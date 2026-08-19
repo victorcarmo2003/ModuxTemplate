@@ -1,0 +1,19 @@
+[package]
+name = "your-name/modux-template"
+version = "0.1.0"
+registry = "https://github.com/UpliftGames/wally-index"
+realm = "shared"
+
+[dependencies]
+# Usado pelo AnimateController (reatividade de estado de animação).
+vide = "centau/vide@0.4.1"
+# Usado por src/shared/Modux/src/Tools/SpringWrapper.luau (self.Tools.Spring, framework).
+spring = "nyxariko/spring@0.1.1"
+
+# [server-dependencies]
+# ProfileService (src/server/Services/ProfileService) já traz um ProfileStore
+# vendorizado em Profile.luau, então não depende do pacote Wally. Se preferir
+# gerenciar a lib via Wally em vez do vendored copy, descomente e ajuste --
+# e adicione de volta o mapeamento ServerScriptService.ServerPackages em
+# default.project.json (removido daqui por não ter nenhuma server-dependency):
+# profilestore = "ddashdev/profilestore@1.0.4"
