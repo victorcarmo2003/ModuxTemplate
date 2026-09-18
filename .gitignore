@@ -1,13 +1,8 @@
-# Project place file
-/ROJO-SRC.rbxlx
-/ServerPackages
-/Packages
-/sync/ReplicatedStorage/Packages
-/sync/ServerScriptService/ServerPackages
-/.modux
-
-# Roblox Studio lock files
+/*.rbxlx
 /*.rbxlx.lock
+/*.rbxl
 /*.rbxl.lock
-
 sourcemap.json
+/Packages
+/ServerPackages
+/DevPackages

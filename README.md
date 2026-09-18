@@ -1,96 +1,187 @@
 # ModuxTemplate
 
-Template inicial pro framework **Modux** (arquitetura Service/Controller/Component customizada, extraída do projeto Faithless), já com 4 sistemas essenciais funcionando:
+Ponto de partida para projetos em Roblox com o [Modux V3](https://github.com/victorcarmo2003/ModuxV3):
+o framework, a rede já ligada e cinco sistemas base funcionando.
 
-- **ProfileService** (`src/server/Services/ProfileService`) — persistência de dados via ProfileStore (vendorizado em `Profile.luau`), com replicação automática (`Data`/`DataKey`) pro client.
-- **VitalService + VitalComponent** (`src/server/Services/Player/VitalService.luau`, `src/server/Components/Player/VitalComponent.luau`) — Health/Armor/Stamina, dano, morte e respawn via `SpawnService`.
-- **AnimateController** (`src/client/Controllers/Player/AnimateController.luau`) — máquina de estados de animação (Idle/Walk/Sprint/Jump/Fall/Land) reativa com `vide`.
-- **InputController** (`src/client/Controllers/InputContext/InputController.luau`) — wrapper de `ContextActionService` com contexto (Gameplay/Menu) e binds desktop+mobile.
+O framework vive em `src/Modux` e é cópia da branch `framework` do repositório do
+Modux. Nada do que está aqui é exemplo descartável — é o que roda.
+
+---
+
+## Setup
+
+```sh
+rokit install
+wally install
+wally-package-types --sourcemap sourcemap.json Packages/ ServerPackages/ DevPackages/
+rogen build
+modux generate
+rojo serve
+```
+
+**`wally-package-types` não é opcional.** O shim que o Wally escreve em
+`Packages/X.lua` é `return require(_Index[...])`, e `export type` não atravessa
+um require assim: os valores resolvem, os tipos não. Sem esse passo,
+`Vide.Source` e `Charm.Atom` viram `Unknown type` e o projeto não compila.
+Rode de novo depois de cada `wally install`.
+
+`rogen build` vem antes de `modux generate`: o `default.project.json` é gerado a
+partir das pastas, e fora de ordem o gerador resolve caminho por um arquivo
+velho.
+
+---
 
 ## Estrutura
 
 ```
-src/
-├── server/
-│   ├── init.server.luau
-│   ├── Services/
-│   │   ├── Player/{PlayerService,SpawnService,VitalService}.luau
-│   │   └── ProfileService/{init,Profile}.luau
-│   └── Components/Player/VitalComponent.luau
-├── client/
-│   ├── init.client.luau
-│   └── Controllers/
-│       ├── Player/AnimateController.luau
-│       └── InputContext/InputController.luau
-└── shared/
-    ├── Modux/           -- framework (não edite src/shared/Modux/src/**)
-    │   ├── init.luau
-    │   ├── CoreTypes.luau    -- tipos base (edite ao adicionar módulos)
-    │   ├── Types.luau        -- *FnMap de cada Service/Controller/Component
-    │   ├── Manifest.luau     -- lista de módulos carregados pelo Loader
-    │   └── src/Network/init.luau  -- pacotes lync (específico de projeto)
-    └── Templates/Profile.luau     -- schema dos dados persistentes
+src/Modux/           framework (gerado + invariante, ver src/Modux/README.md)
+src/Shared/          Types utilitarios (Occlude, Struct, Union) e tablejs
+src/Libs/            injetadas em self.Libs: Signal, Promise, FSM, Charm, Net
+src/Services/server/ NetService, PlayerService, ProfileService, VitalService, GameService
+src/Controllers/client/  NetController, InputController, ProfileController, VitalController, RoundController
+src/Components/server/   Vital
+src/Interface/       componentes Vide e stories do UI Labs
 ```
 
-## Como funciona o carregamento de tipos
+Um módulo é uma pasta com `init.luau`, nunca um arquivo solto: o gerador escreve
+o `Type.luau` ao lado do módulo, e dois módulos na mesma pasta colidiriam nesse
+nome.
 
-No projeto original, `CoreTypes.luau`, `Types.luau` e `Manifest.luau` são **gerados** por uma tooling externa (`syncteam`, listada em `rokit.toml`) que varre `src/server`/`src/client`/`src/shared` procurando `Modux.Service(...)`, `Modux.Controller(...)`, etc. Neste template esses três arquivos foram escritos à mão, reduzidos aos módulos essenciais acima.
+---
 
-Ao criar um novo Service/Controller/Component:
+## Rede
 
-1. Escreva o módulo normalmente (ver padrões abaixo).
-2. Adicione o caminho dotted em `src/shared/Modux/Manifest.luau` (`Services.X`, `Controllers.X`, `Components.X`).
-3. Adicione a entrada em `ServiceFnMap`/`ControllerFnMap`/`ComponentFnMap` dentro de `src/shared/Modux/Types.luau` (pode apontar pra `any` se não quiser tipar os métodos específicos — só isso já dá autocomplete nos IDs válidos de `:Import("...")`).
+As definições ficam em `src/Libs/Net/init.luau`, um `Lync.define` só, requerido
+pelos dois lados. Adicionar tráfego é adicionar uma entrada ali.
 
-Se você tiver o `syncteam` disponível, ele deve conseguir regenerar esses três arquivos automaticamente a partir daqui em diante.
-
-## Padrões Modux
-
-```luau
--- Service (server-only, singleton)
-local Modux = require(game.ReplicatedStorage.Shared.Modux)
-local MyService = Modux.Service("MyService")
-MyService:Import("PlayerService")
-
-MyService:OnInit(function(self) end)
-MyService:OnStart(function(self) end)
-
-return MyService
+```lua
+Vitals = Lync.replicate(Lync.struct({
+	Health = Lync.int(0, 100),
+	Armor = Lync.int(0, 100),
+	Stamina = Lync.int(0, 100),
+})),
 ```
 
-```luau
--- Controller (client-only, singleton)
-local Modux = require(game.ReplicatedStorage.Shared.Modux)
-local MyController = Modux.Controller("MyController")
+Do lado do código, `self.Libs.Net.Vitals:update(...)` já vem tipado pelo schema.
 
-MyController:OnInit(function(self)
-	self.Network.Packages.SomePacket:on(function(data, sender, timestamp) end)
-end)
+### start, flush e close
 
-return MyController
+`NetService` e `NetController` existem só para isso, e o lugar deles no ciclo de
+vida não é arbitrário:
+
+| | |
+|---|---|
+| `Priority = 1000` | roda o **primeiro** `OnStart`, quando todos os `OnInit` já registraram seus responders e antes de qualquer módulo disparar |
+| `OnTick(..., 60, -1000)` | roda o **último** tick do frame, depois de todo mundo ter escrito |
+
+Isso decorre de como o Loader funciona: ele completa todos os `OnInit` antes de
+começar os `OnStart`, e ordena as duas fases por prioridade decrescente.
+
+Daí saem duas regras:
+
+- **Responder de rede só em Service ou Controller, dentro de `OnInit`.**
+  `Lync.start()` tranca as definições, e registrar depois disso lança.
+- **Componente não registra responder.** Componente tagueado sobe depois do
+  `start`, e um responder é único por definição — um por instância seria errado
+  de qualquer forma. Componente dispara e lê à vontade.
+
+---
+
+## O que vem pronto
+
+| | |
+|---|---|
+| `PlayerService` | entrada e saída de jogador e de personagem em Signals, tratando quem já estava no servidor |
+| `ProfileService` | ProfileStore + set `Profile` do Lync com audiência por dono; `Update` aceita patch parcial e replica só o delta |
+| `VitalService` + `Vital` | Health/Armor/Stamina por jogador, dano com absorção por armadura, regen de stamina a 4 Hz, morte e respawn |
+| `InputController` | `ContextActionService` com contexto (Gameplay/Menu), binds desktop e mobile |
+| `GameService` | ciclo de rodada em `atom` do Charm, com `batch` e `effect` replicando |
+| `Counter` | componente Vide com story do UI Labs, para provar o caminho de UI |
+
+O throttle manual de replicação que a versão anterior deste template carregava
+não existe mais: um set do Lync manda só o campo que mudou, junta escritas
+dentro do mesmo flush e tem orçamento por cliente.
+
+---
+
+## Estado reativo
+
+**Charm no servidor, Vide no client.** São dois sistemas de reatividade que não
+se enxergam: um `atom` mudando não re-renderiza Vide. Não há ponte aqui, e é
+proposital — o client recebe do Lync e escreve em `source`.
+
+```lua
+-- server
+self.Status = self.Libs.Charm.atom("Waiting") :: Charm.Atom<Status>
+
+-- client
+self.Health = Vide.source(100) :: Vide.Source<number>
 ```
 
-```luau
--- Component (tagged instance)
-local Modux = require(game.ReplicatedStorage.Shared.Modux)
-local MyComponent = Modux.Component("MyComponent"):Tag("TagName"):ClassName("Instance")
+Para usar Charm no client também, nada precisa mudar: ele já está em
+`self.Libs` dos dois lados.
 
-MyComponent:OnStart(function(self) end)
-MyComponent:OnDestroy(function(self) end)
+---
 
-return MyComponent
+## A armadilha do `self.Libs`
+
+Toda pasta em `src/Libs` entra em `self.Libs` automaticamente, com o tipo saindo
+de `typeof(require(...))`. Mas **nem toda lib pode entrar**.
+
+Lync e Vide estão fora de propósito. O tipo dos dois contém type function que
+não reduz — `Codec<T>` no Lync, `index<Instances, Name>` no `Vide.create` — e
+uma dessas dentro dos extras impede o `SelfOf.Build` de reduzir. O resultado é
+brutal e enganoso:
+
+```
+Cannot add property 'Setup' to table 'setmetatable<Build<Public, {...}>, ...>'
 ```
 
-Dependências entre módulos: `:Import("Name")`. Lifecycle: `OnInit` (setup) -> `OnStart` (todos os módulos prontos) -> `OnDestroy` (cleanup). Rede: server manda com `self.Network.Packages.X:send(data, Player)`, client escuta com `:on(callback)`.
+Esse erro aparece em **todos** os módulos do projeto, em métodos que não têm
+nada de errado, e nunca menciona a lib que o causou. Uma lib ruim derruba a
+tipagem inteira.
 
-## Setup
+Por isso os dois são requeridos direto onde se usa:
 
+```lua
+local Lync = require(ReplicatedStorage.Packages.Lync)
+local Vide = require(ReplicatedStorage.Packages.Vide)
 ```
-rokit install
-wally install
-rojo serve
+
+`src/Libs/Net` continua em `self.Libs` e funciona: `Lync.define(...)` devolve as
+definições com os tipos já aplicados a codecs concretos, então nada fica
+pendente.
+
+**Se depois de adicionar uma lib o projeto inteiro passar a acusar
+`Cannot add property`, o suspeito é a lib que você acabou de adicionar.** Tire
+de `src/Libs`, requeira direto, e rode `tools/analyze.ps1` de novo.
+
+---
+
+## Verificando
+
+```sh
+modux check          # falha se algo esta desatualizado (CI)
+tools/analyze.ps1    # roda o motor do editor sobre o projeto inteiro
 ```
 
-## O que NÃO está incluso
+`analyze.ps1` passando não prova que os tipos existem — prova que nada errou.
+Para saber se o `self` está mesmo tipado, escreva um acesso que **deveria**
+falhar (`self.Dependencies.ServicoQueNaoDeclarei`) e confirme que ele falha.
 
-De propósito, pra manter o template enxuto: câmera, UI (vide components), FSM, zonas, sistemas de mapa/rodada, VitalController (UI de HP client-side — acopla em `vide` + interface própria, então fica de fora; siga o padrão do `AnimateController` pra criar o seu). Adicione conforme a necessidade do projeto.
+### `LuauSolverV2` é obrigatório
+
+Sem a flag não existe type function, `self` fica sem tipo e o autocomplete
+devolve zero item — sem erro e sem aviso. O `.vscode/settings.json` já liga.
+
+---
+
+## Atualizando o framework
+
+```sh
+git clone -b framework https://github.com/victorcarmo2003/ModuxV3 /tmp/modux
+```
+
+E copie por cima de `src/Modux`, menos os quatro arquivos gerados
+(`*/Manifest/init.luau`, `*/Modules.luau`, `shared/Libs.luau`), que o
+`modux generate` reescreve. Os dois `Bootstrap` são seus.
