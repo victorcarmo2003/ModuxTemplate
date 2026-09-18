@@ -84,6 +84,20 @@ Por isso `Vitals` é set (todos veem) e `Profile` é packet direcionado
 (`fireClient(player, ...)`), privado por construção — não por uma alocação de
 chave que um bug poderia errar.
 
+### Para quem o servidor manda
+
+`Lync.all` inclui cliente que ainda não completou o handshake interno do Lync,
+e o frame enviado a ele é descartado com um aviso:
+
+```
+a frame arrived before this client was told it could send one
+```
+
+Por isso o `NetService` mantém um `Lync.group()` alimentado pelo `Ready`, e o
+`GameService` transmite para esse grupo. Quem mandou `Ready` necessariamente
+completou o handshake do transporte — senão o pacote não teria chegado —, então
+o handshake da aplicação implica o do Lync de graça.
+
 ### O handshake Ready
 
 Como packet não guarda estado, o servidor não pode replicar o perfil quando
@@ -189,6 +203,12 @@ local Vide = require(ReplicatedStorage.Packages.Vide)
 `src/Libs/Net` continua em `self.Libs` e funciona: `Lync.define(...)` devolve as
 definições com os tipos já aplicados a codecs concretos, então nada fica
 pendente.
+
+O que está fora é o **módulo inteiro**, não cada tipo dele. `Lync.Group` e
+`Lync.Recipient` são tipos simples e atravessam o `Build` sem problema — o
+`NetService` guarda um `Lync.Group` e o `GameService` recebe um
+`Lync.Recipient`, os dois no Manifest, com o projeto em zero erro. O que não
+passa é `Codec<T>`, `Packet<T>` e companhia.
 
 **Se depois de adicionar uma lib o projeto inteiro passar a acusar
 `Cannot add property`, o suspeito é a lib que você acabou de adicionar.** Tire

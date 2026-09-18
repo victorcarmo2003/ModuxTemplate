@@ -12,6 +12,7 @@ function NetService:Setup()
 	self.Running = false :: boolean
 	self.ClientReady = self.Libs.Signal.new() :: SignalLib.Signal<Player>
 	self.Ready = {} :: { [Player]: boolean }
+	self.Audience = Lync.group() :: Lync.Group
 end
 
 function NetService:IsReady(player: Player): boolean
@@ -23,6 +24,7 @@ NetService:OnInit(function(self)
 
 	self.Libs.Net.Ready:onServer(function(_, player: Player)
 		self.Ready[player] = true
+		self.Audience:add(player)
 		self.ClientReady:Fire(player)
 	end)
 

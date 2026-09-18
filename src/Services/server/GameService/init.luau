@@ -11,7 +11,7 @@ const INTERMISSION = 15
 const ROUND = 120
 const ENDING = 5
 
-const GameService = Modux.Service("GameService", { Priority = 600 })
+const GameService = Modux.Service("GameService", { Require = { "NetService" }, Priority = 600 })
 
 function GameService:Setup()
 	self.Status = self.Libs.Charm.atom("Waiting") :: Charm.Atom<Status>
@@ -36,16 +36,24 @@ function GameService:Advance()
 	end
 end
 
+function GameService:Publish(to: Lync.Recipient)
+	self.Libs.Net.Round:fireClient(to, {
+		Status = self.Status(),
+		Seconds = self.Seconds(),
+	})
+end
+
 GameService:OnInit(function(self)
 	self:Setup()
 end)
 
 GameService:OnStart(function(self)
+	self.Dependencies.NetService.ClientReady:Connect(function(player)
+		self:Publish(player)
+	end)
+
 	self.Libs.Charm.effect(function()
-		self.Libs.Net.Round:fireClient(Lync.all, {
-			Status = self.Status(),
-			Seconds = self.Seconds(),
-		})
+		self:Publish(self.Dependencies.NetService.Audience)
 	end)
 end)
 
