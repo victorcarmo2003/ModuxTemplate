@@ -3,12 +3,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Lync = require(ReplicatedStorage.Packages.Lync)
 
 return Lync.define("game", {
-	Profile = Lync.replicate(Lync.struct({
-		Owner = Lync.str(1, 20),
+	Profile = Lync.packet(Lync.struct({
 		Coins = Lync.int(0, 2147483647),
 		Level = Lync.int(1, 1000),
 		Playtime = Lync.f32(),
-	})):keyBy("Owner"),
+	})),
 
 	Vitals = Lync.replicate(Lync.struct({
 		Health = Lync.int(0, 100),

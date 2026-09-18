@@ -16,6 +16,10 @@ function PlayerService:Setup()
 end
 
 function PlayerService:Watch(player: Player)
+	if self.Connections[player] ~= nil then
+		return
+	end
+
 	const bucket = {}
 	self.Connections[player] = bucket
 
@@ -62,7 +66,9 @@ PlayerService:OnInit(function(self)
 	Players.PlayerRemoving:Connect(function(player)
 		self:Forget(player)
 	end)
+end)
 
+PlayerService:OnStart(function(self)
 	for _, player in Players:GetPlayers() do
 		self:Watch(player)
 	end

@@ -6,12 +6,24 @@ local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 
 const NetController = Modux.Controller("NetController", { Priority = 1000 })
 
+function NetController:Setup()
+	self.Running = false :: boolean
+end
+
+NetController:OnInit(function(self)
+	self:Setup()
+end)
+
 NetController:OnStart(function(self)
 	Lync.start()
+	self.Running = true
 	self.Libs.Net.Ready:fireServer()
 end)
 
 NetController:OnTick(function(self)
+	if not self.Running then
+		return
+	end
 	Lync.flush()
 end, 60, -1000)
 

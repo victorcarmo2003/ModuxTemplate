@@ -12,7 +12,10 @@ export type Data = typeof(Template)
 
 const STORE_NAME = "Player"
 
-const ProfileService = Modux.Service("ProfileService", { Require = { "PlayerService" }, Priority = 800 })
+const ProfileService = Modux.Service(
+	"ProfileService",
+	{ Require = { "PlayerService", "NetService" }, Priority = 800 }
+)
 
 function ProfileService:Setup()
 	self.Store = ProfileStore.New(STORE_NAME, Template) :: any
@@ -37,7 +40,23 @@ function ProfileService:Update(player: Player, patch: Struct.Partial<Data>)
 	for key, value in patch :: any do
 		profile.Data[key] = value
 	end
-	self.Libs.Net.Profile:update(player.UserId, patch)
+	self:Replicate(player)
+end
+
+function ProfileService:Replicate(player: Player)
+	const profile = self.Profiles[player]
+	if not profile then
+		return
+	end
+	if not self.Dependencies.NetService:IsReady(player) then
+		return
+	end
+	const data = profile.Data
+	self.Libs.Net.Profile:fireClient(player, {
+		Coins = data.Coins,
+		Level = data.Level,
+		Playtime = data.Playtime,
+	})
 end
 
 function ProfileService:Load(player: Player)
@@ -55,6 +74,9 @@ function ProfileService:Load(player: Player)
 	profile:AddUserId(player.UserId)
 	profile:Reconcile()
 	profile.OnSessionEnd:Connect(function()
+		if self.Profiles[player] == nil then
+			return
+		end
 		self.Profiles[player] = nil
 		player:Kick("Your data session ended. Please rejoin.")
 	end)
@@ -65,25 +87,11 @@ function ProfileService:Load(player: Player)
 	end
 
 	self.Profiles[player] = profile
-
-	const owner = tostring(player.UserId)
-	const data = profile.Data
-	self.Libs.Net.Profile:add(player.UserId, {
-		Owner = owner,
-		Coins = data.Coins,
-		Level = data.Level,
-		Playtime = data.Playtime,
-	})
-	self.Libs.Net.Profile:audience(owner, player)
-
-	self.Loaded:Fire(player, data)
+	self:Replicate(player)
+	self.Loaded:Fire(player, profile.Data)
 end
 
 function ProfileService:Unload(player: Player)
-	if self.Libs.Net.Profile:get(player.UserId) then
-		self.Libs.Net.Profile:remove(player.UserId)
-	end
-
 	const profile = self.Profiles[player]
 	if not profile then
 		return
@@ -102,6 +110,10 @@ ProfileService:OnInit(function(self)
 	end)
 	self.Dependencies.PlayerService.PlayerRemoving:Connect(function(player)
 		self:Unload(player)
+	end)
+
+	self.Dependencies.NetService.ClientReady:Connect(function(player)
+		self:Replicate(player)
 	end)
 end)
 

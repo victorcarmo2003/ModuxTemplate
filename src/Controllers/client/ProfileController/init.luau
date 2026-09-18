@@ -16,21 +16,11 @@ end
 ProfileController:OnInit(function(self)
 	self:Setup()
 
-	self.Libs.Net.Profile:onAdded(function(_, record)
-		self.Coins(record.Coins)
-		self.Level(record.Level)
-		self.Playtime(record.Playtime)
+	self.Libs.Net.Profile:onClient(function(data)
+		self.Coins(data.Coins)
+		self.Level(data.Level)
+		self.Playtime(data.Playtime)
 		self.Ready(true)
-	end)
-
-	self.Libs.Net.Profile:onChanged(function(_, record)
-		self.Coins(record.Coins)
-		self.Level(record.Level)
-		self.Playtime(record.Playtime)
-	end)
-
-	self.Libs.Net.Profile:onRemoved(function()
-		self.Ready(false)
 	end)
 end)
 

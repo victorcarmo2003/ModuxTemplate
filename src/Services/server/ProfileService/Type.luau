@@ -14,6 +14,7 @@ export type Public = {
 	Setup: (self: Public) -> (),
 	Get: (self: Public, player: Player) -> Data?,
 	Update: (self: Public, player: Player, patch: Struct.Partial<Data>) -> (),
+	Replicate: (self: Public, player: Player) -> (),
 	Load: (self: Public, player: Player) -> (),
 	Unload: (self: Public, player: Player) -> (),
 }

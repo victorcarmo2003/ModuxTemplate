@@ -64,6 +64,40 @@ Vitals = Lync.replicate(Lync.struct({
 
 Do lado do código, `self.Libs.Net.Vitals:update(...)` já vem tipado pelo schema.
 
+**O schema é validado em runtime, dentro de `Lync.start()`.** `analyze.ps1`
+passando não diz nada sobre ele: um `keyBy` inválido compila e só estoura no
+Studio, levando junto tudo que depende do start.
+
+### Set ou packet
+
+| | |
+|---|---|
+| **set** (`replicate`) | estado que vários clientes veem. Manda só o campo que mudou, junta escritas do mesmo flush, e **entrega o estado atual a quem chega depois**. |
+| **packet** (`packet`) | evento, ou dado privado de um jogador só. Não guarda nada: se ninguém estava escutando, se perde. |
+
+`keyBy` particiona a audiência e aceita **só campo finito** — `bool`, `int`,
+`quant`, `angle` ou `enum`. Não serve para "cada um vê o seu": um `str` com o
+UserId é recusado no start, e um `int` com o range de UserId seria uma grade
+absurda. Set é para time, sala, região.
+
+Por isso `Vitals` é set (todos veem) e `Profile` é packet direcionado
+(`fireClient(player, ...)`), privado por construção — não por uma alocação de
+chave que um bug poderia errar.
+
+### O handshake Ready
+
+Como packet não guarda estado, o servidor não pode replicar o perfil quando
+quiser: o cliente demora **segundos** a mais para bootar, e o pacote enviado
+antes disso simplesmente some.
+
+`NetController` dispara `Ready` no `OnStart`; `NetService` escuta e expõe o
+signal `ClientReady` mais o `IsReady(player)`. `ProfileService:Replicate`
+verifica `IsReady` e desiste se o cliente ainda não chegou, e replica de novo
+quando o `ClientReady` chega. Os dois caminhos existem porque a ordem entre
+"perfil carregou" e "cliente pronto" não é garantida.
+
+Set não precisa disso: quem chega depois recebe o estado atual num `onAdded`.
+
 ### start, flush e close
 
 `NetService` e `NetController` existem só para isso, e o lugar deles no ciclo de
@@ -84,6 +118,10 @@ Daí saem duas regras:
 - **Componente não registra responder.** Componente tagueado sobe depois do
   `start`, e um responder é único por definição — um por instância seria errado
   de qualquer forma. Componente dispara e lê à vontade.
+- **Varredura de quem já está no servidor vai no `OnStart`, não no `OnInit`.**
+  `PlayerService` faz isso: varrendo no `OnInit`, os serviços de prioridade
+  menor ainda não tinham conectado seus handlers e perderiam quem já estava lá,
+  e o `Vitals:add` do componente rodaria antes do `Lync.start()`.
 
 ---
 
