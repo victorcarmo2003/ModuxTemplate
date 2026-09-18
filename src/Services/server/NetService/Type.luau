@@ -11,6 +11,7 @@ export type Public = {
 	Running: boolean,
 	Setup: (self: Public) -> (),
 	IsReady: (self: Public, player: Player) -> boolean,
+	IsRunning: (self: Public) -> boolean,
 }
 
 return {}

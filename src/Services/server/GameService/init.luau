@@ -37,6 +37,9 @@ function GameService:Advance()
 end
 
 function GameService:Publish(to: Lync.Recipient)
+	if not self.Dependencies.NetService:IsRunning() then
+		return
+	end
 	self.Libs.Net.Round:fireClient(to, {
 		Status = self.Status(),
 		Seconds = self.Seconds(),

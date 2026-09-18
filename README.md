@@ -98,6 +98,29 @@ Por isso o `NetService` mantém um `Lync.group()` alimentado pelo `Ready`, e o
 completou o handshake do transporte — senão o pacote não teria chegado —, então
 o handshake da aplicação implica o do Lync de graça.
 
+Na volta, `BindToClose` desarma antes de `Lync.close()`, e quem transmite
+checa `NetService:IsRunning()`. Sem isso o servidor erra no desligamento: os
+ticks correm mais um frame, mexem no estado, e o `effect` tenta disparar num
+Lync que ja soltou os remotes.
+
+### Um aviso que nao e teu
+
+Todo cliente que entra produz uma vez:
+
+```
+a frame arrived before this client was told it could send one
+```
+
+E uma corrida dentro do Lync. O servidor responde o handshake e semeia o
+backlog dos sets no mesmo instante, por remotes diferentes, e o Roblox nao
+garante ordem entre remotes — se o dado chega primeiro, o cliente ainda tem
+`link.sending = false` e descarta o frame. O Lync se recupera sozinho: ao
+admitir o cliente ele reenvia os records, e foi por isso que o `Vitals` chegou
+normalmente no teste. Custo real: um frame descartado por join.
+
+Vale para set, que replica sem perguntar. Packet nao sofre disso aqui porque o
+template so dispara depois do `Ready`.
+
 ### O handshake Ready
 
 Como packet não guarda estado, o servidor não pode replicar o perfil quando

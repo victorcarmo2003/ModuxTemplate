@@ -19,6 +19,10 @@ function NetService:IsReady(player: Player): boolean
 	return self.Ready[player] == true
 end
 
+function NetService:IsRunning(): boolean
+	return self.Running
+end
+
 NetService:OnInit(function(self)
 	self:Setup()
 
@@ -36,7 +40,11 @@ end)
 NetService:OnStart(function(self)
 	Lync.start()
 	self.Running = true
-	game:BindToClose(Lync.close)
+
+	game:BindToClose(function()
+		self.Running = false
+		Lync.close()
+	end)
 end)
 
 NetService:OnTick(function(self)
