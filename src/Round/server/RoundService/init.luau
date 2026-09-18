@@ -11,21 +11,21 @@ const INTERMISSION = 15
 const ROUND = 120
 const ENDING = 5
 
-const GameService = Modux.Service("GameService", { Require = { "NetService" }, Priority = 600 })
+const RoundService = Modux.Service("RoundService", { Require = { "NetService" }, Priority = 600 })
 
-function GameService:Setup()
+function RoundService:Setup()
 	self.Status = self.Libs.Charm.atom("Waiting") :: Charm.Atom<Status>
 	self.Seconds = self.Libs.Charm.atom(INTERMISSION) :: Charm.Atom<number>
 end
 
-function GameService:Enter(status: Status, seconds: number)
+function RoundService:Enter(status: Status, seconds: number)
 	self.Libs.Charm.batch(function()
 		self.Status(status)
 		self.Seconds(seconds)
 	end)
 end
 
-function GameService:Advance()
+function RoundService:Advance()
 	const status = self.Status()
 	if status == "Waiting" then
 		self:Enter("Playing", ROUND)
@@ -36,7 +36,7 @@ function GameService:Advance()
 	end
 end
 
-function GameService:Publish(to: Lync.Recipient)
+function RoundService:Publish(to: Lync.Recipient)
 	if not self.Dependencies.NetService:IsRunning() then
 		return
 	end
@@ -46,11 +46,11 @@ function GameService:Publish(to: Lync.Recipient)
 	})
 end
 
-GameService:OnInit(function(self)
+RoundService:OnInit(function(self)
 	self:Setup()
 end)
 
-GameService:OnStart(function(self)
+RoundService:OnStart(function(self)
 	self.Dependencies.NetService.ClientReady:Connect(function(player)
 		self:Publish(player)
 	end)
@@ -60,7 +60,7 @@ GameService:OnStart(function(self)
 	end)
 end)
 
-GameService:OnTick(function(self)
+RoundService:OnTick(function(self)
 	const remaining = self.Seconds() - 1
 	if remaining > 0 then
 		self.Seconds(remaining)
@@ -69,4 +69,4 @@ GameService:OnTick(function(self)
 	self:Advance()
 end, 1)
 
-return GameService
+return RoundService

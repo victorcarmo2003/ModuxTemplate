@@ -24,5 +24,8 @@
 				}
 			}
 		}
-	}
+	},
+	"globIgnorePaths": [
+		"**/*.md"
+	]
 }

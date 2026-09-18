@@ -1,4 +1,7 @@
 {
+	"globIgnorePaths": [
+		"**/*.md"
+	],
 	"name": "ModuxTemplate",
 	"tree": {
 		"$className": "DataModel",
@@ -14,12 +17,6 @@
 			"shared": {
 				"$className": "Folder",
 				"$ignoreUnknownInstances": false,
-				"Interface": {
-					"$ignoreUnknownInstances": false,
-					"$path": {
-						"optional": "src/Interface"
-					}
-				},
 				"Libs": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
@@ -52,21 +49,39 @@
 			"server": {
 				"$className": "Folder",
 				"$ignoreUnknownInstances": false,
-				"Components": {
-					"$ignoreUnknownInstances": false,
-					"$path": {
-						"optional": "src/Components/server"
-					}
-				},
 				"Modux": {
 					"$path": {
 						"optional": "src/Modux/server"
 					}
 				},
-				"Services": {
+				"Net": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
-						"optional": "src/Services/server"
+						"optional": "src/Net/server"
+					}
+				},
+				"Player": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Player/server"
+					}
+				},
+				"Profile": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Profile/server"
+					}
+				},
+				"Round": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Round/server"
+					}
+				},
+				"Vital": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Vital/server"
 					}
 				}
 			}
@@ -81,15 +96,45 @@
 				"client": {
 					"$className": "Folder",
 					"$ignoreUnknownInstances": false,
-					"Controllers": {
+					"Input": {
 						"$ignoreUnknownInstances": false,
 						"$path": {
-							"optional": "src/Controllers/client"
+							"optional": "src/Input/client"
+						}
+					},
+					"Interface": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Interface/client"
 						}
 					},
 					"Modux": {
 						"$path": {
 							"optional": "src/Modux/client"
+						}
+					},
+					"Net": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Net/client"
+						}
+					},
+					"Profile": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Profile/client"
+						}
+					},
+					"Round": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Round/client"
+						}
+					},
+					"Vital": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Vital/client"
 						}
 					}
 				}

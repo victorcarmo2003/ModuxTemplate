@@ -3,10 +3,10 @@
 local ServerScriptService = game:GetService("ServerScriptService")
 
 return {
-	ServerScriptService.server.Components.Vital,
-	ServerScriptService.server.Services.GameService,
-	ServerScriptService.server.Services.NetService,
-	ServerScriptService.server.Services.PlayerService,
-	ServerScriptService.server.Services.ProfileService,
-	ServerScriptService.server.Services.VitalService,
+	ServerScriptService.server.Net.NetService,
+	ServerScriptService.server.Player.PlayerService,
+	ServerScriptService.server.Profile.ProfileService,
+	ServerScriptService.server.Round.RoundService,
+	ServerScriptService.server.Vital.Vital,
+	ServerScriptService.server.Vital.VitalService,
 } :: { ModuleScript }

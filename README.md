@@ -33,15 +33,28 @@ velho.
 
 ## Estrutura
 
+O rogen é feature-based, e o Modux já carrega a espécie na declaração
+(`Modux.Service(...)`). Uma pasta `Services/` repetiria o que o arquivo já diz;
+a pasta guarda a **feature**, e cada uma traz o seu `server/` e `client/`:
+
 ```
-src/Modux/           framework (gerado + invariante, ver src/Modux/README.md)
-src/Shared/          Types utilitarios (Occlude, Struct, Union) e tablejs
-src/Libs/            injetadas em self.Libs: Signal, Promise, FSM, Charm, Net
-src/Services/server/ NetService, PlayerService, ProfileService, VitalService, GameService
-src/Controllers/client/  NetController, InputController, ProfileController, VitalController, RoundController
-src/Components/server/   Vital
-src/Interface/       componentes Vide e stories do UI Labs
+src/Net/       server/NetService        client/NetController
+src/Player/    server/PlayerService
+src/Profile/   server/ProfileService    client/ProfileController
+src/Vital/     server/VitalService      client/VitalController
+               server/Vital  (componente)
+src/Round/     server/RoundService      client/RoundController
+src/Input/                              client/InputController
+src/Interface/                          client/ (componentes Vide e stories)
+
+src/Modux/     framework (gerado + invariante, ver src/Modux/README.md)
+src/Shared/    Types utilitarios (Occlude, Struct, Union) e tablejs
+src/Libs/      injetadas em self.Libs: Signal, Promise, FSM, Charm, Net
 ```
+
+O caminho vira o lugar no DataModel: `src/Vital/server/` chega como
+`ServerScriptService.server.Vital`. Feature nova é uma pasta nova, com as duas
+metades juntas — e apagar a feature é apagar a pasta.
 
 Um módulo é uma pasta com `init.luau`, nunca um arquivo solto: o gerador escreve
 o `Type.luau` ao lado do módulo, e dois módulos na mesma pasta colidiriam nesse
@@ -170,7 +183,7 @@ Daí saem duas regras:
 | `ProfileService` | ProfileStore + set `Profile` do Lync com audiência por dono; `Update` aceita patch parcial e replica só o delta |
 | `VitalService` + `Vital` | Health/Armor/Stamina por jogador, dano com absorção por armadura, regen de stamina a 4 Hz, morte e respawn |
 | `InputController` | `ContextActionService` com contexto (Gameplay/Menu), binds desktop e mobile |
-| `GameService` | ciclo de rodada em `atom` do Charm, com `batch` e `effect` replicando |
+| `RoundService` | ciclo de rodada em `atom` do Charm, com `batch` e `effect` replicando |
 | `Counter` | componente Vide com story do UI Labs, para provar o caminho de UI |
 
 O throttle manual de replicação que a versão anterior deste template carregava

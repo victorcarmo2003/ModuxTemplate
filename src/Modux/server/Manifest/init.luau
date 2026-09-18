@@ -1,18 +1,18 @@
 --!strict
 
 local ServerScriptService = game:GetService("ServerScriptService")
-local Vital = require(ServerScriptService.server.Components.Vital.Type)
-local GameService = require(ServerScriptService.server.Services.GameService.Type)
-local NetService = require(ServerScriptService.server.Services.NetService.Type)
-local PlayerService = require(ServerScriptService.server.Services.PlayerService.Type)
-local ProfileService = require(ServerScriptService.server.Services.ProfileService.Type)
-local VitalService = require(ServerScriptService.server.Services.VitalService.Type)
+local NetService = require(ServerScriptService.server.Net.NetService.Type)
+local PlayerService = require(ServerScriptService.server.Player.PlayerService.Type)
+local ProfileService = require(ServerScriptService.server.Profile.ProfileService.Type)
+local RoundService = require(ServerScriptService.server.Round.RoundService.Type)
+local Vital = require(ServerScriptService.server.Vital.Vital.Type)
+local VitalService = require(ServerScriptService.server.Vital.VitalService.Type)
 
 export type AllServices = {
-	GameService: GameService.Public,
 	NetService: NetService.Public,
 	PlayerService: PlayerService.Public,
 	ProfileService: ProfileService.Public,
+	RoundService: RoundService.Public,
 	VitalService: VitalService.Public,
 }
 
