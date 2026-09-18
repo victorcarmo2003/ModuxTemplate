@@ -116,9 +116,9 @@ checa `NetService:IsRunning()`. Sem isso o servidor erra no desligamento: os
 ticks correm mais um frame, mexem no estado, e o `effect` tenta disparar num
 Lync que ja soltou os remotes.
 
-### Um aviso que nao e teu
+### Um aviso que nao e teu, e como calamos ele
 
-Todo cliente que entra produz uma vez:
+Todo cliente que entra produzia uma vez:
 
 ```
 a frame arrived before this client was told it could send one
@@ -128,11 +128,22 @@ E uma corrida dentro do Lync. O servidor responde o handshake e semeia o
 backlog dos sets no mesmo instante, por remotes diferentes, e o Roblox nao
 garante ordem entre remotes — se o dado chega primeiro, o cliente ainda tem
 `link.sending = false` e descarta o frame. O Lync se recupera sozinho: ao
-admitir o cliente ele reenvia os records, e foi por isso que o `Vitals` chegou
-normalmente no teste. Custo real: um frame descartado por join.
+admitir o cliente ele reenvia os records. Custo real: um frame descartado por
+join, e `Log.warn`, nunca `Log.error` — nada quebra.
 
-Vale para set, que replica sem perguntar. Packet nao sofre disso aqui porque o
-template so dispara depois do `Ready`.
+`src/Net/Log.luau` desconecta o `Lync.console` e instala um listener que deixa
+passar tudo menos `drop.unready`. E a saida que a propria lib documenta: *a
+caller who formats records themselves disconnects it and attaches their own*.
+
+Silenciar **so esse codigo** e o ponto. `link.sending` e escrito uma unica vez
+na vida de uma sessao (`= true`, nunca volta), entao `drop.unready` so pode
+acontecer na janela de handshake — depois dela e impossivel por construcao, e
+nao ha estado acionavel se escondendo.
+
+Os vizinhos dele ficam audiveis de proposito. `drop.mismatch` significa
+servidor e cliente com schemas diferentes, `drop.validate` e uma mensagem
+recusada, `drop.bounds` e frame corrompido. Para acrescentar um codigo a lista,
+edite `SILENCED` — e pense duas vezes.
 
 ### O handshake Ready
 

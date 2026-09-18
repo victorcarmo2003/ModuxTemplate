@@ -28,6 +28,15 @@
 						"optional": "src/Modux/shared"
 					}
 				},
+				"Net": {
+					"$className": "Folder",
+					"$ignoreUnknownInstances": false,
+					"Log": {
+						"$path": {
+							"optional": "src/Net/Log.luau"
+						}
+					}
+				},
 				"Types": {
 					"$ignoreUnknownInstances": false,
 					"$path": {

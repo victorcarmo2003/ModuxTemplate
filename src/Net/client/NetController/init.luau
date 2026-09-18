@@ -2,6 +2,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Lync = require(ReplicatedStorage.Packages.Lync)
+local quietLync = require(ReplicatedStorage.shared.Net.Log)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 
 const NetController = Modux.Controller("NetController", { Priority = 1000 })
@@ -12,6 +13,7 @@ end
 
 NetController:OnInit(function(self)
 	self:Setup()
+	quietLync()
 end)
 
 NetController:OnStart(function(self)

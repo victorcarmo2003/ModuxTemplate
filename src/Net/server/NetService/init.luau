@@ -3,6 +3,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 local Lync = require(ReplicatedStorage.Packages.Lync)
+local quietLync = require(ReplicatedStorage.shared.Net.Log)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 local Modux = require(ServerScriptService.server.Modux)
 
@@ -25,6 +26,7 @@ end
 
 NetService:OnInit(function(self)
 	self:Setup()
+	quietLync()
 
 	self.Libs.Net.Ready:onServer(function(_, player: Player)
 		self.Ready[player] = true
