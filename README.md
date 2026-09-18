@@ -180,7 +180,7 @@ Daí saem duas regras:
 | | |
 |---|---|
 | `PlayerService` | entrada e saída de jogador e de personagem em Signals, tratando quem já estava no servidor |
-| `ProfileService` | ProfileStore + set `Profile` do Lync com audiência por dono; `Update` aceita patch parcial e replica só o delta |
+| `ProfileService` | ProfileStore + campos reativos: `profile.Coins(100)` escreve, `profile.Coins()` lê |
 | `VitalService` + `Vital` | Health/Armor/Stamina por jogador, dano com absorção por armadura, regen de stamina a 4 Hz, morte e respawn |
 | `InputController` | `ContextActionService` com contexto (Gameplay/Menu), binds desktop e mobile |
 | `RoundService` | ciclo de rodada em `atom` do Charm, com `batch` e `effect` replicando |
@@ -193,6 +193,31 @@ dentro do mesmo flush e tem orçamento por cliente.
 ---
 
 ## Estado reativo
+
+### O perfil é reativo
+
+`Get` devolve um campo por atom, não uma tabela plana:
+
+```lua
+const profile = self.Dependencies.ProfileService:Get(player)
+profile.Coins(100)                     -- escreve
+print(profile.Coins())                 -- le, tipado como number
+profile.Level(profile.Level() + 1)
+```
+
+Escrever num campo persiste e replica sozinho: um `effect` por jogador lê todos
+os atoms, copia para `session.Data` (que é o que o ProfileStore salva) e dispara
+a replicação. Não existe "lembrar de salvar".
+
+O tipo é **derivado do Template**, não escrito à mão. `Atomic.Table<Data>` em
+`src/Shared/Types/Atomic.luau` mapeia cada campo `K: V` para
+`K: (() -> V) & ((V) -> V)`. Campo novo em `Template.luau` vira atom tipado sem
+tocar em mais nada — e `profile.Coins("texto")` não compila.
+
+Para mexer em vários campos de uma vez, `Update(player, patch)` envolve tudo num
+`batch`, senão cada escrita dispara o effect e manda um pacote.
+
+### Charm no servidor, Vide no client
 
 **Charm no servidor, Vide no client.** São dois sistemas de reatividade que não
 se enxergam: um `atom` mudando não re-renderiza Vide. Não há ponte aqui, e é

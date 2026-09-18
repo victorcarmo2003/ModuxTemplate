@@ -3,12 +3,14 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 local ProfileStore = require(ServerScriptService.ServerPackages.ProfileStore)
+local Atomic = require(ReplicatedStorage.shared.Types.Atomic)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 local Struct = require(ReplicatedStorage.shared.Types.Struct)
 local Template = require(script.Template)
 local Modux = require(ServerScriptService.server.Modux)
 
 export type Data = typeof(Template)
+export type Profile = Atomic.Table<Data>
 
 const STORE_NAME = "Player"
 
@@ -19,16 +21,14 @@ const ProfileService = Modux.Service(
 
 function ProfileService:Setup()
 	self.Store = ProfileStore.New(STORE_NAME, Template) :: any
-	self.Profiles = {} :: { [Player]: any }
-	self.Loaded = self.Libs.Signal.new() :: SignalLib.Signal<Player, Data>
+	self.Sessions = {} :: { [Player]: any }
+	self.Profiles = {} :: { [Player]: Profile }
+	self.Disposers = {} :: { [Player]: () -> () }
+	self.Loaded = self.Libs.Signal.new() :: SignalLib.Signal<Player, Profile>
 end
 
-function ProfileService:Get(player: Player): Data?
-	const profile = self.Profiles[player]
-	if not profile then
-		return nil
-	end
-	return profile.Data
+function ProfileService:Get(player: Player): Profile?
+	return self.Profiles[player]
 end
 
 function ProfileService:Update(player: Player, patch: Struct.Partial<Data>)
@@ -37,10 +37,18 @@ function ProfileService:Update(player: Player, patch: Struct.Partial<Data>)
 		warn(`[ProfileService] {player.Name} has no loaded profile`)
 		return
 	end
-	for key, value in patch :: any do
-		profile.Data[key] = value
-	end
-	self:Replicate(player)
+
+	const fields: { [string]: (any) -> any } = profile :: any
+	self.Libs.Charm.batch(function()
+		for key, value in patch :: { [string]: any } do
+			const field = fields[key]
+			if field == nil then
+				warn(`[ProfileService] {key} is not a profile field`)
+				continue
+			end
+			field(value)
+		end
+	end)
 end
 
 function ProfileService:Replicate(player: Player)
@@ -51,53 +59,78 @@ function ProfileService:Replicate(player: Player)
 	if not self.Dependencies.NetService:IsReady(player) then
 		return
 	end
-	const data = profile.Data
+
 	self.Libs.Net.Profile:fireClient(player, {
-		Coins = data.Coins,
-		Level = data.Level,
-		Playtime = data.Playtime,
+		Coins = profile.Coins(),
+		Level = profile.Level(),
+		Playtime = profile.Playtime(),
 	})
 end
 
+function ProfileService:Bind(player: Player, session: any): Profile
+	const profile = {}
+	for key, value in session.Data do
+		profile[key] = self.Libs.Charm.atom(value)
+	end
+	self.Profiles[player] = profile :: any
+
+	self.Disposers[player] = self.Libs.Charm.effect(function()
+		for key, field in profile do
+			session.Data[key] = field()
+		end
+		self:Replicate(player)
+	end)
+
+	return profile :: any
+end
+
 function ProfileService:Load(player: Player)
-	const profile = self.Store:StartSessionAsync(`{player.UserId}`, {
+	const session = self.Store:StartSessionAsync(`{player.UserId}`, {
 		Cancel = function()
 			return player.Parent ~= Players
 		end,
 	})
 
-	if not profile then
+	if not session then
 		player:Kick("Could not load your data. Please rejoin.")
 		return
 	end
 
-	profile:AddUserId(player.UserId)
-	profile:Reconcile()
-	profile.OnSessionEnd:Connect(function()
-		if self.Profiles[player] == nil then
+	session:AddUserId(player.UserId)
+	session:Reconcile()
+	session.OnSessionEnd:Connect(function()
+		if self.Sessions[player] == nil then
 			return
 		end
-		self.Profiles[player] = nil
+		self:Forget(player)
 		player:Kick("Your data session ended. Please rejoin.")
 	end)
 
 	if player.Parent ~= Players then
-		profile:EndSession()
+		session:EndSession()
 		return
 	end
 
-	self.Profiles[player] = profile
-	self:Replicate(player)
-	self.Loaded:Fire(player, profile.Data)
+	self.Sessions[player] = session
+	self.Loaded:Fire(player, self:Bind(player, session))
+end
+
+function ProfileService:Forget(player: Player)
+	const dispose = self.Disposers[player]
+	if dispose then
+		dispose()
+		self.Disposers[player] = nil
+	end
+	self.Profiles[player] = nil
+	self.Sessions[player] = nil
 end
 
 function ProfileService:Unload(player: Player)
-	const profile = self.Profiles[player]
-	if not profile then
-		return
+	const session = self.Sessions[player]
+	self:Forget(player)
+	if session then
+		session:EndSession()
 	end
-	self.Profiles[player] = nil
-	profile:EndSession()
 end
 
 ProfileService:OnInit(function(self)
