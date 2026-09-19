@@ -11,7 +11,7 @@ const INTERMISSION = 15
 const ROUND = 120
 const ENDING = 5
 
-const RoundService = Modux.Service("RoundService", { Require = { "NetService" }, Priority = 600 })
+const RoundService = Modux.Service("RoundService", { Require = { "NetService", "VitalService" }, Priority = 600 })
 
 function RoundService:Setup()
 	self.Status = self.Libs.Charm.atom("Waiting") :: Charm.Atom<Status>
