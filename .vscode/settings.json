@@ -3,6 +3,7 @@
     "luau-lsp.studioPlugin.enabled": true,
     "luau-lsp.sourcemap.enabled": true,
     "luau-lsp.sourcemap.autogenerate": true,
+    "luau-lsp.sourcemap.useVSCodeWatcher": true,
     "luau-lsp.studioPlugin.port": 3668,
     "luau-lsp.sourcemap.sourcemapFile": "sourcemap.json",
     "luau-lsp.fflags.enableNewSolver": true,
