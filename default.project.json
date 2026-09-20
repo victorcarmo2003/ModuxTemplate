@@ -63,6 +63,12 @@
 						"optional": "src/Modux/server"
 					}
 				},
+				"ModuxTypes": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/ModuxTypes/server"
+					}
+				},
 				"Net": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
@@ -85,12 +91,6 @@
 					"$ignoreUnknownInstances": false,
 					"$path": {
 						"optional": "src/Round/server"
-					}
-				},
-				"Types": {
-					"$ignoreUnknownInstances": false,
-					"$path": {
-						"optional": "src/Types/server"
 					}
 				},
 				"Vital": {
@@ -128,6 +128,12 @@
 							"optional": "src/Modux/client"
 						}
 					},
+					"ModuxTypes": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/ModuxTypes/client"
+						}
+					},
 					"Net": {
 						"$ignoreUnknownInstances": false,
 						"$path": {
@@ -144,12 +150,6 @@
 						"$ignoreUnknownInstances": false,
 						"$path": {
 							"optional": "src/Round/client"
-						}
-					},
-					"Types": {
-						"$ignoreUnknownInstances": false,
-						"$path": {
-							"optional": "src/Types/client"
 						}
 					},
 					"Vital": {
