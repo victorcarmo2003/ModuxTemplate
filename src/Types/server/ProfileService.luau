@@ -1,10 +1,11 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerScriptService = game:GetService("ServerScriptService")
 local Atomic = require(ReplicatedStorage.shared.Types.Atomic)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 local Struct = require(ReplicatedStorage.shared.Types.Struct)
-local Template = require(script.Parent.Template)
+local Template = require(ServerScriptService.server.Profile.ProfileService.Template)
 
 export type Data = typeof(Template)
 export type Profile = Atomic.Table<Data>

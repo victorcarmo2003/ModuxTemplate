@@ -87,6 +87,12 @@
 						"optional": "src/Round/server"
 					}
 				},
+				"Types": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Types/server"
+					}
+				},
 				"Vital": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
@@ -138,6 +144,12 @@
 						"$ignoreUnknownInstances": false,
 						"$path": {
 							"optional": "src/Round/client"
+						}
+					},
+					"Types": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Types/client"
 						}
 					},
 					"Vital": {
