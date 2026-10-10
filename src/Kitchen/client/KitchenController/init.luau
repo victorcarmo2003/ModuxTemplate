@@ -31,7 +31,7 @@ local Board = require(script.Board)
 const STATION_TAG = "Station"
 
 -- Visual parts, in mount order (Grill, Rail, Board: TASK-030; shared slot helpers in Slots.luau).
-const PARTS: { Context.Part } = { Stock, Grill, Rail, Board }
+const PARTS: { Context.Part } = { Stock, Grill, Rail, Board, require(script.Coffee) :: Context.Part } -- Coffee: TASK-069
 
 export type StockRecord = Context.StockRecord
 export type SlotRecord = Context.SlotRecord
