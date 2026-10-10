@@ -70,6 +70,11 @@ Conciliação das rodadas 16–17 (2026-10-08):
 Nome de exibição do item de reviver (ITM-021): **"Rescue Whistle"** (narrative-writer, `ui-text.md`; DEC-022). DEC-129 o chama de "Revive Kit"; é o mesmo item. Chave de dados segue `revive_kit`. Prompts seguem `ui-text.md` ("Buy Whistle", "Use Whistle", "Blow Whistle").
 
 Anomalias: ID `ANM-###` (DEC-096). Onde o texto ainda usa o rótulo curto "Nk", leia **ANM-00k** (N10 = ANM-010). O ator de servidor de cada anomalia continua com `NPC-###` (NPC-009 a NPC-018), referenciando o `ANM-###`.
+**TASK-081 (2026-10-10, game-designer; números Provisórios, Rascunho):** fluxo da noite e contagem por tentativas
+(FEAT-009, fecha L-05), tabela `Thief` (FEAT-013), tabela `Sanity` + `BasicLampRadius = 0` + orçamento de sanidade
+(FEAT-019), dados do café e recomendação A da `Q-170` (FEAT-021), recusas com toast da D-04 (FEAT-005), nome único
+"Ground Coffee" do ITM-019 (D-10, `items.md`).
+
 Respostas às Qs do game-designer: seção **"Propostas pendentes"** no fim deste arquivo (e em `economy.md`, `upgrades.md`, `npcs.md`, `items.md`, `progression.md`).
 
 ## Template de ficha
@@ -337,10 +342,48 @@ Limite da hotbar (proposta para **Q-056**):
 Risco: a hotbar nativa em celular pequeno pode exibir menos de 4 slots. Pedir ao researcher a contagem real por resolução antes da bandeira verde.
 Atropelamento derruba **só a Tool equipada** (FEAT-033, FEAT-036); o resto da hotbar fica.
 
+Recusas do servidor e avisos (TASK-081; `wave-1-report.md` D-04; **Provisório**, Rascunho)
+
+O client esconde o prompt de ação impossível, mas o servidor ainda pode recusar uma ação que **era** possível na tela
+do jogador um instante antes: um colega pegou a última vaga, o estoque acabou, a fase virou. Recusa silenciosa nesses
+casos parece bug. Regra:
+
+| Tipo de recusa | Aviso | Por quê |
+|---|---|---|
+| **Estado do jogo mudou** (corrida entre jogadores, latência, virada de fase) | toast **só para quem agiu** (`Audience = "Player"`), canto superior direito, 2,5 s | o jogador fez a coisa certa e precisa saber o motivo |
+| Validação anti-trapaça (fora do alcance, âncora errada, ação de outra onda, gate de taxa, não é membro) | **nenhum** (só log de dev) | jogador legítimo não chega aqui; avisar ajuda quem forja |
+| Gate de estado de vida (`Down`, `Spectator`, escondido, atropelado, cutscene) | **nenhum** | o HUD/câmera já explicam o estado |
+| Anti-spam | o mesmo aviso no máximo 1× a cada **2 s** por jogador | segurar o botão na corrida não pode empilhar toasts |
+
+Lista D-04 (quais recusas viram toast). Chaves e textos = proposta do narrative-writer em `ui-text.md` §10.3 (TASK-082);
+nome final da chave é do architect (TASK-047). Esta tabela decide **quais** recusas avisam: **todas as 10**.
+
+| # | Recusa (D-04) | Como um jogador legítimo chega nela | Toast? | Chave (`ui-text.md` §10.3) | `ValueFrom` |
+|---|---|---|---|---|---|
+| 1 | "Grill" com grelha sem vaga | colega ocupou a última vaga | sim | `grill_full` | None |
+| 2 | "Grill"/"Slice Bun"/"Add {item}" sem estoque | colega usou a última unidade | sim | `out_of_stock` | Ingredients |
+| 3 | "Slice Bun" com tábua sem vaga | colega ocupou a última vaga | sim | `board_full` | None |
+| 4 | "Add {item}" com 3 complementos | quase nunca (prompt escondido); custo zero, mesmo caminho de recusa | sim | `topping_max` | None |
+| 5 | "Add {item}" repetido | quase nunca; idem | sim | `topping_repeat` | Ingredients |
+| 6 | "Restock" com estoque cheio (inclui estoque acima da capacidade, `Q-169`) | colega repôs antes | sim | `stock_full` | Ingredients |
+| 7 | Comprar pacote de prateleira `Blocked` | prompt visível na virada do turno ou na compra do trailer | sim | `shelf_locked` | Ingredients |
+| 8 | Bancada `busy` | dois jogadores comprando a mesma posição | sim | `bench_busy` | None |
+| 9 | Bancada `Maxed` | colega comprou o último nível antes | sim | `upgrade_maxed` | Upgrades |
+| 10 | "Take Order" fora de venda (fase sem `Selling` e fora do `Closing`) | o turno virou durante o toque | sim | `shop_closed` | None |
+
+Fora da D-04, mesma regra (propostas; entram se a 047 aceitar as chaves): "Collect" com trilho cheio → `rail_full`
+(texto com o narrative-writer); beber café de dia → `coffee_night_only` (FEAT-021, `Q-170`); "Give" café a quem já tem
+1 → `coffee_has_one` (`ui-text.md` §10.2). Já existem e seguem: `hands_full`, `package_limit`, `not_enough_cash`,
+`coffee_cooldown`, `coffee_full`, `hide_taken`.
+
 - Critérios de aceite:
   - Toda ação do MVP é executável no mobile só com o botão de interagir, o toque na hotbar e a câmera.
   - Prompt de ação impossível não aparece.
   - Pegar o 5º Tool é bloqueado e o prompt explica ("Hands full"); o mesmo vale para "Take" e para comprar o Rescue Whistle com a hotbar cheia.
+  - Dois jogadores disputando a última vaga da grelha (ou da tábua, ou o último nível da bancada): quem perde recebe o toast da tabela, e só ele.
+  - Ação forjada (fora do alcance, âncora errada, outra onda) é descartada **sem** toast.
+  - Segurar a ação recusada por 10 s gera no máximo 5 toasts iguais (1 a cada 2 s).
+  - As 10 recusas da tabela têm chave em `Notices` com `Audience = "Player"`.
 
 ---
 
@@ -435,31 +478,73 @@ Atropelamento derruba **só a Tool equipada** (FEAT-033, FEAT-036); o resto da h
 - Status: Rascunho · Pilares: VENDER · Origem: **[DEC-045, DEC-055, DEC-050]**
 - Resumo: o servidor gera clientes num intervalo base, ajustado por dia, party e Trailer Lights; o balcão tem vagas (Counter).
 
-| Parâmetro | Dia | Noite (proposta) |
+| Parâmetro | Dia | Noite (proposta, **Provisório**) |
 |---|---|---|
 | Intervalo base solo | 22 s **[DEC-045]** | 40 s (noites 1–5) · 36 s (noites 6–10) |
-| Crescimento | ×min(1 + 0,08 × (dia − 1), 1,4) na taxa **[DEC-045]** | — |
-| Party (jogadores presentes no início do turno) | 1p ×1,0 · 2p ×1,6 · 3p ×2,1 · 4p ×2,5 na taxa **[DEC-045]** | igual |
+| Crescimento | ×min(1 + 0,08 × (dia − 1), 1,4) na taxa **[DEC-045]** | — (a noite cresce pela duração, DEC-127, e pelo intervalo 40 → 36) |
+| Party (jogadores **conectados**, recalculado no início do turno) | 1p ×1,0 · 2p ×1,6 · 3p ×2,1 · 4p ×2,5 na taxa **[DEC-045, DEC-185]** | igual |
 | Trailer Lights | taxa ×1,1 **[DEC-055]** | — (de noite é luz) |
 | Variação | intervalo ±25% aleatório | igual |
-| Vagas no balcão (Counter, UPG-003) | 3 / 4 / 5 | igual |
-| Balcão cheio | o spawn é pulado (cliente não nasce; não conta para a nota) | igual |
+| Vagas no balcão (Counter, UPG-003) | 3 / 4 / 5 | igual (trailer começa no nível 1, DEC-184) |
+| Teto de clientes vivos | 8 (`Flow.MaxCustomersDay`) | 6 (`Nights[k].Customers.Max`) |
+| Balcão cheio ou teto atingido | o spawn é pulado (cliente não nasce; não conta para a nota) | igual |
+| Fases em que nasce cliente | `Open` (`Shift.Selling`) | `Night` (`Shift.Selling`) |
+
+Contagem de spawn (fecha L-05 do QA). O fluxo é um **relógio de tentativas**: a 1ª tentativa ocorre um intervalo
+sorteado depois do início da fase de venda; cada tentativa sorteia o próximo intervalo e rearma, **com ou sem** cliente
+nascido (o pulado não é guardado para depois). Resultado de cada tentativa: `Spawned`, `SkippedFull` (balcão cheio) ou
+`SkippedCap` (teto de clientes ou de NPC). Cliente-anomalia (FEAT-022) ocupa uma tentativa como `Spawned`.
+
+Dados da noite (`content-data.md` §6.3, §6.8; valores **Provisórios** da TASK-081):
+
+| Campo | Valor | Regra |
+|---|---|---|
+| `Flow.NightInterval` | **40** | intervalo de referência da noite (solo, s) |
+| `Nights[k].Customers.BaseInterval` | 40 (k = 1–5) · **36** (k = 6–10) | a linha da noite manda; `Validate`: ≤ `Flow.NightInterval` |
+| `Nights[k].Customers.Max` | **6** em todas | `Validate`: ≤ `Flow.MaxCustomersNight` (6) |
+| Crescimento e Trailer Lights | não se aplicam à noite | — |
+
+| Noite | Duração (s, DEC-127) | Intervalo | Tentativas solo | 2p | 4p (limitado por balcão e teto) |
+|---|---|---|---|---|---|
+| 1 | 1200 | 40 | 30 | 48 | 75 |
+| 2 | 1260 | 40 | 31 | 50 | 79 |
+| 3 | 1320 | 40 | 33 | 53 | 82 |
+| 4 | 1380 | 40 | 34 | 55 | 86 |
+| 5 | 1440 | 40 | 36 | 58 | 90 |
+| 6 | 1560 | 36 | 43 | 69 | 108 |
+| 7 | 1620 | 36 | 45 | 72 | 112 |
+| 8 | 1680 | 36 | 47 | 75 | 117 |
+| 9 | 1740 | 36 | 48 | 77 | 121 |
+| 10 | 1800 | 36 | 50 | 80 | 125 |
+
+Por que 40/36 s: à noite a atenção é dividida com anomalias, escuro e café; com 40 s o solo tem ~1 cliente por minuto e
+meio, folga para olhar a rua (OBSERVAR) sem a loja ficar vazia (VENDER). Lucro solo resultante: $120 (N1) → $174 (N10),
+`economy.md` §5.2, dentro do alvo de `economy.md` §10. A queda para 36 s na N6 coincide com o 2º terço da run e
+compensa o equipamento do trailer já melhorado. Lucro por minuto de noite (~$6/min) fica abaixo do dia (~$13–18/min)
+de propósito: a noite paga em gemas (FEAT-029), não em dinheiro.
 
 Teto de NPC simultâneo por servidor: **12** humanoides com IA de servidor **[DEC-045]**. Veículos têm teto próprio (FEAT-033). Proposta (**Q-091 a**): Opal é estática, sem pathfinding, e sai do teto de 12; o slot liberado fica de folga.
 
 | Turno | Clientes (inclui Mr. Pickett) | Ladrão | Atores de anomalia | Pedestres (NPC-019) | Total no teto | Fora do teto |
 |---|---|---|---|---|---|---|
 | Dia | 8 | 1 | 0 | 2 | 11 (1 de folga) | Opal; carros de trânsito (NPC-022) |
-| Noite | 6 | 0 | 3 | 0 (rua vazia) | 9 (3 de folga) | Opal; ambulância e médicos (NPC-023/024, visuais); ≤ 1 carro até 9 PM (NPC-022) e a ANM-008 (teto de veículos) |
+| Noite | 6 | 0 | 3 | 1–2 (0 em tensão) **[DEC-183]** | 10–11 (1–2 de folga; se os passantes ficarem fora do teto, `Q-162`, 9) | Opal; ambulância e médicos (NPC-023/024, visuais); ≤ 1 carro até 9 PM (NPC-022) e a ANM-008 (teto de veículos) |
 
 Clientes contam desde o nascimento até sumirem (andando + no balcão + indo embora). Alucinações (FEAT-019) são só no client e não contam.
 
 Party e reconexão (proposta para **Q-067**): o multiplicador de party usa os jogadores **ativos no início do turno** = conectados e não espectadores permanentes (FEAT-025). Quem cai, sai ou chega no meio do turno não muda o fluxo até o próximo. Preços do trailer e do Rescue Whistle continuam fixos pela party do fim do Day 1 (FEAT-001) **[DEC-047, DEC-121]**.
 
-- Critérios de aceite:
+- Critérios de aceite (método: contador de tentativas do `CustomerService` por resultado, lido por log/comando de dev;
+  turno real ou relógio acelerado pelo dev, a fórmula é a mesma):
   - Nunca há mais de 12 NPCs de servidor vivos.
-  - Em 30 min simulados, solo, dia 1, nascem 16 ± 2 clientes por dia (360 s ÷ 22 s).
-  - Com o balcão cheio, nenhum cliente novo nasce.
+  - Solo, Day 1, conta-se **tentativas** (não nascidos): cada um de 5 turnos de `Open` (360 s ÷ 22 s) tem **14–18**
+    tentativas. Para medir nascidos = tentativas, o testador mantém o balcão com vaga (Refuse ou serve rápido);
+    nesse caso `SkippedFull = 0` e nascidos = tentativas.
+  - Com o balcão cheio, a tentativa sai como `SkippedFull`, nenhum cliente nasce e o relógio rearma (o pulado não vira
+    fila nem nasce depois); tentativas = `Spawned` + `SkippedFull` + `SkippedCap` em qualquer turno.
+  - Solo, Night 1: **28–32** tentativas na fase `Night` (1200 s ÷ 40 s); Night 10: **47–53** (1800 s ÷ 36 s).
+  - À noite nunca há mais de 6 clientes vivos; nenhuma tentativa ocorre fora das fases com `Selling`.
+  - Mudar `Nights[k].Customers.BaseInterval` muda o fluxo daquela noite sem código novo.
 
 ### FEAT-010 — Pedidos por combinação livre
 
@@ -543,7 +628,34 @@ Validação **[DEC-072]**:
 - Status: Rascunho · Pilares: GERENCIAR, OBSERVAR · Origem: **[DEC-018, DEC-050, DEC-023]**
 - Resumo: o ladrão é **Quick Quentin** (CHR-004); comportamento completo em NPC-007 (`npcs.md`). Números **[DEC-050]**: só de dia; chance dia 1 0% · dia 2 50% · dia 3+ 70%; 1 por dia; aparece entre 9:00 AM e 3:00 PM; espreita ≤ 120 s; gatilho = nenhum jogador a ≤ 14 studs do veículo por 3 s; ~4 s até a gaveta; abre em 8 s (16 s com UPG-004); rouba floor(50%) (30% com UPG-004); nada se gaveta < $5; impedir = entrar na zona durante a abertura → foge, party +$5 ("Nice catch!"), creditado na gaveta.
 - Proposta adicional: jogador "presente" na zona precisa estar **conectado e de pé** (um jogador escondido não existe de dia; desconectado não conta).
-- Critérios de aceite: os de `proposals-round-1.md` Q-036, mais: o +$5 aparece na gaveta e entra na nota como dinheiro, não como cliente.
+- **DEC-182:** a aproximação leva **4 s fixos** de qualquer ponto de espreita; velocidade = distância ÷ 4.
+
+Dados (tabela `Thief`, `content-data.md` §6.6; números da DEC-050/DEC-182, conferidos na TASK-081):
+
+| Campo | Valor | Origem |
+|---|---|---|
+| `ChanceByDay` | Day 1 **0** · Day 2 **0,5** · Day 3+ (inclui dia infinito) **0,7** | DEC-050 |
+| `MaxPerDay` | 1 | DEC-050 |
+| `WindowClock` | 540–900 (9:00 AM–3:00 PM, minutos de jogo) | DEC-050 |
+| `LurkMax` | 120 s; depois vai embora sem roubar | DEC-050 |
+| `ZoneRadius`, `ZoneEmptyTime` | 14 studs, 3 s | DEC-050 |
+| `ApproachTime` | 4 s | DEC-182 |
+| `OpenTime` | 8 s · 16 s com UPG-004 (efeito `DrawerOpenTime`) | DEC-050 |
+| `StealPct` | 50 · 30 com UPG-004 (efeito); valor roubado = floor(gaveta × % ÷ 100) | DEC-050 |
+| `MinDrawer` | 5 (gaveta < $5: abre e foge sem nada) | DEC-050 |
+| `CatchReward` | 5 (na gaveta, `"Catch"`) | DEC-050 |
+| `CapRetry` (proposta, campo novo → architect) | 30 s: teto de NPC cheio na hora sorteada → tenta de novo 30 s depois, até o fim da janela; passou das 3:00 PM, o dia fica sem ladrão | `npcs.md` NPC-007 |
+
+Leitura de balanço (solo, gaveta de dia ~$70 às 2 PM no Day 3): roubo sem lock −$35 (≈ 40% do lucro do dia); com lock
+−$21; impedir rende +$5. Esperado por dia (Day 3+, sem reação): 0,7 × −$35 ≈ −$24,5; com UPG-004 ≈ −$14,7 → o lock
+($80) se paga em ~8 dias sem reação, menos se o jogador reage (ele dobra o tempo de reação de 8 para 16 s).
+
+- Critérios de aceite: os de `proposals-round-1.md` Q-036, mais:
+  - o +$5 aparece na gaveta e entra na nota como dinheiro, não como cliente;
+  - em 1.000 dias simulados por faixa: Day 2 com ladrão em 50% ± 3 p.p., Day 3+ em 70% ± 3 p.p., Day 1 em 0;
+  - de qualquer ponto L1–L3, da partida até a gaveta: 4,0 ± 0,3 s;
+  - gaveta de $9 roubada sem lock: −$4 (floor); gaveta de $4: nada roubado;
+  - nunca aparece à noite, nem fora de 9:00 AM–3:00 PM.
 
 ### FEAT-014 — Nota do turno e tela de resumo
 
@@ -759,8 +871,49 @@ Regra: alucinação que imita sinal de anomalia (poste do Walker, telefone) **n�
 | Escopo | por jogador **[DEC-056]** |
 | Entre noites | volta ao valor inicial da classe |
 
+Dados (tabela `Sanity`, `content-data.md` §3.16 + §6.5; conferidos e completados na TASK-081, **Provisório** onde marcado):
+
+| Campo | Valor | Origem |
+|---|---|---|
+| `Start` | 100 (máximo = início; classes por `SanityStart`/`SanityMax`) | DEC-056, DEC-069 |
+| `SeeAnomaly` | 5 (Barista 8 por `SeeAnomalyLoss`) | DEC-056, DEC-069 |
+| `SeeAngle`, `SeeRange`, `SeeTime` | 40° (cone total), 60 studs (padrão; por anomalia em `Anomalies.ViewRange`), 1 s acumulado | FEAT-019 |
+| `RuleBroken` | 35 (nenhuma classe altera) | DEC-056, DEC-069 |
+| `DarkDelay`, `DarkPerSecond` | 3 s, 1/s | DEC-056 |
+| `DarkPhases` | `Call`, `Prep`, `Night`, `NightEnd` | §19.7 |
+| `Coffee`, `CoffeeCooldown`, `CoffeeBrew`, `CoffeeDrinkTime` | 25, 60 s, 6 s, 1,5 s | DEC-055 |
+| `CoffeeNightOnly` | true (**Provisório**, `Q-170` recomendação A; FEAT-021) | `Q-170` |
+| `TrailerLightRadius` | 18 studs (LZ-3) | DEC-055, DEC-189 |
+| `BasicLampRadius` | **0** (**Provisório**): a lâmpada de fábrica acende só os volumes LZ-1 (interior) e **LZ-2 (varanda do balcão, cobre Q1)**; sem esfera extra | DEC-189 (raio deixado ao game-designer) |
+| `Bands` | High 60 · Mid 40 (≥ 60 dia, 40–59 Mid, < 40 noite; pontos absolutos) | DEC-167 |
+| `BandMinHold` | 0 s (1 s se piscar no teste, **Provisório**) | DEC-167 |
+
+Por que `BasicLampRadius = 0` com LZ-2 acesa: quem atende no balcão (dentro ou na varanda) nunca toma escuro com a luz
+ligada, então a lâmpada de fábrica resolve o trabalho de balcão. O Trailer Lights ($100) continua valendo: o raio de 18
+cobre a fila Q2–Q5 e encurta a perna escura até o Mart de ~110 para ~85 studs (MAP-01 §10.2: ~4 → ~2 de sanidade por
+perna). Se a lâmpada de fábrica já tivesse raio, o upgrade viraria só cosmético. Confirma a pendência "LZ-2 conta como
+luz" do MAP-01 §10.2 (level-designer).
+
+Orçamento de sanidade por noite (solo, Rookie, máx. 100, joga certo, vê todas as anomalias ativas uma vez; idas ao Mart
+de `economy.md` §5.2; perna escura ~4 sem Trailer Lights, ~2 com):
+
+| Noite | Ver (5 × N) | Escuro, sem Lights (idas × 8) | Total sem erro | Termina em (sem café) | Com 1 regra quebrada (−35) | Cafés para terminar ≥ 40 (faixa Mid) com 1 erro |
+|---|---|---|---|---|---|---|
+| 1 | 5 | 8 (1 ida) | 13 | 87 | 52 | 0 |
+| 3 | 15 | 8 (1) | 23 | 77 | 42 | 0 |
+| 5 | 25 | 16 (2) | 41 | 59 | 24 | 1 |
+| 7 | 35 | 16 (2) | 51 | 49 | 14 | 2 |
+| 10 | 50 | 24 (3) | 74 | 26 | −9 → desmaio sem café | 2 (bebidos antes de zerar) |
+
+Leitura: até a N4 o solo atento termina sem café; da N5 em diante um erro exige café; na N10 até o jogo perfeito termina
+na faixa baixa sem café. O café (+25 a cada 60 s, ≤ 25/min) nunca vence o escuro contínuo (60/min): quem fica no escuro
+cai mesmo bebendo. Com Trailer Lights o escuro cai pela metade (4/8/12). Dose custa $0,50: 3 cafés × 4 jogadores = $6 por
+noite, irrelevante perto dos $120+ da gaveta; o limite real do café é atenção e o cooldown, não dinheiro.
+
 - Critérios de aceite:
   - De dia não há medidor nem variação.
+  - Jogador parado em LZ-2 (varanda) com o interruptor ligado não perde sanidade; com o interruptor desligado, perde 1/s a partir do 4º s.
+  - Simulação solo Rookie, joga certo, sem café: Night 1 termina com 85–90; Night 10 termina com 20–35 (sem Trailer Lights).
   - A mesma anomalia nunca tira "ver" duas vezes do mesmo jogador na mesma noite, mesmo com várias ocorrências.
   - Alucinação nunca tem prompt e nunca muda estado de servidor.
   - Classe nenhuma altera o −35 **[DEC-069]**.
@@ -793,7 +946,34 @@ Meta para o level-designer: o trajeto trailer → Mart segue a Ninth Avenue (sem
 - Status: Rascunho · Pilares: SOBREVIVER · Origem: **[DEC-042, DEC-055, DEC-069]**; ficha do item ITM-009, equipamento UPG-007
 - Números **[DEC-055]**: cafeteira no trailer, hold 1 s, preparo 6 s com barra (Barista 3 s), consome 1 dose, gera Tool "Coffee"; beber (ativar o Tool, animação 1,5 s) dá +25 (+35 se Barista fez); cooldown 60 s por jogador (cooldown de beber); pode ser entregue a outro jogador (dropar não; "Give" por prompt no colega, hold 0,5 s).
 - Propostas: cafeteira faz 1 café por vez; máx. 1 Coffee por jogador na hotbar; Coffee não estraga; não passa da sanidade máxima.
-- Critérios de aceite: os de `proposals-round-1.md` Q-014, mais: entregar Coffee a quem já tem 1 é bloqueado.
+
+Dados (TASK-081; `Stations.coffee_machine`, `Sanity`, `Items.coffee`, `Packages.pack_coffee`, `Actions`):
+
+| Campo | Valor | Origem |
+|---|---|---|
+| Preparar (`brew_coffee`) | hold **1 s**; `Stations.coffee_machine.Params.BrewTime` **6 s** (Barista 3 s, `CoffeeBrewTime`) | DEC-055, DEC-069 |
+| Pegar | mesmo prompt em `Ready` ("Take Coffee"), toque; hotbar cheia ou já com 1 café → `hands_full` e o café fica na máquina | §19.8 |
+| Beber | ativar a Tool; `CoffeeDrinkTime` 1,5 s; +`Restore` gravado na Tool (25; 35 se feito por Barista); não passa do máximo | DEC-055, DEC-069 |
+| Cooldown | `CoffeeCooldown` 60 s por jogador, desde o gole | DEC-055 |
+| Dar (`give_coffee`) | hold **0,5 s** no colega `Active` sem café | DEC-055 |
+| Doses | começa com 10 na compra do trailer; capacidade 20 (Cooler não afeta); 1 dose por café | `upgrades.md` UPG-007 |
+| Reposição | pacote ITM-019 "Ground Coffee" (D-10): 10 doses, $5 ($0,50/dose) | DEC-049, DEC-055 |
+| De dia (`Q-170`) | **Provisório, recomendação A:** pode preparar e carregar; **beber só à noite** (`Sanity.CoffeeNightOnly = true`); ativar de dia → toast `coffee_night_only` e a Tool fica | `Q-170` |
+
+Por que A em `Q-170`: (B) beber e desperdiçar pune quem não entendeu a regra da sanidade; (C) cafeteira desligada de
+dia esconde a máquina justo no turno calmo em que o jogador aprenderia a usá-la. Com A, preparar o café no fim do dia e
+entrar na noite com ele na hotbar vira uma decisão de GERENCIAR (ocupa 1 das 4 vagas). Custo de escopo: 1 aviso novo.
+
+Avisos: `coffee_cooldown`, `coffee_full` (sanidade no máximo, a Tool fica), `coffee_night_only` e `coffee_has_one`
+(propostas, `ui-text.md` §10.2), `hands_full`; textos no `ui-text.md` §10 (narrative-writer).
+
+- Critérios de aceite: os de `proposals-round-1.md` Q-014, mais:
+  - entregar Coffee a quem já tem 1 é bloqueado;
+  - barra de preparo dura 6,0 ± 0,2 s (3,0 com Barista), só com dose ≥ 1, e consome exatamente 1 dose;
+  - beber com sanidade 90 de máximo 100 deixa 100 (não 115); beber no máximo não consome a Tool;
+  - 2º gole antes de 60 s é recusado com `coffee_cooldown` e o valor restante em s;
+  - de dia, ativar o café não muda nada no servidor e não consome a Tool;
+  - o café feito por um Barista e bebido por outro jogador dá +35.
 
 ### FEAT-022 — Sistema genérico de anomalias
 

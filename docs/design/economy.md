@@ -66,6 +66,7 @@ Custo = $1,25 (pão + salsicha) + Σ custo por uso. Tabela por ingrediente: `ite
 | Party | ×1,0 / 1,6 / 2,1 / 2,5 na taxa **[DEC-045]**; jogadores **ativos** (conectados e não espectadores) no início do turno **(proposta, Q-067)**; atrasado conta a partir do turno seguinte à chegada (Q-112 d) | igual |
 | Trailer Lights | ×1,1 **[DEC-055]** | — |
 | Vagas | Counter 3 / 4 / 5 | igual |
+| Dados | `Flow.BaseInterval` etc. | `Flow.NightInterval` 40; `Nights[k].Customers` = { `BaseInterval` 40/36, `Max` 6 } (TASK-081, Provisório; FEAT-009) |
 
 ## 5. Lucro esperado (solo mediano, Rookie)
 

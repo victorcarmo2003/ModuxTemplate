@@ -41,7 +41,7 @@ Critérios de aceite
 | ITM-016 | Bacon pack | pacote | **sim** |
 | ITM-017 | Potato Sticks pack | pacote | **sim** |
 | ITM-018 | Cream Cheese pack | pacote | **sim** |
-| ITM-019 | Coffee pack | pacote | **sim** |
+| ITM-019 | Ground Coffee (pacote de café; D-10) | pacote | **sim** |
 | ITM-020 | Altered item (ANM-002 The wrong food) | item de anomalia | **sim** |
 | ITM-021 | Rescue Whistle (chave `revive_kit`) | especial (reviver) | **sim** |
 
@@ -168,8 +168,8 @@ não repete; aparece no modelo do Hot Dog e como ícone no balão do pedido; no 
 | Estoque | doses na cafeteira: começa com 10 ao comprar o trailer; capacidade 20 (proposta) |
 | Máx. na hotbar | 1 |
 | Entregar | prompt "Give" no colega, hold 0,5 s |
-| Custo | $0,50 por dose (pacote ITM-019) |
-| De dia | pode ser preparado, mas não tem efeito (sanidade não existe de dia) — prompt de beber some de dia |
+| Custo | $0,50 por dose (pacote ITM-019 "Ground Coffee") |
+| De dia | pode ser preparado e carregado; **beber só à noite** (Provisório, `Q-170` A): ativar de dia não consome e mostra o aviso `coffee_night_only` (FEAT-021) |
 | Derrubado (atropelamento) | derrama e some em 2 s; dose perdida (FEAT-036) |
 | Cafeteira | **fixa no trailer**, não é comprada na bancada **[DEC-055, DEC-125]** |
 
@@ -190,7 +190,15 @@ sobra fica no pacote; pacote vazio some; máx. 2 por jogador (Hauler 3) **[DEC-0
 | ITM-016 | Bacon | 6 un. | $9 | $1,50 | Day 3 | DEC-049 |
 | ITM-017 | Potato Sticks | 10 usos | $5 | $0,50 | Day 4 | DEC-071 |
 | ITM-018 | Cream Cheese | 8 usos | $6 | $0,75 | Day 6 | DEC-071 |
-| ITM-019 | Coffee | 10 doses | $5 | $0,50 | após comprar o trailer | DEC-049, DEC-055 |
+| ITM-019 | Ground Coffee | 10 doses | $5 | $0,50 | após comprar o trailer | DEC-049, DEC-055 |
+
+**D-10 (TASK-081, Provisório; nome final do narrative-writer, DEC-022).** O pacote de café tinha dois nomes ("Coffee Pack"
+na Tool, "Coffee" na prateleira) e o nome da prateleira colidia com a Tool do café pronto (ITM-009 "Coffee") na hotbar.
+Nome único: **"Ground Coffee"**, igual em `Items.pack_coffee.Name` e `Packages.pack_coffee.Name` (prompt "Buy Ground
+Coffee — $5", etiqueta "Ground Coffee ×10"). Alternativa descartada: "Coffee Pack" nos dois (só uma tabela muda, mas
+foge do padrão dos outros pacotes, que usam o nome do conteúdo). Chave `pack_coffee` não muda. O ingrediente
+(`Ingredients.coffee`, contador da cafeteira) segue "Coffee". Para o narrative-writer: `ui-text.md` §3 "Coffee ×10" →
+"Ground Coffee ×10" (TASK-082).
 
 Prateleiras **não** rotacionam: todos os pacotes liberados estão sempre à venda pelo preço da tabela (FEAT-008; proposta para Q-120 g). Pacote derrubado mantém a contagem e pode ser pego com "Take" por qualquer jogador da party (FEAT-036).
 

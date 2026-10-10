@@ -96,7 +96,7 @@ Soma de tudo que se compra com dinheiro (solo): $210 + $170 + $230 + $80 + $100 
 
 | Nível | Preço | Efeito de dia | Efeito de noite | Peça visível |
 |---|---|---|---|---|
-| 0 | — | — | só o interior do trailer é `LightZone`; o interruptor ("Lights") já existe e controla a lâmpada interna | — |
+| 0 | — | — | lâmpada de fábrica (DEC-189): interior do trailer (LZ-1) **e varanda do balcão (LZ-2, cobre Q1)** são `LightZone`, sem raio extra (`Sanity.BasicLampRadius = 0`, Provisório, TASK-081); o interruptor ("Lights") controla as duas | — |
 | 1 | $100 | taxa de clientes ×1,1 | `LightZone` de raio 18 studs ao redor do trailer, ligada pelo mesmo interruptor | cordão de lâmpadas + refletor no teto |
 
 - A ANM-003 (The stopped clock, verbo luz) **não depende** deste upgrade: a sequência "lights off, count five, lights on" funciona com o interruptor do trailer em qualquer nível (FEAT-020).

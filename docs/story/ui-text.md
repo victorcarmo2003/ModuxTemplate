@@ -65,7 +65,7 @@ Saiu: "Upgrade ({price})" no próprio equipamento (Q-084 fechada por DEC-101: co
 | Cafeteira (fixa no trailer, DEC-125; não é vendida) | **Coffee Maker** | Tool: "Coffee" |
 | Item raro de reviver (ITM-021; "Revive Kit" em DEC-129 e `design/`) | **Rescue Whistle** (nome de exibição) | apito dourado com cordão Teal (AST-051), da Bellmoor Rescue; chama a ambulância de volta. Fica na vitrine especial da bancada. Chave de dados segue `revive_kit` |
 | Ingredientes | Bun, Sausage, Ketchup, Mustard, Cheese, Bacon, Potato Sticks, Cream Cheese | nomes genéricos, sem marca (Q-041) |
-| Pacotes do Mart | "Sausages ×8", "Buns ×8", "Ketchup ×20", "Mustard ×20", "Cheese ×6", "Bacon ×6", "Potato Sticks ×10", "Cream Cheese ×8", "Coffee ×10" | quantidades de DEC-049 e DEC-071 |
+| Pacotes do Mart | "Sausages ×8", "Buns ×8", "Ketchup ×20", "Mustard ×20", "Cheese ×6", "Bacon ×6", "Potato Sticks ×10", "Cream Cheese ×8", "Ground Coffee ×10" | quantidades de DEC-049 e DEC-071 |
 
 ## 4. Placas e letreiros (assets com texto)
 
