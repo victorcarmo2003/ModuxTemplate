@@ -438,6 +438,8 @@ Alinhado com o MAP-01 §13 onde os dois documentos tratam da mesma coisa (vale o
 | Personagem com nome (Walt, Opal, Quentin, Raincoat Lady, Walker) | 1.000–2.000 | 2.500 |
 | Acessório R6 isolado | 50–400 | 600 |
 
+> **DEC-164 (2026-10-10):** personagem do **rig animal** (AST-053: crew, clientes, pedestres, Quentin) segue a DEC-164, não as linhas "NPC comum" e "Personagem com nome" acima: **≈ 2,0–2,5k tris** por personagem completo, aprovado como entregue (Sheep ≈ 2.530 aceito). Tabela não reescrita (documento Aprovado).
+
 ### 9.2 Cena
 
 | Métrica | Alvo | Teto |

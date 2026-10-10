@@ -2268,3 +2268,50 @@ Origem das DEC-161 a DEC-163: pedidos do usuário ao orquestrador durante a revi
   - **art-director:** reescrever AST-053 (crew + civil, 18 espécies, expressões, braços, patinhas) e AST-056 (guaxinim, chapéu cinza-ardósia).
   - **modeler-3d:** se `Q-144` (g) cortar orçamento, reduzir a Sheep primeiro.
   - Notas em `asset-list.md` (AST-053, AST-056), `open-questions.md` (`Q-144`, `Q-145`, `Q-149`, `Q-151`), `characters.md`, `npcs.md`, `README.md` → secretário (feito).
+
+---
+
+Origem das DEC-164 e DEC-165: mensagem do usuário ao orquestrador, 2026-10-10, depois da revisão da crew no Studio. Fala **literal**, uma só para as duas DEC: "está otimo a quantia de triangulos, pode prosseguir assim, verdade sobre o da noite notei que precisa também ajustar as mãos deles, corrige por favor. no caso os braços". Correção dos braços feita pelo orquestrador no commit `70094d3` (branch `assets/kenney-pipeline`); relatada ao secretário, **não** é aprovação do usuário da entrega.
+
+### DEC-164 — 2026-10-10 — Orçamento de tris dos personagens do rig animal aprovado como está (≈ 2,0–2,5k; Sheep ≈ 2.530)
+
+- Fala do usuário (literal): "está otimo a quantia de triangulos, pode prosseguir assim".
+- Decidido pelo usuário: o número de tris **entregue** nos personagens do rig animal (`AST-053`; crew e civil usam a mesma malha) está **aprovado como está**:
+
+  | Medida | Valor aprovado |
+  |---|---|
+  | Personagem completo (cabeça v3 + corpo + orelhas/cauda/acessórios) | **≈ 2,0–2,5k tris** |
+  | Maior entregue | **Sheep ≈ 2.530** (acima do teto 2.500 de §9.1; aceito) |
+  | Redução da parte de trás da cabeça (pergunta da DEC-153) | **não** fazer |
+
+- Fecha **`Q-144` (g), parte de tris** (inclui a pergunta da DEC-153 "aceita 1.914–2.104 ou reduz a parte de trás da cabeça" e o caso Sheep da DEC-158/DEC-163). A parte de **memória de textura** de (g) **segue aberta** (art-director + architect). `Q-144` (a, c, d corpo base, e, f, h) seguem.
+- Emenda (sem revogar):
+  - `style-guide.md` §9.1 (Aprovado, DEC-126): linhas "NPC comum 600–1.200 / 1.800" e "Personagem com nome 1.000–2.000 / 2.500" **não valem** para personagem do rig animal; vale esta DEC. Tabela não reescrita; só nota apontando a DEC.
+  - `asset-list.md` AST-056 "Tris ≤ 2.000" → segue esta DEC (Quentin = Raccoon da crew). AST-053 e AST-054 ("NPC montado 600–1.200") idem.
+- Leitura do secretário (não decidida): personagem **novo** do rig animal deve ficar **≤ ~2.530** (o maior aprovado); passar disso volta ao usuário.
+- Impacto:
+  - **modeler-3d:** nenhuma redução pendente (a nota "reduzir a Sheep primeiro" da DEC-163 cai).
+  - **art-director:** reescrita de AST-053/054/056 cita esta DEC no campo Tris.
+  - **architect:** orçamento de cena (§9.2) com ≈ 2,5k por personagem × pool de NPC (T11).
+  - Notas em `style-guide.md` §9.1, `asset-list.md` (AST-053, AST-054, AST-056), `open-questions.md` (`Q-144`), `README.md` → secretário (feito).
+
+### DEC-165 — 2026-10-10 — Noite: mantém o azul-marinho igual para todos os animais; braços e mãos acompanham a cabeça
+
+- Fala do usuário (literal): "verdade sobre o da noite notei que precisa também ajustar as mãos deles, corrige por favor. no caso os braços".
+- Leitura do secretário: o usuário **aceitou o visual noturno atual** (todas as espécies no mesmo azul-marinho, DEC-154/DEC-158) e pediu que os **braços/mãos** sigam a cabeça. Não pediu cor própria por animal.
+- Decidido pelo usuário:
+  - Responde **`Q-151`** = opção **(A) manter como está**: à noite todos os animais ficam azul-marinho; **não** há cor própria escurecida por espécie. A recomendação Provisória vira decisão.
+  - Braços e mãos à noite **acompanham** a cabeça noturna (resolve a inconsistência anotada na DEC-163).
+- Feito (orquestrador, commit `70094d3`; entregue, **não aprovado** pelo usuário):
+
+  | Item | Como ficou |
+  |---|---|
+  | Folhas afetadas | `T_Crew_Uniform_Night`, `T_Civil_A_Night` a `T_Civil_H_Night` |
+  | O que muda | só os **texels de pelo** (braços/mãos) recebem a mesma camada da cabeça noturna: **RGB (30, 32, 54), alpha 68** |
+  | Intacto | **patinhas** rosadas (DEC-161) e **roupa** |
+
+- Não muda: técnica dia/noite por troca de textura (DEC-150), atlas noturno de acessórios (DEC-154), `T_Civil_Thief_Day` só dia (DEC-159). Expressões de noite seguem em `Q-150`; intensidade e quem troca em `Q-148`.
+- Impacto:
+  - **art-director:** regra na ficha AST-053: "noite = camada RGB (30, 32, 54) α 68 sobre todo texel de pelo (cabeça, braços, mãos); patinhas e roupa intactas; mesma cor para todas as espécies".
+  - **architect:** nenhuma técnica nova (sem shader por espécie).
+  - Notas em `asset-list.md` (AST-053), `open-questions.md` (`Q-151` → Respondidas; `Q-148`, `Q-150`), `README.md` → secretário (feito).
