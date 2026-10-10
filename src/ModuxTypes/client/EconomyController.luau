@@ -32,6 +32,8 @@ export type Public = {
 	Apply: (self: Public, record: Record) -> (),
 	Pop: (self: Public, amount: number) -> (),
 	PopDone: (self: Public, pop: DrawerValue.Pop) -> (),
+	DrawerAnchor: (self: Public) -> Instance?,
+	Chime: (self: Public, amount: number, result: string) -> (),
 	Draw: (self: Public, mount: Mount, adornee: Instance, offset: number) -> (),
 	Clear: (self: Public, mount: Mount) -> (),
 	Resolve: (self: Public, mount: Mount) -> (),

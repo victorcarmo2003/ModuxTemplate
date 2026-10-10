@@ -18,7 +18,8 @@
 --   - collision group Npc, not colliding with Players nor Npc (architecture.md §12.3);
 --   - queue slots Q1..Q5 are never intermediate route steps (MAP-01 §9.1 note): AvoidQueue on by default;
 --   - at most ROUTES_PER_FRAME A* searches per frame (§12.3);
---   - no traffic in wave 1: crosswalk edges are free (no TrafficService reservation, §18.6).
+--   - crosswalk edges wait for TrafficService:ReserveCrossing(cw, NpcId) on the near curb (§8.1, DEC-133; TASK-122,
+--     Walker.Follow); released on the far curb, on the failsafe snap and on cancel.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local PhysicsService = game:GetService("PhysicsService")
@@ -103,7 +104,7 @@ local function registerGroup(name: string)
 end
 
 const NpcService = Modux.Service("NpcService", {
-	Require = { "PlaceService", "RoundService" },
+	Require = { "PlaceService", "RoundService", "TrafficService" },
 	Priority = 610,
 })
 
@@ -445,12 +446,18 @@ function NpcService:WalkTo(id: number, target: string, options: WalkOptions?): b
 	end
 
 	const points: { Vector3 } = {}
+	const crossings: { [number]: string } = {}
 	for index = 2, #path do
-		table.insert(points, MapIndex.Node(path[index]).Position)
+		const node = MapIndex.Node(path[index])
+		table.insert(points, node.Position)
+		const previous = MapIndex.Node(path[index - 1])
+		if node.Crosswalk ~= nil and node.Crosswalk == previous.Crosswalk then
+			crossings[index - 1] = node.Crosswalk
+		end
 	end
 	const done = Walker.Follow(npc.Rig, points, alive, function(index: number)
 		npc.Node = path[index + 1]
-	end)
+	end, self:Crossing(id, crossings))
 	if not done or not alive() then
 		return false
 	end
@@ -462,6 +469,24 @@ function NpcService:WalkTo(id: number, target: string, options: WalkOptions?): b
 		end
 	end
 	return true
+end
+
+-- Crosswalk reservations of NPC `id` for Walker.Follow (TrafficService runs in game time only, never in OnInit)
+function NpcService:Crossing(id: number, at: { [number]: string }): Walker.Crossing?
+	if next(at) == nil then
+		return nil
+	end
+	const traffic = self.Dependencies.TrafficService
+	return {
+		At = at,
+		Reserve = function(cw: string): boolean
+			return traffic:ReserveCrossing(cw, id)
+		end,
+		Release = function(cw: string)
+			traffic:ReleaseCrossing(cw, id)
+		end,
+		MaxWait = Content.Traffic.Crossing.MaxWait,
+	}
 end
 
 -- Cancels the current walk; the NPC stops where it is (its Node stays the last one reached).

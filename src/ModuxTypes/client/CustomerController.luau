@@ -22,6 +22,7 @@ type Entry = {
 	Unmount: (() -> ())?,
 	Gui: Instance?,
 	Face: string?,
+	Variant: Vide.Source<string | false>, -- rig attribute Variant (TASK-110); false = ordinary customer
 }
 type Reaction = {
 	Id: number,
@@ -45,6 +46,7 @@ export type Public = {
 	Tracked: { [Model]: Tracked },
 	Setup: (self: Public) -> (),
 	RecordOf: (self: Public, id: number) -> Record?,
+	VariantOf: (self: Public, id: number) -> string?,
 	ToppingsOf: (self: Public, record: Record) -> { OrderBubble.Topping },
 	PatienceOf: (self: Public, entry: Entry) -> number,
 	NewEntry: (self: Public, id: number) -> Entry,
@@ -57,6 +59,8 @@ export type Public = {
 	Mount: (self: Public, entry: Entry, model: Model) -> (),
 	React: (self: Public, id: number, result: string) -> (),
 	ClearReaction: (self: Public, model: Model) -> (),
+	Cue: (self: Public, id: number, key: string) -> (),
+	Feedback: (self: Public, id: number, result: string) -> (),
 	Bind: (self: Public, model: Model) -> (),
 	Track: (self: Public, instance: Instance) -> (),
 	Untrack: (self: Public, instance: Instance) -> (),

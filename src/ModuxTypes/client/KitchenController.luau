@@ -18,6 +18,8 @@ export type Public = {
 	SlotOf: (self: Public, id: number) -> SlotRecord?,
 	WriteStock: (self: Public, id: number, record: StockRecord?) -> (),
 	WriteSlot: (self: Public, id: number, record: SlotRecord?) -> (),
+	IsCurrent: (self: Public, station: Instance) -> boolean,
+	Audio: (self: Public) -> Context.Audio,
 	Context: (self: Public) -> Context.Context,
 	Mount: (self: Public, station: Instance) -> (),
 	Unmount: (self: Public, station: Instance) -> (),

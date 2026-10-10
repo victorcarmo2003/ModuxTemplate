@@ -16,6 +16,7 @@ export type Public = {
 	Origin: Vector3?,
 	Random: Random,
 	Talking: Vide.Source<boolean>,
+	UnbindIdle: (() -> ())?,
 	Unmount: (() -> ())?,
 	Setup: (self: Public) -> (),
 	NightNumber: (self: Public) -> number,

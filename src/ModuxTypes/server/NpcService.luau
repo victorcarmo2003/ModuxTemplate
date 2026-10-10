@@ -5,6 +5,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 local Look = require(ServerScriptService.server.Npc.NpcService.Look)
 local Pool = require(ServerScriptService.server.Npc.NpcService.Pool)
+local Walker = require(ServerScriptService.server.Npc.NpcService.Walker)
 
 export type Role = "Customer" | "Thief" | "Actor"
 export type Npc = {
@@ -72,6 +73,7 @@ export type Public = {
 	DespawnAll: (self: Public) -> (),
 	Route: (self: Public, from: string, to: string, options: WalkOptions?) -> { string }?,
 	WalkTo: (self: Public, id: number, target: string, options: WalkOptions?) -> boolean,
+	Crossing: (self: Public, id: number, at: { [number]: string }) -> Walker.Crossing?,
 	Stop: (self: Public, id: number) -> (),
 	RefreshPacks: (self: Public) -> (),
 	SetTension: (self: Public, on: boolean) -> (),

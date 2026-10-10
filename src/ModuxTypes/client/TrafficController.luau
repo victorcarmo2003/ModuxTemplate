@@ -2,6 +2,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
+local Motion = require(ReplicatedStorage.shared.Traffic.Motion)
 
 export type Record = {
 	Route: number,
@@ -12,10 +13,9 @@ export type Record = {
 	HeldUntil: number,
 }
 type Path = {
-	Points: { Vector3 },
-	Cum: { number }, -- distance at each point
+	Line: Motion.Path,
+	Profile: Motion.Profile,
 	Length: number,
-	Slow: { { number } }, -- [from, to] stretches inside the X-T footprint (SpeedCrossing)
 }
 type Kit = {
 	Model: Model,
@@ -33,12 +33,8 @@ type Car = {
 	Record: Record,
 	Path: Path?,
 	Kit: Kit?,
-	-- grid integration (Motion); state at step K and K + 1
-	K: number,
-	S0: number,
-	U0: number,
-	S1: number,
-	U1: number,
+	-- Motion grid state of the current record (nil until the path is known)
+	Cursor: Motion.Cursor?,
 	-- shown state
 	Dist: number,
 	Speed: number,
@@ -72,7 +68,6 @@ export type Public = {
 	PathOf: (self: Public, route: number) -> Path?,
 	TakeKit: (self: Public, look: number) -> Kit,
 	ReleaseKit: (self: Public, kit: Kit) -> (),
-	Advance: (self: Public, car: Car, path: Path, now: number) -> (),
 	CarMotion: (self: Public, car: Car, path: Path, now: number) -> (number, number),
 	Reanchor: (self: Public, car: Car) -> (),
 	Apply: (self: Public, id: number, record: Record) -> (),
