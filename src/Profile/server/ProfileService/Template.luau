@@ -9,6 +9,8 @@
 export type RunRewards = {
 	RunId: string,
 	Keys: { string },
+	-- Gems credited in this run (data.md §1.3 v5.1, T59): RewardService fills RunReport.Gems from it
+	Gems: number,
 }
 
 export type Stats = {
@@ -56,7 +58,8 @@ const Template: Data = {
 	Receipts = {}, -- last 50 processed PurchaseIds (circular list)
 
 	-- Gem idempotency per run (architecture.md §10.4)
-	RunRewards = { RunId = "", Keys = {} },
+	-- Gems = sum credited in this run, for RunReport.Gems (v5.1, T59; TASK-074)
+	RunRewards = { RunId = "", Keys = {}, Gems = 0 },
 
 	Stats = {
 		RunsStarted = 0,
