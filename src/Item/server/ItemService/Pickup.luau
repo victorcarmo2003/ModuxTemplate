@@ -115,9 +115,10 @@ local function spotFor(ingredient: string, vehicle: string): Vector3?
 end
 
 -- Display copy of the kit Tool: plain Model, every part anchored and untouchable, scripts stripped, no "Handle".
-local function buildModel(template: Tool?, item: string): Model
+-- Also used by Drops.luau for items on the ground (FEAT-036, TASK-066).
+local function buildModel(template: Tool?, item: string, name: string?): Model
 	const model = Instance.new("Model")
-	model.Name = `FreePack_{item}`
+	model.Name = name or `FreePack_{item}`
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
 	if template then
 		for _, child in template:Clone():GetChildren() do
@@ -153,7 +154,7 @@ local function buildModel(template: Tool?, item: string): Model
 		box.CanQuery = false
 		box.Parent = model
 		primary = box
-		warn(`[ItemService] no kit Tool for free package "{item}": placeholder box`)
+		warn(`[ItemService] no kit Tool for "{item}": placeholder box`)
 	end
 	model.PrimaryPart = primary
 	return model
@@ -162,6 +163,7 @@ end
 const Pickup = {}
 
 Pickup.Action = ACTION
+Pickup.display = buildModel
 
 function Pickup.new(deps: Deps): Pickup
 	return { Deps = deps, Given = {}, Live = {}, ByAnchor = {}, Folder = nil }
@@ -242,6 +244,25 @@ function Pickup.shift(pickup: Pickup, day: number, vehicle: string)
 	end
 end
 
+-- Vehicle swap (L2-07, architecture.md §19.5; TASK-066): every ingredient bound to the new vehicle (Ingredients[k].
+-- Vehicle, coffee -> trailer) already unlocked by `day` that never got its package gets it now, over its station in
+-- that vehicle. The ShiftStarted path skips them (coffee has UnlockDay 0, never "exactly today").
+function Pickup.swap(pickup: Pickup, vehicle: string, day: number)
+	for _, row in Content.Ingredients.List do
+		if row.Vehicle ~= vehicle or pickup.Given[row.Key] or row.UnlockDay > day then
+			continue
+		end
+		if Pickup.place(pickup, row.Key, vehicle) then
+			pickup.Given[row.Key] = true
+		end
+	end
+end
+
+-- True when the anchor is a live free package (pick_up_item is shared with Drops.luau).
+function Pickup.owns(pickup: Pickup, anchor: Instance): boolean
+	return pickup.ByAnchor[anchor] ~= nil
+end
+
 -- InteractionService Validate: a live free package and an active member. Hotbar and package limit are checked in
 -- Run by ItemService:Give, which sends the Notice (hands_full / package_limit) and leaves the package in the world.
 function Pickup.validate(pickup: Pickup, player: Player, anchor: Instance): boolean
@@ -291,7 +312,9 @@ function Pickup.restore(pickup: Pickup, data: { [string]: any }, vehicle: string
 		for _, key in data.L do
 			if type(key) == "string" and Content.Ingredients.ByKey[key] ~= nil then
 				pickup.Given[key] = true
-				Pickup.place(pickup, key, vehicle)
+				-- A vehicle-bound ingredient goes back to its own vehicle: "Fp" restores before "Veh" (priority order).
+				const row = Content.Ingredients.ByKey[key]
+				Pickup.place(pickup, key, row.Vehicle or vehicle)
 			end
 		end
 	end
