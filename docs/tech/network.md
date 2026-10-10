@@ -32,7 +32,7 @@ Tabelas que geram os enums: `content-data.md`. Dados persistidos: `data.md`.
 | `Interact` | chaves de ação da linha nova: `topping_add` (no lugar de `board_add_topping`), `board_pickup` sai (o HotDog vai direto para a mão), `party_join` sai (plataforma física) | DEC-190, DEC-179 |
 | `Vitals` (onda 2) | proposta: `Sanity` deixa de ir a todos; vai só ao dono (packet `Sanity`). A party vê a **faixa** pela aparência (`LookPack` no personagem), nunca o número | **DEC-167, DEC-169** |
 | `Round`, `Vitals` antigos | **ficam** no `init.luau` na onda 1, sem uso novo; removidos na onda 2 junto com `VitalService`/`RoundController` novos | TASK-004 |
-| Aparência de personagem | **sem rede própria**: geometria pelo servidor, textura e rosto pelo client a partir de atributos (T40, **Provisório**, §5; segue a DEC-167/169 "troca no client" e diverge da T35 do `architecture.md` §18.9.4, ver §11) | DEC-148, 150, 152, 161, 166–169, 181 |
+| Aparência de personagem | **sem rede própria**: geometria pelo servidor, textura e rosto pelo client a partir de atributos (T40, **Aprovada** pelo architect por delegação da DEC-208, §5; segue a DEC-167/169 "troca no client" e diverge da T35 do `architecture.md` §18.9.4, ver §11) | DEC-148, 150, 152, 161, 166–169, 181 |
 | `keyBy` | nenhuma entrada usa (T14) | T14 |
 
 ### 0.1 Versão 3.1 (DEC-130, rodada 17)
@@ -183,7 +183,7 @@ Stock = Lync.replicate(Lync.struct({
 | | |
 |---|---|
 | Escreve | `KitchenService` (dono do estoque). `Blocked` recalculado no `ShiftStarted`; `Capacity` na compra de Cooler e na troca de veículo |
-| Lê | `KitchenController` (contador "7/12", vermelho com ≤ 2; `Fill` das garrafas e tigelas, DEC-140; **tampa + cadeado** quando `Blocked`, DEC-156); `MarketController` ("Out of stock" quando `Blocked`, DEC-180); `PromptController` (esconde "Add X"/"Restock" com `Amount = 0` ou `Blocked`, previsão de apresentação) |
+| Lê | `KitchenController` (contador "7/12", vermelho com ≤ 2; `Fill` das garrafas e tigelas, DEC-140; **tampa + cadeado** quando `Blocked`, DEC-156); `MarketController` ("Out of stock" quando `Blocked`, DEC-180); `PromptController` (previsão de apresentação: esconde "Add X" com `Amount = 0` ou `Blocked`; esconde "Restock" com `Amount = Capacity` ou `Blocked`, nunca com `Amount = 0`: estoque vazio é justamente quando se repõe; L-02 do QA, TASK-040) |
 | Frequência | por consumo/restock (≤ 2/s em pico de party de 4) |
 | Registros | um por ingrediente, **sempre os 9**: `coffee` existe desde o Day 1 com `Blocked = true` e `Amount = 0` até a compra do trailer (o Mart mostra a prateleira de café pelo mesmo `Blocked`; a cafeteira começa com 10 doses, UPG-007, onda 2) |
 | Por que `Blocked` aqui e não em `Stations` | o bloqueio é do **ingrediente no dia**, não da estação: a mesma flag fecha a tigela, mostra "Out of stock" no Mart e tira o ingrediente do sorteio de pedido. Um registro por ingrediente = um dono, uma escrita. Na tarefa e no MAP-01, "tigela `Blocked`" (DEC-156) **é** `Stock[ing].Blocked == true` |
@@ -204,13 +204,13 @@ Stations = Lync.replicate(Lync.struct({
 |---|---|---|---|
 | `grill` | 1 por vaga (`Slot` 1..4): 2 / 3 / 4 pelo nível do Grill (UPG-001, DEC-201: 1 salsicha por par de rolos) | Empty → Working (`StartedAt`, `Duration` = 12/10/8 s × 0,85 se quem colocou é o Gato, CLS-003) → Ready (salsicha pronta parada na vaga, sem queimar) | vaga nova do upgrade entra com `add` vazia; as em andamento não reiniciam (UPG-001) |
 | `rail` | 1 (`Slot = 0`) | Empty / Ready (com ≥ 1) | `Count` = salsichas (FIFO no servidor). Capacidade = `Vehicles[v].RailSlots` (6 carrinho) |
-| `board` | **2** (`Slot` 1..2, DEC-190) | Empty → Working (corte 1,5 s após "Slice Bun") → Ready (pão cortado esperando salsicha) | ver decisão abaixo |
+| `board` | **2** (`Slot` 1..2, DEC-190); trailer **3** (`Slot` 1..3, DEC-215; onda 2) | Empty → Working (corte 1,5 s após "Slice Bun") → Ready (pão cortado esperando salsicha) | ver decisão abaixo |
 
 **Decisão (DEC-190 pediu "2 registros ou slot no registro"): 2 registros `board`, prompt único na tábua.**
 
 | | |
 |---|---|
-| Estado | cada vaga é um registro próprio (`StationId × 100 + Slot`; `Att_Bun1`/`Att_Bun2` com `Slot` 1..2 no binding, `architecture.md` §18.4). O visual do pão por vaga (inteiro → cortado) e a barra de corte saem direto do registro, igual à grelha |
+| Estado | cada vaga é um registro próprio (`StationId × 100 + Slot`; `Att_Bun1`/`Att_Bun2` com `Slot` 1..2 no binding, `architecture.md` §18.4; no trailer, 3 registros `board`, `Att_Bun1..3`, `Slot` 1..3, `Vehicles.trailer.BoardSlots = 3`, DEC-215). O visual do pão por vaga (inteiro → cortado) e a barra de corte saem direto do registro, igual à grelha |
 | Interação | o **prompt fica na tábua** (uma âncora `Prompt_Board` → `board_add_sausage`), não em cada vaga: as duas vagas ficam a < 2,5 studs (MAP-01 §7: prompts vizinhos ≥ 2,5). "Slice Bun" (na caixa de pão) ocupa a vaga livre de menor `Slot`; "Add Sausage" (na tábua) usa a vaga `Ready` mais antiga e o 1º do trilho |
 | Concorrência | as duas ações passam pelo `InteractionService`, que serializa por alvo no mesmo frame (TASK-011): dois toques simultâneos → o 1º leva o HotDog, o 2º encontra a vaga já `Empty` (ou a outra `Ready`). Atende "só um recebe" (FEAT-006) |
 | Descartada | 1 registro com `Slots = array(...)` ou bits por vaga: obriga o client a diferenciar o array a cada mudança e foge do padrão "registro = coisa com barra" da grelha |
@@ -231,7 +231,7 @@ Customers = Lync.replicate(Lync.struct({
 	State = Lync.enum({ "Arriving", "Queued", "Ordering", "Waiting", "Leaving" }),
 	Slot = Lync.int(0, 8),                               -- 0 = fora da fila; 1..5 = Q1..Q5 (Counter 3/4/5)
 	Order = Lync.bitfield(Content.Ingredients.ToppingKeys), -- vazio até "Take Order"; nunca o K antes disso (FEAT-011)
-	PatienceEndsAt = Lync.f64(),                         -- 40 + 5K (+ Counter) desde a chegada ao balcão (DEC-072)
+	PatienceEndsAt = Lync.f64(),                         -- 0 até "Take Order"; depois 40 + 5K (+ Counter) desde a chegada ao balcão (DEC-072)
 	Mood = Lync.enum(Content.Moods.Keys),                -- Provisório (Q-164): Neutral, Happy, Annoyed, Complaining
 }))
 ```
@@ -244,6 +244,7 @@ Customers = Lync.replicate(Lync.struct({
 | Aparência | **não está aqui**: espécie, roupa, tipo/acessório e pack vão em atributos do modelo do NPC (§5.2). O modelo é achado pelo atributo `NpcId` = id do registro. Os prompts "Take Order"/"Serve" e "Refuse" são âncoras `Interactable` no rig com `EntityId` próprios (`architecture.md` §18.4); o `InteractionService` resolve âncora → rig → `NpcId` |
 | Humor (onda 1, **Provisório**, `Q-164`) | só visual: Neutral na chegada → Annoyed quando falta ≤ 1/3 da paciência (`MoodRules.AnnoyedAt`) → Complaining ao desistir, em Errado ou Refuse; Happy em venda Completo/Perfeito (`content-data.md` §3.16). **Não** mexe no pagamento da DEC-072 até o desenho do game-designer (DEC-187: humor dinâmico completo, que muda pagamento, vem depois). O enum vem de `Content.Moods`: estender o humor não muda o `Net` |
 | Gorjeta | a janela de gorjeta (16 + 4K) **não** vai no set: não aparece no HUD (DEC-015) e o resultado só existe no servidor |
+| Paciência e K oculto (**T41**, decidida pelo architect, DEC-208 delegada; L-06 do QA, TASK-040) | `PatienceEndsAt` deixaria o client deduzir K (40 + 5K) antes do "Take Order", contra FEAT-011 ("K oculto"). Regra: o servidor escreve `PatienceEndsAt = 0` enquanto o cliente está `Arriving`/`Queued`/`Ordering` e o valor real (contado desde a chegada ao balcão, sem mudar a regra da DEC-072) na mesma escrita em que preenche `Order` e passa a `Waiting`. Nenhum visual da onda 1 precisa da paciência antes disso (`Annoyed` é escrito pelo servidor no `Mood`). Descartada: aceitar o vazamento (custo zero, mas abre leitura de K por exploit do client). Afeta TASK-033 (escrita) e TASK-034 (barra/rosto só com `PatienceEndsAt > 0`) |
 
 ### 3.7 `Upgrades` (id = `Content.Upgrades.IndexOf[key]`)
 
@@ -393,7 +394,7 @@ turno; Night reservado à tensão), DEC-152/161/162 (rosto por textura; express�
 sanidade, só a crew), DEC-168/169 (sanidade baixa: NPC em Night **só para quem está na faixa**), DEC-188 (tipo de
 cliente = espécie + acessório + roupa civil sorteada).
 
-### 5.1 Técnica (T40, **Provisório**, vai à `Q-130`)
+### 5.1 Técnica (T40, **Aprovada**: decidida pelo architect, DEC-208 delegada)
 
 | Camada | Quem escreve | Como replica |
 |---|---|---|
@@ -539,7 +540,7 @@ Parties = Lync.replicate(Lync.struct({ ... })),    -- lobby; plataformas física
 |---|---|---|
 | Tools (pacotes, HotDog, café, Revive Kit) | Backpack nativo; atributos na Tool (§7.1) | DEC-040 |
 | Aparência de personagem (pack, rosto, espécie, roupa) | atributos + vestir no client (§5) | T40 |
-| Pacote grátis do dia de liberação | Tool no mundo sobre a estação nova (`ItemService`) | DEC-071 |
+| Pacote grátis do dia de liberação | **modelo de exibição** (não `Tool`, sem `Handle` tocável) sobre a estação nova, com âncora `Interactable` → `pick_up_item` (prompt "Take", toque, raio 7, `Content.Actions`); o servidor valida hotbar de 4 (DEC-174) e limite de pacotes (2, Urso 3), cheio → `Notice hands_full`/`package_limit` e o pacote fica no mundo; pego → vira a Tool `pack_*` na mão. **Provisório** (N-03 do board, L-03 do QA). Dono: TASK-046 | DEC-071 |
 | Prompts (`PromptEnabled`, `PromptText`, `PromptHold`) | atributos das peças, mantidos pelo servidor (TASK-011; nomes no binding da TASK-002) | prompt é do mundo |
 | Peças de upgrade, troca de veículo | instâncias no `Workspace` | DEC-052 |
 | NPCs (posição, animação) | física + `Animator` no servidor (T11); passantes por `Motor6D.Transform` (DEC-183, Provisório, onda 2) | |

@@ -2,8 +2,8 @@ Status: Rascunho
 
 # Dados de conteúdo (data-driven)
 
-Autor: architect. Versão 4, 2026-10-10 (**TASK-001**: estado DEC-140 a DEC-201, núcleo da onda 1). Versão anterior:
-3.1, 2026-10-08 (DEC-130/DEC-133).
+Autor: architect. Versão 4.1, 2026-10-10 (**TASK-003**: implementação em `src/Shared/Content/`, §1.5; DEC-215 na
+tábua do trailer). Versão 4, 2026-10-10 (**TASK-001**: estado DEC-140 a DEC-201, núcleo da onda 1). Anterior: 3.1.
 Formato das tabelas que game-designer, narrative-writer e level-designer preenchem e que o código só lê.
 Base: DEC-044 ("parâmetros são tabela"), propostas das rodadas 1 e 2 (Aprovadas), fichas de `design/` e `story/`.
 Números são **valores iniciais** (ajuste de número não exige DEC; mudança de regra exige).
@@ -149,6 +149,27 @@ item; rota → nó), número fora de faixa, enum vazio, efeito de classe sobre `
 - `Moods` contém `Neutral`; toda `Expression` de `Moods` existe na lista fechada de expressões (§3.16).
 
 Falha = `error` com tabela e linha (R8: enum ruim derruba o `Lync.start()`).
+
+### 1.5 Implementação (TASK-003, v4.1)
+
+O que o código em `src/Shared/Content/` fixou além do texto acima (forma decidida pelo architect; dono do arquivo
+`init.luau` = TASK-003; as outras tasks de conteúdo editam só o próprio arquivo de tabela):
+
+| Ponto | Forma |
+|---|---|
+| `Table` | `Table.new(list)` → `List`, `Keys`, `ByKey`, `IndexOf`, congelado em profundidade. `Table.with(t, extra)` acrescenta campos derivados ou registro único (`ToppingKeys`, `RecordKeys`, `PhaseKeys`, `Rules`, `Looks`). `Table.record(r)` congela registro único. `Table.keysWhere(t, pred)` deriva subconjunto de chaves. Duplicata não quebra o `new`: quem acusa é o `Validate` (com tabela e linha) |
+| Exportados por `Content` | todas as tabelas da onda 1 + `ItemRules` (= `Items.Rules`), `Looks` (= `Outfits.Looks`), `MoodRules` (= `Moods.Rules`), `OrderPhases` (tabela de `Orders.luau`) e `OrderRules` (= `.Rules`), `Stats` (lista fechada da §3.10, `Stats.luau`, `Stats.Has[stat]`) |
+| `Validate` | `Validate.luau` roda uma vez ao requerer `Content` (~0,2 ms medido); falha = `error("[Content] Tabela[linha] 'chave': motivo")`. Cobre as regras da §1.4 da onda 1, mais: todo ingrediente tem pacote; `Upgrades.BenchSpot` único; `KWeights` soma 1 e tem `MaxToppings + 1` entradas; `Actions.Requires` (`Held` = item ou categoria, `Phase` ⊆ `Shift`) |
+| Chaves em PascalCase | só `Shift` (fases) e `Moods` (valores de enum da rede, regra §1.3); o resto segue `^[a-z][a-z0-9_]*$` |
+| Ingredients | `OrderPrice` e `Weight` = 0 e `Stack = nil` em Base/Supply (o "—" das tabelas) |
+| Stations | `Ingredient = Stations.PerAnchor` (`"PerAnchor"`) na estação de complementos |
+| Actions | campo novo `Wave` (1ª onda com prompt ativo). `Requires` só carrega o que o client pré-checa (`Held`, `NotHasTopping`, `Phase`); o resto da coluna Requires da §3.18 é regra do servidor. `Held = "Package"` = categoria. `pick_up_item` = "Take", toque, ativo na onda 1 (N-03; item derrubado da onda 3 usa `PromptHold = 0.5` na âncora, FEAT-036) |
+| Notices | campo novo `ValueFrom` (`None`, `Number`, `Ingredients`, `Upgrades`, `Classes`): diz ao client como ler `Notice.Value`. Placeholder `{class}` para as notices de classe |
+| Upgrades | `Levels[veículo]` lista **todos** os níveis de `StartLevel` ao máximo, em ordem; a 1ª linha é o que o veículo traz (`Price = 0`; nível 0 de Cash Drawer Lock e Trailer Lights incluído, com os efeitos "sem upgrade") |
+| CustomerTypes | `Role` (`Customer`/`Pedestrian`), `UnlockDay`/`UnlockNight`, `Weight = { Day, Night }`, `KShift = { Delta, Chance }`, `IngredientMult` por chave de topping; `pedestrian` com `Species = {}` (= qualquer espécie com `Pedestrian`) |
+| OrderPhases | chaves `day_1`, `day_2_3`, `day_4_5`, `day_6_plus`, `night`; `ToDay = 0` = sem teto |
+| OpalLines | chaves `day`, `n1_3`, `n4_6`, `n7_10` (+ `FromNight`/`ToNight`) |
+| Stubs | `Classes`, `Species`, `Shift`, `Vehicles`, `Upgrades`, `RunParams`, `Flow`, `Orders`, `CustomerTypes`, `OpalLines` já saem com os números desta versão e de `upgrades.md`/`npcs.md`/FEAT-010 onde existiam; TASK-008/009 revisam e completam (nomes, falas, acessórios, noites) |
 
 ## 2. Mapa das tabelas
 
@@ -330,7 +351,7 @@ Chaves alinhadas ao binding da TASK-002 (`architecture.md` §18.4, §18.14 item 
 | `grill` | G | PerSlot | `grill_collect` ("Collect") | — | vagas e tempo: `Upgrades.grill` (`GrillSlots` 2/3/4, `GrillTime` 12/10/8; DEC-046, **DEC-201**) | `Grill.luau` |
 | `rail` | R | Single | — (consumido por `board_add_sausage`) | — | capacidade: `Vehicles[v].RailSlots` | `Rail.luau` |
 | `bun_crate` | B | None | `bun_cut` ("Slice Bun"), `restock` | `bun` | `CutTime = 1.5` (FEAT-006) | `BunCrate.luau` |
-| `board` | T | PerSlot | `board_add_sausage` ("Add Sausage", **um** prompt na tábua) | — | nº de vagas: `Vehicles[v].BoardSlots` (2 no carrinho, **DEC-190**) | `Board.luau` |
+| `board` | T | PerSlot | `board_add_sausage` ("Add Sausage", **um** prompt na tábua) | — | nº de vagas: `Vehicles[v].BoardSlots` (2 no carrinho, 3 no trailer; **DEC-190**, **DEC-215**) | `Board.luau` |
 | `toppings` | K | None | `topping_add` ("Add {item}"), `restock` | `PerAnchor` | 6 complementos (tigela de inox ou garrafa; DEC-156, DEC-140); estado = `Stock` (`Amount`, `Blocked`) | `Toppings.luau` |
 | `trash` | BIN-C | None | `discard` ("Throw Away") | — | — | `Trash.luau` |
 | `coffee_machine` | C (trailer) | Single | `brew_coffee`, `restock` | `coffee` | `BrewTime = 6` (onda 2) | onda 2 |
@@ -368,7 +389,7 @@ Chaves alinhadas ao binding da TASK-002 (`architecture.md` §18.4, §18.14 item 
 | (modelo) | `Model` com tag `Vehicle`, `Vehicle = "cart"` no `Workspace` (T36; sai o campo `Model`) | idem, `"trailer"` | `architecture.md` §18.1, §18.14 |
 | `HasNight` | false | true | DEC-007 |
 | `RailSlots` | 6 | 8 | FEAT-006 |
-| `BoardSlots` | **2** | 3 (**Provisório**: FEAT-006 diz 3 no trailer; DEC-190 fixou 2 vagas sem citar veículo → confirmar com game-designer) | **DEC-190**, FEAT-006 |
+| `BoardSlots` | **2** | **3** | **DEC-190**, **DEC-215** |
 | `HasCoffee`, `HasSwitch`, `HidePoints` | false, false, 0 | true, true, 4 | DEC-125, DEC-189, DEC-176 |
 | `BuyFromDay` | — | 5 | DEC-037 |
 | `BuySpot` | — | o **próprio trailer** à venda no estacionamento (prompt `buy_trailer`). Fixo, fora da bancada (DEC-107) | DEC-107 |
@@ -708,10 +729,11 @@ Ações da **onda 1** (FEAT-005, FEAT-006, FEAT-007, FEAT-008, FEAT-011, FEAT-01
 | `restock` | "Restock" | 1 | 7 | `Held` = pacote do ingrediente da peça | FEAT-007 |
 | `buy_package` | "Buy {item} — ${price}" | 0.5 | 7 | não `Blocked` (senão a etiqueta "Out of stock" e **sem** prompt, DEC-180); limite de pacotes e hotbar | FEAT-008 |
 | `bench_buy_upgrade` | "Buy {upgrade} — ${price}" | 1.5 | 7 | upgrade existe no veículo atual e não está no máximo ("Maxed" sem prompt) | FEAT-015, DEC-184 |
+| `pick_up_item` | "Take" | 0 | 7 | vaga na hotbar (total < 4) e limite de pacotes; na onda 1 só o **pacote grátis** do dia de liberação (modelo de exibição, não `Tool`; `network.md` §7). Item derrubado (onda 3, FEAT-036) usa a mesma ação com `PromptHold = 0.5` na âncora. **Provisório** (N-03 do board, L-03 do QA) | DEC-071, FEAT-036 |
 
 Chaves das ondas seguintes **já existem na tabela** (o enum do `Interact` e a checagem do binding, `architecture.md`
 §18.7 item 3, precisam delas), sem prompt ativo na onda 1: `bench_buy_item` (S1 fica "Nothing special today"),
-`buy_trailer` (2 s), `brew_coffee`, `give_coffee`, `switch_light`, `hide`, `safe_spot`, `pick_up_item`. **Saem:** `board_add_topping`
+`buy_trailer` (2 s), `brew_coffee`, `give_coffee`, `switch_light`, `hide`, `safe_spot`. **Saem:** `board_add_topping`
 (complemento é na estação, não na tábua), `board_pickup` (o HotDog nasce na mão, DEC-190), `party_join` (plataforma
 física, DEC-179). Lixeira de rua (DEC-200) reaproveita `discard` (o que aceita: `Q-166`).
 
@@ -742,7 +764,6 @@ Adicionar campo a uma tabela é mudança de contrato: passa pelo architect.
 |---|---|---|
 | Capacidade do Cream Cheese nos níveis 2/3 (20/30) | §3.3 | `Q-062` |
 | `CategoryLimits.HotDog = 2` | §3.5 | game-designer (FEAT-005) |
-| `Vehicles.trailer.BoardSlots = 3` (FEAT-006) × "2 vagas" da DEC-190 sem veículo | §3.8 | game-designer; se for 2 nos dois, só número |
 | Preços do trailer = carrinho; Cash Drawer Lock recomprado | §3.7 | `Q-163` (a, c) |
 | "Pedido do dono" = quem fez o Take Order (Raposa, Leão) | §3.10 | game-designer (`classes.md`) |
 | `Flow.RecalcOn = "ShiftStarted"` | §3.16 | DEC-185 (parte Provisória) |

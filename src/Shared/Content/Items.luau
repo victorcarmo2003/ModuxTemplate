@@ -1,0 +1,112 @@
+--!strict
+-- Hotbar Tools and ItemRules (content-data.md §3.5; DEC-040, DEC-103, DEC-174, DEC-190). Owner: game-designer.
+-- The Tool in the kit is ReplicatedStorage.Assets.Items.Tools/<key> (architecture.md §18.9.1).
+-- Tool attributes (written only by ItemService, network.md §7.1): Item, Count, Toppings (HotDog), Altered (wave 3).
+-- Drop rules: FEAT-036 (only the equipped Tool drops when hit).
+local Table = require(script.Parent.Table)
+
+export type Kind = "Package" | "Consumable" | "Product" | "Revive" | "Anomaly"
+export type Category = "Package" | "HotDog" | "Coffee" | "Altered" | "Revive"
+export type DropOnHit = "Keep" | "Lost" | "Vanish"
+
+export type Item = {
+	Key: string,
+	Ref: string,
+	Name: string, -- Tool name in the hotbar
+	Kind: Kind,
+	Category: Category, -- key of ItemRules.CategoryLimits
+	Stackable: boolean, -- count in the Tool attribute Count
+	DropOnHit: DropOnHit,
+	DropDespawn: number | "NextShiftEnd", -- seconds on the street; 0 = immediately
+	KeepOnSpectate: boolean,
+}
+
+export type ItemRules = {
+	HotbarSlots: number, -- total Tools per player; the 5th is refused with "Hands full" (DEC-174)
+	CategoryLimits: { [Category]: number },
+}
+
+local function pack(key: string, ref: string, name: string): Item
+	return {
+		Key = key,
+		Ref = ref,
+		Name = name,
+		Kind = "Package",
+		Category = "Package",
+		Stackable = true,
+		DropOnHit = "Keep",
+		DropDespawn = 60,
+		KeepOnSpectate = false,
+	}
+end
+
+const base = Table.new({
+	pack("pack_sausages", "ITM-011", "Sausages"),
+	pack("pack_buns", "ITM-012", "Buns"),
+	pack("pack_ketchup", "ITM-013", "Ketchup"),
+	pack("pack_mustard", "ITM-014", "Mustard"),
+	pack("pack_cheese", "ITM-015", "Cheese"),
+	pack("pack_bacon", "ITM-016", "Bacon"),
+	pack("pack_potato_sticks", "ITM-017", "Potato Sticks"),
+	pack("pack_cream_cheese", "ITM-018", "Cream Cheese"),
+	pack("pack_coffee", "ITM-019", "Coffee Pack"),
+	{
+		Key = "coffee",
+		Ref = "ITM-009",
+		Name = "Coffee",
+		Kind = "Consumable",
+		Category = "Coffee",
+		Stackable = true,
+		DropOnHit = "Lost",
+		DropDespawn = 2,
+		KeepOnSpectate = false,
+	},
+	{
+		Key = "hot_dog",
+		Ref = "ITM-010",
+		Name = "Hot Dog",
+		Kind = "Product",
+		Category = "HotDog",
+		Stackable = false,
+		DropOnHit = "Lost",
+		DropDespawn = 2,
+		KeepOnSpectate = false,
+	},
+	{
+		Key = "altered_item",
+		Ref = "ITM-020",
+		Name = "Altered Item",
+		Kind = "Anomaly",
+		Category = "Altered",
+		Stackable = false,
+		DropOnHit = "Vanish",
+		DropDespawn = 0,
+		KeepOnSpectate = false,
+	},
+	{
+		Key = "revive_kit",
+		Ref = "ITM-021",
+		Name = "Rescue Whistle", -- display name proposed in ui-text.md; key stays revive_kit
+		Kind = "Revive",
+		Category = "Revive",
+		Stackable = false,
+		DropOnHit = "Keep",
+		DropDespawn = 60,
+		KeepOnSpectate = false,
+	},
+} :: { Item })
+
+const rules: ItemRules = {
+	HotbarSlots = 4, -- DEC-174
+	CategoryLimits = {
+		Package = 2, -- DEC-049; PackageLimit stat (bear) raises it to 3 inside the 4 slots
+		HotDog = 2, -- FEAT-005, Provisional
+		Coffee = 1,
+		Altered = 1,
+		Revive = 1, -- DEC-100
+	},
+}
+
+return Table.with(base, {
+	Rules = Table.record(rules),
+})

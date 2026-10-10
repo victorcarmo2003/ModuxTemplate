@@ -37,7 +37,7 @@ que level-designer, modeler-3d e coders seguem na onda 1.
 | Kits de asset | `InsertService` nos protótipos | **§18.9–§18.10**: `ReplicatedStorage.Assets` montado em modo de edição; **sem `InsertService` em runtime**; malha só como instância, textura por id em módulo de dados | DEC-146, DEC-151, DEC-166, DEC-167, DEC-181 |
 | Layout de módulos | implícito | **§18.11–§18.13**: `src/<F>/shared/`, filhos de Service, contrato `KitchenService/Stations/*.luau`, `CustomerService/*.luau` | TASK-002 |
 | Estações e Mart | "componentes de estação", componentes `Shelf`/`BenchSlot` | módulos de estação descobertos pelo `KitchenService`; prateleiras e bancada são âncoras `Interactable` (sem Component) | §18.4, §18.12 |
-| Técnicas | T1–T31 | + **T32–T39** (Provisórias, `Q-130`); T35 proposta e **retirada** em favor da T40 de `network.md` §5 (client veste o personagem a partir de atributos) | §14, §18.9.4 |
+| Técnicas | T1–T31 | + **T32–T34, T36–T40** (decididas pelo architect, DEC-208 delegada); T35 proposta e **retirada** em favor da T40 de `network.md` §5 (client veste o personagem a partir de atributos) | §14, §18.9.4 |
 
 ### 0.0 Versão 3.1 (rodadas 16 e 17)
 
@@ -819,14 +819,15 @@ versão a proposta vem, não se foi aprovada.
 | T26 | Streaming ligado com raio mínimo que cobre o mapa (`Q-087`); colisão jogador–jogador desligada (`Q-086`) | streaming desligado | nova |
 | T30 | NPC cruza só na faixa com reserva do servidor (`TrafficService:ReserveCrossing`/`ReleaseCrossing`, sem rede): concedida sem carro a < 15 studs da linha e ≥ 4 s depois da última liberação; carros param na linha; reserva expira em 4 s (failsafe `PivotTo` do NPC); nenhum carro para dentro da faixa (DEC-133) | NPC atropelável; NPC só em brecha sem carro parar (`IsCrossingClear`, versão 3.1 inicial, incompatível com DEC-133); fila física de carros | nova na 3.1, revista por DEC-133 (`Q-131`) |
 | T31 | Postes da Juniper: emissiva em todos, `SpotLight` sem sombra em um a cada dois + P-01, corte por distância no client; `LightZone` separada da luz visual | `SpotLight` em todos (estoura ≤ 18) | nova na 3.1 |
-| T32 | Binding do mapa por **tag + atributo** (autorado × runtime); âncora por nome só **dentro do dono** achado por tag; índice compartilhado `MapIndex` (§18.1–§18.8) | caminhos de pasta (`workspace.MAP01_Assets.Cart...`); busca global por nome; `MapId` como chave de código | nova na 3.2 |
-| T33 | `EntityId` atribuído pelo servidor no registro (ordem estável por `GetFullName`), escrito como atributo de runtime; nunca autorado; snapshot nunca usa `EntityId` | id autorado no place (colisão, esquecimento, retrabalho a cada mudança de mapa) | nova na 3.2 |
-| T34 | Kits em `ReplicatedStorage.Assets` montados em **modo de edição** por script reproduzível; **sem `InsertService` em runtime**; malha só como instância; id de textura/imagem em módulo de dados (`CrewLooks`, `Content`) | `InsertService:LoadAsset` em runtime (só funciona com asset do dono do place, latência, falha de rede); `MeshId` por código (não é gravável em runtime) | nova na 3.2 |
+| T32 | Binding do mapa por **tag + atributo** (autorado × runtime); âncora por nome só **dentro do dono** achado por tag; índice compartilhado `MapIndex` (§18.1–§18.8) | caminhos de pasta (`workspace.MAP01_Assets.Cart...`); busca global por nome; `MapId` como chave de código | nova na 3.2; **decidida pelo architect (DEC-208, delegada)** |
+| T33 | `EntityId` atribuído pelo servidor no registro (ordem estável por `GetFullName`), escrito como atributo de runtime; nunca autorado; snapshot nunca usa `EntityId` | id autorado no place (colisão, esquecimento, retrabalho a cada mudança de mapa) | nova na 3.2; **decidida pelo architect (DEC-208, delegada)** |
+| T34 | Kits em `ReplicatedStorage.Assets` montados em **modo de edição** por script reproduzível; **sem `InsertService` em runtime**; malha só como instância; id de textura/imagem em módulo de dados (`CrewLooks`, `Content`) | `InsertService:LoadAsset` em runtime (só funciona com asset do dono do place, latência, falha de rede); `MeshId` por código (não é gravável em runtime) | nova na 3.2; **decidida pelo architect (DEC-208, delegada)** |
 | ~~T35~~ | ~~Visual da crew aplicado no servidor; Night de NPC só no client~~ → **retirada**: vale a **T40** de `network.md` §5.1 (servidor monta a geometria e escreve atributos; **cada client veste** textura e rosto), que segue o texto da DEC-167/169 ("servidor replica a faixa; cada client aplica a textura"). Id T35 não é reaproveitado | — | proposta e retirada na 3.2 |
-| T36 | Veículos vivem no `Workspace` e são **reposicionados** (`PivotTo`); estação de veículo que não é o atual fica com prompt desligado | trocar o veículo entre `ServerStorage` e `Workspace` (quebra registro por tag e streaming) | nova na 3.2 |
-| T37 | `KitchenService` descobre `Stations/*.luau` sozinho; uma inscrição por chave de ação no `InteractionService`; despacho pela `StationKind` do dono da âncora (§18.12) | lista estática no init (conflito de merge entre tasks paralelas); um Component por estação (estado espalhado, snapshot difícil) | nova na 3.2 |
-| T38 | Peça de upgrade alternada por **visibilidade**, nunca reparentada; âncoras de prompt e de vaga ficam fora da peça (filtro `Level` quando a posição muda por nível) | trocar o modelo inteiro da estação a cada nível (perde tags e atributos) | nova na 3.2 |
-| T39 | Grafo `NpcNode` por atributos (`NodeId`, `Links`, `Crosswalk`); aresta ≤ 40 studs (limite de 8 s do `MoveTo`); A* determinístico com desempate por `NodeId` (servidor e client) | `ObjectValue` por aresta (some no client com streaming); `PathfindingService` em runtime | nova na 3.2 |
+| T36 | Veículos vivem no `Workspace` e são **reposicionados** (`PivotTo`); estação de veículo que não é o atual fica com prompt desligado | trocar o veículo entre `ServerStorage` e `Workspace` (quebra registro por tag e streaming) | nova na 3.2; **decidida pelo architect (DEC-208, delegada)** |
+| T37 | `KitchenService` descobre `Stations/*.luau` sozinho; uma inscrição por chave de ação no `InteractionService`; despacho pela `StationKind` do dono da âncora (§18.12) | lista estática no init (conflito de merge entre tasks paralelas); um Component por estação (estado espalhado, snapshot difícil) | nova na 3.2; **decidida pelo architect (DEC-208, delegada)** |
+| T38 | Peça de upgrade alternada por **visibilidade**, nunca reparentada; âncoras de prompt e de vaga ficam fora da peça (filtro `Level` quando a posição muda por nível) | trocar o modelo inteiro da estação a cada nível (perde tags e atributos) | nova na 3.2; **decidida pelo architect (DEC-208, delegada)** |
+| T39 | Grafo `NpcNode` por atributos (`NodeId`, `Links`, `Crosswalk`); aresta ≤ 40 studs (limite de 8 s do `MoveTo`); A* determinístico com desempate por `NodeId` (servidor e client) | `ObjectValue` por aresta (some no client com streaming); `PathfindingService` em runtime | nova na 3.2; **decidida pelo architect (DEC-208, delegada)** |
+| T40 | Aparência de personagem vestida **no client** a partir de atributos do modelo (`Species`, `Outfit`, `CustomerType`, `LookPack`); servidor monta a geometria e escreve os atributos (`network.md` §5.1; substitui a T35 retirada) | servidor aplica textura e rosto (T35) | nova (`network.md` v4); **Aprovada: decidida pelo architect (DEC-208, delegada)** |
 
 ## 15. Propostas ao usuário: situação
 
@@ -1244,7 +1245,7 @@ parâmetro). A chave do animal no kit é `Content.Species[k].Asset` (`Dog`). `Va
 `Content.Outfits` (`thief` em `content-data.md` §3.10b na data desta versão; se a tabela mudar para `civil_thief`,
 o `CrewLooks` acompanha).
 
-#### 18.9.4 Quem aplica o visual (T40, Provisório; T35 retirada)
+#### 18.9.4 Quem aplica o visual (T40, Aprovada pela DEC-208 delegada; T35 retirada)
 
 | Caso | Servidor (atributo) | Client (veste) | Regra |
 |---|---|---|---|
@@ -1393,11 +1394,11 @@ Conferido com a versão final da TASK-001 (2026-10-10). Este documento não edit
 | Chaves de `Stations` | adotadas por `content-data.md` §3.6: `sausage_stock`, `grill`, `rail`, `bun_crate`, `board`, `toppings`, `trash` (+ `coffee_machine`). Gaveta, placa, prateleiras e bancada não são estação |
 | Instância ↔ registro de `Stations` | atributo `StationId` (≤ 99) no `Model`; id do registro = `StationId × 100 + Slot` (`Slot = 0` no trilho), `network.md` §3.5 |
 | `EntityId` | `InteractionService` para toda âncora (mapa e runtime), T33; `NpcId` separado no rig (`network.md` regra 5) |
-| Ações | `topping_add` (sai `board_add_topping`); `bench_buy_item`, `pick_up_item` existem sem prompt ativo na onda 1 |
+| Ações | `topping_add` (sai `board_add_topping`); `bench_buy_item` existe sem prompt ativo na onda 1; `pick_up_item` ("Take", toque) ativo na onda 1 só no pacote grátis (N-03, `network.md` §7) |
 | `BenchSpot`, `Vehicles.Model`, `Species.Asset`, sufixo PascalCase | adotados como aqui (§18.4, T36, §18.9.3) |
 | Aparência | **vale a T40** (`network.md` §5): servidor monta e escreve atributos, client veste; T35 retirada (§18.9.4) |
 | Valores de `Outfit` | chaves de `Content.Outfits` (`crew`, `civil_a`..`civil_h`, `thief`); `CrewLooks` indexado por elas |
 | Expressões | `Smile` (nome do JSON) em `Content.Looks.Expressions` |
-| **Aberto: nome do atributo da chave do item na Tool** | `network.md` §11 diz `Item` (nome deste §18.2); `content-data.md` §3.5 ainda diz `ItemKey`. Dono: TASK-001/TASK-003 escolhem um (sugestão: `Item`) antes da TASK-022 |
-| **Aberto: chave da roupa do ladrão** | `content-data.md` §3.10b e `network.md` §5.2 dizem `thief`; o coordenador citou `civil_thief`. Vale a tabela; `CrewLooks` segue a tabela |
-| Numeração | T32–T39 aqui (T35 retirada); T40 em `network.md`. O secretário acrescenta T32–T34, T36–T40 à `Q-130` |
+| Nome do atributo da chave do item na Tool | **`Item`** em todos (`network.md` §7.1/§11, `content-data.md` §3.5, este §18.2); fechado na TASK-003 |
+| Chave da roupa do ladrão | **`thief`** (`content-data.md` §3.10b, `network.md` §5.2, `Content.Outfits`); `CrewLooks` segue a tabela. Fechado na TASK-003 |
+| Numeração | T32–T40 no §14 (T35 retirada; T40 detalhada em `network.md` §5.1). Decididas pelo architect por delegação da DEC-208 (técnica que não muda regra de jogo) |
