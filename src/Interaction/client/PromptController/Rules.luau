@@ -4,6 +4,9 @@
 -- hand) and what the sets already show (stock, slot, customer state). The server revalidates every Interact.
 -- Rule of doubt: when a record is missing, the prompt stays (the server decides); only known facts hide it.
 -- Pure: no Modux, Lync or Vide. The controller passes the lookups in.
+-- Wave 3 (TASK-103, architecture.md §19.14): HideController plugs a probe over the `Hides` set (SetHideProbe). While
+-- the local player is hidden no prompt shows (the only action is `get_up`, HideController's own button); a hide spot
+-- someone already uses shows no "Hide". Without a probe (no HideController) nothing changes.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 
@@ -42,13 +45,25 @@ export type Target = {
 	MemberId: number?, -- UserId of the character the anchor sits on (Prompt_Give, architecture.md §19.8)
 }
 
+-- Read side of the `Hides` set (network.md §13.6), given by HideController.
+export type HideProbe = {
+	IsHidden: (userId: number) -> boolean,
+	SlotTaken: (slot: number) -> boolean, -- H1..H4 used by anyone
+}
+
 -- Package item key -> ingredient it restocks.
 const packageIngredient: { [string]: string } = {}
 for _, package in Content.Packages.List do
 	packageIngredient[package.Item] = package.Ingredient
 end
 
+local hideProbe: HideProbe? = nil
+
 const Rules = {}
+
+function Rules.SetHideProbe(probe: HideProbe?)
+	hideProbe = probe
+end
 
 -- Requires.Held is an Items key ("hot_dog") or an ItemRules category ("Package").
 function Rules.Holds(held: Held?, required: string): boolean
@@ -76,7 +91,11 @@ end
 
 -- Gate of architecture.md §19.7 ("only Active interacts"): no prompt at all while the local player is Down,
 -- Reviving, Spectator or Away. No Vitals record (lobby, before the first replication) = allowed; the server decides.
+-- Hidden (§19.14 gate `Hide`): no prompt either; the "Get Up" button belongs to HideController.
 function Rules.CanInteract(context: Context): boolean
+	if hideProbe and hideProbe.IsHidden(context.SelfId) then
+		return false
+	end
 	const me = context.Vital(context.SelfId)
 	return me == nil or me.State == "Active"
 end
@@ -96,6 +115,16 @@ function Rules.Allows(target: Target, context: Context): boolean
 	if action.Night == "DayOnly" and context.IsNight then
 		return false
 	elseif action.Night == "NightOnly" and not context.IsNight then
+		return false
+	end
+
+	-- `get_up` has no anchor of its own (sent by HideController with the spot's id); never a prompt.
+	if target.Action == "get_up" then
+		return false
+	end
+
+	-- A spot someone already hides in (server would answer `hide_taken`).
+	if target.Action == "hide" and target.Slot and hideProbe and hideProbe.SlotTaken(target.Slot) then
 		return false
 	end
 

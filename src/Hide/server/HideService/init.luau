@@ -294,6 +294,7 @@ HideService:OnInit(function(self)
 		Run = function(player: Player, _anchor: Instance, _id: number)
 			self:Release(player)
 		end,
+		On = { HIDE_ACTION }, -- get_up arrives on the hide slot anchor
 	})
 	interaction:AddGate(GATE, function(player: Player, action: string, _anchor: Instance): (boolean, string?)
 		if action ~= GET_UP_ACTION and self:IsHidden(player) then

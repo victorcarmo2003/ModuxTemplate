@@ -29,6 +29,8 @@ export type Handler = {
 	-- Owner's rules (slot free, stock, hand, phase...). Runs serialized per target, right before Run.
 	Validate: (player: Player, anchor: Instance, id: number) -> boolean,
 	Run: (player: Player, anchor: Instance, id: number) -> (),
+	-- Optional: other PromptAction values whose anchors also accept this action (e.g. get_up on a hide slot).
+	On: { string }?,
 }
 
 export type Request = { Player: Player, Action: string }
@@ -225,11 +227,15 @@ function InteractionService:Process(player: Player, id: number, action: string)
 	if anchor == nil or not anchor:IsDescendantOf(workspace) then
 		return self:Reject(player, id, action, "target")
 	end
-	if anchor:GetAttribute("PromptAction") ~= action then
-		return self:Reject(player, id, action, "target")
-	end
 	const row = Content.Actions.ByKey[action]
 	const handler = self.Handlers[action]
+	const promptAction = anchor:GetAttribute("PromptAction")
+	if promptAction ~= action then
+		const on = if handler then handler.On else nil
+		if on == nil or typeof(promptAction) ~= "string" or table.find(on, promptAction) == nil then
+			return self:Reject(player, id, action, "target")
+		end
+	end
 	if row == nil or row.Wave > BINDING_WAVE or handler == nil then
 		return self:Reject(player, id, action, "target")
 	end
