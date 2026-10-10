@@ -884,16 +884,14 @@ function KitchenService:BuildContext(): StationApi.Context
 			const toppings = if attrs and type(attrs.Toppings) == "string" then attrs.Toppings else nil
 			const count = if attrs and type(attrs.Count) == "number" then attrs.Count else nil
 			const restore = if attrs and type(attrs.Restore) == "number" then attrs.Restore else nil
+			-- Altered: ItemService writes the Tool attribute (network.md §7.1), hot dog only.
+			const altered = item == HOT_DOG and attrs ~= nil and attrs.Altered == true
 			const tool = self.Dependencies.ItemService:Give(player, item, {
 				Toppings = toppings,
 				Count = count,
 				Restore = restore,
+				Altered = if altered then true else nil,
 			})
-			-- Provisional (TASK-109): ItemService has no GiveOptions.Altered yet (network.md §7.1 names it the
-			-- writer); the attribute is set here, on the Tool it just created, until ItemService takes it over.
-			if tool ~= nil and item == HOT_DOG and attrs ~= nil and attrs.Altered == true then
-				tool:SetAttribute("Altered", true)
-			end
 			return tool ~= nil
 		end,
 		Held = function(player: Player): Tool?

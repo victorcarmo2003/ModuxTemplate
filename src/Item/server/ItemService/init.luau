@@ -1,7 +1,7 @@
 --!strict
 -- Hotbar Tools (FEAT-005, FEAT-007; DEC-040, DEC-049, DEC-174, DEC-190; architecture.md §3.1, §18.9.5;
 -- network.md §7, §7.1; TASK-022). Run place only.
--- Single writer of the Tool attributes Item, Count and Toppings. Tools are cloned from the kit
+-- Single writer of the Tool attributes Item, Count, Toppings, Restore and Altered. Tools are cloned from the kit
 -- ReplicatedStorage.Assets.Items.Tools/<Content.Items key> and replicate through the native Backpack (no Lync).
 -- Limits come from Content.ItemRules: HotbarSlots total Tools (4) and CategoryLimits per category; the package limit
 -- goes through ClassService (PackageLimit, bear = 3). Only Tools created here count and are trusted: anything else in
@@ -17,6 +17,10 @@
 --   * Free package of the vehicle-bound ingredient (coffee) on the cart -> trailer swap (L2-07, Pickup.swap).
 -- The hot dog visual is HotDogVisual (TASK-023), refreshed on the server every time Toppings is written (replicates).
 -- It does not cap the count: MaxToppings (DEC-071) is enforced here.
+-- Wave 3 (TASK-109; ITM-020; architecture.md §19.12, §19.13; network.md §7.1): GiveOptions.Altered marks a hot dog
+--   made with an altered item (Tool attribute Altered = true; KitchenService passes it). Stash and snapshot "T" keep it
+--   (Stash.luau). When the phase leaves Night (6:00 AM NightEnd, NightLost, any later phase) every altered hot dog
+--   is gone: in play and in the stashes (ClearAltered).
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -35,13 +39,15 @@ local Modux = require(ServerScriptService.server.Modux)
 -- Options of Give. Count: stackable items only (default = Packages[key].Amount for a package, 1 otherwise).
 -- Toppings: hot dog only, attribute format "ketchup,cheese" (network.md §7.1). Equip: put it in the hand (default
 -- true). Silent: no "Hands full"/"package_limit" notice on refusal (default false). Restore: coffee only, sanity the
--- cup restores (CoffeeRestore of who brewed, architecture.md §19.8), Tool attribute "Restore".
+-- cup restores (CoffeeRestore of who brewed, architecture.md §19.8), Tool attribute "Restore". Altered: hot dog only,
+-- made with an altered item (ITM-020), Tool attribute "Altered" = true.
 export type GiveOptions = {
 	Count: number?,
 	Toppings: string?,
 	Equip: boolean?,
 	Silent: boolean?,
 	Restore: number?,
+	Altered: boolean?,
 }
 
 export type UseHandler = Uses.Handler
@@ -50,6 +56,8 @@ const HOT_DOG = "hot_dog"
 const COFFEE = "coffee"
 const GIVE_COFFEE = "give_coffee"
 const RESTORE = "Restore"
+const ALTERED = "Altered"
+const ALTER_PHASE = "Night" -- altered items exist only in this phase (ITM-020; same rule as KitchenService)
 const MAX_RESTORE = 200
 const PACKAGE = "Package"
 const MAX_COUNT = 1000000
@@ -351,6 +359,11 @@ function ItemService:Holding(player: Player, spec: string): Tool?
 	return nil
 end
 
+-- Hot dog made with an altered item (ITM-020).
+function ItemService:IsAltered(tool: Tool): boolean
+	return self:ItemOf(tool) == HOT_DOG and tool:GetAttribute(ALTERED) == true
+end
+
 -- Units left in a stackable Tool (package leftover, DEC-049). 0 for anything else.
 function ItemService:Count(tool: Tool): number
 	if self.Owners[tool] == nil then
@@ -471,6 +484,7 @@ function ItemService:Give(player: Player, key: string, options: GiveOptions?): T
 	else
 		tool:SetAttribute(RESTORE, nil)
 	end
+	tool:SetAttribute(ALTERED, if key == HOT_DOG and options and options.Altered == true then true else nil)
 
 	tool.Parent = backpack
 	self:Track(player, tool)
@@ -627,7 +641,14 @@ function ItemService:EntriesOf(player: Player): { Stash.Entry }
 	const out: { Stash.Entry } = {}
 	for _, tool in self:Tools(player) do
 		const key = self:ItemOf(tool)
-		const entry = key and Stash.entry(key, tool:GetAttribute("Count"), tool:GetAttribute("Toppings"), tool:GetAttribute(RESTORE))
+		const entry = key
+			and Stash.entry(
+				key,
+				tool:GetAttribute("Count"),
+				tool:GetAttribute("Toppings"),
+				tool:GetAttribute(RESTORE),
+				tool:GetAttribute(ALTERED)
+			)
 		if entry then
 			table.insert(out, entry)
 		end
@@ -666,7 +687,7 @@ function ItemService:CanHold(player: Player): boolean
 	return humanoid ~= nil and humanoid.Health > 0
 end
 
--- Stash -> Tools again (same Count, Toppings, Restore), only for an Active member with a live crew character.
+-- Stash -> Tools again (same Count, Toppings, Restore, Altered), only for an Active member with a live crew character.
 -- Entries that no longer fit stay in the stash. Revive (wave 4) calls this too.
 function ItemService:Unstash(player: Player): boolean
 	const runState = self.Dependencies.RunStateService
@@ -684,6 +705,7 @@ function ItemService:Unstash(player: Player): boolean
 			Count = rebuild.Count,
 			Toppings = rebuild.Toppings,
 			Restore = rebuild.Restore,
+			Altered = rebuild.Altered,
 			Equip = false,
 			Silent = true,
 		})
@@ -740,6 +762,39 @@ function ItemService:OnCharacter(player: Player, character: Model)
 			self:Unstash(player)
 		end
 	end)
+end
+
+-- Altered items (wave 3, TASK-109) -----------------------------------------------------------------------------------
+
+-- Removes every altered hot dog: Tools in play of every player and stash entries of every member. Returns how many.
+function ItemService:ClearAltered(): number
+	local removed = 0
+	for player, owned in self.ByPlayer do
+		const doomed: { Tool } = {}
+		for tool in owned do
+			if self:IsAltered(tool) then
+				table.insert(doomed, tool)
+			end
+		end
+		for _, tool in doomed do
+			self:Consume(player, tool)
+			removed += 1
+		end
+	end
+	const runState = self.Dependencies.RunStateService
+	for userId, member in runState.Members() do
+		const kept: { Stash.Entry } = {}
+		for _, entry in member.Stash do
+			if not Stash.isAltered(entry) then
+				table.insert(kept, entry)
+			end
+		end
+		if #kept < #member.Stash then
+			removed += #member.Stash - #kept
+			runState:SetStash(userId, kept)
+		end
+	end
+	return removed
 end
 
 -- Items on the ground (FEAT-036) -------------------------------------------------------------------------------------
@@ -888,6 +943,12 @@ function ItemService:WireWave2()
 	end)
 	players.CharacterRemoving:Connect(function(player, _character)
 		self:Stash(player)
+	end)
+	-- ITM-020: an altered hot dog never outlives the Night phase (RoundService 750 > 720: PhaseChanged exists).
+	self.Dependencies.RoundService.PhaseChanged:Connect(function(phase: string)
+		if phase ~= ALTER_PHASE then
+			self:ClearAltered()
+		end
 	end)
 end
 

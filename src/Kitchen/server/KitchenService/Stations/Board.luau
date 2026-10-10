@@ -13,7 +13,7 @@
 -- Snapshot: nothing kept (data.md §2.2: the shift restarts with an empty board).
 -- Wave 3 (TASK-109, ANM-002, ITM-020): Alter puts a bitten bun, already sliced (Ready), on a free active slot
 -- (Record.Altered = 1, no stock). A hot dog made with an altered bun or the rail's altered sausage gets the Tool
--- attribute Altered = true (ctx.Give). Every hot dog made emits "assembled" (player, { Altered }) through ctx.Emit.
+-- attribute Altered = true (ctx.Give -> ItemService GiveOptions.Altered). Every hot dog made emits "assembled" (player, { Altered }) through ctx.Emit.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 local StationApi = require(script.Parent.Parent.StationApi)

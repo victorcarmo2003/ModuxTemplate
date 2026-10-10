@@ -14,6 +14,7 @@ export type GiveOptions = {
 	Equip: boolean?,
 	Silent: boolean?,
 	Restore: number?,
+	Altered: boolean?,
 }
 export type UseHandler = Uses.Handler
 
@@ -38,6 +39,7 @@ export type Public = {
 	Tools: (self: Public, player: Player) -> { Tool },
 	GetHeld: (self: Public, player: Player) -> Tool?,
 	Holding: (self: Public, player: Player, spec: string) -> Tool?,
+	IsAltered: (self: Public, tool: Tool) -> boolean,
 	Count: (self: Public, tool: Tool) -> number,
 	Toppings: (self: Public, tool: Tool) -> { string },
 	CountCategory: (self: Public, player: Player, category: string) -> number,
@@ -62,6 +64,7 @@ export type Public = {
 	CaptureTools: (self: Public) -> { [string]: any },
 	RestoreTools: (self: Public, data: { [string]: any }) -> (),
 	OnCharacter: (self: Public, player: Player, character: Model) -> (),
+	ClearAltered: (self: Public) -> number,
 	DropHeld: (self: Public, player: Player, _reason: string) -> boolean,
 	DropStash: (self: Public, userId: number, pointId: string) -> (),
 	CurrentVehicle: (self: Public) -> string,
