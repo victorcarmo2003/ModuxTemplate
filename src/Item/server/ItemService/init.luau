@@ -14,6 +14,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local Content = require(ReplicatedStorage.shared.Content)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 local HotDogVisual = require(ReplicatedStorage.shared.Item.HotDogVisual)
+local Pickup = require(script.Pickup)
 local Modux = require(ServerScriptService.server.Modux)
 
 -- Options of Give. Count: stackable items only (default = Packages[key].Amount for a package, 1 otherwise).
@@ -65,7 +66,7 @@ local function cleanToppings(list: { string }): { string }
 end
 
 const ItemService = Modux.Service("ItemService", {
-	Require = { "PlaceService", "PlayerService", "RunStateService", "ClassService" },
+	Require = { "PlaceService", "PlayerService", "RunStateService", "ClassService", "InteractionService", "RoundService" },
 	Priority = 720,
 })
 
@@ -76,6 +77,21 @@ function ItemService:Setup()
 	-- Hotbar of a player changed (Give, Consume, Count, Toppings, Tool lost). CharacterService reads the package
 	-- count here for the bear's walk speed (Classes, PackagesAtLeast).
 	self.Changed = self.Libs.Signal.new() :: SignalLib.Signal<Player>
+	-- Free package of the unlock day (TASK-046), wired in OnInit.
+	self.Pickup = Pickup.new({
+		Template = function(key: string): Tool?
+			return self:Template(key)
+		end,
+		Give = function(player: Player, key: string): Tool?
+			return self:Give(player, key)
+		end,
+		IsActive = function(player: Player): boolean
+			return self.Dependencies.RunStateService:IsActive(player)
+		end,
+		SetPrompt = function(anchor: Instance, enabled: boolean)
+			self.Dependencies.InteractionService:SetPrompt(anchor, enabled)
+		end,
+	}) :: Pickup.Pickup
 end
 
 -- Kit ----------------------------------------------------------------------------------------------------------------
@@ -413,6 +429,35 @@ function ItemService:AddTopping(tool: Tool, ingredient: string): boolean
 	return true
 end
 
+-- Free package (TASK-046) ------------------------------------------------------------------------------------------
+
+-- Wave 1 runs on the start vehicle only (VehicleService owns the swap in wave 2).
+function ItemService:CurrentVehicle(): string
+	return Content.RunParams.StartVehicle
+end
+
+-- InteractionService (730) and RoundService (750) ran their OnInit before this one (720): handler table and
+-- ShiftStarted exist. Spawn on ShiftStarted happens before RoundService captures the shift snapshot.
+function ItemService:WirePickup()
+	const pickup = self.Pickup
+	self.Dependencies.InteractionService:RegisterAction(Pickup.Action, {
+		Validate = function(player: Player, anchor: Instance, _id: number): boolean
+			return Pickup.validate(pickup, player, anchor)
+		end,
+		Run = function(player: Player, anchor: Instance, _id: number)
+			Pickup.take(pickup, player, anchor)
+		end,
+	})
+	self.Dependencies.RoundService.ShiftStarted:Connect(function(info)
+		Pickup.shift(pickup, info.Day, self:CurrentVehicle())
+	end)
+	self.Dependencies.RunStateService:RegisterSnapshot("Fp", function()
+		return Pickup.capture(pickup)
+	end, function(data, _mode)
+		Pickup.restore(pickup, data, self:CurrentVehicle())
+	end)
+end
+
 ItemService:OnInit(function(self)
 	self:Setup()
 	if not self.Dependencies.PlaceService:Is("Run") then
@@ -422,6 +467,7 @@ ItemService:OnInit(function(self)
 	self.Dependencies.PlayerService.PlayerRemoving:Connect(function(player)
 		self:Release(player)
 	end)
+	self:WirePickup()
 end)
 
 ItemService:OnStart(function(self)

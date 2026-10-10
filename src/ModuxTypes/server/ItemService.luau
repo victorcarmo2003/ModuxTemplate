@@ -1,7 +1,9 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerScriptService = game:GetService("ServerScriptService")
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
+local Pickup = require(ServerScriptService.server.Item.ItemService.Pickup)
 
 export type GiveOptions = {
 	Count: number?,
@@ -15,6 +17,7 @@ export type Public = {
 	Changed: SignalLib.Signal<Player>,
 	Links: { [Tool]: { RBXScriptConnection } },
 	Owners: { [Tool]: Player },
+	Pickup: Pickup.Pickup,
 	Setup: (self: Public) -> (),
 	Template: (self: Public, key: string) -> Tool?,
 	CheckKit: (self: Public) -> (),
@@ -38,6 +41,8 @@ export type Public = {
 	Consume: (self: Public, player: Player, tool: Tool) -> (),
 	SetCount: (self: Public, tool: Tool, count: number) -> number,
 	AddTopping: (self: Public, tool: Tool, ingredient: string) -> boolean,
+	CurrentVehicle: (self: Public) -> string,
+	WirePickup: (self: Public) -> (),
 }
 
 return {}
