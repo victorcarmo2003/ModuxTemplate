@@ -24,11 +24,14 @@ local Content = require(ReplicatedStorage.shared.Content)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Context = require(script.Context)
 local Stock = require(script.Stock)
+local Grill = require(script.Grill)
+local Rail = require(script.Rail)
+local Board = require(script.Board)
 
 const STATION_TAG = "Station"
 
--- Visual parts, in mount order. TASK-030: `require(script.Grill)`, `require(script.Rail)`, `require(script.Board)`.
-const PARTS: { Context.Part } = { Stock }
+-- Visual parts, in mount order (Grill, Rail, Board: TASK-030; shared slot helpers in Slots.luau).
+const PARTS: { Context.Part } = { Stock, Grill, Rail, Board }
 
 export type StockRecord = Context.StockRecord
 export type SlotRecord = Context.SlotRecord
