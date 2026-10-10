@@ -28,6 +28,12 @@
 						"optional": "src/Crew/shared"
 					}
 				},
+				"Item": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Item/shared"
+					}
+				},
 				"Libs": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
@@ -75,16 +81,58 @@
 			"server": {
 				"$className": "Folder",
 				"$ignoreUnknownInstances": false,
+				"Character": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Character/server"
+					}
+				},
 				"Class": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
 						"optional": "src/Class/server"
 					}
 				},
+				"Customer": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Customer/server"
+					}
+				},
+				"Dev": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Dev/server"
+					}
+				},
+				"Economy": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Economy/server"
+					}
+				},
 				"Interaction": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
 						"optional": "src/Interaction/server"
+					}
+				},
+				"Item": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Item/server"
+					}
+				},
+				"Kitchen": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Kitchen/server"
+					}
+				},
+				"Market": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Market/server"
 					}
 				},
 				"Modux": {
@@ -102,6 +150,12 @@
 					"$ignoreUnknownInstances": false,
 					"$path": {
 						"optional": "src/Net/server"
+					}
+				},
+				"Npc": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Npc/server"
 					}
 				},
 				"Place": {
@@ -134,6 +188,12 @@
 						"optional": "src/Run/server"
 					}
 				},
+				"Upgrade": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Upgrade/server"
+					}
+				},
 				"Vital": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
@@ -158,6 +218,36 @@
 							"optional": "src/Camera/client"
 						}
 					},
+					"Class": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Class/client"
+						}
+					},
+					"Crew": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Crew/client"
+						}
+					},
+					"Customer": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Customer/client"
+						}
+					},
+					"Economy": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Economy/client"
+						}
+					},
+					"Hud": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Hud/client"
+						}
+					},
 					"Input": {
 						"$ignoreUnknownInstances": false,
 						"$path": {
@@ -176,6 +266,18 @@
 							"optional": "src/Interface/client"
 						}
 					},
+					"Kitchen": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Kitchen/client"
+						}
+					},
+					"Market": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Market/client"
+						}
+					},
 					"Modux": {
 						"$path": {
 							"optional": "src/Modux/client"
@@ -191,6 +293,12 @@
 						"$ignoreUnknownInstances": false,
 						"$path": {
 							"optional": "src/Net/client"
+						}
+					},
+					"Opal": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Opal/client"
 						}
 					},
 					"Place": {

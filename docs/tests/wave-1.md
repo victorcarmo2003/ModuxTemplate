@@ -630,4 +630,4 @@ Achados para o dono indicado; nenhum bloqueia a onda. Cada um vira caso com espe
 
 | Rodada | Data | Build (commit) | Solo PC | Solo Mob | Party 2 | Casos falhos | Tasks de correção |
 |---|---|---|---|---|---|---|---|
-| — | — | — | — | — | — | — | — |
+| 1 (estática) | 2026-10-10 | `e7ee154` + C-01 (não commitado) | não rodado | não rodado | não rodado | G-03 (B-01); nenhum caso M/S executado | nenhuma; correção C-01 aplicada. Detalhe: `docs/tests/wave-1-report.md` |

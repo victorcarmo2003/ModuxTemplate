@@ -174,11 +174,13 @@ function ClassService:Buy(player: Player, key: string)
 end
 
 function ClassService:Select(player: Player, key: string)
-	if self.Locked[player] then
-		return -- the class is locked for the run (DEC-069, DEC-186)
-	end
 	const class = Content.Classes.ByKey[key]
 	if not class then
+		return
+	end
+	if self.Locked[player] then
+		-- the class is locked for the run (DEC-069, DEC-186); network.md §4.6 answers with class_locked
+		self:Notify(player, "class_locked", Content.Classes.IndexOf[key])
 		return
 	end
 	const profiles = self.Dependencies.ProfileService

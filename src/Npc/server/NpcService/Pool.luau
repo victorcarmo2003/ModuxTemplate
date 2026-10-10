@@ -39,9 +39,9 @@ const ANCHOR_TAG = "Interactable"
 const CUSTOMER_ACTION = "take_order"
 const REFUSE_ACTION = "refuse"
 -- Anchor offsets from the HumanoidRootPart (torso centre). PROVISIONAL: Prompt_Customer at the neck, Prompt_Refuse
--- 1.5 below it (architecture.md §18.4).
+-- 2.5 below it (architecture.md §18.4; prompt spacing rule ≥ 2.5).
 const CUSTOMER_OFFSET = Vector3.new(0, 1.5, 0)
-const REFUSE_OFFSET = Vector3.new(0, 0, 0)
+const REFUSE_OFFSET = Vector3.new(0, -1, 0)
 -- Server rig: only walking. Everything else off (architecture.md §12.3).
 const DISABLED_STATES = {
 	Enum.HumanoidStateType.Climbing,
