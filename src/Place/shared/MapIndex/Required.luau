@@ -24,6 +24,8 @@ export type StationRule = {
 export type VehicleRule = {
 	Stations: { [string]: StationRule }, -- StationKind -> rule, one station of each inside the vehicle
 	Actions: { [string]: number },
+	-- Wave 3: PromptAction -> n; those loose anchors carry Slot 1..n, each exactly once (hide spots H1..H4)
+	Slotted: { [string]: number }?,
 }
 
 -- Every Id must appear exactly once as `Attribute` on an instance tagged `Tag` (light zones, street lights).
@@ -207,7 +209,135 @@ const THIEF_ROUTES: { Route } = {
 }
 wave2.Routes = concat(WAVE1_ROUTES, THIEF_ROUTES)
 
-const BY_WAVE: { List } = { wave1, wave2 }
+-- Wave 3 (§19.22, §8; MAP-01 §5.4-§5.6, §9.5, §10.3, §11; TASK-097). Names that are game data come from Content:
+-- cutscene marks and targets (Cutscenes), route paths, stop lines and boxes (Traffic), sidewalk nodes (WalkPaths,
+-- rows from TASK-098). Map-only names stay here.
+-- Traffic binding (Provisional, architect, TASK-097; architecture.md §18.1 gets the 3 tags in the next doc pass):
+--   TrafficPath  Folder/Model of the ordered route nodes of one route, attribute PathId = Traffic.Routes[].Path
+--   TrafficLine  stop line piece, attribute LineId = SL-* (Routes[].Stops[].Line and Crosswalks[].Lines)
+--   TrafficBox   volume, attribute BoxId = Traffic.Conflicts[].Box (X-T) and Traffic.Crosswalks[].Box (CW-1..4)
+-- Entries and exits W/E/JN/JS-IN/OUT are MapPoints (AMB-IN = W-IN, AMB-OUT = E-OUT reuse them in wave 4).
+
+-- Adds the values of `extra` missing from `list`, keeping the order.
+local function union(list: { string }, extra: { string }): { string }
+	const out = table.clone(list)
+	const seen: { [string]: boolean } = {}
+	for _, value in out do
+		seen[value] = true
+	end
+	for _, value in extra do
+		if not seen[value] then
+			seen[value] = true
+			table.insert(out, value)
+		end
+	end
+	return out
+end
+
+const STREET_POSTS = { "JL-01", "JL-02", "JL-03", "JL-04", "JL-05", "JL-06", "JL-07", "JL-08", "JL-09", "P-01" }
+
+-- MapPoints a cutscene stands on, walks to or looks at (Marks, MoveTo with "{slot}" = 1..4, LookAt). LookAt on a
+-- street post is the StreetLight itself (PostId), not a point. Client actors start and end on the explicit ones
+-- (MAP-01 §11.3: Walt MKT-DOOR -> WALT-1, Raincoat Lady RL-1 -> RL-END).
+local function cutscenePoints(): { string }
+	const posts: { [string]: boolean } = {}
+	for _, id in STREET_POSTS do
+		posts[id] = true
+	end
+	local out: { string } = {}
+	for _, scene in Content.Cutscenes.List do
+		out = union(out, scene.Marks)
+		for _, beat in scene.Beats do
+			if beat.Kind == "MoveTo" and string.find(beat.Target, "{slot}", 1, true) then
+				for slot = 1, 4 do
+					const id = string.gsub(beat.Target, "{slot}", tostring(slot))
+					out = union(out, { id })
+				end
+			elseif (beat.Kind == "MoveTo" or beat.Kind == "LookAt") and not posts[beat.Target] then
+				out = union(out, { beat.Target })
+			end
+		end
+	end
+	return union(out, { "MKT-DOOR", "WALT-1", "RL-1", "RL-END" })
+end
+
+-- Every NodeId of every sidewalk path (Content.WalkPaths; empty until TASK-098 writes the rows).
+local function walkNodes(): { string }
+	local out: { string } = {}
+	for _, path in Content.WalkPaths.List do
+		out = union(out, path.Nodes)
+	end
+	return out
+end
+
+local function trafficPaths(): { string }
+	const out: { string } = {}
+	for _, route in Content.Traffic.Routes.List do
+		table.insert(out, route.Path)
+	end
+	return union({}, out)
+end
+
+local function trafficLines(): { string }
+	local out: { string } = {}
+	for _, route in Content.Traffic.Routes.List do
+		for _, stop in route.Stops do
+			out = union(out, { stop.Line })
+		end
+	end
+	for _, crosswalk in Content.Traffic.Crosswalks.List do
+		for _, line in crosswalk.Lines do
+			out = union(out, { line })
+		end
+	end
+	table.sort(out)
+	return out
+end
+
+local function trafficBoxes(): { string }
+	local out: { string } = {}
+	for _, conflict in Content.Traffic.Conflicts.List do
+		out = union(out, { conflict.Box })
+	end
+	for _, crosswalk in Content.Traffic.Crosswalks.List do
+		out = union(out, { crosswalk.Box })
+	end
+	return out
+end
+
+const wave3 = base(3)
+wave3.Tags = union(wave2.Tags, { "AnomalyAnchor", "TrafficPath", "TrafficLine", "TrafficBox" })
+wave3.Points = union(
+	wave2.Points,
+	concat(
+		-- hide (SS, §19.14), anomaly anchors and hidden actor spawns (MAP-01 §10.3), Walker step 10 (§5.6, fixed)
+		{ "SS", "AN-04", "AN-05", "AN-11", "AN-12", "AS-1", "AS-2", "AS-3", "AS-4", "WALKER-10" },
+		cutscenePoints(),
+		-- traffic entries and exits (MAP-01 §5.4)
+		{ "W-IN", "W-OUT", "E-IN", "E-OUT", "JN-IN", "JN-OUT", "JS-IN", "JS-OUT" }
+	)
+)
+wave3.Nodes = union(wave2.Nodes, walkNodes())
+const trailer3 = kitchen("trailer")
+trailer3.coffee_machine = { Actions = { brew_coffee = 1, restock = 1 } }
+wave3.Vehicles = {
+	cart = { Stations = kitchen("cart"), Actions = { answer_phone = 1 } },
+	trailer = {
+		Stations = trailer3,
+		-- H1..H4 inside the trailer (DEC-176), hold 0.5, NightOnly; get_up has no anchor (sent with the spot's id)
+		Actions = { answer_phone = 1, switch_light = 1, buy_trailer = 1, hide = 4 },
+		Slotted = { hide = 4 },
+	},
+}
+wave3.Tagged = concat(wave2.Tagged, {
+	{ Tag = "AnomalyAnchor", Attribute = "AnchorId", Ids = { "WV-1", "WV-2", "WV-3" } },
+	{ Tag = "TrafficPath", Attribute = "PathId", Ids = trafficPaths() },
+	{ Tag = "TrafficLine", Attribute = "LineId", Ids = trafficLines() },
+	{ Tag = "TrafficBox", Attribute = "BoxId", Ids = trafficBoxes() },
+})
+wave3.Routes = wave2.Routes
+
+const BY_WAVE: { List } = { wave1, wave2, wave3 }
 
 local function freezeDeep<V>(value: V): V
 	if type(value) == "table" and not table.isfrozen(value :: any) then
@@ -231,6 +361,7 @@ end
 return table.freeze({
 	Wave1 = wave1,
 	Wave2 = wave2,
+	Wave3 = wave3,
 	ForWave = forWave,
 	Last = #BY_WAVE,
 })

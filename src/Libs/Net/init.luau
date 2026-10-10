@@ -1,6 +1,6 @@
 --!strict
--- Net v2 (waves 1-2). Contract: docs/tech/network.md v4 (wave 1) and v5 §13.1-§13.4 (wave 2): schema, writer, reader
--- and rate of every entry.
+-- Net v3 (waves 1-3). Contract: docs/tech/network.md v4 (wave 1), v5 §13.1-§13.4 (wave 2) and §13.5-§13.7 (wave 3):
+-- schema, writer, reader and rate of every entry.
 -- Rules: set = state the party sees (late joiners get it ready); packet = event or private data.
 -- No keyBy (T14). Enums and bitfields come from Content keys (T13): Lync sorts the names, both sides require the
 -- same Content, code reads and writes strings. Owner of this file: TASK-004 (wave 1), TASK-048 (wave 2), TASK-097
@@ -66,6 +66,9 @@ return Lync.define("game", {
 		StartedAt = Lync.f64(), -- 0 = idle
 		Duration = Lync.quant(0, 120, 0.1), -- real duration (level and class applied)
 		Count = Lync.int(0, 30), -- rail: sausages on it; others 0
+		-- Wave 3 (§13.5, ANM-002): 0 or nil = nothing altered; grill/board: 1 = this slot; rail: position 1..Count.
+		-- Optional so the wave 1-2 writer keeps compiling and encoding until TASK-109 writes it (nil reads as 0).
+		Altered = Lync.optional(Lync.int(0, 30)),
 	})),
 
 	-- §3.6, record = NpcId. Writer: CustomerService. Looks are model attributes (network.md §5), not here
@@ -181,5 +184,82 @@ return Lync.define("game", {
 		State = Lync.enum({ "None", "Lurking", "Approaching", "Opening", "Fleeing" }),
 		StartedAt = Lync.f64(),
 		Duration = Lync.quant(0, 30, 0.1), -- Opening: 8 s (16 s with UPG-004)
+	})),
+
+	-- Wave 3 (network.md §13.5-§13.7) ----------------------------------------------------------------------------
+
+	-- §13.5, record = occurrence 1..255 (cyclic, per night). Writer: AnomalyService. No verb or deadline (T10)
+	Anomalies = Lync.replicate(Lync.struct({
+		Anomaly = Lync.enum(Content.Anomalies.Keys),
+		Phase = Lync.enum({ "Signal", "Active", "Resolved", "Failed" }),
+		StartedAt = Lync.f64(),
+		-- Walker: step 0..10; Hush: posts out; others 0
+		Step = Lync.int(0, 20),
+		-- NpcId of the customer anomaly, or anchor index (AnchorId/MapPoint); 0 = none
+		Anchor = Lync.int(0, 65535),
+	})),
+
+	-- §13.5 s -> group (everyone sees the sign, DEC-204). Writer: AnomalyService
+	AnomalyCue = Lync.packet(Lync.struct({
+		Anomaly = Lync.enum(Content.Anomalies.Keys),
+		Cue = Lync.enum(Content.AnomalyCues.Keys),
+		Entity = Lync.int(0, 65535),
+		Seed = Lync.int(0, 65535),
+	})),
+
+	-- §13.5 c -> s, 10 Hz, latest wins. Sender: CameraController (night, Active, not hidden). Responder: AnomalyService.
+	-- Degrees 0..360, 1 degree steps; angle is cyclic, so a pitch of -20 travels as 340 (reader maps > 180 to -).
+	Gaze = Lync.packet(Lync.struct({
+		Yaw = Lync.angle(1),
+		Pitch = Lync.angle(1),
+	})):newest(10),
+
+	-- §13.6, record = UserId; removed when the player gets up. Writer: HideService (T52: Vitals keeps one writer)
+	Hides = Lync.replicate(Lync.struct({
+		-- H1..H4 (DEC-176)
+		Slot = Lync.int(1, 4),
+	})),
+
+	-- §13.7 (§6.2 schema), record 1. Writer: CutsceneService. Needed = ceil(0.5 x connected participants) (DEC-194)
+	Cutscene = Lync.replicate(Lync.struct({
+		Scene = Lync.enum(Content.Cutscenes.Keys),
+		StartedAt = Lync.f64(),
+		Votes = Lync.int(0, 4),
+		Needed = Lync.int(0, 4),
+	})),
+
+	-- §13.7 c -> s, <= 1 per segment. Responder: CutsceneService
+	SkipVote = Lync.packet(Lync.empty()),
+
+	-- §13.7 (§6.2 schema; architecture.md §8.1), record = car slot 1..8. Writer: TrafficService, on events only.
+	-- Route = Content.Traffic.Routes.IndexOf; Look = Content.Traffic.LookIndex (4 shapes x 5 paints = 20; room to 32).
+	-- Position = Traffic/shared/Motion from the last record (AnchorAt/AnchorDist, stop at StopDist until HeldUntil)
+	Traffic = Lync.replicate(Lync.struct({
+		Route = Lync.int(1, 32),
+		Look = Lync.int(1, 32),
+		AnchorAt = Lync.f64(),
+		AnchorDist = Lync.f32(),
+		StopDist = Lync.f32(),
+		HeldUntil = Lync.f64(),
+	})),
+
+	-- §13.7 (§6.2 schema; architecture.md §8.2) c -> s, own character only. Responder: TrafficService (+-8 studs)
+	CarHit = Lync.packet(Lync.struct({
+		Car = Lync.int(1, 8),
+	})),
+
+	-- §13.7, record = pedestrian slot 1..8. Writer: PedestrianService. Looks ride here (rule 9 exception: no server
+	-- model, T46); same 1D record as Traffic, read with Traffic/shared/Motion
+	Pedestrians = Lync.replicate(Lync.struct({
+		-- Content.WalkPaths.IndexOf
+		Path = Lync.int(1, 64),
+		Species = Lync.enum(Content.Species.Keys),
+		Outfit = Lync.enum(Content.Outfits.Keys),
+		Speed = Lync.quant(4, 12, 0.5),
+		AnchorAt = Lync.f64(),
+		AnchorDist = Lync.f32(),
+		-- stop at a crosswalk waiting for the reservation (§8.1); 0 = no stop
+		StopDist = Lync.f32(),
+		HeldUntil = Lync.f64(),
 	})),
 })

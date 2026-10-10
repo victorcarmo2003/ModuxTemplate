@@ -493,15 +493,31 @@ function MapIndex.Validate(required: List): { string }
 
 		-- anchors inside the vehicle that belong to no station (phone, switch, buy prompt)
 		const loose: { [string]: number } = {}
+		const looseSlots: { [string]: { [number]: number } } = {}
 		for _, anchor in anchors do
 			if anchor:IsDescendantOf(vehicle) and ancestorWithTag(anchor, "Station") == nil then
 				const action = stringAttribute(anchor, "PromptAction") or "?"
 				loose[action] = (loose[action] or 0) + 1
+				const slot = anchor:GetAttribute("Slot")
+				if typeof(slot) == "number" then
+					const slots = looseSlots[action] or {}
+					looseSlots[action] = slots
+					slots[slot] = (slots[slot] or 0) + 1
+				end
 			end
 		end
 		for action, count in vehicleRule.Actions do
 			if (loose[action] or 0) ~= count then
 				add(`2: {vehicleKey}: {loose[action] or 0} anchor(s) {action} outside the stations, need {count}`)
+			end
+		end
+		-- wave 3: loose anchors with Slot 1..n (hide spots H1..H4)
+		for action, count in vehicleRule.Slotted or {} do
+			const slots = looseSlots[action] or {}
+			for slot = 1, count do
+				if slots[slot] ~= 1 then
+					add(`2: {vehicleKey}: {action} with Slot {slot} found {slots[slot] or 0} time(s), need 1`)
+				end
 			end
 		end
 	end
