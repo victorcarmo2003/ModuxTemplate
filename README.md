@@ -315,3 +315,7 @@ git clone -b framework https://github.com/victorcarmo2003/ModuxV3 /tmp/modux
 E copie por cima de `src/Modux`, menos os quatro arquivos gerados
 (`*/Manifest/init.luau`, `*/Modules.luau`, `shared/Libs.luau`), que o
 `modux generate` reescreve. Os dois `Bootstrap` são seus.
+
+## A armadilha da UI no centro da tela em 1ª pessoa
+
+Em primeira pessoa o cursor fica travado no centro. Qualquer `GuiObject` com `Active = true` (botão, `BillboardGui` ativo) sob o centro da tela consome o movimento do mouse e a câmera para de girar. Balões e pílulas no mundo só podem ser clicáveis no celular (`Tappable` no `PromptBillboard`); no PC e no gamepad a ação vai pela tecla.
