@@ -34,7 +34,7 @@ Caminhos dos packs (abreviados nas fichas):
 |---|---|---|---|---|---|---|
 | AST-001 | Bun (pão) | food | P0 | Pack + edição | `FP/hot-dog.fbx` (pão recortado; DEC-137); modelo `Assets/models/food/AST-001_Bun.fbx` (`Bun_Closed` 128 / `Bun_Open` 152; DEC-141) | Aprovado (DEC-137; modelo DEC-141) |
 | AST-002 | Sausage (crua / grelhada) | food | P0 | Pack + edição | `FP/hot-dog-raw.fbx` (grelhada = recolor; DEC-137); modelo `Assets/models/food/AST-002_Sausage.fbx` (Raw 92 / Grilled 164; DEC-141) | Aprovado (DEC-137; modelo DEC-141) |
-| AST-003 | Hot dog montado (Tool) | food | P0 | Pack + edição | `FP/hot-dog.fbx` (Tool sem molho; DEC-137); modelo `Assets/models/food/AST-003_HotDog.fbx` (Tool 316 / `HotDog_Display` 414; DEC-141); empilhamento `Q-138` | Aprovado (DEC-137; modelo DEC-141) |
+| AST-003 | Hot dog montado (Tool) | food | P0 | Pack + edição | `FP/hot-dog.fbx` (Tool sem molho; DEC-137); modelo `Assets/models/food/AST-003_HotDog.fbx` (Tool 316 / `HotDog_Display` 414; DEC-141); empilhamento pela altura real, queijo antes dos cordões (DEC-142) | Aprovado (DEC-137; modelo DEC-141) |
 | AST-004 | Ketchup (garrafa + cobertura) | food | P0 | Pack + edição | `FP/bottle-ketchup.fbx` + molho recortado de `FP/hot-dog.fbx` (DEC-137); garrafa **translúcida** + `Fill` animado (DEC-140; edição em andamento); cobertura `Assets/models/food/AST-004_KetchupTopping.fbx` (66; DEC-141) | Aprovado (DEC-137; cobertura DEC-141) |
 | AST-005 | Mustard (garrafa + cobertura) | food | P0 | Pack + edição | `FP/bottle-musterd.fbx` + cobertura de 7 dobras (DEC-137); garrafa **translúcida** + `Fill` animado (DEC-140; edição em andamento); cobertura `Assets/models/food/AST-005_MustardTopping.fbx` (86; DEC-141) | Aprovado (DEC-137; cobertura DEC-141) |
 | AST-006 | Cheese (fatia + cobertura) | food | P0 | Pack + edição | `FP/cheese-cut.fbx` (DEC-137); modelo `Assets/models/food/AST-006_Cheese.fbx` (Topping 148 / Slice 160; DEC-141) | Aprovado (DEC-137; modelo DEC-141) |
@@ -57,7 +57,7 @@ Caminhos dos packs (abreviados nas fichas):
 | AST-023 | Trailer Lights (UPG-005) | equipment | P1 | Modelar | modelado: `Assets/models/equipment/AST-023_TrailerLights.fbx` (mastro 356 / cordão 486; DEC-140) | Aprovado (DEC-140) |
 | AST-024 | Placa OPEN / CLOSED + "Available on Day 5" | equipment | P0 | Pack + edição | `KP/menu.fbx` (cavalete; DEC-138) | Aprovado (DEC-138) |
 | AST-025 | Lixeira (descartar) | equipment | P1 | Pack + edição | "Trashcan" by Kenney (CC0, https://poly.pizza/m/eoC8NFaafh) editado: `Assets/models/equipment/AST-025_Trashcan.fbx` (132; DEC-140) | Aprovado (DEC-140) |
-| AST-026 | Corner Cart (carrinho do chefe) | vehicle | P0 | Modelar (casca) + Pack (guarda-sóis) | guarda-sóis `CC/detail-parasol-a.fbx` (DEC-139); casca modelada `Assets/models/vehicle/AST-026_CornerCart.fbx` (2.984; ~7.200 montado; DEC-141); guarda-sóis em 1ª pessoa `Q-139` | Aprovado (DEC-139; casca DEC-141) |
+| AST-026 | Corner Cart (carrinho do chefe) | vehicle | P0 | Modelar (casca) + Pack (guarda-sóis) | guarda-sóis `CC/detail-parasol-a.fbx` (DEC-139); casca modelada `Assets/models/vehicle/AST-026_CornerCart.fbx` (2.984; ~7.200 montado; DEC-141); guarda-sóis mantidos, reavaliar em playtest (DEC-144) | Aprovado (DEC-139; casca DEC-141) |
 | AST-027 | Open Late Trailer (casca + interior) | vehicle | P1 | Pack + edição | `KP/kitchencounter_straight_B.fbx`; modelo `Assets/models/vehicle/AST-027_OpenLateTrailer.fbx` (4.452; inclui a porta do AST-066; DEC-141) | Aprovado (DEC-141) |
 | AST-028 | Ninth Street Mart — fachada, letreiro e ponto seguro | market | P0 | Pack + edição | `MM/wall.fbx`, `MM/wall-window.fbx`, `MM/wall-door-rotate.fbx`, `MM/wall-corner.fbx` (módulo 8 × 12) + toldo `CC/detail-awning-wide.fbx`; paredes em revisão pelo art-director (DEC-139) | Aprovado (DEC-139) |
 | AST-029 | Prateleira de compra + recheio + "Out of stock" | market | P0 | Pack + edição | gôndola `MM/shelf-boxes.fbx`, `MM/shelf-bags.fbx`, `MM/shelf-end.fbx` (4,5 × 6 × 2,5); recheio FP/KP do sourcing; **sem** `FP/soda-bottle.fbx` (DEC-139) | Aprovado (DEC-139) |
@@ -80,10 +80,10 @@ Caminhos dos packs (abreviados nas fichas):
 | AST-046 | Lavanderia | building | P1 | Pack + edição | `CC/building-e.fbx` (DEC-139) | Aprovado (DEC-139) |
 | AST-047 | Barreira "Road Closed" (BAR-N, BAR-S) | street | P1 | Pack + edição | `CR/construction-fence.fbx`, `CR/construction-light.fbx` (DEC-139) | Aprovado (DEC-139) |
 | AST-048 | Caminhão de entrega parado | street | P1 | Pack + edição | `CK/delivery.fbx` (DEC-139) | Aprovado (DEC-139) |
-| AST-049 | Bancada de upgrades do Mart (parede do fundo) | market | P0 | Pack + edição | `KP/kitchencounter_straight_A.fbx`, `KP/shelf_papertowel.fbx` (nichos); painel e S1 modelados (DEC-138); montado `Assets/models/market/AST-049_GearWall.fbx` (1.208; DEC-141); moldura S1 `Q-139` | Aprovado (DEC-138; modelo DEC-141) |
+| AST-049 | Bancada de upgrades do Mart (parede do fundo) | market | P0 | Pack + edição | `KP/kitchencounter_straight_A.fbx`, `KP/shelf_papertowel.fbx` (nichos); painel e S1 modelados (DEC-138); montado `Assets/models/market/AST-049_GearWall.fbx` (1.208; DEC-141); moldura S1 **Mustard** (DEC-144; recolor pendente) | Aprovado (DEC-138; modelo DEC-141) |
 | AST-050 | Área de frutas e verduras do Mart (+ expositor de pão de hot dog) | market | P1 | Pack + edição | `MM/display-fruit.fbx`, `MM/display-bread.fbx`, frutas FP; variante `Assets/models/market/AST-050_BunDisplay.fbx` (DEC-139); caixote refeito `Assets/models/market/AST-050_LettuceCrate.fbx` (1.159; DEC-141) | Aprovado (DEC-139; caixote DEC-141) |
 | AST-051 | Revive Kit — item raro de reviver (Tool, ITM-021) | market | P1 | Modelar | modelado: `Assets/models/market/AST-051_ReviveKit.fbx` (300; DEC-140) | Aprovado (DEC-140) |
-| AST-052 | Ambulância (+ maca levada pelos médicos) | vehicle | P1 | Pack + edição | `CK/ambulance.fbx`; maca modelada `Assets/models/vehicle/AST-052_Stretcher.fbx` (352; DEC-140); ambulância `Assets/models/vehicle/AST-052_Ambulance.fbx` (1.748; DEC-141); carga × maca `Q-140` | Aprovado (DEC-139; maca DEC-140; ambulância DEC-141) |
+| AST-052 | Ambulância (+ maca levada pelos médicos) | vehicle | P1 | Pack + edição | `CK/ambulance.fbx`; maca modelada `Assets/models/vehicle/AST-052_Stretcher.fbx` (352; DEC-140); ambulância `Assets/models/vehicle/AST-052_Ambulance.fbx` (1.748; DEC-141); carga 8,37 × 5,13 × 4,89, maca cabe sem redução (DEC-143) | Aprovado (DEC-139; maca DEC-140; ambulância DEC-141) |
 | AST-053 | Base de personagem R6 (cores, rostos, decals de roupa) | character | P0 | Plataforma + decals | — | Rascunho |
 | AST-054 | Clientes normais e pedestre (7 tipos × 4 variantes) | character | P0 | Plataforma + Modelar (acessórios) | — | Rascunho |
 | AST-055 | Mr. Pickett | character | P0 | Plataforma + Modelar | — | Rascunho |
@@ -96,7 +96,7 @@ Caminhos dos packs (abreviados nas fichas):
 | AST-062 | ANM-004 The copies (variantes espelhadas) | anomaly | P1 | decal + Modelar | — | Rascunho |
 | AST-063 | ANM-006 The wavers (silhueta na janela) | anomaly | P1 | Modelar | — | Rascunho |
 | AST-064 | ANM-007 The Walker | anomaly | P1 | Plataforma + Modelar | — | Rascunho |
-| AST-065 | ANM-008 The long car | anomaly | P1 | Pack + edição | `CK/sedan.fbx` esticado (19,5 × 7,1 × 4,0; DEC-139); modelo preto, 4 rodas `Assets/models/anomaly/AST-065_LongCar.fbx` (1.360; DEC-141); 4 × 6 rodas `Q-139` | Aprovado (DEC-139; modelo DEC-141) |
+| AST-065 | ANM-008 The long car | anomaly | P1 | Pack + edição | `CK/sedan.fbx` esticado (19,5 × 7,1 × 4,0; DEC-139); modelo preto, 4 rodas `Assets/models/anomaly/AST-065_LongCar.fbx` (1.360; DEC-141); 4 rodas (DEC-144) | Aprovado (DEC-139; modelo DEC-141) |
 | AST-066 | ANM-009 The knock (porta dos fundos) | anomaly | P1 | Modelar | parte de AST-027 (porta já está em `AST-027_OpenLateTrailer`; **não** aprovada por tabela na DEC-141) | Rascunho |
 | AST-067 | ANM-010 The Hush (névoa + marcação) | anomaly | P1 | Modelar + VFX | — | Rascunho |
 | AST-068 | Pistas do trailer: foto de 1979 + crachá | story | P1 | Modelar | modelado: `Assets/models/story/AST-068_TrailerClues.fbx` (`Photo_1979` 66 / `Badge_Old` 76; DEC-140) | Aprovado (DEC-140) |
@@ -116,6 +116,12 @@ Mapeamento Kenney/KayKit por ficha (DEC-136, Rascunho): `asset-sourcing.md`. As 
 **DEC-137 (2026-10-09):** comida aprovada — AST-001 a AST-011 e AST-061 em **Aprovado**, com o candidato do sourcing como arquivo de origem (fila do `modeler-3d`). Demais fichas seguem Rascunho. `Q-133` (limite de atlases) segue aberta.
 **DEC-138 (2026-10-10):** equipamentos aprovados após o teste em `workspace.__ImportTest_Equip` — AST-014, 015, 017, 018, 019, 024, 040, 041, 049 em **Aprovado** com o candidato KP/MM como origem (partes sem candidato seguem para modelar no estilo). Banqueta `KP/chair_stool` com **assento plano** em todo uso. **AST-012**: candidato fogão KayKit **recusado**; vira **roller grill** modelada (Steel + painel Ketchup, sem marca), Aprovado na direção; silhueta em reescrita pelo art-director; níveis em `Q-134`.
 **DEC-141 (2026-10-10):** rodada 3 de modelados (`workspace.__Preview_Rodada3`) aprovada — modelos de AST-001 a 010, 014, 017, 018 (N1/N2), 019 (pedestal/corda/marca), 026 (casca), 027, 035, 045 (+ volume do AST-044), 049, 050 (caixote), 052, 061, 065. **AST-027 Rascunho → Aprovado.** AST-066 segue Rascunho; AST-043 não modelada (`Q-082`). Empilhamento de coberturas `Q-138`; guarda-sóis em 1ª pessoa, rodas do long car e moldura da S1 `Q-139`; carga da ambulância `Q-140`.
+
+**DEC-142 a DEC-145 (2026-10-10):** AST-003 empilha pela altura real, queijo antes dos cordões (DEC-142); AST-052 carga medida 8,37 × 5,13 × 4,89, maca cabe sem redução, encaixe `Att_Stretcher_Stowed` (DEC-143); AST-026 guarda-sóis mantidos, AST-065 4 rodas, AST-049 moldura S1 Mustard com recolor pendente (DEC-144); personagem padrão "HotDog Crew" em rig R6 custom (`Assets/reference/customrig.png`): fichas do corpo base e dos animais a escrever pelo art-director (DEC-145; `Q-141` a `Q-144`).
+
+**DEC-146 e DEC-147 (2026-10-10):** jogador vira animal da crew, sem avatar do Roblox; clientes NPC seguem humanos (AST-053/054 só para NPC); AST-073 vira uniforme da crew; personagens com nome em `Q-146`; cada animal é uma classe (lista de animais depende de `Q-145`).
+
+**DEC-148 a DEC-150 (2026-10-10):** personagens da crew com **textura** de roupa/rosto/pelagem (exceção de personagem a DEC-105/DEC-136; orçamento `Q-144` g). **Clientes e pedestres também são animais** (DEC-149, emenda DEC-146): AST-053/054 a rever pelo art-director (`Q-149`); atores de anomalia de cliente `Q-147`. Personagem com **textura de dia e de noite**, mesma malha (DEC-150, `Q-148`).
 
 Mapa anomalia → asset (DEC-096): ANM-001 AST-060 · ANM-002 AST-061 · ANM-003 AST-044 (estados do relógio) · ANM-004 AST-062 (+ AST-055) ·
 ANM-005 AST-059 · ANM-006 AST-063 (+ AST-045) · ANM-007 AST-064 (+ AST-036) · ANM-008 AST-065 · ANM-009 AST-066 · ANM-010 AST-067 (+ AST-036, AST-028).
@@ -210,10 +216,10 @@ Escala geral: comida ~1,5–2× o real (style guide §1.1). Todas usam o atlas d
 
 - **Status:** Aprovado (DEC-137; **modelo aprovado DEC-141**) · **Prioridade:** P0 · **Origem:** Pack + edição — `FP/hot-dog.fbx` (escolhido no teste do Studio); versão do Tool **sem molho** (recorte) para `Att_Topping1..3`; versão com molho para vitrine e ícone. Coerente com AST-001 `Bun_Open` + AST-002 `Sausage_Grilled`
 - **Modelo (DEC-141):** `Assets/blender/food/AST-003_HotDog.blend`, `Assets/models/food/AST-003_HotDog.fbx`; Tool sem molho 316 tris (`Att_Topping1..3`) / `HotDog_Display` 414.
-- **Empilhamento — em aberto (`Q-138`):** o passo fixo de 0,05 abaixo **não funciona** na prévia (bacon 0,115 e batata palha 0,119 de altura atravessam; cordão sobre queijo flutua; molho sob queijo some). Recomendação: empilhar pela altura real da cobertura de baixo e queijo sempre antes dos cordões. Até a resposta, o valor abaixo é **Provisório**.
+- **Empilhamento — decidido (DEC-142, fecha `Q-138`):** cada cobertura apoia no **topo real** da de baixo (altura real do modelo; Bacon 0,115, Potato Sticks 0,119, demais medir nos `.fbx`). **Queijo sempre antes dos cordões** (Ketchup, Mustard, Cream Cheese), qualquer que seja a ordem de montagem; as demais seguem a ordem de montagem. Leitura avaliada em 1ª pessoa (de cima e na mão); vão lateral de cordão não é critério (interpretação a confirmar). Aceite: nenhuma cobertura atravessa, some sob o queijo ou flutua visivelmente.
 - **Uso:** ITM-010; Tool na mão (máx. 2), "Serve" no cliente, "Throw Away" na lixeira. Até 3 complementos (DEC-071).
 - **Dimensões:** 1,2 × 0,45 × 0,45 sem coberturas.
-- **Encaixes:** `Att_Topping1`…`Att_Topping3` (cada cobertura sobe 0,05), `Handle`/`Att_Hand`, `Att_Serve`.
+- **Encaixes:** `Att_Topping1`…`Att_Topping3` (`Att_Topping1` no topo da salsicha; as seguintes pela altura real da cobertura de baixo, DEC-142), `Handle`/`Att_Hand`, `Att_Serve`.
 - **Regra de leitura:** cada cobertura tem silhueta e cor próprias (zigue-zague largo = ketchup, zigue-zague fechado = mostarda, placa = queijo, tiras = bacon, monte = batata palha, espiral = cream cheese). O jogador confere olhando de cima, sem UI.
 - **Estado alterado (ANM-002):** se montado com item de AST-061, mostra a salsicha cinza ou a mordida na mão (ITM-010).
 - **Tris:** montado com 3 coberturas ≤ 900.
@@ -476,7 +482,7 @@ Compra de upgrade: bancada do Mart (AST-049, DEC-101); a peça visível troca no
 
 - **Status:** Aprovado (DEC-139; **casca aprovada DEC-141**) · **Prioridade:** P0 · **Origem:** Modelar (casca) + Pack nos guarda-sóis — `CC/detail-parasol-a.fbx` (9 A; tirar a mesinha da base, recolor Mustard/Cream). **Só os guarda-sóis** vêm do pack; a casca foi modelada no estilo.
 - **Modelo (DEC-141):** `Assets/blender/vehicle/AST-026_CornerCart.blend`, `Assets/models/vehicle/AST-026_CornerCart.fbx`; casca 2.984 tris (~7.200 montado); linha 26 × 3, bancada 3,5, guarda-sóis a 9; posição de mundo **(41, 0, 37.5)**.
-- **Em aberto (`Q-139` a):** os guarda-sóis aparecem no topo da tela em 1ª pessoa (beiral ~5,8 sobre o corredor). Recomendação: manter e reavaliar em playtest.
+- **Guarda-sóis em 1ª pessoa — decidido (DEC-144, fecha `Q-139` a):** aparecem no topo da tela (beiral ~5,8 sobre o corredor); **mantidos** como no modelo aprovado; reavaliar em playtest em 1ª pessoa.
 - **Uso:** dado pelo chefe, fixo no Pad da esquina Ninth & Juniper (DEC-019, DEC-020); um para a party (DEC-032). Nome "Corner Cart", letreiro "BRAMBLE'S CORNER DOGS" (`ui-text.md`).
 - **Dimensões (MAP-01 §7.1):** linha de estações X 28–54 (**26** de largura) × 3 de profundidade, bancada a **3,5**; corredor de trabalho de 6 atrás; **dois guarda-sóis** a 9 de altura (um só não cobre 26 studs) sem tapar a linha de visão a ~4,5.
 - **Silhueta:** carrinho de rua retrô comprido, cantos arredondados, 4 rodas grandes travadas, saia frontal com letreiro e slogan "Hot dogs on the corner since forever." (`world.md` §4). Lê "carrinho", não "barraca": rodas e engate visíveis.
@@ -523,8 +529,8 @@ Compra de upgrade: bancada do Mart (AST-049, DEC-101); a peça visível troca no
 ### AST-052 — Ambulância (+ maca levada pelos médicos)
 
 - **Status:** Aprovado (DEC-139) · **Prioridade:** P1 · **Origem:** Pack + edição — `CK/ambulance.fbx` (16 × 7 × 8); maca, portas traseiras recortadas e barra de luz conforme `asset-sourcing.md`. ~~**Pendente (modeler-3d):** conferir o lado oculto~~ (conferido: sem cruz/emblema, DEC-141). **Ambulância: modelo aprovado DEC-141.**
-- **Modelo (DEC-141):** `Assets/blender/vehicle/AST-052_Ambulance.blend`, `Assets/models/vehicle/AST-052_Ambulance.fbx`; 1.748 tris; Cream + faixa Teal; portas traseiras com pivô, vão **5,1 × 4,9**; compartimento de carga **~2 de fundo**.
-- **Em aberto (`Q-140`):** a carga (~2) não comporta a maca (6). Conferir com a cena dos médicos (AST-076, FEAT-034).
+- **Modelo (DEC-141):** `Assets/blender/vehicle/AST-052_Ambulance.blend`, `Assets/models/vehicle/AST-052_Ambulance.fbx`; 1.748 tris; Cream + faixa Teal; portas traseiras com pivô, vão **5,1 × 4,9**; compartimento de carga **8,37 de fundo × 5,13 de largura × 4,89 de altura** (medido pelo modeler-3d; o "~2 de fundo" da DEC-141 era leitura errada da prévia escura).
+- **Maca na carga — decidido (DEC-143, fecha `Q-140`):** a maca aprovada (6,0 × 2,2 × 1,6) **já cabe** com as portas fechadas, folga ≥ 0,3; **não foi reduzida**. Encaixe no arquivo: **`Att_Stretcher_Stowed`**, Roblox **(0, 2.578, 4.454)** relativo ao pivô da ambulância = o `Stretcher_Dock` desta ficha (nome a unificar pelo art-director; até lá, vale o nome do arquivo). Empty antigo `Att_Stretcher` (abaixo do piso) **removido**.
 - **Uso — ida (coleta), decidido em DEC-114:** a ambulância chega, para (AMB-M ou AMB-P, MAP-01 §5.5), abre as **portas traseiras** e os **2 médicos R6** (CHR-008, ficha AST-076) **descem** com a maca, vão até o corpo, o personagem deita na maca com "poof" e "Zzz" (style guide §4.6), eles levam a maca **à mão** de volta, sobem e as portas fecham. Lê "resgate de desenho animado", não hospital. Sequência e tempos: FEAT-034 / NPC-024 (game-designer).
 - **Uso — volta do reviver (DEC-091, DEC-114):** volta, para em AMB-P em frente ao trailer, o jogador aparece ao lado, vai embora — **ninguém desce**; portas traseiras ficam fechadas.
 - **Caso "corpo inacessível"** (FEAT-034, ainda Rascunho do game-designer; fora de DEC-114): a maca aparece na parada atrás das portas e o corpo some em fade. A peça `Stretcher` já serve; nenhuma malha extra.
@@ -534,7 +540,7 @@ Compra de upgrade: bancada do Mart (AST-049, DEC-101); a peça visível troca no
 - **Cores:** Cream, faixa Teal larga, barra de luz Mustard/Teal (style guide §2.2, Aprovado). Texto lateral "BELLMOOR RESCUE" (placeholder do narrative-writer, AST-072).
 - **Símbolo:** coração Teal com um "+" Cream arredondado. **Proibido:** cruz vermelha sobre branco, crescente vermelho, Star of Life, padrão xadrez de ambulância real, nome de serviço real.
 - **Peças:** `Body`, `Wheel_*`, `Door_RearL/R` (dobradiça), `Stretcher` (peça solta), `Lightbar` (Neon alternando), `Driver` (silhueta lisa na cabine; o motorista não desce).
-- **Encaixes:** `Att_Body` (no tampo da maca, onde o corpo do R6 é preso), `Att_Grip_Front`, `Att_Grip_Back` (na maca), `Medic_Exit_L`, `Medic_Exit_R` (no chão atrás das portas: onde os médicos descem e sobem), `Stretcher_Dock` (posição da maca guardada), `Spawn_Side` (onde o revivido aparece), `Light_Siren` (PointLight Range 10, sem sombra), `VFX_Poof`.
+- **Encaixes:** `Att_Body` (no tampo da maca, onde o corpo do R6 é preso), `Att_Grip_Front`, `Att_Grip_Back` (na maca), `Medic_Exit_L`, `Medic_Exit_R` (no chão atrás das portas: onde os médicos descem e sobem), `Stretcher_Dock` (posição da maca guardada; no arquivo: `Att_Stretcher_Stowed`, DEC-143), `Spawn_Side` (onde o revivido aparece), `Light_Siren` (PointLight Range 10, sem sombra), `VFX_Poof`.
 - **Áudio:** sirene curta de duas notas, baixa, fade (style guide §11).
 - **Tris:** 1.500–2.500; teto 3.000 (sem a maca); maca ≤ 400.
 
@@ -589,15 +595,15 @@ Planta do Mart: MAP-01 revisão 3 §7.4 (loja 36 × 32; bancada na parede oeste;
 ### AST-049 — Bancada de upgrades do Mart (parede do fundo)
 
 - **Status:** Aprovado (DEC-138; **modelo aprovado DEC-141**) · **Prioridade:** P0 · **Origem:** Pack + edição — tampo `KP/kitchencounter_straight_A.fbx` recolor; nichos `KP/shelf_papertowel.fbx`; painel GEAR WALL e vitrine S1 modelados no estilo
-- **Modelo (DEC-141):** `Assets/blender/market/AST-049_GearWall.blend`, `Assets/models/market/AST-049_GearWall.fbx`; 1.208 tris montado; moldura da S1 em Gold (conforme esta ficha).
-- **Em aberto (`Q-139` c):** Gold na S1 (§7.3) × reserva de Gold só para o AST-051 (§2.1). Recomendação: Mustard.
+- **Modelo (DEC-141):** `Assets/blender/market/AST-049_GearWall.blend`, `Assets/models/market/AST-049_GearWall.fbx`; 1.208 tris montado; moldura da S1 modelada em Gold → **recolor para Mustard pendente** (modeler-3d; troca de faixa no atlas, sem mudar malha).
+- **Moldura da S1 — decidido (DEC-144, fecha `Q-139` c):** **Mustard**, não Gold. Gold fica reservado ao AST-051 (style guide §2.1); §7.3 emendado.
 - **Uso:** compra de upgrades por prompt (DEC-101), sem vendedor. **Básicos sempre à venda** — Grill, Cooler, Counter, Cash Drawer Lock, Trailer Lights — e **só 1 vaga especial** no sorteio por turno (DEC-106). Hoje o único especial é o Revive Kit (AST-051, ITM-021; 15% por turno depois da compra do trailer, DEC-129). Layout de posições: FEAT-015 (B1–B5 + S1). Food Trailer **não** está na bancada (DEC-107). Cafeteira **não** está na bancada (fixa no trailer, DEC-125).
 - **Onde:** parede do fundo = parede **oeste** do Mart, X −100..−98, Z 39..57 (MAP-01 revisão 3 §7.4, P34). Jogador usa de X ≈ −96, virado para oeste; 14 studs livres na frente.
 - **Dimensões:** balcão 18 L × 2 P × 3,5 A; painel de parede 18 × 6 acima dele com **6 módulos de 3 L** = **6 posições**, de norte para sul: **B1** (Z 40.5), **B2** (43.5), **S1** (46.5), **B3** (49.5), **B4** (52.5), **B5** (55.5). **S1 fica no meio**, no eixo do corredor do meio, para ser vista da porta (substitui "S1 na ponta").
 - **Posições fixas B1–B5** (B1 Grill, B2 Cooler, B3 Counter, B4 Cash Drawer Lock, B5 Trailer Lights): nicho com caixa de produto (malha única) que recebe na frente o **ícone do próximo nível** (render da peça, AST-071) + placa com nome do nível, efeito em 1 linha e etiqueta de preço Mustard (texto por `SurfaceGui`, FEAT-015). Nível máximo: a placa mostra **"MAX"** e o prompt some. B5 antes da compra do trailer: placa "Trailer only" (DEC-055). Nenhuma posição fixa fica "SOLD" nem vazia.
-- **Posição especial S1:** vitrine pequena de vidro com moldura Gold e lâmpada Neon que acende quando há Kit; o Revive Kit (AST-051) fica exposto. Vazia: placa "Nothing special today". Vendido: placa **"Sold out"** até o fim do turno (FEAT-035). É a **única** posição com "Sold out".
-- **Leitura:** título no topo do painel "GEAR WALL" (`story/ui-text.md` §4), letras de **≥ 1,5 de altura**, legível da porta a **~40 studs** (S1 fica a ~36 em linha reta; P34). Vitrine S1 com moldura Gold lê da porta como "ponto dourado no fim do corredor".
-- **Cores:** painel Teal com moldura Mustard; balcão Off-white; S1 com moldura Gold (style guide §7.3).
+- **Posição especial S1:** vitrine pequena de vidro com moldura **Mustard** (DEC-144) e lâmpada Neon que acende quando há Kit; o Revive Kit (AST-051) fica exposto. Vazia: placa "Nothing special today". Vendido: placa **"Sold out"** até o fim do turno (FEAT-035). É a **única** posição com "Sold out".
+- **Leitura:** título no topo do painel "GEAR WALL" (`story/ui-text.md` §4), letras de **≥ 1,5 de altura**, legível da porta a **~40 studs** (S1 fica a ~36 em linha reta; P34). Vitrine S1 lê da porta pela lâmpada Neon acesa e pelo Kit exposto (brilhos Gold do próprio AST-051), no fim do corredor (DEC-144).
+- **Cores:** painel Teal com moldura Mustard; balcão Off-white; S1 com moldura Mustard (DEC-144; emenda style guide §7.3).
 - **Encaixes:** `Slot_B1`…`Slot_B5`, `Slot_S1`, `Prompt_Buy_<Slot>`, `Price_Anchor_<Slot>`, `Light_S1` (Neon, sem luz real), `VFX_Rare`. **Tris:** ≤ 1.500 montado.
 
 ### AST-050 — Área de frutas e verduras do Mart
@@ -746,6 +752,8 @@ Regras gerais: style guide §4 (opção A: `BodyColors` + acessórios de atlas +
   - **8 rostos** neutros + 3 de reação (feliz, reclamação, bufando) + rosto "olhos fechados" (Raincoat Lady) + rosto escuro liso (Walker), 256² cada.
   - Decals de roupa 128²: textos assimétricos e logos genéricos por variante (sem marca real), e as versões espelhadas da ANM-004 (AST-062).
 - **Regra:** todo rosto normal tem olhos e boca (ANM-001).
+- **DEC-146 (2026-10-10):** esta base fica **só para NPCs humanos** (clientes; personagens com nome até `Q-146`). O jogador **não** usa esta base nem o avatar do Roblox: corpo base R6 custom da crew + peças por animal = **fichas novas** (art-director; `Q-144`, `Q-145`).
+- **DEC-149 (2026-10-10, emenda DEC-146):** clientes e pedestres **também são animais**. "Só para NPCs humanos" acima não vale para clientes/pedestres; esta ficha a rever (provável: mesmo corpo base da crew + roupa de civil; `Q-149`). Textura dia/noite: DEC-148, DEC-150.
 
 ### AST-054 — Clientes normais e pedestre (7 tipos × 4 variantes)
 
@@ -811,6 +819,9 @@ Regras gerais: style guide §4 (opção A: `BodyColors` + acessórios de atlas +
 
 - **Status:** Rascunho · **Prioridade:** P2 · **Origem:** Modelar
 - **Uso:** sugestão de `characters.md` CHR-002 (não decidida): uniforme aplicado na run por cima do avatar R6, sem trocar a roupa do jogador.
+- **DEC-145 (2026-10-10):** o padrão de personagem passa a ser o "HotDog Crew" (`Assets/reference/customrig.png`: boné vermelho, avental vermelho com hot dog, camisa creme, calça preta, sobre corpo base R6 custom). Se o jogador usar o rig animal (`Q-141`), este avental vira parte do uniforme do personagem, não "por cima do avatar". Logo do avental: `Q-143`. Fichas do corpo base e dos animais: a escrever pelo art-director (`Q-144`).
+- **DEC-146 (2026-10-10, fecha `Q-141`):** o jogador é animal da crew, sem avatar próprio. Este avental **é o uniforme da crew**, parte do personagem do jogador (não acessório "por cima do avatar"); o "Uso" acima não vale. Junto do avental: boné vermelho, camisa creme, calça preta (DEC-145) — peças/cores do corpo base a definir na ficha nova. Nome, prioridade (P2 → provável P0, já que todo jogador usa) e attachment → art-director. Logo `Q-143`.
+- **DEC-148 (2026-10-10):** uniforme (camisa, avental com logo, calça) vem por **textura** no corpo, como na prancha, não por acessório de atlas. Orçamento `Q-144` (g); variante de noite `Q-148` (b).
 - **Forma:** avental vermelho e creme com a salsicha sorridente, preso em `BodyFrontAttachment`.
 - **Tris:** ≤ 300.
 
@@ -878,11 +889,11 @@ Regra de arte: a anomalia usa as mesmas peças do normal e quebra **um** traço 
 
 - **Status:** Aprovado (DEC-139) · **Prioridade:** P1 · **Origem:** Pack + edição — `CK/sedan.fbx` esticado (mesma base do `Car_Sedan` de AST-035), rodas centralizadas e proporcionais pelo usuário. ~~**Pendente (modeler-3d):** recolor preto; tris ≤ 2.000~~ (feito, DEC-141). **Modelo aprovado DEC-141.**
 - **Modelo (DEC-141):** `Assets/blender/anomaly/AST-065_LongCar.blend`, `Assets/models/anomaly/AST-065_LongCar.fbx`; 1.360 tris; 19,5 × 7,1 × 4,0; preto; **4 rodas**.
-- **Em aberto (`Q-139` b):** prévia aprovada com 4 rodas × "6 rodas" na linha Peças abaixo. Recomendação: 4.
+- **Rodas — decidido (DEC-144, fecha `Q-139` b):** **4 rodas**, como no modelo aprovado.
 - **Dimensões (DEC-139, ajuste do usuário no Studio):** **19,5 C × 7,1 L × 4,0 A** (≈ 1,6× o sedã; era ~22 × 6 × 4,5, 1,8×).
 - **Visual:** carro preto `#14162A` **comprido demais** (medidas acima), vidros embaçados (translúcido escuro), sem motorista visível, motor com zumbido grave. Farol alto branco frio `#F4F7FF` direto no trailer.
 - **Proibido:** forma de carro funerário ou limusine de marca real; ninguém sai, nada é disparado (DEC-023).
-- **Peças:** `Body`, `Wheel_*` (6 rodas: reforça "comprido demais"), `Headlights` (Neon), `Light_HighL/R` (SpotLight real, sem sombra, alcance ~30).
+- **Peças:** `Body`, `Wheel_*` (4 rodas, DEC-144; o "comprido demais" vem das medidas), `Headlights` (Neon), `Light_HighL/R` (SpotLight real, sem sombra, alcance ~30).
 - **Estados:** `Arrive`, `Parked`, `HighBeam`, `Blink2x` (fim da janela), `Leave`. **Tris:** ≤ 2.500.
 
 ### AST-066 — ANM-009 The knock (porta dos fundos do trailer)

@@ -9,6 +9,12 @@ em `docs/design/npcs.md` (game-designer); aqui fica o lado narrativo e a aparên
 Visual geral: estilo **toy low-poly** (DEC-105), cores quentes de dia. **Todo personagem é R6** — NPCs (DEC-089) e jogadores (DEC-097).
 Aparência pensada para R6: leitura por **silhueta, cor, chapéu e acessório**, não por detalhe de rosto ou dedo. Nada de sangue, ferida ou arma (DEC-023).
 
+> **DEC-145 (2026-10-10):** o padrão de personagem do projeto é o **"HotDog Crew"** (`Assets/reference/customrig.png`): animais humanoides (cachorro, gato, coelho, raposa, urso, panda; tartaruga citada) em rig R6 custom, uniforme boné vermelho + avental vermelho com hot dog + camisa creme + calça preta. Conflita com CHR-002 ("usa o avatar Roblox do próprio jogador") e com a aparência **humana** de CHR-001 e CHR-003 a CHR-008. **Não decidido** quem vira animal → `Q-141`; logo do avental → `Q-143`. Até a resposta, as fichas abaixo não mudam.
+>
+> **DEC-146 (2026-10-10, fecha `Q-141`):** **CHR-002 (cada jogador) é um animal da HotDog Crew**, escolhido pelo jogador; **não usa mais o avatar do Roblox**. Os trechos de CHR-002 sobre "avatar do próprio jogador", "avental por cima" e "colegas veem os avatares" **não valem** (reescrita → narrative-writer). Animal = classe (DEC-147, `Q-145`). Clientes seguem humanos. **Personagens com nome (CHR-001, CHR-003 a CHR-006, CHR-008): não decidido → `Q-146`**; até lá, seguem humanos como abaixo.
+>
+> **DEC-148 a DEC-150 (2026-10-10):** a crew tem **textura** de roupa, rosto e pelagem (DEC-148). **Clientes e pedestres sem nome também são animais** (DEC-149, emenda DEC-146): o mundo deixa de ser misto para os NPCs comuns. Personagens com nome **seguem em `Q-146`** (Pickett e Raincoat Lady também dependem de `Q-147`). Variante de **dia fofa** e de **noite um pouco assustadora**, por textura (DEC-150; intensidade `Q-148`). Reescrita de CHR-002 e do mundo (`world.md`) → narrative-writer.
+
 | ID | Nome | Papel | Aparece |
 |---|---|---|---|
 | CHR-001 | Walt Bramble | o chefe | **só por telefone** durante a run; em pessoa **uma vez**, na cutscene do amanhecer da 10ª noite (DEC-075, DEC-076) |

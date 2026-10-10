@@ -1,4 +1,4 @@
-Status: Aprovado (DEC-126, rodada 15, 2026-10-08: documento inteiro; Future + fallback ShadowMap; roupa de NPC opção A). Exceções que valem por DEC: §4.6 "Ambulância leva" → **DEC-114** (médicos descem e levam o corpo; sem maca automática); §11 sinal do Walker → **DEC-123** (~2 s); §5.3 leitura do fim da Juniper "~110 studs" → **~135 studs**, postes da Juniper a cada 8 studs (**rodada 17**, DEC em registro pelo secretário; trocar "rodada 17" pelo número da DEC quando existir). Texto alinhado com as duas DECs em §4.6 e §11 (art-director, 2026-10-08; fechamento de `Q-127` com o secretário). A proposta de avental (§4.1, CHR-002) segue não decidida.
+Status: Aprovado (DEC-126, rodada 15, 2026-10-08: documento inteiro; Future + fallback ShadowMap; roupa de NPC opção A). Exceções que valem por DEC: §4.6 "Ambulância leva" → **DEC-114** (médicos descem e levam o corpo; sem maca automática); §11 sinal do Walker → **DEC-123** (~2 s); §5.3 leitura do fim da Juniper "~110 studs" → **~135 studs**, postes da Juniper a cada 8 studs (**rodada 17**, DEC em registro pelo secretário; trocar "rodada 17" pelo número da DEC quando existir). Texto alinhado com as duas DECs em §4.6 e §11 (art-director, 2026-10-08; fechamento de `Q-127` com o secretário). A proposta de avental (§4.1, CHR-002) segue não decidida. **2026-10-10:** §7.3 moldura da vaga rara → **Mustard** (**DEC-144**; Gold só no AST-051, §2.1). §4.1 e §1.1 (corpo R6 clássico) **emendados por DEC-145**: personagem padrão "HotDog Crew" (`Assets/reference/customrig.png`), malha custom R6 do projeto, animal trocando cabeça/orelhas/cauda sobre a mesma base; quem usa, proporção e técnica em `Q-141` e `Q-144` (texto do §4 a reescrever pelo art-director). **DEC-146:** jogador vira animal da crew, sem avatar próprio; clientes NPC seguem humanos (§4.1 "Jogadores", §4.5 colegas e §4.6 a reescrever; personagens com nome `Q-146`). **DEC-147:** animal = classe (`Q-145`). **DEC-148:** personagens da crew com **textura** de roupa/rosto/pelagem — exceção de personagem a §1.1/§6 e à opção A do §4.1; cenário e props seguem sem textura pintada; orçamento em §9.3 a escrever (`Q-144` g). **DEC-149:** clientes e pedestres **também são animais** (emenda DEC-146): §4.1 opção A, §4.2, §2.4 e §4.4 a rever (`Q-147`, `Q-149`). **DEC-150:** personagem com variante de **dia** e de **noite** por troca de textura; §2.3 ("a noite não troca modelo nem textura") vale para a cidade, não para personagens (`Q-148`).
 
 # Style guide — Sell Hotdogs
 
@@ -103,6 +103,8 @@ Nomes de rua: `story/world.md` (Ninth Avenue, Juniper Street), os mesmos do `lev
 
 A noite **não troca o modelo nem a textura**. A mesma cidade muda por iluminação e pós-processo (DEC-010: "a cidade continua a mesma").
 
+> **DEC-150 (2026-10-10):** a regra acima vale para **cidade, cenário e props**. **Personagens** animais trocam de **textura** à noite (mesma malha): dia fofo, noite um pouco assustadora. Intensidade e quem troca: `Q-148`; convivência com os traços reservados de §2.4: `Q-147`.
+
 | Elemento | Cor | Nota |
 |---|---|---|
 | Ambiente geral | `#1B2140` (azul-violeta) | sombras nunca pretas puras: criança precisa enxergar a forma |
@@ -167,6 +169,10 @@ Regras gerais:
 
 ### 4.1 Base R6
 
+> **Emenda DEC-145 (2026-10-10):** o padrão de personagem do projeto passa a ser o **"HotDog Crew"** (`Assets/reference/customrig.png`): animal humanoide em **rig R6 custom** (bones `Head`, `Torso`, `LeftArm`/`RightArm`, `LeftLeg`/`RightLeg`), corpo base comum modelado primeiro; cada animal troca cabeça, orelhas, cauda e cores. Uniforme da prancha: boné vermelho, avental vermelho com hot dog, camisa creme, calça preta. R6 continua (DEC-089/DEC-097). Para quem usar o rig novo, "cabeça clássica R6 + decal" e "proporção R6 fixa" abaixo não valem. **Em aberto:** quem usa (jogadores, NPCs; avatar próprio do Roblox) `Q-141`; proporção, rosto, orçamento e técnica `Q-144`; logo do avental `Q-143`.
+>
+> **DEC-146 (2026-10-10, fecha `Q-141`):** **o jogador joga com um animal da crew e não usa mais o avatar do Roblox.** O parágrafo "Jogadores: usam o avatar do próprio Roblox…" e a "Proposta (CHR-002)" abaixo **não valem**: o jogador é corpo base R6 custom + peças do animal + uniforme da crew (AST-073 vira parte do personagem). **Clientes NPC seguem humanos R6** desta seção (opção A, §4.2) por enquanto. Personagens com nome (§4.3) não mudam até `Q-146`. Animal = classe (DEC-147, `Q-145`). Reescrita do §4.1, §4.5 e §4.6 → art-director.
+
 Todo personagem é **R6**: jogadores (avatar do próprio jogador, forçado R6), clientes, Quick Quentin, Opal, Walt, atores de anomalia.
 
 | Opção de roupa do NPC | O que é | Prós | Contras |
@@ -222,6 +228,8 @@ O estranho vem de **algo que falta, sobra, se repete ou está do lado errado**.
 - **Walker (ANM-007):** R6 escalado ~1,35×, sobretudo e chapéu `#14162A`, rosto na sombra da aba (decal escuro liso, sem olhos brilhando).
 
 ### 4.5 Jogador em 1ª pessoa (DEC-097)
+
+> **DEC-146 (2026-10-10):** sem braços, câmera padrão travada e Tool na mão **continuam** (DEC-097). Muda: o corpo do jogador é o **personagem da crew** (rig R6 custom), não o avatar; "colegas veem o avatar R6 inteiro" → colegas veem o **animal da crew** inteiro (também na cutscene, DEC-088). A conferir pelo art-director com `Q-144`: cabeça maior × altura do olho (4,5) e se orelhas/cabeça grande aparecem na câmera; ocultação do próprio corpo com malha custom e acessórios (orelhas, cauda).
 
 - Câmera em 1ª pessoa **padrão do Roblox**, travada (DEC-039). **Sem braços** (sem viewmodel).
 - O corpo do próprio jogador some na câmera padrão; a **Tool continua visível** na mão (o controle de transparência padrão não esconde peças de Tool).
@@ -365,7 +373,7 @@ Zona livre: centro da tela e terço inferior direito (Tool na mão, alvo do prom
 | Reação do cliente | ícones originais: feliz (estrela), reclamação (nuvem rabiscada), irritado (vapor). Sem emoji de fonte |
 | Barra do ladrão | mesma barra da salsicha, cor `#6A5ACD`, acima da gaveta; legível do Mart (billboard ≥ 130 studs, MAP-01 §6) |
 | Falas em balão (Opal, Quentin, Raincoat Lady) | balão branco menor, sem ícone, 3 s |
-| Preço na bancada de upgrades | etiqueta Mustard "$60" em cada vaga; vaga rara com moldura Gold |
+| Preço na bancada de upgrades | etiqueta Mustard "$60" em cada vaga; vaga rara com moldura **Mustard** (DEC-144; era Gold) |
 
 ### 7.4 Telas
 
@@ -454,6 +462,7 @@ Alinhado com o MAP-01 §13 onde os dois documentos tratam da mesma coisa (vale o
 | Foto de 1979 (pista) | 256² |
 | Ícones de UI / hotbar | 128² cada, em folha 1024² (`ImageRectOffset`) |
 | Partículas | 128² ou flipbook 4×4 em 512² |
+| Textura de personagem animal (DEC-148; variante dia + noite, DEC-150) | **a definir pelo art-director** (`Q-144` g): resolução por peça, nº por animal/tipo, memória total dentro de §9.2 |
 
 ### 9.4 LOD e streaming
 

@@ -1,0 +1,1345 @@
+{
+ "asset": "AST-053 HotDog Crew animal pieces (Head/Ears/Tail/extras) over AST-053_CrewBase",
+ "axes": "Roblox (X right, Y up, -Z front), character standing on Y=0. Positions relative to the MeshPart bounding-box centre (Roblox MeshPart CFrame).",
+ "notes": [
+  "Head_<Animal> REPLACES the base Head MeshPart. Its bounding box differs per animal (snout/cheeks), so Neck.C1 and the Head attachments below are per animal; Neck.C0 stays R6 standard [0,1,0]+rot.",
+  "Ears_<Animal>, Tail_<Animal>, Shell_Turtle, Beak_Owl are Accessories: Handle = the MeshPart, one Attachment of the listed name/position/orientation inside it.",
+  "Ears: one Handle with BOTH ears, welded by EarLeftAttachment (orientation 0,0,30 like the head's).",
+  "Cap: Dog and Turtle use the base Cap (AST-053_CrewCap.fbx). All others use Cap_EarsUp (AST-053_CrewCap_EarsUp.fbx), same HatAttachment.",
+  "UV channel 1 'UVMap' = KitchenPack atlas (restaurantbits_texture.png). Channel 2 'UVPaint' = clean non-overlapping unwrap on one 512x512 sheet per animal: Head v 0.375-1 (full width), Ears u 0-0.5 / v 0-0.375 (Shell_Turtle there for the turtle), Tail u 0.5-0.75, extras (Beak_Owl) u 0.75-1. Roblox reads only the first UV channel: for painted textures make UVPaint the first channel on export."
+ ],
+ "animals": {
+  "Dog": {
+   "cap": "Cap",
+   "tris": {
+    "pieces": {
+     "Head_Dog": 564,
+     "Ears_Dog": 152,
+     "Tail_Dog": 46
+    },
+    "character_total": 1554
+   },
+   "head": {
+    "part": "Head_Dog",
+    "size": [
+     2.3,
+     1.75,
+     2.3
+    ],
+    "center_world": [
+     0.0,
+     4.825,
+     -0.2
+    ],
+    "neck_C1": [
+     0.0,
+     -0.825,
+     0.2,
+     -1,
+     0,
+     0,
+     0,
+     0,
+     1,
+     0,
+     1,
+     0
+    ],
+    "attachments": {
+     "HatAttachment": {
+      "position": [
+       0.0,
+       0.875,
+       0.2
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     },
+     "HairAttachment": {
+      "position": [
+       0.0,
+       0.875,
+       0.2
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     },
+     "FaceFrontAttachment": {
+      "position": [
+       0.0,
+       0.0,
+       -0.75
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     },
+     "FaceCenterAttachment": {
+      "position": [
+       0.0,
+       0.0,
+       0.2
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     },
+     "EarLeftAttachment": {
+      "position": [
+       -0.94,
+       0.815,
+       0.2
+      ],
+      "orientation": [
+       0,
+       0,
+       30
+      ]
+     },
+     "EarRightAttachment": {
+      "position": [
+       0.94,
+       0.815,
+       0.2
+      ],
+      "orientation": [
+       0,
+       0,
+       -30
+      ]
+     },
+     "SnoutAttachment": {
+      "position": [
+       0.0,
+       -0.225,
+       -0.75
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     }
+    }
+   },
+   "accessories": {
+    "Ears_Dog": {
+     "handle_size": [
+      2.84,
+      0.72,
+      0.7
+     ],
+     "attachment": "EarLeftAttachment",
+     "attachment_position_in_handle": [
+      -0.94,
+      1.03,
+      -0.05
+     ],
+     "orientation": [
+      0,
+      0,
+      30
+     ],
+     "tris": 152
+    },
+    "Tail_Dog": {
+     "handle_size": [
+      0.2771,
+      0.9318,
+      0.7199
+     ],
+     "attachment": "TailAttachment",
+     "attachment_position_in_handle": [
+      0.0,
+      -0.5241,
+      -0.2294
+     ],
+     "orientation": [
+      0,
+      0,
+      0
+     ],
+     "tris": 46
+    }
+   }
+  },
+  "Cat": {
+   "cap": "Cap_EarsUp",
+   "tris": {
+    "pieces": {
+     "Head_Cat": 676,
+     "Ears_Cat": 76,
+     "Tail_Cat": 70
+    },
+    "character_total": 1670
+   },
+   "head": {
+    "part": "Head_Cat",
+    "size": [
+     2.72,
+     1.75,
+     2.17
+    ],
+    "center_world": [
+     0.0,
+     4.825,
+     -0.135
+    ],
+    "neck_C1": [
+     0.0,
+     -0.825,
+     0.135,
+     -1,
+     0,
+     0,
+     0,
+     0,
+     1,
+     0,
+     1,
+     0
+    ],
+    "attachments": {
+     "HatAttachment": {
+      "position": [
+       0.0,
+       0.875,
+       0.135
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     },
+     "HairAttachment": {
+      "position": [
+       0.0,
+       0.875,
+       0.135
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     },
+     "FaceFrontAttachment": {
+      "position": [
+       0.0,
+       0.0,
+       -0.815
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     },
+     "FaceCenterAttachment": {
+      "position": [
+       0.0,
+       0.0,
+       0.135
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     },
+     "EarLeftAttachment": {
+      "position": [
+       -0.94,
+       0.815,
+       0.135
+      ],
+      "orientation": [
+       0,
+       0,
+       30
+      ]
+     },
+     "EarRightAttachment": {
+      "position": [
+       0.94,
+       0.815,
+       0.135
+      ],
+      "orientation": [
+       0,
+       0,
+       -30
+      ]
+     },
+     "SnoutAttachment": {
+      "position": [
+       0.0,
+       -0.225,
+       -0.815
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     }
+    }
+   },
+   "accessories": {
+    "Ears_Cat": {
+     "handle_size": [
+      2.7212,
+      0.8434,
+      0.3
+     ],
+     "attachment": "EarLeftAttachment",
+     "attachment_position_in_handle": [
+      -0.94,
+      -0.1668,
+      0.0
+     ],
+     "orientation": [
+      0,
+      0,
+      30
+     ],
+     "tris": 76
+    },
+    "Tail_Cat": {
+     "handle_size": [
+      0.5249,
+      1.2001,
+      0.946
+     ],
+     "attachment": "TailAttachment",
+     "attachment_position_in_handle": [
+      -0.1607,
+      -0.6804,
+      -0.367
+     ],
+     "orientation": [
+      0,
+      0,
+      0
+     ],
+     "tris": 70
+    }
+   }
+  },
+  "Rabbit": {
+   "cap": "Cap_EarsUp",
+   "tris": {
+    "pieces": {
+     "Head_Rabbit": 620,
+     "Ears_Rabbit": 240,
+     "Tail_Rabbit": 80
+    },
+    "character_total": 1788
+   },
+   "head": {
+    "part": "Head_Rabbit",
+    "size": [
+     2.3,
+     1.75,
+     2.17
+    ],
+    "center_world": [
+     0.0,
+     4.825,
+     -0.135
+    ],
+    "neck_C1": [
+     0.0,
+     -0.825,
+     0.135,
+     -1,
+     0,
+     0,
+     0,
+     0,
+     1,
+     0,
+     1,
+     0
+    ],
+    "attachments": {
+     "HatAttachment": {
+      "position": [
+       0.0,
+       0.875,
+       0.135
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     },
+     "HairAttachment": {
+      "position": [
+       0.0,
+       0.875,
+       0.135
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     },
+     "FaceFrontAttachment": {
+      "position": [
+       0.0,
+       0.0,
+       -0.815
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     },
+     "FaceCenterAttachment": {
+      "position": [
+       0.0,
+       0.0,
+       0.135
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     },
+     "EarLeftAttachment": {
+      "position": [
+       -0.94,
+       0.815,
+       0.135
+      ],
+      "orientation": [
+       0,
+       0,
+       30
+      ]
+     },
+     "EarRightAttachment": {
+      "position": [
+       0.94,
+       0.815,
+       0.135
+      ],
+      "orientation": [
+       0,
+       0,
+       -30
+      ]
+     },
+     "SnoutAttachment": {
+      "position": [
+       0.0,
+       -0.225,
+       -0.815
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     }
+    }
+   },
+   "accessories": {
+    "Ears_Rabbit": {
+     "handle_size": [
+      2.2611,
+      1.9292,
+      0.23
+     ],
+     "attachment": "EarLeftAttachment",
+     "attachment_position_in_handle": [
+      -0.94,
+      -0.7497,
+      0.015
+     ],
+     "orientation": [
+      0,
+      0,
+      30
+     ],
+     "tris": 240
+    },
+    "Tail_Rabbit": {
+     "handle_size": [
+      0.5706,
+      0.6,
+      0.6
+     ],
+     "attachment": "TailAttachment",
+     "attachment_position_in_handle": [
+      0.0,
+      -0.37,
+      -0.18
+     ],
+     "orientation": [
+      0,
+      0,
+      0
+     ],
+     "tris": 80
+    }
+   }
+  },
+  "Fox": {
+   "cap": "Cap_EarsUp",
+   "tris": {
+    "pieces": {
+     "Head_Fox": 432,
+     "Ears_Fox": 108,
+     "Tail_Fox": 94
+    },
+    "character_total": 1482
+   },
+   "head": {
+    "part": "Head_Fox",
+    "size": [
+     2.9,
+     1.75,
+     2.37
+    ],
+    "center_world": [
+     0.0,
+     4.825,
+     -0.235
+    ],
+    "neck_C1": [
+     0.0,
+     -0.825,
+     0.235,
+     -1,
+     0,
+     0,
+     0,
+     0,
+     1,
+     0,
+     1,
+     0
+    ],
+    "attachments": {
+     "HatAttachment": {
+      "position": [
+       0.0,
+       0.875,
+       0.235
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     },
+     "HairAttachment": {
+      "position": [
+       0.0,
+       0.875,
+       0.235
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     },
+     "FaceFrontAttachment": {
+      "position": [
+       0.0,
+       0.0,
+       -0.715
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     },
+     "FaceCenterAttachment": {
+      "position": [
+       0.0,
+       0.0,
+       0.235
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     },
+     "EarLeftAttachment": {
+      "position": [
+       -0.94,
+       0.815,
+       0.235
+      ],
+      "orientation": [
+       0,
+       0,
+       30
+      ]
+     },
+     "EarRightAttachment": {
+      "position": [
+       0.94,
+       0.815,
+       0.235
+      ],
+      "orientation": [
+       0,
+       0,
+       -30
+      ]
+     },
+     "SnoutAttachment": {
+      "position": [
+       0.0,
+       -0.225,
+       -0.715
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     }
+    }
+   },
+   "accessories": {
+    "Ears_Fox": {
+     "handle_size": [
+      2.8959,
+      0.9647,
+      0.32
+     ],
+     "attachment": "EarLeftAttachment",
+     "attachment_position_in_handle": [
+      -0.94,
+      -0.2174,
+      0.0
+     ],
+     "orientation": [
+      0,
+      0,
+      30
+     ],
+     "tris": 108
+    },
+    "Tail_Fox": {
+     "handle_size": [
+      0.887,
+      1.5306,
+      1.46
+     ],
+     "attachment": "TailAttachment",
+     "attachment_position_in_handle": [
+      -0.1687,
+      -0.8047,
+      -0.6026
+     ],
+     "orientation": [
+      0,
+      0,
+      0
+     ],
+     "tris": 94
+    }
+   }
+  },
+  "Bear": {
+   "cap": "Cap_EarsUp",
+   "tris": {
+    "pieces": {
+     "Head_Bear": 460,
+     "Ears_Bear": 232,
+     "Tail_Bear": 64
+    },
+    "character_total": 1604
+   },
+   "head": {
+    "part": "Head_Bear",
+    "size": [
+     2.3,
+     1.75,
+     2.275
+    ],
+    "center_world": [
+     0.0,
+     4.825,
+     -0.1875
+    ],
+    "neck_C1": [
+     0.0,
+     -0.825,
+     0.1875,
+     -1,
+     0,
+     0,
+     0,
+     0,
+     1,
+     0,
+     1,
+     0
+    ],
+    "attachments": {
+     "HatAttachment": {
+      "position": [
+       0.0,
+       0.875,
+       0.1875
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     },
+     "HairAttachment": {
+      "position": [
+       0.0,
+       0.875,
+       0.1875
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     },
+     "FaceFrontAttachment": {
+      "position": [
+       0.0,
+       0.0,
+       -0.7625
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     },
+     "FaceCenterAttachment": {
+      "position": [
+       0.0,
+       0.0,
+       0.1875
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     },
+     "EarLeftAttachment": {
+      "position": [
+       -0.94,
+       0.815,
+       0.1875
+      ],
+      "orientation": [
+       0,
+       0,
+       30
+      ]
+     },
+     "EarRightAttachment": {
+      "position": [
+       0.94,
+       0.815,
+       0.1875
+      ],
+      "orientation": [
+       0,
+       0,
+       -30
+      ]
+     },
+     "SnoutAttachment": {
+      "position": [
+       0.0,
+       -0.225,
+       -0.7625
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     }
+    }
+   },
+   "accessories": {
+    "Ears_Bear": {
+     "handle_size": [
+      2.9389,
+      0.8684,
+      0.255
+     ],
+     "attachment": "EarLeftAttachment",
+     "attachment_position_in_handle": [
+      -0.94,
+      -0.191,
+      0.0175
+     ],
+     "orientation": [
+      0,
+      0,
+      30
+     ],
+     "tris": 232
+    },
+    "Tail_Bear": {
+     "handle_size": [
+      0.4185,
+      0.44,
+      0.4185
+     ],
+     "attachment": "TailAttachment",
+     "attachment_position_in_handle": [
+      0.0,
+      -0.3,
+      -0.12
+     ],
+     "orientation": [
+      0,
+      0,
+      0
+     ],
+     "tris": 64
+    }
+   }
+  },
+  "Panda": {
+   "cap": "Cap_EarsUp",
+   "tris": {
+    "pieces": {
+     "Head_Panda": 532,
+     "Ears_Panda": 160,
+     "Tail_Panda": 64
+    },
+    "character_total": 1604
+   },
+   "head": {
+    "part": "Head_Panda",
+    "size": [
+     2.3,
+     1.75,
+     2.225
+    ],
+    "center_world": [
+     0.0,
+     4.825,
+     -0.1625
+    ],
+    "neck_C1": [
+     0.0,
+     -0.825,
+     0.1625,
+     -1,
+     0,
+     0,
+     0,
+     0,
+     1,
+     0,
+     1,
+     0
+    ],
+    "attachments": {
+     "HatAttachment": {
+      "position": [
+       0.0,
+       0.875,
+       0.1625
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     },
+     "HairAttachment": {
+      "position": [
+       0.0,
+       0.875,
+       0.1625
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     },
+     "FaceFrontAttachment": {
+      "position": [
+       0.0,
+       0.0,
+       -0.7875
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     },
+     "FaceCenterAttachment": {
+      "position": [
+       0.0,
+       0.0,
+       0.1625
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     },
+     "EarLeftAttachment": {
+      "position": [
+       -0.94,
+       0.815,
+       0.1625
+      ],
+      "orientation": [
+       0,
+       0,
+       30
+      ]
+     },
+     "EarRightAttachment": {
+      "position": [
+       0.94,
+       0.815,
+       0.1625
+      ],
+      "orientation": [
+       0,
+       0,
+       -30
+      ]
+     },
+     "SnoutAttachment": {
+      "position": [
+       0.0,
+       -0.225,
+       -0.7875
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     }
+    }
+   },
+   "accessories": {
+    "Ears_Panda": {
+     "handle_size": [
+      2.9389,
+      0.8684,
+      0.22
+     ],
+     "attachment": "EarLeftAttachment",
+     "attachment_position_in_handle": [
+      -0.94,
+      -0.191,
+      0.0
+     ],
+     "orientation": [
+      0,
+      0,
+      30
+     ],
+     "tris": 160
+    },
+    "Tail_Panda": {
+     "handle_size": [
+      0.4185,
+      0.44,
+      0.4185
+     ],
+     "attachment": "TailAttachment",
+     "attachment_position_in_handle": [
+      0.0,
+      -0.3,
+      -0.12
+     ],
+     "orientation": [
+      0,
+      0,
+      0
+     ],
+     "tris": 64
+    }
+   }
+  },
+  "Turtle": {
+   "cap": "Cap",
+   "tris": {
+    "pieces": {
+     "Head_Turtle": 380,
+     "Tail_Turtle": 22,
+     "Shell_Turtle": 160
+    },
+    "character_total": 1354
+   },
+   "head": {
+    "part": "Head_Turtle",
+    "size": [
+     2.3,
+     1.75,
+     1.975
+    ],
+    "center_world": [
+     0.0,
+     4.825,
+     -0.0375
+    ],
+    "neck_C1": [
+     0.0,
+     -0.825,
+     0.0375,
+     -1,
+     0,
+     0,
+     0,
+     0,
+     1,
+     0,
+     1,
+     0
+    ],
+    "attachments": {
+     "HatAttachment": {
+      "position": [
+       0.0,
+       0.875,
+       0.0375
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     },
+     "HairAttachment": {
+      "position": [
+       0.0,
+       0.875,
+       0.0375
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     },
+     "FaceFrontAttachment": {
+      "position": [
+       0.0,
+       0.0,
+       -0.9125
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     },
+     "FaceCenterAttachment": {
+      "position": [
+       0.0,
+       0.0,
+       0.0375
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     },
+     "EarLeftAttachment": {
+      "position": [
+       -0.94,
+       0.815,
+       0.0375
+      ],
+      "orientation": [
+       0,
+       0,
+       30
+      ]
+     },
+     "EarRightAttachment": {
+      "position": [
+       0.94,
+       0.815,
+       0.0375
+      ],
+      "orientation": [
+       0,
+       0,
+       -30
+      ]
+     },
+     "SnoutAttachment": {
+      "position": [
+       0.0,
+       -0.225,
+       -0.9125
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     }
+    }
+   },
+   "accessories": {
+    "Tail_Turtle": {
+     "handle_size": [
+      0.1386,
+      0.2378,
+      0.4687
+     ],
+     "attachment": "TailAttachment",
+     "attachment_position_in_handle": [
+      0.0,
+      -0.0689,
+      -0.2157
+     ],
+     "orientation": [
+      0,
+      0,
+      0
+     ],
+     "tris": 22
+    },
+    "Shell_Turtle": {
+     "handle_size": [
+      1.84,
+      1.6,
+      0.62
+     ],
+     "attachment": "BodyBackAttachment",
+     "attachment_position_in_handle": [
+      0.0,
+      -0.05,
+      -0.27
+     ],
+     "orientation": [
+      0,
+      0,
+      0
+     ],
+     "tris": 160
+    }
+   }
+  },
+  "Owl": {
+   "cap": "Cap_EarsUp",
+   "tris": {
+    "pieces": {
+     "Head_Owl": 408,
+     "Ears_Owl": 60,
+     "Tail_Owl": 132,
+     "Beak_Owl": 30
+    },
+    "character_total": 1478
+   },
+   "head": {
+    "part": "Head_Owl",
+    "size": [
+     2.3,
+     1.75,
+     2.0
+    ],
+    "center_world": [
+     0.0,
+     4.825,
+     -0.05
+    ],
+    "neck_C1": [
+     0.0,
+     -0.825,
+     0.05,
+     -1,
+     0,
+     0,
+     0,
+     0,
+     1,
+     0,
+     1,
+     0
+    ],
+    "attachments": {
+     "HatAttachment": {
+      "position": [
+       0.0,
+       0.875,
+       0.05
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     },
+     "HairAttachment": {
+      "position": [
+       0.0,
+       0.875,
+       0.05
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     },
+     "FaceFrontAttachment": {
+      "position": [
+       0.0,
+       0.0,
+       -0.9
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     },
+     "FaceCenterAttachment": {
+      "position": [
+       0.0,
+       0.0,
+       0.05
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     },
+     "EarLeftAttachment": {
+      "position": [
+       -0.94,
+       0.815,
+       0.05
+      ],
+      "orientation": [
+       0,
+       0,
+       30
+      ]
+     },
+     "EarRightAttachment": {
+      "position": [
+       0.94,
+       0.815,
+       0.05
+      ],
+      "orientation": [
+       0,
+       0,
+       -30
+      ]
+     },
+     "SnoutAttachment": {
+      "position": [
+       0.0,
+       -0.225,
+       -0.9
+      ],
+      "orientation": [
+       0,
+       0,
+       0
+      ]
+     }
+    }
+   },
+   "accessories": {
+    "Ears_Owl": {
+     "handle_size": [
+      2.8811,
+      0.6568,
+      0.24
+     ],
+     "attachment": "EarLeftAttachment",
+     "attachment_position_in_handle": [
+      -0.94,
+      -0.0985,
+      0.0
+     ],
+     "orientation": [
+      0,
+      0,
+      30
+     ],
+     "tris": 60
+    },
+    "Tail_Owl": {
+     "handle_size": [
+      0.4685,
+      0.3898,
+      0.462
+     ],
+     "attachment": "TailAttachment",
+     "attachment_position_in_handle": [
+      0.0,
+      -0.2259,
+      -0.2053
+     ],
+     "orientation": [
+      0,
+      0,
+      0
+     ],
+     "tris": 132
+    },
+    "Beak_Owl": {
+     "handle_size": [
+      0.26,
+      0.34,
+      0.2
+     ],
+     "attachment": "SnoutAttachment",
+     "attachment_position_in_handle": [
+      0.0,
+      0.16,
+      0.08
+     ],
+     "orientation": [
+      0,
+      0,
+      0
+     ],
+     "tris": 30
+    }
+   }
+  }
+ }
+}

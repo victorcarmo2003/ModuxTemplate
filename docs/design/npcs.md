@@ -13,7 +13,8 @@ Conciliação da rodada 7 (DEC-073, DEC-074): os slots NPC-009 a NPC-018 seguem 
 Conciliação das rodadas 8–12 (DEC-080 a DEC-109):
 
 - Anomalias têm ID **`ANM-###`** (DEC-096): N1 = ANM-001 … N10 = ANM-010. Os atores de servidor seguem NPC-009 a NPC-018 e referenciam o `ANM-###`. Onde o texto ainda diz "Nk", leia ANM-00k.
-- Todo personagem é **R6** (DEC-089, DEC-097).
+- Todo personagem é **R6** (DEC-089, DEC-097). **DEC-145 (2026-10-10):** padrão de personagem "HotDog Crew" (animais em rig R6 custom). **Não decidido** se clientes, personagens com nome e atores de anomalia usam o rig animal → `Q-141` (recomendação: crew jogável primeiro; clientes seguem o plano atual, porque as anomalias dependem do padrão dos clientes, DEC-010). Até a resposta, as fichas abaixo não mudam. **DEC-146 (2026-10-10, fecha `Q-141`):** só a **crew jogável** vira animal; **clientes NPC seguem humanos R6** (padrão das anomalias, DEC-010). Personagens com nome (Opal, Quentin, Pickett, Raincoat Lady, médicos, Walt) → `Q-146`; fichas não mudam.
+- **DEC-149 (2026-10-10, emenda DEC-146):** **clientes e pedestres também são animais** (mesmo custom rig da crew). Vale para NPC-001 a NPC-006, NPC-019 e atores de anomalia de cliente. A parte "clientes seguem humanos" acima **não vale**. Falta: qual animal por tipo, roupa de civil, textura × opção A → `Q-149`; anomalias com clientes animais (ANM-001, 004, 005, 007) → `Q-147`. Personagens com nome seguem em `Q-146`. **DEC-150:** variante de **dia** (fofa) e de **noite** (um pouco assustadora) por troca de textura, mesma malha; intensidade e quem troca → `Q-148`. Invariantes de cliente (padrão para anomalia, DEC-010) seguem valendo; o game-designer revisa as fichas.
 - NPCs novos: **NPC-022** carro de trânsito (DEC-087, DEC-095), **NPC-023** ambulância e **NPC-024** paramédicos (DEC-091).
 - Orçamento: veículos ganham **teto próprio**; Opal sai do teto de 12 (proposta para Q-091 a); paramédicos são atores visuais.
 

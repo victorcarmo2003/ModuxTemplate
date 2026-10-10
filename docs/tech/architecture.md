@@ -96,13 +96,15 @@ Papel do place: atributo `Workspace.PlaceRole` (`"Lobby"`/`"Run"`). No Studio, R
 
 | Configuração | Lobby | Run | Origem |
 |---|---|---|---|
-| Avatar | R6 forçado (Game Settings → Avatar) | R6 forçado | DEC-089, DEC-097 |
+| Avatar | R6 forçado (Game Settings → Avatar) | R6 forçado | DEC-089, DEC-097 — **emendado por DEC-146**: jogador sem avatar próprio, personagem da crew (ver nota abaixo) |
 | `StarterPlayer.CameraMode` | `LockFirstPerson` | `LockFirstPerson` | DEC-039, DEC-097 |
 | `Players.CharacterAutoLoads` | true | **false** (spawn controlado: atrasado, revive, retomada, spectate) | DEC-091, DEC-098 |
 | `StreamingEnabled` | true | true, `StreamingMinRadius` 256, `StreamingTargetRadius` 512; gameplay `Persistent` (§12.4, `Q-087`) | |
 | Grupos de colisão | `Players` não colide com `Players` | idem + `Npc` não colide com `Players`/`Npc` | `Q-086` |
 | Developer product "Revive" | criado no Creator Hub (id em `Content.Products`) | mesmo | DEC-092 |
 | Badge "Day 100" | criado no Creator Hub | — | DEC-070, DEC-084 |
+
+> **DEC-146 / DEC-147 (2026-10-10), nota do secretário — a resolver pelo architect:** o jogador **não usa o avatar do Roblox**; joga com o animal da HotDog Crew (corpo base R6 custom + peças do animal + uniforme), e **animal = classe** (`CLS-###`). Pontos: personagem por **StarterCharacter custom** ou montagem no `CharacterService` (com T25 `CharacterAutoLoads = false`); **Humanoid R6**; nenhuma aparência do avatar aplicada (sem `HumanoidDescription` do jogador); animal escolhido no lobby e levado à run (classe já persistida, DEC-069); ragdoll T22, Tool (`RightGripAttachment`), maca (DEC-143) e animações no rig custom; cutscene "avatares visíveis" → personagens da crew. NPCs clientes seguem R6 de plataforma (T11). Técnica nova vai à lista da `Q-130` como Provisória. Medidas do corpo: `Q-144`.
 
 ## 2. Mapa de features
 

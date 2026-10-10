@@ -1,0 +1,682 @@
+{
+ "asset": "AST-053 CrewBase (HotDog Crew R6 base body)",
+ "axes": "Roblox (X right, Y up, -Z front). CFrame arrays = [x, y, z, R00, R01, R02, R10, R11, R12, R20, R21, R22] (CFrame.new(...) order). Part positions with the character standing on Y=0 (HRP centre at Y=3).",
+ "notes": [
+  "MeshPart CFrame = centre of the mesh bounding box (Roblox rule); Motor6D C0/C1 below are relative to those centres. Blender object origins sit on the joints only for posing in Blender.",
+  "Torso and limbs keep the exact R6 boxes (Torso 2x2x1, limbs 1x2x1): all Motor6Ds except Neck.C1 are the stock R6 values, so default R6 Animate/emotes work unchanged.",
+  "HumanoidRootPart: Transparency 1, CanCollide true (R6 default), no mesh needed in game (a 2x2x1 Part works; mesh exported only for completeness).",
+  "Cap and Apron are Accessories: Handle = the MeshPart, with an Attachment of the listed name/position inside the Handle; Humanoid:AddAccessory welds it to the body attachment of the same name.",
+  "Fur recolor per animal: KitchenPack atlas column 5 row 1 (u 0.6875, v 0.5..0.75) is used ONLY by fur faces (Head, forearms+hands below the sleeve hem). Remap those UVs to the animal band, or swap the band in a per-animal atlas copy."
+ ],
+ "parts": {
+  "HumanoidRootPart": {
+   "size": [
+    2.0,
+    2.0,
+    1.0
+   ],
+   "center_world": [
+    0.0,
+    3.0,
+    -0.0
+   ],
+   "tris": 12
+  },
+  "Torso": {
+   "size": [
+    2.0,
+    2.0,
+    1.0
+   ],
+   "center_world": [
+    0.0,
+    3.0,
+    -0.0
+   ],
+   "tris": 76
+  },
+  "Head": {
+   "size": [
+    2.3,
+    1.75,
+    1.9
+   ],
+   "center_world": [
+    0.0,
+    4.825,
+    -0.0
+   ],
+   "tris": 188
+  },
+  "Left Arm": {
+   "size": [
+    1.0,
+    2.0,
+    1.0
+   ],
+   "center_world": [
+    -1.5,
+    3.0,
+    -0.0
+   ],
+   "tris": 108
+  },
+  "Right Arm": {
+   "size": [
+    1.0,
+    2.0,
+    1.0
+   ],
+   "center_world": [
+    1.5,
+    3.0,
+    -0.0
+   ],
+   "tris": 108
+  },
+  "Left Leg": {
+   "size": [
+    1.0,
+    2.0,
+    1.0
+   ],
+   "center_world": [
+    -0.5,
+    1.0,
+    -0.0
+   ],
+   "tris": 92
+  },
+  "Right Leg": {
+   "size": [
+    1.0,
+    2.0,
+    1.0
+   ],
+   "center_world": [
+    0.5,
+    1.0,
+    -0.0
+   ],
+   "tris": 92
+  },
+  "Cap": {
+   "size": [
+    2.44,
+    1.039,
+    2.691
+   ],
+   "center_world": [
+    0.0,
+    5.34,
+    -0.325
+   ],
+   "tris": 224
+  },
+  "Apron": {
+   "size": [
+    1.84,
+    2.35,
+    0.675
+   ],
+   "center_world": [
+    0.0,
+    2.875,
+    -0.438
+   ],
+   "tris": 92
+  }
+ },
+ "motor6d": {
+  "RootJoint": {
+   "Part0": "HumanoidRootPart",
+   "Part1": "Torso",
+   "C0": [
+    0,
+    0,
+    0,
+    -1,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    1,
+    0
+   ],
+   "C1": [
+    0,
+    0,
+    0,
+    -1,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    1,
+    0
+   ],
+   "standard": true
+  },
+  "Neck": {
+   "Part0": "Torso",
+   "Part1": "Head",
+   "C0": [
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    1,
+    0
+   ],
+   "C1": [
+    0,
+    -0.825,
+    0,
+    -1,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    1,
+    0
+   ],
+   "standard": false,
+   "note": "C0 = R6 standard. C1.Y = -0.825 (standard -0.5) because the chibi Head is 1.75 tall and its mesh bottom is sunk 0.05 into the torso top"
+  },
+  "Right Shoulder": {
+   "Part0": "Torso",
+   "Part1": "Right Arm",
+   "C0": [
+    1,
+    0.5,
+    0,
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ],
+   "C1": [
+    -0.5,
+    0.5,
+    0,
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ],
+   "standard": true
+  },
+  "Left Shoulder": {
+   "Part0": "Torso",
+   "Part1": "Left Arm",
+   "C0": [
+    -1,
+    0.5,
+    0,
+    0,
+    0,
+    -1,
+    0,
+    1,
+    0,
+    1,
+    0,
+    0
+   ],
+   "C1": [
+    0.5,
+    0.5,
+    0,
+    0,
+    0,
+    -1,
+    0,
+    1,
+    0,
+    1,
+    0,
+    0
+   ],
+   "standard": true
+  },
+  "Right Hip": {
+   "Part0": "Torso",
+   "Part1": "Right Leg",
+   "C0": [
+    1,
+    -1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ],
+   "C1": [
+    0.5,
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ],
+   "standard": true
+  },
+  "Left Hip": {
+   "Part0": "Torso",
+   "Part1": "Left Leg",
+   "C0": [
+    -1,
+    -1,
+    0,
+    0,
+    0,
+    -1,
+    0,
+    1,
+    0,
+    1,
+    0,
+    0
+   ],
+   "C1": [
+    -0.5,
+    1,
+    0,
+    0,
+    0,
+    -1,
+    0,
+    1,
+    0,
+    1,
+    0,
+    0
+   ],
+   "standard": true
+  }
+ },
+ "attachments_part_local": {
+  "Head": {
+   "HatAttachment": {
+    "position": [
+     0.0,
+     0.875,
+     0.0
+    ],
+    "orientation": [
+     0,
+     0,
+     0
+    ]
+   },
+   "HairAttachment": {
+    "position": [
+     0.0,
+     0.875,
+     0.0
+    ],
+    "orientation": [
+     0,
+     0,
+     0
+    ]
+   },
+   "FaceFrontAttachment": {
+    "position": [
+     0.0,
+     0.0,
+     -0.95
+    ],
+    "orientation": [
+     0,
+     0,
+     0
+    ]
+   },
+   "FaceCenterAttachment": {
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "orientation": [
+     0,
+     0,
+     0
+    ]
+   },
+   "EarLeftAttachment": {
+    "position": [
+     -0.94,
+     0.815,
+     0.0
+    ],
+    "orientation": [
+     0,
+     0,
+     30
+    ]
+   },
+   "EarRightAttachment": {
+    "position": [
+     0.94,
+     0.815,
+     0.0
+    ],
+    "orientation": [
+     0,
+     0,
+     -30
+    ]
+   },
+   "SnoutAttachment": {
+    "position": [
+     0.0,
+     -0.225,
+     -0.95
+    ],
+    "orientation": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  "Torso": {
+   "NeckAttachment": {
+    "position": [
+     0.0,
+     1.0,
+     0.0
+    ],
+    "orientation": [
+     0,
+     0,
+     0
+    ]
+   },
+   "BodyFrontAttachment": {
+    "position": [
+     0.0,
+     0.0,
+     -0.5
+    ],
+    "orientation": [
+     0,
+     0,
+     0
+    ]
+   },
+   "BodyBackAttachment": {
+    "position": [
+     0.0,
+     0.0,
+     0.5
+    ],
+    "orientation": [
+     0,
+     0,
+     0
+    ]
+   },
+   "LeftCollarAttachment": {
+    "position": [
+     -1.0,
+     1.0,
+     0.0
+    ],
+    "orientation": [
+     0,
+     0,
+     0
+    ]
+   },
+   "RightCollarAttachment": {
+    "position": [
+     1.0,
+     1.0,
+     0.0
+    ],
+    "orientation": [
+     0,
+     0,
+     0
+    ]
+   },
+   "WaistFrontAttachment": {
+    "position": [
+     0.0,
+     -1.0,
+     -0.5
+    ],
+    "orientation": [
+     0,
+     0,
+     0
+    ]
+   },
+   "WaistBackAttachment": {
+    "position": [
+     0.0,
+     -1.0,
+     0.5
+    ],
+    "orientation": [
+     0,
+     0,
+     0
+    ]
+   },
+   "WaistCenterAttachment": {
+    "position": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "orientation": [
+     0,
+     0,
+     0
+    ]
+   },
+   "TailAttachment": {
+    "position": [
+     0.0,
+     -0.75,
+     0.5
+    ],
+    "orientation": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  "Left Arm": {
+   "LeftShoulderAttachment": {
+    "position": [
+     0.0,
+     1.0,
+     0.0
+    ],
+    "orientation": [
+     0,
+     0,
+     0
+    ]
+   },
+   "LeftGripAttachment": {
+    "position": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "orientation": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  "Right Arm": {
+   "RightShoulderAttachment": {
+    "position": [
+     0.0,
+     1.0,
+     0.0
+    ],
+    "orientation": [
+     0,
+     0,
+     0
+    ]
+   },
+   "RightGripAttachment": {
+    "position": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "orientation": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  "Left Leg": {
+   "LeftFootAttachment": {
+    "position": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "orientation": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  "Right Leg": {
+   "RightFootAttachment": {
+    "position": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "orientation": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  "HumanoidRootPart": {
+   "RootAttachment": {
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "orientation": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  "Cap": {
+   "HatAttachment": {
+    "position": [
+     0.0,
+     0.36,
+     0.325
+    ],
+    "orientation": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  "Apron": {
+   "BodyFrontAttachment": {
+    "position": [
+     0.0,
+     0.125,
+     -0.062
+    ],
+    "orientation": [
+     0,
+     0,
+     0
+    ]
+   }
+  }
+ },
+ "accessories": {
+  "Cap": {
+   "handle_size": [
+    2.44,
+    1.039,
+    2.691
+   ],
+   "attachment": "HatAttachment",
+   "attachment_position_in_handle": [
+    0.0,
+    0.36,
+    0.325
+   ],
+   "file": "Assets/models/character/AST-053_CrewCap.fbx"
+  },
+  "Apron": {
+   "handle_size": [
+    1.84,
+    2.35,
+    0.675
+   ],
+   "attachment": "BodyFrontAttachment",
+   "attachment_position_in_handle": [
+    0.0,
+    0.125,
+    -0.062
+   ],
+   "file": "Assets/models/character/AST-053_CrewApron.fbx",
+   "logo_area": "flat front panel between Y 2.2 and 3.05 world (part-local Y -0.675..0.175), width 1.8; decal AST-072 on the Front face"
+  }
+ }
+}

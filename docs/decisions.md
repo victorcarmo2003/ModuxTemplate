@@ -1748,3 +1748,201 @@ Pendências apresentadas na prévia (sem escolha do usuário): empilhamento das 
   - `open-questions.md`: `Q-138`, `Q-139`, `Q-140`; nota em `Q-082` → secretário (feito).
   - **level-designer:** MAP-01 §7.2 janela do trailer 22,5 (era X 30–53).
   - `docs/README.md` → secretário.
+
+---
+
+Origem das DEC-142 a DEC-145: conversa do usuário com o orquestrador, 2026-10-10, depois da DEC-141 (respostas a `Q-138`, `Q-139`, `Q-140`) e apresentando a prancha `Assets/reference/customrig.png`. Transcrição de voz, **literal** (o "[...]" é corte do orquestrador):
+
+> Pode empilhar o queijo com a altura real. Antes dos cordões. O jogo vai ser em primeira pessoa, né? Então as cordas só podem ser em primeira pessoa também. Se a maca não cabe na ambulância, pode diminuir Na verdade, a mãe do tamanho da ambulância logo então, não tem problema não. [...] Tem um modelo de... de personagem que eu vou querer utilizar no projeto. Vai ser basicamente o padrão que a gente vai utilizar. Ele tá na pasta Assets. Referência Custom Rig.png Só que antes da gente modelar ele, a gente precisaria modelar o corpo deles E aí conforme for alterando o tipo de animal né, Se fosse, por exemplo, uma tartaruga, uma raposa Um cachorro, aí vai alterando, por exemplo, a cauda, as orelhas Mas meio que a base da rig vai ser a mesma O restante pode ser com recomendado aí
+
+Leitura da transcrição (erros de voz): "cordas" = **cordões** de molho; "a mãe do tamanho da ambulância" = "a **maca** do tamanho da ambulância"; "Referência Custom Rig.png" = `Assets/reference/customrig.png`.
+
+### DEC-142 — 2026-10-10 — Coberturas empilham pela altura real; queijo sempre antes dos cordões (Q-138, opção A)
+
+- Decidido pelo usuário:
+  - Cada cobertura do hot dog (AST-003) apoia no **topo real** da cobertura de baixo (altura real de cada cobertura, medida no modelo aprovado em DEC-141). Sai o passo fixo de 0,05 (era **Provisório**).
+  - **Queijo sempre antes dos cordões** (Ketchup, Mustard, Cream Cheese), qualquer que seja a ordem de montagem do jogador. As demais coberturas seguem a ordem de montagem.
+- Leitura avaliada em **1ª pessoa** travada (DEC-013, DEC-039): conta o que se vê de cima e na mão.
+- **Interpretação do agente, a confirmar com o usuário:** "as cordas só podem ser em primeira pessoa também" lida como "a leitura dos cordões só precisa funcionar em 1ª pessoa". Pequenos vãos entre cordão e cobertura vistos de lado (colega da party, vitrine) **não** são critério de aceite. Se o usuário quis dizer outra coisa, reabre.
+- Alturas já medidas: Bacon **0,115**; Potato Sticks **0,119**. As outras coberturas: medir nos `.fbx` de DEC-141 (`food/AST-004` a `AST-009`).
+- Não muda regra de jogo: o pedido é a lista exata, **sem ordem** (DEC-071). Pôr o queijo antes muda só o visual.
+- Critério de aceite: qualquer combinação de até 3 coberturas, vista de cima e na mão em 1ª pessoa: nenhuma atravessa a de baixo, nenhum molho some sob o queijo, nenhum cordão flutua visivelmente.
+- Responde e fecha `Q-138`.
+- Impacto:
+  - `art/asset-list.md` AST-003 (Empilhamento e Encaixes; "Provisório" removido) → secretário (feito).
+  - **frontend-coder:** montagem visual (offset pela altura real; queijo antes dos cordões).
+  - **architect / game-designer:** altura por cobertura nos dados de conteúdo (`tech/content-data.md`, `design/items.md`).
+
+### DEC-143 — 2026-10-10 — Maca cabe na ambulância; tamanho original mantido (Q-140)
+
+- Decidido pelo usuário: a maca (`Stretcher`, AST-052) deve caber na ambulância; se não coubesse, **podia ser reduzida** ("pode diminuir… do tamanho da ambulância, não tem problema").
+- **Fato medido depois da fala** (modeler-3d, 2026-10-10, no `.blend` aprovado): a carga tem **8,37 de fundo × 5,13 de largura × 4,89 de altura**. O "~2 de fundo" da DEC-141 / `Q-140` era **leitura errada** da prévia escura.
+- Resultado: a maca aprovada (**6,0 × 2,2 × 1,6**, 352 tris, DEC-140) **já cabe** com as portas fechadas, folga ≥ 0,3. **Não foi reduzida.** A intenção do usuário fica atendida sem edição.
+- A ambulância não muda (modelo DEC-141). A maca não muda (modelo DEC-140).
+- Encaixe no arquivo da ambulância: **`Att_Stretcher_Stowed`** em Roblox **(0, 2.578, 4.454)** relativo ao pivô da ambulância = posição da maca guardada. A ficha chama esse ponto de `Stretcher_Dock`: **nome no arquivo vale como `Att_Stretcher_Stowed`**; art-director unifica o nome na ficha. O Empty antigo `Att_Stretcher` (abaixo do piso) foi **removido**.
+- Responde e fecha `Q-140`.
+- Impacto: `art/asset-list.md` AST-052 (medida da carga, encaixe, nota da Q-140) → secretário (feito); **art-director** (unificar `Stretcher_Dock` × `Att_Stretcher_Stowed`); **frontend-coder** (posição da maca guardada).
+- Correção também da DEC-141, linha AST-052 ("carga ~2 de fundo"): vale **8,37** (medição). DEC-141 não é editada (append-only); vale esta nota.
+
+### DEC-144 — 2026-10-10 — Ajustes de arte da rodada 3 com a recomendação (Q-139 a, b, c)
+
+- Decidido pelo usuário: "O restante pode ser com recomendado." Vale a recomendação do art-director em `Q-139`:
+  - (a) **Guarda-sóis do carrinho** (AST-026): **mantidos** como no modelo aprovado. Reavaliar em **playtest em 1ª pessoa**.
+  - (b) **Long car** (AST-065): **4 rodas** (vale o modelo DEC-141). Linha **Peças** da ficha: 6 → 4.
+  - (c) **Moldura da vitrine S1** do GEAR WALL (AST-049): **Mustard**, não Gold. Preserva a reserva de Gold só para o AST-051 (style guide §2.1). A S1 continua lendo pela lâmpada Neon e pelo Kit exposto (com os brilhos Gold do próprio Kit, §10).
+- **Emenda** o `style-guide.md` (Aprovado, DEC-126) §7.3, linha "Preço na bancada de upgrades": "vaga rara com moldura Gold" → **moldura Mustard**. §2.1 não muda.
+- O modelo do AST-049 (DEC-141) tem a moldura em Gold: **recolor** da moldura S1 (troca de faixa no atlas, sem mudar malha).
+- Responde e fecha `Q-139`.
+- Impacto:
+  - `art/asset-list.md` AST-026, AST-049, AST-065 → secretário (feito).
+  - `art/style-guide.md` §7.3 e cabeçalho (exceção por DEC) → secretário (feito).
+  - **modeler-3d:** recolor da moldura S1 no `market/AST-049_GearWall`.
+
+### DEC-145 — 2026-10-10 — "HotDog Crew": personagem padrão do projeto é animal humanoide em rig R6 custom (emenda DEC-089, DEC-097 e style guide §4.1)
+
+- Referência: `Assets/reference/customrig.png` (prancha "HotDog Crew — Animais R6 (Humanoids)"). Conteúdo da prancha:
+
+  | Item | O que mostra |
+  |---|---|
+  | Animais | cachorro, gato, coelho, raposa, urso, panda (frente, lado, costas) |
+  | Proporção | R6 simples, de blocos; cabeça grande |
+  | Uniforme | boné vermelho; avental vermelho com desenho de hot dog; camisa creme; calça preta |
+  | Rig | custom R6; bones `Head`, `Torso`, `LeftArm`/`RightArm`, `LeftLeg`/`RightLeg`; controles sugeridos: cabeça, braços, pernas, torso (leve), cintura (opcional) |
+  | Variação por animal | cabeça, orelhas, cauda, cores |
+  | Acessórios opcionais | óculos, mochila |
+  | Paleta | vermelho, creme, marrons, cinza, preto |
+  | Extras | carrinho, hot dog e molhos (só ilustração; **não** substituem fichas aprovadas) |
+
+- Decidido pelo usuário:
+  - A prancha é o **padrão de personagem do projeto**.
+  - Ordem de trabalho: **1º o corpo base** comum (rig R6 custom). **Depois** cada animal troca **cabeça, orelhas e cauda** (e cores) sobre a **mesma base**.
+  - Animais citados como exemplo: tartaruga, raposa, cachorro. Os 6 da prancha + tartaruga = referência, **não** lista fechada.
+- **Emenda:**
+  - **DEC-089 / DEC-097:** **R6 continua** (6 partes, juntas R6). Muda o corpo: deixa de ser o corpo R6 clássico e passa a ser **malha custom R6 do projeto**.
+  - **`style-guide.md` §4.1** (Aprovado, DEC-126), opção A ("cabeça clássica R6 + decal de rosto", "proporção R6 fixa") e §1.1 ("o toy do personagem vem de cor chapada por parte do corpo, não de corpo custom"): para quem usar o rig novo, vale a **base custom**. Onde o texto aprovado não convive com a base nova, vale esta DEC.
+- A prancha é **referência**, não modelo aprovado. Corpo base e cada animal precisam de ficha `AST-###` **Aprovada** antes de modelar (regra da Fase 0, `CLAUDE.md`). Próximo passo: art-director escreve a ficha do corpo base (Rascunho) → usuário aprova → modeler-3d.
+- Inspiração, não cópia: nenhum personagem, logo ou marca de terceiros. O desenho do avental vira decal original (`Q-143`).
+- **Não decidido** (não bloqueante; recomendação do agente em cada Q):
+  - Quem usa o rig animal (crew jogável, clientes NPC, personagens com nome, todos) e se o jogador deixa de usar o avatar próprio do Roblox → **`Q-141`**. Recomendação: crew jogável primeiro; clientes NPC seguem o plano atual até decisão (as anomalias dependem do padrão dos clientes, DEC-010).
+  - Cada animal é uma classe (`CLS-###`) ou só visual → **`Q-142`**.
+  - Logo do avental e do carrinho → **`Q-143`** (decal do AST-072).
+  - Proporção, escala, rosto, orçamento e técnica do corpo base → **`Q-144`**.
+- Impacto:
+  - `art/style-guide.md` cabeçalho e §4.1 (nota da emenda) → secretário (feito); texto do §4 → **art-director** (depois de `Q-141` e `Q-144`).
+  - `art/asset-list.md`: fichas novas (corpo base; peças por animal) → **art-director**; nota no AST-073 → secretário (feito).
+  - `design/classes.md` (`Q-142`), `design/npcs.md` (`Q-141`), `story/characters.md` (CHR-002 e personagens com nome, `Q-141`): nota da DEC → secretário (feito); conteúdo → donos.
+  - **architect:** personagem custom no lugar do avatar (se `Q-141` confirmar), T25 (`CharacterAutoLoads = false`), ragdoll R6 (T22).
+  - `docs/README.md` → secretário.
+
+---
+
+Origem das DEC-146 e DEC-147: questionário do orquestrador ao usuário, 2026-10-10, sobre `Q-141` e `Q-142` (DEC-145). Opções escolhidas pelo usuário: "**Jogador vira animal**" (Q-141) e "**Classe por animal**" (Q-142). Personagens com nome **não** estavam entre as opções.
+
+### DEC-146 — 2026-10-10 — Jogador vira animal da HotDog Crew; sem avatar próprio do Roblox (Q-141, opção A; emenda DEC-097, DEC-088 e CHR-002)
+
+- Decidido pelo usuário:
+  - A **crew jogável é animal**: cada jogador joga com um animal da HotDog Crew (DEC-145) e **escolhe o bicho**.
+  - O jogador **deixa de usar o próprio avatar do Roblox**. O personagem é o do projeto: corpo base R6 custom + peças do animal + uniforme da crew.
+  - **Clientes NPC** seguem o plano atual (humanos R6, style guide §4.1/§4.2, DEC-089) **por enquanto**. Motivo: o padrão dos clientes sustenta as anomalias (DEC-010; ANM-001, ANM-004, ANM-007).
+- **Não decidido** (não estava nas opções): personagens com nome (Walt, Opal, Quentin, Pickett, Raincoat Lady, médicos) — humanos ou animais → **`Q-146`**. Até decisão, as fichas CHR e AST deles **não mudam** (humanos R6). Mundo misto (crew animal, clientes humanos) vale até lá.
+- Onde e quando o jogador escolhe o bicho: amarrado à classe (DEC-147) → proposta do game-designer em **`Q-145`**.
+- **Emenda:**
+  - **DEC-097:** "avatares dos jogadores em R6 (o jogo força R6)" → o jogador usa o **personagem R6 custom do projeto**, não o avatar. Continua: **sem braços** em 1ª pessoa, câmera padrão do Roblox travada, só a Tool aparece na mão.
+  - **DEC-088:** "party se vê" continua; os colegas veem o **animal da crew** de cada um, não o avatar Roblox.
+  - **DEC-145:** fecha "quem usa o rig animal" para os jogadores.
+  - Texto de **CHR-002** ("usa o avatar Roblox do próprio jogador"; "avatar + avental por cima") e do **style guide §4.1** ("Jogadores: usam o avatar do próprio Roblox… a arte não controla roupa") e **§4.5** ("colegas veem o avatar R6 inteiro") deixam de valer nesses pontos. Vale esta DEC até os donos reescreverem.
+- Responde e fecha `Q-141` (sub-pergunta (a): sim, o jogador perde o avatar; sub-pergunta (b), uniforme do Walt → `Q-146`).
+- Impacto (por dono):
+  - **art-director:** `art/style-guide.md` §4.1 (parágrafo "Jogadores"), §4.5 (colegas veem o animal; cabeça maior e altura do olho na 1ª pessoa → `Q-144`), §4.6 (ragdoll e desmaio com o corpo custom); `asset-list.md`: fichas novas do corpo base do jogador e das peças por animal; **AST-073** deixa de ser "acessório por cima do avatar" e vira **uniforme da crew** (parte do personagem; logo `Q-143`); **AST-053** fica só para **NPCs** (base R6 de plataforma + decals), o corpo do jogador é ficha nova; **AST-069** animações valem para o rig custom (mesmas juntas R6).
+  - **narrative-writer:** `story/characters.md` CHR-002 (papel, câmera, aparência: animal da crew + uniforme); textos que citam "avatar" do jogador em `story/script.md`, `story/world.md`, `story/ui-text.md`.
+  - **architect:** `tech/architecture.md` §1.1 (linha "Avatar: R6 forçado" → personagem custom), cutscene com "avatares visíveis" (§1, §11, linha 676), `tech/content-data.md` (marcas para 1–4 personagens; tabela de animais): troca de personagem por **StarterCharacter custom** (ou montagem pelo `CharacterService`, junto com T25 `CharacterAutoLoads = false`), **Humanoid R6**, **sem aparência do jogador** (sem `HumanoidDescription` do avatar), animal e uniforme por dados; ragdoll T22 e Tool (`RightGripAttachment`) no rig custom. Técnica nova entra na lista da `Q-130` como Provisória.
+  - **game-designer:** `design/features.md` (citações de avatar), `design/npcs.md` (nota: clientes seguem humanos), escolha do animal (com `Q-145`).
+  - **level-designer:** `levels/MAP-01.md` (citações de avatar; escala e olho dependem de `Q-144`).
+  - `vision.md` (citação de avatar) → secretário na próxima revisão do documento.
+  - `open-questions.md`, `README.md`, notas em `style-guide.md`, `characters.md`, `npcs.md`, `asset-list.md`, `architecture.md` → secretário (feito).
+
+### DEC-147 — 2026-10-10 — Cada animal da crew é uma classe (CLS-###) com habilidade própria (Q-142, opção B)
+
+- Decidido pelo usuário: **cada animal = uma classe** `CLS-###`, com **habilidade própria**. Escolher o animal é escolher a classe.
+- O **game-designer** propõe o desenho das classes por animal (opções com recomendação, como **Rascunho**); o **usuário decide depois**.
+- **Não revoga** nenhuma DEC de classe. As regras aprovadas seguem valendo até o usuário decidir a proposta. Conflitos a resolver na proposta (game-designer + usuário) → **`Q-145`**:
+  - **DEC-069:** 8 classes (CLS-001 a CLS-008) com nomes e fantasias **humanas** (Rookie, Runner, Line Cook…); 4 no MVP. Os animais da prancha são 6 (+ tartaruga), e DEC-145 diz que a lista de animais **não é fechada**: nº de animais fica preso ao nº de classes.
+  - **DEC-069:** Rookie grátis e neutro é a régua → qual animal é o grátis e sem efeito.
+  - **DEC-069 / DEC-070:** classes pagas com **gemas** (45 / 120 / 180) → animais passam a ser comprados com gemas; jogador novo só tem 1 animal.
+  - **DEC-061:** classe é **bônus de atributo** (passivo). "Habilidade própria" pode ser lida como o efeito passivo atual ou como **habilidade ativa** (verbo novo) → confirmar. Leitura do secretário: bônus de atributo, para não sair de DEC-061; habilidade ativa exige DEC nova.
+  - **DEC-069:** teto ±12% de lucro/min, nenhuma classe mexe em regra de anomalia, repetir classe na party permitido (2 jogadores com o mesmo animal) → seguem valendo.
+  - **DEC-081** (sem XP) e **DEC-062** (monetização adiada; animal pago com Robux = classe paga, guarda contra pay-to-win de DEC-069) → seguem valendo.
+- Responde e fecha `Q-142` (sugestão anterior do secretário, "só visual", **não** foi escolhida).
+- Impacto:
+  - `design/classes.md`: nota desta DEC → secretário (feito); desenho das classes por animal → **game-designer** (depois desta DEC).
+  - **art-director:** lista de animais e peças por animal depende da proposta (`Q-145`); fichas novas só depois.
+  - **architect:** `tech/content-data.md` / `data.md` (classe ↔ animal; o animal comprado é o desbloqueio de classe já persistido).
+  - **narrative-writer:** nomes e fantasias das classes (DEC-061 diz que nomes são placeholders).
+
+---
+
+Origem das DEC-148 a DEC-150: mensagem do usuário, 2026-10-10, transcrição de voz literal:
+
+> "Não esquece também da questão do personagem das custom rigs, tá? Se você olhar na imagem também, eles vão ter texturas como roupas, etc. E eu quero fazer tanto o personagem para os players que vão jogar com eles, quanto os personagens que vão andar na rua também, né? Os outros bichos. E aí vão ter variantes de dia, eles vão ser bem fofinhos e bonitos e tal, e de noite eles vão ser um pouco mais assustadores, né? Mas isso vai ser mais a parte da textura mesmo."
+
+"A imagem" = `Assets/reference/customrig.png` (DEC-145).
+
+### DEC-148 — 2026-10-10 — Personagens da HotDog Crew usam textura para roupa e detalhes (exceção de personagem à DEC-105/DEC-136)
+
+- Decidido pelo usuário: os personagens da HotDog Crew (DEC-145) têm **textura** para roupa e detalhes, como na prancha:
+  - camisa, avental com logo, calça, rosto, pelagem.
+- **Exceção só para personagem** à regra "sem textura pintada" de **DEC-105**, **DEC-136** e `style-guide.md` §1.1/§6 ("proibido ruído/sujeira pintada").
+  - **Cenário e props:** a regra segue valendo (atlas de cor dos packs, sem textura pintada).
+- **Emenda:** `style-guide.md` §4.1 (Aprovado, DEC-126), opção A "cor por parte + acessórios de atlas + decals", e §4.1 "cada acessório usa o atlas do projeto, sem textura própria": **não vale** para a crew. Para clientes, ver DEC-149 e `Q-149`.
+- **Não decidido:**
+  - **Orçamento de textura de personagem** (resolução por peça, nº de texturas, memória dentro dos 24 MB / teto 30 MB de §9.2; a opção B de §4.1 já estimava ~1,3 MB por textura e "estoura o orçamento") → pendência do **art-director** em `style-guide.md` §9.3, anotada em **`Q-144`** (item g).
+  - Técnica (textura por `SurfaceAppearance`/`TextureID` da MeshPart custom × `Shirt`/`Pants` clássico): art-director + architect, em `Q-144`.
+- Impacto:
+  - **art-director:** `style-guide.md` §1.1 (nota da exceção), §4.1, §6, §9.3 (linha nova "textura de personagem"); fichas do corpo base e dos animais (AST novas) com textura; **AST-073** (uniforme) passa a ser textura no corpo, não acessório de atlas.
+  - **modeler-3d:** UV do corpo base pensado para textura de roupa (depois da ficha Aprovada).
+  - **architect:** memória de textura por personagem no orçamento (`tech/architecture.md`).
+  - `style-guide.md` cabeçalho, `asset-list.md`, `README.md` → secretário (feito).
+
+### DEC-149 — 2026-10-10 — Clientes e pedestres também são animais ("os outros bichos"); emenda DEC-146
+
+- Decidido pelo usuário: os **personagens que andam na rua** (clientes e pedestres NPC) **também são animais**, feitos com o mesmo sistema de custom rig da crew (DEC-145). Não só o jogador.
+- **Emenda DEC-146** na parte "**clientes NPC seguem humanos R6** por enquanto". O resto da DEC-146 segue (jogador é animal da crew, sem avatar do Roblox).
+- **Nada revogado por conta do secretário.** Ficam em conflito, valendo esta DEC onde o texto não convive com ela, até os donos reescreverem:
+
+  | Onde | O que diz hoje | Conflito |
+  |---|---|---|
+  | DEC-010 | clientes normais repetitivos para criar padrão | **não conflita**: o padrão continua, agora com animais; os tipos precisam seguir repetitivos |
+  | `story/anomalies.md` (Aprovado, DEC-073) | ANM-001 blank folks (rosto liso), ANM-004 copies (lado espelhado), ANM-005 Raincoat Lady (senhora de capa), ANM-007 Walker (figura humana alta) | descrevem humanos; regras e verbos não mudam sem DEC; adaptação → **`Q-147`** |
+  | `design/npcs.md` | NPC-001 a NPC-006, NPC-019, NPC-021: tipos de cliente humanos (escritório, estudante, corredor, operário, avô/avó, plantão noturno, pedestre) | cada tipo vira animal? qual animal por tipo? → **`Q-149`** |
+  | `style-guide.md` §4.1 opção A, §4.2, §2.4, §4.4 | NPC = R6 clássico, cor por parte, 8 decals de rosto humano; traços reservados ("todo NPC normal tem olhos e boca", "nenhum NPC normal maior que o R6 padrão") | base vira o corpo custom; traços reservados precisam de versão animal → art-director, com `Q-147`/`Q-149` |
+  | `story/characters.md`, personagens com nome | Walt, Opal, Quentin, Pickett, Raincoat Lady, médicos humanos | **segue em `Q-146`** (não decidido aqui); Pickett e Raincoat Lady são âncoras de anomalia → ligados a `Q-147` |
+  | `art/asset-list.md` AST-053 | base R6 de plataforma + decals para NPC | NPC passa a usar o corpo custom; AST-053 a rever (art-director) |
+  | `tech/architecture.md` T11 | NPC R6 com Humanoid no servidor, pool de 12 | rig custom também nos NPCs; mesmo pool (architect) |
+
+- Responde em parte `Q-146` (os personagens **sem nome** são animais; os **com nome** seguem em aberto).
+- Impacto (por dono):
+  - **game-designer:** `design/npcs.md` (tipos de cliente animais; `Q-149`); regras de anomalia com clientes animais (`Q-147`, com narrative-writer).
+  - **narrative-writer:** `story/anomalies.md` (proposta de adaptação, Rascunho; volta ao usuário porque o doc é Aprovado), `characters.md`, `world.md` (mundo de animais).
+  - **art-director:** `style-guide.md` §2.4, §4.1, §4.2, §4.4; fichas de cliente (AST-053 e novas); ator do Walker (AST-064) e Raincoat Lady.
+  - **architect:** T11 com rig custom; `content-data.md` (tabela de tipo de cliente ganha animal/textura).
+  - Notas em `npcs.md`, `characters.md`, `anomalies.md` (cabeçalho), `style-guide.md`, `asset-list.md`, `open-questions.md`, `README.md` → secretário (feito).
+
+### DEC-150 — 2026-10-10 — Personagens com variante de dia (fofos) e de noite (um pouco assustadores), por troca de textura
+
+- Decidido pelo usuário: os personagens animais têm **variante de dia** e **variante de noite**.
+  - **Dia:** bem fofos e bonitos.
+  - **Noite:** "um pouco mais assustadores".
+  - A diferença é **principalmente de textura** ("mais a parte da textura mesmo"): **mesma malha**, textura trocada.
+- Liga a **DEC-010** (dia confortável, noite de risco) e **DEC-038** (terror psicológico). A cidade muda à noite por luz; agora **os personagens também mudam, por textura**.
+- **Conferência com `style-guide.md` §2.3** ("a noite **não troca o modelo nem a textura**; a mesma cidade muda por iluminação e pós-processo"): o texto fala da **cidade**. **Sem conflito para cenário e props**, que seguem sem troca. Para **personagens**, vale esta DEC (exceção anotada no §2.3).
+- Limite: **DEC-023** (infantojuvenil, sem violência) e o teto de intensidade de §4.4 (sem sangue, ferimento, dente exposto, olho fora do lugar) seguem valendo.
+- **Não decidido** (não bloqueante, recomendação em cada Q):
+  - Intensidade do "assustador" → **`Q-148`**.
+  - Quem tem variante de noite (clientes/pedestres; crew jogável também?) → **`Q-148`** (b).
+  - Como a variante de noite convive com as anomalias (o normal da noite não pode parecer anomalia; traços reservados de §2.4) → **`Q-147`** (c).
+  - Memória: variante de noite **dobra** as texturas de personagem → orçamento em `Q-144` (g).
+- Impacto:
+  - **art-director:** `style-guide.md` §2.3 (exceção de personagem), §4 (variante dia/noite por personagem), §9.3; fichas com 2 texturas por personagem.
+  - **architect:** troca de textura na virada do turno (por dados; quem troca: client ou servidor; carregamento prévio para não piscar).
+  - **game-designer / narrative-writer:** leitura das anomalias com clientes noturnos (`Q-147`).
+  - Notas em `style-guide.md`, `README.md`, `open-questions.md` → secretário (feito).
