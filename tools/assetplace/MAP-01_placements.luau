@@ -178,7 +178,8 @@ return {
 	{ asset = "AST-015_BunCrate", x = 40, y = 3.45, z = 37.5, rotY = 180, group = "Cart", id = "CART-B", layer = "day", replaces = { "Pad/CART/4_B_Bun" } },
 	{ asset = "AST-014_CuttingBoard", x = 42.5, y = 3.45, z = 37.5, rotY = 180, group = "Cart", id = "CART-T", layer = "day", replaces = { "Pad/CART/5_T_Board" }, note = "knife edge towards the operator" },
 	{ asset = "AST-017_ToppingGrid", x = 47, y = 3.45, z = 37.5, rotY = 0, group = "Cart", id = "CART-K", layer = "day", replaces = { "Pad/CART/6_K_Toppings", "Pad/CART/Lid_Ketchup", "Pad/CART/Lid_Mustard", "Pad/CART/Lid_Cheese", "Pad/CART/Lid_Bacon", "Pad/CART/Lid_PotatoSticks", "Pad/CART/Lid_CreamCheese" }, note = "rotY 180: front row F (Ketchup X45, Mustard X47, Cheese X49) on the queue side, as MAP-01 7.1" },
-	{ asset = "AST-016_SauceHolder", x = 46, y = 3.60, z = 36.75, rotY = 0, group = "Cart", id = "CART-K-SAUCE", layer = "day", replaces = {}, note = "sits on grid cells F1 (Ketchup, X45) + F2 (Mustard, X47); bottles go on Att_Bottle_* at runtime" },
+	-- 2026-10-10: sauce holder removed; Ketchup/Mustard are steel bowls in the grid (user request)
+	-- { asset = "AST-016_SauceHolder", x = 46, y = 3.60, z = 36.75, rotY = 0, group = "Cart", id = "CART-K-SAUCE", layer = "day", replaces = {}, note = "sits on grid cells F1 (Ketchup, X45) + F2 (Mustard, X47); bottles go on Att_Bottle_* at runtime" },
 	{ asset = "AST-020_CashRegister", x = 52, y = 3.45, z = 37.5, rotY = 0, group = "Cart", id = "DRAWER", layer = "day", replaces = { "Pad/CART/7_H_Delivery", "Pad/CART/DRAWER" }, note = "delivery stand X 50..52, drawer X 52.4..54; keep the DRAWER tag visible" },
 	{ asset = "AST-042_VehiclePhone", part = { "Phone_Cart", "Cart_Body", "Cart_Cord", "Cart_Handset", "Cart_Lamp", "Lid" }, x = 47.5, y = 4.65, z = 36.84, rotY = 180, group = "Cart", id = "CART-PHONE", layer = "day", replaces = {}, note = "Att_Mount on Mount_Phone (Parasol_E pole); intersects the sauce holder ~0.8" },
 	{ asset = "AST-025_Trashcan", x = 56, y = 0.45, z = 42, rotY = 90, group = "Cart", id = "BIN-C", layer = "day", replaces = { "Pad/BIN-C" }, note = "Mount_Trash rotY 90 would point the pedal east; 270 = pedal to the corridor" },
@@ -193,7 +194,8 @@ return {
 	{ asset = "AST-015_BunCrate", x = 40, y = 5.95, z = 37.5, rotY = 180, group = "Trailer", id = "TRL-B", layer = "night", replaces = {} },
 	{ asset = "AST-014_CuttingBoard", x = 42.5, y = 5.95, z = 37.5, rotY = 180, group = "Trailer", id = "TRL-T", layer = "night", replaces = {} },
 	{ asset = "AST-017_ToppingGrid", x = 47, y = 5.95, z = 37.5, rotY = 0, group = "Trailer", id = "TRL-K", layer = "night", replaces = {} },
-	{ asset = "AST-016_SauceHolder", x = 46, y = 6.10, z = 36.75, rotY = 0, group = "Trailer", id = "TRL-K-SAUCE", layer = "night", replaces = {} },
+	-- 2026-10-10: sauce holder removed; Ketchup/Mustard are steel bowls in the grid (user request)
+	-- { asset = "AST-016_SauceHolder", x = 46, y = 6.10, z = 36.75, rotY = 0, group = "Trailer", id = "TRL-K-SAUCE", layer = "night", replaces = {} },
 	{ asset = "AST-020_CashRegister", x = 52, y = 5.95, z = 37, rotY = 0, group = "Trailer", id = "TRL-DRAWER", layer = "night", replaces = {} },
 	{ asset = "AST-042_VehiclePhone", part = { "Phone_Trailer", "Trailer_Cord", "Trailer_Handset", "Trailer_Lamp" }, x = 30.7, y = 7.72, z = 36.28, rotY = 180, group = "Trailer", id = "TRL-PHONE", layer = "night", replaces = {}, note = "trailer variant sits 2.2 off the FBX origin; its back lands on Mount_Phone (28.5, 8.45, 36), front wall" },
 	{ asset = "AST-022_CoffeeMachine", x = 40, y = 5.95, z = 44, rotY = 0, group = "Trailer", id = "TRL-COFFEE", layer = "night", replaces = {} },
