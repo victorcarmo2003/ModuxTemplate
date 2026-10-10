@@ -1946,3 +1946,77 @@ Origem das DEC-148 a DEC-150: mensagem do usuário, 2026-10-10, transcrição de
   - **architect:** troca de textura na virada do turno (por dados; quem troca: client ou servidor; carregamento prévio para não piscar).
   - **game-designer / narrative-writer:** leitura das anomalias com clientes noturnos (`Q-147`).
   - Notas em `style-guide.md`, `README.md`, `open-questions.md` → secretário (feito).
+
+---
+
+Origem das DEC-151 e DEC-152: mensagem do usuário ao orquestrador, 2026-10-10, ao ver a entrega do modeler-3d (corpo base com rig, roupas texturizadas `AST-053_CrewTex`, cabeças modeladas `AST-053_Animal_*`). Transcrição de voz, **literal** (o "[...]" é corte do orquestrador):
+
+> "Olha, a roupa de todas as personagens e a rig ficou bem legal. Porém, eu tenho um problema maior com relação à cabeça. Ao invés de fazer tudo modelado, incluindo os olhos, eu queria algo mais texturizado na região da cabeça. A cabeça não precisa ser quadrada, igual você fez aí agora, ela pode seguir mais a referência que eu tinha mandado lá na foto, [...] E ela pode ser mais texturizada, então, por exemplo, você pode fazer uma única malha, fazer o volume para frente do, simbolizando a parte do nariz dele e tal, uma parada talvez um pouco mais oval, não sei. E aí na parte do nariz a gente texturiza, a parte dos olhos texturiza também. Porque assim a gente pode criar algumas variações de textura. A gente faz a textura onde ele tá normal, onde ele tá feliz, onde ele tá sorridente. A gente pode fazer uma textura onde tem, por exemplo, um X na boca ou um X nos olhos, né? Então, uma textura onde ele tem a boca triste, um X nos olhos representando, por exemplo, ele desmaiou ou algo do tipo, entende? A gente pode trabalhar um pouco mais a textura. Acho que fica até melhor nesse sentido, porque fica mais cartonizado."
+
+Leitura: "a referência que eu tinha mandado lá na foto" = `Assets/reference/customrig.png` (DEC-145). "Cartonizado" = **cartunizado**.
+
+### DEC-151 — 2026-10-10 — Roupas texturizadas e rig R6 do HotDog Crew aprovados (modelo entregue)
+
+- Aprovado pelo usuário ("a roupa de todas as personagens e a rig ficou bem legal"):
+  - **Roupas texturizadas** do corpo base: `Assets/blender/character/AST-053_CrewTex.blend` → `Assets/models/character/AST-053_CrewTex.fbx` (camisa, avental, calça; DEC-148).
+  - **Rig R6 custom** do corpo base: `AST-053_CrewBase.blend` / `.fbx` e juntas em `AST-053_CrewBase_joints.json` (DEC-145).
+- Vale para **todos os animais** entregues (a roupa e a rig são comuns).
+- **Não aprovado aqui:** as **cabeças** `AST-053_Animal_*` (substituídas pela DEC-152); orelhas e caudas seguem como entregues, sem aprovação nem recusa explícita.
+- **Ficha:** o texto da ficha AST-053 em `art/asset-list.md` ainda descreve a base R6 humana com decals (anterior a DEC-145/DEC-149) e **segue Rascunho**. Esta DEC aprova o **modelo entregue** (roupa e rig), não o texto antigo. Quando o art-director reescrever a ficha da crew, roupa e rig podem ir a **Aprovado** citando esta DEC.
+- Não muda: proporção, orçamento de tris/textura e técnica seguem em `Q-144` (a, d, f, g).
+- Impacto:
+  - **art-director:** reescrever a ficha AST-053 (ou ficha nova do corpo base da crew) com roupa e rig aprovados.
+  - **modeler-3d:** roupa e rig congelados; mudança só com motivo técnico registrado.
+  - Notas em `asset-list.md`, `README.md` → secretário (feito).
+
+### DEC-152 — 2026-10-10 — Cabeças dos animais: malha única oval com focinho; olhos, nariz e boca por textura; expressões por troca de textura
+
+- Decidido pelo usuário:
+  - A **cabeça de cada animal** é **uma malha única**, **arredondada/oval** (não quadrada), seguindo a prancha `Assets/reference/customrig.png`.
+  - A malha tem **volume para a frente** que forma o **focinho/nariz**.
+  - **Olhos, nariz e boca** são **textura**, não modelados.
+  - **Expressões por troca de textura.** Lista inicial (aberta para outras):
+
+    | Expressão | Leitura |
+    |---|---|
+    | Normal | padrão |
+    | Feliz | contente |
+    | Sorridente | sorriso aberto |
+    | Triste | boca triste |
+    | Desmaiado | **X nos olhos** e/ou **X na boca** |
+
+  - Estilo **mais cartunizado**.
+- **Substitui** as cabeças modeladas entregues antes: `Assets/blender/character/AST-053_Animal_{Dog,Cat,Rabbit,Fox,Bear,Panda,Turtle,Owl}.blend` (cabeça quadrada, olhos modelados). **Orelhas e caudas seguem** (DEC-145).
+- Consistente com **DEC-148** (rosto por textura).
+- **Solução técnica — proposta do agente, Provisória, NÃO decidida pelo usuário:**
+  - Cabeça **por animal**, com marcas próprias na textura (pelagem principal pela cor da peça/alfa).
+  - Sobre ela, uma **"casca de rosto"** fina com **UV padronizado igual em todos os animais**, para que **uma textura de expressão sirva para todos**.
+  - Trocar expressão = trocar o `TextureID` da casca.
+  - Dono: **art-director** (+ architect para a troca em jogo e memória). Fica em `Q-144` (h) até virar ficha Aprovada.
+- **Ligações:**
+
+  | Com | Leitura |
+  |---|---|
+  | DEC-150 (variante noite por textura) | expressões têm versão noite? → **`Q-150`** (não bloqueante) |
+  | DEC-091 (desmaio por sanidade zerada) | usa a expressão **Desmaiado** |
+  | DEC-103 / DEC-095 (atropelamento pastelão) | **X nos olhos** combina com o tom pastelão; uso no ragdoll a definir pelo game-designer |
+  | DEC-023 (sem violência) / `style-guide.md` §4.4 | expressões seguem o teto: sem sangue, ferida, dente exposto, olho fora do lugar |
+  | `style-guide.md` §4 (Aprovado, DEC-126) | §4.1 "cabeça clássica R6 + decal de rosto" já não valia para a crew (DEC-145); agora a cabeça é malha oval + textura de expressão |
+  | AST-053, AST-071 | retratos e ícones podem usar as expressões |
+  | `Q-144` (b) rosto modelado ou decal | **respondido**: focinho é volume na malha; olhos, nariz e boca por textura |
+  | `Q-147` (blank folks = animal sem rosto) | com focinho modelado, "sem rosto" = casca sem olhos/nariz/boca, volume do focinho fica; art-director confere a leitura |
+
+- Não decidido:
+  - Lista final de expressões e **quando cada uma aparece** (evento → expressão) → game-designer (+ narrative-writer), sem voltar ao usuário salvo regra nova.
+  - Resolução da textura de expressão e da cabeça → `Q-144` (g).
+- Critério de aceite (da direção, para a ficha):
+  - Cabeça sem arestas de caixa; silhueta oval com focinho saliente, comparável à prancha.
+  - Nenhum olho, nariz ou boca modelado.
+  - Trocar a expressão não troca a malha.
+  - Expressão legível no celular (distância de leitura a fixar pelo art-director na ficha).
+- Impacto:
+  - **art-director:** ficha da cabeça por animal e das texturas de expressão; `style-guide.md` §4 (cabeça oval + expressão por textura), §4.4 (teto vale para expressões), §9.3 (memória).
+  - **modeler-3d:** refazer as 8 cabeças (malha oval com focinho, UV para textura) **depois da ficha Aprovada**; orelhas e caudas reaproveitadas.
+  - **architect:** troca de expressão por `TextureID` (client ou servidor; pré-carregar para não piscar); conta de memória.
+  - **game-designer:** tabela evento → expressão (desmaio, atropelamento, pedido completo/errado).
+  - Notas em `style-guide.md`, `asset-list.md`, `open-questions.md`, `README.md` → secretário (feito).

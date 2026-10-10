@@ -123,6 +123,8 @@ Mapeamento Kenney/KayKit por ficha (DEC-136, Rascunho): `asset-sourcing.md`. As 
 
 **DEC-148 a DEC-150 (2026-10-10):** personagens da crew com **textura** de roupa/rosto/pelagem (exceção de personagem a DEC-105/DEC-136; orçamento `Q-144` g). **Clientes e pedestres também são animais** (DEC-149, emenda DEC-146): AST-053/054 a rever pelo art-director (`Q-149`); atores de anomalia de cliente `Q-147`. Personagem com **textura de dia e de noite**, mesma malha (DEC-150, `Q-148`).
 
+**DEC-151 e DEC-152 (2026-10-10):** **roupa texturizada** (`AST-053_CrewTex`) e **rig R6** do corpo base (`AST-053_CrewBase`) **aprovados** como modelo entregue (DEC-151; texto da ficha AST-053 segue Rascunho até a reescrita). **Cabeças** `AST-053_Animal_*` **substituídas** (DEC-152): malha única oval com focinho em volume, olhos/nariz/boca por textura, expressões por troca de textura (normal, feliz, sorridente, triste, desmaiado com X); orelhas e caudas seguem. Técnica "casca de rosto com UV padrão" Provisória (`Q-144` h); versão noite das expressões `Q-150`. Retratos e ícones (AST-071) podem usar as expressões.
+
 Mapa anomalia → asset (DEC-096): ANM-001 AST-060 · ANM-002 AST-061 · ANM-003 AST-044 (estados do relógio) · ANM-004 AST-062 (+ AST-055) ·
 ANM-005 AST-059 · ANM-006 AST-063 (+ AST-045) · ANM-007 AST-064 (+ AST-036) · ANM-008 AST-065 · ANM-009 AST-066 · ANM-010 AST-067 (+ AST-036, AST-028).
 
@@ -754,6 +756,8 @@ Regras gerais: style guide §4 (opção A: `BodyColors` + acessórios de atlas +
 - **Regra:** todo rosto normal tem olhos e boca (ANM-001).
 - **DEC-146 (2026-10-10):** esta base fica **só para NPCs humanos** (clientes; personagens com nome até `Q-146`). O jogador **não** usa esta base nem o avatar do Roblox: corpo base R6 custom da crew + peças por animal = **fichas novas** (art-director; `Q-144`, `Q-145`).
 - **DEC-149 (2026-10-10, emenda DEC-146):** clientes e pedestres **também são animais**. "Só para NPCs humanos" acima não vale para clientes/pedestres; esta ficha a rever (provável: mesmo corpo base da crew + roupa de civil; `Q-149`). Textura dia/noite: DEC-148, DEC-150.
+- **DEC-151 (2026-10-10):** modelo entregue aprovado: **roupa texturizada** `AST-053_CrewTex` e **rig R6** `AST-053_CrewBase` (+ `_joints.json`). O texto desta ficha (base humana com decals) segue Rascunho até o art-director reescrevê-lo para a crew.
+- **DEC-152 (2026-10-10):** cabeças `AST-053_Animal_{Dog,Cat,Rabbit,Fox,Bear,Panda,Turtle,Owl}` **substituídas**: malha única **oval** com **focinho em volume** (ref. `customrig.png`), **olhos, nariz e boca por textura**, **expressões por troca de textura** (normal, feliz, sorridente, triste, desmaiado com X; lista aberta). Orelhas e caudas seguem. "8 rostos neutros + 3 de reação" acima vira o conjunto de expressões da crew/clientes (art-director). Técnica Provisória: casca de rosto com UV padrão comum a todos os animais, troca por `TextureID` (`Q-144` h). Versão noite: `Q-150`.
 
 ### AST-054 — Clientes normais e pedestre (7 tipos × 4 variantes)
 

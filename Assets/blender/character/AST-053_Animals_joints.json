@@ -5,7 +5,7 @@
   "2026-10-10 round heads: Head_<Animal> is a single smooth mesh (oval, snout/beak volume, no modelled eyes/nose/mouth), base still at y=3.95 (Neck at the torso top), top at y=6.00 (old 5.70). Neck.C0 stays R6 standard; Neck.C1 below is per animal.",
   "Cap line raised +0.30: HatAttachment and EarLeft/EarRightAttachment are 0.30 higher than on the old box head, so Cap / Cap_EarsUp (files unchanged) and ears ride up with them. Cap: Dog and Turtle use the base Cap (AST-053_CrewCap.fbx); all others Cap_EarsUp (AST-053_CrewCap_EarsUp.fbx).",
   "Head_<Animal> UV (ONLY channel, 'UVMap') = T_Head_<Animal>.png / _Night.png, 512x512: alpha 0 = main fur (MeshPart.Color = fur), opaque texels = marks (muzzle, blaze, patches, mask, facial disc...). MeshPart.TextureID works (alpha shows Color).",
-  "Face_<Animal> = thin shell over the front of the head (offset 0.012 along the normals), its own MeshPart, Accessory welded by FaceFrontAttachment. ONLY UV channel = standard frontal projection shared by all animals: u = 0.5 - 0.38*x (image left = viewer's left), v(from top) = 0.42 + 0.38*(4.80 - y) (x, y = Roblox character space, character on y=0). Eyes at u 0.3245/0.6755 v 0.42, nose (snout tip) u 0.5 v 0.5195, mouth u 0.5 v 0.578. One T_Expr_* sheet serves the 8 animals.",
+  "Face_<Animal> = thin shell over the FRONT of the head only (head faces whose flat normal . front >= 0.50, below the cap, |x| <= 1.20; offset 0.012 along the normals), its own MeshPart, Accessory welded by FaceFrontAttachment. ONLY UV channel = standard frontal projection v2 shared by all animals (2026-10-10 eye fix): u = 0.5 - 0.40*x (image left = viewer's left), v(from top) = 0.30 + 0.40*(4.83 - y) (x, y = Roblox character space, character on y=0). Eyes at u 0.34/0.66 v 0.30 (world x +-0.40, y 4.83, ovals 0.165 x 0.237), nose (snout tip) u 0.5 v 0.418 (y 4.536), mouth u 0.5 v 0.472 (y 4.40). One T_Expr_* sheet serves the 8 animals.",
   "Face_<Animal> needs real transparency: use a SurfaceAppearance (AlphaMode = Transparency, ColorMap = T_Expr_*). SurfaceAppearance maps are not script-writable at runtime: keep one prebuilt SurfaceAppearance per expression (ReplicatedStorage) and swap it by parenting a clone into Face_<Animal>. Expressions: Normal, Happy, Smile, Sad, Fainted, Normal_Night (Assets/textures/character/face/).",
   "Ears_<Animal>, Tail_<Animal>, Shell_Turtle, Beak_Owl are Accessories: Handle = the MeshPart, one Attachment of the listed name/position/orientation inside it. Ears: one Handle with BOTH ears, welded by EarLeftAttachment (orientation 0,0,30 like the head's).",
   "Ears/Tail/Shell/Beak keep the KitchenPack atlas in UV channel 1 'UVMap' (restaurantbits_texture.png); channel 2 'UVPaint' unchanged."
@@ -17,10 +17,10 @@
     "pieces": {
      "Head_Dog": 440,
      "Ears_Dog": 152,
-     "Face_Dog": 136,
+     "Face_Dog": 112,
      "Tail_Dog": 46
     },
-    "character_total": 1566,
+    "character_total": 1542,
     "previous_head_tris": 564
    },
    "head": {
@@ -167,22 +167,22 @@
     },
     "Face_Dog": {
      "handle_size": [
-      2.4504,
-      1.3844,
-      1.065
+      2.3433,
+      1.2629,
+      0.8591
      ],
      "attachment": "FaceFrontAttachment",
      "attachment_position_in_handle": [
       0.0,
-      5.3195,
-      -1.2528
+      5.2588,
+      -1.1499
      ],
      "orientation": [
       0,
       0,
       0
      ],
-     "tris": 136,
+     "tris": 112,
      "surface_appearance": {
       "AlphaMode": "Transparency",
       "ColorMap": "face/T_Expr_Normal.png"
@@ -215,10 +215,10 @@
     "pieces": {
      "Head_Cat": 440,
      "Ears_Cat": 76,
-     "Face_Cat": 136,
+     "Face_Cat": 108,
      "Tail_Cat": 70
     },
-    "character_total": 1570,
+    "character_total": 1542,
     "previous_head_tris": 676
    },
    "head": {
@@ -365,22 +365,22 @@
     },
     "Face_Cat": {
      "handle_size": [
-      2.5222,
-      1.3844,
-      0.8667
+      2.3885,
+      1.2628,
+      0.5454
      ],
      "attachment": "FaceFrontAttachment",
      "attachment_position_in_handle": [
       0.0,
-      5.3195,
-      -1.3498
+      5.2588,
+      -1.1891
      ],
      "orientation": [
       0,
       0,
       0
      ],
-     "tris": 136,
+     "tris": 108,
      "surface_appearance": {
       "AlphaMode": "Transparency",
       "ColorMap": "face/T_Expr_Normal.png"
@@ -413,10 +413,10 @@
     "pieces": {
      "Head_Rabbit": 440,
      "Ears_Rabbit": 240,
-     "Face_Rabbit": 136,
+     "Face_Rabbit": 112,
      "Tail_Rabbit": 80
     },
-    "character_total": 1744,
+    "character_total": 1720,
     "previous_head_tris": 620
    },
    "head": {
@@ -563,22 +563,22 @@
     },
     "Face_Rabbit": {
      "handle_size": [
-      2.5449,
-      1.3844,
-      0.8764
+      2.3408,
+      1.263,
+      0.6706
      ],
      "attachment": "FaceFrontAttachment",
      "attachment_position_in_handle": [
       0.0,
-      5.3195,
-      -1.3448
+      5.2588,
+      -1.2419
      ],
      "orientation": [
       0,
       0,
       0
      ],
-     "tris": 136,
+     "tris": 112,
      "surface_appearance": {
       "AlphaMode": "Transparency",
       "ColorMap": "face/T_Expr_Normal.png"
@@ -611,10 +611,10 @@
     "pieces": {
      "Head_Fox": 440,
      "Ears_Fox": 108,
-     "Face_Fox": 136,
+     "Face_Fox": 112,
      "Tail_Fox": 94
     },
-    "character_total": 1626,
+    "character_total": 1602,
     "previous_head_tris": 432
    },
    "head": {
@@ -761,22 +761,22 @@
     },
     "Face_Fox": {
      "handle_size": [
-      2.5201,
-      1.3844,
-      1.168
+      2.3431,
+      1.263,
+      0.9623
      ],
      "attachment": "FaceFrontAttachment",
      "attachment_position_in_handle": [
       0.0,
-      5.3195,
-      -1.2135
+      5.2589,
+      -1.1106
      ],
      "orientation": [
       0,
       0,
       0
      ],
-     "tris": 136,
+     "tris": 112,
      "surface_appearance": {
       "AlphaMode": "Transparency",
       "ColorMap": "face/T_Expr_Normal.png"
@@ -809,10 +809,10 @@
     "pieces": {
      "Head_Bear": 440,
      "Ears_Bear": 232,
-     "Face_Bear": 136,
+     "Face_Bear": 112,
      "Tail_Bear": 64
     },
-    "character_total": 1720,
+    "character_total": 1696,
     "previous_head_tris": 460
    },
    "head": {
@@ -959,22 +959,22 @@
     },
     "Face_Bear": {
      "handle_size": [
-      2.4983,
-      1.3844,
-      1.067
+      2.3433,
+      1.2632,
+      0.8612
      ],
      "attachment": "FaceFrontAttachment",
      "attachment_position_in_handle": [
       0.0,
-      5.3195,
-      -1.2501
+      5.259,
+      -1.1472
      ],
      "orientation": [
       0,
       0,
       0
      ],
-     "tris": 136,
+     "tris": 112,
      "surface_appearance": {
       "AlphaMode": "Transparency",
       "ColorMap": "face/T_Expr_Normal.png"
@@ -1007,10 +1007,10 @@
     "pieces": {
      "Head_Panda": 440,
      "Ears_Panda": 160,
-     "Face_Panda": 136,
+     "Face_Panda": 108,
      "Tail_Panda": 64
     },
-    "character_total": 1648,
+    "character_total": 1620,
     "previous_head_tris": 532
    },
    "head": {
@@ -1157,22 +1157,22 @@
     },
     "Face_Panda": {
      "handle_size": [
-      2.5169,
-      1.3844,
-      0.9513
+      2.3433,
+      1.2628,
+      0.63
      ],
      "attachment": "FaceFrontAttachment",
      "attachment_position_in_handle": [
       0.0,
-      5.3195,
-      -1.3074
+      5.2588,
+      -1.1468
      ],
      "orientation": [
       0,
       0,
       0
      ],
-     "tris": 136,
+     "tris": 108,
      "surface_appearance": {
       "AlphaMode": "Transparency",
       "ColorMap": "face/T_Expr_Normal.png"
@@ -1204,11 +1204,11 @@
    "tris": {
     "pieces": {
      "Head_Turtle": 440,
-     "Face_Turtle": 152,
+     "Face_Turtle": 112,
      "Shell_Turtle": 160,
      "Tail_Turtle": 22
     },
-    "character_total": 1566,
+    "character_total": 1526,
     "previous_head_tris": 380
    },
    "head": {
@@ -1336,22 +1336,22 @@
    "accessories": {
     "Face_Turtle": {
      "handle_size": [
-      2.5738,
-      1.3845,
-      0.867
+      2.2456,
+      1.2627,
+      0.6602
      ],
      "attachment": "FaceFrontAttachment",
      "attachment_position_in_handle": [
       0.0,
-      5.3195,
-      -1.3799
+      5.2586,
+      -1.2765
      ],
      "orientation": [
       0,
       0,
       0
      ],
-     "tris": 152,
+     "tris": 112,
      "surface_appearance": {
       "AlphaMode": "Transparency",
       "ColorMap": "face/T_Expr_Normal.png"
@@ -1404,10 +1404,10 @@
      "Head_Owl": 440,
      "Beak_Owl": 30,
      "Ears_Owl": 60,
-     "Face_Owl": 136,
+     "Face_Owl": 112,
      "Tail_Owl": 132
     },
-    "character_total": 1646,
+    "character_total": 1622,
     "previous_head_tris": 408
    },
    "head": {
@@ -1573,22 +1573,22 @@
     },
     "Face_Owl": {
      "handle_size": [
-      2.4504,
-      1.3844,
-      0.7133
+      2.3728,
+      1.2629,
+      0.5075
      ],
      "attachment": "FaceFrontAttachment",
      "attachment_position_in_handle": [
       0.0,
-      5.3195,
-      -1.4263
+      5.2588,
+      -1.3234
      ],
      "orientation": [
       0,
       0,
       0
      ],
-     "tris": 136,
+     "tris": 112,
      "surface_appearance": {
       "AlphaMode": "Transparency",
       "ColorMap": "face/T_Expr_Normal.png"
