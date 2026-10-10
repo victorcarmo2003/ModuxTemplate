@@ -25,8 +25,8 @@
 --                 cooldown, not full; drink CoffeeDrinkTime s, +Restore of the Tool, Consume
 --
 -- Hooks left for other tasks (§19.0 rule 1, no Require back):
---   LightService (TASK-059)  looked up by name in OnStart (it is not in this build yet, so it cannot be in Require);
---                            without it every position counts as lit (no dark loss). "sanity dark on|off" forces it
+--   LightService (TASK-059)  in Require (architecture.md §19.2; Light does not require Vital, no cycle). IsLit is read
+--                            at tick time only; an error counts as lit (no dark loss). "sanity dark on|off" forces it
 --   AnomalyService (wave 3)  SeeAnomaly, Penalize
 --   TrafficService (wave 3)  SetKnocked
 --   AmbulanceService (w4)    SetPickupHandler (default: RemoveBody after Revive.BodyFallback, T54)
@@ -39,13 +39,11 @@ local Flow = require(ServerScriptService.server.Round.RoundService.Flow)
 local Life = require(script.Life)
 local Sanity = require(script.Sanity)
 local Modux = require(ServerScriptService.server.Modux)
-local ModuxModules = require(ServerScriptService.server.Modux.Modules)
 
 export type LifeState = Life.State
 export type Band = Sanity.Band
 export type LifeEventKind = "Down" | "Revived" | "Spectating" | "Hit" | "Wipe" | "WipeCleared"
 export type PickupHandler = (userId: number, bodyPos: Vector3?) -> ()
-export type LitProbe = (position: Vector3) -> boolean
 
 export type Entry = {
 	UserId: number,
@@ -75,7 +73,6 @@ const DARK_STEP = 1 -- s (architecture.md §19.7: dark at 1 Hz)
 const COFFEE = "coffee"
 const GATE = "Vital"
 const DROP_POINT = "DROP-T" -- MapPoint of the trailer counter (MAP-01 §5.5; FEAT-025, FEAT-036)
-const LIGHT_SERVICE = "LightService"
 const RESTORE_ATTRIBUTE = "Restore" -- coffee Tool attribute (network.md §7.1; CoffeeMachine)
 const NEVER_SENT = -1
 
@@ -125,6 +122,7 @@ const VitalService = Modux.Service("VitalService", {
 		"ItemService",
 		"InteractionService",
 		"ClassService",
+		"LightService",
 	},
 	Priority = 700,
 })
@@ -145,7 +143,6 @@ function VitalService:Setup()
 	self.LastFallen = 0 :: number
 	self.NextDarkAt = 0 :: number
 	self.PickupHandler = nil :: PickupHandler?
-	self.LitProbe = nil :: LitProbe?
 	-- dev override of IsLit: nil = probe, true = everything lit, false = everything dark
 	self.DevLit = nil :: boolean?
 	self.WarnedLight = false :: boolean
@@ -244,11 +241,10 @@ function VitalService:IsLit(position: Vector3): boolean
 	if self.DevLit ~= nil then
 		return self.DevLit
 	end
-	const probe = self.LitProbe
-	if probe == nil then
-		return true
-	end
-	const ok, lit = pcall(probe, position)
+	const light = self.Dependencies.LightService
+	const ok, lit = pcall(function(): boolean
+		return light:IsLit(position)
+	end)
 	if not ok then
 		if not self.WarnedLight then
 			self.WarnedLight = true
@@ -257,27 +253,6 @@ function VitalService:IsLit(position: Vector3): boolean
 		return true
 	end
 	return lit == true
-end
-
--- LightService (TASK-059) is looked up by name: not in Require while it is not in the build (see header).
-function VitalService:FindLight()
-	for _, module in ModuxModules do
-		if module.Name ~= LIGHT_SERVICE then
-			continue
-		end
-		const ok, required = pcall(require :: any, module)
-		const light: any = required
-		if ok and type(light) == "table" and type(light.IsLit) == "function" then
-			const isLit: (any, Vector3) -> any = light.IsLit
-			self.LitProbe = function(position: Vector3): boolean
-				return isLit(light, position) == true
-			end
-			return
-		end
-		warn(`[VitalService] {LIGHT_SERVICE} has no IsLit: no dark loss`)
-		return
-	end
-	warn(`[VitalService] no {LIGHT_SERVICE} in this build (TASK-059): no dark loss`)
 end
 
 -- Network -----------------------------------------------------------------------------------------------------------
@@ -849,7 +824,6 @@ VitalService:OnStart(function(self)
 	for userId in self.Dependencies.RunStateService.Members() do
 		self:Publish(userId)
 	end
-	self:FindLight()
 	self:QueueWipe()
 end)
 

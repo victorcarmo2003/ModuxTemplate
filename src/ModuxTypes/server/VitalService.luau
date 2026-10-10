@@ -9,7 +9,6 @@ local Sanity = require(ServerScriptService.server.Vital.VitalService.Sanity)
 export type LifeState = Life.State
 export type LifeEventKind = "Down" | "Revived" | "Spectating" | "Hit" | "Wipe" | "WipeCleared"
 export type PickupHandler = (userId: number, bodyPos: Vector3?) -> ()
-export type LitProbe = (position: Vector3) -> boolean
 export type Entry = {
 	UserId: number,
 	-- night token the entry belongs to (0 = day, no sanity)
@@ -39,7 +38,6 @@ export type Public = {
 	Enabled: boolean,
 	Entries: { [number]: Entry },
 	LastFallen: number,
-	LitProbe: LitProbe?,
 	Live: boolean,
 	MemberStateChanged: SignalLib.Signal<number, LifeState, LifeState>,
 	NextDarkAt: number,
@@ -61,7 +59,6 @@ export type Public = {
 	Counts: (self: Public) -> (number, number),
 	Verdict: (self: Public) -> boolean,
 	IsLit: (self: Public, position: Vector3) -> boolean,
-	FindLight: (self: Public) -> (),
 	ClassOf: (self: Public, userId: number, class: string) -> string,
 	Publish: (self: Public, userId: number) -> (),
 	SendSanity: (self: Public, player: Player, force: boolean) -> (),

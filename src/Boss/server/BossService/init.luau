@@ -19,9 +19,10 @@
 -- Once rows are marked played when they start Talking (heard), so a shift capture taken at the shift start does
 -- not hold the call of that shift: a Resume plays it again. Snapshot "Bs" = sorted played keys, restored as is.
 --
--- PROVISIONAL (TASK-070): chaining without a new ring; Resume blocks calls like NightLost; VehicleService is looked up
--- at runtime (TASK-056 runs in parallel; architecture.md §19.0 lists it in Require: switch when it lands); any
--- Swapped to a vehicle other than RunParams.StartVehicle counts as the trailer purchase.
+-- PROVISIONAL (TASK-070): chaining without a new ring; Resume blocks calls like NightLost; any Swapped to a vehicle
+-- other than RunParams.StartVehicle counts as the trailer purchase.
+-- Require follows architecture.md §19.2: VehicleService (Swapped) and ThiefService (owner of the quentin_caught_day
+-- counter read through RunStateService); neither requires Boss, no cycle.
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -36,11 +37,6 @@ export type State = "Idle" | "Ringing" | "Talking"
 export type Record = { Call: string, State: State, StartedAt: number }
 
 export type Entry = { Key: string, Priority: number, Order: number }
-
--- VehicleService seen through a runtime lookup (see header)
-type VehicleHook = {
-	Swapped: { Connect: (self: any, fn: (from: any, to: any) -> ()) -> any },
-}
 
 const RECORD = 1 -- single record (network.md §13.3)
 const NONE = "none"
@@ -64,7 +60,15 @@ local function now(): number
 end
 
 const BossService = Modux.Service("BossService", {
-	Require = { "PlaceService", "NetService", "RoundService", "RunStateService", "InteractionService" },
+	Require = {
+		"PlaceService",
+		"NetService",
+		"RoundService",
+		"RunStateService",
+		"InteractionService",
+		"VehicleService",
+		"ThiefService",
+	},
 	Priority = 560,
 })
 
@@ -352,7 +356,7 @@ function BossService:OnPerformed(action: string)
 	end
 end
 
-function BossService:OnSwapped(to: any)
+function BossService:OnSwapped(to: string)
 	if to == Content.RunParams.StartVehicle then
 		return
 	end
@@ -364,24 +368,6 @@ function BossService:OnSwapped(to: any)
 	if self.Dependencies.RoundService:GetPhase() == "Call" then
 		self:Enqueue(trailer)
 	end
-end
-
--- VehicleService.Swapped through a runtime lookup (see header); silent when the service is not in the build
-function BossService:HookVehicle()
-	const feature = ServerScriptService.server:FindFirstChild("Vehicle")
-	const module = if feature then feature:FindFirstChild("VehicleService") else nil
-	if module == nil or not module:IsA("ModuleScript") then
-		return
-	end
-	const vehicle = (require :: any)(module) :: VehicleHook
-	const swapped = (vehicle :: any).Swapped
-	if type(swapped) ~= "table" or type(swapped.Connect) ~= "function" then
-		warn("[BossService] VehicleService has no Swapped signal: call_trailer_bought will not ring")
-		return
-	end
-	vehicle.Swapped:Connect(function(_from: any, to: any)
-		self:OnSwapped(to)
-	end)
 end
 
 -- Snapshot "Bs" (data.md §3.3) -------------------------------------------------------------------------------------
@@ -520,8 +506,10 @@ BossService:OnInit(function(self)
 		self:OnPerformed(action)
 	end)
 
-	-- VehicleService (620) built its signals in its own OnInit, before ours
-	self:HookVehicle()
+	-- VehicleService (620) built its signals in its own OnInit, before ours (§19.0 rule 2)
+	self.Dependencies.VehicleService.Swapped:Connect(function(_from: string, to: string)
+		self:OnSwapped(to)
+	end)
 end)
 
 BossService:OnStart(function(self)
