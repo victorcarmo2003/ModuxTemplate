@@ -1,0 +1,311 @@
+--!strict
+--[[
+	EconomyController (TASK-024, FEAT-012; DEC-050, DEC-155; network.md §3.3 and §4.3)
+
+	Reads the `Economy` set (record 1) into the Vide sources `Cash` (party money, the HUD reads it, TASK-039) and
+	`Drawer` (cash drawer of the shift). Draws the drawer value in the world over every `Vehicle` and pops "+$N" on
+	each `Sale` with Amount > 0. Everyone reads the same record, so everyone sees the same number (FEAT-012).
+
+	Where the value goes (architecture.md §18.3/§18.4): the `Value_Anchor` fitting searched inside the `Vehicle`
+	(Attachment or BasePart). TASK-005 creates it on top of the POS, so the old register and the new black POS
+	(DEC-155) both work. Without it: warn once and fall back to the top part of the `DRAWER` model (MapId); without
+	that either, warn and draw nothing. A late `Value_Anchor` (streaming, model swap) replaces the fallback.
+
+	The client never writes money: a sale only changes the number when the server's `Economy` record changes. The
+	"+$N" is presentation of the `Sale` packet, not a prediction of the drawer.
+]]
+local Players = game:GetService("Players")
+local CollectionService = game:GetService("CollectionService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterPlayer = game:GetService("StarterPlayer")
+local Vide = require(ReplicatedStorage.Packages.Vide)
+local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
+local DrawerValue = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.DrawerValue)
+
+const RECORD_ID = 1 -- single record (network.md §1, rule 5)
+const VEHICLE_TAG = "Vehicle"
+const ANCHOR_NAME = "Value_Anchor"
+const DRAWER_MAP_ID = "DRAWER"
+-- Height of the value over the anchor (studs, world up)
+const ANCHOR_OFFSET = 0.6
+-- Grace for the anchor to stream in before falling back to the DRAWER model
+const FALLBACK_DELAY = 5
+-- Sales are <= 1/s (network.md §4.3); more than this on screen at once only stacks unreadable text
+const MAX_POPS = 4
+
+type Mount = {
+	Vehicle: Instance,
+	Adornee: Instance?,
+	Gui: Instance?,
+	Unmount: (() -> ())?,
+	Connections: { RBXScriptConnection },
+	Fallback: thread?,
+	Warned: boolean,
+}
+
+export type Record = {
+	Cash: number,
+	Drawer: number,
+}
+
+const EconomyController = Modux.Controller("EconomyController", { Priority = 790 })
+
+function EconomyController:Setup()
+	self.Cash = Vide.source(0) :: Vide.Source<number>
+	self.Drawer = Vide.source(0) :: Vide.Source<number>
+	-- true once the first Economy record arrived
+	self.Ready = Vide.source(false) :: Vide.Source<boolean>
+	self.Pops = Vide.source({} :: { DrawerValue.Pop }) :: Vide.Source<{ DrawerValue.Pop }>
+	self.Mounts = {} :: { [Instance]: Mount }
+	self.Gui = nil :: Instance?
+end
+
+function EconomyController:Apply(record: Record)
+	if self.Cash() ~= record.Cash then
+		self.Cash(record.Cash)
+	end
+	if self.Drawer() ~= record.Drawer then
+		self.Drawer(record.Drawer)
+	end
+	if not self.Ready() then
+		self.Ready(true)
+	end
+end
+
+function EconomyController:Pop(amount: number)
+	const list = table.clone(self.Pops())
+	if #list >= MAX_POPS then
+		table.remove(list, 1)
+	end
+	table.insert(list, { Amount = amount })
+	self.Pops(list)
+end
+
+function EconomyController:PopDone(pop: DrawerValue.Pop)
+	const list = self.Pops()
+	const index = table.find(list, pop)
+	if index then
+		const copy = table.clone(list)
+		table.remove(copy, index)
+		self.Pops(copy)
+	end
+end
+
+-- Value_Anchor inside the vehicle, Attachment or BasePart (the same helper rule as the prompts, §18.3)
+local function findAnchor(vehicle: Instance): Instance?
+	for _, descendant in vehicle:GetDescendants() do
+		if descendant.Name == ANCHOR_NAME and (descendant:IsA("Attachment") or descendant:IsA("BasePart")) then
+			return descendant
+		end
+	end
+	return nil
+end
+
+-- Highest BasePart of the DRAWER model inside the vehicle, and the offset that puts the value on its top
+local function findFallback(vehicle: Instance): (BasePart?, number)
+	local drawer: Instance? = nil
+	for _, descendant in vehicle:GetDescendants() do
+		if descendant:IsA("Model") and descendant:GetAttribute("MapId") == DRAWER_MAP_ID then
+			drawer = descendant
+			break
+		end
+	end
+	if drawer == nil then
+		return nil, 0
+	end
+	local best: BasePart? = nil
+	local bestTop = -math.huge
+	for _, descendant in drawer:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			const top = descendant.Position.Y + descendant.Size.Y / 2
+			if top > bestTop then
+				bestTop = top
+				best = descendant
+			end
+		end
+	end
+	return best, if best then best.Size.Y / 2 else 0
+end
+
+function EconomyController:Draw(mount: Mount, adornee: Instance, offset: number)
+	if mount.Adornee == adornee then
+		return
+	end
+	self:Clear(mount)
+	const gui = self.Gui
+	if gui == nil then
+		return
+	end
+	const unmount, billboard = Vide.root(function()
+		return DrawerValue({
+			Name = "DrawerValue",
+			Adornee = adornee,
+			Value = self.Drawer,
+			Pops = self.Pops,
+			OnPopDone = function(pop)
+				self:PopDone(pop)
+			end,
+			Offset = Vector3.new(0, offset + ANCHOR_OFFSET, 0),
+		})
+	end)
+	billboard.Parent = gui
+	mount.Adornee = adornee
+	mount.Gui = billboard
+	mount.Unmount = unmount
+end
+
+function EconomyController:Clear(mount: Mount)
+	const unmount = mount.Unmount
+	if unmount then
+		mount.Unmount = nil
+		unmount()
+	end
+	const billboard = mount.Gui
+	if billboard then
+		mount.Gui = nil
+		billboard:Destroy()
+	end
+	mount.Adornee = nil
+end
+
+function EconomyController:Resolve(mount: Mount)
+	const anchor = findAnchor(mount.Vehicle)
+	if anchor then
+		self:Draw(mount, anchor, 0)
+		return
+	end
+	if mount.Fallback then
+		-- still inside the grace window: wait for the anchor to stream in
+		return
+	end
+	const part, offset = findFallback(mount.Vehicle)
+	if not mount.Warned then
+		mount.Warned = true
+		warn(
+			("[EconomyController] %s has no %s (TASK-005 creates it on top of the POS); %s"):format(
+				mount.Vehicle:GetFullName(),
+				ANCHOR_NAME,
+				if part then "using the top of the DRAWER model" else "drawer value not shown"
+			)
+		)
+	end
+	if part then
+		self:Draw(mount, part, offset)
+	else
+		self:Clear(mount)
+	end
+end
+
+function EconomyController:Track(vehicle: Instance)
+	if self.Mounts[vehicle] then
+		return
+	end
+	const mount: Mount = {
+		Vehicle = vehicle,
+		Adornee = nil,
+		Gui = nil,
+		Unmount = nil,
+		Connections = {},
+		Fallback = nil,
+		Warned = false,
+	}
+	self.Mounts[vehicle] = mount
+
+	table.insert(
+		mount.Connections,
+		vehicle.DescendantAdded:Connect(function(descendant)
+			if descendant.Name == ANCHOR_NAME and mount.Adornee ~= descendant then
+				self:Resolve(mount)
+			end
+		end)
+	)
+	table.insert(
+		mount.Connections,
+		vehicle.DescendantRemoving:Connect(function(descendant)
+			if descendant == mount.Adornee then
+				-- after the removal lands, so findAnchor no longer sees it
+				task.defer(function()
+					if self.Mounts[vehicle] == mount then
+						self:Clear(mount)
+						self:Resolve(mount)
+					end
+				end)
+			end
+		end)
+	)
+
+	if findAnchor(vehicle) == nil then
+		mount.Fallback = task.delay(FALLBACK_DELAY, function()
+			mount.Fallback = nil
+			if self.Mounts[vehicle] == mount and mount.Adornee == nil then
+				self:Resolve(mount)
+			end
+		end)
+	end
+	self:Resolve(mount)
+end
+
+function EconomyController:Untrack(vehicle: Instance)
+	const mount = self.Mounts[vehicle]
+	if mount == nil then
+		return
+	end
+	self.Mounts[vehicle] = nil
+	for _, connection in mount.Connections do
+		connection:Disconnect()
+	end
+	table.clear(mount.Connections)
+	const fallback = mount.Fallback
+	if fallback then
+		mount.Fallback = nil
+		if coroutine.status(fallback) == "suspended" then
+			task.cancel(fallback)
+		end
+	end
+	self:Clear(mount)
+end
+
+function EconomyController:Watch(gui: Instance)
+	self.Gui = gui
+	CollectionService:GetInstanceAddedSignal(VEHICLE_TAG):Connect(function(vehicle)
+		self:Track(vehicle)
+	end)
+	CollectionService:GetInstanceRemovedSignal(VEHICLE_TAG):Connect(function(vehicle)
+		self:Untrack(vehicle)
+	end)
+	for _, vehicle in CollectionService:GetTagged(VEHICLE_TAG) do
+		self:Track(vehicle)
+	end
+end
+
+EconomyController:OnInit(function(self)
+	self:Setup()
+
+	const economy = self.Libs.Net.Economy
+	economy:onAdded(function(id, record)
+		if id == RECORD_ID then
+			self:Apply(record)
+		end
+	end)
+	economy:onChanged(function(id, record)
+		if id == RECORD_ID then
+			self:Apply(record)
+		end
+	end)
+
+	-- Presentation only: the drawer number itself comes from Economy. Wrong/Left/Refused carry Amount 0.
+	self.Libs.Net.Sale:onClient(function(sale)
+		if sale.Amount > 0 then
+			self:Pop(sale.Amount)
+		end
+	end)
+end)
+
+EconomyController:OnStart(function(self)
+	-- PlayerGui may arrive a frame late; do not hold up the other OnStart.
+	task.spawn(function()
+		self:Watch(Players.LocalPlayer:WaitForChild("PlayerGui"))
+	end)
+end)
+
+return EconomyController
