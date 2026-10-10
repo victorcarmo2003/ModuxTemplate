@@ -26,6 +26,9 @@
 	The Shift set is read here only for WipeEndsAt/WipeFrozen and the banner timing (network.md §3.1 lists the HUD as
 	a reader); Day/Night/Phase/clock still come from RoundController.
 
+	Order card (user request after Play): HudOrder on the top-left column, under the money and day pills, with the
+	order of the customer CustomerController picks (prompt target, else Q1 in Waiting); hidden while Down/Spectator.
+
 	Status only: no button, no input binding (FEAT-032: nothing clickable for an Active player). No reputation, no boss
 	chances (Shift.Chances is never read, DEC-053), no XP. The client never writes money, sanity or life state: the
 	numbers come from the server's sets and packets. Texts from ui-text.md (Provisional, TASK-082).
@@ -37,6 +40,7 @@ local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local CrewLooks = require(ReplicatedStorage.shared.Crew.CrewLooks)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
+local HudOrder = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.HudOrder)
 local HudBanner = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.HudBanner)
 local HudRunEnd = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.HudRunEnd)
 local HudSanity = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.HudSanity)
@@ -64,6 +68,9 @@ const MAX_SCALE = 2
 
 -- Wave 2 layout (px at scale 1): sanity meter and spectate card sit under the clock pill (TOP 6 + 48 + gap 8)
 const UNDER_CLOCK = 62
+-- Order card under the day pill (HudScreen: TOP 6 + money 48 + gap 8 + day 44 + gap 8)
+const ORDER_TOP = 114
+const ORDER_LEFT = 12
 -- Run end screen on screen (architecture.md §19.16)
 const RUN_END_TIME = 15
 -- Banner on screen; a phase change older than BANNER_FRESH s (late joiner, reconnect) gets no banner
@@ -142,7 +149,14 @@ export type LifeEvent = {
 }
 
 const HudController = Modux.Controller("HudController", {
-	Require = { "RoundController", "EconomyController", "ProfileController", "VitalController", "InputController" },
+	Require = {
+		"RoundController",
+		"EconomyController",
+		"ProfileController",
+		"VitalController",
+		"InputController",
+		"CustomerController",
+	},
 	Priority = 500,
 })
 
@@ -527,6 +541,26 @@ function HudController:SanityMeter(): Frame
 	})
 end
 
+function HudController:OrderCard(): Frame
+	const customer = self.Dependencies.CustomerController
+	return HudOrder({
+		Shown = function()
+			return customer:CardShown() and self:SpectateMode() == "None"
+		end,
+		Toppings = function()
+			return customer:CardToppings()
+		end,
+		Empty = function()
+			return customer:CardEmpty()
+		end,
+		Patience = function()
+			return customer:CardPatience()
+		end,
+		WarnAt = Content.Moods.Rules.AnnoyedAt,
+		Position = UDim2.fromOffset(ORDER_LEFT, ORDER_TOP),
+	})
+end
+
 -- Wave 1 -----------------------------------------------------------------------------------------------------------
 
 function HudController:Rescale(camera: Camera?)
@@ -611,6 +645,11 @@ function HudController:Mount(playerGui: Instance)
 					CardTop = UNDER_CLOCK,
 				}),
 				HudWipe({ Seconds = self.WipeLeft, Total = Content.Revive.WipeWindow }),
+			}),
+
+			-- Order card (top-left column), under the wave-1 pills
+			self:Layer("Order", 1, {
+				self:OrderCard(),
 			}),
 
 			HudScreen({

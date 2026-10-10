@@ -33,6 +33,13 @@
 	    missing breath are the TASK-112 effect's).
 	Nothing here decides an anomaly: the verb, the payment and the result stay on the server.
 
+	Order reading (user request after Play: the awning hid the bubble):
+	  - the OrderBubble is AlwaysOnTop, lifted BUBBLE_LIFT px over the prompt pill on the customer's neck;
+	  - HUD order card (Interface/Components/HudOrder, mounted by HudController): `Focus` = the customer the prompt
+	    targets (PromptController.Target on a customer rig) when it is Waiting, else the Q1 customer (Slot 1) in
+	    Waiting (the nearest one if more than one); 0 = no card. Read at TICK_RATE. The card reads CardShown /
+	    CardToppings / CardEmpty / CardPatience (reactive). A blank customer = the card with no icon.
+
 	Listeners in OnInit (before Lync.start, README "Rede"); the late joiner gets the current records through onAdded.
 	Rigs are scanned in OnStart. No input: nothing here is clickable (FEAT-032).
 ]]
@@ -57,6 +64,9 @@ const ORDER_RULES = Content.OrderRules
 const WARN_AT = Content.Moods.Rules.AnnoyedAt
 const VARIANT_ATTRIBUTE = "Variant" -- rig attribute (NpcService, TASK-108)
 const BLANK = "blank" -- ANM-001: no icons in the bubble
+-- px under the bubble's tail: clears the prompt pill (48 px tall, centred on the neck anchor) at any distance
+const BUBBLE_LIFT = 28
+const FRONT_SLOT = 1 -- Q1
 
 export type Record = {
 	State: string,
@@ -93,7 +103,7 @@ type Tracked = {
 
 const CustomerController = Modux.Controller(
 	"CustomerController",
-	{ Require = { "RigController", "AudioController", "AnimController" }, Priority = 670 }
+	{ Require = { "RigController", "AudioController", "AnimController", "PromptController" }, Priority = 670 }
 )
 
 function CustomerController:Setup()
@@ -106,6 +116,8 @@ function CustomerController:Setup()
 	self.Now = Vide.source(workspace:GetServerTimeNow()) :: Vide.Source<number>
 	self.Gui = nil :: Instance?
 	self.Random = Random.new() :: Random
+	-- NpcId of the customer on the HUD order card; 0 = none
+	self.Focus = Vide.source(0) :: Vide.Source<number>
 end
 
 -- Reactive read of a customer record (nil = no such customer). For other controllers and debugging.
@@ -204,6 +216,9 @@ function CustomerController:Drop(id: number)
 	self.Entries[id] = nil
 	self:Detach(entry)
 	self:Fill()
+	if Vide.untrack(self.Focus) == id then
+		self:UpdateFocus()
+	end
 end
 
 -- Unmount the bubble and give the rig its neutral face back.
@@ -313,6 +328,8 @@ function CustomerController:Mount(entry: Entry, model: Model)
 			WarnAt = WARN_AT,
 			Offset = Vector3.new(0, head.Size.Y / 2 + HEAD_GAP, 0),
 			MaxDistance = MAX_DISTANCE,
+			Lift = BUBBLE_LIFT,
+			AlwaysOnTop = true,
 		})
 	end)
 	billboard.Parent = gui
@@ -404,6 +421,92 @@ function CustomerController:Feedback(id: number, result: string)
 	if model ~= nil and feedback.Clip ~= "" then
 		self.Dependencies.AnimController:Play(model, feedback.Clip)
 	end
+end
+
+-- HUD order card ----------------------------------------------------------------------------------------------------
+
+local function isWaiting(entry: Entry?): boolean
+	if entry == nil then
+		return false
+	end
+	const record = Vide.untrack(entry.Record)
+	return record ~= false and record.State == "Waiting"
+end
+
+-- Customer of the card: the prompt target's rig when it is Waiting, else the Q1 customer in Waiting.
+function CustomerController:PickFocus(): number
+	const target = self.Dependencies.PromptController.Target
+	const rig = if target then target.Rig else nil
+	const value = if rig then rig:GetAttribute("NpcId") else nil
+	if typeof(value) == "number" and isWaiting(self.Entries[value]) then
+		return value
+	end
+
+	const character = Players.LocalPlayer.Character
+	const origin = if character then character:GetPivot().Position else nil
+	local best, bestDistance = 0, math.huge
+	for id, entry in self.Entries do
+		const record = Vide.untrack(entry.Record)
+		if record == false or record.State ~= "Waiting" or record.Slot ~= FRONT_SLOT then
+			continue
+		end
+		const model = self.Models[id]
+		const distance = if origin and model then (model:GetPivot().Position - origin).Magnitude else 1e9 -- no rig yet: still a candidate
+		if distance < bestDistance then
+			best, bestDistance = id, distance
+		end
+	end
+	return best
+end
+
+function CustomerController:UpdateFocus()
+	const id = self:PickFocus()
+	if Vide.untrack(self.Focus) ~= id then
+		self.Focus(id)
+		self.Now(workspace:GetServerTimeNow())
+	end
+end
+
+-- Reactive: entry and record of the card customer (nil = no card).
+function CustomerController:FocusEntry(): (Entry?, Record?)
+	const id = self.Focus()
+	const entry = if id ~= 0 then self.Entries[id] else nil
+	if entry == nil then
+		return nil, nil
+	end
+	const record = entry.Record()
+	if record == false or record.State ~= "Waiting" then
+		return nil, nil
+	end
+	return entry, record
+end
+
+function CustomerController:CardShown(): boolean
+	const entry = self:FocusEntry()
+	return entry ~= nil
+end
+
+function CustomerController:CardEmpty(): boolean
+	const entry = self:FocusEntry()
+	return entry ~= nil and entry.Variant() == BLANK
+end
+
+-- Topping keys of the card order (display order, max 3); none for a blank customer.
+function CustomerController:CardToppings(): { string }
+	const entry, record = self:FocusEntry()
+	const keys: { string } = {}
+	if entry == nil or record == nil or entry.Variant() == BLANK then
+		return keys
+	end
+	for _, topping in self:ToppingsOf(record) do
+		table.insert(keys, topping.Key)
+	end
+	return keys
+end
+
+function CustomerController:CardPatience(): number
+	const entry = self:FocusEntry()
+	return if entry then self:PatienceOf(entry) else -1
 end
 
 -- Rig tracking: NpcId attribute -> model, re-read on change (pool reuse = new id).
@@ -525,7 +628,8 @@ CustomerController:OnStart(function(self)
 end)
 
 CustomerController:OnTick(function(self)
-	if self.Mounted > 0 then
+	self:UpdateFocus()
+	if self.Mounted > 0 or Vide.untrack(self.Focus) ~= 0 then
 		self.Now(workspace:GetServerTimeNow())
 	end
 end, TICK_RATE)

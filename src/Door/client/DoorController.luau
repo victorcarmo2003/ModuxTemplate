@@ -1,0 +1,301 @@
+--!strict
+--[[
+	DoorController (user request after Play: the Mart doors open by proximity)
+
+	Every `AutoDoor`-tagged instance is an automatic door. Purely local: each client animates its own copy, nothing
+	goes on the network and no rule depends on it.
+
+	  * Leaf = the parts that move. Tag on a BasePart: that part. Tag on a Model: its descendant BaseParts named
+	    "*Leaf*" or "Door" / attribute `DoorLeaf = true`; with none of those, every BasePart of the model. A leaf wider
+	    than MAX_LEAF_WIDTH (the whole wall got the tag) is skipped with a warning, so a wall never moves.
+	  * Opens when any Humanoid character (players, customers, pedestrians, client-only rigs) is within `DoorRadius`
+	    (default RADIUS) of the closed leaf centre; closes CLOSE_DELAY s after the last one left RADIUS + MARGIN.
+	  * Motion (simplest robust default): slide along the leaf's widest horizontal axis by its width (`DoorSlide`,
+	    signed studs, overrides the distance and the side). With `DoorHinge = "Left" | "Right"` it swings instead,
+	    `DoorAngle` degrees (default 90) around that vertical edge, away from the side the character came from.
+	  * Open (moving or open) = CanCollide false on the leaf; the original value comes back when fully closed.
+	    Local CanCollide only frees the local character (its physics run here); server-simulated NPCs that walk
+	    through the door need the server copy of the leaf with CanCollide false (map binding).
+	  * Leaf parts must be Anchored (an unanchored leaf is skipped with a warning).
+
+	No input, no packet, never writes a set.
+]]
+local CollectionService = game:GetService("CollectionService")
+local StarterPlayer = game:GetService("StarterPlayer")
+local TweenService = game:GetService("TweenService")
+local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
+
+const TAG = "AutoDoor"
+const RADIUS = 8 -- studs
+const MARGIN = 1 -- hysteresis: closes beyond RADIUS + MARGIN
+const CLOSE_DELAY = 1 -- s with nobody near before closing
+const OPEN_TIME = 0.45 -- s
+const CLOSE_TIME = 0.6 -- s
+const SWING_ANGLE = 90 -- degrees
+const MAX_LEAF_WIDTH = 10 -- studs; wider = the wall itself got the tag
+const TICK_RATE = 10
+const LEAF_PATTERN = "leaf"
+
+type Leaf = {
+	Part: BasePart,
+	Offset: CFrame, -- part CFrame relative to the closed pivot
+	CanCollide: boolean,
+}
+
+type Door = {
+	Instance: Instance,
+	Leaves: { Leaf },
+	Closed: CFrame, -- pivot (leaf bounding box) when closed
+	Width: number, -- along the slide / swing axis
+	Axis: Vector3, -- local unit axis of the width (X or Z)
+	Radius: number,
+	Open: boolean,
+	LastNear: number,
+	Value: CFrameValue, -- animated pivot
+	Tween: Tween?,
+	Connection: RBXScriptConnection,
+	Overlap: OverlapParams,
+}
+
+const DoorController = Modux.Controller("DoorController", { Priority = 300 })
+
+function DoorController:Setup()
+	self.Doors = {} :: { [Instance]: Door }
+end
+
+local function isLeafName(part: BasePart): boolean
+	if part:GetAttribute("DoorLeaf") == true then
+		return true
+	end
+	const name = string.lower(part.Name)
+	return name == "door" or string.find(name, LEAF_PATTERN, 1, true) ~= nil
+end
+
+local function leafParts(instance: Instance): { BasePart }
+	if instance:IsA("BasePart") then
+		return { instance }
+	end
+	const named: { BasePart } = {}
+	const all: { BasePart } = {}
+	for _, descendant in instance:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			table.insert(all, descendant)
+			if isLeafName(descendant) then
+				table.insert(named, descendant)
+			end
+		end
+	end
+	return if #named > 0 then named else all
+end
+
+-- Bounding box of the leaf parts (world CFrame, size), oriented like the first part.
+local function bounds(parts: { BasePart }): (CFrame, Vector3)
+	const frame = parts[1].CFrame.Rotation
+	local min = Vector3.new(math.huge, math.huge, math.huge)
+	local max = -min
+	for _, part in parts do
+		const half = part.Size / 2
+		for _, x in { -1, 1 } do
+			for _, y in { -1, 1 } do
+				for _, z in { -1, 1 } do
+					const corner = frame:PointToObjectSpace(part.CFrame:PointToWorldSpace(half * Vector3.new(x, y, z)))
+					min = min:Min(corner)
+					max = max:Max(corner)
+				end
+			end
+		end
+	end
+	const center = frame:PointToWorldSpace((min + max) / 2)
+	return CFrame.new(center) * frame, max - min
+end
+
+local function numberAttribute(instance: Instance, name: string): number?
+	const value = instance:GetAttribute(name)
+	return if typeof(value) == "number" then value else nil
+end
+
+function DoorController:Add(instance: Instance)
+	if self.Doors[instance] ~= nil or not instance:IsDescendantOf(workspace) then
+		return
+	end
+	const parts = leafParts(instance)
+	if #parts == 0 then
+		return
+	end
+	for _, part in parts do
+		if not part.Anchored then
+			warn(`[DoorController] {instance:GetFullName()}: leaf part {part.Name} is not Anchored; door skipped`)
+			return
+		end
+	end
+	const closed, size = bounds(parts)
+	const axis = if size.X >= size.Z then Vector3.xAxis else Vector3.zAxis
+	const width = if size.X >= size.Z then size.X else size.Z
+	if width > MAX_LEAF_WIDTH then
+		warn(
+			`[DoorController] {instance:GetFullName()}: leaf {string.format("%.1f", width)} studs wide (> {MAX_LEAF_WIDTH}); `
+				.. `tag the door leaf (or name it "*Leaf*" / set DoorLeaf = true), not the wall. Door skipped`
+		)
+		return
+	end
+
+	const leaves: { Leaf } = {}
+	for _, part in parts do
+		table.insert(leaves, { Part = part, Offset = closed:ToObjectSpace(part.CFrame), CanCollide = part.CanCollide })
+	end
+
+	const value = Instance.new("CFrameValue")
+	value.Value = closed
+	const door: Door = {
+		Instance = instance,
+		Leaves = leaves,
+		Closed = closed,
+		Width = width,
+		Axis = axis,
+		Radius = numberAttribute(instance, "DoorRadius") or RADIUS,
+		Open = false,
+		LastNear = 0,
+		Value = value,
+		Tween = nil,
+		Connection = value.Changed:Connect(function(pivot: CFrame)
+			for _, leaf in leaves do
+				leaf.Part.CFrame = pivot * leaf.Offset
+			end
+		end),
+		Overlap = OverlapParams.new(),
+	}
+	door.Overlap.FilterType = Enum.RaycastFilterType.Exclude
+	const exclude: { Instance } = {}
+	for _, part in parts do
+		table.insert(exclude, part)
+	end
+	door.Overlap.FilterDescendantsInstances = exclude
+	self.Doors[instance] = door
+end
+
+function DoorController:Remove(instance: Instance)
+	const door = self.Doors[instance]
+	if door == nil then
+		return
+	end
+	self.Doors[instance] = nil
+	const tween = door.Tween
+	if tween then
+		tween:Cancel()
+	end
+	door.Connection:Disconnect()
+	door.Value:Destroy()
+end
+
+-- Position of the nearest Humanoid character within `radius` of the closed leaf centre (nil = nobody).
+local function nearest(door: Door, radius: number): Vector3?
+	const center = door.Closed.Position
+	local best: Vector3? = nil
+	local bestDistance = math.huge
+	const seen: { [Instance]: boolean } = {}
+	for _, part in workspace:GetPartBoundsInRadius(center, radius, door.Overlap) do
+		const model = part.Parent
+		if model == nil or seen[model] then
+			continue
+		end
+		seen[model] = true
+		const humanoid = model:FindFirstChildOfClass("Humanoid")
+		if humanoid == nil or humanoid.Health <= 0 or not model:IsA("Model") then
+			continue
+		end
+		const position = model:GetPivot().Position
+		const distance = (position - center).Magnitude
+		if distance < bestDistance then
+			best, bestDistance = position, distance
+		end
+	end
+	return best
+end
+
+-- Open pivot: slide along the width axis, or swing around the hinge edge away from `from`.
+function DoorController:OpenPivot(door: Door, from: Vector3): CFrame
+	const instance = door.Instance
+	const hinge = instance:GetAttribute("DoorHinge")
+	if hinge == "Left" or hinge == "Right" then
+		const side = if hinge == "Left" then -1 else 1
+		const edge = door.Closed * CFrame.new(door.Axis * (side * door.Width / 2))
+		-- free end direction from the hinge (leaf space); a +Y turn moves it along (d.Z, 0, -d.X)
+		const free = door.Axis * -side
+		const tangent = Vector3.new(free.Z, 0, -free.X)
+		const relative = door.Closed:PointToObjectSpace(from)
+		const away = if tangent:Dot(Vector3.new(relative.X, 0, relative.Z)) > 0 then -1 else 1
+		const angle = math.rad(numberAttribute(instance, "DoorAngle") or SWING_ANGLE) * away
+		return edge * CFrame.Angles(0, angle, 0) * edge:ToObjectSpace(door.Closed)
+	end
+	const slide = numberAttribute(instance, "DoorSlide") or door.Width
+	return door.Closed * CFrame.new(door.Axis * slide)
+end
+
+function DoorController:SetCollide(door: Door, closed: boolean)
+	for _, leaf in door.Leaves do
+		leaf.Part.CanCollide = if closed then leaf.CanCollide else false
+	end
+end
+
+function DoorController:Animate(door: Door, open: boolean, from: Vector3?)
+	door.Open = open
+	const old = door.Tween
+	if old then
+		old:Cancel()
+	end
+	if open then
+		self:SetCollide(door, false)
+	end
+	const goal = if open and from then self:OpenPivot(door, from) else door.Closed
+	const tween = TweenService:Create(
+		door.Value,
+		TweenInfo.new(if open then OPEN_TIME else CLOSE_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		{ Value = goal }
+	)
+	door.Tween = tween
+	if not open then
+		tween.Completed:Connect(function(state)
+			if state == Enum.PlaybackState.Completed and not door.Open then
+				self:SetCollide(door, true)
+			end
+		end)
+	end
+	tween:Play()
+end
+
+function DoorController:Tick()
+	const now = os.clock()
+	for _, door in self.Doors do
+		const from = nearest(door, if door.Open then door.Radius + MARGIN else door.Radius)
+		if from then
+			door.LastNear = now
+			if not door.Open then
+				self:Animate(door, true, from)
+			end
+		elseif door.Open and now - door.LastNear >= CLOSE_DELAY then
+			self:Animate(door, false, nil)
+		end
+	end
+end
+
+DoorController:OnInit(function(self)
+	self:Setup()
+end)
+
+DoorController:OnStart(function(self)
+	CollectionService:GetInstanceAddedSignal(TAG):Connect(function(instance)
+		self:Add(instance)
+	end)
+	CollectionService:GetInstanceRemovedSignal(TAG):Connect(function(instance)
+		self:Remove(instance)
+	end)
+	for _, instance in CollectionService:GetTagged(TAG) do
+		self:Add(instance)
+	end
+end)
+
+DoorController:OnTick(function(self)
+	self:Tick()
+end, TICK_RATE)
+
+return DoorController

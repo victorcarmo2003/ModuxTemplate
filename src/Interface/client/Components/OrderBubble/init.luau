@@ -8,6 +8,9 @@
 -- circle + short letters). The base icon is always the drawn placeholder (no Ingredients row for it). Provisional.
 -- Empty (TASK-112, ANM-001; style guide §7.3 "Vazio = ANM-001"): no base icon and no toppings, same white bubble
 -- and patience ring at the one-cell width; the order is still on the wire (the server judges it).
+-- Always on top (user request after Play: the awning covered the bubble): drawn over the world, so the customer's
+-- order reads through roofs and awnings. `Lift` (px) raises it over the prompt pill on the customer's neck, so the two
+-- billboards never overlap on screen at any distance.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Theme)
@@ -36,6 +39,10 @@ export type Props = {
 	-- World-space offset over the adornee (studs).
 	Offset: Vector3?,
 	MaxDistance: number?,
+	-- Empty pixels under the tail tip (clears the prompt pill under the bubble). Default 0.
+	Lift: number?,
+	-- Drawn over the world (roofs, awnings). Default true.
+	AlwaysOnTop: boolean?,
 	Name: string?,
 }
 
@@ -182,6 +189,7 @@ end
 
 return function(props: Props): BillboardGui
 	const warnAt = props.WarnAt or 1 / 3
+	const lift = math.max(props.Lift or 0, 0)
 	const empty = props.Empty or function(): boolean
 		return false
 	end
@@ -203,10 +211,11 @@ return function(props: Props): BillboardGui
 		Name = props.Name or "OrderBubble",
 		Adornee = props.Adornee,
 		Size = function()
-			return UDim2.fromOffset(width(), HEIGHT)
+			return UDim2.fromOffset(width(), HEIGHT + lift)
 		end,
-		-- bottom of the tail sits on the offset point
+		-- bottom of the gui (tail tip + lift) sits on the offset point
 		SizeOffset = Vector2.new(0, 0.5),
+		AlwaysOnTop = if props.AlwaysOnTop == nil then true else props.AlwaysOnTop,
 		StudsOffsetWorldSpace = props.Offset or Vector3.new(0, 1.5, 0),
 		MaxDistance = props.MaxDistance or 60,
 		LightInfluence = 0,
