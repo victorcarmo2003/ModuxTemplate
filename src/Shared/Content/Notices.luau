@@ -67,5 +67,7 @@ return Table.new({
 
 	-- wave 3
 	{ Key = "hide_taken", Text = "Someone's already hiding there.", Audience = "Player", ValueFrom = "None", Wave = 3 },
+	-- counter action refused with the trailer window closed (DEC-221, Q-173); placeholder until ui-text.md
+	{ Key = "shutter_closed", Text = "The window's shut. Open it to serve.", Audience = "Player", ValueFrom = "None", Wave = 3 },
 	{ Key = "item_dropped", Text = "Dropped {item}!", Audience = "Player", ValueFrom = "Items", Wave = 3 }, -- FEAT-036
 } :: { Notice })

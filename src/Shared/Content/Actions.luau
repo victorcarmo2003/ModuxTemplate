@@ -83,4 +83,7 @@ return Table.new({
 	{ Key = "safe_spot", Text = "Hide", Hold = 0, Radius = 7, Requires = {}, Night = "NightOnly", Wave = 3 },
 	-- leave a hide point (FEAT-023); local button of HideController
 	{ Key = "get_up", Text = "Get Up", Hold = 0, Radius = 10, Requires = {}, Night = "NightOnly", Wave = 3 },
+	-- trailer service window (FEAT-023, DEC-221): Prompt_Shutter next to the light switch; owner VehicleService,
+	-- PromptText "Close Window"/"Open Window" by state, cooldown 1 s in Validate (Q-173, placeholder until ui-text.md)
+	{ Key = "shutter_toggle", Text = "Close Window", Hold = 0.5, Radius = 7, Requires = {}, Night = "NightOnly", Wave = 3 },
 } :: { Action })

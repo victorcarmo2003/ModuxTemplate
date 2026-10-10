@@ -324,9 +324,8 @@ wave3.Vehicles = {
 	cart = { Stations = kitchen("cart"), Actions = { answer_phone = 1 } },
 	trailer = {
 		Stations = trailer3,
-		-- H1..H4 inside the trailer (DEC-176), hold 0.5, NightOnly; get_up has no anchor (sent with the spot's id)
-		Actions = { answer_phone = 1, switch_light = 1, buy_trailer = 1, hide = 4 },
-		Slotted = { hide = 4 },
+		-- service window button TRL-SHUTTER (Prompt_Shutter) next to the switch (DEC-221); H1..H4 left the place
+		Actions = { answer_phone = 1, switch_light = 1, buy_trailer = 1, shutter_toggle = 1 },
 	},
 }
 wave3.Tagged = concat(wave2.Tagged, {
