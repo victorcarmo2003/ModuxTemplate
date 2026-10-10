@@ -737,6 +737,9 @@ function KitchenService:BuildContext(): StationApi.Context
 		Consume = function(player: Player, tool: Tool)
 			self.Dependencies.ItemService:Consume(player, tool)
 		end,
+		AddTopping = function(tool: Tool, ingredient: string): boolean
+			return self.Dependencies.ItemService:AddTopping(tool, ingredient)
+		end,
 		Modifier = function(player: Player, stat: string): number
 			if not Content.Stats.Has[stat] then
 				fail(`[KitchenService] Modifier: {stat} is not a key of Content.Stats`)

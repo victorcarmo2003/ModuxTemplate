@@ -97,6 +97,17 @@ function Rules.Allows(target: Target, context: Context): boolean
 		return false
 	end
 
+	-- DEC-071: no "Add X" once the hot dog has MaxToppings.
+	if target.Action == "topping_add" and held then
+		local count = 0
+		for _ in held.Toppings do
+			count += 1
+		end
+		if count >= Content.OrderRules.MaxToppings then
+			return false
+		end
+	end
+
 	-- Restock needs the package of this station's ingredient (content-data.md §3.18).
 	if target.Action == "restock" and held and ingredient then
 		const restocks = packageIngredient[held.Item]

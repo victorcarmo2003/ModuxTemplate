@@ -40,6 +40,7 @@ export type Context = {
 	Give: (player: Player, item: string, attrs: { [string]: any }?) -> boolean, -- attrs: Toppings, Count
 	Held: (player: Player) -> Tool?,
 	Consume: (player: Player, tool: Tool) -> (),
+	AddTopping: (tool: Tool, ingredient: string) -> boolean, -- ItemService: same Tool, HotDogVisual refreshed
 	Modifier: (player: Player, stat: string) -> number, -- ClassService
 	Effect: (stat: string) -> number, -- UpgradeService, current vehicle
 	Publish: (station: Station) -> (), -- KitchenService writes the Stations set from station.Records
