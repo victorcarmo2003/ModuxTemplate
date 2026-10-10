@@ -17,11 +17,9 @@
 -- API: IsLit(pos), IsSwitchOn(), SetSwitch(on, player?) -> boolean, BeginHush(startedAt, holdUntil), EndHush(),
 -- IsHush(), GroupOn(key); signal SwitchChanged(on, player?).
 --
--- PROVISIONAL (TASK-059): VehicleService (TASK-056) does not exist yet, so the current vehicle is the
--- UpgradeService.Vehicle atom (the one the swap writes through SetVehicle, same moment as Swapped; same choice as
--- ItemService). When 056 lands, architecture.md §19.2 asks for Require VehicleService + Swapped in OnStart; the
--- refresh is already driven by the atom, so only the source changes. Hush auto-end at holdUntil and "trailer dark
--- at the last post" are the reading of FEAT-020; Sanity.BasicLampRadius (0) inflates the Switch zones when > 0.
+-- Current vehicle: VehicleService:Current() and its Swapped signal (architecture.md §19.2; VehicleService 620 does not
+-- require LightService, so no cycle, T42). PROVISIONAL: Hush auto-end at holdUntil and "trailer dark at the last
+-- post" are the reading of FEAT-020; Sanity.BasicLampRadius (0) inflates the Switch zones when > 0.
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -87,6 +85,7 @@ const LightService = Modux.Service("LightService", {
 		"RoundService",
 		"InteractionService",
 		"UpgradeService",
+		"VehicleService",
 	},
 	Priority = 618,
 })
@@ -145,7 +144,7 @@ function LightService:GroupOn(key: string): boolean
 end
 
 function LightService:Vehicle(): string
-	return self.Dependencies.UpgradeService:GetVehicle()
+	return self.Dependencies.VehicleService:Current()
 end
 
 function LightService:Radius(group: Content.LightGroup): number
@@ -448,9 +447,9 @@ LightService:OnStart(function(self)
 		self:AddSwitch(anchor)
 	end)
 
-	-- Vehicle swap (§19.2: lower-priority source, so OnStart). PROVISIONAL until TASK-056: the vehicle atom of
-	-- UpgradeService instead of VehicleService.Swapped (same moment: SetVehicle is part of the swap).
-	self.Libs.Charm.subscribe(self.Dependencies.UpgradeService.Vehicle, function()
+	-- Vehicle swap (§19.2: LightService connects to VehicleService.Swapped in OnStart). Also fires on a
+	-- restore that changes the vehicle.
+	self.Dependencies.VehicleService.Swapped:Connect(function(_from, _to)
 		self:RefreshSwitches()
 		self:Refresh()
 	end)

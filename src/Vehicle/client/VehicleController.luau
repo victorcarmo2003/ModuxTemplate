@@ -13,8 +13,9 @@
 
 	No state of its own (§19.5): the vehicle in use is RoundController.Vehicle (Shift.Vehicle). The only local memory is
 	the `trailer_bought` Notice between the purchase and the swap (Shift.Vehicle still says "cart" until the next
-	shift). Provisional: a client that reconnects in that window sees "FOR SALE" until the swap; a `Bought` flag on
-	the trailer Model written by the VehicleService would close it (suggestion for TASK-054, not required here).
+	shift). The sale vehicle Model also carries the `Bought` attribute (written by the VehicleService): a client that
+	(re)joins in that window reads it and hides the sign too. The last value read is kept while the Model is streamed
+	out.
 
 	The client never buys nor moves a vehicle: the prompt (`Prompt_Buy`, buy_trailer) belongs to the VehicleService and
 	PromptController, the pivots to the server.
@@ -36,6 +37,8 @@ const SIGN_POINT = "SIGN-T"
 const SIGN_MAP_ID = "SIGN-T" -- MapId of the AST-024 stand placed at the point (MAP-01_placements.luau)
 const BOUGHT_NOTICE = "trailer_bought"
 const VEHICLE_TAG = "Vehicle"
+const VEHICLE_ATTRIBUTE = "Vehicle"
+const BOUGHT_ATTRIBUTE = "Bought"
 const MAP_WAIT = 60 -- seconds MapIndex.WaitReady may wait for streaming
 -- Billboard centre over the point when the sign model is not streamed in: AST-024 is 4 studs tall (+ half plate).
 const DEFAULT_SIGN_HEIGHT = 4.8
@@ -82,6 +85,9 @@ function VehicleController:Setup()
 	-- `trailer_bought` seen this session and Day it arrived (cleared by the swap or a new run)
 	self.Bought = Vide.source(false) :: Vide.Source<boolean>
 	self.BoughtDay = 0 :: number
+	-- `Bought` attribute of the sale vehicle Model (VehicleService; authoritative, also for late joiners)
+	self.SaleBought = Vide.source(false) :: Vide.Source<boolean>
+	self.SaleModels = {} :: { [Instance]: RBXScriptConnection }
 	self.SignModel = nil :: Model?
 	self.SignAnchor = nil :: Attachment?
 	self.Unmounts = {} :: { () -> () }
@@ -98,7 +104,31 @@ end
 -- Shown while the run is still on the starting vehicle and nobody bought the trailer
 function VehicleController:SignVisible(): boolean
 	const round = self.Dependencies.RoundController
-	return SALE ~= nil and round.Ready() and round.Vehicle() == START_VEHICLE and not self.Bought()
+	return SALE ~= nil
+		and round.Ready()
+		and round.Vehicle() == START_VEHICLE
+		and not self.Bought()
+		and not self.SaleBought()
+end
+
+-- Tagged Vehicle model: follows its `Bought` attribute when it is the sale vehicle
+function VehicleController:WatchVehicle(model: Instance)
+	if SALE == nil or self.SaleModels[model] ~= nil or model:GetAttribute(VEHICLE_ATTRIBUTE) ~= SALE.Key then
+		return
+	end
+	const read = function()
+		self.SaleBought(model:GetAttribute(BOUGHT_ATTRIBUTE) == true)
+	end
+	self.SaleModels[model] = model:GetAttributeChangedSignal(BOUGHT_ATTRIBUTE):Connect(read)
+	read()
+end
+
+function VehicleController:UnwatchVehicle(model: Instance)
+	const connection = self.SaleModels[model]
+	if connection then
+		self.SaleModels[model] = nil
+		connection:Disconnect()
+	end
 end
 
 -- Transition packet: start (or restart) the cover from the server time; a late packet only plays what is left
@@ -268,6 +298,16 @@ VehicleController:OnInit(function(self)
 end)
 
 VehicleController:OnStart(function(self)
+	for _, model in CollectionService:GetTagged(VEHICLE_TAG) do
+		self:WatchVehicle(model)
+	end
+	CollectionService:GetInstanceAddedSignal(VEHICLE_TAG):Connect(function(model)
+		self:WatchVehicle(model)
+	end)
+	CollectionService:GetInstanceRemovedSignal(VEHICLE_TAG):Connect(function(model)
+		self:UnwatchVehicle(model)
+	end)
+
 	-- PlayerGui and the MapBinding may arrive late; do not hold up the other OnStart.
 	task.spawn(function()
 		const playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
