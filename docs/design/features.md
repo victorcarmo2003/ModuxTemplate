@@ -732,6 +732,8 @@ Efeitos de sanidade baixa (só no client do próprio jogador; nunca interativos;
 
 Regra: alucinação que imita sinal de anomalia (poste do Walker, telefone) **não abre teste**, não faz o Walker andar e não tira o −5 de "ver".
 
+**DEC-166 (2026-10-10), nota do secretário:** o **visual do personagem** representa a sanidade: alta = texturas de dia + rosto Normal; média = pack "Mid" + rosto Exhausted; baixa = texturas de noite + rosto `Normal_Night`. A definir pelo game-designer (Rascunho): critério da troca (turno × sanidade × ambos; de dia a sanidade não existe) → `Q-155`; limites alto/médio/baixo em pontos, de quem (jogador/NPC) e se os colegas veem (DEC-038 diz efeito só no client do próprio jogador) → `Q-156`.
+
 | Regra | Valor |
 |---|---|
 | Existe | só à noite; some do HUD de dia **[DEC-056]** |

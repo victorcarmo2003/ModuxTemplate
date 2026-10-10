@@ -2315,3 +2315,53 @@ Origem das DEC-164 e DEC-165: mensagem do usuário ao orquestrador, 2026-10-10, 
   - **art-director:** regra na ficha AST-053: "noite = camada RGB (30, 32, 54) α 68 sobre todo texel de pelo (cabeça, braços, mãos); patinhas e roupa intactas; mesma cor para todas as espécies".
   - **architect:** nenhuma técnica nova (sem shader por espécie).
   - Notas em `asset-list.md` (AST-053), `open-questions.md` (`Q-151` → Respondidas; `Q-148`, `Q-150`), `README.md` → secretário (feito).
+
+---
+
+Origem da DEC-166: mensagem do usuário ao orquestrador, 2026-10-10, depois da DEC-165. Entrega no commit `d699cf7` (branch `assets/kenney-pipeline`, após `675c0b1`); relatada ao secretário, **não** é aprovação do usuário da entrega.
+
+### DEC-166 — 2026-10-10 — O visual do personagem representa a sanidade: alta = dia, média = pack "Mid" + rosto Exhausted, baixa = noite (emenda da DEC-150)
+
+- Fala do usuário (literal): "Preciso de mais um pack de textura, faz um meio termo entre o Noite e o normal e vamos fazer o seguinte, isso vai ser basicamente a representação da sanidade dele, se estiver baixa ele fica com essa da noite, se estiver alta, ele fica com a do dia, e se estiver media ele fica com a do rosto depressivo".
+- Decidido pelo usuário:
+  - Existe um **terceiro pack de textura, "Mid"**: meio-termo entre o de dia e o de noite.
+  - O visual do personagem **representa a sanidade**:
+
+    | Sanidade | Pack de textura | Rosto (expressão) |
+    |---|---|---|
+    | **Alta** | **dia** (`T_Head_<A>`, uniforme/civil de dia, atlas normal) | **Normal** |
+    | **Média** | **Mid** (pack novo) | **Exhausted** ("depressivo", DEC-162) |
+    | **Baixa** | **noite** (`*_Night`, DEC-150/154/165) | **Normal_Night** |
+
+- Leitura do secretário: "dele" = o personagem do jogador (crew). Se vale também para NPC → `Q-156` (b).
+- Feito pelo orquestrador (commit `d699cf7`; entregue, **não aprovado** pelo usuário):
+
+  | Item | Arquivos |
+  |---|---|
+  | Cabeças Mid | `T_Head_<A>_Mid`, **18 espécies** (DEC-158) |
+  | Roupas Mid | `T_Crew_Uniform_Mid`, `T_Civil_A_Mid` a `T_Civil_H_Mid` |
+  | Acessórios Mid | `T_Atlas_Kitchen_Mid` (orelhas, cauda, casco, bico, boné; como DEC-154) |
+  | Protótipo | `tools/assetplace/build_crew.luau`: `Crew.applyTime` (dia/noite) e `Crew.setSanity` (High/Mid/Low) |
+  | Demo no Studio | `workspace.CrewDemo`, modelos `Sanity_<A>_<High\|Mid\|Low>` |
+
+- **Emenda da DEC-150** (não a revoga; append-only):
+  - DEC-150 dizia: personagem troca dia ↔ noite **pelo turno**.
+  - Agora: o pack de **noite** é **também** o visual da **sanidade baixa**. A noite do turno e a sanidade baixa usam **o mesmo pack**.
+  - **Não decidido:** a troca é **por turno**, **por sanidade** ou **ambos** → **`Q-155`** (não bloqueante).
+- **Conflitos levantados (não resolvidos aqui):**
+
+  | Com | Conflito |
+  |---|---|
+  | DEC-056 / FEAT-019 | sanidade **só existe à noite**. De dia não há valor; "alta = dia" de dia é só leitura padrão? → `Q-155` |
+  | DEC-038 / FEAT-019 | efeitos de sanidade baixa são **só no client do próprio jogador**. Textura no personagem é vista pelos colegas? → `Q-156` (d) |
+  | DEC-150 / `Q-148` (b) | recomendação do agente era "a crew não troca à noite". Esta DEC faz a crew trocar (pela sanidade). `Q-148` (b) fica para conferir junto com `Q-155` |
+  | FEAT-019 | faixas de alucinação < 60 / < 40 / < 20; limites alto/médio/baixo do visual **não definidos** → `Q-156` (c) |
+  | `Q-150` | rosto `Normal_Night` entregue = 1ª expressão de noite; a lista de (a) segue aberta |
+  | `Q-154` (humor dos NPCs) | Exhausted é humor de NPC (DEC-162) **e** sanidade média do jogador → `Q-156` (b) |
+
+- Não muda: técnica por troca de textura (DEC-150), malha e rig (DEC-151), cor da noite azul-marinho (DEC-165), regra de que a noite cobre todas as peças (DEC-154), `T_Civil_Thief_Day` só dia (DEC-159), números de sanidade (DEC-056, FEAT-019).
+- Impacto:
+  - **game-designer:** `Q-155` e `Q-156` (proposta Rascunho com opções e recomendação); nota em FEAT-019 (visual por faixa); ligação com `Q-154`.
+  - **art-director:** ficha AST-053 com 3 packs (dia, Mid, noite) e o rosto por faixa; memória do 3º pack em `Q-144` (g).
+  - **architect:** troca de pack + expressão por faixa (quem troca, quem vê, pré-carregar 3 packs); memória (+1 pack inteiro).
+  - Notas em `features.md` (FEAT-019), `asset-list.md` (AST-053), `open-questions.md` (`Q-155`, `Q-156`; anotadas `Q-144`, `Q-148`, `Q-150`, `Q-154`), `README.md` → secretário (feito).

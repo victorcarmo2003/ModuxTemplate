@@ -133,6 +133,8 @@ Mapeamento Kenney/KayKit por ficha (DEC-136, Rascunho): `asset-sourcing.md`. As 
 
 **DEC-164 e DEC-165 (2026-10-10):** tris do rig animal **aprovados como entregues** (≈ 2,0–2,5k; Sheep ≈ 2.530; vale para AST-053/054/056, nota no style guide §9.1). Noite **azul-marinho igual** para todas as espécies (`Q-151` A); braços/mãos acompanham nas folhas `*_Night` (commit `70094d3`).
 
+**DEC-166 (2026-10-10):** **3º pack "Mid"** (meio-termo dia/noite) e visual por **sanidade**: alta = dia + rosto Normal; média = Mid + Exhausted; baixa = noite + `Normal_Night`. Entregue (commit `d699cf7`, não aprovado): `T_Head_<A>_Mid` (18), `T_Crew_Uniform_Mid`, `T_Civil_A..H_Mid`, `T_Atlas_Kitchen_Mid`. Critério da troca (turno × sanidade) `Q-155`; faixas e quem `Q-156`; memória `Q-144` (g).
+
 Mapa anomalia → asset (DEC-096): ANM-001 AST-060 · ANM-002 AST-061 · ANM-003 AST-044 (estados do relógio) · ANM-004 AST-062 (+ AST-055) ·
 ANM-005 AST-059 · ANM-006 AST-063 (+ AST-045) · ANM-007 AST-064 (+ AST-036) · ANM-008 AST-065 · ANM-009 AST-066 · ANM-010 AST-067 (+ AST-036, AST-028).
 
@@ -781,6 +783,7 @@ Regras gerais: style guide §4 (opção A: `BodyColors` + acessórios de atlas +
 - **DEC-163 (2026-10-10):** **aprovados** (modelo/textura): as 10 espécies da DEC-158, `T_Civil_A` a `H` (A/B repintadas), peças do Quentin (DEC-159), correções da DEC-161 e expressões da DEC-162. **Orçamento de tris não aprovado** (`Q-144` g; Sheep ≈ 2.530); cor da noite em `Q-151` (mãos com a cor do bicho, cabeça azul-marinho). Texto desta ficha segue **Rascunho** até a reescrita do art-director.
 - **DEC-164 (2026-10-10):** tris **aprovados como entregues**: ≈ 2,0–2,5k por personagem completo, Sheep ≈ 2.530 aceito; sem redução da cabeça. Vale para crew e civil (mesma malha). `Q-144` (g) fechado na parte de tris; memória de textura segue aberta.
 - **DEC-165 (2026-10-10):** noite = **azul-marinho igual para todas as espécies** (`Q-151` respondida, opção A). Braços/mãos acompanham: `T_Crew_Uniform_Night` e `T_Civil_A_Night` a `T_Civil_H_Night` com a camada da cabeça noturna (RGB 30, 32, 54; alpha 68) só nos texels de pelo; patinhas e roupa intactas (commit `70094d3`, entregue, não aprovado).
+- **DEC-166 (2026-10-10):** **3 packs** por personagem: **dia**, **Mid** (novo, meio-termo) e **noite**. Visual = **sanidade**: alta → dia + `Normal`; média → Mid + `Exhausted`; baixa → noite + `Normal_Night`. Entregue (commit `d699cf7`, **não aprovado**): `T_Head_<A>_Mid` (18 espécies), `T_Crew_Uniform_Mid`, `T_Civil_A_Mid` a `T_Civil_H_Mid`, `T_Atlas_Kitchen_Mid`; protótipo `tools/assetplace/build_crew.luau` (`Crew.applyTime`, `Crew.setSanity`); demo `workspace.CrewDemo` (`Sanity_<A>_<High|Mid|Low>`). Emenda DEC-150 (noite do turno e sanidade baixa = mesmo pack). Abertos: critério da troca `Q-155`; faixas, quem e visibilidade `Q-156`; +1 pack inteiro na memória `Q-144` (g); `Normal_Night` entra em `Q-150`.
 
 ### AST-054 — Clientes normais e pedestre (7 tipos × 4 variantes)
 
