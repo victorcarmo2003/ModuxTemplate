@@ -1,7 +1,7 @@
 --!strict
 -- OrderBubble is a BillboardGui, so it is previewed in the 3D viewport: a temporary "head" part 8 studs in front of
 -- the Studio camera (removed when the story closes). Tick the toppings (only the first 3 show, DEC-071), drag the
--- patience, or turn the ring off (patience unknown, T41).
+-- patience, turn the ring off (patience unknown, T41), or make it Empty (ANM-001 blank folks: no icon at all).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -20,6 +20,7 @@ type Controls = {
 	PotatoSticks: () -> boolean,
 	CreamCheese: () -> boolean,
 	Ring: () -> boolean,
+	Empty: () -> boolean,
 	Patience: () -> number,
 }
 
@@ -33,6 +34,7 @@ return UILabs.CreateVideStory({
 		PotatoSticks = false,
 		CreamCheese = false,
 		Ring = true,
+		Empty = false,
 		Patience = UILabs.Slider(0.8, 0, 1, 0.01),
 	},
 }, function(props)
@@ -74,6 +76,7 @@ return UILabs.CreateVideStory({
 			end
 			return list
 		end,
+		Empty = controls.Empty,
 		Patience = function()
 			return if controls.Ring() then controls.Patience() else -1
 		end,

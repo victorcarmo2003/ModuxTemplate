@@ -6,6 +6,8 @@
 -- it is drawn (MaxDistance).
 -- Icons: `Icon` (rbxassetid) when the art exists; until Q-152 / AST-071 a flat placeholder chip drawn here (colored
 -- circle + short letters). The base icon is always the drawn placeholder (no Ingredients row for it). Provisional.
+-- Empty (TASK-112, ANM-001; style guide §7.3 "Vazio = ANM-001"): no base icon and no toppings, same white bubble
+-- and patience ring at the one-cell width; the order is still on the wire (the server judges it).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Theme)
@@ -25,6 +27,8 @@ export type Props = {
 	Visible: () -> boolean,
 	-- In the order's display order (max 3, DEC-071). Empty = plain hot dog (K = 0).
 	Toppings: () -> { Topping },
+	-- true = empty bubble (ANM-001 blank folks): no icon at all. Default false.
+	Empty: (() -> boolean)?,
 	-- Patience left, 0..1. Negative = no ring (patience unknown: PatienceEndsAt = 0, T41).
 	Patience: () -> number,
 	-- Below this fraction the ring turns Mustard (Content.Moods.Rules.AnnoyedAt). Default 1/3.
@@ -75,12 +79,15 @@ local function label(text: string | () -> string): TextLabel
 	})
 end
 
-local function baseIcon(): Frame
+local function baseIcon(empty: () -> boolean): Frame
 	return create("Frame")({
 		Name = "Base",
 		LayoutOrder = 0,
 		Size = UDim2.fromOffset(CELL, CELL),
 		BackgroundTransparency = 1,
+		Visible = function()
+			return not empty()
+		end,
 
 		create("Frame")({
 			Name = "Bun",
@@ -175,9 +182,20 @@ end
 
 return function(props: Props): BillboardGui
 	const warnAt = props.WarnAt or 1 / 3
+	const empty = props.Empty or function(): boolean
+		return false
+	end
+
+	-- shown toppings: none in an empty bubble
+	local function toppings(): { Topping }
+		if empty() then
+			return {}
+		end
+		return props.Toppings()
+	end
 
 	local function width(): number
-		const cells = 1 + math.min(#props.Toppings(), 3)
+		const cells = 1 + math.min(#toppings(), 3)
 		return PAD * 2 + cells * CELL + (cells - 1) * GAP
 	end
 
@@ -259,9 +277,9 @@ return function(props: Props): BillboardGui
 					SortOrder = Enum.SortOrder.LayoutOrder,
 					Padding = UDim.new(0, GAP),
 				}),
-				baseIcon(),
+				baseIcon(empty),
 				indexes(function()
-					const list = props.Toppings()
+					const list = toppings()
 					if #list <= 3 then
 						return list
 					end

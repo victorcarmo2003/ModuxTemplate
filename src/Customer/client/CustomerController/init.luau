@@ -293,6 +293,9 @@ function CustomerController:Mount(entry: Entry, model: Model)
 		return OrderBubble({
 			Name = `OrderBubble_{entry.Id}`,
 			Adornee = head,
+			Empty = function()
+				return entry.Variant() == BLANK
+			end,
 			Visible = function()
 				const record = entry.Record()
 				return record ~= false and record.State == "Waiting" and not entry.Reacting()
