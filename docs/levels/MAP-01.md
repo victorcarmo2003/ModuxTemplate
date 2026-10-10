@@ -7,6 +7,7 @@ Autor: level-designer. Versão 1: 2026-10-08. **Revisão 2 (2026-10-08): concili
 **Revisão 3, ajuste final (2026-10-08): DEC-130 (sem semáforo no MVP, revoga DEC-120); rodada 17 (`Q-128`, opção B, secretário registrando); postes da Juniper a 8 studs com JL-09 a ~135 (LD-15 / P33); nota de P35.**
 **Binding da onda 2 (2026-10-10, TASK-083): ponto novo `DROP-T` e `SIGN-T` como ponto (§5.1); poses `CART`/`TRL`/`TRL-SALE` = pivô do modelo; L1 e L3 ajustados para fora do poste e do banco (§5.3); grafo do ladrão (§9.1); §16 (binding no place); P40–P45. Provisório.**
 **Binding da onda 3 (2026-10-10, TASK-098): esconderijos H1..H4 com `Slot` e `Hide_Pose` (§7.2); passantes com 7 caminhos de calçada e 17 nós novos (§9.3, `Content.WalkPaths`); `CutsceneMark1..4` e `CS-5W`/`CS-5E` (§11.1); AN/AS/WALKER-10/SS como pontos (§10.3); trânsito com `TrafficPath`/`TrafficLine`/`TrafficBox` (§9.5); §16.5–§16.6; P46–P50. Provisório.**
+**DEC-221 (2026-10-10, architect a pedido do orquestrador):** esconderijos `H1..H4` (AST-041) **saem**; entra o botão da janela de serviço `TRL-SHUTTER` (`Prompt_Shutter` → `shutter_toggle`) ao lado de `TRL-SWITCH` e a aba `Awning` do AST-027 como peça animável (§7.2, §16.2, §16.5, §16.6, P51). Provisório.
 Nomes de lugares vêm de `story/world.md` (`Q-096`): cidade **Bellmoor**, esquina **Ninth & Juniper**, **Ninth Avenue**, **Juniper Street**, **Ninth Street Mart**, **Bellmoor Savings**. O nome do mapa, a lavanderia, B1 e B4 seguem placeholders para o narrative-writer (DEC-022: textos do jogo em inglês).
 Números de gameplay citados são valores iniciais ajustáveis (DEC-044). Medidas de mapa são **proposta do level-designer**; o que tem `[DEC-###]` é requisito decidido. `Provisório` = recomendação do level-designer que depende de pergunta aberta.
 Anomalias: `ANM-001`…`ANM-010` = N1…N10 (DEC-096).
@@ -364,11 +365,11 @@ Escala: **1 coluna = 1 stud (X)**, **1 linha = 1 stud (Z)**. X de 22 a 56.
       |         |         |         |
   33                                1      <- Q1 (52, 33)
   34                            _______    <- balcão dobrável externo (X 48..54)
-  35      +---~~~~~~~~~~~~~~~~~~~~~~~~+    <- parede frontal; ~ = janela de serviço (X 30..53)
+  35      +---~~~~~~~~~~~~~~~~~~~~~~~~+    <- parede frontal; ~ = janela de serviço (X 30..53); aba `Awning` por fora (DEC-221)
   36      |SSSGGGGGGRRRBBTTTKKKKKKHH$H|
   37      |SSSGGGGGGRRRBBTTTKKKKKKHH$H|    <- estações (mesma ordem e mesmos X do carrinho)
   38      |SSSGGGGGGRRRBBTTTKKKKKKHH$H|
-  39      |....h.....h.....h.....h....|    <- h = pontos de esconder H1..H4
+  39      |...........................|    <- (H1..H4 saíram, DEC-221)
   40      |...........................|
   41   <==|.....@.....@.....@.....@...|    <- @ = PS-N1..4; <== engate
   42      |...........................|
@@ -376,7 +377,7 @@ Escala: **1 coluna = 1 stud (X)**, **1 linha = 1 stud (Z)**. X de 22 a 56.
   44      |bbbbbbbbb...CCC.uu.........|    <- b = banco (3 lugares, cenário); C = cafeteira; u = lixeira
   45      |bbbbbbbbb...CCC.uu.........|
   46      |...........................|
-  47      +-------------------IDDDDD--+    <- I = interruptor (X 46); D = porta dos fundos (X 47..51)
+  47      +-----------------W-IDDDDD--+    <- W = botão da janela (X 43,4); I = interruptor (X 46); D = porta dos fundos (X 47..51)
   48                           ^^^^^       <- degraus (piso +2)
                                  -> rota do Mart / ponto seguro: para oeste pela traseira do Pad (~110 studs)
 ```
@@ -385,7 +386,9 @@ Escala: **1 coluna = 1 stud (X)**, **1 linha = 1 stud (Z)**. X de 22 a 56.
 |---|---|---|---|
 | Linha de estações | Z 36..39, X 27..53 | preparo [DEC-016] | grelha com 6 de largura |
 | Janela de serviço | parede norte, X 30..53, peitoril 3,5 do piso, topo a 8 | atender / recusar em Q1 [DEC-054] | vê a fila, o relógio C-01, as janelas WV, a Juniper e a vaga AN-12 **enquanto trabalha** |
-| Esconder H1..H4 | (31, 39.5) · (37, 39.5) · (43, 39.5) · (49, 39.5) | esconder [DEC-054] (ANM-008, ANM-009) | "atrás do balcão": câmera desce a ~2, abaixo do peitoril. Um por jogador, 4 pontos (DEC-176). **Binding (TASK-098):** armário AST-041 `H<n>` dentro do trailer com `Prompt_Hide` (`hide`, `Slot = n`) na porta, baixo (começa 1,2 acima do fundo do armário e desce/avança para o corredor até ficar ≥ 2,6 dos prompts da bancada) e `Hide_Pose` (chão do corredor, 1 stud à frente da porta, virado para a janela) para o `PivotTo` do `HideService` (P47) |
+| ~~Esconder H1..H4~~ | — | **sai (DEC-221)** | armários AST-041, `Prompt_Hide`, `Hide_Pose` e `Slot` saem do place e do binding |
+| Botão da janela `TRL-SHUTTER` | parede sul, (43.4, 46.5), mesma altura do interruptor | fechar/abrir a janela (DEC-221; ANM-008, ANM-009) | "ao lado do interruptor": 2,6 de `TRL-SWITCH` (donos diferentes: `VehicleService` × `LightService`, regra ≥ 2,5 do §16.4) e longe do prompt da lixeira (43.5, 44) pela altura. Peça = placa placeholder (0,5 × 0,7 × 0,15, Mustard) com `Prompt_Shutter` (`Interactable`, `PromptAction = "shutter_toggle"`) até a arte desenhar o botão. Hold 0,5, só à noite |
+| Aba da janela (`Awning`) | por fora da parede norte, sobre a janela (X 30..53, topo a 8 do piso) | estado `Shutter` do trailer: aberta (toldo levantado, como hoje) ou fechada (cobre a janela, peitoril 3,5 até o topo 8) | malha `Awning` do AST-027 (existe no `.fbx`). `Attachment` `Shutter_Hinge` na borda de cima (eixo X = dobradiça); o `VehicleController` gira a aba no client. Se a malha não for uma `MeshPart` separada no place, ou se abaixada não cobrir os 22,5 × 4,5 da janela: placa placeholder `Shutter_Panel` (Part 22,5 × 4,6 × 0,2, Aluminum, sem colisão) com a mesma dobradiça, e a `Awning` fica fixa (P51) |
 | Interruptor | parede sul, (46, 46.5) | luz [DEC-054, DEC-055] (ANM-003) | `Q-064` |
 | Lixeira | (43.5, 44) | descartar [DEC-054] (ANM-002) | 3,5 do interruptor e da cafeteira |
 | Cafeteira | (40, 44) | café [DEC-055] | barra sobre a cafeteira |
@@ -401,7 +404,7 @@ Medidas (iguais a AST-027): casco 28 × 12 (X 26..54, Z 35..47), interior 26 × 
 | Objeto | Carrinho | Trailer |
 |---|---|---|
 | Fila Q1–Q5, placa OPEN, spawns de cliente, gaveta (52, 37) | iguais | iguais |
-| Cafeteira, interruptor, esconder, banco, porta dos fundos | não existem | existem |
+| Cafeteira, interruptor, botão e aba da janela (DEC-221), banco, porta dos fundos | não existem | existem |
 | Estacionamento | trailer à venda (dias 1–5) | vaga com o carrinho sob lona (`Q-082`) |
 
 ### 7.4 Interior do Ninth Street Mart
@@ -787,7 +790,7 @@ Chaves `L01-##` são provisórias; coluna AST = ficha de `art/asset-list.md` (to
 | L01-10 | Cafeteira (fixa no trailer, DEC-125) | 3 × 3 | AST-022 | |
 | L01-11 | Interruptor | contraste alto | AST-039 | |
 | L01-12 | Banco do fundo (3 lugares, **cenário**) | 9 × 3 | AST-040 | DEC-122: não é lugar de acordar. Uso "amanhecer da noite perdida" em AST-040 está velho (AD-9) |
-| L01-13 | Armário baixo "Hide" (×4) | — | AST-041 | |
+| ~~L01-13~~ | ~~Armário baixo "Hide" (×4)~~ | — | AST-041 | **sai (DEC-221)**; no lugar, botão da janela (placeholder, sem AST) ao lado do AST-039 e aba `Awning` do AST-027 |
 | L01-14 | Lixeiras | 2 × 2 | AST-025 | |
 | L01-15 | Placa OPEN / CLOSED | ≤ 3 de altura | AST-024 | |
 | L01-16 | Pedestais + marcas Q1–Q5 | — | AST-019 | |
@@ -914,7 +917,7 @@ P1–P18 já viraram perguntas no `open-questions.md` (rodada 8). Situação atu
 | P13 | Funcionário do Mart | **resolvida no mapa**: Opal (DEC-079, DEC-099) sem âncora de anomalia; AN-08 retirada, AN-12 nova. Falta `Q-091` (a), fora do teto |
 | P14 | Trânsito | **Fechada: DEC-087** (andando), **DEC-095** (atropela), **DEC-103** (item cai, sem sanidade), **DEC-130** (sem semáforo; revoga DEC-120). Rotas e densidade em §9.5 para `Q-102`; regra de travessia para `Q-129` |
 | P15 | Ponto seguro nunca recebe anomalia | aberta, `Q-092` |
-| P16 | Esconder por jogador | aberta, `Q-094` |
+| P16 | Esconder por jogador | fechada por DEC-176; **esconder saiu (DEC-221)** |
 | P17 | Escala | `Q-095` pode fechar por **DEC-126**: style guide aprovado com R6, olho 4,5, bancada 3,5, igual a este mapa |
 | P18 | Nomes | **resolvida no mapa** com os nomes de `world.md` (`Q-096`); faltam nome do mapa, lavanderia, B1, B4 (narrative-writer) |
 
@@ -955,10 +958,11 @@ Binding da onda 3 (TASK-098), para o secretário registrar (nenhuma bloqueia o c
 | # | Pergunta (dono) | Recomendação do level-designer |
 |---|---|---|
 | P46 | Cutscene de abertura: `MoveTo` é reta. CS-4 (−18, 22) → CS-5 (0, 38) e CS-5 → CS-P{slot} cortam a pista da Juniper Sul **fora** das listras de CW-1; e o `MoveTo CS-4` (At 11) leva a party para dentro de CW-2 enquanto o `ToyCarNinth` passa (At 13), o contrário do beat "para no meio-fio, o carro passa, atravessa" (narrative-writer + architect, `Content.Cutscenes`) | **Resolvida** (architect, 2026-10-10, Provisório): `Content.Cutscenes` intro agora espera o carro em CS-3 (`ToyCarNinth` At 13), atravessa CW-2 depois (`MoveTo CS-4` At 15), desce a calçada oeste até `CS-5W` (At 18,5), cruza CW-1 até `CS-5E` (At 20,5) e vai a `CS-P{slot}` (At 22,5); `LookAt`/`Prompt`/`FlipPhone` em 23,5/24,5/25,5. `CS-5` sai da cadeia (o ponto fica no place). O aviso do `check_map01` deve sumir na próxima rodada |
-| P47 | Onde o `HideService` põe o jogador escondido (§19.14 diz `PivotTo` na vaga, sem dizer o ponto) (architect) | `Hide_Pose` (Attachment sem tag) dentro de cada armário `H<n>`: chão do corredor, 1 stud à frente da porta, virado para a janela; o serviço soma a altura do HRP agachado. O `Prompt_Hide` fica baixo na porta (≥ 2,6 dos prompts da bancada) |
+| P47 | **Obsoleta (DEC-221: esconderijo saiu)**. Onde o `HideService` põe o jogador escondido (§19.14 diz `PivotTo` na vaga, sem dizer o ponto) (architect) | `Hide_Pose` (Attachment sem tag) dentro de cada armário `H<n>`: chão do corredor, 1 stud à frente da porta, virado para a janela; o serviço soma a altura do HRP agachado. O `Prompt_Hide` fica baixo na porta (≥ 2,6 dos prompts da bancada) |
 | P48 | Formato dos nós de rota de trânsito (a TASK-097 só diz "Folder/Model dos nós ordenados") (architect, TASK-104) | `Folder` `TR-n` com `Part` `01..nn`, atributo `Index`, frente para o próximo nó; linha `SL-*` = `Part` com `LookVector` no sentido de quem para; velocidade de cruzamento por `X-T` (§9.5) |
 | P49 | AST-045 novo (com `Window_Up_1..3`) ainda não reenviado (modeler-3d) | Até o reenvio, `WV-1..3` são `Part` invisíveis em `MapBinding/Anomaly` na posição das janelas; o efeito da ANM-006 precisa do modelo novo (cortina, `_Lit`, `Att_Waver_N`) |
 | P50 | Passantes à noite (DEC-183: 1–2) × "NPC fora da rota é sinal" (§9.1); pop-in do laço (game-designer + architect, `Q-162`) | À noite só os caminhos do oeste (CW-2), longe das rotas de cliente e da Juniper Norte. O laço `ninth_east_loop` nasce à vista: `PedestrianService` com fade de entrada ou só de dia (já é `Day`) |
+| P51 | Peça que fecha a janela (DEC-221): a malha `Awning` do AST-027 serve? (level-designer + art-director) | Usar a `Awning` se for `MeshPart` separada no `TRL` e, girada na dobradiça de cima, cobrir a janela (22,5 × 4,5). Senão, `Shutter_Panel` placeholder (Part 22,5 × 4,6 × 0,2, Aluminum) com a mesma dobradiça e a `Awning` fixa; o art-director desenha a aba de verdade depois. Botão `TRL-SHUTTER` placeholder até ficha de arte |
 
 Fora deste documento, mas dependem dele: fichas técnicas `ANM-###` (escolher âncoras de §10.3), `design/npcs.md`, `art/asset-list.md` (converter L01-## sem AST em fichas), blockout no Blender (quando pedido, combinado com o modeler-3d).
 
@@ -971,7 +975,7 @@ Contrato: `tech/architecture.md` §18 e §19.22. Ferramentas (modo de edição, 
 O usuário ajustou o place à mão; `MAP-01_placements.luau` agora reproduz o estado (campos novos `drop`, `parts`, `copies`, `pivot`, aplicados por `place_assets.luau`):
 trailer sem a extensão de entrega (`DeliveryStand` do AST-020), registradora (`TRL-DRAWER`) e mesa de coberturas (`TRL-K`) viradas para o operador (rotY 180) com pivô da registradora movido, tábua `TRL-T` virada (rotY 0) e maior (2,6 × 1,4), bancos `TRL-BENCH-1..3` girados 180 em grupo (pivôs no lugar), duas camadas extras de pão em `TRL-B`, malha dos armários `H1..H4` removida (modelos vazios ficam).
 Carrinho: `Body` com 3,0 de altura (topo em 3,45); `DRAWER` sem extensão e virado para o operador; `CART-K` espelhado do trailer (rotY 180, z 37,352). Conferência sem rodar `Place.run`: `Place.diff(placements, ids)` (só leitura) — resultado 0 diferenças.
-**Atenção:** sem a malha, `H1..H4` estão sem `Prompt_Hide`/`Hide_Pose` no place; um novo `Bind.run` os recria por fallback. Provisório.
+**Atenção:** sem a malha, `H1..H4` estão sem `Prompt_Hide`/`Hide_Pose` no place; um novo `Bind.run` os recria por fallback. Provisório. **DEC-221:** `H1..H4` saem de vez (modelos vazios, placements, fallback do bind); TASK-132.
 
 ### 16.1 Como rodar (Command Bar, repositório servido na porta 8772)
 
@@ -985,10 +989,11 @@ local H=game:GetService("HttpService") local w=H.HttpEnabled H.HttpEnabled=true 
 
 | Peça | Onde | Tag / atributos |
 |---|---|---|
-| Trailer | AST-027 do Pad (`TRL`) + todo `TRL-*` e H1..H4 dentro dele; estacionado em `TRL-SALE` no fim do bind (a casca vazia `TRL-SALE` sai) | `Vehicle = "trailer"`; estações como o carrinho, `rail` com 8 vagas (`Rail_8`), `board` com 3 (`Att_Bun1..3`), `coffee_machine` (`Ingredient = coffee`; `Prompt_Brew` → `brew_coffee`, `Prompt_Restock` → `restock`); `Zone_Center`; gaveta `TRL-DRAWER` com `Value_Anchor` |
+| Trailer | AST-027 do Pad (`TRL`) + todo `TRL-*` dentro dele (H1..H4 saem, DEC-221); estacionado em `TRL-SALE` no fim do bind (a casca vazia `TRL-SALE` sai) | `Vehicle = "trailer"`; estações como o carrinho, `rail` com 8 vagas (`Rail_8`), `board` com 3 (`Att_Bun1..3`), `coffee_machine` (`Ingredient = coffee`; `Prompt_Brew` → `brew_coffee`, `Prompt_Restock` → `restock`); `Zone_Center`; gaveta `TRL-DRAWER` com `Value_Anchor` |
 | Telefone | `CART-PHONE` (no poste do guarda-sol) e `TRL-PHONE` (parede da frente) | `Prompt_Answer` → `answer_phone`; a âncora sobe até ficar ≥ 2,6 de qualquer prompt de outra estação |
 | Compra | `Prompt_Buy` na casca do trailer, fora da janela (anda com ele; em `TRL-SALE` fica virado para o Pad) | `buy_trailer` |
 | Interruptor | `TRL-SWITCH`, parede sul (46, 46) | `Prompt_Switch` → `switch_light` |
+| Janela (onda 3, DEC-221) | botão `TRL-SHUTTER` (43.4, 46.5) ao lado do interruptor; aba `Awning` do AST-027 | `Prompt_Shutter` → `shutter_toggle`; `Shutter_Hinge` (`Attachment`) na `Awning` (ou no `Shutter_Panel`, P51); atributo `Shutter` é do `VehicleService` (não autorar) |
 | Lona | `Model` `VehicleCover` dentro do carrinho (caixa cinza do tamanho da bancada, AST-043 pendente) | tag `VehicleCover`; escondida, `Orig*` com os valores visíveis (P41) |
 | Luz (volumes) | `MapBinding/LightZones`: LZ-1 (X 27..53, Z 36..46, piso +2 até o teto), LZ-2 (X 44..56, Z 30..35), LZ-3 (bola r 18 em (40, 41)), LZ-4 (Mart), LZ-5 (bola r 6 no SS) | tag `LightZone`, `ZoneId`, `Group` (`trailer_interior`, `trailer_lights`, `mart`); nenhum volume na rota Pad ↔ Mart (DEC-196) |
 | Postes | um `Model` por poste (haste + cabeça) JL-01..09, P-01 | tag `StreetLight`, `PostId`, `Group = juniper_posts`, `Order` 1..10 (JL-09 = 1 … JL-01 = 9, P-01 = 10 = ordem do Hush; passo do Walker = `Order − 1`) |
@@ -1021,7 +1026,7 @@ local H=game:GetService("HttpService") local w=H.HttpEnabled H.HttpEnabled=true 
 
 | Peça | Onde | Tag / atributos |
 |---|---|---|
-| Esconderijos | armários AST-041 `H1..H4` dentro do trailer (§7.2) | `Prompt_Hide`: `Interactable`, `PromptAction = "hide"`, `Slot` 1..4; `Hide_Pose` sem tag (P47) |
+| ~~Esconderijos~~ → Janela (DEC-221) | botão `TRL-SHUTTER` ao lado de `TRL-SWITCH`; aba `Awning` do AST-027 (§7.2) | `Prompt_Shutter`: `Interactable`, `PromptAction = "shutter_toggle"`; `Shutter_Hinge` (`Attachment`) na peça que gira. `H1..H4`, `Prompt_Hide`, `Hide_Pose` saem |
 | Janelas N6 | `Window_Up_1..3` do AST-045 (`Z-11`); fallback `MapBinding/Anomaly/WV-n` (P49) | `AnomalyAnchor`, `AnchorId` WV-1..3 |
 | Pontos | §5.2, §5.4, §5.6, §10.3, §11 | `SS`, `AN-04/05/11/12`, `AS-1..4`, `WALKER-10`, `W/E/JN/JS-IN/OUT`, `CutsceneMark1..4`, `CS-1..5`, `CS-5W`, `CS-5E`, `CS-P1..4`, `SS-1..4`, `MKT-DOOR`, `WALT-1`, `RL-1`, `RL-END` |
 | Calçadas | §9.3 | 17 `NpcNode` novos; `Crosswalk` CW-1, CW-2, CW-3 (pares de meio-fio); `Content.WalkPaths` com 7 caminhos |
@@ -1034,7 +1039,7 @@ local H=game:GetService("HttpService") local w=H.HttpEnabled H.HttpEnabled=true 
 | Tags | onda 2 + `AnomalyAnchor`, `TrafficPath`, `TrafficLine`, `TrafficBox` |
 | Pontos | onda 2 + `SS`, `AN-04/05/11/12`, `AS-1..4`, `WALKER-10`, entradas/saídas, pontos de cutscene **derivados de `Content.Cutscenes`** (`Marks`, `MoveTo` com `{slot}` 1..4, `LookAt` fora de poste) + `MKT-DOOR`, `WALT-1`, `RL-1`, `RL-END` |
 | Nós | onda 2 + todos os de `Content.WalkPaths`; regra 10: nós ligados na ordem, laço fecha, nenhuma vaga Q; caminho `Night`/`Any` em nó de rota de cliente só avisa |
-| Trailer | `hide` = 4 âncoras soltas com `Slot` 1..4 uma vez cada; `Prompt_Hide` no armário `H<Slot>`, `Hide_Pose` presente (aviso) |
+| Trailer | `shutter_toggle` = 1 âncora (`Prompt_Shutter`) dentro do trailer, ≥ 2,5 das âncoras de outros donos; `Shutter_Hinge` presente (aviso). `hide`/`Slot` saem (DEC-221) |
 | Ids tagueados | WV-1..3; TR-1..10; as 8 `SL-*`; X-T e CW-1..4 (lidos de `Content.Traffic` quando sincronizado) |
 | Trânsito (regra 11) | nós `Index` 1..n sem buraco; 1º nó no ponto de entrada da rota, último num `*-OUT` (aviso); cruza as linhas das `Stops` na ordem; 1ª linha de faixa ≥ `SpawnMinDist` (55); passa pela caixa do conflito; linhas e caixas invisíveis sem colisão |
 | Cutscene | trecho `MoveTo` da intro fora das listras só avisa (P46) |

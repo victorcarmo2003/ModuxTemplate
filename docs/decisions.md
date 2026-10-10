@@ -3101,3 +3101,20 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
 - Não aprova `sound-list.md` (segue Rascunho).
 - Médicos com rosto `Exhausted` fixo + máscara cirúrgica: **já registrado na DEC-213**; sem DEC nova.
 - Impacto: **architect** (ids vazios até o upload; `Q-167`, `Q-168`), **game-designer** (`sound-list.md` como referência para o usuário). Notas em `open-questions.md` (`Q-167`, `Q-168`), `README.md` → secretário (feito).
+
+### DEC-221 — 2026-10-10 — Esconder sai; entra a janela de serviço do trailer (abre/fecha) como verbo de N8 e N9
+
+- Origem: conversa do usuário com o orquestrador (2026-10-10), registrada pelo architect a pedido do orquestrador.
+- Decidido pelo usuário:
+  - O **esconderijo em armários** dentro do trailer **sai**: pontos `H1..H4`, AST-041, ações `hide`/`get_up`, `HideService`/`HideController`.
+  - No lugar: um **botão ao lado do interruptor de luz** do trailer (`TRL-SWITCH`, `switch_light`) que **abre e fecha a janela de serviço**: a aba/toldo do lado de fora que cobre a janela.
+  - **Janela fechada** é o estado protegido que N8 (ANM-008, long car) e N9 (ANM-009, knock) usavam como "escondido". O verbo de N8/N9 passa de "esconder" para **"fechar a janela"**.
+- **Emendas (append-only):** DEC-054 (o verbo "esconder" vira "fechar a janela"; seguem 7 verbos); **DEC-176** (esconder por jogador com 4 pontos) deixa de valer; `story/anomalies.md` (Aprovado, DEC-073): N8/N9 só trocam o verbo, sinal, conceito, consequência e tempos não mudam; AST-041 (Aprovado, DEC-138) sai do jogo.
+- **Provisório** (não perguntado; architect, `tech/architecture.md` §19.14 v4.2):
+  - Com a janela **fechada** não se atende: "Take Order", "Serve" e "Refuse" são recusados (gate do `InteractionService`); a fila espera e a paciência continua correndo (mesma nota da N8 em `anomalies.md`).
+  - Ação `shutter_toggle`, hold 0,5 s, só à noite, cooldown 1 s; qualquer membro ativo abre ou fecha (estado da party). Abre sozinha no início de cada turno e na noite perdida/retomada; não entra no snapshot.
+  - Protegido = janela fechada **e** jogador dentro do trailer. N8: no fim do prazo (8 s depois do farol), quem está na zona do trailer e não está protegido perde 35; abrir antes de o carro ir embora = falha **de quem abriu** (DEC-204, ação → quem agiu). N9: no fim da última batida (12 s), quem está na zona e não está protegido perde 35.
+  - Com a janela fechada, quem está dentro do trailer não "vê" nada do lado de fora (sem −5 por ver, não conta como "olhando" para N6/N7). Consequência aceita como custo: a venda para.
+  - Estado replicado como atributo `Shutter` no `Model` do trailer (T61). Peça animada = malha `Awning` do AST-027 (existe no `.fbx`); se não cobrir a janela, placa fixa placeholder.
+- Dúvidas para lote: `Q-173`.
+- Impacto: **architect** (este registro; `architecture.md` §19.14, `network.md` §13.6, `content-data.md` §6.9/§6.10, `data.md` §5.2; TASK-129 contrato aditivo, TASK-133 limpeza), **backend-coder** (TASK-130), **frontend-coder** (TASK-131), **level-designer** (TASK-132; `MAP-01.md` §7.2/§16), **game-designer** (`features.md` FEAT-023 feito pelo architect; números da `Q-173`), **narrative-writer** (falas do chefe da N8/N9 em `script.md` e `BossCalls.luau`, textos "Close Window"/"Open Window"/aviso `shutter_closed` em `ui-text.md`; `anomalies.md` com o verbo trocado pelo architect), **art-director** (AST-041 sai; AST-027 `Hide_1..4` saem dos encaixes, `Awning` vira peça animável, botão ao lado do AST-039; clipe `Crew_Hide` do AST-069 sai da lista), **qa-tester** (TASK-134: `tests/wave-3.md`, casos de esconder → janela). `README.md` → secretário.

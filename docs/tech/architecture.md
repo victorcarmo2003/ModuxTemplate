@@ -12,6 +12,8 @@ sugeridas; T42–T58. Onde §2–§13 divergem do §19, **vale o §19**.
 **Versão 4.1, 2026-10-10 (TASK-049):** divergências da onda 1 fechadas no texto (`wave-1-report.md` D-01, D-07;
 §19.26 A5 conferido); `Gems` da run no `RunReport` por passo registrado no `RoundService` (T59); dono do `discard`
 na lixeira de rua = `KitchenService` (T60, DEC-200). Ver §0.-3.
+**Versão 4.2, 2026-10-10 (DEC-221):** esconderijo sai; janela de serviço do trailer (estado `Shutter` do `VehicleService`,
+ação `shutter_toggle`) vira o estado protegido de N8/N9 (§19.14 reescrito, T61; T52 superada).
 Base: `README.md` (raiz, Modux V3), `CLAUDE.md`, `docs/vision.md`, `docs/decisions.md` (DEC-001 a DEC-130),
 `docs/open-questions.md`, `design/proposals-round-1.md` e `proposals-round-2.md` (Aprovados), `story/anomalies.md`
 (Aprovado), `art/style-guide.md` (Aprovado, DEC-126), `levels/MAP-01.md` (Rascunho, revisão 3: rotas e entradas),
@@ -55,7 +57,7 @@ architect por delegação da DEC-208: técnica, sem regra de jogo nova).
 | Relatório do turno | `ShiftEnded(info, report)` (§4.1) | código da onda 1 manda: `ShiftEnded(info)` + `EconomyService.Reported(info, report)`; gemas/AFK/última chance entram por `EconomyService:AddReportStep` antes do envio | §19.3, T48 |
 | Ciclos de `Require` | Round ↔ Vital (§3.1) | **proibidos**; central expõe probe/registro, periférico requer o central (Vital → Round, Vehicle → Round) | §19.0, T42 |
 | Escuro | dentro do `VitalService` | feature `Light` própria (`LightService`, set `Lights`); Vital só pergunta `IsLit` | §19.6, T45 |
-| Esconder | dentro do `AnomalyService` | feature `Hide` (set `Hides`) | §19.14, T52 |
+| Esconder | dentro do `AnomalyService` | feature `Hide` (set `Hides`) → **v4.2 (DEC-221): sai**; janela do trailer no `VehicleService` (atributo `Shutter`) | §19.14, T61 |
 | Passantes | NPC R6 de servidor no pool de 12 | **ator de client** com cinemática 1D no servidor (set `Pedestrians`), fora do teto de 12 (Provisório, `Q-162` a) | §19.17, T46 |
 | Ligação do chefe | packet `BossCall` | **set `Call`** (quem reconecta ouve só as linhas restantes) | §19.9, T44 |
 | Anomalias | só packet `AnomalyCue` | set `Anomalies` (estado) + packet `AnomalyCue` (efeito de um instante); sinal visto por todos (DEC-204) | §19.13, T53 |
@@ -1106,7 +1108,7 @@ Encaixes do AST-049 lidos pelo `MarketController` dentro do dono: `Price_Anchor_
 a própria Tool no `Workspace` com `pick_up_item` (`network.md` §7).
 
 **Onda 2 (mesmo padrão, sem detalhar agora):** trailer (`Vehicle = "trailer"`, estações iguais às do carrinho com
-`Rail_8`; `Prompt_Brew`/`Prompt_Restock` da cafeteira; `Prompt_Switch`; `Hide_1..4` → `hide` + `Slot`; `Prompt_Buy` no
+`Rail_8`; `Prompt_Brew`/`Prompt_Restock` da cafeteira; `Prompt_Switch`; `Prompt_Shutter` → `shutter_toggle` (DEC-221; `Hide_1..4` saem); `Prompt_Buy` no
 trailer à venda → `buy_trailer`; `Prompt_Answer` do telefone; lixeiras de rua com `Prompt_Discard`, DEC-200, `Q-166`).
 
 **Peças de upgrade (T38).** `UpgradePiece` com `Upgrade`/`Level`; o `UpgradeService` mostra a do nível atual e
@@ -1492,14 +1494,14 @@ da DEC-208 (nenhuma muda regra de jogo). Onde §2–§13 divergem, vale esta se�
 | `Reward` (N) | `RewardService/` | — (toasts por `Notice`) | — | 2 | 017, 029, 031 |
 | `Anim` (N) | — | `AnimController/` | — | 2 | — (rig IK do usuário) |
 | `Audio` (N) | — | `AudioController/` | — | 2 | — |
-| `Camera` (E) | — | `CameraController` (+ `Spectate`, `Fixed`, `Hidden`, `Cutscene`) | — | 2/3 | 004, 025 |
+| `Camera` (E) | — | `CameraController` (+ `Spectate`, `Fixed`, `Cutscene`; `Hidden` sai, DEC-221) | — | 2/3 | 004, 025 |
 | `Hud` (E) | — | `HudController` (+ sanidade e retrato, Night k, contador 10 s, spectate, fim de run) | — | 2 | 032 |
 | `Customer` (E) | + noite, `Acted`, `AddServeRule`, `SpawnActor` (3) | `CustomerController` (+ `Variant`) | — | 2/3 | 009, 011, 022 |
 | `Economy` (E) | + `AddReportStep`, `Steal`, `Selling` | — | — | 2 | 012, 014 |
 | `Interaction` (E) | + `AddGate`, `Performed` | — | — | 2 | 005 |
 | `Npc` (E) | + `Role` (ladrão, ator), `SetTension`, reserva de faixa | — | — | 2/3 | 009 |
 | `Anomaly` (N) | `AnomalyService/` (`init`, `Scheduler`, `Vision`, `Anomalies/*`, `Rules/*`) | `AnomalyController/` (`init`, `Effects/*`) | — | 3 | 022, 023, 024 |
-| `Hide` (N) | `HideService/` | `HideController` | — | 3 | 023; DEC-176, 177 |
+| ~~`Hide` (N)~~ | **sai (DEC-221)**: janela do trailer no `VehicleService` (§19.14); ponto seguro no `AnomalyService` | aba no `VehicleController` | — | 3 | 023; DEC-221 |
 | `Hallucination` (N) | — | `HallucinationController/` (`Effects/*`) | — | 3 | 019; DEC-038, 173 |
 | `Cutscene` (N) | `CutsceneService/` | `CutsceneController/` | — | 3 | 004, 027; DEC-194, 205 |
 | `Traffic` (N) | `TrafficService/` | `TrafficController` | `Motion.luau` | 3 | 033 (§8) |
@@ -1545,8 +1547,8 @@ Servidor ("=" = igual à onda 1):
 | 600 | `TrafficService` | PlaceService, NetService, RoundService, RunStateService, CharacterService, ItemService, VitalService | R | 3 |
 | 590 | `CustomerService` | = | R | E |
 | 580 | `ThiefService` | PlaceService, NetService, RoundService, RunStateService, NpcService, EconomyService, UpgradeService | R | 2 |
-| 575 | `HideService` | PlaceService, NetService, RoundService, RunStateService, InteractionService, CharacterService, VehicleService | R | 3 |
-| 570 | `AnomalyService` | PlaceService, NetService, RoundService, RunStateService, VitalService, LightService, HideService, CustomerService, NpcService, KitchenService, ItemService, EconomyService, TrafficService | R | 3 |
+| ~~575~~ | ~~`HideService`~~ | sai (DEC-221) | — | — |
+| 570 | `AnomalyService` | PlaceService, NetService, RoundService, RunStateService, VitalService, LightService, VehicleService (era HideService, DEC-221), CustomerService, NpcService, KitchenService, ItemService, EconomyService, TrafficService | R | 3 |
 | 565 | `AmbulanceService` | PlaceService, NetService, RoundService, VitalService, CharacterService, TrafficService, AnomalyService | R | 4 |
 | 560 | `BossService` | PlaceService, NetService, RoundService, RunStateService, InteractionService, VehicleService, ThiefService | R | 2 |
 | 555 | `ReviveService` | PlaceService, NetService, VitalService, AmbulanceService, MonetizationService, ItemService, RunStateService, EconomyService | L+R (handler) / R | 4 |
@@ -1575,7 +1577,7 @@ Client:
 | 685 | `AnimController` | — | 2 |
 | 680 | `KitchenController`, `MarketController`, `RigController`, `ItemController`, `ThiefController`, `TrafficController`, `PedestrianController` | `RigController`/`AnimController` onde montam rig local | 2/3 |
 | 670 | `CustomerController`, `AmbulanceController`, `ReviveController` | — | E/4 |
-| 660 | `AnomalyController`, `BossController`, `CutsceneController`, `HideController` | RoundController, CameraController | 2/3 |
+| 660 | `AnomalyController`, `BossController`, `CutsceneController` (`HideController` sai, DEC-221) | RoundController, CameraController | 2/3 |
 | 650 | `PartyController` (L) | — | 4 |
 | 640 | `AudioController` | RoundController | 2 |
 | 620 | `PromptController` | = | E |
@@ -1593,7 +1595,7 @@ O que existe hoje (código) e o que muda. "Ajuste A#" = task pequena no início 
 |---|---|---|---|
 | `RoundService` | arquivo único; `Phase` = Prep/Open/Closing/Summary; `NEXT` fixo; `Info()` com `Night = 0`; `Record().Vehicle = RunParams.StartVehicle`; `RestoreShift(data)` ignora `mode`; sinais `PhaseChanged`, `ShiftStarted(info)`, `ShiftEnded(info)`; `SetCounterProbe` | pasta com `Flow.luau`; FSM completa (§19.4). **`ShiftEnded(info)` fica com essa assinatura**: o relatório sai por `EconomyService.Reported(info, report)`, não por `ShiftEnded(info, report)` como dizia o §4.1. + `BeforeShift`, `NightResolved`, `RunEnded`, `LoseNight`, `SetPhaseProbe`, `SetVehicleProbe`, `SetVerdict`, `SetWipe`, `IsSelling`, `NightEndsAt`, `AddRunReportStep` (v4.1, T59) | W2 Round |
 | `EconomyService` | `Deposit` monta e dispara `ShiftReport` com `Gems = 0`, `AfkLocked = false`, `LastChanceUsed = false`; `SHOP_PHASES` fixo; sinal `Reported(info, report)` | `AddReportStep(name, fn(info, report))` (na ordem de registro, **antes** do envio; T48); `IsShopOpen()` = `Content.Shift.ByKey[phase].Selling`; `Steal(amount): number` (ledger `Stolen`); `DrawerKind` + `"Catch"` | ajuste A1 |
-| `InteractionService` | gate de taxa + personagem vivo | `AddGate(name, fn(player, action, anchor) -> (boolean, string?))`: todas passam ou recusa com o motivo (Down, Spectator, escondido, atropelado, cutscene); sinal `Performed(player, action, anchor, id)` depois do `Run` (T49) | ajuste A2 |
+| `InteractionService` | gate de taxa + personagem vivo | `AddGate(name, fn(player, action, anchor) -> (boolean, string?))`: todas passam ou recusa com o motivo (Down, Spectator, janela fechada nas ações de balcão, atropelado, cutscene); sinal `Performed(player, action, anchor, id)` depois do `Run` (T49) | ajuste A2 |
 | `RunStateService` | `Member` com `Sanity`, `CoffeeReadyAt`, `SeenAnomalies`, `RevivesTonight` sem uso; snapshot `M[uid].T` (stash); sem API de vida/chances | + `SetLifeState(userId, state)` (só `VitalService`), `SetStash(userId, entries)` (só `ItemService`), `SpendChance(): boolean`, `SetEndless(on)`, `ResetDev()` (volta à 1ª captura em modo `Resume`, `Chances = RunParams.Chances`); sinal `LifeChanged(userId, old, new)`; `M` perde `T` (T50); os 4 campos sem uso saem do `Member` (cada dono guarda por `UserId`) | ajuste A3 |
 | `ItemService` | sem stash (quem sai perde as Tools); `CurrentVehicle()` = `StartVehicle`; `Pickup.luau` (pacote grátis) | `Stash/Unstash`, snapshot `T`, `Drops.luau` (FEAT-036), `RegisterUse(item, handler)` (T51), ação `give_coffee`; `CurrentVehicle()` = `VehicleService:Current()` | W2 Item |
 | `CharacterService` | spawn em `PS-<seat>`; `LookPack = "Day"` fixo; Animate R6 padrão do `LoadCharacter` | `SpawnPointFor(player, info)` (PS / PS-N / REV); `SetLookPack(player, pack)`; não spawna `Down`/`Spectator`/`Away`; `Faint`, `RemoveBody`, `Freeze(player, reason, on)`; âncora de runtime `Prompt_Give` no HRP; ids de locomoção de `Content.Animations` no `Animate` (§19.20); `Knock` + juntas de ragdoll (onda 3) | W2 Vital (+W3 Traffic) |
@@ -1604,7 +1606,7 @@ O que existe hoje (código) e o que muda. "Ajuste A#" = task pequena no início 
 | `MarketService` | B1–B5 | S1 (onda 4) | W4 |
 | `VitalService` + `Vital` | exemplo Health/Armor/Stamina | reescrito (§19.7); componente `Vital`, set legado `Vitals` e packet legado `Round` saem | W2 Vital |
 | `RoundController` | sources `Day`, `Phase`, `IsNight`, `Vehicle`, `ClockText` | + `Night`, `Attempt`, `NightWindow`; `ClockText` parado na `Call` (ClockFrom = ClockTo) | W2 Round |
-| `CameraController` | `FirstPerson`/`External`, `SetArmsVisible` | + `Spectate(userId)`, `Fixed(pointId)`, `Hidden`, `Cutscene`; braços visíveis à noite com o pack da faixa (DEC-167) | W2 / W3 |
+| `CameraController` | `FirstPerson`/`External`, `SetArmsVisible` | + `Spectate(userId)`, `Fixed(pointId)`, `Cutscene`; braços visíveis à noite com o pack da faixa (DEC-167) | W2 / W3 |
 | `RigController` | camada local Night (DEC-168/169) | + atributo `FixedFace` (médicos `Exhausted` sempre, DEC-213), `Variant` (onda 3), rigs **locais** tagueados no client (passantes) | W3/W4 |
 | `HudController` | dia | + sanidade e retrato da faixa, "Night k", contador da janela de 10 s, spectate, tela de fim de run | W2 |
 | `DevService` | `Commands/*` | + um arquivo por task nova | cada task |
@@ -1689,7 +1691,7 @@ restore `RepeatNight` → `A + 1` e captura nova; `Resume` → fase `Resume` e c
 
 | Item | Contrato |
 |---|---|
-| Estado | `Current` (atom, chave de `Vehicles`), `Bought` (bool), `Pending` (troca no fim do turno) |
+| Estado | `Current` (atom, chave de `Vehicles`), `Bought` (bool), `Pending` (troca no fim do turno); **`Shutter`** por veículo (janela de serviço, DEC-221, §19.14) |
 | Posições (T36) | os dois veículos vivem no `Workspace` e mudam por `PivotTo`. Antes: carrinho em `CART`, trailer em `TRL-SALE`. Depois: trailer em `TRL` (Pad, DEC-086), carrinho em `TRL-SALE` com a lona (`VehicleCover`, AST-043, DEC-199) visível |
 | Compra | âncora `Prompt_Buy` no trailer à venda → ação `buy_trailer` (hold 2). `PromptEnabled` = `Day ≥ Vehicles.trailer.BuyFromDay`, não comprado, fase de dia. `PromptText` = "Buy Trailer — $X", X = `TrailerBasePrice × PartyPriceMult[PriceParty]` (DEC-121). `Run`: `EconomyService:Spend(X, player)` → `Bought = true`, `Pending = true`, `Notice trailer_bought` (todos) |
 | Troca | `RoundService.BeforeShift` com `Pending`: packet `Transition{ Kind = "VehicleSwap" }` (fade 1,5 s no client) → `PivotTo` → `UpgradeService:SetVehicle("trailer")` → sinal `Swapped(from, to)` → `Pending = false`. A ligação `call_trailer_bought` é do `BossService` (escuta `Swapped`) e toca na `Call` da Night 1 |
@@ -1697,8 +1699,8 @@ restore `RepeatNight` → `A + 1` e captura nova; `Resume` → fase `Resume` e c
 | Avisos (FEAT-017) | `ShiftEnded` do Day `TrailerDay` sem compra → `Notice trailer_available`; depois, a cada 3 dias → `trailer_waiting` (dados em `Vehicles.trailer.Reminder`) |
 | Probe | `RoundService:SetVehicleProbe(function() return Current() end)` no `OnInit` |
 | Snapshot | `Veh` = chave do veículo atual (data.md §3.3). Restore: posições + `UpgradeService:SetVehicle` + `Bought = (Veh ~= StartVehicle)` |
-| API | `Current(): string`, `IsBought(): boolean`, `Price(): number`; sinais `Bought(player)`, `Swapped(from, to)` |
-| Client | `VehicleController`: placa "Available on Day 5" (`SIGN-T`), fade do `Transition`, nada de estado próprio (lê `Shift.Vehicle`) |
+| API | `Current(): string`, `IsBought(): boolean`, `Price(): number`; sinais `Bought(player)`, `Swapped(from, to)`; janela (v4.2): `IsShutterClosed`, `IsInside`, `IsProtected`, `SetShutter`, sinal `ShutterChanged` (§19.14) |
+| Client | `VehicleController`: placa "Available on Day 5" (`SIGN-T`), fade do `Transition`, aba da janela pelo atributo `Shutter` (§19.14), nada de estado próprio (lê `Shift.Vehicle`) |
 
 **Lixeira de rua (v4.1, T60; DEC-200; TASK-057; Provisório).** Fica aqui porque a TASK-057 é a mesma que reage ao
 `Swapped`. O verbo `discard` tem **um** dono, o `KitchenService` (`InteractionService:RegisterAction` recusa chave
@@ -1853,7 +1855,7 @@ export type Event =
 	{ Kind: "Customer", Npc: number, Action: string, Player: Player, Result: string? }  -- CustomerService.Acted
 	| { Kind: "Switch", On: boolean, Player: Player? }                                  -- LightService.SwitchChanged
 	| { Kind: "Discard", Player: Player, Item: string, Altered: boolean }               -- KitchenService.Discarded
-	| { Kind: "Hide", Player: Player, Hidden: boolean }                                 -- HideService.Changed
+	| { Kind: "Shutter", Closed: boolean, Player: Player? }                            -- VehicleService.ShutterChanged (v4.2)
 export type Context = {
 	Now: () -> number,
 	Publish: (occ: Occurrence, fields: { Phase: string?, Step: number?, Anchor: number? }) -> (), -- set Anomalies
@@ -1862,12 +1864,13 @@ export type Context = {
 	Succeed: (occ: Occurrence) -> (),
 	Finish: (occ: Occurrence) -> (),
 	Active: () -> { Player },                                            -- FEAT-023: conectado, Active, com personagem
-	Looking: (player: Player, target: Vector3, range: number) -> boolean, -- cone + linha de visão; escondido = false
+	Looking: (player: Player, target: Vector3, range: number) -> boolean, -- cone + linha de visão; protegido e alvo fora do trailer = false
 	SeenTick: (occ: Occurrence, target: Vector3, range: number, dt: number) -> (), -- acumula 1 s → Vital:SeeAnomaly
 	Rule: (key: string) -> any,                                          -- Rules/ (prazos, passos)
 	Spawn: (spec: CustomerActorSpec) -> number?,                         -- CustomerService:SpawnActor
 	Light: { BeginHush: (number, number) -> (), EndHush: () -> () },
-	Hide: { IsHidden: (Player) -> boolean, InZone: (Player, pointId: string, radius: number) -> boolean },
+	Vehicle: { IsShutterClosed: () -> boolean, IsInside: (Player) -> boolean, IsProtected: (Player) -> boolean }, -- v4.2
+	InZone: (Player, pointId: string, radius: number) -> boolean,        -- v4.2: do próprio AnomalyService (era Hide.InZone)
 	Kitchen: { Alter: (kind: "rail" | "board") -> boolean },
 	Traffic: { Hold: (reason: string, on: boolean) -> () },
 }
@@ -1885,9 +1888,9 @@ export type Module = {
 | Recusar / Atender | `CustomerService.Acted` (take_order, serve, refuse) + `SpawnActor` com `Variant` (`blank`, `mirror`, `raincoat`) |
 | Não olhar | `Gaze` (c → s, 10 Hz, só à noite) + `Vision` (cone `Sanity.SeeAngle`, alcance `ViewRange`, raycast) |
 | Luz | `LightService.SwitchChanged` (N3: desligado ≥ 5 s e religado no prazo) |
-| Esconder | `HideService` (§19.14) |
+| Fechar a janela (era Esconder, DEC-221) | `VehicleService` `IsProtected` + `ShutterChanged` (§19.14) |
 | Descartar | `KitchenService:Alter` + `Discarded`; `CustomerService:AddServeRule` (servir com item alterado → `Wrong`, sem pagamento, `Cue smoke`, falha de quem serviu) |
-| Ponto seguro | `HideService:InZone(p, "SS", 6)` + `LightService:BeginHush` |
+| Ponto seguro | `AnomalyService:InZone(p, "SS", 6)` + `LightService:BeginHush` |
 
 | Regra | Contrato |
 |---|---|
@@ -1904,18 +1907,32 @@ export type Module = {
 Rede: set `Anomalies`, packets `AnomalyCue` e `Gaze` (`network.md` §13.5). Uma task por grupo de 2–3 módulos
 (server + `Effects/` do client) depois do núcleo.
 
-### 19.14 Esconder e ponto seguro (`HideService`; FEAT-023; DEC-054, 176, 177)
+### 19.14 Janela de serviço do trailer e ponto seguro (`VehicleService`; FEAT-023; DEC-054, 177, 204, 221)
+
+**v4.2 (DEC-221):** o esconderijo (`HideService`, `HideController`, set `Hides`, âncoras `H1..H4`, ações `hide`/`get_up`,
+AST-041, modo de câmera `Hidden`) **sai**. O estado protegido de N8/N9 passa a ser **a janela de serviço fechada**.
+Sem feature nova: a janela é estado do veículo (princípio "estender o que existe"), dona = `VehicleService`.
+O ponto seguro (N10) não dependia do esconderijo: `InZone` passa para o próprio `AnomalyService`.
+Tudo abaixo é **Provisório** (`Q-173`).
 
 | Item | Contrato |
 |---|---|
-| Âncoras | `H1..H4` no trailer: `Interactable` `PromptAction = "hide"`, `Slot` 1..4 (hold 0,5; `NightOnly`) |
-| Esconder | vaga livre, jogador sem vaga → `Hides[uid] = { Slot }`; `CharacterService:Freeze(p, "Hide", true)` + `PivotTo` na vaga; animação `hide` (owner) |
-| Levantar | ação `get_up` (toque) mandada pelo `HideController` com o `EntityId` da vaga; só o dono da vaga |
-| Gate | `InteractionService:AddGate("Hide", …)`: escondido só faz `get_up` |
-| Solta sozinho | `NightEnd`, `NightLost`, `Down`, sair, troca de fase para dia |
-| Ponto seguro | sem prompt: `InZone(player, "SS", 6)` (MapPoint `SS`, raio na tabela); a ação `safe_spot` fica sem prompt |
-| API | `IsHidden(player)`, `SlotOf(player)`, `InZone(player, pointId, radius)`; sinal `Changed(player, hidden)` |
-| Rede | set `Hides` (id = `UserId`; `network.md` §13.6) → câmera baixa local (`CameraController` modo `Hidden`) e pose dos colegas |
+| Estado | `Shutter` por veículo: `false` = aberta, `true` = fechada. Só o veículo com `Vehicles[v].HasShutter` (trailer) tem botão. O veículo **à venda** (fora de uso) fica fechado: é o estado `ForSale` do AST-027 ("janela fechada") |
+| Réplica (T61) | atributo `Shutter` (bool) no `Model` do veículo (tag `Vehicle`), escrito **só** pelo `VehicleService`. Sem entrada Lync (`network.md` §13.6) |
+| Binding | âncora `Prompt_Shutter` (`Interactable`, `PromptAction = "shutter_toggle"`) no botão `TRL-SHUTTER` ao lado do interruptor `TRL-SWITCH`; peça animada = malha `Awning` do AST-027 com `Attachment` `Shutter_Hinge` (eixo da dobradiça); MAP-01 §7.2, §16.5 |
+| Ação | `shutter_toggle`: hold 0,5, `NightOnly`, raio 7; `Validate`: membro `Active`, âncora do veículo atual, cooldown 1 s (da party, evita estrobo); `Run`: inverte `Shutter`, `PromptText` = "Open Window" / "Close Window" (`Content.Actions`, placeholder até o `ui-text.md`); sinal `ShutterChanged(closed, player)` |
+| Abre sozinha | `ShiftStarted` (todo turno, dia ou noite), `NightLost`, restore (`RepeatNight`/`Resume`), `Swapped` (o novo atual abre, o à venda fecha). Não entra no snapshot (`data.md` §5.3) |
+| Venda com a janela fechada | `InteractionService:AddGate("Shutter", …)` registrado pelo `VehicleService` no `OnInit`: recusa `take_order`, `serve` e `refuse` com motivo `Shutter:Closed` quando o veículo atual está fechado. Recusa de corrida (colega fechou durante o toque) → `Notice shutter_closed` só para quem agiu (FEAT-005, no máximo 1 a cada 2 s). Fila espera, paciência corre (sem mudança no `CustomerService`) |
+| Dentro do trailer | `VehicleService:IsInside(player): boolean` = raiz do personagem dentro da caixa do `Model` do veículo atual (`GetBoundingBox` guardado no `OnStart`/`Swapped`; o veículo não anda à noite) |
+| Protegido | `IsProtected(player)` = `IsShutterClosed()` **e** `IsInside(player)` |
+| Visão | `Context.Looking` (§19.13) devolve `false` quando o jogador está protegido e o alvo está **fora** da caixa do trailer (não vê nada pela janela fechada; a janelinha da porta dos fundos não conta). Alvo dentro do trailer (N2, N9) segue normal |
+| N8 (long car) | `Phase = Active` + farol; em `+ Rules.CloseWindow` (8 s) cada `Active` na zona do trailer (raio 24 do `TRL`) **não protegido** → `Fail` (−35, alvo pessoal). Depois, até `StayFor` (15 s): `ShutterChanged(false, p)` → `Fail({ p })` (**quem abriu**, DEC-204); vigiado que sai do trailer pela porta → `Fail` dele (tick 5 Hz). Tempos, cues e ator não mudam |
+| N9 (knock) | no fim da janela (`Window` 12 s) cada `Active` na zona do trailer não protegido → `Fail`; nada medido antes do fim |
+| N10 (ponto seguro) | `AnomalyService:InZone(player, "SS", 6)` (distância plana ao `MapPoint`, só `Active`; mesmo cálculo que estava no `HideService`) + `LightService:BeginHush`. A ação `safe_spot` segue sem prompt |
+| API | `IsShutterClosed(): boolean`, `IsInside(player)`, `IsProtected(player)`, `SetShutter(closed, player?, force?)`; sinal `ShutterChanged(closed: boolean, player: Player?)` |
+| Client | `VehicleController`: lê o atributo `Shutter` do veículo (`GetAttributeChangedSignal`), gira a `Awning` em volta do `Shutter_Hinge` (tween local 0,6 s; quem entra no meio vê o estado final) e toca o som; `PromptController`: com o veículo atual fechado esconde "Take Order"/"Serve"/"Refuse" (`Rules.SetShutterProbe`). Câmera sem modo novo |
+| Animação | sem clipe de personagem (o clipe `hide` sai de `Content.Animations`; `get_up` fica: é o levantar do atropelamento) |
+| Dev | `Commands/Shutter.luau`: `shutter` (estado), `shutter open` / `shutter close`, `shutter in` (IsInside/IsProtected de quem chamou) |
 
 ### 19.15 Alucinações (`HallucinationController`; FEAT-019; DEC-038, 168, 169, 173)
 
@@ -1993,7 +2010,7 @@ Passantes (DEC-183; T46, Provisório até `Q-162` a):
 | Item | Contrato |
 |---|---|
 | Fonte | o usuário anima no rig IK e exporta `Animation` R6; ids `rbxassetid://` (do grupo) em **`Content.Animations`** (`content-data.md` §3.20). Id `""` = fallback do Roblox (locomoção R6 padrão) ou nada (one-shot) |
-| Crew | `CharacterService:Prepare` grava os ids de `Locomotion.crew` nos `StringValue` do `Animate` R6 do personagem (id vazio mantém o padrão). One-shots (`faint`, `get_up`, `hide`, `drink`, `give`, `answer_phone`, `knock_getup`) tocados pelo **client dono** no próprio `Animator` (replica a todos). Servidor nunca toca animação de jogador |
+| Crew | `CharacterService:Prepare` grava os ids de `Locomotion.crew` nos `StringValue` do `Animate` R6 do personagem (id vazio mantém o padrão). One-shots (`faint`, `get_up`, `drink`, `give`, `answer_phone`, `knock_getup`) tocados pelo **client dono** no próprio `Animator` (replica a todos). Servidor nunca toca animação de jogador |
 | NPC de servidor | servidor **não** toca animação; cada client toca locomoção (`idle`/`walk` pela velocidade do HRP) num `Animator` local do rig (Provisório: protótipo em `Q-167` d; plano B = `Motor6D.Transform` procedural, como a nota da DEC-183) e one-shots por evento (`Sale`, `Customers.Mood`, `Variant`) |
 | Atores locais | Opal, passantes, médicos, Walt, Walker, long car: `AnimationController` + `Animator` locais (padrão do `OpalController`) |
 | `AnimController` | `Bind(model, set: string)` (locomoção automática; LOD: pausa > 120 studs e fora da tela), `Play(model, key, opts?) -> AnimationTrack?`, `Stop(model, key)`, `PlayOwn(key)`; pré-carga por `ContentProvider` |
@@ -2018,7 +2035,7 @@ Passantes (DEC-183; T46, Provisório até `Q-162` a):
 | 2 | Luz | `LightZone` LZ-1..5 (`ZoneId`, `Group`); `StreetLight` JL-01..09 + P-01 (`PostId`, `Group`, `Order`); `Prompt_Switch` → `switch_light` |
 | 2 | Pontos | `PS-N1..4`, `REV-1..4`, `TRL`, `TRL-SALE`, `CART`, `SPEC-P`, `SPEC-M`, **`DROP-T`** (novo: balcão do trailer para os itens do espectador, FEAT-025; o level-designer registra no MAP-01), `L1..L3`, `ST-R` (+ nós de grafo até as espreitas, `MAP-01` §9.2) |
 | 2 | Lixeiras de rua | `Model` da lixeira AST-034 interativa com tag **`StreetBin`** (v4.1, T60; fora de qualquer `Station` e de `Vehicle`), âncora `Prompt_Discard` (`Interactable`, `PromptAction = "discard"`). Dono do verbo: `KitchenService` (TASK-057). Quantas e onde: `Q-166` b; **não** entram em `Required.Wave2` (número aberto) — a checagem só avisa `StreetBin` sem âncora (DEC-200; o que aceita: `Q-166`) |
-| 3 | Esconder | `H1..H4` `Interactable` `hide` + `Slot`; `SS` (`MapPoint`) |
+| 3 | Janela do trailer (DEC-221) | `Prompt_Shutter` (`Interactable`, `shutter_toggle`) no botão `TRL-SHUTTER` ao lado de `TRL-SWITCH`; `Awning` + `Shutter_Hinge` no AST-027; `SS` (`MapPoint`). `H1..H4` saem |
 | 3 | Anomalias | `AN-04`, `AN-05`, `AN-11`, `AN-12`, `AS-1..4` (`MapPoint`); janelas `WV-1..3` (tag `AnomalyAnchor`, `AnchorId`) |
 | 3 | Cutscene | `CutsceneMark1..4`, `CS-*` (`MapPoint`) |
 | 3 | Trânsito e passantes | §8 (rotas, `SL-*`, `X-T`, faixas) + caminhos `WalkPaths` (cadeias de `NodeId` de calçada) |
@@ -2043,7 +2060,7 @@ Passantes (DEC-183; T46, Provisório até `Q-162` a):
 IA e custo de servidor: tick de cliente 5 Hz, visão (Gaze → cone) 5 Hz por jogador, escuro 1 Hz, Walker 5 Hz, trânsito
 e passantes 10 Hz (só aritmética, ≤ 12 entidades), A* ≤ 2 por frame. Animação de NPC só no client com LOD (T47).
 
-Replicação extra por client (pior caso: noite, 4 jogadores): `Vitals` < 30 B/s; `Sanity` ≤ 1/s; `Lights`, `Hides`,
+Replicação extra por client (pior caso: noite, 4 jogadores): `Vitals` < 30 B/s; `Sanity` ≤ 1/s; `Lights`,
 `Thief`, `Call` eventos (< 10 B/s); `Anomalies` ≤ 2 eventos/s com Walker ativo (< 30 B/s); `AnomalyCue` < 10 B/s;
 `Pedestrians` ≤ 8 × ~4 registros/min (< 15 B/s); `Gaze` c → s 10 Hz × ~6 B. Total de Lync segue < 1,5 KB/s.
 
@@ -2079,8 +2096,8 @@ cutscenes com voto, trânsito com atropelamento, passantes, alucinações.
 |---|---|---|---|
 | W3-0 | Contrato: Net v3 (§13.5–13.7), Content (Anomalies, Rules, AnomalyCues, Hallucinations, Cutscenes, Traffic, WalkPaths), `Required.Wave3` | onda 2 | Net, Content |
 | W3-A | Núcleo de anomalias (`AnomalyService` init/Scheduler/Vision/Gaze, `AnomalyController` init; ganchos `CustomerService.SpawnActor/AddServeRule`, `KitchenService.Alter/Discarded` + campo `Altered`) | W3-0 | `src/Anomaly/server/AnomalyService/init.luau`, `Scheduler`, `Vision`; Customer e Kitchen (só os ganchos) |
-| W3-B | Esconder e ponto seguro (`HideService`, `HideController`) | W3-0 | `src/Hide/**` |
-| W3-C1..C4 | Módulos de anomalia + efeitos de client: (N1, N4, N5) clientes; (N2, N3) cozinha e luz; (N6, N7) não olhar + crítica; (N8, N9, N10) esconder, ponto seguro, Hush | W3-A, W3-B | `Anomalies/ANM-00k.luau` + `Effects/ANM-00k.luau` |
+| W3-B | ~~Esconder e ponto seguro~~ → v4.2: janela do trailer no `VehicleService` + aba no `VehicleController` (DEC-221) | W3-0 | `VehicleService/`, `VehicleController` |
+| W3-C1..C4 | Módulos de anomalia + efeitos de client: (N1, N4, N5) clientes; (N2, N3) cozinha e luz; (N6, N7) não olhar + crítica; (N8, N9, N10) janela fechada, ponto seguro, Hush | W3-A, W3-B | `Anomalies/ANM-00k.luau` + `Effects/ANM-00k.luau` |
 | W3-D | Alucinações | W3-0 | `src/Hallucination/**` |
 | W3-E | Cutscenes, final da 10ª noite, `RunReport` | W3-0 | `src/Cutscene/**` |
 | W3-F | Trânsito + atropelamento (`TrafficService`, `TrafficController`, `Motion`, `CharacterService.Knock`/`Ragdoll`, `ItemService.DropHeld` já existe) | W3-0 | `src/Traffic/**`, `CharacterService/Ragdoll.luau` |
@@ -2117,7 +2134,7 @@ podem subir para a onda 3** sem conflito de arquivo (só `RunStateService/` com 
 | T49 | `InteractionService:AddGate` + sinal `Performed` | cada dono revalidar estado de vida/esconder; dicas do chefe ouvindo cada Service |
 | T50 | Tools no snapshot sob a chave `T` do `ItemService` | `M[uid].T` (capturado antes de o Item sincronizar o stash) |
 | T51 | Uso de Tool por `Tool.Activated` no servidor via `ItemService:RegisterUse` | packet novo por item |
-| T52 | `Hides` como set próprio (id = `UserId`) | campo no `Vitals` (dois escritores no mesmo registro) |
+| T52 | ~~`Hides` como set próprio (id = `UserId`)~~ **superada pela DEC-221** (esconderijo saiu; ver T61) | campo no `Vitals` (dois escritores no mesmo registro) |
 | T53 | Anomalia = set `Anomalies` (estado, para quem reconecta) + packet `AnomalyCue` (instantâneo), sinal para todos (DEC-204) | só packet (quem reconecta não vê o Walker no passo atual) |
 | T54 | Coleta do corpo por `PickupHandler` trocável (padrão = remoção com fade; onda 4 = ambulância) | noite da onda 2 sem queda (não testa a derrota) |
 | T55 | Áudio sem rede: `Content.Sounds/Music` + `AudioController`; cada controller toca no evento que já recebe | packet `Sound` genérico (tráfego e acoplamento com o servidor) |
@@ -2126,6 +2143,7 @@ podem subir para a onda 3** sem conflito de arquivo (só `RunStateService/` com 
 | T58 | `Transition` (packet) para o fade da troca de veículo; a sequência da noite perdida sai da fase `NightLost` (`PhaseStartedAt`), sem packet | fase nova no `Shift` só para o fade |
 | T59 | (v4.1) `RunReport.Gems` por passo registrado: `RoundService:AddRunReportStep`; o `RewardService` lê `RunRewards.Gems` do perfil (soma gravada no mesmo `batch` do crédito) | `Require` Round → Reward (ciclo); Round somando gemas (dois donos de gema); total só em memória do Reward (perde na retomada em outro servidor, onda 4); recalcular a partir de `RunRewards.Keys` (depende de a tabela não mudar entre sessões) |
 | T60 | (v4.1) `discard` com dono único `KitchenService` também na lixeira de rua: âncora sem `Station`, dentro de `Model` `StreetBin`; ramo próprio no `Evaluate` (pula `IsCurrent`), mesma regra de mão do `Trash.luau` | dono novo (`RegisterAction` recusa chave repetida; dois donos do mesmo verbo); estação `trash` falsa fora do veículo (entraria em `Stn`, troca de veículo e `IsCurrent`) |
+| T61 | (v4.2, DEC-221) Janela do trailer como **atributo `Shutter` no `Model` do veículo**, escrito só pelo `VehicleService` (exceção declarada à regra 9 do `network.md`, como o atributo `Bought`): 1 bool por veículo, estado de objeto do mundo (como porta), muda ≤ 1/s, `StreamingEnabled = false` (T57) garante o atributo em todo client, quem entra no meio recebe pronto; a regra (protegido, gate) é só do servidor. Gate de venda pelo `InteractionService:AddGate("Shutter")`, sem tocar o `CustomerService` | set novo `Shutter` (entrada no `Net` e no enum só para 1 bool); campo no `Lights` (dono e semântica de outra feature); campo no `Shift` (dois escritores no registro do `RoundService`); `ShutterService` próprio (feature para 1 bool, mais um `Require` no `AnomalyService`) |
 
 ### 19.26 Divergências com a onda 1 (tasks de ajuste)
 

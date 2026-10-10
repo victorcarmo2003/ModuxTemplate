@@ -7,6 +7,8 @@ quem lê, frequência e por quê; remoção do legado `Vitals`/`Round`; `Lights`
 `Anomalies`, `Pedestrians`, `Transition`, `RunReport` novos (contrato de código em `architecture.md` §19).
 **Versão 5.1, 2026-10-10 (TASK-049):** divergências da onda 1 fechadas (`wave-1-report.md` D-06, D-07); origem de
 `RunReport.Gems` (T59); lixeira de rua sem entrada nova (T60). Ver §0.-2.
+**Versão 5.2, 2026-10-10 (DEC-221):** set `Hides` sai; janela do trailer = atributo `Shutter` no `Model` do veículo
+(§13.6, T61); `Actions` perde `hide`/`get_up` e ganha `shutter_toggle`; `Notices` troca `hide_taken` por `shutter_closed`.
 Versão 4, 2026-10-10 (**TASK-001**: estado DEC-140 a DEC-201, núcleo da onda 1). Versão anterior: 3.1, 2026-10-08.
 Tudo aqui vira entrada em `src/Libs/Net/init.luau` (um `Lync.define("game", {...})`, requerido pelos dois lados).
 Mudança neste arquivo passa pelo architect (`PIPELINE.md`, ponto de conflito). Arquitetura: `architecture.md`.
@@ -39,7 +41,7 @@ Tabelas que geram os enums: `content-data.md`. Dados persistidos: `data.md`.
 | `Switches` (v3) | vira **`Lights`** (um registro por grupo de luz, dono `LightService`) | 2 | `architecture.md` §19.6, T45 |
 | `BossCall` (packet, v3) | vira **set `Call`** (reconexão no meio da ligação ouve o resto) | 2 | FEAT-018, T44 |
 | `Thief`, `Transition`, `RunReport` | novos | 2 | FEAT-013, 016, 026, 027; T58 |
-| `Anomalies` (set), `AnomalyCue`, `Gaze`, `Hides` | `Anomalies` e `Hides` novos; `AnomalyCue`/`Gaze` da §6 com schema final | 3 | DEC-204; T52, T53 |
+| `Anomalies` (set), `AnomalyCue`, `Gaze`, ~~`Hides`~~ | `Anomalies` novo; `AnomalyCue`/`Gaze` da §6 com schema final; `Hides` **sai** (v5.2, DEC-221: atributo `Shutter`, §13.6) | 3 | DEC-204; T53, T61 |
 | `Stations` | + `Altered` (ITM-020) | 3 | §3.5 "Onda 3" |
 | `Cutscene`, `SkipVote`, `Traffic`, `CarHit` | como §6.2 | 3 | DEC-133, DEC-194 |
 | `Pedestrians` | novo (passantes como ator de client, aparência no set) | 3 | DEC-183, T46 |
@@ -115,7 +117,8 @@ Tabelas que geram os enums: `content-data.md`. Dados persistidos: `data.md`.
 7. **Responder só em Service/Controller, no `OnInit`.** Componente não registra responder.
 8. **Todo packet c → s é validado**: membro no estado certo, taxa máxima, alvo existe, distância/plausibilidade.
 9. **Aparência de personagem não passa pelo Lync** (§5): é atributo no modelo, escrito pelo servidor, aplicado pelo
-   client. Estado de jogo nunca vai em atributo de modelo (vai em set).
+   client. Estado de jogo nunca vai em atributo de modelo (vai em set). **Exceções declaradas:** `Bought` (TASK-056) e
+   `Shutter` (§13.6, T61, DEC-221) — estado de objeto do mundo, 1 bool, um escritor.
 
 ## 2. Entradas por onda
 
@@ -726,7 +729,7 @@ validado). Uma task de contrato por onda escreve as entradas da onda em `src/Lib
 | `Anomalies` | set | ocorrência 1..255 | `AnomalyService` | `AnomalyController`, `LightController`, `AudioController` | ≤ 2/s com Walker ativo | 3 |
 | `AnomalyCue` | packet s → grupo | grupo (DEC-204) | `AnomalyService` | `AnomalyController` | evento | 3 |
 | `Gaze` | packet c → s, `:newest(10)` | — | `CameraController` (só à noite, `Active`) | `AnomalyService` | 10 Hz | 3 |
-| `Hides` | set | `UserId` | `HideService` | `HideController`, `CameraController` | evento | 3 |
+| ~~`Hides`~~ → atributo `Shutter` (v5.2, DEC-221) | atributo do `Model` do veículo | veículo | `VehicleService` | `VehicleController`, `PromptController` | evento (≤ 1/s) | 3 |
 | `Cutscene` | set | `1` | `CutsceneService` | `CutsceneController` | início, votos, fim | 3 |
 | `SkipVote` | packet c → s | — | `CutsceneController` | `CutsceneService` | ≤ 1 por segmento | 3 |
 | `Traffic` | set | slot 1..8 | `TrafficService` | `TrafficController` | ≤ 6 por carro | 3 |
@@ -852,21 +855,33 @@ Gaze = Lync.packet(Lync.struct({             -- c → s, só à noite e só Acti
 | `AnomalyCue` packet | instantes (batida, buzina, fumaça); perder um ao reconectar não muda regra |
 | Sem verbo correto na rede | `Content.Anomalies` (shared) não tem verbo nem prazo; ficam em `Rules/` no servidor (T10) |
 | `Gaze` `:newest(10)` | só o último olhar importa; 10 Hz bastam para cone de 40° (T7); ~6 B por envio |
-| Validação do `Gaze` | só à noite, membro `Active` não escondido; sem verificação de plausibilidade além do formato (co-op, R10) |
+| Validação do `Gaze` | só à noite, membro `Active` (v5.2: "não escondido" sai; com a janela fechada o `Looking` filtra no servidor, §19.14); sem verificação de plausibilidade além do formato (co-op, R10) |
 
 Mudança em set existente: `Stations` ganha `Altered = Lync.int(0, 30)` (0 = nada; grelha/tábua: 1 = esta vaga;
 trilho: posição 1..`Count` do item alterado). Hot dog montado com ele leva o atributo de Tool `Altered = true` (§7.1).
 
-### 13.6 `Hides` (onda 3)
+### 13.6 Janela do trailer (onda 3; **v5.2, DEC-221**: substitui o set `Hides`)
 
-```lua
-Hides = Lync.replicate(Lync.struct({         -- id = UserId; registro removido ao levantar
-	Slot = Lync.int(1, 4),                    -- H1..H4 (DEC-176)
-})),
-```
+O set `Hides` **sai** (o esconderijo saiu do jogo, DEC-221). Nada novo no `Lync.define`: o estado da janela de
+serviço vai como **atributo** no `Model` do veículo.
 
-Escreve `HideService`; lê `HideController` (botão "Get Up" local), `CameraController` (modo `Hidden`), `AnimController`.
-Set próprio (T52): `Vitals` tem um escritor só (`VitalService`).
+| Item | Contrato |
+|---|---|
+| Atributo | `Shutter` (bool) no `Model` com tag `Vehicle` (`false`/ausente = aberta, `true` = fechada) |
+| Escreve | só o `VehicleService` (ação `shutter_toggle`, aberturas automáticas, `Swapped`; `architecture.md` §19.14) |
+| Lê | `VehicleController` (anima a aba `Awning` em volta do `Shutter_Hinge`, tween local 0,6 s), `PromptController` (`Rules.SetShutterProbe`: esconde "Take Order"/"Serve"/"Refuse" com o veículo atual fechado) |
+| Frequência | evento: ≤ 1/s (cooldown 1 s da ação) + 1 por início de turno; ~10 B por mudança |
+| Pedido c → s | nenhum novo: `Interact{ Id, Action = "shutter_toggle" }` (enum vem de `Content.Actions`) |
+| Aviso | `Notice shutter_closed` (Player) quando o gate recusa uma ação de balcão por corrida |
+
+Por que atributo e não set (T61, **exceção declarada à regra 9 da §1**, como o atributo `Bought` da TASK-056):
+
+| Opção | Por que não |
+|---|---|
+| set novo `Shutter` | entrada no `Net`, boot do `Lync.start()` e enum para **um** bool de um objeto do mundo |
+| campo no `Lights` | o registro é de grupo de luz e o dono é o `LightService`; mistura semântica e dono |
+| campo no `Shift` | dois escritores no registro do `RoundService` (mesmo motivo da T52) |
+| **atributo `Shutter`** (escolhido) | o client já precisa do `Model` para animar a aba; `StreamingEnabled = false` (T57) garante o atributo em todo client e quem entra no meio recebe pronto; a regra (protegido, gate de venda) roda só no servidor, o client só apresenta |
 
 ### 13.7 Cutscene, trânsito e passantes (onda 3)
 
@@ -922,8 +937,8 @@ ReconnectReply = Lync.packet(Lync.struct({ Accept = Lync.bool() })), -- c → s
 
 | Tabela | Chaves novas | Onda |
 |---|---|---|
-| `Actions` (`Interact.Action`) | `answer_phone`, `get_up` (as demais da onda 2+ já existem: `buy_trailer`, `brew_coffee`, `give_coffee`, `switch_light`, `hide`, `safe_spot`, `bench_buy_item`) | 2, 3 |
-| `Notices` (`Notice.Kind`) | `trailer_available`, `trailer_waiting`, `trailer_bought`, `gems_gained`, `afk_no_gems`, `achievement`, `thief_caught`, `coffee_cooldown`, `coffee_full`, `hide_taken`, `revive_used`, `revive_credit_saved`, `special_on_bench`, `shift_cant_resume`, `not_in_roster` | 2–4 |
+| `Actions` (`Interact.Action`) | `answer_phone`, `shutter_toggle` (v5.2, DEC-221; as demais da onda 2+ já existem: `buy_trailer`, `brew_coffee`, `give_coffee`, `switch_light`, `safe_spot`, `bench_buy_item`). **Saem** `hide` e `get_up` | 2, 3 |
+| `Notices` (`Notice.Kind`) | `trailer_available`, `trailer_waiting`, `trailer_bought`, `gems_gained`, `afk_no_gems`, `achievement`, `thief_caught`, `coffee_cooldown`, `coffee_full`, `shutter_closed` (v5.2; sai `hide_taken`), `revive_used`, `revive_credit_saved`, `special_on_bench`, `shift_cant_resume`, `not_in_roster` | 2–4 |
 
 ### 13.11 Removidos
 
@@ -933,6 +948,7 @@ ReconnectReply = Lync.packet(Lync.struct({ Accept = Lync.bool() })), -- c → s
 | `Vitals` legado (Health/Armor/Stamina) | W2-0 (mesmo nome, schema da §13.1) | `Vitals` + `Sanity` |
 | `Switches` (v3, nunca implementado) | — | `Lights` |
 | `BossCall` (v3, nunca implementado) | — | `Call` |
+| `Hides` (set) | v5.2 (DEC-221; TASK-133) | atributo `Shutter` no `Model` do veículo (§13.6) |
 
 Checklist de toda task de contrato: `tools/analyze.ps1` zero erro **e** boot no Studio sem erro de `Lync.start()` (R8).
 
@@ -942,7 +958,7 @@ Checklist de toda task de contrato: `tools/analyze.ps1` zero erro **e** boot no 
 |---|---|
 | sets da onda 1 (`Stations`, `Customers`, `Stock`, `Economy`, `Shift`, `Upgrades`, `RunState`) | < 150 |
 | `Vitals`, `Sanity`, `LifeEvent` | < 40 |
-| `Lights`, `Call`, `Thief`, `Hides`, `Transition` | < 15 |
+| `Lights`, `Call`, `Thief`, `Transition`, atributo `Shutter` | < 15 |
 | `Anomalies`, `AnomalyCue` | < 40 |
 | `Traffic`, `Pedestrians` | < 50 |
 | `Gaze` (c → s) | ~60 por jogador |

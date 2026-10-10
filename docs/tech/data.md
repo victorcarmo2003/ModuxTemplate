@@ -423,7 +423,6 @@ Estado por jogador que **não** está no `Member` (dono guarda por `UserId`, sob
 | `CoffeeReadyAt` | `VitalService` | nunca (cooldown real, FEAT-030 "abuso") |
 | `RevivesTonight` (DEC-129) | `VitalService` | início de cada noite |
 | anomalias vistas na noite (−5 uma vez, DEC-056) | `VitalService` (`SeeAnomaly`) | início de cada noite |
-| vaga de esconder | `HideService` | fim da noite, queda, saída |
 
 ### 5.3 Snapshot: chaves (versão 5)
 
@@ -447,7 +446,7 @@ Estado por jogador que **não** está no `Member` (dono guarda por `UserId`, sob
 | `Bn` | Market | chave do especial de S1 (`none`) | 4 | igual (FEAT-035) | igual |
 
 Não entram (estado vivo; recomeça vazio ou recalculado): sanidade, faixa e `LookPack`, NPCs, ladrão, passantes, carros,
-ambulância, anomalias (agenda recalculada com `Attempt`), esconderijos, itens no chão, gaveta, ligação em curso,
+ambulância, anomalias (agenda recalculada com `Attempt`), janela do trailer (abre no início do turno, DEC-221), itens no chão, gaveta, ligação em curso,
 cutscene.
 
 Exemplo (2 jogadores, Night 2, ~1,1 KB em JSON):

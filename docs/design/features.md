@@ -315,8 +315,8 @@ Durações de prompt (tabela `PromptTimings`):
 
 | Ação | Tipo | Duração |
 |---|---|---|
-| "Grill" / "Collect" / "Add Sausage" / "Take Order" / "Serve" / "Lights" (interruptor) / "Get Up" | toque | 0 s |
-| "Slice Bun", comprar pacote no Mart, "Hide", "Throw Away", "Take" (item alterado ou item no chão, FEAT-036), "Give" (café) | hold | 0,5 s |
+| "Grill" / "Collect" / "Add Sausage" / "Take Order" / "Serve" / "Lights" (interruptor) | toque | 0 s |
+| "Slice Bun", comprar pacote no Mart, "Close Window"/"Open Window" (janela do trailer, DEC-221), "Throw Away", "Take" (item alterado ou item no chão, FEAT-036), "Give" (café) | hold | 0,5 s |
 | "Add {item}" **[DEC-072]**, "Restock", "Refuse", "Brew Coffee" **[DEC-055]**, voto "Skip" em cutscene (FEAT-004) | hold | 1 s |
 | Comprar upgrade ou item especial na bancada do Mart (FEAT-015, FEAT-035) | hold | 1,5 s |
 | "Blow Whistle": colega `Active` usa o Rescue Whistle (ITM-021) para reviver um caído, ativando a Tool na mão | hold | 1,5 s |
@@ -352,7 +352,8 @@ casos parece bug. Regra:
 |---|---|---|
 | **Estado do jogo mudou** (corrida entre jogadores, latência, virada de fase) | toast **só para quem agiu** (`Audience = "Player"`), canto superior direito, 2,5 s | o jogador fez a coisa certa e precisa saber o motivo |
 | Validação anti-trapaça (fora do alcance, âncora errada, ação de outra onda, gate de taxa, não é membro) | **nenhum** (só log de dev) | jogador legítimo não chega aqui; avisar ajuda quem forja |
-| Gate de estado de vida (`Down`, `Spectator`, escondido, atropelado, cutscene) | **nenhum** | o HUD/câmera já explicam o estado |
+| Gate de estado de vida (`Down`, `Spectator`, atropelado, cutscene) | **nenhum** | o HUD/câmera já explicam o estado |
+| Janela do trailer fechada (DEC-221) em "Take Order"/"Serve"/"Refuse" | toast `shutter_closed` só na corrida (o prompt some com a janela fechada) | colega fechou enquanto o jogador tocava |
 | Anti-spam | o mesmo aviso no máximo 1× a cada **2 s** por jogador | segurar o botão na corrida não pode empilhar toasts |
 
 Lista D-04 (quais recusas viram toast). Chaves e textos = proposta do narrative-writer em `ui-text.md` §10.3 (TASK-082);
@@ -374,7 +375,7 @@ nome final da chave é do architect (TASK-047). Esta tabela decide **quais** rec
 Fora da D-04, mesma regra (chaves aceitas e criadas em `Notices` pela TASK-047): "Collect" com trilho cheio → `rail_full`
 (texto com o narrative-writer); beber café de dia → `coffee_night_only` (FEAT-021, `Q-170`); "Give" café a quem já tem
 1 → `coffee_has_one` (`ui-text.md` §10.2). Já existem e seguem: `hands_full`, `package_limit`, `not_enough_cash`,
-`coffee_cooldown`, `coffee_full`, `hide_taken`.
+`coffee_cooldown`, `coffee_full`. `hide_taken` sai com o esconderijo (DEC-221); entra `shutter_closed`.
 
 - Critérios de aceite:
   - Toda ação do MVP é executável no mobile só com o botão de interagir, o toque na hotbar e a câmera.
@@ -627,7 +628,7 @@ Validação **[DEC-072]**:
 
 - Status: Rascunho · Pilares: GERENCIAR, OBSERVAR · Origem: **[DEC-018, DEC-050, DEC-023]**
 - Resumo: o ladrão é **Quick Quentin** (CHR-004); comportamento completo em NPC-007 (`npcs.md`). Números **[DEC-050]**: só de dia; chance dia 1 0% · dia 2 50% · dia 3+ 70%; 1 por dia; aparece entre 9:00 AM e 3:00 PM; espreita ≤ 120 s; gatilho = nenhum jogador a ≤ 14 studs do veículo por 3 s; ~4 s até a gaveta; abre em 8 s (16 s com UPG-004); rouba floor(50%) (30% com UPG-004); nada se gaveta < $5; impedir = entrar na zona durante a abertura → foge, party +$5 ("Nice catch!"), creditado na gaveta.
-- Proposta adicional: jogador "presente" na zona precisa estar **conectado e de pé** (um jogador escondido não existe de dia; desconectado não conta).
+- Proposta adicional: jogador "presente" na zona precisa estar **conectado e de pé** (desconectado não conta).
 - **DEC-182:** a aproximação leva **4 s fixos** de qualquer ponto de espreita; velocidade = distância ÷ 4.
 
 Dados (tabela `Thief`, `content-data.md` §6.6; números da DEC-050/DEC-182, conferidos na TASK-081):
@@ -741,7 +742,7 @@ Impacto na curva: comprar exige ida ao Mart (~25 s ida e volta de dia; à noite 
 |---|---|
 | O que muda de veículo | níveis de Grill, Cooler, Counter e Cash Drawer Lock (mesmo nível, peça visível também no trailer — proposta para **Q-075**); estoque inteiro; dinheiro |
 | Onde fica o carrinho | destino visual com o narrative-writer (**Q-082**); sem função de jogo |
-| O que o trailer acrescenta | cafeteira (UPG-007) com 10 doses; **interruptor de luz** ("Lights", controla a lâmpada interna desde a compra e também UPG-005 se comprado, FEAT-020); ponto de esconder atrás do balcão para 4 jogadores; banco do fundo; telefone fixo; porta dos fundos (sem prompt); foto de 1979 e crachá "WALT — NIGHT SHIFT" (pistas, `ending.md` §3); tábuas 3; trilho 8 |
+| O que o trailer acrescenta | cafeteira (UPG-007) com 10 doses; **interruptor de luz** ("Lights", controla a lâmpada interna desde a compra e também UPG-005 se comprado, FEAT-020); botão da janela de serviço ao lado do interruptor ("Close Window"/"Open Window", FEAT-023, DEC-221); banco do fundo; telefone fixo; porta dos fundos (sem prompt); foto de 1979 e crachá "WALT — NIGHT SHIFT" (pistas, `ending.md` §3); tábuas 3; trilho 8 |
 | Nomes propostos | carrinho "Corner Cart", trailer "Open Late Trailer" (`ui-text.md` §3; DEC-052 deixa o nome final com o narrative-writer) |
 | Compra na Preparação/Fechamento | permitida; troca sempre no fim do turno corrente |
 | Arrependimento | não há venda de volta |
@@ -1030,7 +1031,8 @@ Contrato de conteúdo (vale para as 10 anomalias; `anomalies.md` já cumpre):
 
 ### FEAT-023 — Verbos contra anomalia
 
-- Status: Rascunho · Pilares: SOBREVIVER · Origem: **[DEC-054, DEC-055]**
+- Status: Rascunho · Pilares: SOBREVIVER · Origem: **[DEC-054, DEC-055, DEC-221]**
+- **DEC-221 (2026-10-10):** o verbo "esconder" (armários H1..H4, "Hide"/"Get Up") **sai**; no lugar, **fechar a janela** de serviço do trailer pelo botão ao lado do interruptor. Detalhes Provisórios em `Q-173`.
 - Resumo: 7 verbos, todos com botão de interagir ou câmera. Cada ocorrência abre um "teste" com prazo; o servidor resolve sucesso ou falha.
 
 Comportamento genérico de cada verbo; o que muda por anomalia está em `verbParams` (`npcs.md`, NPC-009 a NPC-018).
@@ -1041,18 +1043,18 @@ Comportamento genérico de cada verbo; o que muda por anomalia está em `verbPar
 | Recusar | hold 1 s "Refuse" | recusado | "Take Order" no ator | por padrão **não** falha (o ator ocupa a vaga até a paciência acabar) | shared | N1, N4 |
 | Não olhar | desviar a câmera | `personalContinuous`: ninguém fica ≥ X s contínuos com o alvo no cone · `sharedApproach`: o alvo não chega ao último passo | — | `personalContinuous`: quem passou de X s · `sharedApproach`: a party | personal / shared | N6 (X = 3 s), N7 (10 passos) |
 | Luz | toque "Lights" | `lightSequence` cumprida dentro do prazo (N3: desligado ≥ 5 s contínuos e depois religado) | — (sequência incompleta não falha) | prazo acaba → todos os ativos | shared | N3 (60 s) |
-| Esconder | hold 0,5 s "Hide" atrás do balcão; toque "Get Up" | todo jogador ativo na zona do trailer está escondido no prazo e fica até o fim | levantar antes do fim | não escondido no prazo | personal | N8, N9 |
+| Fechar a janela | hold 0,5 s "Close Window" no botão ao lado do interruptor do trailer (abre com "Open Window") | no prazo a janela está fechada e cada jogador ativo na zona do trailer está **dentro** do trailer, até o fim | abrir antes do fim (paga quem abriu, DEC-204) | no prazo, janela aberta ou jogador na zona fora do trailer (cada um que falhou) | personal (estado da janela é da party) | N8, N9 |
 | Descartar | pegar o item (ou o Hot Dog com ele) e hold 0,5 s "Throw Away" | item na lixeira | servir o Hot Dog com o item (quem serviu) | por padrão **não** falha; o item some às 6:00 AM | shared | N2 |
 | Ponto seguro | ir até a zona e ficar | todo jogador ativo dentro da zona no prazo e até o fim | sair antes do fim | fora da zona no prazo | personal | N10 |
 
 | Regra | Valor |
 |---|---|
-| Escondido | câmera abaixa; não interage com nada além de "Get Up"; sanidade não cai por "ver"; não conta como "olhando" para N6/N7 |
+| Janela fechada (DEC-221, Provisório `Q-173`) | aba externa cobre a janela; "Take Order", "Serve" e "Refuse" recusados (fila espera, paciência corre); quem está dentro do trailer não "vê" nada do lado de fora (sem −5, não conta como "olhando" para N6/N7); o resto do trailer funciona; só à noite; abre sozinha no início de cada turno |
 | Alvo shared | o verbo de um jogador vale para a party **[DEC-054]** |
 | Quem paga a falha | por ação: **quem agiu**; por omissão em alvo shared: **todo jogador ativo**; alvo personal: **cada jogador que falhou** |
 | Jogador ativo | conectado, de pé (não caído nem espectador) e já spawnado; desconectado, caído e espectador são ignorados. Jogador em ragdoll de atropelamento (FEAT-033) **é** ativo |
 | Consequência | regra comum: −35 em cada jogador que falhou; regra crítica: noite perdida (FEAT-024) |
-| Verbo em cliente normal | Refuse em cliente normal = insatisfeito, sem perda de sanidade; Hide/ponto seguro sem anomalia = só tempo perdido |
+| Verbo em cliente normal | Refuse em cliente normal = insatisfeito, sem perda de sanidade; fechar a janela/ponto seguro sem anomalia = só venda/tempo perdido |
 
 Distribuição das 10 anomalias (ordem de `anomalies.md`, aprovada na rodada 7; substitui o exemplo de DEC-054 e a proposta anterior deste arquivo):
 
@@ -1060,9 +1062,9 @@ Distribuição das 10 anomalias (ordem de `anomalies.md`, aprovada na rodada 7; 
 |---|---|---|---|---|---|---|---|---|---|---|
 | ID | ANM-001 | ANM-002 | ANM-003 | ANM-004 | ANM-005 | ANM-006 | ANM-007 | ANM-008 | ANM-009 | ANM-010 |
 | Anomalia | N1 The blank folks | N2 The wrong food | N3 The stopped clock | N4 The copies | N5 The Raincoat Lady | N6 The wavers | N7 The Walker | N8 The long car | N9 The knock | N10 The Hush |
-| Verbo | recusar | descartar | luz | recusar | **atender** | não olhar | não olhar (**crítica**) | esconder | esconder | ponto seguro |
+| Verbo | recusar | descartar | luz | recusar | **atender** | não olhar | não olhar (**crítica**) | fechar a janela | fechar a janela | ponto seguro |
 
-Contagem: recusar 2 · atender 1 · não olhar 2 · luz 1 · esconder 2 · descartar 1 · ponto seguro 1 (os 7 verbos de DEC-054 aparecem).
+Contagem: recusar 2 · atender 1 · não olhar 2 · luz 1 · fechar a janela 2 (era "esconder", DEC-221) · descartar 1 · ponto seguro 1 (os 7 verbos de DEC-054 aparecem).
 
 - Critérios de aceite:
   - Os de `proposals-round-1.md` Q-013.
@@ -1340,7 +1342,7 @@ Atropelamento (proposta para **Q-122**):
 | Ambulância (NPC-023) | **nunca** atropela: freia para jogador a ≤ 15 studs na frente e a colisão dela com personagem nunca arremessa; velocidades na tabela `Ambulance` (FEAT-034). Ninth é preferencial: não para no cruzamento |
 | Prompt em andamento | cancela |
 | Anomalia | ragdoll não muda verbos: se um prazo de verbo vence no chão, conta como não cumprido (o jogador é `Active`) |
-| Escondido / dentro do trailer ou do Mart | fora da pista: nunca atropelado |
+| Dentro do trailer ou do Mart | fora da pista: nunca atropelado |
 
 Sem semáforo, o padrão aprendível (OBSERVAR) é o ritmo do trânsito e o PARE; a escolha (GERENCIAR) é olhar e esperar a brecha ou arriscar com o pacote na mão. Efeito emergente aceito: atravessar junto com um pedestre NPC é mais seguro (os carros param para ele), e isso é observável, não regra escrita para o jogador.
 
@@ -1552,7 +1554,7 @@ Cada linha é **Rascunho**: proposta + recomendação. Onde a recomendação mud
 | **Q-129** Travessia sem semáforo (DEC-130) | (A) carros nunca param para ninguém; NPC cruza só com brecha e o spawn é suspenso enquanto ele cruza · (B) **carros param só para NPC com reserva de faixa; nunca para jogador**; PARE nos braços da Juniper · (C) carros param para qualquer um na faixa, inclusive jogador | **(B)**. Prós: mantém o "na sorte" do usuário para o jogador; NPC nunca atropelado sem simular fila; a parada para o pedestre é um padrão visível (OBSERVAR) e atravessar junto com ele é uma tática emergente. Contras: o carro "para para o NPC e não para mim" pode parecer injusto (tom pastelão absorve); reserva de faixa é lógica nova no servidor (pequena: 1 flag por faixa). (A): mais puro, mas NPC pode esperar muito e exige suspender spawn. (C): contraria "na sorte" (precisaria do usuário). Faixas continuam pintadas; spawn ≥ 55 studs da faixa, intervalo ≥ 3 s. FEAT-033 | **respondida: DEC-133 (B)** |
 | **Q-091** Opal e teto | — | (a) Opal fora do teto de 12 (estática); (b) a âncora AN-08 sai da Opal (DEC-079) | não |
 | **Q-092** Ponto seguro sem anomalia | — | sim, regra de design: nenhuma `ANM-###` usa a área sob o letreiro nem o interior do Mart como palco | **respondida: DEC-177 — "Não"**, contra esta proposta: o SS **pode** ter anomalia; detalhes `Q-161` |
-| **Q-094** Esconder por jogador | — | sim; 4 pontos atrás do balcão do trailer, um por jogador | **respondida: DEC-176** |
+| **Q-094** Esconder por jogador | — | sim; 4 pontos atrás do balcão do trailer, um por jogador | **respondida: DEC-176**; esconder saiu do jogo (**DEC-221**) |
 | **Q-103** ANM-008 com trânsito | 1 carro raro a noite toda · **≤ 1 carro até 9 PM, 0 depois** (`MAP-01.md`) · 0–2 (architect) | **≤ 1 carro na Calma (8–9 PM), 0 depois das 9 PM**: a ANM-008 é o único carro em movimento, o único que estaciona e o único com farol alto. Alinha FEAT-033, NPC-022, `MAP-01.md` e `world.md` ("quase nenhum"); `tech/` copia a tabela `Traffic`. Co-dono: narrative-writer (sinal aprovado não muda) | **respondida: DEC-198** (trânsito rareia à noite; estes números Provisórios, confirmar "0 depois das 9 PM" dentro de "rareia") |
 | **Q-065** Consequências de sabor | — | entram todas como **só visual/áudio**, exceto: ANM-003 "relógio congela" vira **congelamento só no client** (HUD e relógio do Bellmoor Savings param 30 s e saltam; o relógio do servidor não para, DEC-048). +$1 da ANM-005 entra (cabe na tabela) | **respondida: DEC-195**, supera esta linha: só efeitos sem sistema novo; **cortados** N3 relógio congelado (nem só no client) e N5 +$1; game-designer classifica N5 chuva no trailer, N10 pedidos esfriam e "Thank you, dear." pelo critério |
 | **Q-056** Limite da hotbar | — | 4 Tools; Rescue Whistle ocupa 1. FEAT-005 | **respondida: DEC-174** (4 Tools) |

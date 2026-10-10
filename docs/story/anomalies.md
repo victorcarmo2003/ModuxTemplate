@@ -1,4 +1,4 @@
-Status: Aprovado (DEC-073 — lista N1–N10; DEC-074 — regra crítica fixa só na N7; rodada 7, 2026-10-08). Anotações posteriores: DEC-096 (IDs `ANM-###` na visão geral), DEC-087 (nota N8 × trânsito em "Interações"), DEC-123 (sinal sonoro de início da N7, nota na ficha), DEC-122 (onde se acorda na noite perdida, nota na ficha N7), DEC-054 (interruptor da N3, nota na ficha). **2026-10-10, DEC-149:** clientes e pedestres passam a ser **animais** (emenda DEC-146); ANM-001, ANM-004, ANM-005 e ANM-007 descrevem humanos. **Regras, verbos e sinais aprovados não mudam** sem DEC; adaptação para clientes animais → `Q-147` (narrative-writer + game-designer propõem; usuário decide). **DEC-150:** clientes com variante noturna "um pouco assustadora" por textura; o normal da noite não pode parecer anomalia → `Q-147` (c). **DEC-177 (2026-10-10):** o **ponto seguro pode receber anomalia** (não existe a regra "nunca"; este documento não a continha). A N10 não muda: o verbo segue "estar no ponto seguro". O que pode acontecer lá → `Q-161`. **DEC-178:** personagens com nome são animais, incluindo Pickett (ANM-004), Raincoat Lady (ANM-005) e o Walker (ANM-007); espécies `Q-160`, leitura `Q-147`. **DEC-181:** NPC à noite usa o pack **Mid**; pack **Night** reservado à tensão, inclusive "clima de terror de anomalia" (gatilhos `Q-159`). **DEC-172/173:** classificação Mild; jumpscare só raro e leve. Regras, verbos e sinais aprovados **não mudam**.
+Status: Aprovado (DEC-073 — lista N1–N10; DEC-074 — regra crítica fixa só na N7; rodada 7, 2026-10-08). Anotações posteriores: DEC-096 (IDs `ANM-###` na visão geral), DEC-087 (nota N8 × trânsito em "Interações"), DEC-123 (sinal sonoro de início da N7, nota na ficha), DEC-122 (onde se acorda na noite perdida, nota na ficha N7), DEC-054 (interruptor da N3, nota na ficha). **2026-10-10, DEC-149:** clientes e pedestres passam a ser **animais** (emenda DEC-146); ANM-001, ANM-004, ANM-005 e ANM-007 descrevem humanos. **Regras, verbos e sinais aprovados não mudam** sem DEC; adaptação para clientes animais → `Q-147` (narrative-writer + game-designer propõem; usuário decide). **DEC-150:** clientes com variante noturna "um pouco assustadora" por textura; o normal da noite não pode parecer anomalia → `Q-147` (c). **DEC-177 (2026-10-10):** o **ponto seguro pode receber anomalia** (não existe a regra "nunca"; este documento não a continha). A N10 não muda: o verbo segue "estar no ponto seguro". O que pode acontecer lá → `Q-161`. **DEC-178:** personagens com nome são animais, incluindo Pickett (ANM-004), Raincoat Lady (ANM-005) e o Walker (ANM-007); espécies `Q-160`, leitura `Q-147`. **DEC-181:** NPC à noite usa o pack **Mid**; pack **Night** reservado à tensão, inclusive "clima de terror de anomalia" (gatilhos `Q-159`). **DEC-172/173:** classificação Mild; jumpscare só raro e leve. Regras, verbos e sinais aprovados **não mudam**. **DEC-221 (2026-10-10, usuário):** o verbo **"esconder"** da N8 e da N9 vira **"fechar a janela"** (botão ao lado do interruptor do trailer fecha a aba sobre a janela de serviço); sinal, conceito, tempos e consequência não mudam. Falas do chefe e formas curtas que dizem "Hide"/"get down" ficam para o narrative-writer trocar (`Q-173` d).
 
 # As 10 anomalias (uma nova por noite)
 
@@ -27,7 +27,7 @@ N1 = ANM-001, N2 = ANM-002 … N10 = ANM-010. Os rótulos N1–N10 no corpo dest
 | Atender | 0 | **1** | N5 |
 | Não olhar | 2 | 2 | N6, N7 |
 | Luz | 1 | 1 | N3 |
-| Esconder | 2 | 2 | N8, N9 |
+| Fechar a janela (era "Esconder", DEC-221) | 2 | 2 | N8, N9 |
 | Descartar | 1 | 1 | N2 |
 | Ponto seguro | 1 | 1 | N10 |
 
@@ -47,8 +47,8 @@ Coluna ID: rótulo N# + ID estável `ANM-###` (anotado por DEC-096; conteúdo ap
 | 5 | N5 · ANM-005 | The Raincoat Lady | capa amarela pingando em noite seca | **Atender** | Recusar / deixar esperar | comum | party |
 | 6 | N6 · ANM-006 | The wavers | alguém acena da janela de cima | Não olhar | olhar / ficar olhando | comum | por jogador |
 | 7 | N7 · ANM-007 | The Walker | figura no fim da Juniper que chega mais perto quando é olhada | Não olhar | olhar | **crítica** | party (qualquer olhar conta) |
-| 8 | N8 · ANM-008 | The long car | carro comprido estaciona com o farol no trailer | Esconder | continuar trabalhando | comum | por jogador |
-| 9 | N9 · ANM-009 | The knock | batidas na porta dos fundos + "it's me" | Esconder | ignorar / ir até a porta | comum | por jogador |
+| 8 | N8 · ANM-008 | The long car | carro comprido estaciona com o farol no trailer | Fechar a janela | continuar trabalhando | comum | por jogador |
+| 9 | N9 · ANM-009 | The knock | batidas na porta dos fundos + "it's me" | Fechar a janela | ignorar / ir até a porta | comum | por jogador |
 | 10 | N10 · ANM-010 | The Hush | postes da Juniper apagam um por um | Ponto seguro | ficar no trailer | comum | por jogador |
 
 Escalonamento (DEC-010, GDD §7.4): N1–N3 = perceber uma coisa estranha, sinal óbvio; N4–N6 = lembrar regras, sinal sutil ou contraintuitivo;
@@ -167,11 +167,11 @@ N7–N10 = pressão, regra crítica, eventos que tiram o jogador do balcão enqu
 | Conceito | Um carro procura quem cuida da esquina. Análogo não violento do exemplo do usuário (carro de vidro fumê), que foi rejeitado por violência (DEC-023): aqui **ninguém sai do carro e nada é disparado**; só a luz. |
 | Sinal | Carro preto, comprido demais, vidros embaçados, estaciona no meio-fio em frente. Motor fazendo um zumbido grave. Depois de ~2 s, **acende o farol alto direto no trailer**. |
 | Regra do chefe | "If a long car parks across the street with its lights on you —" / "get down behind the counter. Stay down." / "Wait till you hear it drive away." |
-| Forma curta | **Long car's lights on you? Hide.** |
-| Verbo correto | Esconder (prompt "Hide" atrás do balcão) dentro de ~8 s depois do farol, e ficar escondido até o carro ir embora (~15 s). |
-| Erro | Não estar escondido quando o farol **pisca duas vezes** (fim da janela de ~8 s). |
-| Omissão | Sair do esconderijo antes do carro ir embora conta como erro. |
-| Consequência | −35 de sanidade para quem estava visível. Sabor: o farol pisca, a luz do trailer **apaga por 3 s** e o carro buzina baixinho, como quem achou alguém, e vai embora devagar. |
+| Forma curta | **Long car's lights on you? Hide.** (DEC-221: texto a trocar para fechar a janela, narrative-writer, `Q-173` d; o mesmo vale para "get down behind the counter" na regra do chefe) |
+| Verbo correto | **Fechar a janela** (DEC-221: botão "Close Window" ao lado do interruptor) dentro de ~8 s depois do farol, ficar dentro do trailer e manter a janela fechada até o carro ir embora (~15 s). |
+| Erro | Janela aberta, ou estar perto do trailer do lado de fora, quando o farol **pisca duas vezes** (fim do prazo de ~8 s). |
+| Omissão | Abrir a janela antes do carro ir embora conta como erro de quem abriu (DEC-204). |
+| Consequência | −35 de sanidade para quem estava exposto. Sabor: o farol pisca, a luz do trailer **apaga por 3 s** e o carro buzina baixinho, como quem achou alguém, e vai embora devagar. |
 | Notas | Por jogador. Os clientes na fila esperam (paciência continua correndo). |
 
 ## N9 — The knock (noite 9)
@@ -181,11 +181,11 @@ N7–N10 = pressão, regra crítica, eventos que tiram o jogador do balcão enqu
 | Conceito | Algo bate na porta dos fundos fingindo ser o chefe. Prepara o final: o chefe **nunca** vai ao trailer à noite. Sinal **sonoro** (hábito "ouvir sons", §17). |
 | Sinal | Três batidas na porta dos fundos, pausa, mais três. Legenda sem nome: **"???: Rookie? It's me. It's Walt. Open up."** Segunda série: **"???: It's cold out here, Rookie."** |
 | Regra do chefe | "I never come to the trailer at night. Never." / "If someone knocks on the back door and says it's me —" / "it isn't. Get down and stay quiet till it stops." |
-| Forma curta | **Knock at the back? It's not me. Hide.** |
-| Verbo correto | Esconder até as batidas pararem (~12 s). |
-| Erro | Não estar escondido quando a última batida termina. |
-| Omissão | Ir até a porta: a porta **não abre** (trancar e abrir porta estão fora do MVP, DEC-054); só conta como "não escondido". |
-| Consequência | −35 de sanidade para quem não se escondeu. Sabor: a porta range e abre **um dedo**, entra vento frio, os guardanapos voam, a porta fecha sozinha. Ninguém entra. |
+| Forma curta | **Knock at the back? It's not me. Hide.** (DEC-221: texto a trocar para fechar a janela, narrative-writer, `Q-173` d; idem "Get down and stay quiet" na regra do chefe) |
+| Verbo correto | **Fechar a janela** (DEC-221) e ficar dentro do trailer até as batidas pararem (~12 s). |
+| Erro | Janela aberta, ou estar perto do trailer do lado de fora, quando a última batida termina. |
+| Omissão | Ir até a porta: a porta **não abre** (trancar e abrir porta estão fora do MVP, DEC-054); sair por ela deixa o jogador exposto. |
+| Consequência | −35 de sanidade para quem ficou exposto. Sabor: a porta range e abre **um dedo**, entra vento frio, os guardanapos voam, a porta fecha sozinha. Ninguém entra. |
 | Notas | Por jogador. Legenda com "???" e não com o nome do chefe: o jogador não pode ter certeza pela interface. |
 
 ## N10 — The Hush (noite 10)
@@ -207,7 +207,7 @@ N7–N10 = pressão, regra crítica, eventos que tiram o jogador do balcão enqu
 ## Interações que o game-designer deve checar
 
 - **N3 × N7**: desligar a luz (N3) diminui a área iluminada; o Walker (N7) mede "chegar à luz". Sugestão: com a luz desligada o alvo do Walker é a porta do trailer.
-- **N8/N9 × fila**: esconder deixa clientes esperando; com Counter 2–3 a paciência maior ajuda (uso duplo, DEC-006).
+- **N8/N9 × fila**: com a janela fechada não se atende (DEC-221, Provisório `Q-173`): clientes esperando; com Counter 2–3 a paciência maior ajuda (uso duplo, DEC-006).
 - **N10 × N7**: correr até o Mart não deve exigir olhar a Juniper.
 - **N1 × N5**: a Raincoat Lady tem rosto; o jogador não deve confundi-la com N1.
 - **N4 × N1**: a cópia nunca é sem rosto; um evento por cliente.

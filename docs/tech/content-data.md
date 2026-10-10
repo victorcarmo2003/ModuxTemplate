@@ -4,7 +4,10 @@ Status: Rascunho
 
 Autor: architect. **Versão 5, 2026-10-10 (pós onda 1):** §3.20 Animations, §3.21 Sounds/Music, §6 tabelas das
 ondas 2–4 (Shift de noite, Nights, LightGroups, Sanity, Thief, BossCalls, Anomalies, Hallucinations, Cutscenes,
-WalkPaths, campos novos, Actions/Notices novas). Contrato de código: `architecture.md` §19. Versão 4.1, 2026-10-10 (**TASK-003**: implementação em `src/Shared/Content/`, §1.5; DEC-215 na
+WalkPaths, campos novos, Actions/Notices novas). Contrato de código: `architecture.md` §19.
+**v5.2, 2026-10-10 (DEC-221):** esconderijo sai, janela do trailer entra: `Actions` −`hide` −`get_up` +`shutter_toggle`;
+`Notices` −`hide_taken` +`shutter_closed`; `Vehicles` −`HidePoints` +`HasShutter`; `Animations` −`hide`; `AnomalyRules`
+N8/N9 com verbo `shutter` (§6.9, §6.10). Versão 4.1, 2026-10-10 (**TASK-003**: implementação em `src/Shared/Content/`, §1.5; DEC-215 na
 tábua do trailer). Versão 4, 2026-10-10 (**TASK-001**: estado DEC-140 a DEC-201, núcleo da onda 1). Anterior: 3.1.
 Formato das tabelas que game-designer, narrative-writer e level-designer preenchem e que o código só lê.
 Base: DEC-044 ("parâmetros são tabela"), propostas das rodadas 1 e 2 (Aprovadas), fichas de `design/` e `story/`.
@@ -29,7 +32,7 @@ executável. Toda linha tem `Ref` apontando para o ID da ficha.
 | Ingredients | + `Icon` (plaquinha `Label_<Ing>`, `Q-152` placeholder), + `Stack` (queijo antes dos cordões), + `Vehicle` | **DEC-156**, **DEC-142** |
 | Stations | reescrita com as chaves do binding (TASK-002 §18.4): `sausage_stock`, `grill`, `rail`, `bun_crate`, `board`, `toppings`, `trash`; `Record` (`PerSlot`/`Single`/`None`), `RecordKeys` para o set; tábua `board` com 2 vagas | **DEC-190**, DEC-201, MAP-01 §7.1 |
 | Upgrades | `Levels` **por veículo** (`cart`, `trailer`); trailer recomeça do nível 1; `Vehicles` lista onde o upgrade existe; `Parts` por veículo | **DEC-184** (`Q-163` Provisório nos preços) |
-| Vehicles | + `RailSlots`, `BoardSlots`, `HasCoffee`/`HasSwitch`/`HidePoints`, `CoveredAfter` (lona) | DEC-190, FEAT-006, DEC-189, DEC-199 |
+| Vehicles | + `RailSlots`, `BoardSlots`, `HasCoffee`/`HasSwitch`/`HasShutter` (era `HidePoints`, DEC-221), `CoveredAfter` (lona) | DEC-190, FEAT-006, DEC-189, DEC-199, DEC-221 |
 | Classes | **chaves por animal** (`class_dog`…); + `Species`; 6 com `InMvp = true`; efeitos com `When` | **DEC-186**, DEC-147 |
 | **Species** (nova) | 18 espécies (DEC-158), `Class`, `Customer`, `Pedestrian`, `ReservedFor` (guaxinim só Quentin) | **DEC-158, DEC-186, DEC-188**, DEC-159, DEC-192 |
 | **Outfits** (nova) | `crew`, `civil_a`..`civil_h`, `thief`; packs disponíveis por roupa | DEC-148, DEC-159, DEC-160, DEC-161, DEC-166 |
@@ -392,7 +395,7 @@ Chaves alinhadas ao binding da TASK-002 (`architecture.md` §18.4, §18.14 item 
 | `HasNight` | false | true | DEC-007 |
 | `RailSlots` | 6 | 8 | FEAT-006 |
 | `BoardSlots` | **2** | **3** | **DEC-190**, **DEC-215** |
-| `HasCoffee`, `HasSwitch`, `HidePoints` | false, false, 0 | true, true, 4 | DEC-125, DEC-189, DEC-176 |
+| `HasCoffee`, `HasSwitch`, `HasShutter` (v5.2; sai `HidePoints`) | false, false, false | true, true, true | DEC-125, DEC-189, DEC-221 |
 | `BuyFromDay` | — | 5 | DEC-037 |
 | `BuySpot` | — | o **próprio trailer** à venda no estacionamento (prompt `buy_trailer`). Fixo, fora da bancada (DEC-107) | DEC-107 |
 | `CoveredAfter` | lona AST-043 na vaga do trailer depois da troca (DEC-199) | — | DEC-199 |
@@ -735,7 +738,7 @@ Ações da **onda 1** (FEAT-005, FEAT-006, FEAT-007, FEAT-008, FEAT-011, FEAT-01
 
 Chaves das ondas seguintes **já existem na tabela** (o enum do `Interact` e a checagem do binding, `architecture.md`
 §18.7 item 3, precisam delas), sem prompt ativo na onda 1: `bench_buy_item` (S1 fica "Nothing special today"),
-`buy_trailer` (2 s), `brew_coffee`, `give_coffee`, `switch_light`, `hide`, `safe_spot`. **Saem:** `board_add_topping`
+`buy_trailer` (2 s), `brew_coffee`, `give_coffee`, `switch_light`, `shutter_toggle` (v5.2; `hide`/`get_up` saem, DEC-221), `safe_spot`. **Saem:** `board_add_topping`
 (complemento é na estação, não na tábua), `board_pickup` (o HotDog nasce na mão, DEC-190), `party_join` (plataforma
 física, DEC-179). Lixeira de rua (DEC-200) reaproveita `discard` (o que aceita: `Q-166`).
 
@@ -779,7 +782,7 @@ Lista inicial (Provisória, `Q-167`; ids vazios até o upload):
 
 | Rig | Chaves |
 |---|---|
-| Crew | `crew_idle`, `crew_walk`, `crew_jump`, `crew_fall`, `get_up` (atropelado levanta, 0,5 s), `hide` (agachado, loop), `drink` (1,5 s), `give`, `answer_phone` (loop), `wave_skip` (voto da cutscene, opcional) |
+| Crew | `crew_idle`, `crew_walk`, `crew_jump`, `crew_fall`, `get_up` (atropelado levanta, 0,5 s), ~~`hide`~~ (sai, DEC-221), `drink` (1,5 s), `give`, `answer_phone` (loop), `wave_skip` (voto da cutscene, opcional) |
 | Npc | `npc_idle`, `npc_walk`, `npc_wait` (impaciente, loop), `npc_happy`, `npc_complain`, `npc_refuse_leave`, `thief_sneak`, `thief_open` (loop), `thief_flee` |
 | Actor | `opal_idle` (hoje id fixo no `OpalController`), `walt_walk`, `walt_offer_coffee`, `medic_walk`, `medic_carry`, `medic_lift`, `walker_step`, `waver_wave` (silhueta da janela, N6), `copy_backwalk` (N4), `raincoat_idle` |
 
@@ -968,11 +971,12 @@ Actions:
 | Key | Text | Hold | Radius | Night | Wave | Nota |
 |---|---|---|---|---|---|---|
 | `answer_phone` | "Answer" | 0 | 7 | Any | 2 | **nova**; FEAT-018 |
-| `get_up` | "Get Up" | 0 | 10 | NightOnly | 3 | **nova**; FEAT-023 |
+| ~~`get_up`~~ | — | — | — | — | — | **sai (v5.2, DEC-221)**: sem esconderijo não há "levantar". O clipe `get_up` de `Animations` fica (atropelamento) |
 | `brew_coffee` | "Brew Coffee" / "Take Coffee" (`PromptText`) | **1** (era 0) | 7 | Any | 2 | FEAT-021 |
 | `give_coffee` | "Give" | **0.5** (era 0) | 7 | NightOnly | 2 | FEAT-021 |
-| `hide` | "Hide" | **0.5** (era 0) | 7 | NightOnly | 3 | FEAT-023 |
-| `safe_spot` | — | — | — | — | — | fica na tabela (enum), **sem prompt**: o ponto seguro é zona |
+| ~~`hide`~~ | — | — | — | — | — | **sai (v5.2, DEC-221)** |
+| `shutter_toggle` | "Close Window" / "Open Window" (`PromptText` pelo estado; placeholder até o `ui-text.md`) | **0.5** | 7 | NightOnly | 3 | **nova (v5.2)**; FEAT-023, DEC-221; âncora `Prompt_Shutter`; dono `VehicleService`; cooldown 1 s no `Validate` (não é campo da tabela) |
+| `safe_spot` | — | — | — | — | — | fica na tabela (enum), **sem prompt**: o ponto seguro é zona (o `Text` "Hide" do código vira "Safe Spot", só rótulo de debug) |
 
 Notices (`Audience`, `ValueFrom`):
 
@@ -987,7 +991,8 @@ Notices (`Audience`, `ValueFrom`):
 | `thief_caught` | "Nice catch! +${value}" | Party | Number | 2 |
 | `coffee_cooldown` | "Wait {value}s for another coffee" | Player | Number | 2 |
 | `coffee_full` | "You're wide awake" | Player | None | 2 |
-| `hide_taken` | "Someone's already there" | Player | None | 3 |
+| ~~`hide_taken`~~ | — | — | — | **sai (v5.2, DEC-221)** |
+| `shutter_closed` | "The window is closed." (placeholder) | Player | None | 3 (v5.2; recusa de corrida do gate `Shutter`, FEAT-005) |
 | `revive_used`, `revive_credit_saved`, `special_on_bench`, `shift_cant_resume`, `not_in_roster` | `ui-text.md` | conforme | conforme | 4 |
 
 `Notices.ValueFrom` ganha `"Achievements"`. Textos finais: narrative-writer (`ui-text.md`).
@@ -1014,9 +1019,11 @@ Notices (`Audience`, `ValueFrom`):
 
 `Rules/` (servidor, um arquivo por anomalia ou uma tabela): `{ Anomaly, Verb, LikelyWrongVerb, Window, Params,
 IsCritical }`. `Params` por anomalia (FEAT-023, NPC-009..018): N3 `DarkHold = 5`, `Window = 60`; N6
-`LookLimit = 3`, `AutoOff = 20`; N7 `Steps = 10`, `StepEvery = 1`, `BackEvery = 10`; N8 `HideWindow = 8`,
-`StayFor = 15`; N9 `Window = 12`, `Zone = "trailer"`; N10 `PostsOff = 15`, `HoldFor = 20`, `Point = "SS"`,
-`Radius = 6`. `Validate`: `IsCritical` só em ANM-007 (DEC-074); todo verbo é um dos 7 (DEC-054).
+`LookLimit = 3`, `AutoOff = 20`; N7 `Steps = 10`, `StepEvery = 1`, `BackEvery = 10`; N8 `CloseWindow = 8` (era `HideWindow`, v5.2),
+`StayFor = 15`; N9 `Window = 12`, `Zone = "trailer"` (N8/N9: `Verb = "shutter"`, era `"hide"`, DEC-221; "protegido" =
+janela fechada e dentro do trailer, `architecture.md` §19.14); N10 `PostsOff = 15`, `HoldFor = 20`, `Point = "SS"`,
+`Radius = 6`. `Validate`: `IsCritical` só em ANM-007 (DEC-074); todo verbo é um dos 7 (DEC-054; v5.2: `refuse`, `serve`, `dont_look`,
+`light`, `shutter`, `discard`, `safe_spot`).
 
 ### 6.11 Hallucinations, Cutscenes, WalkPaths (onda 3)
 
