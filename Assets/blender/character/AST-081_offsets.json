@@ -1,0 +1,821 @@
+{
+ "asset": "AST-081 customer accessories (+ AST-076 surgical masks)",
+ "axes": "Roblox (X right, Y up, -Z front), character standing on Y=0, rest pose of the crew kit (meshes modelled in place, like Ears_/Cap).",
+ "rules": [
+  "Each FBX = one MeshPart, welded in place by CrewRig (attribute Anchor or nearest R6 part). Briefcase and Cane MUST get Anchor = 'Right Arm' (Mirror: 'Left Arm') in the kit: their bbox centre is nearer the leg.",
+  "Head-piece fit per species: apply CFrame offset (studs) and Size scale about the HatAttachment point (0, 6.0, 0) of the rest pose. offset [0,0,0] / scale [1,1,1] = mesh as exported.",
+  "All colours from the KitchenPack atlas (restaurantbits_texture): DayTextureID = imported texture; Mid/Night = CrewLooks.Atlas (T_Atlas_Kitchen_Mid/Night), no new texture.",
+  "Hard hat: species with ears on top use Acc_HardHat_EarsUp (ear slots), the others Acc_HardHat (same split as Cap / CapEarsUp).",
+  "Mirror variants (ANM-004 copies): *_Mirror meshes; Backpack, Vest, HardHat, Headphones are symmetric."
+ ],
+ "pieces": {
+  "Acc_Backpack": {
+   "file": "AST-081_Acc_Backpack",
+   "kit_name": "Acc_Backpack",
+   "attachment": "BodyBackAttachment",
+   "anchor": "Torso",
+   "primary_species": "Hamster",
+   "tris": 272,
+   "bbox_roblox_min": [
+    -1.025,
+    2.47,
+    1.28
+   ],
+   "bbox_roblox_max": [
+    1.025,
+    4.048,
+    -0.558
+   ]
+  },
+  "Acc_Badge": {
+   "file": "AST-081_Acc_Badge",
+   "kit_name": "Acc_Badge",
+   "attachment": "BodyFrontAttachment",
+   "anchor": "Torso",
+   "primary_species": "Penguin",
+   "tris": 64,
+   "bbox_roblox_min": [
+    -0.75,
+    2.95,
+    -0.51
+   ],
+   "bbox_roblox_max": [
+    -0.25,
+    3.75,
+    -0.58
+   ]
+  },
+  "Acc_Badge_Mirror": {
+   "file": "AST-081_Acc_Badge_Mirror",
+   "kit_name": "Acc_Badge_Mirror",
+   "attachment": "BodyFrontAttachment",
+   "anchor": "Torso",
+   "primary_species": "Penguin",
+   "tris": 64,
+   "bbox_roblox_min": [
+    0.25,
+    2.95,
+    -0.51
+   ],
+   "bbox_roblox_max": [
+    0.75,
+    3.75,
+    -0.58
+   ]
+  },
+  "Acc_Briefcase": {
+   "file": "AST-081_Acc_Briefcase",
+   "kit_name": "Acc_Briefcase",
+   "attachment": "RightGripAttachment",
+   "anchor": "Right Arm",
+   "primary_species": "Penguin",
+   "tris": 112,
+   "bbox_roblox_min": [
+    1.32,
+    0.93,
+    0.6
+   ],
+   "bbox_roblox_max": [
+    1.68,
+    2.15,
+    -0.6
+   ]
+  },
+  "Acc_Briefcase_Mirror": {
+   "file": "AST-081_Acc_Briefcase_Mirror",
+   "kit_name": "Acc_Briefcase_Mirror",
+   "attachment": "LeftGripAttachment",
+   "anchor": "Left Arm",
+   "primary_species": "Penguin",
+   "tris": 112,
+   "bbox_roblox_min": [
+    -1.68,
+    0.93,
+    0.6
+   ],
+   "bbox_roblox_max": [
+    -1.32,
+    2.15,
+    -0.6
+   ]
+  },
+  "Acc_Cane": {
+   "file": "AST-081_Acc_Cane",
+   "kit_name": "Acc_Cane",
+   "attachment": "RightGripAttachment",
+   "anchor": "Right Arm",
+   "primary_species": "Turtle",
+   "tris": 116,
+   "bbox_roblox_min": [
+    1.444,
+    -0.013,
+    0.014
+   ],
+   "bbox_roblox_max": [
+    1.556,
+    2.375,
+    -0.742
+   ]
+  },
+  "Acc_Cane_Mirror": {
+   "file": "AST-081_Acc_Cane_Mirror",
+   "kit_name": "Acc_Cane_Mirror",
+   "attachment": "LeftGripAttachment",
+   "anchor": "Left Arm",
+   "primary_species": "Turtle",
+   "tris": 116,
+   "bbox_roblox_min": [
+    -1.556,
+    -0.013,
+    0.014
+   ],
+   "bbox_roblox_max": [
+    -1.444,
+    2.375,
+    -0.742
+   ]
+  },
+  "Acc_HardHat": {
+   "file": "AST-081_Acc_HardHat",
+   "kit_name": "Acc_HardHat",
+   "attachment": "HatAttachment",
+   "anchor": "Head",
+   "primary_species": "Monkey",
+   "tris": 178,
+   "bbox_roblox_min": [
+    -1.635,
+    5.143,
+    1.402
+   ],
+   "bbox_roblox_max": [
+    1.635,
+    6.263,
+    -1.524
+   ]
+  },
+  "Acc_HardHat_EarsUp": {
+   "file": "AST-081_Acc_HardHat_EarsUp",
+   "kit_name": "Acc_HardHat_EarsUp",
+   "attachment": "HatAttachment",
+   "anchor": "Head",
+   "primary_species": "Rabbit",
+   "tris": 205,
+   "bbox_roblox_min": [
+    -1.635,
+    5.143,
+    1.402
+   ],
+   "bbox_roblox_max": [
+    1.635,
+    6.263,
+    -1.524
+   ]
+  },
+  "Acc_Headphones": {
+   "file": "AST-081_Acc_Headphones",
+   "kit_name": "Acc_Headphones",
+   "attachment": "HatAttachment",
+   "anchor": "Head",
+   "primary_species": "Frog",
+   "tris": 212,
+   "bbox_roblox_min": [
+    -1.68,
+    4.971,
+    0.506
+   ],
+   "bbox_roblox_max": [
+    1.68,
+    6.222,
+    -0.249
+   ]
+  },
+  "Acc_SafetyVest": {
+   "file": "AST-081_Acc_SafetyVest",
+   "kit_name": "Acc_SafetyVest",
+   "attachment": "BodyFrontAttachment",
+   "anchor": "Torso",
+   "primary_species": "Monkey",
+   "tris": 190,
+   "bbox_roblox_min": [
+    -0.97,
+    2.3,
+    0.57
+   ],
+   "bbox_roblox_max": [
+    0.97,
+    4.056,
+    -0.57
+   ]
+  },
+  "Acc_ShiftBadge": {
+   "file": "AST-081_Acc_ShiftBadge",
+   "kit_name": "Acc_ShiftBadge",
+   "attachment": "BodyFrontAttachment",
+   "anchor": "Torso",
+   "primary_species": "Koala",
+   "tris": 98,
+   "bbox_roblox_min": [
+    0.15,
+    2.85,
+    -0.51
+   ],
+   "bbox_roblox_max": [
+    0.85,
+    4.061,
+    -0.58
+   ]
+  },
+  "Acc_ShiftBadge_Mirror": {
+   "file": "AST-081_Acc_ShiftBadge_Mirror",
+   "kit_name": "Acc_ShiftBadge_Mirror",
+   "attachment": "BodyFrontAttachment",
+   "anchor": "Torso",
+   "primary_species": "Koala",
+   "tris": 98,
+   "bbox_roblox_min": [
+    -0.85,
+    2.85,
+    -0.51
+   ],
+   "bbox_roblox_max": [
+    -0.15,
+    4.061,
+    -0.58
+   ]
+  },
+  "Acc_SurgicalMask_Panda": {
+   "file": "AST-076_Acc_SurgicalMask_Panda",
+   "kit_name": "Acc_SurgicalMask_Panda",
+   "attachment": "FaceFrontAttachment",
+   "anchor": "Head",
+   "primary_species": "Panda",
+   "tris": 108,
+   "bbox_roblox_min": [
+    -1.338,
+    4.037,
+    0.006
+   ],
+   "bbox_roblox_max": [
+    1.338,
+    5.852,
+    -1.369
+   ]
+  },
+  "Acc_SurgicalMask_Rabbit": {
+   "file": "AST-076_Acc_SurgicalMask_Rabbit",
+   "kit_name": "Acc_SurgicalMask_Rabbit",
+   "attachment": "FaceFrontAttachment",
+   "anchor": "Head",
+   "primary_species": "Rabbit",
+   "tris": 108,
+   "bbox_roblox_min": [
+    -1.311,
+    4.038,
+    0.006
+   ],
+   "bbox_roblox_max": [
+    1.311,
+    5.852,
+    -1.308
+   ]
+  }
+ },
+ "species": {
+  "Bear": {
+   "Acc_HardHat": {
+    "use": "Acc_HardHat_EarsUp",
+    "offset": [
+     0,
+     0.0,
+     0
+    ],
+    "ok": true
+   },
+   "Acc_Headphones": {
+    "scale": [
+     1.0,
+     1,
+     1
+    ],
+    "offset": [
+     0,
+     0.0,
+     0
+    ],
+    "ok": true,
+    "note": ""
+   },
+   "Acc_Backpack": {
+    "tail_or_shell_overlap": [
+     "Tail_Bear"
+    ]
+   }
+  },
+  "Cat": {
+   "Acc_HardHat": {
+    "use": "Acc_HardHat_EarsUp",
+    "offset": [
+     0,
+     0.0,
+     0
+    ],
+    "ok": true
+   },
+   "Acc_Headphones": {
+    "scale": [
+     1.0,
+     1,
+     1
+    ],
+    "offset": [
+     0,
+     0.0,
+     0
+    ],
+    "ok": true,
+    "note": ""
+   },
+   "Acc_Backpack": {
+    "tail_or_shell_overlap": [
+     "Tail_Cat"
+    ]
+   }
+  },
+  "Dog": {
+   "Acc_HardHat": {
+    "use": "Acc_HardHat",
+    "offset": [
+     0,
+     0.06,
+     0
+    ],
+    "ok": true
+   },
+   "Acc_Headphones": {
+    "scale": [
+     1.2,
+     1,
+     1
+    ],
+    "offset": [
+     0,
+     0.0,
+     0
+    ],
+    "ok": true,
+    "note": "cups pushed out over floppy/side ears"
+   },
+   "Acc_Backpack": {
+    "tail_or_shell_overlap": [
+     "Tail_Dog"
+    ]
+   }
+  },
+  "Fox": {
+   "Acc_HardHat": {
+    "use": "Acc_HardHat_EarsUp",
+    "offset": [
+     0,
+     0.0,
+     0
+    ],
+    "ok": true
+   },
+   "Acc_Headphones": {
+    "scale": [
+     1.0,
+     1,
+     1
+    ],
+    "offset": [
+     0,
+     0.0,
+     0
+    ],
+    "ok": true,
+    "note": ""
+   },
+   "Acc_Backpack": {
+    "tail_or_shell_overlap": [
+     "Tail_Fox"
+    ]
+   }
+  },
+  "Frog": {
+   "Acc_HardHat": {
+    "use": null,
+    "ok": false,
+    "why": "needs raise 0.34 (eye bumps)"
+   },
+   "Acc_Headphones": {
+    "scale": [
+     1.0,
+     1,
+     1
+    ],
+    "offset": [
+     0,
+     0.0,
+     0
+    ],
+    "ok": true,
+    "note": ""
+   },
+   "Acc_Backpack": {
+    "tail_or_shell_overlap": []
+   }
+  },
+  "Hamster": {
+   "Acc_HardHat": {
+    "use": "Acc_HardHat_EarsUp",
+    "offset": [
+     0,
+     0.0,
+     0
+    ],
+    "ok": true
+   },
+   "Acc_Headphones": {
+    "scale": [
+     1.0,
+     1,
+     1
+    ],
+    "offset": [
+     0,
+     0.0,
+     0
+    ],
+    "ok": true,
+    "note": ""
+   },
+   "Acc_Backpack": {
+    "tail_or_shell_overlap": [
+     "Tail_Hamster"
+    ]
+   }
+  },
+  "Koala": {
+   "Acc_HardHat": {
+    "use": "Acc_HardHat_EarsUp",
+    "offset": [
+     0,
+     0.0,
+     0
+    ],
+    "ok": true
+   },
+   "Acc_Headphones": {
+    "scale": [
+     1.0,
+     1,
+     1
+    ],
+    "offset": [
+     0,
+     0.0,
+     0
+    ],
+    "ok": true,
+    "note": ""
+   },
+   "Acc_Backpack": {
+    "tail_or_shell_overlap": [
+     "Tail_Koala"
+    ]
+   }
+  },
+  "Lion": {
+   "Acc_HardHat": {
+    "use": null,
+    "ok": false,
+    "why": "mane/ears collide at any raise <= 0.8"
+   },
+   "Acc_Headphones": {
+    "scale": [
+     1.5,
+     1,
+     1
+    ],
+    "offset": [
+     0,
+     0.0,
+     0
+    ],
+    "ok": false,
+    "note": "cups pushed out over floppy/side ears"
+   },
+   "Acc_Backpack": {
+    "tail_or_shell_overlap": [
+     "Tail_Lion"
+    ]
+   }
+  },
+  "Monkey": {
+   "Acc_HardHat": {
+    "use": "Acc_HardHat",
+    "offset": [
+     0,
+     0.02,
+     0
+    ],
+    "ok": true
+   },
+   "Acc_Headphones": {
+    "scale": [
+     1.36,
+     1,
+     1
+    ],
+    "offset": [
+     0,
+     0.0,
+     0
+    ],
+    "ok": true,
+    "note": "cups pushed out over floppy/side ears"
+   },
+   "Acc_Backpack": {
+    "tail_or_shell_overlap": [
+     "Tail_Monkey"
+    ]
+   }
+  },
+  "Mouse": {
+   "Acc_HardHat": {
+    "use": "Acc_HardHat_EarsUp",
+    "offset": [
+     0,
+     0.0,
+     0
+    ],
+    "ok": true
+   },
+   "Acc_Headphones": {
+    "scale": [
+     1.0,
+     1,
+     1
+    ],
+    "offset": [
+     0,
+     0.0,
+     0
+    ],
+    "ok": true,
+    "note": ""
+   },
+   "Acc_Backpack": {
+    "tail_or_shell_overlap": []
+   }
+  },
+  "Owl": {
+   "Acc_HardHat": {
+    "use": "Acc_HardHat_EarsUp",
+    "offset": [
+     0,
+     0.0,
+     0
+    ],
+    "ok": true
+   },
+   "Acc_Headphones": {
+    "scale": [
+     1.0,
+     1,
+     1
+    ],
+    "offset": [
+     0,
+     0.0,
+     0
+    ],
+    "ok": true,
+    "note": ""
+   },
+   "Acc_Backpack": {
+    "tail_or_shell_overlap": [
+     "Tail_Owl"
+    ]
+   }
+  },
+  "Panda": {
+   "Acc_HardHat": {
+    "use": "Acc_HardHat_EarsUp",
+    "offset": [
+     0,
+     0.0,
+     0
+    ],
+    "ok": true
+   },
+   "Acc_Headphones": {
+    "scale": [
+     1.0,
+     1,
+     1
+    ],
+    "offset": [
+     0,
+     0.0,
+     0
+    ],
+    "ok": true,
+    "note": ""
+   },
+   "Acc_Backpack": {
+    "tail_or_shell_overlap": [
+     "Tail_Panda"
+    ]
+   }
+  },
+  "Penguin": {
+   "Acc_HardHat": {
+    "use": "Acc_HardHat",
+    "offset": [
+     0,
+     0.0,
+     0
+    ],
+    "ok": true
+   },
+   "Acc_Headphones": {
+    "scale": [
+     1.0,
+     1,
+     1
+    ],
+    "offset": [
+     0,
+     0.0,
+     0
+    ],
+    "ok": true,
+    "note": ""
+   },
+   "Acc_Backpack": {
+    "tail_or_shell_overlap": []
+   }
+  },
+  "Pig": {
+   "Acc_HardHat": {
+    "use": "Acc_HardHat",
+    "offset": [
+     0,
+     0.18,
+     0
+    ],
+    "ok": true
+   },
+   "Acc_Headphones": {
+    "scale": [
+     1.22,
+     1,
+     1
+    ],
+    "offset": [
+     0,
+     0.0,
+     0
+    ],
+    "ok": true,
+    "note": "cups pushed out over floppy/side ears"
+   },
+   "Acc_Backpack": {
+    "tail_or_shell_overlap": [
+     "Tail_Pig"
+    ]
+   }
+  },
+  "Rabbit": {
+   "Acc_HardHat": {
+    "use": "Acc_HardHat_EarsUp",
+    "offset": [
+     0,
+     0.0,
+     0
+    ],
+    "ok": true
+   },
+   "Acc_Headphones": {
+    "scale": [
+     1.0,
+     1,
+     1
+    ],
+    "offset": [
+     0,
+     0.0,
+     0
+    ],
+    "ok": true,
+    "note": ""
+   },
+   "Acc_Backpack": {
+    "tail_or_shell_overlap": [
+     "Tail_Rabbit"
+    ]
+   }
+  },
+  "Raccoon": {
+   "Acc_HardHat": {
+    "use": "Acc_HardHat_EarsUp",
+    "offset": [
+     0,
+     0.0,
+     0
+    ],
+    "ok": true
+   },
+   "Acc_Headphones": {
+    "scale": [
+     1.0,
+     1,
+     1
+    ],
+    "offset": [
+     0,
+     0.0,
+     0
+    ],
+    "ok": true,
+    "note": ""
+   },
+   "Acc_Backpack": {
+    "tail_or_shell_overlap": [
+     "Tail_Raccoon"
+    ]
+   }
+  },
+  "Sheep": {
+   "Acc_HardHat": {
+    "use": "Acc_HardHat",
+    "offset": [
+     0,
+     0.14,
+     0
+    ],
+    "ok": true
+   },
+   "Acc_Headphones": {
+    "scale": [
+     1.22,
+     1,
+     1
+    ],
+    "offset": [
+     0,
+     0.0,
+     0
+    ],
+    "ok": true,
+    "note": "cups pushed out over floppy/side ears"
+   },
+   "Acc_Backpack": {
+    "tail_or_shell_overlap": [
+     "Tail_Sheep"
+    ]
+   }
+  },
+  "Turtle": {
+   "Acc_HardHat": {
+    "use": "Acc_HardHat",
+    "offset": [
+     0,
+     0.0,
+     0
+    ],
+    "ok": true
+   },
+   "Acc_Headphones": {
+    "scale": [
+     1.0,
+     1,
+     1
+    ],
+    "offset": [
+     0,
+     0.0,
+     0
+    ],
+    "ok": true,
+    "note": ""
+   },
+   "Acc_Backpack": {
+    "tail_or_shell_overlap": [
+     "Shell_Turtle"
+    ]
+   }
+  }
+ },
+ "masks_overlap": {
+  "Acc_SurgicalMask_Rabbit": {
+   "Head_Rabbit": 8,
+   "Ears_Rabbit": 8
+  },
+  "Acc_SurgicalMask_Panda": {
+   "Head_Panda": 8,
+   "Ears_Panda": 7
+  }
+ }
+}
