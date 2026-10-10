@@ -25,6 +25,15 @@
 --   Freeze(player, reason, on)   no walk / jump while any reason holds it (Hide, Cutscene...)
 --   Prompt_Give anchor           runtime Interactable on each member's HRP, PromptAction = give_coffee (ItemService)
 --   Animate ids                  Content.Animations.Locomotion.crew written into the stock R6 Animate (id "" = stock)
+--
+-- Wave 3 (TASK-100; architecture.md §8.2, §8.3, §19.16, §19.17; DEC-197, DEC-205):
+--   Knock(player, seconds, impulse) car hit: ragdoll (sockets prebuilt in Prepare) + push, on the ground `seconds` s,
+--                                then Content.Traffic.GetUpTime s getting up in place. Returns the stand-up time
+--                                (server clock) for VitalService:SetKnocked; nil = not knocked. The owner's client
+--                                already predicted it (TrafficController) and owns the physics: the server only flips
+--                                the joints (everyone sees them) and PlatformStand; GettingUp is the client's
+--   CanSpawn in Intro            members connected when the Intro starts are its participants; anyone else waits
+--                                and spawns when the Intro ends, straight at work, no cutscene (DEC-205)
 local CollectionService = game:GetService("CollectionService")
 local PhysicsService = game:GetService("PhysicsService")
 local Players = game:GetService("Players")
@@ -86,6 +95,10 @@ function CharacterService:Setup()
 	self.Frozen = {} :: { [Player]: { [string]: boolean } }
 	-- characters that fainted (never stand up again: Revive spawns a new one)
 	self.Fainted = setmetatable({}, { __mode = "k" }) :: any
+	-- characters knocked down by a car (the token tells a stale timer from the current knock)
+	self.Knocked = setmetatable({}, { __mode = "k" }) :: any
+	-- UserIds taking part in the running Intro (DEC-205); nil outside the Intro
+	self.IntroParticipants = nil :: { [number]: boolean }?
 end
 
 -- Collision groups (T26, DEC-175) ----------------------------------------------------------------------------------
@@ -126,7 +139,12 @@ function CharacterService:CanSpawn(player: Player): boolean
 		return false
 	end
 	const member = self.Dependencies.RunStateService:GetMember(player)
-	return member ~= nil and member.State == "Active"
+	if member == nil or member.State ~= "Active" then
+		return false
+	end
+	-- late member during the Intro: waits for its end (DEC-205, architecture.md §19.16)
+	const participants = self.IntroParticipants
+	return participants == nil or participants[player.UserId] == true
 end
 
 -- Live crew character of the player, or nil.
@@ -299,6 +317,9 @@ function CharacterService:Prepare(player: Player, character: Model)
 
 	const humanoid = character:FindFirstChildOfClass("Humanoid") :: Humanoid
 	humanoid.BreakJointsOnDeath = false
+	-- the Neck motor goes off in a ragdoll: it must never kill (sanity is not health, §8.3)
+	humanoid.RequiresNeck = false
+	Ragdoll.Prepare(character)
 
 	for _, descendant in character:GetDescendants() do
 		setGroup(descendant)
@@ -475,7 +496,7 @@ function CharacterService:ApplyFreeze(player: Player)
 	if humanoid == nil then
 		return
 	end
-	const frozen = self:IsFrozen(player) or self.Fainted[character] == true
+	const frozen = self:IsFrozen(player) or self.Fainted[character] == true or self.Knocked[character] ~= nil
 	character:SetAttribute(FROZEN_ATTRIBUTE, if self:IsFrozen(player) then true else nil)
 	if frozen then
 		humanoid.JumpPower = 0
@@ -498,6 +519,8 @@ function CharacterService:Faint(player: Player)
 	const humanoid = character:FindFirstChildOfClass("Humanoid") :: Humanoid
 	const root = character:FindFirstChild("HumanoidRootPart")
 	self.Fainted[character] = true
+	-- a knocked body that faints stays down: the knock timers see the token gone
+	self.Knocked[character] = nil
 
 	humanoid:UnequipTools()
 	humanoid.RequiresNeck = false
@@ -521,6 +544,96 @@ function CharacterService:Faint(player: Player)
 	end
 	Ragdoll.Enable(character)
 	humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+end
+
+-- Knock (car hit; architecture.md §8.2, §19.17; DEC-197) ----------------------------------------------------------
+
+local function finite(value: number): boolean
+	return value == value and math.abs(value) ~= math.huge
+end
+
+function CharacterService:IsKnocked(player: Player): boolean
+	const character = player.Character
+	return character ~= nil and self.Knocked[character] ~= nil
+end
+
+-- TrafficService, after validating CarHit: ragdoll + push for `seconds` s, then Content.Traffic.GetUpTime s standing
+-- up in place. impulse = velocity change in studs/s (direction of the car + up). Returns the stand-up time (server
+-- clock) or nil when the player cannot be knocked: no live body, fainted, frozen (hidden, cutscene), already down.
+-- Never unequips: ItemService:DropHeld runs right after and needs the Tool in the hand.
+function CharacterService:Knock(player: Player, seconds: number, impulse: Vector3): number?
+	if type(seconds) ~= "number" or not finite(seconds) or seconds <= 0 then
+		return nil
+	end
+	if typeof(impulse) ~= "Vector3" or not (finite(impulse.X) and finite(impulse.Y) and finite(impulse.Z)) then
+		return nil
+	end
+	const character = self:CharacterOf(player)
+	if character == nil or self.Fainted[character] or self.Knocked[character] ~= nil or self:IsFrozen(player) then
+		return nil
+	end
+	const humanoid = character:FindFirstChildOfClass("Humanoid") :: Humanoid
+	const root = character:FindFirstChild("HumanoidRootPart")
+	const getUp = math.max(0, Content.Traffic.GetUpTime)
+	const knock = { Until = workspace:GetServerTimeNow() + seconds + getUp }
+	self.Knocked[character] = knock
+
+	humanoid.RequiresNeck = false
+	humanoid.PlatformStand = true
+	Ragdoll.Enable(character)
+	self:ApplyFreeze(player)
+	self:RefreshSpeed(player)
+	-- the owner's client already pushed its own body; this covers a server-owned body
+	if root ~= nil and root:IsA("BasePart") and impulse.Magnitude > 0 then
+		root:ApplyImpulse(impulse * root.AssemblyMass)
+	end
+
+	task.delay(seconds, function()
+		if self.Knocked[character] ~= knock or self.Fainted[character] then
+			return
+		end
+		Ragdoll.Disable(character)
+		humanoid.PlatformStand = false
+	end)
+	task.delay(seconds + getUp, function()
+		if self.Knocked[character] ~= knock then
+			return
+		end
+		self.Knocked[character] = nil
+		if player.Character == character then
+			self:ApplyFreeze(player)
+			self:RefreshSpeed(player)
+		end
+	end)
+	return knock.Until
+end
+
+-- Intro participants (DEC-205; architecture.md §19.16) ---------------------------------------------------------------
+
+-- Intro starts: members connected now (not Away) are its participants. Intro ends: whoever waited spawns.
+function CharacterService:OnPhaseChanged(phase: string)
+	if phase == "Intro" then
+		const participants: { [number]: boolean } = {}
+		for userId, member in self.Dependencies.RunStateService.Members() do
+			if member.State ~= "Away" and Players:GetPlayerByUserId(userId) ~= nil then
+				participants[userId] = true
+			end
+		end
+		self.IntroParticipants = participants
+		return
+	end
+	if self.IntroParticipants == nil then
+		return
+	end
+	self.IntroParticipants = nil
+	for _, player in Players:GetPlayers() do
+		if player.Character ~= nil or self.Spawning[player] or table.find(self.Queue, player) ~= nil then
+			continue
+		end
+		if self:CanSpawn(player) then
+			self:Enqueue(player)
+		end
+	end
 end
 
 -- Body goes away (PickupHandler fallback after Revive.BodyFallback, T54; AmbulanceService on Load, wave 4).
@@ -577,14 +690,15 @@ function CharacterService:CountPackages(player: Player): number
 	return count
 end
 
--- WalkSpeed from the class (rabbit 18, cat 15, bear 14 with 3 packages, owl 15 by day); 0 while frozen or fainted.
+-- WalkSpeed from the class (rabbit 18, cat 15, bear 14 with 3 packages, owl 15 by day); 0 while frozen, fainted or
+-- knocked down.
 function CharacterService:RefreshSpeed(player: Player)
 	const character = player.Character
 	const humanoid = if character ~= nil then character:FindFirstChildOfClass("Humanoid") else nil
 	if character == nil or humanoid == nil then
 		return
 	end
-	if self:IsFrozen(player) or self.Fainted[character] then
+	if self:IsFrozen(player) or self.Fainted[character] or self.Knocked[character] ~= nil then
 		humanoid.WalkSpeed = 0
 		return
 	end
@@ -694,6 +808,9 @@ CharacterService:OnInit(function(self)
 	-- RoundService (750) ran its Setup before this OnInit (§19.0 rule 2)
 	self.Dependencies.RoundService.ShiftStarted:Connect(function(info)
 		self:OnShiftStarted(info)
+	end)
+	self.Dependencies.RoundService.PhaseChanged:Connect(function(phase)
+		self:OnPhaseChanged(phase)
 	end)
 end)
 
