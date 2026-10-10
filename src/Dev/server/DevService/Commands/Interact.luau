@@ -65,7 +65,7 @@ const Interact: Api.Module = function(ctx: Api.Context): { Api.Command }
 		{
 			Name = "interactlog",
 			Usage = "interactlog [on|off]",
-			Help = "log discarded Interact packets with reason (rate, range, target, state), aggregated per second",
+			Help = "log discarded Interact packets with reason (rate, range, target, state, or gate as <gate>:<detail>), aggregated per second",
 			Run = function(args: { string }, _caller: Player?): string?
 				const arg = if args[1] then string.lower(args[1]) else nil
 				if arg == "on" then

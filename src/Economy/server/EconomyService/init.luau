@@ -40,9 +40,6 @@ const COUNT_MAX = 999 -- ShiftReport.Arrived/Completed wire range
 const TIPS_MAX = 100000 -- ShiftReport.Tips wire range
 const GEMS_MAX = 1000 -- ShiftReport.Gems wire range
 const BOSS_STAT = "BossBonusPP" -- Content.Stats (Shift Lead, Party scope, not stacking; DEC-069)
--- Selling phases until Content.Shift has the `Selling` column (TASK-047). PENDING, last step of TASK-050:
--- IsShopOpen() = Content.Shift.ByKey[phase].Selling and this table goes away (architecture.md §19.3).
-const SHOP_PHASES: { [string]: boolean } = { Open = true, Closing = true }
 -- Closing: sign CLOSED but the queue is still served, so the drawer and the ledger still take entries (DEC-048)
 const CLOSING = "Closing"
 const KINDS: { [string]: boolean } = { Sale = true, Tip = true, Catch = true }
@@ -116,10 +113,14 @@ function EconomyService:LastReport(): Report?
 	return self.Last
 end
 
--- Selling phase: customers come and orders are taken (FEAT-003)
+-- Selling phase: customers come and orders are taken (FEAT-003). Content.Shift[phase].Selling (architecture.md §19.3)
 function EconomyService:IsShopOpen(): boolean
 	const round = self.Dependencies.RoundService
-	return round:IsStarted() and SHOP_PHASES[round:GetPhase()] == true
+	if not round:IsStarted() then
+		return false
+	end
+	const phase = Content.Shift.ByKey[round:GetPhase()]
+	return phase ~= nil and phase.Selling
 end
 
 -- Drawer and ledger take entries: a selling phase or Closing (queue still served)

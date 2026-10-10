@@ -40,9 +40,7 @@ const RATE = 8 -- Interact per second per player, burst included (network.md §4
 const RANGE_SLACK = 2 -- studs added to Actions[a].Radius on the server (network.md §4.1)
 -- Wave this build binds (content-data.md §6.8 RunParams.BindingWave). Actions with Content.Actions[a].Wave above it
 -- are refused even if someone registers them.
--- DEPENDS ON TASK-047: RunParams has no BindingWave field yet, so it is read untyped with fallback 1 (wave 1
--- behavior). When 047 lands, replace with the typed `Content.RunParams.BindingWave` and drop the cast.
-const BINDING_WAVE: number = (Content.RunParams :: any).BindingWave or 1
+const BINDING_WAVE = Content.RunParams.BindingWave
 
 const InteractionService = Modux.Service(
 	"InteractionService",
