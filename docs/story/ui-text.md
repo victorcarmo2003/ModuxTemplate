@@ -229,7 +229,7 @@ Onda 4 (texto pronto, chave já listada no §6.9): `revive_used` "Hang on — Re
 
 | Key (proposta) | Text | Audience | ValueFrom | Quem emite | Nota |
 |---|---|---|---|---|---|
-| `thief_stole` | "The drawer got raided! −${value}" | Party | Number | ThiefService | §6 já tinha o evento, sem chave |
+| `thief_stole` | "The drawer got raided! -${value}" (hífen ASCII, igual à tabela: fonte segura) | Party | Number | ThiefService | §6 já tinha o evento, sem chave |
 | `coffee_night_only` | "Save it for the night shift." | Player | None | VitalService (`Q-170`) | só se o café de dia continuar bloqueado |
 | `coffee_has_one` | "They already have a coffee." | Player | None | ItemService (`give_coffee`) | FEAT-021: entregar a quem já tem 1 é bloqueado |
 
