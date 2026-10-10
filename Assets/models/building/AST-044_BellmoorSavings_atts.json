@@ -1,0 +1,74 @@
+{
+ "Audio_Bell": {
+  "blender": [
+   -10.4,
+   16.27,
+   13.6
+  ],
+  "roblox_local": [
+   -10.4,
+   13.6,
+   -16.27
+  ]
+ },
+ "Audio_Tick": {
+  "blender": [
+   -1.0,
+   17.17,
+   14.0
+  ],
+  "roblox_local": [
+   -1.0,
+   14.0,
+   -17.17
+  ]
+ },
+ "Clock_Center": {
+  "blender": [
+   -1.0,
+   17.17,
+   14.0
+  ],
+  "roblox_local": [
+   -1.0,
+   14.0,
+   -17.17
+  ]
+ },
+ "Hinge_BankDoor_L": {
+  "blender": [
+   1.0,
+   15.09,
+   0.6
+  ],
+  "roblox_local": [
+   1.0,
+   0.6,
+   -15.09
+  ]
+ },
+ "Hinge_BankDoor_R": {
+  "blender": [
+   -3.0,
+   15.09,
+   0.6
+  ],
+  "roblox_local": [
+   -3.0,
+   0.6,
+   -15.09
+  ]
+ },
+ "Sign_Anchor": {
+  "blender": [
+   -1.0,
+   17.0,
+   9.6
+  ],
+  "roblox_local": [
+   -1.0,
+   9.6,
+   -17.0
+  ]
+ }
+}

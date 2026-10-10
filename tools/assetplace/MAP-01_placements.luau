@@ -103,10 +103,10 @@
 	- Fill_* boxes (background masses): stay until BG cards (AST-033 BG_Card) exist.
 	- TRUCK (AST-048, no new model). Ambulance + stretcher (AST-052) and long car (AST-065):
 	  dynamic actors, not static scenery.
-	- Marquee "OPEN 24 HOURS", SS marking, C-01 clock + hands, WV-1..3, BankSign, BankDoor,
-	  Door_D1, Door_SP-B, the three "NO HELP WANTED" windows, PARE-N / PARE-S (CR stop sign is
-	  excluded in asset-sourcing), CoffeeRack, ProduceSign, Opal OP-1: no asset yet or they are
-	  ID anchors; they overlay the new facades like decals.
+	- PARE-N / PARE-S (CR stop sign is excluded in asset-sourcing), CoffeeRack, ProduceSign,
+	  Opal OP-1: no asset yet or they are ID anchors. (2026-10-10, modeler-3d: Marquee, SS marking,
+	  C-01 + hands, WV-1..3, BankSign, BankDoor, Door_D1, Door_SP-B and the three "NO HELP WANTED"
+	  windows now have assets - AST-028 / AST-033 / AST-044 / AST-045 / AST-046 entries below.)
 	- P-01 flyer (AST-037): not in this pass. The blockout flyer sits 0.36 from the pole axis, the
 	  new pole has radius 0.52 -> the flyer ends up INSIDE the pole (move to ~0.56 when swapped).
 	- Mount_Counter (cart and trailer): no asset fits (AST-019 counter is 3.5 tall, the mount is at
@@ -120,10 +120,9 @@
 	==============================================================================================
 	CONFLICTS / OPEN POINTS FOUND (for the user and the art-director)
 	==============================================================================================
-	- AST-045_ApartmentBlock is 22.57 tall; MAP-01 lot is ~30 (bank ~18 + WV-1..3 at 19..28).
-	  The blockout WV glass will float up to 4.4 above the roof. Needs Y scale ~1.33 or new WV.
-	- Void behind the bank (X 24..52, Z -64..-50) visible from the Juniper Norte east sidewalk;
-	  void inside the B1 block (X 81..113, Z 50..88) visible from the EX-E alley; 6.6 gap between
+	- (solved 2026-10-10, modeler-3d) Bellmoor Savings split into AST-044 (ground 0..18, full lot
+	  X 24..52 / Z -64..-32, closes the void behind the bank) + AST-045 (floors 2-3, 18..30, WV-1..3).
+	- Void inside the B1 block (X 81..113, Z 50..88) visible from the EX-E alley; 6.6 gap between
 	  B3a and B2b (X -72..-65.4, tree T-03 in front of it).
 	- AST-024 OPEN sign is 4 tall; DEC-048 / MAP-01 §5.1 ask <= 3. SIGN-T needs 4 x 5 (asset 2 x 4).
 	- AST-030 fridge is 7 tall and one-sided; MAP-01 asks low fridges, and Bacon (-81, 44) is bought
@@ -270,12 +269,13 @@ return {
 	{ asset = "AST-033_BuildingH", x = -129.4, y = 0, z = -41.355, rotY = 0, group = "Buildings", id = "B3", replaces = { "Buildings/B3" }, note = "B3d, ends at X -137.6" },
 	{ asset = "AST-033_BuildingH", x = -57.2, y = 0, z = -41.355, rotY = 0, group = "Buildings", id = "B2", replaces = { "Buildings/B2/Block" }, note = "B2b annex west of the laundry, behind window X -56; gap X -72..-65.4 to B3a" },
 	{ asset = "AST-046_Laundry", x = -37.0, y = 0, z = -39.34, rotY = 0, group = "Buildings", id = "B2", replaces = { "Buildings/B2/Block", "Buildings/B2/Awning" }, note = "Z-10; mesh door ~X -40 = SP-B; Door_SP-B and window X -32 stay" },
+	{ asset = "AST-046_DoorSPB", x = -39.91, y = 0.4, z = -33.64, rotY = 180, group = "Buildings", id = "SP-B", replaces = { "Buildings/B2/Door_SP-B" }, note = "modeler-3d 2026-10-10: between the laundry pillars, under the awning (4.74): opening 3.2 x 4.1 only (see AST-046)" },
+	{ asset = "AST-033_NoHelpSign", x = -93.29, y = 2.2, z = -35.079, rotY = 180, group = "Buildings", id = "CS-2", replaces = { "Buildings/Window_NoHelpWanted_X-92" }, note = "card on the B3b door glass; text = SurfaceGui (AST-072)" },
+	{ asset = "AST-033_NoHelpSign", x = -53.89, y = 2.2, z = -35.079, rotY = 180, group = "Buildings", id = "CS-2", replaces = { "Buildings/B2/Window_NoHelpWanted_X-56" }, note = "card on the B2b door glass" },
+	{ asset = "AST-033_NoHelpSign", x = -34.86, y = 2.4, z = -34.414, rotY = 180, group = "Buildings", id = "CS-2", replaces = { "Buildings/B2/Window_NoHelpWanted_X-32" }, note = "card on the left pane of the laundry window" },
 	{ asset = "AST-033_BuildingA", x = -32.725, y = 0, z = -55.8, rotY = 90, group = "Buildings", id = "B2", replaces = { "Buildings/B2/Block" }, note = "B2c faces the Juniper (east), Z -64..-47.6: closes the lot seen from the trailer window" },
-	{ asset = "AST-045_ApartmentBlock", x = 38, y = 0, z = -41, rotY = 180, group = "Buildings", id = "Z-11", replaces = { "Buildings/BellmoorSavings/Bank_GroundFloor", "Buildings/BellmoorSavings/Apartments", "Buildings/BellmoorSavings/Cornice" }, note = "Bellmoor Savings + apartments; 22.57 tall vs ~30 (WV-1..3 float); C-01, WV, BankSign, BankDoor stay" },
-	{ asset = "AST-044_Column", x = 25.5, y = 0.4, z = -33, rotY = 0, group = "Buildings", id = "Z-11", replaces = {}, note = "bank portico, optional" },
-	{ asset = "AST-044_Column", x = 35.5, y = 0.4, z = -33, rotY = 0, group = "Buildings", id = "Z-11", replaces = {} },
-	{ asset = "AST-044_Column", x = 40.5, y = 0.4, z = -33, rotY = 0, group = "Buildings", id = "Z-11", replaces = {}, note = "C-01 clock (39, 14) sits between the two middle columns" },
-	{ asset = "AST-044_Column", x = 50.5, y = 0.4, z = -33, rotY = 0, group = "Buildings", id = "Z-11", replaces = {} },
+	{ asset = "AST-044_BellmoorSavings", x = 38, y = 0, z = -46.97, rotY = 180, group = "Buildings", id = "Z-11", replaces = { "Buildings/BellmoorSavings/Bank_GroundFloor", "Buildings/BellmoorSavings/Cornice", "Buildings/BellmoorSavings/BankDoor", "Buildings/BellmoorSavings/BankSign", "Buildings/BellmoorSavings/C-01", "Buildings/BellmoorSavings/C-01_MinuteHand", "Buildings/BellmoorSavings/C-01_HourHand" }, note = "modeler-3d 2026-10-10: ground floor 0..18, lot X 24..52 / Z -64..-32, portico + C-01 (39, 14, face at Z ~-30.3); columns now inside this mesh; BankSign text = SurfaceGui on +Z face; hands pivot = Clock_Center (_atts.json)" },
+	{ asset = "AST-045_ApartmentBlock", x = 38, y = 18, z = -40.762, rotY = 180, group = "Buildings", id = "Z-11", replaces = { "Buildings/BellmoorSavings/Apartments", "Buildings/BellmoorSavings/WV-1", "Buildings/BellmoorSavings/WV-2", "Buildings/BellmoorSavings/WV-3" }, note = "modeler-3d 2026-10-10: floors 2-3 on the bank (18..30, roof hut to 32.2); Window_Up_1..3 = WV-1..3 at X 31/38/45, glass 24.6..28" },
 	{ asset = "AST-033_BuildingH", x = 112.2, y = 0, z = -41.355, rotY = 0, group = "Buildings", id = "B4", replaces = { "Buildings/B4" }, note = "Ninth front" },
 	{ asset = "AST-033_BuildingA", x = 128.6, y = 0, z = -40.725, rotY = 0, group = "Buildings", id = "B4", replaces = { "Buildings/B4" } },
 	{ asset = "AST-033_BuildingA", x = 112.725, y = 0, z = -58.91, rotY = 270, group = "Buildings", id = "B4", replaces = { "Buildings/B4" }, note = "faces the parking lot (west)" },
@@ -288,6 +288,7 @@ return {
 	{ asset = "AST-033_BuildingH", x = 88.6, y = 0, z = 41.355, rotY = 180, group = "Buildings", id = "B1", replaces = { "Buildings/B1/Block_East" } },
 	{ asset = "AST-033_BuildingA", x = 105.0, y = 0, z = 40.725, rotY = 180, group = "Buildings", id = "B1", replaces = { "Buildings/B1/Block_East" }, note = "ends X 113.2: EX-E alley 6.8 wide" },
 	{ asset = "AST-033_BuildingA", x = 72.725, y = 0, z = 57.65, rotY = 270, group = "Buildings", id = "B1", replaces = { "Buildings/B1/Block_East" }, note = "faces the Pad (west), Z 49.45..65.85" },
+	{ asset = "AST-033_DoorD1", x = 63.79, y = 0.45, z = 48, rotY = 90, group = "Buildings", id = "D1", replaces = { "Buildings/B1/Door_D1" }, note = "modeler-3d 2026-10-10: opening 3.6 x 6.5 on the X 64 wall (straddles the BuildingA seam at Z 49.45); leaf Door_D1, hinge Hinge_D1" },
 	{ asset = "AST-033_BuildingH", x = 32.2, y = 0, z = 73.355, rotY = 180, group = "Buildings", id = "B1", replaces = { "Buildings/B1/Block_Rear" }, note = "faces the Pad; hides ST-R (18, 92) from the Pad" },
 	{ asset = "AST-033_BuildingA", x = 48.6, y = 0, z = 72.725, rotY = 180, group = "Buildings", id = "B1", replaces = { "Buildings/B1/Block_Rear" } },
 	{ asset = "AST-033_BuildingH", x = 65.0, y = 0, z = 73.355, rotY = 180, group = "Buildings", id = "B1", replaces = { "Buildings/B1/Block_Rear" }, note = "overlaps the west-facing B1 block by ~1.9 at the back (hidden)" },
@@ -323,6 +324,9 @@ return {
 	{ asset = "AST-028_MartAwning", x = -88, y = 5.9, z = 26.46, rotY = 180, group = "Mart", id = "MKT", replaces = { "Mart/MKT_Shell/North_Awning" } },
 	{ asset = "AST-028_MartAwning", x = -80, y = 5.9, z = 26.46, rotY = 180, group = "Mart", id = "MKT", replaces = { "Mart/MKT_Shell/North_Awning" } },
 	{ asset = "AST-028_MartAwning", x = -72, y = 5.9, z = 26.46, rotY = 180, group = "Mart", id = "MKT", replaces = { "Mart/MKT_Shell/North_Awning" } },
+	{ asset = "AST-028_Marquee", x = -58, y = 0.4, z = 30, rotY = 0, group = "Mart", id = "SS", replaces = { "Mart/Marquee_OPEN24/Canopy", "Mart/Marquee_OPEN24/Post_N", "Mart/Marquee_OPEN24/Post_S", "Mart/Marquee_OPEN24/Sign_North", "Mart/Marquee_OPEN24/Sign_East" }, note = "modeler-3d 2026-10-10: canopy X -66..-50 / Z 22..38 at 10.8; Sign_Open24 = coral Neon tubes (set Material Neon); text OPEN 24 HOURS = SurfaceGui at Text_Open24_N / _E; blockout SignLight kept" },
+	{ asset = "AST-028_SafeZoneMarking", x = -58, y = 0.4, z = 30, rotY = 0, group = "Mart", id = "SS", replaces = { "Mart/SS" }, note = "disc r 6, 0.04 thick; CanCollide/CanQuery off" },
+	{ asset = "AST-028_SignName", x = -84, y = 9.925, z = 27.025, rotY = 0, group = "Mart", id = "MKT", replaces = {}, note = "plate 14 x 2 on the north header (wall face Z 27.2); text NINTH STREET MART = SurfaceGui at Text_Name" },
 
 	-- Interior (Mart floor top 0.4)
 	{ asset = "AST-049_GearWall", x = -99, y = 0.4, z = 48, rotY = 270, group = "MartInterior", id = "GEAR_WALL", replaces = { "Mart/Interior/GEAR_WALL/Bench", "Mart/Interior/GEAR_WALL/BenchTopTrim", "Mart/Interior/GEAR_WALL/Panel", "Mart/Interior/GEAR_WALL/Title", "Mart/Interior/GEAR_WALL/S1_Vitrine" }, note = "Slot_B1 lands on Z 40.5, S1 on 46.5, B5 on 55.5 (= MAP-01 7.4); Title SurfaceGui still renders when hidden" },
