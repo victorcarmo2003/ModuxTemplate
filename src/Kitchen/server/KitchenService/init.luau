@@ -10,6 +10,15 @@
 -- (data.md §3.3); "Stn" = what each module's Capture returns (nil = the station restarts empty, data.md §2.2).
 -- Public reads for other services (Customer order draw, Market "Out of stock"): GetStock, GetCapacity, IsBlocked,
 -- Stock; write: TakeStock. The free package of the unlock day is TASK-046 (board N-03), not here.
+-- Wave 2 (TASK-057; architecture.md §19.5, T36, T60; DEC-184, DEC-200):
+--   * VehicleService.Swapped (connected in OnStart) -> Stock set (Capacity at the new Cooler, Blocked: coffee opens in
+--     the trailer) and prompts: the old vehicle's anchors off, the new one's back to what its module last asked for
+--     (Wanted, kept by Context.SetPrompt). Amount passes whole: above the new capacity it stays (Q-169 A,
+--     Provisional) and reads as e.g. 30/12; Restock is refused until it drops below capacity.
+--   * Restock of a full ingredient -> Notice stock_full {item} (D-04), throttled by Refusal like the station toasts.
+--   * Street bin: anchor Prompt_Discard (discard) inside a Model tagged StreetBin, outside any Station/Vehicle. Own
+--     branch in Evaluate (no IsCurrent, no station lock), same hand rule as BIN-C (Trash.Discardable; Q-166 a
+--     Provisional: hot dog only), Consume without refund, nothing recorded.
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -18,16 +27,24 @@ local Charm = require(ReplicatedStorage.Packages.Charm)
 local Content = require(ReplicatedStorage.shared.Content)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 local StationApi = require(script.StationApi)
+local Refusal = require(script.Refusal)
+local Trash = require(script.Stations.Trash)
 local Modux = require(ServerScriptService.server.Modux)
 
 -- [ingredient key] = units in stock. Frozen: the atom holds immutable tables.
 export type Amounts = { [string]: number }
 export type StockRecord = { Amount: number, Capacity: number, Blocked: boolean }
 
+-- What a module last asked for an anchor (restored when its vehicle becomes the current one again).
+type Wanted = { Enabled: boolean, Text: string? }
+
 const STATION_TAG = "Station"
 const VEHICLE_TAG = "Vehicle"
 const ANCHOR_TAG = "Interactable"
+const BIN_TAG = "StreetBin"
 const RESTOCK = "restock"
+const DISCARD = "discard"
+const STOCK_FULL = "stock_full"
 const PACKAGE = "Package"
 const COOLER_STAT = "StockCapacityLevel"
 const UNLOCK_NOTICE = "ingredient_unlocked"
@@ -103,6 +120,7 @@ const KitchenService = Modux.Service("KitchenService", {
 		"ItemService",
 		"ClassService",
 		"UpgradeService",
+		"VehicleService",
 	},
 	Priority = 650,
 })
@@ -122,6 +140,10 @@ function KitchenService:Setup()
 	self.Locks = {} :: { [number]: { thread } }
 	-- Anchors switched off because their vehicle is not the current one
 	self.Gated = {} :: { [Instance]: boolean }
+	-- Last prompt state a module asked for, by station anchor
+	self.Wanted = {} :: { [Instance]: Wanted }
+	-- Street bin Models (tag StreetBin, outside any Station)
+	self.Bins = {} :: { [Instance]: boolean }
 	-- Blocked at the last ShiftStarted (ingredient_unlocked)
 	self.WasBlocked = {} :: { [string]: boolean }
 	self.Warned = {} :: { [string]: boolean }
@@ -154,11 +176,12 @@ function KitchenService:IsBlocked(ingredient: string): boolean
 	return blockedOn(row, self.Dependencies.RoundService:GetDay(), self:GetVehicle())
 end
 
--- (current, capacity). Current never reads above capacity (the trailer can start with a smaller Cooler, wave 2).
+-- (current, capacity). Current can read above capacity after the swap to a vehicle with a smaller Cooler (Q-169 A,
+-- Provisional): nothing paid is lost, Restock waits until it drops below capacity.
 function KitchenService:GetStock(ingredient: string): (number, number)
 	const capacity = self:GetCapacity(ingredient)
 	const amount = self.Amounts()[ingredient] or 0
-	return math.min(amount, capacity), capacity
+	return amount, capacity
 end
 
 function KitchenService:Stock(ingredient: string): StockRecord
@@ -249,7 +272,7 @@ function KitchenService:RegisterActions()
 			Validate = function(player: Player, anchor: Instance, _id: number): boolean
 				const ok, notice, value = self:Evaluate(key, player, anchor)
 				if not ok and notice ~= nil then
-					self:Notify(player, notice, value)
+					Refusal.notify(self.Context, player, notice, value)
 				end
 				return ok
 			end,
@@ -442,6 +465,7 @@ function KitchenService:RemoveStation(instance: Instance)
 	self:Publish(station)
 	for _, anchor in station.Anchors do
 		self.Gated[anchor] = nil
+		self.Wanted[anchor] = nil
 	end
 	if instance.Parent ~= nil then
 		instance:SetAttribute("StationId", nil)
@@ -518,10 +542,56 @@ function KitchenService:Publish(station: StationApi.Station)
 	end
 end
 
+-- Stock set: the 9 records as they read now (Amount, Capacity of the current Cooler, Blocked).
+function KitchenService:PushStock()
+	const records: { StockRecord } = {}
+	for index, row in Content.Ingredients.List do
+		records[index] = self:Stock(row.Key)
+	end
+	if not self.Dependencies.NetService:IsRunning() then
+		return
+	end
+	for index, record in records do
+		self.Libs.Net.Stock:update(index, record)
+	end
+end
+
+-- Street bins -------------------------------------------------------------------------------------------------------
+
+-- A StreetBin Model outside any Station and Vehicle (T60). A bin inside a vehicle would dodge IsCurrent: refused.
+function KitchenService:AddBin(instance: Instance)
+	if self.Bins[instance] or not instance:IsDescendantOf(workspace) then
+		return
+	end
+	if not instance:IsA("Model") then
+		warn(`[KitchenService] StreetBin {instance:GetFullName()} is not a Model`)
+		return
+	end
+	local current = instance.Parent
+	while current ~= nil and current ~= workspace do
+		if CollectionService:HasTag(current, STATION_TAG) or CollectionService:HasTag(current, VEHICLE_TAG) then
+			warn(`[KitchenService] StreetBin {instance:GetFullName()} is inside a Station/Vehicle: ignored`)
+			return
+		end
+		current = current.Parent
+	end
+	self.Bins[instance] = true
+	local anchors = 0
+	for _, child in instance:GetDescendants() do
+		if CollectionService:HasTag(child, ANCHOR_TAG) and child:GetAttribute("PromptAction") == DISCARD then
+			anchors += 1
+		end
+	end
+	if anchors == 0 then
+		warn(`[KitchenService] StreetBin {instance:GetFullName()} has no Interactable anchor with PromptAction discard`)
+	end
+end
+
 -- Prompts ---------------------------------------------------------------------------------------------------------
 
 -- Global state of the station's anchors that depends on the core: a station of another vehicle is off (T36);
--- restock is off while its ingredient is Blocked. Anchors of module actions are left to the module otherwise.
+-- restock is off while its ingredient is Blocked. Anchors of module actions are left to the module otherwise: when
+-- their vehicle becomes the current one they go back to what the module last asked (Wanted; default on, no text).
 function KitchenService:RefreshPrompts(station: StationApi.Station)
 	const current = self:IsCurrent(station)
 	const interaction = self.Dependencies.InteractionService
@@ -541,7 +611,12 @@ function KitchenService:RefreshPrompts(station: StationApi.Station)
 			end
 		elseif self.Gated[anchor] then
 			self.Gated[anchor] = nil
-			interaction:SetPrompt(anchor, true, nil)
+			const wanted = self.Wanted[anchor]
+			if wanted ~= nil then
+				interaction:SetPrompt(anchor, wanted.Enabled, wanted.Text)
+			else
+				interaction:SetPrompt(anchor, true, nil)
+			end
 		end
 	end
 end
@@ -589,18 +664,26 @@ function KitchenService:PackageFor(player: Player, ingredient: string): (Tool?, 
 	return tool, count
 end
 
--- Restock (FEAT-007, DEC-049): package of this ingredient in hand, not Blocked, stock below capacity.
-function KitchenService:CheckRestock(player: Player, station: StationApi.Station, anchor: Instance): boolean
+-- Restock (FEAT-007, DEC-049): package of this ingredient in hand, not Blocked, stock below capacity. Returns
+-- (ok, notice?, value?): full (or above capacity after the swap, Q-169) -> stock_full {item}; the rest is silent.
+function KitchenService:CheckRestock(
+	player: Player,
+	station: StationApi.Station,
+	anchor: Instance
+): (boolean, string?, number?)
 	const ingredient = self:IngredientOf(station, anchor)
 	if ingredient == nil or self:IsBlocked(ingredient) then
-		return false
+		return false, nil, nil
 	end
 	const tool = self:PackageFor(player, ingredient)
 	if tool == nil then
-		return false
+		return false, nil, nil
 	end
 	const amount, capacity = self:GetStock(ingredient)
-	return amount < capacity
+	if amount >= capacity then
+		return false, STOCK_FULL, Content.Ingredients.IndexOf[ingredient]
+	end
+	return true, nil, nil
 end
 
 -- Moves min(left in the package, capacity - current); the leftover stays in the package, an empty one disappears.
@@ -622,36 +705,64 @@ function KitchenService:Restock(player: Player, station: StationApi.Station, anc
 	self.Dependencies.ItemService:SetCount(tool, count - moved)
 end
 
+-- Street bin Model that owns an anchor (nearest StreetBin ancestor), only when no Station owns it.
+function KitchenService:BinOf(anchor: Instance): Instance?
+	local current = anchor.Parent
+	while current ~= nil and current ~= workspace do
+		if self.Bins[current] then
+			return current
+		end
+		current = current.Parent
+	end
+	return nil
+end
+
+-- The table's Requires of an action (phase, day/night, item in hand).
+function KitchenService:MeetsRequires(key: string, player: Player): boolean
+	const row = Content.Actions.ByKey[key]
+	if row == nil then
+		return false
+	end
+	const round = self.Dependencies.RoundService
+	const phases = row.Requires.Phase
+	if phases and not table.find(phases, round:GetPhase()) then
+		return false
+	end
+	if (row.Night == "DayOnly" and round:IsNight()) or (row.Night == "NightOnly" and not round:IsNight()) then
+		return false
+	end
+	const held = row.Requires.Held
+	if held and self.Dependencies.ItemService:Holding(player, held) == nil then
+		return false
+	end
+	return true
+end
+
+-- Street bin (T60): discard only, same hand rule as BIN-C. Not a vehicle station: no IsCurrent, no station lock.
+function KitchenService:CheckStreet(key: string, player: Player, anchor: Instance): boolean
+	if key ~= DISCARD or self:BinOf(anchor) == nil or not self:MeetsRequires(key, player) then
+		return false
+	end
+	return Trash.Discardable(self.Context, player) ~= nil
+end
+
 -- Everything the server checks before an action of a station: member, owner station on the current vehicle, the
--- table's Requires (phase, day/night, item in hand), then restock rules or the module's Validate.
--- Returns (ok, notice?, value?).
+-- table's Requires (phase, day/night, item in hand), then restock rules or the module's Validate. An anchor without
+-- a station goes to the street bin branch. Returns (ok, notice?, value?).
 function KitchenService:Evaluate(key: string, player: Player, anchor: Instance): (boolean, string?, number?)
 	if not self.Active or not self.Dependencies.RunStateService:IsActive(player) then
 		return false, nil, nil
 	end
 	const station = self:StationOf(anchor)
-	if station == nil or not self:IsCurrent(station) then
-		return false, nil, nil
+	if station == nil then
+		return self:CheckStreet(key, player, anchor), nil, nil
 	end
-	const row = Content.Actions.ByKey[key]
-	if row == nil then
-		return false, nil, nil
-	end
-	const round = self.Dependencies.RoundService
-	const phases = row.Requires.Phase
-	if phases and not table.find(phases, round:GetPhase()) then
-		return false, nil, nil
-	end
-	if (row.Night == "DayOnly" and round:IsNight()) or (row.Night == "NightOnly" and not round:IsNight()) then
-		return false, nil, nil
-	end
-	const held = row.Requires.Held
-	if held and self.Dependencies.ItemService:Holding(player, held) == nil then
+	if not self:IsCurrent(station) or not self:MeetsRequires(key, player) then
 		return false, nil, nil
 	end
 
 	if key == RESTOCK then
-		return self:CheckRestock(player, station, anchor), nil, nil
+		return self:CheckRestock(player, station, anchor)
 	end
 	const module = self.Modules[station.Kind]
 	const action = if module then module.Actions[key] else nil
@@ -691,13 +802,20 @@ end
 function KitchenService:Perform(key: string, player: Player, anchor: Instance)
 	const station = self:StationOf(anchor)
 	if station == nil then
+		-- Street bin: Consume is synchronous, so the check and the removal can't interleave with another request.
+		if self:CheckStreet(key, player, anchor) then
+			const tool = Trash.Discardable(self.Context, player)
+			if tool ~= nil then
+				self.Dependencies.ItemService:Consume(player, tool)
+			end
+		end
 		return
 	end
 	self:Serialize(station, function()
 		const ok, notice, value = self:Evaluate(key, player, anchor)
 		if not ok then
 			if notice ~= nil then
-				self:Notify(player, notice, value)
+				Refusal.notify(self.Context, player, notice, value)
 			end
 			return
 		end
@@ -726,10 +844,18 @@ function KitchenService:BuildContext(): StationApi.Context
 		GetStock = function(ingredient: string): (number, number)
 			return self:GetStock(ingredient)
 		end,
+		IsBlocked = function(ingredient: string): boolean
+			return self:IsBlocked(ingredient)
+		end,
 		Give = function(player: Player, item: string, attrs: { [string]: any }?): boolean
 			const toppings = if attrs and type(attrs.Toppings) == "string" then attrs.Toppings else nil
 			const count = if attrs and type(attrs.Count) == "number" then attrs.Count else nil
-			return self.Dependencies.ItemService:Give(player, item, { Toppings = toppings, Count = count }) ~= nil
+			const restore = if attrs and type(attrs.Restore) == "number" then attrs.Restore else nil
+			return self.Dependencies.ItemService:Give(player, item, {
+				Toppings = toppings,
+				Count = count,
+				Restore = restore,
+			}) ~= nil
 		end,
 		Held = function(player: Player): Tool?
 			return self.Dependencies.ItemService:GetHeld(player)
@@ -756,8 +882,13 @@ function KitchenService:BuildContext(): StationApi.Context
 		Notify = function(player: Player, notice: string, value: number?)
 			self:Notify(player, notice, value)
 		end,
+		-- A station of another vehicle stays off; what the module asked is kept for when it becomes the current one.
 		SetPrompt = function(anchor: Instance, enabled: boolean, text: string?)
 			const station = self:StationOf(anchor)
+			if station ~= nil then
+				const wanted: Wanted = { Enabled = enabled, Text = text }
+				self.Wanted[anchor] = wanted
+			end
 			const on = enabled and (station == nil or self:IsCurrent(station))
 			self.Dependencies.InteractionService:SetPrompt(anchor, on, text)
 		end,
@@ -885,16 +1016,27 @@ KitchenService:OnStart(function(self)
 	-- Amount, Cooler level, vehicle and Day are all atoms read in here: purchase, restock, restore, new day and
 	-- vehicle swap land in the same effect. Restock prompts follow Blocked from the same reads.
 	self.Libs.Charm.effect(function()
-		const records: { StockRecord } = {}
-		for index, row in Content.Ingredients.List do
-			records[index] = self:Stock(row.Key)
-		end
-		if self.Dependencies.NetService:IsRunning() then
-			for index, record in records do
-				net.Stock:update(index, record)
-			end
-		end
+		self:PushStock()
 		self:RefreshAllPrompts()
+	end)
+
+	-- VehicleService (620) creates Swapped in its OnInit, after ours (650): connect here. UpgradeService already moved
+	-- to the new vehicle when it fires (§19.5), so Capacity/Blocked and IsCurrent read the new one.
+	self.Dependencies.VehicleService.Swapped:Connect(function(_from: string, _to: string)
+		self:PushStock()
+		self:RefreshAllPrompts()
+	end)
+
+	-- Street bins (T60): indexed like the stations; the anchor itself is tracked by InteractionService (tag
+	-- Interactable), which turns the prompt on because discard is registered.
+	for _, instance in CollectionService:GetTagged(BIN_TAG) do
+		self:AddBin(instance)
+	end
+	CollectionService:GetInstanceAddedSignal(BIN_TAG):Connect(function(instance)
+		self:AddBin(instance)
+	end)
+	CollectionService:GetInstanceRemovedSignal(BIN_TAG):Connect(function(instance)
+		self.Bins[instance] = nil
 	end)
 
 	-- Stations in GetFullName order, so StationIds are the same on every boot of the same place.

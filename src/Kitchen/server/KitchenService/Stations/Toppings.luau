@@ -9,10 +9,8 @@
 -- Prompt_Restock_<Suf> is the core's. Nothing to snapshot: the amounts are "Stk".
 -- Refusal toasts (D-04, TASK-080, via Refusal.luau), in this order: topping already on it -> topping_repeat {item};
 -- MaxToppings reached -> topping_max; bowl empty -> out_of_stock {item}. Silent: no topping on the anchor, no hot dog
--- in hand (core's Requires.Held) and a Blocked bowl (locked bowl, DEC-156: only a forged request reaches it).
--- Provisional (TASK-080): the Context has no IsBlocked (StationApi, TASK-057), so Blocked is read from the PromptEnabled
--- the core keeps on the bowl's own restock anchor (off exactly while the ingredient is Blocked, KitchenService
--- RefreshPrompts). Swap for ctx.IsBlocked when the Context gets it.
+-- in hand (core's Requires.Held) and a Blocked bowl (locked bowl, DEC-156: only a forged request reaches it; read by
+-- ctx.IsBlocked, TASK-057).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 local StationApi = require(script.Parent.Parent.StationApi)
@@ -20,7 +18,6 @@ local Refusal = require(script.Parent.Parent.Refusal)
 
 const ACTION = "topping_add"
 const HOT_DOG = "hot_dog"
-const RESTOCK = "restock"
 
 -- Topping key of the anchor (a Sauce/Topping of Content.Ingredients), else nil.
 local function toppingOf(anchor: Instance): string?
@@ -55,21 +52,11 @@ local function heldHotDog(ctx: StationApi.Context, player: Player): Tool?
 	return nil
 end
 
--- Bowl locked (DEC-156): the restock anchor of the same ingredient on this station is off (see the header).
-local function lockedBowl(station: StationApi.Station, ingredient: string): boolean
-	for _, anchor in station.Anchors do
-		if anchor:GetAttribute("PromptAction") == RESTOCK and anchor:GetAttribute("Ingredient") == ingredient then
-			return anchor:GetAttribute("PromptEnabled") == false
-		end
-	end
-	return false
-end
-
 -- (tool?, ingredient?, notice?). Everything except Blocked, which TakeStock refuses atomically in Run; Blocked only
 -- silences the toast.
 local function canAdd(
 	ctx: StationApi.Context,
-	station: StationApi.Station,
+	_station: StationApi.Station,
 	player: Player,
 	anchor: Instance
 ): (Tool?, string?, string?)
@@ -81,7 +68,7 @@ local function canAdd(
 	if tool == nil then
 		return nil, nil, nil
 	end
-	if lockedBowl(station, ingredient) then
+	if ctx.IsBlocked(ingredient) then
 		return nil, ingredient, nil
 	end
 	const toppings = toppingsOn(tool)

@@ -3,13 +3,18 @@
 -- Station module of KitchenService (StationApi.Module). "Throw Away" (discard, hold 0.5 s from Content.Actions) on
 -- Prompt_Discard destroys the hot dog in hand; its ingredients are lost (a wrong topping can only be fixed here).
 -- Wave 3 (FEAT-023, altered item) and the street bin (DEC-200, Q-166) extend what it accepts; wave 1: hot dog only.
--- No record, no snapshot.
+-- No record, no snapshot. Discardable is the hand rule, shared with the street bin (KitchenService, T60; Q-166 a
+-- Provisional: hot dog only): widening what may be thrown away changes only this function.
 local StationApi = require(script.Parent.Parent.StationApi)
 
 const ACTION = "discard"
 const HOT_DOG = "hot_dog"
 
--- Hot dog in the player's hand (ctx.Held only returns Tools created by ItemService).
+export type TrashModule = StationApi.Module & {
+	Discardable: (ctx: StationApi.Context, player: Player) -> Tool?,
+}
+
+-- Tool in the player's hand that may be thrown away: the hot dog (ctx.Held only returns ItemService Tools).
 local function heldHotDog(ctx: StationApi.Context, player: Player): Tool?
 	const tool = ctx.Held(player)
 	if tool ~= nil and tool:GetAttribute("Item") == HOT_DOG then
@@ -18,7 +23,8 @@ local function heldHotDog(ctx: StationApi.Context, player: Player): Tool?
 	return nil
 end
 
-const Trash: StationApi.Module = {
+const Trash: TrashModule = {
+	Discardable = heldHotDog,
 	Kinds = { "trash" },
 	Actions = {
 		[ACTION] = {

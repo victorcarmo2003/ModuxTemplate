@@ -16,8 +16,7 @@
 --   * Context.Modifier has no base and ClassService has no default base for CoffeeBrewTime/CoffeeRestore, so the call
 --     errors today. modifier() below catches it and falls back to the table base (Barista loses the bonus until the
 --     Context passes `base` or ClassService gets the two defaults: registered on the board).
---   * Context.Give forwards only Toppings/Count: Restore is passed in attrs (for when it is forwarded, TASK-066) and,
---     while missing, written on the coffee Tool just given (CategoryLimits.Coffee = 1, so it is the only one).
+--   * Restore goes in Context.Give attrs; the core forwards it to ItemService GiveOptions.Restore (TASK-057).
 --   * Snapshot "Stn": a Working or Ready cup is kept as Ready ({ Restore = n }), the dose already left the stock.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
@@ -37,7 +36,7 @@ const COFFEE = "coffee"
 const RECORD_SLOT = 0 -- single-record station (network.md §3.5)
 const BREW_STAT = "CoffeeBrewTime"
 const RESTORE_STAT = "CoffeeRestore"
-const RESTORE_ATTRIBUTE = "Restore" -- Tool attribute read by VitalService (network.md §7.1)
+const RESTORE_ATTRIBUTE = "Restore" -- Give attr -> ItemService GiveOptions.Restore -> Tool attribute (network.md §7.1)
 const TAKE_TEXT = "Take Coffee" -- PromptText in Ready (architecture.md §19.8; Actions.brew_coffee has "Brew Coffee")
 const DURATION_STEP = 0.1 -- Stations.Duration is quant(0, 120, 0.1): the server uses the value the wire carries
 const DURATION_MAX = 120
@@ -149,24 +148,6 @@ local function setReady(station: Station, restore: number)
 	station.State = { Restore = restore } :: State
 end
 
--- The coffee Tool just given to the player: in hand (Give equips) or in the Backpack.
-local function givenCoffee(ctx: Context, player: Player): Tool?
-	const held = ctx.Held(player)
-	if held ~= nil and held:GetAttribute("Item") == COFFEE then
-		return held
-	end
-	const backpack = player:FindFirstChildOfClass("Backpack")
-	if backpack == nil then
-		return nil
-	end
-	for _, child in backpack:GetChildren() do
-		if child:IsA("Tool") and child:GetAttribute("Item") == COFFEE and child:GetAttribute(RESTORE_ATTRIBUTE) == nil then
-			return child
-		end
-	end
-	return nil
-end
-
 -- Actions -------------------------------------------------------------------------------------------------------------
 
 local function brew(ctx: Context, station: Station, player: Player)
@@ -188,10 +169,6 @@ local function take(ctx: Context, station: Station, player: Player)
 	const restore = stateOf(station).Restore
 	if not ctx.Give(player, COFFEE, { [RESTORE_ATTRIBUTE] = restore }) then
 		return -- refused (notice sent by ItemService): the cup stays in the machine
-	end
-	const tool = givenCoffee(ctx, player)
-	if tool ~= nil and tool:GetAttribute(RESTORE_ATTRIBUTE) == nil then
-		tool:SetAttribute(RESTORE_ATTRIBUTE, restore)
 	end
 	setEmpty(station)
 	ctx.Publish(station)

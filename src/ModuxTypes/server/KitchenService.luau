@@ -8,10 +8,12 @@ local StationApi = require(ServerScriptService.server.Kitchen.KitchenService.Sta
 
 export type Amounts = { [string]: number }
 export type StockRecord = { Amount: number, Capacity: number, Blocked: boolean }
+type Wanted = { Enabled: boolean, Text: string? }
 
 export type Public = {
 	Active: boolean,
 	Amounts: Charm.Atom<Amounts>,
+	Bins: { [Instance]: boolean },
 	ByInstance: { [Instance]: StationApi.Station },
 	Context: StationApi.Context,
 	Gated: { [Instance]: boolean },
@@ -21,6 +23,7 @@ export type Public = {
 	Published: { [number]: number },
 	Stations: { [number]: StationApi.Station },
 	StockChanged: SignalLib.Signal<string, number>,
+	Wanted: { [Instance]: Wanted },
 	Warned: { [string]: boolean },
 	WasBlocked: { [string]: boolean },
 	Setup: (self: Public) -> (),
@@ -43,13 +46,18 @@ export type Public = {
 	RemoveStation: (self: Public, instance: Instance) -> (),
 	RefreshSlots: (self: Public, upgradeKey: string, vehicle: string) -> (),
 	Publish: (self: Public, station: StationApi.Station) -> (),
+	PushStock: (self: Public) -> (),
+	AddBin: (self: Public, instance: Instance) -> (),
 	RefreshPrompts: (self: Public, station: StationApi.Station) -> (),
 	RefreshAllPrompts: (self: Public) -> (),
 	IngredientOf: (self: Public, station: StationApi.Station, anchor: Instance) -> string?,
 	Notify: (self: Public, player: Player, notice: string, value: number?) -> (),
 	PackageFor: (self: Public, player: Player, ingredient: string) -> (Tool?, number),
-	CheckRestock: (self: Public, player: Player, station: StationApi.Station, anchor: Instance) -> boolean,
+	CheckRestock: (self: Public, player: Player, station: StationApi.Station, anchor: Instance) -> (boolean, string?, number?),
 	Restock: (self: Public, player: Player, station: StationApi.Station, anchor: Instance) -> (),
+	BinOf: (self: Public, anchor: Instance) -> Instance?,
+	MeetsRequires: (self: Public, key: string, player: Player) -> boolean,
+	CheckStreet: (self: Public, key: string, player: Player, anchor: Instance) -> boolean,
 	Evaluate: (self: Public, key: string, player: Player, anchor: Instance) -> (boolean, string?, number?),
 	Serialize: (self: Public, station: StationApi.Station, fn: () -> ()) -> (),
 	Perform: (self: Public, key: string, player: Player, anchor: Instance) -> (),

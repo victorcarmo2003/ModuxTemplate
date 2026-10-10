@@ -7,6 +7,8 @@
 --   Station.Records  set records of the station by Slot (0 = single-record station). The module writes here and calls
 --                    ctx.Publish(station); KitchenService diffs it into the Stations set (add/update/remove).
 --   Module.Refresh   optional: called after Station.Slots was rebuilt (upgrade level of the station changed)
+-- Added by TASK-057: Context.IsBlocked; Context.Give forwards Restore (ItemService GiveOptions.Restore); SetPrompt on a
+-- station of another vehicle is kept and applied when that vehicle becomes the current one (T36).
 
 export type SlotState = "Empty" | "Working" | "Ready"
 
@@ -36,8 +38,9 @@ export type Station = {
 export type Context = {
 	Now: () -> number, -- workspace:GetServerTimeNow()
 	TakeStock: (ingredient: string, n: number) -> boolean,
-	GetStock: (ingredient: string) -> (number, number), -- current, capacity
-	Give: (player: Player, item: string, attrs: { [string]: any }?) -> boolean, -- attrs: Toppings, Count
+	GetStock: (ingredient: string) -> (number, number), -- current (may exceed capacity after a swap, Q-169), capacity
+	IsBlocked: (ingredient: string) -> boolean, -- not unlocked yet or tied to another vehicle (TASK-057)
+	Give: (player: Player, item: string, attrs: { [string]: any }?) -> boolean, -- attrs: Toppings, Count, Restore
 	Held: (player: Player) -> Tool?,
 	Consume: (player: Player, tool: Tool) -> (),
 	AddTopping: (tool: Tool, ingredient: string) -> boolean, -- ItemService: same Tool, HotDogVisual refreshed
