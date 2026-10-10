@@ -19,8 +19,6 @@
 
 	Modes (`Mode` source):
 	  FirstPerson  own character (LocalState `Active`; also wave 1 and any shift without Vitals records)
-	  Hidden       own character, own record in the `Hides` set (§19.14): stock first person lowered HIDE_DROP studs
-	               through Humanoid.CameraOffset (local only; the server froze and placed the body). Free look as usual
 	  Spectate     POV of a mate whose `Vitals.State` is `Active` (`Watching` = their UserId): the view follows the
 	               mate's real facing (their root yaw, which their own first-person camera turns and the engine
 	               replicates) plus a local free look of +-LOOK_LIMIT that eases back to the mate's facing after
@@ -35,7 +33,7 @@
 	stick. It is camera input, not a command, so it reads UserInputService directly (no InputController bind).
 
 	Gaze (network.md §13.5): every GAZE_INTERVAL s, only at night (RoundController.IsNight), own state `Active` and mode
-	`FirstPerson` (so never hidden, spectating or in a cutscene), the camera look is sent as `Gaze { Yaw, Pitch }` in
+	`FirstPerson` (so never spectating or in a cutscene), the camera look is sent as `Gaze { Yaw, Pitch }` in
 	whole degrees, skipped when unchanged for less than GAZE_HEARTBEAT s. Convention for the reader (AnomalyService):
 	  Yaw   = deg(atan2(-Look.X, -Look.Z)) mod 360   (0 = -Z, grows turning left, same as CFrame.fromOrientation)
 	  Pitch = deg(asin(Look.Y)) mod 360              (angle(1) is cyclic: a pitch > 180 is pitch - 360, i.e. down)
@@ -46,9 +44,11 @@
 	  Down, first FAINT_SWITCH s           -> stays put under the faint fade (VitalController)
 	  Down with the own body still there   -> Fixed on the SPEC point nearest to the fall (MAP-01 §5.5, line 629)
 	  otherwise (body gone, Spectator)     -> Spectate a mate `Active`; none -> Fixed("SPEC-P") (MAP-01 §11)
-	Provisional (TASK-064): the nearest-point rule and FAINT_SWITCH. Provisional (TASK-101): HIDE_DROP, the look
+	Provisional (TASK-064): the nearest-point rule and FAINT_SWITCH. Provisional (TASK-101): the look
 	speeds, the spectate follow from the mate's root yaw (pitch stays local: `Gaze` is c -> s only, never relayed) and
 	the recentre timing.
+	DEC-221 (TASK-131): hiding is gone (the trailer service window replaced it, §19.14 v4.2), so the `Hidden` mode,
+	its camera drop and the `Hides` listener are gone too; the camera has no mode for the window.
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -59,7 +59,7 @@ local Vide = require(ReplicatedStorage.Packages.Vide)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 
-export type Mode = "FirstPerson" | "Hidden" | "Spectate" | "Fixed" | "Cutscene" | "External"
+export type Mode = "FirstPerson" | "Spectate" | "Fixed" | "Cutscene" | "External"
 
 type Group = "Head" | "Arm" | "Body"
 
@@ -82,7 +82,6 @@ const SWITCH_BIND = "SpectateSwitch"
 const SWITCH_TOUCH_SIZE = 72 -- px, >= 44 touch target
 
 -- Wave 3 (TASK-101, Provisional numbers).
-const HIDE_DROP = 1.5 -- studs the camera sinks while hidden (§19.14 "câmera baixa")
 const LOOK_LIMIT = math.rad(60) -- free look around the base view (§19.16 "olhar livre ±60°")
 const PITCH_LIMIT = math.rad(80) -- base + free look never reaches straight up/down
 const MOUSE_SPEED = 0.004 -- rad per px at MouseSensitivity 1
@@ -278,8 +277,6 @@ function CameraController:Setup()
 	self.FixedPoint = Vide.source(nil :: string?) :: Vide.Source<string?>
 	-- The switch bind is live (>= 2 mates standing). HUD: "Tap to switch" / "Press E to switch".
 	self.CanSwitch = Vide.source(false) :: Vide.Source<boolean>
-	-- Own record in the `Hides` set (server-decided; drives the Hidden mode).
-	self.Hidden = Vide.source(false) :: Vide.Source<boolean>
 
 	self.Character = nil :: Model?
 	self.Groups = {} :: { [BasePart]: Group }
@@ -298,7 +295,7 @@ function CameraController:Setup()
 	self.NextPointRetry = 0 :: number
 	self.Bound = false :: boolean
 
-	-- Wave 3: POV free look (radians around the base view), base view, Hidden offset, Gaze sender.
+	-- Wave 3: POV free look (radians around the base view), base view, Gaze sender.
 	self.LookYaw = 0 :: number
 	self.LookPitch = 0 :: number
 	self.BaseYaw = nil :: number?
@@ -307,7 +304,6 @@ function CameraController:Setup()
 	self.LastLookInput = 0 :: number
 	self.TouchDelta = Vector2.zero :: Vector2
 	self.MouseLocked = false :: boolean
-	self.OffsetHumanoid = nil :: Humanoid?
 	self.NextGaze = 0 :: number
 	self.GazeYaw = NO_GAZE :: number
 	self.GazePitch = NO_GAZE :: number
@@ -327,7 +323,7 @@ function CameraController:SetMode(mode: Mode)
 		self:ResetLook()
 		self.Mode(mode)
 	end
-	if mode == "FirstPerson" or mode == "Hidden" then
+	if mode == "FirstPerson" then
 		Players.LocalPlayer.CameraMode = Enum.CameraMode.LockFirstPerson
 	end
 end
@@ -534,9 +530,8 @@ function CameraController:Drive()
 	end
 
 	if state == "Active" then
-		const want: Mode = if Vide.untrack(self.Hidden) then "Hidden" else "FirstPerson"
-		if mode ~= want then
-			self:SetMode(want)
+		if mode ~= "FirstPerson" then
+			self:SetMode("FirstPerson")
 		end
 		self:SetSwitchBind(false)
 		return
@@ -583,30 +578,13 @@ end
 -- Character the camera sits in for the current mode.
 function CameraController:Body(): Model?
 	const mode = Vide.untrack(self.Mode)
-	if mode == "FirstPerson" or mode == "Hidden" or mode == "Cutscene" then
+	if mode == "FirstPerson" or mode == "Cutscene" then
 		const own = Players.LocalPlayer.Character
 		return if own ~= nil and own.Parent ~= nil then own else nil
 	elseif mode == "Spectate" then
 		return bodyOf(self.Target)
 	end
 	return nil
-end
-
--- Lowers the own first-person view while hidden; any other mode puts the offset back (only writes what differs).
-function CameraController:ApplyOffset(mode: Mode)
-	const own = humanoidOf(Players.LocalPlayer.Character)
-	const previous = self.OffsetHumanoid
-	if previous ~= nil and previous ~= own and previous.CameraOffset ~= Vector3.zero then
-		previous.CameraOffset = Vector3.zero
-	end
-	self.OffsetHumanoid = own
-	if own == nil then
-		return
-	end
-	const want = if mode == "Hidden" then Vector3.new(0, -HIDE_DROP, 0) else Vector3.zero
-	if own.CameraOffset ~= want then
-		own.CameraOffset = want
-	end
 end
 
 -- Hands the cursor back to the stock camera after a POV mode locked it.
@@ -722,7 +700,6 @@ end
 -- Keeps the camera on the mode's subject (only writes what differs).
 function CameraController:ApplyCamera(dt: number)
 	const mode = Vide.untrack(self.Mode)
-	self:ApplyOffset(mode)
 	const camera = workspace.CurrentCamera
 	if mode == "External" or camera == nil then
 		self:UnlockMouse()
@@ -776,11 +753,10 @@ function CameraController:IsFirstPerson(): boolean
 	if head == nil or not head:IsA("BasePart") then
 		return false
 	end
-	const reach = if mode == "Hidden" then FIRST_PERSON_DISTANCE + HIDE_DROP else FIRST_PERSON_DISTANCE
-	return (camera.CFrame.Position - head.Position).Magnitude <= reach
+	return (camera.CFrame.Position - head.Position).Magnitude <= FIRST_PERSON_DISTANCE
 end
 
--- Sends the own look to the server (network.md §13.5): night, Active, plain first person (not hidden). See header.
+-- Sends the own look to the server (network.md §13.5): night, Active, plain first person. See header.
 function CameraController:SendGaze(now: number)
 	if now < self.NextGaze then
 		return
@@ -788,7 +764,6 @@ function CameraController:SendGaze(now: number)
 	self.NextGaze = now + GAZE_INTERVAL
 	if
 		Vide.untrack(self.Mode) ~= "FirstPerson"
-		or Vide.untrack(self.Hidden)
 		or not Vide.untrack(self.Dependencies.RoundController.IsNight)
 		or Vide.untrack(self.Dependencies.VitalController.LocalState) ~= "Active"
 	then
@@ -806,14 +781,6 @@ function CameraController:SendGaze(now: number)
 	self.GazePitch = pitch
 	self.GazeAt = now
 	self.Libs.Net.Gaze:fireServer({ Yaw = yaw, Pitch = pitch })
-end
-
--- Own record in `Hides` (id = UserId).
-function CameraController:SetHidden(hidden: boolean)
-	if Vide.untrack(self.Hidden) ~= hidden then
-		self.Hidden(hidden)
-		self.NextDrive = 0
-	end
 end
 
 function CameraController:Track(character: Model?)
@@ -904,19 +871,6 @@ end
 
 CameraController:OnInit(function(self)
 	self:Setup()
-
-	const net = self.Libs.Net
-	const me = Players.LocalPlayer.UserId
-	net.Hides:onAdded(function(id)
-		if id == me then
-			self:SetHidden(true)
-		end
-	end)
-	net.Hides:onRemoved(function(id)
-		if id == me then
-			self:SetHidden(false)
-		end
-	end)
 end)
 
 CameraController:OnStart(function(self)

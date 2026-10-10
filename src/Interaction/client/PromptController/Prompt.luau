@@ -25,6 +25,7 @@ export type Prompt = {
 	Anchor: Instance,
 	Owner: Instance?, -- Station ancestor (StationId, Ingredient)
 	Rig: Instance?, -- AnimalRig ancestor (NpcId), runtime customer anchors
+	Vehicle: Instance?, -- `Vehicle`-tagged ancestor (its `Shutter` attribute names the `shutter_toggle` pill)
 	MemberId: number?, -- UserId of the player character the anchor sits on (Prompt_Give); resolved lazily
 	Id: number?, -- EntityId; nil = not registered by the server yet
 	Enabled: boolean, -- PromptEnabled (absent = true)
@@ -41,6 +42,7 @@ export type Prompt = {
 }
 
 const NO_ACTION = ""
+const SHUTTER_ACTION = "shutter_toggle"
 
 local function numberAttribute(instance: Instance?, name: string): number?
 	if instance == nil then
@@ -141,7 +143,12 @@ function Prompt.Refresh(self: Prompt)
 
 	self.Radius = action.Radius
 	self.Hold = math.max(numberAttribute(anchor, "PromptHold") or action.Hold, 0)
-	self.Text(stringAttribute(anchor, "PromptText") or format(action.Text, ingredient, package))
+	if actionKey == SHUTTER_ACTION and self.Vehicle then
+		-- The window state is the vehicle's attribute (DEC-221): read it, so the pill never lags the flap.
+		self.Text(Rules.ShutterText(self.Vehicle:GetAttribute("Shutter") == true))
+	else
+		self.Text(stringAttribute(anchor, "PromptText") or format(action.Text, ingredient, package))
+	end
 	self.HoldDuration(self.Hold)
 end
 
@@ -179,11 +186,15 @@ function Prompt.new(anchor: Instance, hooks: Hooks): Prompt
 	const rig = ancestorWith(anchor, function(instance)
 		return CollectionService:HasTag(instance, "AnimalRig") or instance:GetAttribute("NpcId") ~= nil
 	end)
+	const vehicle = ancestorWith(anchor, function(instance)
+		return CollectionService:HasTag(instance, "Vehicle")
+	end)
 
 	const self: Prompt = {
 		Anchor = anchor,
 		Owner = owner,
 		Rig = rig,
+		Vehicle = vehicle,
 		MemberId = nil,
 		Id = nil,
 		Enabled = false,
@@ -210,6 +221,9 @@ function Prompt.new(anchor: Instance, hooks: Hooks): Prompt
 	end
 	if rig then
 		table.insert(self.Connections, rig:GetAttributeChangedSignal("NpcId"):Connect(refresh))
+	end
+	if vehicle then
+		table.insert(self.Connections, vehicle:GetAttributeChangedSignal("Shutter"):Connect(refresh))
 	end
 
 	const unmount, gui = Vide.root(function()

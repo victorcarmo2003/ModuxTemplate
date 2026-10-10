@@ -3,7 +3,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 
-export type Mode = "FirstPerson" | "Hidden" | "Spectate" | "Fixed" | "Cutscene" | "External"
+export type Mode = "FirstPerson" | "Spectate" | "Fixed" | "Cutscene" | "External"
 type Group = "Head" | "Arm" | "Body"
 
 export type Public = {
@@ -23,7 +23,6 @@ export type Public = {
 	GazePitch: number,
 	GazeYaw: number,
 	Groups: { [BasePart]: Group },
-	Hidden: Vide.Source<boolean>,
 	LastLookInput: number,
 	LastPosition: Vector3?,
 	LastState: string,
@@ -36,7 +35,6 @@ export type Public = {
 	NextGaze: number,
 	NextPointRetry: number,
 	NextStream: number,
-	OffsetHumanoid: Humanoid?,
 	PointId: string?,
 	Target: number?,
 	TouchDelta: Vector2,
@@ -57,14 +55,12 @@ export type Public = {
 	SetSwitchBind: (self: Public, on: boolean) -> (),
 	Drive: (self: Public) -> (),
 	Body: (self: Public) -> Model?,
-	ApplyOffset: (self: Public, mode: Mode) -> (),
 	UnlockMouse: (self: Public) -> (),
 	LookInput: (self: Public, dt: number) -> (number, number),
 	ApplyPov: (self: Public, mode: Mode, camera: Camera, dt: number) -> (),
 	ApplyCamera: (self: Public, dt: number) -> (),
 	IsFirstPerson: (self: Public) -> boolean,
 	SendGaze: (self: Public, now: number) -> (),
-	SetHidden: (self: Public, hidden: boolean) -> (),
 	Track: (self: Public, character: Model?) -> (),
 	Restore: (self: Public) -> (),
 	Update: (self: Public, dt: number) -> (),
