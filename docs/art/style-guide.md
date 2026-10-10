@@ -158,6 +158,8 @@ Escala (fecha `Q-095` do lado da arte, alinhada ao MAP-01 §2):
 | Câmera escondido ("Hide") | ~2 studs | abaixo do peitoril (MAP-01 §7.2) |
 | Porta | 4 × 7,5 | MAP-01 §2 |
 
+> **Nota do secretário, DEC-157 (2026-10-10):** o usuário baixou a bancada do **carrinho** (AST-026) para **3,0**. Vale a DEC para o carrinho; trailer segue 3,5. Conferência da leitura em 1ª pessoa e texto desta tabela: `Q-153` (art-director).
+
 Regras gerais:
 - Objeto interativo nunca encostado em decorativo da mesma cor.
 - Estoque visível: toda estação de ingrediente tem uma peça `Fill` que sobe e desce com o nível (GERENCIAR, DEC-017). O jogador lê "está acabando" sem HUD.

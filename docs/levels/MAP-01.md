@@ -72,7 +72,7 @@ Anomalias: `ANM-001`…`ANM-010` = N1…N10 (DEC-096).
 - Origem `(0, 0)` = centro da pista da Juniper no eixo da Ninth (cruzamento), no chão (Y = 0).
 - **+X = leste**, **+Z = sul**, **norte = −Z**. Coordenadas no texto são `(X, Z)` em studs.
 - Personagem **R6** [DEC-089, DEC-097]: altura 5 studs (pernas 2, tronco 2, cabeça 1), olho ~4,5, largura 2. WalkSpeed padrão 16 studs/s (classes: Runner 18, Line Cook 15, DEC-069).
-- Altura de bancada: **3,5 studs**, igual ao `art/style-guide.md` §4 (Aprovado, DEC-126: R6, olho 4,5, bancada 3,5). Proposta: fechar `Q-095` por DEC-126. Trailer: pé-direito **8,5** sobre o piso a +2, altura externa **~11** (AST-027). Porta: 4 × 7,5.
+- Altura de bancada: **3,5 studs**, igual ao `art/style-guide.md` §4 (Aprovado, DEC-126: R6, olho 4,5, bancada 3,5). Proposta: fechar `Q-095` por DEC-126. **Exceção, DEC-157 (2026-10-10): bancada do carrinho (AST-026) a 3,0** do Pad (y 3,45 no mapa; Pad 0,45); trailer e demais bancadas seguem 3,5; style guide em `Q-153`. Trailer: pé-direito **8,5** sobre o piso a +2, altura externa **~11** (AST-027). Porta: 4 × 7,5.
 - Trânsito em **mão direita**: na Ninth, sentido oeste (WB) na metade norte da pista, sentido leste (EB) na metade sul. Na Juniper (Norte e Sul), sentido sul (SB) no lado oeste, sentido norte (NB) no lado leste.
 - Diagramas ASCII são **aproximados** (±4 studs). As tabelas de coordenadas (§5) são a fonte da verdade.
 
@@ -347,7 +347,7 @@ Escala: **1 coluna = 1 stud (X)**, **1 linha = 2 studs (Z)**. X de 12 a 71.
 | 6. Complementos | K | 44–50 | 6 | grade 3 × 2: frente = Ketchup, Mustard, Cheese; fundo = Bacon, Potato Sticks, Cream Cheese [DEC-071] | um prompt hold 1 s por ingrediente [DEC-072], "Restock" | ingrediente bloqueado = tampa com cadeado até o dia de liberação |
 | 7. Entrega + gaveta | H / $ | 50–54 | 4 | suporte de entrega e gaveta | gaveta: valor no mundo [DEC-050] | Cash Drawer Lock: cadeado |
 
-Medidas: profundidade da linha 3 (Z 36..39), altura 3,5; corredor **6 studs** (Z 39..45) para 4 jogadores. Dois guarda-sóis a 9 de altura (AST-026). Nenhum prompt de compra de upgrade no carrinho: as peças só **mostram** o nível comprado na bancada do Mart [DEC-052, DEC-101]. Saída do corredor pelo **lado oeste** (X 28 → borda do Pad X 24): é o começo da rota do Mart.
+Medidas: profundidade da linha 3 (Z 36..39), altura **3,0** do Pad (y 3,45; DEC-157, era 3,5); corredor **6 studs** (Z 39..45) para 4 jogadores. Dois guarda-sóis a 9 de altura (AST-026). Nenhum prompt de compra de upgrade no carrinho: as peças só **mostram** o nível comprado na bancada do Mart [DEC-052, DEC-101]. Saída do corredor pelo **lado oeste** (X 28 → borda do Pad X 24): é o começo da rota do Mart.
 
 ### 7.2 Food Trailer (tier 2) — vista de cima
 
@@ -742,7 +742,7 @@ Chaves `L01-##` são provisórias; coluna AST = ficha de `art/asset-list.md` (to
 
 | Chave | Asset | Medidas (studs) | AST | Nota |
 |---|---|---|---|---|
-| L01-01 | Carrinho do chefe | linha de 26 × 3 × 3,5; 2 guarda-sóis a 9 | AST-026 | medidas iguais nos dois documentos |
+| L01-01 | Carrinho do chefe | linha de 26 × 3 × **3,0** (DEC-157; era 3,5); 2 guarda-sóis a 9 | AST-026 | medidas iguais nos dois documentos |
 | L01-02 | Estoque de salsicha + Cooler 2/3 | 3 × 3 | AST-018 | o Cooler é a própria caixa que cresce |
 | L01-03 | Grelha (2 / 3 / 4 vagas) | 5 (carrinho), 6 (trailer) | AST-012 | |
 | L01-04 | Esteira de descanso | 3 | AST-013 | |

@@ -48,16 +48,16 @@ Caminhos dos packs (abreviados nas fichas):
 | AST-014 | Tábua + faca | equipment | P0 | Pack | `KP/cuttingboard.fbx`, `KP/knife.fbx` (faca deitada; DEC-138); modelo `Assets/models/equipment/AST-014_CuttingBoard.fbx` (tábua 38 + faca 104; DEC-141) | Aprovado (DEC-138; modelo DEC-141) |
 | AST-015 | Caixa de pães (estoque de pão) | equipment | P0 | Pack + edição | `KP/crate_buns.fbx`, `KP/crate_lid.fbx` (pães de hot dog do AST-001 no lugar dos de hambúrguer; tris ≤ 800; DEC-138) | Aprovado (DEC-138) |
 | AST-016 | Porta-garrafas de molho (2 vagas da grade) | equipment | P0 | Modelar | modelado: `Assets/models/equipment/AST-016_SauceHolder.fbx` (480 + `Fill` 28 cada); garrafas AST-004/005 translúcidas com `Fill` animado (DEC-140) | Aprovado (DEC-140) |
-| AST-017 | Grade de complementos 3 × 2 + cubas | equipment | P0 | Pack + edição | base `KP/kitchencounter_straight_A.fbx`; grade e cubas modeladas no estilo (DEC-138); modelo `Assets/models/equipment/AST-017_ToppingGrid.fbx` (base 274; cuba+tampa+etiqueta+cadeado 386; DEC-141) | Aprovado (DEC-138; modelo DEC-141) |
+| AST-017 | Grade de complementos 3 × 2 + tigelas de inox | equipment | P0 | Pack + edição | base `KP/kitchencounter_straight_A.fbx`; **tigelas `KP/bowl.fbx` com ingrediente dentro + plaquinha `Label_<Ing>` (SurfaceGui/ImageLabel) + Padlock Quaternius (DEC-156)**; modelo antigo `AST-017_ToppingGrid.fbx` (DEC-141) superado | Aprovado (DEC-138; DEC-156); modelo novo em produção |
 | AST-018 | Cooler / estoque de salsicha (3 níveis) | equipment | P0 | Pack + edição | L3 `KP/fridge_A.fbx`; L1–L2 modelados sobre a base `MM/freezer.fbx` (DEC-138); modelos `Assets/models/equipment/AST-018_CoolerL1.fbx` (668) e `_CoolerL2.fbx` (1.106; DEC-141) | Aprovado (DEC-138; N1/N2 DEC-141) |
 | AST-019 | Counter (3 níveis) + pedestais e marcas de fila | equipment | P0 | Pack + edição | `KP/kitchencounter_straight_A.fbx`, `KP/kitchencounter_outercorner.fbx`, `KP/chair_stool.fbx` (assento plano); pedestais/toldo/marcas modelados (DEC-138); modelos `Assets/models/equipment/AST-019_QueuePost.fbx` (94 + corda 68) e `_QueueMark.fbx` (34; DEC-141) | Aprovado (DEC-138; pedestal/corda/marca DEC-141) |
-| AST-020 | Suporte de entrega + gaveta do caixa + Cash Drawer Lock | equipment | P0 | Modelar | modelado: `Assets/models/equipment/AST-020_CashRegister.fbx` (860 + `Lock` 104; DEC-140) | Aprovado (DEC-140) |
+| AST-020 | Suporte de entrega + gaveta do caixa + Cash Drawer Lock | equipment | P0 | Pack + edição (DEC-155) | **POS preta "POS Machine" de J-Toastie (CC-BY 3.0, crédito obrigatório; 606 + gaveta 146) + "Padlock" Quaternius (CC0) Mustard `AST-020_Padlock.fbx`**; modelo antigo `AST-020_CashRegister.fbx` (DEC-140) superado | Aprovado (DEC-140; DEC-155); modelo novo em produção |
 | AST-021 | Saco de moedas (ladrão) | equipment | P0 | Pack + edição | `FP/bag.fbx` | Rascunho |
 | AST-022 | Cafeteira (UPG-007, fixa no trailer) | equipment | P1 | Modelar | modelado: `Assets/models/equipment/AST-022_CoffeeMachine.fbx` (944; DEC-140) | Aprovado (DEC-140) |
 | AST-023 | Trailer Lights (UPG-005) | equipment | P1 | Modelar | modelado: `Assets/models/equipment/AST-023_TrailerLights.fbx` (mastro 356 / cordão 486; DEC-140) | Aprovado (DEC-140) |
 | AST-024 | Placa OPEN / CLOSED + "Available on Day 5" | equipment | P0 | Pack + edição | `KP/menu.fbx` (cavalete; DEC-138) | Aprovado (DEC-138) |
 | AST-025 | Lixeira (descartar) | equipment | P1 | Pack + edição | "Trashcan" by Kenney (CC0, https://poly.pizza/m/eoC8NFaafh) editado: `Assets/models/equipment/AST-025_Trashcan.fbx` (132; DEC-140) | Aprovado (DEC-140) |
-| AST-026 | Corner Cart (carrinho do chefe) | vehicle | P0 | Modelar (casca) + Pack (guarda-sóis) | guarda-sóis `CC/detail-parasol-a.fbx` (DEC-139); casca modelada `Assets/models/vehicle/AST-026_CornerCart.fbx` (2.984; ~7.200 montado; DEC-141); guarda-sóis mantidos, reavaliar em playtest (DEC-144) | Aprovado (DEC-139; casca DEC-141) |
+| AST-026 | Corner Cart (carrinho do chefe) | vehicle | P0 | Modelar (casca) + Pack (guarda-sóis) | guarda-sóis `CC/detail-parasol-a.fbx` (DEC-139); casca modelada `Assets/models/vehicle/AST-026_CornerCart.fbx` (2.984; ~7.200 montado; DEC-141); guarda-sóis mantidos, reavaliar em playtest (DEC-144); **bancada 3,0 (DEC-157)** | Aprovado (DEC-139; casca DEC-141) |
 | AST-027 | Open Late Trailer (casca + interior) | vehicle | P1 | Pack + edição | `KP/kitchencounter_straight_B.fbx`; modelo `Assets/models/vehicle/AST-027_OpenLateTrailer.fbx` (4.452; inclui a porta do AST-066; DEC-141) | Aprovado (DEC-141) |
 | AST-028 | Ninth Street Mart — fachada, letreiro e ponto seguro | market | P0 | Pack + edição | `MM/wall.fbx`, `MM/wall-window.fbx`, `MM/wall-door-rotate.fbx`, `MM/wall-corner.fbx` (módulo 8 × 12) + toldo `CC/detail-awning-wide.fbx`; paredes em revisão pelo art-director (DEC-139) | Aprovado (DEC-139) |
 | AST-029 | Prateleira de compra + recheio + "Out of stock" | market | P0 | Pack + edição | gôndola `MM/shelf-boxes.fbx`, `MM/shelf-bags.fbx`, `MM/shelf-end.fbx` (4,5 × 6 × 2,5); recheio FP/KP do sourcing; **sem** `FP/soda-bottle.fbx` (DEC-139) | Aprovado (DEC-139) |
@@ -124,6 +124,8 @@ Mapeamento Kenney/KayKit por ficha (DEC-136, Rascunho): `asset-sourcing.md`. As 
 **DEC-148 a DEC-150 (2026-10-10):** personagens da crew com **textura** de roupa/rosto/pelagem (exceção de personagem a DEC-105/DEC-136; orçamento `Q-144` g). **Clientes e pedestres também são animais** (DEC-149, emenda DEC-146): AST-053/054 a rever pelo art-director (`Q-149`); atores de anomalia de cliente `Q-147`. Personagem com **textura de dia e de noite**, mesma malha (DEC-150, `Q-148`).
 
 **DEC-151 e DEC-152 (2026-10-10):** **roupa texturizada** (`AST-053_CrewTex`) e **rig R6** do corpo base (`AST-053_CrewBase`) **aprovados** como modelo entregue (DEC-151; texto da ficha AST-053 segue Rascunho até a reescrita). **Cabeças** `AST-053_Animal_*` **substituídas** (DEC-152): malha única oval com focinho em volume, olhos/nariz/boca por textura, expressões por troca de textura (normal, feliz, sorridente, triste, desmaiado com X); orelhas e caudas seguem. Técnica "casca de rosto com UV padrão" Provisória (`Q-144` h); versão noite das expressões `Q-150`. Retratos e ícones (AST-071) podem usar as expressões.
+
+**DEC-153 a DEC-157 (2026-10-10):** cabeças AST-053 **v3** (focinho oval liso, queixo redondo; 728 tris; personagem 1.914–2.104, acima de 1.800, orçamento em `Q-144` g; DEC-153). Noite escurece também orelhas/cauda/acessórios com `T_Atlas_Kitchen_Night` (DEC-154; cor do animal à noite `Q-151`). **AST-020:** POS preta de J-Toastie (**CC-BY 3.0, crédito obrigatório**) + cadeado "Padlock" da Quaternius (CC0) Mustard, reutilizado no AST-017 (DEC-155; modelo em produção). **AST-017:** tigelas de inox `KP/bowl` com ingrediente dentro + plaquinha `Label_<Ing>` para `SurfaceGui`/`ImageLabel` (DEC-156; ícones `Q-152`; modelo em produção). **AST-026:** bancada **3,0** (era 3,5; DEC-157; style guide `Q-153`); AST-019 balcão do carrinho idem.
 
 Mapa anomalia → asset (DEC-096): ANM-001 AST-060 · ANM-002 AST-061 · ANM-003 AST-044 (estados do relógio) · ANM-004 AST-062 (+ AST-055) ·
 ANM-005 AST-059 · ANM-006 AST-063 (+ AST-045) · ANM-007 AST-064 (+ AST-036) · ANM-008 AST-065 · ANM-009 AST-066 · ANM-010 AST-067 (+ AST-036, AST-028).
@@ -354,15 +356,16 @@ Compra de upgrade: bancada do Mart (AST-049, DEC-101); a peça visível troca no
 - **Silhueta:** suporte de arame com garrafa invertida; nível pela peça `Fill` interna. **DEC-140:** a garrafa opaca escondia o `Fill`; garrafas AST-004/005 passam a **translúcidas**, com o `Fill` animado subindo/descendo com o estoque (frontend-coder).
 - **Encaixes:** `Prompt_Ketchup`, `Prompt_Mustard`, `Fill_Ketchup`, `Fill_Mustard`, `Prompt_Restock_*`. **Tris:** ≤ 300 por vaga.
 
-### AST-017 — Grade de complementos 3 × 2 + cubas
+### AST-017 — Grade de complementos 3 × 2 + tigelas de inox
 
-- **Status:** Aprovado (DEC-138) · **Prioridade:** P0 · **Origem:** Pack + edição — base/tampo `KP/kitchencounter_straight_A.fbx` (escala não uniforme para a caixa da ficha); **grade 3 × 2 com degrau, cubas, tampas, etiquetas e cadeado seguem para modelar no estilo** (não cobertos pelo candidato; não bloqueiam a aprovação). **Modelo aprovado DEC-141.**
-- **Modelo (DEC-141):** `Assets/blender/equipment/AST-017_ToppingGrid.blend`, `Assets/models/equipment/AST-017_ToppingGrid.fbx`; base 274 tris; cuba + tampa + etiqueta + cadeado 386 tris; cadeado **em cima da tampa**.
+- **Status:** Aprovado (DEC-138; **cubas trocadas por tigelas de inox, DEC-156**) · **Modelo novo: em produção, não aprovado** · **Prioridade:** P0 · **Origem:** Pack + edição — base/tampo `KP/kitchencounter_straight_A.fbx` (escala não uniforme para a caixa da ficha); **tigelas `KP/bowl.fbx`** (CC0, DEC-156); ingrediente dentro = peças picadas dos packs; cadeado "Padlock" da Quaternius (CC0, `Assets/models/equipment/AST-020_Padlock.fbx`, DEC-155).
+- **Modelo anterior (DEC-141), superado quando o novo for aprovado:** `Assets/blender/equipment/AST-017_ToppingGrid.blend`, `Assets/models/equipment/AST-017_ToppingGrid.fbx`; base 274 tris; cuba + tampa + etiqueta + cadeado 386 tris.
 - **Uso:** 6 complementos do MVP (DEC-071). Frente: ketchup, mostarda (AST-016), queijo; fundo: bacon, Potato Sticks, Cream Cheese.
 - **Dimensões:** base 6 L × 3 P (X 44–50), células com 2 studs entre centros; fileira do fundo 0,3 mais alta (degrau) para o jogador ver as duas fileiras.
-- **Silhueta:** cubas de aço com tampa basculante e etiqueta frontal colorida.
-- **Variações:** `Bin_Cheese`, `Bin_Bacon`, `Bin_PotatoSticks`, `Bin_CreamCheese` (mesma malha, muda `Fill` e etiqueta). **Bloqueada** antes do dia de liberação: tampa fechada + cadeado Mustard.
-- **Encaixes:** `Prompt_Use_<Ing>`, `Prompt_Restock_<Ing>`, `Fill_<Ing>`. **Tris:** base ≤ 400; cuba ≤ 400 sem conteúdo.
+- **Silhueta (DEC-156):** **tigelas de inox** com o **ingrediente de verdade dentro**; **plaquinha frontal** `Label_<Ing>` em cada tigela. ~~Cubas de aço com tampa basculante e etiqueta frontal colorida.~~
+- **Plaquinha:** o jogo põe `SurfaceGui` + `ImageLabel` com o **ícone do ingrediente** na `Label_<Ing>`. Ícones a definir (`Q-152`).
+- **Variações:** uma por ingrediente da grade (`Bin_Cheese`, `Bin_Bacon`, `Bin_PotatoSticks`, `Bin_CreamCheese`): mesma tigela, muda o conteúdo (`Fill`) e o ícone. **Bloqueada** antes do dia de liberação: **tampa + cadeado Mustard** (Padlock, DEC-155).
+- **Encaixes:** `Prompt_Use_<Ing>`, `Prompt_Restock_<Ing>`, `Fill_<Ing>`, `Label_<Ing>`. **Tris:** base ≤ 400; cuba ≤ 400 sem conteúdo (teto da ficha antiga; conferir com a tigela — art-director).
 
 ### AST-018 — Cooler / estoque de salsicha (3 níveis)
 
@@ -380,18 +383,21 @@ Compra de upgrade: bancada do Mart (AST-049, DEC-101); a peça visível troca no
 - **Modelo (DEC-141):** `Assets/blender/equipment/AST-019_QueuePost.blend` / `_QueueMark.blend`, `Assets/models/equipment/AST-019_QueuePost.fbx` / `_QueueMark.fbx`; pedestal 94 + corda (`Rope`) 68 tris; marca 34 tris. Toldo do L3 segue a modelar.
 - **Uso:** UPG-003 (fila 3 → 4 → 5, paciência +10/+20 s). Atender/recusar em Q1.
 - **Níveis visíveis (upgrades.md):** `Counter_L1` balcão curto · `Counter_L2` estendido + banquinhos · `Counter_L3` em L com toldo.
-- **Dimensões:** no carrinho, o balcão é a frente da linha (prateleira externa 3 × 0,8 a 3,5); no trailer, balcão dobrável externo X 48–54 (MAP-01 §7.2).
+- **Dimensões:** no carrinho, o balcão é a frente da linha (prateleira externa 3 × 0,8 a **3,0**, DEC-157; era 3,5); no trailer, balcão dobrável externo X 48–54 (MAP-01 §7.2).
 - **Fila:** marcas de piso 2,0 Ø Mustard em Q1–Q5; **pedestais com corda** (Ketchup e Cream) para Q4 e Q5 aparecem com Counter 2/3 (L01-16).
 - **Encaixes:** `Att_Serve`, `Prompt_TakeOrder`, `Prompt_Refuse`, `Prompt_Serve`, `Queue1`…`Queue5`.
 - **Tris:** 300–900 por nível; marca ≤ 40; pedestal ≤ 150.
 
 ### AST-020 — Suporte de entrega + gaveta do caixa + Cash Drawer Lock
 
-- **Status:** Aprovado (DEC-140) · **Prioridade:** P0 · **Origem:** Modelar — `Assets/blender/equipment/AST-020_CashRegister.blend`, `Assets/models/equipment/AST-020_CashRegister.fbx`; 860 tris + `Lock` 104
+- **Status:** Aprovado (DEC-140; **silhueta e cadeado trocados por DEC-155**) · **Modelo novo: em produção, não aprovado** · **Prioridade:** P0 · **Origem:** Pack + edição (DEC-155):
+  - Caixa: "POS Machine" de **J-Toastie** (Poly Pizza, https://poly.pizza/m/ju1CrAV1UY), **CC-BY 3.0, crédito obrigatório** (`art/credits.md`); 606 tris + gaveta separada 146.
+  - Cadeado: "Padlock" da **Quaternius** (Poly Pizza, https://poly.pizza/m/2ZSHgKVr3F), CC0, recolor Mustard; `Assets/models/equipment/AST-020_Padlock.fbx` (reutilizado no AST-017).
+  - **Superado quando o novo for aprovado:** `Assets/blender/equipment/AST-020_CashRegister.blend`, `Assets/models/equipment/AST-020_CashRegister.fbx` (registradora retrô, 860 tris + `Lock` 104; DEC-140).
 - **Uso:** fim da linha (X 50–54, gaveta em (52, 37)); vendas vão para a gaveta, valor visível no mundo; alvo do ladrão (DEC-050); UPG-004.
-- **Dimensões:** suporte de entrega 2 × 1,5; caixa registradora 1,6 × 1,4 × 1,0; gaveta desliza 0,6.
-- **Silhueta:** registradora retrô arredondada com teclas grandes. **Cores:** Ketchup, teclas Cream, gaveta Steel.
-- **Estados:** `Drawer_Closed`, `Drawer_Open`. **Lock:** trinco + cadeado Mustard grandes, legíveis do balcão. Gaveta guarda também o **crachá antigo** (AST-068), visível ao abrir.
+- **Dimensões:** suporte de entrega 2 × 1,5; caixa registradora 1,6 × 1,4 × 1,0; gaveta desliza 0,6. (Medidas da ficha antiga; conferir com a POS no modelo novo — art-director.)
+- **Silhueta (DEC-155):** **máquina POS preta** com gaveta. ~~Registradora retrô arredondada com teclas grandes. Cores: Ketchup, teclas Cream, gaveta Steel.~~ **Cores:** POS **preta**, como vem (decidido: "pode deixar a POS preta mesmo"); cadeado Mustard.
+- **Estados:** `Drawer_Closed`, `Drawer_Open`. **Lock:** cadeado "Padlock" Mustard (DEC-155), legível do balcão. Gaveta guarda também o **crachá antigo** (AST-068), visível ao abrir.
 - **Encaixes:** `Bar_Thief` (1,2 acima), `Value_Anchor`, `VFX_Coins`. **Tris:** ≤ 900; lock ≤ 200.
 
 ### AST-021 — Saco de moedas (ladrão)
@@ -483,10 +489,11 @@ Compra de upgrade: bancada do Mart (AST-049, DEC-101); a peça visível troca no
 ### AST-026 — Corner Cart (carrinho do chefe)
 
 - **Status:** Aprovado (DEC-139; **casca aprovada DEC-141**) · **Prioridade:** P0 · **Origem:** Modelar (casca) + Pack nos guarda-sóis — `CC/detail-parasol-a.fbx` (9 A; tirar a mesinha da base, recolor Mustard/Cream). **Só os guarda-sóis** vêm do pack; a casca foi modelada no estilo.
-- **Modelo (DEC-141):** `Assets/blender/vehicle/AST-026_CornerCart.blend`, `Assets/models/vehicle/AST-026_CornerCart.fbx`; casca 2.984 tris (~7.200 montado); linha 26 × 3, bancada 3,5, guarda-sóis a 9; posição de mundo **(41, 0, 37.5)**.
+- **Modelo (DEC-141):** `Assets/blender/vehicle/AST-026_CornerCart.blend`, `Assets/models/vehicle/AST-026_CornerCart.fbx`; casca 2.984 tris (~7.200 montado); linha 26 × 3, bancada ~~3,5~~ **3,0** (DEC-157), guarda-sóis a 9; posição de mundo **(41, 0, 37.5)**.
+- **Altura (DEC-157, ajuste do usuário no Studio):** corpo `Body` **3,5 → 3,0**; bancada e encaixes das estações a **3,0** do Pad (y **3,45** no mapa; Pad 0,45). Fonte e posições atualizadas: `Assets/blender/vehicle/AST-026_CornerCart.blend`, `tools/assetplace/MAP-01_placements.luau`. Contradição com `style-guide.md` §3 (bancada 3,5) em `Q-153`.
 - **Guarda-sóis em 1ª pessoa — decidido (DEC-144, fecha `Q-139` a):** aparecem no topo da tela (beiral ~5,8 sobre o corredor); **mantidos** como no modelo aprovado; reavaliar em playtest em 1ª pessoa.
 - **Uso:** dado pelo chefe, fixo no Pad da esquina Ninth & Juniper (DEC-019, DEC-020); um para a party (DEC-032). Nome "Corner Cart", letreiro "BRAMBLE'S CORNER DOGS" (`ui-text.md`).
-- **Dimensões (MAP-01 §7.1):** linha de estações X 28–54 (**26** de largura) × 3 de profundidade, bancada a **3,5**; corredor de trabalho de 6 atrás; **dois guarda-sóis** a 9 de altura (um só não cobre 26 studs) sem tapar a linha de visão a ~4,5.
+- **Dimensões (MAP-01 §7.1):** linha de estações X 28–54 (**26** de largura) × 3 de profundidade, bancada a **3,0** (DEC-157; era 3,5); corredor de trabalho de 6 atrás; **dois guarda-sóis** a 9 de altura (um só não cobre 26 studs) sem tapar a linha de visão a ~4,5.
 - **Silhueta:** carrinho de rua retrô comprido, cantos arredondados, 4 rodas grandes travadas, saia frontal com letreiro e slogan "Hot dogs on the corner since forever." (`world.md` §4). Lê "carrinho", não "barraca": rodas e engate visíveis.
 - **Cores:** corpo Ketchup, listras Cream, frisos e guarda-sóis Mustard/Cream, metais Steel. Objeto mais saturado do mapa.
 - **Encaixes (`Mount_*`):** `Mount_StockSausage`, `Mount_Grill`, `Mount_Rail`, `Mount_StockBun`, `Mount_Board`, `Mount_Toppings`, `Mount_Drawer`, `Mount_Counter`, `Mount_Phone`, `Mount_Sign`, `Zone_Center` (raio 14 do ladrão, DEC-050).
@@ -758,6 +765,8 @@ Regras gerais: style guide §4 (opção A: `BodyColors` + acessórios de atlas +
 - **DEC-149 (2026-10-10, emenda DEC-146):** clientes e pedestres **também são animais**. "Só para NPCs humanos" acima não vale para clientes/pedestres; esta ficha a rever (provável: mesmo corpo base da crew + roupa de civil; `Q-149`). Textura dia/noite: DEC-148, DEC-150.
 - **DEC-151 (2026-10-10):** modelo entregue aprovado: **roupa texturizada** `AST-053_CrewTex` e **rig R6** `AST-053_CrewBase` (+ `_joints.json`). O texto desta ficha (base humana com decals) segue Rascunho até o art-director reescrevê-lo para a crew.
 - **DEC-152 (2026-10-10):** cabeças `AST-053_Animal_{Dog,Cat,Rabbit,Fox,Bear,Panda,Turtle,Owl}` **substituídas**: malha única **oval** com **focinho em volume** (ref. `customrig.png`), **olhos, nariz e boca por textura**, **expressões por troca de textura** (normal, feliz, sorridente, triste, desmaiado com X; lista aberta). Orelhas e caudas seguem. "8 rostos neutros + 3 de reação" acima vira o conjunto de expressões da crew/clientes (art-director). Técnica Provisória: casca de rosto com UV padrão comum a todos os animais, troca por `TextureID` (`Q-144` h). Versão noite: `Q-150`.
+- **DEC-153 (2026-10-10):** direção de forma do usuário: focinho/boca **oval e liso**, sem nariz pontudo, **queixo redondo e fofinho**. Cabeças **v3** entregues (não aprovadas): focinho oval compacto abaixo dos olhos que continua no queixo; cabeça **728 tris** (antes 440), casca do rosto ~190–220; olhos y 4,86, nariz 4,47, boca 4,33 (UV do rosto v3; notas em `Assets/blender/character/AST-053_Animals_joints.json`). Personagem completo **1.914–2.104 tris**: acima do teto de NPC comum (1.800, style guide §9.1), abaixo do de personagem com nome (2.500). **Orçamento não aprovado**; aceitar ou reduzir a parte de trás da cabeça em `Q-144` (g).
+- **DEC-154 (2026-10-10):** a variante de noite troca também orelhas, cauda, casco, bico e boné com furo (peças no atlas KitchenPack): atlas noturno `Assets/textures/character/T_Atlas_Kitchen_Night`, aplicado nos builds Night (`tools/assetplace/build_crew.luau`). Cabeça noturna aparece quase opaca no Roblox (azul-marinho; raposa perde o laranja): manter como está (Provisório) até `Q-151`.
 
 ### AST-054 — Clientes normais e pedestre (7 tipos × 4 variantes)
 

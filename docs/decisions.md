@@ -2020,3 +2020,100 @@ Leitura: "a referência que eu tinha mandado lá na foto" = `Assets/reference/cu
   - **architect:** troca de expressão por `TextureID` (client ou servidor; pré-carregar para não piscar); conta de memória.
   - **game-designer:** tabela evento → expressão (desmaio, atropelamento, pedido completo/errado).
   - Notas em `style-guide.md`, `asset-list.md`, `open-questions.md`, `README.md` → secretário (feito).
+
+---
+
+Origem das DEC-153 a DEC-157: mensagens do usuário ao orquestrador, 2026-10-10, ao revisar as entregas no Studio. Citações **literais** em cada DEC. "Feito" = trabalho do orquestrador/modeler-3d relatado ao secretário; não é aprovação do usuário.
+
+### DEC-153 — 2026-10-10 — Cabeças dos animais: focinho oval e liso, queixo redondo e "fofinho" (emenda de forma da DEC-152)
+
+- Falas do usuário:
+  - Antes: "olha como eles estão caidos, para corrigir, acho melhor fazer a boca mais oval e com smooth pois dá até memo para ver as linhas das vertices".
+  - Depois do render com olhos corrigidos: "Sim, ficou muito bom porém ele não tem queixo, ele tem um nariz pontiaguado, faz um queixo mais redondo e fofinho".
+- Decidido pelo usuário (direção de forma das cabeças da DEC-152):
+  - Focinho/boca **oval** e **liso** (sem arestas de vértice visíveis).
+  - Sem nariz pontudo; **queixo redondo e fofinho**.
+  - Olhos corrigidos aprovados como direção ("ficou muito bom").
+- Feito pelo orquestrador — cabeças `AST-053_Animal_*` **v3**:
+  - Focinho oval compacto **abaixo dos olhos**, continuando num queixo redondo.
+  - Malha mais densa na frente: cabeça **728 tris** (antes 440); casca do rosto **~190–220**.
+  - Posições (UV do rosto v3): olhos y **4,86**, nariz **4,47**, boca **4,33**. Notas em `Assets/blender/character/AST-053_Animals_joints.json`.
+- **Não aprovado:** o modelo v3 não foi aprovado pelo usuário nesta DEC.
+- **Orçamento — pendente, NÃO aprovado:**
+  - Personagem completo agora **1.914–2.104 tris**.
+  - **Acima** do teto de NPC comum do `style-guide.md` §9.1 (**1.800**); abaixo do teto de personagem com nome (**2.500**).
+  - Usuário ainda não respondeu: aceita o número ou reduz a parte de trás da cabeça. Registrado em **`Q-144` (g)**.
+- Impacto:
+  - **art-director:** ficha da cabeça com a forma v3; conferir orçamento §9.1 (`Q-144` g).
+  - **modeler-3d:** se o usuário pedir redução, cortar a parte de trás da cabeça, não a frente.
+  - Notas em `asset-list.md` (AST-053), `open-questions.md` → secretário (feito).
+
+### DEC-154 — 2026-10-10 — Variante de noite escurece também orelhas, cauda e acessórios do atlas
+
+- Fala do usuário (sobre o personagem noturno): "esqueceu as orelhas".
+- Decidido pelo usuário: na variante de noite (DEC-150), **todas** as peças do personagem mudam, não só cabeça e roupa. Orelhas, cauda, casco, bico e boné com furo também.
+- Feito pelo orquestrador:
+  - Essas peças usam o atlas do KitchenPack e ficavam com cor de dia.
+  - Criado `T_Atlas_Kitchen_Night` em `Assets/textures/character/` (derivado do atlas KitchenPack, CC0).
+  - Trocado nos builds Night em `tools/assetplace/build_crew.luau`.
+- **Nota técnica (não decidida):** o Roblox mostra a camada noturna semitransparente da cabeça **quase opaca**: a cabeça noturna fica azul-marinho e a raposa perde o laranja. Perguntado ao usuário se prefere cada animal **mantendo a cor, só mais escura**. Sem resposta → **`Q-151`**.
+  - Recomendação **Provisória:** manter como está até o usuário decidir.
+- Ligações: DEC-150, `Q-148` (intensidade), `Q-150` (expressões de noite).
+- Impacto:
+  - **art-director:** regra "variante de noite cobre todas as peças do personagem" na ficha; `Q-151`.
+  - **architect:** troca de textura de noite inclui os acessórios de atlas (memória: +1 atlas noturno, `Q-144` g).
+  - Notas em `asset-list.md`, `credits.md`, `open-questions.md` → secretário (feito).
+
+### DEC-155 — 2026-10-10 — AST-020: máquina POS preta no lugar da registradora retrô; cadeado "Padlock" da Quaternius
+
+- Falas do usuário: "Preciso de um cadeado melhor... e um caixa registradora também, preciso de um melhor"; sobre a opção POS: "gostei dessa"; "pode deixar a POS preta mesmo, pode ser o quaternius".
+- Decidido pelo usuário:
+  - **Caixa (AST-020):** sai a registradora retrô vermelha; entra a **máquina POS preta**.
+    - Fonte: Poly Pizza "POS Machine" de **J-Toastie**, https://poly.pizza/m/ju1CrAV1UY.
+    - Licença **CC-BY 3.0** → **crédito obrigatório** (`art/credits.md`).
+    - **606 tris**; gaveta separada **146 tris**.
+    - Cor: **preta**, como vem (sem recolor Ketchup).
+  - **Cadeado:** "Padlock" da **Quaternius**, https://poly.pizza/m/2ZSHgKVr3F, **CC0**, recolorido **Mustard**.
+    - Arquivo: `Assets/models/equipment/AST-020_Padlock.fbx`.
+    - Usado no **Cash Drawer Lock** (AST-020) **e** reutilizado no bloqueio da grade AST-017.
+- **Emenda da ficha AST-020** (Aprovada em DEC-140): silhueta "registradora retrô arredondada com teclas grandes" e cores "Ketchup, teclas Cream" **deixam de valer**.
+- **Modelo:** sendo refeito por um modeler-3d. **Em produção, não aprovado.** O modelo `AST-020_CashRegister.fbx` da DEC-140 fica superado quando o novo for aprovado.
+- Não muda: posição (gaveta em (52, 37)), papel no ladrão (DEC-050), UPG-004, crachá antigo na gaveta (AST-068), encaixes.
+- Impacto:
+  - **art-director:** reescrever silhueta/cores da ficha AST-020; conferir com o style guide §3 (POS preta sem acento Mustard? o cadeado é o acento).
+  - **modeler-3d:** montar POS + gaveta + cadeado; exportar.
+  - Notas em `asset-list.md` (AST-020, AST-017), `credits.md` → secretário (feito).
+
+### DEC-156 — 2026-10-10 — AST-017: cubas viram tigelas de inox com o ingrediente de verdade; plaquinha com ícone por SurfaceGui
+
+- Falas do usuário: "desse topping grid, podemos talvez pegar vasilhas e colocar um image label da surface gui ou então deve ter um, verifica por favor"; depois da verificação: "pode seguir com as tigelas inox também".
+- Verificado pelo orquestrador: não há estação de complementos pronta nos packs, no Poly Pizza nem no Sketchfab.
+- Decidido pelo usuário:
+  - **Cubas → tigelas de inox**: `bowl.fbx` do KitchenPack (CC0).
+  - **Ingrediente de verdade dentro** de cada tigela (peças picadas dos packs).
+  - **Bloqueado:** tampa + **cadeado Mustard** (o Padlock da Quaternius, DEC-155).
+  - **Plaquinha frontal** `Label_<Ing>` por tigela; o jogo põe **`SurfaceGui` + `ImageLabel`** com o **ícone do ingrediente**.
+- **Ícones dos ingredientes:** a definir. Quem desenha e em que estilo → **`Q-152`**.
+- **Emenda da ficha AST-017** (Aprovada em DEC-138; modelo DEC-141): "cubas de aço com tampa basculante e etiqueta frontal colorida" muda para tigelas de inox com ingrediente visível e plaquinha com ícone. Modelo da DEC-141 fica superado quando o novo for aprovado.
+- **Modelo:** em produção, **não aprovado**.
+- Não muda: grade 3 × 2 com degrau, 6 complementos (DEC-071), posição (X 44–50), prompts hold 1 s (DEC-072), garrafas da frente (AST-016).
+- Impacto:
+  - **art-director:** ficha AST-017 (tigela, conteúdo por ingrediente, `Label_<Ing>`); estilo dos ícones (`Q-152`).
+  - **frontend-coder:** `SurfaceGui` + `ImageLabel` na `Label_<Ing>` (depois da bandeira verde).
+  - **architect:** ícone por ingrediente em `content-data.md` (campo de imagem).
+  - Notas em `asset-list.md`, `open-questions.md` → secretário (feito).
+
+### DEC-157 — 2026-10-10 — AST-026: carrinho mais baixo; bancada a 3,0 (era 3,5)
+
+- Fala do usuário: "eu diminui um pouco também a altura do carrinho pois estava muito alto".
+- Feito pelo usuário no Studio: `game.Workspace.MAP01_Assets.Cart["CART_AST-026_CornerCart"].Body`.
+- Decidido pelo usuário:
+  - Corpo do carrinho: altura **3,5 → 3,0**.
+  - Bancada e encaixes das estações a **3,0** do Pad (y **3,45** no mapa; Pad a 0,45).
+- Atualizados pelo orquestrador: `Assets/blender/vehicle/AST-026_CornerCart.blend` e `tools/assetplace/MAP-01_placements.luau`.
+- **Só o carrinho.** O **trailer** (AST-027: peitoril e bancadas a 3,5 do piso interno) **não muda**.
+- **Contradição com documento Aprovado:** `style-guide.md` §3 (escala) fixa "superfície de estação e bancada **3,5**" e diz "a 3,0 ficaria na borda (~37°)". Vale esta DEC para o carrinho; conferência em **`Q-153`**.
+- Impacto:
+  - **art-director:** ficha AST-026 (feito pelo secretário), AST-019 (balcão do carrinho), AST-018 L3 ("topo vira bancada a 3,5"), style guide §3 (`Q-153`).
+  - **level-designer:** MAP-01 §2 e §7.1, L01-01 (feito pelo secretário).
+  - Notas em `asset-list.md`, `MAP-01.md`, `open-questions.md` → secretário (feito).
