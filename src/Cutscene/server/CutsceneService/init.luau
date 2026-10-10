@@ -45,7 +45,7 @@ const TICK_RATE = 10 -- Hz: beat timing and late bodies
 const SPAWN_LIFT = Vector3.new(0, 3, 0) -- architecture.md §18.5
 -- Provisional presentation (TASK-120 note; candidates for Content.Cutscenes): side-by-side gap on a shared target and
 -- distance from the last target that triggers a re-pivot at the next shot (R23)
-const LINE_SPACING = 3
+const LINE_SPACING = 2.5 -- 4 avatars fit inside the 8-stud CW-1 stripes (MAP-01 P46)
 const SNAP_DISTANCE = 6
 const PHASE_SCENES: { [string]: string } = { Intro = "intro", Finale = "finale" }
 

@@ -71,15 +71,18 @@ return Table.new({
 			{ At = 0, Kind = "Text", Target = "Title", Text = "Bellmoor" },
 			{ At = 2, Kind = "MoveTo", Target = "CS-2" },
 			{ At = 4, Kind = "Line", Target = "crew", Speaker = "crew", Text = "Empty. Again." },
+			-- Walks cross a carriageway only inside the stripes (MAP-01 P46); ~16 studs/s, each walk ends before the
+			-- next MoveTo (SNAP_DISTANCE). The party waits on the CS-3 curb while the car passes, then crosses CW-2.
 			{ At = 8, Kind = "MoveTo", Target = "CS-3" },
-			{ At = 11, Kind = "MoveTo", Target = "CS-4" },
 			{ At = 13, Kind = "Actor", Target = "ToyCarNinth" }, -- passes without stopping (DEC-130, DEC-133)
 			{ At = 13.5, Kind = "Line", Target = "crew", Speaker = "crew", Text = "Whoa!" },
-			{ At = 16, Kind = "MoveTo", Target = "CS-5" },
-			{ At = 20, Kind = "MoveTo", Target = "CS-P{slot}" },
-			{ At = 22, Kind = "LookAt", Target = "P-01" },
-			{ At = 24, Kind = "Prompt", Target = "P-01", Text = "Call" },
-			{ At = 25, Kind = "Actor", Target = "FlipPhone" }, -- slot 1 only, already open (AST-038)
+			{ At = 15, Kind = "MoveTo", Target = "CS-4" }, -- CW-2, after the car
+			{ At = 18.5, Kind = "MoveTo", Target = "CS-5W" }, -- west curb of CW-1, along the Juniper South sidewalk
+			{ At = 20.5, Kind = "MoveTo", Target = "CS-5E" }, -- across CW-1 (no car in the scene)
+			{ At = 22.5, Kind = "MoveTo", Target = "CS-P{slot}" },
+			{ At = 23.5, Kind = "LookAt", Target = "P-01" },
+			{ At = 24.5, Kind = "Prompt", Target = "P-01", Text = "Call" },
+			{ At = 25.5, Kind = "Actor", Target = "FlipPhone" }, -- slot 1 only, already open (AST-038)
 			walt(26, "Bramble's Corner Dogs! Walt speaking."),
 			walt(28.5, "The flyer? Huh. Nobody's called about that one in years.", "Solo"),
 			walt(28.5, "The flyer? All of you? Huh. Nobody's called in years.", "Party"),

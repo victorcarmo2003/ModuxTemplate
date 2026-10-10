@@ -747,7 +747,7 @@ Formação: 2 × 2 (colunas a ±2 studs do eixo, fileiras a 3 studs). Solo: no e
 | CS-7 | mesmo lugar | todos viram para o SE: o **carrinho** no Pad, sob o sol |
 | FIM | fade → PS-1..4 | 7:00 AM, Day 1 |
 
-**Binding (TASK-098, Provisório).** Marcas de partida `CutsceneMark1..4` (`Content.Cutscenes` intro `Marks`) em volta de CS-1, 2 × 2 virado para o leste: (−100, −26) · (−100, −22) · (−103, −26) · (−103, −22). `CS-1..5`, `CS-P1..4` como na tabela (CS-3 → CS-4 corre dentro de CW-2; CS-5 = meio de CW-1). Propostos para P46: `CS-5W` (−14, 38) e `CS-5E` (14, 38), meios-fios de CW-1, já no place.
+**Binding (TASK-098, Provisório).** Marcas de partida `CutsceneMark1..4` (`Content.Cutscenes` intro `Marks`) em volta de CS-1, 2 × 2 virado para o leste: (−100, −26) · (−100, −22) · (−103, −26) · (−103, −22). `CS-1..5`, `CS-P1..4` como na tabela (CS-3 → CS-4 corre dentro de CW-2; CS-5 = meio de CW-1). `CS-5W` (−14, 38) e `CS-5E` (14, 38), meios-fios de CW-1, já no place e usados pela intro desde P46 (CS-4 → CS-5W → CS-5E → CS-P{slot}).
 
 ### 11.2 Outros momentos de câmera
 
@@ -954,7 +954,7 @@ Binding da onda 3 (TASK-098), para o secretário registrar (nenhuma bloqueia o c
 
 | # | Pergunta (dono) | Recomendação do level-designer |
 |---|---|---|
-| P46 | Cutscene de abertura: `MoveTo` é reta. CS-4 (−18, 22) → CS-5 (0, 38) e CS-5 → CS-P{slot} cortam a pista da Juniper Sul **fora** das listras de CW-1; e o `MoveTo CS-4` (At 11) leva a party para dentro de CW-2 enquanto o `ToyCarNinth` passa (At 13), o contrário do beat "para no meio-fio, o carro passa, atravessa" (narrative-writer + architect, `Content.Cutscenes`) | Trocar `MoveTo CS-5` por `CS-5W` → `CS-5E` (meios-fios de CW-1, já no place) e mover o `MoveTo CS-4` para depois do carro (At ≥ 14), ou parar antes em CS-3. O `check_map01` avisa os trechos fora da faixa |
+| P46 | Cutscene de abertura: `MoveTo` é reta. CS-4 (−18, 22) → CS-5 (0, 38) e CS-5 → CS-P{slot} cortam a pista da Juniper Sul **fora** das listras de CW-1; e o `MoveTo CS-4` (At 11) leva a party para dentro de CW-2 enquanto o `ToyCarNinth` passa (At 13), o contrário do beat "para no meio-fio, o carro passa, atravessa" (narrative-writer + architect, `Content.Cutscenes`) | **Resolvida** (architect, 2026-10-10, Provisório): `Content.Cutscenes` intro agora espera o carro em CS-3 (`ToyCarNinth` At 13), atravessa CW-2 depois (`MoveTo CS-4` At 15), desce a calçada oeste até `CS-5W` (At 18,5), cruza CW-1 até `CS-5E` (At 20,5) e vai a `CS-P{slot}` (At 22,5); `LookAt`/`Prompt`/`FlipPhone` em 23,5/24,5/25,5. `CS-5` sai da cadeia (o ponto fica no place). O aviso do `check_map01` deve sumir na próxima rodada |
 | P47 | Onde o `HideService` põe o jogador escondido (§19.14 diz `PivotTo` na vaga, sem dizer o ponto) (architect) | `Hide_Pose` (Attachment sem tag) dentro de cada armário `H<n>`: chão do corredor, 1 stud à frente da porta, virado para a janela; o serviço soma a altura do HRP agachado. O `Prompt_Hide` fica baixo na porta (≥ 2,6 dos prompts da bancada) |
 | P48 | Formato dos nós de rota de trânsito (a TASK-097 só diz "Folder/Model dos nós ordenados") (architect, TASK-104) | `Folder` `TR-n` com `Part` `01..nn`, atributo `Index`, frente para o próximo nó; linha `SL-*` = `Part` com `LookVector` no sentido de quem para; velocidade de cruzamento por `X-T` (§9.5) |
 | P49 | AST-045 novo (com `Window_Up_1..3`) ainda não reenviado (modeler-3d) | Até o reenvio, `WV-1..3` são `Part` invisíveis em `MapBinding/Anomaly` na posição das janelas; o efeito da ANM-006 precisa do modelo novo (cortina, `_Lit`, `Att_Waver_N`) |
