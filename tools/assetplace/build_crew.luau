@@ -85,7 +85,8 @@ function Crew.build(o: { [string]: any }): Model
 			hat.Name = "Hat"
 			parts.Hat = hat
 		end
-	elseif o.cap ~= false and o.earsUp then
+	elseif o.cap ~= false and o.earsUp and (o.outfit == "Crew" or o.cap == true) then
+		-- the ear-hole cap is atlas-coloured (crew red): civilians with ears up go bare-headed unless cap = true
 		local capModel = load(o.ids["AST-053_CrewCap_EarsUp"])
 		local cap = capModel:FindFirstChildWhichIsA("BasePart", true)
 		if cap then
