@@ -8,10 +8,13 @@
 	Required.Wave3 does; the embedded copies below are only used when Rojo has not synced Content.
 
 	Wave 3 rules (opts.wave = 3):
-	  2. trailer: hide = 4 loose anchors with Slot 1..4 once each (Required.Wave3 Slotted); points SS, AN-04/05/11/12,
+	  2. trailer: shutter_toggle = 1 vehicle anchor (Prompt_Shutter on TRL-SHUTTER, DEC-221, TASK-132; no hide / Slot
+	     any more, Required.Wave3 of TASK-129); points SS, AN-04/05/11/12,
 	     AS-1..4, WALKER-10, W/E/JN/JS-IN/OUT, cutscene points; AnomalyAnchor WV-1..3; TrafficPath / TrafficLine /
 	     TrafficBox ids once each
-	 11. (wave 3) hide: Prompt_Hide inside cabinet H<Slot>, Hide_Pose present, low prompt (warn); WV near the window
+	 11. (wave 3) window (warn): Prompt_Shutter named and inside TRL-SHUTTER, next to Prompt_Switch (<= 4) and at
+	     its height (+-1); exactly one Shutter_Hinge (Attachment on a BasePart, ClosedAngle set) in the trailer;
+	     no H1..H4 / Prompt_Hide / Hide_Pose left (DEC-221); WV near the window
 	     (warn); SS inside LZ-5; traffic: every path a Folder of Parts with Index 1..n, first node on its entry point,
 	     last on an exit, crosses its route's stop lines in order, the first crosswalk line >= SpawnMinDist (55)
 	     from the spawn, passes its conflict box; lines and boxes invisible / no collision; cutscene MoveTo chain
@@ -117,7 +120,6 @@ local CUTSCENE_POINTS_EMBEDDED = {
 }
 local STREET_POSTS = { "JL-01", "JL-02", "JL-03", "JL-04", "JL-05", "JL-06", "JL-07", "JL-08", "JL-09", "P-01" }
 local WINDOWS_W3 = { ["WV-1"] = 31, ["WV-2"] = 38, ["WV-3"] = 45 } -- AnchorId -> window centre X (AST-045)
-local HIDE_SLOTS = 4
 -- Traffic, embedded copy of Content.Traffic (routes: entry point, stop lines in order, conflict boxes)
 local TRAFFIC_EMBEDDED = {
 	routes = {
@@ -179,8 +181,8 @@ local VEHICLE_SPEC = {
 	trailer = {
 		wave = 2,
 		kinds = { "sausage_stock", "grill", "rail", "bun_crate", "board", "toppings", "trash", "coffee_machine" },
-		own = { [2] = { answer_phone = 1, switch_light = 1, buy_trailer = 1 }, [3] = { hide = HIDE_SLOTS } },
-		slotted = { [3] = { hide = HIDE_SLOTS } }, -- loose anchors with Slot 1..n, once each (Required.Wave3)
+		-- wave 3: service window button TRL-SHUTTER (DEC-221; Required.Wave3 of TASK-129); hide H1..H4 left
+		own = { [2] = { answer_phone = 1, switch_light = 1, buy_trailer = 1 }, [3] = { shutter_toggle = 1 } },
 		slots = { RailSlots = 8, BoardSlots = 3 },
 		counter = { ids = { "TRL-G", "TRL-R", "TRL-B", "TRL-T", "TRL-K", "TRL-DRAWER" }, relY = 5.5 },
 	},
@@ -242,8 +244,8 @@ local FALLBACK = {
 	Actions = {
 		"open_sign", "grill_place", "grill_collect", "bun_cut", "board_add_sausage", "topping_add", "discard",
 		"take_order", "serve", "refuse", "restock", "buy_package", "bench_buy_upgrade", "bench_buy_item",
-		"buy_trailer", "brew_coffee", "give_coffee", "switch_light", "hide", "safe_spot", "pick_up_item",
-		"answer_phone", "get_up",
+		"buy_trailer", "brew_coffee", "give_coffee", "switch_light", "safe_spot", "pick_up_item",
+		"answer_phone", "get_up", "shutter_toggle", -- "hide" left with DEC-221 (TASK-132)
 	},
 	Ingredients = { "bun", "sausage", "ketchup", "mustard", "cheese", "bacon", "potato_sticks", "cream_cheese", "coffee" },
 	Packages = REQUIRED_PACKAGES,
@@ -857,31 +859,6 @@ local function checkVehicle(key: string, v: Instance)
 			warn_(("%s: %d unexpected vehicle anchor(s) %s (wave %d)"):format(key, n, a, WAVE))
 		end
 	end
-	-- wave 3: loose anchors with Slot 1..n, each exactly once (hide spots H1..H4; Required.Wave3 Slotted)
-	for w, list in spec.slotted or {} do
-		if w > WAVE then
-			continue
-		end
-		for a, n in list do
-			local seen: { [number]: number } = {}
-			for _, i in tagged("Interactable") do
-				if i:IsDescendantOf(v) and not ancestorWithTag(i, "Station") and i:GetAttribute("PromptAction") == a then
-					local sl = i:GetAttribute("Slot")
-					if typeof(sl) == "number" then
-						seen[sl] = (seen[sl] or 0) + 1
-					else
-						err(("2: %s: %s anchor %s without Slot"):format(key, a, name(i)))
-					end
-				end
-			end
-			for sl = 1, n do
-				if seen[sl] ~= 1 then
-					err(("2: %s: %s with Slot %d found %d time(s), need 1"):format(key, a, sl, seen[sl] or 0))
-				end
-			end
-		end
-	end
-
 	if not v:FindFirstChild("Value_Anchor", true) then
 		err(("2: Value_Anchor missing inside the %s Vehicle (TASK-024)"):format(key))
 	end
@@ -1347,35 +1324,69 @@ local function insideBox(box: BasePart, p: Vector3): boolean
 	return math.abs(l.X) <= h.X and math.abs(l.Z) <= h.Z
 end
 
--- wave 3: hide spots, anomaly anchors, SS, traffic, cutscene chain
+-- wave 3: service window, anomaly anchors, SS, traffic, cutscene chain
 local function checkWave3(points: { [string]: Instance }, vehicles: { [string]: Instance })
-	-- hide spots (§19.14): counted and slotted in checkVehicle; here the cabinet, the pose and the height
+	-- service window (DEC-221, TASK-132; architecture.md §19.14): shutter_toggle counted in checkVehicle (= 1) and
+	-- its distance to other owners in rule 4; here the button, the hinge and the leftovers of the hide spots
 	local trl = vehicles.trailer
 	if trl then
-		local base = ((trl :: any):GetPivot() :: CFrame).Position.Y
-		local n = 0
+		local switch: Instance? = nil
 		for _, i in tagged("Interactable") do
-			if i:IsDescendantOf(trl) and i:GetAttribute("PromptAction") == "hide" then
-				n += 1
-				local sl = i:GetAttribute("Slot")
+			local a = i:GetAttribute("PromptAction")
+			if a == "hide" or a == "get_up" then
+				err(("2: %s still has PromptAction %s (hide spots left with DEC-221)"):format(name(i), tostring(a)))
+			elseif a == "switch_light" and i:IsDescendantOf(trl) then
+				switch = i
+			end
+		end
+		for _, i in tagged("Interactable") do
+			if i:IsDescendantOf(trl) and i:GetAttribute("PromptAction") == "shutter_toggle" then
+				if i.Name ~= "Prompt_Shutter" then
+					warn_(("shutter_toggle anchor %s is not named Prompt_Shutter (§19.14)"):format(name(i)))
+				end
 				local owner: Instance? = i.Parent
 				while owner and owner ~= trl and owner:GetAttribute("MapId") == nil do
 					owner = owner.Parent
 				end
-				local mapId = owner and owner:GetAttribute("MapId")
-				if mapId ~= "H" .. tostring(sl) then
-					warn_(("hide %s (Slot %s) is in %s, MapId %s: expected cabinet H%s (MAP-01 §7.2)"):format(name(i), tostring(sl), name(owner), tostring(mapId), tostring(sl)))
+				if not (owner and owner:GetAttribute("MapId") == "TRL-SHUTTER") then
+					warn_(("Prompt_Shutter %s is not inside the button model TRL-SHUTTER (MAP-01 §7.2)"):format(name(i)))
 				end
-				if owner and not owner:FindFirstChild("Hide_Pose", true) then
-					warn_(("hide Slot %s: no Hide_Pose in %s (where HideService pivots the player)"):format(tostring(sl), name(owner)))
-				end
-				local h = pos(i).Y - base
-				if h > 5.5 then
-					warn_(("hide Slot %s prompt %.2f over the trailer pivot: above the counter top (5.5); it belongs on the cabinet door"):format(tostring(sl), h))
+				if switch then
+					local d = (pos(i) - pos(switch)).Magnitude
+					local dy = math.abs(pos(i).Y - pos(switch).Y)
+					if d > 4 or dy > 1 then
+						warn_(("Prompt_Shutter %.2f from Prompt_Switch (dy %.2f): MAP-01 §7.2 wants it next to the switch (~2.6, same height)"):format(d, dy))
+					end
+					info(("11: Prompt_Shutter at %s, %.2f from Prompt_Switch"):format(fmtV(pos(i)), d))
 				end
 			end
 		end
-		info(("11: %d hide anchor(s) in the trailer"):format(n))
+		local hinges: { Instance } = {}
+		for _, d in trl:GetDescendants() do
+			if d.Name == "Shutter_Hinge" then
+				table.insert(hinges, d)
+			end
+		end
+		if #hinges == 0 then
+			warn_("trailer: no Shutter_Hinge (VehicleController cannot animate the window flap; MAP-01 §7.2, P51)")
+		elseif #hinges > 1 then
+			warn_(("trailer: %d Shutter_Hinge (need 1; the client turns the piece that holds it)"):format(#hinges))
+		end
+		for _, h in hinges do
+			if not (h:IsA("Attachment") and h.Parent and h.Parent:IsA("BasePart")) then
+				warn_(("Shutter_Hinge %s must be an Attachment on the BasePart that turns (Awning or Shutter_Panel)"):format(name(h)))
+			elseif typeof(h:GetAttribute("ClosedAngle")) ~= "number" then
+				warn_(("Shutter_Hinge %s without ClosedAngle (degrees around its X axis, open -> closed)"):format(name(h)))
+			else
+				info(("11: Shutter_Hinge on %s, ClosedAngle %s"):format(name(h.Parent), tostring(h:GetAttribute("ClosedAngle"))))
+			end
+		end
+		for _, d in trl:GetDescendants() do
+			local id = d:GetAttribute("MapId")
+			if (typeof(id) == "string" and string.match(id, "^H[1-4]$")) or d.Name == "Prompt_Hide" or d.Name == "Hide_Pose" then
+				warn_(("%s left over from the hide spots (DEC-221): run Bind.run"):format(name(d)))
+			end
+		end
 	end
 
 	-- apartment windows (ANM-006)
@@ -1415,7 +1426,7 @@ local function checkWave3(points: { [string]: Instance }, vehicles: { [string]: 
 	if ss and lz5 and lz5:IsA("BasePart") then
 		local d = flat(pos(ss) - (lz5 :: BasePart).Position).Magnitude
 		if d > 0.5 then
-			warn_(("SS is %.2f from the centre of LZ-5 (HideService InZone(p, \"SS\", 6) and the light ball should match)"):format(d))
+			warn_(("SS is %.2f from the centre of LZ-5 (AnomalyService InZone(p, \"SS\", 6) and the light ball should match)"):format(d))
 		end
 	end
 

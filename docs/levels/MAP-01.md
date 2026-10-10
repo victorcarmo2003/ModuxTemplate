@@ -975,7 +975,7 @@ Contrato: `tech/architecture.md` §18 e §19.22. Ferramentas (modo de edição, 
 O usuário ajustou o place à mão; `MAP-01_placements.luau` agora reproduz o estado (campos novos `drop`, `parts`, `copies`, `pivot`, aplicados por `place_assets.luau`):
 trailer sem a extensão de entrega (`DeliveryStand` do AST-020), registradora (`TRL-DRAWER`) e mesa de coberturas (`TRL-K`) viradas para o operador (rotY 180) com pivô da registradora movido, tábua `TRL-T` virada (rotY 0) e maior (2,6 × 1,4), bancos `TRL-BENCH-1..3` girados 180 em grupo (pivôs no lugar), duas camadas extras de pão em `TRL-B`, malha dos armários `H1..H4` removida (modelos vazios ficam).
 Carrinho: `Body` com 3,0 de altura (topo em 3,45); `DRAWER` sem extensão e virado para o operador; `CART-K` espelhado do trailer (rotY 180, z 37,352). Conferência sem rodar `Place.run`: `Place.diff(placements, ids)` (só leitura) — resultado 0 diferenças.
-**Atenção:** sem a malha, `H1..H4` estão sem `Prompt_Hide`/`Hide_Pose` no place; um novo `Bind.run` os recria por fallback. Provisório. **DEC-221:** `H1..H4` saem de vez (modelos vazios, placements, fallback do bind); TASK-132.
+**DEC-221 / TASK-132 (2026-10-10, ferramentas prontas, place ainda não rodado):** as 4 entradas `H1..H4` saíram de `MAP-01_placements.luau`; o `Bind.run` destrói os modelos vazios `H1..H4` que ainda estão no place (e qualquer `Prompt_Hide`/`Hide_Pose` que sobrou) e não recria mais nada de esconderijo. Depois do `Bind.run`, `Place.diff` volta a 0 diferenças. Provisório.
 
 ### 16.1 Como rodar (Command Bar, repositório servido na porta 8772)
 
@@ -993,7 +993,7 @@ local H=game:GetService("HttpService") local w=H.HttpEnabled H.HttpEnabled=true 
 | Telefone | `CART-PHONE` (no poste do guarda-sol) e `TRL-PHONE` (parede da frente) | `Prompt_Answer` → `answer_phone`; a âncora sobe até ficar ≥ 2,6 de qualquer prompt de outra estação |
 | Compra | `Prompt_Buy` na casca do trailer, fora da janela (anda com ele; em `TRL-SALE` fica virado para o Pad) | `buy_trailer` |
 | Interruptor | `TRL-SWITCH`, parede sul (46, 46) | `Prompt_Switch` → `switch_light` |
-| Janela (onda 3, DEC-221) | botão `TRL-SHUTTER` (43.4, 46.5) ao lado do interruptor; aba `Awning` do AST-027 | `Prompt_Shutter` → `shutter_toggle`; `Shutter_Hinge` (`Attachment`) na `Awning` (ou no `Shutter_Panel`, P51); atributo `Shutter` é do `VehicleService` (não autorar) |
+| Janela (onda 3, DEC-221) | botão `TRL-SHUTTER` (43.4, 46.5) ao lado do interruptor; aba `Awning` do AST-027 | `Prompt_Shutter` → `shutter_toggle`; `Shutter_Hinge` (`Attachment`, atributo `ClosedAngle`) na `Awning` (ou no `Shutter_Panel`, P51); atributo `Shutter` é do `VehicleService` (não autorar). Detalhe do binding: §16.7 |
 | Lona | `Model` `VehicleCover` dentro do carrinho (caixa cinza do tamanho da bancada, AST-043 pendente) | tag `VehicleCover`; escondida, `Orig*` com os valores visíveis (P41) |
 | Luz (volumes) | `MapBinding/LightZones`: LZ-1 (X 27..53, Z 36..46, piso +2 até o teto), LZ-2 (X 44..56, Z 30..35), LZ-3 (bola r 18 em (40, 41)), LZ-4 (Mart), LZ-5 (bola r 6 no SS) | tag `LightZone`, `ZoneId`, `Group` (`trailer_interior`, `trailer_lights`, `mart`); nenhum volume na rota Pad ↔ Mart (DEC-196) |
 | Postes | um `Model` por poste (haste + cabeça) JL-01..09, P-01 | tag `StreetLight`, `PostId`, `Group = juniper_posts`, `Order` 1..10 (JL-09 = 1 … JL-01 = 9, P-01 = 10 = ordem do Hush; passo do Walker = `Order − 1`) |
@@ -1039,7 +1039,20 @@ local H=game:GetService("HttpService") local w=H.HttpEnabled H.HttpEnabled=true 
 | Tags | onda 2 + `AnomalyAnchor`, `TrafficPath`, `TrafficLine`, `TrafficBox` |
 | Pontos | onda 2 + `SS`, `AN-04/05/11/12`, `AS-1..4`, `WALKER-10`, entradas/saídas, pontos de cutscene **derivados de `Content.Cutscenes`** (`Marks`, `MoveTo` com `{slot}` 1..4, `LookAt` fora de poste) + `MKT-DOOR`, `WALT-1`, `RL-1`, `RL-END` |
 | Nós | onda 2 + todos os de `Content.WalkPaths`; regra 10: nós ligados na ordem, laço fecha, nenhuma vaga Q; caminho `Night`/`Any` em nó de rota de cliente só avisa |
-| Trailer | `shutter_toggle` = 1 âncora (`Prompt_Shutter`) dentro do trailer, ≥ 2,5 das âncoras de outros donos; `Shutter_Hinge` presente (aviso). `hide`/`Slot` saem (DEC-221) |
+| Trailer | `shutter_toggle` = 1 âncora (`Prompt_Shutter`) dentro do trailer, ≥ 2,5 das âncoras de outros donos (erro). Avisos: `Prompt_Shutter` fora do modelo `TRL-SHUTTER`, a mais de 4 do `Prompt_Switch` ou com desnível > 1; `Shutter_Hinge` ausente, duplicado, fora de `BasePart` ou sem `ClosedAngle`; sobra de `H1..H4`/`Prompt_Hide`/`Hide_Pose`. Âncora com `hide`/`get_up` = erro. `hide`/`Slot` saem (DEC-221) |
 | Ids tagueados | WV-1..3; TR-1..10; as 8 `SL-*`; X-T e CW-1..4 (lidos de `Content.Traffic` quando sincronizado) |
 | Trânsito (regra 11) | nós `Index` 1..n sem buraco; 1º nó no ponto de entrada da rota, último num `*-OUT` (aviso); cruza as linhas das `Stops` na ordem; 1ª linha de faixa ≥ `SpawnMinDist` (55); passa pela caixa do conflito; linhas e caixas invisíveis sem colisão |
 | Cutscene | trecho `MoveTo` da intro fora das listras só avisa (P46) |
+
+### 16.7 Janela de serviço no binding (TASK-132, DEC-221) — Provisório
+
+Tudo amarrado com o trailer no Pad (coordenadas deste documento) e estacionado em `TRL-SALE` no fim, como o resto do interior.
+
+| Peça | O que o `Bind.run` faz |
+|---|---|
+| Botão `TRL-SHUTTER` | `Model` criado pelo bind (`MapId = "TRL-SHUTTER"`, `BindCreated`, `Persistent`) dentro do trailer, com a placa `Button` (0,5 × 0,7 × 0,15, Mustard `#F6C12B`, sem colisão) em X 43,4, encostada na mesma face de parede e na mesma altura da placa do `TRL-SWITCH` (sem interruptor: ponto fixo no referencial do Pad). `Prompt_Shutter` = `Attachment` 0,3 à frente da placa (lado do corredor), `Interactable`, `PromptAction = "shutter_toggle"`. Se ficar < 2,6 de âncora de outro dono, a placa anda para oeste (até 1,0) e depois sobe (até 1,0). Por construção fica a 2,6 do `Prompt_Switch`. Reexecução mantém a placa onde está (ajuste à mão sobrevive), salvo `resetCreated` |
+| Aba | O bind **mede** a `MeshPart` `Awning` do casco no referencial do Pad: largura ao longo de X, borda do lado da parede = dobradiça, comprimento inclinado. Usa a `Awning` se ela cobrir a janela X 30,25..52,75 e, pendurada da dobradiça, for do topo (piso + 8) ao peitoril (piso + 3,5), com folga 0,3 e dobradiça a ≤ 1,5 da face da parede. Senão cria `Shutter_Panel` (Part 22,5 × 4,6 × 0,2, Metal cor Aluminum, sem colisão nem query) com dobradiça no topo da janela por fora da parede, **autorada aberta** (horizontal, para fora, debaixo do toldo) e a `Awning` fica fixa (P51). O relatório do bind diz qual caminho tomou e as medidas |
+| `Shutter_Hinge` | `Attachment` na peça que gira, eixo X = dobradiça (ao longo da janela), pose autorada = **aberta**. Atributo `ClosedAngle` (graus em volta do X do hinge, aberta → fechada; `Shutter_Panel` = −90). Para o `VehicleController` (TASK-131): guardar `H = Shutter_Hinge.WorldCFrame` e `open = peça.CFrame` ao achar o veículo; fechada = `H * CFrame.Angles(math.rad(ClosedAngle), 0, 0) * H:Inverse() * open`. Um `Shutter_Hinge` feito à mão (sem `BindCreated`) não é tocado |
+| Esconderijos | modelos `H1..H4` (AST-041) destruídos onde estiverem; `Prompt_Hide`/`Hide_Pose` que sobraram, idem. Os encaixes `Hide_1..4` do próprio `.fbx` do AST-027 ficam, sem tag |
+
+Proposta para o frontend-coder (TASK-131) e o architect: o atributo `ClosedAngle` no `Shutter_Hinge` deixa o ângulo no place e não no código (a aba real do art-director pode ter outro). Provisório.

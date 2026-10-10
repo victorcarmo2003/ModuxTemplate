@@ -51,7 +51,7 @@
 	   side (Mount_Sign, Mount_Counter, awning, Decal_SignFront) is local +Z; operator side,
 	   Zone_Center, Mount_Trash and back door are local -Z. rotY = 180 puts everything on MAP-01:
 	   grill at X 33.5, Parasol_E to the east, back door X 47..51 / Z 47, hitch to X 21.5,
-	   Mount_Trash exactly on BIN-C (56, 42), Hide_1..4 exactly on H1..H4. So the asset LookVector
+	   Mount_Trash exactly on BIN-C (56, 42), Hide_1..4 exactly on the old H1..H4 (removed, DEC-221). So the asset LookVector
 	   ends up facing SOUTH (operator), not the queue. If the modeler meant "front = queue", the
 	   FBX is still flipped; the table does not care (positions are verified by the mounts).
 	3. Station positions = vehicle pivot + mount offset. Because the FBX turned 180 and the vehicle
@@ -65,7 +65,7 @@
 	     rail face the operator in the corridor).
 	   - Cart trash: rotY 270 (pedal faces the corridor, west). Mount_Trash says 90 = pedal east.
 	   - Trailer back-row items (coffee, trash, switch): rotY 180 (face the corridor, north).
-	     Trailer bench / Hide cabinets are KP pack pieces (front -Z): bench 0, Hide 180.
+	     Trailer bench is a KP pack piece (front -Z): bench 0 (the Hide cabinets left with DEC-221).
 	5. Street light: AST-036_StreetLightCurved pivot is the bbox centre; the pole foot is at local
 	   (0, 0, -1.815) and the arm points to local +Z (bbox z -2.33..2.33, foot centre z -1.815).
 	   AST-036_LampHead pivot = pole foot of the pack (dome at local z 2.63..4.63, y 13.0..14.45 ->
@@ -216,10 +216,9 @@ return {
 	{ asset = "AST-040_TrailerBench", x = 34.5, y = 2.45, z = 44.5, rotY = 180, pivot = { 28.5, 2.45, 44.5, 0 }, group = "Trailer", id = "TRL-BENCH-1", layer = "night", replaces = {} },
 	{ asset = "AST-040_TrailerBench", x = 31.5, y = 2.45, z = 44.5, rotY = 180, pivot = { 31.5, 2.45, 44.5, 0 }, group = "Trailer", id = "TRL-BENCH-2", layer = "night", replaces = {} },
 	{ asset = "AST-040_TrailerBench", x = 28.5, y = 2.45, z = 44.5, rotY = 180, pivot = { 34.5, 2.45, 44.5, 0 }, group = "Trailer", id = "TRL-BENCH-3", layer = "night", replaces = {} },
-	{ asset = "AST-041_HideCabinet", x = 31, y = 2.45, z = 38.3, rotY = 180, drop = { "AST-041_HideCabinet" }, group = "Trailer", id = "H1", layer = "night", replaces = {}, note = "door face 0.1 proud of the counter front (Z 39), facing the corridor" },
-	{ asset = "AST-041_HideCabinet", x = 37, y = 2.45, z = 38.3, rotY = 180, drop = { "AST-041_HideCabinet" }, group = "Trailer", id = "H2", layer = "night", replaces = {} },
-	{ asset = "AST-041_HideCabinet", x = 43, y = 2.45, z = 38.3, rotY = 180, drop = { "AST-041_HideCabinet" }, group = "Trailer", id = "H3", layer = "night", replaces = {} },
-	{ asset = "AST-041_HideCabinet", x = 49, y = 2.45, z = 38.3, rotY = 180, drop = { "AST-041_HideCabinet" }, group = "Trailer", id = "H4", layer = "night", replaces = {} },
+	-- 2026-10-10 DEC-221 (TASK-132): hide cabinets H1..H4 (AST-041) removed; their mesh was already dropped by hand.
+	-- bind_map01 destroys the empty H1..H4 models left in the place and creates the window button TRL-SHUTTER
+	-- (placeholder plate, no asset entry) next to TRL-SWITCH.
 	{ asset = "AST-023_TrailerLights", part = { "Lights_Mast", "Lights_Mast_Lamps" }, x = 40, y = 11.45, z = 41, rotY = 0, group = "Trailer", id = "TRL-LIGHTS", layer = "night", replaces = {}, note = "UPG-005: only after purchase; Mount_Lights on the roof" },
 	{ asset = "AST-023_TrailerLights", part = { "Lights_String", "Lights_String_Bulbs" }, x = 41.25, y = 11.05, z = 34.9, rotY = 0, group = "Trailer", id = "TRL-LIGHTS", layer = "night", replaces = {}, note = "UPG-005; Mount_LightsString over the window. Same FBX placed twice (mast / string share the origin)" },
 

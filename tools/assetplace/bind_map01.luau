@@ -1,12 +1,23 @@
 --[[
-	MAP-01 binding, waves 1 + 2 + 3 (TASK-005, TASK-083, TASK-098). Edit-mode tool, same status as place_assets.luau:
+	MAP-01 binding, waves 1 + 2 + 3 (TASK-005, TASK-083, TASK-098, TASK-132). Edit-mode tool, same status as place_assets.luau:
 	NOT gameplay code. Status: Rascunho (level-designer, 2026-10-10).
 
-	Wave 3 (TASK-098; architecture.md §19.22, §8, §19.13-§19.17; MAP-01 §5.4-§5.6, §9.3, §9.5, §10.3, §11, §16.5):
-	  W1. Hide spots: each AST-041 cabinet H1..H4 (inside the trailer) gets Prompt_Hide (Interactable, PromptAction
-	      "hide", Slot 1..4) on its door, pushed down / towards the corridor until it is >= 2.6 from every anchor of
-	      another owner, and an untagged Attachment Hide_Pose (corridor floor in front of the door, facing the
-	      window; where HideService pivots the player; Provisional).
+	Wave 3 (TASK-098, TASK-132; architecture.md §19.22, §8, §19.13-§19.17; MAP-01 §5.4-§5.6, §7.2, §9.3, §9.5, §10.3,
+	§11, §16.5):
+	  W1. Service window (DEC-221, TASK-132; replaces the hide spots H1..H4, which are destroyed here):
+	      - button TRL-SHUTTER: bind-created Model (MapId TRL-SHUTTER) inside the trailer with a placeholder plate
+	        "Button" (0.5 x 0.7 x 0.15, Mustard) on the south wall at X 43.4 (Pad frame), same wall face and height
+	        as the TRL-SWITCH plate; Attachment Prompt_Shutter (Interactable, PromptAction "shutter_toggle") 0.3 in
+	        front of it. The plate slides west, then up, until the prompt is >= 2.6 from every anchor of another
+	        owner (Prompt_Switch is 2.6 away by construction). Kept on re-runs unless opts.resetCreated.
+	      - flap: Attachment Shutter_Hinge (X axis = hinge axis along the window, authored pose = OPEN) with
+	        attribute ClosedAngle (degrees around the hinge X axis that bring the piece from open to closed). On the
+	        AST-027 MeshPart "Awning" when, measured, it spans the window (22.5) and, hung from its wall-side edge,
+	        covers sill 3.5 .. top 8 above the floor; otherwise on a placeholder Part "Shutter_Panel" (22.5 x 4.6 x
+	        0.2, Metal / Aluminum, no collision) hinged on the window top outside the wall, authored open
+	        (horizontal, outwards; ClosedAngle -90), and the Awning stays fixed (MAP-01 P51). The client poses the
+	        piece: closed = H * CFrame.Angles(rad(ClosedAngle), 0, 0) * H:Inverse() * openCFrame, H = the hinge's
+	        authored WorldCFrame (cache it: the hinge moves with the piece).
 	  W2. Apartment windows WV-1..3 (ANM-006): tag AnomalyAnchor + AnchorId on Window_Up_<n> of the AST-045 (Z-11);
 	      without it, an invisible Part WV-<n> in MapBinding/Anomaly at the MAP-01 position (warning).
 	  W3. MapPoints: SS, AN-04/05/11/12, AS-1..4, WALKER-10, traffic entries/exits W/E/JN/JS-IN/OUT, cutscene points
@@ -36,7 +47,7 @@
 	     DRAWER fittings; Zone_Center. Wave 2: CART-PHONE.Prompt_Answer (answer_phone) and the tarp placeholder
 	     (Model "VehicleCover" inside the cart, tag VehicleCover, authored HIDDEN, see step 8).
 	  3. Trailer (wave 2): the AST-027 placed on the Pad (MapId TRL) becomes Vehicle "trailer"; every TRL-* model
-	     (except the TRL-SALE shell) and H1..H4 go inside it. Stations as the cart, plus Rail_8 (8 slots), board with
+	     (except the TRL-SALE shell) goes inside it; the old hide cabinets H1..H4 (AST-041) are destroyed (DEC-221). Stations as the cart, plus Rail_8 (8 slots), board with
 	     3 slots and coffee_machine (Prompt_Brew -> brew_coffee, Prompt_Restock -> restock, Ingredient coffee).
 	     TRL-PHONE.Prompt_Answer, TRL-SWITCH.Prompt_Switch (switch_light), Prompt_Buy on the shell (buy_trailer),
 	     Zone_Center, DRAWER fittings. The empty sale shell (MapId TRL-SALE) is removed: the real trailer parks there.
@@ -197,7 +208,7 @@ local POINTS = {
 	{ id = "ST-R", x = 18, z = 92, floor = 0.24, face = NORTH, node = true },
 
 	-- wave 3 (TASK-098) ----------------------------------------------------------------------
-	-- safe spot under the "OPEN 24 HOURS" marquee (MAP-01 §5.2; HideService InZone(p, "SS", 6)); faces the Pad
+	-- safe spot under the "OPEN 24 HOURS" marquee (MAP-01 §5.2; AnomalyService InZone(p, "SS", 6)); faces the Pad
 	{ id = "SS", x = -58, z = 30, floor = 0.4, face = EAST },
 	-- anomaly anchors (MAP-01 §10.3). AN-04 / AN-11 / AN-05 at the height of the thing (window, clock, door pane)
 	{ id = "AN-04", x = 38, y = 26.3, z = -31, face = SOUTH }, -- WV-2 centre (glass 24.6..28, AST-045)
@@ -426,12 +437,20 @@ local ZONES = {
 
 -- Wave 3 -----------------------------------------------------------------------------------------
 
--- Hide cabinets AST-041 (MAP-01 §7.2: H1..H4 at X 31/37/43/49, corridor edge Z 39.5). Prompt on the door, low.
-local HIDE_COUNT = 4
-local HIDE_GAP = 2.6 -- >= this from anchors of other owners in the trailer (§18.7 item 4 + margin, like the phone)
-local HIDE_PROMPT_UP = 1.2 -- start height of Prompt_Hide over the cabinet bottom
-local HIDE_PROMPT_OUT = 0.3 -- start offset in front of the door face (towards the corridor)
-local HIDE_POSE_OUT = 1.0 -- Hide_Pose: corridor floor this far in front of the door face
+-- Service window (DEC-221, TASK-132; MAP-01 §7.2, P51). Offsets in the trailer's Pad frame (from TRL_POSE, facing
+-- north: local -Z = out of the window). Floor at +2 over the pivot; window X 30..53 (22.5 wide, AST-027), sill 3.5
+-- and top 8 over the floor; north wall outer face at local Z -6 (hull Z 35..47).
+local SHUTTER_ID = "TRL-SHUTTER"
+local SHUTTER_BUTTON_X = 43.4 -- world X with the trailer on the Pad: 2.6 west of TRL-SWITCH (X 46)
+local SHUTTER_BUTTON_FALLBACK = Vector3.new(3.4, 6.4, 5.1) -- Pad frame, used when TRL-SWITCH is missing
+local SHUTTER_BUTTON_SIZE = Vector3.new(0.5, 0.7, 0.15) -- placeholder plate until the art sheet exists (P51)
+local SHUTTER_BUTTON_COLOR = Color3.fromRGB(246, 193, 43) -- Mustard #F6C12B (style guide: interactive accent)
+local SHUTTER_PROMPT_OUT = 0.3 -- Prompt_Shutter in front of the plate (corridor side), like Prompt_Switch
+local SHUTTER_GAP = 2.6 -- >= this from anchors of other owners in the trailer (§18.7 item 4 + margin, like the phone)
+local WINDOW_LOCAL = { x0 = -9.75, x1 = 12.75, sill = 5.5, top = 10.0, wallZ = -6 } -- X 30.25..52.75 on the Pad
+local AWNING_TOL = 0.3 -- slack when deciding whether the Awning covers the window
+local SHUTTER_PANEL_SIZE = Vector3.new(22.5, 4.6, 0.2)
+local SHUTTER_PANEL_COLOR = Color3.fromRGB(198, 204, 210) -- Aluminum mid (#E3E7EB -> #A9B1B9)
 
 -- Apartment windows (AST-045 Window_Up_<n>, MAP-01 §5.2 / §10.3). Fallback Part when the asset lacks them.
 local WINDOWS = {
@@ -768,37 +787,6 @@ local function closestOther(anchor: Instance, vehicle: Instance): (number, strin
 		end
 	end
 	return best, who
-end
-
--- Moves an Attachment anchor along each { step, maxSteps } in order until it is >= gap from every anchor of
--- another owner inside `vehicle` (hide prompts: first down, then towards the corridor).
-local function clearAway(anchor: Instance?, vehicle: Instance, gap: number, moves: { { any } }, label: string)
-	if not (anchor and anchor:IsA("Attachment")) then
-		if anchor then
-			log("warn", ("%s: %s is not an Attachment, clearance not applied"):format(label, anchor.Name))
-		end
-		return
-	end
-	local a = anchor :: Attachment
-	local d, who = closestOther(a, vehicle)
-	local moved = Vector3.zero
-	for _, m in moves do
-		local step, max = m[1] :: Vector3, m[2] :: number
-		local n = 0
-		while d < gap and n < max do
-			a.WorldCFrame = a.WorldCFrame + step
-			moved += step
-			n += 1
-			d, who = closestOther(a, vehicle)
-		end
-	end
-	if d < gap then
-		log("warn", ("%s: %s still %.2f from %s after moving %s (move it by hand)"):format(label, a.Name, d, who, fmtV(moved)))
-	elseif moved.Magnitude > 0 then
-		log("new", ("%s: %s moved %s to clear the counter prompts (closest %s at %.2f)"):format(label, a.Name, fmtV(moved), who, d))
-	else
-		log("ok", ("%s: %s clear of other prompts (closest %s at %.2f)"):format(label, a.Name, who, d))
-	end
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -1480,13 +1468,29 @@ local function bindTrailer(assets: Instance, cart: Instance?, opts: AnchorOpts):
 		log("err", "TRL (AST-027_OpenLateTrailer, layer night) not found. Run Place.run first")
 		return nil, TRL_POSE, salePose
 	end
+	-- DEC-221 (TASK-132): the hide cabinets H1..H4 leave the game. Destroy them wherever they are (inside the trailer
+	-- after an older bind, or loose after an older Place.run); MAP-01_placements.luau no longer lists them.
+	local hides: { Instance } = {}
+	for _, d in assets:GetDescendants() do
+		local id = d:GetAttribute("MapId")
+		if typeof(id) == "string" and string.match(id, "^H[1-4]$") and d:GetAttribute("Asset") == "AST-041_HideCabinet" then
+			table.insert(hides, d)
+		end
+	end
+	for _, d in hides do
+		if d.Parent then
+			d:Destroy()
+		end
+	end
+	if #hides > 0 then
+		log("ok", ("TRL: %d hide cabinet model(s) H1..H4 removed (DEC-221)"):format(#hides))
+	end
+
 	local members: { Instance } = {}
 	for _, d in assets:GetDescendants() do
 		local id = d:GetAttribute("MapId")
 		if d ~= trl and typeof(id) == "string" and not d:IsDescendantOf(trl) then
-			local isTrl = string.sub(id, 1, 4) == "TRL-" and id ~= "TRL-SALE"
-			local isHide = string.match(id, "^H[1-4]$") ~= nil and d:GetAttribute("Asset") == "AST-041_HideCabinet"
-			if isTrl or isHide then
+			if string.sub(id, 1, 4) == "TRL-" and id ~= "TRL-SALE" then
 				table.insert(members, d)
 			end
 		end
@@ -1505,7 +1509,7 @@ local function bindTrailer(assets: Instance, cart: Instance?, opts: AnchorOpts):
 		-- re-run: the set is already inside the trailer (parked at TRL-SALE); bring it back to the Pad to bind
 		(trl :: any):PivotTo(TRL_POSE)
 	end
-	log("ok", ("TRL: %d model(s) moved inside the trailer (TRL-*, H1..H4); bound on the Pad"):format(#members))
+	log("ok", ("TRL: %d model(s) moved inside the trailer (TRL-*); bound on the Pad"):format(#members))
 	CollectionService:AddTag(trl, "Vehicle")
 	trl:SetAttribute("Vehicle", "trailer")
 	setPersistent(trl)
@@ -1918,57 +1922,260 @@ local function bindLightZones(root: Instance, padPose: CFrame)
 	end
 end
 
--- Wave 3 (W1): hide spots H1..H4 inside the trailer (§19.14; DEC-054, DEC-176). Bound with the trailer on the Pad.
-local function bindHides(trl: Instance, padPose: CFrame, opts: AnchorOpts)
-	local fallbackDX = { -9, -3, 3, 9 } -- MAP-01 §7.2: X 31/37/43/49 with the trailer pivot at X 40
-	for n = 1, HIDE_COUNT do
-		local id = "H" .. n
-		local cab = byMapId(trl, id)
-		if not cab then
-			log("err", ("%s (AST-041_HideCabinet) not found inside the trailer (Place.run puts H1..H4 in the night layer)"):format(id))
-			continue
+-- Wave 3 (W1a): service window button TRL-SHUTTER (DEC-221, TASK-132; MAP-01 §7.2). Bound with the trailer on the Pad.
+local function bindShutterButton(trl: Instance, padPose: CFrame, opts: AnchorOpts)
+	-- where the plate goes: X 43.4, same wall face and height as the TRL-SWITCH plate (fallback: Pad-frame constant)
+	local function wanted(): CFrame
+		local sw = byMapId(trl, "TRL-SWITCH")
+		local mn, mx = nil, nil
+		if sw then
+			mn, mx = partsBox(sw)
 		end
-		setPersistent(cab)
-		-- AST-041 fittings may come as Prompt_Hide_<k> / Hide_<k> (same .fbx for the 4): one name each per cabinet
-		-- only Attachments are adopted (a BasePart named Hide_<k> may be the door mesh: never made invisible)
-		local function adopt(pattern: string, to: string)
-			if findNamed(cab, to) then
-				return
+		if mn and mx then
+			local local_ = padPose:PointToObjectSpace(Vector3.new(SHUTTER_BUTTON_X, (mn.Y + mx.Y) / 2, mx.Z - SHUTTER_BUTTON_SIZE.Z / 2))
+			return padPose * CFrame.new(local_)
+		end
+		log("warn", "TRL-SHUTTER: TRL-SWITCH plate not found, button placed at the Pad-frame fallback")
+		return padPose * CFrame.new(SHUTTER_BUTTON_FALLBACK)
+	end
+
+	local model = byMapId(trl, SHUTTER_ID)
+	if model and not model:IsA("Model") then
+		model:Destroy()
+		model = nil
+	end
+	if not model then
+		local m = Instance.new("Model")
+		m.Name = SHUTTER_ID
+		m:SetAttribute("MapId", SHUTTER_ID)
+		m:SetAttribute(CREATED, true)
+		m.Parent = trl
+		model = m
+	end
+	local m = model :: Model
+	setPersistent(m)
+
+	local plate = m:FindFirstChild("Button")
+	local fresh = false
+	if not (plate and plate:IsA("BasePart")) then
+		if plate then
+			plate:Destroy()
+		end
+		local p = Instance.new("Part")
+		p.Name = "Button"
+		p:SetAttribute(CREATED, true)
+		p.Parent = m
+		plate = p
+		fresh = true
+	end
+	local bp = plate :: BasePart
+	bp.Anchored = true
+	if bp:GetAttribute(CREATED) then
+		-- placeholder look (P51); a hand-made / art plate without BindCreated is left as it is
+		bp.Size = SHUTTER_BUTTON_SIZE
+		bp.Material = Enum.Material.SmoothPlastic
+		bp.Color = SHUTTER_BUTTON_COLOR
+		bp.CanCollide = false
+		bp.CanTouch = false
+		bp.CastShadow = false
+		if fresh or opts.resetCreated then
+			bp.CFrame = wanted()
+		end
+	end
+	m.PrimaryPart = bp
+
+	-- Prompt_Shutter: Attachment on the plate, corridor side (local -Z = north with the trailer on the Pad)
+	local prompt = bp:FindFirstChild("Prompt_Shutter")
+	if not (prompt and prompt:IsA("Attachment")) then
+		if prompt then
+			prompt:Destroy()
+		end
+		local a = Instance.new("Attachment")
+		a.Name = "Prompt_Shutter"
+		a:SetAttribute(CREATED, true)
+		a.Parent = bp
+		prompt = a
+	end
+	local a = prompt :: Attachment
+	if a:GetAttribute(CREATED) then
+		a.CFrame = CFrame.new(0, 0, -(bp.Size.Z / 2 + SHUTTER_PROMPT_OUT))
+	end
+	interactable(a, "shutter_toggle")
+
+	-- clearance: slide the plate west (up to 1.0), then up (up to 1.0), until >= SHUTTER_GAP from other owners
+	local d, who = closestOther(a, trl)
+	local moved = Vector3.zero
+	for _, step in { padPose.RightVector * -0.1, padPose.UpVector * 0.1 } do
+		local n = 0
+		while d < SHUTTER_GAP and n < 10 do
+			bp.CFrame = bp.CFrame + step
+			moved += step
+			n += 1
+			d, who = closestOther(a, trl)
+		end
+	end
+	local label = ("%s: Prompt_Shutter (shutter_toggle) at %s"):format(SHUTTER_ID, fmtV(a.WorldPosition))
+	if d < SHUTTER_GAP then
+		log("warn", ("%s still %.2f from %s after moving the plate %s (move it by hand)"):format(label, d, who, fmtV(moved)))
+	elseif moved.Magnitude > 0 then
+		log("new", ("%s, plate moved %s to clear %s (%.2f)"):format(label, fmtV(moved), who, d))
+	else
+		log(if bp:GetAttribute(CREATED) then "new" else "ok", ("%s, closest other owner %s at %.2f"):format(label, who, d))
+	end
+	local sw = byMapId(trl, "TRL-SWITCH")
+	local swPrompt = sw and findNamed(sw, "Prompt_Switch")
+	if swPrompt then
+		local ds = (anchorPos(swPrompt) - a.WorldPosition).Magnitude
+		if ds > 4 then
+			log("warn", ("%s: %.2f from Prompt_Switch (MAP-01 §7.2 wants it next to the switch, ~2.6)"):format(SHUTTER_ID, ds))
+		end
+	end
+end
+
+-- Wave 3 (W1b): the piece that closes the window + Shutter_Hinge (DEC-221, TASK-132; MAP-01 §7.2, P51).
+-- The Awning is used when, measured in the Pad frame, it spans the window and, hung from its wall-side edge,
+-- covers sill..top; otherwise a placeholder Shutter_Panel. ClosedAngle = degrees around the hinge X axis.
+local function bindShutterPiece(trl: Instance, padPose: CFrame)
+	local existing = findNamed(trl, "Shutter_Hinge")
+	if existing and existing:IsA("Attachment") and not existing:GetAttribute(CREATED) then
+		local host = if existing.Parent then existing.Parent:GetFullName() else "?"
+		log("ok", ("TRL: Shutter_Hinge authored by hand on %s, left as is (ClosedAngle %s)"):format(host, tostring(existing:GetAttribute("ClosedAngle"))))
+		return
+	end
+	-- old created hinges / panels are rebuilt below
+	for _, d in trl:GetDescendants() do
+		if d.Name == "Shutter_Hinge" and d:GetAttribute(CREATED) then
+			d:Destroy()
+		end
+	end
+	local W = WINDOW_LOCAL
+	local rot = padPose.Rotation
+
+	local function newHinge(host: BasePart, hingeWorld: Vector3, angle: number)
+		local h = Instance.new("Attachment")
+		h.Name = "Shutter_Hinge"
+		h:SetAttribute(CREATED, true)
+		h.Parent = host
+		h.WorldCFrame = CFrame.new(hingeWorld) * rot -- X axis = along the window (hinge axis)
+		h:SetAttribute("ClosedAngle", angle)
+		return h
+	end
+
+	-- the AST-027 Awning of the shell (not a piece of another MapId model inside the trailer)
+	local awning: BasePart? = nil
+	for _, d in trl:GetDescendants() do
+		if d:IsA("BasePart") and d.Name == "Awning" then
+			local q = d.Parent
+			local nested = false
+			while q and q ~= trl do
+				if q:GetAttribute("MapId") ~= nil then
+					nested = true
+				end
+				q = q.Parent
 			end
-			for _, d in cab:GetDescendants() do
-				if d:IsA("Attachment") and string.match(d.Name, pattern) then
-					d:SetAttribute(SRC_NAME, d.Name)
-					d.Name = to
-					log("ok", ("%s: .fbx %s used as %s"):format(id, tostring(d:GetAttribute(SRC_NAME)), to))
-					return
+			if not nested then
+				awning = d
+				break
+			end
+		end
+	end
+
+	local why = "no BasePart named Awning in the trailer shell"
+	if awning then
+		-- part axes in the Pad frame: width axis = the one most along X; slant = the longer of the other two
+		local cf = padPose:ToObjectSpace(awning.CFrame)
+		local axes = {
+			{ v = cf.RightVector, s = awning.Size.X },
+			{ v = cf.UpVector, s = awning.Size.Y },
+			{ v = -cf.LookVector, s = awning.Size.Z },
+		}
+		table.sort(axes, function(p, q)
+			return math.abs(p.v.X) > math.abs(q.v.X)
+		end)
+		local width = axes[1].s
+		local slant = if axes[2].s >= axes[3].s then axes[2] else axes[3]
+		local half = slant.v * (slant.s / 2)
+		local e1, e2 = cf.Position + half, cf.Position - half
+		local hinge, far = e1, e2
+		if e2.Z > e1.Z then -- the hinge is the edge closer to the wall (larger local Z: the window faces -Z)
+			hinge, far = e2, e1
+		end
+		local length = slant.s
+		local x0, x1 = cf.Position.X - width / 2, cf.Position.X + width / 2
+		local covers = math.abs(axes[1].v.X) > 0.98
+			and x0 <= W.x0 + AWNING_TOL
+			and x1 >= W.x1 - AWNING_TOL
+			and hinge.Y >= W.top - AWNING_TOL
+			and hinge.Y - length <= W.sill + AWNING_TOL
+			and math.abs(hinge.Z - W.wallZ) <= 1.5
+		local info = ("Awning %.2f wide (X %.2f..%.2f), %.2f long, hinge edge at y %.2f z %.2f over the pivot; window X %.2f..%.2f, sill %.2f, top %.2f, wall z %.2f"):format(
+			width, x0, x1, length, hinge.Y, hinge.Z, W.x0, W.x1, W.sill, W.top, W.wallZ)
+		if covers then
+			local v = far - hinge
+			local phi = math.atan2(v.Z, v.Y)
+			local theta = math.pi - phi
+			if theta > math.pi then
+				theta -= 2 * math.pi
+			end
+			local deg = math.floor(math.deg(theta) * 10 + 0.5) / 10
+			for _, d in trl:GetDescendants() do
+				if d.Name == "Shutter_Panel" and d:GetAttribute(CREATED) then
+					d:Destroy()
 				end
 			end
+			newHinge(awning, padPose:PointToWorldSpace(hinge), deg)
+			log("ok", ("TRL: Shutter_Hinge on the AST-027 Awning, ClosedAngle %.1f (%s)"):format(deg, info))
+			return
 		end
-		adopt("^Prompt_Hide_%d+$", "Prompt_Hide")
-		adopt("^Hide_?%d*$", "Hide_Pose")
+		why = "it does not cover the window: " .. info
+	end
 
-		local mn, mx = partsBox(cab)
-		local bottom = if mn then mn.Y else padPose.Y + 2
-		local cx = if mn and mx then (mn.X + mx.X) / 2 else padPose.X + fallbackDX[n]
-		local front = if mx then mx.Z else padPose.Z - 2 -- door face, corridor side (+Z with the trailer facing north)
-		local prompt = ensureAnchor(cab, "Prompt_Hide", function()
-			return Vector3.new(cx, bottom + HIDE_PROMPT_UP, front + HIDE_PROMPT_OUT)
-		end, opts, id)
-		interactable(prompt, "hide", { Slot = n })
-		-- clear of the counter prompts above: first down (to bottom + 0.6), then towards the corridor (up to +1.2)
-		clearAway(prompt, trl, HIDE_GAP, { { Vector3.new(0, -0.1, 0), 6 }, { padPose.LookVector * -0.1, 12 } }, id)
+	-- placeholder panel (P51): hinge on the window top, outside the wall; authored OPEN = horizontal, outwards
+	local hingeLocal = Vector3.new((W.x0 + W.x1) / 2, W.top + 0.1, W.wallZ - SHUTTER_PANEL_SIZE.Z / 2 - 0.05)
+	local hingeCF = padPose * CFrame.new(hingeLocal)
+	local closedCF = hingeCF * CFrame.new(0, -SHUTTER_PANEL_SIZE.Y / 2, 0)
+	local openCF = hingeCF * CFrame.Angles(math.rad(90), 0, 0) * hingeCF:Inverse() * closedCF
+	local panel = trl:FindFirstChild("Shutter_Panel")
+	if not (panel and panel:IsA("BasePart")) then
+		if panel then
+			panel:Destroy()
+		end
+		local p = Instance.new("Part")
+		p.Name = "Shutter_Panel"
+		p:SetAttribute(CREATED, true)
+		p.Parent = trl
+		panel = p
+	end
+	local pp = panel :: BasePart
+	if pp:GetAttribute(CREATED) then
+		-- always re-derived from the window (a hand-made panel without BindCreated is left where it is)
+		pp.Anchored = true
+		pp.Size = SHUTTER_PANEL_SIZE
+		pp.Material = Enum.Material.Metal
+		pp.Color = SHUTTER_PANEL_COLOR
+		pp.CanCollide = false
+		pp.CanQuery = false
+		pp.CanTouch = false
+		pp.CastShadow = true
+		pp.CFrame = openCF
+	end
+	newHinge(pp, hingeCF.Position, -90)
+	log("new", ("TRL: Shutter_Panel placeholder %s, open at %s, Shutter_Hinge ClosedAngle -90; Awning stays fixed (P51: %s)"):format(
+		fmtV(SHUTTER_PANEL_SIZE), fmtV(pp.Position), why))
+end
 
-		-- where HideService pivots the player: corridor floor in front of the door, facing the window (Provisional)
-		local pose = ensureAnchor(cab, "Hide_Pose", function()
-			return Vector3.new(cx, bottom, front + HIDE_POSE_OUT)
-		end, opts, id)
-		if pose and pose:IsA("Attachment") and pose:GetAttribute(CREATED) then
-			local p = pose.WorldPosition
-			pose.WorldCFrame = CFrame.lookAt(p, p + padPose.LookVector)
+-- Leftovers of the hide spots inside the trailer (DEC-221): bind-created Prompt_Hide / Hide_Pose outside the
+-- cabinets (the cabinets themselves are destroyed in bindTrailer). The shell's own Hide_1..4 mounts stay untagged.
+local function removeHideLeftovers(trl: Instance)
+	local n = 0
+	for _, d in trl:GetDescendants() do
+		if (d.Name == "Prompt_Hide" or d.Name == "Hide_Pose") and d.Parent then
+			d:Destroy()
+			n += 1
 		end
-		if pose and pose:IsA("BasePart") then
-			log("warn", ("%s: Hide_Pose is a BasePart; HideService reads its CFrame (Attachment preferred)"):format(id))
-		end
+	end
+	if n > 0 then
+		log("ok", ("TRL: %d leftover Prompt_Hide / Hide_Pose removed (DEC-221)"):format(n))
 	end
 end
 
@@ -2146,8 +2353,10 @@ function Bind.run(opts: AnchorOpts?): string
 	if trl then
 		bindPhone(trl, "TRL-PHONE", o)
 		clearUp(findNamed(trl, "Prompt_Answer"), trl, PHONE_GAP, "TRL-PHONE")
-		-- wave 3: hide spots last, they clear every other prompt of the trailer (phone included)
-		bindHides(trl, padPose, o)
+		-- wave 3 (DEC-221): service window last, the button clears every other prompt of the trailer (phone included)
+		removeHideLeftovers(trl)
+		bindShutterButton(trl, padPose, o)
+		bindShutterPiece(trl, padPose)
 	end
 	bindOpenSign(assets, o)
 	bindMart(assets, o)
