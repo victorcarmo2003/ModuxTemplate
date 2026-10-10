@@ -24,7 +24,7 @@ const LIMITS: { [string]: Limit } = table.freeze({
 	["Left Shoulder"] = SHOULDER,
 	["Right Hip"] = HIP,
 	["Left Hip"] = HIP,
-})
+} :: { [string]: Limit })
 
 -- characters with the ragdoll on (weak: a destroyed character goes away with it)
 const active: { [Model]: boolean } = setmetatable({}, { __mode = "k" }) :: any

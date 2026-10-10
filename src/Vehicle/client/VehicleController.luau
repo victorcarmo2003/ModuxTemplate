@@ -231,9 +231,10 @@ function VehicleController:MountSign(playerGui: Instance)
 		const visible = function(): boolean
 			return self:SignVisible()
 		end
-		if model then
+		const signModel = model
+		if signModel then
 			Vide.effect(function()
-				setSignHidden(model, not visible())
+				setSignHidden(signModel, not visible())
 			end)
 		end
 		return SaleSign({
