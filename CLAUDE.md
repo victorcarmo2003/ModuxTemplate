@@ -49,6 +49,7 @@ Tudo que é referenciado entre documentos tem ID estável. Nunca reaproveite um 
 | `CHR-###` | personagem da história | `docs/story/characters.md` |
 | `AST-###` | asset 3D/visual | `docs/art/asset-list.md` |
 | `TASK-###` | tarefa de implementação | `docs/tasks/board.md` |
+| `SFX-###` / `MUS-###` / `AMB-###` | efeito sonoro / música / ambiente | `docs/audio/sound-list.md` |
 
 ### Status de documento
 
