@@ -1183,14 +1183,14 @@ Sem semáforo, o padrão aprendível (OBSERVAR) é o ritmo do trânsito e o PARE
 
 ### FEAT-034 — Desmaio, ambulância e reviver
 
-- Status: Rascunho · Pilares: SOBREVIVER · Origem: **[DEC-043, DEC-091, DEC-092, DEC-093, DEC-094, DEC-100, DEC-102, DEC-108, DEC-023, DEC-114, DEC-115, DEC-116, DEC-117, DEC-118, DEC-129]**; seguem como proposta: tempos e paradas, sanidade ao voltar, uso do item por colega (**Q-120 f**); preço em Robux adiado (**Q-098**)
+- Status: Rascunho · Pilares: SOBREVIVER · Origem: **[DEC-043, DEC-091, DEC-092, DEC-093, DEC-094, DEC-100, DEC-102, DEC-108, DEC-023, DEC-114, DEC-115, DEC-116, DEC-117, DEC-118, DEC-129, DEC-216]**; seguem como proposta: tempos e paradas, sanidade ao voltar, uso do item por colega (**Q-120 f**); preço em Robux adiado (**Q-098**)
 - Resumo: sanidade 0 → o jogador **desmaia** e cai → a **ambulância** (NPC-023) chega, os **médicos descem e levam o corpo** (NPC-024) **[DEC-114]** → o jogador assiste (FEAT-025) e pode ser **revivido** por **Robux** (developer product, **só para si** **[DEC-116]**) ou pelo **Rescue Whistle** (ITM-021) → a ambulância volta, para em frente ao trailer, ele aparece ao lado e ela vai embora, **sem ninguém descer** **[DEC-091, DEC-114]**. Sem reviver até as 6:00 AM: espectador permanente **[DEC-093, DEC-115]**. Resgate, nunca ferimento **[DEC-023]**. Só existe à noite (sanidade só à noite, DEC-056).
 
 Linha do tempo (t = instante em que a sanidade chega a 0):
 
 | t | O que acontece |
 |---|---|
-| 0 | estado `Down`; animação de desmaio suave (1,2 s, sem ragdoll); prompts em curso cancelam; Tools ficam guardadas; servidor despacha a ambulância para a parada do corpo (AMB-M ou AMB-P) |
+| 0 | estado `Down`; **ragdoll R6** + rosto **`Fainted`** (X) **[DEC-216]**, cai no lugar, sem arremesso (Provisório), fica no chão até os médicos; ~~animação de desmaio suave (1,2 s, sem ragdoll)~~; prompts em curso cancelam; Tools ficam guardadas; servidor despacha a ambulância para a parada do corpo (AMB-M ou AMB-P) |
 | 0–2 s | tela do jogador desbota, som abafado; depois câmera de spectate (FEAT-025) |
 | 2 s | oferta de reviver aparece no spectate |
 | 8 s | ambulância chega à parada (sirene suave, luzes; volume nunca acima do ambiente, sem susto — DEC-005) |

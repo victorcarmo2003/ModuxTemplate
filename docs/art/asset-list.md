@@ -47,8 +47,8 @@ Caminhos dos packs (abreviados nas fichas):
 | AST-013 | Trilho de descanso | equipment | P0 | Modelar | modelado: `Assets/models/equipment/AST-013_RestRail.fbx` (`Rail_6` 384 / `Rail_8` 440 tris; DEC-140) | Aprovado (DEC-140) |
 | AST-014 | Tábua + faca | equipment | P0 | Pack | `KP/cuttingboard.fbx`, `KP/knife.fbx` (faca deitada; DEC-138); modelo `Assets/models/equipment/AST-014_CuttingBoard.fbx` (tábua 38 + faca 104; DEC-141) | Aprovado (DEC-138; modelo DEC-141) |
 | AST-015 | Caixa de pães (estoque de pão) | equipment | P0 | Pack + edição | `KP/crate_buns.fbx`, `KP/crate_lid.fbx` (pães de hot dog do AST-001 no lugar dos de hambúrguer; tris ≤ 800; DEC-138) | Aprovado (DEC-138) |
-| AST-016 | Porta-garrafas de molho (2 vagas da grade) | equipment | P0 | Modelar | modelado: `Assets/models/equipment/AST-016_SauceHolder.fbx` (480 + `Fill` 28 cada); garrafas AST-004/005 translúcidas com `Fill` animado (DEC-140) | Aprovado (DEC-140) |
-| AST-017 | Grade de complementos 3 × 2 + tigelas de inox | equipment | P0 | Pack + edição | base `KP/kitchencounter_straight_A.fbx`; **tigelas `KP/bowl.fbx` com ingrediente dentro + plaquinha `Label_<Ing>` (SurfaceGui/ImageLabel) + Padlock Quaternius (DEC-156)**; modelo antigo `AST-017_ToppingGrid.fbx` (DEC-141) superado | Aprovado (DEC-138; DEC-156); modelo novo em produção |
+| AST-016 | Porta-garrafas de molho (2 vagas da grade) | equipment | P0 | Modelar | modelado: `Assets/models/equipment/AST-016_SauceHolder.fbx` (480 + `Fill` 28 cada); garrafas AST-004/005 translúcidas com `Fill` animado (DEC-140) | Aprovado (DEC-140); **fora da grade por DEC-218** (destino `Q-172`) |
+| AST-017 | Grade de complementos 3 × 2 + tigelas de inox | equipment | P0 | Pack + edição | base `KP/kitchencounter_straight_A.fbx`; **tigelas `KP/bowl.fbx` com ingrediente dentro + plaquinha `Label_<Ing>` (SurfaceGui/ImageLabel) + Padlock Quaternius (DEC-156)**; modelo antigo `AST-017_ToppingGrid.fbx` (DEC-141) superado; **ketchup e mostarda também em tigela (DEC-218)** | Aprovado (DEC-138; DEC-156); **modelo de tigelas aprovado (DEC-218)** |
 | AST-018 | Cooler / estoque de salsicha (3 níveis) | equipment | P0 | Pack + edição | L3 `KP/fridge_A.fbx`; L1–L2 modelados sobre a base `MM/freezer.fbx` (DEC-138); modelos `Assets/models/equipment/AST-018_CoolerL1.fbx` (668) e `_CoolerL2.fbx` (1.106; DEC-141) | Aprovado (DEC-138; N1/N2 DEC-141) |
 | AST-019 | Counter (3 níveis) + pedestais e marcas de fila | equipment | P0 | Pack + edição | `KP/kitchencounter_straight_A.fbx`, `KP/kitchencounter_outercorner.fbx`, `KP/chair_stool.fbx` (assento plano); pedestais/toldo/marcas modelados (DEC-138); modelos `Assets/models/equipment/AST-019_QueuePost.fbx` (94 + corda 68) e `_QueueMark.fbx` (34; DEC-141) | Aprovado (DEC-138; pedestal/corda/marca DEC-141) |
 | AST-020 | Suporte de entrega + gaveta do caixa + Cash Drawer Lock | equipment | P0 | Pack + edição (DEC-155) | **POS preta "POS Machine" de J-Toastie (CC-BY 3.0, crédito obrigatório; 606 + gaveta 146) + "Padlock" Quaternius (CC0) Mustard `AST-020_Padlock.fbx`**; modelo antigo `AST-020_CashRegister.fbx` (DEC-140) superado | Aprovado (DEC-140; DEC-155); modelo novo em produção |
@@ -74,7 +74,7 @@ Caminhos dos packs (abreviados nas fichas):
 | AST-040 | Banco do fundo do trailer | equipment | P1 | Pack + edição | base `KP/kitchencabinet.fbx` ×3 + almofada modelada (DEC-138) | Aprovado (DEC-138) |
 | AST-041 | Pontos de esconder "Hide" (×4) | equipment | P1 | Pack + edição | `KP/kitchencabinet_half.fbx` (DEC-138) | Aprovado (DEC-138) |
 | AST-042 | Telefone fixo do veículo (2 variantes) | equipment | P0 | Modelar | modelado: `Assets/models/equipment/AST-042_VehiclePhone.fbx` (aparelho 396 / `Phone_Cart` 528; DEC-140) | Aprovado (DEC-140) |
-| AST-043 | Lona do carrinho | vehicle | P1 | Modelar | — | Rascunho |
+| AST-043 | Lona do carrinho | vehicle | P1 | Modelar | — | Aprovado (DEC-217) |
 | AST-044 | Bellmoor Savings (fachada + relógio, ANM-003) | building | P0 | Modelar + Pack (coluna) | coluna `KP/pillar_A.fbx`; volume `CC/building-j.fbx` (com AST-045; reduzido em `Assets/models/building/AST-045_ApartmentBlock.fbx`, DEC-141); resto da fachada segue modelar (DEC-139) | Aprovado (DEC-139; volume DEC-141) · Em revisão (modeler-3d, 2026-10-10) |
 | AST-045 | Apartamentos sobre o Bellmoor Savings (ANM-006) | building | P0 | Pack + edição | `CC/building-j.fbx` (DEC-139) reduzido: `Assets/models/building/AST-045_ApartmentBlock.fbx` (2.381; DEC-141) | Aprovado (DEC-139; modelo DEC-141) · Em revisão (modeler-3d, 2026-10-10) |
 | AST-046 | Lavanderia | building | P1 | Pack + edição | `CC/building-e.fbx` (DEC-139) | Aprovado (DEC-139) · Em revisão (modeler-3d, 2026-10-10) |
@@ -100,11 +100,11 @@ Caminhos dos packs (abreviados nas fichas):
 | AST-066 | ANM-009 The knock (porta dos fundos) | anomaly | P1 | Modelar | parte de AST-027 (porta já está em `AST-027_OpenLateTrailer`; **não** aprovada por tabela na DEC-141) | Rascunho |
 | AST-067 | ANM-010 The Hush (névoa + marcação) | anomaly | P1 | Modelar + VFX | — | Rascunho |
 | AST-068 | Pistas do trailer: foto de 1979 + crachá | story | P1 | Modelar | modelado: `Assets/models/story/AST-068_TrailerClues.fbx` (`Photo_1979` 66 / `Badge_Old` 76; DEC-140) | Aprovado (DEC-140) |
-| AST-069 | Pacote de animações R6 | character | P0 | Animar | rig de animação: `Assets/blender/character/AST-069_AnimalRig.blend` (+ `.md`; em revisão); animações: — | Rascunho |
+| AST-069 | Pacote de animações R6 | character | P0 | Animar | rig de animação: `Assets/blender/character/AST-069_AnimalRig.blend` (+ `.md`; em revisão); animações: — (usuário anima, DEC-220) | Aprovado (DEC-217: rig IK + 35 clipes) |
 | AST-070 | VFX pastelão: atropelamento, desmaio, embarque, reviver | vfx | P1 | Modelar (texturas) | — | Rascunho |
-| AST-071 | Folha de ícones de UI (ingredientes, Tools, HUD) | ui | P0 | Render + 2D | — | Rascunho |
+| AST-071 | Folha de ícones de UI (ingredientes, Tools, HUD) | ui | P0 | Render + 2D | — | Aprovado (DEC-217: 54 ícones) |
 | AST-072 | Folha de placas, letreiros e logos | ui | P0 | 2D | — | Rascunho |
-| AST-073 | Avental Bramble's (acessório do jogador) | character | P2 | Modelar | — | Rascunho |
+| AST-073 | Avental Bramble's (acessório do jogador) | character | P2 | Modelar | — | Rascunho (proposta Obsoleto, `Q-172`) |
 | AST-074 | Ônibus urbano (trânsito + cutscene) | vehicle | P2 | Modelar | → sourcing: KayKit City Builder Bits (a confirmar, não baixado; o Car Kit não tem ônibus) | Rascunho |
 | AST-075 | Props da cutscene de abertura (carteira, mariposa, pombos) | story | P2 | Modelar | — | Rascunho |
 | AST-076 | Médicos da ambulância — Bellmoor Rescue crew (CHR-008, NPC-024) | character | P1 | Plataforma + Modelar | — | Rascunho |
@@ -112,7 +112,7 @@ Caminhos dos packs (abreviados nas fichas):
 | AST-078 | Balcão externo do trailer (Counter no trailer, 3 níveis) | equipment | P1 · onda 2 | Pack + edição | `KP/kitchencounter_straight_B.fbx`, `KP/chair_stool.fbx`, `CC/detail-awning.fbx` | Rascunho |
 | AST-079 | Lâmpada básica do trailer (DEC-189) | equipment | P1 · onda 2 | Modelar | — | Rascunho |
 | AST-080 | Ambientação do interior do trailer | equipment | P2 · onda 2 | Pack | `KP/shelf_papertowel_decorated.fbx`, `KP/papertowel.fbx`, `KP/towelrail.fbx`, `KP/jar_*_small.fbx`, `KP/dishrack.fbx` | Rascunho |
-| AST-081 | Kit de acessórios de cliente (DEC-188) | character | P0 · onda 2 | Modelar | — | Rascunho |
+| AST-081 | Kit de acessórios de cliente (DEC-188) | character | P0 · onda 2 | Modelar | — | Aprovado (DEC-217) |
 | AST-082 | Moeda (pagamento, gorjeta, `Coin_Blank`) | vfx | P1 · onda 2 | Modelar | — | Rascunho |
 | AST-083 | Kit de luz de rua: poça, cone, arandela | street | P1 · onda 2 | Modelar + 2D | — | Rascunho |
 | AST-084 | Pós-processo: dia, noite, escuro e sanidade | vfx | P1 · onda 2 | Código + 2D | — | Rascunho |
@@ -122,7 +122,7 @@ Caminhos dos packs (abreviados nas fichas):
 | AST-088 | Plataforma de party do lobby (DEC-179) | equipment | P1 · onda 2 | Pack + edição | `KP/plate.fbx`, `KP/menu.fbx`, `AST-019_QueueMark` | Rascunho |
 | AST-089 | Cenário do lobby (kit modular) | street | P1 · onda 2 | Pack | AST-026, 032, 033, 034, 036; `KP/kitchencounter_straight_A.fbx`, `CC/detail-awning.fbx` | Rascunho |
 | AST-090 | Vitrine de classes "Crew" (lobby) | equipment | P1 · onda 2 | Pack + edição | `KP/pillar_B.fbx`, `AST-020_Padlock` | Rascunho |
-| AST-091 | UI kit (painéis, botões, cartões, barras) | ui | P0 · onda 2 | 2D | — | Rascunho |
+| AST-091 | UI kit (painéis, botões, cartões, barras) | ui | P0 · onda 2 | 2D | — | Aprovado (DEC-217) |
 | AST-092 | VFX de cozinha e loja | vfx | P1 · onda 2 | 2D + código | — | Rascunho |
 | AST-093 | Placa PARE e linha de parada | street | P1 · onda 3 | Pack + edição | `CR/road-sign-stop.fbx` | Rascunho |
 | AST-094 | Porta-guardanapos do trailer (ANM-009) | equipment | P2 · onda 3 | Modelar | ref. `KP/papertowel.fbx` | Rascunho |
@@ -380,7 +380,7 @@ Compra de upgrade: bancada do Mart (AST-049, DEC-101); a peça visível troca no
 
 ### AST-016 — Porta-garrafas de molho (2 vagas da grade)
 
-- **Status:** Aprovado (DEC-140) · **Prioridade:** P0 · **Origem:** Modelar (suporte) — `Assets/blender/equipment/AST-016_SauceHolder.blend`, `Assets/models/equipment/AST-016_SauceHolder.fbx`; 480 tris + `Fill` 28 cada; garrafas AST-004/005
+- **Status:** Aprovado (DEC-140) · **DEC-218 (2026-10-10):** ketchup e mostarda passam a **tigelas** na grade AST-017; este porta-garrafas sai da grade. Destino (Obsoleto ou outro uso) em **`Q-172`** · **Prioridade:** P0 · **Origem:** Modelar (suporte) — `Assets/blender/equipment/AST-016_SauceHolder.blend`, `Assets/models/equipment/AST-016_SauceHolder.fbx`; 480 tris + `Fill` 28 cada; garrafas AST-004/005
 - **Uso:** fileira da frente da grade de complementos (MAP-01 §7.1: frente = ketchup, mostarda, queijo).
 - **Dimensões:** cada vaga ocupa a célula 2 × 1,5 da grade AST-017.
 - **Silhueta:** suporte de arame com garrafa invertida; nível pela peça `Fill` interna. **DEC-140:** a garrafa opaca escondia o `Fill`; garrafas AST-004/005 passam a **translúcidas**, com o `Fill` animado subindo/descendo com o estoque (frontend-coder).
@@ -388,13 +388,13 @@ Compra de upgrade: bancada do Mart (AST-049, DEC-101); a peça visível troca no
 
 ### AST-017 — Grade de complementos 3 × 2 + tigelas de inox
 
-- **Status:** Aprovado (DEC-138; **cubas trocadas por tigelas de inox, DEC-156**) · **Modelo novo: em produção, não aprovado** · **Prioridade:** P0 · **Origem:** Pack + edição — base/tampo `KP/kitchencounter_straight_A.fbx` (escala não uniforme para a caixa da ficha); **tigelas `KP/bowl.fbx`** (CC0, DEC-156); ingrediente dentro = peças picadas dos packs; cadeado "Padlock" da Quaternius (CC0, `Assets/models/equipment/AST-020_Padlock.fbx`, DEC-155).
+- **Status:** Aprovado (DEC-138; **cubas trocadas por tigelas de inox, DEC-156**) · ~~Modelo novo: em produção, não aprovado~~ **Modelo de tigelas aprovado como está (DEC-218):** comida real, plaquinha, cadeado; **ketchup e mostarda também em tigela** (6 vagas = 6 tigelas; AST-016 sai da grade, `Q-172`) · **Prioridade:** P0 · **Origem:** Pack + edição — base/tampo `KP/kitchencounter_straight_A.fbx` (escala não uniforme para a caixa da ficha); **tigelas `KP/bowl.fbx`** (CC0, DEC-156); ingrediente dentro = peças picadas dos packs; cadeado "Padlock" da Quaternius (CC0, `Assets/models/equipment/AST-020_Padlock.fbx`, DEC-155).
 - **Modelo anterior (DEC-141), superado quando o novo for aprovado:** `Assets/blender/equipment/AST-017_ToppingGrid.blend`, `Assets/models/equipment/AST-017_ToppingGrid.fbx`; base 274 tris; cuba + tampa + etiqueta + cadeado 386 tris.
-- **Uso:** 6 complementos do MVP (DEC-071). Frente: ketchup, mostarda (AST-016), queijo; fundo: bacon, Potato Sticks, Cream Cheese.
+- **Uso:** 6 complementos do MVP (DEC-071). Frente: ketchup, mostarda (~~AST-016~~ tigela, DEC-218), queijo; fundo: bacon, Potato Sticks, Cream Cheese.
 - **Dimensões:** base 6 L × 3 P (X 44–50), células com 2 studs entre centros; fileira do fundo 0,3 mais alta (degrau) para o jogador ver as duas fileiras.
 - **Silhueta (DEC-156):** **tigelas de inox** com o **ingrediente de verdade dentro**; **plaquinha frontal** `Label_<Ing>` em cada tigela. ~~Cubas de aço com tampa basculante e etiqueta frontal colorida.~~
 - **Plaquinha:** o jogo põe `SurfaceGui` + `ImageLabel` com o **ícone do ingrediente** na `Label_<Ing>`. Ícones a definir (`Q-152`).
-- **Variações:** uma por ingrediente da grade (`Bin_Cheese`, `Bin_Bacon`, `Bin_PotatoSticks`, `Bin_CreamCheese`): mesma tigela, muda o conteúdo (`Fill`) e o ícone. **Bloqueada** antes do dia de liberação: **tampa + cadeado Mustard** (Padlock, DEC-155).
+- **Variações:** uma por ingrediente da grade (`Bin_Cheese`, `Bin_Bacon`, `Bin_PotatoSticks`, `Bin_CreamCheese`; + `Bin_Ketchup`, `Bin_Mustard` por DEC-218): mesma tigela, muda o conteúdo (`Fill`) e o ícone. **Bloqueada** antes do dia de liberação: **tampa + cadeado Mustard** (Padlock, DEC-155).
 - **Encaixes:** `Prompt_Use_<Ing>`, `Prompt_Restock_<Ing>`, `Fill_<Ing>`, `Label_<Ing>`. **Tris:** base ≤ 400; cuba ≤ 400 sem conteúdo (teto da ficha antiga; conferir com a tigela — art-director).
 
 ### AST-018 — Cooler / estoque de salsicha (3 níveis)
@@ -548,8 +548,8 @@ Compra de upgrade: bancada do Mart (AST-049, DEC-101); a peça visível troca no
 
 ### AST-043 — Lona do carrinho
 
-- **Status:** Rascunho · **Prioridade:** P1 · **Origem:** Modelar
-- **Não modelada** na rodada 3 (DEC-141): espera `Q-082`.
+- **Status:** **Aprovado (DEC-217)** — ficha como está, com o uso da DEC-199 (carrinho coberto na vaga `TRL-SALE`) · **Prioridade:** P1 · **Origem:** Modelar
+- ~~**Não modelada** na rodada 3 (DEC-141): espera `Q-082`.~~ `Q-082` fechada (DEC-199); pronta para o modeler-3d.
 - **Uso:** carrinho coberto no estacionamento depois da troca pelo trailer, se `Q-082` aceitar a sugestão (`world.md` §4). **Não** entra na cutscene de abertura (MAP-01 §11.1 e `script.md` §1 não têm lona); se o narrative-writer quiser o beat, pede.
 - **Dimensões:** veste o AST-026 (26 × 4 × 4), dobras largas, amarrada com 3 cordas.
 - **Cores:** lona Mint-gray `#B7CFC6`, cordas Cream.
@@ -881,9 +881,9 @@ Regras gerais: style guide §4 (opção A: `BodyColors` + acessórios de atlas +
 
 ### AST-069 — Pacote de animações R6
 
-- **Status:** Rascunho · **Prioridade:** P0 · **Origem:** Animar (rig R6 padrão; quem produz: modeler-3d ou frontend, a definir no plano de tarefas)
+- **Status:** **Aprovado (DEC-217)** — rig IK + lista de **35 clipes** do complemento "Rig IK e lista de clipes" (seção do levantamento pós-onda 1); **o usuário anima (DEC-220)**. Onde o texto abaixo divergir do complemento, vale o complemento. Desmaio = ragdoll + `Fainted`, **não é clipe (DEC-216)** · **Prioridade:** P0 · **Origem:** Animar (~~rig R6 padrão; quem produz: modeler-3d ou frontend~~ rig `AST-069_AnimalRig.blend`; animações: usuário)
 - **P0 (dia):** cliente: andar (padrão R6), esperar no balcão (idle com fase aleatória), pagar, reações (feliz / reclamação / bufar), ir embora, recusado (aceno). Quentin: espreita, ponta dos pés, abrir gaveta, fugir.
-- **P1 (noite e final):** Opal (palavras cruzadas, olhar), Raincoat Lady (aceno de cabeça, ficar parada pingando), cópia andando de costas (ANM-004), blank folk sem respiração (pose parada), desmaio do jogador (sentar e deitar de lado), jogador na maca, médicos da ambulância (AST-076, DEC-114: descer, levar a maca em dupla, abaixar e levantar a maca, subir), Walt (andar devagar, estender o café), Walker (pose parada; o "passo" é teleporte entre postes, sem ciclo de andar).
+- **P1 (noite e final):** Opal (palavras cruzadas, olhar), Raincoat Lady (aceno de cabeça, ficar parada pingando), cópia andando de costas (ANM-004), blank folk sem respiração (pose parada), ~~desmaio do jogador (sentar e deitar de lado)~~ (ragdoll, DEC-216), jogador na maca, médicos da ambulância (AST-076, DEC-114: descer, levar a maca em dupla, abaixar e levantar a maca, subir), Walt (andar devagar, estender o café), Walker (pose parada; o "passo" é teleporte entre postes, sem ciclo de andar).
 - **Ragdoll do atropelamento:** física (juntas soltas), não animação; levantar = animação curta de 0,8 s.
 - **DEC-202 (2026-10-10):** Walt (tartaruga) ganha **andar corcunda com bastão de madeira** (P1, cutscene final), além de estender o café e acenar.
 - **Regra:** nenhuma animação de violência, queda dolorida ou contato entre personagens.
@@ -891,7 +891,7 @@ Regras gerais: style guide §4 (opção A: `BodyColors` + acessórios de atlas +
 
 ### AST-073 — Avental Bramble's (acessório do jogador)
 
-- **Status:** Rascunho · **Prioridade:** P2 · **Origem:** Modelar
+- **Status:** Rascunho · **Proposta do art-director: Obsoleto** (coberto por `AST-053_CrewTex` e `AST-053_CrewApron.fbx`), **não decidida** → `Q-172` · **Prioridade:** P2 · **Origem:** Modelar
 - **Uso:** sugestão de `characters.md` CHR-002 (não decidida): uniforme aplicado na run por cima do avatar R6, sem trocar a roupa do jogador.
 - **DEC-145 (2026-10-10):** o padrão de personagem passa a ser o "HotDog Crew" (`Assets/reference/customrig.png`: boné vermelho, avental vermelho com hot dog, camisa creme, calça preta, sobre corpo base R6 custom). Se o jogador usar o rig animal (`Q-141`), este avental vira parte do uniforme do personagem, não "por cima do avatar". Logo do avental: `Q-143`. Fichas do corpo base e dos animais: a escrever pelo art-director (`Q-144`).
 - **DEC-146 (2026-10-10, fecha `Q-141`):** o jogador é animal da crew, sem avatar próprio. Este avental **é o uniforme da crew**, parte do personagem do jogador (não acessório "por cima do avatar"); o "Uso" acima não vale. Junto do avental: boné vermelho, camisa creme, calça preta (DEC-145) — peças/cores do corpo base a definir na ficha nova. Nome, prioridade (P2 → provável P0, já que todo jogador usa) e attachment → art-director. Logo `Q-143`.
@@ -1038,7 +1038,7 @@ Regra de arte: a anomalia usa as mesmas peças do normal e quebra **um** traço 
 
 ### AST-071 — Folha de ícones de UI (ingredientes, Tools, HUD)
 
-- **Status:** Rascunho · **Prioridade:** P0 · **Origem:** render dos modelos 3D + 2D
+- **Status:** **Aprovado (DEC-217)** — **54 ícones** do complemento "Lista de ícones" (vale o complemento onde divergir) · **Prioridade:** P0 · **Origem:** render dos modelos 3D + 2D
 - **Conteúdo:** ícones de pão, salsicha e dos 6 complementos (balão de pedido e hotbar); Tools (hot dog, 9 pacotes, café, item raro); upgrades para as vagas da bancada (Grill, Cooler, Counter, Lock, Trailer Lights); HUD (moeda, sol, lua, telefone, ambulância, votos de "Skip"); reações do cliente (estrela, nuvem rabiscada, vapor); gema.
 - **Formato:** 128² cada, folha 1024² com `ImageRectOffset`; contorno grosso; mesma paleta.
 
@@ -1113,7 +1113,7 @@ Diferença para a sugestão padrão (lobby na onda 4): o board põe **lobby e pa
 
 #### AST-081 — Kit de acessórios de cliente (DEC-188)
 
-- **Status:** Rascunho · **Prioridade:** P0 (pendência da onda 1: TASK-006 importa "acessórios de cliente que existirem" e não existe nenhum) · **Onda:** 2 · **Dono:** modeler-3d · **Origem:** Modelar no estilo (nenhum pack tem acessório de personagem; `MM/character-employee` fora, DEC-089). UV no atlas KitchenPack, como orelhas e caudas, para herdar `T_Atlas_Kitchen_Mid/Night` (DEC-154, DEC-166).
+- **Status:** **Aprovado (DEC-217)** · **Prioridade:** P0 (pendência da onda 1: TASK-006 importa "acessórios de cliente que existirem" e não existe nenhum) · **Onda:** 2 · **Dono:** modeler-3d · **Origem:** Modelar no estilo (nenhum pack tem acessório de personagem; `MM/character-employee` fora, DEC-089). UV no atlas KitchenPack, como orelhas e caudas, para herdar `T_Atlas_Kitchen_Mid/Night` (DEC-154, DEC-166).
 - **Uso:** tipo de cliente = espécie fixa + acessório, roupa civil sorteada (**DEC-188**; `content-data.md` `CustomerTypes.Accessories`). Substitui a lista de acessórios do AST-054 (que era para corpo humano R6).
 
   | Peça | Tipo (NPC) | Attachment | Medida | Tris |
@@ -1229,7 +1229,7 @@ Diferença para a sugestão padrão (lobby na onda 4): o board põe **lobby e pa
 
 #### AST-091 — UI kit (painéis, botões, cartões, barras)
 
-- **Status:** Rascunho · **Prioridade:** P0 · **Onda:** 2 (a onda 1 já usa `ProgressBar`, `PromptBillboard`, `Toast` da TASK-013 sem folha própria) · **Dono:** UI (frontend-coder monta em Vide) + art-director (desenho) · **Origem:** 2D.
+- **Status:** **Aprovado (DEC-217)** · **Prioridade:** P0 · **Onda:** 2 (a onda 1 já usa `ProgressBar`, `PromptBillboard`, `Toast` da TASK-013 sem folha própria) · **Dono:** UI (frontend-coder monta em Vide) + art-director (desenho) · **Origem:** 2D.
 - **Folha:** `T_UI_Kit` 1024², peças em 9-slice:
   - Pílula de HUD (raio 50%, `#2B2233` a 70%, texto branco com contorno 2 px) — dinheiro, dia/noite, horário.
   - Cartão Cream `#FFF1D6` com sombra curta — resumo do turno, oferta de reviver, fim de run, tela "Crew".
@@ -1389,7 +1389,7 @@ Só acrescenta; não muda texto aprovado. Fichas Rascunho seguem precisando de D
 | `Medic_Idle` (calmo; panda curvado) | médicos | 4 | sim | 3 s |
 | `Walt_HunchWalk` (corcunda com bastão) / `Walt_OfferCoffee` / `Walt_Nod` | Walt | 4 | sim / não / não | 1,4 / 1,5 / 0,8 s |
 
-Fora da lista de clipes: **desmaio** = ragdoll em código (ver nota abaixo); atropelamento = ragdoll em código (DEC-197); passo do Walker = teleporte entre postes; aceno das wavers = braço do cartão girando por script.
+Fora da lista de clipes: **desmaio** = ragdoll em código + rosto `Fainted` (**DEC-216**); atropelamento = ragdoll em código (DEC-197); passo do Walker = teleporte entre postes; aceno das wavers = braço do cartão girando por script.
 
 #### AST-071 — Lista de ícones (complemento)
 
@@ -1409,13 +1409,15 @@ Total **54** de 64 células (sobra para a 1ª atualização). Robux usa o ícone
 
 ### Notas para o secretário (decisões e conflitos achados)
 
-- **Desmaio por ragdoll:** o pedido desta rodada diz "desmaio = ragdoll em código"; o style guide §4.6 (Aprovado) e FEAT-034 dizem "animação suave, sem ragdoll". Mantive ragdoll como **Provisório**; precisa de DEC para emendar o §4.6.
-- **Expressão de desmaio:** DEC-152 aprovou a expressão "desmaiado com X"; o style guide §4.6 proíbe "olhos em X" no desmaio. Uma das duas precisa ceder (recomendação: usar `Fainted` só na tela de quem caiu ou trocar por olhos fechados com "Zzz").
-- **Moeda de gorjeta:** §10 fala em "moeda dourada"; §2.1 reserva Gold ao AST-051. Proposta: Mustard brilhante (AST-082).
-- **AST-073:** propor **Obsoleto** (coberto pela textura da crew).
+> **Secretário, 2026-10-10:** fichas AST-069, AST-071, AST-081, AST-043, AST-091 **Aprovadas (DEC-217)**; AST-017 de tigelas aprovada como está, ketchup/mostarda em tigela (**DEC-218**); 1ª pessoa com braços reais (**DEC-219**); usuário anima o AST-069 (**DEC-220**).
+
+- ~~**Desmaio por ragdoll:** o pedido desta rodada diz "desmaio = ragdoll em código"; o style guide §4.6 (Aprovado) e FEAT-034 dizem "animação suave, sem ragdoll". Mantive ragdoll como **Provisório**; precisa de DEC para emendar o §4.6.~~ → **DEC-216**: ragdoll; §4.6 e FEAT-034 emendados.
+- ~~**Expressão de desmaio:** DEC-152 aprovou a expressão "desmaiado com X"; o style guide §4.6 proíbe "olhos em X" no desmaio. Uma das duas precisa ceder.~~ → **DEC-216**: rosto `Fainted` com X; "olhos em X" sai dos proibidos.
+- **Moeda de gorjeta:** §10 fala em "moeda dourada"; §2.1 reserva Gold ao AST-051. Proposta: Mustard brilhante (AST-082). **Aberta em `Q-171`** (sem decisão).
+- **AST-073:** propor **Obsoleto** (coberto pela textura da crew). **Aberta em `Q-172`** (sem decisão; junto do destino do AST-016, DEC-218).
 - **Máscara dos médicos:** decidida aqui como **acessório** (DEC-213 deixou acessório ou textura ao art-director).
 - **ANM-001 com nariz:** proposta de manter o nariz (o sinal aprovado não cita nariz); evita 1 textura de cabeça por espécie.
-- **Memória de textura (`Q-144` g):** esta rodada pede ~3 folhas 1024² de UI (kit, ícones, retratos), 3 de 512² de VFX e ~12 texturas de personagem novas (Pickett, Opal, Walt, Raincoat, Medic ×2, Walker, 9 espelhos da ANM-004). Conferir contra o teto de 30 MB (§9.2) antes de aprovar em bloco.
+- **Memória de textura (`Q-144` g):** esta rodada pede ~3 folhas 1024² de UI (kit, ícones, retratos), 3 de 512² de VFX e ~12 texturas de personagem novas (Pickett, Opal, Walt, Raincoat, Medic ×2, Walker, 9 espelhos da ANM-004). Conferir contra o teto de 30 MB (§9.2) antes de aprovar em bloco. **Segue aberto em `Q-144` (g)**; a aprovação das fichas (DEC-217) não fecha a conta de memória.
 
 ### Tabela-resumo por onda
 

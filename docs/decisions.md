@@ -3028,3 +3028,76 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
 - Leitura do secretário: DEC-190 fixou "2 vagas" sem citar veículo; esta DEC **completa** a DEC-190 por veículo. Confirma o que FEAT-006 passo 4 já dizia ("tábuas: 2 (carrinho), 3 (trailer)").
 - Fecha a pendência "`Vehicles.trailer.BoardSlots = 3` (Provisório) × DEC-190" levantada em `tech/content-data.md` §3.8 e no `tasks/board.md`: o valor **3** deixa de ser Provisório.
 - Impacto: **game-designer** (FEAT-006: só a origem; números já batiam), **architect** (`content-data.md`: `BoardSlots` carrinho 2 / trailer 3 com origem DEC-190 + DEC-215, tirar "Provisório" e a linha da pendência; `network.md`: tábua do trailer = 3 registros `board`, `Slot` 1..3), **task-planner** (TASK-027 e nota de `BoardSlots` no `board.md`), **level-designer/art-director** (tábua do trailer com 3 âncoras `Att_Bun1..3`, se houver marca visual). Nota em `features.md` (FEAT-006), `open-questions.md` (`Q-068`), `README.md` → secretário (feito). **`docs/tech/` e `docs/tasks/board.md` não editados** pelo secretário (agentes em trabalho).
+
+### DEC-216 — 2026-10-10 — Desmaio por sanidade = ragdoll + rosto `Fainted` (X); emenda style guide §4.6 e FEAT-034
+
+- Origem: questionário de múltipla escolha do orquestrador (pendência do art-director em `asset-list.md`, "Notas para o secretário": desmaio por ragdoll × §4.6; expressão `Fainted` × "olhos em X" proibido).
+- Opção escolhida pelo usuário: **ragdoll + rosto "Fainted" com X** (a expressão que a DEC-152 já aprovou).
+- Decidido:
+  - Sanidade 0 (estado `Down`, DEC-091) → o corpo da crew entra em **ragdoll R6** (física, juntas soltas), **não** animação.
+  - Rosto = expressão **`Fainted`** (X nos olhos, DEC-152).
+- **Emendas (append-only):**
+  - `art/style-guide.md` §4.6 (Aprovado, DEC-126), linha "Desmaio": sai "senta e deita de lado (animação, não ragdoll)"; sai **"olhos em X"** da coluna Proibido. Seguem proibidos: cruz, caveira, poça, fita de cena, sangue (DEC-023).
+  - `design/features.md` FEAT-034, t = 0: sai "animação de desmaio suave (1,2 s, sem ragdoll)".
+  - `art/asset-list.md` AST-069 (P1 "desmaio do jogador (sentar e deitar de lado)") deixa de valer: desmaio não é clipe.
+- **Provisório** (não perguntado; art-director + architect):
+  - cai **no lugar**, sem arremesso (o arremesso é só do atropelamento, DEC-095);
+  - fica em ragdoll no chão até os médicos o porem na maca (`Crew_OnStretcher`, AST-069); no reviver aparece de pé (FEAT-034, sem mudança);
+  - balão "Zzz" e visão embaçando do §4.6 seguem como estavam (o art-director pode rever a leitura "Zzz" + X);
+  - `Fainted` segue **nunca em NPC** (Provisório da DEC-187).
+- Fecha as duas notas do art-director em `asset-list.md` ("Desmaio por ragdoll", "Expressão de desmaio"). Supera a recomendação AR-6 de `consistency-report.md` ("ragdoll só para atropelamento").
+- Impacto: **art-director** (§4.6 feito pelo secretário; conferir AST-070 "Zzz"), **game-designer** (FEAT-034 feito pelo secretário), **architect** (`Down` = `Ragdoll` sem arremesso + `Fainted`; tirar o clipe `faint` da lista Provisória de `content-data.md` §3.20; T22), **frontend-coder** (câmera no desmaio). Notas em `style-guide.md` §4.6, `features.md` FEAT-034, `asset-list.md` (AST-069, notas), `README.md` → secretário (feito).
+
+### DEC-217 — 2026-10-10 — Fichas AST-069, AST-071, AST-081, AST-043 e AST-091 aprovadas para produção
+
+- Origem: questionário de múltipla escolha do orquestrador (levantamento pós-onda 1 do art-director, `asset-list.md`).
+- Decidido pelo usuário: fichas **Aprovadas** para produção, como estão escritas:
+
+  | Ficha | O que vale |
+  |---|---|
+  | **AST-069** | **rig IK** + **lista de 35 clipes** (complemento "Rig IK e lista de clipes"); desmaio fora da lista (DEC-216) |
+  | **AST-071** | **54 ícones** (complemento "Lista de ícones"; folha 1024², células 128², comida e equipamento = render do modelo 3D) |
+  | **AST-081** | kit de acessórios de cliente (DEC-188), como na ficha |
+  | **AST-043** | lona do carrinho (DEC-199): 26 × 4 × 4, Mint-gray `#B7CFC6`, 3 cordas Cream, `On`/`Off`, ≤ 1.200 tris |
+  | **AST-091** | UI kit (`T_UI_Kit` 1024², 9-slice), como na ficha |
+
+- Aprova a **ficha**, não o modelo/arte entregue: cada entrega volta para revisão.
+- Ficha AST-071 aprovada responde **`Q-152`** (ícones dos ingredientes): (a) render do modelo 3D; (b) 128² na folha 1024²; (c) mesmos ícones no balão de pedido e na hotbar. (d) vem da DEC-218.
+- Observação do secretário (não decidida): a ficha principal do AST-069 cita `AST-069_AnimalRig.blend` e o complemento `AST-069_AnimRig.blend`. **Provisório:** vale o arquivo existente `AST-069_AnimalRig.blend`.
+- Impacto: **modeler-3d** (AST-043, AST-081, renders do AST-071), **art-director** (desenho do AST-091), **frontend-coder** (AST-091 em Vide, AST-071 por `ImageRectOffset`), **usuário** (clipes do AST-069, DEC-220), **architect** (`content-data.md` §3.20 alinhado aos 35 clipes, `Q-167` a). Status em `asset-list.md` (fichas e tabela), `open-questions.md` (`Q-152` → Respondidas; `Q-167` anotada), `README.md` → secretário (feito).
+
+### DEC-218 — 2026-10-10 — Grade de complementos AST-017 em tigelas de inox aprovada como está; ketchup e mostarda também em tigela
+
+- Origem: questionário de múltipla escolha do orquestrador.
+- Decidido pelo usuário: a grade **AST-017** em **tigelas de inox** é **aprovada como está**:
+  - **comida de verdade** dentro de cada tigela;
+  - **plaquinha** frontal `Label_<Ing>` com o ícone (AST-071, DEC-217);
+  - **cadeado** (tampa + Padlock Mustard, DEC-155) no complemento bloqueado;
+  - **ketchup e mostarda também em tigela** (as 6 vagas são tigelas).
+- Fecha o "Modelo novo: em produção, não aprovado" da ficha AST-017 (DEC-156): o modelo da grade de tigelas está aprovado; o modelo antigo `AST-017_ToppingGrid` (cubas, DEC-141) fica superado.
+- Responde `Q-152` (d): bloqueado = **tampa + cadeado**, sem ícone "bloqueado" na plaquinha.
+- **Consequência (não decidida):** o porta-garrafas **AST-016** (Aprovado, DEC-140) e as garrafas translúcidas AST-004/005 saem da grade. Destino (Obsoleto ou outro uso) → **`Q-172`**.
+- Impacto: **art-director** (AST-017 Variações com `Bin_Ketchup`/`Bin_Mustard`; AST-016 em `Q-172`), **level-designer** (MAP-01 L01-06 "AST-017 + AST-016" → só AST-017), **architect/frontend-coder** (`Fill` de ketchup/mostarda na tigela, não na garrafa). Notas em `asset-list.md` (AST-016, AST-017), `open-questions.md`, `README.md` → secretário (feito).
+
+### DEC-219 — 2026-10-10 — 1ª pessoa: braços reais do bicho visíveis, sem viewmodel (emenda DEC-097)
+
+- Origem: questionário de múltipla escolha do orquestrador.
+- Decidido pelo usuário:
+  - Em 1ª pessoa o jogador vê os **braços reais do próprio personagem** (o animal da crew), não um viewmodel separado.
+  - Os braços aparecem mais quando o jogador **segura um item** (pose de Tool, `Crew_HoldItem`).
+  - Técnica: `CameraController:SetArmsVisible(true)` (já previsto em `tech/architecture.md`).
+  - **Sem animações extras de viewmodel.** Só os clipes do AST-069 (DEC-217).
+- **Emenda (append-only):** DEC-097 ("sem braços em 1ª pessoa") e `style-guide.md` §4.5 ("**Sem braços** (sem viewmodel)"): passa a "braços reais visíveis, sem viewmodel". Câmera 1ª pessoa padrão travada (DEC-039) e Tool na mão **não mudam**.
+- Coerente com DEC-167 (braços/mãos acompanham o pack da faixa de sanidade à noite).
+- Impacto: **frontend-coder** (`SetArmsVisible(true)` em 1ª pessoa; resto do corpo segue oculto), **art-director** (§4.5 feito pelo secretário; conferir braços × `Grip` das Tools, terço inferior direito). Notas em `style-guide.md` §4.5, `README.md` → secretário (feito).
+
+### DEC-220 — 2026-10-10 — Usuário faz as animações no rig AST-069 e separa músicas/sons pela `audio/sound-list.md`
+
+- Origem: conversa do usuário com o orquestrador, junto do questionário desta sessão.
+- Decidido pelo usuário (divisão de trabalho):
+  - O **usuário** produz as **animações** no rig **AST-069** (lista de 35 clipes, DEC-217).
+  - O **usuário** separa **músicas e sons** usando `docs/audio/sound-list.md` (marca qual arquivo atende cada linha).
+- Responde em parte: **`Q-167`** (quem anima) e **`Q-168` (a)** (fonte = arquivos que o usuário separa). Seguem abertos: `Q-167` (b) nome/upload, (c) ordem de entrega, (d) protótipo do `Animator` local; `Q-168` (b) licença de cada arquivo em `art/credits.md` (regra do `CLAUDE.md`), (c) confirmar a lista, (d) volumes.
+- Não aprova `sound-list.md` (segue Rascunho).
+- Médicos com rosto `Exhausted` fixo + máscara cirúrgica: **já registrado na DEC-213**; sem DEC nova.
+- Impacto: **architect** (ids vazios até o upload; `Q-167`, `Q-168`), **game-designer** (`sound-list.md` como referência para o usuário). Notas em `open-questions.md` (`Q-167`, `Q-168`), `README.md` → secretário (feito).
