@@ -52,6 +52,7 @@ precisa de aprovação.
 - Identidade: **Cute / Casual / Satisfying / Progression / Mystery / Horror**. (§22)
 - Apresentação inicial propositalmente inocente. (§22)
 - Horror não depende de jumpscare. Tensão vem de "sei que algo está errado, mas não sei o quê". **[DEC-005]** (§17)
+- Jumpscare só **pontual e leve**: raro, só como efeito de sanidade baixa ou de anomalia, sem gore. **[DEC-173]**
 - Jogo começa sem revelar o sobrenatural. História é descoberta, não explicada. **[DEC-008]** (§8)
 
 Hábitos que o jogador deve desenvolver (§17): olhar clientes, observar ambiente, lembrar regras, verificar horários, conferir ingredientes, ouvir sons, verificar o trailer.
@@ -61,10 +62,11 @@ Hábitos que o jogador deve desenvolver (§17): olhar clientes, observar ambient
 | Item | Valor | Origem |
 |---|---|---|
 | Plataforma | Roblox | §1 |
-| Dispositivos alvo | **mobile primeiro**; PC/console secundários a confirmar. Celular de referência e otimização para aparelho mínimo **adiados** ("otimizamos depois") | **[DEC-014, DEC-090]**, `Q-042`, `Q-074` |
+| Dispositivos alvo | **mobile primeiro** + **PC suportado**; console sem teste dedicado no MVP. Celular de referência e otimização para aparelho mínimo **adiados** ("otimizamos depois") | **[DEC-014, DEC-090, DEC-171]**, `Q-074` |
 | Personagens e estilo | **NPCs e jogadores com rig R6**; sem braços em 1ª pessoa, câmera 1ª pessoa padrão do Roblox. Estilo visual **"toy low-poly"**; `art/style-guide.md` **Aprovado**: iluminação Future com fallback ShadowMap, roupa de NPC por cor por parte do corpo | **[DEC-089, DEC-097, DEC-105, DEC-126]** |
 | Público | **infantojuvenil, sem violência** | **[DEC-023]** |
-| Classificação Roblox | a definir | `Q-043` |
+| Classificação Roblox | **Mild** (sustos leves, sem violência) | **[DEC-172]** |
+| Nome oficial | **"Sell Hotdogs!"** (com exclamação) | **[DEC-170]** |
 | Idioma do jogo | **inglês** (sem localização) | **[DEC-022]** |
 | Sessão | **lobby → party de até 4 (solo permitido) → servidor privado** | **[DEC-012, DEC-034]** |
 | Party | **um carrinho**; dinheiro e progressão **da party** | **[DEC-032, DEC-033, DEC-059]** |
@@ -73,7 +75,7 @@ Hábitos que o jogador deve desenvolver (§17): olhar clientes, observar ambient
 | Gemas | dia concluído 2 (+1 com nota A), só com **≥ 3 pedidos completos** da party no turno (anti-AFK) · noite N 15 + 2(N−1) · final +100 · "Day 100" +300 (badge), **100 dias de modo infinito somados entre sessões** · **creditadas e salvas no DataStore no instante de cada evento** (a tela de resumo só mostra), igual para a party presente no evento · classes custam 45 / 120 / 180 | **[DEC-058, DEC-070, DEC-083, DEC-084, DEC-104]** |
 | Monetização | **reviver por Robux** (developer product, preço adiado `Q-098`); resto **adiado**; não bloqueia o MVP. Item raro de reviver vendido no Mart, pago com **dinheiro da party** (não é monetização) | **[DEC-062, DEC-092, DEC-100, DEC-108]**; `Q-017` |
 | Perspectiva de câmera | **primeira pessoa travada**, sem zoom (risco mobile anotado) | **[DEC-013, DEC-039]** |
-| Interação | **Tools nativas na hotbar nativa + prompt custom do AnimalPlane no mundo**; HUD só de status | **[DEC-015, DEC-040, DEC-066]**; limite de itens `Q-056` |
+| Interação | **Tools nativas na hotbar nativa + prompt custom do AnimalPlane no mundo**; HUD só de status; hotbar com **até 4 Tools** | **[DEC-015, DEC-040, DEC-066, DEC-174]** |
 | Referências | "Animal Hospital" (Roblox) — inspiração, não cópia; outras a definir | **[DEC-013]**, `Q-021` |
 
 ### 5.1 HUD **[DEC-015]**
@@ -223,7 +225,7 @@ Nota: o GDD V1 (§16) tinha "→ XP →" nesta linha; XP saiu do MVP **[DEC-081]
 - IDs das anomalias: N1–N10 = **ANM-001 a ANM-010**. **[DEC-096]**
 - Vitória: não cometer erros; cada anomalia tem um comportamento correto. **[DEC-026]**
 - Sem violência: anomalias usam análogos não violentos. **[DEC-023]**
-- Sanidade baixa → terror psicológico: sons, sustos, vultos, alucinações. Susto é consequência, não base do horror. **[DEC-038, DEC-005]** (`Q-023`)
+- Sanidade baixa → terror psicológico: sons, sustos, vultos, alucinações. Susto é consequência, não base do horror; jumpscare raro e leve. **[DEC-038, DEC-005, DEC-173]**
 
 #### Sanidade (nome provisório "Sanity"; `Q-054` arquivada sem decisão)
 

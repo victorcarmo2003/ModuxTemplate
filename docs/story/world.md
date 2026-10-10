@@ -152,6 +152,8 @@ O sinal de toda anomalia é **visto/ouvido por todos** da party; o que é "por j
 
 ### 5.2 O ponto seguro (proposta para `Q-092`)
 
+> **DEC-177 (2026-10-10, fecha `Q-092`, contra esta proposta):** o ponto seguro **pode** receber anomalia. "Nunca apaga" segue (style guide); "nunca recebe anomalia" **não vale**. Reescrita do parágrafo abaixo → narrative-writer, junto com `Q-161`.
+
 O letreiro "OPEN 24 HOURS" **nunca apaga e nunca recebe anomalia**. É regra de mundo: a luz que o late crowd respeita. Se uma anomalia pudesse aparecer ali, a revelação ("luz educada") perde sentido.
 
 ## 6. A verdade escondida (bíblia do roteirista — **não aparece no jogo antes da 10ª noite**)

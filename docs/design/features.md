@@ -734,6 +734,25 @@ Regra: alucinação que imita sinal de anomalia (poste do Walker, telefone) **n�
 
 **DEC-166 (2026-10-10), nota do secretário:** o **visual do personagem** representa a sanidade: alta = texturas de dia + rosto Normal; média = pack "Mid" + rosto Exhausted; baixa = texturas de noite + rosto `Normal_Night`. A definir pelo game-designer (Rascunho): critério da troca (turno × sanidade × ambos; de dia a sanidade não existe) → `Q-155`; limites alto/médio/baixo em pontos, de quem (jogador/NPC) e se os colegas veem (DEC-038 diz efeito só no client do próprio jogador) → `Q-156`.
 
+**DEC-167 a DEC-169 (2026-10-10), nota do secretário** (`Q-155`, `Q-156`, `Q-158` fechadas; game-designer incorpora na ficha):
+
+| Regra | Valor |
+|---|---|
+| De dia | crew sempre pack dia + rosto Normal **[DEC-167]** |
+| À noite, sanidade ≥ 60 (alta) | pack dia + Normal **[DEC-167]** |
+| À noite, sanidade 40–59 (média) | pack Mid + Exhausted **[DEC-167]** |
+| À noite, sanidade < 40 (baixa) | pack noite + `Normal_Night` **[DEC-167]** |
+| Quem tem | só a crew; pontos absolutos, não % do máximo **[DEC-167]** |
+| Skin do jogador | vista por **todos**; servidor replica só a **faixa**, nunca o número **[DEC-167, DEC-169]** |
+| 1ª pessoa | braços/mãos com a textura da faixa + **retrato do rosto** da faixa ao lado do medidor no HUD **[DEC-167]** |
+| Transição | instantânea, sem VFX **[DEC-167]** |
+| Faixa baixa → NPCs | o jogador vê **clientes e pedestres** com pack Night + `Normal_Night` **só no client dele**; os outros veem os NPCs normais; sai da faixa baixa → volta ao normal **[DEC-168, DEC-169]** |
+
+- Duas regras diferentes: skin do **jogador** = replicada para todos; visual dos **NPCs** = troca local, sem replicar (técnica Provisória: `TextureID` + `SurfaceAppearance` clonada no client, como `Crew.applyTime` em `tools/assetplace/build_crew.luau`).
+- Efeito sobre NPC não é anomalia e não abre teste (como as alucinações; DEC-038).
+- **Provisório** (Rascunho, não apresentado ao usuário): sem histerese (mínimo 1 s por faixa se piscar); sanidade 0 → rosto Desmaiado; reviver/noite repetida pela faixa do valor de volta; 3 packs pré-carregados; NPC não usa Mid.
+- ~~Aberto: à noite, clientes/pedestres para quem está bem — DEC-150 já os põe de noite para todos, o que anula a DEC-168 → `Q-157`.~~ **DEC-181 (2026-10-10, secretário):** NPC à noite = pack **Mid** para todos (Mid ocasional de dia); pack **Night** reservado à tensão: sanidade baixa (local, DEC-168/169) e clima de terror de anomalia. Gatilhos e dosagem → `Q-159`. Crew segue a DEC-167.
+
 | Regra | Valor |
 |---|---|
 | Existe | só à noite; some do HUD de dia **[DEC-056]** |
@@ -1345,17 +1364,17 @@ Cada linha é **Rascunho**: proposta + recomendação. Onde a recomendação mud
 | **Q-069** Sinal visto por um só | — | sinal visível a todos; erro e penalidade por jogador quando o escopo da `ANM-###` é "por jogador" | não |
 | **Q-075** Nível passa ao trailer | — | sim, mesmo nível, peça visível nos dois veículos. FEAT-016 | não |
 | **Q-083** Passantes e NPCs da noite | — | (a) sim, até 2 de dia; (b) à noite todo humanoide de servidor é cliente ou anomalia (médicos da ambulância são visuais) | não |
-| **Q-086** Colisão jogador-jogador | só no Pad · em todo o mapa | **desligada em todo o mapa** (mais simples; 4 avatares R6 no trailer e no Mart) | não |
-| **Q-088** Ingrediente não liberado | escondido · "Out of stock" | "Out of stock" + "Day N" (cria expectativa). FEAT-008 | não |
+| **Q-086** Colisão jogador-jogador | só no Pad · em todo o mapa | **desligada em todo o mapa** (mais simples; 4 avatares R6 no trailer e no Mart) | **respondida: DEC-175** (desligada; alcance todo o mapa Provisório) |
+| **Q-088** Ingrediente não liberado | escondido · "Out of stock" | "Out of stock" + "Day N" (cria expectativa). FEAT-008 | **respondida: DEC-180** ("Out of stock"; "Day N" segue Rascunho) |
 | **Q-089** Ladrão até a gaveta | — | 4 s fixos; velocidade varia por ponto de espreita | não |
 | **Q-090** Sanidade na rota do Mart | — | manter sem ilha de luz (~2–4 por perna); sem semáforo (DEC-130) e com a Juniper Sul sem carros à noite, a travessia de CW-1 à noite não tem espera; o level-designer mantém um poste aceso sobre CW-1 | não |
 | **Q-129** Travessia sem semáforo (DEC-130) | (A) carros nunca param para ninguém; NPC cruza só com brecha e o spawn é suspenso enquanto ele cruza · (B) **carros param só para NPC com reserva de faixa; nunca para jogador**; PARE nos braços da Juniper · (C) carros param para qualquer um na faixa, inclusive jogador | **(B)**. Prós: mantém o "na sorte" do usuário para o jogador; NPC nunca atropelado sem simular fila; a parada para o pedestre é um padrão visível (OBSERVAR) e atravessar junto com ele é uma tática emergente. Contras: o carro "para para o NPC e não para mim" pode parecer injusto (tom pastelão absorve); reserva de faixa é lógica nova no servidor (pequena: 1 flag por faixa). (A): mais puro, mas NPC pode esperar muito e exige suspender spawn. (C): contraria "na sorte" (precisaria do usuário). Faixas continuam pintadas; spawn ≥ 55 studs da faixa, intervalo ≥ 3 s. FEAT-033 | **respondida: DEC-133 (B)** |
 | **Q-091** Opal e teto | — | (a) Opal fora do teto de 12 (estática); (b) a âncora AN-08 sai da Opal (DEC-079) | não |
-| **Q-092** Ponto seguro sem anomalia | — | sim, regra de design: nenhuma `ANM-###` usa a área sob o letreiro nem o interior do Mart como palco | não |
-| **Q-094** Esconder por jogador | — | sim; 4 pontos atrás do balcão do trailer, um por jogador | não |
+| **Q-092** Ponto seguro sem anomalia | — | sim, regra de design: nenhuma `ANM-###` usa a área sob o letreiro nem o interior do Mart como palco | **respondida: DEC-177 — "Não"**, contra esta proposta: o SS **pode** ter anomalia; detalhes `Q-161` |
+| **Q-094** Esconder por jogador | — | sim; 4 pontos atrás do balcão do trailer, um por jogador | **respondida: DEC-176** |
 | **Q-103** ANM-008 com trânsito | 1 carro raro a noite toda · **≤ 1 carro até 9 PM, 0 depois** (`MAP-01.md`) · 0–2 (architect) | **≤ 1 carro na Calma (8–9 PM), 0 depois das 9 PM**: a ANM-008 é o único carro em movimento, o único que estaciona e o único com farol alto. Alinha FEAT-033, NPC-022, `MAP-01.md` e `world.md` ("quase nenhum"); `tech/` copia a tabela `Traffic`. Co-dono: narrative-writer (sinal aprovado não muda) | não |
 | **Q-065** Consequências de sabor | — | entram todas como **só visual/áudio**, exceto: ANM-003 "relógio congela" vira **congelamento só no client** (HUD e relógio do Bellmoor Savings param 30 s e saltam; o relógio do servidor não para, DEC-048). +$1 da ANM-005 entra (cabe na tabela) | não |
-| **Q-056** Limite da hotbar | — | 4 Tools; Rescue Whistle ocupa 1. FEAT-005 | não |
+| **Q-056** Limite da hotbar | — | 4 Tools; Rescue Whistle ocupa 1. FEAT-005 | **respondida: DEC-174** (4 Tools) |
 
 Decididas nas rodadas 13–15 (saíram das pendentes; as fichas acima já citam a DEC):
 

@@ -11,6 +11,10 @@ marcados como proposta. Nomes são placeholders (narrative-writer). Sistema: FEA
 > **DEC-147 (2026-10-10, fecha `Q-142`):** **cada animal = uma classe `CLS-###` com habilidade própria**; escolher o animal é escolher a classe. **DEC-146:** o jogador escolhe o bicho e não usa mais o avatar do Roblox. O desenho das classes por animal é do **game-designer** (opções com recomendação, Rascunho); o usuário decide depois. Nenhuma DEC de classe foi revogada: DEC-061, DEC-069, DEC-070, DEC-081 seguem valendo até lá. Conflitos a resolver na proposta (nº de animais × 8 classes, animal grátis = Rookie, animais pagos com gemas, "habilidade" passiva × ativa, nomes/fantasias humanas, escolha no lobby) → `Q-145`. Até a proposta ser decidida, as fichas abaixo não mudam.
 >
 > **Proposta do game-designer para `Q-145` (Rascunho, 2026-10-10):** seção **"Proposta Q-145 — Classes por animal"** no fim deste documento. Opções com recomendação; nada ali vale antes de DEC do usuário.
+>
+> **Rodada 3 (Rascunho, 2026-10-10, 18 espécies, DEC-158/163):** a proposta vigente para `Q-145` está em **`docs/design/proposals-round-3.md` §1** e **substitui** a seção "Proposta Q-145" abaixo onde as duas divergem (mapa P2 e lista do MVP). Recomendação: **6 classes no MVP** (Cachorro, Coelho, Gato, Urso, Raposa, Coruja), **Coruja = Night Owl**, **Leão = Shift Lead**, Panda = Barista; Tartaruga vira cliente; guaxinim exclusivo do Quentin; efeitos e preços de DEC-069/070 sem mudança. P3 (desbloqueio), P4 (passiva), P6 (tela "Crew") e P7 (regras do modelo) seguem como estão.
+>
+> **DEC-186 (2026-10-10, fecha `Q-145`), nota do secretário:** usuário escolheu as recomendadas de `proposals-round-3.md` §1. **6 classes no MVP:** CLS-001 Cachorro "Rookie" (grátis), CLS-002 Coelho "Runner" (45), CLS-003 Gato "Line Cook" (45), CLS-004 Urso "Hauler" (45), CLS-005 Raposa "Hawker" (120), CLS-006 Coruja "Night Owl" (120); **1ª atualização:** CLS-007 Panda "Barista" (120), CLS-008 Leão "Shift Lead" (180). Habilidades = bônus/contrapeso **passivos** de DEC-069, sem mudança de número. Escolha na tela **"Crew"** do lobby, travada na run. **Guaxinim não é jogável** (só Quentin). Emendas: DEC-069 (MVP 4 → 6), DEC-070 (375 gemas para as 5 pagas). A seção "Proposta Q-145" abaixo é histórico; vale a DEC. Nomes finais com o narrative-writer. Fichas a reescrever pelo game-designer (animal por ficha, coluna MVP).
 
 ## Regras gerais **[DEC-069]**
 
@@ -334,5 +338,5 @@ Campos novos ao lado de `effects`: `animal` (chave), `displayName`, `roleName`, 
 |---|---|---|
 | Classes e reviver/atropelamento | nenhuma classe altera essas regras (tabela de regras gerais) | não (estende a guarda de DEC-069) |
 | Sanidade ao reviver por classe | 50% do máximo da classe (Night Owl 60), sem efeito de classe extra | não |
-| Classes por animal (`Q-145`) | seção "Proposta Q-145": A + F1 + P + L1; V e H opcionais | **sim** |
+| Classes por animal (`Q-145`) | seção "Proposta Q-145": A + F1 + P + L1; V e H opcionais | **respondida: DEC-186** (rodada 3: 6 no MVP, mapa mnemônico, passivas, gemas, guaxinim não jogável) |
 | Faixa de pelo dupla e ID do corpo da crew | ver P7 itens 1 e 6 | não (art-director + secretário) |

@@ -696,6 +696,8 @@ Spawns ocultos de atores (fora de vista do Pad, da janela e do Mart): AS-1 atrá
 
 ### 10.4 Regra do ponto seguro (`Q-092`)
 
+> **Secretário, 2026-10-10 — DEC-177 (fecha `Q-092`, contra a proposta abaixo):** o SS **pode** receber anomalia. A proposta "nunca recebe" **não vale**; também caem a tabela SS ("Nunca recebe anomalia"), o critério de aceite ("nunca recebe anomalia") e P15. Outras pendências fechadas na mesma sessão: P8 colisão **desligada** (DEC-175; alcance todo o mapa Provisório), P10 **"Out of stock"** (DEC-180), P16 esconder **por jogador, 4 pontos** (DEC-176). Reescrita → level-designer, com `Q-161`.
+
 Proposta: **SS nunca recebe anomalia nem ator de anomalia.** Médicos (§9.6), Opal e Walt (final) não são anomalia. Nenhuma rota de anomalia passa por Z-12. O long car não passa pela Ninth Oeste.
 
 ## 11. Cutscenes [DEC-021, DEC-075, DEC-088]

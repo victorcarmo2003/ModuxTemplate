@@ -15,6 +15,8 @@ Aparência pensada para R6: leitura por **silhueta, cor, chapéu e acessório**,
 >
 > **DEC-148 a DEC-150 (2026-10-10):** a crew tem **textura** de roupa, rosto e pelagem (DEC-148). **Clientes e pedestres sem nome também são animais** (DEC-149, emenda DEC-146): o mundo deixa de ser misto para os NPCs comuns. Personagens com nome **seguem em `Q-146`** (Pickett e Raincoat Lady também dependem de `Q-147`). Variante de **dia fofa** e de **noite um pouco assustadora**, por textura (DEC-150; intensidade `Q-148`). Reescrita de CHR-002 e do mundo (`world.md`) → narrative-writer.
 
+> **DEC-178 (2026-10-10, fecha `Q-146`):** **todos os personagens com nome viram animais da crew** (rig HotDog Crew): CHR-001 Walt, CHR-003 Opal, CHR-004 Quentin (guaxinim, DEC-159), CHR-005 Mr. Pickett, CHR-006 Raincoat Lady, CHR-008 médicos, e o Walker (ANM-007). Não há mais humanos no jogo. As aparências humanas abaixo **não valem**; espécie de cada um → `Q-160` (narrative-writer + art-director propõem). Pickett, Raincoat Lady e Walker mantêm os sinais aprovados de `anomalies.md` (`Q-147`).
+
 | ID | Nome | Papel | Aparece |
 |---|---|---|---|
 | CHR-001 | Walt Bramble | o chefe | **só por telefone** durante a run; em pessoa **uma vez**, na cutscene do amanhecer da 10ª noite (DEC-075, DEC-076) |

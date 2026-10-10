@@ -2365,3 +2365,396 @@ Origem da DEC-166: mensagem do usuário ao orquestrador, 2026-10-10, depois da D
   - **art-director:** ficha AST-053 com 3 packs (dia, Mid, noite) e o rosto por faixa; memória do 3º pack em `Q-144` (g).
   - **architect:** troca de pack + expressão por faixa (quem troca, quem vê, pré-carregar 3 packs); memória (+1 pack inteiro).
   - Notas em `features.md` (FEAT-019), `asset-list.md` (AST-053), `open-questions.md` (`Q-155`, `Q-156`; anotadas `Q-144`, `Q-148`, `Q-150`, `Q-154`), `README.md` → secretário (feito).
+
+---
+
+Origem das DEC-167 e DEC-168: mensagem do usuário ao orquestrador, 2026-10-10, respondendo às recomendações de `Q-155` e `Q-156` apresentadas pelo orquestrador. Fala **literal**, uma só para as duas DEC: "Sim pode ser, eu curti, com a sanidade baixa, faz os clientes também terem o visual de noite somente para aquela pessoa com sanidade baixa".
+
+Resumo apresentado ao usuário (pelo orquestrador): troca pelos dois (de dia sempre pack dia + Normal; à noite cada um mostra a faixa da própria sanidade); clientes/pedestres como DEC-150; faixas alta ≥ 60, média 40–59, baixa < 40; só a crew tem; colegas veem a faixa pela aparência, nunca o número; em 1ª pessoa o jogador vê o próprio estado nos braços/mãos e num retrato do rosto no HUD; troca instantânea.
+
+### DEC-167 — 2026-10-10 — Visual por sanidade: turno + faixa, só a crew, colegas veem a faixa (fecha Q-155 e Q-156)
+
+- Fala do usuário (literal): "Sim pode ser, eu curti" (1ª parte da fala acima).
+- Decidido pelo usuário (recomendações do game-designer aprovadas):
+
+  | Regra | Valor |
+  |---|---|
+  | Critério da troca | **ambos** (turno + sanidade) — `Q-155` opção C |
+  | De dia | crew **sempre** pack de dia + rosto **Normal** (sanidade não existe de dia, DEC-056) |
+  | À noite | cada membro da crew mostra a **faixa da própria sanidade** |
+  | Faixa alta | sanidade **≥ 60** → pack dia + Normal |
+  | Faixa média | sanidade **40–59** → pack Mid + Exhausted |
+  | Faixa baixa | sanidade **< 40** → pack noite + `Normal_Night` |
+  | Base das faixas | **pontos absolutos** (não % do máximo da classe) — `Q-156` (a) opção A |
+  | Quem tem | **só a crew** (jogadores) |
+  | Clientes/pedestres | seguem a **DEC-150** (regra de turno). Ver DEC-168 para clientes com sanidade baixa |
+  | Quem vê | **todos** os colegas veem a faixa **pela aparência**; o **número** nunca é mostrado a outro jogador |
+  | 1ª pessoa | o jogador vê o próprio estado nos **braços/mãos** (textura da faixa) e num **retrato do rosto** da faixa no HUD |
+  | Transição | **instantânea**, sem VFX |
+
+- Consequências diretas (pelas regras acima, sem escolha nova):
+  - Início da noite com sanidade ≥ 60: a crew entra na noite com visual de dia e escurece conforme perde sanidade.
+  - Virada noite → dia: toda a crew volta a pack dia + Normal.
+  - DEC-038 (efeito de sanidade baixa só no client do próprio jogador) vale para **alucinações**; a aparência da crew é **estado** visível a todos (leitura aprovada nesta DEC).
+- **Provisório** (detalhes do Rascunho do game-designer em `Q-155`/`Q-156` que **não** estavam no resumo apresentado ao usuário; seguem como recomendação, não como decisão):
+  - sem histerese; se piscar no teste, mínimo de 1 s por faixa;
+  - sanidade 0 → rosto Desmaiado (X, DEC-152) até reviver ou spectate;
+  - reviver (50% do máximo) e noite repetida: visual da faixa do valor com que volta (revive com 50 → média; Night Owl revive com 60 → alta);
+  - 3 packs da espécie de cada membro pré-carregados ao entrar no servidor;
+  - NPC não usa o pack Mid; humor de NPC (`Q-154`) só por expressão; ator de anomalia nunca usa Mid;
+  - regra a escrever: "troca de faixa da crew nunca é anomalia; sempre com olhos e boca" (`anomalies.md`/style guide §2.4, ambos Aprovados → texto pelo dono, sem mudar regra).
+- Emendas (append-only, nada revogado):
+  - **DEC-150:** a troca dia ↔ noite **pelo turno** passa a valer **só para NPC**; a crew troca por faixa à noite (DEC-166 + esta).
+  - **`style-guide.md` §2.3** (Aprovado): exceção de personagem "troca na virada do turno" → para a crew, "de dia sempre dia; à noite pela faixa de sanidade". Art-director anota.
+  - **`Q-148` (b) e (c):** respondidos por esta DEC — a crew **troca** (pela sanidade), NPC troca na virada do turno.
+- Não muda: números de sanidade (DEC-056, FEAT-019), faixas de alucinação (< 60 / < 40 / < 20), técnica por textura (DEC-150), cor da noite (DEC-165), packs entregues (DEC-166).
+- Impacto:
+  - **game-designer:** FEAT-019 (tabela de faixas visuais, regra de visibilidade, retrato no HUD); `Q-148` (a) intensidade segue com o art-director.
+  - **art-director:** AST-053 com regra de faixa; style guide §2.3; retrato do rosto por faixa para o HUD (asset de UI).
+  - **architect:** servidor replica só a **faixa** (3 valores) por jogador; troca no client; memória dos 3 packs (`Q-144` g).
+  - **frontend-coder** (após a bandeira): retrato do rosto ao lado do medidor; textura dos braços em 1ª pessoa.
+  - **narrative-writer:** nada.
+  - Notas em `features.md` (FEAT-019), `npcs.md`, `open-questions.md` (`Q-155`, `Q-156` → Respondidas; anotadas `Q-148`, `Q-154`), `README.md` → secretário (feito).
+
+### DEC-168 — 2026-10-10 — Sanidade baixa: o jogador vê os clientes com o visual de noite, só no client dele
+
+- Fala do usuário (literal): "com a sanidade baixa, faz os clientes também terem o visual de noite somente para aquela pessoa com sanidade baixa" (2ª parte da fala acima).
+- Decidido pelo usuário:
+  - Quando a sanidade de um jogador está na faixa **baixa** (< 40, DEC-167), os **clientes** (NPC) passam a ter o **visual de noite** — pack **Night** + rosto **`Normal_Night`** — **somente para esse jogador**.
+  - Efeito **local**: os outros jogadores continuam vendo os clientes normais.
+  - Saindo da faixa baixa (sobe para ≥ 40, ou virada para o dia), os clientes voltam ao visual normal para esse jogador.
+- Coerência: **DEC-038** (efeitos de sanidade baixa só para o próprio jogador). É efeito de sanidade, como as alucinações de FEAT-019; **não** é anomalia e não abre teste.
+- Escopo: o usuário disse **"clientes"**. Registrado só para clientes (NPC-001 a NPC-006, e NPC-019 enquanto cliente). **Pedestres** → `Q-158` (não bloqueante; recomendação: pedestres também).
+- **Contradição levantada:** pela DEC-150 (mantida pela DEC-167), clientes **já** usam o pack de noite durante a noite para **todos**. Lida ao pé da letra, a DEC-168 não mudaria nada na tela. A fala sugere que, à noite, clientes **não** parecem "de noite" para quem está bem → `Q-157` (volta ao usuário; não bloqueante, mas precisa de resposta antes da ficha AST-053/054 e da troca de textura de NPC).
+- **Nota técnica para o architect (Provisória, não decidida pelo usuário):** a troca é feita **no client** do jogador afetado (troca de `TextureID` e `SurfaceAppearance` **clonada localmente**, como `Crew.applyTime` em `tools/assetplace/build_crew.luau`), **sem replicar**. O servidor só replica a **faixa de sanidade** de cada jogador (DEC-167). Clientes que nascem enquanto o jogador está na faixa baixa recebem o visual no client ao aparecer. Cuidado: ator de anomalia de cliente (ANM-001, 004, 005; `Q-147`) não pode perder o sinal que o distingue por causa da troca local.
+- Não muda: DEC-150 para os outros jogadores, faixas (DEC-167), números de sanidade (DEC-056).
+- Impacto:
+  - **game-designer:** FEAT-019 (novo efeito na faixa baixa); `npcs.md` (comportamento de aparência por observador); `Q-157`, `Q-158` com recomendação.
+  - **art-director:** confirma que a variante noite do cliente + `Normal_Night` não usa traço reservado (§2.4) nem mascara sinal de anomalia (`Q-147`).
+  - **architect:** troca local por client; interação com humor/expressão de NPC (`Q-154`) — qual vence quando o jogador está na faixa baixa.
+  - Notas em `features.md` (FEAT-019), `npcs.md`, `open-questions.md` (`Q-157`, `Q-158`; anotadas `Q-147`, `Q-154`), `README.md` → secretário (feito).
+
+---
+
+Origem da DEC-169: complemento do usuário ao orquestrador, 2026-10-10, logo depois da DEC-168, relatado ao secretário. Fala **literal**: "Sim, pode fazer dessa forma, lembrando só que todos vêem os jogadores com sanidade baixa terem a transição ou seja se X estiver com sanidade baixa, a skin dele com sanidade baixa fica visível para todos."
+
+### DEC-169 — 2026-10-10 — Pedestres entram na DEC-168; a aparência do jogador é vista por todos, a dos NPCs muda só localmente (fecha Q-158)
+
+- Fala do usuário (literal): acima.
+- Decidido pelo usuário:
+  - **(a) Pedestres também** mudam para o visual de noite (pack Night + `Normal_Night`) **só para o jogador com sanidade baixa**, igual aos clientes (DEC-168). Fecha **`Q-158`**, opção A.
+  - **(b) A aparência do próprio jogador** segue a sanidade dele e é **vista por todos** (replicada): se X está com sanidade baixa, a skin de sanidade baixa de X aparece para toda a party. Reforça a DEC-167 ("todos veem a faixa").
+- Duas regras **diferentes**, não confundir:
+
+  | Quem muda | O que muda | Quem vê | Como |
+  |---|---|---|---|
+  | **Jogador (crew)** | própria skin pela faixa de sanidade (dia / Mid / noite, DEC-166/167) | **todos** os jogadores | servidor replica a **faixa** de cada jogador; cada client aplica a textura daquele personagem |
+  | **NPC (clientes e pedestres)** | pack Night + `Normal_Night` quando **o observador** está na faixa baixa | **só o jogador com sanidade baixa** | troca **local** no client dele, **sem replicar** (DEC-168, nota técnica Provisória) |
+
+- O número da sanidade segue **nunca** mostrado a outro jogador (DEC-167); só a faixa, pela aparência.
+- Não resolve **`Q-157`** (clientes/pedestres à noite para quem está bem: DEC-150 já os põe no pack de noite para todos). Segue aberta; agora vale para clientes **e** pedestres.
+- Impacto:
+  - **game-designer:** FEAT-019 e `npcs.md` com a tabela acima.
+  - **architect:** mesma faixa replicada serve às duas regras (skin do jogador para todos; troca local de NPC só no client cujo dono está na faixa baixa).
+  - **art-director:** variante noite do pedestre igual à do cliente.
+  - Notas em `features.md` (FEAT-019), `npcs.md`, `open-questions.md` (`Q-158` → Respondidas; `Q-157` anotada), `README.md` → secretário (feito).
+
+---
+
+Origem das DEC-170 a DEC-181: questionário de múltipla escolha do orquestrador ao usuário, 2026-10-10 (15ª parte da sessão). A opção marcada "Recomendado" era a sugestão já registrada em cada pergunta. A "fala do usuário" abaixo é a **opção que ele escolheu** (texto da opção), exceto na DEC-181, que é **texto livre literal**.
+
+### DEC-170 — 2026-10-10 — Nome oficial do jogo: "Sell Hotdogs!" (fecha Q-029)
+
+- Fala do usuário (opção escolhida): "Sell Hotdogs!" (com exclamação).
+- Decidido: o nome oficial do jogo é **"Sell Hotdogs!"**, com exclamação, como no GDD V1.
+- Não muda: nome do repositório e da pasta (técnico). Textos de jogo, título da página do Roblox, logo e telas usam "Sell Hotdogs!".
+- Impacto:
+  - **narrative-writer:** `story/ui-text.md` (título, tela de carregamento).
+  - **art-director:** logo/ícone do jogo, quando houver ficha.
+  - Notas em `vision.md` §1 (já usa "Sell Hotdogs!"), `open-questions.md` (`Q-029` → Respondidas), `README.md` → secretário (feito).
+
+### DEC-171 — 2026-10-10 — Plataformas: mobile + PC; console sem teste dedicado no MVP (fecha Q-042)
+
+- Fala do usuário (opção escolhida): "Mobile + PC (PC suportado; console sem teste dedicado no MVP)".
+- Decidido:
+  - **Mobile** segue foco (DEC-014).
+  - **PC suportado** no MVP (teclado/mouse testados).
+  - **Console**: sem teste dedicado no MVP. Não é bloqueado; só não entra no plano de teste.
+- Impacto:
+  - **frontend-coder** (após a bandeira): input de mobile e PC; gamepad sem critério de aceite no MVP.
+  - **qa-tester:** planos de teste em mobile e PC.
+  - Nota em `vision.md` §5, `open-questions.md` (`Q-042` → Respondidas), `README.md` → secretário (feito).
+
+### DEC-172 — 2026-10-10 — Classificação de maturidade do Roblox: Mild (fecha Q-043)
+
+- Fala do usuário (opção escolhida): "Mild (sustos leves, sem violência)".
+- Decidido: o jogo mira a classificação **Mild**: sustos leves, **sem violência**. Coerente com DEC-023 (infantojuvenil).
+- Define o teto de susto de DEC-038 e da DEC-173.
+- Impacto:
+  - **game-designer:** teto das alucinações (FEAT-019; `tech/content-data.md` "teto por `Q-043`" passa a ser Mild).
+  - **narrative-writer / art-director:** conteúdo dentro de Mild (style guide §4.4 já proíbe sangue/gore).
+  - Nota em `vision.md` §5, `open-questions.md` (`Q-043` → Respondidas), `README.md` → secretário (feito).
+
+### DEC-173 — 2026-10-10 — Jumpscare: permitido só pontual e leve (fecha Q-023)
+
+- Fala do usuário (opção escolhida): "pontual e leve (raro, só como efeito de sanidade baixa ou anomalia, sem gore)".
+- Decidido:
+  - Jumpscare **permitido**, **raro** e **leve**.
+  - Só como **efeito de sanidade baixa** (DEC-038) ou de **anomalia**. Nunca a base do horror (DEC-005).
+  - **Sem gore** (DEC-023, DEC-172).
+- Não decidido aqui (com o game-designer, Rascunho): frequência exata, faixa de sanidade e quais anomalias podem ter susto.
+- Impacto:
+  - **game-designer:** FEAT-019 (faixa < 20 já cita "susto leve como consequência"); fichas de anomalia em `npcs.md`.
+  - **art-director:** áudio do susto sem pico que vire jumpscare forte (style guide, seção Áudio).
+  - Nota em `vision.md` §4 e §8 (sanidade baixa), `open-questions.md` (`Q-023` → Respondidas), `README.md` → secretário (feito).
+
+### DEC-174 — 2026-10-10 — Hotbar: 4 Tools (fecha Q-056)
+
+- Fala do usuário (opção escolhida): "4 Tools".
+- Decidido: o jogador carrega no máximo **4 Tools** na hotbar nativa (DEC-040).
+- Segue valendo: máximo **2 pacotes** do mercado por jogador (DEC-049); o item raro de reviver ocupa vaga (DEC-100).
+- Impacto:
+  - **game-designer:** FEAT-005 (proposta já era 4).
+  - **architect:** `tech/content-data.md` `HotbarSlots` (hoje "1 (`Q-056`)") → 4.
+  - Nota em `vision.md` §5, `open-questions.md` (`Q-056` → Respondidas; anotada `Q-120` i), `README.md` → secretário (feito).
+
+### DEC-175 — 2026-10-10 — Colisão jogador-jogador desligada (fecha Q-086)
+
+- Fala do usuário (opção escolhida): "desligar".
+- Decidido: jogadores **não colidem** entre si. Motivo da pergunta: 4 jogadores no corredor do carrinho e do trailer (MAP-01 §14).
+- **Alcance — Provisório (não perguntado ao usuário):** a pergunta citava "no carrinho e no trailer"; `features.md` (game-designer) e `tech/architecture.md` T26 / grupo `Players` (architect) propõem **desligada em todo o mapa** (mais simples). Vale "todo o mapa" como Provisório; MAP-01 (medidas do trailer e linha "Colisão") diz "no carrinho e no trailer" / "no Pad e no trailer" → level-designer alinha.
+- Não muda: carro × personagem só pelo detector de atropelamento (DEC-095).
+- Impacto: **architect** (T26, grupos de colisão), **level-designer** (MAP-01), **game-designer** (`features.md`). Nota em `open-questions.md` (`Q-086` → Respondidas), `README.md` → secretário (feito).
+
+### DEC-176 — 2026-10-10 — Esconder é por jogador, com 4 pontos (fecha Q-094)
+
+- Fala do usuário (opção escolhida): "por jogador, 4 pontos".
+- Decidido: o verbo **esconder** (DEC-054; ANM-008, ANM-009) é **por jogador**. Há **4 pontos de esconder**, um por jogador (party de até 4).
+- Já desenhado (Rascunho, sem mudança): H1–H4 atrás do balcão do trailer (MAP-01 §7.3; AST-041 "Hide" ×4, Aprovado por DEC-138).
+- Impacto: **game-designer** (FEAT de esconder), **level-designer** (MAP-01 P16 fechado). Nota em `open-questions.md` (`Q-094` → Respondidas), `README.md` → secretário (feito).
+
+### DEC-177 — 2026-10-10 — O ponto seguro PODE receber anomalia (fecha Q-092, contra a sugestão)
+
+- Fala do usuário (opção escolhida): "Não" (à pergunta "'O ponto seguro nunca recebe anomalia' vira regra de design?").
+- Decidido: **não existe** a regra "o ponto seguro (SS, sob o letreiro 'OPEN 24 HOURS' do Mart) nunca recebe anomalia". O SS **pode** ter anomalia. **Contra a sugestão** (level-designer, game-designer, narrative-writer recomendavam "sim").
+- Não muda:
+  - ANM-010 (The Hush): o verbo correto segue **estar no ponto seguro** (`anomalies.md`, Aprovado).
+  - O neon "OPEN 24 HOURS" segue **nunca apagando** e coral exclusivo (style guide §3, Aprovado).
+  - Médicos, Opal e Walt seguem **não sendo** anomalia.
+- **Não decidido** (o usuário só respondeu "Não"): quais anomalias podem aparecer no SS/Mart, se alguma aparece durante o Hush, e como o mundo explica → **`Q-161`** (level-designer + narrative-writer + game-designer; não bloqueante).
+- Textos que ficam sem base (Rascunho, reescrita pelo dono):
+  - `levels/MAP-01.md` §10.4 ("SS nunca recebe anomalia nem ator de anomalia"), tabela SS ("Nunca recebe anomalia"), critério de aceite §14 ("nunca recebe anomalia"), P15 → **level-designer**.
+  - `story/world.md` §5.2 ("nunca apaga e nunca recebe anomalia"; "luz educada") → **narrative-writer**. A parte "nunca apaga" segue.
+  - `design/features.md` e `design/npcs.md` (linha de proposta `Q-092`) → **game-designer**.
+- `story/anomalies.md` (**Aprovado**): não contém a regra "nunca"; recebe **nota** no cabeçalho (secretário, feito). Regras, sinais e verbos aprovados não mudam.
+- Nota em `open-questions.md` (`Q-092` → Respondidas; nova `Q-161`), `README.md` → secretário (feito).
+
+### DEC-178 — 2026-10-10 — Personagens com nome viram animais da crew (fecha Q-146)
+
+- Fala do usuário (opção escolhida): todos os personagens com nome viram **animais da crew** (Walt, Opal, Mr. Pickett, Raincoat Lady, Walker etc.).
+- Decidido: todo personagem com nome usa o **rig animal HotDog Crew** (DEC-145, DEC-152): Walt (CHR-001), Opal (CHR-003), Quick Quentin (CHR-004, já guaxinim, DEC-159), Mr. Pickett (CHR-005), Raincoat Lady (CHR-006), médicos da Bellmoor Rescue (CHR-008) e o **Walker** (ator de ANM-007). Com DEC-146 e DEC-149, **não há mais humanos** no jogo.
+- **Não decidido:** a **espécie** de cada um (exceto Quentin) → **`Q-160`** (narrative-writer + art-director propõem; usuário decide).
+- Segue aberto: como ANM-004 (Pickett), ANM-005 (Raincoat Lady) e ANM-007 (Walker) se leem com animais, **sem mudar regras** → `Q-147` (b respondido por esta DEC).
+- Impacto:
+  - **narrative-writer:** `story/characters.md` (aparência de CHR-001, 003, 005, 006, 008), `world.md`.
+  - **art-director:** AST-055 a AST-058, AST-076 e fichas dos atores de anomalia (Walker) passam ao rig animal; roupas por textura (DEC-148).
+  - **game-designer:** `npcs.md` (NPC de personagem com nome).
+  - Nota em `story/characters.md`, `open-questions.md` (`Q-146` → Respondidas; nova `Q-160`; anotada `Q-147`), `README.md` → secretário (feito).
+
+### DEC-179 — 2026-10-10 — Party no lobby por plataformas físicas (fecha Q-070)
+
+- Fala do usuário (opção escolhida): "plataformas físicas (pisar = entrar)".
+- Decidido: a party se forma no lobby **pisando em plataformas físicas** (pisar = entrar). Coerente com DEC-012, DEC-015, DEC-034.
+- **Provisório (não perguntado):** convite de amigo pela plataforma do Roblox (parte da sugestão do architect); número de plataformas, contagem regressiva e saída da plataforma → level-designer + game-designer, no documento do lobby (`Q-085`).
+- Impacto: **level-designer** (lobby, `Q-085`), **architect** (T4 roster do lobby), **art-director** (asset das plataformas). Nota em `open-questions.md` (`Q-070` → Respondidas; anotada `Q-085`), `README.md` → secretário (feito).
+
+### DEC-180 — 2026-10-10 — Ingrediente não liberado aparece como "Out of stock" (fecha Q-088)
+
+- Fala do usuário (opção escolhida): "Out of stock".
+- Decidido: a prateleira de ingrediente ainda não liberado **aparece** no Mart com a etiqueta **"Out of stock"** (não fica escondida).
+- **Rascunho (não perguntado):** a linha "Day N" embaixo da etiqueta (proposta do game-designer, FEAT-008) segue como proposta.
+- Impacto: **game-designer** (FEAT-008), **level-designer** (MAP-01 P10), **art-director** (AST-029 etiqueta, já prevista), **narrative-writer** (`ui-text.md`: "Out of stock"). Nota em `open-questions.md` (`Q-088` → Respondidas), `README.md` → secretário (feito).
+
+### DEC-181 — 2026-10-10 — Pack Night reservado para tensão; NPC à noite usa o Mid (fecha Q-157; emenda DEC-150)
+
+- Fala do usuário (**literal**, texto livre): "A skin noite é meio "paranóica" e assustadora por isso quero usar ela para gerar tensão, então dia e mid pode ser utilizado com tranquilidade, mid pode ser aplicado em sua grande maioria para a noite e menos durante o dia, enquanto o noite mesmo deixa reservado para mais tensão, como sanidade baixa ou clima de terror de anomalia sla"
+- Leitura registrada (a fala não bate com nenhuma das opções A/B/C de `Q-157`; é a mais próxima da C):
+
+  | Pack | Uso |
+  |---|---|
+  | **Day** | uso livre; visual padrão de NPC de dia |
+  | **Mid** | uso livre; **visual padrão de NPC à noite** ("grande maioria"); **ocasional de dia** ("menos durante o dia") |
+  | **Night** | **reservado para tensão**: (1) **sanidade baixa** — NPC no pack Night + `Normal_Night` só no client do jogador na faixa baixa (DEC-168, DEC-169); (2) **clima de terror de anomalia** |
+
+- Emendas (append-only, nada revogado):
+  - **DEC-150:** NPC (clientes e pedestres) à noite = **pack Mid**, não mais Night. A troca na virada do turno segue (agora Day → Mid).
+  - **DEC-167**, item Provisório "NPC não usa o pack Mid": **superado** por esta DEC.
+  - **DEC-168/169:** passam a ter efeito visível (à noite, quem está bem vê NPC em Mid; quem está na faixa baixa vê Night). A contradição de `Q-157` some.
+- Não muda: crew (jogadores) segue a DEC-167 (de dia sempre Day + Normal; à noite pela faixa ≥ 60 / 40–59 / < 40); cor da noite (DEC-165); packs entregues (DEC-166).
+- **Não decidido** (detalhes) → **`Q-159`** (game-designer + narrative-writer, + art-director; não bloqueante): quais anomalias disparam o Night, para quem, quanto Mid de dia, e se "menos durante o dia" vale para a crew.
+- Cuidado (de `Q-147`): o Night de "clima de anomalia" não pode esconder o sinal do ator de anomalia nem fazer NPC normal parecer anomalia (style guide §2.4).
+- Impacto:
+  - **game-designer:** FEAT-019 e `npcs.md` (tabela de packs de NPC por turno/tensão); `Q-159`.
+  - **narrative-writer:** `Q-159` (quais anomalias pedem o clima Night).
+  - **art-director:** AST-053/054 (NPC com 3 packs, não 2); style guide §2.3 (nota: NPC à noite = Mid); `Q-148` (a) intensidade do Night agora só em tensão.
+  - **architect:** troca de pack de NPC por turno (Day/Mid) replicada a todos + troca local para Night (DEC-168) + gatilho de anomalia; memória do Mid para NPC (`Q-144` g).
+  - Notas em `features.md` (FEAT-019), `npcs.md`, `open-questions.md` (`Q-157` → Respondidas; nova `Q-159`; anotadas `Q-147`, `Q-148`, `Q-154`), `README.md` → secretário (feito).
+
+---
+
+Origem das DEC-182 a DEC-188: questionário de múltipla escolha do orquestrador ao usuário, 2026-10-10 (16ª parte da sessão). Opções de `design/proposals-round-3.md` (Q-145, Q-154, Q-149) e das sugestões registradas nas perguntas. A "fala do usuário" é a **opção escolhida**, exceto na DEC-183, que é **texto livre literal**.
+
+### DEC-182 — 2026-10-10 — Ladrão: 4 s fixos até a gaveta (fecha Q-089)
+
+- Fala do usuário (opção escolhida): "4 s fixos; a velocidade varia por ponto de espreita".
+- Decidido: o "~4 s até a gaveta" da DEC-050 vira **tempo fixo de 4 s**, de qualquer ponto de espreita (L1–L3, MAP-01). A **velocidade** do Quick Quentin (NPC-007) = distância do ponto até a gaveta ÷ 4 s; varia por ponto.
+- Não muda: gatilho (3 s sem jogador no raio de 14 studs), abertura em 8 s, fuga e "Nice catch!" +$5 (DEC-050).
+- Impacto: **game-designer** (NPC-007 em `npcs.md`, tabela `Thief`), **level-designer** (distâncias L1–L3 → gaveta no MAP-01). Nota em `npcs.md`, `open-questions.md` (`Q-089` → Respondidas), `README.md` → secretário (feito).
+
+### DEC-183 — 2026-10-10 — Passantes: 6–8 de dia, 1–2 à noite, rua deserta em tensão (fecha Q-083; conflito com o teto de 12 da DEC-045)
+
+- Fala do usuário (**literal**, texto livre): "De dia pode deixar mais movimentado, uns 6-8 passantes sem problema, vamos mover com transform do motor6d então nào deve ficar pesado no quesito de fisica e fps, no entanto a noite a gente deixa reduzido como 1 ou 2 apenas, exceto em momentos específicos de tensão aonde a rua fica deserta"
+- Decidido:
+
+  | Turno | Passantes (NPC-019, não compram) |
+  |---|---|
+  | Dia | **6–8** |
+  | Noite | **1–2** |
+  | Noite, momentos de tensão | **0** (rua deserta) |
+
+- Responde `Q-083`: (a) **sim**, existem passantes de dia, mas **6–8**, não "até 2"; (b) **não**: à noite há 1–2 passantes além de clientes e atores de anomalia.
+- Emendas (append-only):
+  - `npcs.md` NPC-019 ("Custo: 1 (máx. 2)", "Turno: só dia", "à noite não nasce") → superado por esta DEC.
+  - **DEC-045** (teto de **12 NPCs** simultâneos; dia 8 clientes + 1 ladrão): **conflito**. Dia com 8 clientes + 1 ladrão + 6–8 passantes = **15–17**. O usuário não falou do teto. **Não revogado**; resolver em **`Q-162`** (game-designer + architect).
+- **Provisório** (nota técnica da fala, para o architect; não é decisão de técnica): NPC animado por **`Motor6D.Transform`**, sem física, para pesar pouco em física e FPS. Liga a T11 (`tech/architecture.md`, NPC R6 com Humanoid no servidor, pool de 12) e a `Q-130`.
+- **Não decidido** → `Q-162`: o que é "momento de tensão" (liga a `Q-159`: Night de clima de anomalia; ANM-010 Hush), como a rua esvazia (somem fora de vista ou deixam de nascer), e se os passantes da noite usam o pack Mid (DEC-181).
+- Cuidado: passante à noite não pode parecer ator de anomalia (style guide §2.4; `Q-147` c).
+- Impacto:
+  - **game-designer:** NPC-019, tabela "Orçamento de NPC por servidor" (`npcs.md`), `AmbientNpcs`; `Q-162`.
+  - **architect:** teto de 12 × passantes, pool de NPC (T11), animação por `Motor6D.Transform`; `Q-162`.
+  - **level-designer:** caminhos de calçada para 6–8 passantes de dia (MAP-01).
+  - Nota em `npcs.md`, `open-questions.md` (`Q-083` → Respondidas; nova `Q-162`), `README.md` → secretário (feito).
+
+### DEC-184 — 2026-10-10 — Upgrades do carrinho não passam para o trailer: o trailer começa do nível 1 (fecha Q-075, contra a sugestão)
+
+- Fala do usuário (opção escolhida): "recomeçam" (o trailer começa do nível 1).
+- Decidido: os equipamentos comprados no carrinho (Grill, Cooler, Counter, Cash Drawer Lock; DEC-046) **não** passam ao trailer. O Food Trailer começa com todos os equipamentos no **nível 1**. **Contra a sugestão** (game-designer, level-designer, art-director: mesmo nível nos dois).
+- Não muda: preço do trailer (DEC-047, DEC-121), Trailer Lights só com o trailer (DEC-055), cafeteira fixa no trailer (DEC-125), compra na bancada do Mart (DEC-101), trailer fora da rotação (DEC-107).
+- **Não decidido** → **`Q-163`** (game-designer; não bloqueante): impacto na economia — os upgrades do trailer custam o mesmo que no carrinho; lucro e ritmo das noites 1+ com equipamento nível 1; se o "Cash Drawer Lock" ($80, compra única) também é recomprado; o que acontece com as peças do carrinho (fica coberto, `Q-082`).
+- Impacto:
+  - **game-designer:** `upgrades.md` (UPG por veículo), `economy.md` (curva depois do trailer); `Q-163`.
+  - **art-director / modeler-3d:** peças de nível dos dois veículos seguem; o trailer nasce com as peças nível 1 (AST-012 a AST-020).
+  - **architect:** nível de upgrade guardado **por veículo** no estado da run.
+  - **level-designer:** MAP-01 §15 P5 (2ª parte) fechado.
+  - Nota em `open-questions.md` (`Q-075` → Respondidas; nova `Q-163`), `README.md` → secretário (feito).
+
+### DEC-185 — 2026-10-10 — Fluxo de clientes pelos jogadores conectados (fecha Q-067)
+
+- Fala do usuário (opção escolhida): "pelos jogadores conectados (recalcula)".
+- Decidido: o multiplicador de fluxo por party da DEC-045 (1p ×1,0 · 2p ×1,6 · 3p ×2,1 · 4p ×2,5) usa o número de jogadores **conectados**, recalculado.
+- **Provisório** (sugestão do architect, não perguntada à parte): recalcula **no início de cada turno**.
+- Não muda: preço do trailer e demais preços pela party do fim do Day 1 (DEC-047, DEC-121).
+- Anotada `Q-112` (d): membro atrasado conectado **conta** no fluxo; o voto de pular segue aberto.
+- Impacto: **game-designer** (FEAT de fluxo, `economy.md`), **architect** (`architecture.md` P4). Nota em `open-questions.md` (`Q-067` → Respondidas; `Q-112` anotada), `README.md` → secretário (feito).
+
+### DEC-186 — 2026-10-10 — Classes por animal: 6 no MVP, mapa mnemônico, passivas, gemas, guaxinim não jogável (fecha Q-145; emenda DEC-069 e DEC-070)
+
+- Fala do usuário (opções escolhidas em `proposals-round-3.md` §1): Q-145-1 **B** (6 classes), Q-145-2 **A** (mapa mnemônico), Q-145-3 **A** (efeitos da DEC-069, passivos), Q-145-4 **A** (Cachorro grátis, resto com gemas), Q-145-5 **A** (guaxinim não jogável). Todas as recomendadas.
+- Decidido:
+
+  | ID | Animal | Classe (placeholder) | Bônus · contrapeso (DEC-069, sem mudança) | Tier · gemas | MVP |
+  |---|---|---|---|---|---|
+  | CLS-001 | Cachorro | "Rookie" | nenhum (régua) | 0 · grátis | sim |
+  | CLS-002 | Coelho | "Runner" | velocidade 16 → 18 · sanidade inicial 90 | 1 · 45 | sim |
+  | CLS-003 | Gato | "Line Cook" | grelha 0,85× (salsichas dele) · velocidade 15 | 1 · 45 | sim |
+  | CLS-004 | Urso | "Hauler" | 3 pacotes · velocidade 14 com 3 | 1 · 45 | sim |
+  | CLS-005 | Raposa | "Hawker" | gorjeta $2 · janela de gorjeta −4 s | 2 · 120 | sim |
+  | CLS-006 | Coruja | "Night Owl" | sanidade inicial e máx. 120 · de dia velocidade 15 | 2 · 120 | sim |
+  | CLS-007 | Panda | "Barista" | café dele 3 s e +35 · −8 por anomalia vista | 2 · 120 | 1ª atualização |
+  | CLS-008 | Leão | "Shift Lead" | party +5 p.p., não acumula · pedidos dele sem gorjeta | 3 · 180 | 1ª atualização |
+
+  - **Habilidade** = bônus + contrapeso **passivos** da DEC-069 (sem habilidade ativa, sem botão novo).
+  - **Desbloqueio:** Cachorro grátis (conta nova = Cachorro); demais com **gemas** (45/120/180, DEC-070).
+  - **Escolha** na tela **"Crew"** do lobby; **travada na run**; repetir animal na party permitido (DEC-069).
+  - **Guaxinim não é jogável**: exclusivo do Quick Quentin (DEC-159).
+  - Tartaruga não é classe (vira cliente, ver DEC-188).
+- Emendas (append-only):
+  - **DEC-069:** MVP passa de 4 (Rookie, Runner, Line Cook, Night Owl) para **6** (+ Hauler, Hawker). Resto da DEC-069 segue (teto ±12%, nenhuma classe mexe em anomalia, 1 efeito de party).
+  - **DEC-070:** "MVP: 210 gemas para as 3 pagas" passa a **375 gemas para as 5 pagas** (≈ uma run completa com o +100 do final).
+- **Não decidido:** nomes e fantasias finais das classes (placeholders; narrative-writer, Rascunho).
+- Impacto:
+  - **game-designer:** `classes.md` (fichas por animal; seção "Proposta Q-145" substituída), `economy.md` §6, `progression.md`.
+  - **narrative-writer:** nomes/descrições por animal (`ui-text.md`, tela "Crew").
+  - **art-director:** ícones de classe por animal; guaxinim fora da tela "Crew".
+  - **architect:** `content-data.md` (`Classes` com espécie; 6 no MVP), dados persistidos (classes desbloqueadas).
+  - Nota em `classes.md`, `open-questions.md` (`Q-145` → Respondidas), `proposals-round-3.md`, `README.md` → secretário (feito).
+
+### DEC-187 — 2026-10-10 — Humor dos NPCs: dinâmico completo (fecha Q-154, contra a recomendação; mexe na DEC-072)
+
+- Fala do usuário (opção escolhida em `proposals-round-3.md` §2): **C** — "Humor dinâmico completo: medidor de humor por cliente que sobe e desce com fila, espera, erros e noite; muda pagamento". **Contra a recomendação** (B: humor de chegada só de dia + reações).
+- Decidido: cada cliente tem um **medidor de humor** que **sobe e desce** durante a visita e **muda o pagamento**. O rosto usa as expressões existentes (DEC-152, DEC-162).
+- Mexe na **DEC-072** (paciência, gorjeta, pagamento). **Nada revogado ainda**: o desenho diz como o humor entra nas fórmulas.
+- **Não decidido** → **`Q-164`** (game-designer, Rascunho; não bloqueante): o que move o humor (fila, espera, erro, noite, anomalia, sanidade?), escala e números, efeitos (paciência, gorjeta, % pago), **teto de impacto** na economia, mapa humor → expressão, noite e anomalias, se entra no MVP. Volta ao usuário **só se mudar regra aprovada** (ex.: completo/incompleto/errado da DEC-072, teto ±12% das classes, Hawker).
+- Fica sem efeito na proposta B: tabela `Moods` de chegada e a regra "à noite todo cliente chega Normal" (rascunho; não aprovado).
+- Restrições que seguem: rosto de humor não pode parecer anomalia (style guide §2.4; `Q-147`); Desmaiado (X) nunca em NPC (recomendação, Provisório); `Normal_Night` do observador com sanidade baixa × humor (DEC-168) → `Q-164`.
+- Impacto: **game-designer** (`npcs.md`, `economy.md`; FEAT nova de humor), **architect** (estado de humor por cliente no servidor; replicação do rosto), **art-director** (expressões; pack × humor `Q-159` h). Nota em `npcs.md`, `open-questions.md` (`Q-154` → Respondidas; nova `Q-164`), `proposals-round-3.md`, `README.md` → secretário (feito).
+
+### DEC-188 — 2026-10-10 — Espécie jogável pode ser cliente; tipo de cliente = espécie(s) fixa(s) + acessório (Q-149 a, b)
+
+- Fala do usuário (opções escolhidas em `proposals-round-3.md` §3): Q-149-a **B** — "Sim; todas podem ser cliente" (**contra a recomendação** A); Q-149-b **A** — "1–2 espécies fixas + acessório; roupa sorteada" (recomendada).
+- Decidido:
+  - (a) Espécie **jogável pode aparecer como cliente**, com roupa civil (nunca o uniforme da crew). **Exceção:** guaxinim é só do Quentin (DEC-186, DEC-159).
+  - (b) Tipo de cliente = **espécie(s) fixa(s) + acessório**; roupa civil **A–H sorteada**:
+
+  | ID | Tipo | Espécies | Acessório |
+  |---|---|---|---|
+  | NPC-001 | "Office Worker" | Pinguim | crachá + pasta |
+  | NPC-002 | "Student" | Hamster, Rato | mochila |
+  | NPC-003 | "Jogger" | Sapo | fone |
+  | NPC-004 | "Construction Worker" | Macaco | capacete + colete |
+  | NPC-005 | "Grandparent" | Tartaruga, Ovelha | bengala |
+  | NPC-006 | "Night Shift Worker" | Coala | crachá de plantão |
+
+- **Tensão (a) × (b)** (não é contradição de regra, é lacuna): os 6 tipos usam só espécies **não jogáveis**; não está dito **onde** as espécies jogáveis aparecem como cliente → **`Q-165`** (game-designer; não bloqueante). Ex.: só como passante/cliente genérico, como 2ª espécie de algum tipo, ou tipo novo.
+- **Não respondido:** (c) da proposta — o **porco** é cliente ou só pedestre → segue em `Q-149`. `Q-149` (d) (4 variantes por tipo, detalhe assimétrico) também segue.
+- Fica sem efeito na proposta: "jogável nunca é cliente" e o critério "nenhum cliente com `playable = true`".
+- Impacto: **game-designer** (`npcs.md` fichas NPC-001 a 006 e NPC-019; tabela `Species`, `CustomerTypes`), **art-director** (fichas AST-053/054 por tipo; acessórios), **architect** (memória de textura `Q-144` g: mais espécies no pool de cliente). Nota em `npcs.md`, `open-questions.md` (`Q-149` anotada; nova `Q-165`), `proposals-round-3.md`, `README.md` → secretário (feito).
+
+Origem das DEC-189 a DEC-192: mesmo questionário (16ª parte), segunda mensagem do orquestrador. DEC-189 a DEC-191 = opção escolhida (sugestão registrada na pergunta). DEC-192 = **texto livre literal**, inclinação a confirmar.
+
+### DEC-189 — 2026-10-10 — Trailer já vem com lâmpada básica + interruptor; Trailer Lights só amplia o raio (fecha Q-064)
+
+- Fala do usuário (opção escolhida): a sugestão do narrative-writer — "o trailer já vem com lâmpada básica + interruptor; Trailer Lights só amplia o raio".
+- Decidido:
+  - O Food Trailer vem **de fábrica** com **lâmpada básica + interruptor**. A N3 (ANM-003, verbo "luz") funciona mesmo sem o upgrade.
+  - **Trailer Lights** (UPG, $100, DEC-046/DEC-055) passa a **só ampliar o raio** (18 studs, valor atual da ficha).
+- **Provisório** (não perguntado): o **interior do trailer conta como luz** para a sanidade (DEC-041, DEC-056); interruptor controla o LZ-3 (sugestão do level-designer, MAP-01 §15 P3).
+- **Não decidido** (game-designer + level-designer, Rascunho; sem nova Q, segue nas fichas): **raio da lâmpada básica**; se a lâmpada básica conta como "luz" para a sanidade fora do interior.
+- Emenda leitura de **DEC-055** (interruptor "vem com o Trailer Lights"): o interruptor passa a vir com o trailer. DEC-055 segue no resto.
+- Impacto: **game-designer** (`upgrades.md` Trailer Lights; FEAT de luz/sanidade), **level-designer** (MAP-01 LZ-3, P3), **art-director** (lâmpada básica e interruptor no AST-027; peça visível do Trailer Lights), **narrative-writer** (`anomalies.md` N3 é Aprovado: a regra não muda, só a origem do interruptor). Nota em `open-questions.md` (`Q-064` → Respondidas), `README.md` → secretário (feito).
+
+### DEC-190 — 2026-10-10 — Tábua com 2 vagas compartilhadas; hot dog pronto vira Tool "HotDog" entregue por prompt (fecha Q-068)
+
+- Fala do usuário (opção escolhida): a sugestão do architect.
+- Decidido:
+  - Tábua de montagem **compartilhada** pela party, com **2 vagas**.
+  - O hot dog pronto vira a **Tool "HotDog"** (ocupa vaga da hotbar de 4, DEC-174).
+  - Entrega **por prompt no cliente** (DEC-066).
+- Impacto: **game-designer** (FEAT de montagem e entrega), **architect** (`InteractionService`, T6; estado das 2 vagas), **level-designer/art-director** (2 vagas na tábua AST-015/017 se precisar de marca visual). Nota em `open-questions.md` (`Q-068` → Respondidas), `README.md` → secretário (feito).
+
+### DEC-191 — 2026-10-10 — Opal fora do teto de 12 e nunca anomalia; âncora AN-08 sai dela (fecha Q-091)
+
+- Fala do usuário (opção escolhida): a sugestão registrada — (a) fora do teto; (b) a âncora sai da Opal.
+- Decidido:
+  - **Opal (CHR-003 / NPC-020) fica fora do teto de 12 NPCs** (DEC-045): estática, sem pathfinding.
+  - **Opal nunca é anomalia** nem âncora de anomalia (coerente com DEC-079, DEC-099 e DEC-177).
+  - A âncora **AN-08** do `MAP-01.md` §7 **sai da Opal**; o **level-designer** move para outra posição, alinhado com DEC-079 e `anomalies.md` (Aprovado; nenhuma regra muda).
+- Impacto: **level-designer** (MAP-01 §7, AN-08), **game-designer** (`npcs.md` NPC-020: proposta → DEC; orçamento), **architect** (pool de NPC sem Opal). Nota em `npcs.md`, `open-questions.md` (`Q-091` → Respondidas), `README.md` → secretário (feito).
+
+### DEC-192 — 2026-10-10 — Porco pode ser cliente normal (Q-149 c; inclinação, confirmar após a explicação)
+
+- Fala do usuário (**literal**): "Qual parte do porco seria piada de mal gosto? kakaakak eu acho que ele pode sim"
+- Contexto: a recomendação "só pedestre" (`proposals-round-3.md` Q-149-c) vinha de o **porco comprar/comer salsicha** (que costuma ser de porco), num jogo infantojuvenil (DEC-023). A explicação foi levada ao usuário pelo orquestrador.
+- Registrado: **porco pode ser cliente normal** (opção B, contra a recomendação), por inclinação explícita do usuário. **A confirmar após a explicação**: se o usuário mudar de ideia, revisar com nova DEC (append-only).
+- Liga a `Q-165`: o porco não está em nenhum tipo da DEC-188; onde aparece como cliente entra lá.
+- Impacto: **game-designer** (`npcs.md`, tabela `Species`). Nota em `open-questions.md` (`Q-149` (c) anotada como "a confirmar"), `proposals-round-3.md`, `README.md` → secretário (feito).
