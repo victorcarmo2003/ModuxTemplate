@@ -2758,3 +2758,106 @@ Origem das DEC-189 a DEC-192: mesmo questionário (16ª parte), segunda mensagem
 - Registrado: **porco pode ser cliente normal** (opção B, contra a recomendação), por inclinação explícita do usuário. **A confirmar após a explicação**: se o usuário mudar de ideia, revisar com nova DEC (append-only).
 - Liga a `Q-165`: o porco não está em nenhum tipo da DEC-188; onde aparece como cliente entra lá.
 - Impacto: **game-designer** (`npcs.md`, tabela `Species`). Nota em `open-questions.md` (`Q-149` (c) anotada como "a confirmar"), `proposals-round-3.md`, `README.md` → secretário (feito).
+
+### DEC-193 — 2026-10-10 — BANDEIRA VERDE: fim da Fase 0, início da Fase 1 — Produção
+
+- Pergunta do orquestrador (literal): "Pela regra do projeto, código de gameplay em src/ só começa com a bandeira verde registrada. Não há pergunta bloqueante aberta. Dá a bandeira verde agora? Depois dela os agentes programam em paralelo e dúvidas novas viram recomendações Provisórias que eu te pergunto em lotes."
+- Contexto anterior (fala do usuário, literal): "bom se o código for sendo feito em paralelo, vc pode ir me fazendo as perguntas"
+- Resposta do usuário (literal): "Sim, bandeira verde agora"
+- Estado na data: `open-questions.md` com **0 bloqueantes** em aberto (47 não bloqueantes; Q-054 arquivada).
+- Decidido:
+  - **Bandeira verde dada.** Fase 0 (Pré-produção) encerrada; projeto passa para a **Fase 1 — Produção**.
+  - Código de gameplay em `src/` **liberado**. Agentes programam em paralelo (`PIPELINE.md`).
+  - Documentos ainda em **Rascunho** seguem como **base Provisória**: valem para construir, abaixo de DEC e de documento Aprovado (ordem de autoridade do `CLAUDE.md` não muda).
+  - Dúvida nova durante a produção: vira `Q-###` em `open-questions.md`; o trabalho segue com a **recomendação do agente marcada Provisória**.
+  - Perguntas ao usuário **em lotes** (questionário do orquestrador), não uma a uma.
+  - Mudar documento para **Aprovado** segue exigindo DEC do usuário.
+- Emenda o critério de `README.md` ("bandeira verde quando tudo estiver Aprovado"): o usuário deu a bandeira com documentos ainda em Rascunho. Vale a regra do `CLAUDE.md` (0 bloqueantes).
+- Impacto: **task-planner** (quebrar features em `TASK-###` a partir dos documentos atuais), **backend-coder/frontend-coder** (implementação liberada), **architect** (T1–T31 seguem Provisórias até a revisão, `Q-130`), todos os especialistas (Rascunhos viram base Provisória). `README.md` → secretário (feito). Trecho "Fase atual" do `CLAUDE.md` → aguarda edição autorizada pelo usuário (ver nota da sessão).
+
+Nota do secretário (2026-10-10, depois da DEC-193): o `CLAUDE.md` da raiz **foi atualizado pelo orquestrador** — seção "Fase atual: 1 — Produção", citando a **DEC-193** (conferido no arquivo). A frase "aguarda edição autorizada pelo usuário" no Impacto acima **não vale mais**. DEC-193 não é editada (append-only); vale esta nota. A linha `CLS-###` na tabela de IDs do `CLAUDE.md` (rodada 6) não foi conferida nesta nota.
+
+Origem das DEC-194 a DEC-197: questionário do orquestrador, 2026-10-10 (18ª parte). Em todas, o usuário escolheu a **opção recomendada**.
+
+### DEC-194 — 2026-10-10 — Voto de pular cutscene: ≥ 50% dos jogadores conectados (fecha Q-077)
+
+- Fala do usuário (opção escolhida): a recomendada para `Q-077` (a).
+- Decidido:
+  - Só **intro** e **final** são cutscenes puláveis (confirma DEC-078 e a conciliação do game-designer).
+  - Pula quando votos ≥ **50% dos jogadores conectados**, arredondado para cima: **1 de 1**, **1 de 2**, **2 de 3**, **2 de 4**.
+  - Jogador **desconectado não conta** (nem no numerador nem no denominador).
+- **Provisório** (conciliação do game-designer, `features.md` "Propostas pendentes", linha Q-077; não perguntado item a item):
+  - (a) espectador conectado vota.
+  - (b) ligações do chefe **não** são puláveis.
+  - (c) legenda da ligação **avança sozinha**, 2,5 s por linha, igual para todos (sem toque).
+  - (d) versão curta na noite repetida = ligação nova, compatível com DEC-077.
+- Liga a `Q-112` (d): voto do membro atrasado segue a proposta Provisória do game-designer ("só quem está na cutscene").
+- Impacto: **game-designer** (FEAT-004, FEAT-018: tirar "proposta"), **architect** (contagem por conectados no servidor), **frontend-coder** (UI do voto). Nota em `features.md`, `open-questions.md` (`Q-077` → Respondidas), `README.md` → secretário (feito).
+
+### DEC-195 — 2026-10-10 — Efeitos de "sabor" das anomalias no MVP: só os que não exigem sistema novo; cortam N3 relógio e N5 +$1 (fecha Q-065)
+
+- Fala do usuário (opção escolhida): a recomendada para `Q-065`.
+- Decidido:
+  - Entram no MVP só os efeitos de sabor de `anomalies.md` que **não exigem sistema novo**.
+  - **Entram:** moeda sem desenho (N1, ANM-001), hot dog vira fumaça (N2, ANM-002), janelas extras (N6, ANM-006), luz apaga 3 s (N8, ANM-008), porta abre um dedo (N9, ANM-009), névoa (N10, ANM-010) e similares.
+  - **Cortados:** relógio do HUD congelado (N3, ANM-003) e o **+$1** (N5, ANM-005).
+- **A classificar pelo game-designer** (critério acima; **Provisório** até a ficha): chuva só no trailer (N5) e pedidos esfriam (N10). Se exigir sistema novo, corta. Mesmo critério para "Thank you, dear." (N5), que não foi citado.
+- **Supera** a conciliação do game-designer em `features.md` (linha Q-065: N3 "congelamento só no client" e +$1 entrando). A regra de cada anomalia em `anomalies.md` (Aprovado) **não muda**: só sai o efeito de sabor.
+- Impacto: **game-designer** (fichas de anomalia em `features.md`; classificar N5 chuva, N10 esfriar, "Thank you, dear."), **narrative-writer** (`anomalies.md`: nota de MVP nos efeitos cortados, sem mexer na regra), **architect** (nada de congelar relógio no client; nenhum ajuste de economia pela N5), **frontend-coder**/**art-director** (VFX dos efeitos que entram). Nota em `features.md`, `open-questions.md` (`Q-065` → Respondidas), `README.md` → secretário (feito).
+
+### DEC-196 — 2026-10-10 — Sem poste aceso no meio da rota trailer ↔ Mart à noite (fecha Q-090)
+
+- Fala do usuário (opção escolhida): a recomendada para `Q-090`.
+- Decidido:
+  - **Nenhuma ilha de luz** no meio da rota trailer ↔ Mart à noite.
+  - Custo de sanidade da ida/volta no escuro fica em **~2–4 por perna** (valor do game-designer, DEC-056 em tabela).
+- **Cai** a frase da conciliação do game-designer "o level-designer mantém um poste aceso sobre CW-1" (`features.md`, linha Q-090): CW-1 fica **sem poste aceso**.
+- **Provisório** (MAP-01 §15 P19 / texto "Decide `Q-090`" sobre postes da Juniper e P-01 serem volume de luz ou só visual): segue com o level-designer + game-designer, com a condição desta DEC — **nenhum volume de luz cobre a rota Pad ↔ Mart** fora do trailer e do Mart.
+- Impacto: **level-designer** (MAP-01 P12/P19, CW-1 sem poste aceso), **game-designer** (FEAT-020, números por perna), **architect** (`LightZone` sem volume na rota). Nota em `features.md`, `open-questions.md` (`Q-090` → Respondidas), `README.md` → secretário (feito).
+
+### DEC-197 — 2026-10-10 — Atropelado fica 2–3 s no chão (ragdoll curto) e levanta (Q-122 a)
+
+- Fala do usuário (opção escolhida): a recomendada para `Q-122` (a).
+- Decidido: atropelado fica **2–3 s no chão** em **ragdoll curto** e **levanta** (Humanoid nunca morre, T22 Provisória).
+- Cabe na proposta do game-designer (FEAT-033): **2,5 s** no chão + **0,5 s** levantando = **3 s** sem controle. Número exato = tabela do game-designer, dentro da faixa.
+- **Provisório** (proposta do game-designer, não perguntado): (c) ambulância nunca atropela; (d) proteção de 5 s após levantar, mesmo carro 1× por jogador; (e) só a Tool equipada cai, sempre (DEC-103), some em 60 s na rua; (f) Hot Dog e café derrubados são perdidos, pacotes e apito recuperáveis. Architect valida ragdoll e colisão.
+- Impacto: **game-designer** (FEAT-033, FEAT-036: tirar "proposta" do tempo), **architect** (T22, ragdoll R6), **frontend-coder** (câmera no ragdoll). Nota em `features.md`, `open-questions.md` (`Q-122` → Respondidas), `README.md` → secretário (feito).
+
+Origem das DEC-198 a DEC-201: mesmo questionário (18ª parte), segunda mensagem do orquestrador. Opção escolhida em cada uma; DEC-200 **contra a sugestão**.
+
+### DEC-198 — 2026-10-10 — Trânsito rareia à noite; a N8 "The long car" é a quebra de padrão (fecha Q-103)
+
+- Fala do usuário (opção escolhida): trânsito **rareia à noite** (poucos carros), para a ANM-008 "The long car" ser quebra de padrão legível.
+- Decidido: à noite o trânsito fica **raro**. O sinal da ANM-008 (`anomalies.md`, Aprovado) não muda.
+- **Provisório** (números do game-designer, `features.md` linha Q-103): ≤ 1 carro na Calma (8–9 PM), 0 depois das 9 PM; nenhum carro nasce com ANM-008 ativa. Nota do secretário: "0 depois das 9 PM" é mais forte que "poucos carros"; o game-designer confirma o número dentro de "rareia" (se ficar 0 a noite toda, não muda regra, mas vale avisar o usuário no próximo lote).
+- Alinha com `Q-102` (densidade dia/noite): a parte "à noite" de `Q-102` fica respondida por esta DEC.
+- Impacto: **game-designer** (FEAT-033 tabela `Traffic`, NPC-022), **level-designer** (MAP-01 §9.5, §648), **architect** (`Traffic` por fase), **narrative-writer** (`world.md` "quase nenhum"). Nota em `open-questions.md` (`Q-103` → Respondidas; `Q-102` anotada), `README.md` → secretário (feito).
+
+### DEC-199 — 2026-10-10 — Carrinho do chefe fica coberto por lona na vaga do trailer; AST-043 vai ser modelada (fecha Q-082)
+
+- Fala do usuário (opção escolhida): a sugestão do level-designer.
+- Decidido:
+  - Quando o trailer assume, o **carrinho do chefe** fica **coberto por lona** na **vaga do estacionamento onde estava o trailer**.
+  - A lona **AST-043** precisa ser **modelada**. A ficha (hoje Rascunho) é completada pelo **art-director** e vai a **Aprovado só com DEC do usuário**; depois entra na fila do modeler-3d.
+- Impacto: **art-director** (ficha AST-043), **modeler-3d** (fila, após ficha Aprovada), **level-designer** (MAP-01 P2, vaga), **narrative-writer** (texto, se houver), **architect** (troca carrinho → trailer coberto no turno). Nota em `open-questions.md` (`Q-082` → Respondidas), `README.md` → secretário (feito).
+
+### DEC-200 — 2026-10-10 — Lixeira de rua AST-034 é interativa: aceita descarte na rua (fecha Q-137; contra a sugestão)
+
+- Fala do usuário (opção escolhida): **interativa** (a sugestão era "só decorativa").
+- Decidido:
+  - A lixeira de rua do AST-034 **aceita descarte** na rua: **verbo novo fora do veículo**.
+  - Ganha **acento Mustard** (style guide §3, peça interativa) e o prompt **`Prompt_Discard`** (mesmo do AST-025).
+- **Não decidido** → **`Q-166`** (game-designer; não bloqueante): o que pode ser descartado ali, quantas lixeiras são interativas, efeito.
+- Emenda a leitura de **DEC-140** (lixeira aprovada sem acento): o modelo aprovado ganha o acento Mustard; recolor = ajuste do modeler-3d, sem nova aprovação de forma.
+- Impacto: **art-director** (ficha AST-034: Mustard, interativa), **modeler-3d** (recolor), **game-designer** (FEAT de descarte, `Q-166`), **level-designer** (posição das lixeiras no MAP-01), **architect** (`InteractionService`, T6). Nota em `open-questions.md` (`Q-137` → Respondidas; nova `Q-166`), `README.md` → secretário (feito).
+
+### DEC-201 — 2026-10-10 — Níveis do roller grill = mais rolos na mesma máquina (fecha Q-134)
+
+- Fala do usuário (opção escolhida): a recomendada para `Q-134`.
+- Decidido:
+  - Cada nível do Grill (UPG-001, AST-012) = **mais rolos na mesma máquina**.
+  - **1 salsicha por par de rolos**: L1 **2 vagas**, L2 **3**, L3 **4**.
+  - **Gaveta aquecedora** de baixo = **só cenário** (sem estação nova).
+  - Números do UPG-001 (**vagas, tempos 12/10/8 s, preços**) **não mudam**.
+- **Provisório** (art-director): largura da máquina por nível e se o L3 cabe nos 5 L do carrinho (`Q-134` c); se não couber, volta ao usuário.
+- Impacto: **art-director** (AST-012 Níveis/Silhueta), **modeler-3d** (variantes L1–L3), **game-designer** (UPG-001 "Peça visível"), **level-designer** (MAP-01 L01-03). Nota em `open-questions.md` (`Q-134` → Respondidas), `README.md` → secretário (feito).
