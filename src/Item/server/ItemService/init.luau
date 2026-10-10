@@ -97,6 +97,7 @@ const ItemService = Modux.Service("ItemService", {
 		"InteractionService",
 		"RoundService",
 		"UpgradeService",
+		"VehicleService",
 	},
 	Priority = 720,
 })
@@ -822,11 +823,9 @@ end
 
 -- Free package (TASK-046) and vehicle swap ---------------------------------------------------------------------------
 
--- Vehicle in use. DEPENDS ON TASK-056 (Provisional): VehicleService does not exist yet; UpgradeService.Vehicle is the
--- atom VehicleService writes on the swap and on the "Veh" restore (DEC-184, architecture.md §19.5). When 056 lands,
--- architecture.md §19.2 asks for VehicleService:Current() here (same value).
+-- Vehicle in use (architecture.md §19.2, §19.5; TASK-056).
 function ItemService:CurrentVehicle(): string
-	return self.Dependencies.UpgradeService:GetVehicle()
+	return self.Dependencies.VehicleService:Current()
 end
 
 -- Swap reaction (L2-07, architecture.md §19.5): free package of the ingredient bound to the new vehicle (coffee).
@@ -912,9 +911,9 @@ ItemService:OnStart(function(self)
 		return
 	end
 	self:CheckKit()
-	-- Vehicle swap (§19.2: lower-priority source, so OnStart). Provisional until TASK-056: the vehicle atom of
-	-- UpgradeService instead of VehicleService.Swapped (same moment: SetVehicle is part of the swap).
-	self.Libs.Charm.subscribe(self.Dependencies.UpgradeService.Vehicle, function(to: string, from: string)
+	-- Vehicle swap (§19.2: VehicleService has a lower priority, so its Swapped exists only from OnStart on).
+	-- Also fired by a "Veh" restore that changes the vehicle (TASK-056).
+	self.Dependencies.VehicleService.Swapped:Connect(function(from: string, to: string)
 		self:OnSwapped(from, to)
 	end)
 end)
