@@ -16,12 +16,21 @@
 -- Shift end: Summary sends every customer still around away; a new shift (and a snapshot restore) starts empty
 -- (data.md: customers are not in the snapshot). Closing ends as soon as nobody is at or walking to the counter
 -- (RoundService:SetCounterProbe).
+--
+-- Orders (TASK-033; FEAT-010, FEAT-011; DEC-071, DEC-072; Orders.luau, OrderRoll.luau): the order is drawn when the
+-- customer reaches the queue (K hidden, server-only Ticket) and patience runs from there. "Take Order" (Q1, Ordering)
+-- writes Order + PatienceEndsAt + Waiting in one set write (T41), opens the tip window of the taker and turns the
+-- customer prompt into "Serve". "Serve" checks the held hot dog against the order and pays into the drawer; "Refuse"
+-- and patience running out send the customer away with $0. Every outcome: EconomyService:CountResult + Sale packet.
+-- Mood (PROVISIONAL, Q-164): visual only — Annoyed at MoodRules.AnnoyedAt, Happy on Complete/Perfect, Complaining on
+-- Wrong/Refuse/gave up; never touches DEC-072 pay.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 local Content = require(ReplicatedStorage.shared.Content)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
+local Orders = require(script.Orders)
 local Queue = require(script.Queue)
 local Modux = require(ServerScriptService.server.Modux)
 
@@ -63,11 +72,23 @@ export type Wire = {
 	Mood: string,
 }
 
+-- Sale.Result (network.md §4.3) = EconomyService SaleResult
+export type SaleResult = "Perfect" | "Complete" | "Incomplete" | "Wrong" | "Left" | "Refused"
+
 type Weighted = { Point: string, Weight: number }
 
 const TICK_RATE = 10 -- Hz
 const SEED_MAX = 2147483646
 const SEED_DOMAIN = "customers"
+const ORDER_SEED_DOMAIN = "orders" -- own stream: order draws never shift the spawn draws
+const SALE_MAX = 1000 -- Sale.Amount wire range
+const TAKE_ORDER = "take_order"
+const SERVE = "serve"
+const REFUSE = "refuse"
+const HOT_DOG = "hot_dog"
+const HAPPY = "Happy"
+const ANNOYED = "Annoyed"
+const COMPLAINING = "Complaining"
 const LEAVE_TIMEOUT = 45 -- s; a leaving customer that never reaches its exit is despawned anyway
 const NEUTRAL = "Neutral" -- arrival mood (Content.Moods)
 -- Exit split (MAP-01 §9.1: Q1 -> EX-E 60% or D1 40%). PROVISIONAL constant: no Content table holds it yet.
@@ -118,6 +139,8 @@ const CustomerService = Modux.Service("CustomerService", {
 		"InteractionService",
 		"UpgradeService",
 		"NpcService",
+		"ItemService",
+		"ClassService",
 	},
 	Priority = 590,
 })
@@ -128,6 +151,10 @@ function CustomerService:Setup()
 	self.Line = Queue.new() :: Queue.Queue
 	-- Reseeded at every ShiftStarted
 	self.Rng = Random.new() :: Random
+	-- Order draws (TASK-033), reseeded at every ShiftStarted
+	self.OrderRng = Random.new() :: Random
+	-- Server-only order of each customer in the queue, by NpcId (TASK-033)
+	self.Tickets = {} :: { [number]: Orders.Ticket }
 	-- Connected members, locked when the shop opens (DEC-185)
 	self.Party = 1 :: number
 	-- 0 = no spawn scheduled
@@ -554,14 +581,220 @@ function CustomerService:Update(id: number, patch: Patch): boolean
 	return true
 end
 
+-- Orders (TASK-033) -------------------------------------------------------------------------------------------------
+
+-- Server-only order of a customer (dev / QA). nil = not in the queue yet, or gone.
+function CustomerService:GetTicket(id: number): Orders.Ticket?
+	return self.Tickets[id]
+end
+
+-- Reached the queue: the order is drawn now (K hidden) and patience starts (FEAT-011 "Chegada", DEC-072).
+function CustomerService:OpenTicket(id: number)
+	const customer = self.Customers[id]
+	const npc = self.Dependencies.NpcService:Get(id)
+	if customer == nil or npc == nil then
+		return
+	end
+	const round = self.Dependencies.RoundService
+	const toppings = Orders.Roll(round:GetDay(), npc.CustomerType, self.OrderRng, round:IsNight())
+	const bonus = self.Dependencies.UpgradeService:GetEffect("PatienceBonus")
+	const arrivedAt = if customer.JoinedAt > 0 then customer.JoinedAt else now()
+	self.Tickets[id] = Orders.Ticket(toppings, arrivedAt, bonus)
+end
+
+-- Reached Q1: "Take Order" and "Refuse" come on (the client still hides them by state, network.md §3.6).
+function CustomerService:OnFronted(id: number)
+	const customerAnchor = self.Dependencies.NpcService:Anchors(id)
+	if customerAnchor ~= nil then
+		customerAnchor:SetAttribute("PromptAction", TAKE_ORDER)
+	end
+	self:SetPrompts(id, true)
+end
+
+-- Customer + ticket behind a prompt anchor, when the customer can still be served (not leaving).
+function CustomerService:TicketAt(anchor: Instance): (number?, Customer?, Orders.Ticket?)
+	const id = self:IdOf(anchor)
+	if id == nil then
+		return nil, nil, nil
+	end
+	const customer = self.Customers[id]
+	const ticket = self.Tickets[id]
+	if customer == nil or ticket == nil or customer.State == "Leaving" then
+		return nil, nil, nil
+	end
+	return id, customer, ticket
+end
+
+-- Common gate of the three actions: active member, shop running (Open/Closing), customer on Q1.
+function CustomerService:CanAct(player: Player, anchor: Instance, state: State?): boolean
+	if not self.Dependencies.RunStateService:IsActive(player) then
+		return false
+	end
+	if not self.Dependencies.EconomyService:IsShopOpen() then
+		return false
+	end
+	const id, customer = self:TicketAt(anchor)
+	if id == nil or customer == nil or self:Front() ~= id or customer.Slot ~= 1 then
+		return false
+	end
+	if state ~= nil and customer.State ~= state then
+		return false
+	end
+	return customer.State == "Ordering" or customer.State == "Waiting"
+end
+
+-- Outcome of a customer: shift ledger + Sale to the group. `amount` = what went into the drawer.
+function CustomerService:Settle(id: number, result: SaleResult, amount: number)
+	self.Dependencies.EconomyService:CountResult(result)
+	const net = self.Dependencies.NetService
+	if net:IsRunning() then
+		self.Libs.Net.Sale:fireClient(net.Audience, {
+			Npc = id,
+			Result = result,
+			Amount = math.clamp(math.floor(amount), 0, SALE_MAX),
+		})
+	end
+end
+
+-- "Take Order" (FEAT-011): order, real patience and Waiting in one write (T41); tip window of the taker.
+function CustomerService:TakeOrder(player: Player, anchor: Instance)
+	const id, _, ticket = self:TicketAt(anchor)
+	if id == nil or ticket == nil then
+		return
+	end
+	const class = self.Dependencies.ClassService
+	const at = now()
+	ticket.Taker = player
+	ticket.TakenAt = at
+	ticket.TipEndsAt = at + Orders.TipWindow(ticket.K, class:GetModifier(player, "TipWindow"))
+	ticket.TipAmount = class:GetModifier(player, "TipAmount")
+	const written = self:Update(id, {
+		State = "Waiting",
+		Order = Orders.Set(ticket.Toppings),
+		PatienceEndsAt = ticket.PatienceEndsAt,
+	})
+	if not written then
+		return
+	end
+	anchor:SetAttribute("PromptAction", SERVE)
+end
+
+-- "Serve" (FEAT-011, DEC-072): validates the held hot dog against the order and pays into the drawer.
+function CustomerService:Serve(player: Player, anchor: Instance)
+	const id, _, ticket = self:TicketAt(anchor)
+	const tool = self.Dependencies.ItemService:Holding(player, HOT_DOG)
+	if id == nil or ticket == nil or tool == nil then
+		return
+	end
+	const items = self.Dependencies.ItemService
+	const economy = self.Dependencies.EconomyService
+	const at = now()
+	const verdict = Orders.Evaluate(ticket.Toppings, items:Toppings(tool))
+	local result: SaleResult = verdict
+	local amount = 0
+	local mood: string? = nil
+	if verdict == "Wrong" then
+		-- $0; the hot dog stays in the server's hand (FEAT-011 "Errado devolvido")
+		mood = COMPLAINING
+	else
+		items:Consume(player, tool)
+		amount += economy:AddToDrawer(Orders.Pay(verdict, ticket.Price), "Sale")
+		if verdict == "Complete" then
+			mood = HAPPY
+			const tip = Orders.Tip(ticket, at)
+			if tip > 0 then
+				amount += economy:AddToDrawer(tip, "Tip")
+				result = "Perfect"
+			end
+		end
+	end
+	self:Settle(id, result, amount)
+	self:Leave(id, mood)
+end
+
+-- "Refuse" (FEAT-011, DEC-051): $0, unsatisfied.
+function CustomerService:Refuse(_player: Player, anchor: Instance)
+	const id = self:TicketAt(anchor)
+	if id == nil then
+		return
+	end
+	self:Settle(id, "Refused", 0)
+	self:Leave(id, COMPLAINING)
+end
+
+-- Patience ran out (FEAT-011 "Desistiu"): $0, unsatisfied.
+function CustomerService:GiveUp(id: number)
+	if self.Tickets[id] == nil then
+		return
+	end
+	self:Settle(id, "Left", 0)
+	self:Leave(id, COMPLAINING)
+end
+
+-- Patience and mood of every ticket (tick). Annoyed is written here; the client never derives it (network.md §3.6).
+function CustomerService:StepOrders(t: number)
+	const ids: { number } = {}
+	for id in self.Tickets do
+		table.insert(ids, id)
+	end
+	table.sort(ids)
+	for _, id in ids do
+		const ticket = self.Tickets[id]
+		const customer = self.Customers[id]
+		if ticket == nil or customer == nil or customer.State == "Leaving" then
+			continue
+		end
+		if t >= ticket.PatienceEndsAt then
+			self:GiveUp(id)
+		elseif customer.Mood == NEUTRAL and Orders.IsAnnoyed(ticket, t) then
+			self:Update(id, { Mood = ANNOYED })
+		end
+	end
+end
+
+function CustomerService:RegisterOrders()
+	const interaction = self.Dependencies.InteractionService
+	interaction:RegisterAction(TAKE_ORDER, {
+		Validate = function(player: Player, anchor: Instance): boolean
+			return self:CanAct(player, anchor, "Ordering")
+		end,
+		Run = function(player: Player, anchor: Instance)
+			self:TakeOrder(player, anchor)
+		end,
+	})
+	interaction:RegisterAction(SERVE, {
+		Validate = function(player: Player, anchor: Instance): boolean
+			if not self:CanAct(player, anchor, "Waiting") then
+				return false
+			end
+			const _, _, ticket = self:TicketAt(anchor)
+			return ticket ~= nil
+				and ticket.TakenAt > 0
+				and self.Dependencies.ItemService:Holding(player, HOT_DOG) ~= nil
+		end,
+		Run = function(player: Player, anchor: Instance)
+			self:Serve(player, anchor)
+		end,
+	})
+	interaction:RegisterAction(REFUSE, {
+		Validate = function(player: Player, anchor: Instance): boolean
+			return self:CanAct(player, anchor, nil)
+		end,
+		Run = function(player: Player, anchor: Instance)
+			self:Refuse(player, anchor)
+		end,
+	})
+end
+
 -- Shift -----------------------------------------------------------------------------------------------------------
 
 -- New Random for the shift: hash(RunSeed, Day, IsNight, Attempt, domain) (architecture.md §4 rule 6).
 function CustomerService:Reseed()
 	const info = self.Dependencies.RoundService:Info()
 	const seed = self.Dependencies.RunStateService.Seed()
-	const key = `{seed}|{info.Day}|{if info.IsNight then 1 else 0}|{info.Attempt}|{SEED_DOMAIN}`
-	self.Rng = Random.new(hash(key) % SEED_MAX + 1)
+	const base = `{seed}|{info.Day}|{if info.IsNight then 1 else 0}|{info.Attempt}|`
+	self.Rng = Random.new(hash(base .. SEED_DOMAIN) % SEED_MAX + 1)
+	self.OrderRng = Random.new(hash(base .. ORDER_SEED_DOMAIN) % SEED_MAX + 1)
 end
 
 function CustomerService:OnPhase(phase: string)
@@ -591,6 +824,7 @@ function CustomerService:Step()
 			self.NextSpawnAt = math.max(self.NextSpawnAt + interval, t + interval * 0.5)
 		end
 	end
+	self:StepOrders(t)
 	-- Safety net: a leaving customer that never reaches its exit still frees its NPC
 	for id, customer in self.Customers do
 		if customer.State == "Leaving" and t - customer.LeftAt > LEAVE_TIMEOUT then
@@ -632,6 +866,22 @@ CustomerService:OnInit(function(self)
 	-- Someone else despawned one of ours (dev parade, anomaly in wave 2): drop the record
 	self.Dependencies.NpcService.Despawned:Connect(function(id: number)
 		self:Forget(id)
+	end)
+
+	-- Orders (TASK-033). Customers sent away at the shift end get no outcome: the shop is closed (Summary), they
+	-- only count as arrived and not satisfied (PROVISIONAL, board TASK-032 note).
+	self:RegisterOrders()
+	self.Joined:Connect(function(id: number)
+		self:OpenTicket(id)
+	end)
+	self.Fronted:Connect(function(id: number)
+		self:OnFronted(id)
+	end)
+	self.Left:Connect(function(id: number)
+		self.Tickets[id] = nil
+	end)
+	self.Removed:Connect(function(id: number)
+		self.Tickets[id] = nil
 	end)
 end)
 

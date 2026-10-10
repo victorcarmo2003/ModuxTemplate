@@ -4,8 +4,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 local Content = require(ReplicatedStorage.shared.Content)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
+local Orders = require(ServerScriptService.server.Customer.CustomerService.Orders)
 local Queue = require(ServerScriptService.server.Customer.CustomerService.Queue)
 
+export type State = "Arriving" | "Queued" | "Ordering" | "Waiting" | "Leaving"
 export type Outcome = "spawned" | "skipped_queue_full" | "skipped_npc_cap"
 export type LeaveReason = "service" | "shift_end"
 export type Customer = {
@@ -33,7 +35,7 @@ export type Wire = {
 	PatienceEndsAt: number,
 	Mood: string,
 }
-export type State = "Arriving" | "Queued" | "Ordering" | "Waiting" | "Leaving"
+export type SaleResult = "Perfect" | "Complete" | "Incomplete" | "Wrong" | "Left" | "Refused"
 
 export type Public = {
 	Customers: { [number]: Customer },
@@ -43,10 +45,12 @@ export type Public = {
 	Left: SignalLib.Signal<number, LeaveReason>,
 	Line: Queue.Queue,
 	NextSpawnAt: number,
+	OrderRng: Random,
 	Party: number,
 	Removed: SignalLib.Signal<number>,
 	Rng: Random,
 	SpawnAttempted: SignalLib.Signal<Outcome>,
+	Tickets: { [number]: Orders.Ticket },
 	Warned: { [string]: boolean },
 	Setup: (self: Public) -> (),
 	WarnOnce: (self: Public, key: string, message: string) -> (),
@@ -78,6 +82,18 @@ export type Public = {
 	SendAllAway: (self: Public) -> (),
 	RemoveAll: (self: Public) -> (),
 	Update: (self: Public, id: number, patch: Patch) -> boolean,
+	GetTicket: (self: Public, id: number) -> Orders.Ticket?,
+	OpenTicket: (self: Public, id: number) -> (),
+	OnFronted: (self: Public, id: number) -> (),
+	TicketAt: (self: Public, anchor: Instance) -> (number?, Customer?, Orders.Ticket?),
+	CanAct: (self: Public, player: Player, anchor: Instance, state: State?) -> boolean,
+	Settle: (self: Public, id: number, result: SaleResult, amount: number) -> (),
+	TakeOrder: (self: Public, player: Player, anchor: Instance) -> (),
+	Serve: (self: Public, player: Player, anchor: Instance) -> (),
+	Refuse: (self: Public, _player: Player, anchor: Instance) -> (),
+	GiveUp: (self: Public, id: number) -> (),
+	StepOrders: (self: Public, t: number) -> (),
+	RegisterOrders: (self: Public) -> (),
 	Reseed: (self: Public) -> (),
 	OnPhase: (self: Public, phase: string) -> (),
 	Step: (self: Public) -> (),
