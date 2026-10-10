@@ -2,9 +2,13 @@ Status: Rascunho
 
 # Dados: perfil persistido, estado da run, MemoryStore
 
-Autor: architect. Versão 4, 2026-10-10 (**TASK-001**: estado DEC-140 a DEC-201). Versão anterior: 3.1, 2026-10-08.
+Autor: architect. **Versão 5, 2026-10-10 (pós onda 1):** §5 novo — o que persiste por categoria (progressão,
+inventário, moeda, desbloqueios), `Member` enxuto, chaves de snapshot das ondas 2–4 (`T`, `Veh`, `Lt`, `Bs`, `Bn`)
+com as chaves que a onda 1 já grava (`Run`, `M`, `Sh`, `Cash`, `Fp`, `Stk`, `Stn`, `Upg`), política de migração.
+Versão 4, 2026-10-10 (**TASK-001**: estado DEC-140 a DEC-201). Versão anterior: 3.1, 2026-10-08.
 
-> **Base Provisória (DEC-193).** Rascunho que vale para construir. Rede: `network.md` v4. Tabelas: `content-data.md` v4.
+> **Base Provisória (DEC-193).** Rascunho que vale para construir. Rede: `network.md` v5. Tabelas: `content-data.md` v5.
+> Onde §1–§4 divergem do §5, **vale o §5**.
 
 Versão 4:
 - **Template v1 confirmado** com as chaves de classe por animal (DEC-186): conta nova = `{ class_dog = true }`,
@@ -164,6 +168,9 @@ Tipos ilustrativos; cada parte vive em atoms do Service dono.
 
 ### 2.1 Raiz e membros (`RunStateService`)
 
+> v5: `Sanity`, `CoffeeReadyAt`, `SeenAnomalies` e `RevivesTonight` **saem** do `Member` (o `VitalService` guarda por
+> `UserId`); `Stash` só vale para quem está fora do servidor ou `Down`. Tipo atual no §5.2.
+
 ```lua
 type LifeState = "Active" | "Down" | "Reviving" | "Spectator" | "Away"
 
@@ -265,6 +272,8 @@ run; sobrescrito quando o jogador começa outra run. ~120 B.
 
 ### 3.3 `Snap` — chave `RunId` (DEC-080)
 
+> v5: as chaves e o exemplo atualizados (Tools em `T`, não em `M[uid].T`; `Fp`, `Stn`, `Lt`, `Bs`) estão no §5.3.
+
 Estado de **início do turno corrente**. Chaves curtas para caber na cota (R16). Exemplo com 2 jogadores:
 
 ```lua
@@ -363,3 +372,111 @@ Falha de escrita (cota, rede): log + `Notice` interno; a run viva segue; só a r
 - Espectador, estado de vida, Tools: só no snapshot.
 - Oferta da bancada: só no snapshot (`Bn`), nunca no perfil.
 - Faixa de sanidade, `LookPack`, humor de cliente, aparência de NPC: estado vivo (DEC-166 a DEC-169, DEC-181, DEC-187).
+
+## 5. Ondas 2–4 (versão 5)
+
+Contrato de código: `architecture.md` §19. Nada aqui muda regra de jogo.
+
+### 5.1 O que persiste, por categoria
+
+| Categoria | Persiste no perfil (para sempre) | Só na run (memória + snapshot de 15 min) | Escreve |
+|---|---|---|---|
+| Moeda | `Gems`, `GemsEarned` (DEC-070, DEC-104) | `Cash` da party (DEC-035) | `RewardService`, `ClassService` (débito) / `EconomyService` |
+| Desbloqueios | `Classes`, `SelectedClass` (DEC-186) | classe travada do membro (DEC-069) | `ClassService` |
+| Progressão | `EndlessDays`, `Achievements`, `BadgesAwarded`, `Stats` (sem XP, DEC-081) | Day, Night, Attempt, `Chances`, veículo, níveis de upgrade por veículo, `Endless` | `RewardService` / Round, RunState, Vehicle, Upgrade |
+| Inventário | `ReviveCredits` (DEC-117) — único "item" persistido | Tools de cada membro (snapshot `T`), estoque, oferta S1 | `ReviveService` / Item, Kitchen, Market |
+| Idempotência | `Receipts` (50), `RunRewards { RunId, Keys }` | — | `MonetizationService`, `RewardService` |
+
+**Template continua `Version = 1`** (§1.1): as ondas 2–4 só **leem e escrevem** campos que já existem. Nada novo
+persiste por sanidade, luz, anomalia, chefe, ladrão, trânsito ou passantes (estado vivo do turno).
+
+### 5.2 `Member` (versão 5)
+
+```lua
+type LifeState = "Active" | "Down" | "Reviving" | "Spectator" | "Away"
+type Member = {
+	UserId: number,
+	Class: string,                 -- travada na run (DEC-069)
+	State: LifeState,              -- escrito só por VitalService via RunStateService:SetLifeState
+	StateBeforeAway: LifeState?,
+	Stash: { { Kind: string, Count: number, Extra: string? } }, -- só fora do servidor ou Down; escrito só pelo ItemService (SetStash)
+	EverJoined: boolean,           -- PriceParty (DEC-121)
+}
+```
+
+Estado por jogador que **não** está no `Member` (dono guarda por `UserId`, sobrevive a `Away`):
+
+| Dado | Dono | Zera |
+|---|---|---|
+| sanidade, máximo, `DarkSince`, `ProtectUntil` | `VitalService` | início de cada noite (classe) |
+| `CoffeeReadyAt` | `VitalService` | nunca (cooldown real, FEAT-030 "abuso") |
+| `RevivesTonight` (DEC-129) | `VitalService` | início de cada noite |
+| anomalias vistas na noite (−5 uma vez, DEC-056) | `VitalService` (`SeeAnomaly`) | início de cada noite |
+| vaga de esconder | `HideService` | fim da noite, queda, saída |
+
+### 5.3 Snapshot: chaves (versão 5)
+
+`V` continua **1** (formato nunca publicado; a onda 1 guarda só em memória). Ordem de restore = ordem de registro
+(prioridade do Service, `Snapshots.luau`).
+
+| Chave | Dono | Conteúdo | Onda | Restore `RepeatNight` | Restore `Resume` |
+|---|---|---|---|---|---|
+| `Run` | RunState | `{ Seed, Roster, Pp, Ch, End, Cnt }` | 1 | `Ch` **não** volta (já gasto) | tudo |
+| `M` | RunState | `{ [uid] = { C, S, J } }` (**sem `T`**, T50) | 1 (ajuste A3) | todos `Active` (DEC-111, 113) | `S` como capturado |
+| `Sh` | Round | `{ D, N, Ni, A }` | 1 | `A + 1`, captura nova | fase `Resume`, captura nova |
+| `Cash` | Economy | número | 1 | igual | igual |
+| `T` | Item | `{ [uid] = { { item, count, extra? } } }` | 2 (ajuste A3 + W2-G) | igual | igual |
+| `Fp` | Item | `{ G = pacotes já pegos, L = pacotes no mundo }` (pacote grátis, TASK-046) | 1 | igual | igual |
+| `Stk` | Kitchen | `Amount` por ingrediente | 1 | igual | igual |
+| `Stn` | Kitchen | estado por estação (chave estável `StableKey`) | 1 | igual | igual |
+| `Upg` | Upgrade | níveis por veículo (DEC-184) | 1 | igual | igual |
+| `Veh` | Vehicle | chave do veículo atual | 2 | igual (posições + `SetVehicle`) | igual |
+| `Lt` | Light | `{ S = interruptor }` | 2 | ligado (FEAT-020) | igual |
+| `Bs` | Boss | chaves `Once` já tocadas | 2 | igual | igual |
+| `Bn` | Market | chave do especial de S1 (`none`) | 4 | igual (FEAT-035) | igual |
+
+Não entram (estado vivo; recomeça vazio ou recalculado): sanidade, faixa e `LookPack`, NPCs, ladrão, passantes, carros,
+ambulância, anomalias (agenda recalculada com `Attempt`), esconderijos, itens no chão, gaveta, ligação em curso,
+cutscene.
+
+Exemplo (2 jogadores, Night 2, ~1,1 KB em JSON):
+
+```lua
+{
+	V = 1, At = 1760000000,
+	Run = { Seed = 123456789, Roster = { 111, 222 }, Pp = 2, Ch = 1, End = false, Cnt = { quentin_caught_day = 6 } },
+	M = { ["111"] = { C = "class_cat", S = "Active", J = true }, ["222"] = { C = "class_owl", S = "Spectator", J = true } },
+	Sh = { D = 7, N = 2, Ni = true, A = 0 },
+	Cash = 412,
+	T = { ["111"] = { { "pack_sausages", 4 }, { "coffee", 1 }, { "hot_dog", 1, "ketchup,cheese" } }, ["222"] = {} },
+	Fp = { G = { "pack_cheese", "pack_bacon", "pack_potato_sticks" }, L = {} },
+	Stk = { bun = 18, sausage = 20, ketchup = 41, mustard = 30, cheese = 12, bacon = 9, potato_sticks = 15, cream_cheese = 6, coffee = 22 },
+	Stn = {},
+	Upg = { cart = { grill = 2, cooler = 1, counter = 2, cash_drawer_lock = 1, trailer_lights = 0 },
+	        trailer = { grill = 1, cooler = 1, counter = 1, cash_drawer_lock = 0, trailer_lights = 1 } },
+	Veh = "trailer",
+	Lt = { S = true },
+	Bs = { "call_day_2", "call_day_3", "call_trailer_bought", "call_night_1" },
+	Bn = "none",
+}
+```
+
+Tamanho: `Bs` cresce até ~40 chaves curtas (~0,6 KB no fim da run); total ≤ 2 KB com 4 jogadores. Se passar do alvo,
+`Bs` vira lista de índices de `BossCalls` (mudança de `V`).
+
+### 5.4 Migração
+
+| Caso | Como |
+|---|---|
+| Campo **novo** no Template | `Reconcile` acrescenta; **sem** bump de `Version` |
+| Renomear, remover ou mudar o tipo de campo | `Version += 1` no Template + `Migrations[v](data)` (puro, append-only, §1.5); QA com fixture da versão anterior |
+| Chave de conteúdo removida (classe, achievement) | a migração devolve gemas da classe e volta `SelectedClass` para `class_dog` (§1.5) |
+| Formato do snapshot | `V += 1` + conversão `V − 1 → V` no `RunStateService` (aceita a anterior); mais antigo → "That shift can't be resumed." (R19) |
+| MemoryStore `Runs`/`PlayerRun` | campo `V` próprio; mesma regra |
+
+Nenhuma migração é necessária nas ondas 2–4 com este contrato.
+
+### 5.5 MemoryStore (onda 4)
+
+§3 vale sem mudança. `SessionService` é o único que fala com `MemoryStoreService`; `RunStateService` entrega cada
+captura a `SessionService:WriteSnapshot(snap)` (onda 4). Antes disso, captura só em memória (como a onda 1).

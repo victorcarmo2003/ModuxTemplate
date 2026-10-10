@@ -2,7 +2,9 @@ Status: Rascunho
 
 # Dados de conteúdo (data-driven)
 
-Autor: architect. Versão 4.1, 2026-10-10 (**TASK-003**: implementação em `src/Shared/Content/`, §1.5; DEC-215 na
+Autor: architect. **Versão 5, 2026-10-10 (pós onda 1):** §3.20 Animations, §3.21 Sounds/Music, §6 tabelas das
+ondas 2–4 (Shift de noite, Nights, LightGroups, Sanity, Thief, BossCalls, Anomalies, Hallucinations, Cutscenes,
+WalkPaths, campos novos, Actions/Notices novas). Contrato de código: `architecture.md` §19. Versão 4.1, 2026-10-10 (**TASK-003**: implementação em `src/Shared/Content/`, §1.5; DEC-215 na
 tábua do trailer). Versão 4, 2026-10-10 (**TASK-001**: estado DEC-140 a DEC-201, núcleo da onda 1). Anterior: 3.1.
 Formato das tabelas que game-designer, narrative-writer e level-designer preenchem e que o código só lê.
 Base: DEC-044 ("parâmetros são tabela"), propostas das rodadas 1 e 2 (Aprovadas), fichas de `design/` e `story/`.
@@ -747,6 +749,73 @@ física, DEC-179). Lixeira de rua (DEC-200) reaproveita `discard` (o que aceita:
 | Hallucinations | `Key`, `MinSanity`, `MaxSanity`, `Kind`, `Cooldown`, `Weight` (teto por `Q-043`) |
 | OpalLines | `Phase` (`Day`, `N1_3`, `N4_6`, `N7_10`), `Lines` (CHR-003) |
 
+### 3.20 Animations (v5; `architecture.md` §19.20, T47; `Q-167`)
+
+Animações do rig IK do usuário, exportadas como `Animation` R6 e enviadas ao grupo. A tabela só guarda id e uso; quem
+toca é o `AnimController` (client) e o `Animate` do personagem (crew).
+
+| Campo | Tipo | Exemplo |
+|---|---|---|
+| `Key` | | `faint` |
+| `Id` | `rbxassetid://…` ou `""` (vazio = fallback: locomoção R6 padrão do Roblox; one-shot não toca) | `""` até o upload |
+| `Rig` | `"Crew" \| "Npc" \| "Actor"` | `Crew` |
+| `Looped` | bool | false |
+| `Priority` | nome de `Enum.AnimationPriority` | `Action` |
+| `FadeTime`, `Speed` | s, multiplicador | 0.15, 1 |
+| `Ref` | AST-### / DEC | `AST-069`, DEC-202 |
+
+`Locomotion` (registro único): conjunto → papel → chave da linha. Papéis: `idle`, `walk`, `run`, `jump`, `fall`,
+`climb`, `sit`.
+
+| Conjunto | Usado por |
+|---|---|
+| `crew` | personagem do jogador (`Animate` R6, gravado pelo `CharacterService`) |
+| `npc` | clientes, ladrão, passantes (client, T47) |
+| `walt` | Walt na cutscene final (andar corcunda com bastão, DEC-202) |
+| `medic` | médicos (onda 4) |
+| `walker` | Walker (ANM-007, DEC-212) |
+
+Lista inicial (Provisória, `Q-167`; ids vazios até o upload):
+
+| Rig | Chaves |
+|---|---|
+| Crew | `crew_idle`, `crew_walk`, `crew_jump`, `crew_fall`, `faint` (senta e deita de lado, ~1,2 s, style guide §4.6), `get_up` (atropelado levanta, 0,5 s), `hide` (agachado, loop), `drink` (1,5 s), `give`, `answer_phone` (loop), `wave_skip` (voto da cutscene, opcional) |
+| Npc | `npc_idle`, `npc_walk`, `npc_wait` (impaciente, loop), `npc_happy`, `npc_complain`, `npc_refuse_leave`, `thief_sneak`, `thief_open` (loop), `thief_flee` |
+| Actor | `opal_idle` (hoje id fixo no `OpalController`), `walt_walk`, `walt_offer_coffee`, `medic_walk`, `medic_carry`, `medic_lift`, `walker_step`, `waver_wave` (silhueta da janela, N6), `copy_backwalk` (N4), `raincoat_idle` |
+
+`Validate`: `Id` vazio ou `rbxassetid://<n>`; toda chave de `Locomotion` existe na lista com o `Rig` certo.
+
+### 3.21 Sounds, Music e SoundRules (v5; `architecture.md` §19.21, T55; `Q-168`)
+
+`Sounds` (lista):
+
+| Campo | Tipo | Exemplo |
+|---|---|---|
+| `Key` | | `phone_ring` |
+| `Id` | `rbxassetid://…` ou `""` (silêncio, sem erro) | `""` até `Q-168` |
+| `Group` | `"Music" \| "Ambient" \| "Sfx" \| "Voice" \| "Ui"` | `Sfx` |
+| `Volume` | 0–1 | 0.6 |
+| `Looped` | bool | true |
+| `Spatial`, `MaxDistance` | bool, studs | true, 60 |
+| `Ref` | AST-### / licença em `credits.md` | — |
+
+`Music` (cues): `{ Key, Sound (chave de Sounds), When = { IsNight: boolean?, Phase: { string }?, Window: string? },
+FadeIn, FadeOut, Priority }`. O `AudioController` toca a cue de maior `Priority` cuja condição vale; `PushMusic`
+sobrepõe (cutscene, final).
+
+`SoundRules` (registro): `MaxVoices = 12` (`architecture.md` §12.5), `DuckOnCall = 0.3`, `SirenMaxVolume` (DEC-005),
+`ScareMaxVolume` (DEC-173).
+
+Lista inicial (Provisória, `Q-168`):
+
+| Grupo | Chaves |
+|---|---|
+| Music | `music_lobby`, `music_day`, `music_night_calm`, `music_night`, `music_finale`, `music_credits` |
+| Ambient | `amb_day_street`, `amb_night_street`, `amb_mart_hum`, `amb_clock_tick` (C-01), `amb_fog` (N10) |
+| Sfx | `grill_sizzle`, `bun_slice`, `topping_squirt`, `topping_sprinkle`, `restock`, `coin`, `drawer`, `buy`, `upgrade_done`, `trash`, `coffee_brew`, `coffee_drink`, `switch_click`, `phone_ring`, `phone_pickup`, `car_engine`, `car_honk_soft`, `hit_boing`, `siren_soft`, `door_knock`, `door_creak`, `curtain`, `post_buzz`, `post_tunk`, `walker_step`, `smoke_poof`, `splash`, `whisper`, `thief_open`, `thief_caught`, `faint`, `revive` |
+| Ui | `toast`, `summary`, `prompt_done`, `skip_vote` |
+| Voice | (vazio no MVP: legenda sem voz) |
+
 ## 4. Quem edita o quê
 
 - **game-designer**: números e listas (preços, tempos, pesos, fases, classes, noites, bancada, revive, densidade de trânsito).
@@ -772,3 +841,193 @@ Adicionar campo a uma tabela é mudança de contrato: passa pelo architect.
 | Nomes de malha de acessório e de peça (`Acc_*`, `Part`) | §3.7, §3.16 | TASK-002/TASK-006 (kits; acessório em `Assets.Crew.Accessories/<chave>`, §18.9.1) |
 | `Sanity.BandMinHold` | §3.16 | teste da onda 2 |
 
+## 6. Ondas 2–4: tabelas novas e mudanças (versão 5)
+
+Contrato de código: `architecture.md` §19. Cada onda abre com a task de contrato (W2-0, W3-0, W4-0) que cria os
+arquivos de tabela com `Keys` certas e números iniciais; o dono do conteúdo (coluna da §2) revisa depois sem tocar no
+`init.luau`. Números de design aqui são os das fichas; ajustar número não exige DEC.
+
+### 6.1 Mapa (onda em que a tabela entra no `init.luau`)
+
+| Tabela | Arquivo | Onda | Gera enum de rede? | Dono do conteúdo |
+|---|---|---|---|---|
+| Shift (mudança) | `Shift.luau` | 2 | `PhaseKeys` (sem mudança de chave) | game-designer |
+| Nights | `Nights.luau` | 2 | não | game-designer + narrative-writer |
+| LightGroups | `LightGroups.luau` | 2 | não (id = `IndexOf`) | game-designer + level-designer |
+| Sanity | `Sanity.luau` | 2 | não | game-designer |
+| Thief | `Thief.luau` | 2 | não | game-designer |
+| BossCalls, BossCallRules | `BossCalls.luau` | 2 | `Call.Call` | narrative-writer (falas) + game-designer (gatilhos) |
+| GemRewards, Achievements | `GemRewards.luau`, `Achievements.luau` | 2 | não | game-designer |
+| Animations | `Animations.luau` | 2 | não | usuário (ids) + art-director (lista) |
+| Sounds, Music, SoundRules | `Sounds.luau` | 2 | não | art-director + usuário (ids, licença) |
+| Actions, Notices (linhas novas) | existentes | 2–4 | `Interact.Action`, `Notice.Kind` | architect + narrative-writer |
+| Vehicles, Items, RunParams, Flow, Stations (campos novos) | existentes | 2 | não | game-designer |
+| Anomalies, AnomalyCues | `Anomalies.luau` | 3 | `Anomalies.Anomaly`, `AnomalyCue.Cue` | game-designer + narrative-writer |
+| AnomalyRules (servidor) | `src/Anomaly/server/AnomalyService/Rules/` | 3 | não | game-designer |
+| Hallucinations | `Hallucinations.luau` | 3 | não | game-designer + art-director |
+| Cutscenes | `Cutscenes.luau` | 3 | `Cutscene.Scene` | narrative-writer + level-designer |
+| Traffic | `Traffic.luau` | 3 | não | level-designer + game-designer |
+| WalkPaths | `WalkPaths.luau` | 3 | não (id = `IndexOf`) | level-designer |
+| Revive, Ambulance, Products, MarketBench/BenchItems, PartyConfig | — | 4 | `Bench.Item` | game-designer / architect |
+
+### 6.2 Shift (mudança de forma)
+
+Campos novos por linha: `Selling: boolean` (nasce cliente, gaveta conta), `SkipWithoutProbe: boolean`,
+`Night: { Duration, ClockFrom, ClockTo }?` (override no turno de noite). `Closing` passa a `Kind = "Any"`.
+
+| Key | Duration (dia / noite) | Relógio dia | Relógio noite | Selling | SkipWithoutProbe |
+|---|---|---|---|---|---|
+| `Resume` | 15 | parado | parado | não | não |
+| `Intro` | 50 (cap) | 7:00 AM | — | não | **sim** |
+| `Call` | — / 60 (cap) | — | 7:00 PM parado | não | **sim** |
+| `Prep` | 60 / **90** | 7→8 AM | 7→8 PM | não | não |
+| `Open` | 360 / — | 8 AM→6 PM | — | **sim** | não |
+| `Night` | — / `Nights[k].Duration` | — | 8 PM→6 AM | **sim** | não |
+| `NightEnd` | — / 3 | — | 6:00 AM | não | não |
+| `Closing` | ≤ 30 / ≤ 30 | 6 PM | 6 AM | não | não |
+| `Summary` | 15 / **20** | parado | parado | não | não |
+| `NightLost` | — / 6 | — | parado | não | não |
+| `Finale` | — / 150 (cap) | — | 6 AM | não | **sim** |
+| `RunEnd` | 15 | parado | parado | não | não |
+
+### 6.3 Nights
+
+| Campo | Tipo | Valor inicial | Origem |
+|---|---|---|---|
+| `Index` | 1..10 | — | DEC-060 |
+| `Duration` | s (8 PM → 6 AM) | 1200, 1260, 1320, 1380, 1440, 1560, 1620, 1680, 1740, 1800 | DEC-127 |
+| `NewAnomaly` | chave de `Anomalies` | `anm_001_blank_folks` … `anm_010_hush` | DEC-073 |
+| `Call`, `ShortCall` | chaves de `BossCalls` | `call_night_<N>`, `call_night_short` | FEAT-018 |
+| `MaxSimultaneous` | int | 1, 1, 1, 2, 2, 2, 2, 3, 3, 3 | FEAT-022 |
+| `MinGap` | s | 60 (1–4), 40 (5–7), 25 (8–10) | FEAT-022 |
+| `Customers` | `{ BaseInterval, Max }` | Max 6 (`Flow.MaxCustomersNight`); intervalo com o game-designer | FEAT-009 |
+
+Registro `Nights.Windows` (minutos de jogo): `Calm = { 1200, 1260 }`, `Shift = { 1260, 1740 }`,
+`Last = { 1740, 1800 }` (FEAT-003). Registro `Nights.Occurrences`: `Premiere = 3`, `Recent = 2` (1–2 noites depois),
+`Old = 1` (`progression.md` §4.2). `Validate`: 10 linhas, `Duration` crescente, toda `NewAnomaly` existe.
+
+### 6.4 LightGroups
+
+| Key | Kind | Condição (além de ser noite) | HushOff | Outros |
+|---|---|---|---|---|
+| `mart` | `Always` | — | **false** (nunca apaga, ANM-010) | zonas LZ-4, LZ-5 |
+| `trailer_interior` | `Switch` | veículo atual `trailer` e interruptor ligado | true | LZ-1, LZ-2; `Cooldown = 0.5` (FEAT-020) |
+| `trailer_lights` | `Upgrade` | idem + `trailer_lights` ≥ 1 | true | LZ-3; raio = efeito `LightRadius` (18) |
+| `juniper_posts` | `Posts` | — (visual; volume só se marcado, DEC-196) | true | `Step = 1.5` (s por poste no Hush, MAP-01 §5.6) |
+
+### 6.5 Sanity (completa a §3.16)
+
+Campos novos: `DarkPhases = { "Call", "Prep", "Night", "NightEnd" }`, `SeeAngle = 40` (graus, cone total),
+`SeeTime = 1` (s acumulado), `SeeRange = 60` (padrão; por anomalia em `Anomalies.ViewRange`), `RuleBroken = 35`,
+`CoffeeDrinkTime = 1.5`, `CoffeeNightOnly = true` (Provisório, `Q-170`). `Bands`, `BandMinHold` como na §3.16.
+
+### 6.6 Thief (completa a §3.16; DEC-050, DEC-182)
+
+| Campo | Valor inicial |
+|---|---|
+| `ChanceByDay` | `{ [1] = 0, [2] = 0.5, Default = 0.7 }` |
+| `MaxPerDay` | 1 |
+| `WindowClock` | `{ 540, 900 }` (9 AM–3 PM) |
+| `LurkMax` | 120 |
+| `ZoneRadius`, `ZoneEmptyTime` | 14, 3 |
+| `ApproachTime` | 4 (fixo, DEC-182) |
+| `OpenTime`, `StealPct` | do efeito do Cash Drawer Lock (`DrawerOpenTime` 8/16, `StealPct` 50/30) |
+| `MinDrawer`, `CatchReward` | 5, 5 |
+| `Lurks`, `Spawn`, `Exits` | `{ "L1", "L2", "L3" }`, `"ST-R"`, `{ "ST-R", "EX-E" }` (MAP-01 §5.3) |
+
+### 6.7 BossCalls e BossCallRules (FEAT-018; `script.md`)
+
+| Campo | Tipo | Exemplo |
+|---|---|---|
+| `Key` | | `call_night_3` (sentinela `none`) |
+| `Lines` | `{ { Text, Speaker? } }` | `{ { Text = "Keep an eye on the bank clock." } }` |
+| `Trigger` | `{ Kind = "DayPrep" \| "DayInfinite" \| "NightCall" \| "NightRepeat" \| "TrailerBought" \| "LostCritical" \| "LostLastChance" \| "RunOver" \| "Hint", Day?, Night?, Action?, Variant? }` | `{ Kind = "NightCall", Night = 3 }` |
+| `Priority` | 1 (baixa) .. 4 (máxima) | 4 |
+| `Once` | bool (uma vez por run) | true |
+
+`BossCallRules`: `LineTime = 2.5`, `AutoAnswer = 15`, `DayMaxLines = 7`, `NightMaxSeconds = 45`. Hints:
+`Trigger.Action` = chave de `Actions` cuja 1ª execução na run dispara a dica (via `InteractionService.Performed`).
+`Validate`: cada noite tem `NightCall`; existe exatamente um `NightRepeat`; nenhuma linha passa do teto de tempo.
+
+### 6.8 Vehicles, Items, RunParams, Flow, Stations, Revive (campos novos)
+
+| Tabela | Campo novo | Valor |
+|---|---|---|
+| `Vehicles.trailer` | `Reminder = { FirstDay = 5, Every = 3 }` | FEAT-017 |
+| `Items` | `DropDespawn` dos pacotes e do `revive_kit` | **60 s** na rua (FEAT-036, DEC-197; era 120); `"NextShiftEnd"` no balcão (`DROP-T`) |
+| `Items.coffee` | `Use = true` (ativa) | FEAT-021 |
+| `RunParams` | `BindingWave` | 1 → 2 → 3 (qual `Required.Wave*` o `PlaceService` valida) |
+| `Flow` | `NightInterval` (base do fluxo de noite) | com o game-designer (FEAT-009) |
+| `Stations.coffee_machine` | `Params.BrewTime = 6` | FEAT-021 (Barista 3 pela classe) |
+| `Revive` | `BodyFallback = 20` | s até o corpo sumir sem ambulância (ondas 2–3, T54) |
+
+### 6.9 Actions e Notices (linhas novas)
+
+Actions:
+
+| Key | Text | Hold | Radius | Night | Wave | Nota |
+|---|---|---|---|---|---|---|
+| `answer_phone` | "Answer" | 0 | 7 | Any | 2 | **nova**; FEAT-018 |
+| `get_up` | "Get Up" | 0 | 10 | NightOnly | 3 | **nova**; FEAT-023 |
+| `brew_coffee` | "Brew Coffee" / "Take Coffee" (`PromptText`) | **1** (era 0) | 7 | Any | 2 | FEAT-021 |
+| `give_coffee` | "Give" | **0.5** (era 0) | 7 | NightOnly | 2 | FEAT-021 |
+| `hide` | "Hide" | **0.5** (era 0) | 7 | NightOnly | 3 | FEAT-023 |
+| `safe_spot` | — | — | — | — | — | fica na tabela (enum), **sem prompt**: o ponto seguro é zona |
+
+Notices (`Audience`, `ValueFrom`):
+
+| Key | Text (placeholder) | Audience | ValueFrom | Onda |
+|---|---|---|---|---|
+| `trailer_available` | "The old trailer is for sale! Check the parking lot." | Party | None | 2 |
+| `trailer_waiting` | "The trailer is still waiting in the lot." | Party | None | 2 |
+| `trailer_bought` | "Trailer bought! It's yours after this shift." | Party | None | 2 |
+| `gems_gained` | "+{value} gems" | Player | Number | 2 |
+| `afk_no_gems` | "No gems today: serve at least 3 orders." | Party | None | 2 |
+| `achievement` | "{achievement} unlocked!" | Player | Achievements | 2 |
+| `thief_caught` | "Nice catch! +${value}" | Party | Number | 2 |
+| `coffee_cooldown` | "Wait {value}s for another coffee" | Player | Number | 2 |
+| `coffee_full` | "You're wide awake" | Player | None | 2 |
+| `hide_taken` | "Someone's already there" | Player | None | 3 |
+| `revive_used`, `revive_credit_saved`, `special_on_bench`, `shift_cant_resume`, `not_in_roster` | `ui-text.md` | conforme | conforme | 4 |
+
+`Notices.ValueFrom` ganha `"Achievements"`. Textos finais: narrative-writer (`ui-text.md`).
+
+### 6.10 Anomalies, AnomalyCues, AnomalyRules (onda 3)
+
+`Anomalies` (shared; **sem** verbo nem prazo, T10):
+
+| Campo | Tipo | Exemplo (ANM-007) |
+|---|---|---|
+| `Key`, `Ref`, `Name` | | `anm_007_walker`, `ANM-007`, "The Walker" |
+| `Night` | 1..10 (estreia) | 7 |
+| `Actor` | `"Customer" \| "Street" \| "Vehicle" \| "World" \| "Audio" \| "Item"` | `Street` |
+| `NpcCost` | 0 ou 1 (teto de 3 atores à noite) | 1 |
+| `Scope` | `"Party" \| "PerPlayer"` (DEC-204: sinal para todos; penalidade por jogador) | `Party` |
+| `ViewRange`, `SeeMode` | studs, `"Cone" \| "AudioZone"` | 300, `Cone` |
+| `ExclusiveWith` | chaves | — |
+| `Scripted` | `{ Night, Clock }?` | `{ Night = 10, Clock = 1785 }` (5:45 AM) |
+| `Tension` | bool: liga o clima Night e a rua deserta (`Q-159`, `Q-162`; Provisório) | true |
+
+`AnomalyCues`: lista de chaves de efeito instantâneo (`blank_coin`, `smoke`, `clock_stop`, `clock_resume`,
+`mirror_smile`, `raincoat_drip`, `waver_more`, `post_buzz`, `post_flicker`, `walker_step`, `car_highbeam`,
+`car_honk`, `trailer_blackout`, `knock`, `door_crack`, `hush_fog`).
+
+`Rules/` (servidor, um arquivo por anomalia ou uma tabela): `{ Anomaly, Verb, LikelyWrongVerb, Window, Params,
+IsCritical }`. `Params` por anomalia (FEAT-023, NPC-009..018): N3 `DarkHold = 5`, `Window = 60`; N6
+`LookLimit = 3`, `AutoOff = 20`; N7 `Steps = 10`, `StepEvery = 1`, `BackEvery = 10`; N8 `HideWindow = 8`,
+`StayFor = 15`; N9 `Window = 12`, `Zone = "trailer"`; N10 `PostsOff = 15`, `HoldFor = 20`, `Point = "SS"`,
+`Radius = 6`. `Validate`: `IsCritical` só em ANM-007 (DEC-074); todo verbo é um dos 7 (DEC-054).
+
+### 6.11 Hallucinations, Cutscenes, WalkPaths (onda 3)
+
+| Tabela | Campos | Valores iniciais |
+|---|---|---|
+| Hallucinations | `Key`, `MaxSanity` (60 / 40 / 20), `Effect` (nome do módulo em `Effects/`), `Cooldown`, `Weight` | FEAT-019: `fake_call` (< 60), `grill_hiss` (< 60), `roof_steps` (< 40), `ghost_customer` (< 40), `post_flicker` (< 40, sem zumbido, DEC-123), `whisper` (< 20), `mart_sign_blink` (< 20), `window_shadow` (< 20) |
+| Cutscenes | como §3.19 + `Participants = "ConnectedAtStart"` | `intro` 45 s (cap 50), `finale` ≤ 60, `credits` ≤ 75 (FEAT-004, FEAT-027) |
+| WalkPaths | `Key`, `Nodes = { NodeId }`, `Loop`, `Shift = "Day" \| "Night" \| "Any"`, `Weight` | caminhos de calçada do MAP-01 (level-designer); faixa = par de nós com `Crosswalk` |
+
+### 6.12 Onda 4
+
+`Revive`, `Ambulance`, `Products`, `MarketBench`/`BenchItems` como §3.9, §3.12, §3.13, §3.15 (sem mudança; +
+`Ambulance.MedicFace = "Exhausted"`, `MedicSpecies = { "rabbit", "panda" }`, DEC-213). `PartyConfig` (registro):
+`MaxParty = 4`, `Countdown = 5`, `TeleportRetries = { 2, 5, 10 }`, `JoinWindow = RunParams.JoinWindow`.

@@ -2,8 +2,10 @@ Status: Rascunho
 
 # Contratos de rede (Lync)
 
-Autor: architect. Versão 4, 2026-10-10 (**TASK-001**: estado DEC-140 a DEC-201, núcleo da onda 1). Versão anterior:
-3.1, 2026-10-08 (DEC-130/DEC-133).
+Autor: architect. **Versão 5, 2026-10-10 (pós onda 1):** §13 novo — entradas das ondas 2–4 com schema, quem escreve,
+quem lê, frequência e por quê; remoção do legado `Vitals`/`Round`; `Lights`, `Call`, `Thief`, `Hides`,
+`Anomalies`, `Pedestrians`, `Transition`, `RunReport` novos (contrato de código em `architecture.md` §19).
+Versão 4, 2026-10-10 (**TASK-001**: estado DEC-140 a DEC-201, núcleo da onda 1). Versão anterior: 3.1, 2026-10-08.
 Tudo aqui vira entrada em `src/Libs/Net/init.luau` (um `Lync.define("game", {...})`, requerido pelos dois lados).
 Mudança neste arquivo passa pelo architect (`PIPELINE.md`, ponto de conflito). Arquitetura: `architecture.md`.
 Tabelas que geram os enums: `content-data.md`. Dados persistidos: `data.md`.
@@ -15,6 +17,24 @@ Tabelas que geram os enums: `content-data.md`. Dados persistidos: `data.md`.
 ---
 
 ## 0. O que mudou
+
+### 0.-1 Versão 5 (pós onda 1; contratos das ondas 2–4)
+
+| Entrada | Mudança | Onda | Origem |
+|---|---|---|---|
+| `Vitals` | o nome fica; schema troca pelo da §6.1 (sem `Sanity`; número vai pelo packet `Sanity`) | 2 | DEC-167; T5 |
+| `Round` (packet legado) | **removido** | 2 | §4.7 |
+| `Sanity`, `LifeEvent` | packets da §6 entram | 2 | DEC-167, DEC-091 |
+| `Switches` (v3) | vira **`Lights`** (um registro por grupo de luz, dono `LightService`) | 2 | `architecture.md` §19.6, T45 |
+| `BossCall` (packet, v3) | vira **set `Call`** (reconexão no meio da ligação ouve o resto) | 2 | FEAT-018, T44 |
+| `Thief`, `Transition`, `RunReport` | novos | 2 | FEAT-013, 016, 026, 027; T58 |
+| `Anomalies` (set), `AnomalyCue`, `Gaze`, `Hides` | `Anomalies` e `Hides` novos; `AnomalyCue`/`Gaze` da §6 com schema final | 3 | DEC-204; T52, T53 |
+| `Stations` | + `Altered` (ITM-020) | 3 | §3.5 "Onda 3" |
+| `Cutscene`, `SkipVote`, `Traffic`, `CarHit` | como §6.2 | 3 | DEC-133, DEC-194 |
+| `Pedestrians` | novo (passantes como ator de client, aparência no set) | 3 | DEC-183, T46 |
+| `Parties`, `PartyAction`, `Reconnect`, `ReconnectReply`, `Ambulance`, `Revive`, `Bench` | schema final | 4 | DEC-179, §5, §6 |
+| `Profile` | + `ReviveCredits` | 4 | DEC-117 |
+| `Interact`, `Notice` | enums crescem com `Content.Actions`/`Notices` (chaves novas na §13.10) | 2–4 | — |
 
 ### 0.0 Versão 4 (TASK-001; DEC-140 a DEC-201)
 
@@ -106,7 +126,7 @@ Tabelas que geram os enums: `content-data.md`. Dados persistidos: `data.md`.
 | `ClassAction` | packet c → s | **1** | §4.6 |
 | `Round` (packet antigo) | packet | legado | **mantido** na onda 1, sem uso novo; removido na onda 2 |
 | `Vitals` (Health/Armor/Stamina) | set | legado | **mantido** na onda 1 (o `VitalService` de exemplo compila); trocado pelo schema da §6.1 na onda 2 |
-| `Sanity`, `Switches`, `Bench`, `Traffic`, `Ambulance`, `Cutscene`, `Parties`, `Gaze`, `CarHit`, `Revive`, `SkipVote`, `BossCall`, `AnomalyCue`, `LifeEvent`, `PartyAction`, `Reconnect`, `ReconnectReply` | — | 2–4 | §6; **não entram** no `init.luau` da onda 1 |
+| `Sanity`, `Switches`, `Bench`, `Traffic`, `Ambulance`, `Cutscene`, `Parties`, `Gaze`, `CarHit`, `Revive`, `SkipVote`, `BossCall`, `AnomalyCue`, `LifeEvent`, `PartyAction`, `Reconnect`, `ReconnectReply` | — | 2–4 | §6; **não entram** no `init.luau` da onda 1. **v5: lista final por onda na §13.0** (`Switches` → `Lights`, `BossCall` → set `Call`) |
 
 Por que não declarar já tudo: cada entrada nova arrasta enums de tabelas que a onda 1 ainda não tem (`Anomalies`,
 `BossCalls`, `Cutscenes`, `BenchItems`); stub de tabela só para o Lync subir é dado falso. Acrescentar entrada depois
@@ -555,6 +575,7 @@ Parties = Lync.replicate(Lync.struct({ ... })),    -- lobby; plataformas física
 | `Count` | pacotes, café | int | `ItemService` | sobra do pacote (DEC-049) |
 | `Toppings` | `hot_dog` | string: chaves de `Ingredients` separadas por vírgula, **na ordem de montagem** (ex.: `"ketchup,cheese"`); `""` = sem complemento | `ItemService` (a cada "Add X") | `HotDogVisual` empilha (queijo antes dos cordões, DEC-142); `PromptController` esconde "Add X" já presente; `CustomerService` valida o pedido (ordem ignorada, DEC-071) |
 | `Altered` | `hot_dog` | bool | `ItemService` | onda 3 (ITM-020) |
+| `Restore` | `coffee` | int | `ItemService` (do `CoffeeRestore` de quem preparou: 25 / Barista 35) | `VitalService` ao beber (onda 2, `architecture.md` §19.8) |
 
 Por que string e não bitmask: a ordem de montagem é dado (DEC-142 usa a ordem para o visual); ≤ 3 complementos,
 custo irrelevante; legível no Explorer.
@@ -671,3 +692,246 @@ Divergências que ficam abertas entre as duas sessões:
 | `Stations` id = `StationId × 100 + Slot` | architect, sugestão do §18.14 item 2 da TASK-002 | — |
 | Rosto Desmaiado na crew `Down`; `Normal_Night` vence o humor | DEC-167 (itens Provisórios), proposals-round-3 §2 | game-designer |
 | `Select` de classe no Run em modo dev | TASK-017 | lobby (`Q-085`, onda 2) |
+
+## 13. Ondas 2–4: entradas (versão 5)
+
+Contrato de código de cada dono: `architecture.md` §19. Regras da §1 valem (sem `keyBy`, T14; enums das tabelas,
+T13; `*At` em tempo de servidor; packets s → c só para `NetService.Audience` ou um jogador `Ready`; todo c → s
+validado). Uma task de contrato por onda escreve as entradas da onda em `src/Libs/Net/init.luau` (W2-0, W3-0, W4-0,
+`architecture.md` §19.24); acrescentar entrada não quebra as outras.
+
+### 13.0 Resumo por onda
+
+| Entrada | Tipo | Id / alvo | Escreve | Lê | Frequência | Onda |
+|---|---|---|---|---|---|---|
+| `Vitals` | set | `UserId` | `VitalService` | `VitalController`, `CameraController`, `HudController` | troca de estado (≤ 1/s por jogador) | 2 |
+| `Sanity` | packet s → dono | jogador | `VitalService` | `VitalController`, `HallucinationController` | ≤ 1/s à noite; no `Ready`/respawn | 2 |
+| `LifeEvent` | packet s → grupo | grupo | `VitalService`, `TrafficService` (`Hit`) | Hud, Camera, Anim, Audio | evento | 2 |
+| `Lights` | set | `IndexOf(LightGroups)` | `LightService` | `LightController` | toque no interruptor, início da noite, Hush | 2 |
+| `Call` | set | `1` | `BossService` | `BossController`, `HudController` | ~3 por ligação | 2 |
+| `Thief` | set | `1` | `ThiefService` | `ThiefController` | ~4 por ladrão | 2 |
+| `Transition` | packet s → grupo | grupo | `VehicleService` | `VehicleController` | 1 por run | 2 |
+| `RunReport` | packet s → jogador | jogador | `RoundService` | `HudController` | 1 por run | 2 |
+| `Anomalies` | set | ocorrência 1..255 | `AnomalyService` | `AnomalyController`, `LightController`, `AudioController` | ≤ 2/s com Walker ativo | 3 |
+| `AnomalyCue` | packet s → grupo | grupo (DEC-204) | `AnomalyService` | `AnomalyController` | evento | 3 |
+| `Gaze` | packet c → s, `:newest(10)` | — | `CameraController` (só à noite, `Active`) | `AnomalyService` | 10 Hz | 3 |
+| `Hides` | set | `UserId` | `HideService` | `HideController`, `CameraController` | evento | 3 |
+| `Cutscene` | set | `1` | `CutsceneService` | `CutsceneController` | início, votos, fim | 3 |
+| `SkipVote` | packet c → s | — | `CutsceneController` | `CutsceneService` | ≤ 1 por segmento | 3 |
+| `Traffic` | set | slot 1..8 | `TrafficService` | `TrafficController` | ≤ 6 por carro | 3 |
+| `CarHit` | packet c → s | — | `TrafficController` | `TrafficService` | evento | 3 |
+| `Pedestrians` | set | slot 1..8 | `PedestrianService` | `PedestrianController` | spawn + paradas na faixa | 3 |
+| `Parties` | set (lobby) | plataforma | `PartyService` | `PartyController` | entrar/sair/contagem | 4 |
+| `PartyAction` | packet c → s | — | `PartyController` | `PartyService` | ≤ 2/s | 4 |
+| `Reconnect` / `ReconnectReply` | packet s → c / c → s | jogador | `SessionService` / `SessionController` | o outro lado | entrada no lobby, 30 s | 4 |
+| `Ambulance` | set | `1` | `AmbulanceService` | `AmbulanceController` | ~5 por viagem | 4 |
+| `Revive` | packet c → s | — | `ReviveController` | `ReviveService` | ≤ 1/s | 4 |
+| `Bench` | set | `1` (S1) | `MarketService` | `MarketController` | 1 por turno + compra | 4 |
+| `Profile` | packet (existe) | jogador | `ProfileService` | `ProfileController` | + `ReviveCredits` | 4 |
+
+### 13.1 Onda 2: vida, sanidade, transições, fim de run
+
+```lua
+Vitals = Lync.replicate(Lync.struct({        -- id = UserId (substitui o legado Health/Armor/Stamina)
+	State = Lync.enum({ "Active", "Down", "Reviving", "Spectator", "Away" }),
+	StateEndsAt = Lync.f64(),                 -- Down: 6:00 AM da noite da queda (DEC-115); 0 = sem prazo
+	KnockedUntil = Lync.f64(),                -- atropelado até (onda 3); 0 = de pé
+	Class = Lync.enum(Content.Classes.Keys),
+})),
+Sanity = Lync.packet(Lync.struct({           -- s → dono
+	Value = Lync.int(0, 200),
+	Max = Lync.int(0, 200),                   -- 0 = sem sanidade (dia): HUD esconde o medidor
+})),
+LifeEvent = Lync.packet(Lync.struct({        -- s → grupo
+	UserId = Lync.f64(),
+	Event = Lync.enum({ "Down", "Revived", "Spectating", "Hit", "Wipe", "WipeCleared" }),
+})),
+Transition = Lync.packet(Lync.struct({       -- s → grupo
+	Kind = Lync.enum({ "VehicleSwap" }),
+	StartedAt = Lync.f64(),
+})),
+RunReport = Lync.packet(Lync.struct({        -- s → cada jogador no RunEnded
+	Result = Lync.enum({ "Success", "Failed" }),
+	Day = Lync.int(1, 10000),
+	Night = Lync.int(0, 10),
+	Gems = Lync.int(0, 100000),               -- gemas desta run para este jogador (RunRewards)
+})),
+```
+
+| Escolha | Por quê |
+|---|---|
+| `Vitals` set, `Sanity` packet | estado de vida a party vê e quem chega precisa pronto (set); o número da sanidade é só do dono (DEC-167: a party vê a faixa pela aparência, `LookPack`) |
+| `LifeEvent` packet | apresentação de um instante (desbotar, "Zzz", toast); o estado já está em `Vitals` |
+| `Transition` packet | fade de 1,5 s; quem reconecta no meio não precisa dele. A sequência da noite perdida **não** usa packet: sai de `Shift.Phase = "NightLost"` + `PhaseStartedAt` |
+| `RunReport` packet por jogador | gemas da run são por jogador (`RunRewards`); reconexão no `RunEnd` perde só a tela |
+
+### 13.2 `Lights` (onda 2)
+
+```lua
+Lights = Lync.replicate(Lync.struct({        -- id = Content.LightGroups.IndexOf[key]
+	On = Lync.bool(),                         -- grupo aceso agora (noite, interruptor/upgrade, sem Hush)
+	At = Lync.f64(),                          -- instante da última troca; Hush: início (postes apagam por Order × Step)
+})),
+```
+
+| | |
+|---|---|
+| Escreve / lê | `LightService` / `LightController` (visual), `VitalController` (previsão do medidor) |
+| Por quê set | todos veem as mesmas luzes; quem reconecta no Hush vê os postes certos |
+| Fora daqui | a regra do escuro (zona ativa) é calculada no servidor (T8); o client só desenha |
+
+### 13.3 `Call` (onda 2)
+
+```lua
+Call = Lync.replicate(Lync.struct({          -- registro 1
+	Call = Lync.enum(Content.BossCalls.Keys), -- inclui "none"
+	State = Lync.enum({ "Idle", "Ringing", "Talking" }),
+	StartedAt = Lync.f64(),                   -- início do toque ou da fala; linha = floor((now − StartedAt) / LineTime)
+})),
+```
+
+| | |
+|---|---|
+| Escreve / lê | `BossService` / `BossController` (toque, legenda), `HudController`, `AudioController` (ducking) |
+| Por quê set (T44) | FEAT-018: quem reconecta no meio ouve só as linhas restantes; o set entrega o estado atual e o client calcula a linha. Packet por linha perderia a ligação na reconexão e mandaria 7–18 pacotes |
+| Atender | `Interact{ Action = "answer_phone" }` (âncora `Prompt_Answer`); sem packet novo |
+
+### 13.4 `Thief` (onda 2)
+
+```lua
+Thief = Lync.replicate(Lync.struct({         -- registro 1
+	State = Lync.enum({ "None", "Lurking", "Approaching", "Opening", "Fleeing" }),
+	StartedAt = Lync.f64(),
+	Duration = Lync.quant(0, 30, 0.1),        -- Opening: 8 s (16 s com UPG-004)
+})),
+```
+
+| | |
+|---|---|
+| Escreve / lê | `ThiefService` / `ThiefController` (barra em `Bar_Thief`, `ProgressBar` por `StartedAt/Duration`) |
+| Por quê set | a barra é igual para todos e quem chega no meio precisa dela; o NPC é um rig comum (`NpcId`, aparência por atributo) |
+
+### 13.5 Anomalias (onda 3; DEC-204)
+
+```lua
+Anomalies = Lync.replicate(Lync.struct({     -- id = ocorrência 1..255 (cíclico, por noite)
+	Anomaly = Lync.enum(Content.Anomalies.Keys),
+	Phase = Lync.enum({ "Signal", "Active", "Resolved", "Failed" }),
+	StartedAt = Lync.f64(),
+	Step = Lync.int(0, 20),                   -- Walker: passo 0..10; Hush: postes apagados; demais 0
+	Anchor = Lync.int(0, 65535),              -- NpcId do cliente-anomalia, ou índice de âncora (AnchorId/MapPoint); 0 = nenhum
+})),
+AnomalyCue = Lync.packet(Lync.struct({       -- s → grupo (todos veem o sinal, DEC-204)
+	Anomaly = Lync.enum(Content.Anomalies.Keys),
+	Cue = Lync.enum(Content.AnomalyCues.Keys), -- knock, honk, smoke, splash, door_creak, buzz, blackout...
+	Entity = Lync.int(0, 65535),
+	Seed = Lync.int(0, 65535),
+})),
+Gaze = Lync.packet(Lync.struct({             -- c → s, só à noite e só Active
+	Yaw = Lync.angle(1),
+	Pitch = Lync.angle(1),
+})):newest(10),
+```
+
+| Escolha | Por quê |
+|---|---|
+| `Anomalies` set | estado que persiste por segundos (janela acesa, Walker no passo 5, relógio parado, long car estacionado): quem reconecta precisa ver pronto (T53) |
+| `AnomalyCue` packet | instantes (batida, buzina, fumaça); perder um ao reconectar não muda regra |
+| Sem verbo correto na rede | `Content.Anomalies` (shared) não tem verbo nem prazo; ficam em `Rules/` no servidor (T10) |
+| `Gaze` `:newest(10)` | só o último olhar importa; 10 Hz bastam para cone de 40° (T7); ~6 B por envio |
+| Validação do `Gaze` | só à noite, membro `Active` não escondido; sem verificação de plausibilidade além do formato (co-op, R10) |
+
+Mudança em set existente: `Stations` ganha `Altered = Lync.int(0, 30)` (0 = nada; grelha/tábua: 1 = esta vaga;
+trilho: posição 1..`Count` do item alterado). Hot dog montado com ele leva o atributo de Tool `Altered = true` (§7.1).
+
+### 13.6 `Hides` (onda 3)
+
+```lua
+Hides = Lync.replicate(Lync.struct({         -- id = UserId; registro removido ao levantar
+	Slot = Lync.int(1, 4),                    -- H1..H4 (DEC-176)
+})),
+```
+
+Escreve `HideService`; lê `HideController` (botão "Get Up" local), `CameraController` (modo `Hidden`), `AnimController`.
+Set próprio (T52): `Vitals` tem um escritor só (`VitalService`).
+
+### 13.7 Cutscene, trânsito e passantes (onda 3)
+
+`Cutscene`, `SkipVote`, `Traffic` e `CarHit` com o schema da §6.2 (sem mudança). Novo:
+
+```lua
+Pedestrians = Lync.replicate(Lync.struct({   -- id = slot 1..8
+	Path = Lync.int(1, 64),                   -- IndexOf de Content.WalkPaths
+	Species = Lync.enum(Content.Species.Keys),
+	Outfit = Lync.enum(Content.Outfits.Keys),
+	Speed = Lync.quant(4, 12, 0.5),
+	AnchorAt = Lync.f64(),
+	AnchorDist = Lync.f32(),
+	StopDist = Lync.f32(),                    -- parada na faixa esperando reserva (§8.1); 0 = sem parada
+	HeldUntil = Lync.f64(),
+})),
+```
+
+| Escolha | Por quê |
+|---|---|
+| Mesmo registro 1D do `Traffic` | uma função de posição (`Traffic/shared/Motion.luau`) para carros e passantes; ≤ 3 registros por passante por travessia |
+| Aparência no set (exceção à regra 9) | passante não tem modelo no servidor (T46) para levar atributo; `Species`/`Outfit` são chaves de `Content`; o client monta e o `RigController` veste, inclusive o Night local da faixa baixa (DEC-169) |
+
+### 13.8 Lobby e sessão (onda 4)
+
+```lua
+Parties = Lync.replicate(Lync.struct({       -- id = plataforma (atributo Party), place Lobby
+	Owner = Lync.f64(),                       -- UserId do 1º a pisar; 0 = vazia
+	Members = Lync.array(Lync.f64(), 0, 4),
+	State = Lync.enum({ "Open", "Countdown", "Teleporting" }),
+	CountdownEndsAt = Lync.f64(),
+})),
+PartyAction = Lync.packet(Lync.struct({       -- c → s; entrar e sair = pisar/sair da plataforma (DEC-179)
+	Action = Lync.enum({ "Start", "Cancel" }),
+	Party = Lync.int(1, 32),
+})),
+Reconnect = Lync.packet(Lync.struct({         -- s → c (lobby); Seconds: relógio do lobby, não do servidor da run (§1 regra 4)
+	Mode = Lync.enum({ "None", "Rejoin", "Resume" }),
+	Day = Lync.int(1, 10000),
+	Night = Lync.int(0, 10),
+	IsNight = Lync.bool(),
+	Seconds = Lync.int(0, 960),
+})),
+ReconnectReply = Lync.packet(Lync.struct({ Accept = Lync.bool() })), -- c → s
+```
+
+### 13.9 Ambulância, reviver, bancada (onda 4)
+
+`Ambulance`, `Revive` e `Bench` com o schema da §6.2 (sem mudança). `Profile` ganha
+`ReviveCredits = Lync.int(0, 99)` (§4.5).
+
+### 13.10 Chaves novas de enum (vêm de `Content`; `content-data.md` §3.18–§3.19)
+
+| Tabela | Chaves novas | Onda |
+|---|---|---|
+| `Actions` (`Interact.Action`) | `answer_phone`, `get_up` (as demais da onda 2+ já existem: `buy_trailer`, `brew_coffee`, `give_coffee`, `switch_light`, `hide`, `safe_spot`, `bench_buy_item`) | 2, 3 |
+| `Notices` (`Notice.Kind`) | `trailer_available`, `trailer_waiting`, `trailer_bought`, `gems_gained`, `afk_no_gems`, `achievement`, `thief_caught`, `coffee_cooldown`, `coffee_full`, `hide_taken`, `revive_used`, `revive_credit_saved`, `special_on_bench`, `shift_cant_resume`, `not_in_roster` | 2–4 |
+
+### 13.11 Removidos
+
+| Entrada | Quando | Substituída por |
+|---|---|---|
+| `Round` (packet legado) | W2-0 | `Shift` |
+| `Vitals` legado (Health/Armor/Stamina) | W2-0 (mesmo nome, schema da §13.1) | `Vitals` + `Sanity` |
+| `Switches` (v3, nunca implementado) | — | `Lights` |
+| `BossCall` (v3, nunca implementado) | — | `Call` |
+
+Checklist de toda task de contrato: `tools/analyze.ps1` zero erro **e** boot no Studio sem erro de `Lync.start()` (R8).
+
+### 13.12 Orçamento (pior caso: noite, 4 jogadores, Walker e Hush ativos)
+
+| Fonte | Bytes/s por client |
+|---|---|
+| sets da onda 1 (`Stations`, `Customers`, `Stock`, `Economy`, `Shift`, `Upgrades`, `RunState`) | < 150 |
+| `Vitals`, `Sanity`, `LifeEvent` | < 40 |
+| `Lights`, `Call`, `Thief`, `Hides`, `Transition` | < 15 |
+| `Anomalies`, `AnomalyCue` | < 40 |
+| `Traffic`, `Pedestrians` | < 50 |
+| `Gaze` (c → s) | ~60 por jogador |
+
+Total < 0,5 KB/s por client; abaixo da meta da §12.4 do `architecture.md` (≤ 10 KB/s).
