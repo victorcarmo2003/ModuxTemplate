@@ -32,6 +32,12 @@
 	            as the TRL ghost of the blockout). Entries without layer are always visible.
 	    paint = colour variant of AST-035 (Paint mesh / _Paints).
 	    note  = short warning for the person doing the swap.
+	    Hand edits made in Studio (2026-10-10, applied by place_assets.luau build(); Place.diff checks them):
+	    drop   = { mesh names } removed from the model.
+	    parts  = { [mesh] = { x, y, z, rotY = deg?, size = { sx, sy, sz }? } } mesh centre in the ASSET frame
+	             (relative to the entry's x/y/z/rotY), extra yaw over the template, new size.
+	    copies = { { part = mesh, x, y, z, rotY = deg? } } extra clones of a mesh, same rule.
+	    pivot  = { x, y, z, rotY } Model.WorldPivot in the placement frame (same coordinates as x/y/z).
 
 	==============================================================================================
 	MEASURED FACTS THAT DRIVE THE ROTATIONS (read before swapping)
@@ -176,16 +182,16 @@ return {
 	-- 2a. CORNER CART (tier 1, day) + stations on its mounts. Pivot (41, 0.45, 37.5), rotY 180.
 -- 2026-10-10: user lowered the cart body 3.5 -> 3.0 tall in Studio; counter mounts now at y 3.45 (Pad 0.45 + 3.0).
 	---------------------------------------------------------------------------------------------
-	{ asset = "AST-026_CornerCart", x = 41, y = 0.45, z = 37.5, rotY = 0, group = "Cart", id = "CART", layer = "day", replaces = { "Pad/CART/Base", "Pad/CART/UmbrellaPole_1", "Pad/CART/UmbrellaPole_2", "Pad/CART/Umbrella_1", "Pad/CART/Umbrella_2" }, note = "queue side is local +Z; LookVector faces the operator (south)" },
+	{ asset = "AST-026_CornerCart", x = 41, y = 0.45, z = 37.5, rotY = 0, parts = { Body = { 1.05, 1.5, 0, size = { 29.5, 3, 4.28 } } }, group = "Cart", id = "CART", layer = "day", replaces = { "Pad/CART/Base", "Pad/CART/UmbrellaPole_1", "Pad/CART/UmbrellaPole_2", "Pad/CART/Umbrella_1", "Pad/CART/Umbrella_2" }, note = "queue side is local +Z; LookVector faces the operator (south)" },
 	{ asset = "AST-018_CoolerL1", x = 29.5, y = 0.95, z = 37.66, rotY = 180, group = "Cart", id = "CART-S", layer = "day", replaces = { "Pad/CART/1_S_Stock" }, note = "Mount_StockSausage (low, inside the cart body)" },
 	{ asset = "AST-012_RollerGrill", part = { "Grill_L1" }, x = 33.5, y = 3.45, z = 37.5, rotY = 180, group = "Cart", id = "CART-G", layer = "day", replaces = { "Pad/CART/2_G_Grill", "Pad/CART/GrillPlate" } },
 	{ asset = "AST-013_RestRail", part = { "Rail_6" }, x = 37.5, y = 3.45, z = 37.5, rotY = 180, group = "Cart", id = "CART-R", layer = "day", replaces = { "Pad/CART/3_R_Rest" }, note = "low end + Prompt_Rail towards the operator" },
 	{ asset = "AST-015_BunCrate", x = 40, y = 3.45, z = 37.5, rotY = 180, group = "Cart", id = "CART-B", layer = "day", replaces = { "Pad/CART/4_B_Bun" } },
 	{ asset = "AST-014_CuttingBoard", x = 42.5, y = 3.45, z = 37.5, rotY = 180, group = "Cart", id = "CART-T", layer = "day", replaces = { "Pad/CART/5_T_Board" }, note = "knife edge towards the operator" },
-	{ asset = "AST-017_ToppingGrid", x = 47, y = 3.45, z = 37.5, rotY = 0, group = "Cart", id = "CART-K", layer = "day", replaces = { "Pad/CART/6_K_Toppings", "Pad/CART/Lid_Ketchup", "Pad/CART/Lid_Mustard", "Pad/CART/Lid_Cheese", "Pad/CART/Lid_Bacon", "Pad/CART/Lid_PotatoSticks", "Pad/CART/Lid_CreamCheese" }, note = "rotY 180: front row F (Ketchup X45, Mustard X47, Cheese X49) on the queue side, as MAP-01 7.1" },
+	{ asset = "AST-017_ToppingGrid", x = 47, y = 3.45, z = 37.352, rotY = 180, group = "Cart", id = "CART-K", layer = "day", replaces = { "Pad/CART/6_K_Toppings", "Pad/CART/Lid_Ketchup", "Pad/CART/Lid_Mustard", "Pad/CART/Lid_Cheese", "Pad/CART/Lid_Bacon", "Pad/CART/Lid_PotatoSticks", "Pad/CART/Lid_CreamCheese" }, note = "2026-10-10 hand edit (mirror of TRL-K): rotY 180, front row F (Ketchup / Mustard / Cheese, labels) faces the operator (south)" },
 	-- 2026-10-10: sauce holder removed; Ketchup/Mustard are steel bowls in the grid (user request)
 	-- { asset = "AST-016_SauceHolder", x = 46, y = 3.60, z = 36.75, rotY = 0, group = "Cart", id = "CART-K-SAUCE", layer = "day", replaces = {}, note = "sits on grid cells F1 (Ketchup, X45) + F2 (Mustard, X47); bottles go on Att_Bottle_* at runtime" },
-	{ asset = "AST-020_CashRegister", x = 52, y = 3.45, z = 37.5, rotY = 0, group = "Cart", id = "DRAWER", layer = "day", replaces = { "Pad/CART/7_H_Delivery", "Pad/CART/DRAWER" }, note = "delivery stand X 50..52, drawer X 52.4..54; keep the DRAWER tag visible" },
+	{ asset = "AST-020_CashRegister", x = 53.143, y = 3.45, z = 37.661, rotY = 180, drop = { "DeliveryStand" }, pivot = { 51.743, 3.45, 37.661, 180 }, group = "Cart", id = "DRAWER", layer = "day", replaces = { "Pad/CART/7_H_Delivery", "Pad/CART/DRAWER" }, note = "2026-10-10 hand edit: delivery stand removed, register turned to the operator, pivot moved by hand" },
 	{ asset = "AST-042_VehiclePhone", part = { "Phone_Cart", "Cart_Body", "Cart_Cord", "Cart_Handset", "Cart_Lamp", "Lid" }, x = 47.5, y = 4.65, z = 36.84, rotY = 180, group = "Cart", id = "CART-PHONE", layer = "day", replaces = {}, note = "Att_Mount on Mount_Phone (Parasol_E pole); intersects the sauce holder ~0.8" },
 	{ asset = "AST-025_Trashcan", x = 56, y = 0.45, z = 42, rotY = 90, group = "Cart", id = "BIN-C", layer = "day", replaces = { "Pad/BIN-C" }, note = "Mount_Trash rotY 90 would point the pedal east; 270 = pedal to the corridor" },
 
@@ -196,23 +202,23 @@ return {
 	{ asset = "AST-018_CoolerL1", x = 28.5, y = 5.95, z = 37.5, rotY = 180, group = "Trailer", id = "TRL-S", layer = "night", replaces = {}, note = "cooler level carries over from the cart (Q-075)" },
 	{ asset = "AST-012_RollerGrill", part = { "Grill_L1" }, x = 33, y = 5.95, z = 37.5, rotY = 180, group = "Trailer", id = "TRL-G", layer = "night", replaces = {} },
 	{ asset = "AST-013_RestRail", part = { "Rail_8" }, x = 37.5, y = 5.95, z = 37.5, rotY = 180, group = "Trailer", id = "TRL-R", layer = "night", replaces = {}, note = "TASK-083: Rail_8 (Vehicles.trailer.RailSlots 8, §19.22); bind_map01 picks the 8 slot empties" },
-	{ asset = "AST-015_BunCrate", x = 40, y = 5.95, z = 37.5, rotY = 180, group = "Trailer", id = "TRL-B", layer = "night", replaces = {} },
-	{ asset = "AST-014_CuttingBoard", x = 42.5, y = 5.95, z = 37.5, rotY = 180, group = "Trailer", id = "TRL-T", layer = "night", replaces = {} },
-	{ asset = "AST-017_ToppingGrid", x = 47, y = 5.95, z = 37.5, rotY = 0, group = "Trailer", id = "TRL-K", layer = "night", replaces = {} },
+	{ asset = "AST-015_BunCrate", x = 40, y = 5.95, z = 37.5, rotY = 180, copies = { { part = "Buns", 0, 0.512, 0 }, { part = "Buns", 0, 0.78, 0 } }, group = "Trailer", id = "TRL-B", layer = "night", replaces = {}, note = "2026-10-10 hand edit: two more bun layers stacked" },
+	{ asset = "AST-014_CuttingBoard", x = 42.5, y = 5.95, z = 37.5, rotY = 0, parts = { Board = { 0, 0.06, 0.25, size = { 2.6, 0.12, 1.4 } }, Knife = { 0, 0.161, 0.012, size = { 1.246, 0.083, 0.276 } } }, group = "Trailer", id = "TRL-T", layer = "night", replaces = {}, note = "2026-10-10 hand edit: turned 180, board 2.6 x 1.4 (3 slots), knife scaled" },
+	{ asset = "AST-017_ToppingGrid", x = 47, y = 5.95, z = 37.352, rotY = 180, group = "Trailer", id = "TRL-K", layer = "night", replaces = {}, note = "2026-10-10 hand edit: front row (labels) faces the operator" },
 	-- 2026-10-10: sauce holder removed; Ketchup/Mustard are steel bowls in the grid (user request)
 	-- { asset = "AST-016_SauceHolder", x = 46, y = 6.10, z = 36.75, rotY = 0, group = "Trailer", id = "TRL-K-SAUCE", layer = "night", replaces = {} },
-	{ asset = "AST-020_CashRegister", x = 52, y = 5.95, z = 37, rotY = 0, group = "Trailer", id = "TRL-DRAWER", layer = "night", replaces = {} },
+	{ asset = "AST-020_CashRegister", x = 52.351, y = 5.95, z = 36.861, rotY = 180, drop = { "DeliveryStand" }, pivot = { 51.18, 5.95, 36.861, 180 }, group = "Trailer", id = "TRL-DRAWER", layer = "night", replaces = {}, note = "2026-10-10 hand edit: delivery stand removed, register turned to the operator, pivot moved by hand" },
 	{ asset = "AST-042_VehiclePhone", part = { "Phone_Trailer", "Trailer_Cord", "Trailer_Handset", "Trailer_Lamp" }, x = 30.7, y = 7.72, z = 36.28, rotY = 180, group = "Trailer", id = "TRL-PHONE", layer = "night", replaces = {}, note = "trailer variant sits 2.2 off the FBX origin; its back lands on Mount_Phone (28.5, 8.45, 36), front wall" },
 	{ asset = "AST-022_CoffeeMachine", x = 40, y = 5.95, z = 44, rotY = 0, group = "Trailer", id = "TRL-COFFEE", layer = "night", replaces = {} },
 	{ asset = "AST-025_Trashcan", x = 43.5, y = 2.45, z = 44, rotY = 0, group = "Trailer", id = "TRL-BIN", layer = "night", replaces = {} },
 	{ asset = "AST-039_LightSwitch", x = 46, y = 6.45, z = 46, rotY = 0, group = "Trailer", id = "TRL-SWITCH", layer = "night", replaces = {}, note = "back plate on the south wall (Z 46), lever to the north" },
-	{ asset = "AST-040_TrailerBench", x = 28.5, y = 2.45, z = 44.5, rotY = 0, group = "Trailer", id = "TRL-BENCH-1", layer = "night", replaces = {} },
-	{ asset = "AST-040_TrailerBench", x = 31.5, y = 2.45, z = 44.5, rotY = 0, group = "Trailer", id = "TRL-BENCH-2", layer = "night", replaces = {} },
-	{ asset = "AST-040_TrailerBench", x = 34.5, y = 2.45, z = 44.5, rotY = 0, group = "Trailer", id = "TRL-BENCH-3", layer = "night", replaces = {} },
-	{ asset = "AST-041_HideCabinet", x = 31, y = 2.45, z = 38.3, rotY = 180, group = "Trailer", id = "H1", layer = "night", replaces = {}, note = "door face 0.1 proud of the counter front (Z 39), facing the corridor" },
-	{ asset = "AST-041_HideCabinet", x = 37, y = 2.45, z = 38.3, rotY = 180, group = "Trailer", id = "H2", layer = "night", replaces = {} },
-	{ asset = "AST-041_HideCabinet", x = 43, y = 2.45, z = 38.3, rotY = 180, group = "Trailer", id = "H3", layer = "night", replaces = {} },
-	{ asset = "AST-041_HideCabinet", x = 49, y = 2.45, z = 38.3, rotY = 180, group = "Trailer", id = "H4", layer = "night", replaces = {} },
+	{ asset = "AST-040_TrailerBench", x = 34.5, y = 2.45, z = 44.5, rotY = 180, pivot = { 28.5, 2.45, 44.5, 0 }, group = "Trailer", id = "TRL-BENCH-1", layer = "night", replaces = {} },
+	{ asset = "AST-040_TrailerBench", x = 31.5, y = 2.45, z = 44.5, rotY = 180, pivot = { 31.5, 2.45, 44.5, 0 }, group = "Trailer", id = "TRL-BENCH-2", layer = "night", replaces = {} },
+	{ asset = "AST-040_TrailerBench", x = 28.5, y = 2.45, z = 44.5, rotY = 180, pivot = { 34.5, 2.45, 44.5, 0 }, group = "Trailer", id = "TRL-BENCH-3", layer = "night", replaces = {} },
+	{ asset = "AST-041_HideCabinet", x = 31, y = 2.45, z = 38.3, rotY = 180, drop = { "AST-041_HideCabinet" }, group = "Trailer", id = "H1", layer = "night", replaces = {}, note = "door face 0.1 proud of the counter front (Z 39), facing the corridor" },
+	{ asset = "AST-041_HideCabinet", x = 37, y = 2.45, z = 38.3, rotY = 180, drop = { "AST-041_HideCabinet" }, group = "Trailer", id = "H2", layer = "night", replaces = {} },
+	{ asset = "AST-041_HideCabinet", x = 43, y = 2.45, z = 38.3, rotY = 180, drop = { "AST-041_HideCabinet" }, group = "Trailer", id = "H3", layer = "night", replaces = {} },
+	{ asset = "AST-041_HideCabinet", x = 49, y = 2.45, z = 38.3, rotY = 180, drop = { "AST-041_HideCabinet" }, group = "Trailer", id = "H4", layer = "night", replaces = {} },
 	{ asset = "AST-023_TrailerLights", part = { "Lights_Mast", "Lights_Mast_Lamps" }, x = 40, y = 11.45, z = 41, rotY = 0, group = "Trailer", id = "TRL-LIGHTS", layer = "night", replaces = {}, note = "UPG-005: only after purchase; Mount_Lights on the roof" },
 	{ asset = "AST-023_TrailerLights", part = { "Lights_String", "Lights_String_Bulbs" }, x = 41.25, y = 11.05, z = 34.9, rotY = 0, group = "Trailer", id = "TRL-LIGHTS", layer = "night", replaces = {}, note = "UPG-005; Mount_LightsString over the window. Same FBX placed twice (mast / string share the origin)" },
 

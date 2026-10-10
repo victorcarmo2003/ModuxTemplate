@@ -14,6 +14,7 @@
 		local Place = require(<this module>)
 		Place.run(placements, ids)   -- placements = require(MAP-01_placements), ids = { [name] = assetId }
 		Place.restore()              -- show the blockout again and delete MAP01_Assets
+		Place.diff(placements, ids)  -- READ-ONLY: what Place.run (+ bind_map01's trailer move) would put vs the Workspace
 ]]
 
 local InsertService = game:GetService("InsertService")
@@ -180,6 +181,107 @@ function Place.showLayer(layer: string): string
 	return "layer " .. layer
 end
 
+local function v3(t: { number }): Vector3
+	return Vector3.new(t[1], t[2], t[3])
+end
+
+-- y-rotation frame in placement coordinates: { x, y, z, rotY } (rotY in degrees, optional)
+local function frameOf(x: number?, y: number?, z: number?, rotY: number?): CFrame
+	return CFrame.new(x or 0, y or 0, z or 0) * CFrame.Angles(0, math.rad(rotY or 0), 0)
+end
+
+-- Part pose in the asset frame: centre o = { x, y, z, rotY = extra yaw over the template orientation }.
+local function partPose(origin: CFrame, rel: CFrame, o: { [any]: any }): CFrame
+	return origin * CFrame.new(o[1] or 0, o[2] or 0, o[3] or 0) * CFrame.Angles(0, math.rad(o.rotY or 0), 0) * rel.Rotation
+end
+
+local function findPart(inst: Instance, name: string): BasePart?
+	if inst:IsA("BasePart") and inst.Name == name then
+		return inst
+	end
+	for _, d in inst:GetDescendants() do
+		if d:IsA("BasePart") and d.Name == name then
+			return d
+		end
+	end
+	return nil
+end
+
+--[[ Builds one placement from its cached template (not parented). Optional hand-edit fields (2026-10-10,
+	recorded from edits made in Studio; all coordinates in the placement frame / asset frame):
+	  part   = { names }   keep only these BaseParts (multi-variant FBX)
+	  drop   = { names }   destroy these BaseParts (meshes removed by hand)
+	  parts  = { [name] = { x, y, z, rotY = deg?, size = { sx, sy, sz }? } }
+	           part centre in the ASSET frame (relative to x/y/z/rotY of the entry), extra yaw over the template
+	           orientation, new size (MeshPart scaled)
+	  copies = { { part = name, x, y, z, rotY = deg?, size = {..}? } }   extra clones of a part, same pose rule
+	  pivot  = { x, y, z, rotY }   Model.WorldPivot in the PLACEMENT frame (same coordinates as x/y/z), when the
+	           pivot was moved off the asset origin by hand ]]
+local function build(p: { [string]: any }, tpl: Instance): Instance
+	local inst = tpl:Clone()
+	inst.Name = if p.id then (p.id .. "_" .. p.asset) else p.asset
+	-- multi-variant files: keep only the listed meshes
+	if p.part then
+		local keep = {}
+		for _, n in p.part do
+			keep[n] = true
+		end
+		for _, d in inst:GetDescendants() do
+			if d:IsA("BasePart") and not keep[d.Name] then
+				d:Destroy()
+			end
+		end
+	end
+	if p.drop then
+		local gone = {}
+		for _, n in p.drop do
+			gone[n] = true
+		end
+		for _, d in inst:GetDescendants() do
+			if d:IsA("BasePart") and gone[d.Name] then
+				d:Destroy()
+			end
+		end
+	end
+	local cf = frameOf(p.x, p.y, p.z, p.rotY)
+	if inst:IsA("Model") then
+		inst:PivotTo(cf)
+	elseif inst:IsA("BasePart") then
+		inst.CFrame = cf
+	end
+	-- copies first (they clone the part with its template pose and size)
+	if p.copies then
+		for _, c in p.copies do
+			local src = findPart(inst, c.part)
+			if src then
+				local rel = cf:ToObjectSpace(src.CFrame)
+				local cp = src:Clone()
+				cp.CFrame = partPose(cf, rel, c)
+				if c.size then
+					cp.Size = v3(c.size)
+				end
+				cp.Parent = src.Parent
+			end
+		end
+	end
+	if p.parts then
+		for name, o in p.parts do
+			local bp = findPart(inst, name)
+			if bp then
+				local rel = cf:ToObjectSpace(bp.CFrame)
+				if o.size then
+					bp.Size = v3(o.size)
+				end
+				bp.CFrame = partPose(cf, rel, o)
+			end
+		end
+	end
+	if p.pivot and inst:IsA("Model") then
+		inst.WorldPivot = frameOf(p.pivot[1], p.pivot[2], p.pivot[3], p.pivot[4])
+	end
+	return inst
+end
+
 --[[ placements: { { asset, x, y, z, rotY, group, id, replaces = { paths } } }
 	Returns a report string (placed / missing assets / missing blockout paths). ]]
 function Place.run(placements: { any }, ids: { [string]: any }): string
@@ -215,26 +317,7 @@ function Place.run(placements: { any }, ids: { [string]: any }): string
 			g.Parent = if p.layer == "night" then nightRoot else root
 			groups[gkey] = g
 		end
-		local inst = tpl:Clone()
-		inst.Name = if p.id then (p.id .. "_" .. p.asset) else p.asset
-		-- multi-variant files: keep only the listed meshes
-		if p.part then
-			local keep = {}
-			for _, n in p.part do
-				keep[n] = true
-			end
-			for _, d in inst:GetDescendants() do
-				if d:IsA("BasePart") and not keep[d.Name] then
-					d:Destroy()
-				end
-			end
-		end
-		local cf = CFrame.new(p.x or 0, p.y or 0, p.z or 0) * CFrame.Angles(0, math.rad(p.rotY or 0), 0)
-		if inst:IsA("Model") then
-			inst:PivotTo(cf)
-		elseif inst:IsA("BasePart") then
-			inst.CFrame = cf
-		end
+		local inst = build(p, tpl)
 		inst:SetAttribute("Asset", p.asset)
 		if p.id then
 			inst:SetAttribute("MapId", p.id)
@@ -261,6 +344,228 @@ function Place.run(placements: { any }, ids: { [string]: any }): string
 		msg ..= "\n" .. table.concat(problems, "\n")
 	end
 	return msg
+end
+
+--[[ Place.diff(placements, ids, opts?) -> (report, nDiff)
+	Read-only. Builds every placement in memory (same build() as Place.run, never parented) and compares it with what
+	is in workspace.MAP01_Assets now: model pivot, every BasePart (name, CFrame, Size), parts missing / extra, and the
+	template Attachments (counted apart: bind_map01 / bind_pieces move some anchors on purpose).
+	Default frame rule = MAP-01 after bind_map01: the entries bind_map01 puts inside the trailer (id TRL, TRL-*, H1..H4)
+	are compared after the trailer's move from its placement pose to its CURRENT pivot (TRL-SALE or the Pad); the
+	TRL-SALE shell is skipped (bind_map01 destroys it). opts:
+	  tolPos (0.05 stud), tolDeg (1), ids = { [MapId] = true } (only these), verbose (matching entries + attachments),
+	  moved = function(p) -> CFrame | false | nil (custom frame rule; false = skip, nil = as placed).
+	Ignored in the Workspace: UpgradePieces / VehicleCover subtrees, nested MapId models, parts with BindCreated,
+	"Light_Lamp" (bind_map01 step 5); the "Fixed_" prefix of bind_pieces is stripped before matching. ]]
+function Place.diff(placements: { any }, ids: { [string]: any }?, opts: { [string]: any }?): (string, number)
+	local o = opts or {}
+	local tolPos: number = o.tolPos or 0.05
+	local tolDeg: number = o.tolDeg or 1
+	local root = workspace:FindFirstChild(ROOT_NAME)
+	if not root then
+		return "no workspace." .. ROOT_NAME, 1
+	end
+	local function angle(a: CFrame, b: CFrame): number
+		local _, t = a:ToObjectSpace(b):ToAxisAngle()
+		return math.deg(math.abs(t))
+	end
+	local function fmt(v: Vector3): string
+		return string.format("(%.3f, %.3f, %.3f)", v.X, v.Y, v.Z)
+	end
+	-- live instances by MapId|Asset
+	local live: { [string]: { Instance } } = {}
+	for _, d in root:GetDescendants() do
+		local id, a = d:GetAttribute("MapId"), d:GetAttribute("Asset")
+		if typeof(id) == "string" and typeof(a) == "string" and d:IsA("PVInstance") then
+			local k = id .. "|" .. a
+			live[k] = live[k] or {}
+			table.insert(live[k], d)
+		end
+	end
+	-- default rule: the trailer set follows the trailer
+	local moved = o.moved
+	if not moved then
+		local trlEntry
+		for _, p in placements do
+			if p.id == "TRL" then
+				trlEntry = p
+			end
+		end
+		local liveTrl = live["TRL|AST-027_OpenLateTrailer"]
+		local trlMove = CFrame.identity
+		if trlEntry and liveTrl and liveTrl[1] then
+			trlMove = (liveTrl[1] :: any):GetPivot() * frameOf(trlEntry.x, trlEntry.y, trlEntry.z, trlEntry.rotY):Inverse()
+		end
+		moved = function(p: { [string]: any }): any
+			local id = p.id or ""
+			if id == "TRL-SALE" then
+				return false
+			end
+			if id == "TRL" or string.sub(id, 1, 4) == "TRL-" or string.match(id, "^H[1-4]$") then
+				return trlMove
+			end
+			return nil
+		end
+	end
+	local function ownParts(m: Instance): { BasePart }
+		local list = {}
+		local all: { Instance } = if m:IsA("BasePart") then { m } else {}
+		for _, d in m:GetDescendants() do
+			table.insert(all, d)
+		end
+		for _, d in all do
+			if d:IsA("BasePart") and not d:GetAttribute("BindCreated") and d.Name ~= "Light_Lamp" then
+				local skip = d ~= m and d:GetAttribute("MapId") ~= nil
+				local q = d.Parent
+				while not skip and q and q ~= m and q ~= root do
+					if q.Name == "UpgradePieces" or q.Name == "VehicleCover" or q:GetAttribute("MapId") ~= nil then
+						skip = true
+					end
+					q = q.Parent
+				end
+				if not skip then
+					table.insert(list, d)
+				end
+			end
+		end
+		return list
+	end
+	local function bare(n: string): string
+		return (string.gsub(n, "^Fixed_", ""))
+	end
+	local used: { [Instance]: boolean } = {}
+	local lines: { string } = {}
+	local nDiff, nOk, nAtt = 0, 0, 0
+	for i, p in placements do
+		if o.ids and not o.ids[p.id or ""] then
+			continue
+		end
+		local move = moved(p)
+		if move == false then
+			continue
+		end
+		local tpl, err = template(p.asset, ids or {})
+		if not tpl then
+			table.insert(lines, string.format("#%d %s: %s", i, tostring(p.id), tostring(err)))
+			nDiff += 1
+			continue
+		end
+		local exp = build(p, tpl)
+		if move then
+			if exp:IsA("Model") then
+				-- a hand-set WorldPivot travels with the parts
+				local piv = exp.WorldPivot
+				exp:PivotTo(move * exp:GetPivot())
+				exp.WorldPivot = move * piv
+			elseif exp:IsA("BasePart") then
+				exp.CFrame = move * exp.CFrame
+			end
+		end
+		local key = (p.id or "") .. "|" .. p.asset
+		local expPivot = (exp :: any):GetPivot() :: CFrame
+		local best, bd = nil, math.huge
+		for _, a in live[key] or {} do
+			if not used[a] then
+				local d = ((a :: any):GetPivot().Position - expPivot.Position).Magnitude
+				if d < bd then
+					best, bd = a, d
+				end
+			end
+		end
+		local msgs: { string } = {}
+		local real = 0
+		if not best then
+			table.insert(msgs, "MISSING in the Workspace")
+			real += 1
+		else
+			used[best] = true
+			local livePivot = (best :: any):GetPivot() :: CFrame
+			if bd > tolPos or angle(expPivot, livePivot) > tolDeg then
+				table.insert(msgs, string.format("pivot d=%.3f a=%.1f live %s", bd, angle(expPivot, livePivot), fmt(livePivot.Position)))
+				real += 1
+			end
+			local liveParts = ownParts(best)
+			local taken: { [Instance]: boolean } = {}
+			for _, ep in ownParts(exp) do
+				local cand, cd = nil, math.huge
+				for _, lp in liveParts do
+					if not taken[lp] and bare(lp.Name) == ep.Name then
+						local d = (lp.Position - ep.Position).Magnitude
+						if d < cd then
+							cand, cd = lp, d
+						end
+					end
+				end
+				if not cand then
+					table.insert(msgs, "part missing live: " .. ep.Name)
+					real += 1
+					continue
+				end
+				taken[cand] = true
+				local a = angle(ep.CFrame, cand.CFrame)
+				local ds = (ep.Size - cand.Size).Magnitude
+				if cd > tolPos or a > tolDeg or ds > tolPos then
+					table.insert(msgs, string.format("part %s d=%.3f a=%.1f size %s live %s", ep.Name, cd, a, fmt(ep.Size), fmt(cand.Size)))
+					real += 1
+				end
+				-- template attachments (informational: bind_map01 / bind_pieces move some)
+				for _, at in ep:GetChildren() do
+					if at:IsA("Attachment") then
+						local la = cand:FindFirstChild(at.Name)
+						local off = if la and la:IsA("Attachment") then (la.WorldPosition - at.WorldPosition).Magnitude else math.huge
+						if off > tolPos then
+							nAtt += 1
+							if o.verbose then
+								table.insert(msgs, string.format("(att %s/%s %s)", ep.Name, at.Name, if off == math.huge then "missing" else string.format("d=%.3f", off)))
+							end
+						end
+					end
+				end
+			end
+			for _, lp in liveParts do
+				if not taken[lp] then
+					table.insert(msgs, "part extra live: " .. lp:GetFullName())
+					real += 1
+				end
+			end
+		end
+		exp:Destroy()
+		if real > 0 then
+			nDiff += 1
+			table.insert(lines, string.format("#%d %s%s: %s", i, key, if move then " [trailer frame]" else "", table.concat(msgs, " | ")))
+		else
+			nOk += 1
+			if o.verbose then
+				table.insert(lines, string.format("#%d %s ok %s", i, key, table.concat(msgs, " ")))
+			end
+		end
+		if i % 25 == 0 then
+			task.wait()
+		end
+	end
+	if not o.ids then
+		for k, list in live do
+			for _, a in list do
+				if not used[a] and string.sub(k, 1, 9) ~= "TRL-SALE|" then
+					nDiff += 1
+					table.insert(lines, "live model not in the placements: " .. a:GetFullName())
+				end
+			end
+		end
+	end
+	table.insert(
+		lines,
+		1,
+		string.format(
+			"diff: %d differ, %d match (tol %.2f stud / %.0f deg); template attachments off or missing: %d (bind moves some on purpose)",
+			nDiff,
+			nOk,
+			tolPos,
+			tolDeg,
+			nAtt
+		)
+	)
+	return table.concat(lines, "\n"), nDiff
 end
 
 return Place

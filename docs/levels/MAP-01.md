@@ -966,6 +966,13 @@ Fora deste documento, mas dependem dele: fichas técnicas `ANM-###` (escolher â
 
 Contrato: `tech/architecture.md` §18 e §19.22. Ferramentas (modo de edição, fora do Rojo): `tools/assetplace/bind_map01.luau` (aplica) e `check_map01.luau` (confere; espelho de `MapIndex/Required.luau`). Tudo **Provisório** (DEC-193).
 
+### 16.0 Edições à mão no Studio gravadas nos placements (2026-10-10)
+
+O usuário ajustou o place à mão; `MAP-01_placements.luau` agora reproduz o estado (campos novos `drop`, `parts`, `copies`, `pivot`, aplicados por `place_assets.luau`):
+trailer sem a extensão de entrega (`DeliveryStand` do AST-020), registradora (`TRL-DRAWER`) e mesa de coberturas (`TRL-K`) viradas para o operador (rotY 180) com pivô da registradora movido, tábua `TRL-T` virada (rotY 0) e maior (2,6 × 1,4), bancos `TRL-BENCH-1..3` girados 180 em grupo (pivôs no lugar), duas camadas extras de pão em `TRL-B`, malha dos armários `H1..H4` removida (modelos vazios ficam).
+Carrinho: `Body` com 3,0 de altura (topo em 3,45); `DRAWER` sem extensão e virado para o operador; `CART-K` espelhado do trailer (rotY 180, z 37,352). Conferência sem rodar `Place.run`: `Place.diff(placements, ids)` (só leitura) — resultado 0 diferenças.
+**Atenção:** sem a malha, `H1..H4` estão sem `Prompt_Hide`/`Hide_Pose` no place; um novo `Bind.run` os recria por fallback. Provisório.
+
 ### 16.1 Como rodar (Command Bar, repositório servido na porta 8772)
 
 Ordem: `Place.run` (se os assets mudaram) → `Bind.run()` → `Pieces.run()` (`bind_pieces.luau`, TASK-085) → `Check.run({ wave = 3 })` → salvar o place. Depois de qualquer `Place.run`, rodar o `Bind` de novo; depois de qualquer `Bind`, o `Pieces`. Depois do `Bind`, **não** usar `Place.showLayer`: os dois veículos ficam no `Workspace` (T36). O `check` da onda 3 lê `Content` (`Cutscenes`, `WalkPaths`, `Traffic`) do `ReplicatedStorage`: rode com o `rojo serve` sincronizado.
