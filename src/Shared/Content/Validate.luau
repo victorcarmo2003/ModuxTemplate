@@ -1,26 +1,37 @@
 --!strict
 -- Content validation (content-data.md §1.4). Runs once when Content is required, on server and client.
 -- Any failure is an error naming the table and the row: a bad enum would bring Lync.start() down anyway (R8).
+local Achievements = require(script.Parent.Achievements)
 local Actions = require(script.Parent.Actions)
+local Animations = require(script.Parent.Animations)
+local BossCalls = require(script.Parent.BossCalls)
 local Classes = require(script.Parent.Classes)
 local CustomerTypes = require(script.Parent.CustomerTypes)
 local Flow = require(script.Parent.Flow)
+local GemRewards = require(script.Parent.GemRewards)
 local Ingredients = require(script.Parent.Ingredients)
 local Items = require(script.Parent.Items)
+local LightGroups = require(script.Parent.LightGroups)
 local Moods = require(script.Parent.Moods)
+local Nights = require(script.Parent.Nights)
 local Notices = require(script.Parent.Notices)
 local OpalLines = require(script.Parent.OpalLines)
 local Orders = require(script.Parent.Orders)
 local Outfits = require(script.Parent.Outfits)
 local Packages = require(script.Parent.Packages)
+local Revive = require(script.Parent.Revive)
 local RunParams = require(script.Parent.RunParams)
+local Sanity = require(script.Parent.Sanity)
 local Shift = require(script.Parent.Shift)
+local Sounds = require(script.Parent.Sounds)
 local Species = require(script.Parent.Species)
 local Stations = require(script.Parent.Stations)
 local Stats = require(script.Parent.Stats)
 local Table = require(script.Parent.Table)
+local Thief = require(script.Parent.Thief)
 local Upgrades = require(script.Parent.Upgrades)
 local Vehicles = require(script.Parent.Vehicles)
+local WalkPaths = require(script.Parent.WalkPaths)
 
 const KEY_PATTERN = "^[a-z][a-z0-9_]*$"
 -- Wire enum values (rule §1.3 exception): Shift phases and mood names.
@@ -459,6 +470,360 @@ local function checkRecords()
 	end
 end
 
+-- Wave 2 (TASK-047; content-data.md §6) ---------------------------------------------------------------------------
+
+const SELLING_PHASES: { [string]: boolean } = { Open = true, Night = true }
+const SKIP_PHASES: { [string]: boolean } = { Intro = true, Call = true, Finale = true }
+
+local function checkShiftWave2()
+	for index, row in Shift.List do
+		if row.Selling and not SELLING_PHASES[row.Key] then
+			fail("Shift", index, row.Key, "Selling is only for Open and Night (architecture.md §19.4)")
+		end
+		if row.SkipWithoutProbe and not SKIP_PHASES[row.Key] then
+			fail("Shift", index, row.Key, "SkipWithoutProbe is only for Intro, Call and Finale (§19.0 rule 4)")
+		end
+		const night = row.Night
+		if night ~= nil then
+			if row.Kind == "Day" then
+				fail("Shift", index, row.Key, "Night override on a Day-only phase")
+			end
+			inRange("Shift", index, row.Key, "Night.Duration", night.Duration, 0, 3600)
+			inRange("Shift", index, row.Key, "Night.ClockFrom", night.ClockFrom, 0, 2880)
+			inRange("Shift", index, row.Key, "Night.ClockTo", night.ClockTo, night.ClockFrom, 2880)
+		end
+	end
+	for key in SELLING_PHASES do
+		const row = Shift.ByKey[key]
+		if row == nil or not row.Selling then
+			fail("Shift", nil, nil, `phase '{key}' must exist with Selling = true`)
+		end
+	end
+end
+
+-- Highest Priority and longest call among the rows of a trigger kind (0, 0 when there is none).
+local function kindStats(kind: BossCalls.TriggerKind): (number, number)
+	local priority, count = 0, 0
+	for _, row in BossCalls.List do
+		if row.Trigger.Kind == kind then
+			priority = math.max(priority, row.Priority)
+			count = math.max(count, #row.Lines)
+		end
+	end
+	return priority, count
+end
+
+local function checkBossCalls()
+	checkKeys("BossCalls", BossCalls, KEY_PATTERN)
+	const rules = BossCalls.Rules
+	inRange("BossCallRules", nil, nil, "LineTime", rules.LineTime, 0.5, 10)
+	inRange("BossCallRules", nil, nil, "AutoAnswer", rules.AutoAnswer, 1, 120)
+	if BossCalls.Keys[1] ~= "none" or BossCalls.List[1].Trigger.Kind ~= "None" then
+		fail("BossCalls", 1, BossCalls.Keys[1], "first row must be the sentinel 'none' (Trigger None)")
+	end
+
+	const nightCalls: { [number]: string } = {}
+	const hints: { [string]: string } = {}
+	local repeatKey = ""
+	local repeats = 0
+	local maxShort = 0
+	for index, row in BossCalls.List do
+		const trigger = row.Trigger
+		const kind = trigger.Kind
+		inRange("BossCalls", index, row.Key, "Priority", row.Priority, 1, 4)
+		if kind ~= "None" and #row.Lines == 0 then
+			fail("BossCalls", index, row.Key, "call without Lines")
+		end
+		for position, line in row.Lines do
+			if line.Text == "" then
+				fail("BossCalls", index, row.Key, `Lines[{position}] is empty`)
+			end
+		end
+		if row.Short ~= nil and kind ~= "NightCall" then
+			fail("BossCalls", index, row.Key, "Short only on NightCall rows")
+		end
+		if kind == "DayPrep" or kind == "DayInfinite" or kind == "Hint" then
+			if #row.Lines > rules.DayMaxLines then
+				fail("BossCalls", index, row.Key, `{#row.Lines} lines, day calls have at most {rules.DayMaxLines}`)
+			end
+		elseif #row.Lines * rules.LineTime > rules.NightMaxSeconds then
+			fail("BossCalls", index, row.Key, `{#row.Lines * rules.LineTime} s, night calls last at most {rules.NightMaxSeconds} s`)
+		end
+		if kind == "DayPrep" and (trigger.Day == nil) == (trigger.Night == nil) then
+			fail("BossCalls", index, row.Key, "DayPrep needs exactly one of Trigger.Day or Trigger.Night")
+		end
+		if kind == "NightCall" then
+			const night = trigger.Night or 0
+			if night < 1 or night > RunParams.Nights then
+				fail("BossCalls", index, row.Key, `NightCall Trigger.Night must be 1..{RunParams.Nights}`)
+			end
+			if nightCalls[night] then
+				fail("BossCalls", index, row.Key, `second NightCall for night {night} (first '{nightCalls[night]}')`)
+			end
+			nightCalls[night] = row.Key
+			const short = row.Short or {}
+			if #short == 0 then
+				fail("BossCalls", index, row.Key, "NightCall needs Short (lines played on a repeated night)")
+			end
+			maxShort = math.max(maxShort, #short)
+		elseif kind == "NightRepeat" then
+			repeats += 1
+			repeatKey = row.Key
+		elseif kind == "Hint" then
+			const action = trigger.Action or ""
+			if not Actions.ByKey[action] then
+				fail("BossCalls", index, row.Key, `Hint Trigger.Action '{action}' not in Actions`)
+			end
+			if hints[action] then
+				fail("BossCalls", index, row.Key, `second hint for '{action}' (first '{hints[action]}')`)
+			end
+			hints[action] = row.Key
+		end
+	end
+	for night = 1, RunParams.Nights do
+		if nightCalls[night] == nil then
+			fail("BossCalls", nil, nil, `night {night} has no NightCall`)
+		end
+	end
+	if repeats ~= 1 then
+		fail("BossCalls", nil, nil, `exactly one NightRepeat call is required (found {repeats})`)
+	end
+
+	-- Calls sharing one Call phase play in Priority order and must fit its cap (L2-12 of the wave 2 test plan).
+	const callCap = Shift.ByKey.Call.Duration
+	const firstNight = BossCalls.ByKey[nightCalls[1]]
+	const trailerP, trailerN = kindStats("TrailerBought")
+	if trailerN > 0 and trailerP <= firstNight.Priority then
+		fail("BossCalls", nil, nil, "TrailerBought needs a higher Priority than NightCall (plays first on Night 1)")
+	end
+	if (trailerN + #firstNight.Lines) * rules.LineTime > callCap then
+		fail("BossCalls", nil, nil, `trailer call + {firstNight.Key} exceed the Call cap ({callCap} s)`)
+	end
+	const repeatRow = BossCalls.ByKey[repeatKey]
+	const criticalP, criticalN = kindStats("LostCritical")
+	const lastP, lastN = kindStats("LostLastChance")
+	if not (criticalP > lastP and lastP > repeatRow.Priority) then
+		fail("BossCalls", nil, nil, "Priority order on a repeated night: LostCritical > LostLastChance > NightRepeat")
+	end
+	const repeatN = #repeatRow.Lines + maxShort
+	if repeatN * rules.LineTime > rules.NightMaxSeconds then
+		fail("BossCalls", nil, nil, "NightRepeat + the longest Short exceed NightMaxSeconds")
+	end
+	if (criticalN + lastN + repeatN) * rules.LineTime > callCap then
+		fail("BossCalls", nil, nil, `critical + last chance + short exceed the Call cap ({callCap} s)`)
+	end
+end
+
+local function checkNights()
+	checkKeys("Nights", Nights, KEY_PATTERN)
+	if #Nights.List ~= RunParams.Nights then
+		fail("Nights", nil, nil, `{#Nights.List} rows, RunParams.Nights = {RunParams.Nights}`)
+	end
+	local previous = 0
+	for index, row in Nights.List do
+		if row.Index ~= index then
+			fail("Nights", index, row.Key, `Index = {row.Index}, expected {index} (list order)`)
+		end
+		inRange("Nights", index, row.Key, "Duration", row.Duration, 60, 3600)
+		if row.Duration <= previous then
+			fail("Nights", index, row.Key, "Duration must increase night after night (DEC-127)")
+		end
+		previous = row.Duration
+		if not string.match(row.NewAnomaly, "^anm_%d%d%d_[a-z0-9_]+$") then
+			fail("Nights", index, row.Key, `NewAnomaly '{row.NewAnomaly}' is not an anomaly key (anm_###_name)`)
+		end
+		const call = BossCalls.ByKey[row.Call]
+		if call == nil or call.Trigger.Kind ~= "NightCall" or call.Trigger.Night ~= index then
+			fail("Nights", index, row.Key, `Call '{row.Call}' is not the NightCall of night {index}`)
+		end
+		const short = BossCalls.ByKey[row.ShortCall]
+		if short == nil or short.Trigger.Kind ~= "NightRepeat" then
+			fail("Nights", index, row.Key, `ShortCall '{row.ShortCall}' is not the NightRepeat call`)
+		end
+		inRange("Nights", index, row.Key, "MaxSimultaneous", row.MaxSimultaneous, 1, Flow.MaxActorsNight)
+		inRange("Nights", index, row.Key, "MinGap", row.MinGap, 0, 600)
+		inRange("Nights", index, row.Key, "Customers.BaseInterval", row.Customers.BaseInterval, 1, 600)
+		inRange("Nights", index, row.Key, "Customers.Max", row.Customers.Max, 0, Flow.MaxCustomersNight)
+	end
+	const nightPhase = Shift.ByKey.Night
+	local cursor = nightPhase.ClockFrom
+	for _, name in { "Calm", "Shift", "Last" } do
+		const window = (Nights.Windows :: any)[name] :: { number }
+		if #window ~= 2 or window[1] ~= cursor or window[2] <= window[1] then
+			fail("Nights", nil, nil, `Windows.{name} must start at {cursor} and end after it (contiguous)`)
+		end
+		cursor = window[2]
+	end
+	if cursor ~= nightPhase.ClockTo then
+		fail("Nights", nil, nil, `Windows end at {cursor}, the Night phase ends at {nightPhase.ClockTo}`)
+	end
+	inRange("Flow", nil, nil, "NightInterval", Flow.NightInterval, 1, 600)
+end
+
+local function checkLightsAndSanity()
+	checkKeys("LightGroups", LightGroups, KEY_PATTERN)
+	const zoneOwner: { [string]: string } = {}
+	for index, row in LightGroups.List do
+		if row.Vehicle ~= nil and not Vehicles.ByKey[row.Vehicle] then
+			fail("LightGroups", index, row.Key, `Vehicle '{row.Vehicle}' not in Vehicles`)
+		end
+		if (row.Kind == "Upgrade") ~= (row.Upgrade ~= nil) then
+			fail("LightGroups", index, row.Key, "Upgrade is set exactly when Kind = Upgrade")
+		end
+		if row.Upgrade ~= nil and not Upgrades.ByKey[row.Upgrade] then
+			fail("LightGroups", index, row.Key, `Upgrade '{row.Upgrade}' not in Upgrades`)
+		end
+		if (row.Kind == "Switch" or row.Kind == "Upgrade") and row.Vehicle == nil then
+			fail("LightGroups", index, row.Key, "switch groups belong to a vehicle")
+		end
+		if row.Kind ~= "Posts" and #row.Zones == 0 then
+			fail("LightGroups", index, row.Key, "group without Zones")
+		end
+		for _, zone in row.Zones do
+			if zoneOwner[zone] then
+				fail("LightGroups", index, row.Key, `zone {zone} already in '{zoneOwner[zone]}'`)
+			end
+			zoneOwner[zone] = row.Key
+		end
+		inRange("LightGroups", index, row.Key, "Cooldown", row.Cooldown, 0, 10)
+		inRange("LightGroups", index, row.Key, "Step", row.Step, 0, 10)
+	end
+	if #LightGroups.List > 255 then
+		fail("LightGroups", nil, nil, "more than 255 groups (Lights set id)")
+	end
+
+	const phases = setOf(Shift.Keys)
+	for _, phase in Sanity.DarkPhases do
+		if not phases[phase] then
+			fail("Sanity", nil, nil, `DarkPhases '{phase}' not in Shift`)
+		end
+	end
+	inRange("Sanity", nil, nil, "Start", Sanity.Start, 1, 200)
+	inRange("Sanity", nil, nil, "Bands.High", Sanity.Bands.High, Sanity.Bands.Mid, Sanity.Start)
+	inRange("Sanity", nil, nil, "Bands.Mid", Sanity.Bands.Mid, 1, Sanity.Bands.High)
+	inRange("Sanity", nil, nil, "SeeAngle", Sanity.SeeAngle, 1, 180)
+	inRange("Sanity", nil, nil, "BasicLampRadius", Sanity.BasicLampRadius, 0, 100)
+	inRange("Revive", nil, nil, "MaxPerNight", Revive.MaxPerNight, 0, 10)
+	inRange("Revive", nil, nil, "WipeWindow", Revive.WipeWindow, 1, 120)
+	inRange("Revive", nil, nil, "BodyFallback", Revive.BodyFallback, 0, 600)
+end
+
+local function checkThiefAndRewards()
+	for day, chance in Thief.ChanceByDay.Days do
+		inRange("Thief", nil, nil, `ChanceByDay.Days[{day}]`, chance, 0, 1)
+	end
+	inRange("Thief", nil, nil, "ChanceByDay.Default", Thief.ChanceByDay.Default, 0, 1)
+	const window = Thief.WindowClock
+	const open = Shift.ByKey.Open
+	if #window ~= 2 or window[1] < open.ClockFrom or window[2] > open.ClockTo or window[2] <= window[1] then
+		fail("Thief", nil, nil, "WindowClock must be {from, to} inside the Open phase")
+	end
+	inRange("Thief", nil, nil, "ApproachTime", Thief.ApproachTime, 0.5, 30)
+	inRange("Thief", nil, nil, "CapRetry", Thief.CapRetry, 1, 600)
+	if #Thief.Lurks == 0 or #Thief.Exits == 0 then
+		fail("Thief", nil, nil, "Lurks and Exits cannot be empty")
+	end
+
+	checkKeys("Achievements", Achievements, KEY_PATTERN)
+	for index, row in Achievements.List do
+		inRange("Achievements", index, row.Key, "Target", row.Target, 1, 100000)
+		inRange("Achievements", index, row.Key, "Gems", row.Gems, 0, 100000)
+	end
+	for field, value in GemRewards :: any do
+		if type(value) == "number" then
+			inRange("GemRewards", nil, nil, field, value, 0, 100000)
+		end
+	end
+end
+
+local function checkMedia()
+	checkKeys("Animations", Animations, KEY_PATTERN)
+	for index, row in Animations.List do
+		if row.Id ~= "" and not string.match(row.Id, "^rbxassetid://%d+$") then
+			fail("Animations", index, row.Key, `Id '{row.Id}' is neither empty nor rbxassetid://<n>`)
+		end
+		inRange("Animations", index, row.Key, "FadeTime", row.FadeTime, 0, 2)
+		inRange("Animations", index, row.Key, "Speed", row.Speed, 0.1, 5)
+	end
+	for set, roles in Animations.Locomotion :: any do
+		const rig = (Animations.SetRig :: any)[set]
+		if rig == nil then
+			fail("Animations", nil, nil, `Locomotion.{set} has no rig in SetRig`)
+		end
+		for role, key in roles :: { [string]: string } do
+			const row = Animations.ByKey[key]
+			if row == nil or row.Rig ~= rig then
+				fail("Animations", nil, nil, `Locomotion.{set}.{role} = '{key}' is not a {rig} animation`)
+			end
+		end
+	end
+
+	checkKeys("Sounds", Sounds, KEY_PATTERN)
+	for index, row in Sounds.List do
+		if row.Id ~= "" and not string.match(row.Id, "^rbxassetid://%d+$") then
+			fail("Sounds", index, row.Key, `Id '{row.Id}' is neither empty nor rbxassetid://<n>`)
+		end
+		inRange("Sounds", index, row.Key, "Volume", row.Volume, 0, 1)
+	end
+	checkKeys("Music", Sounds.Music, KEY_PATTERN)
+	const phases = setOf(Shift.Keys)
+	for index, cue in Sounds.Music.List do
+		const sound = Sounds.ByKey[cue.Sound]
+		if sound == nil or sound.Group ~= "Music" then
+			fail("Music", index, cue.Key, `Sound '{cue.Sound}' is not a Music sound`)
+		end
+		for _, phase in cue.When.Phase or {} do
+			if not phases[phase] then
+				fail("Music", index, cue.Key, `When.Phase '{phase}' not in Shift`)
+			end
+		end
+		const window = cue.When.Window
+		if window ~= nil and (Nights.Windows :: any)[window] == nil then
+			fail("Music", index, cue.Key, `When.Window '{window}' not in Nights.Windows`)
+		end
+	end
+	inRange("SoundRules", nil, nil, "MaxVoices", Sounds.Rules.MaxVoices, 1, 64)
+
+	-- WalkPaths: shape only in wave 2 (empty is valid: no wire enum)
+	const seen: { [string]: boolean } = {}
+	for index, row in WalkPaths.List do
+		if not string.match(row.Key, KEY_PATTERN) or seen[row.Key] then
+			fail("WalkPaths", index, row.Key, "bad or duplicate key")
+		end
+		seen[row.Key] = true
+		if #row.Nodes < 2 then
+			fail("WalkPaths", index, row.Key, "a path needs at least 2 nodes")
+		end
+	end
+end
+
+local function checkWave2Records()
+	const trailer = Vehicles.ByKey.trailer
+	const reminder = if trailer then trailer.Reminder else nil
+	if trailer and reminder then
+		inRange("Vehicles", nil, "trailer", "Reminder.FirstDay", reminder.FirstDay, trailer.BuyFromDay, 1000)
+		inRange("Vehicles", nil, "trailer", "Reminder.Every", reminder.Every, 1, 100)
+	end
+	inRange("RunParams", nil, nil, "BindingWave", RunParams.BindingWave, 1, 4)
+	for index, row in Items.List do
+		if row.Use and row.Kind ~= "Consumable" and row.Kind ~= "Revive" then
+			fail("Items", index, row.Key, "only Consumable and Revive items have Use")
+		end
+	end
+	const valueTables: { [string]: boolean } =
+		{ Ingredients = true, Upgrades = true, Classes = true, Achievements = true, Items = true }
+	for index, row in Notices.List do
+		inRange("Notices", index, row.Key, "Wave", row.Wave, 1, 4)
+		const from = row.ValueFrom
+		if from ~= "None" and from ~= "Number" and not valueTables[from] then
+			fail("Notices", index, row.Key, `ValueFrom '{from}' unknown`)
+		end
+		if string.find(row.Text, "{achievement}", 1, true) and from ~= "Achievements" then
+			fail("Notices", index, row.Key, "{achievement} needs ValueFrom = Achievements")
+		end
+	end
+end
+
 return function()
 	checkKeySets()
 	checkUpgrades()
@@ -473,4 +838,11 @@ return function()
 	checkCustomerTypes()
 	checkOrders()
 	checkRecords()
+	checkShiftWave2()
+	checkBossCalls()
+	checkNights()
+	checkLightsAndSanity()
+	checkThiefAndRewards()
+	checkMedia()
+	checkWave2Records()
 end

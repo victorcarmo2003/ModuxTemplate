@@ -5,10 +5,14 @@
 -- Dev mode = Run place in Studio without PrivateServerId: roster = whoever joins, no MemoryStore, snapshot in memory.
 -- Provisional (TASK-010): a missing PlaceRole reads as "Run" (wave 1 ships only the Run place), and dev mode also
 -- needs RunService:IsStudio(), so a public Run server can never expose dev commands (gems, skip day).
--- OnStart runs MapIndex.Validate (architecture.md §18.8): problem in Studio = error (loud), published = warn.
+-- OnStart runs MapIndex.Validate (architecture.md §18.8) against Required.ForWave(Content.RunParams.BindingWave)
+-- (§19.22, TASK-048): problem in Studio = error (loud), published = warn. Provisional (TASK-048): while the binding of
+-- the configured wave is still being authored (TASK-083), a place that passes the previous wave only warns, so the
+-- other wave 2 tasks keep play-testing; a place that fails the previous wave too is an error as before.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local ServerScriptService = game:GetService("ServerScriptService")
+local Content = require(ReplicatedStorage.shared.Content)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
 local Modux = require(ServerScriptService.server.Modux)
 
@@ -47,6 +51,10 @@ function PlaceService:IsDev(): boolean
 	return self.Dev
 end
 
+local function report(wave: number, problems: { string }): string
+	return `[PlaceService] map binding (wave {wave}) has {#problems} problem(s):\n  {table.concat(problems, "\n  ")}`
+end
+
 -- Runtime twin of the edit-time check (architecture.md §18.7). No binding root yet = TASK-005 pending: warn only.
 function PlaceService:ValidateMap()
 	if not self:Is("Run") then
@@ -56,15 +64,21 @@ function PlaceService:ValidateMap()
 		warn("[PlaceService] no MapBinding in the Workspace (TASK-005 pending): map checks skipped")
 		return
 	end
-	const problems = MapIndex.Validate(MapIndex.Required)
+	const wave = Content.RunParams.BindingWave
+	const problems = MapIndex.Validate(MapIndex.Required.ForWave(wave))
 	if #problems == 0 then
 		return
 	end
-	const report = `[PlaceService] map binding has {#problems} problem(s):\n  {table.concat(problems, "\n  ")}`
-	if RunService:IsStudio() then
-		error(report, 0)
+	local fatal = true
+	if wave > 1 and #MapIndex.Validate(MapIndex.Required.ForWave(wave - 1)) == 0 then
+		fatal = false
+		warn(`[PlaceService] binding passes wave {wave - 1} but not wave {wave} yet (binding task pending)`)
 	end
-	warn(report)
+	const text = report(wave, problems)
+	if fatal and RunService:IsStudio() then
+		error(text, 0)
+	end
+	warn(text)
 end
 
 PlaceService:OnInit(function(self)

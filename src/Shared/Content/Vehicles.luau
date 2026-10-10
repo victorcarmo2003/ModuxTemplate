@@ -17,6 +17,13 @@ export type Vehicle = {
 	HidePoints: number,
 	BuyFromDay: number, -- 0 = not bought (starting vehicle)
 	CoveredAfter: string?, -- tarp asset over the parked vehicle after the swap (DEC-199)
+	Reminder: Reminder?, -- "for sale" notices while not bought (FEAT-017)
+}
+
+-- Notice trailer_available at the end of Day FirstDay without a purchase; trailer_waiting every Every days after.
+export type Reminder = {
+	FirstDay: number,
+	Every: number,
 }
 
 return Table.new({
@@ -44,5 +51,6 @@ return Table.new({
 		HasSwitch = true, -- "Lights" switch (DEC-189)
 		HidePoints = 4, -- 4 hide points, hiding is per player (DEC-176)
 		BuyFromDay = 5, -- = RunParams.TrailerDay (DEC-037)
+		Reminder = { FirstDay = 5, Every = 3 }, -- FEAT-017
 	},
 } :: { Vehicle })

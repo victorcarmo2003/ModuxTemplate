@@ -7,6 +7,9 @@
     "luau-lsp.sourcemap.sourcemapFile": "sourcemap.json",
     "luau-lsp.fflags.enableNewSolver": true,
     "luau-lsp.fflags.sync": true,
+    "luau-lsp.fflags.override": {
+        "LuauTypeInferIterationLimit": "40000"
+    },
     "luau-lsp.completion.anonymousAutofilledFunction.enabled": true,
     "[lua]": {
         "editor.defaultFormatter": "JohnnyMorganz.stylua"

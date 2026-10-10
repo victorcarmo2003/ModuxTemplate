@@ -38,5 +38,5 @@ return Table.new({
 		Price = 6,
 		Item = "pack_cream_cheese",
 	},
-	{ Key = "pack_coffee", Ref = "ITM-019", Name = "Coffee", Ingredient = "coffee", Amount = 10, Price = 5, Item = "pack_coffee" },
+	{ Key = "pack_coffee", Ref = "ITM-019", Name = "Ground Coffee", Ingredient = "coffee", Amount = 10, Price = 5, Item = "pack_coffee" },
 } :: { Package })

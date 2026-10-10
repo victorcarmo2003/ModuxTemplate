@@ -20,6 +20,5 @@ return {
 	ServerScriptService.server.Round.RoundService,
 	ServerScriptService.server.Run.RunStateService,
 	ServerScriptService.server.Upgrade.UpgradeService,
-	ServerScriptService.server.Vital.Vital,
 	ServerScriptService.server.Vital.VitalService,
 } :: { ModuleScript }

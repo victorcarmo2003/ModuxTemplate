@@ -337,6 +337,26 @@ function MapIndex.Validate(required: List): { string }
 	checkKey("Interactable", "Ingredient", Content.Ingredients.ByKey, "Ingredients")
 	checkKey("Interactable", "Package", Content.Packages.ByKey, "Packages")
 	checkKey("Vehicle", "Vehicle", Content.Vehicles.ByKey, "Vehicles")
+	checkKey("LightZone", "Group", Content.LightGroups.ByKey, "LightGroups")
+	checkKey("StreetLight", "Group", Content.LightGroups.ByKey, "LightGroups")
+
+	-- 2: ids that must exist once on tagged instances (light zones, street lights; §19.22)
+	for _, rule in required.Tagged do
+		const seen: { [string]: number } = {}
+		for _, instance in tagged(rule.Tag) do
+			const id = stringAttribute(instance, rule.Attribute)
+			if id == nil then
+				add(`2: {rule.Tag} {nameOf(instance)} without {rule.Attribute}`)
+			else
+				seen[id] = (seen[id] or 0) + 1
+			end
+		end
+		for _, id in rule.Ids do
+			if seen[id] ~= 1 then
+				add(`2: {rule.Tag} {rule.Attribute} = {id} found {seen[id] or 0} time(s), need 1`)
+			end
+		end
+	end
 
 	const anchors = tagged("Interactable")
 	for _, anchor in anchors do
@@ -367,23 +387,36 @@ function MapIndex.Validate(required: List): { string }
 		end
 	end
 
-	-- 2: the vehicle and its stations
-	const vehicles: { Instance } = {}
-	for _, instance in tagged("Vehicle") do
-		const key = stringAttribute(instance, "Vehicle")
-		if key == nil then
-			add(`2: Vehicle {nameOf(instance)} without attribute Vehicle`)
-		elseif key == required.Vehicle then
-			table.insert(vehicles, instance)
+	-- 2: the vehicles and their stations (one Model per required vehicle; A6: none of them is "current" here)
+	const vehicleModels: { [string]: Instance } = {}
+	do
+		const found: { [string]: { Instance } } = {}
+		for _, instance in tagged("Vehicle") do
+			const key = stringAttribute(instance, "Vehicle")
+			if key == nil then
+				add(`2: Vehicle {nameOf(instance)} without attribute Vehicle`)
+			else
+				const list = found[key] or {}
+				found[key] = list
+				table.insert(list, instance)
+			end
+		end
+		for key in required.Vehicles do
+			const list = found[key] or {}
+			if #list ~= 1 then
+				add(`2: {#list} Vehicle '{key}' in the Workspace (need 1)`)
+			else
+				vehicleModels[key] = list[1]
+			end
 		end
 	end
-	if #vehicles ~= 1 then
-		add(`2: {#vehicles} Vehicle '{required.Vehicle}' in the Workspace (need 1)`)
-	end
-	const vehicle = vehicles[1]
 
-	if vehicle ~= nil then
-		for kind, rule in required.Stations do
+	for vehicleKey, vehicleRule in required.Vehicles do
+		const vehicle = vehicleModels[vehicleKey]
+		if vehicle == nil then
+			continue
+		end
+		for kind, rule in vehicleRule.Stations do
 			const inVehicle: { Instance } = {}
 			for _, station in tagged("Station") do
 				if station:GetAttribute("StationKind") == kind and station:IsDescendantOf(vehicle) then
@@ -391,7 +424,7 @@ function MapIndex.Validate(required: List): { string }
 				end
 			end
 			if #inVehicle ~= 1 then
-				add(`2: {#inVehicle} Station '{kind}' in the {required.Vehicle} (need 1)`)
+				add(`2: {#inVehicle} Station '{kind}' in the {vehicleKey} (need 1)`)
 				continue
 			end
 			const station = inVehicle[1]
@@ -420,14 +453,14 @@ function MapIndex.Validate(required: List): { string }
 			if rule.Actions then
 				for action, count in rule.Actions do
 					if (actions[action] or 0) ~= count then
-						add(`2: {kind}: {actions[action] or 0} anchor(s) {action}, need {count}`)
+						add(`2: {vehicleKey}/{kind}: {actions[action] or 0} anchor(s) {action}, need {count}`)
 					end
 				end
 			end
 			if rule.SlotAnchors then
 				for slot = 1, rule.SlotAnchors do
 					if slotAnchors[slot] ~= 1 then
-						add(`2: {kind}: anchor with Slot {slot} found {slotAnchors[slot] or 0} time(s), need 1`)
+						add(`2: {vehicleKey}/{kind}: anchor with Slot {slot} found {slotAnchors[slot] or 0} time(s), need 1`)
 					end
 				end
 			end
@@ -441,7 +474,7 @@ function MapIndex.Validate(required: List): { string }
 				end
 				for slot = 1, rule.Slots do
 					if seen[slot] ~= 1 then
-						add(`2: {kind}: slot Attachment with Slot {slot} found {seen[slot] or 0} time(s), need 1`)
+						add(`2: {vehicleKey}/{kind}: slot Attachment with Slot {slot} found {seen[slot] or 0} time(s), need 1`)
 					end
 				end
 			end
@@ -451,10 +484,24 @@ function MapIndex.Validate(required: List): { string }
 						const counts = perIngredient[ingredient]
 						const found = if counts then counts[action] or 0 else 0
 						if found ~= 1 then
-							add(`2: {kind}: {action} with Ingredient {ingredient} found {found} time(s), need 1`)
+							add(`2: {vehicleKey}/{kind}: {action} with Ingredient {ingredient} found {found} time(s), need 1`)
 						end
 					end
 				end
+			end
+		end
+
+		-- anchors inside the vehicle that belong to no station (phone, switch, buy prompt)
+		const loose: { [string]: number } = {}
+		for _, anchor in anchors do
+			if anchor:IsDescendantOf(vehicle) and ancestorWithTag(anchor, "Station") == nil then
+				const action = stringAttribute(anchor, "PromptAction") or "?"
+				loose[action] = (loose[action] or 0) + 1
+			end
+		end
+		for action, count in vehicleRule.Actions do
+			if (loose[action] or 0) ~= count then
+				add(`2: {vehicleKey}: {loose[action] or 0} anchor(s) {action} outside the stations, need {count}`)
 			end
 		end
 	end
@@ -534,7 +581,7 @@ function MapIndex.Validate(required: List): { string }
 	end
 	spread(shelves, required.ShelfGap, "Mart shelves")
 	spread(benches, required.BenchGap, "bench")
-	if vehicle ~= nil then
+	for _, vehicle in vehicleModels do
 		const inVehicle: { Instance } = {}
 		for _, anchor in anchors do
 			if anchor:IsDescendantOf(vehicle) then

@@ -1,8 +1,10 @@
 --!strict
--- Net v1 (wave 1). Contract: docs/tech/network.md v4 (schema, writer, reader and rate of every entry).
+-- Net v2 (waves 1-2). Contract: docs/tech/network.md v4 (wave 1) and v5 §13.1-§13.4 (wave 2): schema, writer, reader
+-- and rate of every entry.
 -- Rules: set = state the party sees (late joiners get it ready); packet = event or private data.
 -- No keyBy (T14). Enums and bitfields come from Content keys (T13): Lync sorts the names, both sides require the
--- same Content, code reads and writes strings. Owner of this file: TASK-004 in wave 1 (board conflict point).
+-- same Content, code reads and writes strings. Owner of this file: TASK-004 (wave 1), TASK-048 (wave 2), TASK-097
+-- (wave 3) (board conflict point). Legacy Round packet and Health/Armor/Stamina Vitals are gone (§13.11).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Lync = require(ReplicatedStorage.Packages.Lync)
 local Content = require(ReplicatedStorage.shared.Content)
@@ -125,15 +127,59 @@ return Lync.define("game", {
 		Class = Lync.enum(Content.Classes.Keys),
 	})),
 
-	-- Legacy kept until wave 2 (network.md §4.7): example VitalService / RoundService still compile ----------------
+	-- Wave 2 (network.md §13.1-§13.4) ----------------------------------------------------------------------------
+
+	-- §13.1, record = UserId. Writer: VitalService (single writer). Replaces the legacy Health/Armor/Stamina set
 	Vitals = Lync.replicate(Lync.struct({
-		Health = Lync.int(0, 100),
-		Armor = Lync.int(0, 100),
-		Stamina = Lync.int(0, 100),
+		State = Lync.enum({ "Active", "Down", "Reviving", "Spectator", "Away" }),
+		StateEndsAt = Lync.f64(), -- Down: 6:00 AM of the night of the fall (DEC-115); 0 = no deadline
+		KnockedUntil = Lync.f64(), -- hit by a car until (wave 3); 0 = standing
+		Class = Lync.enum(Content.Classes.Keys),
 	})),
 
-	Round = Lync.packet(Lync.struct({
-		Status = Lync.enum({ "Waiting", "Playing", "Ending" }),
-		Seconds = Lync.int(0, 3600),
+	-- §13.1 s -> owner. Writer: VitalService. Max = 0: no sanity (day), the HUD hides the meter
+	Sanity = Lync.packet(Lync.struct({
+		Value = Lync.int(0, 200),
+		Max = Lync.int(0, 200),
+	})),
+
+	-- §13.1 s -> group. Writers: VitalService, TrafficService (Hit, wave 3). The state itself is in Vitals
+	LifeEvent = Lync.packet(Lync.struct({
+		UserId = Lync.f64(),
+		Event = Lync.enum({ "Down", "Revived", "Spectating", "Hit", "Wipe", "WipeCleared" }),
+	})),
+
+	-- §13.1 s -> group. Writer: VehicleService (1.5 s fade of the vehicle swap, T58)
+	Transition = Lync.packet(Lync.struct({
+		Kind = Lync.enum({ "VehicleSwap" }),
+		StartedAt = Lync.f64(),
+	})),
+
+	-- §13.1 s -> each player on RunEnded. Writer: RoundService. Gems of this run for this player (RunRewards)
+	RunReport = Lync.packet(Lync.struct({
+		Result = Lync.enum({ "Success", "Failed" }),
+		Day = Lync.int(1, 10000),
+		Night = Lync.int(0, 10),
+		Gems = Lync.int(0, 100000),
+	})),
+
+	-- §13.2, record = Content.LightGroups.IndexOf[key]. Writer: LightService
+	Lights = Lync.replicate(Lync.struct({
+		On = Lync.bool(), -- group lit now (night, switch/upgrade, no Hush)
+		At = Lync.f64(), -- last change; Hush: start (posts go out by Order x Step)
+	})),
+
+	-- §13.3, record 1. Writer: BossService. Line = floor((now - StartedAt) / BossCallRules.LineTime) (T44)
+	Call = Lync.replicate(Lync.struct({
+		Call = Lync.enum(Content.BossCalls.Keys), -- includes "none"
+		State = Lync.enum({ "Idle", "Ringing", "Talking" }),
+		StartedAt = Lync.f64(),
+	})),
+
+	-- §13.4, record 1. Writer: ThiefService. Bar over Bar_Thief by StartedAt / Duration
+	Thief = Lync.replicate(Lync.struct({
+		State = Lync.enum({ "None", "Lurking", "Approaching", "Opening", "Fleeing" }),
+		StartedAt = Lync.f64(),
+		Duration = Lync.quant(0, 30, 0.1), -- Opening: 8 s (16 s with UPG-004)
 	})),
 })

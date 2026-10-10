@@ -2,7 +2,8 @@
 -- Hotbar Tools and ItemRules (content-data.md §3.5; DEC-040, DEC-103, DEC-174, DEC-190). Owner: game-designer.
 -- The Tool in the kit is ReplicatedStorage.Assets.Items.Tools/<key> (architecture.md §18.9.1).
 -- Tool attributes (written only by ItemService, network.md §7.1): Item, Count, Toppings (HotDog), Altered (wave 3).
--- Drop rules: FEAT-036 (only the equipped Tool drops when hit).
+-- Drop rules: FEAT-036 (only the equipped Tool drops when hit). DropDespawn = seconds on the street (60 s, DEC-197,
+-- A10); items left by a spectator on the counter (DROP-T) last until the end of the next shift (ItemService rule).
 local Table = require(script.Parent.Table)
 
 export type Kind = "Package" | "Consumable" | "Product" | "Revive" | "Anomaly"
@@ -19,6 +20,7 @@ export type Item = {
 	DropOnHit: DropOnHit,
 	DropDespawn: number | "NextShiftEnd", -- seconds on the street; 0 = immediately
 	KeepOnSpectate: boolean,
+	Use: boolean, -- active item: ItemService:RegisterUse handles Tool.Activated (coffee, revive_kit; T51)
 }
 
 export type ItemRules = {
@@ -35,8 +37,9 @@ local function pack(key: string, ref: string, name: string): Item
 		Category = "Package",
 		Stackable = true,
 		DropOnHit = "Keep",
-		DropDespawn = 60,
+		DropDespawn = 60, -- FEAT-036, DEC-197
 		KeepOnSpectate = false,
+		Use = false,
 	}
 end
 
@@ -49,7 +52,7 @@ const base = Table.new({
 	pack("pack_bacon", "ITM-016", "Bacon"),
 	pack("pack_potato_sticks", "ITM-017", "Potato Sticks"),
 	pack("pack_cream_cheese", "ITM-018", "Cream Cheese"),
-	pack("pack_coffee", "ITM-019", "Coffee Pack"),
+	pack("pack_coffee", "ITM-019", "Ground Coffee"), -- D-10 (TASK-081)
 	{
 		Key = "coffee",
 		Ref = "ITM-009",
@@ -60,6 +63,7 @@ const base = Table.new({
 		DropOnHit = "Lost",
 		DropDespawn = 2,
 		KeepOnSpectate = false,
+		Use = true, -- drink at night (FEAT-021; Q-170)
 	},
 	{
 		Key = "hot_dog",
@@ -71,6 +75,7 @@ const base = Table.new({
 		DropOnHit = "Lost",
 		DropDespawn = 2,
 		KeepOnSpectate = false,
+		Use = false,
 	},
 	{
 		Key = "altered_item",
@@ -82,6 +87,7 @@ const base = Table.new({
 		DropOnHit = "Vanish",
 		DropDespawn = 0,
 		KeepOnSpectate = false,
+		Use = false,
 	},
 	{
 		Key = "revive_kit",
@@ -91,8 +97,9 @@ const base = Table.new({
 		Category = "Revive",
 		Stackable = false,
 		DropOnHit = "Keep",
-		DropDespawn = 60,
+		DropDespawn = 60, -- FEAT-036, DEC-197
 		KeepOnSpectate = false,
+		Use = true, -- wave 4 (ReviveService)
 	},
 } :: { Item })
 

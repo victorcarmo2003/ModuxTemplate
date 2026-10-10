@@ -1,42 +1,10 @@
 --!strict
+-- Shell of VitalService between waves 1 and 2 (TASK-048, architecture.md §19.26 A9). The template example
+-- (Health/Armor/Stamina, component Vital, Kill/respawn) is gone with its Net entry; TASK-062 rewrites this feature as
+-- VitalService/ (init, Sanity, Life) per architecture.md §19.7. Priority stays 700 (§19.2).
 local ServerScriptService = game:GetService("ServerScriptService")
 local Modux = require(ServerScriptService.server.Modux)
 
-const RESPAWN_DELAY = 3
-
-const VitalService = Modux.Service("VitalService", { Require = { "PlayerService" }, Priority = 700 })
-
-function VitalService:Kill(player: Player)
-	const character = player.Character
-	if character then
-		const humanoid = character:FindFirstChildOfClass("Humanoid")
-		if humanoid then
-			humanoid.Health = 0
-		end
-	end
-
-	task.delay(RESPAWN_DELAY, function()
-		if player.Parent ~= nil then
-			player:LoadCharacter()
-		end
-	end)
-end
-
-VitalService:OnInit(function(self)
-	self.Dependencies.PlayerService.PlayerAdded:Connect(function(player)
-		self.Components.Vital:Create(player)
-	end)
-
-	self.Dependencies.PlayerService.PlayerRemoving:Connect(function(player)
-		self.Components.Vital:Destroy(player)
-	end)
-
-	self.Dependencies.PlayerService.CharacterAdded:Connect(function(player)
-		const vital = self.Components.Vital:Get(player)
-		if vital then
-			vital:Revive()
-		end
-	end)
-end)
+const VitalService = Modux.Service("VitalService", { Priority = 700 })
 
 return VitalService

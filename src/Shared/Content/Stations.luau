@@ -75,7 +75,7 @@ const base = Table.new({
 		Params = {},
 	},
 	{
-		-- trailer only (wave 2)
+		-- trailer only (wave 2, FEAT-021): BrewTime 6 s, Barista via the CoffeeBrewTime class stat
 		Key = "coffee_machine",
 		Letter = "C",
 		Record = "Single",

@@ -58,12 +58,29 @@ return Table.new({
 	-- Dropped items (wave 3, FEAT-036) reuse it with PromptHold = 0.5 on the anchor.
 	{ Key = "pick_up_item", Text = "Take", Hold = 0, Radius = 7, Requires = {}, Night = "Any", Wave = 1 },
 
-	-- later waves (texts and holds Provisional; owners: game-designer, narrative-writer)
+	-- later waves (texts Provisional until ui-text.md; owners: game-designer, narrative-writer). Holds of the coffee and
+	-- hide actions from FEAT-021/FEAT-023 (A7, architecture.md §19.26). Every wave 2-3 row is here already, so the
+	-- wave 3 content task does not reopen this file.
 	{ Key = "bench_buy_item", Text = "Buy {item} — ${price}", Hold = 1.5, Radius = 7, Requires = {}, Night = "Any", Wave = 4 },
 	{ Key = "buy_trailer", Text = "Buy Trailer — ${price}", Hold = 2, Radius = 10, Requires = {}, Night = "DayOnly", Wave = 2 },
-	{ Key = "brew_coffee", Text = "Brew Coffee", Hold = 0, Radius = 7, Requires = {}, Night = "Any", Wave = 2 },
-	{ Key = "give_coffee", Text = "Give", Hold = 0, Radius = 7, Requires = { Held = "coffee" }, Night = "NightOnly", Wave = 2 },
+	-- "Take Coffee" when the machine is Ready (PromptText from CoffeeMachine.luau, architecture.md §19.8)
+	{ Key = "brew_coffee", Text = "Brew Coffee", Hold = 1, Radius = 7, Requires = {}, Night = "Any", Wave = 2 },
+	-- on the Prompt_Give anchor of a crew mate's HRP (CharacterService); the owner never targets its own
+	{
+		Key = "give_coffee",
+		Text = "Give",
+		Hold = 0.5,
+		Radius = 7,
+		Requires = { Held = "coffee" },
+		Night = "NightOnly",
+		Wave = 2,
+	},
 	{ Key = "switch_light", Text = "Lights", Hold = 0, Radius = 7, Requires = {}, Night = "Any", Wave = 2 },
-	{ Key = "hide", Text = "Hide", Hold = 0, Radius = 7, Requires = {}, Night = "NightOnly", Wave = 2 },
+	-- Prompt_Answer on the cart and trailer phones (FEAT-018, DEC-124)
+	{ Key = "answer_phone", Text = "Answer", Hold = 0, Radius = 7, Requires = {}, Night = "Any", Wave = 2 },
+	{ Key = "hide", Text = "Hide", Hold = 0.5, Radius = 7, Requires = {}, Night = "NightOnly", Wave = 3 },
+	-- the safe spot is a zone, not a prompt: the key exists for the enum only (content-data.md §6.9)
 	{ Key = "safe_spot", Text = "Hide", Hold = 0, Radius = 7, Requires = {}, Night = "NightOnly", Wave = 3 },
+	-- leave a hide point (FEAT-023); local button of HideController
+	{ Key = "get_up", Text = "Get Up", Hold = 0, Radius = 10, Requires = {}, Night = "NightOnly", Wave = 3 },
 } :: { Action })

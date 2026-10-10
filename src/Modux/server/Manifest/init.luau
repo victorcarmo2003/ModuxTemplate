@@ -18,7 +18,6 @@ local ProfileService = require(ServerScriptService.server.ModuxTypes.ProfileServ
 local RoundService = require(ServerScriptService.server.ModuxTypes.RoundService)
 local RunStateService = require(ServerScriptService.server.ModuxTypes.RunStateService)
 local UpgradeService = require(ServerScriptService.server.ModuxTypes.UpgradeService)
-local Vital = require(ServerScriptService.server.ModuxTypes.Vital)
 local VitalService = require(ServerScriptService.server.ModuxTypes.VitalService)
 
 export type AllServices = {
@@ -42,17 +41,8 @@ export type AllServices = {
 	VitalService: VitalService.Public,
 }
 
-export type AllComponents = {
-	Vital: Vital.Public,
-}
+export type AllComponents = {}
 
-export type ComponentAccess = {
-	Vital: {
-		Get: (self: any, instance: Instance) -> Vital.Public?,
-		Create: (self: any, instance: Instance) -> Vital.Public,
-		All: (self: any) -> { Vital.Public },
-		Destroy: (self: any, instance: Instance) -> (),
-	},
-}
+export type ComponentAccess = {}
 
 return {}

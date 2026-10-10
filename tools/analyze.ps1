@@ -37,7 +37,10 @@ Write-Host "engine: luau-lsp + Rojo sourcemap + Roblox definitions" -ForegroundC
 $files = Get-ChildItem -Path $Src -Recurse -Filter *.luau |
     Where-Object { $_.FullName -like $Filter }
 
-$args = @("analyze", "--sourcemap=$map", "--flag:LuauSolverV2=true")
+# LuauTypeInferIterationLimit 40000 (default 20000): the Modux self of the biggest Services (10+ dependencies plus
+# typeof(Net)) exceeds the default budget and reports "Code is too complex to typecheck" on correct code (TASK-048).
+# Same value in .vscode/settings.json (luau-lsp.fflags.override) so editor and gate agree.
+$args = @("analyze", "--sourcemap=$map", "--flag:LuauSolverV2=true", "--flag:LuauTypeInferIterationLimit=40000")
 if ($Defs) { $args += "--definitions=$Defs" }
 $args += $files.FullName
 
