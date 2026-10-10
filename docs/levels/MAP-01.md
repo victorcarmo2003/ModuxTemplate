@@ -305,7 +305,7 @@ Ordem de preparo [DEC-016]: **estoque → grelha → esteira → pão/tábua →
 Regras de prompt para 1ª pessoa no mobile (DEC-039, DEC-066, DEC-097 — sem braços, só a Tool na mão):
 - prompts de estações vizinhas a **≥ 2,5 studs**; cada estação com silhueta e cor diferentes;
 - toda estação alcançável do corredor sem pular nem agachar;
-- complementos: uma tampa/caixa por ingrediente, grade 3 × 2 com 2 studs entre centros (6 complementos do MVP, DEC-071).
+- complementos: uma tigela por ingrediente, grade 3 × 2 (6 complementos do MVP, DEC-071, DEC-156): 2 studs entre centros na fileira e 1,5 entre as fileiras no modelo. As âncoras de prompt são afastadas para ficarem ≥ 2,0 entre si (§7.1).
 
 ### 7.1 Carrinho (tier 1) — vista de cima
 
@@ -344,7 +344,7 @@ Escala: **1 coluna = 1 stud (X)**, **1 linha = 2 studs (Z)**. X de 12 a 71.
 | 3. Esteira / descanso | R | 36–39 | 3 | trilho inclinado | usar (salsicha → pão) | — |
 | 4. Pão | B | 39–41 | 2 | caixa de pães | usar (pão → tábua), "Restock" | — |
 | 5. Tábua / montagem | T | 41–44 | 3 | tábua de corte | fluxo da montagem (`Q-068`) | — |
-| 6. Complementos | K | 44–50 | 6 | grade 3 × 2: frente = Ketchup, Mustard, Cheese; fundo = Bacon, Potato Sticks, Cream Cheese [DEC-071] | um prompt hold 1 s por ingrediente [DEC-072], "Restock" | ingrediente bloqueado = tampa com cadeado até o dia de liberação |
+| 6. Complementos | K | 44–50 | 6 | grade 3 × 2 de tigelas de inox [DEC-071, DEC-156], conforme o modelo AST-017 no place (TASK-005; modelo em produção, **Provisório** até aprovação): **fileira do operador** (Z ~38,1, baixa), de oeste para leste = **Cheese (X 45), Mustard (47), Ketchup (49)**; **fileira de trás** (Z ~36,6, 0,3 mais alta) = **Cream Cheese (45), Potato Sticks (47), Bacon (49)**. Fileiras a 1,5 stud; as âncoras de prompt saem da grade (operador: +0,4 Z e +0,35 Y; trás: +1,25 Y) para ficarem ≥ 2,0 entre si (`bind_map01.luau`) | um prompt hold 1 s por ingrediente [DEC-072], "Restock" | ingrediente bloqueado = tampa com cadeado até o dia de liberação |
 | 7. Entrega + gaveta | H / $ | 50–54 | 4 | suporte de entrega e gaveta | gaveta: valor no mundo [DEC-050] | Cash Drawer Lock: cadeado |
 
 Medidas: profundidade da linha 3 (Z 36..39), altura **3,0** do Pad (y 3,45; DEC-157, era 3,5); corredor **6 studs** (Z 39..45) para 4 jogadores. Dois guarda-sóis a 9 de altura (AST-026). Nenhum prompt de compra de upgrade no carrinho: as peças só **mostram** o nível comprado na bancada do Mart [DEC-052, DEC-101]. Saída do corredor pelo **lado oeste** (X 28 → borda do Pad X 24): é o começo da rota do Mart.
@@ -523,6 +523,9 @@ Tipos e comportamento: `design/npcs.md`. Aqui só o espacial. Todos os NPCs são
 | Fila cheia | spawner não gera cliente novo | igual |
 | Pedido | balão em Q1 [DEC-071] | igual |
 | Saída | Q1 → LANE-E → EX-E (60%) ou D1 (40%) | igual |
+
+**Grafo de NPC (TASK-005, `workspace.MapBinding`).** 25 nós, que seguem as rotas ROUTE-SP-A, ROUTE-D1-IN, ROUTE-QUEUE, ROUTE-EXIT-E e ROUTE-EXIT-D1. Fonte: `tools/assetplace/bind_map01.luau`; checagem: `check_map01.luau`. D1 fica 1 stud a oeste da porta, em (63, 48), para o NPC não nascer dentro da parede.
+**Nota para a TASK-031 e o `MapIndex.Path` (Provisório):** **um nó Q (Q1–Q5) nunca é ponto intermediário de um caminho**, só origem ou destino. Sem essa regra, o A* sem direção leva a chegada D1 → Q5 por dentro da fila (Q1 → Q2 → … → Q5), porque é mais curto que a rota pela calçada (LANE-W). Dentro da fila, o `CustomerService` move o cliente vaga a vaga. Quem sai do meio da fila sem ser atendido é caso da TASK-032: ou anda até Q1 e sai por lá, ou ganha uma ligação própria. Os pontos de chegada continuam ligados só a Q5 (`architecture.md` §18.6).
 
 Clientes normais são repetitivos para criar padrão [DEC-010]: chegam pela esquerda, saem pela direita, pelos mesmos pontos. À noite, NPC fora dessas rotas é quebra de padrão legível.
 
