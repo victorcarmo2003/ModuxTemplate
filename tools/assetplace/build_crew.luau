@@ -60,6 +60,19 @@ function Crew.build(o: { [string]: any }): Model
 			parts[d.Name] = d
 		end
 	end
+	-- civilians use plain arms (no puffed uniform sleeve); same UV layout, same R6 boxes and rest pose
+	if o.outfit ~= "Crew" and o.ids["AST-053_CivilArms"] then
+		local civil = load(o.ids["AST-053_CivilArms"])
+		for _, n in { "Left Arm", "Right Arm" } do
+			local arm = civil:FindFirstChild(n, true)
+			if arm and arm:IsA("BasePart") then
+				if parts[n] then
+					parts[n]:Destroy()
+				end
+				parts[n] = arm
+			end
+		end
+	end
 	-- outfit texture (Cap only when wanted; ears-up animals use the cap with ear holes)
 	local outfitKey = o.outfit == "Crew" and "Crew_Uniform" or ("Civil_" .. o.outfit)
 	-- day-only outfits (e.g. Thief) fall back to the Day sheet
