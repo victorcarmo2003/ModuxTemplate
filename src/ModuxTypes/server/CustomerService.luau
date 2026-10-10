@@ -21,6 +21,7 @@ export type Customer = {
 	JoinedAt: number, -- server time it reached the queue (0 = still arriving); patience base for TASK-033
 	LeftAt: number, -- server time it started leaving (0 = not leaving)
 	Move: number, -- walk order counter: a newer order cancels the callback of the older one
+	Variant: Variant?, -- customer anomaly (SpawnActor); nil = ordinary customer
 }
 export type Patch = {
 	State: State?,
@@ -36,10 +37,21 @@ export type Wire = {
 	Mood: string,
 }
 export type SaleResult = "Perfect" | "Complete" | "Incomplete" | "Wrong" | "Left" | "Refused"
+export type Variant = "blank" | "mirror" | "raincoat"
+export type CustomerActorSpec = {
+	Variant: Variant,
+	CustomerType: string?,
+	Species: string?,
+	Outfit: string?,
+	CopyOf: number?,
+	From: string?,
+}
 export type ActedAction = "take_order" | "serve" | "refuse" | "give_up"
+export type ServeRule = (customer: Customer, tool: Tool, player: Player) -> SaleResult?
 
 export type Public = {
 	Acted: SignalLib.Signal<number, ActedAction, Player?, SaleResult?>,
+	ActorRng: Random,
 	Customers: { [number]: Customer },
 	Enabled: boolean,
 	Fronted: SignalLib.Signal<number>,
@@ -52,6 +64,7 @@ export type Public = {
 	Party: number,
 	Removed: SignalLib.Signal<number>,
 	Rng: Random,
+	ServeRules: { ServeRule },
 	SpawnAttempted: SignalLib.Signal<Outcome>,
 	Tickets: { [number]: Orders.Ticket },
 	Warned: { [string]: boolean },
@@ -80,7 +93,10 @@ export type Public = {
 	Reached: (self: Public, customer: Customer, slot: number) -> (),
 	Join: (self: Public, customer: Customer) -> (),
 	Attempt: (self: Public) -> (Outcome, number?),
-	Create: (self: Public, id: number) -> (),
+	Create: (self: Public, id: number, variant: Variant?) -> (),
+	SpawnActor: (self: Public, spec: CustomerActorSpec) -> number?,
+	AddServeRule: (self: Public, rule: ServeRule) -> () -> (),
+	ServeOverride: (self: Public, customer: Customer, tool: Tool, player: Player) -> SaleResult?,
 	SetPrompts: (self: Public, id: number, enabled: boolean) -> (),
 	ExitRoute: (self: Public, node: string) -> (string?, boolean),
 	Leave: (self: Public, id: number, mood: string?, reason: LeaveReason?) -> boolean,

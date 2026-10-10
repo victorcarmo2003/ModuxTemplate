@@ -33,6 +33,14 @@
 -- customer away (NightEnd/NightLost, the 6 AM Closing, Summary...), so the night Closing finds the counter empty.
 -- Acted(id, action, player, result) fires after take_order, serve, refuse and give_up (patience, no player) for the
 -- anomaly rules (§19.13). "Take Order" outside the drawer phases sends the D-04 notice shop_closed to that player.
+--
+-- Wave 3 (TASK-108; architecture.md §19.3, §19.13; DEC-051): SpawnActor(spec) brings a customer anomaly (NpcService
+-- Role "Actor", Variant blank / mirror / raincoat). It takes a counter slot and counts in every cap like a customer,
+-- walks, orders and acts the same, but never touches the shift ledger: no CountArrival on joining, no CountResult on
+-- its outcome (the anomaly module counts Arrival + Wrong only on a failure). The Sale packet still goes out.
+-- AddServeRule(fn) lets a system override the verdict of "Serve" (any customer): the first rule that returns a result
+-- wins (Complete/Perfect pay as Complete, Incomplete as Incomplete, anything else = Wrong: $0, the hot dog stays in
+-- the server's hand).
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -62,6 +70,7 @@ export type Customer = {
 	JoinedAt: number, -- server time it reached the queue (0 = still arriving); patience base for TASK-033
 	LeftAt: number, -- server time it started leaving (0 = not leaving)
 	Move: number, -- walk order counter: a newer order cancels the callback of the older one
+	Variant: Variant?, -- customer anomaly (SpawnActor); nil = ordinary customer
 }
 
 -- Fields TASK-033 may write (Leaving goes through Leave)
@@ -84,8 +93,25 @@ export type Wire = {
 -- Sale.Result (network.md §4.3) = EconomyService SaleResult
 export type SaleResult = "Perfect" | "Complete" | "Incomplete" | "Wrong" | "Left" | "Refused"
 
+-- Customer-anomaly variant (= NpcService.Variant; rig attribute "Variant", read by the client)
+export type Variant = "blank" | "mirror" | "raincoat"
+
+-- SpawnActor request (architecture.md §19.13 Context.Spawn). Look fields force the draw (must be valid for the type);
+-- CopyOf (mirror only) copies the type, species and outfit of a live, non-actor customer that is not leaving.
+export type CustomerActorSpec = {
+	Variant: Variant,
+	CustomerType: string?,
+	Species: string?,
+	Outfit: string?,
+	CopyOf: number?,
+	From: string?,
+}
+
 -- Acted.action (TASK-053): the three customer actions, plus give_up when patience ran out (no player)
 export type ActedAction = "take_order" | "serve" | "refuse" | "give_up"
+
+-- Serve override (AddServeRule): nil = no opinion, the order check decides
+export type ServeRule = (customer: Customer, tool: Tool, player: Player) -> SaleResult?
 
 type Weighted = { Point: string, Weight: number }
 
@@ -93,6 +119,8 @@ const TICK_RATE = 10 -- Hz
 const SEED_MAX = 2147483646
 const SEED_DOMAIN = "customers"
 const ORDER_SEED_DOMAIN = "orders" -- own stream: order draws never shift the spawn draws
+const ACTOR_SEED_DOMAIN = "actors" -- own stream: anomaly actors never shift the customer draws
+const MIRROR = "mirror"
 const SALE_MAX = 1000 -- Sale.Amount wire range
 const TAKE_ORDER = "take_order"
 const SERVE = "serve"
@@ -171,6 +199,10 @@ function CustomerService:Setup()
 	self.Rng = Random.new() :: Random
 	-- Order draws (TASK-033), reseeded at every ShiftStarted
 	self.OrderRng = Random.new() :: Random
+	-- Actor look draws (TASK-108), reseeded at every ShiftStarted
+	self.ActorRng = Random.new() :: Random
+	-- Serve overrides (AddServeRule), in registration order
+	self.ServeRules = {} :: { ServeRule }
 	-- Server-only order of each customer in the queue, by NpcId (TASK-033)
 	self.Tickets = {} :: { [number]: Orders.Ticket }
 	-- Connected members, locked when the shop opens (DEC-185)
@@ -413,7 +445,10 @@ function CustomerService:Join(customer: Customer)
 	customer.JoinedAt = now()
 	Queue.join(self.Line, customer.Id)
 	self:Publish(customer, false)
-	self.Dependencies.EconomyService:CountArrival() -- FEAT-014 denominator; skipped spawns never get here
+	if customer.Variant == nil then
+		-- FEAT-014 denominator; skipped spawns never get here. Actors are excluded (DEC-051)
+		self.Dependencies.EconomyService:CountArrival()
+	end
 	self.Joined:Fire(customer.Id)
 	self:Refresh()
 end
@@ -443,7 +478,7 @@ function CustomerService:Attempt(): (Outcome, number?)
 	return outcome, id
 end
 
-function CustomerService:Create(id: number)
+function CustomerService:Create(id: number, variant: Variant?)
 	const customer: Customer = {
 		Id = id,
 		State = "Arriving",
@@ -455,6 +490,7 @@ function CustomerService:Create(id: number)
 		JoinedAt = 0,
 		LeftAt = 0,
 		Move = 0,
+		Variant = variant,
 	}
 	self.Customers[id] = customer
 	self:SetPrompts(id, false)
@@ -467,6 +503,73 @@ function CustomerService:Create(id: number)
 			self:Remove(id) -- no route (binding broken): nothing to queue
 		end
 	end)
+end
+
+-- Customer anomaly (TASK-108; architecture.md §19.13). Spawns now and walks to the queue like a customer. Needs a
+-- selling phase, a free counter slot and room in the NPC cap; nil otherwise (the anomaly schedule retries later).
+function CustomerService:SpawnActor(spec: CustomerActorSpec): number?
+	if not self.Enabled or not self:IsSelling() then
+		return nil
+	end
+	const npc = self.Dependencies.NpcService
+	if Queue.isFull(self:Occupants(), self:QueueSize()) or npc:Count() >= npc:Capacity() then
+		return nil
+	end
+	local customerType = spec.CustomerType
+	local species = spec.Species
+	local outfit = spec.Outfit
+	if spec.CopyOf ~= nil then
+		if spec.Variant ~= MIRROR then
+			warn(`[CustomerService] SpawnActor: CopyOf is for the mirror variant only ({spec.Variant})`)
+			return nil
+		end
+		const original = self.Customers[spec.CopyOf]
+		const source = npc:Get(spec.CopyOf)
+		if original == nil or original.Variant ~= nil or original.State == "Leaving" or source == nil then
+			return nil
+		end
+		customerType = source.CustomerType
+		species = source.Species
+		outfit = source.Outfit
+	end
+	const id = npc:Spawn({
+		Role = "Actor",
+		Variant = spec.Variant,
+		CustomerType = customerType,
+		Species = species,
+		Outfit = outfit,
+		From = spec.From,
+		Rng = self.ActorRng,
+	})
+	if id == nil then
+		return nil
+	end
+	self:Create(id, spec.Variant)
+	return id
+end
+
+-- Registers a Serve override (architecture.md §19.13, T42). Returns the function that removes it.
+function CustomerService:AddServeRule(rule: ServeRule): () -> ()
+	table.insert(self.ServeRules, rule)
+	return function()
+		const index = table.find(self.ServeRules, rule)
+		if index ~= nil then
+			table.remove(self.ServeRules, index)
+		end
+	end
+end
+
+-- First non-nil result of the Serve rules, or nil. A rule that errors is skipped (warned).
+function CustomerService:ServeOverride(customer: Customer, tool: Tool, player: Player): SaleResult?
+	for _, rule in table.clone(self.ServeRules) do
+		const ok, result = pcall(rule, customer, tool, player)
+		if not ok then
+			warn(`[CustomerService] serve rule failed: {result}`)
+		elseif result ~= nil then
+			return result
+		end
+	end
+	return nil
 end
 
 -- Leave / remove --------------------------------------------------------------------------------------------------
@@ -735,8 +838,12 @@ function CustomerService:NoticeShopClosed(player: Player, anchor: Instance)
 end
 
 -- Outcome of a customer: shift ledger + Sale to the group. `amount` = what went into the drawer.
+-- Actors stay out of the ledger (DEC-051): their module counts a failure itself.
 function CustomerService:Settle(id: number, result: SaleResult, amount: number)
-	self.Dependencies.EconomyService:CountResult(result)
+	const customer = self.Customers[id]
+	if customer == nil or customer.Variant == nil then
+		self.Dependencies.EconomyService:CountResult(result)
+	end
 	const net = self.Dependencies.NetService
 	if net:IsRunning() then
 		self.Libs.Net.Sale:fireClient(net.Audience, {
@@ -773,15 +880,24 @@ end
 
 -- "Serve" (FEAT-011, DEC-072): validates the held hot dog against the order and pays into the drawer.
 function CustomerService:Serve(player: Player, anchor: Instance)
-	const id, _, ticket = self:TicketAt(anchor)
+	const id, customer, ticket = self:TicketAt(anchor)
 	const tool = self.Dependencies.ItemService:Holding(player, HOT_DOG)
-	if id == nil or ticket == nil or tool == nil then
+	if id == nil or customer == nil or ticket == nil or tool == nil then
 		return
 	end
 	const items = self.Dependencies.ItemService
 	const economy = self.Dependencies.EconomyService
 	const at = now()
-	const verdict = Orders.Evaluate(ticket.Toppings, items:Toppings(tool))
+	-- AddServeRule (TASK-108): an override replaces the order check
+	const override = self:ServeOverride(customer, tool, player)
+	if self.Customers[id] ~= customer or customer.State == "Leaving" then
+		return -- a rule sent the customer away
+	end
+	const verdict: Orders.Verdict = if override == nil
+		then Orders.Evaluate(ticket.Toppings, items:Toppings(tool))
+		elseif override == "Complete" or override == "Perfect" then "Complete"
+		elseif override == "Incomplete" then "Incomplete"
+		else "Wrong"
 	local result: SaleResult = verdict
 	local amount = 0
 	local mood: string? = nil
@@ -890,6 +1006,7 @@ function CustomerService:Reseed()
 	const base = `{seed}|{info.Day}|{if info.IsNight then 1 else 0}|{info.Attempt}|`
 	self.Rng = Random.new(hash(base .. SEED_DOMAIN) % SEED_MAX + 1)
 	self.OrderRng = Random.new(hash(base .. ORDER_SEED_DOMAIN) % SEED_MAX + 1)
+	self.ActorRng = Random.new(hash(base .. ACTOR_SEED_DOMAIN) % SEED_MAX + 1)
 end
 
 function CustomerService:OnPhase(phase: string)

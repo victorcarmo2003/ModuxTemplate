@@ -187,6 +187,7 @@ function PoolModule.release(pool: Pool, rig: Rig, now: number, parking: Instance
 	resetAnchor(rig.Customer, CUSTOMER_ACTION)
 	resetAnchor(rig.Refuse, REFUSE_ACTION)
 	rig.Model:SetAttribute("NpcId", nil)
+	rig.Model:SetAttribute("Variant", nil) -- actor variant (TASK-108): a reused rig is a plain customer again
 	rig.Model.Name = "Npc"
 	rig.Model.Parent = parking
 end

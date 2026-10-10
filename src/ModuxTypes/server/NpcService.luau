@@ -6,6 +6,7 @@ local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 local Look = require(ServerScriptService.server.Npc.NpcService.Look)
 local Pool = require(ServerScriptService.server.Npc.NpcService.Pool)
 
+export type Role = "Customer" | "Thief" | "Actor"
 export type Npc = {
 	Id: number,
 	Rig: Pool.Rig,
@@ -13,11 +14,13 @@ export type Npc = {
 	CustomerType: string, -- "" for the thief
 	Species: string,
 	Outfit: string,
+	Variant: Variant?, -- Role "Actor" only
 	Node: string, -- last graph node reached (spawn point at first)
 	Walk: number, -- walk order counter: a new order or a despawn cancels the running one
 }
 export type SpawnRequest = {
 	Role: Role?, -- default "Customer". "Thief": Quick Quentin; CustomerType/Species/Outfit are ignored
+	Variant: Variant?, -- required with Role "Actor", refused with any other role
 	CustomerType: string?, -- default: weighted draw among the types unlocked this shift (Look.PickType)
 	Species: string?, -- forced species (must belong to the type)
 	Outfit: string?, -- forced civil outfit
@@ -29,7 +32,7 @@ export type WalkOptions = {
 	AvoidCrossings: boolean?, -- default false (thief, wave 2)
 	Face: boolean?, -- default true: on arrival, face the MapPoint direction of the goal (when it is a point)
 }
-export type Role = "Customer" | "Thief"
+export type Variant = "blank" | "mirror" | "raincoat"
 
 export type Public = {
 	Active: { [number]: Npc },
@@ -45,6 +48,7 @@ export type Public = {
 	RouteFrame: number,
 	RoutesInFrame: number,
 	Spawned: SignalLib.Signal<number, Model>,
+	Tension: boolean,
 	Warned: { [string]: boolean },
 	Setup: (self: Public) -> (),
 	WarnOnce: (self: Public, key: string, message: string) -> (),
@@ -57,6 +61,8 @@ export type Public = {
 	Capacity: (self: Public) -> number,
 	PoolStats: (self: Public) -> (number, number),
 	Pack: (self: Public) -> string,
+	PackFor: (self: Public, role: Role, outfit: string) -> string,
+	IsTension: (self: Public) -> boolean,
 	PickType: (self: Public, rng: Random?) -> string?,
 	AllocateId: (self: Public) -> number?,
 	PickSpawnPoint: (self: Public, isNight: boolean, rng: Random) -> string,
@@ -68,6 +74,7 @@ export type Public = {
 	WalkTo: (self: Public, id: number, target: string, options: WalkOptions?) -> boolean,
 	Stop: (self: Public, id: number) -> (),
 	RefreshPacks: (self: Public) -> (),
+	SetTension: (self: Public, on: boolean) -> (),
 	DevParade: (self: Public, count: number?) -> (),
 }
 

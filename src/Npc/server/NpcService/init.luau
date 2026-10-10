@@ -10,7 +10,11 @@
 --   - customers (Role "Customer") never wear the crew uniform nor the raccoon; the raccoon in the thief outfit and
 --     ThiefHat is Role "Thief" only (Quick Quentin, NPC-007; DEC-159, DEC-186; TASK-072). Pedestrians: DEC-183, Q-162;
 --   - LookPack Day by day, Mid at night (DEC-181), refreshed at every ShiftStarted. Night is tension only (local
---     low-sanity swap on the client, DEC-168/169; anomaly mood, Q-159): never written here in wave 1;
+--     low-sanity swap on the client, DEC-168/169; anomaly mood, Q-159): SetTension(on) (AnomalyService, wave 3)
+--     writes Night on Role "Customer" rigs whose outfit has the Night pack; actors and the thief keep the shift pack
+--     so the anomaly sign never changes (Q-147 c). Tension drops at every ShiftStarted (PROVISIONAL, Q-159);
+--   - Role "Actor" (wave 3, TASK-108): a customer-anomaly look (same draw as a customer, or forced) + the Variant
+--     attribute (blank, mirror, raincoat) the client applies locally (TASK-110). Counts in the cap like any NPC;
 --   - collision group Npc, not colliding with Players nor Npc (architecture.md §12.3);
 --   - queue slots Q1..Q5 are never intermediate route steps (MAP-01 §9.1 note): AvoidQueue on by default;
 --   - at most ROUTES_PER_FRAME A* searches per frame (§12.3);
@@ -28,8 +32,11 @@ local Pool = require(script.Pool)
 local Walker = require(script.Walker)
 local Modux = require(ServerScriptService.server.Modux)
 
--- Who the NPC is (architecture.md §19.3). "Actor" (anomalies) is wave 3.
-export type Role = "Customer" | "Thief"
+-- Who the NPC is (architecture.md §19.3). "Actor": customer anomaly (wave 3, CustomerService:SpawnActor).
+export type Role = "Customer" | "Thief" | "Actor"
+
+-- Customer-anomaly variant (architecture.md §19.13; ANM-001 blank, ANM-004 mirror, ANM-005 raincoat). Rig attribute.
+export type Variant = "blank" | "mirror" | "raincoat"
 
 export type Npc = {
 	Id: number,
@@ -38,12 +45,14 @@ export type Npc = {
 	CustomerType: string, -- "" for the thief
 	Species: string,
 	Outfit: string,
+	Variant: Variant?, -- Role "Actor" only
 	Node: string, -- last graph node reached (spawn point at first)
 	Walk: number, -- walk order counter: a new order or a despawn cancels the running one
 }
 
 export type SpawnRequest = {
 	Role: Role?, -- default "Customer". "Thief": Quick Quentin; CustomerType/Species/Outfit are ignored
+	Variant: Variant?, -- required with Role "Actor", refused with any other role
 	CustomerType: string?, -- default: weighted draw among the types unlocked this shift (Look.PickType)
 	Species: string?, -- forced species (must belong to the type)
 	Outfit: string?, -- forced civil outfit
@@ -66,6 +75,9 @@ const PARKING_NAME = "NpcPool"
 const THIEF_NPC = "NPC-007" -- Species/Outfits.ReservedFor of Quick Quentin
 const THIEF_HAT = "ThiefHat" -- kit name, Assets.Crew.Hats (AST-053, DEC-159)
 const THIEF_KEY = "Thief" -- pool geometry key suffix (no customer type, no accessories)
+const VARIANT_ATTRIBUTE = "Variant" -- rig attribute read by the client (TASK-110)
+const VARIANTS: { [string]: true } = { blank = true, mirror = true, raincoat = true }
+const NIGHT_PACK = "Night"
 const MAX_ID = 65535 -- NpcId wire range (Customers id, Sale.Npc)
 const ROUTES_PER_FRAME = 2 -- architecture.md §12.3
 const LIFT = 3 -- HumanoidRootPart above the floor point (architecture.md §18.5)
@@ -108,6 +120,8 @@ function NpcService:Setup()
 	self.Folder = nil :: Folder?
 	self.Parking = nil :: Folder?
 	self.Warned = {} :: { [string]: boolean }
+	-- Anomaly mood (SetTension; Q-159): Role "Customer" rigs wear the Night pack while on
+	self.Tension = false :: boolean
 	-- Created here so CustomerService (590) connects in its OnInit
 	self.Spawned = self.Libs.Signal.new() :: SignalLib.Signal<number, Model>
 	self.Despawned = self.Libs.Signal.new() :: SignalLib.Signal<number>
@@ -181,6 +195,25 @@ function NpcService:Pack(): string
 	return if self.Dependencies.RoundService:IsNight() then "Mid" else "Day"
 end
 
+-- Pack an NPC wears now: the shift pack, or Night under tension for Role "Customer" rigs whose outfit has it.
+function NpcService:PackFor(role: Role, outfit: string): string
+	if self.Tension and role == "Customer" then
+		const row = Content.Outfits.ByKey[outfit]
+		if row ~= nil then
+			for _, pack in row.Packs do
+				if pack == NIGHT_PACK then
+					return NIGHT_PACK
+				end
+			end
+		end
+	end
+	return self:Pack()
+end
+
+function NpcService:IsTension(): boolean
+	return self.Tension
+end
+
 -- Customer type draw for the current shift (weighted, unlocked types only).
 function NpcService:PickType(rng: Random?): string?
 	const info = self.Dependencies.RoundService:Info()
@@ -226,8 +259,15 @@ function NpcService:Choose(r: SpawnRequest, rng: Random): (Look.Choice?, string?
 		end
 		return { CustomerType = "", Species = reserved.Species, Outfit = reserved.Outfit }, nil, nil
 	end
-	if role ~= "Customer" then
+	if role ~= "Customer" and role ~= "Actor" then
 		return nil, `unknown Role '{role}'`, nil
+	end
+	if role == "Actor" then
+		if r.Variant == nil or not VARIANTS[r.Variant] then
+			return nil, `Role Actor needs a Variant (blank, mirror, raincoat), got '{tostring(r.Variant)}'`, nil
+		end
+	elseif r.Variant ~= nil then
+		return nil, `Variant is for Role Actor only (Role '{role}')`, nil
 	end
 	const info = self.Dependencies.RoundService:Info()
 	const typeKey = r.CustomerType or Look.PickType(info.Day, info.Night, info.IsNight, rng)
@@ -301,8 +341,9 @@ function NpcService:Spawn(request: SpawnRequest?): number?
 	model.Name = `Npc_{id}`
 	-- Look attributes before entering the Workspace: the client dresses the complete rig at once (Atomic streaming)
 	model:SetAttribute("Outfit", choice.Outfit)
-	model:SetAttribute("LookPack", self:Pack())
+	model:SetAttribute("LookPack", self:PackFor(role, choice.Outfit))
 	model:SetAttribute("NpcId", id)
+	model:SetAttribute(VARIANT_ATTRIBUTE, if role == "Actor" then r.Variant else nil)
 	if not isThief then
 		rig.Humanoid.WalkSpeed = Content.CustomerTypes.ByKey[choice.CustomerType].WalkSpeed
 	end
@@ -319,6 +360,7 @@ function NpcService:Spawn(request: SpawnRequest?): number?
 		CustomerType = choice.CustomerType,
 		Species = choice.Species,
 		Outfit = choice.Outfit,
+		Variant = if role == "Actor" then r.Variant else nil,
 		Node = from,
 		Walk = 0,
 	}
@@ -434,14 +476,25 @@ end
 
 -- Look pack -------------------------------------------------------------------------------------------------------
 
--- Turn change (DEC-181): every NPC gets the pack of the new shift. Attribute only; clients re-dress (T40).
+-- Turn change (DEC-181) or tension change: every NPC gets the pack it should wear now (PackFor). Attribute only;
+-- clients re-dress (T40).
 function NpcService:RefreshPacks()
-	const pack = self:Pack()
 	for _, npc in self.Active do
+		const pack = self:PackFor(npc.Role, npc.Outfit)
 		if npc.Rig.Model:GetAttribute("LookPack") ~= pack then
 			npc.Rig.Model:SetAttribute("LookPack", pack)
 		end
 	end
+end
+
+-- Anomaly mood (architecture.md §19.13 "Tensão"; Q-159, PROVISIONAL): AnomalyService calls it while an occurrence
+-- with Anomalies[k].Tension runs. Customers on the street switch to the Night pack at once; new spawns too.
+function NpcService:SetTension(on: boolean)
+	if self.Tension == on then
+		return
+	end
+	self.Tension = on
+	self:RefreshPacks()
 end
 
 -- Dev hook (Command Bar; CustomerService does this for real in TASK-032) ------------------------------------------
@@ -491,6 +544,7 @@ NpcService:OnInit(function(self)
 
 	-- RoundService (750) created its signals in its own OnInit, before ours
 	self.Dependencies.RoundService.ShiftStarted:Connect(function()
+		self.Tension = false -- a new shift starts calm; AnomalyService raises it again if needed
 		self:RefreshPacks()
 	end)
 	-- Frame counter for the route budget (Route)
