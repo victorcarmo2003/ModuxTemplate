@@ -1,0 +1,196 @@
+--!strict
+-- CallSubtitle: the boss call subtitle (style guide §7.2 "Legenda de ligação": bottom strip above the hotbar, phone
+-- icon of the vehicle + "Walt:" + one line; no portrait, DEC-076; no replay button, DEC-077; ui-text.md §12.4).
+-- One line at a time (lines are <= 42 characters, ui-text.md §11); a longer line wraps to a 2nd row instead of
+-- shrinking, so the text never goes under Theme.MinTextSize. Narrow on purpose (60% of the width, 300..560 px) so it
+-- stays clear of the thumbstick and the jump button on a phone.
+-- Pure: only props. The owner (BossController) decides the speaker, the line and when it shows.
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Vide = require(ReplicatedStorage.Packages.Vide)
+local Theme = require(script.Parent.Theme)
+
+const create = Vide.create
+const spring = Vide.spring
+-- Vide 0.4.1 types `create` for 19 classes only; UIStroke, UIPadding, UIScale, UIListLayout and UISizeConstraint
+-- are not among them.
+const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }) -> Instance
+
+export type Phone = "cart" | "trailer"
+
+export type Props = {
+	Visible: () -> boolean,
+	-- "Walt" (BossCalls Line.Speaker nil)
+	Speaker: () -> string,
+	Text: () -> string,
+	-- Vehicle key: the badge takes the colour of that phone (AST-042: red on the cart, cream in the trailer)
+	Phone: (() -> string)?,
+	-- UI scale of the owner (1 on the smallest phone)
+	Scale: (() -> number)?,
+	-- rbxassetid of a phone icon; "" or nil = the drawn placeholder handset
+	Icon: string?,
+	Name: string?,
+}
+
+const TEXT_SIZE = 18 -- >= Theme.MinTextSize on the smallest phone
+const WIDTH_SCALE = 0.6
+const MIN_WIDTH = 300
+const MAX_WIDTH = 560
+const BADGE = Theme.MinTouch -- 44 px round badge
+-- Clear of the native hotbar (DEC-040) on the bottom centre
+const BOTTOM_GAP = 84
+const SLIDE = 24
+
+-- AST-042 colours (style guide §2.1): Ketchup phone on the cart, Cream phone in the trailer
+const PHONE_COLOR: { [string]: Color3 } = {
+	cart = Color3.fromHex("#E2402E"),
+	trailer = Theme.Color.Cream,
+}
+const HANDSET_COLOR: { [string]: Color3 } = {
+	cart = Theme.Color.Cream,
+	trailer = Theme.Color.Ink,
+}
+
+local function escape(text: string): string
+	return (string.gsub(string.gsub(string.gsub(text, "&", "&amp;"), "<", "&lt;"), ">", "&gt;"))
+end
+
+local function hex(color: Color3): string
+	return "#" .. color:ToHex()
+end
+
+-- Placeholder handset: a rounded bar with an ear cup and a mouth cup, tilted
+local function handset(color: () -> Color3): Frame
+	local function cup(x: number): Frame
+		return create("Frame")({
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(x, 0.5),
+			Size = UDim2.fromOffset(10, 12),
+			BackgroundColor3 = color,
+			create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+		})
+	end
+	return create("Frame")({
+		Name = "Handset",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(26, 6),
+		Rotation = -35,
+		BackgroundColor3 = color,
+		create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+		cup(0.08),
+		cup(0.92),
+	})
+end
+
+return function(props: Props): Frame
+	const alpha = spring(function()
+		return if props.Visible() then 0 else 1
+	end, 0.18, 1)
+	const offset = spring(function()
+		return if props.Visible() then 0 else SLIDE
+	end, 0.22, 0.8)
+
+	local function phone(): string
+		return if props.Phone then props.Phone() else "cart"
+	end
+
+	const hasIcon = props.Icon ~= nil and props.Icon ~= ""
+
+	return create("Frame")({
+		Name = props.Name or "CallSubtitle",
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -BOTTOM_GAP),
+		Size = UDim2.fromScale(WIDTH_SCALE, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundTransparency = 1,
+		Visible = function()
+			-- keep it in the tree while it fades out
+			return props.Visible() or alpha() < 0.99
+		end,
+
+		createRaw("UISizeConstraint")({ MinSize = Vector2.new(MIN_WIDTH, 0), MaxSize = Vector2.new(MAX_WIDTH, 10000) }),
+		createRaw("UIScale")({
+			Scale = function()
+				return if props.Scale then props.Scale() else 1
+			end,
+		}),
+
+		create("CanvasGroup")({
+			Name = "Strip",
+			Position = function()
+				return UDim2.fromOffset(0, offset())
+			end,
+			Size = UDim2.fromScale(1, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundColor3 = Theme.Color.Ink,
+			BackgroundTransparency = Theme.Transparency.Panel,
+			GroupTransparency = alpha,
+
+			create("UICorner")({ CornerRadius = UDim.new(0, 16) }),
+			createRaw("UISizeConstraint")({ MinSize = Vector2.new(0, BADGE + 12) }),
+			createRaw("UIPadding")({
+				PaddingLeft = UDim.new(0, 8),
+				PaddingRight = UDim.new(0, 16),
+				PaddingTop = UDim.new(0, 6),
+				PaddingBottom = UDim.new(0, 6),
+			}),
+			createRaw("UIListLayout")({
+				FillDirection = Enum.FillDirection.Horizontal,
+				VerticalAlignment = Enum.VerticalAlignment.Center,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 10),
+			}),
+
+			-- Phone badge
+			create("Frame")({
+				Name = "Phone",
+				LayoutOrder = 1,
+				Size = UDim2.fromOffset(BADGE, BADGE),
+				BackgroundColor3 = function()
+					return PHONE_COLOR[phone()] or PHONE_COLOR.cart
+				end,
+				create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+				createRaw("UIStroke")({
+					Color = Theme.Color.Ink,
+					Thickness = Theme.Stroke,
+					ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+				}),
+				if hasIcon
+					then create("ImageLabel")({
+						Name = "Icon",
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						Position = UDim2.fromScale(0.5, 0.5),
+						Size = UDim2.fromScale(0.7, 0.7),
+						BackgroundTransparency = 1,
+						Image = props.Icon,
+					})
+					else handset(function()
+						return HANDSET_COLOR[phone()] or HANDSET_COLOR.cart
+					end),
+			}),
+
+			-- "Walt: line"
+			create("TextLabel")({
+				Name = "Line",
+				LayoutOrder = 2,
+				Size = UDim2.new(1, -(BADGE + 10), 0, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				BackgroundTransparency = 1,
+				FontFace = Theme.Font.Body,
+				TextSize = TEXT_SIZE,
+				TextColor3 = Theme.Color.Text,
+				TextWrapped = true,
+				RichText = true,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				Text = function()
+					return `<font color="{hex(Theme.Color.Mustard)}">{escape(props.Speaker())}:</font> {escape(props.Text())}`
+				end,
+				createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = Theme.Stroke }),
+				createRaw("UIPadding")({
+					PaddingTop = UDim.new(0, 6),
+					PaddingBottom = UDim.new(0, 6),
+				}),
+			}),
+		}),
+	})
+end
