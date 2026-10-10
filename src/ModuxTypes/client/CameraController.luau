@@ -3,12 +3,14 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 
-export type Mode = "FirstPerson" | "Spectate" | "Fixed" | "External"
+export type Mode = "FirstPerson" | "Hidden" | "Spectate" | "Fixed" | "Cutscene" | "External"
 type Group = "Head" | "Arm" | "Body"
 
 export type Public = {
 	Applied: boolean,
 	ArmsVisible: Vide.Source<boolean>,
+	BasePitch: number,
+	BaseYaw: number?,
 	Bound: boolean,
 	CanSwitch: Vide.Source<boolean>,
 	Character: Model?,
@@ -17,18 +19,33 @@ export type Public = {
 	DownAt: number?,
 	FallPoint: string?,
 	FixedPoint: Vide.Source<string?>,
+	GazeAt: number,
+	GazePitch: number,
+	GazeYaw: number,
 	Groups: { [BasePart]: Group },
+	Hidden: Vide.Source<boolean>,
+	LastLookInput: number,
 	LastPosition: Vector3?,
 	LastState: string,
+	LookPitch: number,
+	LookTarget: Vector3?,
+	LookYaw: number,
 	Mode: Vide.Source<Mode>,
+	MouseLocked: boolean,
 	NextDrive: number,
+	NextGaze: number,
 	NextPointRetry: number,
 	NextStream: number,
+	OffsetHumanoid: Humanoid?,
 	PointId: string?,
 	Target: number?,
+	TouchDelta: Vector2,
 	Watching: Vide.Source<number?>,
 	Setup: (self: Public) -> (),
 	SetMode: (self: Public, mode: Mode) -> (),
+	ResetLook: (self: Public) -> (),
+	Cutscene: (self: Public, on: boolean) -> (),
+	LookAt: (self: Public, position: Vector3?) -> (),
 	SetArmsVisible: (self: Public, visible: boolean) -> (),
 	Spectate: (self: Public, userId: number) -> (),
 	Fixed: (self: Public, pointId: string) -> (),
@@ -40,11 +57,17 @@ export type Public = {
 	SetSwitchBind: (self: Public, on: boolean) -> (),
 	Drive: (self: Public) -> (),
 	Body: (self: Public) -> Model?,
-	ApplyCamera: (self: Public) -> (),
+	ApplyOffset: (self: Public, mode: Mode) -> (),
+	UnlockMouse: (self: Public) -> (),
+	LookInput: (self: Public, dt: number) -> (number, number),
+	ApplyPov: (self: Public, mode: Mode, camera: Camera, dt: number) -> (),
+	ApplyCamera: (self: Public, dt: number) -> (),
 	IsFirstPerson: (self: Public) -> boolean,
+	SendGaze: (self: Public, now: number) -> (),
+	SetHidden: (self: Public, hidden: boolean) -> (),
 	Track: (self: Public, character: Model?) -> (),
 	Restore: (self: Public) -> (),
-	Update: (self: Public) -> (),
+	Update: (self: Public, dt: number) -> (),
 }
 
 return {}
