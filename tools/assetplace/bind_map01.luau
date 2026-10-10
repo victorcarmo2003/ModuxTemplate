@@ -1241,7 +1241,7 @@ local function bindTrailer(assets: Instance, cart: Instance?, opts: AnchorOpts):
 		end
 	else
 		-- re-run: the set is already inside the trailer (parked at TRL-SALE); bring it back to the Pad to bind
-		;(trl :: any):PivotTo(TRL_POSE)
+		(trl :: any):PivotTo(TRL_POSE)
 	end
 	log("ok", ("TRL: %d model(s) moved inside the trailer (TRL-*, H1..H4); bound on the Pad"):format(#members))
 	CollectionService:AddTag(trl, "Vehicle")
@@ -1725,7 +1725,7 @@ function Bind.run(opts: AnchorOpts?): string
 
 	-- start of a run: trailer for sale (T36, DEC-047)
 	if trl then
-		;(trl :: any):PivotTo(salePose)
+		(trl :: any):PivotTo(salePose)
 		log("ok", ("TRL: trailer parked at TRL-SALE %s (VehicleService moves it to TRL on the swap)"):format(fmtV(salePose.Position)))
 	end
 

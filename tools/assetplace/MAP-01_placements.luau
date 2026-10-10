@@ -175,7 +175,7 @@ return {
 	---------------------------------------------------------------------------------------------
 	{ asset = "AST-026_CornerCart", x = 41, y = 0.45, z = 37.5, rotY = 0, group = "Cart", id = "CART", layer = "day", replaces = { "Pad/CART/Base", "Pad/CART/UmbrellaPole_1", "Pad/CART/UmbrellaPole_2", "Pad/CART/Umbrella_1", "Pad/CART/Umbrella_2" }, note = "queue side is local +Z; LookVector faces the operator (south)" },
 	{ asset = "AST-018_CoolerL1", x = 29.5, y = 0.95, z = 37.66, rotY = 180, group = "Cart", id = "CART-S", layer = "day", replaces = { "Pad/CART/1_S_Stock" }, note = "Mount_StockSausage (low, inside the cart body)" },
-	{ asset = "AST-012_RollerGrill", x = 33.5, y = 3.45, z = 37.5, rotY = 180, group = "Cart", id = "CART-G", layer = "day", replaces = { "Pad/CART/2_G_Grill", "Pad/CART/GrillPlate" } },
+	{ asset = "AST-012_RollerGrill", part = { "Grill_L1" }, x = 33.5, y = 3.45, z = 37.5, rotY = 180, group = "Cart", id = "CART-G", layer = "day", replaces = { "Pad/CART/2_G_Grill", "Pad/CART/GrillPlate" } },
 	{ asset = "AST-013_RestRail", part = { "Rail_6" }, x = 37.5, y = 3.45, z = 37.5, rotY = 180, group = "Cart", id = "CART-R", layer = "day", replaces = { "Pad/CART/3_R_Rest" }, note = "low end + Prompt_Rail towards the operator" },
 	{ asset = "AST-015_BunCrate", x = 40, y = 3.45, z = 37.5, rotY = 180, group = "Cart", id = "CART-B", layer = "day", replaces = { "Pad/CART/4_B_Bun" } },
 	{ asset = "AST-014_CuttingBoard", x = 42.5, y = 3.45, z = 37.5, rotY = 180, group = "Cart", id = "CART-T", layer = "day", replaces = { "Pad/CART/5_T_Board" }, note = "knife edge towards the operator" },
@@ -191,7 +191,7 @@ return {
 	---------------------------------------------------------------------------------------------
 	{ asset = "AST-027_OpenLateTrailer", x = 40, y = 0.45, z = 41, rotY = 0, group = "Trailer", id = "TRL", layer = "night", replaces = { "Pad/TRL", "Pad/TRL_Hitch" }, note = "window/awning north (queue), back door X 47..51 south, hitch to X 21.5; floor at Y 2.45" },
 	{ asset = "AST-018_CoolerL1", x = 28.5, y = 5.95, z = 37.5, rotY = 180, group = "Trailer", id = "TRL-S", layer = "night", replaces = {}, note = "cooler level carries over from the cart (Q-075)" },
-	{ asset = "AST-012_RollerGrill", x = 33, y = 5.95, z = 37.5, rotY = 180, group = "Trailer", id = "TRL-G", layer = "night", replaces = {} },
+	{ asset = "AST-012_RollerGrill", part = { "Grill_L1" }, x = 33, y = 5.95, z = 37.5, rotY = 180, group = "Trailer", id = "TRL-G", layer = "night", replaces = {} },
 	{ asset = "AST-013_RestRail", part = { "Rail_8" }, x = 37.5, y = 5.95, z = 37.5, rotY = 180, group = "Trailer", id = "TRL-R", layer = "night", replaces = {}, note = "TASK-083: Rail_8 (Vehicles.trailer.RailSlots 8, §19.22); bind_map01 picks the 8 slot empties" },
 	{ asset = "AST-015_BunCrate", x = 40, y = 5.95, z = 37.5, rotY = 180, group = "Trailer", id = "TRL-B", layer = "night", replaces = {} },
 	{ asset = "AST-014_CuttingBoard", x = 42.5, y = 5.95, z = 37.5, rotY = 180, group = "Trailer", id = "TRL-T", layer = "night", replaces = {} },
