@@ -2117,3 +2117,87 @@ Origem das DEC-153 a DEC-157: mensagens do usuário ao orquestrador, 2026-10-10,
   - **art-director:** ficha AST-026 (feito pelo secretário), AST-019 (balcão do carrinho), AST-018 L3 ("topo vira bancada a 3,5"), style guide §3 (`Q-153`).
   - **level-designer:** MAP-01 §2 e §7.1, L01-01 (feito pelo secretário).
   - Notas em `asset-list.md`, `MAP-01.md`, `open-questions.md` → secretário (feito).
+
+---
+
+Origem das DEC-158 a DEC-160: mensagens do usuário ao orquestrador, 2026-10-10. Citações **literais** em cada DEC. "Feito" / "em produção" = trabalho do orquestrador/modeler-3d relatado ao secretário; **não é aprovação do usuário**.
+
+### DEC-158 — 2026-10-10 — HotDog Crew ganha 10 espécies novas (18 no total); modelos entregues para revisão
+
+- Fala do usuário: "spawna uma gente em paralelo e vai criando os outros animais, preciso de umas 10 variações".
+- Decidido pelo usuário: a crew passa a ter **mais 10 espécies**, além das 8 (Dog, Cat, Rabbit, Fox, Bear, Panda, Turtle, Owl):
+
+  | # | Espécie |
+  |---|---|
+  | 1 | Pig |
+  | 2 | Mouse |
+  | 3 | Raccoon |
+  | 4 | Koala |
+  | 5 | Monkey |
+  | 6 | Lion |
+  | 7 | Frog |
+  | 8 | Penguin |
+  | 9 | Hamster |
+  | 10 | Sheep |
+
+- Feito pelo orquestrador (entregue **para revisão**):
+  - Arquivos: `Assets/blender/character/AST-053_Animal_<A>.blend`, `Assets/models/character/AST-053_Animal_<A>.fbx`; texturas `T_Head_<A>` e `T_Head_<A>_Night`.
+  - Demo no Studio: `workspace.CrewDemo` (`New_<A>_Day` / `New_<A>_Night`).
+- **Não aprovado:** o usuário **não aprovou** os 10 modelos. Seguem como entregues, para revisão.
+- **Orçamento — pendente, NÃO aprovado:**
+  - Tris por personagem **≈ 2,0–2,5k**.
+  - **Sheep ≈ 2.530**: acima até do teto de personagem com nome (**2.500**, `style-guide.md` §9.1).
+  - Registrado em **`Q-144` (g)**.
+- **Observação de Studio (não decidida):** à noite **todas as espécies** ficam do mesmo azul-marinho. Ligado a **`Q-151`**.
+- Não decide: quais espécies são classe jogável (`Q-145` a), quais são cliente (`Q-149` a).
+- Impacto:
+  - **art-director:** revisar as 10 contra a DEC-152/DEC-153 (cabeça oval, rosto por textura, queixo redondo) e o §9.1; ficha da crew com a lista de 18.
+  - **game-designer:** `Q-145` (a) agora parte de 18 espécies; `Q-149` (a).
+  - **modeler-3d:** se o orçamento for cortado, reduzir a Sheep primeiro (parte de trás, como DEC-153).
+  - Notas em `asset-list.md` (AST-053), `open-questions.md` (`Q-144`, `Q-145`, `Q-151`), `README.md` → secretário (feito).
+
+### DEC-159 — 2026-10-10 — Quick Quentin (CHR-004 / NPC-007) é um guaxinim da crew
+
+- Fala do usuário: "Faz o guaxinim ser o ladrão e faz agora algumas roupas casuais para eles" (1ª parte).
+- Decidido pelo usuário: o ladrão **Quick Quentin** (CHR-004, NPC-007) passa a ser um **guaxinim** (Raccoon, DEC-158) no rig da crew.
+- Coerente com **DEC-149** (NPCs são animais). Responde **`Q-146` só para o CHR-004**; os demais personagens com nome seguem em aberto.
+- Aparência: a de `characters.md` e `style-guide.md` §4.3 **mantida e adaptada** ao guaxinim:
+
+  | Peça | Como fica | Técnica |
+  |---|---|---|
+  | Sobretudo grande demais | cinza-arroxeado **`#7A6FB0`** (mantido) | textura `T_Civil_Thief_Day` |
+  | Chapéu de aba baixa | mantido | malha `AST-053_ThiefHat` |
+  | Óculos escuros redondos + bigodinho | mantidos | textura de rosto `T_Expr_Thief` |
+  | Tênis muito brancos | mantidos | textura `T_Civil_Thief_Day` |
+
+- **Só textura de dia** (`T_Civil_Thief_Day`): Quentin nunca aparece à noite (`npcs.md` NPC-007, invariante própria). Sem variante de noite.
+- Não muda: papel, regras, números, falas, saco com "$" (AST-021), tom "vilão de desenho" (sem máscara, sem arma).
+- **Modelo:** em produção, **não aprovado**.
+- **Nota de nome de arquivo:** as peças levam prefixo `AST-053_` (família da crew), mas a ficha do personagem é **AST-056**.
+- Impacto:
+  - **art-director:** ficha AST-056 (guaxinim + peças acima; tris ≤ 2.000 da ficha × personagem da crew ≈ 2,0–2,5k → `Q-144` g); `style-guide.md` §4.3 (nota feita pelo secretário).
+  - **narrative-writer:** CHR-004 "Aparência" reescrita para o guaxinim (nota feita pelo secretário; texto final com o narrative-writer).
+  - **modeler-3d:** chapéu, `T_Expr_Thief`, `T_Civil_Thief_Day`.
+  - Notas em `characters.md`, `npcs.md`, `style-guide.md` §4.3, `asset-list.md` (AST-053, AST-056), `open-questions.md` (`Q-146`) → secretário (feito).
+
+### DEC-160 — 2026-10-10 — Roupas casuais para clientes e pedestres animais: 6 conjuntos novos (T_Civil_C a H)
+
+- Fala do usuário: "Faz o guaxinim ser o ladrão e faz agora algumas roupas casuais para eles" (2ª parte).
+- Decidido pelo usuário: os animais **clientes e pedestres** ganham **roupas casuais** (de civil).
+- Feito pelo orquestrador (**em produção**):
+  - **6 conjuntos novos** `T_Civil_C` a `T_Civil_H`, cada um com **dia e noite**.
+  - Somam-se aos já existentes `T_Civil_A` e `T_Civil_B` → **8 conjuntos**.
+- **Não aprovado:** texturas em produção, sem aprovação do usuário.
+- Ligações:
+
+  | Com | Leitura |
+  |---|---|
+  | `Q-149` (c) roupa de civil por textura × opção A do §4.1 | roupas sendo feitas **por textura** (como a crew, DEC-148); confirmação junto com a aprovação das roupas |
+  | `Q-149` (b) tipo de cliente = roupa + acessório | quais conjuntos vão para qual tipo (NPC-001 a NPC-006, NPC-019) segue com game-designer + art-director |
+  | DEC-150 | dia e noite por textura; cor da noite em `Q-151` |
+  | `Q-144` (g) | +12 texturas (6 × 2) no orçamento de memória |
+
+- Impacto:
+  - **art-director:** AST-054 (tipos × conjuntos); conferir traço reservado (§2.4) e detalhe assimétrico (invariante 10, ANM-004) nos 8 conjuntos.
+  - **architect:** memória das texturas de civil (`Q-144` g).
+  - Notas em `asset-list.md` (AST-053), `open-questions.md` (`Q-149`), `README.md` → secretário (feito).

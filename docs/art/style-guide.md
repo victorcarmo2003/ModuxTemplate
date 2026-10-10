@@ -214,6 +214,8 @@ DEC-010: o normal precisa ser repetitivo para a quebra ser notada. Tipos de `des
 | Walt Bramble (CHR-001) | **só** na cutscene final (DEC-075, DEC-076) | ~70 anos, baixo, barriga redonda (acessório de tronco), bigode branco grosso, boné vermelho com a salsicha sorridente, jaqueta creme e vermelha desbotada, crachá "WALT — NIGHT SHIFT", óculos grossos, dois cafés | modelo só no client; nenhum retrato dele em outra tela |
 | Raincoat Lady (CHR-006) | noite 5+ e final | senhora pequena, capa amarela com capuz, botas verdes, guarda-chuva fechado, **olhos fechados**, rosto completo e gentil | nunca assustadora: o estranho é a água (pingos e poça), não ela |
 
+> **Nota do secretário, DEC-159 (2026-10-10):** Quick Quentin passa a ser um **guaxinim** da crew. Silhueta e cor da linha acima seguem (sobretudo `#7A6FB0`, chapéu de aba baixa, óculos redondos, bigodinho, tênis brancos), agora por textura `T_Civil_Thief_Day` (só dia), rosto `T_Expr_Thief` e chapéu `AST-053_ThiefHat`. Texto desta tabela não reescrito (documento Aprovado); vale a DEC.
+
 ### 4.4 Como sinalizar anomalia
 
 Princípio: **a anomalia é feita das mesmas peças do normal**. Nada de brilho, partícula ou som que "aponte" o alvo (DEC-005: "sei que tem algo errado, mas não sei o quê").

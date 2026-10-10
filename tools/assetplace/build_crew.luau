@@ -61,7 +61,9 @@ function Crew.build(o: { [string]: any }): Model
 		end
 	end
 	-- outfit texture (Cap only when wanted; ears-up animals use the cap with ear holes)
-	local tex = o.tex[string.format("T_%s_%s", o.outfit == "Crew" and "Crew_Uniform" or ("Civil_" .. o.outfit), o.time)]
+	local outfitKey = o.outfit == "Crew" and "Crew_Uniform" or ("Civil_" .. o.outfit)
+	-- day-only outfits (e.g. Thief) fall back to the Day sheet
+	local tex = o.tex[string.format("T_%s_%s", outfitKey, o.time)] or o.tex["T_" .. outfitKey .. "_Day"]
 	for _, n in BODY do
 		local p = parts[n]
 		if p and p:IsA("MeshPart") then
@@ -69,12 +71,21 @@ function Crew.build(o: { [string]: any }): Model
 			p.Color = o.fur or Color3.fromHex("C98B5A")
 		end
 	end
-	if (o.cap == false or o.earsUp) and parts.Cap then
+	if (o.cap == false or o.earsUp or o.hat) and parts.Cap then
 		parts.Cap:Destroy()
 		parts.Cap = nil
 	end
 	-- animals with ears up wear the cap with ear holes (atlas-coloured)
-	if o.cap ~= false and o.earsUp then
+	-- o.hat = asset name of a hat that replaces the cap (e.g. "AST-053_ThiefHat"); modelled at its final place on
+	-- the round head, so it is not raised like the cap
+	if o.hat then
+		local hatModel = load(o.ids[o.hat])
+		local hat = hatModel:FindFirstChildWhichIsA("BasePart", true)
+		if hat then
+			hat.Name = "Hat"
+			parts.Hat = hat
+		end
+	elseif o.cap ~= false and o.earsUp then
 		local capModel = load(o.ids["AST-053_CrewCap_EarsUp"])
 		local cap = capModel:FindFirstChildWhichIsA("BasePart", true)
 		if cap then

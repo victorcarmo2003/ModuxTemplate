@@ -127,6 +127,8 @@ Mapeamento Kenney/KayKit por ficha (DEC-136, Rascunho): `asset-sourcing.md`. As 
 
 **DEC-153 a DEC-157 (2026-10-10):** cabeças AST-053 **v3** (focinho oval liso, queixo redondo; 728 tris; personagem 1.914–2.104, acima de 1.800, orçamento em `Q-144` g; DEC-153). Noite escurece também orelhas/cauda/acessórios com `T_Atlas_Kitchen_Night` (DEC-154; cor do animal à noite `Q-151`). **AST-020:** POS preta de J-Toastie (**CC-BY 3.0, crédito obrigatório**) + cadeado "Padlock" da Quaternius (CC0) Mustard, reutilizado no AST-017 (DEC-155; modelo em produção). **AST-017:** tigelas de inox `KP/bowl` com ingrediente dentro + plaquinha `Label_<Ing>` para `SurfaceGui`/`ImageLabel` (DEC-156; ícones `Q-152`; modelo em produção). **AST-026:** bancada **3,0** (era 3,5; DEC-157; style guide `Q-153`); AST-019 balcão do carrinho idem.
 
+**DEC-158 a DEC-160 (2026-10-10):** crew com **+10 espécies** (18; AST-053, entregues para revisão, não aprovadas; Sheep ≈ 2.530 tris, `Q-144` g; noite azul-marinho igual em todas, `Q-151`). **Quick Quentin = guaxinim** (AST-056; `T_Civil_Thief_Day` só dia, `AST-053_ThiefHat`, `T_Expr_Thief`; em produção). **Roupas casuais** de cliente/pedestre `T_Civil_C` a `H` (dia e noite), 8 conjuntos com A/B (em produção; `Q-149`).
+
 Mapa anomalia → asset (DEC-096): ANM-001 AST-060 · ANM-002 AST-061 · ANM-003 AST-044 (estados do relógio) · ANM-004 AST-062 (+ AST-055) ·
 ANM-005 AST-059 · ANM-006 AST-063 (+ AST-045) · ANM-007 AST-064 (+ AST-036) · ANM-008 AST-065 · ANM-009 AST-066 · ANM-010 AST-067 (+ AST-036, AST-028).
 
@@ -767,6 +769,9 @@ Regras gerais: style guide §4 (opção A: `BodyColors` + acessórios de atlas +
 - **DEC-152 (2026-10-10):** cabeças `AST-053_Animal_{Dog,Cat,Rabbit,Fox,Bear,Panda,Turtle,Owl}` **substituídas**: malha única **oval** com **focinho em volume** (ref. `customrig.png`), **olhos, nariz e boca por textura**, **expressões por troca de textura** (normal, feliz, sorridente, triste, desmaiado com X; lista aberta). Orelhas e caudas seguem. "8 rostos neutros + 3 de reação" acima vira o conjunto de expressões da crew/clientes (art-director). Técnica Provisória: casca de rosto com UV padrão comum a todos os animais, troca por `TextureID` (`Q-144` h). Versão noite: `Q-150`.
 - **DEC-153 (2026-10-10):** direção de forma do usuário: focinho/boca **oval e liso**, sem nariz pontudo, **queixo redondo e fofinho**. Cabeças **v3** entregues (não aprovadas): focinho oval compacto abaixo dos olhos que continua no queixo; cabeça **728 tris** (antes 440), casca do rosto ~190–220; olhos y 4,86, nariz 4,47, boca 4,33 (UV do rosto v3; notas em `Assets/blender/character/AST-053_Animals_joints.json`). Personagem completo **1.914–2.104 tris**: acima do teto de NPC comum (1.800, style guide §9.1), abaixo do de personagem com nome (2.500). **Orçamento não aprovado**; aceitar ou reduzir a parte de trás da cabeça em `Q-144` (g).
 - **DEC-154 (2026-10-10):** a variante de noite troca também orelhas, cauda, casco, bico e boné com furo (peças no atlas KitchenPack): atlas noturno `Assets/textures/character/T_Atlas_Kitchen_Night`, aplicado nos builds Night (`tools/assetplace/build_crew.luau`). Cabeça noturna aparece quase opaca no Roblox (azul-marinho; raposa perde o laranja): manter como está (Provisório) até `Q-151`.
+- **DEC-158 (2026-10-10):** **+10 espécies** (18 no total): Pig, Mouse, Raccoon, Koala, Monkey, Lion, Frog, Penguin, Hamster, Sheep. Arquivos `Assets/blender|models/character/AST-053_Animal_<A>`, texturas `T_Head_<A>` / `T_Head_<A>_Night`; demo `workspace.CrewDemo` (`New_<A>_Day/Night`). **Entregues para revisão, não aprovados.** Tris ≈ 2,0–2,5k por personagem; **Sheep ≈ 2.530**, acima do teto 2.500 → `Q-144` (g). À noite todas as espécies ficam do mesmo azul-marinho → `Q-151`.
+- **DEC-159 (2026-10-10):** peças do Quick Quentin guaxinim com prefixo desta família: chapéu `AST-053_ThiefHat`, rosto `T_Expr_Thief`, roupa `T_Civil_Thief_Day` (só dia). Ficha do personagem: **AST-056**. Em produção.
+- **DEC-160 (2026-10-10):** roupas casuais de cliente/pedestre por textura: **6 conjuntos novos** `T_Civil_C` a `T_Civil_H` (dia e noite), além de `T_Civil_A`/`B` → 8 conjuntos. Em produção, não aprovados. Distribuição por tipo (AST-054) com `Q-149` (b).
 
 ### AST-054 — Clientes normais e pedestre (7 tipos × 4 variantes)
 
@@ -791,6 +796,7 @@ Regras gerais: style guide §4 (opção A: `BodyColors` + acessórios de atlas +
 - **Tom:** vilão de desenho; sem máscara, sem arma, sem capuz de assalto.
 - **Animações (AST-069):** espreita disfarçada (jornal, assobio), andar na ponta dos pés, abrir gaveta, fuga com saco.
 - **Tris:** ≤ 2.000.
+- **DEC-159 (2026-10-10):** Quentin é um **guaxinim** da crew (base AST-053 Raccoon). Visual acima mantido e adaptado: sobretudo `#7A6FB0` e tênis brancos em `T_Civil_Thief_Day` (**só dia**), chapéu malha `AST-053_ThiefHat`, óculos + bigodinho em `T_Expr_Thief`. "Plataforma + decal" acima não vale mais. Tris ≤ 2.000 × crew ≈ 2,0–2,5k: `Q-144` (g). Em produção, não aprovado; texto da ficha a reescrever pelo art-director.
 
 ### AST-057 — Opal (CHR-003, NPC-020)
 

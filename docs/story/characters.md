@@ -79,7 +79,13 @@ Aparência pensada para R6: leitura por **silhueta, cor, chapéu e acessório**,
   - Espreitando: "Nice day. Very nice. Not looking at anything." · "Just... waiting for a bus."
   - Pego (jogador entra na zona): "Whoops! Wrong drawer!" · "I was just admiring it!"
   - Fugindo com o saco: "Thanks for the tip!" · "See you tomorrow!"
-- **Aparência** (R6): magro e comprido, sobretudo cinza grande demais, chapéu de aba baixa, óculos escuros redondos, bigodinho fino, tênis muito brancos. Saco de pano com "$" costurado.
+- ~~**Aparência** (R6): magro e comprido, sobretudo cinza grande demais, chapéu de aba baixa, óculos escuros redondos, bigodinho fino, tênis muito brancos. Saco de pano com "$" costurado.~~ (substituída por DEC-159)
+- **Aparência** (**DEC-159**, 2026-10-10): **guaxinim** da HotDog Crew (rig da crew, DEC-145/DEC-149). Mantém a aparência anterior, adaptada:
+  - sobretudo grande demais **cinza-arroxeado `#7A6FB0`** e tênis muito brancos → textura `T_Civil_Thief_Day`;
+  - chapéu de aba baixa → malha `AST-053_ThiefHat`;
+  - óculos escuros redondos + bigodinho → textura de rosto `T_Expr_Thief`;
+  - saco de pano com "$" costurado (AST-021).
+  - **Só textura de dia**: nunca aparece à noite. Modelo em produção, não aprovado. Texto final → narrative-writer.
 - **Pista leve**: o chefe comenta o ladrão no dia seguinte, sem ter estado lá ("Heard you caught Quentin. Nice.") — como ele sabe? (resposta implícita: Opal conta tudo.)
 - Atropelamento de NPC: sem semáforo (DEC-130, revoga DEC-120); como NPC atravessa fica com `Q-129`, e `design/features.md` propõe que NPC nunca é atropelado. Fala **de reserva** (só entra se isso mudar em `Q-122` b / `Q-129`): "Not my day!"
 
