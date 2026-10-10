@@ -17,6 +17,8 @@ Aparência pensada para R6: leitura por **silhueta, cor, chapéu e acessório**,
 
 > **DEC-178 (2026-10-10, fecha `Q-146`):** **todos os personagens com nome viram animais da crew** (rig HotDog Crew): CHR-001 Walt, CHR-003 Opal, CHR-004 Quentin (guaxinim, DEC-159), CHR-005 Mr. Pickett, CHR-006 Raincoat Lady, CHR-008 médicos, e o Walker (ANM-007). Não há mais humanos no jogo. As aparências humanas abaixo **não valem**; espécie de cada um → `Q-160` (narrative-writer + art-director propõem). Pickett, Raincoat Lady e Walker mantêm os sinais aprovados de `anomalies.md` (`Q-147`).
 
+> **DEC-202 a DEC-206 (2026-10-10, `Q-160` parte, `Q-143`):** espécies definidas — **CHR-001 Walt = tartaruga** (animação **corcunda**, **bastão de madeira**, **barba branca low poly**, **textura com rugas**; DEC-202); **CHR-003 Opal = coruja**, **CHR-005 Mr. Pickett = rato**, **CHR-006 Raincoat Lady = sapo** (DEC-203). Distinção por roupa/acessório fixo de cada ficha (Provisório); sinais de `anomalies.md` não mudam. **Walker e CHR-008 médicos** seguem em `Q-160`. **Logo** do Bramble's = o **hot dog cartoon do avental** atual (DEC-206): onde abaixo se lê "salsicha sorridente", vale esse desenho. Aparências humanas abaixo seguem sem valor (DEC-178); reescrita → narrative-writer.
+
 | ID | Nome | Papel | Aparece |
 |---|---|---|---|
 | CHR-001 | Walt Bramble | o chefe | **só por telefone** durante a run; em pessoa **uma vez**, na cutscene do amanhecer da 10ª noite (DEC-075, DEC-076) |

@@ -506,6 +506,7 @@ Compra de upgrade: bancada do Mart (AST-049, DEC-101); a peça visível troca no
 - **Cores:** corpo Ketchup, listras Cream, frisos e guarda-sóis Mustard/Cream, metais Steel. Objeto mais saturado do mapa.
 - **Encaixes (`Mount_*`):** `Mount_StockSausage`, `Mount_Grill`, `Mount_Rail`, `Mount_StockBun`, `Mount_Board`, `Mount_Toppings`, `Mount_Drawer`, `Mount_Counter`, `Mount_Phone`, `Mount_Sign`, `Zone_Center` (raio 14 do ladrão, DEC-050).
 - **Letreiro e logo:** decals da folha AST-072 (salsicha sorridente original).
+- **DEC-206 (2026-10-10, fecha `Q-143`):** o logo do carrinho passa a ser **o hot dog cartoon atual do avental** (`AST-053_CrewTex`), o mesmo dos personagens. Decal/textura sem mudar a forma aprovada (Provisório: posição na lateral/frente, art-director).
 - **Estados:** `Open`; `Covered` (com AST-043, só no estacionamento depois da troca, se `Q-082` aceitar).
 - **Pivô:** base-centro. **Tris:** carroceria 2.000–3.500; montado ≤ 8.000.
 
@@ -784,6 +785,8 @@ Regras gerais: style guide §4 (opção A: `BodyColors` + acessórios de atlas +
 - **DEC-164 (2026-10-10):** tris **aprovados como entregues**: ≈ 2,0–2,5k por personagem completo, Sheep ≈ 2.530 aceito; sem redução da cabeça. Vale para crew e civil (mesma malha). `Q-144` (g) fechado na parte de tris; memória de textura segue aberta.
 - **DEC-165 (2026-10-10):** noite = **azul-marinho igual para todas as espécies** (`Q-151` respondida, opção A). Braços/mãos acompanham: `T_Crew_Uniform_Night` e `T_Civil_A_Night` a `T_Civil_H_Night` com a camada da cabeça noturna (RGB 30, 32, 54; alpha 68) só nos texels de pelo; patinhas e roupa intactas (commit `70094d3`, entregue, não aprovado).
 - **DEC-166 (2026-10-10):** **3 packs** por personagem: **dia**, **Mid** (novo, meio-termo) e **noite**. Visual = **sanidade**: alta → dia + `Normal`; média → Mid + `Exhausted`; baixa → noite + `Normal_Night`. Entregue (commit `d699cf7`, **não aprovado**): `T_Head_<A>_Mid` (18 espécies), `T_Crew_Uniform_Mid`, `T_Civil_A_Mid` a `T_Civil_H_Mid`, `T_Atlas_Kitchen_Mid`; protótipo `tools/assetplace/build_crew.luau` (`Crew.applyTime`, `Crew.setSanity`); demo `workspace.CrewDemo` (`Sanity_<A>_<High|Mid|Low>`). Emenda DEC-150 (noite do turno e sanidade baixa = mesmo pack). Abertos: critério da troca `Q-155`; faixas, quem e visibilidade `Q-156`; +1 pack inteiro na memória `Q-144` (g); `Normal_Night` entra em `Q-150`.
+- **DEC-207 (2026-10-10, fecha `Q-150`):** só **`Normal_Night`** tem versão de noite. Feliz, sorridente, triste, desmaiado (X), Skeptical, Exhausted, Stressed: **uma versão** (a de dia), usada nos 3 packs. Sem "Assustado".
+- **DEC-206 (2026-10-10, fecha `Q-143`):** o hot dog cartoon do avental em `AST-053_CrewTex` é o **logo oficial** do Bramble's (também no carrinho AST-026).
 
 ### AST-054 — Clientes normais e pedestre (7 tipos × 4 variantes)
 
@@ -801,6 +804,7 @@ Regras gerais: style guide §4 (opção A: `BodyColors` + acessórios de atlas +
 - **Visual (characters.md):** baixo (postura), terno marrom (BodyColors + paletó acessório), gravata-borboleta verde, relógio grande no pulso **esquerdo** (`LeftGripAttachment`), maleta na mão **direita**, cabelo repartido à **esquerda**, bordado "PICKETT & SONS" no peito **esquerdo** (decal 128²).
 - **Uso na ANM-004:** primeira cópia espelhada é dele (AST-062).
 - **Tris:** ≤ 1.500.
+- **DEC-203 (2026-10-10):** Pickett é um **rato** (Mouse, rig da crew). Terno marrom, gravata-borboleta verde, relógio no pulso **esquerdo**, maleta na mão **direita**, bordado "PICKETT & SONS" mantidos (por textura/acessório; Provisório, art-director). Rato comum de cliente nunca usa esse conjunto. Tris segue DEC-164 (≈ 2,0–2,5k).
 
 ### AST-056 — Quick Quentin (CHR-004, NPC-007)
 
@@ -820,6 +824,7 @@ Regras gerais: style guide §4 (opção A: `BodyColors` + acessórios de atlas +
 - **Pose:** atrás do balcão AST-031, idle de palavras cruzadas (revista na mão), olha para o jogador quando fala.
 - **Regra:** nunca é ator nem âncora de anomalia; nunca some (npcs.md).
 - **Tris:** ≤ 2.000.
+- **DEC-203 (2026-10-10):** Opal é uma **coruja** (Owl, rig da crew). Coque com lápis, cardigã verde, colete do Mart, óculos na corrente: adaptar à coruja (Provisório, art-director). Coruja também é classe jogável (CLS-006); a distinção vem do colete do Mart e do lugar fixo atrás do balcão. Tris segue DEC-164.
 
 ### AST-058 — Walt Bramble (CHR-001, só cutscene final)
 
@@ -828,6 +833,7 @@ Regras gerais: style guide §4 (opção A: `BodyColors` + acessórios de atlas +
 - **Visual:** ~70 anos, baixo (postura curvada), barriga redonda (acessório de tronco), bigode branco grosso (acessório de rosto), óculos grossos, **boné de feltro vermelho com a salsicha sorridente** (logo original, AST-072), jaqueta de uniforme creme e vermelha desbotada, crachá de metal "WALT — NIGHT SHIFT". Segura AST-010 `Coffee_Pair`.
 - **Animações (AST-069):** sair pela porta, andar devagar, estender o café, acenar com a cabeça.
 - **Tris:** ≤ 2.500.
+- **DEC-202 (2026-10-10):** Walt é uma **tartaruga** (Turtle, rig da crew). Fala literal: "Faz uma tartaruga mesmo, ele vai ter uma animaçào mais corcunda, andando com um bastão de madeira e uma barba branca low poly, além da textura com rugas". Peças novas: **bastão de madeira** (na mão), **barba branca low poly** (substitui o bigode), **textura de cabeça com rugas** (própria do Walt). Animação: **andar corcunda** apoiado no bastão (AST-069). **Provisório** (art-director): bastão na mão esquerda e `Coffee_Pair` na direita; boné vermelho com o logo da DEC-206, óculos, jaqueta e crachá mantidos se couberem com a barba; tris ≤ 2.500 somando barba e bastão.
 
 ### AST-076 — Médicos da ambulância: Bellmoor Rescue crew (CHR-008, NPC-024)
 
@@ -840,6 +846,7 @@ Regras gerais: style guide §4 (opção A: `BodyColors` + acessórios de atlas +
 - **Animações (AST-069):** descer pela traseira (degrau), andar levando a maca (dois em linha, maca entre eles), abaixar a maca e "colocar" o corpo (o corpo aparece deitado com "poof", sem contato de mão), levantar a maca, voltar, subir pela traseira. Idle calmo. Falas em balão (`characters.md`): uma por evento.
 - **Variações:** 2 (`Medic_A`, `Medic_B`); sempre os mesmos dois (padrão fixo, como a ambulância).
 - **Tris:** NPC montado 600–1.200 cada; acessório ≤ 400.
+- **2026-10-10:** espécie dos médicos **ainda aberta** (`Q-160`; propostas: dois porcos, ou coelho alto + panda baixo). Rig da crew (DEC-178); tris seguem DEC-164.
 
 ### AST-069 — Pacote de animações R6
 
@@ -847,6 +854,7 @@ Regras gerais: style guide §4 (opção A: `BodyColors` + acessórios de atlas +
 - **P0 (dia):** cliente: andar (padrão R6), esperar no balcão (idle com fase aleatória), pagar, reações (feliz / reclamação / bufar), ir embora, recusado (aceno). Quentin: espreita, ponta dos pés, abrir gaveta, fugir.
 - **P1 (noite e final):** Opal (palavras cruzadas, olhar), Raincoat Lady (aceno de cabeça, ficar parada pingando), cópia andando de costas (ANM-004), blank folk sem respiração (pose parada), desmaio do jogador (sentar e deitar de lado), jogador na maca, médicos da ambulância (AST-076, DEC-114: descer, levar a maca em dupla, abaixar e levantar a maca, subir), Walt (andar devagar, estender o café), Walker (pose parada; o "passo" é teleporte entre postes, sem ciclo de andar).
 - **Ragdoll do atropelamento:** física (juntas soltas), não animação; levantar = animação curta de 0,8 s.
+- **DEC-202 (2026-10-10):** Walt (tartaruga) ganha **andar corcunda com bastão de madeira** (P1, cutscene final), além de estender o café e acenar.
 - **Regra:** nenhuma animação de violência, queda dolorida ou contato entre personagens.
 
 ### AST-073 — Avental Bramble's (acessório do jogador)
@@ -856,6 +864,7 @@ Regras gerais: style guide §4 (opção A: `BodyColors` + acessórios de atlas +
 - **DEC-145 (2026-10-10):** o padrão de personagem passa a ser o "HotDog Crew" (`Assets/reference/customrig.png`: boné vermelho, avental vermelho com hot dog, camisa creme, calça preta, sobre corpo base R6 custom). Se o jogador usar o rig animal (`Q-141`), este avental vira parte do uniforme do personagem, não "por cima do avatar". Logo do avental: `Q-143`. Fichas do corpo base e dos animais: a escrever pelo art-director (`Q-144`).
 - **DEC-146 (2026-10-10, fecha `Q-141`):** o jogador é animal da crew, sem avatar próprio. Este avental **é o uniforme da crew**, parte do personagem do jogador (não acessório "por cima do avatar"); o "Uso" acima não vale. Junto do avental: boné vermelho, camisa creme, calça preta (DEC-145) — peças/cores do corpo base a definir na ficha nova. Nome, prioridade (P2 → provável P0, já que todo jogador usa) e attachment → art-director. Logo `Q-143`.
 - **DEC-148 (2026-10-10):** uniforme (camisa, avental com logo, calça) vem por **textura** no corpo, como na prancha, não por acessório de atlas. Orçamento `Q-144` (g); variante de noite `Q-148` (b).
+- **DEC-206 (2026-10-10, fecha `Q-143`):** logo do avental = **o hot dog cartoon atual** da textura `AST-053_CrewTex` (mantido; é o logo oficial, também no carrinho).
 - **Forma:** avental vermelho e creme com a salsicha sorridente, preso em `BodyFrontAttachment`.
 - **Tris:** ≤ 300.
 
@@ -873,6 +882,7 @@ Regra de arte: a anomalia usa as mesmas peças do normal e quebra **um** traço 
 - **Sinal:** pingos constantes e poça que cresce no chão numa noite seca (VFX, style guide §10).
 - **Uso no final:** passa do outro lado da rua no sol da manhã, acena com a cabeça e "desaparece numa poça" (`ending.md` §2.2): poça + "poof" de gotas.
 - **Regra:** nunca assustadora. **Tris:** ≤ 2.000.
+- **DEC-203 (2026-10-10):** Raincoat Lady é um **sapo** (Frog, rig da crew). Capa amarela `#F2C230`, botas verdes, guarda-chuva, **olhos fechados** e o sinal de água mantidos (`anomalies.md`, Aprovado). Sapo comum de cliente nunca usa capa amarela (§2.4). Tris segue DEC-164.
 
 ### AST-060 — ANM-001 The blank folks
 
@@ -1004,6 +1014,7 @@ Regra de arte: a anomalia usa as mesmas peças do normal e quebra **um** traço 
 - **Status:** Rascunho · **Prioridade:** P0 · **Origem:** 2D (texto final do narrative-writer, DEC-022)
 - **Conteúdo:** logo **salsicha sorridente** do Bramble's (original); "BRAMBLE'S CORNER DOGS"; slogan "Hot dogs on the corner since forever."; "BRAMBLE'S — OPEN LATE" (versão desbotada); "NINTH STREET MART"; "OPEN 24 HOURS" (desenho para o neon); "BELLMOOR SAVINGS"; placa da lavanderia; "NINTH AVE" / "JUNIPER ST"; "ROAD CLOSED"; "NO HELP WANTED"; "Available on Day 5"; OPEN / CLOSED; "Out of stock"; "GEAR WALL", "MAX", "Trailer only", "Nothing special today" e "Sold out" da bancada (textos finais do narrative-writer); etiquetas de preço; "BELLMOOR RESCUE", o símbolo da ambulância (coração Teal com "+") e o crachá "BR" dos médicos (AST-076); ~~pictogramas do semáforo de pedestre (AST-077, Obsoleto por DEC-130)~~; rótulos dos 9 pacotes.
 - **Formato:** 256² por placa (ou folha 1024² recortada por `SurfaceGui`/`Texture`). Nenhuma marca, logotipo ou tipografia-assinatura de terceiros.
+- **DEC-206 (2026-10-10):** logo do Bramble's = **o hot dog cartoon do avental** (`AST-053_CrewTex`), nos personagens e no carrinho. **Provisório:** a "salsicha sorridente" desta folha passa a ser esse mesmo desenho (marca única). Art-director confere que o desenho é original (não copiado da prancha `customrig.png`).
 
 ---
 

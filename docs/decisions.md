@@ -2861,3 +2861,83 @@ Origem das DEC-198 a DEC-201: mesmo questionário (18ª parte), segunda mensagem
   - Números do UPG-001 (**vagas, tempos 12/10/8 s, preços**) **não mudam**.
 - **Provisório** (art-director): largura da máquina por nível e se o L3 cabe nos 5 L do carrinho (`Q-134` c); se não couber, volta ao usuário.
 - Impacto: **art-director** (AST-012 Níveis/Silhueta), **modeler-3d** (variantes L1–L3), **game-designer** (UPG-001 "Peça visível"), **level-designer** (MAP-01 L01-03). Nota em `open-questions.md` (`Q-134` → Respondidas), `README.md` → secretário (feito).
+
+Origem das DEC-202 a DEC-207: questionário do orquestrador, 2026-10-10 (19ª parte). Opção escolhida em cada uma; Walt com texto livre literal.
+
+### DEC-202 — 2026-10-10 — Walt Bramble (CHR-001) é uma tartaruga: corcunda, bastão de madeira, barba branca low poly, textura com rugas (Q-160, parte)
+
+- Fala do usuário (literal): "Faz uma tartaruga mesmo, ele vai ter uma animaçào mais corcunda, andando com um bastão de madeira e uma barba branca low poly, além da textura com rugas"
+- Decidido:
+  - **Walt = tartaruga** (espécie Turtle já modelada, rig HotDog Crew, DEC-145/DEC-178).
+  - **Animação corcunda**: andar curvado, devagar, apoiado no bastão.
+  - **Bastão de madeira** (peça nova, na mão).
+  - **Barba branca low poly** (malha nova, no rosto/queixo).
+  - **Textura com rugas** (cabeça/rosto próprios do Walt, não a `T_Head_Turtle` comum).
+- Emenda a aparência de CHR-001 e AST-058 (eram humanas; DEC-178 já as invalidava). "Bigode branco grosso" vira **barba branca low poly**; "postura curvada" vira **animação corcunda**.
+- **Provisório** (art-director; não perguntado):
+  - mão do bastão × `Coffee_Pair` (AST-010) na cutscene final: sugestão bastão na **esquerda**, cafés na **direita**; se a cena exigir as duas mãos, o bastão fica encostado;
+  - mantém boné vermelho com o logo (DEC-206), óculos grossos, jaqueta creme/vermelha desbotada e crachá "WALT — NIGHT SHIFT", salvo conflito com a barba;
+  - tartaruga da crew usa a mesma malha de corpo; a corcunda vem da animação (e do casco, se a espécie tiver), sem escala de corpo nova;
+  - tris dentro do teto de personagem com nome (2.500, AST-058) somando barba e bastão; se passar, art-director avisa.
+- Leitura: Tartaruga também é espécie de um tipo de cliente (DEC-188, Grandparent "Tartaruga/Ovelha"). Walt só aparece em pessoa na cutscene final (DEC-076); a distinção vem de barba, bastão, rugas e boné. Ver `Q-160` (b).
+- Impacto: **art-director** (ficha AST-058 reescrita: espécie, barba, bastão, textura com rugas, packs; peças novas com ID próprio se precisar), **modeler-3d** (barba low poly, bastão de madeira, textura com rugas, após ficha Aprovada), **animação / AST-069** (andar corcunda com bastão, estender o café; quem produz segue a definir no plano de tarefas), **narrative-writer** (CHR-001 Aparência), **task-planner** (tarefas de asset/animação quando a ficha for Aprovada). Nota em `characters.md`, `asset-list.md` (AST-058, AST-069), `open-questions.md` (`Q-160`), `README.md` → secretário (feito).
+
+### DEC-203 — 2026-10-10 — Opal = coruja; Mr. Pickett = rato; Raincoat Lady = sapo (Q-160, parte)
+
+- Fala do usuário (opção escolhida em cada um): Opal **CORUJA**, Mr. Pickett **RATO**, Raincoat Lady **SAPO**.
+- Decidido:
+  - **Opal (CHR-003, AST-057) = coruja** (Owl).
+  - **Mr. Pickett (CHR-005, AST-055) = rato** (Mouse).
+  - **Raincoat Lady (CHR-006, AST-059, ANM-005) = sapo** (Frog).
+- Todas espécies já modeladas e aprovadas (DEC-158, DEC-163). Responde `Q-160` (a) para esses três: **espécie existente**, sem espécie nova.
+- `Q-160` (b) respondido por consequência: personagem com nome **pode repetir** espécie jogável (Coruja = CLS-006 Night Owl, DEC-186) e de tipo de cliente (Rato = "Hamster/Rato", Sapo, Tartaruga, DEC-188).
+- **Provisório** (art-director; não perguntado): a distinção vem da **roupa e dos acessórios fixos** de cada ficha (Opal: colete do Mart, coque com lápis → adaptar à coruja, óculos na corrente; Pickett: terno marrom, gravata-borboleta verde, relógio no pulso **esquerdo**, maleta na mão **direita**, bordado "PICKETT & SONS"; Raincoat Lady: capa amarela `#F2C230`, botas verdes, guarda-chuva, **olhos fechados**). Sinais aprovados de `anomalies.md` **não mudam** (ANM-004 cópia espelhada do Pickett; ANM-005 capa amarela e água).
+- Regra mantida (style guide §2.4): cliente sapo comum **nunca** usa capa amarela; cliente rato comum **nunca** usa o conjunto do Pickett.
+- Impacto: **art-director** (fichas AST-055, AST-057, AST-059), **modeler-3d** (após fichas Aprovadas), **narrative-writer** (CHR-003, CHR-005, CHR-006 Aparência; `Q-147` b), **game-designer** (`npcs.md` NPC-020, NPC-021, ANM-005). Nota em `characters.md`, `asset-list.md`, `open-questions.md` (`Q-160`, `Q-147`), `README.md` → secretário (feito).
+
+### DEC-204 — 2026-10-10 — Anomalia "por jogador": sinal visto por todos; erro e penalidade por jogador (fecha Q-069)
+
+- Fala do usuário (opção escolhida): a sugestão de `Q-069`.
+- Decidido:
+  - Nas anomalias de escopo **por jogador** (`anomalies.md`, Aprovado: N6, N8, N9, N10), o **sinal é visto por todos** os jogadores.
+  - **Erro e penalidade** contam **por jogador** (só quem errou paga).
+  - Anomalias de escopo **party** não mudam.
+- Consequência técnica (architect): o sinal (`AnomalyCue`) é **replicado a todos**; o "mostrar a um só" previsto na arquitetura **não é usado** para essas anomalias. Alucinações locais de sanidade baixa (T9, DEC-168/169) **não são** sinal de anomalia e seguem locais.
+- Impacto: **game-designer** (fichas de anomalia em `features.md`/`npcs.md`: escopo do sinal × do erro), **narrative-writer** (`anomalies.md`: nota, sem mudar regra), **architect** (`AnomalyCue` para todos; validação de erro por jogador). Nota em `open-questions.md` (`Q-069` → Respondidas), `README.md` → secretário (feito). `docs/tech/` não editado pelo secretário (architect em trabalho).
+
+### DEC-205 — 2026-10-10 — Membro atrasado: só o roster do lobby entra/volta; spawna direto no trabalho, sem cutscene (fecha Q-112)
+
+- Fala do usuário (opção escolhida): `Q-112` (b) e (c).
+- Decidido:
+  - (b) Só quem está no **roster do lobby** (party formada nas plataformas, DEC-179) pode **entrar** ou **voltar** na run. Ninguém de fora (confirma DEC-067).
+  - (c) O atrasado **spawna direto no trabalho**, **sem cutscene** de abertura.
+- **Provisório** (não perguntado):
+  - prazo: pode entrar **a qualquer momento** enquanto a run existir (DEC-098 "spawna quando chegar"; DEC-067/DEC-080 limitam a existência da run);
+  - ponto de spawn "no trabalho" = ao lado do veículo atual (carrinho ou trailer), definido pelo level-designer;
+  - (d) voto de pular: segue DEC-194 + proposta Provisória do game-designer ("só quem está na cutscene"); como o atrasado não vê cutscene, não vota nela.
+- Impacto: **architect** (claim por roster, T4; spawn sem cutscene), **level-designer** (ponto de spawn do atrasado no MAP-01), **game-designer** (FEAT de run/party), **frontend-coder** (pular cutscene local do atrasado). Nota em `open-questions.md` (`Q-112` → Respondidas), `README.md` → secretário (feito). `docs/tech/` e `docs/tasks/board.md` não editados pelo secretário.
+
+### DEC-206 — 2026-10-10 — Logo do Bramble's = o hot dog cartoon atual do avental; vai nos personagens e no carrinho (fecha Q-143)
+
+- Fala do usuário (opção escolhida): logo = **o hot dog cartoon que já está no avental** (textura do uniforme, `AST-053_CrewTex`, DEC-151); **mantém nos personagens e no carrinho**.
+- Decidido:
+  - O desenho do avental atual é o **logo** do Bramble's.
+  - Aparece no **uniforme da crew** (avental, boné; AST-073/AST-053) e no **carrinho** (AST-026).
+- Não é nenhuma das opções da `Q-143`: não é o AST-072 "salsicha sorridente" como estava, nem desenho novo.
+- **Provisório** (art-director; não perguntado):
+  - letreiros e placas do AST-072 e o boné do Walt (AST-058) usam **o mesmo desenho**, para a marca ser uma só;
+  - no carrinho: decal na lateral/frente, sem mudar a forma aprovada (AST-026, DEC-141); ajuste de textura/decal sem nova aprovação de forma;
+  - trailer (AST-027): mesmo logo, se houver espaço de marca.
+- Condição do `CLAUDE.md`: o desenho precisa ser **original** (feito no projeto, não copiado da prancha de referência nem de marca). Art-director confere a origem e anota em `credits.md` se necessário.
+- Impacto: **art-director** (AST-072, AST-073, AST-026, AST-058; logo como peça 2D reaproveitável), **modeler-3d** (decal no carrinho), **narrative-writer** (`world.md`/CHR-001: "salsicha sorridente" passa a ser este desenho). Nota em `asset-list.md`, `characters.md`, `open-questions.md` (`Q-143` → Respondidas), `README.md` → secretário (feito).
+
+### DEC-207 — 2026-10-10 — Expressão de noite: só `Normal_Night`; as demais usam a versão de dia (fecha Q-150)
+
+- Fala do usuário (opção escolhida): **só `Normal_Night`** como expressão noturna por enquanto; as outras usam a **versão de dia** mesmo à noite.
+- Decidido:
+  - Única expressão com versão própria de noite: **`Normal_Night`** (DEC-166).
+  - Feliz, sorridente, triste, desmaiado (X), Skeptical, Exhausted, Stressed: **uma versão só** (a de dia), usada em qualquer pack (Day, Mid, Night).
+  - **Sem** expressão nova "Assustado" (a recomendação do agente não entra).
+- "Por enquanto": pode crescer depois por nova DEC.
+- Emenda leitura de **DEC-150** para expressões: a variante de noite vale para pelagem/roupa/acessórios (packs), não para cada expressão.
+- Impacto: **art-director** (lista de texturas de expressão; memória `Q-144` g fica menor), **architect** (troca de expressão independe do pack, exceto `Normal` ↔ `Normal_Night`), **game-designer** (humor dinâmico `Q-164` f usa as expressões de dia à noite). Nota em `asset-list.md` (AST-053), `open-questions.md` (`Q-150` → Respondidas; `Q-144`, `Q-164` anotadas), `README.md` → secretário (feito).
