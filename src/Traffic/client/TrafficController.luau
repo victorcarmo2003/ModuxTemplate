@@ -23,17 +23,14 @@
 	    that far cannot touch the own character anyway). Parts move with one BulkMoveTo per car.
 	  * Night (RoundController.IsNight): headlights Neon Cream + short Beam, no real light (style guide §2.3).
 
-	Motion (PROVISIONAL, frontend-coder, until TASK-104 ships `src/Traffic/shared/Motion.luau`): the shared pure
-	function does not exist yet, so the §8.1 rule lives here in `step`, integrated on a fixed grid of MOTION_DT from
-	AnchorAt (deterministic: every client gets the same distance for the same server time):
-	  - speed at the anchor = profile speed there; 0 when the anchor already sits on the stop;
-	  - profile: Traffic.SpeedStraight, Traffic.SpeedCrossing inside the `X-T` TrafficBox footprint; slows down ahead of
-	    a slower stretch with Crossing.BrakeDecel, speeds up with Crossing.PullAway;
-	  - StopDist > 0 still ahead and (HeldUntil = 0 or now < HeldUntil): brakes to stop exactly on StopDist and waits;
-	    after HeldUntil it pulls away (the PARE needs no second record);
-	  - path = ordered nodes of the TrafficPath (attribute `Order`, else the number in the name), distance in studs along
-	    the polyline from the first node; a BasePart node counts at its bottom face (road surface).
-	When the Motion module lands, `CarMotion` swaps to it (one place); the hit validation tolerates 8 studs (§8.2).
+	Motion: the shared pure module `src/Traffic/shared/Motion.luau` (TASK-104), the same one the TrafficService runs:
+	  - profile = Motion.Profile(path length, Motion.Stretches of the `Content.Traffic.Conflicts` box (X-T),
+	    SpeedStraight, SpeedCrossing, Crossing.PullAway, Crossing.BrakeDecel), built exactly as TrafficService/Paths;
+	  - the anchor of a record is a STANDSTILL (speed 0 at AnchorAt); one fresh Motion.Cursor per new record, then
+	    Motion.Sample(profile, record, cursor, now) every frame (one grid step per DT);
+	  - path = nodes of the TrafficPath ordered by attribute `Index` (binding), else `Order`, else the number in the
+	    name; a BasePart node counts at its bottom face (road surface); distance along the polyline from node 1.
+	The hit validation on the server tolerates `HitTolerance` studs (§8.2).
 
 	No input (the player never commands a car), no UI, never writes a set.
 ]]
@@ -46,6 +43,7 @@ local Workspace = game:GetService("Workspace")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
+local Motion = require(ReplicatedStorage.shared.Traffic.Motion)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 
 -- Fields of a Traffic record (network.md §6.2; Look 1..32 since TASK-097)
@@ -58,11 +56,11 @@ export type Record = {
 	HeldUntil: number,
 }
 
+-- Route geometry and speed profile (same build as TrafficService/Paths)
 type Path = {
-	Points: { Vector3 },
-	Cum: { number }, -- distance at each point
+	Line: Motion.Path,
+	Profile: Motion.Profile,
 	Length: number,
-	Slow: { { number } }, -- [from, to] stretches inside the X-T footprint (SpeedCrossing)
 }
 
 type Wheel = {
@@ -88,12 +86,8 @@ type Car = {
 	Record: Record,
 	Path: Path?,
 	Kit: Kit?,
-	-- grid integration (Motion); state at step K and K + 1
-	K: number,
-	S0: number,
-	U0: number,
-	S1: number,
-	U1: number,
+	-- Motion grid state of the current record (nil until the path is known)
+	Cursor: Motion.Cursor?,
 	-- shown state
 	Dist: number,
 	Speed: number,
@@ -110,30 +104,19 @@ const PATH_TAG = "TrafficPath"
 const PATH_ATTRIBUTE = "PathId"
 const BOX_TAG = "TrafficBox"
 const BOX_ATTRIBUTE = "BoxId"
-const CROSSING_BOX = "X-T" -- Content.Traffic.Conflicts (architecture.md §8.1)
-const ORDER_ATTRIBUTE = "Order"
+const ORDER_ATTRIBUTES = { "Index", "Order" } -- binding order first (TASK-104 Paths)
 const FROZEN_ATTRIBUTE = "Frozen" -- CharacterService:Freeze (hide, cutscene)
 const MAP_WAIT = 60 -- seconds MapIndex.WaitReady may wait for streaming
 const PATH_RETRY = 2 -- seconds between lookups of a path that is not in the map yet
 
 const TRAFFIC = Content.Traffic
 const CROSSING = TRAFFIC.Crossing
-const SPEED_STRAIGHT = TRAFFIC.SpeedStraight
-const SPEED_CROSSING = TRAFFIC.SpeedCrossing
-const BRAKE = CROSSING.BrakeDecel
-const PULL_AWAY = CROSSING.PullAway
 const HIT_MIN_SPEED = TRAFFIC.HitMinSpeed
 const KNOCK_TIME = TRAFFIC.KnockTime
 const GET_UP_TIME = TRAFFIC.GetUpTime
 const IMMUNE_TIME = TRAFFIC.ImmuneTime
 const IMPULSE_FORWARD = TRAFFIC.ImpulseForward
 const IMPULSE_UP = TRAFFIC.ImpulseUp
-
--- Motion grid (PROVISIONAL until TASK-104 Motion): 30 Hz steps from AnchorAt, linear in between.
-const MOTION_DT = 1 / 30
-const STOP_EPSILON = 0.05 -- studs: on the stop line
-const PROFILE_SAMPLE = 0.5 -- studs between footprint samples of the X-T box
-const MAX_CATCH_UP = 20 * 60 * 30 -- grid steps a single frame may integrate (20 min of motion)
 
 -- Latency blend (§8.1): reach the computed place in BLEND_TIME; a gap larger than SNAP_GAP is a different car.
 const BLEND_TIME = 0.2
@@ -166,92 +149,14 @@ const FALLBACK_COLOR = Color3.fromHex("#F4B183")
 const DEFAULT_WHEEL_RADIUS = 1.4
 const WHEELS = { "Wheel_FL", "Wheel_FR", "Wheel_RL", "Wheel_RR" }
 
--- Motion (PROVISIONAL, see header) --------------------------------------------------------------------------------
-
--- Profile speed at distance `s` of `path`
-local function speedAt(path: Path, s: number): number
-	for _, stretch in path.Slow do
-		if s >= stretch[1] and s <= stretch[2] then
-			return SPEED_CROSSING
-		end
-	end
-	return SPEED_STRAIGHT
-end
-
--- Start of the next slower stretch ahead of `s` (math.huge if none)
-local function nextSlow(path: Path, s: number): number
-	for _, stretch in path.Slow do
-		if stretch[1] > s then
-			return stretch[1]
-		end
-	end
-	return math.huge
-end
-
--- The stop of `record` still binds at distance `s` and time `t`
-local function holding(record: Record, s: number, t: number): boolean
-	if record.StopDist <= 0 or s > record.StopDist + STOP_EPSILON then
-		return false
-	end
-	return record.HeldUntil <= 0 or t < record.HeldUntil
-end
-
--- Speed at the anchor: on the stop -> 0; otherwise the profile speed there.
-local function anchorSpeed(path: Path, record: Record): number
-	if record.StopDist > 0 and math.abs(record.AnchorDist - record.StopDist) <= STOP_EPSILON then
-		return 0
-	end
-	return speedAt(path, record.AnchorDist)
-end
-
--- One grid step from (s, u), the state at grid time t, to the next grid point. Pure: same inputs, same outputs on every client.
-local function step(path: Path, record: Record, s: number, u: number, t: number): (number, number)
-	local target = speedAt(path, s)
-	-- slow down ahead of the X-T box
-	const slowAt = nextSlow(path, s)
-	if slowAt < math.huge and u > SPEED_CROSSING then
-		const room = slowAt - s
-		if u * u - SPEED_CROSSING * SPEED_CROSSING >= 2 * BRAKE * math.max(room - u * MOTION_DT, 0) then
-			target = SPEED_CROSSING
-		end
-	end
-	if holding(record, s, t) then
-		const room = record.StopDist - s
-		if room <= STOP_EPSILON then
-			return record.StopDist, 0
-		end
-		-- brake to stop exactly on StopDist (v^2 = 2 a d)
-		if u * u >= 2 * BRAKE * math.max(room - u * MOTION_DT, 0) then
-			const decel = u * u / (2 * room)
-			local nu = math.max(u - decel * MOTION_DT, 0)
-			local ns = s + (u + nu) * 0.5 * MOTION_DT
-			if ns >= record.StopDist - STOP_EPSILON or nu <= 0 then
-				ns = record.StopDist
-				nu = 0
-			end
-			return ns, nu
-		end
-	end
-	local nu: number
-	if u < target then
-		nu = math.min(u + PULL_AWAY * MOTION_DT, target)
-	else
-		nu = math.max(u - BRAKE * MOTION_DT, target)
-	end
-	local ns = s + (u + nu) * 0.5 * MOTION_DT
-	if holding(record, s, t) and ns > record.StopDist then
-		ns = record.StopDist
-		nu = 0
-	end
-	return ns, nu
-end
-
 -- Path geometry -------------------------------------------------------------------------------------------------
 
 local function nodeOrder(instance: Instance): number
-	const order = instance:GetAttribute(ORDER_ATTRIBUTE)
-	if type(order) == "number" then
-		return order
+	for _, attribute in ORDER_ATTRIBUTES do
+		const value = instance:GetAttribute(attribute)
+		if type(value) == "number" then
+			return value
+		end
 	end
 	const digits = string.match(instance.Name, "(%d+)%D*$")
 	return if digits then tonumber(digits) or math.huge else math.huge
@@ -275,42 +180,8 @@ local function findTagged(tag: string, attribute: string, id: string): Instance?
 	return nil
 end
 
--- Stretches of the polyline whose XZ falls inside the footprint of `box`
-local function slowStretches(points: { Vector3 }, cum: { number }, box: BasePart?): { { number } }
-	const out: { { number } } = {}
-	if box == nil then
-		return out
-	end
-	const cf = box.CFrame
-	const half = box.Size / 2
-	local from: number? = nil
-	const length = cum[#cum]
-	local s = 0
-	local segment = 1
-	while s <= length do
-		while segment < #points - 1 and cum[segment + 1] < s do
-			segment += 1
-		end
-		const a, b = points[segment], points[segment + 1]
-		const span = cum[segment + 1] - cum[segment]
-		const alpha = if span > 0 then (s - cum[segment]) / span else 0
-		const pos = cf:PointToObjectSpace(a:Lerp(b, alpha))
-		const inside = math.abs(pos.X) <= half.X and math.abs(pos.Z) <= half.Z
-		if inside and from == nil then
-			from = s
-		elseif not inside and from ~= nil then
-			table.insert(out, { from, s })
-			from = nil
-		end
-		s += PROFILE_SAMPLE
-	end
-	if from ~= nil then
-		table.insert(out, { from, length })
-	end
-	return out
-end
-
-local function buildPath(container: Instance, box: BasePart?): Path?
+-- Polyline of a TrafficPath container (nodes in binding order)
+local function polyline(container: Instance): Motion.Path?
 	const nodes: { Instance } = {}
 	for _, child in container:GetDescendants() do
 		if child:IsA("BasePart") or child:IsA("Attachment") then
@@ -331,55 +202,40 @@ local function buildPath(container: Instance, box: BasePart?): Path?
 			table.insert(points, position)
 		end
 	end
-	if #points < 2 then
-		return nil
-	end
-	const cum: { number } = { 0 }
-	for i = 2, #points do
-		cum[i] = cum[i - 1] + (points[i] - points[i - 1]).Magnitude
-	end
-	return {
-		Points = points,
-		Cum = cum,
-		Length = cum[#cum],
-		Slow = slowStretches(points, cum, box),
-	}
+	return Motion.Path(points)
 end
 
--- Point at distance `s` (clamped extrapolation past the ends along the end segments)
-local function pointAt(path: Path, s: number): Vector3
-	const points, cum = path.Points, path.Cum
-	local lo, hi = 1, #points
-	if s <= 0 then
-		hi = 2
-	elseif s >= path.Length then
-		lo = #points - 1
-	else
-		while hi - lo > 1 do
-			const mid = (lo + hi) // 2
-			if cum[mid] <= s then
-				lo = mid
-			else
-				hi = mid
+-- Path + profile of a route; Slow = stretches inside the Conflicts box (X-T), as TrafficService/Paths.build
+local function buildPath(container: Instance): Path?
+	const line = polyline(container)
+	if line == nil then
+		return nil
+	end
+	local slow: { { number } } = {}
+	for _, conflict in TRAFFIC.Conflicts.List do
+		const box = findTagged(BOX_TAG, BOX_ATTRIBUTE, conflict.Box)
+		if box ~= nil and box:IsA("BasePart") then
+			const stretches = Motion.Stretches(line, box.CFrame, box.Size)
+			if #stretches > 0 then
+				slow = stretches
 			end
 		end
 	end
-	hi = lo + 1
-	const span = cum[hi] - cum[lo]
-	const alpha = if span > 0 then (s - cum[lo]) / span else 0
-	return points[lo] + (points[hi] - points[lo]) * alpha
+	const profile = Motion.Profile(
+		line.Length,
+		slow,
+		TRAFFIC.SpeedStraight,
+		TRAFFIC.SpeedCrossing,
+		CROSSING.PullAway,
+		CROSSING.BrakeDecel
+	)
+	return { Line = line, Profile = profile, Length = line.Length }
 end
 
 -- Pivot (base centre, LookVector = front) at distance `s`; heading from the chord over `half` studs each side
 local function pivotAt(path: Path, s: number, half: number): CFrame
-	const position = pointAt(path, s)
-	const ahead = pointAt(path, s + half)
-	const behind = pointAt(path, s - half)
-	local direction = Vector3.new(ahead.X - behind.X, 0, ahead.Z - behind.Z)
-	if direction.Magnitude < 1e-3 then
-		direction = Vector3.new(0, 0, -1)
-	end
-	return CFrame.lookAt(position, position + direction.Unit)
+	const position = Motion.PointAt(path.Line, s)
+	return CFrame.lookAt(position, position + Motion.Heading(path.Line, s, half))
 end
 
 -- Kit -------------------------------------------------------------------------------------------------------------
@@ -583,9 +439,7 @@ function TrafficController:PathOf(route: number): Path?
 		return nil
 	end
 	const container = findTagged(PATH_TAG, PATH_ATTRIBUTE, row.Path)
-	const boxInstance = findTagged(BOX_TAG, BOX_ATTRIBUTE, CROSSING_BOX)
-	const box = if boxInstance and boxInstance:IsA("BasePart") then boxInstance else nil
-	const path = if container then buildPath(container, box) else nil
+	const path = if container then buildPath(container) else nil
 	if path == nil then
 		if retry == nil then
 			warn(`[TrafficController] TrafficPath {row.Path} missing or empty: its cars are not drawn yet`)
@@ -617,59 +471,20 @@ function TrafficController:ReleaseKit(kit: Kit)
 	table.insert(pool, kit)
 end
 
--- Grid state of `car` at step `k` from the anchor (integrates forward from the cached step)
-function TrafficController:Advance(car: Car, path: Path, now: number)
-	const record = car.Record
-	const target = math.floor((now - record.AnchorAt) / MOTION_DT)
-	if target < car.K then
-		return
-	end
-	local steps = 0
-	while car.K < target and steps < MAX_CATCH_UP do
-		-- parked on a held stop: nothing changes until HeldUntil, jump the grid
-		if car.U1 == 0 and holding(record, car.S1, record.AnchorAt + (car.K + 1) * MOTION_DT) then
-			local last = target
-			if record.HeldUntil > 0 then
-				-- last grid index whose step still sees the hold (t_last < HeldUntil)
-				last = math.min(target, math.ceil((record.HeldUntil - record.AnchorAt) / MOTION_DT) - 1)
-			end
-			if last > car.K then
-				car.K = last
-				car.S0, car.U0 = car.S1, car.U1
-				continue
-			end
-		end
-		car.K += 1
-		car.S0, car.U0 = car.S1, car.U1
-		car.S1, car.U1 = step(path, record, car.S0, car.U0, record.AnchorAt + car.K * MOTION_DT)
-		steps += 1
-	end
-end
-
--- Distance and speed of `car` at server time `now` (Motion)
+-- Distance and speed of `car` at server time `now` (Motion; the cursor only moves forward)
 function TrafficController:CarMotion(car: Car, path: Path, now: number): (number, number)
-	const record = car.Record
-	if now <= record.AnchorAt then
-		return record.AnchorDist, car.U0
+	local cursor = car.Cursor
+	if cursor == nil then
+		cursor = Motion.Cursor(path.Profile, car.Record)
+		car.Cursor = cursor
 	end
-	self:Advance(car, path, now)
-	const t0 = record.AnchorAt + car.K * MOTION_DT
-	const alpha = math.clamp((now - t0) / MOTION_DT, 0, 1)
-	return car.S0 + (car.S1 - car.S0) * alpha, car.U0 + (car.U1 - car.U0) * alpha
+	return Motion.Sample(path.Profile, car.Record, cursor :: Motion.Cursor, now)
 end
 
--- Resets the integration of `car` to its record
+-- Fresh cursor for the record of `car` (the anchor is a standstill)
 function TrafficController:Reanchor(car: Car)
 	const path = car.Path
-	const record = car.Record
-	const u = if path then anchorSpeed(path, record) else 0
-	car.K = 0
-	car.S0, car.U0 = record.AnchorDist, u
-	if path then
-		car.S1, car.U1 = step(path, record, record.AnchorDist, u, record.AnchorAt)
-	else
-		car.S1, car.U1 = record.AnchorDist, u
-	end
+	car.Cursor = if path then Motion.Cursor(path.Profile, car.Record) else nil
 end
 
 function TrafficController:Apply(id: number, record: Record)
@@ -689,11 +504,7 @@ function TrafficController:Apply(id: number, record: Record)
 			Record = copy,
 			Path = self:PathOf(copy.Route),
 			Kit = nil,
-			K = 0,
-			S0 = copy.AnchorDist,
-			U0 = 0,
-			S1 = copy.AnchorDist,
-			U1 = 0,
+			Cursor = nil,
 			Dist = copy.AnchorDist,
 			Speed = 0,
 			Blend = 0,
