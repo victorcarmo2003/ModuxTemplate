@@ -89,6 +89,22 @@ function Crew.build(o: { [string]: any }): Model
 	local head = parts["Head_" .. o.animal]
 	head.Name = "Head"
 	parts.Head = head
+	-- the round heads (DEC-152) are 0.30 taller than the base head: the cap rides up with HatAttachment
+	if parts.Cap then
+		parts.Cap.CFrame += Vector3.new(0, o.capRaise or 0.30, 0)
+	end
+	-- textured head (animal markings; main fur = part Color through the alpha) + face shell (expression)
+	local headTex = o.tex["T_Head_" .. o.animal .. (o.time == "Night" and "_Night" or "")] or o.tex["T_Head_" .. o.animal]
+	if headTex and head:IsA("MeshPart") then
+		head.TextureID = headTex
+		head.Color = o.fur or head.Color
+	end
+	local face = parts["Face_" .. o.animal]
+	if face then
+		face.Name = "Face"
+		parts["Face_" .. o.animal] = nil
+		parts.Face = face
+	end
 	-- HumanoidRootPart
 	local hrp = Instance.new("Part")
 	hrp.Name = "HumanoidRootPart"
@@ -138,7 +154,63 @@ function Crew.build(o: { [string]: any }): Model
 	model:SetAttribute("Animal", o.animal)
 	model:SetAttribute("Outfit", o.outfit)
 	model:SetAttribute("Time", o.time)
+	if parts.Face then
+		Crew.setExpression(model, o.expression or "Normal", o.tex)
+	end
 	return model
+end
+
+--[[ Expressions. The face shell needs real transparency (SurfaceAppearance AlphaMode Transparency); a plain
+	TextureID would paint its transparent texels with the part Color and hide the head markings.
+	SurfaceAppearance.ColorMap cannot be set by game scripts at runtime, so one ready-made SurfaceAppearance per
+	expression lives in ReplicatedStorage.CrewExpressions (built here in edit mode) and swapping = cloning it.
+	tex keys "T_Expr_<Name>" (+ "T_Expr_<Name>_Night" preferred for Night variants). ]]
+function Crew.ensureExpressions(tex: { [string]: string }): Folder
+	local RS = game:GetService("ReplicatedStorage")
+	local folder = RS:FindFirstChild("CrewExpressions")
+	if not folder then
+		folder = Instance.new("Folder")
+		folder.Name = "CrewExpressions"
+		folder.Parent = RS
+	end
+	for key, id in tex do
+		local name = string.match(key, "^T_Expr_(.+)$")
+		if name and not folder:FindFirstChild(name) then
+			local sa = Instance.new("SurfaceAppearance")
+			sa.Name = name
+			sa.ColorMap = id
+			sa.AlphaMode = Enum.AlphaMode.Transparency
+			sa.Parent = folder
+		end
+	end
+	return folder :: Folder
+end
+
+function Crew.setExpression(model: Model, name: string, tex: { [string]: string }?): boolean
+	local face = model:FindFirstChild("Face")
+	if not face or not face:IsA("MeshPart") then
+		return false
+	end
+	local folder = game:GetService("ReplicatedStorage"):FindFirstChild("CrewExpressions")
+	if not folder and tex then
+		folder = Crew.ensureExpressions(tex)
+	end
+	if not folder then
+		return false
+	end
+	local night = model:GetAttribute("Time") == "Night"
+	local tpl = (night and folder:FindFirstChild(name .. "_Night")) or folder:FindFirstChild(name)
+	if not tpl then
+		return false
+	end
+	local old = face:FindFirstChildOfClass("SurfaceAppearance")
+	if old then
+		old:Destroy()
+	end
+	tpl:Clone().Parent = face
+	face.TextureID = ""
+	model:SetAttribute("Expression", name)
+	return true
 end
 
 return Crew
