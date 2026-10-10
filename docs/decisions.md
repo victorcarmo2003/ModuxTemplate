@@ -2941,3 +2941,79 @@ Origem das DEC-202 a DEC-207: questionário do orquestrador, 2026-10-10 (19ª pa
 - "Por enquanto": pode crescer depois por nova DEC.
 - Emenda leitura de **DEC-150** para expressões: a variante de noite vale para pelagem/roupa/acessórios (packs), não para cada expressão.
 - Impacto: **art-director** (lista de texturas de expressão; memória `Q-144` g fica menor), **architect** (troca de expressão independe do pack, exceto `Normal` ↔ `Normal_Night`), **game-designer** (humor dinâmico `Q-164` f usa as expressões de dia à noite). Nota em `asset-list.md` (AST-053), `open-questions.md` (`Q-150` → Respondidas; `Q-144`, `Q-164` anotadas), `README.md` → secretário (feito).
+
+Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª parte). Médicos com fala livre literal; porco confirmado após a explicação.
+
+### DEC-208 — 2026-10-10 — Técnicas T1–T31 do architect aprovadas em bloco, como estão (fecha Q-130)
+
+- Fala do usuário (opção escolhida): técnicas **T1–T31** do architect **aprovadas em bloco como estão**; o orquestrador **só volta ao usuário com técnica que mude regra de jogo**.
+- Decidido:
+  - **T1, T3 a T31** (`tech/architecture.md` §14 e §15, texto vigente na data) deixam de ser Provisórias: **Aprovadas**.
+  - **T2** e qualquer outra T marcada como **substituída** no documento **continuam fora** (T2 → DEC-080/T16).
+  - **Técnica nova** (T32 em diante) ou ajuste técnico que **não muda regra de jogo**: não vai ao usuário; o architect registra no documento técnico (aprovação **delegada ao agente**, por esta DEC). Técnica que **muda regra de jogo** volta ao usuário no próximo lote.
+- **Limite da aprovação:** aprovar a técnica **não revoga nenhuma DEC de regra de jogo**. Onde uma T contradiz uma DEC, vale a DEC:
+  - T21/T30 × **DEC-133** ("carro nunca para" × PARE 1 s e parada com reserva de NPC): vale DEC-133; alinhamento segue em **`Q-131`** (architect), sem voltar ao usuário.
+  - T26 × **DEC-209** (streaming do MAP-01): ver DEC-209.
+- Nota para o **architect** (o secretário não editou `docs/tech/`, architect em trabalho): atualizar o status das técnicas em `architecture.md` §14/§15 ("Provisória" → "Aprovada, DEC-208"), a §17 e as linhas de `network.md`/`content-data.md` que citam `Q-130`.
+- Impacto: **architect** (status das T; `Q-131` segue), **task-planner** (tarefas que dependiam de `Q-130` deixam de esperar), todos os coders (T1–T31 valem como base aprovada). Nota em `open-questions.md` (`Q-130` → Respondidas), `README.md` → secretário (feito).
+
+### DEC-209 — 2026-10-10 — MAP-01 sempre carregado; sem streaming no mapa jogável (fecha Q-087)
+
+- Fala do usuário (opção escolhida): **mapa sempre carregado** — sem `StreamingEnabled` para o MAP-01; **decoração distante pode ter stream**, conforme o architect.
+- Decidido:
+  - **Regra:** todo o MAP-01 (rua, trailer, carrinho, Mart, postes, rotas de NPC e de carro, âncoras de anomalia) fica **sempre carregado** no client. Nada do mapa jogável some por distância.
+  - Só **decoração distante**, fora da área jogável, pode ter stream; o que entra nessa lista é do architect (+ level-designer).
+- Nota técnica para o **architect** (não muda regra, não volta ao usuário): `StreamingEnabled` é propriedade do `Workspace` inteiro. Se houver stream de decoração distante, o flag fica **ligado** e o MAP-01 inteiro entra como `Persistent` (ou raio que cobre o mapa, como a T26); se não houver, o flag fica **desligado**. As duas leituras cumprem a regra; o architect escolhe e anota em §1.1/§12.5 de `architecture.md`.
+- Liga a **T26** (DEC-208): compatível desde que nenhuma parte do MAP-01 saia por streaming.
+- Impacto: **architect** (`architecture.md` §1.1, §12.5, T26; `Persistent` × flag desligado), **level-designer** (MAP-01 §15 P9: lista da decoração distante, se houver). Nota em `open-questions.md` (`Q-087` → Respondidas), `README.md` → secretário (feito).
+
+### DEC-210 — 2026-10-10 — Sem outras referências além de "Animal Hospital" (fecha Q-021)
+
+- Fala do usuário (opção escolhida): **sem outras referências** além de "Animal Hospital".
+- Decidido: a única referência de sensação segue **"Animal Hospital"** (DEC-013; `research/animal-hospital.md`). Nenhuma pesquisa nova de referência pedida ao researcher. Só inspiração, nunca cópia (`CLAUDE.md`).
+- Impacto: **researcher** (nada novo). Nota em `open-questions.md` (`Q-021` → Respondidas), `README.md` → secretário (feito).
+
+### DEC-211 — 2026-10-10 — Ambulância = van do Car Kit adaptada, original e sem marca; paramédicos são animais da crew de roupa de paramédico; tom fofo (fecha Q-104)
+
+- Fala do usuário (opção escolhida): ambulância = **van do pack (Car Kit) adaptada**, **original, sem marca**; paramédicos = **animais da crew com roupa de paramédico**; **tom fofo**.
+- Decidido:
+  - **AST-052** segue como está: modelo do **Car Kit** (`CK/ambulance.fbx`) adaptado, já Aprovado (DEC-139/DEC-141/DEC-143). Sem cruz vermelha, Star of Life, nome de serviço real (proibições da ficha valem). Texto "BELLMOOR RESCUE" e coração Teal com "+" seguem como estão.
+  - **Paramédicos (CHR-008, AST-076, NPC-024)** = **animais no rig da crew** (DEC-178) com **roupa de paramédico** (não o uniforme do Bramble's). Espécies e rosto: **DEC-213**.
+  - **Tom fofo** (DEC-023, DEC-172): resgate de desenho animado, sem sangue nem ferimento.
+- Leitura do secretário: "van do pack" = a base Car Kit já usada no AST-052. Se o usuário quis dizer o `Car_Van` do AST-035, o art-director confere no próximo lote; até lá vale o AST-052 aprovado.
+- **Provisório** (art-director; já nas fichas): sirene curta e baixa (style guide §11), barra de luz Neon, animações de AST-069 (descer, levar a maca, subir), sequência e tempos em FEAT-034/NPC-024 (game-designer).
+- Impacto: **art-director** (AST-076: roupa de paramédico em textura no rig da crew, no lugar de `BodyColors`/acessórios R6), **modeler-3d** (após ficha Aprovada), **narrative-writer** (CHR-008 Aparência). Nota em `asset-list.md` (AST-052, AST-076), `characters.md`, `open-questions.md` (`Q-104` → Respondidas), `README.md` → secretário (feito).
+
+### DEC-212 — 2026-10-10 — Walker (ANM-007) = silhueta própria, que não lembra nenhuma das 18 espécies (Q-160, parte)
+
+- Fala do usuário (opção escolhida): **Walker = silhueta própria**; não lembra nenhuma das 18 espécies; **o art-director propõe**.
+- Decidido:
+  - O Walker **não usa** nenhuma espécie existente (nem Leão, nem Pinguim, nem Ovelha).
+  - Forma própria no rig da crew (DEC-178), alto (~1,35–1,4×, já aceito em style guide §2.4/AST-064), escuro sob o poste.
+  - Opção 1 do narrative-writer (contra a recomendação A "Leão" do art-director).
+- **A propor pelo art-director** (Rascunho; usuário aprova a ficha): cabeça/orelhas da silhueta (ponto de partida do narrative-writer: **orelhas pequenas caídas**, pelagem escura lisa), textura, escala, LOD.
+- Sinais aprovados de `anomalies.md` **não mudam**: sem olhos brilhando, sem garra, sem boca; não olha nem aponta para o jogador. "Rosto liso" do Walker **não pode** se confundir com o sinal da ANM-001 (blank folks, `Q-147`).
+- Impacto: **art-director** (ficha AST-064 reescrita: rig da crew + silhueta própria; memória `Q-144` g: +1 cabeça/textura), **modeler-3d** (após ficha Aprovada), **narrative-writer** (`anomalies.md` só nota; `Q-147`), **level-designer** (nada: `Walker_Spot` igual). Nota em `asset-list.md` (AST-064), `characters.md`, `open-questions.md` (`Q-160` → Respondidas; `Q-147` anotada), `README.md` → secretário (feito).
+
+### DEC-213 — 2026-10-10 — Médicos = coelho alto + panda baixo; rosto sempre Exhausted + máscara cirúrgica cobrindo a boca (fecha Q-160)
+
+- Fala do usuário (opção escolhida): paramédicos = **coelho alto + panda baixo** (opção A do art-director).
+- Fala do usuário (**literal**, adicional): "para os médicos usa sempre o rosto de mid, eles precisam parecer cansados, dai vc só joga uma mascara por cima da boca"
+- Decidido:
+  - **`Medic_A` = coelho** (alto; as orelhas dão a altura), **`Medic_B` = panda** (baixo). Sem escala de corpo (só o Walker sai do tamanho padrão).
+  - **Rosto fixo = expressão `Exhausted`** (a do pack Mid, DEC-166/DEC-162), **sempre**, em qualquer hora e fase. Não trocam de expressão.
+  - **Máscara cirúrgica** cobrindo a boca. **Acessório ou textura: decide o art-director.**
+- **Emenda** a ficha AST-076 e CHR-008 (Rascunho): sai "**máscara cirúrgica**" da lista de proibidos e "rostos gentis, olhos e boca sempre" (a boca fica coberta). Vale esta DEC. Seguem proibidos: cruz vermelha, Star of Life, estetoscópio, seringa, sangue, equipamento médico realista.
+- Leitura do secretário: "rosto de mid" = **expressão** Exhausted, não o pack inteiro. Pelagem/roupa seguem a regra de NPC (à noite = Mid, DEC-181); os médicos só aparecem à noite, então na prática ficam Mid.
+- **Provisório** (não perguntado; art-director + architect):
+  - observador com sanidade baixa (DEC-168/169): os médicos **mantêm** Exhausted + máscara (expressão fixa); pelagem/roupa pode trocar para Night como os demais NPCs;
+  - Panda é classe da 1ª atualização (DEC-186) e Coelho é classe MVP (Runner): o médico se distingue do jogador pela **roupa de paramédico** e pela máscara, nunca pelo uniforme da crew.
+- Com DEC-202, DEC-203, DEC-212 e esta, **`Q-160` fecha**: todos os personagens com nome têm espécie.
+- Impacto: **art-director** (AST-076: espécies, rosto Exhausted fixo, máscara, roupa de paramédico; memória `Q-144` g), **modeler-3d** (máscara, se acessório; após ficha Aprovada), **narrative-writer** (CHR-008 Aparência), **architect** (médicos sem troca de expressão; T23 atores locais), **game-designer** (NPC-024). Nota em `asset-list.md` (AST-076), `characters.md`, `open-questions.md` (`Q-160` → Respondidas), `README.md` → secretário (feito).
+
+### DEC-214 — 2026-10-10 — Porco confirmado como cliente normal (confirma DEC-192)
+
+- Fala do usuário (literal, depois da explicação do porco/salsicha): "Sim, cliente normal"
+- Decidido: **porco pode ser cliente normal**. A marca "a confirmar" da **DEC-192** cai; DEC-192 vale sem ressalva.
+- Onde o porco aparece como cliente (tipo, genérico ou 2ª espécie) segue em **`Q-165`** (game-designer).
+- Impacto: **game-designer** (`npcs.md`, tabela `Species`), **architect/task-planner** (`content-data.md` e `tasks/board.md` TASK-009 citam "DEC-192, a confirmar": trocar por "DEC-192, DEC-214"; o secretário não editou esses arquivos). Nota em `npcs.md`, `proposals-round-3.md`, `open-questions.md` (`Q-149`, `Q-165`), `README.md` → secretário (feito).

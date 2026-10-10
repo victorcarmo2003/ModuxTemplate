@@ -554,6 +554,7 @@ Compra de upgrade: bancada do Mart (AST-049, DEC-101); a peça visível troca no
 - **Caso "corpo inacessível"** (FEAT-034, ainda Rascunho do game-designer; fora de DEC-114): a maca aparece na parada atrás das portas e o corpo some em fade. A peça `Stretcher` já serve; nenhuma malha extra.
 - **Dimensões:** 16 C × 7 L × 8 A (toy van alta; medida do MAP-01 L01-36, ~16 × 7: com o centro em AMB-P (44, 13), as portas traseiras caem em X 36, como no MAP-01 §5.5); portas traseiras de 2 folhas abrindo 100° para os lados, vão livre 4 L × 5,5 A (2 médicos + maca passam); degrau traseiro a 1,0.
 - **Maca (`Stretcher`) — modelada e aprovada (DEC-140):** `Assets/blender/vehicle/AST-052_Stretcher.blend`, `Assets/models/vehicle/AST-052_Stretcher.fbx`, 352 tris, encaixes `Att_Grip_Front`/`Att_Grip_Back` conforme abaixo. 6 × 2,2 × 1,6 (tampo a 1,6), branca com rodinhas pequenas e alças nas duas pontas; **carregada pelos médicos** (um em cada ponta, `Att_Grip_Front` / `Att_Grip_Back` presos no `RightGripAttachment` de cada um). Dentro da ambulância fica presa num trilho no piso; sai solta (sem animação de trilho).
+- **DEC-211 (2026-10-10, fecha `Q-104`):** usuário confirma ambulância = **van do Car Kit adaptada**, original, sem marca, tom fofo — este modelo segue como está. Paramédicos: AST-076 (DEC-213).
 - **Silhueta:** van arredondada com cabine curta, barra de luz no teto, degrau traseiro.
 - **Cores:** Cream, faixa Teal larga, barra de luz Mustard/Teal (style guide §2.2, Aprovado). Texto lateral "BELLMOOR RESCUE" (placeholder do narrative-writer, AST-072).
 - **Símbolo:** coração Teal com um "+" Cream arredondado. **Proibido:** cruz vermelha sobre branco, crescente vermelho, Star of Life, padrão xadrez de ambulância real, nome de serviço real.
@@ -847,6 +848,7 @@ Regras gerais: style guide §4 (opção A: `BodyColors` + acessórios de atlas +
 - **Variações:** 2 (`Medic_A`, `Medic_B`); sempre os mesmos dois (padrão fixo, como a ambulância).
 - **Tris:** NPC montado 600–1.200 cada; acessório ≤ 400.
 - **2026-10-10:** espécie dos médicos **ainda aberta** (`Q-160`; propostas: dois porcos, ou coelho alto + panda baixo). Rig da crew (DEC-178); tris seguem DEC-164.
+- **DEC-211 e DEC-213 (2026-10-10, fecham `Q-104` e `Q-160`):** `Medic_A` = **coelho** (alto pelas orelhas), `Medic_B` = **panda** (baixo); animais da crew com **roupa de paramédico** (textura no rig, no lugar de `BodyColors`/acessórios R6; não usar o uniforme do Bramble's); tom fofo. Rosto **fixo `Exhausted`** (DEC-162/166) em qualquer hora, sem troca de expressão. **Máscara cirúrgica** cobrindo a boca: **acessório ou textura, decide o art-director**. **Emenda desta ficha:** "máscara cirúrgica" **sai** da lista de proibidos; "olhos e boca sempre" não vale (boca coberta). Seguem proibidos cruz vermelha, Star of Life, estetoscópio, seringa, sangue, equipamento realista. `Medic_Cap`/`Hair_Medic_*` a rever pelo art-director (orelhas do coelho × boné). **Provisório:** com observador de sanidade baixa, expressão e máscara não mudam.
 
 ### AST-069 — Pacote de animações R6
 
@@ -928,6 +930,7 @@ Regra de arte: a anomalia usa as mesmas peças do normal e quebra **um** traço 
 - **Comportamento visual:** parado sob o poste (`Walker_Spot` de AST-036); cada avanço = o poste onde estava pisca e ele aparece no próximo (sem ciclo de andar). Recua para o escuro e some.
 - **Regra:** não olha nem aponta para o jogador; nada de olhos brilhando, garras ou boca. O medo é a regra, não a forma.
 - **Tris:** ≤ 1.500.
+- **DEC-212 (2026-10-10, fecha a parte do Walker em `Q-160`):** Walker no **rig da crew** (DEC-178) com **silhueta própria**, que **não lembra nenhuma das 18 espécies** (opção do narrative-writer; o "Leão" proposto não entra). **Art-director propõe** cabeça/orelhas, textura e escala (ponto de partida: orelhas pequenas caídas, pelagem escura lisa); ficha vai a Aprovado com DEC do usuário. "R6 escalado ~1,4×" e o rosto escuro liso seguem, sem confundir com o "sem rosto" da ANM-001 (`Q-147`). Tris do rig animal (DEC-164) substituem o "≤ 1.500"; LOD ≤ 400 segue.
 
 ### AST-065 — ANM-008 The long car
 

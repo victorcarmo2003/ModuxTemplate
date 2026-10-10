@@ -25,7 +25,8 @@ Conciliação das rodadas 8–12 (DEC-080 a DEC-109):
   - **DEC-187** (`Q-154`): **humor dinâmico completo** (medidor sobe/desce, muda pagamento; contra a recomendação B). A proposta B (humor de chegada, "à noite chega Normal") **não vale**; desenho em `Q-164`. Mexe na DEC-072 só pelo desenho.
   - **DEC-188** (`Q-149` a, b): espécie jogável **pode** ser cliente (contra a recomendação); tipo = espécie(s) fixa(s) + acessório, roupa A–H sorteada — NPC-001 Pinguim, NPC-002 Hamster/Rato, NPC-003 Sapo, NPC-004 Macaco, NPC-005 Tartaruga/Ovelha, NPC-006 Coala. Onde as jogáveis aparecem → `Q-165`. Guaxinim só Quentin (DEC-186).
   - **DEC-191** (`Q-091`): Opal (NPC-020) **fora do teto de 12** e **nunca anomalia**; AN-08 sai dela.
-  - **DEC-192** (`Q-149` c): **porco pode ser cliente normal** — inclinação do usuário, **a confirmar** após a explicação.
+  - **DEC-192** (`Q-149` c): **porco pode ser cliente normal** — **confirmado por DEC-214** ("Sim, cliente normal", depois da explicação). Onde aparece: `Q-165`.
+- **DEC-211 a DEC-213 (2026-10-10), nota do secretário:** **NPC-023** ambulância = AST-052 (van do Car Kit adaptada, sem marca; DEC-211). **NPC-024** paramédicos = **coelho alto + panda baixo** no rig da crew, **roupa de paramédico**, rosto **sempre `Exhausted`** + **máscara cirúrgica** sobre a boca (DEC-211, DEC-213). Walker (ANM-007) = **silhueta própria** (DEC-212).
   - Ao reescrever, a proposta "Pack Mid nunca em NPC" de `proposals-round-3.md` §2 também não vale (DEC-181).
 - NPCs novos: **NPC-022** carro de trânsito (DEC-087, DEC-095), **NPC-023** ambulância e **NPC-024** paramédicos (DEC-091).
 - Orçamento: veículos ganham **teto próprio**; Opal sai do teto de 12 (proposta para Q-091 a); paramédicos são atores visuais.

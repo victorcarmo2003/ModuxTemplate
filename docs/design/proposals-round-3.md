@@ -18,7 +18,7 @@ Formato para decisão rápida: cada pergunta tem título curto, 2–3 opções d
 > | Q-154 | **C (humor dinâmico completo)** | DEC-187 | **não** (rec. B); desenho em `Q-164` |
 > | Q-149-a | **B (jogável pode ser cliente)** | DEC-188 | **não** (rec. A); lacuna em `Q-165` |
 > | Q-149-b | A (espécies fixas + acessório) | DEC-188 | sim |
-> | Q-149-c | **B (porco cliente normal)**, a confirmar | DEC-192 | **não** (rec. A) |
+> | Q-149-c | **B (porco cliente normal)**, confirmado | DEC-192, DEC-214 | **não** (rec. A) |
 >
 > Sem efeito por essas escolhas: §2 tabela de humor de chegada e regras da B; §3 tabela "Grupo" (jogáveis e porco também podem ser cliente) e o critério "nenhum cliente com `playable = true`". A regra "Pack Mid nunca em NPC" (§2) já caiu por DEC-181.
 

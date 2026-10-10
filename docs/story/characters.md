@@ -19,6 +19,8 @@ Aparência pensada para R6: leitura por **silhueta, cor, chapéu e acessório**,
 
 > **DEC-202 a DEC-206 (2026-10-10, `Q-160` parte, `Q-143`):** espécies definidas — **CHR-001 Walt = tartaruga** (animação **corcunda**, **bastão de madeira**, **barba branca low poly**, **textura com rugas**; DEC-202); **CHR-003 Opal = coruja**, **CHR-005 Mr. Pickett = rato**, **CHR-006 Raincoat Lady = sapo** (DEC-203). Distinção por roupa/acessório fixo de cada ficha (Provisório); sinais de `anomalies.md` não mudam. **Walker e CHR-008 médicos** seguem em `Q-160`. **Logo** do Bramble's = o **hot dog cartoon do avental** atual (DEC-206): onde abaixo se lê "salsicha sorridente", vale esse desenho. Aparências humanas abaixo seguem sem valor (DEC-178); reescrita → narrative-writer.
 
+> **DEC-211 a DEC-213 (2026-10-10, fecham `Q-160` e `Q-104`):** **Walker (ANM-007) = silhueta própria**, que não lembra nenhuma das 18 espécies; art-director propõe (DEC-212). **CHR-008 médicos = coelho alto (`Medic_A`) + panda baixo (`Medic_B`)**, animais da crew com **roupa de paramédico** (não o uniforme do Bramble's), tom fofo (DEC-211). Rosto **sempre `Exhausted`** ("eles precisam parecer cansados") + **máscara cirúrgica** sobre a boca, acessório ou textura a critério do art-director (DEC-213). Na ficha CHR-008 abaixo, "máscara cirúrgica" sai dos proibidos e "boca sempre visível" não vale para os médicos. Falas em balão não mudam.
+
 | ID | Nome | Papel | Aparece |
 |---|---|---|---|
 | CHR-001 | Walt Bramble | o chefe | **só por telefone** durante a run; em pessoa **uma vez**, na cutscene do amanhecer da 10ª noite (DEC-075, DEC-076) |
