@@ -109,9 +109,30 @@ Caminhos dos packs (abreviados nas fichas):
 | AST-075 | Props da cutscene de abertura (carteira, mariposa, pombos) | story | P2 | Modelar | — | Rascunho |
 | AST-076 | Médicos da ambulância — Bellmoor Rescue crew (CHR-008, NPC-024) | character | P1 | Plataforma + Modelar | — | Rascunho |
 | AST-077 | ~~Semáforo (carro + pedestre) e faixa de pedestre~~ | street | — | — | — | **Obsoleto** (DEC-130) |
+| AST-078 | Balcão externo do trailer (Counter no trailer, 3 níveis) | equipment | P1 · onda 2 | Pack + edição | `KP/kitchencounter_straight_B.fbx`, `KP/chair_stool.fbx`, `CC/detail-awning.fbx` | Rascunho |
+| AST-079 | Lâmpada básica do trailer (DEC-189) | equipment | P1 · onda 2 | Modelar | — | Rascunho |
+| AST-080 | Ambientação do interior do trailer | equipment | P2 · onda 2 | Pack | `KP/shelf_papertowel_decorated.fbx`, `KP/papertowel.fbx`, `KP/towelrail.fbx`, `KP/jar_*_small.fbx`, `KP/dishrack.fbx` | Rascunho |
+| AST-081 | Kit de acessórios de cliente (DEC-188) | character | P0 · onda 2 | Modelar | — | Rascunho |
+| AST-082 | Moeda (pagamento, gorjeta, `Coin_Blank`) | vfx | P1 · onda 2 | Modelar | — | Rascunho |
+| AST-083 | Kit de luz de rua: poça, cone, arandela | street | P1 · onda 2 | Modelar + 2D | — | Rascunho |
+| AST-084 | Pós-processo: dia, noite, escuro e sanidade | vfx | P1 · onda 2 | Código + 2D | — | Rascunho |
+| AST-085 | Alucinações de sanidade baixa | vfx | P1 · onda 2 | Modelar + código | — | Rascunho |
+| AST-086 | Retratos de faixa de sanidade (HUD) | ui | P1 · onda 2 | Render | renders do AST-053 | Rascunho |
+| AST-087 | Jornal de espreita do Quick Quentin | character | P1 · onda 2 | Modelar | — | Rascunho |
+| AST-088 | Plataforma de party do lobby (DEC-179) | equipment | P1 · onda 2 | Pack + edição | `KP/plate.fbx`, `KP/menu.fbx`, `AST-019_QueueMark` | Rascunho |
+| AST-089 | Cenário do lobby (kit modular) | street | P1 · onda 2 | Pack | AST-026, 032, 033, 034, 036; `KP/kitchencounter_straight_A.fbx`, `CC/detail-awning.fbx` | Rascunho |
+| AST-090 | Vitrine de classes "Crew" (lobby) | equipment | P1 · onda 2 | Pack + edição | `KP/pillar_B.fbx`, `AST-020_Padlock` | Rascunho |
+| AST-091 | UI kit (painéis, botões, cartões, barras) | ui | P0 · onda 2 | 2D | — | Rascunho |
+| AST-092 | VFX de cozinha e loja | vfx | P1 · onda 2 | 2D + código | — | Rascunho |
+| AST-093 | Placa PARE e linha de parada | street | P1 · onda 3 | Pack + edição | `CR/road-sign-stop.fbx` | Rascunho |
+| AST-094 | Porta-guardanapos do trailer (ANM-009) | equipment | P2 · onda 3 | Modelar | ref. `KP/papertowel.fbx` | Rascunho |
+| AST-095 | VFX de anomalias | vfx | P1 · onda 3 | 2D + código | — | Rascunho |
+| AST-096 | Item no chão: marcador, "splat", derramado | vfx | P1 · onda 3 | 2D + código | — | Rascunho |
+| AST-097 | Logo do jogo, ícone e thumbnails | ui | P1 · onda 4 | 2D + render | — | Rascunho |
 
 Totais: **77 IDs**, **76 fichas ativas** (AST-001 a AST-038 existentes, revistas; AST-039 a AST-075 da 1ª conciliação; AST-076 e AST-077 da 2ª revisão; **AST-077 Obsoleto** por DEC-130).
 Usam pack: **25** (4 direto, 21 com edição). Plataforma R6 + acessórios: **9**. Modelar / 2D / animação do zero: **43**. (DEC-138: AST-017, 018, 019, 024 passaram de Modelar para Pack + edição; antes 21 / 47.) DEC-140: AST-025 passou de Modelar para Pack + edição ("Trashcan" by Kenney via Poly Pizza, fora dos packs de `Assets/`) — usam pack **26** (4 / 22); Modelar **42**.
+**Levantamento pós-onda 1 (art-director, 2026-10-10):** fichas novas **AST-078 a AST-097** (20, todas **Rascunho**) e complementos de onda/dono/orçamento nas fichas antigas ainda abertas. Seção "Levantamento pós-onda 1" no fim do documento. Totais: **97 IDs**, **96 fichas ativas** (AST-077 Obsoleto).
 Mapeamento Kenney/KayKit por ficha (DEC-136, Rascunho): `asset-sourcing.md`. As entradas "→ sourcing:" na coluna "Arquivo de pack" vêm de lá; Origem e Status não mudaram.
 **DEC-137 (2026-10-09):** comida aprovada — AST-001 a AST-011 e AST-061 em **Aprovado**, com o candidato do sourcing como arquivo de origem (fila do `modeler-3d`). Demais fichas seguem Rascunho. `Q-133` (limite de atlases) segue aberta.
 **DEC-138 (2026-10-10):** equipamentos aprovados após o teste em `workspace.__ImportTest_Equip` — AST-014, 015, 017, 018, 019, 024, 040, 041, 049 em **Aprovado** com o candidato KP/MM como origem (partes sem candidato seguem para modelar no estilo). Banqueta `KP/chair_stool` com **assento plano** em todo uso. **AST-012**: candidato fogão KayKit **recusado**; vira **roller grill** modelada (Steel + painel Ketchup, sem marca), Aprovado na direção; silhueta em reescrita pelo art-director; níveis em `Q-134`.
@@ -1037,12 +1058,372 @@ Pendência para o narrative-writer: `script.md` §3 (tutorial) e §4 falam em "l
 
 ---
 
+## Levantamento pós-onda 1 (2026-10-10)
+
+Autor: art-director. Base: `features.md` (FEAT-001 a 036), `story/` (anomalies Aprovado, script, ending, world, characters), `MAP-01.md`, `decisions.md` até a **DEC-215**, `tasks/board.md` ("Ondas seguintes") e `tools/assetplace/MAP-01_placements.luau` (lista de peças sem asset).
+Tudo nesta seção é **Rascunho**. Nada vai à fila do `modeler-3d` sem DEC do usuário (regra do topo).
+
+**Ondas** = as do `tasks/board.md` (task-planner, sobre a arquitetura do architect; `architecture.md` cita onda 2 = trailer e noite):
+- **Onda 2 — Noite e meta:** sanidade e faixa visual, escuro e `LightZone`, interruptor e lâmpada básica, café, compra e troca do trailer, ligações do chefe, ladrão, humor, passantes, **lobby com plataformas e party**, gemas.
+- **Onda 3 — Anomalias e rua:** ANM-001 a ANM-010, alucinações de anomalia, trânsito com PARE, atropelamento, item no chão.
+- **Onda 4 — Queda e monetização:** desmaio, ambulância e médicos, reviver, spectate, Revive Kit, Robux, cutscenes de intro e final.
+Diferença para a sugestão padrão (lobby na onda 4): o board põe **lobby e party na onda 2**; segui o board.
+
+**Dono:** `modeler-3d` (malha, textura, render, rig) · **VFX em código** (`frontend-coder`: emissores, `Beam`, pós-processo; a textura da partícula vem do modeler-3d) · **UI** (`frontend-coder` monta em Vide; desenho e folha 2D pelo art-director/modeler-3d).
+
+**Fonte, em ordem de preferência:** pack já no repositório (KP, FP, CK, CR, CC, CS, MM) → peça já modelada do projeto → modelar no estilo. Nenhum asset de terceiros novo é pedido nesta rodada; se algum entrar, a licença vai para `credits.md` **antes** do arquivo.
+
+### Fichas novas
+
+#### AST-078 — Balcão externo do trailer (Counter no trailer, 3 níveis)
+
+- **Status:** Rascunho · **Prioridade:** P1 · **Onda:** 2 · **Dono:** modeler-3d · **Origem:** Pack + edição — tampo `KP/kitchencounter_straight_B.fbx` (mesmo do interior do AST-027), escoras e dobradiça modeladas; banquetas `KP/chair_stool.fbx` com assento plano (DEC-138); toldo `CC/detail-awning.fbx` recolor Ketchup Faded/Cream; pedestais e marcas = `AST-019_QueuePost` / `_QueueMark` (já aprovados, DEC-141).
+- **Por que ficha nova:** os níveis do AST-019 são do carrinho (L3 em L com toldo próprio). O trailer começa no **nível 1** com peças próprias (**DEC-184**) e o balcão dele é a prateleira dobrável **externa** sob a janela de serviço, X 48–54 (MAP-01 §7.2).
+- **Níveis:** `TrailerCounter_L1` prateleira curta 3 L com 2 escoras · `_L2` prateleira 6 L + 2 banquetas · `_L3` prateleira 6 L + toldo extra + pedestais com corda até Q5.
+- **Dimensões:** prateleira 1,2 de profundidade, topo **no peitoril** da janela (3,5 do piso interno; conferir com o level-designer a altura de `Att_Serve` em relação ao cliente na calçada).
+- **Cores:** Steel com friso Ketchup Faded; toldo Ketchup Faded/Cream (mesma marca desbotada do trailer).
+- **Encaixes:** `Att_Serve`, `Queue1`…`Queue5`, `VFX_Upgrade`. **Pivô:** base-centro, rente à parede do trailer.
+- **Tris:** 300–900 por nível (§9.1 "peça visível de upgrade", teto 800 sem as banquetas).
+
+#### AST-079 — Lâmpada básica do trailer (luminária de fábrica, DEC-189)
+
+- **Status:** Rascunho · **Prioridade:** P1 · **Onda:** 2 · **Dono:** modeler-3d · **Origem:** Modelar (nenhum pack tem luminária de teto).
+- **Uso:** luz de fábrica do trailer (**DEC-189**), ligada ao interruptor AST-039; é o volume LZ-3 do interior. Pisca e apaga na noite perdida (FEAT-026), apaga 3 s no sabor da ANM-008 (DEC-195), fica apagada no Hush (FEAT-020).
+- **Dimensões:** plafon oval 1,6 × 0,8 × 0,4, no teto, sobre o corredor; encaixa no `Light_Interior` do AST-027.
+- **Silhueta:** luminária antiga de grade grossa (barras ≥ 0,2) com a lâmpada `Neon` visível por baixo; lê "lâmpada velha de trailer" no escuro.
+- **Cores:** Steel; difusor Cream translúcido (0,4); lâmpada Neon `#FFE7C2`.
+- **Estados:** `On`, `Off`, `Flicker` (script). **Encaixes:** `Light_Interior` (SpotLight com sombra, a única com sombra do trailer, §5.1).
+- **Tris:** ≤ 300.
+
+#### AST-080 — Ambientação do interior do trailer
+
+- **Status:** Rascunho · **Prioridade:** P2 · **Onda:** 2 · **Dono:** modeler-3d · **Origem:** Pack direto — `KP/shelf_papertowel_decorated.fbx`, `KP/papertowel.fbx`, `KP/towelrail.fbx`, `KP/jar_A_small.fbx`, `KP/jar_C_small.fbx`, `KP/dishrack.fbx`; pacotes AST-011 (Coffee, Buns) instanciados como estoque de reserva visual.
+- **Uso:** só cenário, para o interior não parecer vazio à noite. Sem prompt, colisão desligada.
+- **Regras:** decorativo Sat ~55%; nada em cinza-azulado (ANM-002); **nenhuma pista nova** (as pistas são só AST-068 e `ending.md` §3); nada encostado nas estações nem nos 4 pontos "Hide" (AST-041).
+- **Tris:** ≤ 1.500 somado (instâncias da mesma malha).
+
+#### AST-081 — Kit de acessórios de cliente (DEC-188)
+
+- **Status:** Rascunho · **Prioridade:** P0 (pendência da onda 1: TASK-006 importa "acessórios de cliente que existirem" e não existe nenhum) · **Onda:** 2 · **Dono:** modeler-3d · **Origem:** Modelar no estilo (nenhum pack tem acessório de personagem; `MM/character-employee` fora, DEC-089). UV no atlas KitchenPack, como orelhas e caudas, para herdar `T_Atlas_Kitchen_Mid/Night` (DEC-154, DEC-166).
+- **Uso:** tipo de cliente = espécie fixa + acessório, roupa civil sorteada (**DEC-188**; `content-data.md` `CustomerTypes.Accessories`). Substitui a lista de acessórios do AST-054 (que era para corpo humano R6).
+
+  | Peça | Tipo (NPC) | Attachment | Medida | Tris |
+  |---|---|---|---|---|
+  | `Acc_Badge` | crachá de escritório no peito **esquerdo** (NPC-001) | `BodyFrontAttachment` | cartão 0,5 × 0,7 | ≤ 80 |
+  | `Acc_Briefcase` | pasta na mão **direita** (NPC-001; Pickett, AST-055) | `RightGripAttachment` | 1,2 × 0,9 × 0,3 | ≤ 250 |
+  | `Acc_Backpack` | mochila (NPC-002) | `BodyBackAttachment` | 1,4 × 1,6 × 0,7 | ≤ 400 |
+  | `Acc_Headphones` | fone de arco (NPC-003) | `HatAttachment` + offset por espécie | arco sobre a cabeça, conchas de 0,5 | ≤ 250 |
+  | `Acc_HardHat` | capacete com furo de orelha, como `AST-053_CrewCap_EarsUp` (NPC-004) | `HatAttachment` | aba 0,3 | ≤ 300 |
+  | `Acc_SafetyVest` | colete por cima da roupa (NPC-004) | `BodyFrontAttachment` | casca do tronco +0,05 | ≤ 300 |
+  | `Acc_Cane` | bengala na mão **direita** (NPC-005) | `RightGripAttachment` | 2,6 A | ≤ 150 |
+  | `Acc_NightBadge` | crachá de plantão grande, Teal, peito **direito** (NPC-006) | `BodyFrontAttachment` | 0,7 × 0,9 | ≤ 120 |
+
+- **Leitura:** cada peça reconhecível pela silhueta a 10 studs; todo acessório de lado fixo marca a assimetria que a ANM-004 inverte (AST-062).
+- **Cores:** Sat ~55%; capacete Mustard (detalhe de cabeça é permitido, §2.4); colete laranja suave com faixas Cream, **nunca** o amarelo `#F2C230` da Raincoat Lady; nada `#14162A`.
+- **Encaixe por espécie:** tabela de offsets `Assets/blender/character/AST-081_offsets.json` (capacete e fone mudam com a cabeça de cada espécie de cliente; espécies jogáveis como cliente seguem `Q-165`).
+- **Variantes:** versão do lado oposto para a cópia (ANM-004) = troca de attachment; malha espelhada só onde a peça é assimétrica.
+- **Tris:** por peça na tabela; personagem montado segue DEC-164 (≈ 2,0–2,5k).
+
+#### AST-082 — Moeda (pagamento, gorjeta, `Coin_Blank`)
+
+- **Status:** Rascunho · **Prioridade:** P1 · **Onda:** 2 · **Dono:** modeler-3d (malha) + VFX em código (tween/emissão) · **Origem:** Modelar (nenhum pack tem moeda solta).
+- **Uso:** VFX de pagamento (4 moedas saltam até a gaveta, §10), gorjeta (+1 moeda com brilho), `Coin_Blank` da ANM-001 (moeda sem desenho, DEC-195), base do ícone de moeda (AST-071).
+- **Dimensões:** 0,4 Ø × 0,08, borda grossa chanfrada.
+- **Peças:** `Coin` (face com o contorno do hot dog do logo em **relevo raso**, DEC-206) · `Coin_Blank` (mesma borda, face **lisa**).
+- **Cores:** Mustard, borda Cream. Gorjeta: mesmo Mustard + brilho; **não usar Gold** (Gold é exclusivo do AST-051, §2.1; o "moeda dourada" do §10 fica lido como Mustard brilhante).
+- **Encaixes:** pivô no centro. **Tris:** ≤ 80 cada.
+
+#### AST-083 — Kit de luz de rua: poça, cone e arandela
+
+- **Status:** Rascunho · **Prioridade:** P1 · **Onda:** 2 · **Dono:** modeler-3d (arandela + texturas) + VFX em código (`Beam`, decal) · **Origem:** Modelar + 2D.
+- **Uso:** escuro e zonas de luz (FEAT-020). Lâmpada `Neon` + **poça falsa** nos postes sem luz real (`On_Fake` do AST-036, §5.3); cone curto dos faróis (AST-035) e farol alto frio (AST-065); marcos de luz fora da Juniper.
+- **Peças:** `T_LightPool` 256² (disco Cream de borda suave, alpha), `T_LightCone` 128 × 256 (gradiente para `Beam`), `Wall_Sconce` (arandela de fachada 0,6 × 0,8 × 0,5 com Neon pequena) para portas D1, SP-B e entrada do banco.
+- **Regras:** **sem luz real** nas arandelas (§5.1); nenhuma arandela na Juniper (a fila de lâmpadas é do Walker, ANM-007); nenhuma luz coral (exclusiva do Mart, §2.4); nada na rota Pad ↔ Mart vira volume de luz (**DEC-196**).
+- **Lanterna de mão:** fora do MVP (DEC-055). Não entra.
+- **Tris:** arandela ≤ 150; texturas sem malha.
+
+#### AST-084 — Pós-processo: dia, noite, escuro e sanidade
+
+- **Status:** Rascunho · **Prioridade:** P1 · **Onda:** 2 · **Dono:** VFX em código (frontend-coder; valores do art-director) + modeler-3d (1 textura `T_Vignette` 512²) · **Origem:** código + 2D.
+- **Base:** presets do style guide §5.2 (dia, hora dourada) e §5.3 (Noite 1 → Noite 10 interpolada; amanhecer de 6 s). Camada por jogador, **só no client dele** (DEC-038):
+
+  | Estado | Efeito |
+  |---|---|
+  | No escuro (> 3 s fora de `LightZone`) | vinheta 25% entra em 1 s; Saturation −0,10 |
+  | Sanidade < 60 | vinheta 20% |
+  | Sanidade < 40 | vinheta 35%; Saturation −0,15; Tint mais frio |
+  | Sanidade < 25 | vinheta pulsando devagar (0,5 Hz); `Blur` ≤ 4 por ≤ 0,5 s, raro |
+  | Desmaio | bordas escurecem + `Blur` 4 em 1,5 s → tela escura (`script.md` §9.1) |
+  | Hush (ANM-010) | `Atmosphere.Density` +0,15 por ~20 s |
+  | Noite perdida | fade preto 1 s (FEAT-026) |
+
+- **Regras:** sem vermelho, sem tremor forte, sem `Blur` grande (§10); a troca de pack da skin pela faixa (DEC-167) é **instantânea, sem VFX** — esta ficha mexe só na tela do próprio jogador.
+- **Tris:** —. **Textura:** 1 × 512².
+
+#### AST-085 — Alucinações de sanidade baixa
+
+- **Status:** Rascunho · **Prioridade:** P1 · **Onda:** 2 · **Dono:** modeler-3d (`Shadow_Card`) + VFX em código · **Origem:** Modelar + reuso.
+- **Uso:** tabela do `script.md` §8 / FEAT-019, só no client, sem prompt, nunca conta como anomalia.
+
+  | Alucinação | Asset |
+  |---|---|
+  | Telefone toca, legenda "Walt: ..." | AST-042 estado `Ringing` local |
+  | Chiado numa grelha vazia | áudio |
+  | Passos no teto, sussurro "Rookie..." | áudio |
+  | Cliente na fila que some | rig de cliente (AST-053/081) no pack Night, local |
+  | Poste da Juniper pisca **sem zumbido** | AST-036 `Flicker` local |
+  | Letreiro do Mart pisca uma vez | AST-028 `Sign_Open24` local |
+  | Sombra na janela dos fundos / vulto na periferia | **`Shadow_Card`** (novo) |
+
+- **`Shadow_Card`:** 2 planos cruzados 2,5 × 5 com `T_ShadowFigure` 256² (alpha): silhueta lisa de **crew genérica** (cabeça redonda, orelhas pequenas redondas), cor `#2B2233`, altura normal (5). Não pode lembrar o Walker (`#14162A`, alto, chapéu: §2.4).
+- **Tris:** `Shadow_Card` ≤ 40.
+
+#### AST-086 — Retratos de faixa de sanidade (HUD)
+
+- **Status:** Rascunho · **Prioridade:** P1 · **Onda:** 2 · **Dono:** modeler-3d (render) → UI · **Origem:** render dos personagens AST-053.
+- **Uso:** **DEC-167**: retrato do rosto da faixa ao lado do medidor de sanidade. High = pack Day + `Normal`; Mid = pack Mid + `Exhausted`; Low = pack Night + `Normal_Night`. O retrato High também serve de ícone de classe (AST-071, tela "Crew").
+- **Quantidade:** 6 espécies jogáveis do MVP (Dog, Rabbit, Cat, Bear, Fox, Owl; DEC-186) × 3 = **18**; Panda e Lion (1ª atualização) +6 depois.
+- **Formato:** 128² cada, folha `T_UI_Portraits` 1024²; câmera 3/4 frontal, fundo transparente, luz chapada igual para todos, contorno 4 px `#2B2233`.
+
+#### AST-087 — Jornal de espreita do Quick Quentin
+
+- **Status:** Rascunho · **Prioridade:** P1 · **Onda:** 2 (ladrão) · **Dono:** modeler-3d · **Origem:** Modelar (nenhum pack tem jornal).
+- **Uso:** espreita disfarçada (AST-056; clipe `Thief_Lurk` do AST-069) no banco de praça e no poste; some quando ele vai à gaveta; o saco AST-021 aparece na fuga. Também serve de "jornal de vagas amassado" da intro (AST-075, variante `Newspaper_Crumpled`).
+- **Dimensões:** aberto 1,6 × 1,1, dobra central em V, papel com espessura 0,05.
+- **Cores:** papel Cream; manchete e colunas por decal (AST-072; título do jornal com o narrative-writer, sem marca real).
+- **Encaixes:** `Handle` no `RightGripAttachment`. **Tris:** ≤ 120 (amassado ≤ 150).
+
+#### AST-088 — Plataforma de party do lobby (DEC-179)
+
+- **Status:** Rascunho · **Prioridade:** P1 · **Onda:** 2 · **Dono:** modeler-3d · **Origem:** Pack + edição — disco `KP/plate.fbx` escalado (prato gigante, tema da casa), quadro `KP/menu.fbx` (mesmo cavalete do AST-024), 4 marcas de pé = `AST-019_QueueMark`.
+- **Uso:** pisar = entrar na party (**DEC-179**); 1–4 jogadores (DEC-012); contagem e "Start" (FEAT-001). Número de plataformas e posição: documento do lobby (`Q-085`, level-designer).
+- **Dimensões:** disco Ø 12 × 0,6; quadro 2 × 4; marcas Ø 2.
+- **Cores:** disco Cream com borda Ketchup; marcas Mustard → Neon Mustard quando ocupadas; anel Neon Teal na contagem.
+- **Estados:** `Empty`, `Partial` (n/4), `Countdown` (anel gira), `Launching` (poof).
+- **Encaixes:** `Slot_1`…`Slot_4`, `Board_Anchor` (`SurfaceGui` com nomes e contagem), `Zone_Party`, `VFX_Launch`.
+- **Tris:** ≤ 1.200 montado.
+
+#### AST-089 — Cenário do lobby (kit modular)
+
+- **Status:** Rascunho · **Prioridade:** P1 · **Onda:** 2 · **Dono:** modeler-3d (montagem, com o level-designer) · **Origem:** Pack + peças já aprovadas — rua e calçada AST-032, fachadas e `BG_Card` AST-033, mobiliário AST-034, postes AST-036, carrinho AST-026 como peça de vitrine (só a casca), quiosque `KP/kitchencounter_straight_A.fbx` + `CC/detail-awning.fbx`.
+- **Proposta (Provisória):** praça de Bellmoor **de manhã**, sempre dia, tom da intro (DEC-008: nada de horror no lobby). Área das plataformas sob um arco com "BRAMBLE'S CREW" (decal AST-072); quiosque "Crew" ao lado da vitrine de classes (AST-090).
+- **Peças novas:** `Lobby_Floor` (piso de praça 8 × 8, Cream, ≤ 50 tris), `Lobby_Arch` (arco 16 L × 10 A, Ketchup/Cream, ≤ 600 tris).
+- **Orçamento da cena:** ≤ 120 mil tris; ≤ 80 malhas únicas; luzes 0–2 (dia).
+- **Depende de:** `MAP-00` / `Q-085` (layout do level-designer).
+
+#### AST-090 — Vitrine de classes "Crew" (lobby)
+
+- **Status:** Rascunho · **Prioridade:** P1 · **Onda:** 2 · **Dono:** modeler-3d · **Origem:** Pack + edição — pedestal de `KP/pillar_B.fbx` cortado (base redonda 3 Ø × 1); cadeado `AST-020_Padlock` reaproveitado (DEC-155); placa por `SurfaceGui`.
+- **Uso:** escolher a classe na tela "Crew" (DEC-186): 8 pedestais (6 MVP + Panda e Lion "coming soon"), cada um com o animal no uniforme da crew (AST-053), clipe `Lobby_ShowIdle`. **Guaxinim nunca** (DEC-186).
+- **Estados:** `Unlocked`, `Locked` (cadeado Mustard no pedestal + preço em gemas), `Selected` (anel Neon Mustard).
+- **Encaixes:** `Att_Character`, `Label_Anchor`, `Prompt_Choose`. **Tris:** pedestal ≤ 300; personagem DEC-164.
+
+#### AST-091 — UI kit (painéis, botões, cartões, barras)
+
+- **Status:** Rascunho · **Prioridade:** P0 · **Onda:** 2 (a onda 1 já usa `ProgressBar`, `PromptBillboard`, `Toast` da TASK-013 sem folha própria) · **Dono:** UI (frontend-coder monta em Vide) + art-director (desenho) · **Origem:** 2D.
+- **Folha:** `T_UI_Kit` 1024², peças em 9-slice:
+  - Pílula de HUD (raio 50%, `#2B2233` a 70%, texto branco com contorno 2 px) — dinheiro, dia/noite, horário.
+  - Cartão Cream `#FFF1D6` com sombra curta — resumo do turno, oferta de reviver, fim de run, tela "Crew".
+  - Botões: primário Mustard (texto `#2B2233`), secundário Cream, desabilitado `#8A8FA3`, pressionado escala 0,95. **Sem vermelho.** Botão de Robux: pílula Teal com o **ícone oficial da plataforma** (não redesenhar).
+  - Barra de sanidade: trilho `#2B2233`, preenchimento `#FFD45A` → `#6A5ACD` (§7.2), retrato AST-086 à esquerda.
+  - Barras no mundo: `CookInterface` (laranja → verde) e barra do ladrão `#6A5ACD` (§7.3).
+  - Anéis: paciência do balão e contagem de 10 s (Mustard).
+  - Balão de pedido (com rabicho) e balão de fala menor.
+  - Selo de nota A–D (cores §7.4).
+  - Toast (topo direito), "Skip (1/2)", setas de spectate, rótulo "Watching".
+  - Cartão de classe (retrato, nome, bônus, contrapeso, preço em gemas, cadeado).
+- **Fontes:** Fredoka One (títulos, números) e Builder Sans Bold (§7.1). Alvo de toque ≥ 44 px; texto ≥ 3,5% da altura da tela.
+- **Proibido:** vermelho de alerta, caveira, coração de vida, layout ou ícone de outro jogo.
+
+#### AST-092 — VFX de cozinha e loja
+
+- **Status:** Rascunho · **Prioridade:** P1 · **Onda:** 2 · **Dono:** modeler-3d (folha `T_VFX_Kitchen` 512², células 128² e flipbook 4 × 4) + VFX em código · **Origem:** 2D + código.
+- **Efeitos (style guide §10):**
+
+  | Efeito | Visual | Orçamento |
+  |---|---|---|
+  | Fumaça da grelha | fiapo cinza-claro quente, sobe e some | Rate 3 por vaga ocupada, Lifetime 1,2 s; desliga em qualidade baixa |
+  | Vapor | 2 fiapos brancos na salsicha pronta e no café (AST-010/022) | Rate 1 |
+  | Brilho de pronto (`ReadyVFX`) | 10 estrelinhas Mustard/branco + sino | `Emit(10)` |
+  | Pagamento | 4 moedas AST-082 em tween até a gaveta + "+$7" subindo | `Emit(4)` |
+  | Gorjeta | +1 moeda Mustard com brilho (não Gold) | `Emit(1)` |
+  | Molho | 6 gotinhas da cor do molho | `Emit(6)` |
+  | Restock | lufada de poeira clara | `Emit(5)` |
+  | Upgrade instalado | confete 14 peças + pop de escala 0,9 → 1,05 → 1 | `Emit(14)` |
+  | "Nice catch!" | poeira na fuga do Quentin | `Emit(6)` |
+
+- **Texturas:** estrela, fiapo (flipbook), gota, poeira, confete (4 formas), brilho.
+- **Teto:** ≤ 150 partículas na tela, ≤ 8 emissores perto da câmera (§9.2).
+
+#### AST-093 — Placa PARE e linha de parada (Juniper Norte e Sul)
+
+- **Status:** Rascunho · **Prioridade:** P1 · **Onda:** 3 · **Dono:** modeler-3d · **Origem:** Pack + edição — `CR/road-sign-stop.fbx` (antes fora do sourcing por falta de ficha); linha de parada = peça `Stop_Line` do AST-032.
+- **Uso:** **DEC-133**: braços da Juniper com PARE (PARE-N, PARE-S; MAP-01 §5.4 e P38). O carro para 1 s na linha.
+- **Dimensões:** placa octogonal Ø 2,0 no topo de poste de 7 A (poste `#4B4F63`, família do AST-036).
+- **Cores:** placa Ketchup, borda e texto Cream; texto "STOP" por decal (AST-072, inglês, DEC-022), sem texto modelado. Octógono é convenção genérica; nenhuma placa de país ou marca específica.
+- **Encaixes:** `Stop_Line_Anchor`. **Tris:** ≤ 300.
+
+#### AST-094 — Porta-guardanapos do trailer (ANM-009)
+
+- **Status:** Rascunho · **Prioridade:** P2 · **Onda:** 3 · **Dono:** modeler-3d · **Origem:** Modelar (volume de referência `KP/papertowel.fbx`).
+- **Uso:** no balcão do trailer, perto da janela; sabor da ANM-009 (guardanapos voam para dentro; entra pela DEC-195). De resto, cenário.
+- **Dimensões:** 0,8 × 0,5 × 0,7; pilha de guardanapos como peça `Fill`.
+- **Cores:** Steel; guardanapos Cream.
+- **Encaixes:** `VFX_Napkins`. **Tris:** ≤ 200.
+
+#### AST-095 — VFX de anomalias
+
+- **Status:** Rascunho · **Prioridade:** P1 · **Onda:** 3 · **Dono:** modeler-3d (folha `T_VFX_Anomaly` 512²) + VFX em código · **Origem:** 2D + código.
+- **Por anomalia** (só efeitos que entram pela **DEC-195**; "chuva no trailer" e "pedidos esfriam" dependem da classificação do game-designer):
+
+  | ANM | Efeito | Textura / peça |
+  |---|---|---|
+  | 001 | balão vazio (UI) + `Coin_Blank` | AST-082 |
+  | 002 | puff curto ao surgir no trilho; fumaça cinza-clara quando o cliente morde (`Emit(8)`, 0,8 s) | fiapo do AST-092 tingido |
+  | 003 | nenhum VFX: ponteiros param por script (AST-044), tique-taque some (áudio) | — |
+  | 004 | nenhum VFX: sorriso parado (expressão) e andar de costas (clipe) | — |
+  | 005 | pingos azul-claros (Rate 4) + poça que cresce até Ø 2,5; poof de gotas no final; chuva 14 × 16 por 20 s sobre o trailer se classificada | gota, `T_Puddle` 256² |
+  | 006 | janela `Lit` (AST-045); +2 janelas acesas por 5 s no sabor | — |
+  | 007 | poste `Flicker` a cada passo; **nada** no personagem | — |
+  | 008 | farol alto: `Beam` frio (`T_LightCone`, AST-083) + SpotLight real; pisca 2× | — |
+  | 009 | porta `Ajar` (AST-066) + 6 guardanapos voando (AST-094) + 3 fiapos azulados de vento | guardanapo |
+  | 010 | névoa baixa (AST-067) + postes `Off_Hush` | — |
+
+- **Regra:** nenhum VFX aponta o alvo (§4.4: "sei que tem algo errado, mas não sei o quê"). O pack Night de "clima de anomalia" (DEC-181) é troca de textura, não VFX.
+
+#### AST-096 — Item no chão: marcador, "splat" e derramado
+
+- **Status:** Rascunho · **Prioridade:** P1 · **Onda:** 3 · **Dono:** modeler-3d (texturas) + VFX em código · **Origem:** 2D + código.
+- **Uso:** FEAT-036. Pacote e Rescue Whistle no chão usam **a própria malha**; Hot Dog e café se perdem em 2 s.
+- **Peças:** `T_DropRing` 256² (anel Cream com borda Mustard, decal plano sob o item, pulsa devagar; substitui o "contorno leve" sem `Highlight` permanente, §1.1) · `T_Splat_HotDog` (estrela cômica Mustard com pingos Ketchup claros, 2 s; nada vermelho-escuro, §10) · `T_Spill_Coffee` (mancha Coffee, 2 s).
+- **Queda:** quique 1× (física) + mini poeira (AST-070).
+- **Tris:** — (decais).
+
+#### AST-097 — Logo do jogo "Sell Hotdogs!", ícone e thumbnails
+
+- **Status:** Rascunho · **Prioridade:** P1 · **Onda:** 4 (lançamento) · **Dono:** art-director (direção) + modeler-3d (render das cenas) · **Origem:** 2D + render.
+- **Uso:** nome oficial **DEC-170**. Logo para lobby, tela de título e créditos; ícone do jogo 512²; 3 thumbnails 1920 × 1080.
+- **Conteúdo proposto:** logo tipográfico próprio, letras arredondadas grossas (sem fonte-assinatura de terceiros), com o hot dog do avental (**DEC-206**). Ícone: o cachorro da crew (CLS-001) segurando um hot dog, metade do quadro de dia e metade de noite. Thumbnails: (1) party servindo a fila de dia; (2) trailer como ilha de luz na esquina à noite, sem mostrar anomalia; (3) a crew alinhada no lobby.
+- **Regras:** nada que lembre logo, mascote ou thumbnail de outro jogo ou marca; texto em inglês; classificação Mild (DEC-172).
+
+### Complementos de fichas existentes (onda, dono, orçamento, fonte)
+
+Só acrescenta; não muda texto aprovado. Fichas Rascunho seguem precisando de DEC para ir ao modelador.
+
+| AST | Onda | Dono | O que falta / proposta (Provisória) | Orçamento |
+|---|---|---|---|---|
+| AST-012 Grill | 2 (trailer começa no L1, DEC-184) | modeler-3d | **Silhueta reescrita (DEC-201):** mesma máquina, mais rolos — L1 3 rolos (2 vagas), L2 4 (3), L3 5 (4), rolos a 0,9 entre centros; L3 ≈ 4,5 L, cabe nos 5 L do carrinho (`Q-134` c fechado do lado da arte); no trailer, a mesma máquina centrada nos 6 L. Gaveta aquecedora só cenário. Steel + painel Ketchup, sem marca | 600–1.200 por nível |
+| AST-021 Saco de moedas | 2 | modeler-3d | `FP/bag.fbx` com boca **amarrada** (ajuste de malha) + 2–3 moedas AST-082 saindo + "$" por decal | ≤ 300 |
+| AST-043 Lona do carrinho | 2 | modeler-3d | **DEC-199**: carrinho coberto na vaga onde estava o trailer (`TRL-SALE`). Ficha completa como está (26 × 4 × 4, Mint-gray, 3 cordas Cream, `On`/`Off`); pronta para pedir aprovação | ≤ 1.200 |
+| AST-044 Bellmoor Savings | 3 (ANM-003), landmark desde já | modeler-3d | **Aprovado e não modelado**: relógio C-01 (`Clock_Face`, `Hand_Hour`, `Hand_Minute`, `Clock_Bell`), frontão, quina chanfrada, `BankSign`, `BankDoor` (lista de pendências do `MAP-01_placements.luau`) | térreo ≤ 1.500; relógio ≤ 400 |
+| AST-045 Apartamentos | 3 (ANM-006) | modeler-3d | **Aprovado**; o modelo tem 22,57 de altura e o lote pede ~30 (janelas WV-1..3 a 19–28): esticar os andares ou refazer `Window_Up_<N>` na altura certa | ≤ 2.500 o prédio |
+| AST-054 Clientes e pedestre | 2 | modeler-3d | Releitura para animais (DEC-149, DEC-188): espécie fixa + roupa `T_Civil_A..H` (já aprovadas) + acessórios **AST-081**. Pedestre: sem acessório (`content-data.md`) | DEC-164 |
+| AST-055 Mr. Pickett (rato) | 2 (regular), espelho na 3 | modeler-3d | `T_Civil_Pickett` Day/Mid (terno marrom, bordado "PICKETT & SONS" no peito esquerdo), gravata-borboleta verde (≤ 80, `NeckAttachment`), relógio grande no pulso **esquerdo** (≤ 80), pasta `Acc_Briefcase` na **direita** | DEC-164 + 160 |
+| AST-056 Quick Quentin | 2 | modeler-3d | Peças aprovadas (DEC-163); faltam jornal **AST-087** e saco **AST-021** | DEC-164 |
+| AST-057 Opal (coruja) | 2 | modeler-3d | `T_Civil_Opal` Day/Mid/Night (cardigã verde + colete Sage com crachá "MART"), óculos na corrente (≤ 150), lápis preso no tufo da cabeça (≤ 60); revista = peça do AST-031 na mão | DEC-164 + 210 |
+| AST-058 Walt (tartaruga) | 4 | modeler-3d | **DEC-202**: bastão de madeira na mão **esquerda** (≤ 150), barba branca low poly (≤ 300), `T_Head_Turtle_Walt` com rugas (só Day: o final é ao amanhecer), `T_Civil_Walt` (jaqueta creme e vermelha desbotada, crachá "WALT — NIGHT SHIFT"), boné vermelho = `CrewCap` + logo DEC-206, óculos grossos (≤ 120); `Coffee_Pair` na direita | ≤ 2.500 total |
+| AST-059 Raincoat Lady (sapo) | 3 (final na 4) | modeler-3d | `T_Civil_Raincoat` (capa `#F2C230`, botas verdes pintadas nos pés), capuz (≤ 400, `HatAttachment`), guarda-chuva fechado (≤ 200, `RightGripAttachment`), expressão nova **`T_Expr_EyesClosed`** (só ela usa) | DEC-164 + 600 |
+| AST-060 Blank folks | 3 | modeler-3d | `T_Expr_Blank` = casca do rosto **vazia** (sem olhos e sem boca). O nariz fica na `T_Head_<A>` (DEC-161): o sinal aprovado é "sem olhos, boca ou sobrancelha", então o nariz pode ficar (sem textura de cabeça nova). Sem respiração = clipe `Cust_NoBreath`. Balão vazio = UI. `Coin_Blank` = AST-082 | 0 tris; 1 textura |
+| AST-062 Copies | 3 | modeler-3d | Espelho por **textura**: `T_Civil_<A..H>_Mid_Mirror` (texto invertido) + `T_Civil_Pickett_Mirror`; acessórios do AST-081 no attachment oposto. Só a variante Mid (NPC à noite = Mid, DEC-181); Night do observador com sanidade baixa usa o normal (a confirmar com `Q-147`) | 9 texturas; memória `Q-144` g |
+| AST-063 Wavers | 3 | modeler-3d | `Silhouette_Card` com cabeça redonda **sem orelhas** (num mundo só de animais, a falta de orelha já estranha) + `Arm_R`/`Arm_L` girando por script | ≤ 150 |
+| AST-064 Walker | 3 | modeler-3d | **Proposta da DEC-212:** cabeça própria `AST-064_WalkerHead` (oval alongada na vertical, 1,3× a cabeça da crew, **sem focinho em volume**, orelhas pequenas **caídas** sob a aba), pelagem `#14162A` lisa, textura `T_Walker` (um pack só), sobretudo em saia (≤ 500) e chapéu de aba Ø 2,2 (≤ 200), escala 1,4, mãos nos bolsos. Rosto = sombra da aba, não o "sem rosto" da ANM-001. Vai a Aprovado só com DEC | ≤ 2.500; LOD ≤ 400 |
+| AST-066 Knock (porta) | 3 | modeler-3d | Porta já no `AST-027_OpenLateTrailer.fbx`: conferir pivô na dobradiça, estado `Ajar` (~10°) e janelinha AN-05; pedir aprovação da ficha | ≤ 300 |
+| AST-067 Hush | 3 | modeler-3d (`T_Fog` 256²) + VFX em código | 2 emissores de névoa a 1,5 stud + `Atmosphere` (AST-084) | 0 tris |
+| AST-069 Animações | 2–4 por clipe | modeler-3d (rig) + **usuário anima** | Rig IK e lista de clipes abaixo | — |
+| AST-070 VFX pastelão | 3 (atropelamento) e 4 (desmaio, embarque, reviver) | modeler-3d (texturas) + VFX em código | Estrelinha, anel de impacto, poeira, "Zzz", poof; ver nota sobre ragdoll no desmaio abaixo | §10 |
+| AST-071 Ícones | 2 (ingredientes já fazem falta na onda 1: plaquinhas do AST-017, `Q-152`) | modeler-3d (render) + UI | Lista completa abaixo | 1024², 64 células |
+| AST-072 Placas e logos | 2–4 | art-director (2D) | Acrescentar: "STOP" (AST-093), "SIDEWALK CLOSED" / "USE OTHER SIDE" (AST-047), "BRAMBLE'S CREW" (AST-089), manchete do jornal (AST-087), crachá "MART" (Opal), "PICKETT & SONS", "WALT — NIGHT SHIFT", "BR" (médicos), logo "Sell Hotdogs!" (AST-097) | 256² por placa |
+| AST-073 Avental | — | — | Coberto pela textura `AST-053_CrewTex` e por `AST-053_CrewApron.fbx` (DEC-148, DEC-151): **propor Obsoleto** por DEC | — |
+| AST-074 Ônibus | 4 (intro) | modeler-3d | O Car Kit não tem ônibus; **Pack + edição**: `CK/van.fbx` alongado para 30 (mesma técnica do long car) com fileira de janelas por UV, Butter + faixa Peach. **Só na cutscene de abertura**: no trânsito, 30 studs quebraria a regra "nenhum veículo de trânsito > 16" reservada ao long car (§2.4) | ≤ 2.500 |
+| AST-075 Props da intro | 4 | modeler-3d | Carteira **sai** (`script.md` §1). Ficam: mariposa (≤ 50, bater de asas por 2 frames de malha ou flipbook) e 5 pombos (≤ 200 cada; bicar e voar por clipe simples de 2 ossos, fora do R6). Jornal de vagas = `Newspaper_Crumpled` do AST-087 | ver colunas |
+| AST-076 Médicos | 4 | modeler-3d | **DEC-211/213**: coelho alto (`Medic_A`) e panda baixo (`Medic_B`), `T_Civil_Medic` Mid e Night (menta `#9FD8C4`, faixa branca, crachá "BR"), rosto fixo `Exhausted`. **Máscara cirúrgica como acessório** (pedido desta rodada): `Acc_SurgicalMask_Rabbit` e `_Panda`, casca sobre o focinho com elásticos até as orelhas, branco-menta, `FaceFrontAttachment`. Boné menta: coelho = `CrewCap_EarsUp` recolor; panda = `CrewCap` recolor | máscara ≤ 150 cada; DEC-164 |
+
+#### AST-069 — Rig IK e lista de clipes (complemento)
+
+- **Rig:** `Assets/blender/character/AST-069_AnimRig.blend`, control rig sobre `AST-053_CrewBase` (modeler-3d monta; usuário anima). R6 não tem cotovelo nem joelho: "IK" aqui = **alvo de mão e pé que gira o membro inteiro** + controles FK de cabeça e tronco; nomes de junta iguais aos `Motor6D` do R6. Formato de exportação para o Roblox (KeyframeSequence) a definir com o architect/frontend.
+- **Regra:** nenhum clipe de violência, queda dolorida ou contato entre personagens (AST-069). Prioridade de animação do Roblox entre parênteses quando importa.
+
+| Clipe | Quem | Onda | Loop | Duração |
+|---|---|---|---|---|
+| `Crew_Idle` | crew (visto por colegas e cutscene) | 2 | sim | 3 s |
+| `Crew_Walk` / `Crew_Run` | crew | 2 | sim | 1,0 / 0,7 s |
+| `Crew_HoldItem` (Action, só braço direito) | crew | 2 | sim | pose |
+| `Crew_Serve` | crew | 2 | não | 0,5 s |
+| `Crew_Slice` (cortar o pão) | crew | 2 | não | 0,6 s |
+| `Crew_Grill` (pôr/colher salsicha) | crew | 2 | não | 0,5 s |
+| `Crew_Restock` | crew | 2 | não | 0,8 s |
+| `Crew_Drink` (café, FEAT-021) | crew | 2 | não | 1,5 s |
+| `Crew_Wave` (acenar) | crew | 2 | não | 1,2 s |
+| `Crew_Sit` (banco AST-040, cutscene) | crew | 2 | sim | pose |
+| `Lobby_ShowIdle` (pedestal) | crew | 2 | sim | 4 s |
+| `Crew_Hide` (agachado atrás do balcão) | crew | 3 | sim | pose |
+| `Crew_GetUp` (levantar do ragdoll do atropelamento) | crew | 3 | não | 0,8 s |
+| `Crew_OnStretcher` (deitado de lado na maca) | crew | 4 | sim | pose |
+| `Crew_WakeShake` (sacode a cabeça ao reviver e na noite perdida) | crew | 4 | não | 1,0 s |
+| `Crew_Startle` / `Crew_Nod` / `Crew_LookUp` (intro) | crew | 4 | não | 0,5 / 0,8 / pose |
+| `Cust_WaitIdle` (fase aleatória) | cliente | 2 | sim | 3 s |
+| `Cust_Impatient` (bufar, bater o pé) | cliente | 2 | sim | 2 s |
+| `Cust_Happy` / `Cust_Complain` | cliente | 2 | não | 1,0 s |
+| `Cust_Pay` | cliente | 2 | não | 0,6 s |
+| `Cust_RefusedWave` | cliente | 2 | não | 0,8 s |
+| `Cust_SitDrive` (sentado: banco de praça, motorista em silhueta) | cliente | 3 | sim | pose |
+| `Cust_Eat` (mordida, ANM-002) | cliente | 3 | não | 0,8 s |
+| `Cust_NoBreath` (ANM-001, pose parada) | cliente | 3 | sim | pose |
+| `Cust_WalkBackward` (ANM-004) | cliente | 3 | sim | 1,0 s |
+| `Thief_Lurk` (jornal) / `Thief_Tiptoe` / `Thief_OpenDrawer` / `Thief_Flee` | Quentin | 2 | sim | 2–3 s |
+| `Opal_Crossword` (idle) / `Opal_LookTalk` | Opal | 2 | sim / não | 4 s / 1,5 s |
+| `Raincoat_Idle` / `Raincoat_Nod` | Raincoat Lady | 3 (aceno na 4) | sim / não | 3 s / 1,0 s |
+| `Walker_Stand` (mãos nos bolsos) | Walker | 3 | sim | pose |
+| `Medic_StepDown` / `Medic_StepUp` | médicos | 4 | não | 0,5 s |
+| `Medic_CarryWalk` (dupla, maca no `RightGripAttachment`) | médicos | 4 | sim | 1,0 s |
+| `Medic_LowerStretcher` / `Medic_LiftStretcher` | médicos | 4 | não | 1,0 s |
+| `Medic_Idle` (calmo; panda curvado) | médicos | 4 | sim | 3 s |
+| `Walt_HunchWalk` (corcunda com bastão) / `Walt_OfferCoffee` / `Walt_Nod` | Walt | 4 | sim / não / não | 1,4 / 1,5 / 0,8 s |
+
+Fora da lista de clipes: **desmaio** = ragdoll em código (ver nota abaixo); atropelamento = ragdoll em código (DEC-197); passo do Walker = teleporte entre postes; aceno das wavers = braço do cartão girando por script.
+
+#### AST-071 — Lista de ícones (complemento)
+
+Folha 1024², células 128², contorno grosso `#2B2233`; comida e equipamento = **render do modelo 3D** (§7.1).
+
+| Grupo | Ícones | Qtd | Onda |
+|---|---|---|---|
+| Ingredientes | pão, salsicha, ketchup, mostarda, queijo, bacon, batata palha, cream cheese, café | 9 | 2 (ingredientes já pedidos pela onda 1, `Q-152`) |
+| Tools | hot dog, 9 pacotes, copo de café, Rescue Whistle | 12 | 2 |
+| Upgrades | Grill L1–L3, Cooler L1–L3, Counter L1–L3, Cash Drawer Lock, Trailer Lights, Food Trailer, cafeteira | 13 | 2 |
+| Classes | 8 animais (6 MVP + Panda e Lion); usar o retrato High do AST-086 | 8 | 2 |
+| HUD | moeda (AST-082), gema, sol, lua, telefone, ambulância | 6 | 2 (ambulância na 4) |
+| Reações | estrela, nuvem rabiscada, vapor | 3 | 2 |
+| Avisos | cadeado, trailer, "raro" (S1) | 3 | 2 |
+
+Total **54** de 64 células (sobra para a 1ª atualização). Robux usa o ícone oficial da plataforma, fora da folha.
+
+### Notas para o secretário (decisões e conflitos achados)
+
+- **Desmaio por ragdoll:** o pedido desta rodada diz "desmaio = ragdoll em código"; o style guide §4.6 (Aprovado) e FEAT-034 dizem "animação suave, sem ragdoll". Mantive ragdoll como **Provisório**; precisa de DEC para emendar o §4.6.
+- **Expressão de desmaio:** DEC-152 aprovou a expressão "desmaiado com X"; o style guide §4.6 proíbe "olhos em X" no desmaio. Uma das duas precisa ceder (recomendação: usar `Fainted` só na tela de quem caiu ou trocar por olhos fechados com "Zzz").
+- **Moeda de gorjeta:** §10 fala em "moeda dourada"; §2.1 reserva Gold ao AST-051. Proposta: Mustard brilhante (AST-082).
+- **AST-073:** propor **Obsoleto** (coberto pela textura da crew).
+- **Máscara dos médicos:** decidida aqui como **acessório** (DEC-213 deixou acessório ou textura ao art-director).
+- **ANM-001 com nariz:** proposta de manter o nariz (o sinal aprovado não cita nariz); evita 1 textura de cabeça por espécie.
+- **Memória de textura (`Q-144` g):** esta rodada pede ~3 folhas 1024² de UI (kit, ícones, retratos), 3 de 512² de VFX e ~12 texturas de personagem novas (Pickett, Opal, Walt, Raincoat, Medic ×2, Walker, 9 espelhos da ANM-004). Conferir contra o teto de 30 MB (§9.2) antes de aprovar em bloco.
+
+### Tabela-resumo por onda
+
+| Onda | Fichas novas | Fichas existentes com trabalho | modeler-3d | VFX em código | UI |
+|---|---|---|---|---|---|
+| **2 — Noite e meta** (trailer, café, escuro, sanidade, chefe, ladrão, lobby, party) | AST-078, 079, 080, 081, 082, 083, 084, 085, 086, 087, 088, 089, 090, 091, 092 | AST-012 (níveis), 021, 043, 054, 055, 056, 057, 069 (clipes onda 2), 071, 072 | 078, 079, 080, 081, 082 (malha), 083, 085, 086 (render), 087, 088, 089, 090, 012, 021, 043, 054–057, rig do 069, renders do 071 | 082 (tween), 083 (`Beam`), 084, 085, 092 | 086, 091, 071 |
+| **3 — Anomalias e rua** (ANM-001 a 010, trânsito, atropelamento, item no chão) | AST-093, 094, 095, 096 | AST-044, 045, 055 (espelho), 059, 060, 062, 063, 064, 066, 067, 069 (clipes onda 3), 070 (atropelamento) | 093, 094, texturas de 095/096, 044, 045, 059, 060, 062, 063, 064, 066, `T_Fog` do 067 | 095, 096, 067, 070 | — |
+| **4 — Queda, monetização, cutscenes, final** | AST-097 | AST-058, 059 (final), 069 (clipes onda 4), 070 (desmaio, embarque, reviver), 074, 075, 076 | 097 (render), 058, 074, 075, 076 (+ máscaras) | 070 | 097, botão Robux e telas do 091 |
+
+Contagem: **20 fichas novas** (AST-078 a AST-097) + **25 complementos** em fichas existentes.
+
 ## Fora desta lista (próxima rodada)
 
-- Lobby (depende de `Q-085`/`Q-070`): plataformas de party, seleção de classe, ícones das classes CLS-001 a CLS-008.
-- Ícones e retrato das classes (lobby).
+- ~~Lobby: plataformas de party, seleção de classe, ícones das classes~~ → AST-088, AST-089, AST-090, AST-071 e AST-086 (levantamento pós-onda 1). Layout do lobby segue com o level-designer (`Q-085`).
 - Assets de áudio (style guide §11): rodada própria.
 - Blockout do MAP-01 no Blender: quando pedido, junto com o level-designer.
+- Lanterna de mão: fora do MVP (DEC-055).
 
 ## Notas de revisão
 
