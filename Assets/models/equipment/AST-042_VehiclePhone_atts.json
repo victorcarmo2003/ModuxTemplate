@@ -1,0 +1,98 @@
+{
+ "Phone_Cart/Prompt_Answer": {
+  "blender": [
+   0.0,
+   0.35,
+   1.367
+  ],
+  "roblox_local": [
+   0.0,
+   1.367,
+   -0.35
+  ]
+ },
+ "Phone_Cart/Light_Ring": {
+  "blender": [
+   0.0,
+   -0.088,
+   0.987
+  ],
+  "roblox_local": [
+   0.0,
+   0.987,
+   0.088
+  ]
+ },
+ "Phone_Cart/VFX_Ring": {
+  "blender": [
+   0.0,
+   -0.088,
+   1.337
+  ],
+  "roblox_local": [
+   0.0,
+   1.337,
+   0.088
+  ]
+ },
+ "Phone_Cart/Att_Mount": {
+  "blender": [
+   0,
+   -0.35,
+   0.6
+  ],
+  "roblox_local": [
+   0,
+   0.6,
+   0.35
+  ]
+ },
+ "Phone_Trailer/Prompt_Answer": {
+  "blender": [
+   2.2,
+   0.35,
+   1.367
+  ],
+  "roblox_local": [
+   2.2,
+   1.367,
+   -0.35
+  ]
+ },
+ "Phone_Trailer/Light_Ring": {
+  "blender": [
+   2.2,
+   -0.088,
+   0.987
+  ],
+  "roblox_local": [
+   2.2,
+   0.987,
+   0.088
+  ]
+ },
+ "Phone_Trailer/VFX_Ring": {
+  "blender": [
+   2.2,
+   -0.088,
+   1.337
+  ],
+  "roblox_local": [
+   2.2,
+   1.337,
+   0.088
+  ]
+ },
+ "Phone_Trailer/Att_Mount": {
+  "blender": [
+   2.2,
+   -0.35,
+   0.6
+  ],
+  "roblox_local": [
+   2.2,
+   0.6,
+   0.35
+  ]
+ }
+}

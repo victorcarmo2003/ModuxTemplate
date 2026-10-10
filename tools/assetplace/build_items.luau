@@ -9,8 +9,8 @@
 	    Tools/<Content.Items key>   Tool: Handle (+ welded parts), Att_Hand, Grip, attribute Item = key
 	      hot_dog                   AST-003 Tool without sauce: Handle (open bun) + Sausage; Att_Topping1, Att_Serve
 	      coffee                    AST-010 cup; VFX_Steam
-	      pack_*  (9)               AST-011 pack pieces, flat recolor per package (see PACKS)
-	      revive_kit                AST-051 rescue whistle; VFX_Rare, VFX_Use
+	      pack_*  (9)               AST-011 one mesh per package (AST-011_Pack<Name>), label texture T_PackLabels embedded
+	      revive_kit                AST-051 first-aid kit (grip = top of the arch handle); VFX_Rare, VFX_Use
 	      altered_item              AST-061 default variant (= Variants/altered_item/Sausage), attribute Variant
 	    Variants/altered_item/<V>   TASK-099 (Provisional): Tool per ITM-020 variant, Item = "altered_item",
 	                                Variant = V: Sausage (Sausage_Wrong), Bun (Bun_Bitten; Att_Sausage)
@@ -100,29 +100,28 @@ end
 
 -- Tools (key = Content.Items key) -------------------------------------------------------------------------------
 
-local function pack(form: string, sizeBox: Box, tris: number, color: string, lying: boolean?): ToolSpec
+local function pack(name: string, sizeBox: Box, tris: number, lying: boolean?): ToolSpec
 	return {
-		asset = "AST-011_" .. form,
-		parts = { { name = "AST-011_" .. form, box = sizeBox, tris = tris } },
+		asset = "AST-011_Pack" .. name,
+		parts = { { name = "AST-011_Pack" .. name, box = sizeBox, tris = tris } },
 		-- lying: the long axis (Y of the piece) goes across the hand, +X of the piece goes down
 		up = if lying then Vector3.new(-1, 0, 0) else nil,
 		right = if lying then Vector3.new(0, 1, 0) else nil,
-		color = Color3.fromHex(color),
 		budget = 300, -- AST-011
 	}
 end
 
--- AST-011 pack pieces (exporter "direct" mode: one joined mesh named after the asset, base centre at the origin).
-const BAG = box(-0.15, 0, -0.27, 0.15, 0.8, 0.27)
-const BAG_FLAT = box(-0.4, 0, -0.29, 0.4, 0.23, 0.29)
-const CAN = box(-0.23, 0, -0.23, 0.23, 0.5, 0.23)
-const CAN_SMALL = box(-0.28, 0, -0.28, 0.28, 0.3, 0.28)
-const CARTON = box(-0.16, 0, -0.16, 0.16, 0.8, 0.16)
-const CARTON_SMALL = box(-0.16, 0, -0.16, 0.16, 0.55, 0.16)
+-- AST-011 packages (2026-10-10): Kenney Food Kit shapes (CC0) with their own colour and label (product drawing from
+-- AST-071 + English name) from one texture, Assets/textures/props/T_PackLabels.png (embedded in each FBX). Base centre
+-- at the origin; label faces to the front/back. Measured in Assets/blender/food/AST-011_Pack*.blend.
+-- "caixa baixa" (Cheese) = carton-small lying down.
+const BAG = box(-0.2746, 0, -0.1468, 0.2746, 0.8, 0.1468)
+const BAG_FLAT = box(-0.4, 0, -0.2877, 0.4, 0.2345, 0.2877)
+const CAN = box(-0.2344, 0, -0.2344, 0.2344, 0.5, 0.2344)
+const CAN_SMALL = box(-0.28, 0, -0.28, 0.28, 0.3008, 0.28)
+const CARTON = box(-0.1558, 0, -0.1558, 0.1558, 0.8, 0.1558)
+const CARTON_SMALL = box(-0.162, 0, -0.162, 0.162, 0.55, 0.162)
 
--- Form and dominant colour per package: AST-011 table + style guide §2 palette (first stop of each gradient).
--- Provisional (TASK-007): flat colour instead of a recoloured atlas; labels wait for AST-072; "caixa baixa"
--- (Cheese) = carton-small lying down.
 const TOOLS: { [string]: ToolSpec } = {
 	hot_dog = {
 		asset = "AST-003_HotDog",
@@ -140,31 +139,31 @@ const TOOLS: { [string]: ToolSpec } = {
 	},
 	coffee = {
 		asset = "AST-010_Coffee",
-		parts = { { name = "Handle", box = box(-0.175, 0, -0.175, 0.175, 0.55, 0.175), tris = 236 } },
+		parts = { { name = "Handle", box = box(-0.166, 0, -0.175, 0.166, 0.55, 0.175), tris = 260 } },
 		atts = { Att_Hand = Vector3.new(0, 0.265, 0), VFX_Steam = Vector3.new(0, 0.55, 0) },
 		hand = Vector3.new(0, 0.265, 0),
 		budget = 300, -- AST-010
 	},
 	revive_kit = {
 		asset = "AST-051_ReviveKit",
-		parts = { { name = "Handle", box = box(-0.25, -1.109, -0.425, 0.25, 0.26, 0.6615), tris = 300 } },
+		parts = { { name = "Handle", box = box(-0.4, -0.68, -0.2, 0.4, 0.039, 0.2), tris = 172 } },
 		atts = {
-			Att_Hand = Vector3.new(0, 0, 0),
-			VFX_Rare = Vector3.new(0, 0, 0.1),
-			VFX_Use = Vector3.new(0, 0.3, 0.08),
+			Att_Hand = Vector3.new(0, 0, 0), -- centre of the arch handle; the box hangs below the hand
+			VFX_Rare = Vector3.new(0, -0.43, 0),
+			VFX_Use = Vector3.new(0, 0.12, 0),
 		},
 		hand = Vector3.new(0, 0, 0),
 		budget = 400, -- AST-051
 	},
-	pack_sausages = pack("Carton", CARTON, 94, "#C2602F", true),
-	pack_buns = pack("Bag", BAG, 46, "#D9A35E"), -- darker Bun stop: the light one reads as Potato Sticks
-	pack_ketchup = pack("Can", CAN, 156, "#E2402E"),
-	pack_mustard = pack("Can", CAN, 156, "#F6C12B"),
-	pack_cheese = pack("CartonSmall", CARTON_SMALL, 74, "#FFD45A", true),
-	pack_bacon = pack("BagFlat", BAG_FLAT, 114, "#C9533E"),
-	pack_potato_sticks = pack("Bag", BAG, 46, "#F7D27A"),
-	pack_cream_cheese = pack("CanSmall", CAN_SMALL, 154, "#FFF8EC"),
-	pack_coffee = pack("Bag", BAG, 46, "#5A3A2A"),
+	pack_sausages = pack("Sausages", CARTON, 90, true),
+	pack_buns = pack("Buns", BAG, 44),
+	pack_ketchup = pack("Ketchup", CAN, 156),
+	pack_mustard = pack("Mustard", CAN, 156),
+	pack_cheese = pack("Cheese", CARTON_SMALL, 70, true),
+	pack_bacon = pack("Bacon", BAG_FLAT, 110),
+	pack_potato_sticks = pack("PotatoSticks", BAG, 44),
+	pack_cream_cheese = pack("CreamCheese", CAN_SMALL, 154),
+	pack_coffee = pack("Coffee", BAG, 44),
 }
 
 -- Content.Items keys deliberately not built by this script (check reports them as notes).
@@ -529,7 +528,7 @@ function Items.buildTool(key: string, spec: ToolSpec, ids: Ids, reload: boolean?
 			handle.TextureID = ""
 		end
 		handle.Color = spec.color
-		handle:SetAttribute("Recolor", "Provisional") -- flat colour until the AST-011 recolor + AST-072 label
+		handle:SetAttribute("Recolor", "Provisional")
 	end
 	addAtts(handle, origin, spec.atts)
 	if not handle:FindFirstChild("Att_Hand") then

@@ -139,7 +139,8 @@
 	- AST-024 OPEN sign is 4 tall; DEC-048 / MAP-01 §5.1 ask <= 3. SIGN-T needs 4 x 5 (asset 2 x 4).
 	- AST-030 fridge is 7 tall and one-sided; MAP-01 asks low fridges, and Bacon (-81, 44) is bought
 	  at the back of the north fridge.
-	- Cart phone (on the Parasol_E pole, Mount_Phone) intersects the sauce holder (~0.8 stud).
+	- Cart phone (on the Parasol_E pole, Mount_Phone): new AST-042 model (2026-10-10) sits on its own shelf at 4.85,
+	  above the topping grid (top 4.75); not verified in Studio yet (raycast the dial side: must face south).
 	- AST-028_MartAwning still has its legs (edition pending in AST-028); side not confirmed.
 	- AST-031 checkout side not confirmed (detail side -Z put towards Opal).
 	- Rail: the FBX has Rail_6 and Rail_8 on top of each other; cart Rail_6, trailer Rail_8 (TASK-083).
@@ -192,7 +193,7 @@ return {
 	-- 2026-10-10: sauce holder removed; Ketchup/Mustard are steel bowls in the grid (user request)
 	-- { asset = "AST-016_SauceHolder", x = 46, y = 3.60, z = 36.75, rotY = 0, group = "Cart", id = "CART-K-SAUCE", layer = "day", replaces = {}, note = "sits on grid cells F1 (Ketchup, X45) + F2 (Mustard, X47); bottles go on Att_Bottle_* at runtime" },
 	{ asset = "AST-020_CashRegister", x = 53.143, y = 3.45, z = 37.661, rotY = 180, drop = { "DeliveryStand" }, pivot = { 51.743, 3.45, 37.661, 180 }, group = "Cart", id = "DRAWER", layer = "day", replaces = { "Pad/CART/7_H_Delivery", "Pad/CART/DRAWER" }, note = "2026-10-10 hand edit: delivery stand removed, register turned to the operator, pivot moved by hand" },
-	{ asset = "AST-042_VehiclePhone", part = { "Phone_Cart", "Cart_Body", "Cart_Cord", "Cart_Handset", "Cart_Lamp", "Lid" }, x = 47.5, y = 4.65, z = 36.84, rotY = 180, group = "Cart", id = "CART-PHONE", layer = "day", replaces = {}, note = "Att_Mount on Mount_Phone (Parasol_E pole); intersects the sauce holder ~0.8" },
+	{ asset = "AST-042_VehiclePhone", part = { "Phone_Cart", "Cart_Body", "Cart_Handset", "Cart_Lamp" }, x = 47.5, y = 4.85, z = 36.84, rotY = 180, group = "Cart", id = "CART-PHONE", layer = "day", replaces = {}, note = "2026-10-10 new model (rotary desk phone on a wood shelf, Poly Pizza CC-BY): Att_Mount (local z 0.6) on Mount_Phone (47.5, 5.45, 36.49, Parasol_E pole); shelf base 4.85 clears the topping grid top (4.75); phone faces the operator (south)" },
 	{ asset = "AST-025_Trashcan", x = 56, y = 0.45, z = 42, rotY = 90, group = "Cart", id = "BIN-C", layer = "day", replaces = { "Pad/BIN-C" }, note = "Mount_Trash rotY 90 would point the pedal east; 270 = pedal to the corridor" },
 
 	---------------------------------------------------------------------------------------------
@@ -208,7 +209,7 @@ return {
 	-- 2026-10-10: sauce holder removed; Ketchup/Mustard are steel bowls in the grid (user request)
 	-- { asset = "AST-016_SauceHolder", x = 46, y = 6.10, z = 36.75, rotY = 0, group = "Trailer", id = "TRL-K-SAUCE", layer = "night", replaces = {} },
 	{ asset = "AST-020_CashRegister", x = 52.351, y = 5.95, z = 36.861, rotY = 180, drop = { "DeliveryStand" }, pivot = { 51.18, 5.95, 36.861, 180 }, group = "Trailer", id = "TRL-DRAWER", layer = "night", replaces = {}, note = "2026-10-10 hand edit: delivery stand removed, register turned to the operator, pivot moved by hand" },
-	{ asset = "AST-042_VehiclePhone", part = { "Phone_Trailer", "Trailer_Cord", "Trailer_Handset", "Trailer_Lamp" }, x = 30.7, y = 7.72, z = 36.28, rotY = 180, group = "Trailer", id = "TRL-PHONE", layer = "night", replaces = {}, note = "trailer variant sits 2.2 off the FBX origin; its back lands on Mount_Phone (28.5, 8.45, 36), front wall" },
+	{ asset = "AST-042_VehiclePhone", part = { "Phone_Trailer", "Trailer_Body", "Trailer_Handset", "Trailer_Lamp" }, x = 30.7, y = 7.85, z = 36.35, rotY = 180, group = "Trailer", id = "TRL-PHONE", layer = "night", replaces = {}, note = "2026-10-10 new model: trailer variant sits 2.2 off the FBX origin; Att_Mount (back of the shelf, local z 0.6) lands on Mount_Phone (28.5, 8.45, 36), front wall; shelf base 7.85 clears the TRL-S cooler top (7.55)" },
 	{ asset = "AST-022_CoffeeMachine", x = 40, y = 5.95, z = 44, rotY = 0, group = "Trailer", id = "TRL-COFFEE", layer = "night", replaces = {} },
 	{ asset = "AST-025_Trashcan", x = 43.5, y = 2.45, z = 44, rotY = 0, group = "Trailer", id = "TRL-BIN", layer = "night", replaces = {} },
 	{ asset = "AST-039_LightSwitch", x = 46, y = 6.45, z = 46, rotY = 0, group = "Trailer", id = "TRL-SWITCH", layer = "night", replaces = {}, note = "back plate on the south wall (Z 46), lever to the north" },
@@ -360,8 +361,12 @@ return {
 	{ asset = "AST-029_GondolaBoxes", x = -70.75, y = 0.4, z = 62.75, rotY = 0, group = "MartInterior", id = "MKT", replaces = { "Mart/Interior/BackShelves" } },
 	{ asset = "AST-029_GondolaBoxes", x = -66.25, y = 0.4, z = 62.75, rotY = 0, group = "MartInterior", id = "MKT", replaces = { "Mart/Interior/BackShelves" } },
 	{ asset = "AST-050_FruitDisplay", x = -94, y = 0.4, z = 35.5, rotY = 180, group = "MartInterior", id = "MKT", replaces = { "Mart/Interior/ProduceDisplay", "Mart/Interior/Fruit1", "Mart/Interior/Fruit2", "Mart/Interior/Fruit3", "Mart/Interior/Fruit4" }, note = "scenery, no prompt (DEC-109)" },
-	{ asset = "AST-050_LettuceCrate", x = -91, y = 0.4, z = 35.5, rotY = 180, group = "MartInterior", id = "MKT", replaces = { "Mart/Interior/ProduceDisplay" } },
-	{ asset = "AST-050_LettuceCrate", x = -89, y = 0.4, z = 35.5, rotY = 180, group = "MartInterior", id = "MKT", replaces = { "Mart/Interior/ProduceDisplay" } },
+	-- 2026-10-10: wooden market table (AST-098, Quaternius CC0 via Poly Pizza) under the two lettuce crates, FRESH PRODUCE corner.
+	-- Table 4.6 x 2.65 x 3.33 (top of the planks 2.5); X -91.95..-87.35 (FruitDisplay ends at -92), Z 34.14..37.47 (sign at Z 33.2..33.4, Y 4.9..6.4).
+	-- Crates sit on Slot_1 / Slot_2 (local x -/+1.05, z 0.307 in Roblox axes): world (-90.70 / -88.60, 2.91, 35.5).
+	{ asset = "AST-098_ProduceStand", x = -89.65, y = 0.4, z = 35.807, rotY = 180, group = "MartInterior", id = "MKT", replaces = { "Mart/Interior/ProduceDisplay" }, note = "scenery, no prompt (DEC-109); front (planks edge) faces the store (south)" },
+	{ asset = "AST-050_LettuceCrate", x = -90.7, y = 2.91, z = 35.5, rotY = 180, group = "MartInterior", id = "MKT", replaces = { "Mart/Interior/ProduceDisplay" }, note = "on AST-098 Slot (was on the floor at -91)" },
+	{ asset = "AST-050_LettuceCrate", x = -88.6, y = 2.91, z = 35.5, rotY = 180, group = "MartInterior", id = "MKT", replaces = { "Mart/Interior/ProduceDisplay" }, note = "on AST-098 Slot (was on the floor at -89)" },
 
 	---------------------------------------------------------------------------------------------
 	-- 6. STREET FURNITURE (proposed spots, Provisório; nothing > 3 tall in the Z 30..47 band)
