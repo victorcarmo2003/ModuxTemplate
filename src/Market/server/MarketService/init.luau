@@ -10,9 +10,12 @@
 --     (Content.Upgrades.BenchSpot). Always on sale (DEC-106); no prompt when Maxed, "Trailer only" (not on the current
 --     vehicle) or before UnlockDay. The purchase is UpgradeService:Buy (atomic, its own guards).
 --   S1 (bench_buy_item, wave 4): prompt always off, "Nothing special today" (Q-120). The action is not registered.
+-- Refusal toasts (FEAT-005 D-04; TASK-080), only to the player who acted, the same key at most once every
+-- NOTICE_GAP seconds: shelf Blocked -> shelf_locked {item}; bench "busy" (another buyer inside UpgradeService's guard)
+-- -> bench_busy; bench "maxed" -> upgrade_maxed {upgrade}. Silent: run not started / member not Active (life state),
+-- anchor without Package/BenchSlot, buy_package cadence, "locked" and "not_on_vehicle" (prompt never shown).
+-- Blocked is KitchenService:IsBlocked (the Stock.Blocked of the set; ends the TASK-036 Provisional).
 -- Provisional (TASK-036):
---   * Blocked is derived here with the Stock.Blocked formula (content-data.md §3.3: Day < UnlockDay, or Vehicle not the
---     current one) until KitchenService (TASK-025) exposes it; both read the same Day and vehicle, so they agree;
 --   * bench prompt text "Buy Grill 2 — $60" (upgrade Name + level number; the number is left out when the upgrade has
 --     a single level to buy); the world card keeps the ui-text.md level names;
 --   * a player's buy_package packets closer than PACKAGE_GAP are refused (cadence; the hold is 0.5 s on the client).
@@ -27,6 +30,7 @@ const PACKAGE_ACTION = "buy_package"
 const UPGRADE_ACTION = "bench_buy_upgrade"
 const ITEM_ACTION = "bench_buy_item"
 const PACKAGE_GAP = Content.Actions.ByKey[PACKAGE_ACTION].Hold * 0.8
+const NOTICE_GAP = 2 -- seconds (FEAT-005 anti-spam; Provisional constant, TASK-080: no Content field yet)
 
 local function stringAttribute(anchor: Instance, name: string): string?
 	const value = anchor:GetAttribute(name)
@@ -64,6 +68,7 @@ const MarketService = Modux.Service("MarketService", {
 		"UpgradeService",
 		"RoundService",
 		"RunStateService",
+		"KitchenService",
 	},
 	Priority = 615,
 })
@@ -71,20 +76,16 @@ const MarketService = Modux.Service("MarketService", {
 function MarketService:Setup()
 	-- os.clock() of the last accepted buy_package per player (PACKAGE_GAP)
 	self.LastBuy = {} :: { [Player]: number }
+	-- os.clock() of the last refusal toast per player and Notices key (NOTICE_GAP)
+	self.LastNotice = {} :: { [Player]: { [string]: number } }
 end
 
 -- Reads -----------------------------------------------------------------------------------------------------------
 
 -- Ingredient not on sale today (DEC-180): before its UnlockDay, or bound to another vehicle (Coffee before the trailer).
+-- Same answer as Stock.Blocked: KitchenService owns the rule.
 function MarketService:IsBlocked(ingredientKey: string): boolean
-	const ingredient = Content.Ingredients.ByKey[ingredientKey]
-	if ingredient == nil then
-		return true
-	end
-	if ingredient.Vehicle ~= nil and ingredient.Vehicle ~= self.Dependencies.UpgradeService:GetVehicle() then
-		return true
-	end
-	return self.Dependencies.RoundService:GetDay() < ingredient.UnlockDay
+	return self.Dependencies.KitchenService:IsBlocked(ingredientKey)
 end
 
 function MarketService:PackageOf(anchor: Instance): Content.Package?
@@ -144,6 +145,22 @@ function MarketService:RefreshAll()
 	end
 end
 
+-- Refusal toast to the player who acted, throttled per key (FEAT-005 anti-spam).
+function MarketService:Refuse(player: Player, key: string, value: number) -- value 0 = none
+	const now = os.clock()
+	local keys = self.LastNotice[player]
+	if keys == nil then
+		keys = {}
+		self.LastNotice[player] = keys
+	end
+	const last = keys[key]
+	if last ~= nil and now - last < NOTICE_GAP then
+		return
+	end
+	keys[key] = now
+	self.Dependencies.RunStateService:Notify(player, key, value)
+end
+
 -- Actions ---------------------------------------------------------------------------------------------------------
 
 function MarketService:CanAct(player: Player): boolean
@@ -155,7 +172,11 @@ function MarketService:ValidatePackage(player: Player, anchor: Instance): boolea
 		return false
 	end
 	const package = self:PackageOf(anchor)
-	if package == nil or self:IsBlocked(package.Ingredient) then
+	if package == nil then
+		return false
+	end
+	if self:IsBlocked(package.Ingredient) then
+		self:Refuse(player, "shelf_locked", Content.Ingredients.IndexOf[package.Ingredient] or 0)
 		return false
 	end
 	const last = self.LastBuy[player]
@@ -196,7 +217,16 @@ function MarketService:ValidateUpgrade(player: Player, anchor: Instance): boolea
 		return false
 	end
 	const upgrade = self:UpgradeOf(anchor)
-	return upgrade ~= nil and (self.Dependencies.UpgradeService:CanBuy(upgrade.Key))
+	if upgrade == nil then
+		return false
+	end
+	const ok, reason = self.Dependencies.UpgradeService:CanBuy(upgrade.Key)
+	if reason == "busy" then
+		self:Refuse(player, "bench_busy", 0)
+	elseif reason == "maxed" then
+		self:Refuse(player, "upgrade_maxed", Content.Upgrades.IndexOf[upgrade.Key] or 0)
+	end
+	return ok
 end
 
 function MarketService:BuyUpgrade(player: Player, anchor: Instance)
@@ -234,6 +264,7 @@ MarketService:OnInit(function(self)
 
 	self.Dependencies.PlayerService.PlayerRemoving:Connect(function(player)
 		self.LastBuy[player] = nil
+		self.LastNotice[player] = nil
 	end)
 end)
 

@@ -7,12 +7,20 @@
 -- No Stations record (Record = "None"): the state of every bowl is the Stock set (Amount, Blocked), so lid + padlock
 -- of a locked bowl (DEC-156) and the hidden "Add X" with 0 left are drawn by the client from Stock. Restock on
 -- Prompt_Restock_<Suf> is the core's. Nothing to snapshot: the amounts are "Stk".
+-- Refusal toasts (D-04, TASK-080, via Refusal.luau), in this order: topping already on it -> topping_repeat {item};
+-- MaxToppings reached -> topping_max; bowl empty -> out_of_stock {item}. Silent: no topping on the anchor, no hot dog
+-- in hand (core's Requires.Held) and a Blocked bowl (locked bowl, DEC-156: only a forged request reaches it).
+-- Provisional (TASK-080): the Context has no IsBlocked (StationApi, TASK-057), so Blocked is read from the PromptEnabled
+-- the core keeps on the bowl's own restock anchor (off exactly while the ingredient is Blocked, KitchenService
+-- RefreshPrompts). Swap for ctx.IsBlocked when the Context gets it.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 local StationApi = require(script.Parent.Parent.StationApi)
+local Refusal = require(script.Parent.Parent.Refusal)
 
 const ACTION = "topping_add"
 const HOT_DOG = "hot_dog"
+const RESTOCK = "restock"
 
 -- Topping key of the anchor (a Sauce/Topping of Content.Ingredients), else nil.
 local function toppingOf(anchor: Instance): string?
@@ -47,25 +55,46 @@ local function heldHotDog(ctx: StationApi.Context, player: Player): Tool?
 	return nil
 end
 
--- Everything except Blocked, which TakeStock refuses atomically in Run (the Context has no IsBlocked).
-local function canAdd(ctx: StationApi.Context, player: Player, anchor: Instance): (Tool?, string?)
+-- Bowl locked (DEC-156): the restock anchor of the same ingredient on this station is off (see the header).
+local function lockedBowl(station: StationApi.Station, ingredient: string): boolean
+	for _, anchor in station.Anchors do
+		if anchor:GetAttribute("PromptAction") == RESTOCK and anchor:GetAttribute("Ingredient") == ingredient then
+			return anchor:GetAttribute("PromptEnabled") == false
+		end
+	end
+	return false
+end
+
+-- (tool?, ingredient?, notice?). Everything except Blocked, which TakeStock refuses atomically in Run; Blocked only
+-- silences the toast.
+local function canAdd(
+	ctx: StationApi.Context,
+	station: StationApi.Station,
+	player: Player,
+	anchor: Instance
+): (Tool?, string?, string?)
 	const ingredient = toppingOf(anchor)
 	if ingredient == nil then
-		return nil, nil
+		return nil, nil, nil
 	end
 	const tool = heldHotDog(ctx, player)
 	if tool == nil then
-		return nil, nil
+		return nil, nil, nil
+	end
+	if lockedBowl(station, ingredient) then
+		return nil, ingredient, nil
 	end
 	const toppings = toppingsOn(tool)
-	if table.find(toppings, ingredient) or #toppings >= Content.OrderRules.MaxToppings then
-		return nil, nil
+	if table.find(toppings, ingredient) then
+		return nil, ingredient, "topping_repeat"
 	end
-	const amount = ctx.GetStock(ingredient)
-	if amount < 1 then
-		return nil, nil
+	if #toppings >= Content.OrderRules.MaxToppings then
+		return nil, ingredient, "topping_max"
 	end
-	return tool, ingredient
+	if ctx.GetStock(ingredient) < 1 then
+		return nil, ingredient, "out_of_stock"
+	end
+	return tool, ingredient, nil
 end
 
 -- Adds the topping to the held Tool (same Tool; ItemService refreshes HotDogVisual).
@@ -77,14 +106,19 @@ const Toppings: StationApi.Module = {
 	Kinds = { "toppings" },
 	Actions = {
 		[ACTION] = {
-			Validate = function(ctx: StationApi.Context, _station: StationApi.Station, player: Player, anchor: Instance)
-				const tool = canAdd(ctx, player, anchor)
+			Validate = function(ctx: StationApi.Context, station: StationApi.Station, player: Player, anchor: Instance)
+				const tool, ingredient, notice = canAdd(ctx, station, player, anchor)
+				if notice == "topping_max" then
+					Refusal.notify(ctx, player, notice, nil)
+				elseif notice ~= nil and ingredient ~= nil then
+					Refusal.notify(ctx, player, notice, Refusal.ingredient(ingredient))
+				end
 				return tool ~= nil, nil
 			end,
 			-- Runs inside the station lock: revalidate, take the unit, then add. TakeStock refuses Blocked and an
 			-- emptied bowl (another player took the last unit while this one waited).
-			Run = function(ctx: StationApi.Context, _station: StationApi.Station, player: Player, anchor: Instance)
-				const tool, ingredient = canAdd(ctx, player, anchor)
+			Run = function(ctx: StationApi.Context, station: StationApi.Station, player: Player, anchor: Instance)
+				const tool, ingredient = canAdd(ctx, station, player, anchor)
 				if tool == nil or ingredient == nil then
 					return
 				end

@@ -9,10 +9,13 @@
 -- Empty, slots in progress never restart (network.md §3.5). One Stations record per active slot.
 -- Prompts (Provisional, TASK-026): "Grill" off while no slot is free or the stock is 0; "Collect" on only on a Ready
 -- slot with room on the rail. Snapshot: nothing kept (data.md §2.2: the shift restarts with an empty grill).
+-- Refusal toasts (D-04, TASK-080, via Refusal.luau): "Grill" with no stock -> out_of_stock {item}, with no free slot ->
+-- grill_full; "Collect" with the rail full -> rail_full. A wrong kind or a slot that is not Ready stays silent.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 local StationApi = require(script.Parent.Parent.StationApi)
 local Rail = require(script.Parent.Rail)
+local Refusal = require(script.Parent.Parent.Refusal)
 
 type Context = StationApi.Context
 type Station = StationApi.Station
@@ -131,13 +134,17 @@ local function promptAll(ctx: Context, station: Station, action: string, want: (
 	end
 end
 
-local function canPlace(ctx: Context, station: Station): boolean
+-- (ok, notice?): stock first (restocking is what the player can do), then a free slot.
+local function canPlace(ctx: Context, station: Station): (boolean, string?)
 	const amount = ctx.GetStock(ingredientOf(station))
 	if amount < 1 then
-		return false
+		return false, "out_of_stock"
 	end
 	const grill = freeSlot(ctx, station.Vehicle)
-	return grill ~= nil
+	if grill == nil then
+		return false, "grill_full"
+	end
+	return true, nil
 end
 
 -- The anchor's slot, if it is the slot attachment of the current level and holds a Ready sausage.
@@ -165,7 +172,7 @@ local function refreshCollect(ctx: Context, station: Station)
 end
 
 local function refreshPlace(ctx: Context, station: Station)
-	const enabled = canPlace(ctx, station)
+	const enabled = (canPlace(ctx, station))
 	promptAll(ctx, station, PLACE, function(_anchor: Instance): boolean
 		return enabled
 	end)
@@ -174,11 +181,17 @@ end
 -- Actions -------------------------------------------------------------------------------------------------------------
 
 const place: StationApi.Action = {
-	Validate = function(ctx: Context, station: Station, _player: Player, _anchor: Instance): (boolean, string?)
+	Validate = function(ctx: Context, station: Station, player: Player, _anchor: Instance): (boolean, string?)
 		if station.Kind ~= STOCK then
 			return false, nil
 		end
-		return canPlace(ctx, station), nil
+		const ok, notice = canPlace(ctx, station)
+		if notice == "out_of_stock" then
+			Refusal.notify(ctx, player, notice, Refusal.ingredient(ingredientOf(station)))
+		elseif notice ~= nil then
+			Refusal.notify(ctx, player, notice, nil)
+		end
+		return ok, nil
 	end,
 	Run = function(ctx: Context, station: Station, player: Player, _anchor: Instance)
 		const grill, slot = freeSlot(ctx, station.Vehicle)
@@ -204,11 +217,15 @@ const place: StationApi.Action = {
 }
 
 const collect: StationApi.Action = {
-	Validate = function(_ctx: Context, station: Station, _player: Player, anchor: Instance): (boolean, string?)
+	Validate = function(ctx: Context, station: Station, player: Player, anchor: Instance): (boolean, string?)
 		if station.Kind ~= GRILL or readySlot(station, anchor) == nil then
 			return false, nil
 		end
-		return Rail.Room(station.Vehicle) > 0, nil
+		if Rail.Room(station.Vehicle) <= 0 then
+			Refusal.notify(ctx, player, "rail_full", nil)
+			return false, nil
+		end
+		return true, nil
 	end,
 	Run = function(ctx: Context, station: Station, _player: Player, anchor: Instance)
 		const slot = readySlot(station, anchor)
