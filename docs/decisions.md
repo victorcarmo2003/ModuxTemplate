@@ -3017,3 +3017,14 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
 - Decidido: **porco pode ser cliente normal**. A marca "a confirmar" da **DEC-192** cai; DEC-192 vale sem ressalva.
 - Onde o porco aparece como cliente (tipo, genérico ou 2ª espécie) segue em **`Q-165`** (game-designer).
 - Impacto: **game-designer** (`npcs.md`, tabela `Species`), **architect/task-planner** (`content-data.md` e `tasks/board.md` TASK-009 citam "DEC-192, a confirmar": trocar por "DEC-192, DEC-214"; o secretário não editou esses arquivos). Nota em `npcs.md`, `proposals-round-3.md`, `open-questions.md` (`Q-149`, `Q-165`), `README.md` → secretário (feito).
+
+### DEC-215 — 2026-10-10 — Tábua de montagem: carrinho 2 vagas, trailer 3 vagas (completa DEC-190)
+
+- Pergunta do orquestrador: "A tábua de montagem tem 2 vagas (DEC-190). No trailer ela também fica com 2 ou ganha 3, como estava na ficha antiga?"
+- Fala do usuário (**literal**): "Trailer com 3 vagas"
+- Decidido:
+  - **Carrinho: 2 vagas** na tábua. **Trailer: 3 vagas.**
+  - Resto da DEC-190 segue igual: vagas **compartilhadas** pela party, Tool "HotDog", entrega por prompt no cliente.
+- Leitura do secretário: DEC-190 fixou "2 vagas" sem citar veículo; esta DEC **completa** a DEC-190 por veículo. Confirma o que FEAT-006 passo 4 já dizia ("tábuas: 2 (carrinho), 3 (trailer)").
+- Fecha a pendência "`Vehicles.trailer.BoardSlots = 3` (Provisório) × DEC-190" levantada em `tech/content-data.md` §3.8 e no `tasks/board.md`: o valor **3** deixa de ser Provisório.
+- Impacto: **game-designer** (FEAT-006: só a origem; números já batiam), **architect** (`content-data.md`: `BoardSlots` carrinho 2 / trailer 3 com origem DEC-190 + DEC-215, tirar "Provisório" e a linha da pendência; `network.md`: tábua do trailer = 3 registros `board`, `Slot` 1..3), **task-planner** (TASK-027 e nota de `BoardSlots` no `board.md`), **level-designer/art-director** (tábua do trailer com 3 âncoras `Att_Bun1..3`, se houver marca visual). Nota em `features.md` (FEAT-006), `open-questions.md` (`Q-068`), `README.md` → secretário (feito). **`docs/tech/` e `docs/tasks/board.md` não editados** pelo secretário (agentes em trabalho).

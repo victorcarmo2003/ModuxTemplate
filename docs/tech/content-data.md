@@ -2,11 +2,14 @@ Status: Rascunho
 
 # Dados de conteúdo (data-driven)
 
-Autor: architect. Versão 3.1, 2026-10-08 (conciliação com DEC-106 a DEC-130, rodada 17 e `consistency-report.md` §5;
-`Traffic` alinhado à **DEC-133**).
+Autor: architect. Versão 4, 2026-10-10 (**TASK-001**: estado DEC-140 a DEC-201, núcleo da onda 1). Versão anterior:
+3.1, 2026-10-08 (DEC-130/DEC-133).
 Formato das tabelas que game-designer, narrative-writer e level-designer preenchem e que o código só lê.
 Base: DEC-044 ("parâmetros são tabela"), propostas das rodadas 1 e 2 (Aprovadas), fichas de `design/` e `story/`.
 Números são **valores iniciais** (ajuste de número não exige DEC; mudança de regra exige).
+
+> **Base Provisória (DEC-193).** Rascunho que vale para construir. Item sem DEC está marcado **Provisório**.
+> Rede: `network.md` v4. Persistência: `data.md` v4.
 
 Fichas de design (`ITM-###`, `UPG-###`, `NPC-###`, `CLS-###`, `ANM-###`) são a fonte; a tabela é a forma
 executável. Toda linha tem `Ref` apontando para o ID da ficha.
@@ -15,7 +18,27 @@ executável. Toda linha tem `Ref` apontando para o ID da ficha.
 
 ## 0. O que mudou
 
-### 0.0 Versão 3.1 (DEC-130, rodada 17)
+### 0.0 Versão 4 (TASK-001; DEC-140 a DEC-201)
+
+| Tabela | Mudança | Origem |
+|---|---|---|
+| **ItemRules** (nova, registro único) | `HotbarSlots = 4`; limites por categoria (pacote 2, HotDog 2, café 1, alterado 1, Revive Kit 1). Sai o campo por item `HotbarSlots` ("1, `Q-056`") | **DEC-174**, DEC-049, DEC-100, FEAT-005 |
+| Items | + `Category`; sai `ToolModel` (convenção do kit); atributos de Tool (`Item`, `Count`, `Toppings`) | DEC-040, **DEC-190**, DEC-142 |
+| Ingredients | + `Icon` (plaquinha `Label_<Ing>`, `Q-152` placeholder), + `Stack` (queijo antes dos cordões), + `Vehicle` | **DEC-156**, **DEC-142** |
+| Stations | reescrita com as chaves do binding (TASK-002 §18.4): `sausage_stock`, `grill`, `rail`, `bun_crate`, `board`, `toppings`, `trash`; `Record` (`PerSlot`/`Single`/`None`), `RecordKeys` para o set; tábua `board` com 2 vagas | **DEC-190**, DEC-201, MAP-01 §7.1 |
+| Upgrades | `Levels` **por veículo** (`cart`, `trailer`); trailer recomeça do nível 1; `Vehicles` lista onde o upgrade existe; `Parts` por veículo | **DEC-184** (`Q-163` Provisório nos preços) |
+| Vehicles | + `RailSlots`, `BoardSlots`, `HasCoffee`/`HasSwitch`/`HidePoints`, `CoveredAfter` (lona) | DEC-190, FEAT-006, DEC-189, DEC-199 |
+| Classes | **chaves por animal** (`class_dog`…); + `Species`; 6 com `InMvp = true`; efeitos com `When` | **DEC-186**, DEC-147 |
+| **Species** (nova) | 18 espécies (DEC-158), `Class`, `Customer`, `Pedestrian`, `ReservedFor` (guaxinim só Quentin) | **DEC-158, DEC-186, DEC-188**, DEC-159, DEC-192 |
+| **Outfits** (nova) | `crew`, `civil_a`..`civil_h`, `thief`; packs disponíveis por roupa | DEC-148, DEC-159, DEC-160, DEC-161, DEC-166 |
+| **Moods** (nova) | humor → expressão; onda 1 só visual (**Provisório**, `Q-164`) | DEC-162, DEC-187 |
+| CustomerTypes | `Species` (lista), `Accessories`, `Outfits`; mapa da DEC-188 | **DEC-188** |
+| Flow | `PartySource = "Connected"`, `RecalcOn = "ShiftStarted"` (Provisório) | **DEC-185** |
+| Sanity | + `Bands` (≥ 60 / 40–59 / < 40) e `Look` (faixa → pack → rosto) | DEC-166, **DEC-167** |
+| Actions | lista da onda 1; `topping_add` substitui `board_add_topping`; saem `board_pickup` e `party_join` | DEC-190, DEC-179 |
+| Notices | chaves da onda 1 | FEAT-005, FEAT-015, FEAT-032, DEC-186 |
+
+### 0.1 Versão 3.1 (DEC-130, rodada 17)
 
 | Tabela | Mudança | Origem |
 |---|---|---|
@@ -23,7 +46,7 @@ executável. Toda linha tem `Ref` apontando para o ID da ficha.
 | Traffic (DEC-133) | sai `CrossGap` (era da brecha sem parada); entram `Routes[].Stops` (PARE e linhas de faixa por rota), `Crosswalks[].Lines`, e a subtabela **`Traffic.Crossing`** (PARE 1 s, raio de reserva 15 studs, espera máx. 4 s, cooldown 4 s, spawn ≥ 55 studs, 3 s por faixa de rolagem, Juniper Sul 12–20 s por sentido, frenagem, fila) | DEC-133, FEAT-033 |
 | NpcNodes (mapa) | nó de travessia ganha atributo `Crosswalk = "CW-n"`: NPC só cruza pista ali, com reserva (DEC-133) | `architecture.md` §8.1, T30 |
 
-### 0.1 Versão 3
+### 0.2 Versão 3
 
 | Tabela | Mudança | Origem |
 |---|---|---|
@@ -39,7 +62,7 @@ executável. Toda linha tem `Ref` apontando para o ID da ficha.
 | Cutscenes | só cutscenes de verdade (intro, finale, credits); troca de veículo e noite perdida são transições no mundo | FEAT-004 |
 | Actions | `take_item` vira `pick_up_item` ("Pick Up", toque) | FEAT-036 |
 
-### 0.2 Versão 2
+### 0.3 Versão 2
 
 | Tabela | Mudança | Origem |
 |---|---|---|
@@ -88,61 +111,86 @@ return Table.new({
 } :: { Ingredient })
 ```
 
-`Table.new(list)` devolve, congelado: `List`, `Keys` (enum do Lync), `ByKey`, `IndexOf`.
-Registro único (ex.: `RunParams`) é tabela simples congelada, sem `Table.new`.
+`Table.new(list)` devolve, congelado: `List`, `Keys` (lista de chaves para `Lync.enum`/`Lync.bitfield`), `ByKey`,
+`IndexOf` (posição na `List`; é o id de registro de `Stock` e `Upgrades`).
+Subconjuntos usados pela rede são **derivados no próprio módulo**, nunca escritos à mão: `Ingredients.ToppingKeys`
+(`Kind` ∈ Sauce, Topping), `Stations.RecordKeys` (`Record ≠ "None"`), `Shift.PhaseKeys`.
+Registro único (ex.: `RunParams`, `ItemRules`) é tabela simples congelada, sem `Table.new`.
 
 ### 1.3 Regras
 
-1. **Chave é para sempre.** Perfil e snapshot guardam chaves; para mudar o texto, mude `Name`.
-2. Ordem livre entre versões, fixa dentro de uma (índice só vive no fio).
+1. **Chave é para sempre.** Perfil e snapshot guardam chaves; para mudar o texto, mude `Name`. Chave nova:
+   minúsculas com `_` (`^[a-z][a-z0-9_]*$`); exceções já usadas em enums literais da rede (`"Day"`, `"Mid"`,
+   `"Night"`, nomes de humor) são valores, não chaves de tabela.
+2. Ordem livre entre versões. O **Lync ordena** os nomes de `enum`/`bitfield` antes de numerar (Lync 4.0.2): a ordem
+   da tabela não chega ao fio; o código lê strings. `IndexOf` (ordem da `List`) só é usado como id de registro.
 3. **Sem lógica na tabela.** Fórmulas viram parâmetros (`Base`, `PerK`).
-4. **Efeitos por modificador** `{ Stat, Op, Value, Scope }` sobre a lista fechada de `Stat` (§3.10).
+4. **Efeitos por modificador** `{ Stat, Op, Value, Scope, When? }` sobre a lista fechada de `Stat` (§3.10).
 5. Tempo em segundos reais; dinheiro em inteiros; distância em studs; preço em Robux **nunca** na tabela.
 6. Texto de jogador em `Name`/`Text`/`Lines`.
-7. Enum com sentinela (`none`) declara a sentinela **como linha da tabela** (primeira posição).
+7. Enum com sentinela (`none`) declara a sentinela **como linha da tabela** (por convenção a primeira; a posição não
+   importa para o fio).
+8. Ids de textura de personagem **não** ficam em `Content`: ficam em `src/Crew/shared/CrewLooks.luau` (TASK-006),
+   indexados pelas chaves de `Species`, `Outfits` e pelos packs `Day`/`Mid`/`Night`. `Content` diz **o que existe**;
+   `CrewLooks` diz **com que textura**.
 
 ### 1.4 Validação
 
 `Validate()` ao requerer `Content` (< 1 ms): chave duplicada ou fora do padrão, referência quebrada (pacote →
-ingrediente; noite → anomalia; bench → item; rota → nó), número fora de faixa, enum vazio, efeito de classe sobre
-`Stat` de regra de anomalia, **ProductId = 0 em produção** (aviso no Studio). Falha = `error` com tabela e linha
-(R8: enum ruim derruba o `Lync.start()`).
+ingrediente; ingrediente → estação; classe → espécie; tipo de cliente → espécie/roupa; noite → anomalia; bench →
+item; rota → nó), número fora de faixa, enum vazio, efeito de classe sobre `Stat` de regra de anomalia,
+**ProductId = 0 em produção** (aviso no Studio). Regras novas da v4:
+- `Species` com `ReservedFor` não é `Class` de nenhuma classe nem aparece em `CustomerTypes` (guaxinim, DEC-186);
+- toda classe tem `Species`, e essa espécie tem `Class` apontando de volta (1 ↔ 1);
+- `Upgrades[k].Levels[v]` existe para todo `v` em `Upgrades[k].Vehicles`; `Levels[v][1].Price = 0` para upgrades de
+  nível inicial (Grill, Cooler, Counter);
+- `Ingredients[k].Capacity` tem uma entrada por nível de Cooler (`#Upgrades.cooler.Levels.cart`);
+- `ItemRules.CategoryLimits` soma ≥ `HotbarSlots` não é erro (limites são por categoria; o total manda);
+- `Moods` contém `Neutral`; toda `Expression` de `Moods` existe na lista fechada de expressões (§3.16).
+
+Falha = `error` com tabela e linha (R8: enum ruim derruba o `Lync.start()`).
 
 ## 2. Mapa das tabelas
 
-| Tabela | Arquivo | Fonte | Dono do conteúdo |
-|---|---|---|---|
-| RunParams | `RunParams.luau` | DEC-044, DEC-057, DEC-080, DEC-083, DEC-084, DEC-098, DEC-110, DEC-112, DEC-121 | game-designer (+ architect nos tempos técnicos) |
-| Shift | `Shift.luau` | DEC-048 | game-designer |
-| Ingredients | `Ingredients.luau` | DEC-071 | game-designer |
-| Packages | `Packages.luau` | DEC-049, DEC-071 | game-designer |
-| Items | `Items.luau` | DEC-040, DEC-100, DEC-103 | game-designer |
-| Stations | `Stations.luau` | DEC-016, DEC-046, DEC-055 | game-designer |
-| Upgrades | `Upgrades.luau` | DEC-046, DEC-101 | game-designer |
-| Vehicles | `Vehicles.luau` | DEC-047, DEC-052, DEC-086 | game-designer |
-| MarketBench, BenchItems | `MarketBench.luau` | DEC-100, DEC-101, DEC-106, DEC-108, DEC-129 | game-designer (`Q-120`) |
-| Flow | `Flow.luau` | DEC-045 | game-designer |
-| OrderPhases, OrderRules | `Orders.luau` | DEC-071, DEC-072 | game-designer |
-| CustomerTypes | `CustomerTypes.luau` | `design/npcs.md` | game-designer + art-director |
-| Thief | `Thief.luau` | DEC-050 | game-designer |
-| Sanity | `Sanity.luau` | DEC-056, DEC-069 | game-designer |
-| Revive | `Revive.luau` | DEC-091 a DEC-094, DEC-102, DEC-115 a DEC-118, DEC-129 | game-designer |
-| Ambulance | `Ambulance.luau` | DEC-091, DEC-114, DEC-122 | game-designer + level-designer |
-| Traffic | `Traffic.luau` | DEC-087, DEC-095, DEC-103, DEC-130, DEC-133 | level-designer + game-designer |
-| Products | `Products.luau` | DEC-092 | architect (ids do Creator Hub, pelo usuário) |
-| Nights | `Nights.luau` | DEC-025, DEC-053, DEC-060, DEC-073, DEC-127 | game-designer + narrative-writer |
-| Anomalies | `Anomalies.luau` | DEC-073, DEC-096 | game-designer + art-director |
-| AnomalyRules (servidor) | `src/Anomaly/server/Rules/` | DEC-054, DEC-073, DEC-074 | game-designer |
-| AnomalyCues | `AnomalyCues.luau` | `story/anomalies.md` | game-designer |
-| BossCalls | `BossCalls.luau` | DEC-025, DEC-076, DEC-077 | narrative-writer |
-| Cutscenes | `Cutscenes.luau` | DEC-021, DEC-075, DEC-078, DEC-088 | narrative-writer + level-designer |
-| Classes | `Classes.luau` | DEC-069 | game-designer |
-| GemRewards | `GemRewards.luau` | DEC-070, DEC-083, DEC-084, DEC-104 | game-designer |
-| Achievements | `Achievements.luau` | DEC-058, DEC-084 | game-designer + narrative-writer |
-| Actions | `Actions.luau` | DEC-016, DEC-054, DEC-066 | architect + game-designer |
-| Notices | `Notices.luau` | — | narrative-writer |
-| Hallucinations | `Hallucinations.luau` | DEC-038 | game-designer + art-director |
-| OpalLines | `OpalLines.luau` | DEC-079, CHR-003 | narrative-writer |
+Coluna **Onda**: em que onda a tabela precisa estar completa. Na onda 1 (TASK-003) as tabelas marcadas "1 (stub)"
+existem com `Keys` corretas e valores preenchidos nas TASK-008/009.
+
+| Tabela | Arquivo | Fonte | Dono do conteúdo | Onda |
+|---|---|---|---|---|
+| RunParams | `RunParams.luau` | DEC-044, DEC-057, DEC-080, DEC-083, DEC-084, DEC-098, DEC-110, DEC-112, DEC-121 | game-designer (+ architect nos tempos técnicos) | 1 (stub → TASK-008) |
+| Shift | `Shift.luau` | DEC-048 | game-designer | 1 (stub → TASK-008) |
+| Ingredients | `Ingredients.luau` | DEC-071, DEC-142, DEC-156 | game-designer (+ art-director no `Icon`) | 1 |
+| Packages | `Packages.luau` | DEC-049, DEC-071 | game-designer | 1 |
+| Items, **ItemRules** | `Items.luau` | DEC-040, DEC-100, DEC-103, **DEC-174**, DEC-190 | game-designer | 1 |
+| Stations | `Stations.luau` | DEC-016, DEC-046, DEC-055, **DEC-190**, DEC-201, MAP-01 §7.1 | game-designer + architect | 1 |
+| Upgrades | `Upgrades.luau` | DEC-046, DEC-101, **DEC-184** | game-designer | 1 (stub → TASK-008) |
+| Vehicles | `Vehicles.luau` | DEC-047, DEC-052, DEC-086, DEC-184, DEC-190 | game-designer | 1 (stub → TASK-008) |
+| **Species** | `Species.luau` | **DEC-158, DEC-186, DEC-188**, DEC-159, DEC-192 | game-designer + art-director | 1 (stub → TASK-009) |
+| **Outfits**, **Looks** | `Outfits.luau` | DEC-148, DEC-159, DEC-160, DEC-161, DEC-166, DEC-167 | art-director | 1 (TASK-003, completa: 10 roupas) |
+| **Moods**, **MoodRules** | `Moods.luau` | DEC-162, DEC-187 (`Q-164`) | game-designer | 1 (TASK-003, Provisório) |
+| MarketBench, BenchItems | `MarketBench.luau` | DEC-100, DEC-101, DEC-106, DEC-108, DEC-129 | game-designer (`Q-120`) | 4 |
+| Flow | `Flow.luau` | DEC-045, **DEC-185** | game-designer | 1 (stub → TASK-008) |
+| OrderPhases, OrderRules | `Orders.luau` | DEC-071, DEC-072 | game-designer | 1 (stub → TASK-008) |
+| CustomerTypes | `CustomerTypes.luau` | `design/npcs.md`, **DEC-188** | game-designer + art-director | 1 (stub → TASK-009) |
+| Thief | `Thief.luau` | DEC-050, DEC-182 | game-designer | 2 |
+| Sanity | `Sanity.luau` | DEC-056, DEC-069, **DEC-166, DEC-167** | game-designer | 2 |
+| Revive | `Revive.luau` | DEC-091 a DEC-094, DEC-102, DEC-115 a DEC-118, DEC-129 | game-designer | 4 |
+| Ambulance | `Ambulance.luau` | DEC-091, DEC-114, DEC-122 | game-designer + level-designer | 4 |
+| Traffic | `Traffic.luau` | DEC-087, DEC-095, DEC-103, DEC-130, DEC-133, DEC-198 | level-designer + game-designer | 3 |
+| Products | `Products.luau` | DEC-092 | architect (ids do Creator Hub, pelo usuário) | 4 |
+| Nights | `Nights.luau` | DEC-025, DEC-053, DEC-060, DEC-073, DEC-127 | game-designer + narrative-writer | 2 |
+| Anomalies | `Anomalies.luau` | DEC-073, DEC-096, DEC-195 | game-designer + art-director | 3 |
+| AnomalyRules (servidor) | `src/Anomaly/server/Rules/` | DEC-054, DEC-073, DEC-074 | game-designer | 3 |
+| AnomalyCues | `AnomalyCues.luau` | `story/anomalies.md` | game-designer | 3 |
+| BossCalls | `BossCalls.luau` | DEC-025, DEC-076, DEC-077 | narrative-writer | 2 |
+| Cutscenes | `Cutscenes.luau` | DEC-021, DEC-075, DEC-078, DEC-088, DEC-194 | narrative-writer + level-designer | 4 |
+| Classes | `Classes.luau` | DEC-069, DEC-070, **DEC-186** | game-designer | 1 (stub → TASK-009) |
+| GemRewards | `GemRewards.luau` | DEC-070, DEC-083, DEC-084, DEC-104 | game-designer | 2 |
+| Achievements | `Achievements.luau` | DEC-058, DEC-084 | game-designer + narrative-writer | 2 |
+| Actions | `Actions.luau` | DEC-016, DEC-054, DEC-066, DEC-190 | architect + game-designer | 1 |
+| Notices | `Notices.luau` | — | narrative-writer | 1 |
+| Hallucinations | `Hallucinations.luau` | DEC-038, DEC-172, DEC-173 | game-designer + art-director | 2 |
+| OpalLines | `OpalLines.luau` | DEC-079, CHR-003 | narrative-writer | 1 (stub → TASK-009) |
 
 ## 3. Formato de cada tabela
 
@@ -158,6 +206,8 @@ ingrediente; noite → anomalia; bench → item; rota → nó), número fora de 
 | `Chances` | int | **1** (por run inteira: a 2ª noite perdida encerra a run) | DEC-110, DEC-112 (emendam DEC-057) |
 | `StartCash` | int | 30 | DEC-045 |
 | `StartStockFull` | bool | true | DEC-049 |
+| `BaseWalkSpeed` | studs/s | 16 (classe sem efeito de velocidade) | DEC-069 |
+| `StartVehicle` | chave de `Vehicles` | `cart` | DEC-007 |
 | `JoinWindow` | s | 60 | DEC-098 |
 | `ResumeWindow` | s | 900 (15 min) | DEC-080 |
 | `ResumeWait` | s | 15 (fase `Resume`) | architect |
@@ -174,21 +224,42 @@ ingrediente; noite → anomalia; bench → item; rota → nó), número fora de 
 | `ClockStepMinutes` | int | 10 |
 | `PhaseKeys` | derivado | enum do set `Shift` |
 
+Onda 1 (TASK-008): só as fases de dia têm números (Prep 60 s, Open 360 s, Closing ≤ 30 s, Summary 15 s); as de noite
+existem como chave (o enum `PhaseKeys` já sai completo, o `Net` não muda na onda 2).
+
 ### 3.3 Ingredients
 
-| Campo | Tipo | Exemplo (Ketchup) |
-|---|---|---|
-| `Key`, `Ref`, `Name` | | `ketchup`, `ITM-003`, "Ketchup" |
-| `Kind` | `"Base" \| "Sauce" \| "Topping" \| "Supply"` | `Sauce` |
-| `OrderPrice` | int | 1 |
-| `UnlockDay` | int | 1 |
-| `Weight` | number | 10 |
-| `Capacity` | `{ int }` por nível de Cooler | 30 / 50 / 75 (`items.md`) |
-| `Station` | chave de `Stations` | `condiment_ketchup` |
-| `Icon` | asset id | (art-director) |
+| Campo | Tipo | Exemplo (Ketchup) | Origem |
+|---|---|---|---|
+| `Key`, `Ref`, `Name` | | `ketchup`, `ITM-003`, "Ketchup" | |
+| `Kind` | `"Base" \| "Sauce" \| "Topping" \| "Supply"` | `Sauce` | |
+| `OrderPrice` | int | 1 | DEC-071 |
+| `UnlockDay` | int (0 = depende de veículo) | 1 | DEC-071 |
+| `Vehicle` | chave de `Vehicles` ou `nil` | `nil` (Coffee: `trailer`) | DEC-049, DEC-055 |
+| `Weight` | number | 10 | DEC-071 |
+| `Capacity` | `{ int }` por nível de Cooler | 30 / 50 / 75 | DEC-049, `items.md` |
+| `Station` | chave de `Stations` | `toppings` | MAP-01 §7.1, `architecture.md` §18.4 |
+| `Stack` | `"BeforeCords" \| "Cord" \| "InOrder"` | `Cord` | **DEC-142**: queijo sempre antes dos cordões (Ketchup, Mustard, Cream Cheese); o resto na ordem de montagem |
+| `Icon` | asset id (`rbxassetid://…`); `""` = placeholder | `""` até `Q-152` | **DEC-156** |
 
-Linhas (DEC-071): bun, sausage (Base); ketchup, mustard (dia 1); cheese (2); bacon (3); potato_sticks (4);
-cream_cheese (6); coffee (Supply). `ToppingKeys` = Sauce + Topping. Capacidade do Cream Cheese: `Q-062`.
+A cobertura no kit é `ReplicatedStorage.Assets.Items.Toppings/<chave>` (convenção do §18.9.1, sem campo). A altura
+(DEC-142) **não** fica aqui: é o atributo `TopHeight` no modelo do kit (medida da malha, TASK-007). `Stack` é a regra;
+`TopHeight` é a medida.
+
+| Key | Ref | Kind | OrderPrice | UnlockDay | Weight | Capacity (Cooler 1/2/3) | Station | Stack |
+|---|---|---|---|---|---|---|---|---|
+| `bun` | ITM-001 | Base | — | 1 | — | 12 / 20 / 30 | `bun_crate` | — |
+| `sausage` | ITM-002 | Base | — | 1 | — | 12 / 20 / 30 | `sausage_stock` | — |
+| `ketchup` | ITM-003 | Sauce | 1 | 1 | 10 | 30 / 50 / 75 | `toppings` | Cord |
+| `mustard` | ITM-004 | Sauce | 1 | 1 | 10 | 30 / 50 / 75 | `toppings` | Cord |
+| `cheese` | ITM-005 | Topping | 2 | 2 | 7 | 8 / 14 / 20 | `toppings` | BeforeCords |
+| `bacon` | ITM-006 | Topping | 3 | 3 | 6 | 8 / 14 / 20 | `toppings` | InOrder |
+| `potato_sticks` | ITM-007 | Topping | 2 | 4 | 6 | 15 / 25 / 35 | `toppings` | InOrder |
+| `cream_cheese` | ITM-008 | Topping | 2 | 6 | 5 | 12 / 20 / 30 (2/3 **Provisório**, `Q-062`) | `toppings` | Cord |
+| `coffee` | ITM-009 | Supply | — | 0 (`Vehicle = trailer`) | — | 20 / 20 / 20 | `coffee_machine` | — |
+
+`ToppingKeys` = Sauce + Topping (6 chaves; bitfield de `Customers.Order`). Estoque inicial = capacidade do nível 1
+(`RunParams.StartStockFull`, DEC-049). `Stock.Blocked` = `Day < UnlockDay` ou `Vehicle` diferente do atual.
 
 ### 3.4 Packages
 
@@ -199,58 +270,109 @@ cream_cheese (6); coffee (Supply). `ToppingKeys` = Sauce + Topping. Capacidade d
 | `Amount`, `Price` | 8, 6 |
 | `Item` | chave em `Items` (`pack_sausages`) |
 
-`MaxCarried = 2` (DEC-049), modificado por `PackageLimit` (Hauler, pós-MVP).
+Linhas: `pack_sausages` (8, $6), `pack_buns` (8, $4), `pack_ketchup` (20, $4), `pack_mustard` (20, $4), `pack_cheese`
+(6, $6), `pack_bacon` (6, $9), `pack_potato_sticks` (10, $5), `pack_cream_cheese` (8, $6), `pack_coffee` (10, $5)
+(`items.md`, DEC-049, DEC-071). Limite de carga: `ItemRules.CategoryLimits.Package` (§3.5).
 
-### 3.5 Items (Tools) — nova
+### 3.5 Items (Tools) e ItemRules
 
-Toda Tool que vai à hotbar (DEC-040).
+Toda Tool que vai à hotbar (DEC-040). A Tool no kit é `ReplicatedStorage.Assets.Items.Tools/<chave>` (convenção do
+`architecture.md` §18.9.1; sai o campo `ToolModel`).
 
-| Campo | Tipo | Exemplo (kit de reviver) |
+| Campo | Tipo | Exemplo (Hot Dog) |
 |---|---|---|
-| `Key`, `Ref`, `Name` | | `revive_kit`, `ITM-021`, "Revive Kit" |
-| `Kind` | `"Package" \| "Consumable" \| "Product" \| "Revive" \| "Anomaly"` | `Revive` |
-| `ToolModel` | nome do modelo (AST-###) | (art-director) |
-| `Stackable` | bool | false |
-| `DropOnHit` | `"Keep" \| "Lost" \| "Vanish"` | `Keep` (Revive Kit e pacotes ficam no chão). Só a Tool **equipada** cai (DEC-103); `Lost` = Hot Dog e café ("splat"/derrama, some em 2 s); `Vanish` = item alterado (FEAT-036) |
-| `DropDespawn` | s ou `"NextShiftEnd"` | pacote 120 s na rua; Revive Kit `NextShiftEnd` (FEAT-036; game-designer fecha `Q-122` e) |
-| `KeepOnSpectate` | bool | true (fica no stash; usável pelo `Revive` com `Method = Item`) |
-| `HotbarSlots` | int | 1 (`Q-056`) |
+| `Key`, `Ref`, `Name` | | `hot_dog`, `ITM-010`, "Hot Dog" |
+| `Kind` | `"Package" \| "Consumable" \| "Product" \| "Revive" \| "Anomaly"` | `Product` |
+| `Category` | chave de `ItemRules.CategoryLimits` | `HotDog` |
+| `Stackable` | bool (contagem em atributo `Count`) | false |
+| `DropOnHit` | `"Keep" \| "Lost" \| "Vanish"` | `Lost` (só a Tool equipada cai, DEC-103; FEAT-036) |
+| `DropDespawn` | s ou `"NextShiftEnd"` | — |
+| `KeepOnSpectate` | bool | false |
 
-Linhas: um item por pacote (ITM-011…019), `coffee` (ITM-009), `hot_dog` (ITM-010), `altered_item` (ITM-020),
-`revive_kit` (ITM-021).
+Linhas: um item por pacote (ITM-011…019, `Category = Package`, `Stackable = true`), `coffee` (ITM-009, `Coffee`),
+`hot_dog` (ITM-010, `HotDog`), `altered_item` (ITM-020, `Altered`), `revive_kit` (ITM-021, `Revive`). Onda 1 usa os
+9 pacotes e `hot_dog`; as demais linhas existem (o `Validate` cobre referências).
 
-### 3.6 Stations
+**Atributos de Tool** (escritos só pelo `ItemService`; contrato em `network.md` §7.1): `Item` (todas, chave), `Count`
+(pacotes, café), `Toppings` (HotDog: chaves de `Ingredients` separadas por vírgula, na ordem de montagem, **DEC-190**,
+DEC-142), `Altered` (HotDog, onda 3).
 
-| Campo | Exemplo (vaga de grelha) |
-|---|---|
-| `Key` | `grill_slot` |
-| `BaseDuration` | 12 |
-| `Actions` | `grill_place`, `grill_collect` |
-| `Consumes` | `sausage` |
+`ItemRules` (registro único):
 
-### 3.7 Upgrades
+| Campo | Valor | Origem |
+|---|---|---|
+| `HotbarSlots` | **4** (total de Tools por jogador; o 5º é bloqueado com "Hands full") | **DEC-174** |
+| `CategoryLimits.Package` | 2 (modificado por `PackageLimit`: Urso 3, dentro das 4 vagas) | DEC-049, DEC-186 |
+| `CategoryLimits.HotDog` | 2 | FEAT-005 (proposta; **Provisório**) |
+| `CategoryLimits.Coffee` | 1 | FEAT-005 |
+| `CategoryLimits.Altered` | 1 | FEAT-005, ITM-020 |
+| `CategoryLimits.Revive` | 1 | DEC-100 |
+
+### 3.6 Stations (estações da cozinha do veículo)
+
+Chaves alinhadas ao binding da TASK-002 (`architecture.md` §18.4, §18.14 item 1): `StationKind` no `Model` com tag
+`Station` = chave desta tabela. Gaveta/POS, placa OPEN, prateleiras e bancada do Mart **não** são estação (são
+âncoras `Interactable` soltas, §18.4). O set `Stations` usa só as linhas com `Record ≠ "None"` (`RecordKeys`), com id
+= `StationId × 100 + Slot` (`network.md` §3.5).
+
+| Campo | Tipo | Exemplo (grelha) |
+|---|---|---|
+| `Key` | | `grill` |
+| `Letter` | letra do MAP-01 §7.1 (documentação) | `G` |
+| `Record` | `"PerSlot" \| "Single" \| "None"` | `PerSlot` |
+| `Actions` | chaves de `Actions` com âncora nesta estação | `grill_collect` |
+| `Ingredient` | chave de `Ingredients`, ou `"PerAnchor"` (atributo `Ingredient` em cada âncora), ou `nil` | `nil` |
+| `Params` | números da própria estação (tempos e capacidades que dependem de nível ou veículo vêm de `Upgrades`/`Vehicles`) | — |
+
+| Key | Letra | Record | Actions | Ingredient | Params / de onde vem o número | Módulo (`architecture.md` §18.12) |
+|---|---|---|---|---|---|---|
+| `sausage_stock` | S | None | `grill_place` ("Grill"), `restock` | `sausage` | — | `Grill.luau` |
+| `grill` | G | PerSlot | `grill_collect` ("Collect") | — | vagas e tempo: `Upgrades.grill` (`GrillSlots` 2/3/4, `GrillTime` 12/10/8; DEC-046, **DEC-201**) | `Grill.luau` |
+| `rail` | R | Single | — (consumido por `board_add_sausage`) | — | capacidade: `Vehicles[v].RailSlots` | `Rail.luau` |
+| `bun_crate` | B | None | `bun_cut` ("Slice Bun"), `restock` | `bun` | `CutTime = 1.5` (FEAT-006) | `BunCrate.luau` |
+| `board` | T | PerSlot | `board_add_sausage` ("Add Sausage", **um** prompt na tábua) | — | nº de vagas: `Vehicles[v].BoardSlots` (2 no carrinho, **DEC-190**) | `Board.luau` |
+| `toppings` | K | None | `topping_add` ("Add {item}"), `restock` | `PerAnchor` | 6 complementos (tigela de inox ou garrafa; DEC-156, DEC-140); estado = `Stock` (`Amount`, `Blocked`) | `Toppings.luau` |
+| `trash` | BIN-C | None | `discard` ("Throw Away") | — | — | `Trash.luau` |
+| `coffee_machine` | C (trailer) | Single | `brew_coffee`, `restock` | `coffee` | `BrewTime = 6` (onda 2) | onda 2 |
+
+`restock` é do núcleo do `KitchenService` (por `Ingredient`), não de módulo (§18.12 item 4).
+
+### 3.7 Upgrades (nível por veículo, **DEC-184**)
 
 | Campo | Tipo | Exemplo (Grill) |
 |---|---|---|
 | `Key`, `Ref`, `Name` | | `grill`, `UPG-001`, "Grill" |
-| `Levels` | lista `{ Price, Effects, Part }` | N1 `{0, {GrillSlots=2, GrillTime=12}}` · N2 `{60, ...}` · N3 `{150, ...}` |
-| `Vehicle` | `"Any" \| "Trailer"` | Any |
+| `Vehicles` | lista de chaves de `Vehicles` onde o upgrade existe | `{ "cart", "trailer" }` (Trailer Lights: `{ "trailer" }`) |
+| `StartLevel` | int | 1 (Cash Drawer Lock e Trailer Lights: 0) |
+| `Levels` | `{ [vehicle]: { { Level, Price, Effects, Part } } }` | `cart = { {1, 0, {GrillSlots=2, GrillTime=12}, "Grill_L1"}, {2, 60, {GrillSlots=3, GrillTime=10}, "Grill_L2"}, {3, 150, {GrillSlots=4, GrillTime=8}, "Grill_L3"} }`; `trailer` = mesma lista com peças do trailer |
 | `UnlockDay` | int | 1 |
 | `SoldAt` | `"Bench"` | Bench (DEC-101; sempre à venda, DEC-106) |
-| `BenchSpot` | nome da peça de exibição na bancada | `BenchGrill` (level-designer) |
+| `BenchSpot` | posição na bancada (`B1`..`B5`) | `B1` |
 
-Linhas MVP: grill (UPG-001), cooler (UPG-002), counter (UPG-003), cash_drawer_lock (UPG-004), trailer_lights
-(UPG-005). Coffee Machine (UPG-007) vem com o trailer (sem compra). Nível passa do carrinho ao trailer: `Q-075`.
+- `Effects` é mapa `{ [Stat]: valor absoluto do nível }` sobre a lista fechada de `Stat` (§3.10): `GrillSlots`,
+  `GrillTime`, `StockCapacityLevel`, `QueueSize`, `PatienceBonus`, `DrawerOpenTime`, `StealPct`, `LightRadius`,
+  `DayFlowBonus`.
+- **Por veículo (DEC-184):** o estado da run guarda `Levels[vehicle][upgrade]`; o trailer nasce com `StartLevel` em
+  tudo; comprar na bancada sobe o nível **do veículo atual**. Preços do trailer = preços do carrinho e Cash Drawer Lock
+  recomprado no trailer: **Provisório** até `Q-163` (a, c); mudar é só número na linha `trailer`.
+- Linhas: `grill` (UPG-001), `cooler` (UPG-002), `counter` (UPG-003), `cash_drawer_lock` (UPG-004), `trailer_lights`
+  (UPG-005, só trailer, "Trailer only" na bancada antes). Coffee Machine (UPG-007) vem com o trailer, sem linha de compra.
+- `Part`: nome da peça visível no modelo do veículo (DEC-052); grill = rolos por nível (DEC-201). Nomes com o
+  art-director/level-designer (binding TASK-002).
 
 ### 3.8 Vehicles
 
-| Campo | Exemplo |
-|---|---|
-| `Key`, `Ref`, `Name` | `cart` / `trailer` (`UPG-006`) |
-| `Model` | modelo no `ServerStorage` |
-| `HasNight` | false / true |
-| `BuyFromDay` | — / 5 |
-| `BuySpot` | — / o **próprio trailer** à venda no estacionamento (peça com prompt `buy_trailer`; level-designer). **Fixo**, fora da bancada e da rotação (DEC-107, FEAT-016) |
+| Campo | `cart` | `trailer` | Origem |
+|---|---|---|---|
+| `Ref`, `Name` | AST-026, "Corner Cart" | UPG-006 / AST-027, "Open Late Trailer" | DEC-139, DEC-141 |
+| (modelo) | `Model` com tag `Vehicle`, `Vehicle = "cart"` no `Workspace` (T36; sai o campo `Model`) | idem, `"trailer"` | `architecture.md` §18.1, §18.14 |
+| `HasNight` | false | true | DEC-007 |
+| `RailSlots` | 6 | 8 | FEAT-006 |
+| `BoardSlots` | **2** | 3 (**Provisório**: FEAT-006 diz 3 no trailer; DEC-190 fixou 2 vagas sem citar veículo → confirmar com game-designer) | **DEC-190**, FEAT-006 |
+| `HasCoffee`, `HasSwitch`, `HidePoints` | false, false, 0 | true, true, 4 | DEC-125, DEC-189, DEC-176 |
+| `BuyFromDay` | — | 5 | DEC-037 |
+| `BuySpot` | — | o **próprio trailer** à venda no estacionamento (prompt `buy_trailer`). Fixo, fora da bancada (DEC-107) | DEC-107 |
+| `CoveredAfter` | lona AST-043 na vaga do trailer depois da troca (DEC-199) | — | DEC-199 |
 
 ### 3.9 MarketBench e BenchItems (DEC-106, DEC-129; FEAT-035)
 
@@ -279,34 +401,113 @@ Aqui só a vaga especial.
 | `PerShift` | int | 1 (vendido → "Sold out" até o fim do turno) |
 | `PerRun` | int ou 0 (sem limite) | 0 (limite por turno/run do Kit segue com o game-designer, `Q-120`) |
 
-### 3.10 Classes e modificadores
+### 3.10 Classes e modificadores (**DEC-186**: animal = classe)
 
-| Campo | Tipo | Exemplo (Line Cook) |
+| Campo | Tipo | Exemplo (Gato) |
 |---|---|---|
-| `Key`, `Ref`, `Name`, `Description` | | `class_line_cook`, `CLS-003`, "Line Cook", ... |
-| `Tier`, `Price` | int | 1, 45 gemas |
+| `Key`, `Ref`, `Name`, `Description` | | `class_cat`, `CLS-003`, "Line Cook" (placeholder, narrative-writer), ... |
+| `Species` | chave de `Species` | `cat` |
+| `Tier`, `Price` | int (gemas) | 1, 45 |
 | `InMvp` | bool | true |
-| `Effects` | lista `{ Stat, Op, Value, Scope }` | `{GrillTime, Mul, 0.85, Self}`, `{WalkSpeed, Set, 15, Self}` |
+| `Effects` | lista `{ Stat, Op = "Set" \| "Mul" \| "Add", Value, Scope = "Self" \| "Party", When?, WhenValue? }` | `{GrillTime, Mul, 0.85, Self}`, `{WalkSpeed, Set, 15, Self}` |
+
+**Chaves por animal (decisão desta versão, pedida pela TASK-001):** `class_<espécie>`. O animal é a identidade
+estável da classe (DEC-147: escolher o animal é escolher a classe); o nome ("Rookie", "Line Cook"…) é placeholder e
+muda com o narrative-writer sem tocar em perfil. As chaves antigas `class_rookie`… nunca foram publicadas (sem
+migração).
+
+| Key | Ref | Species | Name (placeholder) | Tier | Price | InMvp | Effects | Origem |
+|---|---|---|---|---|---|---|---|---|
+| `class_dog` | CLS-001 | `dog` | "Rookie" | 0 | 0 | true | — (régua) | DEC-186; conta nova = Cachorro |
+| `class_rabbit` | CLS-002 | `rabbit` | "Runner" | 1 | 45 | true | `{WalkSpeed, Set, 18}`, `{SanityStart, Set, 90}` | DEC-069, DEC-186 |
+| `class_cat` | CLS-003 | `cat` | "Line Cook" | 1 | 45 | true | `{GrillTime, Mul, 0.85, Self}` (só salsichas que ele pôs), `{WalkSpeed, Set, 15}` | DEC-069, DEC-186 |
+| `class_bear` | CLS-004 | `bear` | "Hauler" | 1 | 45 | true | `{PackageLimit, Set, 3}`, `{WalkSpeed, Set, 14, When = PackagesAtLeast, WhenValue = 3}` | DEC-069, DEC-186 |
+| `class_fox` | CLS-005 | `fox` | "Hawker" | 2 | 120 | true | `{TipAmount, Set, 2, Self}`, `{TipWindow, Add, -4, Self}` | DEC-069, DEC-186 |
+| `class_owl` | CLS-006 | `owl` | "Night Owl" | 2 | 120 | true | `{SanityStart, Set, 120}`, `{SanityMax, Set, 120}`, `{WalkSpeed, Set, 15, When = Day}` | DEC-069, DEC-186 |
+| `class_panda` | CLS-007 | `panda` | "Barista" | 2 | 120 | false | `{CoffeeBrewTime, Set, 3, Self}`, `{CoffeeRestore, Set, 35, Self}`, `{SeeAnomalyLoss, Set, 8}` | DEC-069, DEC-186 (1ª atualização) |
+| `class_lion` | CLS-008 | `lion` | "Shift Lead" | 3 | 180 | false | `{BossBonusPP, Add, 5, Party}` (não acumula), `{TipAmount, Set, 0, Self}` | DEC-069, DEC-186 (1ª atualização) |
+
+- Velocidade base de quem não tem efeito: `RunParams.BaseWalkSpeed = 16` (DEC-069).
+- `Scope = Self`: só nas ações do próprio jogador. "Pedido do dono" (Raposa, Leão) = pedido em que **ele fez o "Take
+  Order"** (a janela de gorjeta começa ali, DEC-072) — **Provisório**, game-designer confirma em `classes.md`.
+- Onda 1 implementa `WalkSpeed`, `GrillTime`, `PackageLimit`, `TipAmount`, `TipWindow` (TASK-017). `SanityStart`/
+  `SanityMax` na onda 2; Panda e Leão fora do MVP.
 
 Lista fechada de `Stat`:
 
 | Stat | Lido por | Usam |
 |---|---|---|
-| `WalkSpeed` | `CharacterService` (Humanoid) | Runner, Line Cook, Night Owl (dia), Hauler |
-| `GrillTime`, `GrillSlots` | `Kitchen` | Line Cook, Grill |
+| `WalkSpeed` | `CharacterService` (Humanoid) | Coelho, Gato, Coruja (dia), Urso (com 3 pacotes) |
+| `GrillTime`, `GrillSlots` | `Kitchen` | Gato, Grill |
 | `StockCapacityLevel` | `Kitchen` | Cooler |
 | `QueueSize`, `PatienceBonus` | `Customer` | Counter |
-| `PackageLimit` | `Item` | Hauler (pós-MVP) |
-| `TipAmount`, `TipWindow` | `Economy` | Hawker (pós-MVP) |
-| `SanityStart`, `SanityMax` | `Vital` | Runner (90), Night Owl (120) |
-| `CoffeeBrewTime`, `CoffeeRestore`, `SeeAnomalyLoss` | `Kitchen`, `Vital` | Barista (pós-MVP) |
-| `BossBonusPP` | `Economy` | Shift Lead (pós-MVP, Party, não acumula) |
+| `PackageLimit` | `Item` | Urso |
+| `TipAmount`, `TipWindow` | `Economy`/`Customer` | Raposa, Leão |
+| `SanityStart`, `SanityMax` | `Vital` | Coelho (90), Coruja (120) |
+| `CoffeeBrewTime`, `CoffeeRestore`, `SeeAnomalyLoss` | `Kitchen`, `Vital` | Panda |
+| `BossBonusPP` | `Economy` | Leão (Party, não acumula) |
 | `DrawerOpenTime`, `StealPct` | `Thief` | Cash Drawer Lock |
 | `LightRadius`, `DayFlowBonus` | `Vital`, `Customer` | Trailer Lights |
 
-Linhas MVP (DEC-069): class_rookie (grátis), class_runner (45), class_line_cook (45), class_night_owl (120).
-Hauler, Hawker, Barista, Shift Lead com `InMvp = false`. `Validate()`: nenhum `Stat` toca regra de anomalia, chances,
-revive ou trânsito (guarda pay-to-win e DEC-069).
+`When`: `"Always"` (padrão), `"Day"`, `"Night"`, `"PackagesAtLeast"` (com `WhenValue`). `Validate()`: nenhum `Stat`
+toca regra de anomalia, chances, revive ou trânsito (guarda pay-to-win e DEC-069); guaxinim nunca é `Species` de
+classe (DEC-186).
+
+### 3.10a Species (nova; **DEC-158**, DEC-186, **DEC-188**)
+
+| Campo | Tipo | Exemplo (Pinguim) |
+|---|---|---|
+| `Key`, `Name` | | `penguin`, "Penguin" |
+| `Asset` | sufixo do kit (`AST-053_Animal_<Asset>`, texturas `T_Head_<Asset>[_Mid\|_Night]`) | `Penguin` |
+| `Class` | chave de `Classes` ou `nil` | `nil` |
+| `Customer` | bool: a espécie pode aparecer como cliente (DEC-188 a). Quais tipos a usam: `CustomerTypes.Species` | true |
+| `Pedestrian` | bool: pode ser passante (NPC-019, onda 2) | true |
+| `ReservedFor` | ID de personagem/NPC ou `nil` | `nil` (guaxinim: `NPC-007`) |
+
+| Key | Asset | Class | Customer | Pedestrian | ReservedFor | Nota |
+|---|---|---|---|---|---|---|
+| `dog` | Dog | `class_dog` | true | true | — | jogável (MVP) |
+| `rabbit` | Rabbit | `class_rabbit` | true | true | — | jogável (MVP) |
+| `cat` | Cat | `class_cat` | true | true | — | jogável (MVP) |
+| `bear` | Bear | `class_bear` | true | true | — | jogável (MVP) |
+| `fox` | Fox | `class_fox` | true | true | — | jogável (MVP) |
+| `owl` | Owl | `class_owl` | true | true | — | jogável (MVP) |
+| `panda` | Panda | `class_panda` | true | true | — | classe da 1ª atualização |
+| `lion` | Lion | `class_lion` | true | true | — | classe da 1ª atualização |
+| `penguin` | Penguin | — | true | true | — | NPC-001 |
+| `hamster` | Hamster | — | true | true | — | NPC-002 |
+| `mouse` | Mouse | — | true | true | — | NPC-002 |
+| `frog` | Frog | — | true | true | — | NPC-003 |
+| `monkey` | Monkey | — | true | true | — | NPC-004 |
+| `turtle` | Turtle | — | true | true | — | NPC-005 |
+| `sheep` | Sheep | — | true | true | — | NPC-005 |
+| `koala` | Koala | — | true | true | — | NPC-006 |
+| `pig` | Pig | — | true (DEC-192, **a confirmar**) | true | — | sem tipo de cliente ainda (`Q-165`) |
+| `raccoon` | Raccoon | — | **false** | false | `NPC-007` | só Quick Quentin (DEC-159, DEC-186) |
+
+- Espécies jogáveis e o porco têm `Customer = true` (DEC-188 a, DEC-192), mas **nenhum tipo** da onda 1 os usa: onde
+  aparecem é `Q-165` (game-designer). Na onda 1 o pool de clientes sai só de `CustomerTypes.Species`.
+- Personagens com nome (Walt, Opal, médicos, Pickett, Raincoat Lady, Walker; DEC-178) usam espécie a definir
+  (`Q-160`). Opal na onda 1: espécie **Provisória** (TASK-038).
+
+### 3.10b Outfits e Looks (novas; DEC-148, 159, 160, 161, 166, 167)
+
+`Outfits` (lista):
+
+| Key | Ref | Arms | Packs | Use | Origem |
+|---|---|---|---|---|---|
+| `crew` | AST-053 (`AST-053_CrewTex`, `T_Crew_Uniform[_Mid\|_Night]`) | Uniform (manga) | Day, Mid, Night | Crew: só personagem de jogador; **nunca** NPC (DEC-188) | DEC-151, DEC-161, DEC-166 |
+| `civil_a` … `civil_h` | AST-053/054 (`T_Civil_<X>[_Mid\|_Night]`) | Civil (`AST-053_CivilArms`) | Day, Mid, Night | Civil: clientes e passantes, sorteada por tipo (DEC-188) | DEC-160, DEC-163, DEC-166 |
+| `thief` | AST-056 (`T_Civil_Thief_Day`, `AST-053_ThiefHat`, `T_Expr_Thief`) | Civil | **Day** | Reserved: NPC-007 | DEC-159, DEC-163 |
+
+`Looks` (registro único):
+
+| Campo | Valor | Origem |
+|---|---|---|
+| `Packs` | `{ "Day", "Mid", "Night" }` (valores do atributo `LookPack`, `network.md` §5.2) | DEC-166 |
+| `PackFace` | `Day → Normal`, `Mid → Exhausted`, `Night → Normal_Night` (rosto da crew pela faixa) | DEC-166, DEC-167 |
+| `Expressions` (lista fechada) | `Normal`, `Happy`, `Smile`, `Sad`, `Fainted`, `Skeptical`, `Exhausted`, `Stressed`, `Normal_Night` (+ `Thief`, só NPC-007). Nome = `SurfaceAppearance` em `ReplicatedStorage.CrewExpressions` (TASK-006) | DEC-152, DEC-162, DEC-166 |
+| `NpcNeverUses` | `Fainted` em NPC (Provisório, DEC-187); `crew` em NPC | DEC-187, DEC-188 |
 
 ### 3.11 GemRewards e Achievements
 
@@ -422,18 +623,53 @@ não fixou):
 | `ProductId` | id do developer product no Creator Hub (usuário cria; preço lá, `Q-098`) |
 | `Kind` | `Revive` (handler registrado pelo `ReviveService`) |
 
-### 3.16 Flow, OrderPhases, OrderRules, CustomerTypes, Thief, Sanity
-
-Sem mudança de formato desde a versão 1 (valores de DEC-045, DEC-050, DEC-056, DEC-071, DEC-072):
+### 3.16 Flow, OrderPhases, OrderRules, CustomerTypes, Moods, Thief, Sanity
 
 | Tabela | Campos |
 |---|---|
-| Flow | `BaseInterval` 22 · `GrowthPerDay` 0.08 · `GrowthCap` 0.40 · `PartyMult` {1.0, 1.6, 2.1, 2.5} · `PartySource` = `"ActiveAtShiftStart"` (ativos no início do turno, sem espectadores; FEAT-009, `Q-067`) · `MaxCustomersDay` 8 · `MaxCustomersNight` 6 · `MaxActorsNight` 3 · `MaxNpc` 12 · `DayWalkers` 2 (`Q-083`) |
-| OrderPhases | `{ FromDay, ToDay, IsNight, KWeights }` |
-| OrderRules | `BasePrice` 4 · `MaxToppings` 3 · `NewIngredientBoost` 1.5 · `TipAmount` 1 · `TipWindowBase` 16 · `TipWindowPerK` 4 · `PatienceBase` 40 · `PatiencePerK` 5 · `IncompletePct` 50 (floor) · `GradeThresholds` · `GradeBonusPct` |
-| CustomerTypes | `Key`, `Ref` (NPC-###), `Name`, `Looks` (R6), `WalkSpeed`, `Weight`, `IngredientMult`, `Lines` |
-| Thief | `ChanceByDay`, `MaxPerDay`, `WindowClock`, `LurkMax`, `ZoneRadius`, `ZoneEmptyTime`, `OpenTime`, `StealPct`, `MinDrawer`, `CatchReward` |
-| Sanity | `Start` 100 · `SeeAnomaly` −5 (1× por anomalia, por jogador, por noite, `Q-114`) · `SeeTime` · `SeeAngle` · `SeeRange` · `RuleBroken` −35 · `DarkDelay` 3 · `DarkPerSecond` −1 · `Coffee` +25 · `CoffeeCooldown` 60 · `CoffeeBrew` 6 · `TrailerLightRadius` 18 · `BasicLampRadius` (`Q-064`) |
+| Flow | `BaseInterval` 22 · `GrowthPerDay` 0.08 · `GrowthCap` 0.40 · `PartyMult` {1.0, 1.6, 2.1, 2.5} · **`PartySource = "Connected"`** (jogadores conectados, DEC-185; substitui `ActiveAtShiftStart`) · `RecalcOn = "ShiftStarted"` (**Provisório**, DEC-185) · `Jitter` 0.25 · `MaxCustomersDay` 8 · `MaxCustomersNight` 6 · `MaxActorsNight` 3 · `MaxNpc` 12 (DEC-045; passantes fora ou dentro do teto: `Q-162`) · `DayWalkers` {6, 8} e `NightWalkers` {1, 2} (DEC-183, onda 2) |
+| OrderPhases | `{ FromDay, ToDay, IsNight, KWeights }` (FEAT-010) |
+| OrderRules | `BasePrice` 4 · `MaxToppings` 3 · `NewIngredientBoost` 1.5 · `TipAmount` 1 · `TipWindowBase` 16 · `TipWindowPerK` 4 · `PatienceBase` 40 · `PatiencePerK` 5 · `IncompletePct` 50 (floor) · `GradeThresholds` {A 0.90, B 0.75, C 0.50} · `GradeBonusPct` {A 20, B 10, C 0, D 0} · `NoCustomerGrade = "C"` (DEC-051) |
+| Thief | `ChanceByDay`, `MaxPerDay`, `WindowClock`, `LurkMax`, `ZoneRadius`, `ZoneEmptyTime`, **`ApproachTime` 4** (fixo; velocidade = distância ÷ 4, DEC-182), `OpenTime`, `StealPct`, `MinDrawer`, `CatchReward` (onda 2) |
+| Sanity | `Start` 100 · `SeeAnomaly` −5 · `SeeTime` · `SeeAngle` · `SeeRange` · `RuleBroken` −35 · `DarkDelay` 3 · `DarkPerSecond` −1 · `Coffee` +25 · `CoffeeCooldown` 60 · `CoffeeBrew` 6 · `TrailerLightRadius` 18 · `BasicLampRadius` (lâmpada de fábrica do trailer, DEC-189; número com o game-designer) · **`Bands = { High = 60, Mid = 40 }`** (≥ 60 → `Day`, 40–59 → `Mid`, < 40 → `Night`; pontos absolutos, DEC-167) · `BandMinHold` 0 s (1 s se piscar no teste, **Provisório**, DEC-167) (onda 2) |
+
+`CustomerTypes` (**DEC-188**; números com o game-designer, TASK-009):
+
+| Campo | Tipo | Exemplo |
+|---|---|---|
+| `Key`, `Ref`, `Name` | | `office_worker`, `NPC-001`, "Office Worker" |
+| `Species` | lista de chaves de `Species` (1–2 fixas) | `{ "penguin" }` |
+| `Accessories` | lista de nomes de malha no kit `ReplicatedStorage.Assets.Crew` (nomes finais na TASK-006) | `{ "Acc_Badge", "Acc_Briefcase" }` |
+| `Outfits` | lista de chaves de `Outfits` (só `civil_*`); sorteio uniforme | `{ "civil_a", "civil_c", "civil_e", "civil_g" }` |
+| `Shift` | `"Day" \| "Night" \| "Any"` | `Day` |
+| `WalkSpeed`, `Weight`, `IngredientMult`, `KShift`, `Lines` | como em `npcs.md` | |
+
+| Key | Ref | Species | Acessório (DEC-188) |
+|---|---|---|---|
+| `office_worker` | NPC-001 | `penguin` | crachá + pasta |
+| `student` | NPC-002 | `hamster`, `mouse` | mochila |
+| `jogger` | NPC-003 | `frog` | fone |
+| `construction_worker` | NPC-004 | `monkey` | capacete + colete |
+| `grandparent` | NPC-005 | `turtle`, `sheep` | bengala |
+| `night_shift_worker` | NPC-006 | `koala` | crachá de plantão |
+| `pedestrian` | NPC-019 | qualquer `Species` com `Pedestrian = true` (inclui `pig`) | nenhum (onda 2) |
+
+- `Validate()`: nenhum tipo usa `raccoon` nem `Outfits.crew`; toda espécie listada tem `Customer = true`.
+- Variante = espécie × roupa (DEC-188); "nunca 2 clientes vivos com a mesma variante do mesmo tipo" é regra do
+  `NpcService` (proposals-round-3 §3, **Provisório**).
+- Espécies jogáveis e porco como cliente: `Q-165` (fora da onda 1).
+
+`Moods` (**Provisório**, `Q-164`; onda 1 só visual, sem mexer no pagamento da DEC-072):
+
+| Key | Expression | Quando (onda 1) |
+|---|---|---|
+| `Neutral` | `Normal` | chegada |
+| `Happy` | `Happy` | venda Completo/Perfeito |
+| `Annoyed` | `Skeptical` | resta ≤ `MoodRules.AnnoyedAt` da paciência |
+| `Complaining` | `Stressed` | desistiu (paciência zerou), Errado, Refuse |
+
+`MoodRules` (registro único): `AnnoyedAt = 0.33` (fração da paciência restante), `AffectsPay = false` (onda 1). O humor
+dinâmico completo (DEC-187: sobe e desce, muda pagamento) acrescenta linhas e campos aqui; o `Net` não muda.
 
 ### 3.17 Nights, Anomalies, AnomalyCues, AnomalyRules
 
@@ -446,10 +682,38 @@ Sem mudança de formato desde a versão 1 (valores de DEC-045, DEC-050, DEC-056,
 
 ### 3.18 Actions
 
-| Campo | Exemplo |
-|---|---|
-| `Key` | `grill_place`, `grill_collect`, `bun_cut`, `board_add_sausage`, `board_add_topping`, `board_pickup`, `serve`, `take_order`, `refuse`, `restock`, `buy_package`, **`bench_buy_upgrade`**, **`bench_buy_item`**, `buy_trailer`, `brew_coffee`, `switch_light`, `hide`, `discard`, `safe_spot`, `open_sign`, **`pick_up_item`**, `party_join` |
-| `Text`, `Hold`, `Radius`, `Night`, `Requires` | como na versão 1 (`pick_up_item`: "Pick Up", toque, 7 studs, FEAT-036) |
+| Campo | Tipo | Exemplo |
+|---|---|---|
+| `Key` | | `topping_add` |
+| `Text` | texto do prompt; `{item}` = `Name` do ingrediente da peça | "Add {item}" |
+| `Hold` | s (0 = toque) | 1 |
+| `Radius` | studs | 7 |
+| `Requires` | `{ Held = chave de Items ou categoria, NotHasTopping = true?, Phase = {...}? }` | `{ Held = "hot_dog", NotHasTopping = true }` |
+| `Night` | `"Any" \| "DayOnly" \| "NightOnly"` | Any |
+
+Ações da **onda 1** (FEAT-005, FEAT-006, FEAT-007, FEAT-008, FEAT-011, FEAT-015):
+
+| Key | Text | Hold | Radius | Requires | Origem |
+|---|---|---|---|---|---|
+| `open_sign` | "Open Shop" | 0 | 10 | `Phase = Prep` | FEAT-003 |
+| `grill_place` | "Grill" | 0 | 7 | vaga livre, `Stock.sausage ≥ 1` | FEAT-006 |
+| `grill_collect` | "Collect" | 0 | 7 | vaga `Ready`, trilho com espaço | FEAT-006 |
+| `bun_cut` | "Slice Bun" | 0.5 | 7 | vaga da tábua livre, `Stock.bun ≥ 1` | FEAT-006, DEC-190 |
+| `board_add_sausage` | "Add Sausage" | 0 | 7 | vaga da tábua `Ready`, trilho ≥ 1, vaga na hotbar (`HotDog` < 2 e total < 4) | FEAT-006, **DEC-190** |
+| `topping_add` | "Add {item}" | 1 | 7 | `Held = hot_dog` sem o ingrediente, < 3 complementos, `Stock ≥ 1`, não `Blocked` | FEAT-006, DEC-072, DEC-156 |
+| `discard` | "Throw Away" | 0.5 | 7 | `Held = hot_dog` (onda 3: ou `altered_item`) | FEAT-006, DEC-054 |
+| `take_order` | "Take Order" | 0 | 10 | cliente `Ordering` em Q1 | FEAT-011 |
+| `serve` | "Serve" | 0 | 10 | `Held = hot_dog`, cliente `Waiting` | FEAT-011, DEC-190 |
+| `refuse` | "Refuse" | 1 | 10 | cliente em Q1 | FEAT-011 |
+| `restock` | "Restock" | 1 | 7 | `Held` = pacote do ingrediente da peça | FEAT-007 |
+| `buy_package` | "Buy {item} — ${price}" | 0.5 | 7 | não `Blocked` (senão a etiqueta "Out of stock" e **sem** prompt, DEC-180); limite de pacotes e hotbar | FEAT-008 |
+| `bench_buy_upgrade` | "Buy {upgrade} — ${price}" | 1.5 | 7 | upgrade existe no veículo atual e não está no máximo ("Maxed" sem prompt) | FEAT-015, DEC-184 |
+
+Chaves das ondas seguintes **já existem na tabela** (o enum do `Interact` e a checagem do binding, `architecture.md`
+§18.7 item 3, precisam delas), sem prompt ativo na onda 1: `bench_buy_item` (S1 fica "Nothing special today"),
+`buy_trailer` (2 s), `brew_coffee`, `give_coffee`, `switch_light`, `hide`, `safe_spot`, `pick_up_item`. **Saem:** `board_add_topping`
+(complemento é na estação, não na tábua), `board_pickup` (o HotDog nasce na mão, DEC-190), `party_join` (plataforma
+física, DEC-179). Lixeira de rua (DEC-200) reaproveita `discard` (o que aceita: `Q-166`).
 
 ### 3.19 BossCalls, Cutscenes, Notices, Hallucinations, OpalLines
 
@@ -457,7 +721,7 @@ Sem mudança de formato desde a versão 1 (valores de DEC-045, DEC-050, DEC-056,
 |---|---|
 | BossCalls | `Key`, `Lines` (`{ Text, Audio? }`), `Short` (versão curta), `Skippable = false` (DEC-077, `Q-077` b) |
 | Cutscenes | `Key` (`none`, `intro`, `finale`, `credits`), `Duration`, `Skippable` (todas, por voto; FEAT-004). Troca de veículo e noite perdida **não** são cutscene: são transições no mundo, sem "Skip" (FEAT-004), dirigidas por `VehicleService` e `RunStateService`/`AmbulanceService`. Campos: `Marks` (nomes `CutsceneMark1..4` no mapa), `Beats` (lista `{ At, Kind = "MoveTo"/"LookAt"/"Line"/"Actor", Target }`) |
-| Notices | `Key`, `Text` com `{value}`, `Kind`. Novas: `gems_gained`, `afk_no_gems`, `revive_credit_saved`, `revive_used`, `trailer_price`, `shift_ended_resume`, `shift_cant_resume`, `item_dropped` |
+| Notices | `Key`, `Text` com `{value}` (ou `{item}`/`{upgrade}` quando `Value` é `IndexOf` de tabela), `Audience = "Player" \| "Party"`. **Onda 1:** `hands_full` ("Hands full", FEAT-005), `package_limit`, `not_enough_cash`, `upgrade_bought` ("{upgrade} upgraded!", Party, FEAT-015), `ingredient_unlocked` (Party, FEAT-032), `class_bought`, `class_selected`, `not_enough_gems`, `class_locked` (DEC-186). Ondas seguintes: `gems_gained`, `afk_no_gems`, `revive_credit_saved`, `revive_used`, `trailer_price`, `shift_ended_resume`, `shift_cant_resume`, `item_dropped`, `special_on_bench`. Textos placeholder até `ui-text.md` (narrative-writer) |
 | Hallucinations | `Key`, `MinSanity`, `MaxSanity`, `Kind`, `Cooldown`, `Weight` (teto por `Q-043`) |
 | OpalLines | `Phase` (`Day`, `N1_3`, `N4_6`, `N7_10`), `Lines` (CHR-003) |
 
@@ -465,9 +729,25 @@ Sem mudança de formato desde a versão 1 (valores de DEC-045, DEC-050, DEC-056,
 
 - **game-designer**: números e listas (preços, tempos, pesos, fases, classes, noites, bancada, revive, densidade de trânsito).
 - **narrative-writer**: `Name`, `Text`, `Lines`, `Description`, falas da Opal, beats de fala das cutscenes.
-- **art-director / modeler-3d**: `Icon`, `Look`, `ToolModel`, `Part`, modelos de carro e ambulância.
+- **art-director / modeler-3d**: `Icon`, `Part`, `Outfits`, `Accessories` de `CustomerTypes`, modelos de carro e ambulância; ids de textura em `CrewLooks.luau` (TASK-006).
 - **level-designer**: nomes de rota, parada, cruzamento, marca de cutscene, `BenchSpot`, `BuySpot` (autoria no mapa).
 - **architect**: forma das tabelas, `Stat`, `Actions`, `Validate()`, `Products`.
 - **usuário**: cria no Creator Hub o developer product e o badge e passa os ids.
 
 Adicionar campo a uma tabela é mudança de contrato: passa pelo architect.
+
+## 5. Provisórios desta versão (v4)
+
+| Item | Onde | Fecha em |
+|---|---|---|
+| Capacidade do Cream Cheese nos níveis 2/3 (20/30) | §3.3 | `Q-062` |
+| `CategoryLimits.HotDog = 2` | §3.5 | game-designer (FEAT-005) |
+| `Vehicles.trailer.BoardSlots = 3` (FEAT-006) × "2 vagas" da DEC-190 sem veículo | §3.8 | game-designer; se for 2 nos dois, só número |
+| Preços do trailer = carrinho; Cash Drawer Lock recomprado | §3.7 | `Q-163` (a, c) |
+| "Pedido do dono" = quem fez o Take Order (Raposa, Leão) | §3.10 | game-designer (`classes.md`) |
+| `Flow.RecalcOn = "ShiftStarted"` | §3.16 | DEC-185 (parte Provisória) |
+| `Moods`/`MoodRules` da onda 1 (só visual) | §3.16 | `Q-164` |
+| Espécies jogáveis e porco sem tipo de cliente | §3.10a | `Q-165`, DEC-192 (a confirmar) |
+| Nomes de malha de acessório e de peça (`Acc_*`, `Part`) | §3.7, §3.16 | TASK-002/TASK-006 (kits; acessório em `Assets.Crew.Accessories/<chave>`, §18.9.1) |
+| `Sanity.BandMinHold` | §3.16 | teste da onda 2 |
+

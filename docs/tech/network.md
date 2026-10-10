@@ -2,81 +2,117 @@ Status: Rascunho
 
 # Contratos de rede (Lync)
 
-Autor: architect. Versão 3.1, 2026-10-08 (conciliação com DEC-106 a DEC-130, rodada 17 e `consistency-report.md` §5;
-`Traffic` alinhado à **DEC-133**, lado técnico de `Q-131`).
+Autor: architect. Versão 4, 2026-10-10 (**TASK-001**: estado DEC-140 a DEC-201, núcleo da onda 1). Versão anterior:
+3.1, 2026-10-08 (DEC-130/DEC-133).
 Tudo aqui vira entrada em `src/Libs/Net/init.luau` (um `Lync.define("game", {...})`, requerido pelos dois lados).
 Mudança neste arquivo passa pelo architect (`PIPELINE.md`, ponto de conflito). Arquitetura: `architecture.md`.
-Tabelas que geram os enums: `content-data.md`.
+Tabelas que geram os enums: `content-data.md`. Dados persistidos: `data.md`.
+
+> **Base Provisória (DEC-193).** Este documento é Rascunho e vale como base Provisória para construir. Itens sem DEC
+> estão marcados **Provisório**; técnicas T# seguem Provisórias até a `Q-130`. Lib conferida: **Lync 4.0.2**
+> (`Packages/_Index/axp3cter_lync@4.0.2`).
 
 ---
 
 ## 0. O que mudou
 
-### 0.0 Versão 3.1 (DEC-130, rodada 17)
+### 0.0 Versão 4 (TASK-001; DEC-140 a DEC-201)
 
 | Entrada | Mudança | Origem |
 |---|---|---|
-| `Traffic` | `Route` cobre `TR-1..TR-10` (cabe em `int(1, 32)`); teto de slots continua 8. **DEC-133**: `StartedAt` sai; entram `AnchorAt`, `AnchorDist`, `StopDist`, `HeldUntil` (carro para no PARE e na faixa reservada por NPC); registro muda por evento, não só no nascimento | `MAP-01.md` revisão 3, DEC-133 |
-| Semáforo | **removido** (não tinha rede; sai também o atributo `Workspace.RunEpoch`) | DEC-130 (revoga DEC-120) |
-| Reserva de faixa / caixa do PARE | sem rede: `NpcService` → `TrafficService` no servidor; o client só vê o efeito (carro parado no registro `Traffic`, NPC andando) | `architecture.md` §8.1, T30, DEC-133 |
-| Nenhuma entrada nova em `src/Libs/Net/init.luau` | só o schema de `Traffic` muda | — |
+| Regra 3 (enum) | **corrigida**: o Lync 4.0.2 **ordena** os nomes de `enum`/`bitfield` antes de numerar; o índice no fio é a posição na lista ordenada, não a ordem da tabela. O código vê **strings** (`enum`) e `{ [string]: boolean }` (`bitfield`). Nada muda para persistência (já era por chave) | código do Lync (`codec/Composites.luau`, `sortedNames`) |
+| `Stations` | um registro **por vaga** (grelha, **tábua**) ou por estação de estado único (trilho); id = `StationId × 100 + Slot` (binding T33/§18 da TASK-002). Tábua de **2 vagas compartilhadas** = 2 registros `Kind = board` (decisão desta versão, §3.5). Saem `Contents` (montagem não acontece mais na tábua) e o estado `Blocked` | **DEC-190**, DEC-201 |
+| `Stock` | + `Blocked` (ingrediente não liberado): fonte única da tampa + cadeado da tigela, do "Out of stock" do Mart e do sorteio de pedido | **DEC-156**, DEC-180, DEC-071 |
+| `Customers` | sai `Look` (índice opaco). Aparência de **todo** NPC (cliente, passante, ladrão) vai em **atributos do modelo** (§5); o set fica só com estado de jogo. `Mood` vira enum da tabela `Moods` (**Provisório**, humor simplificado da onda 1, `Q-164`) | DEC-181, **DEC-188**, DEC-183, DEC-187 |
+| `Upgrades` | o set mostra os níveis do **veículo atual**; o servidor guarda nível **por veículo** e reescreve o set na troca | **DEC-184** |
+| `Shift` | sem mudança de schema; onda 1 só escreve os campos de dia (§3.1) | DEC-048, DEC-193 |
+| `ShiftReport` | campos renomeados para o resumo de FEAT-014 (`Arrived`, `Completed`, `Drawer`, `Deposited`); `Grade` perde `"None"` (sem cliente = C); + `LastChanceUsed` | DEC-051, FEAT-014, DEC-110 |
+| `Profile` | chaves de classe por **animal** (`class_dog`…); onda 1 manda só `Gems`, `Classes`, `Selected` | **DEC-186**, DEC-147 |
+| `ClassAction` | válido também no Run em **modo dev** (sem lobby na onda 1) | DEC-186, TASK-017 |
+| `Interact` | chaves de ação da linha nova: `topping_add` (no lugar de `board_add_topping`), `board_pickup` sai (o HotDog vai direto para a mão), `party_join` sai (plataforma física) | DEC-190, DEC-179 |
+| `Vitals` (onda 2) | proposta: `Sanity` deixa de ir a todos; vai só ao dono (packet `Sanity`). A party vê a **faixa** pela aparência (`LookPack` no personagem), nunca o número | **DEC-167, DEC-169** |
+| `Round`, `Vitals` antigos | **ficam** no `init.luau` na onda 1, sem uso novo; removidos na onda 2 junto com `VitalService`/`RoundController` novos | TASK-004 |
+| Aparência de personagem | **sem rede própria**: geometria pelo servidor, textura e rosto pelo client a partir de atributos (T40, **Provisório**, §5; segue a DEC-167/169 "troca no client" e diverge da T35 do `architecture.md` §18.9.4, ver §11) | DEC-148, 150, 152, 161, 166–169, 181 |
+| `keyBy` | nenhuma entrada usa (T14) | T14 |
 
-### 0.1 Versão 3
-
-| Entrada | Mudança | Origem |
-|---|---|---|
-| `Shift` | + `WipeFrozen` (contador parado com prompt de compra aberto); `Chances` começa em 1 | DEC-118, DEC-110 |
-| `Vitals` | `StateEndsAt` de Down = 6:00 AM da noite da queda | DEC-115 |
-| `RunState` | `Joined` sai; entra `PriceParty` (fixado no fim do Day 1) | DEC-121 |
-| `Bench` | 1 vaga especial; preço já multiplicado por `PriceParty` | DEC-106, DEC-129 |
-| `Traffic` | sem `Speed` (perfil de velocidade da tabela por trecho) | FEAT-033 |
-| `Ambulance` | **registro único** (uma ambulância por servidor), viagens `Pickup`/`Return`/`Dawn`, lista de corpos na parada | DEC-114, DEC-122, FEAT-034 |
-| `Revive` | Robux e crédito: `Target` tem de ser o remetente | DEC-116 |
-| `Interact` | item no chão usa `pick_up_item` ("Pick Up") | FEAT-036 |
-
-### 0.2 Versão 2
+### 0.1 Versão 3.1 (DEC-130, rodada 17)
 
 | Entrada | Mudança | Origem |
 |---|---|---|
-| `Vitals` | `State` ganha `Down`, `Reviving`, `Spectator`; novos `StateEndsAt`, `KnockedUntil` | DEC-091, DEC-093, DEC-095 |
-| `Shift` | novos `WipeEndsAt`, `Attempt`, fase `Resume`; `Chances` mantido | DEC-080, DEC-094, DEC-102 |
-| `Upgrades` | sem prompt no equipamento; lido pela bancada | DEC-101 |
-| `RunState` | **novo** set (registro único): `Joined`, contadores | DEC-098, `Q-112` |
-| `Bench` | **novo** set: slots especiais sorteados por turno | DEC-100, DEC-101, DEC-106 |
-| `Traffic` | **novo** set: agenda de carros | DEC-087 |
-| `Ambulance` | **novo** set: timeline por jogador caído | DEC-091 |
-| `Cutscene` | packet vira **set** (votos, entrada no meio) | DEC-078, DEC-088, DEC-098 |
-| `KnockOut` | **removido**; vira `LifeEvent` | DEC-091 |
-| `CarHit`, `Revive`, `SkipVote` | **novos** packets c → s | DEC-095, DEC-092, DEC-078 |
-| `Profile` | + `EndlessDays`, `ReviveCredits` | DEC-084, §10.2 de `architecture.md` |
-| `Reconnect` | + `Mode` (Live/Suspended), segundos restantes | DEC-080 |
-| `ShiftReport` | `Gems` passa a ser "já creditado neste turno"; + `AfkLocked` | DEC-083, DEC-104 |
+| `Traffic` | `Route` cobre `TR-1..TR-10`; **DEC-133**: `StartedAt` sai; entram `AnchorAt`, `AnchorDist`, `StopDist`, `HeldUntil` | `MAP-01.md` revisão 3, DEC-133 |
+| Semáforo | **removido** (sem rede; sai `Workspace.RunEpoch`) | DEC-130 |
+| Reserva de faixa | sem rede: `NpcService` → `TrafficService` no servidor | DEC-133 |
+
+### 0.2 Versões 3 e 2 (resumo)
+
+| Entrada | Mudança | Origem |
+|---|---|---|
+| `Shift` | `WipeEndsAt`, `WipeFrozen`, `Attempt`, fase `Resume`; `Chances` começa em 1 | DEC-080, 094, 102, 110, 118 |
+| `Vitals` | `State` com `Down`/`Reviving`/`Spectator`/`Away`; `StateEndsAt` (6:00 AM), `KnockedUntil` | DEC-091, 093, 095, 115 |
+| `RunState` | novo; `PriceParty` fixado no fim do Day 1 | DEC-098, DEC-121 |
+| `Bench`, `Traffic`, `Ambulance`, `Cutscene` | novos sets | DEC-087, 091, 100, 106, 114, 129 |
+| `CarHit`, `Revive`, `SkipVote` | novos packets c → s; `KnockOut` vira `LifeEvent` | DEC-078, 092, 095, 116 |
+| `Reconnect`, `ShiftReport`, `Interact` | `Mode`/`Seconds`; `Gems` creditadas por evento, `AfkLocked`; `pick_up_item` | DEC-080, 083, 104, FEAT-036 |
 
 ## 1. Regras
 
 1. **Set** (`Lync.replicate`) para estado que a party vê e que quem chega/reconecta precisa receber pronto.
    **Packet** para evento ou dado privado.
-2. **Sem `keyBy` no MVP.** O servidor da run tem uma party só; no lobby o único set (`Parties`) é público.
-3. **Enums gerados das tabelas de conteúdo** (`Lync.enum(Content.X.Keys)`). Ordem da lista = índice no fio.
-   Nada persistido usa o índice (perfil, MemoryStore e snapshot guardam a chave string).
+2. **Sem `keyBy`** (T14). O servidor da run tem uma party só; no lobby o único set (`Parties`) é público.
+3. **Enums e bitfields gerados das tabelas de conteúdo** (`Lync.enum(Content.X.Keys)`, T13). O Lync **ordena** os
+   nomes; o índice no fio é a posição ordenada, igual nos dois lados porque os dois requerem o mesmo `Content`. O
+   código lê e escreve **strings**. Nada persistido usa índice: perfil, MemoryStore e snapshot guardam a chave.
+   Acrescentar ou renomear chave muda o fio → servidor e client da mesma versão (publicação normal já garante).
 4. **Tempo em tempo de servidor.** Campos `*At` são `f64` de `workspace:GetServerTimeNow()`; o client interpola.
-   Exceção: `Reconnect.Seconds` (o lobby não compartilha relógio com a run; manda a duração restante).
-5. **IDs de registro.** `UserId` para jogadores (`Vitals`, `Ambulance`), `EntityId` (1–65535) para estações e NPCs,
-   índice da tabela para estoque e upgrades, slot (1–8) para `Traffic` e `Bench`, `1` para registro único.
-6. **Packets s → c vão para `NetService.Audience`**, nunca `Lync.all`, e só com `NetService:IsRunning()`.
-7. **Responder só em Service/Controller, no `OnInit`.**
+   Exceção: `Reconnect.Seconds` (o lobby não compartilha relógio com a run).
+5. **IDs de registro e de alvo** (alinhados ao binding da TASK-002, `architecture.md` §18.2–§18.3, T33):
+
+   | Id | Quem aloca | Usado em |
+   |---|---|---|
+   | `UserId` | Roblox | `Vitals`, `Ambulance.Riders` |
+   | `EntityId` (1–65535, runtime) | `InteractionService` para **toda** âncora `Interactable` (do mapa e de runtime); id liberado só volta ao uso 10 s depois | `Interact.Id` (alvo do prompt) |
+   | `StationId` (runtime, ≤ 99 por place) | `KitchenService`, atributo no `Model` da estação | id de registro de `Stations` = `StationId × 100 + Slot` (`Slot = 0` para estação de registro único) |
+   | `NpcId` (1–65535, runtime) | `NpcService`, atributo no rig, **novo a cada spawn** (contador cíclico; rig do pool reaproveitado ganha id novo) | id de registro de `Customers`; `Sale.Npc` |
+   | `IndexOf` da tabela (posição na **lista**, não no enum ordenado) | `Content` | `Stock`, `Upgrades` |
+   | slot | dono | `Traffic` (1–8), `Bench` (S1 = 1) |
+   | `1` | — | registro único (`Shift`, `RunState`, `Economy`, `Ambulance`, `Cutscene`) |
+
+   Snapshot nunca guarda `EntityId`, `StationId` nem `NpcId` (nascem a cada servidor): guarda chaves estáveis.
+
+6. **Packets s → c vão para `NetService.Audience`** (ou `fireClient` a um jogador do grupo), nunca `Lync.all`, e só
+   com `NetService:IsRunning()`.
+7. **Responder só em Service/Controller, no `OnInit`.** Componente não registra responder.
 8. **Todo packet c → s é validado**: membro no estado certo, taxa máxima, alvo existe, distância/plausibilidade.
+9. **Aparência de personagem não passa pelo Lync** (§5): é atributo no modelo, escrito pelo servidor, aplicado pelo
+   client. Estado de jogo nunca vai em atributo de modelo (vai em set).
 
-## 2. Mudanças no que já existe em `src/Libs/Net/init.luau`
+## 2. Entradas por onda
 
-| Entrada atual | Vira | Motivo |
-|---|---|---|
-| `Profile` (Coins, Level, Playtime) | `Profile` (§6) | Template novo (`data.md` §1); sem XP/Level (DEC-081) |
-| `Vitals` (Health, Armor, Stamina) | `Vitals` (§3.3) | sanidade + estado de vida |
-| `Round` (packet) | **removido**; set `Shift` | estado do turno chega pronto a quem reconecta |
-| `Ready` | sem mudança | handshake |
+| Entrada | Tipo | Onda | Estado nesta versão |
+|---|---|---|---|
+| `Ready` | packet c → s | existe | sem mudança |
+| `Profile` | packet s → c | **1** | schema novo (§4.5) |
+| `Shift` | set | **1** | §3.1 |
+| `RunState` | set | **1** | §3.2 |
+| `Economy` | set | **1** | §3.3 |
+| `Stock` | set | **1** | §3.4 |
+| `Stations` | set | **1** | §3.5 |
+| `Customers` | set | **1** | §3.6 |
+| `Upgrades` | set | **1** | §3.7 |
+| `Interact` | packet c → s | **1** | §4.1 |
+| `Notice` | packet s → c/grupo | **1** | §4.2 |
+| `Sale` | packet s → grupo | **1** | §4.3 |
+| `ShiftReport` | packet s → grupo | **1** | §4.4 |
+| `ClassAction` | packet c → s | **1** | §4.6 |
+| `Round` (packet antigo) | packet | legado | **mantido** na onda 1, sem uso novo; removido na onda 2 |
+| `Vitals` (Health/Armor/Stamina) | set | legado | **mantido** na onda 1 (o `VitalService` de exemplo compila); trocado pelo schema da §6.1 na onda 2 |
+| `Sanity`, `Switches`, `Bench`, `Traffic`, `Ambulance`, `Cutscene`, `Parties`, `Gaze`, `CarHit`, `Revive`, `SkipVote`, `BossCall`, `AnomalyCue`, `LifeEvent`, `PartyAction`, `Reconnect`, `ReconnectReply` | — | 2–4 | §6; **não entram** no `init.luau` da onda 1 |
 
-## 3. Sets — place Run
+Por que não declarar já tudo: cada entrada nova arrasta enums de tabelas que a onda 1 ainda não tem (`Anomalies`,
+`BossCalls`, `Cutscenes`, `BenchItems`); stub de tabela só para o Lync subir é dado falso. Acrescentar entrada depois
+não quebra as existentes (o `define` é por nome).
+
+## 3. Sets — place Run, onda 1
 
 ### 3.1 `Shift` (registro único, id `1`)
 
@@ -85,230 +121,444 @@ Shift = Lync.replicate(Lync.struct({
 	Day = Lync.int(1, 10000),
 	Night = Lync.int(0, 10),
 	IsNight = Lync.bool(),
-	Attempt = Lync.int(0, 9),               -- tentativas da noite atual (0 = primeira); fala curta do chefe na repetida
+	Attempt = Lync.int(0, 9),                   -- tentativas da noite atual (0 = primeira)
 	Phase = Lync.enum(Content.Shift.PhaseKeys), -- Resume, Intro, Prep, Open, Closing, Summary, Call, Night, NightEnd, NightLost, Finale, RunEnd
 	PhaseStartedAt = Lync.f64(),
-	PhaseDuration = Lync.int(0, 3600),
-	ClockFrom = Lync.int(0, 2880),
+	PhaseDuration = Lync.int(0, 3600),          -- teto da fase; Closing termina antes se o balcão esvaziar
+	ClockFrom = Lync.int(0, 2880),              -- minutos de jogo
 	ClockTo = Lync.int(0, 2880),
 	Vehicle = Lync.enum(Content.Vehicles.Keys),
-	Chances = Lync.int(0, 9),               -- começa em 1 por run inteira (DEC-110, DEC-112); não vai ao HUD (DEC-053)
-	WipeEndsAt = Lync.f64(),                -- 0 = sem janela; >0 = contador de 10 s "todos caídos" (DEC-094)
-	WipeFrozen = Lync.bool(),               -- true = contador parado (prompt de compra aberto), até +20 s no total (DEC-118)
+	Chances = Lync.int(0, 9),                   -- 1 por run (DEC-110, DEC-112); não vai ao HUD (DEC-053)
+	WipeEndsAt = Lync.f64(),                    -- 0 = sem janela de 10 s (DEC-094)
+	WipeFrozen = Lync.bool(),                   -- DEC-118
 }))
 ```
 
 | | |
 |---|---|
-| Escreve | `RoundService` (`WipeEndsAt` e `WipeFrozen` vêm do `VitalService`; ao descongelar, `WipeEndsAt` é reenviado já somado do tempo parado) |
-| Lê | `RoundController` → HUD (relógio derivado), `CameraController`, `HudController` (contador), `CutsceneController` |
-| Frequência | por troca de fase; wipe raro |
-| Por que set | todos veem; quem reconecta precisa do estado atual |
+| Escreve | `RoundService` (único dono; `WipeEndsAt`/`WipeFrozen` vêm do `VitalService` pela API do `RoundService`, onda 2) |
+| Lê | `RoundController` → sources `Day`, `Phase`, `ClockText`, `IsNight` (os outros Controllers leem esses sources, não o set); `HudController`; placa OPEN/CLOSED. "Out of stock" e cadeado **não** derivam do `Day` no client: leem `Stock.Blocked` |
+| Frequência | por troca de fase (4 por dia de jogo) |
+| Por que set | todos veem; quem reconecta precisa da fase atual (TASK-015) |
+| Onda 1 | escreve `Day`, `Phase` (Prep, Open, Closing, Summary), `PhaseStartedAt`, `PhaseDuration`, `ClockFrom/To`, `Vehicle = "cart"`. Fixos: `Night = 0`, `IsNight = false`, `Attempt = 0`, `Chances = 1`, `WipeEndsAt = 0`, `WipeFrozen = false`. Placa OPEN/CLOSED é **derivada** de `Phase` (Prep: CLOSED com prompt "Open Shop"; Open: OPEN; Closing/Summary: CLOSED), sem campo |
+| Relógio | `ClockText` = `ClockFrom + (ClockTo − ClockFrom) × (now − PhaseStartedAt) / PhaseDuration`, arredondado para baixo a 10 min (DEC-048). Na Prep, `PhaseDuration` = 60 mesmo que "Open Shop" abra antes: o servidor troca a fase e o relógio pula para 8:00 |
 
-### 3.2 `Economy` (registro único) — sem mudança
-
-`{ Cash: int(0, 2^31−1), Drawer: int(0, 1000000) }`. Escreve `EconomyService`; lê `EconomyController`. Por venda,
-compra, depósito, roubo (~0,2–1/s em pico).
-
-### 3.3 `Vitals` (id = `UserId`) — estendido
-
-```lua
-Vitals = Lync.replicate(Lync.struct({
-	Sanity = Lync.int(0, 200),
-	MaxSanity = Lync.int(0, 200),
-	State = Lync.enum({ "Active", "Down", "Reviving", "Spectator", "Away" }),
-	StateEndsAt = Lync.f64(),       -- Down: 6:00 AM da noite da queda, fim da oferta (DEC-115); 0 = sem prazo
-	KnockedUntil = Lync.f64(),      -- atropelado até (ragdoll); 0 = de pé
-	Class = Lync.enum(Content.Classes.Keys),
-}))
-```
-
-| | |
-|---|---|
-| Escreve | componente `Vital` (servidor) e `VitalService`; `KnockedUntil` por `CharacterService` via `VitalService:SetKnocked` (um dono por set) |
-| Lê | `VitalController` (HUD), `CameraController` (spectate escolhe colega Active), `ReviveController` (oferta enquanto `Down`), `HallucinationController` |
-| Frequência | noite: escuro a 1 Hz por jogador no pior caso; eventos. Dia: só atropelamento e Away |
-| Por que set | a party precisa ver quem caiu, quem está em spectate e quem está fora. Registro **não** é removido quando o jogador sai (vira `Away`); membro atrasado ainda não chegado não tem registro |
-
-### 3.4 `Stock`, 3.5 `Stations`, 3.6 `Customers`, 3.8 `Switches` — sem mudança de schema
-
-Ver versão 1 (mesmos campos). Notas: `Stations.Kind` e `Customers.Look` continuam índices de tabela; `Customers`
-não diz "anomalia". Escritores e leitores iguais.
-
-```lua
-Stock = Lync.replicate(Lync.struct({ Amount = Lync.int(0, 999), Capacity = Lync.int(0, 999) })),
-Stations = Lync.replicate(Lync.struct({
-	Kind = Lync.enum(Content.Stations.Keys),
-	State = Lync.enum({ "Empty", "Working", "Ready", "Blocked" }),
-	StartedAt = Lync.f64(), Duration = Lync.quant(0, 120, 0.1),
-	Count = Lync.int(0, 30), Contents = Lync.bitfield(Content.Ingredients.Keys),
-})),
-Customers = Lync.replicate(Lync.struct({
-	Look = Lync.int(1, 255),
-	State = Lync.enum({ "Arriving", "Queued", "Ordering", "Waiting", "Leaving" }),
-	Slot = Lync.int(0, 8),
-	Order = Lync.bitfield(Content.Ingredients.ToppingKeys),
-	PatienceEndsAt = Lync.f64(),
-	Mood = Lync.enum({ "Neutral", "Happy", "Annoyed", "Complaining" }),
-})),
-Switches = Lync.replicate(Lync.struct({ On = Lync.bool() })),
-```
-
-### 3.7 `Upgrades` (id = índice em `Content.Upgrades`)
-
-`{ Level: int(0, 9) }`. Escreve `UpgradeService`; lê `MarketController` (preço e nível na bancada) e
-`UpgradeController` (peça visível). Por compra. Sem prompt no equipamento (DEC-101).
-
-### 3.9 `RunState` (registro único, id `1`) — novo
+### 3.2 `RunState` (registro único, id `1`)
 
 ```lua
 RunState = Lync.replicate(Lync.struct({
-	PriceParty = Lync.int(0, 4),    -- 0 até o fim do Day 1; depois fixo = quem entrou até ali (DEC-121). Multiplica trailer e Revive Kit
+	PriceParty = Lync.int(0, 4),  -- 0 até o fim do Day 1; depois fixo (DEC-121). Multiplica trailer e Revive Kit
 	RosterSize = Lync.int(1, 4),
-	Endless = Lync.bool(),          -- run em modo dia infinito (contador Day 100 ativo)
+	Endless = Lync.bool(),        -- modo dia infinito (DEC-084)
 }))
 ```
 
 | | |
 |---|---|
 | Escreve | `RunStateService` |
-| Lê | prompt do trailer à venda (`PromptController`), `MarketController` (preço do Revive Kit), `HudController` |
-| Frequência | 1 vez no fim do Day 1; entrada no modo infinito |
-| Por que set | os preços dependem dele e são mostrados a todos |
+| Lê | `HudController`; `MarketController` (onda 2+: preço do Revive Kit); prompt do trailer (onda 2) |
+| Frequência | entrada/saída de membro; 1 vez no fim do Day 1 |
+| Onda 1 | modo dev (sem `PrivateServerId`): `RosterSize` = quem entrou; `PriceParty` fixa no fim do Day 1 normalmente; `Endless = false` |
 
-### 3.10 `Bench` (id = vaga especial; hoje só `1`, DEC-106) — novo
+### 3.3 `Economy` (registro único, id `1`) — sem mudança
+
+`{ Cash = Lync.int(0, 2147483647), Drawer = Lync.int(0, 1000000) }`.
+
+| | |
+|---|---|
+| Escreve | `EconomyService` (dono único de `Cash` e `Drawer`; outros chamam `Spend(amount): boolean`, `AddToDrawer`) |
+| Lê | `EconomyController` → sources `Cash`, `Drawer`; BillboardGui da gaveta (igual para todos, FEAT-012) |
+| Frequência | por venda, compra, depósito (~0,2–1/s em pico) |
+
+### 3.4 `Stock` (id = `Content.Ingredients.IndexOf[key]`)
 
 ```lua
+Stock = Lync.replicate(Lync.struct({
+	Amount = Lync.int(0, 999),
+	Capacity = Lync.int(0, 999),  -- Ingredients[k].Capacity[nível do Cooler do veículo atual] (DEC-184)
+	Blocked = Lync.bool(),        -- ingrediente ainda não liberado (Shift.Day < UnlockDay; Coffee: sem trailer)
+}))
+```
+
+| | |
+|---|---|
+| Escreve | `KitchenService` (dono do estoque). `Blocked` recalculado no `ShiftStarted`; `Capacity` na compra de Cooler e na troca de veículo |
+| Lê | `KitchenController` (contador "7/12", vermelho com ≤ 2; `Fill` das garrafas e tigelas, DEC-140; **tampa + cadeado** quando `Blocked`, DEC-156); `MarketController` ("Out of stock" quando `Blocked`, DEC-180); `PromptController` (esconde "Add X"/"Restock" com `Amount = 0` ou `Blocked`, previsão de apresentação) |
+| Frequência | por consumo/restock (≤ 2/s em pico de party de 4) |
+| Registros | um por ingrediente, **sempre os 9**: `coffee` existe desde o Day 1 com `Blocked = true` e `Amount = 0` até a compra do trailer (o Mart mostra a prateleira de café pelo mesmo `Blocked`; a cafeteira começa com 10 doses, UPG-007, onda 2) |
+| Por que `Blocked` aqui e não em `Stations` | o bloqueio é do **ingrediente no dia**, não da estação: a mesma flag fecha a tigela, mostra "Out of stock" no Mart e tira o ingrediente do sorteio de pedido. Um registro por ingrediente = um dono, uma escrita. Na tarefa e no MAP-01, "tigela `Blocked`" (DEC-156) **é** `Stock[ing].Blocked == true` |
+
+### 3.5 `Stations` (id = `StationId × 100 + Slot`)
+
+```lua
+Stations = Lync.replicate(Lync.struct({
+	Kind = Lync.enum(Content.Stations.RecordKeys), -- grill, rail, board (onda 1); coffee_machine (onda 2)
+	State = Lync.enum({ "Empty", "Working", "Ready" }),
+	StartedAt = Lync.f64(),                        -- início do trabalho (grelhar, cortar); 0 = parado
+	Duration = Lync.quant(0, 120, 0.1),            -- duração real (já com nível e classe)
+	Count = Lync.int(0, 30),                       -- rail: salsichas no trilho; demais: 0
+}))
+```
+
+| Kind | Registros (carrinho) | `State` | Notas |
+|---|---|---|---|
+| `grill` | 1 por vaga (`Slot` 1..4): 2 / 3 / 4 pelo nível do Grill (UPG-001, DEC-201: 1 salsicha por par de rolos) | Empty → Working (`StartedAt`, `Duration` = 12/10/8 s × 0,85 se quem colocou é o Gato, CLS-003) → Ready (salsicha pronta parada na vaga, sem queimar) | vaga nova do upgrade entra com `add` vazia; as em andamento não reiniciam (UPG-001) |
+| `rail` | 1 (`Slot = 0`) | Empty / Ready (com ≥ 1) | `Count` = salsichas (FIFO no servidor). Capacidade = `Vehicles[v].RailSlots` (6 carrinho) |
+| `board` | **2** (`Slot` 1..2, DEC-190) | Empty → Working (corte 1,5 s após "Slice Bun") → Ready (pão cortado esperando salsicha) | ver decisão abaixo |
+
+**Decisão (DEC-190 pediu "2 registros ou slot no registro"): 2 registros `board`, prompt único na tábua.**
+
+| | |
+|---|---|
+| Estado | cada vaga é um registro próprio (`StationId × 100 + Slot`; `Att_Bun1`/`Att_Bun2` com `Slot` 1..2 no binding, `architecture.md` §18.4). O visual do pão por vaga (inteiro → cortado) e a barra de corte saem direto do registro, igual à grelha |
+| Interação | o **prompt fica na tábua** (uma âncora `Prompt_Board` → `board_add_sausage`), não em cada vaga: as duas vagas ficam a < 2,5 studs (MAP-01 §7: prompts vizinhos ≥ 2,5). "Slice Bun" (na caixa de pão) ocupa a vaga livre de menor `Slot`; "Add Sausage" (na tábua) usa a vaga `Ready` mais antiga e o 1º do trilho |
+| Concorrência | as duas ações passam pelo `InteractionService`, que serializa por alvo no mesmo frame (TASK-011): dois toques simultâneos → o 1º leva o HotDog, o 2º encontra a vaga já `Empty` (ou a outra `Ready`). Atende "só um recebe" (FEAT-006) |
+| Descartada | 1 registro com `Slots = array(...)` ou bits por vaga: obriga o client a diferenciar o array a cada mudança e foge do padrão "registro = coisa com barra" da grelha |
+
+| | |
+|---|---|
+| Escreve | `KitchenService` (estações em `KitchenService/Stations/*.luau`, interface da TASK-002) |
+| Lê | `KitchenController` (salsicha por vaga, `ProgressBar` por `StartedAt/Duration`, salsichas no trilho, pão nas vagas); `PromptController` (prompt "Collect" só em `Ready`, previsão) |
+| Frequência | ~1/s em pico (cada salsicha: 2 escritas na grelha + 1 no trilho; cada hot dog: 2 na tábua + 1 no trilho) |
+| Por que set | todos veem as mesmas vagas; quem reconecta vê o estado atual (TASK-030) |
+| Fora do set | caixa de salsicha, caixa de pão, complementos (estado = `Stock`), lixeira, entrega/POS (estado = `Economy.Drawer`), placa (estado = `Shift.Phase`) |
+| Onda 3 | ITM-020 (item alterado no trilho/tábua) acrescenta campo `Altered` (`bool` na vaga; posição no trilho) — mudança de schema registrada quando a onda abrir |
+
+### 3.6 `Customers` (id = `NpcId`)
+
+```lua
+Customers = Lync.replicate(Lync.struct({
+	State = Lync.enum({ "Arriving", "Queued", "Ordering", "Waiting", "Leaving" }),
+	Slot = Lync.int(0, 8),                               -- 0 = fora da fila; 1..5 = Q1..Q5 (Counter 3/4/5)
+	Order = Lync.bitfield(Content.Ingredients.ToppingKeys), -- vazio até "Take Order"; nunca o K antes disso (FEAT-011)
+	PatienceEndsAt = Lync.f64(),                         -- 40 + 5K (+ Counter) desde a chegada ao balcão (DEC-072)
+	Mood = Lync.enum(Content.Moods.Keys),                -- Provisório (Q-164): Neutral, Happy, Annoyed, Complaining
+}))
+```
+
+| | |
+|---|---|
+| Escreve | `CustomerService` (`add` no spawn, `remove` ao sumir) |
+| Lê | `CustomerController`: balão com ícones do `Order` (visível à party, DEC-071; só depois de `Take Order`); rosto pelo `Mood` (§5.3); reação ao `Sale`. `PromptController`: "Take Order" só em `Ordering`, "Serve" só em `Waiting` (previsão; o servidor revalida) |
+| Frequência | ~1/s em pico (≤ 8 clientes de dia: chegada, fila, pedido, humor, saída) |
+| Aparência | **não está aqui**: espécie, roupa, tipo/acessório e pack vão em atributos do modelo do NPC (§5.2). O modelo é achado pelo atributo `NpcId` = id do registro. Os prompts "Take Order"/"Serve" e "Refuse" são âncoras `Interactable` no rig com `EntityId` próprios (`architecture.md` §18.4); o `InteractionService` resolve âncora → rig → `NpcId` |
+| Humor (onda 1, **Provisório**, `Q-164`) | só visual: Neutral na chegada → Annoyed quando falta ≤ 1/3 da paciência (`MoodRules.AnnoyedAt`) → Complaining ao desistir, em Errado ou Refuse; Happy em venda Completo/Perfeito (`content-data.md` §3.16). **Não** mexe no pagamento da DEC-072 até o desenho do game-designer (DEC-187: humor dinâmico completo, que muda pagamento, vem depois). O enum vem de `Content.Moods`: estender o humor não muda o `Net` |
+| Gorjeta | a janela de gorjeta (16 + 4K) **não** vai no set: não aparece no HUD (DEC-015) e o resultado só existe no servidor |
+
+### 3.7 `Upgrades` (id = `Content.Upgrades.IndexOf[key]`)
+
+```lua
+Upgrades = Lync.replicate(Lync.struct({ Level = Lync.int(0, 9) }))
+```
+
+| | |
+|---|---|
+| Escreve | `UpgradeService` |
+| Lê | `MarketController` (bancada B1–B5: nível atual, próximo preço, "Maxed", "Trailer only"); `UpgradeController` (peça visível no veículo, DEC-052) |
+| Frequência | por compra; na troca de veículo, todos os registros de uma vez (num `batch`) |
+| Nível por veículo (**DEC-184**) | o servidor guarda `Levels[vehicle][upgrade]`; o set mostra **só o veículo atual** (`Shift.Vehicle`). Na troca carrinho → trailer, o set é reescrito com os níveis do trailer (todos 1, ou 0 nos de compra única). O client nunca precisa do nível de um veículo que não está em uso |
+| Onda 1 | só `cart`; 5 registros (UPG-001..005). `trailer_lights` existe com `Level = 0` e a bancada mostra "Trailer only" pela tabela (`Upgrades[k].Vehicles` não contém `cart`) |
+
+## 4. Packets — onda 1
+
+### 4.1 `Interact` (c → s)
+
+```lua
+Interact = Lync.packet(Lync.struct({
+	Id = Lync.int(1, 65535),                    -- EntityId da âncora alvo (runtime, T33)
+	Action = Lync.enum(Content.Actions.Keys),
+}))
+```
+
+| | |
+|---|---|
+| Dispara | `PromptController` ao fim do hold (ou no toque) |
+| Responde | `InteractionService` (único responder, T6, **Provisório** pela `Q-130`); despacha para a ação registrada por `RegisterAction(key, { Validate, Run })` |
+| Taxa | ≤ 8/s por jogador; excesso descartado sem erro |
+| Validação | membro ativo; alvo existe e aceita a ação (`StationKind`/tag); distância ≤ `Actions[a].Radius` + 2 de folga; requisito de mão (`Actions[a].Requires`, ex.: HotDog para "Add X"/"Serve", pacote do ingrediente certo para "Restock"); estado (vaga livre, estoque ≥ 1, fase). Falha → descarta; quando o jogador precisa saber (hotbar cheia, sem saldo), `Notice` |
+| Hold | o servidor não cronometra o hold (o client segura e só então manda); a guarda contra hold falso é a taxa + a regra (FEAT-005 aceita a mesma tolerância do AnimalPlane) |
+| Ações da onda 1 | `open_sign`, `grill_place`, `grill_collect`, `bun_cut`, `board_add_sausage`, `topping_add`, `discard`, `take_order`, `serve`, `refuse`, `restock`, `buy_package`, `bench_buy_upgrade` (`content-data.md` §3.18) |
+| Prompt por jogador | o atributo `PromptEnabled` (servidor) diz se a ação existe para a party; a condição **da mão** ("Add Ketchup" só com HotDog sem ketchup) é avaliada no client pelo `Actions.Requires` + atributos da Tool na mão (`Toppings`), só para apresentação. O servidor revalida tudo |
+
+### 4.2 `Notice` (s → jogador ou grupo)
+
+```lua
+Notice = Lync.packet(Lync.struct({
+	Kind = Lync.enum(Content.Notices.Keys),
+	Value = Lync.int(-1000000, 1000000),        -- parâmetro do texto ({value}); índice de tabela quando o texto cita item/upgrade
+}))
+```
+
+| | |
+|---|---|
+| Dispara | qualquer Service por `RunStateService:Notify(player | "all", key, value)` (TASK-010) |
+| Lê | `HudController` (toast no canto superior direito, 3–6 s) |
+| Onda 1 | `hands_full`, `package_limit`, `not_enough_cash`, `upgrade_bought` (Value = `IndexOf` do upgrade, "Grill upgraded!", grupo), `ingredient_unlocked` (Value = `IndexOf` do ingrediente, grupo, no `ShiftStarted`), `class_bought`, `class_selected`, `not_enough_gems`, `class_locked` (`content-data.md` §3.19) |
+| Frequência | evento (< 1/s) |
+
+### 4.3 `Sale` (s → grupo)
+
+```lua
+Sale = Lync.packet(Lync.struct({
+	Npc = Lync.int(1, 65535),                   -- NpcId
+	Result = Lync.enum({ "Perfect", "Complete", "Incomplete", "Wrong", "Left", "Refused" }),
+	Amount = Lync.int(0, 1000),                 -- valor que entrou na gaveta (com gorjeta)
+}))
+```
+
+| | |
+|---|---|
+| Dispara | `CustomerService` (validação de "Serve", desistência, "Refuse") |
+| Lê | `CustomerController` (balão feliz/neutro/reclamação), `EconomyController` ("+$N" flutuante na gaveta) |
+| Frequência | por venda (≤ 1/s) |
+| `Perfect` | Completo **com** gorjeta (dentro da janela, DEC-072). `Wrong` → o HotDog volta à mão de quem serviu (Tool, sem rede) |
+| Por que packet | é apresentação de um instante; o estado (gaveta) já está em `Economy` |
+
+### 4.4 `ShiftReport` (s → grupo)
+
+```lua
+ShiftReport = Lync.packet(Lync.struct({
+	Day = Lync.int(1, 10000),
+	Night = Lync.int(0, 10),
+	IsNight = Lync.bool(),
+	Arrived = Lync.int(0, 999),                 -- clientes que chegaram ao balcão (FEAT-014)
+	Completed = Lync.int(0, 999),               -- servidos completos (= satisfeitos, DEC-051)
+	Drawer = Lync.int(0, 1000000),              -- gaveta antes do bônus (inclui gorjetas)
+	Tips = Lync.int(0, 100000),
+	Stolen = Lync.int(0, 1000000),              -- onda 1: sempre 0 (sem ladrão)
+	Grade = Lync.enum({ "A", "B", "C", "D" }),  -- sem cliente = C (DEC-051)
+	Bonus = Lync.int(0, 1000000),               -- floor(gaveta × %), DEC-051
+	Deposited = Lync.int(0, 1000000),
+	Gems = Lync.int(0, 1000),                   -- já creditado neste turno (DEC-104); onda 1: 0 (sem RewardService)
+	AfkLocked = Lync.bool(),                    -- DEC-083; onda 1: false
+	LastChanceUsed = Lync.bool(),               -- resumo de noite (DEC-053, DEC-110); onda 1: false
+}))
+```
+
+| | |
+|---|---|
+| Dispara | `EconomyService` no início do Summary (com `RewardService` a partir da onda 2) |
+| Lê | `HudController` (tela de resumo 15 s dia / 20 s noite, some sozinha) |
+| Frequência | 1 por turno |
+| Reconexão no meio do Summary | perde a tela (apresentação de 15 s); o dinheiro já está em `Economy` |
+
+### 4.5 `Profile` (s → jogador)
+
+```lua
+Profile = Lync.packet(Lync.struct({
+	Gems = Lync.int(0, 2147483647),
+	Classes = Lync.bitfield(Content.Classes.Keys), -- desbloqueadas
+	Selected = Lync.enum(Content.Classes.Keys),
+}))
+```
+
+| | |
+|---|---|
+| Dispara | `ProfileService:Replicate` (effect existente + handshake `Ready`) |
+| Lê | `ProfileController` → sources `Gems`, `Classes`, `Selected`; tela "Crew" (`ClassController`, TASK-020) |
+| Frequência | quando muda (compra/seleção, crédito de gema) |
+| Por que packet | privado por construção (README) |
+| Chaves | `class_dog`, `class_rabbit`, `class_cat`, `class_bear`, `class_fox`, `class_owl`, `class_panda`, `class_lion` (`content-data.md` §3.10, **DEC-186**) |
+| Ondas seguintes | + `ReviveCredits = Lync.int(0, 99)` (onda 4, DEC-117). `EndlessDays` e `Achievements` **não** vão ao client: achievement secreto (DEC-058); o toast de conquista vai por `Notice` |
+
+### 4.6 `ClassAction` (c → s)
+
+```lua
+ClassAction = Lync.packet(Lync.struct({
+	Action = Lync.enum({ "Buy", "Select" }),
+	Class = Lync.enum(Content.Classes.Keys),
+}))
+```
+
+| | |
+|---|---|
+| Dispara | `ClassController` (tela "Crew") |
+| Responde | `ClassService` (L+R) |
+| Validação | `Buy`: classe com `InMvp = true`, ainda não possuída, `Gems ≥ Price` (cópia do mapa, não mutação). `Select`: possuída; no Run, só **antes do spawn** e só em **modo dev** (**Provisório**, TASK-017: sem lobby na onda 1); fora do modo dev a classe é travada na run (DEC-069, DEC-186) |
+| Resposta | `Profile` atualizado + `Notice` (`class_bought`, `class_selected`, `not_enough_gems`, `class_locked`) |
+| Taxa | ≤ 2/s |
+| Gemas de dev | **sem rede**: comando de servidor no Studio, só com `PlaceService:IsDev()` (TASK-017) |
+
+### 4.7 Legado mantido na onda 1
+
+| Entrada | Por que fica | Remoção |
+|---|---|---|
+| `Round` (packet `{ Status, Seconds }`) | `RoundController`/`RoundService` de exemplo compilam até as TASK-012/015 reescreverem; nenhuma task nova lê | onda 2, junto com a limpeza do `Net` (board, "Ondas seguintes") |
+| `Vitals` (`Health`, `Armor`, `Stamina`) | `VitalService` + componente `Vital` de exemplo seguem compilando (TASK-004 aceite) | onda 2: vira o schema da §6.1 com o `VitalService` de sanidade |
+
+## 5. Aparência de personagem (crew e NPC): contrato sem Lync
+
+Base: DEC-145/146 (jogador é animal da crew), DEC-148 (textura), DEC-149 (NPC também é animal), DEC-150/181 (packs por
+turno; Night reservado à tensão), DEC-152/161/162 (rosto por textura; expressões), DEC-166/167 (visual = faixa de
+sanidade, só a crew), DEC-168/169 (sanidade baixa: NPC em Night **só para quem está na faixa**), DEC-188 (tipo de
+cliente = espécie + acessório + roupa civil sorteada).
+
+### 5.1 Técnica (T40, **Provisório**, vai à `Q-130`)
+
+| Camada | Quem escreve | Como replica |
+|---|---|---|
+| **Geometria** (corpo R6, cabeça/orelhas/cauda da espécie, braços de uniforme ou civis, boné, acessórios do tipo) | servidor (`CrewRig.Build`, TASK-016), clonando do kit em `ReplicatedStorage.Assets.Crew` (TASK-006) | instâncias (nativo) |
+| **Dados da aparência** (atributos §5.2) | servidor (`CharacterService` para a crew, `NpcService` para NPCs) | atributo (nativo) |
+| **Textura e rosto** (`MeshPart.TextureID` do pack; `SurfaceAppearance` da casca de rosto clonada de `ReplicatedStorage.CrewExpressions`) | **cada client** (`CrewRig.Dress`), a partir dos atributos + camada local (§5.3) | não replica |
+
+- O servidor **nunca** escreve `TextureID` nem `SurfaceAppearance` depois da montagem (o kit clonado já vem com o pack
+  Day como padrão). Assim a troca local do client não é desfeita por replicação.
+- O client veste ao ver o modelo (tag do binding da TASK-002; vale também para modelo que entra por streaming) e
+  re-veste quando qualquer atributo da §5.2 muda ou quando a camada local muda.
+- Pré-carga: ao entrar, o client faz `PreloadAsync` dos 3 packs das espécies da party e das roupas civis em uso
+  (DEC-167, item Provisório "3 packs pré-carregados"). Memória: `Q-144` (g), art-director + architect.
+- **Alternativa descartada:** servidor aplicar texturas e o client sobrescrever localmente para a sanidade baixa. O
+  servidor reescreve `TextureID` na virada Day → Mid e apaga o override local; `SurfaceAppearance` trocada no servidor
+  duplica a casca local. A troca local da DEC-168 ficaria frágil.
+
+### 5.2 Atributos no modelo
+
+| Atributo | Em | Valores (chave de `Content`) | Escreve | Onda |
+|---|---|---|---|---|
+| `Species` | personagem da crew, NPC | `Species.Keys` (`dog`, `penguin`…) | `CharacterService` (da classe), `NpcService` | 1 |
+| `Outfit` | personagem, NPC | `Outfits.Keys`: `crew` (jogador), `civil_a`..`civil_h` (sorteada, DEC-160/188), `thief` (Quentin) | idem | 1 |
+| `CustomerType` | NPC | `CustomerTypes.Keys`; define o(s) acessório(s) (DEC-188). Passante: `pedestrian` (onda 2) | `NpcService` | 1 |
+| `LookPack` | personagem, NPC | `"Day"`, `"Mid"`, `"Night"` | crew: `CharacterService` (onda 1 sempre `Day`; onda 2 pelo `VitalService` conforme a faixa); NPC: `NpcService` (Day de dia, Mid à noite, DEC-181; Night só no clima de anomalia, onda 3, `Q-159`) | 1 |
+| `NpcId` | NPC | id do registro em `Customers` | `NpcService` | 1 |
+
+O rosto **não** é atributo escrito pelo servidor: deriva do pack (crew: Day → Normal, Mid → Exhausted, Night →
+`Normal_Night`, DEC-166/167; `Down` → Fainted, **Provisório** DEC-167) e, no NPC, do `Customers.Mood` (§5.3). O
+atributo `Expression` da §18.9.2 do `architecture.md`, se o `CrewRig` o escrever, é local ao client (debug).
+
+Valores de `Outfit` são **chaves de `Content.Outfits`** (`crew`, `civil_a`…`civil_h`, `thief`), pela regra "valores são
+chaves" do binding (§18.0 item 4). O `CrewLooks.Outfits` (§18.9.3, TASK-006) deve ser indexado por essas chaves
+(`crew → "Crew_Uniform"`, `civil_a → "Civil_A"`…); hoje o rascunho usa `Crew`, `A`..`H`, `Thief`.
+
+### 5.3 Camada local do client (o que cada client decide sozinho)
+
+| Regra | Valor | Origem |
+|---|---|---|
+| Crew: pack | `LookPack` do personagem; **todos** veem o mesmo (a faixa é estado do servidor) | DEC-167, DEC-169 |
+| Crew: 1ª pessoa | braços/mãos com o pack do próprio `LookPack`; retrato do rosto no HUD pelo mesmo atributo | DEC-167 |
+| NPC: pack | `LookPack` do modelo, **exceto** se o personagem local estiver com `LookPack = "Night"` à noite (faixa baixa, < 40): então todo cliente e passante é vestido **Night + `Normal_Night`** só neste client | **DEC-168, DEC-169** |
+| NPC: rosto | `Moods[Customers.Mood].Expression` (Normal, Happy, Skeptical, Stressed); na faixa baixa local, `Normal_Night` vence o humor (**Provisório**, `proposals-round-3.md` §2) | DEC-162, DEC-187, `Q-164` |
+| Fora da troca local | Opal (CHR-003, local, DEC-191), Quentin (só dia, só textura Day, DEC-159), atores de anomalia que dependem do sinal (`Q-147`, onda 3) | DEC-159, DEC-191 |
+| Transição | instantânea, sem VFX | DEC-167 |
+| Proibido | Desmaiado (X) em NPC; pack Mid na crew de dia | DEC-187 (Provisório), DEC-167 |
+
+Onda 1: só dia → crew sempre Day + Normal; NPC Day + rosto pelo `Mood`. As regras de noite já valem como contrato
+para a onda 2 (sem mudança de rede: só os valores de `LookPack` mudam).
+
+### 5.4 Divergência com a T35 (`architecture.md` §18.9.4, TASK-002)
+
+A TASK-002 propôs a T35: pack da crew e Day/Mid de NPC aplicados **no servidor** (replica); só o Night local da faixa
+baixa no client, **reaplicado** quando o servidor muda o pack. Este documento propõe a T40 (client veste tudo a partir
+dos atributos). Os atributos, quem os escreve e o que cada jogador vê são **iguais** nas duas; muda só quem escreve
+`TextureID`/casca de rosto.
+
+| Ponto | T35 | T40 (esta versão) |
+|---|---|---|
+| Texto da DEC | — | DEC-169 (tabela "Como": "servidor replica a faixa; cada client aplica a textura daquele personagem") e DEC-167 (Impacto: "troca no client") |
+| Override local da DEC-168 | apagado a cada escrita do servidor (virada Day → Mid, pool reaproveitado); depende de reaplicar | servidor nunca escreve textura depois da montagem; nada a reaplicar |
+| Quem entra depois | recebe pronto | recebe o kit no pack Day (padrão do kit) e o client aplica Mid/Night no mesmo frame em que o atributo chega |
+| Fontes | uma (servidor) + override | uma (atributo) |
+
+Pela ordem de autoridade do `CLAUDE.md` (DEC acima de Rascunho), **vale a T40** até o usuário decidir na `Q-130`.
+Pedido à TASK-002: alinhar §18.9.4 (ou registrar a divergência lá). Tasks afetadas (descrição na board diz "servidor
+aplica pack Day"): TASK-016 (`CrewRig` ganha `Dress` no client), TASK-018, TASK-031 (servidor só monta e escreve
+atributos), TASK-034. Para a onda 1 a diferença é pequena: de dia tudo é Day, que é o padrão do kit.
+
+## 6. Ondas 2–4 (contrato v3 mantido; não entra no `init.luau` da onda 1)
+
+### 6.1 `Vitals` (id = `UserId`) — schema da onda 2 (**Provisório**)
+
+```lua
+Vitals = Lync.replicate(Lync.struct({
+	State = Lync.enum({ "Active", "Down", "Reviving", "Spectator", "Away" }),
+	StateEndsAt = Lync.f64(),       -- Down: 6:00 AM da noite da queda (DEC-115); 0 = sem prazo
+	KnockedUntil = Lync.f64(),      -- atropelado até (ragdoll); 0 = de pé
+	Class = Lync.enum(Content.Classes.Keys),
+}))
+Sanity = Lync.packet(Lync.struct({  -- s → dono; enviado na mudança (≤ 1 Hz no escuro) e no Ready/respawn
+	Value = Lync.int(0, 200),
+	Max = Lync.int(0, 200),
+}))
+```
+
+| | |
+|---|---|
+| Mudança da v3 | `Sanity`/`MaxSanity` saem do set (iam a todos) e vão só ao dono. DEC-167: "o número nunca é mostrado a outro jogador"; a party vê a faixa pela aparência (`LookPack`, §5). Menos dado exposto a exploit; banda igual |
+| Escreve | `VitalService` (+ componente `Vital`); `LookPack` no personagem pela faixa (≥ 60 Day, 40–59 Mid, < 40 Night; de dia sempre Day; `Content.Sanity.Bands`) |
+| Lê | `VitalController` (medidor e retrato), `CameraController` (spectate), `ReviveController`, `HallucinationController` (faixas de alucinação < 60/< 40/< 20, FEAT-019) |
+| Packet e reconexão | como o `Profile`: reenviado no `ClientReady` e no respawn |
+
+### 6.2 Demais entradas (sem mudança de schema desde a v3.1)
+
+```lua
+Switches = Lync.replicate(Lync.struct({ On = Lync.bool() })), -- interruptor do trailer (DEC-189: vem de fábrica)
 Bench = Lync.replicate(Lync.struct({
-	Item = Lync.enum(Content.BenchItems.Keys), -- inclui "none" (slot vazio no turno)
-	Price = Lync.int(0, 100000),               -- já multiplicado por PriceParty ($200 × mult. para o Revive Kit, DEC-129)
-	Left = Lync.int(0, 9),                       -- unidades restantes neste turno
-}))
-```
-
-| | |
-|---|---|
-| Escreve | `MarketService` no `ShiftStarted` (sorteio com semente, ou a oferta restaurada do snapshot) e a cada compra |
-| Lê | `MarketController` (modelo exposto no slot, billboard de preço, "Sold out") |
-| Frequência | 1 por turno por slot + compras |
-| Por que set | oferta compartilhada; quem chega vê a oferta atual |
-| Nota | upgrades básicos **não** passam aqui (sempre à venda, DEC-106): leem `Upgrades` e tabela. O Food Trailer não é da bancada (prompt no próprio trailer, DEC-107): lê `Shift.Vehicle`, `RunState.PriceParty` e tabela |
-
-### 3.11 `Traffic` (id = slot de carro, 1–8) — novo
-
-```lua
+	Item = Lync.enum(Content.BenchItems.Keys),  -- inclui "none"
+	Price = Lync.int(0, 100000),                -- já × PriceParty (DEC-129)
+	Left = Lync.int(0, 9),
+})),
 Traffic = Lync.replicate(Lync.struct({
-	Route = Lync.int(1, 32),          -- índice em Content.Traffic.Routes (TR-1..TR-10 hoje; polilinha nomeada no mapa)
-	Look = Lync.int(1, 16),           -- modelo/cor
-	AnchorAt = Lync.f64(),            -- tempo de servidor da âncora (nascimento ou última arrancada)
-	AnchorDist = Lync.f32(),          -- studs ao longo da rota em AnchorAt; velocidade não vai no fio (perfil por trecho)
-	StopDist = Lync.f32(),            -- próxima parada (studs ao longo da rota); 0 = nenhuma parada à frente
-	HeldUntil = Lync.f64(),           -- arranca sozinho neste tempo (PARE com caixa reservada); 0 = parado até novo registro
-}))
-```
-
-| | |
-|---|---|
-| Escreve | só `TrafficService`: `set` ao nascer, ao ganhar/trocar a próxima parada (PARE `SL-N/SL-S`, linha de faixa com reserva de NPC, fila atrás de outro carro), ao arrancar (nova âncora) e `remove` ao sair da rota |
-| Lê | `TrafficController` (clona o modelo; posição = `Shared/TrafficMotion(registro, rota, now)`, a mesma função que o servidor usa no tick de 10 Hz e na validação de `CarHit`; testa hit local) |
-| Frequência | por carro: 1 ao nascer + 1–2 por PARE (o 2º só se a caixa `X-T` estava ocupada) + 0–2 por faixa reservada + `remove`. Teto 4 carros de dia; Juniper Sul 1 carro a cada 12–20 s por sentido (DEC-133); 1 carro à noite, só TR-1/TR-2 (`Q-103`). Pior caso < 40 B/s por client |
-| Paradas (DEC-133) | `StopDist`/`HeldUntil` existem por causa do PARE (1 s, Juniper) e da reserva de faixa por NPC (máx. 4 s). **Nenhum campo depende de jogador**: carro nunca para nem desvia por jogador. PARE com caixa livre já sai com `HeldUntil = chegada + 1 s` (sem segundo registro, imune à latência) |
-| Por que âncora e não `StartedAt` + lista de paradas | a duração de parada por NPC só é conhecida quando o NPC sai da pista; re-ancorar a cada arrancada mantém o registro em tamanho fixo (~34 B) e a posição função pura do último registro |
-| Por que set e não packet | quem chega ou reconecta precisa ver os carros já na rua (inclusive parados); o registro some sozinho |
-| Por que não posição por frame | 4 carros × 10 Hz × CFrame seria ~2 KB/s; a cinemática é determinística entre eventos |
-| Reserva de faixa no fio? | **não**: o client não precisa saber da reserva; vê o carro parar pelo registro. Evita set extra e mantém a regra só no servidor |
-
-### 3.12 `Ambulance` (registro único, id `1`) — novo
-
-```lua
+	Route = Lync.int(1, 32), Look = Lync.int(1, 16),
+	AnchorAt = Lync.f64(), AnchorDist = Lync.f32(), StopDist = Lync.f32(), HeldUntil = Lync.f64(),
+})),
 Ambulance = Lync.replicate(Lync.struct({
-	Trip = Lync.enum({ "Pickup", "Return", "Dawn" }), -- coleta (médicos descem, DEC-114) / volta do reviver (ninguém desce, DEC-091) / noite perdida (parte sem sirene, DEC-122)
+	Trip = Lync.enum({ "Pickup", "Return", "Dawn" }),
 	Phase = Lync.enum({ "Arrive", "Load", "Leave", "Drop", "Depart" }),
-	StartedAt = Lync.f64(),           -- início da fase atual
-	Stop = Lync.int(1, 4),            -- índice em Content.Ambulance.Stops (AMB-M, AMB-P)
-	Riders = Lync.array(Lync.struct({ -- corpos a recolher nesta parada (Pickup) ou quem aparece em REV-n (Return)
-		UserId = Lync.f64(),
-		Body = Lync.vec3(),           -- onde o corpo está; ignorado em Return
-	}), 0, 4),
-}))
-```
-
-| | |
-|---|---|
-| Escreve | `AmbulanceService` (uma ambulância por servidor; a fila de viagens fica no servidor, não replica) |
-| Lê | `AmbulanceController` (ambulância, sirene, médicos, maca: tudo local pela timeline; caminho dos médicos calculado no client sobre o grafo `NpcNode`), `CameraController` |
-| Frequência | ~5 updates por viagem; uma viagem pode servir várias quedas |
-| Por que set | colegas e quem reconecta veem a sequência no ponto atual; registro removido quando a ambulância sai do mapa |
-| Por que registro único | só existe uma ambulância (FEAT-034, NPC-023, `MAP-01.md` §9.6); id por caído (versão 2) permitia várias simultâneas |
-
-### 3.13 `Cutscene` (registro único) — packet virou set
-
-```lua
+	StartedAt = Lync.f64(), Stop = Lync.int(1, 4),
+	Riders = Lync.array(Lync.struct({ UserId = Lync.f64(), Body = Lync.vec3() }), 0, 4),
+})),
 Cutscene = Lync.replicate(Lync.struct({
-	Scene = Lync.enum(Content.Cutscenes.Keys), -- inclui "none"
-	StartedAt = Lync.f64(),
-	Votes = Lync.int(0, 4),
-	Needed = Lync.int(0, 4),                   -- 0 = não pulável
-}))
+	Scene = Lync.enum(Content.Cutscenes.Keys), StartedAt = Lync.f64(),
+	Votes = Lync.int(0, 4), Needed = Lync.int(0, 4), -- ceil(50% dos conectados), DEC-194
+})),
+Parties = Lync.replicate(Lync.struct({ ... })),    -- lobby; plataformas físicas (DEC-179)
 ```
 
-| | |
-|---|---|
-| Escreve | `CutsceneService` |
-| Lê | `CutsceneController` (timeline por tempo, POV), `CameraController`, `HudController` ("Skip 1/2") |
-| Frequência | início, cada voto, fim |
-| Por que set | atrasado e reconectado entram no ponto atual (DEC-088, `Q-112` c); votos visíveis a todos |
+| Entrada | Escreve → lê | Frequência | Nota |
+|---|---|---|---|
+| `Switches` | `KitchenService`/`VehicleService` → `TrailerController` | por toque | interruptor vem com o trailer (DEC-189) |
+| `Bench` | `MarketService` → `MarketController` | 1 por turno + compras | só a vaga especial S1; básicos leem `Upgrades` (DEC-106) |
+| `Traffic` | `TrafficService` → `TrafficController` | ≤ 6 por carro | DEC-133; noite rara (DEC-198) |
+| `Ambulance` | `AmbulanceService` → `AmbulanceController` | ~5 por viagem | uma por servidor (DEC-114) |
+| `Cutscene` | `CutsceneService` → `CutsceneController` | início, votos, fim | limiar ≥ 50% dos **conectados** (DEC-194) |
 
-## 4. Sets — place Lobby
-
-### 4.1 `Parties` — sem mudança
-
-`{ Pad, Owner, Members (array de UserId, 0–4), Ready (bitfield M1–M4), State }`. Escreve `PartyService`.
-
-## 5. Packets — place Run
-
-| Nome | Direção | Schema | Dispara | Responde/lê | Frequência | Justificativa |
-|---|---|---|---|---|---|---|
-| `Interact` | c → s | `{ Id: int(1,65535), Action: enum(Content.Actions.Keys) }` | `PromptController` | `InteractionService` | ≤ 8/s | alvo por `EntityId`; bancada, prateleira, trailer à venda (`buy_trailer`), item derrubado (`pick_up_item`, "Pick Up") passam aqui |
-| `Gaze` | c → s, `.newest(10)` | `{ Yaw: angle(1), Pitch: angle(1) }` | `CameraController` (noite, ator ativo) | `AnomalyService` | 10 Hz | perda aceitável |
-| `CarHit` | c → s | `{ Car: int(1,8) }` | `CharacterController`/`TrafficController` ao detectar contato local | `TrafficService` | ≤ 1 por imunidade (5 s); servidor limita a 2/s | client vê o carro onde ele está para ele; servidor valida posição calculada ± 8 studs (`architecture.md` §8.2) |
-| `Revive` | c → s | `{ Target: f64, Method: enum({"Robux","Item","Credit"}) }` | `ReviveController` (oferta no spectate enquanto `Down`, Tool do Kit ativada) | `ReviveService` | ação; limite 1/s | Validação: **`Method = Robux` ou `Credit` → `Target == remetente`** e remetente `Down` (DEC-116), senão descarta. `Item`: remetente `Down` com o Kit no stash (alvo = ele) ou `Active` com o Kit na mão (alvo escolhido pelo servidor, `Revive.KitTarget`; `Target` ignorado). Sempre: alvo `Down` (nunca `Spectator`), antes das 6:00 AM (DEC-115), `RevivesTonight < 2` (DEC-129). Robux: servidor grava intenção e chama `PromptProductPurchase`; o client **não** abre o prompt sozinho |
-| `SkipVote` | c → s | `Lync.empty()` | `CutsceneController` (hold "Skip") | `CutsceneService` | 1 por cutscene por jogador | voto não se retira |
-| `Notice` | s → client ou grupo | `{ Kind: enum(Content.Notices.Keys), Value: int(-1000000,1000000) }` | qualquer Service via `RunStateService:Notify` | `HudController` (toast) | evento | inclui `gems_gained` (Value = gemas), `afk_no_gems`, `revive_credit_saved`, `trailer_price` |
-| `Sale` | s → grupo | `{ Npc: int(1,65535), Result: enum({"Perfect","Complete","Incomplete","Wrong","Left","Refused"}), Amount: int(0,1000) }` | `CustomerService` | `CustomerController` | por venda | apresentação |
-| `ShiftReport` | s → grupo | `{ Day, Night, Revenue, Tips, Bonus, Stolen: int; Grade: enum({"A","B","C","D","None"}); Served, Satisfied, Completed: int(0,999); Gems: int(0,1000); AfkLocked: bool }` | `EconomyService` + `RewardService` | `HudController` | 1 por turno | `Gems` = já creditado no turno (DEC-104); `AfkLocked` explica "sem gema de dia" (DEC-083) |
-| `BossCall` | s → grupo | `{ Call: enum(Content.BossCalls.Keys), Short: bool }` | `BossService` | `BossController` | 1–2 por turno | `Short` = versão curta da noite repetida (`Q-077` d); sem replay (DEC-077) |
-| `AnomalyCue` | s → client ou grupo | `{ Anomaly: enum(Content.Anomalies.Keys), Cue: enum(Content.AnomalyCues.Keys), Entity: int(0,65535), Seed: int(0,65535) }` | `AnomalyService` | `AnomalyController` | eventos | escopo "por jogador" (DEC-073) |
-| `LifeEvent` | s → grupo | `{ UserId: f64, Event: enum({"Down","Revived","Spectating","Hit","Wipe","WipeCleared"}) }` | `VitalService`, `TrafficService` | `CameraController`, `HudController`, `AmbulanceController` (sirene), áudio | raro | gatilho de transição; o estado está em `Vitals`/`Shift` |
-
-## 6. Packets — place Lobby (e perfil nos dois)
-
-| Nome | Direção | Schema | Dispara | Responde/lê | Frequência | Justificativa |
-|---|---|---|---|---|---|---|
-| `Profile` | s → client | `{ Gems: int(0,2^31−1), Classes: bitfield(Content.Classes.Keys), Selected: enum(Content.Classes.Keys), Achievements: bitfield(Content.Achievements.Keys), EndlessDays: int(0,100000), ReviveCredits: int(0,99) }` | `ProfileService:Replicate` (effect existente) | `ProfileController` | quando muda (por evento de gema) | privado por construção; `EndlessDays` **não** é mostrado como "Day 100" (achievement secreto, DEC-058): só debug/estatística |
-| `PartyAction` | c → s | `{ Action: enum({"Join","Leave","Ready","Unready","Start"}), Party: int(0,255) }` | `PartyController` | `PartyService` | ≤ 4/s | |
-| `ClassAction` | c → s | `{ Action: enum({"Buy","Select"}), Class: enum(Content.Classes.Keys) }` | `ClassController` | `ClassService` | ação | |
-| `Reconnect` | s → client | `{ Mode: enum({"Live","Suspended"}), Day: int(1,10000), Night: int(0,10), IsNight: bool, Connected: int(0,4), Seconds: int(0,900) }` | `SessionService` ao achar run | `SessionController` → notificação (DEC-063) | 1 por entrada + atualização a cada 30 s se mudar | `Suspended` mostra "Resume Day N" e o tempo restante (DEC-080); `Seconds` = 0 em `Live` |
-| `ReconnectReply` | c → s | `{ Accept: bool }` | `SessionController` | `SessionService` | 1 | |
-| `Notice` | s → client | (mesmo de §5) | `PartyService`, `SessionService`, `ClassService`, `MonetizationService` | `HudController` | evento | "That shift has ended.", "That shift can't be resumed.", crédito de reviver recebido no lobby |
+| Packet | Direção | Schema | Responde/lê | Nota |
+|---|---|---|---|---|
+| `Gaze` | c → s, `:newest(10)` | `{ Yaw: angle(1), Pitch: angle(1) }` | `AnomalyService` | só à noite |
+| `CarHit` | c → s | `{ Car: int(1,8) }` | `TrafficService` | ± 8 studs |
+| `Revive` | c → s | `{ Target: f64, Method: enum({"Robux","Item","Credit"}) }` | `ReviveService` | Robux/crédito só para si (DEC-116) |
+| `SkipVote` | c → s | `Lync.empty()` | `CutsceneService` | DEC-194 |
+| `BossCall` | s → grupo | `{ Call: enum(Content.BossCalls.Keys), Short: bool }` | `BossController` | não pulável (DEC-194 b, Provisório) |
+| `AnomalyCue` | s → jogador/grupo | `{ Anomaly, Cue, Entity: int(0,65535), Seed: int(0,65535) }` | `AnomalyController` | |
+| `LifeEvent` | s → grupo | `{ UserId: f64, Event: enum({"Down","Revived","Spectating","Hit","Wipe","WipeCleared"}) }` | Camera, Hud, Ambulance | |
+| `PartyAction` | c → s | `{ Action: enum({"Leave","Ready","Unready","Start"}), Party: int(0,255) }` | `PartyService` | entrar = pisar na plataforma (DEC-179), sem `Join` |
+| `Reconnect` / `ReconnectReply` | s → c / c → s | como na v3 | `SessionService` | |
 
 ## 7. O que não passa pelo Lync
 
 | O quê | Como replica | Por quê |
 |---|---|---|
-| Tools (pacotes, Coffee, HotDog, Revive kit) | Backpack nativo; `Count` em atributo | DEC-040 |
-| Item derrubado (atropelamento: só a Tool da mão, DEC-103) | a própria Tool no `Workspace` com atributos de prompt (`EntityId`, `PromptAction = pick_up_item`) | já é instância; o prompt lê atributos |
-| Usar Tool simples (café) | `Tool.Activated` no servidor | o revive kit usa `Revive` (precisa de alvo) |
-| Ragdoll | `Motor6D.Enabled`/constraints mudados no servidor; física do client dono | replicação nativa |
-| NPCs | física + `Animator` no servidor | |
-| Travessia de NPC (DEC-133) | **nenhuma rede própria**: `NpcService` pede/libera a reserva da faixa ao `TrafficService` no servidor; o client vê o NPC andar (física nativa) e os carros pararem (registro `Traffic`) | reserva é regra do servidor; o efeito já replica |
-| Luzes dos postes (emissiva, `SpotLight`, corte por distância) | locais ao client; apagar no Hush vem do `AnomalyCue` que já existe | `architecture.md` §12.5, T31 |
-| Fala da Opal | escolhida localmente pelo client | puro ambiente (DEC-079) |
-| Compra em Robux | `MarketplaceService:PromptProductPurchase` chamado **no servidor**; recibo em `ProcessReceipt` | o servidor associa compra e alvo |
-| Peças de upgrade, troca de veículo | instâncias no `Workspace` | |
-| Teleporte, roster, snapshot | `TeleportService` + MemoryStore | `data.md` §3 |
+| Tools (pacotes, HotDog, café, Revive Kit) | Backpack nativo; atributos na Tool (§7.1) | DEC-040 |
+| Aparência de personagem (pack, rosto, espécie, roupa) | atributos + vestir no client (§5) | T40 |
+| Pacote grátis do dia de liberação | Tool no mundo sobre a estação nova (`ItemService`) | DEC-071 |
+| Prompts (`PromptEnabled`, `PromptText`, `PromptHold`) | atributos das peças, mantidos pelo servidor (TASK-011; nomes no binding da TASK-002) | prompt é do mundo |
+| Peças de upgrade, troca de veículo | instâncias no `Workspace` | DEC-052 |
+| NPCs (posição, animação) | física + `Animator` no servidor (T11); passantes por `Motor6D.Transform` (DEC-183, Provisório, onda 2) | |
+| Opal | modelo e falas locais ao client (`OpalController`), zero rede | DEC-079, DEC-191 |
+| Item derrubado, ragdoll, luzes dos postes, compra em Robux, teleporte/snapshot | como na v3.1 | |
 
-## 8. Esboço do `init.luau` (referência; não aplicar na Fase 0)
+### 7.1 Atributos de Tool (contrato com `ItemService`, `HotDogVisual`, `PromptController`)
+
+| Atributo | Tools | Tipo | Escreve | Uso |
+|---|---|---|---|---|
+| `Item` | todas | string (`Content.Items` key) | `ItemService` | identificar sem depender do nome da Tool (nome igual ao do binding, §18.2) |
+| `Count` | pacotes, café | int | `ItemService` | sobra do pacote (DEC-049) |
+| `Toppings` | `hot_dog` | string: chaves de `Ingredients` separadas por vírgula, **na ordem de montagem** (ex.: `"ketchup,cheese"`); `""` = sem complemento | `ItemService` (a cada "Add X") | `HotDogVisual` empilha (queijo antes dos cordões, DEC-142); `PromptController` esconde "Add X" já presente; `CustomerService` valida o pedido (ordem ignorada, DEC-071) |
+| `Altered` | `hot_dog` | bool | `ItemService` | onda 3 (ITM-020) |
+
+Por que string e não bitmask: a ordem de montagem é dado (DEC-142 usa a ordem para o visual); ≤ 3 complementos,
+custo irrelevante; legível no Explorer.
+
+## 8. `init.luau` da onda 1 (referência para a TASK-004)
 
 ```lua
 --!strict
@@ -318,50 +568,105 @@ local Content = require(ReplicatedStorage.shared.Content)
 
 return Lync.define("game", {
 	Ready = Lync.packet(Lync.empty()),
-	Profile = Lync.packet(Lync.struct({ ... })),
-	-- sets da run
-	Shift = Lync.replicate(Lync.struct({ ... })),
-	RunState = Lync.replicate(Lync.struct({ ... })),
-	Economy = Lync.replicate(Lync.struct({ ... })),
-	Vitals = Lync.replicate(Lync.struct({ ... })),
-	Stock = Lync.replicate(Lync.struct({ ... })),
-	Stations = Lync.replicate(Lync.struct({ ... })),
-	Customers = Lync.replicate(Lync.struct({ ... })),
-	Upgrades = Lync.replicate(Lync.struct({ ... })),
-	Switches = Lync.replicate(Lync.struct({ ... })),
-	Bench = Lync.replicate(Lync.struct({ ... })),
-	Traffic = Lync.replicate(Lync.struct({ ... })),
-	Ambulance = Lync.replicate(Lync.struct({ ... })),
-	Cutscene = Lync.replicate(Lync.struct({ ... })),
-	-- set do lobby
-	Parties = Lync.replicate(Lync.struct({ ... })),
-	-- packets
-	Interact = Lync.packet(Lync.struct({ ... })),
-	Gaze = Lync.packet(Lync.struct({ ... })):newest(10),
-	CarHit = Lync.packet(Lync.struct({ ... })),
-	Revive = Lync.packet(Lync.struct({ ... })),
-	SkipVote = Lync.packet(Lync.empty()),
-	-- Notice, Sale, ShiftReport, BossCall, AnomalyCue, LifeEvent,
-	-- PartyAction, ClassAction, Reconnect, ReconnectReply
+
+	Profile = Lync.packet(Lync.struct({
+		Gems = Lync.int(0, 2147483647),
+		Classes = Lync.bitfield(Content.Classes.Keys),
+		Selected = Lync.enum(Content.Classes.Keys),
+	})),
+
+	-- sets da run (onda 1)
+	Shift = Lync.replicate(Lync.struct({ --[[ §3.1 ]] })),
+	RunState = Lync.replicate(Lync.struct({ --[[ §3.2 ]] })),
+	Economy = Lync.replicate(Lync.struct({ Cash = Lync.int(0, 2147483647), Drawer = Lync.int(0, 1000000) })),
+	Stock = Lync.replicate(Lync.struct({ Amount = Lync.int(0, 999), Capacity = Lync.int(0, 999), Blocked = Lync.bool() })),
+	Stations = Lync.replicate(Lync.struct({ --[[ §3.5 ]] })),
+	Customers = Lync.replicate(Lync.struct({ --[[ §3.6 ]] })),
+	Upgrades = Lync.replicate(Lync.struct({ Level = Lync.int(0, 9) })),
+
+	-- packets (onda 1)
+	Interact = Lync.packet(Lync.struct({ --[[ §4.1 ]] })),
+	Notice = Lync.packet(Lync.struct({ --[[ §4.2 ]] })),
+	Sale = Lync.packet(Lync.struct({ --[[ §4.3 ]] })),
+	ShiftReport = Lync.packet(Lync.struct({ --[[ §4.4 ]] })),
+	ClassAction = Lync.packet(Lync.struct({ --[[ §4.6 ]] })),
+
+	-- legado mantido até a onda 2 (§4.7)
+	Vitals = Lync.replicate(Lync.struct({
+		Health = Lync.int(0, 100), Armor = Lync.int(0, 100), Stamina = Lync.int(0, 100),
+	})),
+	Round = Lync.packet(Lync.struct({
+		Status = Lync.enum({ "Waiting", "Playing", "Ending" }), Seconds = Lync.int(0, 3600),
+	})),
 })
 ```
 
-Os dois places definem todas as entradas (mesmo código). Requerer `shared.Content` em `Net` é seguro (não depende
-de `self.Libs`, Lync ou Vide). Enums com valor sentinela (`"none"` em `BenchItems` e `Cutscenes`) ficam **na
-tabela**, não no código, para a ordem continuar vindo de um lugar só.
+- `Content` precisa expor, na onda 1: `Shift.PhaseKeys`, `Vehicles.Keys`, `Stations.RecordKeys`,
+  `Ingredients.ToppingKeys`, `Moods.Keys`, `Actions.Keys`, `Notices.Keys`, `Classes.Keys` (TASK-003). Requerer
+  `shared.Content` em `Net` é seguro (não depende de `self.Libs`, Lync ou Vide).
+- Checklist de PR que toca este arquivo: `tools/analyze.ps1` zero erro **e** boot no Studio sem erro de
+  `Lync.start()` (o schema só é validado em runtime, R8).
 
-Checklist de PR que toca este arquivo: `tools/analyze.ps1` zero erro **e** boot no Studio nos dois places sem erro
-de `Lync.start()`.
+## 9. Orçamento de replicação (onda 1, por client, pior caso: party de 4 em pico de dia)
 
-## 9. Escolhas justificadas (resumo)
+| Fonte | Taxa | Bytes/s aprox. |
+|---|---|---|
+| `Stations` | ~1–2 escritas/s (4 jogadores montando) | < 40 |
+| `Customers` | ~1/s (≤ 8 clientes) | < 30 |
+| `Stock` | ≤ 2/s | < 15 |
+| `Economy`, `Shift`, `Upgrades`, `RunState` | eventos | < 10 |
+| packets (`Notice`, `Sale`) | eventos | < 20 |
+| `Interact` (c → s) | ≤ 8/s, típico 1/s | ~5 por jogador |
+
+Total de Lync < 150 B/s por client. Atributos de aparência: uma vez por spawn de NPC (≤ 1 a cada ~5 s) e por troca de
+faixa (onda 2). O peso real continua sendo física dos Humanoids (T11) e memória de textura (`Q-144` g).
+
+## 10. Escolhas justificadas (resumo)
 
 | Escolha | Por quê |
 |---|---|
-| `Traffic` como set, não posição por frame | ~34 B por evento (nascer, parar, arrancar), ≤ 6 por carro; o client interpola; servidor só faz cinemática 1D, zero física (DEC-133 acrescenta paradas sem mudar o modelo) |
-| `Ambulance` como set de registro único | uma ambulância por servidor; a sequência tem fases longas (segundos) e precisa aparecer certa para quem reconecta no meio |
-| `Cutscene` como set | votos e entrada no meio; packet não entrega estado a quem chega |
-| `Revive` com `Method` | um responder só para três caminhos de pagamento; o servidor decide a validade (Robux e crédito só para si, DEC-116) |
-| `CarHit` c → s | detecção onde o jogador vê o carro; servidor valida plausibilidade |
-| `Bench` só para a vaga especial | básicos são fixos (DEC-106) e o trailer não é da bancada (DEC-107); mandar o que já está em `Upgrades` duplicaria dono |
-| `LifeEvent` em vez de `KnockOut` | mais transições (Down, Revived, Spectating, Hit, Wipe); estado continua nos sets |
-| Sem set de gemas | gemas são privadas: vão no packet `Profile` + `Notice` |
+| Tábua = 2 registros `board` + prompt único na tábua | mesmo padrão da grelha (registro = vaga com barra); prompts vizinhos ≥ 2,5 studs; servidor escolhe a vaga, o client nunca manda índice de vaga |
+| `Blocked` em `Stock`, não em `Stations` | bloqueio é do ingrediente no dia; uma flag serve tigela, Mart e pedido |
+| Aparência fora do `Customers` | passantes (DEC-183), ladrão e atores de anomalia também precisam; um mecanismo para todo NPC; o set fica com estado de jogo |
+| `Mood` por tabela | humor dinâmico (DEC-187) ainda em desenho (`Q-164`); estender sem tocar no `Net` |
+| `Upgrades` só do veículo atual | DEC-184 separa níveis; o client só mostra o veículo em uso; o dono guarda os dois |
+| `Sanity` privado (onda 2) | DEC-167 (número nunca a outro jogador); a faixa já é visível pela aparência |
+| Entradas das ondas 2–4 fora do `init.luau` da onda 1 | sem stubs de tabela para enums que ainda não existem; adicionar entrada depois não quebra as outras |
+| Sem `keyBy` | T14 |
+
+## 11. Sobreposição com a TASK-002 (`architecture.md` §18)
+
+A TASK-002 (outra sessão do architect) escreveu o binding, os kits e o layout de módulos em `architecture.md` §18 e
+deixou notas para esta task em §18.14. Este documento **não** edita `architecture.md`. Resposta item a item:
+
+| §18.14 | Resposta nesta versão |
+|---|---|
+| 1. chaves de `Stations` | **adotadas**: `sausage_stock`, `grill`, `rail`, `bun_crate`, `board`, `toppings`, `trash` (+ `coffee_machine`) (`content-data.md` §3.6). Gaveta, placa, prateleiras e bancada não são estação |
+| 2. instância ↔ registro do set | **adotado**: atributo `StationId`; id do registro = `StationId × 100 + Slot` (`Slot = 0` no trilho). Tigela não tem registro (estado em `Stock`) |
+| 3. `Actions` | `board_add_topping` vira **`topping_add`**; demais iguais. `bench_buy_item` e `pick_up_item` existem na tabela desde a onda 1 (a checagem do binding recusa chave fora de `Content`), sem prompt ativo |
+| 4. `Upgrades.BenchSpot` | `B1`..`B5` (`content-data.md` §3.7) |
+| 5. `Vehicles.Model` | sai; o veículo é o `Model` com tag `Vehicle` (T36) |
+| 6. `Species.Asset`, `Items.ToolModel` | `Species.Asset` = nome do animal no kit; `ToolModel` sai (a Tool do kit tem o nome da chave). Idem `Ingredients.Model` (cobertura = `Assets.Items.Toppings/<chave>`) |
+| 7. sufixo PascalCase | aceito, sem campo |
+| 8. `Toppings` | formato confirmado (§7.1); atributo da chave do item = **`Item`** (nome do §18.2) |
+| 9. faixa de sanidade | fonte = `VitalService` (onda 2), escrita como atributo `LookPack` no personagem (não é espelho: é o valor replicado); `Vitals` não leva faixa nem número (§6.1) |
+
+Divergências que ficam abertas entre as duas sessões:
+
+| Ponto | TASK-002 | Este documento | Encaminhamento |
+|---|---|---|---|
+| Quem aplica textura | T35: servidor (crew e Day/Mid de NPC) | T40: client, a partir de atributos | §5.4; vale a T40 pela DEC-167/169 até a `Q-130`; TASK-002 alinha §18.9.4 |
+| Valores de `Outfit` | `Crew`, `A`..`H`, `Thief` (§18.9.2) | chaves de `Content.Outfits` (`crew`, `civil_a`…) | §18.0 item 4 ("valores são chaves") pede chave; `CrewLooks` mapeia |
+| Nomes de expressão | `Smile` (nome do JSON de texturas) | `Content.Looks.Expressions` usa os nomes do JSON | alinhado: `Smile`, não `Smiling` |
+
+## 12. Provisórios desta versão
+
+| Item | Base | Fecha em |
+|---|---|---|
+| T6 (`InteractionService` único), T13 (enums das tabelas), T14 (sem `keyBy`) | architect | `Q-130` |
+| **T40** aparência vestida no client a partir de atributos (diverge da T35) | DEC-167/169 ("troca no client") + nota técnica da DEC-168 | `Q-130` (acrescentar); alinhar com a T35 (§11) |
+| Humor simplificado (Neutral/Happy/Annoyed/Complaining, só visual) | board, TASK-033 | `Q-164` |
+| `Sanity` como packet privado (onda 2) | DEC-167 (leitura do architect) | `Q-130` |
+| `Stations` id = `StationId × 100 + Slot` | architect, sugestão do §18.14 item 2 da TASK-002 | — |
+| Rosto Desmaiado na crew `Down`; `Normal_Night` vence o humor | DEC-167 (itens Provisórios), proposals-round-3 §2 | game-designer |
+| `Select` de classe no Run em modo dev | TASK-017 | lobby (`Q-085`, onda 2) |

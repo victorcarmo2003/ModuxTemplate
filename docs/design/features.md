@@ -356,7 +356,7 @@ Atropelamento derruba **só a Tool equipada** (FEAT-033, FEAT-036); o resto da h
 | 1 | Caixa de salsicha | toque "Grill" | consome 1 salsicha do estoque; vai para uma vaga livre da grelha | exige vaga livre |
 | 2 | Grelha (UPG-001) | automático | barra de progresso sobre a salsicha **[DEC-015]** | 12 s / 10 s / 8 s por nível; Line Cook −15% nas dele |
 | 3 | Grelha | toque "Collect" na salsicha pronta | vai para o trilho de descanso (fila: a mais antiga sai primeiro) | trilho: 6 (carrinho), 8 (trailer) |
-| 4 | Caixa de pão | hold 0,5 s "Slice Bun" | consome 1 pão; pão vai para uma tábua livre e é cortado | corte automático 1,5 s; tábuas: 2 (carrinho), 3 (trailer) |
+| 4 | Caixa de pão | hold 0,5 s "Slice Bun" | consome 1 pão; pão vai para uma tábua livre e é cortado | corte automático 1,5 s; tábua com vagas compartilhadas: **2 (carrinho), 3 (trailer) [DEC-190, DEC-215]** |
 | 5 | Tábua | toque "Add Sausage" (trilho com ≥1) | a próxima salsicha do trilho entra no pão; vira Tool **Hot Dog** (ITM-010) na mão de quem tocou; a tábua libera | — |
 | 6 | Estação de complemento | hold 1 s "Add {item}" com Hot Dog na mão | consome 1 uso do complemento; adiciona ao Hot Dog | 1 por complemento; não repete |
 | 7 | Cliente | toque "Serve" com Hot Dog na mão | entrega (FEAT-011) | — |
