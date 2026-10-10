@@ -15,25 +15,29 @@
 --   Context     one table of functions shared by every module (Api.Context): Publish (set), Cue (packet to
 --               everyone, DEC-204), Fail (who pays, DEC-204; once per player per occurrence; critical ->
 --               LoseNight("critical"), DEC-094), Succeed, Finish, Active, Looking (Gaze + Vision), SeenTick/See
---               (VitalService:SeeAnomaly), Rule, Spawn, Light, Hide, Kitchen, Traffic, Economy.
---   Events      CustomerService.Acted, LightService.SwitchChanged, InteractionService.Performed (OnInit);
---               KitchenService.Discarded and HideService.Changed when they exist (OnStart) -> OnEvent of every
---               running occurrence.
---   Gaze        c -> s, 10 Hz (network.md §13.5). Kept only from a member Active on a night shift and not hidden;
---               older than GAZE_STALE s counts as not looking. Format check only (co-op, R10).
+--               (VitalService:SeeAnomaly), Rule, Spawn, Light, Vehicle, InZone, Kitchen, Traffic, Economy.
+--   Events      CustomerService.Acted, LightService.SwitchChanged, InteractionService.Performed,
+--               VehicleService.ShutterChanged (OnInit); KitchenService.Discarded when it exists (OnStart) -> OnEvent of
+--               every running occurrence.
+--   Gaze        c -> s, 10 Hz (network.md §13.5). Kept only from a member Active on a night shift; older than
+--               GAZE_STALE s counts as not looking. Format check only (co-op, R10). A protected player (window closed
+--               and inside the trailer, DEC-221) does not look at anything outside the trailer (architecture.md §19.14).
+--   InZone      safe spot / trailer zone: flat distance from the root of an Active player to a MapPoint (owned here
+--               since DEC-221).
 --   Tension     signal Tension(on) while an occurrence of an anomaly with Anomalies[k].Tension runs; also
 --               NpcService:SetTension(on) when it exists (TASK-108). PedestrianService listens to the signal.
 --   Cleanup     NightEnd -> Stop(..., "NightOver"); NightLost, a new shift, any other phase -> "Restore"; set cleared.
 --
--- Hooks of services that do not exist yet (PROVISIONAL, TASK-106): HideService (TASK-102) and TrafficService
--- (TASK-104) are in architecture.md §19.2 Require but not in this build, so they are looked up by name at OnStart;
+-- Hooks of services that do not exist yet (PROVISIONAL, TASK-106): TrafficService (TASK-104) is in
+-- architecture.md §19.2 Require but was not in this build, so it is looked up by name at OnStart;
 -- CustomerService:SpawnActor, NpcService:SetTension (TASK-108) and KitchenService:Alter/Discarded (TASK-109) are
 -- used when the method/signal is there. Each missing hook degrades to "not available" (Spawn nil, Alter false,
--- nobody hidden, Hold no-op). InteractionService is required beyond §19.2 for the Action event (Performed).
+-- Hold no-op). InteractionService is required beyond §19.2 for the Action event (Performed).
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 local Content = require(ReplicatedStorage.shared.Content)
+local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 local Api = require(script.Api)
 local Rules = require(script.Rules)
@@ -72,10 +76,6 @@ export type Due = { Entry: Scheduler.Entry, RetryAt: number, Done: boolean }
 
 export type Gaze = { Yaw: number, Pitch: number, At: number }
 
-type HideHook = {
-	IsHidden: (self: any, player: Player) -> boolean,
-	InZone: (self: any, player: Player, pointId: string, radius: number) -> boolean,
-}
 type TrafficHook = { Hold: (self: any, reason: string, on: boolean) -> () }
 
 const TICK_RATE = 5 -- Hz (architecture.md §19.13: module Tick at 5 Hz)
@@ -85,7 +85,7 @@ const ANCHOR_MAX = 65535 -- Anomalies.Anchor / AnomalyCue.Entity wire range
 const SEED_MAX = 65535 -- AnomalyCue.Seed wire range
 const RETRY = 1 -- s between two Start attempts of the same due entry (Start returned false)
 const LINGER = 1 -- s a finished record stays in the set so clients see its last Phase
-const GAZE_STALE = 1 -- s; the client sends at 10 Hz, an older gaze means it stopped (hidden, day, not Active)
+const GAZE_STALE = 1 -- s; the client sends at 10 Hz, an older gaze means it stopped (day, not Active)
 const TARGET_SLACK = 2 -- studs; a hit this close to the target does not block the line of sight
 const EYE_OFFSET = Vector3.new(0, 1.5, 0) -- HumanoidRootPart -> eye when the Head is missing
 const DOMAIN = "anomaly"
@@ -104,7 +104,7 @@ local function wireInt(value: number, low: number, high: number): number
 	return math.clamp(math.floor(value), low, high)
 end
 
--- Live Modux service by ID when it is in this build (no Require: TASK-102/104 do not exist yet). nil otherwise.
+-- Live Modux service by ID when it is in this build (no Require: TASK-104 did not exist yet). nil otherwise.
 local function lookup(name: string): any
 	for _, module in ModuxModules do
 		if module.Name == name then
@@ -115,7 +115,7 @@ local function lookup(name: string): any
 	return nil
 end
 
--- Connects to a signal of a service that may not have it yet (TASK-102/109). nil signal = nothing to connect.
+-- Connects to a signal of a service that may not have it yet (TASK-109). nil signal = nothing to connect.
 local function connectOptional(signal: any, name: string, handler: (...any) -> ())
 	if signal == nil then
 		return
@@ -169,6 +169,7 @@ const AnomalyService = Modux.Service("AnomalyService", {
 		"ItemService",
 		"EconomyService",
 		"InteractionService",
+		"VehicleService",
 	},
 	Priority = 570,
 })
@@ -196,7 +197,6 @@ function AnomalyService:Setup()
 	self.InNight = false :: boolean
 	self.Gazes = {} :: { [Player]: Gaze }
 	self.TensionOn = false :: boolean
-	self.Hide = nil :: HideHook?
 	self.Traffic = nil :: TrafficHook?
 	self.Warned = {} :: { [string]: boolean }
 	-- Tension(on): created here so lower-priority services (PedestrianService 545) connect in their OnInit
@@ -303,23 +303,25 @@ function AnomalyService:ActivePlayers(): { Player }
 	return out
 end
 
-function AnomalyService:IsHidden(player: Player): boolean
-	const hide = self.Hide
-	if hide == nil then
-		return false
-	end
-	const ok, hidden = pcall(hide.IsHidden, hide, player)
-	return ok and hidden == true
+-- Window closed and inside the trailer (VehicleService, DEC-221)
+function AnomalyService:IsProtected(player: Player): boolean
+	return self.Dependencies.VehicleService:IsProtected(player)
 end
 
+-- Root of an Active player within radius (flat distance) of the MapPoint (architecture.md §19.14: "SS", 6 for N10;
+-- TRL, 24 for the trailer zone of N8/N9)
 function AnomalyService:InZone(player: Player, pointId: string, radius: number): boolean
-	const hide = self.Hide
-	if hide == nil then
-		self:WarnOnce("nohide", "InZone without HideService (TASK-102): always false")
+	if not finite(radius) or not self.Dependencies.RunStateService:IsActive(player) then
 		return false
 	end
-	const ok, inside = pcall(hide.InZone, hide, player, pointId, radius)
-	return ok and inside == true
+	const character = player.Character
+	const root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
+	const point = MapIndex.FindPoint(pointId)
+	if root == nil or not root:IsA("BasePart") or point == nil then
+		return false
+	end
+	const offset = root.Position - point.Position
+	return Vector2.new(offset.X, offset.Z).Magnitude <= radius
 end
 
 -- Eye position: Head, or HumanoidRootPart + EYE_OFFSET.
@@ -363,7 +365,12 @@ function AnomalyService:Looking(player: Player, target: Vector3, range: number):
 	if typeof(target) ~= "Vector3" or not finite(range) then
 		return false
 	end
-	if not self.Dependencies.RunStateService:IsActive(player) or self:IsHidden(player) then
+	if not self.Dependencies.RunStateService:IsActive(player) then
+		return false
+	end
+	-- the closed window blocks the view out (the back door's little window does not count, §19.14)
+	const vehicle = self.Dependencies.VehicleService
+	if vehicle:IsProtected(player) and not vehicle:IsInsidePoint(target) then
 		return false
 	end
 	const gaze = self.Gazes[player]
@@ -384,7 +391,7 @@ function AnomalyService:Looking(player: Player, target: Vector3, range: number):
 	)
 end
 
--- Gaze responder body (network.md §13.5): night shift, Active, not hidden; otherwise the stored gaze is dropped.
+-- Gaze responder body (network.md §13.5): night shift, Active; otherwise the stored gaze is dropped.
 function AnomalyService:OnGaze(value: any, player: Player)
 	if type(value) ~= "table" or not finite(value.Yaw) or not finite(value.Pitch) then
 		return
@@ -392,7 +399,6 @@ function AnomalyService:OnGaze(value: any, player: Player)
 	if
 		not self.Dependencies.RoundService:IsNight()
 		or not self.Dependencies.RunStateService:IsActive(player)
-		or self:IsHidden(player)
 	then
 		self.Gazes[player] = nil
 		return
@@ -740,6 +746,7 @@ end
 function AnomalyService:BuildContext(): Api.Context
 	const light = self.Dependencies.LightService
 	const economy = self.Dependencies.EconomyService
+	const vehicle = self.Dependencies.VehicleService
 	return {
 		Now = now,
 		Publish = function(occ: Api.Occurrence, fields: Api.Fields)
@@ -799,14 +806,20 @@ function AnomalyService:BuildContext(): Api.Context
 				return light:IsSwitchOn()
 			end,
 		},
-		Hide = {
-			IsHidden = function(player: Player): boolean
-				return self:IsHidden(player)
+		Vehicle = {
+			IsShutterClosed = function(): boolean
+				return vehicle:IsShutterClosed()
 			end,
-			InZone = function(player: Player, pointId: string, radius: number): boolean
-				return self:InZone(player, pointId, radius)
+			IsInside = function(player: Player): boolean
+				return vehicle:IsInside(player)
+			end,
+			IsProtected = function(player: Player): boolean
+				return vehicle:IsProtected(player)
 			end,
 		},
+		InZone = function(player: Player, pointId: string, radius: number): boolean
+			return self:InZone(player, pointId, radius)
+		end,
 		Kitchen = {
 			Alter = function(kind: "rail" | "board"): boolean
 				const kitchen = self.Dependencies.KitchenService :: any
@@ -1142,6 +1155,9 @@ AnomalyService:OnInit(function(self)
 	self.Dependencies.InteractionService.Performed:Connect(function(player, action, anchor, id)
 		self:Emit({ Kind = "Action", Player = player, Action = action, Anchor = anchor, Id = id })
 	end)
+	self.Dependencies.VehicleService.ShutterChanged:Connect(function(closed, player)
+		self:Emit({ Kind = "Shutter", Closed = closed, Player = player })
+	end)
 
 	Players.PlayerRemoving:Connect(function(player)
 		self.Gazes[player] = nil
@@ -1155,17 +1171,7 @@ AnomalyService:OnStart(function(self)
 	-- Lync.start already ran (NetService OnStart, priority 1000)
 	self.Live = true
 
-	-- Optional hooks (PROVISIONAL until TASK-102/104/109 land; see header)
-	const hide = lookup("HideService")
-	if hide ~= nil and type(hide.IsHidden) == "function" and type(hide.InZone) == "function" then
-		self.Hide = hide :: HideHook
-		connectOptional(hide.Changed, "HideService.Changed", function(player: Player, hidden: boolean)
-			if hidden then
-				self.Gazes[player] = nil
-			end
-			self:Emit({ Kind = "Hide", Player = player, Hidden = hidden == true })
-		end)
-	end
+	-- Optional hooks (PROVISIONAL until TASK-104/109 land; see header)
 	const traffic = lookup("TrafficService")
 	if traffic ~= nil and type(traffic.Hold) == "function" then
 		self.Traffic = traffic :: TrafficHook

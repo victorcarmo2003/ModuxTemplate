@@ -40,6 +40,12 @@
 						"optional": "src/Libs"
 					}
 				},
+				"Light": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Light/shared"
+					}
+				},
 				"Modux": {
 					"$path": {
 						"optional": "src/Modux/shared"
@@ -54,10 +60,22 @@
 						}
 					}
 				},
+				"Pedestrian": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Pedestrian/shared"
+					}
+				},
 				"Place": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
 						"optional": "src/Place/shared"
+					}
+				},
+				"Traffic": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Traffic/shared"
 					}
 				},
 				"Types": {
@@ -81,6 +99,18 @@
 			"server": {
 				"$className": "Folder",
 				"$ignoreUnknownInstances": false,
+				"Anomaly": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Anomaly/server"
+					}
+				},
+				"Boss": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Boss/server"
+					}
+				},
 				"Character": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
@@ -97,6 +127,12 @@
 					"$ignoreUnknownInstances": false,
 					"$path": {
 						"optional": "src/Customer/server"
+					}
+				},
+				"Cutscene": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Cutscene/server"
 					}
 				},
 				"Dev": {
@@ -129,6 +165,12 @@
 						"optional": "src/Kitchen/server"
 					}
 				},
+				"Light": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Light/server"
+					}
+				},
 				"Market": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
@@ -158,6 +200,12 @@
 						"optional": "src/Npc/server"
 					}
 				},
+				"Pedestrian": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Pedestrian/server"
+					}
+				},
 				"Place": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
@@ -176,6 +224,12 @@
 						"optional": "src/Profile/server"
 					}
 				},
+				"Reward": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Reward/server"
+					}
+				},
 				"Round": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
@@ -188,10 +242,28 @@
 						"optional": "src/Run/server"
 					}
 				},
+				"Thief": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Thief/server"
+					}
+				},
+				"Traffic": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Traffic/server"
+					}
+				},
 				"Upgrade": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
 						"optional": "src/Upgrade/server"
+					}
+				},
+				"Vehicle": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Vehicle/server"
 					}
 				},
 				"Vital": {
@@ -212,10 +284,40 @@
 				"client": {
 					"$className": "Folder",
 					"$ignoreUnknownInstances": false,
+					"Anim": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Anim/client"
+						}
+					},
+					"Anomaly": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Anomaly/client"
+						}
+					},
+					"Audio": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Audio/client"
+						}
+					},
+					"Boss": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Boss/client"
+						}
+					},
 					"Camera": {
 						"$ignoreUnknownInstances": false,
 						"$path": {
 							"optional": "src/Camera/client"
+						}
+					},
+					"Character": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Character/client"
 						}
 					},
 					"Class": {
@@ -236,10 +338,22 @@
 							"optional": "src/Customer/client"
 						}
 					},
+					"Cutscene": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Cutscene/client"
+						}
+					},
 					"Economy": {
 						"$ignoreUnknownInstances": false,
 						"$path": {
 							"optional": "src/Economy/client"
+						}
+					},
+					"Hallucination": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Hallucination/client"
 						}
 					},
 					"Hud": {
@@ -266,10 +380,22 @@
 							"optional": "src/Interface/client"
 						}
 					},
+					"Item": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Item/client"
+						}
+					},
 					"Kitchen": {
 						"$ignoreUnknownInstances": false,
 						"$path": {
 							"optional": "src/Kitchen/client"
+						}
+					},
+					"Light": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Light/client"
 						}
 					},
 					"Market": {
@@ -301,6 +427,12 @@
 							"optional": "src/Opal/client"
 						}
 					},
+					"Pedestrian": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Pedestrian/client"
+						}
+					},
 					"Place": {
 						"$ignoreUnknownInstances": false,
 						"$path": {
@@ -317,6 +449,24 @@
 						"$ignoreUnknownInstances": false,
 						"$path": {
 							"optional": "src/Round/client"
+						}
+					},
+					"Thief": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Thief/client"
+						}
+					},
+					"Traffic": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Traffic/client"
+						}
+					},
+					"Vehicle": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Vehicle/client"
 						}
 					},
 					"Vital": {

@@ -29,10 +29,6 @@ export type Run = {
 }
 export type Due = { Entry: Scheduler.Entry, RetryAt: number, Done: boolean }
 export type Gaze = { Yaw: number, Pitch: number, At: number }
-type HideHook = {
-	IsHidden: (self: any, player: Player) -> boolean,
-	InZone: (self: any, player: Player, pointId: string, radius: number) -> boolean,
-}
 type TrafficHook = { Hold: (self: any, reason: string, on: boolean) -> () }
 export type Entry = Scheduler.Entry
 export type Wire = { Anomaly: string, Phase: Api.Phase, StartedAt: number, Step: number, Anchor: number }
@@ -43,7 +39,6 @@ export type Public = {
 	Enabled: boolean,
 	Example: Api.Module?,
 	Gazes: { [Player]: Gaze },
-	Hide: HideHook?,
 	InNight: boolean,
 	LastStartAt: number,
 	Live: boolean,
@@ -65,7 +60,7 @@ export type Public = {
 	HasModule: (self: Public, anomaly: string) -> boolean,
 	GetRule: (self: Public, anomaly: string) -> Api.Rule?,
 	ActivePlayers: (self: Public) -> { Player },
-	IsHidden: (self: Public, player: Player) -> boolean,
+	IsProtected: (self: Public, player: Player) -> boolean,
 	InZone: (self: Public, player: Player, pointId: string, radius: number) -> boolean,
 	Looking: (self: Public, player: Player, target: Vector3, range: number) -> boolean,
 	OnGaze: (self: Public, value: any, player: Player) -> (),

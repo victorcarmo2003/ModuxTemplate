@@ -1,19 +1,20 @@
 --!strict
 -- ANM-009 The knock (anomalies.md N9; npcs.md NPC-017; architecture.md §19.13; FEAT-019, FEAT-023; DEC-054, DEC-195,
--- DEC-204; TASK-117). Rule in Rules/ANM-009.luau. Sound only (Actor Audio, NpcCost 0): nothing in the world moves on
+-- DEC-204, DEC-221; TASK-117, TASK-130). Rule in Rules/ANM-009.luau. Verb: close the trailer service window
+-- (architecture.md §19.14: protected = window closed and inside the trailer). Sound only (Actor Audio, NpcCost 0): nothing in the world moves on
 -- the server; the back door never opens for real and has no prompt (DEC-054).
 --
 --   Start    Phase Active + cue knock (Entity 1: "Rookie? It's me. It's Walt. Open up."). "Seen" (AudioZone,
 --            FEAT-019): every active player in the trailer zone when the first knock sounds gets ctx.See.
 --   Second   SecondAt s: cue knock (Entity 2: "It's cold out here, Rookie.").
---   End      Window s (the last knock ends): every active player in the trailer zone who is not hidden fails (personal
---            target, DEC-204); going to the door only means "not hidden". Outside the zone (Mart) = not tested. Any
+--   End      Window s (the last knock ends): every active player in the trailer zone who is not protected fails
+--            (personal target, DEC-204); nothing is measured before. Outside the zone (Mart) = not tested. Any
 --            failure -> cue door_crack (DEC-195 flavour: the door opens a finger, napkins fly). Phase Failed when
 --            anyone failed, else Resolved; Finish.
 --   Stop     nothing to undo.
 --
 -- PROVISIONAL (backend-coder, TASK-117; tests/wave-3.md L3-15): trailer zone = flat radius around MapPoint TRL (Rules
--- Params), a hidden player always counts as inside.
+-- Params), a player inside the trailer always counts as in the zone.
 local Api = require(script.Parent.Parent.Api)
 
 const REF = "ANM-009"
@@ -48,7 +49,7 @@ local function text(rule: Api.Rule?, name: string, default: string): string
 end
 
 local function inZone(ctx: Api.Context, state: State, player: Player): boolean
-	return ctx.Hide.IsHidden(player) or ctx.Hide.InZone(player, state.ZonePoint, state.ZoneRadius)
+	return ctx.Vehicle.IsInside(player) or ctx.InZone(player, state.ZonePoint, state.ZoneRadius)
 end
 
 const Knock: Api.Module = {
@@ -88,7 +89,7 @@ const Knock: Api.Module = {
 		end
 		const failing: { Player } = {}
 		for _, player in ctx.Active() do
-			if not ctx.Hide.IsHidden(player) and inZone(ctx, state, player) then
+			if not ctx.Vehicle.IsProtected(player) and inZone(ctx, state, player) then
 				table.insert(failing, player)
 			end
 		end

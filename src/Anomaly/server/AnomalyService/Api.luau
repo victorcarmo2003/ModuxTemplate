@@ -11,7 +11,7 @@
 --   Start(ctx, occ) -> true      occurrence runs; Publish/Cue made inside Start go out only when it returns true
 --   Start(ctx, occ) -> false     no slot/actor now: nothing is published, the scheduler tries again later
 --   Tick(ctx, occ, now)          5 Hz while it runs
---   OnEvent(ctx, occ, event)     every Event while it runs (customer action, switch, discard, hide, any action)
+--   OnEvent(ctx, occ, event)     every Event while it runs (customer action, switch, discard, window, any action)
 --   ctx.Finish(occ)              the module ends it: Stop(ctx, occ, "Done"), record removed shortly after
 --   Stop(ctx, occ, reason)       called exactly once: "Done" (Finish), "NightOver" (6:00 AM), "Restore" (night lost,
 --                                restore, new shift, dev stop). Undo what Start did (actors, Hush, Hold, Alter)
@@ -23,8 +23,9 @@
 -- "Seen" (-Sanity.SeeAnomaly, once per anomaly per player per night): ctx.SeenTick for Cone anomalies (1 s
 -- accumulated in the gaze cone), ctx.See for AudioZone (N9: in the zone when the sound starts).
 
--- Verbs (FEAT-023, DEC-054): exactly one per anomaly, in Rules/ only (T10: never on the client).
-export type Verb = "refuse" | "serve" | "dont_look" | "light" | "hide" | "discard" | "safe_spot"
+-- Verbs (FEAT-023, DEC-054): exactly one per anomaly, in Rules/ only (T10: never on the client). "shutter" = close the
+-- trailer service window (was "hide", DEC-221).
+export type Verb = "refuse" | "serve" | "dont_look" | "light" | "shutter" | "discard" | "safe_spot"
 
 -- Anomalies set record phase (network.md §13.5)
 export type Phase = "Signal" | "Active" | "Resolved" | "Failed"
@@ -46,13 +47,13 @@ export type Occurrence = {
 --   Customer  CustomerService.Acted (take_order, serve, refuse, give_up; give_up has no Player)
 --   Switch    LightService.SwitchChanged
 --   Discard   KitchenService.Discarded (TASK-109; absent until then)
---   Hide      HideService.Changed (TASK-102; absent until then)
+--   Shutter   VehicleService.ShutterChanged (DEC-221; Player = who toggled, nil = automatic opening or dev)
 --   Action    InteractionService.Performed (any validated action, after its Run)
 export type Event =
 	{ Kind: "Customer", Npc: number, Action: string, Player: Player?, Result: string? }
 	| { Kind: "Switch", On: boolean, Player: Player? }
 	| { Kind: "Discard", Player: Player, Item: string, Altered: boolean }
-	| { Kind: "Hide", Player: Player, Hidden: boolean }
+	| { Kind: "Shutter", Closed: boolean, Player: Player? }
 	| { Kind: "Action", Player: Player, Action: string, Anchor: Instance, Id: number }
 
 -- Fields a module may publish on its record. Step 0..20, Anchor 0..65535 (NpcId or anchor index).
@@ -76,7 +77,8 @@ export type Context = {
 	Finish: (occ: Occurrence) -> (),
 	-- FEAT-023 active player: connected, Active, with a character (a knocked player is active)
 	Active: () -> { Player },
-	-- gaze cone (Sanity.SeeAngle) up to range + line of sight. Hidden, not Active or no fresh Gaze = false
+	-- gaze cone (Sanity.SeeAngle) up to range + line of sight. Not Active, no fresh Gaze, or protected (window closed,
+	-- inside the trailer) with the target outside the trailer = false
 	Looking: (player: Player, target: Vector3, range: number) -> boolean,
 	-- accumulates dt for every Active player Looking at target; Sanity.SeeTime reached -> VitalService:SeeAnomaly
 	SeenTick: (occ: Occurrence, target: Vector3, range: number, dt: number) -> (),
@@ -92,11 +94,14 @@ export type Context = {
 		IsLit: (position: Vector3) -> boolean,
 		IsSwitchOn: () -> boolean,
 	},
-	-- HideService (TASK-102). Without it: nobody is hidden, nobody is in a zone
-	Hide: {
-		IsHidden: (player: Player) -> boolean,
-		InZone: (player: Player, pointId: string, radius: number) -> boolean,
+	-- VehicleService service window (architecture.md §19.14, DEC-221). Protected = window closed and inside the trailer
+	Vehicle: {
+		IsShutterClosed: () -> boolean,
+		IsInside: (player: Player) -> boolean,
+		IsProtected: (player: Player) -> boolean,
 	},
+	-- Active player's root within radius (flat distance) of a MapPoint (safe spot "SS"; trailer zone "TRL")
+	InZone: (player: Player, pointId: string, radius: number) -> boolean,
 	-- KitchenService:Alter (TASK-109). false = refused or not available yet
 	Kitchen: { Alter: (kind: "rail" | "board") -> boolean },
 	-- TrafficService:Hold (TASK-104). No-op without it
@@ -131,7 +136,7 @@ const VERBS: { [string]: boolean } = {
 	serve = true,
 	dont_look = true,
 	light = true,
-	hide = true,
+	shutter = true,
 	discard = true,
 	safe_spot = true,
 }

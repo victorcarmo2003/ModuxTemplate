@@ -1,24 +1,26 @@
 --!strict
 -- ANM-008 The long car (anomalies.md N8; npcs.md NPC-016; architecture.md §19.13 "Long car", §19.17; MAP-01 §9.5;
--- FEAT-019, FEAT-023, FEAT-033; DEC-087, DEC-195, DEC-204; TASK-117). Rule in Rules/ANM-008.luau.
+-- §19.14; FEAT-019, FEAT-023, FEAT-033; DEC-087, DEC-195, DEC-204, DEC-221; TASK-117, TASK-130). Rule in
+-- Rules/ANM-008.luau. Verb: close the trailer service window (protected = window closed and inside the trailer).
 --
 -- The car is a client-only actor (Effects/ANM-008, TASK-118) driven by the record's StartedAt: it comes in on the
 -- Ninth WB lane and reverses into MapPoint AN-12, parked at StartedAt + ArriveAt. The server keeps the timeline:
 --   Start    AN-12 bound (else Start false, retried, one warning) -> TrafficService:Hold("anm_008", true) (no
 --            traffic car spawns while it runs), Phase Signal.
---   Beam     ArriveAt + BeamDelay: Phase Active + cue car_highbeam (the window of HideWindow s starts).
---   Flash    beam + HideWindow: cue car_flash. Every active player in the trailer zone (hidden, or within ZoneRadius
---            of ZonePoint) is tested: not hidden -> Fail of that player (personal target, DEC-204); hidden -> watched
---            until the car leaves. Outside the zone = not tested (Mart).
---   Stay     flash .. flash + StayFor: a watched player who gets up (5 Hz check) fails.
+--   Beam     ArriveAt + BeamDelay: Phase Active + cue car_highbeam (the window of CloseWindow s starts).
+--   Flash    beam + CloseWindow: cue car_flash. Every active player in the trailer zone (inside the trailer, or within
+--            ZoneRadius of ZonePoint) is tested: not protected -> Fail of that player (personal target, DEC-204);
+--            protected -> watched until the car leaves. Outside the zone = not tested (Mart).
+--   Stay     flash .. flash + StayFor: whoever opens the window fails (Shutter event, action -> who acted, DEC-204);
+--            a watched player who leaves the trailer (5 Hz check) fails.
 --   Flavour  on the first failure: car_honk + trailer_blackout (3 s, client only: no drain, DEC-195); a late failure
---            (getting up) also flashes the beam once more.
+--            (opening, leaving) also flashes the beam once more.
 --   Leave    flash + StayFor: Phase Failed when anyone failed, else Resolved (the client drives the car away), then
 --            the record stays LeaveLinger s and Finish. The Hold is released by Stop.
 --   Seen     1 s in the gaze cone of the parked car (AN-12, ViewRange 100) between parking and leaving.
 --
 -- PROVISIONAL (backend-coder, TASK-117; tests/wave-3.md L3-03/L3-15): trailer zone = flat radius around MapPoint TRL
--- (Rules Params), a hidden player always counts as inside.
+-- (Rules Params), a player inside the trailer always counts as in the zone.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
@@ -32,7 +34,7 @@ const MAX_DT = 0.5 -- s; a late tick never counts more than this
 -- Defaults when Rules/ANM-008 is missing (same numbers as the rule file)
 const DEFAULT_ARRIVE_AT = 9.5
 const DEFAULT_BEAM_DELAY = 2
-const DEFAULT_HIDE_WINDOW = 8
+const DEFAULT_CLOSE_WINDOW = 8
 const DEFAULT_STAY_FOR = 15
 const DEFAULT_LEAVE_LINGER = 6
 const DEFAULT_ZONE_POINT = "TRL"
@@ -51,7 +53,7 @@ type State = {
 	FinishAt: number,
 	ZonePoint: string,
 	ZoneRadius: number,
-	-- userId -> player hidden at the flash, still watched until the car leaves
+	-- userId -> player protected at the flash, still watched until the car leaves
 	Watched: { [number]: Player },
 	Failed: { [number]: boolean },
 	AnyFailed: boolean,
@@ -94,7 +96,7 @@ local function setHold(ctx: Api.Context, state: State, on: boolean)
 end
 
 local function inZone(ctx: Api.Context, state: State, player: Player): boolean
-	return ctx.Hide.IsHidden(player) or ctx.Hide.InZone(player, state.ZonePoint, state.ZoneRadius)
+	return ctx.Vehicle.IsInside(player) or ctx.InZone(player, state.ZonePoint, state.ZoneRadius)
 end
 
 -- -35 for one player (once per occurrence); the first failure plays the flavour (DEC-195)
@@ -118,7 +120,7 @@ local function fail(ctx: Api.Context, occ: Api.Occurrence, state: State, player:
 	ctx.Cue(occ, "car_honk", 0)
 end
 
--- End of the hide window: test every active player in the trailer zone.
+-- End of the close window: test every active player in the trailer zone.
 local function flash(ctx: Api.Context, occ: Api.Occurrence, state: State)
 	state.Stage = "Watching"
 	ctx.Cue(occ, "car_flash", 0)
@@ -127,7 +129,7 @@ local function flash(ctx: Api.Context, occ: Api.Occurrence, state: State)
 		if not inZone(ctx, state, player) then
 			continue -- outside the trailer zone: not tested (npcs.md N8)
 		end
-		if ctx.Hide.IsHidden(player) then
+		if ctx.Vehicle.IsProtected(player) then
 			state.Watched[player.UserId] = player
 		else
 			table.insert(failing, player)
@@ -160,7 +162,7 @@ const LongCar: Api.Module = {
 		const row = Content.Anomalies.ByKey[occ.Key]
 		const parkedAt = occ.StartedAt + param(rule, "ArriveAt", DEFAULT_ARRIVE_AT)
 		const beamAt = parkedAt + param(rule, "BeamDelay", DEFAULT_BEAM_DELAY)
-		const flashAt = beamAt + param(rule, "HideWindow", if rule ~= nil then rule.Window else DEFAULT_HIDE_WINDOW)
+		const flashAt = beamAt + param(rule, "CloseWindow", if rule ~= nil then rule.Window else DEFAULT_CLOSE_WINDOW)
 		const leaveAt = flashAt + param(rule, "StayFor", DEFAULT_STAY_FOR)
 		const state: State = {
 			Stage = "Arriving",
@@ -209,23 +211,36 @@ const LongCar: Api.Module = {
 			flash(ctx, occ, state)
 		end
 		if state.Stage == "Watching" then
-			-- Omission (anomalies.md N8): a watched player no longer hidden got up before the car left. Read at 5 Hz
-			-- and not from the Hide event: HideService (575) releases everyone on the NightEnd phase change before
-			-- AnomalyService stops the occurrence, and Tick only runs in the Night phase.
-			const up: { Player } = {}
+			-- Omission (anomalies.md N8): a watched player left the trailer before the car left. Read at 5 Hz (Tick only
+			-- runs in the Night phase).
+			const out: { Player } = {}
 			for _, player in state.Watched do
 				if player.Parent == nil then
 					continue
 				end
-				if not ctx.Hide.IsHidden(player) then
-					table.insert(up, player)
+				if not ctx.Vehicle.IsInside(player) then
+					table.insert(out, player)
 				end
 			end
-			for _, player in up do
+			for _, player in out do
 				fail(ctx, occ, state, player, true)
 			end
 			if now >= state.LeaveAt then
 				leave(ctx, occ, state)
+			end
+		end
+	end,
+
+	-- Action (DEC-204): opening the window while the car is parked fails who opened, wherever they are
+	OnEvent = function(ctx: Api.Context, occ: Api.Occurrence, event: Api.Event)
+		const state = occ.State :: State?
+		if state == nil or state.Stage ~= "Watching" then
+			return
+		end
+		if event.Kind == "Shutter" then
+			const opener = event.Player
+			if not event.Closed and opener ~= nil then
+				fail(ctx, occ, state, opener, true)
 			end
 		end
 	end,

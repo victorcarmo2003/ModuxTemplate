@@ -13,6 +13,13 @@
 -- Others read: Current() (RoundService probe, ItemService, KitchenService), IsBought(), Price(); signals
 -- Bought(player) and Swapped(from, to). The sale vehicle Model carries attribute Bought for clients that join between
 -- the purchase and the swap (VehicleController, TASK-058).
+-- Service window (architecture.md §19.14 v4.2, network.md §13.6, T61; FEAT-023; DEC-204, DEC-221; TASK-130): state of
+-- the current vehicle when Content.Vehicles[v].HasShutter (the trailer). Single writer of the attribute Shutter on the
+-- vehicle Models (true = closed; the vehicle for sale / parked is always closed, AST-027 ForSale). Action
+-- shutter_toggle (Prompt_Shutter, hold 0.5, night only, party cooldown 1 s, Active member, anchor of the current
+-- vehicle, caller inside the trailer = LightZone LZ-1); opens by itself on ShiftStarted, NightLost, Resume, restore and swap; not in the snapshot. Gate "Shutter":
+-- take_order/serve/refuse refused while closed (reason Shutter:Closed) + Notice shutter_closed to who acted (one per
+-- NOTICE_EVERY s). API IsShutterClosed, IsInside, IsInsidePoint, IsProtected, SetShutter; signal ShutterChanged.
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -22,6 +29,7 @@ local Content = require(ReplicatedStorage.shared.Content)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
 local Modux = require(ServerScriptService.server.Modux)
+local Shutter = require(script.Shutter)
 
 const VEHICLE_TAG = "Vehicle"
 const COVER_TAG = "VehicleCover"
@@ -42,6 +50,20 @@ const CLOSED_PHASES = { "Resume", "Intro", "RunEnd", "NightLost" }
 -- Seconds between the Transition packet and the PivotTo: fade-in (0.2) + half the black hold (0.5) of the
 -- VehicleController fade (T58, 1.5 s total), so the pivot lands under the cover on every client. Provisional.
 const PIVOT_DELAY = 0.45
+-- Service window (§19.14)
+const SHUTTER_ACTION = "shutter_toggle"
+const SHUTTER_ATTRIBUTE = "Shutter"
+const SHUTTER_GATE = "Shutter"
+const SHUTTER_NOTICE = "shutter_closed"
+const SHUTTER_COOLDOWN = 1 -- s between two toggles, party-wide (Q-173; not a Content.Actions field)
+const NOTICE_EVERY = 2 -- s between two shutter_closed notices to the same player
+-- Counter actions refused while the window is closed (the queue waits, patience keeps running)
+const COUNTER_ACTIONS: { [string]: boolean } = { take_order = true, serve = true, refuse = true }
+-- PromptText when closed. Content.Actions.shutter_toggle.Text ("Close Window") is the open state; the table has one
+-- Text per action. PLACEHOLDER until ui-text.md (content-data.md §6 row shutter_toggle).
+const OPEN_TEXT = "Open Window"
+-- Phases where the window opens by itself (NightLost; Resume = restore waiting for the roster)
+const OPEN_PHASES = { "NightLost", "Resume" }
 
 local function fail(message: string)
 	if RunService:IsStudio() then
@@ -119,6 +141,14 @@ function VehicleService:Setup()
 	-- Created here so lower-priority services connect in their OnInit; higher ones (Item, Kitchen) in OnStart
 	self.Bought = self.Libs.Signal.new() :: SignalLib.Signal<Player>
 	self.Swapped = self.Libs.Signal.new() :: SignalLib.Signal<string, string>
+	-- Service window of the current vehicle (only meaningful with HasShutter)
+	self.ShutterClosed = false :: boolean
+	self.ShutterAt = 0 :: number -- os.clock() of the last shutter_toggle (party cooldown; 0 = none yet)
+	self.ShutterAnchors = {} :: { [Instance]: boolean }
+	self.InteriorPart = nil :: BasePart?
+	self.NoticeAt = setmetatable({}, { __mode = "k" }) :: { [Player]: number }
+	-- (closed, player?) player = who toggled; nil = automatic opening or dev. AnomalyService (570) connects in OnInit
+	self.ShutterChanged = self.Libs.Signal.new() :: SignalLib.Signal<boolean, Player?>
 end
 
 -- Reads -----------------------------------------------------------------------------------------------------------
@@ -278,6 +308,139 @@ function VehicleService:RefreshSale()
 	end
 end
 
+-- Service window (§19.14) -----------------------------------------------------------------------------------------
+
+local function hasShutter(key: string?): boolean
+	const row = if key ~= nil then Content.Vehicles.ByKey[key] else nil
+	return row ~= nil and row.HasShutter
+end
+
+function VehicleService:IsShutterClosed(): boolean
+	return self.ShutterClosed and hasShutter(self.Vehicle())
+end
+
+-- Interior volume (Shutter.luau: LightZone LZ-1; L3-20). Cached part, scanned again when it leaves the Workspace.
+function VehicleService:Interior(): BasePart?
+	const cached = self.InteriorPart
+	if cached ~= nil and cached:IsDescendantOf(workspace) then
+		return cached
+	end
+	self.InteriorPart = Shutter.findInterior()
+	return self.InteriorPart
+end
+
+-- Point inside the trailer interior while the current vehicle has a window (the cart has no interior to protect)
+function VehicleService:IsInsidePoint(position: Vector3): boolean
+	if typeof(position) ~= "Vector3" or not hasShutter(self.Vehicle()) then
+		return false
+	end
+	const part = self:Interior()
+	return part ~= nil and Shutter.contains(part, position)
+end
+
+-- Root of the player's character inside the current vehicle
+function VehicleService:IsInside(player: Player): boolean
+	const character = player.Character
+	const root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
+	if root == nil or not root:IsA("BasePart") then
+		return false
+	end
+	return self:IsInsidePoint(root.Position)
+end
+
+-- N8/N9 protected state (DEC-221): window closed and inside the trailer
+function VehicleService:IsProtected(player: Player): boolean
+	return self:IsShutterClosed() and self:IsInside(player)
+end
+
+function VehicleService:IsShutterAnchor(anchor: Instance): boolean
+	return anchor:GetAttribute("PromptAction") == SHUTTER_ACTION
+end
+
+-- Attribute Shutter of every Model with a window (current = its state, parked/for sale = closed) and the prompts
+function VehicleService:ApplyShutter()
+	const current = self.Vehicle()
+	for _, model in self:Models() do
+		const key = model:GetAttribute("Vehicle") :: string
+		if hasShutter(key) then
+			model:SetAttribute(SHUTTER_ATTRIBUTE, if key == current then self.ShutterClosed else true)
+		end
+	end
+	const interaction = self.Dependencies.InteractionService
+	const enabled = interaction:IsActive(SHUTTER_ACTION)
+	const text = if self.ShutterClosed then OPEN_TEXT else nil
+	for anchor in self.ShutterAnchors do
+		if anchor.Parent == nil then
+			self.ShutterAnchors[anchor] = nil
+			continue
+		end
+		const _, key = vehicleOf(anchor)
+		const live = enabled and key == current and hasShutter(key)
+		interaction:SetPrompt(anchor, live, if live then text else nil)
+	end
+end
+
+function VehicleService:AddShutterAnchor(anchor: Instance)
+	if not self:IsShutterAnchor(anchor) or self.ShutterAnchors[anchor] then
+		return
+	end
+	self.ShutterAnchors[anchor] = true
+	self:ApplyShutter()
+end
+
+-- Party window state. Closing needs a night shift outside the closed phases and a vehicle with a window (dev goes
+-- through here too: "shutter close" by day does nothing); force = automatic opening paths. Opening always works.
+-- Returns the state now matches `closed`.
+function VehicleService:SetShutter(closed: boolean, player: Player?, force: boolean?): boolean
+	if type(closed) ~= "boolean" then
+		error("[VehicleService] SetShutter needs a boolean", 2)
+	end
+	if closed and force ~= true then
+		if not hasShutter(self.Vehicle()) or not self:ShutterPhase() then
+			return false
+		end
+	end
+	if self.ShutterClosed == closed then
+		return true
+	end
+	self.ShutterClosed = closed
+	self:ApplyShutter()
+	self.ShutterChanged:Fire(closed, player)
+	return true
+end
+
+-- Night shift, outside Resume/Intro/RunEnd/NightLost. Follows Actions.shutter_toggle.Night = NightOnly, i.e. the
+-- night shift as a whole (its Prep included, same as KitchenService/ItemService read Night; L3-18, PROVISIONAL)
+function VehicleService:ShutterPhase(): boolean
+	const round = self.Dependencies.RoundService
+	return round:IsStarted() and round:IsNight() and table.find(CLOSED_PHASES, round:GetPhase()) == nil
+end
+
+-- shutter_toggle Validate: Active member, anchor of the current vehicle with a window, caller inside it, phase,
+-- party cooldown
+function VehicleService:CanToggleShutter(player: Player, anchor: Instance): boolean
+	if not self.Dependencies.RunStateService:IsActive(player) or not self:ShutterPhase() then
+		return false
+	end
+	const _, key = vehicleOf(anchor)
+	if key ~= self.Vehicle() or not hasShutter(key) or not self:IsInside(player) then
+		return false -- L3-17: the button works only from inside the trailer
+	end
+	-- cooldown: silent refusal (L3-19)
+	return os.clock() - self.ShutterAt >= SHUTTER_COOLDOWN
+end
+
+-- Gate refusal notice, at most one per NOTICE_EVERY s per player (FEAT-005)
+function VehicleService:NotifyClosed(player: Player)
+	const at = os.clock()
+	const last = self.NoticeAt[player]
+	if last ~= nil and at - last < NOTICE_EVERY then
+		return
+	end
+	self.NoticeAt[player] = at
+	self.Dependencies.RunStateService:Notify(player, SHUTTER_NOTICE)
+end
+
 -- Writes ----------------------------------------------------------------------------------------------------------
 
 -- buy_trailer Run: atomic Spend, then Purchased + Pending (swap at the next boundary) and the party notice
@@ -325,6 +488,8 @@ function VehicleService:Swap()
 	end
 	self.Vehicle(to)
 	self.Dependencies.UpgradeService:SetVehicle(to)
+	self:SetShutter(false, nil, true) -- the new current opens, the parked one closes (ApplyShutter below)
+	self:ApplyShutter()
 	self.Swapped:Fire(from, to)
 	self:Place(if covered then PIVOT_DELAY else 0)
 end
@@ -365,6 +530,9 @@ function VehicleService:Restore(data: any)
 	end)
 	self.Dependencies.UpgradeService:SetVehicle(key)
 	self:Place(0)
+	-- the window is not in the snapshot: every restore opens it (§19.14)
+	self:SetShutter(false, nil, true)
+	self:ApplyShutter()
 	if from ~= key then
 		self.Swapped:Fire(from, key)
 	end
@@ -441,6 +609,35 @@ VehicleService:OnInit(function(self)
 			self:Buy(player)
 		end,
 	})
+
+	-- Service window (§19.14)
+	const interaction = self.Dependencies.InteractionService
+	interaction:RegisterAction(SHUTTER_ACTION, {
+		Validate = function(player: Player, anchor: Instance, _id: number): boolean
+			return self:CanToggleShutter(player, anchor)
+		end,
+		Run = function(player: Player, _anchor: Instance, _id: number)
+			self.ShutterAt = os.clock()
+			self:SetShutter(not self.ShutterClosed, player, true)
+		end,
+	})
+	interaction:AddGate(SHUTTER_GATE, function(player: Player, action: string, _anchor: Instance): (boolean, string?)
+		if COUNTER_ACTIONS[action] and self:IsShutterClosed() then
+			-- the prompt is already hidden on clients with the window closed: this is the race (a mate closed it
+			-- during the hold)
+			self:NotifyClosed(player)
+			return false, "Closed"
+		end
+		return true, nil
+	end)
+	round.ShiftStarted:Connect(function(_info)
+		self:SetShutter(false, nil, true)
+	end)
+	round.PhaseChanged:Connect(function(phase)
+		if table.find(OPEN_PHASES, phase) ~= nil then
+			self:SetShutter(false, nil, true)
+		end
+	end)
 end)
 
 VehicleService:OnStart(function(self)
@@ -460,7 +657,22 @@ VehicleService:OnStart(function(self)
 		if self:IsBuyAnchor(anchor) then
 			self:RefreshSale()
 		end
+		self:AddShutterAnchor(anchor)
 	end)
+
+	-- Service window: anchors, attribute of every vehicle and the interior volume
+	for _, anchor in CollectionService:GetTagged(ANCHOR_TAG) do
+		if self:IsShutterAnchor(anchor) then
+			self.ShutterAnchors[anchor] = true
+		end
+	end
+	if SALE ~= nil and SALE.HasShutter and self:Interior() == nil then
+		warn(`[VehicleService] LightZone {Shutter.InteriorZone} not bound (MAP-01 §16); IsInside is always false`)
+	end
+	if SALE ~= nil and SALE.HasShutter and next(self.ShutterAnchors) == nil then
+		warn("[VehicleService] no Prompt_Shutter (PromptAction shutter_toggle) in the Workspace (MAP-01 §16.5)")
+	end
+	self:ApplyShutter()
 	CollectionService:GetInstanceAddedSignal(COVER_TAG):Connect(function(cover)
 		if cover:IsDescendantOf(workspace) then
 			self:RefreshCover(cover)

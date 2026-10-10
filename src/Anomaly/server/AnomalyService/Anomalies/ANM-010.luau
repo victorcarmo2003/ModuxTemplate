@@ -221,7 +221,7 @@ local function rootOf(player: Player): BasePart?
 end
 
 local function safe(ctx: Api.Context, state: State, player: Player): boolean
-	if ctx.Hide.InZone(player, state.Point, state.Radius) then
+	if ctx.InZone(player, state.Point, state.Radius) then
 		return true
 	end
 	if #state.SafeZones == 0 then

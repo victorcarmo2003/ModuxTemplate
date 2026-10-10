@@ -73,7 +73,7 @@ function InteractionService:RegisterAction(key: string, handler: Handler)
 	self.Handlers[key] = handler
 end
 
--- Called by state owners in their OnInit (VitalService "Vital", HideService "Hide", ...; T42, T49). Gates run in
+-- Called by state owners in their OnInit (VitalService "Vital", VehicleService "Shutter", ...; T42, T49). Gates run in
 -- registration order; the first one that refuses stops the request. One gate per name.
 function InteractionService:AddGate(name: string, fn: GateFn)
 	for _, gate in self.Gates do
