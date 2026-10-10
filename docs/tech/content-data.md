@@ -756,7 +756,7 @@ toca é o `AnimController` (client) e o `Animate` do personagem (crew).
 
 | Campo | Tipo | Exemplo |
 |---|---|---|
-| `Key` | | `faint` |
+| `Key` | | `crew_walk` |
 | `Id` | `rbxassetid://…` ou `""` (vazio = fallback: locomoção R6 padrão do Roblox; one-shot não toca) | `""` até o upload |
 | `Rig` | `"Crew" \| "Npc" \| "Actor"` | `Crew` |
 | `Looped` | bool | false |
@@ -779,7 +779,7 @@ Lista inicial (Provisória, `Q-167`; ids vazios até o upload):
 
 | Rig | Chaves |
 |---|---|
-| Crew | `crew_idle`, `crew_walk`, `crew_jump`, `crew_fall`, `faint` (senta e deita de lado, ~1,2 s, style guide §4.6), `get_up` (atropelado levanta, 0,5 s), `hide` (agachado, loop), `drink` (1,5 s), `give`, `answer_phone` (loop), `wave_skip` (voto da cutscene, opcional) |
+| Crew | `crew_idle`, `crew_walk`, `crew_jump`, `crew_fall`, `get_up` (atropelado levanta, 0,5 s), `hide` (agachado, loop), `drink` (1,5 s), `give`, `answer_phone` (loop), `wave_skip` (voto da cutscene, opcional) |
 | Npc | `npc_idle`, `npc_walk`, `npc_wait` (impaciente, loop), `npc_happy`, `npc_complain`, `npc_refuse_leave`, `thief_sneak`, `thief_open` (loop), `thief_flee` |
 | Actor | `opal_idle` (hoje id fixo no `OpalController`), `walt_walk`, `walt_offer_coffee`, `medic_walk`, `medic_carry`, `medic_lift`, `walker_step`, `waver_wave` (silhueta da janela, N6), `copy_backwalk` (N4), `raincoat_idle` |
 

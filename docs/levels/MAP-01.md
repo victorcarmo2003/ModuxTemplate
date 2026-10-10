@@ -752,7 +752,7 @@ Chaves `L01-##` são provisórias; coluna AST = ficha de `art/asset-list.md` (to
 | L01-03 | Grelha (2 / 3 / 4 vagas) | 5 (carrinho), 6 (trailer) | AST-012 | |
 | L01-04 | Esteira de descanso | 3 | AST-013 | |
 | L01-05 | Caixa de pães + tábua | 2 + 3 | AST-015, AST-014 | |
-| L01-06 | Grade de complementos 3 × 2 | 6 × 3 | AST-017, AST-016 | 6 ingredientes [DEC-071] |
+| L01-06 | Grade de complementos 3 × 2 | 6 × 3 | AST-017 (tigelas, DEC-218) | 6 ingredientes [DEC-071] |
 | L01-07 | Entrega + gaveta (+ cadeado) | 4 | AST-020 | |
 | L01-08 | Food Trailer (2 estados: à venda / em operação) | casco 28 × 12, altura externa ~11, pé-direito 8,5 | AST-027 | medidas iguais nos dois documentos |
 | L01-09 | Trailer Lights | — | AST-023 | |
