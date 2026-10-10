@@ -1,0 +1,838 @@
+{
+ "asset": "AST-071",
+ "image": "Assets/textures/ui/AST-071_icons.png",
+ "imageSize": [
+  1024,
+  1024
+ ],
+ "cell": 128,
+ "grid": [
+  8,
+  8
+ ],
+ "free": [
+  [
+   768,
+   768
+  ],
+  [
+   896,
+   768
+  ],
+  [
+   0,
+   896
+  ],
+  [
+   128,
+   896
+  ],
+  [
+   256,
+   896
+  ],
+  [
+   384,
+   896
+  ],
+  [
+   512,
+   896
+  ],
+  [
+   640,
+   896
+  ],
+  [
+   768,
+   896
+  ],
+  [
+   896,
+   896
+  ]
+ ],
+ "usage": "ImageLabel.Image = <asset id da folha>; ImageRectOffset/ImageRectSize do icone. Asset id: upload em lote (fora deste arquivo).",
+ "outline": "#2B2233, 4 px",
+ "icons": {
+  "Ingredient/bun": {
+   "ImageRectOffset": [
+    0,
+    0
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Ingredients",
+   "ref": "bun",
+   "source": "Assets/blender/food/AST-001_Bun.blend:Bun_Open",
+   "placeholder": false
+  },
+  "Ingredient/sausage": {
+   "ImageRectOffset": [
+    128,
+    0
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Ingredients",
+   "ref": "sausage",
+   "source": "Assets/blender/food/AST-002_Sausage.blend:Sausage_Grilled",
+   "placeholder": false
+  },
+  "Ingredient/ketchup": {
+   "ImageRectOffset": [
+    256,
+    0
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Ingredients",
+   "ref": "ketchup",
+   "source": "Assets/blender/food/AST-004_KetchupBottle.blend",
+   "placeholder": false
+  },
+  "Ingredient/mustard": {
+   "ImageRectOffset": [
+    384,
+    0
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Ingredients",
+   "ref": "mustard",
+   "source": "Assets/blender/food/AST-005_MustardBottle.blend",
+   "placeholder": false
+  },
+  "Ingredient/cheese": {
+   "ImageRectOffset": [
+    512,
+    0
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Ingredients",
+   "ref": "cheese",
+   "source": "Assets/blender/food/AST-006_Cheese.blend:Cheese_Slice",
+   "placeholder": false
+  },
+  "Ingredient/bacon": {
+   "ImageRectOffset": [
+    640,
+    0
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Ingredients",
+   "ref": "bacon",
+   "source": "Assets/blender/food/AST-007_Bacon.blend:Bacon_Pile",
+   "placeholder": false
+  },
+  "Ingredient/potato_sticks": {
+   "ImageRectOffset": [
+    768,
+    0
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Ingredients",
+   "ref": "potato_sticks",
+   "source": "Assets/blender/food/AST-008_PotatoSticks.blend:PotatoSticks_Pile",
+   "placeholder": false
+  },
+  "Ingredient/cream_cheese": {
+   "ImageRectOffset": [
+    896,
+    0
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Ingredients",
+   "ref": "cream_cheese",
+   "source": "Assets/blender/food/AST-009_CreamCheese.blend:CreamCheese_Jar",
+   "placeholder": false
+  },
+  "Ingredient/coffee": {
+   "ImageRectOffset": [
+    0,
+    128
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Ingredients",
+   "ref": "coffee",
+   "source": "Assets/blender/equipment/AST-022_CoffeeMachine.blend:Jar+JarHandle+Coffee",
+   "placeholder": false
+  },
+  "Item/hot_dog": {
+   "ImageRectOffset": [
+    128,
+    128
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Tools",
+   "ref": "ITM-010",
+   "source": "Assets/blender/food/AST-003_HotDog.blend:HotDog_Display",
+   "placeholder": false
+  },
+  "Item/pack_sausages": {
+   "ImageRectOffset": [
+    256,
+    128
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Tools",
+   "ref": "pack_sausages",
+   "source": "Assets/import/food/AST-011_*.fbx (recolor AST-011 table) + Ingredient badge",
+   "placeholder": true,
+   "note": "pacote sem recolor/rotulo final no modelo (AST-011/AST-072): cor so no icone"
+  },
+  "Item/pack_buns": {
+   "ImageRectOffset": [
+    384,
+    128
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Tools",
+   "ref": "pack_buns",
+   "source": "Assets/import/food/AST-011_*.fbx (recolor AST-011 table) + Ingredient badge",
+   "placeholder": true,
+   "note": "pacote sem recolor/rotulo final no modelo (AST-011/AST-072): cor so no icone"
+  },
+  "Item/pack_ketchup": {
+   "ImageRectOffset": [
+    512,
+    128
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Tools",
+   "ref": "pack_ketchup",
+   "source": "Assets/import/food/AST-011_*.fbx (recolor AST-011 table) + Ingredient badge",
+   "placeholder": true,
+   "note": "pacote sem recolor/rotulo final no modelo (AST-011/AST-072): cor so no icone"
+  },
+  "Item/pack_mustard": {
+   "ImageRectOffset": [
+    640,
+    128
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Tools",
+   "ref": "pack_mustard",
+   "source": "Assets/import/food/AST-011_*.fbx (recolor AST-011 table) + Ingredient badge",
+   "placeholder": true,
+   "note": "pacote sem recolor/rotulo final no modelo (AST-011/AST-072): cor so no icone"
+  },
+  "Item/pack_cheese": {
+   "ImageRectOffset": [
+    768,
+    128
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Tools",
+   "ref": "pack_cheese",
+   "source": "Assets/import/food/AST-011_*.fbx (recolor AST-011 table) + Ingredient badge",
+   "placeholder": true,
+   "note": "pacote sem recolor/rotulo final no modelo (AST-011/AST-072): cor so no icone"
+  },
+  "Item/pack_bacon": {
+   "ImageRectOffset": [
+    896,
+    128
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Tools",
+   "ref": "pack_bacon",
+   "source": "Assets/import/food/AST-011_*.fbx (recolor AST-011 table) + Ingredient badge",
+   "placeholder": true,
+   "note": "pacote sem recolor/rotulo final no modelo (AST-011/AST-072): cor so no icone"
+  },
+  "Item/pack_potato_sticks": {
+   "ImageRectOffset": [
+    0,
+    256
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Tools",
+   "ref": "pack_potato_sticks",
+   "source": "Assets/import/food/AST-011_*.fbx (recolor AST-011 table) + Ingredient badge",
+   "placeholder": true,
+   "note": "pacote sem recolor/rotulo final no modelo (AST-011/AST-072): cor so no icone"
+  },
+  "Item/pack_cream_cheese": {
+   "ImageRectOffset": [
+    128,
+    256
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Tools",
+   "ref": "pack_cream_cheese",
+   "source": "Assets/import/food/AST-011_*.fbx (recolor AST-011 table) + Ingredient badge",
+   "placeholder": true,
+   "note": "pacote sem recolor/rotulo final no modelo (AST-011/AST-072): cor so no icone"
+  },
+  "Item/pack_coffee": {
+   "ImageRectOffset": [
+    256,
+    256
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Tools",
+   "ref": "pack_coffee",
+   "source": "Assets/import/food/AST-011_*.fbx (recolor AST-011 table) + Ingredient badge",
+   "placeholder": true,
+   "note": "pacote sem recolor/rotulo final no modelo (AST-011/AST-072): cor so no icone"
+  },
+  "Item/coffee": {
+   "ImageRectOffset": [
+    384,
+    256
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Tools",
+   "ref": "ITM-009",
+   "source": "Assets/blender/food/AST-010_Coffee.blend:Handle",
+   "placeholder": false
+  },
+  "Item/revive_kit": {
+   "ImageRectOffset": [
+    512,
+    256
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Tools",
+   "ref": "ITM-021",
+   "source": "Assets/blender/market/AST-051_ReviveKit.blend:Handle",
+   "placeholder": false
+  },
+  "Upgrade/grill/1": {
+   "ImageRectOffset": [
+    640,
+    256
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Upgrades",
+   "ref": "UPG-001 L1",
+   "source": "Assets/blender/equipment/AST-012_RollerGrill.blend:Grill_L1 + Sausage_Grilled",
+   "placeholder": false
+  },
+  "Upgrade/grill/2": {
+   "ImageRectOffset": [
+    768,
+    256
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Upgrades",
+   "ref": "UPG-001 L2",
+   "source": "Assets/blender/equipment/AST-012_RollerGrill.blend:Grill_L2 + Sausage_Grilled",
+   "placeholder": false
+  },
+  "Upgrade/grill/3": {
+   "ImageRectOffset": [
+    896,
+    256
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Upgrades",
+   "ref": "UPG-001 L3",
+   "source": "Assets/blender/equipment/AST-012_RollerGrill.blend:Grill_L3 + Sausage_Grilled",
+   "placeholder": false
+  },
+  "Upgrade/cooler/1": {
+   "ImageRectOffset": [
+    0,
+    384
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Upgrades",
+   "ref": "UPG-002 L1",
+   "source": "Assets/blender/equipment/AST-018_CoolerL1.blend",
+   "placeholder": false
+  },
+  "Upgrade/cooler/2": {
+   "ImageRectOffset": [
+    128,
+    384
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Upgrades",
+   "ref": "UPG-002 L2",
+   "source": "Assets/blender/equipment/AST-018_CoolerL2.blend",
+   "placeholder": false
+  },
+  "Upgrade/cooler/3": {
+   "ImageRectOffset": [
+    256,
+    384
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Upgrades",
+   "ref": "UPG-002 L3",
+   "source": "Assets/import/equipment/AST-018_CoolerL3.fbx",
+   "placeholder": false
+  },
+  "Upgrade/counter/1": {
+   "ImageRectOffset": [
+    384,
+    384
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Upgrades",
+   "ref": "UPG-003 L1",
+   "source": "Assets/import/equipment/AST-019_CounterStraight/Corner/Stool.fbx (composicao)",
+   "placeholder": true,
+   "note": "Counter L1-L3 sem modelo final: composicao de pecas KayKit; L3 sem toldo"
+  },
+  "Upgrade/counter/2": {
+   "ImageRectOffset": [
+    512,
+    384
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Upgrades",
+   "ref": "UPG-003 L2",
+   "source": "Assets/import/equipment/AST-019_CounterStraight/Corner/Stool.fbx (composicao)",
+   "placeholder": true,
+   "note": "Counter L1-L3 sem modelo final: composicao de pecas KayKit; L3 sem toldo"
+  },
+  "Upgrade/counter/3": {
+   "ImageRectOffset": [
+    640,
+    384
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Upgrades",
+   "ref": "UPG-003 L3",
+   "source": "Assets/import/equipment/AST-019_CounterStraight/Corner/Stool.fbx (composicao)",
+   "placeholder": true,
+   "note": "Counter L1-L3 sem modelo final: composicao de pecas KayKit; L3 sem toldo"
+  },
+  "Upgrade/cash_drawer_lock": {
+   "ImageRectOffset": [
+    768,
+    384
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Upgrades",
+   "ref": "UPG-004",
+   "source": "Assets/blender/equipment/AST-020_CashRegister.blend:Register+Drawer+Lock",
+   "placeholder": false
+  },
+  "Upgrade/trailer_lights": {
+   "ImageRectOffset": [
+    896,
+    384
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Upgrades",
+   "ref": "UPG-005",
+   "source": "Assets/blender/equipment/AST-023_TrailerLights.blend:Lights_Mast",
+   "placeholder": false
+  },
+  "Upgrade/food_trailer": {
+   "ImageRectOffset": [
+    0,
+    512
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Upgrades",
+   "ref": "UPG-006 / Vehicles.trailer",
+   "source": "Assets/blender/vehicle/AST-027_OpenLateTrailer.blend",
+   "placeholder": false
+  },
+  "Upgrade/coffee_machine": {
+   "ImageRectOffset": [
+    128,
+    512
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Upgrades",
+   "ref": "UPG-007",
+   "source": "Assets/blender/equipment/AST-022_CoffeeMachine.blend",
+   "placeholder": false
+  },
+  "Class/class_dog": {
+   "ImageRectOffset": [
+    256,
+    512
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Classes",
+   "ref": "class_dog",
+   "source": "Assets/blender/character/AST-053_Animal_Dog.blend:Head+Ears+Face(Normal)+REF_Cap",
+   "placeholder": true,
+   "note": "render provisorio da cabeca Day+Normal; trocar pelo retrato High do AST-086 quando existir"
+  },
+  "Class/class_rabbit": {
+   "ImageRectOffset": [
+    384,
+    512
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Classes",
+   "ref": "class_rabbit",
+   "source": "Assets/blender/character/AST-053_Animal_Rabbit.blend:Head+Ears+Face(Normal)+REF_Cap",
+   "placeholder": true,
+   "note": "render provisorio da cabeca Day+Normal; trocar pelo retrato High do AST-086 quando existir"
+  },
+  "Class/class_cat": {
+   "ImageRectOffset": [
+    512,
+    512
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Classes",
+   "ref": "class_cat",
+   "source": "Assets/blender/character/AST-053_Animal_Cat.blend:Head+Ears+Face(Normal)+REF_Cap",
+   "placeholder": true,
+   "note": "render provisorio da cabeca Day+Normal; trocar pelo retrato High do AST-086 quando existir"
+  },
+  "Class/class_bear": {
+   "ImageRectOffset": [
+    640,
+    512
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Classes",
+   "ref": "class_bear",
+   "source": "Assets/blender/character/AST-053_Animal_Bear.blend:Head+Ears+Face(Normal)+REF_Cap",
+   "placeholder": true,
+   "note": "render provisorio da cabeca Day+Normal; trocar pelo retrato High do AST-086 quando existir"
+  },
+  "Class/class_fox": {
+   "ImageRectOffset": [
+    768,
+    512
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Classes",
+   "ref": "class_fox",
+   "source": "Assets/blender/character/AST-053_Animal_Fox.blend:Head+Ears+Face(Normal)+REF_Cap",
+   "placeholder": true,
+   "note": "render provisorio da cabeca Day+Normal; trocar pelo retrato High do AST-086 quando existir"
+  },
+  "Class/class_owl": {
+   "ImageRectOffset": [
+    896,
+    512
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Classes",
+   "ref": "class_owl",
+   "source": "Assets/blender/character/AST-053_Animal_Owl.blend:Head+Ears+Face(Normal)+REF_Cap",
+   "placeholder": true,
+   "note": "render provisorio da cabeca Day+Normal; trocar pelo retrato High do AST-086 quando existir"
+  },
+  "Class/class_panda": {
+   "ImageRectOffset": [
+    0,
+    640
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Classes",
+   "ref": "class_panda",
+   "source": "Assets/blender/character/AST-053_Animal_Panda.blend:Head+Ears+Face(Normal)+REF_Cap",
+   "placeholder": true,
+   "note": "render provisorio da cabeca Day+Normal; trocar pelo retrato High do AST-086 quando existir"
+  },
+  "Class/class_lion": {
+   "ImageRectOffset": [
+    128,
+    640
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Classes",
+   "ref": "class_lion",
+   "source": "Assets/blender/character/AST-053_Animal_Lion.blend:Head+Ears+Face(Normal)+REF_Cap",
+   "placeholder": true,
+   "note": "render provisorio da cabeca Day+Normal; trocar pelo retrato High do AST-086 quando existir"
+  },
+  "Hud/coin": {
+   "ImageRectOffset": [
+    256,
+    640
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "HUD",
+   "ref": "AST-082",
+   "source": "vetorial (Pillow)",
+   "placeholder": true,
+   "note": "AST-082 sem malha: moeda desenhada; re-renderizar quando a malha existir"
+  },
+  "Hud/gem": {
+   "ImageRectOffset": [
+    384,
+    640
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "HUD",
+   "ref": "gemas (FEAT lobby)",
+   "source": "vetorial (Pillow)",
+   "placeholder": true,
+   "note": "cor da gema nao definida no style guide: Teal provisorio"
+  },
+  "Hud/sun": {
+   "ImageRectOffset": [
+    512,
+    640
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "HUD",
+   "ref": "Day",
+   "source": "vetorial (Pillow)",
+   "placeholder": false
+  },
+  "Hud/moon": {
+   "ImageRectOffset": [
+    640,
+    640
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "HUD",
+   "ref": "Night",
+   "source": "vetorial (Pillow)",
+   "placeholder": false
+  },
+  "Hud/phone": {
+   "ImageRectOffset": [
+    768,
+    640
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "HUD",
+   "ref": "AST-042",
+   "source": "Assets/blender/equipment/AST-042_VehiclePhone.blend:Phone_Trailer",
+   "placeholder": false
+  },
+  "Hud/ambulance": {
+   "ImageRectOffset": [
+    896,
+    640
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "HUD",
+   "ref": "AST-052",
+   "source": "Assets/blender/vehicle/AST-052_Ambulance.blend",
+   "placeholder": false
+  },
+  "Reaction/star": {
+   "ImageRectOffset": [
+    0,
+    768
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Reactions",
+   "ref": "reacao feliz",
+   "source": "vetorial (Pillow)",
+   "placeholder": false
+  },
+  "Reaction/scribble_cloud": {
+   "ImageRectOffset": [
+    128,
+    768
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Reactions",
+   "ref": "reacao irritada",
+   "source": "vetorial (Pillow)",
+   "placeholder": false
+  },
+  "Reaction/steam": {
+   "ImageRectOffset": [
+    256,
+    768
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Reactions",
+   "ref": "reacao impaciente",
+   "source": "vetorial (Pillow)",
+   "placeholder": false
+  },
+  "Notice/lock": {
+   "ImageRectOffset": [
+    384,
+    768
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Notices",
+   "ref": "bloqueado",
+   "source": "Assets/blender/equipment/AST-020_Padlock.blend:Padlock",
+   "placeholder": false
+  },
+  "Notice/trailer": {
+   "ImageRectOffset": [
+    512,
+    768
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Notices",
+   "ref": "Trailer only",
+   "source": "Assets/blender/vehicle/AST-027_OpenLateTrailer.blend",
+   "placeholder": false
+  },
+  "Notice/rare": {
+   "ImageRectOffset": [
+    640,
+    768
+   ],
+   "ImageRectSize": [
+    128,
+    128
+   ],
+   "group": "Notices",
+   "ref": "S1 / AST-051",
+   "source": "vetorial (Pillow)",
+   "placeholder": true,
+   "note": "brilho em Gold (cor do AST-051); confirmar com art-director"
+  }
+ }
+}

@@ -74,7 +74,7 @@ Caminhos dos packs (abreviados nas fichas):
 | AST-040 | Banco do fundo do trailer | equipment | P1 | Pack + edição | base `KP/kitchencabinet.fbx` ×3 + almofada modelada (DEC-138) | Aprovado (DEC-138) |
 | AST-041 | Pontos de esconder "Hide" (×4) | equipment | P1 | Pack + edição | `KP/kitchencabinet_half.fbx` (DEC-138) | Aprovado (DEC-138) |
 | AST-042 | Telefone fixo do veículo (2 variantes) | equipment | P0 | Modelar | modelado: `Assets/models/equipment/AST-042_VehiclePhone.fbx` (aparelho 396 / `Phone_Cart` 528; DEC-140) | Aprovado (DEC-140) |
-| AST-043 | Lona do carrinho | vehicle | P1 | Modelar | — | Aprovado (DEC-217) |
+| AST-043 | Lona do carrinho | vehicle | P1 | Modelar | `Assets/models/vehicle/AST-043_CartTarp.fbx` (1.152 tris) | Em revisão (ficha DEC-217) |
 | AST-044 | Bellmoor Savings (fachada + relógio, ANM-003) | building | P0 | Modelar + Pack (coluna) | coluna `KP/pillar_A.fbx`; volume `CC/building-j.fbx` (com AST-045; reduzido em `Assets/models/building/AST-045_ApartmentBlock.fbx`, DEC-141); resto da fachada segue modelar (DEC-139) | Aprovado (DEC-139; volume DEC-141) · Em revisão (modeler-3d, 2026-10-10) |
 | AST-045 | Apartamentos sobre o Bellmoor Savings (ANM-006) | building | P0 | Pack + edição | `CC/building-j.fbx` (DEC-139) reduzido: `Assets/models/building/AST-045_ApartmentBlock.fbx` (2.381; DEC-141) | Aprovado (DEC-139; modelo DEC-141) · Em revisão (modeler-3d, 2026-10-10) |
 | AST-046 | Lavanderia | building | P1 | Pack + edição | `CC/building-e.fbx` (DEC-139) | Aprovado (DEC-139) · Em revisão (modeler-3d, 2026-10-10) |
@@ -102,7 +102,7 @@ Caminhos dos packs (abreviados nas fichas):
 | AST-068 | Pistas do trailer: foto de 1979 + crachá | story | P1 | Modelar | modelado: `Assets/models/story/AST-068_TrailerClues.fbx` (`Photo_1979` 66 / `Badge_Old` 76; DEC-140) | Aprovado (DEC-140) |
 | AST-069 | Pacote de animações R6 | character | P0 | Animar | rig de animação: `Assets/blender/character/AST-069_AnimalRig.blend` (+ `.md`; em revisão); animações: — (usuário anima, DEC-220) | Aprovado (DEC-217: rig IK + 35 clipes) |
 | AST-070 | VFX pastelão: atropelamento, desmaio, embarque, reviver | vfx | P1 | Modelar (texturas) | — | Rascunho |
-| AST-071 | Folha de ícones de UI (ingredientes, Tools, HUD) | ui | P0 | Render + 2D | — | Aprovado (DEC-217: 54 ícones) |
+| AST-071 | Folha de ícones de UI (ingredientes, Tools, HUD) | ui | P0 | Render + 2D | `Assets/textures/ui/AST-071_icons.png` + `.json` (54 ícones, 1024², células 128²; 23 placeholders) | Aprovado (DEC-217: 54 ícones) · Em revisão (modeler-3d, 2026-10-10) |
 | AST-072 | Folha de placas, letreiros e logos | ui | P0 | 2D | — | Rascunho |
 | AST-073 | Avental Bramble's (acessório do jogador) | character | P2 | Modelar | — | Rascunho (proposta Obsoleto, `Q-172`) |
 | AST-074 | Ônibus urbano (trânsito + cutscene) | vehicle | P2 | Modelar | → sourcing: KayKit City Builder Bits (a confirmar, não baixado; o Car Kit não tem ônibus) | Rascunho |
@@ -112,7 +112,7 @@ Caminhos dos packs (abreviados nas fichas):
 | AST-078 | Balcão externo do trailer (Counter no trailer, 3 níveis) | equipment | P1 · onda 2 | Pack + edição | `KP/kitchencounter_straight_B.fbx`, `KP/chair_stool.fbx`, `CC/detail-awning.fbx` | Rascunho |
 | AST-079 | Lâmpada básica do trailer (DEC-189) | equipment | P1 · onda 2 | Modelar | — | Rascunho |
 | AST-080 | Ambientação do interior do trailer | equipment | P2 · onda 2 | Pack | `KP/shelf_papertowel_decorated.fbx`, `KP/papertowel.fbx`, `KP/towelrail.fbx`, `KP/jar_*_small.fbx`, `KP/dishrack.fbx` | Rascunho |
-| AST-081 | Kit de acessórios de cliente (DEC-188) | character | P0 · onda 2 | Modelar | — | Aprovado (DEC-217) |
+| AST-081 | Kit de acessórios de cliente (DEC-188) | character | P0 · onda 2 | Modelar | `Assets/models/character/AST-081_Acc_*.fbx` (13 malhas, 64–272 tris) | Em revisão (ficha DEC-217) |
 | AST-082 | Moeda (pagamento, gorjeta, `Coin_Blank`) | vfx | P1 · onda 2 | Modelar | — | Rascunho |
 | AST-083 | Kit de luz de rua: poça, cone, arandela | street | P1 · onda 2 | Modelar + 2D | — | Rascunho |
 | AST-084 | Pós-processo: dia, noite, escuro e sanidade | vfx | P1 · onda 2 | Código + 2D | — | Rascunho |
@@ -554,6 +554,7 @@ Compra de upgrade: bancada do Mart (AST-049, DEC-101); a peça visível troca no
 - **Dimensões:** veste o AST-026 (26 × 4 × 4), dobras largas, amarrada com 3 cordas.
 - **Cores:** lona Mint-gray `#B7CFC6`, cordas Cream.
 - **Estados:** `On`, `Off`. **Tris:** ≤ 1.200.
+- **Modelo (modeler-3d, 2026-10-10) — Em revisão:** `Assets/blender/vehicle/AST-043_CartTarp.blend`, `Assets/models/vehicle/AST-043_CartTarp.fbx`, `Assets/import/vehicle/AST-043_CartTarp.fbx`; **1.152 tris**, uma malha `Lona` (lona + 3 cordas + nós). Medida 27,4 × 4,9 × 3,0 (Z 0,95–3,98: cobre o `Body` 26,5 × 3,3 + para-lamas, saia até ~1,3, rodas aparecem embaixo; calombos sobre grelha/tábua/coberturas/gaveta dão a altura 4). Mesmo referencial do AST-026 (origem do carrinho, +Y = frente do carrinho): CFrame da lona = CFrame do `Body` do carrinho. Se o runner usar centro da bbox, centro da lona X ≈ −0,02 contra X ≈ +1,05 do `Body` (Blender). Renders: `Assets/reference/AST-043_CartTarp_*.png`. **Provisório:** Mint-gray aproximado pelo cinza claro do atlas KitchenPack (`#BDC8CC`, o mais perto de `#B7CFC6`); no estado `Covered` os guarda-sóis `Parasol_E/W` e as estações precisam ser escondidos (os postes atravessam a lona); a alça de empurrar (X 13–14,5) sai pela aba da ponta, de propósito.
 
 ### AST-035 — Carros de trânsito (família de 4)
 
@@ -876,6 +877,7 @@ Regras gerais: style guide §4 (opção A: `BodyColors` + acessórios de atlas +
 - **Animações (AST-069):** descer pela traseira (degrau), andar levando a maca (dois em linha, maca entre eles), abaixar a maca e "colocar" o corpo (o corpo aparece deitado com "poof", sem contato de mão), levantar a maca, voltar, subir pela traseira. Idle calmo. Falas em balão (`characters.md`): uma por evento.
 - **Variações:** 2 (`Medic_A`, `Medic_B`); sempre os mesmos dois (padrão fixo, como a ambulância).
 - **Tris:** NPC montado 600–1.200 cada; acessório ≤ 400.
+- **Máscara (modeler-3d, 2026-10-10, adiantada com a ficha em Rascunho):** `Acc_SurgicalMask_Rabbit` e `_Panda`, 108 tris cada, casca branca com pregas sobre focinho e boca (Z 4,04–4,65, abaixo dos olhos) + elásticos pela lateral da cabeça até a base das orelhas; âncora Head. `Assets/blender/character/AST-076_Acc_SurgicalMask_<Espécie>.blend`, `Assets/models|import/character/` idem. Render `Assets/reference/AST-076_SurgicalMask_*.png` (Day/Mid/Night com `Exhausted`). **Provisório:** branco do atlas (`#FBFCFC`), sem tom menta (o atlas não tem); ficha AST-076 segue Rascunho, malha precisa de aprovação junto.
 - **2026-10-10:** espécie dos médicos **ainda aberta** (`Q-160`; propostas: dois porcos, ou coelho alto + panda baixo). Rig da crew (DEC-178); tris seguem DEC-164.
 - **DEC-211 e DEC-213 (2026-10-10, fecham `Q-104` e `Q-160`):** `Medic_A` = **coelho** (alto pelas orelhas), `Medic_B` = **panda** (baixo); animais da crew com **roupa de paramédico** (textura no rig, no lugar de `BodyColors`/acessórios R6; não usar o uniforme do Bramble's); tom fofo. Rosto **fixo `Exhausted`** (DEC-162/166) em qualquer hora, sem troca de expressão. **Máscara cirúrgica** cobrindo a boca: **acessório ou textura, decide o art-director**. **Emenda desta ficha:** "máscara cirúrgica" **sai** da lista de proibidos; "olhos e boca sempre" não vale (boca coberta). Seguem proibidos cruz vermelha, Star of Life, estetoscópio, seringa, sangue, equipamento realista. `Medic_Cap`/`Hair_Medic_*` a rever pelo art-director (orelhas do coelho × boné). **Provisório:** com observador de sanidade baixa, expressão e máscara não mudam.
 
@@ -1041,6 +1043,10 @@ Regra de arte: a anomalia usa as mesmas peças do normal e quebra **um** traço 
 - **Status:** **Aprovado (DEC-217)** — **54 ícones** do complemento "Lista de ícones" (vale o complemento onde divergir) · **Prioridade:** P0 · **Origem:** render dos modelos 3D + 2D
 - **Conteúdo:** ícones de pão, salsicha e dos 6 complementos (balão de pedido e hotbar); Tools (hot dog, 9 pacotes, café, item raro); upgrades para as vagas da bancada (Grill, Cooler, Counter, Lock, Trailer Lights); HUD (moeda, sol, lua, telefone, ambulância, votos de "Skip"); reações do cliente (estrela, nuvem rabiscada, vapor); gema.
 - **Formato:** 128² cada, folha 1024² com `ImageRectOffset`; contorno grosso; mesma paleta.
+- **Folha (modeler-3d, 2026-10-10, Em revisão; não enviada):** `Assets/textures/ui/AST-071_icons.png` (1024², 8 × 8 células de 128², 54 usadas, 10 livres) + `Assets/textures/ui/AST-071_icons.json` (nome → `ImageRectOffset`/`ImageRectSize`, grupo, ID de conteúdo, modelo de origem, flag `placeholder`). Nomes = chaves do `src/Shared/Content`: `Ingredient/<Ingredients.Key>`, `Item/<Items.Key>` (`hot_dog`, `pack_*`, `coffee`, `revive_kit`), `Upgrade/<Upgrades.Key>/<nível>` (grill, cooler, counter 1–3), `Upgrade/cash_drawer_lock`, `Upgrade/trailer_lights`, `Upgrade/food_trailer`, `Upgrade/coffee_machine`, `Class/<Classes.Key>`, `Hud/coin|gem|sun|moon|phone|ambulance`, `Reaction/star|scribble_cloud|steam`, `Notice/lock|trailer|rare`. Revisão: `Assets/reference/AST-071_icons_contact.png` (cada ícone na pílula do HUD, em fundo claro e a 48/32 px). Asset id: upload em lote pelo usuário; `Ingredients.Icon` continua `""` até lá.
+- **Como foi feito:** render EEVEE dos `.blend`/FBX do repositório (câmera ortográfica 3/4, luz Cream `#FFF1D6` + contraluz fria, view transform Standard, fundo transparente), contorno `#2B2233` de 4 px (dilatação da silhueta, com preenchimento claro sob vidro), reduzido de 512 para 128. Sem modelo: moeda, gema, sol, lua, estrela, nuvem rabiscada, vapor e brilho do "raro" desenhados em Pillow com a paleta §2.1. Avisos = disco `#2B2233` com anel Mustard. Pacotes = render do AST-011 + ícone do ingrediente no canto (selo). Pipeline para regenerar quando um modelo mudar: `tools/icons/` (`make_jobs.py` → `render_icons.py` via `bl.sh` → `build_sheet.py`).
+- **Placeholders (23, marcados no JSON):** 9 pacotes (AST-011 ainda sem recolor/rótulo no modelo: a cor da tabela do AST-011 entrou só no ícone; re-renderizar quando o recolor e os rótulos do AST-072 existirem) · Counter L1–L3 (sem modelo final; composição de peças KayKit, L3 em L **sem toldo**) · 8 classes (render provisório da cabeça Day + `Normal` + boné `REF_Cap` liso, sem logo; trocar pelo retrato High do AST-086) · moeda (AST-082 sem malha; desenho com o hot dog do logo em relevo, DEC-206) · gema (cor não definida no style guide: **Teal**, Provisório) · `Notice/rare` (brilho em **Gold**, cor do AST-051; confirmar com o art-director).
+- **Escolhas Provisórias (art-director confere):** ketchup e mostarda = **garrafas** AST-004/005 (lêem melhor que tigela; DEC-218 tirou as garrafas da grade, destino em `Q-172`: se virarem Obsoletas, trocar por tigela com molho); salsicha = `Sausage_Grilled`; café-ingrediente = jarra da cafeteira (AST-022), para não repetir o copo (Tool) nem o saco (pacote); pão = `Bun_Open`; Cooler L3 = FBX importado atual (verde, não o Steel + Ketchup da ficha). "Votos de Skip" do texto acima não está na lista de 54 do complemento (que vale, DEC-217) e ficou fora.
 
 ### AST-072 — Folha de placas, letreiros e logos
 
@@ -1132,6 +1138,21 @@ Diferença para a sugestão padrão (lobby na onda 4): o board põe **lobby e pa
 - **Encaixe por espécie:** tabela de offsets `Assets/blender/character/AST-081_offsets.json` (capacete e fone mudam com a cabeça de cada espécie de cliente; espécies jogáveis como cliente seguem `Q-165`).
 - **Variantes:** versão do lado oposto para a cópia (ANM-004) = troca de attachment; malha espelhada só onde a peça é assimétrica.
 - **Tris:** por peça na tabela; personagem montado segue DEC-164 (≈ 2,0–2,5k).
+- **Modelo (modeler-3d, 2026-10-10) — Em revisão:** uma malha por peça, modelada no lugar da pose de repouso do kit (como `Ears_`/`Cap`), cor só do atlas KitchenPack (Day = textura importada → `DayTextureID`; Mid/Night = `CrewLooks.Atlas`, sem textura nova). Fontes `Assets/blender/character/AST-081_<Peça>.blend`, export `Assets/models/character/` e `Assets/import/character/` com o mesmo nome. Nomes = `CustomerTypes.Accessories` (`Acc_ShiftBadge`, não `Acc_NightBadge`).
+
+  | Malha | Tris | Âncora (`Anchor`) | Nota |
+  |---|---|---|---|
+  | `Acc_Badge` / `_Mirror` | 64 | Torso | cartão 0,5 × 0,7, faixa azul + foto, clipe |
+  | `Acc_Briefcase` / `_Mirror` | 112 | **Right Arm** / Left Arm | 1,2 × 0,9 × 0,3, alça entra no punho |
+  | `Acc_Backpack` | 272 | Torso | **1,36 × 1,42 × 0,6** (Provisório: mais baixa/rasa que 1,4 × 1,6 × 0,7 para a cauda do rato passar por trás e o topo não bater na cabeça) |
+  | `Acc_Headphones` | 212 | Head | conchas Ø 0,54 coral, arco inclinado para trás (passa atrás das orelhas e dos olhos do sapo) |
+  | `Acc_HardHat` | 178 | Head | Mustard, sem furo: espécies sem orelha no topo (macaco, cachorro, porco, ovelha, pinguim, tartaruga) |
+  | `Acc_HardHat_EarsUp` | 205 | Head | mesmo capacete com fendas de orelha (orelhas de todas as espécies "EarsUp" passam sem tocar) |
+  | `Acc_SafetyVest` | 190 | Torso | frente em 2 painéis + costas, 2 faixas Cream, alças sob a cabeça |
+  | `Acc_Cane` / `_Mirror` | 116 | **Right Arm** / Left Arm | altura 2,38, gancho sai pela frente do punho, ponteira escura |
+  | `Acc_ShiftBadge` / `_Mirror` | 98 | Torso | Teal 0,7 × 0,9 com faixa e foto Cream, cordão até o pescoço |
+
+  Encaixe nas 18 cabeças: `Assets/blender/character/AST-081_offsets.json` (medido por sobreposição de malha com cada kit). Fone: sem ajuste em 13 espécies; escala X 1,2–1,36 em cachorro, porco, ovelha, macaco (orelhas laterais); leão 1,5 (juba, não recomendado). Capacete: ok em 16; sapo precisa subir 0,34 (calombos dos olhos) e leão não serve (juba). Mochila: cauda curta fica coberta; caudas longas (gato, raposa, macaco, leão, guaxinim, coruja) atravessam e tartaruga tem casco — só hamster/rato (DEC-188) estão limpos. Renders: `Assets/reference/AST-081_*.png` (Day/Mid/Night, costas, perfil, capacete e fone em 12 espécies, espelhadas). **Provisório:** (1) `Anchor` não vai no FBX: o kit (`build_kits.luau`) tem que gravar `Anchor = "Right Arm"` na pasta e na bengala (pelo centro da bbox o mais perto é a perna) e o `CrewRig` ainda não aplica offset/escala por espécie (o JSON fica pronto para isso); (2) capacete em duas malhas, como `Cap`/`CapEarsUp`; (3) no pacote Night o atlas compartilhado deixa capacete, colete e crachá azul-escuros (mesma regra das orelhas, DEC-154); (4) cores sem número na ficha: pasta marrom com fechos Mustard escuro, mochila azul, fone coral com arco escuro, bengala de madeira.
 
 #### AST-082 — Moeda (pagamento, gorjeta, `Coin_Blank`)
 

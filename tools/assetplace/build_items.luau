@@ -11,8 +11,13 @@
 	      coffee                    AST-010 cup; VFX_Steam
 	      pack_*  (9)               AST-011 pack pieces, flat recolor per package (see PACKS)
 	      revive_kit                AST-051 rescue whistle; VFX_Rare, VFX_Use
+	      altered_item              AST-061 default variant (= Variants/altered_item/Sausage), attribute Variant
+	    Variants/altered_item/<V>   TASK-099 (Provisional): Tool per ITM-020 variant, Item = "altered_item",
+	                                Variant = V: Sausage (Sausage_Wrong), Bun (Bun_Bitten; Att_Sausage)
 	    Toppings/<ingredient key>   Model, pivot = Att_Topping of the .fbx, attribute TopHeight (measured here)
 	    Food/SausageRaw, SausageGrilled (AST-002), BunClosed, BunOpen (AST-001)   Model, pivot = base centre
+	    Food/SausageWrong, BunBitten (AST-061)   rail / board visual of the altered item (TASK-110) and the part a
+	                                hot dog with Altered = true shows instead of its sausage / bun (same boxes)
 
 	Geometry facts below (part boxes, attachment points, tris) were measured in the approved .blend sources
 	(Assets/blender/food, market) on 2026-10-10, in Roblox axes (x = -X, y = Z, z = Y of Blender; exporter
@@ -26,8 +31,8 @@
 	    (ItemService turns collision on for a dropped Tool, FEAT-036); CanBeDropped = false; Grip = Att_Hand
 	    (C1 of the R6 RightGrip; item upright, front -Z, lower right third in 1st person);
 	  - Toppings/Food: anchored, no collision/query/touch, PrimaryPart + PivotOffset = pivot.
-	Not built here (notes in check): altered_item (wave 3, ANM-002 / AST-061 has two variants), bottles,
-	slices, piles and the jar (station visuals, map), HotDog_Display and Coffee_Pair (vitrine / cutscene).
+	Not built here: bottles, slices, piles and the jar (station visuals, map), HotDog_Display and Coffee_Pair
+	(vitrine / cutscene).
 
 	Usage (repo served at http://127.0.0.1:8772/, e.g. `python -m http.server 8772` at the repo root):
 		local Http = game:GetService("HttpService")
@@ -77,7 +82,7 @@ export type Options = {
 
 local Items = {}
 
-const ITEMS_VERSION = 1
+const ITEMS_VERSION = 2 -- 2: altered_item, Variants, Food SausageWrong / BunBitten (TASK-099)
 const CACHE_NAME = "__AssetCache" -- shared with place_assets.luau / build_kits.luau
 const DEMO_NAME = "ItemsDemo"
 const SIZE_TOL = 0.05
@@ -162,9 +167,32 @@ const TOOLS: { [string]: ToolSpec } = {
 	pack_coffee = pack("Bag", BAG, 46, "#5A3A2A"),
 }
 
--- Content.Items keys deliberately not built by this task (check reports them as notes).
-const DEFERRED: { [string]: string } = {
-	altered_item = "wave 3 (ANM-002, AST-061 sausage/bun variants; Tool shape decided with that task)",
+-- Content.Items keys deliberately not built by this script (check reports them as notes).
+const DEFERRED: { [string]: string } = {}
+
+-- ITM-020 altered item (AST-061_WrongFood, measured in the .blend 2026-10-10). One Content key, two looks: each
+-- variant is a Tool under Variants/altered_item/<V>; Tools/altered_item is a copy of ALTERED_DEFAULT so that every
+-- Content.Items key still has a Tool. Provisional (TASK-099): ItemService picks the variant (Tool attribute Variant).
+const WRONG_SAUSAGE_BOX = box(-0.6, 0, -0.82, 0.6, 0.24, -0.58)
+const BITTEN_BUN_BOX = box(-0.5, 0, -0.225, 0.5, 0.345, 0.225)
+const ALTERED_DEFAULT = "Sausage"
+const ALTERED_ORDER = { "Sausage", "Bun" }
+const ALTERED: { [string]: ToolSpec } = {
+	Sausage = {
+		asset = "AST-061_WrongFood",
+		parts = { { name = "Sausage_Wrong", box = WRONG_SAUSAGE_BOX, tris = 164 } },
+		atts = { Att_Hand = Vector3.new(0, 0, -0.7) },
+		hand = Vector3.new(0, 0, -0.7), -- base centre of the sausage
+		budget = 250, -- AST-061
+	},
+	Bun = {
+		-- Bun_Bitten is the asset root (origin = base centre of the bun, like AST-001 Bun_Open)
+		asset = "AST-061_WrongFood",
+		parts = { { name = "Bun_Bitten", box = BITTEN_BUN_BOX, tris = 208 } },
+		atts = { Att_Hand = Vector3.zero, Att_Sausage = Vector3.new(0, 0.33, 0) },
+		hand = Vector3.zero,
+		budget = 250, -- AST-061
+	},
 }
 
 -- Toppings (key = Content.Ingredients key; pivot = asset origin = Att_Topping) ----------------------------------
@@ -217,6 +245,25 @@ const FOOD: { [string]: PivotSpec } = {
 	BunOpen = {
 		asset = "AST-001_Bun",
 		parts = { { name = "Bun_Open", box = box(-0.5, 0, -0.225, 0.5, 0.345, 0.225), tris = 152 } },
+		atts = { Att_Hand = Vector3.zero, Att_Sausage = Vector3.new(0, 0.33, 0) },
+		pivot = Vector3.zero,
+		budget = 250,
+	},
+	-- AST-061 (ITM-020): same boxes and attachments as SausageGrilled / BunOpen, so they swap 1:1
+	SausageWrong = {
+		asset = "AST-061_WrongFood",
+		parts = { { name = "Sausage_Wrong", box = WRONG_SAUSAGE_BOX, tris = 164 } },
+		atts = {
+			Bar_Cook = Vector3.new(0, 1.24, -0.7),
+			VFX_Ready = Vector3.new(0, 0.12, -0.7),
+			VFX_Steam = Vector3.new(0, 0.24, -0.7),
+		},
+		pivot = Vector3.new(0, 0, -0.7),
+		budget = 250,
+	},
+	BunBitten = {
+		asset = "AST-061_WrongFood",
+		parts = { { name = "Bun_Bitten", box = BITTEN_BUN_BOX, tris = 208 } },
 		atts = { Att_Hand = Vector3.zero, Att_Sausage = Vector3.new(0, 0.33, 0) },
 		pivot = Vector3.zero,
 		budget = 250,
@@ -563,6 +610,7 @@ function Items.build(ids: Ids, reload: boolean?, problems: { string }): Folder
 	items.Name = "Items"
 	items:SetAttribute("KitVersion", ITEMS_VERSION)
 	local tools = folder(items, "Tools")
+	local variants = folder(folder(items, "Variants"), "altered_item")
 	local toppings = folder(items, "Toppings")
 	local food = folder(items, "Food")
 
@@ -582,6 +630,24 @@ function Items.build(ids: Ids, reload: boolean?, problems: { string }): Folder
 			Items.buildTool(k, TOOLS[k], ids, reload, tools, problems)
 		end)
 	end
+	-- ITM-020: one Tool per variant (named after the variant), plus Tools.altered_item = the default variant
+	for _, v in ALTERED_ORDER do
+		guarded("Variants.altered_item." .. v, function()
+			Items.buildTool("altered_item", ALTERED[v], ids, reload, variants, problems)
+			local t = variants:FindFirstChild("altered_item")
+			if t then
+				t.Name = v
+				t:SetAttribute("Variant", v)
+			end
+		end)
+	end
+	guarded("Tools.altered_item", function()
+		Items.buildTool("altered_item", ALTERED[ALTERED_DEFAULT], ids, reload, tools, problems)
+		local t = tools:FindFirstChild("altered_item")
+		if t then
+			t:SetAttribute("Variant", ALTERED_DEFAULT)
+		end
+	end)
 	for k, spec in TOPPINGS do
 		guarded("Toppings." .. k, function()
 			local m = Items.buildPivoted(k, spec, ids, reload, toppings, problems)
@@ -626,6 +692,9 @@ function Items.check(ids: Ids?, content: any?): { string }
 			need(s.asset)
 		end
 		for _, s in FOOD do
+			need(s.asset)
+		end
+		for _, s in ALTERED do
 			need(s.asset)
 		end
 	end
@@ -714,6 +783,36 @@ function Items.check(ids: Ids?, content: any?): { string }
 	end
 	if hotDog and not hotDog:FindFirstChild("Sausage") then
 		table.insert(problems, "Tools.hot_dog.Sausage missing")
+	end
+
+	-- ITM-020: one Tool per variant (Item = altered_item, Variant = name), Tools.altered_item = default variant
+	local altered = tools and tools:FindFirstChild("altered_item")
+	if altered and altered:GetAttribute("Variant") ~= ALTERED_DEFAULT then
+		table.insert(problems, "Tools.altered_item: attribute Variant ~= " .. ALTERED_DEFAULT)
+	end
+	local variantsRoot = items:FindFirstChild("Variants")
+	local variants = variantsRoot and variantsRoot:FindFirstChild("altered_item")
+	for _, v in ALTERED_ORDER do
+		local t = variants and variants:FindFirstChild(v)
+		if not (t and t:IsA("Tool")) then
+			table.insert(problems, "Variants.altered_item." .. v .. " missing")
+			continue
+		end
+		local handle = t:FindFirstChild("Handle")
+		if not (handle and handle:IsA("BasePart") and handle:FindFirstChild("Att_Hand")) then
+			table.insert(problems, "Variants.altered_item." .. v .. ".Handle.Att_Hand missing")
+		end
+		if t:GetAttribute("Item") ~= "altered_item" or t:GetAttribute("Variant") ~= v then
+			table.insert(problems, "Variants.altered_item." .. v .. ": attributes Item / Variant wrong")
+		end
+		if (t:GetAttribute("Tris") :: number? or 0) > ALTERED[v].budget then
+			table.insert(problems, string.format("Variants.altered_item.%s: tris > %d", v, ALTERED[v].budget))
+		end
+	end
+	local bitten = variants and variants:FindFirstChild("Bun")
+	local bittenHandle = bitten and bitten:FindFirstChild("Handle")
+	if bittenHandle and not bittenHandle:FindFirstChild("Att_Sausage") then
+		table.insert(problems, "Variants.altered_item.Bun.Handle.Att_Sausage missing")
 	end
 
 	-- every topping has a Model with pivot and a measured TopHeight that matches the .blend
@@ -923,6 +1022,15 @@ function Items.demo(content: any?): { string }
 	table.sort(tools, function(a: Instance, b: Instance)
 		return a.Name < b.Name
 	end)
+	local variants = items:FindFirstChild("Variants") and items.Variants:FindFirstChild("altered_item")
+	if variants then
+		for _, v in ALTERED_ORDER do
+			local t = variants:FindFirstChild(v)
+			if t then
+				table.insert(tools, t)
+			end
+		end
+	end
 	local row = Instance.new("Model")
 	row.Name = "Tools"
 	for i, t in tools do
