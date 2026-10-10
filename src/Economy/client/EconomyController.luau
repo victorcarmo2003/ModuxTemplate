@@ -11,6 +11,10 @@
 	(DEC-155) both work. Without it: warn once and fall back to the top part of the `DRAWER` model (MapId); without
 	that either, warn and draw nothing. A late `Value_Anchor` (streaming, model swap) replaces the fallback.
 
+	Only the vehicle in use shows the drawer (TASK-058, closes the TASK-024 Provisional): a `Vehicle` whose attribute
+	`Vehicle` differs from RoundController.Vehicle (Shift.Vehicle) draws nothing, so the trailer for sale (wave 2) and
+	the parked cart under the tarp after the swap never show a value. The swap redraws from the Shift record.
+
 	The client never writes money: a sale only changes the number when the server's `Economy` record changes. The
 	"+$N" is presentation of the `Sale` packet, not a prediction of the drawer.
 ]]
@@ -24,6 +28,7 @@ local DrawerValue = require(StarterPlayer.StarterPlayerScripts.client.Interface.
 
 const RECORD_ID = 1 -- single record (network.md §1, rule 5)
 const VEHICLE_TAG = "Vehicle"
+const VEHICLE_ATTRIBUTE = "Vehicle" -- key of Content.Vehicles on the tagged Model (architecture.md §18.1, T36)
 const ANCHOR_NAME = "Value_Anchor"
 const DRAWER_MAP_ID = "DRAWER"
 -- Height of the value over the anchor (studs, world up)
@@ -48,7 +53,7 @@ export type Record = {
 	Drawer: number,
 }
 
-const EconomyController = Modux.Controller("EconomyController", { Priority = 790 })
+const EconomyController = Modux.Controller("EconomyController", { Require = { "RoundController" }, Priority = 790 })
 
 function EconomyController:Setup()
 	self.Cash = Vide.source(0) :: Vide.Source<number>
@@ -58,6 +63,12 @@ function EconomyController:Setup()
 	self.Pops = Vide.source({} :: { DrawerValue.Pop }) :: Vide.Source<{ DrawerValue.Pop }>
 	self.Mounts = {} :: { [Instance]: Mount }
 	self.Gui = nil :: Instance?
+	self.Unmount = nil :: (() -> ())?
+end
+
+-- True when this tagged Model is the vehicle in use (Shift.Vehicle)
+function EconomyController:IsCurrent(vehicle: Instance): boolean
+	return vehicle:GetAttribute(VEHICLE_ATTRIBUTE) == self.Dependencies.RoundController.Vehicle()
 end
 
 function EconomyController:Apply(record: Record)
@@ -169,6 +180,11 @@ function EconomyController:Clear(mount: Mount)
 end
 
 function EconomyController:Resolve(mount: Mount)
+	if not self:IsCurrent(mount.Vehicle) then
+		-- not the vehicle in use: no value (the fallback timer, if pending, resolves again when it fires)
+		self:Clear(mount)
+		return
+	end
 	const anchor = findAnchor(mount.Vehicle)
 	if anchor then
 		self:Draw(mount, anchor, 0)
@@ -221,6 +237,12 @@ function EconomyController:Track(vehicle: Instance)
 	)
 	table.insert(
 		mount.Connections,
+		vehicle:GetAttributeChangedSignal(VEHICLE_ATTRIBUTE):Connect(function()
+			self:Resolve(mount)
+		end)
+	)
+	table.insert(
+		mount.Connections,
 		vehicle.DescendantRemoving:Connect(function(descendant)
 			if descendant == mount.Adornee then
 				-- after the removal lands, so findAnchor no longer sees it
@@ -267,6 +289,19 @@ end
 
 function EconomyController:Watch(gui: Instance)
 	self.Gui = gui
+	-- Vehicle swap (Shift.Vehicle): redraw every tracked vehicle. The first run of the effect sees no mount yet.
+	const round = self.Dependencies.RoundController
+	self.Unmount = Vide.root(function()
+		Vide.effect(function()
+			round.Vehicle()
+			Vide.untrack(function()
+				for _, mount in self.Mounts do
+					self:Resolve(mount)
+				end
+				return nil
+			end)
+		end)
+	end)
 	CollectionService:GetInstanceAddedSignal(VEHICLE_TAG):Connect(function(vehicle)
 		self:Track(vehicle)
 	end)
