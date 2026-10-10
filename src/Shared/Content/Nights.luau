@@ -4,7 +4,8 @@
 -- Duration = real seconds of the Night phase (8 PM -> 6 AM), increasing (DEC-127).
 -- NewAnomaly = key of Anomalies (wave 3 table, TASK-096 checks the reference); here only the key pattern is checked.
 -- Call / ShortCall = keys of BossCalls (Trigger NightCall for this night / the single NightRepeat call).
--- Customers.BaseInterval = seconds between spawns at night, solo (placeholder, TASK-081); Max = Flow.MaxCustomersNight.
+-- Customers.BaseInterval = seconds between spawns at night, solo (40 N1-5, 36 N6-10; Provisional, TASK-081, FEAT-009);
+-- Max = Flow.MaxCustomersNight.
 -- Windows (game minutes since 0:00 of the shift day): Calm 8-9 PM, Shift 9 PM-5 AM, Last 5-6 AM (FEAT-003). Not
 -- phases: RoundService:NightWindow() derives them from the clock.
 -- Occurrences: weight of an anomaly by age (Premiere = debut night, Recent = 1-2 nights after, Old = older;
@@ -63,7 +64,7 @@ local function night(
 end
 
 const base = Table.new({
-	-- Duration DEC-127; MaxSimultaneous and MinGap FEAT-022; interval placeholder (FEAT-009 proposal: 40 s / 36 s)
+	-- Duration DEC-127; MaxSimultaneous and MinGap FEAT-022; interval FEAT-009 (40 s / 36 s, Provisional, TASK-081)
 	night(1, 1200, "anm_001_blank_folks", 1, 60, 40),
 	night(2, 1260, "anm_002_wrong_food", 1, 60, 40),
 	night(3, 1320, "anm_003_stopped_clock", 1, 60, 40),

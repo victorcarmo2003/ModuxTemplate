@@ -371,7 +371,7 @@ nome final da chave é do architect (TASK-047). Esta tabela decide **quais** rec
 | 9 | Bancada `Maxed` | colega comprou o último nível antes | sim | `upgrade_maxed` | Upgrades |
 | 10 | "Take Order" fora de venda (fase sem `Selling` e fora do `Closing`) | o turno virou durante o toque | sim | `shop_closed` | None |
 
-Fora da D-04, mesma regra (propostas; entram se a 047 aceitar as chaves): "Collect" com trilho cheio → `rail_full`
+Fora da D-04, mesma regra (chaves aceitas e criadas em `Notices` pela TASK-047): "Collect" com trilho cheio → `rail_full`
 (texto com o narrative-writer); beber café de dia → `coffee_night_only` (FEAT-021, `Q-170`); "Give" café a quem já tem
 1 → `coffee_has_one` (`ui-text.md` §10.2). Já existem e seguem: `hands_full`, `package_limit`, `not_enough_cash`,
 `coffee_cooldown`, `coffee_full`, `hide_taken`.
@@ -500,7 +500,7 @@ Dados da noite (`content-data.md` §6.3, §6.8; valores **Provisórios** da TASK
 | Campo | Valor | Regra |
 |---|---|---|
 | `Flow.NightInterval` | **40** | intervalo de referência da noite (solo, s) |
-| `Nights[k].Customers.BaseInterval` | 40 (k = 1–5) · **36** (k = 6–10) | a linha da noite manda; `Validate`: ≤ `Flow.NightInterval` |
+| `Nights[k].Customers.BaseInterval` | 40 (k = 1–5) · **36** (k = 6–10) | a linha da noite manda; `Flow.NightInterval` é o fallback (`Validate`: 1–600) |
 | `Nights[k].Customers.Max` | **6** em todas | `Validate`: ≤ `Flow.MaxCustomersNight` (6) |
 | Crescimento e Trailer Lights | não se aplicam à noite | — |
 
@@ -880,10 +880,11 @@ Dados (tabela `Sanity`, `content-data.md` §3.16 + §6.5; conferidos e completad
 | `SeeAngle`, `SeeRange`, `SeeTime` | 40° (cone total), 60 studs (padrão; por anomalia em `Anomalies.ViewRange`), 1 s acumulado | FEAT-019 |
 | `RuleBroken` | 35 (nenhuma classe altera) | DEC-056, DEC-069 |
 | `DarkDelay`, `DarkPerSecond` | 3 s, 1/s | DEC-056 |
-| `DarkPhases` | `Call`, `Prep`, `Night`, `NightEnd` | §19.7 |
-| `Coffee`, `CoffeeCooldown`, `CoffeeBrew`, `CoffeeDrinkTime` | 25, 60 s, 6 s, 1,5 s | DEC-055 |
+| `DarkPhases` | `Call`, `Prep`, `Night` (**sem `NightEnd`**: a noite já foi vencida, escuro ali só puniria depois da vitória; L2-03, **Provisório**) | §19.7, TASK-047 |
+| `Coffee`, `CoffeeCooldown`, `CoffeeDrinkTime` | 25, 60 s, 1,5 s | DEC-055 |
+| Preparo do café | 6 s, em `Stations.coffee_machine.Params.BrewTime` (não repete em `Sanity`) | DEC-055 |
 | `CoffeeNightOnly` | true (**Provisório**, `Q-170` recomendação A; FEAT-021) | `Q-170` |
-| `TrailerLightRadius` | 18 studs (LZ-3) | DEC-055, DEC-189 |
+| Raio do Trailer Lights | 18 studs (LZ-3), no efeito `LightRadius` de `Upgrades.trailer_lights` (não repete em `Sanity`) | DEC-055, DEC-189 |
 | `BasicLampRadius` | **0** (**Provisório**): a lâmpada de fábrica acende só os volumes LZ-1 (interior) e **LZ-2 (varanda do balcão, cobre Q1)**; sem esfera extra | DEC-189 (raio deixado ao game-designer) |
 | `Bands` | High 60 · Mid 40 (≥ 60 dia, 40–59 Mid, < 40 noite; pontos absolutos) | DEC-167 |
 | `BandMinHold` | 0 s (1 s se piscar no teste, **Provisório**) | DEC-167 |
@@ -955,7 +956,7 @@ Dados (TASK-081; `Stations.coffee_machine`, `Sanity`, `Items.coffee`, `Packages.
 | Pegar | mesmo prompt em `Ready` ("Take Coffee"), toque; hotbar cheia ou já com 1 café → `hands_full` e o café fica na máquina | §19.8 |
 | Beber | ativar a Tool; `CoffeeDrinkTime` 1,5 s; +`Restore` gravado na Tool (25; 35 se feito por Barista); não passa do máximo | DEC-055, DEC-069 |
 | Cooldown | `CoffeeCooldown` 60 s por jogador, desde o gole | DEC-055 |
-| Dar (`give_coffee`) | hold **0,5 s** no colega `Active` sem café | DEC-055 |
+| Dar (`give_coffee`) | hold **0,5 s** no colega `Active` sem café; só à noite (`Actions.give_coffee.Night = "NightOnly"`; de dia cada um carrega o seu) | DEC-055 |
 | Doses | começa com 10 na compra do trailer; capacidade 20 (Cooler não afeta); 1 dose por café | `upgrades.md` UPG-007 |
 | Reposição | pacote ITM-019 "Ground Coffee" (D-10): 10 doses, $5 ($0,50/dose) | DEC-049, DEC-055 |
 | De dia (`Q-170`) | **Provisório, recomendação A:** pode preparar e carregar; **beber só à noite** (`Sanity.CoffeeNightOnly = true`); ativar de dia → toast `coffee_night_only` e a Tool fica | `Q-170` |
