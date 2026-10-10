@@ -99,6 +99,17 @@ function Crew.build(o: { [string]: any }): Model
 		head.TextureID = headTex
 		head.Color = o.fur or head.Color
 	end
+	-- night: atlas-coloured pieces (ears, tail, shell, beak, cap with ear holes) swap to the night atlas
+	local nightAtlas = o.tex.T_Atlas_Kitchen_Night
+	if o.time == "Night" and nightAtlas then
+		for name, p in parts do
+			local own = p == head or string.find(name, "^Face_") ~= nil
+			if not own and p:IsA("MeshPart") and p.TextureID ~= "" and p.TextureID ~= tex then
+				p:SetAttribute("DayTextureID", p.TextureID)
+				p.TextureID = nightAtlas
+			end
+		end
+	end
 	local face = parts["Face_" .. o.animal]
 	if face then
 		face.Name = "Face"
