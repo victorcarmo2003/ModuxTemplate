@@ -1,12 +1,24 @@
 --!strict
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Vide = require(ReplicatedStorage.Packages.Vide)
+
 export type Context = "Gameplay" | "Menu"
+export type Device = "KeyboardMouse" | "Gamepad" | "Touch"
 export type Binding = {
 	Name: string,
-	Key: Enum.KeyCode | Enum.UserInputType,
+	Key: Input,
+	-- More inputs for the same action (gamepad button, alternate key).
+	Keys: { Input }?,
 	TouchButton: boolean?,
+	-- Text on the mobile button.
+	Title: string?,
+	-- Side of the mobile button in px (CAS default is smaller than a comfortable thumb target on a phone).
+	TouchSize: number?,
 	Priority: number?,
 	Position: UDim2?,
+	-- Only dispatch while this context is active; nil = any context.
+	Context: Context?,
 }
 export type Handle = {
 	OnPress: (callback: () -> ()) -> Handle,
@@ -14,10 +26,13 @@ export type Handle = {
 	Unbind: () -> (),
 	_press: { () -> () },
 	_release: { () -> () },
+	_context: Context?,
 }
+export type Input = Enum.KeyCode | Enum.UserInputType
 
 export type Public = {
 	Context: Context,
+	Device: Vide.Source<Device>,
 	Handles: { [string]: Handle },
 	Listeners: { (Context) -> () },
 	Setup: (self: Public) -> (),
