@@ -21,6 +21,11 @@
 	     (slot 1) never crosses a carriageway outside the stripes (warn, MAP-01 P46)
 	 10. (wave 3) WalkPaths: every node exists, consecutive nodes linked, Loop closes, no queue slot; Night / Any
 	     paths never use a customer route node (warn, MAP-01 §9.1)
+	 12. (wave 3, MAP-01 §9.8) every Flow.Spawns arrival is a node; customer spawn -> Q5 and Q1 -> exit routes exist;
+	     spawn -> Q5 over 130 studs (10 s at 13) = warning
+	 13. (wave 3, MAP-01 §9.8) spawn / despawn points out of sight of PS-1..4, Q1..Q5, MKT-DOOR, SS (raycast, 9 rays
+	     per viewer, <= 200 studs): an edge point in sight = warning, a door point = info; AutoDoor leaves of
+	     MKT-DOOR / D1 / SP-B present and not colliding. Ghost upgrade pieces (NoVisual) are reported as info (rule 9)
 
 	Reads only tags and attributes (never the bind script's data). Items of §18.7 (wave 1) + §19.22 (wave 2):
 	  1. tags present (wave 1: MapBinding MapPoint NpcNode Vehicle Station Interactable UpgradePiece; wave 2: + LightZone
@@ -118,7 +123,8 @@ local CUTSCENE_POINTS_EMBEDDED = {
 	"CutsceneMark1", "CutsceneMark2", "CutsceneMark3", "CutsceneMark4", "CS-2", "CS-3", "CS-4", "CS-5",
 	"CS-P1", "CS-P2", "CS-P3", "CS-P4", "CART", "SS-1", "SS-2", "SS-3", "SS-4", "WALT-1", "RL-END",
 }
-local STREET_POSTS = { "JL-01", "JL-02", "JL-03", "JL-04", "JL-05", "JL-06", "JL-07", "JL-08", "JL-09", "P-01" }
+-- 2026-10-10: 5 Juniper posts (user's choice, MAP-01 §5.6). Required.luau (src/Place) still lists JL-06..09: to fix there.
+local STREET_POSTS = { "JL-01", "JL-02", "JL-03", "JL-04", "JL-05", "P-01" }
 local WINDOWS_W3 = { ["WV-1"] = 31, ["WV-2"] = 38, ["WV-3"] = 45 } -- AnchorId -> window centre X (AST-045)
 -- Traffic, embedded copy of Content.Traffic (routes: entry point, stop lines in order, conflict boxes)
 local TRAFFIC_EMBEDDED = {
@@ -203,9 +209,8 @@ local ZONES = { -- ZoneId -> Group, shape
 	["LZ-4"] = { group = "mart", shape = "Block" },
 	["LZ-5"] = { group = "mart", shape = "Ball" },
 }
-local POSTS = { -- PostId -> Order (Hush order: JL-09 first, P-01 last; Walker step = Order - 1)
-	["JL-09"] = 1, ["JL-08"] = 2, ["JL-07"] = 3, ["JL-06"] = 4, ["JL-05"] = 5,
-	["JL-04"] = 6, ["JL-03"] = 7, ["JL-02"] = 8, ["JL-01"] = 9, ["P-01"] = 10,
+local POSTS = { -- PostId -> Order (Hush order: JL-05 first, P-01 last; Walker step = Order - 1 for Order 1..5)
+	["JL-05"] = 1, ["JL-04"] = 2, ["JL-03"] = 3, ["JL-02"] = 4, ["JL-01"] = 5, ["P-01"] = 6,
 }
 local POST_GROUP = "juniper_posts"
 
@@ -225,6 +230,9 @@ local ROUTES_W1 = { -- blockout routes of §18.6, as A* queries
 	{ "D1", "Q5", "ROUTE-D1-IN" },
 	{ "Q1", "EX-E", "ROUTE-EXIT-E" },
 	{ "Q1", "D1", "ROUTE-EXIT-D1" },
+	-- MAP-01 §9.8 customer arrivals (Content.Flow.Spawns); they count as customer route nodes for rule 10
+	{ "DR-APT", "Q5", "ROUTE-DR-APT" },
+	{ "SP-S", "Q5", "ROUTE-SP-S" },
 }
 local ROUTES_W2 = { -- thief (MAP-01 §9.2): never a queue slot, never a crosswalk edge (AvoidCrossings)
 	{ "ST-R", "L1", "THIEF-IN-L1" },
@@ -236,6 +244,12 @@ local ROUTES_W2 = { -- thief (MAP-01 §9.2): never a queue slot, never a crosswa
 }
 local MAX_EDGE = 40
 local MAX_NODES = 80
+-- MAP-01 §9.8 (2026-10-10, Provisório): spawn / despawn rules
+local SPAWN_ROUTE_MAX = 130 -- studs spawn -> Q5 (10 s at 13 studs/s)
+local SIGHT_VIEWERS = { "PS-1", "PS-2", "PS-3", "PS-4", "Q1", "Q2", "Q3", "Q4", "Q5", "MKT-DOOR", "SS" } -- Pad, queue, Mart
+local SIGHT_EYE = 4.5 -- R6 eye over the floor point
+local SIGHT_MAX = 200 -- studs: night fog end (MAP-01 §13); farther counts as out of sight
+local SIGHT_SEE_THROUGH = 0.3 -- parts at least this transparent do not block (glass, ghosts)
 
 -- Embedded Content keys (content-data.md v5 §3.3, §3.4, §3.6, §3.8, §3.18, §6.4, §6.9) for when Rojo has not
 -- synced Content. WAVE2 = keys that a synced Content may still lack until TASK-047 lands (warning, not error).
@@ -1613,6 +1627,123 @@ local function checkWave3(points: { [string]: Instance }, vehicles: { [string]: 
 	end
 end
 
+-- 13 (MAP-01 §9.8): no NPC appears or vanishes in sight. For every MapPoint with Spawn / Despawn: line of sight from
+-- the eyes of SIGHT_VIEWERS (Pad PS-1..4, queue Q1..Q5, Mart door, SS) to an R6 body on the point (3 heights x 3
+-- lateral offsets = 9 rays per viewer), up to SIGHT_MAX. Blockers = any part with CanQuery that is less than
+-- SIGHT_SEE_THROUGH transparent; the binding, the blockout Markers / Limits, NPCs and the two vehicles are ignored
+-- (the cart / trailer move; worst case). Edge points seen = warning; door points seen = info (rule a: they appear
+-- in the doorway while the AutoDoor leaf opens). Also: AutoDoor leaves present (info / warning).
+local function checkSpawnSight(points: { [string]: Instance })
+	local exclude: { Instance } = {}
+	local binding = Workspace:FindFirstChild("MapBinding")
+	if binding then
+		table.insert(exclude, binding)
+	end
+	local blockout = Workspace:FindFirstChild("MAP01_Blockout")
+	if blockout then
+		for _, n in { "Markers", "Limits" } do
+			local f = blockout:FindFirstChild(n)
+			if f then
+				table.insert(exclude, f)
+			end
+		end
+	end
+	local npcs = Workspace:FindFirstChild("Npcs")
+	if npcs then
+		table.insert(exclude, npcs)
+	end
+	for _, v in tagged("Vehicle") do
+		table.insert(exclude, v)
+	end
+	for _, c in Workspace:GetChildren() do
+		if c:IsA("Model") and c:FindFirstChildOfClass("Humanoid") then
+			table.insert(exclude, c)
+		end
+	end
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	local function clear(a: Vector3, b: Vector3): boolean
+		local ex = table.clone(exclude)
+		for _ = 1, 24 do
+			params.FilterDescendantsInstances = ex
+			local hit = Workspace:Raycast(a, b - a, params)
+			if not hit then
+				return true
+			end
+			if hit.Instance.Transparency < SIGHT_SEE_THROUGH then
+				return false
+			end
+			table.insert(ex, hit.Instance)
+		end
+		return true
+	end
+
+	local spawns: { string } = {}
+	for id, p in points do
+		if p:GetAttribute("Spawn") ~= nil or p:GetAttribute("Despawn") ~= nil then
+			table.insert(spawns, id)
+		end
+	end
+	table.sort(spawns)
+	if #spawns == 0 then
+		warn_("13: no MapPoint with Spawn / Despawn (binding older than MAP-01 §9.8: run Bind.run)")
+		return
+	end
+	for _, id in spawns do
+		local tp = pos(points[id])
+		local kind = tostring(points[id]:GetAttribute("SpawnKind"))
+		local seenBy: { string } = {}
+		for _, vid in SIGHT_VIEWERS do
+			local v = points[vid]
+			if not v or vid == id then
+				continue
+			end
+			local eye = pos(v) + Vector3.new(0, SIGHT_EYE, 0)
+			local flatD = Vector3.new(tp.X - eye.X, 0, tp.Z - eye.Z)
+			if flatD.Magnitude > SIGHT_MAX or flatD.Magnitude < 1 then
+				continue
+			end
+			local side = Vector3.new(-flatD.Z, 0, flatD.X).Unit
+			local seen = false
+			for _, h in { 0.8, 2.5, 4.3 } do
+				for _, o in { -0.8, 0, 0.8 } do
+					if not seen and clear(eye, tp + Vector3.new(0, h, 0) + side * o) then
+						seen = true
+					end
+				end
+			end
+			if seen then
+				table.insert(seenBy, ("%s@%.0f"):format(vid, flatD.Magnitude))
+			end
+		end
+		local roles = tostring(points[id]:GetAttribute("Spawn"))
+		if #seenBy == 0 then
+			info(("13: %s (%s, %s) out of sight of the Pad, the queue and the Mart"):format(id, kind, roles))
+		elseif kind == "door" then
+			info(("13: %s (door %s, %s) seen from %s: door rule (a), the NPC shows up in the doorway"):format(id, tostring(points[id]:GetAttribute("Door")), roles, table.concat(seenBy, ", ")))
+		else
+			warn_(("13: spawn/despawn %s (%s, %s) is IN SIGHT from %s (MAP-01 §9.8: move it behind a building or beyond the limits)"):format(id, kind, roles, table.concat(seenBy, ", ")))
+		end
+	end
+
+	-- AutoDoor leaves (DoorController contract)
+	local byDoor: { [string]: number } = {}
+	for _, l in tagged("AutoDoor") do
+		local d = tostring(l:GetAttribute("DoorId"))
+		byDoor[d] = (byDoor[d] or 0) + 1
+		if l:IsA("BasePart") and (l :: BasePart).CanCollide then
+			warn_(("13: AutoDoor leaf %s still collides on the server (NPCs cannot pass)"):format(name(l)))
+		end
+	end
+	for _, d in { "MKT-DOOR", "D1", "SP-B" } do
+		if byDoor[d] then
+			info(("13: AutoDoor %s: %d leaf / leaves"):format(d, byDoor[d]))
+		else
+			warn_(("13: AutoDoor %s: no tagged leaf (bind W8)"):format(d))
+		end
+	end
+end
+
 type Node = { id: string, inst: Instance, p: Vector3, links: { string }, cw: string? }
 
 local function astar(nodes: { [string]: Node }, adj: { [string]: { [string]: boolean } }, from: string, to: string, noQueueMid: boolean, noCross: boolean?): ({ string }?, number)
@@ -1862,6 +1993,68 @@ local function checkGraph(root: Instance?)
 			end
 		end
 	end
+	-- 12 (MAP-01 §9.8): customer spawn -> Q5 and Q1 -> customer despawn, AvoidQueue, <= SPAWN_ROUTE_MAX studs
+	-- (10 s at 13 studs/s, the usual customer speed; the slowest type walks 9)
+	if WAVE >= 3 then
+		local flow = loadedContent and loadedContent.Flow and loadedContent.Flow.Spawns
+		local arrivals: { string } = {}
+		local exits: { string } = {}
+		for id, n in nodes do
+			local sp = n.inst:GetAttribute("Spawn")
+			if typeof(sp) == "string" and string.find(sp, "customer", 1, true) then
+				table.insert(arrivals, id)
+			end
+		end
+		if flow then
+			for _, list in { flow.Exits.Day, flow.Exits.Night } do
+				for _, e in list do
+					if e.Weight > 0 then
+						exits = union(exits, { e.Point })
+					end
+				end
+			end
+			for _, list in { flow.Arrivals.Day, flow.Arrivals.Night } do
+				for _, e in list do
+					local n = nodes[e.Point]
+					if not n then
+						if e.Weight > 0 then
+							err(("12: Content.Flow.Spawns arrival %s is not an NpcNode of the binding"):format(e.Point))
+						end
+					elseif e.Weight > 0 and not string.find(tostring(n.inst:GetAttribute("Spawn")), "customer", 1, true) then
+						warn_(("12: %s is a Flow.Spawns arrival but its Spawn attribute (%s) does not list customer"):format(e.Point, tostring(n.inst:GetAttribute("Spawn"))))
+					end
+				end
+			end
+		else
+			exits = { "EX-E", "D1" }
+			warn_("12: Content.Flow.Spawns not synced (Rojo): exits checked from the embedded EX-E / D1")
+		end
+		table.sort(arrivals)
+		for _, id in arrivals do
+			local path, len = astar(nodes, adj, id, "Q5", true)
+			if not path then
+				err(("12: customer spawn %s has no route to Q5 (AvoidQueue)"):format(id))
+			else
+				local msg = ("12: spawn %s -> Q5 %.0f studs (%.1f s at 13, %.1f s at 9)"):format(id, len, len / 13, len / 9)
+				if len > SPAWN_ROUTE_MAX then
+					warn_(msg .. (": over %d studs (~10 s); fine only with Flow.Spawns weight 0"):format(SPAWN_ROUTE_MAX))
+				else
+					info(msg)
+				end
+				for _, nid in path do
+					customerNodes[nid] = customerNodes[nid] or ("ROUTE-" .. id)
+				end
+			end
+		end
+		for _, id in exits do
+			local path, len = astar(nodes, adj, "Q1", id, true)
+			if not path then
+				err(("12: no route Q1 -> exit %s"):format(id))
+			else
+				info(("12: exit Q1 -> %s %.0f studs (%.1f s at 13)"):format(id, len, len / 13))
+			end
+		end
+	end
 	-- thief routes (wave 2): AvoidQueue + AvoidCrossings must still find a path (MAP-01 §9.2)
 	if WAVE >= 2 then
 		for _, r in ROUTES_W2 do
@@ -1955,6 +2148,7 @@ local function checkPieces(vehicles: { [string]: Instance })
 	end
 	local seen: { [string]: { Instance } } = {}
 	local visible: { [string]: { number } } = {}
+	local ghostKeys: { [string]: boolean }? = nil
 	local byVehicle: { [string]: number } = {}
 	for _, p in tagged("UpgradePiece") do
 		local label = name(p)
@@ -2007,7 +2201,11 @@ local function checkPieces(vehicles: { [string]: Instance })
 		if raw > 0 then
 			warn_(("UpgradePiece %s: %d invisible part(s) without UpgHidden: UpgradeService cannot show them (hide with bind_pieces / Pieces.luau attributes)"):format(label, raw))
 		end
-		if not isHidden(p) then
+		if p:GetAttribute("NoVisual") then
+			-- ghost piece (bind_pieces GHOST_UPGRADES, user 2026-10-10): hidden at every level until its model exists
+			ghostKeys = ghostKeys or {}
+			ghostKeys[vk .. "|" .. up] = true
+		elseif not isHidden(p) then
 			local k = vk .. "|" .. up
 			visible[k] = visible[k] or {}
 			table.insert(visible[k], lv)
@@ -2025,7 +2223,9 @@ local function checkPieces(vehicles: { [string]: Instance })
 	-- authored state: only the StartLevel piece visible (warn)
 	for k, start in starts do
 		local vk = string.match(k, "^([^|]+)")
-		if vk and vehicles[vk] then
+		if ghostKeys and ghostKeys[k] then
+			info(("9: %s: pieces exist but have no visual (NoVisual ghost until the model exists; the upgrade still works)"):format(k))
+		elseif vk and vehicles[vk] then
 			local list = visible[k] or {}
 			local hasStart = want[("%s|%d"):format(k, start)] ~= nil
 			local ok = if hasStart then (#list == 1 and list[1] == start) else #list == 0
@@ -2152,6 +2352,9 @@ function Check.run(opts: { write: boolean?, wave: number? }?): (string, number)
 		checkWave3(points, vehicles)
 	end
 	checkGraph(root)
+	if WAVE >= 3 then
+		checkSpawnSight(points)
+	end
 
 	local pc, nc, ic = #tagged("MapPoint"), #tagged("NpcNode"), #tagged("Interactable")
 	local written = "not written (errors)"

@@ -28,6 +28,25 @@
 	      LineId; LookVector = travel direction of the lane that stops there), Boxes/X-T + CW-1..4 (volume, tag
 	      TrafficBox, BoxId). All invisible, no collision, no query (Provisional, TASK-097 note d).
 
+	2026-10-10 additions (level-designer, all Provisório; MAP-01 §9.8, §5.6, §16.8):
+	  W6. Spawn / despawn points (MAP-01 §9.8): every point where an NPC appears or vanishes carries Spawn (comma list of
+	      roles: customer, thief, pedestrian, actor), Despawn (bool) and SpawnKind ("door" = a building door, rule a;
+	      "edge" = a street end beyond the player limits, out of sight of the Pad and the Mart, rule b); door points
+	      also Door = the door id. New: DR-APT (bank / apartments door), SP-S (Juniper South beyond BAR-S), SP-B (laundry
+	      door), DR-B3 (B3b door); moved: EX-E into the alley behind B1, ST-R past the curve, SP-A into the shadow of the
+	      bank rear; MKT-DOOR becomes a node. Content.Flow.Spawns (customers) and Content.WalkPaths (pedestrians) use them.
+	  W7. Helpers locked: every invisible helper (MapBinding parts, created anchors / lamp holders / placeholders, the
+	      blockout Markers, Limits, hidden and ghost parts) gets Locked = true (no click-select in Studio) and CanTouch
+	      false; CanQuery false unless it still collides (player limits keep their collision).
+	  W8. AutoDoor (DoorController contract): the LEAF of the Mart door (MapId MKT-DOOR; placeholder glass Door_Leaf
+	      when the mesh has none), D1 and SP-B gets tag AutoDoor + DoorId, DoorLeaf, DoorHinge (Left/Right), DoorAngle
+	      (signed: opens inward), DoorRadius 8 and CanCollide false on the server (only the client animates).
+	  Walker posts: 5 Juniper posts JL-01..05 every 16 studs + P-01 (Order 1..6: JL-05 = 1 ... JL-01 = 5, P-01 = 6);
+	      Walker steps 0..4 = Order 1..5, step 5 = WALKER-10; Hush = 6 posts x 2.5 s (Content.LightGroups). The blockout
+	      lights of the old JL-06..09 posts are disabled.
+	  Awning: ClosedAngle from the measured slant of the Awning (bbox diagonal + raycast profile), hanging 3 degrees
+	      outwards; a degenerate angle (< 5 degrees) falls back to the Shutter_Panel.
+
 	Contract: docs/tech/architecture.md §18 (tags §18.1, attributes §18.2, anchors §18.3-§18.4, points §18.5, NpcNode
 	graph §18.6) and §19.22 (wave 2: trailer, phone, purchase, tarp, light, points, street bins; T36, T38, T60).
 	Layout: docs/levels/MAP-01.md §5, §7, §9, §10.2 and §16 (binding notes). DEC-157 (cart counter y 3.45), DEC-190 /
@@ -123,8 +142,12 @@ local OWN_TAGS = {
 	"TrafficPath",
 	"TrafficLine",
 	"TrafficBox",
+	-- 2026-10-10 (W8)
+	"AutoDoor",
 }
 local AUTHORED_ATTRS = {
+	"DoorId",
+	"DoorAngle",
 	"AnchorId",
 	"PointId",
 	"NodeId",
@@ -172,9 +195,13 @@ local POINTS = {
 	{ id = "Q5", x = 31, z = 29, floor = 0.4, face = EAST, node = true },
 	-- D1: MAP-01 gives (64, 48) = the door plane on B1's west wall (X 64). Point 1 stud out, on the Pad, so an
 	-- NPC never spawns inside the wall. Faces west (out of the door).
-	{ id = "D1", x = 63, z = 48, floor = 0.45, face = WEST, node = true },
-	{ id = "SP-A", x = 30, z = -104, floor = 0.24, face = WEST, node = true },
-	{ id = "EX-E", x = 116, z = 24, floor = 0.4, face = EAST, node = true },
+	{ id = "D1", x = 63, z = 48, floor = 0.45, face = WEST, node = true, spawn = "customer,actor", despawn = true, door = "D1" },
+	-- SP-A (MAP-01 §9.8): moved from (30, -104) to the strip north of the bank-rear fill, in its shadow as seen from
+	-- the Pad AND from the Mart door / SS (at -104 the Mart door saw it down the Juniper). Beyond BAR-N.
+	{ id = "SP-A", x = 29, z = -92, floor = 0.24, face = WEST, node = true, spawn = "customer,pedestrian,actor", despawn = true },
+	-- EX-E (MAP-01 §9.8): moved from the sidewalk (116, 24), seen from Q1..Q5 down the sidewalk, into the alley
+	-- X 113..120 behind B1 (beyond BAR-E): B1 hides it from the Pad, the queue and the Mart door.
+	{ id = "EX-E", x = 116.5, z = 40, floor = 0, face = SOUTH, node = true, spawn = "pedestrian", despawn = true },
 	-- Opal behind the checkout, back to the north glass, facing into the store (south).
 	{ id = "OP-1", x = -75, z = 33.5, floor = 0.4, face = SOUTH },
 
@@ -205,7 +232,9 @@ local POINTS = {
 	{ id = "L1", x = 21.5, z = 22, floor = 0.4, faceTo = DRAWER_XZ, node = true },
 	{ id = "L2", x = 84, z = 22, floor = 0.4, faceTo = DRAWER_XZ, node = true },
 	{ id = "L3", x = 58, z = 56.5, floor = 0.45, faceTo = DRAWER_XZ, node = true }, -- 20.4 from the drawer (>= 20, MAP-01 §14)
-	{ id = "ST-R", x = 18, z = 92, floor = 0.24, face = NORTH, node = true },
+	-- ST-R (MAP-01 §9.8): moved from (18, 92), seen from Q5 past the B1 rear corner, to (21, 108) past the curve,
+	-- close to the building line X 24 (B1 rear hides it from every Pad / queue point; B5 from the Mart door)
+	{ id = "ST-R", x = 21, z = 108, floor = 0.24, face = NORTH, node = true, spawn = "thief", despawn = true },
 
 	-- wave 3 (TASK-098) ----------------------------------------------------------------------
 	-- safe spot under the "OPEN 24 HOURS" marquee (MAP-01 §5.2; AnomalyService InZone(p, "SS", 6)); faces the Pad
@@ -216,10 +245,10 @@ local POINTS = {
 	{ id = "AN-11", x = 39, y = 14, z = -31, face = SOUTH }, -- C-01 clock face (AST-044)
 	{ id = "AN-12", x = 70, z = -22, floor = 0.4, face = SOUTH }, -- long car pose: parking entrance mouth, nose south
 	-- hidden actor spawns (out of sight of the Pad, the window and the Mart)
-	{ id = "AS-1", x = 92, z = -80, floor = 0.02, faceTo = { 41, 40 } }, -- behind the van (AST-035 van at AS-1)
-	{ id = "AS-2", x = 100, z = 18, floor = 0.4, faceTo = { 41, 40 } }, -- behind the TRUCK
-	{ id = "AS-3", x = -30, z = -104, floor = 0.4, faceTo = { 41, 40 } }, -- beyond BAR-N, west side alley
-	{ id = "AS-4", x = -40, z = -36, floor = 0.4, faceTo = { -40, 0 } }, -- behind the laundry door
+	{ id = "AS-1", x = 92, z = -80, floor = 0.02, faceTo = { 41, 40 }, spawn = "actor", despawn = true }, -- behind the van (AST-035 van at AS-1)
+	{ id = "AS-2", x = 100, z = 18, floor = 0.4, faceTo = { 41, 40 }, spawn = "actor", despawn = true }, -- behind the TRUCK
+	{ id = "AS-3", x = -30, z = -104, floor = 0.4, faceTo = { 41, 40 }, spawn = "actor", despawn = true }, -- beyond BAR-N, west side alley
+	{ id = "AS-4", x = -40, z = -36, floor = 0.4, faceTo = { -40, 0 }, spawn = "actor", despawn = true, door = "SP-B" }, -- behind the laundry door
 	-- Walker step 10 (MAP-01 §5.6, fixed); steps 0..9 are the StreetLight posts (Order - 1)
 	{ id = "WALKER-10", x = 28, z = 29, floor = 0.4, faceTo = { 41, 35 } },
 	-- traffic entries / exits (MAP-01 §5.4), on the road top, facing the travel direction
@@ -253,10 +282,22 @@ local POINTS = {
 	{ id = "SS-2", x = -52, z = 30, floor = 0.4, face = WEST },
 	{ id = "SS-3", x = -54, z = 34, floor = 0.4, face = WEST },
 	{ id = "SS-4", x = -56, z = 23, floor = 0.4, face = WEST },
-	{ id = "MKT-DOOR", x = -62, z = 34, floor = 0.4, faceTo = { -60, 30 } },
+	-- also a pedestrian door (MAP-01 §9.8): shoppers come out of / go into the Mart (24 h)
+	{ id = "MKT-DOOR", x = -62, z = 34, floor = 0.4, faceTo = { -60, 30 }, node = true, spawn = "pedestrian", despawn = true, door = "MKT-DOOR" },
 	{ id = "WALT-1", x = -60, z = 30, floor = 0.4, face = EAST },
 	{ id = "RL-1", x = -100, z = -22, floor = 0.4, face = EAST },
 	{ id = "RL-END", x = -76, z = -22, floor = 0.4, face = EAST },
+
+	-- spawn / despawn (MAP-01 §9.8, 2026-10-10, Provisório) ------------------------------------------------------
+	-- doors (rule a): the NPC appears / vanishes on the threshold, 0.8 in front of the leaf (resolve = measured on the
+	-- placed door model when found; x / z = fallback). The AutoDoor leaf opens for it (W8, client).
+	{ id = "DR-APT", x = 32, z = -31, floor = 0.4, face = SOUTH, node = true, spawn = "customer,pedestrian", despawn = true, door = "DR-APT",
+		resolve = { mapId = "Z-11", asset = "AST-044_BellmoorSavings", part = "[Dd]oor", out = SOUTH } }, -- bank / apartments door
+	{ id = "SP-B", x = -40, z = -31, floor = 0.4, face = SOUTH, node = true, spawn = "pedestrian", despawn = true, door = "SP-B",
+		resolve = { mapId = "SP-B", asset = "AST-046_DoorSPB", out = SOUTH } }, -- laundry door (day; MAP-01 §5.3)
+	{ id = "DR-B3", x = -93.3, z = -31.2, floor = 0.4, face = SOUTH, node = true, spawn = "pedestrian", despawn = true, door = "DR-B3" }, -- B3b door (NO HELP WANTED glass)
+	-- street end (rule b): Juniper South east sidewalk beyond BAR-S, past the curve, against the building line X 24
+	{ id = "SP-S", x = 21, z = 100, floor = 0.24, face = NORTH, node = true, spawn = "customer,actor", despawn = true },
 }
 
 -- NpcNode-only parts (NodeId = N-<zone>-<nn>, §18.6). crosswalk = the two curb nodes of a crosswalk.
@@ -307,12 +348,14 @@ local NODES = {
 	{ id = "N-Z06-06", x = -18, z = -17, floor = 0.4, crosswalk = "CW-2" },
 	{ id = "N-Z06-07", x = -40, z = -22, floor = 0.4 },
 	{ id = "N-Z06-08", x = -76, z = -22, floor = 0.4 },
-	{ id = "N-Z06-09", x = -108, z = -22, floor = 0.4 }, -- west end (BAR-W)
+	{ id = "N-Z06-09", x = -108, z = -22, floor = 0.4 }, -- west end (BAR-W); no walk path ends here any more (§9.8)
+	-- MAP-01 §9.8: north sidewalk in front of the bank / apartments door (DR-APT)
+	{ id = "N-Z06-10", x = 32, z = -22, floor = 0.4 },
 }
 
 local EDGES = {
-	-- ROUTE-SP-A
-	{ "SP-A", "N-Z13-01" },
+	-- ROUTE-SP-A (SP-A moved to (29, -92), MAP-01 §9.8: straight to N-Z13-02; N-Z13-01 stays as a spare node)
+	{ "SP-A", "N-Z13-02" },
 	{ "N-Z13-01", "N-Z13-02" },
 	{ "N-Z13-02", "N-Z07-01" },
 	{ "N-Z07-01", "N-Z07-02" },
@@ -372,6 +415,15 @@ local EDGES = {
 	{ "N-Z06-06", "N-Z06-07" },
 	{ "N-Z06-07", "N-Z06-08" },
 	{ "N-Z06-08", "N-Z06-09" },
+	-- MAP-01 §9.8 spawn / despawn points
+	{ "DR-APT", "N-Z06-10" }, -- ROUTE-DR-APT: door -> sidewalk -> CW-4 curb (N-Z06-01) -> CW-4 -> ... -> Q5
+	{ "N-Z06-10", "N-Z06-01" },
+	{ "N-Z06-10", "N-Z06-03" },
+	{ "SP-S", "N-Z08-01" }, -- ROUTE-SP-S: Juniper South east sidewalk (same as the thief's, never crosses a road)
+	{ "N-Z02-10", "N-Z02-06" }, -- CW-3 south curb -> LANE-W east end (walkers to the EX-E alley)
+	{ "SP-B", "N-Z06-07" }, -- laundry door
+	{ "DR-B3", "N-Z06-08" }, -- B3b door
+	{ "MKT-DOOR", "N-Z12-02" }, -- Mart door -> SS rim -> plaza / south sidewalk
 }
 
 -- Ingredient key -> .fbx suffix (PascalCase rule of §18.4) and MAP-01 §7.1 grid cell (fallback XZ, cart coords).
@@ -410,19 +462,19 @@ local BENCH = {
 	{ slot = "B5", action = "bench_buy_upgrade", z = 55.5 },
 }
 
--- Street lights of the Hush / Walker chain (MAP-01 §5.6): Order = Hush order = Walker step + 1.
+-- Street lights of the Hush / Walker chain (MAP-01 §5.6, 2026-10-10: 5 Juniper posts every 16 studs, user's choice):
+-- Order = Hush order (JL-05 first, P-01 last). Walker: step = Order - 1 for Order 1..5 (JL-05..JL-01), step 5 =
+-- WALKER-10; P-01 (Order 6) is only the Hush's corner post.
 local POSTS = {
-	{ id = "JL-09", order = 1 },
-	{ id = "JL-08", order = 2 },
-	{ id = "JL-07", order = 3 },
-	{ id = "JL-06", order = 4 },
-	{ id = "JL-05", order = 5 },
-	{ id = "JL-04", order = 6 },
-	{ id = "JL-03", order = 7 },
-	{ id = "JL-02", order = 8 },
-	{ id = "JL-01", order = 9 },
-	{ id = "P-01", order = 10 },
+	{ id = "JL-05", order = 1 },
+	{ id = "JL-04", order = 2 },
+	{ id = "JL-03", order = 3 },
+	{ id = "JL-02", order = 4 },
+	{ id = "JL-01", order = 5 },
+	{ id = "P-01", order = 6 },
 }
+-- blockout posts that no longer exist on the map: their SpotLight is switched off (W: Walker posts)
+local RETIRED_POSTS = { "JL-06", "JL-07", "JL-08", "JL-09" }
 local POST_GROUP = "juniper_posts" -- Content.LightGroups (content-data.md §6.4); visual only, no volume (DEC-196)
 
 -- Light volumes (MAP-01 §10.2). Trailer zones are given in the trailer's Pad frame (offset from TRL_POSE), the
@@ -1777,9 +1829,68 @@ local function bindStreetLights(assets: Instance)
 		ensureLampLight(post, head, spec.id)
 		log("ok", ("StreetLight %s: Order %d, Group %s (%d model(s))"):format(spec.id, spec.order, POST_GROUP, #parts))
 	end
+	-- retired posts (5-post Juniper, 2026-10-10): their blockout light would still shine (hidden parts keep lights)
+	local blockout = Workspace:FindFirstChild("MAP01_Blockout")
+	local folder = blockout and blockout:FindFirstChild("StreetLights")
+	local off = 0
+	for _, id in RETIRED_POSTS do
+		local bp = folder and folder:FindFirstChild(id)
+		if bp then
+			for _, d in bp:GetDescendants() do
+				if d:IsA("Light") and d.Enabled then
+					d.Enabled = false
+					d:SetAttribute("DisabledByBind", true)
+					off += 1
+				end
+			end
+		end
+		for _, d in assets:GetDescendants() do
+			if d:GetAttribute("MapId") == id then
+				log("warn", ("StreetLight %s: a placed model %s still has the retired MapId (run Place.run with the new placements)"):format(id, d:GetFullName()))
+				break
+			end
+		end
+	end
+	log("ok", ("StreetLight: %d blockout light(s) of the retired posts %s switched off"):format(off, table.concat(RETIRED_POSTS, ", ")))
 end
 
-type Ctx = { cart: Instance?, trailer: Instance?, poses: { [string]: CFrame } }
+type Ctx = { cart: Instance?, trailer: Instance?, poses: { [string]: CFrame }, assets: Instance? }
+
+-- Door spawn point measured on the placed door (MAP-01 §9.8): XZ of the door part / model centre, pushed `out` to
+-- 0.8 in front of its outer face. nil when the model (or the named part) is not in the place.
+local function resolveDoor(assets: Instance?, r: any): (number?, number?, string)
+	if not assets then
+		return nil, nil, "no MAP01_Assets"
+	end
+	local model = byMapId(assets, r.mapId, r.asset)
+	if not model then
+		return nil, nil, ("%s (%s) not placed"):format(r.mapId, r.asset)
+	end
+	local target: Instance = model
+	if r.part then
+		local best: BasePart? = nil
+		for _, d in model:GetDescendants() do
+			if d:IsA("BasePart") and string.find(d.Name, r.part) and d.Transparency < 1 then
+				if not best or d.Size.Magnitude > best.Size.Magnitude then
+					best = d
+				end
+			end
+		end
+		if not best then
+			return nil, nil, ("no part matching '%s' in %s"):format(r.part, model:GetFullName())
+		end
+		target = best :: BasePart
+	end
+	local mn, mx = partsBox(target)
+	if not (mn and mx) then
+		return nil, nil, "empty box"
+	end
+	local c = (mn + mx) / 2
+	local out: Vector3 = r.out
+	local half = math.abs(out.X) * (mx.X - mn.X) / 2 + math.abs(out.Z) * (mx.Z - mn.Z) / 2
+	local p = c + out * (half + 0.8)
+	return p.X, p.Z, ("measured on %s"):format(target:GetFullName())
+end
 
 local function bindPoints(ctx: Ctx): Instance
 	local root = Workspace:FindFirstChild(BINDING_ROOT)
@@ -1846,20 +1957,32 @@ local function bindPoints(ctx: Ctx): Instance
 		if pt.pose then
 			cf = ctx.poses[pt.pose]
 		else
+			local px, pz = pt.x, pt.z
+			if pt.resolve then
+				local rx, rz, how = resolveDoor(ctx.assets, pt.resolve)
+				if rx and rz and math.abs(rx - pt.x) + math.abs(rz - pt.z) <= 12 then
+					px, pz = rx, rz
+					log("ok", ("%s: door point %s"):format(pt.id, how))
+				elseif rx and rz then
+					log("warn", ("%s: measured door at (%.1f, %.1f) is > 12 from the MAP-01 fallback; fallback used (%s)"):format(pt.id, rx, rz, how))
+				else
+					log("warn", ("%s: door not measured (%s); MAP-01 fallback (%.1f, %.1f) used"):format(pt.id, how, pt.x, pt.z))
+				end
+			end
 			local y: number
 			if pt.y then
 				y = pt.y
 			else
 				local why
-				y, why = floorY(pt.x, pt.z, pt.floor, without(if pt.onTrailer then ctx.cart else ctx.trailer))
+				y, why = floorY(px, pz, pt.floor, without(if pt.onTrailer then ctx.cart else ctx.trailer))
 				if why then
 					log("warn", ("%s: %s"):format(pt.id, why))
 				end
 			end
-			local pos = Vector3.new(pt.x, y, pt.z)
+			local pos = Vector3.new(px, y, pz)
 			local face: Vector3? = pt.face
 			if pt.faceTo then
-				local d = Vector3.new(pt.faceTo[1] - pt.x, 0, pt.faceTo[2] - pt.z)
+				local d = Vector3.new(pt.faceTo[1] - px, 0, pt.faceTo[2] - pz)
 				face = if d.Magnitude > 1e-3 then d.Unit else nil
 			end
 			cf = if face then CFrame.lookAt(pos, pos + face) else CFrame.new(pos)
@@ -1871,7 +1994,16 @@ local function bindPoints(ctx: Ctx): Instance
 			CollectionService:AddTag(p, "NpcNode")
 			p:SetAttribute("Links", table.concat(links[pt.id] or {}, ","))
 		end
-		log("ok", ("MapPoint %s at %s%s"):format(pt.id, fmtV(p.Position), if pt.node then " (+ NpcNode)" else ""))
+		-- spawn / despawn contract (MAP-01 §9.8, Provisório)
+		if pt.spawn or pt.despawn then
+			p:SetAttribute("Spawn", pt.spawn or "")
+			p:SetAttribute("Despawn", pt.despawn == true)
+			p:SetAttribute("SpawnKind", if pt.door then "door" else "edge")
+			if pt.door then
+				p:SetAttribute("Door", pt.door)
+			end
+		end
+		log("ok", ("MapPoint %s at %s%s%s"):format(pt.id, fmtV(p.Position), if pt.node then " (+ NpcNode)" else "", if pt.spawn then (" spawn {%s}"):format(pt.spawn) else ""))
 	end
 	for _, nd in NODES do
 		local y, why = floorY(nd.x, nd.z, nd.floor, without(ctx.trailer))
@@ -2082,42 +2214,73 @@ local function bindShutterPiece(trl: Instance, padPose: CFrame)
 
 	local why = "no BasePart named Awning in the trailer shell"
 	if awning then
-		-- part axes in the Pad frame: width axis = the one most along X; slant = the longer of the other two
-		local cf = padPose:ToObjectSpace(awning.CFrame)
-		local axes = {
-			{ v = cf.RightVector, s = awning.Size.X },
-			{ v = cf.UpVector, s = awning.Size.Y },
-			{ v = -cf.LookVector, s = awning.Size.Z },
-		}
-		table.sort(axes, function(p, q)
-			return math.abs(p.v.X) > math.abs(q.v.X)
-		end)
-		local width = axes[1].s
-		local slant = if axes[2].s >= axes[3].s then axes[2] else axes[3]
-		local half = slant.v * (slant.s / 2)
-		local e1, e2 = cf.Position + half, cf.Position - half
-		local hinge, far = e1, e2
-		if e2.Z > e1.Z then -- the hinge is the edge closer to the wall (larger local Z: the window faces -Z)
-			hinge, far = e2, e1
+		--[[ 2026-10-10 fix (ClosedAngle came out 0, the flap never closed): the MeshPart is axis-aligned and its Size is
+			the BOUNDING BOX of a slanted plate, so "the longer axis" was the box height and the plate looked vertical
+			(already closed). Now the slant is the box DIAGONAL in the Pad YZ plane: hinge = the wall-side edge (largest
+			local Z: the window faces -Z), far = the outer edge; which of the two diagonals is the plate comes from a
+			raycast profile (top surface higher at the wall = canopy sloping down-outwards, the usual raised awning).
+			Closed = hanging from the hinge, 3 degrees outwards so it never sinks into the wall. ]]
+		local box = padPose:ToObjectSpace(awning.CFrame)
+		local half = awning.Size / 2
+		local mnL, mxL = nil :: Vector3?, nil :: Vector3?
+		for _, sx in { -1, 1 } do
+			for _, sy in { -1, 1 } do
+				for _, sz in { -1, 1 } do
+					local p = box:PointToWorldSpace(Vector3.new(half.X * sx, half.Y * sy, half.Z * sz))
+					mnL = if mnL then mnL:Min(p) else p
+					mxL = if mxL then mxL:Max(p) else p
+				end
+			end
 		end
-		local length = slant.s
-		local x0, x1 = cf.Position.X - width / 2, cf.Position.X + width / 2
-		local covers = math.abs(axes[1].v.X) > 0.98
-			and x0 <= W.x0 + AWNING_TOL
-			and x1 >= W.x1 - AWNING_TOL
+		local mn, mx = mnL :: Vector3, mxL :: Vector3
+		local width = mx.X - mn.X
+		local cx = (mn.X + mx.X) / 2
+		-- profile: top surface height near the wall side and near the outer side (pad frame), raycast on the mesh only
+		local params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Include
+		params.FilterDescendantsInstances = { awning }
+		local query = awning.CanQuery
+		awning.CanQuery = true
+		local function topAt(z: number): number?
+			local o = padPose:PointToWorldSpace(Vector3.new(cx, mx.Y + 2, z))
+			local hit = Workspace:Raycast(o, padPose:VectorToWorldSpace(Vector3.new(0, -(mx.Y - mn.Y) - 4, 0)), params)
+			return if hit then padPose:PointToObjectSpace(hit.Position).Y else nil
+		end
+		local depth = mx.Z - mn.Z
+		local yWall = topAt(mx.Z - depth * 0.15)
+		local yOut = topAt(mn.Z + depth * 0.15)
+		awning.CanQuery = query
+		local downOut = not (yWall and yOut and yOut > yWall + 0.05) -- unknown profile = the usual down-outwards canopy
+		local hinge = Vector3.new(cx, if downOut then mx.Y else mn.Y, mx.Z)
+		local far = Vector3.new(cx, if downOut then mn.Y else mx.Y, mn.Z)
+		local v = far - hinge
+		local length = math.sqrt(v.Y * v.Y + v.Z * v.Z)
+		local covers = width >= (W.x1 - W.x0) - 2 * AWNING_TOL
+			and mn.X <= W.x0 + AWNING_TOL
+			and mx.X >= W.x1 - AWNING_TOL
 			and hinge.Y >= W.top - AWNING_TOL
 			and hinge.Y - length <= W.sill + AWNING_TOL
 			and math.abs(hinge.Z - W.wallZ) <= 1.5
-		local info = ("Awning %.2f wide (X %.2f..%.2f), %.2f long, hinge edge at y %.2f z %.2f over the pivot; window X %.2f..%.2f, sill %.2f, top %.2f, wall z %.2f"):format(
-			width, x0, x1, length, hinge.Y, hinge.Z, W.x0, W.x1, W.sill, W.top, W.wallZ)
+		local info = ("Awning box %.2f x %.2f x %.2f (X %.2f..%.2f), profile wall %s / out %s (%s), slant %.2f, hinge y %.2f z %.2f over the pivot; window X %.2f..%.2f, sill %.2f, top %.2f, wall z %.2f"):format(
+			width, mx.Y - mn.Y, depth, mn.X, mx.X, if yWall then ("%.2f"):format(yWall) else "-", if yOut then ("%.2f"):format(yOut) else "-",
+			if downOut then "down-outwards" else "up-outwards", length, hinge.Y, hinge.Z, W.x0, W.x1, W.sill, W.top, W.wallZ)
+		-- angle of v in the (Y, Z) plane = atan2(Z, Y); CFrame.Angles(t, 0, 0) adds t to it. Target: hanging down,
+		-- tilted 3 degrees outwards (-Z): atan2(-sin 3, -cos 3) = -(180 - 3) degrees.
+		local theta = -(math.pi - math.rad(3)) - math.atan2(v.Z, v.Y)
+		while theta > math.pi do
+			theta -= 2 * math.pi
+		end
+		while theta <= -math.pi do
+			theta += 2 * math.pi
+		end
+		local deg = math.floor(math.deg(theta) * 10 + 0.5) / 10
+		if covers and math.abs(deg) < 5 then
+			covers = false
+			why = ("measured ClosedAngle %.1f is degenerate (the awning already hangs over the window?): %s"):format(deg, info)
+		elseif not covers then
+			why = "it does not cover the window: " .. info
+		end
 		if covers then
-			local v = far - hinge
-			local phi = math.atan2(v.Z, v.Y)
-			local theta = math.pi - phi
-			if theta > math.pi then
-				theta -= 2 * math.pi
-			end
-			local deg = math.floor(math.deg(theta) * 10 + 0.5) / 10
 			for _, d in trl:GetDescendants() do
 				if d.Name == "Shutter_Panel" and d:GetAttribute(CREATED) then
 					d:Destroy()
@@ -2127,7 +2290,6 @@ local function bindShutterPiece(trl: Instance, padPose: CFrame)
 			log("ok", ("TRL: Shutter_Hinge on the AST-027 Awning, ClosedAngle %.1f (%s)"):format(deg, info))
 			return
 		end
-		why = "it does not cover the window: " .. info
 	end
 
 	-- placeholder panel (P51): hinge on the window top, outside the wall; authored OPEN = horizontal, outwards
@@ -2300,6 +2462,199 @@ local function bindTraffic(root: Instance)
 	end
 end
 
+-- W8: AutoDoor leaves (2026-10-10, Provisório; the client controller opens them by proximity, another agent).
+-- Leaf = a visible BasePart of the door model whose name contains "door"/"leaf"/"glass"/"panel" (or DoorLeaf = true)
+-- and not "frame" / "wall" / "jamb" / "header"; none in the Mart door -> placeholder glass Door_Leaf (contract of the
+-- DoorController). Per leaf: tag AutoDoor, DoorId, DoorLeaf, DoorHinge, DoorAngle, DoorRadius (see below) and an
+-- informative Attachment Door_Hinge on the hinge edge (double door: each leaf its outer edge; a hand-made one is kept).
+-- CanCollide false on the server (DoorOrigCanCollide keeps the old value).
+local DOORS = {
+	{ id = "MKT-DOOR", mapId = "MKT-DOOR", asset = "AST-028_MartWallDoor", inward = Vector3.new(-1, 0, 1).Unit, placeholder = Vector3.new(4, 7.5, 0.2) }, -- into the Mart (chamfer at its NE corner: inside is west + south)
+	{ id = "D1", mapId = "D1", asset = "AST-033_DoorD1", inward = EAST }, -- into B1
+	{ id = "SP-B", mapId = "SP-B", asset = "AST-046_DoorSPB", inward = NORTH }, -- into the laundry
+}
+local DOOR_OPEN = 90
+
+local function isLeafName(n: string): boolean
+	local l = string.lower(n)
+	if string.find(l, "frame") or string.find(l, "wall") or string.find(l, "jamb") or string.find(l, "header") or string.find(l, "sign") then
+		return false
+	end
+	return string.find(l, "door") ~= nil or string.find(l, "leaf") ~= nil or string.find(l, "glass") ~= nil or string.find(l, "panel") ~= nil
+end
+
+local function bindAutoDoors(assets: Instance)
+	for _, spec in DOORS do
+		local model = byMapId(assets, spec.mapId, spec.asset)
+		if not model then
+			log("warn", ("AutoDoor %s: %s (%s) not placed"):format(spec.id, spec.mapId, spec.asset))
+			continue
+		end
+		local leaves: { BasePart } = {}
+		local names: { string } = {}
+		for _, d in model:GetDescendants() do
+			if d:IsA("BasePart") and d.Transparency < 1 then
+				table.insert(names, d.Name)
+				if isLeafName(d.Name) or d:GetAttribute("DoorLeaf") == true then
+					table.insert(leaves, d)
+				end
+			end
+		end
+		if #leaves == 0 and spec.placeholder then
+			-- DoorController contract: no separate leaf in the mesh -> a placeholder glass leaf in the doorway (the
+			-- mesh is one piece: its painted door cannot be hidden alone; the art-director splits it later)
+			local old = model:FindFirstChild("Door_Leaf")
+			if old then
+				old:Destroy()
+			end
+			local pivot = (model :: any):GetPivot() :: CFrame
+			local leaf = Instance.new("Part")
+			leaf.Name = "Door_Leaf"
+			leaf.Size = spec.placeholder
+			leaf.CFrame = pivot * CFrame.new(0, spec.placeholder.Y / 2, 0)
+			leaf.Anchored = true
+			leaf.Material = Enum.Material.Glass
+			leaf.Color = Color3.fromRGB(200, 230, 235)
+			leaf.Transparency = 0.45
+			leaf.CastShadow = false
+			leaf:SetAttribute(CREATED, true)
+			leaf.Parent = model
+			table.insert(leaves, leaf)
+			log("new", ("AutoDoor %s: no leaf in %s (parts: %s): placeholder Door_Leaf %s at %s (art-director: split the leaf in the mesh)"):format(spec.id, model:GetFullName(), table.concat(names, ", "), fmtV(spec.placeholder), fmtV(leaf.Position)))
+		end
+		if #leaves == 0 then
+			log("warn", ("AutoDoor %s: no leaf part in %s (parts: %s). Tag the leaf by hand: tag AutoDoor, DoorLeaf, DoorHinge"):format(spec.id, model:GetFullName(), table.concat(names, ", ")))
+			continue
+		end
+		-- doorway centre = centre of all the leaves
+		local sum = Vector3.zero
+		for _, p in leaves do
+			sum += p.Position
+		end
+		local centre = sum / #leaves
+		for _, p in leaves do
+			-- width axis = the longer horizontal axis of the part
+			local right = p.CFrame.RightVector
+			local look = p.CFrame.LookVector
+			local axis, w = right, p.Size.X
+			if math.abs(look.Y) < 0.9 and p.Size.Z > p.Size.X then
+				axis, w = look, p.Size.Z
+			end
+			axis = Vector3.new(axis.X, 0, axis.Z)
+			axis = if axis.Magnitude > 1e-3 then axis.Unit else EAST
+			local e1 = p.Position + axis * (w / 2)
+			local e2 = p.Position - axis * (w / 2)
+			local edge = if #leaves == 1 then e1 elseif (e1 - centre).Magnitude >= (e2 - centre).Magnitude then e1 else e2
+			-- an empty "Hinge*" of the .fbx (AST-033 Door_D1 has Hinge_D1) wins for a single leaf
+			local fbxHinge: Attachment? = nil
+			for _, d in model:GetDescendants() do
+				if d:IsA("Attachment") and string.sub(d.Name, 1, 5) == "Hinge" then
+					fbxHinge = d
+					break
+				end
+			end
+			if #leaves == 1 and fbxHinge then
+				edge = fbxHinge.WorldPosition
+			elseif #leaves == 1 then
+				log("warn", ("AutoDoor %s: single leaf %s, hinge put on its +width edge %s: check the side in Studio (move Door_Hinge by hand if wrong)"):format(spec.id, p:GetFullName(), fmtV(e1)))
+			end
+			local hinge = p:FindFirstChild("Door_Hinge")
+			if hinge and not hinge:GetAttribute(CREATED) then
+				log("ok", ("AutoDoor %s: Door_Hinge on %s authored by hand, kept"):format(spec.id, p.Name))
+			else
+				if hinge then
+					hinge:Destroy()
+				end
+				local a = Instance.new("Attachment")
+				a.Name = "Door_Hinge"
+				a:SetAttribute(CREATED, true)
+				a.Parent = p
+				a.WorldCFrame = CFrame.new(Vector3.new(edge.X, p.Position.Y - p.Size.Y / 2, edge.Z)) -- Y axis = world up
+				hinge = a
+			end
+			-- sign: the leaf centre turned +90 about the hinge must move towards the inside
+			local h = (hinge :: Attachment).WorldPosition
+			local r = p.Position - h
+			local turned = CFrame.Angles(0, math.rad(DOOR_OPEN), 0):VectorToWorldSpace(Vector3.new(r.X, 0, r.Z))
+			local sign = if (turned - Vector3.new(r.X, 0, r.Z)):Dot(spec.inward) >= 0 then 1 else -1
+			if p:GetAttribute("DoorOrigCanCollide") == nil then
+				p:SetAttribute("DoorOrigCanCollide", p.CanCollide)
+			end
+			-- DoorController contract (commit of the frontend): tag on the LEAF (<= 10 wide, Anchored), DoorLeaf,
+			-- DoorHinge Left/Right (turns 90; Right = hinge on the leaf's +RightVector edge, Provisório), DoorAngle
+			-- (signed so the leaf swings INTO the building), DoorRadius 8. Only the client animates: the leaf has
+			-- no collision on the server so NPCs walk through the doorway.
+			if w > 10 then
+				log("warn", ("AutoDoor %s: leaf %s is %.1f wide (> 10, DoorController limit)"):format(spec.id, p:GetFullName(), w))
+			end
+			local side = if (h - p.Position):Dot(p.CFrame.RightVector) >= 0 then "Right" else "Left"
+			p.Anchored = true
+			p.CanCollide = false
+			CollectionService:AddTag(p, "AutoDoor")
+			p:SetAttribute("DoorId", spec.id)
+			p:SetAttribute("DoorLeaf", true)
+			p:SetAttribute("DoorHinge", side)
+			p:SetAttribute("DoorAngle", sign * DOOR_OPEN)
+			p:SetAttribute("DoorRadius", 8)
+			log("new", ("AutoDoor %s: leaf %s, DoorHinge %s (Door_Hinge %s), DoorAngle %d (inward), CanCollide off"):format(spec.id, p:GetFullName(), side, fmtV(h), sign * DOOR_OPEN))
+		end
+		setPersistent(model)
+	end
+end
+
+-- W7: helpers locked (Studio click-select off) and out of touch / query when nothing reads them that way.
+local function lockOne(p: BasePart): boolean
+	local changed = not p.Locked or p.CanTouch
+	p.Locked = true
+	p.CanTouch = false
+	if not p.CanCollide and p.CanQuery and p.Transparency >= 0.75 then
+		p.CanQuery = false
+		changed = true
+	end
+	return changed
+end
+
+local function lockHelpers(assets: Instance, root: Instance): number
+	local n = 0
+	-- the whole binding (points, nodes, zones, traffic, anomaly fallbacks): invisible data parts
+	for _, d in root:GetDescendants() do
+		if d:IsA("BasePart") and lockOne(d) then
+			n += 1
+		end
+	end
+	-- bind-created helpers inside the assets (lamp holders, shelf anchors, tarp, placeholders) and hidden parts
+	for _, d in assets:GetDescendants() do
+		-- visible created placeholders (shutter button plate, Shutter_Panel) stay selectable: the user tunes them by hand
+		if d:IsA("BasePart") and d.Transparency >= 0.99 and not CollectionService:HasTag(d, "AutoDoor") then
+			-- hidden upgrade pieces / fixed parts keep CanQuery as their owners left it (they restore it themselves)
+			if d:GetAttribute("UpgHidden") or d:GetAttribute("PieceFixed") or d.Name == "Cover" then
+				if not d.Locked then
+					d.Locked = true
+					n += 1
+				end
+			elseif lockOne(d) then
+				n += 1
+			end
+		end
+	end
+	-- blockout: markers, limits (keep collision), hidden pieces (place_assets.hide) and translucent zones / ghosts
+	local blockout = Workspace:FindFirstChild("MAP01_Blockout")
+	if blockout then
+		for _, d in blockout:GetDescendants() do
+			if d:IsA("BasePart") then
+				local inHelper = (blockout:FindFirstChild("Markers") and d:IsDescendantOf(blockout.Markers))
+					or (blockout:FindFirstChild("Limits") and d:IsDescendantOf(blockout.Limits))
+				if inHelper or d.Transparency >= 0.75 then
+					if lockOne(d) then
+						n += 1
+					end
+				end
+			end
+		end
+	end
+	return n
+end
+
 -- Persistent on every Model that is, or contains, a tagged instance (§18.0 item 6).
 local function persistAll(): number
 	local n = 0
@@ -2362,15 +2717,18 @@ function Bind.run(opts: AnchorOpts?): string
 	bindMart(assets, o)
 	bindStreetBins(assets, o)
 	bindStreetLights(assets)
+	bindAutoDoors(assets)
 
 	local cartPose = if cart then (cart :: any):GetPivot() :: CFrame else CART_POSE
 	if (cartPose.Position - CART_POSE.Position).Magnitude > 0.05 then
 		log("warn", ("CART pivot %s differs from the binding constant %s; the actual pivot is used as CART"):format(fmtV(cartPose.Position), fmtV(CART_POSE.Position)))
 	end
-	local root = bindPoints({ cart = cart, trailer = trl, poses = { cart = cartPose, trl = padPose, sale = salePose } })
+	local root = bindPoints({ cart = cart, trailer = trl, poses = { cart = cartPose, trl = padPose, sale = salePose }, assets = assets })
 	bindLightZones(root, padPose)
 	bindWindows(assets, root)
 	bindTraffic(root)
+	local locked = lockHelpers(assets, root)
+	log("ok", ("helpers: %d invisible / helper part(s) Locked (no click-select), CanTouch off, CanQuery off where they do not collide (W7)"):format(locked))
 	local p = persistAll()
 	log("ok", ("ModelStreamingMode = Persistent set on %d more model(s)"):format(p))
 

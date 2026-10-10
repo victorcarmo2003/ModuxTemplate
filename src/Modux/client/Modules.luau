@@ -13,6 +13,7 @@ return {
 	StarterPlayer.StarterPlayerScripts.client.Crew.RigController,
 	StarterPlayer.StarterPlayerScripts.client.Customer.CustomerController,
 	StarterPlayer.StarterPlayerScripts.client.Cutscene.CutsceneController,
+	StarterPlayer.StarterPlayerScripts.client.Door.DoorController,
 	StarterPlayer.StarterPlayerScripts.client.Economy.EconomyController,
 	StarterPlayer.StarterPlayerScripts.client.Hallucination.HallucinationController,
 	StarterPlayer.StarterPlayerScripts.client.Hud.HudController,

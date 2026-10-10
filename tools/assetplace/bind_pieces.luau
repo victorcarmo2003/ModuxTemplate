@@ -367,6 +367,38 @@ local function hidePiece(piece: Instance)
 	end
 end
 
+-- GHOST (2026-10-10, user request, Provisório): upgrades whose kit piece is a stand-in without its own model stay
+-- INVISIBLE at every level. The pieces still exist (tag UpgradePiece, Upgrade / Level: UpgradeService and check_map01
+-- find them, the upgrade keeps working) but the "original" values UpgradeService restores when it shows a level are
+-- the hidden ones, so showing the bought level changes nothing on screen. Attribute NoVisual = true on the piece.
+-- counter: Counter_L1..L3 (AST-019 stand-in, loose on the Pad) until the counter model exists (AST-078 / art-director).
+local GHOST_UPGRADES: { [string]: boolean } = { counter = true }
+
+local function ghostPiece(piece: Instance)
+	hidePiece(piece)
+	local list: { Instance } = { piece }
+	for _, d in piece:GetDescendants() do
+		table.insert(list, d)
+	end
+	for _, d in list do
+		if d:GetAttribute(UPG_HIDDEN) then
+			if d:IsA("BasePart") then
+				d:SetAttribute(UPG_T, 1)
+				d:SetAttribute(UPG_COLLIDE, false)
+				d:SetAttribute(UPG_QUERY, false)
+				d.CanTouch = false
+				d.CastShadow = false
+				d.Locked = true
+			elseif d:IsA("Decal") or d:IsA("Texture") then
+				d:SetAttribute(UPG_T, 1)
+			else
+				d:SetAttribute(UPG_ENABLED, false)
+			end
+		end
+	end
+	piece:SetAttribute("NoVisual", true)
+end
+
 local function hideFixedOne(item: Instance)
 	if item:GetAttribute(FIXED) then
 		return
@@ -729,13 +761,17 @@ local function bindGroup(vehicle: Instance, g: Group, kit: Instance): number
 		c.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
 		c.Parent = folder
 		CollectionService:AddTag(c, TAG)
-		local shown = r.level == r.start
-		if not shown then
+		local ghost = GHOST_UPGRADES[g.upgrade] == true
+		local shown = r.level == r.start and not ghost
+		if ghost then
+			ghostPiece(c)
+		elseif not shown then
 			hidePiece(c)
 		end
 		clones[r.level] = c
 		count += 1
-		log("new", ("%s: %s (L%d) tagged %s in %s%s"):format(label, r.part, r.level, TAG, parent.Name, if shown then " - visible (StartLevel)" else " - hidden (UpgHidden)"))
+		log("new", ("%s: %s (L%d) tagged %s in %s%s"):format(label, r.part, r.level, TAG, parent.Name,
+			if ghost then " - NO VISUAL (ghost until its model exists; upgrade still works)" elseif shown then " - visible (StartLevel)" else " - hidden (UpgHidden)"))
 	end
 
 	-- fixed equivalents

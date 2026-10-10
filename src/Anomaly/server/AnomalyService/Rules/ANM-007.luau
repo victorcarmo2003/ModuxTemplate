@@ -16,7 +16,7 @@ return {
 	Window = 0,
 	IsCritical = true,
 	Params = {
-		Steps = 10,
+		Steps = 5, -- 5 Juniper posts (user, 2026-10-10; MAP-01 §5.6)
 		StepEvery = 1,
 		BackEvery = 10,
 		Duration = 45,

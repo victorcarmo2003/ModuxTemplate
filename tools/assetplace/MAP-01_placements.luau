@@ -239,24 +239,19 @@ return {
 	--    JL arms point east (rotY 90). Juniper sidewalk tiles -> y 0.24 (JL-01 sits on the Ninth
 	--    sidewalk, 0.4; JL-02 straddles the seam at Z -32 and uses the lower 0.24).
 	---------------------------------------------------------------------------------------------
+	-- 2026-10-10 (user: fewer posts, 5 Walker steps): 5 Juniper posts every 16 studs, same span Z -24..-88 (JL-05 at
+	-- ~135 from the window, as the old JL-09). The 9 blockout posts are all hidden by these entries; bind_map01 turns
+	-- off the blockout lights of the retired JL-06..09 (hidden parts keep their lights).
 	{ asset = "AST-036_StreetLightCurved", x = -14.185, y = 0.4, z = -24, rotY = 90, group = "StreetLights", id = "JL-01", replaces = { "StreetLights/JL-01/Pole", "StreetLights/JL-01/Arm" } },
 	{ asset = "AST-036_LampHead", x = -12.405, y = 0.4, z = -24, rotY = 90, group = "StreetLights", id = "JL-01", replaces = { "StreetLights/JL-01/Lamp" } },
-	{ asset = "AST-036_StreetLightCurved", x = -14.185, y = 0.24, z = -32, rotY = 90, group = "StreetLights", id = "JL-02", replaces = { "StreetLights/JL-02/Pole", "StreetLights/JL-02/Arm" } },
-	{ asset = "AST-036_LampHead", x = -12.405, y = 0.24, z = -32, rotY = 90, group = "StreetLights", id = "JL-02", replaces = { "StreetLights/JL-02/Lamp" } },
-	{ asset = "AST-036_StreetLightCurved", x = -14.185, y = 0.24, z = -40, rotY = 90, group = "StreetLights", id = "JL-03", replaces = { "StreetLights/JL-03/Pole", "StreetLights/JL-03/Arm" } },
-	{ asset = "AST-036_LampHead", x = -12.405, y = 0.24, z = -40, rotY = 90, group = "StreetLights", id = "JL-03", replaces = { "StreetLights/JL-03/Lamp" } },
-	{ asset = "AST-036_StreetLightCurved", x = -14.185, y = 0.24, z = -48, rotY = 90, group = "StreetLights", id = "JL-04", replaces = { "StreetLights/JL-04/Pole", "StreetLights/JL-04/Arm" } },
-	{ asset = "AST-036_LampHead", x = -12.405, y = 0.24, z = -48, rotY = 90, group = "StreetLights", id = "JL-04", replaces = { "StreetLights/JL-04/Lamp" } },
-	{ asset = "AST-036_StreetLightCurved", x = -14.185, y = 0.24, z = -56, rotY = 90, group = "StreetLights", id = "JL-05", replaces = { "StreetLights/JL-05/Pole", "StreetLights/JL-05/Arm" } },
-	{ asset = "AST-036_LampHead", x = -12.405, y = 0.24, z = -56, rotY = 90, group = "StreetLights", id = "JL-05", replaces = { "StreetLights/JL-05/Lamp" } },
-	{ asset = "AST-036_StreetLightCurved", x = -14.185, y = 0.24, z = -64, rotY = 90, group = "StreetLights", id = "JL-06", replaces = { "StreetLights/JL-06/Pole", "StreetLights/JL-06/Arm" } },
-	{ asset = "AST-036_LampHead", x = -12.405, y = 0.24, z = -64, rotY = 90, group = "StreetLights", id = "JL-06", replaces = { "StreetLights/JL-06/Lamp" } },
-	{ asset = "AST-036_StreetLightCurved", x = -14.185, y = 0.24, z = -72, rotY = 90, group = "StreetLights", id = "JL-07", replaces = { "StreetLights/JL-07/Pole", "StreetLights/JL-07/Arm" } },
-	{ asset = "AST-036_LampHead", x = -12.405, y = 0.24, z = -72, rotY = 90, group = "StreetLights", id = "JL-07", replaces = { "StreetLights/JL-07/Lamp" } },
-	{ asset = "AST-036_StreetLightCurved", x = -14.185, y = 0.24, z = -80, rotY = 90, group = "StreetLights", id = "JL-08", replaces = { "StreetLights/JL-08/Pole", "StreetLights/JL-08/Arm" } },
-	{ asset = "AST-036_LampHead", x = -12.405, y = 0.24, z = -80, rotY = 90, group = "StreetLights", id = "JL-08", replaces = { "StreetLights/JL-08/Lamp" } },
-	{ asset = "AST-036_StreetLightCurved", x = -14.185, y = 0.24, z = -88, rotY = 90, group = "StreetLights", id = "JL-09", replaces = { "StreetLights/JL-09/Pole", "StreetLights/JL-09/Arm" } },
-	{ asset = "AST-036_LampHead", x = -12.405, y = 0.24, z = -88, rotY = 90, group = "StreetLights", id = "JL-09", replaces = { "StreetLights/JL-09/Lamp" } },
+	{ asset = "AST-036_StreetLightCurved", x = -14.185, y = 0.24, z = -40, rotY = 90, group = "StreetLights", id = "JL-02", replaces = { "StreetLights/JL-02/Pole", "StreetLights/JL-02/Arm", "StreetLights/JL-03/Pole", "StreetLights/JL-03/Arm" } },
+	{ asset = "AST-036_LampHead", x = -12.405, y = 0.24, z = -40, rotY = 90, group = "StreetLights", id = "JL-02", replaces = { "StreetLights/JL-02/Lamp", "StreetLights/JL-03/Lamp" } },
+	{ asset = "AST-036_StreetLightCurved", x = -14.185, y = 0.24, z = -56, rotY = 90, group = "StreetLights", id = "JL-03", replaces = { "StreetLights/JL-04/Pole", "StreetLights/JL-04/Arm", "StreetLights/JL-05/Pole", "StreetLights/JL-05/Arm" } },
+	{ asset = "AST-036_LampHead", x = -12.405, y = 0.24, z = -56, rotY = 90, group = "StreetLights", id = "JL-03", replaces = { "StreetLights/JL-04/Lamp", "StreetLights/JL-05/Lamp" } },
+	{ asset = "AST-036_StreetLightCurved", x = -14.185, y = 0.24, z = -72, rotY = 90, group = "StreetLights", id = "JL-04", replaces = { "StreetLights/JL-06/Pole", "StreetLights/JL-06/Arm", "StreetLights/JL-07/Pole", "StreetLights/JL-07/Arm" } },
+	{ asset = "AST-036_LampHead", x = -12.405, y = 0.24, z = -72, rotY = 90, group = "StreetLights", id = "JL-04", replaces = { "StreetLights/JL-06/Lamp", "StreetLights/JL-07/Lamp" } },
+	{ asset = "AST-036_StreetLightCurved", x = -14.185, y = 0.24, z = -88, rotY = 90, group = "StreetLights", id = "JL-05", replaces = { "StreetLights/JL-08/Pole", "StreetLights/JL-08/Arm", "StreetLights/JL-09/Pole", "StreetLights/JL-09/Arm" } },
+	{ asset = "AST-036_LampHead", x = -12.405, y = 0.24, z = -88, rotY = 90, group = "StreetLights", id = "JL-05", replaces = { "StreetLights/JL-08/Lamp", "StreetLights/JL-09/Lamp" } },
 	{ asset = "AST-036_StreetLightCurved", x = 18.717, y = 0.4, z = 18.717, rotY = 225, group = "StreetLights", id = "P-01", replaces = { "StreetLights/P-01/Pole", "StreetLights/P-01/Arm" }, note = "foot (20, 20), arm to the NW over the intersection; flyer must move out to r ~0.56" },
 	{ asset = "AST-036_LampHead", x = 17.459, y = 0.4, z = 17.459, rotY = 225, group = "StreetLights", id = "P-01", replaces = { "StreetLights/P-01/Lamp" } },
 	{ asset = "AST-036_StreetLightCurved", x = -40, y = 0.4, z = 16.185, rotY = 180, group = "StreetLights", id = "Post_NinthS_W1", replaces = { "StreetLights/Post_NinthS_W1/Pole", "StreetLights/Post_NinthS_W1/Arm" } },

@@ -40,7 +40,7 @@ const REF = "ANM-007"
 const POST_TAG = "StreetLight"
 const POST_GROUP = "juniper_posts"
 const LAST_POINT = "WALKER-10"
-const STEPS = 10 -- Rules/ANM-007 Steps (server); step STEPS = WALKER-10
+const STEPS = 5 -- Rules/ANM-007 Steps (server); step STEPS = WALKER-10
 const ASSET_NAME = "AST-064_Walker"
 const SPOT_NAME = "Walker_Spot" -- AST-036 fitting
 const RETRY = 1 -- s between two lookups of a position not streamed in yet

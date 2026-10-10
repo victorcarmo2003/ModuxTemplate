@@ -37,7 +37,7 @@ const FIGURE_HEIGHT = 4.5 -- studs above the ground: upper body of a tall figure
 const MAX_DT = 0.5 -- s; a late tick never counts more than this
 const EPSILON = 1e-3 -- s; float slack of 5 x 0.2 s against 1 s
 -- Defaults when Rules/ANM-007 is missing (same numbers as the rule file)
-const DEFAULT_STEPS = 10
+const DEFAULT_STEPS = 5
 const DEFAULT_STEP_EVERY = 1
 const DEFAULT_BACK_EVERY = 10
 const DEFAULT_DURATION = 45

@@ -82,12 +82,8 @@ const NIGHT_PACK = "Night"
 const MAX_ID = 65535 -- NpcId wire range (Customers id, Sale.Npc)
 const ROUTES_PER_FRAME = 2 -- architecture.md §12.3
 const LIFT = 3 -- HumanoidRootPart above the floor point (architecture.md §18.5)
--- Arrival points (MAP-01 §9.1). Wave 1 has no SP-B: PROVISIONAL day split SP-A/D1 = 30/30 of the MAP-01 table
--- renormalised to 50/50; night = MAP-01 night column (SP-A 60, D1 40). No Content table holds these yet.
-const SPAWN_POINTS: { Day: { SpawnWeight }, Night: { SpawnWeight } } = {
-	Day = { { Point = "SP-A", Weight = 30 }, { Point = "D1", Weight = 30 } },
-	Night = { { Point = "SP-A", Weight = 60 }, { Point = "D1", Weight = 40 } },
-}
+-- Arrival points by shift: Content.Flow.Spawns.Arrivals (MAP-01 §9.8, Provisional). Points missing from the binding
+-- are skipped (the draw falls back to the others).
 
 local function nodePosition(id: string): Vector3?
 	const ok, info = pcall(MapIndex.Node, id)
@@ -234,10 +230,19 @@ function NpcService:AllocateId(): number?
 end
 
 function NpcService:PickSpawnPoint(isNight: boolean, rng: Random): string
-	const list = if isNight then SPAWN_POINTS.Night else SPAWN_POINTS.Day
+	const arrivals = Content.Flow.Spawns.Arrivals
+	const source: { SpawnWeight } = if isNight then arrivals.Night else arrivals.Day
+	-- only weighted points bound in the graph (a binding older than MAP-01 §9.8 still works with D1 / SP-A)
+	const list: { SpawnWeight } = {}
 	local total = 0
-	for _, entry in list do
-		total += entry.Weight
+	for _, entry in source do
+		if entry.Weight > 0 and nodePosition(entry.Point) ~= nil then
+			table.insert(list, entry)
+			total += entry.Weight
+		end
+	end
+	if total <= 0 then
+		return if source[1] ~= nil then source[1].Point else "D1"
 	end
 	local roll = rng:NextNumber() * total
 	for _, entry in list do

@@ -344,6 +344,12 @@
 							"optional": "src/Cutscene/client"
 						}
 					},
+					"Door": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Door/client"
+						}
+					},
 					"Economy": {
 						"$ignoreUnknownInstances": false,
 						"$path": {

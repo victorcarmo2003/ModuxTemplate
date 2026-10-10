@@ -11,6 +11,7 @@ local ClassController = require(StarterPlayer.StarterPlayerScripts.client.ModuxT
 local RigController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.RigController)
 local CustomerController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.CustomerController)
 local CutsceneController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.CutsceneController)
+local DoorController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.DoorController)
 local EconomyController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.EconomyController)
 local HallucinationController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.HallucinationController)
 local HudController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.HudController)
@@ -42,6 +43,7 @@ export type AllControllers = {
 	RigController: RigController.Public,
 	CustomerController: CustomerController.Public,
 	CutsceneController: CutsceneController.Public,
+	DoorController: DoorController.Public,
 	EconomyController: EconomyController.Public,
 	HallucinationController: HallucinationController.Public,
 	HudController: HudController.Public,

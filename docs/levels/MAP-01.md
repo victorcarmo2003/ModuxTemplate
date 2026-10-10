@@ -7,6 +7,7 @@ Autor: level-designer. Versão 1: 2026-10-08. **Revisão 2 (2026-10-08): concili
 **Revisão 3, ajuste final (2026-10-08): DEC-130 (sem semáforo no MVP, revoga DEC-120); rodada 17 (`Q-128`, opção B, secretário registrando); postes da Juniper a 8 studs com JL-09 a ~135 (LD-15 / P33); nota de P35.**
 **Binding da onda 2 (2026-10-10, TASK-083): ponto novo `DROP-T` e `SIGN-T` como ponto (§5.1); poses `CART`/`TRL`/`TRL-SALE` = pivô do modelo; L1 e L3 ajustados para fora do poste e do banco (§5.3); grafo do ladrão (§9.1); §16 (binding no place); P40–P45. Provisório.**
 **Binding da onda 3 (2026-10-10, TASK-098): esconderijos H1..H4 com `Slot` e `Hide_Pose` (§7.2); passantes com 7 caminhos de calçada e 17 nós novos (§9.3, `Content.WalkPaths`); `CutsceneMark1..4` e `CS-5W`/`CS-5E` (§11.1); AN/AS/WALKER-10/SS como pontos (§10.3); trânsito com `TrafficPath`/`TrafficLine`/`TrafficBox` (§9.5); §16.5–§16.6; P46–P50. Provisório.**
+**Spawn e despawn (2026-10-10, level-designer, pedido do usuário; tudo Provisório):** regra "NPC nunca aparece nem some à vista" com pontos novos/movidos e contrato `Spawn`/`Despawn`/`SpawnKind`/`Door` (§9.8, `Content.Flow.Spawns`, `Content.WalkPaths`); **5 postes na Juniper** (JL-01..05 a cada 16, passos 0–4 + WALKER-10, §5.6); peças de balcão sem visual; ajudantes travados no Studio; `AutoDoor` nas portas; ângulo da aba recalculado (§16.8; P52–P59).
 **DEC-221 (2026-10-10, architect a pedido do orquestrador):** esconderijos `H1..H4` (AST-041) **saem**; entra o botão da janela de serviço `TRL-SHUTTER` (`Prompt_Shutter` → `shutter_toggle`) ao lado de `TRL-SWITCH` e a aba `Awning` do AST-027 como peça animável (§7.2, §16.2, §16.5, §16.6, P51). Provisório.
 Nomes de lugares vêm de `story/world.md` (`Q-096`): cidade **Bellmoor**, esquina **Ninth & Juniper**, **Ninth Avenue**, **Juniper Street**, **Ninth Street Mart**, **Bellmoor Savings**. O nome do mapa, a lavanderia, B1 e B4 seguem placeholders para o narrative-writer (DEC-022: textos do jogo em inglês).
 Números de gameplay citados são valores iniciais ajustáveis (DEC-044). Medidas de mapa são **proposta do level-designer**; o que tem `[DEC-###]` é requisito decidido. `Provisório` = recomendação do level-designer que depende de pergunta aberta.
@@ -199,7 +200,7 @@ Poses dos veículos (`MapPoint`, T36): `CART` = pivô do carrinho **(41, 37.5)**
 | MKT | Interior do Mart | X −100..−64; Z 32..64 | §7.4 |
 | SS | **Ponto seguro** (sob o letreiro) | centro (−58, 30), raio 6 (X −64..−52, Z 24..36) | marcação amarela no chão + marquise. Conta como luz [`anomalies.md` N10]. Nunca recebe anomalia (§10.4, `Q-092`) |
 | P-01 | Poste da esquina com panfleto | (20, 20) | quina SE do cruzamento. Cutscene, espreita L1, **último poste do Hush** e passo 9 do Walker |
-| JL-01..09 | Postes da Juniper (calçada oeste, X −16), **a cada 8 studs** | Z −24, −32, −40, −48, −56, −64, −72, −80, −88 | acendem um por um às 8 PM (`world.md` §2). JL-08 e JL-09 ficam além do limite do jogador (BAR-N, Z −76). Distância do centro da janela (41, 35): JL-01 82 · JL-02 88 · JL-03 94 · JL-04 101 · JL-05 107 · JL-06 114 · JL-07 121 · JL-08 128 · **JL-09 ~135** (LD-15 / P33, usuário) |
+| JL-01..05 | Postes da Juniper (calçada oeste, X −16), **5 postes a cada 16 studs** (usuário, 2026-10-10: menos postes, 5 passos; antes 9 a cada 8) | Z −24, −40, −56, −72, −88 | acendem um por um às 8 PM (`world.md` §2). JL-05 fica além de BAR-N (Z −76); **JL-04 (−72) fica 4 studs dentro** (P53). Distância do centro da janela (41, 35): JL-01 82 · JL-02 94 · JL-03 107 · JL-04 121 · **JL-05 ~135** (mesma ponta da antiga JL-09). IDs JL-06..09 aposentados (não reaproveitar) |
 | C-01 | Relógio do Bellmoor Savings | (39, −33), Ø 6, centro a ~14 de altura (AST-044) | fachada sul do banco, de frente para o Pad (~73 studs). Mesma hora do HUD [DEC-048]; tique-taque audível no Pad. Âncora AN-11 (ANM-003) |
 | WV-1..3 | Janelas dos apartamentos | fachada sul, X 28..48, alturas 19–28 (andares 2–3, AST-045, sobre o térreo do banco AST-044 de ~18) | âncora AN-04 (ANM-006) |
 | CW-1 | **Travessia trailer ↔ Mart**: faixa sobre a Juniper Sul, meio da quadra | X −12..12; Z 34..42 | rota Pad ↔ Mart e Pad ↔ SS; SP-B; ladrão não cruza. **Sem semáforo** [DEC-130]; Juniper Sul com carros de dia (rodada 17, `Q-128` B). Pista de 24: 1,5 s a 16 studs/s. Nenhum carro para dentro dela; carro só para na linha (SL-1N/SL-1S) com reserva de NPC e nunca pelo jogador [DEC-133] |
@@ -215,18 +216,24 @@ Poses dos veículos (`MapPoint`, T36): `CART` = pivô do carrinho **(41, 37.5)**
 
 ### 5.3 Spawns, saídas e espreitas de NPC
 
-Velocidade de cliente a pé: ~8 studs/s.
+Velocidade de cliente a pé: ~8 studs/s (texto antigo; `CustomerTypes` usa 9–18, a maioria 13–14).
+
+**2026-10-10 (§9.8):** pontos de spawn/despawn revistos. Os pesos por turno estão em `Content.Flow.Spawns`; tempos a 13 studs/s (velocidade usual de cliente; o tipo mais lento anda 9).
 
 | ID | Tipo | Posição (X, Z) | Quando | Rota |
 |---|---|---|---|---|
-| SP-A | chegada de cliente (norte) | (30, −104), beco lateral leste da Juniper, atrás de BAR-N | dia e noite | calçada leste da Juniper → quina NE → **CW-4** → quina SE → LANE-E → fim da fila. ~155 studs, ~19 s |
-| SP-B | chegada de cliente (lavanderia) | (−40, −32) | só dia | calçada norte → quina NO → **CW-2** → quina SO → calçada oeste da Juniper Sul → **CW-1** → calçada leste → LANE-E → fim da fila. ~145 studs, ~18 s + espera de brecha (§9.5) |
-| D1 | chegada **e** saída (porta de B1) | (64, 48) | dia e noite | lado leste do Pad (X 56..64) → LANE-W → fim da fila. ~45 studs |
-| EX-E | saída leste | (116, 24), vira a quina de B1 | dia e noite | Q1 → LANE-E → leste. ~65 studs, ~8 s |
+| SP-A | chegada de cliente (norte), passantes | **(29, −92)** (era (30, −104)): faixa ao norte do fundo do banco, além de BAR-N, na sombra do prédio vista do Pad **e** da porta do Mart | peso 0 para clientes (~136 studs, 10,5 s > 10 s); passantes de dia; atores | calçada leste da Juniper → **CW-4** → LANE-E → Q5 |
+| SP-B | **porta** da lavanderia | (−40, −31), medido na porta AST-046 | passantes de dia (clientes: peso 0, ~151 studs) | calçada norte → **CW-2** → … |
+| D1 | **porta** de B1, chegada **e** saída | (63, 48) | dia e noite | Pad leste → LANE-W → Q5. **~79 studs, 6,1 s** |
+| **DR-APT** | **porta** do Bellmoor Savings / apartamentos (novo) | (32, −31), medido no AST-044 se houver peça "Door" | dia e noite (de noite = moradores) | calçada norte → **CW-4** → LANE-E → Q5. **~80 studs, 6,1 s** |
+| **SP-S** | ponta de rua (novo): calçada leste da Juniper Sul além de BAR-S, depois da curva | (21, 100) | dia e noite | calçada leste da Juniper Sul → LANE-E → Q5. **~93 studs, 7,1 s** (nunca cruza pista) |
+| EX-E | saída leste, passantes | **(116.5, 40)** (era (116, 24), visível de Q1..Q5 pela calçada): beco X 113..120 atrás de B1, além de BAR-E | dia e noite | Q1 → LANE-E → beco. **~85 studs, 6,5 s** |
+| **DR-B3** | **porta** de B3b (vidro "NO HELP WANTED") (novo) | (−93.3, −31.2) | passantes, dia e noite | calçada norte oeste → CW-2 → Mart |
+| MKT-DOOR | **porta** do Mart (agora também nó) | (−62, 34) | passantes (24 h) | praça / borda do SS |
 | L1 | espreita do ladrão (P-01) | (20, 20) → ponto em **(21.5, 22)** (TASK-083: fora do poste, que tem o pé em (20, 20)) | dia 2+ | 34 studs até a gaveta |
 | L2 | espreita do ladrão (poste leste) | (84, 22) | dia 2+ | 35 studs até a gaveta |
 | L3 | espreita do ladrão (banco do Pad) | (58, 58) → ponto em **(58, 56.5)** (TASK-083: na frente do banco, não em cima) | dia 2+ | 20 studs até a gaveta |
-| ST-R | spawn/fuga do ladrão | (18, 92), calçada leste da Juniper Sul, além de BAR-S; B1 esconde o spawn do Pad | dia 2+ | só pela calçada leste da Juniper Sul (**nunca cruza pista**); de L2 foge para EX-E |
+| ST-R | spawn/fuga do ladrão | **(21, 108)** (era (18, 92), que Q5 via pela quina de B1): depois da curva, colado na linha dos prédios X 24 | dia 2+ | só pela calçada leste da Juniper Sul (**nunca cruza pista**); de L2 foge para EX-E |
 | AS-1..4 | spawns ocultos de atores de anomalia | §10.3 | só noite | — |
 
 ### 5.4 Trânsito: entradas, faixas e linhas de parada (DEC-087)
@@ -262,21 +269,22 @@ Velocidade de cliente a pé: ~8 studs/s.
 
 | Passo do Walker | Posição | Nota |
 |---|---|---|
-| 0 (início) | JL-09 (−16, −88) | "sob o último poste da Juniper"; **~135 studs** da janela (LD-15 / P33, resolvido pelo usuário). Além de BAR-N. Sinal de início: JL-09 **zumbe ~2 s** [DEC-123] |
-| 1 | JL-08 (−16, −80) | ~128 da janela; além de BAR-N. Um poste por passo; o poste onde ele está pisca |
-| 2 | JL-07 (−16, −72) | ~121 |
-| 3 | JL-06 (−16, −64) | ~114 |
-| 4 | JL-05 (−16, −56) | ~107 |
-| 5 | JL-04 (−16, −48) | ~101 |
-| 6 | JL-03 (−16, −40) | ~94 |
-| 7 | JL-02 (−16, −32) | ~88; calçada norte da Ninth |
-| 8 | JL-01 (−16, −24) | ~82; quina NO |
-| 9 | P-01 (20, 20) | ~26; atravessa o cruzamento na diagonal (~57 studs de JL-01) |
-| 10 (perde a noite) | **(28, 29), fixo** (mantido) | calçada sul, quina NO do Pad, ~15 studs do centro do trailer (na borda do raio 18 de Trailer Lights). **Não muda** com o interruptor, com Trailer Lights (NPC-015, UPG-005) nem com o novo espaçamento dos postes |
+**2026-10-10 (usuário: menos postes, 5 passos; Provisório):** 5 postes na Juniper a cada 16 studs; passos 0–4 nos postes, passo 5 em WALKER-10. P-01 sai da cadeia do Walker (fica só como poste da esquina do Hush). `StreetLight.Order`: JL-05 = 1 … JL-01 = 5, P-01 = 6; passo = `Order − 1` para Order 1..5. O `PointId` continua `WALKER-10` (é o id exigido pelo `Required.luau` e pelo código; o nome não é o número do passo).
 
-Passos 1–8 agora têm 8 studs entre si (antes 12): o avanço de cada passo fica menor na tela, mas o poste que pisca continua marcando o passo. Os passos 0–3 (JL-09..JL-06) ficam além dos ~110 do style guide; o usuário aceitou ~135 (emenda ao style guide, §15 P33).
+| Passo do Walker | Posição | Nota |
+|---|---|---|
+| 0 (início) | JL-05 (−16, −88) | "sob o último poste da Juniper"; **~135 studs** da janela (mesma ponta de antes). Além de BAR-N. Sinal de início: JL-05 **zumbe ~2 s** [DEC-123] |
+| 1 | JL-04 (−16, −72) | ~121; **4 studs dentro de BAR-N** (o jogador pode chegar perto, P53). O poste onde ele está pisca |
+| 2 | JL-03 (−16, −56) | ~107 |
+| 3 | JL-02 (−16, −40) | ~94 |
+| 4 | JL-01 (−16, −24) | ~82; quina NO |
+| 5 (perde a noite) | **WALKER-10 = (28, 29), fixo** | calçada sul, quina NO do Pad, ~15 studs do centro do trailer. Salto de ~68 studs desde JL-01 (antes passava por P-01). **Não muda** com o interruptor nem com Trailer Lights |
 
-Hush: apaga JL-09 → JL-01 → **P-01** (**10 postes** em ~15 s, ~1,5 s por poste). "O poste da esquina" de `anomalies.md` N10 = **P-01**. Quando P-01 apaga, quem não está em SS errou.
+Cada passo agora anda 16 studs (antes 8): o avanço fica mais legível no celular. Os passos 0–1 ficam além dos ~110 do style guide (emenda ~135, P33). Alternativa (P52): 4 postes JL + P-01 como passo 4, para o último salto não atravessar o cruzamento inteiro.
+
+Hush: apaga JL-05 → JL-01 → **P-01** (**6 postes**, **2,5 s por poste** em `Content.LightGroups.juniper_posts.Step`, total **15 s** como antes). "O poste da esquina" de `anomalies.md` N10 = **P-01**. Quando P-01 apaga, quem não está em SS errou.
+
+Arquivos de código que ainda assumem 10 postes / passos 0..9 + 10 (não editados aqui, lista para backend/frontend): `src/Place/shared/MapIndex/Required.luau` (linhas `Ids` da onda 2 e `STREET_POSTS` da onda 3 listam JL-06..09: **o `Validate` acusa erro no Studio até mudar**), `src/Anomaly/server/AnomalyService/Rules/ANM-007.luau` (`Steps = 10` → 5; comentário dos passos), `src/Anomaly/server/AnomalyService/Anomalies/ANM-007.luau` (comentários "step 0..9", "step 10"), `src/Anomaly/client/AnomalyController/Effects/ANM-007.luau` (`STEPS = 10` → 5), `src/Anomaly/server/AnomalyService/Rules/ANM-010.luau` (comentário "10 x 1.5" → "6 x 2.5"; `PostsOff = 15` continua certo).
 
 ## 6. Distâncias e linhas de visão (checagem dos requisitos)
 
@@ -525,7 +533,7 @@ Tipos e comportamento: `design/npcs.md`. Aqui só o espacial. Todos os NPCs são
 
 | Etapa | Dia | Noite |
 |---|---|---|
-| Chegada | SP-A (30%), SP-B (40%), D1 (30%) | SP-A (60%), D1 (40%); lavanderia fechada |
+| Chegada | **2026-10-10 (§9.8):** D1 35, DR-APT 35, SP-S 30 (SP-A e SP-B peso 0: > 10 s). Antes: SP-A 30, SP-B 40, D1 30 | **D1 50, SP-S 30, DR-APT 20** (antes SP-A 60, D1 40); lavanderia fechada |
 | Travessias | SP-A cruza CW-4; SP-B cruza CW-2 e CW-1. Proposta (`Q-129`, Provisório): **clientes só atravessam em faixa e com reserva** (§9.5); esperam no nó de meio-fio em cada ponta da faixa até a reserva | SP-A cruza CW-4 com reserva; quase sem trânsito (§9.5) |
 | Entrar na fila | vaga livre mais à esquerda, avança até Q1 | igual |
 | Fila cheia | spawner não gera cliente novo | igual |
@@ -553,16 +561,19 @@ Clientes normais são repetitivos para criar padrão [DEC-010]: chegam pela esqu
 
 DEC-183: **6–8 de dia, 1–2 à noite, 0 em tensão** (a proposta antiga de 2/0 caiu). Passantes andam pelas calçadas e atravessam só nas faixas **com reserva** (§9.5), nunca entram na fila. Caminhos em `src/Shared/Content/WalkPaths.luau` (TASK-098, Provisório): cada um é uma cadeia de `NpcNode` do grafo (§9.1), na ordem de caminhada.
 
-| Caminho | Turno | Trajeto | Faixas |
+**2026-10-10 (§9.8, Provisório):** os 7 caminhos foram trocados por **10 de mão única** que começam e terminam numa porta ou numa ponta de rua escondida. O laço `ninth_east_loop` saiu (nascia à vista); as pontas (−108, 24), (−108, −22) e (110, −22) saíram (visíveis da fila pela calçada).
+
+| Caminho (ida / volta) | Turno | Trajeto | Faixas |
 |---|---|---|---|
-| `ninth_east_loop` (laço) | dia | quina SE (18, 23) → CW-4 → calçada norte em frente ao banco → CW-3 → LANE-W de volta à quina | CW-4, CW-3 |
-| `juniper_north_to_east` / `east_to_juniper_north` | dia | além de BAR-N pela calçada leste da Juniper Norte ↔ calçada norte da Ninth até a ponta leste (110, −22) | — |
-| `east_to_west_via_mart` / `west_to_east_via_mart` | dia | EX-E → LANE-W atrás da fila → calçada leste da Juniper Sul → **CW-1** → praça e SS → calçada sul oeste (−108, 24) | CW-1 |
-| `west_cross_north` / `west_cross_south` | **dia e noite** | calçada sul oeste (−108, 24) ↔ **CW-2** ↔ calçada norte oeste (−108, −22) | CW-2 |
+| `apt_to_east` / `east_to_apt` | dia | porta DR-APT → calçada norte → **CW-3** → LANE-W leste → beco EX-E | CW-3 |
+| `juniper_north_to_east` / `east_to_juniper_north` | dia | SP-A (além de BAR-N) → calçada leste da Juniper Norte → calçada norte → **CW-3** → beco EX-E | CW-3 |
+| `east_to_mart` / `mart_to_east` | dia | beco EX-E → LANE-W atrás da fila → calçada leste da Juniper Sul → **CW-1** → praça → porta do Mart | CW-1 |
+| `laundry_to_east` / `east_to_laundry` | dia | porta SP-B → **CW-2** → calçada oeste da Juniper Sul → **CW-1** → LANE-W → beco EX-E | CW-2, CW-1 |
+| `b3_to_mart` / `mart_to_b3` | **dia e noite** | porta DR-B3 → calçada norte oeste → **CW-2** → calçada sul oeste → borda do SS → porta do Mart | CW-2 |
 
 Regras do desenho:
-- Os caminhos de mão única começam e terminam **fora de vista** (além de BAR-N, EX-E, pontas leste e oeste das calçadas): o passante nasce e some sem pop-in. O laço nasce à vista; o `PedestrianService` faz fade (nota P50).
-- **À noite só os caminhos do oeste** (CW-2, ~60 studs à esquerda da janela): nenhum passante noturno usa as rotas de cliente (SP-A, D1) nem a calçada dos postes da Juniper Norte. Assim um NPC noturno fora das rotas de cliente continua sendo sinal de anomalia (§9.1) e nada puxa o olhar para o Walker. `check_map01` avisa se um caminho `Night`/`Any` tocar nó de rota de cliente.
+- Todo caminho começa e termina **numa porta** (regra a) **ou numa ponta de rua além dos limites e fora de vista** (regra b, §9.8): o passante nunca nasce nem some à vista.
+- **À noite só o caminho do oeste** (DR-B3 ↔ CW-2 ↔ Mart): nenhum passante noturno usa as rotas de cliente (D1, DR-APT, SP-S, SP-A) nem a calçada dos postes da Juniper Norte. Ele passa pela borda do SS (o Mart é 24 h; passantes saem em tensão, então nunca estão lá durante o Hush). Assim um NPC noturno fora das rotas de cliente continua sendo sinal de anomalia (§9.1) e nada puxa o olhar para o Walker. `check_map01` avisa se um caminho `Night`/`Any` tocar nó de rota de cliente.
 - De dia, CW-1 recebe passantes nos dois sentidos: quem atravessa junto com eles atravessa mais seguro (FEAT-033, §9.5).
 - Nós novos (17): `N-Z06-02` (57, −17) e `N-Z02-10` (57, 17) = CW-3; `N-Z08-04` (13, 38) e `N-Z08-05` (−13, 38) = CW-1; `N-Z02-14` (−18, 17) e `N-Z06-06` (−18, −17) = CW-2; `N-Z06-03` (38, −22), `N-Z06-04` (84, −22), `N-Z06-05` (110, −22), `N-Z12-01` (−34, 40), `N-Z12-02` (−54, 30), `N-Z02-11` (−72, 24), `N-Z02-12` (−108, 24), `N-Z02-13` (−40, 22), `N-Z06-07` (−40, −22), `N-Z06-08` (−76, −22), `N-Z06-09` (−108, −22). CW-4 reusa os nós da onda 1. Grafo: **50 nós** (teto 80). A aresta `N-Z02-14`–`N-Z08-05` (calçada oeste da Juniper Sul) já serve à rota SP-B quando ela entrar no grafo.
 - Nenhuma aresta nova toca vaga de fila; as rotas de cliente e do ladrão das ondas 1–2 continuam com os mesmos caminhos A* (todo atalho novo é mais longo).
@@ -607,6 +618,8 @@ Distância do spawn até a 1ª faixa da rota (regra de FEAT-033: ≥ 55): W-IN �
 | NPCs (clientes, passantes) | só atravessam **em faixa**, com **reserva** pedida no nó de meio-fio (dada se nenhum carro está a < 15 studs da linha); com a reserva, os carros que chegam **param na linha da faixa** até o NPC sair (máx. 4 s). NPC nunca é atropelado | linhas de faixa: CW-1 → SL-1N / SL-1S; CW-3 → SL-3W / SL-3E; **CW-2 e CW-4 → SL-W e SL-E juntas** (a reserva de uma faixa da Ninth junto ao cruzamento segura os dois lados, para nenhum carro parar dentro da caixa) e a caixa conta como ocupada para o PARE. Nó de espera em cada ponta de faixa, na calçada, a 2 studs do meio-fio |
 | Ladrão | não cruza pista | chega e foge pela calçada leste da Juniper Sul (inalterado) |
 | Ambulância e long car | roteirizados; Ninth, sem parar no cruzamento | à noite não há carro na Juniper |
+
+**Regra de conversão (debugger, 2026-10-10; registrada aqui, Provisório):** rota da Juniper que **vira para a Ninth** (TR-3, TR-4, TR-10) para na **linha de PARE** (SL-N / SL-S) também quando há reserva de NPC em **CW-4 / CW-2**, antes de entrar no cruzamento: a faixa que ela vai cruzar depois da curva fica logo na saída do cruzamento e não há linha própria entre os dois. Por isso `Content.Traffic` lista a mesma linha duas vezes em seguida (`Pare` e `Crosswalk` em SL-N/SL-S) e o `check_map01` aceita a repetição.
 
 Efeito aceito por FEAT-033: atravessar junto com um NPC é mais seguro (os carros param para ele). No mapa, isso acontece sobretudo em CW-1 (SP-B) e CW-4 (SP-A), longe da linha de visão Mart → carrinho.
 
@@ -665,6 +678,58 @@ Regras de convivência:
 | ANM-007 The Walker | aparece em JL-09 (além de BAR-N, fora do alcance). Avança poste a poste pela calçada oeste (§5.6). Nunca usa a rota de clientes (eles descem pela calçada **leste**) |
 | ANM-008 The long car | entra por E-IN, Ninth WB, passa da entrada do estacionamento, **dá ré na boca da entrada** e para em AN-12 (70, −22), **de frente para o sul**, farol alto na janela do trailer (~63 studs). Sai virando à esquerda para a Ninth EB → E-OUT. Nunca entra na Juniper nem passa pelo Mart. À noite o trânsito é raro (1 carro, só na Ninth reta, §9.5) e **nenhum carro nasce enquanto a ANM-008 está ativa**; a quebra de padrão é ser o **único carro que para no meio-fio** e o único com farol alto (`design/npcs.md` N8, FEAT-033, `Q-103`) |
 | ANM-005 The Raincoat Lady | rota normal de cliente (SP-A ou D1), deixando poças pelo caminho |
+
+### 9.8 Spawn e despawn (2026-10-10, level-designer; Provisório)
+
+**Regra:** NPC (cliente, ladrão, passante, ator de anomalia) **nunca aparece nem some à vista do jogador**. Ele nasce/some:
+- **(a) numa porta de prédio** — D1 (B1), DR-APT (Bellmoor Savings / apartamentos), SP-B (lavanderia), DR-B3 (B3b), MKT-DOOR (Mart). O ponto fica na soleira, 0,8 à frente da folha; a folha tem tag `AutoDoor` e abre por proximidade no client (§16.8). Vale mesmo à vista: quem olha vê "alguém saiu/entrou pela porta";
+- **(b) numa ponta de rua além dos limites do jogador** (BAR-N, BAR-S, BAR-E) **e fora da linha de visão** do Pad (PS-1..4), da fila (Q1..Q5), da porta do Mart e do SS — SP-A, SP-S, ST-R, EX-E, e os AS-1..4 dos atores.
+
+Rota até a fila **≤ ~100 studs** (≤ 10 s a 13 studs/s); ponto mais longe fica com peso 0 em `Content.Flow.Spawns` (SP-A 136, SP-B 151). Distribuição por turno em `Content.Flow.Spawns` (chegadas e saídas de cliente); ladrão em `Content.Thief` (ST-R); passantes nas pontas de `Content.WalkPaths` (§9.3); atores de anomalia usam as chegadas de cliente ou os AS-1..4.
+
+**Contrato no place** (`bind_map01.luau`, W6): o `MapPoint` (que também é `NpcNode`) leva `Spawn` (lista separada por vírgula: `customer`, `thief`, `pedestrian`, `actor`), `Despawn` (bool), `SpawnKind` (`door` | `edge`) e, nas portas, `Door` (id da porta). O código lê os pontos pelo id em `Content`; os atributos servem ao `check_map01` (regras 12 e 13) e a quem edita o place.
+
+Escala: **1 coluna = 8 studs (X)**, **1 linha = 8 studs (Z)**. Norte para cima. Aproximado (±4).
+
+```
+  X →  -128      -96      -64      -32       0        32       64       96      128
+         |        |        |        |        |        |        |        |        |
+ -104  ##########################~~~~::=v^=::A###############################       A  SP-A (29,-92) pedestre/ator (cliente peso 0)
+  -88  ##########################a~~~:5=v^=::######......................####       a  AS-3 (-30,-104) ator   5 JL-05 (passo 0)
+  -76  ##########################xxxxxxxxxxxxx######......V...............####       x  BAR-N (Z -76)          V AS-1 atrás da van
+  -72  ##########################::::::4=v^=::######.........................####       4  JL-04 (passo 1)
+  -56  ##########################::::::3=v^=::######.........................####       3  JL-03 (passo 2)
+  -40  ################b#########::::::2=v^=::#P####.........................####       2  JL-02 (passo 3)  b SP-B porta lavanderia  P DR-APT porta banco/apart.
+  -32  #####G####################::::::1=v^=::#################################       G  DR-B3 porta B3b        1 JL-01 (passo 4)
+  -24  :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::      calçada norte
+  -16  ====================%%=============%%=========%%==========================      NINTH (CW-2 | CW-4 | CW-3)
+    8  =========================================================================
+   16  ::::::::::::::::::::::::::::::::::::P::::::::::::::::::::::::::2:::::::::::     P  P-01 (Hush, fora do Walker)   2 AS-2 atrás do caminhão
+   24  ::::::::::::::::::::::S:::::::::::::::5432:1:::::::::::::::::::::::::::::E:      fila Q5..Q1; S = SS
+   32  ############MMMMMMMMMM_m________::%%%%%%::,,,,,,,,,,,,,########################E     m  MKT-DOOR porta Mart   E  EX-E (116.5,40) beco além de BAR-E
+   48  ############MMMMMMMMMM__________::=v^=::,,,,,,,,,,,,d#########################.      d  D1 porta B1
+   64  ############MMMMMMMMMM##########::=v^=::##########################################
+   80  ##############################xxxxxxxxxxx############################################   x  BAR-S (Z 80)
+  100  ##############################::=v^=::S#############################################   S  SP-S (21,100) cliente/ator
+  108  ##############################::=v^=::R#############################################   R  ST-R (21,108) ladrão
+```
+
+| Ponto | Tipo | Posição | Papéis (`Spawn`) | Some aqui | Por que fica fora de vista |
+|---|---|---|---|---|---|
+| D1 | porta | (63, 48) | customer, actor | sim (saída 40%) | regra (a); `AutoDoor` |
+| DR-APT | porta | (32, −31) ou medida no AST-044 | customer, pedestrian | sim | regra (a) |
+| SP-B | porta | (−40, −31) medida no AST-046 | pedestrian (clientes peso 0) | sim | regra (a); fechada à noite |
+| DR-B3 | porta | (−93.3, −31.2) | pedestrian (dia e noite) | sim | regra (a) |
+| MKT-DOOR | porta | (−62, 34) | pedestrian (24 h) | sim | regra (a); folha placeholder `Door_Leaf` se o AST-028 não tiver folha |
+| SP-A | ponta | (29, −92) | customer (peso 0), pedestrian, actor | sim | além de BAR-N; o fundo do banco (X 24..52, Z −88..−64) tapa da porta do Mart e do SS; o banco tapa do Pad |
+| SP-S | ponta | (21, 100) | customer, actor | sim | além de BAR-S; o prédio de trás de B1 (X 24..40, Z 64..83) tapa de Q5 (raio passa em X ~26 em Z 64) e do Pad; B5 tapa do Mart |
+| ST-R | ponta | (21, 108) | thief | sim | idem SP-S, mais fundo |
+| EX-E | ponta | (116.5, 40) | pedestrian | sim (saída 60%) | beco X 113..120 atrás de B1 (X 64..113, Z 32..50): da fila, do Pad e da porta do Mart o raio entra em B1 |
+| AS-1..4 | ponta / porta | §10.3 | actor | sim | já existentes; o `check_map01` regra 13 mede |
+
+Tempos (A*, AvoidQueue, a 13 / 9 studs/s): D1 → Q5 ~79 (6,1 / 8,8 s); DR-APT → Q5 ~80 (6,1 / 8,9 s); SP-S → Q5 ~93 (7,1 / 10,3 s); SP-A → Q5 ~136 (10,5 / 15 s, peso 0); Q1 → EX-E ~85 (6,5 s); Q1 → D1 ~25.
+
+**Conferência** (`check_map01` regra 13, só no Studio): raycast do olho (4,5) de PS-1..4, Q1..Q5, MKT-DOOR e SS até um corpo R6 no ponto (3 alturas × 3 deslocamentos), até 200 studs (fim da névoa); peças ≥ 30% transparentes não tapam; veículos, NPCs, binding e marcadores ignorados. Ponta à vista = aviso; porta à vista = info. Conta de mesa (antes do Studio): SP-A, SP-S, ST-R e EX-E escondidos de todos os 11 pontos; a margem mais apertada é SP-S/ST-R vistos de Q5 (o raio passa ~1,5–2,6 studs dentro da quina do prédio em X 24).
 
 ## 10. Dia × noite
 
@@ -964,6 +1029,19 @@ Binding da onda 3 (TASK-098), para o secretário registrar (nenhuma bloqueia o c
 | P50 | Passantes à noite (DEC-183: 1–2) × "NPC fora da rota é sinal" (§9.1); pop-in do laço (game-designer + architect, `Q-162`) | À noite só os caminhos do oeste (CW-2), longe das rotas de cliente e da Juniper Norte. O laço `ninth_east_loop` nasce à vista: `PedestrianService` com fade de entrada ou só de dia (já é `Day`) |
 | P51 | Peça que fecha a janela (DEC-221): a malha `Awning` do AST-027 serve? (level-designer + art-director) | Usar a `Awning` se for `MeshPart` separada no `TRL` e, girada na dobradiça de cima, cobrir a janela (22,5 × 4,5). Senão, `Shutter_Panel` placeholder (Part 22,5 × 4,6 × 0,2, Aluminum) com a mesma dobradiça e a `Awning` fixa; o art-director desenha a aba de verdade depois. Botão `TRL-SHUTTER` placeholder até ficha de arte |
 
+Spawn/despawn, postes e ajustes do place (2026-10-10), para o secretário registrar (todas **Provisório**):
+
+| # | Pergunta (dono) | Recomendação do level-designer |
+|---|---|---|
+| P52 | 5 postes: qual é a cadeia do Walker? (usuário + game-designer) | Feito: 5 postes JL (passos 0–4) + WALKER-10 (passo 5); P-01 só no Hush. Alternativa: 4 JL + P-01 como passo 4 (o último salto não cruza o cruzamento inteiro, ~26 studs como antes) |
+| P53 | JL-04 (passo 1) fica 4 studs dentro de BAR-N (Z −76): o jogador pode chegar perto do Walker no passo 1 (antes 0–1 ficavam fora) (usuário + game-designer) | Recuar BAR-N para **Z −64** (entre JL-03 e JL-04; mover cones/cercas AST-047 e a parede do blockout). Não aplicado: mexe no limite jogável |
+| P54 | Bloqueio: `Required.luau` ainda exige JL-06..09; `ANM-007` server/client com 10 passos (backend-coder + frontend-coder) | Ajustar os arquivos listados em §5.6 **antes** do próximo Play (senão `MapIndex.Validate` erra no Studio) |
+| P55 | Porta do banco (DR-APT) como porta de moradores à noite; o AST-045 "não tem porta de cliente" (art-director) | Usar a porta do pórtico do AST-044 (ou uma porta lateral de moradores, se o art-director desenhar); o bind mede uma peça "Door" do AST-044 se existir |
+| P56 | SP-A e SP-B ficam com peso 0 para clientes (> 10 s) (game-designer) | Manter; se quiser variedade, SP-B só de dia com peso ≤ 15 (11,6 s a 13 st/s) |
+| P57 | Porta do Mart: o AST-028 não tem folha separada? (art-director + frontend) | O bind cria `Door_Leaf` (vidro 4 × 7,5 × 0,2) com `AutoDoor`; a porta pintada na malha continua até o art-director separar a folha. `DoorHinge` "Right" = dobradiça na borda +RightVector da folha (conferir com o `DoorController`) |
+| P58 | Balcão (`Counter_L1..L3`) sem modelo próprio (usuário) | Peças existem mas **sem visual** em todos os níveis (`NoVisual`); o upgrade funciona. Volta a aparecer tirando `counter` de `GHOST_UPGRADES` no `bind_pieces.luau` quando o modelo existir |
+| P59 | Aba da janela com `ClosedAngle 0` (usuário) | Causa: a `Awning` é `MeshPart` alinhada aos eixos; o lado maior da caixa era a altura e a aba "parecia" pendurada. O bind agora usa a diagonal da caixa + perfil por raycast e pendura a aba 3° para fora; ângulo < 5° ou aba curta demais (não chega ao peitoril) → `Shutter_Panel` |
+
 Fora deste documento, mas dependem dele: fichas técnicas `ANM-###` (escolher âncoras de §10.3), `design/npcs.md`, `art/asset-list.md` (converter L01-## sem AST em fichas), blockout no Blender (quando pedido, combinado com o modeler-3d).
 
 ## 16. Binding no place (TASK-005 onda 1, TASK-083 onda 2, TASK-098 onda 3)
@@ -1056,3 +1134,22 @@ Tudo amarrado com o trailer no Pad (coordenadas deste documento) e estacionado e
 | Esconderijos | modelos `H1..H4` (AST-041) destruídos onde estiverem; `Prompt_Hide`/`Hide_Pose` que sobraram, idem. Os encaixes `Hide_1..4` do próprio `.fbx` do AST-027 ficam, sem tag |
 
 Proposta para o frontend-coder (TASK-131) e o architect: o atributo `ClosedAngle` no `Shutter_Hinge` deixa o ângulo no place e não no código (a aba real do art-director pode ter outro). Provisório.
+
+**Correção 2026-10-10 (P59):** a medida da aba usava o lado maior da caixa da `MeshPart` como comprimento; numa aba inclinada a caixa é mais alta que funda, então a aba "já estava pendurada" e saía `ClosedAngle 0`. Agora a inclinação é a **diagonal da caixa** no plano YZ do Pad (dobradiça = aresta do lado da parede; o sentido da diagonal vem de um raycast no topo da malha: mais alta na parede = toldo descendo para fora) e a aba fechada fica **pendurada 3° para fora**. Ângulo < 5° ou aba que não chega ao peitoril → `Shutter_Panel`. O relatório mostra caixa, perfil e o caminho escolhido.
+
+### 16.8 Spawn/despawn, postes, portas, peças sem visual e ajudantes travados (2026-10-10) — Provisório
+
+| Item | O que muda | Onde |
+|---|---|---|
+| Spawn/despawn (§9.8) | pontos novos DR-APT, SP-S, SP-B, DR-B3, nó N-Z06-10; SP-A, EX-E, ST-R movidos; MKT-DOOR vira nó; atributos `Spawn`/`Despawn`/`SpawnKind`/`Door`. Arestas novas: DR-APT–N-Z06-10–(N-Z06-01, N-Z06-03), SP-S–N-Z08-01, N-Z02-10–N-Z02-06, SP-B–N-Z06-07, DR-B3–N-Z06-08, MKT-DOOR–N-Z12-02; SP-A liga direto em N-Z13-02. Grafo: **56 nós** (teto 80) | `bind_map01.luau` W6; `Content.Flow.Spawns`, `Content.WalkPaths`; `NpcService:PickSpawnPoint` e `CustomerService:ExitRoute` leem `Flow.Spawns` (ponto sem nó no binding é pulado) |
+| Postes (§5.6) | 5 postes JL-01..05 a cada 16 (Z −24..−88); `Order` JL-05 = 1 … JL-01 = 5, P-01 = 6; luzes do blockout de JL-06..09 desligadas (`DisabledByBind`); Hush 6 × 2,5 s | `MAP-01_placements.luau` (pede `Place.run`), `bind_map01.luau`, `Content.LightGroups`; código pendente em §5.6 (P54) |
+| Portas `AutoDoor` (contrato do `DoorController`) | folha(s) de MKT-DOOR (placeholder `Door_Leaf` vidro 4 × 7,5 × 0,2 se a malha não tiver folha), D1 (`Door_D1`, dobradiça `Hinge_D1`) e SP-B: tag `AutoDoor`, `DoorId`, `DoorLeaf`, `DoorHinge` (Left/Right), `DoorAngle` (sinal = abre para dentro), `DoorRadius` 8, `CanCollide` falso no servidor (NPCs passam; só o client anima) + `Attachment` `Door_Hinge` informativo | `bind_map01.luau` W8 |
+| Balcão sem visual | `Counter_L1..L3` continuam `UpgradePiece` (o upgrade funciona), mas escondidos em todos os níveis: os `UpgOrig*` guardados são os escondidos, então o `UpgradeService` "mostra" invisível. Atributo `NoVisual`; o check informa em vez de avisar | `bind_pieces.luau` `GHOST_UPGRADES`, `check_map01` regra 9 |
+| Ajudantes travados | tudo de `MapBinding`, peças invisíveis dos assets (âncoras, porta-luz, lona) e do blockout (`Markers`, `Limits`, peças escondidas e fantasmas ≥ 75% transparentes) com `Locked = true` e `CanTouch` falso; `CanQuery` falso só onde não colide (os limites BAR-* mantêm colisão). Nenhum código lê essas peças por raycast/toque | `bind_map01.luau` W7 |
+| Check | regra 12 (rotas de spawn ≤ 130 studs, saídas) e 13 (linha de visão + `AutoDoor`) | `check_map01.luau` |
+
+**Command Bar** (a mudança dos postes pede `Place.run`, que refaz `MAP01_Assets` a partir dos placements — as edições do §16.0 estão gravadas neles; confira antes com `Place.diff`):
+
+```lua
+local H=game:GetService("HttpService") local w=H.HttpEnabled H.HttpEnabled=true local B="http://127.0.0.1:8772/" local function get(p) local ms=Instance.new("ModuleScript") ms.Source=H:GetAsync(B.."tools/assetplace/"..p,true) return require(ms) end local Place=get("place_assets.luau") local P=get("MAP-01_placements.luau") local ids=H:JSONDecode(H:GetAsync(B.."Assets/import/_asset_ids.json",true)) local Bind=get("bind_map01.luau") local Pieces=get("bind_pieces.luau") local Check=get("check_map01.luau") H.HttpEnabled=w print(Place.run(P, ids)) print(Bind.run()) print(Pieces.run()) Check.run({ wave = 3 })
+```

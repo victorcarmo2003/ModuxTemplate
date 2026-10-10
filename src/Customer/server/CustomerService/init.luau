@@ -137,8 +137,7 @@ const ANNOYED = "Annoyed"
 const COMPLAINING = "Complaining"
 const LEAVE_TIMEOUT = 45 -- s; a leaving customer that never reaches its exit is despawned anyway
 const NEUTRAL = "Neutral" -- arrival mood (Content.Moods)
--- Exit split (MAP-01 §9.1: Q1 -> EX-E 60% or D1 40%). PROVISIONAL constant: no Content table holds it yet.
-const EXITS: { Weighted } = { { Point = "EX-E", Weight = 60 }, { Point = "D1", Weight = 40 } }
+-- Exit split by shift: Content.Flow.Spawns.Exits (MAP-01 §9.8, Provisional; EX-E 60 / D1 40).
 
 -- djb2 over a string, exact in doubles (h x 33 + byte < 2^38). Run seed hash, architecture.md §4 rule 6.
 local function hash(text: string): number
@@ -590,11 +589,13 @@ end
 function CustomerService:ExitRoute(node: string): (string?, boolean)
 	const slot = Queue.slotOfNode(node)
 	const avoidQueue = slot == nil or slot == 1
-	const first = pick(EXITS, self.Rng)
+	const exits = Content.Flow.Spawns.Exits
+	const list: { Weighted } = if self:IsNightShift() then exits.Night else exits.Day
+	const first = pick(list, self.Rng)
 	if hasPath(node, first, avoidQueue) then
 		return first, avoidQueue
 	end
-	for _, entry in EXITS do
+	for _, entry in list do
 		if entry.Point ~= first then
 			if hasPath(node, entry.Point, avoidQueue) then
 				return entry.Point, avoidQueue

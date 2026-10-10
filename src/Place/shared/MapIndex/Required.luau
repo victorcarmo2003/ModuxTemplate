@@ -196,7 +196,7 @@ wave2.Tagged = {
 	{
 		Tag = "StreetLight",
 		Attribute = "PostId",
-		Ids = { "JL-01", "JL-02", "JL-03", "JL-04", "JL-05", "JL-06", "JL-07", "JL-08", "JL-09", "P-01" },
+		Ids = { "JL-01", "JL-02", "JL-03", "JL-04", "JL-05", "P-01" },
 	},
 }
 -- thief routes from the street spawn to each lurk (MAP-01 §9.2; AvoidCrossings is the thief's own query)
@@ -232,7 +232,7 @@ local function union(list: { string }, extra: { string }): { string }
 	return out
 end
 
-const STREET_POSTS = { "JL-01", "JL-02", "JL-03", "JL-04", "JL-05", "JL-06", "JL-07", "JL-08", "JL-09", "P-01" }
+const STREET_POSTS = { "JL-01", "JL-02", "JL-03", "JL-04", "JL-05", "P-01" }
 
 -- MapPoints a cutscene stands on, walks to or looks at (Marks, MoveTo with "{slot}" = 1..4, LookAt). LookAt on a
 -- street post is the StreetLight itself (PostId), not a point. Client actors start and end on the explicit ones
