@@ -9,17 +9,21 @@
 -- (Bar_Brew, Att_Cup, VFX_Steam: TRL-COFFEE warns about them) fall back to local attachments derived from the
 -- station box and its Prompt_Brew (Provisional until AST-022 carries the empties).
 -- Coffee stock (Fill / counter) is not drawn here: Stock.luau does not list coffee_machine (out of scope).
+-- Sound (TASK-079; sound-list §5.3 SFX-033): `coffee_brew` loop at the machine while Working; Working -> Ready plays
+-- `coffee_ready` (the soft bell at the end, style guide §10). The steam counts in the shared VFX budget (Fx.luau).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Components = StarterPlayer.StarterPlayerScripts.client.Interface.Components
 local ProgressBar = require(Components.ProgressBar)
 local Context = require(script.Parent.Context)
+local Fx = require(script.Parent.Fx)
 local Slots = require(script.Parent.Slots)
 
 const effect = Vide.effect
 const derive = Vide.derive
 const cleanup = Vide.cleanup
+const untrack = Vide.untrack
 
 const KIND = "coffee_machine"
 const RECORD_SLOT = 0 -- single-record station (network.md §3.5)
@@ -290,6 +294,33 @@ function Coffee.Mount(station: Instance, context: Context.Context)
 		const current = state()
 		emitter.Enabled = current ~= "Empty"
 		emitter.Rate = if current == "Working" then STEAM_RATE_WORKING else STEAM_RATE_READY
+		if emitter.Enabled then
+			Fx.Track(emitter)
+		else
+			Fx.Untrack(emitter)
+		end
+	end)
+	cleanup(function()
+		Fx.Untrack(emitter)
+	end)
+
+	-- Sound: brew loop while Working; bell on Working -> Ready (first record of a late joiner is silent)
+	const audio = context.Audio
+	local last: string? = nil
+	effect(function()
+		const current = state()
+		const previous = last
+		last = current
+		untrack(function()
+			audio.Loop(station, "coffee_brew", host, current == "Working")
+			if previous == "Working" and current == "Ready" then
+				audio.Play(station, "coffee_ready", cupSpot)
+			end
+			return nil
+		end)
+	end)
+	cleanup(function()
+		audio.Loop(station, "coffee_brew", host, false)
 	end)
 end
 

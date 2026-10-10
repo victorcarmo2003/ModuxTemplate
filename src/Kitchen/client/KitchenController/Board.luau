@@ -7,6 +7,9 @@
 --   Ready     BunOpen (sliced, waiting for "Add Sausage"); no bar
 -- The bun swaps to BunOpen when the local bar ends, like the grill. Buns lie end to end along the line of slots
 -- (Att_Bun1/2 = Att_Bun -/+ 0.55 along its X; bun 1.0 long: Provisional until the visual check in the place).
+-- Sound (TASK-079; sound-list §5.3), on transitions only (a late joiner's first record is silent):
+--   Empty -> Working   SFX-024 `bun_slice` at the slot (the 1.5 s automatic cut)
+--   Ready -> Empty     SFX-025 `hotdog_assemble` at the slot ("Add Sausage" took the bun)
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Context = require(script.Parent.Context)
@@ -14,14 +17,42 @@ local Slots = require(script.Parent.Slots)
 
 const effect = Vide.effect
 const derive = Vide.derive
+const untrack = Vide.untrack
 
 const KIND = "board"
 const BUN_HEIGHT = 0.35 -- AST-001 BunClosed (build_items.luau)
 
-local function mountSlot(station: Instance, spot: Slots.Spot, read: Slots.Reader, clock: () -> number)
+local function mountSlot(
+	station: Instance,
+	spot: Slots.Spot,
+	read: Slots.Reader,
+	clock: () -> number,
+	audio: Context.Audio
+)
 	local function progress(): number
 		return Slots.Progress(read, clock)
 	end
+
+	-- state transitions (nil = no record seen yet: the first one is silent)
+	local last: string? = nil
+	effect(function()
+		const record = read()
+		const state = if record then record.State else nil
+		const previous = last
+		last = state
+		if previous == nil or state == nil or previous == state then
+			return
+		end
+		untrack(function()
+			const at = (spot.Host.CFrame * spot.Offset).Position
+			if previous == "Empty" then
+				audio.Play(station, "bun_slice", at)
+			elseif state == "Empty" and previous == "Ready" then
+				audio.Play(station, "hotdog_assemble", at)
+			end
+			return nil
+		end)
+	end)
 
 	const model = derive(function(): string?
 		const record = read()
@@ -59,7 +90,7 @@ function Board.Mount(station: Instance, context: Context.Context)
 		return Slots.AnyWorking(readers)
 	end)
 	for slot, spot in spots do
-		mountSlot(station, spot, readers[slot], clock)
+		mountSlot(station, spot, readers[slot], clock, context.Audio)
 	end
 end
 

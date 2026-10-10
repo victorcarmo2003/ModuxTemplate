@@ -24,7 +24,31 @@ const LINES: { [string]: { string } } = {
 	Refused = {},
 }
 
+-- TASK-079: sound (sound-list §5.4) and one-shot clip (Content.Animations) per Sale result.
+-- Perfect/Complete -> SFX-045 + npc_happy (Cust_Happy; the "pay" beat is the coin on the drawer, EconomyController);
+-- Incomplete -> SFX-046 + npc_complain; Wrong -> SFX-047 + npc_complain; Left -> SFX-048 + npc_refuse_leave;
+-- Refused -> SFX-049 + npc_refuse_leave. Served = something was handed over (SFX-042 `serve`).
+export type Feedback = {
+	Sound: string, -- Content.Sounds key ("" = none)
+	Clip: string, -- Content.Animations key ("" = none)
+	Served: boolean,
+}
+
+const FEEDBACK: { [string]: Feedback } = {
+	Perfect = { Sound = "cust_happy", Clip = "npc_happy", Served = true },
+	Complete = { Sound = "cust_happy", Clip = "npc_happy", Served = true },
+	Incomplete = { Sound = "cust_complain", Clip = "npc_complain", Served = true },
+	Wrong = { Sound = "cust_wrong", Clip = "npc_complain", Served = true },
+	Left = { Sound = "cust_leave", Clip = "npc_refuse_leave", Served = false },
+	Refused = { Sound = "refuse", Clip = "npc_refuse_leave", Served = false },
+}
+const NO_FEEDBACK: Feedback = { Sound = "", Clip = "", Served = false }
+
 const Reactions = {}
+
+function Reactions.Feedback(result: string): Feedback
+	return FEEDBACK[result] or NO_FEEDBACK
+end
 
 -- Kind and line for a Sale result; unknown result = Neutral, no line.
 function Reactions.For(result: string, rng: Random): (Kind, string)

@@ -15,6 +15,10 @@
 	Extension (TASK-030, architecture.md §18.11): add `Grill`, `Rail`, `Board` next to `Stock` as Context.Part
 	modules (`Kinds = { grill = true }`, ...) and list them in PARTS. They read `context.Slot(id)` with the id from
 	the station's `StationId` attribute; nothing else in this file needs to change.
+
+	Sound and VFX (TASK-079): the Context also carries `Audio` (AudioController hooks that stay silent for stations
+	of a vehicle not in use, and for keys not yet in Content.Sounds); the parts play on the record transitions they
+	already watch. Particles go through Fx.luau (shared budget: <= 150 particles, <= 8 emitters near the camera).
 ]]
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -29,6 +33,8 @@ local Rail = require(script.Rail)
 local Board = require(script.Board)
 
 const STATION_TAG = "Station"
+const VEHICLE_TAG = "Vehicle"
+const VEHICLE_ATTRIBUTE = "Vehicle" -- key of Content.Vehicles on the tagged Model (architecture.md §18.1, T36)
 
 -- Visual parts, in mount order (Grill, Rail, Board: TASK-030; shared slot helpers in Slots.luau).
 const PARTS: { Context.Part } = { Stock, Grill, Rail, Board, require(script.Coffee) :: Context.Part } -- Coffee: TASK-069
@@ -36,7 +42,8 @@ const PARTS: { Context.Part } = { Stock, Grill, Rail, Board, require(script.Coff
 export type StockRecord = Context.StockRecord
 export type SlotRecord = Context.SlotRecord
 
-const KitchenController = Modux.Controller("KitchenController", { Priority = 680 })
+const KitchenController =
+	Modux.Controller("KitchenController", { Require = { "AudioController", "RoundController" }, Priority = 680 })
 
 function KitchenController:Setup()
 	-- All 9 ingredients exist from the start (network.md §3.4); false until the first record arrives
@@ -104,8 +111,62 @@ function KitchenController:WriteSlot(id: number, record: SlotRecord?)
 	})
 end
 
+-- Vehicle model a station belongs to (nil = station on the street, e.g. the street trash can)
+local function vehicleOf(station: Instance): Instance?
+	local node = station.Parent
+	while node and node ~= workspace do
+		if CollectionService:HasTag(node, VEHICLE_TAG) then
+			return node
+		end
+		node = node.Parent
+	end
+	return nil
+end
+
+-- Not reactive: reads Shift.Vehicle untracked, so a part may call it inside its effects.
+function KitchenController:IsCurrent(station: Instance): boolean
+	const vehicle = vehicleOf(station)
+	if vehicle == nil then
+		return true
+	end
+	const current = Vide.untrack(self.Dependencies.RoundController.Vehicle)
+	return vehicle:GetAttribute(VEHICLE_ATTRIBUTE) == current
+end
+
+-- Sound hooks handed to the parts (TASK-079; Context.Audio). Keys still missing from Content.Sounds are skipped
+-- without a warn (the row is added by the Content owner; then it just plays).
+function KitchenController:Audio(): Context.Audio
+	const audio = self.Dependencies.AudioController
+	return {
+		Play = function(station: Instance, key: string, at: (Instance | Vector3)?, opts: Context.PlayOptions?)
+			if Content.Sounds.ByKey[key] == nil or not self:IsCurrent(station) then
+				return
+			end
+			audio:Play(key, at, if opts then { Volume = opts.Volume, Speed = opts.Speed } else nil)
+		end,
+		Loop = function(station: Instance, key: string, at: Instance, on: boolean, volume: number?)
+			const row = Content.Sounds.ByKey[key]
+			if row == nil then
+				return
+			end
+			if not on or not self:IsCurrent(station) then
+				audio:Loop(key, at, false)
+				return
+			end
+			const sound = audio:Loop(key, at, true)
+			if sound and volume then
+				sound.Volume = math.clamp(row.Volume * volume, 0, 1)
+			end
+		end,
+		Current = function(station: Instance): boolean
+			return self:IsCurrent(station)
+		end,
+	}
+end
+
 function KitchenController:Context(): Context.Context
 	return {
+		Audio = self:Audio(),
 		Stock = function(ingredient: string): StockRecord?
 			return self:StockOf(ingredient)
 		end,

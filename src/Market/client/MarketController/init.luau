@@ -14,6 +14,12 @@
 	Presentation only: it never buys, never changes cash, stock or levels. Prompts (text, enabled, hold) belong to
 	MarketService/PromptController; the server refuses a buy without cash whatever this shows.
 	Network: listeners on the Economy, Stock and Upgrades sets are registered in OnInit (README, network.md rule 7).
+
+	Sound and VFX (TASK-079; sound-list §5.5; AST-092): an upgrade level going up by one on the same vehicle (and not
+	right after a vehicle swap, which rewrites the levels) plays SFX-064 `buy` on its GEAR WALL card and SFX-065
+	`upgrade_done` + 14 confetti on the vehicle in use (heard at the Pad, FEAT-015). Decided SETTLE s after the record,
+	so a swap whose Shift.Vehicle lands after the Upgrades records stays silent. Package buys have no event here
+	(the Tool arrives through ItemController): SFX-061 is not played by this controller.
 ]]
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -25,6 +31,8 @@ local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local BenchCard = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.BenchCard)
 local ShelfTag = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.ShelfTag)
 local Labels = require(script.Labels)
+-- shared VFX budget (AST-092 ceiling counts the whole screen)
+local Fx = require(StarterPlayer.StarterPlayerScripts.client.Kitchen.KitchenController.Fx)
 
 const TAG = "Interactable"
 const ECONOMY_ID = 1 -- single record (network.md §1 rule 5)
@@ -37,6 +45,12 @@ const SHELF_DISTANCE = 30
 const CARD_OFFSET = Vector3.new(0, 3.4 / 2 + 0.6, 0)
 -- Readable from the Mart door (~36 studs to S1, AST-049 "Leitura").
 const BENCH_DISTANCE = 45
+const VEHICLE_TAG = "Vehicle"
+const VEHICLE_ATTRIBUTE = "Vehicle"
+const SETTLE = 0.5 -- s before an upgrade sound is decided (swap guard)
+const SWAP_GUARD = 2 -- s: level changes this close to a vehicle swap are the swap, not a purchase
+const CONFETTI = 14 -- AST-092 upgrade Emit(14)
+const NEVER = -1e9 -- SwappedAt before any swap
 
 export type View = {
 	Visible: boolean,
@@ -58,7 +72,8 @@ const UNKNOWN_LEVEL = -1
 -- Stock[ingredient].Blocked as seen by the client; Unknown = record not received yet.
 type Availability = "Unknown" | "Open" | "Blocked"
 
-const MarketController = Modux.Controller("MarketController", { Require = { "RoundController" }, Priority = 680 })
+const MarketController =
+	Modux.Controller("MarketController", { Require = { "RoundController", "AudioController" }, Priority = 680 })
 
 function MarketController:Setup()
 	-- Party cash (Economy.Cash). Until the first record arrives nothing is drawn red.
@@ -76,6 +91,64 @@ function MarketController:Setup()
 	end
 	self.Mounted = {} :: { [Instance]: Mounted }
 	self.Gui = nil :: Instance?
+	-- last level seen per upgrade key (UNKNOWN_LEVEL = none) and when Shift.Vehicle last changed (os.clock)
+	self.LastLevel = {} :: { [string]: number }
+	self.SwappedAt = NEVER :: number
+	self.Unmount = nil :: (() -> ())?
+end
+
+-- Bench anchor of a GEAR WALL position (B1..B5), nil when not mounted (streamed out)
+function MarketController:BenchAnchor(slot: string): Instance?
+	for anchor in self.Mounted do
+		if anchor:GetAttribute("BenchSlot") == slot and anchor.Parent then
+			return anchor
+		end
+	end
+	return nil
+end
+
+function MarketController:CurrentVehicle(): Model?
+	const key = Vide.untrack(self.Dependencies.RoundController.Vehicle)
+	for _, vehicle in CollectionService:GetTagged(VEHICLE_TAG) do
+		if vehicle:IsA("Model") and vehicle:GetAttribute(VEHICLE_ATTRIBUTE) == key and vehicle:IsDescendantOf(workspace) then
+			return vehicle
+		end
+	end
+	return nil
+end
+
+-- One-shot; a key still missing from Content.Sounds is skipped quietly
+function MarketController:Cue(key: string, at: Instance)
+	if Content.Sounds.ByKey[key] then
+		self.Dependencies.AudioController:Play(key, at)
+	end
+end
+
+-- Upgrade level change: +1 on the same vehicle, away from a swap = a purchase (presentation only).
+function MarketController:OnLevel(upgrade: Content.Upgrade, level: number)
+	const previous = self.LastLevel[upgrade.Key] or UNKNOWN_LEVEL
+	self.LastLevel[upgrade.Key] = level
+	if previous == UNKNOWN_LEVEL or level ~= previous + 1 then
+		return
+	end
+	const round = self.Dependencies.RoundController
+	const vehicle = Vide.untrack(round.Vehicle)
+	const at = os.clock()
+	task.delay(SETTLE, function()
+		if Vide.untrack(round.Vehicle) ~= vehicle or at - self.SwappedAt < SWAP_GUARD then
+			return
+		end
+		const bench = self:BenchAnchor(upgrade.BenchSpot)
+		if bench then
+			self:Cue("buy", bench)
+		end
+		const model = self:CurrentVehicle()
+		if model then
+			self:Cue("upgrade_done", model)
+			const frame, size = model:GetBoundingBox()
+			Fx.Burst(frame.Position + Vector3.new(0, size.Y / 2, 0), "Confetti", CONFETTI)
+		end
+	end)
 end
 
 -- True when the party can pay `price` (or cash is not known yet: no false red on join).
@@ -354,6 +427,7 @@ MarketController:OnInit(function(self)
 		const upgrade = Content.Upgrades.List[id]
 		if upgrade then
 			self.Levels[upgrade.Key](record.Level)
+			self:OnLevel(upgrade, record.Level)
 		end
 	end
 	net.Upgrades:onAdded(applyLevel)
@@ -362,6 +436,7 @@ MarketController:OnInit(function(self)
 		const upgrade = Content.Upgrades.List[id]
 		if upgrade then
 			self.Levels[upgrade.Key](UNKNOWN_LEVEL)
+			self.LastLevel[upgrade.Key] = UNKNOWN_LEVEL
 		end
 	end)
 
@@ -382,6 +457,19 @@ MarketController:OnInit(function(self)
 end)
 
 MarketController:OnStart(function(self)
+	-- swap guard: remember when Shift.Vehicle changes (the first run is the initial value, not a swap)
+	const round = self.Dependencies.RoundController
+	local first = true
+	self.Unmount = Vide.root(function()
+		Vide.effect(function()
+			round.Vehicle()
+			if first then
+				first = false
+				return
+			end
+			self.SwappedAt = os.clock()
+		end)
+	end)
 	-- PlayerGui may arrive a frame late; do not hold up the other OnStart.
 	task.spawn(function()
 		self:Watch(Players.LocalPlayer:WaitForChild("PlayerGui"))

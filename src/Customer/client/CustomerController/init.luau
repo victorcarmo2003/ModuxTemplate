@@ -18,6 +18,11 @@
 	    mood from the patience (Annoyed is written by the server, network.md §3.6). Cleared when the record goes.
 	  - Sale packet -> ReactionBubble over the rig for REACTION_TIME s (Reactions.luau); the order bubble of that
 	    customer hides meanwhile. The "+$N" on the drawer is EconomyController's.
+	  - Sound and one-shot animation (TASK-079; sound-list §5.4; architecture.md §19.20): "Take Order" (record goes
+	    to Waiting) plays SFX-041 `order_take` on the rig; a Sale plays SFX-042 `serve` (when something was handed
+	    over) and the reaction sound + clip of Reactions.Feedback through AudioController / AnimController. The coin
+	    (SFX-043/044) is EconomyController's, on the drawer. Keys still missing from Content.Sounds are skipped
+	    quietly (the row comes with the Content owner); clips with an empty id do not play (AnimController).
 
 	Listeners in OnInit (before Lync.start, README "Rede"); the late joiner gets the current records through onAdded.
 	Rigs are scanned in OnStart. No input: nothing here is clickable (FEAT-032).
@@ -74,7 +79,10 @@ type Tracked = {
 	Connections: { RBXScriptConnection },
 }
 
-const CustomerController = Modux.Controller("CustomerController", { Require = { "RigController" }, Priority = 670 })
+const CustomerController = Modux.Controller(
+	"CustomerController",
+	{ Require = { "RigController", "AudioController", "AnimController" }, Priority = 670 }
+)
 
 function CustomerController:Setup()
 	self.Entries = {} :: { [number]: Entry }
@@ -147,6 +155,10 @@ function CustomerController:WriteRecord(id: number, record: Record?)
 		PatienceEndsAt = record.PatienceEndsAt,
 		Mood = record.Mood,
 	}
+	const old = Vide.untrack(entry.Record)
+	if old ~= false and old.State ~= "Waiting" and copy.State == "Waiting" then
+		self:Cue(id, "order_take")
+	end
 	const now = workspace:GetServerTimeNow()
 	if copy.PatienceEndsAt <= 0 then
 		entry.EndsAt = 0
@@ -337,6 +349,30 @@ function CustomerController:ClearReaction(model: Model)
 	end
 end
 
+-- One-shot sound on the customer's head (nothing without a rig). Missing key = silent (row not in Content yet).
+function CustomerController:Cue(id: number, key: string)
+	const model = self.Models[id]
+	if model == nil or Content.Sounds.ByKey[key] == nil then
+		return
+	end
+	self.Dependencies.AudioController:Play(key, headOf(model) or model)
+end
+
+-- Sale packet: serve + reaction sound on the rig, reaction clip (npc_happy / npc_complain / npc_refuse_leave).
+function CustomerController:Feedback(id: number, result: string)
+	const feedback = Reactions.Feedback(result)
+	if feedback.Served then
+		self:Cue(id, "serve")
+	end
+	if feedback.Sound ~= "" then
+		self:Cue(id, feedback.Sound)
+	end
+	const model = self.Models[id]
+	if model ~= nil and feedback.Clip ~= "" then
+		self.Dependencies.AnimController:Play(model, feedback.Clip)
+	end
+end
+
 -- Rig tracking: NpcId attribute -> model, re-read on change (pool reuse = new id).
 function CustomerController:Bind(model: Model)
 	const tracked = self.Tracked[model]
@@ -435,6 +471,7 @@ CustomerController:OnInit(function(self)
 
 	net.Sale:onClient(function(sale)
 		self:React(sale.Npc, sale.Result)
+		self:Feedback(sale.Npc, sale.Result)
 	end)
 end)
 

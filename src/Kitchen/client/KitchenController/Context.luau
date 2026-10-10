@@ -22,10 +22,28 @@ export type SlotRecord = {
 	Count: number,
 }
 
+-- Sound hooks (TASK-079). Never reactive (safe inside effects). Every call is for one station: nothing plays for a
+-- station of a vehicle that is not in use (trailer for sale, parked cart), since the Stock set is the party's and
+-- would otherwise sound on both. A key missing from Content.Sounds is skipped quietly (row still to be added).
+export type PlayOptions = {
+	Volume: number?, -- multiplier of the row Volume
+	Speed: number?, -- PlaybackSpeed multiplier (pitch)
+}
+
+export type Audio = {
+	-- one-shot at `at` (Instance or world position)
+	Play: (station: Instance, key: string, at: (Instance | Vector3)?, opts: PlayOptions?) -> (),
+	-- looped voice per (key, at); volume = multiplier of the row Volume, applied on every call while on
+	Loop: (station: Instance, key: string, at: Instance, on: boolean, volume: number?) -> (),
+	-- true when the station is not inside a `Vehicle`, or its vehicle is the one in use (Shift.Vehicle)
+	Current: (station: Instance) -> boolean,
+}
+
 export type Context = {
 	-- Reactive: reading inside a Vide effect re-runs it when the record changes. nil = no record yet.
 	Stock: (ingredient: string) -> StockRecord?,
 	Slot: (recordId: number) -> SlotRecord?,
+	Audio: Audio,
 }
 
 export type Part = {

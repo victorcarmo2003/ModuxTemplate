@@ -10,6 +10,12 @@
 -- Rule of doubt: with no record yet, Fill and counters stay as authored/hidden and bowls stay closed.
 -- Everything here is local (LocalTransparencyModifier, client-side Size/CFrame): other clients and the server
 -- never see these writes, and the next record overwrites them.
+-- Sound and VFX (TASK-079; sound-list §5.3/§5.5, AST-092), from the change between two records of the same capacity
+-- (a vehicle swap changes Capacity and is silent; so is a late joiner's first record and a Blocked flip):
+--   topping Amount down   SFX-026 `topping_squirt` (ketchup, mustard; pitch per sauce) or SFX-027
+--                         `topping_sprinkle` (solids) at the bowl + 6 droplets in the swatch colour
+--   any Amount up         SFX-062 `restock` at the station + dust puff (5)
+-- Sausage, bun and coffee going down are heard on the grill, the board and the machine instead.
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
@@ -20,9 +26,11 @@ local Components = StarterPlayer.StarterPlayerScripts.client.Interface.Component
 local StockCounter = require(Components.StockCounter)
 local StockPlate = require(Components.StockPlate)
 local Context = require(script.Parent.Context)
+local Fx = require(script.Parent.Fx)
 
 const effect = Vide.effect
 const cleanup = Vide.cleanup
+const untrack = Vide.untrack
 
 const TOPPINGS_KIND = "toppings"
 const INTERACTABLE_TAG = "Interactable"
@@ -46,6 +54,14 @@ const SWATCH: { [string]: Color3 } = {
 	bun = Color3.fromHex("#F4D9A0"),
 }
 const DEFAULT_SWATCH = Color3.fromHex("#C9D1D8")
+
+-- SFX-026: the same squirt for both sauces, a different pitch each
+const SAUCE_SPEED: { [string]: number } = {
+	ketchup = 1,
+	mustard = 1.15,
+}
+const DROPS = 6 -- AST-092 sauce Emit(6)
+const DUST = 5 -- AST-092 restock Emit(5)
 
 -- Fill --------------------------------------------------------------------------------------------------------------
 
@@ -283,6 +299,58 @@ local function padlock(station: Instance, suffix: string, lid: Instance?): Insta
 	return copy
 end
 
+-- Sound -------------------------------------------------------------------------------------------------------------
+
+-- Plays on the change between two records with the same Capacity (see header). `at` = bowl or station anchor.
+local function bindSounds(
+	station: Instance,
+	ingredient: string,
+	read: () -> Context.StockRecord?,
+	at: Instance,
+	topping: boolean,
+	audio: Context.Audio
+)
+	local last: Context.StockRecord? = nil
+	effect(function()
+		const record = read()
+		const previous = last
+		last = record
+		if record == nil or previous == nil then
+			return
+		end
+		if record.Capacity ~= previous.Capacity or record.Blocked ~= previous.Blocked then
+			return
+		end
+		const delta = record.Amount - previous.Amount
+		if delta == 0 then
+			return
+		end
+		untrack(function()
+			if not audio.Current(station) then
+				return nil
+			end
+			const position = worldPosition(at)
+			if delta > 0 then
+				audio.Play(station, "restock", at)
+				if position then
+					Fx.Burst(position, "Dust", DUST)
+				end
+			elseif topping then
+				const speed = SAUCE_SPEED[ingredient]
+				if speed then
+					audio.Play(station, "topping_squirt", at, { Speed = speed })
+				else
+					audio.Play(station, "topping_sprinkle", at)
+				end
+				if position then
+					Fx.Burst(position, "Drops", DROPS, SWATCH[ingredient] or DEFAULT_SWATCH)
+				end
+			end
+			return nil
+		end)
+	end)
+end
+
 -- Views -------------------------------------------------------------------------------------------------------------
 
 local function mountBowl(station: Instance, ingredient: string, context: Context.Context)
@@ -307,6 +375,11 @@ local function mountBowl(station: Instance, ingredient: string, context: Context
 		if ref then
 			bindFill(fillPart, ref, read, true)
 		end
+	end
+
+	const soundAt: Instance? = bin or fillPart or label or hostPart(station, nil)
+	if soundAt then
+		bindSounds(station, ingredient, read, soundAt, true, context.Audio)
 	end
 
 	-- DEC-156: lid + padlock only while Blocked. No record yet = closed (rule of doubt, as authored).
@@ -411,6 +484,7 @@ local function mountSingle(station: Instance, ingredient: string, context: Conte
 	end
 
 	const anchor = localAnchor(host, "StockCounter", position)
+	bindSounds(station, ingredient, read, host, false, context.Audio)
 	const gui = StockCounter({
 		Name = "StockCounter",
 		Adornee = anchor,

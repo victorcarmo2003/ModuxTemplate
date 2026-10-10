@@ -17,6 +17,11 @@
 
 	The client never writes money: a sale only changes the number when the server's `Economy` record changes. The
 	"+$N" is presentation of the `Sale` packet, not a prediction of the drawer.
+
+	Sound and VFX (TASK-079; sound-list §5.4; AST-092, AST-082): a Sale with Amount > 0 plays SFX-043 `coin` on the
+	drawer of the vehicle in use and hops 4 coins there (placeholder particles, Fx.luau budget); a Perfect sale (paid
+	inside the tip window) adds SFX-044 `tip` and one brighter coin. No drawer drawn = no sound (nothing to hear it
+	from). Keys still missing from Content.Sounds are skipped quietly.
 ]]
 local Players = game:GetService("Players")
 local CollectionService = game:GetService("CollectionService")
@@ -24,7 +29,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
+local Content = require(ReplicatedStorage.shared.Content)
 local DrawerValue = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.DrawerValue)
+-- shared VFX budget (AST-092 ceiling counts the whole screen)
+local Fx = require(StarterPlayer.StarterPlayerScripts.client.Kitchen.KitchenController.Fx)
 
 const RECORD_ID = 1 -- single record (network.md §1, rule 5)
 const VEHICLE_TAG = "Vehicle"
@@ -37,6 +45,9 @@ const ANCHOR_OFFSET = 0.6
 const FALLBACK_DELAY = 5
 -- Sales are <= 1/s (network.md §4.3); more than this on screen at once only stacks unreadable text
 const MAX_POPS = 4
+const COINS = 4 -- AST-092 payment Emit(4)
+const TIP_COINS = 1 -- AST-092 tip Emit(1)
+const TIP_SPEED = 1.2 -- tip with no `tip` row yet: the coin again, higher (Provisional)
 
 type Mount = {
 	Vehicle: Instance,
@@ -53,7 +64,8 @@ export type Record = {
 	Drawer: number,
 }
 
-const EconomyController = Modux.Controller("EconomyController", { Require = { "RoundController" }, Priority = 790 })
+const EconomyController =
+	Modux.Controller("EconomyController", { Require = { "RoundController", "AudioController" }, Priority = 790 })
 
 function EconomyController:Setup()
 	self.Cash = Vide.source(0) :: Vide.Source<number>
@@ -99,6 +111,51 @@ function EconomyController:PopDone(pop: DrawerValue.Pop)
 		const copy = table.clone(list)
 		table.remove(copy, index)
 		self.Pops(copy)
+	end
+end
+
+-- Where the drawer is drawn now (vehicle in use); nil = nothing drawn
+function EconomyController:DrawerAnchor(): Instance?
+	for _, mount in self.Mounts do
+		if mount.Adornee and mount.Adornee.Parent then
+			return mount.Adornee
+		end
+	end
+	return nil
+end
+
+local function positionOf(instance: Instance): Vector3?
+	if instance:IsA("Attachment") then
+		return instance.WorldPosition
+	elseif instance:IsA("BasePart") then
+		return instance.Position + Vector3.new(0, instance.Size.Y / 2, 0)
+	end
+	return nil
+end
+
+-- Sale feedback on the drawer: coin sound + coins; Perfect adds the tip (presentation only).
+function EconomyController:Chime(amount: number, result: string)
+	const anchor = self:DrawerAnchor()
+	if anchor == nil or amount <= 0 then
+		return
+	end
+	const audio = self.Dependencies.AudioController
+	const position = positionOf(anchor)
+	if Content.Sounds.ByKey.coin then
+		audio:Play("coin", anchor)
+	end
+	if position then
+		Fx.Burst(position, "Coins", COINS)
+	end
+	if result == "Perfect" then
+		if Content.Sounds.ByKey.tip then
+			audio:Play("tip", anchor)
+		elseif Content.Sounds.ByKey.coin then
+			audio:Play("coin", anchor, { Speed = TIP_SPEED })
+		end
+		if position then
+			Fx.Burst(position, "Tip", TIP_COINS)
+		end
 	end
 end
 
@@ -332,6 +389,7 @@ EconomyController:OnInit(function(self)
 	self.Libs.Net.Sale:onClient(function(sale)
 		if sale.Amount > 0 then
 			self:Pop(sale.Amount)
+			self:Chime(sale.Amount, sale.Result)
 		end
 	end)
 end)
