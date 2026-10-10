@@ -4,6 +4,7 @@ Status: Rascunho
 
 Autor: architect. Versão 3.1, 2026-10-08 (conciliação com DEC-106 a DEC-130, rodada 17 e `consistency-report.md` §5;
 alinhada à **DEC-133** — PARE na Juniper, reserva de faixa para NPC — fechando o lado técnico de `Q-131`).
+**Versão 3.2, 2026-10-10 (Fase 1, TASK-002):** §18 novo (binding do MAP-01, kits de asset, layout de módulos), T32–T39.
 Base: `README.md` (raiz, Modux V3), `CLAUDE.md`, `docs/vision.md`, `docs/decisions.md` (DEC-001 a DEC-130),
 `docs/open-questions.md`, `design/proposals-round-1.md` e `proposals-round-2.md` (Aprovados), `story/anomalies.md`
 (Aprovado), `art/style-guide.md` (Aprovado, DEC-126), `levels/MAP-01.md` (Rascunho, revisão 3: rotas e entradas),
@@ -21,10 +22,22 @@ Documentos irmãos:
 
 Nada aqui é código. Fase 0: nenhum arquivo em `src/` muda até a bandeira verde. Nomes de Service, Controller,
 Component, campo e pacote são **propostas**; viram contrato quando o documento for Aprovado.
+Fase 1 (DEC-193): este documento vale como **base Provisória** para construir; o §18 é o contrato de binding e de kits
+que level-designer, modeler-3d e coders seguem na onda 1.
 
 ---
 
 ## 0. O que mudou
+
+### 0.-1 Versão 3.2 (Fase 1, TASK-002, 2026-10-10)
+
+| Tema | Antes | Agora | Origem |
+|---|---|---|---|
+| Binding do mapa | "atributos de prompt", nomes soltos | **§18**: tags reservadas, atributos autorados × de runtime, âncoras por nome só dentro do dono, pontos `MapPoint`, grafo `NpcNode`, checagem | TASK-002; MAP-01 §5, §7; DEC-157, DEC-190 |
+| Kits de asset | `InsertService` nos protótipos | **§18.9–§18.10**: `ReplicatedStorage.Assets` montado em modo de edição; **sem `InsertService` em runtime**; malha só como instância, textura por id em módulo de dados | DEC-146, DEC-151, DEC-166, DEC-167, DEC-181 |
+| Layout de módulos | implícito | **§18.11–§18.13**: `src/<F>/shared/`, filhos de Service, contrato `KitchenService/Stations/*.luau`, `CustomerService/*.luau` | TASK-002 |
+| Estações e Mart | "componentes de estação", componentes `Shelf`/`BenchSlot` | módulos de estação descobertos pelo `KitchenService`; prateleiras e bancada são âncoras `Interactable` (sem Component) | §18.4, §18.12 |
+| Técnicas | T1–T31 | + **T32–T39** (Provisórias, `Q-130`); T35 proposta e **retirada** em favor da T40 de `network.md` §5 (client veste o personagem a partir de atributos) | §14, §18.9.4 |
 
 ### 0.0 Versão 3.1 (rodadas 16 e 17)
 
@@ -143,8 +156,8 @@ Legenda: **E** = existe e será estendido; **N** = novo. Place: L, R, L+R.
 | `Interaction` (N) | `InteractionService` | `PromptController` + `Prompt` | prompt custom (DEC-066); **único** responder de `Interact` |
 | `Item` (N) | `ItemService` | `ItemController` | Tools (pacotes, Coffee, HotDog, **Revive**), contagem, limite, **stash** (sair, cair, respawn), **item derrubado** no mundo |
 | `Character` (N) | `CharacterService` | `CharacterController` | spawn controlado (`LoadCharacter`), grupo de colisão, **ragdoll R6 só no atropelamento** (juntas pré-montadas), **desmaio por animação** (sanidade 0), "atordoado até", controles desligados em cutscene |
-| `Kitchen` (N) | `KitchenService` + componentes de estação | `KitchenController` + visuais | estoque, estações, montagem, restock |
-| `Market` (N) | `MarketService` + componentes `Shelf`, `BenchSlot` | `MarketController` | prateleiras (pacotes), **bancada** (upgrades básicos sempre à venda + **1 vaga especial** sorteada por turno, DEC-106). O Food Trailer **não** passa aqui (DEC-107) |
+| `Kitchen` (N) | `KitchenService` + módulos `Stations/*.luau` (§18.12) | `KitchenController` + visuais | estoque, estações, montagem, restock |
+| `Market` (N) | `MarketService` (prateleiras e vagas da bancada são âncoras `Interactable`, §18.4) | `MarketController` | prateleiras (pacotes), **bancada** (upgrades básicos sempre à venda + **1 vaga especial** sorteada por turno, DEC-106). O Food Trailer **não** passa aqui (DEC-107) |
 | `Upgrade` (N) | `UpgradeService` | `UpgradeController` | nível por upgrade, efeito, peça visível; **compra delegada pela bancada** |
 | `Vehicle` (N) | `VehicleService` | — | carrinho → trailer; **prompt de compra no próprio trailer** no estacionamento a partir do dia 5 (DEC-107, FEAT-016), preço × `PriceParty`; troca no fim do turno |
 | `Npc` (N) | `NpcService` + `Walker` | `NpcController` | pool R6, teto de 12, rotas por grafo, LOD; nó de faixa pede reserva ao `TrafficService` (DEC-133, §8.1) |
@@ -806,6 +819,14 @@ versão a proposta vem, não se foi aprovada.
 | T26 | Streaming ligado com raio mínimo que cobre o mapa (`Q-087`); colisão jogador–jogador desligada (`Q-086`) | streaming desligado | nova |
 | T30 | NPC cruza só na faixa com reserva do servidor (`TrafficService:ReserveCrossing`/`ReleaseCrossing`, sem rede): concedida sem carro a < 15 studs da linha e ≥ 4 s depois da última liberação; carros param na linha; reserva expira em 4 s (failsafe `PivotTo` do NPC); nenhum carro para dentro da faixa (DEC-133) | NPC atropelável; NPC só em brecha sem carro parar (`IsCrossingClear`, versão 3.1 inicial, incompatível com DEC-133); fila física de carros | nova na 3.1, revista por DEC-133 (`Q-131`) |
 | T31 | Postes da Juniper: emissiva em todos, `SpotLight` sem sombra em um a cada dois + P-01, corte por distância no client; `LightZone` separada da luz visual | `SpotLight` em todos (estoura ≤ 18) | nova na 3.1 |
+| T32 | Binding do mapa por **tag + atributo** (autorado × runtime); âncora por nome só **dentro do dono** achado por tag; índice compartilhado `MapIndex` (§18.1–§18.8) | caminhos de pasta (`workspace.MAP01_Assets.Cart...`); busca global por nome; `MapId` como chave de código | nova na 3.2 |
+| T33 | `EntityId` atribuído pelo servidor no registro (ordem estável por `GetFullName`), escrito como atributo de runtime; nunca autorado; snapshot nunca usa `EntityId` | id autorado no place (colisão, esquecimento, retrabalho a cada mudança de mapa) | nova na 3.2 |
+| T34 | Kits em `ReplicatedStorage.Assets` montados em **modo de edição** por script reproduzível; **sem `InsertService` em runtime**; malha só como instância; id de textura/imagem em módulo de dados (`CrewLooks`, `Content`) | `InsertService:LoadAsset` em runtime (só funciona com asset do dono do place, latência, falha de rede); `MeshId` por código (não é gravável em runtime) | nova na 3.2 |
+| ~~T35~~ | ~~Visual da crew aplicado no servidor; Night de NPC só no client~~ → **retirada**: vale a **T40** de `network.md` §5.1 (servidor monta a geometria e escreve atributos; **cada client veste** textura e rosto), que segue o texto da DEC-167/169 ("servidor replica a faixa; cada client aplica a textura"). Id T35 não é reaproveitado | — | proposta e retirada na 3.2 |
+| T36 | Veículos vivem no `Workspace` e são **reposicionados** (`PivotTo`); estação de veículo que não é o atual fica com prompt desligado | trocar o veículo entre `ServerStorage` e `Workspace` (quebra registro por tag e streaming) | nova na 3.2 |
+| T37 | `KitchenService` descobre `Stations/*.luau` sozinho; uma inscrição por chave de ação no `InteractionService`; despacho pela `StationKind` do dono da âncora (§18.12) | lista estática no init (conflito de merge entre tasks paralelas); um Component por estação (estado espalhado, snapshot difícil) | nova na 3.2 |
+| T38 | Peça de upgrade alternada por **visibilidade**, nunca reparentada; âncoras de prompt e de vaga ficam fora da peça (filtro `Level` quando a posição muda por nível) | trocar o modelo inteiro da estação a cada nível (perde tags e atributos) | nova na 3.2 |
+| T39 | Grafo `NpcNode` por atributos (`NodeId`, `Links`, `Crosswalk`); aresta ≤ 40 studs (limite de 8 s do `MoveTo`); A* determinístico com desempate por `NodeId` (servidor e client) | `ObjectValue` por aresta (some no client com streaming); `PathfindingService` em runtime | nova na 3.2 |
 
 ## 15. Propostas ao usuário: situação
 
@@ -881,3 +902,502 @@ T30, `network.md` §3.11, `content-data.md` §3.14 (as linhas de `levels/MAP-01.
 Fechadas por DEC e já aplicadas aqui: `Q-121` (DEC-111), `Q-125` (DEC-112), `Q-126` (DEC-113), `Q-116`/`Q-117`/`Q-118`
 (DEC-106/107/108), `Q-044` (DEC-127), partes de `Q-107` (DEC-115, DEC-116, DEC-129).
 Restrições técnicas para o que segue aberto: `Q-120` f (§6.4, §9), `Q-103` (§8.1: 0 ou 1 carro à noite suportados).
+
+## 18. Binding do MAP-01, kits de asset e layout de módulos (TASK-002)
+
+Status da seção: **Provisória** (DEC-193: base para construir). Técnicas T32–T39 aguardam o usuário em `Q-130`;
+altura da bancada do carrinho depende de `Q-153`; posições de vaga da grelha L2/L3 dependem de `Q-134` (c).
+Fontes: `levels/MAP-01.md` §5, §7, §9.1; `tools/assetplace/MAP-01_placements.luau`, `place_assets.luau`,
+`build_crew.luau`; `tools/blockout/MAP-01_blockout.luau`; `Assets/import/_asset_ids.json`,
+`Assets/textures/character/_texture_ids.json`; encaixes lidos dos `.fbx` de `Assets/import/` nesta sessão; DEC-142,
+DEC-146, DEC-151, DEC-156, DEC-157, DEC-166 a DEC-169, DEC-174, DEC-181, DEC-184, DEC-186, DEC-190, DEC-201, DEC-207.
+
+Quem usa: level-designer (TASK-005), modeler-3d (TASK-006, TASK-007), backend e frontend (TASK-010 em diante).
+Chaves de `Content` citadas aqui (`StationKind`, ações, pacotes, itens) são as de `content-data.md`; onde a tabela
+ainda não fechou, a chave proposta está marcada e a nota ao dono está em §18.14.
+
+### 18.0 Princípios
+
+1. **O código acha coisas por tag + atributo**, nunca por caminho de pasta. `workspace.MAP01_Assets`, `Cart`,
+   `MartInterior` são organização do level-designer e podem mudar sem tocar em código.
+2. **Três camadas.** Tag = *o que é* (§18.1). Atributo autorado = *qual* (estação, ação, vaga, ponto) (§18.2).
+   Nome de encaixe = peça **dentro de um dono já achado por tag** (nomes dos `.fbx` e de `asset-list.md`). Busca global
+   por nome é proibida.
+3. **Autorado × runtime.** O level-designer escreve só atributo autorado; o código escreve só atributo de runtime.
+   Nunca os dois no mesmo atributo.
+4. **Valores são chaves.** Atributo semântico guarda chave de `Content` (minúsculas_com_underscore) ou ID do
+   `MAP-01.md` **literal** (`Q1`, `PS-3`, `SP-A`).
+5. **Só o `Workspace` conta.** Instância tagueada fora do `Workspace` (`ServerStorage`, `nil`, kits em
+   `ReplicatedStorage`) é ignorada pelos registros.
+6. **Streaming:** todo `Model` que contém tag de gameplay tem `ModelStreamingMode = Persistent` (T26). A checagem
+   (§18.7) recusa o que não tiver.
+7. **Snapshot usa chave estável** (`StationKind` + veículo + `Slot`/`Ingredient`; `PointId`), nunca `EntityId` nem
+   `StationId` (que nascem a cada servidor).
+8. `MapId` e `Asset` (escritos por `place_assets.luau` em todo modelo colocado) são **metadado de ferramenta**:
+   o código não lê. Vários modelos têm o mesmo `MapId` (`MKT`), por isso ponto usa `PointId`, não `MapId`.
+
+### 18.1 Tags reservadas (`CollectionService`)
+
+Nenhum Modux Component usa uma tag desta lista (Component usa o próprio nome como tag, como `Vital`). Isso evita que o
+`ComponentManager` construa um objeto para cada estação ou ponto sem querer.
+
+| Tag | Vai em | Quem lê | Onda |
+|---|---|---|---|
+| `MapBinding` | **um** `Model` raiz (`workspace.MapBinding`, Persistent) que agrupa pontos e nós | `MapIndex` (§18.8) | 1 |
+| `MapPoint` | `Part` invisível (1 × 1 × 1) com `PointId` | `MapIndex` → Character, Customer, Npc, Opal, Ambulance, Cutscene | 1 |
+| `NpcNode` | `Part` invisível com `NodeId`/`Links` (pode ser a mesma `Part` de um `MapPoint`) | `MapIndex` → `NpcService` (servidor), `AmbulanceController` (client, T28) | 1 |
+| `Vehicle` | `Model` do veículo (`cart`; `trailer` na onda 2) | `VehicleService`, `KitchenService`, `ThiefService`, `EconomyController` | 1 |
+| `Station` | `Model` de uma estação da cozinha, **descendente** do `Model` do veículo | `KitchenService`, `KitchenController` | 1 |
+| `Interactable` | âncora de prompt (`Attachment`, ou `BasePart` invisível) | `InteractionService`, `PromptController` | 1 |
+| `AnimalRig` | modelo montado por `CrewRig.Build` (crew e NPC; Opal local também) | client: veste textura e rosto a partir dos atributos (`network.md` §5.1, T40), inclusive modelo que chega por streaming | 1 |
+| `UpgradePiece` | peça visível de nível de upgrade | `UpgradeService` | 1 (Cooler, Grill) |
+| `LightZone` | volume de luz de jogo (LZ-1..5) | `VitalService`, `AnomalyService` | 2 |
+| `StreetLight` | poste (JL-01..09, P-01) | `AnomalyController`, corte local T31 | 2 |
+
+### 18.2 Atributos
+
+**Autorados** (level-designer na TASK-005; modeler-3d nos kits):
+
+| Atributo | Tipo | Em | Valores | Obrigatório |
+|---|---|---|---|---|
+| `PointId` | string | `MapPoint` | ID do MAP-01 (`PS-1`, `Q1`, `D1`, `OP-1`…), único no place | sim |
+| `NodeId` | string | `NpcNode` | ID único; se a `Part` também é `MapPoint`, omitir (vale o `PointId`) | sim, salvo nesse caso |
+| `Links` | string | `NpcNode` | `NodeId`s vizinhos separados por vírgula, sem espaço (`Q2,N-Z02-04`) | sim (≥ 1) |
+| `Crosswalk` | string | `NpcNode` | `CW-1`..`CW-4`, só nos dois nós de meio-fio de cada faixa | não |
+| `Vehicle` | string | `Vehicle` | chave de `Content.Vehicles` (`cart`, `trailer`) | sim |
+| `StationKind` | string | `Station` | chave de `Content.Stations` (§18.4) | sim |
+| `Ingredient` | string | `Station` (estação de um ingrediente só) ou `Interactable` (tigela) | chave de `Content.Ingredients` | conforme §18.4 |
+| `PromptAction` | string | `Interactable` | chave de `Content.Actions` | sim |
+| `Slot` | int ≥ 1 | `Attachment` de vaga (grelha, trilho, tábua) e o `Interactable` que age numa vaga | 1..n, da esquerda para a direita vista do corredor | conforme §18.4 |
+| `Level` | int ≥ 1 | âncora cuja posição muda por nível de upgrade | nível em que a âncora vale; sem `Level` = vale em todos | não |
+| `Package` | string | `Interactable` de prateleira do Mart | chave de `Content.Packages` | sim, nas prateleiras |
+| `BenchSlot` | string | `Interactable` da bancada | `B1`..`B5`, `S1` (MAP-01 §7.4) | sim, na bancada |
+| `Upgrade`, `Level` | string, int | `UpgradePiece` | chave de `Content.Upgrades`, nível que a peça mostra | sim |
+| `TopHeight` | number (studs) | cobertura em `Assets.Items.Toppings` | altura do pivô ao topo real (DEC-142) | sim |
+
+**De runtime** (escritos pelo dono; lidos por quem está na coluna):
+
+| Atributo | Tipo | Em | Escreve | Lê |
+|---|---|---|---|---|
+| `EntityId` | int 1..65535 | `Interactable` | `InteractionService` (registro, T33) | `PromptController` → `Interact{Id}` |
+| `PromptEnabled` | bool | `Interactable` | dono da ação (Kitchen, Market, Round, Customer…) | `PromptController` (falso = não aparece) |
+| `PromptText` | string | `Interactable` | dono da ação, quando o texto muda ("Restock (7/12)", "Grill Lv2 — $60") | `PromptController`; ausente = `Content.Actions[PromptAction].Text` |
+| `PromptHold` | number (s) | `Interactable` | dono da ação, só quando **difere** da tabela | `PromptController`; ausente = `Content.Actions[...].Hold` |
+| `PromptAction` | string | `Interactable` **criado em runtime** (cliente NPC) | dono (ex.: `take_order` → `serve`) | `PromptController` reage à mudança |
+| `StationId` | int | `Station` | `KitchenService` | `KitchenController` (liga instância ↔ registro do set `Stations`, §18.14) |
+| `Species`, `Outfit`, `CustomerType`, `LookPack` | string | modelo com tag `AnimalRig` (crew e NPC) | servidor: `CharacterService` (crew), `NpcService` (NPC) — `network.md` §5.2 | client que veste (`CrewRig.Dress`, T40); `CameraController` |
+| `NpcId` | int | rig de NPC | `NpcService`, novo a cada spawn (`network.md` regra 5) | `CustomerController`; `InteractionService` (âncora → rig → `NpcId`) |
+| `Item`, `Count`, `Toppings` | string, int, string | Tool clonada | `ItemService` | `ItemController`, `HotDogVisual`, `PromptController` (pré-checagem de "Add X") |
+
+Raio do prompt: sempre `Content.Actions[PromptAction].Radius` (FEAT-005: estações 7, clientes 10, placas 10), lido
+pelos dois lados; o servidor soma a folga na validação (TASK-011).
+
+### 18.3 Âncoras de prompt (`Interactable`)
+
+- **Tipo:** `Attachment` (preferido; `BillboardGui.Adornee` aceita, posição = `WorldPosition`). `BasePart` invisível é
+  aceita (`Transparency 1`, `CanCollide`/`CanQuery`/`CanTouch` falsos); o código usa um só helper para os dois casos.
+- **Origem:** os empties `Prompt_*` dos `.fbx` (lista em §18.4). Onde o `.fbx` não tem (caixa de pães, placa OPEN,
+  gôndolas), a TASK-005 cria um `Attachment` com o mesmo padrão de nome (`Prompt_<Ação>`), só para leitura humana: o
+  código não lê o nome, lê a tag e os atributos. **A TASK-005 confere no place** se os empties chegaram como
+  `Attachment`; nome divergente se corrige no place, não no código.
+- **Uma âncora, uma ação por vez.** Duas ações no mesmo objeto = duas âncoras (ex.: tigela com `Prompt_Use_<Ing>` e
+  `Prompt_Restock_<Ing>`). Âncora de runtime pode trocar `PromptAction` (cliente: "Take Order" → "Serve").
+- **Dono da âncora** = o `Station` ancestral; se não houver, o `Model` ancestral mais próximo. Encaixes por nome
+  (`Price_Anchor_B1`, `Fill_Ketchup`, `Value_Anchor`) são buscados **só dentro do dono** (ou do `Vehicle`, §18.4).
+- **Registro (servidor, T33):** `InteractionService` no `OnStart` varre `GetTagged("Interactable")` dentro do
+  `Workspace`, ordena por `GetFullName()` e dá `EntityId` 1, 2, 3…; escuta `GetInstanceAddedSignal`/`Removed` para
+  âncoras de runtime (NPC, item derrubado). Id liberado volta ao uso só depois de 10 s (evita `Interact` atrasado cair
+  no alvo errado).
+- **Registro (client):** `PromptController` usa a mesma tag; âncora sem `EntityId` ainda não existe para ele (espera
+  `GetAttributeChangedSignal("EntityId")`).
+- **Visibilidade por jogador** (FEAT-005: "Add Ketchup" só com Hot Dog na mão) é pré-checagem **local** do client
+  (`Content.Actions[...].Requires` + Tool na mão + atributo `Toppings`); `PromptEnabled` é o estado **global**. O
+  servidor sempre revalida (TASK-011).
+
+### 18.4 Estações e âncoras da onda 1 (carrinho, Mart)
+
+Prefixo de modelo = `id` de `MAP-01_placements.luau`. Na TASK-005 os modelos `CART-*` viram **descendentes** do modelo
+`CART` (tag `Vehicle`, `Vehicle = "cart"`): o veículo da estação é o `Vehicle` ancestral (sem atributo repetido) e o
+conjunto anda junto no `PivotTo` (T36).
+
+`StationKind` proposto (dono da tabela: TASK-001, §18.14). Ações = chaves de `content-data.md` §3.18.
+
+| MAP-01 §7.1 | Modelo | `StationKind` | `Ingredient` da estação | `Interactable` (âncora → `PromptAction`, extras) | Vagas (`Slot`) | Encaixes por nome lidos |
+|---|---|---|---|---|---|---|
+| S estoque | `CART-S` AST-018 CoolerL1 | `sausage_stock` | `sausage` | `Prompt_Take` → `grill_place` ("Grill", FEAT-006 passo 1); `Prompt_Restock` → `restock` | — | `Fill`, `Lid`, `VFX_Upgrade` |
+| G grelha | `CART-G` AST-012 RollerGrill | `grill` | — | cada vaga é também âncora: `Att_Slot<n>` → `grill_collect`, `Slot = n` | `Att_Slot1..4` → `Slot` 1..4 (L1 usa 1–2, L2 1–3, L3 1–4, DEC-201). O `.fbx` tem 6: a TASK-005 escolhe as 4 dos rolos usados e marca `Level` se a posição mudar (`Q-134` c) | — (barra = `ProgressBar` na vaga) |
+| R trilho | `CART-R` AST-013 `Rail_6` | `rail` | — | nenhuma (`Prompt_Rail` fica **sem tag**: "Add Sausage" é na tábua) | `Slot1..6` → 1..6 (trailer 8) | — |
+| B pão | `CART-B` AST-015 BunCrate | `bun_crate` | `bun` | `Prompt_Take` → `bun_cut` ("Slice Bun", hold 0,5); `Prompt_Restock` → `restock`. **O `.fbx` não tem empties: TASK-005 cria** | — | `Fill` (se existir) |
+| T tábua | `CART-T` AST-014 CuttingBoard | `board` | — | `Prompt_Board` → `board_add_sausage` (**um** prompt; o servidor escolhe a vaga com pão cortado mais antiga, DEC-190) | **2 vagas compartilhadas** (DEC-190): `Att_Bun1`, `Att_Bun2` com `Slot` 1, 2, criadas pela TASK-005 a partir de `Att_Bun` | — |
+| K complementos | `CART-K` AST-017 ToppingGrid | `toppings` | — (por âncora) | por ingrediente: `Prompt_Use_<Suf>` → `topping_add` ("Add {item}") + `Ingredient`; `Prompt_Restock_<Suf>` → `restock` + `Ingredient` | — (a "vaga" é o ingrediente) | `Fill_<Suf>`, `Label_<Suf>` (SurfaceGui + ícone, DEC-156), `Lid_<Suf>`, `Att_Lock_<Suf>` (cadeado do bloqueio; **novo**, no modelo de tigelas da DEC-156; até lá o cadeado vai no centro de `Lid_<Suf>`) |
+| H/$ entrega + gaveta | `DRAWER` AST-020 | — (**não é `Station`**) | — | nenhuma na onda 1: "Serve" é **no cliente** (DEC-190). `Prompt_Serve`/`Prompt_Drawer` ficam sem tag | — | buscados dentro do `Vehicle`: `Value_Anchor` (valor da gaveta, TASK-024; **o `.fbx` atual não tem: TASK-005 cria** no topo da POS), `Bar_Thief`, `VFX_Coins` |
+| lixeira BIN-C | `BIN-C` AST-025 | `trash` | — | `Prompt_Discard` → `discard` ("Throw Away", hold 0,5) | — | `Lid` |
+| placa OPEN | `OPEN` AST-024 | — (**não é `Station`**; fica no mapa, não no veículo: MAP-01 §7.3) | — | `Prompt_Open` → `open_sign` (**criar**; `RoundService`, TASK-012) | — | — |
+| veículo | `CART` AST-026 | — | — | — | — | `Zone_Center` (raio 14 do ladrão, DEC-050), `Mount_*` (só ferramenta) |
+
+`<Suf>` = chave do ingrediente em PascalCase (`ketchup` → `Ketchup`, `potato_sticks` → `PotatoSticks`,
+`cream_cheese` → `CreamCheese`), que é exatamente o sufixo dos `.fbx`. Regra fixa, sem tabela.
+Grade (MAP-01 §7.1): frente `Ketchup`, `Mustard`, `Cheese` (X 45, 47, 49); fundo `Bacon`, `PotatoSticks`,
+`CreamCheese`. Os empties `Att_Cell_F1..B3` são internos do asset: o código não lê (e `B1..B3` ali não têm relação com
+a bancada nem com o prédio B1).
+
+**Mart (MAP-01 §7.4).** Não há `Station`: são `Interactable` soltos, dono = o `Model` ancestral.
+
+| Âncora | Onde | `PromptAction` | Extras |
+|---|---|---|---|
+| 9 prateleiras | `Attachment`/`Part` `BUY-<Nome>` nas posições da tabela "Ponto de compra" (as gôndolas e geladeiras **não** têm empties; a TASK-005 cria dentro de um `Model` `MKT-SHELVES`, Persistent), altura ~4,5 do piso | `buy_package` | `Package` = `pack_sausages`, `pack_buns`, `pack_ketchup`, `pack_mustard`, `pack_cheese`, `pack_bacon`, `pack_potato_sticks`, `pack_cream_cheese`, `pack_coffee` (chaves de `Content.Packages`; TASK-001 confirma) |
+| bancada B1–B5 | `Prompt_Buy_B1..B5` do AST-049 (`GEAR_WALL`) | `bench_buy_upgrade` | `BenchSlot` = `B1`..`B5`. Qual upgrade está em cada vaga é **dado** (`Content.Upgrades.BenchSpot`), não atributo do place |
+| bancada S1 | `Prompt_Buy_S1` do AST-049 | `bench_buy_item` | `BenchSlot = "S1"` |
+
+Encaixes do AST-049 lidos pelo `MarketController` dentro do dono: `Price_Anchor_<Slot>`, `PriceTag_<Slot>`,
+`Slot_<Slot>` (miniatura), `Light_S1`, `VFX_Rare`. Prateleira usa a própria âncora como lugar do preço.
+
+**Âncoras de runtime** (mesmo contrato, criadas pelo dono): cliente NPC = `Attachment` `Prompt_Customer` no
+`HumanoidRootPart` do rig do pool (criado uma vez por rig pelo `NpcService`; `PromptAction` trocado pelo
+`CustomerService`: `take_order` → `serve`; "Refuse" numa segunda âncora `Prompt_Refuse`, 1,5 abaixo); item derrubado =
+a própria Tool no `Workspace` com `pick_up_item` (`network.md` §7).
+
+**Onda 2 (mesmo padrão, sem detalhar agora):** trailer (`Vehicle = "trailer"`, estações iguais às do carrinho com
+`Rail_8`; `Prompt_Brew`/`Prompt_Restock` da cafeteira; `Prompt_Switch`; `Hide_1..4` → `hide` + `Slot`; `Prompt_Buy` no
+trailer à venda → `buy_trailer`; `Prompt_Answer` do telefone; lixeiras de rua com `Prompt_Discard`, DEC-200, `Q-166`).
+
+**Peças de upgrade (T38).** `UpgradePiece` com `Upgrade`/`Level`; o `UpgradeService` mostra a do nível atual e
+esconde as outras (guarda `Transparency`/`CanCollide`/`CanQuery` originais em atributos, como `place_assets.hide`),
+**sem reparentar**. Peça não contém `Interactable` nem `Attachment` de vaga: esses ficam na raiz da estação (com
+`Level` se a posição muda). Nível é **por veículo** (DEC-184): a peça do trailer é outra instância.
+
+### 18.5 Pontos (`MapPoint`)
+
+- `Part` 1 × 1 × 1, `Anchored`, `Transparency 1`, `CanCollide`/`CanQuery`/`CanTouch` falsos, dentro de
+  `workspace.MapBinding` (pasta livre). **Posição** = no chão onde se pisa (Y do piso, por raycast; os marcadores do
+  blockout ficam a Y 1,2 e precisam descer). **Frente** = `LookVector`, horizontal (os marcadores do blockout já usam
+  `CFrame.lookAt` com `face`: copiar o giro).
+- Os marcadores de `MAP01_Blockout.Markers` têm os mesmos IDs e servem de fonte; o binding **não** fica dentro do
+  blockout (ele sai em produção).
+- Spawn de personagem: `HumanoidRootPart` em `ponto.Position + (0, 3, 0)` com a frente do ponto.
+
+| `PointId` (MAP-01) | § | Quem lê | Uso | Onda |
+|---|---|---|---|---|
+| `PS-1`..`PS-4` | 5.1 | `CharacterService` | spawn de dia, reconexão, atrasado; olhando para o norte | 1 |
+| `Q1`..`Q5` | 5.1 | `CustomerService` (fila), também `NpcNode` | vagas do balcão; `Q1` olha para o sul (carrinho), `Q2..Q5` para o leste | 1 |
+| `D1`, `SP-A`, `EX-E` | 5.3 | `NpcService`, também `NpcNode` | chegada/saída | 1 |
+| `OP-1` | 7.4 | `OpalController` (client, TASK-038) | onde a Opal é montada, olhando para dentro da loja; raio de fala 8 a partir dele | 1 |
+| `PS-N1..4`, `REV-1..4`, `AMB-M`, `AMB-P`, `SPEC-P`, `SPEC-M`, `SS`, `SP-B`, `L1..L3`, `ST-R`, `H1..H4`, `CS-*`, `WALKER-0..10`, `AN-*`, `AS-*`, `W-IN`…`JS-OUT`, `CART`, `TRL`, `TRL-SALE` | 5.1–5.6, 9, 11 | Services da onda 2 | mesma regra | 2 |
+
+Bancada (`B1`..`B5`, `S1`) **não** é `MapPoint`: é valor de `BenchSlot`. Assim `B1` nunca vira `PointId` e não colide
+com o prédio B1 (MAP-01 §4, Z-09) nem com a letra "B" do pão. Ponto novo que não existe no MAP-01 (ex.: pivô do
+carrinho sob a lona, DEC-199) ganha ID novo registrado pelo level-designer no MAP-01 antes de ser usado.
+
+### 18.6 Grafo `NpcNode`
+
+| Regra | Valor |
+|---|---|
+| Nó | `Part` invisível (como `MapPoint`), Y no piso; `NodeId` = `N-<zona>-<nn>` (`N-Z02-03`) ou o `PointId` quando o nó é ponto (`SP-A`, `D1`, `EX-E`, `Q1`..`Q5`) |
+| Aresta | `Links` em pelo menos um dos lados; o `MapIndex` simetriza (não direcionado) |
+| Aresta válida | reta caminhável, sem obstáculo, **≤ 40 studs** (`Humanoid:MoveTo` desiste em 8 s; cliente anda ~8 studs/s) |
+| Pista | nenhuma aresta cruza pista, **salvo** a aresta de faixa: os dois nós de meio-fio de uma faixa têm o mesmo `Crosswalk` (`CW-4`) e se ligam; essa aresta pede reserva ao `TrafficService` (DEC-133). Onda 1: sem trânsito, a aresta é livre (TASK-031) |
+| Fila | `Q5`–`Q4`–`Q3`–`Q2`–`Q1` em cadeia; a chegada liga só em `Q5` (ponta oeste); saídas saem de `Q1` (→ `EX-E` pela LANE-E; → `D1`) |
+| Tamanho | ≤ 80 nós (§12.3) |
+| Busca | A* com custo euclidiano, desempate por `NodeId` (ordem de string): mesmo caminho no servidor e no client (T28, T39) |
+| Ladrão | evita arestas de faixa (nunca cruza pista, MAP-01 §9.2) |
+| Onda 1 obrigatório | um componente conexo com `SP-A`, `D1`, `EX-E`, `Q1`..`Q5`, seguindo `ROUTE-SP-A`, `ROUTE-D1-IN`, `ROUTE-QUEUE`, `ROUTE-EXIT-E`, `ROUTE-EXIT-D1` do blockout. `SP-B`, `ST-R`, espreitas: onda 2 |
+
+### 18.7 Checagem (aceite da TASK-005)
+
+Ferramenta de edição `tools/assetplace/check_binding.luau` (protótipo da TASK-005, roda no Command Bar) e, em runtime,
+`MapIndex.Validate` (§18.8) com a **mesma lista** (`src/Place/shared/MapIndex/Required.luau`). Falha = lista de
+problemas; zero problema = aceite.
+
+1. Toda tag de §18.1 da onda 1 presente; `MapBinding` exatamente 1; `PointId` e `NodeId` únicos.
+2. Todo `PointId`/`Station`/`Interactable` exigido por §18.4–§18.6 existe (lista em `Required.luau`).
+3. Atributo com valor fora de `Content` (`StationKind`, `PromptAction`, `Ingredient`, `Package`) = erro.
+4. Âncoras de **estações vizinhas** a ≥ 2,5 studs (MAP-01 §7); dentro da grade de complementos vale 2,0 (uma
+   ação aparece por vez: "Add" exige Hot Dog, "Restock" exige pacote).
+5. `Station` descendente de um `Vehicle`; todo `Model` com tag de gameplay `Persistent`; nada tagueado fora do
+   `Workspace`.
+6. Grafo conexo; `Links` sem id desconhecido; nenhuma aresta > 40 studs; nenhuma aresta cruza os retângulos de pista
+   do MAP-01 (Z-03, Z-07, Z-08) fora de aresta de faixa.
+7. Pivôs das estações do carrinho a y 3,45 (bancada 3,0, DEC-157; **Provisório até `Q-153`**: se a altura mudar,
+   mudam os pivôs, o binding não).
+8. Ao passar, grava na raiz `MapBinding`: `BindingVersion` (int, +1 por mudança), `PointCount`, `NodeCount`,
+   `InteractableCount`. O client usa as contagens para saber que o streaming entregou tudo (§18.8).
+
+### 18.8 `MapIndex` (código compartilhado de leitura do mapa)
+
+`src/Place/shared/MapIndex/` → `ReplicatedStorage.shared.Place.MapIndex`. Puro: sem Modux, Lync, Vide nem `self.Libs`;
+cache preenchido na primeira chamada. Nota ao task-planner: **nenhuma task da onda 1 tem este módulo**; o natural é
+a TASK-010 (Place), antes da TASK-031.
+
+```lua
+MapIndex.WaitReady(timeout: number?): boolean          -- client: espera as contagens da raiz MapBinding
+MapIndex.Point(id: string): CFrame                     -- error se faltar
+MapIndex.FindPoint(id: string): CFrame?
+MapIndex.Points(prefix: string): { [string]: CFrame }  -- "PS-", "Q", "REV-"
+MapIndex.Node(id: string): { Position: Vector3, Links: { string }, Crosswalk: string? }
+MapIndex.Path(from: string, to: string, opts: { AvoidCrossings: boolean? }?): { string }?
+MapIndex.Validate(required: Required.List): { string } -- problemas (vazio = ok)
+```
+
+`PlaceService` (servidor) roda `Validate` no `OnStart`: no Studio, problema = `error` (falha alta, R8); em servidor
+publicado, `warn` e segue. Registro de `Interactable` e `Station` **não** passa pelo `MapIndex`: é do
+`InteractionService` e do `KitchenService` (donos únicos, §4 regra 1).
+
+### 18.9 Kits de asset
+
+**Regras (T34).**
+1. **Proibido `InsertService` em código de `src/`** (QA: `rg InsertService src` vazio). Ele fica só nas ferramentas
+   de edição (`tools/assetplace/`).
+2. `MeshPart.MeshId` não é gravável em runtime: **malha só existe como instância** num kit e é clonada.
+3. `TextureID` e imagem **são** graváveis: ids `rbxassetid://` ficam em **módulo de dados** versionado no git
+   (`CrewLooks`, `Content.Ingredients.Icon`).
+4. `SurfaceAppearance.ColorMap` não é gravável em runtime: cada expressão é uma `SurfaceAppearance` pronta, clonada.
+5. Os kits ficam **fora do Rojo**: `ReplicatedStorage.Assets` e `ReplicatedStorage.CrewExpressions` (o
+   `default.project.json` não dá `$path` ao `ReplicatedStorage`, então instâncias do place sobrevivem ao `rojo serve`).
+   **Nunca dentro de `ReplicatedStorage.shared`** (tem `$ignoreUnknownInstances = false`: o Rojo apaga).
+6. Kit montado **em modo de edição** por script reproduzível (`tools/assetplace/build_kits.luau`, TASK-006/007, mesmo
+   padrão de `place_assets.luau`: `InsertService` + `_asset_ids.json`, idempotente, `PackageLink` removido). O place
+   não está no git; o script é a receita para refazer.
+7. Rastreio: cada peça de kit tem atributo `Asset = "AST-###_<nome>"`; a raiz `ReplicatedStorage.Assets` tem
+   `KitVersion` (int). `CrewLooks.KitVersion` diferente do place = aviso alto no Studio.
+8. Kits em `ReplicatedStorage` porque os dois lados clonam (servidor: rigs e Tools; client: Opal, visuais de estação,
+   prévia na tela "Crew", troca local de NPC). Custo de memória: malhas pequenas (≈ 2–2,5k tris por personagem,
+   DEC-164); texturas só baixam quando aplicadas.
+
+#### 18.9.1 Árvore
+
+```
+ReplicatedStorage
+├─ Assets                       (Folder, KitVersion)
+│  ├─ Crew
+│  │  ├─ Body                   AST-053_CrewTex sem Head: Torso, Left/Right Arm, Left/Right Leg, Apron, Cap
+│  │  ├─ CivilArms              AST-053_CivilArms (braços retos de civil, DEC-161)
+│  │  ├─ CapEarsUp              AST-053_CrewCap_EarsUp
+│  │  ├─ Hats/ThiefHat          AST-053_ThiefHat
+│  │  ├─ Animals/<Animal>       AST-053_Animal_<A> (18): Head_<A>, Face_<A>, Ears_<A>, Tail_<A>, extras
+│  │  └─ Accessories/<chave>    AST-054 (crachá, mochila, capacete…), quando existirem
+│  ├─ Items
+│  │  ├─ Tools/<item>           Tool por chave de Content.Items: hot_dog, pack_sausages … pack_coffee
+│  │  ├─ Toppings/<ingrediente> ketchup, mustard, cheese, bacon, potato_sticks, cream_cheese (TopHeight)
+│  │  └─ Food                   SausageRaw, SausageGrilled (AST-002), BunClosed, BunOpen (AST-001)
+│  └─ Equipment                 Padlock (AST-020_Padlock, Att_Hang); variantes que não estão no place
+└─ CrewExpressions              SurfaceAppearance: Normal, Happy, Smile, Sad, Fainted, Skeptical, Exhausted,
+                                Stressed, Thief, Normal_Night (só esta tem _Night, DEC-207)
+```
+
+`AST-053_CrewBase` (rig de referência + `_joints.json`) **não** entra no kit de runtime: as juntas são resolvidas pela
+pose de repouso (abaixo). Nome de cada `SurfaceAppearance` = nome em `Content.Looks.Expressions` (= sufixo das chaves
+`T_Expr_<Nome>` do JSON: `Smile`, não `Smiling`). Só `Normal_Night` tem versão de noite (DEC-207).
+
+#### 18.9.2 Personagem (referência: `build_crew.luau`; produção: `CrewRig`, TASK-016)
+
+- Todas as peças do kit guardam a **pose de repouso importada** (origem comum nos pés, frente −Z). `CrewRig.Build`
+  resolve o `C1` de cada `Motor6D` pela pose, como `Crew.build`: as animações R6 padrão funcionam no rig custom.
+- `Head_<Asset>` vira `Head`; `Face_<Asset>` vira `Face` (casca do rosto). Civil (`Outfit ≠ crew`): troca os braços
+  por `CivilArms`, tira `Apron`; boné só se pedido. Orelha em pé: `CapEarsUp` no lugar do `Cap` (só crew, salvo
+  pedido). Chapéu (`ThiefHat`) substitui o boné, sem subir. Acessório do tipo de cliente soldado onde foi modelado.
+  Pelagem = `MeshPart.Color` (dado de `CrewLooks`), escrita no `Build`.
+- **Divisão servidor × client (T40, `network.md` §5.1; vale sobre a antiga T35, retirada):**
+  - `CrewRig.Build(species, outfit, opts)` roda no **servidor** (crew: `CharacterService`; NPC: `NpcService`):
+    monta a geometria, põe a tag `AnimalRig` e os atributos `Species`, `Outfit`, `CustomerType`, `LookPack` (e
+    `NpcId` no NPC). As peças clonadas já vêm com o pack **Day** do kit. Depois disso o servidor **só muda atributos**
+    (ex.: `LookPack` pela faixa de sanidade ou na virada do turno); **nunca** escreve `TextureID` nem
+    `SurfaceAppearance`.
+  - `CrewRig.Dress(model, pack, expression)` roda no **client** (equivalente de `Crew.applyTime` + `setExpression`):
+    `TextureID` da roupa (`CrewLooks.Outfits[outfit][pack]`) e da cabeça (`CrewLooks.Species[species].Head[pack]`),
+    atlas `T_Atlas_Kitchen_<Mid|Night>` nas peças de atlas (guardam `DayTextureID`), e clone da `SurfaceAppearance`
+    do rosto (`TextureID` da casca = ""). Pack/rosto efetivos saem dos atributos + camada local (`network.md` §5.3:
+    NPC em Night + `Normal_Night` só no client cujo personagem está com `LookPack = "Night"`; rosto da crew pelo pack,
+    do NPC pelo `Customers.Mood`).
+  - O client veste ao ver um modelo `AnimalRig` (inclusive por streaming) e reveste quando muda um atributo ou a camada
+    local. Quem chama: um Controller do client (TASK-016 decide entre `CharacterController`/`NpcController` ou um
+    `RigController` único; Opal pelo `OpalController`, que monta e veste localmente).
+- API para a TASK-016: `Build` (servidor) e `Dress` (client); `ApplyPack`/`SetExpression` da board viram partes do
+  `Dress`. `Expression`, se o `CrewRig` escrever, é atributo **local** de debug.
+
+#### 18.9.3 `CrewLooks` (`src/Crew/shared/CrewLooks.luau`, TASK-006)
+
+Módulo de dados, sem lógica, indexado pelas **chaves de `Content`** (`content-data.md` §1.3 regra 8; §18.0 item 4).
+Gerado de `Assets/textures/character/_texture_ids.json` (cópia fiel; chave que não existe no JSON não entra).
+
+```lua
+export type Pack = "Day" | "Mid" | "Night"
+export type SpeciesLook = { Fur: Color3, EarsUp: boolean, CapRaise: number, Head: { [Pack]: string } }
+return table.freeze({
+	KitVersion = 1,
+	Species = {                                   -- chaves de Content.Species (18)
+		dog = { Fur = Color3.fromHex("C98B5A"), EarsUp = false, CapRaise = 0.30,
+			Head = { Day = "rbxassetid://…", Mid = "…", Night = "…" } },   -- T_Head_Dog[_Mid|_Night]
+		-- …
+	},
+	Outfits = {                                   -- chaves de Content.Outfits
+		crew = { Day = "…", Mid = "…", Night = "…" },     -- T_Crew_Uniform_<Pack>
+		civil_a = { Day = "…", Mid = "…", Night = "…" },  -- T_Civil_A_<Pack> … civil_h
+		thief = { Day = "…" },                            -- T_Civil_Thief_Day (só dia, DEC-159)
+	},
+	Atlas = { Mid = "…", Night = "…" },           -- T_Atlas_Kitchen_*; Day = textura original da peça
+})
+```
+
+Pack ausente → Day. Cor, orelha em pé e subida do boné são **dados por espécie** aqui (o protótipo recebia por
+parâmetro). A chave do animal no kit é `Content.Species[k].Asset` (`Dog`). `Validate` da TASK-006: toda chave de
+`Content.Species`/`Content.Outfits` tem entrada; todo id existe no JSON. A chave da roupa do ladrão é a de
+`Content.Outfits` (`thief` em `content-data.md` §3.10b na data desta versão; se a tabela mudar para `civil_thief`,
+o `CrewLooks` acompanha).
+
+#### 18.9.4 Quem aplica o visual (T40, Provisório; T35 retirada)
+
+| Caso | Servidor (atributo) | Client (veste) | Regra |
+|---|---|---|---|
+| Crew: pack pela faixa de sanidade | `LookPack` no personagem: onda 1 sempre `Day` (`CharacterService`); onda 2 pela faixa (`VitalService`) | todos os clients vestem o mesmo pack | DEC-167, DEC-169 |
+| NPC: Day de dia, Mid à noite | `LookPack` no rig (`NpcService`, ao montar e na virada do turno) | veste o pack do atributo | DEC-181 |
+| NPC: Night para quem está na faixa baixa | nada (é local) | só o client cujo personagem está com `LookPack = "Night"` à noite veste NPCs em Night + `Normal_Night` | DEC-168, DEC-169 |
+| Opal | — | `OpalController` monta e veste localmente | DEC-191, TASK-038 |
+
+Por que T40 e não a T35 desta seção (versão anterior): é o texto da DEC-169 ("servidor replica a faixa; cada client
+aplica a textura daquele personagem"); com o servidor escrevendo textura, a troca local da DEC-168 seria desfeita a
+cada escrita (virada Day → Mid, rig reaproveitado do pool). Pré-carga e memória: `network.md` §5.1, `Q-144` (g).
+
+#### 18.9.5 Itens e comida (TASK-007; usados pelas TASK-022, 023, 030)
+
+| Peça | Contrato |
+|---|---|
+| Tool `hot_dog` (AST-003, versão **sem molho**) | `Handle` = peça raiz com origem na pegada (style guide, Tool); `Att_Topping1` no topo da salsicha; `Att_Serve`; `Grip` ajustado para o `RightGripAttachment` do braço da crew (a TASK-007 confere no rig custom); `CanBeDropped = false`. `Att_Topping2/3` do `.fbx` **não** são usados (DEC-142 trocou o passo fixo pela altura real) |
+| Tools de pacote `pack_*` (AST-011) | mesmo padrão; forma por pacote = ficha AST-011 (art-director); nome da Tool clonada = `Content.Items[key].Name` (texto da hotbar); atributo `Item` = chave, `Count` = sobra |
+| Coberturas `Toppings/<ing>` | `Model` com pivô = ponto de apoio (`Att_Topping` do `.fbx`); `TopHeight` = do pivô ao topo real, **medido** (Bacon 0,115 e Potato Sticks 0,119 já medidos, DEC-142; os outros pela TASK-007) |
+| `HotDogVisual` (TASK-023) | 1ª cobertura no `Att_Topping1`; cada seguinte no pivô anterior + `TopHeight` anterior, no eixo para cima do `Att_Topping1`; **queijo sempre antes dos cordões** (Ketchup, Mustard, Cream Cheese), resto na ordem de montagem. Chamado pelo `ItemService` no servidor (replica) |
+| `Toppings` na Tool | string com chaves na ordem de montagem, separadas por vírgula (`"ketchup,cheese"`); a ordem visual é do `HotDogVisual`. Formato final: `content-data.md` (TASK-001) |
+| Comida de estação (`Food/*`) | pivô = centro da base, apoiada no `Attachment` da vaga; clonada **no client** pelo `KitchenController` a partir do set `Stations` (não cria instância no servidor) |
+
+### 18.10 Onde ficam os ids em produção
+
+| Id | Onde | Gravável em runtime? | Origem |
+|---|---|---|---|
+| Malha (`MeshId`) | só nas instâncias dos kits e do mapa | não | import no Studio / `build_kits.luau` |
+| Modelo (`_asset_ids.json`) | só `tools/assetplace/` | — (nunca em runtime) | upload do grupo |
+| Textura de personagem (`TextureID`) | `CrewLooks.Textures` | sim | `_texture_ids.json` |
+| Expressão (`SurfaceAppearance.ColorMap`) | `ReplicatedStorage.CrewExpressions` | não | `Crew.ensureExpressions` em modo de edição |
+| Ícone de ingrediente, imagens de UI | `Content.Ingredients.Icon` e tabelas de conteúdo | sim | art-director (`Q-152`) |
+| Developer product | `Content.Products` | — | Creator Hub (§10.1) |
+
+### 18.11 Layout de módulos
+
+Verificado nesta sessão com `rogen 1.4.4` num projeto de teste (scratchpad): `src/<F>/shared/` vira
+`ReplicatedStorage.shared.<F>`; `server/` e `client/` seguem como hoje; arquivo solto na raiz da feature e pasta
+`shared/` se fundem no mesmo `shared.<F>`.
+
+| O quê | Onde | DataModel | Regras |
+|---|---|---|---|
+| Service/Controller de um arquivo | `src/<F>/server/<Nome>Service.luau`, `src/<F>/client/<Nome>Controller.luau` | `ServerScriptService.server.<F>` / `…client.<F>` | padrão atual |
+| Service/Controller com ajudantes | `src/<F>/server/<Nome>Service/init.luau` + filhos (precedente: `ProfileService/Template.luau`) | idem | filho é `ModuleScript` comum: **não** chama `Modux.Service/Controller/Component` (o `modux generate` o registraria), não registra responder, **não fala com a rede** (devolve dados; quem publica é o Service). Recebe dependências por parâmetro. Pode requerer `Content`, `shared.Libs.*` (servidor: Charm, Signal) e `shared.<F>`; no client pode requerer Vide |
+| Component | `src/<F>/server/<Nome>.luau` (precedente: `Vital`) | idem | tag = nome do Component, nunca uma tag de §18.1 |
+| Código dos dois lados | `src/<F>/shared/<Módulo>.luau` ou `src/<F>/shared/<Módulo>/init.luau` | `ReplicatedStorage.shared.<F>.<Módulo>` | **puro**: sem Modux, Lync, Vide, átomo Charm ou `self.Libs`; só Luau + API do Roblox + `Content`. Não criar arquivo solto na raiz da feature (`src/Net/Log.luau` é legado) |
+| Tabelas | `src/Shared/Content/` | `ReplicatedStorage.shared.Content` | `content-data.md` |
+| Componentes de UI | `src/Interface/client/Components/<Nome>/init.luau` + `.story.luau` | | só props (TASK-013) |
+
+Nome de feature proibido (colide em `ReplicatedStorage.shared`): `Types`, `tablejs`, `Content`, `Libs`, `Modux`.
+
+Onda 1, arquivos novos por feature (dono = task da board):
+
+| Feature | server | client | shared |
+|---|---|---|---|
+| `Place` | `PlaceService.luau` | `PlaceController.luau` | `MapIndex/` (`init`, `Graph`, `Required`) |
+| `Interaction` | `InteractionService/` (`init`, `Registry`) | `PromptController.luau`, `Prompt.luau` | — |
+| `Kitchen` | `KitchenService/` (`init`, `StationApi`, `Stations/*.luau`) | `KitchenController/` (`init`, `Stock`, `Grill`, `Rail`, `Board`) | — |
+| `Crew` | — | quem chama `CrewRig.Dress` (Controller a definir na TASK-016, §18.9.2) | `CrewLooks.luau`, `CrewRig/` (`Build` no servidor, `Dress` no client) |
+| `Item` | `ItemService/` | `ItemController` | `HotDogVisual/` |
+| `Customer` | `CustomerService/` (`init`, `Queue`, `Orders`) | `CustomerController` | — |
+| `Npc` | `NpcService/` (`init`, `Pool`, `Walker`): monta com `CrewRig.Build`, escreve atributos e `NpcId` | `NpcController` (veste; troca local Night na onda 2) | — |
+| `Character`, `Class`, `Economy`, `Upgrade`, `Market`, `Run` | `<Nome>Service/` | `<Nome>Controller` | — |
+| `Camera`, `Hud`, `Opal` | — | `<Nome>Controller.luau` | — |
+
+O `KitchenController` lista os filhos **explicitamente** no `init` (TASK-029 → TASK-030 são sequenciais). O
+`KitchenService` **descobre** `Stations/` (TASK-026/027/028 correm em paralelo e não podem disputar o init; regra da
+board).
+
+### 18.12 Contrato `KitchenService/Stations/*.luau` (T37)
+
+`KitchenService/StationApi.luau` (escrito pela TASK-025, junto com o init) define os tipos; cada arquivo de
+`Stations/` devolve um `StationApi.Module`.
+
+```lua
+--!strict
+export type Station = {
+	Kind: string,                          -- StationKind
+	Vehicle: string,                       -- do Vehicle ancestral
+	Instance: Model,
+	Id: number,                            -- StationId (runtime)
+	Ingredient: string?,
+	Slots: { [number]: Attachment },       -- Attachment com Slot, filtrado pelo Level do upgrade atual
+	State: any,                            -- estado privado do módulo, criado em Bind
+}
+export type Context = {                  -- só funções: o módulo nunca vê Lync, átomo nem outro Service inteiro
+	Now: () -> number,                     -- workspace:GetServerTimeNow()
+	TakeStock: (ingredient: string, n: number) -> boolean,
+	GetStock: (ingredient: string) -> (number, number),     -- atual, capacidade
+	Give: (player: Player, item: string, attrs: { [string]: any }?) -> boolean,
+	Held: (player: Player) -> Tool?,
+	Consume: (player: Player, tool: Tool) -> (),
+	Modifier: (player: Player, stat: string) -> number,     -- ClassService
+	Effect: (stat: string) -> number,                       -- UpgradeService, veículo atual
+	Publish: (station: Station) -> (),                      -- o KitchenService grava o set Stations
+	Notify: (player: Player, notice: string, value: number?) -> (),
+	SetPrompt: (anchor: Instance, enabled: boolean, text: string?) -> (),
+}
+export type Action = {
+	Validate: (ctx: Context, station: Station, player: Player, anchor: Instance) -> (boolean, string?),
+	Run: (ctx: Context, station: Station, player: Player, anchor: Instance) -> (),
+}
+export type Module = {
+	Kinds: { string },
+	Actions: { [string]: Action },         -- chave de Content.Actions
+	Bind: (ctx: Context, station: Station) -> (),
+	Tick: ((ctx: Context, station: Station, now: number) -> ())?,  -- 10 Hz, só se tiver timer
+	Capture: (ctx: Context, station: Station) -> any,              -- chaves estáveis (Slot, Ingredient)
+	Restore: (ctx: Context, station: Station, data: any) -> (),
+}
+return nil
+```
+
+Ciclo:
+1. `OnInit` (prioridade 650 < `InteractionService` 730): `require` de cada `ModuleScript` de `script.Stations`
+   (cast para `Module`, forma conferida em runtime); `Kind` repetida em dois módulos = `error`. Para cada **chave de
+   ação** distinta (união de todos os módulos), **uma** chamada a `InteractionService:RegisterAction`.
+   `RegisterSnapshot("Kitchen", …)` no `RunStateService`.
+2. `OnStart`: varre `GetTagged("Station")` no `Workspace`; monta `Station`; `StationKind` sem módulo = `error` no
+   Studio; chama `Bind`; escreve `StationId`.
+3. `Interact` chega → `InteractionService` resolve a âncora → `KitchenService` acha a `Station` dona → módulo da
+   `Kind` → `Actions[ação].Validate` e `Run`, serializados por estação (critério "só um recebe" da FEAT-006).
+4. `restock` é do **núcleo** (TASK-025, por `Ingredient`), não de módulo. Estação de veículo que não é o atual:
+   prompts desligados e ações recusadas (T36).
+
+Arquivos da onda 1: `Grill.luau` + `Rail.luau` (TASK-026; `Rail` sem ações, só a fila FIFO e `Capture`),
+`BunCrate.luau` + `Board.luau` (TASK-027), `Toppings.luau` + `Trash.luau` (TASK-028). O estoque do cooler
+(`sausage_stock`) é atendido pelo `Grill.luau` (`Kinds = { "grill", "sausage_stock" }`, ação `grill_place`).
+
+### 18.13 Contrato `CustomerService/*.luau`
+
+| Arquivo | Conteúdo | Task |
+|---|---|---|
+| `init.luau` | Service: estado por cliente (tabela por id), átomos, set `Customers`, `RegisterAction` de `take_order`, `serve`, `refuse` no `OnInit`, snapshot | TASK-032 (+ registro da TASK-033) |
+| `Queue.luau` | puro: vagas ativas pelo nível de Counter (`Q1..Q3/Q4/Q5`), quem avança para onde, `PointId` de cada vaga | TASK-032 |
+| `Orders.luau` | puro: sorteio de K e dos complementos com `Random` da semente (§4 regra 6), paciência, janela de gorjeta, `Validate(order, toppings) -> Result` e valor; nenhum `Spend`/`AddToDrawer` aqui (quem paga é o init via `EconomyService`) | TASK-033 |
+
+Rotas: o `NpcService` pede `MapIndex.Path`; o `CustomerService` só diz o destino (`PointId`).
+
+### 18.14 Conciliação com a TASK-001 (`network.md`, `content-data.md`, `data.md` v4)
+
+Conferido com a versão final da TASK-001 (2026-10-10). Este documento não edita aqueles três.
+
+| Ponto | Situação |
+|---|---|
+| Chaves de `Stations` | adotadas por `content-data.md` §3.6: `sausage_stock`, `grill`, `rail`, `bun_crate`, `board`, `toppings`, `trash` (+ `coffee_machine`). Gaveta, placa, prateleiras e bancada não são estação |
+| Instância ↔ registro de `Stations` | atributo `StationId` (≤ 99) no `Model`; id do registro = `StationId × 100 + Slot` (`Slot = 0` no trilho), `network.md` §3.5 |
+| `EntityId` | `InteractionService` para toda âncora (mapa e runtime), T33; `NpcId` separado no rig (`network.md` regra 5) |
+| Ações | `topping_add` (sai `board_add_topping`); `bench_buy_item`, `pick_up_item` existem sem prompt ativo na onda 1 |
+| `BenchSpot`, `Vehicles.Model`, `Species.Asset`, sufixo PascalCase | adotados como aqui (§18.4, T36, §18.9.3) |
+| Aparência | **vale a T40** (`network.md` §5): servidor monta e escreve atributos, client veste; T35 retirada (§18.9.4) |
+| Valores de `Outfit` | chaves de `Content.Outfits` (`crew`, `civil_a`..`civil_h`, `thief`); `CrewLooks` indexado por elas |
+| Expressões | `Smile` (nome do JSON) em `Content.Looks.Expressions` |
+| **Aberto: nome do atributo da chave do item na Tool** | `network.md` §11 diz `Item` (nome deste §18.2); `content-data.md` §3.5 ainda diz `ItemKey`. Dono: TASK-001/TASK-003 escolhem um (sugestão: `Item`) antes da TASK-022 |
+| **Aberto: chave da roupa do ladrão** | `content-data.md` §3.10b e `network.md` §5.2 dizem `thief`; o coordenador citou `civil_thief`. Vale a tabela; `CrewLooks` segue a tabela |
+| Numeração | T32–T39 aqui (T35 retirada); T40 em `network.md`. O secretário acrescenta T32–T34, T36–T40 à `Q-130` |

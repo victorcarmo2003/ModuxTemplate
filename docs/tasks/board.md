@@ -39,9 +39,9 @@ Base: `CLAUDE.md`, `README.md` (Modux V3), `docs/PIPELINE.md`, `docs/tech/archit
 
 | ID | Título | Dono | Depende de | Arquivos / pastas | Spec | Provisória | Status |
 |---|---|---|---|---|---|---|---|
-| TASK-001 | Contratos de rede, conteúdo e dados da onda 1 (docs) | architect | — | `docs/tech/network.md`, `content-data.md`, `data.md` | DEC-140 a DEC-193; FEAT-003, 005–012, 014, 015, 028, 032 | Q-130 (T6, T13, T14) | Pronta |
-| TASK-002 | Contrato de binding do MAP-01, kits de asset e layout de módulos (docs) | architect | — | `docs/tech/architecture.md` (seção nova) | MAP-01 §5, §7; DEC-146, 151, 156, 157, 190 | Q-153 | Pronta |
-| TASK-003 | `Content`: scaffold + tabelas que geram enum + stubs tipados | architect | TASK-001 | `src/Shared/Content/` (Table, Validate, init, Ingredients, Packages, Items, Stations, Actions, Notices + stubs) | `content-data.md` §1–§3; DEC-071, 174, 180, 186, 190 | Q-062 | Bloqueada |
+| TASK-001 | Contratos de rede, conteúdo e dados da onda 1 (docs) | architect | — | `docs/tech/network.md`, `content-data.md`, `data.md` | DEC-140 a DEC-193; FEAT-003, 005–012, 014, 015, 028, 032 | Q-130 (T6, T13, T14) | Feito |
+| TASK-002 | Contrato de binding do MAP-01, kits de asset e layout de módulos (docs) | architect | — | `docs/tech/architecture.md` (seção nova) | MAP-01 §5, §7; DEC-146, 151, 156, 157, 190 | Q-153 | Feito (`architecture.md` §18, v3.2; T32–T39 em `Q-130`, T35 retirada pela T40) |
+| TASK-003 | `Content`: scaffold + tabelas que geram enum + stubs tipados | architect | TASK-001 | `src/Shared/Content/` (Table, Validate, init, Ingredients, Packages, Items, Stations, Actions, Notices + stubs) | `content-data.md` §1–§3; DEC-071, 174, 180, 186, 190 | Q-062 | Em andamento |
 | TASK-004 | Net v1 do núcleo + Template do perfil | architect | TASK-003 | `src/Libs/Net/init.luau`, `src/Profile/server/ProfileService/Template.luau`, `.../ProfileService/init.luau`, `src/Profile/client/ProfileController.luau` | `network.md` (pós TASK-001); `data.md` §1.1; DEC-186 | Q-130 (T13, T14) | Bloqueada |
 | TASK-005 | Binding do MAP-01 no place (tags, atributos, pontos, grafo de NPC) | level-designer | TASK-002 | place (Studio, fora do Rojo); `tools/assetplace/MAP-01_placements.luau` se preciso | MAP-01 §5.1, §5.3, §7.1, §7.4, §9.1; DEC-157, 190 | Q-153; AN-08 fora (DEC-191) | Bloqueada |
 | TASK-006 | Kit de personagem no place + `CrewLooks` | modeler-3d | TASK-002 | `ReplicatedStorage.Assets.Crew`, `ReplicatedStorage.CrewExpressions` (Studio); `src/Crew/shared/CrewLooks.luau` | DEC-145, 151–154, 158–166, 181; `build_crew.luau` | pack Mid entregue sem aprovação (DEC-166); Q-144 h | Bloqueada |
@@ -51,7 +51,7 @@ Base: `CLAUDE.md`, `README.md` (Modux V3), `docs/PIPELINE.md`, `docs/tech/archit
 | TASK-010 | `Place` + `RunState` mínimo (modo dev) | backend-coder | TASK-004 | `src/Place/server/PlaceService`, `src/Place/client/PlaceController`, `src/Run/server/RunStateService/` | `architecture.md` §1, §2.3, §7; `data.md` §2.1 | modo dev; snapshot só em memória | Bloqueada |
 | TASK-011 | `InteractionService` (único responder de `Interact`) | backend-coder | TASK-002, TASK-004 | `src/Interaction/server/InteractionService/` | `architecture.md` §4, T6; FEAT-005; DEC-066, 174 | Q-130 (T6) | Bloqueada |
 | TASK-012 | `RoundService`: turno de dia, relógio, placa OPEN/CLOSED | backend-coder | TASK-004, TASK-008, TASK-010, TASK-011 | `src/Round/server/RoundService.luau` | FEAT-002, FEAT-003; DEC-048, 085 | noite fora da onda (Day N → Day N+1) | Bloqueada |
-| TASK-013 | Interface: `ProgressBar`, `PromptBillboard`, `Toast`, `UseTween` (+ stories) | frontend-coder | — | `src/Interface/client/Components/` (pastas novas) | `animalplane-reuse.md` §1, §2; DEC-015, 029, 066 | — | Pronta |
+| TASK-013 | Interface: `ProgressBar`, `PromptBillboard`, `Toast`, `UseTween` (+ stories) | frontend-coder | — | `src/Interface/client/Components/` (pastas novas) | `animalplane-reuse.md` §1, §2; DEC-015, 029, 066 | — | Feito |
 | TASK-014 | `PromptController` + `Prompt` + bind de interagir | frontend-coder | TASK-002, TASK-004, TASK-013 | `src/Interaction/client/`, `src/Input/client/InputController.luau` | FEAT-005; DEC-039, 066, 097, 171; `architecture.md` §13 | — | Bloqueada |
 | TASK-015 | `RoundController`: set `Shift` → sources Vide | frontend-coder | TASK-004 | `src/Round/client/RoundController.luau` | FEAT-003; `network.md` §3.1 | — | Bloqueada |
 | TASK-016 | `CrewRig`: montagem de personagem de produção (crew e NPC) | backend-coder | TASK-006 | `src/Crew/shared/CrewRig/` | DEC-146, 152, 161, 165–169, 181; `build_crew.luau` | Q-144 h (casca de rosto) | Bloqueada |
@@ -78,7 +78,7 @@ Base: `CLAUDE.md`, `README.md` (Modux V3), `docs/PIPELINE.md`, `docs/tech/archit
 | TASK-037 | `MarketController`: preços, "Out of stock", bancada no mundo | frontend-coder | TASK-004, TASK-005, TASK-013 | `src/Market/client/` | FEAT-008, FEAT-015; DEC-015, 180 | linha "Day N" sob a etiqueta (Rascunho) | Bloqueada |
 | TASK-038 | Opal local: idle e falas por fase | frontend-coder | TASK-009, TASK-016 | `src/Opal/client/OpalController.luau` | DEC-079, 099, 178, 191; NPC-020; `architecture.md` §2.3 | Q-160 (espécie da Opal) | Bloqueada |
 | TASK-039 | `HudController` básico: relógio, turno, dinheiro, toasts, resumo | frontend-coder | TASK-013, TASK-015, TASK-024 | `src/Hud/client/HudController.luau`, `src/Interface/client/Components/Hud*/` | FEAT-032, FEAT-014; DEC-015, 048, 051, 053, 081 | textos placeholder até `ui-text.md` | Bloqueada |
-| TASK-040 | Plano de teste da onda 1 | qa-tester | TASK-001 | `docs/tests/wave-1.md` | critérios das FEAT da onda; DEC-171 (mobile + PC) | — | Bloqueada |
+| TASK-040 | Plano de teste da onda 1 | qa-tester | TASK-001 | `docs/tests/wave-1.md` | critérios das FEAT da onda; DEC-171 (mobile + PC) | — | Pronta |
 | TASK-041 | Validação integrada da onda 1 (dia completo, solo e party de 2) | qa-tester | TASK-010 a TASK-039, TASK-040 | `docs/tests/wave-1.md` (resultado) | `tests/wave-1.md` | — | Bloqueada |
 
 ---
@@ -134,6 +134,14 @@ Atualizar `network.md`, `content-data.md` e `data.md` (v4) para o estado DEC-140
 - `data.md`: Template v1 confirmado (Gems, Classes, SelectedClass com as chaves novas).
 - Aceite: toda entrada de `Net/init.luau` da onda 1 tem schema, escritor, leitor e frequência; cada mudança cita a DEC;
   item Provisório marcado como tal; nenhuma entrada usa `keyBy` (T14).
+- **Entrega (architect, 2026-10-10):** `network.md` v4, `content-data.md` v4, `data.md` v4. Decisões que mudam a
+  descrição de outras tasks (o planner ajusta o texto delas): (1) tábua = 2 registros `Kind = board` + prompt único
+  na tábua (`network.md` §3.5); (2) bloqueio de ingrediente = `Stock.Blocked` (tigela, Mart e pedido), não estado de
+  `Stations` (TASK-028/029/037); (3) aparência de NPC em **atributos do rig** (`Species`, `Outfit`, `CustomerType`,
+  `LookPack`, `NpcId`), fora do set `Customers` (TASK-031/032/034); (4) textura e rosto vestidos **no client** a partir
+  dos atributos (T40, `network.md` §5; diverge da T35 do `architecture.md` §18.9.4 → TASK-016/018/031/034); (5) chaves
+  de classe por animal `class_dog`… (TASK-004/009/017/020); (6) chaves de `Stations` e ids alinhados ao §18 da TASK-002.
+  Novo Provisório: `Vehicles.trailer.BoardSlots = 3` × DEC-190 (2 vagas, sem citar veículo) → game-designer.
 
 ### TASK-002 — Contrato de binding do MAP-01, kits de asset e layout de módulos
 Seção nova em `architecture.md`:
@@ -229,6 +237,13 @@ Seção nova em `architecture.md`:
 - Porte de `CookInterface` → `ProgressBar`, `PromptInterface` → `PromptBillboard` (Hidden/Indicator/Prompt, fill do
   hold), `UseTween`, `Toast` (canto superior direito, 3–6 s), cada um com story no UI Labs.
 - Aceite: componentes puros (só props), sem `require` de Controller; stories abrem sem erro; analyze zero erro.
+- **Entrega (frontend-coder, 2026-10-10):** `Components/ProgressBar` (`init` = BillboardGui, `Bar` = corpo 2D),
+  `Components/PromptBillboard`, `Components/Toast` (`init` = cartão, `Stack` = coluna no canto superior direito, fila
+  de até 3), `Components/UseTween`, `Components/Theme` (tokens do style guide §2/§7). Analyze em `*Interface*`: 0 erro.
+  Como testar: UI Labs → storybook "ModuxTemplate" → `ProgressBar` (slider, Auto, Thief, InWorld: barra numa peça 8
+  studs à frente da câmera), `PromptBillboard` (State/KeyLabel/Holding/HoldDuration; prévia no viewport 3D), `Toast`
+  (botão "Push toast" e Auto), `UseTween` (AtEnd, Duration). Toque na pílula do prompt só chega a `OnPress/OnRelease`
+  em play test, com o BillboardGui sob `PlayerGui` (TASK-014).
 
 ### TASK-014 — `PromptController` + `Prompt`
 - Porte do AnimalPlane sem `PlaneController`; alvo = prompt mais próximo do centro da tela com histerese; hold pela
@@ -243,11 +258,15 @@ Seção nova em `architecture.md`:
   troca de fase.
 
 ### TASK-016 — `CrewRig`
-- Versão de produção de `build_crew.luau`: `Build(species, outfit, opts)` a partir dos kits (sem `InsertService`),
-  `ApplyPack(model, "Day"|"Mid"|"Night")`, `SetExpression(model, name)`, acessórios por tipo de cliente; usável no
-  servidor (crew, NPC) e no client (troca local).
-- Aceite: monta as 18 espécies com roupa Crew e civil A–H; troca de pack e de expressão em runtime sem recriar o modelo;
-  sem vazamento de instâncias (teste de 200 montagens/destroys).
+- Versão de produção de `build_crew.luau` (`architecture.md` §18.9.2, T40 de `network.md` §5): `Build(species, outfit,
+  opts)` **no servidor**, a partir dos kits (sem `InsertService`): geometria, acessórios por tipo de cliente, tag
+  `AnimalRig`, atributos `Species`, `Outfit`, `CustomerType`, `LookPack` (peças no pack Day do kit). `Dress(model, pack,
+  expression)` **no client** (equivalente de `Crew.applyTime` + `setExpression`: `TextureID` por `CrewLooks`, atlas,
+  `SurfaceAppearance` do rosto) + o Controller que veste todo `AnimalRig` ao aparecer e quando um atributo muda. O
+  servidor nunca escreve `TextureID`/`SurfaceAppearance`.
+- Aceite: monta as 18 espécies com roupa `crew` e `civil_a`..`civil_h`; trocar `LookPack` no servidor re-veste em todos
+  os clients sem recriar o modelo; troca local (Night) não é desfeita por escrita do servidor; sem vazamento de
+  instâncias (teste de 200 montagens/destroys).
 
 ### TASK-017 — `ClassService`
 - Lê/escreve `Classes`, `SelectedClass`, `Gems` no perfil (cópia, não mutação); `ClassAction{Buy|Select}` validado
@@ -260,7 +279,8 @@ Seção nova em `architecture.md`:
 ### TASK-018 — `CharacterService`
 - `CharacterAutoLoads = false`; spawn em `PS-1..4` com `CrewRig` (espécie da classe, uniforme Crew, pack Day, rosto
   Normal); Humanoid R6, `BreakJointsOnDeath = false`; grupo `Players` sem colisão com `Players` (DEC-175, mapa todo);
-  `WalkSpeed` pelo modificador da classe; atributos `Species`, `LookPack` no personagem.
+  `WalkSpeed` pelo modificador da classe; atributos `Species`, `Outfit = "crew"`, `LookPack = "Day"` no personagem
+  (o servidor só escreve atributos; quem veste é o client, T40, `architecture.md` §18.9.4).
 - Aceite: 2 jogadores com espécies diferentes se veem com o animal certo; atravessam um ao outro; Coelho anda a 18 e
   Cachorro a 16; nenhum avatar do Roblox aparece.
 
@@ -334,8 +354,10 @@ Seção nova em `architecture.md`:
 - Aceite: barra termina junto com o "Ready" do servidor (±0,2 s); quem reconecta vê o estado atual das vagas.
 
 ### TASK-031 — `NpcService` mínimo
-- Pool ≤ 12 (Opal fora, DEC-191); cliente montado por `CrewRig` com espécie do tipo, roupa civil A–H sorteada,
-  acessório, pack Day de dia / Mid à noite (DEC-181); `MoveTo` por A* no grafo `NpcNode`; grupo `Npc` sem colisão com
+- Pool ≤ 12 (Opal fora, DEC-191); cliente montado por `CrewRig.Build` com espécie do tipo, roupa `civil_*` sorteada,
+  acessório; o servidor só escreve atributos (`Species`, `Outfit`, `CustomerType`, `LookPack` Day de dia / Mid à noite,
+  DEC-181; `NpcId` novo a cada spawn) e cria as âncoras `Prompt_Customer`/`Prompt_Refuse` (`architecture.md` §18.4);
+  o client veste (T40); `MoveTo` por A* no grafo `NpcNode`; grupo `Npc` sem colisão com
   `Players`/`Npc`; spawn em D1 e SP-A (sem trânsito nesta onda).
 - Aceite: nunca mais de 12 NPCs de servidor; nenhum NPC usa o uniforme da crew nem o guaxinim; pool reaproveita rigs
   (sem crescer em 30 min de soak).
@@ -356,8 +378,8 @@ Seção nova em `architecture.md`:
   FEAT-011 (Serve só com pedido anotado; gorjeta nunca fora da janela nem em incompleto; client não manda preço).
 
 ### TASK-034 — `CustomerController`
-- Balão com ícones do pedido (bitfield) visível para a party; rosto por `Mood` via `CrewRig.SetExpression` local
-  (Normal, Happy, Skeptical, Stressed); reação ao `Sale` (balão feliz/neutro/reclamação).
+- Balão com ícones do pedido (bitfield) visível para a party; rosto por `Mood` via `CrewRig.Dress` no client
+  (Normal, Happy, Skeptical, Stressed; T40, `network.md` §5.3), achando o rig pelo `NpcId`; reação ao `Sale` (balão feliz/neutro/reclamação).
 - Aceite: balão aparece só depois do "Take Order"; ≤ 8 balões; ícone placeholder até `Q-152`.
 
 ### TASK-035 — `UpgradeService`
