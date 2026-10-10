@@ -4,11 +4,14 @@
 local Achievements = require(script.Parent.Achievements)
 local Actions = require(script.Parent.Actions)
 local Animations = require(script.Parent.Animations)
+local Anomalies = require(script.Parent.Anomalies)
 local BossCalls = require(script.Parent.BossCalls)
 local Classes = require(script.Parent.Classes)
 local CustomerTypes = require(script.Parent.CustomerTypes)
+local Cutscenes = require(script.Parent.Cutscenes)
 local Flow = require(script.Parent.Flow)
 local GemRewards = require(script.Parent.GemRewards)
+local Hallucinations = require(script.Parent.Hallucinations)
 local Ingredients = require(script.Parent.Ingredients)
 local Items = require(script.Parent.Items)
 local LightGroups = require(script.Parent.LightGroups)
@@ -29,6 +32,7 @@ local Stations = require(script.Parent.Stations)
 local Stats = require(script.Parent.Stats)
 local Table = require(script.Parent.Table)
 local Thief = require(script.Parent.Thief)
+local Traffic = require(script.Parent.Traffic)
 local Upgrades = require(script.Parent.Upgrades)
 local Vehicles = require(script.Parent.Vehicles)
 local WalkPaths = require(script.Parent.WalkPaths)
@@ -783,18 +787,6 @@ local function checkMedia()
 		end
 	end
 	inRange("SoundRules", nil, nil, "MaxVoices", Sounds.Rules.MaxVoices, 1, 64)
-
-	-- WalkPaths: shape only in wave 2 (empty is valid: no wire enum)
-	const seen: { [string]: boolean } = {}
-	for index, row in WalkPaths.List do
-		if not string.match(row.Key, KEY_PATTERN) or seen[row.Key] then
-			fail("WalkPaths", index, row.Key, "bad or duplicate key")
-		end
-		seen[row.Key] = true
-		if #row.Nodes < 2 then
-			fail("WalkPaths", index, row.Key, "a path needs at least 2 nodes")
-		end
-	end
 end
 
 local function checkWave2Records()
@@ -824,6 +816,413 @@ local function checkWave2Records()
 	end
 end
 
+-- Wave 3 (TASK-096; content-data.md §3.14, §6.10, §6.11) -----------------------------------------------------------
+
+-- T10: the shared anomaly table never carries the answer. These belong to AnomalyService/Rules/ (server only).
+const ANOMALY_SERVER_FIELDS: { [string]: boolean } = {
+	Verb = true,
+	CorrectVerb = true,
+	LikelyWrongVerb = true,
+	WrongVerb = true,
+	Window = true,
+	Deadline = true,
+	Duration = true,
+	Params = true,
+	Steps = true,
+	IsCritical = true,
+	Critical = true,
+	Rule = true,
+	Rules = true,
+}
+const ANOMALY_ACTORS: { [string]: boolean } =
+	{ Customer = true, Street = true, Vehicle = true, World = true, Audio = true, Item = true }
+-- Actors that take a slot on the night cap of anomaly actors (npcs.md: N1, N4, N5, N7, N8)
+const ACTOR_COSTS: { [string]: boolean } = { Customer = true, Street = true, Vehicle = true }
+const CUE_KINDS: { [string]: boolean } = { Visual = true, Audio = true, Both = true }
+
+local function checkAnomalies()
+	checkKeys("Anomalies", Anomalies, "^anm_%d%d%d_[a-z0-9_]+$")
+	checkKeys("AnomalyCues", Anomalies.Cues, KEY_PATTERN)
+	if #Anomalies.List ~= RunParams.Nights then
+		fail("Anomalies", nil, nil, `{#Anomalies.List} rows, one debut per night needs {RunParams.Nights} (DEC-060)`)
+	end
+	for index, cue in Anomalies.Cues.List do
+		if not CUE_KINDS[cue.Kind] then
+			fail("AnomalyCues", index, cue.Key, `Kind '{cue.Kind}' is not Visual, Audio or Both`)
+		end
+		inRange("AnomalyCues", index, cue.Key, "Duration", cue.Duration, 0, 30)
+	end
+
+	const debut: { [number]: string } = {}
+	const cueUsed: { [string]: boolean } = {}
+	const last = Nights.Windows.Last
+	local scriptedCost = 0
+	for index, row in Anomalies.List do
+		const key = row.Key
+		for field in row :: any do
+			if ANOMALY_SERVER_FIELDS[field] then
+				fail("Anomalies", index, key, `field '{field}' is server-only (T10: put it in AnomalyService/Rules/)`)
+			end
+		end
+		inRange("Anomalies", index, key, "Night", row.Night, 1, RunParams.Nights)
+		if debut[row.Night] then
+			fail("Anomalies", index, key, `second debut on night {row.Night} (first '{debut[row.Night]}')`)
+		end
+		debut[row.Night] = key
+		if row.Ref ~= string.format("ANM-%03d", row.Night) then
+			fail("Anomalies", index, key, `Ref '{row.Ref}' must be ANM-00k for debut night k (DEC-096)`)
+		end
+		if string.sub(key, 5, 7) ~= string.sub(row.Ref, 5, 7) then
+			fail("Anomalies", index, key, `key number differs from Ref '{row.Ref}'`)
+		end
+		if row.Name == "" then
+			fail("Anomalies", index, key, "empty Name")
+		end
+		const night = Nights.List[row.Night]
+		if night and night.NewAnomaly ~= key then
+			fail("Anomalies", index, key, `Nights[{row.Night}].NewAnomaly is '{night.NewAnomaly}'`)
+		end
+		if not ANOMALY_ACTORS[row.Actor] then
+			fail("Anomalies", index, key, `Actor '{row.Actor}' unknown`)
+		end
+		if row.NpcCost ~= (if ACTOR_COSTS[row.Actor] then 1 else 0) then
+			fail("Anomalies", index, key, `NpcCost {row.NpcCost}: Customer/Street/Vehicle cost 1, the rest 0 (npcs.md)`)
+		end
+		if row.Scope ~= "Party" and row.Scope ~= "PerPlayer" then
+			fail("Anomalies", index, key, `Scope '{row.Scope}' is not Party or PerPlayer (DEC-073)`)
+		end
+		if row.SeeMode == "Cone" then
+			inRange("Anomalies", index, key, "ViewRange", row.ViewRange, 1, 1000)
+		elseif row.SeeMode == "AudioZone" then
+			if row.ViewRange ~= 0 then
+				fail("Anomalies", index, key, "ViewRange must be 0 with SeeMode AudioZone")
+			end
+		else
+			fail("Anomalies", index, key, `SeeMode '{row.SeeMode}' is not Cone or AudioZone`)
+		end
+		for _, other in row.ExclusiveWith do
+			const target = Anomalies.ByKey[other]
+			if target == nil or other == key then
+				fail("Anomalies", index, key, `ExclusiveWith '{other}' is not another anomaly`)
+			end
+			if not table.find(target.ExclusiveWith, key) then
+				fail("Anomalies", index, key, `ExclusiveWith '{other}' is not symmetric`)
+			end
+		end
+		const scripted = row.Scripted
+		if scripted then
+			if scripted.Night ~= RunParams.Nights then
+				fail("Anomalies", index, key, `Scripted only on the last night ({RunParams.Nights}, FEAT-027)`)
+			end
+			if scripted.Night < row.Night then
+				fail("Anomalies", index, key, "Scripted before the debut night")
+			end
+			if scripted.Clock < last[1] or scripted.Clock >= last[2] then
+				fail("Anomalies", index, key, `Scripted.Clock {scripted.Clock} outside Nights.Windows.Last`)
+			end
+			scriptedCost += row.NpcCost
+		end
+		if #row.Cues == 0 then
+			fail("Anomalies", index, key, "Cues is empty")
+		end
+		for _, cue in row.Cues do
+			if not Anomalies.Cues.ByKey[cue] then
+				fail("Anomalies", index, key, `Cue '{cue}' not in AnomalyCues`)
+			end
+			cueUsed[cue] = true
+		end
+	end
+	for night = 1, RunParams.Nights do
+		if debut[night] == nil then
+			fail("Anomalies", nil, nil, `night {night} has no debut (one new anomaly per night, DEC-060)`)
+		end
+	end
+	if scriptedCost > Flow.MaxActorsNight then
+		fail("Anomalies", nil, nil, `scripted occurrences cost {scriptedCost} actors (cap {Flow.MaxActorsNight})`)
+	end
+	for index, cue in Anomalies.Cues.List do
+		if not cueUsed[cue.Key] then
+			fail("AnomalyCues", index, cue.Key, "no anomaly uses this cue")
+		end
+	end
+end
+
+local function checkHallucinations()
+	checkKeys("Hallucinations", Hallucinations, KEY_PATTERN)
+	const bands = Sanity.Bands
+	const effects: { [string]: string } = {}
+	local hasHigh, hasMid, hasLow = false, false, false
+	for index, row in Hallucinations.List do
+		inRange("Hallucinations", index, row.Key, "MaxSanity", row.MaxSanity, 1, bands.High)
+		if row.MaxSanity == bands.High then
+			hasHigh = true
+		elseif row.MaxSanity == bands.Mid then
+			hasMid = true
+		elseif row.MaxSanity < bands.Mid then
+			hasLow = true
+		end
+		if not string.match(row.Effect, "^[A-Z][A-Za-z0-9]*$") then
+			fail("Hallucinations", index, row.Key, `Effect '{row.Effect}' is not a module name`)
+		end
+		if effects[row.Effect] then
+			fail("Hallucinations", index, row.Key, `Effect '{row.Effect}' already used by '{effects[row.Effect]}'`)
+		end
+		effects[row.Effect] = row.Key
+		inRange("Hallucinations", index, row.Key, "Cooldown", row.Cooldown, 0, 3600)
+		inRange("Hallucinations", index, row.Key, "Weight", row.Weight, 0.01, 100)
+	end
+	if not (hasHigh and hasMid and hasLow) then
+		fail("Hallucinations", nil, nil, `needs effects below {bands.High}, below {bands.Mid} and lower (FEAT-019)`)
+	end
+	const interval = Hallucinations.Rules.Interval
+	if #interval ~= 2 or interval[1] < 1 or interval[2] < interval[1] then
+		fail("HallucinationRules", nil, nil, "Interval must be {min, max} with 1 <= min <= max")
+	end
+end
+
+const BEAT_KINDS: { [string]: boolean } =
+	{ Fade = true, Text = true, MoveTo = true, LookAt = true, Prompt = true, Line = true, Actor = true }
+const BEAT_TEXT: { [string]: boolean } = { Text = true, Prompt = true, Line = true }
+
+local function checkCutscenes()
+	checkKeys("Cutscenes", Cutscenes, KEY_PATTERN)
+	if Cutscenes.Keys[1] ~= "none" then
+		fail("Cutscenes", 1, Cutscenes.Keys[1], "first row must be the sentinel 'none'")
+	end
+	for _, required in { "intro", "finale", "credits" } do
+		if not Cutscenes.ByKey[required] then
+			fail("Cutscenes", nil, nil, `scene '{required}' is required (FEAT-004, FEAT-027)`)
+		end
+	end
+	for index, row in Cutscenes.List do
+		const key = row.Key
+		inRange("Cutscenes", index, key, "Cap", row.Cap, 0, 600)
+		inRange("Cutscenes", index, key, "Duration", row.Duration, 0, row.Cap)
+		if row.Participants ~= "ConnectedAtStart" then
+			fail("Cutscenes", index, key, "Participants must be ConnectedAtStart (DEC-205)")
+		end
+		if key ~= "none" and #row.Marks ~= 4 then
+			fail("Cutscenes", index, key, `{#row.Marks} Marks, a party of 4 needs 4`)
+		end
+		const nextKey = row.Next
+		if nextKey ~= nil and (nextKey == key or nextKey == "none" or not Cutscenes.ByKey[nextKey]) then
+			fail("Cutscenes", index, key, `Next '{nextKey}' is not another scene`)
+		end
+		local previous = 0
+		for position, beat in row.Beats do
+			if not BEAT_KINDS[beat.Kind] then
+				fail("Cutscenes", index, key, `Beats[{position}].Kind '{beat.Kind}' unknown`)
+			end
+			if beat.At < previous or beat.At > row.Duration then
+				fail("Cutscenes", index, key, `Beats[{position}].At = {beat.At} out of order or after Duration`)
+			end
+			previous = beat.At
+			if beat.Target == "" then
+				fail("Cutscenes", index, key, `Beats[{position}] without Target`)
+			end
+			if BEAT_TEXT[beat.Kind] and (beat.Text == nil or beat.Text == "") then
+				fail("Cutscenes", index, key, `Beats[{position}] ({beat.Kind}) needs Text`)
+			end
+		end
+	end
+	const intro = Cutscenes.ByKey.intro
+	if intro.Cap > Shift.ByKey.Intro.Duration then
+		fail("Cutscenes", nil, "intro", `Cap {intro.Cap} above the Intro phase cap ({Shift.ByKey.Intro.Duration} s)`)
+	end
+	-- finale and its Next chain play inside the Finale phase
+	local total, hops = 0, 0
+	local scene: string? = "finale"
+	while scene ~= nil do
+		const row = Cutscenes.ByKey[scene]
+		total += row.Cap
+		hops += 1
+		if hops > #Cutscenes.List then
+			fail("Cutscenes", nil, "finale", "Next chain loops")
+		end
+		scene = row.Next
+	end
+	if total > Shift.ByKey.Finale.Duration then
+		fail("Cutscenes", nil, "finale", `finale chain caps sum {total} s, Finale phase cap is {Shift.ByKey.Finale.Duration} s`)
+	end
+end
+
+const LOOK_MAX = 32 -- Traffic.Look on the wire (TASK-097 widens it from Lync.int(1, 16))
+
+local function checkTraffic()
+	checkKeys("Traffic.Routes", Traffic.Routes, "^TR%-%d+$")
+	checkKeys("Traffic.Crosswalks", Traffic.Crosswalks, "^CW%-%d+$")
+	checkKeys("Traffic.Conflicts", Traffic.Conflicts, "^[A-Z]+%-[A-Z0-9]+$")
+	if #Traffic.Routes.List > 32 then
+		fail("Traffic.Routes", nil, nil, "more than 32 routes (Traffic.Route = Lync.int(1, 32))")
+	end
+	for index, row in Traffic.Crosswalks.List do
+		if next(row.Lines) == nil then
+			fail("Traffic.Crosswalks", index, row.Key, "Lines is empty")
+		end
+		const linked = row.Linked
+		if linked ~= nil then
+			const other = Traffic.Crosswalks.ByKey[linked]
+			if other == nil or other.Linked ~= row.Key then
+				fail("Traffic.Crosswalks", index, row.Key, `Linked '{linked}' does not link back`)
+			end
+		end
+	end
+
+	local hasNightRoute = false
+	for index, row in Traffic.Routes.List do
+		const key = row.Key
+		if row.Path == "" or row.Lane == "" then
+			fail("Traffic.Routes", index, key, "Path and Lane are required")
+		end
+		if row.Shift ~= "Day" and row.Shift ~= "DayNight" then
+			fail("Traffic.Routes", index, key, `Shift '{row.Shift}' is not Day or DayNight`)
+		end
+		inRange("Traffic.Routes", index, key, "Weight", row.Weight, 0.01, 100)
+		for _, conflict in row.Conflicts do
+			if not Traffic.Conflicts.ByKey[conflict] then
+				fail("Traffic.Routes", index, key, `Conflict '{conflict}' not in Traffic.Conflicts`)
+			end
+		end
+		local crossesCw1 = false
+		for position, stop in row.Stops do
+			if stop.Kind == "Pare" then
+				if row.Shift == "DayNight" then
+					fail("Traffic.Routes", index, key, "a Ninth route (DayNight) has no PARE (DEC-133)")
+				end
+				if stop.Ref ~= stop.Line then
+					fail("Traffic.Routes", index, key, `Stops[{position}]: a PARE stop has Ref = Line`)
+				end
+			elseif stop.Kind == "Crosswalk" then
+				const cw = Traffic.Crosswalks.ByKey[stop.Ref]
+				if cw == nil then
+					fail("Traffic.Routes", index, key, `Stops[{position}].Ref '{stop.Ref}' not in Traffic.Crosswalks`)
+				end
+				local found = false
+				for _, line in cw.Lines do
+					if line == stop.Line then
+						found = true
+					end
+				end
+				if not found then
+					fail("Traffic.Routes", index, key, `Stops[{position}].Line '{stop.Line}' is not a line of {stop.Ref}`)
+				end
+				if stop.Ref == "CW-1" then
+					crossesCw1 = true
+				end
+			else
+				fail("Traffic.Routes", index, key, `Stops[{position}].Kind '{stop.Kind}' is not Pare or Crosswalk`)
+			end
+		end
+		const direction = row.JuniperSouth
+		if direction ~= nil and ((direction ~= "NB" and direction ~= "SB") or not crossesCw1) then
+			fail("Traffic.Routes", index, key, "JuniperSouth must be NB or SB on a route that crosses CW-1")
+		end
+		if direction == nil and crossesCw1 then
+			fail("Traffic.Routes", index, key, "crosses CW-1 without JuniperSouth (its flow is per direction)")
+		end
+		if row.Shift == "DayNight" then
+			hasNightRoute = true
+		end
+	end
+
+	inRange("Traffic", nil, nil, "MaxCars", Traffic.MaxCars, 1, 8)
+	local cursor: number? = nil
+	for position, row in Traffic.Density do
+		const where = `Density[{position}]`
+		if cursor ~= nil and row.From ~= cursor then
+			fail("Traffic", nil, nil, `{where}.From = {row.From}, expected {cursor} (contiguous)`)
+		end
+		if row.To <= row.From then
+			fail("Traffic", nil, nil, `{where}: To must be after From`)
+		end
+		cursor = row.To
+		inRange("Traffic", nil, nil, `{where}.MaxCars`, row.MaxCars, 0, Traffic.MaxCars)
+		if row.Night and row.MaxCars > 1 then
+			fail("Traffic", nil, nil, `{where}: night traffic is rare, at most 1 car (DEC-198)`)
+		end
+		if row.Night and row.MaxCars > 0 and not hasNightRoute then
+			fail("Traffic", nil, nil, `{where}: night cars but no DayNight route`)
+		end
+		if row.MaxCars > 0 then
+			const interval = row.Interval
+			if #interval ~= 2 or interval[1] <= 0 or interval[2] < interval[1] then
+				fail("Traffic", nil, nil, `{where}.Interval must be min, max with 0 < min <= max`)
+			end
+		end
+	end
+
+	const looks = #Traffic.Looks.Shapes * #Traffic.Looks.Paints
+	if looks == 0 or looks > LOOK_MAX then
+		fail("Traffic", nil, nil, `{looks} looks (shapes x paints), must be 1..{LOOK_MAX}`)
+	end
+	for _, reason in { "anm_008", "anm_010", "cutscene" } do
+		if not table.find(Traffic.HoldReasons, reason) then
+			fail("Traffic", nil, nil, `HoldReasons misses '{reason}' (FEAT-033)`)
+		end
+	end
+	inRange("Traffic", nil, nil, "SpeedStraight", Traffic.SpeedStraight, 1, 100)
+	inRange("Traffic", nil, nil, "SpeedCrossing", Traffic.SpeedCrossing, 1, Traffic.SpeedStraight)
+	inRange("Traffic", nil, nil, "HitMinSpeed", Traffic.HitMinSpeed, 0, Traffic.SpeedStraight)
+	inRange("Traffic", nil, nil, "HitTolerance", Traffic.HitTolerance, 1, 30)
+	inRange("Traffic", nil, nil, "KnockTime", Traffic.KnockTime, 0.5, 10)
+	inRange("Traffic", nil, nil, "GetUpTime", Traffic.GetUpTime, 0, 5)
+	inRange("Traffic", nil, nil, "ImmuneTime", Traffic.ImmuneTime, 0, 60)
+	if Traffic.HitsNpcs then
+		fail("Traffic", nil, nil, "HitsNpcs must be false (DEC-133)")
+	end
+
+	const crossing = Traffic.Crossing
+	inRange("Traffic.Crossing", nil, nil, "PareStop", crossing.PareStop, 0.1, 10)
+	inRange("Traffic.Crossing", nil, nil, "BrakeDecel", crossing.BrakeDecel, 1, 200)
+	const braking = Traffic.SpeedStraight ^ 2 / (2 * crossing.BrakeDecel)
+	if crossing.ReserveRadius < braking then
+		fail("Traffic.Crossing", nil, nil, `ReserveRadius {crossing.ReserveRadius} below the braking distance {braking}`)
+	end
+	if crossing.MaxWait < crossing.NpcCrossTime then
+		fail("Traffic.Crossing", nil, nil, "MaxWait below NpcCrossTime (the NPC would still be on the road)")
+	end
+	inRange("Traffic.Crossing", nil, nil, "SpawnMinDist", crossing.SpawnMinDist, 0, 500)
+	inRange("Traffic.Crossing", nil, nil, "LaneGap", crossing.LaneGap, 0, 60)
+	const south = crossing.JuniperSouthInterval
+	if #south ~= 2 or south[1] <= 0 or south[2] < south[1] then
+		fail("Traffic.Crossing", nil, nil, "JuniperSouthInterval must be min, max with 0 < min <= max")
+	end
+end
+
+local function checkWalkPaths()
+	-- Rows come from the MAP-01 binding (TASK-098); empty is valid (no wire enum).
+	const rules = WalkPaths.Rules
+	inRange("WalkPathRules", nil, nil, "MaxPaths", rules.MaxPaths, 1, 255)
+	inRange("WalkPathRules", nil, nil, "Slots", rules.Slots, Flow.DayWalkers[2], 255)
+	inRange("WalkPathRules", nil, nil, "LodDistance", rules.LodDistance, 10, 1000)
+	const speed = rules.Speed
+	if #speed ~= 2 or speed[1] < 4 or speed[2] > 12 or speed[2] < speed[1] then
+		fail("WalkPathRules", nil, nil, "Speed must be min, max inside 4..12 (Pedestrians.Speed quant)")
+	end
+	if #WalkPaths.List > rules.MaxPaths then
+		fail("WalkPaths", nil, nil, `{#WalkPaths.List} paths, Pedestrians.Path holds {rules.MaxPaths}`)
+	end
+	const seen: { [string]: boolean } = {}
+	for index, row in WalkPaths.List do
+		if not string.match(row.Key, KEY_PATTERN) or seen[row.Key] then
+			fail("WalkPaths", index, row.Key, "bad or duplicate key")
+		end
+		seen[row.Key] = true
+		if #row.Nodes < 2 then
+			fail("WalkPaths", index, row.Key, "a path needs at least 2 nodes")
+		end
+		for position = 2, #row.Nodes do
+			if row.Nodes[position] == row.Nodes[position - 1] then
+				fail("WalkPaths", index, row.Key, `Nodes[{position}] repeats the previous node`)
+			end
+		end
+		if row.Shift ~= "Day" and row.Shift ~= "Night" and row.Shift ~= "Any" then
+			fail("WalkPaths", index, row.Key, `Shift '{row.Shift}' is not Day, Night or Any`)
+		end
+		inRange("WalkPaths", index, row.Key, "Weight", row.Weight, 0.01, 100)
+	end
+end
+
 return function()
 	checkKeySets()
 	checkUpgrades()
@@ -845,4 +1244,9 @@ return function()
 	checkThiefAndRewards()
 	checkMedia()
 	checkWave2Records()
+	checkAnomalies()
+	checkHallucinations()
+	checkCutscenes()
+	checkTraffic()
+	checkWalkPaths()
 end
