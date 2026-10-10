@@ -5,7 +5,7 @@
 	(Required.Wave1 / Wave2 from TASK-048): keep the lists below in sync with it (wave 2 list: MAP-01 §16.4).
 
 	Reads only tags and attributes (never the bind script's data). Items of §18.7 (wave 1) + §19.22 (wave 2):
-	  1. tags present (wave 1: MapBinding MapPoint NpcNode Vehicle Station Interactable; wave 2: + LightZone
+	  1. tags present (wave 1: MapBinding MapPoint NpcNode Vehicle Station Interactable UpgradePiece; wave 2: + LightZone
 	     StreetLight VehicleCover); exactly one MapBinding; PointId / NodeId / ZoneId / PostId unique
 	  2. every PointId / Station / Interactable required exists, per vehicle (cart; wave 2 also trailer with Rail 8,
 	     board 3, coffee_machine) and vehicle-level prompts (answer_phone; trailer switch_light, buy_trailer)
@@ -20,6 +20,10 @@
 	     except a crosswalk edge, queue chain Q5-Q4-Q3-Q2-Q1; wave 2: thief routes exist without queue slots and
 	     without crosswalk edges (MAP-01 §9.2: never crosses a road)
 	  7. pivots of the counter stations: cart at y 3.45 (DEC-157, Provisório until Q-153); trailer at pivot + 5.5
+	  9. (TASK-085) UpgradePiece: one Model per Content.Upgrades row with Part ~= "" in each vehicle of the wave, inside
+	     that Vehicle, valid Upgrade / integer Level, nothing interactive inside (T38). Warnings: authored state not
+	     "StartLevel only", invisible piece parts without UpgHidden, fixed grill / cooler / Lock / TRL-LIGHTS parts
+	     still visible, grill Slot anchors off the kit Anchor_Slot<n>
 	  8. zero errors -> writes on the MapBinding root: BindingVersion (+1 when the binding hash changes),
 	     PointCount, NodeCount, InteractableCount (+ BindingHash, tool metadata)
 	Warnings (do not block): missing named fittings, obstacles on edges (knee/chest raycast), MapPoint off the floor
@@ -44,10 +48,33 @@ local Check = {}
 -- Required (keep in sync with MapIndex/Required.luau: Wave1, Wave2)
 ---------------------------------------------------------------------------------------------------
 
-local EDIT_TAGS_W1 = { "MapBinding", "MapPoint", "NpcNode", "Vehicle", "Station", "Interactable" }
+-- UpgradePiece (§18.1, wave 1): kit TASK-084, bound by bind_pieces.luau (TASK-085). Rule 9 below.
+local EDIT_TAGS_W1 = { "MapBinding", "MapPoint", "NpcNode", "Vehicle", "Station", "Interactable", "UpgradePiece" }
 local EDIT_TAGS_W2 = { "LightZone", "StreetLight", "VehicleCover" }
 local OPTIONAL_TAGS = { "StreetBin" } -- DEC-200 / T60: checked, never required (Q-166 b)
-local PENDING_TAGS = { "UpgradePiece" } -- §18.1 wave 1, models from TASK-084, bound by TASK-085
+
+-- Upgrade pieces expected per vehicle (copy of src/Shared/Content/Upgrades.luau rows with Part ~= ""; a synced
+-- Content.Upgrades wins). start = StartLevel (the piece visible in the authored place).
+local PIECE_ROWS_EMBEDDED = (function()
+	local rows = {}
+	for _, v in { "cart", "trailer" } do
+		for level = 1, 3 do
+			table.insert(rows, { upgrade = "grill", vehicle = v, level = level, part = "Grill_L" .. level, start = 1 })
+			table.insert(rows, { upgrade = "cooler", vehicle = v, level = level, part = "Cooler_L" .. level, start = 1 })
+			table.insert(rows, { upgrade = "counter", vehicle = v, level = level, part = "Counter_L" .. level, start = 1 })
+		end
+		table.insert(rows, { upgrade = "cash_drawer_lock", vehicle = v, level = 1, part = "DrawerLock_L1", start = 0 })
+	end
+	table.insert(rows, { upgrade = "trailer_lights", vehicle = "trailer", level = 1, part = "TrailerLights_L1", start = 0 })
+	return rows
+end)()
+-- fixed models whose visible parts must be gone once the pieces exist (bind_pieces hides them)
+local PIECE_FIXED = {
+	{ kind = "grill", what = "all" },
+	{ kind = "sausage_stock", what = "all" },
+	{ ids = { "DRAWER", "TRL-DRAWER" }, what = "Lock" },
+	{ ids = { "TRL-LIGHTS" }, what = "all" },
+}
 
 local POINTS_W1 = { "PS-1", "PS-2", "PS-3", "PS-4", "Q1", "Q2", "Q3", "Q4", "Q5", "D1", "SP-A", "EX-E", "OP-1" }
 local POINTS_W2 = {
@@ -167,6 +194,7 @@ local FALLBACK = {
 	Packages = REQUIRED_PACKAGES,
 	Vehicles = { "cart", "trailer" },
 	LightGroups = { "mart", "trailer_interior", "trailer_lights", "juniper_posts" },
+	Upgrades = { "grill", "cooler", "counter", "cash_drawer_lock", "trailer_lights" },
 }
 local WAVE2_KEYS = {
 	Actions = { answer_phone = true, get_up = true, buy_trailer = true, brew_coffee = true, switch_light = true },
@@ -403,11 +431,6 @@ local function checkTags(): Instance?
 			err(("1: no instance with tag %s in the Workspace"):format(t))
 		end
 	end
-	for _, t in PENDING_TAGS do
-		if #tagged(t) == 0 then
-			info(("1: tag %s absent (pending: upgrade pieces, TASK-084 kit + TASK-085 binding)"):format(t))
-		end
-	end
 	local roots = tagged("MapBinding")
 	if #roots ~= 1 then
 		err(("1: %d MapBinding roots in the Workspace (need exactly 1)"):format(#roots))
@@ -494,6 +517,7 @@ local function checkContentValues(content: { [string]: Keys })
 	validate("Interactable", "Ingredient", "Ingredients")
 	validate("Interactable", "Package", "Packages")
 	validate("Vehicle", "Vehicle", "Vehicles")
+	validate("UpgradePiece", "Upgrade", "Upgrades")
 	if WAVE >= 2 then
 		validate("LightZone", "Group", "LightGroups")
 		validate("StreetLight", "Group", "LightGroups")
@@ -1326,6 +1350,202 @@ local function checkGraph(root: Instance?)
 	info(("6: graph %d nodes, %d edges"):format(count, edges))
 end
 
+-- 9 (TASK-085, §18.1, §18.2, §18.4 T38; DEC-052, DEC-184): upgrade pieces of every vehicle of this wave.
+local function pieceRows(): ({ any }, string)
+	local c = loadedContent
+	local up = c and c.Upgrades
+	if type(up) == "table" and type(up.List) == "table" then
+		local rows = {}
+		for _, u in up.List do
+			for _, v in u.Vehicles or {} do
+				for _, r in (u.Levels and u.Levels[v]) or {} do
+					if type(r.Part) == "string" and r.Part ~= "" then
+						table.insert(rows, { upgrade = u.Key, vehicle = v, level = r.Level, part = r.Part, start = u.StartLevel })
+					end
+				end
+			end
+		end
+		return rows, "Content"
+	end
+	return PIECE_ROWS_EMBEDDED, "embedded"
+end
+
+local function checkPieces(vehicles: { [string]: Instance })
+	local rows, src = pieceRows()
+	local want: { [string]: any } = {}
+	local starts: { [string]: number } = {}
+	for _, r in rows do
+		want[("%s|%s|%d"):format(r.vehicle, r.upgrade, r.level)] = r
+		starts[r.vehicle .. "|" .. r.upgrade] = r.start
+	end
+	local seen: { [string]: { Instance } } = {}
+	local visible: { [string]: { number } } = {}
+	local byVehicle: { [string]: number } = {}
+	for _, p in tagged("UpgradePiece") do
+		local label = name(p)
+		if not p:IsA("Model") then
+			err(("5: UpgradePiece %s is a %s (must be a Model)"):format(label, p.ClassName))
+		end
+		local up, lv = p:GetAttribute("Upgrade"), p:GetAttribute("Level")
+		if typeof(up) ~= "string" or typeof(lv) ~= "number" or lv ~= math.floor(lv) or lv < 0 then
+			err(("2: UpgradePiece %s without string Upgrade / integer Level (§18.2)"):format(label))
+			continue
+		end
+		local veh = ancestorWithTag(p, "Vehicle")
+		if not veh then
+			err(("5: UpgradePiece %s outside a Vehicle (DEC-184: one instance per vehicle)"):format(label))
+			continue
+		end
+		if ancestorWithTag(p, "UpgradePiece") then
+			err(("5: UpgradePiece %s inside another UpgradePiece"):format(label))
+		end
+		local vk = tostring(veh:GetAttribute("Vehicle"))
+		local fv = p:GetAttribute("ForVehicle")
+		if fv ~= nil and fv ~= vk then
+			warn_(("UpgradePiece %s: kit ForVehicle %s but it sits in the %s"):format(label, tostring(fv), vk))
+		end
+		local key = ("%s|%s|%d"):format(vk, up, lv)
+		if not want[key] then
+			err(("3: UpgradePiece %s: %s L%d is not a row of Content.Upgrades for the %s (Part ~= \"\")"):format(label, up, lv, vk))
+		end
+		seen[key] = seen[key] or {}
+		table.insert(seen[key], p)
+		byVehicle[vk] = (byVehicle[vk] or 0) + 1
+		-- T38: nothing interactive inside a piece; hidden parts carry the UpgradeService attributes
+		local raw = 0
+		for _, d in p:GetDescendants() do
+			for _, t in { "Interactable", "Station", "Vehicle", "MapPoint", "NpcNode", "UpgradePiece" } do
+				if CollectionService:HasTag(d, t) then
+					err(("5: %s tagged %s inside UpgradePiece %s (T38: anchors stay on the station root)"):format(name(d), t, label))
+				end
+			end
+			if d:GetAttribute("Slot") ~= nil then
+				err(("5: %s has Slot inside UpgradePiece %s (T38)"):format(name(d), label))
+			end
+			if d:IsA("Attachment") and (string.match(d.Name, "^Prompt_") or string.match(d.Name, "^Slot%d+$") or string.match(d.Name, "^Att_Slot%d+$")) then
+				err(("5: anchor %s inside UpgradePiece %s (T38)"):format(name(d), label))
+			end
+			if d:IsA("BasePart") and d.Transparency >= 1 and not d:GetAttribute("UpgHidden") then
+				raw += 1
+			end
+		end
+		if raw > 0 then
+			warn_(("UpgradePiece %s: %d invisible part(s) without UpgHidden: UpgradeService cannot show them (hide with bind_pieces / Pieces.luau attributes)"):format(label, raw))
+		end
+		if not isHidden(p) then
+			local k = vk .. "|" .. up
+			visible[k] = visible[k] or {}
+			table.insert(visible[k], lv)
+		end
+	end
+	-- 2: exactly one piece per (vehicle, upgrade, level) of the vehicles of this wave
+	for key, r in want do
+		if vehicles[r.vehicle] then
+			local n = #(seen[key] or {})
+			if n ~= 1 then
+				err(("2: %s: %d UpgradePiece %s L%d (%s), need 1 (run bind_pieces.luau)"):format(r.vehicle, n, r.upgrade, r.level, r.part))
+			end
+		end
+	end
+	-- authored state: only the StartLevel piece visible (warn)
+	for k, start in starts do
+		local vk = string.match(k, "^([^|]+)")
+		if vk and vehicles[vk] then
+			local list = visible[k] or {}
+			local hasStart = want[("%s|%d"):format(k, start)] ~= nil
+			local ok = if hasStart then (#list == 1 and list[1] == start) else #list == 0
+			if not ok then
+				warn_(("%s: visible piece level(s) {%s}, authored state should be %s (UpgradeService fixes it at run time)"):format(k, table.concat(list, ","), if hasStart then "L" .. start .. " only" else "none (StartLevel " .. start .. ")"))
+			end
+		end
+	end
+	-- fixed equivalents still visible beside the pieces (warn)
+	local function visibleOutside(m: Instance, what: string): number
+		local n = 0
+		local list: { Instance } = { m }
+		for _, d in m:GetDescendants() do
+			table.insert(list, d)
+		end
+		for _, d in list do
+			if d:IsA("BasePart") and d.Transparency < 1 and (what == "all" or d.Name == what)
+				and not CollectionService:HasTag(d, "UpgradePiece") and not ancestorWithTag(d, "UpgradePiece")
+				and not CollectionService:HasTag(d, "Interactable")
+			then
+				n += 1
+			end
+		end
+		return n
+	end
+	for vk, v in vehicles do
+		if (byVehicle[vk] or 0) == 0 then
+			continue
+		end
+		for _, f in PIECE_FIXED do
+			local models: { Instance } = {}
+			if f.kind then
+				for _, s in tagged("Station") do
+					if s:IsDescendantOf(v) and s:GetAttribute("StationKind") == f.kind then
+						table.insert(models, s)
+					end
+				end
+			else
+				for _, d in v:GetDescendants() do
+					if table.find(f.ids, d:GetAttribute("MapId")) and not ancestorWithTag(d, "UpgradePiece") then
+						table.insert(models, d)
+					end
+				end
+			end
+			for _, m in models do
+				local n = visibleOutside(m, f.what)
+				if n > 0 then
+					warn_(("%s: %s has %d visible fixed part(s)%s beside the upgrade pieces (run bind_pieces.luau)"):format(vk, name(m), n, if f.what == "all" then "" else " named " .. f.what))
+				end
+			end
+		end
+		-- grill slots on the kit anchors (DEC-201: same place at every level)
+		for _, s in tagged("Station") do
+			if s:IsDescendantOf(v) and s:GetAttribute("StationKind") == "grill" then
+				local ref: Instance? = nil
+				local refN = 0
+				for _, p in tagged("UpgradePiece") do
+					if p:IsDescendantOf(s) and p:GetAttribute("Upgrade") == "grill" then
+						local k = 0
+						while typeof(p:GetAttribute("Anchor_Slot" .. (k + 1))) == "Vector3" do
+							k += 1
+						end
+						if k > refN then
+							ref, refN = p, k
+						end
+					end
+				end
+				if ref then
+					local pivot = (ref :: any):GetPivot() :: CFrame
+					for _, i in tagged("Interactable") do
+						if ownerOf(i) == s and i:GetAttribute("PromptAction") == "grill_collect" then
+							local sl = i:GetAttribute("Slot")
+							local a = if typeof(sl) == "number" then (ref :: Instance):GetAttribute("Anchor_Slot" .. sl) else nil
+							if typeof(a) == "Vector3" then
+								local d = (pos(i) - pivot:PointToWorldSpace(a)).Magnitude
+								if d > 0.1 then
+									warn_(("%s grill: Slot %s anchor %.2f from the kit Anchor_Slot%s of %s (run bind_pieces.luau)"):format(vk, tostring(sl), d, tostring(sl), ref.Name))
+								end
+							end
+						end
+					end
+				else
+					warn_(("%s grill: no grill UpgradePiece inside the station (pieces must sit under their station)"):format(vk))
+				end
+			end
+		end
+	end
+	local parts = {}
+	for vk, n in byVehicle do
+		table.insert(parts, ("%s %d"):format(vk, n))
+	end
+	table.sort(parts)
+	info(("9: UpgradePiece %s (rows from %s)"):format(table.concat(parts, ", "), src))
+end
+
 ---------------------------------------------------------------------------------------------------
 -- Entry point
 ---------------------------------------------------------------------------------------------------
@@ -1345,6 +1565,7 @@ function Check.run(opts: { write: boolean?, wave: number? }?): (string, number)
 	local points = checkPoints(root)
 	checkContentValues(content)
 	local vehicles = checkVehicles()
+	checkPieces(vehicles)
 	checkMapAnchors()
 	checkVehicleDistances(vehicles)
 	checkStreaming()

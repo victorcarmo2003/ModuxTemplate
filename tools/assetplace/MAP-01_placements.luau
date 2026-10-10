@@ -112,7 +112,10 @@
 	- Mount_Counter (cart and trailer): no asset fits (AST-019 counter is 3.5 tall, the mount is at
 	  counter-top height). Cart Mount_Sign is the skirt decal (AST-072), not the OPEN sign.
 	- Bottles AST-004/005 on the holder (Att_Bottle_*): editing in progress, runtime.
-	- Upgrade states (CoolerL2/L3, Lock, grill levels): runtime (TASK-084 kit, TASK-085 binding). AST-043 tarp: not
+	- Upgrade states (CoolerL2/L3, Lock, grill levels): runtime (TASK-084 kit, TASK-085 binding). The CART-S / TRL-S,
+	  CART-G / TRL-G, DRAWER Lock and TRL-LIGHTS entries below stay: bind_pieces.luau aligns the kit pieces on them,
+	  then hides them (Fixed_*) and keeps them as hosts of the bind anchors. Counter has no entry (piece pose in
+	  bind_pieces.luau COUNTER_POSE). AST-043 tarp: not
   modelled; bind_map01 puts a hidden grey placeholder (tag VehicleCover) inside the cart (TASK-083).
 - 2026-10-10 (TASK-083): after Place.run, bind_map01 brings the night layer into the Workspace for good (both
   vehicles live there, T36) and parks the trailer at TRL-SALE. Place.showLayer is no longer used after a bind.

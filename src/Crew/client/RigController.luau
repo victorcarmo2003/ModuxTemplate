@@ -57,6 +57,9 @@ function RigController:Resolve(model: Model): (Pack, string?)
 	if self.LowBand and (row == nil or row.Use ~= "Reserved") then
 		return NIGHT, NIGHT_FACE
 	end
+	if override == nil and outfit == "thief" then
+		return pack, "Thief" -- Quick Quentin's own face (T_Expr_Thief, NPC-007)
+	end
 	return pack, override or NEUTRAL_FACE
 end
 

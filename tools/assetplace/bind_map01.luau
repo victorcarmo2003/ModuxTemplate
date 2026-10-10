@@ -13,7 +13,10 @@
 	  0. Both layers in the Workspace (T36: "both vehicles live in the Workspace"): the Night_* folders kept in
 	     ServerStorage.MAP01_Assets_Night and the Cart folder kept in MAP01_Assets_Day move into MAP01_Assets.
 	     After this, do NOT use Place.showLayer any more (it would store the cart again).
-	  1. Clean slate: removes the tags it owns and the authored attributes from every descendant of MAP01_Assets.
+	  1. Clean slate: first undoes bind_pieces.luau (TASK-085: destroys the UpgradePiece clones, restores the fixed
+     grill / cooler / Lock / TRL-LIGHTS parts; otherwise the clones would lose their Level attribute below), then
+     removes the tags it owns and the authored attributes from every descendant of MAP01_Assets.
+     Run bind_pieces.luau (Pieces.run) after every Bind.run.
 	  2. Cart (wave 1, unchanged): Vehicle "cart"; CART-*, DRAWER and BIN-C inside it; stations S G R B T K + BIN-C;
 	     DRAWER fittings; Zone_Center. Wave 2: CART-PHONE.Prompt_Answer (answer_phone) and the tarp placeholder
 	     (Model "VehicleCover" inside the cart, tag VehicleCover, authored HIDDEN, see step 8).
@@ -55,7 +58,7 @@
 	Usage (edit mode, Command Bar; repo served on 8772, see docs/levels/MAP-01.md §16):
 		local Bind = require(<this module>)
 		print(Bind.run())                       -- opts: { resetCreated = false }
-	Then run check_map01.luau (Check.run({ wave = 2 })).
+	Then bind_pieces.luau (Pieces.run(), TASK-085) and check_map01.luau (Check.run({ wave = 2 })).
 ]]
 
 local CollectionService = game:GetService("CollectionService")
@@ -617,6 +620,52 @@ local function mergeLayers(assets: Instance): number
 		end
 	end
 	return moved
+end
+
+-- Undo of bind_pieces.luau (TASK-085), same attributes as its Pieces.undo: keep both in sync.
+-- Clones (PieceClone) are destroyed; fixed parts hidden there (PieceFixed) get name and visuals back.
+local PIECE_ORIG = { "PieceFixed", "PieceOrigName", "PieceOrigTransparency", "PieceOrigCanCollide", "PieceOrigCanQuery", "PieceOrigCanTouch", "PieceOrigCastShadow", "PieceOrigEnabled" }
+local function unbindPieces(root: Instance)
+	local clones, fixed = {}, {}
+	for _, d in root:GetDescendants() do
+		if d:GetAttribute("PieceClone") then
+			table.insert(clones, d)
+		elseif d:GetAttribute("PieceFixed") then
+			table.insert(fixed, d)
+		end
+	end
+	local n = 0
+	for _, c in clones do
+		if CollectionService:HasTag(c, "UpgradePiece") then
+			n += 1
+		end
+	end
+	for _, c in clones do
+		c:Destroy()
+	end
+	for _, f in fixed do
+		if f:IsA("BasePart") then
+			local name = f:GetAttribute("PieceOrigName")
+			if typeof(name) == "string" then
+				f.Name = name
+			end
+			local t = f:GetAttribute("PieceOrigTransparency")
+			f.Transparency = if typeof(t) == "number" then t else 0
+			f.CanCollide = f:GetAttribute("PieceOrigCanCollide") ~= false
+			f.CanQuery = f:GetAttribute("PieceOrigCanQuery") ~= false
+			f.CanTouch = f:GetAttribute("PieceOrigCanTouch") ~= false
+			f.CastShadow = f:GetAttribute("PieceOrigCastShadow") ~= false
+		elseif f:IsA("Decal") or f:IsA("Texture") then
+			local t = f:GetAttribute("PieceOrigTransparency")
+			f.Transparency = if typeof(t) == "number" then t else 0
+		elseif f:IsA("Light") or f:IsA("SurfaceGui") or f:IsA("BillboardGui") then
+			f.Enabled = f:GetAttribute("PieceOrigEnabled") ~= false
+		end
+		for _, a in PIECE_ORIG do
+			f:SetAttribute(a, nil)
+		end
+	end
+	log("ok", ("upgrade pieces undone: %d UpgradePiece clone(s) destroyed, %d fixed instance(s) restored (run bind_pieces.luau after this bind)"):format(n, #fixed))
 end
 
 local function cleanSlate(root: Instance)
@@ -1697,6 +1746,7 @@ function Bind.run(opts: AnchorOpts?): string
 		return "[err] the cart set (MapId CART) is not in MAP01_Assets nor in ServerStorage.MAP01_Assets_Day. Run Place.run first"
 	end
 
+	unbindPieces(assets)
 	cleanSlate(assets)
 	local cart = bindCart(assets, o)
 	local trl, padPose, salePose = bindTrailer(assets, cart, o)
@@ -1749,7 +1799,7 @@ function Bind.run(opts: AnchorOpts?): string
 		table.concat(tagCounts, ", ")
 	)
 	local body = table.concat(report, "\n")
-	return head .. body .. "\nNext: run check_map01.luau (Check.run({ wave = 2 }))."
+	return head .. body .. "\nNext: run bind_pieces.luau (Pieces.run(), TASK-085), then check_map01.luau (Check.run({ wave = 2 }))."
 end
 
 return Bind
