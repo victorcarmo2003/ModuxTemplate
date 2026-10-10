@@ -3,7 +3,7 @@
 -- RunStateService owns one registry and decides when to capture and restore.
 -- A snapshot is { V, At, [name] = capture() } with the names chosen by each Service (data.md §3.3 uses short keys:
 -- Run, M, Sh, Cash, Veh, Stk, Upg, Bn). Wave 1 keeps the last capture in memory; wave 2 hands it to SessionService
--- (MemoryStore Snap[RunId]) with the same shape.
+-- (MemoryStore Snap[RunId]) with the same shape. The first capture of the run is kept apart for ResetDev (T56).
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 
@@ -12,7 +12,7 @@ export type Capture = () -> any
 export type Restore = (data: any, mode: Mode) -> ()
 export type Entry = { Name: string, Capture: Capture, Restore: Restore }
 export type Snapshot = { [string]: any }
-export type Registry = { Entries: { Entry }, Last: Snapshot? }
+export type Registry = { Entries: { Entry }, Last: Snapshot?, First: Snapshot? }
 
 const VERSION = 1 -- data.md §3.3 (format never published: still V = 1)
 const TARGET_BYTES = 2048 -- target size (data.md §3.3)
@@ -29,7 +29,7 @@ end
 const Snapshots = {}
 
 function Snapshots.new(): Registry
-	return { Entries = {}, Last = nil }
+	return { Entries = {}, Last = nil, First = nil }
 end
 
 -- Called by Services in OnInit. Duplicate or reserved names are programmer errors.
@@ -72,12 +72,14 @@ function Snapshots.capture(registry: Registry): Snapshot
 	end
 
 	registry.Last = snapshot
+	if registry.First == nil then
+		registry.First = snapshot
+	end
 	return snapshot
 end
 
--- Restores the last capture in registration order. False when nothing was captured yet.
-function Snapshots.restore(registry: Registry, mode: Mode): boolean
-	const snapshot = registry.Last
+-- Restores one snapshot in registration order. False when there is nothing to restore.
+local function restoreFrom(registry: Registry, snapshot: Snapshot?, mode: Mode): boolean
 	if snapshot == nil then
 		return false
 	end
@@ -92,6 +94,21 @@ function Snapshots.restore(registry: Registry, mode: Mode): boolean
 		end
 	end
 	return true
+end
+
+-- Restores the last capture. False when nothing was captured yet.
+function Snapshots.restore(registry: Registry, mode: Mode): boolean
+	return restoreFrom(registry, registry.Last, mode)
+end
+
+-- Back to the first capture of the run (dev RunEnd, T56); it becomes the last one again.
+function Snapshots.rewind(registry: Registry, mode: Mode): boolean
+	const first = registry.First
+	if first == nil then
+		return false
+	end
+	registry.Last = first
+	return restoreFrom(registry, first, mode)
 end
 
 return table.freeze(Snapshots)

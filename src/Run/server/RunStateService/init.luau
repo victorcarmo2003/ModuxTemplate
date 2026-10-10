@@ -5,6 +5,9 @@
 -- Snapshot lives in memory only (MemoryStore in wave 2). Single writer of the RunState set.
 -- Hooks for other tasks: FixPriceParty() at the end of Day 1 and Capture()/Restore(mode) at the shift boundary are
 -- called by RoundService (TASK-012); it requires this service, so this one never requires it (no cycle, T12).
+-- Wave 2 (A3; architecture.md §19.3, §19.26; data.md §5.2, §5.3; TASK-052): SetLifeState (VitalService only),
+-- SetStash (ItemService only), SpendChance, SetEndless, ResetDev (T56) and the LifeChanged signal. Tools left the
+-- "M" snapshot: ItemService captures them under its own "T" key (T50).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -18,18 +21,15 @@ export type LifeState = "Active" | "Down" | "Reviving" | "Spectator" | "Away"
 export type RestoreMode = Snapshots.Mode
 export type StashEntry = { Kind: string, Count: number, Extra: string? }
 
--- data.md §2.1. Owners of the other fields write them through this service later (Vital: State/Sanity,
--- Item: Stash); wave 1 only fills UserId, Class, State and EverJoined.
+-- data.md §5.2. Class is locked on first admission (DEC-069); State is written by VitalService through SetLifeState;
+-- Stash (only while out of the server or Down) by ItemService through SetStash; EverJoined feeds PriceParty (DEC-121).
+-- Sanity, coffee cooldown, revives and seen anomalies are kept by their owner per UserId (data.md §5.2).
 export type Member = {
 	UserId: number,
-	Class: string, -- key of Content.Classes, locked when the member is first admitted
+	Class: string,
 	State: LifeState,
 	StateBeforeAway: LifeState?,
-	Sanity: number,
 	Stash: { StashEntry },
-	CoffeeReadyAt: number,
-	SeenAnomalies: { [string]: boolean },
-	RevivesTonight: number,
 	EverJoined: boolean,
 }
 
@@ -40,6 +40,8 @@ const MAX_PARTY = #Content.RunParams.PartyPriceMult -- 4 (DEC-047)
 const NOTICE_MIN = -1000000 -- Notice.Value wire range (network.md §4.2)
 const NOTICE_MAX = 1000000
 const SEED_MAX = 2147483647
+const STASH_MAX_ENTRIES = 32 -- far above any hotbar; guards a runaway caller
+const STASH_MAX_COUNT = 999
 
 local function fail(message: string)
 	if RunService:IsStudio() then
@@ -54,11 +56,7 @@ local function newMember(userId: number, class: string): Member
 		Class = class,
 		State = "Active",
 		StateBeforeAway = nil,
-		Sanity = 0,
-		Stash = {},
-		CoffeeReadyAt = 0,
-		SeenAnomalies = {},
-		RevivesTonight = 0,
+		Stash = table.freeze({} :: { StashEntry }),
 		EverJoined = true,
 	}
 end
@@ -71,6 +69,34 @@ end
 
 local function isLifeState(value: any): boolean
 	return value == "Active" or value == "Down" or value == "Reviving" or value == "Spectator" or value == "Away"
+end
+
+-- Copies and checks stash entries (Kind of Content.Items, whole Count >= 1, Extra string). Nil when any entry is bad.
+local function cleanStash(entries: any): { StashEntry }?
+	if type(entries) ~= "table" or #entries > STASH_MAX_ENTRIES then
+		return nil
+	end
+	const out: { StashEntry } = {}
+	for _, entry in entries do
+		if type(entry) ~= "table" then
+			return nil
+		end
+		const kind, count, extra = entry.Kind, entry.Count, entry.Extra
+		if type(kind) ~= "string" or Content.Items.ByKey[kind] == nil then
+			return nil
+		end
+		if type(count) ~= "number" or count ~= math.floor(count) or count < 1 or count > STASH_MAX_COUNT then
+			return nil
+		end
+		if extra ~= nil and type(extra) ~= "string" then
+			return nil
+		end
+		const clean: StashEntry = { Kind = kind, Count = count, Extra = extra }
+		table.freeze(clean :: any)
+		table.insert(out, clean)
+	end
+	table.freeze(out :: any)
+	return out
 end
 
 const RunStateService = Modux.Service(
@@ -91,6 +117,7 @@ function RunStateService:Setup()
 	self.Registry = Snapshots.new() :: Snapshots.Registry
 	self.MemberJoined = self.Libs.Signal.new() :: SignalLib.Signal<Player, Member>
 	self.MemberAway = self.Libs.Signal.new() :: SignalLib.Signal<Player, Member>
+	self.LifeChanged = self.Libs.Signal.new() :: SignalLib.Signal<number, LifeState, LifeState>
 end
 
 -- Members --------------------------------------------------------------------------------------------------------
@@ -109,11 +136,69 @@ function RunStateService:IsActive(player: Player): boolean
 	return member ~= nil and member.State == "Active"
 end
 
+-- LifeChanged(userId, old, new) for every member whose State differs between two member maps (a new member counts
+-- from Active, so admission fires nothing).
+function RunStateService:EmitLifeChanges(before: { [number]: Member }, after: { [number]: Member })
+	for userId, member in after do
+		const previous = before[userId]
+		const old: LifeState = if previous then previous.State else "Active"
+		if old ~= member.State then
+			self.LifeChanged:Fire(userId, old, member.State)
+		end
+	end
+end
+
 -- Writes one member by copy (atoms hold immutable tables).
 function RunStateService:SetMember(userId: number, member: Member)
-	const members = table.clone(self.Members())
+	const before = self.Members()
+	const members = table.clone(before)
 	members[userId] = freeze(member)
 	self.Members(members)
+	self:EmitLifeChanges(before, members)
+end
+
+-- Life state of a member (VitalService only; data.md §5.2). Away is a connection state owned by Admit/Leave: a member
+-- who is Away keeps the new state for the return. False when the user is not a member or the state is not writable.
+function RunStateService:SetLifeState(userId: number, state: LifeState): boolean
+	const current = self.Members()[userId]
+	if current == nil then
+		return false
+	end
+	if not isLifeState(state) or state == "Away" then
+		fail(`[RunStateService] SetLifeState: {state} is not a life state VitalService can write`)
+		return false
+	end
+	const member = table.clone(current)
+	if member.State == "Away" then
+		if member.StateBeforeAway == state then
+			return true
+		end
+		member.StateBeforeAway = state
+	else
+		if member.State == state then
+			return true
+		end
+		member.State = state
+	end
+	self:SetMember(userId, member)
+	return true
+end
+
+-- Stash of a member (ItemService only; data.md §5.2). The list replaces the previous one; an empty list clears it.
+function RunStateService:SetStash(userId: number, entries: { StashEntry }): boolean
+	const current = self.Members()[userId]
+	if current == nil then
+		return false
+	end
+	const stash = cleanStash(entries)
+	if stash == nil then
+		fail(`[RunStateService] SetStash: bad stash for {userId}`)
+		return false
+	end
+	const member = table.clone(current)
+	member.Stash = stash
+	self:SetMember(userId, member)
+	return true
 end
 
 -- Dev roster: the first MAX_PARTY players who join; nobody else becomes a member.
@@ -180,6 +265,63 @@ function RunStateService:FixPriceParty()
 	self.PriceParty(math.clamp(joined, 1, MAX_PARTY))
 end
 
+-- Run ------------------------------------------------------------------------------------------------------------
+
+-- End of a lost night (architecture.md §19.4): true = one chance spent (the night repeats); false = none left (run
+-- ends). Chances never come back on RepeatNight (DEC-110, DEC-112).
+function RunStateService:SpendChance(): boolean
+	const left = self.Chances()
+	if left <= 0 then
+		return false
+	end
+	self.Chances(left - 1)
+	return true
+end
+
+-- Endless mode (DEC-084), decided by RoundService at each shift boundary.
+function RunStateService:SetEndless(on: boolean)
+	self.Endless(on == true)
+end
+
+-- Dev RunEnd (waves 2-3, T56): back to the first capture of the run in Resume mode, with every chance back. The dev
+-- roster keeps whoever joined after that capture (appended in join order) and every member comes back Active.
+-- False when nothing was captured yet.
+function RunStateService:ResetDev(): boolean
+	const roster = self.Roster()
+	if not Snapshots.rewind(self.Registry, "Resume") then
+		return false
+	end
+
+	const before = self.Members()
+	const members = table.clone(before)
+	for userId, member in members do
+		if member.State ~= "Active" and member.State ~= "Away" then
+			const copy = table.clone(member)
+			copy.State = "Active"
+			members[userId] = freeze(copy)
+		elseif member.State == "Away" and member.StateBeforeAway ~= "Active" then
+			const copy = table.clone(member)
+			copy.StateBeforeAway = "Active"
+			members[userId] = freeze(copy)
+		end
+	end
+
+	const nextRoster = table.clone(self.Roster())
+	for _, userId in roster do
+		if not table.find(nextRoster, userId) and #nextRoster < MAX_PARTY then
+			table.insert(nextRoster, userId)
+		end
+	end
+
+	self.Libs.Charm.batch(function()
+		self.Roster(table.freeze(nextRoster))
+		self.Members(members)
+		self.Chances(Content.RunParams.Chances)
+	end)
+	self:EmitLifeChanges(before, members)
+	return true
+end
+
 -- Notices ----------------------------------------------------------------------------------------------------------
 
 -- Toast to one player or to the whole audience (network.md §4.2). Works on any place role.
@@ -230,7 +372,7 @@ function RunStateService:LastSnapshot(): Snapshots.Snapshot?
 	return self.Registry.Last
 end
 
--- data.md §3.3 "Run": Chances are not restored on a repeated night (already spent, DEC-110/112).
+-- data.md §5.3 "Run": Chances are not restored on a repeated night (already spent, DEC-110/112).
 function RunStateService:CaptureRun(): { [string]: any }
 	return {
 		Seed = self.Seed(),
@@ -265,25 +407,22 @@ function RunStateService:RestoreRun(data: { [string]: any }, mode: RestoreMode)
 	end)
 end
 
--- data.md §3.3 "M": C class, S life state, J EverJoined, T stash ({ Kind, Count, Extra? }). Away is a connection
--- state, not a life state: the state before leaving is what goes in.
+-- data.md §5.3 "M": C class, S life state, J EverJoined (Tools are ItemService's own "T" key, T50). Away is a
+-- connection state, not a life state: the state before leaving is what goes in.
 function RunStateService:CaptureMembers(): { [string]: any }
 	const out: { [string]: any } = {}
 	for userId, member in self.Members() do
-		const stash = {}
-		for _, entry in member.Stash do
-			table.insert(stash, if entry.Extra then { entry.Kind, entry.Count, entry.Extra } else { entry.Kind, entry.Count })
-		end
 		const state = if member.State == "Away" then member.StateBeforeAway or "Active" else member.State
-		out[tostring(userId)] = { C = member.Class, S = state, J = member.EverJoined, T = stash }
+		out[tostring(userId)] = { C = member.Class, S = state, J = member.EverJoined }
 	end
 	return out
 end
 
 -- RepeatNight: everyone back Active (DEC-111, DEC-113); Resume: life state as captured. Members not in the server
--- stay Away with that state saved for their return.
+-- stay Away with that state saved for their return. The stash is left as is: ItemService restores "T" after this.
 function RunStateService:RestoreMembers(data: { [string]: any }, mode: RestoreMode)
-	const members = table.clone(self.Members())
+	const before = self.Members()
+	const members = table.clone(before)
 	for key, saved in data do
 		const userId = tonumber(key)
 		if userId == nil or type(saved) ~= "table" then
@@ -296,14 +435,6 @@ function RunStateService:RestoreMembers(data: { [string]: any }, mode: RestoreMo
 			member.Class = class
 		end
 		member.EverJoined = saved.J == true or member.EverJoined
-		member.Stash = {}
-		if type(saved.T) == "table" then
-			for _, item in saved.T do
-				if type(item) == "table" and type(item[1]) == "string" and type(item[2]) == "number" then
-					table.insert(member.Stash, { Kind = item[1], Count = item[2], Extra = item[3] })
-				end
-			end
-		end
 		const state: LifeState = if mode == "RepeatNight" or not isLifeState(saved.S) then "Active" else saved.S
 		if member.State == "Away" then
 			member.StateBeforeAway = state
@@ -326,6 +457,7 @@ function RunStateService:RestoreMembers(data: { [string]: any }, mode: RestoreMo
 		end
 	end
 	self.Members(members)
+	self:EmitLifeChanges(before, members)
 end
 
 -- Network ----------------------------------------------------------------------------------------------------------
