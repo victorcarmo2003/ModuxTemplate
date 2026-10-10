@@ -1,6 +1,6 @@
 --!strict
 -- Run parameters, single record (content-data.md §3.1). Owner: game-designer (+ architect on technical times).
--- STUB (TASK-003): values from content-data.md v4; reviewed in TASK-008.
+-- Values reviewed in TASK-008; every number cites its origin.
 local Table = require(script.Parent.Table)
 
 export type RunParams = {
@@ -24,23 +24,23 @@ export type RunParams = {
 }
 
 const params: RunParams = {
-	TrailerDay = 5, -- DEC-037
-	TrailerBasePrice = 300, -- DEC-047
-	PartyPriceMult = { 1.0, 1.5, 1.9, 2.2 },
-	PricePartyFrom = "JoinedByDay1End",
+	TrailerDay = 5, -- trailer on sale from Day 5 (DEC-037)
+	TrailerBasePrice = 300, -- $300 x party (DEC-047)
+	PartyPriceMult = { 1.0, 1.5, 1.9, 2.2 }, -- 1p..4p: $300/$450/$570/$660 (DEC-047); also Revive Kit (DEC-129)
+	PricePartyFrom = "JoinedByDay1End", -- party size fixed at the end of Day 1 (DEC-121)
 	Nights = 10, -- DEC-060
-	Chances = 1,
-	StartCash = 30, -- DEC-045
-	StartStockFull = true, -- DEC-049
-	BaseWalkSpeed = 16, -- DEC-069
+	Chances = 1, -- per whole run: the 2nd lost night ends the run (DEC-110, DEC-112)
+	StartCash = 30, -- boss advance (DEC-045)
+	StartStockFull = true, -- run starts with full stock at Cooler level 1 (DEC-049)
+	BaseWalkSpeed = 16, -- class without speed effect (DEC-069)
 	StartVehicle = "cart", -- DEC-007
 	JoinWindow = 60, -- DEC-098
-	ResumeWindow = 900, -- DEC-080
-	ResumeWait = 15,
-	EndlessFromDay = 6, -- DEC-084
-	EndlessRequiresNoTrailer = true,
+	ResumeWindow = 900, -- 15 min (DEC-080)
+	ResumeWait = 15, -- Resume phase (architect, content-data.md §3.1)
+	EndlessFromDay = 6, -- "from Day 6" (DEC-084)
+	EndlessRequiresNoTrailer = true, -- "days without trailer" (DEC-084; game-designer confirms)
 	AntiAfkMinCompleted = 3, -- DEC-083
-	AntiAfkAppliesToGradeA = true,
+	AntiAfkAppliesToGradeA = true, -- DEC-083 (secretary reading, to confirm)
 }
 
 return Table.record(params)

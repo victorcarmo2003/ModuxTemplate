@@ -1,7 +1,8 @@
 --!strict
--- Vehicles (content-data.md §3.8; DEC-007, DEC-037, DEC-047, DEC-107, DEC-190, DEC-215).
+-- Vehicles (content-data.md §3.8; upgrades.md UPG-006; DEC-007, DEC-037, DEC-047, DEC-107, DEC-190, DEC-215).
 -- The Model lives in the Workspace with tag Vehicle and attribute Vehicle = key (architecture.md §18.1, T36).
--- STUB (TASK-003): rows from content-data.md v4; reviewed in TASK-008.
+-- Trailer price = RunParams.TrailerBasePrice x RunParams.PartyPriceMult (DEC-047, DEC-121); buy spot = the trailer
+-- itself in the lot, prompt buy_trailer, outside the bench rotation (DEC-107).
 local Table = require(script.Parent.Table)
 
 export type Vehicle = {
@@ -22,26 +23,26 @@ return Table.new({
 	{
 		Key = "cart",
 		Ref = "AST-026",
-		Name = "Corner Cart",
-		HasNight = false,
-		RailSlots = 6,
-		BoardSlots = 2,
-		HasCoffee = false,
-		HasSwitch = false,
-		HidePoints = 0,
-		BuyFromDay = 0,
-		CoveredAfter = "AST-043",
+		Name = "Corner Cart", -- upgrades.md UPG-006 / ui-text.md §3
+		HasNight = false, -- day only (DEC-007)
+		RailSlots = 6, -- FEAT-006
+		BoardSlots = 2, -- DEC-190, DEC-215
+		HasCoffee = false, -- coffee maker comes with the trailer (DEC-055, DEC-125)
+		HasSwitch = false, -- light switch comes with the trailer (DEC-189)
+		HidePoints = 0, -- DEC-176
+		BuyFromDay = 0, -- starting vehicle (RunParams.StartVehicle, DEC-007)
+		CoveredAfter = "AST-043", -- tarp over the cart after the swap (DEC-199)
 	},
 	{
 		Key = "trailer",
-		Ref = "UPG-006",
-		Name = "Open Late Trailer",
-		HasNight = true,
-		RailSlots = 8,
-		BoardSlots = 3,
-		HasCoffee = true,
-		HasSwitch = true,
-		HidePoints = 4,
-		BuyFromDay = 5, -- DEC-037; buy spot = the trailer itself in the lot (DEC-107)
+		Ref = "UPG-006", -- model AST-027
+		Name = "Open Late Trailer", -- upgrades.md UPG-006 / ui-text.md §3
+		HasNight = true, -- opens the night shift (DEC-007)
+		RailSlots = 8, -- FEAT-006, UPG-006
+		BoardSlots = 3, -- DEC-215
+		HasCoffee = true, -- UPG-007 Coffee Maker, fixed, not sold (DEC-055, DEC-125)
+		HasSwitch = true, -- "Lights" switch (DEC-189)
+		HidePoints = 4, -- 4 hide points, hiding is per player (DEC-176)
+		BuyFromDay = 5, -- = RunParams.TrailerDay (DEC-037)
 	},
 } :: { Vehicle })
