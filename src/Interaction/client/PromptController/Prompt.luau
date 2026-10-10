@@ -4,6 +4,7 @@
 -- Slot) and keeps Vide sources for the PromptBillboard. Owns no input and no network: PromptController targets,
 -- holds and fires Interact. Plain module (not a Modux module); dependencies come in through `Hooks`.
 local CollectionService = game:GetService("CollectionService")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -24,6 +25,7 @@ export type Prompt = {
 	Anchor: Instance,
 	Owner: Instance?, -- Station ancestor (StationId, Ingredient)
 	Rig: Instance?, -- AnimalRig ancestor (NpcId), runtime customer anchors
+	MemberId: number?, -- UserId of the player character the anchor sits on (Prompt_Give); resolved lazily
 	Id: number?, -- EntityId; nil = not registered by the server yet
 	Enabled: boolean, -- PromptEnabled (absent = true)
 	Radius: number,
@@ -89,9 +91,28 @@ end
 
 const Prompt = {}
 
+-- UserId of the player whose character holds the anchor. Player.Character may replicate after the anchor, so it is
+-- retried on every Refresh until found (TASK-078).
+local function memberOf(anchor: Instance): number?
+	local current = anchor.Parent
+	while current and current ~= workspace do
+		if current:IsA("Model") then
+			const player = Players:GetPlayerFromCharacter(current)
+			if player then
+				return player.UserId
+			end
+		end
+		current = current.Parent
+	end
+	return nil
+end
+
 -- Rereads every attribute the prompt depends on. Cheap; called on any attribute change of the anchor or owners.
 function Prompt.Refresh(self: Prompt)
 	const anchor = self.Anchor
+	if self.MemberId == nil then
+		self.MemberId = memberOf(anchor)
+	end
 	self.Id = numberAttribute(anchor, "EntityId")
 	const enabled = anchor:GetAttribute("PromptEnabled")
 	self.Enabled = enabled ~= false
@@ -107,6 +128,7 @@ function Prompt.Refresh(self: Prompt)
 		StationId = numberAttribute(self.Owner, "StationId"),
 		Slot = numberAttribute(anchor, "Slot"),
 		NpcId = numberAttribute(self.Rig, "NpcId"),
+		MemberId = self.MemberId,
 	}
 
 	if action == nil then
@@ -162,6 +184,7 @@ function Prompt.new(anchor: Instance, hooks: Hooks): Prompt
 		Anchor = anchor,
 		Owner = owner,
 		Rig = rig,
+		MemberId = nil,
 		Id = nil,
 		Enabled = false,
 		Radius = 0,

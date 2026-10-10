@@ -7,8 +7,8 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 
--- First wave whose prompts are live (Content.Actions[...].Wave). Later-wave keys exist in the table already.
-const ACTIVE_WAVE = 1
+-- Wave this build binds (content-data.md §6.8): actions with Content.Actions[a].Wave above it never show (TASK-078).
+const BINDING_WAVE = Content.RunParams.BindingWave
 
 export type Held = {
 	Item: string,
@@ -18,14 +18,18 @@ export type Held = {
 export type StockRecord = { Amount: number, Capacity: number, Blocked: boolean }
 export type SlotRecord = { State: string }
 export type CustomerRecord = { State: string }
+export type VitalRecord = { State: string }
 
 export type Context = {
 	Phase: string,
 	IsNight: boolean,
+	SelfId: number, -- UserId of the local player
 	Held: Held?,
 	Stock: (ingredient: string) -> StockRecord?,
 	Slot: (stationId: number, slot: number) -> SlotRecord?,
 	Customer: (npcId: number) -> CustomerRecord?,
+	Vital: (userId: number) -> VitalRecord?, -- set Vitals (network.md §13.1)
+	MemberHeld: (userId: number) -> Held?, -- Tool equipped by a crew mate (others' backpacks do not replicate)
 }
 
 -- What the rules read from the anchor (Prompt keeps these fresh from attributes).
@@ -35,6 +39,7 @@ export type Target = {
 	StationId: number?,
 	Slot: number?,
 	NpcId: number?,
+	MemberId: number?, -- UserId of the character the anchor sits on (Prompt_Give, architecture.md §19.8)
 }
 
 -- Package item key -> ingredient it restocks.
@@ -69,9 +74,22 @@ function Rules.ParseToppings(value: string?): { [string]: boolean }
 	return out
 end
 
+-- Gate of architecture.md §19.7 ("only Active interacts"): no prompt at all while the local player is Down,
+-- Reviving, Spectator or Away. No Vitals record (lobby, before the first replication) = allowed; the server decides.
+function Rules.CanInteract(context: Context): boolean
+	const me = context.Vital(context.SelfId)
+	return me == nil or me.State == "Active"
+end
+
 function Rules.Allows(target: Target, context: Context): boolean
 	const action = Content.Actions.ByKey[target.Action]
-	if action == nil or action.Wave > ACTIVE_WAVE then
+	if action == nil or action.Wave > BINDING_WAVE then
+		return false
+	end
+
+	-- Anchors on the local character (its own Prompt_Give) are never a target (architecture.md §19.8).
+	const memberId = target.MemberId
+	if memberId and memberId == context.SelfId then
 		return false
 	end
 
@@ -147,6 +165,18 @@ function Rules.Allows(target: Target, context: Context): boolean
 			if customer.State ~= wanted then
 				return false
 			end
+		end
+	end
+
+	-- architecture.md §19.8 (give_coffee): the mate must be Active and not already hold a coffee
+	-- (CategoryLimits.Coffee = 1). Only the equipped Tool is visible here; the server checks the backpack.
+	if target.Action == "give_coffee" and memberId then
+		const mate = context.Vital(memberId)
+		if mate and mate.State ~= "Active" then
+			return false
+		end
+		if Rules.Holds(context.MemberHeld(memberId), "Coffee") then
+			return false
 		end
 	end
 

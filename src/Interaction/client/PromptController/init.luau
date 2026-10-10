@@ -13,6 +13,11 @@
 
 	The client only presents: it fires `Interact{Id, Action}` and the server decides (InteractionService
 	revalidates range, hand, stock and state). Nothing is applied locally.
+
+	Wave 2 (TASK-078, architecture.md §19.7-§19.8): actions show up to `RunParams.BindingWave`; no prompt while
+	`Vitals[me].State` is not Active; anchors on the local character (own `Prompt_Give`) are never candidates;
+	`PromptText` changes ("Take Coffee") update the pill live and cancel a hold in progress; `give_coffee` is
+	pre-checked against the mate's state and equipped Tool.
 ]]
 local Players = game:GetService("Players")
 local CollectionService = game:GetService("CollectionService")
@@ -125,13 +130,15 @@ function PromptController:BeginHold(prompt: Prompt.Prompt)
 
 	self.Holding = prompt
 	Prompt.SetHolding(prompt, true)
-	const id, action = prompt.Id, prompt.Target.Action
+	const id, action, text = prompt.Id, prompt.Target.Action, prompt.Text()
 	self.HoldThread = task.delay(prompt.Hold, function()
 		self.HoldThread = nil
-		-- Same target, same entity and action, still live: otherwise nothing is sent.
+		-- Same target, same entity, action and text ("Brew Coffee" -> "Take Coffee"), still live: otherwise nothing
+		-- is sent.
 		const valid = self.Target == prompt
 			and prompt.Id == id
 			and prompt.Target.Action == action
+			and prompt.Text() == text
 			and Prompt.IsLive(prompt)
 		self:CancelHold()
 		if valid then
@@ -212,6 +219,7 @@ function PromptController:RulesContext(character: Model): Rules.Context
 	return {
 		Phase = round.Phase(),
 		IsNight = round.IsNight(),
+		SelfId = Players.LocalPlayer.UserId,
 		Held = self:Held(character),
 		Stock = function(ingredient: string): Rules.StockRecord?
 			const index = Content.Ingredients.IndexOf[ingredient]
@@ -222,6 +230,14 @@ function PromptController:RulesContext(character: Model): Rules.Context
 		end,
 		Customer = function(npcId: number): Rules.CustomerRecord?
 			return net.Customers:get(npcId)
+		end,
+		Vital = function(userId: number): Rules.VitalRecord?
+			return net.Vitals:get(userId)
+		end,
+		MemberHeld = function(userId: number): Rules.Held?
+			const player = Players:GetPlayerByUserId(userId)
+			const mate = if player then player.Character else nil
+			return if mate then self:Held(mate) else nil
 		end,
 	}
 end
@@ -245,6 +261,10 @@ function PromptController:Tick()
 	end
 
 	const context = self:RulesContext(character)
+	if not Rules.CanInteract(context) then
+		self:HideAll()
+		return
+	end
 	const viewport = camera.ViewportSize
 	const center = viewport / 2
 	const maxScreenDistance = viewport.Y * MAX_SCREEN_DISTANCE_FRACTION
@@ -255,7 +275,7 @@ function PromptController:Tick()
 	local bestDistance = math.huge
 
 	for _, prompt in self.Prompts do
-		if not Prompt.IsLive(prompt) then
+		if not Prompt.IsLive(prompt) or prompt.Anchor:IsDescendantOf(character) then
 			continue
 		end
 		const position = Prompt.Position(prompt)
