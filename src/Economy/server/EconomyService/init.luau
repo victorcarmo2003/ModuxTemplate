@@ -1,13 +1,16 @@
 --!strict
 -- Party money, cash drawer, shift ledger, grade and summary (FEAT-012, FEAT-014; DEC-045, DEC-050, DEC-051, DEC-072,
--- DEC-083; architecture.md §2.3, §3.1, §4; network.md §3.3, §4.4; data.md §2.2; TASK-021). Run place only.
+-- DEC-083; architecture.md §2.3, §3.1, §4, §19.3, §19.26 A1, T48; network.md §3.3, §4.4; data.md §2.2;
+-- TASK-021, TASK-050). Run place only.
 -- Single writer of Cash and Drawer (Economy set, record 1). Others call:
 --   Spend(amount, player?)        purchases (Mart, bench, trailer); atomic check-and-debit, never below 0
---   AddToDrawer(amount, kind)     order price / tip / thief caught; only while the shop runs (Open, Closing)
+--   AddToDrawer(amount, kind)     order price / tip / thief caught ("Catch"); while the drawer is open
+--   Steal(amount)                 thief (FEAT-013): takes up to the drawer, counted in the ledger's Stolen
 --   CountArrival(), CountResult() ledger for the grade (CustomerService, TASK-032/033)
+--   AddReportStep(name, fn)       fills ShiftReport fields of other features before it is sent (T48)
 -- Payments go to the drawer, never to Cash (DEC-050): Cash only changes by Spend, the deposit and DevAddCash.
 -- Deposit on RoundService.ShiftEnded (start of Summary): grade A-D, bonus floor(drawer x %), Cash += drawer + bonus,
--- Drawer = 0, ShiftReport to the group, Reported(info, report) for RewardService (wave 2).
+-- Drawer = 0, report steps, ShiftReport to the group, Reported(info, report).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -24,16 +27,24 @@ export type DrawerKind = Ledger.DrawerKind
 -- ShiftReport packet (network.md §4.4), also handed to Reported listeners
 export type Report = Ledger.Report
 
-type ShiftInfo = { Day: number, Night: number, IsNight: boolean, Attempt: number }
+export type ShiftInfo = { Day: number, Night: number, IsNight: boolean, Attempt: number }
+
+-- Report step (T48): fills Gems, AfkLocked, LastChanceUsed (reads the rest). No yield; an error becomes a warn.
+export type ReportStep = (info: ShiftInfo, report: Report) -> ()
+type Step = { Name: string, Run: ReportStep }
 
 const RECORD = 1 -- Economy is a single record (network.md §3.3)
 const CASH_MAX = 2147483647 -- Economy.Cash wire range
 const DRAWER_MAX = 1000000 -- Economy.Drawer / ShiftReport.Drawer wire range
 const COUNT_MAX = 999 -- ShiftReport.Arrived/Completed wire range
 const TIPS_MAX = 100000 -- ShiftReport.Tips wire range
+const GEMS_MAX = 1000 -- ShiftReport.Gems wire range
 const BOSS_STAT = "BossBonusPP" -- Content.Stats (Shift Lead, Party scope, not stacking; DEC-069)
--- Phases in which money can enter the drawer and customers can be counted (FEAT-003: customers only while open)
+-- Selling phases until Content.Shift has the `Selling` column (TASK-047). PENDING, last step of TASK-050:
+-- IsShopOpen() = Content.Shift.ByKey[phase].Selling and this table goes away (architecture.md §19.3).
 const SHOP_PHASES: { [string]: boolean } = { Open = true, Closing = true }
+-- Closing: sign CLOSED but the queue is still served, so the drawer and the ledger still take entries (DEC-048)
+const CLOSING = "Closing"
 const KINDS: { [string]: boolean } = { Sale = true, Tip = true, Catch = true }
 -- Sale.Result enum (network.md §4.3)
 const RESULTS: { [string]: boolean } =
@@ -54,6 +65,14 @@ local function amountOf(value: any): number?
 	return value
 end
 
+-- Whole number in [0, max]; anything else (a report step wrote garbage) becomes 0
+local function wireInt(value: any, max: number): number
+	if type(value) ~= "number" or value ~= value then
+		return 0
+	end
+	return math.clamp(math.floor(value), 0, max)
+end
+
 const EconomyService = Modux.Service("EconomyService", {
 	Require = { "PlaceService", "NetService", "RunStateService", "RoundService" },
 	Priority = 740,
@@ -68,6 +87,8 @@ function EconomyService:Setup()
 	self.Last = nil :: Report?
 	-- Fired after the deposit: RewardService (wave 2) reads Completed for the anti-AFK rule (DEC-083)
 	self.Reported = self.Libs.Signal.new() :: SignalLib.Signal<ShiftInfo, Report>
+	-- Report steps in registration order (AddReportStep, T48)
+	self.Steps = {} :: { Step }
 end
 
 -- Reads -----------------------------------------------------------------------------------------------------------
@@ -95,9 +116,16 @@ function EconomyService:LastReport(): Report?
 	return self.Last
 end
 
+-- Selling phase: customers come and orders are taken (FEAT-003)
 function EconomyService:IsShopOpen(): boolean
 	const round = self.Dependencies.RoundService
 	return round:IsStarted() and SHOP_PHASES[round:GetPhase()] == true
+end
+
+-- Drawer and ledger take entries: a selling phase or Closing (queue still served)
+function EconomyService:IsDrawerOpen(): boolean
+	const round = self.Dependencies.RoundService
+	return self:IsShopOpen() or (round:IsStarted() and round:GetPhase() == CLOSING)
 end
 
 -- Writes ----------------------------------------------------------------------------------------------------------
@@ -133,8 +161,8 @@ function EconomyService:AddToDrawer(amount: number, kind: DrawerKind): number
 		fail(`[EconomyService] AddToDrawer: unknown kind {kind}`)
 		return 0
 	end
-	if not self:IsShopOpen() then
-		warn(`[EconomyService] AddToDrawer({value}, {kind}) outside Open/Closing ignored`)
+	if not self:IsDrawerOpen() then
+		warn(`[EconomyService] AddToDrawer({value}, {kind}) outside a selling phase or Closing ignored`)
 		return 0
 	end
 	const drawer = self.Drawer()
@@ -147,9 +175,27 @@ function EconomyService:AddToDrawer(amount: number, kind: DrawerKind): number
 	return added
 end
 
+-- Thief (FEAT-013): takes up to the drawer, adds it to the ledger's Stolen, returns what was taken. The amount
+-- (floor(Drawer x StealPct / 100) when Drawer >= MinDrawer) is ThiefService's call, from Content.
+function EconomyService:Steal(amount: number): number
+	const value = amountOf(amount)
+	if value == nil then
+		fail(`[EconomyService] Steal: amount must be a non-negative integer, got {amount}`)
+		return 0
+	end
+	const drawer = self.Drawer()
+	const taken = math.min(value, drawer)
+	if taken <= 0 then
+		return 0
+	end
+	self.Drawer(drawer - taken)
+	self.Shift.Stolen += taken
+	return taken
+end
+
 -- A customer reached the counter (FEAT-014 denominator). Called once per customer by CustomerService.
 function EconomyService:CountArrival()
-	if not self:IsShopOpen() then
+	if not self:IsDrawerOpen() then
 		return
 	end
 	self.Shift.Arrived += 1
@@ -161,10 +207,42 @@ function EconomyService:CountResult(result: SaleResult)
 		fail(`[EconomyService] CountResult: unknown result {result}`)
 		return
 	end
-	if not self:IsShopOpen() then
+	if not self:IsDrawerOpen() then
 		return
 	end
 	Ledger.count(self.Shift, result)
+end
+
+-- Report steps (T48: no Require cycle; RewardService and RoundService register here) -----------------------------
+
+-- Call from the peripheral's OnInit (lower priority, so Setup already ran). Runs at every deposit, in registration
+-- order, before the ShiftReport goes out. A repeated name is refused.
+function EconomyService:AddReportStep(name: string, fn: ReportStep)
+	if type(name) ~= "string" or name == "" or type(fn) ~= "function" then
+		fail("[EconomyService] AddReportStep: needs a name and a function")
+		return
+	end
+	for _, step in self.Steps do
+		if step.Name == name then
+			fail(`[EconomyService] AddReportStep: duplicate step {name}`)
+			return
+		end
+	end
+	table.insert(self.Steps, { Name = name, Run = fn })
+end
+
+-- Every step on the report; an error in one is a warn, the next ones still run and the report goes out anyway
+function EconomyService:RunReportSteps(info: ShiftInfo, report: Report)
+	for _, step in self.Steps do
+		const ok, err = pcall(step.Run, info, report)
+		if not ok then
+			warn(`[EconomyService] report step {step.Name} failed: {err}`)
+		end
+	end
+	-- Fields a step may write, back into wire shape (an out-of-range int would break the packet)
+	report.Gems = wireInt(report.Gems, GEMS_MAX)
+	report.AfkLocked = report.AfkLocked == true
+	report.LastChanceUsed = report.LastChanceUsed == true
 end
 
 -- Settlement ------------------------------------------------------------------------------------------------------
@@ -209,14 +287,15 @@ function EconomyService:Deposit(info: ShiftInfo): Report
 		Completed = math.min(ledger.Completed, COUNT_MAX),
 		Drawer = math.min(drawer, DRAWER_MAX),
 		Tips = math.min(ledger.Tips, TIPS_MAX),
-		Stolen = math.min(ledger.Stolen, DRAWER_MAX), -- wave 1: no thief
+		Stolen = math.min(ledger.Stolen, DRAWER_MAX),
 		Grade = settlement.Grade,
 		Bonus = math.min(settlement.Bonus, DRAWER_MAX),
 		Deposited = math.min(settlement.Deposited, DRAWER_MAX),
-		Gems = 0, -- wave 1: no RewardService (DEC-104 credits by event in wave 2)
-		AfkLocked = false, -- wave 1: anti-AFK lives in RewardService (DEC-083, wave 2)
-		LastChanceUsed = false, -- night summary only (DEC-053, DEC-110)
+		Gems = 0, -- RewardService step (DEC-104)
+		AfkLocked = false, -- RewardService step (DEC-083)
+		LastChanceUsed = false, -- RoundService step, night summary (DEC-053, DEC-110)
 	}
+	self:RunReportSteps(info, report)
 	self.Last = table.clone(report)
 	self.Shift = Ledger.new()
 

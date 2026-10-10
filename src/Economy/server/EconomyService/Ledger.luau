@@ -17,8 +17,8 @@ export type Ledger = {
 	Completed: number, -- Perfect + Complete (= satisfied, DEC-051); anti-AFK base (DEC-083)
 	Sales: number, -- $ from orders
 	Tips: number, -- $ from tips (DEC-072)
-	Catches: number, -- $ from caught thieves (wave 2)
-	Stolen: number, -- $ taken by the thief (wave 1: always 0)
+	Catches: number, -- $ from caught thieves (FEAT-013)
+	Stolen: number, -- $ taken by the thief (EconomyService:Steal)
 }
 
 -- ShiftReport packet (network.md §4.4)
