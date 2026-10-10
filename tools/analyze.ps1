@@ -40,14 +40,28 @@ $files = Get-ChildItem -Path $Src -Recurse -Filter *.luau |
 # LuauTypeInferIterationLimit 40000 (default 20000): the Modux self of the biggest Services (10+ dependencies plus
 # typeof(Net)) exceeds the default budget and reports "Code is too complex to typecheck" on correct code (TASK-048).
 # Same value in .vscode/settings.json (luau-lsp.fflags.override) so editor and gate agree.
-$args = @("analyze", "--sourcemap=$map", "--flag:LuauSolverV2=true", "--flag:LuauTypeInferIterationLimit=40000")
-if ($Defs) { $args += "--definitions=$Defs" }
-$args += $files.FullName
+$base = @("analyze", "--sourcemap=$map", "--flag:LuauSolverV2=true", "--flag:LuauTypeInferIterationLimit=40000")
+if ($Defs) { $base += "--definitions=$Defs" }
 
+# Relative paths in batches: one command line with every absolute path exceeds the Windows limit
+# ("The filename or extension is too long") and the engine never runs, which used to report a false 0.
+$root = (Get-Location).Path
+$paths = @($files | ForEach-Object { $_.FullName.Substring($root.Length + 1) })
+$batch = 100
+$output = @()
 $previous = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
-$output = & $engine @args 2>&1 | ForEach-Object { "$_" } | Where-Object { $_ -notmatch '\[INFO\]' }
+for ($i = 0; $i -lt $paths.Count; $i += $batch) {
+    $chunk = $paths[$i..([Math]::Min($i + $batch, $paths.Count) - 1)]
+    $output += & $engine @($base + $chunk) 2>&1 | ForEach-Object { "$_" } | Where-Object { $_ -notmatch '\[INFO\]' }
+}
 $ErrorActionPreference = $previous
+
+$launch = @($output | Select-String 'too long|is not recognized|cannot find' )
+if ($launch.Count -gt 0) {
+    Write-Host "analyzer failed to run: $($launch[0].Line)" -ForegroundColor Red
+    exit 1
+}
 
 $errors = @($output | Select-String 'TypeError|SyntaxError' | ForEach-Object { $_.Line } | Select-Object -Unique)
 $cycles = @($output | Select-String 'Cyclic module dependency')
