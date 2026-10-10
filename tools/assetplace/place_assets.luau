@@ -190,9 +190,11 @@ local function frameOf(x: number?, y: number?, z: number?, rotY: number?): CFram
 	return CFrame.new(x or 0, y or 0, z or 0) * CFrame.Angles(0, math.rad(rotY or 0), 0)
 end
 
--- Part pose in the asset frame: centre o = { x, y, z, rotY = extra yaw over the template orientation }.
+-- Part pose in the asset frame: centre o = { x, y, z, rotY = extra yaw, rotX / rotZ = extra pitch / roll over the
+-- template orientation }, in the asset frame, composed Y * X * Z (CFrame.fromEulerAnglesYXZ).
 local function partPose(origin: CFrame, rel: CFrame, o: { [any]: any }): CFrame
-	return origin * CFrame.new(o[1] or 0, o[2] or 0, o[3] or 0) * CFrame.Angles(0, math.rad(o.rotY or 0), 0) * rel.Rotation
+	local extra = CFrame.fromEulerAnglesYXZ(math.rad(o.rotX or 0), math.rad(o.rotY or 0), math.rad(o.rotZ or 0))
+	return origin * CFrame.new(o[1] or 0, o[2] or 0, o[3] or 0) * extra * rel.Rotation
 end
 
 local function findPart(inst: Instance, name: string): BasePart?
@@ -211,9 +213,9 @@ end
 	recorded from edits made in Studio; all coordinates in the placement frame / asset frame):
 	  part   = { names }   keep only these BaseParts (multi-variant FBX)
 	  drop   = { names }   destroy these BaseParts (meshes removed by hand)
-	  parts  = { [name] = { x, y, z, rotY = deg?, size = { sx, sy, sz }? } }
-	           part centre in the ASSET frame (relative to x/y/z/rotY of the entry), extra yaw over the template
-	           orientation, new size (MeshPart scaled)
+	  parts  = { [name] = { x, y, z, rotY = deg?, rotX = deg?, rotZ = deg?, size = { sx, sy, sz }? } }
+	           part centre in the ASSET frame (relative to x/y/z/rotY of the entry), extra rotation over the template
+	           orientation (asset frame, Y * X * Z), new size (MeshPart scaled)
 	  copies = { { part = name, x, y, z, rotY = deg?, size = {..}? } }   extra clones of a part, same pose rule
 	  pivot  = { x, y, z, rotY }   Model.WorldPivot in the PLACEMENT frame (same coordinates as x/y/z), when the
 	           pivot was moved off the asset origin by hand ]]
@@ -347,7 +349,9 @@ function Place.run(placements: { any }, ids: { [string]: any }): string
 end
 
 --[[ Place.diff(placements, ids, opts?) -> (report, nDiff)
-	Read-only. Builds every placement in memory (same build() as Place.run, never parented) and compares it with what
+	Read-only. Pairing is by stable key, never by list position: entry <-> live model with the same MapId|Asset
+	(attributes set by Place.run; the live name is "<id>_<asset>"), closest pivots first over the whole key group
+	(parts: same rule by name). Builds every placement in memory (same build() as Place.run, never parented) and compares it with what
 	is in workspace.MAP01_Assets now: model pivot, every BasePart (name, CFrame, Size), parts missing / extra, and the
 	template Attachments (counted apart: bind_map01 / bind_pieces move some anchors on purpose).
 	Default frame rule = MAP-01 after bind_map01: the entries bind_map01 puts inside the trailer (id TRL, TRL-*, H1..H4)
@@ -433,9 +437,10 @@ function Place.diff(placements: { any }, ids: { [string]: any }?, opts: { [strin
 	local function bare(n: string): string
 		return (string.gsub(n, "^Fixed_", ""))
 	end
-	local used: { [Instance]: boolean } = {}
-	local lines: { string } = {}
-	local nDiff, nOk, nAtt = 0, 0, 0
+	-- Pass 1: build every expected model (never parented) and group the entries by their stable key MapId|Asset.
+	type Entry = { i: number, p: { [string]: any }, key: string, move: CFrame?, exp: Instance?, err: string?, live: Instance?, dist: number }
+	local entries: { Entry } = {}
+	local byKey: { [string]: { Entry } } = {}
 	for i, p in placements do
 		if o.ids and not o.ids[p.id or ""] then
 			continue
@@ -444,64 +449,111 @@ function Place.diff(placements: { any }, ids: { [string]: any }?, opts: { [strin
 		if move == false then
 			continue
 		end
+		local key = (p.id or "") .. "|" .. p.asset
+		local e: Entry = { i = i, p = p, key = key, move = move, dist = math.huge }
 		local tpl, err = template(p.asset, ids or {})
 		if not tpl then
-			table.insert(lines, string.format("#%d %s: %s", i, tostring(p.id), tostring(err)))
+			e.err = err
+		else
+			local exp = build(p, tpl)
+			if move then
+				if exp:IsA("Model") then
+					-- a hand-set WorldPivot travels with the parts
+					local piv = exp.WorldPivot
+					exp:PivotTo(move * exp:GetPivot())
+					exp.WorldPivot = move * piv
+				elseif exp:IsA("BasePart") then
+					exp.CFrame = move * exp.CFrame
+				end
+			end
+			e.exp = exp
+			byKey[key] = byKey[key] or {}
+			table.insert(byKey[key], e)
+		end
+		table.insert(entries, e)
+		if i % 25 == 0 then
+			task.wait()
+		end
+	end
+	-- Pass 2: pair entries and live models of the same key by GLOBAL nearest pivot (closest pairs first), so the
+	-- result does not depend on the order of the placement list or of the Workspace children (a moved copy, a removed
+	-- or renumbered entry never shifts the pairing of the others).
+	local used: { [Instance]: boolean } = {}
+	for key, list in byKey do
+		local pairs_: { { e: Entry, a: Instance, d: number } } = {}
+		for _, e in list do
+			local ep = ((e.exp :: any):GetPivot() :: CFrame).Position
+			for _, a in live[key] or {} do
+				table.insert(pairs_, { e = e, a = a, d = ((a :: any):GetPivot().Position - ep).Magnitude })
+			end
+		end
+		table.sort(pairs_, function(x, y)
+			if x.d ~= y.d then
+				return x.d < y.d
+			end
+			return x.e.i < y.e.i
+		end)
+		for _, pr in pairs_ do
+			if not pr.e.live and not used[pr.a] then
+				pr.e.live = pr.a
+				pr.e.dist = pr.d
+				used[pr.a] = true
+			end
+		end
+	end
+	local lines: { string } = {}
+	local nDiff, nOk, nAtt = 0, 0, 0
+	for n, e in entries do
+		local i, key, move = e.i, e.key, e.move
+		if not e.exp then
+			table.insert(lines, string.format("#%d %s: %s", i, key, tostring(e.err)))
 			nDiff += 1
 			continue
 		end
-		local exp = build(p, tpl)
-		if move then
-			if exp:IsA("Model") then
-				-- a hand-set WorldPivot travels with the parts
-				local piv = exp.WorldPivot
-				exp:PivotTo(move * exp:GetPivot())
-				exp.WorldPivot = move * piv
-			elseif exp:IsA("BasePart") then
-				exp.CFrame = move * exp.CFrame
-			end
-		end
-		local key = (p.id or "") .. "|" .. p.asset
+		local exp = e.exp :: Instance
 		local expPivot = (exp :: any):GetPivot() :: CFrame
-		local best, bd = nil, math.huge
-		for _, a in live[key] or {} do
-			if not used[a] then
-				local d = ((a :: any):GetPivot().Position - expPivot.Position).Magnitude
-				if d < bd then
-					best, bd = a, d
-				end
-			end
-		end
+		local best, bd = e.live, e.dist
 		local msgs: { string } = {}
 		local real = 0
 		if not best then
 			table.insert(msgs, "MISSING in the Workspace")
 			real += 1
 		else
-			used[best] = true
 			local livePivot = (best :: any):GetPivot() :: CFrame
 			if bd > tolPos or angle(expPivot, livePivot) > tolDeg then
 				table.insert(msgs, string.format("pivot d=%.3f a=%.1f live %s", bd, angle(expPivot, livePivot), fmt(livePivot.Position)))
 				real += 1
 			end
 			local liveParts = ownParts(best)
-			local taken: { [Instance]: boolean } = {}
-			for _, ep in ownParts(exp) do
-				local cand, cd = nil, math.huge
+			local expParts = ownParts(exp)
+			-- same global nearest rule for parts of the same name (duplicated meshes, copies)
+			local pp: { { ep: BasePart, lp: BasePart, d: number } } = {}
+			for _, ep in expParts do
 				for _, lp in liveParts do
-					if not taken[lp] and bare(lp.Name) == ep.Name then
-						local d = (lp.Position - ep.Position).Magnitude
-						if d < cd then
-							cand, cd = lp, d
-						end
+					if bare(lp.Name) == ep.Name then
+						table.insert(pp, { ep = ep, lp = lp, d = (lp.Position - ep.Position).Magnitude })
 					end
 				end
+			end
+			table.sort(pp, function(x, y)
+				return x.d < y.d
+			end)
+			local taken: { [Instance]: boolean } = {}
+			local match: { [BasePart]: BasePart } = {}
+			for _, pr in pp do
+				if not match[pr.ep] and not taken[pr.lp] then
+					match[pr.ep] = pr.lp
+					taken[pr.lp] = true
+				end
+			end
+			for _, ep in expParts do
+				local cand = match[ep]
 				if not cand then
 					table.insert(msgs, "part missing live: " .. ep.Name)
 					real += 1
 					continue
 				end
-				taken[cand] = true
+				local cd = (cand.Position - ep.Position).Magnitude
 				local a = angle(ep.CFrame, cand.CFrame)
 				local ds = (ep.Size - cand.Size).Magnitude
 				if cd > tolPos or a > tolDeg or ds > tolPos then
@@ -530,16 +582,17 @@ function Place.diff(placements: { any }, ids: { [string]: any }?, opts: { [strin
 			end
 		end
 		exp:Destroy()
+		local where = if best then " <-> " .. best:GetFullName() else ""
 		if real > 0 then
 			nDiff += 1
-			table.insert(lines, string.format("#%d %s%s: %s", i, key, if move then " [trailer frame]" else "", table.concat(msgs, " | ")))
+			table.insert(lines, string.format("#%d %s%s%s: %s", i, key, if move then " [moved]" else "", where, table.concat(msgs, " | ")))
 		else
 			nOk += 1
 			if o.verbose then
-				table.insert(lines, string.format("#%d %s ok %s", i, key, table.concat(msgs, " ")))
+				table.insert(lines, string.format("#%d %s ok%s %s", i, key, where, table.concat(msgs, " ")))
 			end
 		end
-		if i % 25 == 0 then
+		if n % 25 == 0 then
 			task.wait()
 		end
 	end

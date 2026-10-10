@@ -14,7 +14,7 @@
 	  * T31: every post keeps its Neon lamp; the real SpotLight only on every other post counted from the corner
 	    (P-01 = highest Order included) and only within POST_LIGHT_RANGE of the camera. A post without a live real
 	    light shows its Pool_Decal (On_Fake, AST-036) when lit.
-	  * Lighting preset (style guide §5.2-§5.3): day locked on the "nice day" with ClockTime following the clock,
+	  * Lighting preset (day = the user's hand-set Lighting, 2026-10-10; night = style guide §5.3): day locked with ClockTime following the clock,
 	    golden hour 4 -> 6 PM; night interpolated Night 1 -> Night 10. Changes blend over BLEND_TIME.
 
 	Fixtures (binding, MAP-01 §16):
@@ -58,13 +58,17 @@ type Preset = {
 	Ambient: Color3,
 	OutdoorAmbient: Color3,
 	ColorShiftTop: Color3,
+	ColorShiftBottom: Color3,
 	EnvDiffuse: number,
 	EnvSpecular: number,
 	ShadowSoftness: number,
 	AtmDensity: number,
 	AtmHaze: number,
+	AtmOffset: number,
+	AtmGlare: number,
 	AtmColor: Color3,
 	AtmDecay: Color3,
+	CCBrightness: number,
 	Saturation: number,
 	Contrast: number,
 	Tint: Color3,
@@ -72,6 +76,7 @@ type Preset = {
 	BloomSize: number,
 	BloomThreshold: number,
 	SunRays: number,
+	SunRaysSpread: number,
 }
 
 const STREET_LIGHT_TAG = "StreetLight"
@@ -106,48 +111,61 @@ const FALLBACK_DROP = 0.4 -- studs below the zone ceiling
 const LAMP_OFF_MATERIAL = Enum.Material.SmoothPlastic
 const LAMP_OFF_COLOR = Color3.fromHex("#EAD6B0") -- Cream (style guide §2.1)
 
--- Style guide §5.2 (day) and §5.3 (Night 1 / Night 10). GOLDEN and the night fields the guide leaves open
--- (ColorShift_Top, Bloom Size, Night 10 Contrast/colours) are PROVISIONAL (frontend-coder, TASK-060).
+-- DAY = the look the user set by hand in Studio (2026-10-10): Lighting + Atmosphere + Bloom + ColorCorrection +
+-- SunRays of the place, copied as is (DepthOfField and Sky are not touched here). ClockTime still follows the shift.
+-- GOLDEN (4 -> 6 PM) is the user's day warmed up: PROVISIONAL (frontend-coder). Night 1 / Night 10 keep the style
+-- guide §5.3 colours and brightness; the fields the guide leaves open (atmosphere offset / glare, environment scales,
+-- shadow softness, bloom size, sun rays spread) start from the user's day. PROVISIONAL.
 const DAY: Preset = {
-	Brightness = 2.2,
-	Ambient = Color3.fromHex("#8C8378"),
-	OutdoorAmbient = Color3.fromHex("#A89E8E"),
-	ColorShiftTop = Color3.fromHex("#FFF1D6"),
-	EnvDiffuse = 0.5,
-	EnvSpecular = 0.15,
-	ShadowSoftness = 0.35,
-	AtmDensity = 0.25,
-	AtmHaze = 1,
-	AtmColor = Color3.fromHex("#C7E6F5"),
-	AtmDecay = Color3.fromHex("#F2D8B0"),
-	Saturation = 0.1,
-	Contrast = 0.05,
+	Brightness = 3,
+	Ambient = Color3.new(0.2745, 0.2745, 0.2745),
+	OutdoorAmbient = Color3.new(0.2745, 0.2745, 0.2745),
+	ColorShiftTop = Color3.new(0, 0, 0),
+	ColorShiftBottom = Color3.new(0, 0, 0),
+	EnvDiffuse = 1,
+	EnvSpecular = 1,
+	ShadowSoftness = 0.2,
+	AtmDensity = 0.507,
+	AtmOffset = 1,
+	AtmGlare = 2.6,
+	AtmHaze = 0,
+	AtmColor = Color3.new(0.2745, 0.3843, 0.7804),
+	AtmDecay = Color3.new(0.3608, 0.298, 0.4902),
+	CCBrightness = 0.04,
+	Saturation = 0.5,
+	Contrast = 0.1,
 	Tint = Color3.new(1, 1, 1),
-	BloomIntensity = 0.35,
+	BloomIntensity = 1,
 	BloomSize = 24,
-	BloomThreshold = 1.8,
-	SunRays = 0.04,
+	BloomThreshold = 2,
+	SunRays = 0.01,
+	SunRaysSpread = 0.1,
 }
 
 const GOLDEN: Preset = {
-	Brightness = 2,
-	Ambient = Color3.fromHex("#8F7A6A"),
-	OutdoorAmbient = Color3.fromHex("#B09078"),
+	Brightness = 2.6,
+	Ambient = Color3.fromHex("#504339"),
+	OutdoorAmbient = Color3.fromHex("#5A4A3E"),
 	ColorShiftTop = Color3.fromHex("#FFC98A"),
-	EnvDiffuse = 0.5,
-	EnvSpecular = 0.15,
-	ShadowSoftness = 0.35,
-	AtmDensity = 0.28,
-	AtmHaze = 1.2,
-	AtmColor = Color3.fromHex("#E6C9B0"),
-	AtmDecay = Color3.fromHex("#F2B27A"),
-	Saturation = 0.12,
-	Contrast = 0.06,
+	ColorShiftBottom = Color3.new(0, 0, 0),
+	EnvDiffuse = 1,
+	EnvSpecular = 1,
+	ShadowSoftness = 0.2,
+	AtmDensity = 0.507,
+	AtmOffset = 1,
+	AtmGlare = 2.6,
+	AtmHaze = 0.5,
+	AtmColor = Color3.fromHex("#9C7FA8"),
+	AtmDecay = Color3.fromHex("#E0905A"),
+	CCBrightness = 0.03,
+	Saturation = 0.45,
+	Contrast = 0.1,
 	Tint = Color3.fromHex("#FFF2E2"),
-	BloomIntensity = 0.4,
+	BloomIntensity = 1,
 	BloomSize = 24,
-	BloomThreshold = 1.7,
-	SunRays = 0.06,
+	BloomThreshold = 1.9,
+	SunRays = 0.03,
+	SunRaysSpread = 0.1,
 }
 
 const NIGHT_1: Preset = {
@@ -155,13 +173,17 @@ const NIGHT_1: Preset = {
 	Ambient = Color3.fromHex("#262B4A"),
 	OutdoorAmbient = Color3.fromHex("#2A3058"),
 	ColorShiftTop = Color3.fromHex("#3A4270"),
-	EnvDiffuse = 0.5,
-	EnvSpecular = 0.15,
-	ShadowSoftness = 0.35,
+	ColorShiftBottom = Color3.new(0, 0, 0),
+	EnvDiffuse = 1,
+	EnvSpecular = 1,
+	ShadowSoftness = 0.2,
 	AtmDensity = 0.35,
+	AtmOffset = 1,
+	AtmGlare = 0,
 	AtmHaze = 1.5,
 	AtmColor = Color3.fromHex("#1E2448"),
 	AtmDecay = Color3.fromHex("#0B0D1E"),
+	CCBrightness = 0,
 	Saturation = -0.2,
 	Contrast = 0.08,
 	Tint = Color3.fromHex("#D2DAFF"),
@@ -169,6 +191,7 @@ const NIGHT_1: Preset = {
 	BloomSize = 24,
 	BloomThreshold = 1.2,
 	SunRays = 0,
+	SunRaysSpread = 0.1,
 }
 
 const NIGHT_10: Preset = {
@@ -176,13 +199,17 @@ const NIGHT_10: Preset = {
 	Ambient = Color3.fromHex("#1E2240"), -- never below #1B2140 (style guide §5.3 reading minimum)
 	OutdoorAmbient = Color3.fromHex("#202546"),
 	ColorShiftTop = Color3.fromHex("#30385F"),
-	EnvDiffuse = 0.5,
-	EnvSpecular = 0.15,
-	ShadowSoftness = 0.35,
+	ColorShiftBottom = Color3.new(0, 0, 0),
+	EnvDiffuse = 1,
+	EnvSpecular = 1,
+	ShadowSoftness = 0.2,
 	AtmDensity = 0.45,
+	AtmOffset = 1,
+	AtmGlare = 0,
 	AtmHaze = 2.2,
 	AtmColor = Color3.fromHex("#1E2448"),
 	AtmDecay = Color3.fromHex("#0B0D1E"),
+	CCBrightness = 0,
 	Saturation = -0.3,
 	Contrast = 0.08,
 	Tint = Color3.fromHex("#C8D2FF"),
@@ -190,6 +217,7 @@ const NIGHT_10: Preset = {
 	BloomSize = 24,
 	BloomThreshold = 1.2,
 	SunRays = 0,
+	SunRaysSpread = 0.1,
 }
 
 local function lerp(a: number, b: number, t: number): number
@@ -207,13 +235,17 @@ local function blend(a: Preset, b: Preset, t: number): Preset
 		Ambient = a.Ambient:Lerp(b.Ambient, t),
 		OutdoorAmbient = a.OutdoorAmbient:Lerp(b.OutdoorAmbient, t),
 		ColorShiftTop = a.ColorShiftTop:Lerp(b.ColorShiftTop, t),
+		ColorShiftBottom = a.ColorShiftBottom:Lerp(b.ColorShiftBottom, t),
 		EnvDiffuse = lerp(a.EnvDiffuse, b.EnvDiffuse, t),
 		EnvSpecular = lerp(a.EnvSpecular, b.EnvSpecular, t),
 		ShadowSoftness = lerp(a.ShadowSoftness, b.ShadowSoftness, t),
 		AtmDensity = lerp(a.AtmDensity, b.AtmDensity, t),
 		AtmHaze = lerp(a.AtmHaze, b.AtmHaze, t),
+		AtmOffset = lerp(a.AtmOffset, b.AtmOffset, t),
+		AtmGlare = lerp(a.AtmGlare, b.AtmGlare, t),
 		AtmColor = a.AtmColor:Lerp(b.AtmColor, t),
 		AtmDecay = a.AtmDecay:Lerp(b.AtmDecay, t),
+		CCBrightness = lerp(a.CCBrightness, b.CCBrightness, t),
 		Saturation = lerp(a.Saturation, b.Saturation, t),
 		Contrast = lerp(a.Contrast, b.Contrast, t),
 		Tint = a.Tint:Lerp(b.Tint, t),
@@ -221,6 +253,7 @@ local function blend(a: Preset, b: Preset, t: number): Preset
 		BloomSize = lerp(a.BloomSize, b.BloomSize, t),
 		BloomThreshold = lerp(a.BloomThreshold, b.BloomThreshold, t),
 		SunRays = lerp(a.SunRays, b.SunRays, t),
+		SunRaysSpread = lerp(a.SunRaysSpread, b.SunRaysSpread, t),
 	}
 end
 
@@ -633,6 +666,7 @@ function LightController:Write(preset: Preset, clock: number)
 	Lighting.Ambient = preset.Ambient
 	Lighting.OutdoorAmbient = preset.OutdoorAmbient
 	Lighting.ColorShift_Top = preset.ColorShiftTop
+	Lighting.ColorShift_Bottom = preset.ColorShiftBottom
 	Lighting.EnvironmentDiffuseScale = preset.EnvDiffuse
 	Lighting.EnvironmentSpecularScale = preset.EnvSpecular
 	Lighting.ShadowSoftness = preset.ShadowSoftness
@@ -641,10 +675,13 @@ function LightController:Write(preset: Preset, clock: number)
 	const atmosphere = self.Atmosphere :: Atmosphere
 	atmosphere.Density = preset.AtmDensity
 	atmosphere.Haze = preset.AtmHaze
+	atmosphere.Offset = preset.AtmOffset
+	atmosphere.Glare = preset.AtmGlare
 	atmosphere.Color = preset.AtmColor
 	atmosphere.Decay = preset.AtmDecay
 
 	const correction = self.ColorCorrection :: ColorCorrectionEffect
+	correction.Brightness = preset.CCBrightness
 	correction.Saturation = preset.Saturation
 	correction.Contrast = preset.Contrast
 	correction.TintColor = preset.Tint
@@ -656,6 +693,7 @@ function LightController:Write(preset: Preset, clock: number)
 
 	const rays = self.SunRaysEffect :: SunRaysEffect
 	rays.Intensity = preset.SunRays
+	rays.Spread = preset.SunRaysSpread
 end
 
 function LightController:RefreshPreset()

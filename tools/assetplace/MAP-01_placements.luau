@@ -34,8 +34,8 @@
 	    note  = short warning for the person doing the swap.
 	    Hand edits made in Studio (2026-10-10, applied by place_assets.luau build(); Place.diff checks them):
 	    drop   = { mesh names } removed from the model.
-	    parts  = { [mesh] = { x, y, z, rotY = deg?, size = { sx, sy, sz }? } } mesh centre in the ASSET frame
-	             (relative to the entry's x/y/z/rotY), extra yaw over the template, new size.
+	    parts  = { [mesh] = { x, y, z, rotY = deg?, rotX = deg?, rotZ = deg?, size = { sx, sy, sz }? } } mesh centre
+	             in the ASSET frame (relative to the entry's x/y/z/rotY), extra rotation over the template (Y * X * Z), new size.
 	    copies = { { part = mesh, x, y, z, rotY = deg? } } extra clones of a mesh, same rule.
 	    pivot  = { x, y, z, rotY } Model.WorldPivot in the placement frame (same coordinates as x/y/z).
 
@@ -183,7 +183,7 @@ return {
 	-- 2a. CORNER CART (tier 1, day) + stations on its mounts. Pivot (41, 0.45, 37.5), rotY 180.
 -- 2026-10-10: user lowered the cart body 3.5 -> 3.0 tall in Studio; counter mounts now at y 3.45 (Pad 0.45 + 3.0).
 	---------------------------------------------------------------------------------------------
-	{ asset = "AST-026_CornerCart", x = 41, y = 0.45, z = 37.5, rotY = 0, parts = { Body = { 1.05, 1.5, 0, size = { 29.5, 3, 4.28 } } }, group = "Cart", id = "CART", layer = "day", replaces = { "Pad/CART/Base", "Pad/CART/UmbrellaPole_1", "Pad/CART/UmbrellaPole_2", "Pad/CART/Umbrella_1", "Pad/CART/Umbrella_2" }, note = "queue side is local +Z; LookVector faces the operator (south)" },
+	{ asset = "AST-026_CornerCart", x = 41, y = 0.45, z = 37.5, rotY = 0, parts = { Body = { 1.05, 1.5, 0, size = { 29.5, 3, 4.28 } }, Parasol_E = { 6.5, 5.9009, -1.7698, rotX = -9 }, Parasol_W = { -6.5, 5.8931, -1.6201, rotX = -6.3 } }, group = "Cart", id = "CART", layer = "day", replaces = { "Pad/CART/Base", "Pad/CART/UmbrellaPole_1", "Pad/CART/UmbrellaPole_2", "Pad/CART/Umbrella_1", "Pad/CART/Umbrella_2" }, note = "queue side is local +Z; LookVector faces the operator (south). 2026-10-10 hand edit (user, Studio): parasols tilted 9 / 6.3 deg" },
 	{ asset = "AST-018_CoolerL1", x = 29.5, y = 0.95, z = 37.66, rotY = 180, group = "Cart", id = "CART-S", layer = "day", replaces = { "Pad/CART/1_S_Stock" }, note = "Mount_StockSausage (low, inside the cart body)" },
 	{ asset = "AST-012_RollerGrill", part = { "Grill_L1" }, x = 33.5, y = 3.45, z = 37.5, rotY = 180, group = "Cart", id = "CART-G", layer = "day", replaces = { "Pad/CART/2_G_Grill", "Pad/CART/GrillPlate" } },
 	{ asset = "AST-013_RestRail", part = { "Rail_6" }, x = 37.5, y = 3.45, z = 37.5, rotY = 180, group = "Cart", id = "CART-R", layer = "day", replaces = { "Pad/CART/3_R_Rest" }, note = "low end + Prompt_Rail towards the operator" },
@@ -281,7 +281,7 @@ return {
 	{ asset = "AST-033_NoHelpSign", x = -53.89, y = 2.2, z = -35.079, rotY = 180, group = "Buildings", id = "CS-2", replaces = { "Buildings/B2/Window_NoHelpWanted_X-56" }, note = "card on the B2b door glass" },
 	{ asset = "AST-033_NoHelpSign", x = -34.86, y = 2.4, z = -34.414, rotY = 180, group = "Buildings", id = "CS-2", replaces = { "Buildings/B2/Window_NoHelpWanted_X-32" }, note = "card on the left pane of the laundry window" },
 	{ asset = "AST-033_BuildingA", x = -32.725, y = 0, z = -55.8, rotY = 90, group = "Buildings", id = "B2", replaces = { "Buildings/B2/Block" }, note = "B2c faces the Juniper (east), Z -64..-47.6: closes the lot seen from the trailer window" },
-	{ asset = "AST-044_BellmoorSavings", x = 38, y = 0, z = -46.97, rotY = 180, group = "Buildings", id = "Z-11", replaces = { "Buildings/BellmoorSavings/Bank_GroundFloor", "Buildings/BellmoorSavings/Cornice", "Buildings/BellmoorSavings/BankDoor", "Buildings/BellmoorSavings/BankSign", "Buildings/BellmoorSavings/C-01", "Buildings/BellmoorSavings/C-01_MinuteHand", "Buildings/BellmoorSavings/C-01_HourHand" }, note = "modeler-3d 2026-10-10: ground floor 0..18, lot X 24..52 / Z -64..-32, portico + C-01 (39, 14, face at Z ~-30.3); columns now inside this mesh; BankSign text = SurfaceGui on +Z face; hands pivot = Clock_Center (_atts.json)" },
+	{ asset = "AST-044_BellmoorSavings", x = 38, y = 0, z = -46.97, rotY = 180, parts = { BankDoor = { -1, 4.65, -15.18, size = { 3.92, 6.85, 0.34 } } }, group = "Buildings", id = "Z-11", replaces = { "Buildings/BellmoorSavings/Bank_GroundFloor", "Buildings/BellmoorSavings/Cornice", "Buildings/BellmoorSavings/BankDoor", "Buildings/BellmoorSavings/BankSign", "Buildings/BellmoorSavings/C-01", "Buildings/BellmoorSavings/C-01_MinuteHand", "Buildings/BellmoorSavings/C-01_HourHand" }, note = "modeler-3d 2026-10-10: ground floor 0..18, lot X 24..52 / Z -64..-32, portico + C-01 (39, 14, face at Z ~-30.3); columns now inside this mesh; BankSign text = SurfaceGui on +Z face; hands pivot = Clock_Center (_atts.json). 2026-10-10 hand edit (user, Studio): BankDoor 7.45 -> 6.85 tall, bottom raised 0.6 (doors overlapped)" },
 	{ asset = "AST-045_ApartmentBlock", x = 38, y = 18, z = -40.762, rotY = 180, group = "Buildings", id = "Z-11", replaces = { "Buildings/BellmoorSavings/Apartments", "Buildings/BellmoorSavings/WV-1", "Buildings/BellmoorSavings/WV-2", "Buildings/BellmoorSavings/WV-3" }, note = "modeler-3d 2026-10-10: floors 2-3 on the bank (18..30, roof hut to 32.2); Window_Up_1..3 = WV-1..3 at X 31/38/45, glass 24.6..28" },
 	{ asset = "AST-033_BuildingH", x = 112.2, y = 0, z = -41.355, rotY = 0, group = "Buildings", id = "B4", replaces = { "Buildings/B4" }, note = "Ninth front" },
 	{ asset = "AST-033_BuildingA", x = 128.6, y = 0, z = -40.725, rotY = 0, group = "Buildings", id = "B4", replaces = { "Buildings/B4" } },
