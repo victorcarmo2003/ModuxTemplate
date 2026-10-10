@@ -2201,3 +2201,70 @@ Origem das DEC-158 a DEC-160: mensagens do usuário ao orquestrador, 2026-10-10.
   - **art-director:** AST-054 (tipos × conjuntos); conferir traço reservado (§2.4) e detalhe assimétrico (invariante 10, ANM-004) nos 8 conjuntos.
   - **architect:** memória das texturas de civil (`Q-144` g).
   - Notas em `asset-list.md` (AST-053), `open-questions.md` (`Q-149`), `README.md` → secretário (feito).
+
+---
+
+Origem das DEC-161 a DEC-163: pedidos do usuário ao orquestrador durante a revisão no Studio (`workspace.CrewDemo`), 2026-10-10, e a fala final de aprovação. Entregas até o commit `716c0d7` (branch `assets/kenney-pipeline`). Falas das correções da DEC-161 **resumidas pelo orquestrador** (não literais); falas das DEC-162 e DEC-163 **literais**.
+
+### DEC-161 — 2026-10-10 — Correções do rig da crew: um nariz só por espécie, braços retos de civil, patinhas cartoon
+
+- Fala do usuário (resumo do orquestrador, não literal): pediu (1) **um nariz só** por espécie, sem nariz duplicado; (2) braços **retos** para civis, sem manga bufante/elástico; (3) **patinhas cartoon rosadas** nas mãos.
+- Decidido pelo usuário (feito e entregue; aprovado na DEC-163):
+
+  | # | Correção | Como ficou | Onde |
+  |---|---|---|---|
+  | 1 | Um nariz só por espécie | nariz **saiu das expressões compartilhadas** e foi para a `T_Head_<A>` de cada espécie; espécie com nariz **modelado ou pintado próprio** fica **só com ele** | texturas `T_Expr_*`, `T_Head_<A>` |
+  | 2 | Braços de civil | braços **retos** `AST-053_CivilArms`, sem manga bufante/elástico. O **uniforme da crew mantém a manga** | malha `AST-053_CivilArms` |
+  | 3 | Patinhas | mãos com **almofada + dedinhos rosados**, estilo cartoon, em **todas as folhas de roupa**, inclusive o **uniforme** | `T_Civil_*`, `T_Civil_Thief_Day`, textura do uniforme (`AST-053_CrewTex`) |
+
+- Emenda: **DEC-152** (nariz por textura continua; agora na textura da cabeça, não na de expressão). A troca de expressão (`TextureID`) não mexe mais no nariz.
+- Não muda: rig R6 (DEC-151), cabeça oval (DEC-152/DEC-153), dia/noite (DEC-150).
+- Impacto:
+  - **art-director:** fichas AST-053/AST-054 (braço de civil × braço do uniforme; patinha nas folhas); regra "todo rosto normal tem olhos e boca" segue; nariz deixa de ser parte da expressão.
+  - **architect:** troca de rosto = só textura de expressão; nariz fixo na cabeça (`Q-144` h).
+  - Notas em `asset-list.md` (AST-053), `README.md` → secretário (feito).
+
+### DEC-162 — 2026-10-10 — Três expressões novas de humor: Skeptical, Exhausted, Stressed; sistema de humor dos NPCs fica para depois
+
+- Fala do usuário (literal): "Faz mais 2 rostos, um de cético, um de depressivo/exaurido e um de estressado, que daí podemos implementar também sistema de humor nos npcs (planejamos depois isso)".
+- Leitura: a fala diz "2 rostos" mas lista **3**; foram feitos os 3 e o usuário aprovou (DEC-163).
+- Decidido pelo usuário: o conjunto de expressões (DEC-152: normal, feliz, sorridente, triste, desmaiado com X) ganha:
+
+  | Expressão | Pedido do usuário |
+  |---|---|
+  | **Skeptical** | "cético" |
+  | **Exhausted** | "depressivo/exaurido" |
+  | **Stressed** | "estressado" |
+
+- Mesma técnica das demais (troca de textura, `Q-144` h). Versão noite: segue em **`Q-150`**.
+- **Sistema de humor dos NPCs:** intenção do usuário, **não desenhado**, "planejamos depois". Aberto em **`Q-154`** (não bloqueante). Nenhuma `FEAT-###` criada até o desenho.
+- Impacto:
+  - **game-designer:** `Q-154` (quando houver espaço; liga humor ↔ expressão ↔ paciência/gorjeta, DEC-072).
+  - **art-director:** lista de expressões na ficha AST-053.
+  - Notas em `asset-list.md` (AST-053), `open-questions.md` (`Q-150`, `Q-154`), `README.md` → secretário (feito).
+
+### DEC-163 — 2026-10-10 — Modelos e texturas da crew aprovados: 10 espécies, Quentin guaxinim, roupas casuais, correções e expressões
+
+- Fala do usuário (literal), depois de ver `workspace.CrewDemo` no Studio: "Show gostei de todos".
+- Decidido pelo usuário — **aprovados** (modelo/textura entregue):
+
+  | Entrega | DEC de origem | Peças aprovadas |
+  |---|---|---|
+  | 10 espécies novas | DEC-158 | Pig, Mouse, Raccoon, Koala, Monkey, Lion, Frog, Penguin, Hamster, Sheep: modelos `AST-053_Animal_<A>` e texturas `T_Head_<A>` / `T_Head_<A>_Night` |
+  | Quick Quentin guaxinim | DEC-159 | `T_Civil_Thief_Day`, `AST-053_ThiefHat` (**cinza-ardósia**: o atlas não tem roxo), `T_Expr_Thief` |
+  | Roupas casuais | DEC-160 | `T_Civil_C` a `T_Civil_H` + `T_Civil_A`/`B` **repintadas** (8 conjuntos, dia e noite) |
+  | Correções | DEC-161 | nariz único por espécie, `AST-053_CivilArms`, patinhas |
+  | Expressões de humor | DEC-162 | Skeptical, Exhausted, Stressed |
+
+- Chapéu do Quentin: cinza-ardósia, não o cinza-arroxeado da ficha. O **sobretudo** segue `#7A6FB0` (DEC-159). Aceito com a aprovação.
+- **NÃO aprovado / segue em aberto** (o usuário não respondeu):
+  - **`Q-144` (g)** orçamento de tris: personagem ≈ 2,0–2,5k; **Sheep ≈ 2.530** (acima de 2.500). Aprovar o modelo **não** aprova o número.
+  - **`Q-151`** cor dos animais à noite (inclui: **mãos mostram a cor do bicho** enquanto a cabeça fica azul-marinho).
+- Fichas: **AST-053** e **AST-056** seguem **Rascunho** no texto (como na DEC-151); só as entregas acima estão aprovadas.
+- Responde em parte:
+  - **`Q-149` (c):** roupa de civil **por textura** (confirmada com a aprovação das roupas). (a), (b), (d) seguem.
+  - **`Q-145` (a):** as 18 espécies estão aprovadas como modelo; quais viram classe segue em aberto.
+- Impacto:
+  - **art-director:** reescrever AST-053 (crew + civil, 18 espécies, expressões, braços, patinhas) e AST-056 (guaxinim, chapéu cinza-ardósia).
+  - **modeler-3d:** se `Q-144` (g) cortar orçamento, reduzir a Sheep primeiro.
+  - Notas em `asset-list.md` (AST-053, AST-056), `open-questions.md` (`Q-144`, `Q-145`, `Q-149`, `Q-151`), `characters.md`, `npcs.md`, `README.md` → secretário (feito).

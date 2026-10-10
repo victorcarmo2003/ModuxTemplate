@@ -169,6 +169,7 @@ Critérios de aceite (clientes normais):
 - Papel: ladrão · Turno: só dia · Custo: 1 · Origem: **[DEC-018, DEC-050, DEC-023]**; personagem CHR-004 (aparência e falas em `characters.md`)
 - Falas: 1 balão por evento (espreitar, pego, fugindo), pool do narrative-writer.
 - **DEC-159 (2026-10-10):** Quentin é um **guaxinim** da crew (DEC-149). Roupa por textura `T_Civil_Thief_Day` (**só dia**, sem variante de noite), chapéu `AST-053_ThiefHat`, rosto `T_Expr_Thief`. Regras e números abaixo **não mudam**. "Mesma roupa" da invariante própria = esse conjunto.
+- **DEC-163 (2026-10-10):** visual do Quentin **aprovado** (chapéu cinza-ardósia; sobretudo `#7A6FB0`). Regras e números não mudam.
 - Gancho de roteiro: se Quentin foi impedido no dia D, a ligação do dia D+1 (a partir do Day 3) usa a variante "Heard you caught Quentin" (`script.md` §4.1; condição na tabela `BossCalls`, FEAT-018).
 
 | Estado | Regra | Números |

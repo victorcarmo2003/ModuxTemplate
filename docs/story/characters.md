@@ -86,6 +86,7 @@ Aparência pensada para R6: leitura por **silhueta, cor, chapéu e acessório**,
   - óculos escuros redondos + bigodinho → textura de rosto `T_Expr_Thief`;
   - saco de pano com "$" costurado (AST-021).
   - **Só textura de dia**: nunca aparece à noite. Modelo em produção, não aprovado. Texto final → narrative-writer.
+  - **DEC-163 (2026-10-10):** visual entregue **aprovado**. Chapéu ficou **cinza-ardósia** (o atlas não tem roxo); sobretudo segue `#7A6FB0`. Texto final segue com o narrative-writer.
 - **Pista leve**: o chefe comenta o ladrão no dia seguinte, sem ter estado lá ("Heard you caught Quentin. Nice.") — como ele sabe? (resposta implícita: Opal conta tudo.)
 - Atropelamento de NPC: sem semáforo (DEC-130, revoga DEC-120); como NPC atravessa fica com `Q-129`, e `design/features.md` propõe que NPC nunca é atropelado. Fala **de reserva** (só entra se isso mudar em `Q-122` b / `Q-129`): "Not my day!"
 

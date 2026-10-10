@@ -129,6 +129,8 @@ Mapeamento Kenney/KayKit por ficha (DEC-136, Rascunho): `asset-sourcing.md`. As 
 
 **DEC-158 a DEC-160 (2026-10-10):** crew com **+10 espécies** (18; AST-053, entregues para revisão, não aprovadas; Sheep ≈ 2.530 tris, `Q-144` g; noite azul-marinho igual em todas, `Q-151`). **Quick Quentin = guaxinim** (AST-056; `T_Civil_Thief_Day` só dia, `AST-053_ThiefHat`, `T_Expr_Thief`; em produção). **Roupas casuais** de cliente/pedestre `T_Civil_C` a `H` (dia e noite), 8 conjuntos com A/B (em produção; `Q-149`).
 
+**DEC-161 a DEC-163 (2026-10-10):** correções (nariz único por espécie na `T_Head_<A>`; braços retos de civil `AST-053_CivilArms`; patinhas rosadas em todas as roupas, inclusive uniforme), expressões **Skeptical / Exhausted / Stressed**, e **aprovação** ("Show gostei de todos") das 10 espécies, peças do Quentin (chapéu cinza-ardósia) e 8 conjuntos casuais. Orçamento `Q-144` (g) e noite `Q-151` **seguem abertos**; fichas AST-053/056 seguem Rascunho no texto.
+
 Mapa anomalia → asset (DEC-096): ANM-001 AST-060 · ANM-002 AST-061 · ANM-003 AST-044 (estados do relógio) · ANM-004 AST-062 (+ AST-055) ·
 ANM-005 AST-059 · ANM-006 AST-063 (+ AST-045) · ANM-007 AST-064 (+ AST-036) · ANM-008 AST-065 · ANM-009 AST-066 · ANM-010 AST-067 (+ AST-036, AST-028).
 
@@ -772,6 +774,9 @@ Regras gerais: style guide §4 (opção A: `BodyColors` + acessórios de atlas +
 - **DEC-158 (2026-10-10):** **+10 espécies** (18 no total): Pig, Mouse, Raccoon, Koala, Monkey, Lion, Frog, Penguin, Hamster, Sheep. Arquivos `Assets/blender|models/character/AST-053_Animal_<A>`, texturas `T_Head_<A>` / `T_Head_<A>_Night`; demo `workspace.CrewDemo` (`New_<A>_Day/Night`). **Entregues para revisão, não aprovados.** Tris ≈ 2,0–2,5k por personagem; **Sheep ≈ 2.530**, acima do teto 2.500 → `Q-144` (g). À noite todas as espécies ficam do mesmo azul-marinho → `Q-151`.
 - **DEC-159 (2026-10-10):** peças do Quick Quentin guaxinim com prefixo desta família: chapéu `AST-053_ThiefHat`, rosto `T_Expr_Thief`, roupa `T_Civil_Thief_Day` (só dia). Ficha do personagem: **AST-056**. Em produção.
 - **DEC-160 (2026-10-10):** roupas casuais de cliente/pedestre por textura: **6 conjuntos novos** `T_Civil_C` a `T_Civil_H` (dia e noite), além de `T_Civil_A`/`B` → 8 conjuntos. Em produção, não aprovados. Distribuição por tipo (AST-054) com `Q-149` (b).
+- **DEC-161 (2026-10-10):** correções: (1) **um nariz só por espécie** — nariz sai das expressões compartilhadas e vai para a `T_Head_<A>`; quem tem nariz modelado/pintado próprio fica só com ele; (2) braços **retos** de civil `AST-053_CivilArms` (sem manga bufante/elástico; o **uniforme mantém a manga**); (3) **patinhas cartoon rosadas** (almofada + dedinhos) em todas as folhas de roupa, inclusive o uniforme.
+- **DEC-162 (2026-10-10):** expressões novas **Skeptical, Exhausted, Stressed** (somam-se às da DEC-152). Sistema de humor dos NPCs: `Q-154` (depois).
+- **DEC-163 (2026-10-10):** **aprovados** (modelo/textura): as 10 espécies da DEC-158, `T_Civil_A` a `H` (A/B repintadas), peças do Quentin (DEC-159), correções da DEC-161 e expressões da DEC-162. **Orçamento de tris não aprovado** (`Q-144` g; Sheep ≈ 2.530); cor da noite em `Q-151` (mãos com a cor do bicho, cabeça azul-marinho). Texto desta ficha segue **Rascunho** até a reescrita do art-director.
 
 ### AST-054 — Clientes normais e pedestre (7 tipos × 4 variantes)
 
@@ -797,6 +802,7 @@ Regras gerais: style guide §4 (opção A: `BodyColors` + acessórios de atlas +
 - **Animações (AST-069):** espreita disfarçada (jornal, assobio), andar na ponta dos pés, abrir gaveta, fuga com saco.
 - **Tris:** ≤ 2.000.
 - **DEC-159 (2026-10-10):** Quentin é um **guaxinim** da crew (base AST-053 Raccoon). Visual acima mantido e adaptado: sobretudo `#7A6FB0` e tênis brancos em `T_Civil_Thief_Day` (**só dia**), chapéu malha `AST-053_ThiefHat`, óculos + bigodinho em `T_Expr_Thief`. "Plataforma + decal" acima não vale mais. Tris ≤ 2.000 × crew ≈ 2,0–2,5k: `Q-144` (g). Em produção, não aprovado; texto da ficha a reescrever pelo art-director.
+- **DEC-163 (2026-10-10):** peças entregues **aprovadas**: `T_Civil_Thief_Day`, `AST-053_ThiefHat` (**cinza-ardósia**; o atlas não tem roxo), `T_Expr_Thief`. Sobretudo segue `#7A6FB0`. Tris ≤ 2.000 segue em `Q-144` (g). Ficha segue **Rascunho** no texto.
 
 ### AST-057 — Opal (CHR-003, NPC-020)
 
