@@ -62,6 +62,11 @@ local function template(name: string, ids: { [string]: any }): (Instance?, strin
 			d:Destroy()
 		elseif d:IsA("BasePart") then
 			d.Anchored = true
+			-- glass pieces split out by export_import.py (flat-colour material) are translucent
+			if string.sub(d.Name, 1, 5) == "Glass" then
+				d.Transparency = 0.5
+				d.CastShadow = false
+			end
 		end
 	end
 	model.Name = name
