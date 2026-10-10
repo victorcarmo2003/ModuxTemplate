@@ -1,19 +1,21 @@
 --!strict
 --[[
-	OpalController (TASK-038; NPC-020, CHR-003; DEC-079, DEC-099, DEC-178, DEC-191, DEC-203; architecture.md §2.3)
+	OpalController (TASK-038, TASK-077; NPC-020, CHR-003; DEC-079, DEC-099, DEC-178, DEC-191, DEC-203; architecture.md §2.3)
 
 	Opal, the Ninth Street Mart clerk, exists only on this client:
 	  * built once with CrewRig.Build at MapPoint OP-1 (architecture.md §18.5: HumanoidRootPart at point + 3 studs,
 	    facing the point's front), anchored, untagged (`Tag = false`), so RigController never dresses her and the
 	    local low-band Night swap (DEC-168) never reaches her. Dressed here once: Day pack, Normal face;
-	  * no Humanoid: the Humanoid Build adds is replaced by an AnimationController + Animator (§2.3) playing a
-	    looped idle;
+	  * no Humanoid: the Humanoid Build adds is removed (§2.3); AnimController (TASK-075) makes the local
+	    AnimationController + Animator and loops `opal_idle` of Content.Animations (AST-057 `Opal_Crossword`).
+	    Id "" -> the `npc` locomotion set binds her instead, which idles with the stock R6 idle while `npc_idle`
+	    is empty too (§19.26 A8). No animation id lives in this file;
 	  * talks: when the local character enters the 8-stud radius of OP-1, one balloon (3 s) with a line drawn from
 	    Content.OpalLines for the current phase (day / nights 1-3 / 4-6 / 7-10), never the same as this player's
 	    last line. One balloon per visit, at most one every 90 s (NPC-020). The balloon is local, so only the player
 	    who entered sees it.
 
-	Zero network: no Net, no set, no packet. Reads RoundController sources only (IsNight, and Night when it exists).
+	Zero network: no Net, no set, no packet. Reads RoundController sources only (IsNight, Night: TASK-055).
 	Outside the NPC cap of 12 (DEC-191: no server rig at all) and never an anomaly nor an anomaly anchor: there is
 	no hook here for AnomalyController, on purpose.
 ]]
@@ -38,8 +40,10 @@ const OUTFIT = "civil_a"
 const PACK: CrewRig.Pack = "Day" -- the Mart never goes dark (NPC-020); not affected by the local Night swap
 const FACE = "Normal"
 const SPAWN_LIFT = Vector3.new(0, 3, 0) -- architecture.md §18.5
--- PROVISIONAL: stock R6 idle (Roblox-owned) until the crossword idle of AST-057 exists.
-const IDLE_ANIMATION = "rbxassetid://180435571"
+const IDLE_KEY = "opal_idle" -- Content.Animations (AST-057 Opal_Crossword)
+-- PROVISIONAL (§19.26 A8: empty id = R6 idle): Opal has no locomotion set of her own; the `npc` set idles with
+-- the stock R6 clip while its ids are empty. She is anchored, so the set never leaves `idle`.
+const FALLBACK_SET = "npc"
 
 const RADIUS = 8 -- studs from OP-1 (NPC-020, architecture.md §18.5)
 const EXIT_MARGIN = 1 -- leave only past RADIUS + margin, so standing on the edge is one visit
@@ -53,7 +57,8 @@ const MAP_WAIT = 60 -- seconds MapIndex.WaitReady may wait for streaming
 const FIRST_NIGHT = 1
 const LAST_NIGHT = Content.RunParams.Nights
 
-const OpalController = Modux.Controller("OpalController", { Require = { "RoundController" }, Priority = 600 })
+const OpalController =
+	Modux.Controller("OpalController", { Require = { "RoundController", "AnimController" }, Priority = 600 })
 
 function OpalController:Setup()
 	self.Model = nil :: Model?
@@ -66,19 +71,16 @@ function OpalController:Setup()
 	self.Talking = Vide.source(false) :: Vide.Source<boolean>
 	self.HideThread = nil :: thread?
 	self.Unmount = nil :: (() -> ())?
+	self.UnbindIdle = nil :: (() -> ())?
 end
 
--- Night number of the shift. RoundController exposes no Night source in wave 1 (Shift.Night is always 0 there);
--- once it does, this reads it. Unknown at night -> first night.
+-- Night number of the shift (RoundController.Night, TASK-055; 0 on day shifts). Unknown at night -> first night.
 function OpalController:NightNumber(): number
-	const getter: unknown = (self.Dependencies.RoundController :: any).Night
-	if type(getter) == "function" then
-		const value = (getter :: () -> unknown)()
-		if typeof(value) == "number" and value >= FIRST_NIGHT then
-			return math.min(value, LAST_NIGHT)
-		end
+	const value = self.Dependencies.RoundController.Night()
+	if value < FIRST_NIGHT then
+		return FIRST_NIGHT
 	end
-	return FIRST_NIGHT
+	return math.min(value, LAST_NIGHT)
 end
 
 -- Pool of the current phase (Content.OpalLines: FromNight 0 = day).
@@ -160,29 +162,16 @@ function OpalController:Check()
 	end
 end
 
--- Replaces the Humanoid from Build with an AnimationController and loops the idle.
+-- Drops the Humanoid from Build (§2.3) and loops the idle through AnimController (it makes the local
+-- AnimationController + Animator). Empty / failed id -> the fallback set (stock R6 idle).
 function OpalController:Animate(model: Model)
 	const humanoid = model:FindFirstChildOfClass("Humanoid")
 	if humanoid ~= nil then
 		humanoid:Destroy()
 	end
-	const controller = Instance.new("AnimationController")
-	controller.Name = "AnimationController"
-	controller.Parent = model
-	const animator = Instance.new("Animator")
-	animator.Parent = controller
-	const animation = Instance.new("Animation")
-	animation.Name = "Idle"
-	animation.AnimationId = IDLE_ANIMATION
-	const ok, track = pcall(function()
-		return animator:LoadAnimation(animation)
-	end)
-	if ok and track then
-		track.Looped = true
-		track.Priority = Enum.AnimationPriority.Idle
-		track:Play()
-	else
-		warn(`[OpalController] idle animation failed to load: {track}`)
+	const anim = self.Dependencies.AnimController
+	if anim:Play(model, IDLE_KEY, { Looped = true }) == nil then
+		self.UnbindIdle = anim:Bind(model, FALLBACK_SET)
 	end
 end
 
