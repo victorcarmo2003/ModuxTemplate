@@ -209,9 +209,16 @@ local function kit(name: string): Model?
 	return nil
 end
 
+-- Altered food (TASK-110, AST-061) -> the normal model it replaces 1:1, used only while the kit lacks it (TASK-099).
+const FALLBACK = table.freeze({
+	SausageWrong = "SausageGrilled",
+	BunBitten = "BunOpen",
+}) :: { [string]: string }
+
 -- Local clone on the spot (client only; the server never creates station food, §18.9.5). Destroyed with the scope.
 function Slots.Food(name: string, spot: Spot, parent: Instance): Model?
-	const template = kit(name)
+	const fallback = FALLBACK[name]
+	const template = kit(name) or (if fallback then kit(fallback) else nil)
 	if template == nil or spot.Host.Parent == nil then
 		return nil
 	end

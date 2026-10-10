@@ -4,6 +4,9 @@
 -- the server). Anchors `Slot1..6` (trailer 8) with `Slot`. The client shows `Count` SausageGrilled filling slots
 -- 1..Count; when one leaves, the last one disappears (the queue is a server fact, the picture is just a count).
 -- A Count above the number of anchors only fills the anchors that exist.
+-- Wave 3 (TASK-110, ANM-002): `Altered` = position 1..Count of the gray sausage (position 1 = front = slot 1, the
+-- next "Add Sausage"); that slot shows SausageWrong (AST-061) instead. Positions shift with the queue, so the
+-- picture follows the server's field, never a local guess.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Context = require(script.Parent.Context)
@@ -25,13 +28,21 @@ function Rail.Mount(station: Instance, context: Context.Context)
 		const record = read()
 		return if record then record.Count else 0
 	end)
+	const altered = derive(function(): number
+		const record = read()
+		return if record then record.Altered else 0
+	end)
 	for slot, spot in Slots.Spots(station, false) do
-		const shown = derive(function(): boolean
-			return count() >= slot
+		const model = derive(function(): string?
+			if count() < slot then
+				return nil
+			end
+			return if altered() == slot then "SausageWrong" else "SausageGrilled"
 		end)
 		effect(function()
-			if shown() then
-				Slots.Food("SausageGrilled", spot, station)
+			const name = model()
+			if name then
+				Slots.Food(name, spot, station)
 			end
 		end)
 	end

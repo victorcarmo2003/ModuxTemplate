@@ -12,6 +12,7 @@
 --   bar reaches 1      SFX-022 `grill_ready` + ReadyVFX (10 stars) at the slot
 --   Ready -> Empty     SFX-023 `grill_collect` at the slot ("Collect" took it to the rail)
 --   any slot busy      SFX-021 `grill_sizzle` loop on the grill (volume by busy slots) + smoke, Rate 3 per busy slot
+-- Wave 3 (TASK-110): a slot with `Altered` >= 1 shows SausageWrong (AST-061) whatever the bar says (no ready burst).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Context = require(script.Parent.Context)
@@ -68,6 +69,8 @@ local function mountSlot(
 		const record = read()
 		if record == nil or record.State == "Empty" then
 			return nil
+		elseif record.Altered > 0 then
+			return "SausageWrong" -- AST-061 (network.md §13.5 allows it on the grill; TASK-109 does not use it today)
 		end
 		return if progress() >= 1 then "SausageGrilled" else "SausageRaw"
 	end)

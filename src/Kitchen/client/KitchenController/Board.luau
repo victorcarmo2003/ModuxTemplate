@@ -10,6 +10,8 @@
 -- Sound (TASK-079; sound-list §5.3), on transitions only (a late joiner's first record is silent):
 --   Empty -> Working   SFX-024 `bun_slice` at the slot (the 1.5 s automatic cut)
 --   Ready -> Empty     SFX-025 `hotdog_assemble` at the slot ("Add Sausage" took the bun)
+-- Wave 3 (TASK-110, ANM-002): a slot with `Altered` >= 1 shows BunBitten (AST-061; the server writes it Ready, already
+-- sliced). It appears silently: no `bun_slice`, since nobody cut it (Provisional, frontend-coder).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Context = require(script.Parent.Context)
@@ -43,9 +45,10 @@ local function mountSlot(
 		if previous == nil or state == nil or previous == state then
 			return
 		end
+		const altered = record ~= nil and record.Altered > 0
 		untrack(function()
 			const at = (spot.Host.CFrame * spot.Offset).Position
-			if previous == "Empty" then
+			if previous == "Empty" and not altered then
 				audio.Play(station, "bun_slice", at)
 			elseif state == "Empty" and previous == "Ready" then
 				audio.Play(station, "hotdog_assemble", at)
@@ -58,6 +61,8 @@ local function mountSlot(
 		const record = read()
 		if record == nil or record.State == "Empty" then
 			return nil
+		elseif record.Altered > 0 then
+			return "BunBitten" -- AST-061: arrives already sliced (Ready)
 		end
 		return if progress() >= 1 then "BunOpen" else "BunClosed"
 	end)

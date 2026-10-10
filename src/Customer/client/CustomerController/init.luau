@@ -24,6 +24,15 @@
 	    (SFX-043/044) is EconomyController's, on the drawer. Keys still missing from Content.Sounds are skipped
 	    quietly (the row comes with the Content owner); clips with an empty id do not play (AnimController).
 
+	Wave 3 (TASK-110; anomalies.md N1/N4/N5, architecture.md §19.3): the rig attribute `Variant` (NpcService,
+	TASK-108: blank / mirror / raincoat; nil = ordinary customer) is read per customer into a Vide source
+	(`self:VariantOf(id)`, reactive), re-read when the attribute changes (a pooled rig loses it). Applied locally:
+	  - the face is RigController's (it reads the same attribute; the variant face beats the mood);
+	  - blank: the order bubble shows no topping icon (the order is still on the wire, the server judges it). The
+	    bubble's base icon stays until OrderBubble has an "empty" prop (Interface owner; ANM-001 `Coin_Blank` and the
+	    missing breath are the TASK-112 effect's).
+	Nothing here decides an anomaly: the verb, the payment and the result stay on the server.
+
 	Listeners in OnInit (before Lync.start, README "Rede"); the late joiner gets the current records through onAdded.
 	Rigs are scanned in OnStart. No input: nothing here is clickable (FEAT-032).
 ]]
@@ -46,6 +55,8 @@ const HEAD_GAP = 0.6 -- studs between the top of the head and the tip of the bub
 const MAX_DISTANCE = 60
 const ORDER_RULES = Content.OrderRules
 const WARN_AT = Content.Moods.Rules.AnnoyedAt
+const VARIANT_ATTRIBUTE = "Variant" -- rig attribute (NpcService, TASK-108)
+const BLANK = "blank" -- ANM-001: no icons in the bubble
 
 export type Record = {
 	State: string,
@@ -65,6 +76,7 @@ type Entry = {
 	Unmount: (() -> ())?,
 	Gui: Instance?,
 	Face: string?,
+	Variant: Vide.Source<string | false>, -- rig attribute Variant (TASK-110); false = ordinary customer
 }
 
 type Reaction = {
@@ -102,6 +114,13 @@ function CustomerController:RecordOf(id: number): Record?
 	return if entry then entry.Record() or nil else nil
 end
 
+-- Reactive customer-anomaly variant (nil = ordinary, or no such customer / rig yet). TASK-110.
+function CustomerController:VariantOf(id: number): string?
+	const entry = self.Entries[id]
+	const value = if entry then entry.Variant() else false
+	return if typeof(value) == "string" then value else nil
+end
+
 -- Topping keys of an order, in display order (ToppingKeys order), max 3 (DEC-071).
 function CustomerController:ToppingsOf(record: Record): { OrderBubble.Topping }
 	const list: { OrderBubble.Topping } = {}
@@ -136,6 +155,7 @@ function CustomerController:NewEntry(id: number): Entry
 		Unmount = nil,
 		Gui = nil,
 		Face = nil,
+		Variant = Vide.source(false :: string | false) :: Vide.Source<string | false>,
 	}
 	self.Entries[id] = entry
 	return entry
@@ -195,6 +215,7 @@ function CustomerController:Detach(entry: Entry)
 	end
 	entry.Model = nil
 	entry.Face = nil
+	entry.Variant(false)
 end
 
 function CustomerController:Unmount(entry: Entry)
@@ -244,6 +265,12 @@ function CustomerController:Sync(id: number)
 	end
 	entry.Model = model
 
+	const value = model:GetAttribute(VARIANT_ATTRIBUTE)
+	const variant: string | false = if typeof(value) == "string" and value ~= "" then value else false
+	if Vide.untrack(entry.Variant) ~= variant then
+		entry.Variant(variant)
+	end
+
 	const mood = Content.Moods.ByKey[record.Mood]
 	const face = if mood then mood.Expression else nil
 	if face ~= entry.Face then
@@ -272,7 +299,10 @@ function CustomerController:Mount(entry: Entry, model: Model)
 			end,
 			Toppings = function()
 				const record = entry.Record()
-				return if record == false then {} else self:ToppingsOf(record)
+				if record == false or entry.Variant() == BLANK then
+					return {}
+				end
+				return self:ToppingsOf(record)
 			end,
 			Patience = function()
 				return self:PatienceOf(entry)
@@ -410,6 +440,15 @@ function CustomerController:Track(instance: Instance)
 		self:Bind(model)
 	end
 	table.insert(tracked.Connections, model:GetAttributeChangedSignal("NpcId"):Connect(bind))
+	table.insert(
+		tracked.Connections,
+		model:GetAttributeChangedSignal(VARIANT_ATTRIBUTE):Connect(function()
+			const id = tracked.Id
+			if id ~= nil and self.Models[id] == model then
+				self:Sync(id)
+			end
+		end)
+	)
 	table.insert(tracked.Connections, model.AncestryChanged:Connect(bind))
 	table.insert(
 		tracked.Connections,

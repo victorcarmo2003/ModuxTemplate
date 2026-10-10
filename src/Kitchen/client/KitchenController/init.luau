@@ -19,6 +19,11 @@
 	Sound and VFX (TASK-079): the Context also carries `Audio` (AudioController hooks that stay silent for stations
 	of a vehicle not in use, and for keys not yet in Content.Sounds); the parts play on the record transitions they
 	already watch. Particles go through Fx.luau (shared budget: <= 150 particles, <= 8 emitters near the camera).
+
+	Altered item (TASK-110; ANM-002, ITM-020; network.md §13.5): the record's `Altered` field is copied as a number
+	(nil = 0). Grill/Board draw AST-061 (`SausageWrong` / `BunBitten`) on a slot with Altered >= 1; the Rail draws
+	`SausageWrong` on the slot at position Altered. Same model boxes as the normal food (1:1 swap). The client never
+	decides that an item is altered: it only draws the server's field.
 ]]
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -108,6 +113,7 @@ function KitchenController:WriteSlot(id: number, record: SlotRecord?)
 		StartedAt = record.StartedAt,
 		Duration = record.Duration,
 		Count = record.Count,
+		Altered = record.Altered or 0, -- wave 3 (TASK-110): optional on the wire, nil = nothing altered
 	})
 end
 
