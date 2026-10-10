@@ -33,7 +33,73 @@ const rules: Rules = {
 	LodDistance = 120, -- architecture.md §19.17
 }
 
-const base = Table.new({} :: { WalkPath })
+-- Rows: MAP-01 §9.3 (TASK-098, level-designer; Provisional). Every node is an NpcNode of workspace.MapBinding
+-- written by tools/assetplace/bind_map01.luau; consecutive nodes are linked there (check_map01 rule 10).
+-- Crosswalk pairs: CW-4 N-Z02-01/N-Z06-01, CW-3 N-Z02-10/N-Z06-02, CW-1 N-Z08-04/N-Z08-05, CW-2 N-Z02-14/N-Z06-06.
+-- Through paths start and end out of sight (beyond BAR-N, EX-E, the west/east ends of the sidewalks). Night
+-- walkers only use the far west crossing (Shift Any): never the customer routes (SP-A, D1) nor the Juniper North
+-- posts, so a night NPC off those routes stays a readable anomaly sign (MAP-01 §9.1).
+const base = Table.new({
+	-- loop around the east block: CW-4, north sidewalk in front of the bank, CW-3, LANE-W back to the corner
+	{
+		Key = "ninth_east_loop",
+		Nodes = { "N-Z02-02", "N-Z02-01", "N-Z06-01", "N-Z06-03", "N-Z06-02", "N-Z02-10", "N-Z02-05", "N-Z02-04", "N-Z02-03" },
+		Loop = true,
+		Shift = "Day",
+		Weight = 1,
+	},
+	-- Juniper North east sidewalk (from beyond BAR-N) -> CW-4 curb -> north sidewalk -> east end
+	{
+		Key = "juniper_north_to_east",
+		Nodes = { "N-Z13-01", "N-Z13-02", "N-Z07-01", "N-Z07-02", "N-Z06-01", "N-Z06-03", "N-Z06-02", "N-Z06-04", "N-Z06-05" },
+		Loop = false,
+		Shift = "Day",
+		Weight = 1,
+	},
+	{
+		Key = "east_to_juniper_north",
+		Nodes = { "N-Z06-05", "N-Z06-04", "N-Z06-02", "N-Z06-03", "N-Z06-01", "N-Z07-02", "N-Z07-01", "N-Z13-02", "N-Z13-01" },
+		Loop = false,
+		Shift = "Day",
+		Weight = 1,
+	},
+	-- EX-E -> LANE-W behind the queue -> Juniper South east sidewalk -> CW-1 (the Mart crossing) -> plaza -> west end
+	{
+		Key = "east_to_west_via_mart",
+		Nodes = {
+			"EX-E", "N-Z02-09", "N-Z02-08", "N-Z02-06", "N-Z02-05", "N-Z02-04", "N-Z02-03", "N-Z02-02",
+			"N-Z08-03", "N-Z08-04", "N-Z08-05", "N-Z12-01", "N-Z12-02", "N-Z02-11", "N-Z02-12",
+		},
+		Loop = false,
+		Shift = "Day",
+		Weight = 1,
+	},
+	{
+		Key = "west_to_east_via_mart",
+		Nodes = {
+			"N-Z02-12", "N-Z02-11", "N-Z12-02", "N-Z12-01", "N-Z08-05", "N-Z08-04", "N-Z08-03", "N-Z02-02",
+			"N-Z02-03", "N-Z02-04", "N-Z02-05", "N-Z02-06", "N-Z02-08", "N-Z02-09", "EX-E",
+		},
+		Loop = false,
+		Shift = "Day",
+		Weight = 1,
+	},
+	-- far west: south sidewalk -> CW-2 -> north sidewalk (the only night walk, ~60 studs left of the window)
+	{
+		Key = "west_cross_north",
+		Nodes = { "N-Z02-12", "N-Z02-11", "N-Z02-13", "N-Z02-14", "N-Z06-06", "N-Z06-07", "N-Z06-08", "N-Z06-09" },
+		Loop = false,
+		Shift = "Any",
+		Weight = 1,
+	},
+	{
+		Key = "west_cross_south",
+		Nodes = { "N-Z06-09", "N-Z06-08", "N-Z06-07", "N-Z06-06", "N-Z02-14", "N-Z02-13", "N-Z02-11", "N-Z02-12" },
+		Loop = false,
+		Shift = "Any",
+		Weight = 1,
+	},
+} :: { WalkPath })
 
 return Table.with(base, {
 	Rules = Table.record(rules),

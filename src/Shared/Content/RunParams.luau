@@ -42,7 +42,7 @@ const params: RunParams = {
 	EndlessRequiresNoTrailer = true, -- "days without trailer" (DEC-084; game-designer confirms)
 	AntiAfkMinCompleted = 3, -- DEC-083
 	AntiAfkAppliesToGradeA = true, -- DEC-083 (secretary reading, to confirm)
-	BindingWave = 2, -- 1 -> 2 -> 3 per wave (content-data.md §6.8; architecture.md §19.22)
+	BindingWave = 3, -- 1 -> 2 -> 3 per wave (content-data.md §6.8; architecture.md §19.22)
 }
 
 return Table.record(params)

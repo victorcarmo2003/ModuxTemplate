@@ -6,6 +6,7 @@ Autor: level-designer. Versão 1: 2026-10-08. **Revisão 2 (2026-10-08): concili
 **Revisão 3 (2026-10-08): conciliação com DEC-100 a DEC-129 e `art/style-guide.md` (Aprovado, DEC-126); corrige os itens LD-1 a LD-21 de `consistency-report.md`.**
 **Revisão 3, ajuste final (2026-10-08): DEC-130 (sem semáforo no MVP, revoga DEC-120); rodada 17 (`Q-128`, opção B, secretário registrando); postes da Juniper a 8 studs com JL-09 a ~135 (LD-15 / P33); nota de P35.**
 **Binding da onda 2 (2026-10-10, TASK-083): ponto novo `DROP-T` e `SIGN-T` como ponto (§5.1); poses `CART`/`TRL`/`TRL-SALE` = pivô do modelo; L1 e L3 ajustados para fora do poste e do banco (§5.3); grafo do ladrão (§9.1); §16 (binding no place); P40–P45. Provisório.**
+**Binding da onda 3 (2026-10-10, TASK-098): esconderijos H1..H4 com `Slot` e `Hide_Pose` (§7.2); passantes com 7 caminhos de calçada e 17 nós novos (§9.3, `Content.WalkPaths`); `CutsceneMark1..4` e `CS-5W`/`CS-5E` (§11.1); AN/AS/WALKER-10/SS como pontos (§10.3); trânsito com `TrafficPath`/`TrafficLine`/`TrafficBox` (§9.5); §16.5–§16.6; P46–P50. Provisório.**
 Nomes de lugares vêm de `story/world.md` (`Q-096`): cidade **Bellmoor**, esquina **Ninth & Juniper**, **Ninth Avenue**, **Juniper Street**, **Ninth Street Mart**, **Bellmoor Savings**. O nome do mapa, a lavanderia, B1 e B4 seguem placeholders para o narrative-writer (DEC-022: textos do jogo em inglês).
 Números de gameplay citados são valores iniciais ajustáveis (DEC-044). Medidas de mapa são **proposta do level-designer**; o que tem `[DEC-###]` é requisito decidido. `Provisório` = recomendação do level-designer que depende de pergunta aberta.
 Anomalias: `ANM-001`…`ANM-010` = N1…N10 (DEC-096).
@@ -384,7 +385,7 @@ Escala: **1 coluna = 1 stud (X)**, **1 linha = 1 stud (Z)**. X de 22 a 56.
 |---|---|---|---|
 | Linha de estações | Z 36..39, X 27..53 | preparo [DEC-016] | grelha com 6 de largura |
 | Janela de serviço | parede norte, X 30..53, peitoril 3,5 do piso, topo a 8 | atender / recusar em Q1 [DEC-054] | vê a fila, o relógio C-01, as janelas WV, a Juniper e a vaga AN-12 **enquanto trabalha** |
-| Esconder H1..H4 | (31, 39.5) · (37, 39.5) · (43, 39.5) · (49, 39.5) | esconder [DEC-054] (ANM-008, ANM-009) | "atrás do balcão": câmera desce a ~2, abaixo do peitoril. Um por jogador (`Q-094`) |
+| Esconder H1..H4 | (31, 39.5) · (37, 39.5) · (43, 39.5) · (49, 39.5) | esconder [DEC-054] (ANM-008, ANM-009) | "atrás do balcão": câmera desce a ~2, abaixo do peitoril. Um por jogador, 4 pontos (DEC-176). **Binding (TASK-098):** armário AST-041 `H<n>` dentro do trailer com `Prompt_Hide` (`hide`, `Slot = n`) na porta, baixo (começa 1,2 acima do fundo do armário e desce/avança para o corredor até ficar ≥ 2,6 dos prompts da bancada) e `Hide_Pose` (chão do corredor, 1 stud à frente da porta, virado para a janela) para o `PivotTo` do `HideService` (P47) |
 | Interruptor | parede sul, (46, 46.5) | luz [DEC-054, DEC-055] (ANM-003) | `Q-064` |
 | Lixeira | (43.5, 44) | descartar [DEC-054] (ANM-002) | 3,5 do interruptor e da cafeteira |
 | Cafeteira | (40, 44) | café [DEC-055] | barra sobre a cafeteira |
@@ -530,6 +531,7 @@ Tipos e comportamento: `design/npcs.md`. Aqui só o espacial. Todos os NPCs são
 
 **Grafo de NPC (TASK-005, `workspace.MapBinding`).** 25 nós, que seguem as rotas ROUTE-SP-A, ROUTE-D1-IN, ROUTE-QUEUE, ROUTE-EXIT-E e ROUTE-EXIT-D1. Fonte: `tools/assetplace/bind_map01.luau`; checagem: `check_map01.luau`. D1 fica 1 stud a oeste da porta, em (63, 48), para o NPC não nascer dentro da parede.
 **Onda 2 (TASK-083): ROUTE-THIEF**, +8 nós (33 no total): `ST-R`, `L1`, `L2`, `L3` (pontos e nós) e `N-Z08-01` (18, 70), `N-Z08-02` (18, 56), `N-Z08-03` (18, 38) na calçada leste da Juniper Sul, `N-Z01-04` (38, 56) na faixa sul do Pad. Arestas novas: ST-R–N-Z08-01–N-Z08-02–N-Z08-03–N-Z02-02–L1; N-Z08-02–N-Z01-04–L3 (por trás do carrinho/trailer, nunca na frente do balcão); N-Z02-06–N-Z02-08–L2 (LANE-W até o poste leste; também a fuga de L2 para EX-E). Nenhuma aresta nova cruza pista nem toca a fila; as rotas de cliente da onda 1 não mudam (o A* continua achando os mesmos caminhos). A aresta ST-R–N-Z08-01 passa por BAR-S (parede só de jogador: o NPC passa pelo collision group, como SP-A em BAR-N).
+**Onda 3 (TASK-098): calçadas dos passantes**, +17 nós (50 no total) e as faixas CW-1, CW-2 e CW-3 com seus pares de meio-fio (§9.3).
 **Nota para a TASK-031 e o `MapIndex.Path` (Provisório):** **um nó Q (Q1–Q5) nunca é ponto intermediário de um caminho**, só origem ou destino. Sem essa regra, o A* sem direção leva a chegada D1 → Q5 por dentro da fila (Q1 → Q2 → … → Q5), porque é mais curto que a rota pela calçada (LANE-W). Dentro da fila, o `CustomerService` move o cliente vaga a vaga. Quem sai do meio da fila sem ser atendido é caso da TASK-032: ou anda até Q1 e sai por lá, ou ganha uma ligação própria. Os pontos de chegada continuam ligados só a Q5 (`architecture.md` §18.6).
 
 Clientes normais são repetitivos para criar padrão [DEC-010]: chegam pela esquerda, saem pela direita, pelos mesmos pontos. À noite, NPC fora dessas rotas é quebra de padrão legível.
@@ -544,9 +546,23 @@ Clientes normais são repetitivos para criar padrão [DEC-010]: chegam pela esqu
 | Abre a gaveta | até (52, 37) em ~4 s; barra de 8 s (16 s com Lock) |
 | Foge | volta para ST-R pela calçada leste da Juniper Sul; de L2 foge para EX-E pela calçada |
 
-### 9.3 Passantes (`Q-083`)
+### 9.3 Passantes (DEC-183; `Q-162`)
 
-Proposta: de dia, até 2 passantes que andam pelas calçadas e atravessam nas faixas **com reserva** (§9.5), sem entrar na fila. À noite, **zero** passantes.
+DEC-183: **6–8 de dia, 1–2 à noite, 0 em tensão** (a proposta antiga de 2/0 caiu). Passantes andam pelas calçadas e atravessam só nas faixas **com reserva** (§9.5), nunca entram na fila. Caminhos em `src/Shared/Content/WalkPaths.luau` (TASK-098, Provisório): cada um é uma cadeia de `NpcNode` do grafo (§9.1), na ordem de caminhada.
+
+| Caminho | Turno | Trajeto | Faixas |
+|---|---|---|---|
+| `ninth_east_loop` (laço) | dia | quina SE (18, 23) → CW-4 → calçada norte em frente ao banco → CW-3 → LANE-W de volta à quina | CW-4, CW-3 |
+| `juniper_north_to_east` / `east_to_juniper_north` | dia | além de BAR-N pela calçada leste da Juniper Norte ↔ calçada norte da Ninth até a ponta leste (110, −22) | — |
+| `east_to_west_via_mart` / `west_to_east_via_mart` | dia | EX-E → LANE-W atrás da fila → calçada leste da Juniper Sul → **CW-1** → praça e SS → calçada sul oeste (−108, 24) | CW-1 |
+| `west_cross_north` / `west_cross_south` | **dia e noite** | calçada sul oeste (−108, 24) ↔ **CW-2** ↔ calçada norte oeste (−108, −22) | CW-2 |
+
+Regras do desenho:
+- Os caminhos de mão única começam e terminam **fora de vista** (além de BAR-N, EX-E, pontas leste e oeste das calçadas): o passante nasce e some sem pop-in. O laço nasce à vista; o `PedestrianService` faz fade (nota P50).
+- **À noite só os caminhos do oeste** (CW-2, ~60 studs à esquerda da janela): nenhum passante noturno usa as rotas de cliente (SP-A, D1) nem a calçada dos postes da Juniper Norte. Assim um NPC noturno fora das rotas de cliente continua sendo sinal de anomalia (§9.1) e nada puxa o olhar para o Walker. `check_map01` avisa se um caminho `Night`/`Any` tocar nó de rota de cliente.
+- De dia, CW-1 recebe passantes nos dois sentidos: quem atravessa junto com eles atravessa mais seguro (FEAT-033, §9.5).
+- Nós novos (17): `N-Z06-02` (57, −17) e `N-Z02-10` (57, 17) = CW-3; `N-Z08-04` (13, 38) e `N-Z08-05` (−13, 38) = CW-1; `N-Z02-14` (−18, 17) e `N-Z06-06` (−18, −17) = CW-2; `N-Z06-03` (38, −22), `N-Z06-04` (84, −22), `N-Z06-05` (110, −22), `N-Z12-01` (−34, 40), `N-Z12-02` (−54, 30), `N-Z02-11` (−72, 24), `N-Z02-12` (−108, 24), `N-Z02-13` (−40, 22), `N-Z06-07` (−40, −22), `N-Z06-08` (−76, −22), `N-Z06-09` (−108, −22). CW-4 reusa os nós da onda 1. Grafo: **50 nós** (teto 80). A aresta `N-Z02-14`–`N-Z08-05` (calçada oeste da Juniper Sul) já serve à rota SP-B quando ela entrar no grafo.
+- Nenhuma aresta nova toca vaga de fila; as rotas de cliente e do ladrão das ondas 1–2 continuam com os mesmos caminhos A* (todo atalho novo é mais longo).
 
 ### 9.4 Teto de NPCs [DEC-045]
 
@@ -602,6 +618,8 @@ Efeito aceito por FEAT-033: atravessar junto com um NPC é mais seguro (os carro
 | Noite, depois das 9 PM | **0** (FEAT-033) | — | só ambulância e ANM-008 |
 | Sem trânsito | — | — | durante ANM-008 ativa (nenhum carro nasce), Hush (ANM-010), cutscenes e Final (FEAT-033) |
 | Exceções noturnas | ambulância (§9.6) e long car (ANM-008, §9.7) | roteirizados | — |
+
+**Binding (TASK-098, Provisório; tags da TASK-097):** `MapBinding/Traffic`. **Rotas** = `Folder` `TR-n` (tag `TrafficPath`, `PathId` = `Content.Traffic.Routes[].Path`) com `Part` filhas `01..nn` (`Index` 1..n, cada uma virada para a próxima, no topo da pista): faixas EB Z 5, WB Z −5, SB X −6, NB X 6; curvas com 2–3 nós dentro de `X-T`; o 1º nó fica no ponto de entrada (`W-IN` etc.) e o último num `*-OUT`. **Linhas** `SL-*` = `Part` atravessando a(s) faixa(s) que param ali (tag `TrafficLine`, `LineId`; `LookVector` = sentido de quem para; largura 12 na Juniper, 16 na Ninth). **Caixas** `X-T` (X −12..12, Z −16..16) e `CW-1..4` (as listras de §5.2), 10 de altura (tag `TrafficBox`, `BoxId`). Tudo invisível, sem colisão. O `TrafficService` acha `StopDist` cruzando o caminho com o plano da linha; a velocidade de cruzamento (12) vale dentro de `X-T`. Distâncias do spawn até a 1ª linha de faixa: TR-1/5/9 108, TR-2/6 72, TR-7/10 70, TR-3/8 ≥ 120 (todas ≥ 55).
 
 Carros parados (estáticos, ancorados): ~4 em PARK-N oeste, ~2 em PARK-N leste, ~4 no estacionamento (inclui a van de AS-1). Nunca no meio-fio vermelho.
 
@@ -702,6 +720,8 @@ Teto de 3 atores simultâneos [DEC-045]: atores = ANM-001, 004, 005, 006, 007, 0
 
 Spawns ocultos de atores (fora de vista do Pad, da janela e do Mart): AS-1 atrás da van no canto NE do estacionamento (92, −80); AS-2 atrás do TRUCK (100, 18); AS-3 atrás de BAR-N, no beco lateral oposto a SP-A (−30, −104); AS-4 atrás da porta da lavanderia (−40, −36). O long car usa E-IN; o Walker aparece em JL-09 (além do limite e na névoa).
 
+**Binding (TASK-098, Provisório).** `MapPoint`: `AN-04` (38, altura 26,3, −31; centro de WV-2), `AN-11` (39, altura 14, −31; mostrador do C-01), `AN-05` (49, altura 7,45, 46,5; vidro da porta dos fundos, por dentro, trailer no Pad), `AN-12` (70, −22) no chão com a frente para o sul (pose do long car), `AS-1..4` no chão virados para o Pad (AS-4 para a rua), `WALKER-10` (28, 29) virado para a janela, `SS` (−58, 30) no centro de LZ-5. As demais âncoras desta tabela (AN-01..03, 06, 07, 09, 10) não viram ponto: são objetos já tagueados (postes, fila, estações) ou reserva. Janelas: tag `AnomalyAnchor` + `AnchorId` WV-1..3 em `Window_Up_1..3` do AST-045 (X 31 / 38 / 45, vidro 24,6–28); sem o modelo novo no place, o bind cria uma `Part` invisível `WV-n` em `MapBinding/Anomaly` e avisa (P49).
+
 ### 10.4 Regra do ponto seguro (`Q-092`)
 
 > **Secretário, 2026-10-10 — DEC-177 (fecha `Q-092`, contra a proposta abaixo):** o SS **pode** receber anomalia. A proposta "nunca recebe" **não vale**; também caem a tabela SS ("Nunca recebe anomalia"), o critério de aceite ("nunca recebe anomalia") e P15. Outras pendências fechadas na mesma sessão: P8 colisão **desligada** (DEC-175; alcance todo o mapa Provisório), P10 **"Out of stock"** (DEC-180), P16 esconder **por jogador, 4 pontos** (DEC-176). Reescrita → level-designer, com `Q-161`.
@@ -727,6 +747,8 @@ Formação: 2 × 2 (colunas a ±2 studs do eixo, fileiras a 3 studs). Solo: no e
 | CS-7 | mesmo lugar | todos viram para o SE: o **carrinho** no Pad, sob o sol |
 | FIM | fade → PS-1..4 | 7:00 AM, Day 1 |
 
+**Binding (TASK-098, Provisório).** Marcas de partida `CutsceneMark1..4` (`Content.Cutscenes` intro `Marks`) em volta de CS-1, 2 × 2 virado para o leste: (−100, −26) · (−100, −22) · (−103, −26) · (−103, −22). `CS-1..5`, `CS-P1..4` como na tabela (CS-3 → CS-4 corre dentro de CW-2; CS-5 = meio de CW-1). Propostos para P46: `CS-5W` (−14, 38) e `CS-5E` (14, 38), meios-fios de CW-1, já no place.
+
 ### 11.2 Outros momentos de câmera
 
 - **Troca carrinho → trailer** (DEC-047): fade; plano do trailer já no Pad (C-01 marcando 6 PM) + ligação.
@@ -742,6 +764,7 @@ Formação: 2 × 2 (colunas a ±2 studs do eixo, fileiras a 3 studs). Solo: no e
 | 6:00 AM | sol nasce a leste; postes religam; o Walker some; o relógio do banco bate seis vezes (som) |
 | Cutscene (fade de encaixe) | party em slots SS-1..4: (−54, 26) · (−52, 30) · (−54, 34) · (−56, 23), virados para o oeste. **Walt (CHR-001)** sai por MKT-DOOR com dois cafés e para em WALT-1 (−60, 30) [DEC-075, DEC-076] |
 | Plano final | Raincoat Lady pela calçada norte da Ninth Oeste, de RL-1 (−100, −22) a **RL-END (−76, −22)**, some numa poça. Todos olham para o norte-noroeste; o Walker já sumiu |
+| Binding (TASK-098) | `SS-1..4` virados para o oeste; `WALT-1` virado para o leste; `MKT-DOOR` (−62, 34) virado para WALT-1; `RL-1` e `RL-END` virados para o leste (Provisório) |
 | Pós-créditos | close no P-01 com o panfleto novo (AN-03) |
 
 ## 12. Assets necessários (pedido ao art-director)
@@ -927,18 +950,28 @@ Novas, para o secretário registrar (nenhuma bloqueante na minha leitura; P32 mu
 | P44 | Quantas lixeiras de rua são interativas (`Q-166` b; game-designer) | **As 3** AST-034 do mapa ((−46, 17.5), (66, 17.5), (−30, −17.5)), tag `StreetBin` (T60). Até a TASK-057, o prompt "Throw Away" aparece nelas e o servidor recusa. Provisório |
 | P45 | Luz dos postes JL-01..09 e P-01 (TASK-060) | O `SpotLight` do blockout de cada poste foi **copiado** para `LampHead/Light_Lamp` (para baixo, sem sombra) e o do blockout desligado (`DisabledByBind`), para o `StreetLight` conter a própria luz sem dobrar o orçamento (§13). `Place.restore` não religa o do blockout. Troca pela luz do AST-083 quando a ficha for aprovada (TASK-092) |
 
+Binding da onda 3 (TASK-098), para o secretário registrar (nenhuma bloqueia o código; todas **Provisório**):
+
+| # | Pergunta (dono) | Recomendação do level-designer |
+|---|---|---|
+| P46 | Cutscene de abertura: `MoveTo` é reta. CS-4 (−18, 22) → CS-5 (0, 38) e CS-5 → CS-P{slot} cortam a pista da Juniper Sul **fora** das listras de CW-1; e o `MoveTo CS-4` (At 11) leva a party para dentro de CW-2 enquanto o `ToyCarNinth` passa (At 13), o contrário do beat "para no meio-fio, o carro passa, atravessa" (narrative-writer + architect, `Content.Cutscenes`) | Trocar `MoveTo CS-5` por `CS-5W` → `CS-5E` (meios-fios de CW-1, já no place) e mover o `MoveTo CS-4` para depois do carro (At ≥ 14), ou parar antes em CS-3. O `check_map01` avisa os trechos fora da faixa |
+| P47 | Onde o `HideService` põe o jogador escondido (§19.14 diz `PivotTo` na vaga, sem dizer o ponto) (architect) | `Hide_Pose` (Attachment sem tag) dentro de cada armário `H<n>`: chão do corredor, 1 stud à frente da porta, virado para a janela; o serviço soma a altura do HRP agachado. O `Prompt_Hide` fica baixo na porta (≥ 2,6 dos prompts da bancada) |
+| P48 | Formato dos nós de rota de trânsito (a TASK-097 só diz "Folder/Model dos nós ordenados") (architect, TASK-104) | `Folder` `TR-n` com `Part` `01..nn`, atributo `Index`, frente para o próximo nó; linha `SL-*` = `Part` com `LookVector` no sentido de quem para; velocidade de cruzamento por `X-T` (§9.5) |
+| P49 | AST-045 novo (com `Window_Up_1..3`) ainda não reenviado (modeler-3d) | Até o reenvio, `WV-1..3` são `Part` invisíveis em `MapBinding/Anomaly` na posição das janelas; o efeito da ANM-006 precisa do modelo novo (cortina, `_Lit`, `Att_Waver_N`) |
+| P50 | Passantes à noite (DEC-183: 1–2) × "NPC fora da rota é sinal" (§9.1); pop-in do laço (game-designer + architect, `Q-162`) | À noite só os caminhos do oeste (CW-2), longe das rotas de cliente e da Juniper Norte. O laço `ninth_east_loop` nasce à vista: `PedestrianService` com fade de entrada ou só de dia (já é `Day`) |
+
 Fora deste documento, mas dependem dele: fichas técnicas `ANM-###` (escolher âncoras de §10.3), `design/npcs.md`, `art/asset-list.md` (converter L01-## sem AST em fichas), blockout no Blender (quando pedido, combinado com o modeler-3d).
 
-## 16. Binding no place (TASK-005 onda 1, TASK-083 onda 2)
+## 16. Binding no place (TASK-005 onda 1, TASK-083 onda 2, TASK-098 onda 3)
 
 Contrato: `tech/architecture.md` §18 e §19.22. Ferramentas (modo de edição, fora do Rojo): `tools/assetplace/bind_map01.luau` (aplica) e `check_map01.luau` (confere; espelho de `MapIndex/Required.luau`). Tudo **Provisório** (DEC-193).
 
 ### 16.1 Como rodar (Command Bar, repositório servido na porta 8772)
 
-Ordem: `Place.run` (se os assets mudaram) → `Bind.run()` → `Check.run({ wave = 2 })` → salvar o place. Depois de qualquer `Place.run`, rodar o `Bind` de novo. Depois do `Bind`, **não** usar `Place.showLayer`: os dois veículos ficam no `Workspace` (T36).
+Ordem: `Place.run` (se os assets mudaram) → `Bind.run()` → `Pieces.run()` (`bind_pieces.luau`, TASK-085) → `Check.run({ wave = 3 })` → salvar o place. Depois de qualquer `Place.run`, rodar o `Bind` de novo; depois de qualquer `Bind`, o `Pieces`. Depois do `Bind`, **não** usar `Place.showLayer`: os dois veículos ficam no `Workspace` (T36). O `check` da onda 3 lê `Content` (`Cutscenes`, `WalkPaths`, `Traffic`) do `ReplicatedStorage`: rode com o `rojo serve` sincronizado.
 
 ```lua
-local H=game:GetService("HttpService") local w=H.HttpEnabled H.HttpEnabled=true local function get(p) local ms=Instance.new("ModuleScript") ms.Source=H:GetAsync("http://127.0.0.1:8772/tools/assetplace/"..p) return require(ms) end local Bind=get("bind_map01.luau") local Check=get("check_map01.luau") H.HttpEnabled=w print(Bind.run()) Check.run({ wave = 2 })
+local H=game:GetService("HttpService") local w=H.HttpEnabled H.HttpEnabled=true local function get(p) local ms=Instance.new("ModuleScript") ms.Source=H:GetAsync("http://127.0.0.1:8772/tools/assetplace/"..p,true) return require(ms) end local Bind=get("bind_map01.luau") local Pieces=get("bind_pieces.luau") local Check=get("check_map01.luau") H.HttpEnabled=w print(Bind.run()) print(Pieces.run()) Check.run({ wave = 3 })
 ```
 
 ### 16.2 O que a onda 2 põe no place
@@ -976,3 +1009,25 @@ local H=game:GetService("HttpService") local w=H.HttpEnabled H.HttpEnabled=true 
 | Luz | LZ-1..5 únicos com o `Group` da tabela acima; JL-01..09 + P-01 únicos com `Order` do Hush |
 | Lona | exatamente 1 `VehicleCover` |
 | Bancada | pivôs do carrinho a y 3,45; do trailer a pivô + 5,5 |
+
+### 16.5 O que a onda 3 põe no place (TASK-098)
+
+| Peça | Onde | Tag / atributos |
+|---|---|---|
+| Esconderijos | armários AST-041 `H1..H4` dentro do trailer (§7.2) | `Prompt_Hide`: `Interactable`, `PromptAction = "hide"`, `Slot` 1..4; `Hide_Pose` sem tag (P47) |
+| Janelas N6 | `Window_Up_1..3` do AST-045 (`Z-11`); fallback `MapBinding/Anomaly/WV-n` (P49) | `AnomalyAnchor`, `AnchorId` WV-1..3 |
+| Pontos | §5.2, §5.4, §5.6, §10.3, §11 | `SS`, `AN-04/05/11/12`, `AS-1..4`, `WALKER-10`, `W/E/JN/JS-IN/OUT`, `CutsceneMark1..4`, `CS-1..5`, `CS-5W`, `CS-5E`, `CS-P1..4`, `SS-1..4`, `MKT-DOOR`, `WALT-1`, `RL-1`, `RL-END` |
+| Calçadas | §9.3 | 17 `NpcNode` novos; `Crosswalk` CW-1, CW-2, CW-3 (pares de meio-fio); `Content.WalkPaths` com 7 caminhos |
+| Trânsito | `MapBinding/Traffic/{Paths,Lines,Boxes}` (§9.5) | `TrafficPath`/`PathId` TR-1..10 (nós `Index`), `TrafficLine`/`LineId` SL-N/S/W/E/1N/1S/3W/3E, `TrafficBox`/`BoxId` X-T, CW-1..4 |
+
+### 16.6 Lista que o `check_map01` cobra na onda 3 (espelho do `Required.Wave3` da TASK-097)
+
+| Item | Valor |
+|---|---|
+| Tags | onda 2 + `AnomalyAnchor`, `TrafficPath`, `TrafficLine`, `TrafficBox` |
+| Pontos | onda 2 + `SS`, `AN-04/05/11/12`, `AS-1..4`, `WALKER-10`, entradas/saídas, pontos de cutscene **derivados de `Content.Cutscenes`** (`Marks`, `MoveTo` com `{slot}` 1..4, `LookAt` fora de poste) + `MKT-DOOR`, `WALT-1`, `RL-1`, `RL-END` |
+| Nós | onda 2 + todos os de `Content.WalkPaths`; regra 10: nós ligados na ordem, laço fecha, nenhuma vaga Q; caminho `Night`/`Any` em nó de rota de cliente só avisa |
+| Trailer | `hide` = 4 âncoras soltas com `Slot` 1..4 uma vez cada; `Prompt_Hide` no armário `H<Slot>`, `Hide_Pose` presente (aviso) |
+| Ids tagueados | WV-1..3; TR-1..10; as 8 `SL-*`; X-T e CW-1..4 (lidos de `Content.Traffic` quando sincronizado) |
+| Trânsito (regra 11) | nós `Index` 1..n sem buraco; 1º nó no ponto de entrada da rota, último num `*-OUT` (aviso); cruza as linhas das `Stops` na ordem; 1ª linha de faixa ≥ `SpawnMinDist` (55); passa pela caixa do conflito; linhas e caixas invisíveis sem colisão |
+| Cutscene | trecho `MoveTo` da intro fora das listras só avisa (P46) |

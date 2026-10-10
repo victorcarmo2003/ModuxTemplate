@@ -1,6 +1,21 @@
 --[[
-	MAP-01 binding, waves 1 + 2 (TASK-005, TASK-083). Edit-mode tool, same status as place_assets.luau: NOT gameplay
-	code. Status: Rascunho (level-designer, 2026-10-10).
+	MAP-01 binding, waves 1 + 2 + 3 (TASK-005, TASK-083, TASK-098). Edit-mode tool, same status as place_assets.luau:
+	NOT gameplay code. Status: Rascunho (level-designer, 2026-10-10).
+
+	Wave 3 (TASK-098; architecture.md §19.22, §8, §19.13-§19.17; MAP-01 §5.4-§5.6, §9.3, §9.5, §10.3, §11, §16.5):
+	  W1. Hide spots: each AST-041 cabinet H1..H4 (inside the trailer) gets Prompt_Hide (Interactable, PromptAction
+	      "hide", Slot 1..4) on its door, pushed down / towards the corridor until it is >= 2.6 from every anchor of
+	      another owner, and an untagged Attachment Hide_Pose (corridor floor in front of the door, facing the
+	      window; where HideService pivots the player; Provisional).
+	  W2. Apartment windows WV-1..3 (ANM-006): tag AnomalyAnchor + AnchorId on Window_Up_<n> of the AST-045 (Z-11);
+	      without it, an invisible Part WV-<n> in MapBinding/Anomaly at the MAP-01 position (warning).
+	  W3. MapPoints: SS, AN-04/05/11/12, AS-1..4, WALKER-10, traffic entries/exits W/E/JN/JS-IN/OUT, cutscene points
+	      (CutsceneMark1..4, CS-1..5, CS-P1..4, SS-1..4, WALT-1, MKT-DOOR, RL-1, RL-END; + CS-5W / CS-5E proposal).
+	  W4. Sidewalk nodes of Content.WalkPaths (17 new NpcNodes, crosswalk pairs CW-1, CW-2, CW-3; CW-4 is wave 1).
+	  W5. Traffic in MapBinding/Traffic: Paths/TR-n (Folder, tag TrafficPath, PathId; child Parts "01".."nn" with
+	      Index 1..n, each facing the next node, on the road top), Lines/SL-* (Part across the lane, tag TrafficLine,
+	      LineId; LookVector = travel direction of the lane that stops there), Boxes/X-T + CW-1..4 (volume, tag
+	      TrafficBox, BoxId). All invisible, no collision, no query (Provisional, TASK-097 note d).
 
 	Contract: docs/tech/architecture.md §18 (tags §18.1, attributes §18.2, anchors §18.3-§18.4, points §18.5, NpcNode
 	graph §18.6) and §19.22 (wave 2: trailer, phone, purchase, tarp, light, points, street bins; T36, T38, T60).
@@ -58,7 +73,7 @@
 	Usage (edit mode, Command Bar; repo served on 8772, see docs/levels/MAP-01.md §16):
 		local Bind = require(<this module>)
 		print(Bind.run())                       -- opts: { resetCreated = false }
-	Then bind_pieces.luau (Pieces.run(), TASK-085) and check_map01.luau (Check.run({ wave = 2 })).
+	Then bind_pieces.luau (Pieces.run(), TASK-085) and check_map01.luau (Check.run({ wave = 3 })).
 ]]
 
 local CollectionService = game:GetService("CollectionService")
@@ -92,8 +107,14 @@ local OWN_TAGS = {
 	"LightZone",
 	"StreetLight",
 	"StreetBin",
+	-- wave 3
+	"AnomalyAnchor",
+	"TrafficPath",
+	"TrafficLine",
+	"TrafficBox",
 }
 local AUTHORED_ATTRS = {
+	"AnchorId",
 	"PointId",
 	"NodeId",
 	"Links",
@@ -174,6 +195,57 @@ local POINTS = {
 	{ id = "L2", x = 84, z = 22, floor = 0.4, faceTo = DRAWER_XZ, node = true },
 	{ id = "L3", x = 58, z = 56.5, floor = 0.45, faceTo = DRAWER_XZ, node = true }, -- 20.4 from the drawer (>= 20, MAP-01 §14)
 	{ id = "ST-R", x = 18, z = 92, floor = 0.24, face = NORTH, node = true },
+
+	-- wave 3 (TASK-098) ----------------------------------------------------------------------
+	-- safe spot under the "OPEN 24 HOURS" marquee (MAP-01 §5.2; HideService InZone(p, "SS", 6)); faces the Pad
+	{ id = "SS", x = -58, z = 30, floor = 0.4, face = EAST },
+	-- anomaly anchors (MAP-01 §10.3). AN-04 / AN-11 / AN-05 at the height of the thing (window, clock, door pane)
+	{ id = "AN-04", x = 38, y = 26.3, z = -31, face = SOUTH }, -- WV-2 centre (glass 24.6..28, AST-045)
+	{ id = "AN-05", x = 49, y = 7.45, z = 46.5, face = NORTH }, -- back door pane, inside, trailer on the Pad (night pose)
+	{ id = "AN-11", x = 39, y = 14, z = -31, face = SOUTH }, -- C-01 clock face (AST-044)
+	{ id = "AN-12", x = 70, z = -22, floor = 0.4, face = SOUTH }, -- long car pose: parking entrance mouth, nose south
+	-- hidden actor spawns (out of sight of the Pad, the window and the Mart)
+	{ id = "AS-1", x = 92, z = -80, floor = 0.02, faceTo = { 41, 40 } }, -- behind the van (AST-035 van at AS-1)
+	{ id = "AS-2", x = 100, z = 18, floor = 0.4, faceTo = { 41, 40 } }, -- behind the TRUCK
+	{ id = "AS-3", x = -30, z = -104, floor = 0.4, faceTo = { 41, 40 } }, -- beyond BAR-N, west side alley
+	{ id = "AS-4", x = -40, z = -36, floor = 0.4, faceTo = { -40, 0 } }, -- behind the laundry door
+	-- Walker step 10 (MAP-01 §5.6, fixed); steps 0..9 are the StreetLight posts (Order - 1)
+	{ id = "WALKER-10", x = 28, z = 29, floor = 0.4, faceTo = { 41, 35 } },
+	-- traffic entries / exits (MAP-01 §5.4), on the road top, facing the travel direction
+	{ id = "W-IN", x = -136, z = 5, floor = 0, face = EAST },
+	{ id = "W-OUT", x = -136, z = -5, floor = 0, face = WEST },
+	{ id = "E-IN", x = 136, z = -5, floor = 0, face = WEST },
+	{ id = "E-OUT", x = 136, z = 5, floor = 0, face = EAST },
+	{ id = "JN-IN", x = -6, z = -140, floor = 0, face = SOUTH },
+	{ id = "JN-OUT", x = 6, z = -140, floor = 0, face = NORTH },
+	{ id = "JS-IN", x = 6, z = 116, floor = 0, face = NORTH },
+	{ id = "JS-OUT", x = -6, z = 116, floor = 0, face = SOUTH },
+	-- opening cutscene (MAP-01 §11.1). Marks = 2 x 2 around CS-1 (columns +-2 of the axis, rows 3 apart), facing east
+	{ id = "CutsceneMark1", x = -100, z = -26, floor = 0.4, face = EAST },
+	{ id = "CutsceneMark2", x = -100, z = -22, floor = 0.4, face = EAST },
+	{ id = "CutsceneMark3", x = -103, z = -26, floor = 0.4, face = EAST },
+	{ id = "CutsceneMark4", x = -103, z = -22, floor = 0.4, face = EAST },
+	{ id = "CS-1", x = -100, z = -24, floor = 0.4, face = EAST },
+	{ id = "CS-2", x = -60, z = -24, floor = 0.4, face = EAST },
+	{ id = "CS-3", x = -18, z = -22, floor = 0.4, face = SOUTH }, -- NW corner; CS-3 -> CS-4 runs inside CW-2
+	{ id = "CS-4", x = -18, z = 22, floor = 0.4, face = SOUTH }, -- SW corner after CW-2
+	{ id = "CS-5", x = 0, z = 38, floor = 0, face = EAST }, -- middle of CW-1
+	-- proposal (MAP-01 P46): curb marks so every MoveTo segment stays on the sidewalk or inside the stripes
+	{ id = "CS-5W", x = -14, z = 38, floor = 0.24, face = EAST },
+	{ id = "CS-5E", x = 14, z = 38, floor = 0.24, face = EAST },
+	{ id = "CS-P1", x = 16, z = 25, floor = 0.4, faceTo = { 20, 20 } },
+	{ id = "CS-P2", x = 19, z = 27, floor = 0.4, faceTo = { 20, 20 } },
+	{ id = "CS-P3", x = 23, z = 26, floor = 0.4, faceTo = { 20, 20 } },
+	{ id = "CS-P4", x = 13, z = 22, floor = 0.4, faceTo = { 20, 20 } },
+	-- finale (MAP-01 §11.3): party under the marquee facing Walt, Walt from the Mart door, Raincoat Lady on Ninth W
+	{ id = "SS-1", x = -54, z = 26, floor = 0.4, face = WEST },
+	{ id = "SS-2", x = -52, z = 30, floor = 0.4, face = WEST },
+	{ id = "SS-3", x = -54, z = 34, floor = 0.4, face = WEST },
+	{ id = "SS-4", x = -56, z = 23, floor = 0.4, face = WEST },
+	{ id = "MKT-DOOR", x = -62, z = 34, floor = 0.4, faceTo = { -60, 30 } },
+	{ id = "WALT-1", x = -60, z = 30, floor = 0.4, face = EAST },
+	{ id = "RL-1", x = -100, z = -22, floor = 0.4, face = EAST },
+	{ id = "RL-END", x = -76, z = -22, floor = 0.4, face = EAST },
 }
 
 -- NpcNode-only parts (NodeId = N-<zone>-<nn>, §18.6). crosswalk = the two curb nodes of a crosswalk.
@@ -204,6 +276,27 @@ local NODES = {
 	{ id = "N-Z08-02", x = 18, z = 56, floor = 0.24 },
 	{ id = "N-Z08-03", x = 18, z = 38, floor = 0.24 },
 	{ id = "N-Z01-04", x = 38, z = 56, floor = 0.45 }, -- south strip of the Pad, behind the cart / trailer, to L3
+	-- wave 3, sidewalk nodes of Content.WalkPaths (MAP-01 §9.3). Curb nodes 1 stud off the carriageway.
+	-- east: north sidewalk of the Ninth in front of the bank, CW-3
+	{ id = "N-Z06-02", x = 57, z = -17, floor = 0.4, crosswalk = "CW-3" },
+	{ id = "N-Z02-10", x = 57, z = 17, floor = 0.4, crosswalk = "CW-3" },
+	{ id = "N-Z06-03", x = 38, z = -22, floor = 0.4 },
+	{ id = "N-Z06-04", x = 84, z = -22, floor = 0.4 }, -- passes the parking entrance (AN-12 is night only)
+	{ id = "N-Z06-05", x = 110, z = -22, floor = 0.4 }, -- east end (BAR-E), walkers despawn here
+	-- CW-1 (the Mart crossing) curb nodes
+	{ id = "N-Z08-04", x = 13, z = 38, floor = 0.24, crosswalk = "CW-1" },
+	{ id = "N-Z08-05", x = -13, z = 38, floor = 0.24, crosswalk = "CW-1" },
+	-- west: plaza, south sidewalk of the Ninth (west), CW-2, north sidewalk (west)
+	{ id = "N-Z12-01", x = -34, z = 40, floor = 0.4 },
+	{ id = "N-Z12-02", x = -54, z = 30, floor = 0.4 }, -- inside SS (day only for these paths)
+	{ id = "N-Z02-11", x = -72, z = 24, floor = 0.4 },
+	{ id = "N-Z02-12", x = -108, z = 24, floor = 0.4 }, -- west end (BAR-W)
+	{ id = "N-Z02-13", x = -40, z = 22, floor = 0.4 },
+	{ id = "N-Z02-14", x = -18, z = 17, floor = 0.4, crosswalk = "CW-2" },
+	{ id = "N-Z06-06", x = -18, z = -17, floor = 0.4, crosswalk = "CW-2" },
+	{ id = "N-Z06-07", x = -40, z = -22, floor = 0.4 },
+	{ id = "N-Z06-08", x = -76, z = -22, floor = 0.4 },
+	{ id = "N-Z06-09", x = -108, z = -22, floor = 0.4 }, -- west end (BAR-W)
 }
 
 local EDGES = {
@@ -247,6 +340,27 @@ local EDGES = {
 	{ "N-Z02-08", "L2" },
 	{ "N-Z08-02", "N-Z01-04" },
 	{ "N-Z01-04", "L3" },
+	-- wave 3: sidewalk network of the pedestrians (Content.WalkPaths). No edge touches a queue slot; the customer
+	-- and thief routes of waves 1-2 keep their A* paths (every new way is longer).
+	{ "N-Z06-01", "N-Z06-03" },
+	{ "N-Z06-03", "N-Z06-02" },
+	{ "N-Z06-02", "N-Z02-10" }, -- CW-3 crosswalk edge
+	{ "N-Z02-10", "N-Z02-05" },
+	{ "N-Z06-02", "N-Z06-04" },
+	{ "N-Z06-04", "N-Z06-05" },
+	{ "N-Z08-03", "N-Z08-04" },
+	{ "N-Z08-04", "N-Z08-05" }, -- CW-1 crosswalk edge
+	{ "N-Z08-05", "N-Z12-01" },
+	{ "N-Z12-01", "N-Z12-02" },
+	{ "N-Z12-02", "N-Z02-11" },
+	{ "N-Z02-11", "N-Z02-12" },
+	{ "N-Z02-11", "N-Z02-13" },
+	{ "N-Z02-13", "N-Z02-14" },
+	{ "N-Z02-14", "N-Z08-05" }, -- Juniper South west sidewalk (future SP-B route, MAP-01 §5.3)
+	{ "N-Z02-14", "N-Z06-06" }, -- CW-2 crosswalk edge
+	{ "N-Z06-06", "N-Z06-07" },
+	{ "N-Z06-07", "N-Z06-08" },
+	{ "N-Z06-08", "N-Z06-09" },
 }
 
 -- Ingredient key -> .fbx suffix (PascalCase rule of §18.4) and MAP-01 §7.1 grid cell (fallback XZ, cart coords).
@@ -309,6 +423,59 @@ local ZONES = {
 	{ id = "LZ-4", group = "mart", shape = "Block", world = Vector3.new(-82, 6.4, 48), size = Vector3.new(36, 12, 32) }, -- Mart X -100..-64, Z 32..64
 	{ id = "LZ-5", group = "mart", shape = "Ball", world = Vector3.new(-58, 3.4, 30), radius = 6 }, -- SS under the marquee
 }
+
+-- Wave 3 -----------------------------------------------------------------------------------------
+
+-- Hide cabinets AST-041 (MAP-01 §7.2: H1..H4 at X 31/37/43/49, corridor edge Z 39.5). Prompt on the door, low.
+local HIDE_COUNT = 4
+local HIDE_GAP = 2.6 -- >= this from anchors of other owners in the trailer (§18.7 item 4 + margin, like the phone)
+local HIDE_PROMPT_UP = 1.2 -- start height of Prompt_Hide over the cabinet bottom
+local HIDE_PROMPT_OUT = 0.3 -- start offset in front of the door face (towards the corridor)
+local HIDE_POSE_OUT = 1.0 -- Hide_Pose: corridor floor this far in front of the door face
+
+-- Apartment windows (AST-045 Window_Up_<n>, MAP-01 §5.2 / §10.3). Fallback Part when the asset lacks them.
+local WINDOWS = {
+	{ id = "WV-1", n = 1, x = 31 },
+	{ id = "WV-2", n = 2, x = 38 },
+	{ id = "WV-3", n = 3, x = 45 },
+}
+local WINDOW_Y, WINDOW_Z = 26.3, -32.2 -- glass 24.6..28 (AST-045, Em revisão); facade at Z -32 (MAP-01)
+
+-- Traffic (MAP-01 §5.4, §9.5; architecture.md §8.1; Content.Traffic). Lanes: Ninth EB Z 5, WB Z -5; Juniper SB
+-- X -6, NB X 6. Turns are 2-3 corner nodes inside the X-T box. Path = Content.Traffic.Routes[].Path (= Key).
+local TRAFFIC_ROUTES = {
+	{ id = "TR-1", pts = { { -136, 5 }, { -12, 5 }, { 12, 5 }, { 136, 5 } } }, -- W-IN -> E-OUT
+	{ id = "TR-2", pts = { { 136, -5 }, { 12, -5 }, { -12, -5 }, { -136, -5 } } }, -- E-IN -> W-OUT
+	{ id = "TR-3", pts = { { -6, -140 }, { -6, -16 }, { -4, -6 }, { 2, 2 }, { 12, 5 }, { 136, 5 } } }, -- JN-IN -> left -> E-OUT
+	{ id = "TR-4", pts = { { -6, -140 }, { -6, -16 }, { -7.5, -9 }, { -12, -5 }, { -136, -5 } } }, -- JN-IN -> right -> W-OUT
+	{ id = "TR-5", pts = { { -136, 5 }, { -12, 5 }, { -2, 2 }, { 4, -6 }, { 6, -16 }, { 6, -140 } } }, -- W-IN -> left -> JN-OUT
+	{ id = "TR-6", pts = { { 136, -5 }, { 12, -5 }, { 8, -9 }, { 6, -16 }, { 6, -140 } } }, -- E-IN -> right -> JN-OUT
+	{ id = "TR-7", pts = { { 6, 116 }, { 6, 16 }, { 6, -16 }, { 6, -140 } } }, -- JS-IN -> straight -> JN-OUT
+	{ id = "TR-8", pts = { { -6, -140 }, { -6, -16 }, { -6, 16 }, { -6, 116 } } }, -- JN-IN -> straight -> JS-OUT
+	{ id = "TR-9", pts = { { -136, 5 }, { -12, 5 }, { -8, 9 }, { -6, 16 }, { -6, 116 } } }, -- W-IN -> right -> JS-OUT
+	{ id = "TR-10", pts = { { 6, 116 }, { 6, 16 }, { 8, 9 }, { 12, 5 }, { 136, 5 } } }, -- JS-IN -> right -> E-OUT
+}
+-- Stop lines: centre (x, z), width across the lane(s), dir = travel direction of the lane that stops there.
+local TRAFFIC_LINES = {
+	{ id = "SL-N", x = -6, z = -20, width = 12, dir = SOUTH }, -- PARE, Juniper SB
+	{ id = "SL-S", x = 6, z = 20, width = 12, dir = NORTH }, -- PARE, Juniper NB
+	{ id = "SL-W", x = -28, z = 8, width = 16, dir = EAST }, -- CW-2 / CW-4, Ninth EB
+	{ id = "SL-E", x = 28, z = -8, width = 16, dir = WEST }, -- CW-2 / CW-4, Ninth WB
+	{ id = "SL-1N", x = -6, z = 30, width = 12, dir = SOUTH }, -- CW-1, Juniper South SB
+	{ id = "SL-1S", x = 6, z = 46, width = 12, dir = NORTH }, -- CW-1, Juniper South NB
+	{ id = "SL-3W", x = 50, z = 8, width = 16, dir = EAST }, -- CW-3, Ninth EB
+	{ id = "SL-3E", x = 64, z = -8, width = 16, dir = WEST }, -- CW-3, Ninth WB
+}
+-- Boxes: X0..X1, Z0..Z1 (MAP-01 §5.2 crosswalk stripes; X-T = the carriageway square of the crossing).
+local TRAFFIC_BOXES = {
+	{ id = "X-T", x0 = -12, x1 = 12, z0 = -16, z1 = 16 },
+	{ id = "CW-1", x0 = -12, x1 = 12, z0 = 34, z1 = 42 },
+	{ id = "CW-2", x0 = -24, x1 = -12, z0 = -16, z1 = 16 },
+	{ id = "CW-3", x0 = 54, x1 = 60, z0 = -16, z1 = 16 },
+	{ id = "CW-4", x0 = 12, x1 = 24, z0 = -16, z1 = 16 },
+}
+local TRAFFIC_BOX_H = 10
+local ROAD_Y = 0 -- carriageway top (blockout Y_ROAD); the raycast result wins when within 0.6
 
 -- Grill (AST-012): the .fbx has 6 slot empties; DEC-201 uses 4 (L1 1-2, L2 1-3, L3 1-4). Pick = the 4 central
 -- ones after sorting left -> right as seen from the corridor (+X). Same positions at every level (no Level attr).
@@ -585,6 +752,52 @@ local function clearUp(anchor: Instance?, vehicle: Instance, gap: number, label:
 		log("new", ("%s: %s raised %.1f to clear the counter prompts (closest %s at %.2f)"):format(label, anchor.Name, steps * 0.1, who, d))
 	else
 		log("ok", ("%s: %s clear of other prompts (closest %s at %.2f)"):format(label, anchor.Name, who, d))
+	end
+end
+
+-- Closest Interactable of another owner inside `vehicle` (distance, name).
+local function closestOther(anchor: Instance, vehicle: Instance): (number, string)
+	local own = ownerOf(anchor)
+	local best, who = math.huge, "-"
+	for _, o in CollectionService:GetTagged("Interactable") do
+		if o ~= anchor and o:IsDescendantOf(vehicle) and ownerOf(o) ~= own then
+			local d = (anchorPos(o) - anchorPos(anchor)).Magnitude
+			if d < best then
+				best, who = d, o.Name
+			end
+		end
+	end
+	return best, who
+end
+
+-- Moves an Attachment anchor along each { step, maxSteps } in order until it is >= gap from every anchor of
+-- another owner inside `vehicle` (hide prompts: first down, then towards the corridor).
+local function clearAway(anchor: Instance?, vehicle: Instance, gap: number, moves: { { any } }, label: string)
+	if not (anchor and anchor:IsA("Attachment")) then
+		if anchor then
+			log("warn", ("%s: %s is not an Attachment, clearance not applied"):format(label, anchor.Name))
+		end
+		return
+	end
+	local a = anchor :: Attachment
+	local d, who = closestOther(a, vehicle)
+	local moved = Vector3.zero
+	for _, m in moves do
+		local step, max = m[1] :: Vector3, m[2] :: number
+		local n = 0
+		while d < gap and n < max do
+			a.WorldCFrame = a.WorldCFrame + step
+			moved += step
+			n += 1
+			d, who = closestOther(a, vehicle)
+		end
+	end
+	if d < gap then
+		log("warn", ("%s: %s still %.2f from %s after moving %s (move it by hand)"):format(label, a.Name, d, who, fmtV(moved)))
+	elseif moved.Magnitude > 0 then
+		log("new", ("%s: %s moved %s to clear the counter prompts (closest %s at %.2f)"):format(label, a.Name, fmtV(moved), who, d))
+	else
+		log("ok", ("%s: %s clear of other prompts (closest %s at %.2f)"):format(label, a.Name, who, d))
 	end
 end
 
@@ -1705,6 +1918,181 @@ local function bindLightZones(root: Instance, padPose: CFrame)
 	end
 end
 
+-- Wave 3 (W1): hide spots H1..H4 inside the trailer (§19.14; DEC-054, DEC-176). Bound with the trailer on the Pad.
+local function bindHides(trl: Instance, padPose: CFrame, opts: AnchorOpts)
+	local fallbackDX = { -9, -3, 3, 9 } -- MAP-01 §7.2: X 31/37/43/49 with the trailer pivot at X 40
+	for n = 1, HIDE_COUNT do
+		local id = "H" .. n
+		local cab = byMapId(trl, id)
+		if not cab then
+			log("err", ("%s (AST-041_HideCabinet) not found inside the trailer (Place.run puts H1..H4 in the night layer)"):format(id))
+			continue
+		end
+		setPersistent(cab)
+		-- AST-041 fittings may come as Prompt_Hide_<k> / Hide_<k> (same .fbx for the 4): one name each per cabinet
+		-- only Attachments are adopted (a BasePart named Hide_<k> may be the door mesh: never made invisible)
+		local function adopt(pattern: string, to: string)
+			if findNamed(cab, to) then
+				return
+			end
+			for _, d in cab:GetDescendants() do
+				if d:IsA("Attachment") and string.match(d.Name, pattern) then
+					d:SetAttribute(SRC_NAME, d.Name)
+					d.Name = to
+					log("ok", ("%s: .fbx %s used as %s"):format(id, tostring(d:GetAttribute(SRC_NAME)), to))
+					return
+				end
+			end
+		end
+		adopt("^Prompt_Hide_%d+$", "Prompt_Hide")
+		adopt("^Hide_?%d*$", "Hide_Pose")
+
+		local mn, mx = partsBox(cab)
+		local bottom = if mn then mn.Y else padPose.Y + 2
+		local cx = if mn and mx then (mn.X + mx.X) / 2 else padPose.X + fallbackDX[n]
+		local front = if mx then mx.Z else padPose.Z - 2 -- door face, corridor side (+Z with the trailer facing north)
+		local prompt = ensureAnchor(cab, "Prompt_Hide", function()
+			return Vector3.new(cx, bottom + HIDE_PROMPT_UP, front + HIDE_PROMPT_OUT)
+		end, opts, id)
+		interactable(prompt, "hide", { Slot = n })
+		-- clear of the counter prompts above: first down (to bottom + 0.6), then towards the corridor (up to +1.2)
+		clearAway(prompt, trl, HIDE_GAP, { { Vector3.new(0, -0.1, 0), 6 }, { padPose.LookVector * -0.1, 12 } }, id)
+
+		-- where HideService pivots the player: corridor floor in front of the door, facing the window (Provisional)
+		local pose = ensureAnchor(cab, "Hide_Pose", function()
+			return Vector3.new(cx, bottom, front + HIDE_POSE_OUT)
+		end, opts, id)
+		if pose and pose:IsA("Attachment") and pose:GetAttribute(CREATED) then
+			local p = pose.WorldPosition
+			pose.WorldCFrame = CFrame.lookAt(p, p + padPose.LookVector)
+		end
+		if pose and pose:IsA("BasePart") then
+			log("warn", ("%s: Hide_Pose is a BasePart; HideService reads its CFrame (Attachment preferred)"):format(id))
+		end
+	end
+end
+
+-- Wave 3 (W2): AnomalyAnchor WV-1..3 on the apartment windows (ANM-006).
+local function bindWindows(assets: Instance, root: Instance)
+	local bldg = byMapId(assets, "Z-11", "AST-045_ApartmentBlock")
+	if not bldg then
+		log("warn", "Z-11 (AST-045_ApartmentBlock) not found: WV-1..3 use fallback Parts in MapBinding/Anomaly")
+	end
+	local folder: Instance? = nil
+	for _, w in WINDOWS do
+		local want = "Window_Up_" .. w.n
+		local found: Instance? = nil
+		if bldg then
+			for _, d in bldg:GetDescendants() do
+				if d.Name == want and (d:IsA("Model") or d:IsA("BasePart")) then
+					found = d
+					if d:IsA("Model") then
+						break -- a Model groups glass, Lit, curtain and the waver empty: preferred
+					end
+				end
+			end
+		end
+		if found then
+			CollectionService:AddTag(found, "AnomalyAnchor")
+			found:SetAttribute("AnchorId", w.id)
+			log("ok", ("%s: AnomalyAnchor on %s at %s"):format(w.id, found:GetFullName(), fmtV(anchorPos(found))))
+		else
+			if not folder then
+				local f = Instance.new("Folder")
+				f.Name = "Anomaly"
+				f.Parent = root
+				folder = f
+			end
+			local p = Instance.new("Part")
+			p.Name = w.id
+			p.Size = Vector3.new(3, 3.4, 0.2)
+			local c = Vector3.new(w.x, WINDOW_Y, WINDOW_Z)
+			p.CFrame = CFrame.lookAt(c, c + SOUTH)
+			makeInvisible(p)
+			p.Parent = folder
+			CollectionService:AddTag(p, "AnomalyAnchor")
+			p:SetAttribute("AnchorId", w.id)
+			log("warn", ("%s: %s not in the AST-045 (re-upload pending): fallback Part at %s"):format(w.id, want, fmtV(c)))
+		end
+	end
+end
+
+-- Wave 3 (W5): traffic routes, stop lines and boxes in MapBinding/Traffic (static; never move).
+local function bindTraffic(root: Instance)
+	local exclude: { Instance } = { root }
+	local blockout = Workspace:FindFirstChild("MAP01_Blockout")
+	if blockout and blockout:FindFirstChild("Markers") then
+		table.insert(exclude, blockout.Markers)
+	end
+	local misses = 0
+	local function roadY(x: number, z: number): number
+		local y, why = floorY(x, z, ROAD_Y, exclude)
+		if why then
+			misses += 1
+		end
+		return y
+	end
+	local function folder(name: string, parent: Instance): Folder
+		local f = Instance.new("Folder")
+		f.Name = name
+		f.Parent = parent
+		return f
+	end
+	local tf = folder("Traffic", root)
+	local paths, lines, boxes = folder("Paths", tf), folder("Lines", tf), folder("Boxes", tf)
+
+	for _, r in TRAFFIC_ROUTES do
+		local f = folder(r.id, paths)
+		CollectionService:AddTag(f, "TrafficPath")
+		f:SetAttribute("PathId", r.id)
+		local pos: { Vector3 } = {}
+		for i, p in r.pts do
+			pos[i] = Vector3.new(p[1], roadY(p[1], p[2]), p[2])
+		end
+		local len = 0
+		for i, p in pos do
+			local d = if i < #pos then pos[i + 1] - p else p - pos[i - 1]
+			d = Vector3.new(d.X, 0, d.Z)
+			local part = Instance.new("Part")
+			part.Name = ("%02d"):format(i)
+			part.Size = Vector3.one * 0.6
+			part.CFrame = CFrame.lookAt(p, p + d.Unit)
+			makeInvisible(part)
+			part:SetAttribute("Index", i)
+			part.Parent = f
+			if i > 1 then
+				len += (p - pos[i - 1]).Magnitude
+			end
+		end
+		log("ok", ("TrafficPath %s: %d nodes, %.0f studs"):format(r.id, #pos, len))
+	end
+	for _, l in TRAFFIC_LINES do
+		local p = Instance.new("Part")
+		p.Name = l.id
+		p.Size = Vector3.new(l.width, 0.2, 0.4)
+		local c = Vector3.new(l.x, roadY(l.x, l.z) + 0.1, l.z)
+		p.CFrame = CFrame.lookAt(c, c + l.dir)
+		makeInvisible(p)
+		p.Parent = lines
+		CollectionService:AddTag(p, "TrafficLine")
+		p:SetAttribute("LineId", l.id)
+	end
+	for _, b in TRAFFIC_BOXES do
+		local p = Instance.new("Part")
+		p.Name = b.id
+		p.Size = Vector3.new(b.x1 - b.x0, TRAFFIC_BOX_H, b.z1 - b.z0)
+		p.CFrame = CFrame.new((b.x0 + b.x1) / 2, ROAD_Y + TRAFFIC_BOX_H / 2, (b.z0 + b.z1) / 2)
+		makeInvisible(p)
+		p.Parent = boxes
+		CollectionService:AddTag(p, "TrafficBox")
+		p:SetAttribute("BoxId", b.id)
+	end
+	log("ok", ("Traffic: %d paths, %d stop lines, %d boxes in MapBinding/Traffic"):format(#TRAFFIC_ROUTES, #TRAFFIC_LINES, #TRAFFIC_BOXES))
+	if misses > 0 then
+		log("warn", ("Traffic: %d road raycast(s) missed or off by > 0.6; used Y %.2f there (road ends at X +-136 are expected)"):format(misses, ROAD_Y))
+	end
+end
+
 -- Persistent on every Model that is, or contains, a tagged instance (§18.0 item 6).
 local function persistAll(): number
 	local n = 0
@@ -1758,6 +2146,8 @@ function Bind.run(opts: AnchorOpts?): string
 	if trl then
 		bindPhone(trl, "TRL-PHONE", o)
 		clearUp(findNamed(trl, "Prompt_Answer"), trl, PHONE_GAP, "TRL-PHONE")
+		-- wave 3: hide spots last, they clear every other prompt of the trailer (phone included)
+		bindHides(trl, padPose, o)
 	end
 	bindOpenSign(assets, o)
 	bindMart(assets, o)
@@ -1770,6 +2160,8 @@ function Bind.run(opts: AnchorOpts?): string
 	end
 	local root = bindPoints({ cart = cart, trailer = trl, poses = { cart = cartPose, trl = padPose, sale = salePose } })
 	bindLightZones(root, padPose)
+	bindWindows(assets, root)
+	bindTraffic(root)
 	local p = persistAll()
 	log("ok", ("ModelStreamingMode = Persistent set on %d more model(s)"):format(p))
 
@@ -1790,7 +2182,7 @@ function Bind.run(opts: AnchorOpts?): string
 		table.insert(tagCounts, ("%s=%d"):format(tag, c))
 	end
 
-	local head = ("bind_map01 (waves 1+2): ok %d | new %d | conv %d | warn %d | err %d\ntags in Workspace: %s\n"):format(
+	local head = ("bind_map01 (waves 1+2+3): ok %d | new %d | conv %d | warn %d | err %d\ntags in Workspace: %s\n"):format(
 		counts.ok,
 		counts.new,
 		counts.conv,
@@ -1799,7 +2191,7 @@ function Bind.run(opts: AnchorOpts?): string
 		table.concat(tagCounts, ", ")
 	)
 	local body = table.concat(report, "\n")
-	return head .. body .. "\nNext: run bind_pieces.luau (Pieces.run(), TASK-085), then check_map01.luau (Check.run({ wave = 2 }))."
+	return head .. body .. "\nNext: run bind_pieces.luau (Pieces.run(), TASK-085), then check_map01.luau (Check.run({ wave = 3 }))."
 end
 
 return Bind

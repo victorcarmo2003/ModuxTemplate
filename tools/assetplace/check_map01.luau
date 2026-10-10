@@ -1,8 +1,23 @@
 --[[
-	MAP-01 binding check, waves 1 + 2 (TASK-005, TASK-083; docs/tech/architecture.md §18.7, §19.22). Edit-mode tool,
-	NOT gameplay code. Status: Rascunho (level-designer, 2026-10-10). §18.7 calls this tool check_binding.luau; this is
-	that tool for MAP-01. The runtime twin is MapIndex.Validate + src/Place/shared/MapIndex/Required.luau
-	(Required.Wave1 / Wave2 from TASK-048): keep the lists below in sync with it (wave 2 list: MAP-01 §16.4).
+	MAP-01 binding check, waves 1 + 2 + 3 (TASK-005, TASK-083, TASK-098; docs/tech/architecture.md §18.7, §19.22).
+	Edit-mode tool, NOT gameplay code. Status: Rascunho (level-designer, 2026-10-10). §18.7 calls this tool
+	check_binding.luau; this is that tool for MAP-01. The runtime twin is MapIndex.Validate +
+	src/Place/shared/MapIndex/Required.luau (Required.Wave1 / Wave2 / Wave3 from TASK-048 / TASK-097): keep the lists
+	below in sync with it (wave 2 list: MAP-01 §16.4; wave 3: MAP-01 §16.6). Wave 3 names that are game data
+	(cutscene points, walk path nodes, traffic paths / lines / boxes) are read from the synced Content, like
+	Required.Wave3 does; the embedded copies below are only used when Rojo has not synced Content.
+
+	Wave 3 rules (opts.wave = 3):
+	  2. trailer: hide = 4 loose anchors with Slot 1..4 once each (Required.Wave3 Slotted); points SS, AN-04/05/11/12,
+	     AS-1..4, WALKER-10, W/E/JN/JS-IN/OUT, cutscene points; AnomalyAnchor WV-1..3; TrafficPath / TrafficLine /
+	     TrafficBox ids once each
+	 11. (wave 3) hide: Prompt_Hide inside cabinet H<Slot>, Hide_Pose present, low prompt (warn); WV near the window
+	     (warn); SS inside LZ-5; traffic: every path a Folder of Parts with Index 1..n, first node on its entry point,
+	     last on an exit, crosses its route's stop lines in order, the first crosswalk line >= SpawnMinDist (55)
+	     from the spawn, passes its conflict box; lines and boxes invisible / no collision; cutscene MoveTo chain
+	     (slot 1) never crosses a carriageway outside the stripes (warn, MAP-01 P46)
+	 10. (wave 3) WalkPaths: every node exists, consecutive nodes linked, Loop closes, no queue slot; Night / Any
+	     paths never use a customer route node (warn, MAP-01 §9.1)
 
 	Reads only tags and attributes (never the bind script's data). Items of §18.7 (wave 1) + §19.22 (wave 2):
 	  1. tags present (wave 1: MapBinding MapPoint NpcNode Vehicle Station Interactable UpgradePiece; wave 2: + LightZone
@@ -35,7 +50,7 @@
 
 	Usage (edit mode):
 		local Check = require(<this module>)
-		Check.run({ wave = 2 })   -- prints and returns (report, errorCount); opts { wave = 1 | 2 (default 2), write = false }
+		Check.run({ wave = 3 })   -- prints and returns (report, errorCount); opts { wave = 1 | 2 | 3 (default 3), write = false }
 ]]
 
 local CollectionService = game:GetService("CollectionService")
@@ -51,6 +66,7 @@ local Check = {}
 -- UpgradePiece (§18.1, wave 1): kit TASK-084, bound by bind_pieces.luau (TASK-085). Rule 9 below.
 local EDIT_TAGS_W1 = { "MapBinding", "MapPoint", "NpcNode", "Vehicle", "Station", "Interactable", "UpgradePiece" }
 local EDIT_TAGS_W2 = { "LightZone", "StreetLight", "VehicleCover" }
+local EDIT_TAGS_W3 = { "AnomalyAnchor", "TrafficPath", "TrafficLine", "TrafficBox" }
 local OPTIONAL_TAGS = { "StreetBin" } -- DEC-200 / T60: checked, never required (Q-166 b)
 
 -- Upgrade pieces expected per vehicle (copy of src/Shared/Content/Upgrades.luau rows with Part ~= ""; a synced
@@ -89,6 +105,39 @@ local POINTS_W2 = {
 local NODES_W1 = { "SP-A", "D1", "EX-E", "Q1", "Q2", "Q3", "Q4", "Q5" }
 local NODES_W2 = { "ST-R", "L1", "L2", "L3" }
 
+-- wave 3 (Required.Wave3): map-only points; cutscene points come from Content.Cutscenes (embedded copy below)
+local POINTS_W3 = {
+	"SS", "AN-04", "AN-05", "AN-11", "AN-12", "AS-1", "AS-2", "AS-3", "AS-4", "WALKER-10",
+	"W-IN", "W-OUT", "E-IN", "E-OUT", "JN-IN", "JN-OUT", "JS-IN", "JS-OUT",
+	"MKT-DOOR", "WALT-1", "RL-1", "RL-END",
+}
+local CUTSCENE_POINTS_EMBEDDED = {
+	"CutsceneMark1", "CutsceneMark2", "CutsceneMark3", "CutsceneMark4", "CS-2", "CS-3", "CS-4", "CS-5",
+	"CS-P1", "CS-P2", "CS-P3", "CS-P4", "CART", "SS-1", "SS-2", "SS-3", "SS-4", "WALT-1", "RL-END",
+}
+local STREET_POSTS = { "JL-01", "JL-02", "JL-03", "JL-04", "JL-05", "JL-06", "JL-07", "JL-08", "JL-09", "P-01" }
+local WINDOWS_W3 = { ["WV-1"] = 31, ["WV-2"] = 38, ["WV-3"] = 45 } -- AnchorId -> window centre X (AST-045)
+local HIDE_SLOTS = 4
+-- Traffic, embedded copy of Content.Traffic (routes: entry point, stop lines in order, conflict boxes)
+local TRAFFIC_EMBEDDED = {
+	routes = {
+		{ path = "TR-1", lane = "W-IN", stops = { { "Crosswalk", "SL-W" }, { "Crosswalk", "SL-3W" } } },
+		{ path = "TR-2", lane = "E-IN", stops = { { "Crosswalk", "SL-3E" }, { "Crosswalk", "SL-E" } } },
+		{ path = "TR-3", lane = "JN-IN", stops = { { "Pare", "SL-N" }, { "Crosswalk", "SL-3W" } } },
+		{ path = "TR-4", lane = "JN-IN", stops = { { "Pare", "SL-N" } } },
+		{ path = "TR-5", lane = "W-IN", stops = { { "Crosswalk", "SL-W" } } },
+		{ path = "TR-6", lane = "E-IN", stops = { { "Crosswalk", "SL-3E" }, { "Crosswalk", "SL-E" } } },
+		{ path = "TR-7", lane = "JS-IN", stops = { { "Crosswalk", "SL-1S" }, { "Pare", "SL-S" } } },
+		{ path = "TR-8", lane = "JN-IN", stops = { { "Pare", "SL-N" }, { "Crosswalk", "SL-1N" } } },
+		{ path = "TR-9", lane = "W-IN", stops = { { "Crosswalk", "SL-W" }, { "Crosswalk", "SL-1N" } } },
+		{ path = "TR-10", lane = "JS-IN", stops = { { "Crosswalk", "SL-1S" }, { "Pare", "SL-S" }, { "Crosswalk", "SL-3W" } } },
+	},
+	lines = { "SL-1N", "SL-1S", "SL-3E", "SL-3W", "SL-E", "SL-N", "SL-S", "SL-W" },
+	boxes = { "X-T", "CW-1", "CW-2", "CW-3", "CW-4" },
+	spawnMinDist = 55,
+}
+local EXITS = { "W-OUT", "E-OUT", "JN-OUT", "JS-OUT" }
+
 local N, S, E, W = Vector3.new(0, 0, -1), Vector3.new(0, 0, 1), Vector3.new(1, 0, 0), Vector3.new(-1, 0, 0)
 local FACING = { -- expected LookVector of points (warn when > 10 degrees off)
 	["PS-1"] = N, ["PS-2"] = N, ["PS-3"] = N, ["PS-4"] = N,
@@ -97,8 +146,13 @@ local FACING = { -- expected LookVector of points (warn when > 10 degrees off)
 	["PS-N1"] = N, ["PS-N2"] = N, ["PS-N3"] = N, ["PS-N4"] = N,
 	["REV-1"] = S, ["REV-2"] = S, ["REV-3"] = S, ["REV-4"] = S,
 	TRL = N, CART = N, ["TRL-SALE"] = S, ["SIGN-T"] = S, ["DROP-T"] = N, ["ST-R"] = N,
+	-- wave 3
+	["AN-04"] = S, ["AN-05"] = N, ["AN-11"] = S, ["AN-12"] = S,
+	["W-IN"] = E, ["W-OUT"] = W, ["E-IN"] = W, ["E-OUT"] = E,
+	["JN-IN"] = S, ["JN-OUT"] = N, ["JS-IN"] = N, ["JS-OUT"] = S,
+	CutsceneMark1 = E, CutsceneMark2 = E, CutsceneMark3 = E, CutsceneMark4 = E,
+	["SS-1"] = W, ["SS-2"] = W, ["SS-3"] = W, ["SS-4"] = W, ["WALT-1"] = E,
 }
-local _ = W
 
 local TOPPING_KEYS = { "ketchup", "mustard", "cheese", "bacon", "potato_sticks", "cream_cheese" }
 
@@ -125,7 +179,8 @@ local VEHICLE_SPEC = {
 	trailer = {
 		wave = 2,
 		kinds = { "sausage_stock", "grill", "rail", "bun_crate", "board", "toppings", "trash", "coffee_machine" },
-		own = { [2] = { answer_phone = 1, switch_light = 1, buy_trailer = 1 } },
+		own = { [2] = { answer_phone = 1, switch_light = 1, buy_trailer = 1 }, [3] = { hide = HIDE_SLOTS } },
+		slotted = { [3] = { hide = HIDE_SLOTS } }, -- loose anchors with Slot 1..n, once each (Required.Wave3)
 		slots = { RailSlots = 8, BoardSlots = 3 },
 		counter = { ids = { "TRL-G", "TRL-R", "TRL-B", "TRL-T", "TRL-K", "TRL-DRAWER" }, relY = 5.5 },
 	},
@@ -420,9 +475,102 @@ end
 -- Checks
 ---------------------------------------------------------------------------------------------------
 
-local WAVE = 2
+local WAVE = 3
 local function editTags(): { string }
+	if WAVE >= 3 then
+		return concat(concat(EDIT_TAGS_W1, EDIT_TAGS_W2), EDIT_TAGS_W3)
+	end
 	return if WAVE >= 2 then concat(EDIT_TAGS_W1, EDIT_TAGS_W2) else EDIT_TAGS_W1
+end
+
+-- Adds the values of `extra` missing from `list`, keeping the order (Required.union).
+local function union(list: { string }, extra: { string }): { string }
+	local out = table.clone(list)
+	local seen: { [string]: boolean } = {}
+	for _, v in out do
+		seen[v] = true
+	end
+	for _, v in extra do
+		if not seen[v] then
+			seen[v] = true
+			table.insert(out, v)
+		end
+	end
+	return out
+end
+
+-- Wave 3 names that are game data (Required.Wave3 derives them from Content; embedded copies otherwise).
+local function cutscenePoints(): ({ string }, string)
+	local c = loadedContent
+	local cs = c and c.Cutscenes
+	if not (type(cs) == "table" and type(cs.List) == "table") then
+		return CUTSCENE_POINTS_EMBEDDED, "embedded"
+	end
+	local posts = set(STREET_POSTS)
+	local out: { string } = {}
+	for _, scene in cs.List do
+		out = union(out, scene.Marks or {})
+		for _, beat in scene.Beats or {} do
+			if beat.Kind == "MoveTo" and string.find(beat.Target, "{slot}", 1, true) then
+				for slot = 1, 4 do
+					out = union(out, { (string.gsub(beat.Target, "{slot}", tostring(slot))) })
+				end
+			elseif (beat.Kind == "MoveTo" or beat.Kind == "LookAt") and not posts[beat.Target] then
+				out = union(out, { beat.Target })
+			end
+		end
+	end
+	return out, "Content"
+end
+
+-- WalkPaths rows (Content only: the rows live in src/Shared/Content/WalkPaths.luau, TASK-098).
+local function walkPaths(): { any }?
+	local c = loadedContent
+	local wp = c and c.WalkPaths
+	if type(wp) == "table" and type(wp.List) == "table" then
+		return wp.List
+	end
+	return nil
+end
+
+-- Traffic ids: { routes = { path, lane, stops = { { kind, line } }, conflicts }, lines, boxes, spawnMinDist }.
+local function trafficSpec(): (any, string)
+	local c = loadedContent
+	local t = c and c.Traffic
+	if not (type(t) == "table" and type(t.Routes) == "table" and type(t.Routes.List) == "table") then
+		local out = table.clone(TRAFFIC_EMBEDDED)
+		for _, r in out.routes do
+			r.conflicts = r.conflicts or { "X-T" }
+		end
+		return out, "embedded"
+	end
+	local routes = {}
+	local lines: { string } = {}
+	local boxes: { string } = {}
+	for _, r in t.Routes.List do
+		local stops = {}
+		for _, s in r.Stops do
+			table.insert(stops, { s.Kind, s.Line })
+			lines = union(lines, { s.Line })
+		end
+		local conflicts = {}
+		for _, k in r.Conflicts or {} do
+			local row = t.Conflicts and t.Conflicts.ByKey and t.Conflicts.ByKey[k]
+			table.insert(conflicts, if row then row.Box else k)
+		end
+		table.insert(routes, { path = r.Path, lane = r.Lane, stops = stops, conflicts = conflicts })
+	end
+	for _, cw in (t.Crosswalks and t.Crosswalks.List) or {} do
+		for _, l in cw.Lines do
+			lines = union(lines, { l })
+		end
+		boxes = union(boxes, { cw.Box })
+	end
+	for _, k in (t.Conflicts and t.Conflicts.List) or {} do
+		boxes = union(boxes, { k.Box })
+	end
+	local minDist = (t.Crossing and t.Crossing.SpawnMinDist) or TRAFFIC_EMBEDDED.spawnMinDist
+	return { routes = routes, lines = lines, boxes = boxes, spawnMinDist = minDist }, "Content"
 end
 
 local function checkTags(): Instance?
@@ -479,6 +627,11 @@ local function checkPoints(root: Instance?): { [string]: Instance }
 		end
 	end
 	local req = if WAVE >= 2 then concat(POINTS_W1, POINTS_W2) else POINTS_W1
+	if WAVE >= 3 then
+		local cs, src = cutscenePoints()
+		req = union(union(req, POINTS_W3), cs)
+		info(("cutscene points from %s: %s"):format(src, table.concat(cs, ", ")))
+	end
 	for _, id in req do
 		if not byId[id] then
 			err(("2: required MapPoint %s missing"):format(id))
@@ -702,6 +855,30 @@ local function checkVehicle(key: string, v: Instance)
 	for a, n in own do
 		if not wantOwn[a] then
 			warn_(("%s: %d unexpected vehicle anchor(s) %s (wave %d)"):format(key, n, a, WAVE))
+		end
+	end
+	-- wave 3: loose anchors with Slot 1..n, each exactly once (hide spots H1..H4; Required.Wave3 Slotted)
+	for w, list in spec.slotted or {} do
+		if w > WAVE then
+			continue
+		end
+		for a, n in list do
+			local seen: { [number]: number } = {}
+			for _, i in tagged("Interactable") do
+				if i:IsDescendantOf(v) and not ancestorWithTag(i, "Station") and i:GetAttribute("PromptAction") == a then
+					local sl = i:GetAttribute("Slot")
+					if typeof(sl) == "number" then
+						seen[sl] = (seen[sl] or 0) + 1
+					else
+						err(("2: %s: %s anchor %s without Slot"):format(key, a, name(i)))
+					end
+				end
+			end
+			for sl = 1, n do
+				if seen[sl] ~= 1 then
+					err(("2: %s: %s with Slot %d found %d time(s), need 1"):format(key, a, sl, seen[sl] or 0))
+				end
+			end
 		end
 	end
 
@@ -1098,6 +1275,329 @@ local function checkWave2(points: { [string]: Instance }, vehicles: { [string]: 
 	end
 end
 
+-- wave 3 helpers ---------------------------------------------------------------------------------
+
+-- Every id once as `attr` on an instance tagged `tag` (Required.Wave3 Tagged). Returns id -> instance.
+local function taggedIds(tag: string, attr: string, ids: { string }): { [string]: Instance }
+	local byId: { [string]: Instance } = {}
+	local count: { [string]: number } = {}
+	local valid = set(ids)
+	for _, i in tagged(tag) do
+		local id = i:GetAttribute(attr)
+		if typeof(id) ~= "string" or id == "" then
+			err(("2: %s %s without %s"):format(tag, name(i), attr))
+			continue
+		end
+		count[id] = (count[id] or 0) + 1
+		byId[id] = byId[id] or i
+		if not valid[id] then
+			warn_(("%s %s: %s = %s is not in the list (%s)"):format(tag, name(i), attr, id, table.concat(ids, ",")))
+		end
+	end
+	for _, id in ids do
+		if count[id] ~= 1 then
+			err(("2: %s %s = %s found %d time(s), need 1"):format(tag, attr, id, count[id] or 0))
+		end
+	end
+	return byId
+end
+
+local function invisiblePart(i: Instance, label: string)
+	if not i:IsA("BasePart") then
+		err(("5: %s %s is a %s (must be a Part)"):format(label, name(i), i.ClassName))
+		return
+	end
+	local bp = i :: BasePart
+	if bp.Transparency < 1 or bp.CanCollide or bp.CanQuery or bp.CanTouch then
+		err(("5: %s %s must be invisible with CanCollide/CanQuery/CanTouch false"):format(label, name(i)))
+	end
+end
+
+local function flat(v: Vector3): Vector3
+	return Vector3.new(v.X, 0, v.Z)
+end
+
+-- Along-path distance where the polyline crosses the plane of a stop line (normal = line LookVector, travelling
+-- with it), within the line's width; nil when it never does.
+local function crossAt(pts: { Vector3 }, line: BasePart): number?
+	local cf = line.CFrame
+	local look, right = flat(cf.LookVector).Unit, flat(cf.RightVector).Unit
+	local o = flat(cf.Position)
+	local half = line.Size.X / 2 + 0.5
+	local acc = 0
+	for k = 1, #pts - 1 do
+		local a, b = flat(pts[k]), flat(pts[k + 1])
+		local da, db = (a - o):Dot(look), (b - o):Dot(look)
+		local seg = (b - a).Magnitude
+		if da < 0 and db >= 0 then
+			local t = da / (da - db)
+			local c = a + (b - a) * t
+			if math.abs((c - o):Dot(right)) <= half then
+				return acc + seg * t
+			end
+		end
+		acc += seg
+	end
+	return nil
+end
+
+local function insideBox(box: BasePart, p: Vector3): boolean
+	local l = box.CFrame:PointToObjectSpace(Vector3.new(p.X, box.Position.Y, p.Z))
+	local h = box.Size / 2
+	return math.abs(l.X) <= h.X and math.abs(l.Z) <= h.Z
+end
+
+-- wave 3: hide spots, anomaly anchors, SS, traffic, cutscene chain
+local function checkWave3(points: { [string]: Instance }, vehicles: { [string]: Instance })
+	-- hide spots (§19.14): counted and slotted in checkVehicle; here the cabinet, the pose and the height
+	local trl = vehicles.trailer
+	if trl then
+		local base = ((trl :: any):GetPivot() :: CFrame).Position.Y
+		local n = 0
+		for _, i in tagged("Interactable") do
+			if i:IsDescendantOf(trl) and i:GetAttribute("PromptAction") == "hide" then
+				n += 1
+				local sl = i:GetAttribute("Slot")
+				local owner: Instance? = i.Parent
+				while owner and owner ~= trl and owner:GetAttribute("MapId") == nil do
+					owner = owner.Parent
+				end
+				local mapId = owner and owner:GetAttribute("MapId")
+				if mapId ~= "H" .. tostring(sl) then
+					warn_(("hide %s (Slot %s) is in %s, MapId %s: expected cabinet H%s (MAP-01 §7.2)"):format(name(i), tostring(sl), name(owner), tostring(mapId), tostring(sl)))
+				end
+				if owner and not owner:FindFirstChild("Hide_Pose", true) then
+					warn_(("hide Slot %s: no Hide_Pose in %s (where HideService pivots the player)"):format(tostring(sl), name(owner)))
+				end
+				local h = pos(i).Y - base
+				if h > 5.5 then
+					warn_(("hide Slot %s prompt %.2f over the trailer pivot: above the counter top (5.5); it belongs on the cabinet door"):format(tostring(sl), h))
+				end
+			end
+		end
+		info(("11: %d hide anchor(s) in the trailer"):format(n))
+	end
+
+	-- apartment windows (ANM-006)
+	local wvIds = {}
+	for id in WINDOWS_W3 do
+		table.insert(wvIds, id)
+	end
+	table.sort(wvIds)
+	local wv = taggedIds("AnomalyAnchor", "AnchorId", wvIds)
+	local binding = Workspace:FindFirstChild("MapBinding")
+	for id, a in wv do
+		local x = WINDOWS_W3[id]
+		if not x then
+			continue
+		end
+		if not (a:IsA("BasePart") or a:IsA("Model")) then
+			err(("5: AnomalyAnchor %s is a %s (Part or Model)"):format(id, a.ClassName))
+			continue
+		end
+		local p = pos(a)
+		if math.abs(p.X - x) > 2.5 or p.Y < 22 or p.Y > 31 or p.Z > -29 or p.Z < -40 then
+			warn_(("AnomalyAnchor %s at %s, expected X %d, Y 24.6..28, facade Z ~-32 (MAP-01 §5.2)"):format(id, fmtV(p), x))
+		end
+		if binding and a:IsDescendantOf(binding) then
+			warn_(("AnomalyAnchor %s is the fallback Part (AST-045 Window_Up_* missing: re-upload pending)"):format(id))
+		end
+	end
+
+	-- SS inside LZ-5 (the safe spot counts as light, anomalies.md N10)
+	local lz5: Instance? = nil
+	for _, z in tagged("LightZone") do
+		if z:GetAttribute("ZoneId") == "LZ-5" then
+			lz5 = z
+		end
+	end
+	local ss = points.SS
+	if ss and lz5 and lz5:IsA("BasePart") then
+		local d = flat(pos(ss) - (lz5 :: BasePart).Position).Magnitude
+		if d > 0.5 then
+			warn_(("SS is %.2f from the centre of LZ-5 (HideService InZone(p, \"SS\", 6) and the light ball should match)"):format(d))
+		end
+	end
+
+	-- traffic (§8.1; TASK-097 tags)
+	local spec, src = trafficSpec()
+	local pathIds = {}
+	for _, r in spec.routes do
+		table.insert(pathIds, r.path)
+	end
+	info(("11: traffic ids from %s: %d paths, %d lines, %d boxes"):format(src, #pathIds, #spec.lines, #spec.boxes))
+	local paths = taggedIds("TrafficPath", "PathId", pathIds)
+	local lines = taggedIds("TrafficLine", "LineId", spec.lines)
+	local boxes = taggedIds("TrafficBox", "BoxId", spec.boxes)
+	for _, l in lines do
+		invisiblePart(l, "TrafficLine")
+		if l:IsA("BasePart") and math.abs((l :: BasePart).CFrame.LookVector.Y) > 0.01 then
+			err(("5: TrafficLine %s LookVector not horizontal"):format(name(l)))
+		end
+	end
+	for _, b in boxes do
+		invisiblePart(b, "TrafficBox")
+	end
+	local exits = {}
+	for _, id in EXITS do
+		if points[id] then
+			table.insert(exits, pos(points[id]))
+		end
+	end
+	for _, r in spec.routes do
+		local f = paths[r.path]
+		if not f then
+			continue
+		end
+		local nodes = {}
+		for _, c in f:GetChildren() do
+			if c:IsA("BasePart") then
+				local idx = c:GetAttribute("Index")
+				if typeof(idx) ~= "number" then
+					err(("11: TrafficPath %s node %s without Index"):format(r.path, name(c)))
+				else
+					table.insert(nodes, { idx = idx, p = c.Position, part = c })
+				end
+				invisiblePart(c, "TrafficPath node")
+			end
+		end
+		table.sort(nodes, function(a, b)
+			return a.idx < b.idx
+		end)
+		for k, n in nodes do
+			if n.idx ~= k then
+				err(("11: TrafficPath %s: Index %d where %d was expected (Index 1..n, no gaps)"):format(r.path, n.idx, k))
+				break
+			end
+		end
+		if #nodes < 2 then
+			err(("11: TrafficPath %s has %d node(s) (need >= 2)"):format(r.path, #nodes))
+			continue
+		end
+		local pts = {}
+		local length = 0
+		for k, n in nodes do
+			pts[k] = n.p
+			if k > 1 then
+				length += flat(n.p - pts[k - 1]).Magnitude
+			end
+		end
+		-- ends: spawn on the lane's entry point, despawn on an exit point
+		local entry = points[r.lane]
+		if entry and flat(pts[1] - pos(entry)).Magnitude > 1.5 then
+			warn_(("TrafficPath %s starts at %s, %.1f from its entry %s"):format(r.path, fmtV(pts[1]), flat(pts[1] - pos(entry)).Magnitude, r.lane))
+		end
+		local nearExit = false
+		for _, e in exits do
+			if flat(pts[#pts] - e).Magnitude <= 1.5 then
+				nearExit = true
+			end
+		end
+		if not nearExit then
+			warn_(("TrafficPath %s ends at %s, not on W/E/JN/JS-OUT"):format(r.path, fmtV(pts[#pts])))
+		end
+		-- stops in order, first crosswalk line far enough from the spawn
+		local last = -1
+		local firstCw: number? = nil
+		local order = {}
+		for _, s in r.stops do
+			local kind, lineId = s[1], s[2]
+			local l = lines[lineId]
+			if not (l and l:IsA("BasePart")) then
+				continue
+			end
+			local at = crossAt(pts, l :: BasePart)
+			if not at then
+				err(("11: TrafficPath %s never crosses its stop line %s (travel direction = line LookVector)"):format(r.path, lineId))
+				continue
+			end
+			if at <= last then
+				err(("11: TrafficPath %s crosses %s before the previous stop (Stops order of Content.Traffic)"):format(r.path, lineId))
+			end
+			last = at
+			table.insert(order, ("%s@%.0f"):format(lineId, at))
+			if kind == "Crosswalk" and firstCw == nil then
+				firstCw = at
+			end
+			if at < spec.spawnMinDist then
+				local msg = ("TrafficPath %s: %s %.0f studs from the spawn (SpawnMinDist %d)"):format(r.path, lineId, at, spec.spawnMinDist)
+				if kind == "Crosswalk" then
+					err("11: " .. msg)
+				else
+					warn_(msg)
+				end
+			end
+		end
+		-- other lines the path crosses in their direction (informative: the car only stops on its own Stops)
+		local extra = {}
+		for id, l in lines do
+			local listed = false
+			for _, s in r.stops do
+				if s[2] == id then
+					listed = true
+				end
+			end
+			if not listed and l:IsA("BasePart") and crossAt(pts, l :: BasePart) then
+				table.insert(extra, id)
+			end
+		end
+		-- conflict boxes the route must pass
+		for _, boxId in r.conflicts or {} do
+			local b = boxes[boxId]
+			if b and b:IsA("BasePart") then
+				local inside = false
+				for k = 1, #pts - 1 do
+					local seg = flat(pts[k + 1] - pts[k]).Magnitude
+					for s = 0, math.ceil(seg) do
+						if insideBox(b :: BasePart, pts[k]:Lerp(pts[k + 1], s / math.max(1, math.ceil(seg)))) then
+							inside = true
+							break
+						end
+					end
+					if inside then
+						break
+					end
+				end
+				if not inside then
+					err(("11: TrafficPath %s never enters its conflict box %s"):format(r.path, boxId))
+				end
+			end
+		end
+		info(("11: %s %.0f studs, stops {%s}%s"):format(r.path, length, table.concat(order, ", "), if #extra > 0 then ", also crosses " .. table.concat(extra, ",") else ""))
+	end
+
+	-- cutscene walking chain of slot 1 (MAP-01 §11.1, P46): straight MoveTo segments vs carriageways
+	local chain: { string } = { "CutsceneMark1", "CS-2", "CS-3", "CS-4", "CS-5", "CS-P1" }
+	local cs = loadedContent and loadedContent.Cutscenes
+	local intro = cs and cs.ByKey and cs.ByKey.intro
+	if intro then
+		chain = { intro.Marks[1] }
+		for _, beat in intro.Beats do
+			if beat.Kind == "MoveTo" then
+				table.insert(chain, (string.gsub(beat.Target, "{slot}", "1")))
+			end
+		end
+	end
+	for k = 1, #chain - 1 do
+		local a, b = points[chain[k]], points[chain[k + 1]]
+		if a and b then
+			local road, _ = crossesRoad(pos(a), pos(b), nil)
+			if road then
+				local ok = false
+				for _, cw in CROSSWALKS do
+					local _, inCw = crossesRoad(pos(a), pos(b), cw)
+					if inCw then
+						ok = true
+					end
+				end
+				if not ok then
+					warn_(("cutscene intro: MoveTo %s -> %s crosses the %s carriageway outside the stripes (MAP-01 P46: add CS-5W / CS-5E beats)"):format(chain[k], chain[k + 1], road))
+				end
+			end
+		end
+	end
+end
+
 type Node = { id: string, inst: Instance, p: Vector3, links: { string }, cw: string? }
 
 local function astar(nodes: { [string]: Node }, adj: { [string]: { [string]: boolean } }, from: string, to: string, noQueueMid: boolean, noCross: boolean?): ({ string }?, number)
@@ -1190,7 +1690,18 @@ local function checkGraph(root: Instance?)
 	if count > MAX_NODES then
 		err(("6: %d nodes (max %d, §12.3)"):format(count, MAX_NODES))
 	end
-	for _, id in (if WAVE >= 2 then concat(NODES_W1, NODES_W2) else NODES_W1) do
+	local reqNodes = if WAVE >= 2 then concat(NODES_W1, NODES_W2) else NODES_W1
+	local paths = if WAVE >= 3 then walkPaths() else nil
+	if WAVE >= 3 then
+		if paths then
+			for _, p in paths do
+				reqNodes = union(reqNodes, p.Nodes)
+			end
+		else
+			warn_("10: Content.WalkPaths not synced (Rojo): walk path nodes and rule 10 not checked")
+		end
+	end
+	for _, id in reqNodes do
 		if not nodes[id] then
 			err(("6: required node %s missing"):format(id))
 		end
@@ -1314,11 +1825,15 @@ local function checkGraph(root: Instance?)
 	end
 
 	-- routes (info) + queue shortcut (warn)
+	local customerNodes: { [string]: string } = {}
 	for _, r in ROUTES_W1 do
 		local path, len = astar(nodes, adj, r[1], r[2], false)
 		if not path then
 			err(("6: no path %s -> %s (%s)"):format(r[1], r[2], r[3]))
 		else
+			for _, id in path do
+				customerNodes[id] = r[3]
+			end
 			info(("route %s: %s (%.0f studs, ~%.0f s at 8 st/s)"):format(r[3], table.concat(path, " > "), len, len / 8))
 			local viaQ = false
 			for k = 2, #path - 1 do
@@ -1345,6 +1860,51 @@ local function checkGraph(root: Instance?)
 					info(("route %s: without AvoidCrossings A* would take a crosswalk; the thief must pass AvoidCrossings = true"):format(r[3]))
 				end
 			end
+		end
+	end
+	-- 10 (wave 3): pedestrian walk paths (Content.WalkPaths; architecture.md §19.17, T46; MAP-01 §9.3)
+	if paths then
+		for _, p in paths do
+			local label = ("WalkPaths %s"):format(tostring(p.Key))
+			local list = p.Nodes or {}
+			local length = 0
+			local crossings = {}
+			for k, id in list do
+				local n = nodes[id]
+				if not n then
+					continue -- already reported as a missing required node
+				end
+				if string.match(id, "^Q%d$") then
+					err(("10: %s passes the queue slot %s (pedestrians never enter the queue)"):format(label, id))
+				end
+				if (p.Shift == "Night" or p.Shift == "Any") and customerNodes[id] then
+					warn_(("%s (Shift %s) uses %s of the customer route %s: at night an NPC there reads as a customer (MAP-01 §9.1)"):format(label, p.Shift, id, customerNodes[id]))
+				end
+				local nextId = list[k + 1]
+				if nextId == nil and p.Loop then
+					nextId = list[1]
+				end
+				if nextId and nodes[nextId] then
+					if not (adj[id] and adj[id][nextId]) then
+						err(("10: %s: %s -> %s are not linked in the NpcNode graph"):format(label, id, nextId))
+					else
+						length += (n.p - nodes[nextId].p).Magnitude
+						if n.cw ~= nil and n.cw == nodes[nextId].cw then
+							table.insert(crossings, n.cw)
+						end
+					end
+				end
+			end
+			info(("10: %s (%s, %s, weight %s): %d nodes, %.0f studs (~%.0f s at 8 st/s), crossings {%s}"):format(
+				label,
+				tostring(p.Shift),
+				if p.Loop then "loop" else "one-way",
+				tostring(p.Weight),
+				#list,
+				length,
+				length / 8,
+				table.concat(crossings, ",")
+			))
 		end
 	end
 	info(("6: graph %d nodes, %d edges"):format(count, edges))
@@ -1555,7 +2115,7 @@ function Check.run(opts: { write: boolean?, wave: number? }?): (string, number)
 	table.clear(warns)
 	table.clear(infos)
 	local write = not (opts and opts.write == false)
-	WAVE = if opts and opts.wave then opts.wave else 2
+	WAVE = if opts and opts.wave then opts.wave else 3
 
 	local content, src = loadContent()
 	info("Content keys: " .. src)
@@ -1572,6 +2132,9 @@ function Check.run(opts: { write: boolean?, wave: number? }?): (string, number)
 	checkPivots(vehicles)
 	if WAVE >= 2 then
 		checkWave2(points, vehicles)
+	end
+	if WAVE >= 3 then
+		checkWave3(points, vehicles)
 	end
 	checkGraph(root)
 
