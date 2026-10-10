@@ -3,7 +3,9 @@
 local StarterPlayer = game:GetService("StarterPlayer")
 local CameraController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.CameraController)
 local InputController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.InputController)
+local PromptController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PromptController)
 local NetController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.NetController)
+local PlaceController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PlaceController)
 local ProfileController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ProfileController)
 local RoundController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.RoundController)
 local VitalController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.VitalController)
@@ -11,7 +13,9 @@ local VitalController = require(StarterPlayer.StarterPlayerScripts.client.ModuxT
 export type AllControllers = {
 	CameraController: CameraController.Public,
 	InputController: InputController.Public,
+	PromptController: PromptController.Public,
 	NetController: NetController.Public,
+	PlaceController: PlaceController.Public,
 	ProfileController: ProfileController.Public,
 	RoundController: RoundController.Public,
 	VitalController: VitalController.Public,

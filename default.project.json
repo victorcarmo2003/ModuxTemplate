@@ -22,6 +22,12 @@
 						"optional": "src/Shared/Content"
 					}
 				},
+				"Crew": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Crew/shared"
+					}
+				},
 				"Libs": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
@@ -40,6 +46,12 @@
 						"$path": {
 							"optional": "src/Net/Log.luau"
 						}
+					}
+				},
+				"Place": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Place/shared"
 					}
 				},
 				"Types": {
@@ -63,6 +75,18 @@
 			"server": {
 				"$className": "Folder",
 				"$ignoreUnknownInstances": false,
+				"Class": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Class/server"
+					}
+				},
+				"Interaction": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Interaction/server"
+					}
+				},
 				"Modux": {
 					"$path": {
 						"optional": "src/Modux/server"
@@ -78,6 +102,12 @@
 					"$ignoreUnknownInstances": false,
 					"$path": {
 						"optional": "src/Net/server"
+					}
+				},
+				"Place": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Place/server"
 					}
 				},
 				"Player": {
@@ -96,6 +126,12 @@
 					"$ignoreUnknownInstances": false,
 					"$path": {
 						"optional": "src/Round/server"
+					}
+				},
+				"Run": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Run/server"
 					}
 				},
 				"Vital": {
@@ -128,6 +164,12 @@
 							"optional": "src/Input/client"
 						}
 					},
+					"Interaction": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Interaction/client"
+						}
+					},
 					"Interface": {
 						"$ignoreUnknownInstances": false,
 						"$path": {
@@ -149,6 +191,12 @@
 						"$ignoreUnknownInstances": false,
 						"$path": {
 							"optional": "src/Net/client"
+						}
+					},
+					"Place": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Place/client"
 						}
 					},
 					"Profile": {

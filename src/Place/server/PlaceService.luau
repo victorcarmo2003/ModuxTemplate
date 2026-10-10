@@ -1,0 +1,78 @@
+--!strict
+-- Place role and dev mode (architecture.md §1, §2.1, §3.1; TASK-010).
+-- Role = authored attribute Workspace.PlaceRole ("Lobby" | "Run"). Same code runs on both places; services that
+-- belong to one role return at the top of OnInit/OnStart when Is(role) is false (architecture.md §3.1).
+-- Dev mode = Run place in Studio without PrivateServerId: roster = whoever joins, no MemoryStore, snapshot in memory.
+-- Provisional (TASK-010): a missing PlaceRole reads as "Run" (wave 1 ships only the Run place), and dev mode also
+-- needs RunService:IsStudio(), so a public Run server can never expose dev commands (gems, skip day).
+-- OnStart runs MapIndex.Validate (architecture.md §18.8): problem in Studio = error (loud), published = warn.
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local ServerScriptService = game:GetService("ServerScriptService")
+local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
+local Modux = require(ServerScriptService.server.Modux)
+
+export type Role = "Lobby" | "Run"
+
+const ROLE_ATTRIBUTE = "PlaceRole"
+const DEFAULT_ROLE: Role = "Run"
+
+local function readRole(): (Role, string?)
+	const raw = workspace:GetAttribute(ROLE_ATTRIBUTE)
+	if raw == "Lobby" or raw == "Run" then
+		return raw, nil
+	end
+	if raw == nil then
+		return DEFAULT_ROLE, `Workspace.{ROLE_ATTRIBUTE} is not set; reading as "{DEFAULT_ROLE}" (wave 1)`
+	end
+	return DEFAULT_ROLE, `Workspace.{ROLE_ATTRIBUTE} = {tostring(raw)} is not "Lobby"/"Run"; reading as "{DEFAULT_ROLE}"`
+end
+
+const PlaceService = Modux.Service("PlaceService", { Priority = 950 })
+
+function PlaceService:Setup()
+	const role, problem = readRole()
+	if problem then
+		warn(`[PlaceService] {problem}`)
+	end
+	self.Role = role :: Role
+	self.Dev = (role == "Run" and game.PrivateServerId == "" and RunService:IsStudio()) :: boolean
+end
+
+function PlaceService:Is(role: Role): boolean
+	return self.Role == role
+end
+
+function PlaceService:IsDev(): boolean
+	return self.Dev
+end
+
+-- Runtime twin of the edit-time check (architecture.md §18.7). No binding root yet = TASK-005 pending: warn only.
+function PlaceService:ValidateMap()
+	if not self:Is("Run") then
+		return
+	end
+	if not MapIndex.HasBinding() then
+		warn("[PlaceService] no MapBinding in the Workspace (TASK-005 pending): map checks skipped")
+		return
+	end
+	const problems = MapIndex.Validate(MapIndex.Required)
+	if #problems == 0 then
+		return
+	end
+	const report = `[PlaceService] map binding has {#problems} problem(s):\n  {table.concat(problems, "\n  ")}`
+	if RunService:IsStudio() then
+		error(report, 0)
+	end
+	warn(report)
+end
+
+PlaceService:OnInit(function(self)
+	self:Setup()
+end)
+
+PlaceService:OnStart(function(self)
+	self:ValidateMap()
+end)
+
+return PlaceService
