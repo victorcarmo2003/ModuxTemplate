@@ -1,21 +1,31 @@
 --!strict
--- Shift commands (board TASK-042, R1; tests/wave-1.md §0.4 R1, L-10). Thin wrappers over the RoundService dev
--- hooks (TASK-012 v1.1): both go through the natural path (EndPhase / StartShift), so Closing, Summary, deposit,
--- ShiftStarted and the capture run exactly as on a timeout or a day rollover. RoundService validates and errors.
+-- Shift commands (board TASK-042 R1, TASK-054; tests/wave-1.md §0.4 R1, L-10; architecture.md §19.4). Thin wrappers
+-- over the RoundService hooks: every one goes through the natural path (Advance / StartShift / LoseNight), so
+-- Closing, Summary, deposit, ShiftStarted, NightResolved and the capture run exactly as on a timeout.
+-- RoundService validates and errors.
 local Api = require(script.Parent.Parent.Api)
 
 type Round = {
 	DevSetDay: (self: any, day: number) -> (),
+	DevSetNight: (self: any, night: number) -> (),
 	DevSkipPhase: (self: any) -> (),
+	DevWinNight: (self: any) -> (),
+	LoseNight: (self: any, reason: "wipe" | "critical") -> boolean,
 	GetDay: (self: any) -> number,
+	GetNight: (self: any) -> number,
+	IsNight: (self: any) -> boolean,
 	GetPhase: (self: any) -> string,
+	Info: (self: any) -> { Attempt: number },
 }
 
 const Round: Api.Module = function(ctx: Api.Context): { Api.Command }
 	const round = ctx.Get("RoundService") :: Round
 
 	local function where(): string
-		return `Day {round:GetDay()} {round:GetPhase()}`
+		const shift = if round:IsNight() then `Night {round:GetNight()}` else `Day {round:GetDay()}`
+		const attempt = round:Info().Attempt
+		const suffix = if attempt > 0 then ` (attempt {attempt + 1})` else ""
+		return `{shift} {round:GetPhase()}{suffix}`
 	end
 
 	return {
@@ -34,12 +44,52 @@ const Round: Api.Module = function(ctx: Api.Context): { Api.Command }
 			end,
 		},
 		{
+			Name = "night",
+			Usage = "night <k>",
+			Help = "start Night k on the current day (Call, skipped without a boss, then Prep)",
+			Run = function(args: { string }, _caller: Player?): string?
+				const night = tonumber(args[1])
+				if night == nil then
+					error("usage: night <k>", 0)
+				end
+				const before = where()
+				round:DevSetNight(night)
+				return `{before} -> {where()}`
+			end,
+		},
+		{
 			Name = "skip",
 			Usage = "skip",
-			Help = "end the current phase now, same path as its timer (Open -> Closing -> Summary -> next Day)",
+			Help = "end the current phase now, same path as its timer (the Night goes through the verdict)",
 			Run = function(_args: { string }, _caller: Player?): string?
 				const before = where()
 				round:DevSkipPhase()
+				return `{before} -> {where()}`
+			end,
+		},
+		{
+			Name = "lose",
+			Usage = "lose wipe|critical",
+			Help = "lose the current night (Call, Prep or Night): NightLost, then repeat or end of run",
+			Run = function(args: { string }, _caller: Player?): string?
+				const reason = args[1]
+				if reason ~= "wipe" and reason ~= "critical" then
+					error("usage: lose wipe|critical", 0)
+				end
+				const before = where()
+				if not round:LoseNight(reason :: any) then
+					error(`{before}: a night can only be lost in Call, Prep or Night of a night shift`, 0)
+				end
+				return `{before} -> {where()}`
+			end,
+		},
+		{
+			Name = "win",
+			Usage = "win",
+			Help = "win the current night now (NightEnd; Night 10 goes to the finale)",
+			Run = function(_args: { string }, _caller: Player?): string?
+				const before = where()
+				round:DevWinNight()
 				return `{before} -> {where()}`
 			end,
 		},
