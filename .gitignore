@@ -7,3 +7,6 @@ sourcemap.json
 /ServerPackages
 /DevPackages
 /probe/
+
+# Blender auto-backups
+*.blend1
