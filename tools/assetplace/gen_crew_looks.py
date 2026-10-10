@@ -5,10 +5,9 @@ Sources (never edit CrewLooks.luau by hand; change the sources and run this agai
   - Assets/textures/character/T_Head_<A>.png      fur colour = RGB stored under the alpha-0 texels (the head painter
                                                    keeps the fur there; same values as the skill's colors.json)
   - CAP_PLAIN below                                species wearing the plain Cap (floppy ears / no ears); every other
-                                                   species has ears up and wears AST-053_CrewCap_EarsUp. Same table as
-                                                   the head pipeline (skill roblox-cartoon-animal-char, heads/hcommon.py
-                                                   CAP; REF_Cap in each AST-053_Animal_<A>.blend). Check the 10 newer
-                                                   species in build_kits demo (Provisional).
+                                                   species has ears up and wears AST-053_CrewCap_EarsUp. Read from the
+                                                   REF_Cap object (mesh "Cap" vs "Cap_EarsUp") of each
+                                                   Assets/blender/character/AST-053_Animal_<A>.blend (2026-10-10).
   - SPECIES / OUTFITS below                        keys of Content.Species / Content.Outfits (content-data.md v4,
                                                    §3.10a and §3.10b). The run fails if the JSON does not cover them.
 
@@ -50,8 +49,8 @@ OUTFITS = {
     "thief": "Civil_Thief",  # Day only (DEC-159)
 }
 
-# Plain Cap (REF_Cap = AST-053_CrewCap, 224 tris): floppy ears or no ears. Everyone else: ears up (hcommon.CAP).
-CAP_PLAIN = {"Dog", "Turtle"}
+# Plain Cap (REF_Cap = AST-053_CrewCap, 224 tris): floppy ears or no ears. Everyone else: ears up.
+CAP_PLAIN = {"Dog", "Frog", "Monkey", "Penguin", "Pig", "Sheep", "Turtle"}
 
 # HatAttachment / ear sockets of the round heads are 0.30 above the old box head (DEC-152; hcommon.CAP_DZ)
 CAP_RAISE = 0.30

@@ -67,7 +67,7 @@ const looks: CrewLooks = {
 		},
 		penguin = { -- Penguin: T_Head_Penguin[_Mid|_Night]
 			Fur = Color3.fromHex("242F33"),
-			EarsUp = true,
+			EarsUp = false,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://123931388358269", Mid = "rbxassetid://80736875394051", Night = "rbxassetid://89367599680359" },
 		},
@@ -85,13 +85,13 @@ const looks: CrewLooks = {
 		},
 		frog = { -- Frog: T_Head_Frog[_Mid|_Night]
 			Fur = Color3.fromHex("00AB5C"),
-			EarsUp = true,
+			EarsUp = false,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://135183718306005", Mid = "rbxassetid://73613673868262", Night = "rbxassetid://73115565618007" },
 		},
 		monkey = { -- Monkey: T_Head_Monkey[_Mid|_Night]
 			Fur = Color3.fromHex("834231"),
-			EarsUp = true,
+			EarsUp = false,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://101395404005070", Mid = "rbxassetid://87619323373695", Night = "rbxassetid://81425577486040" },
 		},
@@ -103,7 +103,7 @@ const looks: CrewLooks = {
 		},
 		sheep = { -- Sheep: T_Head_Sheep[_Mid|_Night]
 			Fur = Color3.fromHex("E9D0B8"),
-			EarsUp = true,
+			EarsUp = false,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://117304578679749", Mid = "rbxassetid://127849777390802", Night = "rbxassetid://135462136928062" },
 		},
@@ -115,7 +115,7 @@ const looks: CrewLooks = {
 		},
 		pig = { -- Pig: T_Head_Pig[_Mid|_Night]
 			Fur = Color3.fromHex("FAA39B"),
-			EarsUp = true,
+			EarsUp = false,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://73376431637354", Mid = "rbxassetid://118497069683126", Night = "rbxassetid://129336666278943" },
 		},
