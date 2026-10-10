@@ -6,7 +6,7 @@
 	  - clock and "Day N" from RoundController (ClockText, Day, IsNight; the Shift set is never read here);
 	  - party money from EconomyController.Cash;
 	  - toasts from the `Notice` packet (network.md §4.2), text from Content.Notices with {value}/{item}/{upgrade}/
-	    {class} filled in; same text already queued is dropped (a spammed "Hands full" shows once);
+	    {class}/{achievement} filled in; same text already queued is dropped (a spammed "Hands full" shows once);
 	  - end-of-shift summary from the `ShiftReport` packet (network.md §4.4), hidden by itself after 15 s on day /
 	    20 s at night, or as soon as the next shift starts.
 
@@ -94,6 +94,10 @@ local function rowName(from: string, index: number): string
 		row = Content.Upgrades.List[index]
 	elseif from == "Classes" then
 		row = Content.Classes.List[index]
+	elseif from == "Achievements" then
+		row = Content.Achievements.List[index]
+	elseif from == "Items" then
+		row = Content.Items.List[index]
 	end
 	return if row then row.Name else "?"
 end
@@ -113,6 +117,7 @@ function HudController:NoticeText(kind: string, value: number): string?
 	text = string.gsub(text, "{item}", safeName)
 	text = string.gsub(text, "{upgrade}", safeName)
 	text = string.gsub(text, "{class}", safeName)
+	text = string.gsub(text, "{achievement}", safeName)
 	return text
 end
 

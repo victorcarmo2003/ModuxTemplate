@@ -435,6 +435,7 @@ const Stock = {}
 Stock.Kinds = table.freeze({
 	sausage_stock = true,
 	bun_crate = true,
+	coffee_machine = true, -- coffee stock counter (TASK-068/069)
 	[TOPPINGS_KIND] = true,
 }) :: { [string]: boolean }
 
