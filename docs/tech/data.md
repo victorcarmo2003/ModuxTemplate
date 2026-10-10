@@ -5,6 +5,9 @@ Status: Rascunho
 Autor: architect. **Versão 5, 2026-10-10 (pós onda 1):** §5 novo — o que persiste por categoria (progressão,
 inventário, moeda, desbloqueios), `Member` enxuto, chaves de snapshot das ondas 2–4 (`T`, `Veh`, `Lt`, `Bs`, `Bn`)
 com as chaves que a onda 1 já grava (`Run`, `M`, `Sh`, `Cash`, `Fp`, `Stk`, `Stn`, `Upg`), política de migração.
+**Versão 5.1, 2026-10-10 (TASK-049):** D-05 fechado — `Stn` e `Fp` descritos como o código grava (§3.3, §5.3, exemplo
+corrigido: `Fp` guarda chaves de **ingrediente**); `RunRewards.Gems` novo (soma da run, alimenta `RunReport.Gems`,
+T59) sem bump de `Version` (§1.1, §1.3, §5.4). Provisório (DEC-193).
 Versão 4, 2026-10-10 (**TASK-001**: estado DEC-140 a DEC-201). Versão anterior: 3.1, 2026-10-08.
 
 > **Base Provisória (DEC-193).** Rascunho que vale para construir. Rede: `network.md` v5. Tabelas: `content-data.md` v5.
@@ -71,7 +74,7 @@ return {
 	Receipts = {} :: { string },               -- últimos 50 PurchaseId processados (lista circular)
 
 	-- Idempotência de gemas por run (architecture.md §10.4)
-	RunRewards = { RunId = "", Keys = {} :: { string } },
+	RunRewards = { RunId = "", Keys = {} :: { string }, Gems = 0 }, -- Gems (v5.1, T59): soma creditada nesta run → RunReport.Gems
 
 	Stats = {
 		RunsStarted = 0,
@@ -117,13 +120,19 @@ Limite por chave hoje é 4 MB/min (sem o antigo cooldown de 6 s).
 Credit(member, key, gems, extra):
   profile = ProfileService:Get(member) ; sem perfil carregado → não paga (DEC-104: só presentes e carregados)
   rr = profile.RunRewards()
-  if rr.RunId ~= RunId then rr = { RunId = RunId, Keys = {} } end
+  if rr.RunId ~= RunId then rr = { RunId = RunId, Keys = {}, Gems = 0 } end
   if key ∈ rr.Keys then return end                  -- noite repetida, retomada, reconexão: nunca 2×
   batch:
-    Gems += gems ; GemsEarned += gems ; RunRewards = rr ∪ {key} ; extra (EndlessDays += 1, Stats...)
+    Gems += gems ; GemsEarned += gems ; RunRewards = rr ∪ {key}, rr.Gems += gems ; extra (EndlessDays += 1, Stats...)
   RequestSave(member)
   Notice{gems_gained, gems} ao jogador
 ```
+
+`RunRewards.Gems` (v5.1, T59, Provisório) só existe para o `RunReport` (`network.md` §13.1): no `RunEnded` o passo
+do `RewardService` (`RoundService:AddRunReportStep`, `architecture.md` §19.11) copia `rr.Gems` para `report.Gems` se
+`rr.RunId` é a run atual (senão 0). Como mora no perfil e muda no mesmo `batch` do crédito, sobrevive a noite
+repetida, `ResetDev` (mesmo `RunId`, nada é pago de novo), reconexão e retomada em outro servidor. Ninguém além do
+`RewardService` escreve; o Round nunca lê o perfil.
 
 Perfil ainda carregando (trava de sessão, R4) no instante do evento: o crédito espera até 10 s pelo `Loaded`; depois
 disso, perde o evento (é "não estava presente"). Registrar em log.
@@ -211,7 +220,7 @@ type Run = {
 | `KitchenService` | estoque, estações (vagas da grelha, trilho, vagas da tábua) | estoque sim (`Amount` por ingrediente; `Capacity` e `Blocked` são derivados de Cooler/Day/veículo e **não** entram); estações vazias | turno recomeça com grelha, trilho e tábua vazios |
 | `UpgradeService` | Level **por veículo** por upgrade (DEC-184) | sim, os dois veículos | o set `Upgrades` mostra só o veículo atual; o snapshot guarda os dois |
 | `VehicleService` | Vehicle, troca agendada | Vehicle sim | troca do fim de turno já aplicada antes da captura |
-| `ItemService` | Tools de cada membro (com `Count` e `Toppings`), itens no chão | Tools sim (no stash do membro, com o extra); itens no chão **não** | |
+| `ItemService` | Tools de cada membro (com `Count` e `Toppings`), itens no chão, pacote grátis | Tools sim (no stash do membro, com o extra); itens no chão **não**; pacote grátis sim (`Fp`, §5.3) | |
 | `MarketService` | oferta da vaga especial, `Left` | **sim** (só a chave do item sorteado; `Left` volta ao valor de início de turno) | FEAT-035: noite repetida e retomada não sorteiam de novo. `Counters` da run ficam no `RunStateService` |
 | `VitalService` | sanidade, estado de vida, `RevivesTonight` | estado de vida sim (no `Member`); sanidade não (início de noite da classe, DEC-056/069); `RevivesTonight` não (é 0 em toda captura) | |
 | `CustomerService`, `ThiefService`, `NpcService`, `TrafficService`, `AmbulanceService` | entidades vivas, fila da ambulância | não | turno recomeça vazio; na noite repetida a ambulância só faz a viagem `Dawn` (DEC-122) |
@@ -273,6 +282,8 @@ run; sobrescrito quando o jogador começa outra run. ~120 B.
 ### 3.3 `Snap` — chave `RunId` (DEC-080)
 
 > v5: as chaves e o exemplo atualizados (Tools em `T`, não em `M[uid].T`; `Fp`, `Stn`, `Lt`, `Bs`) estão no §5.3.
+> v5.1 (D-05 do `wave-1-report.md`): o exemplo abaixo é o da v4 e **não** tem `Stn` (`KitchenService`) nem `Fp`
+> (`ItemService/Pickup`), que a onda 1 já grava; o formato de cada um está no §5.3, que vale.
 
 Estado de **início do turno corrente**. Chaves curtas para caber na cota (R16). Exemplo com 2 jogadores:
 
@@ -385,7 +396,7 @@ Contrato de código: `architecture.md` §19. Nada aqui muda regra de jogo.
 | Desbloqueios | `Classes`, `SelectedClass` (DEC-186) | classe travada do membro (DEC-069) | `ClassService` |
 | Progressão | `EndlessDays`, `Achievements`, `BadgesAwarded`, `Stats` (sem XP, DEC-081) | Day, Night, Attempt, `Chances`, veículo, níveis de upgrade por veículo, `Endless` | `RewardService` / Round, RunState, Vehicle, Upgrade |
 | Inventário | `ReviveCredits` (DEC-117) — único "item" persistido | Tools de cada membro (snapshot `T`), estoque, oferta S1 | `ReviveService` / Item, Kitchen, Market |
-| Idempotência | `Receipts` (50), `RunRewards { RunId, Keys }` | — | `MonetizationService`, `RewardService` |
+| Idempotência | `Receipts` (50), `RunRewards { RunId, Keys, Gems }` (`Gems` = soma da run para o `RunReport`, v5.1) | — | `MonetizationService`, `RewardService` |
 
 **Template continua `Version = 1`** (§1.1): as ondas 2–4 só **leem e escrevem** campos que já existem. Nada novo
 persiste por sanidade, luz, anomalia, chefe, ladrão, trânsito ou passantes (estado vivo do turno).
@@ -426,9 +437,9 @@ Estado por jogador que **não** está no `Member` (dono guarda por `UserId`, sob
 | `Sh` | Round | `{ D, N, Ni, A }` | 1 | `A + 1`, captura nova | fase `Resume`, captura nova |
 | `Cash` | Economy | número | 1 | igual | igual |
 | `T` | Item | `{ [uid] = { { item, count, extra? } } }` | 2 (ajuste A3 + W2-G) | igual | igual |
-| `Fp` | Item | `{ G = pacotes já pegos, L = pacotes no mundo }` (pacote grátis, TASK-046) | 1 | igual | igual |
+| `Fp` | Item (`Pickup.luau`) | `{ G = { ingrediente }, L = { ingrediente } }`: listas ordenadas de chaves de `Content.Ingredients` (não de pacote). `G` = ingredientes cujo pacote grátis já foi posto no mundo (nunca de novo); `L` = pacotes ainda no mundo na captura (pacote grátis, TASK-046; v5.1, D-05) | 1 | igual: remove os do mundo, marca `G`, recoloca `L` no veículo atual (`L` também conta como dado) | igual |
 | `Stk` | Kitchen | `Amount` por ingrediente | 1 | igual | igual |
-| `Stn` | Kitchen | estado por estação (chave estável `StableKey`) | 1 | igual | igual |
+| `Stn` | Kitchen | `{ [StableKey] = dado do módulo }`; `StableKey` = `"<veículo>/<kind>"` (+ `"/2"`, `"/3"` se o kind repete no veículo). Só entra estação cujo `Capture` devolve não-`nil`: na onda 1 nenhuma (grelha, trilho, tábua, caixa de pão, tigelas e lixeira devolvem `nil`) → `{}`. Restore chama `Restore(ctx, station, saved[key])` em **toda** estação (com `nil` = começa vazia) e republica o set (v5.1, D-05) | 1 | igual | igual |
 | `Upg` | Upgrade | níveis por veículo (DEC-184) | 1 | igual | igual |
 | `Veh` | Vehicle | chave do veículo atual | 2 | igual (posições + `SetVehicle`) | igual |
 | `Lt` | Light | `{ S = interruptor }` | 2 | ligado (FEAT-020) | igual |
@@ -449,7 +460,7 @@ Exemplo (2 jogadores, Night 2, ~1,1 KB em JSON):
 	Sh = { D = 7, N = 2, Ni = true, A = 0 },
 	Cash = 412,
 	T = { ["111"] = { { "pack_sausages", 4 }, { "coffee", 1 }, { "hot_dog", 1, "ketchup,cheese" } }, ["222"] = {} },
-	Fp = { G = { "pack_cheese", "pack_bacon", "pack_potato_sticks" }, L = {} },
+	Fp = { G = { "bacon", "cheese", "potato_sticks" }, L = {} },  -- chaves de ingrediente (v5.1)
 	Stk = { bun = 18, sausage = 20, ketchup = 41, mustard = 30, cheese = 12, bacon = 9, potato_sticks = 15, cream_cheese = 6, coffee = 22 },
 	Stn = {},
 	Upg = { cart = { grill = 2, cooler = 1, counter = 2, cash_drawer_lock = 1, trailer_lights = 0 },
@@ -474,7 +485,10 @@ Tamanho: `Bs` cresce até ~40 chaves curtas (~0,6 KB no fim da run); total ≤ 2
 | Formato do snapshot | `V += 1` + conversão `V − 1 → V` no `RunStateService` (aceita a anterior); mais antigo → "That shift can't be resumed." (R19) |
 | MemoryStore `Runs`/`PlayerRun` | campo `V` próprio; mesma regra |
 
-Nenhuma migração é necessária nas ondas 2–4 com este contrato.
+Nenhuma migração é necessária nas ondas 2–4 com este contrato. v5.1: `RunRewards.Gems` é campo **novo aninhado**; o
+`Reconcile` do ProfileStore completa tabelas aninhadas, então perfil antigo carrega com `Gems = 0` sem bump de
+`Version`. A linha entra no `Template.luau` junto com o `RewardService` (TASK-074, uma linha no Template e no tipo
+`RunRewards`).
 
 ### 5.5 MemoryStore (onda 4)
 

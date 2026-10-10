@@ -9,6 +9,9 @@ alinhada à **DEC-133** — PARE na Juniper, reserva de faixa para NPC — fecha
 `e7ee154`): run completa, noite, sanidade, luz, café, chefe, ladrão, gemas, anomalias, esconder, cutscenes, trânsito,
 passantes, ambulância/reviver, lobby/sessão, animação e áudio; pontos de extensão dos Services da onda 1; ondas
 sugeridas; T42–T58. Onde §2–§13 divergem do §19, **vale o §19**.
+**Versão 4.1, 2026-10-10 (TASK-049):** divergências da onda 1 fechadas no texto (`wave-1-report.md` D-01, D-07;
+§19.26 A5 conferido); `Gems` da run no `RunReport` por passo registrado no `RoundService` (T59); dono do `discard`
+na lixeira de rua = `KitchenService` (T60, DEC-200). Ver §0.-3.
 Base: `README.md` (raiz, Modux V3), `CLAUDE.md`, `docs/vision.md`, `docs/decisions.md` (DEC-001 a DEC-130),
 `docs/open-questions.md`, `design/proposals-round-1.md` e `proposals-round-2.md` (Aprovados), `story/anomalies.md`
 (Aprovado), `art/style-guide.md` (Aprovado, DEC-126), `levels/MAP-01.md` (Rascunho, revisão 3: rotas e entradas),
@@ -32,6 +35,18 @@ que level-designer, modeler-3d e coders seguem na onda 1.
 ---
 
 ## 0. O que mudou
+
+### 0.-3 Versão 4.1 (TASK-049, 2026-10-10)
+
+Só documento; nenhum contrato de código da onda 1 muda. Tudo **Provisório** (DEC-193; T59 e T60 decididas pelo
+architect por delegação da DEC-208: técnica, sem regra de jogo nova).
+
+| # | Antes | Agora | Onde |
+|---|---|---|---|
+| D-01 / A5 | §4.1 com `ShiftEnded(info, report)`; §3.1 com `RoundService` requerendo `VitalService` | conferido contra o código (`RoundService.luau`, `EconomyService/init.luau`): `ShiftEnded(info)` + `EconomyService.Reported(info, report)`; Round **não** requer Vital. Corrigido no próprio §3.1 e §4.1 (antes só havia nota apontando para o §19) | §3.1, §4.1 |
+| D-07 | `UpgradeController` no mapa de features (§2.3) e no boot do client (§3.2) | **não existe**: a peça de upgrade é alternada pelo servidor por visibilidade (`UpgradeService/Pieces.luau`, T38), que replica como instância; o client só lê o set `Upgrades` no `MarketController` | §2.3, §3.2; `network.md` §3.7 |
+| §19 aberto | `RunReport.Gems` sem caminho (o `RewardService`, 550, requer o `RoundService`, 750; o contrário seria ciclo) | `RoundService:AddRunReportStep(name, fn)`: o `RewardService` registra no `OnInit` um passo que preenche `report.Gems` a partir de `RunRewards.Gems` do perfil (T59) | §19.3, §19.4, §19.11, §19.16; `network.md` §13.1; `data.md` §1.1, §1.3 |
+| §19 aberto | lixeira de rua (DEC-200) sem dono de código | `discard` continua com **um** dono, o `KitchenService` (TASK-057): âncora `Prompt_Discard` dentro de `Model` com tag `StreetBin`, fora de `Station` e de `Vehicle` (T60) | §19.3, §19.5, §19.22, §19.25 |
 
 ### 0.-2 Versão 4.0 (pós onda 1, 2026-10-10)
 
@@ -182,7 +197,7 @@ Legenda: **E** = existe e será estendido; **N** = novo. Place: L, R, L+R.
 | `Character` (N) | `CharacterService` | `CharacterController` | spawn controlado (`LoadCharacter`), grupo de colisão, **ragdoll R6 só no atropelamento** (juntas pré-montadas), **desmaio por animação** (sanidade 0), "atordoado até", controles desligados em cutscene |
 | `Kitchen` (N) | `KitchenService` + módulos `Stations/*.luau` (§18.12) | `KitchenController` + visuais | estoque, estações, montagem, restock |
 | `Market` (N) | `MarketService` (prateleiras e vagas da bancada são âncoras `Interactable`, §18.4) | `MarketController` | prateleiras (pacotes), **bancada** (upgrades básicos sempre à venda + **1 vaga especial** sorteada por turno, DEC-106). O Food Trailer **não** passa aqui (DEC-107) |
-| `Upgrade` (N) | `UpgradeService` | `UpgradeController` | nível por upgrade, efeito, peça visível; **compra delegada pela bancada** |
+| `Upgrade` (N) | `UpgradeService` (+ `Pieces.luau`) | — (v4.1, D-07: sem controller; a peça visível é alternada pelo servidor, T38, e o nível chega ao client pelo set `Upgrades`, lido no `MarketController`) | nível por upgrade, efeito, peça visível; **compra delegada pela bancada** |
 | `Vehicle` (N) | `VehicleService` | — | carrinho → trailer; **prompt de compra no próprio trailer** no estacionamento a partir do dia 5 (DEC-107, FEAT-016), preço × `PriceParty`; troca no fim do turno |
 | `Npc` (N) | `NpcService` + `Walker` | `NpcController` | pool R6, teto de 12, rotas por grafo, LOD; nó de faixa pede reserva ao `TrafficService` (DEC-133, §8.1) |
 | `Traffic` (N) | `TrafficService` | `TrafficController` | carros (set) com cinemática 1D e paradas (PARE, faixa reservada), reserva da caixa `X-T` e das faixas para NPC, validação de atropelamento (§8). Sem semáforo (DEC-130); paradas por DEC-133 |
@@ -238,7 +253,7 @@ Quem usa estado de outro no próprio `OnInit` precisa de prioridade menor. `effe
 | 790 | `MonetizationService` | ProfileService, PlaceService | L+R | `ProcessReceipt` no `OnStart`; handlers registrados por outros no `OnInit` (prioridade menor) |
 | 780 | `SessionService` | PlaceService, PlayerService, NetService | L+R | MemoryStore, TeleportService |
 | 760 | `RunStateService` | PlaceService, SessionService, PlayerService, ProfileService, NetService | R | roster, membros, registro de snapshot |
-| 750 | `RoundService` | NetService, RunStateService, VitalService | R | sinais de fase criados no `Setup` |
+| 750 | `RoundService` | PlaceService, NetService, RunStateService, InteractionService (v4.1, A5: **sem** `VitalService`; o Vital entra por probe, §19.2, T42) | R | sinais de fase criados no `Setup` |
 | 740 | `EconomyService` | RunStateService, RoundService, NetService | R | |
 | 730 | `InteractionService` | PlayerService, RunStateService, NetService | R | |
 | 720 | `ItemService` | PlayerService, RunStateService, InteractionService | R | stash, item derrubado |
@@ -282,7 +297,7 @@ reviver vira crédito (§10.2). `ReviveService` portanto é L+R no registro do h
 | 720 | `CharacterController` | ragdoll previsto localmente, controles |
 | 700 | `PromptController` | |
 | 690 | `CameraController` | 1ª pessoa, spectate, cutscene |
-| 680 | `ItemController`, `KitchenController`, `CustomerController`, `NpcController`, `UpgradeController`, `MarketController`, `TrafficController` | |
+| 680 | `ItemController`, `KitchenController`, `CustomerController`, `NpcController`, `MarketController`, `TrafficController` | v4.1 (D-07): sem `UpgradeController` |
 | 670 | `AmbulanceController`, `ReviveController` | |
 | 660 | `AnomalyController`, `BossController`, `CutsceneController` | |
 | 650 | `PartyController`, `ClassController` | L |
@@ -328,7 +343,8 @@ Regras:
 | Sinal | Dono | Quando | Quem escuta |
 |---|---|---|---|
 | `PhaseChanged(phase, day, night)` | RoundService | troca de fase | Customer, Thief, Anomaly, Boss, Cutscene, Kitchen, Traffic, Market |
-| `ShiftStarted(info)` / `ShiftEnded(info, report)` | RoundService | início/fim de turno | Economy, Reward, Vital, Market (nova oferta), RunState (snapshot) |
+| `ShiftStarted(info)` / `ShiftEnded(info)` | RoundService | início/fim de turno | Economy, Reward, Vital, Market (nova oferta), RunState (snapshot) |
+| `Reported(info, report)` | EconomyService | `ShiftReport` montado e enviado (dentro do `Deposit`, no `ShiftEnded`) | quem precisa do relatório pronto. v4.1 (D-01): o relatório **não** viaja no `ShiftEnded`; campos de outras features entram antes do envio por `AddReportStep` (T48) |
 | `NightLost(reason)` | RoundService | regra crítica ou janela de 10 s esgotada | RunState (restaura com todos `Active` ou encerra a run se `Chances = 0`, §7), Ambulance (viagem `Dawn`), Boss |
 | `MemberStateChanged(uid, old, new)` | VitalService | Active/Down/Reviving/Spectator/Away | Round ("todos caídos"), Ambulance, Revive, Camera (via set), Reward |
 | `Wipe(started: boolean, endsAt)` | VitalService | último de pé caiu / janela fechou | Round, Revive, Hud (via set) |
@@ -1575,13 +1591,13 @@ O que existe hoje (código) e o que muda. "Ajuste A#" = task pequena no início 
 
 | Service | Hoje (onda 1) | Muda para | Quem |
 |---|---|---|---|
-| `RoundService` | arquivo único; `Phase` = Prep/Open/Closing/Summary; `NEXT` fixo; `Info()` com `Night = 0`; `Record().Vehicle = RunParams.StartVehicle`; `RestoreShift(data)` ignora `mode`; sinais `PhaseChanged`, `ShiftStarted(info)`, `ShiftEnded(info)`; `SetCounterProbe` | pasta com `Flow.luau`; FSM completa (§19.4). **`ShiftEnded(info)` fica com essa assinatura**: o relatório sai por `EconomyService.Reported(info, report)`, não por `ShiftEnded(info, report)` como dizia o §4.1. + `BeforeShift`, `NightResolved`, `RunEnded`, `LoseNight`, `SetPhaseProbe`, `SetVehicleProbe`, `SetVerdict`, `SetWipe`, `IsSelling`, `NightEndsAt` | W2 Round |
+| `RoundService` | arquivo único; `Phase` = Prep/Open/Closing/Summary; `NEXT` fixo; `Info()` com `Night = 0`; `Record().Vehicle = RunParams.StartVehicle`; `RestoreShift(data)` ignora `mode`; sinais `PhaseChanged`, `ShiftStarted(info)`, `ShiftEnded(info)`; `SetCounterProbe` | pasta com `Flow.luau`; FSM completa (§19.4). **`ShiftEnded(info)` fica com essa assinatura**: o relatório sai por `EconomyService.Reported(info, report)`, não por `ShiftEnded(info, report)` como dizia o §4.1. + `BeforeShift`, `NightResolved`, `RunEnded`, `LoseNight`, `SetPhaseProbe`, `SetVehicleProbe`, `SetVerdict`, `SetWipe`, `IsSelling`, `NightEndsAt`, `AddRunReportStep` (v4.1, T59) | W2 Round |
 | `EconomyService` | `Deposit` monta e dispara `ShiftReport` com `Gems = 0`, `AfkLocked = false`, `LastChanceUsed = false`; `SHOP_PHASES` fixo; sinal `Reported(info, report)` | `AddReportStep(name, fn(info, report))` (na ordem de registro, **antes** do envio; T48); `IsShopOpen()` = `Content.Shift.ByKey[phase].Selling`; `Steal(amount): number` (ledger `Stolen`); `DrawerKind` + `"Catch"` | ajuste A1 |
 | `InteractionService` | gate de taxa + personagem vivo | `AddGate(name, fn(player, action, anchor) -> (boolean, string?))`: todas passam ou recusa com o motivo (Down, Spectator, escondido, atropelado, cutscene); sinal `Performed(player, action, anchor, id)` depois do `Run` (T49) | ajuste A2 |
 | `RunStateService` | `Member` com `Sanity`, `CoffeeReadyAt`, `SeenAnomalies`, `RevivesTonight` sem uso; snapshot `M[uid].T` (stash); sem API de vida/chances | + `SetLifeState(userId, state)` (só `VitalService`), `SetStash(userId, entries)` (só `ItemService`), `SpendChance(): boolean`, `SetEndless(on)`, `ResetDev()` (volta à 1ª captura em modo `Resume`, `Chances = RunParams.Chances`); sinal `LifeChanged(userId, old, new)`; `M` perde `T` (T50); os 4 campos sem uso saem do `Member` (cada dono guarda por `UserId`) | ajuste A3 |
 | `ItemService` | sem stash (quem sai perde as Tools); `CurrentVehicle()` = `StartVehicle`; `Pickup.luau` (pacote grátis) | `Stash/Unstash`, snapshot `T`, `Drops.luau` (FEAT-036), `RegisterUse(item, handler)` (T51), ação `give_coffee`; `CurrentVehicle()` = `VehicleService:Current()` | W2 Item |
 | `CharacterService` | spawn em `PS-<seat>`; `LookPack = "Day"` fixo; Animate R6 padrão do `LoadCharacter` | `SpawnPointFor(player, info)` (PS / PS-N / REV); `SetLookPack(player, pack)`; não spawna `Down`/`Spectator`/`Away`; `Faint`, `RemoveBody`, `Freeze(player, reason, on)`; âncora de runtime `Prompt_Give` no HRP; ids de locomoção de `Content.Animations` no `Animate` (§19.20); `Knock` + juntas de ragdoll (onda 3) | W2 Vital (+W3 Traffic) |
-| `KitchenService` | veículo por `UpgradeService:GetVehicle()`; estação de veículo não atual já recusa (`IsCurrent`) | `VehicleService.Swapped` (no `OnStart`) → `Capacity`/`Blocked`/prompts; módulo `CoffeeMachine.luau`; onda 3: `Alter(kind, slot)`, campo `Altered` no set, sinal `Discarded(player, item, altered)`, `StationApi.Context.Emit` | W2 Vehicle, W2 Coffee, W3 Anomaly |
+| `KitchenService` | veículo por `UpgradeService:GetVehicle()`; estação de veículo não atual já recusa (`IsCurrent`) | `VehicleService.Swapped` (no `OnStart`) → `Capacity`/`Blocked`/prompts; módulo `CoffeeMachine.luau`; `discard` também na lixeira de rua (v4.1, T60: âncora fora de `Station`, dentro de `StreetBin`; TASK-057); onda 3: `Alter(kind, slot)`, campo `Altered` no set, sinal `Discarded(player, item, altered)`, `StationApi.Context.Emit` | W2 Vehicle, W2 Coffee, W3 Anomaly |
 | `UpgradeService` | `Vehicle` atom + `SetVehicle(v)` prontos (DEC-184) | sem mudança; chamado pelo `VehicleService` | — |
 | `CustomerService` | spawn só em `Open`; `Party` lido no `Open`; sinais `Joined`, `Fronted`, `Left`, `Removed` | spawn em fase `Selling` (Open, Night) com `Flow` de noite; sinal `Acted(id, action, player, result)`; `AddServeRule(fn(customer, tool, player) -> SaleResult?)`; `SpawnActor(spec)` (onda 3) | ajuste A4 / W3 |
 | `NpcService` | só clientes; `SpawnRequest` sem papel | `SpawnRequest.Role = "Customer" \| "Thief" \| "Actor"` (+ `Variant`); `raccoon`/`thief` só com `Role = "Thief"`; `SetTension(on)` (pack Night de clima, `Q-159`); reserva de faixa no `Walker` (onda 3, §8.1) | W2 Thief, W3 |
@@ -1655,6 +1671,7 @@ RoundService:SetVehicleProbe(probe: () -> string)               -- VehicleServic
 RoundService:SetVerdict(probe: () -> boolean)                   -- VitalService
 RoundService:SetWipe(endsAt: number, frozen: boolean)           -- VitalService (Shift.WipeEndsAt/WipeFrozen)
 RoundService:LoseNight(reason: "wipe" | "critical")             -- VitalService, AnomalyService
+RoundService:AddRunReportStep(name: string, step: (player: Player, report: RunReport) -> ())  -- v4.1, T59: RewardService (Gems)
 -- sinais (Setup)
 PhaseChanged(phase, day, night) ; ShiftStarted(info) ; ShiftEnded(info)          -- existentes, mesma assinatura
 BeforeShift(prev: ShiftInfo)
@@ -1682,6 +1699,20 @@ restore `RepeatNight` → `A + 1` e captura nova; `Resume` → fase `Resume` e c
 | Snapshot | `Veh` = chave do veículo atual (data.md §3.3). Restore: posições + `UpgradeService:SetVehicle` + `Bought = (Veh ~= StartVehicle)` |
 | API | `Current(): string`, `IsBought(): boolean`, `Price(): number`; sinais `Bought(player)`, `Swapped(from, to)` |
 | Client | `VehicleController`: placa "Available on Day 5" (`SIGN-T`), fade do `Transition`, nada de estado próprio (lê `Shift.Vehicle`) |
+
+**Lixeira de rua (v4.1, T60; DEC-200; TASK-057; Provisório).** Fica aqui porque a TASK-057 é a mesma que reage ao
+`Swapped`. O verbo `discard` tem **um** dono, o `KitchenService` (`InteractionService:RegisterAction` recusa chave
+repetida; feature nova para a lixeira seria segundo dono do mesmo verbo).
+
+| Item | Contrato |
+|---|---|
+| Binding | `Model` AST-034 interativo com tag `StreetBin` (§19.22), âncora `Prompt_Discard` com `PromptAction = "discard"`; sem `Station`, sem `Vehicle` |
+| Descoberta | `KitchenService` indexa `StreetBin` no `OnStart` (como as estações) e liga o prompt pelo padrão do `InteractionService:Track` |
+| `Evaluate` | âncora sem `StationOf` e com ancestral `StreetBin` → ramo de rua: membro ativo, `Requires` da linha `discard` (`Held`, `Phase`, `Night`) e a mesma regra de mão do `Trash.luau` (função exportada do módulo, sem duplicar); **não** passa por `IsCurrent` (não é do veículo) nem por trava de estação |
+| Efeito | igual ao BIN-C: `Consume` da Tool, sem reembolso, sem registro em `Stations`, nada no snapshot |
+| O que aceita | `Q-166` a, recomendação Provisória do board: **só HotDog** (igual ao BIN-C na onda 1). Se o game-designer ampliar, muda só a regra de mão no `Trash.luau` |
+| Onda 3 | o sinal `Discarded(player, item, altered)` sai igual nos dois lugares (+ campo `Where = "Vehicle" \| "Street"`); se descarte de item alterado na rua conta para a anomalia é regra do game-designer (`Q-166` e). A lixeira nunca vira âncora de anomalia sem DEC |
+| Rede | nada novo: `Interact` já leva `discard`; texto "Throw Away" vem de `Content.Actions` |
 
 ### 19.6 Escuro e luz (`LightService`; FEAT-020; DEC-041, 055, 056, 189, 196)
 
@@ -1770,6 +1801,19 @@ variação), `Life.luau` (puro: transições §6.1). Estado por **`UserId`** (so
   `RunRewards` (§10.4, `data.md` §1.3).
 - O passo de relatório preenche `report.Gems` (soma creditada no turno, incluindo a da noite às 6:00) e
   `report.AfkLocked`; o passo do `RoundService` preenche `LastChanceUsed` (noite com `Chances = 0`).
+- **Gemas da run no `RunReport`** (v4.1, T59, Provisório). O `RewardService` (550) requer o `RoundService` (750);
+  o Round **não** requer o Reward (T42). Contrato:
+  - `RoundService:AddRunReportStep(name, step: (player, report) -> ())`, registrado no `OnInit` do dono (o Round já
+    criou a lista no `Setup`, prioridade maior). Passos rodam na ordem de registro, sem yield, em `pcall`: erro vira
+    `warn` e o campo fica com o padrão.
+  - No `RunEnded(result)` o Round monta, **por jogador conectado** (membro do roster com `Ready`),
+    `report = { Result, Day, Night, Gems = 0 }`, roda os passos e manda o packet `RunReport` só a ele.
+  - Passo do `RewardService`: `report.Gems = rr.Gems` se `rr = profile.RunRewards()` tem `rr.RunId == RunId`; senão 0
+    (sem perfil carregado também 0). `RunRewards.Gems` soma no mesmo `batch` de cada `Credit` (`data.md` §1.3), então
+    sobrevive a noite repetida, reconexão e retomada em outro servidor (onda 4) sem estado novo na run.
+  - Ordem garantida: o último crédito possível (`finale`, `N10:night`) acontece no `NightResolved("Won")`, antes do
+    `Finale`; na derrota não há crédito no `NightLost`. O `RunEnded` nunca corre antes do crédito do turno.
+  - Sem `RewardService` (antes da TASK-074) a run termina com `Gems = 0` (fase sem dono não quebra, §19.0 regra 4).
 - Toasts: `Notice gems_gained` (jogador), `afk_no_gems` (party), `achievement` (jogador; achievement secreto, DEC-058).
 - Badge: `BadgeService:AwardBadge` com retry; `BadgesAwarded`. No lobby (onda 4) o `RewardService` também roda o retry
   no `Loaded` (L+R só nessa parte).
@@ -1892,7 +1936,7 @@ em Night da faixa baixa já é do `RigController` (DEC-168/169), não daqui.
 | Voto | packet `SkipVote`; `Needed = ceil(0,5 × participantes conectados)` (DEC-194; espectador vota, Provisório); recalcula ao sair; voto vale para o segmento atual |
 | Atores | Walt (tartaruga, bastão, barba, DEC-202), Raincoat Lady (sapo, DEC-203), panfleto: locais ao client (`CutsceneController`), animados pelo `AnimController` |
 | Câmera | `CameraController` modo `Cutscene`: POV da própria cabeça, olhar livre ±60° |
-| Fim de run | packet `RunReport` (`network.md` §13.1), enviado pelo `RoundService` no `RunEnded` (já na onda 2, derrota); tela "You Kept the Light On" / derrota no `HudController` (15 s) |
+| Fim de run | packet `RunReport` (`network.md` §13.1), enviado pelo `RoundService` no `RunEnded` (já na onda 2, derrota); `Gems` preenchido pelo passo do `RewardService` (`AddRunReportStep`, §19.11, T59); tela "You Kept the Light On" / derrota no `HudController` (15 s) |
 
 ### 19.17 Trânsito, atropelamento e passantes (FEAT-033, 036; DEC-087, 095, 103, 130, 133, 183, 197, 198)
 
@@ -1973,7 +2017,7 @@ Passantes (DEC-183; T46, Provisório até `Q-162` a):
 | 2 | Lona | `Model` com tag `VehicleCover` (AST-043, DEC-199), escondida até a troca (visibilidade, T38) |
 | 2 | Luz | `LightZone` LZ-1..5 (`ZoneId`, `Group`); `StreetLight` JL-01..09 + P-01 (`PostId`, `Group`, `Order`); `Prompt_Switch` → `switch_light` |
 | 2 | Pontos | `PS-N1..4`, `REV-1..4`, `TRL`, `TRL-SALE`, `CART`, `SPEC-P`, `SPEC-M`, **`DROP-T`** (novo: balcão do trailer para os itens do espectador, FEAT-025; o level-designer registra no MAP-01), `L1..L3`, `ST-R` (+ nós de grafo até as espreitas, `MAP-01` §9.2) |
-| 2 | Lixeiras de rua | `Prompt_Discard` → `discard` (DEC-200; o que aceita: `Q-166`) |
+| 2 | Lixeiras de rua | `Model` da lixeira AST-034 interativa com tag **`StreetBin`** (v4.1, T60; fora de qualquer `Station` e de `Vehicle`), âncora `Prompt_Discard` (`Interactable`, `PromptAction = "discard"`). Dono do verbo: `KitchenService` (TASK-057). Quantas e onde: `Q-166` b; **não** entram em `Required.Wave2` (número aberto) — a checagem só avisa `StreetBin` sem âncora (DEC-200; o que aceita: `Q-166`) |
 | 3 | Esconder | `H1..H4` `Interactable` `hide` + `Slot`; `SS` (`MapPoint`) |
 | 3 | Anomalias | `AN-04`, `AN-05`, `AN-11`, `AN-12`, `AS-1..4` (`MapPoint`); janelas `WV-1..3` (tag `AnomalyAnchor`, `AnchorId`) |
 | 3 | Cutscene | `CutsceneMark1..4`, `CS-*` (`MapPoint`) |
@@ -2080,6 +2124,8 @@ podem subir para a onda 3** sem conflito de arquivo (só `RunStateService/` com 
 | T56 | `RunEnd` em modo dev volta à 1ª captura (`ResetDev`) até o lobby existir | servidor parado no `RunEnd` |
 | T57 | `StreamingEnabled = false` no place Run (DEC-209: mapa sempre carregado; não há decoração distante listada) | ligado com `Persistent` em tudo (mesmo resultado, mais regra) |
 | T58 | `Transition` (packet) para o fade da troca de veículo; a sequência da noite perdida sai da fase `NightLost` (`PhaseStartedAt`), sem packet | fase nova no `Shift` só para o fade |
+| T59 | (v4.1) `RunReport.Gems` por passo registrado: `RoundService:AddRunReportStep`; o `RewardService` lê `RunRewards.Gems` do perfil (soma gravada no mesmo `batch` do crédito) | `Require` Round → Reward (ciclo); Round somando gemas (dois donos de gema); total só em memória do Reward (perde na retomada em outro servidor, onda 4); recalcular a partir de `RunRewards.Keys` (depende de a tabela não mudar entre sessões) |
+| T60 | (v4.1) `discard` com dono único `KitchenService` também na lixeira de rua: âncora sem `Station`, dentro de `Model` `StreetBin`; ramo próprio no `Evaluate` (pula `IsCurrent`), mesma regra de mão do `Trash.luau` | dono novo (`RegisterAction` recusa chave repetida; dois donos do mesmo verbo); estação `trash` falsa fora do veículo (entraria em `Stn`, troca de veículo e `IsCurrent`) |
 
 ### 19.26 Divergências com a onda 1 (tasks de ajuste)
 
@@ -2089,7 +2135,7 @@ podem subir para a onda 3** sem conflito de arquivo (só `RunStateService/` com 
 | A2 | `InteractionService` não conhece estado de vida/esconder; não avisa ação concluída | `AddGate`, sinal `Performed` | W2-E, W2-I, W3-B |
 | A3 | `RunStateService`: sem `SetLifeState`/`SetStash`/`SpendChance`/`SetEndless`/`ResetDev`; `M.T` no snapshot; campos mortos no `Member` | API nova, `T` sai do `M`, `Member` enxuto | W2-B, W2-E, W2-G |
 | A4 | `CustomerService` só vende em `Open`; sem `Acted` | spawn em `Selling` (noite), `Flow` noturno, sinal `Acted` | W2-B (noite jogável), W3-A |
-| A5 | `architecture.md` §4.1 dizia `ShiftEnded(info, report)`; §3.1 dizia Round requer Vital | doc corrigido aqui (§19.3, §19.2); código não muda | — |
+| A5 | `architecture.md` §4.1 dizia `ShiftEnded(info, report)`; §3.1 dizia Round requer Vital | doc corrigido aqui (§19.3, §19.2); código não muda. **v4.1 (TASK-049): conferido** no código e corrigido também no §3.1 e no §4.1 | — |
 | A6 | `ItemService.CurrentVehicle()`, `RoundService.Record().Vehicle` e `MapIndex/Required.luau` usam `RunParams.StartVehicle` | trocar por `VehicleService:Current()` / probe; `Required` por onda | W2-C, W2-G |
 | A7 | `Actions`: `brew_coffee` e `give_coffee` com hold 0 (FEAT-021 diz 1 e 0,5); faltam `answer_phone`, `get_up` | tabela (W2-0) | W2-H, W2-I |
 | A8 | `CharacterService` usa só o `Animate` padrão; `OpalController` com id de idle fixo no código | ids em `Content.Animations` | W2-M |

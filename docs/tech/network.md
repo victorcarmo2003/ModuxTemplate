@@ -5,6 +5,8 @@ Status: Rascunho
 Autor: architect. **Versão 5, 2026-10-10 (pós onda 1):** §13 novo — entradas das ondas 2–4 com schema, quem escreve,
 quem lê, frequência e por quê; remoção do legado `Vitals`/`Round`; `Lights`, `Call`, `Thief`, `Hides`,
 `Anomalies`, `Pedestrians`, `Transition`, `RunReport` novos (contrato de código em `architecture.md` §19).
+**Versão 5.1, 2026-10-10 (TASK-049):** divergências da onda 1 fechadas (`wave-1-report.md` D-06, D-07); origem de
+`RunReport.Gems` (T59); lixeira de rua sem entrada nova (T60). Ver §0.-2.
 Versão 4, 2026-10-10 (**TASK-001**: estado DEC-140 a DEC-201, núcleo da onda 1). Versão anterior: 3.1, 2026-10-08.
 Tudo aqui vira entrada em `src/Libs/Net/init.luau` (um `Lync.define("game", {...})`, requerido pelos dois lados).
 Mudança neste arquivo passa pelo architect (`PIPELINE.md`, ponto de conflito). Arquitetura: `architecture.md`.
@@ -17,6 +19,15 @@ Tabelas que geram os enums: `content-data.md`. Dados persistidos: `data.md`.
 ---
 
 ## 0. O que mudou
+
+### 0.-2 Versão 5.1 (TASK-049; só documento, `init.luau` não muda)
+
+| Ponto | Antes | Agora | Onde |
+|---|---|---|---|
+| D-06 | §11 item 3: `pick_up_item` "sem prompt ativo" na onda 1 | ativo desde a TASK-046 com prompt **"Take"** (toque, raio 7), só no pacote grátis (como o §7 e o código já diziam); `bench_buy_item` segue sem prompt até a onda 4 | §11 |
+| D-07 | §3.7: `UpgradeController` lê `Upgrades` | **não existe**; único leitor é o `MarketController`. A peça visível é do servidor (`UpgradeService/Pieces.luau`, visibilidade, T38) e replica como instância | §3.7, §7 |
+| `RunReport.Gems` | sem origem definida | passo do `RewardService` registrado em `RoundService:AddRunReportStep` (T59, `architecture.md` §19.11); valor = `RunRewards.Gems` do perfil (`data.md` §1.3). Schema igual | §13.0, §13.1 |
+| Lixeira de rua (DEC-200) | — | **sem entrada nova**: `Interact` com `Action = discard` numa âncora `StreetBin`; dono `KitchenService` (T60, `architecture.md` §19.5) | §13.0 |
 
 ### 0.-1 Versão 5 (pós onda 1; contratos das ondas 2–4)
 
@@ -275,7 +286,7 @@ Upgrades = Lync.replicate(Lync.struct({ Level = Lync.int(0, 9) }))
 | | |
 |---|---|
 | Escreve | `UpgradeService` |
-| Lê | `MarketController` (bancada B1–B5: nível atual, próximo preço, "Maxed", "Trailer only"); `UpgradeController` (peça visível no veículo, DEC-052) |
+| Lê | `MarketController` (bancada B1–B5: nível atual, próximo preço, "Maxed", "Trailer only"). v5.1 (D-07): **não** há `UpgradeController`; a peça visível no veículo (DEC-052) é alternada pelo servidor (`UpgradeService/Pieces.luau`, T38) e chega ao client como instância, sem leitura do set |
 | Frequência | por compra; na troca de veículo, todos os registros de uma vez (num `batch`) |
 | Nível por veículo (**DEC-184**) | o servidor guarda `Levels[vehicle][upgrade]`; o set mostra **só o veículo atual** (`Shift.Vehicle`). Na troca carrinho → trailer, o set é reescrito com os níveis do trailer (todos 1, ou 0 nos de compra única). O client nunca precisa do nível de um veículo que não está em uso |
 | Onda 1 | só `cart`; 5 registros (UPG-001..005). `trailer_lights` existe com `Level = 0` e a bancada mostra "Trailer only" pela tabela (`Upgrades[k].Vehicles` não contém `cart`) |
@@ -562,7 +573,7 @@ Parties = Lync.replicate(Lync.struct({ ... })),    -- lobby; plataformas física
 | Aparência de personagem (pack, rosto, espécie, roupa) | atributos + vestir no client (§5) | T40 |
 | Pacote grátis do dia de liberação | **modelo de exibição** (não `Tool`, sem `Handle` tocável) sobre a estação nova, com âncora `Interactable` → `pick_up_item` (prompt "Take", toque, raio 7, `Content.Actions`); o servidor valida hotbar de 4 (DEC-174) e limite de pacotes (2, Urso 3), cheio → `Notice hands_full`/`package_limit` e o pacote fica no mundo; pego → vira a Tool `pack_*` na mão. **Provisório** (N-03 do board, L-03 do QA). Dono: TASK-046 | DEC-071 |
 | Prompts (`PromptEnabled`, `PromptText`, `PromptHold`) | atributos das peças, mantidos pelo servidor (TASK-011; nomes no binding da TASK-002) | prompt é do mundo |
-| Peças de upgrade, troca de veículo | instâncias no `Workspace` | DEC-052 |
+| Peças de upgrade, troca de veículo | instâncias no `Workspace`; peça alternada **pelo servidor** por visibilidade (T38), sem controller no client (v5.1, D-07) | DEC-052 |
 | NPCs (posição, animação) | física + `Animator` no servidor (T11); passantes por `Motor6D.Transform` (DEC-183, Provisório, onda 2) | |
 | Opal | modelo e falas locais ao client (`OpalController`), zero rede | DEC-079, DEC-191 |
 | Item derrubado, ragdoll, luzes dos postes, compra em Robux, teleporte/snapshot | como na v3.1 | |
@@ -665,7 +676,7 @@ deixou notas para esta task em §18.14. Este documento **não** edita `architect
 |---|---|
 | 1. chaves de `Stations` | **adotadas**: `sausage_stock`, `grill`, `rail`, `bun_crate`, `board`, `toppings`, `trash` (+ `coffee_machine`) (`content-data.md` §3.6). Gaveta, placa, prateleiras e bancada não são estação |
 | 2. instância ↔ registro do set | **adotado**: atributo `StationId`; id do registro = `StationId × 100 + Slot` (`Slot = 0` no trilho). Tigela não tem registro (estado em `Stock`) |
-| 3. `Actions` | `board_add_topping` vira **`topping_add`**; demais iguais. `bench_buy_item` e `pick_up_item` existem na tabela desde a onda 1 (a checagem do binding recusa chave fora de `Content`), sem prompt ativo |
+| 3. `Actions` | `board_add_topping` vira **`topping_add`**; demais iguais. `bench_buy_item` e `pick_up_item` existem na tabela desde a onda 1 (a checagem do binding recusa chave fora de `Content`). v5.1 (D-06): `bench_buy_item` sem prompt ativo até a onda 4; `pick_up_item` **ativo** na onda 1 com prompt "Take" (toque, raio 7) só no pacote grátis (TASK-046, §7) |
 | 4. `Upgrades.BenchSpot` | `B1`..`B5` (`content-data.md` §3.7) |
 | 5. `Vehicles.Model` | sai; o veículo é o `Model` com tag `Vehicle` (T36) |
 | 6. `Species.Asset`, `Items.ToolModel` | `Species.Asset` = nome do animal no kit; `ToolModel` sai (a Tool do kit tem o nome da chave). Idem `Ingredients.Model` (cobertura = `Assets.Items.Toppings/<chave>`) |
@@ -711,7 +722,7 @@ validado). Uma task de contrato por onda escreve as entradas da onda em `src/Lib
 | `Call` | set | `1` | `BossService` | `BossController`, `HudController` | ~3 por ligação | 2 |
 | `Thief` | set | `1` | `ThiefService` | `ThiefController` | ~4 por ladrão | 2 |
 | `Transition` | packet s → grupo | grupo | `VehicleService` | `VehicleController` | 1 por run | 2 |
-| `RunReport` | packet s → jogador | jogador | `RoundService` | `HudController` | 1 por run | 2 |
+| `RunReport` | packet s → jogador | jogador | `RoundService` (`Gems` pelo passo do `RewardService`, T59) | `HudController` | 1 por run | 2 |
 | `Anomalies` | set | ocorrência 1..255 | `AnomalyService` | `AnomalyController`, `LightController`, `AudioController` | ≤ 2/s com Walker ativo | 3 |
 | `AnomalyCue` | packet s → grupo | grupo (DEC-204) | `AnomalyService` | `AnomalyController` | evento | 3 |
 | `Gaze` | packet c → s, `:newest(10)` | — | `CameraController` (só à noite, `Active`) | `AnomalyService` | 10 Hz | 3 |
@@ -754,7 +765,8 @@ RunReport = Lync.packet(Lync.struct({        -- s → cada jogador no RunEnded
 	Result = Lync.enum({ "Success", "Failed" }),
 	Day = Lync.int(1, 10000),
 	Night = Lync.int(0, 10),
-	Gems = Lync.int(0, 100000),               -- gemas desta run para este jogador (RunRewards)
+	Gems = Lync.int(0, 100000),               -- gemas desta run para este jogador: RunRewards.Gems do perfil, posto pelo
+	                                          -- passo do RewardService (RoundService:AddRunReportStep, T59); 0 sem Reward
 })),
 ```
 
@@ -764,6 +776,7 @@ RunReport = Lync.packet(Lync.struct({        -- s → cada jogador no RunEnded
 | `LifeEvent` packet | apresentação de um instante (desbotar, "Zzz", toast); o estado já está em `Vitals` |
 | `Transition` packet | fade de 1,5 s; quem reconecta no meio não precisa dele. A sequência da noite perdida **não** usa packet: sai de `Shift.Phase = "NightLost"` + `PhaseStartedAt` |
 | `RunReport` packet por jogador | gemas da run são por jogador (`RunRewards`); reconexão no `RunEnd` perde só a tela |
+| `Gems` vindo de passo registrado (v5.1, T59) | o `RewardService` requer o `RoundService`, nunca o contrário (T42); o total já está no perfil (`RunRewards.Gems`, gravado no crédito), então a retomada em outro servidor não zera a tela; sem campo novo no Lync nem estado novo na run |
 
 ### 13.2 `Lights` (onda 2)
 
