@@ -19,6 +19,15 @@
 --   * Street bin: anchor Prompt_Discard (discard) inside a Model tagged StreetBin, outside any Station/Vehicle. Own
 --     branch in Evaluate (no IsCurrent, no station lock), same hand rule as BIN-C (Trash.Discardable; Q-166 a
 --     Provisional: hot dog only), Consume without refund, nothing recorded.
+-- Wave 3 (TASK-109; architecture.md §19.3, §19.13; network.md §13.5; ANM-002, ITM-020; Provisional):
+--   * Alter(kind, slot?) -> boolean: one altered item on the current vehicle's "rail" (gray sausage at the front) or
+--     "board" (bitten bun, sliced). Only in phase Night; false = no room / already one / station busy (retry later).
+--     ClearAltered() removes them; it also runs by itself when the phase leaves Night (ITM-020: gone at 6:00 AM).
+--     HasAltered(kind?) reads it. Stations set field Altered (0..30) is written from Record.Altered.
+--   * A hot dog made with an altered item carries the Tool attribute Altered = true (Board.luau via Context.Give).
+--   * Discarded(player, item, altered, where) after every Throw Away that removed the Tool (BIN-C "Vehicle", street
+--     bin "Street"). Emitted(name, player, data) relays Context.Emit ("assembled"). Both fire deferred, outside the
+--     station lock, so a listener may call Alter/ClearAltered.
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -38,6 +47,10 @@ export type StockRecord = { Amount: number, Capacity: number, Blocked: boolean }
 -- What a module last asked for an anchor (restored when its vehicle becomes the current one again).
 type Wanted = { Enabled: boolean, Text: string? }
 
+-- Wave 3 (TASK-109): kinds an anomaly may alter (AnomalyService Context.Kitchen.Alter).
+export type AlterKind = "rail" | "board"
+export type DiscardWhere = "Vehicle" | "Street"
+
 const STATION_TAG = "Station"
 const VEHICLE_TAG = "Vehicle"
 const ANCHOR_TAG = "Interactable"
@@ -55,6 +68,9 @@ const AMOUNT_MAX = 999 -- Stock.Amount / Capacity wire range (network.md §3.4)
 const DURATION_MAX = 120 -- Stations.Duration wire range (network.md §3.5)
 const COUNT_MAX = 30 -- Stations.Count wire range
 const TICK_RATE = 10 -- station timers (architecture.md §18.12)
+const ALTER_PHASE = "Night" -- altered items only exist while the night is being played (ITM-020)
+const ALTER_KINDS: { [string]: boolean } = { rail = true, board = true }
+const HOT_DOG = "hot_dog"
 
 -- Package Tool item key -> package row (what a held package restocks).
 const packageByItem: { [string]: Content.Package } = {}
@@ -149,6 +165,10 @@ function KitchenService:Setup()
 	self.Warned = {} :: { [string]: boolean }
 	-- Amount of an ingredient changed (ingredient, amount). For services that react to stock (wave 2+).
 	self.StockChanged = self.Libs.Signal.new() :: SignalLib.Signal<string, number>
+	-- Wave 3 (TASK-109). Throw Away removed a Tool: (player, item key, Altered attribute, "Vehicle" | "Street").
+	self.Discarded = self.Libs.Signal.new() :: SignalLib.Signal<Player, string, boolean, DiscardWhere>
+	-- Wave 3 (TASK-109). Context.Emit of a station module: (event name, player or nil, data or nil).
+	self.Emitted = self.Libs.Signal.new() :: SignalLib.Signal<string, Player?, { [string]: any }?>
 	self.Context = self:BuildContext() :: StationApi.Context
 end
 
@@ -524,6 +544,10 @@ function KitchenService:Publish(station: StationApi.Station)
 					then math.clamp(record.Duration, 0, DURATION_MAX)
 					else 0,
 				Count = wholeNumber(record.Count, 0, COUNT_MAX),
+				-- wave 3: nil = nothing altered (keeps wave 1-2 records as they were)
+				Altered = if type(record.Altered) == "number" and record.Altered >= 1
+					then wholeNumber(record.Altered, 0, COUNT_MAX)
+					else nil,
 			}
 			if self.Published[id] ~= nil then
 				set:update(id, value)
@@ -806,7 +830,9 @@ function KitchenService:Perform(key: string, player: Player, anchor: Instance)
 		if self:CheckStreet(key, player, anchor) then
 			const tool = Trash.Discardable(self.Context, player)
 			if tool ~= nil then
+				const _, item, altered = self:DiscardTarget(player)
 				self.Dependencies.ItemService:Consume(player, tool)
+				self:ReportDiscard(player, tool, item, altered, "Street")
 			end
 		end
 		return
@@ -825,9 +851,16 @@ function KitchenService:Perform(key: string, player: Player, anchor: Instance)
 		end
 		const module = self.Modules[station.Kind]
 		const action = if module then module.Actions[key] else nil
-		if action ~= nil then
-			action.Run(self.Context, station, player, anchor)
+		if action == nil then
+			return
 		end
+		if key ~= DISCARD then
+			action.Run(self.Context, station, player, anchor)
+			return
+		end
+		const tool, item, altered = self:DiscardTarget(player)
+		action.Run(self.Context, station, player, anchor)
+		self:ReportDiscard(player, tool, item, altered, "Vehicle")
 	end)
 end
 
@@ -851,11 +884,17 @@ function KitchenService:BuildContext(): StationApi.Context
 			const toppings = if attrs and type(attrs.Toppings) == "string" then attrs.Toppings else nil
 			const count = if attrs and type(attrs.Count) == "number" then attrs.Count else nil
 			const restore = if attrs and type(attrs.Restore) == "number" then attrs.Restore else nil
-			return self.Dependencies.ItemService:Give(player, item, {
+			const tool = self.Dependencies.ItemService:Give(player, item, {
 				Toppings = toppings,
 				Count = count,
 				Restore = restore,
-			}) ~= nil
+			})
+			-- Provisional (TASK-109): ItemService has no GiveOptions.Altered yet (network.md §7.1 names it the
+			-- writer); the attribute is set here, on the Tool it just created, until ItemService takes it over.
+			if tool ~= nil and item == HOT_DOG and attrs ~= nil and attrs.Altered == true then
+				tool:SetAttribute("Altered", true)
+			end
+			return tool ~= nil
 		end,
 		Held = function(player: Player): Tool?
 			return self.Dependencies.ItemService:GetHeld(player)
@@ -892,7 +931,108 @@ function KitchenService:BuildContext(): StationApi.Context
 			const on = enabled and (station == nil or self:IsCurrent(station))
 			self.Dependencies.InteractionService:SetPrompt(anchor, on, text)
 		end,
+		-- Deferred: modules emit from inside the station lock; listeners run after it.
+		Emit = function(name: string, player: Player?, data: { [string]: any }?)
+			task.defer(function()
+				self.Emitted:Fire(name, player, data)
+			end)
+		end,
 	}
+end
+
+-- Altered items (wave 3, TASK-109) ---------------------------------------------------------------------------------
+
+-- Station of `kind` on the current vehicle with the lowest StationId, nil if none.
+function KitchenService:CurrentStation(kind: string): StationApi.Station?
+	const vehicle = self:GetVehicle()
+	local best: StationApi.Station? = nil
+	for _, station in self.Stations do
+		if station.Kind == kind and station.Vehicle == vehicle and (best == nil or station.Id < best.Id) then
+			best = station
+		end
+	end
+	return best
+end
+
+-- One altered item (ANM-002) on the current vehicle: "rail" = gray sausage taken by the next "Add Sausage",
+-- "board" = bitten bun on a free slot (`slot` nil = the board picks). Synchronous; refused outside phase Night, with
+-- no room, with one already there, or while an action holds the station lock (the caller retries later).
+function KitchenService:Alter(kind: AlterKind, slot: number?): boolean
+	if not self.Active or not ALTER_KINDS[kind] then
+		return false
+	end
+	if self.Dependencies.RoundService:GetPhase() ~= ALTER_PHASE then
+		return false
+	end
+	if slot ~= nil and (type(slot) ~= "number" or slot ~= math.floor(slot) or slot < 1 or slot > MAX_SLOT) then
+		return false
+	end
+	const station = self:CurrentStation(kind)
+	if station == nil or self.Locks[station.Id] ~= nil then
+		return false
+	end
+	const module = self.Modules[station.Kind]
+	const alter = if module then module.Alter else nil
+	if alter == nil then
+		return false
+	end
+	const ok, result = pcall(alter, self.Context, station, slot)
+	report(`Alter of {station.Key}`, ok, result)
+	return ok and result == true
+end
+
+-- Removes every altered item still on a station (any vehicle). Returns how many stations changed.
+function KitchenService:ClearAltered(): number
+	local cleared = 0
+	for _, station in self.Stations do
+		const module = self.Modules[station.Kind]
+		const clear = if module then module.ClearAltered else nil
+		if clear == nil then
+			continue
+		end
+		const ok, result = pcall(clear, self.Context, station)
+		report(`ClearAltered of {station.Key}`, ok, result)
+		if ok and result == true then
+			cleared += 1
+		end
+	end
+	return cleared
+end
+
+-- Some altered item on a station of the current vehicle (`kind` nil = rail or board).
+function KitchenService:HasAltered(kind: AlterKind?): boolean
+	const vehicle = self:GetVehicle()
+	for _, station in self.Stations do
+		if station.Vehicle ~= vehicle or (kind ~= nil and station.Kind ~= kind) then
+			continue
+		end
+		for _, record in station.Records do
+			if type(record.Altered) == "number" and record.Altered >= 1 then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+-- Held Tool before a Throw Away: (tool, item key, Altered attribute).
+function KitchenService:DiscardTarget(player: Player): (Tool?, string, boolean)
+	const items = self.Dependencies.ItemService
+	const tool = items:GetHeld(player)
+	if tool == nil then
+		return nil, "", false
+	end
+	return tool, items:ItemOf(tool) or "", tool:GetAttribute("Altered") == true
+end
+
+-- Fires Discarded when the Throw Away really took the Tool away (ItemService forgot it).
+function KitchenService:ReportDiscard(player: Player, tool: Tool?, item: string, altered: boolean, where: DiscardWhere)
+	if tool == nil or self.Dependencies.ItemService.Owners[tool] ~= nil then
+		return
+	end
+	task.defer(function()
+		self.Discarded:Fire(player, item, altered, where)
+	end)
 end
 
 -- Snapshot --------------------------------------------------------------------------------------------------------
@@ -995,6 +1135,12 @@ KitchenService:OnInit(function(self)
 	-- Signals exist since RoundService's OnInit (750 > 650)
 	self.Dependencies.RoundService.ShiftStarted:Connect(function()
 		self:AnnounceUnlocks()
+	end)
+	-- ITM-020: altered items never outlive the Night phase (NightEnd at 6:00 AM, NightLost, any later phase).
+	self.Dependencies.RoundService.PhaseChanged:Connect(function(phase: string)
+		if phase ~= ALTER_PHASE then
+			self:ClearAltered()
+		end
 	end)
 end)
 

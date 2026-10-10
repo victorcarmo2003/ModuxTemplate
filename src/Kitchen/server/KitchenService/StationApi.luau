@@ -9,6 +9,14 @@
 --   Module.Refresh   optional: called after Station.Slots was rebuilt (upgrade level of the station changed)
 -- Added by TASK-057: Context.IsBlocked; Context.Give forwards Restore (ItemService GiveOptions.Restore); SetPrompt on a
 -- station of another vehicle is kept and applied when that vehicle becomes the current one (T36).
+-- Added by TASK-109 (wave 3, ANM-002; architecture.md §19.3, §19.13; network.md §13.5; Provisional):
+--   Record.Altered   0/nil = nothing altered; grill/board: 1 = this slot holds the altered item; rail: position
+--                    1..Count of the altered sausage (next "Add Sausage" takes position 1)
+--   Module.Alter     optional: put one altered item on the station (slot nil = the module picks); false = no room
+--   Module.ClearAltered optional: remove every altered item of the station (6:00 AM, end of the occurrence)
+--   Context.Emit     kitchen event for other services (KitchenService.Emitted, deferred out of the station lock):
+--                    "assembled" (player, { Altered = boolean }) from the board when a hot dog is made
+--   Context.Give     attrs.Altered = true marks the hot dog (Tool attribute Altered, network.md §7.1)
 
 export type SlotState = "Empty" | "Working" | "Ready"
 
@@ -19,6 +27,7 @@ export type Record = {
 	StartedAt: number, -- workspace:GetServerTimeNow(); 0 = idle
 	Duration: number, -- seconds, level and class already applied (0..120)
 	Count: number, -- rail: sausages on it; others 0 (0..30)
+	Altered: number?, -- wave 3: nil/0 = nothing; grill/board 1 = this slot; rail position 1..Count (0..30)
 }
 
 export type Station = {
@@ -49,6 +58,7 @@ export type Context = {
 	Publish: (station: Station) -> (), -- KitchenService writes the Stations set from station.Records
 	Notify: (player: Player, notice: string, value: number?) -> (),
 	SetPrompt: (anchor: Instance, enabled: boolean, text: string?) -> (),
+	Emit: (name: string, player: Player?, data: { [string]: any }?) -> (), -- KitchenService.Emitted (TASK-109)
 }
 
 -- Validate returns (ok, notice?): a Content.Notices key in the second value is sent to the player on refusal.
@@ -65,6 +75,8 @@ export type Module = {
 	Capture: (ctx: Context, station: Station) -> any, -- stable keys (Slot, Ingredient); nil = nothing to keep
 	Restore: (ctx: Context, station: Station, data: any) -> (), -- data nil = start empty
 	Refresh: ((ctx: Context, station: Station) -> ())?,
+	Alter: ((ctx: Context, station: Station, slot: number?) -> boolean)?, -- wave 3 (TASK-109)
+	ClearAltered: ((ctx: Context, station: Station) -> boolean)?, -- true when something was removed
 }
 
 const RESERVED_ACTION = "restock"
@@ -113,7 +125,7 @@ function StationApi.check(
 			return nil, `{name}: {field} must be a function`
 		end
 	end
-	for _, field in { "Tick", "Refresh" } do
+	for _, field in { "Tick", "Refresh", "Alter", "ClearAltered" } do
 		if value[field] ~= nil and not isFunction(value[field]) then
 			return nil, `{name}: {field} must be a function or nil`
 		end

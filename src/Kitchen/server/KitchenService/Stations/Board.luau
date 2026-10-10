@@ -11,6 +11,9 @@
 --                 touched; the slot is freed. Hotbar full = ItemService refuses with "Hands full" and nothing moves.
 -- Prompts (Provisional, TASK-027): "Add Sausage" on only with a sliced bun and >= 1 sausage on the rail.
 -- Snapshot: nothing kept (data.md §2.2: the shift restarts with an empty board).
+-- Wave 3 (TASK-109, ANM-002, ITM-020): Alter puts a bitten bun, already sliced (Ready), on a free active slot
+-- (Record.Altered = 1, no stock). A hot dog made with an altered bun or the rail's altered sausage gets the Tool
+-- attribute Altered = true (ctx.Give). Every hot dog made emits "assembled" (player, { Altered }) through ctx.Emit.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 local StationApi = require(script.Parent.Parent.StationApi)
@@ -111,7 +114,10 @@ const add: StationApi.Action = {
 		if slot == nil or Rail.Count(station.Vehicle) < 1 then
 			return
 		end
-		if not ctx.Give(player, HOT_DOG, nil) then
+		-- read before Give: the altered sausage is at the front of the rail, so it is the one Pop takes
+		const bun = station.Records[slot]
+		const altered = (bun ~= nil and (bun.Altered or 0) > 0) or Rail.FrontAltered(station.Vehicle)
+		if not ctx.Give(player, HOT_DOG, if altered then { Altered = true } else nil) then
 			return
 		end
 		if not Rail.Pop(ctx, station.Vehicle) then
@@ -121,6 +127,7 @@ const add: StationApi.Action = {
 		sync(station)
 		ctx.Publish(station)
 		refreshAdd(ctx, station)
+		ctx.Emit("assembled", player, { Altered = altered })
 	end,
 }
 
@@ -181,6 +188,55 @@ function Board.Place(ctx: Context, vehicle: string, slot: number, duration: numb
 	sync(station)
 	ctx.Publish(station)
 	return true
+end
+
+-- Wave 3 (TASK-109): a bitten bun, already sliced, on `slot` (nil = lowest free active slot). One per board.
+function Board.Alter(ctx: Context, station: Station, slot: number?): boolean
+	for _, record in station.Records do
+		if (record.Altered or 0) > 0 then
+			return false
+		end
+	end
+	local target: number? = nil
+	for _, active in activeSlots(station) do
+		const record = station.Records[active]
+		if (slot == nil or slot == active) and (record == nil or record.State == "Empty") then
+			target = active
+			break
+		end
+	end
+	if target == nil then
+		return false
+	end
+	station.Records[target] = {
+		Kind = KIND,
+		State = "Ready",
+		StartedAt = ctx.Now(),
+		Duration = 0,
+		Count = 0,
+		Altered = 1,
+	}
+	sync(station)
+	ctx.Publish(station)
+	refreshAdd(ctx, station)
+	return true
+end
+
+-- Removes the bitten bun (its slot frees up). True when there was one.
+function Board.ClearAltered(ctx: Context, station: Station): boolean
+	local removed = false
+	for slot, record in station.Records do
+		if (record.Altered or 0) > 0 then
+			station.Records[slot] = StationApi.empty(KIND)
+			removed = true
+		end
+	end
+	if removed then
+		sync(station)
+		ctx.Publish(station)
+		refreshAdd(ctx, station)
+	end
+	return removed
 end
 
 function Board.Bind(ctx: Context, station: Station)

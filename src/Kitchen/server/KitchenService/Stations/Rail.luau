@@ -6,6 +6,9 @@
 -- Other station modules use the functions below (require(script.Parent.Rail)); KitchenService serializes per
 -- station, and every call here is synchronous, so a Push/Pop never interleaves with another one.
 -- Snapshot: nothing kept (data.md §2.2: the shift restarts with an empty rail).
+-- Wave 3 (TASK-109, ANM-002, ITM-020): Alter puts one gray sausage at the FRONT of the queue (the next "Add Sausage"
+-- of any player takes it), using one rail place, no stock. At most one altered sausage per rail. Record.Altered =
+-- its position 1..Count (nil when none). Pop tells the board whether the sausage it took was the altered one.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 local StationApi = require(script.Parent.Parent.StationApi)
@@ -13,8 +16,11 @@ local StationApi = require(script.Parent.Parent.StationApi)
 type Context = StationApi.Context
 type Station = StationApi.Station
 
--- Private state of a rail station: server time each sausage arrived, oldest first.
-type RailState = { Queue: { number } }
+-- One sausage on the rail: server time it arrived; Altered = the anomaly's gray sausage (ITM-020).
+type Entry = { At: number, Altered: boolean }
+
+-- Private state of a rail station: sausages in take order (front = next "Add Sausage").
+type RailState = { Queue: { Entry } }
 
 const KIND = "rail"
 const RECORD_SLOT = 0 -- single-record station (network.md §3.5)
@@ -46,14 +52,27 @@ local function capacityOf(station: Station): number
 	return math.clamp(slots, 0, COUNT_MAX)
 end
 
+-- Position 1..#Queue of the altered sausage, nil when there is none.
+local function alteredAt(queue: { Entry }): number?
+	for index, entry in queue do
+		if entry.Altered then
+			return index
+		end
+	end
+	return nil
+end
+
 local function write(ctx: Context, station: Station)
-	const count = #stateOf(station).Queue
+	const queue = stateOf(station).Queue
+	const count = #queue
+	const altered = alteredAt(queue)
 	station.Records[RECORD_SLOT] = {
 		Kind = KIND,
 		State = if count > 0 then "Ready" else "Empty",
 		StartedAt = 0,
 		Duration = 0,
 		Count = count,
+		Altered = if altered ~= nil and altered <= COUNT_MAX then altered else nil,
 	}
 	ctx.Publish(station)
 end
@@ -101,24 +120,35 @@ function Rail.Push(ctx: Context, vehicle: string): boolean
 	if #queue >= capacityOf(station) then
 		return false
 	end
-	table.insert(queue, ctx.Now())
+	const entry: Entry = { At = ctx.Now(), Altered = false }
+	table.insert(queue, entry)
 	write(ctx, station)
 	return true
 end
 
--- Takes the oldest sausage (FIFO). False when the rail is empty.
-function Rail.Pop(ctx: Context, vehicle: string): boolean
+-- True when the next sausage "Add Sausage" would take is the altered one (read only).
+function Rail.FrontAltered(vehicle: string): boolean
 	const station = Rail.Find(vehicle)
 	if station == nil then
 		return false
 	end
+	const front = stateOf(station).Queue[1]
+	return front ~= nil and front.Altered
+end
+
+-- Takes the front sausage (FIFO; an altered one sits at the front). Returns (taken, it was the altered one).
+function Rail.Pop(ctx: Context, vehicle: string): (boolean, boolean)
+	const station = Rail.Find(vehicle)
+	if station == nil then
+		return false, false
+	end
 	const queue = stateOf(station).Queue
 	if #queue == 0 then
-		return false
+		return false, false
 	end
-	table.remove(queue, 1)
+	const entry = table.remove(queue, 1)
 	write(ctx, station)
-	return true
+	return true, entry ~= nil and entry.Altered
 end
 
 -- StationApi.Module ---------------------------------------------------------------------------------------------------
@@ -133,6 +163,31 @@ function Rail.Bind(ctx: Context, station: Station)
 	table.insert(bound, station)
 	station.State = { Queue = {} } :: RailState
 	write(ctx, station)
+end
+
+-- Wave 3 (TASK-109): one altered sausage at the front of this rail. False without room or with one already there.
+-- `slot` is ignored (the position is always the next one to be used, ITM-020).
+function Rail.Alter(ctx: Context, station: Station, _slot: number?): boolean
+	const queue = stateOf(station).Queue
+	if alteredAt(queue) ~= nil or #queue >= capacityOf(station) then
+		return false
+	end
+	const entry: Entry = { At = ctx.Now(), Altered = true }
+	table.insert(queue, 1, entry)
+	write(ctx, station)
+	return true
+end
+
+-- Removes the altered sausage (the place it held frees up). True when there was one.
+function Rail.ClearAltered(ctx: Context, station: Station): boolean
+	const queue = stateOf(station).Queue
+	const index = alteredAt(queue)
+	if index == nil then
+		return false
+	end
+	table.remove(queue, index)
+	write(ctx, station)
+	return true
 end
 
 function Rail.Capture(_ctx: Context, _station: Station): any

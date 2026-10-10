@@ -9,6 +9,8 @@ local StationApi = require(ServerScriptService.server.Kitchen.KitchenService.Sta
 export type Amounts = { [string]: number }
 export type StockRecord = { Amount: number, Capacity: number, Blocked: boolean }
 type Wanted = { Enabled: boolean, Text: string? }
+export type AlterKind = "rail" | "board"
+export type DiscardWhere = "Vehicle" | "Street"
 
 export type Public = {
 	Active: boolean,
@@ -16,6 +18,8 @@ export type Public = {
 	Bins: { [Instance]: boolean },
 	ByInstance: { [Instance]: StationApi.Station },
 	Context: StationApi.Context,
+	Discarded: SignalLib.Signal<Player, string, boolean, DiscardWhere>,
+	Emitted: SignalLib.Signal<string, Player?, { [string]: any }?>,
 	Gated: { [Instance]: boolean },
 	Locks: { [number]: { thread } },
 	ModuleNames: { [string]: string },
@@ -62,6 +66,12 @@ export type Public = {
 	Serialize: (self: Public, station: StationApi.Station, fn: () -> ()) -> (),
 	Perform: (self: Public, key: string, player: Player, anchor: Instance) -> (),
 	BuildContext: (self: Public) -> StationApi.Context,
+	CurrentStation: (self: Public, kind: string) -> StationApi.Station?,
+	Alter: (self: Public, kind: AlterKind, slot: number?) -> boolean,
+	ClearAltered: (self: Public) -> number,
+	HasAltered: (self: Public, kind: AlterKind?) -> boolean,
+	DiscardTarget: (self: Public, player: Player) -> (Tool?, string, boolean),
+	ReportDiscard: (self: Public, player: Player, tool: Tool?, item: string, altered: boolean, where: DiscardWhere) -> (),
 	CaptureStock: (self: Public) -> { [string]: number },
 	RestoreStock: (self: Public, data: any) -> (),
 	CaptureStations: (self: Public) -> { [string]: any },
