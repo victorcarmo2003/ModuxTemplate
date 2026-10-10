@@ -36,8 +36,10 @@ export type Wire = {
 	Mood: string,
 }
 export type SaleResult = "Perfect" | "Complete" | "Incomplete" | "Wrong" | "Left" | "Refused"
+export type ActedAction = "take_order" | "serve" | "refuse" | "give_up"
 
 export type Public = {
+	Acted: SignalLib.Signal<number, ActedAction, Player?, SaleResult?>,
 	Customers: { [number]: Customer },
 	Enabled: boolean,
 	Fronted: SignalLib.Signal<number>,
@@ -45,6 +47,7 @@ export type Public = {
 	Left: SignalLib.Signal<number, LeaveReason>,
 	Line: Queue.Queue,
 	NextSpawnAt: number,
+	NoticeAt: { [Player]: { [string]: number } },
 	OrderRng: Random,
 	Party: number,
 	Removed: SignalLib.Signal<number>,
@@ -61,6 +64,10 @@ export type Public = {
 	Occupants: (self: Public) -> number,
 	IsCounterEmpty: (self: Public) -> boolean,
 	QueueSize: (self: Public) -> number,
+	PhaseRow: (self: Public) -> Content.Phase?,
+	IsSelling: (self: Public) -> boolean,
+	IsNightShift: (self: Public) -> boolean,
+	NightRow: (self: Public) -> Content.Night?,
 	MaxCustomers: (self: Public) -> number,
 	ConnectedMembers: (self: Public) -> number,
 	MeanInterval: (self: Public) -> number?,
@@ -87,10 +94,12 @@ export type Public = {
 	OnFronted: (self: Public, id: number) -> (),
 	TicketAt: (self: Public, anchor: Instance) -> (number?, Customer?, Orders.Ticket?),
 	CanAct: (self: Public, player: Player, anchor: Instance, state: State?) -> boolean,
+	NotifyThrottled: (self: Public, player: Player, key: string) -> (),
+	NoticeShopClosed: (self: Public, player: Player, anchor: Instance) -> (),
 	Settle: (self: Public, id: number, result: SaleResult, amount: number) -> (),
 	TakeOrder: (self: Public, player: Player, anchor: Instance) -> (),
 	Serve: (self: Public, player: Player, anchor: Instance) -> (),
-	Refuse: (self: Public, _player: Player, anchor: Instance) -> (),
+	Refuse: (self: Public, player: Player, anchor: Instance) -> (),
 	GiveUp: (self: Public, id: number) -> (),
 	StepOrders: (self: Public, t: number) -> (),
 	RegisterOrders: (self: Public) -> (),

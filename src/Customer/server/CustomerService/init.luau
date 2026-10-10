@@ -3,7 +3,7 @@
 -- §3.1, §18.13; network.md §3.6, T41; TASK-032). Run place only. Single writer of the Customers set (id = NpcId).
 --
 -- Flow (day): mean interval = BaseInterval / (growth(Day) x PartyMult[connected] x DayFlowBonus), each interval
--- jittered by +-Jitter, all from Content.Flow / UpgradeService. Spawns only while the shop is Open. One attempt per
+-- jittered by +-Jitter, all from Content.Flow / UpgradeService. Spawns only in Selling phases. One attempt per
 -- interval; a full counter (customers queued or walking to it >= QueueSize) or the NPC cap skips it (FEAT-009: the
 -- skipped one is never born and never counts). Every attempt fires SpawnAttempted(outcome) (R5, TASK-045).
 -- Draws (type, species, outfit, spawn point, intervals, exit) use a Random seeded per shift from the run seed
@@ -24,6 +24,15 @@
 -- and patience running out send the customer away with $0. Every outcome: EconomyService:CountResult + Sale packet.
 -- Mood (PROVISIONAL, Q-164): visual only — Annoyed at MoodRules.AnnoyedAt, Happy on Complete/Perfect, Complaining on
 -- Wrong/Refuse/gave up; never touches DEC-072 pay.
+--
+-- Wave 2 (TASK-053; architecture.md §19.3, §19.26 A4; FEAT-009): customers spawn in every phase with
+-- Content.Shift[phase].Selling (Open, Night). Night flow: mean interval = Nights[k].Customers.BaseInterval (fallback
+-- Flow.NightInterval) / PartyMult[connected], no day growth and no Trailer Lights; cap Nights[k].Customers.Max (never
+-- above Flow.MaxCustomersNight). The drawer side follows EconomyService:IsDrawerOpen() (selling phase or Closing):
+-- the queue is still served in the day Closing. Leaving a selling phase for anything but the day Closing sends every
+-- customer away (NightEnd/NightLost, the 6 AM Closing, Summary...), so the night Closing finds the counter empty.
+-- Acted(id, action, player, result) fires after take_order, serve, refuse and give_up (patience, no player) for the
+-- anomaly rules (§19.13). "Take Order" outside the drawer phases sends the D-04 notice shop_closed to that player.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -75,6 +84,9 @@ export type Wire = {
 -- Sale.Result (network.md §4.3) = EconomyService SaleResult
 export type SaleResult = "Perfect" | "Complete" | "Incomplete" | "Wrong" | "Left" | "Refused"
 
+-- Acted.action (TASK-053): the three customer actions, plus give_up when patience ran out (no player)
+export type ActedAction = "take_order" | "serve" | "refuse" | "give_up"
+
 type Weighted = { Point: string, Weight: number }
 
 const TICK_RATE = 10 -- Hz
@@ -85,6 +97,12 @@ const SALE_MAX = 1000 -- Sale.Amount wire range
 const TAKE_ORDER = "take_order"
 const SERVE = "serve"
 const REFUSE = "refuse"
+const GIVE_UP = "give_up"
+const CLOSING = "Closing"
+const SHOP_CLOSED = "shop_closed" -- Content.Notices key (D-04 #10)
+-- Same notice to the same player at most once per this many seconds (FEAT-005 anti-spam). PROVISIONAL constant:
+-- no Content field holds it yet.
+const NOTICE_GAP = 2
 const HOT_DOG = "hot_dog"
 const HAPPY = "Happy"
 const ANNOYED = "Annoyed"
@@ -168,6 +186,11 @@ function CustomerService:Setup()
 	self.Fronted = self.Libs.Signal.new() :: SignalLib.Signal<number>
 	self.Left = self.Libs.Signal.new() :: SignalLib.Signal<number, LeaveReason>
 	self.Removed = self.Libs.Signal.new() :: SignalLib.Signal<number>
+	-- Acted(id, action, player, result): a customer action finished (TASK-053). take_order: result nil;
+	-- serve: the SaleResult (Wrong included); refuse: "Refused"; give_up: player nil, "Left".
+	self.Acted = self.Libs.Signal.new() :: SignalLib.Signal<number, ActedAction, Player?, SaleResult?>
+	-- Last time each notice went to each player (FEAT-005 anti-spam)
+	self.NoticeAt = {} :: { [Player]: { [string]: number } }
 end
 
 function CustomerService:WarnOnce(key: string, message: string)
@@ -224,9 +247,37 @@ function CustomerService:QueueSize(): number
 	return Queue.size(self.Dependencies.UpgradeService:GetEffect("QueueSize"))
 end
 
+-- Content.Shift row of the current phase (nil = unknown key: treated as not selling).
+function CustomerService:PhaseRow(): Content.Phase?
+	return Content.Shift.ByKey[self.Dependencies.RoundService:GetPhase()]
+end
+
+-- Customers spawn now (Content.Shift[phase].Selling: Open, Night). Read from the table, not from a phase list.
+function CustomerService:IsSelling(): boolean
+	const round = self.Dependencies.RoundService
+	const row = self:PhaseRow()
+	return round:IsStarted() and row ~= nil and row.Selling
+end
+
+-- Night shift (or a night-only phase while RoundService still reports days, wave 1).
+function CustomerService:IsNightShift(): boolean
+	const row = self:PhaseRow()
+	return self.Dependencies.RoundService:IsNight() or (row ~= nil and row.Kind == "Night")
+end
+
+-- Content.Nights row of the current night, or nil (day, or a night index without a row).
+function CustomerService:NightRow(): Content.Night?
+	const night = self.Dependencies.RoundService:Info().Night
+	return Content.Nights.ByKey[`night_{night}`]
+end
+
 function CustomerService:MaxCustomers(): number
 	const flow = Content.Flow
-	return if self.Dependencies.RoundService:IsNight() then flow.MaxCustomersNight else flow.MaxCustomersDay
+	if not self:IsNightShift() then
+		return flow.MaxCustomersDay
+	end
+	const row = self:NightRow()
+	return if row ~= nil then math.min(row.Customers.Max, flow.MaxCustomersNight) else flow.MaxCustomersNight
 end
 
 -- Run members connected to this server, 1..#PartyMult (DEC-185: connected players).
@@ -241,17 +292,26 @@ function CustomerService:ConnectedMembers(): number
 	return math.clamp(count, 1, #Content.Flow.PartyMult)
 end
 
--- Mean seconds between spawns now, or nil when there is no flow (night has no Content field yet, wave 2).
+-- Mean seconds between spawns now, or nil when there is no flow.
+-- Day: BaseInterval / (growth(Day) x PartyMult x DayFlowBonus). Night (FEAT-009): Nights[k].Customers.BaseInterval
+-- (fallback Flow.NightInterval) / PartyMult; no growth, no Trailer Lights.
 function CustomerService:MeanInterval(): number?
 	const round = self.Dependencies.RoundService
-	if round:IsNight() then
-		self:WarnOnce("night", "no night flow in Content.Flow yet (wave 2): no customers at night")
-		return nil
-	end
 	const flow = Content.Flow
+	const party = flow.PartyMult[math.clamp(self.Party, 1, #flow.PartyMult)]
+	if self:IsNightShift() then
+		const row = self:NightRow()
+		if row == nil then
+			self:WarnOnce("night", `no Nights row for night {round:Info().Night}: using Flow.NightInterval`)
+		end
+		const base = if row ~= nil then row.Customers.BaseInterval else flow.NightInterval
+		if base <= 0 or party <= 0 then
+			return nil
+		end
+		return base / party
+	end
 	const day = round:GetDay()
 	const growth = math.min(1 + flow.GrowthPerDay * (day - 1), 1 + flow.GrowthCap)
-	const party = flow.PartyMult[math.clamp(self.Party, 1, #flow.PartyMult)]
 	const bonus = self.Dependencies.UpgradeService:GetEffect("DayFlowBonus") -- Trailer Lights (DEC-055)
 	const rate = growth * party * bonus / flow.BaseInterval
 	if rate <= 0 then
@@ -625,12 +685,13 @@ function CustomerService:TicketAt(anchor: Instance): (number?, Customer?, Orders
 	return id, customer, ticket
 end
 
--- Common gate of the three actions: active member, shop running (Open/Closing), customer on Q1.
+-- Common gate of the three actions: active member, drawer open (selling phase or Closing: the queue is still
+-- served, EconomyService:IsDrawerOpen), customer on Q1.
 function CustomerService:CanAct(player: Player, anchor: Instance, state: State?): boolean
 	if not self.Dependencies.RunStateService:IsActive(player) then
 		return false
 	end
-	if not self.Dependencies.EconomyService:IsShopOpen() then
+	if not self.Dependencies.EconomyService:IsDrawerOpen() then
 		return false
 	end
 	const id, customer = self:TicketAt(anchor)
@@ -641,6 +702,36 @@ function CustomerService:CanAct(player: Player, anchor: Instance, state: State?)
 		return false
 	end
 	return customer.State == "Ordering" or customer.State == "Waiting"
+end
+
+-- Sends `key` to `player` unless the same key went to them less than NOTICE_GAP s ago (FEAT-005 anti-spam).
+function CustomerService:NotifyThrottled(player: Player, key: string)
+	const t = now()
+	local sent = self.NoticeAt[player]
+	if sent == nil then
+		sent = {}
+		self.NoticeAt[player] = sent
+	end
+	const last = sent[key]
+	if last ~= nil and t - last < NOTICE_GAP then
+		return
+	end
+	sent[key] = t
+	self.Dependencies.RunStateService:Notify(player, key)
+end
+
+-- D-04 #10: "Take Order" on a customer of ours refused while the drawer is closed (the phase turned during the tap:
+-- the customer is already leaving with its prompt off). Called from InteractionService.Rejected with reason "state",
+-- which only comes after the target, gate and range checks: a forged packet never gets here with a valid anchor.
+-- Only an active member gets it; an anchor that is not one of our customers stays silent (FEAT-005).
+function CustomerService:NoticeShopClosed(player: Player, anchor: Instance)
+	if self.Dependencies.EconomyService:IsDrawerOpen() then
+		return
+	end
+	if not self.Dependencies.RunStateService:IsActive(player) or self:IdOf(anchor) == nil then
+		return
+	end
+	self:NotifyThrottled(player, SHOP_CLOSED)
 end
 
 -- Outcome of a customer: shift ledger + Sale to the group. `amount` = what went into the drawer.
@@ -677,6 +768,7 @@ function CustomerService:TakeOrder(player: Player, anchor: Instance)
 		return
 	end
 	anchor:SetAttribute("PromptAction", SERVE)
+	self.Acted:Fire(id, TAKE_ORDER, player, nil)
 end
 
 -- "Serve" (FEAT-011, DEC-072): validates the held hot dog against the order and pays into the drawer.
@@ -709,16 +801,18 @@ function CustomerService:Serve(player: Player, anchor: Instance)
 		end
 	end
 	self:Settle(id, result, amount)
+	self.Acted:Fire(id, SERVE, player, result)
 	self:Leave(id, mood)
 end
 
 -- "Refuse" (FEAT-011, DEC-051): $0, unsatisfied.
-function CustomerService:Refuse(_player: Player, anchor: Instance)
+function CustomerService:Refuse(player: Player, anchor: Instance)
 	const id = self:TicketAt(anchor)
 	if id == nil then
 		return
 	end
 	self:Settle(id, "Refused", 0)
+	self.Acted:Fire(id, REFUSE, player, "Refused")
 	self:Leave(id, COMPLAINING)
 end
 
@@ -728,6 +822,7 @@ function CustomerService:GiveUp(id: number)
 		return
 	end
 	self:Settle(id, "Left", 0)
+	self.Acted:Fire(id, GIVE_UP, nil, "Left")
 	self:Leave(id, COMPLAINING)
 end
 
@@ -798,23 +893,26 @@ function CustomerService:Reseed()
 end
 
 function CustomerService:OnPhase(phase: string)
-	if phase == "Open" then
-		-- PROVISIONAL (DEC-185 says "start of the shift"): locked when the shop opens, so a member who joins during
-		-- the Prep counts on this shift (wave 1 has no lobby: the run starts with the first member alone).
+	if self:IsSelling() then
+		-- PROVISIONAL (DEC-185 says "start of the shift"): locked when the selling phase starts (Open, Night), so a
+		-- member who joins during the Prep counts on this shift. The first attempt is one drawn interval later.
 		self.Party = self:ConnectedMembers()
 		const interval = self:NextInterval()
 		self.NextSpawnAt = if interval then now() + interval else 0
-	else
-		self.NextSpawnAt = 0
-		if phase == "Summary" then
-			self:SendAllAway()
-		end
+		return
 	end
+	self.NextSpawnAt = 0
+	-- The day Closing still serves the queue (DEC-048). Any other phase after selling (NightEnd, NightLost, the 6 AM
+	-- Closing, Summary, Finale, RunEnd) empties the counter: everyone still around walks off with no outcome.
+	if phase == CLOSING and not self:IsNightShift() then
+		return
+	end
+	self:SendAllAway()
 end
 
 function CustomerService:Step()
 	const t = now()
-	if self.NextSpawnAt > 0 and t >= self.NextSpawnAt and self.Dependencies.RoundService:GetPhase() == "Open" then
+	if self.NextSpawnAt > 0 and t >= self.NextSpawnAt and self:IsSelling() then
 		self:Attempt()
 		const interval = self:NextInterval()
 		if interval == nil then
@@ -876,6 +974,21 @@ CustomerService:OnInit(function(self)
 	end)
 	self.Fronted:Connect(function(id: number)
 		self:OnFronted(id)
+	end)
+	-- D-04 (TASK-053): a refused "Take Order" while the drawer is closed gets the shop_closed toast
+	self.Dependencies.InteractionService.Rejected:Connect(
+		function(player: Player, anchorId: number, action: string, reason: string)
+			if action ~= TAKE_ORDER or reason ~= "state" then
+				return
+			end
+			const anchor = self.Dependencies.InteractionService:Get(anchorId)
+			if anchor ~= nil then
+				self:NoticeShopClosed(player, anchor)
+			end
+		end
+	)
+	Players.PlayerRemoving:Connect(function(player: Player)
+		self.NoticeAt[player] = nil
 	end)
 	self.Left:Connect(function(id: number)
 		self.Tickets[id] = nil
