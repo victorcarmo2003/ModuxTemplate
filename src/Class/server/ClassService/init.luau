@@ -32,6 +32,8 @@ const DEFAULT_BASE: { [string]: number } = {
 	PackageLimit = Content.ItemRules.CategoryLimits.Package, -- 2 (DEC-049)
 	TipAmount = Content.OrderRules.TipAmount, -- $1 (DEC-072)
 	TipWindow = 0,
+	CoffeeBrewTime = Content.Stations.ByKey.coffee_machine.Params.BrewTime, -- 6 s; Barista 3 (DEC-069)
+	CoffeeRestore = Content.Sanity.Coffee, -- 25; Barista 35 (DEC-069)
 }
 
 const ClassService = Modux.Service(
