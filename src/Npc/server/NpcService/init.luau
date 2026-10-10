@@ -7,7 +7,8 @@
 --
 -- Rules kept here:
 --   - never more than Content.Flow.MaxNpc rigs (12, DEC-045); Opal is not one of them (DEC-191);
---   - customers only, wave 1 (pedestrians are wave 2: DEC-183, Q-162); never the crew uniform nor the raccoon;
+--   - customers (Role "Customer") never wear the crew uniform nor the raccoon; the raccoon in the thief outfit and
+--     ThiefHat is Role "Thief" only (Quick Quentin, NPC-007; DEC-159, DEC-186; TASK-072). Pedestrians: DEC-183, Q-162;
 --   - LookPack Day by day, Mid at night (DEC-181), refreshed at every ShiftStarted. Night is tension only (local
 --     low-sanity swap on the client, DEC-168/169; anomaly mood, Q-159): never written here in wave 1;
 --   - collision group Npc, not colliding with Players nor Npc (architecture.md §12.3);
@@ -27,10 +28,14 @@ local Pool = require(script.Pool)
 local Walker = require(script.Walker)
 local Modux = require(ServerScriptService.server.Modux)
 
+-- Who the NPC is (architecture.md §19.3). "Actor" (anomalies) is wave 3.
+export type Role = "Customer" | "Thief"
+
 export type Npc = {
 	Id: number,
 	Rig: Pool.Rig,
-	CustomerType: string,
+	Role: Role,
+	CustomerType: string, -- "" for the thief
 	Species: string,
 	Outfit: string,
 	Node: string, -- last graph node reached (spawn point at first)
@@ -38,6 +43,7 @@ export type Npc = {
 }
 
 export type SpawnRequest = {
+	Role: Role?, -- default "Customer". "Thief": Quick Quentin; CustomerType/Species/Outfit are ignored
 	CustomerType: string?, -- default: weighted draw among the types unlocked this shift (Look.PickType)
 	Species: string?, -- forced species (must belong to the type)
 	Outfit: string?, -- forced civil outfit
@@ -57,6 +63,9 @@ const GROUP = "Npc"
 const PLAYERS_GROUP = "Players" -- CharacterService (TASK-018) puts the crew parts here
 const FOLDER_NAME = "Npcs"
 const PARKING_NAME = "NpcPool"
+const THIEF_NPC = "NPC-007" -- Species/Outfits.ReservedFor of Quick Quentin
+const THIEF_HAT = "ThiefHat" -- kit name, Assets.Crew.Hats (AST-053, DEC-159)
+const THIEF_KEY = "Thief" -- pool geometry key suffix (no customer type, no accessories)
 const MAX_ID = 65535 -- NpcId wire range (Customers id, Sale.Npc)
 const ROUTES_PER_FRAME = 2 -- architecture.md §12.3
 const LIFT = 3 -- HumanoidRootPart above the floor point (architecture.md §18.5)
@@ -206,7 +215,31 @@ function NpcService:PickSpawnPoint(isNight: boolean, rng: Random): string
 	return list[#list].Point
 end
 
--- New customer NPC at a spawn point. Returns its NpcId, or nil (service off, pool full, bad request, no binding).
+-- Look of a spawn request: customer draw, or the reserved thief look (Role "Thief"). nil + reason when refused;
+-- the third value is a WarnOnce key for refusals that repeat every spawn attempt (no type unlocked).
+function NpcService:Choose(r: SpawnRequest, rng: Random): (Look.Choice?, string?, string?)
+	const role = r.Role or "Customer"
+	if role == "Thief" then
+		const reserved, problem = Look.Reserved(THIEF_NPC)
+		if reserved == nil then
+			return nil, problem, nil
+		end
+		return { CustomerType = "", Species = reserved.Species, Outfit = reserved.Outfit }, nil, nil
+	end
+	if role ~= "Customer" then
+		return nil, `unknown Role '{role}'`, nil
+	end
+	const info = self.Dependencies.RoundService:Info()
+	const typeKey = r.CustomerType or Look.PickType(info.Day, info.Night, info.IsNight, rng)
+	if typeKey == nil then
+		return nil, `no customer type unlocked for Day {info.Day} / Night {info.Night}`, "no-type"
+	end
+	const choice, problem = Look.Pick(typeKey, rng, r.Species, r.Outfit)
+	return choice, problem, nil
+end
+
+-- New NPC at a spawn point. Returns its NpcId, or nil (service off, pool full, bad request, no binding).
+-- Every role counts in the cap (Content.Flow.MaxNpc). The thief keeps the WalkSpeed its owner sets (ThiefService).
 function NpcService:Spawn(request: SpawnRequest?): number?
 	if not self.Enabled then
 		return nil
@@ -214,15 +247,16 @@ function NpcService:Spawn(request: SpawnRequest?): number?
 	const r: SpawnRequest = request or {}
 	const rng = r.Rng or self.Random
 	const info = self.Dependencies.RoundService:Info()
+	const role: Role = r.Role or "Customer"
+	const isThief = role == "Thief"
 
-	const typeKey = r.CustomerType or Look.PickType(info.Day, info.Night, info.IsNight, rng)
-	if typeKey == nil then
-		self:WarnOnce("no-type", `no customer type unlocked for Day {info.Day} / Night {info.Night}`)
-		return nil
-	end
-	const choice, problem = Look.Pick(typeKey, rng, r.Species, r.Outfit)
+	const choice, problem, onceKey = self:Choose(r, rng)
 	if choice == nil then
-		warn(`[NpcService] Spawn refused: {problem}`)
+		if onceKey ~= nil then
+			self:WarnOnce(onceKey, problem or onceKey)
+		else
+			warn(`[NpcService] Spawn refused: {problem}`)
+		end
 		return nil
 	end
 
@@ -242,17 +276,19 @@ function NpcService:Spawn(request: SpawnRequest?): number?
 		return nil
 	end
 
-	const rig = Pool.acquire(self.Pool, Look.Key(choice.Species, choice.CustomerType), function(): Pool.Rig?
+	const poolKey = Look.Key(choice.Species, if isThief then THIEF_KEY else choice.CustomerType)
+	const rig = Pool.acquire(self.Pool, poolKey, function(): Pool.Rig?
 		const spec: Pool.BuildSpec = {
 			Species = choice.Species,
 			Outfit = choice.Outfit,
-			CustomerType = choice.CustomerType,
+			CustomerType = if isThief then nil else choice.CustomerType,
+			Hat = if isThief then THIEF_HAT else nil,
 			Group = GROUP,
 			Parking = parking,
 		}
 		const ok, result = pcall(Pool.build, spec)
 		if not ok then
-			self:WarnOnce(`build:{choice.Species}/{choice.CustomerType}`, `rig build failed: {result}`)
+			self:WarnOnce(`build:{poolKey}`, `rig build failed: {result}`)
 			return nil
 		end
 		return result
@@ -267,7 +303,9 @@ function NpcService:Spawn(request: SpawnRequest?): number?
 	model:SetAttribute("Outfit", choice.Outfit)
 	model:SetAttribute("LookPack", self:Pack())
 	model:SetAttribute("NpcId", id)
-	rig.Humanoid.WalkSpeed = Content.CustomerTypes.ByKey[choice.CustomerType].WalkSpeed
+	if not isThief then
+		rig.Humanoid.WalkSpeed = Content.CustomerTypes.ByKey[choice.CustomerType].WalkSpeed
+	end
 	model:PivotTo(CFrame.new(position + Vector3.new(0, LIFT, 0)) * rotation)
 	model.Parent = folder
 	if rig.Root:CanSetNetworkOwnership() then
@@ -277,6 +315,7 @@ function NpcService:Spawn(request: SpawnRequest?): number?
 	const npc: Npc = {
 		Id = id,
 		Rig = rig,
+		Role = role,
 		CustomerType = choice.CustomerType,
 		Species = choice.Species,
 		Outfit = choice.Outfit,

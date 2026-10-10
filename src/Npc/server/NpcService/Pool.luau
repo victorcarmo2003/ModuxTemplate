@@ -30,7 +30,8 @@ export type Pool = {
 export type BuildSpec = {
 	Species: string,
 	Outfit: string,
-	CustomerType: string,
+	CustomerType: string?, -- nil for the thief (no customer accessories)
+	Hat: string?, -- kit hat replacing the cap ("ThiefHat" for the thief, DEC-159)
 	Group: string, -- collision group of every part (architecture.md §12.3)
 	Parking: Instance,
 }
@@ -97,6 +98,7 @@ end
 function PoolModule.build(spec: BuildSpec): Rig
 	const model = CrewRig.Build(spec.Species, spec.Outfit, {
 		CustomerType = spec.CustomerType,
+		Hat = spec.Hat,
 		LookPack = "Day",
 		Name = "Npc",
 	})

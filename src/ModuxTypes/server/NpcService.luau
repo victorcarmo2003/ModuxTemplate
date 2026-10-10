@@ -9,13 +9,15 @@ local Pool = require(ServerScriptService.server.Npc.NpcService.Pool)
 export type Npc = {
 	Id: number,
 	Rig: Pool.Rig,
-	CustomerType: string,
+	Role: Role,
+	CustomerType: string, -- "" for the thief
 	Species: string,
 	Outfit: string,
 	Node: string, -- last graph node reached (spawn point at first)
 	Walk: number, -- walk order counter: a new order or a despawn cancels the running one
 }
 export type SpawnRequest = {
+	Role: Role?, -- default "Customer". "Thief": Quick Quentin; CustomerType/Species/Outfit are ignored
 	CustomerType: string?, -- default: weighted draw among the types unlocked this shift (Look.PickType)
 	Species: string?, -- forced species (must belong to the type)
 	Outfit: string?, -- forced civil outfit
@@ -27,6 +29,7 @@ export type WalkOptions = {
 	AvoidCrossings: boolean?, -- default false (thief, wave 2)
 	Face: boolean?, -- default true: on arrival, face the MapPoint direction of the goal (when it is a point)
 }
+export type Role = "Customer" | "Thief"
 
 export type Public = {
 	Active: { [number]: Npc },
@@ -57,6 +60,7 @@ export type Public = {
 	PickType: (self: Public, rng: Random?) -> string?,
 	AllocateId: (self: Public) -> number?,
 	PickSpawnPoint: (self: Public, isNight: boolean, rng: Random) -> string,
+	Choose: (self: Public, r: SpawnRequest, rng: Random) -> (Look.Choice?, string?, string?),
 	Spawn: (self: Public, request: SpawnRequest?) -> number?,
 	Despawn: (self: Public, id: number) -> boolean,
 	DespawnAll: (self: Public) -> (),
