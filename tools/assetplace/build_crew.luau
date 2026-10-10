@@ -82,6 +82,7 @@ function Crew.build(o: { [string]: any }): Model
 		if p and p:IsA("MeshPart") then
 			p.TextureID = tex
 			p.Color = o.fur or Color3.fromHex("C98B5A")
+			p:SetAttribute("OutfitPart", true)
 		end
 	end
 	if (o.cap == false or o.earsUp or o.hat) and parts.Cap then
@@ -119,20 +120,14 @@ function Crew.build(o: { [string]: any }): Model
 		parts.Cap.CFrame += Vector3.new(0, o.capRaise or 0.30, 0)
 	end
 	-- textured head (animal markings; main fur = part Color through the alpha) + face shell (expression)
-	local headTex = o.tex["T_Head_" .. o.animal .. (o.time == "Night" and "_Night" or "")] or o.tex["T_Head_" .. o.animal]
-	if headTex and head:IsA("MeshPart") then
-		head.TextureID = headTex
+	if head:IsA("MeshPart") then
 		head.Color = o.fur or head.Color
 	end
-	-- night: atlas-coloured pieces (ears, tail, shell, beak, cap with ear holes) swap to the night atlas
-	local nightAtlas = o.tex.T_Atlas_Kitchen_Night
-	if o.time == "Night" and nightAtlas then
-		for name, p in parts do
-			local own = p == head or string.find(name, "^Face_") ~= nil
-			if not own and p:IsA("MeshPart") and p.TextureID ~= "" and p.TextureID ~= tex then
-				p:SetAttribute("DayTextureID", p.TextureID)
-				p.TextureID = nightAtlas
-			end
+	-- atlas-coloured pieces (ears, tail, shell, beak, hat, cap with ear holes) remember their day atlas; Mid/Night swap it
+	for name, p in parts do
+		local own = p == head or string.find(name, "^Face_") ~= nil
+		if not own and p:IsA("MeshPart") and p.TextureID ~= "" and not p:GetAttribute("OutfitPart") then
+			p:SetAttribute("DayTextureID", p.TextureID)
 		end
 	end
 	local face = parts["Face_" .. o.animal]
@@ -190,9 +185,7 @@ function Crew.build(o: { [string]: any }): Model
 	model:SetAttribute("Animal", o.animal)
 	model:SetAttribute("Outfit", o.outfit)
 	model:SetAttribute("Time", o.time)
-	if parts.Face then
-		Crew.setExpression(model, o.expression or "Normal", o.tex)
-	end
+	Crew.applyTime(model, o.time or "Day", o.tex, o.expression)
 	return model
 end
 
@@ -247,6 +240,45 @@ function Crew.setExpression(model: Model, name: string, tex: { [string]: string 
 	face.TextureID = ""
 	model:SetAttribute("Expression", name)
 	return true
+end
+
+--[[ Day / Mid / Night texture state (DEC: sanity shown on the character).
+	Day = high sanity (day sheets, Normal face), Mid = medium sanity (T_*_Mid sheets, Exhausted face),
+	Night = low sanity (night sheets, Normal_Night face). Every swap is a TextureID / SurfaceAppearance clone, so it
+	works at runtime. Keys: T_<Outfit>_<Time>, T_Head_<A>[_Mid|_Night], T_Atlas_Kitchen_<Mid|Night>. ]]
+local DEFAULT_FACE = { Day = "Normal", Mid = "Exhausted", Night = "Normal" }
+
+function Crew.applyTime(model: Model, time: string, tex: { [string]: string }, expression: string?)
+	local animal, outfit = model:GetAttribute("Animal"), model:GetAttribute("Outfit")
+	local key = outfit == "Crew" and "Crew_Uniform" or ("Civil_" .. tostring(outfit))
+	local sheet = tex[string.format("T_%s_%s", key, time)] or tex["T_" .. key .. "_Day"]
+	local headTex = tex["T_Head_" .. tostring(animal) .. (time == "Day" and "" or "_" .. time)] or tex["T_Head_" .. tostring(animal)]
+	local atlas = time ~= "Day" and tex["T_Atlas_Kitchen_" .. time] or nil
+	for _, p in model:GetChildren() do
+		if p:IsA("MeshPart") then
+			if p:GetAttribute("OutfitPart") and sheet then
+				p.TextureID = sheet
+			elseif p.Name == "Head" and headTex then
+				p.TextureID = headTex
+			elseif p:GetAttribute("DayTextureID") then
+				p.TextureID = atlas or p:GetAttribute("DayTextureID")
+			end
+		end
+	end
+	model:SetAttribute("Time", time)
+	if model:FindFirstChild("Face") then
+		Crew.setExpression(model, expression or DEFAULT_FACE[time] or "Normal", tex)
+	end
+end
+
+-- level: "High" | "Mid" | "Low", or a number 0..1 (>= 0.66 high, >= 0.33 mid, else low)
+function Crew.setSanity(model: Model, level: any, tex: { [string]: string })
+	if type(level) == "number" then
+		level = level >= 0.66 and "High" or (level >= 0.33 and "Mid" or "Low")
+	end
+	local time = ({ High = "Day", Mid = "Mid", Low = "Night" })[level] or "Day"
+	model:SetAttribute("Sanity", level)
+	Crew.applyTime(model, time, tex)
 end
 
 return Crew
