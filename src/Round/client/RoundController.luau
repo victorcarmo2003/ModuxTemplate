@@ -1,8 +1,9 @@
 --!strict
 -- Shift view (network.md §3.1, FEAT-003, DEC-048). Reads the Shift set (record 1) and exposes Vide sources:
--- Day, Phase, IsNight and ClockText ("8:00 AM", floored to Content.Shift.ClockStepMinutes). Other Controllers read
--- these sources, never the set. The clock is interpolated locally from server time (PhaseStartedAt) so a late
--- joiner or reconnect gets the current phase and hour from onAdded without waiting for a phase change.
+-- Day, Phase, IsNight, Vehicle and ClockText ("8:00 AM", floored to Content.Shift.ClockStepMinutes). Other
+-- Controllers read these sources, never the set. The clock is interpolated locally from server time
+-- (PhaseStartedAt) so a late joiner or reconnect gets the current phase and hour from onAdded without waiting for a
+-- phase change.
 -- The client never decides phase or time: it only presents what the server wrote.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
@@ -17,6 +18,7 @@ const TICK_RATE = 10 -- Hz; one clock step is 6 s real on day, so 0.1 s is far i
 
 -- Fallback before the first record arrives (Ready = false): start of the day prep (7:00 AM)
 const DEFAULT_PHASE = "Prep"
+const DEFAULT_VEHICLE = "cart" -- wave 1 always starts on the cart
 const NO_MINUTE = -1 -- forces the next Refresh to write ClockText
 
 export type Clock = {
@@ -31,6 +33,7 @@ export type Record = {
 	Day: number,
 	IsNight: boolean,
 	Phase: string,
+	Vehicle: string,
 	PhaseStartedAt: number,
 	PhaseDuration: number,
 	ClockFrom: number,
@@ -65,6 +68,8 @@ function RoundController:Setup()
 	self.Day = Vide.source(1) :: Vide.Source<number>
 	self.Phase = Vide.source(DEFAULT_PHASE) :: Vide.Source<string>
 	self.IsNight = Vide.source(false) :: Vide.Source<boolean>
+	-- Shift.Vehicle (key of Content.Vehicles); MarketController reads it for "Trailer only" (FEAT-015, DEC-184)
+	self.Vehicle = Vide.source(DEFAULT_VEHICLE) :: Vide.Source<string>
 	self.ClockText = Vide.source(self:Format(Content.Shift.ByKey[DEFAULT_PHASE].ClockFrom)) :: Vide.Source<string>
 	-- true once the first Shift record arrived
 	self.Ready = Vide.source(false) :: Vide.Source<boolean>
@@ -101,6 +106,7 @@ function RoundController:Apply(record: Record)
 		self.Day(record.Day)
 		self.Phase(record.Phase)
 		self.IsNight(record.IsNight)
+		self.Vehicle(record.Vehicle)
 		self:Refresh()
 		self.Ready(true)
 	end)

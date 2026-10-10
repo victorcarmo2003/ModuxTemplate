@@ -12,9 +12,14 @@ const Theme = {
 		Green = Color3.fromHex("#5FA36A"),
 		Cream = Color3.fromHex("#FFF1D6"),
 		Violet = Color3.fromHex("#6A5ACD"), -- thief bar (§7.3)
+		Slate = Color3.fromHex("#8A8FA3"), -- grade D on the shift summary (§7.4, never red)
+		-- Price the party cannot pay (FEAT-008 "preço em vermelho"); same Ketchup red as Low. Grades/sanity never red.
+		NoCash = Color3.fromHex("#E2402E"),
 		-- CookInterface colors from AnimalPlane (DEC-029): orange while cooking, green when ready.
 		Cooking = Color3.fromRGB(252, 172, 1),
 		Ready = Color3.fromRGB(0, 255, 115),
+		-- FEAT-007: stock counter turns red at <= 2 (Ketchup of §2.1).
+		Low = Color3.fromHex("#E2402E"),
 	},
 
 	Transparency = {
