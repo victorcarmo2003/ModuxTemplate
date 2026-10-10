@@ -4,7 +4,7 @@
 	AST-084, AST-095 row 010; sound-list SFX-160; T117-11, T118-03).
 
 	Presents only. The posts going out one by one are drawn by LightController from the `Lights` set (Order x Step
-	since At, same on every client); the safe point rule is AnomalyService + HideService on the server.
+	since At, same on every client); the safe point rule is AnomalyService on the server (zone SS).
 
 	Mount (one occurrence of the `Anomalies` set):
 	  * low fog (AST-067 placeholder): an invisible box that follows the camera at ground level with 2 emitters at

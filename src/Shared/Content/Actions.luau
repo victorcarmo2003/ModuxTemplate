@@ -59,7 +59,7 @@ return Table.new({
 	{ Key = "pick_up_item", Text = "Take", Hold = 0, Radius = 7, Requires = {}, Night = "Any", Wave = 1 },
 
 	-- later waves (texts Provisional until ui-text.md; owners: game-designer, narrative-writer). Holds of the coffee and
-	-- hide actions from FEAT-021/FEAT-023 (A7, architecture.md §19.26). Every wave 2-3 row is here already, so the
+	-- service window actions from FEAT-021/FEAT-023 (A7, architecture.md §19.26). Every wave 2-3 row is here already, so the
 	-- wave 3 content task does not reopen this file.
 	{ Key = "bench_buy_item", Text = "Buy {item} — ${price}", Hold = 1.5, Radius = 7, Requires = {}, Night = "Any", Wave = 4 },
 	{ Key = "buy_trailer", Text = "Buy Trailer — ${price}", Hold = 2, Radius = 10, Requires = {}, Night = "DayOnly", Wave = 2 },
@@ -78,11 +78,8 @@ return Table.new({
 	{ Key = "switch_light", Text = "Lights", Hold = 0, Radius = 7, Requires = {}, Night = "Any", Wave = 2 },
 	-- Prompt_Answer on the cart and trailer phones (FEAT-018, DEC-124)
 	{ Key = "answer_phone", Text = "Answer", Hold = 0, Radius = 7, Requires = {}, Night = "Any", Wave = 2 },
-	{ Key = "hide", Text = "Hide", Hold = 0.5, Radius = 7, Requires = {}, Night = "NightOnly", Wave = 3 },
 	-- the safe spot is a zone, not a prompt: the key exists for the enum only (content-data.md §6.9)
-	{ Key = "safe_spot", Text = "Hide", Hold = 0, Radius = 7, Requires = {}, Night = "NightOnly", Wave = 3 },
-	-- leave a hide point (FEAT-023); local button of HideController
-	{ Key = "get_up", Text = "Get Up", Hold = 0, Radius = 10, Requires = {}, Night = "NightOnly", Wave = 3 },
+	{ Key = "safe_spot", Text = "Safe Spot", Hold = 0, Radius = 7, Requires = {}, Night = "NightOnly", Wave = 3 },
 	-- trailer service window (FEAT-023, DEC-221): Prompt_Shutter next to the light switch; owner VehicleService,
 	-- PromptText "Close Window"/"Open Window" by state, cooldown 1 s in Validate (Q-173, placeholder until ui-text.md)
 	{ Key = "shutter_toggle", Text = "Close Window", Hold = 0.5, Radius = 7, Requires = {}, Night = "NightOnly", Wave = 3 },

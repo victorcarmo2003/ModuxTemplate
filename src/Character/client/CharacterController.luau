@@ -4,7 +4,7 @@
 
 	Own character on this client:
 	  - locks the controls (walk, jump, hotbar) while the own life state is not `Active` (Down, Reviving,
-	    Spectator) or while the server froze the character (`CharacterService:Freeze`: hide, cutscene);
+	    Spectator) or while the server froze the character (`CharacterService:Freeze`: cutscene);
 	  - shows the own arms in first person, day and night (DEC-219, `CameraController:SetArmsVisible(true)`);
 	  - Fainted face on every crew member whose `Vitals.State` is `Down` (network.md §5.2, DEC-216), through
 	    `RigController:SetExpression` (local layer; the server only ragdolls the body).

@@ -207,18 +207,12 @@ return Lync.define("game", {
 		Seed = Lync.int(0, 65535),
 	})),
 
-	-- §13.5 c -> s, 10 Hz, latest wins. Sender: CameraController (night, Active, not hidden). Responder: AnomalyService.
+	-- §13.5 c -> s, 10 Hz, latest wins. Sender: CameraController (night, Active). Responder: AnomalyService.
 	-- Degrees 0..360, 1 degree steps; angle is cyclic, so a pitch of -20 travels as 340 (reader maps > 180 to -).
 	Gaze = Lync.packet(Lync.struct({
 		Yaw = Lync.angle(1),
 		Pitch = Lync.angle(1),
 	})):newest(10),
-
-	-- §13.6, record = UserId; removed when the player gets up. Writer: HideService (T52: Vitals keeps one writer)
-	Hides = Lync.replicate(Lync.struct({
-		-- H1..H4 (DEC-176)
-		Slot = Lync.int(1, 4),
-	})),
 
 	-- §13.7 (§6.2 schema), record 1. Writer: CutsceneService. Needed = ceil(0.5 x connected participants) (DEC-194)
 	Cutscene = Lync.replicate(Lync.struct({

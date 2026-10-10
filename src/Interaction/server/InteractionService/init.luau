@@ -3,7 +3,7 @@
 -- Owns the EntityId of every Interactable anchor in the Workspace and dispatches each Interact to the action
 -- registered by its owner (RegisterAction, called from the owner's OnInit). The client never decides: every packet
 -- is checked for rate, target, member state, gates, range and the owner's own rules before Run.
--- Wave 2 (TASK-051, architecture.md §19.3, §19.26 A2, T49): AddGate (life/hide/cutscene owners refuse without a
+-- Wave 2 (TASK-051, architecture.md §19.3, §19.26 A2, T49): AddGate (life/cutscene owners refuse without a
 -- Require back to them, T42), Performed after a clean Run, binding wave from Content, member via RunStateService.
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -21,7 +21,7 @@ local Modux = require(ServerScriptService.server.Modux)
 -- Rejected carries a plain string (Provisional format, TASK-051).
 export type RejectReason = "rate" | "range" | "target" | "state"
 
--- Gate: true lets the request go on; false refuses it, with an optional detail ("Down", "Hidden"...).
+-- Gate: true lets the request go on; false refuses it, with an optional detail ("Down", "Cutscene"...).
 export type GateFn = (player: Player, action: string, anchor: Instance) -> (boolean, string?)
 export type Gate = { Name: string, Fn: GateFn }
 
@@ -29,7 +29,7 @@ export type Handler = {
 	-- Owner's rules (slot free, stock, hand, phase...). Runs serialized per target, right before Run.
 	Validate: (player: Player, anchor: Instance, id: number) -> boolean,
 	Run: (player: Player, anchor: Instance, id: number) -> (),
-	-- Optional: other PromptAction values whose anchors also accept this action (e.g. get_up on a hide slot).
+	-- Optional: other PromptAction values whose anchors also accept this action (none in use since DEC-221).
 	On: { string }?,
 }
 

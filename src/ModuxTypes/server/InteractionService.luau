@@ -12,7 +12,7 @@ export type Handler = {
 	-- Owner's rules (slot free, stock, hand, phase...). Runs serialized per target, right before Run.
 	Validate: (player: Player, anchor: Instance, id: number) -> boolean,
 	Run: (player: Player, anchor: Instance, id: number) -> (),
-	-- Optional: other PromptAction values whose anchors also accept this action (e.g. get_up on a hide slot).
+	-- Optional: other PromptAction values whose anchors also accept this action (none in use since DEC-221).
 	On: { string }?,
 }
 export type Request = { Player: Player, Action: string }

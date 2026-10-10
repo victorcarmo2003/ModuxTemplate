@@ -53,7 +53,6 @@ const base = Table.new({
 	anim("crew_jump", "Crew", false, "Movement"),
 	anim("crew_fall", "Crew", true, "Movement"),
 	anim("get_up", "Crew", false, "Action"), -- hit by a car, gets up (0.5 s)
-	anim("hide", "Crew", true, "Action"), -- crouched behind the counter
 	anim("drink", "Crew", false, "Action"), -- coffee, 1.5 s (Sanity.CoffeeDrinkTime)
 	anim("give", "Crew", false, "Action"),
 	anim("answer_phone", "Crew", true, "Action"),

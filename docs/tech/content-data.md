@@ -976,7 +976,7 @@ Actions:
 | `give_coffee` | "Give" | **0.5** (era 0) | 7 | NightOnly | 2 | FEAT-021 |
 | ~~`hide`~~ | — | — | — | — | — | **sai (v5.2, DEC-221)** |
 | `shutter_toggle` | "Close Window" / "Open Window" (`PromptText` pelo estado; placeholder até o `ui-text.md`) | **0.5** | 7 | NightOnly | 3 | **nova (v5.2)**; FEAT-023, DEC-221; âncora `Prompt_Shutter`; dono `VehicleService`; cooldown 1 s no `Validate` (não é campo da tabela) |
-| `safe_spot` | — | — | — | — | — | fica na tabela (enum), **sem prompt**: o ponto seguro é zona (o `Text` "Hide" do código vira "Safe Spot", só rótulo de debug) |
+| `safe_spot` | — | — | — | — | — | fica na tabela (enum), **sem prompt**: o ponto seguro é zona (`Text` = "Safe Spot", só rótulo de debug; era "Hide", TASK-133) |
 
 Notices (`Audience`, `ValueFrom`):
 

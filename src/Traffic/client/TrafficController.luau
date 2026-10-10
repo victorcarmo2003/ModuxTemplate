@@ -17,7 +17,7 @@
 	    HumanoidRootPart only. Contact -> local prediction (Physics state + impulse along the car + up, stands up after
 	    KnockTime) and `CarHit { Car }` to the server, which validates and runs the real Knock / DropHeld / immunity.
 	    One hit per car per record life and none during the local immunity window. No hit while the own state is not
-	    Active or the character is `Frozen` (hide, cutscene).
+	    Active or the character is `Frozen` (cutscene).
 	  * LOD: wheels spin and the car moves every frame up to LOD_NEAR studs from the camera; up to LOD_FAR it moves at
 	    FAR_RATE without spinning wheels; past LOD_FAR the model is parked (still integrated, still hit-tested: a car
 	    that far cannot touch the own character anyway). Parts move with one BulkMoveTo per car.
@@ -105,7 +105,7 @@ const PATH_ATTRIBUTE = "PathId"
 const BOX_TAG = "TrafficBox"
 const BOX_ATTRIBUTE = "BoxId"
 const ORDER_ATTRIBUTES = { "Index", "Order" } -- binding order first (TASK-104 Paths)
-const FROZEN_ATTRIBUTE = "Frozen" -- CharacterService:Freeze (hide, cutscene)
+const FROZEN_ATTRIBUTE = "Frozen" -- CharacterService:Freeze (cutscene)
 const MAP_WAIT = 60 -- seconds MapIndex.WaitReady may wait for streaming
 const PATH_RETRY = 2 -- seconds between lookups of a path that is not in the map yet
 

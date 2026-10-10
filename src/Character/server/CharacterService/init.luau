@@ -22,7 +22,7 @@
 --   Faint(player)                ragdoll in place, no throw (DEC-216); the body stays down. The Fainted face is
 --                                derived on every client from Vitals.State = Down (network.md §5.2)
 --   RemoveBody(player, instant?) fade, then the character goes away (PickupHandler fallback T54; ambulance, wave 4)
---   Freeze(player, reason, on)   no walk / jump while any reason holds it (Hide, Cutscene...)
+--   Freeze(player, reason, on)   no walk / jump while any reason holds it (Cutscene...)
 --   Prompt_Give anchor           runtime Interactable on each member's HRP, PromptAction = give_coffee (ItemService)
 --   Animate ids                  Content.Animations.Locomotion.crew written into the stock R6 Animate (id "" = stock)
 --
@@ -468,7 +468,7 @@ function CharacterService:IsFrozen(player: Player): boolean
 	return reasons ~= nil and next(reasons) ~= nil
 end
 
--- Holds the player in place for a reason (Hide, Cutscene...). Released only when every reason is off.
+-- Holds the player in place for a reason (Cutscene...). Released only when every reason is off.
 function CharacterService:Freeze(player: Player, reason: string, on: boolean)
 	local reasons = self.Frozen[player]
 	if on then

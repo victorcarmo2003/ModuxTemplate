@@ -24,8 +24,6 @@ export type StationRule = {
 export type VehicleRule = {
 	Stations: { [string]: StationRule }, -- StationKind -> rule, one station of each inside the vehicle
 	Actions: { [string]: number },
-	-- Wave 3: PromptAction -> n; those loose anchors carry Slot 1..n, each exactly once (hide spots H1..H4)
-	Slotted: { [string]: number }?,
 }
 
 -- Every Id must appear exactly once as `Attribute` on an instance tagged `Tag` (light zones, street lights).
@@ -310,7 +308,7 @@ wave3.Tags = union(wave2.Tags, { "AnomalyAnchor", "TrafficPath", "TrafficLine", 
 wave3.Points = union(
 	wave2.Points,
 	concat(
-		-- hide (SS, §19.14), anomaly anchors and hidden actor spawns (MAP-01 §10.3), Walker step 10 (§5.6, fixed)
+		-- safe spot (SS, §19.14), anomaly anchors and hidden actor spawns (MAP-01 §10.3), Walker step 10 (§5.6, fixed)
 		{ "SS", "AN-04", "AN-05", "AN-11", "AN-12", "AS-1", "AS-2", "AS-3", "AS-4", "WALKER-10" },
 		cutscenePoints(),
 		-- traffic entries and exits (MAP-01 §5.4)
