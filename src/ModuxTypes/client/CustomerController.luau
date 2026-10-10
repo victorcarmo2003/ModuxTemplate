@@ -37,6 +37,7 @@ type Tracked = {
 
 export type Public = {
 	Entries: { [number]: Entry },
+	Focus: Vide.Source<number>,
 	Gui: Instance?,
 	Models: { [number]: Model },
 	Mounted: number,
@@ -61,6 +62,13 @@ export type Public = {
 	ClearReaction: (self: Public, model: Model) -> (),
 	Cue: (self: Public, id: number, key: string) -> (),
 	Feedback: (self: Public, id: number, result: string) -> (),
+	PickFocus: (self: Public) -> number,
+	UpdateFocus: (self: Public) -> (),
+	FocusEntry: (self: Public) -> (Entry?, Record?),
+	CardShown: (self: Public) -> boolean,
+	CardEmpty: (self: Public) -> boolean,
+	CardToppings: (self: Public) -> { string },
+	CardPatience: (self: Public) -> number,
 	Bind: (self: Public, model: Model) -> (),
 	Track: (self: Public, instance: Instance) -> (),
 	Untrack: (self: Public, instance: Instance) -> (),

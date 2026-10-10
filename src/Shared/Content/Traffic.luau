@@ -129,24 +129,34 @@ local function route(
 end
 
 -- MAP-01 §9.5: "(SL-x)" = crosswalk line (stop only with an NPC reservation); PARE = always 1 s.
+-- Juniper routes that turn into the Ninth cross CW-2 (west) or CW-4 (east) right after the X-T box and pass no SL-W /
+-- SL-E: their line for that crosswalk is their own PARE line (SL-N / SL-S), so a reservation keeps them out of the box
+-- (no car stops inside X-T). PROVISIONAL (debugger, 2026-10-10): MAP-01 §9.5 lists only SL-W/SL-E for CW-2/CW-4.
 const routes = Table.new({
 	route("TR-1", "DayNight", "W-IN", nil, { crosswalk("CW-2", "SL-W"), crosswalk("CW-3", "SL-3W") }),
 	route("TR-2", "DayNight", "E-IN", nil, { crosswalk("CW-3", "SL-3E"), crosswalk("CW-2", "SL-E") }),
-	route("TR-3", "Day", "JN-IN", nil, { pare("SL-N"), crosswalk("CW-3", "SL-3W") }),
-	route("TR-4", "Day", "JN-IN", nil, { pare("SL-N") }),
+	route("TR-3", "Day", "JN-IN", nil, { pare("SL-N"), crosswalk("CW-4", "SL-N"), crosswalk("CW-3", "SL-3W") }),
+	route("TR-4", "Day", "JN-IN", nil, { pare("SL-N"), crosswalk("CW-2", "SL-N") }),
 	route("TR-5", "Day", "W-IN", nil, { crosswalk("CW-2", "SL-W") }),
 	route("TR-6", "Day", "E-IN", nil, { crosswalk("CW-3", "SL-3E"), crosswalk("CW-2", "SL-E") }),
 	route("TR-7", "Day", "JS-IN", "NB", { crosswalk("CW-1", "SL-1S"), pare("SL-S") }),
 	route("TR-8", "Day", "JN-IN", "SB", { pare("SL-N"), crosswalk("CW-1", "SL-1N") }),
 	route("TR-9", "Day", "W-IN", "SB", { crosswalk("CW-2", "SL-W"), crosswalk("CW-1", "SL-1N") }),
-	route("TR-10", "Day", "JS-IN", "NB", { crosswalk("CW-1", "SL-1S"), pare("SL-S"), crosswalk("CW-3", "SL-3W") }),
+	route(
+		"TR-10",
+		"Day",
+		"JS-IN",
+		"NB",
+		{ crosswalk("CW-1", "SL-1S"), pare("SL-S"), crosswalk("CW-4", "SL-S"), crosswalk("CW-3", "SL-3W") }
+	),
 } :: { Route })
 
 const crosswalks = Table.new({
 	{ Key = "CW-1", Box = "CW-1", Lines = { NB = "SL-1S", SB = "SL-1N" } }, -- Juniper South, trailer <-> Mart
-	{ Key = "CW-2", Box = "CW-2", Lines = { EB = "SL-W", WB = "SL-E" }, Linked = "CW-4" },
+	{ Key = "CW-2", Box = "CW-2", Lines = { EB = "SL-W", WB = "SL-E", SB = "SL-N" }, Linked = "CW-4" }, -- SB: TR-4
 	{ Key = "CW-3", Box = "CW-3", Lines = { EB = "SL-3W", WB = "SL-3E" } },
-	{ Key = "CW-4", Box = "CW-4", Lines = { EB = "SL-W", WB = "SL-E" }, Linked = "CW-2" },
+	-- SB: TR-3 (left from Juniper North), NB: TR-10 (right from Juniper South)
+	{ Key = "CW-4", Box = "CW-4", Lines = { EB = "SL-W", WB = "SL-E", SB = "SL-N", NB = "SL-S" }, Linked = "CW-2" },
 } :: { Crosswalk })
 
 const conflicts = Table.new({

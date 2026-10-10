@@ -125,14 +125,14 @@ local TRAFFIC_EMBEDDED = {
 	routes = {
 		{ path = "TR-1", lane = "W-IN", stops = { { "Crosswalk", "SL-W" }, { "Crosswalk", "SL-3W" } } },
 		{ path = "TR-2", lane = "E-IN", stops = { { "Crosswalk", "SL-3E" }, { "Crosswalk", "SL-E" } } },
-		{ path = "TR-3", lane = "JN-IN", stops = { { "Pare", "SL-N" }, { "Crosswalk", "SL-3W" } } },
-		{ path = "TR-4", lane = "JN-IN", stops = { { "Pare", "SL-N" } } },
+		{ path = "TR-3", lane = "JN-IN", stops = { { "Pare", "SL-N" }, { "Crosswalk", "SL-N" }, { "Crosswalk", "SL-3W" } } },
+		{ path = "TR-4", lane = "JN-IN", stops = { { "Pare", "SL-N" }, { "Crosswalk", "SL-N" } } },
 		{ path = "TR-5", lane = "W-IN", stops = { { "Crosswalk", "SL-W" } } },
 		{ path = "TR-6", lane = "E-IN", stops = { { "Crosswalk", "SL-3E" }, { "Crosswalk", "SL-E" } } },
 		{ path = "TR-7", lane = "JS-IN", stops = { { "Crosswalk", "SL-1S" }, { "Pare", "SL-S" } } },
 		{ path = "TR-8", lane = "JN-IN", stops = { { "Pare", "SL-N" }, { "Crosswalk", "SL-1N" } } },
 		{ path = "TR-9", lane = "W-IN", stops = { { "Crosswalk", "SL-W" }, { "Crosswalk", "SL-1N" } } },
-		{ path = "TR-10", lane = "JS-IN", stops = { { "Crosswalk", "SL-1S" }, { "Pare", "SL-S" }, { "Crosswalk", "SL-3W" } } },
+		{ path = "TR-10", lane = "JS-IN", stops = { { "Crosswalk", "SL-1S" }, { "Pare", "SL-S" }, { "Crosswalk", "SL-S" }, { "Crosswalk", "SL-3W" } } },
 	},
 	lines = { "SL-1N", "SL-1S", "SL-3E", "SL-3W", "SL-E", "SL-N", "SL-S", "SL-W" },
 	boxes = { "X-T", "CW-1", "CW-2", "CW-3", "CW-4" },
@@ -1511,10 +1511,14 @@ local function checkWave3(points: { [string]: Instance }, vehicles: { [string]: 
 		local last = -1
 		local firstCw: number? = nil
 		local order = {}
+		local prevLine: string? = nil
 		for _, s in r.stops do
 			local kind, lineId = s[1], s[2]
+			-- one line, two roles (PARE + the crosswalk right after the X-T box): checked once
+			local repeated = lineId == prevLine
+			prevLine = lineId
 			local l = lines[lineId]
-			if not (l and l:IsA("BasePart")) then
+			if repeated or not (l and l:IsA("BasePart")) then
 				continue
 			end
 			local at = crossAt(pts, l :: BasePart)

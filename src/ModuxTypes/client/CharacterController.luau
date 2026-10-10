@@ -16,9 +16,12 @@ export type Public = {
 	Frozen: Vide.Source<boolean>,
 	FrozenConnection: RBXScriptConnection?,
 	Locked: Vide.Source<boolean>,
+	Looked: boolean,
+	Sinking: boolean,
 	Setup: (self: Public) -> (),
 	RefreshFaces: (self: Public) -> (),
 	GetControls: (self: Public) -> Controls?,
+	Sink: (self: Public, on: boolean) -> (),
 	Apply: (self: Public, locked: boolean) -> (),
 	Watch: (self: Public, character: Model?) -> (),
 }

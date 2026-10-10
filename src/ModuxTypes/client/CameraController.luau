@@ -23,6 +23,7 @@ export type Public = {
 	GazePitch: number,
 	GazeYaw: number,
 	Groups: { [BasePart]: Group },
+	HoldYaw: number?,
 	LastLookInput: number,
 	LastPosition: Vector3?,
 	LastState: string,

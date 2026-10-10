@@ -23,6 +23,9 @@ type Cache = {
 const ROOT_TAG = "MapBinding"
 const DEFAULT_WAIT = 30 -- seconds WaitReady waits for streaming by default
 const POLL = 0.1
+-- Root present but a count short and nothing new streamed in for this long: the counts are stale (the binding changed
+-- after check_map01 last wrote them, e.g. hide spots removed by TASK-133) and the map is what the server has.
+const SETTLE = 8
 -- Counts written on the root by the edit-time check (§18.7 item 8): what the client must have streamed in.
 const COUNTS = {
 	{ Attribute = "PointCount", Tag = "MapPoint" },
@@ -43,6 +46,17 @@ local function tagged(tag: string): { Instance }
 		return a:GetFullName() < b:GetFullName()
 	end)
 	return out
+end
+
+-- Count of `tag` in the Workspace (no sort: polled by WaitReady)
+local function countTagged(tag: string): number
+	local n = 0
+	for _, instance in CollectionService:GetTagged(tag) do
+		if instance:IsDescendantOf(Workspace) then
+			n += 1
+		end
+	end
+	return n
 end
 
 local function positionOf(instance: Instance): Vector3
@@ -197,21 +211,39 @@ end
 
 -- Client: waits until the root exists and the tagged counts written by the check (§18.7 item 8) have streamed in.
 -- Root without counts = the check never wrote them: ready as soon as the root is there. Server: returns at once.
+-- Counts that stop growing for SETTLE s with the root there are stale, not streaming: ready, with one warning.
+local warnedStale = false
 function MapIndex.WaitReady(timeout: number?): boolean
 	const deadline = os.clock() + (timeout or DEFAULT_WAIT)
+	local seen = ""
+	local stillSince = os.clock()
 	while true do
 		const roots = tagged(ROOT_TAG)
 		const root = roots[1]
 		if root ~= nil then
 			local complete = true
+			const parts: { string } = {}
 			for _, count in COUNTS do
 				const expected = root:GetAttribute(count.Attribute)
-				if typeof(expected) == "number" and #tagged(count.Tag) < expected then
+				const got = countTagged(count.Tag)
+				table.insert(parts, `{count.Tag} {got}/{if typeof(expected) == "number" then expected else "-"}`)
+				if typeof(expected) == "number" and got < expected then
 					complete = false
-					break
 				end
 			end
 			if complete then
+				MapIndex.Refresh()
+				return true
+			end
+			const summary = table.concat(parts, ", ")
+			if summary ~= seen then
+				seen = summary
+				stillSince = os.clock()
+			elseif os.clock() - stillSince >= SETTLE then
+				if not warnedStale then
+					warnedStale = true
+					warn(`[MapIndex] binding counts not reached and nothing new for {SETTLE} s ({summary}): stale counts, run check_map01 to rewrite them`)
+				end
 				MapIndex.Refresh()
 				return true
 			end

@@ -88,6 +88,7 @@ export type Public = {
 	HideRunEnd: (self: Public) -> (),
 	Layer: (self: Public, name: string, zIndex: number, children: { Instance }) -> Frame,
 	SanityMeter: (self: Public) -> Frame,
+	OrderCard: (self: Public) -> Frame,
 	Rescale: (self: Public, camera: Camera?) -> (),
 	WatchViewport: (self: Public) -> (),
 	Mount: (self: Public, playerGui: Instance) -> (),

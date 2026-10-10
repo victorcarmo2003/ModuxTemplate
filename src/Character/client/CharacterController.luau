@@ -15,6 +15,7 @@
 	Freeze contract (TASK-061): `CharacterService:Freeze` writes the boolean attribute `Frozen` on the character
 	(walk and jump zeroed on the server); a non-empty string is also accepted. Wave 3 ragdoll prediction ("ragdoll previsto", §19.1) is not in this task.
 ]]
+local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterGui = game:GetService("StarterGui")
@@ -24,6 +25,23 @@ local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 
 const FROZEN_ATTRIBUTE = "Frozen"
 const FAINTED_FACE = "Fainted" -- Content.Looks expression (DEC-216, Provisional DEC-167)
+const MODULE_WAIT = 10 -- seconds the first lookup waits for PlayerScripts.PlayerModule; later lookups do not yield
+-- Fallback lock when the stock PlayerModule is not there: sink the walk/jump inputs above every other binding.
+const LOCK_ACTION = "CharacterControlsLock"
+const LOCK_PRIORITY = Enum.ContextActionPriority.High.Value + 1000
+const LOCK_INPUTS: { Enum.KeyCode } = {
+	Enum.KeyCode.W,
+	Enum.KeyCode.A,
+	Enum.KeyCode.S,
+	Enum.KeyCode.D,
+	Enum.KeyCode.Up,
+	Enum.KeyCode.Down,
+	Enum.KeyCode.Left,
+	Enum.KeyCode.Right,
+	Enum.KeyCode.Space,
+	Enum.KeyCode.Thumbstick1,
+	Enum.KeyCode.ButtonA,
+}
 
 type Controls = {
 	Enable: (self: Controls, enabled: boolean?) -> (),
@@ -54,6 +72,9 @@ function CharacterController:Setup()
 	-- Controls are locked now (not Active or Frozen). Other Controllers may read it.
 	self.Locked = Vide.source(false) :: Vide.Source<boolean>
 	self.Controls = nil :: Controls?
+	-- The first lookup already waited MODULE_WAIT s (the next ones only look, never yield again).
+	self.Looked = false :: boolean
+	self.Sinking = false :: boolean
 	self.Applied = false :: boolean
 	self.Character = nil :: Model?
 	self.FrozenConnection = nil :: RBXScriptConnection?
@@ -85,18 +106,29 @@ function CharacterController:RefreshFaces()
 	end
 end
 
--- PlayerModule controls (stock Roblox), loaded once; nil if the module is missing (custom player scripts).
+-- PlayerModule controls (stock Roblox), loaded once; nil if the module is missing (custom player scripts). Only the
+-- first lookup waits; a missing module warns once and the lock falls back to sinking the inputs (Apply).
 function CharacterController:GetControls(): Controls?
 	if self.Controls ~= nil then
 		return self.Controls
 	end
-	const scripts = Players.LocalPlayer:WaitForChild("PlayerScripts", 10)
-	const module = if scripts ~= nil then scripts:WaitForChild("PlayerModule", 10) else nil
+	const player = Players.LocalPlayer
+	local module: Instance? = nil
+	if self.Looked then
+		const scripts = player:FindFirstChild("PlayerScripts")
+		module = if scripts ~= nil then scripts:FindFirstChild("PlayerModule") else nil
+	else
+		self.Looked = true
+		const scripts = player:WaitForChild("PlayerScripts", MODULE_WAIT)
+		module = if scripts ~= nil then scripts:WaitForChild("PlayerModule", MODULE_WAIT) else nil
+		if module == nil then
+			warn("[CharacterController] no PlayerScripts.PlayerModule: the lock sinks walk/jump input instead")
+		end
+	end
 	if module == nil or not module:IsA("ModuleScript") then
-		warn("[CharacterController] PlayerModule not found: controls cannot be locked")
 		return nil
 	end
-	const ok, result = pcall(require, module)
+	const ok, result = pcall(require, module :: ModuleScript)
 	if not ok then
 		warn(`[CharacterController] PlayerModule failed to load: {result}`)
 		return nil
@@ -106,15 +138,36 @@ function CharacterController:GetControls(): Controls?
 	return controls
 end
 
+-- Fallback lock: walk/jump keys sunk at the top priority (no PlayerModule to disable)
+function CharacterController:Sink(on: boolean)
+	if self.Sinking == on then
+		return
+	end
+	self.Sinking = on
+	if on then
+		ContextActionService:BindActionAtPriority(LOCK_ACTION, function()
+			return Enum.ContextActionResult.Sink
+		end, false, LOCK_PRIORITY, table.unpack(LOCK_INPUTS))
+	else
+		ContextActionService:UnbindAction(LOCK_ACTION)
+	end
+end
+
 function CharacterController:Apply(locked: boolean)
 	self.Applied = locked
 	const controls = self:GetControls()
+	if self.Applied ~= locked then
+		return -- the state changed while the first lookup waited: the newer Apply wins
+	end
 	if controls ~= nil then
+		self:Sink(false)
 		if locked then
 			controls:Disable()
 		else
 			controls:Enable()
 		end
+	else
+		self:Sink(locked)
 	end
 	-- Hotbar: no switching items while locked (the server stashes or keeps the Tools; nothing is unequipped here).
 	pcall(function()

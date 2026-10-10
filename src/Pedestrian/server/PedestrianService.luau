@@ -85,7 +85,7 @@ type Walker = {
 -- One reservation held by this service on a crosswalk (key = crosswalk)
 type Hold = {
 	Holder: number, -- reservation id given to TrafficService
-	Expires: number, -- server time: GrantedAt + Crossing.MaxWait (mirror of TrafficService)
+	Expires: number, -- server time: GrantedAt + the duration asked (mirror of TrafficService, >= Crossing.MaxWait)
 	Riders: { [number]: boolean }, -- walker slots on the road under it
 }
 
@@ -442,13 +442,17 @@ function PedestrianService:TryCross(walker: Walker, stop: Stop, t: number)
 			return
 		end
 	else
-		if arrival + RIDE_MARGIN > t + CROSSING.MaxWait then
-			self:WarnOnce(`long:{key}`, `{key} takes longer than Crossing.MaxWait to cross at walking speed`)
-		end
-		if not self.Dependencies.TrafficService:ReserveCrossing(key, walker.Npc) then
+		-- the reservation lasts the real crossing at this walker's speed (the Ninth crosswalks take > MaxWait)
+		const traffic = self.Dependencies.TrafficService
+		if not traffic:ReserveCrossing(key, walker.Npc, math.max(CROSSING.MaxWait, arrival + RIDE_MARGIN - t)) then
 			return
 		end
-		hold = { Holder = walker.Npc, Expires = t + CROSSING.MaxWait, Riders = {} }
+		-- mirror of what TrafficService granted (it clamps the duration; with traffic off it holds nothing)
+		const expires = traffic:ReservedUntil(key, walker.Npc) or (arrival + RIDE_MARGIN)
+		if arrival + RIDE_MARGIN > expires then
+			self:WarnOnce(`long:{key}`, `{key} takes longer than the longest crosswalk reservation at walking speed`)
+		end
+		hold = { Holder = walker.Npc, Expires = expires, Riders = {} }
 		self.Holds[key] = hold
 	end
 	const granted = hold :: Hold

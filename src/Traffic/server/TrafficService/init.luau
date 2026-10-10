@@ -35,8 +35,8 @@
 	CharacterService:Knock(KnockTime, impulse) -> VitalService:SetKnocked -> ItemService:DropHeld(player, "Hit") ->
 	immunity until stand-up + ImmuneTime -> LifeEvent Hit. No sanity effect (DEC-103).
 
-	API: Hold(reason, on), IsHeld(), ReserveCrossing(cw, npcId) -> boolean, ReleaseCrossing(cw, npcId),
-	IsReserved(cw), Count(), Status(); dev: DevSpawn(route?), DevClear(), DevHit(player).
+	API: Hold(reason, on), IsHeld(), ReserveCrossing(cw, npcId, duration?) -> boolean, ReleaseCrossing(cw, npcId),
+	IsReserved(cw), ReservedUntil(cw, npcId), Count(), Status(); dev: DevSpawn(route?), DevClear(), DevHit(player).
 
 	PROVISIONAL (backend-coder, TASK-104; the user is away):
 	  (a) every record starts from rest (Motion header): a parked car always gets a new record to pull away, also at
@@ -118,6 +118,7 @@ const HEADING_HALF = 4 -- studs each side for the car heading
 const HORIZON = 60 -- seconds Motion.TimeAt may look ahead
 const MATCH = 1e-3 -- studs / studs per second: same motion up to now
 const PATH_RETRY = 5 -- seconds between lookups of a route path missing in the map
+const MAX_RESERVE = 12 -- seconds: ceiling of a reservation asked longer than Crossing.MaxWait (PROVISIONAL, debugger)
 const SPAWN_GROUP_OTHER = "Other"
 const NO_TRAFFIC_PHASES = { "Resume", "NightEnd", "NightLost", "Finale", "RunEnd" }
 
@@ -228,6 +229,17 @@ function TrafficService:IsReserved(cw: string): boolean
 		end
 	end
 	return false
+end
+
+-- Server time the reservation of `cw` (or of its Linked one) held by `npcId` ends, nil when it holds none
+function TrafficService:ReservedUntil(cw: string, npcId: number): number?
+	for _, key in groupOf(cw) do
+		const current = self.Reservations[key]
+		if current ~= nil and current.Npc == npcId then
+			return current.ExpiresAt
+		end
+	end
+	return nil
 end
 
 -- Geometry of a route (cached; nil while the binding is missing, retried every PATH_RETRY s)
@@ -477,7 +489,9 @@ end
 
 -- Granted only with no car whose front is within ReserveRadius of a line of the crosswalk (both directions) nor with
 -- its body inside the crosswalk, and Cooldown s after the last release. Cars that still have to cross stop on the line.
-function TrafficService:ReserveCrossing(cw: string, npcId: number): boolean
+-- `duration` (s): how long the holder needs the road; default and floor Crossing.MaxWait, ceiling MAX_RESERVE (a
+-- passer-by at walking speed needs more than MaxWait on the wide Ninth crosswalks).
+function TrafficService:ReserveCrossing(cw: string, npcId: number, duration: number?): boolean
 	const row = TRAFFIC.Crosswalks.ByKey[cw]
 	if row == nil then
 		self:WarnOnce(`cw:{cw}`, `ReserveCrossing: unknown crosswalk {cw}`)
@@ -517,7 +531,11 @@ function TrafficService:ReserveCrossing(cw: string, npcId: number): boolean
 			end
 		end
 	end
-	self.Reservations[cw] = { Npc = npcId, GrantedAt = t, ExpiresAt = t + CROSSING.MaxWait }
+	local hold = CROSSING.MaxWait
+	if type(duration) == "number" and duration == duration then
+		hold = math.clamp(duration, CROSSING.MaxWait, math.max(MAX_RESERVE, CROSSING.MaxWait))
+	end
+	self.Reservations[cw] = { Npc = npcId, GrantedAt = t, ExpiresAt = t + hold }
 	self:Reconcile(t)
 	return true
 end
@@ -768,7 +786,7 @@ end
 
 function TrafficService:Step()
 	const t = now()
-	-- reservations past MaxWait end by themselves (NpcService pivots its NPC off the road, §8.1)
+	-- reservations past their ExpiresAt end by themselves (NpcService pivots its NPC off the road, §8.1)
 	for key, reservation in self.Reservations do
 		if t >= reservation.ExpiresAt then
 			self:EndReservation(key, t)

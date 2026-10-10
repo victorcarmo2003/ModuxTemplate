@@ -31,7 +31,7 @@ type Walker = {
 }
 type Hold = {
 	Holder: number, -- reservation id given to TrafficService
-	Expires: number, -- server time: GrantedAt + Crossing.MaxWait (mirror of TrafficService)
+	Expires: number, -- server time: GrantedAt + the duration asked (mirror of TrafficService, >= Crossing.MaxWait)
 	Riders: { [number]: boolean }, -- walker slots on the road under it
 }
 export type Record = {
