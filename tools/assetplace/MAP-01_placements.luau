@@ -112,7 +112,10 @@
 	- Mount_Counter (cart and trailer): no asset fits (AST-019 counter is 3.5 tall, the mount is at
 	  counter-top height). Cart Mount_Sign is the skirt decal (AST-072), not the OPEN sign.
 	- Bottles AST-004/005 on the holder (Att_Bottle_*): editing in progress, runtime.
-	- Upgrade states (CoolerL2/L3, Rail_8, Lock, grill levels) and AST-043 tarp: runtime / not modelled.
+	- Upgrade states (CoolerL2/L3, Lock, grill levels): runtime (TASK-084 kit, TASK-085 binding). AST-043 tarp: not
+  modelled; bind_map01 puts a hidden grey placeholder (tag VehicleCover) inside the cart (TASK-083).
+- 2026-10-10 (TASK-083): after Place.run, bind_map01 brings the night layer into the Workspace for good (both
+  vehicles live there, T36) and parks the trailer at TRL-SALE. Place.showLayer is no longer used after a bind.
 	- AST-050_BunDisplay: MAP-01 §7.4 has no slot for it (buns are bought at the gondola, Q-135).
 	- Not used: AST-034_Cone (same role as AST-047_ConstructionCone), AST-036_StreetLightSquare,
 	  AST-047_WorkLight.
@@ -130,7 +133,7 @@
 	- Cart phone (on the Parasol_E pole, Mount_Phone) intersects the sauce holder (~0.8 stud).
 	- AST-028_MartAwning still has its legs (edition pending in AST-028); side not confirmed.
 	- AST-031 checkout side not confirmed (detail side -Z put towards Opal).
-	- Rail: the FBX has Rail_6 and Rail_8 on top of each other; Rail_6 used.
+	- Rail: the FBX has Rail_6 and Rail_8 on top of each other; cart Rail_6, trailer Rail_8 (TASK-083).
 	- Barriers moved 0.8 towards the play area (Z -74.0 / 78.0) so they do not cut the cones.
 ]]
 
@@ -189,7 +192,7 @@ return {
 	{ asset = "AST-027_OpenLateTrailer", x = 40, y = 0.45, z = 41, rotY = 0, group = "Trailer", id = "TRL", layer = "night", replaces = { "Pad/TRL", "Pad/TRL_Hitch" }, note = "window/awning north (queue), back door X 47..51 south, hitch to X 21.5; floor at Y 2.45" },
 	{ asset = "AST-018_CoolerL1", x = 28.5, y = 5.95, z = 37.5, rotY = 180, group = "Trailer", id = "TRL-S", layer = "night", replaces = {}, note = "cooler level carries over from the cart (Q-075)" },
 	{ asset = "AST-012_RollerGrill", x = 33, y = 5.95, z = 37.5, rotY = 180, group = "Trailer", id = "TRL-G", layer = "night", replaces = {} },
-	{ asset = "AST-013_RestRail", part = { "Rail_6" }, x = 37.5, y = 5.95, z = 37.5, rotY = 180, group = "Trailer", id = "TRL-R", layer = "night", replaces = {} },
+	{ asset = "AST-013_RestRail", part = { "Rail_8" }, x = 37.5, y = 5.95, z = 37.5, rotY = 180, group = "Trailer", id = "TRL-R", layer = "night", replaces = {}, note = "TASK-083: Rail_8 (Vehicles.trailer.RailSlots 8, §19.22); bind_map01 picks the 8 slot empties" },
 	{ asset = "AST-015_BunCrate", x = 40, y = 5.95, z = 37.5, rotY = 180, group = "Trailer", id = "TRL-B", layer = "night", replaces = {} },
 	{ asset = "AST-014_CuttingBoard", x = 42.5, y = 5.95, z = 37.5, rotY = 180, group = "Trailer", id = "TRL-T", layer = "night", replaces = {} },
 	{ asset = "AST-017_ToppingGrid", x = 47, y = 5.95, z = 37.5, rotY = 0, group = "Trailer", id = "TRL-K", layer = "night", replaces = {} },
@@ -213,7 +216,7 @@ return {
 	---------------------------------------------------------------------------------------------
 	-- 2c. SALE TRAILER, signs, queue marks
 	---------------------------------------------------------------------------------------------
-	{ asset = "AST-027_OpenLateTrailer", x = 78, y = 0.02, z = -58, rotY = 180, group = "Trailer", id = "TRL-SALE", replaces = { "Trailer/TRL-SALE" }, note = "window faces south (Pad); hitch east, like the blockout" },
+	{ asset = "AST-027_OpenLateTrailer", x = 78, y = 0.02, z = -58, rotY = 180, group = "Trailer", id = "TRL-SALE", replaces = { "Trailer/TRL-SALE" }, note = "window faces south (Pad); hitch east, like the blockout. TASK-083: empty shell = pose reference only; bind_map01 reads its pivot, destroys it and parks the real trailer (TRL) here (T36)" },
 	{ asset = "AST-024_SignStand", x = 78, y = 0.02, z = -40, rotY = 180, group = "Pad", id = "SIGN-T", replaces = { "Trailer/SIGN-T" }, note = "MAP asks 4 x 5; asset is 2 x 4 (scale or variant)" },
 	{ asset = "AST-024_SignStand", x = 25, y = 0.45, z = 35, rotY = 0, group = "Pad", id = "OPEN", replaces = { "Pad/OPEN" }, note = "4 tall vs <= 3 (DEC-048 sight band). Trailer has Mount_Sign at (27.5, 0.45, 33) as alternative" },
 	{ asset = "AST-019_QueueMark", x = 52, y = 0.45, z = 33, rotY = 180, group = "Pad", id = "Q1", replaces = {} },

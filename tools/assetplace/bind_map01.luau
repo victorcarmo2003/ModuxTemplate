@@ -1,45 +1,65 @@
 --[[
-	MAP-01 binding (TASK-005). Edit-mode tool, same status as place_assets.luau: NOT gameplay code.
-	Status: Rascunho (level-designer, 2026-10-10).
+	MAP-01 binding, waves 1 + 2 (TASK-005, TASK-083). Edit-mode tool, same status as place_assets.luau: NOT gameplay
+	code. Status: Rascunho (level-designer, 2026-10-10).
 
-	Contract: docs/tech/architecture.md §18 (tags §18.1, attributes §18.2, anchors §18.3-§18.4, points §18.5,
-	NpcNode graph §18.6). Layout: docs/levels/MAP-01.md §5.1, §5.3, §7.1, §7.4, §9.1. DEC-157 (cart counter at
-	y 3.45), DEC-190 (board with 2 shared slots), DEC-201 (grill levels = more rollers, 2/3/4 slots).
+	Contract: docs/tech/architecture.md §18 (tags §18.1, attributes §18.2, anchors §18.3-§18.4, points §18.5, NpcNode
+	graph §18.6) and §19.22 (wave 2: trailer, phone, purchase, tarp, light, points, street bins; T36, T38, T60).
+	Layout: docs/levels/MAP-01.md §5, §7, §9, §10.2 and §16 (binding notes). DEC-157 (cart counter y 3.45), DEC-190 /
+	DEC-215 (board 2 slots on the cart, 3 on the trailer), DEC-201 (grill 4 slots), DEC-086 (trailer on the Pad),
+	DEC-124 (phone in both vehicles), DEC-196 (no light volume on the Pad <-> Mart route), DEC-199 (tarp on the cart
+	at the sale spot), DEC-200 (street bin is interactive).
 
 	What it does, over workspace.MAP01_Assets (built by place_assets.luau) and workspace.MapBinding:
-	  1. Clean slate: removes the §18.1 tags it owns and the §18.2 authored attributes from every descendant of
-	     MAP01_Assets, so a re-run never leaves stale data (e.g. Prompt_Rail / Prompt_Serve stay untagged).
-	  2. Cart: CART (AST-026) gets tag Vehicle + Vehicle = "cart"; CART-*, DRAWER and BIN-C models are re-parented
-	     INSIDE the CART model (world positions unchanged), so stations find their vehicle by ancestry (§18.4, T36).
-	  3. Stations S, G, R, B, T, K and BIN-C: tag Station + StationKind (+ Ingredient); anchors tagged Interactable
-	     with PromptAction (+ Slot / Ingredient). Slots of grill (4), rail (6) and board (2: Att_Bun1/Att_Bun2).
-	  4. Map anchors: OPEN sign (open_sign), 9 Mart shelf anchors in a new Model MKT-SHELVES (buy_package +
-	     Package), GEAR WALL B1..B5 (bench_buy_upgrade) and S1 (bench_buy_item) + BenchSlot.
-	  5. Named fittings the code reads but the .fbx may lack: DRAWER.Value_Anchor, CART.Zone_Center.
-	  6. workspace.MapBinding (Model, tag MapBinding): MapPoint parts PS-1..4, Q1..Q5, D1, SP-A, EX-E, OP-1 and
-	     the NpcNode graph SP-A / D1 -> Q5 -> ... -> Q1 -> EX-E / D1 (Links on both ends). Y by raycast to the floor.
-	  7. ModelStreamingMode = Persistent on every Model that is, or contains, a tagged instance (§18.0 item 6).
+	  0. Both layers in the Workspace (T36: "both vehicles live in the Workspace"): the Night_* folders kept in
+	     ServerStorage.MAP01_Assets_Night and the Cart folder kept in MAP01_Assets_Day move into MAP01_Assets.
+	     After this, do NOT use Place.showLayer any more (it would store the cart again).
+	  1. Clean slate: removes the tags it owns and the authored attributes from every descendant of MAP01_Assets.
+	  2. Cart (wave 1, unchanged): Vehicle "cart"; CART-*, DRAWER and BIN-C inside it; stations S G R B T K + BIN-C;
+	     DRAWER fittings; Zone_Center. Wave 2: CART-PHONE.Prompt_Answer (answer_phone) and the tarp placeholder
+	     (Model "VehicleCover" inside the cart, tag VehicleCover, authored HIDDEN, see step 8).
+	  3. Trailer (wave 2): the AST-027 placed on the Pad (MapId TRL) becomes Vehicle "trailer"; every TRL-* model
+	     (except the TRL-SALE shell) and H1..H4 go inside it. Stations as the cart, plus Rail_8 (8 slots), board with
+	     3 slots and coffee_machine (Prompt_Brew -> brew_coffee, Prompt_Restock -> restock, Ingredient coffee).
+	     TRL-PHONE.Prompt_Answer, TRL-SWITCH.Prompt_Switch (switch_light), Prompt_Buy on the shell (buy_trailer),
+	     Zone_Center, DRAWER fittings. The empty sale shell (MapId TRL-SALE) is removed: the real trailer parks there.
+	  4. Map anchors (wave 1): OPEN sign, Mart shelves (MKT-SHELVES), GEAR WALL. Wave 2: street bins AST-034_TrashCan
+	     -> tag StreetBin + Prompt_Discard (discard; T60, Q-166 b: all three, Provisório).
+	  5. Street lights: JL-01..09 + P-01 -> one Model per post (pole + head) with tag StreetLight, PostId,
+	     Group = "juniper_posts", Order 1..10 in Hush order (JL-09 = 1 ... JL-01 = 9, P-01 = 10). The blockout
+	     SpotLight of each post is copied into LampHead/Light_Lamp and the blockout one is disabled (no double light).
+	  6. workspace.MapBinding: MapPoint parts (wave 1 + PS-N1..4, REV-1..4, TRL, TRL-SALE, CART, SPEC-P, SPEC-M,
+	     DROP-T, L1..L3, ST-R, SIGN-T) and the NpcNode graph (wave 1 + thief nodes up to the lurks). Floor Y by
+	     raycast; vehicle poses are the model pivots (no raycast); SPEC-* are camera points at absolute height.
+	  7. MapBinding/LightZones: LZ-1..5 volume parts (tag LightZone, ZoneId, Group; Block or Ball). Static on the Pad
+	     (only active with the trailer as current vehicle: LightGroups condition), never on the Pad <-> Mart route.
+	  8. Tarp (VehicleCover): authored hidden (Transparency 1, CanCollide/CanQuery false) with OrigTransparency /
+	     OrigCanCollide / OrigCanQuery = the visible values (same attribute names as place_assets.hide). The
+	     VehicleService shows it while the cart is at TRL-SALE (T38). Provisório until AST-043 is modelled.
+	  9. ModelStreamingMode = Persistent on every Model that is, or contains, a tagged instance (§18.0 item 6).
+	 10. Last: the trailer is pivoted to TRL-SALE (start of a run: cart on the Pad, trailer for sale, DEC-047).
+	     Every anchor is bound with the trailer on the Pad, so the fallbacks are in MAP-01 coordinates.
 
-	Anchor lookup (§18.3: "TASK-005 confere no place se os empties chegaram como Attachment"):
+	Anchor lookup (§18.3):
 	  - Attachment with the expected name            -> used as is ("ok").
 	  - BasePart with that name                       -> used as anchor, forced invisible / no collide ("ok part").
 	  - other class with that name (Model, Folder...) -> renamed <name>_Src, Attachment created at its pivot ("conv").
 	  - nothing                                       -> Attachment created at a fallback position ("new"), with
-	                                                     attribute BindCreated = true. Fallbacks follow MAP-01 §7.1
-	                                                     coordinates and are kept on re-runs (hand-tuning survives),
-	                                                     unless opts.resetCreated = true.
+	                                                     attribute BindCreated = true. Kept on re-runs (hand-tuning
+	                                                     survives) unless opts.resetCreated = true.
+	  Trailer fallbacks = the cart fallback + (trailer station pivot - cart station pivot): same asset, same layout.
+	  Phone prompts are pushed up until they are >= 2.6 from every anchor of another owner in the same vehicle.
 
-	IMPORTANT: place_assets.luau Place.run() destroys and rebuilds MAP01_Assets. After every Place.run, run
-	Bind.run() again (MapBinding lives outside MAP01_Assets and survives). Run with the DAY layer visible
-	(Place.showLayer("day")): the cart set must be in the Workspace.
+	IMPORTANT: place_assets.luau Place.run() destroys and rebuilds MAP01_Assets (and the night store). After every
+	Place.run, run Bind.run() again. MapBinding lives outside MAP01_Assets and is rebuilt here every run.
 
-	Usage (edit mode, Command Bar or Studio MCP):
-		local Bind = require(<this module>)     -- or: local Bind = loadstring(<source>)()
+	Usage (edit mode, Command Bar; repo served on 8772, see docs/levels/MAP-01.md §16):
+		local Bind = require(<this module>)
 		print(Bind.run())                       -- opts: { resetCreated = false }
-	Then run check_map01.luau (acceptance list of §18.7).
+	Then run check_map01.luau (Check.run({ wave = 2 })).
 ]]
 
 local CollectionService = game:GetService("CollectionService")
+local ServerStorage = game:GetService("ServerStorage")
 local Workspace = game:GetService("Workspace")
 
 local Bind = {}
@@ -50,8 +70,26 @@ local CREATED = "BindCreated"
 local SRC_NAME = "SrcName"
 
 local COUNTER_Y = 3.45 -- cart counter top (DEC-157; Provisório until Q-153)
+local TRAILER_COUNTER_DY = 5.5 -- trailer counter top over the trailer pivot: floor +2, counter 3.5 (MAP-01 §2, §7.2)
 
-local OWN_TAGS = { "MapBinding", "MapPoint", "NpcNode", "Vehicle", "Station", "Interactable" }
+-- Vehicle poses = model pivots (T36: VehicleService does vehicle:PivotTo(MapIndex.Point(id))). Same numbers as the
+-- CART / TRL / TRL-SALE entries of MAP-01_placements.luau: change both together.
+local CART_POSE = CFrame.new(41, 0.45, 37.5) -- MAP-01 CART centre is (41, 40); the pivot of AST-026 is (41, 37.5)
+local TRL_POSE = CFrame.new(40, 0.45, 41) -- facing north (window to the queue)
+local SALE_POSE = CFrame.new(78, 0.02, -58) * CFrame.Angles(0, math.pi, 0) -- facing south (window to the Pad)
+
+local OWN_TAGS = {
+	"MapBinding",
+	"MapPoint",
+	"NpcNode",
+	"Vehicle",
+	"Station",
+	"Interactable",
+	"VehicleCover",
+	"LightZone",
+	"StreetLight",
+	"StreetBin",
+}
 local AUTHORED_ATTRS = {
 	"PointId",
 	"NodeId",
@@ -65,19 +103,28 @@ local AUTHORED_ATTRS = {
 	"Level",
 	"Package",
 	"BenchSlot",
+	"ZoneId",
+	"Group",
+	"PostId",
+	"Order",
 }
 
 local NORTH = Vector3.new(0, 0, -1)
 local SOUTH = Vector3.new(0, 0, 1)
 local EAST = Vector3.new(1, 0, 0)
 local WEST = Vector3.new(-1, 0, 0)
+local DRAWER_XZ = { 52, 37 } -- the thief looks at the drawer from the lurks (MAP-01 §9.2)
 
 ---------------------------------------------------------------------------------------------------
 -- DATA (MAP-01). x, z = world studs; floor = expected floor top (Pad 0.45, Ninth sidewalk / Mart 0.4,
--- Juniper sidewalk tiles 0.24); the raycast result is used when it is within 0.6 of it.
+-- Juniper sidewalk tiles 0.24, trailer floor 2.45, parking lot 0.02); the raycast result is used when it is
+-- within 0.6 of it.
 ---------------------------------------------------------------------------------------------------
 
 -- MapPoint (§18.5). node = true -> the same Part is also an NpcNode (NodeId omitted, PointId is the id).
+-- onTrailer = the floor is the trailer's (raycast ignores the cart); the others ignore the trailer.
+-- y = absolute height (camera points, no raycast). pose = vehicle pose (pivot of the model, no raycast).
+-- faceTo = { x, z } the point faces (horizontal).
 local POINTS = {
 	{ id = "PS-1", x = 32, z = 42, floor = 0.45, face = NORTH },
 	{ id = "PS-2", x = 38, z = 42, floor = 0.45, face = NORTH },
@@ -95,6 +142,35 @@ local POINTS = {
 	{ id = "EX-E", x = 116, z = 24, floor = 0.4, face = EAST, node = true },
 	-- Opal behind the checkout, back to the north glass, facing into the store (south).
 	{ id = "OP-1", x = -75, z = 33.5, floor = 0.4, face = SOUTH },
+
+	-- wave 2 (§19.22) -------------------------------------------------------------------------
+	-- night spawn inside the trailer (MAP-01 §5.1), facing the window
+	{ id = "PS-N1", x = 32, z = 41, floor = 2.45, face = NORTH, onTrailer = true },
+	{ id = "PS-N2", x = 38, z = 41, floor = 2.45, face = NORTH, onTrailer = true },
+	{ id = "PS-N3", x = 44, z = 41, floor = 2.45, face = NORTH, onTrailer = true },
+	{ id = "PS-N4", x = 50, z = 41, floor = 2.45, face = NORTH, onTrailer = true },
+	-- revived / lost night: standing on the south sidewalk, facing the Pad (MAP-01 §5.5, DEC-122)
+	{ id = "REV-1", x = 38, z = 20, floor = 0.4, face = SOUTH },
+	{ id = "REV-2", x = 42, z = 20, floor = 0.4, face = SOUTH },
+	{ id = "REV-3", x = 46, z = 20, floor = 0.4, face = SOUTH },
+	{ id = "REV-4", x = 50, z = 20, floor = 0.4, face = SOUTH },
+	-- spectator's items (FEAT-025): trailer floor, back-right corner beside the back door, inside LZ-1 (MAP-01 §5.1)
+	{ id = "DROP-T", x = 51.5, z = 44.5, floor = 2.45, face = NORTH, onTrailer = true },
+	-- vehicle poses (T36)
+	{ id = "CART", pose = "cart" },
+	{ id = "TRL", pose = "trl" },
+	{ id = "TRL-SALE", pose = "sale" },
+	-- sale sign (VehicleController draws "Available on Day 5" here; proposal, see MAP-01 §16)
+	{ id = "SIGN-T", x = 78, y = 0.02, z = -40, face = SOUTH }, -- y fixed: a raycast would start inside the sign
+	-- fixed spectator cameras (MAP-01 §5.5): absolute height, horizontal facing; the camera pitches down itself
+	{ id = "SPEC-P", x = 66, y = 20, z = 28, faceTo = { 44, 30 } },
+	{ id = "SPEC-M", x = -48, y = 14, z = 40, faceTo = { -50, 13 } },
+	-- thief (MAP-01 §5.3, §9.2). L1 is 2 studs NE of the P-01 pole foot (20, 20), not inside the pole; L3 stands
+	-- in front of the Pad bench (58, 58). All face the drawer.
+	{ id = "L1", x = 21.5, z = 22, floor = 0.4, faceTo = DRAWER_XZ, node = true },
+	{ id = "L2", x = 84, z = 22, floor = 0.4, faceTo = DRAWER_XZ, node = true },
+	{ id = "L3", x = 58, z = 56.5, floor = 0.45, faceTo = DRAWER_XZ, node = true }, -- 20.4 from the drawer (>= 20, MAP-01 §14)
+	{ id = "ST-R", x = 18, z = 92, floor = 0.24, face = NORTH, node = true },
 }
 
 -- NpcNode-only parts (NodeId = N-<zone>-<nn>, §18.6). crosswalk = the two curb nodes of a crosswalk.
@@ -120,6 +196,11 @@ local NODES = {
 	-- ROUTE-EXIT-D1: Q1 -> east of the cart -> D1
 	{ id = "N-Z01-02", x = 58, z = 33, floor = 0.45 },
 	{ id = "N-Z01-03", x = 58, z = 47, floor = 0.45 },
+	-- wave 2, thief (ROUTE-THIEF): ST-R -> Juniper South east sidewalk (X 18, never crosses a road) -> lurks
+	{ id = "N-Z08-01", x = 18, z = 70, floor = 0.24 }, -- passes BAR-S (Z 78): player-only wall (collision group)
+	{ id = "N-Z08-02", x = 18, z = 56, floor = 0.24 },
+	{ id = "N-Z08-03", x = 18, z = 38, floor = 0.24 },
+	{ id = "N-Z01-04", x = 38, z = 56, floor = 0.45 }, -- south strip of the Pad, behind the cart / trailer, to L3
 }
 
 local EDGES = {
@@ -129,7 +210,7 @@ local EDGES = {
 	{ "N-Z13-02", "N-Z07-01" },
 	{ "N-Z07-01", "N-Z07-02" },
 	{ "N-Z07-02", "N-Z06-01" },
-	{ "N-Z06-01", "N-Z02-01" }, -- CW-4 crosswalk edge (reservation in wave 2; free in wave 1)
+	{ "N-Z06-01", "N-Z02-01" }, -- CW-4 crosswalk edge (reservation in wave 3; free before)
 	{ "N-Z02-01", "N-Z02-02" },
 	{ "N-Z02-02", "N-Z02-03" },
 	{ "N-Z02-03", "Q5" }, -- arrivals link only to Q5 (§18.6)
@@ -153,10 +234,19 @@ local EDGES = {
 	{ "Q1", "N-Z01-02" },
 	{ "N-Z01-02", "N-Z01-03" },
 	{ "N-Z01-03", "D1" },
+	-- wave 2: ROUTE-THIEF (MAP-01 §9.2). L1 by the corner, L2 by LANE-W -> LANE-E, L3 by the Pad's south strip.
+	{ "ST-R", "N-Z08-01" },
+	{ "N-Z08-01", "N-Z08-02" },
+	{ "N-Z08-02", "N-Z08-03" },
+	{ "N-Z08-03", "N-Z02-02" },
+	{ "N-Z02-02", "L1" },
+	{ "N-Z02-06", "N-Z02-08" }, -- LANE-W east end -> L2's post (also L2's flight to EX-E)
+	{ "N-Z02-08", "L2" },
+	{ "N-Z08-02", "N-Z01-04" },
+	{ "N-Z01-04", "L3" },
 }
 
--- Ingredient key -> .fbx suffix (PascalCase rule of §18.4) and MAP-01 §7.1 grid cell (fallback XZ).
--- Front row (queue side, north) Ketchup / Mustard / Cheese; back row Bacon / Potato Sticks / Cream Cheese.
+-- Ingredient key -> .fbx suffix (PascalCase rule of §18.4) and MAP-01 §7.1 grid cell (fallback XZ, cart coords).
 -- x, z are used ONLY when the real bowl Bin_<Suf> is missing (see bindToppings: anchors live on the bowls).
 local TOPPINGS = {
 	{ key = "ketchup", suf = "Ketchup", x = 45, z = 36.5 },
@@ -192,12 +282,40 @@ local BENCH = {
 	{ slot = "B5", action = "bench_buy_upgrade", z = 55.5 },
 }
 
+-- Street lights of the Hush / Walker chain (MAP-01 §5.6): Order = Hush order = Walker step + 1.
+local POSTS = {
+	{ id = "JL-09", order = 1 },
+	{ id = "JL-08", order = 2 },
+	{ id = "JL-07", order = 3 },
+	{ id = "JL-06", order = 4 },
+	{ id = "JL-05", order = 5 },
+	{ id = "JL-04", order = 6 },
+	{ id = "JL-03", order = 7 },
+	{ id = "JL-02", order = 8 },
+	{ id = "JL-01", order = 9 },
+	{ id = "P-01", order = 10 },
+}
+local POST_GROUP = "juniper_posts" -- Content.LightGroups (content-data.md §6.4); visual only, no volume (DEC-196)
+
+-- Light volumes (MAP-01 §10.2). Trailer zones are given in the trailer's Pad frame (offset from TRL_POSE), the
+-- others in world coords. Block: centre + size; Ball: centre + radius (centre at standing-HRP height).
+local ZONES = {
+	{ id = "LZ-1", group = "trailer_interior", shape = "Block", local_ = Vector3.new(0, 6.25, 0), size = Vector3.new(26, 8.5, 10) }, -- X 27..53, Z 36..46, floor 2.45 .. ceiling 10.95
+	{ id = "LZ-2", group = "trailer_interior", shape = "Block", local_ = Vector3.new(10, 4.75, -8.5), size = Vector3.new(12, 9.5, 5) }, -- porch X 44..56, Z 30..35 (Q1)
+	{ id = "LZ-3", group = "trailer_lights", shape = "Ball", local_ = Vector3.new(0, 3, 0), radius = 18 }, -- Trailer Lights (40, 41) r 18 (LightRadius)
+	{ id = "LZ-4", group = "mart", shape = "Block", world = Vector3.new(-82, 6.4, 48), size = Vector3.new(36, 12, 32) }, -- Mart X -100..-64, Z 32..64
+	{ id = "LZ-5", group = "mart", shape = "Ball", world = Vector3.new(-58, 3.4, 30), radius = 6 }, -- SS under the marquee
+}
+
 -- Grill (AST-012): the .fbx has 6 slot empties; DEC-201 uses 4 (L1 1-2, L2 1-3, L3 1-4). Pick = the 4 central
 -- ones after sorting left -> right as seen from the corridor (+X). Same positions at every level (no Level attr).
 local GRILL_SLOTS = 4
 local GRILL_FALLBACK_DX = { -1.35, -0.45, 0.45, 1.35 } -- 0.9 between centres (asset-list AST-012)
-local RAIL_SLOTS = 6
-local BUN_SLOT_HALF = 0.55 -- Att_Bun1/Att_Bun2 = Att_Bun -/+ this along its local X (verify visually, TASK-030)
+local BUN_SLOT_STEP = 1.1 -- board slots along Att_Bun local X (cart 2: -/+0.55; trailer 3: -1.1, 0, +1.1)
+local PHONE_GAP = 2.6 -- phone prompt >= this from anchors of other owners in the same vehicle (§18.7 item 4 + margin)
+
+-- Tarp placeholder (AST-043: 26 x 4 x 4, Mint-gray #B7CFC6; DEC-199). Replaced when the model exists (TASK-088).
+local COVER_COLOR = Color3.fromRGB(183, 207, 198)
 
 ---------------------------------------------------------------------------------------------------
 -- Report
@@ -290,7 +408,7 @@ local function hostPart(model: Instance): BasePart?
 	return best
 end
 
--- World bounding box of the BaseParts of `model` that pass `keep` (all when nil): min, max.
+-- World bounding box of the visible BaseParts of `model` that pass `keep` (all when nil): min, max.
 local function partsBox(model: Instance, keep: ((BasePart) -> boolean)?): (Vector3?, Vector3?)
 	local mn, mx = nil, nil
 	for _, d in model:GetDescendants() do
@@ -310,9 +428,9 @@ local function partsBox(model: Instance, keep: ((BasePart) -> boolean)?): (Vecto
 	return mn, mx
 end
 
-local function topY(model: Instance): number
+local function topY(model: Instance, default: number?): number
 	local _, mx = partsBox(model)
-	return if mx then mx.Y else COUNTER_Y
+	return if mx then mx.Y else (default or COUNTER_Y)
 end
 
 local function newAttachment(host: BasePart, name: string, worldPos: Vector3): Attachment
@@ -322,6 +440,33 @@ local function newAttachment(host: BasePart, name: string, worldPos: Vector3): A
 	a.WorldCFrame = CFrame.new(worldPos)
 	a:SetAttribute(CREATED, true)
 	return a
+end
+
+local function ancestorWithTag(i: Instance, tag: string): Instance?
+	local n = i.Parent
+	while n and n ~= game do
+		if CollectionService:HasTag(n, tag) then
+			return n
+		end
+		n = n.Parent
+	end
+	return nil
+end
+
+-- Owner of an anchor (§18.3): the Station ancestor, else the nearest Model ancestor.
+local function ownerOf(i: Instance): Instance?
+	local st = ancestorWithTag(i, "Station")
+	if st then
+		return st
+	end
+	local n = i.Parent
+	while n and n ~= Workspace do
+		if n:IsA("Model") then
+			return n
+		end
+		n = n.Parent
+	end
+	return nil
 end
 
 type AnchorOpts = { resetCreated: boolean? }
@@ -403,9 +548,76 @@ local function floorY(x: number, z: number, expected: number, exclude: { Instanc
 	return expected, "too many non-colliding hits, used expected Y"
 end
 
+-- Pushes an Attachment anchor up until it is >= gap from every anchor of another owner inside `vehicle`.
+local function clearUp(anchor: Instance?, vehicle: Instance, gap: number, label: string)
+	if not (anchor and anchor:IsA("Attachment")) then
+		if anchor then
+			log("warn", ("%s: %s is not an Attachment, clearance not applied"):format(label, anchor.Name))
+		end
+		return
+	end
+	local own = ownerOf(anchor)
+	local function closest(): (number, string)
+		local best, who = math.huge, "-"
+		for _, o in CollectionService:GetTagged("Interactable") do
+			if o ~= anchor and o:IsDescendantOf(vehicle) and ownerOf(o) ~= own then
+				local d = (anchorPos(o) - anchor.WorldPosition).Magnitude
+				if d < best then
+					best, who = d, o.Name
+				end
+			end
+		end
+		return best, who
+	end
+	local steps = 0
+	local d, who = closest()
+	while d < gap and steps < 40 do
+		anchor.WorldCFrame = anchor.WorldCFrame + Vector3.new(0, 0.1, 0)
+		steps += 1
+		d, who = closest()
+	end
+	if d < gap then
+		log("warn", ("%s: %s still %.2f from %s after +4.0 (move it by hand)"):format(label, anchor.Name, d, who))
+	elseif steps > 0 then
+		log("new", ("%s: %s raised %.1f to clear the counter prompts (closest %s at %.2f)"):format(label, anchor.Name, steps * 0.1, who, d))
+	else
+		log("ok", ("%s: %s clear of other prompts (closest %s at %.2f)"):format(label, anchor.Name, who, d))
+	end
+end
+
 ---------------------------------------------------------------------------------------------------
 -- Steps
 ---------------------------------------------------------------------------------------------------
+
+-- Both layers in the Workspace (T36). Returns how many folders were moved.
+local function mergeLayers(assets: Instance): number
+	local moved = 0
+	local function bring(f: Instance)
+		local same = assets:FindFirstChild(f.Name)
+		if same and same ~= f then
+			for _, c in f:GetChildren() do
+				c.Parent = same
+			end
+			f:Destroy()
+		else
+			f.Parent = assets
+		end
+		moved += 1
+	end
+	local night = ServerStorage:FindFirstChild(ASSETS_ROOT .. "_Night")
+	if night then
+		for _, f in night:GetChildren() do
+			bring(f)
+		end
+	end
+	local day = ServerStorage:FindFirstChild(ASSETS_ROOT .. "_Day")
+	if day then
+		for _, f in day:GetChildren() do
+			bring(f)
+		end
+	end
+	return moved
+end
 
 local function cleanSlate(root: Instance)
 	local n = 0
@@ -426,7 +638,7 @@ local function cleanSlate(root: Instance)
 end
 
 -- Grill: pick 4 of the slot empties (Att_SlotN / SlotN), or create fallbacks.
-local function bindGrill(model: Instance, opts: AnchorOpts)
+local function bindGrill(model: Instance, opts: AnchorOpts, label: string)
 	local src, created = {}, {}
 	for _, d in model:GetDescendants() do
 		local n = d:GetAttribute(SRC_NAME) or d.Name
@@ -474,28 +686,28 @@ local function bindGrill(model: Instance, opts: AnchorOpts)
 			if slot >= 1 and slot <= GRILL_SLOTS then
 				d.Name = "Att_Slot" .. slot
 				interactable(d, "grill_collect", { Slot = slot })
-				log("ok", ("CART-G: %s (.fbx %s) -> Slot %d at %s"):format(d.Name, tostring(d:GetAttribute(SRC_NAME)), slot, fmtV(anchorPos(d))))
+				log("ok", ("%s: %s (.fbx %s) -> Slot %d at %s"):format(label, d.Name, tostring(d:GetAttribute(SRC_NAME)), slot, fmtV(anchorPos(d))))
 			else
 				spare += 1
 				d.Name = "Att_SlotSpare" .. spare
 			end
 		end
 		if not alongX then
-			log("warn", "CART-G: slot empties spread along Z, not X; ordered north -> south. Check the slot order")
+			log("warn", label .. ": slot empties spread along Z, not X; ordered north -> south. Check the slot order")
 		end
-		log("ok", ("CART-G: %d slot empties found, central %d used (DEC-201), %d spare left untagged"):format(#src, GRILL_SLOTS, spare))
+		log("ok", ("%s: %d slot empties found, central %d used (DEC-201), %d spare left untagged"):format(label, #src, GRILL_SLOTS, spare))
 		return
 	end
 	if #src > 0 then
-		log("warn", ("CART-G: only %d slot empties found (need %d); using fallback slots"):format(#src, GRILL_SLOTS))
+		log("warn", ("%s: only %d slot empties found (need %d); using fallback slots"):format(label, #src, GRILL_SLOTS))
 	end
 	local host = hostPart(model)
 	if not host then
-		log("err", "CART-G: no BasePart to host slot Attachments")
+		log("err", label .. ": no BasePart to host slot Attachments")
 		return
 	end
 	local mn, mx = partsBox(model)
-	local centre = if mn and mx then (mn + mx) / 2 else Vector3.new(33.5, 0, 37.5)
+	local centre = if mn and mx then (mn + mx) / 2 else (model :: any):GetPivot().Position
 	local top = if mx then mx.Y else COUNTER_Y
 	for slot = 1, GRILL_SLOTS do
 		local name = "Att_Slot" .. slot
@@ -516,74 +728,98 @@ local function bindGrill(model: Instance, opts: AnchorOpts)
 			a = newAttachment(host, name, pos)
 		end
 		interactable(a, "grill_collect", { Slot = slot })
-		log("new", ("CART-G: %s fallback -> Slot %d at %s (verify on the rollers)"):format(name, slot, fmtV(anchorPos(a))))
+		log("new", ("%s: %s fallback -> Slot %d at %s (verify on the rollers)"):format(label, name, slot, fmtV(anchorPos(a))))
 	end
 end
 
--- Rail: Slot1..6 (or Att_Slot1..6) get Slot = n; missing numbers are created along the rail.
-local function bindRail(model: Instance, opts: AnchorOpts)
+--[[ Rail: Slot1..n (or Att_Slot1..n) get Slot = k; missing numbers are created along the rail.
+	mode "first" (cart, wave 1, unchanged): when a number has duplicates (Rail_6 and Rail_8 empties), the first one.
+	mode "ideal" (trailer, Rail_8): the duplicate closest to the evenly spaced position along the visible rail. ]]
+local function bindRail(model: Instance, opts: AnchorOpts, n: number, label: string, mode: string)
 	local byNum: { [number]: { Instance } } = {}
 	for _, d in model:GetDescendants() do
-		local n = string.match(d.Name, "^Slot(%d+)$") or string.match(d.Name, "^Att_Slot(%d+)$")
-		if n and (d:IsA("Attachment") or d:IsA("BasePart")) then
-			local k = tonumber(n) :: number
+		local num = string.match(d.Name, "^Slot(%d+)$") or string.match(d.Name, "^Att_Slot(%d+)$")
+		if num and (d:IsA("Attachment") or d:IsA("BasePart")) then
+			local k = tonumber(num) :: number
 			byNum[k] = byNum[k] or {}
 			table.insert(byNum[k], d)
 		end
 	end
 	local mn, mx = partsBox(model)
-	local centre = if mn and mx then (mn + mx) / 2 else Vector3.new(37.5, COUNTER_Y, 37.5)
+	local centre = if mn and mx then (mn + mx) / 2 else (model :: any):GetPivot().Position
 	local top = if mx then mx.Y else COUNTER_Y + 0.5
+	local alongX = if mn and mx then (mx.X - mn.X) >= (mx.Z - mn.Z) else true
+	local function ideal(slot: number): Vector3
+		if mode == "first" or not (mn and mx) then
+			return Vector3.new(centre.X - 1 + 0.4 * (slot - 1), top, centre.Z)
+		end
+		local len = if alongX then mx.X - mn.X else mx.Z - mn.Z
+		local step = len * 0.8 / math.max(n - 1, 1)
+		local off = -len * 0.4 + step * (slot - 1)
+		return if alongX then Vector3.new(centre.X + off, top, centre.Z) else Vector3.new(centre.X, top, centre.Z + off)
+	end
 	local host = hostPart(model)
-	for slot = 1, RAIL_SLOTS do
+	for slot = 1, n do
 		local list = byNum[slot]
 		local a: Instance? = nil
 		if list and #list > 0 then
 			a = list[1]
 			if #list > 1 then
-				log("warn", ("CART-R: %d instances named Slot%d (Rail_6 and Rail_8 empties?); used %s"):format(#list, slot, list[1]:GetFullName()))
+				if mode == "ideal" then
+					local want = ideal(slot)
+					local best = math.huge
+					for _, c in list do
+						local d = (anchorPos(c) - want).Magnitude
+						if d < best then
+							a, best = c, d
+						end
+					end
+				end
+				log("warn", ("%s: %d instances named Slot%d (Rail_6 and Rail_8 empties?); used %s"):format(label, #list, slot, (a :: Instance):GetFullName()))
 			end
 			if a and a:IsA("BasePart") then
 				makeInvisible(a)
 			end
 			if a and a:GetAttribute(CREATED) and opts.resetCreated and a:IsA("Attachment") then
-				a.WorldCFrame = CFrame.new(centre.X - 1 + 0.4 * (slot - 1), top, centre.Z)
+				a.WorldCFrame = CFrame.new(ideal(slot))
 			end
 		elseif host then
-			a = newAttachment(host, "Slot" .. slot, Vector3.new(centre.X - 1 + 0.4 * (slot - 1), top, centre.Z))
+			a = newAttachment(host, "Slot" .. slot, ideal(slot))
 		end
 		if a then
 			a:SetAttribute("Slot", slot)
-			log(if a:GetAttribute(CREATED) then "new" else "ok", ("CART-R: %s -> Slot %d at %s"):format(a.Name, slot, fmtV(anchorPos(a))))
+			log(if a:GetAttribute(CREATED) then "new" else "ok", ("%s: %s -> Slot %d at %s"):format(label, a.Name, slot, fmtV(anchorPos(a))))
 		else
-			log("err", ("CART-R: cannot create Slot%d (no BasePart)"):format(slot))
+			log("err", ("%s: cannot create Slot%d (no BasePart)"):format(label, slot))
 		end
 	end
-	local rp = findNamed(model, "Prompt_Rail")
-	if rp then
-		log("ok", "CART-R: Prompt_Rail left WITHOUT tag (Add Sausage is on the board, §18.4)")
+	if findNamed(model, "Prompt_Rail") then
+		log("ok", label .. ": Prompt_Rail left WITHOUT tag (Add Sausage is on the board, §18.4)")
 	end
 end
 
--- Board: Att_Bun -> Att_Bun1 / Att_Bun2 (Slot 1 = the one more to the west, DEC-190).
-local function bindBoard(model: Instance, opts: AnchorOpts)
+-- Board: Att_Bun -> Att_Bun1..n (Slot 1 = the one more to the west; DEC-190 cart 2, DEC-215 trailer 3).
+local function bindBoard(model: Instance, opts: AnchorOpts, n: number, label: string)
 	local mn, mx = partsBox(model)
-	local centre = if mn and mx then (mn + mx) / 2 else Vector3.new(42.5, COUNTER_Y, 37.5)
+	local centre = if mn and mx then (mn + mx) / 2 else (model :: any):GetPivot().Position
 	local top = if mx then mx.Y else COUNTER_Y + 0.2
 	local base = ensureAnchor(model, "Att_Bun", function()
 		return Vector3.new(centre.X, top + 0.05, centre.Z)
-	end, opts, "CART-T")
+	end, opts, label)
 	if not base then
 		return
 	end
 	local baseCF = if base:IsA("Attachment") then base.WorldCFrame else (base :: BasePart).CFrame
 	local host = if base:IsA("Attachment") then base.Parent :: BasePart else hostPart(model)
-	local pA = (baseCF * CFrame.new(-BUN_SLOT_HALF, 0, 0)).Position
-	local pB = (baseCF * CFrame.new(BUN_SLOT_HALF, 0, 0)).Position
-	if pB.X < pA.X then
-		pA, pB = pB, pA
+	local list: { Vector3 } = {}
+	for i = 1, n do
+		local off = (i - (n + 1) / 2) * BUN_SLOT_STEP
+		table.insert(list, (baseCF * CFrame.new(off, 0, 0)).Position)
 	end
-	for slot, pos in { pA, pB } do
+	table.sort(list, function(a, b)
+		return a.X < b.X
+	end)
+	for slot, pos in list do
 		local name = "Att_Bun" .. slot
 		local a = findNamed(model, name)
 		if a and a:IsA("Attachment") then
@@ -596,7 +832,7 @@ local function bindBoard(model: Instance, opts: AnchorOpts)
 		end
 		if a then
 			a:SetAttribute("Slot", slot)
-			log(if a:GetAttribute(CREATED) then "new" else "ok", ("CART-T: %s -> Slot %d at %s (shared slot, DEC-190)"):format(name, slot, fmtV(anchorPos(a))))
+			log(if a:GetAttribute(CREATED) then "new" else "ok", ("%s: %s -> Slot %d at %s (shared slot)"):format(label, name, slot, fmtV(anchorPos(a))))
 		end
 	end
 end
@@ -605,15 +841,13 @@ end
 	Bin_<Suf>), parented to it, and are always re-derived from it on every run.
 	The two real rows are 1.5 apart in Z (operator row low, back row 0.3 higher), under the 2.0 of §18.7 item 4.
 	Fix without changing any game rule: the anchors of each row are pushed OUT of the grid so the billboards are
-	>= 2.0 apart: operator row -> towards the corridor (+Z) and slightly up; back row -> straight up. With the
-	measured bowls (Z 38.1 / 36.6, Y 3.9 / 4.2) this gives Z 38.5 / 36.6 and Y 4.25 / 5.45 -> 2.25 studs.
-	Use and Restock of the same bowl share the position (one action visible at a time: "Add" needs a Hot Dog in
-	hand, "Restock" needs the package; §18.7 item 4 already exempts the same ingredient). ]]
+	>= 2.0 apart: operator row -> towards the corridor (+Z) and slightly up; back row -> straight up.
+	Use and Restock of the same bowl share the position (one action visible at a time). ]]
 local TOPPING_OPERATOR_OFFSET = Vector3.new(0, 0.35, 0.4)
 local TOPPING_BACK_OFFSET = Vector3.new(0, 1.25, 0)
 local TOPPING_MIN_GAP = 2.05 -- back row is raised further if the measured rows still end up closer than this
 
-local function bindToppings(model: Instance, opts: AnchorOpts)
+local function bindToppings(model: Instance, opts: AnchorOpts, label: string, delta: Vector3)
 	local bins: { [string]: BasePart } = {}
 	local zs: { number } = {}
 	for _, t in TOPPINGS do
@@ -622,7 +856,7 @@ local function bindToppings(model: Instance, opts: AnchorOpts)
 			bins[t.key] = b
 			table.insert(zs, b.Position.Z)
 		else
-			log("err", ("CART-K: bowl Bin_%s not found (MeshPart of AST-017): anchor falls back to MAP-01 §7.1"):format(t.suf))
+			log("err", ("%s: bowl Bin_%s not found (MeshPart of AST-017): anchor falls back to MAP-01 §7.1"):format(label, t.suf))
 		end
 	end
 	-- operator row = the bowls nearest the corridor (largest Z, operator faces north)
@@ -639,7 +873,7 @@ local function bindToppings(model: Instance, opts: AnchorOpts)
 			local isOperator = b.Position.Z >= splitZ
 			wanted[t.key] = b.Position + (if isOperator then TOPPING_OPERATOR_OFFSET else TOPPING_BACK_OFFSET)
 		else
-			wanted[t.key] = Vector3.new(t.x, topY(model) + 0.3, t.z)
+			wanted[t.key] = Vector3.new(t.x + delta.X, topY(model) + 0.3, t.z + delta.Z)
 		end
 	end
 	-- safety: raise the back row until every pair of different bowls is >= TOPPING_MIN_GAP apart
@@ -671,7 +905,7 @@ local function bindToppings(model: Instance, opts: AnchorOpts)
 		for _, spec in { { "Prompt_Use_" .. t.suf, "topping_add" }, { "Prompt_Restock_" .. t.suf, "restock" } } do
 			local a = findNamed(model, spec[1])
 			if a and a:IsA("Attachment") and not a:GetAttribute(CREATED) then
-				log("ok", ("CART-K: %s (Attachment from .fbx) kept at %s"):format(spec[1], fmtV(a.WorldPosition)))
+				log("ok", ("%s: %s (Attachment from .fbx) kept at %s"):format(label, spec[1], fmtV(a.WorldPosition)))
 			else
 				if a and not a:IsA("Attachment") then
 					a.Name = spec[1] .. "_Src"
@@ -684,22 +918,22 @@ local function bindToppings(model: Instance, opts: AnchorOpts)
 					a.Parent = host
 					;(a :: Attachment).WorldCFrame = CFrame.new(p)
 				end
-				log("new", ("CART-K: %s on %s at %s"):format(spec[1], if bins[t.key] then "Bin_" .. t.suf else "MAP-01 cell", fmtV(p)))
+				log("new", ("%s: %s on %s at %s"):format(label, spec[1], if bins[t.key] then "Bin_" .. t.suf else "MAP-01 cell", fmtV(p)))
 			end
 			interactable(a, spec[2], { Ingredient = t.key })
 		end
 	end
-	-- layout note: MAP-01 §7.1 puts Ketchup/Mustard/Cheese (W -> E) on the queue side; the real grid differs
+	-- layout note: MAP-01 §7.1 documents the real grid (Cheese / Mustard / Ketchup on the operator row)
 	local k, c = bins.ketchup, bins.cheese
-	if k and c and (k.Position.X > c.Position.X or k.Position.Z >= splitZ) then
-		log("warn", ("CART-K: real grid = Ketchup X %.1f Z %.1f, Cheese X %.1f; MAP-01 §7.1 says Ketchup/Mustard/Cheese W->E on the queue side. Doc to update (level-designer)"):format(k.Position.X, k.Position.Z, c.Position.X))
+	if k and c and (k.Position.X < c.Position.X or k.Position.Z < splitZ) then
+		log("warn", ("%s: grid differs from MAP-01 §7.1 (Ketchup X %.1f Z %.1f, Cheese X %.1f): update the doc"):format(label, k.Position.X, k.Position.Z, c.Position.X))
 	end
 end
 
-local function bindStation(cart: Instance, mapId: string, kind: string, ingredient: string?): Instance?
-	local m = byMapId(cart, mapId)
+local function bindStation(vehicle: Instance, mapId: string, kind: string, ingredient: string?): Instance?
+	local m = byMapId(vehicle, mapId)
 	if not m then
-		log("err", ("%s not found inside the CART model (run place_assets with the day layer)"):format(mapId))
+		log("err", ("%s not found inside the %s model (run place_assets first)"):format(mapId, vehicle.Name))
 		return nil
 	end
 	CollectionService:AddTag(m, "Station")
@@ -712,10 +946,221 @@ local function bindStation(cart: Instance, mapId: string, kind: string, ingredie
 	return m
 end
 
+-- Kitchen of one vehicle. The cart is the reference: trailer fallbacks = cart fallbacks + station pivot delta.
+type Kit = {
+	label: string, -- "CART" / "TRL"
+	ids: { [string]: string }, -- role -> MapId: S G R B T K BIN DRAWER PHONE
+	rail: number,
+	board: number,
+	railMode: string,
+	counterY: number,
+	cart: Instance?, -- the cart vehicle (reference for the deltas); nil when binding the cart itself
+	fallbackDelta: Vector3, -- vehicle pivot delta, used when a station has no counterpart
+}
+
+local CART_IDS = { S = "CART-S", G = "CART-G", R = "CART-R", B = "CART-B", T = "CART-T", K = "CART-K", BIN = "BIN-C", DRAWER = "DRAWER", PHONE = "CART-PHONE" }
+local TRL_IDS = { S = "TRL-S", G = "TRL-G", R = "TRL-R", B = "TRL-B", T = "TRL-T", K = "TRL-K", BIN = "TRL-BIN", DRAWER = "TRL-DRAWER", PHONE = "TRL-PHONE" }
+
+local function bindKitchen(vehicle: Instance, kit: Kit, opts: AnchorOpts): Instance?
+	local function delta(role: string): Vector3
+		if not kit.cart then
+			return Vector3.zero
+		end
+		local a = byMapId(vehicle, kit.ids[role])
+		local b = byMapId(kit.cart :: Instance, CART_IDS[role])
+		if a and b and a:IsA("PVInstance") and b:IsA("PVInstance") then
+			return (a :: any):GetPivot().Position - (b :: any):GetPivot().Position
+		end
+		return kit.fallbackDelta
+	end
+	local L = kit.label
+
+	-- S: sausage stock
+	local s = bindStation(vehicle, kit.ids.S, "sausage_stock", "sausage")
+	if s then
+		local d = delta("S")
+		local y = math.max(topY(s), kit.counterY) + 0.3
+		interactable(ensureAnchor(s, "Prompt_Take", function()
+			return Vector3.new(28.9 + d.X, y, 38.4 + d.Z)
+		end, opts, kit.ids.S), "grill_place")
+		interactable(ensureAnchor(s, "Prompt_Restock", function()
+			return Vector3.new(29.6 + d.X, y, 37.0 + d.Z)
+		end, opts, kit.ids.S), "restock")
+	end
+	-- G: grill
+	local g = bindStation(vehicle, kit.ids.G, "grill")
+	if g then
+		bindGrill(g, opts, kit.ids.G)
+		if findNamed(g, "Prompt_Grill") then
+			log("ok", kit.ids.G .. ": Prompt_Grill left WITHOUT tag (placing is on the cooler, Prompt_Take -> grill_place)")
+		end
+	end
+	-- R: rest rail
+	local r = bindStation(vehicle, kit.ids.R, "rail")
+	if r then
+		bindRail(r, opts, kit.rail, kit.ids.R, kit.railMode)
+	end
+	-- B: bun crate (the .fbx has no empties)
+	local b = bindStation(vehicle, kit.ids.B, "bun_crate", "bun")
+	if b then
+		local d = delta("B")
+		local y = topY(b) + 0.3
+		interactable(ensureAnchor(b, "Prompt_Take", function()
+			return Vector3.new(39.7 + d.X, y, 38.4 + d.Z)
+		end, opts, kit.ids.B), "bun_cut")
+		interactable(ensureAnchor(b, "Prompt_Restock", function()
+			return Vector3.new(39.7 + d.X, y, 36.9 + d.Z)
+		end, opts, kit.ids.B), "restock")
+	end
+	-- T: cutting board, one prompt + shared slots
+	local t = bindStation(vehicle, kit.ids.T, "board")
+	if t then
+		local d = delta("T")
+		local y = topY(t) + 0.3
+		interactable(ensureAnchor(t, "Prompt_Board", function()
+			return Vector3.new(42.3 + d.X, y, 38.4 + d.Z)
+		end, opts, kit.ids.T), "board_add_sausage")
+		bindBoard(t, opts, kit.board, kit.ids.T)
+	end
+	-- K: toppings grid
+	local k = bindStation(vehicle, kit.ids.K, "toppings")
+	if k then
+		bindToppings(k, opts, kit.ids.K, delta("K"))
+	end
+	-- BIN: trash (cart: BIN-C on the Pad; trailer: inside, back wall)
+	local bin = bindStation(vehicle, kit.ids.BIN, "trash")
+	if bin then
+		local y = topY(bin) + 0.3
+		interactable(ensureAnchor(bin, "Prompt_Discard", function()
+			if not kit.cart then
+				return Vector3.new(56, y, 42)
+			end
+			local mn, mx = partsBox(bin)
+			if mn and mx then
+				local c = (mn + mx) / 2
+				return Vector3.new(c.X, y, mn.Z - 0.2) -- corridor side (north) of the back-wall bin
+			end
+			return (bin :: any):GetPivot().Position + Vector3.new(0, 2.3, -0.6)
+		end, opts, kit.ids.BIN), "discard")
+	end
+	-- DRAWER: not a Station; Value_Anchor on top of the POS (drawer half, X >= 52.2 on the cart)
+	local drawer = byMapId(vehicle, kit.ids.DRAWER)
+	if drawer then
+		setPersistent(drawer)
+		local d = delta("DRAWER")
+		ensureAnchor(drawer, "Value_Anchor", function()
+			local mn, mx = partsBox(drawer, function(p)
+				return p.Position.X >= 52.2 + d.X
+			end)
+			if not (mn and mx) then
+				mn, mx = partsBox(drawer)
+			end
+			if mn and mx then
+				local c = (mn + mx) / 2
+				return Vector3.new(c.X, mx.Y + 0.4, c.Z)
+			end
+			return Vector3.new(53.2 + d.X, kit.counterY + 1.6, 37 + d.Z)
+		end, opts, kit.ids.DRAWER)
+		for _, n in { "Prompt_Serve", "Prompt_Drawer", "Prompt_TakeOrder", "Prompt_Refuse" } do
+			if findNamed(drawer, n) then
+				log("ok", ("%s: %s left WITHOUT tag (Serve is on the customer, DEC-190)"):format(kit.ids.DRAWER, n))
+			end
+		end
+		for _, n in { "Bar_Thief", "VFX_Coins" } do
+			if not findNamed(drawer, n) then
+				log("warn", ("%s: fitting %s missing (read by TASK-024 / ThiefController)"):format(kit.ids.DRAWER, n))
+			end
+		end
+	else
+		log("err", ("%s (AST-020) not found inside the %s model"):format(kit.ids.DRAWER, L))
+	end
+	return vehicle
+end
+
+-- Phone (AST-042, DEC-124): Prompt_Answer -> answer_phone, pushed clear of the counter prompts.
+local function bindPhone(vehicle: Instance, mapId: string, opts: AnchorOpts)
+	local ph = byMapId(vehicle, mapId)
+	if not ph then
+		log("err", ("%s (AST-042) not found inside the %s model"):format(mapId, vehicle.Name))
+		return
+	end
+	setPersistent(ph)
+	local a = ensureAnchor(ph, "Prompt_Answer", function()
+		local mn, mx = partsBox(ph)
+		if mn and mx then
+			local c = (mn + mx) / 2
+			return Vector3.new(c.X, mx.Y + 0.3, c.Z)
+		end
+		return (ph :: any):GetPivot().Position + Vector3.new(0, 1.6, 0)
+	end, opts, mapId)
+	interactable(a, "answer_phone")
+	for _, n in { "Light_Ring", "VFX_Ring" } do
+		if not findNamed(ph, n) then
+			log("warn", ("%s: fitting %s missing (BossController ring light, TASK-071)"):format(mapId, n))
+		end
+	end
+end
+
+-- Tarp placeholder inside the cart (VehicleCover, DEC-199, T38). Authored hidden; Orig* = visible values.
+local function bindCover(cart: Instance)
+	local cover = cart:FindFirstChild("VehicleCover")
+	if not (cover and cover:IsA("Model")) then
+		if cover then
+			cover:Destroy()
+		end
+		local m = Instance.new("Model")
+		m.Name = "VehicleCover"
+		m:SetAttribute(CREATED, true)
+		m.Parent = cart
+		cover = m
+	end
+	local bin = byMapId(cart, "BIN-C")
+	local pivot = (cart :: any):GetPivot() :: CFrame
+	-- footprint of the cart body + counter items, without the parasol canopies and the loose bin
+	local mn, mx = partsBox(cart, function(p)
+		local inCover = p:IsDescendantOf(cover :: Instance)
+		local inBin = bin ~= nil and p:IsDescendantOf(bin :: Instance)
+		return not inCover and not inBin and p.Position.Y < pivot.Y + 5.5
+	end)
+	local size = Vector3.new(26.6, 4.2, 4.6)
+	local centre = pivot.Position + Vector3.new(0, 2.1, 0)
+	if mn and mx then
+		-- height fixed at 4.2 (AST-043: 26 x 4 x 4 over body + counter); parasol poles poke through
+		size = Vector3.new(mx.X - mn.X + 0.4, 4.2, mx.Z - mn.Z + 0.4)
+		centre = Vector3.new((mn.X + mx.X) / 2, pivot.Y + size.Y / 2, (mn.Z + mx.Z) / 2)
+	end
+	local part = (cover :: Instance):FindFirstChild("Cover")
+	if not (part and part:IsA("BasePart")) then
+		local p = Instance.new("Part")
+		p.Name = "Cover"
+		p.Parent = cover
+		part = p
+	end
+	local bp = part :: BasePart
+	bp.Anchored = true
+	bp.Size = size
+	bp.CFrame = CFrame.new(centre) * pivot.Rotation
+	bp.Material = Enum.Material.Fabric
+	bp.Color = COVER_COLOR
+	bp.CastShadow = true
+	-- authored state = hidden; the VehicleService restores Orig* while the cart is at TRL-SALE (T38)
+	bp.Transparency = 1
+	bp.CanCollide = false
+	bp.CanQuery = false
+	bp.CanTouch = false
+	bp:SetAttribute("OrigTransparency", 0)
+	bp:SetAttribute("OrigCanCollide", true)
+	bp:SetAttribute("OrigCanQuery", true)
+	;(cover :: Model).PrimaryPart = bp
+	CollectionService:AddTag(cover :: Instance, "VehicleCover")
+	setPersistent(cover :: Instance)
+	log("new", ("CART: VehicleCover placeholder %s at %s (hidden; AST-043 replaces it, TASK-088)"):format(fmtV(size), fmtV(centre)))
+end
+
 local function bindCart(assets: Instance, opts: AnchorOpts): Instance?
 	local cart = byMapId(assets, "CART", "AST-026_CornerCart")
 	if not cart then
-		log("err", "CART (AST-026_CornerCart) not found in MAP01_Assets. Run Place.run / Place.showLayer('day') first")
+		log("err", "CART (AST-026_CornerCart) not found in MAP01_Assets. Run Place.run first")
 		return nil
 	end
 	CollectionService:AddTag(cart, "Vehicle")
@@ -736,99 +1181,137 @@ local function bindCart(assets: Instance, opts: AnchorOpts): Instance?
 	end
 	log("ok", ("CART: %d model(s) moved inside the vehicle (CART-*, DRAWER, BIN-C)"):format(moved))
 
-	-- S: sausage stock (cooler, low in the cart body)
-	local s = bindStation(cart, "CART-S", "sausage_stock", "sausage")
-	if s then
-		local y = math.max(topY(s), COUNTER_Y) + 0.3
-		interactable(ensureAnchor(s, "Prompt_Take", function()
-			return Vector3.new(28.9, y, 38.4)
-		end, opts, "CART-S"), "grill_place")
-		interactable(ensureAnchor(s, "Prompt_Restock", function()
-			return Vector3.new(29.6, y, 37.0)
-		end, opts, "CART-S"), "restock")
-	end
-	-- G: grill
-	local g = bindStation(cart, "CART-G", "grill")
-	if g then
-		bindGrill(g, opts)
-		local pg = findNamed(g, "Prompt_Grill")
-		if pg then
-			log("ok", "CART-G: Prompt_Grill left WITHOUT tag (placing is on the cooler, Prompt_Take -> grill_place)")
-		end
-	end
-	-- R: rest rail
-	local r = bindStation(cart, "CART-R", "rail")
-	if r then
-		bindRail(r, opts)
-	end
-	-- B: bun crate (the .fbx has no empties)
-	local b = bindStation(cart, "CART-B", "bun_crate", "bun")
-	if b then
-		local y = topY(b) + 0.3
-		interactable(ensureAnchor(b, "Prompt_Take", function()
-			return Vector3.new(39.7, y, 38.4)
-		end, opts, "CART-B"), "bun_cut")
-		interactable(ensureAnchor(b, "Prompt_Restock", function()
-			return Vector3.new(39.7, y, 36.9)
-		end, opts, "CART-B"), "restock")
-	end
-	-- T: cutting board, one prompt + 2 shared slots
-	local t = bindStation(cart, "CART-T", "board")
-	if t then
-		local y = topY(t) + 0.3
-		interactable(ensureAnchor(t, "Prompt_Board", function()
-			return Vector3.new(42.3, y, 38.4)
-		end, opts, "CART-T"), "board_add_sausage")
-		bindBoard(t, opts)
-	end
-	-- K: toppings grid
-	local k = bindStation(cart, "CART-K", "toppings")
-	if k then
-		bindToppings(k, opts)
-	end
-	-- BIN-C: trash
-	local bin = bindStation(cart, "BIN-C", "trash")
-	if bin then
-		local y = topY(bin) + 0.3
-		interactable(ensureAnchor(bin, "Prompt_Discard", function()
-			return Vector3.new(56, y, 42)
-		end, opts, "BIN-C"), "discard")
-	end
-	-- DRAWER: not a Station; Value_Anchor on top of the POS (drawer half, X >= 52.2)
-	local drawer = byMapId(cart, "DRAWER")
-	if drawer then
-		setPersistent(drawer)
-		ensureAnchor(drawer, "Value_Anchor", function()
-			local mn, mx = partsBox(drawer, function(p)
-				return p.Position.X >= 52.2
-			end)
-			if not (mn and mx) then
-				mn, mx = partsBox(drawer)
-			end
-			if mn and mx then
-				local c = (mn + mx) / 2
-				return Vector3.new(c.X, mx.Y + 0.4, c.Z)
-			end
-			return Vector3.new(53.2, COUNTER_Y + 1.6, 37)
-		end, opts, "DRAWER")
-		for _, n in { "Prompt_Serve", "Prompt_Drawer", "Prompt_TakeOrder", "Prompt_Refuse" } do
-			if findNamed(drawer, n) then
-				log("ok", ("DRAWER: %s left WITHOUT tag (Serve is on the customer, DEC-190)"):format(n))
-			end
-		end
-		for _, n in { "Bar_Thief", "VFX_Coins" } do
-			if not findNamed(drawer, n) then
-				log("warn", ("DRAWER: fitting %s missing (read by TASK-024 / thief, wave 2)"):format(n))
-			end
-		end
-	else
-		log("err", "DRAWER (AST-020) not found inside the CART model")
-	end
+	bindKitchen(cart, {
+		label = "CART",
+		ids = CART_IDS,
+		rail = 6,
+		board = 2,
+		railMode = "first",
+		counterY = COUNTER_Y,
+		cart = nil,
+		fallbackDelta = Vector3.zero,
+	}, opts)
 	-- Zone_Center (thief radius 14, DEC-050): from the .fbx or created at the cart centre (41, 40)
 	ensureAnchor(cart, "Zone_Center", function()
 		return Vector3.new(41, 0.55, 40)
 	end, opts, "CART")
+	bindCover(cart)
 	return cart
+end
+
+-- Trailer (wave 2). Returns the model and its Pad pose; leaves it ON THE PAD (moved to TRL-SALE at the end).
+local function bindTrailer(assets: Instance, cart: Instance?, opts: AnchorOpts): (Instance?, CFrame, CFrame)
+	local salePose = SALE_POSE
+	local shell = byMapId(assets, "TRL-SALE", "AST-027_OpenLateTrailer")
+	if shell and shell:IsA("PVInstance") then
+		local p = (shell :: any):GetPivot() :: CFrame
+		if (p.Position - SALE_POSE.Position).Magnitude > 0.05 or p.LookVector:Dot(SALE_POSE.LookVector) < 0.999 then
+			log("warn", ("TRL-SALE shell pivot %s differs from the binding constant; the shell's pivot is used"):format(fmtV(p.Position)))
+		end
+		salePose = p
+		shell:Destroy()
+		log("ok", "TRL-SALE: empty sale shell removed (the real trailer parks here, T36)")
+	end
+
+	local trl = byMapId(assets, "TRL", "AST-027_OpenLateTrailer")
+	if not trl then
+		log("err", "TRL (AST-027_OpenLateTrailer, layer night) not found. Run Place.run first")
+		return nil, TRL_POSE, salePose
+	end
+	local members: { Instance } = {}
+	for _, d in assets:GetDescendants() do
+		local id = d:GetAttribute("MapId")
+		if d ~= trl and typeof(id) == "string" and not d:IsDescendantOf(trl) then
+			local isTrl = string.sub(id, 1, 4) == "TRL-" and id ~= "TRL-SALE"
+			local isHide = string.match(id, "^H[1-4]$") ~= nil and d:GetAttribute("Asset") == "AST-041_HideCabinet"
+			if isTrl or isHide then
+				table.insert(members, d)
+			end
+		end
+	end
+	local padPose = TRL_POSE
+	if #members > 0 then
+		-- first bind after Place.run: the trailer and its interior are where place_assets put them (Pad)
+		padPose = (trl :: any):GetPivot()
+		if (padPose.Position - TRL_POSE.Position).Magnitude > 0.05 or padPose.LookVector:Dot(TRL_POSE.LookVector) < 0.999 then
+			log("warn", ("TRL pivot %s differs from the binding constant %s; the actual pivot is used as TRL"):format(fmtV(padPose.Position), fmtV(TRL_POSE.Position)))
+		end
+		for _, d in members do
+			d.Parent = trl
+		end
+	else
+		-- re-run: the set is already inside the trailer (parked at TRL-SALE); bring it back to the Pad to bind
+		;(trl :: any):PivotTo(TRL_POSE)
+	end
+	log("ok", ("TRL: %d model(s) moved inside the trailer (TRL-*, H1..H4); bound on the Pad"):format(#members))
+	CollectionService:AddTag(trl, "Vehicle")
+	trl:SetAttribute("Vehicle", "trailer")
+	setPersistent(trl)
+
+	local cartPivot = if cart then (cart :: any):GetPivot().Position else CART_POSE.Position
+	bindKitchen(trl, {
+		label = "TRL",
+		ids = TRL_IDS,
+		rail = 8, -- Vehicles.trailer.RailSlots (Rail_8, §19.22)
+		board = 3, -- Vehicles.trailer.BoardSlots (DEC-215)
+		railMode = "ideal",
+		counterY = padPose.Y + TRAILER_COUNTER_DY,
+		cart = cart,
+		fallbackDelta = padPose.Position - cartPivot,
+	}, opts)
+
+	-- coffee machine (AST-022, DEC-125): Prompt_Brew -> brew_coffee, Prompt_Restock -> restock (stock coffee)
+	local cm = bindStation(trl, "TRL-COFFEE", "coffee_machine", "coffee")
+	if cm then
+		local mn, mx = partsBox(cm)
+		local c = if mn and mx then (mn + mx) / 2 else (cm :: any):GetPivot().Position
+		local top = if mx then mx.Y else padPose.Y + TRAILER_COUNTER_DY + 2
+		local front = if mn then mn.Z - 0.2 else c.Z - 1.6 -- corridor side (north) at the Pad pose
+		interactable(ensureAnchor(cm, "Prompt_Brew", function()
+			return Vector3.new(c.X - 0.6, top + 0.3, front)
+		end, opts, "TRL-COFFEE"), "brew_coffee")
+		interactable(ensureAnchor(cm, "Prompt_Restock", function()
+			return Vector3.new(c.X + 0.6, top + 0.3, front)
+		end, opts, "TRL-COFFEE"), "restock")
+		for _, n in { "Bar_Brew", "Att_Cup", "VFX_Steam" } do
+			if not findNamed(cm, n) then
+				log("warn", ("TRL-COFFEE: fitting %s missing (KitchenController/Coffee.luau, TASK-069)"):format(n))
+			end
+		end
+	end
+
+	-- light switch (AST-039): Prompt_Switch -> switch_light (LightService, §19.6)
+	local sw = byMapId(trl, "TRL-SWITCH")
+	if sw then
+		setPersistent(sw)
+		interactable(ensureAnchor(sw, "Prompt_Switch", function()
+			local mn, mx = partsBox(sw)
+			if mn and mx then
+				local c = (mn + mx) / 2
+				return Vector3.new(c.X, c.Y, mn.Z - 0.3) -- in front of the plate, corridor side (north)
+			end
+			return (sw :: any):GetPivot().Position + Vector3.new(0, 0.5, -0.4)
+		end, opts, "TRL-SWITCH"), "switch_light")
+	else
+		log("err", "TRL-SWITCH (AST-039) not found inside the trailer")
+	end
+
+	-- purchase (FEAT-016, DEC-047, DEC-107): Prompt_Buy on the shell, outside the service window; it travels with
+	-- the trailer (at TRL-SALE the window faces the Pad). The VehicleService disables it once bought.
+	interactable(ensureAnchor(trl, "Prompt_Buy", function()
+		return padPose:PointToWorldSpace(Vector3.new(1, 4.5, -7.5))
+	end, opts, "TRL"), "buy_trailer")
+
+	-- thief zone of the trailer (DEC-050): centre of the trailer, Pad level
+	ensureAnchor(trl, "Zone_Center", function()
+		return padPose.Position + Vector3.new(0, 0.1, 0)
+	end, opts, "TRL")
+	for _, n in { "Light_Interior" } do
+		if not findNamed(trl, n) then
+			log("warn", ("TRL: fitting %s missing (LightController, TASK-060; AST-079 pending)"):format(n))
+		end
+	end
+	return trl, padPose, salePose
 end
 
 local function bindOpenSign(assets: Instance, opts: AnchorOpts)
@@ -846,7 +1329,7 @@ local function bindOpenSign(assets: Instance, opts: AnchorOpts)
 		return Vector3.new(25, 2, 35)
 	end, opts, "OPEN")
 	interactable(a, "open_sign")
-	-- the sale-trailer sign uses the same asset: its Prompt_Open must stay untagged (clean slate does it)
+	-- the sale sign SIGN-T uses the same asset: its Prompt_Open must stay untagged (clean slate does it)
 end
 
 local function bindMart(assets: Instance, opts: AnchorOpts)
@@ -900,7 +1383,139 @@ local function bindMart(assets: Instance, opts: AnchorOpts)
 	end
 end
 
-local function bindPoints(): Instance
+-- Street bins (DEC-200, T60): every AST-034_TrashCan on the map. Q-166 b (how many): all, Provisório.
+local function bindStreetBins(assets: Instance, opts: AnchorOpts)
+	local n = 0
+	for _, d in assets:GetDescendants() do
+		if d:IsA("Model") and d:GetAttribute("Asset") == "AST-034_TrashCan" then
+			if ancestorWithTag(d, "Vehicle") then
+				log("err", ("StreetBin %s is inside a Vehicle (T60: never)"):format(d:GetFullName()))
+				continue
+			end
+			n += 1
+			CollectionService:AddTag(d, "StreetBin")
+			setPersistent(d)
+			local p = d:GetPivot().Position
+			local label = ("StreetBin %s (%.0f, %.0f)"):format(tostring(d:GetAttribute("MapId")), p.X, p.Z)
+			interactable(ensureAnchor(d, "Prompt_Discard", function()
+				local mn, mx = partsBox(d)
+				if mn and mx then
+					local c = (mn + mx) / 2
+					return Vector3.new(c.X, mx.Y + 0.3, c.Z)
+				end
+				return p + Vector3.new(0, 3.3, 0)
+			end, opts, label), "discard")
+		end
+	end
+	log(if n > 0 then "ok" else "warn", ("StreetBin: %d street bin(s) interactive (DEC-200; Q-166 b Provisório: all)"):format(n))
+end
+
+-- Copies the blockout SpotLight of a post into LampHead/Light_Lamp (pointing down) and disables the blockout one.
+local function ensureLampLight(post: Instance, head: Instance?, id: string)
+	for _, d in post:GetDescendants() do
+		if d:IsA("SpotLight") or d:IsA("PointLight") or d:IsA("SurfaceLight") then
+			log("ok", ("%s: light %s already in the post"):format(id, d:GetFullName()))
+			return
+		end
+	end
+	if not head then
+		log("warn", ("%s: no LampHead model, light not bound"):format(id))
+		return
+	end
+	local src: Light? = nil
+	local blockout = Workspace:FindFirstChild("MAP01_Blockout")
+	local folder = blockout and blockout:FindFirstChild("StreetLights")
+	local bp = folder and folder:FindFirstChild(id)
+	if bp then
+		for _, d in bp:GetDescendants() do
+			if d:IsA("Light") then
+				src = d
+				break
+			end
+		end
+	end
+	local mn, mx = partsBox(head)
+	local pivot = (head :: any):GetPivot() :: CFrame
+	local pos = if mn and mx then Vector3.new((mn.X + mx.X) / 2, mn.Y - 0.05, (mn.Z + mx.Z) / 2) else pivot.Position + Vector3.new(0, 13, 0)
+	local holder = Instance.new("Part")
+	holder.Name = "Light_Lamp"
+	holder.Size = Vector3.new(0.4, 0.1, 0.4)
+	holder.CFrame = CFrame.new(pos) * pivot.Rotation
+	makeInvisible(holder)
+	holder:SetAttribute(CREATED, true)
+	holder.Parent = head
+	local light: Light
+	if src then
+		light = src:Clone()
+		light.Enabled = true -- the source may be disabled by an earlier bind (Place.run rebuilt the head)
+		light:SetAttribute("DisabledByBind", nil)
+		src.Enabled = false
+		src:SetAttribute("DisabledByBind", true)
+	else
+		local sl = Instance.new("SpotLight")
+		sl.Range = 18
+		sl.Angle = 60
+		sl.Brightness = 2
+		sl.Color = Color3.fromRGB(255, 214, 150)
+		light = sl
+		log("warn", ("%s: no blockout light found; default SpotLight created (style guide §5.1: Range 16-20, no shadow)"):format(id))
+	end
+	if light:IsA("SpotLight") then
+		light.Face = Enum.NormalId.Bottom
+	end
+	light.Shadows = false
+	light.Parent = holder
+	log("new", ("%s: %s moved to LampHead/Light_Lamp at %s%s"):format(id, light.ClassName, fmtV(pos), if src then " (blockout light disabled)" else ""))
+end
+
+-- Street lights: one Model per post with tag StreetLight (§19.6).
+local function bindStreetLights(assets: Instance)
+	for _, spec in POSTS do
+		local parts: { Instance } = {}
+		local group: Model? = nil
+		for _, d in assets:GetDescendants() do
+			if d:GetAttribute("MapId") == spec.id and d:IsA("PVInstance") then
+				table.insert(parts, d)
+				local par = d.Parent
+				if par and par:IsA("Model") and par.Name == spec.id then
+					group = par
+				end
+			end
+		end
+		if #parts == 0 then
+			log("err", ("StreetLight %s: no placed model with MapId %s"):format(spec.id, spec.id))
+			continue
+		end
+		local head: Instance? = nil
+		for _, d in parts do
+			if d:GetAttribute("Asset") == "AST-036_LampHead" then
+				head = d
+			end
+		end
+		if not group then
+			local g = Instance.new("Model")
+			g.Name = spec.id
+			g.Parent = parts[1].Parent
+			group = g
+		end
+		for _, d in parts do
+			d.Parent = group
+		end
+		local post = group :: Model
+		post.WorldPivot = if head then (head :: any):GetPivot() else (parts[1] :: any):GetPivot()
+		CollectionService:AddTag(post, "StreetLight")
+		post:SetAttribute("PostId", spec.id)
+		post:SetAttribute("Group", POST_GROUP)
+		post:SetAttribute("Order", spec.order)
+		setPersistent(post)
+		ensureLampLight(post, head, spec.id)
+		log("ok", ("StreetLight %s: Order %d, Group %s (%d model(s))"):format(spec.id, spec.order, POST_GROUP, #parts))
+	end
+end
+
+type Ctx = { cart: Instance?, trailer: Instance?, poses: { [string]: CFrame } }
+
+local function bindPoints(ctx: Ctx): Instance
 	local root = Workspace:FindFirstChild(BINDING_ROOT)
 	if not (root and root:IsA("Model")) then
 		if root then
@@ -930,9 +1545,16 @@ local function bindPoints(): Instance
 	end
 	-- review / demo scenes are not part of the map
 	for _, c in Workspace:GetChildren() do
-		if c.Name == "CrewDemo" or c.Name == "AssetReview" or string.sub(c.Name, 1, 10) == "__Preview_" then
+		if c.Name == "CrewDemo" or c.Name == "AssetReview" or c.Name == "KitDemo" or c.Name == "ItemsDemo" or string.sub(c.Name, 1, 10) == "__Preview_" then
 			table.insert(exclude, c)
 		end
+	end
+	local function without(v: Instance?): { Instance }
+		local ex = table.clone(exclude)
+		if v then
+			table.insert(ex, v)
+		end
+		return ex
 	end
 
 	local links: { [string]: { string } } = {}
@@ -943,23 +1565,40 @@ local function bindPoints(): Instance
 		table.insert(links[e[2]], e[1])
 	end
 
-	local function place(name: string, x: number, z: number, floor: number, face: Vector3?, parent: Instance): Part
-		local y, why = floorY(x, z, floor, exclude)
-		if why then
-			log("warn", ("%s: %s"):format(name, why))
-		end
-		local pos = Vector3.new(x, y, z)
+	local function newPart(name: string, cf: CFrame, parent: Instance): Part
 		local p = Instance.new("Part")
 		p.Name = name
 		p.Size = Vector3.one
-		p.CFrame = if face then CFrame.lookAt(pos, pos + face) else CFrame.new(pos)
+		p.CFrame = cf
 		makeInvisible(p)
 		p.Parent = parent
 		return p
 	end
 
 	for _, pt in POINTS do
-		local p = place(pt.id, pt.x, pt.z, pt.floor, pt.face, pts)
+		local cf: CFrame
+		if pt.pose then
+			cf = ctx.poses[pt.pose]
+		else
+			local y: number
+			if pt.y then
+				y = pt.y
+			else
+				local why
+				y, why = floorY(pt.x, pt.z, pt.floor, without(if pt.onTrailer then ctx.cart else ctx.trailer))
+				if why then
+					log("warn", ("%s: %s"):format(pt.id, why))
+				end
+			end
+			local pos = Vector3.new(pt.x, y, pt.z)
+			local face: Vector3? = pt.face
+			if pt.faceTo then
+				local d = Vector3.new(pt.faceTo[1] - pt.x, 0, pt.faceTo[2] - pt.z)
+				face = if d.Magnitude > 1e-3 then d.Unit else nil
+			end
+			cf = if face then CFrame.lookAt(pos, pos + face) else CFrame.new(pos)
+		end
+		local p = newPart(pt.id, cf, pts)
 		CollectionService:AddTag(p, "MapPoint")
 		p:SetAttribute("PointId", pt.id)
 		if pt.node then
@@ -969,7 +1608,11 @@ local function bindPoints(): Instance
 		log("ok", ("MapPoint %s at %s%s"):format(pt.id, fmtV(p.Position), if pt.node then " (+ NpcNode)" else ""))
 	end
 	for _, nd in NODES do
-		local p = place(nd.id, nd.x, nd.z, nd.floor, nil, nodes)
+		local y, why = floorY(nd.x, nd.z, nd.floor, without(ctx.trailer))
+		if why then
+			log("warn", ("%s: %s"):format(nd.id, why))
+		end
+		local p = newPart(nd.id, CFrame.new(nd.x, y, nd.z), nodes)
 		CollectionService:AddTag(p, "NpcNode")
 		p:SetAttribute("NodeId", nd.id)
 		p:SetAttribute("Links", table.concat(links[nd.id] or {}, ","))
@@ -985,6 +1628,32 @@ local function bindPoints(): Instance
 	end
 	log("ok", ("NpcNode graph: %d node-only parts + %d point nodes, %d edges"):format(#NODES, pointNodes, #EDGES))
 	return root :: Instance
+end
+
+-- Light volumes LZ-1..5 in MapBinding/LightZones (static; trailer zones on the Pad pose).
+local function bindLightZones(root: Instance, padPose: CFrame)
+	local folder = Instance.new("Folder")
+	folder.Name = "LightZones"
+	folder.Parent = root
+	for _, z in ZONES do
+		local p = Instance.new("Part")
+		p.Name = z.id
+		local centre: CFrame = if z.local_ then padPose * CFrame.new(z.local_) else CFrame.new(z.world :: Vector3)
+		if z.shape == "Ball" then
+			p.Shape = Enum.PartType.Ball
+			p.Size = Vector3.one * (z.radius :: number) * 2
+		else
+			p.Shape = Enum.PartType.Block
+			p.Size = z.size :: Vector3
+		end
+		p.CFrame = centre
+		makeInvisible(p)
+		p.Parent = folder
+		CollectionService:AddTag(p, "LightZone")
+		p:SetAttribute("ZoneId", z.id)
+		p:SetAttribute("Group", z.group)
+		log("ok", ("LightZone %s (%s, %s) at %s size %s"):format(z.id, z.group, z.shape, fmtV(p.Position), fmtV(p.Size)))
+	end
 end
 
 -- Persistent on every Model that is, or contains, a tagged instance (§18.0 item 6).
@@ -1022,17 +1691,43 @@ function Bind.run(opts: AnchorOpts?): string
 	if not assets then
 		return "[err] workspace." .. ASSETS_ROOT .. " not found: run place_assets.luau Place.run first"
 	end
-	if not assets:FindFirstChild("Cart") and not byMapId(assets, "CART") then
-		return "[err] the cart set is not in the Workspace (night layer active?). Run Place.showLayer('day') first"
+	local merged = mergeLayers(assets)
+	log("ok", ("layers: %d folder(s) brought from ServerStorage (both vehicles in the Workspace, T36). Do not use Place.showLayer after this"):format(merged))
+	if not byMapId(assets, "CART") then
+		return "[err] the cart set (MapId CART) is not in MAP01_Assets nor in ServerStorage.MAP01_Assets_Day. Run Place.run first"
 	end
 
 	cleanSlate(assets)
-	bindCart(assets, o)
+	local cart = bindCart(assets, o)
+	local trl, padPose, salePose = bindTrailer(assets, cart, o)
+	-- phones last: the clearance looks at every other prompt of the vehicle
+	if cart then
+		bindPhone(cart, "CART-PHONE", o)
+		clearUp(findNamed(cart, "Prompt_Answer"), cart, PHONE_GAP, "CART-PHONE")
+	end
+	if trl then
+		bindPhone(trl, "TRL-PHONE", o)
+		clearUp(findNamed(trl, "Prompt_Answer"), trl, PHONE_GAP, "TRL-PHONE")
+	end
 	bindOpenSign(assets, o)
 	bindMart(assets, o)
-	bindPoints()
+	bindStreetBins(assets, o)
+	bindStreetLights(assets)
+
+	local cartPose = if cart then (cart :: any):GetPivot() :: CFrame else CART_POSE
+	if (cartPose.Position - CART_POSE.Position).Magnitude > 0.05 then
+		log("warn", ("CART pivot %s differs from the binding constant %s; the actual pivot is used as CART"):format(fmtV(cartPose.Position), fmtV(CART_POSE.Position)))
+	end
+	local root = bindPoints({ cart = cart, trailer = trl, poses = { cart = cartPose, trl = padPose, sale = salePose } })
+	bindLightZones(root, padPose)
 	local p = persistAll()
 	log("ok", ("ModelStreamingMode = Persistent set on %d more model(s)"):format(p))
+
+	-- start of a run: trailer for sale (T36, DEC-047)
+	if trl then
+		;(trl :: any):PivotTo(salePose)
+		log("ok", ("TRL: trailer parked at TRL-SALE %s (VehicleService moves it to TRL on the swap)"):format(fmtV(salePose.Position)))
+	end
 
 	local tagCounts = {}
 	for _, tag in OWN_TAGS do
@@ -1045,7 +1740,7 @@ function Bind.run(opts: AnchorOpts?): string
 		table.insert(tagCounts, ("%s=%d"):format(tag, c))
 	end
 
-	local head = ("bind_map01: ok %d | new %d | conv %d | warn %d | err %d\ntags in Workspace: %s\n"):format(
+	local head = ("bind_map01 (waves 1+2): ok %d | new %d | conv %d | warn %d | err %d\ntags in Workspace: %s\n"):format(
 		counts.ok,
 		counts.new,
 		counts.conv,
@@ -1054,7 +1749,7 @@ function Bind.run(opts: AnchorOpts?): string
 		table.concat(tagCounts, ", ")
 	)
 	local body = table.concat(report, "\n")
-	return head .. body .. "\nNext: run check_map01.luau (Check.run())."
+	return head .. body .. "\nNext: run check_map01.luau (Check.run({ wave = 2 }))."
 end
 
 return Bind

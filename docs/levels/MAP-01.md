@@ -5,6 +5,7 @@ Status: Rascunho
 Autor: level-designer. Versão 1: 2026-10-08. **Revisão 2 (2026-10-08): conciliação com DEC-086 a DEC-099, `story/anomalies.md` (Aprovado), `story/ending.md` (Aprovado), `story/world.md`, `story/characters.md` e `story/script.md` (Rascunho).**
 **Revisão 3 (2026-10-08): conciliação com DEC-100 a DEC-129 e `art/style-guide.md` (Aprovado, DEC-126); corrige os itens LD-1 a LD-21 de `consistency-report.md`.**
 **Revisão 3, ajuste final (2026-10-08): DEC-130 (sem semáforo no MVP, revoga DEC-120); rodada 17 (`Q-128`, opção B, secretário registrando); postes da Juniper a 8 studs com JL-09 a ~135 (LD-15 / P33); nota de P35.**
+**Binding da onda 2 (2026-10-10, TASK-083): ponto novo `DROP-T` e `SIGN-T` como ponto (§5.1); poses `CART`/`TRL`/`TRL-SALE` = pivô do modelo; L1 e L3 ajustados para fora do poste e do banco (§5.3); grafo do ladrão (§9.1); §16 (binding no place); P40–P45. Provisório.**
 Nomes de lugares vêm de `story/world.md` (`Q-096`): cidade **Bellmoor**, esquina **Ninth & Juniper**, **Ninth Avenue**, **Juniper Street**, **Ninth Street Mart**, **Bellmoor Savings**. O nome do mapa, a lavanderia, B1 e B4 seguem placeholders para o narrative-writer (DEC-022: textos do jogo em inglês).
 Números de gameplay citados são valores iniciais ajustáveis (DEC-044). Medidas de mapa são **proposta do level-designer**; o que tem `[DEC-###]` é requisito decidido. `Provisório` = recomendação do level-designer que depende de pergunta aberta.
 Anomalias: `ANM-001`…`ANM-010` = N1…N10 (DEC-096).
@@ -184,6 +185,9 @@ Três linhas que organizam o mapa:
 | BIN-C | Lixeira do carrinho | (56, 42) | ponta direita do corredor |
 | PS-1..4 | Spawn dos jogadores (dia) | (32, 42) · (38, 42) · (44, 42) · (50, 42) | olhando para o norte. Também reconexão [DEC-063] e membro atrasado [DEC-098] |
 | PS-N1..4 | Spawn dos jogadores (noite) | (32, 41) · (38, 41) · (44, 41) · (50, 41) | dentro do trailer. Também reconexão e atrasado à noite |
+| DROP-T | Itens do espectador (FEAT-025, §19.12 do `architecture.md`) | (51.5, 44.5), piso do trailer (+2) | **novo (TASK-083)**. Canto de trás à direita, ao lado da porta dos fundos, dentro de LZ-1: os pacotes e o apito de quem virou espectador caem aqui às 6:00 AM. Fora da linha de estações (nenhum prompt de estação a < 5 studs) e visível de quem entra pela porta. Provisório |
+
+Poses dos veículos (`MapPoint`, T36): `CART` = pivô do carrinho **(41, 37.5)** (o "centro (41, 40)" da tabela é o visual; o código usa o pivô do modelo, base-centro do AST-026), `TRL` = pivô do trailer no Pad (40, 41), virado para o norte; `TRL-SALE` = (78, −58), virado para o sul. O `VehicleService` faz `PivotTo` do modelo para o ponto: carrinho em `CART` e trailer em `TRL-SALE` no começo da run; depois da troca, trailer em `TRL` e carrinho (com a lona) em `TRL-SALE`. `SIGN-T` também vira `MapPoint` (78, −40), virado para o sul: é onde o `VehicleController` desenha "Available on Day 5" (§16.3).
 
 ### 5.2 Mart, ruas e marcos
 
@@ -217,9 +221,9 @@ Velocidade de cliente a pé: ~8 studs/s.
 | SP-B | chegada de cliente (lavanderia) | (−40, −32) | só dia | calçada norte → quina NO → **CW-2** → quina SO → calçada oeste da Juniper Sul → **CW-1** → calçada leste → LANE-E → fim da fila. ~145 studs, ~18 s + espera de brecha (§9.5) |
 | D1 | chegada **e** saída (porta de B1) | (64, 48) | dia e noite | lado leste do Pad (X 56..64) → LANE-W → fim da fila. ~45 studs |
 | EX-E | saída leste | (116, 24), vira a quina de B1 | dia e noite | Q1 → LANE-E → leste. ~65 studs, ~8 s |
-| L1 | espreita do ladrão (P-01) | (20, 20) | dia 2+ | 36 studs até a gaveta |
+| L1 | espreita do ladrão (P-01) | (20, 20) → ponto em **(21.5, 22)** (TASK-083: fora do poste, que tem o pé em (20, 20)) | dia 2+ | 34 studs até a gaveta |
 | L2 | espreita do ladrão (poste leste) | (84, 22) | dia 2+ | 35 studs até a gaveta |
-| L3 | espreita do ladrão (banco do Pad) | (58, 58) | dia 2+ | 22 studs até a gaveta |
+| L3 | espreita do ladrão (banco do Pad) | (58, 58) → ponto em **(58, 56.5)** (TASK-083: na frente do banco, não em cima) | dia 2+ | 20 studs até a gaveta |
 | ST-R | spawn/fuga do ladrão | (18, 92), calçada leste da Juniper Sul, além de BAR-S; B1 esconde o spawn do Pad | dia 2+ | só pela calçada leste da Juniper Sul (**nunca cruza pista**); de L2 foge para EX-E |
 | AS-1..4 | spawns ocultos de atores de anomalia | §10.3 | só noite | — |
 
@@ -525,6 +529,7 @@ Tipos e comportamento: `design/npcs.md`. Aqui só o espacial. Todos os NPCs são
 | Saída | Q1 → LANE-E → EX-E (60%) ou D1 (40%) | igual |
 
 **Grafo de NPC (TASK-005, `workspace.MapBinding`).** 25 nós, que seguem as rotas ROUTE-SP-A, ROUTE-D1-IN, ROUTE-QUEUE, ROUTE-EXIT-E e ROUTE-EXIT-D1. Fonte: `tools/assetplace/bind_map01.luau`; checagem: `check_map01.luau`. D1 fica 1 stud a oeste da porta, em (63, 48), para o NPC não nascer dentro da parede.
+**Onda 2 (TASK-083): ROUTE-THIEF**, +8 nós (33 no total): `ST-R`, `L1`, `L2`, `L3` (pontos e nós) e `N-Z08-01` (18, 70), `N-Z08-02` (18, 56), `N-Z08-03` (18, 38) na calçada leste da Juniper Sul, `N-Z01-04` (38, 56) na faixa sul do Pad. Arestas novas: ST-R–N-Z08-01–N-Z08-02–N-Z08-03–N-Z02-02–L1; N-Z08-02–N-Z01-04–L3 (por trás do carrinho/trailer, nunca na frente do balcão); N-Z02-06–N-Z02-08–L2 (LANE-W até o poste leste; também a fuga de L2 para EX-E). Nenhuma aresta nova cruza pista nem toca a fila; as rotas de cliente da onda 1 não mudam (o A* continua achando os mesmos caminhos). A aresta ST-R–N-Z08-01 passa por BAR-S (parede só de jogador: o NPC passa pelo collision group, como SP-A em BAR-N).
 **Nota para a TASK-031 e o `MapIndex.Path` (Provisório):** **um nó Q (Q1–Q5) nunca é ponto intermediário de um caminho**, só origem ou destino. Sem essa regra, o A* sem direção leva a chegada D1 → Q5 por dentro da fila (Q1 → Q2 → … → Q5), porque é mais curto que a rota pela calçada (LANE-W). Dentro da fila, o `CustomerService` move o cliente vaga a vaga. Quem sai do meio da fila sem ser atendido é caso da TASK-032: ou anda até Q1 e sai por lá, ou ganha uma ligação própria. Os pontos de chegada continuam ligados só a Q5 (`architecture.md` §18.6).
 
 Clientes normais são repetitivos para criar padrão [DEC-010]: chegam pela esquerda, saem pela direita, pelos mesmos pontos. À noite, NPC fora dessas rotas é quebra de padrão legível.
@@ -915,5 +920,59 @@ Novas, para o secretário registrar (nenhuma bloqueante na minha leitura; P32 mu
 | P37 | **`Q-129`**: sem semáforo, carro para na faixa? faixas ficam pintadas? como NPC atravessa? (game-designer + level-designer) | Proposta em §9.5, alinhada com FEAT-033 `Traffic.Crossing` (Rascunho): Ninth preferencial; **PARE de 1 s** nas bocas da Juniper (placas PARE-N, PARE-S); faixas **pintadas**, sem proteger o jogador; carro **nunca** para por jogador; NPC atravessa só em faixa com **reserva**, e com reserva os carros param na linha da faixa (SL-W/SL-E juntas para CW-2/CW-4; SL-1N/SL-1S; SL-3W/SL-3E). **Provisório** |
 | P38 | Pedidos ao art-director pelo ajuste final | (1) AST-077 (semáforo) **obsoleto**, L01-39 sai; (2) AST-032 (kit de rua) ganha **placa PARE** (×2), linha de PARE em SL-N/SL-S e linhas de faixa (§5.4); faixas pintadas conforme `Q-129`; (3) style guide §5: anotar a emenda ~110 → **~135** (LD-15), com teste de leitura do Walker no celular sob o `SpotLight` de JL-09 |
 | P39 | Novo limite **BAR-N em Z −76** (antes −100): a Juniper Norte jogável fica com 44 studs de comprimento (Z −76..−32). SP-A (30, −104) e AS-3 (−30, −104) seguem atrás do limite; cones de AST-047 mudam de lugar (informativo; architect e art-director) | Manter. Alternativa: BAR-N em Z −84 deixa só JL-09 fora do alcance, mas o jogador chega a 4 studs do Walker no passo 1 |
+| P40 | Como o `VehicleController` acha a placa `SIGN-T` (architect; TASK-058). §19.22 cita a placa, mas nenhuma tag nem ponto | **Provisório (TASK-083):** `SIGN-T` vira `MapPoint` (78, −40), virado para o sul; o client desenha o texto ali. Se a placa precisar sumir ao comprar, falta uma tag no modelo (sugestão `SaleSign`): pedido ao architect para o `Required.Wave2` |
+| P41 | Estado autorado da lona (`VehicleCover`): visível ou escondida no place? (architect; TASK-056) | **Escondida** (Transparency 1, sem colisão) com `OrigTransparency`/`OrigCanCollide`/`OrigCanQuery` = valores visíveis, mesmos nomes do `place_assets.hide`. Assim o código da onda 1 nunca mostra a lona sobre o carrinho e o `VehicleService` só restaura os `Orig*`. Provisório |
+| P42 | `LightZone` do trailer (LZ-1..3) no veículo ou no mapa? (architect; TASK-059) | **No mapa** (`MapBinding/LightZones`), na pose do Pad: a zona só vale com o trailer como veículo atual (condição do grupo), então não precisa andar com ele e o cache do `IsLit` não depende de `Swapped`. Provisório |
+| P43 | `SPEC-P`/`SPEC-M` são câmeras a 20 / 14 de altura, mas `MapPoint` exige frente horizontal (architect + frontend; TASK-064) | Ponto com frente horizontal para o alvo (SPEC-P → (44, 30); SPEC-M → AMB-M); o `CameraController` inclina para baixo (sugestão −30°). Provisório |
+| P44 | Quantas lixeiras de rua são interativas (`Q-166` b; game-designer) | **As 3** AST-034 do mapa ((−46, 17.5), (66, 17.5), (−30, −17.5)), tag `StreetBin` (T60). Até a TASK-057, o prompt "Throw Away" aparece nelas e o servidor recusa. Provisório |
+| P45 | Luz dos postes JL-01..09 e P-01 (TASK-060) | O `SpotLight` do blockout de cada poste foi **copiado** para `LampHead/Light_Lamp` (para baixo, sem sombra) e o do blockout desligado (`DisabledByBind`), para o `StreetLight` conter a própria luz sem dobrar o orçamento (§13). `Place.restore` não religa o do blockout. Troca pela luz do AST-083 quando a ficha for aprovada (TASK-092) |
 
 Fora deste documento, mas dependem dele: fichas técnicas `ANM-###` (escolher âncoras de §10.3), `design/npcs.md`, `art/asset-list.md` (converter L01-## sem AST em fichas), blockout no Blender (quando pedido, combinado com o modeler-3d).
+
+## 16. Binding no place (TASK-005 onda 1, TASK-083 onda 2)
+
+Contrato: `tech/architecture.md` §18 e §19.22. Ferramentas (modo de edição, fora do Rojo): `tools/assetplace/bind_map01.luau` (aplica) e `check_map01.luau` (confere; espelho de `MapIndex/Required.luau`). Tudo **Provisório** (DEC-193).
+
+### 16.1 Como rodar (Command Bar, repositório servido na porta 8772)
+
+Ordem: `Place.run` (se os assets mudaram) → `Bind.run()` → `Check.run({ wave = 2 })` → salvar o place. Depois de qualquer `Place.run`, rodar o `Bind` de novo. Depois do `Bind`, **não** usar `Place.showLayer`: os dois veículos ficam no `Workspace` (T36).
+
+```lua
+local H=game:GetService("HttpService") local w=H.HttpEnabled H.HttpEnabled=true local function get(p) local ms=Instance.new("ModuleScript") ms.Source=H:GetAsync("http://127.0.0.1:8772/tools/assetplace/"..p) return require(ms) end local Bind=get("bind_map01.luau") local Check=get("check_map01.luau") H.HttpEnabled=w print(Bind.run()) Check.run({ wave = 2 })
+```
+
+### 16.2 O que a onda 2 põe no place
+
+| Peça | Onde | Tag / atributos |
+|---|---|---|
+| Trailer | AST-027 do Pad (`TRL`) + todo `TRL-*` e H1..H4 dentro dele; estacionado em `TRL-SALE` no fim do bind (a casca vazia `TRL-SALE` sai) | `Vehicle = "trailer"`; estações como o carrinho, `rail` com 8 vagas (`Rail_8`), `board` com 3 (`Att_Bun1..3`), `coffee_machine` (`Ingredient = coffee`; `Prompt_Brew` → `brew_coffee`, `Prompt_Restock` → `restock`); `Zone_Center`; gaveta `TRL-DRAWER` com `Value_Anchor` |
+| Telefone | `CART-PHONE` (no poste do guarda-sol) e `TRL-PHONE` (parede da frente) | `Prompt_Answer` → `answer_phone`; a âncora sobe até ficar ≥ 2,6 de qualquer prompt de outra estação |
+| Compra | `Prompt_Buy` na casca do trailer, fora da janela (anda com ele; em `TRL-SALE` fica virado para o Pad) | `buy_trailer` |
+| Interruptor | `TRL-SWITCH`, parede sul (46, 46) | `Prompt_Switch` → `switch_light` |
+| Lona | `Model` `VehicleCover` dentro do carrinho (caixa cinza do tamanho da bancada, AST-043 pendente) | tag `VehicleCover`; escondida, `Orig*` com os valores visíveis (P41) |
+| Luz (volumes) | `MapBinding/LightZones`: LZ-1 (X 27..53, Z 36..46, piso +2 até o teto), LZ-2 (X 44..56, Z 30..35), LZ-3 (bola r 18 em (40, 41)), LZ-4 (Mart), LZ-5 (bola r 6 no SS) | tag `LightZone`, `ZoneId`, `Group` (`trailer_interior`, `trailer_lights`, `mart`); nenhum volume na rota Pad ↔ Mart (DEC-196) |
+| Postes | um `Model` por poste (haste + cabeça) JL-01..09, P-01 | tag `StreetLight`, `PostId`, `Group = juniper_posts`, `Order` 1..10 (JL-09 = 1 … JL-01 = 9, P-01 = 10 = ordem do Hush; passo do Walker = `Order − 1`) |
+| Lixeiras de rua | as 3 AST-034 (P44) | tag `StreetBin`; `Prompt_Discard` → `discard` (T60) |
+| Pontos | §5.1, §5.3, §5.5 | `PS-N1..4`, `REV-1..4`, `TRL`, `TRL-SALE`, `CART`, `SPEC-P`, `SPEC-M`, `DROP-T`, `L1..L3`, `ST-R`, `SIGN-T` |
+| Grafo | §9.1 | ROUTE-THIEF (33 nós) |
+
+### 16.3 Decisões de binding (Provisório)
+
+- **Pose do veículo = pivô do modelo** (o `PivotTo` do T36 usa o ponto como está). `CART` (41, 37.5), `TRL` (40, 41) norte, `TRL-SALE` (78, −58) sul. As mesmas constantes estão em `MAP-01_placements.luau`: mudar nos dois.
+- **Trailer no place = começo de run**: estacionado em `TRL-SALE` com o interior completo; o carrinho fica no Pad. O bind amarra as âncoras com o trailer no Pad (coordenadas deste documento) e só no fim o estaciona.
+- **Fallback das âncoras do trailer** = o do carrinho + diferença de pivô da mesma estação (mesmo asset, mesma ordem, DEC-086).
+- **`SIGN-T` é ponto** (P40); **lona escondida** (P41); **zonas de luz no mapa** (P42); **câmeras SPEC com frente horizontal** (P43).
+
+### 16.4 Lista que o `check_map01` cobra na onda 2 (para o `Required.Wave2` da TASK-048)
+
+| Item | Valor |
+|---|---|
+| Tags | onda 1 + `LightZone`, `StreetLight`, `VehicleCover` (`StreetBin` só avisa; `UpgradePiece` fica com a TASK-085) |
+| Pontos | onda 1 + `PS-N1..4`, `REV-1..4`, `TRL`, `TRL-SALE`, `CART`, `SPEC-P`, `SPEC-M`, `DROP-T`, `L1`, `L2`, `L3`, `ST-R` (+ `SIGN-T`, P40) |
+| Nós | onda 1 + `ST-R`, `L1`, `L2`, `L3`; rotas do ladrão com `AvoidQueue` e `AvoidCrossings` existem (ST-R → L1/L2/L3, L1/L3 → ST-R, L2 → EX-E) |
+| Veículos | 1 `cart` (7 estações da onda 1) e 1 `trailer` (as 7 + `coffee_machine`); vagas de `rail`/`board` por `Vehicles[v].RailSlots`/`BoardSlots` (6/2 e 8/3) |
+| Âncoras do veículo (dono sem `Station`) | carrinho: `answer_phone` = 1; trailer: `answer_phone` = 1, `switch_light` = 1, `buy_trailer` = 1 |
+| Distâncias | dentro de cada veículo, âncoras de donos diferentes ≥ 2,5; complementos ≥ 2,0 |
+| Luz | LZ-1..5 únicos com o `Group` da tabela acima; JL-01..09 + P-01 únicos com `Order` do Hush |
+| Lona | exatamente 1 `VehicleCover` |
+| Bancada | pivôs do carrinho a y 3,45; do trailer a pivô + 5,5 |

@@ -23,7 +23,8 @@
 
 	Kit conventions:
 	  - pivot = base centre (wheels touch Y 0 of the pivot); pivot LookVector (-Z) = FRONT of the car. The imported FBX
-	    has its front at +Z (MAP-01_placements.luau fact 1), so the pivot is turned 180 degrees here, once;
+	    is already exported turned 180 degrees about Y (pipeline export), so .blend +Z (front) arrives at -Z: the
+	    pivot keeps identity rotation and .blend coordinates are mapped through BLEND_TO_ASSET;
 	  - attachments facing forward (Hit_Front, VFX_Honk, Beam_*, Light_*) have LookVector = front;
 	  - every part Anchored, CanCollide / CanQuery / CanTouch false (§8.1: local car, hit tested by box in the client);
 	  - attribute Asset = "AST-###_<name>" on every Model and BasePart (§18.9 rule 7); Tris = .blend count;
@@ -77,7 +78,8 @@ const VEHICLES_VERSION = 1
 const CACHE_NAME = "__AssetCache" -- shared with place_assets / build_kits / build_items
 const DEMO_NAME = "VehiclesDemo"
 const SIZE_TOL = 0.05
-const FRONT = CFrame.Angles(0, math.pi, 0) -- asset +Z (front) -> LookVector
+const FRONT = CFrame.identity -- imported asset front is already -Z (LookVector)
+const BLEND_TO_ASSET = CFrame.Angles(0, math.pi, 0) -- .blend space -> imported asset space (export turns 180 degrees)
 const SHAPES = { "Sedan", "Hatch", "Van", "Pickup" } -- order = Shapes attribute (index for Look, TASK-104)
 const PAINTS = { "Peach", "Butter", "Lilac", "MintGray", "TealLight" } -- AST-035, style guide §2.2
 const WHEELS = { "Wheel_FL", "Wheel_FR", "Wheel_RL", "Wheel_RR" }
@@ -359,7 +361,7 @@ function Vehicles.buildVehicle(name: string, spec: VehicleSpec, ids: Ids, reload
 		return nil
 	end
 	-- asset origin from the root part (imported MeshParts sit at their bounding-box centre)
-	local origin = root.CFrame * CFrame.new(-centre(spec.parts[1].box))
+	local origin = CFrame.new(root.Position - BLEND_TO_ASSET:VectorToWorldSpace(centre(spec.parts[1].box)))
 	local m = Instance.new("Model")
 	m.Name = name
 	m:SetAttribute("Asset", spec.asset)
@@ -377,7 +379,7 @@ function Vehicles.buildVehicle(name: string, spec: VehicleSpec, ids: Ids, reload
 			table.insert(problems, string.format("%s.%s: size %s, .blend %s", spec.asset, s.name, fmt(p.Size), fmt(size)))
 		end
 		local at = origin:PointToObjectSpace(p.Position)
-		if not near(at, centre(s.box), SIZE_TOL) then
+		if not near(at, BLEND_TO_ASSET:VectorToWorldSpace(centre(s.box)), SIZE_TOL) then
 			table.insert(problems, string.format("%s.%s: at %s, .blend %s", spec.asset, s.name, fmt(at), fmt(centre(s.box))))
 		end
 		p.CFrame = origin:ToObjectSpace(p.CFrame) -- asset origin -> world identity
@@ -392,7 +394,7 @@ function Vehicles.buildVehicle(name: string, spec: VehicleSpec, ids: Ids, reload
 	m.PrimaryPart = root
 	root.PivotOffset = root.CFrame:ToObjectSpace(FRONT)
 	for attName, pos in spec.atts do
-		attach(root, attName, CFrame.new(pos) * FRONT)
+		attach(root, attName, CFrame.new(BLEND_TO_ASSET:VectorToWorldSpace(pos)) * FRONT)
 	end
 	-- wheels: Axle at the centre (Axis = asset X), radius for the spin speed
 	local radius = 0
