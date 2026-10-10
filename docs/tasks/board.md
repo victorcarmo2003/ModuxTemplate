@@ -2,7 +2,9 @@ Status: Rascunho
 
 # Board de tarefas (TASK-###)
 
-Dono do arquivo: task-planner. Versão 1, 2026-10-10. Primeira onda depois da **bandeira verde (DEC-193)**.
+Dono do arquivo: task-planner. Versão 1.1, 2026-10-10. Primeira onda depois da **bandeira verde (DEC-193)**.
+v1.1: retorno da TASK-040 (`docs/tests/wave-1.md` §0.4 R1–R5 e §9 L-01–L-10) → TASK-042 a TASK-046 e notas
+abaixo da tabela.
 
 Base: `CLAUDE.md`, `README.md` (Modux V3), `docs/PIPELINE.md`, `docs/tech/architecture.md`, `network.md`, `data.md`,
 `content-data.md` (v3.1), `docs/design/*.md`, `docs/levels/MAP-01.md`, `docs/art/asset-list.md`, `decisions.md`
@@ -48,7 +50,7 @@ Base: `CLAUDE.md`, `README.md` (Modux V3), `docs/PIPELINE.md`, `docs/tech/archit
 | TASK-007 | Kit de itens e comida no place | modeler-3d | TASK-002, TASK-006 (mesma sessão de Studio) | `ReplicatedStorage.Assets.Items` (Studio) | AST-001–011; DEC-137, 141, 142, 174 | — | Bloqueada |
 | TASK-008 | Conteúdo: turno, upgrades, veículos, fluxo e pedidos | backend-coder | TASK-003 | `src/Shared/Content/` Shift, RunParams, Upgrades, Vehicles, Flow, Orders | FEAT-003, 009, 010, 011, 015; `upgrades.md`; DEC-045, 048, 072, 184, 185 | Q-062, Q-163 | Bloqueada |
 | TASK-009 | Conteúdo: classes, espécies, tipos de cliente, falas da Opal | backend-coder | TASK-003 | `src/Shared/Content/` Classes, Species, CustomerTypes, OpalLines | DEC-069, 070, 186, 188, 192; `npcs.md`; `characters.md` CHR-003 | Q-165, DEC-192 (porco, a confirmar), Q-160 | Bloqueada |
-| TASK-010 | `Place` + `RunState` mínimo (modo dev) | backend-coder | TASK-004 | `src/Place/server/PlaceService`, `src/Place/client/PlaceController`, `src/Run/server/RunStateService/` | `architecture.md` §1, §2.3, §7; `data.md` §2.1 | modo dev; snapshot só em memória | Bloqueada |
+| TASK-010 | `Place` + `RunState` mínimo (modo dev) + `MapIndex` compartilhado (leitura do mapa por tag/atributo, `architecture.md` §18; pré-requisito da TASK-031) | backend-coder | TASK-004 | `src/Place/server/PlaceService`, `src/Place/client/PlaceController`, `src/Run/server/RunStateService/`, `src/Map/shared/MapIndex` | `architecture.md` §1, §2.3, §7; `data.md` §2.1 | modo dev; snapshot só em memória | Bloqueada |
 | TASK-011 | `InteractionService` (único responder de `Interact`) | backend-coder | TASK-002, TASK-004 | `src/Interaction/server/InteractionService/` | `architecture.md` §4, T6; FEAT-005; DEC-066, 174 | Q-130 (T6) | Bloqueada |
 | TASK-012 | `RoundService`: turno de dia, relógio, placa OPEN/CLOSED | backend-coder | TASK-004, TASK-008, TASK-010, TASK-011 | `src/Round/server/RoundService.luau` | FEAT-002, FEAT-003; DEC-048, 085 | noite fora da onda (Day N → Day N+1) | Bloqueada |
 | TASK-013 | Interface: `ProgressBar`, `PromptBillboard`, `Toast`, `UseTween` (+ stories) | frontend-coder | — | `src/Interface/client/Components/` (pastas novas) | `animalplane-reuse.md` §1, §2; DEC-015, 029, 066 | — | Feito |
@@ -57,7 +59,7 @@ Base: `CLAUDE.md`, `README.md` (Modux V3), `docs/PIPELINE.md`, `docs/tech/archit
 | TASK-016 | `CrewRig`: montagem de personagem de produção (crew e NPC) | backend-coder | TASK-006 | `src/Crew/shared/CrewRig/` | DEC-146, 152, 161, 165–169, 181; `build_crew.luau` | Q-144 h (casca de rosto) | Bloqueada |
 | TASK-017 | `ClassService`: 6 classes, desbloqueio, seleção, modificadores | backend-coder | TASK-004, TASK-009 | `src/Class/server/ClassService/` | FEAT-028; DEC-069, 070, 186 | seleção no Run em modo dev (lobby `Q-085`); gemas de dev | Bloqueada |
 | TASK-018 | `CharacterService`: spawn da crew com o animal da classe | backend-coder | TASK-005, TASK-010, TASK-016, TASK-017 | `src/Character/server/CharacterService/` | DEC-146, 147, 167, 175, 186; `architecture.md` §1.1, §8.3, T25, T26 | Q-130 (T25, T26); colisão no mapa todo (DEC-175); animações R6 padrão (AST-069 Rascunho) | Bloqueada |
-| TASK-019 | `CameraController`: 1ª pessoa travada, corpo local | frontend-coder | TASK-002 | `src/Camera/client/CameraController.luau` | DEC-039, 097, 146, 171 | — | Bloqueada |
+| TASK-019 | `CameraController`: 1ª pessoa travada, corpo local | frontend-coder | TASK-002 | `src/Camera/client/CameraController.luau` | DEC-039, 097, 146, 171 | braços ocultos por padrão (DEC-097); gancho `SetArmsVisible` para DEC-167 | Em QA (testar: Play no Studio com 2 jogadores em PC e no emulador mobile; olhar para baixo/cima e girar: nada de cabeça, rosto, boné ou orelha na câmera, Tool visível na mão; o outro jogador vê o personagem inteiro. Rig custom só com a TASK-018; até lá vale com o R6 padrão) |
 | TASK-020 | Tela "Crew": escolher e comprar animal (`ClassController` + UI) | frontend-coder | TASK-004, TASK-013, TASK-016 | `src/Class/client/`, `src/Interface/client/Components/CrewCard/` | DEC-186; FEAT-001 (parte de classe), FEAT-028 | nomes de classe placeholder; ícones (art-director) | Bloqueada |
 | TASK-021 | `EconomyService`: dinheiro da party, gaveta, nota, resumo | backend-coder | TASK-004, TASK-010, TASK-012 | `src/Economy/server/EconomyService/` | FEAT-012, FEAT-014; DEC-045, 050, 051, 072, 083 | — | Bloqueada |
 | TASK-022 | `ItemService`: Tools, hotbar de 4, pacotes, Tool HotDog | backend-coder | TASK-004, TASK-007, TASK-011, TASK-017 | `src/Item/server/ItemService/` | FEAT-005, FEAT-007; DEC-040, 049, 174, 190 | — | Bloqueada |
@@ -71,15 +73,72 @@ Base: `CLAUDE.md`, `README.md` (Modux V3), `docs/PIPELINE.md`, `docs/tech/archit
 | TASK-030 | Visuais de grelha, trilho e tábua (salsichas, barras, pães) | frontend-coder | TASK-013, TASK-029 | `src/Kitchen/client/KitchenController/` (`Grill.luau`, `Rail.luau`, `Board.luau`) | FEAT-006; DEC-015, 029, 190 | — | Bloqueada |
 | TASK-031 | `NpcService` mínimo: pool, cliente animal, rota por grafo | backend-coder | TASK-005, TASK-009, TASK-016 | `src/Npc/server/NpcService/` | `architecture.md` §12.3, T11; DEC-045, 149, 181, 188, 191 | Q-130 (T11); Q-162; sem trânsito/reserva de faixa nesta onda | Bloqueada |
 | TASK-032 | `CustomerService`: fluxo, fila Q1–Q5, ciclo de vida | backend-coder | TASK-008, TASK-012, TASK-031 | `src/Customer/server/CustomerService/` (`init.luau`, `Queue.luau`) | FEAT-009; DEC-045, 046, 185; MAP-01 §9.1 | recálculo no início do turno (DEC-185) | Bloqueada |
-| TASK-033 | Pedido, atendimento e pagamento (Take Order / Serve / Refuse) | backend-coder | TASK-021, TASK-022, TASK-032 | `src/Customer/server/CustomerService/Orders.luau` (+ registro no `init.luau`) | FEAT-010, FEAT-011; DEC-071, 072, 187 | **humor simplificado** (Q-164) | Bloqueada |
+| TASK-033 | Pedido, atendimento e pagamento (Take Order / Serve / Refuse) | backend-coder | TASK-021, TASK-022, TASK-032 | `src/Customer/server/CustomerService/Orders.luau`, `OrderRoll.luau` (função pura, R3) (+ registro no `init.luau`) | FEAT-010, FEAT-011; DEC-071, 072, 187 | **humor simplificado** (Q-164) | Bloqueada |
 | TASK-034 | `CustomerController`: balão do pedido, rosto de humor, reação de venda | frontend-coder | TASK-004, TASK-013, TASK-016 | `src/Customer/client/` | FEAT-010, FEAT-011; DEC-071, 152, 162, 187 | Q-164; Q-152 | Bloqueada |
 | TASK-035 | `UpgradeService`: níveis por veículo, efeitos, peça visível | backend-coder | TASK-008, TASK-021 | `src/Upgrade/server/UpgradeService/` | FEAT-015; `upgrades.md`; DEC-046, 052, 101, 106, **184** | Q-163 | Bloqueada |
 | TASK-036 | `MarketService`: prateleiras + bancada de upgrades básicos | backend-coder | TASK-011, TASK-022, TASK-035 | `src/Market/server/MarketService/` | FEAT-008, FEAT-015; DEC-049, 101, 106, 109, **180** | S1 sempre vazia nesta onda (Q-120) | Bloqueada |
 | TASK-037 | `MarketController`: preços, "Out of stock", bancada no mundo | frontend-coder | TASK-004, TASK-005, TASK-013 | `src/Market/client/` | FEAT-008, FEAT-015; DEC-015, 180 | linha "Day N" sob a etiqueta (Rascunho) | Bloqueada |
 | TASK-038 | Opal local: idle e falas por fase | frontend-coder | TASK-009, TASK-016 | `src/Opal/client/OpalController.luau` | DEC-079, 099, 178, 191; NPC-020; `architecture.md` §2.3 | Q-160 (espécie da Opal) | Bloqueada |
 | TASK-039 | `HudController` básico: relógio, turno, dinheiro, toasts, resumo | frontend-coder | TASK-013, TASK-015, TASK-024 | `src/Hud/client/HudController.luau`, `src/Interface/client/Components/Hud*/` | FEAT-032, FEAT-014; DEC-015, 048, 051, 053, 081 | textos placeholder até `ui-text.md` | Bloqueada |
-| TASK-040 | Plano de teste da onda 1 | qa-tester | TASK-001 | `docs/tests/wave-1.md` | critérios das FEAT da onda; DEC-171 (mobile + PC) | — | Pronta |
-| TASK-041 | Validação integrada da onda 1 (dia completo, solo e party de 2) | qa-tester | TASK-010 a TASK-039, TASK-040 | `docs/tests/wave-1.md` (resultado) | `tests/wave-1.md` | — | Bloqueada |
+| TASK-040 | Plano de teste da onda 1 | qa-tester | TASK-001 | `docs/tests/wave-1.md` | critérios das FEAT da onda; DEC-171 (mobile + PC) | — | Feito (`tests/wave-1.md` v1; lacunas L-01..L-10 na §9, pedidos de testabilidade R1..R5 na §0.4) |
+| TASK-041 | Validação integrada da onda 1 (dia completo, solo e party de 2) | qa-tester | TASK-010 a TASK-039, TASK-040, TASK-042 a TASK-046 | `docs/tests/wave-1.md` (resultado) | `tests/wave-1.md` | — | Bloqueada |
+| TASK-042 | `DevService` + comandos de dev de turno (R1: pular para o Day N e para a próxima fase) | backend-coder | TASK-010, TASK-012 | `src/Dev/server/DevService/init.luau`, `Commands/Round.luau` | `tests/wave-1.md` §0.4 R1, L-10; `architecture.md` §1 (modo dev) | ferramenta de dev, sem DEC (só `IsDev()`) | Bloqueada |
+| TASK-043 | Comando de dev: dar gemas e dinheiro da party (R2) | backend-coder | TASK-042, TASK-017, TASK-021 | `src/Dev/server/DevService/Commands/Economy.luau` | `tests/wave-1.md` §0.4 R2; TASK-017 (gemas de dev) | ferramenta de dev | Bloqueada |
+| TASK-044 | Log de dev de `Interact` descartado com motivo (R4) | backend-coder | TASK-042, TASK-011 | `src/Dev/server/DevService/Commands/Interact.luau` | `tests/wave-1.md` §0.4 R4, §3 | ferramenta de dev | Bloqueada |
+| TASK-045 | Contador de tentativas de spawn de cliente por turno (R5) | backend-coder | TASK-042, TASK-032 | `src/Dev/server/DevService/Commands/Spawns.luau` | `tests/wave-1.md` §0.4 R5, T032-01/02 | ferramenta de dev | Bloqueada |
+| TASK-046 | Pacote grátis do dia de liberação no mundo, pego por "Take" (L-03) | backend-coder | TASK-010, TASK-011, TASK-012, TASK-022, TASK-025 (só para o aceite do Restock) | `src/Item/server/ItemService/Pickup.luau` (+ registro no `ItemService/init.luau`) | DEC-071, DEC-174; FEAT-007; `tests/wave-1.md` L-03, T025-09 | **Provisório** (architect + task-planner): prompt "Take" em vez de toque nativo; ver nota N-03 | Bloqueada |
+
+### Notas do retorno da TASK-040 (QA, `docs/tests/wave-1.md` §0.4 e §9)
+
+As linhas da tabela em execução (TASK-003, 005, 006, 019) **não** foram alteradas. Mudanças em tasks ainda
+`Bloqueada` estão nas seções de detalhe (marcadas "v1.1").
+
+**Testabilidade (§0.4).** Princípio: o Service dono expõe um gancho mínimo, dentro da própria task; todo comando e
+log de dev mora em `src/Dev/` (TASK-042 a 045), que nenhuma outra task toca. Assim as tasks de dev não disputam
+arquivo com as de gameplay.
+
+| Pedido | Onde fica | Gancho no Service dono |
+|---|---|---|
+| R1 pular dia/fase | TASK-042 | TASK-012: `DevSkipPhase()`, `DevSetDay(n)` |
+| R2 gemas e dinheiro | TASK-043 | TASK-017: `DevGrantGems(player, n)` (já previsto); TASK-021: `DevAddCash(n)` |
+| R3 sorteio puro | critério da TASK-033 (`OrderRoll.luau`) | — |
+| R4 log de `Interact` descartado | TASK-044 | TASK-011: sinal `Rejected(player, id, action, reason)` |
+| R5 contador de spawns | TASK-045 | TASK-032: sinal `SpawnAttempted(outcome)` |
+
+**Lacunas (§9).**
+
+- **N-01 (L-01, stash de Tools ao sair e voltar):** vai para a **onda 2** (sessão/reconexão; ver lista de ondas).
+  Mínimo na onda 1, critério novo da TASK-022: Tools de quem sai somem sem erro e sem vazar instância. Q-01/Q-08 do
+  plano ficam com esse resultado esperado.
+- **N-02 (L-02, L-06, L-07): correção para o architect** (`docs/tech/` é dele; o planner não edita). Doc-only, pode
+  rodar já, em paralelo à TASK-003 (arquivos diferentes):
+  - L-02 — `network.md` §3.4 (≈ linha 186): o `PromptController` esconde "Restock" com `Amount = Capacity` (ou
+    `Blocked`), **não** com `Amount = 0`. Afeta TASK-014/029.
+  - L-06 — `network.md` §3.6: `Customers.PatienceEndsAt` (40 + 5K) replicado na chegada deixa o client deduzir K
+    antes do "Take Order" (FEAT-011 "K oculto"). Decidir: aceitar o vazamento (baixo impacto) e registrar, ou
+    replicar só depois do "Take Order" (antes disso, um valor sem K). Afeta TASK-033/034.
+  - L-07 — `architecture.md` §18.4 (≈ linha 1030, linha K): trocar `board_add_topping` por `topping_add`
+    (`content-data.md` v4). Afeta a checagem do binding da TASK-005.
+  - L-03 — registrar a definição Provisória da N-03 em `network.md` §7 (linha "Pacote grátis") e em `content-data.md`
+    (`Actions.pick_up_item`: texto, hold, raio, ativo na onda 1 só para o pacote grátis).
+- **N-03 (L-03, pacote grátis sem prompt) — definição Provisória (task-planner + architect):** o pacote grátis do
+  dia de liberação (DEC-071) aparece sobre a estação nova como **modelo de exibição, não `Tool`** (sem `Handle`
+  tocável, logo sem pegada nativa do Roblox) e é pego pela ação `pick_up_item` com prompt **"Take"** (toque, sem
+  hold). O servidor valida hotbar de 4 (DEC-174) e limite de pacotes (2, Urso 3); cheio → "Hands full" e o pacote
+  fica no mundo. Dono: **TASK-046**; sai da TASK-025. Se a `Actions` da TASK-003 sair com o texto "Pick Up", a
+  TASK-046 troca o texto para "Take" depois que a TASK-003 estiver `Feito` (único arquivo de `Content` que ela toca).
+  O caso T025-09 do plano passa a ser da TASK-046.
+- **N-04 (L-04, L-05): para o game-designer.**
+  - L-04 — Raposa (gorjeta $2, janela −4 s) vale no pedido do dono (quem fez "Take Order"). Definir o que acontece se
+    o dono sair antes do Serve. Recomendação Provisória até a resposta: a janela e o bônus já calculados no "Take
+    Order" se mantêm (o servidor guarda no pedido, não consulta o jogador no Serve).
+  - L-05 — FEAT-009 "16 ± 2 clientes no Day 1 solo": dizer se conta **tentativas** de spawn ou clientes nascidos e
+    trocar "30 min simulados" por um método. Recomendação Provisória: contar tentativas (spawnado + pulado por fila
+    cheia), medido com a TASK-045 em 5 Days 1.
+- **N-05 (L-08):** descrição da TASK-032 corrigida (sem `Look`; aparência em atributos do rig, TASK-031).
+- **N-06 (L-09):** T017-08 ("classe não muda durante a run fora do modo dev") fica **E** até a onda 2 (sem run fora
+  do modo dev na onda 1). Só registro; a TASK-041 não falha por ele.
+- **N-07 (L-10):** coberto pela TASK-042 (R1).
 
 ---
 
@@ -89,10 +148,11 @@ O que pode começar **agora**, por agente:
 
 | Agente | Tasks |
 |---|---|
-| architect | **TASK-001** e **TASK-002** (arquivos diferentes; podem rodar em duas sessões) |
-| frontend-coder | **TASK-013** (componentes puros, sem dependência) |
-| backend-coder | — (espera TASK-003/TASK-004; ver etapa 1–3) |
-| level-designer, modeler-3d, qa-tester | — (esperam TASK-001/TASK-002) |
+| architect | TASK-003 em andamento · **nota N-02** (correções doc-only em `docs/tech/`, outra sessão, sem conflito com a TASK-003) |
+| frontend-coder | TASK-019 em QA · nada novo pronto (TASK-014/015/023/024/029/037 esperam TASK-004/005/007) |
+| backend-coder | — (espera TASK-003/TASK-004) |
+| level-designer, modeler-3d | TASK-005 e TASK-006 (já com dono) |
+| game-designer | **nota N-04** (L-04, L-05) |
 
 ### Ordem recomendada (etapas)
 
@@ -105,14 +165,18 @@ Cada etapa abre quando as dependências da anterior fecham. Dentro da etapa, tud
 | E2 | 004 | 008, 009 | (013 se não terminou) | modeler-3d 007 (depois da 006) |
 | E3 | — | 010, 011, 016, 017 | 014, 015, 023, 024, 029, 037 | — |
 | E4 | — | 012, 018, 022, 031 | 020, 030, 034, 038, 039 | — |
-| E5 | — | 021, 025, 032 | — | — |
-| E6 | — | 026, 028, 033, 035 | — | — |
+| E5 | — | 021, 025, 032, 042 | — | — |
+| E6 | — | 026, 028, 033, 035, 043, 044, 045, 046 | — | — |
 | E7 | — | 027, 036 | — | — |
 | E8 | — | — | — | qa-tester 041 |
 
 - **Caminho crítico:** 001 → 003 → 004 → 011 → 022 → 025 → 026 → 027 (montagem completa do hot dog) e
   006 → 016 → 031 → 032 → 033 (cliente que paga). Backend tem 19 tasks contra 13 do frontend: rode **2 ou 3 sessões
   de backend-coder** em paralelo a partir da E3 (as tasks de cada etapa não compartilham arquivo).
+- v1.1: TASK-042 a 046 ficam fora do caminho crítico. 043/044/045 são arquivos separados em
+  `DevService/Commands/` (descobertos pelo `init` da 042) e podem rodar juntas. A TASK-046 toca `ItemService/init.luau`
+  só para registrar o `Pickup.luau`: não roda em paralelo com outra task no `ItemService`. A TASK-044 pode ser
+  antecipada para logo depois da 042 (só precisa da 011); vale começar cedo para servir de apoio aos testes de §3.
 - Frontend fica à frente a partir da E3: tudo dele lê sets e atributos do contrato (TASK-001/002), então pode ser
   feito e testado com dados de story (UI Labs) antes do backend fechar.
 
@@ -225,6 +289,9 @@ Seção nova em `architecture.md`:
   pelo servidor.
 - Aceite: `Interact` com `EntityId` inexistente, fora do raio ou acima da taxa é descartado sem erro; duas ações no
   mesmo alvo no mesmo frame são serializadas (base do critério "só um recebe" da FEAT-006).
+- v1.1 (R4): sinal `Rejected(player, entityId, action, reason)` com `reason` ∈ `rate`, `range`, `target`, `state`
+  disparado em todo descarte; o log fica na TASK-044. Aceite extra: cada um dos 4 motivos dispara o sinal uma vez por
+  pacote descartado.
 
 ### TASK-012 — `RoundService`: turno de dia
 - Reescreve o exemplo: fases de `Content.Shift` em atom Charm, set `Shift` por `effect` no `OnStart`, relógio por
@@ -232,6 +299,9 @@ Seção nova em `architecture.md`:
   `open_sign` ("Open Shop", qualquer jogador, só na Preparação); Fechamento termina com balcão vazio ou 30 s.
 - Aceite: FEAT-003 (nenhum cliente antes de 8:00 AM nem depois de 6:00 PM; CLOSED às 6:00 e fim em ≤ 30 s; horário igual
   para todos; relógio não pausa com jogador fora). Depois do Summary do Day N começa o Day N+1 (sem noite nesta onda).
+- v1.1 (R1): ganchos `DevSkipPhase()` (encerra a fase atual **pelo mesmo caminho** do fim do tempo: Fechamento,
+  Summary e sinais rodam normalmente) e `DevSetDay(n)` (vai para a Preparação do Day N disparando `ShiftStarted` como
+  na troca natural). Os dois fazem `error` se `PlaceService:IsDev()` for falso. Os comandos ficam na TASK-042.
 
 ### TASK-013 — Componentes de Interface
 - Porte de `CookInterface` → `ProgressBar`, `PromptInterface` → `PromptBillboard` (Hidden/Indicator/Prompt, fill do
@@ -274,7 +344,10 @@ Seção nova em `architecture.md`:
   `GrillTime`, `PackageLimit`, `TipAmount`, `TipWindow`.
 - Provisório: no Run em modo dev, `Select` permitido antes do spawn e um comando de dev dá gemas (sem `RewardService`
   nesta onda).
-- Aceite: conta nova = Cachorro; comprar sem gemas falha; classe não muda durante a run fora do modo dev.
+- Aceite: conta nova = Cachorro; comprar sem gemas falha; classe não muda durante a run fora do modo dev (este último
+  fica **E** até a onda 2, nota N-06).
+- v1.1 (R2): o comando de dev de gemas é o gancho `DevGrantGems(player, n)` (só `IsDev()`); a entrada de comando
+  fica na TASK-043.
 
 ### TASK-018 — `CharacterService`
 - `CharacterAutoLoads = false`; spawn em `PS-1..4` com `CrewRig` (espécie da classe, uniforme Crew, pack Day, rosto
@@ -301,12 +374,18 @@ Seção nova em `architecture.md`:
   floor(gaveta × %), depósito, `ShiftReport` ao grupo, gaveta zera; snapshot registrado.
 - Aceite: FEAT-012 (dinheiro da party não muda com venda durante o turno); FEAT-014 (bônus inteiro; sem cliente = C);
   duas compras simultâneas nunca deixam `Cash` negativo.
+- v1.1 (R2): gancho `DevAddCash(n)` (só `IsDev()`; `n` pode ser negativo, nunca deixa `Cash` < 0); comando na
+  TASK-043.
 
 ### TASK-022 — `ItemService`
 - `Give/Consume/GetHeld/Count`; máximo **4 Tools** (DEC-174) e 2 pacotes (3 com a classe do Urso); `Count` em atributo;
   Tool `HotDog` com atributo `Toppings` e visual por `HotDogVisual`; "Hands full" por `Notice`.
 - Aceite: FEAT-005 (5º Tool bloqueado com aviso); pacote com sobra mantém `Count`; HotDog criado pelo servidor aparece
   na mão de quem tocou.
+- v1.1 (L-01, nota N-01): o stash (`data.md` §2.3) é da onda 2. Aceite extra: jogador que sai com Tools (HotDog,
+  pacote pela metade) não gera erro; as Tools somem e nada fica referenciado no `ItemService` (sem vazamento).
+- v1.1 (L-03): `Give` e a checagem "cabe na hotbar / no limite de pacotes" ficam públicas (`CanGive(player, item)`)
+  para a TASK-046.
 
 ### TASK-023 — `HotDogVisual`
 - Módulo compartilhado (chamado pelo `ItemService` no servidor): coloca as coberturas pela `TopHeight` real, **queijo
@@ -322,7 +401,8 @@ Seção nova em `architecture.md`:
 ### TASK-025 — `KitchenService` núcleo + estoque
 - Registro de estações pelas tags; carrega `Stations/*.luau` (interface da TASK-002); estoque por ingrediente em atom,
   capacidade pelo nível de Cooler **do veículo atual** (DEC-184), set `Stock`; ação `restock` (hold 1 s, pacote na mão,
-  transfere min(sobra, capacidade − atual), pacote vazio some); pacote grátis no dia de liberação (DEC-071); snapshot.
+  transfere min(sobra, capacidade − atual), pacote vazio some); snapshot. **v1.1:** o pacote grátis do dia de
+  liberação (DEC-071) saiu desta task e foi para a TASK-046 (nota N-03).
 - Aceite: FEAT-007 (Restock nunca passa da capacidade; upgrade de Cooler aumenta capacidade sem mudar o atual; estoque
   do Day N+1 = fim do Day N).
 
@@ -365,8 +445,13 @@ Seção nova em `architecture.md`:
 ### TASK-032 — `CustomerService`: fluxo e fila
 - Intervalo base 22 s ×crescimento ×`PartyMult` pelos **conectados** (DEC-185) recalculado no `ShiftStarted`
   (Provisório), ±25%; só na fase Open; vagas Q1..Q3/Q4/Q5 pelo Counter; fila cheia pula o spawn; avança até Q1; saída
-  EX-E/D1; set `Customers` (`Look`, `State`, `Slot`).
-- Aceite: FEAT-009 (16 ± 2 clientes no Day 1 solo; fila cheia não gera cliente; ≤ 12 NPCs).
+  EX-E/D1; set `Customers` (`State`, `Slot`, `PatienceEndsAt`, `Mood`; `Order` pela TASK-033) com id = `NpcId`
+  (`network.md` §3.6). **v1.1 (L-08):** sem `Look`; a aparência é atributo do rig, escrita pelo `NpcService`
+  (TASK-031, `network.md` §5.2).
+- v1.1 (R5): sinal `SpawnAttempted(outcome)` com `outcome` ∈ `spawned`, `skipped_queue_full`, `skipped_npc_cap` a
+  cada tentativa de spawn; o contador fica na TASK-045.
+- Aceite: FEAT-009 (16 ± 2 clientes no Day 1 solo; fila cheia não gera cliente; ≤ 12 NPCs). A métrica do "16 ± 2"
+  (tentativas ou nascidos) está com o game-designer (nota N-04, L-05); até a resposta, vale contar tentativas.
 
 ### TASK-033 — Pedido, atendimento e pagamento
 - K por `OrderPhases`, pesos × tipo × 1,5 no dia de liberação, ≤ 3, só liberados; paciência 40 + 5K (+Counter) desde a
@@ -376,6 +461,13 @@ Seção nova em `architecture.md`:
   pagamento da DEC-072 até o desenho do game-designer.
 - Aceite: FEAT-010 (sem ingrediente não liberado, sem repetição, ≤ 3, distribuição de K ±3 p.p. em 1.000 sorteios);
   FEAT-011 (Serve só com pedido anotado; gorjeta nunca fora da janela nem em incompleto; client não manda preço).
+- v1.1 (R3): o sorteio do pedido fica em `CustomerService/OrderRoll.luau`, função pura
+  `Roll(day: number, customerType: string, rng: Random): { string }` (chaves de ingrediente). Só `require` de
+  `Content`; sem estado, sem Service, sem rede, sem `math.random` global. Aceite extra: com o mesmo `Random.new(seed)`
+  devolve o mesmo pedido; 1.000 chamadas pelo Command Bar (visão Server) rodam em < 50 ms; `Orders.luau` usa só
+  essa função para sortear.
+- v1.1 (L-04): se o dono do pedido (quem fez "Take Order") sair antes do Serve, vale a janela e o bônus já guardados
+  no pedido no "Take Order" (Provisório até o game-designer, nota N-04).
 
 ### TASK-034 — `CustomerController`
 - Balão com ícones do pedido (bitfield) visível para a party; rosto por `Mood` via `CrewRig.Dress` no client
@@ -420,12 +512,57 @@ Seção nova em `architecture.md`:
   stock".
 - Aceite: todos os casos do plano passam; `modux check` e analyze zero erro; falha vira task de correção neste board.
 
+### TASK-042 — `DevService` + comandos de turno (R1)
+- Feature nova `src/Dev/`. `DevService` retorna no topo do `OnInit` se `PlaceService:IsDev()` for falso (nada criado,
+  nenhum comando registrado). Carrega `Commands/*.luau` (cada um exporta `{ Name, Help, Run(args, caller?) }`), mesmo
+  padrão de descoberta das `Stations/` (TASK-002); comando novo = arquivo novo, sem editar o `init`.
+- Entrada **sem Lync**: chamada direta pelo Command Bar na visão Server
+  (`require(<DevService>).Run("day", 4)`) e `TextChatCommand` `/dev <comando> <args>` criado no servidor. `/dev help`
+  lista os comandos.
+- `Commands/Round.luau`: `day <n>` → `RoundService:DevSetDay(n)`; `skip` → `RoundService:DevSkipPhase()`.
+- Aceite: com `IsDev()` falso, `/dev` não existe e `require(...).Run` faz `error`; `day 2` a partir do Day 1 deixa o
+  jogo igual ao Day 2 natural (Cheese liberado, Bacon "Out of stock", `Shift.Day = 2` para todos); `skip` em Open passa
+  por Fechamento e Summary normalmente (resumo e depósito acontecem); Day 6 alcançável em < 1 min; nenhum `require`
+  de Lync; analyze zero erro.
+
+### TASK-043 — Comando de dev: gemas e dinheiro (R2)
+- `Commands/Economy.luau`: `gems <n> [player]` → `ClassService:DevGrantGems`; `cash <n>` → `EconomyService:DevAddCash`.
+- Aceite: `gems 45` permite comprar `class_rabbit` (T017-03); `cash 500` aparece no HUD de todos em ≤ 1 s; `cash -9999`
+  deixa `Cash = 0`, nunca negativo; sem `IsDev()` nada disso existe.
+
+### TASK-044 — Log de `Interact` descartado (R4)
+- `Commands/Interact.luau`: assina `InteractionService.Rejected` e imprime no Output do servidor
+  `[Interact] <player> <entityId> <action> -> <reason>`, com agregação por segundo (ex.: `rate x22`) para não inundar.
+  Comando `interactlog on|off` (padrão on em dev).
+- Aceite: cada caso de pacote forjado da §3 do plano mostra a linha com o motivo certo (`rate`, `range`, `target`,
+  `state`); 30 pacotes no mesmo frame geram ≤ 2 linhas.
+
+### TASK-045 — Contador de spawns de cliente (R5)
+- `Commands/Spawns.luau`: assina `CustomerService.SpawnAttempted`; zera no `ShiftStarted`; no fim da fase Open imprime
+  `Day N: tentativas X, spawnados Y, pulados (fila) Z, pulados (teto) W`; comando `spawns` mostra o turno atual.
+- Aceite: X = Y + Z + W; com fila sempre vazia (Refuse rápido) Z = 0; números batem com a contagem manual de T032-02.
+
+### TASK-046 — Pacote grátis pego por "Take" (L-03, Provisório)
+- `ItemService/Pickup.luau` (+ 1 linha de registro no `init.luau` do `ItemService`): no `ShiftStarted` do dia de
+  liberação de um ingrediente (`Content.Ingredients`), coloca **1 modelo de exibição** do pacote (não `Tool`; sem
+  `Handle` tocável) sobre a estação desse ingrediente (ponto pelo `MapIndex`), com `EntityId` e tag `Interactable`.
+  Registra a ação `pick_up_item` no `InteractionService` (prompt "Take", toque). Validação: `ItemService:CanGive`
+  (hotbar 4, DEC-174; limite de pacotes 2/Urso 3); ok → `Give` do pacote cheio na mão de quem tocou e o modelo some;
+  cheio → `Notice` "Hands full" e o modelo fica.
+- Fica no mundo até ser pego (não some no fim do dia, não reaparece). Dias pulados pelo `DevSetDay` não geram pacote
+  (só o dia em que se entra). Snapshot por `RegisterSnapshot` (pacote não pego sobrevive ao snapshot).
+- Se `Actions.pick_up_item` vier da TASK-003 com texto diferente de "Take", trocar o texto em
+  `src/Shared/Content/Actions.luau` (só depois de TASK-003 `Feito`).
+- Aceite: Day 2 (R1) → 1 `pack_cheese` sobre a estação do queijo (T025-09); encostar não pega; "Take" com hotbar
+  cheia ou 2 pacotes → "Hands full", pacote fica; dois jogadores no mesmo frame → só um recebe (serialização da
+  TASK-011); o pacote pego faz Restock normal (TASK-025).
+
 ---
 
 ## Ondas seguintes (só listadas; viram TASK quando a onda abrir)
 
 | Onda | Escopo | Specs |
 |---|---|---|
-| 2 — Noite e meta | `VitalService` com sanidade e faixa visual da crew (DEC-166/167/169), troca local de NPC para Night (DEC-168/181), escuro e `LightZone`, interruptor e lâmpada básica (DEC-189), café, **compra do trailer** e troca de veículo (DEC-107/184), noite no `RoundService`, ligações do chefe, snapshot e noite repetida, ladrão (DEC-182), humor dinâmico completo (Q-164), passantes (DEC-183, Q-162), lobby com plataformas (DEC-179), party, sessão/teleporte/reconexão, gemas por evento (`RewardService`). Limpeza de `Round`/`Vitals` antigos no `Net` | FEAT-001, 002, 013, 016–021, 026, 029–031 |
+| 2 — Noite e meta | `VitalService` com sanidade e faixa visual da crew (DEC-166/167/169), troca local de NPC para Night (DEC-168/181), escuro e `LightZone`, interruptor e lâmpada básica (DEC-189), café, **compra do trailer** e troca de veículo (DEC-107/184), noite no `RoundService`, ligações do chefe, snapshot e noite repetida, ladrão (DEC-182), humor dinâmico completo (Q-164), passantes (DEC-183, Q-162), lobby com plataformas (DEC-179), party, sessão/teleporte/reconexão, **stash de Tools ao sair e devolução ao voltar (`data.md` §2.3; L-01 da TASK-040)**, gemas por evento (`RewardService`). Limpeza de `Round`/`Vitals` antigos no `Net` | FEAT-001, 002, 013, 016–021, 026, 029–031 |
 | 3 — Anomalias e rua | `AnomalyService`, 7 verbos, ANM-001 a ANM-010, alucinações, trânsito com PARE e reserva de faixa (DEC-133), atropelamento e item no chão | FEAT-022–024, 033, 036; `anomalies.md` |
 | 4 — Queda e monetização | desmaio, **ambulância**, reviver, spectate, janela de 10 s, Revive Kit na S1, `MonetizationService` (reviver por Robux), cutscenes de intro e final, final da 10ª noite | FEAT-004, 025, 027, 034, 035; DEC-091–094, 114–118, 129 |
