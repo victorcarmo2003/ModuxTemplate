@@ -68,7 +68,7 @@ export type Voice = {
 	Connections: { RBXScriptConnection },
 }
 
-const AudioController = Modux.Controller("AudioController", { Priority = 640 })
+const AudioController = Modux.Controller("AudioController", { Require = { "RoundController" }, Priority = 640 })
 
 function AudioController:Setup()
 	self.Master = nil :: SoundGroup?
@@ -559,7 +559,7 @@ AudioController:OnStart(function(self)
 				Ready = round.Ready(),
 				IsNight = round.IsNight(),
 				Phase = round.Phase(),
-				Window = round.NightWindow(),
+				Window = (round.NightWindow :: () -> ("Calm" | "Last" | "Shift")?)(),
 			}
 			const stack = self.MusicStack()
 			const cue = if #stack > 0 then stack[#stack] else Cues.Pick(Content.Music.List, state)
