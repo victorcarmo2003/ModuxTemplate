@@ -2,7 +2,9 @@
 -- Single responder of Interact (network.md §4.1, T6 Provisional by Q-130; architecture.md §4, §18.3).
 -- Owns the EntityId of every Interactable anchor in the Workspace and dispatches each Interact to the action
 -- registered by its owner (RegisterAction, called from the owner's OnInit). The client never decides: every packet
--- is checked for rate, target, member state, range and the owner's own rules before Run.
+-- is checked for rate, target, member state, gates, range and the owner's own rules before Run.
+-- Wave 2 (TASK-051, architecture.md §19.3, §19.26 A2, T49): AddGate (life/hide/cutscene owners refuse without a
+-- Require back to them, T42), Performed after a clean Run, binding wave from Content, member via RunStateService.
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -13,9 +15,15 @@ local Modux = require(ServerScriptService.server.Modux)
 
 -- Reasons fired by Rejected (board TASK-011 v1.1, R4). One reason per discarded packet:
 -- rate = above RATE per second; target = unknown id, anchor out of the Workspace, action not on the anchor, not
--- registered or not active in this wave; state = player not active, prompt disabled or the owner's Validate said
--- no; range = farther than Actions[a].Radius + RANGE_SLACK.
+-- registered or not active in this wave; state = player not an active member, no live character, prompt disabled
+-- or the owner's Validate said no; range = farther than Actions[a].Radius + RANGE_SLACK.
+-- A gate refusal uses the gate name as reason ("<name>", or "<name>:<detail>" when the gate returns one), so
+-- Rejected carries a plain string (Provisional format, TASK-051).
 export type RejectReason = "rate" | "range" | "target" | "state"
+
+-- Gate: true lets the request go on; false refuses it, with an optional detail ("Down", "Hidden"...).
+export type GateFn = (player: Player, action: string, anchor: Instance) -> (boolean, string?)
+export type Gate = { Name: string, Fn: GateFn }
 
 export type Handler = {
 	-- Owner's rules (slot free, stock, hand, phase...). Runs serialized per target, right before Run.
@@ -30,13 +38,15 @@ export type Bucket = { Tokens: number, At: number }
 const TAG = "Interactable"
 const RATE = 8 -- Interact per second per player, burst included (network.md §4.1)
 const RANGE_SLACK = 2 -- studs added to Actions[a].Radius on the server (network.md §4.1)
--- Wave this build ships. Actions with Content.Actions[a].Wave above it are refused even if someone registers them.
--- Provisional: Content has no build-wave field yet (note on the board, TASK-011).
-const BUILD_WAVE = 1
+-- Wave this build binds (content-data.md §6.8 RunParams.BindingWave). Actions with Content.Actions[a].Wave above it
+-- are refused even if someone registers them.
+-- DEPENDS ON TASK-047: RunParams has no BindingWave field yet, so it is read untyped with fallback 1 (wave 1
+-- behavior). When 047 lands, replace with the typed `Content.RunParams.BindingWave` and drop the cast.
+const BINDING_WAVE: number = (Content.RunParams :: any).BindingWave or 1
 
 const InteractionService = Modux.Service(
 	"InteractionService",
-	{ Require = { "PlayerService", "NetService" }, Priority = 730 }
+	{ Require = { "PlaceService", "PlayerService", "NetService", "RunStateService" }, Priority = 730 }
 )
 
 function InteractionService:Setup()
@@ -45,7 +55,11 @@ function InteractionService:Setup()
 	self.Queues = {} :: { [number]: { Request } }
 	self.Buckets = {} :: { [Player]: Bucket }
 	self.Watched = {} :: { [Instance]: RBXScriptConnection }
-	self.Rejected = self.Libs.Signal.new() :: SignalLib.Signal<Player, number, string, RejectReason>
+	self.Gates = {} :: { Gate }
+	self.Rejected = self.Libs.Signal.new() :: SignalLib.Signal<Player, number, string, string>
+	-- Fired after Run returned without error (player, action, anchor, id). Listeners run inside the per-target
+	-- queue: they must not yield (BossService hints, architecture.md §19.10).
+	self.Performed = self.Libs.Signal.new() :: SignalLib.Signal<Player, string, Instance, number>
 end
 
 -- Called by owners in their OnInit (lower priority than 730, so Handlers exists). One owner per action key.
@@ -57,6 +71,17 @@ function InteractionService:RegisterAction(key: string, handler: Handler)
 		error(`[InteractionService] action "{key}" already registered`, 2)
 	end
 	self.Handlers[key] = handler
+end
+
+-- Called by state owners in their OnInit (VitalService "Vital", HideService "Hide", ...; T42, T49). Gates run in
+-- registration order; the first one that refuses stops the request. One gate per name.
+function InteractionService:AddGate(name: string, fn: GateFn)
+	for _, gate in self.Gates do
+		if gate.Name == name then
+			error(`[InteractionService] gate "{name}" already added`, 2)
+		end
+	end
+	table.insert(self.Gates, { Name = name, Fn = fn })
 end
 
 function InteractionService:Get(id: number): Instance?
@@ -84,7 +109,7 @@ end
 
 function InteractionService:IsActive(action: string): boolean
 	const row = Content.Actions.ByKey[action]
-	return row ~= nil and row.Wave <= BUILD_WAVE and self.Handlers[action] ~= nil
+	return row ~= nil and row.Wave <= BINDING_WAVE and self.Handlers[action] ~= nil
 end
 
 function InteractionService:Track(anchor: Instance)
@@ -147,8 +172,16 @@ function InteractionService:Allow(player: Player): boolean
 	return true
 end
 
--- Wave 1 member check: dev roster = whoever is in the server (architecture.md §1), "active" = alive character.
--- RunStateService/VitalService states replace this when they exist (note on the board, TASK-011).
+-- Member check (TASK-051, closes the TASK-011 note): on the Run place only an Active member of RunStateService acts;
+-- other places (lobby) have no members, only the live character counts. Down/Spectator/hidden come from gates.
+function InteractionService:IsMemberActive(player: Player): boolean
+	if not self.Dependencies.PlaceService:Is("Run") then
+		return true
+	end
+	return self.Dependencies.RunStateService:IsActive(player)
+end
+
+-- Root of a live character, or nil.
 function InteractionService:RootOf(player: Player): BasePart?
 	if player.Parent == nil then
 		return nil
@@ -168,8 +201,24 @@ function InteractionService:RootOf(player: Player): BasePart?
 	return root
 end
 
-function InteractionService:Reject(player: Player, id: number, action: string, reason: RejectReason)
+function InteractionService:Reject(player: Player, id: number, action: string, reason: RejectReason | string)
 	self.Rejected:Fire(player, id, action, reason)
+end
+
+-- Runs the gates in registration order; returns the reject reason of the first refusal, nil when all pass.
+-- A gate that errors refuses (fail closed) with its name as reason.
+function InteractionService:CheckGates(player: Player, action: string, anchor: Instance): string?
+	for _, gate in self.Gates do
+		const ok, allowed, detail = pcall(gate.Fn, player, action, anchor)
+		if not ok then
+			warn(`[InteractionService] gate "{gate.Name}" errored: {allowed}`)
+			return gate.Name
+		end
+		if allowed ~= true then
+			return if type(detail) == "string" and detail ~= "" then `{gate.Name}:{detail}` else gate.Name
+		end
+	end
+	return nil
 end
 
 -- Full check + Run of one request. Called only from Drain, so requests on the same target never overlap.
@@ -183,13 +232,21 @@ function InteractionService:Process(player: Player, id: number, action: string)
 	end
 	const row = Content.Actions.ByKey[action]
 	const handler = self.Handlers[action]
-	if row == nil or row.Wave > BUILD_WAVE or handler == nil then
+	if row == nil or row.Wave > BINDING_WAVE or handler == nil then
 		return self:Reject(player, id, action, "target")
 	end
 
+	if not self:IsMemberActive(player) then
+		return self:Reject(player, id, action, "state")
+	end
 	const root = self:RootOf(player)
 	if root == nil then
 		return self:Reject(player, id, action, "state")
+	end
+
+	const refused = self:CheckGates(player, action, anchor)
+	if refused ~= nil then
+		return self:Reject(player, id, action, refused)
 	end
 
 	const position = Registry.position(anchor)
@@ -213,7 +270,9 @@ function InteractionService:Process(player: Player, id: number, action: string)
 	const ran, err = pcall(handler.Run, player, anchor, id)
 	if not ran then
 		warn(`[InteractionService] Run of "{action}" errored: {err}`)
+		return
 	end
+	self.Performed:Fire(player, action, anchor, id)
 end
 
 -- Serializes requests per target: the first request on an id drains the queue; requests arriving meanwhile (same
