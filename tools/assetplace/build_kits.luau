@@ -10,7 +10,9 @@
 	    Crew/CapEarsUp                    AST-053_CrewCap_EarsUp: one MeshPart named "Cap"
 	    Crew/Hats/ThiefHat                AST-053_ThiefHat: one MeshPart named "Hat"
 	    Crew/Animals/<Asset>              AST-053_Animal_<Asset> (18): Head_<A>, Face_<A>, Ears_<A>, Tail_<A>, extras
-	    Crew/Accessories                  empty until AST-054 pieces exist
+	    Crew/Accessories/<kit name>       AST-081_Acc_* / AST-076_Acc_* (TASK-089): one MeshPart named after the kit
+	                                      name ("Acc_Badge"), attribute Anchor (R6 part) + DayTextureID; list, assets and
+	                                      anchors from AccessoryFit (src/Crew/shared, generated from AST-081_offsets.json)
 	  ReplicatedStorage.CrewExpressions   one SurfaceAppearance per expression (T_Expr_<Name>, AlphaMode Transparency)
 
 	Kit conventions (consumed by CrewRig, TASK-016):
@@ -34,8 +36,10 @@
 		print(Kits.run({ baseUrl = "http://127.0.0.1:8772/" }))          -- build + check
 		print(Kits.run({ baseUrl = "http://127.0.0.1:8772/", demo = true })) -- + workspace.KitDemo (18 x Day/Mid/Night)
 		Kits.clearDemo()
-	Without the server: Kits.run({ ids = <_asset_ids table>, tex = <_texture_ids table>, looks = <CrewLooks table> }).
-	CrewLooks is taken from opts.looks, else ReplicatedStorage.shared.Crew.CrewLooks (rojo serve), else the server.
+	Without the server: Kits.run({ ids = <_asset_ids table>, tex = <_texture_ids table>, looks = <CrewLooks table>,
+		fit = <AccessoryFit table> }).
+	CrewLooks / AccessoryFit are taken from opts.looks / opts.fit, else ReplicatedStorage.shared.Crew.<module> (rojo
+	serve), else the server.
 	Save the place afterwards (Ctrl+S): the place is not in git, this script is the recipe.
 ]]
 
@@ -53,11 +57,14 @@ type Looks = {
 	Outfits: { [string]: { [string]: string } },
 	Atlas: { [string]: string },
 }
+type FitPiece = { Asset: string, Anchor: string, Attachment: string, Only: string? }
+type Fit = { Pieces: { [string]: FitPiece }, Species: { [string]: { [string]: { Use: string? } } } }
 export type Options = {
 	baseUrl: string?,
 	ids: Ids?,
 	tex: Tex?,
 	looks: Looks?,
+	fit: Fit?, -- AccessoryFit (src/Crew/shared/AccessoryFit.luau)
 	reload: boolean?, -- drop cached character assets and load them again
 	demo: boolean?, -- also build workspace.KitDemo for a visual check
 }
@@ -142,20 +149,32 @@ local function requireSource(name: string, source: string): any
 	return (require :: any)(ms)
 end
 
-local function resolveLooks(opts: Options): Looks
-	if opts.looks then
-		return opts.looks
-	end
+-- Data module of src/Crew/shared: ReplicatedStorage.shared.Crew.<name> (rojo serve), else the repo server.
+local function crewModule(name: string, opts: Options): any
 	local shared = ReplicatedStorage:FindFirstChild("shared")
 	local crew = shared and shared:FindFirstChild("Crew")
-	local mod = crew and crew:FindFirstChild("CrewLooks")
+	local mod = crew and crew:FindFirstChild(name)
 	if mod and mod:IsA("ModuleScript") then
 		return (require :: any)(mod)
 	end
 	if opts.baseUrl then
-		return requireSource("CrewLooks", httpGet(join(opts.baseUrl, "src/Crew/shared/CrewLooks.luau")))
+		return requireSource(name, httpGet(join(opts.baseUrl, "src/Crew/shared/" .. name .. ".luau")))
 	end
-	error("CrewLooks not found: pass opts.looks, run rojo serve, or pass opts.baseUrl")
+	error(name .. " not found: pass it in opts, run rojo serve, or pass opts.baseUrl")
+end
+
+local function resolveLooks(opts: Options): Looks
+	if opts.looks then
+		return opts.looks
+	end
+	return crewModule("CrewLooks", opts)
+end
+
+local function resolveFit(opts: Options): Fit
+	if opts.fit then
+		return opts.fit
+	end
+	return crewModule("AccessoryFit", opts)
 end
 
 -- Asset loading (InsertService, cached like place_assets.luau) ------------------------------------------------------
@@ -334,7 +353,42 @@ local function single(
 	m.PrimaryPart = p
 end
 
-function Kits.buildCrew(ids: Ids, looks: Looks, expressions: Folder, reload: boolean?, problems: { string }): Folder
+-- Accessories (TASK-089): one Model per AccessoryFit.Pieces entry, named by kit name, holding one MeshPart of the
+-- same name (rest pose kept). Anchor on Model and part: CrewRig welds there (briefcase/cane = arm, not the nearest leg).
+local function buildAccessories(ids: Ids, fit: Fit, reload: boolean?, crew: Instance, problems: { string })
+	local root = folder(crew, "Accessories")
+	local names = {}
+	for name in fit.Pieces do
+		table.insert(names, name)
+	end
+	table.sort(names)
+	for _, name in names do
+		const row = fit.Pieces[name]
+		local ok, err = pcall(function()
+			single(row.Asset, name, name, ids, reload, root, problems)
+		end)
+		if not ok then
+			table.insert(problems, tostring(err))
+			continue
+		end
+		local m = root:FindFirstChild(name)
+		local p = m and m:FindFirstChild(name)
+		if m and p and p:IsA("BasePart") then
+			m:SetAttribute("Anchor", row.Anchor)
+			p:SetAttribute("Anchor", row.Anchor)
+			p:SetAttribute("Attachment", row.Attachment)
+		end
+	end
+end
+
+function Kits.buildCrew(
+	ids: Ids,
+	looks: Looks,
+	expressions: Folder,
+	reload: boolean?,
+	problems: { string },
+	fit: Fit?
+): Folder
 	local assets = folder(ReplicatedStorage, "Assets")
 	assets:SetAttribute("KitVersion", looks.KitVersion)
 	local old = assets:FindFirstChild("Crew")
@@ -459,14 +513,19 @@ function Kits.buildCrew(ids: Ids, looks: Looks, expressions: Folder, reload: boo
 		end
 	end
 
-	folder(crew, "Accessories")
+	if fit then
+		buildAccessories(ids, fit, reload, crew, problems)
+	else
+		folder(crew, "Accessories")
+		table.insert(problems, "AccessoryFit not given: Crew.Accessories left empty")
+	end
 	crew.Parent = assets
 	return crew
 end
 
 -- Check (TASK-006 acceptance) -------------------------------------------------------------------------------------
 
-function Kits.check(looks: Looks, tex: Tex?): { string }
+function Kits.check(looks: Looks, tex: Tex?, fit: Fit?): { string }
 	local problems: { string } = {}
 	local assets = ReplicatedStorage:FindFirstChild("Assets")
 	local crew = assets and assets:FindFirstChild("Crew")
@@ -537,6 +596,22 @@ function Kits.check(looks: Looks, tex: Tex?): { string }
 				table.insert(problems, "Content.Looks.Expressions." .. name .. " is not built by build_kits")
 			end
 		end
+		-- every CustomerTypes accessory is a kit piece (TASK-089)
+		local accessories = crew:FindFirstChild("Accessories")
+		for _, row in c.CustomerTypes.List do
+			for _, name in row.Accessories do
+				if not (accessories and accessories:FindFirstChild(name)) then
+					table.insert(problems, "Content.CustomerTypes." .. row.Key .. ": Crew.Accessories." .. name .. " missing")
+				end
+			end
+		end
+		if fit then
+			for k in fit.Species do
+				if not c.Species.ByKey[k] then
+					table.insert(problems, "AccessoryFit.Species." .. k .. " is not a Content.Species key")
+				end
+			end
+		end
 	else
 		table.insert(problems, "note: Content not found (rojo serve off): Content key cross-check skipped")
 	end
@@ -580,6 +655,40 @@ function Kits.check(looks: Looks, tex: Tex?): { string }
 				table.insert(problems, "Crew.Animals." .. a .. "." .. n .. " missing")
 			end
 		end
+	end
+	-- accessories (TASK-089): every AccessoryFit piece built, one MeshPart, Anchor + DayTextureID
+	local accessories = crew:FindFirstChild("Accessories")
+	if not accessories then
+		table.insert(problems, "Crew.Accessories missing")
+	elseif fit then
+		for name, row in fit.Pieces do
+			local m = accessories:FindFirstChild(name)
+			local p = m and m:FindFirstChild(name)
+			if not (m and p and p:IsA("MeshPart")) then
+				table.insert(problems, "Crew.Accessories." .. name .. " missing (" .. row.Asset .. ")")
+				continue
+			end
+			if m:GetAttribute("Anchor") ~= row.Anchor then
+				table.insert(problems, "Crew.Accessories." .. name .. ": Anchor ~= " .. row.Anchor)
+			end
+			if p:GetAttribute("DayTextureID") == nil then
+				table.insert(problems, "Crew.Accessories." .. name .. ": no DayTextureID (atlas texture missing)")
+			end
+		end
+		for _, bySpecies in fit.Species do
+			for _, f in bySpecies do
+				if f.Use and not accessories:FindFirstChild(f.Use) then
+					table.insert(problems, "Crew.Accessories." .. f.Use .. " missing (AccessoryFit Use)")
+				end
+			end
+		end
+		for _, m in accessories:GetChildren() do
+			if not fit.Pieces[m.Name] then
+				table.insert(problems, "note: Crew.Accessories." .. m.Name .. " is not in AccessoryFit")
+			end
+		end
+	else
+		table.insert(problems, "note: AccessoryFit not given: accessory check skipped")
 	end
 	for _, name in EXPRESSIONS do
 		local sa = expr and expr:FindFirstChild(name)
@@ -734,10 +843,11 @@ function Kits.run(opts: Options): string
 	assert(ids, "asset ids missing: pass opts.ids or opts.baseUrl")
 	assert(tex, "texture ids missing: pass opts.tex or opts.baseUrl")
 	local looks = resolveLooks(opts)
+	local fit = resolveFit(opts)
 	local problems: { string } = {}
 	local expressions = Kits.buildExpressions(tex, problems)
-	local crew: any = Kits.buildCrew(ids, looks, expressions, opts.reload, problems)
-	for _, p in Kits.check(looks, tex) do
+	local crew: any = Kits.buildCrew(ids, looks, expressions, opts.reload, problems, fit)
+	for _, p in Kits.check(looks, tex, fit) do
 		table.insert(problems, p)
 	end
 	if opts.demo then
@@ -752,9 +862,10 @@ function Kits.run(opts: Options): string
 		end
 	end
 	local msg = string.format(
-		"crew kit v%d: %d species, %d expressions; %d problem(s)",
+		"crew kit v%d: %d species, %d accessories, %d expressions; %d problem(s)",
 		looks.KitVersion,
 		#crew.Animals:GetChildren(),
+		#crew.Accessories:GetChildren(),
 		#expressions:GetChildren(),
 		errors
 	)

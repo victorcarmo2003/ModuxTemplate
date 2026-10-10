@@ -14,6 +14,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CollectionService = game:GetService("CollectionService")
 local Content = require(ReplicatedStorage.shared.Content)
+local AccessoryFit = require(script.Parent.Parent.AccessoryFit)
 local CrewLooks = require(script.Parent.Parent.CrewLooks)
 local Kit = require(script.Parent.Kit)
 
@@ -22,7 +23,8 @@ export type Pack = CrewLooks.Pack
 export type Options = {
 	-- Content.CustomerTypes key: written as attribute, adds the type's accessories (DEC-188).
 	CustomerType: string?,
-	-- Extra accessories by kit name (Assets.Crew.Accessories). Missing meshes are skipped with one warning.
+	-- Extra accessories by kit name (Assets.Crew.Accessories). Missing meshes, and pieces that do not fit the species
+	-- (AccessoryFit: lion hard hat, mask of another species...), are skipped with one warning.
 	Accessories: { string }?,
 	-- Crew cap. Default: on for the crew uniform (Outfits.Use = "Crew"), off for civil outfits. Ears-up species
 	-- wear the cap with ear holes (Assets.Crew.CapEarsUp).
@@ -116,12 +118,21 @@ local function bodyPiece(name: string): boolean
 	return name == "Apron" or string.find(name, "Tail", 1, true) ~= nil or string.find(name, "Shell", 1, true) ~= nil
 end
 
--- Accessory anchor: attribute Anchor (R6 part name) on the piece or its kit root; else the R6 part whose rest-pose
--- centre is nearest (pieces are modelled in place, §18.9.2). PROVISIONAL until the AST-054 sheet fixes a rule.
-local function accessoryAnchor(piece: BasePart, root: Instance, parts: { [string]: BasePart }): BasePart
-	const named = piece:GetAttribute("Anchor") or root:GetAttribute("Anchor")
-	if typeof(named) == "string" and CORE[named] and parts[named] then
-		return parts[named]
+-- Accessory anchor: attribute Anchor (R6 part name) on the piece or its kit root (build_kits writes it), else the
+-- AccessoryFit row (an older place without the attribute); else the R6 part whose rest-pose centre is nearest (pieces
+-- are modelled in place, §18.9.2). Hand-held pieces need the explicit anchor: their centre is nearer the leg.
+local function accessoryAnchor(
+	piece: BasePart,
+	root: Instance,
+	fallback: string?,
+	parts: { [string]: BasePart }
+): BasePart
+	local function named(value: unknown): BasePart?
+		return if typeof(value) == "string" and CORE[value] then parts[value] else nil
+	end
+	const explicit = named(piece:GetAttribute("Anchor")) or named(root:GetAttribute("Anchor")) or named(fallback)
+	if explicit ~= nil then
+		return explicit
 	end
 	local best: BasePart = parts.Head
 	local bestDistance = math.huge
@@ -136,6 +147,52 @@ local function accessoryAnchor(piece: BasePart, root: Instance, parts: { [string
 		end
 	end
 	return best
+end
+
+-- Kit piece actually worn for a requested accessory on this species, and its fit (AccessoryFit, generated from
+-- AST-081_offsets.json). nil when the piece does not fit the species (warned once per species and piece).
+local function fitFor(species: string, name: string): (string?, AccessoryFit.Fit?)
+	const piece = AccessoryFit.Pieces[name]
+	if piece ~= nil and piece.Only ~= nil and piece.Only ~= species then
+		Kit.WarnOnce(`Fit:{name}:{species}`, `{name} is shaped for '{piece.Only}', not '{species}': built without it`)
+		return nil, nil
+	end
+	const bySpecies = AccessoryFit.Species[species]
+	const fit = if bySpecies ~= nil then bySpecies[name] else nil
+	if fit == nil then
+		return name, nil
+	end
+	if fit.Forbidden ~= nil then
+		Kit.WarnOnce(`Fit:{name}:{species}`, `{name} does not fit '{species}' ({fit.Forbidden}): built without it`)
+		return nil, nil
+	end
+	return fit.Use or name, fit
+end
+
+-- Size scale about a point, factors along the world (rest pose) axes; kit pieces are axis-aligned, so each local axis
+-- takes the factor of the world axis it lies along.
+local function scaleAbout(part: BasePart, scale: Vector3, pivot: Vector3)
+	const frame = part.CFrame
+	local function along(axis: Vector3): number
+		const x, y, z = math.abs(axis.X), math.abs(axis.Y), math.abs(axis.Z)
+		if x >= y and x >= z then
+			return scale.X
+		elseif y >= z then
+			return scale.Y
+		end
+		return scale.Z
+	end
+	part.Size *= Vector3.new(along(frame.RightVector), along(frame.UpVector), along(frame.LookVector))
+	part.CFrame = frame.Rotation + (pivot + (frame.Position - pivot) * scale)
+end
+
+local function applyFit(part: BasePart, fit: AccessoryFit.Fit)
+	if fit.Scale ~= nil then
+		scaleAbout(part, fit.Scale, AccessoryFit.Pivot)
+	end
+	if fit.Offset ~= nil then
+		part.CFrame += fit.Offset
+	end
 end
 
 local function accessoryList(customerType: string?, extra: { string }?): { string }
@@ -180,7 +237,7 @@ local function build(species: string, outfit: string, opts: Options?): Model
 
 	const parts: { [string]: BasePart } = {}
 	-- Accessory pieces: kept apart so their names never collide with body pieces.
-	const extras: { { Part: BasePart, Root: Instance } } = {}
+	const extras: { { Part: BasePart, Root: Instance, Anchor: string? } } = {}
 
 	takeAll(parts, Kit.CloneParts(Kit.Body())) -- Torso, arms, legs, Apron, Cap
 	takeAll(parts, Kit.CloneParts(Kit.Animal(asset))) -- Head_<A>, Face_<A>, Ears/Tail/extras
@@ -228,15 +285,24 @@ local function build(species: string, outfit: string, opts: Options?): Model
 		end
 	end
 
-	for _, name in accessories do
+	for _, requested in accessories do
+		-- species fit first (variant, offset/scale, forbidden), then the kit piece
+		const name, fit = fitFor(species, requested)
+		if name == nil then
+			continue
+		end
 		const root = Kit.Accessory(name)
 		if root == nil then
 			Kit.WarnOnce("Accessory:" .. name, `Assets.Crew.Accessories.{name} missing: built without it`)
 			continue
 		end
+		const row = AccessoryFit.Pieces[name]
 		for _, piece in Kit.CloneParts(root, true) do
-			piece:SetAttribute("Accessory", name)
-			table.insert(extras, { Part = piece, Root = root })
+			if fit ~= nil then
+				applyFit(piece, fit) -- rest pose, before the weld
+			end
+			piece:SetAttribute("Accessory", requested)
+			table.insert(extras, { Part = piece, Root = root, Anchor = if row ~= nil then row.Anchor else nil })
 		end
 	end
 
@@ -314,7 +380,7 @@ local function build(species: string, outfit: string, opts: Options?): Model
 		end
 	end
 	for _, extra in extras do
-		weld(accessoryAnchor(extra.Part, extra.Root, parts), extra.Part)
+		weld(accessoryAnchor(extra.Part, extra.Root, extra.Anchor, parts), extra.Part)
 	end
 
 	const humanoid = Instance.new("Humanoid")

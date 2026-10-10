@@ -83,8 +83,8 @@ function Kit.Animal(asset: string): Instance
 	return need(need(Kit.Crew(), "Animals"), asset)
 end
 
--- Accessories/<name>. Optional: the AST-054 meshes do not exist yet, so a missing one returns nil and the rig is built
--- without it (Content.CustomerTypes note: "CrewRig must skip a missing mesh, not fail").
+-- Accessories/<name> (AST-081 / AST-076, TASK-089). Optional: a place built before the pieces existed returns nil and
+-- the rig is built without it (Content.CustomerTypes note: "CrewRig must skip a missing mesh, not fail").
 function Kit.Accessory(name: string): Instance?
 	const folder = Kit.Crew():FindFirstChild("Accessories")
 	return if folder then folder:FindFirstChild(name) else nil
