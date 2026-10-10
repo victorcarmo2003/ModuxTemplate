@@ -356,13 +356,14 @@ const base = Table.new({
 			"Evening. You're doing better than I ever did.",
 			"If a long car parks across the street",
 			"with its lights on you —",
-			"get down behind the counter. Stay down.",
-			"Wait till you hear it drive away.",
+			"close the service window. Stay inside.",
+			"Don't open it till you hear it drive away.",
+			"Can't serve with it shut. Folks will wait.",
 			"Regular cars never stop there. That one does.",
 			WALKER,
-			"Long car's lights on you? Hide."
+			"Long car? Close the window. Keep it shut."
 		),
-		lines("Long car's lights on you? Hide.", WALKER)
+		lines("Long car? Close the window. Keep it shut.", WALKER)
 	),
 	nightCall(
 		9,
@@ -371,12 +372,13 @@ const base = Table.new({
 			"I never come to the trailer at night. Never.",
 			"If someone knocks on the back door",
 			"and says it's me —",
-			"it isn't. Get down. Stay quiet till it stops.",
+			"it isn't. Close the window. Stay inside.",
+			"Keep it shut till the knocking stops.",
 			"...I'm sorry I didn't tell you sooner.",
 			WALKER,
-			"Knock at the back? It's not me. Hide."
+			"Knocking? It's not me. Close the window."
 		),
-		lines("Knock at the back? It's not me. Hide.", WALKER)
+		lines("Knocking? It's not me. Close the window.", WALKER)
 	),
 	nightCall(
 		10,

@@ -244,23 +244,30 @@ A linha 6 apoia o sinal de início decidido em DEC-123 (§5.12).
 
 1. "Evening. You're doing better than I ever did."
 2. "If a long car parks across the street with its lights on you —"
-3. "get down behind the counter. Stay down."
-4. "Wait till you hear it drive away."
-5. † "Regular cars never stop there. That one does."
-6. "And never watch the Walker."
-7. **"Long car's lights on you? Hide."**
+3. "close the service window. Stay inside."
+4. "Don't open it till you hear it drive away."
+5. "Can't serve with it shut. Folks will wait."
+6. † "Regular cars never stop there. That one does."
+7. "And never watch the Walker."
+8. **"Long car? Close the window. Keep it shut."**
 
-A linha 5 apoia a proposta para `Q-103` (`world.md` §3.2: red curb "NO PARKING", rua esvazia).
+DEC-221 (Provisório): linhas 3–5 e a forma curta trocadas (era "get down behind the counter. Stay down." / "Wait till
+you hear it drive away." / "Long car's lights on you? Hide."). "Close the window" repete o prompt "Close Window".
+A linha 6 apoia a proposta para `Q-103` (`world.md` §3.2: red curb "NO PARKING", rua esvazia).
 
 ### Noite 9 — ANM-009 The knock
 
 1. "One more thing. This is important."
 2. "I never come to the trailer at night. Never."
 3. "If someone knocks on the back door and says it's me —"
-4. "it isn't. Get down. Stay quiet till it stops."
-5. "...I'm sorry I didn't tell you sooner."
-6. "And never watch the Walker."
-7. **"Knock at the back? It's not me. Hide."**
+4. "it isn't. Close the window. Stay inside."
+5. "Keep it shut till the knocking stops."
+6. "...I'm sorry I didn't tell you sooner."
+7. "And never watch the Walker."
+8. **"Knocking? It's not me. Close the window."**
+
+DEC-221 (Provisório): linhas 4–5 e a forma curta trocadas (era "it isn't. Get down. Stay quiet till it stops." /
+"Knock at the back? It's not me. Hide.").
 
 ### Noite 10 — ANM-010 The Hush (final)
 

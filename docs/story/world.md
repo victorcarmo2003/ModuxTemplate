@@ -148,7 +148,7 @@ O chefe chama esses visitantes de **"the late crowd"** (o pessoal da madrugada).
 
 ### 5.1 Quem vê o sinal (proposta narrativa para `Q-069`)
 
-O sinal de toda anomalia é **visto/ouvido por todos** da party; o que é "por jogador" é o erro e a penalidade. Motivo: o momento co-op ("não olha pra janela!", "esconde, o carro!") só existe se todos podem perceber. Exceção nenhuma no MVP.
+O sinal de toda anomalia é **visto/ouvido por todos** da party; o que é "por jogador" é o erro e a penalidade. Motivo: o momento co-op ("não olha pra janela!", "fecha a janela, o carro!") só existe se todos podem perceber. Exceção nenhuma no MVP.
 
 ### 5.2 O ponto seguro (proposta para `Q-092`)
 

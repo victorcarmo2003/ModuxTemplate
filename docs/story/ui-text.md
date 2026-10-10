@@ -42,7 +42,7 @@ Só muda o texto do HUD; a mecânica é a mesma (DEC-056). Abaixo, `{meter}` = o
 | Estação, com pacote na mão | "Restock" |
 | Lixeira | "Throw Away" |
 | Interruptor | "Lights Off" / "Lights On" (texto dinâmico pelo estado, como o "Take Coffee"; ajuda a N3 "lights off, count five, lights on"). Sem texto dinâmico: "Lights". Provisório (§12.4) |
-| Balcão (noite) | "Hide" · "Get Up" |
+| Botão da janela de serviço, ao lado do interruptor do trailer (só à noite, DEC-221; ação `shutter_toggle`) | **"Close Window"** / **"Open Window"** (texto dinâmico pelo estado, como o interruptor). Sem texto dinâmico: "Window". Provisório |
 | Cafeteira | "Brew Coffee" · café pronto: "Take Coffee" (`PromptText`, `content-data.md` §6.9) |
 | Tool Coffee | "Drink" |
 | Tool Rescue Whistle (uso por colega depende de `Q-120` f) | na mão de um colega de pé: "Revive {name}" · na hotbar: "Blow Whistle" |
@@ -217,7 +217,8 @@ como texto-fonte, e esta seção vale para as tabelas.
 | `thief_caught` | "Nice catch! +${value}" | Party | Number | 2 |
 | `coffee_cooldown` | "Coffee again in {value}s" | Player | Number | 2 |
 | `coffee_full` | "Already wide awake. Save it!" | Player | None | 2 |
-| `hide_taken` | "Someone's already hiding there." | Player | None | 3 |
+| ~~`hide_taken`~~ | saiu com o esconderijo (DEC-221) | — | — | — |
+| `shutter_closed` | "The window's shut. Open it to serve." | Player | None | 3 (DEC-221; recusa de "Take Order"/"Serve"/"Refuse" com a janela fechada. Provisório) |
 | `item_dropped` | "Dropped {item}!" (texto do mundo "BONK!" fica no avatar, §6) | Player | conforme architect | 3 |
 
 Onda 4 (texto pronto, chave já listada no §6.9): `revive_used` "Hang on — Rescue's turning around!" ·
@@ -344,11 +345,13 @@ I'll tell you as we go." (7 linhas, 17,5 s; com a `call_night_1` somam ~37 s, de
 | `call_night_5` | "Tonight, a lady in a yellow raincoat" · "might come by." · "It won't be raining." · "She'll be dripping anyway." · "Serve her. Always. Whatever she asks for." · "Don't refuse her. Don't make her wait." · "She's a... very old customer. Be nice." · **"Yellow raincoat? Always serve her."** | 8 / 20 |
 | `call_night_6` | "Evening. Folks upstairs might wave tonight." · "Don't wave back. Don't even look up." · "They just want someone to notice them." · "Eyes on your grill. They'll get bored." · "I know. I know. I'll explain someday." · **"Someone waving upstairs? Don't look up."** | 6 / 15 |
 | `call_night_7` | "Rookie. Listen close. This one matters most." · "Down Juniper Street, someone walks" · "toward the trailer." · "Every time you look at them," · "they get closer." · "Whatever you do," · "never let them reach your light." · "Don't watch the Walker. Not for a second." · "When the far lamp buzzes, they're there." · "Tell your crew." · **"Whatever you do, never watch the Walker."** | 11 / 27,5 |
-| `call_night_8` | "Evening. You're doing better than I ever did." · "If a long car parks across the street" · "with its lights on you —" · "get down behind the counter. Stay down." · "Wait till you hear it drive away." · "Regular cars never stop there. That one does." · "And never watch the Walker." · **"Long car's lights on you? Hide."** | 8 / 20 |
-| `call_night_9` | "One more thing. This is important." · "I never come to the trailer at night. Never." · "If someone knocks on the back door" · "and says it's me —" · "it isn't. Get down. Stay quiet till it stops." · "...I'm sorry I didn't tell you sooner." · "And never watch the Walker." · **"Knock at the back? It's not me. Hide."** | 8 / 20 |
+| `call_night_8` | "Evening. You're doing better than I ever did." · "If a long car parks across the street" · "with its lights on you —" · "close the service window. Stay inside." · "Don't open it till you hear it drive away." · "Can't serve with it shut. Folks will wait." · "Regular cars never stop there. That one does." · "And never watch the Walker." · **"Long car? Close the window. Keep it shut."** | 9 / 22,5 |
+| `call_night_9` | "One more thing. This is important." · "I never come to the trailer at night. Never." · "If someone knocks on the back door" · "and says it's me —" · "it isn't. Close the window. Stay inside." · "Keep it shut till the knocking stops." · "...I'm sorry I didn't tell you sooner." · "And never watch the Walker." · **"Knocking? It's not me. Close the window."** | 9 / 22,5 |
 | `call_night_10` | "Last night, Rookie. Ten." · "Nobody's made it to ten since... well." · "Tonight the street might go dark." · "Lamp by lamp." · "When the lamps start going out," · "leave the trailer." · "Go to the Mart. Stand under the OPEN sign." · "It never goes out." · "Come back when the lamps come back." · "And never watch the Walker." · "See you at sunrise. I promise." · **"Lamps going out? Go to the Mart sign."** | 12 / 30 |
 
 Todas ≤ 45 s. A forma curta é sempre a última linha (o que fica na cabeça).
+N8 e N9 (DEC-221, Provisório): o verbo "esconder" virou "fechar a janela"; as falas repetem o prompt "Close Window" e
+dizem a regra inteira: janela fechada protege, abrir antes da hora custa, com ela fechada não se atende.
 
 ### 11.7 Noite repetida e noite perdida
 
@@ -415,6 +418,7 @@ Onde ficam (tabela ou HUD) é do architect; hoje nenhuma tabela da onda 2 tem es
 | Cafeteira | "Brew Coffee" → barra → "Take Coffee" |
 | Tool | "Coffee" · colega: "Give" |
 | Interruptor | "Lights Off" / "Lights On" (§2) |
+| Botão da janela (DEC-221) | "Close Window" / "Open Window" (§2) · atender com ela fechada: toast `shutter_closed` (§10.1) |
 
 ### 12.5 Tela de resumo da noite
 
