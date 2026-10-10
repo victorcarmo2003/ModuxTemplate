@@ -34,6 +34,9 @@ export type Props = {
 	HoldDuration: () -> number,
 	OnPress: (() -> ())?,
 	OnRelease: (() -> ())?,
+	-- The pill takes taps/clicks (touch only). An Active button under the locked first-person cursor sinks
+	-- MouseMovement and the stock camera stops turning, so desktop/gamepad keep it off. nil = has OnPress.
+	Tappable: (() -> boolean)?,
 	StudsOffset: Vector3?,
 	Name: string?,
 }
@@ -46,6 +49,11 @@ const RELEASE_TIME = 0.15
 
 return function(props: Props): BillboardGui
 	const hovered = source(false)
+
+	local function tappable(): boolean
+		const prop = props.Tappable
+		return if prop then prop() else props.OnPress ~= nil
+	end
 
 	local function isPrompt(): boolean
 		return props.State() == "Prompt"
@@ -85,7 +93,7 @@ return function(props: Props): BillboardGui
 		AlwaysOnTop = true,
 		LightInfluence = 0,
 		ResetOnSpawn = false,
-		Active = true,
+		Active = tappable,
 		ClipsDescendants = false,
 		Enabled = function()
 			return props.State() ~= "Hidden" or pillScale() > 0.01 or dotSize() > 0.5
@@ -196,6 +204,7 @@ return function(props: Props): BillboardGui
 				Text = "",
 				ZIndex = 3,
 				Active = true,
+				Visible = tappable,
 				MouseEnter = function()
 					hovered(true)
 				end,

@@ -67,6 +67,9 @@ function PromptController:Add(anchor: Instance)
 		KeyLabel = function()
 			return KEY_LABEL[input.Device()]
 		end,
+		Tappable = function()
+			return input.Device() == "Touch"
+		end,
 		OnPress = function(prompt)
 			self:BeginHold(prompt)
 		end,

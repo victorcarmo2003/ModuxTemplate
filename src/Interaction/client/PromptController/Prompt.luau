@@ -17,6 +17,7 @@ export type State = PromptBillboard.State
 export type Hooks = {
 	Parent: Instance, -- PlayerGui: taps on the pill only arrive there
 	KeyLabel: () -> string,
+	Tappable: () -> boolean, -- the pill takes taps (touch only: a clickable pill under the locked cursor stops the camera)
 	OnPress: (prompt: Prompt) -> (),
 	OnRelease: (prompt: Prompt) -> (),
 }
@@ -233,6 +234,7 @@ function Prompt.new(anchor: Instance, hooks: Hooks): Prompt
 			State = self.State,
 			Text = self.Text,
 			KeyLabel = hooks.KeyLabel,
+			Tappable = hooks.Tappable,
 			Holding = self.Holding,
 			HoldDuration = self.HoldDuration,
 			OnPress = function()

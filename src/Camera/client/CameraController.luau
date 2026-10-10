@@ -301,6 +301,8 @@ function CameraController:Setup()
 	self.BaseYaw = nil :: number?
 	self.BasePitch = 0 :: number
 	self.LookTarget = nil :: Vector3?
+	-- Cutscene base yaw without a LookAt target: the own facing, taken once (see ApplyPov).
+	self.HoldYaw = nil :: number?
 	self.LastLookInput = 0 :: number
 	self.TouchDelta = Vector2.zero :: Vector2
 	self.MouseLocked = false :: boolean
@@ -334,6 +336,7 @@ function CameraController:ResetLook()
 	self.LookPitch = 0
 	self.BaseYaw = nil
 	self.BasePitch = 0
+	self.HoldYaw = nil
 	self.TouchDelta = Vector2.zero
 end
 
@@ -353,6 +356,7 @@ end
 -- Base view of the cutscene POV turns to a world position (beat `LookAt`); nil = the own facing.
 function CameraController:LookAt(position: Vector3?)
 	self.LookTarget = position
+	self.HoldYaw = nil
 	self.LookYaw = 0
 	self.LookPitch = 0
 end
@@ -668,6 +672,13 @@ function CameraController:ApplyPov(mode: Mode, camera: Camera, dt: number)
 			targetYaw = yawOf(unit)
 			targetPitch = math.asin(math.clamp(unit.Y, -1, 1))
 		end
+	elseif mode == "Cutscene" then
+		-- The own root turns toward the camera (camera-relative rotation of the stock first person), so following it
+		-- would feed the free look back into the base every frame and spin the view while the body walks: the base
+		-- is the facing taken once (cutscene start, each LookAt).
+		const hold = self.HoldYaw or targetYaw
+		self.HoldYaw = hold
+		targetYaw = hold
 	end
 	const ease = 1 - math.exp(-FOLLOW_RATE * dt)
 	const baseYaw = self.BaseYaw
