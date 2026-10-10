@@ -1691,3 +1691,60 @@ Perguntado se aprovava o lote:
   - **modeler-3d:** terminar `AST-004_KetchupBottle` e `AST-005_MustardBottle` (garrafa translúcida + `Fill` separado, pivô na base do `Fill` para escalar em Y).
   - **art-director:** valor de Transparency da garrafa; `Q-137`.
   - `docs/README.md` → secretário.
+
+---
+
+Origem da DEC-141: conversa do usuário com o orquestrador, 2026-10-10, depois da prévia no Roblox Studio (`workspace.__Preview_Rodada3`) da rodada 3 de **versões de análise** (DEC-134) no estilo DEC-136. Transcrição não literal; registro a partir do resumo do orquestrador. Arquivos em `Assets/blender/<cat>/` e `Assets/models/<cat>/`; todos com **zfight 0**; licenças: só packs CC0 já registrados em `art/credits.md`.
+
+Pendências apresentadas na prévia (sem escolha do usuário): empilhamento das coberturas no hot dog; guarda-sóis do carrinho no topo da tela em 1ª pessoa; lona AST-043 não modelada; long car com 4 rodas (ficha pede 6); carga da ambulância rasa para a maca; cor da moldura da vitrine S1 do GEAR WALL. Palavras do usuário ao ver a rodada:
+
+> pode aprovar
+
+### DEC-141 — 2026-10-10 — Rodada 3 de modelados aprovada (comida editada, coberturas, otimizações, equipamentos, AST-026 casca e AST-027 trailer)
+
+- Decidido pelo usuário: as **versões de análise** abaixo passam a **Aprovado** (modelo aceito, não só a ficha). **AST-027** estava **Rascunho** → **Aprovado** por esta DEC. As demais fichas já eram Aprovadas (DEC-137/138/139); esta DEC aprova o **modelo entregue**.
+
+  | Ficha | Peça / variante | Tris | Arquivo (`.blend` em `Assets/blender/`, `.fbx` em `Assets/models/`) |
+  |---|---|---|---|
+  | AST-001 Bun (DEC-137) | `Bun_Closed` / `Bun_Open` — pão refeito com corte em V e miolo Cream (mesma seção e cores do pack) | 128 / 152 | `food/AST-001_Bun` |
+  | AST-002 Sausage (DEC-137) | `Sausage_Raw` / `Sausage_Grilled` | 92 / 164 | `food/AST-002_Sausage` |
+  | AST-003 Hot dog (DEC-137) | Tool sem molho (`Att_Topping1..3`) / `HotDog_Display` | 316 / 414 | `food/AST-003_HotDog` |
+  | AST-004 Ketchup (DEC-137) | cobertura, 5 dobras | 66 | `food/AST-004_KetchupTopping` |
+  | AST-005 Mustard (DEC-137) | cobertura, 7 dobras | 86 | `food/AST-005_MustardTopping` |
+  | AST-006 Cheese (DEC-137) | `Cheese_Topping` / `Cheese_Slice` | 148 / 160 | `food/AST-006_Cheese` |
+  | AST-007 Bacon (DEC-137) | `Bacon_Topping` (tiras 0,8) / `Bacon_Pile` | 160 / 120 | `food/AST-007_Bacon` |
+  | AST-008 Potato Sticks (DEC-137) | `PotatoSticks_Topping` / `PotatoSticks_Pile` | 240 / 344 | `food/AST-008_PotatoSticks` |
+  | AST-009 Cream Cheese (DEC-137) | `CreamCheese_Topping` / `CreamCheese_Jar` (pote 0,6 × 0,6 × 0,78, medida escolhida pelo modelador) | 126 / 188 | `food/AST-009_CreamCheese` |
+  | AST-010 Coffee (DEC-137) | Tool sem canudo / `Coffee_Pair` (L/R) | 236 por copo | `food/AST-010_Coffee` |
+  | AST-061 Wrong food (DEC-137) | `Sausage_Wrong` / `Bun_Bitten` | 164 / 208 | `anomaly/AST-061_WrongFood` |
+  | AST-014 Tábua + faca (DEC-138) | tábua / faca (deitada na borda da frente) | 38 / 104 | `equipment/AST-014_CuttingBoard` |
+  | AST-017 Grade de complementos (DEC-138) | base / cuba + tampa + etiqueta + cadeado (cadeado em cima da tampa) | 274 / 386 | `equipment/AST-017_ToppingGrid` |
+  | AST-018 Cooler (DEC-138) | `CoolerL1` / `CoolerL2` (duas tampas) | 668 / 1.106 | `equipment/AST-018_CoolerL1`, `_CoolerL2` |
+  | AST-019 Counter + fila (DEC-138) | pedestal + corda / marca de fila | 94 + 68 / 34 | `equipment/AST-019_QueuePost`, `_QueueMark` |
+  | AST-049 Bancada de upgrades (DEC-138) | GEAR WALL montado (moldura da S1 em Gold, conforme ficha) | 1.208 | `market/AST-049_GearWall` |
+  | AST-035 Carros (DEC-139) | `CarSedan`, `CarHatch`, `CarVan`, `CarPickup`; rodas separadas; 5 cores cada (Butter, Mint-gray e Teal claro **aproximados** no atlas) | 1.360–1.416 cada | `vehicle/AST-035_CarSedan`, `_CarHatch`, `_CarVan`, `_CarPickup` (+ `_Paints`) |
+  | AST-065 Long car (DEC-139) | 19,5 × 7,1 × 4,0, preto, **4 rodas** | 1.360 | `anomaly/AST-065_LongCar` |
+  | AST-052 Ambulância (DEC-139) | Cream + faixa Teal, **sem cruz/emblema** (lado oculto conferido); portas traseiras com pivô (vão 5,1 × 4,9; carga ~2 de fundo) | 1.748 | `vehicle/AST-052_Ambulance` |
+  | AST-045 Apartamentos (DEC-139) + AST-044 (parte do prédio) | `building-j` reduzido (`ApartmentBlock`) | 2.381 | `building/AST-045_ApartmentBlock` |
+  | AST-050 Frutas e verduras (DEC-139) | caixote de alface refeito | 1.159 | `market/AST-050_LettuceCrate` |
+  | AST-026 Corner Cart (DEC-139) | **casca** (linha 26 × 3, bancada 3,5, guarda-sóis a 9; posição de mundo (41, 0, 37.5)) | 2.984 (~7.200 montado) | `vehicle/AST-026_CornerCart` |
+  | AST-027 Open Late Trailer | casco 28 × 12 × 11, piso +2, pé-direito 8,5, janela de serviço **22,5** de largura (por causa da quina); inclui a porta dos fundos (AST-066) | 4.452 | `vehicle/AST-027_OpenLateTrailer` |
+
+- **Pendências da DEC-139 resolvidas** por estes modelos: AST-035 ≤ 2.000 tris (rodas mais simples); AST-065 recolor preto e base ≤ 2.000; AST-044/045 `building-j` ≤ 2.500; AST-050 caixote ≤ 1.200; AST-052 lado oculto sem cruz/emblema.
+- **AST-026:** com a casca aprovada, a ficha inteira tem modelo aprovado (guarda-sóis já em DEC-139).
+- **AST-044:** aprovado aqui só o **volume do prédio** (dentro do `AST-045_ApartmentBlock`). Frontão, relógio e quina chanfrada seguem a modelar.
+- **AST-066 (porta dos fundos):** está **dentro** do arquivo do trailer, mas **não** é aprovada por tabela. Ficha AST-066 **segue Rascunho**.
+- **Desvios aceitos com a aprovação** (substituem a medida da ficha): AST-027 janela de serviço **22,5** de largura (ficha: X 30–53, 23); AST-009 pote **0,6 × 0,6 × 0,78**; AST-007 tiras da cobertura **0,8** (ficha: tira 1,0); AST-008 `PotatoSticks_Pile` **344** tris (ficha ≤ 250); AST-006 `Cheese_Slice` **160** tris (ficha ≤ 150); AST-035 Butter/Mint-gray/Teal claro **aproximados** no atlas.
+- Licenças: só packs CC0 já registrados em `art/credits.md` (nenhuma linha nova). Dentro da regra da Fase 0 (modelagem de ficha **Aprovada**).
+- **Não decidido** nesta DEC (o usuário aprovou a rodada sem escolher):
+  - Empilhamento das coberturas no hot dog (passo fixo 0,05 da ficha AST-003 não funciona) → **`Q-138`** (game-designer + frontend-coder).
+  - Guarda-sóis do carrinho em 1ª pessoa; long car 4 × 6 rodas; moldura da S1 Gold × Mustard → **`Q-139`** (art-director).
+  - Carga da ambulância (~2 de fundo) × maca de 6 → **`Q-140`** (level-designer + art-director).
+  - AST-043 (lona) **não modelada**; ficha segue Rascunho, depende de `Q-082` (pendência anotada lá).
+  - Destino de `workspace.__Preview_Rodada3` e dos modelos de revisão (DEC-134): não decidido.
+  - `Q-133` a `Q-137` seguem abertas. `asset-list.md` como documento segue **Rascunho** (aprovação é por ficha). Bandeira verde segue pendente.
+- Impacto:
+  - `art/asset-list.md`: Status/Origem/arquivo/tris de AST-001 a 010, 014, 017, 018, 019, 026, 027, 035, 044, 045, 049, 050, 052, 061, 065 e do Resumo; nota em AST-003, 026, 043, 049, 052, 065, 066 → secretário (feito).
+  - `open-questions.md`: `Q-138`, `Q-139`, `Q-140`; nota em `Q-082` → secretário (feito).
+  - **level-designer:** MAP-01 §7.2 janela do trailer 22,5 (era X 30–53).
+  - `docs/README.md` → secretário.
