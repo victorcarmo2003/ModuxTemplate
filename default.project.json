@@ -433,6 +433,12 @@
 							"optional": "src/ModuxTypes/client"
 						}
 					},
+					"Neon": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Neon/client"
+						}
+					},
 					"Net": {
 						"$ignoreUnknownInstances": false,
 						"$path": {

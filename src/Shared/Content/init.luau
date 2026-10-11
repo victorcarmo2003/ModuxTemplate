@@ -18,6 +18,7 @@ local Ingredients = require(script.Ingredients)
 local Items = require(script.Items)
 local LightGroups = require(script.LightGroups)
 local Moods = require(script.Moods)
+local Neon = require(script.Neon)
 local Nights = require(script.Nights)
 local Notices = require(script.Notices)
 local OpalLines = require(script.OpalLines)
@@ -68,6 +69,7 @@ export type Locomotion = Animations.Locomotion
 export type Looks = Outfits.Looks
 export type MusicCue = Sounds.Cue
 export type Mood = Moods.Mood
+export type Neon = Neon.Neon
 export type MoodRules = Moods.MoodRules
 export type Night = Nights.Night
 export type Notice = Notices.Notice
@@ -149,4 +151,7 @@ return table.freeze({
 	Traffic = Traffic,
 	WalkPathRules = WalkPaths.Rules,
 	WalkPaths = WalkPaths,
+
+	-- neon tube signs (user request 2026-10-11; NeonController)
+	Neon = Neon,
 })
