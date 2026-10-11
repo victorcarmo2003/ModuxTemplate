@@ -1,7 +1,7 @@
 --!strict
 -- Bun crate (FEAT-006 step 4; DEC-190, DEC-215; architecture.md §18.4, §18.12; TASK-027). StationKind "bun_crate".
 --   bun_cut (Prompt_Take, hold 0.5 s "Slice Bun")  1 bun from stock -> lowest free slot of the vehicle's board
---           (Board.luau), sliced in Content.Stations.bun_crate.Params.CutTime (1.5 s). The unit leaves the stock only
+--           (Board.luau), sliced in Content.Stations.bun_crate.Params.CutTime (0.8 s). The unit leaves the stock only
 --           together with a free slot (never one without the other).
 -- Restock on Prompt_Restock is the core's (KitchenService). No Stations record: the board slot carries the state.
 -- Prompts (Provisional, TASK-027, same rule as "Grill"): "Slice Bun" off while the board has no free slot or the bun

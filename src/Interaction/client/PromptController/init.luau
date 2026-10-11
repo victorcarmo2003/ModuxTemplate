@@ -22,6 +22,10 @@
 	Sound (user request 2026-10-10): `prompt_hold` (Ui) plays on screen while a hold is in progress and stops when it
 	ends (released, cancelled or fired). `trash` (user request 2026-10-10) plays at the bin once a fired `discard`
 	actually took the hand Tool away (the server decided; no Tool gone within DISCARD_WAIT s = rejected = silence).
+
+	Completion pop (user request 2026-10-11): the moment an Interact is actually sent (hold completed or tap), the
+	pill pops (Prompt.Celebrate -> PromptBillboard bump/flash/check), a few sparkles burst at the anchor (Burst) and
+	`prompt_done` (Ui) plays. It confirms the input, not the result: the server still decides.
 ]]
 local Players = game:GetService("Players")
 local CollectionService = game:GetService("CollectionService")
@@ -31,6 +35,7 @@ local Content = require(ReplicatedStorage.shared.Content)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Prompt = require(script.Prompt)
 local Rules = require(script.Rules)
+local Burst = require(script.Burst)
 
 const TAG = "Interactable"
 const TICK_RATE = 10
@@ -42,6 +47,7 @@ const MIN_FIRE_INTERVAL = 1 / 8
 const TOUCH_SIZE = 72
 const KEY_LABEL = { KeyboardMouse = "E", Gamepad = "X", Touch = "" }
 const HOLD_SOUND = "prompt_hold"
+const DONE_SOUND = "prompt_done"
 const DISCARD_ACTION = "discard"
 const DISCARD_SOUND = "trash"
 const DISCARD_WAIT = 1.5 -- s for the server to remove the thrown Tool
@@ -113,9 +119,20 @@ function PromptController:Fire(prompt: Prompt.Prompt)
 	end
 	self.LastFire = now
 	self.Libs.Net.Interact:fireServer({ Id = id, Action = action })
+	self:Celebrate(prompt)
 	if action == DISCARD_ACTION then
 		self:WatchDiscard(prompt.Anchor)
 	end
+end
+
+-- Completion feedback, in the same frame as the fire.
+function PromptController:Celebrate(prompt: Prompt.Prompt)
+	Prompt.Celebrate(prompt)
+	const position = Prompt.Position(prompt)
+	if position then
+		Burst.Emit(position)
+	end
+	self.Dependencies.AudioController:Play(DONE_SOUND)
 end
 
 -- `trash` at the bin when the server removes the Tool the local character held (Throw Away accepted)
@@ -193,10 +210,11 @@ function PromptController:BeginHold(prompt: Prompt.Prompt)
 			and prompt.Target.Action == action
 			and prompt.Text() == text
 			and Prompt.IsLive(prompt)
-		self:CancelHold()
+		-- Fire before clearing the hold, so the pill goes from full straight into the pop (no drain in between).
 		if valid then
 			self:Fire(prompt)
 		end
+		self:CancelHold()
 	end)
 end
 

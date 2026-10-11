@@ -40,6 +40,9 @@ local Board = require(script.Board)
 const STATION_TAG = "Station"
 const VEHICLE_TAG = "Vehicle"
 const VEHICLE_ATTRIBUTE = "Vehicle" -- key of Content.Vehicles on the tagged Model (architecture.md §18.1, T36)
+-- Clamp of the playback speed fitted by PlayOptions.Fit: past it the clip just runs a bit long/short (no chipmunk).
+const FIT_MIN = 0.8
+const FIT_MAX = 1.6
 
 -- Visual parts, in mount order (Grill, Rail, Board: TASK-030; shared slot helpers in Slots.luau).
 const PARTS: { Context.Part } = { Stock, Grill, Rail, Board, require(script.Coffee) :: Context.Part } -- Coffee: TASK-069
@@ -139,6 +142,22 @@ function KitchenController:IsCurrent(station: Instance): boolean
 	return vehicle:GetAttribute(VEHICLE_ATTRIBUTE) == current
 end
 
+-- PlaybackSpeed so the clip lasts `seconds` (bun_slice ends with the cut bar). TimeLength is 0 until the clip loads;
+-- the pooled Sounds are usually loaded already (AudioController preloads), otherwise it fits on Loaded.
+local function fitLength(sound: Sound, seconds: number)
+	local function apply()
+		const length = sound.TimeLength
+		if length > 0 then
+			sound.PlaybackSpeed = math.clamp(length / seconds, FIT_MIN, FIT_MAX)
+		end
+	end
+	if sound.IsLoaded then
+		apply()
+	else
+		sound.Loaded:Once(apply)
+	end
+end
+
 -- Sound hooks handed to the parts (TASK-079; Context.Audio). Keys still missing from Content.Sounds are skipped
 -- without a warn (the row is added by the Content owner; then it just plays).
 function KitchenController:Audio(): Context.Audio
@@ -148,7 +167,11 @@ function KitchenController:Audio(): Context.Audio
 			if Content.Sounds.ByKey[key] == nil or not self:IsCurrent(station) then
 				return
 			end
-			audio:Play(key, at, if opts then { Volume = opts.Volume, Speed = opts.Speed } else nil)
+			const sound = audio:Play(key, at, if opts then { Volume = opts.Volume, Speed = opts.Speed } else nil)
+			const fit = if opts then opts.Fit else nil
+			if sound and fit and fit > 0 then
+				fitLength(sound, fit)
+			end
 		end,
 		Loop = function(station: Instance, key: string, at: Instance, on: boolean, volume: number?)
 			const row = Content.Sounds.ByKey[key]

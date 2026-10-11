@@ -3,12 +3,13 @@
 -- 2 shared slots on the cart (3 on the trailer): one Stations record per slot (Kind = board), anchors
 -- `Att_Bun1..n` with `Slot`. Same pattern as the grill:
 --   Empty     nothing on the board
---   Working   BunClosed (whole bun) + ProgressBar of the 1.5 s cut
+--   Working   BunClosed (whole bun) + ProgressBar of the cut (Stations.bun_crate.Params.CutTime, 0.8 s)
 --   Ready     BunOpen (sliced, waiting for "Add Sausage"); no bar
 -- The bun swaps to BunOpen when the local bar ends, like the grill. Buns lie end to end along the line of slots
 -- (Att_Bun1/2 = Att_Bun -/+ 0.55 along its X; bun 1.0 long: Provisional until the visual check in the place).
 -- Sound (TASK-079; sound-list §5.3), on transitions only (a late joiner's first record is silent):
---   Empty -> Working   SFX-024 `bun_slice` at the slot (the 1.5 s automatic cut)
+--   Empty -> Working   SFX-024 `bun_slice` at the slot, speed fitted to the record Duration so the knife ends with
+--                      the bar (user request 2026-10-11)
 --   Ready -> Empty     SFX-025 `hotdog_assemble` at the slot ("Add Sausage" took the bun)
 -- Wave 3 (TASK-110, ANM-002): a slot with `Altered` >= 1 shows BunBitten (AST-061; the server writes it Ready, already
 -- sliced). It appears silently: no `bun_slice`, since nobody cut it (Provisional, frontend-coder).
@@ -49,7 +50,7 @@ local function mountSlot(
 		untrack(function()
 			const at = (spot.Host.CFrame * spot.Offset).Position
 			if previous == "Empty" and not altered then
-				audio.Play(station, "bun_slice", at)
+				audio.Play(station, "bun_slice", at, { Fit = if record and record.Duration > 0 then record.Duration else nil })
 			elseif state == "Empty" and previous == "Ready" then
 				audio.Play(station, "hotdog_assemble", at)
 			end

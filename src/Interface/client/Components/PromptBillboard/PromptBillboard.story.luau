@@ -2,6 +2,7 @@
 -- The prompt is a BillboardGui, so it is previewed in the 3D viewport: a temporary part 6 studs in
 -- front of the Studio camera (removed when the story closes). Drive every state from the controls;
 -- clicks on the pill only reach OnPress/OnRelease in a play test (BillboardGui under PlayerGui).
+-- Move "Done" up one step to see the completion pop (bump, flash, check); world sparkles and sound are the controller's.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -19,6 +20,7 @@ return UILabs.CreateVideStory({
 		KeyLabel = UILabs.Choose({ "E", "X", "" }),
 		Holding = false,
 		HoldDuration = UILabs.Slider(0.6, 0, 3, 0.05),
+		Done = UILabs.Slider(0, 0, 50, 1),
 	},
 }, function(props)
 	const controls = props.controls
@@ -50,6 +52,9 @@ return UILabs.CreateVideStory({
 		end,
 		HoldDuration = function()
 			return controls.HoldDuration()
+		end,
+		Done = function()
+			return controls.Done()
 		end,
 		StudsOffset = Vector3.new(0, 1.2, 0),
 	})

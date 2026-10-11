@@ -48,7 +48,7 @@ const base = Table.new({
 		Record = "None",
 		Actions = { "bun_cut", "restock" },
 		Ingredient = "bun",
-		Params = { CutTime = 1.5 }, -- FEAT-006
+		Params = { CutTime = 0.8 }, -- FEAT-006; 1.5 -> 0.8 s to match the knife sound bun_slice (user request 2026-10-11)
 	},
 	{
 		-- slot count: Vehicles[v].BoardSlots (cart 2, trailer 3; DEC-190, DEC-215); one prompt on the board

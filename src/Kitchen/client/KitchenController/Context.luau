@@ -31,6 +31,9 @@ export type SlotRecord = {
 export type PlayOptions = {
 	Volume: number?, -- multiplier of the row Volume
 	Speed: number?, -- PlaybackSpeed multiplier (pitch)
+	-- Seconds the one-shot should last: the playback speed is fitted to it once the clip length is known (clamped,
+	-- KitchenController FIT_MIN..FIT_MAX). Overrides Speed. Used to end a sound with its progress bar.
+	Fit: number?,
 }
 
 export type Audio = {

@@ -37,6 +37,7 @@ export type Prompt = {
 	Text: Vide.Source<string>,
 	Holding: Vide.Source<boolean>,
 	HoldDuration: Vide.Source<number>,
+	Done: Vide.Source<number>, -- completion counter: +1 = the billboard plays its pop
 	Gui: BillboardGui?,
 	Unmount: (() -> ())?,
 	Connections: { RBXScriptConnection },
@@ -180,6 +181,11 @@ function Prompt.SetHolding(self: Prompt, holding: boolean)
 	end
 end
 
+-- The interaction was just sent: the billboard plays its completion pop.
+function Prompt.Celebrate(self: Prompt)
+	self.Done(self.Done() + 1)
+end
+
 function Prompt.new(anchor: Instance, hooks: Hooks): Prompt
 	const owner = ancestorWith(anchor, function(instance)
 		return CollectionService:HasTag(instance, "Station")
@@ -206,6 +212,7 @@ function Prompt.new(anchor: Instance, hooks: Hooks): Prompt
 		Text = Vide.source(""),
 		Holding = Vide.source(false),
 		HoldDuration = Vide.source(0),
+		Done = Vide.source(0),
 		Gui = nil,
 		Unmount = nil,
 		Connections = {},
@@ -237,6 +244,7 @@ function Prompt.new(anchor: Instance, hooks: Hooks): Prompt
 			Tappable = hooks.Tappable,
 			Holding = self.Holding,
 			HoldDuration = self.HoldDuration,
+			Done = self.Done,
 			OnPress = function()
 				hooks.OnPress(self)
 			end,

@@ -3,7 +3,7 @@
 -- StationKind "board". Shared slots: Slot attachments Att_Bun1..n, n = Content.Vehicles[vehicle].BoardSlots (cart 2,
 -- trailer 3). One Stations record per active slot (Kind "board"):
 --   Empty     free slot
---   Working   whole bun being sliced (StartedAt + Duration = Stations.bun_crate.Params.CutTime, 1.5 s)
+--   Working   whole bun being sliced (StartedAt + Duration = Stations.bun_crate.Params.CutTime, 0.8 s)
 --   Ready     sliced bun waiting for "Add Sausage"
 -- "Slice Bun" is on the bun crate (BunCrate.luau) and uses Board.Free/Board.Place below.
 --   board_add_sausage (Prompt_Board, tap, one prompt)  rail >= 1 and a sliced bun: the oldest sliced bun (DEC-190)

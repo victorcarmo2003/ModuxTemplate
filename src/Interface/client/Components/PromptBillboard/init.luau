@@ -13,16 +13,25 @@
 -- horizontal gradient on the face (Mustard up to the progress, Cream after), so the round corners stay intact
 -- without a CanvasGroup (crisp text, cheap on a phone). The width is measured from the text (TextService), never
 -- from AutomaticSize, so the pill cannot keep a stale size.
+-- Completion pop (user request 2026-10-11): each time `Done` goes up (PromptController fired the Interact) the pill
+-- bumps with an underdamped bounce (Motion.Bump), the face flashes white -> Green, the fill stays full for the pop and
+-- a check icon (AST-091 `Ui/check`) jumps over the pill and fades. One-shot tweens on 2 instances: cheap on a phone.
+-- The world sparkles and the `prompt_done` sound belong to PromptController (they are not UI).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TextService = game:GetService("TextService")
+local TweenService = game:GetService("TweenService")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Theme)
 local UseTween = require(script.Parent.UseTween)
+local Motion = require(script.Parent.Motion)
+local Icons = require(script.Parent.Icons)
 
 const create = Vide.create
 const source = Vide.source
 const spring = Vide.spring
 const untrack = Vide.untrack
+const effect = Vide.effect
+const cleanup = Vide.cleanup
 -- Vide 0.4.1 types `create` for 19 classes only; UIStroke, UIPadding and UIScale are not among them.
 const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }) -> Instance
 
@@ -43,6 +52,8 @@ export type Props = {
 	-- The pill takes taps/clicks (touch only). An Active button under the locked first-person cursor sinks
 	-- MouseMovement and the stock camera stops turning, so desktop/gamepad keep it off. nil = has OnPress.
 	Tappable: (() -> boolean)?,
+	-- Completion counter: every increase plays the pop (the interaction was just sent). nil = never pops.
+	Done: (() -> number)?,
 	StudsOffset: Vector3?,
 	Name: string?,
 }
@@ -65,6 +76,23 @@ const FACE = Theme.Tone.Cream.Top
 const LIP_COLOR = Theme.Tone.Cream.Lip
 const FILL = Theme.Tone.Mustard.Bottom
 const EDGE = 0.002 -- width of the fill edge in the gradient (keypoint times must increase)
+
+-- Completion pop
+const POP_TIME = 0.45 -- s the pop keeps the billboard on and the fill full
+const POP_SCALE = 1.16 -- pill bump peak
+const FLASH_FROM = Color3.new(1, 1, 1)
+const FLASH_TO = Theme.Tone.Green.Top
+const FLASH_START = 0.15 -- transparency of the flash at the trigger
+const FLASH_TIME = 0.3
+const CHECK_SIZE = 44
+const CHECK_RISE = 34 -- px the check jumps above its start
+const CHECK_IN = 0.18 -- s of the scale-in (Back overshoot)
+const CHECK_UP = 0.45 -- s of the rise
+const CHECK_FADE_DELAY = 0.22
+const CHECK_FADE = 0.23
+const CHECK_ICON = if Icons.Has("Ui/check") then "Ui/check" else "Reaction/star"
+const CHECK_RECT = Icons.Rect(CHECK_ICON)
+const CHECK_START = UDim2.new(0.5, 0, 0.5, -PILL_HEIGHT // 2 - 4)
 
 -- Face colour along the pill: Mustard up to `fill` (0..1), Cream after it.
 local function fillSequence(fill: number): ColorSequence
@@ -102,9 +130,88 @@ return function(props: Props): BillboardGui
 		return props.KeyLabel() ~= ""
 	end
 
-	-- Hold fill: linear over HoldDuration while held, quick drain from wherever it stopped on release.
+	-- Completion pop: `popping` is on for POP_TIME after each increase of Done.
+	const done = props.Done or function(): number
+		return 0
+	end
+	const popping = source(false)
+	const checkScale = createRaw("UIScale")({ Scale = 0 }) :: UIScale
+	const flash = create("Frame")({
+		Name = "Flash",
+		Size = UDim2.new(1, 0, 1, -LIP),
+		BackgroundColor3 = FLASH_FROM,
+		BackgroundTransparency = 1,
+		ZIndex = 3,
+		create("UICorner")({ CornerRadius = Theme.Radius.Pill }),
+	})
+	const check = create("ImageLabel")({
+		Name = "Check",
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = CHECK_START,
+		Size = UDim2.fromOffset(CHECK_SIZE, CHECK_SIZE),
+		BackgroundTransparency = 1,
+		Image = Icons.ImageOf(CHECK_ICON),
+		ImageRectOffset = if CHECK_RECT then CHECK_RECT.Offset else Vector2.zero,
+		ImageRectSize = if CHECK_RECT then CHECK_RECT.Size else Vector2.zero,
+		ImageTransparency = 1,
+		ZIndex = 6,
+		checkScale,
+	})
+
+	local popThread: thread? = nil
+	local lastDone = untrack(done)
+	local function pop()
+		flash.BackgroundColor3 = FLASH_FROM
+		flash.BackgroundTransparency = FLASH_START
+		TweenService:Create(flash, TweenInfo.new(FLASH_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			BackgroundColor3 = FLASH_TO,
+			BackgroundTransparency = 1,
+		}):Play()
+
+		check.Position = CHECK_START
+		check.ImageTransparency = 0
+		checkScale.Scale = 0
+		TweenService:Create(checkScale, TweenInfo.new(CHECK_IN, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+			Scale = 1,
+		}):Play()
+		TweenService
+			:Create(check, TweenInfo.new(CHECK_UP, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+				Position = CHECK_START - UDim2.fromOffset(0, CHECK_RISE),
+			})
+			:Play()
+		TweenService
+			:Create(check, TweenInfo.new(CHECK_FADE, Enum.EasingStyle.Quad, Enum.EasingDirection.In, 0, false, CHECK_FADE_DELAY), {
+				ImageTransparency = 1,
+			})
+			:Play()
+
+		if popThread and coroutine.status(popThread) == "suspended" then
+			task.cancel(popThread)
+		end
+		popping(true)
+		popThread = task.delay(POP_TIME, function()
+			popThread = nil
+			popping(false)
+		end)
+	end
+	effect(function()
+		const now = done()
+		if now > lastDone then
+			untrack(pop)
+		end
+		lastDone = now
+	end)
+	cleanup(function()
+		if popThread and coroutine.status(popThread) == "suspended" then
+			task.cancel(popThread)
+		end
+	end)
+	const bump = Motion.Bump(done, POP_SCALE)
+
+	-- Hold fill: linear over HoldDuration while held, quick drain from wherever it stopped on release. Full during
+	-- the pop (a tap fills in RELEASE_TIME).
 	const fill = UseTween(function()
-		return if props.Holding() and isPrompt() then UDim2.fromScale(1, 1) else UDim2.fromScale(0, 1)
+		return if (props.Holding() or popping()) and isPrompt() then UDim2.fromScale(1, 1) else UDim2.fromScale(0, 1)
 	end, function()
 		return if untrack(props.Holding) then untrack(props.HoldDuration) else RELEASE_TIME
 	end, Enum.EasingStyle.Linear)
@@ -119,6 +226,9 @@ return function(props: Props): BillboardGui
 		end
 		return 1
 	end, 0.2, 1)
+	const pillSize = function(): number
+		return pillScale() * bump()
+	end
 
 	const dotSize = spring(function()
 		return if props.State() == "Indicator" then DOT_SIZE else 0
@@ -143,8 +253,10 @@ return function(props: Props): BillboardGui
 		Active = tappable,
 		ClipsDescendants = false,
 		Enabled = function()
-			return props.State() ~= "Hidden" or pillScale() > 0.01 or dotSize() > 0.5
+			return props.State() ~= "Hidden" or pillScale() > 0.01 or dotSize() > 0.5 or popping()
 		end,
+
+		check,
 
 		create("Frame")({
 			Name = "Indicator",
@@ -177,7 +289,7 @@ return function(props: Props): BillboardGui
 			end,
 
 			create("UICorner")({ CornerRadius = Theme.Radius.Pill }),
-			createRaw("UIScale")({ Scale = pillScale }),
+			createRaw("UIScale")({ Scale = pillSize }),
 			createRaw("UIStroke")({
 				Color = Theme.Color.Ink,
 				Thickness = Theme.Outline.Thick,
@@ -207,6 +319,8 @@ return function(props: Props): BillboardGui
 				}),
 			}),
 
+			flash,
+
 			create("Frame")({
 				Name = "Gloss",
 				AnchorPoint = Vector2.new(0.5, 0),
@@ -222,7 +336,7 @@ return function(props: Props): BillboardGui
 				Name = "Content",
 				Size = UDim2.new(1, 0, 1, -LIP),
 				BackgroundTransparency = 1,
-				ZIndex = 3,
+				ZIndex = 4,
 
 				createRaw("UIPadding")({
 					PaddingLeft = function()
@@ -284,7 +398,7 @@ return function(props: Props): BillboardGui
 				Size = UDim2.fromScale(1, 1),
 				BackgroundTransparency = 1,
 				Text = "",
-				ZIndex = 4,
+				ZIndex = 5,
 				Active = true,
 				Visible = tappable,
 				MouseEnter = function()
