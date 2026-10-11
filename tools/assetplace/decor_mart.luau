@@ -787,6 +787,59 @@ function Decor.runDetails(): string
 		table.insert(log, "open sign")
 	end
 
+	-- 5. Mart v2 section signs (AST-106): text on Face_Front / Face_Back (MAP-01 §18.6)
+	local SIGN_TEXT = {
+		["AST-106_SignBakery"] = { "BAKERY", "BAKERY", Color3.fromRGB(196, 120, 40) },
+		["AST-106_SignProduce"] = { "FRESH PRODUCE", "FRESH PRODUCE", Color3.fromRGB(46, 150, 90) },
+		["AST-106_SignMeatDeli"] = { "MEAT & DELI", "MEAT & DELI", Color3.fromRGB(200, 50, 50) },
+		["AST-106_SignSaucesSnacks"] = { "SAUCES", "SNACKS · COFFEE", Color3.fromRGB(200, 140, 20) },
+		["AST-106_WallSignDairy"] = { "DAIRY", nil, Color3.fromRGB(30, 140, 150) },
+	}
+	local signs = 0
+	for _, m in root:GetDescendants() do
+		local spec = m:IsA("Model") and SIGN_TEXT[m:GetAttribute("Asset")]
+		if spec then
+			for i, faceName in { "Face_Front", "Face_Back" } do
+				local text = spec[i]
+				local face = m:FindFirstChild(faceName, true)
+				if text and face and face:IsA("BasePart") then
+					-- the SurfaceGui goes on the face part's widest side that looks the way of the model front / back
+					local gui = Instance.new("SurfaceGui")
+					gui.Name = "Detail_SignText"
+					local look = m:GetPivot().LookVector * (if i == 1 then 1 else -1)
+					local best, bestDot = Enum.NormalId.Front, -2
+					for _, nid in Enum.NormalId:GetEnumItems() do
+						local dot = face.CFrame:VectorToWorldSpace(Vector3.fromNormalId(nid)):Dot(look)
+						if dot > bestDot then
+							best, bestDot = nid, dot
+						end
+					end
+					gui.Face = best
+					gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+					gui.PixelsPerStud = 80
+					gui.LightInfluence = 0.4
+					local t = Instance.new("TextLabel")
+					t.Size = UDim2.fromScale(0.9, 0.78)
+					t.AnchorPoint = Vector2.new(0.5, 0.5)
+					t.Position = UDim2.fromScale(0.5, 0.5)
+					t.BackgroundTransparency = 1
+					t.FontFace = FONT
+					t.Text = text
+					t.TextScaled = true
+					t.TextColor3 = spec[3]
+					local st = Instance.new("UIStroke")
+					st.Color = CREAM
+					st.Thickness = 2
+					st.Parent = t
+					t.Parent = gui
+					gui.Parent = face
+					signs += 1
+				end
+			end
+		end
+	end
+	table.insert(log, ("section sign faces: %d"):format(signs))
+
 	return "details: " .. table.concat(log, ", ")
 end
 
