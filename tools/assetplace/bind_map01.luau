@@ -2820,6 +2820,33 @@ local function bindNoHelpCards(assets: Instance)
 	log(if n > 0 then "ok" else "warn", ("NoHelp: %d NO HELP WANTED card(s) lettered and tagged NoHelpWantedSign"):format(n))
 end
 
+-- Mart blockout markers (user 2026-10-11: "yellow blocks floating"): the purchase points, the gear wall slots and the
+-- OP-1 dummy are only positions for the binding (prompts) and for OpalController (the clerk animal is built at OP-1 in
+-- Play). Hidden, not destroyed: the binding still reads their positions.
+local function hideMartMarkers(): number
+	local blockout = Workspace:FindFirstChild("MAP01_Blockout")
+	local interior = blockout and blockout:FindFirstChild("Mart") and blockout.Mart:FindFirstChild("Interior")
+	if not interior then
+		return 0
+	end
+	local n = 0
+	for _, name in { "PurchasePoints", "GEAR_WALL", "OP-1" } do
+		local f = interior:FindFirstChild(name)
+		for _, d in (if f then f:GetDescendants() else {}) do
+			if d:IsA("BasePart") and d.Transparency < 1 then
+				d.Transparency = 1
+				d.CanCollide = false
+				d.CanQuery = false
+				d.CanTouch = false
+				n += 1
+			elseif d:IsA("Decal") then
+				d.Transparency = 1
+			end
+		end
+	end
+	return n
+end
+
 function Bind.run(opts: AnchorOpts?): string
 	local o: AnchorOpts = opts or {}
 	table.clear(report)
@@ -2860,6 +2887,7 @@ function Bind.run(opts: AnchorOpts?): string
 	bindStreetLights(assets)
 	bindAutoDoors(assets)
 	bindNoHelpCards(assets)
+	log("ok", ("Mart markers: %d blockout marker part(s) hidden (purchase points, gear wall slots, OP-1 dummy)"):format(hideMartMarkers()))
 
 	local cartPose = if cart then mapPivot(cart) else CART_POSE
 	if (cartPose.Position - CART_POSE.Position).Magnitude > 0.05 then
