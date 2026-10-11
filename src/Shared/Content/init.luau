@@ -17,6 +17,7 @@ local Hallucinations = require(script.Hallucinations)
 local Ingredients = require(script.Ingredients)
 local Items = require(script.Items)
 local LightGroups = require(script.LightGroups)
+local Mart = require(script.Mart)
 local Moods = require(script.Moods)
 local Neon = require(script.Neon)
 local Nights = require(script.Nights)
@@ -66,6 +67,9 @@ export type Item = Items.Item
 export type ItemRules = Items.ItemRules
 export type LightGroup = LightGroups.LightGroup
 export type Locomotion = Animations.Locomotion
+export type Mart = Mart.Mart
+export type MartDoor = Mart.Door
+export type MartPedestal = Mart.Pedestal
 export type Looks = Outfits.Looks
 export type MusicCue = Sounds.Cue
 export type Mood = Moods.Mood
@@ -154,4 +158,7 @@ return table.freeze({
 
 	-- neon tube signs (user request 2026-10-11; NeonController)
 	Neon = Neon,
+
+	-- Mart v2 "Gear Stand" (TASK-135; FEAT-015 v2; MAP-01 §18). Numbers Provisional
+	Mart = Mart,
 })

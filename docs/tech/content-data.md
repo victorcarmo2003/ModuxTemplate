@@ -819,6 +819,27 @@ Lista inicial (Provisória, `Q-168`):
 | Ui | `toast`, `summary`, `prompt_done`, `skip_vote` |
 | Voice | (vazio no MVP: legenda sem voz) |
 
+### 3.22 Mart (registro único; Mart v2 "Gear Stand", TASK-135, Provisório)
+
+`src/Shared/Content/Mart.luau`, exposto como `Content.Mart`. Fonte: FEAT-015 v2, `MAP-01.md` §18.4/§18.5; `Q-175`,
+`Q-176`, `Q-177` com a recomendação A. Só apresentação e quando o quiosque atende: preço, efeito e rotação seguem em
+`Upgrades` (DEC-101, DEC-106). Nenhuma rede nova: a porta é derivada da fase do set `Shift`.
+
+| Campo | Valor | Quem lê |
+|---|---|---|
+| `KioskClosedPhases` | `Summary`, `Call`, `NightLost`, `Resume`, `Intro`, `Finale`, `RunEnd` | `MarketService` (recusa e prompts), `MarketController` (porta), `OpalController` (sem balão) |
+| `Pedestals` | `B1`..`B5` (`Offer = "Upgrade"`, via `Upgrades.BenchSpot`), `S1` (`"Special"`), da esquerda para a direita | `MarketController`, `Required.Kiosk` |
+| `Doors` | `L` = B1–B3, `C` = balcão da Opal, `R` = B4, B5, S1 (ordem = defasagem) | `Kiosk.luau`, `Required.Kiosk` |
+| `Door` | `CloseTime` 2,0 · `OpenTime` 1,6 · `Stagger` 0,25 | `Kiosk.luau` |
+| `Mini` | `Size` 1,6 · `Lift` 1,2 · `Bob` 0,25 · `BobPeriod` 3 · `SpinPeriod` 8 · `ActiveRadius` 60 · `LockedTransparency` 0,5 | `Minis.luau` |
+| `Purchase` | `PopTime` 0,4 · `PopScale` 1,3 · `PopTurns` 1 · `Confetti` 14 · `RiseDelay` 0,5 · `RiseTime` 0,6 · `OpalLineGap` 20 · `OpalLineRadius` 12 | `Minis.luau`, `MarketController` (os dois `OpalLine*` ficam para o pool `Purchase`, TASK-142) |
+| `Plate` | `Distance` 45 | `MarketController` (`BenchCard` modo placa) |
+| `Tags` | `Pedestal = "GearPedestal"`, `Shutter = "GearShutter"`, `Slot = "Slot"` | client, `Required.Kiosk` |
+| `Fallback` | `DoorHeight` 7 · `DoorAhead` 1 · `AnchorHeight` 4,2 · `Margin` 1,5 | porta de teste gerada no client quando o mapa não tem `GearShutter` |
+
+`Validate` (`checkMart`): toda fase fechada existe em `Shift`, sem repetição; cada `Upgrades.BenchSpot` tem pedestal e
+vice-versa; exatamente 1 pedestal `Special`; pedestal atrás de no máximo uma porta; números dentro de faixa.
+
 ## 4. Quem edita o quê
 
 - **game-designer**: números e listas (preços, tempos, pesos, fases, classes, noites, bancada, revive, densidade de trânsito).

@@ -757,4 +757,81 @@ function MapIndex.Validate(required: List): { string }
 	return problems
 end
 
+-- Mart v2 Gear Stand (TASK-135; MAP-01 §18.4): soft checks, returned as notes (PlaceService warns, never errors) so
+-- the place keeps running while TASK-138 builds the kiosk. MarketController/OpalController fall back on their own.
+--   pedestal: exactly one `PedestalTag` with Slot = each BenchSlot; a `Price_Anchor_<Slot>` (or `Price_Anchor`)
+--     inside it; shutter: exactly one `ShutterTag` with Slot = each door key, holding `Slat_*` or `Door_Panel` parts
+--     and a `Roll` / `Door_Drum` part; OP-1 facing the store (Q-175 A).
+function MapIndex.KioskNotes(required: List): { string }
+	const rule = required.Kiosk
+	const notes: { string } = {}
+	local function note(message: string)
+		table.insert(notes, message)
+	end
+
+	local function bySlot(tag: string): { [string]: { Instance } }
+		const out: { [string]: { Instance } } = {}
+		for _, instance in tagged(tag) do
+			const slot = stringAttribute(instance, rule.SlotAttribute)
+			if slot == nil then
+				note(`{tag} {nameOf(instance)} without {rule.SlotAttribute}`)
+				continue
+			end
+			const list = out[slot] or {}
+			out[slot] = list
+			table.insert(list, instance)
+		end
+		return out
+	end
+
+	const pedestals = bySlot(rule.PedestalTag)
+	for _, slot in rule.Pedestals do
+		const list = pedestals[slot] or {}
+		if #list ~= 1 then
+			note(`{rule.PedestalTag} Slot = {slot} found {#list} time(s), need 1`)
+		else
+			const pedestal = list[1]
+			if
+				pedestal:FindFirstChild("Price_Anchor_" .. slot, true) == nil
+				and pedestal:FindFirstChild("Price_Anchor", true) == nil
+			then
+				note(`{rule.PedestalTag} {slot}: no Price_Anchor_{slot} (the plate goes on the prompt anchor)`)
+			end
+		end
+	end
+
+	const shutters = bySlot(rule.ShutterTag)
+	for _, key in rule.Shutters do
+		const list = shutters[key] or {}
+		if #list ~= 1 then
+			note(`{rule.ShutterTag} Slot = {key} found {#list} time(s), need 1`)
+			continue
+		end
+		local slats, roll = 0, false
+		for _, part in list[1]:GetDescendants() do
+			if part:IsA("BasePart") then
+				if string.sub(part.Name, 1, 5) == "Slat_" or part.Name == "Door_Panel" then
+					slats += 1
+				elseif part.Name == "Roll" or part.Name == "Door_Drum" then
+					roll = true
+				end
+			end
+		end
+		if slats == 0 then
+			note(`{rule.ShutterTag} {key}: no Slat_* or Door_Panel part (the door will not move)`)
+		end
+		if not roll then
+			note(`{rule.ShutterTag} {key}: no Roll / Door_Drum part (nothing turns)`)
+		end
+	end
+
+	const point = MapIndex.FindPoint(rule.OpalPoint)
+	if point == nil then
+		note(`MapPoint {rule.OpalPoint} missing (Opal)`)
+	elseif point.LookVector:Dot(rule.OpalFacing) < 0.9 then
+		note(`MapPoint {rule.OpalPoint} does not face the store (MAP-01 §18.4: MAP east)`)
+	end
+	return notes
+end
+
 return table.freeze(MapIndex)

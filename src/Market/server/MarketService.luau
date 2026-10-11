@@ -10,6 +10,10 @@
 --     (Content.Upgrades.BenchSpot). Always on sale (DEC-106); no prompt when Maxed, "Trailer only" (not on the current
 --     vehicle) or before UnlockDay. The purchase is UpgradeService:Buy (atomic, its own guards).
 --   S1 (bench_buy_item, wave 4): prompt always off, "Nothing special today" (Q-120). The action is not registered.
+--   Gear Stand shutter (Mart v2, TASK-139; FEAT-015 v2; Q-176 A Provisional): the kiosk is closed in the phases of
+--     Content.Mart.KioskClosedPhases (Summary, Call, NightLost, Resume, Intro, Finale, RunEnd). Closed = bench prompts
+--     off and every bench purchase refused in silence, in Validate AND Run (a hold that ends on the phase change buys
+--     nothing). Shelves (buy_package) never close (Q-177 A). No network: the client derives the shutter from Shift.
 -- Refusal toasts (FEAT-005 D-04; TASK-080), only to the player who acted, the same key at most once every
 -- NOTICE_GAP seconds: shelf Blocked -> shelf_locked {item}; bench "busy" (another buyer inside UpgradeService's guard)
 -- -> bench_busy; bench "maxed" -> upgrade_maxed {upgrade}. Silent: run not started / member not Active (life state),
@@ -30,6 +34,11 @@ const PACKAGE_ACTION = "buy_package"
 const UPGRADE_ACTION = "bench_buy_upgrade"
 const ITEM_ACTION = "bench_buy_item"
 const PACKAGE_GAP = Content.Actions.ByKey[PACKAGE_ACTION].Hold * 0.8
+-- Phases with the Gear Stand shutter down (Content.Mart; FEAT-015 v2)
+const KIOSK_CLOSED: { [string]: boolean } = {}
+for _, phase in Content.Mart.KioskClosedPhases do
+	KIOSK_CLOSED[phase] = true
+end
 const NOTICE_GAP = 2 -- seconds (FEAT-005 anti-spam; Provisional constant, TASK-080: no Content field yet)
 
 local function stringAttribute(anchor: Instance, name: string): string?
@@ -98,6 +107,11 @@ function MarketService:UpgradeOf(anchor: Instance): Content.Upgrade?
 	return if slot then upgradeAt(slot) else nil
 end
 
+-- Gear Stand shutter up: the current Shift phase is not in Content.Mart.KioskClosedPhases (reactive inside an effect).
+function MarketService:IsKioskOpen(): boolean
+	return not KIOSK_CLOSED[self.Dependencies.RoundService:GetPhase()]
+end
+
 -- Bench slot sells now: upgrade exists on the current vehicle, not maxed, unlocked today. Money and the post-purchase
 -- guard are checked by UpgradeService:Buy.
 function MarketService:OnSale(upgrade: Content.Upgrade): boolean
@@ -126,7 +140,7 @@ function MarketService:Refresh(anchor: Instance)
 		interaction:SetPrompt(anchor, package ~= nil and not self:IsBlocked(package.Ingredient))
 	elseif action == UPGRADE_ACTION then
 		const upgrade = self:UpgradeOf(anchor)
-		if upgrade == nil or not self:OnSale(upgrade) then
+		if upgrade == nil or not self:IsKioskOpen() or not self:OnSale(upgrade) then
 			interaction:SetPrompt(anchor, false)
 			return
 		end
@@ -213,8 +227,8 @@ function MarketService:BuyPackage(player: Player, anchor: Instance)
 end
 
 function MarketService:ValidateUpgrade(player: Player, anchor: Instance): boolean
-	if not self:CanAct(player) then
-		return false
+	if not self:CanAct(player) or not self:IsKioskOpen() then
+		return false -- shutter down: silent (the prompt is already off for everyone)
 	end
 	const upgrade = self:UpgradeOf(anchor)
 	if upgrade == nil then
@@ -231,7 +245,7 @@ end
 
 function MarketService:BuyUpgrade(player: Player, anchor: Instance)
 	const upgrade = self:UpgradeOf(anchor)
-	if upgrade == nil then
+	if upgrade == nil or not self:IsKioskOpen() then
 		return
 	end
 	self.Dependencies.UpgradeService:Buy(upgrade.Key, player)
@@ -273,11 +287,13 @@ MarketService:OnStart(function(self)
 		return
 	end
 
-	-- Day, vehicle and levels drive every Mart prompt: one effect re-reads them (purchase, restore, unlock day, swap).
+	-- Day, vehicle, levels and phase (Gear Stand shutter) drive every Mart prompt: one effect re-reads them
+	-- (purchase, restore, unlock day, swap, turn change).
 	const round = self.Dependencies.RoundService
 	const upgrades = self.Dependencies.UpgradeService
 	self.Libs.Charm.effect(function()
 		round:GetDay()
+		round:GetPhase()
 		upgrades:GetVehicle()
 		upgrades:Capture()
 		self:RefreshAll()

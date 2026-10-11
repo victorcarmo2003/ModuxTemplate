@@ -1,0 +1,53 @@
+{
+ "Pedestal_B1": [
+  10.0,
+  0.0,
+  1.125
+ ],
+ "Pedestal_B2": [
+  7.0,
+  0.0,
+  1.125
+ ],
+ "Pedestal_B3": [
+  4.0,
+  0.0,
+  1.125
+ ],
+ "Pedestal_B4": [
+  -4.0,
+  0.0,
+  1.125
+ ],
+ "Pedestal_B5": [
+  -7.0,
+  0.0,
+  1.125
+ ],
+ "Pedestal_S1": [
+  -10.0,
+  0.0,
+  1.125
+ ],
+ "Opal_Stand": [
+  -0.0,
+  0.0,
+  -1.375
+ ],
+ "Neon_Upgrades": [
+  -0.0,
+  9.75,
+  3.175
+ ],
+ "NamePlate_L": [
+  10.5,
+  9.75,
+  3.165
+ ],
+ "NamePlate_R": [
+  -10.5,
+  9.75,
+  3.165
+ ],
+ "_frame": "model-local Roblox axes, origin = bbox base centre"
+}

@@ -15,10 +15,18 @@
 	    last line. One balloon per visit, at most one every 90 s (NPC-020). The balloon is local, so only the player
 	    who entered sees it.
 
-	Zero network: no Net, no set, no packet. Reads RoundController sources only (IsNight, Night: TASK-055).
+	Mart v2 (TASK-141; Q-175 A Provisional): Opal stands behind the short counter in the middle of the Gear Stand and
+	still sells nothing (no prompt). Spawn point, first found: Attachment/Part `Att_Opal` inside the Gear Stand model
+	(searched in the Model ancestors of the `GearPedestal` instances, TASK-137 fitting; its front = LookVector),
+	else MapPoint OP-1 (moved to the counter by TASK-138). No position constant lives here. No balloon while the
+	kiosk shutter is down (Content.Mart.KioskClosedPhases: door C in front of her is closed); a visit only counts
+	with the shutter up. The optional purchase line (pool "Purchase", TASK-142) is not wired: the pool does not exist.
+
+	Zero network: no Net, no set, no packet. Reads RoundController sources only (IsNight, Night, Phase: TASK-055).
 	Outside the NPC cap of 12 (DEC-191: no server rig at all) and never an anomaly nor an anomaly anchor: there is
 	no hook here for AnomalyController, on purpose.
 ]]
+local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
@@ -33,6 +41,12 @@ local SpeechBalloon = require(StarterPlayer.StarterPlayerScripts.client.Interfac
 type OpalPool = Content.OpalPool
 
 const POINT_ID = "OP-1"
+const COUNTER_FITTING = "Att_Opal" -- Gear Stand counter (TASK-137), preferred over OP-1
+const KIOSK_SEARCH_DEPTH = 4 -- Model ancestors of a pedestal searched for the fitting
+const KIOSK_CLOSED: { [string]: boolean } = {}
+for _, phase in Content.Mart.KioskClosedPhases do
+	KIOSK_CLOSED[phase] = true
+end
 const SPECIES = "owl" -- DEC-203
 -- PROVISIONAL (AST-057 sheet is Rascunho): no Opal outfit in the kit yet (Mart vest, green cardigan, glasses on a
 -- chain); a civil outfit without the crew cap stands in until the art-director's sheet ships.
@@ -135,10 +149,23 @@ function OpalController:Speak()
 	end)
 end
 
--- Visit tracking: entering the radius is a visit; one balloon per visit, respecting the cooldown.
+-- Kiosk shutter down (door C in front of the counter): no balloon (FEAT-015 v2, Q-176 A).
+function OpalController:KioskClosed(): boolean
+	return KIOSK_CLOSED[Vide.untrack(self.Dependencies.RoundController.Phase)] == true
+end
+
+-- Visit tracking: entering the radius is a visit; one balloon per visit, respecting the cooldown. With the shutter
+-- down nobody is "inside": the visit starts when it goes up.
 function OpalController:Check()
 	const origin = self.Origin
 	if origin == nil then
+		return
+	end
+	if self:KioskClosed() then
+		self.Inside = false
+		if Vide.untrack(self.Talking) then
+			self.Talking(false)
+		end
 		return
 	end
 	const character = Players.LocalPlayer.Character
@@ -221,6 +248,31 @@ function OpalController:Mount(point: CFrame)
 	self.Origin = point.Position
 end
 
+-- Counter fitting `Att_Opal` in the Gear Stand (Model ancestors of a GearPedestal), as a CFrame facing its front.
+local function counterPoint(): CFrame?
+	for _, pedestal in CollectionService:GetTagged(Content.Mart.Tags.Pedestal) do
+		if not pedestal:IsDescendantOf(Workspace) then
+			continue
+		end
+		local node: Instance? = pedestal.Parent
+		local depth = 0
+		while node ~= nil and node ~= Workspace and depth < KIOSK_SEARCH_DEPTH do
+			if node:IsA("Model") then
+				const fitting = node:FindFirstChild(COUNTER_FITTING, true)
+				if fitting and fitting:IsA("Attachment") then
+					const cf = fitting.WorldCFrame
+					return CFrame.lookAt(cf.Position, cf.Position + cf.LookVector * Vector3.new(1, 0, 1))
+				elseif fitting and fitting:IsA("BasePart") then
+					return CFrame.lookAt(fitting.Position, fitting.Position + fitting.CFrame.LookVector * Vector3.new(1, 0, 1))
+				end
+			end
+			node = node.Parent
+			depth += 1
+		end
+	end
+	return nil
+end
+
 OpalController:OnInit(function(self)
 	self:Setup()
 end)
@@ -232,9 +284,9 @@ OpalController:OnStart(function(self)
 			warn("[OpalController] map binding not ready: Opal not placed")
 			return
 		end
-		const point = MapIndex.FindPoint(POINT_ID)
+		const point = counterPoint() or MapIndex.FindPoint(POINT_ID)
 		if point == nil then
-			warn(`[OpalController] MapPoint {POINT_ID} missing: Opal not placed`)
+			warn(`[OpalController] no {COUNTER_FITTING} in the Gear Stand and MapPoint {POINT_ID} missing: Opal not placed`)
 			return
 		end
 		self:Mount(point)

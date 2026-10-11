@@ -4,7 +4,7 @@
 -- Provisional (TASK-037):
 --   * level names are the ui-text.md §3 proposals (Rascunho), Content.Upgrades has only the upgrade name;
 --   * effect lines ("3 spots · 10 s") are written here from the level Effects until ui-text.md has them;
---   * "Maxed" (FEAT-015) instead of "MAX" (ui-text.md §2 / AST-049): the two documents disagree;
+--   * "MAX" on the Gear Stand plate (FEAT-015 v2 table, ui-text.md §2; was "Maxed" on the GEAR WALL card, TASK-140);
 --   * "Day N" under "Out of stock" (FEAT-008 proposal, DEC-180 keeps it Rascunho);
 --   * badge = first letter of the upgrade until the AST-071 renders exist (Q-152).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -23,7 +23,7 @@ const COOLER_SAMPLE = "sausage"
 
 const Labels = {
 	OutOfStock = "Out of stock",
-	Maxed = "Maxed",
+	Maxed = "MAX",
 	TrailerOnly = "Trailer only",
 	NothingSpecial = "Nothing special today",
 }

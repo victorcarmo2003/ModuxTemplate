@@ -23,6 +23,7 @@ export type Public = {
 	CurrentPool: (self: Public) -> OpalPool?,
 	DrawLine: (self: Public, pool: OpalPool) -> string?,
 	Speak: (self: Public) -> (),
+	KioskClosed: (self: Public) -> boolean,
 	Check: (self: Public) -> (),
 	Animate: (self: Public, model: Model) -> (),
 	Mount: (self: Public, point: CFrame) -> (),

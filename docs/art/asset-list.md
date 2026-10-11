@@ -130,11 +130,17 @@ Caminhos dos packs (abreviados nas fichas):
 | AST-096 | Item no chão: marcador, "splat", derramado | vfx | P1 · onda 3 | 2D + código | — | Rascunho |
 | AST-097 | Logo do jogo, ícone e thumbnails | ui | P1 · onda 4 | 2D + render | — | Rascunho |
 | AST-098 | Bancada de feira do canto FRESH PRODUCE (Mart) | market | P1 | Pack + edição (Poly Pizza) | "Market Stand" by Quaternius (CC0) editado: `Assets/models/market/AST-098_ProduceStand.fbx` (468 tris) | Em revisão (modelo pronto; ficha Rascunho até DEC) |
+| AST-103 | Porta de enrolar de ripas de madeira (Gear Stand; avulsa e tripla) | market | P1 | Modelar | — (nenhum pack tem; `asset-sourcing-2026-10-11.md` §6); atlas KitchenPack | Rascunho (modelo entregue 2026-10-11) |
+| AST-104 | Gear Stand: estrutura/fachada do quiosque de upgrades | market | P1 | Modelar + pack | `MM/cash-register.fbx` no balcão; resto modelado no atlas KitchenPack | Rascunho (modelo entregue 2026-10-11) |
+| AST-105 | Pedestal de vitrine do Gear Stand (B1–B5 e S1) | market | P1 | Pack + edição (Poly Pizza) | "Column Round" by Quaternius (CC0), recolor no atlas KitchenPack | Rascunho (modelo entregue 2026-10-11) |
+| AST-106 | Placas de seção do Mart (5: penduradas e de parede, sem texto) | market | P1 | Modelar | — (`asset-sourcing-2026-10-11.md` §5) | Rascunho (modelo entregue 2026-10-11) |
+| AST-107 | Expositor refrigerado aberto de carnes (MEAT & DELI) | market | P1 | Modelar + pack | `KP/food_ingredient_steak.fbx`, `KP/food_ingredient_ham.fbx` dentro; `MM/freezer.fbx` recusado | Rascunho (modelo entregue 2026-10-11) |
 
 Totais: **77 IDs**, **76 fichas ativas** (AST-001 a AST-038 existentes, revistas; AST-039 a AST-075 da 1ª conciliação; AST-076 e AST-077 da 2ª revisão; **AST-077 Obsoleto** por DEC-130).
 Usam pack: **25** (4 direto, 21 com edição). Plataforma R6 + acessórios: **9**. Modelar / 2D / animação do zero: **43**. (DEC-138: AST-017, 018, 019, 024 passaram de Modelar para Pack + edição; antes 21 / 47.) DEC-140: AST-025 passou de Modelar para Pack + edição ("Trashcan" by Kenney via Poly Pizza, fora dos packs de `Assets/`) — usam pack **26** (4 / 22); Modelar **42**.
 **Levantamento pós-onda 1 (art-director, 2026-10-10):** fichas novas **AST-078 a AST-097** (20, todas **Rascunho**) e complementos de onda/dono/orçamento nas fichas antigas ainda abertas. Seção "Levantamento pós-onda 1" no fim do documento. Totais: **97 IDs**, **96 fichas ativas** (AST-077 Obsoleto).
 **2026-10-10 (pedido do usuário):** ficha nova **AST-098** (bancada de feira do Mart, Rascunho) e modelo novo do **AST-042** (telefone de mesa de disco), ambos de Poly Pizza; licenças em `credits.md`. Totais: **98 IDs**, **97 fichas ativas**.
+**2026-10-11 (Mart v2, MAP-01 §18.9):** fichas novas **AST-103 a AST-107** (Rascunho), modelos entregues pelo modeler-3d (Blender headless). Os FBX `AST-099` a `AST-102` em `Assets/import/` (rodada de sourcing do mesmo dia) ainda não têm ficha aqui.
 Mapeamento Kenney/KayKit por ficha (DEC-136, Rascunho): `asset-sourcing.md`. As entradas "→ sourcing:" na coluna "Arquivo de pack" vêm de lá; Origem e Status não mudaram.
 **DEC-137 (2026-10-09):** comida aprovada — AST-001 a AST-011 e AST-061 em **Aprovado**, com o candidato do sourcing como arquivo de origem (fila do `modeler-3d`). Demais fichas seguem Rascunho. `Q-133` (limite de atlases) segue aberta.
 **DEC-138 (2026-10-10):** equipamentos aprovados após o teste em `workspace.__ImportTest_Equip` — AST-014, 015, 017, 018, 019, 024, 040, 041, 049 em **Aprovado** com o candidato KP/MM como origem (partes sem candidato seguem para modelar no estilo). Banqueta `KP/chair_stool` com **assento plano** em todo uso. **AST-012**: candidato fogão KayKit **recusado**; vira **roller grill** modelada (Steel + painel Ketchup, sem marca), Aprovado na direção; silhueta em reescrita pelo art-director; níveis em `Q-134`.
@@ -708,6 +714,49 @@ Planta do Mart: MAP-01 revisão 3 §7.4 (loja 36 × 32; bancada na parede oeste;
 - **Arquivos:** `Assets/blender/market/AST-098_ProduceStand.blend`, `Assets/models/market/AST-098_ProduceStand.fbx`, `Assets/import/market/AST-098_ProduceStand.fbx`; renders `Assets/reference/AST-098_ProduceStand*.png`.
 - **Placement:** `tools/assetplace/MAP-01_placements.luau` (−89,65; 0,4; 35,807; rotY 180), caixotes em (−90,7 / −88,6; 2,91; 35,5). Não verificado no Studio.
 - **Licença:** a referência de sourcing da skill `roblox-asset-pipeline` marca a licença geral da Quaternius como ambígua (página do autor fala em "QAL"); o Poly Pizza publica este modelo como CC0 1.0, e o projeto já usa o "Padlock" da Quaternius pelo mesmo caminho (DEC-155). Confirmar com o usuário se basta a página do Poly Pizza.
+
+
+### AST-103 — Porta de enrolar de ripas de madeira
+
+- **Status:** Rascunho (2026-10-11) · **Prioridade:** P1 · **Origem:** Modelar (nenhum pack tem porta de enrolar) · cor pelo atlas KitchenPack (`restaurantbits_texture.png`).
+- **Uso:** portas do Gear Stand (MAP-01 §18.4/§18.5): sobem em `Prep`…`NightEnd`, descem nas outras fases. Estilo porta de banca de rua: ripas de madeira clara alternando 2 tons, trilhos laterais de aço, caixa do rolo de aço claro com friso Mustard, barra de baixo com pé de aço e puxadores Mustard.
+- **Variantes:** `AST-103_RollerShutter` (avulsa: vão 5, 11 ripas de 0,35; 5,14 L × 4,59 A × 0,8 P; 792 tris) e `AST-103_RollerShutterTriple` (as 3 portas do §18.4 no referencial do Gear Stand: vãos 9,5 / 4 / 9,5, 14 ripas de 0,5, rolos em h 6,95–8,4; 24,14 × 8,4 × 1,1; 2.772 tris).
+- **Partes animáveis (MeshParts separadas):** `Slat_01..Slat_11` (avulsa) e `L_Slat_01..14`, `C_Slat_01..14`, `R_Slat_01..14` (tripla), numeradas **de cima para baixo** (`Slat_01` logo abaixo do rolo; a última é a barra com puxadores). Fixas: `Rail_L`, `Rail_R`, `Roll` (com prefixo `L_`/`C_`/`R_` na tripla). Animação sugerida: cada ripa sobe até o rolo e some (`Transparency`), a de baixo por último.
+- **Posição (tripla):** centro da base do bbox em WORLD (93,7; piso; 20), frente (−Z) para WORLD −X — alinha com o AST-104.
+- **Arquivos:** `Assets/blender/market/AST-103_*.blend`, `Assets/import/market/AST-103_*.fbx`, renders `Assets/reference/AST-103_*.png`; script `tools/blender/mart_v2/build_shutter.py`.
+
+### AST-104 — Gear Stand (estrutura/fachada do quiosque)
+
+- **Status:** Rascunho (2026-10-11) · **Prioridade:** P1 · **Origem:** Modelar no atlas KitchenPack + `MM/cash-register` (Kenney, CC0) no balcão.
+- **Uso:** substitui o AST-049 (GEAR WALL) no fundo do Mart (§18.4). **Sem** portas (AST-103 tripla) e **sem** pedestais (AST-105): modelos próprios no mesmo referencial.
+- **Peças:** testeira Teal 25 × 4 (h 7–11) com campo escuro 16 × 2 e moldura Mustard para o neon **UPGRADES** existente (âncora `Neon_Upgrades`); 2 plaquinhas Cream lisas nas pontas para o nome da bancada (texto por SurfaceGui, TASK-142); cobertura Cream com friso Mustard; 4 postes Cream (0,5 × 0,8 × 7) com pé de aço e capitel Mustard; paredes laterais Teal com cantoneira; grade baixa (h 2,6) nos vãos L/R com rodapé de madeira, montantes e corrimão Mustard; prateleirinhas de fundo com caixas; balcão da Opal 4 × 1,6 × 3,5 (Cream, painéis Teal, tampo de madeira) com caixa registradora, campainha, revista e caneca.
+- **Partes:** `Structure`, `OpalCounter`, `CashRegister` (atlas Mini Market), `Glass_L`, `Glass_R` (vidro: Transparency 0,5 no placement). Colisão: colisores simples (Parts) nos postes, grade e paredes; o jogador não entra.
+- **Dimensões / tris:** 25,9 L × 11,38 A × 6,95 P; 2.643 tris (Structure 1.964).
+- **Posição:** centro da base do bbox em WORLD (96,625; piso; 20), frente (−Z) para WORLD −X. Âncoras (pedestais B1–S1, `Opal_Stand`, `Neon_Upgrades`, `NamePlate_L/R`) em `Assets/import/market/AST-104_GearStand_atts.json`.
+- **Arquivos:** `Assets/blender/market/AST-104_GearStand.blend`, `Assets/import/market/AST-104_GearStand.fbx`, renders `Assets/reference/AST-104_GearStand*.png` (inclui `_Assembled` com portas e pedestais); script `tools/blender/mart_v2/build_gearstand.py`.
+
+### AST-105 — Pedestal de vitrine (Gear Stand)
+
+- **Status:** Rascunho (2026-10-11) · **Prioridade:** P1 · **Origem:** Pack + edição — **"Column Round" by Quaternius**, https://poly.pizza/m/n8ZvVFcJhl, CC0 1.0 (Poly Pizza; mesma ressalva "QAL" do AST-098).
+- **Edição:** topo escalado para 1,6; só o fuste esticado até a altura **3,0** do §18.4 (o pedido falava em ~1,2; com 1,2 a miniatura ficaria abaixo da grade de 2,6); cores de material trocadas por faixas do atlas KitchenPack por altura (base e capitel no acento, fuste Cream), então não precisa de `palette_bake`; colarinho no encontro fuste/capitel.
+- **Variantes:** `AST-105_Pedestal` (B1–B5, acento Teal; 1,52 × 3,06 × 1,6; 536 tris) e `AST-105_PedestalS1` (acento Mustard + `Lamp` com 4 lâmpadas nos cantos, DEC-144; 648 tris).
+- **Partes:** `Body`, `Ring` (anel sobre o topo: material **Neon** no Roblox), `Lamp` (só S1, Neon). Âncoras em `AST-105_Pedestal*_atts.json`: `Mini_Anchor` (h 4,2), `Price_Anchor` (face frontal do capitel), `Prompt_Buy`.
+- **Arquivos:** `Assets/blender/market/AST-105_*.blend`, `Assets/import/market/AST-105_*.fbx`, renders `Assets/reference/AST-105_*.png`; script `tools/blender/mart_v2/build_pedestal.py`.
+
+### AST-106 — Placas de seção do Mart
+
+- **Status:** Rascunho (2026-10-11) · **Prioridade:** P1 · **Origem:** Modelar (atlas KitchenPack). Sem texto modelado (style guide §1.1): texto e ícone AST-071 por SurfaceGui nas peças `Face_Front`/`Face_Back`.
+- **Penduradas** (placa 4 × 1,2 × 0,3, moldura colorida, painel Cream dos dois lados, 2 olhais e 2 hastes de aço `Rod_L`/`Rod_R` — cilindros simples: ajustar `Size.Y` no Roblox se o teto mudar): `AST-106_SignBakery` (Bun, h 8), `AST-106_SignProduce` (Mint, h 8), `AST-106_SignMeatDeli` (Ketchup, h 8,5), `AST-106_SignSaucesSnacks` (frente Mustard "SAUCES", verso Coffee "SNACKS · COFFEE", h 9). 344 tris cada; hastes cortadas para teto a 12 sobre o piso (3,27 / 3,27 / 2,77 / 2,27). Base do modelo = borda de baixo da placa.
+- **De parede:** `AST-106_WallSignDairy` (Teal, 6 × 1,4, 2 espaçadores; 144 tris).
+- **Arquivos:** `Assets/blender/market/AST-106_*.blend`, `Assets/import/market/AST-106_*.fbx`, renders `Assets/reference/AST-106_*.png`; âncoras `Text_Front`/`Text_Back` em `AST-106_*_atts.json`; script `tools/blender/mart_v2/build_signs.py`.
+
+### AST-107 — Expositor refrigerado aberto de carnes (MEAT & DELI)
+
+- **Status:** Rascunho (2026-10-11) · **Prioridade:** P1 · **Origem:** Modelar (atlas KitchenPack) + `KP/food_ingredient_steak`, `KP/food_ingredient_ham` dentro. Responde a P61 do MAP-01: `MM/freezer.fbx` **não serve** (baú fechado com tampas de vidro; em 4,5 de largura teria 2,0 de altura e esconde o produto).
+- **Forma:** ilha baixa aberta 4,62 L × 2,85 A × 3,12 P (borda incluída): corpo esmaltado branco, faixa Ketchup, filete Teal, rodapé escuro, borda de aço, divisória no meio, fundo "gelo", trilhos Cream de etiqueta de preço nas duas faces. Metade com 2 bandejas de salsichas cruas, metade com bacon + bife + pernil. A ilha do §18.2 (9 × 3) = **2 unidades** lado a lado.
+- **Partes:** `Case`, `Food`. Âncoras `Prompt_Buy_Sausages`/`Prompt_Buy_Bacon` (h 3,6) em `AST-107_MeatCase_atts.json`. Alcançável dos dois corredores (frente e verso iguais).
+- **Tris:** 1.946 (Case 814, Food 1.132) — acima do alvo de prop médio; se pesar, a comida vira uma malha só de bandejas simples.
+- **Arquivos:** `Assets/blender/market/AST-107_MeatCase.blend`, `Assets/import/market/AST-107_MeatCase.fbx`, renders `Assets/reference/AST-107_MeatCase*.png`; script `tools/blender/mart_v2/build_meatcase.py`.
 
 ---
 

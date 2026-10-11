@@ -1,0 +1,12 @@
+{
+ "Prompt_Buy_Sausages": [
+  1.05,
+  3.6,
+  0.0
+ ],
+ "Prompt_Buy_Bacon": [
+  -1.05,
+  3.6,
+  0.0
+ ]
+}

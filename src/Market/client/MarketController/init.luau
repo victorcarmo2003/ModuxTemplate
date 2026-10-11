@@ -16,10 +16,22 @@
 	Network: listeners on the Economy, Stock and Upgrades sets are registered in OnInit (README, network.md rule 7).
 
 	Sound and VFX (TASK-079; sound-list §5.5; AST-092): an upgrade level going up by one on the same vehicle (and not
-	right after a vehicle swap, which rewrites the levels) plays SFX-064 `buy` on its GEAR WALL card and SFX-065
-	`upgrade_done` + 14 confetti on the vehicle in use (heard at the Pad, FEAT-015). Decided SETTLE s after the record,
-	so a swap whose Shift.Vehicle lands after the Upgrades records stays silent. Package buys have no event here
-	(the Tool arrives through ItemController): SFX-061 is not played by this controller.
+	right after a vehicle swap, which rewrites the levels) is a purchase: the pedestal celebrates at once (see Gear
+	Stand) and, SETTLE s after the record, SFX-065 `upgrade_done` + 14 confetti play on the vehicle in use (heard at
+	the Pad, FEAT-015), so a swap whose Shift.Vehicle lands after the Upgrades records stays silent. Package buys have
+	no event here (the Tool arrives through ItemController): SFX-061 is not played by this controller.
+
+	Gear Stand (Mart v2, TASK-140; FEAT-015 v2; MAP-01 §18.4; Q-176 A Provisional), zero network of its own:
+	  * shutters (Kiosk.luau): down in Content.Mart.KioskClosedPhases, up in every other phase of the Shift set
+	    (RoundController.Phase). Animated with Mart.Door times and the L -> C -> R stagger; the first record (late
+	    joiner) snaps to the final state. Without GearShutter models a test shutter is generated (1 warning);
+	  * miniatures (Minis.luau) over the pedestals: the piece of the NEXT level on the current vehicle ("Sale", bob +
+	    spin), the current level when maxed (still), the first trailer level at 50% for "Trailer only" (still), none
+	    on the empty S1. Frozen with the camera beyond Mart.Mini.ActiveRadius or the shutter down;
+	  * price plate = BenchCard in Plate mode hung under `Price_Anchor_<Slot>` (pedestal first, then the prompt owner,
+	    then the prompt anchor), hidden while the shutter is down;
+	  * purchase: the old miniature spins and pops, 14 confetti + SFX-064 `buy` at the pedestal, the next one rises.
+	    Shutter SFX keys `kiosk_shutter_down` / `kiosk_shutter_up` play once they exist in Content.Sounds.
 ]]
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -30,7 +42,10 @@ local Content = require(ReplicatedStorage.shared.Content)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local BenchCard = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.BenchCard)
 local ShelfTag = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.ShelfTag)
+local Kiosk = require(script.Kiosk)
 local Labels = require(script.Labels)
+local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
+local Minis = require(script.Minis)
 -- shared VFX budget (AST-092 ceiling counts the whole screen)
 local Fx = require(StarterPlayer.StarterPlayerScripts.client.Kitchen.KitchenController.Fx)
 
@@ -40,17 +55,25 @@ const SPECIAL_SLOT = "S1"
 -- Shelf tag sits under the prompt pill, which is drawn at the anchor itself (Provisional, MAP-01 §7.4).
 const SHELF_OFFSET = Vector3.new(0, -1.3, 0)
 const SHELF_DISTANCE = 30
--- Card bottom 0.6 stud above its anchor so it never covers the prompt pill (Provisional until the AST-049 fittings
--- are checked in the place).
-const CARD_OFFSET = Vector3.new(0, 3.4 / 2 + 0.6, 0)
--- Readable from the Mart door (~36 studs to S1, AST-049 "Leitura").
-const BENCH_DISTANCE = 45
 const VEHICLE_TAG = "Vehicle"
 const VEHICLE_ATTRIBUTE = "Vehicle"
 const SETTLE = 0.5 -- s before an upgrade sound is decided (swap guard)
 const SWAP_GUARD = 2 -- s: level changes this close to a vehicle swap are the swap, not a purchase
 const CONFETTI = 14 -- AST-092 upgrade Emit(14)
 const NEVER = -1e9 -- SwappedAt before any swap
+const MART = Content.Mart
+const TICK_RATE = 60 -- Hz: shutters and miniatures move every frame while visible
+const RELOCATE_EVERY = 2 -- s between two re-reads of the pedestal positions (streaming)
+const MAP_WAIT = 60 -- s MapIndex.WaitReady may wait before the fallback shutters are generated
+-- Plate (BenchCard Plate mode, 1.9 high) hangs under its anchor; without Price_Anchor it goes under the prompt pill.
+const PLATE_UNDER_FITTING = Vector3.new(0, -1.9 / 2, 0)
+const PLATE_UNDER_PROMPT = Vector3.new(0, -(1.9 / 2 + 0.9), 0)
+const DOOR_DOWN_SFX = "kiosk_shutter_down"
+const DOOR_UP_SFX = "kiosk_shutter_up"
+const KIOSK_CLOSED: { [string]: boolean } = {}
+for _, phase in MART.KioskClosedPhases do
+	KIOSK_CLOSED[phase] = true
+end
 
 export type View = {
 	Visible: boolean,
@@ -95,6 +118,14 @@ function MarketController:Setup()
 	self.LastLevel = {} :: { [string]: number }
 	self.SwappedAt = NEVER :: number
 	self.Unmount = nil :: (() -> ())?
+	-- Gear Stand
+	self.KioskOpen = Vide.source(true) :: Vide.Source<boolean>
+	self.KioskSynced = false :: boolean -- first Shift record applied (later changes animate)
+	self.Kiosk = Kiosk.new() :: Kiosk.Kiosk
+	self.Minis = Minis.new() :: Minis.Minis
+	self.Pedestals = {} :: { [string]: Instance }
+	self.LastStep = os.clock() :: number
+	self.LastRelocate = 0 :: number
 end
 
 -- Bench anchor of a GEAR WALL position (B1..B5), nil when not mounted (streamed out)
@@ -124,7 +155,22 @@ function MarketController:Cue(key: string, at: Instance)
 	end
 end
 
--- Upgrade level change: +1 on the same vehicle, away from a swap = a purchase (presentation only).
+-- Pedestal celebration of a purchase (FEAT-015 v2 "Feedback da compra" 2): pop on the next miniature change,
+-- SFX-064 `buy` and confetti at the miniature.
+function MarketController:Celebrate(slot: string)
+	self.Minis:Celebrate(slot)
+	const at, host = self.Minis:Where(slot)
+	if at then
+		Fx.Burst(at, "Confetti", MART.Purchase.Confetti)
+	end
+	const where = host or self:BenchAnchor(slot)
+	if where then
+		self:Cue("buy", where)
+	end
+end
+
+-- Upgrade level change: +1 on the same vehicle, away from a swap = a purchase (presentation only). Called BEFORE the
+-- level source is written, so the pedestal knows the miniature change is a purchase.
 function MarketController:OnLevel(upgrade: Content.Upgrade, level: number)
 	const previous = self.LastLevel[upgrade.Key] or UNKNOWN_LEVEL
 	self.LastLevel[upgrade.Key] = level
@@ -134,13 +180,12 @@ function MarketController:OnLevel(upgrade: Content.Upgrade, level: number)
 	const round = self.Dependencies.RoundController
 	const vehicle = Vide.untrack(round.Vehicle)
 	const at = os.clock()
+	if at - self.SwappedAt >= SWAP_GUARD then
+		self:Celebrate(upgrade.BenchSpot)
+	end
 	task.delay(SETTLE, function()
 		if Vide.untrack(round.Vehicle) ~= vehicle or at - self.SwappedAt < SWAP_GUARD then
 			return
-		end
-		const bench = self:BenchAnchor(upgrade.BenchSpot)
-		if bench then
-			self:Cue("buy", bench)
 		end
 		const model = self:CurrentVehicle()
 		if model then
@@ -226,15 +271,55 @@ function MarketController:BenchView(upgrade: Content.Upgrade, vehicle: string, l
 	}
 end
 
--- `Price_Anchor_<Slot>` inside the anchor's owner (nearest Model ancestor, architecture.md §18.3/§18.4); the prompt
--- anchor itself when the fitting is missing (bind_map01 logs it as a warning).
-function MarketController:CardAdornee(anchor: Instance, slot: string): Instance
-	const owner = anchor:FindFirstAncestorWhichIsA("Model")
-	const fitting = if owner then owner:FindFirstChild("Price_Anchor_" .. slot, true) else nil
+-- Miniature target of a fixed position (B1..B5): next level on sale, current level when maxed, first level of the
+-- home vehicle for "Trailer only", nothing until the level is known (FEAT-015 v2 table).
+function MarketController:MiniTarget(upgrade: Content.Upgrade, vehicle: string, level: number): Minis.Target
+	const badge = Labels.Badge(upgrade)
+	if not table.find(upgrade.Vehicles, vehicle) then
+		const home = upgrade.Vehicles[1]
+		const rows = (if home then upgrade.Levels[home] else nil) or {}
+		for _, row in rows do
+			if row.Level > upgrade.StartLevel then
+				return { State = "Locked", Part = row.Part, Vehicle = home, Badge = badge }
+			end
+		end
+		return { State = "Locked", Part = "", Vehicle = vehicle, Badge = badge }
+	end
+	if level == UNKNOWN_LEVEL then
+		return { State = "Hidden", Part = "", Vehicle = vehicle, Badge = badge }
+	end
+	local current: Content.UpgradeLevel? = nil
+	local nextRow: Content.UpgradeLevel? = nil
+	for _, row in upgrade.Levels[vehicle] or {} do
+		if row.Level == level then
+			current = row
+		elseif row.Level == level + 1 then
+			nextRow = row
+		end
+	end
+	if nextRow then
+		return { State = "Sale", Part = nextRow.Part, Vehicle = vehicle, Badge = badge }
+	end
+	return { State = "Maxed", Part = if current then current.Part else "", Vehicle = vehicle, Badge = badge }
+end
+
+-- Plate fitting of a slot: `Price_Anchor_<Slot>` (or `Price_Anchor`) inside the GearPedestal, else
+-- `Price_Anchor_<Slot>` inside the anchor's owner (nearest Model ancestor, architecture.md §18.3/§18.4). nil = none
+-- (the plate hangs under the prompt anchor).
+function MarketController:PlateFitting(anchor: Instance, slot: string): Instance?
+	const pedestal = self.Pedestals[slot]
+	local fitting: Instance? = nil
+	if pedestal then
+		fitting = pedestal:FindFirstChild("Price_Anchor_" .. slot, true) or pedestal:FindFirstChild("Price_Anchor", true)
+	end
+	if fitting == nil then
+		const owner = anchor:FindFirstAncestorWhichIsA("Model")
+		fitting = if owner then owner:FindFirstChild("Price_Anchor_" .. slot, true) else nil
+	end
 	if fitting and (fitting:IsA("Attachment") or fitting:IsA("BasePart")) then
 		return fitting
 	end
-	return anchor
+	return nil
 end
 
 function MarketController:MountShelf(anchor: Instance, packageKey: string): Mounted?
@@ -276,16 +361,20 @@ function MarketController:MountShelf(anchor: Instance, packageKey: string): Moun
 end
 
 function MarketController:MountBench(anchor: Instance, slot: string): Mounted?
-	const adornee = self:CardAdornee(anchor, slot)
+	const fitting = self:PlateFitting(anchor, slot)
+	const adornee = fitting or anchor
+	const offset = if fitting then PLATE_UNDER_FITTING else PLATE_UNDER_PROMPT
+	const open = self.KioskOpen
 
 	if slot == SPECIAL_SLOT then
 		-- Wave 1: no Bench set, the special slot is always empty (FEAT-015, Q-120; draw in wave 4, FEAT-035).
 		const unmount, gui = Vide.root(function()
 			return BenchCard({
 				Name = "BenchCard_" .. slot,
+				Plate = true,
 				Adornee = adornee,
 				Visible = function()
-					return true
+					return open()
 				end,
 				Mode = function(): BenchCard.Mode
 					return "Empty"
@@ -308,8 +397,8 @@ function MarketController:MountBench(anchor: Instance, slot: string): Mounted?
 				Special = function()
 					return true
 				end,
-				StudsOffset = CARD_OFFSET,
-				MaxDistance = BENCH_DISTANCE,
+				StudsOffset = offset,
+				MaxDistance = MART.Plate.Distance,
 			})
 		end)
 		return { Gui = gui, Unmount = unmount }
@@ -330,9 +419,10 @@ function MarketController:MountBench(anchor: Instance, slot: string): Mounted?
 		end)
 		return BenchCard({
 			Name = "BenchCard_" .. slot,
+			Plate = true,
 			Adornee = adornee,
 			Visible = function()
-				return view().Visible
+				return view().Visible and open()
 			end,
 			Mode = function()
 				return view().Mode
@@ -353,11 +443,154 @@ function MarketController:MountBench(anchor: Instance, slot: string): Mounted?
 			Tag = function()
 				return view().Tag
 			end,
-			StudsOffset = CARD_OFFSET,
-			MaxDistance = BENCH_DISTANCE,
+			StudsOffset = offset,
+			MaxDistance = MART.Plate.Distance,
 		})
 	end)
 	return { Gui = gui, Unmount = unmount }
+end
+
+-- Gear Stand ------------------------------------------------------------------------------------------------------
+
+-- Prompt anchor of a slot, mounted or not (Interactable + BenchSlot in the Workspace).
+function MarketController:SlotAnchor(slot: string): Instance?
+	const mounted = self:BenchAnchor(slot)
+	if mounted then
+		return mounted
+	end
+	for _, anchor in CollectionService:GetTagged(TAG) do
+		if anchor:GetAttribute("BenchSlot") == slot and anchor:IsDescendantOf(workspace) then
+			return anchor
+		end
+	end
+	return nil
+end
+
+-- Re-binds the miniature of a slot to its pedestal / prompt anchor and re-hangs the plate (the pedestal may carry
+-- the Price_Anchor that the plate was missing).
+function MarketController:Rebind(slot: string)
+	const anchor = self:SlotAnchor(slot)
+	self.Minis:Bind(slot, self.Pedestals[slot], anchor)
+	if anchor and self.Mounted[anchor] then
+		self:Remove(anchor)
+		self:Add(anchor)
+	end
+end
+
+function MarketController:AddPedestal(pedestal: Instance)
+	const slot = pedestal:GetAttribute(MART.Tags.Slot)
+	if typeof(slot) ~= "string" or self.Minis.Slots[slot] == nil then
+		warn(`[MarketController] GearPedestal {pedestal:GetFullName()}: Slot "{tostring(slot)}" is not a Content.Mart pedestal`)
+		return
+	end
+	if not pedestal:IsDescendantOf(workspace) or self.Pedestals[slot] == pedestal then
+		return
+	end
+	self.Pedestals[slot] = pedestal
+	self:Rebind(slot)
+end
+
+function MarketController:RemovePedestal(pedestal: Instance)
+	for slot, current in self.Pedestals do
+		if current == pedestal then
+			self.Pedestals[slot] = nil
+			self:Rebind(slot)
+		end
+	end
+end
+
+-- Shutter state from the Shift phase; the first record snaps, later changes animate (with the shutter SFX).
+function MarketController:ApplyPhase(phase: string, ready: boolean)
+	const open = not KIOSK_CLOSED[phase]
+	const animate = self.KioskSynced
+	const changed = Vide.untrack(self.KioskOpen) ~= open
+	self.KioskSynced = ready
+	self.KioskOpen(open)
+	self.Kiosk:Set(open, animate)
+	if animate and changed then
+		const _, host = self.Minis:Where(MART.Pedestals[1].Slot)
+		if host then
+			self:Cue(if open then DOOR_UP_SFX else DOOR_DOWN_SFX, host)
+		end
+	end
+end
+
+-- One Vide effect per pedestal (inside the OnStart root): its miniature target follows the vehicle and the level.
+-- S1 is always empty until the FEAT-035 special set exists (wave 4).
+function MarketController:WatchMinis()
+	const round = self.Dependencies.RoundController
+	for _, row in MART.Pedestals do
+		const slot = row.Slot
+		const upgrade = if row.Offer == "Upgrade" then self:UpgradeAt(slot) else nil
+		if upgrade == nil then
+			self.Minis:Set(slot, { State = "Empty", Part = "", Vehicle = "", Badge = "" })
+			continue
+		end
+		const level = self.Levels[upgrade.Key]
+		Vide.effect(function()
+			const target = self:MiniTarget(upgrade, round.Vehicle(), level())
+			Vide.untrack(function()
+				self.Minis:Set(slot, target)
+				return nil
+			end)
+		end)
+	end
+end
+
+function MarketController:WatchKiosk()
+	const pedestalTag = MART.Tags.Pedestal
+	CollectionService:GetInstanceAddedSignal(pedestalTag):Connect(function(pedestal)
+		self:AddPedestal(pedestal)
+	end)
+	CollectionService:GetInstanceRemovedSignal(pedestalTag):Connect(function(pedestal)
+		self:RemovePedestal(pedestal)
+	end)
+	for _, pedestal in CollectionService:GetTagged(pedestalTag) do
+		self:AddPedestal(pedestal)
+	end
+
+	const shutterTag = MART.Tags.Shutter
+	CollectionService:GetInstanceAddedSignal(shutterTag):Connect(function(model)
+		self.Kiosk:Add(model)
+	end)
+	CollectionService:GetInstanceRemovedSignal(shutterTag):Connect(function(model)
+		self.Kiosk:Remove(model)
+	end)
+	for _, model in Kiosk.Tagged() do
+		self.Kiosk:Add(model)
+	end
+
+	for _, row in MART.Pedestals do
+		self:Rebind(row.Slot)
+	end
+
+	-- The map streams in after boot: fallback shutters only once the binding is ready.
+	if MapIndex.WaitReady(MAP_WAIT) then
+		const anchors: { [string]: Instance } = {}
+		for _, row in MART.Pedestals do
+			const anchor = self:SlotAnchor(row.Slot)
+			if anchor then
+				anchors[row.Slot] = anchor
+			end
+			self:Rebind(row.Slot)
+		end
+		self.Kiosk:Fallback(anchors)
+	end
+end
+
+function MarketController:Step()
+	const now = os.clock()
+	const dt = math.min(now - self.LastStep, 0.25)
+	self.LastStep = now
+	if now - self.LastRelocate >= RELOCATE_EVERY then
+		self.LastRelocate = now
+		self.Minis:Relocate()
+	end
+	self.Kiosk:Step(now)
+	const camera = workspace.CurrentCamera
+	if camera then
+		self.Minis:Step(now, dt, camera.CFrame.Position, Vide.untrack(self.KioskOpen))
+	end
 end
 
 function MarketController:Add(anchor: Instance)
@@ -372,6 +605,8 @@ function MarketController:Add(anchor: Instance)
 		mounted = self:MountShelf(anchor, package)
 	elseif typeof(slot) == "string" and slot ~= "" then
 		mounted = self:MountBench(anchor, slot)
+		-- the miniature falls back to the prompt anchor when the slot has no pedestal
+		self.Minis:Bind(slot, self.Pedestals[slot], anchor)
 	end
 	if mounted then
 		mounted.Gui.Parent = gui
@@ -426,8 +661,9 @@ MarketController:OnInit(function(self)
 	const applyLevel = function(id: number, record: { Level: number })
 		const upgrade = Content.Upgrades.List[id]
 		if upgrade then
-			self.Levels[upgrade.Key](record.Level)
+			-- OnLevel first: a purchase must be marked before the miniature target changes
 			self:OnLevel(upgrade, record.Level)
+			self.Levels[upgrade.Key](record.Level)
 		end
 	end
 	net.Upgrades:onAdded(applyLevel)
@@ -469,11 +705,26 @@ MarketController:OnStart(function(self)
 			end
 			self.SwappedAt = os.clock()
 		end)
+		-- Gear Stand shutter follows the Shift phase (snap until the first record, animate afterwards)
+		Vide.effect(function()
+			const phase = round.Phase()
+			const ready = round.Ready()
+			Vide.untrack(function()
+				self:ApplyPhase(phase, ready)
+				return nil
+			end)
+		end)
+		self:WatchMinis()
 	end)
 	-- PlayerGui may arrive a frame late; do not hold up the other OnStart.
 	task.spawn(function()
 		self:Watch(Players.LocalPlayer:WaitForChild("PlayerGui"))
+		self:WatchKiosk()
 	end)
 end)
+
+MarketController:OnTick(function(self)
+	self:Step()
+end, TICK_RATE)
 
 return MarketController

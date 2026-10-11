@@ -1,6 +1,7 @@
 --!strict
 -- The card is a BillboardGui, so it is previewed in the 3D viewport: a temporary wall part 5 studs in front of the
 -- Studio camera (removed when the story closes). Every mode of a GEAR WALL position is driven by the controls.
+-- Left: the GEAR WALL card; right: the Gear Stand plate (`Plate = true`, Mart v2, TASK-140), same controls.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -38,41 +39,45 @@ return UILabs.CreateVideStory({
 		return controls.Mode() :: BenchCard.Mode
 	end
 
-	const billboard = BenchCard({
-		Adornee = anchor,
-		Visible = function()
-			return true
-		end,
-		Mode = mode,
-		Icon = function()
-			return controls.Icon()
-		end,
-		Badge = function()
-			return "G"
-		end,
-		Title = function()
-			return if mode() == "Locked" then "Trailer Lights" else controls.Title()
-		end,
-		Detail = function()
-			return controls.Detail()
-		end,
-		Tag = function()
-			const m = mode()
-			if m == "Maxed" then
-				return "Maxed"
-			elseif m == "Locked" then
-				return "Trailer only"
-			elseif m == "Empty" then
-				return "Nothing special today"
-			end
-			return `${controls.Price()}`
-		end,
-		Special = function()
-			return controls.Special()
-		end,
-		StudsOffset = Vector3.new(0, 1.9, 0),
-	})
-	billboard.Parent = anchor
+	local function card(plate: boolean, offset: Vector3): BillboardGui
+		return BenchCard({
+			Plate = plate,
+			Adornee = anchor,
+			Visible = function()
+				return true
+			end,
+			Mode = mode,
+			Icon = function()
+				return controls.Icon()
+			end,
+			Badge = function()
+				return "G"
+			end,
+			Title = function()
+				return if mode() == "Locked" then "Trailer Lights" else controls.Title()
+			end,
+			Detail = function()
+				return controls.Detail()
+			end,
+			Tag = function()
+				const m = mode()
+				if m == "Maxed" then
+					return "MAX"
+				elseif m == "Locked" then
+					return "Trailer only"
+				elseif m == "Empty" then
+					return "Nothing special today"
+				end
+				return `${controls.Price()}`
+			end,
+			Special = function()
+				return controls.Special()
+			end,
+			StudsOffset = offset,
+		})
+	end
+	card(false, Vector3.new(-1.6, 1.9, 0)).Parent = anchor
+	card(true, Vector3.new(1.6, 1.2, 0)).Parent = anchor
 
 	return create("TextLabel")({
 		AnchorPoint = Vector2.new(0.5, 0),

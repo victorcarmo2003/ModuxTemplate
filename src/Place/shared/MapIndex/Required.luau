@@ -31,6 +31,18 @@ export type TaggedIds = { Tag: string, Attribute: string, Ids: { string } }
 
 export type Route = { From: string, To: string, Name: string }
 
+-- Mart v2 Gear Stand (TASK-135; MAP-01 §18.4, §18.8). Soft rule: MapIndex.KioskNotes reports it as warnings, never
+-- as a binding error, so the place keeps running while TASK-138 builds the kiosk (the client has fallbacks).
+export type KioskRule = {
+	PedestalTag: string, -- Content.Mart.Tags.Pedestal
+	ShutterTag: string, -- Content.Mart.Tags.Shutter
+	SlotAttribute: string, -- Content.Mart.Tags.Slot
+	Pedestals: { string }, -- BenchSlot of every pedestal (Content.Mart.Pedestals)
+	Shutters: { string }, -- Content.Mart.Doors[].Key
+	OpalPoint: string, -- MapPoint of Opal's counter (Q-175 A)
+	OpalFacing: Vector3, -- WORLD direction OP-1 must face (MAP east = world -X, MAP-01 §18.4)
+}
+
 export type List = {
 	Wave: number,
 	Tags: { string }, -- tags that must exist in the Workspace (§18.1, §19.22)
@@ -51,6 +63,7 @@ export type List = {
 	Roads: { Rect }, -- carriageways an edge may only cross on a crosswalk edge
 	Crosswalks: { [string]: Rect }, -- Crosswalk attribute value -> stripes
 	Routes: { Route }, -- blockout routes that must have a path (§18.6)
+	Kiosk: KioskRule, -- soft (warnings only), see KioskRule
 }
 
 -- Grill anchors: one grill_collect per roller slot at the highest level of the vehicle (DEC-201: 4 on L3).
@@ -83,6 +96,27 @@ local function bench(): { [string]: string }
 		out[upgrade.BenchSpot] = "bench_buy_upgrade"
 	end
 	return out
+end
+
+-- Gear Stand (Mart v2): pedestal slots and shutter keys come from Content.Mart.
+local function kiosk(): KioskRule
+	const pedestals: { string } = {}
+	for _, row in Content.Mart.Pedestals do
+		table.insert(pedestals, row.Slot)
+	end
+	const shutters: { string } = {}
+	for _, door in Content.Mart.Doors do
+		table.insert(shutters, door.Key)
+	end
+	return {
+		PedestalTag = Content.Mart.Tags.Pedestal,
+		ShutterTag = Content.Mart.Tags.Shutter,
+		SlotAttribute = Content.Mart.Tags.Slot,
+		Pedestals = pedestals,
+		Shutters = shutters,
+		OpalPoint = "OP-1",
+		OpalFacing = Vector3.new(-1, 0, 0),
+	}
 end
 
 -- LightZone ids from Content.LightGroups (one source for the zone list).
@@ -160,6 +194,7 @@ local function base(wave: number): List
 		Roads = ROADS,
 		Crosswalks = CROSSWALKS,
 		Routes = WAVE1_ROUTES,
+		Kiosk = kiosk(),
 	}
 end
 

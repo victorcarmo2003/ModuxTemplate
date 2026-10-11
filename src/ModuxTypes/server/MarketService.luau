@@ -10,6 +10,7 @@ export type Public = {
 	IsBlocked: (self: Public, ingredientKey: string) -> boolean,
 	PackageOf: (self: Public, anchor: Instance) -> Content.Package?,
 	UpgradeOf: (self: Public, anchor: Instance) -> Content.Upgrade?,
+	IsKioskOpen: (self: Public) -> boolean,
 	OnSale: (self: Public, upgrade: Content.Upgrade) -> boolean,
 	UpgradeText: (self: Public, upgrade: Content.Upgrade, row: Content.UpgradeLevel) -> string,
 	Refresh: (self: Public, anchor: Instance) -> (),

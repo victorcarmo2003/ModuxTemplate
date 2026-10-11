@@ -15,6 +15,7 @@ local Hallucinations = require(script.Parent.Hallucinations)
 local Ingredients = require(script.Parent.Ingredients)
 local Items = require(script.Parent.Items)
 local LightGroups = require(script.Parent.LightGroups)
+local Mart = require(script.Parent.Mart)
 local Moods = require(script.Parent.Moods)
 local Nights = require(script.Parent.Nights)
 local Notices = require(script.Parent.Notices)
@@ -1308,6 +1309,94 @@ local function checkWalkPaths()
 	end
 end
 
+-- Mart v2 (TASK-135): closed phases exist in Shift; pedestals = every Upgrades.BenchSpot once + the special slot;
+-- every pedestal behind at most one door; timings and sizes positive.
+local function checkMart()
+	const phases = setOf(Shift.PhaseKeys)
+	const closed: { [string]: boolean } = {}
+	for _, phase in Mart.KioskClosedPhases do
+		if not phases[phase] then
+			fail("Mart", nil, nil, `KioskClosedPhases '{phase}' is not a Shift phase`)
+		end
+		if closed[phase] then
+			fail("Mart", nil, nil, `KioskClosedPhases '{phase}' repeated`)
+		end
+		closed[phase] = true
+	end
+
+	const spots: { [string]: boolean } = {}
+	for _, upgrade in Upgrades.List do
+		spots[upgrade.BenchSpot] = true
+	end
+	const pedestals: { [string]: boolean } = {}
+	local specials = 0
+	for index, row in Mart.Pedestals do
+		if pedestals[row.Slot] then
+			fail("Mart", index, row.Slot, "pedestal Slot repeated")
+		end
+		pedestals[row.Slot] = true
+		if row.Offer == "Upgrade" then
+			if not spots[row.Slot] then
+				fail("Mart", index, row.Slot, "Offer Upgrade but no Upgrades row has this BenchSpot")
+			end
+		elseif row.Offer == "Special" then
+			specials += 1
+		else
+			fail("Mart", index, row.Slot, `Offer '{tostring(row.Offer)}' is not Upgrade or Special`)
+		end
+	end
+	for spot in spots do
+		if not pedestals[spot] then
+			fail("Mart", nil, nil, `Upgrades BenchSpot '{spot}' has no pedestal`)
+		end
+	end
+	if specials ~= 1 then
+		fail("Mart", nil, nil, `{specials} Special pedestals (need 1, FEAT-035 S1)`)
+	end
+
+	const covered: { [string]: string } = {}
+	const doorKeys: { [string]: boolean } = {}
+	for index, door in Mart.Doors do
+		if door.Key == "" or doorKeys[door.Key] then
+			fail("Mart", index, door.Key, "door Key empty or repeated")
+		end
+		doorKeys[door.Key] = true
+		for _, slot in door.Pedestals do
+			if not pedestals[slot] then
+				fail("Mart", index, door.Key, `pedestal '{slot}' is not in Pedestals`)
+			end
+			if covered[slot] then
+				fail("Mart", index, door.Key, `pedestal '{slot}' already behind door {covered[slot]}`)
+			end
+			covered[slot] = door.Key
+		end
+	end
+
+	inRange("Mart", nil, nil, "Door.CloseTime", Mart.Door.CloseTime, 0.1, 10)
+	inRange("Mart", nil, nil, "Door.OpenTime", Mart.Door.OpenTime, 0.1, 10)
+	inRange("Mart", nil, nil, "Door.Stagger", Mart.Door.Stagger, 0, 2)
+	inRange("Mart", nil, nil, "Mini.Size", Mart.Mini.Size, 0.2, 5)
+	inRange("Mart", nil, nil, "Mini.Lift", Mart.Mini.Lift, 0, 5)
+	inRange("Mart", nil, nil, "Mini.Bob", Mart.Mini.Bob, 0, 2)
+	inRange("Mart", nil, nil, "Mini.BobPeriod", Mart.Mini.BobPeriod, 0.1, 30)
+	inRange("Mart", nil, nil, "Mini.SpinPeriod", Mart.Mini.SpinPeriod, 0.1, 60)
+	inRange("Mart", nil, nil, "Mini.ActiveRadius", Mart.Mini.ActiveRadius, 1, 500)
+	inRange("Mart", nil, nil, "Mini.LockedTransparency", Mart.Mini.LockedTransparency, 0, 1)
+	inRange("Mart", nil, nil, "Purchase.PopTime", Mart.Purchase.PopTime, 0.05, 5)
+	inRange("Mart", nil, nil, "Purchase.PopScale", Mart.Purchase.PopScale, 1, 3)
+	inRange("Mart", nil, nil, "Purchase.PopTurns", Mart.Purchase.PopTurns, 0, 10)
+	inRange("Mart", nil, nil, "Purchase.Confetti", Mart.Purchase.Confetti, 0, 100)
+	inRange("Mart", nil, nil, "Purchase.RiseDelay", Mart.Purchase.RiseDelay, 0, 5)
+	inRange("Mart", nil, nil, "Purchase.RiseTime", Mart.Purchase.RiseTime, 0.05, 5)
+	inRange("Mart", nil, nil, "Purchase.OpalLineGap", Mart.Purchase.OpalLineGap, 0, 600)
+	inRange("Mart", nil, nil, "Purchase.OpalLineRadius", Mart.Purchase.OpalLineRadius, 0, 100)
+	inRange("Mart", nil, nil, "Plate.Distance", Mart.Plate.Distance, 1, 500)
+	inRange("Mart", nil, nil, "Fallback.DoorHeight", Mart.Fallback.DoorHeight, 1, 30)
+	if Mart.Tags.Pedestal == "" or Mart.Tags.Shutter == "" or Mart.Tags.Slot == "" then
+		fail("Mart", nil, nil, "Tags must not be empty")
+	end
+end
+
 return function()
 	checkKeySets()
 	checkUpgrades()
@@ -1334,4 +1423,5 @@ return function()
 	checkCutscenes()
 	checkTraffic()
 	checkWalkPaths()
+	checkMart()
 end

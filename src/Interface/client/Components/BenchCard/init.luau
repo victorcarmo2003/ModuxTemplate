@@ -11,6 +11,8 @@
 -- where the smallest phone shows the effect line at >= 14 px.
 -- Cartoon pass (AST-091): Ink CartoonPanel card with studs (Mustard outline on the rare slot), white miniature tile,
 -- the tag as a tone CartoonPanel; thin pixel outlines because the card is sized in studs.
+-- `Plate` (Mart v2 Gear Stand, TASK-140): the miniature is a 3D model floating over the pedestal, so the card drops
+-- the miniature tile and shrinks to a price plate (PLATE_WIDTH x PLATE_HEIGHT) hung under `Price_Anchor_<Slot>`.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Cinematic = require(script.Parent.Parent.Cinematic)
@@ -36,6 +38,7 @@ export type Props = {
 	-- "$60", "Maxed", "Trailer only"; the Empty line ("Nothing special today") also comes here.
 	Tag: () -> string,
 	Special: (() -> boolean)?,
+	Plate: boolean?, -- Gear Stand plate: no miniature tile, smaller card
 	StudsOffset: Vector3?,
 	MaxDistance: number?,
 	Name: string?,
@@ -43,6 +46,10 @@ export type Props = {
 
 const WIDTH = 2.8 -- studs; one GEAR WALL module is 3 wide (AST-049)
 const HEIGHT = 3.4
+-- Gear Stand plate: a pedestal is 1.6 wide and its neighbours 3 apart (MAP-01 §18.4); the player reads it from
+-- 1.5-2.5 studs, where the effect line stays >= 14 px on the smallest phone.
+const PLATE_WIDTH = 2.6
+const PLATE_HEIGHT = 1.9
 const MAX_TEXT = 64
 
 const TAG_TONE: { [Mode]: Theme.Tone } = {
@@ -76,7 +83,14 @@ local function label(props: {
 	})
 end
 
+-- Vertical layout (scale of the card height): Title, Detail, Tag; the plate has no miniature tile above them.
+type Layout = { Title: number, TitleH: number, Detail: number, DetailH: number, Tag: number, TagH: number }
+const CARD_LAYOUT: Layout = { Title = 0.43, TitleH = 0.2, Detail = 0.63, DetailH = 0.12, Tag = 0.78, TagH = 0.18 }
+const PLATE_LAYOUT: Layout = { Title = 0.06, TitleH = 0.3, Detail = 0.38, DetailH = 0.2, Tag = 0.62, TagH = 0.32 }
+
 return function(props: Props): BillboardGui
+	const plate = props.Plate == true
+	const layout = if plate then PLATE_LAYOUT else CARD_LAYOUT
 	local function filled(): boolean
 		return props.Mode() ~= "Empty"
 	end
@@ -96,7 +110,7 @@ return function(props: Props): BillboardGui
 	return create("BillboardGui")({
 		Name = props.Name or "BenchCard",
 		Adornee = props.Adornee,
-		Size = UDim2.fromScale(WIDTH, HEIGHT),
+		Size = if plate then UDim2.fromScale(PLATE_WIDTH, PLATE_HEIGHT) else UDim2.fromScale(WIDTH, HEIGHT),
 		StudsOffset = props.StudsOffset or Vector3.zero,
 		MaxDistance = props.MaxDistance or 40,
 		LightInfluence = 0,
@@ -133,7 +147,9 @@ return function(props: Props): BillboardGui
 					Lip = 2,
 					Radius = UDim.new(0.2, 0),
 					Gloss = false,
-					Visible = filled,
+					Visible = function()
+						return filled() and not plate
+					end,
 					Decor = {
 						create("UIAspectRatioConstraint")({ AspectRatio = 1 }),
 					},
@@ -170,8 +186,8 @@ return function(props: Props): BillboardGui
 
 				label({
 					Name = "Title",
-					Position = UDim2.fromScale(0.5, 0.43),
-					Size = UDim2.fromScale(0.92, 0.2),
+					Position = UDim2.fromScale(0.5, layout.Title),
+					Size = UDim2.fromScale(0.92, layout.TitleH),
 					Text = props.Title,
 					Wrapped = true,
 					Visible = filled,
@@ -179,8 +195,8 @@ return function(props: Props): BillboardGui
 
 				label({
 					Name = "Detail",
-					Position = UDim2.fromScale(0.5, 0.63),
-					Size = UDim2.fromScale(0.92, 0.12),
+					Position = UDim2.fromScale(0.5, layout.Detail),
+					Size = UDim2.fromScale(0.92, layout.DetailH),
 					Text = props.Detail,
 					Visible = filled,
 				}),
@@ -188,8 +204,8 @@ return function(props: Props): BillboardGui
 				CartoonPanel({
 					Name = "Tag",
 					AnchorPoint = Vector2.new(0.5, 0),
-					Position = UDim2.fromScale(0.5, 0.78),
-					Size = UDim2.fromScale(0.78, 0.18),
+					Position = UDim2.fromScale(0.5, layout.Tag),
+					Size = UDim2.fromScale(0.78, layout.TagH),
 					Rotation = -2,
 					Tone = function()
 						return TAG_TONE[props.Mode()]

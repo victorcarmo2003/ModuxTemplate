@@ -1102,6 +1102,26 @@ a bancada nem com o prédio B1).
 Encaixes do AST-049 lidos pelo `MarketController` dentro do dono: `Price_Anchor_<Slot>`, `PriceTag_<Slot>`,
 `Slot_<Slot>` (miniatura), `Light_S1`, `VFX_Rare`. Prateleira usa a própria âncora como lugar do preço.
 
+**Mart v2 "Gear Stand" (TASK-135/139/140/141, Provisório; MAP-01 §18.4; `Content.Mart`, `content-data.md` §3.22).**
+As âncoras de compra **não mudam**: `Interactable` + `PromptAction` (`bench_buy_upgrade` / `bench_buy_item`) +
+`BenchSlot` (`Prompt_Buy_<Slot>`). Peças novas, todas **opcionais** para o código (o client tem fallback e avisa 1 vez;
+`MapIndex.KioskNotes` lista o que falta e o `PlaceService` só dá `warn`, nunca erro):
+
+| Peça | Tag / nome | Atributos | Quem lê |
+|---|---|---|---|
+| Pedestal | `Model` (ou `BasePart`) com tag `GearPedestal` | `Slot` = `B1`..`B5` / `S1` | `MarketController` (mini, placa, anel), `OpalController` (procura `Att_Opal` nos ancestrais) |
+| Centro da mini | `Slot_<Slot>` (`Attachment`/`Part`) dentro do pedestal ou do dono da âncora; sem ele: topo do pedestal + `Mini.Lift` | — | `Minis.luau` |
+| Placa de preço | `Price_Anchor_<Slot>` ou `Price_Anchor` dentro do pedestal; senão `Price_Anchor_<Slot>` no dono da âncora; senão embaixo da âncora do prompt | — | `MarketController` (`BenchCard` com `Plate = true`, pendurado **abaixo** do encaixe) |
+| Anel de luz | `BasePart`s com nome começando em `Ring` dentro do pedestal | — | aceso (material/cor do autor) só "à venda"; apagado em MAX, Trailer only, vazio |
+| Porta de enrolar | `Model` com tag `GearShutter`, **montada fechada** | `Slot` = `L` / `C` / `R` | `Kiosk.luau` |
+| Ripas | `BasePart`s `Slat_*` (sobem e somem dentro do rolo) **ou** `Door_Panel` (painel com `Texture`, encolhe por baixo) | — | `Kiosk.luau` |
+| Rolo | `BasePart` `Roll` ou `Door_Drum` (gira no eixo mais longo) | — | `Kiosk.luau` |
+| Balcão da Opal | `Att_Opal` (`Attachment`/`Part`, frente = `LookVector`) dentro de um `Model` ancestral de um `GearPedestal`; senão `MapPoint` `OP-1` | — | `OpalController` |
+
+Pedestal e porta precisam ser `ModelStreamingMode = Persistent` (como o resto do Mart). A porta é derivada da fase
+(`Content.Mart.KioskClosedPhases`) nos dois lados; o servidor recusa compra de bancada com ela fechada (`Validate` e
+`Run`), prateleiras nunca fecham.
+
 **Âncoras de runtime** (mesmo contrato, criadas pelo dono): cliente NPC = `Attachment` `Prompt_Customer` no
 `HumanoidRootPart` do rig do pool (criado uma vez por rig pelo `NpcService`; `PromptAction` trocado pelo
 `CustomerService`: `take_order` → `serve`; "Refuse" numa segunda âncora `Prompt_Refuse`, 1,5 abaixo); item derrubado =

@@ -65,6 +65,11 @@ function PlaceService:ValidateMap()
 		return
 	end
 	const wave = Content.RunParams.BindingWave
+	-- Mart v2 Gear Stand (TASK-135): soft, warnings only while TASK-138 builds the kiosk.
+	const notes = MapIndex.KioskNotes(MapIndex.Required.ForWave(wave))
+	if #notes > 0 then
+		warn(`[PlaceService] Gear Stand binding (Mart v2) has {#notes} note(s):\n  {table.concat(notes, "\n  ")}`)
+	end
 	const problems = MapIndex.Validate(MapIndex.Required.ForWave(wave))
 	if #problems == 0 then
 		return

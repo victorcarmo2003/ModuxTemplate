@@ -1,0 +1,18 @@
+{
+ "Mini_Anchor": [
+  -0.0,
+  4.2,
+  0.0
+ ],
+ "Price_Anchor": [
+  -0.0,
+  2.8,
+  0.82
+ ],
+ "Prompt_Buy": [
+  -0.0,
+  4.2,
+  0.5
+ ],
+ "_note": "Price_Anchor: front face of the cap, tilt the price plate 30 deg; Mini_Anchor: mini centre"
+}
