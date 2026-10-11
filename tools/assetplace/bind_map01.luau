@@ -3193,20 +3193,17 @@ end
 -- the lobby services find them with the same MapPoint index. Rebuilt with the rest of the binding.
 -- Squads: near row 1..4 at X 16, far row 5..8 at X 34, Z -647 / -629 / -611 / -593 (pitch 18, 10 between edges).
 local LOBBY_POINTS = {
+	-- lobby v2 scaled x1.3 around the spawn (5, 0, -620) and 4 squad pads (user 2026-10-11)
 	{ id = "LOBBY-SPAWN", pos = Vector3.new(5, 0, -620), look = Vector3.new(0, 0, 1) },
-	{ id = "LOBBY-CLASS-STAGE", pos = Vector3.new(0, 1.02, -575.5), look = Vector3.new(0, 0, -1) },
-	{ id = "LOBBY-CLASS-CAM", pos = Vector3.new(0, 4.5, -587.5), look = Vector3.new(0, 0, 1), attrs = { Pitch = 2.39, Fov = 50 } },
-	{ id = "LOBBY-SHOP", pos = Vector3.new(-29, 0, -620), look = Vector3.new(-1, 0, 0) },
-	{ id = "LOBBY-CODES", pos = Vector3.new(-10, 0, -650.5), look = Vector3.new(0, 0, -1) },
-	{ id = "LOBBY-SQUAD-1", pos = Vector3.new(16, 0.3, -647), look = Vector3.new(1, 0, 0) },
-	{ id = "LOBBY-SQUAD-2", pos = Vector3.new(16, 0.3, -629), look = Vector3.new(1, 0, 0) },
-	{ id = "LOBBY-SQUAD-3", pos = Vector3.new(16, 0.3, -611), look = Vector3.new(1, 0, 0) },
-	{ id = "LOBBY-SQUAD-4", pos = Vector3.new(16, 0.3, -593), look = Vector3.new(1, 0, 0) },
-	{ id = "LOBBY-SQUAD-5", pos = Vector3.new(34, 0.3, -647), look = Vector3.new(1, 0, 0) },
-	{ id = "LOBBY-SQUAD-6", pos = Vector3.new(34, 0.3, -629), look = Vector3.new(1, 0, 0) },
-	{ id = "LOBBY-SQUAD-7", pos = Vector3.new(34, 0.3, -611), look = Vector3.new(1, 0, 0) },
-	{ id = "LOBBY-SQUAD-8", pos = Vector3.new(34, 0.3, -593), look = Vector3.new(1, 0, 0) },
-	{ id = "LOBBY-START", pos = Vector3.new(44.5, 0, -620), look = Vector3.new(1, 0, 0) },
+	{ id = "LOBBY-CLASS-STAGE", pos = Vector3.new(-1.5, 1.326, -562.15), look = Vector3.new(0, 0, -1) },
+	{ id = "LOBBY-CLASS-CAM", pos = Vector3.new(-1.5, 5.85, -577.75), look = Vector3.new(0, 0, 1), attrs = { Pitch = 2.39, Fov = 50 } },
+	{ id = "LOBBY-SHOP", pos = Vector3.new(-39.2, 0.0, -620.0), look = Vector3.new(-1, 0, 0) },
+	{ id = "LOBBY-CODES", pos = Vector3.new(-14.5, 0.0, -659.65), look = Vector3.new(0, 0, -1) },
+	{ id = "LOBBY-SQUAD-1", pos = Vector3.new(19.3, 0.39, -655.1), look = Vector3.new(1, 0, 0) },
+	{ id = "LOBBY-SQUAD-2", pos = Vector3.new(19.3, 0.39, -631.7), look = Vector3.new(1, 0, 0) },
+	{ id = "LOBBY-SQUAD-3", pos = Vector3.new(19.3, 0.39, -608.3), look = Vector3.new(1, 0, 0) },
+	{ id = "LOBBY-SQUAD-4", pos = Vector3.new(19.3, 0.39, -584.9), look = Vector3.new(1, 0, 0) },
+	{ id = "LOBBY-START", pos = Vector3.new(56.35, 0.0, -620.0), look = Vector3.new(1, 0, 0) },
 }
 local function bindLobby(root: Instance): number
 	if not Workspace:FindFirstChild("LOBBY_Assets") then

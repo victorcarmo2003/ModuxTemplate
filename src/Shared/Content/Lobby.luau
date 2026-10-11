@@ -6,7 +6,7 @@
 --
 -- A zone is a circle on the floor. Center = the MapPoint `PointId` when the map has it (WORLD), else `Center`.
 -- Walking in (planar distance <= Radius, |dy| <= Trigger.Height) opens its panel; walking out (distance >
--- Radius + Trigger.Hysteresis) closes it. Squad zones (Platform 1..8) are the squad platforms: the server watches them.
+-- Radius + Trigger.Hysteresis) closes it. Squad zones (Platform 1..4; lobby v2 scaled x1.3 around the spawn, 2026-10-11) are the squad platforms: the server watches them.
 
 export type Panel = "Classes" | "Shop" | "Codes" | "Platform"
 
@@ -107,8 +107,8 @@ local function squad(n: number, x: number, z: number): Zone
 		Panel = "Platform",
 		Platform = n,
 		PointId = `LOBBY-SQUAD-{n}`,
-		Center = Vector3.new(x, 0.3, z),
-		Radius = 4,
+		Center = Vector3.new(x, 0.39, z),
+		Radius = 5.2,
 		Color = WHITE,
 	}
 end
@@ -121,8 +121,8 @@ const lobby: Lobby = {
 			Panel = "Classes",
 			Platform = 0,
 			PointId = nil,
-			Center = Vector3.new(0, 0, -587),
-			Radius = 7,
+			Center = Vector3.new(-1.5, 0, -577.1),
+			Radius = 9.1,
 			Color = YELLOW,
 		},
 		{
@@ -130,8 +130,8 @@ const lobby: Lobby = {
 			Panel = "Shop",
 			Platform = 0,
 			PointId = "LOBBY-SHOP",
-			Center = Vector3.new(-29, 0, -620),
-			Radius = 5.5,
+			Center = Vector3.new(-39.2, 0, -620.0),
+			Radius = 7.15,
 			Color = GREEN,
 		},
 		{
@@ -139,18 +139,14 @@ const lobby: Lobby = {
 			Panel = "Codes",
 			Platform = 0,
 			PointId = "LOBBY-CODES",
-			Center = Vector3.new(-10, 0, -650.5),
-			Radius = 5,
+			Center = Vector3.new(-14.5, 0, -659.65),
+			Radius = 6.5,
 			Color = BLUE,
 		},
-		squad(1, 16, -647),
-		squad(2, 16, -629),
-		squad(3, 16, -611),
-		squad(4, 16, -593),
-		squad(5, 34, -647),
-		squad(6, 34, -629),
-		squad(7, 34, -611),
-		squad(8, 34, -593),
+		squad(1, 19.3, -655.1),
+		squad(2, 19.3, -631.7),
+		squad(3, 19.3, -608.3),
+		squad(4, 19.3, -584.9),
 	},
 	Trigger = {
 		Hysteresis = 1.25,
@@ -159,7 +155,7 @@ const lobby: Lobby = {
 	},
 	Column = {
 		Height = 7,
-		Panels = 10,
+		Panels = 0, -- 0 = no light column, rings only (user 2026-10-11)
 		RadiusScale = 1,
 		Overlap = 1.08,
 		Roll = 0,

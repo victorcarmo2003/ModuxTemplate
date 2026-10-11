@@ -5,7 +5,7 @@
 
 return table.freeze({
 	Title = "SELL HOTDOGS",
-	Tagline = "Hot dogs by day. Keep the light on by night.",
+	Tagline = "Work hard. Stay alert.",
 	Tips = table.freeze({
 		"A short line is a happy line. Grill ahead when the street gets busy.",
 		"An empty cooler sells nothing. Restock at the Mart before you run out.",

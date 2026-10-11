@@ -118,6 +118,10 @@ local function newBand(
 end
 
 local function buildPanels(zone: LobbyZones.Zone, anchor: BasePart, color: Color3): { Beam }
+	-- Panels = 0 turns the light column off (user 2026-10-11: rings only, no pillars)
+	if COLUMN.Panels <= 0 then
+		return {}
+	end
 	const count = math.max(math.floor(COLUMN.Panels), 3)
 	const radius = zone.Radius * COLUMN.RadiusScale
 	const step = 2 * math.pi / count
