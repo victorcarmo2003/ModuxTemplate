@@ -282,8 +282,11 @@ local POINTS = {
 	{ id = "SPEC-M", x = -48, y = 14, z = 40, faceTo = { -50, 13 } },
 	-- thief (MAP-01 §5.3, §9.2). L1 is 2 studs NE of the P-01 pole foot (20, 20), not inside the pole; L3 stands
 	-- in front of the Pad bench (58, 58). All face the drawer.
-	{ id = "L1", x = 21.5, z = 22, floor = 0.4, faceTo = DRAWER_XZ, node = true },
-	{ id = "L2", x = 84, z = 22, floor = 0.4, faceTo = DRAWER_XZ, node = true },
+	-- 2026-10-11 (debugger, playtest: NPCs stuck on the poles; Provisório): L1 (21.5, 22) -> (22.5, 22.2), so the edge
+	-- from N-Z02-02 keeps >= 2.5 from the P-01 foot; L2 (84, 22) stood 0.4 from the Post_L2 foot (84, 21.6) and inside
+	-- its collision box -> (84, 24.6), on the building side of the post.
+	{ id = "L1", x = 22.5, z = 22.2, floor = 0.4, faceTo = DRAWER_XZ, node = true },
+	{ id = "L2", x = 84, z = 24.6, floor = 0.4, faceTo = DRAWER_XZ, node = true },
 	-- L3 (2026-10-11, user moved 5 picnic tables behind the cart, WORLD z 10.9..15.7, x -59..-25): moved from (58, 56.5)
 	-- to the strip between the tables and the wall planters (WORLD (-62.5, 8.0)), beside the L3 bench. 25.2 from the drawer
 	{ id = "L3", x = 62.5, z = 59.887, floor = 0.45, faceTo = DRAWER_XZ, node = true },
@@ -357,6 +360,12 @@ local POINTS = {
 }
 
 -- NpcNode-only parts (NodeId = N-<zone>-<nn>, §18.6). crosswalk = the two curb nodes of a crosswalk.
+-- 2026-10-11 (debugger, playtest: NPCs stuck on the street-light poles; Provisório). The AST-036 pole's collision
+-- fills its whole bbox (foot -> arm tip, 4.7 studs, knee height included), so a lane under the arm is walled: every
+-- edge keeps its centre line out of those boxes and >= 2.5 studs from each pole foot (NPC radius 1 + pole + 1).
+-- Pole feet on the Ninth sidewalks stand at |Z| ~21 (south 21.5, north -20.9..-21.5), arms over the curb strip:
+-- the sidewalk lanes moved to the building side of the posts (south Z 24.5 / 26..27, north Z -24.6). Measured on the
+-- MAP-01_placements.luau entries (foot = pivot - 1.815 * arm direction, note 5 there).
 local NODES = {
 	-- ROUTE-SP-A: Juniper North east sidewalk (X 18), CW-4, Ninth south sidewalk (LANE-E, Z 23)
 	{ id = "N-Z13-01", x = 18, z = -104, floor = 0.24 },
@@ -364,18 +373,19 @@ local NODES = {
 	{ id = "N-Z07-01", x = 18, z = -62, floor = 0.24 },
 	{ id = "N-Z07-02", x = 18, z = -40, floor = 0.24 },
 	{ id = "N-Z06-01", x = 18, z = -17, floor = 0.4, crosswalk = "CW-4" },
-	{ id = "N-Z02-01", x = 18, z = 17, floor = 0.4, crosswalk = "CW-4" },
-	{ id = "N-Z02-02", x = 18, z = 23, floor = 0.4 },
+	-- CW-4 south curb and the corner: X 18 -> 16.5, out of the P-01 box (foot (20, 20), arm NW over the corner)
+	{ id = "N-Z02-01", x = 16.5, z = 17, floor = 0.4, crosswalk = "CW-4" },
+	{ id = "N-Z02-02", x = 16.5, z = 23, floor = 0.4 },
 	{ id = "N-Z02-03", x = 26, z = 23, floor = 0.4 }, -- shared by ROUTE-SP-A and ROUTE-D1-IN, last node before Q5
-	-- ROUTE-D1-IN: D1 -> Pad east side -> LANE-W (Z 18) -> west -> up to Q5
+	-- ROUTE-D1-IN: D1 -> LANE-W (Z 24.5, building side of the posts at X 36.4 / 62.2) -> west -> up to Q5
 	{ id = "N-Z01-01", x = 62, z = 33, floor = 0.45 },
-	{ id = "N-Z02-06", x = 62, z = 18, floor = 0.4 },
-	{ id = "N-Z02-05", x = 44, z = 18, floor = 0.4 },
-	{ id = "N-Z02-04", x = 26, z = 18, floor = 0.4 },
-	-- ROUTE-EXIT-E: Q1 -> LANE-E -> EX-E
-	{ id = "N-Z02-07", x = 55, z = 23, floor = 0.4 },
-	{ id = "N-Z02-08", x = 84, z = 23, floor = 0.4 },
-	{ id = "N-Z02-09", x = 112, z = 23, floor = 0.4 },
+	{ id = "N-Z02-06", x = 60, z = 24.5, floor = 0.4 },
+	{ id = "N-Z02-05", x = 44, z = 24.5, floor = 0.4 },
+	{ id = "N-Z02-04", x = 26, z = 24.5, floor = 0.4 },
+	-- ROUTE-EXIT-E: Q1 -> LANE-E (Z 26..27, east of the queue; 2+ studs from LANE-W) -> EX-E
+	{ id = "N-Z02-07", x = 55, z = 27, floor = 0.4 },
+	{ id = "N-Z02-08", x = 84, z = 27, floor = 0.4 },
+	{ id = "N-Z02-09", x = 112, z = 26, floor = 0.4 },
 	-- ROUTE-EXIT-D1: Q1 -> east of the cart -> D1
 	{ id = "N-Z01-02", x = 58, z = 33, floor = 0.45 },
 	{ id = "N-Z01-03", x = 58, z = 47, floor = 0.45 },
@@ -389,12 +399,13 @@ local NODES = {
 	{ id = "N-Z01-05", x = 22, z = 59.887, floor = 0.45 },
 	{ id = "N-Z01-04", x = 38, z = 60.287, floor = 0.45 }, -- WORLD (-38, 7.6)
 	-- wave 3, sidewalk nodes of Content.WalkPaths (MAP-01 §9.3). Curb nodes 1 stud off the carriageway.
-	-- east: north sidewalk of the Ninth in front of the bank, CW-3
-	{ id = "N-Z06-02", x = 57, z = -17, floor = 0.4, crosswalk = "CW-3" },
-	{ id = "N-Z02-10", x = 57, z = 17, floor = 0.4, crosswalk = "CW-3" },
-	{ id = "N-Z06-03", x = 38, z = -22, floor = 0.4 },
-	{ id = "N-Z06-04", x = 84, z = -22, floor = 0.4 }, -- passes the parking entrance (AN-12 is night only)
-	{ id = "N-Z06-05", x = 110, z = -22, floor = 0.4 }, -- east end (BAR-E), walkers despawn here
+	-- east: north sidewalk of the Ninth in front of the bank, CW-3 (curbs X 57 -> 56: off the NL-04 box, X 57.4..58.6)
+	{ id = "N-Z06-02", x = 56, z = -17, floor = 0.4, crosswalk = "CW-3" },
+	{ id = "N-Z02-10", x = 56, z = 17, floor = 0.4, crosswalk = "CW-3" },
+	{ id = "N-Z06-03", x = 36.4, z = -25.2, floor = 0.4 }, -- right behind the post at X 36.4 (foot Z -21.5)
+	-- N-Z06-04 now hangs off N-Z06-03 (the old N-Z06-02 link ran under the NL-04 / NL-03 arms); no walk path uses it
+	{ id = "N-Z06-04", x = 74, z = -24.6, floor = 0.4 }, -- passes the parking entrance (AN-12 is night only)
+	{ id = "N-Z06-05", x = 110, z = -24.6, floor = 0.4 }, -- east end (BAR-E), walkers despawn here
 	-- CW-1 (the Mart crossing) curb nodes
 	{ id = "N-Z08-04", x = 13, z = 38, floor = 0.24, crosswalk = "CW-1" },
 	{ id = "N-Z08-05", x = -13, z = 38, floor = 0.24, crosswalk = "CW-1" },
@@ -403,14 +414,15 @@ local NODES = {
 	{ id = "N-Z12-02", x = -54, z = 30, floor = 0.4 }, -- inside SS (day only for these paths)
 	{ id = "N-Z02-11", x = -72, z = 24, floor = 0.4 },
 	{ id = "N-Z02-12", x = -108, z = 24, floor = 0.4 }, -- west end (BAR-W)
-	{ id = "N-Z02-13", x = -40, z = 22, floor = 0.4 },
-	{ id = "N-Z02-14", x = -18, z = 17, floor = 0.4, crosswalk = "CW-2" },
+	{ id = "N-Z02-13", x = -40, z = 24.6, floor = 0.4 }, -- was (-40, 22), 1.1 from the Post_NinthS_W1 foot
+	-- CW-2 south curb X -18 -> -19.5: the edge to N-Z08-05 keeps 2.5 from the corner post foot (-14.5, 23.8)
+	{ id = "N-Z02-14", x = -19.5, z = 17, floor = 0.4, crosswalk = "CW-2" },
 	{ id = "N-Z06-06", x = -18, z = -17, floor = 0.4, crosswalk = "CW-2" },
-	{ id = "N-Z06-07", x = -40, z = -22, floor = 0.4 },
-	{ id = "N-Z06-08", x = -76, z = -22, floor = 0.4 },
-	{ id = "N-Z06-09", x = -108, z = -22, floor = 0.4 }, -- west end (BAR-W); no walk path ends here any more (§9.8)
+	{ id = "N-Z06-07", x = -40, z = -24.6, floor = 0.4 },
+	{ id = "N-Z06-08", x = -76, z = -24.6, floor = 0.4 },
+	{ id = "N-Z06-09", x = -108, z = -24.6, floor = 0.4 }, -- west end (BAR-W); no walk path ends here any more (§9.8)
 	-- MAP-01 §9.8: north sidewalk in front of the bank / apartments door (DR-APT)
-	{ id = "N-Z06-10", x = 32, z = -22, floor = 0.4 },
+	{ id = "N-Z06-10", x = 32, z = -24.6, floor = 0.4 },
 }
 
 local EDGES = {
@@ -460,7 +472,7 @@ local EDGES = {
 	{ "N-Z06-03", "N-Z06-02" },
 	{ "N-Z06-02", "N-Z02-10" }, -- CW-3 crosswalk edge
 	{ "N-Z02-10", "N-Z02-05" },
-	{ "N-Z06-02", "N-Z06-04" },
+	{ "N-Z06-03", "N-Z06-04" }, -- 2026-10-11: was N-Z06-02 - N-Z06-04 (under the NL-04 / NL-03 arms)
 	{ "N-Z06-04", "N-Z06-05" },
 	{ "N-Z08-03", "N-Z08-04" },
 	{ "N-Z08-04", "N-Z08-05" }, -- CW-1 crosswalk edge

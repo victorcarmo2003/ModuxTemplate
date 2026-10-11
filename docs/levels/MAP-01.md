@@ -231,8 +231,8 @@ Velocidade de cliente a pé: ~8 studs/s (texto antigo; `CustomerTypes` usa 9–1
 | EX-E | saída leste, passantes | **(116.5, 40)** (era (116, 24), visível de Q1..Q5 pela calçada): beco X 113..120 atrás de B1, além de BAR-E | dia e noite | Q1 → LANE-E → beco. **~85 studs, 6,5 s** |
 | **DR-B3** | **porta** de B3b (vidro "NO HELP WANTED") (novo) | (−93.3, −31.2) | passantes, dia e noite | calçada norte oeste → CW-2 → Mart |
 | MKT-DOOR | **porta** do Mart (agora também nó) | (−62, 34) | passantes (24 h) | praça / borda do SS |
-| L1 | espreita do ladrão (P-01) | (20, 20) → ponto em **(21.5, 22)** (TASK-083: fora do poste, que tem o pé em (20, 20)) | dia 2+ | 34 studs até a gaveta |
-| L2 | espreita do ladrão (poste leste) | (84, 22) | dia 2+ | 35 studs até a gaveta |
+| L1 | espreita do ladrão (P-01) | (20, 20) → ponto em **(21.5, 22)** (TASK-083: fora do poste, que tem o pé em (20, 20)) → **(22,5, 22,2)** (2026-10-11, §9.1) | dia 2+ | 34 studs até a gaveta |
+| L2 | espreita do ladrão (poste leste) | (84, 22) → **(84, 24,6)** (2026-10-11: estava a 0,4 do pé do `Post_L2`, dentro da caixa de colisão; §9.1) | dia 2+ | 34 studs até a gaveta |
 | L3 | espreita do ladrão (banco do Pad) | (58, 58) → ponto em **(58, 56.5)** (TASK-083: na frente do banco, não em cima) | dia 2+ | 20 studs até a gaveta |
 | ST-R | spawn/fuga do ladrão | **(21, 108)** (era (18, 92), que Q5 via pela quina de B1): depois da curva, colado na linha dos prédios X 24 | dia 2+ | só pela calçada leste da Juniper Sul (**nunca cruza pista**); de L2 foge para EX-E |
 | AS-1..4 | spawns ocultos de atores de anomalia | §10.3 | só noite | — |
@@ -537,6 +537,8 @@ Tipos e comportamento: `design/npcs.md`. Aqui só o espacial. Todos os NPCs são
 ### 9.1 Clientes — rotas
 
 **Faixas da calçada sul:** LANE-E (Z ≈ 23, sentido leste) para quem chega do oeste e para quem sai; LANE-W (Z ≈ 18, sentido oeste) só para quem sai da porta D1. A fila fica em Z 29 (Q2–Q5) e Q1 em Z 33.
+
+**2026-10-11 — nós longe dos postes (debugger, playtest "NPC preso no poste"; Provisório).** A colisão do AST-036 ocupa a caixa inteira do poste (do pé até a ponta do braço, 4,7 studs, inclusive na altura do joelho): uma faixa que passa sob o braço fica bloqueada. Os postes que o usuário pôs na calçada sul da Ninth (X 36,4 / 62,2 / 107,8 / 131,4, pé em Z 21,5), o `Post_L2`, o P-01 e os da calçada norte deixavam arestas dentro dessas caixas. Regra nova: **toda aresta fica fora da caixa dos postes e a ≥ 2,5 studs do pé** (raio do NPC 1 + poste + 1). As faixas da Ninth passaram para o lado dos prédios: LANE-W em Z 24,5 (`N-Z02-04` (26, 24,5), `N-Z02-05` (44, 24,5), `N-Z02-06` (60, 24,5)); LANE-E a leste da fila em Z 26–27 (`N-Z02-07` (55, 27), `N-Z02-08` (84, 27), `N-Z02-09` (112, 26)); calçada norte em Z −24,6 (`N-Z06-10` (32, −24,6), `N-Z06-03` (36,4, −25,2), `N-Z06-04` (74, −24,6), `N-Z06-05` (110, −24,6), `N-Z06-07/08/09` em Z −24,6); `N-Z02-13` (−40, 24,6). Meios-fios: CW-4 sul `N-Z02-01` (16,5, 17) e `N-Z02-02` (16,5, 23); CW-3 `N-Z06-02`/`N-Z02-10` em X 56; CW-2 sul `N-Z02-14` (−19,5, 17). Espreitas: L1 (22,5, 22,2), L2 (84, 24,6). Aresta `N-Z06-02`–`N-Z06-04` trocada por `N-Z06-03`–`N-Z06-04` (nenhum caminho de passante a usava). No servidor, postes e placas finas ficam no collision group `NpcPass` (não colide com NPC, colide com jogador) como rede de segurança; o `Walker` tem anti-travamento e espaçamento entre NPCs.
 
 | Etapa | Dia | Noite |
 |---|---|---|

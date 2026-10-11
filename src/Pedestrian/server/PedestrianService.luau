@@ -68,7 +68,7 @@ export type Record = {
 
 type Stop = {
 	At: number, -- absolute distance of the record
-	Kind: "Crossing" | "Pause",
+	Kind: "Crossing" | "Pause" | "Hold", -- Hold: behind another walker (spacing), not a place of the path
 	Crosswalk: string?,
 	Exit: number, -- Crossing: far curb (absolute); Pause: = At
 }
@@ -91,6 +91,8 @@ type Walker = {
 	LapEnd: number?,
 	-- braking / standing for the customer side (adoption): no crosswalk request until released or taken
 	Noticed: boolean,
+	-- server time the walker started braking behind another one (Stop.Kind "Hold"); nil = not holding
+	HoldAt: number?,
 }
 
 -- What the customer side reads of a noticed walker (CustomerService/Adopt.luau Handoff)
@@ -114,6 +116,16 @@ const HORIZON = 30 -- seconds Motion.TimeAt may look ahead
 const MIN_STOP = 0.1 -- studs: StopDist 0 means "no stop", so a curb at distance 0 stops here
 const NOTICE_ROOM = 0.25 -- studs added to the braking distance of a noticed walker
 const END_ROOM = 6 -- studs: a walker this close to the end of a through path is never picked
+-- Spacing (playtest 2026-10-11: walkers stacked on the same curb / walking inside each other), PROVISIONAL:
+-- a walking passer-by brakes when another one stands or walks the same way less than HOLD_GAP studs (+ its braking
+-- distance) ahead within HOLD_LANE studs of its line, and walks on once the way is clear (or after HOLD_MAX s).
+-- World space, so walkers of different paths sharing a sidewalk or a curb keep apart too. Oncoming walkers pass.
+const HOLD_GAP = 2.5 -- studs between two walkers in line
+const HOLD_LANE = 1.5 -- studs off the line that still count as "in the way"
+const HOLD_SAME = 0.3 -- min dot of the two headings: same way (perpendicular and oncoming walkers pass)
+const HOLD_MIN = 0.3 -- studs: closer than this along the line is "beside", not ahead
+const HOLD_MAX = 10 -- seconds: safety, a hold never lasts longer (one stud later it brakes again if still blocked)
+const HOLD_SPEED = 0.5 -- studs/s: slower than this is standing (no new hold)
 const PREFIX = "[PedestrianService]"
 
 const EPSILON = Motion.Epsilon
@@ -348,6 +360,7 @@ function PedestrianService:Anchor(walker: Walker, dist: number, inclusive: boole
 	walker.Cursor = Motion.Cursor(walker.Profile, walker.Record)
 	walker.Dist, walker.Speed = anchor, 0
 	walker.ParkedAt = nil
+	walker.HoldAt = nil
 	self:Publish(walker, added)
 end
 
@@ -395,6 +408,7 @@ function PedestrianService:Spawn(row: WalkPath, geo: WalkGeo.Geo, dist: number, 
 		Leaving = false,
 		LapEnd = nil,
 		Noticed = false,
+		HoldAt = nil,
 	}
 	self.Walkers[id] = walker
 	self:Anchor(walker, dist, true, t, true)
@@ -480,11 +494,76 @@ function PedestrianService:TryCross(walker: Walker, stop: Stop, t: number)
 	self:Anchor(walker, walker.Dist, false, t, false)
 end
 
+-- Spacing ---------------------------------------------------------------------------------------------------------
+
+-- Another walker stands or walks the same way less than `reach` studs ahead of `walker`, near its line
+function PedestrianService:Ahead(walker: Walker, reach: number): boolean
+	const position = WalkGeo.PointAt(walker.Geo, walker.Dist)
+	const heading = WalkGeo.Heading(walker.Geo, walker.Dist)
+	for _, other in self.Walkers do
+		if other == walker then
+			continue
+		end
+		const offset = WalkGeo.PointAt(other.Geo, other.Dist) - position
+		const along = offset.X * heading.X + offset.Z * heading.Z
+		if along <= HOLD_MIN or along > reach then
+			continue
+		end
+		if math.abs(offset.X * heading.Z - offset.Z * heading.X) > HOLD_LANE then
+			continue
+		end
+		const otherHeading = WalkGeo.Heading(other.Geo, other.Dist)
+		if otherHeading.X * heading.X + otherHeading.Z * heading.Z < HOLD_SAME then
+			continue
+		end
+		return true
+	end
+	return false
+end
+
+-- Brakes the walker from where it is now (same rule as AdoptPick: the record's past does not change). A nearer stop
+-- already set is kept (it brakes there anyway). Returns true when it holds.
+function PedestrianService:Hold(walker: Walker, brake: number, t: number): boolean
+	const record = walker.Record
+	local stopAt = walker.Dist + brake
+	if record.StopDist > 0 and record.StopDist >= walker.Dist - EPSILON and record.StopDist <= stopAt then
+		return false
+	end
+	if not walker.Geo.Loop then
+		stopAt = math.min(stopAt, walker.Geo.Length - MIN_STOP)
+	end
+	record.StopDist = f32(math.max(stopAt, MIN_STOP))
+	record.HeldUntil = 0
+	walker.Cursor = Motion.Cursor(walker.Profile, record)
+	walker.Stop = { At = record.StopDist, Kind = "Hold", Crosswalk = nil, Exit = record.StopDist }
+	walker.HoldAt = t
+	walker.ParkedAt = nil
+	self:Publish(walker, false)
+	return true
+end
+
 -- Tick ------------------------------------------------------------------------------------------------------------
 
 function PedestrianService:StepWalker(walker: Walker, t: number)
 	if walker.Noticed then
 		return -- stands for the customer side until Take / Release
+	end
+	-- spacing: holding behind another walker -> walk on once the way is clear (re-anchored at rest, real stop again)
+	const holdAt = walker.HoldAt
+	if holdAt ~= nil and walker.Crossing == nil then
+		if
+			Motion.Parked(walker.Profile, walker.Record, walker.Cursor, t)
+			and (t - holdAt > HOLD_MAX or not self:Ahead(walker, HOLD_GAP + 0.5))
+		then
+			self:Anchor(walker, walker.Dist, true, t, false)
+		end
+		return
+	end
+	if walker.Crossing == nil and walker.Speed > HOLD_SPEED then
+		const brake = walker.Speed * walker.Speed / (2 * WalkGeo.Brake) + walker.Speed / TICK_RATE + NOTICE_ROOM
+		if self:Ahead(walker, HOLD_GAP + brake) and self:Hold(walker, brake, t) then
+			return
+		end
 	end
 	const crossing = walker.Crossing
 	if crossing ~= nil then

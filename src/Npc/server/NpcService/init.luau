@@ -16,6 +16,12 @@
 --   - Role "Actor" (wave 3, TASK-108): a customer-anomaly look (same draw as a customer, or forced) + the Variant
 --     attribute (blank, mirror, raincoat) the client applies locally (TASK-110). Counts in the cap like any NPC;
 --   - collision group Npc, not colliding with Players nor Npc (architecture.md §12.3);
+--   - thin street props (PASS_ASSETS: street-light poles, street signs) go to the collision group NpcPass, which
+--     collides with everything but Npc: their collision box fills the space under the lamp arm, and a pole moved in
+--     Studio onto a sidewalk lane walled the NPCs in (playtest 2026-10-11, PROVISIONAL). Players still collide;
+--   - spacing (same playtest, PROVISIONAL): a graph walk waits behind another rig standing or walking the same way
+--     less than SPACING studs ahead (Blocked; Walker gate, bounded). The thief never waits; nobody waits for a pair
+--     partner (it keeps itself beside its leader);
 --   - queue slots Q1..Q5 are never intermediate route steps (MAP-01 §9.1 note): AvoidQueue on by default;
 --   - at most ROUTES_PER_FRAME A* searches per frame (§12.3);
 --   - crosswalk edges wait for TrafficService:ReserveCrossing(cw, NpcId) on the near curb (§8.1, DEC-133; TASK-122,
@@ -55,6 +61,7 @@ export type Npc = {
 	Variant: Variant?, -- Role "Actor" only
 	Node: string, -- last graph node reached (spawn point at first)
 	Walk: number, -- walk order counter: a new order or a despawn cancels the running one
+	Tether: boolean, -- moved by MoveToward / Teleport (pair partner): other rigs never wait for it
 }
 
 export type SpawnRequest = {
@@ -81,6 +88,18 @@ type SpawnWeight = { Point: string, Weight: number }
 
 const GROUP = "Npc"
 const PLAYERS_GROUP = "Players" -- CharacterService (TASK-018) puts the crew parts here
+const PASS_GROUP = "NpcPass" -- thin street props: collide with everything but Npc
+-- `Asset` attribute of the placed models (place_assets.luau) whose parts go to PASS_GROUP
+const PASS_ASSETS: { [string]: true } = {
+	["AST-036_StreetLightCurved"] = true,
+	["AST-036_LampHead"] = true,
+	["AST-034_StreetSign"] = true,
+}
+const ASSETS_ROOT = "MAP01_Assets"
+-- Spacing gate (Blocked), PROVISIONAL
+const SPACING = 2.5 -- studs: another rig closer than this ahead = wait
+const SPACING_CONE = 0.8 -- cos of the half-angle of "ahead" (~37 degrees)
+const ONCOMING = -1 -- studs/s: a rig coming at us faster than this is passed, not waited for
 const FOLDER_NAME = "Npcs"
 const PARKING_NAME = "NpcPool"
 const THIEF_NPC = "NPC-007" -- Species/Outfits.ReservedFor of Quick Quentin
@@ -109,6 +128,30 @@ local function registerGroup(name: string)
 	if not PhysicsService:IsCollisionGroupRegistered(name) then
 		PhysicsService:RegisterCollisionGroup(name)
 	end
+end
+
+-- Parts of the placed thin street props (PASS_ASSETS) -> PASS_GROUP. Returns how many parts moved.
+local function passThinProps(): number
+	const root = workspace:FindFirstChild(ASSETS_ROOT)
+	if root == nil then
+		return 0
+	end
+	local count = 0
+	for _, instance in root:GetDescendants() do
+		const asset = instance:GetAttribute("Asset")
+		if typeof(asset) ~= "string" or not PASS_ASSETS[asset] then
+			continue
+		end
+		const parts: { Instance } = instance:GetDescendants()
+		table.insert(parts, instance)
+		for _, part in parts do
+			if part:IsA("BasePart") and part.CollisionGroup ~= PASS_GROUP then
+				part.CollisionGroup = PASS_GROUP
+				count += 1
+			end
+		end
+	end
+	return count
 end
 
 const NpcService = Modux.Service("NpcService", {
@@ -385,6 +428,7 @@ function NpcService:Spawn(request: SpawnRequest?): number?
 		Variant = if role == "Actor" then r.Variant else nil,
 		Node = from,
 		Walk = 0,
+		Tether = false,
 	}
 	self.Active[id] = npc
 	self.ByModel[model] = id
@@ -449,6 +493,7 @@ function NpcService:WalkTo(id: number, target: string, options: WalkOptions?): b
 		return false
 	end
 	npc.Walk += 1
+	npc.Tether = false
 	const order = npc.Walk
 	local function alive(): boolean
 		return self.Active[id] == npc and npc.Walk == order
@@ -476,9 +521,15 @@ function NpcService:WalkTo(id: number, target: string, options: WalkOptions?): b
 			crossings[index - 1] = node.Crosswalk
 		end
 	end
+	-- spacing gate (the thief runs: it never waits)
+	const gate: Walker.Gate? = if npc.Role == "Thief"
+		then nil
+		else function(direction: Vector3): boolean
+			return self:Blocked(id, direction)
+		end
 	const done = Walker.Follow(npc.Rig, points, alive, function(index: number)
 		npc.Node = path[index + 1]
-	end, self:Crossing(id, crossings))
+	end, self:Crossing(id, crossings), gate)
 	if not done or not alive() then
 		return false
 	end
@@ -490,6 +541,36 @@ function NpcService:WalkTo(id: number, target: string, options: WalkOptions?): b
 		end
 	end
 	return true
+end
+
+-- Spacing gate of NPC `id` walking along `direction` (flat unit): true when another rig (not a pair partner, not
+-- seated) stands or walks the same way less than SPACING studs ahead. Rigs coming at it are passed, not waited for.
+function NpcService:Blocked(id: number, direction: Vector3): boolean
+	const npc = self.Active[id]
+	if npc == nil then
+		return false
+	end
+	const position = npc.Rig.Root.Position
+	for otherId, other in self.Active do
+		if otherId == id or other.Tether then
+			continue
+		end
+		const root = other.Rig.Root
+		if root.Anchored or not root:IsDescendantOf(workspace) then
+			continue
+		end
+		const offset = Vector3.new(root.Position.X - position.X, 0, root.Position.Z - position.Z)
+		const distance = offset.Magnitude
+		if distance < 1e-3 or distance > SPACING or offset:Dot(direction) < SPACING_CONE * distance then
+			continue
+		end
+		const velocity = root.AssemblyLinearVelocity
+		if velocity.X * direction.X + velocity.Z * direction.Z < ONCOMING then
+			continue
+		end
+		return true
+	end
+	return false
 end
 
 -- Crosswalk reservations of NPC `id` for Walker.Follow (TrafficService runs in game time only, never in OnInit)
@@ -524,6 +605,7 @@ function NpcService:WalkToPosition(id: number, position: Vector3, timeout: numbe
 		return false
 	end
 	npc.Walk += 1
+	npc.Tether = false
 	const order = npc.Walk
 	return Walker.Direct(npc.Rig, position, function(): boolean
 		return self.Active[id] == npc and npc.Walk == order
@@ -538,6 +620,7 @@ function NpcService:MoveToward(id: number, position: Vector3)
 		return
 	end
 	npc.Walk += 1
+	npc.Tether = true
 	npc.Rig.Humanoid:MoveTo(position)
 end
 
@@ -548,6 +631,7 @@ function NpcService:Teleport(id: number, position: Vector3)
 		return
 	end
 	npc.Walk += 1
+	npc.Tether = true
 	const rotation = npc.Rig.Root.CFrame.Rotation
 	npc.Rig.Model:PivotTo(CFrame.new(position) * rotation)
 end
@@ -643,6 +727,11 @@ NpcService:OnInit(function(self)
 	registerGroup(PLAYERS_GROUP)
 	PhysicsService:CollisionGroupSetCollidable(GROUP, GROUP, false)
 	PhysicsService:CollisionGroupSetCollidable(GROUP, PLAYERS_GROUP, false)
+	registerGroup(PASS_GROUP)
+	PhysicsService:CollisionGroupSetCollidable(PASS_GROUP, GROUP, false)
+	if passThinProps() == 0 then
+		warn(`[NpcService] no thin street prop found in workspace.{ASSETS_ROOT}: NPCs still collide with the poles`)
+	end
 
 	const folder = Instance.new("Folder")
 	folder.Name = FOLDER_NAME
