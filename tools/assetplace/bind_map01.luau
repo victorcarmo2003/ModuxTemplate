@@ -1187,10 +1187,13 @@ end
 	Bin_<Suf>), parented to it, and are always re-derived from it on every run.
 	The two real rows are 1.5 apart in Z (operator row low, back row 0.3 higher), under the 2.0 of §18.7 item 4.
 	Fix without changing any game rule: the anchors of each row are pushed OUT of the grid so the billboards are
-	>= 2.0 apart: operator row -> towards the corridor (+Z) and slightly up; back row -> straight up.
+	>= 2.0 apart: operator row -> towards the corridor (+Z) and slightly up; back row -> slightly up (only raised
+	further by the safety loop when the measured rows still end up too close).
 	Use and Restock of the same bowl share the position (one action visible at a time). ]]
-local TOPPING_OPERATOR_OFFSET = Vector3.new(0, 0.35, 0.4)
-local TOPPING_BACK_OFFSET = Vector3.new(0, 1.25, 0)
+-- 2026-10-10 (user: prompts too high): the gap now comes from pushing the operator row further out (+0.6 Z,
+-- over the counter edge) instead of lifting the back row 1.25 (+ safety) over its bowls.
+local TOPPING_OPERATOR_OFFSET = Vector3.new(0, 0.35, 0.6)
+local TOPPING_BACK_OFFSET = Vector3.new(0, 0.35, 0)
 local TOPPING_MIN_GAP = 2.05 -- back row is raised further if the measured rows still end up closer than this
 
 local function bindToppings(model: Instance, opts: AnchorOpts, label: string, delta: Vector3)
@@ -1434,14 +1437,22 @@ local function bindPhone(vehicle: Instance, mapId: string, opts: AnchorOpts)
 		return
 	end
 	setPersistent(ph)
-	local a = ensureAnchor(ph, "Prompt_Answer", function()
+	-- 2026-10-10 (user: prompts too high): in front of the phone at mid-height, not 0.3 over its top (the phone sits
+	-- on a raised shelf, so the old point was ~2 studs over the eye). Both phones face the operator (MAP-01 +Z).
+	-- Re-derived on every run (the old created anchor kept its height); clearUp still lifts it if another owner is
+	-- under 2.6.
+	local function wanted(): Vector3
 		local mn, mx = partsBox(ph)
 		if mn and mx then
 			local c = (mn + mx) / 2
-			return Vector3.new(c.X, mx.Y + 0.3, c.Z)
+			return Vector3.new(c.X, c.Y, mx.Z + 0.1)
 		end
-		return mapPivot(ph).Position + Vector3.new(0, 1.6, 0)
-	end, opts, mapId)
+		return mapPivot(ph).Position + Vector3.new(0, 0.7, 0.45)
+	end
+	local a = ensureAnchor(ph, "Prompt_Answer", wanted, opts, mapId)
+	if a and a:IsA("Attachment") and a:GetAttribute(CREATED) then
+		a.WorldCFrame = FCF(CFrame.new(wanted()))
+	end
 	interactable(a, "answer_phone")
 	for _, n in { "Light_Ring", "VFX_Ring" } do
 		if not findNamed(ph, n) then
@@ -1630,14 +1641,20 @@ local function bindTrailer(assets: Instance, cart: Instance?, opts: AnchorOpts):
 	if cm then
 		local mn, mx = partsBox(cm)
 		local c = if mn and mx then (mn + mx) / 2 else mapPivot(cm).Position
-		local top = if mx then mx.Y else padPose.Y + TRAILER_COUNTER_DY + 2
+		-- 2026-10-10 (user: prompts too high): on the front face at mid-height (was 0.3 over the machine top, ~1.3
+		-- over the eye); re-derived on every run when created by the binding (an .fbx Attachment is left alone)
+		local mid = if mn and mx then c.Y else padPose.Y + TRAILER_COUNTER_DY + 1
 		local front = if mn then mn.Z - 0.2 else c.Z - 1.6 -- corridor side (north) at the Pad pose
-		interactable(ensureAnchor(cm, "Prompt_Brew", function()
-			return Vector3.new(c.X - 0.6, top + 0.3, front)
-		end, opts, "TRL-COFFEE"), "brew_coffee")
-		interactable(ensureAnchor(cm, "Prompt_Restock", function()
-			return Vector3.new(c.X + 0.6, top + 0.3, front)
-		end, opts, "TRL-COFFEE"), "restock")
+		for _, spec in { { "Prompt_Brew", "brew_coffee", -0.6 }, { "Prompt_Restock", "restock", 0.6 } } do
+			local function wanted(): Vector3
+				return Vector3.new(c.X + spec[3], mid, front)
+			end
+			local a = ensureAnchor(cm, spec[1], wanted, opts, "TRL-COFFEE")
+			if a and a:IsA("Attachment") and a:GetAttribute(CREATED) then
+				a.WorldCFrame = FCF(CFrame.new(wanted()))
+			end
+			interactable(a, spec[2])
+		end
 		for _, n in { "Bar_Brew", "Att_Cup", "VFX_Steam" } do
 			if not findNamed(cm, n) then
 				log("warn", ("TRL-COFFEE: fitting %s missing (KitchenController/Coffee.luau, TASK-069)"):format(n))

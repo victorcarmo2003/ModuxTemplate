@@ -20,7 +20,8 @@
 	pre-checked against the mate's state and equipped Tool.
 
 	Sound (user request 2026-10-10): `prompt_hold` (Ui) plays on screen while a hold is in progress and stops when it
-	ends (released, cancelled or fired).
+	ends (released, cancelled or fired). `trash` (user request 2026-10-10) plays at the bin once a fired `discard`
+	actually took the hand Tool away (the server decided; no Tool gone within DISCARD_WAIT s = rejected = silence).
 ]]
 local Players = game:GetService("Players")
 local CollectionService = game:GetService("CollectionService")
@@ -41,6 +42,9 @@ const MIN_FIRE_INTERVAL = 1 / 8
 const TOUCH_SIZE = 72
 const KEY_LABEL = { KeyboardMouse = "E", Gamepad = "X", Touch = "" }
 const HOLD_SOUND = "prompt_hold"
+const DISCARD_ACTION = "discard"
+const DISCARD_SOUND = "trash"
+const DISCARD_WAIT = 1.5 -- s for the server to remove the thrown Tool
 
 const PromptController = Modux.Controller(
 	"PromptController",
@@ -109,6 +113,41 @@ function PromptController:Fire(prompt: Prompt.Prompt)
 	end
 	self.LastFire = now
 	self.Libs.Net.Interact:fireServer({ Id = id, Action = action })
+	if action == DISCARD_ACTION then
+		self:WatchDiscard(prompt.Anchor)
+	end
+end
+
+-- `trash` at the bin when the server removes the Tool the local character held (Throw Away accepted)
+function PromptController:WatchDiscard(anchor: Instance)
+	const character = Players.LocalPlayer.Character
+	const tool = if character then character:FindFirstChildOfClass("Tool") else nil
+	if character == nil or tool == nil then
+		return
+	end
+	local connection: RBXScriptConnection? = nil
+	const timeout = task.delay(DISCARD_WAIT, function()
+		if connection then
+			connection:Disconnect()
+		end
+	end)
+	connection = tool.AncestryChanged:Connect(function()
+		if tool:IsDescendantOf(character) then
+			return
+		end
+		if connection then
+			connection:Disconnect()
+		end
+		if coroutine.status(timeout) == "suspended" then
+			task.cancel(timeout)
+		end
+		-- moved to the Backpack = unequipped, not thrown
+		const backpack = Players.LocalPlayer:FindFirstChildOfClass("Backpack")
+		if backpack and tool:IsDescendantOf(backpack) then
+			return
+		end
+		self.Dependencies.AudioController:Play(DISCARD_SOUND, anchor)
+	end)
 end
 
 function PromptController:CancelHold()

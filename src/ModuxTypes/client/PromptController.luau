@@ -16,6 +16,7 @@ export type Public = {
 	Add: (self: Public, anchor: Instance) -> (),
 	Remove: (self: Public, anchor: Instance) -> (),
 	Fire: (self: Public, prompt: Prompt.Prompt) -> (),
+	WatchDiscard: (self: Public, anchor: Instance) -> (),
 	CancelHold: (self: Public) -> (),
 	BeginHold: (self: Public, prompt: Prompt.Prompt) -> (),
 	EndHold: (self: Public) -> (),

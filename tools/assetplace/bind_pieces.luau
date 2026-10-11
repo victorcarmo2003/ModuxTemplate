@@ -46,8 +46,8 @@
 	SHARED PROMPTS (Provisório, level-designer, TASK-085): only KitchenService filters slot Attachments by Level; the
 	InteractionService / PromptController do not filter Interactable by Level, so one anchor per level would show three
 	prompts. Each cooler prompt goes to the X/Z of the level whose kit anchor is furthest out in front (L3 fridge, so it
-	is never inside the body), Y = median of the levels, then both are lifted together until the lower one is 0.3
-	above the counter top (the cart cooler sits low inside the cart body). If the code ever filters Interactable by
+	is never inside the body), Y = the lowest level (2026-10-10, was the median), then each one is lifted on its own
+	until it is 0.3 above the counter top (the cart cooler sits low inside the cart body). If the code ever filters Interactable by
 	Level, switch to one anchor per level with Level (T38).
 
 	COUNTER (Provisório, level-designer, TASK-085; AST-078 replaces the trailer one, TASK-088): the kit counter is a
@@ -569,8 +569,10 @@ local function bindCoolerPrompts(station: Instance, clones: { [number]: Model },
 	if not pivot then
 		return moved
 	end
+	-- 2026-10-10 (user: prompts too high): Y = the LOWEST level (L1 front face), not the median, and each prompt is
+	-- clamped on its own to counter + PROMPT_ABOVE_COUNTER. The old common lift kept Take ~1.1 over Restock, so on
+	-- the cart (cooler low in the body) Take ended ~1.4 over the counter, at eye height.
 	local targets: { [string]: Vector3 } = {}
-	local lowest = math.huge
 	for _, spec in COOLER_PROMPTS do
 		local list: { Vector3 } = {}
 		for _, c in clones do
@@ -592,19 +594,17 @@ local function bindCoolerPrompts(station: Instance, clones: { [number]: Model },
 			table.insert(ys, p.Y)
 		end
 		table.sort(ys)
-		local y = ys[math.floor((#ys + 1) / 2)]
-		local localPos = Vector3.new(front.X, y, front.Z)
-		targets[spec.action] = localPos
-		lowest = math.min(lowest, (pivot :: CFrame):PointToWorldSpace(localPos).Y)
+		targets[spec.action] = Vector3.new(front.X, ys[1], front.Z)
 	end
 	local floor = ((vehicle :: any):GetPivot() :: CFrame).Y + (COUNTER_TOP_DY[vkey] or 3.0) + PROMPT_ABOVE_COUNTER
-	local lift = if lowest < math.huge then math.max(0, floor - lowest) else 0
 	for _, spec in COOLER_PROMPTS do
 		local localPos = targets[spec.action]
 		if not localPos then
 			continue
 		end
-		local world = (pivot :: CFrame):PointToWorldSpace(localPos) + Vector3.new(0, lift, 0)
+		local raw = (pivot :: CFrame):PointToWorldSpace(localPos)
+		local lift = math.max(0, floor - raw.Y)
+		local world = raw + Vector3.new(0, lift, 0)
 		local list = stationAnchors(station, spec.action)
 		if #list ~= 1 then
 			log("err", ("%s: %d %s anchor(s) in the station (need 1; run bind_map01 first)"):format(label, #list, spec.action))
