@@ -54,8 +54,20 @@ Faixas enviadas pelo usuário ao grupo do jogo ("Axiom Project Studio"); licenç
 | Faixa | Asset ID | Uso (`Content.Sounds`) |
 |---|---|---|
 | Lobby | 133495425923316 | `music_lobby` |
-| Sunny Town | 88103069634103 | `music_day` |
-| Night Town | 73501320034226 | `music_night_calm` |
-| Night Fall | 135232738690923 | `music_night` |
+| Sunny Town | 88103069634103 | `music_day_sunny` (início do turno de dia) |
+| Small Town | 104601257905379 | `music_day_small` (início do turno de dia) |
+| Night Town | 73501320034226 | `music_night_town` (início do turno de noite) |
+| Night Fall | 135232738690923 | `music_night_fall` (início do turno de noite) |
 | Melancolic City | 86360851369933 | `music_finale` |
-| Small Town | 104601257905379 | `music_credits` |
+
+Sem música de créditos (decisão do usuário, 2026-10-10; `docs/audio/sound-list.md` §3).
+
+## Ambiente (2026-10-10)
+
+Faixas enviadas pelo usuário ao grupo do jogo ("Axiom Project Studio"); licença e origem sob responsabilidade do usuário (**licença a confirmar**: registrar autor/licença de cada faixa aqui).
+
+| Faixa | Asset ID | Uso (`Content.Sounds`) |
+|---|---|---|
+| CityAmbient | 108990827199430 | `amb_day_street` |
+| NightCrickets | 98652860867664 | `amb_night_street` |
+| SuperMarket Ambient | 121312424334285 | `amb_mart_hum` (dentro do Mart, LZ-4) |

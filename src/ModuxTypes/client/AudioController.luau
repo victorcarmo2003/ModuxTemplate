@@ -4,6 +4,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 
+export type AmbientBed = {
+	Key: string,
+	Stop: (fade: number?) -> (),
+}
 export type GroupName = "Music" | "Ambient" | "Sfx" | "Voice" | "Ui"
 export type At = Vector3 | Instance
 export type PlayOptions = {
@@ -24,21 +28,29 @@ export type Voice = {
 }
 
 export type Public = {
+	AmbientKey: string?,
+	Bed: AmbientBed?,
 	Ducked: Vide.Source<boolean>,
 	Groups: { [string]: SoundGroup },
 	Idle: { [string]: { Sound } },
+	LastShiftTrack: { [string]: string },
 	Loops: { [string]: { [any]: Voice } },
 	Master: SoundGroup?,
 	MusicCue: Vide.Source<string>,
 	MusicStack: Vide.Source<{ string }>,
 	Rng: Random,
 	Screen: Folder?,
+	ShiftId: string?,
+	ShiftMusic: Vide.Source<string>,
+	ShiftTrack: Sound?,
 	Track: Sound?,
 	TrackKey: string?,
 	Unmount: (() -> ())?,
 	Voices: { Voice },
 	Volumes: { [string]: number },
 	Warned: { [string]: boolean },
+	ZoneAmbient: Vide.Source<string>,
+	ZoneParts: { [string]: BasePart },
 	Setup: (self: Public) -> (),
 	WarnOnce: (self: Public, tag: string, message: string) -> (),
 	BuildGroups: (self: Public) -> (),
@@ -60,6 +72,12 @@ export type Public = {
 	PopMusic: (self: Public, cue: string) -> (),
 	FadeOut: (self: Public, sound: Sound, time: number) -> (),
 	SetMusic: (self: Public, cueKey: string?) -> (),
+	StopShiftTrack: (self: Public, time: number) -> (),
+	PlayShiftTrack: (self: Public, isNight: boolean) -> (),
+	OnShiftState: (self: Public, ready: boolean, phase: string, id: string, isNight: boolean) -> (),
+	SetAmbient: (self: Public, key: string?) -> (),
+	ZonePart: (self: Public, id: string) -> BasePart?,
+	ZoneAt: (self: Public) -> string?,
 	Preload: (self: Public) -> (),
 	SetDucked: (self: Public, record: { State: string }?) -> (),
 }

@@ -5,6 +5,11 @@
 -- the event it already receives.
 -- Music (cues): AudioController plays the highest Priority cue whose When holds; PushMusic overrides (cutscene).
 -- When: IsNight (shift kind), Phase (keys of Shift), Window (Nights.Windows name); nil field = any.
+-- Shift music (user decision 2026-10-10, sound-list.md §3): no looped day/night theme. At the start of each shift
+-- (Rules.ShiftMusicPhase) one track of the shift's pool plays once (Looped = false), never twice in a row when the
+-- pool allows; a client that joins after Rules.ShiftMusicFresh seconds of that phase hears nothing. The rest of the
+-- shift is only the street ambience (Rules.Ambient, crossfaded loop; Rules.AmbientZones inside the Mart). No credits
+-- music.
 local Table = require(script.Parent.Table)
 
 export type Group = "Music" | "Ambient" | "Sfx" | "Voice" | "Ui"
@@ -18,6 +23,10 @@ export type Sound = {
 	Spatial: boolean,
 	MaxDistance: number, -- studs (Spatial only)
 	Ref: string, -- AST-### / license line in credits.md
+	-- s: Ambient beds loop by crossfading two copies (user request 2026-10-10): fade-in at the start, fade-out over the
+	-- last Crossfade s while the next copy fades in from the start; also the fade between two beds. Capped at 1/4 of
+	-- the track length by AudioController. 0 = plain Looped (or no fade) for the other groups.
+	Crossfade: number,
 }
 
 export type When = {
@@ -40,22 +49,51 @@ export type SoundRules = {
 	DuckOnCall: number, -- music volume multiplier while the boss is talking
 	SirenMaxVolume: number, -- never above the ambience (DEC-005)
 	ScareMaxVolume: number, -- DEC-173
+	ShiftMusic: ShiftPool, -- one track per shift start (user decision 2026-10-10)
+	ShiftMusicPhase: string, -- key of Shift where the shift starts
+	ShiftMusicFresh: number, -- s: joined later than this into ShiftMusicPhase = no shift music
+	Ambient: ShiftAmbient, -- street ambience looped through the shift
+	AmbientZones: { [string]: string }, -- LightZone ZoneId -> Ambient key that replaces the street inside it
+	AmbientOff: { string }, -- keys of Shift without street ambience (cutscenes, end of run)
 }
 
-local function music(key: string, id: string?, ref: string?): Sound
-	return { Key = key, Id = id or "", Group = "Music", Volume = 0.5, Looped = true, Spatial = false, MaxDistance = 0, Ref = ref or "" }
-end
+export type ShiftPool = {
+	Day: { string }, -- keys of Sounds (Group Music, Looped = false)
+	Night: { string },
+}
 
-local function ambient(key: string, spatial: boolean): Sound
+export type ShiftAmbient = {
+	Day: string, -- key of Sounds (Group Ambient)
+	Night: string,
+}
+
+local function music(key: string, id: string?, ref: string?, looped: boolean?): Sound
 	return {
 		Key = key,
-		Id = "",
+		Id = id or "",
+		Group = "Music",
+		Volume = 0.5,
+		Looped = looped ~= false,
+		Spatial = false,
+		MaxDistance = 0,
+		Ref = ref or "",
+		Crossfade = 0,
+	}
+end
+
+const AMBIENT_CROSSFADE = 4 -- s, default (user request 2026-10-10)
+
+local function ambient(key: string, spatial: boolean, id: string?, ref: string?): Sound
+	return {
+		Key = key,
+		Id = id or "",
 		Group = "Ambient",
 		Volume = 0.4,
 		Looped = true,
 		Spatial = spatial,
 		MaxDistance = if spatial then 80 else 0,
-		Ref = "",
+		Ref = ref or "",
+		Crossfade = AMBIENT_CROSSFADE,
 	}
 end
 
@@ -69,25 +107,38 @@ local function sfx(key: string, looped: boolean?): Sound
 		Spatial = true,
 		MaxDistance = 60,
 		Ref = "",
+		Crossfade = 0,
 	}
 end
 
 local function ui(key: string): Sound
-	return { Key = key, Id = "", Group = "Ui", Volume = 0.5, Looped = false, Spatial = false, MaxDistance = 0, Ref = "" }
+	return {
+		Key = key,
+		Id = "",
+		Group = "Ui",
+		Volume = 0.5,
+		Looped = false,
+		Spatial = false,
+		MaxDistance = 0,
+		Ref = "",
+		Crossfade = 0,
+	}
 end
 
 const base = Table.new({
 	-- Music
 	music("music_lobby", "rbxassetid://133495425923316", "Lobby (Axiom Project Studio upload)"),
-	music("music_day", "rbxassetid://88103069634103", "Sunny Town (Axiom Project Studio upload)"),
-	music("music_night_calm", "rbxassetid://73501320034226", "Night Town (Axiom Project Studio upload)"),
-	music("music_night", "rbxassetid://135232738690923", "Night Fall (Axiom Project Studio upload)"),
 	music("music_finale", "rbxassetid://86360851369933", "Melancolic City (Axiom Project Studio upload)"),
-	music("music_credits", "rbxassetid://104601257905379", "Small Town (Axiom Project Studio upload)"),
+	-- shift start pools (once, no loop)
+	music("music_day_sunny", "rbxassetid://88103069634103", "Sunny Town (Axiom Project Studio upload)", false),
+	music("music_day_small", "rbxassetid://104601257905379", "Small Town (Axiom Project Studio upload)", false),
+	music("music_night_town", "rbxassetid://73501320034226", "Night Town (Axiom Project Studio upload)", false),
+	music("music_night_fall", "rbxassetid://135232738690923", "Night Fall (Axiom Project Studio upload)", false),
 	-- Ambient
-	ambient("amb_day_street", false),
-	ambient("amb_night_street", false),
-	ambient("amb_mart_hum", true),
+	ambient("amb_day_street", false, "rbxassetid://108990827199430", "CityAmbient (Axiom Project Studio upload)"),
+	ambient("amb_night_street", false, "rbxassetid://98652860867664", "NightCrickets (Axiom Project Studio upload)"),
+	-- inside the Mart (LZ-4), replaces the street bed (Rules.AmbientZones)
+	ambient("amb_mart_hum", false, "rbxassetid://121312424334285", "SuperMarket Ambient (Axiom Project Studio upload)"),
 	ambient("amb_clock_tick", true), -- C-01
 	ambient("amb_fog", false), -- N10
 	-- Sfx
@@ -150,19 +201,10 @@ const base = Table.new({
 } :: { Sound })
 
 const cues = Table.new({
+	-- lobby only before the first Shift record (empty When, see AudioController Cues)
 	{ Key = "lobby", Sound = "music_lobby", When = {}, FadeIn = 1, FadeOut = 1, Priority = 0 },
-	{ Key = "day", Sound = "music_day", When = { IsNight = false }, FadeIn = 2, FadeOut = 2, Priority = 1 },
-	{
-		Key = "night_calm",
-		Sound = "music_night_calm",
-		When = { IsNight = true, Phase = { "Night" }, Window = "Calm" },
-		FadeIn = 3,
-		FadeOut = 3,
-		Priority = 3,
-	},
-	{ Key = "night", Sound = "music_night", When = { IsNight = true }, FadeIn = 3, FadeOut = 3, Priority = 2 },
+	-- finale (FEAT-027) and through the credits scene of the same phase; RunEnd has no music
 	{ Key = "finale", Sound = "music_finale", When = { Phase = { "Finale" } }, FadeIn = 2, FadeOut = 2, Priority = 5 },
-	{ Key = "credits", Sound = "music_credits", When = { Phase = { "RunEnd" } }, FadeIn = 2, FadeOut = 2, Priority = 4 },
 } :: { Cue })
 
 const rules: SoundRules = {
@@ -170,6 +212,15 @@ const rules: SoundRules = {
 	DuckOnCall = 0.3,
 	SirenMaxVolume = 0.5, -- DEC-005 (below the ambience peak; tune in play)
 	ScareMaxVolume = 0.5, -- DEC-173
+	ShiftMusic = {
+		Day = { "music_day_sunny", "music_day_small" },
+		Night = { "music_night_town", "music_night_fall" },
+	},
+	ShiftMusicPhase = "Prep", -- 7 AM / 7 PM: start of every shift (Shift.luau)
+	ShiftMusicFresh = 5, -- Provisional (frontend-coder)
+	Ambient = { Day = "amb_day_street", Night = "amb_night_street" },
+	AmbientZones = { ["LZ-4"] = "amb_mart_hum" }, -- MAP-01 §10.2: LZ-4 = Mart interior
+	AmbientOff = { "Intro", "Finale", "RunEnd" },
 }
 
 return Table.with(base, {

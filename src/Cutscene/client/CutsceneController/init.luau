@@ -82,8 +82,9 @@ const LIVE_WINDOW = 0.75 -- s: a beat crossed later than this after its At is ca
 const FADE_ORDER = 51 -- above the vehicle fade (50) and the HUD
 const UI_ORDER = 52 -- subtitles and skip over the black
 const SPEAKERS: { [string]: string } = { walt = "Walt", crew = "You" }
--- music cue per scene (Content.Music); nil = the default cue of the phase
-const SCENE_MUSIC: { [string]: string } = { finale = "finale", credits = "credits" }
+-- music cue per scene (Content.Music); nil = the default cue of the phase (credits: the finale cue of the Finale
+-- phase keeps playing; no credits music, user decision 2026-10-10)
+const SCENE_MUSIC: { [string]: string } = { finale = "finale" }
 const PROMPT_SOUND = "prompt_done"
 const VOTE_SOUND = "skip_vote"
 const VOTE_CLIP = "wave_skip"

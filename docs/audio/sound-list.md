@@ -118,6 +118,25 @@ Padrão aprendido é o que as anomalias quebram (DEC-010). Estes sons têm dono 
 
 ## 3. Música (MUS)
 
+> **Decisão do usuário (2026-10-10) — vale sobre a tabela abaixo onde ela discordar.**
+> 1. **Sem música de créditos** (MUS-007 sai; `cs_credits` segue com a música do final da fase Finale e a tela de fim de run fica sem música).
+> 2. **Uma música no início de cada turno, uma vez só (sem loop).** Ao entrar na Preparação (`Prep`, 7 AM / 7 PM) o client sorteia uma faixa:
+>    dia = "Sunny Town" (`music_day_sunny`, rbxassetid://88103069634103) ou "Small Town" (`music_day_small`, rbxassetid://104601257905379);
+>    noite = "Night Town" (`music_night_town`, rbxassetid://73501320034226) ou "Night Fall" (`music_night_fall`, rbxassetid://135232738690923).
+>    Não repete a mesma faixa do último turno do mesmo tipo. Quem entra no meio do turno (mais de `ShiftMusicFresh` = 5 s depois do início da fase,
+>    Provisório) não ouve. Noite repetida (retry) conta como turno novo.
+> 3. **O resto do turno é só ambiente:** rua de dia `amb_day_street` = "CityAmbient" (rbxassetid://108990827199430), rua de noite
+>    `amb_night_street` = "NightCrickets" (rbxassetid://98652860867664); dentro do Mart (volume LZ-4) `amb_mart_hum` = "SuperMarket Ambient"
+>    (rbxassetid://121312424334285) no lugar da rua.
+> 4. **Loop com crossfade (pedido explícito):** ambiente nunca usa `Looped` puro. Duas cópias do mesmo som se alternam: a faixa começa baixa e sobe;
+>    `Crossfade` s antes do fim (campo por som em `Content.Sounds`, padrão 4 s, limitado a 1/4 da duração) ela começa a descer e, no mesmo instante,
+>    a outra cópia começa do início subindo. A troca entre ambientes (dia → noite, rua → Mart) é o mesmo crossfade.
+> 5. Mantidas: `music_lobby` ("Lobby", rbxassetid://133495425923316, loop no lobby) e `music_finale` ("Melancolic City", rbxassetid://86360851369933)
+>    no final. Ducking na ligação do chefe continua (vale também para a música do turno).
+>
+> Implementação: `src/Shared/Content/Sounds.luau` (`Rules.ShiftMusic`, `ShiftMusicPhase`, `ShiftMusicFresh`, `Ambient`, `AmbientZones`, `AmbientOff`),
+> `src/Audio/client/AudioController/` (`init.luau`, `Cues.luau`, `Bed.luau`).
+
 Direção (style guide §11): dia com ukulele/xilofone leves, loop curto e alegre; noite = **a mesma melodia, mais lenta e com notas faltando**.
 Um tema só, várias roupas. Música **nunca reage ao aparecimento de anomalia** (seria um sinal apontando o alvo, style guide §4.4).
 

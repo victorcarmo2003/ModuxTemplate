@@ -768,6 +768,7 @@ local function checkMedia()
 			fail("Sounds", index, row.Key, `Id '{row.Id}' is neither empty nor rbxassetid://<n>`)
 		end
 		inRange("Sounds", index, row.Key, "Volume", row.Volume, 0, 1)
+		inRange("Sounds", index, row.Key, "Crossfade", row.Crossfade, 0, 30)
 	end
 	checkKeys("Music", Sounds.Music, KEY_PATTERN)
 	const phases = setOf(Shift.Keys)
@@ -787,6 +788,39 @@ local function checkMedia()
 		end
 	end
 	inRange("SoundRules", nil, nil, "MaxVoices", Sounds.Rules.MaxVoices, 1, 64)
+	-- shift music pools: Music rows played once (user decision 2026-10-10)
+	const rules = Sounds.Rules
+	const pools: { { string } } = { rules.ShiftMusic.Day, rules.ShiftMusic.Night }
+	for _, pool in pools do
+		if #pool == 0 then
+			fail("SoundRules", nil, nil, "ShiftMusic pool is empty")
+		end
+		for _, key in pool do
+			const sound = Sounds.ByKey[key]
+			if sound == nil or sound.Group ~= "Music" or sound.Looped then
+				fail("SoundRules", nil, key, `ShiftMusic '{key}' is not a Music sound with Looped = false`)
+			end
+		end
+	end
+	if not phases[rules.ShiftMusicPhase] then
+		fail("SoundRules", nil, nil, `ShiftMusicPhase '{rules.ShiftMusicPhase}' not in Shift`)
+	end
+	inRange("SoundRules", nil, nil, "ShiftMusicFresh", rules.ShiftMusicFresh, 0, 60)
+	const beds: { string } = { rules.Ambient.Day, rules.Ambient.Night }
+	for _, key in rules.AmbientZones do
+		table.insert(beds, key)
+	end
+	for _, key in beds do
+		const sound = Sounds.ByKey[key]
+		if sound == nil or sound.Group ~= "Ambient" or not sound.Looped then
+			fail("SoundRules", nil, key, `Ambient '{key}' is not a looped Ambient sound`)
+		end
+	end
+	for _, phase in rules.AmbientOff do
+		if not phases[phase] then
+			fail("SoundRules", nil, nil, `AmbientOff '{phase}' not in Shift`)
+		end
+	end
 end
 
 local function checkWave2Records()

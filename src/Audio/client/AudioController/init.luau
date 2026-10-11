@@ -15,7 +15,16 @@
 	- Loop(key, at, on) -> Sound?: one looped voice per (key, at); on = false stops it. A destroyed anchor ends it.
 	- Music: the highest Priority cue of Content.Music whose When holds for RoundController (Phase, IsNight,
 	  NightWindow); PushMusic(cue) overrides (cutscene, finale) until PopMusic(cue). Crossfade with the cue's
-	  FadeOut/FadeIn. An anomaly never changes the music (sound-list §6).
+	  FadeOut/FadeIn. An anomaly never changes the music (sound-list §6). Today the cues are lobby and finale only.
+	- Shift music (user decision 2026-10-10, sound-list §3): when RoundController enters SoundRules.ShiftMusicPhase
+	  (Prep) of a new shift, one track of SoundRules.ShiftMusic.Day/Night plays once (no loop), not the same track as
+	  the last shift of that kind. A client that sees the phase more than ShiftMusicFresh s after it started (late
+	  joiner, reconnect) hears nothing; a retried night counts as a new shift. A cue (lobby, finale, cutscene push)
+	  fades the shift track out.
+	- Ambience: SoundRules.Ambient.Day/Night on screen while a shift runs (not in the lobby, during a pushed cue or in
+	  SoundRules.AmbientOff phases); inside a LightZone of SoundRules.AmbientZones (LZ-4 = Mart interior, character
+	  position, AMBIENT_RATE Hz) that zone's bed replaces the street. Each bed is a crossfaded loop of two copies
+	  (Bed.luau, Sound.Crossfade); a change of bed crossfades too. Beds are apart from the MaxVoices pool, like music.
 	- Ducking: while the Call set (network.md §13.3, record 1) is "Talking", the Music group goes to
 	  SoundRules.DuckOnCall.
 	- Id "" = silence: Play/Loop return nil, no error and no warn (every Id is "" until Q-168). An unknown key warns
@@ -23,14 +32,19 @@
 	- Caps (DEC-005, DEC-173): siren_soft never above SoundRules.SirenMaxVolume; opts.Scare clamps to
 	  SoundRules.ScareMaxVolume (Provisional: the table has no scare flag yet, the caller marks it).
 ]]
+local CollectionService = game:GetService("CollectionService")
 local ContentProvider = game:GetService("ContentProvider")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local SoundService = game:GetService("SoundService")
 local StarterPlayer = game:GetService("StarterPlayer")
 local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
+local Players = game:GetService("Players")
+local Zones = require(ReplicatedStorage.shared.Light.Zones)
+local Bed = require(script.Bed)
 local Cues = require(script.Cues)
 
 const RULES = Content.SoundRules
@@ -46,6 +60,13 @@ const IDLE_PER_KEY = 3 -- pooled Sounds kept per key
 const STALE_AFTER = 1 -- s: a one-shot not playing after this is released (failed load never fires Ended)
 const DUCK_TIME = 0.5 -- s
 const SCREEN_ANCHOR = "screen"
+const SHIFT_FADE = 1.5 -- s: fade of a shift track cut by a cue or by the next shift
+const AMBIENT_RATE = 4 -- Hz: zone check of the local character (Mart bed)
+
+export type AmbientBed = {
+	Key: string,
+	Stop: (fade: number?) -> (),
+}
 
 export type GroupName = "Music" | "Ambient" | "Sfx" | "Voice" | "Ui"
 export type At = Vector3 | Instance
@@ -90,6 +111,19 @@ function AudioController:Setup()
 	self.Track = nil :: Sound?
 	self.TrackKey = nil :: string?
 	self.Ducked = Vide.source(false) :: Vide.Source<boolean>
+	-- shift track (once per shift): the Sound, its key ("" = none; QA and debug read it), the last shift that got
+	-- its chance and the last key per kind ("Day" / "Night") so the pool does not repeat
+	self.ShiftTrack = nil :: Sound?
+	self.ShiftMusic = Vide.source("") :: Vide.Source<string>
+	self.ShiftId = nil :: string?
+	self.LastShiftTrack = {} :: { [string]: string }
+	-- ambience key and bed playing now (nil = none)
+	self.AmbientKey = nil :: string?
+	self.Bed = nil :: AmbientBed?
+	-- Ambient key of the SoundRules.AmbientZones zone the character is in ("" = outside)
+	self.ZoneAmbient = Vide.source("") :: Vide.Source<string>
+	-- ZoneId -> LightZone part (rescanned when it leaves the Workspace)
+	self.ZoneParts = {} :: { [string]: BasePart }
 	self.Unmount = nil :: (() -> ())?
 end
 
@@ -493,7 +527,7 @@ function AudioController:SetMusic(cueKey: string?)
 	sound.Name = `Music_{cue.Key}`
 	sound.SoundId = row.Id
 	sound.SoundGroup = self.Groups.Music
-	sound.Looped = true
+	sound.Looped = row.Looped
 	sound.Volume = if cue.FadeIn > 0 then 0 else row.Volume
 	sound.Parent = self.Screen
 	sound:Play()
@@ -501,6 +535,121 @@ function AudioController:SetMusic(cueKey: string?)
 		TweenService:Create(sound, TweenInfo.new(cue.FadeIn), { Volume = row.Volume }):Play()
 	end
 	self.Track = sound
+end
+
+function AudioController:StopShiftTrack(time: number)
+	const track = self.ShiftTrack
+	if track == nil then
+		return
+	end
+	self.ShiftTrack = nil
+	self.ShiftMusic("")
+	self:FadeOut(track, time)
+end
+
+-- One track of the shift pool, once (sound-list §3); nil key or Id "" = silence
+function AudioController:PlayShiftTrack(isNight: boolean)
+	const kind = if isNight then "Night" else "Day"
+	const pool = if isNight then RULES.ShiftMusic.Night else RULES.ShiftMusic.Day
+	const key = Cues.PickTrack(pool, self.LastShiftTrack[kind], self.Rng)
+	if key == nil then
+		return
+	end
+	self.LastShiftTrack[kind] = key
+	self:StopShiftTrack(SHIFT_FADE)
+	const row = self:Row(key)
+	if row == nil then
+		return
+	end
+	const sound = Instance.new("Sound")
+	sound.Name = `Shift_{key}`
+	sound.SoundId = row.Id
+	sound.SoundGroup = self.Groups.Music
+	sound.Looped = false
+	sound.Volume = row.Volume
+	sound.Parent = self.Screen
+	sound.Ended:Once(function()
+		if self.ShiftTrack == sound then
+			self.ShiftTrack = nil
+			self.ShiftMusic("")
+		end
+		sound:Destroy()
+	end)
+	self.ShiftTrack = sound
+	self.ShiftMusic(key)
+	sound:Play()
+end
+
+-- Shift start: plays the shift track once per shift, only for a client that saw the phase begin
+function AudioController:OnShiftState(ready: boolean, phase: string, id: string, isNight: boolean)
+	if not ready then
+		-- lobby: the next run starts clean
+		self.ShiftId = nil
+		return
+	end
+	if phase ~= RULES.ShiftMusicPhase or id == self.ShiftId then
+		return
+	end
+	self.ShiftId = id
+	const clock = self.Dependencies.RoundController.Clock
+	const fresh = clock ~= nil and Workspace:GetServerTimeNow() - clock.PhaseStartedAt <= RULES.ShiftMusicFresh
+	if fresh and #self.MusicStack() == 0 then
+		self:PlayShiftTrack(isNight)
+	end
+end
+
+-- Crossfades to the bed of `key` (nil = silence): the old bed fades out over the new bed's Crossfade
+function AudioController:SetAmbient(key: string?)
+	if self.AmbientKey == key then
+		return
+	end
+	self.AmbientKey = key
+	const row = if key ~= nil then self:Row(key) else nil
+	const old = self.Bed
+	self.Bed = nil
+	if old then
+		old.Stop(if row then row.Crossfade else nil)
+	end
+	if row == nil then
+		return
+	end
+	const screen = self.Screen
+	if screen == nil then
+		return
+	end
+	self.Bed = Bed.start(row, screen, self.Groups.Ambient)
+end
+
+function AudioController:ZonePart(id: string): BasePart?
+	const cached = self.ZoneParts[id]
+	if cached and cached:IsDescendantOf(Workspace) then
+		return cached
+	end
+	self.ZoneParts[id] = nil
+	for _, instance in CollectionService:GetTagged(Zones.Tag) do
+		if instance:IsA("BasePart") and instance:GetAttribute("ZoneId") == id and instance:IsDescendantOf(Workspace) then
+			self.ZoneParts[id] = instance
+			return instance
+		end
+	end
+	return nil
+end
+
+-- Ambient key of the zone the local character stands in (SoundRules.AmbientZones), nil = outside
+function AudioController:ZoneAt(): string?
+	const character = Players.LocalPlayer.Character
+	const root = if character then character:FindFirstChild("HumanoidRootPart") else nil
+	if not (root and root:IsA("BasePart")) then
+		return nil
+	end
+	for id, key in RULES.AmbientZones do
+		const part = self:ZonePart(id)
+		const zone = if part then Zones.read(part) else nil
+		if zone and Zones.contains(zone, root.Position) then
+			return key
+		end
+	end
+	return nil
 end
 
 function AudioController:Preload()
@@ -563,8 +712,24 @@ AudioController:OnStart(function(self)
 			}
 			const stack = self.MusicStack()
 			const cue = if #stack > 0 then stack[#stack] else Cues.Pick(Content.Music.List, state)
+			const zone: string = self.ZoneAmbient()
+			const ambient = Cues.Ambient(state, RULES.Ambient, RULES.AmbientOff, #stack > 0, if zone ~= "" then zone else nil)
 			Vide.untrack(function()
+				if cue ~= nil then
+					self:StopShiftTrack(SHIFT_FADE)
+				end
 				self:SetMusic(cue)
+				self:SetAmbient(ambient)
+				return nil
+			end)
+		end)
+		Vide.effect(function()
+			const ready = round.Ready()
+			const phase = round.Phase()
+			const isNight = round.IsNight()
+			const id = Cues.ShiftId(round.Day(), round.Night(), round.Attempt(), isNight)
+			Vide.untrack(function()
+				self:OnShiftState(ready, phase, id, isNight)
 				return nil
 			end)
 		end)
@@ -581,5 +746,12 @@ AudioController:OnStart(function(self)
 		self:Preload()
 	end)
 end)
+
+AudioController:OnTick(function(self)
+	const key = self:ZoneAt() or ""
+	if self.ZoneAmbient() ~= key then
+		self.ZoneAmbient(key)
+	end
+end, AMBIENT_RATE)
 
 return AudioController
