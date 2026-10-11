@@ -1083,7 +1083,12 @@ local function checkVehicleDistances(vehicles: { [string]: Instance })
 				local d = (pos(a) - pos(b)).Magnitude
 				if oa ~= ob then
 					closest = math.min(closest, d)
-					if d < 2.5 then
+					-- the phone prompt only shows while it rings (answer_phone): the user put the phones next to the
+					-- grill / cooler (2026-10-11), so it only has to keep 1.2 from the other prompts
+					const phone = a.Name == "Prompt_Answer" or b.Name == "Prompt_Answer"
+					if phone and d < 1.2 then
+						err(("4: %s: %s / %s (phone vs other owner) %.2f apart (< 1.2)"):format(key, name(a), name(b), d))
+					elseif not phone and d < 2.5 then
 						err(("4: %s: %s / %s (different owners) %.2f apart (< 2.5)"):format(key, name(a), name(b), d))
 					end
 				elseif oa and oa:GetAttribute("StationKind") == "toppings" then

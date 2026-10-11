@@ -662,10 +662,19 @@ local function streetText(on: BasePart, text: string)
 	end
 end
 
-function Decor.runDetails(): string
+-- FROZEN 2026-10-11: the user resized / centred the street sign blades, moved the cart logo and rebuilt the OPEN sign
+-- faces on a "Borda" proxy part by hand. runDetails refuses while any Detail_* exists unless force = true.
+function Decor.runDetails(force: boolean?): string
 	local root = workspace:FindFirstChild(ROOT)
 	if not root then
 		return "[err] no workspace." .. ROOT
+	end
+	if not force then
+		for _, d in root:GetDescendants() do
+			if string.sub(d.Name, 1, 7) == "Detail_" then
+				return "[skip] Detail_* pieces exist and were edited by hand: Decor.runDetails(true) to rebuild them anyway"
+			end
+		end
 	end
 	clearDetails(root)
 	local log = {}

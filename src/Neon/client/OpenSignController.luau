@@ -28,8 +28,11 @@ function OpenSignController:IsOpen(): boolean
 	return phase ~= nil and phase.Selling
 end
 
+-- The faces may sit on the tagged mesh or on a proxy part of the same stand model (user 2026-10-11: "Board" part,
+-- the mesh surface was not flat enough for a SurfaceGui), so the whole stand is searched.
 function OpenSignController:Paint(board: Instance, open: boolean)
-	for _, gui in board:GetChildren() do
+	const stand = board.Parent or board
+	for _, gui in stand:GetDescendants() do
 		if gui.Name == GUI_NAME then
 			const openLabel = gui:FindFirstChild("Open")
 			const closedLabel = gui:FindFirstChild("Closed")

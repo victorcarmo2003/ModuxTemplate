@@ -629,7 +629,7 @@ local ROAD_Y = 0 -- carriageway top (blockout Y_ROAD); the raycast result wins w
 local GRILL_SLOTS = 4
 local GRILL_FALLBACK_DX = { -1.35, -0.45, 0.45, 1.35 } -- 0.9 between centres (asset-list AST-012)
 local BUN_SLOT_STEP = 1.1 -- board slots along Att_Bun local X (cart 2: -/+0.55; trailer 3: -1.1, 0, +1.1)
-local PHONE_GAP = 2.6 -- phone prompt >= this from anchors of other owners in the same vehicle (§18.7 item 4 + margin)
+local PHONE_GAP = 1.3 -- phone prompt >= this from anchors of other owners (user 2026-10-11: phone moved next to the sausage cooler, prompt must stay low; was 2.6)
 
 -- Tarp placeholder (AST-043: 26 x 4 x 4, Mint-gray #B7CFC6; DEC-199). Replaced when the model exists (TASK-088).
 local COVER_COLOR = Color3.fromRGB(183, 207, 198)
