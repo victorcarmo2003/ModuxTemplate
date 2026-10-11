@@ -3189,6 +3189,47 @@ local function bindTables(assets: Instance, root: Instance?): number
 	return #tables
 end
 
+-- Lobby points (docs/levels/LOBBY.md §5, 2026-10-11): WORLD coordinates (no MAP_FRAME), in MapBinding/Lobby so the
+-- lobby services find them with the same MapPoint index. Rebuilt with the rest of the binding.
+local LOBBY_POINTS = {
+	{ id = "LOBBY-SPAWN", pos = Vector3.new(2, 0, -602), look = Vector3.new(0, 0, 1) },
+	{ id = "LOBBY-CLASS-STAGE", pos = Vector3.new(0, 1.02, -580.5), look = Vector3.new(0, 0, -1) },
+	{ id = "LOBBY-CLASS-CAM", pos = Vector3.new(0, 4.5, -592.5), look = Vector3.new(0, 0, 1), attrs = { Pitch = 2.39, Fov = 50 } },
+	{ id = "LOBBY-SHOP", pos = Vector3.new(-19.5, 0, -600), look = Vector3.new(-1, 0, 0) },
+	{ id = "LOBBY-CODES", pos = Vector3.new(-10, 0, -622.5), look = Vector3.new(0, 0, -1) },
+	{ id = "LOBBY-SQUAD-1", pos = Vector3.new(20, 0.3, -588), look = Vector3.new(1, 0, 0) },
+	{ id = "LOBBY-SQUAD-2", pos = Vector3.new(20, 0.3, -598), look = Vector3.new(1, 0, 0) },
+	{ id = "LOBBY-SQUAD-3", pos = Vector3.new(20, 0.3, -608), look = Vector3.new(1, 0, 0) },
+	{ id = "LOBBY-SQUAD-4", pos = Vector3.new(20, 0.3, -618), look = Vector3.new(1, 0, 0) },
+	{ id = "LOBBY-START", pos = Vector3.new(26.5, 0, -603), look = Vector3.new(1, 0, 0) },
+}
+local function bindLobby(root: Instance): number
+	if not Workspace:FindFirstChild("LOBBY_Assets") then
+		return 0
+	end
+	local f = Instance.new("Folder")
+	f.Name = "Lobby"
+	for _, pt in LOBBY_POINTS do
+		local p = Instance.new("Part")
+		p.Name = pt.id
+		p.Size = Vector3.new(1, 1, 1)
+		p.CFrame = CFrame.lookAt(pt.pos, pt.pos + pt.look)
+		p.Anchored = true
+		p.CanCollide = false
+		p.CanQuery = false
+		p.CanTouch = false
+		p.Transparency = 1
+		p:SetAttribute("PointId", pt.id)
+		for k, v in pt.attrs or {} do
+			p:SetAttribute(k, v)
+		end
+		CollectionService:AddTag(p, "MapPoint")
+		p.Parent = f
+	end
+	f.Parent = root
+	return #LOBBY_POINTS
+end
+
 function Bind.run(opts: AnchorOpts?): string
 	local o: AnchorOpts = opts or {}
 	table.clear(report)
@@ -3237,6 +3278,7 @@ function Bind.run(opts: AnchorOpts?): string
 	end
 	local root = bindPoints({ cart = cart, trailer = trl, poses = { cart = cartPose, trl = padPose, sale = salePose }, assets = assets })
 	bindLightZones(root, padPose)
+	log("ok", ("Lobby: %d lobby MapPoint(s) in MapBinding/Lobby (LOBBY.md §5)"):format(bindLobby(root)))
 	log("ok", ("SeatTable: %d picnic table(s) tagged, TableIndex nearest to Q1 first (FEAT-037)"):format(bindTables(assets, root)))
 	bindWindows(assets, root)
 	bindTraffic(root)

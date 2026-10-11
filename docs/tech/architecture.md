@@ -1584,7 +1584,7 @@ Servidor ("=" = igual à onda 1):
 | 560 | `BossService` | PlaceService, NetService, RoundService, RunStateService, InteractionService, VehicleService, ThiefService | R | 2 |
 | 555 | `ReviveService` | PlaceService, NetService, VitalService, AmbulanceService, MonetizationService, ItemService, RunStateService, EconomyService | L+R (handler) / R | 4 |
 | 550 | `RewardService` | PlaceService, ProfileService, RoundService, RunStateService, EconomyService | R (+ L: retry de badge) | 2 |
-| 545 | `PedestrianService` | PlaceService, NetService, RoundService, TrafficService, AnomalyService | R | 3 |
+| 545 | `PedestrianService` | PlaceService, NetService, RoundService, TrafficService, AnomalyService, CustomerService (TASK-163: registra `CustomerService:SetAdopter`, T42; o Customer nunca requer o Pedestrian) | R | 3 |
 | 540 | `CutsceneService` | PlaceService, NetService, RoundService, RunStateService, CharacterService | R | 3 |
 | 100 | `DevService` | = | R (dev) | E |
 

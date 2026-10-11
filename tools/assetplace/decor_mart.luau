@@ -181,6 +181,9 @@ local GLYPHS: { [string]: { { number } } } = {
 	N = { { 0, 0, 0, 3, 2, 0, 2, 3 } },
 	O = { { 0.5, 0, 0, 0.6, 0, 2.4, 0.5, 3, 1.5, 3, 2, 2.4, 2, 0.6, 1.5, 0, 0.5, 0 } },
 	P = { { 0, 0, 0, 3, 1.5, 3, 2, 2.5, 2, 2, 1.5, 1.5, 0, 1.5 } },
+	Q = { { 0.5, 0, 0, 0.6, 0, 2.4, 0.5, 3, 1.5, 3, 2, 2.4, 2, 0.6, 1.5, 0, 0.5, 0 }, { 1.2, 0.8, 2.2, -0.2 } },
+	F = { { 2, 3, 0, 3, 0, 0 }, { 0, 1.5, 1.4, 1.5 } },
+	B = { { 0, 0, 0, 3, 1.4, 3, 1.9, 2.6, 1.9, 1.9, 1.4, 1.5, 0, 1.5 }, { 1.4, 1.5, 2, 1.1, 2, 0.4, 1.5, 0, 0, 0 } },
 	R = { { 0, 0, 0, 3, 1.5, 3, 2, 2.5, 2, 2, 1.5, 1.5, 0, 1.5 }, { 1, 1.5, 2, 0 } },
 	S = { { 2, 2.6, 1.5, 3, 0.5, 3, 0, 2.5, 0, 2, 0.5, 1.5, 1.5, 1.5, 2, 1, 2, 0.5, 1.5, 0, 0.5, 0, 0, 0.4 } },
 	T = { { 0, 3, 2, 3 }, { 1, 3, 1, 0 } },
@@ -850,6 +853,220 @@ function Decor.runDetails(force: boolean?): string
 	table.insert(log, ("section sign faces: %d"):format(signs))
 
 	return "details: " .. table.concat(log, ", ")
+end
+
+--[[ Decor.runLobby(force?) (2026-10-11): procedural pieces of the lobby (docs/levels/LOBBY.md §10-§12): HQ / GEM SHOP /
+	START SHIFT / CODES neon, class stage, squad platforms (tag PartyPlatform, attribute Party), codes board, spawn
+	medallion, string lights, local lights, invisible walls. WORLD coordinates. Rebuilds workspace.LOBBY_Assets.LobbyProcedural;
+	refuses when it exists unless force (hand edits). MapPoints are the binding's job (bind_map01 bindLobby). ]]
+function Decor.runLobby(force: boolean?): string
+	local lobby = workspace:FindFirstChild("LOBBY_Assets")
+	if not lobby then
+		return "[err] no workspace.LOBBY_Assets: run Place.runInto(LOBBY_placements) first"
+	end
+	if lobby:FindFirstChild("LobbyProcedural") and not force then
+		return "[skip] LobbyProcedural exists: Decor.runLobby(true) to rebuild it"
+	end
+	local old = lobby:FindFirstChild("LobbyProcedural")
+	if old then
+		old:Destroy()
+	end
+	folder = Instance.new("Folder")
+	folder.Name = "LobbyProcedural"
+	folder.Parent = lobby
+	local KETCHUP = Color3.fromRGB(235, 70, 60)
+	local WOOD = Color3.fromRGB(196, 132, 84)
+	local WOOD_D = Color3.fromRGB(150, 92, 58)
+	local PAD = Color3.fromHex("E8D9B5")
+	local function face(pos: Vector3, dir: Vector3): CFrame
+		return CFrame.lookAt(pos, pos + dir)
+	end
+	local function solid(p: Part): Part
+		p.CanCollide = true
+		p.CanQuery = true
+		return p
+	end
+	local function cyl(name: string, dia: number, h: number, pos: Vector3, color: Color3, material: Enum.Material?): Part
+		local p = part(name, Vector3.new(h, dia, dia), CFrame.new(pos) * CFrame.Angles(0, 0, math.rad(90)), color, material)
+		p.Shape = Enum.PartType.Cylinder
+		return p
+	end
+	local function spot(at: Vector3, target: Vector3, color: Color3, brightness: number, range: number, angle: number, shadows: boolean?)
+		local p = part("LightAnchor", Vector3.new(0.2, 0.2, 0.2), CFrame.lookAt(at, target), color)
+		p.Transparency = 1
+		local s = Instance.new("SpotLight")
+		s.Face = Enum.NormalId.Front
+		s.Angle = angle
+		s.Color = color
+		s.Brightness = brightness
+		s.Range = range
+		s.Shadows = shadows == true
+		s.Parent = p
+	end
+	local function point(at: Vector3, color: Color3, brightness: number, range: number)
+		light(CFrame.new(at), "Point", color, brightness, range)
+	end
+
+	-- 12.1 HQ sign on BK-3
+	part("HQ_SignBoard", Vector3.new(26, 4.8, 0.3), face(Vector3.new(0, 11.6, -569.6), Vector3.new(0, 0, -1)), INK)
+	for _, t in { { Vector3.new(0, 14.1, -569.78), Vector3.new(26.4, 0.2, 0.2) }, { Vector3.new(0, 9.1, -569.78), Vector3.new(26.4, 0.2, 0.2) }, { Vector3.new(-13.1, 11.6, -569.78), Vector3.new(0.2, 5.2, 0.2) }, { Vector3.new(13.1, 11.6, -569.78), Vector3.new(0.2, 5.2, 0.2) } } do
+		part("HQ_SignTrim", t[2], CFrame.new(t[1]), MUSTARD, Enum.Material.Neon)
+	end
+	neonText("Neon_CornerDogs", "CORNER DOGS", face(Vector3.new(0, 12.5, -569.95), Vector3.new(0, 0, -1)), 2.0, MUSTARD)
+	neonText("Neon_HQ", "HQ", face(Vector3.new(0, 10.15, -569.95), Vector3.new(0, 0, -1)), 1.4, CREAM)
+	local plate = part("HQ_TopPlate", Vector3.new(9, 1.2, 0.2), face(Vector3.new(0, 14.75, -569.6), Vector3.new(0, 0, -1)), CREAM)
+	label(plate, Enum.NormalId.Front, "BRAMBLE'S", KETCHUP, INK)
+	for i, x in { -8.42, 11.48 } do
+		local icon = Instance.new("Model")
+		local icf = face(Vector3.new(x, 9.46, -569.95), Vector3.new(0, 0, -1))
+		neonShape("Neon_HotDog", { { 0, 0.6, 0.5, 0.1, 1.5, 0, 4.5, 0, 5.5, 0.1, 6, 0.6 }, { 0, 1.9, 0.5, 2.4, 1.5, 2.5, 4.5, 2.5, 5.5, 2.4, 6, 1.9 } }, icf, 0.55, Color3.fromRGB(255, 176, 80), 0.2, icon)
+		neonShape("Neon_HotDog", { { -0.4, 1.25, 0.2, 0.75, 1, 0.65, 5, 0.65, 5.8, 0.75, 6.4, 1.25, 5.8, 1.75, 5, 1.85, 1, 1.85, 0.2, 1.75, -0.4, 1.25 } }, icf, 0.55, KETCHUP, 0.2, icon)
+		neonShape("Neon_HotDog", { { 0.8, 1.2, 1.4, 1.5, 2, 1, 2.6, 1.5, 3.2, 1, 3.8, 1.5, 4.4, 1, 5, 1.4 } }, icf, 0.55, MUSTARD, 0.14, icon)
+		icon.Name = "Neon_HotDog"
+		icon:SetAttribute("Color", KETCHUP)
+		if i == 2 then
+			icon:SetAttribute("Flicker", true)
+		end
+		game:GetService("CollectionService"):AddTag(icon, "NeonSign")
+		icon.Parent = folder
+	end
+
+	-- 12.2 gem shop
+	neonText("Neon_GemShop", "GEM SHOP", face(Vector3.new(-22.0, 9.75, -600), Vector3.new(1, 0, 0)), 1.1, MINT)
+	for _, z in { -589.5, -610.5 } do
+		neonShape("Neon_Gem", { { 0, 2, 1, 3, 3, 3, 4, 2, 2, 0, 0, 2 }, { 0, 2, 4, 2 }, { 1, 3, 1.4, 2, 2, 0 }, { 3, 3, 2.6, 2, 2, 0 } }, face(Vector3.new(-22.0, 9.3, z) + Vector3.new(0, 0, 0.6), Vector3.new(1, 0, 0)), 0.3, MINT)
+	end
+	for i, z in { -590, -593, -596, -604, -607, -610 } do
+		local s = if i == 6 then 1.2 else 0.9
+		local g = part(if i == 6 then "Gem_S1" else "Gem_P" .. i, Vector3.new(s, s, s), CFrame.new(-24.375, 4.2, z) * CFrame.Angles(math.rad(45), 0, math.rad(35.26)), if i == 6 then MUSTARD else MINT, Enum.Material.Neon)
+		g:SetAttribute("Spin", true)
+	end
+
+	-- 12.3 squad platforms
+	for n, zc in { -588, -598, -608, -618 } do
+		local pad = solid(cyl("SquadPad_" .. n, 8, 0.3, Vector3.new(20, 0.15, zc), CREAM))
+		game:GetService("CollectionService"):AddTag(pad, "PartyPlatform")
+		pad:SetAttribute("Party", n)
+		cyl("SquadPadRim_" .. n, 8.5, 0.2, Vector3.new(20, 0.1, zc), KETCHUP, Enum.Material.Neon)
+		local numberPlate = part("SquadPadNumber_" .. n, Vector3.new(3.2, 0.02, 3.2), CFrame.new(20, 0.31, zc) * CFrame.Angles(0, math.rad(-90), 0), CREAM)
+		numberPlate.Transparency = 1
+		label(numberPlate, Enum.NormalId.Top, tostring(n), KETCHUP, CREAM)
+	end
+
+	-- 12.4 START SHIFT
+	for _, z in { -610.5, -595.5 } do
+		solid(part("Start_Post", Vector3.new(0.4, 9.8, 0.4), CFrame.new(29.4, 4.9, z), INK))
+	end
+	part("Start_Board", Vector3.new(0.3, 2.6, 15), CFrame.new(29.4, 8.4, -603), INK)
+	neonText("Neon_StartShift", "START SHIFT", face(Vector3.new(29.2, 8.4, -603), Vector3.new(-1, 0, 0)), 1.3, KETCHUP)
+	neonShape("Neon_StartArrow", { { 0, 1, 3, 1 }, { 2, 2, 3, 1, 2, 0 } }, face(Vector3.new(29.2, 7.0, -601.5), Vector3.new(-1, 0, 0)), 0.4, MUSTARD)
+
+	-- 12.5 codes board
+	for _, x in { -14.4, -5.6 } do
+		solid(part("Codes_Post", Vector3.new(0.6, 6.6, 0.6), CFrame.new(x, 3.3, -626.6), WOOD))
+	end
+	part("Codes_Frame", Vector3.new(8.6, 5.0, 0.3), CFrame.new(-10, 3.7, -626.75), WOOD_D)
+	local board = part("Codes_Board", Vector3.new(8, 4.4, 0.4), face(Vector3.new(-10, 3.7, -626.6), Vector3.new(0, 0, 1)), Color3.fromRGB(205, 160, 110))
+	label(board, Enum.NormalId.Front, "SECRET CODES\nCheck our socials!", INK, CREAM)
+	part("Codes_Roof", Vector3.new(9.4, 0.4, 1.4), CFrame.new(-10, 6.8, -626.6), KETCHUP)
+	part("Codes_SignBack", Vector3.new(5.2, 1.4, 0.2), CFrame.new(-10, 7.6, -626.6), INK)
+	neonText("Neon_Codes", "CODES", face(Vector3.new(-10, 7.6, -626.4), Vector3.new(0, 0, 1)), 1.0, CREAM)
+
+	-- 12.6 class stage
+	solid(part("Stage_Body", Vector3.new(12, 0.9, 7), CFrame.new(0, 0.45, -580.5), KETCHUP))
+	solid(part("Stage_Top", Vector3.new(12.2, 0.1, 7.2), CFrame.new(0, 0.95, -580.5), PAD))
+	part("Stage_Edge", Vector3.new(12.2, 0.08, 0.08), CFrame.new(0, 0.96, -584.14), MUSTARD, Enum.Material.Neon)
+	cyl("Stage_SpotRing", 3.9, 0.03, Vector3.new(0, 0.995, -580.5), CREAM, Enum.Material.Neon)
+	cyl("Stage_Spot", 3.6, 0.04, Vector3.new(0, 1.0, -580.5), MUSTARD)
+	for _, x in { -6.5, 6.5 } do
+		local headY = if x < 0 then 8.0 else 6.6
+		part("StageLight_Pole", Vector3.new(0.35, headY, 0.35), CFrame.new(x, headY / 2, -588.5), INK)
+		part("StageLight_Foot", Vector3.new(1.2, 0.3, 1.2), CFrame.new(x, 0.15, -588.5), INK)
+		local head = part("StageLight_Head", Vector3.new(1.0, 0.8, 1.2), CFrame.lookAt(Vector3.new(x, headY, -588.5), Vector3.new(0, 3.6, -580.5)), INK)
+		part("StageLight_Lens", Vector3.new(0.7, 0.5, 0.05), head.CFrame * CFrame.new(0, 0, -0.62), CREAM, Enum.Material.Neon)
+	end
+	spot(Vector3.new(-6.5, 8.0, -588.5), Vector3.new(0, 3.6, -580.5), Color3.fromHex("FFE7C2"), 4, 16, 45, true)
+	spot(Vector3.new(6.5, 6.6, -588.5), Vector3.new(0, 3.6, -580.5), CREAM, 1.5, 14, 55)
+	spot(Vector3.new(0, 6.8, -577.0), Vector3.new(0, 4.2, -580.5), Color3.fromHex("3FA7B5"), 1.2, 8, 60)
+
+	-- 10 other lights
+	point(Vector3.new(0, 10.5, -572.5), Color3.fromRGB(255, 200, 120), 1.4, 18)
+	point(Vector3.new(-24.5, 8.0, -600), Color3.fromHex("FFE7C2"), 1.2, 16)
+	spot(Vector3.new(-10, 7.0, -624.6), Vector3.new(-10, 3.7, -626.4), CREAM, 1.5, 9, 70)
+
+	-- 12.7 string lights
+	local colors = { MUSTARD, CREAM, KETCHUP, MINT }
+	local spans = {
+		{ Vector3.new(24, 11.5, -626), Vector3.new(24, 11.5, -576) },
+		{ Vector3.new(-26, 11.5, -626), Vector3.new(24, 11.5, -626) },
+		{ Vector3.new(-26, 11.5, -626), Vector3.new(24, 11.5, -576) },
+		{ Vector3.new(24, 11.5, -626), Vector3.new(-26, 11.5, -576) },
+	}
+	local bulbs = 0
+	for _, sp in spans do
+		local a, b = sp[1], sp[2]
+		local n = math.max(4, math.floor((b - a).Magnitude / 2.2))
+		local prev = a
+		for i = 1, n do
+			local t = i / n
+			local q = a:Lerp(b, t) - Vector3.new(0, math.sin(t * math.pi) * 1.5, 0)
+			local w = part("Wire", Vector3.new((q - prev).Magnitude, 0.06, 0.06), CFrame.lookAt((q + prev) / 2, q) * CFrame.Angles(0, math.rad(90), 0), INK)
+			w.CastShadow = false
+			if i < n then
+				local bulb = part("Bulb", Vector3.new(0.32, 0.32, 0.32), CFrame.new(q - Vector3.new(0, 0.22, 0)), colors[(i % #colors) + 1], Enum.Material.Neon)
+				bulb.Shape = Enum.PartType.Ball
+				bulbs += 1
+			end
+			prev = q
+		end
+	end
+
+	-- 12.8 floor chevrons
+	local routes = {
+		{ MUSTARD, { Vector2.new(1.6, -597.5), Vector2.new(1.2, -594.5), Vector2.new(0.8, -591.5) }, Vector2.new(0, 1), "CLASSES", Vector2.new(1.9, -600) },
+		{ KETCHUP, { Vector2.new(7.5, -602.6), Vector2.new(10.5, -602.8), Vector2.new(13.5, -603) }, Vector2.new(1, 0), "SQUAD UP", Vector2.new(6, -604.6) },
+		{ MINT, { Vector2.new(-2.5, -601.6), Vector2.new(-6.0, -601.2), Vector2.new(-9.5, -600.8) }, Vector2.new(-1, 0), "GEM SHOP", Vector2.new(-1, -599.6) },
+		{ CREAM, { Vector2.new(-0.6, -607.0), Vector2.new(-3.4, -611.2), Vector2.new(-6.2, -615.4) }, Vector2.new(-0.555, -0.832), "CODES", Vector2.new(0.8, -605.3) },
+	}
+	for _, r in routes do
+		local dir = Vector3.new(r[3].X, 0, r[3].Y).Unit
+		for _, tip in r[2] do
+			local tipPos = Vector3.new(tip.X, 0.025, tip.Y)
+			for _, side in { -1, 1 } do
+				local arm = (CFrame.lookAt(Vector3.zero, -dir) * CFrame.Angles(0, math.rad(40 * side), 0)).LookVector
+				local c = tipPos + arm * 0.7
+				part("Chevron", Vector3.new(0.28, 0.05, 1.4), CFrame.lookAt(c, c + arm), r[1], Enum.Material.Neon)
+			end
+		end
+		local lab = part("RouteLabel", Vector3.new(4.5, 0.04, 1.1), CFrame.lookAt(Vector3.new(r[5].X, 0.03, r[5].Y), Vector3.new(r[5].X, 0.03, r[5].Y) + dir) * CFrame.Angles(0, math.rad(90), 0), r[1])
+		lab.Transparency = 1
+		label(lab, Enum.NormalId.Top, r[4], r[1], INK)
+	end
+
+	-- 12.9 spawn medallion
+	cyl("SpawnRing", 6.4, 0.02, Vector3.new(2, 0.01, -602), MUSTARD, Enum.Material.Neon)
+	local med = cyl("SpawnMedallion", 6, 0.04, Vector3.new(2, 0.02, -602), CREAM)
+	local medLabel = part("SpawnLabel", Vector3.new(5, 0.02, 2), CFrame.new(2, 0.045, -602) * CFrame.Angles(0, math.rad(180), 0), CREAM)
+	medLabel.Transparency = 1
+	label(medLabel, Enum.NormalId.Top, "SELL HOTDOGS!", KETCHUP, INK)
+	local _ = med
+
+	-- 12.10 invisible walls
+	local walls = {
+		{ Vector3.new(0.7, 15, -569.5), Vector3.new(62.4, 30, 1) },
+		{ Vector3.new(0.7, 15, -630.5), Vector3.new(62.4, 30, 1) },
+		{ Vector3.new(-29.5, 15, -600), Vector3.new(1, 30, 64) },
+		{ Vector3.new(30.9, 15, -600), Vector3.new(1, 30, 64) },
+		{ Vector3.new(0, 15, -577.5), Vector3.new(32, 30, 15) },
+		{ Vector3.new(-25.65, 15, -600), Vector3.new(6.7, 30, 26) },
+	}
+	for i, w in walls do
+		local p = part("LobbyWall_" .. i, w[2], CFrame.new(w[1]), INK)
+		p.Transparency = 1
+		p.CanCollide = true
+		p.CastShadow = false
+	end
+	return ("lobby decor: bulbs %d"):format(bulbs)
 end
 
 return Decor

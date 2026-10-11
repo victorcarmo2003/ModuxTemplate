@@ -536,6 +536,19 @@ Teto de NPC simultâneo por servidor: **12** humanoides com IA de servidor **[DE
 
 Clientes contam desde o nascimento até sumirem (andando + no balcão + indo embora). Alucinações (FEAT-019) são só no client e não contam.
 
+**Passante vira cliente (Provisório, pedido do usuário 2026-10-11, TASK-163; números em `Content.Flow.Adopt`).** Para
+imersão e para o primeiro cliente não demorar: ~0,8 s antes de uma tentativa, com chance de **50% de dia / 15% à noite**
+(no máximo 1 a cada 8 s), o passante mais perto de Q5 (≤ 60 studs, fora da faixa) cuja espécie e roupa cabem num tipo
+de cliente liberado no turno **para** na calçada; na tentativa ele vira esse cliente no mesmo lugar (mesma espécie e
+roupa, sem o acessório do tipo), fica 0,6 s de frente para o carrinho e segue a rota normal até Q5. Ele sai da conta de
+passantes (a rua repõe um novo pela ponta de um caminho) e entra na de clientes (teto, balcão, nota). Se a tentativa
+der dupla, balcão cheio ou teto, ele só volta a andar. Nunca: cliente do tutorial, ator de anomalia, ladrão, dupla (os
+passantes andam sozinhos), tensão (rua deserta). À noite os passantes ficam no extremo oeste (MAP-01 §9.8), então quase
+nenhum está no raio. A **1ª tentativa** de cada fase de venda passa a ser 3–5 s depois do início (era um intervalo
+inteiro, ~22 s): primeiro cliente em Q5 em ~8–12 s. No Day 1 isso soma ~1 tentativa no `Open` (16 → 17, dentro de 14–18).
+Limite: só 8 das 17 espécies de passante têm tipo de cliente (Day 1: pinguim, hamster, rato, sapo), então a adoção
+depende de haver um desses perto.
+
 Party e reconexão (proposta para **Q-067**): o multiplicador de party usa os jogadores **ativos no início do turno** = conectados e não espectadores permanentes (FEAT-025). Quem cai, sai ou chega no meio do turno não muda o fluxo até o próximo. Preços do trailer e do Rescue Whistle continuam fixos pela party do fim do Day 1 (FEAT-001) **[DEC-047, DEC-121]**.
 
 - Critérios de aceite (método: contador de tentativas do `CustomerService` por resultado, lido por log/comando de dev;

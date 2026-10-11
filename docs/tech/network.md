@@ -471,6 +471,7 @@ cliente = espécie + acessório + roupa civil sorteada).
 | `CustomerType` | NPC | `CustomerTypes.Keys`; define o(s) acessório(s) (DEC-188). Passante: `pedestrian` (onda 2) | `NpcService` | 1 |
 | `LookPack` | personagem, NPC | `"Day"`, `"Mid"`, `"Night"` | crew: `CharacterService` (onda 1 sempre `Day`; onda 2 pelo `VitalService` conforme a faixa); NPC: `NpcService` (Day de dia, Mid à noite, DEC-181; Night só no clima de anomalia, onda 3, `Q-159`) | 1 |
 | `NpcId` | NPC | id do registro em `Customers` | `NpcService` | 1 |
+| `FromWalker` | NPC | id (slot 1..`WalkPaths.Rules.Slots`) do registro de `Pedestrians` que virou este cliente (adoção, TASK-163); ausente nos outros. Escrito antes de o rig entrar no `Workspace`, no mesmo frame em que o registro do passante sai; o client usa para a troca sem pulo (TASK-164). Sem rig do `CustomerType` (sem acessório: o passante não tinha) | `NpcService` | 3 (**Provisório**, pedido ao architect ratificar) |
 
 O rosto **não** é atributo escrito pelo servidor: deriva do pack (crew: Day → Normal, Mid → Exhausted, Night →
 `Normal_Night`, DEC-166/167; `Down` → Fainted, **Provisório** DEC-167) e, no NPC, do `Customers.Mood` (§5.3). O
