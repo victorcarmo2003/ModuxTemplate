@@ -220,6 +220,8 @@ DEC-010: o normal precisa ser repetitivo para a quebra ser notada. Tipos de `des
 
 Princípio: **a anomalia é feita das mesmas peças do normal**. Nada de brilho, partícula ou som que "aponte" o alvo (DEC-005: "sei que tem algo errado, mas não sei o quê").
 
+> **DEC-222 (2026-10-10, emenda deste §4.4):** o "sem som" acima não vale mais para estes sons, pedidos pelo usuário: ver anomalia = `anomaly_see`; início de anomalia = `horror_sting`; último passo do Walker (ANM-007) = `jumpscare`; janela 5–6 AM = `scary_violins` + camada `amb_horror`; noite perdida = `horror_dramatic`; chegada da SUV longa (ANM-008) = `car_honk_goofy`, bem alta (susto cômico). Brilho e partícula seguem proibidos. Detalhes em `audio/sound-list.md` §9.
+
 | Camada | Distância de leitura | Anomalias (DEC-073) |
 |---|---|---|
 | 1. Silhueta | 15+ studs | Walker alto e escuro sob o poste (ANM-007); carro comprido demais (ANM-008); silhueta acenando na janela (ANM-006) |
@@ -517,6 +519,8 @@ Proibido em qualquer VFX: sangue, respingo vermelho escuro, fogo em pessoa, expl
 ## 11. Áudio (direção mínima)
 
 Seção a completar em rodada própria (README tema 13). Direção inicial:
+
+> **DEC-222 (2026-10-10):** música toca **uma vez no início de cada turno** (dia: "Sunny Town"/"Small Town"; noite: "Night Town"/"Night Fall"); o resto do turno é só ambiente em loop com crossfade ("CityAmbient", "NightCrickets", "SuperMarket Ambient" no Mart); sem música de créditos ("Melancolic City" no final). Sons de terror ligados a anomalia: ver §4.4. Vale sobre "loop" e "sustos sonoros só como consequência da sanidade baixa" abaixo.
 - Dia: ukulele/xilofone leves, loop curto e alegre; SFX "plásticos" e redondos (pop, sino, chiado de grelha fofo); buzinas de trânsito curtas e engraçadas.
 - Noite: mesma melodia do dia, **mais lenta e com notas faltando**; zumbido constante dos postes; tique-taque do relógio do banco (ANM-003 é o silêncio dele).
 - Telefone do veículo (AST-042): toque de campainha antiga, próprio, nunca usado em outro lugar (a alucinação reaproveita o mesmo som).

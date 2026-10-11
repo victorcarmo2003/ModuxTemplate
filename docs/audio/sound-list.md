@@ -118,7 +118,7 @@ Padrão aprendido é o que as anomalias quebram (DEC-010). Estes sons têm dono 
 
 ## 3. Música (MUS)
 
-> **Decisão do usuário (2026-10-10) — vale sobre a tabela abaixo onde ela discordar.**
+> **Decisão do usuário (2026-10-10), registrada como DEC-222 — vale sobre a tabela abaixo onde ela discordar.**
 > 1. **Sem música de créditos** (MUS-007 sai; `cs_credits` segue com a música do final da fase Finale e a tela de fim de run fica sem música).
 > 2. **Uma música no início de cada turno, uma vez só (sem loop).** Ao entrar na Preparação (`Prep`, 7 AM / 7 PM) o client sorteia uma faixa:
 >    dia = "Sunny Town" (`music_day_sunny`, rbxassetid://88103069634103) ou "Small Town" (`music_day_small`, rbxassetid://104601257905379);
@@ -442,8 +442,9 @@ Reusos nas cutscenes: buzina (SFX-112), motor (SFX-110), ônibus (SFX-111), celu
 |---|---|---|
 | Teto do susto | nenhum SFX de alucinação ou anomalia passa **+3 dB** acima do ambiente da noite no mesmo instante | DEC-005, DEC-173 |
 | Grito, gore, impacto realista | proibidos | DEC-023, DEC-172, style guide §4.6 |
-| Música e anomalia | música **não** muda quando uma anomalia aparece; MUS-004 entra por número da noite ou por estado (Q-159), com fade ≥ 3 s | style guide §4.4 |
-| Ver anomalia | sem som | style guide §4.4 |
+| Música e anomalia | música **não** muda quando uma anomalia aparece; MUS-004 entra por número da noite ou por estado (Q-159), com fade ≥ 3 s. **DEC-222:** início de anomalia toca o stinger `horror_sting`; janela 5–6 AM toca `scary_violins` + `amb_horror` | style guide §4.4, DEC-222 |
+| Ver anomalia | ~~sem som~~ **`anomaly_see`** (DEC-222) | DEC-222 (emenda style guide §4.4) |
+| Exceção ao teto do susto | `car_honk_goofy` na chegada da SUV longa (ANM-008), bem alta (susto cômico) | DEC-222 |
 | Sirene | nunca acima do ambiente; fade de entrada e saída | style guide §11 |
 | Telefone | todos ouvem; longe, mais baixo (queda até ~40 studs, nunca some) | FEAT-018 |
 | Zumbido do Walker | todos ouvem, sem queda por distância | DEC-123 |
@@ -508,7 +509,9 @@ No Studio, cada Sound de `ReplicatedStorage.Assets.SFX/AmbientSFX/Musics` agora 
 
 Regras dos stingers: `Content.SoundRules.Stings` e `Content.SoundRules.Tension` (validados em `Validate.luau`).
 
-**Conflito a registrar (secretário):** `horror_sting` (anomalia começa) e `anomaly_see` (jogador vê anomalia) contrariam o §6
+> **Resolvido pela DEC-222 (2026-10-10):** o usuário confirmou `anomaly_see`, `horror_sting`, `jumpscare`, `scary_violins` + `amb_horror`, `horror_dramatic` e `car_honk_goofy` (bem alta). Emenda o style guide §4.4 e o §6 desta lista. Volumes e gatilhos da tabela acima seguem Provisórios. Texto abaixo mantido como histórico.
+
+~~**Conflito a registrar (secretário):**~~ `horror_sting` (anomalia começa) e `anomaly_see` (jogador vê anomalia) contrariam o §6
 ("Ver anomalia: sem som"; "música não muda quando uma anomalia aparece") e o style guide §4.4 (**Aprovado**, DEC-126): o som aponta que
 há anomalia. Foram ligados por pedido do usuário em 2026-10-10; precisam de DEC para valer sobre o §4.4 (ou saem trocando a chave em
 `Rules.Stings` por uma sem id).

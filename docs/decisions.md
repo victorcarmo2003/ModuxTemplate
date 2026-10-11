@@ -3118,3 +3118,25 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
   - Estado replicado como atributo `Shutter` no `Model` do trailer (T61). Peça animada = malha `Awning` do AST-027 (existe no `.fbx`); se não cobrir a janela, placa fixa placeholder.
 - Dúvidas para lote: `Q-173`.
 - Impacto: **architect** (este registro; `architecture.md` §19.14, `network.md` §13.6, `content-data.md` §6.9/§6.10, `data.md` §5.2; TASK-129 contrato aditivo, TASK-133 limpeza), **backend-coder** (TASK-130), **frontend-coder** (TASK-131), **level-designer** (TASK-132; `MAP-01.md` §7.2/§16), **game-designer** (`features.md` FEAT-023 feito pelo architect; números da `Q-173`), **narrative-writer** (falas do chefe da N8/N9 em `script.md` e `BossCalls.luau`, textos "Close Window"/"Open Window"/aviso `shutter_closed` em `ui-text.md`; `anomalies.md` com o verbo trocado pelo architect), **art-director** (AST-041 sai; AST-027 `Hide_1..4` saem dos encaixes, `Awning` vira peça animável, botão ao lado do AST-039; clipe `Crew_Hide` do AST-069 sai da lista), **qa-tester** (TASK-134: `tests/wave-3.md`, casos de esconder → janela). `README.md` → secretário.
+
+### DEC-222 — 2026-10-10 — Sons de terror e buzina goofy da SUV longa; música uma vez por turno, resto só ambiente com crossfade (emenda style guide §4.4)
+
+- Origem: conversa do usuário com o orquestrador (2026-10-10), registrada pelo secretário a pedido do orquestrador. Arquivos subidos pelo usuário (ids em `art/credits.md`).
+- Decidido pelo usuário (sons de terror):
+  - Ver anomalia toca **`anomaly_see`** ("AnomalySee").
+  - Início de anomalia toca **`horror_sting`** ("horror sting").
+  - Último passo do Walker (ANM-007) toca **`jumpscare`** ("JumpScare").
+  - Janela 5–6 AM toca **`scary_violins`** ("Scary Violins") + camada **`amb_horror`** ("HorrorAmbient").
+  - Noite perdida toca **`horror_dramatic`** ("horror dramatic sound").
+- Decidido pelo usuário (susto cômico): quando a SUV longa (**ANM-008**) chega, toca **`car_honk_goofy`** ("Goofy car honk"), **bem alta**.
+- Decidido pelo usuário (música e ambiente):
+  - Música toca **uma vez no início de cada turno**: dia = "Sunny Town" ou "Small Town"; noite = "Night Town" ou "Night Fall".
+  - Resto do turno: **só ambiente em loop com crossfade**: "CityAmbient" (rua de dia), "NightCrickets" (rua de noite), "SuperMarket Ambient" (dentro do Mart).
+  - **Sem música de créditos**. "Melancolic City" toca no final.
+- **Emendas (append-only):**
+  - `art/style-guide.md` §4.4 (**Aprovado**, DEC-126), "nada de som que aponte o alvo" / "ver anomalia: sem som": deixa de valer para os sons acima.
+  - `art/style-guide.md` §11 (música do dia/noite em loop; "sustos sonoros só como consequência da sanidade baixa"): vale a música por turno e os sons de terror acima.
+  - `audio/sound-list.md` §3 (MUS em loop, MUS-007 de créditos) e §6 ("Ver anomalia: sem som"; "música não muda quando uma anomalia aparece").
+- Coerente com DEC-173 (jumpscare permitido, pontual, ligado a anomalia). Fecha o "Conflito a registrar" de `sound-list.md` §9.
+- Detalhes de implementação (volumes, gatilhos no client, `ShiftMusicFresh`, crossfade 4 s) seguem **Provisórios** como estão em `sound-list.md` §3 e §9; esta DEC não os aprova.
+- Impacto: **frontend-coder** (já ligado em `Sounds.luau` / `AudioController`; nada novo), **art-director** (§4.4 e §11 com nota do secretário, feito), **game-designer** (`sound-list.md` com nota do secretário, feito), **qa-tester** (casos que esperam "ver anomalia sem som" ou música em loop mudam). `README.md` → secretário.
