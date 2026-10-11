@@ -46,3 +46,16 @@ Sugestão de texto nos créditos do jogo: "Food Kit, Car Kit, City Kit and Mini 
 | Fontes Fredoka One e Builder Sans | catálogo de fontes do Roblox | sugestão do style guide §7.1; uso dentro da plataforma |
 
 Nenhum modelo do Sketchfab entrou até agora. **Poly Pizza:** "Trashcan" by Kenney (CC0, AST-025, DEC-140); "POS Machine" by J-Toastie (**CC-BY 3.0**, AST-020, DEC-155); "Padlock" by Quaternius (CC0, AST-020/AST-017, DEC-155); "Low poly phone" by Anastasiia Ku (**CC-BY 3.0**, AST-042, 2026-10-10, em revisão); "Market Stand" by Quaternius (CC0, AST-098, 2026-10-10, em revisão). Se entrar outro, a linha vai nesta tabela **antes** do arquivo ir para `Assets/`.
+
+## Música (2026-10-10)
+
+Faixas enviadas pelo usuário ao grupo do jogo ("Axiom Project Studio"); licença e origem sob responsabilidade do usuário (confirmar e registrar autor/licença de cada faixa aqui).
+
+| Faixa | Asset ID | Uso (`Content.Sounds`) |
+|---|---|---|
+| Lobby | 133495425923316 | `music_lobby` |
+| Sunny Town | 88103069634103 | `music_day` |
+| Night Town | 73501320034226 | `music_night_calm` |
+| Night Fall | 135232738690923 | `music_night` |
+| Melancolic City | 86360851369933 | `music_finale` |
+| Small Town | 104601257905379 | `music_credits` |

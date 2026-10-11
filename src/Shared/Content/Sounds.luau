@@ -42,8 +42,8 @@ export type SoundRules = {
 	ScareMaxVolume: number, -- DEC-173
 }
 
-local function music(key: string): Sound
-	return { Key = key, Id = "", Group = "Music", Volume = 0.5, Looped = true, Spatial = false, MaxDistance = 0, Ref = "" }
+local function music(key: string, id: string?, ref: string?): Sound
+	return { Key = key, Id = id or "", Group = "Music", Volume = 0.5, Looped = true, Spatial = false, MaxDistance = 0, Ref = ref or "" }
 end
 
 local function ambient(key: string, spatial: boolean): Sound
@@ -78,12 +78,12 @@ end
 
 const base = Table.new({
 	-- Music
-	music("music_lobby"),
-	music("music_day"),
-	music("music_night_calm"),
-	music("music_night"),
-	music("music_finale"),
-	music("music_credits"),
+	music("music_lobby", "rbxassetid://133495425923316", "Lobby (Axiom Project Studio upload)"),
+	music("music_day", "rbxassetid://88103069634103", "Sunny Town (Axiom Project Studio upload)"),
+	music("music_night_calm", "rbxassetid://73501320034226", "Night Town (Axiom Project Studio upload)"),
+	music("music_night", "rbxassetid://135232738690923", "Night Fall (Axiom Project Studio upload)"),
+	music("music_finale", "rbxassetid://86360851369933", "Melancolic City (Axiom Project Studio upload)"),
+	music("music_credits", "rbxassetid://104601257905379", "Small Town (Axiom Project Studio upload)"),
 	-- Ambient
 	ambient("amb_day_street", false),
 	ambient("amb_night_street", false),
