@@ -122,6 +122,15 @@ function Walker.Follow(
 	return true
 end
 
+-- One straight MoveTo to `target` (no graph: Pad tables, pair partners; TASK-145/146). YIELDS. true = reached, false =
+-- gave up after `timeout` s (default STEP_TIMEOUT) or cancelled. Never snaps: the caller decides.
+function Walker.Direct(mover: Mover, target: Vector3, alive: () -> boolean, timeout: number?): boolean
+	if not alive() then
+		return false
+	end
+	return step(mover, target, alive, timeout)
+end
+
 -- Stops any MoveTo in progress.
 function Walker.Stop(mover: Mover)
 	if mover.Root:IsDescendantOf(workspace) then

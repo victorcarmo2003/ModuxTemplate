@@ -23,6 +23,7 @@ local ProfileService = require(ServerScriptService.server.ModuxTypes.ProfileServ
 local RewardService = require(ServerScriptService.server.ModuxTypes.RewardService)
 local RoundService = require(ServerScriptService.server.ModuxTypes.RoundService)
 local RunStateService = require(ServerScriptService.server.ModuxTypes.RunStateService)
+local SeatingService = require(ServerScriptService.server.ModuxTypes.SeatingService)
 local ThiefService = require(ServerScriptService.server.ModuxTypes.ThiefService)
 local TrafficService = require(ServerScriptService.server.ModuxTypes.TrafficService)
 local TutorialService = require(ServerScriptService.server.ModuxTypes.TutorialService)
@@ -53,6 +54,7 @@ export type AllServices = {
 	RewardService: RewardService.Public,
 	RoundService: RoundService.Public,
 	RunStateService: RunStateService.Public,
+	SeatingService: SeatingService.Public,
 	ThiefService: ThiefService.Public,
 	TrafficService: TrafficService.Public,
 	TutorialService: TutorialService.Public,

@@ -174,6 +174,10 @@ end
 function MarketController:OnLevel(upgrade: Content.Upgrade, level: number)
 	const previous = self.LastLevel[upgrade.Key] or UNKNOWN_LEVEL
 	self.LastLevel[upgrade.Key] = level
+	-- In-place upgrades (Pad tables, TASK-144) are not Gear Stand purchases: SeatingController presents them
+	if upgrade.SoldAt ~= "Bench" then
+		return
+	end
 	if previous == UNKNOWN_LEVEL or level ~= previous + 1 then
 		return
 	end

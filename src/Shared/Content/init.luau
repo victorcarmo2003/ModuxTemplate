@@ -29,6 +29,7 @@ local Packages = require(script.Packages)
 local Revive = require(script.Revive)
 local RunParams = require(script.RunParams)
 local Sanity = require(script.Sanity)
+local Seating = require(script.Seating)
 local Shift = require(script.Shift)
 local Sounds = require(script.Sounds)
 local Species = require(script.Species)
@@ -86,6 +87,9 @@ export type Phase = Shift.Phase
 export type Revive = Revive.Revive
 export type RunParams = RunParams.RunParams
 export type Sanity = Sanity.Sanity
+export type Seating = Seating.Seating
+export type GroupPair = Flow.GroupPair
+export type Groups = Flow.Groups
 export type Sound = Sounds.Sound
 export type SoundRules = Sounds.SoundRules
 export type Species = Species.Species
@@ -161,4 +165,8 @@ return table.freeze({
 
 	-- Mart v2 "Gear Stand" (TASK-135; FEAT-015 v2; MAP-01 §18). Numbers Provisional
 	Mart = Mart,
+
+	-- Pad tables and pairs (TASK-144; FEAT-037, FEAT-038; content-data.md §3.25). Numbers Provisional; Flow.Groups
+	-- lives in Flow
+	Seating = Seating,
 })

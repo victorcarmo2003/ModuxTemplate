@@ -43,6 +43,17 @@ export type KioskRule = {
 	OpalFacing: Vector3, -- WORLD direction OP-1 must face (MAP east = world -X, MAP-01 §18.4)
 }
 
+-- Pad tables (TASK-144; FEAT-037; MAP-01 "Mesas do Pad", TASK-149). Soft rule like the kiosk: MapIndex.SeatingNotes
+-- reports warnings only, SeatingService falls back (search by name, runtime prompt anchor) until the binding exists.
+export type SeatingRule = {
+	Tag: string, -- Content.Seating.Binding.Tag (Model of each table)
+	IndexAttribute: string, -- TableIndex 1..Tables, closest to Q1 first
+	Tables: number,
+	SeatPrefix: string,
+	SeatCount: number, -- BaseParts Seat1..SeatN inside each table
+	Anchors: { string }, -- optional anchors, noted when missing (Prompt_BuyTable, Prompt_CleanTable, Tray_Anchor)
+}
+
 export type List = {
 	Wave: number,
 	Tags: { string }, -- tags that must exist in the Workspace (§18.1, §19.22)
@@ -64,6 +75,7 @@ export type List = {
 	Crosswalks: { [string]: Rect }, -- Crosswalk attribute value -> stripes
 	Routes: { Route }, -- blockout routes that must have a path (§18.6)
 	Kiosk: KioskRule, -- soft (warnings only), see KioskRule
+	Seating: SeatingRule, -- soft (warnings only), see SeatingRule
 }
 
 -- Grill anchors: one grill_collect per roller slot at the highest level of the vehicle (DEC-201: 4 on L3).
@@ -93,7 +105,9 @@ end
 local function bench(): { [string]: string }
 	const out: { [string]: string } = { S1 = "bench_buy_item" }
 	for _, upgrade in Content.Upgrades.List do
-		out[upgrade.BenchSpot] = "bench_buy_upgrade"
+		if upgrade.SoldAt == "Bench" then -- Pad tables are sold in place (TASK-144, Q-178 A)
+			out[upgrade.BenchSpot] = "bench_buy_upgrade"
+		end
 	end
 	return out
 end
@@ -116,6 +130,19 @@ local function kiosk(): KioskRule
 		Shutters = shutters,
 		OpalPoint = "OP-1",
 		OpalFacing = Vector3.new(-1, 0, 0),
+	}
+end
+
+-- Pad tables: names from Content.Seating.Binding.
+local function seating(): SeatingRule
+	const binding = Content.Seating.Binding
+	return {
+		Tag = binding.Tag,
+		IndexAttribute = binding.IndexAttribute,
+		Tables = Content.Seating.Tables,
+		SeatPrefix = binding.SeatPrefix,
+		SeatCount = binding.SeatCount,
+		Anchors = { binding.BuyAnchor, binding.CleanAnchor, binding.TrayAnchor },
 	}
 end
 
@@ -195,6 +222,7 @@ local function base(wave: number): List
 		Crosswalks = CROSSWALKS,
 		Routes = WAVE1_ROUTES,
 		Kiosk = kiosk(),
+		Seating = seating(),
 	}
 end
 

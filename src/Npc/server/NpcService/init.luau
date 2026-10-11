@@ -36,6 +36,9 @@ local Modux = require(ServerScriptService.server.Modux)
 -- Who the NPC is (architecture.md §19.3). "Actor": customer anomaly (wave 3, CustomerService:SpawnActor).
 export type Role = "Customer" | "Thief" | "Actor"
 
+-- Rig of an active NPC (model, HumanoidRootPart, Humanoid, prompt anchors)
+export type Rig = Pool.Rig
+
 -- Customer-anomaly variant (architecture.md §19.13; ANM-001 blank, ANM-004 mirror, ANM-005 raincoat). Rig attribute.
 export type Variant = "blank" | "mirror" | "raincoat"
 
@@ -492,6 +495,71 @@ function NpcService:Crossing(id: number, at: { [number]: string }): Walker.Cross
 		end,
 		MaxWait = Content.Traffic.Crossing.MaxWait,
 	}
+end
+
+-- Rig of an active NPC (SeatingService poses and anchors it, TASK-145). nil = unknown id.
+function NpcService:GetRig(id: number): Rig?
+	const npc = self.Active[id]
+	return if npc then npc.Rig else nil
+end
+
+-- Straight walk to a world position, off the graph (Pad tables, TASK-145). YIELDS until it arrives (true), gives up
+-- after `timeout` s or is cancelled by Stop / a newer order / Despawn (false). The Node stays the last graph node.
+function NpcService:WalkToPosition(id: number, position: Vector3, timeout: number?): boolean
+	const npc = self.Active[id]
+	if npc == nil then
+		return false
+	end
+	npc.Walk += 1
+	const order = npc.Walk
+	return Walker.Direct(npc.Rig, position, function(): boolean
+		return self.Active[id] == npc and npc.Walk == order
+	end, timeout)
+end
+
+-- One MoveTo towards `position`, no yield, no graph (pair partner following its leader, TASK-146). Cancels any
+-- graph walk of this NPC.
+function NpcService:MoveToward(id: number, position: Vector3)
+	const npc = self.Active[id]
+	if npc == nil or not npc.Rig.Root:IsDescendantOf(workspace) then
+		return
+	end
+	npc.Walk += 1
+	npc.Rig.Humanoid:MoveTo(position)
+end
+
+-- Puts the NPC on a world position at once, keeping its heading (pair partner leash, TASK-146).
+function NpcService:Teleport(id: number, position: Vector3)
+	const npc = self.Active[id]
+	if npc == nil then
+		return
+	end
+	npc.Walk += 1
+	const rotation = npc.Rig.Root.CFrame.Rotation
+	npc.Rig.Model:PivotTo(CFrame.new(position) * rotation)
+end
+
+-- Graph node the NPC stands on now (after an off-graph walk ends back on a node, TASK-145/146).
+function NpcService:SetNode(id: number, node: string)
+	const npc = self.Active[id]
+	if npc ~= nil then
+		npc.Node = node
+	end
+end
+
+-- Turns the NPC to face `look` (horizontal part only).
+function NpcService:Face(id: number, look: Vector3)
+	const npc = self.Active[id]
+	if npc ~= nil then
+		Walker.Face(npc.Rig, look)
+	end
+end
+
+function NpcService:SetWalkSpeed(id: number, speed: number)
+	const npc = self.Active[id]
+	if npc ~= nil and speed > 0 then
+		npc.Rig.Humanoid.WalkSpeed = speed
+	end
 end
 
 -- Cancels the current walk; the NPC stops where it is (its Node stays the last one reached).

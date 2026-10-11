@@ -1,5 +1,5 @@
 --!strict
--- Net v3 (waves 1-3). Contract: docs/tech/network.md v4 (wave 1), v5 §13.1-§13.4 (wave 2) and §13.5-§13.7 (wave 3):
+-- Net v3 (waves 1-3) + v3.1 (TASK-144: Tables set, Customers.Order2/Leader; network.md §14). Contract: docs/tech/network.md v4 (wave 1), v5 §13.1-§13.4 (wave 2) and §13.5-§13.7 (wave 3):
 -- schema, writer, reader and rate of every entry.
 -- Rules: set = state the party sees (late joiners get it ready); packet = event or private data.
 -- No keyBy (T14). Enums and bitfields come from Content keys (T13): Lync sorts the names, both sides require the
@@ -85,11 +85,29 @@ return Lync.define("game", {
 		Order = Lync.bitfield(Content.Ingredients.ToppingKeys), -- empty until "Take Order" (FEAT-011)
 		PatienceEndsAt = Lync.f64(), -- 0 until "Take Order" (T41: K stays hidden)
 		Mood = Lync.enum(Content.Moods.Keys), -- Provisional (Q-164)
+		-- §14.2 (TASK-144; FEAT-038). Pair leader: the 2nd hot dog still pending (nil = none or a lone customer; the
+		-- record always shows the pending items, Order = the 1st pending one). Written with Order at "Take Order".
+		Order2 = Lync.optional(Lync.bitfield(Content.Ingredients.ToppingKeys)),
+		-- §14.2 (TASK-144; FEAT-038). Pair partner: NpcId of its leader (nil = not a partner). A partner never shows a
+		-- balloon nor prompts; its State is Arriving / Queued / Leaving only
+		Leader = Lync.optional(Lync.int(1, 65535)),
 	})),
 
 	-- §3.7, record = Content.Upgrades.IndexOf[key]; levels of the current vehicle only (DEC-184). Writer: UpgradeService
 	Upgrades = Lync.replicate(Lync.struct({
 		Level = Lync.int(0, 9),
+	})),
+
+	-- §14.1 (TASK-144; FEAT-037), record = table index 1..Content.Seating.Tables (TBL-n; 6 = Back Bar, not written
+	-- yet). Writer: SeatingService. Locked = before Seating.UnlockDay (hidden); Ghost = not bought (Price > 0 only on
+	-- the next one for sale); Free / Occupied / Dirty = bought. Npc1/Npc2 = NpcId of the diners (0 = none). Tip = $
+	-- on the table (Dirty), moved to the drawer by "Clean Table"
+	Tables = Lync.replicate(Lync.struct({
+		State = Lync.enum(Content.Seating.States),
+		Price = Lync.int(0, 1000),
+		Npc1 = Lync.int(0, 65535),
+		Npc2 = Lync.int(0, 65535),
+		Tip = Lync.int(0, 1000),
 	})),
 
 	-- Packets, wave 1 ----------------------------------------------------------------------------------------------

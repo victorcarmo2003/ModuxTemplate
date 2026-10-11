@@ -25,6 +25,7 @@ return {
 	ServerScriptService.server.Reward.RewardService,
 	ServerScriptService.server.Round.RoundService,
 	ServerScriptService.server.Run.RunStateService,
+	ServerScriptService.server.Seating.SeatingService,
 	ServerScriptService.server.Thief.ThiefService,
 	ServerScriptService.server.Traffic.TrafficService,
 	ServerScriptService.server.Tutorial.TutorialService,

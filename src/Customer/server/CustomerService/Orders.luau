@@ -9,17 +9,27 @@
 --   Complete   = exactly the ordered toppings: price (+ tip inside the window = Perfect)
 --   Incomplete = missing >= 1 ordered topping, nothing extra: floor(price x IncompletePct / 100), no tip
 --   Wrong      = any topping not ordered: $0, the hot dog goes back to the server's hand
+-- Pairs (TASK-146; FEAT-038): a ticket has 1 or 2 lines (one hot dog each). K = K1 + K2 for patience and the tip
+-- window; price, pay and tip per line. Match picks the pending line a served hot dog answers: equal -> Complete;
+-- subset -> Incomplete of the line with the fewest missing toppings; anything else -> Wrong (first pending line).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 local OrderRoll = require(script.Parent.OrderRoll)
 
 export type Verdict = "Complete" | "Incomplete" | "Wrong"
 
--- Server-only order of one customer (never on the wire before "Take Order", T41)
-export type Ticket = {
+-- One hot dog of a ticket. Result nil = still pending; else the SaleResult it ended with.
+export type Line = {
 	Toppings: { string }, -- ordered topping keys (ToppingKeys order)
 	K: number,
 	Price: number,
+	Result: string?,
+}
+
+-- Server-only order of one customer or pair (never on the wire before "Take Order", T41)
+export type Ticket = {
+	Lines: { Line }, -- 1 (customer) or 2 (pair: leader's hot dog, partner's hot dog)
+	K: number, -- sum of the lines' K (patience, tip window)
 	ArrivedAt: number, -- server time it reached the queue (patience base)
 	PatienceEndsAt: number,
 	Taker: Player?, -- who did "Take Order" ("own order", content-data.md §3.10, Provisional)
@@ -56,13 +66,17 @@ function Orders.Price(toppings: { string }): number
 	return price
 end
 
--- New ticket for a customer that reached the queue at `arrivedAt`.
-function Orders.Ticket(toppings: { string }, arrivedAt: number, patienceBonus: number): Ticket
-	const k = #toppings
+-- New ticket for a customer (1 line) or a pair (2 lines) that reached the queue at `arrivedAt`.
+function Orders.Ticket(lines: { { string } }, arrivedAt: number, patienceBonus: number): Ticket
+	local k = 0
+	const out: { Line } = {}
+	for _, toppings in lines do
+		k += #toppings
+		table.insert(out, { Toppings = table.clone(toppings), K = #toppings, Price = Orders.Price(toppings), Result = nil })
+	end
 	return {
-		Toppings = table.clone(toppings),
+		Lines = out,
 		K = k,
-		Price = Orders.Price(toppings),
 		ArrivedAt = arrivedAt,
 		PatienceEndsAt = arrivedAt + Orders.Patience(k, patienceBonus),
 		Taker = nil,
@@ -92,6 +106,44 @@ function Orders.Evaluate(order: { string }, served: { string }): Verdict
 		matched += 1
 	end
 	return if matched >= #order then "Complete" else "Incomplete"
+end
+
+-- Indexes of the lines still pending, in order.
+function Orders.Pending(ticket: Ticket): { number }
+	const out: { number } = {}
+	for index, line in ticket.Lines do
+		if line.Result == nil then
+			table.insert(out, index)
+		end
+	end
+	return out
+end
+
+-- Pending line a served hot dog answers, and its verdict (TASK-146; FEAT-038 "Serve"). nil = nothing pending.
+function Orders.Match(ticket: Ticket, served: { string }): (number?, Verdict)
+	const pending = Orders.Pending(ticket)
+	if #pending == 0 then
+		return nil, "Wrong"
+	end
+	local best: number? = nil
+	local bestMissing = math.huge
+	for _, index in pending do
+		const line = ticket.Lines[index]
+		const verdict = Orders.Evaluate(line.Toppings, served)
+		if verdict == "Complete" then
+			return index, "Complete"
+		elseif verdict == "Incomplete" then
+			const missing = #line.Toppings - #served
+			if missing < bestMissing then
+				best = index
+				bestMissing = missing
+			end
+		end
+	end
+	if best ~= nil then
+		return best, "Incomplete"
+	end
+	return pending[1], "Wrong"
 end
 
 -- Money for a verdict (tip apart). Integer (DEC-072).

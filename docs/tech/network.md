@@ -7,6 +7,8 @@ quem lê, frequência e por quê; remoção do legado `Vitals`/`Round`; `Lights`
 `Anomalies`, `Pedestrians`, `Transition`, `RunReport` novos (contrato de código em `architecture.md` §19).
 **Versão 5.1, 2026-10-10 (TASK-049):** divergências da onda 1 fechadas (`wave-1-report.md` D-06, D-07); origem de
 `RunReport.Gems` (T59); lixeira de rua sem entrada nova (T60). Ver §0.-2.
+**Versão 5.3, 2026-10-11 (TASK-144; FEAT-037, FEAT-038):** set `Tables` novo; `Customers` ganha `Order2` e `Leader`
+(opcionais, duplas); `Actions` + `buy_in_place`, `clean_table`; `Notices` + `table_added`; atributo `Seated` no rig (§14).
 **Versão 5.2, 2026-10-10 (DEC-221):** set `Hides` sai; janela do trailer = atributo `Shutter` no `Model` do veículo
 (§13.6, T61); `Actions` perde `hide`/`get_up` e ganha `shutter_toggle`; `Notices` troca `hide_taken` por `shutter_closed`.
 Versão 4, 2026-10-10 (**TASK-001**: estado DEC-140 a DEC-201, núcleo da onda 1). Versão anterior: 3.1, 2026-10-08.
@@ -970,3 +972,56 @@ Checklist de toda task de contrato: `tools/analyze.ps1` zero erro **e** boot no 
 | `Gaze` (c → s) | ~60 por jogador |
 
 Total < 0,5 KB/s por client; abaixo da meta da §12.4 do `architecture.md` (≤ 10 KB/s).
+
+## 14. Mesas do Pad e duplas (v5.3, TASK-144; FEAT-037, FEAT-038; Provisório)
+
+Contrato de código: `architecture.md` §19.28. Tabelas: `content-data.md` §3.25. Nenhum packet novo: o toast de compra
+usa `Notice` (`table_added`), o "+$N" da limpeza sai do próprio set (`Tip` → 0 e `State` Dirty → Free na mesma
+escrita; a gaveta sobe pelo `Economy`).
+
+### 14.1 `Tables` (set, id = índice da mesa 1..`Content.Seating.Tables`)
+
+```lua
+Tables = Lync.replicate(Lync.struct({
+	State = Lync.enum(Content.Seating.States), -- Locked, Ghost, Free, Occupied, Dirty
+	Price = Lync.int(0, 1000),                  -- > 0 só na próxima mesa à venda (Ghost)
+	Npc1 = Lync.int(0, 65535),                  -- NpcId dos clientes na mesa (0 = ninguém)
+	Npc2 = Lync.int(0, 65535),
+	Tip = Lync.int(0, 1000),                    -- $ em cima da mesa (Dirty)
+}))
+```
+
+| | |
+|---|---|
+| Escreve | `SeatingService` (único). Registros 1..5 sempre presentes (`add` no `OnStart`); 6 = Back Bar (UPG-010), **não escrito** nesta versão |
+| Lê | `SeatingController` (TASK-147): `Locked` = mesa escondida (antes do Day 2, nada aparece); `Ghost` = malha a `Seating.GhostTransparency`, placa de preço só com `Price > 0`; `Free`/`Occupied` = mesa normal; `Dirty` = bandeja + moeda no `Tray_Anchor` (ou no topo da mesa). Limpeza = escrita com `Dirty → Free` e `Tip → 0`: o client mostra "+$N" com o `Tip` anterior. `PromptController` só lê os atributos da âncora |
+| Frequência | por evento (compra, sentar, levantar, limpar, fase): < 1/s |
+| Colisão | mesa `Locked`/`Ghost` tem `CanCollide = false` escrito **pelo servidor** (replica); a transparência é do client |
+| Por que set | estado do mundo que todos veem e quem entra no meio precisa pronto (bandeja, fantasma) |
+
+### 14.2 `Customers` (campos novos, opcionais)
+
+```lua
+Order2 = Lync.optional(Lync.bitfield(Content.Ingredients.ToppingKeys)), -- líder de dupla: 2º hot dog pendente
+Leader = Lync.optional(Lync.int(1, 65535)),                              -- parceiro: NpcId do líder
+```
+
+| | |
+|---|---|
+| `Order2` | só no líder de uma dupla, escrito junto com `Order` no "Take Order" (T41 continua: nada antes). O registro mostra sempre **os itens pendentes**: `Order` = 1º pendente, `Order2` = 2º pendente; ao resolver um, o que sobra vira `Order` e `Order2` vai a `nil` (o balão volta a 1 linha, TASK-148) |
+| `Leader` | só no parceiro. O parceiro nunca tem balão nem prompt e seu `State` é só `Arriving` → `Queued` → `Leaving` (`Slot = 0`); o rosto segue o `Mood` do líder (copiado pelo servidor) |
+| `Sale` | uma por hot dog; `Npc` = dono da linha (linha 1 = líder, linha 2 = parceiro): a reação aparece sobre quem pediu |
+| Cliente sentado | continua `Leaving` no set (não há estado novo); quem está na mesa se lê no `Tables` (`Npc1`/`Npc2`) e no atributo `Seated` do rig (§14.3) |
+
+### 14.3 Atributos (sem Lync)
+
+| Onde | Atributo | Escreve | Uso |
+|---|---|---|---|
+| `Model` da mesa (tag `SeatTable`) | `TableIndex` (1..5) | bind do mapa (TASK-149); no fallback por nome, o `SeatingService` escreve tag e atributo em runtime | client acha a mesa do registro |
+| rig do NPC | `Seated` = índice da mesa (nil = de pé) | `SeatingService` | client toca `npc_sit`/`npc_eat_seated` quando tiverem Id; sem Id o servidor já dobra quadril/ombro por `Motor6D.C0` (replica) |
+| `Motor6D` do rig | `RestC0` (CFrame) | `SeatingService` (`Diner.luau`) | C0 de repouso; `NpcService/Pool` restaura ao devolver o rig ao pool |
+| âncora de mesa (`Prompt_Table` runtime, ou `Prompt_BuyTable`/`Prompt_CleanTable` do bind) | `PromptAction` (`buy_in_place` ↔ `clean_table` na âncora única), `PromptEnabled`, `PromptText` ("Buy Table — $30"), `Upgrade` = `patio_tables`, `TableIndex` | `SeatingService` | `PromptController` como qualquer âncora |
+| placa do Patio Lights (`Prompt_PatioLights`) | `PromptAction = buy_in_place`, `Upgrade = patio_lights` | bind (TASK-149) + `SeatingService` | idem |
+
+`Interact` ganha `buy_in_place` (hold 1,5, raio 7) e `clean_table` (hold 1, raio 7) pelo enum de `Content.Actions`;
+`Notice` ganha `table_added` (Party, `Value` = índice da mesa). Orçamento: +< 5 B/s por client.

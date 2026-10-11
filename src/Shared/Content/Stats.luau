@@ -22,6 +22,8 @@ export type Stat =
 	| "StealPct"
 	| "LightRadius"
 	| "DayFlowBonus"
+	| "TableCount" -- UPG-008 Patio Tables: tables bought on the Pad (FEAT-037)
+	| "SitBonus" -- UPG-009 Patio Lights: added to every SitChance (FEAT-037)
 
 const LIST: { Stat } = {
 	"WalkSpeed",
@@ -43,6 +45,8 @@ const LIST: { Stat } = {
 	"StealPct",
 	"LightRadius",
 	"DayFlowBonus",
+	"TableCount",
+	"SitBonus",
 }
 
 const SET: { [string]: boolean } = {}

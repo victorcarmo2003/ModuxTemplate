@@ -295,6 +295,25 @@ function MapIndex.Node(id: string): NodeInfo
 	return info
 end
 
+-- Closest NpcNode to `position` on the XZ plane, skipping ids `skip` says no to (queue slots, crosswalk curbs...).
+-- nil when the graph is empty. Off-graph walks (Pad tables, TASK-145) hop on and off the graph here.
+function MapIndex.NearestNode(position: Vector3, skip: ((id: string) -> boolean)?): string?
+	local best: string? = nil
+	local bestDistance = math.huge
+	for id, node in get().Nodes do
+		if skip ~= nil and skip(id) then
+			continue
+		end
+		const offset = node.Position - position
+		const distance = offset.X * offset.X + offset.Z * offset.Z
+		if distance < bestDistance or (distance == bestDistance and best ~= nil and id < best) then
+			best = id
+			bestDistance = distance
+		end
+	end
+	return best
+end
+
 -- Node ids from `from` to `to` (both included), or nil. AvoidCrossings for the thief (MAP-01 §9.2); AvoidQueue
 -- keeps queue slots from being intermediate steps (check_map01 route warning).
 function MapIndex.Path(from: string, to: string, options: PathOptions?): { string }?
@@ -830,6 +849,45 @@ function MapIndex.KioskNotes(required: List): { string }
 		note(`MapPoint {rule.OpalPoint} missing (Opal)`)
 	elseif point.LookVector:Dot(rule.OpalFacing) < 0.9 then
 		note(`MapPoint {rule.OpalPoint} does not face the store (MAP-01 §18.4: MAP east)`)
+	end
+	return notes
+end
+
+-- Pad tables (TASK-144; FEAT-037): soft checks, returned as notes (PlaceService warns, never errors) until TASK-149
+-- binds the tables. Each TableIndex 1..Tables once on a `Tag` Model, with Seat1..SeatN BaseParts; optional anchors
+-- (Prompt_BuyTable, Prompt_CleanTable, Tray_Anchor) noted when missing (SeatingService creates a runtime prompt).
+function MapIndex.SeatingNotes(required: List): { string }
+	const rule = required.Seating
+	const notes: { string } = {}
+	const byIndex: { [number]: { Instance } } = {}
+	for _, instance in tagged(rule.Tag) do
+		const index = instance:GetAttribute(rule.IndexAttribute)
+		if typeof(index) ~= "number" or index ~= math.floor(index) or index < 1 or index > rule.Tables then
+			table.insert(notes, `{rule.Tag} {nameOf(instance)}: {rule.IndexAttribute} must be 1..{rule.Tables}`)
+			continue
+		end
+		const list = byIndex[index] or {}
+		byIndex[index] = list
+		table.insert(list, instance)
+	end
+	for index = 1, rule.Tables do
+		const list = byIndex[index] or {}
+		if #list ~= 1 then
+			table.insert(notes, `{rule.Tag} {rule.IndexAttribute} = {index} found {#list} time(s), need 1`)
+			continue
+		end
+		const model = list[1]
+		for seat = 1, rule.SeatCount do
+			const part = model:FindFirstChild(`{rule.SeatPrefix}{seat}`, true)
+			if part == nil or not part:IsA("BasePart") then
+				table.insert(notes, `{rule.Tag} {index}: no BasePart {rule.SeatPrefix}{seat}`)
+			end
+		end
+		for _, anchor in rule.Anchors do
+			if model:FindFirstChild(anchor, true) == nil then
+				table.insert(notes, `{rule.Tag} {index}: no {anchor} (optional)`)
+			end
+		end
 	end
 	return notes
 end

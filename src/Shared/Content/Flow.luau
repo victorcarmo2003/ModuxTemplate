@@ -9,6 +9,14 @@
 -- building door (D1, DR-APT) or a street end beyond the player limits, out of sight of the Pad and the Mart; route to
 -- Q5 <= ~100 studs (<= 10 s at 13 studs/s). Weight 0 = known point, not drawn (SP-A: 136 studs; SP-B: 151 studs).
 -- The thief keeps Content.Thief.Spawn / Exits; pedestrians start/end on the ends of Content.WalkPaths.
+-- Groups (TASK-144; FEAT-038; Q-182 A, Provisional): one spawn attempt may bring a pair (leader + partner) that takes
+-- ONE queue slot, orders 2 hot dogs, pays per hot dog and counts 2 on the shift grade. Chance per attempt by shift
+-- from FromDay / FromNight; a pair needs room for 2 in the customer cap and the NPC cap, else 1 customer spawns.
+-- The next interval after a pair is x IntervalMult. Patience = Orders patience with K = K1 + K2, + PatienceBonus.
+-- Pairs: weighted per shift; a pair with a type locked this shift weighs 0. Never the same species AND the same
+-- outfit; at night never the same species (ANM-004 copies). Couple = walks and sits side by side (no gesture, Q-182 b).
+-- The partner follows the leader (no pathfinding of its own): FollowGap behind (Couple: beside), QueueGap beside
+-- while standing, snapped back to its spot past Leash studs.
 local Table = require(script.Parent.Table)
 
 export type SpawnWeight = { Point: string, Weight: number }
@@ -16,6 +24,29 @@ export type SpawnShift = { Day: { SpawnWeight }, Night: { SpawnWeight } }
 export type Spawns = {
 	Arrivals: SpawnShift, -- customers and customer anomalies (Role Customer / Actor) walking to Q5
 	Exits: SpawnShift, -- where a customer leaving Q1 despawns
+}
+
+export type GroupPair = {
+	Shift: "Day" | "Night",
+	Leader: string, -- CustomerTypes key
+	Partner: string, -- CustomerTypes key
+	Weight: number,
+	Couple: boolean,
+}
+
+export type Groups = {
+	ChanceDay: number,
+	ChanceNight: number,
+	FromDay: number, -- first day with pairs (Day 1 = 0)
+	FromNight: number, -- first night with pairs (Night 1 = 0)
+	IntervalMult: number,
+	PatienceBonus: number, -- seconds
+	FollowGap: number, -- studs behind the walking leader (pair of friends)
+	SideGap: number, -- studs beside the walking leader (couple)
+	QueueGap: number, -- studs beside the standing leader (queue, counter)
+	Leash: number, -- studs: farther than this from its spot the partner is snapped back
+	PartnerSpeedMult: number, -- partner WalkSpeed = leader WalkSpeed x this (catches up)
+	Pairs: { GroupPair },
 }
 
 export type Flow = {
@@ -34,6 +65,7 @@ export type Flow = {
 	NightWalkers: { number },
 	NightInterval: number, -- seconds between spawns at night, solo; fallback when a night has no own value
 	Spawns: Spawns, -- MAP-01 §9.8 (Provisional)
+	Groups: Groups, -- FEAT-038 (Provisional)
 }
 
 const flow: Flow = {
@@ -69,6 +101,32 @@ const flow: Flow = {
 		Exits = {
 			Day = { { Point = "EX-E", Weight = 60 }, { Point = "D1", Weight = 40 } },
 			Night = { { Point = "EX-E", Weight = 60 }, { Point = "D1", Weight = 40 } },
+		},
+	},
+	Groups = {
+		ChanceDay = 0.20,
+		ChanceNight = 0.10, -- Q-182 a (A)
+		FromDay = 2,
+		FromNight = 2,
+		IntervalMult = 1.6,
+		PatienceBonus = 10,
+		FollowGap = 2,
+		SideGap = 2,
+		QueueGap = 1.8,
+		Leash = 8,
+		PartnerSpeedMult = 1.2,
+		Pairs = {
+			-- Day (FEAT-038 Groups.Pairs)
+			{ Shift = "Day", Leader = "student", Partner = "student", Weight = 30, Couple = false }, -- hamster + mouse
+			{ Shift = "Day", Leader = "office_worker", Partner = "office_worker", Weight = 20, Couple = false },
+			{ Shift = "Day", Leader = "grandparent", Partner = "grandparent", Weight = 15, Couple = true }, -- turtle + sheep
+			{ Shift = "Day", Leader = "construction_worker", Partner = "construction_worker", Weight = 15, Couple = false },
+			{ Shift = "Day", Leader = "office_worker", Partner = "student", Weight = 10, Couple = false },
+			{ Shift = "Day", Leader = "construction_worker", Partner = "office_worker", Weight = 10, Couple = false },
+			-- Night: never the same species
+			{ Shift = "Night", Leader = "night_shift_worker", Partner = "construction_worker", Weight = 40, Couple = false },
+			{ Shift = "Night", Leader = "night_shift_worker", Partner = "office_worker", Weight = 35, Couple = false },
+			{ Shift = "Night", Leader = "office_worker", Partner = "construction_worker", Weight = 25, Couple = false },
 		},
 	},
 }

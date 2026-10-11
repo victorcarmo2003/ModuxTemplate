@@ -11,6 +11,10 @@
 --   SetVehicle(vehicle)         VehicleService (wave 2) on the cart -> trailer swap: the set is rewritten in one batch
 -- State keeps Levels[vehicle][upgrade] for every vehicle (DEC-184); the set shows only the current vehicle, with
 -- Level = 0 for an upgrade that does not exist there (network.md §3.7, wave 1). Snapshot "Upg" keeps both vehicles.
+-- TASK-144 (FEAT-037; Q-178 A, Q-179 a): Scope "Pad" upgrades (Patio Tables, Patio Lights) hold one level for the
+-- whole Pad: SetLevel and Restore write it on every vehicle where the upgrade exists, so the swap keeps it. SoldAt
+-- "InPlace" upgrades are bought by SeatingService (Buy with quiet = true: it sends its own notice); Requires = another
+-- upgrade's minimum level on the current vehicle ("locked" until then).
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -185,6 +189,10 @@ function UpgradeService:CanBuy(key: string): (boolean, Reason?)
 	if self.Dependencies.RoundService:GetDay() < upgrade.UnlockDay then
 		return false, "locked"
 	end
+	const requires = upgrade.Requires
+	if requires ~= nil and (self:GetLevel(requires.Upgrade) or 0) < requires.Level then
+		return false, "locked"
+	end
 	const last = self.BoughtAt[self:GuardKey(key)]
 	if last ~= nil and os.clock() - last < BUY_GUARD then
 		return false, "busy"
@@ -194,8 +202,9 @@ end
 
 -- Atomic: validation, Spend and the level write run without yielding, so two buyers in the same frame are served one
 -- after the other and the second sees the new level (T035-06). On success: effect is immediate on the current
--- vehicle, the piece swaps for everyone (server-side visibility) and the party gets "upgrade_bought".
-function UpgradeService:Buy(key: string, player: Player?): (boolean, Reason?)
+-- vehicle, the piece swaps for everyone (server-side visibility) and the party gets "upgrade_bought" (unless `quiet`:
+-- the in-place seller sends its own notice, TASK-144).
+function UpgradeService:Buy(key: string, player: Player?, quiet: boolean?): (boolean, Reason?)
 	const ok, reason = self:CanBuy(key)
 	if not ok then
 		return false, reason
@@ -206,25 +215,40 @@ function UpgradeService:Buy(key: string, player: Player?): (boolean, Reason?)
 	end
 	self.BoughtAt[self:GuardKey(key)] = os.clock()
 	self:SetLevel(self.Vehicle(), key, nextRow.Level)
-	self.Dependencies.RunStateService:Notify("all", BOUGHT_NOTICE, Content.Upgrades.IndexOf[key])
+	if not quiet then
+		self.Dependencies.RunStateService:Notify("all", BOUGHT_NOTICE, Content.Upgrades.IndexOf[key])
+	end
 	return true, nil
 end
 
 -- Writes ----------------------------------------------------------------------------------------------------------
 
--- One level by copy; fires Changed. The Charm effect rewrites the set and the pieces.
+-- One level by copy; fires Changed. The Charm effect rewrites the set and the pieces. A Scope "Pad" upgrade is
+-- written on every vehicle where it exists (TASK-144, Q-179 a); Changed fires for each vehicle that changed.
 function UpgradeService:SetLevel(vehicle: string, key: string, level: number)
 	const all = self.Levels()
 	const current = all[vehicle]
 	if current == nil or current[key] == nil or current[key] == level then
 		return
 	end
-	const levels = table.clone(current)
-	levels[key] = level
+	const upgrade = Content.Upgrades.ByKey[key]
+	const targets: { string } = if upgrade ~= nil and upgrade.Scope == "Pad" then upgrade.Vehicles else { vehicle }
 	const nextAll = table.clone(all)
-	nextAll[vehicle] = table.freeze(levels)
+	const changed: { string } = {}
+	for _, target in targets do
+		const levels = nextAll[target]
+		if levels == nil or levels[key] == nil or levels[key] == level then
+			continue
+		end
+		const copy = table.clone(levels)
+		copy[key] = level
+		nextAll[target] = table.freeze(copy)
+		table.insert(changed, target)
+	end
 	self.Levels(table.freeze(nextAll))
-	self.Changed:Fire(key, level, vehicle)
+	for _, target in changed do
+		self.Changed:Fire(key, level, target)
+	end
 end
 
 -- Vehicle swap (VehicleService, wave 2): the set switches to the new vehicle's levels in one batch.
@@ -270,6 +294,28 @@ function UpgradeService:Restore(data: any)
 				end
 			end
 			restored[vehicle] = table.freeze(copy)
+		end
+	end
+	-- Scope "Pad" (TASK-144): one level for every vehicle, the highest one saved (an old snapshot may hold it on the
+	-- cart only)
+	for _, upgrade in Content.Upgrades.List do
+		if upgrade.Scope ~= "Pad" then
+			continue
+		end
+		local level = upgrade.StartLevel
+		for _, vehicle in upgrade.Vehicles do
+			const levels = restored[vehicle]
+			if levels ~= nil and levels[upgrade.Key] ~= nil then
+				level = math.max(level, levels[upgrade.Key])
+			end
+		end
+		for _, vehicle in upgrade.Vehicles do
+			const levels = restored[vehicle]
+			if levels ~= nil and levels[upgrade.Key] ~= nil and levels[upgrade.Key] ~= level then
+				const copy = table.clone(levels)
+				copy[upgrade.Key] = level
+				restored[vehicle] = table.freeze(copy)
+			end
 		end
 	end
 	const before = self.Levels()

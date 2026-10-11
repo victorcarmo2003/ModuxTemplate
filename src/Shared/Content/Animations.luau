@@ -68,6 +68,11 @@ const base = Table.new({
 	anim("thief_sneak", "Npc", true, "Movement"),
 	anim("thief_open", "Npc", true, "Action"),
 	anim("thief_flee", "Npc", true, "Movement"),
+	-- Pad tables (TASK-144; FEAT-037; TASK-151 asks the clips): while `npc_sit` has no Id the server poses the hips of
+	-- the seated rig itself (SeatingService/Diner.luau); with an Id the client plays it on rigs with the `Seated`
+	-- attribute and the server only anchors the rig.
+	anim("npc_sit", "Npc", true, "Idle"),
+	anim("npc_eat_seated", "Npc", false, "Action"),
 
 	-- Actor
 	anim("opal_idle", "Actor", true, "Idle"), -- today a fixed id in OpalController (A8, TASK-077)

@@ -8,6 +8,7 @@ local Pool = require(ServerScriptService.server.Npc.NpcService.Pool)
 local Walker = require(ServerScriptService.server.Npc.NpcService.Walker)
 
 export type Role = "Customer" | "Thief" | "Actor"
+export type Rig = Pool.Rig
 export type Npc = {
 	Id: number,
 	Rig: Pool.Rig,
@@ -74,6 +75,13 @@ export type Public = {
 	Route: (self: Public, from: string, to: string, options: WalkOptions?) -> { string }?,
 	WalkTo: (self: Public, id: number, target: string, options: WalkOptions?) -> boolean,
 	Crossing: (self: Public, id: number, at: { [number]: string }) -> Walker.Crossing?,
+	GetRig: (self: Public, id: number) -> Rig?,
+	WalkToPosition: (self: Public, id: number, position: Vector3, timeout: number?) -> boolean,
+	MoveToward: (self: Public, id: number, position: Vector3) -> (),
+	Teleport: (self: Public, id: number, position: Vector3) -> (),
+	SetNode: (self: Public, id: number, node: string) -> (),
+	Face: (self: Public, id: number, look: Vector3) -> (),
+	SetWalkSpeed: (self: Public, id: number, speed: number) -> (),
 	Stop: (self: Public, id: number) -> (),
 	RefreshPacks: (self: Public) -> (),
 	SetTension: (self: Public, on: boolean) -> (),

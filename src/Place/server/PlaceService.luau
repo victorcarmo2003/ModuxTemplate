@@ -70,6 +70,11 @@ function PlaceService:ValidateMap()
 	if #notes > 0 then
 		warn(`[PlaceService] Gear Stand binding (Mart v2) has {#notes} note(s):\n  {table.concat(notes, "\n  ")}`)
 	end
+	-- Pad tables (TASK-144): soft, warnings only until TASK-149 binds them (SeatingService falls back).
+	const seats = MapIndex.SeatingNotes(MapIndex.Required.ForWave(wave))
+	if #seats > 0 then
+		warn(`[PlaceService] Pad tables binding has {#seats} note(s):\n  {table.concat(seats, "\n  ")}`)
+	end
 	const problems = MapIndex.Validate(MapIndex.Required.ForWave(wave))
 	if #problems == 0 then
 		return

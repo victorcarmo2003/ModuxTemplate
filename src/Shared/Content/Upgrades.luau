@@ -5,6 +5,12 @@
 -- DEC-184: levels are per vehicle and the trailer starts over at StartLevel. Cart and trailer rows are written out
 -- separately so a trailer price is a number change only.
 -- Provisional: trailer prices = cart prices and Drawer Lock bought again on the trailer (Q-163 a, c).
+-- 2026-10-11 (TASK-144; FEAT-037, UPG-008..010; Q-178, Q-179, Provisional): SoldAt "InPlace" = bought on a prompt in
+-- the world (SeatingService, action buy_in_place), never on the Gear Stand (BenchSpot ""); PlaceSpots[i] = where
+-- level StartLevel + i is sold (TBL-n = table n of Content.Seating). Scope "Pad" = the level belongs to the Pad, not
+-- to the vehicle: UpgradeService writes it on every vehicle at once, so the cart -> trailer swap keeps it (Q-179 a);
+-- Levels of a Pad upgrade are identical on every vehicle (Validate). Requires = another upgrade's minimum level on the
+-- current vehicle before this one can be bought (UPG-009 needs 2 tables).
 -- Provisional: Part names (UpgradePiece is found by tag + Upgrade/Level attributes, architecture.md §18.4 T38;
 -- the trailer piece is another instance inside the trailer model). Final names with art-director / TASK-005.
 local Stats = require(script.Parent.Stats)
@@ -17,6 +23,10 @@ export type Level = {
 	Part: string, -- UpgradePiece shown at this level; "" = none
 }
 
+export type SoldAt = "Bench" | "InPlace"
+export type Scope = "Vehicle" | "Pad"
+export type Requires = { Upgrade: string, Level: number }
+
 export type Upgrade = {
 	Key: string,
 	Ref: string,
@@ -25,8 +35,11 @@ export type Upgrade = {
 	StartLevel: number,
 	Levels: { [string]: { Level } }, -- per vehicle key
 	UnlockDay: number,
-	SoldAt: "Bench",
-	BenchSpot: string, -- B1..B5
+	SoldAt: SoldAt,
+	BenchSpot: string, -- B1..B5 when SoldAt = "Bench"; "" when "InPlace"
+	PlaceSpots: { string }, -- SoldAt "InPlace": spot of each purchasable level, in order; {} on the bench
+	Scope: Scope, -- "Vehicle" (DEC-184: the trailer starts over) or "Pad" (kept across the swap, Q-179 a)
+	Requires: Requires?, -- prerequisite on the current vehicle (UPG-009: patio_tables >= 2)
 }
 
 -- UPG-001 Grill: 2 slots/12 s -> 3/10 s $60 -> 4/8 s $150 (DEC-046). Roller grill, one sausage per roller pair,
@@ -83,6 +96,35 @@ const trailerLightsTrailer: { Level } = {
 	{ Level = 1, Price = 100, Effects = { LightRadius = 18, DayFlowBonus = 1.1 }, Part = "TrailerLights_L1" },
 }
 
+-- UPG-008 Patio Tables (FEAT-037; Provisional): one table per level, bought at the ghost table itself, fixed order
+-- TBL-1 (closest to Q1) -> TBL-5; $30 / $45 / $60 / $80 / $100 = $315. Pad scope: same rows on both vehicles.
+local function patioTables(): { Level }
+	return {
+		{ Level = 0, Price = 0, Effects = { TableCount = 0 }, Part = "" },
+		{ Level = 1, Price = 30, Effects = { TableCount = 1 }, Part = "" },
+		{ Level = 2, Price = 45, Effects = { TableCount = 2 }, Part = "" },
+		{ Level = 3, Price = 60, Effects = { TableCount = 3 }, Part = "" },
+		{ Level = 4, Price = 80, Effects = { TableCount = 4 }, Part = "" },
+		{ Level = 5, Price = 100, Effects = { TableCount = 5 }, Part = "" },
+	}
+end
+
+-- UPG-009 Patio Lights (FEAT-037; Provisional): $120, SitChance +0.10 day and night; at night the LZ-PATIO light zone
+-- on the trailer switch (not wired yet: needs the LightGroups row + the binding volume, board note of TASK-145).
+local function patioLights(): { Level }
+	return {
+		{ Level = 0, Price = 0, Effects = { SitBonus = 0 }, Part = "" },
+		{ Level = 1, Price = 120, Effects = { SitBonus = 0.10 }, Part = "" },
+	}
+end
+
+-- UPG-010 Back Bar (Q-179 b; Provisional, cuttable): $90, trailer only, one more table spot (TBL-6). Listed for the
+-- contract; SeatingService does not sell it yet (no TBL-6 in the binding).
+const backBarTrailer: { Level } = {
+	{ Level = 0, Price = 0, Effects = {}, Part = "" },
+	{ Level = 1, Price = 90, Effects = {}, Part = "" },
+}
+
 -- Bench spots B1..B5, always on sale, no rotation (DEC-101, DEC-106; FEAT-015). UnlockDay 1 = from the first day.
 return Table.new({
 	{
@@ -95,6 +137,8 @@ return Table.new({
 		UnlockDay = 1,
 		SoldAt = "Bench",
 		BenchSpot = "B1",
+		PlaceSpots = {},
+		Scope = "Vehicle",
 	},
 	{
 		Key = "cooler",
@@ -106,6 +150,8 @@ return Table.new({
 		UnlockDay = 1,
 		SoldAt = "Bench",
 		BenchSpot = "B2",
+		PlaceSpots = {},
+		Scope = "Vehicle",
 	},
 	{
 		Key = "counter",
@@ -117,6 +163,8 @@ return Table.new({
 		UnlockDay = 1,
 		SoldAt = "Bench",
 		BenchSpot = "B3",
+		PlaceSpots = {},
+		Scope = "Vehicle",
 	},
 	{
 		Key = "cash_drawer_lock",
@@ -128,6 +176,8 @@ return Table.new({
 		UnlockDay = 1,
 		SoldAt = "Bench",
 		BenchSpot = "B4",
+		PlaceSpots = {},
+		Scope = "Vehicle",
 	},
 	{
 		Key = "trailer_lights",
@@ -139,5 +189,48 @@ return Table.new({
 		UnlockDay = 1,
 		SoldAt = "Bench",
 		BenchSpot = "B5",
+		PlaceSpots = {},
+		Scope = "Vehicle",
+	},
+	-- In place (TASK-144; FEAT-037; Q-178 A): not on the Gear Stand
+	{
+		Key = "patio_tables",
+		Ref = "UPG-008",
+		Name = "Patio Table",
+		Vehicles = { "cart", "trailer" },
+		StartLevel = 0,
+		Levels = { cart = patioTables(), trailer = patioTables() },
+		UnlockDay = 2, -- Day 1 is the tutorial (FEAT-037)
+		SoldAt = "InPlace",
+		BenchSpot = "",
+		PlaceSpots = { "TBL-1", "TBL-2", "TBL-3", "TBL-4", "TBL-5" },
+		Scope = "Pad",
+	},
+	{
+		Key = "patio_lights",
+		Ref = "UPG-009",
+		Name = "Patio Lights",
+		Vehicles = { "cart", "trailer" },
+		StartLevel = 0,
+		Levels = { cart = patioLights(), trailer = patioLights() },
+		UnlockDay = 2,
+		SoldAt = "InPlace",
+		BenchSpot = "",
+		PlaceSpots = { "PATIO-LIGHTS" }, -- sign next to TBL-1 (UPG-009)
+		Scope = "Pad",
+		Requires = { Upgrade = "patio_tables", Level = 2 },
+	},
+	{
+		Key = "back_bar",
+		Ref = "UPG-010",
+		Name = "Back Bar",
+		Vehicles = { "trailer" },
+		StartLevel = 0,
+		Levels = { trailer = backBarTrailer },
+		UnlockDay = 1,
+		SoldAt = "InPlace",
+		BenchSpot = "",
+		PlaceSpots = { "TBL-6" },
+		Scope = "Vehicle",
 	},
 } :: { Upgrade })

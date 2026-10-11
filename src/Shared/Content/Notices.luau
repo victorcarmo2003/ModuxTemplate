@@ -69,4 +69,7 @@ return Table.new({
 	-- counter action refused with the trailer window closed (DEC-221, Q-173); placeholder until ui-text.md
 	{ Key = "shutter_closed", Text = "The window's shut. Open it to serve.", Audience = "Player", ValueFrom = "None", Wave = 3 },
 	{ Key = "item_dropped", Text = "Dropped {item}!", Audience = "Player", ValueFrom = "Items", Wave = 3 }, -- FEAT-036
+	-- Pad tables (TASK-144; FEAT-037): after a purchase in place, to the party (Value = table index 1..5); placeholder
+	-- until ui-text.md (TASK-150). A refusal for cash reuses not_enough_cash.
+	{ Key = "table_added", Text = "Table added!", Audience = "Party", ValueFrom = "Number", Wave = 3 },
 } :: { Notice })

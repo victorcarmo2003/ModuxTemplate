@@ -31,6 +31,9 @@ export type CustomerType = {
 	KShift: { Delta: number, Chance: number }, -- K +-1 after the phase draw (clamped 0..3)
 	IngredientMult: { [string]: number }, -- keys of Ingredients.ToppingKeys; missing = 1
 	Lines: { string },
+	-- Chance to sit at a Pad table after a Complete order (FEAT-037, TASK-144; Provisional). Day value; at night
+	-- x Seating.NightSitMult. 0 = never sits.
+	SitChance: number,
 }
 
 -- Civil outfits A-H, drawn uniformly for every type (DEC-188 b, DEC-160, DEC-163).
@@ -54,6 +57,7 @@ return Table.new({
 		KShift = NO_SHIFT,
 		IngredientMult = { mustard = 1.5, potato_sticks = 0.7, cream_cheese = 1.3 },
 		Lines = {},
+		SitChance = 0.30,
 	},
 	{
 		Key = "student",
@@ -71,6 +75,7 @@ return Table.new({
 		KShift = NO_SHIFT,
 		IngredientMult = { ketchup = 1.5, cheese = 1.4, mustard = 0.6 },
 		Lines = {},
+		SitChance = 0.60,
 	},
 	{
 		Key = "jogger",
@@ -88,6 +93,7 @@ return Table.new({
 		KShift = { Delta = -1, Chance = 0.4 },
 		IngredientMult = { mustard = 1.2, bacon = 0.5, cream_cheese = 0.5 },
 		Lines = {},
+		SitChance = 0.10,
 	},
 	{
 		Key = "construction_worker",
@@ -105,6 +111,7 @@ return Table.new({
 		KShift = { Delta = 1, Chance = 0.3 },
 		IngredientMult = { bacon = 1.8, potato_sticks = 1.3, ketchup = 0.8 },
 		Lines = {},
+		SitChance = 0.50,
 	},
 	{
 		Key = "grandparent",
@@ -122,6 +129,7 @@ return Table.new({
 		KShift = NO_SHIFT,
 		IngredientMult = { cream_cheese = 1.6, cheese = 1.2, mustard = 0.5, bacon = 0.6 },
 		Lines = {},
+		SitChance = 0.70,
 	},
 	{
 		Key = "night_shift_worker",
@@ -139,6 +147,7 @@ return Table.new({
 		KShift = NO_SHIFT,
 		IngredientMult = { ketchup = 1.2, potato_sticks = 1.3 },
 		Lines = {},
+		SitChance = 0.40, -- night 0.30 after x 0.75 (FEAT-037)
 	},
 	{
 		Key = "pedestrian",
@@ -156,5 +165,6 @@ return Table.new({
 		KShift = NO_SHIFT,
 		IngredientMult = {},
 		Lines = {},
+		SitChance = 0, -- never a diner
 	},
 } :: { CustomerType })

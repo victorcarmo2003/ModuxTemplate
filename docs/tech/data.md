@@ -5,6 +5,9 @@ Status: Rascunho
 Autor: architect. **Versão 5, 2026-10-10 (pós onda 1):** §5 novo — o que persiste por categoria (progressão,
 inventário, moeda, desbloqueios), `Member` enxuto, chaves de snapshot das ondas 2–4 (`T`, `Veh`, `Lt`, `Bs`, `Bn`)
 com as chaves que a onda 1 já grava (`Run`, `M`, `Sh`, `Cash`, `Fp`, `Stk`, `Stn`, `Upg`), política de migração.
+**Versão 5.2, 2026-10-11 (TASK-144; FEAT-037):** mesas do Pad (UPG-008) e Patio Lights (UPG-009) entram no `Upg`
+como qualquer upgrade, com escopo **Pad** (o mesmo nível gravado nos dois veículos, Q-179 a); estado das mesas (suja,
+gorjeta, quem está sentado) e duplas **não** persistem (§5.6). `V` e `Version` não mudam.
 **Versão 5.1, 2026-10-10 (TASK-049):** D-05 fechado — `Stn` e `Fp` descritos como o código grava (§3.3, §5.3, exemplo
 corrigido: `Fp` guarda chaves de **ingrediente**); `RunRewards.Gems` novo (soma da run, alimenta `RunReport.Gems`,
 T59) sem bump de `Version` (§1.1, §1.3, §5.4). Provisório (DEC-193).
@@ -444,7 +447,7 @@ Estado por jogador que **não** está no `Member` (dono guarda por `UserId`, sob
 | `Fp` | Item (`Pickup.luau`) | `{ G = { ingrediente }, L = { ingrediente } }`: listas ordenadas de chaves de `Content.Ingredients` (não de pacote). `G` = ingredientes cujo pacote grátis já foi posto no mundo (nunca de novo); `L` = pacotes ainda no mundo na captura (pacote grátis, TASK-046; v5.1, D-05) | 1 | igual: remove os do mundo, marca `G`, recoloca `L` no veículo atual (`L` também conta como dado) | igual |
 | `Stk` | Kitchen | `Amount` por ingrediente | 1 | igual | igual |
 | `Stn` | Kitchen | `{ [StableKey] = dado do módulo }`; `StableKey` = `"<veículo>/<kind>"` (+ `"/2"`, `"/3"` se o kind repete no veículo). Só entra estação cujo `Capture` devolve não-`nil`: na onda 1 nenhuma (grelha, trilho, tábua, caixa de pão, tigelas e lixeira devolvem `nil`) → `{}`. Restore chama `Restore(ctx, station, saved[key])` em **toda** estação (com `nil` = começa vazia) e republica o set (v5.1, D-05) | 1 | igual | igual |
-| `Upg` | Upgrade | níveis por veículo (DEC-184) | 1 | igual | igual |
+| `Upg` | Upgrade | níveis por veículo (DEC-184); upgrades `Scope = "Pad"` (`patio_tables`, `patio_lights`) com o mesmo nível nos dois veículos (v5.2) | 1 | igual | igual |
 | `Veh` | Vehicle | chave do veículo atual | 2 | igual (posições + `SetVehicle`) | igual |
 | `Lt` | Light | `{ S = interruptor }` | 2 | ligado (FEAT-020) | igual |
 | `Bs` | Boss | chaves `Once` já tocadas | 2 | igual | igual |
@@ -498,3 +501,14 @@ Nenhuma migração é necessária nas ondas 2–4 com este contrato. v5.1: `RunR
 
 §3 vale sem mudança. `SessionService` é o único que fala com `MemoryStoreService`; `RunStateService` entrega cada
 captura a `SessionService:WriteSnapshot(snap)` (onda 4). Antes disso, captura só em memória (como a onda 1).
+
+### 5.6 Mesas do Pad e duplas (v5.2, TASK-144; FEAT-037, FEAT-038; Provisório)
+
+| Dado | Onde vive | Persiste? |
+|---|---|---|
+| Mesas compradas (UPG-008, `TableCount` 0..5) e Patio Lights (UPG-009) | `UpgradeService` (`Levels[vehicle][key]`), snapshot `Upg` | **sim, como upgrade da run** (snapshot de turno; nunca no perfil). Escopo `Pad`: `SetLevel` grava o mesmo nível no carrinho e no trailer, então a troca de veículo não zera (Q-179 a); `Restore` normaliza para o maior nível salvo (snapshot antigo com só um veículo) |
+| Estado por mesa (`Free`/`Occupied`/`Dirty`), gorjeta em cima da mesa, quem está sentado | `SeatingService` (memória) | **não**: todo turno, restore e noite repetida começam com as mesas limpas e vazias; gorjeta não recolhida se perde no `Summary` (Q-181 A, DEC-053 para a noite perdida) |
+| Duplas (líder/parceiro, pedido de 2 itens) | `CustomerService` | não (clientes não entram no snapshot, §2.2) |
+| Back Bar (UPG-010) | `UpgradeService` (só trailer, escopo `Vehicle`) | como upgrade; ainda não vendido (sem TBL-6) |
+
+Nenhuma chave nova de snapshot, nenhum campo novo no perfil.

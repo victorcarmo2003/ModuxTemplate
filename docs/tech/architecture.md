@@ -272,6 +272,7 @@ Quem usa estado de outro no próprio `OnInit` precisa de prioridade menor. `effe
 | 590 | `CustomerService` | NpcService, KitchenService, EconomyService, RoundService, InteractionService | R | |
 | 580 | `ThiefService` | NpcService, EconomyService, RoundService | R | |
 | 570 | `AnomalyService` | NpcService, RoundService, VitalService, InteractionService, CustomerService | R | |
+| 568 | `SeatingService` (TASK-145, §19.28) | PlaceService, NetService, RunStateService, RoundService, EconomyService, InteractionService, UpgradeService, NpcService, CustomerService, AnomalyService | R | mesas do Pad, sentar, limpar (FEAT-037) |
 | 565 | `AmbulanceService` | VitalService, CharacterService, RoundService, NetService | R | uma ambulância, fila de viagens |
 | 560 | `BossService` | RoundService, NetService | R | |
 | 555 | `ReviveService` | VitalService, AmbulanceService, MonetizationService, ItemService, RunStateService, NetService | R | |
@@ -1569,6 +1570,7 @@ Servidor ("=" = igual à onda 1):
 | 580 | `ThiefService` | PlaceService, NetService, RoundService, RunStateService, NpcService, EconomyService, UpgradeService | R | 2 |
 | ~~575~~ | ~~`HideService`~~ | sai (DEC-221) | — | — |
 | 570 | `AnomalyService` | PlaceService, NetService, RoundService, RunStateService, VitalService, LightService, VehicleService (era HideService, DEC-221), CustomerService, NpcService, KitchenService, ItemService, EconomyService, TrafficService | R | 3 |
+| 568 | `SeatingService` | PlaceService, NetService, RunStateService, RoundService, EconomyService, InteractionService, UpgradeService, NpcService, CustomerService, AnomalyService | R | 3 (§19.28) |
 | 565 | `AmbulanceService` | PlaceService, NetService, RoundService, VitalService, CharacterService, TrafficService, AnomalyService | R | 4 |
 | 560 | `BossService` | PlaceService, NetService, RoundService, RunStateService, InteractionService, VehicleService, ThiefService | R | 2 |
 | 555 | `ReviveService` | PlaceService, NetService, VitalService, AmbulanceService, MonetizationService, ItemService, RunStateService, EconomyService | L+R (handler) / R | 4 |
@@ -2188,3 +2190,26 @@ podem subir para a onda 3** sem conflito de arquivo (só `RunStateService/` com 
 | `Q-168` | Fonte e licença de música e SFX; lista de cues | ids vazios; lista em `content-data.md` §3.21; só áudio com licença verificada (`credits.md`) |
 | `Q-169` | Estoque acima da capacidade na troca carrinho → trailer (DEC-184: trailer volta ao Cooler 1) | manter o excesso (sem perda); `Restock` bloqueado até cair abaixo da capacidade |
 | `Q-170` | Café de dia (sanidade não existe de dia) | só bebe à noite; de dia a Tool fica guardada (não ativa) |
+
+### 19.28 Mesas do Pad e duplas (TASK-144 a TASK-146; FEAT-037, FEAT-038; Provisório)
+
+Feature nova `src/Seating/server/SeatingService/` (`init.luau`, `Tables.luau` puro, `Diner.luau`), prioridade **568**
+(abaixo do `AnomalyService` 570), `Require` PlaceService, NetService, RunStateService, RoundService, EconomyService,
+InteractionService, UpgradeService, NpcService, CustomerService, AnomalyService. Client (TASK-147):
+`src/Seating/client/SeatingController/`, prioridade 680 (com os outros controllers de mundo).
+
+| Ponto | Contrato |
+|---|---|
+| Customer → Seating | sem `Require` de volta (T42): `CustomerService:SetSeater(fn(party) -> boolean)`, chamado no fim do pedido (não pode ceder: roda dentro do `Run` do Serve). `party = { Leader, Partner?, Couple, CustomerType }`. `true` = o Seating reservou a mesa; o cliente vira `Leaving` com `Dining = true` (sem caminhada de saída, sem `LEAVE_TIMEOUT`) até `CustomerService:Dismiss(leader)` |
+| Quem pode sentar | `CustomerService:Conclude`: sozinho Completo/Perfeito, ou dupla com ≥ 1 Completo e nenhum Errado/Desistiu/Recusado; ator (`Variant`) nunca |
+| Condições (`SeatingService:TrySeat`) | fase em `SitPhases`; sem tensão (`AnomalyService:IsRunning` de `TensionAnomalies` ou `CustomerService:HasActor()`); diners + tamanho ≤ `MaxDiners`; `CustomerService:Count() ≤ MaxCustomers() − SitHeadroom`; mesa `Free` de menor índice com os assentos do grupo; depois a chance (`Tables.Chance`, Random do turno, domínio `"seating"`) |
+| Caminho | Q1 → `NpcNode` `TBL-n` (se o bind tiver) ou o nó mais perto da mesa que não é vaga de fila (`MapIndex.NearestNode`, **fallback**) → ponto de aproximação (2,5 studs atrás do assento) → assento. Volta: ponto de aproximação → nó → `Dismiss` → saída normal pelo grafo. `NpcService` ganhou `WalkToPosition`, `MoveToward`, `Teleport`, `SetNode`, `Face`, `SetWalkSpeed`, `GetRig` |
+| Sentado | `Diner.Sit`: HRP ancorado no `CFrame` do `SeatN` (posição = torso, frente = `LookVector` achatado); sem Id em `npc_sit`, quadris/ombros a ±90° por `Motor6D.C0` (replica, `RestC0` guardado); atributo `Seated`. `Pool.release` desancora e restaura `RestC0` |
+| Levantar | `EatTime` vencido, tensão (≤ 1 tick de 5 Hz), fase fora de `SitPhases` que não seja `Closing`: `Dirty`, `Tip += TableTip × pessoas` |
+| Fim de turno | gaveta fechada (Summary, fim de noite): todas as mesas `Free`, gorjeta perdida; `ShiftStarted`: idem (o `CustomerService:RemoveAll` derruba os diners, `Removed` limpa a pose) |
+| Compra | `buy_in_place` (dono `SeatingService`): âncora com `Upgrade` vendido aqui (`patio_tables` na próxima mesa `Ghost`, `patio_lights` na placa); `UpgradeService:CanBuy` + `Buy(key, player, quiet = true)`; notice `table_added` (mesa) ou `upgrade_bought` (luzes). Back Bar recusado (sem TBL-6) |
+| Upgrade escopo Pad | `UpgradeService:SetLevel` grava o nível em todo veículo da linha; `Restore` normaliza; `CanBuy` respeita `Requires` ("locked") |
+| Duplas | `CustomerService/Group.luau` (puro): `Roll` (chance do turno + par ponderado), `PartnerLook` (nunca espécie+roupa iguais; à noite nunca a mesma espécie), `Spot`. Parceiro = registro com `Leader`, fora da fila (`Occupants` não conta), sem prompt, movido por `StepPairs` a 10 Hz (`MoveToward`, sem A*; `Teleport` além de `Leash`). Ticket com 2 linhas (`Orders.Ticket(lines)`, `Orders.Match`), `Sale`/`CountResult` por linha, `CountArrival` 2 |
+| Dev | `/dev seating [buy|sit|dirty n|clean n]`, `/dev customer group [leader+partner]` |
+| Fallbacks registrados | mesas por nome em `MAP01_Assets.PadDecor` ordenadas pela distância a Q1 (warn 1×, escreve tag/atributo); âncora runtime `Prompt_Table`; nó mais próximo; notas do `MapIndex.SeatingNotes` só avisam (`PlaceService`) |
+| Pendente | `LZ-PATIO` (UPG-009 à noite) precisa de linha em `LightGroups` + volume no bind, e o `Required` cobra toda zona de `LightGroups`: entra junto com a TASK-149. Medir 4 NPCs sentados no MicroProfiler do celular (`Q-180` B) |

@@ -1059,3 +1059,40 @@ janela fechada e dentro do trailer, `architecture.md` §19.14); N10 `PostsOff = 
 `Revive`, `Ambulance`, `Products`, `MarketBench`/`BenchItems` como §3.9, §3.12, §3.13, §3.15 (sem mudança; +
 `Ambulance.MedicFace = "Exhausted"`, `MedicSpecies = { "rabbit", "panda" }`, DEC-213). `PartyConfig` (registro):
 `MaxParty = 4`, `Countdown = 5`, `TeleportRetries = { 2, 5, 10 }`, `JoinWindow = RunParams.JoinWindow`.
+
+### 3.25 Seating, Flow.Groups e mudanças de mesas/duplas (v5.3, TASK-144; FEAT-037, FEAT-038; Provisório)
+
+Arquivos: `Content/Seating.luau` (novo, registro), `Flow.luau` (`Groups`), `Upgrades.luau`, `CustomerTypes.luau`,
+`Stats.luau`, `Actions.luau`, `Notices.luau`, `Animations.luau`; `Validate.checkSeating` cobre tudo abaixo.
+
+**`Content.Seating`** (registro): `UnlockDay` 2 · `Tables` 5 · `UpgradeKey` `patio_tables` · `LightsKey`
+`patio_lights` · `TableLabel` "Table" · `EatTime` { Day 20, Night 24, Jitter 3, GroupExtra 4 } · `TableTip` 2 ·
+`MaxTip` 1000 · `MaxDiners` { Day 4, Night 2 } · `SitHeadroom` 2 · `NightSitMult` 0,75 · `GroupSitBonus` 0,20 ·
+`SitChanceCap` 0,95 · `CleanHold` 1 · `BuyHold` 1,5 · `PromptRadius` 7 (iguais às linhas de `Actions`, Validate) ·
+`TipLostAtSummary` true · `SeatedOutsideCap` false · `SitPhases` { Open, Night } · `TensionAnomalies` { anm_007_walker,
+anm_008_long_car, anm_009_knock, anm_010_hush } · `GhostTransparency` 0,7 · `StandTimeout` 30 · `WalkTimeout` 6 ·
+`Approach` 2,5 · `States` { Locked, Ghost, Free, Occupied, Dirty } (enum do set `Tables`) · `Seats` { Solo {1},
+Pair {1, 3}, Couple {1, 2} } · `Binding` { Tag `SeatTable`, IndexAttribute `TableIndex`, Folder { MAP01_Assets, PadDecor }
+(fallback), ModelName `AST-100_PicnicTable`, SeatPrefix `Seat`, SeatCount 4, BuyAnchor `Prompt_BuyTable`, CleanAnchor
+`Prompt_CleanTable`, RuntimeAnchor `Prompt_Table`, TrayAnchor `Tray_Anchor`, NodePrefix `TBL-`, LightsAnchor
+`Prompt_PatioLights` }. Só `TipLostAtSummary = true` e `SeatedOutsideCap = false` estão implementados (o outro valor
+avisa no boot).
+
+**`Flow.Groups`**: `ChanceDay` 0,20 · `ChanceNight` 0,10 · `FromDay` 2 · `FromNight` 2 · `IntervalMult` 1,6 ·
+`PatienceBonus` 10 · `FollowGap` 2 · `SideGap` 2 · `QueueGap` 1,8 · `Leash` 8 · `PartnerSpeedMult` 1,2 · `Pairs`
+{ `Shift`, `Leader`, `Partner`, `Weight`, `Couple` } com as 9 linhas da FEAT-038. Validate: tipos existem e são
+`Customer`, aparecem no turno do par, e todo líder deixa ao parceiro outra espécie (noite) ou outra roupa (dia).
+
+**`Upgrades`** (campos novos em toda linha): `SoldAt` `"Bench" | "InPlace"` · `BenchSpot` (`""` em InPlace) ·
+`PlaceSpots` (InPlace: um ponto por nível comprável, em ordem) · `Scope` `"Vehicle" | "Pad"` (Pad = mesmo nível nos
+dois veículos; Validate exige linhas iguais) · `Requires?` { `Upgrade`, `Level` }. Linhas novas: `patio_tables`
+(UPG-008, `StartLevel` 0, níveis 0..5 = $0/30/45/60/80/100, `Effects.TableCount`, `UnlockDay` 2, `PlaceSpots`
+TBL-1..TBL-5, Pad); `patio_lights` (UPG-009, $120, `Effects.SitBonus` 0,10, `Requires` patio_tables ≥ 2, Pad);
+`back_bar` (UPG-010, $90, só trailer, `Scope` Vehicle, sem efeito ainda, não vendido). Gear Stand (`Mart`,
+`Required.Bench`, `MarketController.OnLevel`) passam a olhar só `SoldAt = "Bench"`.
+
+**`Stats`**: + `TableCount`, `SitBonus`. **`CustomerTypes.SitChance`** (0..1, valor de dia; noite × `NightSitMult`):
+office 0,30 · student 0,60 · jogger 0,10 · construction 0,50 · grandparent 0,70 · night shift 0,40 · pedestrian 0.
+**`Actions`**: `buy_in_place` ("Buy {item} — ${price}", 1,5 s, raio 7, onda 3) e `clean_table` ("Clean Table", 1 s,
+raio 7, onda 3). **`Notices`**: `table_added` ("Table added!", Party, Number). **`Animations`**: `npc_sit` (Idle,
+loop) e `npc_eat_seated` (Action), Id "" até o upload (TASK-151).

@@ -22,7 +22,7 @@ export type Public = {
 	GetEffect: (self: Public, stat: string, vehicle: string?) -> number,
 	GuardKey: (self: Public, key: string) -> string,
 	CanBuy: (self: Public, key: string) -> (boolean, Reason?),
-	Buy: (self: Public, key: string, player: Player?) -> (boolean, Reason?),
+	Buy: (self: Public, key: string, player: Player?, quiet: boolean?) -> (boolean, Reason?),
 	SetLevel: (self: Public, vehicle: string, key: string, level: number) -> (),
 	SetVehicle: (self: Public, vehicle: string) -> (),
 	Capture: (self: Public) -> { [string]: { [string]: number } },

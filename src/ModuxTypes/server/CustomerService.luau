@@ -4,6 +4,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 local Content = require(ReplicatedStorage.shared.Content)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
+local Group = require(ServerScriptService.server.Customer.CustomerService.Group)
 local Orders = require(ServerScriptService.server.Customer.CustomerService.Orders)
 local Queue = require(ServerScriptService.server.Customer.CustomerService.Queue)
 
@@ -22,7 +23,19 @@ export type Customer = {
 	LeftAt: number, -- server time it started leaving (0 = not leaving)
 	Move: number, -- walk order counter: a newer order cancels the callback of the older one
 	Variant: Variant?, -- customer anomaly (SpawnActor); nil = ordinary customer
+	-- Pairs (TASK-146)
+	Order2: { [string]: boolean }?, -- leader: the 2nd pending hot dog on the wire (nil = none)
+	Partner: number?, -- leader: NpcId of its partner
+	Leader: number?, -- partner: NpcId of its leader
+	Couple: boolean, -- pair walks and sits side by side (Flow.Groups.Pairs[].Couple)
+	Held: boolean, -- partner: moved by SeatingService, StepPairs leaves it alone
+	FollowTarget: Vector3?, -- partner: last MoveTo target
+	FollowAt: number, -- partner: server time of that MoveTo
+	Faced: boolean, -- partner: already turned like its standing leader
+	-- Tables (TASK-145/146)
+	Dining: boolean, -- handed to SeatingService: no exit walk, no leave timeout until Dismiss
 }
+export type Seater = (party: SeatParty) -> boolean
 export type Patch = {
 	State: State?,
 	Order: { [string]: boolean }?,
@@ -35,6 +48,8 @@ export type Wire = {
 	Order: { [string]: boolean },
 	PatienceEndsAt: number,
 	Mood: string,
+	Order2: { [string]: boolean }?,
+	Leader: number?,
 }
 export type SaleResult = "Perfect" | "Complete" | "Incomplete" | "Wrong" | "Left" | "Refused"
 export type Variant = "blank" | "mirror" | "raincoat"
@@ -48,14 +63,22 @@ export type CustomerActorSpec = {
 }
 export type ActedAction = "take_order" | "serve" | "refuse" | "give_up"
 export type ServeRule = (customer: Customer, tool: Tool, player: Player) -> SaleResult?
+export type SeatParty = {
+	Leader: number,
+	Partner: number?,
+	Couple: boolean,
+	CustomerType: string, -- leader's type (SitChance)
+}
 
 export type Public = {
 	Acted: SignalLib.Signal<number, ActedAction, Player?, SaleResult?>,
 	ActorRng: Random,
 	Customers: { [number]: Customer },
 	Enabled: boolean,
+	ForcedPair: Group.Pair?,
 	Fronted: SignalLib.Signal<number>,
 	Joined: SignalLib.Signal<number>,
+	LastWasPair: boolean,
 	Left: SignalLib.Signal<number, LeaveReason>,
 	Line: Queue.Queue,
 	NextSpawnAt: number,
@@ -64,6 +87,7 @@ export type Public = {
 	Party: number,
 	Removed: SignalLib.Signal<number>,
 	Rng: Random,
+	Seater: Seater?,
 	ServeRules: { ServeRule },
 	SpawnAttempted: SignalLib.Signal<Outcome>,
 	Tickets: { [number]: Orders.Ticket },
@@ -75,6 +99,8 @@ export type Public = {
 	Front: (self: Public) -> number?,
 	Count: (self: Public) -> number,
 	Occupants: (self: Public) -> number,
+	HasActor: (self: Public) -> boolean,
+	SetSeater: (self: Public, seater: Seater?) -> (),
 	IsCounterEmpty: (self: Public) -> boolean,
 	QueueSize: (self: Public) -> number,
 	PhaseRow: (self: Public) -> Content.Phase?,
@@ -93,13 +119,18 @@ export type Public = {
 	Reached: (self: Public, customer: Customer, slot: number) -> (),
 	Join: (self: Public, customer: Customer) -> (),
 	Attempt: (self: Public) -> (Outcome, number?),
-	Create: (self: Public, id: number, variant: Variant?) -> (),
+	RollPair: (self: Public) -> Group.Pair?,
+	SpawnPair: (self: Public, pair: Group.Pair) -> number?,
+	Create: (self: Public, id: number, variant: Variant?, leader: number?) -> (),
 	SpawnActor: (self: Public, spec: CustomerActorSpec) -> number?,
 	AddServeRule: (self: Public, rule: ServeRule) -> () -> (),
 	ServeOverride: (self: Public, customer: Customer, tool: Tool, player: Player) -> SaleResult?,
 	SetPrompts: (self: Public, id: number, enabled: boolean) -> (),
 	ExitRoute: (self: Public, node: string) -> (string?, boolean),
-	Leave: (self: Public, id: number, mood: string?, reason: LeaveReason?) -> boolean,
+	Leave: (self: Public, id: number, mood: string?, reason: LeaveReason?, dining: boolean?) -> boolean,
+	WalkOut: (self: Public, customer: Customer) -> (),
+	Dismiss: (self: Public, id: number) -> boolean,
+	SetHeld: (self: Public, id: number, held: boolean) -> (),
 	Remove: (self: Public, id: number) -> (),
 	Forget: (self: Public, id: number) -> boolean,
 	SendAllAway: (self: Public) -> (),
@@ -107,6 +138,8 @@ export type Public = {
 	Update: (self: Public, id: number, patch: Patch) -> boolean,
 	GetTicket: (self: Public, id: number) -> Orders.Ticket?,
 	OpenTicket: (self: Public, id: number) -> (),
+	LineOwner: (self: Public, customer: Customer, index: number) -> number,
+	ShowPending: (self: Public, customer: Customer, ticket: Orders.Ticket) -> (),
 	OnFronted: (self: Public, id: number) -> (),
 	TicketAt: (self: Public, anchor: Instance) -> (number?, Customer?, Orders.Ticket?),
 	CanAct: (self: Public, player: Player, anchor: Instance, state: State?) -> boolean,
@@ -115,6 +148,10 @@ export type Public = {
 	Settle: (self: Public, id: number, result: SaleResult, amount: number) -> (),
 	TakeOrder: (self: Public, player: Player, anchor: Instance) -> (),
 	Serve: (self: Public, player: Player, anchor: Instance) -> (),
+	Judge: (self: Public, ticket: Orders.Ticket, tool: Tool, override: SaleResult?) -> (number?, Orders.Verdict),
+	Conclude: (self: Public, customer: Customer, ticket: Orders.Ticket) -> (),
+	OfferSeat: (self: Public, customer: Customer) -> boolean,
+	SettlePending: (self: Public, customer: Customer, ticket: Orders.Ticket, result: SaleResult) -> (),
 	Refuse: (self: Public, player: Player, anchor: Instance) -> (),
 	GiveUp: (self: Public, id: number) -> (),
 	StepOrders: (self: Public, t: number) -> (),
@@ -122,6 +159,8 @@ export type Public = {
 	Reseed: (self: Public) -> (),
 	OnPhase: (self: Public, phase: string) -> (),
 	Step: (self: Public) -> (),
+	StepPairs: (self: Public, t: number) -> (),
+	DevSpawnPair: (self: Public, leader: string?, partner: string?) -> (Outcome, number?),
 	DevSpawn: (self: Public) -> (Outcome, number?),
 }
 

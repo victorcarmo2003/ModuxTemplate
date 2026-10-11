@@ -37,6 +37,10 @@ export type BuildSpec = {
 }
 
 const ANCHOR_TAG = "Interactable"
+-- Seated pose (SeatingService/Diner.luau, TASK-145): a posed Motor6D keeps its rest C0 in this attribute; release
+-- puts it back, so a pooled rig never comes out sitting or anchored.
+const REST_ATTRIBUTE = "RestC0"
+const SEATED_ATTRIBUTE = "Seated"
 const CUSTOMER_ACTION = "take_order"
 const REFUSE_ACTION = "refuse"
 -- Anchor offsets from the HumanoidRootPart (torso centre). PROVISIONAL: Prompt_Customer at the neck, Prompt_Refuse
@@ -186,6 +190,16 @@ function PoolModule.release(pool: Pool, rig: Rig, now: number, parking: Instance
 	end
 	resetAnchor(rig.Customer, CUSTOMER_ACTION)
 	resetAnchor(rig.Refuse, REFUSE_ACTION)
+	rig.Root.Anchored = false
+	for _, motor in rig.Model:GetDescendants() do
+		if motor:IsA("Motor6D") then
+			const rest = motor:GetAttribute(REST_ATTRIBUTE)
+			if typeof(rest) == "CFrame" then
+				motor.C0 = rest
+			end
+		end
+	end
+	rig.Model:SetAttribute(SEATED_ATTRIBUTE, nil)
 	rig.Model:SetAttribute("NpcId", nil)
 	rig.Model:SetAttribute("Variant", nil) -- actor variant (TASK-108): a reused rig is a plain customer again
 	rig.Model.Name = "Npc"

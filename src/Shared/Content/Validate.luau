@@ -26,6 +26,7 @@ local Packages = require(script.Parent.Packages)
 local Revive = require(script.Parent.Revive)
 local RunParams = require(script.Parent.RunParams)
 local Sanity = require(script.Parent.Sanity)
+local Seating = require(script.Parent.Seating)
 local Shift = require(script.Parent.Shift)
 local Sounds = require(script.Parent.Sounds)
 local Species = require(script.Parent.Species)
@@ -164,13 +165,56 @@ local function checkUpgrades()
 				fail("Upgrades", index, row.Key, `Levels.{vehicle} exists but '{vehicle}' is not in Vehicles`)
 			end
 		end
-		if not string.match(row.BenchSpot, "^B[1-5]$") then
-			fail("Upgrades", index, row.Key, `BenchSpot '{row.BenchSpot}' is not B1..B5`)
-		end
-		for other = 1, index - 1 do
-			if Upgrades.List[other].BenchSpot == row.BenchSpot then
-				fail("Upgrades", index, row.Key, `BenchSpot {row.BenchSpot} already used by '{Upgrades.List[other].Key}'`)
+		if row.SoldAt == "Bench" then
+			if not string.match(row.BenchSpot, "^B[1-5]$") then
+				fail("Upgrades", index, row.Key, `BenchSpot '{row.BenchSpot}' is not B1..B5`)
 			end
+			for other = 1, index - 1 do
+				if Upgrades.List[other].BenchSpot == row.BenchSpot then
+					fail("Upgrades", index, row.Key, `BenchSpot {row.BenchSpot} already used by '{Upgrades.List[other].Key}'`)
+				end
+			end
+			if #row.PlaceSpots > 0 then
+				fail("Upgrades", index, row.Key, "PlaceSpots is only for SoldAt InPlace")
+			end
+		elseif row.SoldAt == "InPlace" then
+			-- TASK-144 (Q-178 A): sold on a prompt in the world, one spot per purchasable level
+			if row.BenchSpot ~= "" then
+				fail("Upgrades", index, row.Key, "SoldAt InPlace must have an empty BenchSpot")
+			end
+			for _, vehicle in row.Vehicles do
+				const buyable = #row.Levels[vehicle] - 1
+				if #row.PlaceSpots ~= buyable then
+					fail("Upgrades", index, row.Key, `{#row.PlaceSpots} PlaceSpots for {buyable} purchasable levels on {vehicle}`)
+				end
+			end
+		else
+			fail("Upgrades", index, row.Key, `SoldAt '{tostring(row.SoldAt)}' is not Bench or InPlace`)
+		end
+		if row.Scope == "Pad" then
+			-- Q-179 a: one level for the whole Pad, written on every vehicle at once (UpgradeService)
+			const first = row.Levels[row.Vehicles[1]]
+			for _, vehicle in row.Vehicles do
+				const levels = row.Levels[vehicle]
+				if #levels ~= #first then
+					fail("Upgrades", index, row.Key, `Scope Pad: Levels.{vehicle} differs from Levels.{row.Vehicles[1]}`)
+				end
+				for position, level in levels do
+					if level.Price ~= first[position].Price then
+						fail("Upgrades", index, row.Key, `Scope Pad: Levels.{vehicle}[{position}].Price differs between vehicles`)
+					end
+				end
+			end
+		elseif row.Scope ~= "Vehicle" then
+			fail("Upgrades", index, row.Key, `Scope '{tostring(row.Scope)}' is not Vehicle or Pad`)
+		end
+		const requires = row.Requires
+		if requires ~= nil then
+			const other = Upgrades.ByKey[requires.Upgrade]
+			if other == nil or other == row then
+				fail("Upgrades", index, row.Key, `Requires.Upgrade '{requires.Upgrade}' is not another upgrade`)
+			end
+			inRange("Upgrades", index, row.Key, "Requires.Level", requires.Level, 1, 9)
 		end
 	end
 	if not Upgrades.ByKey.cooler or not Upgrades.ByKey.cooler.Levels.cart then
@@ -1311,6 +1355,123 @@ end
 
 -- Mart v2 (TASK-135): closed phases exist in Shift; pedestals = every Upgrades.BenchSpot once + the special slot;
 -- every pedestal behind at most one door; timings and sizes positive.
+-- Pad tables and pairs (TASK-144; FEAT-037, FEAT-038; content-data.md §3.25).
+local function checkSeating()
+	const name = "Seating"
+	const phases = setOf(Shift.PhaseKeys)
+	inRange(name, nil, nil, "UnlockDay", Seating.UnlockDay, 1, 100)
+	inRange(name, nil, nil, "Tables", Seating.Tables, 1, 8)
+	const tables = Upgrades.ByKey[Seating.UpgradeKey]
+	if tables == nil or tables.SoldAt ~= "InPlace" or tables.Scope ~= "Pad" then
+		fail(name, nil, nil, `UpgradeKey '{Seating.UpgradeKey}' must be an InPlace upgrade with Scope Pad`)
+	end
+	for _, vehicle in tables.Vehicles do
+		const levels = tables.Levels[vehicle]
+		if levels[#levels].Effects.TableCount ~= Seating.Tables then
+			fail(name, nil, nil, `UpgradeKey max TableCount on {vehicle} must be Tables ({Seating.Tables})`)
+		end
+	end
+	const lights = Upgrades.ByKey[Seating.LightsKey]
+	if lights == nil or lights.SoldAt ~= "InPlace" then
+		fail(name, nil, nil, `LightsKey '{Seating.LightsKey}' must be an InPlace upgrade`)
+	end
+	const eat = Seating.EatTime
+	inRange(name, nil, nil, "EatTime.Day", eat.Day, 1, 120)
+	inRange(name, nil, nil, "EatTime.Night", eat.Night, 1, 120)
+	inRange(name, nil, nil, "EatTime.GroupExtra", eat.GroupExtra, 0, 60)
+	inRange(name, nil, nil, "EatTime.Jitter", eat.Jitter, 0, math.min(eat.Day, eat.Night) - 1)
+	inRange(name, nil, nil, "TableTip", Seating.TableTip, 0, 100)
+	inRange(name, nil, nil, "MaxTip", Seating.MaxTip, Seating.TableTip * 2, 65535)
+	inRange(name, nil, nil, "MaxDiners.Day", Seating.MaxDiners.Day, 0, Flow.MaxCustomersDay)
+	inRange(name, nil, nil, "MaxDiners.Night", Seating.MaxDiners.Night, 0, Flow.MaxCustomersNight)
+	inRange(name, nil, nil, "SitHeadroom", Seating.SitHeadroom, 0, Flow.MaxCustomersNight)
+	inRange(name, nil, nil, "NightSitMult", Seating.NightSitMult, 0, 1)
+	inRange(name, nil, nil, "GroupSitBonus", Seating.GroupSitBonus, 0, 1)
+	inRange(name, nil, nil, "SitChanceCap", Seating.SitChanceCap, 0, 1)
+	inRange(name, nil, nil, "GhostTransparency", Seating.GhostTransparency, 0, 1)
+	inRange(name, nil, nil, "StandTimeout", Seating.StandTimeout, 1, 120)
+	inRange(name, nil, nil, "WalkTimeout", Seating.WalkTimeout, 1, 30)
+	inRange(name, nil, nil, "Approach", Seating.Approach, 0, 10)
+	const holds: { [string]: number } = { buy_in_place = Seating.BuyHold, clean_table = Seating.CleanHold }
+	for key, hold in holds do
+		const action = Actions.ByKey[key]
+		if action == nil then
+			fail(name, nil, nil, `Actions.{key} missing`)
+		end
+		if action.Hold ~= hold or action.Radius ~= Seating.PromptRadius then
+			fail(name, nil, nil, `Actions.{key} Hold/Radius differ from Seating (BuyHold/CleanHold, PromptRadius)`)
+		end
+	end
+	if not Notices.ByKey.table_added then
+		fail(name, nil, nil, "Notices.table_added missing")
+	end
+	for _, phase in Seating.SitPhases do
+		if not phases[phase] then
+			fail(name, nil, nil, `SitPhases '{phase}' is not a Shift phase`)
+		end
+	end
+	for _, key in Seating.TensionAnomalies do
+		if not Anomalies.ByKey[key] then
+			fail(name, nil, nil, `TensionAnomalies '{key}' not in Anomalies`)
+		end
+	end
+	if #Seating.States ~= 5 then
+		fail(name, nil, nil, "States must be Locked, Ghost, Free, Occupied, Dirty")
+	end
+	if #Seating.Seats.Solo ~= 1 or #Seating.Seats.Pair ~= 2 or #Seating.Seats.Couple ~= 2 then
+		fail(name, nil, nil, "Seats: Solo needs 1 seat, Pair and Couple 2")
+	end
+	for _, list in { Seating.Seats.Solo, Seating.Seats.Pair, Seating.Seats.Couple } do
+		for _, seat in list do
+			inRange(name, nil, nil, "Seats", seat, 1, Seating.Binding.SeatCount)
+		end
+	end
+	for index, row in CustomerTypes.List do
+		inRange("CustomerTypes", index, row.Key, "SitChance", row.SitChance, 0, 1)
+	end
+
+	-- Flow.Groups (FEAT-038)
+	const groups = Flow.Groups
+	const g = "Flow.Groups"
+	inRange(g, nil, nil, "ChanceDay", groups.ChanceDay, 0, 1)
+	inRange(g, nil, nil, "ChanceNight", groups.ChanceNight, 0, 1)
+	inRange(g, nil, nil, "FromDay", groups.FromDay, 1, 10000)
+	inRange(g, nil, nil, "FromNight", groups.FromNight, 1, 10)
+	inRange(g, nil, nil, "IntervalMult", groups.IntervalMult, 1, 5)
+	inRange(g, nil, nil, "PatienceBonus", groups.PatienceBonus, 0, 120)
+	inRange(g, nil, nil, "PartnerSpeedMult", groups.PartnerSpeedMult, 1, 3)
+	inRange(g, nil, nil, "Leash", groups.Leash, 1, 50)
+	for index, pair in groups.Pairs do
+		const label = `{pair.Leader}+{pair.Partner}`
+		const leader = CustomerTypes.ByKey[pair.Leader]
+		const partner = CustomerTypes.ByKey[pair.Partner]
+		if leader == nil or partner == nil or leader.Role ~= "Customer" or partner.Role ~= "Customer" then
+			fail("Flow.Groups.Pairs", index, label, "Leader and Partner must be customer types")
+		end
+		if pair.Shift ~= "Day" and pair.Shift ~= "Night" then
+			fail("Flow.Groups.Pairs", index, label, `Shift '{tostring(pair.Shift)}' is not Day or Night`)
+		end
+		inRange("Flow.Groups.Pairs", index, label, "Weight", pair.Weight, 0, 1000)
+		for _, kind in { leader, partner } do
+			if kind.Shift ~= "Any" and kind.Shift ~= pair.Shift then
+				fail("Flow.Groups.Pairs", index, label, `{kind.Key} never comes on the {pair.Shift} shift`)
+			end
+		end
+		-- every leader species leaves the partner another species (night) or another outfit (day)
+		for _, species in leader.Species do
+			local other = false
+			for _, candidate in partner.Species do
+				if candidate ~= species then
+					other = true
+				end
+			end
+			if not other and (pair.Shift == "Night" or #partner.Outfits < 2) then
+				fail("Flow.Groups.Pairs", index, label, `no valid partner look when the leader is a {species}`)
+			end
+		end
+	end
+end
+
 local function checkMart()
 	const phases = setOf(Shift.PhaseKeys)
 	const closed: { [string]: boolean } = {}
@@ -1326,7 +1487,9 @@ local function checkMart()
 
 	const spots: { [string]: boolean } = {}
 	for _, upgrade in Upgrades.List do
-		spots[upgrade.BenchSpot] = true
+		if upgrade.SoldAt == "Bench" then
+			spots[upgrade.BenchSpot] = true
+		end
 	end
 	const pedestals: { [string]: boolean } = {}
 	local specials = 0
@@ -1424,4 +1587,5 @@ return function()
 	checkTraffic()
 	checkWalkPaths()
 	checkMart()
+	checkSeating()
 end

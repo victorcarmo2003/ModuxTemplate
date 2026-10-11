@@ -248,6 +248,12 @@
 						"optional": "src/Run/server"
 					}
 				},
+				"Seating": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Seating/server"
+					}
+				},
 				"Thief": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
