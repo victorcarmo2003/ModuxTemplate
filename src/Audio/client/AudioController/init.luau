@@ -42,7 +42,6 @@
 	  SoundRules.ScareMaxVolume (Provisional: the table has no scare flag yet, the caller marks it).
 ]]
 local CollectionService = game:GetService("CollectionService")
-local ContentProvider = game:GetService("ContentProvider")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local SoundService = game:GetService("SoundService")
 local StarterPlayer = game:GetService("StarterPlayer")
@@ -55,6 +54,7 @@ local Players = game:GetService("Players")
 local Zones = require(ReplicatedStorage.shared.Light.Zones)
 local Bed = require(script.Bed)
 local Cues = require(script.Cues)
+local LoadQueue = require(script.LoadQueue)
 
 const RULES = Content.SoundRules
 const GROUPS = { "Music", "Ambient", "Sfx", "Voice", "Ui" }
@@ -753,8 +753,9 @@ function AudioController:Preload()
 	if #ids == 0 then
 		return
 	end
+	-- background job of the one audio queue (LoadQueue): never a burst next to the loading screen and the voices
 	const ok, err = pcall(function()
-		ContentProvider:PreloadAsync(ids)
+		LoadQueue.Preload(ids)
 	end)
 	if not ok then
 		warn(`[AudioController] preload failed: {err}`)

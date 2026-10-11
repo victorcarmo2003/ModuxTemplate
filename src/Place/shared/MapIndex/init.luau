@@ -22,7 +22,9 @@ type Cache = {
 
 const ROOT_TAG = "MapBinding"
 const LOBBY_PREFIX = "LOBBY-" -- lobby MapPoints may sit outside the MapBinding root (architecture.md §20.4)
-const DEFAULT_WAIT = 30 -- seconds WaitReady waits for streaming by default
+const PHONE_ANCHOR = "Prompt_Answer" -- answer_phone anchor: shown only while the phone rings
+const PHONE_GAP = 1.2 -- studs it keeps from anchors of other owners (check_map01.luau checkVehicleDistances)
+const DEFAULT_WAIT = 30-- seconds WaitReady waits for streaming by default
 const POLL = 0.1
 -- Root present but a count short and nothing new streamed in for this long: the counts are stale (the binding changed
 -- after check_map01 last wrote them, e.g. hide spots removed by TASK-133) and the map is what the server has.
@@ -648,7 +650,14 @@ function MapIndex.Validate(required: List): { string }
 				const distance = (positionOf(a) - positionOf(b)).Magnitude
 				const text = string.format("%.2f", distance)
 				if ownerA ~= ownerB then
-					if distance < required.StationGap then
+					-- the phone prompt only shows while it rings: the user put the phones next to the grill / cooler
+					-- (2026-10-11), so it keeps only PhoneGap from the other prompts (same rule as check_map01.luau)
+					const phone = a.Name == PHONE_ANCHOR or b.Name == PHONE_ANCHOR
+					if phone then
+						if distance < PHONE_GAP then
+							add(`4: {nameOf(a)} / {nameOf(b)} (phone vs other owner) {text} apart (< {PHONE_GAP})`)
+						end
+					elseif distance < required.StationGap then
 						add(`4: {nameOf(a)} / {nameOf(b)} (different stations) {text} apart (< {required.StationGap})`)
 					end
 				elseif ownerA ~= nil and ownerA:GetAttribute("StationKind") == "toppings" then
@@ -856,7 +865,7 @@ function MapIndex.KioskNotes(required: List): { string }
 end
 
 -- Pad tables (TASK-144; FEAT-037): soft checks, returned as notes (PlaceService warns, never errors) until TASK-149
--- binds the tables. Each TableIndex 1..Tables once on a `Tag` Model, with Seat1..SeatN BaseParts; optional anchors
+-- binds the tables. Each TableIndex 1..N once on a `Tag` Model (N = highest found, 1 <= N <= Tables), with Seat1..SeatN BaseParts; optional anchors
 -- (Prompt_BuyTable, Prompt_CleanTable, Tray_Anchor) noted when missing (SeatingService creates a runtime prompt).
 function MapIndex.SeatingNotes(required: List): { string }
 	const rule = required.Seating
@@ -872,10 +881,21 @@ function MapIndex.SeatingNotes(required: List): { string }
 		byIndex[index] = list
 		table.insert(list, instance)
 	end
-	for index = 1, rule.Tables do
+	-- the place may hold fewer tables than Content.Seating.Tables: 1..N contiguous, N >= 1 (the rest is not sold)
+	local count = 0
+	for index = rule.Tables, 1, -1 do
+		if byIndex[index] ~= nil then
+			count = index
+			break
+		end
+	end
+	if count == 0 then
+		table.insert(notes, `no {rule.Tag} with {rule.IndexAttribute} 1..{rule.Tables} (no Pad tables)`)
+	end
+	for index = 1, count do
 		const list = byIndex[index] or {}
 		if #list ~= 1 then
-			table.insert(notes, `{rule.Tag} {rule.IndexAttribute} = {index} found {#list} time(s), need 1`)
+			table.insert(notes, `{rule.Tag} {rule.IndexAttribute} = {index} found {#list} time(s), need 1 (1..{count} contiguous)`)
 			continue
 		end
 		const model = list[1]

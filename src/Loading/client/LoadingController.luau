@@ -10,7 +10,7 @@
 	  Start    every Modux controller ran its OnStart: this controller has the lowest priority, so the Loader
 	           (descending priority, OnInit of all then OnStart of all) reaches its OnStart last
 	  Kit      RigController warm-up done (crew meshes, expressions, look textures: RigController:Warmup)
-	  Assets   ContentProvider:PreloadAsync of the intro sounds (music cue, phone, horns, car, prompt, skip, day
+	  Assets   LoadQueue (the one audio queue, small batches) of the intro sounds (music cue, phone, horns, car, prompt, skip, day
 	           ambience) and the UI images (Icons.Ids)
 	  Voices   Run place only: every text-to-speech line of the intro (CutsceneController:PreloadVoices; the queue
 	           there loads one line at a time with retry, see Speech.luau)
@@ -29,6 +29,7 @@ local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Icons = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Icons)
+local LoadQueue = require(StarterPlayer.StarterPlayerScripts.client.Audio.AudioController.LoadQueue)
 
 type Texts = { Status: { [string]: string } }
 
@@ -205,10 +206,26 @@ function LoadingController:StepAssets()
 		if total == 0 then
 			return
 		end
-		ContentProvider:PreloadAsync(list, function()
-			done += 1
-			self:Mark("Assets", done / total)
+		-- sounds through the one audio queue (urgent: before AudioController's background preload), in small
+		-- batches; images straight to PreloadAsync (no audio rate limit)
+		const sounds: { any } = {}
+		const images: { any } = {}
+		for _, item in list do
+			table.insert(if typeof(item) == "Instance" then sounds else images, item)
+		end
+		local soundsDone = 0
+		task.spawn(function()
+			pcall(function()
+				ContentProvider:PreloadAsync(images, function()
+					done += 1
+					self:Mark("Assets", (done + soundsDone) / total)
+				end)
+			end)
 		end)
+		LoadQueue.Preload(sounds, function(count: number)
+			soundsDone = count
+			self:Mark("Assets", (done + soundsDone) / total)
+		end, true)
 	end)
 	self:Mark("Assets", 1)
 	for _, item in list do

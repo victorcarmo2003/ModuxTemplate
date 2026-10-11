@@ -10,6 +10,7 @@
 -- (§19.22, TASK-048): problem in Studio = error (loud), published = warn. Provisional (TASK-048): while the binding of
 -- the configured wave is still being authored (TASK-083), a place that passes the previous wave only warns, so the
 -- other wave 2 tasks keep play-testing; a place that fails the previous wave too is an error as before.
+local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -40,6 +41,16 @@ local function report(wave: number, problems: { string }): string
 	return `[PlaceService] map binding (wave {wave}) has {#problems} problem(s):\n  {table.concat(problems, "\n  ")}`
 end
 
+-- Problems that break the game, and rule 4 (anchor spacing: prompt comfort only, warned, never an error)
+local function split(all: { string }): ({ string }, { string })
+	const hard: { string } = {}
+	const spacing: { string } = {}
+	for _, problem in all do
+		table.insert(if string.sub(problem, 1, 2) == "4:" then spacing else hard, problem)
+	end
+	return hard, spacing
+end
+
 -- Runtime twin of the edit-time check (architecture.md §18.7). No binding root yet = TASK-005 pending: warn only.
 function PlaceService:ValidateMap()
 	if not self:Is("Run") then
@@ -60,12 +71,20 @@ function PlaceService:ValidateMap()
 	if #seats > 0 then
 		warn(`[PlaceService] Pad tables binding has {#seats} note(s):\n  {table.concat(seats, "\n  ")}`)
 	end
-	const problems = MapIndex.Validate(MapIndex.Required.ForWave(wave))
+	-- the cutscene's NO HELP WANTED stop falls back to Rules.Sign.Fallback without a tagged sign: a note, not a problem
+	const signTag = Content.Cutscenes.Rules.Sign.Tag
+	if #CollectionService:GetTagged(signTag) == 0 then
+		warn(`[PlaceService] no instance tagged {signTag}: the intro stops at MapPoint {Content.Cutscenes.Rules.Sign.Fallback}`)
+	end
+	const problems, spacing = split(MapIndex.Validate(MapIndex.Required.ForWave(wave)))
+	if #spacing > 0 then
+		warn(`[PlaceService] anchor spacing (rule 4) has {#spacing} note(s):\n  {table.concat(spacing, "\n  ")}`)
+	end
 	if #problems == 0 then
 		return
 	end
 	local fatal = true
-	if wave > 1 and #MapIndex.Validate(MapIndex.Required.ForWave(wave - 1)) == 0 then
+	if wave > 1 and #(split(MapIndex.Validate(MapIndex.Required.ForWave(wave - 1)))) == 0 then
 		fatal = false
 		warn(`[PlaceService] binding passes wave {wave - 1} but not wave {wave} yet (binding task pending)`)
 	end

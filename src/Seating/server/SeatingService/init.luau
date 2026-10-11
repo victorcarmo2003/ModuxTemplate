@@ -449,7 +449,10 @@ function SeatingService:Refresh()
 	const nextRow = upgrades:NextLevel(SEATING.UpgradeKey)
 	for _, spot in self.Spots do
 		const state = Tables.Next(spot.State, spot.Index, owned, unlocked)
-		const price = if state == "Ghost" and spot.Index == owned + 1 and nextRow ~= nil then nextRow.Price else 0
+		-- a table missing from the map (the place may have fewer than Seating.Tables) is never for sale
+		const price = if state == "Ghost" and spot.Index == owned + 1 and nextRow ~= nil and spot.Model ~= nil
+			then nextRow.Price
+			else 0
 		if state == spot.State and price == spot.Price then
 			continue
 		end

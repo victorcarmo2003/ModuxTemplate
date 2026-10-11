@@ -566,16 +566,31 @@ local function cutscenePoints(): ({ string }, string)
 		return CUTSCENE_POINTS_EMBEDDED, "embedded"
 	end
 	local posts = set(STREET_POSTS)
+	-- special targets of src/Cutscene/shared/Anchors.luau (same rule as Required.luau): "Sign" / "Poster" / "Phone"
+	-- need no MapPoint; "a|b@f" / "a|b" needs only a and b
+	local anchors = { Sign = true, Poster = true, Phone = true }
+	local function pointsOf(target: string): { string }
+		if anchors[target] or posts[target] then
+			return {}
+		end
+		local a, rest = string.match(target, "^([^|]+)|(.+)$")
+		if a ~= nil and rest ~= nil then
+			return { a, string.match(rest, "^([^@]+)@") or rest }
+		end
+		return { target }
+	end
 	local out: { string } = {}
 	for _, scene in cs.List do
 		out = union(out, scene.Marks or {})
 		for _, beat in scene.Beats or {} do
-			if beat.Kind == "MoveTo" and string.find(beat.Target, "{slot}", 1, true) then
-				for slot = 1, 4 do
-					out = union(out, { (string.gsub(beat.Target, "{slot}", tostring(slot))) })
+			if beat.Kind == "MoveTo" or beat.Kind == "LookAt" then
+				if string.find(beat.Target, "{slot}", 1, true) then
+					for slot = 1, 4 do
+						out = union(out, pointsOf((string.gsub(beat.Target, "{slot}", tostring(slot)))))
+					end
+				else
+					out = union(out, pointsOf(beat.Target))
 				end
-			elseif (beat.Kind == "MoveTo" or beat.Kind == "LookAt") and not posts[beat.Target] then
-				out = union(out, { beat.Target })
 			end
 		end
 	end

@@ -18,6 +18,7 @@
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local StarterGui = game:GetService("StarterGui")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -121,8 +122,10 @@ function CharacterController:GetControls(): Controls?
 		self.Looked = true
 		const scripts = player:WaitForChild("PlayerScripts", MODULE_WAIT)
 		module = if scripts ~= nil then scripts:WaitForChild("PlayerModule", MODULE_WAIT) else nil
-		if module == nil then
-			warn("[CharacterController] no PlayerScripts.PlayerModule: the lock sinks walk/jump input instead")
+		-- harmless: the server freezes the body anyway (CharacterService:Freeze zeroes walk/jump), later lookups
+		-- pick the module up if it arrives after MODULE_WAIT, and meanwhile the lock sinks the inputs. Studio only.
+		if module == nil and RunService:IsStudio() then
+			warn("[CharacterController] no PlayerScripts.PlayerModule yet: the lock sinks walk/jump input instead")
 		end
 	end
 	if module == nil or not module:IsA("ModuleScript") then

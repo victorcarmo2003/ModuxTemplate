@@ -10,7 +10,8 @@
 
 	Loading (playtest 2026-10-11: every line of the segment called LoadAsync in the same frame and the engine refused
 	them all with "Failed to load sound : Rate limited by the client" + one "Failed to load text to speech" error each):
-	  * one request at a time (GAP s between two), never a burst;
+	  * one request at a time (GAP s between two), never a burst, and inside the client's one audio queue
+	    (Audio/AudioController/LoadQueue), so no sound preload runs next to it;
 	  * a failed load is retried (MAX_TRIES) after a growing pause (BACKOFF x 2^n, up to MAX_BACKOFF) that holds the
 	    whole queue, so a rate limit clears before the next request;
 	  * a VoiceId that never loaded a single line after MAX_TRIES is judged bad; its lines move to a voice that did
@@ -25,7 +26,9 @@
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local SoundService = game:GetService("SoundService")
+local StarterPlayer = game:GetService("StarterPlayer")
 local Content = require(ReplicatedStorage.shared.Content)
+local LoadQueue = require(StarterPlayer.StarterPlayerScripts.client.Audio.AudioController.LoadQueue)
 
 type Beat = Content.CutsceneBeat
 
@@ -284,9 +287,14 @@ function Speech.new(volume: () -> number): Speech
 			return
 		end
 		entry.State = "Loading"
-		const ok, status = pcall(function(): Enum.AssetFetchStatus
-			return voice:LoadAsync()
-		end)
+		-- inside the one audio queue of the client (LoadQueue, urgent): never next to another sound load
+		local ok, status: any = false, nil
+		LoadQueue.Run(function(): boolean?
+			ok, status = pcall(function(): Enum.AssetFetchStatus
+				return voice:LoadAsync()
+			end)
+			return not ok or status ~= Enum.AssetFetchStatus.Success
+		end, true)
 		if not alive or voice.Parent == nil then
 			return
 		end
