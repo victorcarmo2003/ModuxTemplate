@@ -41,7 +41,11 @@
 	     Content keys (ReplicatedStorage.shared.Content when Rojo has synced it, else the lists embedded below; a
 	     wave-2 key missing from a synced Content is a warning "TASK-047 pending", not an error)
 	  4. anchors of different owners in the same vehicle >= 2.5 apart; toppings grid >= 2.0 (same ingredient
-	     exempt); Mart shelves >= 2.5 (warn under 3.0, MAP-01 §7.4); bench >= 2.5
+	     exempt); Mart shelves >= 4.0 (error, Mart v2 MAP-01 §18.10); bench (Gear Stand) >= 2.5
+	 15. (Mart v2, TASK-138; MAP-01 §18.3/§18.4/§18.10) one GearPedestal per Slot B1..B5/S1 with its Prompt_Buy inside
+	     (error), Slot_/Price_Anchor_ (warn); one GearShutter per Slot L/C/R with Slat_* (error) and Roll (warn);
+	     Att_Opal found like OpalController does, on OP-1 and facing MAP east (warn); OP-1 FACING = east; shelf
+	     heights 3.0..4.5 and bench prompts reachable from the rail line (warn); GEAR_WALL / checkout OP-1 placed (warn)
 	  5. Station under a Vehicle; every Model that is/contains a tagged instance is Persistent; nothing tagged
 	     outside the Workspace; Interactable = Attachment or invisible non-colliding BasePart; LightZone invisible
 	  6. graph: connected, Links resolve, no space in Links, edge <= 40, <= 80 nodes, no edge over a carriageway
@@ -80,7 +84,18 @@ local Check = {}
 local EDIT_TAGS_W1 = { "MapBinding", "MapPoint", "NpcNode", "Vehicle", "Station", "Interactable", "UpgradePiece" }
 local EDIT_TAGS_W2 = { "LightZone", "StreetLight", "VehicleCover" }
 local EDIT_TAGS_W3 = { "AnomalyAnchor", "TrafficPath", "TrafficLine", "TrafficBox" }
-local OPTIONAL_TAGS = { "StreetBin" } -- DEC-200 / T60: checked, never required (Q-166 b)
+local OPTIONAL_TAGS = { "StreetBin", "GearPedestal", "GearShutter" } -- StreetBin: DEC-200 / T60, never required (Q-166 b); Gear*: rule 15
+
+-- Mart v2 "Gear Stand" (rule 15; MAP-01 §18.3, §18.4, §18.10; Content.Mart; MapIndex.KioskNotes is the soft runtime twin)
+local MART_PEDESTALS = { "B1", "B2", "B3", "B4", "B5", "S1" } -- Content.Mart.Pedestals
+local MART_SHUTTERS = { "L", "C", "R" } -- Content.Mart.Doors[].Key
+local MART_FLOOR = 0.4
+local SHELF_GAP = 4.0 -- §18.10: purchase anchors >= 4 apart (error under it)
+local SHELF_H = { 3.0, 4.5 } -- §18.10: anchor height above the Mart floor (warning outside)
+local OPAL_AT = Vector3.new(-98, 0, 47.887) -- MAP-01: Att_Opal / OP-1 (WORLD (98, 20))
+local KIOSK_STAND_X = -93.5 -- MAP-01 X of the glass rail line (WORLD 93.5): players stand east of it
+local KIOSK_REACH = 3.0 -- studs (XZ) from the rail line to a pedestal prompt before a warning
+local OPAL_SEARCH_DEPTH = 4 -- same as OpalController KIOSK_SEARCH_DEPTH
 
 -- Upgrade pieces expected per vehicle (copy of src/Shared/Content/Upgrades.luau rows with Part ~= ""; a synced
 -- Content.Upgrades wins). start = StartLevel (the piece visible in the authored place).
@@ -175,7 +190,7 @@ local N, S, E, W = FD(Vector3.new(0, 0, -1)), FD(Vector3.new(0, 0, 1)), FD(Vecto
 local FACING = { -- expected LookVector of points (warn when > 10 degrees off)
 	["PS-1"] = N, ["PS-2"] = N, ["PS-3"] = N, ["PS-4"] = N,
 	Q1 = S, Q2 = E, Q3 = E, Q4 = E, Q5 = E,
-	["OP-1"] = S,
+	["OP-1"] = E, -- Mart v2 (MAP-01 §18.4): behind the Gear Stand counter, facing the store (MAP east = WORLD -X)
 	["PS-N1"] = N, ["PS-N2"] = N, ["PS-N3"] = N, ["PS-N4"] = N,
 	["REV-1"] = S, ["REV-2"] = S, ["REV-3"] = S, ["REV-4"] = S,
 	TRL = N, CART = N, ["TRL-SALE"] = S, ["SIGN-T"] = S, ["DROP-T"] = N, ["ST-R"] = N,
@@ -1025,8 +1040,8 @@ local function checkMapAnchors()
 			table.insert(benches, i)
 		end
 	end
-	pairs_(shelves, 2.5, 3.0, "Mart shelves")
-	pairs_(benches, 2.5, 2.5, "GEAR WALL")
+	pairs_(shelves, SHELF_GAP - 0.01, SHELF_GAP - 0.01, "Mart shelves (MAP-01 §18.10: >= 4)")
+	pairs_(benches, 2.5, 2.5, "Gear Stand")
 
 	-- street bins (DEC-200; not in Required.Wave2, Q-166 b)
 	if WAVE >= 2 then
@@ -2435,6 +2450,163 @@ local function checkPieces(vehicles: { [string]: Instance })
 	info(("9: UpgradePiece %s (rows from %s)"):format(table.concat(parts, ", "), src))
 end
 
+-- 15. Mart v2 Gear Stand (TASK-138; MAP-01 §18.3, §18.4, §18.10). Errors: pedestal / shutter count per Slot, shutter
+-- without Slat_* / Door_Panel, bench prompt of a slot outside its pedestal. Warnings: Slot_ / Price_Anchor_ missing,
+-- shutter without Roll, Att_Opal missing / off OP-1 / not facing the store, shelf heights, prompts out of reach of the
+-- rail line, GEAR_WALL / checkout still placed.
+local function checkMart(points: { [string]: Instance })
+	local function bySlot(tag: string): { [string]: { Instance } }
+		local out: { [string]: { Instance } } = {}
+		for _, i in tagged(tag) do
+			local s = i:GetAttribute("Slot")
+			if typeof(s) ~= "string" then
+				err(("15: %s %s without attribute Slot"):format(tag, name(i)))
+				continue
+			end
+			out[s] = out[s] or {}
+			table.insert(out[s], i)
+		end
+		return out
+	end
+
+	-- bench prompt anchors by BenchSlot
+	local prompts: { [string]: Instance } = {}
+	for _, i in tagged("Interactable") do
+		local b = i:GetAttribute("BenchSlot")
+		if typeof(b) == "string" then
+			prompts[b] = i
+		end
+	end
+
+	local peds = bySlot("GearPedestal")
+	for _, slot in MART_PEDESTALS do
+		local list = peds[slot] or {}
+		if #list ~= 1 then
+			err(("15: GearPedestal Slot %s found %d time(s), need 1"):format(slot, #list))
+			continue
+		end
+		local p = list[1]
+		if not p:FindFirstChild("Slot_" .. slot, true) then
+			warn_(("15: GearPedestal %s: no Slot_%s (mini falls back on the column top)"):format(slot, slot))
+		end
+		if not (p:FindFirstChild("Price_Anchor_" .. slot, true) or p:FindFirstChild("Price_Anchor", true)) then
+			warn_(("15: GearPedestal %s: no Price_Anchor_%s (plate hangs under the prompt)"):format(slot, slot))
+		end
+		local a = prompts[slot]
+		if a and not a:IsDescendantOf(p) then
+			err(("15: bench prompt %s (%s) is not inside its GearPedestal %s"):format(slot, name(a), name(p)))
+		end
+		if a then
+			local m = M(pos(a))
+			local reach = math.abs(m.X - KIOSK_STAND_X)
+			if m.X < KIOSK_STAND_X - KIOSK_REACH then
+				warn_(("15: bench prompt %s at MAP X %.2f is %.2f behind the rail line (X %.1f): reach from outside (§18.10)"):format(slot, m.X, reach, KIOSK_STAND_X))
+			end
+			local h = m.Y - MART_FLOOR
+			if h < 3.5 or h > 5.0 then
+				warn_(("15: bench prompt %s at h %.2f over the floor (MAP-01 §18.4: 4.2)"):format(slot, h))
+			end
+		end
+	end
+	for s, list in peds do
+		if not table.find(MART_PEDESTALS, s) then
+			err(("15: %d GearPedestal with unknown Slot %s"):format(#list, s))
+		end
+	end
+
+	local shutters = bySlot("GearShutter")
+	for _, key in MART_SHUTTERS do
+		local list = shutters[key] or {}
+		if #list ~= 1 then
+			err(("15: GearShutter Slot %s found %d time(s), need 1"):format(key, #list))
+			continue
+		end
+		local sh = list[1]
+		if not sh:IsA("Model") then
+			err(("15: GearShutter %s is a %s (must be a Model)"):format(key, sh.ClassName))
+		end
+		local slats, roll = 0, false
+		for _, d in sh:GetDescendants() do
+			if d:IsA("BasePart") then
+				if string.sub(d.Name, 1, 5) == "Slat_" or d.Name == "Door_Panel" then
+					slats += 1
+				elseif d.Name == "Roll" or d.Name == "Door_Drum" then
+					roll = true
+				end
+			end
+		end
+		if slats == 0 then
+			err(("15: GearShutter %s has no Slat_* / Door_Panel part (the door would not move)"):format(key))
+		end
+		if not roll then
+			warn_(("15: GearShutter %s has no Roll / Door_Drum part"):format(key))
+		end
+		info(("15: GearShutter %s: %d slat(s)%s"):format(key, slats, if roll then " + Roll" else ""))
+	end
+	for s, list in shutters do
+		if not table.find(MART_SHUTTERS, s) then
+			err(("15: %d GearShutter with unknown Slot %s"):format(#list, s))
+		end
+	end
+
+	-- Att_Opal: same lookup as OpalController (Model ancestors of a GearPedestal, depth 4)
+	local att: Instance? = nil
+	for _, p in tagged("GearPedestal") do
+		local node: Instance? = p.Parent
+		local depth = 0
+		while node and node ~= Workspace and depth < OPAL_SEARCH_DEPTH and not att do
+			if node:IsA("Model") then
+				local f = node:FindFirstChild("Att_Opal", true)
+				if f and (f:IsA("Attachment") or f:IsA("BasePart")) then
+					att = f
+				end
+			end
+			node = node.Parent
+			depth += 1
+		end
+		if att then
+			break
+		end
+	end
+	if not att then
+		warn_("15: Att_Opal not found in the Model ancestors of a GearPedestal (Opal falls back on OP-1)")
+	else
+		local cf = if att:IsA("Attachment") then att.WorldCFrame else (att :: BasePart).CFrame
+		local m = M(cf.Position)
+		if (Vector3.new(m.X, 0, m.Z) - OPAL_AT).Magnitude > 0.5 then
+			warn_(("15: Att_Opal at MAP %s, MAP-01 §18.4 says (%.1f, %.3f)"):format(fmtV(m), OPAL_AT.X, OPAL_AT.Z))
+		end
+		if cf.LookVector:Dot(E) < math.cos(math.rad(10)) then
+			warn_(("15: Att_Opal faces %s, expected MAP east %s (the store)"):format(fmtV(cf.LookVector), fmtV(E)))
+		end
+		local op = points["OP-1"]
+		if op and (pos(op) - cf.Position).Magnitude > 1.0 then
+			warn_(("15: Att_Opal and MapPoint OP-1 are %.2f apart (same spot expected)"):format((pos(op) - cf.Position).Magnitude))
+		end
+	end
+
+	-- shelf anchor heights (§18.10: 3.0 .. 4.5 above the floor)
+	for _, i in tagged("Interactable") do
+		if i:GetAttribute("PromptAction") == "buy_package" then
+			local h = M(pos(i)).Y - MART_FLOOR
+			if h < SHELF_H[1] - 0.05 or h > SHELF_H[2] + 0.05 then
+				warn_(("15: shelf anchor %s at h %.2f (MAP-01 §18.10: %.1f .. %.1f)"):format(i.Name, h, SHELF_H[1], SHELF_H[2]))
+			end
+		end
+	end
+
+	-- what Mart v2 took out (MAP-01 §18.8)
+	local assets = Workspace:FindFirstChild("MAP01_Assets")
+	if assets then
+		for _, d in assets:GetDescendants() do
+			local id = d:GetAttribute("MapId")
+			if id == "GEAR_WALL" or id == "OP-1" then
+				warn_(("15: %s (%s) still in MAP01_Assets: Mart v2 takes it out (MAP-01 §18.8)"):format(id, tostring(d:GetAttribute("Asset"))))
+			end
+		end
+	end
+end
+
 ---------------------------------------------------------------------------------------------------
 -- Entry point
 ---------------------------------------------------------------------------------------------------
@@ -2456,6 +2628,7 @@ function Check.run(opts: { write: boolean?, wave: number? }?): (string, number)
 	local vehicles = checkVehicles()
 	checkPieces(vehicles)
 	checkMapAnchors()
+	checkMart(points)
 	checkVehicleDistances(vehicles)
 	checkStreaming()
 	checkPivots(vehicles)

@@ -52,7 +52,24 @@
 	  Awning: ClosedAngle from the measured slant of the Awning (bbox diagonal + raycast profile), hanging 3 degrees
 	      outwards; a degenerate angle (< 5 degrees) falls back to the Shutter_Panel.
 
-	Map frame (2026-10-10, decision of the user): the place is turned 180 degrees in Y (map_frame.luau). Every number in
+	Mart v2 "Gear Stand" (TASK-138, 2026-10-11, Provisório; MAP-01 §18.3, §18.4, §18.8; architecture.md §18.4 Mart v2
+table; Content.Mart):
+  M1. Shelves: the 9 BUY-* anchors at the §18.3 MAP positions and heights (Coffee on island 2, no longer at the
+      checkout). The table wins on every run (moved = "conv"); no blockout BUY-* is read.
+  M2. Pedestals (Asset AST-105_Pedestal x5 + AST-105_PedestalS1, the one closest to each §18.4 centre): tag
+      GearPedestal + Slot; inside it Slot_<S> (mini centre = column top + 1.2), Price_Anchor_<S> (front of the cap,
+      facing the store, tilted 30), Prompt_Buy_<S> (Interactable, bench_buy_upgrade B1..B5 / bench_buy_item S1,
+      BenchSlot; 0.5 in front of the centre at the mini height). Pedestals are moved INSIDE the GEAR_STAND model
+      (AST-104): OpalController finds Att_Opal in the Model ancestors of a GearPedestal.
+  M3. Shutters: the AST-103_RollerShutterTriple parts L_/C_/R_* go into child Models Shutter_L/C/R (tag GearShutter,
+      Slot L/C/R), renamed Slat_01.., Roll, Rail_L/R (SrcName keeps the .fbx name); re-runs do not duplicate. The
+      Triple also goes inside GEAR_STAND. NOTE Place.diff: the renamed parts show as differences of that entry.
+  M4. Att_Opal on the GEAR_STAND OpalCounter at MAP (-98, floor, 47.887), LookVector = MAP east (WORLD -X); MapPoint
+      OP-1 at the same spot, facing east. GEAR_WALL / checkout OP-1 still placed = warning, never bound.
+  Thief lane (2026-10-11, user's picnic tables behind the cart): N-Z08-02 -> N-Z01-05 (new) -> N-Z01-04 -> L3 along
+      WORLD z 7.6..8, between the tables (z 10.9..15.7) and the wall planters (z ~4.9).
+
+Map frame (2026-10-10, decision of the user): the place is turned 180 degrees in Y (map_frame.luau). Every number in
 this file stays in MAP-01 coordinates (docs, +X east, +Z south) and so does the logic (north = -Z, "west first" = smaller
 X, boxes, raycast probes). Conversion happens ONLY at the Workspace boundary: reads of world positions go through
 M / MCF (partsBox, mapPos, mapPivot, bowl / part positions) and writes through F / FCF (Attachment.WorldCFrame,
@@ -81,7 +98,8 @@ Contract: docs/tech/architecture.md §18 (tags §18.1, attributes §18.2, anchor
 	     3 slots and coffee_machine (Prompt_Brew -> brew_coffee, Prompt_Restock -> restock, Ingredient coffee).
 	     TRL-PHONE.Prompt_Answer, TRL-SWITCH.Prompt_Switch (switch_light), Prompt_Buy on the shell (buy_trailer),
 	     Zone_Center, DRAWER fittings. The empty sale shell (MapId TRL-SALE) is removed: the real trailer parks there.
-	  4. Map anchors (wave 1): OPEN sign, Mart shelves (MKT-SHELVES), GEAR WALL. Wave 2: street bins AST-034_TrashCan
+	  4. Map anchors (wave 1): OPEN sign, Mart shelves (MKT-SHELVES), Gear Stand (Mart v2 below; the GEAR WALL is gone).
+	     Wave 2: street bins AST-034_TrashCan
 	     -> tag StreetBin + Prompt_Discard (discard; T60, Q-166 b: all three, Provisório).
 	  5. Street lights (2026-10-10: Walker posts moved to the Ninth): NL-01..04 + P-01 -> one Model per post (pole +
 	     head) with tag StreetLight, PostId, Group = "juniper_posts", Order 1..5 in Hush order (NL-01 = 1 ... NL-04 = 4,
@@ -175,6 +193,9 @@ local OWN_TAGS = {
 	"TrafficBox",
 	-- 2026-10-10 (W8)
 	"AutoDoor",
+	-- Mart v2 (TASK-138; Content.Mart.Tags)
+	"GearPedestal",
+	"GearShutter",
 }
 local AUTHORED_ATTRS = {
 	"DoorId",
@@ -233,8 +254,9 @@ local POINTS = {
 	-- EX-E (MAP-01 §9.8): moved from the sidewalk (116, 24), seen from Q1..Q5 down the sidewalk, into the alley
 	-- X 113..120 behind B1 (beyond BAR-E): B1 hides it from the Pad, the queue and the Mart door.
 	{ id = "EX-E", x = 116.5, z = 40, floor = 0, face = SOUTH, node = true, spawn = "pedestrian", despawn = true },
-	-- Opal behind the checkout, back to the north glass, facing into the store (south).
-	{ id = "OP-1", x = -75, z = 33.5, floor = 0.4, face = SOUTH },
+	-- Opal (Mart v2, MAP-01 §18.4, Q-175 A): behind the short counter in the middle of the Gear Stand, facing the
+	-- store (MAP east = WORLD -X). Same point as the Att_Opal fitting (OPAL_COUNTER). The checkout (AST-031) is gone.
+	{ id = "OP-1", x = -98, z = 47.887, floor = 0.4, face = EAST },
 
 	-- wave 2 (§19.22) -------------------------------------------------------------------------
 	-- night spawn inside the trailer (MAP-01 §5.1), facing the window
@@ -262,7 +284,9 @@ local POINTS = {
 	-- in front of the Pad bench (58, 58). All face the drawer.
 	{ id = "L1", x = 21.5, z = 22, floor = 0.4, faceTo = DRAWER_XZ, node = true },
 	{ id = "L2", x = 84, z = 22, floor = 0.4, faceTo = DRAWER_XZ, node = true },
-	{ id = "L3", x = 58, z = 56.5, floor = 0.45, faceTo = DRAWER_XZ, node = true }, -- 20.4 from the drawer (>= 20, MAP-01 §14)
+	-- L3 (2026-10-11, user moved 5 picnic tables behind the cart, WORLD z 10.9..15.7, x -59..-25): moved from (58, 56.5)
+	-- to the strip between the tables and the wall planters (WORLD (-62.5, 8.0)), beside the L3 bench. 25.2 from the drawer
+	{ id = "L3", x = 62.5, z = 59.887, floor = 0.45, faceTo = DRAWER_XZ, node = true },
 	-- ST-R (MAP-01 §9.8): moved from (18, 92), seen from Q5 past the B1 rear corner, to (21, 108) past the curve,
 	-- close to the building line X 24 (B1 rear hides it from every Pad / queue point; B5 from the Mart door)
 	{ id = "ST-R", x = 21, z = 108, floor = 0.24, face = NORTH, node = true, spawn = "thief", despawn = true },
@@ -359,7 +383,11 @@ local NODES = {
 	{ id = "N-Z08-01", x = 18, z = 70, floor = 0.24 }, -- passes BAR-S (Z 78): player-only wall (collision group)
 	{ id = "N-Z08-02", x = 18, z = 56, floor = 0.24 },
 	{ id = "N-Z08-03", x = 18, z = 38, floor = 0.24 },
-	{ id = "N-Z01-04", x = 38, z = 56, floor = 0.45 }, -- south strip of the Pad, behind the cart / trailer, to L3
+	-- south strip of the Pad, behind the cart / trailer, to L3. 2026-10-11 (picnic tables, WORLD z 10.9..15.7 x -59..-25):
+	-- the thief walks the WORLD z 7.6..8 lane between the tables and the wall planters (z ~4.9, x -36 / -52).
+	-- N-Z01-05 is the corner off the sidewalk, east of the tables (WORLD (-22, 8.0)), so N-Z08-02 never cuts the tables.
+	{ id = "N-Z01-05", x = 22, z = 59.887, floor = 0.45 },
+	{ id = "N-Z01-04", x = 38, z = 60.287, floor = 0.45 }, -- WORLD (-38, 7.6)
 	-- wave 3, sidewalk nodes of Content.WalkPaths (MAP-01 §9.3). Curb nodes 1 stud off the carriageway.
 	-- east: north sidewalk of the Ninth in front of the bank, CW-3
 	{ id = "N-Z06-02", x = 57, z = -17, floor = 0.4, crosswalk = "CW-3" },
@@ -423,7 +451,8 @@ local EDGES = {
 	{ "N-Z02-02", "L1" },
 	{ "N-Z02-06", "N-Z02-08" }, -- LANE-W east end -> L2's post (also L2's flight to EX-E)
 	{ "N-Z02-08", "L2" },
-	{ "N-Z08-02", "N-Z01-04" },
+	{ "N-Z08-02", "N-Z01-05" }, -- 2026-10-11: around the picnic tables (east of them), then the lane z 7.6..8 WORLD
+	{ "N-Z01-05", "N-Z01-04" },
 	{ "N-Z01-04", "L3" },
 	-- wave 3: sidewalk network of the pedestrians (Content.WalkPaths). No edge touches a queue slot; the customer
 	-- and thief routes of waves 1-2 keep their A* paths (every new way is longer).
@@ -468,30 +497,46 @@ local TOPPINGS = {
 	{ key = "cream_cheese", suf = "CreamCheese", x = 49, z = 38.5 },
 }
 
--- Mart shelf purchase points (MAP-01 §7.4), anchor ~4.5 above the floor (0.4).
+-- Mart shelf purchase points (Mart v2, MAP-01 §18.3, TASK-138; Provisório). MAP-01 coordinates; the WORLD point of
+-- §18.3 is in the comment (WORLD = (-x, y, 67.887 - z)). h = anchor height above the Mart floor (0.4), 3.0 .. 4.5.
+-- >= 4 studs between anchors (§18.10). The table is the source: every run puts each BUY-* at its position.
 local SHELVES = {
-	{ name = "Sausages", package = "pack_sausages", x = -69, z = 40 },
-	{ name = "Buns", package = "pack_buns", x = -69, z = 44 },
-	{ name = "Ketchup", package = "pack_ketchup", x = -75, z = 40 },
-	{ name = "Mustard", package = "pack_mustard", x = -75, z = 44 },
-	{ name = "Cheese", package = "pack_cheese", x = -81, z = 40 },
-	{ name = "Bacon", package = "pack_bacon", x = -81, z = 44 },
-	{ name = "PotatoSticks", package = "pack_potato_sticks", x = -75, z = 48 },
-	{ name = "CreamCheese", package = "pack_cream_cheese", x = -81, z = 48 },
-	{ name = "Coffee", package = "pack_coffee", x = -68, z = 35 },
+	{ name = "Buns", package = "pack_buns", x = -72, z = 35.187, h = 3.0 }, -- BAKERY rack, main aisle face (WORLD 72, 32.7)
+	{ name = "Sausages", package = "pack_sausages", x = -73.5, z = 42.487, h = 3.6 }, -- MEAT & DELI case top (WORLD 73.5, 25.4)
+	{ name = "Bacon", package = "pack_bacon", x = -77.5, z = 42.487, h = 3.6 }, -- MEAT & DELI (WORLD 77.5, 25.4)
+	{ name = "Ketchup", package = "pack_ketchup", x = -73.25, z = 49.787, h = 4.5 }, -- SAUCES, island 2 north face (WORLD 73.25, 18.1)
+	{ name = "Mustard", package = "pack_mustard", x = -77.75, z = 49.787, h = 4.5 }, -- SAUCES (WORLD 77.75, 18.1)
+	{ name = "PotatoSticks", package = "pack_potato_sticks", x = -73.25, z = 55.187, h = 4.5 }, -- SNACKS, south face (WORLD 73.25, 12.7)
+	{ name = "Coffee", package = "pack_coffee", x = -77.75, z = 55.187, h = 4.5 }, -- COFFEE, same gondola; was at the checkout (WORLD 77.75, 12.7)
+	{ name = "Cheese", package = "pack_cheese", x = -73.5, z = 60.787, h = 4.5 }, -- DAIRY fridge door 1 (WORLD 73.5, 7.1)
+	{ name = "CreamCheese", package = "pack_cream_cheese", x = -77.5, z = 60.787, h = 4.5 }, -- DAIRY door 2 (WORLD 77.5, 7.1)
 }
 local MART_FLOOR = 0.4
-local SHELF_ANCHOR_H = 4.5
 
--- GEAR WALL (AST-049) prompts (MAP-01 §7.4): bench X -100..-98, top 3.5 above the Mart floor.
+-- Gear Stand (Mart v2, MAP-01 §18.4, TASK-138; replaces the GEAR WALL AST-049 and the checkout AST-031 at OP-1).
+-- Pedestal centres in MAP-01 (WORLD (95.5, Z) for Z = 10, 13, 16, 24, 27, 30). The kiosk faces the store: MAP east
+-- (WORLD -X). Each pedestal is the one of `asset` closest to its centre.
+local GEAR_STAND_ID = "GEAR_STAND"
+local GEAR_STAND_ASSET = "AST-104_GearStand"
+local PEDESTAL_ASSET = "AST-105_Pedestal"
+local PEDESTAL_S1_ASSET = "AST-105_PedestalS1"
+local SHUTTER_ASSET = "AST-103_RollerShutterTriple"
 local BENCH = {
-	{ slot = "B1", action = "bench_buy_upgrade", z = 40.5 },
-	{ slot = "B2", action = "bench_buy_upgrade", z = 43.5 },
-	{ slot = "S1", action = "bench_buy_item", z = 46.5 },
-	{ slot = "B3", action = "bench_buy_upgrade", z = 49.5 },
-	{ slot = "B4", action = "bench_buy_upgrade", z = 52.5 },
-	{ slot = "B5", action = "bench_buy_upgrade", z = 55.5 },
+	{ slot = "B1", action = "bench_buy_upgrade", asset = PEDESTAL_ASSET, x = -95.5, z = 57.887 }, -- corridor 3 axis (WORLD Z 10)
+	{ slot = "B2", action = "bench_buy_upgrade", asset = PEDESTAL_ASSET, x = -95.5, z = 54.887 }, -- WORLD Z 13
+	{ slot = "B3", action = "bench_buy_upgrade", asset = PEDESTAL_ASSET, x = -95.5, z = 51.887 }, -- WORLD Z 16
+	{ slot = "B4", action = "bench_buy_upgrade", asset = PEDESTAL_ASSET, x = -95.5, z = 43.887 }, -- WORLD Z 24
+	{ slot = "B5", action = "bench_buy_upgrade", asset = PEDESTAL_ASSET, x = -95.5, z = 40.887 }, -- WORLD Z 27
+	{ slot = "S1", action = "bench_buy_item", asset = PEDESTAL_S1_ASSET, x = -95.5, z = 37.887 }, -- main aisle axis (WORLD Z 30)
 }
+local GEAR_FRONT = Vector3.new(1, 0, 0) -- MAP east = WORLD -X: out of the kiosk, towards the players
+local PEDESTAL_MATCH = 1.5 -- studs (XZ) between a pedestal and its §18.4 centre before a warning
+local PEDESTAL_TOP_H = 3.0 -- column top above the Mart floor (§18.4); a measured top this far off (> 0.3) warns
+local MINI_LIFT = 1.2 -- Content.Mart.Mini.Lift: miniature centre over the column top (h 4.2)
+local PROMPT_AHEAD = 0.5 -- §18.4: prompt anchor at WORLD X 95.0 = 0.5 in front of the centre, at the mini height
+local PRICE_AHEAD, PRICE_DROP, PRICE_TILT = 0.82, 0.2, 30 -- AST-105 atts: front face of the cap, plate tilted 30 deg
+local OPAL_COUNTER = { x = -98, z = 47.887 } -- Att_Opal = OP-1: behind the short counter (WORLD (98, 20)), Q-175 A
+local SHUTTER_KEYS = { "L", "C", "R" } -- Content.Mart.Doors[].Key; parts "<key>_Slat_01".. of AST-103 Triple
 
 -- Street lights of the Hush / Walker chain (MAP-01 §5.6, 2026-10-10: 4 posts on the Ninth north curb, seen from the
 -- trailer window, user's request). Order = Hush order (NL-01 farthest first, P-01 last). Walker: step = Order - 1 for
@@ -1713,9 +1758,11 @@ local function bindOpenSign(assets: Instance, opts: AnchorOpts)
 	-- the sale sign SIGN-T uses the same asset: its Prompt_Open must stay untagged (clean slate does it)
 end
 
-local function bindMart(assets: Instance, opts: AnchorOpts)
-	-- Shelves: invisible anchor Parts in a Model MKT-SHELVES (gondolas/fridges have no empties)
-	local parent = assets:FindFirstChild("MartInterior") or assets
+-- Mart shelves (Mart v2, MAP-01 §18.3): invisible anchor Parts BUY-<name> in a Model MKT-SHELVES (the furniture has
+-- no empties). Nothing of the blockout is read: SHELVES is the source and every run puts each anchor at its position
+-- (a BUY-* found elsewhere is moved, "conv"); BUY-* the table no longer lists are destroyed.
+local function bindShelves(assets: Instance)
+	local parent = assets:FindFirstChild("MartInterior") or assets:FindFirstChild("MartInterior", true) or assets
 	local shelves = assets:FindFirstChild("MKT-SHELVES", true)
 	if not (shelves and shelves:IsA("Model")) then
 		shelves = Instance.new("Model")
@@ -1724,10 +1771,12 @@ local function bindMart(assets: Instance, opts: AnchorOpts)
 		shelves.Parent = parent
 	end
 	setPersistent(shelves :: Instance)
+	local listed: { [string]: boolean } = {}
 	for _, sh in SHELVES do
 		local name = "BUY-" .. sh.name
+		listed[name] = true
 		local p = (shelves :: Instance):FindFirstChild(name)
-		local pos = Vector3.new(sh.x, MART_FLOOR + SHELF_ANCHOR_H, sh.z)
+		local pos = Vector3.new(sh.x, MART_FLOOR + sh.h, sh.z)
 		if not (p and p:IsA("BasePart")) then
 			local part = Instance.new("Part")
 			part.Name = name
@@ -1736,31 +1785,289 @@ local function bindMart(assets: Instance, opts: AnchorOpts)
 			part:SetAttribute(CREATED, true)
 			part.Parent = shelves
 			p = part
-		elseif opts.resetCreated then
-			(p :: BasePart).CFrame = FCF(CFrame.new(pos))
+			log("new", ("MKT-SHELVES: %s created at %s (MAP-01 §18.3)"):format(name, fmtV(pos)))
+		else
+			local was = M((p :: BasePart).Position)
+			if (was - pos).Magnitude > 0.05 then
+				(p :: BasePart).CFrame = FCF(CFrame.new(pos))
+				log("conv", ("MKT-SHELVES: %s moved %s -> %s (Mart v2, MAP-01 §18.3)"):format(name, fmtV(was), fmtV(pos)))
+			end
 		end
 		makeInvisible(p :: BasePart)
 		interactable(p, "buy_package", { Package = sh.package })
 		log("ok", ("MKT-SHELVES: %s -> buy_package %s at %s"):format(name, sh.package, fmtV(M((p :: BasePart).Position))))
 	end
+	for _, c in (shelves :: Instance):GetChildren() do
+		if string.sub(c.Name, 1, 4) == "BUY-" and not listed[c.Name] then
+			log("conv", ("MKT-SHELVES: stray %s destroyed (not in MAP-01 §18.3)"):format(c.Name))
+			c:Destroy()
+		end
+	end
+end
 
-	-- GEAR WALL (AST-049): Prompt_Buy_<slot>
-	local gw = byMapId(assets, "GEAR_WALL", "AST-049_GearWall")
-	if not gw then
-		log("err", "GEAR_WALL (AST-049_GearWall) not found")
+-- Created Attachment `a` turned to face `dir` (MAP-01 direction), pitched up `tilt` degrees, position kept.
+-- Attachments that came from the .fbx are left alone.
+local function orientCreated(a: Instance?, dir: Vector3, tilt: number)
+	if not (a and a:IsA("Attachment") and a:GetAttribute(CREATED)) then
 		return
 	end
-	setPersistent(gw)
+	local p = M(a.WorldPosition)
+	a.WorldCFrame = FCF(CFrame.lookAt(p, p + dir) * CFrame.Angles(math.rad(tilt), 0, 0))
+end
+
+-- Centre (MAP-01, XZ, Y = 0) and top Y of a pedestal column: its Body part, else every visible part but the S1 lamp.
+local function pedestalCentre(ped: Instance): (Vector3, number, boolean)
+	local mn, mx = partsBox(ped, function(p: BasePart): boolean
+		return p.Name == "Body"
+	end)
+	if not (mn and mx) then
+		mn, mx = partsBox(ped, function(p: BasePart): boolean
+			return string.sub(p.Name, 1, 4) ~= "Lamp"
+		end)
+	end
+	if mn and mx then
+		local c = (mn + mx) / 2
+		return Vector3.new(c.X, 0, c.Z), mx.Y, true
+	end
+	local p = mapPivot(ped).Position
+	return Vector3.new(p.X, 0, p.Z), MART_FLOOR + PEDESTAL_TOP_H, false
+end
+
+-- Pedestals (MAP-01 §18.4; architecture.md §18.4 Mart v2 table): tag GearPedestal + Slot, fittings Slot_<S> (mini
+-- centre = top + MINI_LIFT), Price_Anchor_<S>, Prompt_Buy_<S> (Interactable, bench_buy_* + BenchSlot), all inside the
+-- pedestal. The pedestal goes inside the GEAR_STAND model: OpalController looks for Att_Opal in the Model ancestors
+-- of a GearPedestal.
+local function bindPedestals(assets: Instance, gs: Instance?, opts: AnchorOpts)
+	local pool: { [string]: { Instance } } = { [PEDESTAL_ASSET] = {}, [PEDESTAL_S1_ASSET] = {} }
+	for _, d in assets:GetDescendants() do
+		local a = d:GetAttribute("Asset")
+		if d:IsA("Model") and typeof(a) == "string" and pool[a] then
+			table.insert(pool[a], d)
+		end
+	end
+	local used: { [Instance]: boolean } = {}
+	local nested = 0
 	for _, b in BENCH do
-		local a = ensureAnchor(gw, "Prompt_Buy_" .. b.slot, function()
-			return Vector3.new(-97.8, MART_FLOOR + 3.5 + 1.0, b.z)
-		end, opts, "GEAR_WALL")
-		interactable(a, b.action, { BenchSlot = b.slot })
-		for _, n in { "Price_Anchor_" .. b.slot, "PriceTag_" .. b.slot, "Slot_" .. b.slot } do
-			if not findNamed(gw, n) then
-				log("warn", ("GEAR_WALL: fitting %s missing (read by MarketController, TASK-037)"):format(n))
+		local want = Vector3.new(b.x, 0, b.z)
+		local function nearest(asset: string): (Instance?, number)
+			local best, bestD = nil, math.huge
+			for _, c in pool[asset] do
+				if not used[c] then
+					local centre = pedestalCentre(c)
+					local d = (centre - want).Magnitude
+					if d < bestD then
+						best, bestD = c, d
+					end
+				end
+			end
+			return best, bestD
+		end
+		local ped, dist = nearest(b.asset)
+		if not ped and b.asset ~= PEDESTAL_ASSET then
+			ped, dist = nearest(PEDESTAL_ASSET)
+			if ped then
+				log("warn", ("GEAR_STAND %s: no %s, using a plain %s (no Mustard frame / lamp)"):format(b.slot, b.asset, PEDESTAL_ASSET))
 			end
 		end
+		if not ped then
+			log("err", ("GEAR_STAND %s: no pedestal model (Asset %s) left in %s; MarketController falls back on the prompt anchor"):format(b.slot, b.asset, ASSETS_ROOT))
+			continue
+		end
+		used[ped] = true
+		local label = "GEAR_STAND " .. b.slot
+		if dist > PEDESTAL_MATCH then
+			log("warn", ("%s: pedestal %s is %.2f from its MAP-01 §18.4 centre %s (> %.1f): check the placement"):format(label, ped:GetFullName(), dist, fmtV(want), PEDESTAL_MATCH))
+		end
+		if gs and ped.Parent ~= gs then
+			ped.Parent = gs
+			nested += 1
+		end
+		CollectionService:AddTag(ped, "GearPedestal")
+		ped:SetAttribute("Slot", b.slot)
+		setPersistent(ped)
+
+		local c, top, measured = pedestalCentre(ped)
+		if not measured then
+			log("warn", ("%s: no visible part to measure, top taken as floor + %.1f"):format(label, PEDESTAL_TOP_H))
+		elseif math.abs(top - (MART_FLOOR + PEDESTAL_TOP_H)) > 0.3 then
+			log("warn", ("%s: column top at y %.2f, MAP-01 §18.4 says %.2f (mini floats at top + %.1f)"):format(label, top, MART_FLOOR + PEDESTAL_TOP_H, MINI_LIFT))
+		end
+		local miniY = top + MINI_LIFT
+		ensureAnchor(ped, "Slot_" .. b.slot, function()
+			return Vector3.new(c.X, miniY, c.Z)
+		end, opts, label)
+		local price = ensureAnchor(ped, "Price_Anchor_" .. b.slot, function()
+			return Vector3.new(c.X, top - PRICE_DROP, c.Z) + GEAR_FRONT * PRICE_AHEAD
+		end, opts, label)
+		orientCreated(price, GEAR_FRONT, PRICE_TILT)
+		local promptAt = Vector3.new(c.X, miniY, c.Z) + GEAR_FRONT * PROMPT_AHEAD
+		local prompt = ensureAnchor(ped, "Prompt_Buy_" .. b.slot, function()
+			return promptAt
+		end, opts, label)
+		orientCreated(prompt, GEAR_FRONT, 0)
+		interactable(prompt, b.action, { BenchSlot = b.slot })
+		-- the .fbx empty (AST-105 atts: Prompt_Buy) tells whether the model faces the store
+		local src = ped:FindFirstChild("Prompt_Buy", true)
+		if src and src:IsA("Attachment") and (M(src.WorldPosition) - promptAt).Magnitude > 0.3 then
+			log("warn", ("%s: the model's own Prompt_Buy is %.2f from the §18.4 prompt %s: pedestal turned the wrong way?"):format(label, (M(src.WorldPosition) - promptAt).Magnitude, fmtV(promptAt)))
+		end
+		log("ok", ("%s: %s -> GearPedestal Slot %s, %s at %s, mini at y %.2f"):format(label, ped.Name, b.slot, b.action, fmtV(promptAt), miniY))
+	end
+	for asset, list in pool do
+		for _, c in list do
+			if not used[c] then
+				log("warn", ("GEAR_STAND: extra pedestal %s (%s) left untagged"):format(c:GetFullName(), asset))
+			end
+		end
+	end
+	if nested > 0 then
+		log("conv", ("GEAR_STAND: %d pedestal(s) moved inside the %s model (Opal's Att_Opal lookup)"):format(nested, GEAR_STAND_ASSET))
+	end
+end
+
+-- Roll-up shutters (Kiosk.luau contract): the AST-103 Triple's parts "<key>_<name>" go into a child Model
+-- "Shutter_<key>" (tag GearShutter, Slot = key, Persistent) renamed "<name>" (Slat_01.., Roll, Rail_L/R); the original
+-- name stays in attribute SrcName. Re-runs find the parts already moved and only re-tag. Authored CLOSED (door down).
+local function bindShutters(assets: Instance, gs: Instance?)
+	local tri = byMapId(assets, GEAR_STAND_ID, SHUTTER_ASSET)
+	if not tri then -- any MapId
+		for _, d in assets:GetDescendants() do
+			if d:GetAttribute("Asset") == SHUTTER_ASSET then
+				tri = d
+				break
+			end
+		end
+	end
+	if not (tri and tri:IsA("Model")) then
+		log("warn", ("GEAR_STAND: no %s model; the client generates test shutters (Kiosk.Fallback, 1 warning)"):format(SHUTTER_ASSET))
+		return
+	end
+	if gs and tri.Parent ~= gs then
+		tri.Parent = gs
+		log("conv", ("GEAR_STAND: %s moved inside the %s model"):format(SHUTTER_ASSET, GEAR_STAND_ASSET))
+	end
+	setPersistent(tri)
+	for _, key in SHUTTER_KEYS do
+		local subName = "Shutter_" .. key
+		local sub = tri:FindFirstChild(subName)
+		local created = false
+		if not (sub and sub:IsA("Model")) then
+			sub = Instance.new("Model")
+			sub.Name = subName;
+			(sub :: Model):SetAttribute(CREATED, true)
+			sub.Parent = tri
+			created = true
+		end
+		local prefix = key .. "_"
+		local moved = 0
+		for _, d in tri:GetDescendants() do
+			if d:IsA("BasePart") and string.sub(d.Name, 1, #prefix) == prefix and not d:IsDescendantOf(sub :: Instance) then
+				if d:GetAttribute(SRC_NAME) == nil then
+					d:SetAttribute(SRC_NAME, d.Name)
+				end
+				d.Name = string.sub(d.Name, #prefix + 1)
+				d.Parent = sub
+				moved += 1
+			end
+		end
+		if created and moved > 0 then
+			local cf = (sub :: Model):GetBoundingBox()
+			;(sub :: Model).WorldPivot = cf
+		end
+		local slats, roll = 0, false
+		for _, d in (sub :: Instance):GetDescendants() do
+			if d:IsA("BasePart") then
+				if string.sub(d.Name, 1, 5) == "Slat_" or d.Name == "Door_Panel" then
+					slats += 1
+				elseif d.Name == "Roll" or d.Name == "Door_Drum" then
+					roll = true
+				end
+			end
+		end
+		CollectionService:AddTag(sub :: Instance, "GearShutter");
+		(sub :: Instance):SetAttribute("Slot", key)
+		setPersistent(sub :: Instance)
+		if slats == 0 then
+			log("err", ("GEAR_STAND shutter %s: no %sSlat_* part in %s (the door would not move)"):format(key, prefix, tri:GetFullName()))
+		elseif not roll then
+			log("warn", ("GEAR_STAND shutter %s: %d slat(s) but no Roll (%sRoll): nothing turns"):format(key, slats, prefix))
+		else
+			log(if moved > 0 then "conv" else "ok", ("GEAR_STAND shutter %s: %s with %d slat(s) + Roll (%d part(s) moved in this run)"):format(key, subName, slats, moved))
+		end
+	end
+end
+
+-- Opal's counter (Q-175 A): Attachment Att_Opal inside the GEAR_STAND (on OpalCounter), at the floor, LookVector =
+-- MAP east (WORLD -X). OpalController builds her at point + 3 facing LookVector; OP-1 (same spot) is the fallback.
+local function bindOpalCounter(gs: Instance, opts: AnchorOpts)
+	local y, note = floorY(OPAL_COUNTER.x, OPAL_COUNTER.z, MART_FLOOR, {})
+	if note then
+		log("warn", "Att_Opal floor: " .. note)
+	end
+	local at = Vector3.new(OPAL_COUNTER.x, y, OPAL_COUNTER.z)
+	local want = FCF(CFrame.lookAt(at, at + GEAR_FRONT))
+	local a = findNamed(gs, "Att_Opal")
+	if a and a:IsA("Attachment") then
+		if a:GetAttribute(CREATED) then
+			if opts.resetCreated then
+				a.WorldCFrame = want
+			end
+			log("new", ("GEAR_STAND: Att_Opal kept (created by binding) at %s"):format(fmtV(M(a.WorldPosition))))
+		else
+			log("ok", ("GEAR_STAND: Att_Opal (Attachment from .fbx) at %s"):format(fmtV(M(a.WorldPosition))))
+		end
+	elseif a and a:IsA("BasePart") then
+		makeInvisible(a)
+		log("ok", ("GEAR_STAND: Att_Opal is a BasePart (made invisible) at %s"):format(fmtV(M(a.Position))))
+	else
+		if a then
+			a.Name = "Att_Opal_Src"
+		end
+		local counter = findNamed(gs, "OpalCounter")
+		local host: BasePart? = if counter and counter:IsA("BasePart") then counter else hostPart(gs)
+		if not host then
+			log("err", "GEAR_STAND: no BasePart to host Att_Opal")
+			return
+		end
+		local att = Instance.new("Attachment")
+		att.Name = "Att_Opal"
+		att.Parent = host
+		att.WorldCFrame = want
+		att:SetAttribute(CREATED, true)
+		a = att
+		log("new", ("GEAR_STAND: Att_Opal created on %s at %s, facing MAP east (WORLD -X)"):format(host.Name, fmtV(at)))
+	end
+	local look = if a:IsA("Attachment") then a.WorldCFrame.LookVector else (a :: BasePart).CFrame.LookVector
+	if look:Dot(FD(GEAR_FRONT)) < math.cos(math.rad(10)) then
+		log("warn", ("GEAR_STAND: Att_Opal faces %s, expected WORLD -X (MAP east): Opal would turn her back on the store"):format(fmtV(look)))
+	end
+end
+
+-- Mart v2 (TASK-138): shelves + Gear Stand. The GEAR WALL (AST-049) and the checkout (AST-031 at OP-1) left the map
+-- (MAP-01 §18.8): if they are still placed they get no anchor (clean slate untagged them) and a warning.
+local function bindMart(assets: Instance, opts: AnchorOpts)
+	bindShelves(assets)
+
+	local gw = byMapId(assets, "GEAR_WALL")
+	if gw then
+		log("warn", ("GEAR_WALL (%s) still in %s: MAP-01 §18.8 takes it out of MAP-01_placements.luau; its prompts stay untagged"):format(tostring(gw:GetAttribute("Asset")), ASSETS_ROOT))
+	end
+	local checkout = byMapId(assets, "OP-1")
+	if checkout then
+		log("warn", ("checkout OP-1 (%s) still in %s: MAP-01 §18.8 takes it out (Opal is at the Gear Stand now)"):format(tostring(checkout:GetAttribute("Asset")), ASSETS_ROOT))
+	end
+
+	local gs = byMapId(assets, GEAR_STAND_ID, GEAR_STAND_ASSET)
+	if not (gs and gs:IsA("Model")) then
+		log("err", ("%s (%s) not found: pedestals and shutters bound where they are, no Att_Opal (Opal falls back on OP-1)"):format(GEAR_STAND_ID, GEAR_STAND_ASSET))
+		gs = nil
+	else
+		setPersistent(gs)
+	end
+	bindPedestals(assets, gs, opts)
+	bindShutters(assets, gs)
+	if gs then
+		bindOpalCounter(gs, opts)
 	end
 end
 

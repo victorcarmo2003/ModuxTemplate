@@ -503,7 +503,7 @@ function Place.diff(placements: { any }, ids: { [string]: any }?, opts: { [strin
 		local pp = {}
 		for _, ep in expParts do
 			for _, lp in liveParts do
-				if bare(lp.Name) == ep.Name then
+				if bare(lp:GetAttribute("SrcName") or lp.Name) == ep.Name then
 					table.insert(pp, { ep = ep, lp = lp, d = (lp.Position - ep.Position).Magnitude })
 				end
 			end
@@ -564,7 +564,7 @@ function Place.diff(placements: { any }, ids: { [string]: any }?, opts: { [strin
 		end
 		for _, lp in liveParts do
 			if not taken[lp] then
-				local n = bare(lp.Name)
+				local n = bare(lp:GetAttribute("SrcName") or lp.Name)
 				if relOf[n] then
 					rec.copies = rec.copies or {}
 					local c = pose(relOf[n], lp, sizeOf[n])
@@ -674,7 +674,7 @@ function Place.diff(placements: { any }, ids: { [string]: any }?, opts: { [strin
 			local pp: { { ep: BasePart, lp: BasePart, d: number } } = {}
 			for _, ep in expParts do
 				for _, lp in liveParts do
-					if bare(lp.Name) == ep.Name then
+					if bare(lp:GetAttribute("SrcName") or lp.Name) == ep.Name then
 						table.insert(pp, { ep = ep, lp = lp, d = (lp.Position - ep.Position).Magnitude })
 					end
 				end
