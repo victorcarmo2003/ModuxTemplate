@@ -8,7 +8,7 @@ local WalkGeo = require(ReplicatedStorage.shared.Pedestrian.WalkGeo)
 type WalkPath = typeof(Content.WalkPaths.List[1])
 type Stop = {
 	At: number, -- absolute distance of the record
-	Kind: "Crossing" | "Pause",
+	Kind: "Crossing" | "Pause" | "Hold", -- Hold: behind another walker (spacing), not a place of the path
 	Crosswalk: string?,
 	Exit: number, -- Crossing: far curb (absolute); Pause: = At
 }
@@ -30,6 +30,8 @@ type Walker = {
 	LapEnd: number?,
 	-- braking / standing for the customer side (adoption): no crosswalk request until released or taken
 	Noticed: boolean,
+	-- server time the walker started braking behind another one (Stop.Kind "Hold"); nil = not holding
+	HoldAt: number?,
 }
 export type Handoff = { Species: string, Outfit: string, Position: Vector3, Heading: Vector3, Node: string }
 type Hold = {
@@ -78,6 +80,8 @@ export type Public = {
 	RemoveAll: (self: Public) -> (),
 	OffRoad: (self: Public, walker: Walker) -> (),
 	TryCross: (self: Public, walker: Walker, stop: Stop, t: number) -> (),
+	Ahead: (self: Public, walker: Walker, reach: number) -> boolean,
+	Hold: (self: Public, walker: Walker, brake: number, t: number) -> boolean,
 	StepWalker: (self: Public, walker: Walker, t: number) -> (),
 	Retarget: (self: Public) -> (),
 	TrimExtras: (self: Public) -> (),

@@ -17,6 +17,7 @@
 	  CodeRedeem    CodeRedeem packet -> CodeRedeemResult (ok / invalid / expired / already used)
 	  SquadPanel    the Party set (my squad = the record whose Members has my UserId), invite the players of this
 	                server, kick (leader), Ready, Start (leader), Leave; InvitePopup for PartyInviteReceived
+	  PlayChoice    what Play opens outside a squad: Play Solo · Create Squad (PartyQuickPlay)
 	Feedback toasts (top right) for ClassBuyResult, CodeRedeemResult and PartyNotice; texts in Text.luau.
 
 	Client presents, server decides: gems, owned classes and the selection come from the Profile packet
@@ -24,8 +25,14 @@
 	answers "Prompt", then this client prompts Content.Shop.ClassProducts[key].ProductId and ShopService grants on the
 	receipt); Equip is the existing ClassAction "Select". Squad state is only what the Party set says.
 
-	Play: outside a squad = PartyCreate, then PartyStart as soon as the new squad (me as leader) arrives (solo run);
-	leader = PartyStart (enabled when everyone is ready); member = Ready / Not ready.
+	Play (user request 2026-10-11, Provisional; network.md §16.7): outside a squad it opens PlayChoice:
+	  Play Solo     PartyQuickPlay { Mode = "Solo" }: the server creates a squad of one and starts it at once (normal
+	                countdown, then the teleport; Studio answers StudioNoTeleport and drops the squad). The choice
+	                closes; the HUD shows "Starting in n..." over the Play button.
+	  Create Squad  PartyQuickPlay { Mode = "Squad" }: an open invite squad (no platform); as soon as it arrives the
+	                setup window (SquadSetup) opens: Friends only, Max players, Invite players (-> SquadPanel), Leave,
+	                Start. No need to walk to a platform; stepping on a free one takes the squad there.
+	In a squad, Play opens the setup window of my squad (Start for the leader, Ready for invite squad members).
 
 	Zones (user request 2026-10-11, Provisional; Content.Lobby, shared.Lobby.LobbyZones): every lobby zone is a floor
 	Part of the map tagged "LobbyZone" (attribute Zone = Classes / Shop / Codes / Squad1..4; circle on a disc, oriented
@@ -33,9 +40,11 @@
 	walking out closes it (only if that panel is still the open one); checked every Trigger.Poll s from the own
 	HumanoidRootPart, with hysteresis. The HUD tiles and keys stay as shortcuts. A panel closed by hand stays closed
 	until the player walks out and in again.
-	  SquadSetup    the platform window (Panel "Platform"): the squad on the platform the player stands on, Friends
-	                only, Max players, Start (leader) or the countdown. Joining / leaving is the server's (PartyService
-	                watches the platforms); this client only sends PartyConfigure / PartyStart.
+	  SquadSetup    the setup window (Panel "Platform"): my squad (platform or invite), else the squad on the platform
+	                the player stands on; Friends only, Max players, Start (leader) or the countdown; invite squads add
+	                Ready (members), Invite players and Leave. Joining / leaving a platform is the server's
+	                (PartyService watches the platforms); this client sends PartyConfigure / PartyStart / PartyReady /
+	                PartyLeave. Opened by Play too; closes by itself when there is no squad left to show.
 	Zone VFX (Rings.luau): local Neon frames on the floor edges (square / ring) with rising ghost frames, one Heartbeat
 	for every zone; platform colours follow the Party set (free / squad / starting).
 	Camera: normal third person in the lobby (CameraController External; CameraMode Classic). While the class screen
@@ -44,6 +53,7 @@
 	Binds (InputController; touch = the HUD tiles and buttons, >= 44 px):
 	  Classes C / ButtonY · Shop B / DPadUp · Codes K / DPadLeft · Squad P / DPadRight · Play Return / DPadDown
 	  Close (Menu) ButtonB · previous / next class (Menu) Left / Right, ButtonL1 / ButtonR1
+	  Play choice (Menu) Play Solo 1 · Create Squad 2 (gamepad: the selection starts on Play Solo, A picks)
 	The Classes bind has a higher priority than ClassController's Crew toggle (C / ButtonY), so in the lobby these keys
 	open this screen.
 ]]
@@ -68,6 +78,7 @@ local CodeRedeem = require(StarterPlayer.StarterPlayerScripts.client.Interface.C
 local GemShop = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.GemShop)
 local InvitePopup = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.InvitePopup)
 local LobbyHud = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.LobbyHud)
+local PlayChoice = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.PlayChoice)
 local SquadPanel = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.SquadPanel)
 local SquadSetup = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.SquadSetup)
 local ToastStack = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Toast.Stack)
@@ -75,7 +86,7 @@ local Rings = require(script.Rings)
 local Stage = require(script.Stage)
 local Text = require(script.Text)
 
-export type Panel = "None" | "Classes" | "Shop" | "Codes" | "Squad" | "Platform"
+export type Panel = "None" | "Classes" | "Shop" | "Codes" | "Squad" | "Platform" | "Play"
 
 export type PartyRecord = {
 	Leader: number,
@@ -100,7 +111,7 @@ const OUTFIT = "crew"
 const IDLE = "crew_idle"
 const CLICK_SOUND = "ui_click"
 const PENDING_TIMEOUT = 4 -- s without an answer: the class buttons come back
-const PLAY_TIMEOUT = 6 -- s waiting for the new squad of a solo Play
+const PLAY_TIMEOUT = 6 -- s waiting for the squad of a quick play (Play Solo / Create Squad)
 const SENT_TIME = 6 -- s an "Invite" button stays "Sent"
 -- UI scale: 1 on the smallest landscape phone, grows up to 2 (same rule as the Crew screen)
 const BASE_WIDTH = 660
@@ -114,6 +125,10 @@ const PANEL_BINDS: { { Name: string, Panel: Panel, Key: Enum.KeyCode, Pad: Enum.
 	{ Name = "LobbySquad", Panel = "Squad", Key = Enum.KeyCode.P, Pad = Enum.KeyCode.DPadRight, PadText = "Right" },
 }
 const PLAY = "LobbyPlay"
+const PLAY_CHOICES: { { Name: string, Key: Enum.KeyCode, Choice: PlayChoice.Choice } } = {
+	{ Name = "LobbyPlaySolo", Key = Enum.KeyCode.One, Choice = "Solo" },
+	{ Name = "LobbyPlaySquad", Key = Enum.KeyCode.Two, Choice = "Squad" },
+}
 const CLOSE = "LobbyClose"
 const PREVIOUS = "LobbyPrevious"
 const NEXT = "LobbyNext"
@@ -126,7 +141,8 @@ const FIRST_SELECTION: { [Panel]: { string } } = {
 	Shop = { "Buy" },
 	Codes = { "Redeem" },
 	Squad = { "Start", "Ready", "Create", "Invite" },
-	Platform = { "Start", "Toggle" },
+	Platform = { "Start", "Ready", "Toggle", "Leave" },
+	Play = { "Solo", "Squad" },
 }
 
 -- Root instance of each panel (component Name), where SelectFirst looks.
@@ -137,6 +153,7 @@ const PANEL_ROOT: { [Panel]: string } = {
 	Codes = "CodeRedeem",
 	Squad = "SquadPanel",
 	Platform = "SquadSetup",
+	Play = "PlayChoice",
 }
 
 const LOBBY = Content.Lobby
@@ -202,8 +219,11 @@ function LobbyController:Setup()
 	self.Roster = Vide.source({}) :: Vide.Source<{ Player }>
 	self.Sent = Vide.source({}) :: Vide.Source<{ [number]: boolean }>
 	self.Invites = Vide.source({}) :: Vide.Source<{ Invite }>
-	-- os.clock() of a solo Play waiting for its squad; 0 = none
-	self.PlayAfterCreate = 0 :: number
+	-- a quick play (PartyQuickPlay) waiting for its squad
+	self.QuickPending = Vide.source(false) :: Vide.Source<boolean>
+	self.QuickMode = "Solo" :: PlayChoice.Choice
+	-- os.clock() of the quick play on its way; 0 = none
+	self.QuickAt = 0 :: number
 
 	-- zones
 	-- zone key -> the own root is inside (hysteresis)
@@ -658,26 +678,33 @@ end
 function LobbyController:PlayButton(): LobbyHud.PlayButton
 	const _, party = self:MyParty()
 	if party == nil then
-		return { Text = "Play", Kind = "Go", Enabled = true }
+		return if self.QuickPending()
+			then { Text = "...", Kind = "Off", Enabled = false }
+			else { Text = "Play", Kind = "Go", Enabled = true }
 	end
 	if party.State == "Starting" then
-		return { Text = "Starting...", Kind = "Off", Enabled = false }
+		return { Text = "Starting...", Kind = "Go", Enabled = true }
 	end
 	const me = Players.LocalPlayer.UserId
 	if party.Leader == me then
 		return if self:AllReady(party)
 			then { Text = "Start", Kind = "Go", Enabled = true }
-			else { Text = "Waiting...", Kind = "Off", Enabled = false }
+			else { Text = "Squad", Kind = "Wait", Enabled = true }
 	end
-	return if party.Ready[me] == true
-		then { Text = "Not ready", Kind = "Wait", Enabled = true }
-		else { Text = "Ready", Kind = "Go", Enabled = true }
+	return { Text = "Squad", Kind = if party.Ready[me] == true then "Go" else "Wait", Enabled = true }
 end
 
 function LobbyController:PlayStatus(): string
 	const _, party = self:MyParty()
-	if party == nil or party.State == "Starting" then
+	if party == nil then
 		return ""
+	end
+	if party.State == "Starting" then
+		if party.StartAt <= 0 then
+			return ""
+		end
+		const left = party.StartAt - self.Clock()
+		return if left > 0 then `Starting in {math.ceil(left)}...` else "Here we go!"
 	end
 	local waiting = 0
 	for _, userId in party.Members do
@@ -691,41 +718,66 @@ function LobbyController:PlayStatus(): string
 	return if waiting == 1 then "Waiting for 1 player" else `Waiting for {waiting} players`
 end
 
+-- Play button: outside a squad the choice (Play Solo / Create Squad); in a squad its setup window.
 function LobbyController:Play()
 	-- event handlers run outside any reactive scope: plain reads
-	const _, party = self:MyParty()
-	const me = Players.LocalPlayer.UserId
-	if party == nil then
-		-- solo run: a squad of one, started as soon as it exists
-		self.PlayAfterCreate = os.clock()
-		self.Libs.Net.PartyCreate:fireServer()
+	const id = self:MyParty()
+	if id == nil then
+		if not Vide.untrack(self.QuickPending) then
+			self:SetPanel("Play")
+		end
 		return
 	end
-	if party.State == "Starting" then
-		return
-	end
-	if party.Leader == me then
-		self.Libs.Net.PartyStart:fireServer()
-	else
-		self.Libs.Net.PartyReady:fireServer({ Ready = party.Ready[me] ~= true })
+	self:SetPanel("Platform")
+end
+
+function LobbyController:ClearQuickPlay()
+	self.QuickAt = 0
+	if Vide.untrack(self.QuickPending) then
+		self.QuickPending(false)
 	end
 end
 
--- A solo Play waits for its squad, then starts it.
-function LobbyController:CheckPlayAfterCreate()
-	const at = self.PlayAfterCreate
-	if at == 0 then
+-- Play Solo / Create Squad: the server creates the squad (and starts it for Solo); nothing is assumed here.
+function LobbyController:QuickPlay(choice: PlayChoice.Choice)
+	if Vide.untrack(self.QuickPending) then
 		return
 	end
-	if os.clock() - at > PLAY_TIMEOUT then
-		self.PlayAfterCreate = 0
+	const id = self:MyParty()
+	if id ~= nil then
+		self:SetPanel("Platform")
+		return
+	end
+	const at = os.clock()
+	self.QuickMode = choice
+	self.QuickAt = at
+	self.QuickPending(true)
+	self.Libs.Net.PartyQuickPlay:fireServer({ Mode = choice })
+	if choice == "Solo" then
+		self:SetPanel("None") -- the HUD shows the countdown
+	end
+	-- no answer (dropped by the rate limit): the buttons come back
+	task.delay(PLAY_TIMEOUT, function()
+		if self.QuickAt == at then
+			self:ClearQuickPlay()
+		end
+	end)
+end
+
+-- The squad of a quick play arrived: Create Squad opens its setup window.
+function LobbyController:CheckQuickPlay()
+	if not Vide.untrack(self.QuickPending) then
 		return
 	end
 	-- event handlers run outside any reactive scope: plain reads
-	const _, party = self:MyParty()
-	if party and party.Leader == Players.LocalPlayer.UserId and party.State == "Forming" then
-		self.PlayAfterCreate = 0
-		self.Libs.Net.PartyStart:fireServer()
+	const id = self:MyParty()
+	if id == nil then
+		return
+	end
+	self:ClearQuickPlay()
+	const panel = Vide.untrack(self.Panel)
+	if self.QuickMode == "Squad" and (panel == "Play" or panel == "None") then
+		self:SetPanel("Platform")
 	end
 end
 
@@ -744,14 +796,14 @@ function LobbyController:PlatformParty(n: number): PartyRecord?
 	return nil
 end
 
--- The squad shown in the platform window: the one on the platform I stand on, else my own platform squad.
+-- The squad shown in the setup window: my own squad (platform or invite), else the one on the platform I stand on
+-- (being refused, or a friends-only check on its way).
 function LobbyController:SetupParty(): PartyRecord?
-	const standing = self:PlatformParty(self.Standing())
-	if standing then
-		return standing
-	end
 	const _, mine = self:MyParty()
-	return if mine and mine.Platform > 0 then mine else nil
+	if mine then
+		return mine
+	end
+	return self:PlatformParty(self.Standing())
 end
 
 function LobbyController:SetupMembers(): { SquadSetup.Member }
@@ -768,6 +820,8 @@ function LobbyController:SetupMembers(): { SquadSetup.Member }
 			Name = if userId == me then `{nameOf(userId)} (you)` else nameOf(userId),
 			Leader = userId == party.Leader,
 			Me = userId == me,
+			-- invite squads only: platform members are ready by standing there
+			Ready = if party.Platform == 0 and userId ~= party.Leader then party.Ready[userId] == true else nil,
 		})
 	end
 	return list
@@ -994,6 +1048,21 @@ function LobbyController:Bind()
 				self:Play()
 			end
 		end)
+	for _, choice in PLAY_CHOICES do
+		input
+			:Bind({
+				Name = choice.Name,
+				Key = choice.Key,
+				Context = "Menu",
+				Priority = BIND_PRIORITY,
+			})
+			.OnPress(function()
+				if Vide.untrack(self.Panel) == "Play" then
+					self:Click()
+					self:QuickPlay(choice.Choice)
+				end
+			end)
+	end
 	input
 		:Bind({
 			Name = CLOSE,
@@ -1108,6 +1177,18 @@ function LobbyController:Mount(playerGui: Instance)
 			self.Parties()
 			Vide.untrack(function()
 				self:PaintPlatforms()
+				return nil
+			end)
+		end)
+
+		-- The setup window opened by Play closes when there is no squad to show anymore (left, solo run over)
+		Vide.effect(function()
+			const panel = self.Panel()
+			const party = self:SetupParty()
+			Vide.untrack(function()
+				if panel == "Platform" and party == nil and self.Standing() == 0 then
+					self:SetPanel("None")
+				end
 				return nil
 			end)
 		end)
@@ -1312,6 +1393,22 @@ function LobbyController:Mount(playerGui: Instance)
 				Scale = self.Scale,
 			}),
 
+			PlayChoice({
+				Visible = isOpen("Play"),
+				Busy = self.QuickPending,
+				Keys = function()
+					return if self.Dependencies.InputController.Device() == "KeyboardMouse"
+						then { Solo = "1", Squad = "2" }
+						else {}
+				end,
+				OnChoose = function(choice: PlayChoice.Choice)
+					self:Click()
+					self:QuickPlay(choice)
+				end,
+				OnClose = close,
+				Scale = self.Scale,
+			}),
+
 			SquadSetup({
 				Visible = isOpen("Platform"),
 				Platform = self.Standing,
@@ -1358,6 +1455,27 @@ function LobbyController:Mount(playerGui: Instance)
 				end,
 				OnClose = close,
 				Scale = self.Scale,
+				Invite = function()
+					const party = self:SetupParty()
+					return party ~= nil and party.Platform == 0
+				end,
+				Ready = function()
+					const party = self:SetupParty()
+					return party ~= nil and party.Ready[Players.LocalPlayer.UserId] == true
+				end,
+				OnReady = function(ready: boolean)
+					self:Click()
+					self.Libs.Net.PartyReady:fireServer({ Ready = ready })
+				end,
+				OnInvite = function()
+					self:Click()
+					self:SetPanel("Squad")
+				end,
+				OnLeave = function()
+					self:Click()
+					self.Libs.Net.PartyLeave:fireServer()
+					self:SetPanel("None")
+				end,
 			}),
 
 			InvitePopup({
@@ -1400,13 +1518,13 @@ LobbyController:OnInit(function(self)
 		const copy = table.clone(Vide.untrack(self.Parties))
 		copy[id] = record :: any
 		self.Parties(copy)
-		self:CheckPlayAfterCreate()
+		self:CheckQuickPlay()
 	end)
 	net.Party:onChanged(function(id, record)
 		const copy = table.clone(Vide.untrack(self.Parties))
 		copy[id] = record :: any
 		self.Parties(copy)
-		self:CheckPlayAfterCreate()
+		self:CheckQuickPlay()
 	end)
 	net.Party:onRemoved(function(id)
 		const copy = table.clone(Vide.untrack(self.Parties))
@@ -1424,8 +1542,8 @@ LobbyController:OnInit(function(self)
 		if not self.Active then
 			return
 		end
-		if data.Key == "Created" and self.PlayAfterCreate ~= 0 then
-			return -- a solo Play: the start notice follows
+		if data.Key == "AlreadyInParty" or data.Key == "TooFast" or data.Key == "WrongServer" then
+			self:ClearQuickPlay() -- a quick play refused: the buttons come back
 		end
 		const line = Text.Party(data.Key, if data.UserId then nameOf(data.UserId) else nil)
 		self:Toast(line.Text, line.Kind)

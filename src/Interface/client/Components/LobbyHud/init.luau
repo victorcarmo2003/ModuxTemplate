@@ -3,7 +3,7 @@
 -- Laid out for the smallest landscape phone (620 x 340 px at Scale 1, inside CoreUISafeInsets); `Scale` grows it.
 --   top left     gem balance pill (a button: opens the gem shop), gem icon + amount + "+"
 --   left column  four big tiles (62 px): Classes · Shop · Codes · Squad (Squad shows "2/4" when in a squad)
---   bottom centre the big Play button (text and colour from `Play`: Play / Ready / Not ready / Start / ...)
+--   bottom centre the big Play button (text and colour from `Play`: Play / Squad / Start / Starting...)
 -- Kept clear of the mobile thumbstick (bottom left) and jump button (bottom right). Key chips ("C", "Y"...) on the tiles
 -- when the device is not touch (`Keys`). Pure: only props.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

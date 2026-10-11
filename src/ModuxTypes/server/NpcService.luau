@@ -19,6 +19,7 @@ export type Npc = {
 	Variant: Variant?, -- Role "Actor" only
 	Node: string, -- last graph node reached (spawn point at first)
 	Walk: number, -- walk order counter: a new order or a despawn cancels the running one
+	Tether: boolean, -- moved by MoveToward / Teleport (pair partner): other rigs never wait for it
 }
 export type SpawnRequest = {
 	Role: Role?, -- default "Customer". "Thief": Quick Quentin; CustomerType/Species/Outfit are ignored
@@ -78,6 +79,7 @@ export type Public = {
 	DespawnAll: (self: Public) -> (),
 	Route: (self: Public, from: string, to: string, options: WalkOptions?) -> { string }?,
 	WalkTo: (self: Public, id: number, target: string, options: WalkOptions?) -> boolean,
+	Blocked: (self: Public, id: number, direction: Vector3) -> boolean,
 	Crossing: (self: Public, id: number, at: { [number]: string }) -> Walker.Crossing?,
 	GetRig: (self: Public, id: number) -> Rig?,
 	WalkToPosition: (self: Public, id: number, position: Vector3, timeout: number?) -> boolean,

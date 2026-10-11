@@ -317,13 +317,22 @@ function Speech.new(volume: () -> number): Speech
 		entry.State = "Loading"
 		-- inside the one audio queue of the client (LoadQueue, urgent): never next to another sound load
 		local ok, status: any = false, nil
+		local returned = false
 		LoadQueue.Run(function(): boolean?
 			ok, status = pcall(function(): Enum.AssetFetchStatus
 				return voice:LoadAsync()
 			end)
+			returned = true
 			return not ok or status ~= Enum.AssetFetchStatus.Success
 		end, true)
 		if not alive or voice.Parent == nil then
+			return
+		end
+		if not returned then
+			-- LoadQueue gave up on a LoadAsync that never returned: the retry builds a fresh instance
+			voice:Destroy()
+			entry.Voice = nil
+			failed(entry, "timed out")
 			return
 		end
 		if ok and status == Enum.AssetFetchStatus.Success then

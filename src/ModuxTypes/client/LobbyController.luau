@@ -10,6 +10,7 @@ local CodeRedeem = require(StarterPlayer.StarterPlayerScripts.client.Interface.C
 local GemShop = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.GemShop)
 local InvitePopup = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.InvitePopup)
 local LobbyHud = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.LobbyHud)
+local PlayChoice = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.PlayChoice)
 local SquadPanel = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.SquadPanel)
 local SquadSetup = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.SquadSetup)
 local ToastStack = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Toast.Stack)
@@ -17,7 +18,7 @@ local Rings = require(StarterPlayer.StarterPlayerScripts.client.Lobby.LobbyContr
 local Stage = require(StarterPlayer.StarterPlayerScripts.client.Lobby.LobbyController.Stage)
 local Text = require(StarterPlayer.StarterPlayerScripts.client.Lobby.LobbyController.Text)
 
-export type Panel = "None" | "Classes" | "Shop" | "Codes" | "Squad" | "Platform"
+export type Panel = "None" | "Classes" | "Shop" | "Codes" | "Squad" | "Platform" | "Play"
 export type PartyRecord = {
 	Leader: number,
 	Members: { number },
@@ -50,10 +51,12 @@ export type Public = {
 	Parties: Vide.Source<{ [number]: PartyRecord }>,
 	Pending: Vide.Source<string>,
 	PendingThread: thread?,
-	PlayAfterCreate: number,
 	Prices: Vide.Source<{ [number]: number }>,
 	PromptClass: string,
 	Prompting: Vide.Source<boolean>,
+	QuickAt: number,
+	QuickMode: PlayChoice.Choice,
+	QuickPending: Vide.Source<boolean>,
 	RigWarned: boolean,
 	Rings: Rings.Rings?,
 	Roster: Vide.Source<{ Player }>,
@@ -102,7 +105,9 @@ export type Public = {
 	PlayButton: (self: Public) -> LobbyHud.PlayButton,
 	PlayStatus: (self: Public) -> string,
 	Play: (self: Public) -> (),
-	CheckPlayAfterCreate: (self: Public) -> (),
+	ClearQuickPlay: (self: Public) -> (),
+	QuickPlay: (self: Public, choice: PlayChoice.Choice) -> (),
+	CheckQuickPlay: (self: Public) -> (),
 	PlatformParty: (self: Public, n: number) -> PartyRecord?,
 	SetupParty: (self: Public) -> PartyRecord?,
 	SetupMembers: (self: Public) -> { SquadSetup.Member },

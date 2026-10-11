@@ -11,6 +11,18 @@ local Lync = require(ReplicatedStorage.Packages.Lync)
 local Content = require(ReplicatedStorage.shared.Content)
 local PartyRules = require(ReplicatedStorage.shared.Party.PartyRules) -- squad notices (§16, TASK-154)
 
+-- §13.7 Cutscene record (set and its CutsceneSnapshot fallback packet)
+local function cutsceneRecord()
+	return Lync.struct({
+		Scene = Lync.enum(Content.Cutscenes.Keys),
+		StartedAt = Lync.f64(),
+		Votes = Lync.int(0, 4),
+		Needed = Lync.int(0, 4),
+		-- true while the server holds the chain for the participants' ClientReady (Scene = "none" meanwhile)
+		Waiting = Lync.bool(),
+	})
+end
+
 return Lync.define("game", {
 	-- c -> s handshake (NetService.Audience)
 	Ready = Lync.packet(Lync.empty()),
@@ -101,7 +113,10 @@ return Lync.define("game", {
 
 	-- §3.7, record = Content.Upgrades.IndexOf[key]; levels of the current vehicle only (DEC-184). Writer: UpgradeService
 	Upgrades = Lync.replicate(Lync.struct({
-		Level = Lync.int(0, 9),
+		-- Real range 0..9 (UpgradeService clamps). The wire is 8 bits on purpose: Lync 4.0.2 bounds a keyframe at
+		-- >= 1 byte per record, but 8 records x 4 bits + 1-bit id steps pack below that, so a keyframe that ended its
+		-- frame was refused on the client ("drop.section ... more records than its own bytes could hold").
+		Level = Lync.int(0, 255),
 	})),
 
 	-- §14.1 (TASK-144; FEAT-037), record = table index 1..Content.Seating.Tables (TBL-n; 6 = Back Bar, not written
@@ -246,14 +261,11 @@ return Lync.define("game", {
 	})):newest(10),
 
 	-- §13.7 (§6.2 schema), record 1. Writer: CutsceneService. Needed = ceil(0.5 x connected participants) (DEC-194)
-	Cutscene = Lync.replicate(Lync.struct({
-		Scene = Lync.enum(Content.Cutscenes.Keys),
-		StartedAt = Lync.f64(),
-		Votes = Lync.int(0, 4),
-		Needed = Lync.int(0, 4),
-		-- true while the server holds the chain for the participants' ClientReady (Scene = "none" meanwhile)
-		Waiting = Lync.bool(),
-	})),
+	Cutscene = Lync.replicate(cutsceneRecord()),
+	-- s -> Audience, on every Cutscene write and in reply to ClientReady. Writer: CutsceneService. Same record as the
+	-- set; the client (CutsceneController) uses it only while its Cutscene set has no record 1 (a backlog lost to
+	-- drop.unready before NetService:Resync landed): the intro must never wait on one lost keyframe
+	CutsceneSnapshot = Lync.packet(cutsceneRecord()),
 
 	-- §13.7 c -> s, <= 1 per segment. Responder: CutsceneService
 	SkipVote = Lync.packet(Lync.empty()),
@@ -386,6 +398,11 @@ return Lync.define("game", {
 	PartyConfigure = Lync.packet(Lync.struct({
 		FriendsOnly = Lync.bool(),
 		MaxPlayers = Lync.int(1, 4),
+	})),
+	-- §16.7 c -> s. Lobby Play button outside a squad: Solo = a squad of one started at once (countdown + teleport);
+	-- Squad = an open invite squad (Platform 0) to set up and invite into
+	PartyQuickPlay = Lync.packet(Lync.struct({
+		Mode = Lync.enum({ "Solo", "Squad" }),
 	})),
 	-- §16.3 s -> player. Key = PartyRules.NoticeKeys; UserId = the other player when the notice names one
 	PartyNotice = Lync.packet(Lync.struct({

@@ -55,7 +55,7 @@ const RULES = Content.Cutscenes.Rules
 const PHASE_SCENES: { [string]: string } = { Intro = "intro", Finale = "finale" }
 -- Help Wanted flyer dressing (Rules.Poster; PROVISIONAL look, frontend-coder 2026-10-11)
 const DRESSED_ATTRIBUTE = "CutsceneDressed"
-const POSTER_PPS = 100
+const POSTER_PPS = 200
 const INK = Color3.fromHex("#2B2233")
 const KETCHUP = Color3.fromHex("#E2402E")
 const CREAM = Color3.fromHex("#FFF1D6")
@@ -263,24 +263,39 @@ end
 
 -- Network -----------------------------------------------------------------------------------------------------------
 
-function CutsceneService:Write()
-	if not self.Dependencies.NetService:IsRunning() then
-		return
-	end
+-- The Cutscene record as it stands now (set record 1 and CutsceneSnapshot)
+function CutsceneService:Record(): { Scene: string, StartedAt: number, Votes: number, Needed: number, Waiting: boolean }
 	const playing = self:IsPlaying()
-	const record = {
+	return {
 		Scene = self.Scene,
 		StartedAt = if playing then self.StartedAt else 0,
 		Votes = if playing then math.clamp(self:VoteCount(), 0, MAX_WIRE) else 0,
 		Needed = if playing then math.clamp(self:Needed(), 0, MAX_WIRE) else 0,
 		Waiting = self.Pending ~= nil,
 	}
+end
+
+function CutsceneService:Write()
+	if not self.Dependencies.NetService:IsRunning() then
+		return
+	end
+	const record = self:Record()
 	if self.Written then
 		self.Libs.Net.Cutscene:update(RECORD, record)
 	else
 		self.Written = true
 		self.Libs.Net.Cutscene:add(RECORD, record)
 	end
+	-- fallback for a client whose set lost record 1 (CutsceneSnapshot, Net): writes are a few per chain
+	self.Libs.Net.CutsceneSnapshot:fireClient(self.Dependencies.NetService.Audience, record)
+end
+
+-- The current record to one client (reply to its ClientReady), for the same fallback
+function CutsceneService:SendSnapshot(player: Player)
+	if not self.Written or not self.Dependencies.NetService:IsRunning() then
+		return
+	end
+	self.Libs.Net.CutsceneSnapshot:fireClient(player, self:Record())
 end
 
 -- Traffic (TASK-104) --------------------------------------------------------------------------------------------
@@ -674,6 +689,9 @@ CutsceneService:OnInit(function(self)
 		self.Loaded[player] = true
 		if self.Enabled and self:IsWaiting() then
 			self:StepPending()
+		end
+		if self.Enabled then
+			self:SendSnapshot(player)
 		end
 	end)
 	Players.PlayerRemoving:Connect(function(player)

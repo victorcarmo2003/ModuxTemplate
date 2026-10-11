@@ -5,7 +5,9 @@
 	loading, all at once -> "Failed to load sound : Rate limited by the client" x24 and failed voices).
 
 	One job at a time, GAP s between two jobs; a job that reports a failure holds the queue BACKOFF s (a rate limit
-	clears before the next request). Urgent jobs (loading screen, text-to-speech) go before the background ones.
+	clears before the next request). A job still running after JOB_TIMEOUT s counts as failed and the queue moves on
+	(playtest 2026-10-11: one text-to-speech LoadAsync that never returned held every later line, Walt's voice
+	included, for the whole session); the stuck call keeps running on its own thread. Urgent jobs (loading screen, text-to-speech) go before the background ones.
 	  Preload(items, progress?, urgent?)  ContentProvider:PreloadAsync in batches of BATCH (Sound instances or content
 	                                      ids); ids already loaded are skipped. Yields until every batch ran.
 	  Run(work, urgent?)                  runs work() inside the queue (work returns true on failure); yields until it ran.
@@ -19,6 +21,7 @@ const BATCH = 4 -- assets per PreloadAsync
 const GAP = 0.25 -- s between two jobs
 const BACKOFF = 2 -- s the queue waits after a job that failed
 const POLL = 0.05
+const JOB_TIMEOUT = 8 -- s before a job that has not returned is abandoned (counts as failed)
 
 const urgentJobs: { Job } = {}
 const backgroundJobs: { Job } = {}
@@ -36,9 +39,21 @@ local function pump()
 			if job == nil then
 				break
 			end
-			const ok, result = pcall(job.Work)
+			local finished = false
+			local ok, result: any = true, nil
+			task.spawn(function()
+				ok, result = pcall(job.Work)
+				finished = true
+			end)
+			const deadline = os.clock() + JOB_TIMEOUT
+			while not finished and os.clock() < deadline do
+				task.wait(POLL)
+			end
 			job.Done = true
-			if not ok then
+			if not finished then
+				warn(`[LoadQueue] load job still running after {JOB_TIMEOUT} s: moving on`)
+				ok, result = true, true
+			elseif not ok then
 				warn(`[LoadQueue] load job failed: {result}`)
 			end
 			task.wait(if not ok or result == true then BACKOFF else GAP)

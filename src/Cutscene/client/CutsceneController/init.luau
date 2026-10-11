@@ -106,6 +106,10 @@ const FLYER_HEIGHT = 4.5 -- the P-01 flyer, same as Actors
 const BALLOON_OFFSET = Vector3.new(0, 2.6, 0)
 const BALLOON_DISTANCE = 60
 const LIVE_WINDOW = 0.75 -- s: a beat crossed later than this after its At is catch-up (no sound, no balloon)
+-- watchdog (a lost Cutscene frame must not leave the camera/input in a chain): how often the set's store is read
+-- back, and how long past the scene's server Cap a chain may run before the client ends it by itself
+const WATCH_RATE = 2 -- Hz
+const STALE_MARGIN = 5 -- s
 const FADE_ORDER = 51 -- above the vehicle fade (50) and the HUD
 const UI_ORDER = 52 -- subtitles and skip over the black
 const SPEAKERS: { [string]: string } = { walt = "Walt", crew = "You" }
@@ -178,6 +182,8 @@ function CutsceneController:Setup()
 	self.Folder = nil :: Folder?
 	self.Warned = {} :: { [string]: boolean }
 	self.Stepping = false :: boolean
+	-- last CutsceneSnapshot packet (fallback while the Cutscene set has no record 1)
+	self.Snapshot = nil :: Record?
 end
 
 function CutsceneController:WarnOnce(key: string, message: string)
@@ -630,6 +636,48 @@ function CutsceneController:Apply(record: Record?)
 	end
 end
 
+-- A segment the server has certainly ended by now (its Cap passed long ago)
+local function overdue(key: string, startedAt: number): boolean
+	const scene = Content.Cutscenes.ByKey[key]
+	if scene == nil or key == NONE or startedAt <= 0 then
+		return false
+	end
+	return Workspace:GetServerTimeNow() - startedAt > scene.Cap + STALE_MARGIN
+end
+
+-- Record 1 of the Cutscene set, or the last CutsceneSnapshot while the set has none (its keyframe was lost)
+function CutsceneController:Current(): Record?
+	const ok, stored = pcall(function()
+		return self.Libs.Net.Cutscene:get(RECORD)
+	end)
+	const record = if ok then stored :: Record? else nil
+	return if record ~= nil then record else self.Snapshot
+end
+
+-- Watchdog: the set's store (or the snapshot) read back, so a listener call lost with a dropped frame is applied
+-- late, and a chain past its Cap ended locally (camera, input and HUD back): a lost update never holds the client
+-- in a cutscene.
+function CutsceneController:Watch()
+	const record = self:Current()
+	if record ~= nil then
+		const key = record.Scene
+		const scene = self.Scene
+		const differs = if key == NONE or Content.Cutscenes.ByKey[key] == nil
+			then self.Playing
+			else not self.Playing or scene == nil or scene.Key ~= key or record.StartedAt ~= self.StartedAt
+		if differs and not overdue(key, record.StartedAt) then
+			self:Apply(record)
+		elseif record.Waiting ~= Vide.untrack(self.Waiting) then
+			self.Waiting(record.Waiting)
+		end
+	end
+	const scene = self.Scene
+	if self.Playing and scene ~= nil and overdue(scene.Key, self.StartedAt) then
+		warn(`[CutsceneController] {scene.Key} ran past its cap without an end from the server: ending it here`)
+		self:EndChain()
+	end
+end
+
 -- Beats ---------------------------------------------------------------------------------------------------------
 
 function CutsceneController:FireBeat(beat: Beat, live: boolean)
@@ -1040,6 +1088,16 @@ CutsceneController:OnInit(function(self)
 			self:Apply(nil)
 		end
 	end)
+	-- fallback (Net CutsceneSnapshot): applied only while the set itself has no record 1
+	self.Libs.Net.CutsceneSnapshot:onClient(function(record)
+		self.Snapshot = record :: Record
+		const ok, stored = pcall(function()
+			return self.Libs.Net.Cutscene:get(RECORD)
+		end)
+		if ok and stored == nil then
+			self:Watch()
+		end
+	end)
 end)
 
 CutsceneController:OnStart(function(self)
@@ -1052,5 +1110,9 @@ CutsceneController:OnStart(function(self)
 		end
 	end)
 end)
+
+CutsceneController:OnTick(function(self)
+	self:Watch()
+end, WATCH_RATE)
 
 return CutsceneController

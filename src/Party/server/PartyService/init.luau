@@ -2,7 +2,7 @@
 -- Squad (party) in the lobby (architecture.md §20.2, §20.6; network.md §16; user request 2026-10-11, Provisional;
 -- TASK-155). Lobby roles only (Lobby, PrivateLobby): elsewhere every squad packet answers PartyNotice "WrongServer".
 -- Single writer of the Party set (record = PartyId). Responders for PartyCreate/Invite/Respond/Leave/Kick/Ready/Start/
--- Configure.
+-- Configure/QuickPlay.
 --
 -- Rules (Provisional): up to PartyRules.Rules.MaxSize (4, DEC-012) members, and never more than the squad's
 -- MaxPlayers; the creator leads; only the leader invites, kicks, configures and starts; inviting without a squad
@@ -25,6 +25,11 @@
 -- (PartyRules.Rules.TeleportRetries); all failing = back to the idle state + "TeleportFailed". A member whose own
 -- teleport fails later (TeleportInitFailed) retries alone with the same options (same server). Studio cannot teleport:
 -- the countdown runs, then "StudioNoTeleport" and back to the idle state.
+-- Quick play (the lobby Play button, user request 2026-10-11, Provisional; network.md §16.7): PartyQuickPlay outside a
+-- squad creates an invite squad (Platform 0) led by the sender. Mode "Solo" = a squad of one (MaxPlayers 1) started at
+-- once (same countdown and teleport as Start); when it comes back to the idle state (Studio, every teleport failing)
+-- it is disbanded, so Play offers the choice again. Mode "Squad" = an open invite squad ("Forming") to set up and
+-- invite into; its leader may still take it to a free platform.
 -- Server never trusts the client: membership, leadership, state, size, presence of the target, friendship and rate
 -- are checked here; TeleportData is written only by this service.
 local Players = game:GetService("Players")
@@ -50,6 +55,7 @@ export type Party = {
 	MaxPlayers: number, -- 1..Rules.MaxSize, never below #Members when set
 	StartAt: number, -- workspace:GetServerTimeNow() of the teleport; 0 = no countdown
 	Launched: boolean, -- countdown over: reserve / teleport running
+	Solo: boolean, -- quick play "Solo": disbanded instead of going back to the idle state
 }
 type Invite = { From: number, ExpiresAt: number }
 type Flight = { Options: TeleportOptions, Tries: number, PartyId: number }
@@ -241,6 +247,7 @@ function PartyService:Create(leader: number, platform: number): Party?
 		MaxPlayers = math.clamp(RULES.DefaultMaxPlayers, 1, RULES.MaxSize),
 		StartAt = 0,
 		Launched = false,
+		Solo = false,
 	}
 	self.Parties[party.Id] = party
 	self.PartyOf[leader] = party.Id
@@ -518,6 +525,11 @@ function PartyService:HandleStart(player: Player)
 			return
 		end
 	end
+	self:Begin(party)
+end
+
+-- Countdown, then Fire (checks already done by the caller).
+function PartyService:Begin(party: Party)
 	party.State = "Starting"
 	party.StartAt = workspace:GetServerTimeNow() + RULES.Countdown
 	self:Publish(party, false)
@@ -525,6 +537,26 @@ function PartyService:HandleStart(player: Player)
 	task.delay(RULES.Countdown, function()
 		self:Fire(party)
 	end)
+end
+
+-- Play button outside a squad: "Solo" = a squad of one started now; "Squad" = an open invite squad to set up.
+function PartyService:HandleQuickPlay(player: Player, mode: string)
+	const userId = player.UserId
+	if self.PartyOf[userId] ~= nil then
+		self:Notice(player, "AlreadyInParty", nil)
+		return
+	end
+	const party = self:Create(userId, 0)
+	if party == nil then
+		return
+	end
+	if mode == "Solo" then
+		party.Solo = true
+		party.MaxPlayers = 1
+		self:Begin(party)
+	else
+		self:Notice(player, "Created", nil)
+	end
 end
 
 -- Teleport ---------------------------------------------------------------------------------------------------------
@@ -567,6 +599,14 @@ function PartyService:Reopen(party: Party, notify: boolean)
 		if self.InFlight[userId] ~= nil then
 			return
 		end
+	end
+	if party.Solo then
+		-- a solo quick play is not a squad to keep: gone, and Play offers the choice again
+		if notify then
+			self:NoticeParty(party, "TeleportFailed", nil)
+		end
+		self:Disband(party)
+		return
 	end
 	party.State = idleState(party)
 	party.StartAt = 0
@@ -878,6 +918,11 @@ PartyService:OnInit(function(self)
 	net.PartyConfigure:onServer(function(data, player: Player)
 		if self:Gate(player) then
 			self:HandleConfigure(player, data.FriendsOnly == true, data.MaxPlayers)
+		end
+	end)
+	net.PartyQuickPlay:onServer(function(data, player: Player)
+		if self:Gate(player) then
+			self:HandleQuickPlay(player, if data.Mode == "Solo" then "Solo" else "Squad")
 		end
 	end)
 

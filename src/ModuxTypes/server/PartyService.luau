@@ -11,6 +11,7 @@ export type Party = {
 	MaxPlayers: number, -- 1..Rules.MaxSize, never below #Members when set
 	StartAt: number, -- workspace:GetServerTimeNow() of the teleport; 0 = no countdown
 	Launched: boolean, -- countdown over: reserve / teleport running
+	Solo: boolean, -- quick play "Solo": disbanded instead of going back to the idle state
 }
 type Invite = { From: number, ExpiresAt: number }
 type Flight = { Options: TeleportOptions, Tries: number, PartyId: number }
@@ -53,6 +54,8 @@ export type Public = {
 	HandleReady: (self: Public, player: Player, ready: boolean) -> (),
 	HandleConfigure: (self: Public, player: Player, friendsOnly: boolean, maxPlayers: number) -> (),
 	HandleStart: (self: Public, player: Player) -> (),
+	Begin: (self: Public, party: Party) -> (),
+	HandleQuickPlay: (self: Public, player: Player, mode: string) -> (),
 	LaunchData: (self: Public, party: Party) -> { [string]: any },
 	Fire: (self: Public, party: Party) -> (),
 	Reopen: (self: Public, party: Party, notify: boolean) -> (),

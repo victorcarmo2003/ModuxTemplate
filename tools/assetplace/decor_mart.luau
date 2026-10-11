@@ -125,7 +125,7 @@ local function label(on: BasePart, face: Enum.NormalId, text: string, color: Col
 	gui.Name = "DecorText"
 	gui.Face = face
 	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-	gui.PixelsPerStud = 60
+	gui.PixelsPerStud = 200
 	gui.LightInfluence = if glow then 0 else 0.6
 	gui.Brightness = if glow then 2 else 1
 	local t = Instance.new("TextLabel")
@@ -645,7 +645,7 @@ local function streetText(on: BasePart, text: string)
 		gui.Name = "Detail_Text"
 		gui.Face = face
 		gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-		gui.PixelsPerStud = 80
+		gui.PixelsPerStud = 200
 		gui.LightInfluence = 0.5
 		local t = Instance.new("TextLabel")
 		t.Size = UDim2.fromScale(0.94, 0.8)
@@ -762,7 +762,7 @@ function Decor.runDetails(force: boolean?): string
 			gui.Name = "Detail_OpenSign"
 			gui.Face = face
 			gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-			gui.PixelsPerStud = 100
+			gui.PixelsPerStud = 200
 			gui.LightInfluence = 0.3
 			for _, state in { "Open", "Closed" } do
 				local t = Instance.new("TextLabel")
@@ -828,7 +828,7 @@ function Decor.runDetails(force: boolean?): string
 					end
 					gui.Face = best
 					gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-					gui.PixelsPerStud = 80
+					gui.PixelsPerStud = 200
 					gui.LightInfluence = 0.4
 					local t = Instance.new("TextLabel")
 					t.Size = UDim2.fromScale(0.9, 0.78)

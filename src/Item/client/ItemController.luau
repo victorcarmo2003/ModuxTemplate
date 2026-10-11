@@ -60,7 +60,7 @@ const RING_SCALE = 1.6 -- ring diameter = widest footprint side x this
 const RING_MIN = 1.6
 const RING_MAX = 4
 const RING_STROKE = 0.12 -- stroke thickness as a fraction of the ring size (UIStroke is in pixels, see below)
-const RING_PIXELS = 64 -- SurfaceGui pixels per stud
+const RING_PIXELS = 200 -- SurfaceGui pixels per stud
 const RING_LIFT = 0.04 -- above the ground, avoids z-fighting
 const RING_PULSE_TIME = 1.2 -- seconds per half cycle ("pulsa devagar", AST-096)
 const RING_PULSE_MIN = 0.85 -- size factor at the low end of the pulse

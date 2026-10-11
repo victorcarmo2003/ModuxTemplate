@@ -5,6 +5,7 @@ local Content = require(ReplicatedStorage.shared.Content)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 local Route = require(ReplicatedStorage.shared.Cutscene.Route)
 
+type Scene = Content.Cutscene
 type Beat = Content.CutsceneBeat
 type TrafficHook = {
 	Hold: (self: any, reason: string, on: boolean) -> (),
@@ -40,7 +41,9 @@ export type Public = {
 	ConnectedCount: (self: Public) -> number,
 	VoteCount: (self: Public) -> number,
 	Needed: (self: Public) -> number,
+	Record: (self: Public) -> { Scene: string, StartedAt: number, Votes: number, Needed: number, Waiting: boolean },
 	Write: (self: Public) -> (),
+	SendSnapshot: (self: Public, player: Player) -> (),
 	TrafficHook: (self: Public) -> TrafficHook?,
 	HoldTraffic: (self: Public, on: boolean) -> (),
 	DressPoster: (self: Public) -> (),

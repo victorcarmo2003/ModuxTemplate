@@ -8,10 +8,12 @@ export type Public = {
 	Audience: Lync.Group,
 	ClientReady: SignalLib.Signal<Player>,
 	Ready: { [Player]: boolean },
+	ResyncWarned: boolean,
 	Running: boolean,
 	Setup: (self: Public) -> (),
 	IsReady: (self: Public, player: Player) -> boolean,
 	IsRunning: (self: Public) -> boolean,
+	Resync: (self: Public, player: Player) -> (),
 }
 
 return {}

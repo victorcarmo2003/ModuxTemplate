@@ -3118,7 +3118,7 @@ local function bindNoHelpCards(assets: Instance)
 				gui.Name = "NoHelpText"
 				gui.Face = Enum.NormalId.Front
 				gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-				gui.PixelsPerStud = 100
+				gui.PixelsPerStud = 200
 				gui.LightInfluence = 0.6
 				local label = Instance.new("TextLabel")
 				label.Size = UDim2.fromScale(0.86, 0.8)

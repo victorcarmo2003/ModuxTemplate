@@ -1,12 +1,16 @@
 --!strict
--- SquadSetup: the squad platform window (user request 2026-10-11, Provisional), cartoon kit (AST-091), mobile first.
--- Opens when the player steps on a lobby squad platform (LobbyController zone trigger), closes when they step off.
--- A LobbyWindow (560 x 300 at Scale 1):
---   left   the squad on this platform: `MaxPlayers` slots (head shot, name, "Leader" tag); empty slots faded
+-- SquadSetup: the squad setup window (user request 2026-10-11, Provisional), cartoon kit (AST-091), mobile first.
+-- Opens when the player steps on a lobby squad platform (LobbyController zone trigger), closes when they step off;
+-- also opened by the lobby Play button for the player's own squad ("Create Squad" or already in one).
+-- A LobbyWindow (560 x 320 at Scale 1):
+--   left   the squad: `MaxPlayers` slots (head shot, name, "Leader" / "Ready" / "Not ready" tag); empty slots faded
 --   right  Friends only On / Off · Max players  -  n  +  (the leader changes them; the others only read them)
 --          Start (leader) or "Waiting for the leader..." (members); while starting: "Starting in n..."
---   foot   hint "Step off the platform to leave"
--- Pure: only props. The caller sends PartyConfigure / PartyStart and the server decides (Party set).
+--          invite squad (`Invite`): Ready / Not ready for the members (platform members are ready by standing there)
+--   foot   platform squad: hint "Step off the platform to leave"
+--          invite squad: Invite players (leader) · Leave · hint "Step on a free pad to take your squad there"
+-- Pure: only props. The caller sends PartyConfigure / PartyStart / PartyReady / PartyLeave and the server decides
+-- (Party set).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Theme)
@@ -23,6 +27,8 @@ export type Member = {
 	Name: string,
 	Leader: boolean,
 	Me: boolean,
+	-- invite squads: ready state shown on the slot; nil = no tag (platform members are ready by standing there)
+	Ready: boolean?,
 }
 
 type Slot = { Member: Member? }
@@ -44,12 +50,21 @@ export type Props = {
 	OnStart: () -> (),
 	OnClose: () -> (),
 	Scale: (() -> number)?,
+	-- invite squad (no platform): Ready for the members, Invite players / Leave in the foot. Default false.
+	Invite: (() -> boolean)?,
+	-- my ready state (invite squad members)
+	Ready: (() -> boolean)?,
+	OnReady: ((ready: boolean) -> ())?,
+	-- open the invite list (the leader)
+	OnInvite: (() -> ())?,
+	OnLeave: (() -> ())?,
 }
 
 const WIDTH = 560
-const HEIGHT = 300
+const HEIGHT = 320
 const LEFT = 250
 const GAP = 12
+const FOOT = 44
 const SLOT = 42
 const SLOT_GAP = 4
 const BUTTON = 44
@@ -67,6 +82,12 @@ return function(props: Props): Frame
 	const editable = function(): boolean
 		return props.IsLeader() and not starting()
 	end
+	const inviteMode = function(): boolean
+		return props.Invite ~= nil and props.Invite()
+	end
+	const ready = function(): boolean
+		return props.Ready ~= nil and props.Ready()
+	end
 	const slots = function(): { Slot }
 		const list: { Slot } = {}
 		for _, member in props.Members() do
@@ -81,7 +102,7 @@ return function(props: Props): Frame
 
 	const slotList = create("Frame")({
 		Name = "Slots",
-		Size = UDim2.new(0, LEFT, 1, -28),
+		Size = UDim2.new(0, LEFT, 1, -(FOOT + 4)),
 		BackgroundTransparency = 1,
 		create("UIListLayout")({
 			FillDirection = Enum.FillDirection.Vertical,
@@ -146,13 +167,24 @@ return function(props: Props): Frame
 						AnchorPoint = Vector2.new(1, 0.5),
 						Position = UDim2.fromScale(1, 0.5),
 						TextSize = Theme.MinTextSize,
-						Color = Theme.Color.Green,
+						Color = function()
+							const m = member()
+							return if m and (m.Leader or m.Ready == true) then Theme.Color.Green else Theme.Color.Dark
+						end,
 						Stroke = 0,
 						Visible = function()
 							const m = member()
-							return m ~= nil and m.Leader
+							return m ~= nil and (m.Leader or m.Ready ~= nil)
 						end,
-						Text = "Leader",
+						Text = function()
+							const m = member()
+							if m == nil then
+								return ""
+							elseif m.Leader then
+								return "Leader"
+							end
+							return if m.Ready then "Ready" else "Not ready"
+						end,
 					}),
 				},
 			})
@@ -194,7 +226,7 @@ return function(props: Props): Frame
 		Name = "Settings",
 		AnchorPoint = Vector2.new(1, 0),
 		Position = UDim2.fromScale(1, 0),
-		Size = UDim2.new(1, -(LEFT + GAP), 1, -28),
+		Size = UDim2.new(1, -(LEFT + GAP), 1, -(FOOT + 4)),
 		BackgroundTransparency = 1,
 		create("UIListLayout")({
 			FillDirection = Enum.FillDirection.Vertical,
@@ -273,11 +305,33 @@ return function(props: Props): Frame
 			end,
 			OnActivated = props.OnStart,
 		}),
+		-- invite squad members: Ready toggle
+		CartoonButton({
+			Name = "Ready",
+			LayoutOrder = 4,
+			Size = UDim2.new(1, 0, 0, BUTTON),
+			TextSize = 20,
+			Outline = Theme.Outline.Thick,
+			Tone = function()
+				return if ready() then Theme.Tone.Mustard else Theme.Tone.Green
+			end,
+			Visible = function()
+				return inviteMode() and not props.IsLeader() and not starting()
+			end,
+			Text = function()
+				return if ready() then "Not ready" else "Ready"
+			end,
+			OnActivated = function()
+				if props.OnReady then
+					props.OnReady(not ready())
+				end
+			end,
+		}),
 		CartoonLabel({
 			Name = "Status",
-			LayoutOrder = 4,
-			Box = UDim2.new(1, 0, 0, BUTTON + 8),
-			TextSize = 20,
+			LayoutOrder = 5,
+			Box = UDim2.new(1, 0, 0, 36),
+			TextSize = 18,
 			Wrapped = true,
 			Color = function()
 				return if starting() then Theme.Color.Green else Theme.Color.Text
@@ -295,14 +349,75 @@ return function(props: Props): Frame
 		}),
 	})
 
-	const hint = CartoonLabel({
-		Name = "Hint",
+	const foot = create("Frame")({
+		Name = "Foot",
 		AnchorPoint = Vector2.new(0, 1),
 		Position = UDim2.fromScale(0, 1),
-		Box = UDim2.new(1, 0, 0, 22),
-		TextSize = Theme.MinTextSize,
-		Transparency = 0.25,
-		Text = "Step off the platform to leave",
+		Size = UDim2.new(1, 0, 0, FOOT),
+		BackgroundTransparency = 1,
+		create("UIListLayout")({
+			FillDirection = Enum.FillDirection.Horizontal,
+			VerticalAlignment = Enum.VerticalAlignment.Center,
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Padding = UDim.new(0, 8),
+		}),
+		CartoonButton({
+			Name = "Invite",
+			LayoutOrder = 1,
+			Size = UDim2.fromOffset(150, BUTTON),
+			TextSize = 18,
+			Outline = Theme.Outline.Thick,
+			Tone = Theme.Tone.Teal,
+			Visible = function()
+				return inviteMode() and props.IsLeader()
+			end,
+			Enabled = function()
+				return not starting()
+			end,
+			Text = "Invite players",
+			OnActivated = function()
+				if props.OnInvite then
+					props.OnInvite()
+				end
+			end,
+		}),
+		CartoonButton({
+			Name = "Leave",
+			LayoutOrder = 2,
+			Size = UDim2.fromOffset(96, BUTTON),
+			TextSize = 18,
+			Outline = Theme.Outline.Thick,
+			Tone = Theme.Tone.Slate,
+			Visible = inviteMode,
+			Enabled = function()
+				return not starting()
+			end,
+			Text = "Leave",
+			OnActivated = function()
+				if props.OnLeave then
+					props.OnLeave()
+				end
+			end,
+		}),
+		CartoonLabel({
+			Name = "Hint",
+			LayoutOrder = 3,
+			Box = function()
+				if not inviteMode() then
+					return UDim2.new(1, 0, 1, 0)
+				end
+				const used = 96 + 8 + (if props.IsLeader() then 150 + 8 else 0)
+				return UDim2.new(1, -used, 1, 0)
+			end,
+			TextSize = Theme.MinTextSize,
+			Wrapped = true,
+			Transparency = 0.25,
+			Text = function()
+				return if inviteMode()
+					then "Step on a free pad to take your squad there"
+					else "Step off the platform to leave"
+			end,
+		}),
 	})
 
 	return LobbyWindow({
@@ -316,7 +431,7 @@ return function(props: Props): Frame
 		Children = {
 			slotList,
 			settings,
-			hint,
+			foot,
 		},
 	})
 end

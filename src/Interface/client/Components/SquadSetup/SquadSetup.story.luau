@@ -1,7 +1,8 @@
 --!strict
 -- SquadSetup on a phone-sized frame (iPhone SE landscape, 667 x 375) or the whole viewport, with a fake server:
 -- Friends only / Max players answer after "Latency" s; Start runs a 5 s countdown and goes back (as in Studio).
--- "Leader" off shows the member view; "Members" sets how many stand on the platform.
+-- "Leader" off shows the member view; "Members" sets how many stand on the platform. "Invite" = an invite squad (Play ->
+-- Create Squad): Ready / Not ready tags, the members' Ready button, Invite players / Leave in the foot.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -18,6 +19,7 @@ type Controls = {
 	Leader: () -> boolean,
 	Members: () -> number,
 	Latency: () -> number,
+	Invite: () -> boolean,
 }
 
 const PEOPLE: { { UserId: number, Name: string } } = {
@@ -35,6 +37,7 @@ return UILabs.CreateVideStory({
 		Leader = true,
 		Members = UILabs.Slider(2, 1, 4, 1),
 		Latency = UILabs.Slider(0.3, 0, 3, 0.1),
+		Invite = false,
 	},
 }, function(props)
 	const controls: Controls = (props.controls :: any)
@@ -42,6 +45,7 @@ return UILabs.CreateVideStory({
 	const maxPlayers = source(4)
 	const startAt = source(0)
 	const now = source(os.clock())
+	const ready = source(false)
 
 	const threads: { thread } = {}
 	local alive = true
@@ -89,11 +93,13 @@ return UILabs.CreateVideStory({
 				const leader = controls.Leader()
 				for index = 1, math.floor(controls.Members()) do
 					const person = PEOPLE[index]
+					const me = index == (if leader then 1 else 2)
 					table.insert(list, {
 						UserId = person.UserId,
-						Name = if index == (if leader then 1 else 2) then `{person.Name} (you)` else person.Name,
+						Name = if me then `{person.Name} (you)` else person.Name,
 						Leader = index == 1,
-						Me = index == (if leader then 1 else 2),
+						Me = me,
+						Ready = if controls.Invite() then (if me then ready() else index % 2 == 1) else nil,
 					})
 				end
 				return list
@@ -137,6 +143,19 @@ return UILabs.CreateVideStory({
 				print("[SquadSetup story] close")
 			end,
 			Scale = controls.Scale,
+			Invite = controls.Invite,
+			Ready = ready,
+			OnReady = function(on: boolean)
+				later(function()
+					ready(on)
+				end)
+			end,
+			OnInvite = function()
+				print("[SquadSetup story] invite players")
+			end,
+			OnLeave = function()
+				print("[SquadSetup story] leave")
+			end,
 		}),
 	})
 end)

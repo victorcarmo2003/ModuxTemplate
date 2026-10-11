@@ -16,6 +16,8 @@ processa recibo (`ShopService`).
 **Versão 5.6, 2026-10-11 (pedido do usuário, Provisório):** plataformas de squad (§16.6): set `Party` ganha
 `Platform`, `FriendsOnly`, `MaxPlayers`, `StartAt` e o estado `Configuring`; packet novo `PartyConfigure`; avisos
 `FriendsOnly`, `Configured`; `PartyStart` passa a ter contagem de 5 s.
+**Versão 5.7, 2026-10-11 (pedido do usuário, Provisório):** botão Play do lobby com escolha (§16.7): packet novo
+`PartyQuickPlay { Mode = "Solo" | "Squad" }`; squad "Solo" de 1 começa já e some ao voltar ao estado ocioso.
 **Versão 5.2, 2026-10-10 (DEC-221):** set `Hides` sai; janela do trailer = atributo `Shutter` no `Model` do veículo
 (§13.6, T61); `Actions` perde `hide`/`get_up` e ganha `shutter_toggle`; `Notices` troca `hide_taken` por `shutter_closed`.
 Versão 4, 2026-10-10 (**TASK-001**: estado DEC-140 a DEC-201, núcleo da onda 1). Versão anterior: 3.1, 2026-10-08.
@@ -292,7 +294,7 @@ Customers = Lync.replicate(Lync.struct({
 ### 3.7 `Upgrades` (id = `Content.Upgrades.IndexOf[key]`)
 
 ```lua
-Upgrades = Lync.replicate(Lync.struct({ Level = Lync.int(0, 9) }))
+Upgrades = Lync.replicate(Lync.struct({ Level = Lync.int(0, 255) })) -- valor real 0..9; fio de 8 bits por causa do limite de keyframe do Lync 4.0.2 (comentário em src/Libs/Net)
 ```
 
 | | |
@@ -638,7 +640,7 @@ return Lync.define("game", {
 	Stock = Lync.replicate(Lync.struct({ Amount = Lync.int(0, 999), Capacity = Lync.int(0, 999), Blocked = Lync.bool() })),
 	Stations = Lync.replicate(Lync.struct({ --[[ §3.5 ]] })),
 	Customers = Lync.replicate(Lync.struct({ --[[ §3.6 ]] })),
-	Upgrades = Lync.replicate(Lync.struct({ Level = Lync.int(0, 9) })),
+	Upgrades = Lync.replicate(Lync.struct({ Level = Lync.int(0, 255) })), -- 0..9 real (§3.7)
 
 	-- packets (onda 1)
 	Interact = Lync.packet(Lync.struct({ --[[ §4.1 ]] })),
@@ -933,6 +935,11 @@ segura a cadeia; `Scene = "none"` nesse meio-tempo) e há um packet novo:
 | Entrada | Direção | Schema | Escritor → leitor | Taxa |
 |---|---|---|---|---|
 | `ClientReady` | packet c → s | `Lync.empty()` | `LoadingController` → `CutsceneService` | 1 por join |
+| `CutsceneSnapshot` | packet s → `Audience` / jogador | mesmo struct do record `Cutscene` | `CutsceneService` → `CutsceneController` | a cada escrita do set + resposta ao `ClientReady` |
+
+`CutsceneSnapshot` é fallback (debugger 2026-10-11): o client só o usa enquanto o set `Cutscene` não tem o record 1
+(backlog perdido como `drop.unready`; ver README, "Um aviso que nao e teu"). O reparo geral é o
+`NetService:Resync(player)` no `Ready`, que reenvia todos os sets àquele jogador.
 
 O `LoadingController` (tela de carregamento: jogo carregado, controllers iniciados, kit da crew, sons/imagens da
 intro e falas TTS da intro) manda `ClientReady`; a cadeia só começa quando todo participante conectado mandou, ou
@@ -1171,6 +1178,7 @@ Party = Lync.replicate(Lync.struct({
 | `PartyReady` | `{ Ready }` | membro não-líder, `Forming` | set / `NotInParty`, `Busy` |
 | `PartyStart` | — | líder, `Forming`/`Configuring`, todos os outros prontos | set `Starting` + `StartAt` + `Starting` à squad → `Rules.Countdown` s (5) depois, teleporte (`TeleportRetry` a cada nova tentativa; `TeleportFailed` se todas falharem); no Studio a contagem roda e termina em `StudioNoTeleport` (volta ao estado de antes) / `NotLeader`, `Busy`, `NotAllReady{UserId}` |
 | `PartyConfigure` | `{ FriendsOnly, MaxPlayers }` | líder, não `Starting`; `MaxPlayers` preso a `[max(#Members, 1), 4]` | set + `Configured` aos outros membros / `NotInParty`, `NotLeader`, `Busy` |
+| `PartyQuickPlay` | `{ Mode }` (`"Solo"`/`"Squad"`) | fora de squad (§16.7) | `Solo`: set (`Platform 0`, `MaxPlayers 1`) já em `Starting` + `Starting`; `Squad`: set `Forming` + `Created` / `AlreadyInParty` |
 
 ### 16.3 Avisos (s → jogador)
 
@@ -1240,3 +1248,23 @@ PartyConfigure = Lync.packet(Lync.struct({
 
 Orçamento: o set `Party` ganha 4 campos pequenos por squad; a detecção é só no servidor (≤ N jogadores × 4 círculos a
 6–7 Hz). Irrelevante.
+
+### 16.7 Play com escolha: `PartyQuickPlay` (v5.7, pedido do usuário 2026-10-11; **Provisório**)
+
+O botão Play do lobby, fora de squad, abre a escolha **Play Solo** / **Create Squad** (`PlayChoice`). Em squad, o Play
+abre a janela de configuração da própria squad (`SquadSetup`: Start do líder, Ready dos membros de squad de convite).
+
+```lua
+PartyQuickPlay = Lync.packet(Lync.struct({
+	Mode = Lync.enum({ "Solo", "Squad" }),
+})),
+```
+
+| Mode | Servidor (`PartyService:HandleQuickPlay`) |
+|---|---|
+| `Solo` | squad nova sem plataforma (`Platform 0`, `MaxPlayers 1`), já em `Starting` com `StartAt` (mesma contagem de `Rules.Countdown` s e mesmo teleporte do `PartyStart`). Aviso `Starting` (sem `Created`). Ao voltar ao estado ocioso (Studio → `StudioNoTeleport`; todas as tentativas falharam → `TeleportFailed`) a squad é **desfeita** em vez de ficar `Forming`: o Play volta a oferecer a escolha |
+| `Squad` | squad de convite aberta (`Platform 0`, `State "Forming"`, opções padrão) + `Created`. O client abre a configuração (Friends only, Max players, Invite players, Leave, Start) sem andar até plataforma; convites como no §16.2; o líder ainda pode levá-la a uma plataforma livre pisando nela (§16.6) |
+
+Validação: rate e papel comuns (§16); já em squad = `AlreadyInParty`. `Solo` é campo só do servidor (não viaja no set).
+Client: botões ficam desligados até o registro da squad chegar no set (ou 6 s / `AlreadyInParty` / `TooFast` /
+`WrongServer`). Orçamento: um evento por clique.

@@ -252,7 +252,7 @@ local function surfaceText(p: Instance, face: Enum.NormalId, text: string, fg: C
 	local g = Instance.new("SurfaceGui")
 	g.Face = face
 	g.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-	g.PixelsPerStud = 30
+	g.PixelsPerStud = 200
 	g.LightInfluence = 0
 	local t = Instance.new("TextLabel")
 	t.Size = UDim2.fromScale(1, 1)

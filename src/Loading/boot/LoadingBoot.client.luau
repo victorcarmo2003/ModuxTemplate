@@ -93,6 +93,17 @@ coverStroke.Thickness = 4
 coverStroke.LineJoinMode = Enum.LineJoinMode.Round
 coverStroke.Parent = coverTitle
 
+-- free cursor while loading: a visible Modal button overrides the first-person / POV mouse lock; destroyed on lift
+const cursor = Instance.new("TextButton")
+cursor.Name = "FreeCursor"
+cursor.Modal = true
+cursor.Text = ""
+cursor.BackgroundTransparency = 1
+cursor.AutoButtonColor = false
+cursor.Selectable = false
+cursor.Size = UDim2.fromScale(0, 0)
+cursor.Parent = gui
+
 gui.Parent = playerGui
 
 local lifted = false
@@ -105,6 +116,7 @@ local function finish()
 		return
 	end
 	lifted = true
+	cursor:Destroy()
 	const setShown = shown
 	if setShown ~= nil then
 		setShown(false)
