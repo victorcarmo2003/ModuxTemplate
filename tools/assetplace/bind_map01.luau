@@ -226,7 +226,7 @@ local POINTS = {
 	{ id = "Q5", x = 31, z = 29, floor = 0.4, face = EAST, node = true },
 	-- D1 (user 2026-10-11): moved from B1's west wall (next to the cart) to B1's Ninth front, wall Z 32, door X 88.6.
 	-- Point 1 stud out, on the sidewalk, so an NPC never spawns inside the wall. Faces north (out of the door).
-	{ id = "D1", x = 88.6, z = 31, floor = 0.45, face = NORTH, node = true, spawn = "customer,actor", despawn = true, door = "D1" },
+	{ id = "D1", x = 88.6, z = 30.3, floor = 0.45, face = NORTH, node = true, spawn = "customer,actor", despawn = true, door = "D1" },
 	-- SP-A (MAP-01 §9.8): moved from (30, -104) to the strip north of the bank-rear fill, in its shadow as seen from
 	-- the Pad AND from the Mart door / SS (at -104 the Mart door saw it down the Juniper). Beyond BAR-N.
 	{ id = "SP-A", x = 29, z = -92, floor = 0.24, face = WEST, node = true, spawn = "customer,pedestrian,actor", despawn = true },
@@ -2783,6 +2783,43 @@ end
 -- Entry point
 ---------------------------------------------------------------------------------------------------
 
+-- NO HELP WANTED cards (AST-033_NoHelpSign): the mesh is a blank card; the text is a SurfaceGui on its front face
+-- (AST-072 text pass). Tag NoHelpWantedSign: the intro cutscene looks at them (first stop, CS-2).
+local function bindNoHelpCards(assets: Instance)
+	local n = 0
+	for _, m in assets:GetDescendants() do
+		if m:GetAttribute("Asset") == "AST-033_NoHelpSign" and m:IsA("Model") then
+			local card = m:FindFirstChildWhichIsA("BasePart", true)
+			if card then
+				local old = card:FindFirstChild("NoHelpText")
+				if old then
+					old:Destroy()
+				end
+				local gui = Instance.new("SurfaceGui")
+				gui.Name = "NoHelpText"
+				gui.Face = Enum.NormalId.Front
+				gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+				gui.PixelsPerStud = 100
+				gui.LightInfluence = 0.6
+				local label = Instance.new("TextLabel")
+				label.Size = UDim2.fromScale(0.86, 0.8)
+				label.AnchorPoint = Vector2.new(0.5, 0.5)
+				label.Position = UDim2.fromScale(0.5, 0.52)
+				label.BackgroundTransparency = 1
+				label.FontFace = Font.fromEnum(Enum.Font.FredokaOne)
+				label.Text = "NO HELP\nWANTED"
+				label.TextScaled = true
+				label.TextColor3 = Color3.fromRGB(205, 45, 55)
+				label.Parent = gui
+				gui.Parent = card
+				CollectionService:AddTag(m, "NoHelpWantedSign")
+				n += 1
+			end
+		end
+	end
+	log(if n > 0 then "ok" else "warn", ("NoHelp: %d NO HELP WANTED card(s) lettered and tagged NoHelpWantedSign"):format(n))
+end
+
 function Bind.run(opts: AnchorOpts?): string
 	local o: AnchorOpts = opts or {}
 	table.clear(report)
@@ -2822,6 +2859,7 @@ function Bind.run(opts: AnchorOpts?): string
 	bindStreetBins(assets, o)
 	bindStreetLights(assets)
 	bindAutoDoors(assets)
+	bindNoHelpCards(assets)
 
 	local cartPose = if cart then mapPivot(cart) else CART_POSE
 	if (cartPose.Position - CART_POSE.Position).Magnitude > 0.05 then
