@@ -35,16 +35,30 @@ export type Call = {
 }
 
 const SPEAKER = "walt" -- Content.Cutscenes.Rules.Voices key
--- PROVISIONAL: reading time of a line (TTS at Speed 0.95 says ~2.7 words/s)
+-- PROVISIONAL: reading time of a line (TTS at Speed 0.9 says ~2.6 words/s)
 const BASE_TIME = 0.7
 const WORD_TIME = 0.36
 const MIN_TIME = 1.4
 const GAP = 0.25 -- s of silence between two lines
 const LINGER = 4 -- s the last line stays on screen after it was said
-const HOLD = 3 -- s a line waits for its voice before it goes on as a subtitle only
+const HOLD = 4 -- s a line waits for its voice before it goes on as a subtitle only
+const MAX_WARNINGS = 3 -- subtitle-only warnings per session (one per distinct reason)
 const TAIL = 0.3 -- s after the voice ends before the next line
 
 const Call = {}
+
+const warned: { [string]: boolean } = {}
+local warnings = 0
+
+-- One warning per kind of reason (the status, and at most MAX_WARNINGS) when a line of Walt goes on without its voice
+local function warnSilent(kind: string, reason: string, text: string)
+	if warned[kind] or warnings >= MAX_WARNINGS then
+		return
+	end
+	warned[kind] = true
+	warnings += 1
+	warn(`[TutorialCall] Walt's line "{text}" goes on as a subtitle only: {reason}`)
+end
 
 local function beat(text: string): Content.CutsceneBeat
 	return { At = 0, Kind = "Line", Target = SPEAKER, Speaker = SPEAKER, Text = text }
@@ -131,7 +145,15 @@ function Call.new(show: (text: string?) -> (), volume: () -> number): Call
 					end
 				end
 				table.remove(queue, 1)
+				const waited = if waitFrom > 0 then now - waitFrom else 0
 				waitFrom = 0
+				if status ~= "Loaded" then
+					local reason = speech.Reason(line)
+					if status == "Queued" or status == "Loading" then
+						reason = `waited {string.format("%.1f", waited)} s (HOLD {HOLD} s), {reason}`
+					end
+					warnSilent(status, if reason ~= "" then reason else status, text)
+				end
 				local time = readTime(text)
 				if status == "Loaded" then
 					const length = speech.Length(line)

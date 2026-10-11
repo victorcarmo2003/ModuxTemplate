@@ -37,7 +37,8 @@
 	Highlight on the exact piece of the step: the pot, the grill, the bun crate, the board, the customer; and a 3D
 	arrow bobbing over it), TutorialPointer on the screen edge while the target is off screen, and Spotlight on the
 	money pill for the UI step. From far away (camera > ARROW_FAR studs from the target) the 3D arrow gets small, so a
-	screen-sized bouncing billboard arrow (TutorialArrow, scaled like the HUD) hangs over the same spot. Pieces without a
+	screen-sized bouncing billboard arrow (TutorialArrow, scaled like the HUD) hangs over the same spot; a step with
+	AlwaysArrow (the OPEN sign, playtest 2026-10-11) shows it at any distance. Pieces without a
 	visible part of their own (the OPEN sign's anchor on its stand, an invisible Mart shelf anchor) mark the small model
 	around them or the nearest visible piece (highlightOf). A step completed (the panel number goes up) turns the chip Green with a check for
 	CHECK_TIME s and plays `prompt_done`.
@@ -849,7 +850,10 @@ function TutorialController:UpdatePointer()
 	const margin = EDGE_MARGIN * Vide.untrack(self.Scale)
 	const viewport = camera.ViewportSize
 	const point, onScreen = camera:WorldToViewportPoint(position)
-	self:SetFar(onScreen and (position - camera.CFrame.Position).Magnitude > ARROW_FAR)
+	-- steps with AlwaysArrow (the OPEN sign) keep the billboard arrow up close too
+	const step = Steps.ByKey[Vide.untrack(self.StepKey)]
+	const always = step ~= nil and step.AlwaysArrow == true
+	self:SetFar(onScreen and (always or (position - camera.CFrame.Position).Magnitude > ARROW_FAR))
 	const centre = viewport / 2
 	local delta = Vector2.new(point.X, point.Y) - centre
 	if point.Z < 0 then

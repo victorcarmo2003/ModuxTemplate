@@ -55,7 +55,7 @@ export type Context = {
 
 const SPAWN_LIFT = Vector3.new(0, 3, 0) -- architecture.md §18.5
 const FLYER_HEIGHT = 4.5 -- studs above the post base (eye height, style guide)
-const FLIP_TIME = 18 -- s on screen: shot 7 (48.9 s) to the hang-up after Walt's last line (66.9 s; the cart focus waits)
+const FLIP_TIME = 19 -- s on screen: shot 7 (48.9 s) to the hang-up after Walt's last line (67.9 s; the cart focus waits)
 const HANGUP_LEAD = 0.15 -- s before the flip goes away: the hang-up click
 const FLIP_OFFSET = CFrame.new(0.55, -0.8, -1.7) * CFrame.Angles(math.rad(20), math.rad(-15), 0)
 const WALT_SPEED = 3 -- studs/s, hunched with a cane

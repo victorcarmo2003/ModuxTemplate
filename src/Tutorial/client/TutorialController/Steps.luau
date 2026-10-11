@@ -20,6 +20,8 @@
 -- The order of the cooking steps is decided live from the replicated state (TutorialController:Decide), never stored.
 -- Say lines are fixed strings (no "{item}"): the voice is generated ahead (Prepare), a live text could not be. The
 -- tutorial order is fixed (Rules.Order = ketchup), so Walt names it.
+-- Punctuation of the Say / Done / greeting lines shapes Walt's voice (Speech speaks sentence by sentence: a pause after
+-- . ? ! and a longer one after "..."); fewer "!" = a calmer tone (user feedback 2026-10-11: "too shouted").
 
 export type Step = {
 	Key: string,
@@ -34,6 +36,9 @@ export type Step = {
 	-- (waiting rows, talk steps)
 	Remind: string?,
 	Talk: boolean?,
+	-- the screen-sized arrow over the target shows at any distance (not only from far away); the OPEN sign (playtest
+	-- 2026-10-11: up close the player did not see which piece to press)
+	AlwaysArrow: boolean?,
 }
 
 const TOTAL = 13
@@ -68,8 +73,8 @@ const LIST: { Step } = {
 		Text = "Take the order",
 		Hint = 'Press "Take Order" on the customer.',
 		Action = "take_order",
-		Say = { "Go on, take their order." },
-		Done = "Hot dog with ketchup. Easy.",
+		Say = { "Go on... take their order." },
+		Done = "Hot dog with ketchup... Easy.",
 		Remind = "They're waiting. Take the order!",
 	},
 	{
@@ -79,7 +84,7 @@ const LIST: { Step } = {
 		Hint = 'Grab one at the cooler: press "Grill".',
 		Action = "grill_place",
 		Say = { "Grab a sausage from the cooler.", "It goes right on the grill." },
-		Done = "Nice!",
+		Done = "Nice.",
 		Remind = "Sausage on the grill. Follow the arrow.",
 	},
 	{
@@ -99,7 +104,7 @@ const LIST: { Step } = {
 		Text = "Wait for the sausage",
 		Hint = 'It gets a "Collect" button when ready.',
 		Action = "grill_collect",
-		Say = { "Watch the grill. When the bar fills up, it's ready." },
+		Say = { "Watch the grill. When the bar fills up... it's ready." },
 	},
 	{
 		Key = "collect",
@@ -107,8 +112,8 @@ const LIST: { Step } = {
 		Text = "Collect the sausage",
 		Hint = 'Press "Collect" on the grill.',
 		Action = "grill_collect",
-		Say = { "It's ready! Grab it off the grill." },
-		Done = "Got it!",
+		Say = { "It's ready. Grab it off the grill." },
+		Done = "Got it.",
 		Remind = "It's ready! Collect it off the grill.",
 	},
 	{
@@ -127,7 +132,7 @@ const LIST: { Step } = {
 		Text = "Add {item}",
 		Hint = 'Hold "Add" at the topping. The order is on the card, top left.',
 		Action = "topping_add",
-		Say = { "They want ketchup. Go add some.", "Only what they asked. Nothing extra." },
+		Say = { "They want ketchup. Go add some.", "Only what they asked... nothing extra." },
 		Done = "Perfect.",
 		Remind = "Ketchup! Hold Add at the ketchup.",
 	},
@@ -137,7 +142,7 @@ const LIST: { Step } = {
 		Text = "Throw it away",
 		Hint = "That's not what they asked. Hold \"Throw Away\" at the bin, then make a new one.",
 		Action = "discard",
-		Say = { "Whoa, that's not what they ordered.", "Toss it in the bin and make a new one." },
+		Say = { "Whoa... that's not what they ordered.", "Toss it in the bin and make a new one." },
 		Remind = "Toss it. Hold Throw Away at the bin.",
 	},
 	{
@@ -147,7 +152,8 @@ const LIST: { Step } = {
 		Hint = 'You can\'t sell yet. Press "Open Shop" at the sign.',
 		Action = "open_sign",
 		Say = { "Flip the sign to open the shop first." },
-		Done = "We're open!",
+		Done = "We're open.",
+		AlwaysArrow = true,
 		Remind = "Shop's closed! Press Open Shop at the sign.",
 	},
 	{
@@ -156,7 +162,7 @@ const LIST: { Step } = {
 		Text = "Serve the hot dog",
 		Hint = 'Press "Serve" on the customer.',
 		Action = "serve",
-		Say = { "That's what they wanted. Now serve it!" },
+		Say = { "That's what they wanted. Now serve it." },
 		Remind = "Hand it over. Press Serve on them.",
 	},
 	{
@@ -175,9 +181,9 @@ const LIST: { Step } = {
 		Hint = "Ninth Street Mart, across the street. Look both ways!",
 		Action = nil,
 		Say = {
-			"Uh-oh. That was your last bun.",
+			"Uh-oh... that was your last bun.",
 			"Head to the Mart, across the street.",
-			"Look both ways! These drivers don't brake.",
+			"Look both ways... These drivers don't brake.",
 		},
 		Done = "That's the place.",
 		Remind = "Mart's across the street. Follow the arrow.",
@@ -221,7 +227,7 @@ const LIST: { Step } = {
 		Say = {
 			"Running low on stuff? The Mart's across the street.",
 			"Buy a package, bring it back and restock.",
-			"Look both ways! These drivers don't brake.",
+			"Look both ways... These drivers don't brake.",
 		},
 		Talk = true,
 	},
@@ -234,11 +240,11 @@ const TALKS: { string } = { "money", "mart" }
 const SHOPPING: { string } = { "mart_go", "mart_buy", "mart_back", "restock" }
 
 -- Walt when the call is answered (before the first step line)
-const GREETING: { string } = { "Morning, Rookie! Walt here.", "I'll stay on the line and walk you through it." }
+const GREETING: { string } = { "Morning, Rookie. Walt here.", "I'll stay on the line... and walk you through it." }
 -- after the last talk step; the server hangs up after BossCallRules.Tutorial.Goodbye s (the click)
-const GOODBYE: { string } = { "That's the whole job. You got this, Rookie.", "Call me if..." }
+const GOODBYE: { string } = { "That's the whole job... You got this, Rookie.", "Call me if..." }
 -- the player skipped the tutorial during the call
-const SKIP_GOODBYE: { string } = { "Alright, you know your way around.", "I'll let you work. Call me if you need me." }
+const SKIP_GOODBYE: { string } = { "Alright... you know your way around.", "I'll let you work. Call me if you need me." }
 
 const ByKey: { [string]: Step } = {}
 const IndexOf: { [string]: number } = {}

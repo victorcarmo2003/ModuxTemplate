@@ -202,7 +202,8 @@ const rules: Rules = {
 		Fallback = "CS-2",
 	},
 	Voices = {
-		walt = { VoiceId = "1", Speed = 0.95, Volume = 1 },
+		-- user feedback 2026-10-11: a calmer, slower Walt (was 0.95)
+		walt = { VoiceId = "1", Speed = 0.9, Volume = 1 },
 		crew = { VoiceId = "2", Speed = 1.05, Volume = 0.9 },
 	},
 	Cars = {
@@ -291,19 +292,22 @@ const scenes = Table.new({
 			crew(47.5, `{PHONE}...`),
 			{ At = 47.6, Kind = "Prompt", Target = "Phone", Text = `Call {PHONE}` },
 			{ At = 48.9, Kind = "Actor", Target = "FlipPhone" }, -- slot 1 only, already open (AST-038)
-			walt(49.4, "Bramble's Corner Dogs! Walt speaking."),
-			walt(52, "The flyer? Huh. Nobody's called about that one in years.", "Solo"),
-			walt(52, "The flyer? All of you? Huh. Nobody's called in years.", "Party"),
-			walt(54.8, "But you noticed it. That counts for a lot.", "Solo"),
-			walt(54.8, "You all noticed it. That counts for a lot. Heh.", "Party"),
-			walt(57.4, "Can you start today? Great. Wonderful."),
-			walt(59.8, "The cart's right on the corner. Ninth and Juniper."),
-			walt(62.3, "Keys are under the mustard. See you around, Rookie."),
+			-- user feedback 2026-10-11 (pauses, calmer tone): the voice speaks sentence by sentence with a pause after
+			-- . ? ! and a longer one after "..." (Speech.Pieces), so the lines are spaced for those pauses and the
+			-- hang-up (Actors FLIP_TIME) waits for the last one
+			walt(49.4, "Bramble's Corner Dogs. Walt speaking."),
+			walt(51.8, "The flyer? Huh. Nobody's called about that one in years.", "Solo"),
+			walt(51.8, "The flyer? All of you? Huh. Nobody's called in years.", "Party"),
+			walt(55.8, "But you noticed it. That counts for a lot.", "Solo"),
+			walt(55.8, "You all noticed it. That counts for a lot. Heh.", "Party"),
+			walt(59.2, "Can you start today? ... Great."),
+			walt(61.8, "The cart's right on the corner. Ninth and Juniper."),
 			{ At = 63.4, Kind = "Actor", Target = "CarCorner" }, -- street life on the Ninth, no camera focus
+			walt(64.8, "Keys are under the mustard. See you around, Rookie."),
 			-- Beat 5 (user feedback 2026-10-11: the view left the phone while Walt still talked): the focus stays on
-			-- the phone/poster through the whole call; the flip closes at 66.9 (Actors FLIP_TIME, hang-up click), a
+			-- the phone/poster through the whole call; the flip closes at 67.9 (Actors FLIP_TIME, hang-up click), a
 			-- breath, then everyone turns to the cart (CS-7, eased) and holds on it; fade out; the game fades in after
-			focus(67.8, "CART", 55),
+			focus(68.6, "CART", 55),
 			{ At = 71.2, Kind = "Fade", Target = "Out" },
 		},
 	},
