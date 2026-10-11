@@ -1,7 +1,9 @@
 --!strict
 -- mart_sign_blink (< 20; script.md §8, AST-028 `Sign_Open24`, sound-list.md SFX-133): the Mart's "OPEN 24 HOURS"
--- (the safe spot, "it never goes out") blinks ONCE on this client. Only when the sign is in view. Dims the neon
--- tubes and `Light_Sign` locally (Context.Dim) and restores; the neon click `neon_click` has no key yet (Q-168).
+-- (the safe spot, "it never goes out") fails on this client. Only when the sign is in view. The neon flickers in
+-- sync with `neon_click` (NeonFlicking, 18 s): Context.NeonSync reads the Sound's PlaybackLoudness every frame and
+-- puts the tubes and `Light_Sign` out in the quiet stretches, back on the peaks (user request 2026-10-10); the
+-- original look returns at the end. With no Sound (silent key, voice cap) it blinks ONCE (Context.Dim, OFF_TIME).
 local Workspace = game:GetService("Workspace")
 local Context = require(script.Parent.Parent.Context)
 
@@ -12,6 +14,7 @@ const CONE = 50 -- degrees
 const RANGE = 250 -- studs
 const OFF_TIME = 0.4 -- s (sound-list: 0.4 s)
 const DIM = 0.95
+const SYNC_LIMIT = 20 -- s: longest sync (the clip is 18 s)
 const RESCAN = 15 -- s: the Workspace walk is cached (rolls are rare, but the map is big)
 
 local cached: { Instance } = {}
@@ -66,12 +69,20 @@ const MartSignBlink: Context.Effect = {
 		if sign == nil then
 			return
 		end
+		const at = Context.PositionOf(sign)
+		const sound = if at then env.Sound(KEY, at) else nil
+		if sound then
+			-- a cancelled run (sanity back up, night over) cuts the clip with the flicker
+			run:Cleanup(function()
+				if sound.Name == KEY and sound.IsPlaying then
+					sound:Stop()
+				end
+			end)
+			Context.NeonSync(parts, lights, sound, run, SYNC_LIMIT)
+			return
+		end
 		const restore = Context.Dim(parts, lights, DIM)
 		run:Cleanup(restore)
-		const at = Context.PositionOf(sign)
-		if at then
-			env.Sound(KEY, at)
-		end
 		run:Wait(OFF_TIME)
 	end,
 }

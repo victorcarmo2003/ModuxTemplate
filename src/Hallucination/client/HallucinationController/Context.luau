@@ -8,6 +8,7 @@
 --   Effect module contract: { CanRun: ((env) -> boolean)?, Play: (env, run) -> () }
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 export type PlayOptions = { Volume: number?, Speed: number?, Vary: number?, Scare: boolean? }
@@ -219,6 +220,77 @@ function Context.Dim(parts: { BasePart }, lights: { Light }, amount: number): ()
 			end
 		end
 	end
+end
+
+-- Neon in sync with its sound (user request 2026-10-10): every frame the `sound`'s PlaybackLoudness (client only, on a
+-- playing Sound) drives the neon: lit above NEON_ON, out below NEON_OFF (hysteresis, no chatter on the edge). Out =
+-- Material SmoothPlastic on the parts and Enabled = false on the lights. Returns when the sound stops, the run is
+-- cancelled or `limit` s passed; the original look is put back on exit (cleanup on the run too). A value that
+-- LightController rewrote meanwhile (its own switch) is left alone: only what this still owns is restored.
+-- PROVISIONAL thresholds (frontend-coder), calibrated against `neon_click` (NeonFlicking, 18 s).
+const NEON_ON = 40
+const NEON_OFF = 20
+
+function Context.NeonSync(parts: { BasePart }, lights: { Light }, sound: Sound, run: Run, limit: number)
+	const material: { [BasePart]: Enum.Material } = {}
+	const enabled: { [Light]: boolean } = {}
+	for _, part in parts do
+		material[part] = part.Material
+	end
+	for _, light in lights do
+		enabled[light] = light.Enabled
+	end
+	local lit = true
+	local function apply(on: boolean)
+		if on == lit then
+			return
+		end
+		lit = on
+		for part, original in material do
+			if part.Parent ~= nil then
+				part.Material = if on then original else Enum.Material.SmoothPlastic
+			end
+		end
+		for light, original in enabled do
+			if light.Parent ~= nil then
+				light.Enabled = if on then original else false
+			end
+		end
+	end
+	local restored = false
+	local function restore()
+		if restored then
+			return
+		end
+		restored = true
+		if lit then
+			return
+		end
+		-- only what still shows this effect's "out" look
+		for part, original in material do
+			if part.Parent ~= nil and part.Material == Enum.Material.SmoothPlastic then
+				part.Material = original
+			end
+		end
+		for light, original in enabled do
+			if light.Parent ~= nil and light.Enabled == false then
+				light.Enabled = original
+			end
+		end
+		lit = true
+	end
+	run:Cleanup(restore)
+	const started = os.clock()
+	while run:Alive() and sound.IsPlaying and sound.Parent ~= nil and os.clock() - started < limit do
+		const loudness = sound.PlaybackLoudness
+		if lit and loudness < NEON_OFF then
+			apply(false)
+		elseif not lit and loudness > NEON_ON then
+			apply(true)
+		end
+		RunService.RenderStepped:Wait()
+	end
+	restore()
 end
 
 -- Weighted pick ---------------------------------------------------------------------------------------------------

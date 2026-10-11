@@ -1,8 +1,10 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Motion = require(ReplicatedStorage.shared.Traffic.Motion)
+local VitalTypes = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.VitalController)
 
 export type Record = {
 	Route: number,
@@ -45,6 +47,7 @@ type Car = {
 	Parked: boolean,
 	NextFarAt: number,
 	CFrame: CFrame?,
+	Engine: Model?, -- model the `car_engine` loop is on (nil = silent)
 }
 type Wheel = {
 	Index: number, -- position in Car.Parts
@@ -53,11 +56,13 @@ type Wheel = {
 }
 
 export type Public = {
+	BoingAt: number,
 	Cars: { [number]: Car },
 	Count: Vide.Source<number>,
 	Folder: Folder?,
 	GetUpThread: thread?,
 	ImmuneUntil: number,
+	KnockSeen: { [number]: number },
 	MapReady: boolean,
 	Night: boolean,
 	PathRetryAt: { [string]: number },
@@ -67,6 +72,7 @@ export type Public = {
 	Container: (self: Public) -> Folder,
 	PathOf: (self: Public, route: number) -> Path?,
 	TakeKit: (self: Public, look: number) -> Kit,
+	SetEngine: (self: Public, car: Car, on: boolean) -> (),
 	ReleaseKit: (self: Public, kit: Kit) -> (),
 	CarMotion: (self: Public, car: Car, path: Path, now: number) -> (number, number),
 	Reanchor: (self: Public, car: Car) -> (),
@@ -78,6 +84,8 @@ export type Public = {
 	PredictHit: (self: Public, root: BasePart, carFront: Vector3, clock: number) -> (),
 	TestHit: (self: Public, car: Car, kit: Kit, pivot: CFrame, root: BasePart, clock: number) -> boolean,
 	Step: (self: Public, dt: number) -> (),
+	Engines: (self: Public, near: { Car }, distance: { [Car]: number }) -> (),
+	OnMembers: (self: Public, members: { [number]: VitalTypes.Member }) -> (),
 }
 
 return {}

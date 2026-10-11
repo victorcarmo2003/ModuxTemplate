@@ -22,6 +22,7 @@ export type Record = {
 export type Public = {
 	Cash: Vide.Source<number>,
 	Drawer: Vide.Source<number>,
+	DrawerClose: thread?,
 	Gui: Instance?,
 	Mounts: { [Instance]: Mount },
 	Pops: Vide.Source<{ DrawerValue.Pop }>,
@@ -33,6 +34,7 @@ export type Public = {
 	Pop: (self: Public, amount: number) -> (),
 	PopDone: (self: Public, pop: DrawerValue.Pop) -> (),
 	DrawerAnchor: (self: Public) -> Instance?,
+	OpenDrawer: (self: Public, anchor: Instance) -> (),
 	Chime: (self: Public, amount: number, result: string) -> (),
 	Draw: (self: Public, mount: Mount, adornee: Instance, offset: number) -> (),
 	Clear: (self: Public, mount: Mount) -> (),

@@ -33,6 +33,14 @@
 	The hit validation on the server tolerates `HitTolerance` studs (§8.2).
 
 	No input (the player never commands a car), no UI, never writes a set.
+
+Sound (user request 2026-10-10):
+  * `hit_boing` on the own character when the local hit is predicted (where CarHit is fired), and on another
+    member's character when its `Vitals.KnockedUntil` (VitalController.Members) moves forward (the visible knock).
+    A server knock of the own character with no local prediction (dev command) also boings, once.
+  * `car_engine` loop on each drawn car inside LOD_NEAR, ENGINE_MAX nearest at most (PROVISIONAL, frontend-coder:
+    keeps the SoundRules.MaxVoices pool from filling with engines); stopped when the car leaves LOD_NEAR, is
+    hidden/parked or goes back to the pool.
 ]]
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -45,6 +53,7 @@ local Content = require(ReplicatedStorage.shared.Content)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
 local Motion = require(ReplicatedStorage.shared.Traffic.Motion)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
+local VitalTypes = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.VitalController)
 
 -- Fields of a Traffic record (network.md §6.2; Look 1..32 since TASK-097)
 export type Record = {
@@ -98,6 +107,7 @@ type Car = {
 	Parked: boolean,
 	NextFarAt: number,
 	CFrame: CFrame?,
+	Engine: Model?, -- model the `car_engine` loop is on (nil = silent)
 }
 
 const PATH_TAG = "TrafficPath"
@@ -125,6 +135,10 @@ const SNAP_GAP = 40
 -- LOD (PROVISIONAL, frontend-coder): studs from the camera
 const LOD_NEAR = 160
 const LOD_FAR = 260
+const ENGINE_MAX = 3 -- `car_engine` loops at once (PROVISIONAL, frontend-coder)
+const ENGINE_KEY = "car_engine"
+const HIT_KEY = "hit_boing"
+const OWN_BOING_GRACE = 2 -- s: a server knock this soon after the local prediction already boinged
 const FAR_RATE = 15 -- Hz between LOD_NEAR and LOD_FAR
 
 -- Hit box: car Size (kit attribute) grown by the HumanoidRootPart half extents (R6 HRP 2 x 2 x 1)
@@ -390,7 +404,7 @@ end
 
 const TrafficController = Modux.Controller(
 	"TrafficController",
-	{ Require = { "RoundController", "VitalController" }, Priority = 680 }
+	{ Require = { "RoundController", "VitalController", "AudioController" }, Priority = 680 }
 )
 
 function TrafficController:Setup()
@@ -404,6 +418,10 @@ function TrafficController:Setup()
 	-- local hit prediction
 	self.ImmuneUntil = 0 :: number
 	self.GetUpThread = nil :: thread?
+	-- os.clock of the last local boing (prediction)
+	self.BoingAt = 0 :: number
+	-- last KnockedUntil seen per member (Vitals), to boing only when it moves forward
+	self.KnockSeen = {} :: { [number]: number }
 	-- Vide source other Controllers may read (e.g. TASK-118): number of cars on the street now
 	self.Count = Vide.source(0) :: Vide.Source<number>
 end
@@ -461,6 +479,24 @@ function TrafficController:TakeKit(look: number): Kit
 	return kit
 end
 
+-- `car_engine` loop on/off on the car's current model
+function TrafficController:SetEngine(car: Car, on: boolean)
+	const kit = car.Kit
+	const model = if on and kit then kit.Model else nil
+	if car.Engine == model then
+		return
+	end
+	const audio = self.Dependencies.AudioController
+	const previous = car.Engine
+	if previous then
+		audio:Loop(ENGINE_KEY, previous, false)
+	end
+	car.Engine = model
+	if model then
+		audio:Loop(ENGINE_KEY, model, true)
+	end
+end
+
 function TrafficController:ReleaseKit(kit: Kit)
 	kit.Model.Parent = nil
 	local pool = self.Pool[kit.Look]
@@ -514,6 +550,7 @@ function TrafficController:Apply(id: number, record: Record)
 			Parked = true,
 			NextFarAt = 0,
 			CFrame = nil,
+			Engine = nil,
 		}
 		self.Cars[id] = fresh
 		self:Reanchor(fresh)
@@ -524,6 +561,7 @@ function TrafficController:Apply(id: number, record: Record)
 	const shown = car.Dist -- already includes the running blend
 	if not sameCar then
 		-- slot reused by another car: fresh look, fresh hit
+		self:SetEngine(car, false)
 		if car.Kit then
 			self:ReleaseKit(car.Kit)
 			car.Kit = nil
@@ -552,6 +590,7 @@ function TrafficController:Remove(id: number)
 		return
 	end
 	self.Cars[id] = nil
+	self:SetEngine(car, false)
 	if car.Kit then
 		self:ReleaseKit(car.Kit)
 	end
@@ -645,6 +684,8 @@ function TrafficController:TestHit(car: Car, kit: Kit, pivot: CFrame, root: Base
 	end
 	car.Hit = true
 	self:PredictHit(root, pivot.LookVector, clock)
+	self.BoingAt = clock
+	self.Dependencies.AudioController:Play(HIT_KEY, root)
 	self.Libs.Net.CarHit:fireServer({ Car = car.Id })
 	return true
 end
@@ -658,6 +699,9 @@ function TrafficController:Step(dt: number)
 	const camera = Workspace.CurrentCamera
 	const eye = if camera then camera.CFrame.Position else Vector3.zero
 	local root = self:OwnRoot(clock)
+	-- cars inside LOD_NEAR this frame and their camera distance (engine loops go to the nearest)
+	const near: { Car } = {}
+	const nearDistance: { [Car]: number } = {}
 	for _, car in self.Cars do
 		if car.Path == nil then
 			car.Path = self:PathOf(car.Record.Route)
@@ -692,6 +736,7 @@ function TrafficController:Step(dt: number)
 				k.Model.Parent = nil
 				car.Parked = true
 			end
+			self:SetEngine(car, false)
 			continue
 		end
 		const pivot = pivotAt(path, car.Dist, k.Size.Z * 0.35)
@@ -705,13 +750,17 @@ function TrafficController:Step(dt: number)
 				car.Parked = true
 			end
 		else
-			const near = distance <= LOD_NEAR
+			const isNear = distance <= LOD_NEAR
+			if isNear then
+				table.insert(near, car)
+				nearDistance[car] = distance
+			end
 			if car.Parked then
 				k.Model.Parent = self:Container()
 				car.Parked = false
 				car.NextFarAt = 0
 			end
-			if near then
+			if isNear then
 				self:Place(car, k, pivot, true)
 			elseif clock >= car.NextFarAt then
 				car.NextFarAt = clock + 1 / FAR_RATE
@@ -720,6 +769,55 @@ function TrafficController:Step(dt: number)
 		end
 		if root and self:TestHit(car, k, pivot, root, clock) then
 			root = nil
+		end
+	end
+	self:Engines(near, nearDistance)
+end
+
+-- `car_engine` on the ENGINE_MAX nearest cars inside LOD_NEAR, off on every other car
+function TrafficController:Engines(near: { Car }, distance: { [Car]: number })
+	table.sort(near, function(a: Car, b: Car): boolean
+		return distance[a] < distance[b]
+	end)
+	const loud: { [Car]: boolean } = {}
+	for i = 1, math.min(#near, ENGINE_MAX) do
+		loud[near[i]] = true
+	end
+	for _, car in self.Cars do
+		if car.Engine ~= nil and not loud[car] then
+			self:SetEngine(car, false)
+		end
+	end
+	for car in loud do
+		self:SetEngine(car, true)
+	end
+end
+
+-- A member's KnockedUntil moved forward: boing on that character (the own one only without a local prediction)
+function TrafficController:OnMembers(members: { [number]: VitalTypes.Member })
+	const seen = self.KnockSeen
+	const now = Workspace:GetServerTimeNow()
+	const own = Players.LocalPlayer.UserId
+	for userId, member in members do
+		const knocked = member.KnockedUntil
+		const previous = seen[userId]
+		seen[userId] = knocked
+		if previous == nil or knocked <= previous or knocked <= now then
+			continue
+		end
+		if userId == own and os.clock() - self.BoingAt < OWN_BOING_GRACE then
+			continue
+		end
+		const player = Players:GetPlayerByUserId(userId)
+		const character = if player then player.Character else nil
+		const root = if character then character:FindFirstChild("HumanoidRootPart") else nil
+		if root then
+			self.Dependencies.AudioController:Play(HIT_KEY, root)
+		end
+	end
+	for userId in seen do
+		if members[userId] == nil then
+			seen[userId] = nil
 		end
 	end
 end
@@ -746,6 +844,14 @@ TrafficController:OnStart(function(self)
 	Vide.root(function()
 		Vide.effect(function()
 			self:SetNight(round.IsNight())
+		end)
+		const vital = self.Dependencies.VitalController
+		Vide.effect(function()
+			const members = vital.Members()
+			Vide.untrack(function()
+				self:OnMembers(members)
+				return nil
+			end)
 		end)
 		return nil
 	end)

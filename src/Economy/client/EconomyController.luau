@@ -22,6 +22,9 @@
 	drawer of the vehicle in use and hops 4 coins there (placeholder particles, Fx.luau budget); a Perfect sale (paid
 	inside the tip window) adds SFX-044 `tip` and one brighter coin. No drawer drawn = no sound (nothing to hear it
 	from). Keys still missing from Content.Sounds are skipped quietly.
+Cash drawer (user request 2026-10-10): the sale opens the drawer (`drawer`) right before the `coin`, and
+`drawer_close` plays DRAWER_CLOSE_DELAY s after the LAST sale: a sale while the drawer is still open does not open it
+again, it only pushes the close back (no stacked open/close pairs on a burst of sales).
 ]]
 local Players = game:GetService("Players")
 local CollectionService = game:GetService("CollectionService")
@@ -48,6 +51,7 @@ const MAX_POPS = 4
 const COINS = 4 -- AST-092 payment Emit(4)
 const TIP_COINS = 1 -- AST-092 tip Emit(1)
 const TIP_SPEED = 1.2 -- tip with no `tip` row yet: the coin again, higher (Provisional)
+const DRAWER_CLOSE_DELAY = 0.8 -- s after the last sale
 
 type Mount = {
 	Vehicle: Instance,
@@ -76,6 +80,8 @@ function EconomyController:Setup()
 	self.Mounts = {} :: { [Instance]: Mount }
 	self.Gui = nil :: Instance?
 	self.Unmount = nil :: (() -> ())?
+	-- pending `drawer_close` (nil = drawer closed)
+	self.DrawerClose = nil :: thread?
 end
 
 -- True when this tagged Model is the vehicle in use (Shift.Vehicle)
@@ -133,7 +139,26 @@ local function positionOf(instance: Instance): Vector3?
 	return nil
 end
 
--- Sale feedback on the drawer: coin sound + coins; Perfect adds the tip (presentation only).
+-- Opens the drawer (sound) unless it is already open, and (re)schedules its close after the last sale
+function EconomyController:OpenDrawer(anchor: Instance)
+	const audio = self.Dependencies.AudioController
+	const pending = self.DrawerClose
+	if pending then
+		if coroutine.status(pending) == "suspended" then
+			task.cancel(pending)
+		end
+	else
+		audio:Play("drawer", anchor)
+	end
+	self.DrawerClose = task.delay(DRAWER_CLOSE_DELAY, function()
+		self.DrawerClose = nil
+		if anchor.Parent then
+			audio:Play("drawer_close", anchor)
+		end
+	end)
+end
+
+-- Sale feedback on the drawer: drawer + coin sound + coins; Perfect adds the tip (presentation only).
 function EconomyController:Chime(amount: number, result: string)
 	const anchor = self:DrawerAnchor()
 	if anchor == nil or amount <= 0 then
@@ -141,6 +166,7 @@ function EconomyController:Chime(amount: number, result: string)
 	end
 	const audio = self.Dependencies.AudioController
 	const position = positionOf(anchor)
+	self:OpenDrawer(anchor)
 	if Content.Sounds.ByKey.coin then
 		audio:Play("coin", anchor)
 	end
