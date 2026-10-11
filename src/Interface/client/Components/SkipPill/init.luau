@@ -7,13 +7,17 @@
 --          once the own vote is in; "Skipping..." when the server count reaches the threshold
 -- Sits left of the mobile jump button and right of the call strip, so it never covers either on a phone. The pill is
 -- the mobile control (>= 44 px tall): press/release go to OnPress/OnRelease; the owner times the hold.
+-- Cartoon pass (AST-091): Ink CartoonPanel pill with a Mustard hold fill (pill shaped, grows from the left), Cream
+-- key chip, squash on press (Motion.Press).
 -- Pure: only props. Votes and Needed come from the server (`Cutscene` set); nothing is counted here.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Theme)
+local Motion = require(script.Parent.Motion)
+local CartoonPanel = require(script.Parent.CartoonPanel)
+local CartoonLabel = require(script.Parent.CartoonLabel)
 
 const create = Vide.create
-const spring = Vide.spring
 const source = Vide.source
 -- Vide 0.4.1 types `create` for 19 classes only; UIStroke, UIPadding, UIScale and UIListLayout are not among them.
 const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }) -> Instance
@@ -44,7 +48,6 @@ const MIN_WIDTH = 150
 const TEXT_SIZE = 20 -- >= Theme.MinTextSize on the smallest phone
 const HINT_SIZE = 16
 const CHIP_SIZE = 32
-const FILL_TRANSPARENCY = 0.15
 
 local function isPointer(input: InputObject): boolean
 	return input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch
@@ -73,15 +76,8 @@ return function(props: Props): Frame
 		return fill() >= 1
 	end
 
-	const scale = spring(function()
-		if not props.Visible() then
-			return 0.6
-		end
-		return if pressed() then 0.95 else 1
-	end, 0.18, 0.7)
-	const alpha = spring(function()
-		return if props.Visible() then 0 else 1
-	end, 0.18, 1)
+	const press = Motion.Press(pressed)
+	const pop = Motion.Pop(props.Visible)
 
 	local function release()
 		if not pressed() then
@@ -101,10 +97,14 @@ return function(props: Props): Frame
 		AutomaticSize = Enum.AutomaticSize.XY,
 		BackgroundTransparency = 1,
 		Visible = function()
-			return props.Visible() or alpha() < 0.99
+			return props.Visible() or pop() > 0.02
 		end,
 
-		createRaw("UIScale")({ Scale = scale }),
+		createRaw("UIScale")({
+			Scale = function()
+				return pop() * press()
+			end,
+		}),
 		createRaw("UIListLayout")({
 			FillDirection = Enum.FillDirection.Vertical,
 			HorizontalAlignment = Enum.HorizontalAlignment.Right,
@@ -112,25 +112,17 @@ return function(props: Props): Frame
 			Padding = UDim.new(0, 4),
 		}),
 
-		create("TextLabel")({
+		CartoonLabel({
 			Name = "Hint",
 			LayoutOrder = 1,
-			Size = UDim2.fromOffset(MIN_WIDTH, HINT_SIZE + 6),
-			BackgroundTransparency = 1,
-			FontFace = Theme.Font.Body,
+			Box = UDim2.fromOffset(MIN_WIDTH, HINT_SIZE + 6),
 			TextSize = HINT_SIZE,
-			TextColor3 = Theme.Color.Cream,
-			TextXAlignment = Enum.TextXAlignment.Right,
-			TextTransparency = alpha,
+			Color = Theme.Color.Cream,
+			XAlignment = Enum.TextXAlignment.Right,
 			Text = HINT,
 			Visible = function()
 				return not props.Voted() and not skipping()
 			end,
-			createRaw("UIStroke")({
-				Color = Theme.Color.Ink,
-				Thickness = Theme.Stroke,
-				Transparency = alpha,
-			}),
 		}),
 
 		create("TextButton")({
@@ -159,90 +151,89 @@ return function(props: Props): Frame
 			end,
 			MouseLeave = release,
 
-			create("CanvasGroup")({
+			CartoonPanel({
 				Name = "Body",
 				Size = UDim2.fromOffset(0, PILL_HEIGHT),
 				AutomaticSize = Enum.AutomaticSize.X,
-				BackgroundColor3 = Theme.Color.Ink,
-				BackgroundTransparency = Theme.Transparency.Panel,
-				GroupTransparency = alpha,
-
-				create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
-				createRaw("UISizeConstraint")({ MinSize = Vector2.new(MIN_WIDTH, PILL_HEIGHT) }),
-
-				-- Hold fill, under the content
-				create("Frame")({
-					Name = "Fill",
-					Size = function()
-						return UDim2.fromScale(fill(), 1)
-					end,
-					BackgroundColor3 = Theme.Color.Mustard,
-					BackgroundTransparency = FILL_TRANSPARENCY,
-					BorderSizePixel = 0,
-					ZIndex = 0,
-					Visible = function()
-						return fill() > 0
-					end,
-				}),
-
-				create("Frame")({
-					Name = "Content",
-					Size = UDim2.fromOffset(0, PILL_HEIGHT),
-					AutomaticSize = Enum.AutomaticSize.X,
-					BackgroundTransparency = 1,
-					ZIndex = 1,
-					createRaw("UIPadding")({
-						PaddingLeft = UDim.new(0, 8),
-						PaddingRight = UDim.new(0, 18),
-					}),
-					createRaw("UIListLayout")({
-						FillDirection = Enum.FillDirection.Horizontal,
-						VerticalAlignment = Enum.VerticalAlignment.Center,
-						SortOrder = Enum.SortOrder.LayoutOrder,
-						Padding = UDim.new(0, 8),
+				Tone = Theme.Tone.Ink,
+				Transparency = Theme.Transparency.Panel,
+				Outline = Theme.Outline.Thick,
+				Decor = {
+					createRaw("UISizeConstraint")({ MinSize = Vector2.new(MIN_WIDTH, PILL_HEIGHT) }),
+				},
+				Children = {
+					-- Hold fill, under the content: a Mustard pill growing from the left
+					create("Frame")({
+						Name = "Fill",
+						AnchorPoint = Vector2.new(0, 0.5),
+						Position = UDim2.new(0, 3, 0.5, 0),
+						Size = function()
+							return UDim2.new(fill(), -6 * fill(), 1, -6)
+						end,
+						BackgroundColor3 = Theme.Color.Mustard,
+						ZIndex = 0,
+						Visible = function()
+							return fill() > 0
+						end,
+						create("UICorner")({ CornerRadius = Theme.Radius.Pill }),
+						createRaw("UIGradient")({
+							Rotation = 90,
+							Color = Theme.Gradient(Theme.Tone.Mustard),
+						}),
 					}),
 
 					create("Frame")({
-						Name = "Chip",
-						LayoutOrder = 1,
-						Size = UDim2.fromOffset(CHIP_SIZE, CHIP_SIZE),
-						BackgroundColor3 = Theme.Color.Text,
-						Visible = function()
-							return props.KeyLabel() ~= ""
-						end,
-						create("UICorner")({ CornerRadius = UDim.new(0, 8) }),
-						create("TextLabel")({
-							Size = UDim2.fromScale(1, 1),
-							BackgroundTransparency = 1,
-							FontFace = Theme.Font.Title,
-							TextSize = TEXT_SIZE,
-							TextColor3 = Theme.Color.Ink,
-							Text = props.KeyLabel,
-						}),
-					}),
-
-					create("TextLabel")({
-						Name = "Label",
-						LayoutOrder = 2,
-						Size = UDim2.fromOffset(0, PILL_HEIGHT),
+						Name = "Content",
+						Size = UDim2.new(0, 0, 1, 0),
 						AutomaticSize = Enum.AutomaticSize.X,
 						BackgroundTransparency = 1,
-						FontFace = Theme.Font.Title,
-						TextSize = TEXT_SIZE,
-						TextColor3 = function()
-							return if full() then Theme.Color.Ink else Theme.Color.Text
-						end,
-						Text = label,
-						ZIndex = 2,
-						createRaw("UIStroke")({
-							Color = Theme.Color.Ink,
-							Thickness = Theme.Stroke,
-							Enabled = function()
-								return not full()
+						ZIndex = 1,
+						createRaw("UIPadding")({
+							PaddingLeft = UDim.new(0, 8),
+							PaddingRight = UDim.new(0, 18),
+						}),
+						createRaw("UIListLayout")({
+							FillDirection = Enum.FillDirection.Horizontal,
+							VerticalAlignment = Enum.VerticalAlignment.Center,
+							SortOrder = Enum.SortOrder.LayoutOrder,
+							Padding = UDim.new(0, 8),
+						}),
+
+						CartoonPanel({
+							Name = "Chip",
+							LayoutOrder = 1,
+							Size = UDim2.fromOffset(CHIP_SIZE, CHIP_SIZE),
+							Tone = Theme.Tone.Cream,
+							Radius = Theme.Radius.Small,
+							Lip = 3,
+							Visible = function()
+								return props.KeyLabel() ~= ""
 							end,
+							Children = {
+								CartoonLabel({
+									Box = UDim2.fromScale(1, 1),
+									TextSize = TEXT_SIZE,
+									Color = Theme.Color.Dark,
+									Stroke = 0,
+									Text = props.KeyLabel,
+								}),
+							},
+						}),
+
+						CartoonLabel({
+							Name = "Label",
+							LayoutOrder = 2,
+							TextSize = TEXT_SIZE,
+							Color = function()
+								return if full() then Theme.Color.Ink else Theme.Color.Text
+							end,
+							Stroke = function()
+								return if full() then 0 else Theme.TextStroke(TEXT_SIZE)
+							end,
+							Text = label,
 						}),
 					}),
-				}),
+				},
 			}),
 		}),
 	})

@@ -4,13 +4,14 @@
 -- "FOR SALE" from then until the purchase; the caller hides it after the purchase.
 -- Pure: only props. VehicleController (TASK-058) owns the state and parents the BillboardGui.
 -- Fixed pixel size (not studs) so the text stays >= 14 px on a phone at any distance it is drawn (Theme.MinTextSize).
+-- Cartoon pass (AST-091): Mustard CartoonPanel plate with studs, a slight tilt, Ink text.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Theme)
+local CartoonPanel = require(script.Parent.CartoonPanel)
+local CartoonLabel = require(script.Parent.CartoonLabel)
 
 const create = Vide.create
--- Vide 0.4.1 types `create` for 19 classes only; UIStroke and UIPadding are not among them.
-const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }) -> Instance
 
 export type Props = {
 	Adornee: Instance?,
@@ -38,35 +39,29 @@ return function(props: Props): BillboardGui
 		ResetOnSpawn = false,
 		Enabled = props.Visible,
 
-		create("Frame")({
+		CartoonPanel({
 			Name = "Plate",
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = UDim2.fromScale(0.5, 0.5),
 			Size = UDim2.fromOffset(0, HEIGHT - 8),
 			AutomaticSize = Enum.AutomaticSize.X,
-			BackgroundColor3 = Theme.Color.Mustard,
-
-			create("UICorner")({ CornerRadius = UDim.new(0.25, 0) }),
-			createRaw("UIStroke")({
-				Color = Theme.Color.Ink,
-				Thickness = Theme.Stroke,
-				ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-			}),
-			createRaw("UIPadding")({
-				PaddingLeft = UDim.new(0, 14),
-				PaddingRight = UDim.new(0, 14),
-			}),
-
-			create("TextLabel")({
-				Name = "Label",
-				Size = UDim2.fromScale(0, 1),
-				AutomaticSize = Enum.AutomaticSize.X,
-				BackgroundTransparency = 1,
-				FontFace = Theme.Font.Title,
-				TextSize = TEXT_SIZE,
-				TextColor3 = Theme.Color.Ink,
-				Text = props.Text,
-			}),
+			Rotation = -2,
+			Tone = Theme.Tone.Mustard,
+			Outline = Theme.Outline.Thick,
+			Radius = Theme.Radius.Chip,
+			Studs = true,
+			Padding = { Left = 14, Right = 14 },
+			Children = {
+				CartoonLabel({
+					Name = "Label",
+					Box = UDim2.fromScale(0, 1),
+					AutomaticSize = Enum.AutomaticSize.X,
+					TextSize = TEXT_SIZE,
+					Color = Theme.Color.Dark,
+					Stroke = 0,
+					Text = props.Text,
+				}),
+			},
 		}),
 	})
 end

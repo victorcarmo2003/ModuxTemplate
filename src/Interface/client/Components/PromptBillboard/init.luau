@@ -8,6 +8,8 @@
 -- draws `Holding` over `HoldDuration`. Taps on the pill reach OnPress/OnRelease only when the
 -- BillboardGui is parented under PlayerGui.
 -- Fixed pixel size (not studs) so the text keeps >= 14 px and the pill >= 44 px tall on a phone.
+-- Cartoon pass (AST-091; visual only): Ink two-tone pill with a thick Ink outline drawn inside the group (the
+-- CanvasGroup clips anything outside), Mustard two-tone hold fill, Cream key chip with outline, bigger dot.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Theme)
@@ -43,7 +45,7 @@ export type Props = {
 
 const PILL_HEIGHT = 48
 const CHIP_SIZE = 34
-const DOT_SIZE = 14
+const DOT_SIZE = 18
 const TEXT_SIZE = 20
 const RELEASE_TIME = 0.15
 
@@ -110,9 +112,10 @@ return function(props: Props): BillboardGui
 			Visible = function()
 				return dotSize() > 0.5
 			end,
-			BackgroundColor3 = Theme.Color.Mustard,
+			BackgroundColor3 = Color3.new(1, 1, 1),
 			create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
-			createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = Theme.Stroke }),
+			createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = Theme.Outline.Normal }),
+			createRaw("UIGradient")({ Rotation = 90, Color = Theme.Gradient(Theme.Tone.Mustard) }),
 		}),
 
 		create("CanvasGroup")({
@@ -121,7 +124,7 @@ return function(props: Props): BillboardGui
 			Position = UDim2.fromScale(0.5, 0.5),
 			Size = UDim2.fromOffset(0, PILL_HEIGHT),
 			AutomaticSize = Enum.AutomaticSize.X,
-			BackgroundColor3 = Theme.Color.Ink,
+			BackgroundColor3 = Color3.new(1, 1, 1),
 			BackgroundTransparency = Theme.Transparency.Panel,
 			Visible = function()
 				return pillScale() > 0.01
@@ -129,15 +132,17 @@ return function(props: Props): BillboardGui
 
 			create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
 			createRaw("UIScale")({ Scale = pillScale }),
+			createRaw("UIGradient")({ Rotation = 90, Color = Theme.Gradient(Theme.Tone.Ink) }),
 
 			create("Frame")({
 				Name = "HoldFill",
 				Size = fill,
-				BackgroundColor3 = Theme.Color.Mustard,
-				BackgroundTransparency = 0.15,
+				BackgroundColor3 = Color3.new(1, 1, 1),
+				BackgroundTransparency = 0.05,
 				Visible = function()
 					return fill().X.Scale > 0.001
 				end,
+				createRaw("UIGradient")({ Rotation = 90, Color = Theme.Gradient(Theme.Tone.Mustard) }),
 			}),
 
 			create("Frame")({
@@ -162,9 +167,16 @@ return function(props: Props): BillboardGui
 					Name = "KeyChip",
 					LayoutOrder = 1,
 					Size = UDim2.fromOffset(CHIP_SIZE, CHIP_SIZE),
-					BackgroundColor3 = Theme.Color.Cream,
+					BackgroundColor3 = Color3.new(1, 1, 1),
 					Visible = hasKey,
 					create("UICorner")({ CornerRadius = UDim.new(0.3, 0) }),
+					createRaw("UIStroke")({
+						Color = Theme.Color.Ink,
+						Thickness = 2,
+						ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+						BorderStrokePosition = Enum.BorderStrokePosition.Inner,
+					}),
+					createRaw("UIGradient")({ Rotation = 90, Color = Theme.Gradient(Theme.Tone.Cream) }),
 
 					create("TextLabel")({
 						Size = UDim2.fromScale(1, 1),
@@ -196,13 +208,28 @@ return function(props: Props): BillboardGui
 				}),
 			}),
 
+			-- Outline over everything, inside the group (an outer stroke would be clipped by the CanvasGroup)
+			create("Frame")({
+				Name = "Outline",
+				Size = UDim2.fromScale(1, 1),
+				BackgroundTransparency = 1,
+				ZIndex = 3,
+				create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+				createRaw("UIStroke")({
+					Color = Theme.Color.Ink,
+					Thickness = Theme.Outline.Normal,
+					ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+					BorderStrokePosition = Enum.BorderStrokePosition.Inner,
+				}),
+			}),
+
 			-- Touch/mouse target over the whole pill (>= 44 px tall).
 			create("TextButton")({
 				Name = "Hit",
 				Size = UDim2.fromScale(1, 1),
 				BackgroundTransparency = 1,
 				Text = "",
-				ZIndex = 3,
+				ZIndex = 4,
 				Active = true,
 				Visible = tappable,
 				MouseEnter = function()

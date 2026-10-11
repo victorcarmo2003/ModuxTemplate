@@ -1,16 +1,22 @@
 --!strict
 -- Toast: small notification card (style guide §7.2, "Notificação": top right, closes by itself; DEC-063).
--- Slides in, stays `Duration` seconds (clamped to 3..6), fades out, then calls OnDone so the owner
--- can drop it from its list. Pure: only props. Toast/Stack.luau places several in the top-right corner.
+-- Cartoon pass (AST-091): a Cream "tag" (CartoonPanel) leaning a little (alternating with its slot, Theme.Motion
+-- TagTilt), a coloured tab with the kind icon on its left (Info Teal, Good Green, Alert Mustard; never red), Ink text.
+-- Pops in from the right with overshoot, stays `Duration` seconds (clamped to 3..6), shrinks away, then calls OnDone
+-- so the owner can drop it from its list. Pure: only props. Toast/Stack.luau places several in the top-right corner.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Theme)
+local Icons = require(script.Parent.Icons)
+local Motion = require(script.Parent.Motion)
+local CartoonPanel = require(script.Parent.CartoonPanel)
+local CartoonLabel = require(script.Parent.CartoonLabel)
 
 const create = Vide.create
 const source = Vide.source
 const spring = Vide.spring
 const cleanup = Vide.cleanup
--- Vide 0.4.1 types `create` for 19 classes only; UIStroke, UIPadding and UISizeConstraint are not among them.
+-- Vide 0.4.1 types `create` for 19 classes only; UIScale and UISizeConstraint are not among them.
 const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }) -> Instance
 
 export type Kind = "Info" | "Good" | "Alert"
@@ -25,17 +31,32 @@ export type Props = {
 }
 
 const WIDTH = 280
-const TEXT_SIZE = 18
+const TEXT_SIZE = 17
+const TAB = 46
+const ICON = 34
 const MIN_DURATION = 3
 const MAX_DURATION = 6
 const OUT_TIME = 0.35
-const SLIDE = 48
+const SLIDE = 60
 
 -- No red in the UI (style guide §7.4): Alert is Mustard.
-const ACCENT: { [Kind]: Color3 } = {
-	Info = Theme.Color.Teal,
-	Good = Theme.Color.Green,
-	Alert = Theme.Color.Mustard,
+const TONE: { [Kind]: Theme.Tone } = {
+	Info = Theme.Tone.Teal,
+	Good = Theme.Tone.Green,
+	Alert = Theme.Tone.Mustard,
+}
+
+const ICON_NAME: { [Kind]: string } = {
+	Info = "Ui/info",
+	Good = "Ui/check",
+	Alert = "Ui/warning",
+}
+
+-- Drawn glyph on the tab while the UI sheet is not uploaded.
+const GLYPH: { [Kind]: string } = {
+	Info = "i",
+	Good = "+",
+	Alert = "!",
 }
 
 local function cancel(thread: thread)
@@ -65,16 +86,22 @@ return function(props: Props): Frame
 		cancel(done)
 	end)
 
-	const alpha = spring(function()
-		return if shown() then 0 else 1
-	end, 0.2, 1)
+	const scale = Motion.Pop(shown)
 	const offset = spring(function()
 		return if shown() then 0 else SLIDE
-	end, 0.25, 0.8)
+	end, 0.25, 0.7)
 
-	local function accent(): Color3
-		const kind: Kind = if props.Kind then props.Kind() else "Info"
-		return ACCENT[kind]
+	local function kind(): Kind
+		return if props.Kind then props.Kind() else "Info"
+	end
+	local function order(): number
+		return if props.LayoutOrder then props.LayoutOrder() else 0
+	end
+	local function iconName(): string
+		return ICON_NAME[kind()]
+	end
+	local function rect(): Icons.Rect
+		return Icons.Rect(iconName()) or { Offset = Vector2.zero, Size = Vector2.zero }
 	end
 
 	return create("Frame")({
@@ -82,47 +109,93 @@ return function(props: Props): Frame
 		Size = UDim2.fromOffset(WIDTH, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
-		LayoutOrder = props.LayoutOrder or 0,
+		LayoutOrder = order,
 
-		create("CanvasGroup")({
+		CartoonPanel({
 			Name = "Card",
 			Position = function()
 				return UDim2.fromOffset(offset(), 0)
 			end,
 			Size = UDim2.fromOffset(WIDTH, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
-			BackgroundColor3 = Theme.Color.Ink,
-			BackgroundTransparency = Theme.Transparency.Panel,
-			GroupTransparency = alpha,
-
-			create("UICorner")({ CornerRadius = UDim.new(0, 14) }),
-			createRaw("UISizeConstraint")({ MinSize = Vector2.new(WIDTH, Theme.MinTouch) }),
-
-			create("Frame")({
-				Name = "Accent",
-				Size = UDim2.new(0, 6, 1, 0),
-				BackgroundColor3 = accent,
-			}),
-
-			create("TextLabel")({
-				Name = "Message",
-				Size = UDim2.fromScale(1, 0),
-				AutomaticSize = Enum.AutomaticSize.Y,
-				BackgroundTransparency = 1,
-				FontFace = Theme.Font.Body,
-				TextSize = TEXT_SIZE,
-				TextColor3 = Theme.Color.Text,
-				TextWrapped = true,
-				TextXAlignment = Enum.TextXAlignment.Left,
-				Text = props.Text,
-				createRaw("UIPadding")({
-					PaddingLeft = UDim.new(0, 18),
-					PaddingRight = UDim.new(0, 14),
-					PaddingTop = UDim.new(0, 12),
-					PaddingBottom = UDim.new(0, 12),
+			-- Tags lean, alternating with their slot.
+			Rotation = function()
+				return if order() % 2 == 0 then Theme.Motion.TagTilt else -Theme.Motion.TagTilt
+			end,
+			Tone = Theme.Tone.Cream,
+			Outline = Theme.Outline.Normal,
+			Radius = Theme.Radius.Chip,
+			Gloss = false,
+			Decor = {
+				createRaw("UIScale")({ Scale = scale }),
+				createRaw("UISizeConstraint")({ MinSize = Vector2.new(WIDTH, Theme.MinTouch + Theme.Lip) }),
+			},
+			Children = {
+				-- Coloured tab with the kind icon
+				CartoonPanel({
+					Name = "Tab",
+					Size = UDim2.new(0, TAB, 1, 0),
+					Tone = function()
+						return TONE[kind()]
+					end,
+					Outline = 0,
+					Lip = 0,
+					Radius = Theme.Radius.Chip,
+					Children = {
+						create("ImageLabel")({
+							Name = "Icon",
+							AnchorPoint = Vector2.new(0.5, 0.5),
+							Position = UDim2.fromScale(0.5, 0.5),
+							Size = UDim2.fromOffset(ICON, ICON),
+							BackgroundTransparency = 1,
+							Image = function()
+								return Icons.ImageOf(iconName())
+							end,
+							ImageRectOffset = function()
+								return rect().Offset
+							end,
+							ImageRectSize = function()
+								return rect().Size
+							end,
+							Visible = function()
+								return Icons.Has(iconName())
+							end,
+						}),
+						CartoonLabel({
+							Name = "Glyph",
+							Box = UDim2.fromScale(1, 1),
+							TextSize = 26,
+							Text = function()
+								return GLYPH[kind()]
+							end,
+							Visible = function()
+								return not Icons.Has(iconName())
+							end,
+						}),
+					},
 				}),
-				createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = Theme.Stroke }),
-			}),
+
+				CartoonLabel({
+					Name = "Message",
+					Position = UDim2.fromOffset(TAB, 0),
+					Box = UDim2.new(1, -TAB, 0, 0),
+					AutomaticSize = Enum.AutomaticSize.Y,
+					TextSize = TEXT_SIZE,
+					Color = Theme.Color.Dark,
+					Stroke = 0,
+					Wrapped = true,
+					XAlignment = Enum.TextXAlignment.Left,
+					Text = props.Text,
+					Children = {
+						createRaw("UIPadding")({
+							PaddingLeft = UDim.new(0, 10),
+							PaddingRight = UDim.new(0, 12),
+							PaddingTop = UDim.new(0, 10),
+							PaddingBottom = UDim.new(0, 10),
+						}),
+					},
+				}),
+			},
 		}),
 	})
 end

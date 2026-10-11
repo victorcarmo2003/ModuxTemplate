@@ -7,9 +7,13 @@
 -- Pure: only props. The caller parents the BillboardGui (PlayerGui, with Adornee = the shelf anchor) and decides
 -- the texts. Sized in studs, so it shrinks with distance like a real tag; at the prompt radius (7 studs) on the
 -- smallest phone the price is ~22 px and the sub line ~15 px (frontend rule: text >= 14 px).
+-- Cartoon pass (AST-091): the tag is a CartoonPanel (Mustard / Ketchup / Cream) with a thin Ink outline (the tag is
+-- sized in studs: a thick pixel outline would swallow it from far away), tilted a little like a hung price tag.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Theme)
+local CartoonPanel = require(script.Parent.CartoonPanel)
+local CartoonLabel = require(script.Parent.CartoonLabel)
 
 const create = Vide.create
 -- Vide 0.4.1 types `create` for 19 classes only; UIStroke, UIPadding and UITextSizeConstraint are not among them.
@@ -36,16 +40,10 @@ const TAG_HEIGHT = 0.6 -- fraction of HEIGHT
 const PRICE_WIDTH = 0.5 -- fraction of WIDTH for a short "$6"
 const MAX_TEXT = 64
 
-const BACKGROUND: { [Mode]: Color3 } = {
-	Price = Theme.Color.Mustard,
-	NoCash = Theme.Color.NoCash,
-	OutOfStock = Theme.Color.Cream,
-}
-
-const FOREGROUND: { [Mode]: Color3 } = {
-	Price = Theme.Color.Ink,
-	NoCash = Theme.Color.Text,
-	OutOfStock = Theme.Color.Ink,
+const TONE: { [Mode]: Theme.Tone } = {
+	Price = Theme.Tone.Mustard,
+	NoCash = Theme.ToneOf(Theme.Color.NoCash),
+	OutOfStock = Theme.Tone.Cream,
 }
 
 return function(props: Props): BillboardGui
@@ -63,64 +61,74 @@ return function(props: Props): BillboardGui
 		ResetOnSpawn = false,
 		Enabled = props.Visible,
 
-		create("Frame")({
+		CartoonPanel({
 			Name = "Tag",
 			AnchorPoint = Vector2.new(0.5, 0),
-			Position = UDim2.fromScale(0.5, 0),
+			Position = UDim2.fromScale(0.5, 0.02),
 			Size = function()
-				return UDim2.fromScale(if props.Mode() == "OutOfStock" then 1 else PRICE_WIDTH, TAG_HEIGHT)
+				return UDim2.fromScale(if props.Mode() == "OutOfStock" then 0.96 else PRICE_WIDTH, TAG_HEIGHT)
 			end,
-			BackgroundColor3 = function()
-				return BACKGROUND[props.Mode()]
+			Rotation = -3,
+			Tone = function()
+				return TONE[props.Mode()]
 			end,
-
-			create("UICorner")({ CornerRadius = UDim.new(0.3, 0) }),
-			createRaw("UIStroke")({
-				Color = Theme.Color.Ink,
-				Thickness = Theme.Stroke,
-				ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-			}),
-
-			create("TextLabel")({
-				Name = "Label",
-				Size = UDim2.fromScale(1, 1),
-				BackgroundTransparency = 1,
-				FontFace = Theme.Font.Title,
-				TextScaled = true,
-				TextColor3 = function()
-					return FOREGROUND[props.Mode()]
-				end,
-				Text = props.Text,
-				createRaw("UIPadding")({
-					PaddingTop = UDim.new(0.1, 0),
-					PaddingBottom = UDim.new(0.1, 0),
-					PaddingLeft = UDim.new(0.06, 0),
-					PaddingRight = UDim.new(0.06, 0),
+			Outline = Theme.Outline.Thin,
+			Lip = 3,
+			Radius = UDim.new(0.3, 0),
+			Children = {
+				CartoonLabel({
+					Name = "Label",
+					Box = UDim2.fromScale(1, 1),
+					Scaled = true,
+					MaxTextSize = MAX_TEXT,
+					TextSize = 20,
+					Color = function()
+						return TONE[props.Mode()].Text
+					end,
+					Stroke = function()
+						return if TONE[props.Mode()].Stroke then Theme.Outline.Thin else 0
+					end,
+					Text = props.Text,
+					Children = {
+						createRaw("UIPadding")({
+							PaddingTop = UDim.new(0.1, 0),
+							PaddingBottom = UDim.new(0.1, 0),
+							PaddingLeft = UDim.new(0.06, 0),
+							PaddingRight = UDim.new(0.06, 0),
+						}),
+					},
 				}),
-				createRaw("UITextSizeConstraint")({ MaxTextSize = MAX_TEXT }),
-			}),
+			},
 		}),
 
-		create("TextLabel")({
+		CartoonPanel({
 			Name = "Sub",
 			AnchorPoint = Vector2.new(0.5, 1),
 			Position = UDim2.fromScale(0.5, 1),
 			Size = UDim2.fromScale(0.6, 1 - TAG_HEIGHT - 0.04),
-			BackgroundColor3 = Theme.Color.Ink,
-			BackgroundTransparency = Theme.Transparency.Panel,
-			FontFace = Theme.Font.Body,
-			TextScaled = true,
-			TextColor3 = Theme.Color.Text,
-			Text = props.SubText,
+			Tone = Theme.Tone.Ink,
+			Outline = Theme.Outline.Thin,
+			Lip = 2,
+			Gloss = false,
 			Visible = function()
 				return props.Mode() == "OutOfStock" and hasSub()
 			end,
-			create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
-			createRaw("UIPadding")({
-				PaddingTop = UDim.new(0.08, 0),
-				PaddingBottom = UDim.new(0.08, 0),
-			}),
-			createRaw("UITextSizeConstraint")({ MaxTextSize = MAX_TEXT }),
+			Children = {
+				CartoonLabel({
+					Box = UDim2.fromScale(1, 1),
+					Scaled = true,
+					MaxTextSize = MAX_TEXT,
+					TextSize = 16,
+					Stroke = 0,
+					Text = props.SubText,
+					Children = {
+						createRaw("UIPadding")({
+							PaddingTop = UDim.new(0.08, 0),
+							PaddingBottom = UDim.new(0.08, 0),
+						}),
+					},
+				}),
+			},
 		}),
 	})
 end

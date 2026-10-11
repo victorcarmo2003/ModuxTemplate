@@ -5,11 +5,13 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Parent.Theme)
 local UseTween = require(script.Parent.Parent.UseTween)
+local Motion = require(script.Parent.Parent.Motion)
+local CartoonLabel = require(script.Parent.Parent.CartoonLabel)
 
-const create = Vide.create
 const source = Vide.source
 const spring = Vide.spring
 const cleanup = Vide.cleanup
+-- Vide 0.4.1 types `create` for 19 classes only; UIScale is not among them.
 const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }) -> Instance
 
 export type Entry = {
@@ -25,8 +27,8 @@ export type Options = {
 const DURATION = 1.2
 const FADE_AT = 0.7
 const RISE = 70
-const TEXT_SIZE = 24
-const HEIGHT = 30
+const TEXT_SIZE = 28
+const HEIGHT = 34
 
 local function cancel(thread: thread)
 	if coroutine.status(thread) == "suspended" then
@@ -62,24 +64,25 @@ function Pop.Render(entry: Entry, options: Options): TextLabel
 		return if fading() then 1 else 0
 	end, 0.15, 1)
 
-	return create("TextLabel")({
+	-- Cartoon pass: fat Mustard "+$N" with a heavy Ink stroke that pops in with overshoot while it rises.
+	const scale = Motion.Pop(flying)
+
+	return CartoonLabel({
 		Name = "Pop",
 		AnchorPoint = Vector2.new(0.5, 1),
 		Position = position,
-		Size = UDim2.fromOffset(160, HEIGHT),
-		BackgroundTransparency = 1,
-		FontFace = Theme.Font.Title,
+		Box = UDim2.fromOffset(160, HEIGHT),
 		TextSize = TEXT_SIZE,
-		TextColor3 = Theme.Color.Mustard,
-		TextTransparency = alpha,
+		Color = Theme.Color.Mustard,
+		Stroke = 3,
+		Transparency = alpha,
+		Rotation = -6,
 		Text = "+$" .. tostring(math.floor(entry.Amount)),
 		ZIndex = 2,
-		createRaw("UIStroke")({
-			Color = Theme.Color.Ink,
-			Thickness = Theme.Stroke,
-			Transparency = alpha,
-		}),
-	}) :: TextLabel
+		Children = {
+			createRaw("UIScale")({ Scale = scale }),
+		},
+	})
 end
 
 return table.freeze(Pop)

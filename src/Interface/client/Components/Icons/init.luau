@@ -2,11 +2,24 @@
 -- Icon sheet AST-071 (1024², cells 128²): name -> rect, from Assets/textures/ui/AST-071_icons.json.
 -- Regenerate this map when the JSON changes (same keys: "Hud/coin", "Class/class_fox", "Ingredient/bun", ...).
 -- Placeholder renders are marked in the JSON (`placeholder`); the class icons are the Day head render until AST-086.
--- Usage: ImageLabel.Image = Icons.Image; ImageRectOffset/ImageRectSize = Icons.Rect(name).
+-- Second sheet AST-091 (`Ui/<name>`): RhosGFX vector icons with the same Ink outline, from
+-- Assets/textures/ui/AST-091_ui_icons.json (tools/icons/build_ui_kit.py). RhosGFX licence: use in this game only.
+-- Usage: ImageLabel.Image = Icons.ImageOf(name); ImageRectOffset/ImageRectSize = Icons.Rect(name).
+-- Every UI image id of the project lives in `Ids` (one place to paste the upload ids). An id that is still ""
+-- makes `Has` false for its names, so the caller keeps its drawn fallback until the upload.
 
 export type Rect = { Offset: Vector2, Size: Vector2 }
 
-const IMAGE = "rbxassetid://75974795918833"
+const Ids = table.freeze({
+	-- AST-071 icon sheet (food, stations, HUD, reactions)
+	Sheet = "rbxassetid://75974795918833",
+	-- AST-091 UI icon sheet (Assets/textures/ui/AST-091_ui_icons.png)
+	UiSheet = "rbxassetid://121094453044732",
+	-- AST-091 studs tile (Assets/textures/ui/AST-091_studs.png, 128², tileable)
+	Studs = "rbxassetid://118792572605027",
+})
+
+const IMAGE = Ids.Sheet
 
 const RECTS: { [string]: { number } } = {
 	["Class/class_bear"] = { 640, 512, 128, 128 },
@@ -65,8 +78,44 @@ const RECTS: { [string]: { number } } = {
 	["Upgrade/trailer_lights"] = { 896, 384, 128, 128 },
 }
 
-local function rect(name: string): Rect?
+const UI_RECTS: { [string]: { number } } = {
+	["Ui/arrow_left"] = { 256, 0, 128, 128 },
+	["Ui/arrow_right"] = { 384, 0, 128, 128 },
+	["Ui/bell"] = { 384, 256, 128, 128 },
+	["Ui/calendar"] = { 256, 128, 128, 128 },
+	["Ui/cash"] = { 384, 128, 128, 128 },
+	["Ui/check"] = { 128, 0, 128, 128 },
+	["Ui/clock"] = { 0, 256, 128, 128 },
+	["Ui/close"] = { 0, 0, 128, 128 },
+	["Ui/friends"] = { 640, 128, 128, 128 },
+	["Ui/hourglass"] = { 640, 0, 128, 128 },
+	["Ui/info"] = { 768, 0, 128, 128 },
+	["Ui/lantern"] = { 128, 256, 128, 128 },
+	["Ui/megaphone"] = { 256, 256, 128, 128 },
+	["Ui/paw"] = { 768, 128, 128, 128 },
+	["Ui/sparkle"] = { 0, 128, 128, 128 },
+	["Ui/spectate"] = { 512, 0, 128, 128 },
+	["Ui/thumbs_up"] = { 896, 128, 128, 128 },
+	["Ui/tip_jar"] = { 512, 128, 128, 128 },
+	["Ui/trophy"] = { 128, 128, 128, 128 },
+	["Ui/warning"] = { 896, 0, 128, 128 },
+}
+
+-- Sheet image and cell of a name; nil when unknown or when its sheet is not uploaded yet.
+local function lookup(name: string): (string?, { number }?)
 	const r = RECTS[name]
+	if r ~= nil then
+		return IMAGE, r
+	end
+	const u = UI_RECTS[name]
+	if u ~= nil and Ids.UiSheet ~= "" then
+		return Ids.UiSheet, u
+	end
+	return nil, nil
+end
+
+local function rect(name: string): Rect?
+	const _, r = lookup(name)
 	if r == nil then
 		return nil
 	end
@@ -74,10 +123,18 @@ local function rect(name: string): Rect?
 end
 
 return table.freeze({
+	Ids = Ids,
+	-- AST-071 sheet (kept for callers that only use `Ingredient/`, `Class/`, `Hud/` names)
 	Image = IMAGE,
+	-- Sheet of any name ("" when unknown or not uploaded)
+	ImageOf = function(name: string): string
+		const image = lookup(name)
+		return image or ""
+	end,
 	-- nil for an unknown name (the caller keeps its fallback)
 	Rect = rect,
 	Has = function(name: string): boolean
-		return RECTS[name] ~= nil
+		const image = lookup(name)
+		return image ~= nil
 	end,
 })

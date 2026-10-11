@@ -8,10 +8,14 @@
 -- the customer (prompt target, else the Q1 customer in Waiting) and HudController mounts it on the top-left column,
 -- under the money and day pills: clear of the joystick, hotbar and interact button (style guide §7.2).
 -- Pixel sizes at UI scale 1 (smallest phone): icons 44 px, title 16 px.
+-- Cartoon pass (AST-091): white CartoonPanel bubble (gradient, lip, thick Ink outline), the patience ring drawn just
+-- inside the outline, the title on a small Ink tab over the top-left corner.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Icons = require(script.Parent.Icons)
 local Theme = require(script.Parent.Theme)
+local CartoonPanel = require(script.Parent.CartoonPanel)
+local CartoonLabel = require(script.Parent.CartoonLabel)
 
 const create = Vide.create
 const indexes = Vide.indexes
@@ -38,9 +42,10 @@ export type Props = {
 const CELL = 44
 const GAP = 6
 const PAD = 8
-const CARD_HEIGHT = CELL + PAD * 2
-const TITLE_HEIGHT = 20
-const TITLE_GAP = 2
+const LIP = 4
+const CARD_HEIGHT = CELL + PAD * 2 + LIP
+const TITLE_HEIGHT = 24
+const TITLE_GAP = -6 -- the tab overlaps the card edge
 const RING = 4
 const TITLE_SIZE = 16
 const LABEL_SIZE = 16
@@ -85,10 +90,10 @@ local function cell(key: () -> string, order: number): Frame
 		BackgroundTransparency = function()
 			return if hasArt() then 1 else 0
 		end,
-		create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+		create("UICorner")({ CornerRadius = Theme.Radius.Pill }),
 		createRaw("UIStroke")({
 			Color = Theme.Color.Ink,
-			Thickness = Theme.Stroke,
+			Thickness = Theme.Outline.Normal,
 			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 			Enabled = function()
 				return not hasArt()
@@ -108,20 +113,16 @@ local function cell(key: () -> string, order: number): Frame
 			end,
 			Visible = hasArt,
 		}),
-		create("TextLabel")({
+		CartoonLabel({
 			Name = "Letter",
-			Size = UDim2.fromScale(1, 1),
-			BackgroundTransparency = 1,
-			FontFace = Theme.Font.Title,
+			Box = UDim2.fromScale(1, 1),
 			TextSize = LABEL_SIZE,
-			TextColor3 = Theme.Color.Text,
 			Text = function()
 				return chipOf(key()).Label
 			end,
 			Visible = function()
 				return not hasArt()
 			end,
-			createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = Theme.Stroke }),
 		}),
 	})
 end
@@ -177,71 +178,81 @@ return function(props: Props): Frame
 		BackgroundTransparency = 1,
 		Visible = props.Shown,
 
-		create("TextLabel")({
-			Name = "Title",
-			Position = UDim2.fromOffset(PAD, 0),
-			Size = UDim2.new(1, -PAD, 0, TITLE_HEIGHT),
-			BackgroundTransparency = 1,
-			FontFace = Theme.Font.Title,
-			TextSize = TITLE_SIZE,
-			TextColor3 = Theme.Color.Text,
-			TextXAlignment = Enum.TextXAlignment.Left,
-			Text = props.Title or "Order",
-			createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = Theme.Stroke }),
-		}),
-
-		create("Frame")({
+		CartoonPanel({
 			Name = "Card",
 			Position = UDim2.fromOffset(0, TITLE_HEIGHT + TITLE_GAP),
 			Size = UDim2.new(1, 0, 0, CARD_HEIGHT),
-			BackgroundColor3 = WHITE,
-
-			create("UICorner")({ CornerRadius = UDim.new(0, CARD_HEIGHT / 2) }),
-			createRaw("UIStroke")({
-				Color = Theme.Color.Ink,
-				Thickness = Theme.Stroke,
-				ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-			}),
-
-			create("Frame")({
-				Name = "Ring",
-				Size = UDim2.fromScale(1, 1),
-				BackgroundTransparency = 1,
-				ZIndex = 2,
-				create("UICorner")({ CornerRadius = UDim.new(0, CARD_HEIGHT / 2) }),
-				createRaw("UIStroke")({
-					Thickness = RING,
-					ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-					Color = WHITE, -- the gradient below gives the color
-					Enabled = function()
-						return props.Patience() >= 0
-					end,
-					create("UIGradient")({
-						Color = function()
-							const color = if props.Patience() > warnAt then Theme.Color.Green else Theme.Color.Mustard
-							return ColorSequence.new(color)
+			Tone = Theme.Tone.White,
+			Outline = Theme.Outline.Thick,
+			Radius = UDim.new(0, (CARD_HEIGHT - LIP) / 2),
+			Lip = LIP,
+			Children = {
+				-- Patience ring, just inside the Ink outline
+				create("Frame")({
+					Name = "Ring",
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Position = UDim2.fromScale(0.5, 0.5),
+					Size = UDim2.new(1, -RING * 2, 1, -RING * 2),
+					BackgroundTransparency = 1,
+					create("UICorner")({ CornerRadius = UDim.new(0, (CARD_HEIGHT - LIP) / 2 - RING) }),
+					createRaw("UIStroke")({
+						Thickness = RING,
+						ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+						Color = WHITE, -- the gradient below gives the color
+						Enabled = function()
+							return props.Patience() >= 0
 						end,
-						Transparency = function()
-							return ringTransparency(math.clamp(props.Patience(), 0, 1))
-						end,
+						create("UIGradient")({
+							Color = function()
+								const color = if props.Patience() > warnAt then Theme.Color.Green else Theme.Color.Mustard
+								return ColorSequence.new(color)
+							end,
+							Transparency = function()
+								return ringTransparency(math.clamp(props.Patience(), 0, 1))
+							end,
+						}),
 					}),
 				}),
-			}),
 
-			create("Frame")({
-				Name = "Icons",
-				Size = UDim2.fromScale(1, 1),
-				BackgroundTransparency = 1,
-				ZIndex = 3,
-				create("UIListLayout")({
-					FillDirection = Enum.FillDirection.Horizontal,
-					HorizontalAlignment = Enum.HorizontalAlignment.Center,
-					VerticalAlignment = Enum.VerticalAlignment.Center,
-					SortOrder = Enum.SortOrder.LayoutOrder,
-					Padding = UDim.new(0, GAP),
+				create("Frame")({
+					Name = "Icons",
+					Size = UDim2.fromScale(1, 1),
+					BackgroundTransparency = 1,
+					ZIndex = 2,
+					create("UIListLayout")({
+						FillDirection = Enum.FillDirection.Horizontal,
+						HorizontalAlignment = Enum.HorizontalAlignment.Center,
+						VerticalAlignment = Enum.VerticalAlignment.Center,
+						SortOrder = Enum.SortOrder.LayoutOrder,
+						Padding = UDim.new(0, GAP),
+					}),
+					indexes(keys, cell),
 				}),
-				indexes(keys, cell),
-			}),
+			},
+		}),
+
+		-- Title tab over the top-left corner of the card
+		CartoonPanel({
+			Name = "Title",
+			Position = UDim2.fromOffset(PAD, 0),
+			Size = UDim2.fromOffset(0, TITLE_HEIGHT),
+			AutomaticSize = Enum.AutomaticSize.X,
+			Rotation = -3,
+			Tone = Theme.Tone.Mustard,
+			Outline = Theme.Outline.Normal,
+			Lip = 3,
+			Padding = { Left = 8, Right = 8 },
+			ZIndex = 2,
+			Children = {
+				CartoonLabel({
+					Box = UDim2.new(0, 0, 1, 0),
+					AutomaticSize = Enum.AutomaticSize.X,
+					TextSize = TITLE_SIZE,
+					Text = props.Title or "Order",
+					Color = Theme.Color.Dark,
+					Stroke = 0,
+				}),
+			},
 		}),
 	})
 end

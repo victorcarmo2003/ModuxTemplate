@@ -1,5 +1,5 @@
 --!strict
--- HudRunEnd: toggle "Shown" to fade the screen; "Result" Failed (lost night, Walt quote) or Success (Night 10).
+-- HudRunEnd: "Shown" fades the dawn in and pops the card; "Result" Failed (lost night, Walt quote) or Success (Night 10).
 -- Phone = 667 x 375.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)

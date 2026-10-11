@@ -7,16 +7,20 @@
 --               current device ("Tap to switch" / "Press E to switch" / "Press X to switch")
 -- Wave 2: no ambulance, no revive offer, no lobby button. Status only: the switch itself is the camera's bind
 -- (CameraController); nothing here is clickable (FEAT-032). Pure: only props.
+-- Cartoon pass (AST-091): the card is a Cream CartoonPanel that pops in (Motion.Pop); the "Watching" pill is an Ink
+-- panel with the binoculars icon between two arrow icons (decoration only: they show the switch, they are not buttons).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Theme)
-local HudPill = require(script.Parent.HudPill)
+local Icons = require(script.Parent.Icons)
+local Motion = require(script.Parent.Motion)
+local CartoonPanel = require(script.Parent.CartoonPanel)
+local CartoonLabel = require(script.Parent.CartoonLabel)
 
 const create = Vide.create
-const spring = Vide.spring
 const source = Vide.source
 const effect = Vide.effect
--- Vide 0.4.1 types `create` for 19 classes only; UIStroke and UIPadding are not among them.
+-- Vide 0.4.1 types `create` for 19 classes only; UIScale is not among them.
 const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }) -> Instance
 
 -- None = on their feet (nothing shown); Down = fainted tonight; Out = spectator until the next night.
@@ -38,9 +42,11 @@ export type Props = {
 }
 
 const CARD_WIDTH = 300
-const TITLE_SIZE = 28
-const LINE_SIZE = 18
+const TITLE_SIZE = 26
+const LINE_SIZE = 17
 const HINT_SIZE = 16
+const PILL = 48
+const ARROW = 34
 
 const LINES: { [Mode]: { string } } = {
 	None = {},
@@ -48,18 +54,29 @@ const LINES: { [Mode]: { string } } = {
 	Out = { "You're out for now.", "Watch your crew. Cheer them on!", "Your gems are safe." },
 }
 
-local function line(order: number, size: number, font: Font, value: () -> string): TextLabel
-	return create("TextLabel")({
-		Name = `Line{order}`,
+-- Sheet icon, or a drawn text glyph while the sheet is not uploaded.
+local function glyph(order: number, name: string, fallback: string, size: number): Frame
+	const rect = Icons.Rect(name)
+	return create("Frame")({
+		Name = "Glyph",
 		LayoutOrder = order,
-		Size = UDim2.new(1, 0, 0, size + 8),
+		Size = UDim2.fromOffset(size, size),
 		BackgroundTransparency = 1,
-		FontFace = font,
-		TextSize = size,
-		TextColor3 = if order == 1 then Theme.Color.Text else Theme.Color.Cream,
-		TextWrapped = true,
-		Text = value,
-		createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = Theme.Stroke }),
+		if rect
+			then create("ImageLabel")({
+				Size = UDim2.fromScale(1, 1),
+				BackgroundTransparency = 1,
+				Image = Icons.ImageOf(name),
+				ImageRectOffset = rect.Offset,
+				ImageRectSize = rect.Size,
+			})
+			else CartoonLabel({
+				Box = UDim2.fromScale(1, 1),
+				Text = fallback,
+				TextSize = math.floor(size * 0.8),
+				Color = Theme.Color.Mustard,
+				Visible = fallback ~= "",
+			}),
 	})
 end
 
@@ -67,7 +84,7 @@ return function(props: Props): Frame
 	const shown = function(): boolean
 		return props.Mode() ~= "None"
 	end
-	-- Keep the last mode so the card fades out with its text.
+	-- Keep the last mode so the card shrinks away with its text.
 	const initial: Mode = if props.Mode() == "None" then "Down" else props.Mode()
 	const lastMode = source(initial)
 	effect(function()
@@ -76,9 +93,10 @@ return function(props: Props): Frame
 			lastMode(mode)
 		end
 	end)
-	const cardAlpha = spring(function()
-		return if shown() and props.Card() then 0 else 1
-	end, 0.25, 1)
+	const cardScale = Motion.Pop(function()
+		return shown() and props.Card()
+	end)
+	const pillScale = Motion.Pop(shown)
 
 	const textAt = function(index: number): () -> string
 		return function()
@@ -91,46 +109,66 @@ return function(props: Props): Frame
 		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
 		Visible = function()
-			return shown() or cardAlpha() < 0.99
+			return shown() or cardScale() > 0.02 or pillScale() > 0.02
 		end,
 
-		create("CanvasGroup")({
+		CartoonPanel({
 			Name = "Card",
 			AnchorPoint = Vector2.new(0.5, 0),
 			Position = UDim2.new(0.5, 0, 0, props.CardTop or 62),
 			Size = UDim2.fromOffset(CARD_WIDTH, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
-			BackgroundColor3 = Theme.Color.Ink,
-			BackgroundTransparency = Theme.Transparency.Panel,
-			GroupTransparency = cardAlpha,
+			Tone = Theme.Tone.Cream,
+			Outline = Theme.Outline.Thick,
+			Radius = Theme.Radius.Card,
+			Studs = true,
+			Gloss = false,
+			Padding = { Left = 14, Right = 14, Top = 8, Bottom = 10 },
 			Visible = function()
-				return cardAlpha() < 0.99
+				return cardScale() > 0.02
 			end,
-			create("UICorner")({ CornerRadius = UDim.new(0, 18) }),
-			createRaw("UIPadding")({
-				PaddingLeft = UDim.new(0, 14),
-				PaddingRight = UDim.new(0, 14),
-				PaddingTop = UDim.new(0, 8),
-				PaddingBottom = UDim.new(0, 10),
-			}),
-			create("UIListLayout")({
-				FillDirection = Enum.FillDirection.Vertical,
-				HorizontalAlignment = Enum.HorizontalAlignment.Center,
-				SortOrder = Enum.SortOrder.LayoutOrder,
-			}),
-			line(1, TITLE_SIZE, Theme.Font.Title, textAt(1)),
-			line(2, LINE_SIZE, Theme.Font.Body, textAt(2)),
-			create("Frame")({
-				Name = "Third",
-				LayoutOrder = 3,
-				Size = UDim2.new(1, 0, 0, 0),
-				AutomaticSize = Enum.AutomaticSize.Y,
-				BackgroundTransparency = 1,
-				Visible = function()
-					return textAt(3)() ~= ""
-				end,
-				line(3, LINE_SIZE, Theme.Font.Body, textAt(3)),
-			}),
+			Decor = { createRaw("UIScale")({ Scale = cardScale }) },
+			Children = {
+				create("UIListLayout")({
+					FillDirection = Enum.FillDirection.Vertical,
+					HorizontalAlignment = Enum.HorizontalAlignment.Center,
+					SortOrder = Enum.SortOrder.LayoutOrder,
+				}),
+				CartoonLabel({
+					Name = "Line1",
+					LayoutOrder = 1,
+					Box = UDim2.new(1, 0, 0, TITLE_SIZE + 8),
+					Text = textAt(1),
+					TextSize = TITLE_SIZE,
+					Color = Theme.Color.Violet,
+					Stroke = 0,
+				}),
+				CartoonLabel({
+					Name = "Line2",
+					LayoutOrder = 2,
+					Box = UDim2.new(1, 0, 0, 0),
+					AutomaticSize = Enum.AutomaticSize.Y,
+					Wrapped = true,
+					Text = textAt(2),
+					TextSize = LINE_SIZE,
+					Color = Theme.Color.Dark,
+					Stroke = 0,
+				}),
+				CartoonLabel({
+					Name = "Line3",
+					LayoutOrder = 3,
+					Box = UDim2.new(1, 0, 0, 0),
+					AutomaticSize = Enum.AutomaticSize.Y,
+					Wrapped = true,
+					Text = textAt(3),
+					TextSize = LINE_SIZE,
+					Color = Theme.Color.Slate,
+					Stroke = 0,
+					Visible = function()
+						return textAt(3)() ~= ""
+					end,
+				}),
+			},
 		}),
 
 		create("Frame")({
@@ -140,38 +178,68 @@ return function(props: Props): Frame
 			Size = UDim2.fromOffset(0, 0),
 			AutomaticSize = Enum.AutomaticSize.XY,
 			BackgroundTransparency = 1,
-			Visible = shown,
+			Visible = function()
+				return pillScale() > 0.02
+			end,
+			createRaw("UIScale")({ Scale = pillScale }),
 			create("UIListLayout")({
 				FillDirection = Enum.FillDirection.Vertical,
 				HorizontalAlignment = Enum.HorizontalAlignment.Center,
 				SortOrder = Enum.SortOrder.LayoutOrder,
 				Padding = UDim.new(0, 4),
 			}),
-			HudPill({
-				Name = "Target",
+
+			create("Frame")({
+				Name = "Row",
 				LayoutOrder = 1,
-				Height = 44,
-				TextSize = 20,
-				MinWidth = 180,
-				Text = function()
-					const target = props.Target()
-					return if target == "" then "Watching the trailer" else `Watching: {target}`
-				end,
-			}),
-			create("TextLabel")({
-				Name = "Hint",
-				LayoutOrder = 2,
-				Size = UDim2.fromOffset(0, HINT_SIZE + 6),
+				Size = UDim2.fromOffset(0, PILL),
 				AutomaticSize = Enum.AutomaticSize.X,
 				BackgroundTransparency = 1,
-				FontFace = Theme.Font.Body,
-				TextSize = HINT_SIZE,
-				TextColor3 = Theme.Color.Cream,
+				create("UIListLayout")({
+					FillDirection = Enum.FillDirection.Horizontal,
+					VerticalAlignment = Enum.VerticalAlignment.Center,
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					Padding = UDim.new(0, 6),
+				}),
+				glyph(1, "Ui/arrow_left", "<", ARROW),
+				CartoonPanel({
+					Name = "Target",
+					LayoutOrder = 2,
+					Size = UDim2.fromOffset(0, PILL),
+					AutomaticSize = Enum.AutomaticSize.X,
+					Tone = Theme.Tone.Ink,
+					Transparency = Theme.Transparency.Panel,
+					Padding = { Left = 6, Right = 18 },
+					Children = {
+						create("UIListLayout")({
+							FillDirection = Enum.FillDirection.Horizontal,
+							VerticalAlignment = Enum.VerticalAlignment.Center,
+							SortOrder = Enum.SortOrder.LayoutOrder,
+							Padding = UDim.new(0, 6),
+						}),
+						glyph(1, "Ui/spectate", "", PILL - 8),
+						CartoonLabel({
+							LayoutOrder = 2,
+							TextSize = 20,
+							Text = function()
+								const target = props.Target()
+								return if target == "" then "Watching the trailer" else `Watching: {target}`
+							end,
+						}),
+					},
+				}),
+				glyph(3, "Ui/arrow_right", ">", ARROW),
+			}),
+
+			CartoonLabel({
+				Name = "Hint",
+				LayoutOrder = 2,
 				Text = props.Hint,
+				TextSize = HINT_SIZE,
+				Color = Theme.Color.Cream,
 				Visible = function()
 					return props.Hint() ~= ""
 				end,
-				createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = Theme.Stroke }),
 			}),
 		}),
 	})

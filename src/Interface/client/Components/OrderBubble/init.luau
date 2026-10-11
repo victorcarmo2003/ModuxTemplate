@@ -11,9 +11,15 @@
 -- Always on top (user request after Play: the awning covered the bubble): drawn over the world, so the customer's
 -- order reads through roofs and awnings. `Lift` (px) raises it over the prompt pill on the customer's neck, so the two
 -- billboards never overlap on screen at any distance.
+-- Cartoon pass (AST-091 "Balão de pedido"): white CartoonPanel bubble (gradient, lip, thick Ink outline), the patience
+-- ring just inside the outline, tail under it; icons from the AST-071 sheet when the topping has no own `Icon`
+-- (`Ingredient/<key>`, base = `Item/hot_dog`), the drawn chips stay as the last fallback.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Theme)
+local Icons = require(script.Parent.Icons)
+local CartoonPanel = require(script.Parent.CartoonPanel)
+local CartoonLabel = require(script.Parent.CartoonLabel)
 
 const create = Vide.create
 const indexes = Vide.indexes
@@ -49,7 +55,8 @@ export type Props = {
 const CELL = 44 -- icon size (min touch/readable size, Theme.MinTouch)
 const GAP = 6
 const PAD = 10
-const BUBBLE_HEIGHT = CELL + PAD * 2
+const LIP = 4
+const BUBBLE_HEIGHT = CELL + PAD * 2 + LIP
 const TAIL = 16 -- tail square side (rotated 45°)
 const HEIGHT = BUBBLE_HEIGHT + TAIL
 const RING = 4
@@ -74,19 +81,35 @@ end
 
 -- Readable label on any chip color: white text with the Ink outline (style guide §7.1).
 local function label(text: string | () -> string): TextLabel
-	return create("TextLabel")({
+	return CartoonLabel({
 		Name = "Label",
-		Size = UDim2.fromScale(1, 1),
-		BackgroundTransparency = 1,
-		FontFace = Theme.Font.Title,
+		Box = UDim2.fromScale(1, 1),
 		TextSize = LABEL_SIZE,
-		TextColor3 = Theme.Color.Text,
 		Text = text,
-		createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = Theme.Stroke }),
 	})
 end
 
-local function baseIcon(empty: () -> boolean): Frame
+-- Sheet image for a name, or nil (keeps the drawn fallback).
+local function sheet(name: string): (string, Icons.Rect?)
+	return Icons.ImageOf(name), Icons.Rect(name)
+end
+
+local function baseIcon(empty: () -> boolean): GuiObject
+	const image, rect = sheet("Item/hot_dog")
+	if rect then
+		return create("ImageLabel")({
+			Name = "Base",
+			LayoutOrder = 0,
+			Size = UDim2.fromOffset(CELL, CELL),
+			BackgroundTransparency = 1,
+			Image = image,
+			ImageRectOffset = rect.Offset,
+			ImageRectSize = rect.Size,
+			Visible = function()
+				return not empty()
+			end,
+		})
+	end
 	return create("Frame")({
 		Name = "Base",
 		LayoutOrder = 0,
@@ -105,7 +128,7 @@ local function baseIcon(empty: () -> boolean): Frame
 			create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
 			createRaw("UIStroke")({
 				Color = Theme.Color.Ink,
-				Thickness = Theme.Stroke,
+				Thickness = Theme.Outline.Normal,
 				ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 			}),
 		}),
@@ -126,8 +149,17 @@ local function baseIcon(empty: () -> boolean): Frame
 end
 
 local function toppingIcon(topping: () -> Topping, index: number): Frame
+	local function sheetName(): string
+		return `Ingredient/{topping().Key}`
+	end
 	local function hasArt(): boolean
-		return topping().Icon ~= ""
+		return topping().Icon ~= "" or Icons.Has(sheetName())
+	end
+	local function rect(): Icons.Rect
+		if topping().Icon ~= "" then
+			return { Offset = Vector2.zero, Size = Vector2.zero }
+		end
+		return Icons.Rect(sheetName()) or { Offset = Vector2.zero, Size = Vector2.zero }
 	end
 	return create("Frame")({
 		Name = "Topping",
@@ -142,7 +174,7 @@ local function toppingIcon(topping: () -> Topping, index: number): Frame
 		create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
 		createRaw("UIStroke")({
 			Color = Theme.Color.Ink,
-			Thickness = Theme.Stroke,
+			Thickness = Theme.Outline.Normal,
 			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 			Enabled = function()
 				return not hasArt()
@@ -154,7 +186,14 @@ local function toppingIcon(topping: () -> Topping, index: number): Frame
 			BackgroundTransparency = 1,
 			ScaleType = Enum.ScaleType.Fit,
 			Image = function()
-				return topping().Icon
+				const own = topping().Icon
+				return if own ~= "" then own else Icons.ImageOf(sheetName())
+			end,
+			ImageRectOffset = function()
+				return rect().Offset
+			end,
+			ImageRectSize = function()
+				return rect().Size
 			end,
 			Visible = hasArt,
 		}),
@@ -225,76 +264,75 @@ return function(props: Props): BillboardGui
 		create("Frame")({
 			Name = "Tail",
 			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.new(0.5, 0, 0, BUBBLE_HEIGHT - 2),
+			Position = UDim2.new(0.5, 0, 0, BUBBLE_HEIGHT - 3),
 			Size = UDim2.fromOffset(TAIL, TAIL),
 			Rotation = 45,
-			BackgroundColor3 = WHITE,
+			BackgroundColor3 = Theme.Tone.White.Lip,
 			createRaw("UIStroke")({
 				Color = Theme.Color.Ink,
-				Thickness = Theme.Stroke,
+				Thickness = Theme.Outline.Normal,
 				ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 			}),
 		}),
 
-		create("Frame")({
+		CartoonPanel({
 			Name = "Bubble",
 			Size = UDim2.new(1, 0, 0, BUBBLE_HEIGHT),
-			BackgroundColor3 = WHITE,
+			Tone = Theme.Tone.White,
+			Outline = Theme.Outline.Thick,
+			Radius = UDim.new(0, (BUBBLE_HEIGHT - LIP) / 2),
+			Lip = LIP,
 			ZIndex = 2,
-
-			create("UICorner")({ CornerRadius = UDim.new(0, BUBBLE_HEIGHT / 2) }),
-			createRaw("UIStroke")({
-				Color = Theme.Color.Ink,
-				Thickness = Theme.Stroke,
-				ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-			}),
-
-			create("Frame")({
-				Name = "Ring",
-				Size = UDim2.fromScale(1, 1),
-				BackgroundTransparency = 1,
-				ZIndex = 3,
-				create("UICorner")({ CornerRadius = UDim.new(0, BUBBLE_HEIGHT / 2) }),
-				createRaw("UIStroke")({
-					Thickness = RING,
-					ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-					Color = WHITE, -- the gradient below gives the color
-					Enabled = function()
-						return props.Patience() >= 0
-					end,
-					create("UIGradient")({
-						Color = function()
-							const color = if props.Patience() > warnAt then Theme.Color.Green else Theme.Color.Mustard
-							return ColorSequence.new(color)
+			Children = {
+				-- Patience ring, just inside the Ink outline
+				create("Frame")({
+					Name = "Ring",
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Position = UDim2.fromScale(0.5, 0.5),
+					Size = UDim2.new(1, -RING * 2, 1, -RING * 2),
+					BackgroundTransparency = 1,
+					create("UICorner")({ CornerRadius = UDim.new(0, (BUBBLE_HEIGHT - LIP) / 2 - RING) }),
+					createRaw("UIStroke")({
+						Thickness = RING,
+						ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+						Color = WHITE, -- the gradient below gives the color
+						Enabled = function()
+							return props.Patience() >= 0
 						end,
-						Transparency = function()
-							return ringTransparency(math.clamp(props.Patience(), 0, 1))
-						end,
+						create("UIGradient")({
+							Color = function()
+								const color = if props.Patience() > warnAt then Theme.Color.Green else Theme.Color.Mustard
+								return ColorSequence.new(color)
+							end,
+							Transparency = function()
+								return ringTransparency(math.clamp(props.Patience(), 0, 1))
+							end,
+						}),
 					}),
 				}),
-			}),
 
-			create("Frame")({
-				Name = "Icons",
-				Size = UDim2.fromScale(1, 1),
-				BackgroundTransparency = 1,
-				ZIndex = 4,
-				create("UIListLayout")({
-					FillDirection = Enum.FillDirection.Horizontal,
-					HorizontalAlignment = Enum.HorizontalAlignment.Center,
-					VerticalAlignment = Enum.VerticalAlignment.Center,
-					SortOrder = Enum.SortOrder.LayoutOrder,
-					Padding = UDim.new(0, GAP),
+				create("Frame")({
+					Name = "Icons",
+					Size = UDim2.fromScale(1, 1),
+					BackgroundTransparency = 1,
+					ZIndex = 2,
+					create("UIListLayout")({
+						FillDirection = Enum.FillDirection.Horizontal,
+						HorizontalAlignment = Enum.HorizontalAlignment.Center,
+						VerticalAlignment = Enum.VerticalAlignment.Center,
+						SortOrder = Enum.SortOrder.LayoutOrder,
+						Padding = UDim.new(0, GAP),
+					}),
+					baseIcon(empty),
+					indexes(function()
+						const list = toppings()
+						if #list <= 3 then
+							return list
+						end
+						return { list[1], list[2], list[3] }
+					end, toppingIcon),
 				}),
-				baseIcon(empty),
-				indexes(function()
-					const list = toppings()
-					if #list <= 3 then
-						return list
-					end
-					return { list[1], list[2], list[3] }
-				end, toppingIcon),
-			}),
+			},
 		}),
 	})
 end

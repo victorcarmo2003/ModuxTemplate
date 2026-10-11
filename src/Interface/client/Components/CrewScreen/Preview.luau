@@ -101,18 +101,21 @@ return function(props: Props): Frame
 		end)
 	end)
 
+	-- Cartoon pass (AST-091): Cream card with a soft top-light gradient and a thick Ink outline.
 	return create("Frame")({
 		Name = "Preview",
 		LayoutOrder = props.LayoutOrder or 0,
 		Size = props.Size or UDim2.fromScale(1, 1),
-		BackgroundColor3 = Theme.Color.Cream,
+		BackgroundColor3 = Color3.new(1, 1, 1), -- the gradient gives the Cream
 
-		create("UICorner")({ CornerRadius = UDim.new(0, 14) }),
+		create("UICorner")({ CornerRadius = Theme.Radius.Card }),
 		createRaw("UIStroke")({
 			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+			LineJoinMode = Enum.LineJoinMode.Round,
 			Color = Theme.Color.Ink,
-			Thickness = Theme.Stroke,
+			Thickness = Theme.Outline.Normal,
 		}),
+		createRaw("UIGradient")({ Rotation = 90, Color = Theme.Gradient(Theme.Tone.Cream) }),
 
 		-- placeholder until the rig (or its kit) exists
 		create("TextLabel")({

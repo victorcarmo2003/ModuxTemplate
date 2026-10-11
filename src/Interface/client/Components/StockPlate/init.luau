@@ -3,6 +3,7 @@
 -- SurfaceGui on one face of the plate: ingredient icon + "7/12" (red at Low). Until the icons exist (Q-152) the
 -- icon is a placeholder: the ingredient name on a swatch of its palette color (style guide §2.1).
 -- Lit by the scene (LightInfluence 1) so the plate darkens at night like the bowl it is glued to.
+-- Cartoon pass (AST-091): Cream plate with a top-light gradient, placeholder swatch with a thick Ink outline.
 -- Pure: only props. The caller picks the face that looks at the operator and parents the SurfaceGui.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -58,7 +59,9 @@ return function(props: Props): SurfaceGui
 		create("Frame")({
 			Name = "Plate",
 			Size = UDim2.fromScale(1, 1),
-			BackgroundColor3 = Theme.Color.Cream,
+			BackgroundColor3 = Color3.new(1, 1, 1), -- the gradient gives the Cream
+
+			create("UIGradient")({ Rotation = 90, Color = Theme.Gradient(Theme.Tone.Cream) }),
 
 			createRaw("UIPadding")({
 				PaddingTop = UDim.new(0.08, 0),
@@ -97,6 +100,11 @@ return function(props: Props): SurfaceGui
 						return not hasIcon()
 					end,
 					create("UICorner")({ CornerRadius = UDim.new(0.2, 0) }),
+					createRaw("UIStroke")({
+						Color = Theme.Color.Ink,
+						Thickness = 4,
+						ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+					}),
 					create("TextLabel")({
 						Size = UDim2.fromScale(0.92, 0.9),
 						AnchorPoint = Vector2.new(0.5, 0.5),

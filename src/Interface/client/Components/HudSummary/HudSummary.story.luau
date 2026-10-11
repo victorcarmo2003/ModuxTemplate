@@ -1,5 +1,5 @@
 --!strict
--- HudSummary: toggle "Shown" to fade the card in/out; the other controls fill the ShiftReport fields.
+-- HudSummary: toggle "Shown" to pop the card in/out; the other controls fill the ShiftReport fields.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
 local Vide = require(ReplicatedStorage.Packages.Vide)

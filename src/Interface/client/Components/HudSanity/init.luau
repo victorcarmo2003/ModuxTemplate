@@ -7,12 +7,16 @@
 -- species fur colour; species letter when the icon is missing. The band shows as the ring colour (Day warm, Mid
 -- between, Night violet) and a darker portrait on Night.
 -- The owner hides it with `Shown` (Max > 0 and own state Active). Status only: nothing clickable (FEAT-032).
+-- Cartoon pass (AST-091 "Barra de sanidade"): portrait in a thick band ring with an Ink outline, the bar is an Ink
+-- CartoonPanel track with a glossy two-tone fill, the number with a heavy Ink stroke.
 -- Pure: only props.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Theme)
 local Icons = require(script.Parent.Icons)
+local CartoonPanel = require(script.Parent.CartoonPanel)
+local CartoonLabel = require(script.Parent.CartoonLabel)
 
 const create = Vide.create
 const source = Vide.source
@@ -45,13 +49,13 @@ export type Props = {
 const FULL = Color3.fromHex("#FFD45A")
 const EMPTY = Theme.Color.Violet -- #6A5ACD
 const MID_RING = FULL:Lerp(EMPTY, 0.5)
-const PORTRAIT = 44 -- touch-sized circle (not clickable, but readable at a glance)
-const BAR_HEIGHT = 18
+const PORTRAIT = 48 -- touch-sized circle (not clickable, but readable at a glance)
+const BAR_HEIGHT = 26
 const MIN_BAR = 140
 const MAX_BAR = 320
-const TEXT_SIZE = 18
+const TEXT_SIZE = 20
 const GAP = 8
-const VALUE_WIDTH = 36 -- "100" at TEXT_SIZE
+const VALUE_WIDTH = 40 -- "100" at TEXT_SIZE
 -- Offset width of everything that is not the bar: portrait, gaps, number
 const SIDES = PORTRAIT + GAP * 2 + VALUE_WIDTH
 -- style guide §7.2: "abaixo de 25 pulsa devagar"
@@ -83,49 +87,59 @@ local function portrait(props: Props): Frame
 	const rect = function(): Icons.Rect
 		return Icons.Rect(icon()) or { Offset = Vector2.zero, Size = Vector2.zero }
 	end
+	-- Band ring (thick, coloured) inside an Ink outline, the portrait disc inside the ring.
 	return create("Frame")({
 		Name = "Portrait",
 		Size = UDim2.fromOffset(PORTRAIT, PORTRAIT),
-		BackgroundColor3 = fur,
-		create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
-		createRaw("UIStroke")({
-			Color = function()
-				return RING[props.Band()]
-			end,
-			Thickness = 3,
-		}),
-		create("TextLabel")({
-			Name = "Letter",
-			Size = UDim2.fromScale(1, 1),
-			BackgroundTransparency = 1,
-			FontFace = Theme.Font.Title,
-			TextSize = 26,
-			TextColor3 = function()
-				return letterColor(fur())
-			end,
-			Text = props.Letter,
-			Visible = function()
-				return icon() == ""
-			end,
-		}),
-		create("ImageLabel")({
-			Name = "Icon",
-			Size = UDim2.fromScale(1, 1),
-			BackgroundTransparency = 1,
-			Image = Icons.Image,
-			ImageRectOffset = function()
-				return rect().Offset
-			end,
-			ImageRectSize = function()
-				return rect().Size
-			end,
-			ImageColor3 = function()
-				return if props.Band() == "Night" then Color3.new(0.65, 0.65, 0.72) else Color3.new(1, 1, 1)
-			end,
-			Visible = function()
-				return icon() ~= ""
-			end,
-			create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+		BackgroundColor3 = function()
+			return RING[props.Band()]
+		end,
+		create("UICorner")({ CornerRadius = Theme.Radius.Pill }),
+		createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = Theme.Outline.Normal }),
+		create("Frame")({
+			Name = "Disc",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.new(1, -8, 1, -8),
+			BackgroundColor3 = fur,
+			create("UICorner")({ CornerRadius = Theme.Radius.Pill }),
+			createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = 2 }),
+			createRaw("UIGradient")({
+				Rotation = 90,
+				Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(215, 205, 195)),
+			}),
+			CartoonLabel({
+				Name = "Letter",
+				Box = UDim2.fromScale(1, 1),
+				TextSize = 24,
+				Color = function()
+					return letterColor(fur())
+				end,
+				Stroke = 0,
+				Text = props.Letter,
+				Visible = function()
+					return icon() == ""
+				end,
+			}),
+			create("ImageLabel")({
+				Name = "Icon",
+				Size = UDim2.fromScale(1, 1),
+				BackgroundTransparency = 1,
+				Image = Icons.Image,
+				ImageRectOffset = function()
+					return rect().Offset
+				end,
+				ImageRectSize = function()
+					return rect().Size
+				end,
+				ImageColor3 = function()
+					return if props.Band() == "Night" then Color3.new(0.65, 0.65, 0.72) else Color3.new(1, 1, 1)
+				end,
+				Visible = function()
+					return icon() ~= ""
+				end,
+				create("UICorner")({ CornerRadius = Theme.Radius.Pill }),
+			}),
 		}),
 	})
 end
@@ -171,49 +185,60 @@ return function(props: Props): Frame
 
 		portrait(props),
 
-		-- Bar: Ink track (style guide §7.2), fill by sanity / max.
-		create("Frame")({
+		-- Bar: Ink track (style guide §7.2), glossy fill by sanity / max.
+		CartoonPanel({
 			Name = "Bar",
 			AnchorPoint = Vector2.new(0, 0.5),
 			Position = UDim2.new(0, PORTRAIT + GAP, 0.5, 0),
 			Size = UDim2.new(1, -SIDES, 0, BAR_HEIGHT),
-			BackgroundColor3 = Theme.Color.Ink,
-			BackgroundTransparency = Theme.Transparency.Track,
-			create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
-			createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = Theme.Stroke }),
-
-			create("Frame")({
-				Name = "Fill",
-				Size = function()
-					return UDim2.fromScale(math.clamp(fill(), 0, 1), 1)
-				end,
-				Visible = function()
-					return fill() > 0.005
-				end,
-				BackgroundColor3 = function()
-					return EMPTY:Lerp(FULL, math.clamp(fill(), 0, 1))
-				end,
-				BackgroundTransparency = function()
-					return pulse() * PULSE_DEPTH
-				end,
-				create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
-			}),
+			Tone = Theme.Tone.Ink,
+			Outline = Theme.Outline.Normal,
+			Lip = 0,
+			Gloss = false,
+			Padding = 3,
+			Children = {
+				create("Frame")({
+					Name = "Fill",
+					Size = function()
+						return UDim2.fromScale(math.clamp(fill(), 0, 1), 1)
+					end,
+					Visible = function()
+						return fill() > 0.005
+					end,
+					BackgroundColor3 = function()
+						return EMPTY:Lerp(FULL, math.clamp(fill(), 0, 1))
+					end,
+					BackgroundTransparency = function()
+						return pulse() * PULSE_DEPTH
+					end,
+					create("UICorner")({ CornerRadius = Theme.Radius.Pill }),
+					createRaw("UIGradient")({
+						Rotation = 90,
+						Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(200, 200, 200)),
+					}),
+					create("Frame")({
+						Name = "Gloss",
+						AnchorPoint = Vector2.new(0.5, 0),
+						Position = UDim2.new(0.5, 0, 0, 2),
+						Size = UDim2.new(1, -8, 0.32, 0),
+						BackgroundColor3 = Color3.new(1, 1, 1),
+						BackgroundTransparency = 0.55,
+						create("UICorner")({ CornerRadius = Theme.Radius.Pill }),
+					}),
+				}),
+			},
 		}),
 
-		create("TextLabel")({
+		CartoonLabel({
 			Name = "Value",
 			AnchorPoint = Vector2.new(1, 0),
 			Position = UDim2.fromScale(1, 0),
-			Size = UDim2.fromOffset(VALUE_WIDTH, PORTRAIT),
-			BackgroundTransparency = 1,
-			FontFace = Theme.Font.Title,
+			Box = UDim2.fromOffset(VALUE_WIDTH, PORTRAIT),
 			TextSize = TEXT_SIZE,
-			TextColor3 = Theme.Color.Text,
-			TextXAlignment = Enum.TextXAlignment.Left,
+			XAlignment = Enum.TextXAlignment.Left,
 			Text = function()
 				return tostring(math.floor(props.Value()))
 			end,
-			createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = Theme.Stroke }),
 		}),
 	})
 end

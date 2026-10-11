@@ -6,10 +6,13 @@
 --   centre     end-of-shift summary (FEAT-014), fades out by itself
 -- Nothing here is clickable (FEAT-032 acceptance): Frames and TextLabels only. No reputation, boss chances, XP or
 -- sanity (sanity is night only, wave 2). The bottom third stays free for the hotbar, joystick and interact button.
+-- Cartoon pass (AST-091): Ink pills with big icons; the money rolls up to the new value (Motion.Count) and the pill
+-- jumps (Motion.Bump) when it goes up.
 -- Pure: only props. Mount it inside a ScreenGui with `ScreenInsets = CoreUISafeInsets` (clear of the Roblox top bar).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local HudPill = require(script.Parent.HudPill)
+local Motion = require(script.Parent.Motion)
 local Money = require(script.Parent.HudPill.Money)
 local HudSummary = require(script.Parent.HudSummary)
 local ToastStack = require(script.Parent.Toast.Stack)
@@ -40,6 +43,9 @@ return function(props: Props): Frame
 	const scale = function(): number
 		return if props.Scale then math.max(props.Scale(), 1) else 1
 	end
+
+	-- Shown money rolls from the old value to the new one (the bump still reads the real value).
+	const rolled = Motion.Count(props.Cash)
 
 	return create("Frame")({
 		Name = "HudScreen",
@@ -76,7 +82,7 @@ return function(props: Props): Frame
 					return "Coin"
 				end,
 				Text = function()
-					return Money(props.Cash())
+					return Money(math.floor(rolled() + 0.5))
 				end,
 				Bump = props.Cash,
 			}),
@@ -101,6 +107,9 @@ return function(props: Props): Frame
 			Height = BIG,
 			TextSize = 24,
 			MinWidth = 140,
+			Icon = function(): HudPill.Icon
+				return "Clock"
+			end,
 			Text = props.Clock,
 		}),
 

@@ -1,0 +1,227 @@
+{
+  "image": "AST-091_ui_icons.png",
+  "cell": 128,
+  "icons": {
+    "Ui/close": {
+      "ImageRectOffset": [
+        0,
+        0
+      ],
+      "ImageRectSize": [
+        128,
+        128
+      ],
+      "source": "Rhos Vectors/X/X Flat White 256.png"
+    },
+    "Ui/check": {
+      "ImageRectOffset": [
+        128,
+        0
+      ],
+      "ImageRectSize": [
+        128,
+        128
+      ],
+      "source": "Rhos Vectors/Check Mark/Check Mark 256.png"
+    },
+    "Ui/arrow_left": {
+      "ImageRectOffset": [
+        256,
+        0
+      ],
+      "ImageRectSize": [
+        128,
+        128
+      ],
+      "source": "Rhos Vectors/Arrow Left/Arrow Left 256.png"
+    },
+    "Ui/arrow_right": {
+      "ImageRectOffset": [
+        384,
+        0
+      ],
+      "ImageRectSize": [
+        128,
+        128
+      ],
+      "source": "Rhos Vectors/Arrow Right/Arrow Right 256.png"
+    },
+    "Ui/spectate": {
+      "ImageRectOffset": [
+        512,
+        0
+      ],
+      "ImageRectSize": [
+        128,
+        128
+      ],
+      "source": "Rhos Vectors/Spectate/Spectate 256.png"
+    },
+    "Ui/hourglass": {
+      "ImageRectOffset": [
+        640,
+        0
+      ],
+      "ImageRectSize": [
+        128,
+        128
+      ],
+      "source": "Rhos Vectors/Hourglass/Hourglass 256.png"
+    },
+    "Ui/info": {
+      "ImageRectOffset": [
+        768,
+        0
+      ],
+      "ImageRectSize": [
+        128,
+        128
+      ],
+      "source": "Rhos Vectors/Info/Info 256.png"
+    },
+    "Ui/warning": {
+      "ImageRectOffset": [
+        896,
+        0
+      ],
+      "ImageRectSize": [
+        128,
+        128
+      ],
+      "source": "Rhos Vectors/Warning/Warning 256.png"
+    },
+    "Ui/sparkle": {
+      "ImageRectOffset": [
+        0,
+        128
+      ],
+      "ImageRectSize": [
+        128,
+        128
+      ],
+      "source": "Rhos Vectors/Sparkle/Sparkle 256.png"
+    },
+    "Ui/trophy": {
+      "ImageRectOffset": [
+        128,
+        128
+      ],
+      "ImageRectSize": [
+        128,
+        128
+      ],
+      "source": "Rhos Vectors/Trophy/Trophy 256.png"
+    },
+    "Ui/calendar": {
+      "ImageRectOffset": [
+        256,
+        128
+      ],
+      "ImageRectSize": [
+        128,
+        128
+      ],
+      "source": "Rhos Vectors/Calendar/Calendar 256.png"
+    },
+    "Ui/cash": {
+      "ImageRectOffset": [
+        384,
+        128
+      ],
+      "ImageRectSize": [
+        128,
+        128
+      ],
+      "source": "Rhos Vectors/Cash/Cash 256.png"
+    },
+    "Ui/tip_jar": {
+      "ImageRectOffset": [
+        512,
+        128
+      ],
+      "ImageRectSize": [
+        128,
+        128
+      ],
+      "source": "Rhos Vectors/Tip Jar/Tip Jar 256.png"
+    },
+    "Ui/friends": {
+      "ImageRectOffset": [
+        640,
+        128
+      ],
+      "ImageRectSize": [
+        128,
+        128
+      ],
+      "source": "Rhos Vectors/Friends/Friends 256.png"
+    },
+    "Ui/paw": {
+      "ImageRectOffset": [
+        768,
+        128
+      ],
+      "ImageRectSize": [
+        128,
+        128
+      ],
+      "source": "Rhos Vectors/Paw/Paw 256.png"
+    },
+    "Ui/thumbs_up": {
+      "ImageRectOffset": [
+        896,
+        128
+      ],
+      "ImageRectSize": [
+        128,
+        128
+      ],
+      "source": "Rhos Vectors/Thumbs Up/Thumbs Up 256.png"
+    },
+    "Ui/clock": {
+      "ImageRectOffset": [
+        0,
+        256
+      ],
+      "ImageRectSize": [
+        128,
+        128
+      ],
+      "source": "Rhos Vectors/Clock/Clock 256.png"
+    },
+    "Ui/lantern": {
+      "ImageRectOffset": [
+        128,
+        256
+      ],
+      "ImageRectSize": [
+        128,
+        128
+      ],
+      "source": "Rhos Vectors/Lantern/Lantern 256.png"
+    },
+    "Ui/megaphone": {
+      "ImageRectOffset": [
+        256,
+        256
+      ],
+      "ImageRectSize": [
+        128,
+        128
+      ],
+      "source": "Rhos Vectors/Megaphone/Megaphone 256.png"
+    },
+    "Ui/bell": {
+      "ImageRectOffset": [
+        384,
+        256
+      ],
+      "ImageRectSize": [
+        128,
+        128
+      ],
+      "source": "Rhos Vectors/Bell/Bell 256.png"
+    }
+  },
+  "license": "RhosGFX Vector Icon Pack: use in this game only, never resell or redistribute"
+}

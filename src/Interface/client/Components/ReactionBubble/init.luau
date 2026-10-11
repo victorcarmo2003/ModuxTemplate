@@ -5,10 +5,15 @@
 -- line, mounts it for a few seconds and destroys it.
 -- Fixed pixel size (not studs): icon 44 px and text 16 px on a phone at any distance it is drawn (MaxDistance).
 -- Pops in (scale 0 -> 1, Back easing) when mounted.
+-- Cartoon pass (AST-091): the star and the scribbled cloud are the AST-071 sheet icons (`Reaction/star`,
+-- `Reaction/scribble_cloud`; drawn shapes stay as the fallback), the line sits on a white CartoonPanel pill.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Theme)
+local Icons = require(script.Parent.Icons)
 local UseTween = require(script.Parent.UseTween)
+local CartoonPanel = require(script.Parent.CartoonPanel)
+local CartoonLabel = require(script.Parent.CartoonLabel)
 
 const create = Vide.create
 const source = Vide.source
@@ -29,8 +34,8 @@ export type Props = {
 }
 
 const WIDTH = 240
-const ICON = 44
-const LINE_HEIGHT = 30
+const ICON = 52
+const LINE_HEIGHT = 34
 const GAP = 4
 const HEIGHT = ICON + GAP + LINE_HEIGHT
 const TEXT_SIZE = 16
@@ -41,8 +46,24 @@ const WHITE = Color3.fromHex("#FFFFFF")
 local function stroke(): Instance
 	return createRaw("UIStroke")({
 		Color = Theme.Color.Ink,
-		Thickness = Theme.Stroke,
+		Thickness = Theme.Outline.Normal,
 		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+	})
+end
+
+-- The sheet icon of `name` when it exists, else the drawn shape.
+local function art(name: string, drawn: () -> Frame): Instance
+	const rect = Icons.Rect(name)
+	if rect == nil then
+		return drawn()
+	end
+	return create("ImageLabel")({
+		Name = "Art",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		Image = Icons.ImageOf(name),
+		ImageRectOffset = rect.Offset,
+		ImageRectSize = rect.Size,
 	})
 end
 
@@ -188,7 +209,7 @@ return function(props: Props): BillboardGui
 					Visible = function()
 						return props.Kind() == "Happy"
 					end,
-					star(),
+					art("Reaction/star", star),
 				}),
 				create("Frame")({
 					Size = UDim2.fromScale(1, 1),
@@ -196,7 +217,7 @@ return function(props: Props): BillboardGui
 					Visible = function()
 						return props.Kind() == "Complaint"
 					end,
-					cloud(),
+					art("Reaction/scribble_cloud", cloud),
 				}),
 				create("Frame")({
 					Size = UDim2.fromScale(1, 1),
@@ -208,29 +229,30 @@ return function(props: Props): BillboardGui
 				}),
 			}),
 
-			create("TextLabel")({
+			CartoonPanel({
 				Name = "Line",
 				AnchorPoint = Vector2.new(0.5, 1),
 				Position = UDim2.fromScale(0.5, 1),
 				-- as wide as the line (pill), height follows the pop
 				Size = UDim2.fromScale(0, LINE_HEIGHT / HEIGHT),
 				AutomaticSize = Enum.AutomaticSize.X,
-				BackgroundColor3 = WHITE,
-				FontFace = Theme.Font.Body,
-				TextSize = TEXT_SIZE,
-				TextScaled = false,
-				TextColor3 = Theme.Color.Ink,
-				Text = props.Text,
+				Tone = Theme.Tone.White,
+				Lip = 3,
+				Padding = { Left = 10, Right = 10 },
 				Visible = function()
 					-- hidden while the pop is tiny: TextSize is fixed and would spill out of a small frame
 					return hasText() and shown()
 				end,
-				create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
-				stroke(),
-				createRaw("UIPadding")({
-					PaddingLeft = UDim.new(0, 10),
-					PaddingRight = UDim.new(0, 10),
-				}),
+				Children = {
+					CartoonLabel({
+						Box = UDim2.new(0, 0, 1, 0),
+						AutomaticSize = Enum.AutomaticSize.X,
+						TextSize = TEXT_SIZE,
+						Color = Theme.Color.Dark,
+						Stroke = 0,
+						Text = props.Text,
+					}),
+				},
 			}),
 		}),
 	})

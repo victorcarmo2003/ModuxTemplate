@@ -1,5 +1,5 @@
 --!strict
--- HudWipe: "Run" counts 10 -> 0 in real seconds (as the HUD does from Shift.WipeEndsAt); turn it off to see the fade.
+-- HudWipe: "Run" counts 10 -> 0 in real seconds (as the HUD does from Shift.WipeEndsAt); turn it off: it shrinks away.
 -- "Seconds" picks a fixed value while "Run" is off; -1 hides the card. Phone = 667 x 375.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")

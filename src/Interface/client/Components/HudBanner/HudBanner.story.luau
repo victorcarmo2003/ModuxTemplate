@@ -1,5 +1,5 @@
 --!strict
--- HudBanner: toggle "Shown" to fade in/out; "Kind" picks the night start, the repeated night or 6:00 AM.
+-- HudBanner: toggle "Shown" to pop the ribbon in/out; "Kind" picks the night start, the repeated night or 6:00 AM.
 -- Phone = 667 x 375.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)

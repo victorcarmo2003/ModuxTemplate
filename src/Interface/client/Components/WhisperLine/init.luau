@@ -63,7 +63,7 @@ return function(props: Props): Frame
 			end,
 			Size = UDim2.fromScale(1, 1),
 			BackgroundTransparency = 1,
-			FontFace = Font.new(Theme.Font.Body.Family, Enum.FontWeight.Regular, Enum.FontStyle.Italic),
+			FontFace = Theme.Font.Whisper, -- thin italic on purpose: not part of the cartoon kit
 			TextSize = TEXT_SIZE,
 			TextColor3 = Theme.Color.Cream,
 			TextTransparency = alpha,

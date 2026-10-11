@@ -1,6 +1,8 @@
 --!strict
 -- Bar: the 2D body of ProgressBar (track + fill + optional label). Fills its parent.
 -- Kept apart from the BillboardGui so a story can preview it flat and so a screen HUD can reuse it.
+-- Cartoon pass (AST-091 "Barras no mundo"): solid Ink track that is its own outline (proportional, so it stays light
+-- from far away where a pixel UIStroke would not), a darker channel, and a two-tone fill with a gloss band.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Parent.Theme)
@@ -35,8 +37,10 @@ return function(props: Props): Frame
 			Name = "Inner",
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.fromScale(0.96, 0.7),
-			BackgroundTransparency = 1,
+			Size = UDim2.new(0.97, 0, 0.62, 0),
+			BackgroundColor3 = Theme.Tone.Ink.Top,
+			BackgroundTransparency = 0,
+			create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
 
 			create("Frame")({
 				Name = "Fill",
@@ -46,6 +50,19 @@ return function(props: Props): Frame
 					return props.Progress() > 0
 				end,
 				create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+				create("UIGradient")({
+					Rotation = 90,
+					Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(190, 190, 190)),
+				}),
+				create("Frame")({
+					Name = "Gloss",
+					AnchorPoint = Vector2.new(0.5, 0),
+					Position = UDim2.fromScale(0.5, 0.12),
+					Size = UDim2.fromScale(0.94, 0.3),
+					BackgroundColor3 = Color3.new(1, 1, 1),
+					BackgroundTransparency = 0.5,
+					create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+				}),
 			}),
 		}),
 	}
@@ -65,7 +82,11 @@ return function(props: Props): Frame
 				TextColor3 = Theme.Color.Text,
 				Text = text,
 				ZIndex = 2,
-				createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = Theme.Stroke }),
+				createRaw("UIStroke")({
+					Color = Theme.Color.Ink,
+					Thickness = Theme.Stroke,
+					LineJoinMode = Enum.LineJoinMode.Round,
+				}),
 			})
 		)
 	end
@@ -74,7 +95,7 @@ return function(props: Props): Frame
 		Name = "Track",
 		Size = UDim2.fromScale(1, 1),
 		BackgroundColor3 = Theme.Color.Ink,
-		BackgroundTransparency = Theme.Transparency.Track,
+		BackgroundTransparency = 0,
 		children,
 	})
 end

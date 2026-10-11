@@ -3,18 +3,19 @@
 -- coin, above the drawer) plus the "+$N" that rises from it on each sale (style guide §10 "Pagamento").
 -- Pure: only props. EconomyController (TASK-024) owns the data and the list of pops; this only draws.
 -- Fixed pixel size (not studs) so the text stays >= 14 px on a phone at any distance it is drawn.
--- When the value goes up the number bumps (scale 1.15 for 0.2 s, same as the HUD money, style guide §7.2).
+-- When the value goes up the pill jumps and the number rolls up (Motion.Bump / Motion.Count, same as the HUD money,
+-- style guide §7.2). Cartoon pass (AST-091): Ink CartoonPanel pill with the AST-071 `Hud/coin` icon (drawn coin while
+-- missing).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Theme)
+local Icons = require(script.Parent.Icons)
+local Motion = require(script.Parent.Motion)
+local CartoonPanel = require(script.Parent.CartoonPanel)
+local CartoonLabel = require(script.Parent.CartoonLabel)
 local Pop = require(script.Pop)
 
 const create = Vide.create
-const source = Vide.source
-const spring = Vide.spring
-const effect = Vide.effect
-const cleanup = Vide.cleanup
-const untrack = Vide.untrack
 const values = Vide.values
 -- Vide 0.4.1 types `create` for 19 classes only; UIStroke, UIPadding and UIScale are not among them.
 const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }) -> Instance
@@ -36,10 +37,8 @@ export type Props = {
 const WIDTH = 220
 const HEIGHT = 150
 const PILL_HEIGHT = 48
-const COIN_SIZE = 28
+const COIN_SIZE = 44
 const TEXT_SIZE = 26
-const BUMP_SCALE = 1.15
-const BUMP_TIME = 0.2
 
 -- 1234 -> "$1,234"
 local function money(value: number): string
@@ -55,33 +54,9 @@ local function money(value: number): string
 end
 
 return function(props: Props): BillboardGui
-	const bumped = source(false)
-	local last = untrack(props.Value)
-	local bumpThread: thread? = nil
-
-	effect(function()
-		const value = props.Value()
-		if value > last then
-			if bumpThread and coroutine.status(bumpThread) == "suspended" then
-				task.cancel(bumpThread)
-			end
-			bumped(true)
-			bumpThread = task.delay(BUMP_TIME, function()
-				bumpThread = nil
-				bumped(false)
-			end)
-		end
-		last = value
-	end)
-	cleanup(function()
-		if bumpThread and coroutine.status(bumpThread) == "suspended" then
-			task.cancel(bumpThread)
-		end
-	end)
-
-	const scale = spring(function()
-		return if bumped() then BUMP_SCALE else 1
-	end, 0.1, 0.6)
+	const scale = Motion.Bump(props.Value)
+	const rolled = Motion.Count(props.Value)
+	const coin = Icons.Rect("Hud/coin")
 
 	const pops = props.Pops or function(): { Pop }
 		return {}
@@ -100,60 +75,61 @@ return function(props: Props): BillboardGui
 		ResetOnSpawn = false,
 		ClipsDescendants = false,
 
-		create("Frame")({
+		CartoonPanel({
 			Name = "Pill",
 			AnchorPoint = Vector2.new(0.5, 1),
 			Position = UDim2.fromScale(0.5, 1),
 			Size = UDim2.fromOffset(0, PILL_HEIGHT),
 			AutomaticSize = Enum.AutomaticSize.X,
-			BackgroundColor3 = Theme.Color.Ink,
-			BackgroundTransparency = Theme.Transparency.Panel,
-
-			create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
-			createRaw("UIScale")({ Scale = scale }),
-			createRaw("UIPadding")({
-				PaddingLeft = UDim.new(0, 10),
-				PaddingRight = UDim.new(0, 16),
-			}),
-			create("UIListLayout")({
-				FillDirection = Enum.FillDirection.Horizontal,
-				VerticalAlignment = Enum.VerticalAlignment.Center,
-				SortOrder = Enum.SortOrder.LayoutOrder,
-				Padding = UDim.new(0, 8),
-			}),
-
-			-- Coin: drawn shape until the icon sheet (AST-071) exists.
-			create("Frame")({
-				Name = "Coin",
-				LayoutOrder = 1,
-				Size = UDim2.fromOffset(COIN_SIZE, COIN_SIZE),
-				BackgroundColor3 = Theme.Color.Mustard,
-				create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
-				createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = Theme.Stroke }),
-				create("TextLabel")({
-					Size = UDim2.fromScale(1, 1),
-					BackgroundTransparency = 1,
-					FontFace = Theme.Font.Title,
-					TextSize = 18,
-					TextColor3 = Theme.Color.Ink,
-					Text = "$",
+			Tone = Theme.Tone.Ink,
+			Transparency = Theme.Transparency.Panel,
+			Decor = {
+				createRaw("UIScale")({ Scale = scale }),
+			},
+			Padding = { Left = 2, Right = 16 },
+			Children = {
+				create("UIListLayout")({
+					FillDirection = Enum.FillDirection.Horizontal,
+					VerticalAlignment = Enum.VerticalAlignment.Center,
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					Padding = UDim.new(0, 4),
 				}),
-			}),
 
-			create("TextLabel")({
-				Name = "Amount",
-				LayoutOrder = 2,
-				Size = UDim2.fromOffset(0, PILL_HEIGHT),
-				AutomaticSize = Enum.AutomaticSize.X,
-				BackgroundTransparency = 1,
-				FontFace = Theme.Font.Title,
-				TextSize = TEXT_SIZE,
-				TextColor3 = Theme.Color.Text,
-				Text = function()
-					return money(props.Value())
-				end,
-				createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = Theme.Stroke }),
-			}),
+				if coin
+					then create("ImageLabel")({
+						Name = "Coin",
+						LayoutOrder = 1,
+						Size = UDim2.fromOffset(COIN_SIZE, COIN_SIZE),
+						BackgroundTransparency = 1,
+						Image = Icons.ImageOf("Hud/coin"),
+						ImageRectOffset = coin.Offset,
+						ImageRectSize = coin.Size,
+					})
+					else create("Frame")({
+						Name = "Coin",
+						LayoutOrder = 1,
+						Size = UDim2.fromOffset(COIN_SIZE - 14, COIN_SIZE - 14),
+						BackgroundColor3 = Theme.Color.Mustard,
+						create("UICorner")({ CornerRadius = Theme.Radius.Pill }),
+						createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = Theme.Outline.Normal }),
+						CartoonLabel({
+							Box = UDim2.fromScale(1, 1),
+							TextSize = 18,
+							Color = Theme.Color.Dark,
+							Stroke = 0,
+							Text = "$",
+						}),
+					}),
+
+				CartoonLabel({
+					Name = "Amount",
+					LayoutOrder = 2,
+					TextSize = TEXT_SIZE,
+					Text = function()
+						return money(rolled() + 0.5)
+					end,
+				}),
+			},
 		}),
 
 		values(pops, function(pop: Pop, _index: () -> number)

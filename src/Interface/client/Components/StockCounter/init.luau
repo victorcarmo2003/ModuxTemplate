@@ -3,9 +3,12 @@
 -- Ink pill with white text; turns Low (red) when the station is about to run out. Fixed pixel size (not studs),
 -- so the text keeps >= 14 px on a phone at any distance. Not AlwaysOnTop: walls and the cart hide it.
 -- Pure: only props. The caller parents the returned BillboardGui (the adornee itself is fine: no input here).
+-- Cartoon pass (AST-091): Ink CartoonPanel pill (Ketchup when Low) with a heavy-stroke number.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Theme)
+local CartoonPanel = require(script.Parent.CartoonPanel)
+local CartoonLabel = require(script.Parent.CartoonLabel)
 
 const create = Vide.create
 const spring = Vide.spring
@@ -22,8 +25,9 @@ export type Props = {
 	Name: string?,
 }
 
-const WIDTH = 76
-const HEIGHT = 30
+const WIDTH = 84
+const HEIGHT = 36
+const LOW = Theme.ToneOf(Theme.Color.Low)
 const TEXT_SIZE = 20
 
 return function(props: Props): BillboardGui
@@ -47,29 +51,28 @@ return function(props: Props): BillboardGui
 		ResetOnSpawn = false,
 		Enabled = visible,
 
-		create("Frame")({
+		CartoonPanel({
 			Name = "Pill",
-			Size = UDim2.fromScale(1, 1),
-			BackgroundColor3 = function()
-				return if props.Low() then Theme.Color.Low else Theme.Color.Ink
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.new(1, -6, 1, -6),
+			Tone = function()
+				return if props.Low() then LOW else Theme.Tone.Ink
 			end,
-			BackgroundTransparency = function()
-				return if props.Low() then 0.05 else Theme.Transparency.Panel
+			Transparency = function()
+				return if props.Low() then 0 else Theme.Transparency.Panel
 			end,
-
-			create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
-			createRaw("UIScale")({ Scale = scale }),
-
-			create("TextLabel")({
-				Name = "Count",
-				Size = UDim2.fromScale(1, 1),
-				BackgroundTransparency = 1,
-				FontFace = Theme.Font.Title,
-				TextSize = TEXT_SIZE,
-				TextColor3 = Theme.Color.Text,
-				Text = props.Text,
-				createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = Theme.Stroke }),
-			}),
+			Decor = {
+				createRaw("UIScale")({ Scale = scale }),
+			},
+			Children = {
+				CartoonLabel({
+					Name = "Count",
+					Box = UDim2.fromScale(1, 1),
+					TextSize = TEXT_SIZE,
+					Text = props.Text,
+				}),
+			},
 		}),
 	})
 end

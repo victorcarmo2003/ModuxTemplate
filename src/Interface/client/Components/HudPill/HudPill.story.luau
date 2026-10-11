@@ -1,11 +1,12 @@
 --!strict
--- HudPill: money pill (coin, bumps when Value goes up), day pill (sun/moon) and clock pill side by side.
--- Move "Value" up to see the bump.
+-- HudPill: money pill (coin, jumps when Value goes up and the number rolls), day pill (sun/moon) and clock pill.
+-- Move "Value" up to see the bump and the count. The clock icon shows once the AST-091 sheet id is in Icons.Ids.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local HudPill = require(script.Parent)
 local Money = require(script.Parent.Money)
+local Motion = require(script.Parent.Parent.Motion)
 
 const create = Vide.create
 
@@ -27,6 +28,7 @@ return UILabs.CreateVideStory({
 }, function(props)
 	-- UI Labs types the control sources loosely; pin them to what the story reads.
 	const controls: Controls = (props.controls :: any)
+	const rolled = Motion.Count(controls.Value)
 
 	return create("Frame")({
 		Position = UDim2.fromOffset(16, 16),
@@ -46,7 +48,7 @@ return UILabs.CreateVideStory({
 				return "Coin"
 			end,
 			Text = function()
-				return Money(controls.Value())
+				return Money(math.floor(rolled() + 0.5))
 			end,
 			Bump = controls.Value,
 			MinWidth = 120,
@@ -65,6 +67,9 @@ return UILabs.CreateVideStory({
 		HudPill({
 			LayoutOrder = 3,
 			Text = controls.Clock,
+			Icon = function(): HudPill.Icon
+				return "Clock"
+			end,
 			MinWidth = 140,
 		}),
 	})

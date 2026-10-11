@@ -4,10 +4,16 @@
 -- One line at a time (lines are <= 42 characters, ui-text.md §11); a longer line wraps to a 2nd row instead of
 -- shrinking, so the text never goes under Theme.MinTextSize. Narrow on purpose (60% of the width, 300..560 px) so it
 -- stays clear of the thumbstick and the jump button on a phone.
+-- Cartoon pass (AST-091): Ink CartoonPanel strip, round phone badge (CartoonPanel in the phone colour) with the
+-- AST-071 `Hud/phone` icon (drawn handset while missing); pops and slides up (Motion.Pop + spring).
 -- Pure: only props. The owner (BossController) decides the speaker, the line and when it shows.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Theme)
+local Icons = require(script.Parent.Icons)
+local Motion = require(script.Parent.Motion)
+local CartoonPanel = require(script.Parent.CartoonPanel)
+local CartoonLabel = require(script.Parent.CartoonLabel)
 
 const create = Vide.create
 const spring = Vide.spring
@@ -41,9 +47,9 @@ const BOTTOM_GAP = 84
 const SLIDE = 24
 
 -- AST-042 colours (style guide §2.1): Ketchup phone on the cart, Cream phone in the trailer
-const PHONE_COLOR: { [string]: Color3 } = {
-	cart = Color3.fromHex("#E2402E"),
-	trailer = Theme.Color.Cream,
+const PHONE_TONE: { [string]: Theme.Tone } = {
+	cart = Theme.Tone.Ketchup,
+	trailer = Theme.Tone.Cream,
 }
 const HANDSET_COLOR: { [string]: Color3 } = {
 	cart = Theme.Color.Cream,
@@ -83,9 +89,7 @@ local function handset(color: () -> Color3): Frame
 end
 
 return function(props: Props): Frame
-	const alpha = spring(function()
-		return if props.Visible() then 0 else 1
-	end, 0.18, 1)
+	const scale = Motion.Pop(props.Visible)
 	const offset = spring(function()
 		return if props.Visible() then 0 else SLIDE
 	end, 0.22, 0.8)
@@ -95,6 +99,7 @@ return function(props: Props): Frame
 	end
 
 	const hasIcon = props.Icon ~= nil and props.Icon ~= ""
+	const sheet = Icons.Rect("Hud/phone")
 
 	return create("Frame")({
 		Name = props.Name or "CallSubtitle",
@@ -104,93 +109,97 @@ return function(props: Props): Frame
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
 		Visible = function()
-			-- keep it in the tree while it fades out
-			return props.Visible() or alpha() < 0.99
+			-- keep it in the tree while it shrinks away
+			return props.Visible() or scale() > 0.02
 		end,
 
 		createRaw("UISizeConstraint")({ MinSize = Vector2.new(MIN_WIDTH, 0), MaxSize = Vector2.new(MAX_WIDTH, 10000) }),
 		createRaw("UIScale")({
 			Scale = function()
-				return if props.Scale then props.Scale() else 1
+				return (if props.Scale then props.Scale() else 1) * scale()
 			end,
 		}),
 
-		create("CanvasGroup")({
+		CartoonPanel({
 			Name = "Strip",
 			Position = function()
 				return UDim2.fromOffset(0, offset())
 			end,
 			Size = UDim2.fromScale(1, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
-			BackgroundColor3 = Theme.Color.Ink,
-			BackgroundTransparency = Theme.Transparency.Panel,
-			GroupTransparency = alpha,
-
-			create("UICorner")({ CornerRadius = UDim.new(0, 16) }),
-			createRaw("UISizeConstraint")({ MinSize = Vector2.new(0, BADGE + 12) }),
-			createRaw("UIPadding")({
-				PaddingLeft = UDim.new(0, 8),
-				PaddingRight = UDim.new(0, 16),
-				PaddingTop = UDim.new(0, 6),
-				PaddingBottom = UDim.new(0, 6),
-			}),
-			createRaw("UIListLayout")({
-				FillDirection = Enum.FillDirection.Horizontal,
-				VerticalAlignment = Enum.VerticalAlignment.Center,
-				SortOrder = Enum.SortOrder.LayoutOrder,
-				Padding = UDim.new(0, 10),
-			}),
-
-			-- Phone badge
-			create("Frame")({
-				Name = "Phone",
-				LayoutOrder = 1,
-				Size = UDim2.fromOffset(BADGE, BADGE),
-				BackgroundColor3 = function()
-					return PHONE_COLOR[phone()] or PHONE_COLOR.cart
-				end,
-				create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
-				createRaw("UIStroke")({
-					Color = Theme.Color.Ink,
-					Thickness = Theme.Stroke,
-					ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+			Tone = Theme.Tone.Ink,
+			Transparency = Theme.Transparency.Panel,
+			Outline = Theme.Outline.Thick,
+			Radius = Theme.Radius.Card,
+			Decor = {
+				createRaw("UISizeConstraint")({ MinSize = Vector2.new(0, BADGE + 12 + Theme.Lip) }),
+			},
+			Padding = { Left = 8, Right = 16, Top = 6, Bottom = 6 },
+			Children = {
+				createRaw("UIListLayout")({
+					FillDirection = Enum.FillDirection.Horizontal,
+					VerticalAlignment = Enum.VerticalAlignment.Center,
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					Padding = UDim.new(0, 10),
 				}),
-				if hasIcon
-					then create("ImageLabel")({
-						Name = "Icon",
-						AnchorPoint = Vector2.new(0.5, 0.5),
-						Position = UDim2.fromScale(0.5, 0.5),
-						Size = UDim2.fromScale(0.7, 0.7),
-						BackgroundTransparency = 1,
-						Image = props.Icon,
-					})
-					else handset(function()
-						return HANDSET_COLOR[phone()] or HANDSET_COLOR.cart
-					end),
-			}),
 
-			-- "Walt: line"
-			create("TextLabel")({
-				Name = "Line",
-				LayoutOrder = 2,
-				Size = UDim2.new(1, -(BADGE + 10), 0, 0),
-				AutomaticSize = Enum.AutomaticSize.Y,
-				BackgroundTransparency = 1,
-				FontFace = Theme.Font.Body,
-				TextSize = TEXT_SIZE,
-				TextColor3 = Theme.Color.Text,
-				TextWrapped = true,
-				RichText = true,
-				TextXAlignment = Enum.TextXAlignment.Left,
-				Text = function()
-					return `<font color="{hex(Theme.Color.Mustard)}">{escape(props.Speaker())}:</font> {escape(props.Text())}`
-				end,
-				createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = Theme.Stroke }),
-				createRaw("UIPadding")({
-					PaddingTop = UDim.new(0, 6),
-					PaddingBottom = UDim.new(0, 6),
+				-- Phone badge
+				CartoonPanel({
+					Name = "Phone",
+					LayoutOrder = 1,
+					Size = UDim2.fromOffset(BADGE, BADGE),
+					Tone = function()
+						return PHONE_TONE[phone()] or PHONE_TONE.cart
+					end,
+					Outline = Theme.Outline.Normal,
+					Lip = 3,
+					Children = {
+						if hasIcon
+							then create("ImageLabel")({
+								Name = "Icon",
+								AnchorPoint = Vector2.new(0.5, 0.5),
+								Position = UDim2.fromScale(0.5, 0.5),
+								Size = UDim2.fromScale(0.8, 0.8),
+								BackgroundTransparency = 1,
+								Image = props.Icon,
+							})
+							elseif sheet then create("ImageLabel")({
+								Name = "Icon",
+								AnchorPoint = Vector2.new(0.5, 0.5),
+								Position = UDim2.fromScale(0.5, 0.5),
+								Size = UDim2.fromScale(0.95, 0.95),
+								BackgroundTransparency = 1,
+								Image = Icons.ImageOf("Hud/phone"),
+								ImageRectOffset = sheet.Offset,
+								ImageRectSize = sheet.Size,
+							})
+							else handset(function()
+								return HANDSET_COLOR[phone()] or HANDSET_COLOR.cart
+							end),
+					},
 				}),
-			}),
+
+				-- "Walt: line"
+				CartoonLabel({
+					Name = "Line",
+					LayoutOrder = 2,
+					Box = UDim2.new(1, -(BADGE + 10), 0, 0),
+					AutomaticSize = Enum.AutomaticSize.Y,
+					TextSize = TEXT_SIZE,
+					Wrapped = true,
+					RichText = true,
+					XAlignment = Enum.TextXAlignment.Left,
+					Text = function()
+						return `<font color="{hex(Theme.Color.Mustard)}">{escape(props.Speaker())}:</font> {escape(props.Text())}`
+					end,
+					Children = {
+						createRaw("UIPadding")({
+							PaddingTop = UDim.new(0, 6),
+							PaddingBottom = UDim.new(0, 6),
+						}),
+					},
+				}),
+			},
 		}),
 	})
 end
