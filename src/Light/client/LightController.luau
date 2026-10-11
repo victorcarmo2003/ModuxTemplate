@@ -14,8 +14,9 @@
 	  * T31: every post keeps its Neon lamp; the real SpotLight only on every other post counted from the corner
 	    (P-01 = highest Order included) and only within POST_LIGHT_RANGE of the camera. A post without a live real
 	    light shows its Pool_Decal (On_Fake, AST-036) when lit.
-	  * Lighting preset (day = the user's hand-set Lighting, 2026-10-10; night = style guide §5.3): day locked with ClockTime following the clock,
-	    golden hour 4 -> 6 PM; night interpolated Night 1 -> Night 10. Changes blend over BLEND_TIME.
+	  * Lighting preset (Content.LightPresets, warm pass 2026-10-11): lobby servers = Lobby (fixed night clock); game =
+	    day locked with ClockTime following the clock, golden hour 4 -> 6 PM; night interpolated Night 1 -> Night 10.
+	    Changes blend (smoothstep) over BLEND_TIME; the first write happens in OnStart, without blend.
 
 	Fixtures (binding, MAP-01 §16):
 	  * StreetLight tag (Group, Order): every Light descendant + lamp parts.
@@ -101,11 +102,14 @@ const CONTEXT_GRACE = 1.5 -- s after a night / attempt / vehicle change in which
 const TICK_RATE = 20 -- Hz: Hush steps of 1.5 s and preset blends stay smooth; each pass only writes on change
 const POST_LIGHT_RANGE = 150 -- studs from the camera (T31)
 const REAL_POST_EVERY = 2 -- T31: one real light every two posts (8 studs apart -> one per 16)
-const BLEND_TIME = 3 -- seconds of preset blend on day <-> night and night k -> k+1
+const BLEND_TIME = Content.LightPresets.BlendTime -- s of preset blend on day <-> night and night k -> k+1
 const DECAL_TRANSPARENCY = 0.6 -- Pool_Decal when shown (Cream translucent)
-const NIGHT_CLOCK = 0 -- style guide §5.3: ClockTime fixed near 0
-const GOLDEN_FROM = 16 -- 4:00 PM (style guide §5.2)
-const GOLDEN_TO = 18 -- 6:00 PM
+const NIGHT_CLOCK = Content.LightPresets.NightClock -- style guide §5.3: ClockTime fixed near 0
+const GOLDEN_FROM = Content.LightPresets.GoldenFrom -- 4:00 PM (style guide §5.2)
+const GOLDEN_TO = Content.LightPresets.GoldenTo -- 6:00 PM
+const LOBBY_CLOCK = Content.LightPresets.LobbyClock
+-- Lighting children owned by another controller (VitalController's sanity look): never taken as the preset's effect
+const VITAL_EFFECTS = table.freeze({ VitalColor = true, VitalBlur = true } :: { [string]: boolean })
 const DAY_CLOCK_MIN = 6.5 -- keep the sun above the horizon on the day shift
 const DAY_CLOCK_MAX = 17.4
 const HOURS = 24
@@ -121,114 +125,15 @@ const FALLBACK_DROP = 0.4 -- studs below the zone ceiling
 const LAMP_OFF_MATERIAL = Enum.Material.SmoothPlastic
 const LAMP_OFF_COLOR = Color3.fromHex("#EAD6B0") -- Cream (style guide §2.1)
 
--- DAY = the look the user set by hand in Studio (2026-10-10): Lighting + Atmosphere + Bloom + ColorCorrection +
--- SunRays of the place, copied as is (DepthOfField and Sky are not touched here). ClockTime still follows the shift.
--- GOLDEN (4 -> 6 PM) is the user's day warmed up: PROVISIONAL (frontend-coder). Night 1 / Night 10 keep the style
--- guide §5.3 colours and brightness; the fields the guide leaves open (atmosphere offset / glare, environment scales,
--- shadow softness, bloom size, sun rays spread) start from the user's day. PROVISIONAL.
-const DAY: Preset = {
-	Brightness = 3,
-	Ambient = Color3.new(0.2745, 0.2745, 0.2745),
-	OutdoorAmbient = Color3.new(0.2745, 0.2745, 0.2745),
-	ColorShiftTop = Color3.new(0, 0, 0),
-	ColorShiftBottom = Color3.new(0, 0, 0),
-	EnvDiffuse = 1,
-	EnvSpecular = 1,
-	ShadowSoftness = 0.2,
-	AtmDensity = 0.507,
-	AtmOffset = 1,
-	AtmGlare = 2.6,
-	AtmHaze = 0,
-	AtmColor = Color3.new(0.2745, 0.3843, 0.7804),
-	AtmDecay = Color3.new(0.3608, 0.298, 0.4902),
-	CCBrightness = 0.04,
-	Saturation = 0.5,
-	Contrast = 0.1,
-	Tint = Color3.new(1, 1, 1),
-	BloomIntensity = 1,
-	BloomSize = 24,
-	BloomThreshold = 2,
-	SunRays = 0.01,
-	SunRaysSpread = 0.1,
-}
-
-const GOLDEN: Preset = {
-	Brightness = 2.6,
-	Ambient = Color3.fromHex("#504339"),
-	OutdoorAmbient = Color3.fromHex("#5A4A3E"),
-	ColorShiftTop = Color3.fromHex("#FFC98A"),
-	ColorShiftBottom = Color3.new(0, 0, 0),
-	EnvDiffuse = 1,
-	EnvSpecular = 1,
-	ShadowSoftness = 0.2,
-	AtmDensity = 0.507,
-	AtmOffset = 1,
-	AtmGlare = 2.6,
-	AtmHaze = 0.5,
-	AtmColor = Color3.fromHex("#9C7FA8"),
-	AtmDecay = Color3.fromHex("#E0905A"),
-	CCBrightness = 0.03,
-	Saturation = 0.45,
-	Contrast = 0.1,
-	Tint = Color3.fromHex("#FFF2E2"),
-	BloomIntensity = 1,
-	BloomSize = 24,
-	BloomThreshold = 1.9,
-	SunRays = 0.03,
-	SunRaysSpread = 0.1,
-}
-
-const NIGHT_1: Preset = {
-	Brightness = 0.6,
-	Ambient = Color3.fromHex("#262B4A"),
-	OutdoorAmbient = Color3.fromHex("#2A3058"),
-	ColorShiftTop = Color3.fromHex("#3A4270"),
-	ColorShiftBottom = Color3.new(0, 0, 0),
-	EnvDiffuse = 1,
-	EnvSpecular = 1,
-	ShadowSoftness = 0.2,
-	AtmDensity = 0.35,
-	AtmOffset = 1,
-	AtmGlare = 0,
-	AtmHaze = 1.5,
-	AtmColor = Color3.fromHex("#1E2448"),
-	AtmDecay = Color3.fromHex("#0B0D1E"),
-	CCBrightness = 0,
-	Saturation = -0.2,
-	Contrast = 0.08,
-	Tint = Color3.fromHex("#D2DAFF"),
-	BloomIntensity = 0.8,
-	BloomSize = 24,
-	BloomThreshold = 1.2,
-	SunRays = 0,
-	SunRaysSpread = 0.1,
-}
-
-const NIGHT_10: Preset = {
-	Brightness = 0.4,
-	Ambient = Color3.fromHex("#1E2240"), -- never below #1B2140 (style guide §5.3 reading minimum)
-	OutdoorAmbient = Color3.fromHex("#202546"),
-	ColorShiftTop = Color3.fromHex("#30385F"),
-	ColorShiftBottom = Color3.new(0, 0, 0),
-	EnvDiffuse = 1,
-	EnvSpecular = 1,
-	ShadowSoftness = 0.2,
-	AtmDensity = 0.45,
-	AtmOffset = 1,
-	AtmGlare = 0,
-	AtmHaze = 2.2,
-	AtmColor = Color3.fromHex("#1E2448"),
-	AtmDecay = Color3.fromHex("#0B0D1E"),
-	CCBrightness = 0,
-	Saturation = -0.3,
-	Contrast = 0.08,
-	Tint = Color3.fromHex("#C8D2FF"),
-	BloomIntensity = 0.8,
-	BloomSize = 24,
-	BloomThreshold = 1.2,
-	SunRays = 0,
-	SunRaysSpread = 0.1,
-}
+-- Presets live in Content.LightPresets (warm pass, user request 2026-10-11; PROVISIONAL). This controller is the only
+-- writer of Lighting / Atmosphere / the place's ColorCorrection, Bloom and SunRays: ANM-010 lays its fog over
+-- `Applied`, VitalController owns its own ColorCorrection (VITAL_EFFECTS) stacked on top.
+const PRESETS = Content.LightPresets
+const DAY: Preset = PRESETS.Day
+const GOLDEN: Preset = PRESETS.Golden
+const NIGHT_1: Preset = PRESETS.Night1
+const NIGHT_10: Preset = PRESETS.Night10
+const LOBBY: Preset = PRESETS.Lobby
 
 local function lerp(a: number, b: number, t: number): number
 	return a + (b - a) * t
@@ -281,19 +186,23 @@ local function isLampName(name: string): boolean
 	return string.sub(lower, -4) == "lamp" or string.sub(lower, -5) == "lamps"
 end
 
--- Lighting child of the class (the place's own, or a new one): the preset owns its values on this client
+-- Lighting child of the class (the place's own, or a new one): the preset owns its values on this client.
+-- Skips the effects other controllers own (VITAL_EFFECTS), so two systems never write the same instance.
 local function effect(className: string): any
-	const found = Lighting:FindFirstChildOfClass(className :: any)
-	if found then
-		return found
+	for _, child in Lighting:GetChildren() do
+		if child.ClassName == className and not VITAL_EFFECTS[child.Name] then
+			return child
+		end
 	end
 	const created = Instance.new(className :: any)
 	created.Parent = Lighting
 	return created
 end
 
-const LightController =
-	Modux.Controller("LightController", { Require = { "RoundController", "AudioController" }, Priority = 500 })
+const LightController = Modux.Controller(
+	"LightController",
+	{ Require = { "RoundController", "AudioController", "PlaceController" }, Priority = 500 }
+)
 
 function LightController:Setup()
 	self.Records = {} :: { [string]: Record }
@@ -663,6 +572,9 @@ end
 -- Lighting preset ------------------------------------------------------------------------------------------------
 
 function LightController:Target(): (Preset, number, string)
+	if self.Dependencies.PlaceController:Is("Lobby") then
+		return LOBBY, LOBBY_CLOCK, "lobby"
+	end
 	const round = self.Dependencies.RoundController
 	if round.IsNight() then
 		const night = self:NightNumber()
@@ -731,10 +643,11 @@ function LightController:RefreshPreset()
 	local outClock = clock
 	const from = self.From
 	if from then
-		const alpha = (now - self.BlendStart) / BLEND_TIME
+		local alpha = (now - self.BlendStart) / BLEND_TIME
 		if alpha >= 1 then
 			self.From = nil
 		else
+			alpha = alpha * alpha * (3 - 2 * alpha) -- smoothstep: eases in and out
 			preset = blend(from, target, alpha)
 			outClock = blendClock(self.FromClock, clock, alpha)
 		end
@@ -849,6 +762,8 @@ LightController:OnStart(function(self)
 	self.ColorCorrection = effect("ColorCorrectionEffect") :: ColorCorrectionEffect
 	self.Bloom = effect("BloomEffect") :: BloomEffect
 	self.SunRaysEffect = effect("SunRaysEffect") :: SunRaysEffect
+	-- first write right away (no blend): the place's own Lighting (cold, edit-time) never shows past this point
+	self:RefreshPreset()
 
 	self:Track(STREET_LIGHT_TAG, true)
 	self:Track(VEHICLE_TAG, true)

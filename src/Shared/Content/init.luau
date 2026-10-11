@@ -17,6 +17,8 @@ local Hallucinations = require(script.Hallucinations)
 local Ingredients = require(script.Ingredients)
 local Items = require(script.Items)
 local LightGroups = require(script.LightGroups)
+local LightPresets = require(script.LightPresets)
+local Lobby = require(script.Lobby)
 local Mart = require(script.Mart)
 local Moods = require(script.Moods)
 local Neon = require(script.Neon)
@@ -68,6 +70,11 @@ export type Ingredient = Ingredients.Ingredient
 export type Item = Items.Item
 export type ItemRules = Items.ItemRules
 export type LightGroup = LightGroups.LightGroup
+export type LightPreset = LightPresets.LightPreset
+export type LightPresets = LightPresets.LightPresets
+export type Lobby = Lobby.Lobby
+export type LobbyZone = Lobby.Zone
+export type LobbyPanel = Lobby.Panel
 export type Locomotion = Animations.Locomotion
 export type Mart = Mart.Mart
 export type MartDoor = Mart.Door
@@ -178,4 +185,11 @@ return table.freeze({
 	-- Robux shop: gem packs and class products (user request 2026-10-11, TASK-160; data.md §1.7). Ids 0 until the
 	-- Creator Hub products exist; prices Provisional (Q-190)
 	Shop = Shop,
+
+	-- Lighting presets day / golden / nights / lobby, warm pass (user request 2026-10-11; LightController). Provisional
+	LightPresets = LightPresets,
+
+	-- Lobby zones (auto-open triggers), ring VFX, platform squads, lobby camera (user request 2026-10-11; LobbyController,
+	-- PartyService). Provisional
+	Lobby = Lobby,
 })
