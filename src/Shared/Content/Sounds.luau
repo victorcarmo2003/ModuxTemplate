@@ -97,10 +97,26 @@ local function ambient(key: string, spatial: boolean, id: string?, ref: string?)
 	}
 end
 
+-- SFX uploaded by the user (ReplicatedStorage.Assets.SFX, 2026-10-10); key -> rbxassetid
+const UPLOADED: { [string]: string } = {
+	grill_sizzle = "rbxassetid://6383276435",
+	grill_drop = "rbxassetid://126425746730419",
+	grill_ready = "rbxassetid://131845870598154",
+	grill_collect = "rbxassetid://137054034685704",
+	restock = "rbxassetid://137054034685704",
+	bun_slice = "rbxassetid://120927697011937",
+	topping_squirt = "rbxassetid://90416226721742",
+	topping_sprinkle = "rbxassetid://9117851142",
+	coin = "rbxassetid://134810204798705",
+	buy = "rbxassetid://135428907715078",
+	phone_ring = "rbxassetid://94426589952590",
+	toast = "rbxassetid://82845990304289",
+}
+
 local function sfx(key: string, looped: boolean?): Sound
 	return {
 		Key = key,
-		Id = "",
+		Id = UPLOADED[key] or "",
 		Group = "Sfx",
 		Volume = 0.6,
 		Looped = looped == true,
@@ -114,7 +130,7 @@ end
 local function ui(key: string): Sound
 	return {
 		Key = key,
-		Id = "",
+		Id = UPLOADED[key] or "",
 		Group = "Ui",
 		Volume = 0.5,
 		Looped = false,

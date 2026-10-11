@@ -71,3 +71,19 @@ Faixas enviadas pelo usuário ao grupo do jogo ("Axiom Project Studio"); licenç
 | CityAmbient | 108990827199430 | `amb_day_street` |
 | NightCrickets | 98652860867664 | `amb_night_street` |
 | SuperMarket Ambient | 121312424334285 | `amb_mart_hum` (dentro do Mart, LZ-4) |
+
+## SFX (2026-10-10, uploads do usuário em ReplicatedStorage.Assets.SFX; licença a confirmar)
+
+| Arquivo | Asset ID | Chave(s) |
+|---|---|---|
+| Grilling | 6383276435 | `grill_sizzle` |
+| PlacingGrill | 126425746730419 | `grill_drop` |
+| ReadyBell | 131845870598154 | `grill_ready` |
+| GetItem | 137054034685704 | `grill_collect`, `restock` |
+| SliceBun | 120927697011937 | `bun_slice` |
+| Sauce | 90416226721742 | `topping_squirt` |
+| Potato | 9117851142 | `topping_sprinkle` |
+| MoneyIncome | 134810204798705 | `coin` |
+| MoneySpend | 135428907715078 | `buy` |
+| PhoneRinging | 94426589952590 | `phone_ring` |
+| Notification | 82845990304289 | `toast` |
