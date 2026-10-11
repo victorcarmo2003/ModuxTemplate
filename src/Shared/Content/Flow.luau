@@ -54,7 +54,7 @@ const flow: Flow = {
 	Spawns = {
 		Arrivals = {
 			Day = {
-				{ Point = "D1", Weight = 35 }, -- B1 door on the Pad, ~79 studs
+				{ Point = "D1", Weight = 35 }, -- B1 door on the Ninth front, east of the Pad
 				{ Point = "DR-APT", Weight = 35 }, -- Bellmoor Savings / apartments door, CW-4, ~80 studs
 				{ Point = "SP-S", Weight = 30 }, -- Juniper South beyond BAR-S, ~93 studs
 				{ Point = "SP-A", Weight = 0 }, -- alley beyond BAR-N, ~136 studs (> 10 s): kept for actors / tests

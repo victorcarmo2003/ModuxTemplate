@@ -224,9 +224,9 @@ local POINTS = {
 	{ id = "Q3", x = 41, z = 29, floor = 0.4, face = EAST, node = true },
 	{ id = "Q4", x = 36, z = 29, floor = 0.4, face = EAST, node = true },
 	{ id = "Q5", x = 31, z = 29, floor = 0.4, face = EAST, node = true },
-	-- D1: MAP-01 gives (64, 48) = the door plane on B1's west wall (X 64). Point 1 stud out, on the Pad, so an
-	-- NPC never spawns inside the wall. Faces west (out of the door).
-	{ id = "D1", x = 63, z = 48, floor = 0.45, face = WEST, node = true, spawn = "customer,actor", despawn = true, door = "D1" },
+	-- D1 (user 2026-10-11): moved from B1's west wall (next to the cart) to B1's Ninth front, wall Z 32, door X 88.6.
+	-- Point 1 stud out, on the sidewalk, so an NPC never spawns inside the wall. Faces north (out of the door).
+	{ id = "D1", x = 88.6, z = 31, floor = 0.45, face = NORTH, node = true, spawn = "customer,actor", despawn = true, door = "D1" },
 	-- SP-A (MAP-01 §9.8): moved from (30, -104) to the strip north of the bank-rear fill, in its shadow as seen from
 	-- the Pad AND from the Mart door / SS (at -104 the Mart door saw it down the Juniper). Beyond BAR-N.
 	{ id = "SP-A", x = 29, z = -92, floor = 0.24, face = WEST, node = true, spawn = "customer,pedestrian,actor", despawn = true },
@@ -397,7 +397,7 @@ local EDGES = {
 	{ "N-Z02-02", "N-Z02-03" },
 	{ "N-Z02-03", "Q5" }, -- arrivals link only to Q5 (§18.6)
 	-- ROUTE-D1-IN
-	{ "D1", "N-Z01-01" },
+	{ "D1", "N-Z02-08" }, -- D1 on the Ninth front (2026-10-11): straight onto the sidewalk line
 	{ "N-Z01-01", "N-Z02-06" },
 	{ "N-Z02-06", "N-Z02-05" },
 	{ "N-Z02-05", "N-Z02-04" },
@@ -415,7 +415,6 @@ local EDGES = {
 	-- ROUTE-EXIT-D1
 	{ "Q1", "N-Z01-02" },
 	{ "N-Z01-02", "N-Z01-03" },
-	{ "N-Z01-03", "D1" },
 	-- wave 2: ROUTE-THIEF (MAP-01 §9.2). L1 by the corner, L2 by LANE-W -> LANE-E, L3 by the Pad's south strip.
 	{ "ST-R", "N-Z08-01" },
 	{ "N-Z08-01", "N-Z08-02" },
@@ -2557,7 +2556,7 @@ end
 -- CanCollide false on the server (DoorOrigCanCollide keeps the old value).
 local DOORS = {
 	{ id = "MKT-DOOR", mapId = "MKT-DOOR", asset = "AST-028_MartWallDoor", inward = Vector3.new(-1, 0, 1).Unit, placeholder = Vector3.new(4, 7.5, 0.2) }, -- into the Mart (chamfer at its NE corner: inside is west + south)
-	{ id = "D1", mapId = "D1", asset = "AST-033_DoorD1", inward = EAST }, -- into B1
+	{ id = "D1", mapId = "D1", asset = "AST-033_DoorD1", inward = SOUTH }, -- into B1
 	{ id = "SP-B", mapId = "SP-B", asset = "AST-046_DoorSPB", inward = NORTH }, -- into the laundry
 }
 local DOOR_OPEN = 90

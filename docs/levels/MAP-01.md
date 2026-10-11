@@ -225,7 +225,7 @@ Velocidade de cliente a pé: ~8 studs/s (texto antigo; `CustomerTypes` usa 9–1
 |---|---|---|---|---|
 | SP-A | chegada de cliente (norte), passantes | **(29, −92)** (era (30, −104)): faixa ao norte do fundo do banco, além de BAR-N, na sombra do prédio vista do Pad **e** da porta do Mart | peso 0 para clientes (~136 studs, 10,5 s > 10 s); passantes de dia; atores | calçada leste da Juniper → **CW-4** → LANE-E → Q5 |
 | SP-B | **porta** da lavanderia | (−40, −31), medido na porta AST-046 | passantes de dia (clientes: peso 0, ~151 studs) | calçada norte → **CW-2** → … |
-| D1 | **porta** de B1, chegada **e** saída | (63, 48) | dia e noite | Pad leste → LANE-W → Q5. **~79 studs, 6,1 s** |
+| D1 | **porta** de B1, chegada **e** saída | (88.6, 31) — **2026-10-11 (pedido do usuário):** saiu da parede oeste de B1 (ao lado do carrinho) para a fachada da Ninth do bloco do meio | dia e noite | calçada sul (N-Z02-08) → Q1..Q5. **~71–81 studs, ~6–9 s** |
 | **DR-APT** | **porta** do Bellmoor Savings / apartamentos (novo) | (32, −31), medido no AST-044 se houver peça "Door" | dia e noite (de noite = moradores) | calçada norte → **CW-4** → LANE-E → Q5. **~80 studs, 6,1 s** |
 | **SP-S** | ponta de rua (novo): calçada leste da Juniper Sul além de BAR-S, depois da curva | (21, 100) | dia e noite | calçada leste da Juniper Sul → LANE-E → Q5. **~93 studs, 7,1 s** (nunca cruza pista) |
 | EX-E | saída leste, passantes | **(116.5, 40)** (era (116, 24), visível de Q1..Q5 pela calçada): beco X 113..120 atrás de B1, além de BAR-E | dia e noite | Q1 → LANE-E → beco. **~85 studs, 6,5 s** |

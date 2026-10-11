@@ -344,12 +344,12 @@ return {
 	{ asset = "AST-033_BuildingA", x = 112.725, y = 0, z = -91.71, rotY = 270, group = "Buildings", id = "B4", replaces = { "Buildings/B4" } },
 	{ asset = "AST-033_BuildingH", x = 113.355, y = 0, z = -108.11, rotY = 270, group = "Buildings", id = "B4", replaces = { "Buildings/B4" } },
 	{ asset = "AST-033_BuildingA", x = 112.725, y = 0, z = -124.51, rotY = 270, group = "Buildings", id = "B4", replaces = { "Buildings/B4" } },
-	-- South of the Ninth: B1 behind the Pad (Door_D1 part stays at X 64, Z 46..50)
-	{ asset = "AST-033_BuildingA", x = 72.2, y = 0, z = 40.725, rotY = 180, group = "Buildings", id = "B1", replaces = { "Buildings/B1/Block_East" }, note = "corner, Ninth front; its west side wall (X 64) carries Door_D1" },
+	-- South of the Ninth: B1 behind the Pad (Door_D1 moved 2026-10-11 to the Ninth front of the middle block, X 88.6)
+	{ asset = "AST-033_BuildingA", x = 72.2, y = 0, z = 40.725, rotY = 180, group = "Buildings", id = "B1", replaces = { "Buildings/B1/Block_East" }, note = "corner, Ninth front" },
 	{ asset = "AST-033_BuildingH", x = 88.6, y = 0, z = 41.355, rotY = 180, group = "Buildings", id = "B1", replaces = { "Buildings/B1/Block_East" } },
 	{ asset = "AST-033_BuildingA", x = 105.0, y = 0, z = 40.725, rotY = 180, group = "Buildings", id = "B1", replaces = { "Buildings/B1/Block_East" }, note = "ends X 113.2: EX-E alley 6.8 wide" },
 	{ asset = "AST-033_BuildingA", x = 72.725, y = 0, z = 57.65, rotY = 270, group = "Buildings", id = "B1", replaces = { "Buildings/B1/Block_East" }, note = "faces the Pad (west), Z 49.45..65.85" },
-	{ asset = "AST-033_DoorD1", x = 63.79, y = 0.45, z = 48, rotY = 90, group = "Buildings", id = "D1", replaces = { "Buildings/B1/Door_D1" }, note = "modeler-3d 2026-10-10: opening 3.6 x 6.5 on the X 64 wall (straddles the BuildingA seam at Z 49.45); leaf Door_D1, hinge Hinge_D1" },
+	{ asset = "AST-033_DoorD1", x = 88.6, y = 0.45, z = 31.79, rotY = 0, group = "Buildings", id = "D1", replaces = { "Buildings/B1/Door_D1" }, note = "user 2026-10-11: moved off the Pad side wall (next to the cart) to the plain ground floor of the middle B1 block on the Ninth front (wall Z 32); leaf Door_D1, hinge Hinge_D1" },
 	{ asset = "AST-033_BuildingH", x = 32.2, y = 0, z = 73.355, rotY = 180, group = "Buildings", id = "B1", replaces = { "Buildings/B1/Block_Rear" }, note = "faces the Pad; hides ST-R (18, 92) from the Pad" },
 	{ asset = "AST-033_BuildingA", x = 48.6, y = 0, z = 72.725, rotY = 180, group = "Buildings", id = "B1", replaces = { "Buildings/B1/Block_Rear" } },
 	{ asset = "AST-033_BuildingH", x = 65.0, y = 0, z = 73.355, rotY = 180, group = "Buildings", id = "B1", replaces = { "Buildings/B1/Block_Rear" }, note = "overlaps the west-facing B1 block by ~1.9 at the back (hidden)" },
