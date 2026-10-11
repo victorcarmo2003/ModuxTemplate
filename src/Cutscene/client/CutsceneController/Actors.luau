@@ -6,9 +6,10 @@
 -- plays a sound only when an instant falls in (last, t], so an actor created late (join in the middle of the scene)
 -- shows the right pose without replaying the sounds that already happened.
 --
---   ToyCarNinth    toy car along the Ninth, across the CS-3 -> CS-4 crossing, without stopping (DEC-130, DEC-133)
---   ToyCarJuniper  toy car between the flyer post (P-01) and the cart (CS-7, "beep-beep!")
---   FlipPhone      the open flip (AST-038, no opening animation) of the avatar on CS-P1 (slot 1, Q-106 c):
+--   CarNinth, CarCorner (any key of Content.Cutscenes.Rules.Cars)
+--                  real car of the traffic kit on its TrafficPath lane, past the party, never braking (Cars.luau;
+--                  DEC-130, DEC-133). Replaces the old toy-box placeholders (user feedback 2026-10-11)
+--   FlipPhone      the open flip (AST-038, no opening animation) of the avatar standing at the phone (slot 1, Q-106 c):
 --                  low in the own view when that avatar is this client, in the right hand of a mate otherwise
 --   MartDoor       Mart door bell at MKT-DOOR (sound only; the door is map geometry)
 --   Walt           Walt Bramble (CHR-001, turtle, DEC-202): MKT-DOOR -> WALT-1 at a slow walk, cane, beard, coffee
@@ -17,12 +18,14 @@
 --   Flyer          "NIGHT SHIFT — NOW HIRING" flyer flapping on the P-01 post (ending.md §2.4, AN-03)
 --
 -- PROVISIONAL (TASK-121): Walt and the Raincoat Lady are CrewRig placeholders (civil outfit + Part props) until the
--- sheets AST-059 / CHR-001 ship (TASK-125); toy cars, the flip, the coffee, the puddle and the flyer are Part
--- placeholders; every speed and time below.
+-- sheets AST-059 / CHR-001 ship (TASK-125); the flip, the coffee, the puddle and the flyer are Part placeholders;
+-- every speed and time below.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
+local Content = require(ReplicatedStorage.shared.Content)
 local CrewRig = require(ReplicatedStorage.shared.Crew.CrewRig)
+local Cars = require(script.Parent.Cars)
 
 export type Actor = {
 	Model: Model?,
@@ -38,6 +41,10 @@ export type Context = {
 	-- another actor of the running segment
 	Find: (target: string) -> Actor?,
 	Play: (sound: string, at: Vector3 | Instance?) -> (),
+	Loop: (sound: string, at: Instance, on: boolean) -> (),
+	-- where slot 1 stands to make the call (in front of the real phone/poster)
+	Caller: () -> Vector3?,
+	Warn: (key: string, message: string) -> (),
 	-- AnimController
 	Bind: (model: Model, set: string) -> (),
 	Action: (model: Model, key: string) -> (),
@@ -46,11 +53,7 @@ export type Context = {
 
 const SPAWN_LIFT = Vector3.new(0, 3, 0) -- architecture.md §18.5
 const FLYER_HEIGHT = 4.5 -- studs above the post base (eye height, style guide)
-const CAR_LIFT = 0.9
-const CAR_REACH = 45 -- studs each side of the crossing point
-const CAR_TIME = 2.6 -- s to cross the whole reach
-const CAR_HONK = 0.4 -- fraction of the pass
-const FLIP_TIME = 16 -- s on screen: shot 7 (25 s) to the turn to the cart (41 s)
+const FLIP_TIME = 15.8 -- s on screen: shot 7 (27.1 s) to the car before the turn to the cart (43 s)
 const FLIP_OFFSET = CFrame.new(0.55, -0.8, -1.7) * CFrame.Angles(math.rad(20), math.rad(-15), 0)
 const WALT_SPEED = 3 -- studs/s, hunched with a cane
 const COFFEE_FLY = 1.2
@@ -169,46 +172,6 @@ end
 
 -- Actors --------------------------------------------------------------------------------------------------------
 
-local function toyCar(name: string, a: Vector3, b: Vector3, paint: Color3, horn: string, ctx: Context): Actor
-	const model = Instance.new("Model")
-	model.Name = name
-	const body = part("Body", Vector3.new(2.4, 1.1, 4.4), paint, model)
-	const cabin = part("Cabin", Vector3.new(2, 0.9, 2.2), CREAM, model)
-	cabin.CFrame = body.CFrame * CFrame.new(0, 0.95, 0.3)
-	for _, offset in { Vector3.new(1.2, -0.45, -1.4), Vector3.new(-1.2, -0.45, -1.4), Vector3.new(1.2, -0.45, 1.4), Vector3.new(-1.2, -0.45, 1.4) } do
-		const wheel = cylinder("Wheel", Vector3.new(0.5, 1, 1), INK, model)
-		wheel.CFrame = body.CFrame * CFrame.new(offset)
-	end
-	model.PrimaryPart = body
-	model.Parent = ctx.Folder
-
-	-- across the crossing: perpendicular to a -> b in the ground plane
-	const across = flat(b - a)
-	const lane = Vector3.new(across.Z, 0, -across.X)
-	const middle = (a + b) / 2 + Vector3.new(0, CAR_LIFT, 0)
-	const from = middle - lane * CAR_REACH
-	const to = middle + lane * CAR_REACH
-
-	return {
-		Model = model,
-		Update = function(t: number, last: number)
-			if t >= CAR_TIME then
-				model.Parent = nil
-				return
-			end
-			model.Parent = ctx.Folder
-			const position = from:Lerp(to, math.clamp(t / CAR_TIME, 0, 1))
-			model:PivotTo(CFrame.lookAt(position, position + lane))
-			if crossed(CAR_TIME * CAR_HONK, t, last) then
-				ctx.Play(horn, body)
-			end
-		end,
-		Destroy = function()
-			model:Destroy()
-		end,
-	}
-end
-
 -- Character standing nearest to a point (the avatar the server walked to CS-P1)
 local function nearestCharacter(point: Vector3): Model?
 	local best: Model? = nil
@@ -250,11 +213,11 @@ local function flipModel(parent: Instance?): (Model, BasePart)
 end
 
 local function flipPhone(ctx: Context): Actor?
-	const mark = ctx.Point("CS-P1")
-	if mark == nil then
+	const caller = ctx.Caller()
+	if caller == nil then
 		return nil
 	end
-	const holder = nearestCharacter(mark.Position)
+	const holder = nearestCharacter(caller)
 	if holder == nil then
 		return nil
 	end
@@ -542,14 +505,20 @@ end
 
 -- Builds the actor of an `Actor` beat; nil = unknown target or missing map points (warned once by the caller)
 function Actors.Create(target: string, ctx: Context): Actor?
-	if target == "ToyCarNinth" then
-		const a = ctx.Point("CS-3")
-		const b = ctx.Point("CS-4")
-		return if a ~= nil and b ~= nil then toyCar(target, a.Position, b.Position, TEAL, "car_honk_soft", ctx) else nil
-	elseif target == "ToyCarJuniper" then
-		const a = ctx.Post("P-01")
-		const b = ctx.Point("CART")
-		return if a ~= nil and b ~= nil then toyCar(target, a, b.Position, MUSTARD, "car_honk_soft", ctx) else nil
+	const car = Content.Cutscenes.Rules.Cars[target]
+	if car ~= nil then
+		const actor, problem = Cars.Create(target, car, {
+			Play = function(sound: string, at: Instance)
+				ctx.Play(sound, at)
+			end,
+			Loop = ctx.Loop,
+			Folder = ctx.Folder,
+		})
+		if actor == nil then
+			ctx.Warn(`car:{target}`, `car "{target}" not shown: {problem}`)
+			return nil
+		end
+		return { Model = actor.Model, Update = actor.Update, Destroy = actor.Destroy }
 	elseif target == "FlipPhone" then
 		return flipPhone(ctx)
 	elseif target == "MartDoor" then

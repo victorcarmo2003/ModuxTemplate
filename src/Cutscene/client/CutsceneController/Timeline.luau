@@ -50,6 +50,22 @@ function Timeline.Last(beats: { Beat }, kind: string, elapsed: number): (Beat?, 
 	return found, index
 end
 
+-- Last beat of any of `kinds` that already started (and its index), or nil
+function Timeline.LastOf(beats: { Beat }, kinds: { [string]: boolean }, elapsed: number): (Beat?, number)
+	local found: Beat? = nil
+	local index = 0
+	for i, beat in beats do
+		if beat.At > elapsed then
+			break
+		end
+		if kinds[beat.Kind] then
+			found = beat
+			index = i
+		end
+	end
+	return found, index
+end
+
 -- Next beat of a kind after index `from`, or nil
 function Timeline.Next(beats: { Beat }, kind: string, from: number): Beat?
 	for i = from + 1, #beats do

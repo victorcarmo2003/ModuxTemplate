@@ -1028,7 +1028,7 @@ local function checkHallucinations()
 end
 
 const BEAT_KINDS: { [string]: boolean } =
-	{ Fade = true, Text = true, MoveTo = true, LookAt = true, Prompt = true, Line = true, Actor = true }
+	{ Fade = true, Text = true, MoveTo = true, LookAt = true, Focus = true, Prompt = true, Line = true, Actor = true }
 const BEAT_TEXT: { [string]: boolean } = { Text = true, Prompt = true, Line = true }
 
 local function checkCutscenes()
@@ -1070,7 +1070,33 @@ local function checkCutscenes()
 			if BEAT_TEXT[beat.Kind] and (beat.Text == nil or beat.Text == "") then
 				fail("Cutscenes", index, key, `Beats[{position}] ({beat.Kind}) needs Text`)
 			end
+			const arrive = beat.Arrive
+			if arrive ~= nil and (beat.Kind ~= "MoveTo" or arrive < beat.At or arrive > row.Duration) then
+				fail("Cutscenes", index, key, `Beats[{position}].Arrive = {arrive}: MoveTo only, between At and Duration`)
+			end
+			const fov = beat.Fov
+			if fov ~= nil and ((beat.Kind ~= "LookAt" and beat.Kind ~= "Focus") or fov < 20 or fov > 100) then
+				fail("Cutscenes", index, key, `Beats[{position}].Fov = {fov}: LookAt/Focus only, 20..100`)
+			end
 		end
+	end
+	const rules = Cutscenes.Rules
+	if #rules.Stand.Slots ~= 4 then
+		fail("Cutscenes.Rules", nil, "Stand", `{#rules.Stand.Slots} Stand.Slots, a party of 4 needs 4`)
+	end
+	inRange("Cutscenes.Rules", nil, "Walk", "MinSpeed", rules.Walk.MinSpeed, 1, rules.Walk.MaxSpeed)
+	inRange("Cutscenes.Rules", nil, "Walk", "Accel", rules.Walk.Accel, 1, 100)
+	for speaker, voice in rules.Voices do
+		inRange("Cutscenes.Rules", nil, speaker, "Voices.Volume", voice.Volume, 0, 1)
+	end
+	for car, row in rules.Cars do
+		if Traffic.Routes.ByKey[row.Route] == nil then
+			fail("Cutscenes.Rules", nil, car, `Cars.Route '{row.Route}' is not a Traffic route`)
+		end
+		if Sounds.ByKey[row.Horn] == nil then
+			fail("Cutscenes.Rules", nil, car, `Cars.Horn '{row.Horn}' is not a sound`)
+		end
+		inRange("Cutscenes.Rules", nil, car, "Cars.Look", row.Look, 1, #Traffic.Looks.Shapes * #Traffic.Looks.Paints)
 	end
 	const intro = Cutscenes.ByKey.intro
 	if intro.Cap > Shift.ByKey.Intro.Duration then

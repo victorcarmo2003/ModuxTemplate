@@ -3,6 +3,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
+local Route = require(ReplicatedStorage.shared.Cutscene.Route)
 
 type Beat = Content.CutsceneBeat
 type TrafficHook = {
@@ -19,12 +20,12 @@ export type Public = {
 	Owner: string?,
 	Participants: { number },
 	Placed: any,
+	Plans: { [number]: Route.Plan },
 	Scene: string,
 	StartedAt: number,
 	Target: string?,
 	Traffic: TrafficHook?,
 	Votes: { [number]: boolean },
-	Walks: { [Player]: {} },
 	Written: boolean,
 	Setup: (self: Public) -> (),
 	IsPlaying: (self: Public) -> boolean,
@@ -37,11 +38,11 @@ export type Public = {
 	Write: (self: Public) -> (),
 	TrafficHook: (self: Public) -> TrafficHook?,
 	HoldTraffic: (self: Public, on: boolean) -> (),
+	DressPoster: (self: Public) -> (),
+	PlanFor: (self: Public, slot: number) -> Route.Plan?,
 	SpotFor: (self: Public, slot: number) -> CFrame?,
 	BodyOf: (self: Public, player: Player) -> Model?,
 	Place: (self: Public, player: Player, slot: number) -> (),
-	Walk: (self: Public, player: Player, slot: number) -> (),
-	StopWalk: (self: Public, player: Player) -> (),
 	Hold: (self: Public) -> (),
 	ReleaseAll: (self: Public) -> (),
 	RunMove: (self: Public, beat: Beat) -> (),

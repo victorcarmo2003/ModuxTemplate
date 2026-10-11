@@ -9,11 +9,19 @@
 
 	  Fade      ScreenFade over the whole screen (black before the first beat when that beat is a fade in)
 	  Text      HudBanner title ("Bellmoor"; "Credits" stays until the next fade)
-	  MoveTo    nothing here: the server walks the bodies
-	  LookAt    CameraController:LookAt(point / post / Walt's mark) inside the Cutscene POV (own head, free look)
+	  MoveTo    the own body walks the shared Route (Walker.luau: eased start/stop, flowing waypoints, smooth turn);
+	            the server only places bodies and re-places one that is far (CutsceneService)
+	  LookAt    focus on a point / post / Walt's mark (CameraController:Focus, elastic free look, eased switch)
+	  Focus     focus on a live target: a car actor (followed), "Poster", "Phone" (real map instances, Anchors),
+	            "Windows" (nearest NO HELP WANTED card ahead) or "Walk" (where the body walks); Fov narrows the view
 	  Prompt    PromptBillboard on the target that fills by itself (input locked, script.md §1)
-	  Line      subtitle strip (CallSubtitle): "Walt" lines, or "You" for crew lines + a SpeechBalloon over each mate
-	  Actor     local actors (Actors.luau): toy cars, flip phone, Walt, coffee, Raincoat Lady, flyer, Mart bell
+	  Line      subtitle strip (CallSubtitle): "Walt" lines, or "You" for crew lines + a SpeechBalloon over each mate;
+	            voiced by text-to-speech when the engine has it (Speech.luau, Rules.Voices; subtitles only otherwise)
+	  Actor     local actors (Actors.luau): street cars of the traffic kit, flip phone, Walt, coffee, Raincoat Lady,
+	            flyer, Mart bell
+
+	Cutscene active (for the HUD and anyone else): `CutsceneController.Active` (Vide source, true from the first
+	segment to the end of the chain) and the attribute `CutsceneActive` (true / nil) on Players.LocalPlayer.
 
 	Every frame is a function of (beats, server time - StartedAt): a late or rejoining client lands on the same frame
 	(Timeline.luau). Sounds and balloons only fire for beats crossed live, never on catch-up.
@@ -43,6 +51,7 @@ local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
+local Anchors = require(ReplicatedStorage.shared.Cutscene.Anchors)
 local CallSubtitle = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.CallSubtitle)
 local HudBanner = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.HudBanner)
 local PromptBillboard = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.PromptBillboard)
@@ -50,7 +59,9 @@ local ScreenFade = require(StarterPlayer.StarterPlayerScripts.client.Interface.C
 local SkipPill = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.SkipPill)
 local SpeechBalloon = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.SpeechBalloon)
 local Actors = require(script.Actors)
+local Speech = require(script.Speech)
 local Timeline = require(script.Timeline)
+local Walker = require(script.Walker)
 
 type Beat = Content.CutsceneBeat
 type Scene = Content.Cutscene
@@ -88,6 +99,11 @@ const SCENE_MUSIC: { [string]: string } = { finale = "finale" }
 const PROMPT_SOUND = "prompt_done"
 const VOTE_SOUND = "skip_vote"
 const VOTE_CLIP = "wave_skip"
+const ACTIVE_ATTRIBUTE = "CutsceneActive"
+const ACTOR_LIFT = Vector3.new(0, 2, 0) -- focus on a car: a bit above its base
+const WINDOW_PATTERN = "NoHelp" -- NO HELP WANTED cards (AST-033_NoHelpSign, blockout Window_NoHelpWanted_*)
+const WINDOW_RANGE = 34 -- studs: cards farther than this are not glanced at
+const WINDOW_AHEAD = 0.15 -- dot with the walk heading: only cards ahead or beside
 
 const CutsceneController = Modux.Controller("CutsceneController", {
 	Require = { "InputController", "CameraController", "AnimController", "AudioController" },
@@ -110,6 +126,8 @@ function CutsceneController:Setup()
 	self.Voted = Vide.source(false) :: Vide.Source<boolean>
 	self.Progress = Vide.source(0) :: Vide.Source<number>
 	self.Skippable = Vide.source(false) :: Vide.Source<boolean>
+	-- a chain plays (HUD and others hide what does not belong in a cutscene); also attribute CutsceneActive
+	self.Active = Vide.source(false) :: Vide.Source<boolean>
 
 	-- segment
 	self.Scene = nil :: Scene?
@@ -120,6 +138,9 @@ function CutsceneController:Setup()
 	self.Actors = {} :: { [string]: { Actor: Actors.Actor, At: number } }
 	self.LookIndex = 0 :: number
 	self.Music = nil :: string?
+	self.Walker = nil :: Walker.Walker?
+	self.Speech = nil :: Speech.Speech?
+	self.Windows = nil :: { BasePart }?
 	-- chain
 	self.Playing = false :: boolean
 	self.Party = false :: boolean
@@ -168,8 +189,15 @@ local function postGround(id: string): Vector3?
 	return nil
 end
 
--- Where a LookAt / Prompt target is: a MapPoint (+ LOOK_LIFT) or a street post (flyer height)
+-- Where a LookAt / Prompt target is: the real poster / phone, a MapPoint (+ LOOK_LIFT) or a street post (flyer
+-- height). "P-01" (the flyer post) is the poster itself when the map has it.
 function CutsceneController:TargetPosition(target: string): Vector3?
+	if target == "Poster" or target == "Phone" or target == "P-01" then
+		const anchor = Anchors.Point(if target == "P-01" then "Poster" else target)
+		if anchor ~= nil then
+			return anchor.Position
+		end
+	end
 	const point = if MapIndex.HasBinding() then MapIndex.FindPoint(target) else nil
 	if point ~= nil then
 		return point.Position + LOOK_LIFT
@@ -179,6 +207,86 @@ function CutsceneController:TargetPosition(target: string): Vector3?
 		return ground + Vector3.new(0, FLYER_HEIGHT, 0)
 	end
 	return nil
+end
+
+-- NO HELP WANTED cards of the map (found once per chain)
+function CutsceneController:WindowCards(): { BasePart }
+	const cached = self.Windows
+	if cached ~= nil then
+		return cached
+	end
+	const cards: { BasePart } = {}
+	for _, instance in Workspace:GetDescendants() do
+		if string.find(instance.Name, WINDOW_PATTERN, 1, true) then
+			if instance:IsA("BasePart") then
+				table.insert(cards, instance)
+			elseif instance:IsA("Model") and instance.PrimaryPart ~= nil then
+				table.insert(cards, instance.PrimaryPart)
+			end
+		end
+	end
+	self.Windows = cards
+	return cards
+end
+
+-- Live focus of a Focus beat (nil = where the body walks)
+function CutsceneController:FocusGetter(target: string): (() -> Vector3?)?
+	if target == "Walk" then
+		return nil
+	elseif target == "Windows" then
+		const cards = self:WindowCards()
+		return function(): Vector3?
+			const character = Players.LocalPlayer.Character
+			const root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
+			if root == nil or not root:IsA("BasePart") then
+				return nil
+			end
+			const heading = root.CFrame.LookVector
+			local best: Vector3? = nil
+			local bestScore = -math.huge
+			for _, card in cards do
+				if card.Parent == nil then
+					continue
+				end
+				const offset = card.Position - root.Position
+				const distance = offset.Magnitude
+				if distance > WINDOW_RANGE or distance < 1 then
+					continue
+				end
+				const ahead = Vector3.new(offset.X, 0, offset.Z).Unit:Dot(Vector3.new(heading.X, 0, heading.Z).Unit)
+				if ahead < WINDOW_AHEAD then
+					continue
+				end
+				const score = ahead - distance / WINDOW_RANGE
+				if score > bestScore then
+					bestScore = score
+					best = card.Position
+				end
+			end
+			return best
+		end
+	elseif target == "Poster" or target == "Phone" then
+		return function(): Vector3?
+			return self:TargetPosition(target)
+		end
+	elseif Content.Cutscenes.Rules.Cars[target] ~= nil then
+		return function(): Vector3?
+			const entry = self.Actors[target]
+			const model = if entry ~= nil then entry.Actor.Model else nil
+			if model == nil or model.Parent == nil then
+				return nil
+			end
+			return model:GetPivot().Position + ACTOR_LIFT
+		end
+	end
+	const fixed = self:TargetPosition(target)
+	if fixed == nil then
+		self:WarnOnce(`focus:{target}`, `Focus target "{target}" not found`)
+		return nil
+	end
+	return function(): Vector3?
+		return fixed
+	end
 end
 
 function CutsceneController:ActorContext(): Actors.Context
@@ -195,6 +303,16 @@ function CutsceneController:ActorContext(): Actors.Context
 		end,
 		Play = function(sound: string, at: (Vector3 | Instance)?)
 			audio:Play(sound, at)
+		end,
+		Loop = function(sound: string, at: Instance, on: boolean)
+			audio:Loop(sound, at, on)
+		end,
+		Caller = function(): Vector3?
+			const spot = Anchors.Spot(Content.Cutscenes.Rules.Stand.Target, 1, #Players:GetPlayers())
+			return if spot ~= nil then spot.Position else nil
+		end,
+		Warn = function(key: string, message: string)
+			self:WarnOnce(key, message)
 		end,
 		Bind = function(model: Model, set: string)
 			anim:Bind(model, set)
@@ -229,6 +347,15 @@ function CutsceneController:ClearSegment()
 		unmount()
 	end
 	table.clear(self.Balloons)
+	const walker = self.Walker
+	self.Walker = nil
+	if walker ~= nil then
+		walker.Stop()
+	end
+	const speech = self.Speech
+	if speech ~= nil then
+		speech.Stop()
+	end
 	const music = self.Music
 	self.Music = nil
 	if music ~= nil then
@@ -248,9 +375,23 @@ function CutsceneController:ClearSegment()
 	end)
 end
 
+-- Master x Voice group of the AudioController (user volumes)
+function CutsceneController:VoiceVolume(): number
+	const volumes = self.Dependencies.AudioController.Volumes
+	return (volumes.Master or 1) * (volumes.Voice or 1)
+end
+
 function CutsceneController:BeginChain()
 	self.Playing = true
 	self.EndedAt = nil
+	self.Windows = nil
+	self.Active(true)
+	Players.LocalPlayer:SetAttribute(ACTIVE_ATTRIBUTE, true)
+	if self.Speech == nil then
+		self.Speech = Speech.new(function(): number
+			return self:VoiceVolume()
+		end)
+	end
 	self.Party = #Players:GetPlayers() > 1
 	const input = self.Dependencies.InputController
 	self.PreviousContext = input.Context
@@ -268,6 +409,14 @@ function CutsceneController:EndChain()
 	self.EndAlpha = Vide.untrack(self.Fade)
 	self.EndedAt = os.clock()
 	self:ClearSegment()
+	const speech = self.Speech
+	self.Speech = nil
+	if speech ~= nil then
+		speech.Destroy()
+	end
+	self.Windows = nil
+	self.Active(false)
+	Players.LocalPlayer:SetAttribute(ACTIVE_ATTRIBUTE, nil)
 	self.Skippable(false)
 	self:UnbindSkip()
 	self.Dependencies.CameraController:Cutscene(false)
@@ -295,8 +444,14 @@ function CutsceneController:BeginSegment(key: string, startedAt: number)
 	-- within LIVE_WINDOW of its start, plays its first beats live)
 	const elapsed = Workspace:GetServerTimeNow() - startedAt
 	self.LastElapsed = if elapsed <= LIVE_WINDOW then -LIVE_WINDOW else elapsed
-	self.Dependencies.CameraController:LookAt(nil)
+	self.Dependencies.CameraController:Focus(nil, nil)
 	self.Skippable(scene.Skippable)
+	-- the own walk along the shared Route, and the voices of this segment loaded ahead
+	self.Walker = Walker.new(scene, #Players:GetPlayers())
+	const speech = self.Speech
+	if speech ~= nil then
+		speech.Prepare(self.Beats)
+	end
 	const music = SCENE_MUSIC[key]
 	if music ~= nil then
 		self.Music = music
@@ -335,8 +490,14 @@ function CutsceneController:FireBeat(beat: Beat, live: boolean)
 			return
 		end
 		self.Actors[beat.Target] = { Actor = actor, At = beat.At }
-	elseif beat.Kind == "Line" and live and beat.Speaker == "crew" then
-		self:CrewBalloons(beat.Text or "")
+	elseif beat.Kind == "Line" and live then
+		const speech = self.Speech
+		if speech ~= nil then
+			speech.Say(beat)
+		end
+		if beat.Speaker == "crew" then
+			self:CrewBalloons(beat.Text or "")
+		end
 	elseif beat.Kind == "Prompt" and live then
 		self:PlacePrompt(beat.Target)
 	end
@@ -419,15 +580,31 @@ function CutsceneController:Step()
 		end
 	end
 
-	-- camera look: the last LookAt beat already reached
-	const look, lookIndex = Timeline.Last(self.Beats, "LookAt", elapsed)
+	-- camera focus: the last LookAt / Focus beat already reached
+	const look, lookIndex = Timeline.LastOf(self.Beats, { LookAt = true, Focus = true }, elapsed)
 	if lookIndex ~= self.LookIndex then
 		self.LookIndex = lookIndex
-		const position = if look ~= nil then self:TargetPosition(look.Target) else nil
-		if look ~= nil and position == nil then
-			self:WarnOnce(`look:{look.Target}`, `LookAt target "{look.Target}" not found`)
+		const camera = self.Dependencies.CameraController
+		if look == nil then
+			camera:Focus(nil, nil)
+		elseif look.Kind == "Focus" then
+			camera:Focus(self:FocusGetter(look.Target), look.Fov)
+		else
+			const position = self:TargetPosition(look.Target)
+			if position == nil then
+				self:WarnOnce(`look:{look.Target}`, `LookAt target "{look.Target}" not found`)
+			end
+			camera:Focus(if position ~= nil
+				then function(): Vector3?
+					return position
+				end
+				else nil, look.Fov)
 		end
-		self.Dependencies.CameraController:LookAt(position)
+	end
+
+	const walker = self.Walker
+	if walker ~= nil then
+		walker.Step(elapsed, math.clamp(elapsed - last, 0, 0.1))
 	end
 
 	for _, entry in self.Actors do

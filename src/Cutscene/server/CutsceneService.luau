@@ -9,21 +9,26 @@
 -- Participants: members connected (not Away) when the chain starts, in roster order (slot 1..4). A late member is
 -- not one: no vote, no freeze; during the Intro CharacterService keeps it without a body until the phase ends.
 -- Avatars: CharacterService:Freeze(p, "Cutscene", true); at the start of each segment the body is pivoted to
--- Marks[slot]; MoveTo beats walk every body to the target (R23: the body is pivoted to the last target first when
--- it is far from it). A body that appears later (spawn after join, rejoin) is frozen and pivoted where it should be.
+-- Marks[slot]. The walk itself is the shared Route (src/Cutscene/shared/Route.luau): each client steers its own body
+-- along it (smooth start/stop, no dry stop at a waypoint, CutsceneController/Walker). At each MoveTo beat a body far
+-- from where the Route says it should be (Rules.SnapDistance) is pivoted there (R23). A body that appears later
+-- (spawn after join, rejoin) is frozen and pivoted where the Route puts it. Targets come from the real map
+-- (Anchors.luau): the stand spots in front of the phone/poster follow the instance wherever it was moved.
+-- Poster: the Help Wanted flyer gets its printed text + phone number (Rules.Poster) once per server (DressPoster).
 -- Vote: SkipVote from a connected participant (spectators too, DEC-194 a), once per segment. The segment ends when
 -- Votes >= Needed = ceil(0.5 x connected participants), recomputed when someone leaves. Everything else in the
 -- beats (fade, text, lines, actors, look, prompt) is client presentation (CutsceneController, TASK-121).
 -- Traffic: TrafficService:Hold("cutscene", on) while a chain plays (runtime lookup: Traffic is not in Require).
--- PROVISIONAL (TASK-120 note): side-by-side spacing on shared targets; walk speed = StarterPlayer default; intro end
--- moves participants to their spawn point (PS-n, "at work"); chain ends when no participant is connected.
+-- PROVISIONAL (TASK-120 note): side-by-side spacing on shared targets (Rules.LineSpacing); walk pace = Rules.Walk;
+-- intro end moves participants to their spawn point (PS-n, "at work"); chain ends when no participant is connected.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
-local StarterPlayer = game:GetService("StarterPlayer")
 local Content = require(ReplicatedStorage.shared.Content)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
+local Anchors = require(ReplicatedStorage.shared.Cutscene.Anchors)
+local Route = require(ReplicatedStorage.shared.Cutscene.Route)
 local Modux = require(ServerScriptService.server.Modux)
 
 type Scene = Content.Cutscene
@@ -38,16 +43,18 @@ const RECORD = 1
 const NONE = "none"
 const FREEZE_REASON = "Cutscene"
 const HOLD_REASON = "cutscene"
-const SLOT_TOKEN = "{slot}"
 const MAX_WIRE = 4 -- Cutscene.Votes / Needed wire range
 const VOTE_SHARE = 0.5 -- DEC-194
 const TICK_RATE = 10 -- Hz: beat timing and late bodies
 const SPAWN_LIFT = Vector3.new(0, 3, 0) -- architecture.md §18.5
--- Provisional presentation (TASK-120 note; candidates for Content.Cutscenes): side-by-side gap on a shared target and
--- distance from the last target that triggers a re-pivot at the next shot (R23)
-const LINE_SPACING = 2.5 -- 4 avatars fit inside the 8-stud CW-1 stripes (MAP-01 P46)
-const SNAP_DISTANCE = 6
+const RULES = Content.Cutscenes.Rules
 const PHASE_SCENES: { [string]: string } = { Intro = "intro", Finale = "finale" }
+-- Help Wanted flyer dressing (Rules.Poster; PROVISIONAL look, frontend-coder 2026-10-11)
+const DRESSED_ATTRIBUTE = "CutsceneDressed"
+const POSTER_PPS = 100
+const INK = Color3.fromHex("#2B2233")
+const KETCHUP = Color3.fromHex("#E2402E")
+const CREAM = Color3.fromHex("#FFF1D6")
 
 local function sceneOf(key: string): Scene?
 	const scene = Content.Cutscenes.ByKey[key]
@@ -69,6 +76,69 @@ local function movesOf(scene: Scene): { Beat }
 		return a.At < b.At
 	end)
 	return moves
+end
+
+local function label(parent: Instance, name: string, text: string, y: number, h: number, color: Color3, bold: boolean)
+	const line = Instance.new("TextLabel")
+	line.Name = name
+	line.BackgroundTransparency = 1
+	line.Position = UDim2.fromScale(0.06, y)
+	line.Size = UDim2.fromScale(0.88, h)
+	line.FontFace = Font.fromEnum(if bold then Enum.Font.FredokaOne else Enum.Font.Gotham)
+	line.TextScaled = true
+	line.TextWrapped = true
+	line.TextColor3 = color
+	line.Text = text
+	line.Parent = parent
+end
+
+local function phoneStrip(parent: Instance, phone: string)
+	const strip = Instance.new("Frame")
+	strip.Name = "PhoneStrip"
+	strip.BorderSizePixel = 0
+	strip.BackgroundColor3 = KETCHUP
+	strip.Position = UDim2.fromScale(0, 0.78)
+	strip.Size = UDim2.fromScale(1, 0.19)
+	strip.Parent = parent
+	label(strip, "Phone", `CALL {phone}`, 0.08, 0.84, CREAM, true)
+end
+
+-- Printed flyer: title, the lines and a "CALL <number>" strip (Rules.Poster) on the SurfaceGui the map already has.
+-- A flyer without SurfaceGui (texture) only gets the strip, on its Front face.
+local function dressPoster(part: BasePart)
+	local gui: SurfaceGui? = nil
+	for _, child in part:GetChildren() do
+		if child:IsA("SurfaceGui") then
+			gui = child
+			break
+		end
+	end
+	const poster = RULES.Poster
+	if gui == nil then
+		warn(`[CutsceneService] {part:GetFullName()} has no SurfaceGui: adding a "CALL {poster.Phone}" strip on Front`)
+		const created = Instance.new("SurfaceGui")
+		created.Name = "PhoneStrip"
+		created.Face = Enum.NormalId.Front
+		created.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+		created.PixelsPerStud = POSTER_PPS
+		created.LightInfluence = 0
+		created.Parent = part
+		phoneStrip(created, poster.Phone)
+		return
+	end
+	const surface = gui :: SurfaceGui
+	surface:ClearAllChildren()
+	surface.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	surface.PixelsPerStud = POSTER_PPS
+	surface.LightInfluence = 0
+	const lines = poster.Lines
+	label(surface, "Title", lines[1] or "", 0.04, 0.2, KETCHUP, true)
+	const rest = math.max(#lines - 1, 1)
+	const room = 0.5 / rest
+	for i = 2, #lines do
+		label(surface, `Line{i - 1}`, lines[i], 0.26 + (i - 2) * room, room * 0.9, INK, false)
+	end
+	phoneStrip(surface, poster.Phone)
 end
 
 local function rootOf(character: Model): BasePart?
@@ -108,8 +178,8 @@ function CutsceneService:Setup()
 	self.Placed = setmetatable({}, { __mode = "k" }) :: any
 	-- players frozen by this service
 	self.Frozen = {} :: { [Player]: boolean }
-	-- walk in progress per player (a token tells the current walk from a stale MoveToFinished)
-	self.Walks = {} :: { [Player]: {} }
+	-- walk plan per slot of the current segment (shared Route; rebuilt while a target is missing)
+	self.Plans = {} :: { [number]: Route.Plan }
 	self.Traffic = nil :: TrafficHook?
 	-- Fired when a chain starts (scene key) and ends ("none")
 	self.Changed = self.Libs.Signal.new() :: SignalLib.Signal<string>
@@ -219,36 +289,66 @@ function CutsceneService:HoldTraffic(on: boolean)
 	end
 end
 
--- Bodies ------------------------------------------------------------------------------------------------------------
+-- Poster ------------------------------------------------------------------------------------------------------------
 
--- Point id of a target for a slot ("{slot}" -> 1..4)
-local function pointId(target: string, slot: number): string
-	return (string.gsub(target, SLOT_TOKEN, tostring(slot)))
+-- Prints the Help Wanted flyer (title, lines, phone number) once; replicated to every client
+function CutsceneService:DressPoster()
+	const instance = Anchors.PosterInstance()
+	if instance == nil or instance:GetAttribute(DRESSED_ATTRIBUTE) then
+		return
+	end
+	local part: BasePart? = nil
+	if instance:IsA("BasePart") then
+		part = instance
+	else
+		for _, descendant in instance:GetDescendants() do
+			if descendant:IsA("SurfaceGui") and descendant.Parent ~= nil and descendant.Parent:IsA("BasePart") then
+				part = descendant.Parent :: BasePart
+				break
+			end
+		end
+		if part == nil then
+			part = instance:FindFirstChildWhichIsA("BasePart", true)
+		end
+	end
+	if part == nil then
+		return
+	end
+	instance:SetAttribute(DRESSED_ATTRIBUTE, true)
+	const ok, problem = pcall(dressPoster, part)
+	if not ok then
+		warn(`[CutsceneService] poster dressing failed: {problem}`)
+	end
 end
 
--- Where the body of a slot stands now: its mark, or the current MoveTo target (side by side on a shared point)
-function CutsceneService:SpotFor(slot: number): CFrame?
+-- Bodies ------------------------------------------------------------------------------------------------------------
+
+-- Walk plan of a slot for the current segment (Anchors: real map; rebuilt while something is not found)
+function CutsceneService:PlanFor(slot: number): Route.Plan?
 	const scene = sceneOf(self.Scene)
 	if scene == nil or not MapIndex.HasBinding() then
 		return nil
 	end
-	const target = self.Target
-	if target == nil then
-		const marks = scene.Marks
-		if #marks == 0 then
-			return nil
-		end
-		return MapIndex.FindPoint(marks[math.min(slot, #marks)])
+	const cached = self.Plans[slot]
+	if cached ~= nil and not cached.Missing then
+		return cached
 	end
-	const point = MapIndex.FindPoint(pointId(target, slot))
-	if point == nil then
+	const plan = Route.Build(scene, slot, #self.Participants, Anchors.Spot)
+	self.Plans[slot] = plan
+	return plan
+end
+
+-- Where the body of a slot should stand now (its mark, a point of the walk, or the last target), facing its way
+function CutsceneService:SpotFor(slot: number): CFrame?
+	const plan = self:PlanFor(slot)
+	if plan == nil then
 		return nil
 	end
-	if string.find(target, SLOT_TOKEN, 1, true) then
-		return point
+	const position, _, facing = Route.Sample(plan, workspace:GetServerTimeNow() - self.StartedAt)
+	if position == nil then
+		return nil
 	end
-	const offset = (slot - (#self.Participants + 1) / 2) * LINE_SPACING
-	return point * CFrame.new(offset, 0, 0)
+	return CFrame.lookAt(position, position + (facing or Vector3.new(0, 0, -1)))
 end
 
 -- Live body of a connected participant, once CharacterService finished its spawn (it pivots to PS-n in Prepare)
@@ -269,53 +369,6 @@ function CutsceneService:Place(player: Player, slot: number)
 	const spot = self:SpotFor(slot)
 	if spot ~= nil then
 		character:PivotTo(spot + SPAWN_LIFT)
-	end
-end
-
--- Walks a body to the current target. The freeze holds WalkSpeed at 0: the walk sets it for the trip, and
--- CharacterService:RefreshSpeed puts the frozen 0 back on arrival.
-function CutsceneService:Walk(player: Player, slot: number)
-	const character = self:BodyOf(player)
-	const spot = self:SpotFor(slot)
-	if character == nil or spot == nil then
-		return
-	end
-	const humanoid = character:FindFirstChildOfClass("Humanoid")
-	const root = rootOf(character)
-	if humanoid == nil or root == nil then
-		return
-	end
-	const token = {}
-	self.Walks[player] = token
-	humanoid.WalkSpeed = StarterPlayer.CharacterWalkSpeed
-	humanoid:MoveTo(spot.Position)
-	local connection: RBXScriptConnection? = nil
-	connection = humanoid.MoveToFinished:Connect(function()
-		if connection ~= nil then
-			connection:Disconnect()
-		end
-		-- a newer walk (next shot) owns the speed now
-		if self.Walks[player] ~= token then
-			return
-		end
-		self.Walks[player] = nil
-		if player.Character == character then
-			self.Dependencies.CharacterService:RefreshSpeed(player)
-		end
-	end)
-end
-
--- Stops a walk in progress (end of the chain): the body stays where it is
-function CutsceneService:StopWalk(player: Player)
-	if self.Walks[player] == nil then
-		return
-	end
-	self.Walks[player] = nil
-	const character = player.Character
-	const humanoid = if character ~= nil then character:FindFirstChildOfClass("Humanoid") else nil
-	const root = if character ~= nil then rootOf(character) else nil
-	if humanoid ~= nil and root ~= nil then
-		humanoid:MoveTo(root.Position)
 	end
 end
 
@@ -340,37 +393,31 @@ end
 
 function CutsceneService:ReleaseAll()
 	const characters = self.Dependencies.CharacterService
-	for player in self.Walks do
-		self:StopWalk(player)
-	end
 	for player in self.Frozen do
 		if player.Parent ~= nil then
 			characters:Freeze(player, FREEZE_REASON, false)
 		end
 	end
 	table.clear(self.Frozen)
-	table.clear(self.Walks)
 end
 
--- MoveTo beat: bodies far from the last target are pivoted there first (R23), then walk to the new one
+-- MoveTo beat: the clients walk their own bodies along the Route; a body far from where the Route puts it now
+-- (lag, a client that does not walk) is pivoted there (R23)
 function CutsceneService:RunMove(beat: Beat)
-	for slot, userId in self.Participants do
-		const player = self:Connected(userId)
-		const character = if player ~= nil then self:BodyOf(player) else nil
-		if player == nil or character == nil then
-			continue
-		end
-		const root = rootOf(character)
-		const last = self:SpotFor(slot)
-		if root ~= nil and last ~= nil and (root.Position - last.Position).Magnitude > SNAP_DISTANCE then
-			character:PivotTo(last + SPAWN_LIFT)
-		end
-	end
 	self.Target = beat.Target
 	for slot, userId in self.Participants do
 		const player = self:Connected(userId)
-		if player ~= nil then
-			self:Walk(player, slot)
+		const character = if player ~= nil then self:BodyOf(player) else nil
+		if character == nil then
+			continue
+		end
+		const root = rootOf(character)
+		const spot = self:SpotFor(slot)
+		if root ~= nil and spot ~= nil then
+			const off = Vector3.new(root.Position.X - spot.Position.X, 0, root.Position.Z - spot.Position.Z)
+			if off.Magnitude > RULES.SnapDistance then
+				character:PivotTo(spot + SPAWN_LIFT)
+			end
 		end
 	end
 end
@@ -390,6 +437,7 @@ function CutsceneService:Begin(key: string)
 	self.Moves = movesOf(scene)
 	self.NextMove = 1
 	self.Target = nil
+	self.Plans = {}
 	self.Placed = setmetatable({}, { __mode = "k" })
 	self:Hold()
 	self:Write()
@@ -419,6 +467,7 @@ function CutsceneService:Play(key: string, owner: string?): boolean
 	self.Participants = participants
 	self.Owner = owner
 	self.Done = false
+	self:DressPoster()
 	self:HoldTraffic(true)
 	self:Begin(key)
 	self.Changed:Fire(key)
@@ -439,6 +488,7 @@ function CutsceneService:Finish()
 	self.Done = true
 	self.Target = nil
 	self.Moves = {}
+	self.Plans = {}
 	self.Participants = {}
 	table.clear(self.Votes)
 	self:ReleaseAll()
@@ -568,12 +618,10 @@ CutsceneService:OnInit(function(self)
 
 	self.Dependencies.RunStateService.MemberAway:Connect(function(player)
 		self.Frozen[player] = nil
-		self.Walks[player] = nil
 		self:Settle()
 	end)
 	Players.PlayerRemoving:Connect(function(player)
 		self.Frozen[player] = nil
-		self.Walks[player] = nil
 		task.defer(function()
 			self:Settle()
 		end)
@@ -581,7 +629,13 @@ CutsceneService:OnInit(function(self)
 end)
 
 CutsceneService:OnStart(function(self)
-	if not self.Enabled or self.Written then
+	if not self.Enabled then
+		return
+	end
+	task.defer(function()
+		self:DressPoster()
+	end)
+	if self.Written then
 		return
 	end
 	self:Write()

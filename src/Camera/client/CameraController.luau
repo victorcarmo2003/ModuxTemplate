@@ -25,8 +25,14 @@
 	               RECENTER_DELAY s without input. The interact bind (E / ButtonX / touch "Switch") goes to the next
 	               mate; bound only with >= 2 mates
 	  Fixed        scripted camera on a MapPoint (`SPEC-P` / `SPEC-M`), tilted down FIXED_PITCH (MAP-01 P43)
-	  Cutscene     POV of the own head with free look +-LOOK_LIMIT (§19.16). Entered and left only by
-	               `Cutscene(on)` (CutsceneController); `LookAt(position)` turns the base view (beat `LookAt`)
+	  Cutscene     POV of the own head (§19.16). Entered and left only by `Cutscene(on)` (CutsceneController).
+	               `Focus(getter, fov)` gives the focus of the beat (a live position: an actor, the poster, a point;
+	               nil = where the body faces); `LookAt(position)` is a fixed one. The base view eases to a new focus
+	               (smootherstep, Rules.Look.Transition), then follows it (Rules.Look.Follow). Elastic free look:
+	               the look input loses gain the farther the view is from the focus (1 - (angle/limit)^Exponent, full
+	               gain back towards it) and a critically damped spring brings the view back after Rules.Look.Recenter
+	               s without input. Fov narrows the view while that focus holds; a light depth of field keeps the
+	               focus sharp (Content.Cutscenes.Rules.Look; 2026-10-11 user feedback).
 	  External     someone else owns the camera: nothing is driven, every part is restored
 
 	Free look (Spectate, Cutscene): mouse (cursor locked to the centre), touch drag on the free screen, gamepad right
@@ -56,6 +62,7 @@ local RunService = game:GetService("RunService")
 local StarterPlayer = game:GetService("StarterPlayer")
 local UserInputService = game:GetService("UserInputService")
 local Vide = require(ReplicatedStorage.Packages.Vide)
+local Content = require(ReplicatedStorage.shared.Content)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 
@@ -95,6 +102,16 @@ const GAZE_INTERVAL = 0.1 -- s: 10 Hz (network.md §13.5)
 const GAZE_HEARTBEAT = 1 -- s: resend an unchanged gaze this often
 const TWO_PI = 2 * math.pi
 const NO_GAZE = -1 -- nothing sent yet (wire values are 0..359)
+
+-- Cutscene POV (Content.Cutscenes.Rules.Look, data-driven; see header)
+const CUT_LOOK = Content.Cutscenes.Rules.Look
+const CUT_YAW = math.rad(CUT_LOOK.Yaw)
+const CUT_PITCH = math.rad(CUT_LOOK.Pitch)
+const CUT_JUMP = math.rad(25) -- a live focus that jumps this much in a frame (next window card) eases like a new one
+const FOV_RATE = 3 -- 1/s ease of the field of view
+const DOF_RATE = 4 -- 1/s ease of the depth of field
+const DOF_FAR = 0.3 -- far blur while a focus holds (none while walking)
+const DOF_RADIUS_MIN = 8 -- studs in focus around the focus distance
 
 -- R6 core parts: the head-group walk never crosses them.
 const CORE: { [string]: boolean } = {
@@ -300,8 +317,17 @@ function CameraController:Setup()
 	self.LookPitch = 0 :: number
 	self.BaseYaw = nil :: number?
 	self.BasePitch = 0 :: number
-	self.LookTarget = nil :: Vector3?
-	-- Cutscene base yaw without a LookAt target: the own facing, taken once (see ApplyPov).
+	-- Cutscene focus: live position (nil = the own facing), its field of view, and the eased switch between two
+	self.FocusGetter = nil :: (() -> Vector3?)?
+	self.FocusFov = nil :: number?
+	self.Retarget = false :: boolean
+	self.LastTargetYaw = nil :: number?
+	self.Transition = nil :: { FromYaw: number, FromPitch: number, At: number, Time: number }?
+	-- free look spring velocity (rad/s) and the view settings restored after the cutscene
+	self.LookVelocity = Vector2.zero :: Vector2
+	self.BaseFov = nil :: number?
+	self.Dof = nil :: DepthOfFieldEffect?
+	-- kept for ResetLook (older cutscene base)
 	self.HoldYaw = nil :: number?
 	self.LastLookInput = 0 :: number
 	self.TouchDelta = Vector2.zero :: Vector2
@@ -338,27 +364,73 @@ function CameraController:ResetLook()
 	self.BasePitch = 0
 	self.HoldYaw = nil
 	self.TouchDelta = Vector2.zero
+	self.LookVelocity = Vector2.zero
+	self.Transition = nil
+	self.LastTargetYaw = nil
 end
 
 -- Cutscene POV on (CutsceneController, §19.16) or off (back to the life-state driver).
 function CameraController:Cutscene(on: boolean)
+	const camera = workspace.CurrentCamera
 	if on then
-		self.LookTarget = nil
+		self.FocusGetter = nil
+		self.FocusFov = nil
+		if Vide.untrack(self.Mode) ~= "Cutscene" and camera ~= nil then
+			self.BaseFov = camera.FieldOfView
+			const dof = Instance.new("DepthOfFieldEffect")
+			dof.Name = "CutsceneFocus"
+			dof.FarIntensity = 0
+			dof.NearIntensity = 0
+			dof.FocusDistance = 20
+			dof.InFocusRadius = 30
+			dof.Parent = camera
+			const previous = self.Dof
+			if previous ~= nil then
+				previous:Destroy()
+			end
+			self.Dof = dof
+		end
 		self:SetMode("Cutscene")
 		self:SetSwitchBind(false)
 	elseif Vide.untrack(self.Mode) == "Cutscene" then
-		self.LookTarget = nil
+		self.FocusGetter = nil
+		self.FocusFov = nil
+		const dof = self.Dof
+		self.Dof = nil
+		if dof ~= nil then
+			dof:Destroy()
+		end
+		const fov = self.BaseFov
+		self.BaseFov = nil
+		if fov ~= nil and camera ~= nil then
+			camera.FieldOfView = fov
+		end
 		self:SetMode("FirstPerson")
 		self.NextDrive = 0
 	end
 end
 
--- Base view of the cutscene POV turns to a world position (beat `LookAt`); nil = the own facing.
-function CameraController:LookAt(position: Vector3?)
-	self.LookTarget = position
+-- Focus of the cutscene POV (beats `LookAt` / `Focus`): a live position (re-read every frame, so a moving car is
+-- followed) or nil = where the own body faces. `fov` narrows the view while it holds (nil = the player's).
+function CameraController:Focus(getter: (() -> Vector3?)?, fov: number?)
+	self.FocusGetter = getter
+	self.FocusFov = fov
 	self.HoldYaw = nil
-	self.LookYaw = 0
-	self.LookPitch = 0
+	self.Retarget = true
+	-- the free look springs back to the new focus right away
+	self.LastLookInput = 0
+end
+
+-- Fixed world position as the focus (beat `LookAt`); nil = the own facing.
+function CameraController:LookAt(position: Vector3?)
+	if position == nil then
+		self:Focus(nil, nil)
+		return
+	end
+	const at: Vector3 = position
+	self:Focus(function(): Vector3?
+		return at
+	end, nil)
 end
 
 function CameraController:SetArmsVisible(visible: boolean)
@@ -659,53 +731,161 @@ function CameraController:ApplyPov(mode: Mode, camera: Camera, dt: number)
 	end
 	self.MouseLocked = true
 
-	-- Base view: the body's facing, or the cutscene LookAt target.
+	-- Base view: the body's facing, or the cutscene focus.
 	const root = body:FindFirstChild("HumanoidRootPart")
 	const facing: Vector3 = if root and root:IsA("BasePart") then root.CFrame.LookVector else head.CFrame.LookVector
-	local targetYaw = yawOf(facing)
-	local targetPitch = 0
-	const lookTarget = self.LookTarget
-	if mode == "Cutscene" and lookTarget ~= nil then
-		const direction = lookTarget - head.Position
-		if direction.Magnitude > 0.01 then
-			const unit = direction.Unit
-			targetYaw = yawOf(unit)
-			targetPitch = math.asin(math.clamp(unit.Y, -1, 1))
-		end
-	elseif mode == "Cutscene" then
-		-- The own root turns toward the camera (camera-relative rotation of the stock first person), so following it
-		-- would feed the free look back into the base every frame and spin the view while the body walks: the base
-		-- is the facing taken once (cutscene start, each LookAt).
-		const hold = self.HoldYaw or targetYaw
-		self.HoldYaw = hold
-		targetYaw = hold
-	end
-	const ease = 1 - math.exp(-FOLLOW_RATE * dt)
-	const baseYaw = self.BaseYaw
-	if baseYaw == nil then
-		self.BaseYaw = targetYaw
-		self.BasePitch = targetPitch
+	const now = os.clock()
+	if mode == "Cutscene" then
+		self:CutsceneBase(head.Position, facing, camera, dt, now)
 	else
-		self.BaseYaw = baseYaw + angleDelta(baseYaw, targetYaw) * ease
-		self.BasePitch += (targetPitch - self.BasePitch) * ease
+		const targetYaw = yawOf(facing)
+		const ease = 1 - math.exp(-FOLLOW_RATE * dt)
+		const baseYaw = self.BaseYaw
+		if baseYaw == nil then
+			self.BaseYaw = targetYaw
+			self.BasePitch = 0
+		else
+			self.BaseYaw = baseYaw + angleDelta(baseYaw, targetYaw) * ease
+			self.BasePitch += (0 - self.BasePitch) * ease
+		end
 	end
 
-	-- Free look, clamped around the base view.
-	const now = os.clock()
+	-- Free look around the base view
 	const dYaw, dPitch = self:LookInput(dt)
 	if dYaw ~= 0 or dPitch ~= 0 then
 		self.LastLookInput = now
-	elseif mode == "Spectate" and now - self.LastLookInput > RECENTER_DELAY then
-		const back = math.exp(-RECENTER_RATE * dt)
-		self.LookYaw *= back
-		self.LookPitch *= back
 	end
-	self.LookYaw = math.clamp(self.LookYaw + dYaw, -LOOK_LIMIT, LOOK_LIMIT)
-	self.LookPitch = math.clamp(self.LookPitch + dPitch, -LOOK_LIMIT, LOOK_LIMIT)
+	if mode == "Cutscene" then
+		self:ElasticLook(dYaw, dPitch, dt, now)
+	else
+		if dYaw == 0 and dPitch == 0 and now - self.LastLookInput > RECENTER_DELAY then
+			const back = math.exp(-RECENTER_RATE * dt)
+			self.LookYaw *= back
+			self.LookPitch *= back
+		end
+		self.LookYaw = math.clamp(self.LookYaw + dYaw, -LOOK_LIMIT, LOOK_LIMIT)
+		self.LookPitch = math.clamp(self.LookPitch + dPitch, -LOOK_LIMIT, LOOK_LIMIT)
+	end
 
 	const yaw = (self.BaseYaw :: number) + self.LookYaw
 	const pitch = math.clamp(self.BasePitch + self.LookPitch, -PITCH_LIMIT, PITCH_LIMIT)
 	camera.CFrame = CFrame.new(head.Position) * CFrame.fromOrientation(pitch, yaw, 0)
+end
+
+-- Cutscene base view: eased switch to a new focus, then follows it; FOV and depth of field of the focus.
+function CameraController:CutsceneBase(eye: Vector3, facing: Vector3, camera: Camera, dt: number, now: number)
+	local targetYaw = yawOf(facing)
+	local targetPitch = 0
+	const getter = self.FocusGetter
+	const target = if getter ~= nil then getter() else nil
+	local distance: number? = nil
+	if target ~= nil then
+		const direction = target - eye
+		if direction.Magnitude > 0.01 then
+			const unit = direction.Unit
+			targetYaw = yawOf(unit)
+			targetPitch = math.asin(math.clamp(unit.Y, -1, 1))
+			distance = direction.Magnitude
+		end
+	end
+
+	const baseYaw = self.BaseYaw
+	if baseYaw == nil then
+		self.BaseYaw = targetYaw
+		self.BasePitch = targetPitch
+		self.Retarget = false
+	else
+		const lastTarget = self.LastTargetYaw
+		const jumped = lastTarget ~= nil and math.abs(angleDelta(lastTarget, targetYaw)) > CUT_JUMP
+		if self.Retarget or jumped then
+			self.Retarget = false
+			const turn = math.abs(angleDelta(baseYaw, targetYaw)) + math.abs(targetPitch - self.BasePitch)
+			const spec = CUT_LOOK.Transition
+			self.Transition = {
+				FromYaw = baseYaw,
+				FromPitch = self.BasePitch,
+				At = now,
+				Time = math.min(spec.Min + spec.PerHalfTurn * turn / math.pi, spec.Max),
+			}
+		end
+		const transition = self.Transition
+		if transition ~= nil then
+			const x = math.clamp((now - transition.At) / math.max(transition.Time, 1e-3), 0, 1)
+			const alpha = x * x * x * (x * (x * 6 - 15) + 10) -- smootherstep
+			self.BaseYaw = transition.FromYaw + angleDelta(transition.FromYaw, targetYaw) * alpha
+			self.BasePitch = transition.FromPitch + (targetPitch - transition.FromPitch) * alpha
+			if x >= 1 then
+				self.Transition = nil
+			end
+		else
+			const ease = 1 - math.exp(-CUT_LOOK.Follow * dt)
+			self.BaseYaw = baseYaw + angleDelta(baseYaw, targetYaw) * ease
+			self.BasePitch += (targetPitch - self.BasePitch) * ease
+		end
+	end
+	self.LastTargetYaw = targetYaw
+
+	-- field of view of the focus
+	const baseFov = self.BaseFov or camera.FieldOfView
+	const fov = self.FocusFov or baseFov
+	if math.abs(camera.FieldOfView - fov) > 0.01 then
+		camera.FieldOfView += (fov - camera.FieldOfView) * (1 - math.exp(-FOV_RATE * dt))
+	end
+	-- depth of field: the focus sharp, the far background a little soft (none while walking)
+	const dof = self.Dof
+	if dof ~= nil then
+		const ease = 1 - math.exp(-DOF_RATE * dt)
+		const far = if distance ~= nil then DOF_FAR else 0
+		dof.FarIntensity += (far - dof.FarIntensity) * ease
+		if distance ~= nil then
+			dof.FocusDistance += (distance - dof.FocusDistance) * ease
+			dof.InFocusRadius += (math.max(DOF_RADIUS_MIN, distance * 0.6) - dof.InFocusRadius) * ease
+		end
+	end
+end
+
+-- Elastic free look of the cutscene: input gain falls to 0 at the limit when turning away from the focus (full gain
+-- back), and after Rules.Look.Recenter s without input a critically damped spring returns the view to the focus.
+local function elastic(offset: number, delta: number, limit: number): number
+	if delta == 0 then
+		return offset
+	end
+	if offset * delta > 0 then
+		const ratio = math.clamp(math.abs(offset) / limit, 0, 1)
+		delta *= math.max(1 - ratio ^ CUT_LOOK.Exponent, 0)
+	end
+	return math.clamp(offset + delta, -limit, limit)
+end
+
+function CameraController:ElasticLook(dYaw: number, dPitch: number, dt: number, now: number)
+	if dYaw ~= 0 or dPitch ~= 0 then
+		self.LookVelocity = Vector2.zero
+		self.LookYaw = elastic(self.LookYaw, dYaw, CUT_YAW)
+		self.LookPitch = elastic(self.LookPitch, dPitch, CUT_PITCH)
+		return
+	end
+	if now - self.LastLookInput <= CUT_LOOK.Recenter then
+		return
+	end
+	-- x'' = -2w x' - w^2 x (critically damped), integrated in small steps
+	const omega = CUT_LOOK.Spring
+	local x = Vector2.new(self.LookYaw, self.LookPitch)
+	local v = self.LookVelocity
+	local left = math.min(dt, 0.1)
+	while left > 0 do
+		const h = math.min(left, 1 / 120)
+		const accel = -2 * omega * v - omega * omega * x
+		v += accel * h
+		x += v * h
+		left -= h
+	end
+	if x.Magnitude < 1e-4 and v.Magnitude < 1e-3 then
+		x = Vector2.zero
+		v = Vector2.zero
+	end
+	self.LookVelocity = v
+	self.LookYaw = x.X
+	self.LookPitch = x.Y
 end
 
 -- Keeps the camera on the mode's subject (only writes what differs).
