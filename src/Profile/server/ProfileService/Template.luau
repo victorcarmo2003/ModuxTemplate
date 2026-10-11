@@ -38,6 +38,9 @@ export type Data = {
 	-- First-hot-dog tutorial finished or skipped (user request 2026-10-11, Provisional). Reconcile adds it as false to
 	-- older profiles, so no migration.
 	TutorialDone: boolean,
+	-- Codes redeemed by this account: normalized code -> os.time() of the redeem (CodesService; user request
+	-- 2026-10-11, Provisional, data.md §1.7). Reconcile adds it as {} to older profiles, so no migration.
+	RedeemedCodes: { [string]: number },
 }
 
 const Template: Data = {
@@ -58,7 +61,7 @@ const Template: Data = {
 
 	-- Monetization (DEC-092; architecture.md §10)
 	ReviveCredits = 0, -- paid revive not used yet (DEC-117); self only (DEC-116)
-	Receipts = {}, -- last 50 processed PurchaseIds (circular list)
+	Receipts = {}, -- last 50 processed PurchaseIds (circular list); writer: ShopService (data.md §1.4)
 
 	-- Gem idempotency per run (architecture.md §10.4)
 	-- Gems = sum credited in this run, for RunReport.Gems (v5.1, T59; TASK-074)
@@ -75,6 +78,9 @@ const Template: Data = {
 
 	-- Onboarding: the first-hot-dog tutorial ran to the end or was skipped (TutorialService)
 	TutorialDone = false,
+
+	-- Codes: one redeem per code per account (CodesService, data.md §1.7)
+	RedeemedCodes = {},
 }
 
 return Template

@@ -8,6 +8,10 @@ com as chaves que a onda 1 já grava (`Run`, `M`, `Sh`, `Cash`, `Fp`, `Stk`, `St
 **Versão 5.2, 2026-10-11 (TASK-144; FEAT-037):** mesas do Pad (UPG-008) e Patio Lights (UPG-009) entram no `Upg`
 como qualquer upgrade, com escopo **Pad** (o mesmo nível gravado nos dois veículos, Q-179 a); estado das mesas (suja,
 gorjeta, quem está sentado) e duplas **não** persistem (§5.6). `V` e `Version` não mudam.
+**Versão 5.3, 2026-10-11 (TASK-160 a TASK-162; pedido do usuário, Provisório):** loja em Robux, classe por Robux e
+códigos (§1.7). Campo novo `RedeemedCodes` (sem migração: `Reconcile` acrescenta `{}`); `Receipts` passa a ter escritor
+(`ShopService`, que faz o papel do `MonetizationService` do `architecture.md` §10.1); `Classes` e `Gems` ganham
+escritores (`ShopService`, `CodesService`). `Version` não muda.
 **Versão 5.1, 2026-10-10 (TASK-049):** D-05 fechado — `Stn` e `Fp` descritos como o código grava (§3.3, §5.3, exemplo
 corrigido: `Fp` guarda chaves de **ingrediente**); `RunRewards.Gems` novo (soma da run, alimenta `RunReport.Gems`,
 T59) sem bump de `Version` (§1.1, §1.3, §5.4). Provisório (DEC-193).
@@ -90,6 +94,9 @@ return {
 
 	-- Onboarding (Provisório, pedido do usuário 2026-10-11): tutorial do 1º cachorro-quente concluído ou pulado
 	TutorialDone = false,
+
+	-- Códigos resgatados (Provisório, pedido do usuário 2026-10-11; §1.7): código normalizado → os.time() do resgate
+	RedeemedCodes = {} :: { [string]: number },
 }
 ```
 
@@ -115,7 +122,9 @@ Notas:
 | `Achievements`, `BadgesAwarded` | `RewardService` (R); retry de badge também no L | L+R | `EndlessDays` = 100 | `RequestSave` |
 | `RunRewards` | `RewardService` | R | junto de cada crédito | mesmo save |
 | `ReviveCredits` | `ReviveService` (+1 pelo recibo, −1 no uso) | L+R | recibo; uso | `Save()` imediato no recibo (§1.4) |
-| `Receipts` | `MonetizationService` | L+R | todo recibo concedido | `Save()` + espera `OnAfterSave` |
+| `Receipts` | `ShopService` (papel do `MonetizationService`, §1.4) | L+R | todo recibo concedido | `SaveConfirmed` (§1.4) |
+| `Gems` (crédito de pacote), `Classes` (classe por Robux) | `ShopService` | L+R | recibo de Developer Product (§1.7) | no mesmo `Update` do `PurchaseId` + `SaveConfirmed` |
+| `Gems`, `Classes`, `RedeemedCodes` | `CodesService` | L+R | código resgatado (§1.7) | `RequestSave` |
 | `Stats` | `RewardService`, `ReviveService` | R | eventos | `RequestSave` |
 | `TutorialDone` | `TutorialService` (packet `TutorialComplete`, Provisório) | R | fim ou skip do tutorial | `RequestSave` |
 
@@ -146,6 +155,14 @@ Perfil ainda carregando (trava de sessão, R4) no instante do evento: o crédito
 disso, perde o evento (é "não estava presente"). Registrar em log.
 
 ### 1.4 Recibos (`MonetizationService`, `architecture.md` §10.1)
+
+> **v5.3 (TASK-160):** o `MonetizationService` existe com o nome **`ShopService`** (`src/Shop/server/ShopService.luau`,
+> prioridade 790, L+R). Mesmo algoritmo abaixo, com três detalhes do código: (1) produto desconhecido é checado
+> **antes** de esperar o perfil; (2) o perfil carregando é esperado até 10 s (padrão ProfileStore); (3) a confirmação
+> é `ProfileService:SaveConfirmed(player, pred)`: `Save()` e espera `OnAfterSave` até `LastSavedData.Receipts` conter o
+> `PurchaseId` (15 s no total, nova tentativa a cada 5 s). Concessão e `PurchaseId` entram no **mesmo** `Update`
+> (um `batch` do Charm, sem yield entre "já concedido?" e a escrita). `RegisterProduct(productId, nome, handler)`;
+> o handler devolve `{ Patch, After? }` (o patch não toca `Receipts`; `After` = feedback).
 
 ```
 ProcessReceipt(receipt):
@@ -178,6 +195,27 @@ jogador nunca perde o que pagou.
 
 Mesmo store nos dois places. Lobby encerra a sessão no `PlayerRemoving`; a run abre com `StartSessionAsync`. A trava
 pode atrasar alguns segundos (R4): a run não espera o perfil; classe vale quando carregar (Cachorro, `class_dog`, até lá; o spawn espera no máximo 10 s pelo perfil antes de usar o Cachorro, **Provisório**).
+
+### 1.7 Loja, classe por Robux e códigos (v5.3; TASK-160 a TASK-162; pedido do usuário 2026-10-11, **Provisório**)
+
+**Classes possuídas = o campo `Classes` que já existe** (o "OwnedClasses" do pedido). Não há campo novo nem
+migração: `ProfileService:OwnedClasses(profile)` lê `Classes` (ignora chave desconhecida e sempre inclui o Cachorro,
+grátis, DEC-186); `SelectedClass` só aceita classe possuída (`ClassService:Select`; leitura cai no Cachorro).
+`ProfileService:WithClass(profile, key)` devolve a cópia do mapa com a chave (o perfil muda por cópia, §1.1).
+
+| Caminho | Quem | Checagem | Escrita (um `Update`, sem yield entre checagem e escrita) | Save |
+|---|---|---|---|---|
+| Classe com gemas (`ClassBuy` Gems ou `ClassAction` Buy) | `ClassService:BuyWithGems` | `InMvp`; lobby (ou Run em modo dev); perfil carregado; não possuída; `Gems ≥ Price` | `Gems −= Price`, `Classes = WithClass` | `RequestSave` |
+| Classe com Robux | `ShopService` (recibo) | `PurchaseId` ∉ `Receipts`; produto registrado (`Content.Shop`, id > 0, `InMvp`) | `Classes = WithClass` + `Receipts`; **já possuída** → `Gems += Price` da classe (nada pago se perde) | `SaveConfirmed` antes do `PurchaseGranted` |
+| Pacote de gemas | `ShopService` (recibo) | idem | `Gems += pack.Gems` + `Receipts` (`GemsEarned` **não** muda: é ganho jogando) | `SaveConfirmed` |
+| Código | `CodesService:Redeem` | código existe, ativo, não expirado, ∉ `RedeemedCodes` | `Gems += Reward.Gems`; `Classes = WithClass` (já possuída → `Gems += Price`); `RedeemedCodes[código] = os.time()` | `RequestSave` |
+
+- Recibo de classe chega em qualquer place (inclusive no meio da run): a classe fica possuída; a classe **travada**
+  da run não muda (DEC-069).
+- `RedeemedCodes` guarda o código **normalizado** (sem espaços, maiúsculo). Tabela de códigos **só no servidor**
+  (`src/Codes/server/CodesService/Codes.luau`): o que está em `ReplicatedStorage` qualquer client lê, e código que
+  vai ao client é público. Por isso não é `Content.Codes`.
+- Tamanho: ~20 bytes por código resgatado; irrelevante.
 
 ## 2. Estado da run (memória do servidor reservado)
 

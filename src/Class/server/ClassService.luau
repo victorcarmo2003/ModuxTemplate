@@ -1,9 +1,14 @@
 --!strict
 -- Crew classes: buy with gems, select, lock for the run, passive modifiers (FEAT-028; DEC-069, DEC-070, DEC-186).
 -- Animal = class (DEC-147): the profile keeps class keys only; Content.Classes[key].Species resolves the animal.
--- Writes Gems, Classes and SelectedClass by copy, never in place (data.md §1.1, §1.2). Single ClassAction responder.
+-- Writes Gems, Classes and SelectedClass by copy, never in place (data.md §1.1, §1.2). Single ClassAction and ClassBuy
+-- responder.
 -- Wave 1 runs the Run place in dev mode (no lobby, Q-085): in the Run, Buy and Select are accepted only with
 -- PlaceService:IsDev() and only before the class is locked (Provisional, TASK-017; network.md §4.6).
+-- ClassBuy (TASK-162; network.md §15, user request 2026-10-11, Provisional): Currency "Gems" buys here, atomically
+-- (check and Update without yield); Currency "Robux" is a pre-check only: "Prompt" tells the client it may call
+-- MarketplaceService:PromptProductPurchase with Content.Shop.ClassProducts[key].ProductId. The receipt itself is
+-- ShopService's (it answers ClassBuyResult "Granted"/"Converted"). ClassAction "Buy" stays for the Crew screen.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -11,6 +16,19 @@ local Content = require(ReplicatedStorage.shared.Content)
 local Modux = require(ServerScriptService.server.Modux)
 
 export type Action = "Buy" | "Select"
+export type Currency = "Gems" | "Robux"
+-- ClassBuyResult.Reason (network.md §15). Ok: bought with gems. Prompt: Robux pre-check passed. Granted / Converted:
+-- Robux receipt (ShopService). The rest are refusals.
+export type BuyReason =
+	"Ok"
+	| "Prompt"
+	| "Granted"
+	| "Converted"
+	| "Owned"
+	| "NotEnoughGems"
+	| "NotForSale"
+	| "Unavailable"
+	| "Busy"
 
 -- Situation the caller knows and the class may depend on (Classes.Effect.When).
 export type Context = {
@@ -146,33 +164,96 @@ function ClassService:GetModifier(player: Player, stat: Content.Stat, base: numb
 	return value
 end
 
-function ClassService:Buy(player: Player, key: string)
+-- Buys `key` with gems: on sale (InMvp, DEC-186), not owned, Gems >= Price. Check and write run without yield, so two
+-- requests in the same frame can never both pay or both pass the balance check (data.md §1.7).
+function ClassService:BuyWithGems(player: Player, key: string): BuyReason
 	const class = Content.Classes.ByKey[key]
 	if not class or not class.InMvp then
-		return -- forged: only MVP classes are on sale (DEC-186)
+		return "NotForSale" -- forged: only MVP classes are on sale (DEC-186)
+	end
+	if not self:CanWrite() then
+		return "Unavailable"
 	end
 	const profiles = self.Dependencies.ProfileService
 	const profile = profiles:Get(player)
 	if not profile then
-		return
+		return "Busy"
 	end
 	if profiles:OwnedClasses(profile)[key] then
-		return -- already owned: never charge twice
+		return "Owned" -- never charge twice
 	end
 	const gems = profile.Gems()
 	if gems < class.Price then
-		self:Notify(player, "not_enough_gems", class.Price)
-		return
+		return "NotEnoughGems"
 	end
 
-	const classes = table.clone(profile.Classes())
-	classes[key] = true
 	profiles:Update(player, {
 		Gems = gems - class.Price,
-		Classes = classes,
+		Classes = profiles:WithClass(profile, key),
 	})
 	profiles:RequestSave(player)
-	self:Notify(player, "class_bought", Content.Classes.IndexOf[key])
+	return "Ok"
+end
+
+-- Robux pre-check (no write): the class is on sale, has a Developer Product, is not owned. "Prompt" = the client may
+-- prompt. The server never trusts this answer later: the receipt is checked again by ShopService.
+function ClassService:CheckRobux(player: Player, key: string): BuyReason
+	const class = Content.Classes.ByKey[key]
+	if not class or not class.InMvp then
+		return "NotForSale"
+	end
+	const product = Content.Shop.ClassProducts.ByKey[key]
+	if not product or product.ProductId <= 0 or not self:CanWrite() then
+		return "Unavailable" -- product not created on the Creator Hub yet (Content.Shop), or not in this place
+	end
+	const profiles = self.Dependencies.ProfileService
+	const profile = profiles:Get(player)
+	if not profile then
+		return "Busy"
+	end
+	if profiles:OwnedClasses(profile)[key] then
+		return "Owned"
+	end
+	return "Prompt"
+end
+
+function ClassService:Reply(player: Player, key: string, reason: BuyReason)
+	const net = self.Dependencies.NetService
+	if not net:IsRunning() or not net:IsReady(player) then
+		return
+	end
+	self.Libs.Net.ClassBuyResult:fireClient(player, {
+		Class = key,
+		Ok = reason == "Ok" or reason == "Prompt" or reason == "Granted" or reason == "Converted",
+		Reason = reason,
+	})
+end
+
+-- ClassAction "Buy" (Crew screen, TASK-020): same purchase, answered with Notice only.
+function ClassService:Buy(player: Player, key: string)
+	const reason = self:BuyWithGems(player, key)
+	if reason == "Ok" then
+		self:Notify(player, "class_bought", Content.Classes.IndexOf[key])
+	elseif reason == "NotEnoughGems" then
+		self:Notify(player, "not_enough_gems", Content.Classes.ByKey[key].Price)
+	end
+end
+
+-- ClassBuy (network.md §15). Every request gets one ClassBuyResult.
+function ClassService:HandleBuy(player: Player, key: string, currency: Currency)
+	if not self:Allow(player) then
+		self:Reply(player, key, "Busy")
+		return
+	end
+	if currency == "Gems" then
+		const reason = self:BuyWithGems(player, key)
+		self:Reply(player, key, reason)
+		if reason == "Ok" then
+			self:Notify(player, "class_bought", Content.Classes.IndexOf[key])
+		end
+	else
+		self:Reply(player, key, self:CheckRobux(player, key))
+	end
 end
 
 function ClassService:Select(player: Player, key: string)
@@ -231,6 +312,10 @@ ClassService:OnInit(function(self)
 		elseif data.Action == "Select" then
 			self:Select(player, data.Class)
 		end
+	end)
+
+	self.Libs.Net.ClassBuy:onServer(function(data, player: Player)
+		self:HandleBuy(player, data.Class, data.Currency)
 	end)
 
 	Players.PlayerRemoving:Connect(function(player)

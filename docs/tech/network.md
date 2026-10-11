@@ -9,6 +9,10 @@ quem lê, frequência e por quê; remoção do legado `Vitals`/`Round`; `Lights`
 `RunReport.Gems` (T59); lixeira de rua sem entrada nova (T60). Ver §0.-2.
 **Versão 5.3, 2026-10-11 (TASK-144; FEAT-037, FEAT-038):** set `Tables` novo; `Customers` ganha `Order2` e `Leader`
 (opcionais, duplas); `Actions` + `buy_in_place`, `clean_table`; `Notices` + `table_added`; atributo `Seated` no rig (§14).
+**Versão 5.4, 2026-10-11 (TASK-160 a TASK-162; pedido do usuário, Provisório):** loja, classe por Robux e códigos
+(§15): packets `ClassBuy`/`ClassBuyResult` e `CodeRedeem`/`CodeRedeemResult`. **Sem set `Wallet`**: saldo e classes
+possuídas já viajam no packet privado `Profile` (§4.5). Robux: o client chama `PromptProductPurchase`; o servidor só
+processa recibo (`ShopService`).
 **Versão 5.2, 2026-10-10 (DEC-221):** set `Hides` sai; janela do trailer = atributo `Shutter` no `Model` do veículo
 (§13.6, T61); `Actions` perde `hide`/`get_up` e ganha `shutter_toggle`; `Notices` troca `hide_taken` por `shutter_closed`.
 Versão 4, 2026-10-10 (**TASK-001**: estado DEC-140 a DEC-201, núcleo da onda 1). Versão anterior: 3.1, 2026-10-08.
@@ -392,6 +396,11 @@ Profile = Lync.packet(Lync.struct({
 -- c -> s, Provisório (2026-10-11). Responder: TutorialService. Marca TutorialDone = true (idempotente).
 -- Flag cosmética: o servidor confia no client (nada de dinheiro, item ou stat depende dela).
 TutorialComplete = Lync.packet(Lync.empty())
+
+-- c -> s, Provisório (2026-10-11). Responder: TutorialService. O novato atendeu a ligação do tutorial (ou ela não
+-- veio): se ele ainda tem TutorialDone = false, CustomerService:RequestTutorial() traz o cliente de tutorial (um por
+-- vez; pedido fixo, sem paciência, fora da nota; atributo de rig `TutorialCustomer` = true). Idempotente.
+TutorialBegin = Lync.packet(Lync.empty())
 ```
 
 | | |
@@ -913,6 +922,19 @@ Pedestrians = Lync.replicate(Lync.struct({   -- id = slot 1..8
 | Mesmo registro 1D do `Traffic` | uma função de posição (`Traffic/shared/Motion.luau`) para carros e passantes; ≤ 3 registros por passante por travessia |
 | Aparência no set (exceção à regra 9) | passante não tem modelo no servidor (T46) para levar atributo; `Species`/`Outfit` são chaves de `Content`; o client monta e o `RigController` veste, inclusive o Night local da faixa baixa (DEC-169) |
 
+**Portão de carregamento (Provisório, frontend-coder 2026-10-11, feedback do usuário: o começo da intro se perdia
+enquanto o client ainda carregava).** `Cutscene` ganha `Waiting = Lync.bool()` (true enquanto o `CutsceneService`
+segura a cadeia; `Scene = "none"` nesse meio-tempo) e há um packet novo:
+
+| Entrada | Direção | Schema | Escritor → leitor | Taxa |
+|---|---|---|---|---|
+| `ClientReady` | packet c → s | `Lync.empty()` | `LoadingController` → `CutsceneService` | 1 por join |
+
+O `LoadingController` (tela de carregamento: jogo carregado, controllers iniciados, kit da crew, sons/imagens da
+intro e falas TTS da intro) manda `ClientReady`; a cadeia só começa quando todo participante conectado mandou, ou
+após `Content.Cutscenes.Rules.ReadyTimeout` (25 s). O teto da fase Intro (`Shift.luau`) cobre essa espera + o `Cap`.
+Não é o handshake `Ready` do `NetService`.
+
 ### 13.8 Lobby e sessão (onda 4)
 
 ```lua
@@ -1025,3 +1047,74 @@ Leader = Lync.optional(Lync.int(1, 65535)),                              -- parc
 
 `Interact` ganha `buy_in_place` (hold 1,5, raio 7) e `clean_table` (hold 1, raio 7) pelo enum de `Content.Actions`;
 `Notice` ganha `table_added` (Party, `Value` = índice da mesa). Orçamento: +< 5 B/s por client.
+
+---
+
+## 15. Loja, classe por Robux e códigos (v5.4; TASK-160 a TASK-162; pedido do usuário 2026-10-11, **Provisório**)
+
+Lobby (e Run em modo dev, mesma regra do `ClassAction`). Dados: `data.md` §1.7. Produtos e preços: `Content.Shop`
+(`economy.md` §9). Nomes combinados com o frontend.
+
+**Saldo e classes possuídas: reaproveita o `Profile` (§4.5).** O pedido previa um set `Wallet` (Gems, OwnedClasses)
+"se não existir algo equivalente". Existe: `Profile` é packet **privado** (`fireClient`), já leva `Gems`, `Classes`
+(bitfield das possuídas, Cachorro sempre incluso) e `Selected`, é reenviado a cada mudança do perfil pelo `effect` do
+`ProfileService` e no handshake `Ready`. Um set seria pior: `keyBy` não serve para "cada um vê o seu" (README), e
+sem `keyBy` todo client veria o saldo de todos. O client lê pelo `ProfileController` (`Gems`, `Classes`, `Selected`).
+
+### 15.1 `ClassBuy` (c → s) / `ClassBuyResult` (s → dono)
+
+```lua
+ClassBuy = Lync.packet(Lync.struct({
+	Class = Lync.enum(Content.Classes.Keys),
+	Currency = Lync.enum({ "Gems", "Robux" }),
+})),
+ClassBuyResult = Lync.packet(Lync.struct({
+	Class = Lync.enum(Content.Classes.Keys),
+	Ok = Lync.bool(),
+	Reason = Lync.enum({ "Ok", "Prompt", "Granted", "Converted", "Owned", "NotEnoughGems", "NotForSale",
+		"Unavailable", "Busy" }),
+})),
+```
+
+| | |
+|---|---|
+| Responde | `ClassService` (L+R), taxa ≤ 2/s **somada** ao `ClassAction` |
+| `Currency = "Gems"` | compra na hora (`BuyWithGems`, `data.md` §1.7). Resposta `Ok` (+ `Notice class_bought` + `Profile` novo) ou `Owned` / `NotEnoughGems` / `NotForSale` (não `InMvp`) / `Unavailable` (Run fora do modo dev) / `Busy` (taxa ou perfil carregando) |
+| `Currency = "Robux"` | **só pré-checagem**, nada é escrito. `Prompt` = classe à venda, com produto criado e não possuída: o client chama `MarketplaceService:PromptProductPurchase(LocalPlayer, Content.Shop.ClassProducts.ByKey[Class].ProductId)`. Senão `Owned` / `NotForSale` / `Unavailable` (`ProductId` 0 = produto ainda não criado) / `Busy` |
+| Recibo de classe | `ShopService` manda `ClassBuyResult{ Ok = true, Reason = "Granted" }` (+ `Notice class_bought`) ou `"Converted"` (já possuía: virou as gemas do preço, + `Notice gems_gained`). Chega **depois** do diálogo do Roblox fechar; pode chegar noutro servidor (recibo reentregue) |
+| `Ok` | `true` para `Ok`, `Prompt`, `Granted`, `Converted` |
+| Pular a pré-checagem | permitido: o client pode chamar o prompt direto; o servidor valida no recibo do mesmo jeito |
+| `ClassAction` Buy | segue valendo (tela "Crew", TASK-020); mesma compra, resposta só por `Notice` |
+
+### 15.2 `CodeRedeem` (c → s) / `CodeRedeemResult` (s → dono)
+
+```lua
+CodeRedeem = Lync.packet(Lync.struct({
+	Code = Lync.str(0, 32),
+})),
+CodeRedeemResult = Lync.packet(Lync.struct({
+	Ok = Lync.bool(),
+	Reason = Lync.enum({ "Ok", "Invalid", "Expired", "Already", "Busy" }),
+	Reward = Lync.struct({
+		Gems = Lync.int(0, 1000000),
+		Class = Lync.optional(Lync.enum(Content.Classes.Keys)),
+	}),
+})),
+```
+
+| | |
+|---|---|
+| Responde | `CodesService` (L+R). Uma resposta por pedido |
+| Normalização | tira todo espaço e põe em maiúsculas (`" hot dog "` = `HOTDOG`). Código com mais de 32 caracteres é recusado pelo Lync (o client limita a caixa a 32) |
+| Taxa | 1 tentativa por segundo; depois de 5 respostas `Invalid`/`Expired` em 60 s, tudo vira `Busy` até a janela acabar |
+| `Reward` | o que foi creditado: `Gems` (inclui o preço de uma classe já possuída, convertida) e `Class` (nil se não ganhou classe). `{ Gems = 0 }` quando não é `Ok` |
+| Também muda | `Profile` (saldo, classes). Sem `Notice`: o feedback é a própria resposta |
+
+### 15.3 Pacotes de gemas (sem packet novo)
+
+O client chama `PromptProductPurchase` com `Content.Shop.GemPacks.ByKey[k].ProductId` (botão escondido/desligado com
+id 0). O servidor credita no recibo; o client vê o saldo no `Profile` e o toast `Notice gems_gained` (`Value` = gemas
+do pacote). Preço exibido: `MarketplaceService:GetProductInfo(id, Enum.InfoType.Product).PriceInRobux`, com
+`Robux` da tabela só como fallback.
+
+Orçamento: eventos raros, por clique; irrelevante.

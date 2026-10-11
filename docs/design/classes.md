@@ -41,6 +41,15 @@ marcados como proposta. Nomes são placeholders (narrative-writer). Sistema: FEA
 
 Nenhum desses efeitos muda o teto de ±12% (a travessia é ~2 × 4 s por ida ao Mart).
 
+### Compra com gemas ou Robux (pedido do usuário 2026-10-11, **Provisório**)
+
+- Toda classe paga do MVP pode ser comprada com **gemas** (preço DEC-070, sem mudança) **ou Robux** (developer product
+  por classe; preço sugerido em `economy.md` §9, `Q-190`). Cachorro segue grátis para toda conta (DEC-186).
+- Classes possuídas = campo `Classes` do perfil (`data.md` §1.7); só classe possuída pode ser selecionada; a classe da
+  run continua travada (DEC-069), mesmo que um recibo chegue no meio da run.
+- Classe também pode vir de **código** (`CodesService`, `Q-191`). Já possuída → vira as gemas do preço.
+- Contradiz DEC-069 ("só com gemas ganhas jogando"): registrado em `Q-190` (a) para virar DEC.
+
 ## Template de ficha
 
 ```

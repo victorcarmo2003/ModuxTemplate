@@ -17,6 +17,8 @@ export type Profile = Atomic.Table<Data>
 const STORE_NAME = "Player"
 const SAVE_DELAY = 2 -- RequestSave groups events within this window (architecture.md §10.3)
 const DEFAULT_CLASS = "class_dog" -- free class, fallback for unknown or unowned selections (data.md §1.5)
+const CONFIRM_TIMEOUT = 15 -- s SaveConfirmed waits for the data to reach the DataStore (architecture.md §10.1)
+const CONFIRM_RETRY = 5 -- s between Save attempts while the DataStore keeps failing
 
 const ProfileService = Modux.Service(
 	"ProfileService",
@@ -86,6 +88,64 @@ function ProfileService:OwnedClasses(profile: Profile): { [string]: boolean }
 	end
 	owned[DEFAULT_CLASS] = true
 	return owned
+end
+
+-- Copy of profile.Classes with `key` unlocked: the profile changes by copy, never in place (data.md §1.1). Callers put
+-- it in the same Update as the payment, so the grant and the debit/receipt land in one batch (data.md §1.7).
+function ProfileService:WithClass(profile: Profile, key: string): { [string]: boolean }
+	const classes = table.clone(profile.Classes())
+	classes[key] = true
+	return classes
+end
+
+-- Saves now and yields until `saved(LastSavedData)` holds, the session ends or `timeout` runs out (ProfileStore
+-- developer-product pattern; data.md §1.4). The atoms are already in session.Data: the Charm effect runs when the
+-- outermost batch of Update ends. Used by ShopService before PurchaseGranted.
+function ProfileService:SaveConfirmed(
+	player: Player,
+	saved: (data: { [string]: any }) -> boolean,
+	timeout: number?
+): boolean
+	const session = self.Sessions[player]
+	if not session then
+		return false
+	end
+	const deadline = os.clock() + (timeout or CONFIRM_TIMEOUT)
+	while session:IsActive() do
+		if session.LastSavedData ~= nil and saved(session.LastSavedData) then
+			return true
+		end
+		const left = deadline - os.clock()
+		if left <= 0 then
+			return false
+		end
+
+		-- connect before Save: a save without yield (ProfileStore mock in Studio) would fire before a later Connect
+		const thread = coroutine.running()
+		local fired = false
+		local waiting = false
+		local connection: any = nil
+		local function resume()
+			if fired then
+				return
+			end
+			fired = true
+			if connection then
+				connection:Disconnect()
+			end
+			if waiting then
+				task.spawn(thread)
+			end
+		end
+		connection = session.OnAfterSave:Connect(resume)
+		session:Save()
+		task.delay(math.min(left, CONFIRM_RETRY), resume)
+		if not fired then
+			waiting = true
+			coroutine.yield()
+		end
+	end
+	return false
 end
 
 -- Selected class, falling back to the Dog when it is unknown or not owned (read only, nothing is written).

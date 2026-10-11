@@ -186,12 +186,38 @@ Tamanho da party para trailer e Rescue Whistle: membros do roster que entraram a
 
 ## 9. Monetização
 
-Adiada, com uma exceção **[DEC-062, DEC-092]**:
+Adiada, com uma exceção **[DEC-062, DEC-092]** e o pedido do usuário de 2026-10-11 (Provisório, abaixo):
 
 | Produto | Tipo | Preço | Estado |
 |---|---|---|---|
 | Reviver pela ambulância | developer product (repetível), só o próprio caído compra, para si **[DEC-116]**; recibo não aplicado = crédito no perfil **[DEC-117]** (FEAT-034) | adiado (**Q-098**) | definido como regra; preço adiado |
-| Resto (gemas, passes, cosméticos) | — | — | adiado (**Q-017**) |
+| Pacotes de gemas | developer product (repetível) | ver tabela abaixo | **Provisório** (pedido do usuário 2026-10-11; `Q-190`) |
+| Classe paga (Coelho, Gato, Urso, Raposa, Coruja) | developer product **por classe** (não Game Pass; `Q-190` c) | ver tabela abaixo | **Provisório** (idem) |
+| Códigos de resgate | grátis (gemas ou classe por código) | — | **Provisório** (`Q-191`) |
+| Resto (passes, cosméticos) | — | — | adiado (**Q-017**) |
+
+**2026-10-11 (pedido do usuário, Provisório; TASK-160 a TASK-162):** no lobby, classe com **gemas ou Robux**, gemas
+compráveis com Robux e códigos. Preço em gemas das classes **não muda** (DEC-070: 45/120/180). Números sugeridos pelo
+backend-coder para o game-designer validar (`Q-190`); o preço real é o do Creator Hub (`Content.Shop.*.Robux` é só
+sugestão e fallback de exibição).
+
+| Produto (`Content.Shop`) | Entrega | Robux sugerido | R$/gema |
+|---|---|---|---|
+| `gems_50` "Handful of Gems" | 50 gemas | 99 | 1,98 |
+| `gems_130` "Pouch of Gems" | 130 gemas | 229 | 1,76 |
+| `gems_300` "Crate of Gems" | 300 gemas | 449 | 1,50 |
+| `gems_700` "Truckload of Gems" | 700 gemas | 899 | 1,28 |
+| `class_rabbit`, `class_cat`, `class_bear` (tier 1, 45 gemas) | a classe | 79 cada | — |
+| `class_fox`, `class_owl` (tier 2, 120 gemas) | a classe | 199 cada | — |
+
+- Classe direta sai um pouco mais barata que comprar as mesmas gemas no menor pacote (tier 1: 79 × ~99), para quem
+  quer **um** animal; quem quer vários compra gemas. Panda e Leão (1ª atualização, DEC-186) não têm produto ainda.
+- Gemas compradas **não** contam em `GemsEarned` (total ganho jogando; Day 100 e telemetria).
+- Comprar com Robux uma classe que já possui (corrida entre prompt e recibo, ou código): vira as gemas do preço.
+- **Conflito a registrar (secretário):** DEC-069 diz "classes só se compram com gemas ganhas jogando (monetização
+  adiada, DEC-062)" e DEC-061 registra o risco de pay-to-win. O pedido do usuário de 2026-10-11 muda isso; vale como
+  Provisório até virar DEC (`Q-190` a). As guardas que seguem: teto ±12% por classe, nenhuma classe só paga (toda
+  classe continua comprável com gemas de jogo), nenhuma classe mexe em anomalia.
 
 Guardas de design: classe sempre comprável com gemas de jogo; teto ±12%; nenhuma classe só paga; preferir cosmético **[DEC-069]**. Para o reviver (contra "pay-to-skip-horror"): limite de 2 revives por jogador por noite, Robux + apito **[DEC-129]**; prazo até 6:00 AM **[DEC-115]**; Robux só para si **[DEC-116]**; (proposta) oferta discreta só no spectate, sem pop-up nem contador fora da janela de 10 s, nunca na regra crítica (ANM-007).
 
