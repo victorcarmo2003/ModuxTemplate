@@ -9,6 +9,9 @@
 	Assets come from the group-owned Model assets uploaded from Assets/import (ids in Assets/import/_asset_ids.json).
 	They are cached once in ServerStorage.__AssetCache (PackageLink removed) and cloned per placement.
 	Asset convention: pivot = base centre, front = local -Z (LookVector), 1 unit = 1 stud.
+	Map frame (2026-10-10): placement x/y/z/rotY (and pivot) are MAP-01 coordinates; the world pose is
+	MAP_FRAME * placementCFrame (map_frame.luau: the place is turned 180 in Y around (0, 33.94)). parts / copies are
+	relative to the entry, so they need no transform.
 
 	Usage (edit mode, Command Bar or Studio MCP):
 		local Place = require(<this module>)
@@ -19,6 +22,22 @@
 
 local InsertService = game:GetService("InsertService")
 local ServerStorage = game:GetService("ServerStorage")
+
+-- MAP-01 frame (map_frame.luau, 2026-10-10): placements stay in MAP-01 coordinates; the place is turned 180 in Y,
+-- so every placement pose is MAP_FRAME * placementCFrame (one transform, at the Workspace boundary).
+local MAP_FRAME_URL = "http://127.0.0.1:8772/tools/assetplace/map_frame.luau"
+local function loadMapFrame(): any
+	local sib = script and script.Parent and script.Parent:FindFirstChild("map_frame")
+	if sib and sib:IsA("ModuleScript") then
+		return (require :: any)(sib)
+	end
+	local ms = Instance.new("ModuleScript")
+	ms.Name = "map_frame"
+	ms.Source = game:GetService("HttpService"):GetAsync(MAP_FRAME_URL, true)
+	return (require :: any)(ms)
+end
+local MapFrame = loadMapFrame()
+local MAP_FRAME: CFrame = MapFrame.FRAME
 
 local Place = {}
 
@@ -185,9 +204,10 @@ local function v3(t: { number }): Vector3
 	return Vector3.new(t[1], t[2], t[3])
 end
 
--- y-rotation frame in placement coordinates: { x, y, z, rotY } (rotY in degrees, optional)
+-- y-rotation frame in placement coordinates: { x, y, z, rotY } (rotY in degrees, optional) -> WORLD CFrame
+-- (MAP_FRAME applied: placements are MAP-01 coordinates, the place is turned 180 in Y)
 local function frameOf(x: number?, y: number?, z: number?, rotY: number?): CFrame
-	return CFrame.new(x or 0, y or 0, z or 0) * CFrame.Angles(0, math.rad(rotY or 0), 0)
+	return MAP_FRAME * CFrame.new(x or 0, y or 0, z or 0) * CFrame.Angles(0, math.rad(rotY or 0), 0)
 end
 
 -- Part pose in the asset frame: centre o = { x, y, z, rotY = extra yaw, rotX / rotZ = extra pitch / roll over the

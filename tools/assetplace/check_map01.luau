@@ -146,7 +146,26 @@ local TRAFFIC_EMBEDDED = {
 }
 local EXITS = { "W-OUT", "E-OUT", "JN-OUT", "JS-OUT" }
 
-local N, S, E, W = Vector3.new(0, 0, -1), Vector3.new(0, 0, 1), Vector3.new(1, 0, 0), Vector3.new(-1, 0, 0)
+-- MAP-01 frame (map_frame.luau, 2026-10-10): the place is turned 180 in Y. The literals of this file stay in MAP-01
+-- coordinates and are converted ONCE here (directions FD, rectangles box) or at the read (M) / probe (F).
+local MAP_FRAME_URL = "http://127.0.0.1:8772/tools/assetplace/map_frame.luau"
+local function loadMapFrame(): any
+	local sib = script and script.Parent and script.Parent:FindFirstChild("map_frame")
+	if sib and sib:IsA("ModuleScript") then
+		return (require :: any)(sib)
+	end
+	local ms = Instance.new("ModuleScript")
+	ms.Name = "map_frame"
+	ms.Source = game:GetService("HttpService"):GetAsync(MAP_FRAME_URL, true)
+	return (require :: any)(ms)
+end
+local MapFrame = loadMapFrame()
+local F: (Vector3) -> Vector3 = MapFrame.F
+local M: (Vector3) -> Vector3 = MapFrame.M
+local FD: (Vector3) -> Vector3 = MapFrame.FD
+
+-- MAP-01 north / south / east / west as WORLD directions
+local N, S, E, W = FD(Vector3.new(0, 0, -1)), FD(Vector3.new(0, 0, 1)), FD(Vector3.new(1, 0, 0)), FD(Vector3.new(-1, 0, 0))
 local FACING = { -- expected LookVector of points (warn when > 10 degrees off)
 	["PS-1"] = N, ["PS-2"] = N, ["PS-3"] = N, ["PS-4"] = N,
 	Q1 = S, Q2 = E, Q3 = E, Q4 = E, Q5 = E,
@@ -214,16 +233,17 @@ local POSTS = { -- PostId -> Order (Hush order: JL-05 first, P-01 last; Walker s
 }
 local POST_GROUP = "juniper_posts"
 
+-- MAP-01 rectangles -> world rectangles (MapFrame.box)
 local ROADS = {
-	{ name = "Ninth", x0 = -136, x1 = 136, z0 = -16, z1 = 16 },
-	{ name = "Juniper North", x0 = -12, x1 = 12, z0 = -152, z1 = -16 },
-	{ name = "Juniper South", x0 = -12, x1 = 12, z0 = 16, z1 = 120 },
+	MapFrame.box({ name = "Ninth", x0 = -136, x1 = 136, z0 = -16, z1 = 16 }),
+	MapFrame.box({ name = "Juniper North", x0 = -12, x1 = 12, z0 = -152, z1 = -16 }),
+	MapFrame.box({ name = "Juniper South", x0 = -12, x1 = 12, z0 = 16, z1 = 120 }),
 }
 local CROSSWALKS = {
-	["CW-1"] = { x0 = -12, x1 = 12, z0 = 34, z1 = 42 },
-	["CW-2"] = { x0 = -24, x1 = -12, z0 = -16, z1 = 16 },
-	["CW-3"] = { x0 = 54, x1 = 60, z0 = -16, z1 = 16 },
-	["CW-4"] = { x0 = 12, x1 = 24, z0 = -16, z1 = 16 },
+	["CW-1"] = MapFrame.box({ x0 = -12, x1 = 12, z0 = 34, z1 = 42 }),
+	["CW-2"] = MapFrame.box({ x0 = -24, x1 = -12, z0 = -16, z1 = 16 }),
+	["CW-3"] = MapFrame.box({ x0 = 54, x1 = 60, z0 = -16, z1 = 16 }),
+	["CW-4"] = MapFrame.box({ x0 = 12, x1 = 24, z0 = -16, z1 = 16 }),
 }
 local ROUTES_W1 = { -- blockout routes of §18.6, as A* queries
 	{ "SP-A", "Q5", "ROUTE-SP-A" },
@@ -1212,7 +1232,7 @@ local function checkWave2(points: { [string]: Instance }, vehicles: { [string]: 
 	end
 	-- DEC-196: no volume on the Pad <-> Mart route (sampled on the walking line Z 44, X -56..20, HRP height)
 	for x = -56, 20, 2 do
-		local p = Vector3.new(x, 3.4, 44)
+		local p = F(Vector3.new(x, 3.4, 44))
 		for id, z in zones do
 			if id ~= "LZ-5" and id ~= "LZ-4" and inZone(z, p) then
 				err(("2: LightZone %s covers the Pad <-> Mart route at %s (DEC-196)"):format(id, fmtV(p)))
@@ -1420,7 +1440,7 @@ local function checkWave3(points: { [string]: Instance }, vehicles: { [string]: 
 			err(("5: AnomalyAnchor %s is a %s (Part or Model)"):format(id, a.ClassName))
 			continue
 		end
-		local p = pos(a)
+		local p = M(pos(a)) -- MAP-01
 		if math.abs(p.X - x) > 2.5 or p.Y < 22 or p.Y > 31 or p.Z > -29 or p.Z < -40 then
 			warn_(("AnomalyAnchor %s at %s, expected X %d, Y 24.6..28, facade Z ~-32 (MAP-01 §5.2)"):format(id, fmtV(p), x))
 		end

@@ -9,7 +9,8 @@
 	  * local car from the TASK-099 kit `ReplicatedStorage.Assets.Vehicles.LongCar` (placeholder black block if the
 	    kit is missing). Anchored, no collision / query / touch: never hits anyone (T117-07).
 	  * timeline from `StartedAt` (same pose on every client, a late joiner sees it parked): comes in from E-IN on
-	    the Ninth WB lane, passes the parking mouth, stops, reverses into AN-12 facing south (MAP-01 §9.5).
+	    the Ninth WB lane, passes the parking mouth, stops, reverses into AN-12 facing MAP-01 south (MAP-01 §9.5).
+	    Lanes = MapPoints E-IN / E-OUT (position + LookVector), never world constants (the place is turned 180).
 	  * high beam when parked AND (Phase = Active OR cue `car_highbeam` arrived): kit SpotLights `HighBeam` (no
 	    shadow, range 30, they light only the curb) + 2 cold `Beam`s from Light_HighL/R to the trailer (T118-01).
 	  * Phase Resolved / Failed (or the record leaves the set): beam off, the car pulls out to the left onto the
@@ -28,13 +29,20 @@ local RunService = game:GetService("RunService")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Effect = require(script.Parent.Parent.Effect)
 
--- Route (MAP-01 §5.4: WB lane Z -5, EB lane Z 5, E-IN / E-OUT at X 136, behind the curve)
-const LANE_WB_Z = -5
-const LANE_EB_Z = 5
-const EDGE_X = 140
-const REVERSE_LEAD = 14 -- studs west of AN-12 where the car stops before reversing
-const LEAVE_TURN_RUN = 16 -- studs east of AN-12 where the left turn meets the EB lane
-const FALLBACK_SPOT = CFrame.lookAt(Vector3.new(70, 0, -22), Vector3.new(70, 0, 0)) -- AN-12, facing south
+-- Route (MAP-01 §5.4): the Ninth WB lane comes in at E-IN, the EB lane leaves at E-OUT (behind the curve). The lanes
+-- are read from the binding MapPoints (position + LookVector = travel direction), so the route follows the map
+-- whatever its orientation in the place (2026-10-10: the place is turned 180 in Y, tools/assetplace/map_frame.luau).
+const EDGE_RUN = 4 -- studs before E-IN where the car appears / past E-OUT where it vanishes
+const REVERSE_LEAD = 14 -- studs past AN-12 along the WB lane (MAP-01 west) where the car stops before reversing
+const LEAVE_TURN_RUN = 16 -- studs along the EB lane (MAP-01 east) where the left turn meets the EB lane
+-- Fallbacks when the points are not streamed in: MAP-01 (x, z) through the map frame (x, z) -> (-x, K - z)
+const MAP_K = 67.887287 -- tools/assetplace/map_frame.luau K
+local function mapPoint(x: number, z: number): Vector3
+	return Vector3.new(-x, 0, MAP_K - z)
+end
+const FALLBACK_SPOT = CFrame.lookAt(mapPoint(70, -22), mapPoint(70, 0)) -- AN-12, facing MAP-01 south
+const FALLBACK_E_IN = CFrame.lookAt(mapPoint(136, -5), mapPoint(135, -5)) -- WB lane, travelling MAP-01 west
+const FALLBACK_E_OUT = CFrame.lookAt(mapPoint(136, 5), mapPoint(137, 5)) -- EB lane, travelling MAP-01 east
 
 -- Timeline (seconds; PROVISIONAL, see header)
 const DRIVE_TIME = 6
@@ -70,6 +78,10 @@ const HONK_VOLUME = 0.8
 const BLACKOUT_GROUPS = { "trailer_interior", "trailer_lights" }
 const LAMP_OFF_COLOR = Color3.fromHex("#EAD6B0")
 
+-- A lane = point on it + travel direction (horizontal unit)
+type Lane = { Origin: Vector3, Dir: Vector3 }
+type Route = { Wb: Lane, Eb: Lane, EdgeIn: Vector3, EdgeOut: Vector3 }
+
 type CarState = {
 	Ctx: Effect.Context,
 	Model: Model,
@@ -81,6 +93,7 @@ type CarState = {
 	Beams: { Beam },
 	Target: BasePart, -- beam ends on the trailer
 	Spot: CFrame, -- AN-12 pose
+	Route: Route, -- lanes from E-IN / E-OUT
 	StartedAt: number,
 	Phase: Effect.Phase,
 	Cued: boolean, -- car_highbeam arrived
@@ -121,16 +134,41 @@ local function smooth(t: number): number
 	return x * x * (3 - 2 * x)
 end
 
--- Reverse curve: from the WB lane west of the spot, back into the spot (moves east then north, faces west then south)
-local function reverseCurve(spot: CFrame): (Vector3, Vector3, Vector3)
-	const p = spot.Position
-	return Vector3.new(p.X - REVERSE_LEAD, p.Y, LANE_WB_Z), Vector3.new(p.X, p.Y, LANE_WB_Z), p
+local function flatUnit(v: Vector3, default: Vector3): Vector3
+	const flat = Vector3.new(v.X, 0, v.Z)
+	return if flat.Magnitude > 1e-3 then flat.Unit else default
 end
 
--- Leave curve: out of the spot forward (south), turning left onto the EB lane
-local function leaveCurve(spot: CFrame): (Vector3, Vector3, Vector3)
+local function lane(point: CFrame): Lane
+	return { Origin = point.Position, Dir = flatUnit(point.LookVector, Vector3.xAxis) }
+end
+
+-- Lanes of the route from the binding (E-IN = WB lane, E-OUT = EB lane), fallbacks when not streamed in
+local function route(ctx: Effect.Context): Route
+	const eIn = ctx.Point("E-IN") or FALLBACK_E_IN
+	const eOut = ctx.Point("E-OUT") or FALLBACK_E_OUT
+	const wb, eb = lane(eIn), lane(eOut)
+	return { Wb = wb, Eb = eb, EdgeIn = wb.Origin - wb.Dir * EDGE_RUN, EdgeOut = eb.Origin + eb.Dir * EDGE_RUN }
+end
+
+-- `p` projected on the lane line, at height y
+local function onLane(l: Lane, p: Vector3, y: number): Vector3
+	const q = l.Origin + l.Dir * (p - l.Origin):Dot(l.Dir)
+	return Vector3.new(q.X, y, q.Z)
+end
+
+-- Reverse curve: from the WB lane past the spot, back into the spot (faces along the WB lane, then the spot)
+local function reverseCurve(spot: CFrame, r: Route): (Vector3, Vector3, Vector3)
 	const p = spot.Position
-	return p, Vector3.new(p.X, p.Y, LANE_EB_Z), Vector3.new(p.X + LEAVE_TURN_RUN, p.Y, LANE_EB_Z)
+	const r1 = onLane(r.Wb, p, p.Y)
+	return r1 + r.Wb.Dir * REVERSE_LEAD, r1, p
+end
+
+-- Leave curve: out of the spot forward, turning left onto the EB lane
+local function leaveCurve(spot: CFrame, r: Route): (Vector3, Vector3, Vector3)
+	const p = spot.Position
+	const l1 = onLane(r.Eb, p, p.Y)
+	return p, l1, l1 + r.Eb.Dir * LEAVE_TURN_RUN
 end
 
 local function curveLength(a: Vector3, b: Vector3, c: Vector3): number
@@ -145,16 +183,16 @@ local function curveLength(a: Vector3, b: Vector3, c: Vector3): number
 end
 
 -- Pose while arriving / parked, `t` seconds after StartedAt
-local function arrivePose(spot: CFrame, t: number): CFrame
-	const r0, r1, r2 = reverseCurve(spot)
+local function arrivePose(spot: CFrame, r: Route, t: number): CFrame
+	const r0, r1, r2 = reverseCurve(spot, r)
 	if t < DRIVE_TIME then
 		-- ease-out along the WB lane: comes in fast, stops past the parking mouth
 		const a = math.max(t, 0) / DRIVE_TIME
 		const e = 1 - (1 - a) * (1 - a)
-		const x = EDGE_X + (r0.X - EDGE_X) * e
-		return facing(Vector3.new(x, spot.Position.Y, LANE_WB_Z), Vector3.new(-1, 0, 0))
+		const start = onLane(r.Wb, r.EdgeIn, spot.Position.Y)
+		return facing(start:Lerp(r0, e), r.Wb.Dir)
 	elseif t < DRIVE_TIME + PAUSE_TIME then
-		return facing(r0, Vector3.new(-1, 0, 0))
+		return facing(r0, r.Wb.Dir)
 	elseif t < ARRIVE_TIME then
 		const e = smooth((t - DRIVE_TIME - PAUSE_TIME) / REVERSE_TIME)
 		-- reversing: the car faces against its motion
@@ -166,7 +204,7 @@ end
 -- Pose while leaving, `u` seconds after LeaveAt; nil = past E-OUT
 local function leavePose(state: CarState, u: number): CFrame?
 	const spot = state.Spot
-	const l0, l1, l2 = leaveCurve(spot)
+	const l0, l1, l2 = leaveCurve(spot, state.Route)
 	if u < LEAVE_TURN_TIME then
 		-- ease-in out of the spot ("vai embora devagar")
 		const a = math.max(u, 0) / LEAVE_TURN_TIME
@@ -174,11 +212,12 @@ local function leavePose(state: CarState, u: number): CFrame?
 		return facing(bezier(l0, l1, l2, e), bezierTangent(l0, l1, l2, e))
 	end
 	const speed = 2 * state.TurnLength / LEAVE_TURN_TIME -- end speed of the ease-in
-	const x = l2.X + speed * (u - LEAVE_TURN_TIME)
-	if x > EDGE_X then
+	const eb = state.Route.Eb
+	const run = speed * (u - LEAVE_TURN_TIME)
+	if run > (state.Route.EdgeOut - l2):Dot(eb.Dir) then
 		return nil
 	end
-	return facing(Vector3.new(x, l2.Y, LANE_EB_Z), Vector3.new(1, 0, 0))
+	return facing(l2 + eb.Dir * run, eb.Dir)
 end
 
 -- Model --------------------------------------------------------------------------------------------------------------
@@ -318,7 +357,8 @@ local function buildCar(ctx: Effect.Context, occ: Effect.Occurrence): CarState
 	end
 
 	const startedAt = Vide.untrack(occ.Record).StartedAt
-	const l0, l1, l2 = leaveCurve(spot)
+	const lanes = route(ctx)
+	const l0, l1, l2 = leaveCurve(spot, lanes)
 	const state: CarState = {
 		Ctx = ctx,
 		Model = model,
@@ -330,6 +370,7 @@ local function buildCar(ctx: Effect.Context, occ: Effect.Occurrence): CarState
 		Beams = beams,
 		Target = holder,
 		Spot = spot,
+		Route = lanes,
 		StartedAt = startedAt,
 		Phase = Vide.untrack(occ.Record).Phase,
 		Cued = false,
@@ -342,7 +383,7 @@ local function buildCar(ctx: Effect.Context, occ: Effect.Occurrence): CarState
 		Done = false,
 		Connection = nil,
 	}
-	model:PivotTo(arrivePose(spot, ctx.Now() - startedAt))
+	model:PivotTo(arrivePose(spot, lanes, ctx.Now() - startedAt))
 	model.Parent = ctx.Folder()
 	ctx.Audio:Loop("car_engine", body, true)
 	return state
@@ -430,7 +471,7 @@ local function step(state: CarState, occId: number)
 		end
 	else
 		state.Parked = false
-		place(state, arrivePose(state.Spot, now - state.StartedAt))
+		place(state, arrivePose(state.Spot, state.Route, now - state.StartedAt))
 	end
 end
 

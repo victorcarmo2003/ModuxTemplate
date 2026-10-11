@@ -76,6 +76,23 @@ local Workspace = game:GetService("Workspace")
 
 local Pieces = {}
 
+-- MAP-01 frame (map_frame.luau, 2026-10-10): the place is turned 180 in Y. PAD_POSE / COUNTER_POSE stay in MAP-01
+-- coordinates and go through FCF; the "west -> east" order of the grill slots is read in MAP-01 X (M).
+local MAP_FRAME_URL = "http://127.0.0.1:8772/tools/assetplace/map_frame.luau"
+local function loadMapFrame(): any
+	local sib = script and script.Parent and script.Parent:FindFirstChild("map_frame")
+	if sib and sib:IsA("ModuleScript") then
+		return (require :: any)(sib)
+	end
+	local ms = Instance.new("ModuleScript")
+	ms.Name = "map_frame"
+	ms.Source = game:GetService("HttpService"):GetAsync(MAP_FRAME_URL, true)
+	return (require :: any)(ms)
+end
+local MapFrame = loadMapFrame()
+local M: (Vector3) -> Vector3 = MapFrame.M
+local FCF: (CFrame) -> CFrame = MapFrame.FCF
+
 local ASSETS_ROOT = "MAP01_Assets"
 local BINDING_ROOT = "MapBinding"
 local TAG = "UpgradePiece"
@@ -104,9 +121,9 @@ local MIN_GAP = 2.5 -- §18.7 item 4
 
 -- Pad poses: the MapPoints CART / TRL (written by bind_map01 = the vehicle pivots on the Pad) win; these constants
 -- are the same as bind_map01.luau CART_POSE / TRL_POSE.
-local PAD_POSE = {
-	cart = CFrame.new(41, 0.45, 37.5),
-	trailer = CFrame.new(40, 0.45, 41),
+local PAD_POSE = { -- world (MAP-01 numbers through the map frame)
+	cart = FCF(CFrame.new(41, 0.45, 37.5)),
+	trailer = FCF(CFrame.new(40, 0.45, 41)),
 }
 local PAD_POINT = { cart = "CART", trailer = "TRL" }
 -- counter top over the vehicle pivot: cart Pad 0.45 + 3.0 (DEC-157); trailer floor +2, counter 3.5 (MAP-01 §7.2)
@@ -114,9 +131,9 @@ local COUNTER_TOP_DY = { cart = 3.0, trailer = 5.5 }
 local PROMPT_ABOVE_COUNTER = 0.3
 
 -- Counter piece origin in Pad coordinates (see COUNTER above). rotY 0: local -Z (front, stools) = north = queue.
-local COUNTER_POSE = {
-	cart = CFrame.new(52, 0.45, 35.0),
-	trailer = CFrame.new(52, 0.45, 34.4),
+local COUNTER_POSE = { -- world (MAP-01 numbers through the map frame)
+	cart = FCF(CFrame.new(52, 0.45, 35.0)),
+	trailer = FCF(CFrame.new(52, 0.45, 34.4)),
 }
 
 -- Owner of each upgrade. ids = MapId of the fixed model inside the vehicle; match = BasePart name in both the
@@ -517,7 +534,7 @@ local function bindGrillSlots(station: Instance, clones: { [number]: Model }, vk
 				log("warn", ("%s: kit Slot%d differs between levels (L%d): DEC-201 asks the same place; the L%d one is used, no Level attribute"):format(label, n, level, ref:GetAttribute("Level") :: number))
 			end
 		end
-		table.insert(padX, toPad(vkey, vehicle, world).X)
+		table.insert(padX, M(toPad(vkey, vehicle, world)).X) -- MAP-01 X: west -> east
 		local list = stationAnchors(station, "grill_collect", n)
 		if #list == 0 then
 			log("err", ("%s: no grill_collect anchor with Slot %d in the station (run bind_map01 first)"):format(label, n))
@@ -685,7 +702,7 @@ local function bindGroup(vehicle: Instance, g: Group, kit: Instance): number
 	if spec.pose then
 		local pad = spec.pose[g.vkey]
 		pose = ((vehicle :: any):GetPivot() :: CFrame) * padPose(g.vkey):Inverse() * pad
-		log("note", ("%s: no fixed counter; piece origin at Pad %s, front north (Provisório, TASK-085; AST-078 for the trailer)"):format(label, fmtV(pad.Position)))
+		log("note", ("%s: no fixed counter; piece origin at Pad %s (MAP-01), front north (Provisório, TASK-085; AST-078 for the trailer)"):format(label, fmtV(M(pad.Position))))
 	elseif spec.match then
 		local cands: { BasePart } = {}
 		for _, m in fixedModels do

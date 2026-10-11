@@ -9,7 +9,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 
--- XZ rectangle in studs (MAP-01 §4 coordinates).
+-- XZ rectangle in studs, WORLD coordinates (built from MAP-01 §4 numbers by mapRect below).
 export type Rect = { Name: string, X0: number, X1: number, Z0: number, Z1: number }
 
 export type StationRule = {
@@ -107,17 +107,24 @@ local function concat<T>(...: { T }): { T }
 	return out
 end
 
+-- Map frame (2026-10-10, user's decision): the place is turned 180 degrees in Y, MAP-01 (x, z) is world (-x, K - z).
+-- Same K as tools/assetplace/map_frame.luau (change both together). The numbers below stay the MAP-01 §4 ones.
+const MAP_K = 67.887287
+local function mapRect(name: string, x0: number, x1: number, z0: number, z1: number): Rect
+	return { Name = name, X0 = -x1, X1 = -x0, Z0 = MAP_K - z1, Z1 = MAP_K - z0 }
+end
+
 const ROADS: { Rect } = {
-	{ Name = "Ninth", X0 = -136, X1 = 136, Z0 = -16, Z1 = 16 },
-	{ Name = "Juniper North", X0 = -12, X1 = 12, Z0 = -152, Z1 = -16 },
-	{ Name = "Juniper South", X0 = -12, X1 = 12, Z0 = 16, Z1 = 120 },
+	mapRect("Ninth", -136, 136, -16, 16),
+	mapRect("Juniper North", -12, 12, -152, -16),
+	mapRect("Juniper South", -12, 12, 16, 120),
 }
 
 const CROSSWALKS: { [string]: Rect } = {
-	["CW-1"] = { Name = "CW-1", X0 = -12, X1 = 12, Z0 = 34, Z1 = 42 },
-	["CW-2"] = { Name = "CW-2", X0 = -24, X1 = -12, Z0 = -16, Z1 = 16 },
-	["CW-3"] = { Name = "CW-3", X0 = 54, X1 = 60, Z0 = -16, Z1 = 16 },
-	["CW-4"] = { Name = "CW-4", X0 = 12, X1 = 24, Z0 = -16, Z1 = 16 },
+	["CW-1"] = mapRect("CW-1", -12, 12, 34, 42),
+	["CW-2"] = mapRect("CW-2", -24, -12, -16, 16),
+	["CW-3"] = mapRect("CW-3", 54, 60, -16, 16),
+	["CW-4"] = mapRect("CW-4", 12, 24, -16, 16),
 }
 
 const WAVE1_TAGS = { "MapBinding", "MapPoint", "NpcNode", "Vehicle", "Station", "Interactable" }

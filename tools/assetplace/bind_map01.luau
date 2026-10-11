@@ -47,7 +47,13 @@
 	  Awning: ClosedAngle from the measured slant of the Awning (bbox diagonal + raycast profile), hanging 3 degrees
 	      outwards; a degenerate angle (< 5 degrees) falls back to the Shutter_Panel.
 
-	Contract: docs/tech/architecture.md §18 (tags §18.1, attributes §18.2, anchors §18.3-§18.4, points §18.5, NpcNode
+	Map frame (2026-10-10, decision of the user): the place is turned 180 degrees in Y (map_frame.luau). Every number in
+this file stays in MAP-01 coordinates (docs, +X east, +Z south) and so does the logic (north = -Z, "west first" = smaller
+X, boxes, raycast probes). Conversion happens ONLY at the Workspace boundary: reads of world positions go through
+M / MCF (partsBox, mapPos, mapPivot, bowl / part positions) and writes through F / FCF (Attachment.WorldCFrame,
+Part.CFrame, PivotTo, raycast origins); world directions compared with MAP-01 directions go through FD.
+
+Contract: docs/tech/architecture.md §18 (tags §18.1, attributes §18.2, anchors §18.3-§18.4, points §18.5, NpcNode
 	graph §18.6) and §19.22 (wave 2: trailer, phone, purchase, tarp, light, points, street bins; T36, T38, T60).
 	Layout: docs/levels/MAP-01.md §5, §7, §9, §10.2 and §16 (binding notes). DEC-157 (cart counter y 3.45), DEC-190 /
 	DEC-215 (board 2 slots on the cart, 3 on the trailer), DEC-201 (grill 4 slots), DEC-086 (trailer on the Pad),
@@ -112,6 +118,25 @@ local Workspace = game:GetService("Workspace")
 
 local Bind = {}
 
+-- MAP-01 frame (map_frame.luau): MAP-01 coordinates <-> world. See the header.
+local MAP_FRAME_URL = "http://127.0.0.1:8772/tools/assetplace/map_frame.luau"
+local function loadMapFrame(): any
+	local sib = script and script.Parent and script.Parent:FindFirstChild("map_frame")
+	if sib and sib:IsA("ModuleScript") then
+		return (require :: any)(sib)
+	end
+	local ms = Instance.new("ModuleScript")
+	ms.Name = "map_frame"
+	ms.Source = game:GetService("HttpService"):GetAsync(MAP_FRAME_URL, true)
+	return (require :: any)(ms)
+end
+local MapFrame = loadMapFrame()
+local F: (Vector3) -> Vector3 = MapFrame.F -- MAP-01 point -> world
+local M: (Vector3) -> Vector3 = MapFrame.M -- world point -> MAP-01
+local FD: (Vector3) -> Vector3 = MapFrame.FD -- MAP-01 direction -> world
+local FCF: (CFrame) -> CFrame = MapFrame.FCF -- MAP-01 CFrame -> world
+local MCF: (CFrame) -> CFrame = MapFrame.MCF -- world CFrame -> MAP-01
+
 local ASSETS_ROOT = "MAP01_Assets"
 local BINDING_ROOT = "MapBinding"
 local CREATED = "BindCreated"
@@ -121,7 +146,7 @@ local COUNTER_Y = 3.45 -- cart counter top (DEC-157; Provisório until Q-153)
 local TRAILER_COUNTER_DY = 5.5 -- trailer counter top over the trailer pivot: floor +2, counter 3.5 (MAP-01 §2, §7.2)
 
 -- Vehicle poses = model pivots (T36: VehicleService does vehicle:PivotTo(MapIndex.Point(id))). Same numbers as the
--- CART / TRL / TRL-SALE entries of MAP-01_placements.luau: change both together.
+-- CART / TRL / TRL-SALE entries of MAP-01_placements.luau: change both together. MAP-01 frame (world = FCF(pose)).
 local CART_POSE = CFrame.new(41, 0.45, 37.5) -- MAP-01 CART centre is (41, 40); the pivot of AST-026 is (41, 37.5)
 local TRL_POSE = CFrame.new(40, 0.45, 41) -- facing north (window to the queue)
 local SALE_POSE = CFrame.new(78, 0.02, -58) * CFrame.Angles(0, math.pi, 0) -- facing south (window to the Pad)
@@ -578,6 +603,7 @@ local function fmtV(v: Vector3): string
 	return ("(%.2f, %.2f, %.2f)"):format(v.X, v.Y, v.Z)
 end
 
+-- WORLD position of an anchor (distances only; use mapPos for anything that reads an axis)
 local function anchorPos(a: Instance): Vector3
 	if a:IsA("Attachment") then
 		return a.WorldPosition
@@ -587,6 +613,16 @@ local function anchorPos(a: Instance): Vector3
 		return (a :: any):GetPivot().Position
 	end
 	return Vector3.zero
+end
+
+-- MAP-01 position of an anchor
+local function mapPos(a: Instance): Vector3
+	return M(anchorPos(a))
+end
+
+-- MAP-01 pivot of a model / part
+local function mapPivot(m: Instance): CFrame
+	return MCF((m :: any):GetPivot() :: CFrame)
 end
 
 local function setPersistent(m: Instance)
@@ -649,7 +685,7 @@ local function hostPart(model: Instance): BasePart?
 	return best
 end
 
--- World bounding box of the visible BaseParts of `model` that pass `keep` (all when nil): min, max.
+-- Bounding box (MAP-01 axes) of the visible BaseParts of `model` that pass `keep` (all when nil): min, max.
 local function partsBox(model: Instance, keep: ((BasePart) -> boolean)?): (Vector3?, Vector3?)
 	local mn, mx = nil, nil
 	for _, d in model:GetDescendants() do
@@ -658,7 +694,7 @@ local function partsBox(model: Instance, keep: ((BasePart) -> boolean)?): (Vecto
 			for _, sx in { -1, 1 } do
 				for _, sy in { -1, 1 } do
 					for _, sz in { -1, 1 } do
-						local p = cf:PointToWorldSpace(Vector3.new(s.X * sx, s.Y * sy, s.Z * sz))
+						local p = M(cf:PointToWorldSpace(Vector3.new(s.X * sx, s.Y * sy, s.Z * sz)))
 						mn = if mn then mn:Min(p) else p
 						mx = if mx then mx:Max(p) else p
 					end
@@ -674,11 +710,12 @@ local function topY(model: Instance, default: number?): number
 	return if mx then mx.Y else (default or COUNTER_Y)
 end
 
-local function newAttachment(host: BasePart, name: string, worldPos: Vector3): Attachment
+-- `pos` in MAP-01 coordinates
+local function newAttachment(host: BasePart, name: string, pos: Vector3): Attachment
 	local a = Instance.new("Attachment")
 	a.Name = name
 	a.Parent = host
-	a.WorldCFrame = CFrame.new(worldPos)
+	a.WorldCFrame = FCF(CFrame.new(pos))
 	a:SetAttribute(CREATED, true)
 	return a
 end
@@ -712,14 +749,14 @@ end
 
 type AnchorOpts = { resetCreated: boolean? }
 
--- Finds or creates the anchor `name` inside `model`. fallback() = world position used when it must be created.
+-- Finds or creates the anchor `name` inside `model`. fallback() = MAP-01 position used when it must be created.
 local function ensureAnchor(model: Instance, name: string, fallback: () -> Vector3, opts: AnchorOpts, label: string): Instance?
 	local found = findNamed(model, name)
 	if found then
 		if found:IsA("Attachment") then
 			if found:GetAttribute(CREATED) then
 				if opts.resetCreated then
-					found.WorldCFrame = CFrame.new(fallback())
+					found.WorldCFrame = FCF(CFrame.new(fallback()))
 				end
 				log("new", ("%s: %s kept (created by binding) at %s"):format(label, name, fmtV(found.WorldPosition)))
 			else
@@ -736,7 +773,7 @@ local function ensureAnchor(model: Instance, name: string, fallback: () -> Vecto
 				log("err", ("%s: %s exists as %s and the model has no BasePart to host an Attachment"):format(label, name, found.ClassName))
 				return nil
 			end
-			local pos = if found:IsA("PVInstance") then (found :: any):GetPivot().Position else fallback()
+			local pos = if found:IsA("PVInstance") then mapPivot(found).Position else fallback()
 			found.Name = name .. "_Src"
 			local a = newAttachment(host, name, pos)
 			log("conv", ("%s: %s came as %s -> Attachment created at its pivot %s (original renamed %s_Src)"):format(label, name, found.ClassName, fmtV(pos), name))
@@ -766,14 +803,14 @@ local function interactable(anchor: Instance?, action: string, attrs: { [string]
 	end
 end
 
--- Floor height under (x, z) by raycast; returns expected when the hit is missing or too far from it.
+-- Floor height under MAP-01 (x, z) by raycast; returns expected when the hit is missing or too far from it.
 local function floorY(x: number, z: number, expected: number, exclude: { Instance }): (number, string?)
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
 	local ex = table.clone(exclude)
 	for _ = 1, 16 do
 		params.FilterDescendantsInstances = ex
-		local hit = Workspace:Raycast(Vector3.new(x, expected + 3, z), Vector3.new(0, -6, 0), params)
+		local hit = Workspace:Raycast(F(Vector3.new(x, expected + 3, z)), Vector3.new(0, -6, 0), params)
 		if not hit then
 			return expected, "no floor hit, used expected Y"
 		end
@@ -958,12 +995,12 @@ local function bindGrill(model: Instance, opts: AnchorOpts, label: string)
 		end
 		local minP, maxP = Vector3.one * math.huge, -Vector3.one * math.huge
 		for _, d in src do
-			local p = anchorPos(d)
+			local p = mapPos(d)
 			minP, maxP = minP:Min(p), maxP:Max(p)
 		end
 		local alongX = (maxP.X - minP.X) >= (maxP.Z - minP.Z)
 		table.sort(src, function(a, b)
-			local pa, pb = anchorPos(a), anchorPos(b)
+			local pa, pb = mapPos(a), mapPos(b)
 			if alongX then
 				if math.abs(pa.X - pb.X) > 1e-3 then
 					return pa.X < pb.X
@@ -1009,7 +1046,7 @@ local function bindGrill(model: Instance, opts: AnchorOpts, label: string)
 		return
 	end
 	local mn, mx = partsBox(model)
-	local centre = if mn and mx then (mn + mx) / 2 else (model :: any):GetPivot().Position
+	local centre = if mn and mx then (mn + mx) / 2 else mapPivot(model).Position
 	local top = if mx then mx.Y else COUNTER_Y
 	for slot = 1, GRILL_SLOTS do
 		local name = "Att_Slot" .. slot
@@ -1024,7 +1061,7 @@ local function bindGrill(model: Instance, opts: AnchorOpts, label: string)
 		if existing then
 			a = existing
 			if opts.resetCreated and a:IsA("Attachment") then
-				a.WorldCFrame = CFrame.new(pos)
+				a.WorldCFrame = FCF(CFrame.new(pos))
 			end
 		else
 			a = newAttachment(host, name, pos)
@@ -1048,7 +1085,7 @@ local function bindRail(model: Instance, opts: AnchorOpts, n: number, label: str
 		end
 	end
 	local mn, mx = partsBox(model)
-	local centre = if mn and mx then (mn + mx) / 2 else (model :: any):GetPivot().Position
+	local centre = if mn and mx then (mn + mx) / 2 else mapPivot(model).Position
 	local top = if mx then mx.Y else COUNTER_Y + 0.5
 	local alongX = if mn and mx then (mx.X - mn.X) >= (mx.Z - mn.Z) else true
 	local function ideal(slot: number): Vector3
@@ -1071,7 +1108,7 @@ local function bindRail(model: Instance, opts: AnchorOpts, n: number, label: str
 					local want = ideal(slot)
 					local best = math.huge
 					for _, c in list do
-						local d = (anchorPos(c) - want).Magnitude
+						local d = (mapPos(c) - want).Magnitude
 						if d < best then
 							a, best = c, d
 						end
@@ -1083,7 +1120,7 @@ local function bindRail(model: Instance, opts: AnchorOpts, n: number, label: str
 				makeInvisible(a)
 			end
 			if a and a:GetAttribute(CREATED) and opts.resetCreated and a:IsA("Attachment") then
-				a.WorldCFrame = CFrame.new(ideal(slot))
+				a.WorldCFrame = FCF(CFrame.new(ideal(slot)))
 			end
 		elseif host then
 			a = newAttachment(host, "Slot" .. slot, ideal(slot))
@@ -1103,7 +1140,7 @@ end
 -- Board: Att_Bun -> Att_Bun1..n (Slot 1 = the one more to the west; DEC-190 cart 2, DEC-215 trailer 3).
 local function bindBoard(model: Instance, opts: AnchorOpts, n: number, label: string)
 	local mn, mx = partsBox(model)
-	local centre = if mn and mx then (mn + mx) / 2 else (model :: any):GetPivot().Position
+	local centre = if mn and mx then (mn + mx) / 2 else mapPivot(model).Position
 	local top = if mx then mx.Y else COUNTER_Y + 0.2
 	local base = ensureAnchor(model, "Att_Bun", function()
 		return Vector3.new(centre.X, top + 0.05, centre.Z)
@@ -1111,7 +1148,7 @@ local function bindBoard(model: Instance, opts: AnchorOpts, n: number, label: st
 	if not base then
 		return
 	end
-	local baseCF = if base:IsA("Attachment") then base.WorldCFrame else (base :: BasePart).CFrame
+	local baseCF = MCF(if base:IsA("Attachment") then base.WorldCFrame else (base :: BasePart).CFrame) -- MAP-01
 	local host = if base:IsA("Attachment") then base.Parent :: BasePart else hostPart(model)
 	local list: { Vector3 } = {}
 	for i = 1, n do
@@ -1126,11 +1163,11 @@ local function bindBoard(model: Instance, opts: AnchorOpts, n: number, label: st
 		local a = findNamed(model, name)
 		if a and a:IsA("Attachment") then
 			if a:GetAttribute(CREATED) and opts.resetCreated then
-				a.WorldCFrame = CFrame.new(pos) * baseCF.Rotation
+				a.WorldCFrame = FCF(CFrame.new(pos) * baseCF.Rotation)
 			end
 		elseif host then
 			a = newAttachment(host :: BasePart, name, pos)
-			;(a :: Attachment).WorldCFrame = CFrame.new(pos) * baseCF.Rotation
+			;(a :: Attachment).WorldCFrame = FCF(CFrame.new(pos) * baseCF.Rotation)
 		end
 		if a then
 			a:SetAttribute("Slot", slot)
@@ -1156,7 +1193,7 @@ local function bindToppings(model: Instance, opts: AnchorOpts, label: string, de
 		local b = findNamed(model, "Bin_" .. t.suf)
 		if b and b:IsA("BasePart") then
 			bins[t.key] = b
-			table.insert(zs, b.Position.Z)
+			table.insert(zs, M(b.Position).Z)
 		else
 			log("err", ("%s: bowl Bin_%s not found (MeshPart of AST-017): anchor falls back to MAP-01 §7.1"):format(label, t.suf))
 		end
@@ -1172,8 +1209,9 @@ local function bindToppings(model: Instance, opts: AnchorOpts, label: string, de
 	for _, t in TOPPINGS do
 		local b = bins[t.key]
 		if b then
-			local isOperator = b.Position.Z >= splitZ
-			wanted[t.key] = b.Position + (if isOperator then TOPPING_OPERATOR_OFFSET else TOPPING_BACK_OFFSET)
+			local bm = M(b.Position)
+			local isOperator = bm.Z >= splitZ
+			wanted[t.key] = bm + (if isOperator then TOPPING_OPERATOR_OFFSET else TOPPING_BACK_OFFSET)
 		else
 			wanted[t.key] = Vector3.new(t.x + delta.X, topY(model) + 0.3, t.z + delta.Z)
 		end
@@ -1185,7 +1223,7 @@ local function bindToppings(model: Instance, opts: AnchorOpts, label: string, de
 			for _, c in TOPPINGS do
 				local ba, bc = bins[a.key], bins[c.key]
 				-- only pairs across the two rows (same-row spacing is the model's, 2.0 between bowls)
-				if ba and bc and (ba.Position.Z >= splitZ) ~= (bc.Position.Z >= splitZ) then
+				if ba and bc and (M(ba.Position).Z >= splitZ) ~= (M(bc.Position).Z >= splitZ) then
 					worst = math.min(worst, (wanted[a.key] - wanted[c.key]).Magnitude)
 				end
 			end
@@ -1195,7 +1233,7 @@ local function bindToppings(model: Instance, opts: AnchorOpts, label: string, de
 		end
 		for _, t in TOPPINGS do
 			local b = bins[t.key]
-			if b and b.Position.Z < splitZ then
+			if b and M(b.Position).Z < splitZ then
 				wanted[t.key] += Vector3.new(0, 0.1, 0)
 			end
 		end
@@ -1218,7 +1256,7 @@ local function bindToppings(model: Instance, opts: AnchorOpts, label: string, de
 				end
 				if a and host then
 					a.Parent = host
-					;(a :: Attachment).WorldCFrame = CFrame.new(p)
+					;(a :: Attachment).WorldCFrame = FCF(CFrame.new(p))
 				end
 				log("new", ("%s: %s on %s at %s"):format(label, spec[1], if bins[t.key] then "Bin_" .. t.suf else "MAP-01 cell", fmtV(p)))
 			end
@@ -1227,8 +1265,10 @@ local function bindToppings(model: Instance, opts: AnchorOpts, label: string, de
 	end
 	-- layout note: MAP-01 §7.1 documents the real grid (Cheese / Mustard / Ketchup on the operator row)
 	local k, c = bins.ketchup, bins.cheese
-	if k and c and (k.Position.X < c.Position.X or k.Position.Z < splitZ) then
-		log("warn", ("%s: grid differs from MAP-01 §7.1 (Ketchup X %.1f Z %.1f, Cheese X %.1f): update the doc"):format(label, k.Position.X, k.Position.Z, c.Position.X))
+	local km = if k then M(k.Position) else Vector3.zero
+	local cm = if c then M(c.Position) else Vector3.zero
+	if k and c and (km.X < cm.X or km.Z < splitZ) then
+		log("warn", ("%s: grid differs from MAP-01 §7.1 (Ketchup X %.1f Z %.1f, Cheese X %.1f): update the doc"):format(label, km.X, km.Z, cm.X))
 	end
 end
 
@@ -1271,7 +1311,7 @@ local function bindKitchen(vehicle: Instance, kit: Kit, opts: AnchorOpts): Insta
 		local a = byMapId(vehicle, kit.ids[role])
 		local b = byMapId(kit.cart :: Instance, CART_IDS[role])
 		if a and b and a:IsA("PVInstance") and b:IsA("PVInstance") then
-			return (a :: any):GetPivot().Position - (b :: any):GetPivot().Position
+			return mapPivot(a).Position - mapPivot(b).Position
 		end
 		return kit.fallbackDelta
 	end
@@ -1342,7 +1382,7 @@ local function bindKitchen(vehicle: Instance, kit: Kit, opts: AnchorOpts): Insta
 				local c = (mn + mx) / 2
 				return Vector3.new(c.X, y, mn.Z - 0.2) -- corridor side (north) of the back-wall bin
 			end
-			return (bin :: any):GetPivot().Position + Vector3.new(0, 2.3, -0.6)
+			return mapPivot(bin).Position + Vector3.new(0, 2.3, -0.6)
 		end, opts, kit.ids.BIN), "discard")
 	end
 	-- DRAWER: not a Station; Value_Anchor on top of the POS (drawer half, X >= 52.2 on the cart)
@@ -1352,7 +1392,7 @@ local function bindKitchen(vehicle: Instance, kit: Kit, opts: AnchorOpts): Insta
 		local d = delta("DRAWER")
 		ensureAnchor(drawer, "Value_Anchor", function()
 			local mn, mx = partsBox(drawer, function(p)
-				return p.Position.X >= 52.2 + d.X
+				return M(p.Position).X >= 52.2 + d.X
 			end)
 			if not (mn and mx) then
 				mn, mx = partsBox(drawer)
@@ -1393,7 +1433,7 @@ local function bindPhone(vehicle: Instance, mapId: string, opts: AnchorOpts)
 			local c = (mn + mx) / 2
 			return Vector3.new(c.X, mx.Y + 0.3, c.Z)
 		end
-		return (ph :: any):GetPivot().Position + Vector3.new(0, 1.6, 0)
+		return mapPivot(ph).Position + Vector3.new(0, 1.6, 0)
 	end, opts, mapId)
 	interactable(a, "answer_phone")
 	for _, n in { "Light_Ring", "VFX_Ring" } do
@@ -1417,7 +1457,7 @@ local function bindCover(cart: Instance)
 		cover = m
 	end
 	local bin = byMapId(cart, "BIN-C")
-	local pivot = (cart :: any):GetPivot() :: CFrame
+	local pivot = mapPivot(cart) -- MAP-01
 	-- footprint of the cart body + counter items, without the parasol canopies and the loose bin
 	local mn, mx = partsBox(cart, function(p)
 		local inCover = p:IsDescendantOf(cover :: Instance)
@@ -1441,7 +1481,7 @@ local function bindCover(cart: Instance)
 	local bp = part :: BasePart
 	bp.Anchored = true
 	bp.Size = size
-	bp.CFrame = CFrame.new(centre) * pivot.Rotation
+	bp.CFrame = FCF(CFrame.new(centre) * pivot.Rotation)
 	bp.Material = Enum.Material.Fabric
 	bp.Color = COVER_COLOR
 	bp.CastShadow = true
@@ -1506,7 +1546,7 @@ local function bindTrailer(assets: Instance, cart: Instance?, opts: AnchorOpts):
 	local salePose = SALE_POSE
 	local shell = byMapId(assets, "TRL-SALE", "AST-027_OpenLateTrailer")
 	if shell and shell:IsA("PVInstance") then
-		local p = (shell :: any):GetPivot() :: CFrame
+		local p = mapPivot(shell)
 		if (p.Position - SALE_POSE.Position).Magnitude > 0.05 or p.LookVector:Dot(SALE_POSE.LookVector) < 0.999 then
 			log("warn", ("TRL-SALE shell pivot %s differs from the binding constant; the shell's pivot is used"):format(fmtV(p.Position)))
 		end
@@ -1550,7 +1590,7 @@ local function bindTrailer(assets: Instance, cart: Instance?, opts: AnchorOpts):
 	local padPose = TRL_POSE
 	if #members > 0 then
 		-- first bind after Place.run: the trailer and its interior are where place_assets put them (Pad)
-		padPose = (trl :: any):GetPivot()
+		padPose = mapPivot(trl)
 		if (padPose.Position - TRL_POSE.Position).Magnitude > 0.05 or padPose.LookVector:Dot(TRL_POSE.LookVector) < 0.999 then
 			log("warn", ("TRL pivot %s differs from the binding constant %s; the actual pivot is used as TRL"):format(fmtV(padPose.Position), fmtV(TRL_POSE.Position)))
 		end
@@ -1559,14 +1599,14 @@ local function bindTrailer(assets: Instance, cart: Instance?, opts: AnchorOpts):
 		end
 	else
 		-- re-run: the set is already inside the trailer (parked at TRL-SALE); bring it back to the Pad to bind
-		(trl :: any):PivotTo(TRL_POSE)
+		(trl :: any):PivotTo(FCF(TRL_POSE))
 	end
 	log("ok", ("TRL: %d model(s) moved inside the trailer (TRL-*); bound on the Pad"):format(#members))
 	CollectionService:AddTag(trl, "Vehicle")
 	trl:SetAttribute("Vehicle", "trailer")
 	setPersistent(trl)
 
-	local cartPivot = if cart then (cart :: any):GetPivot().Position else CART_POSE.Position
+	local cartPivot = if cart then mapPivot(cart).Position else CART_POSE.Position
 	bindKitchen(trl, {
 		label = "TRL",
 		ids = TRL_IDS,
@@ -1582,7 +1622,7 @@ local function bindTrailer(assets: Instance, cart: Instance?, opts: AnchorOpts):
 	local cm = bindStation(trl, "TRL-COFFEE", "coffee_machine", "coffee")
 	if cm then
 		local mn, mx = partsBox(cm)
-		local c = if mn and mx then (mn + mx) / 2 else (cm :: any):GetPivot().Position
+		local c = if mn and mx then (mn + mx) / 2 else mapPivot(cm).Position
 		local top = if mx then mx.Y else padPose.Y + TRAILER_COUNTER_DY + 2
 		local front = if mn then mn.Z - 0.2 else c.Z - 1.6 -- corridor side (north) at the Pad pose
 		interactable(ensureAnchor(cm, "Prompt_Brew", function()
@@ -1608,7 +1648,7 @@ local function bindTrailer(assets: Instance, cart: Instance?, opts: AnchorOpts):
 				local c = (mn + mx) / 2
 				return Vector3.new(c.X, c.Y, mn.Z - 0.3) -- in front of the plate, corridor side (north)
 			end
-			return (sw :: any):GetPivot().Position + Vector3.new(0, 0.5, -0.4)
+			return mapPivot(sw).Position + Vector3.new(0, 0.5, -0.4)
 		end, opts, "TRL-SWITCH"), "switch_light")
 	else
 		log("err", "TRL-SWITCH (AST-039) not found inside the trailer")
@@ -1669,16 +1709,16 @@ local function bindMart(assets: Instance, opts: AnchorOpts)
 			local part = Instance.new("Part")
 			part.Name = name
 			part.Size = Vector3.one
-			part.CFrame = CFrame.new(pos)
+			part.CFrame = FCF(CFrame.new(pos))
 			part:SetAttribute(CREATED, true)
 			part.Parent = shelves
 			p = part
 		elseif opts.resetCreated then
-			(p :: BasePart).CFrame = CFrame.new(pos)
+			(p :: BasePart).CFrame = FCF(CFrame.new(pos))
 		end
 		makeInvisible(p :: BasePart)
 		interactable(p, "buy_package", { Package = sh.package })
-		log("ok", ("MKT-SHELVES: %s -> buy_package %s at %s"):format(name, sh.package, fmtV((p :: BasePart).Position)))
+		log("ok", ("MKT-SHELVES: %s -> buy_package %s at %s"):format(name, sh.package, fmtV(M((p :: BasePart).Position))))
 	end
 
 	-- GEAR WALL (AST-049): Prompt_Buy_<slot>
@@ -1713,7 +1753,7 @@ local function bindStreetBins(assets: Instance, opts: AnchorOpts)
 			n += 1
 			CollectionService:AddTag(d, "StreetBin")
 			setPersistent(d)
-			local p = d:GetPivot().Position
+			local p = mapPivot(d).Position
 			local label = ("StreetBin %s (%.0f, %.0f)"):format(tostring(d:GetAttribute("MapId")), p.X, p.Z)
 			interactable(ensureAnchor(d, "Prompt_Discard", function()
 				local mn, mx = partsBox(d)
@@ -1753,12 +1793,12 @@ local function ensureLampLight(post: Instance, head: Instance?, id: string)
 		end
 	end
 	local mn, mx = partsBox(head)
-	local pivot = (head :: any):GetPivot() :: CFrame
+	local pivot = mapPivot(head) -- MAP-01
 	local pos = if mn and mx then Vector3.new((mn.X + mx.X) / 2, mn.Y - 0.05, (mn.Z + mx.Z) / 2) else pivot.Position + Vector3.new(0, 13, 0)
 	local holder = Instance.new("Part")
 	holder.Name = "Light_Lamp"
 	holder.Size = Vector3.new(0.4, 0.1, 0.4)
-	holder.CFrame = CFrame.new(pos) * pivot.Rotation
+	holder.CFrame = FCF(CFrame.new(pos) * pivot.Rotation)
 	makeInvisible(holder)
 	holder:SetAttribute(CREATED, true)
 	holder.Parent = head
@@ -1942,11 +1982,12 @@ local function bindPoints(ctx: Ctx): Instance
 		table.insert(links[e[2]], e[1])
 	end
 
+	-- cf in MAP-01 coordinates
 	local function newPart(name: string, cf: CFrame, parent: Instance): Part
 		local p = Instance.new("Part")
 		p.Name = name
 		p.Size = Vector3.one
-		p.CFrame = cf
+		p.CFrame = FCF(cf)
 		makeInvisible(p)
 		p.Parent = parent
 		return p
@@ -2044,7 +2085,7 @@ local function bindLightZones(root: Instance, padPose: CFrame)
 			p.Shape = Enum.PartType.Block
 			p.Size = z.size :: Vector3
 		end
-		p.CFrame = centre
+		p.CFrame = FCF(centre)
 		makeInvisible(p)
 		p.Parent = folder
 		CollectionService:AddTag(p, "LightZone")
@@ -2111,7 +2152,7 @@ local function bindShutterButton(trl: Instance, padPose: CFrame, opts: AnchorOpt
 		bp.CanTouch = false
 		bp.CastShadow = false
 		if fresh or opts.resetCreated then
-			bp.CFrame = wanted()
+			bp.CFrame = FCF(wanted())
 		end
 	end
 	m.PrimaryPart = bp
@@ -2140,7 +2181,7 @@ local function bindShutterButton(trl: Instance, padPose: CFrame, opts: AnchorOpt
 	for _, step in { padPose.RightVector * -0.1, padPose.UpVector * 0.1 } do
 		local n = 0
 		while d < SHUTTER_GAP and n < 10 do
-			bp.CFrame = bp.CFrame + step
+			bp.CFrame = bp.CFrame + FD(step)
 			moved += step
 			n += 1
 			d, who = closestOther(a, trl)
@@ -2188,7 +2229,7 @@ local function bindShutterPiece(trl: Instance, padPose: CFrame)
 		h.Name = "Shutter_Hinge"
 		h:SetAttribute(CREATED, true)
 		h.Parent = host
-		h.WorldCFrame = CFrame.new(hingeWorld) * rot -- X axis = along the window (hinge axis)
+		h.WorldCFrame = FCF(CFrame.new(hingeWorld) * rot) -- X axis = along the window (hinge axis); hingeWorld in MAP-01
 		h:SetAttribute("ClosedAngle", angle)
 		return h
 	end
@@ -2220,7 +2261,7 @@ local function bindShutterPiece(trl: Instance, padPose: CFrame)
 			local Z: the window faces -Z), far = the outer edge; which of the two diagonals is the plate comes from a
 			raycast profile (top surface higher at the wall = canopy sloping down-outwards, the usual raised awning).
 			Closed = hanging from the hinge, 3 degrees outwards so it never sinks into the wall. ]]
-		local box = padPose:ToObjectSpace(awning.CFrame)
+		local box = padPose:ToObjectSpace(MCF(awning.CFrame))
 		local half = awning.Size / 2
 		local mnL, mxL = nil :: Vector3?, nil :: Vector3?
 		for _, sx in { -1, 1 } do
@@ -2242,9 +2283,9 @@ local function bindShutterPiece(trl: Instance, padPose: CFrame)
 		local query = awning.CanQuery
 		awning.CanQuery = true
 		local function topAt(z: number): number?
-			local o = padPose:PointToWorldSpace(Vector3.new(cx, mx.Y + 2, z))
-			local hit = Workspace:Raycast(o, padPose:VectorToWorldSpace(Vector3.new(0, -(mx.Y - mn.Y) - 4, 0)), params)
-			return if hit then padPose:PointToObjectSpace(hit.Position).Y else nil
+			local o = F(padPose:PointToWorldSpace(Vector3.new(cx, mx.Y + 2, z)))
+			local hit = Workspace:Raycast(o, FD(padPose:VectorToWorldSpace(Vector3.new(0, -(mx.Y - mn.Y) - 4, 0))), params)
+			return if hit then padPose:PointToObjectSpace(M(hit.Position)).Y else nil
 		end
 		local depth = mx.Z - mn.Z
 		local yWall = topAt(mx.Z - depth * 0.15)
@@ -2319,11 +2360,11 @@ local function bindShutterPiece(trl: Instance, padPose: CFrame)
 		pp.CanQuery = false
 		pp.CanTouch = false
 		pp.CastShadow = true
-		pp.CFrame = openCF
+		pp.CFrame = FCF(openCF)
 	end
 	newHinge(pp, hingeCF.Position, -90)
 	log("new", ("TRL: Shutter_Panel placeholder %s, open at %s, Shutter_Hinge ClosedAngle -90; Awning stays fixed (P51: %s)"):format(
-		fmtV(SHUTTER_PANEL_SIZE), fmtV(pp.Position), why))
+		fmtV(SHUTTER_PANEL_SIZE), fmtV(M(pp.Position)), why))
 end
 
 -- Leftovers of the hide spots inside the trailer (DEC-221): bind-created Prompt_Hide / Hide_Pose outside the
@@ -2376,7 +2417,7 @@ local function bindWindows(assets: Instance, root: Instance)
 			p.Name = w.id
 			p.Size = Vector3.new(3, 3.4, 0.2)
 			local c = Vector3.new(w.x, WINDOW_Y, WINDOW_Z)
-			p.CFrame = CFrame.lookAt(c, c + SOUTH)
+			p.CFrame = FCF(CFrame.lookAt(c, c + SOUTH))
 			makeInvisible(p)
 			p.Parent = folder
 			CollectionService:AddTag(p, "AnomalyAnchor")
@@ -2425,7 +2466,7 @@ local function bindTraffic(root: Instance)
 			local part = Instance.new("Part")
 			part.Name = ("%02d"):format(i)
 			part.Size = Vector3.one * 0.6
-			part.CFrame = CFrame.lookAt(p, p + d.Unit)
+			part.CFrame = FCF(CFrame.lookAt(p, p + d.Unit))
 			makeInvisible(part)
 			part:SetAttribute("Index", i)
 			part.Parent = f
@@ -2440,7 +2481,7 @@ local function bindTraffic(root: Instance)
 		p.Name = l.id
 		p.Size = Vector3.new(l.width, 0.2, 0.4)
 		local c = Vector3.new(l.x, roadY(l.x, l.z) + 0.1, l.z)
-		p.CFrame = CFrame.lookAt(c, c + l.dir)
+		p.CFrame = FCF(CFrame.lookAt(c, c + l.dir))
 		makeInvisible(p)
 		p.Parent = lines
 		CollectionService:AddTag(p, "TrafficLine")
@@ -2450,7 +2491,7 @@ local function bindTraffic(root: Instance)
 		local p = Instance.new("Part")
 		p.Name = b.id
 		p.Size = Vector3.new(b.x1 - b.x0, TRAFFIC_BOX_H, b.z1 - b.z0)
-		p.CFrame = CFrame.new((b.x0 + b.x1) / 2, ROAD_Y + TRAFFIC_BOX_H / 2, (b.z0 + b.z1) / 2)
+		p.CFrame = FCF(CFrame.new((b.x0 + b.x1) / 2, ROAD_Y + TRAFFIC_BOX_H / 2, (b.z0 + b.z1) / 2))
 		makeInvisible(p)
 		p.Parent = boxes
 		CollectionService:AddTag(p, "TrafficBox")
@@ -2541,7 +2582,7 @@ local function bindAutoDoors(assets: Instance)
 				axis, w = look, p.Size.Z
 			end
 			axis = Vector3.new(axis.X, 0, axis.Z)
-			axis = if axis.Magnitude > 1e-3 then axis.Unit else EAST
+			axis = if axis.Magnitude > 1e-3 then axis.Unit else FD(EAST)
 			local e1 = p.Position + axis * (w / 2)
 			local e2 = p.Position - axis * (w / 2)
 			local edge = if #leaves == 1 then e1 elseif (e1 - centre).Magnitude >= (e2 - centre).Magnitude then e1 else e2
@@ -2576,7 +2617,7 @@ local function bindAutoDoors(assets: Instance)
 			local h = (hinge :: Attachment).WorldPosition
 			local r = p.Position - h
 			local turned = CFrame.Angles(0, math.rad(DOOR_OPEN), 0):VectorToWorldSpace(Vector3.new(r.X, 0, r.Z))
-			local sign = if (turned - Vector3.new(r.X, 0, r.Z)):Dot(spec.inward) >= 0 then 1 else -1
+			local sign = if (turned - Vector3.new(r.X, 0, r.Z)):Dot(FD(spec.inward)) >= 0 then 1 else -1 -- leaf geometry is world, inward MAP-01
 			if p:GetAttribute("DoorOrigCanCollide") == nil then
 				p:SetAttribute("DoorOrigCanCollide", p.CanCollide)
 			end
@@ -2719,7 +2760,7 @@ function Bind.run(opts: AnchorOpts?): string
 	bindStreetLights(assets)
 	bindAutoDoors(assets)
 
-	local cartPose = if cart then (cart :: any):GetPivot() :: CFrame else CART_POSE
+	local cartPose = if cart then mapPivot(cart) else CART_POSE
 	if (cartPose.Position - CART_POSE.Position).Magnitude > 0.05 then
 		log("warn", ("CART pivot %s differs from the binding constant %s; the actual pivot is used as CART"):format(fmtV(cartPose.Position), fmtV(CART_POSE.Position)))
 	end
@@ -2734,7 +2775,7 @@ function Bind.run(opts: AnchorOpts?): string
 
 	-- start of a run: trailer for sale (T36, DEC-047)
 	if trl then
-		(trl :: any):PivotTo(salePose)
+		(trl :: any):PivotTo(FCF(salePose))
 		log("ok", ("TRL: trailer parked at TRL-SALE %s (VehicleService moves it to TRL on the swap)"):format(fmtV(salePose.Position)))
 	end
 

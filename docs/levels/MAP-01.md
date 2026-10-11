@@ -75,6 +75,7 @@ Anomalias: `ANM-001`…`ANM-010` = N1…N10 (DEC-096).
 
 - Origem `(0, 0)` = centro da pista da Juniper no eixo da Ninth (cruzamento), no chão (Y = 0).
 - **+X = leste**, **+Z = sul**, **norte = −Z**. Coordenadas no texto são `(X, Z)` em studs.
+- **Referencial do place (2026-10-10, decisão do usuário):** o mapa inteiro foi girado 180° em Y no Studio em volta de `(0, 33,94)`. Todas as coordenadas deste documento (e das tabelas das ferramentas) continuam no referencial MAP-01 acima; no place, um ponto `(x, y, z)` daqui fica em **`(−x, y, 67,887287 − z)`**, e as direções viram (norte = +Z do mundo, leste = −X do mundo). A transformação única é `MAP_FRAME` em `tools/assetplace/map_frame.luau` (§16.9).
 - Personagem **R6** [DEC-089, DEC-097]: altura 5 studs (pernas 2, tronco 2, cabeça 1), olho ~4,5, largura 2. WalkSpeed padrão 16 studs/s (classes: Runner 18, Line Cook 15, DEC-069).
 - Altura de bancada: **3,5 studs**, igual ao `art/style-guide.md` §4 (Aprovado, DEC-126: R6, olho 4,5, bancada 3,5). Proposta: fechar `Q-095` por DEC-126. **Exceção, DEC-157 (2026-10-10): bancada do carrinho (AST-026) a 3,0** do Pad (y 3,45 no mapa; Pad 0,45); trailer e demais bancadas seguem 3,5; style guide em `Q-153`. Trailer: pé-direito **8,5** sobre o piso a +2, altura externa **~11** (AST-027). Porta: 4 × 7,5.
 - Trânsito em **mão direita**: na Ninth, sentido oeste (WB) na metade norte da pista, sentido leste (EB) na metade sul. Na Juniper (Norte e Sul), sentido sul (SB) no lado oeste, sentido norte (NB) no lado leste.
@@ -1057,6 +1058,8 @@ Carrinho: `Body` com 3,0 de altura (topo em 3,45); `DRAWER` sem extensão e vira
 
 ### 16.1 Como rodar (Command Bar, repositório servido na porta 8772)
 
+As ferramentas carregam `map_frame.luau` (§16.9) do mesmo servidor na hora do `require` (o loader abaixo deixa o `HttpEnabled` ligado durante os `get`). Não precisa mudar nada no comando.
+
 Ordem: `Place.run` (se os assets mudaram) → `Bind.run()` → `Pieces.run()` (`bind_pieces.luau`, TASK-085) → `Check.run({ wave = 3 })` → salvar o place. Depois de qualquer `Place.run`, rodar o `Bind` de novo; depois de qualquer `Bind`, o `Pieces`. Depois do `Bind`, **não** usar `Place.showLayer`: os dois veículos ficam no `Workspace` (T36). O `check` da onda 3 lê `Content` (`Cutscenes`, `WalkPaths`, `Traffic`) do `ReplicatedStorage`: rode com o `rojo serve` sincronizado.
 
 ```lua
@@ -1148,8 +1151,38 @@ Proposta para o frontend-coder (TASK-131) e o architect: o atributo `ClosedAngle
 | Ajudantes travados | tudo de `MapBinding`, peças invisíveis dos assets (âncoras, porta-luz, lona) e do blockout (`Markers`, `Limits`, peças escondidas e fantasmas ≥ 75% transparentes) com `Locked = true` e `CanTouch` falso; `CanQuery` falso só onde não colide (os limites BAR-* mantêm colisão). Nenhum código lê essas peças por raycast/toque | `bind_map01.luau` W7 |
 | Check | regra 12 (rotas de spawn ≤ 130 studs, saídas) e 13 (linha de visão + `AutoDoor`) | `check_map01.luau` |
 
-**Command Bar** (a mudança dos postes pede `Place.run`, que refaz `MAP01_Assets` a partir dos placements — as edições do §16.0 estão gravadas neles; confira antes com `Place.diff`):
+**Command Bar** (a mudança dos postes pede `Place.run`, que refaz `MAP01_Assets` a partir dos placements — as edições do §16.0 estão gravadas neles; confira antes com `Place.diff`; feito em 2026-10-10, §16.9):
 
 ```lua
 local H=game:GetService("HttpService") local w=H.HttpEnabled H.HttpEnabled=true local B="http://127.0.0.1:8772/" local function get(p) local ms=Instance.new("ModuleScript") ms.Source=H:GetAsync(B.."tools/assetplace/"..p,true) return require(ms) end local Place=get("place_assets.luau") local P=get("MAP-01_placements.luau") local ids=H:JSONDecode(H:GetAsync(B.."Assets/import/_asset_ids.json",true)) local Bind=get("bind_map01.luau") local Pieces=get("bind_pieces.luau") local Check=get("check_map01.luau") H.HttpEnabled=w print(Place.run(P, ids)) print(Bind.run()) print(Pieces.run()) Check.run({ wave = 3 })
 ```
+
+### 16.9 Referencial girado e ruas AST-032 completas (2026-10-10) — Provisório
+
+**Referencial.** O usuário girou o place 180° em Y (MAP01_Blockout, MAP01_Assets, MapBinding, SpawnLocation) e quer essa orientação. Medido em 73 placements (pivô vivo + placement): `K = 67,887287` (dispersão < 1e-5), centro `(0, 33,9436)`. O pipeline continua escrevendo números MAP-01 e converte só na fronteira com o Workspace:
+
+| Ferramenta | Onde entra o `MAP_FRAME` |
+|---|---|
+| `map_frame.luau` (novo) | `FRAME = CFrame.new(0, 0, K, −1,0,0, 0,1,0, 0,0,−1)` (matriz exata); `F`/`M` (ponto), `FD`/`MD` (direção), `FCF`/`MCF` (CFrame), `box` (retângulo X0..X1, Z0..Z1) |
+| `place_assets.luau` | cada placement (e `pivot`) vira `MAP_FRAME * CFrame(x, y, z, rotY)`; `parts`/`copies` são relativos à entrada e não mudam; `Place.diff` usa a mesma conta (regra do trailer: pivô vivo × (MAP_FRAME × placement)⁻¹) |
+| `bind_map01.luau` | tabelas (POINTS, NODES, ZONES, TRAFFIC_*, SHELVES, poses CART/TRL/TRL-SALE, janela do trailer) e a lógica (norte = −Z, "oeste primeiro" = X menor, caixas, sondas de raycast) ficam em MAP-01; leituras do Workspace passam por `M`/`MCF` (`partsBox`, `mapPos`, `mapPivot`, posição das cubas), escritas por `F`/`FCF` (`WorldCFrame`, `CFrame`, `PivotTo`, origem de raycast); `inward` das portas por `FD` |
+| `bind_pieces.luau` | `PAD_POSE`/`COUNTER_POSE` por `FCF`; ordem oeste → leste dos slots da chapa lida em X MAP-01 |
+| `check_map01.luau` | N/S/L/O do `FACING` por `FD`; `ROADS`/`CROSSWALKS` por `box`; amostra da rota Pad ↔ Mart (Z 44) por `F`; janelas WV pelo `M` |
+| `src/Place/shared/MapIndex/Required.luau` | `ROADS`/`CROSSWALKS` viram retângulos do mundo (`mapRect`, mesmo K); usados por `MapIndex` (regra de travessia) e `ItemService/Drops` (item na pista vai para a calçada) |
+| `src/Anomaly/client/.../ANM-008.luau` | rota do long car lida das faixas do binding (`E-IN` = faixa WB, `E-OUT` = faixa EB: posição + LookVector), não mais `Z ±5`/`X 140`; fallbacks pelo mesmo K |
+
+Mudar `K` (outro giro) = mudar `map_frame.luau` e o `MAP_K` de `Required.luau` / `ANM-008.luau`. O resto do `src/` lê pontos/tags do binding (conferido: Content, Traffic, Cutscene, Light, Thief, Npc, Pedestrian, Door, Vehicle).
+
+**Ruas (pedido do usuário, print da esquina: Kenney de um lado, asfalto liso do blockout do outro).** Toda pista e calçada da Ninth agora é AST-032 (`MAP-01_placements.luau` §1), com `parts.size` para escalar a malha:
+
+| Trecho | Peças | Escala | Esconde |
+|---|---|---|---|
+| Ninth (X −136..136, Z −16..16) | 10 `RoadStraight` rotY 0, 24,8 de comprimento | atravessado 40: asfalto (19,2 de 24) = 32; meio-fio (topo 0,24) em \|Z\| 16..20, embaixo da calçada | `Roads/NinthAvenue` |
+| Cruzamento (X −12..12) | `RoadCrossroad` 24 × 40 | quinas do meio-fio em X ±9,6..12, \|Z\| 16..20 continuam o meio-fio da Juniper | idem |
+| Juniper: 1º trecho norte e sul | `RoadStraight` encurtado 24 → 20 (Z −40..−20 e 20..40) | ao longo da pista | — |
+| BackStreet (Z −152..−136) | 10 `RoadStraight` 24,8 × 20 + `RoadCrossroad` 24 × 20 em (0, −144); último trecho da Juniper Norte encurtado para 22 (Z −134..−112) | asfalto 16 | `Roads/BackStreet` |
+| Calçadas da Ninth (Z-02, Z-06) | 20 `SidewalkTile` 24,8 × 16 em y −0,08 | topo 0,4 (igual ao blockout: postes, lixeiras e pontos a 0,4 continuam no chão) | `Sidewalks/Z-0x_Ninth*` |
+
+Asfalto no Y 0 em toda parte (pista y −0,24): faixas CW-1..4, linhas SL-* e linhas amarelas/brancas do blockout continuam por cima (0,01–0,05), nas mesmas posições do trânsito. Degrau de 0,16 entre calçada da Juniper (0,24) e da Ninth (0,4) continua como antes.
+
+**Rodado em 2026-10-10:** `Place.diff` antes (referencial novo, placements antigos): só os postes esperados (JL-02..05 a 8/16/24/32 do lugar novo, JL-06..09 sobrando). `Place.run` 244/244 → `Bind.run` (err 0) → `Pieces.run` (21/21, err 0) → `Check.run({ wave = 3 })` **PASS, 0 erros**, 24 avisos (fittings de arte, barreiras, AS-1/2/3 e SP-S à vista — SP-S do SS através do vidro do B5; giro rígido, então já valia antes). `Place.diff` depois: **0 diferenças** (243 iguais). `Shutter_Hinge` no `Shutter_Panel` (`ClosedAngle −90`: a `Awning` medida deu ângulo degenerado). `Workspace.Model` (CrewDemo) e `Workspace.Rig` foram para `ServerStorage.DevScenes`.

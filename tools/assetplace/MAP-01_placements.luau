@@ -18,7 +18,9 @@
 	==============================================================================================
 	CONVENTIONS
 	==============================================================================================
-	- x, z: MAP-01 world coords (origin = Juniper centre on the Ninth axis, +X east, +Z south).
+	- MAP FRAME (2026-10-10, user's decision): the place is turned 180 in Y around (0, 33.94). The numbers here stay
+	  MAP-01 coordinates; place_assets.luau puts every entry at MAP_FRAME * CFrame(x, y, z, rotY) (map_frame.luau).
+	- x, z: MAP-01 coords (origin = Juniper centre on the Ninth axis, +X east, +Z south).
 	  y: ABSOLUTE world height of the asset pivot (pivot = bottom centre of the bbox).
 	- rotY: degrees, CFrame.new(x, y, z) * CFrame.Angles(0, math.rad(rotY), 0).
 	  With this, local +Z points to world (sin rotY, cos rotY): 0 = +Z faces south, 90 = east,
@@ -98,9 +100,9 @@
 	==============================================================================================
 	LEFT OUT (blockout stays) AND WHY
 	==============================================================================================
-	- Ninth Avenue (32 wide), the intersection box (24 x 32), BackStreet (16), Ninth sidewalks (16)
-	  and the Juniper sidewalk strip Z -136..-128 (8): no 24-stud tile fits. Ninth stays blockout;
-	  the far strip becomes a gap at ground level (Z-13, beyond BAR-N, in the fog).
+	- (2026-10-10, user's print: Kenney tile next to blockout asphalt at the corner) Ninth Avenue, the intersection,
+	  BackStreet and the Ninth sidewalks now use AST-032 tiles scaled with `parts.size` (see section 1). Only the
+	  Juniper sidewalk strip Z -136..-128 (8) stays a gap at ground level (Z-13, beyond BAR-N, in the fog).
 	- Kenney crossing tile not used for CW-1: its stripes are centred on the tile (~7.6 wide) and
 	  CW-1 (Z 34..42) would need a tile at Z 26..50, leaving a 10-stud hole at Z 16..26. CW-1..4,
 	  SL lines and the yellow centre lines stay as blockout paint (the tiles also carry a thin
@@ -151,16 +153,64 @@ return {
 	---------------------------------------------------------------------------------------------
 	-- 1. ROADS (Juniper only; road tiles rotY 90 = carriageway along Z) and SIDEWALKS
 	---------------------------------------------------------------------------------------------
-	{ asset = "AST-032_RoadStraight", x = 0, y = -0.24, z = -28, rotY = 90, group = "Roads", id = "Z-07", replaces = { "Roads/Juniper_North" } },
+	-- 2026-10-10 (user, print of the corner): the Ninth, the crossing and the BackStreet get AST-032 tiles too (no more
+	-- blockout asphalt next to the Kenney tiles). First / last Juniper tiles trimmed to 20 / 22 long so the crossroads
+	-- (Z -20..20 and Z -154..-134) do not overlap them.
+	{ asset = "AST-032_RoadStraight", x = 0, y = -0.24, z = -30, rotY = 90, parts = { ["AST-032_RoadStraight"] = { 0, 0.24, 0, size = { 20, 0.48, 24 } } }, group = "Roads", id = "Z-07", replaces = { "Roads/Juniper_North" }, note = "Z -40..-20 (trimmed 24 -> 20 for the crossroad)" },
 	{ asset = "AST-032_RoadStraight", x = 0, y = -0.24, z = -52, rotY = 90, group = "Roads", id = "Z-07", replaces = { "Roads/Juniper_North" } },
 	{ asset = "AST-032_RoadStraight", x = 0, y = -0.24, z = -76, rotY = 90, group = "Roads", id = "Z-07", replaces = { "Roads/Juniper_North" } },
 	{ asset = "AST-032_RoadStraight", x = 0, y = -0.24, z = -100, rotY = 90, group = "Roads", id = "Z-13", replaces = { "Roads/Juniper_North" } },
-	{ asset = "AST-032_RoadStraight", x = 0, y = -0.24, z = -124, rotY = 90, group = "Roads", id = "Z-13", replaces = { "Roads/Juniper_North" } },
-	{ asset = "AST-032_RoadStraight", x = 0, y = -0.24, z = 28, rotY = 90, group = "Roads", id = "Z-08", replaces = { "Roads/Juniper_South" } },
+	{ asset = "AST-032_RoadStraight", x = 0, y = -0.24, z = -123, rotY = 90, parts = { ["AST-032_RoadStraight"] = { 0, 0.24, 0, size = { 22, 0.48, 24 } } }, group = "Roads", id = "Z-13", replaces = { "Roads/Juniper_North" }, note = "Z -134..-112 (trimmed 24 -> 22 for the BackStreet crossroad)" },
+	{ asset = "AST-032_RoadStraight", x = 0, y = -0.24, z = 30, rotY = 90, parts = { ["AST-032_RoadStraight"] = { 0, 0.24, 0, size = { 20, 0.48, 24 } } }, group = "Roads", id = "Z-08", replaces = { "Roads/Juniper_South" }, note = "Z 20..40 (trimmed 24 -> 20 for the crossroad)" },
 	{ asset = "AST-032_RoadStraight", x = 0, y = -0.24, z = 52, rotY = 90, group = "Roads", id = "Z-08", replaces = { "Roads/Juniper_South" } },
 	{ asset = "AST-032_RoadStraight", x = 0, y = -0.24, z = 76, rotY = 90, group = "Roads", id = "Z-08", replaces = { "Roads/Juniper_South" } },
 	{ asset = "AST-032_RoadStraight", x = 0, y = -0.24, z = 100, rotY = 90, group = "Roads", id = "Z-08", replaces = { "Roads/Juniper_South" } },
 	{ asset = "AST-032_RoadStraightHalf", x = 0, y = -0.24, z = 118, rotY = 90, group = "Roads", id = "Z-08", replaces = { "Roads/Juniper_South" }, note = "covers Z 112..124 (blockout road ended at 120; out of view after the curve)" },
+	-- Ninth Avenue (Z-03, X -136..136, Z -16..16) along X: 5 + 5 tiles 24.8 long, scaled across to 40 so the asphalt
+	-- (19.2 of 24) is exactly the 32 of the Ninth and the curb strips (|Z| 16..20, top 0.24) end up inside the Ninth
+	-- sidewalk tiles (top 0.4); lanes, lines, SL-* and CW-2/3/4 stripes of the blockout stay on top (asphalt Y 0).
+	{ asset = "AST-032_RoadStraight", x = -24.4, y = -0.24, z = 0, rotY = 0, parts = { ["AST-032_RoadStraight"] = { 0, 0.24, 0, size = { 24.8, 0.48, 40 } } }, group = "Roads", id = "Z-03", replaces = { "Roads/NinthAvenue" } },
+	{ asset = "AST-032_RoadStraight", x = -49.2, y = -0.24, z = 0, rotY = 0, parts = { ["AST-032_RoadStraight"] = { 0, 0.24, 0, size = { 24.8, 0.48, 40 } } }, group = "Roads", id = "Z-03", replaces = { "Roads/NinthAvenue" } },
+	{ asset = "AST-032_RoadStraight", x = -74, y = -0.24, z = 0, rotY = 0, parts = { ["AST-032_RoadStraight"] = { 0, 0.24, 0, size = { 24.8, 0.48, 40 } } }, group = "Roads", id = "Z-03", replaces = { "Roads/NinthAvenue" } },
+	{ asset = "AST-032_RoadStraight", x = -98.8, y = -0.24, z = 0, rotY = 0, parts = { ["AST-032_RoadStraight"] = { 0, 0.24, 0, size = { 24.8, 0.48, 40 } } }, group = "Roads", id = "Z-03", replaces = { "Roads/NinthAvenue" } },
+	{ asset = "AST-032_RoadStraight", x = -123.6, y = -0.24, z = 0, rotY = 0, parts = { ["AST-032_RoadStraight"] = { 0, 0.24, 0, size = { 24.8, 0.48, 40 } } }, group = "Roads", id = "Z-03", replaces = { "Roads/NinthAvenue" } },
+	{ asset = "AST-032_RoadStraight", x = 24.4, y = -0.24, z = 0, rotY = 0, parts = { ["AST-032_RoadStraight"] = { 0, 0.24, 0, size = { 24.8, 0.48, 40 } } }, group = "Roads", id = "Z-03", replaces = { "Roads/NinthAvenue" } },
+	{ asset = "AST-032_RoadStraight", x = 49.2, y = -0.24, z = 0, rotY = 0, parts = { ["AST-032_RoadStraight"] = { 0, 0.24, 0, size = { 24.8, 0.48, 40 } } }, group = "Roads", id = "Z-03", replaces = { "Roads/NinthAvenue" } },
+	{ asset = "AST-032_RoadStraight", x = 74, y = -0.24, z = 0, rotY = 0, parts = { ["AST-032_RoadStraight"] = { 0, 0.24, 0, size = { 24.8, 0.48, 40 } } }, group = "Roads", id = "Z-03", replaces = { "Roads/NinthAvenue" } },
+	{ asset = "AST-032_RoadStraight", x = 98.8, y = -0.24, z = 0, rotY = 0, parts = { ["AST-032_RoadStraight"] = { 0, 0.24, 0, size = { 24.8, 0.48, 40 } } }, group = "Roads", id = "Z-03", replaces = { "Roads/NinthAvenue" } },
+	{ asset = "AST-032_RoadStraight", x = 123.6, y = -0.24, z = 0, rotY = 0, parts = { ["AST-032_RoadStraight"] = { 0, 0.24, 0, size = { 24.8, 0.48, 40 } } }, group = "Roads", id = "Z-03", replaces = { "Roads/NinthAvenue" } },
+	{ asset = "AST-032_RoadCrossroad", x = 0, y = -0.24, z = 0, rotY = 0, parts = { ["AST-032_RoadCrossroad"] = { 0, 0.24, 0, size = { 24, 0.48, 40 } } }, group = "Roads", id = "Z-03", replaces = { "Roads/NinthAvenue" }, note = "2026-10-10: X -12..12, Z -20..20; corner curbs (X +-9.6..12, Z +-16..20) continue the Juniper curbs; Ninth arms open" },
+	{ asset = "AST-032_RoadStraight", x = -24.4, y = -0.24, z = -144, rotY = 0, parts = { ["AST-032_RoadStraight"] = { 0, 0.24, 0, size = { 24.8, 0.48, 20 } } }, group = "Roads", id = "Z-13", replaces = { "Roads/BackStreet" } },
+	{ asset = "AST-032_RoadStraight", x = -49.2, y = -0.24, z = -144, rotY = 0, parts = { ["AST-032_RoadStraight"] = { 0, 0.24, 0, size = { 24.8, 0.48, 20 } } }, group = "Roads", id = "Z-13", replaces = { "Roads/BackStreet" } },
+	{ asset = "AST-032_RoadStraight", x = -74, y = -0.24, z = -144, rotY = 0, parts = { ["AST-032_RoadStraight"] = { 0, 0.24, 0, size = { 24.8, 0.48, 20 } } }, group = "Roads", id = "Z-13", replaces = { "Roads/BackStreet" } },
+	{ asset = "AST-032_RoadStraight", x = -98.8, y = -0.24, z = -144, rotY = 0, parts = { ["AST-032_RoadStraight"] = { 0, 0.24, 0, size = { 24.8, 0.48, 20 } } }, group = "Roads", id = "Z-13", replaces = { "Roads/BackStreet" } },
+	{ asset = "AST-032_RoadStraight", x = -123.6, y = -0.24, z = -144, rotY = 0, parts = { ["AST-032_RoadStraight"] = { 0, 0.24, 0, size = { 24.8, 0.48, 20 } } }, group = "Roads", id = "Z-13", replaces = { "Roads/BackStreet" } },
+	{ asset = "AST-032_RoadStraight", x = 24.4, y = -0.24, z = -144, rotY = 0, parts = { ["AST-032_RoadStraight"] = { 0, 0.24, 0, size = { 24.8, 0.48, 20 } } }, group = "Roads", id = "Z-13", replaces = { "Roads/BackStreet" } },
+	{ asset = "AST-032_RoadStraight", x = 49.2, y = -0.24, z = -144, rotY = 0, parts = { ["AST-032_RoadStraight"] = { 0, 0.24, 0, size = { 24.8, 0.48, 20 } } }, group = "Roads", id = "Z-13", replaces = { "Roads/BackStreet" } },
+	{ asset = "AST-032_RoadStraight", x = 74, y = -0.24, z = -144, rotY = 0, parts = { ["AST-032_RoadStraight"] = { 0, 0.24, 0, size = { 24.8, 0.48, 20 } } }, group = "Roads", id = "Z-13", replaces = { "Roads/BackStreet" } },
+	{ asset = "AST-032_RoadStraight", x = 98.8, y = -0.24, z = -144, rotY = 0, parts = { ["AST-032_RoadStraight"] = { 0, 0.24, 0, size = { 24.8, 0.48, 20 } } }, group = "Roads", id = "Z-13", replaces = { "Roads/BackStreet" } },
+	{ asset = "AST-032_RoadStraight", x = 123.6, y = -0.24, z = -144, rotY = 0, parts = { ["AST-032_RoadStraight"] = { 0, 0.24, 0, size = { 24.8, 0.48, 20 } } }, group = "Roads", id = "Z-13", replaces = { "Roads/BackStreet" } },
+	{ asset = "AST-032_RoadCrossroad", x = 0, y = -0.24, z = -144, rotY = 0, parts = { ["AST-032_RoadCrossroad"] = { 0, 0.24, 0, size = { 24, 0.48, 20 } } }, group = "Roads", id = "Z-13", replaces = { "Roads/BackStreet" }, note = "2026-10-10: Juniper North meets the BackStreet (Z -154..-134)" },
+	{ asset = "AST-032_SidewalkTile", x = -24.4, y = -0.08, z = -24, rotY = 0, parts = { ["AST-032_SidewalkTile"] = { 0, 0.24, 0, size = { 24.8, 0.48, 16 } } }, group = "Sidewalks", id = "Z-06", replaces = { "Sidewalks/Z-06_NinthNorth_W" } },
+	{ asset = "AST-032_SidewalkTile", x = -49.2, y = -0.08, z = -24, rotY = 0, parts = { ["AST-032_SidewalkTile"] = { 0, 0.24, 0, size = { 24.8, 0.48, 16 } } }, group = "Sidewalks", id = "Z-06", replaces = { "Sidewalks/Z-06_NinthNorth_W" } },
+	{ asset = "AST-032_SidewalkTile", x = -74, y = -0.08, z = -24, rotY = 0, parts = { ["AST-032_SidewalkTile"] = { 0, 0.24, 0, size = { 24.8, 0.48, 16 } } }, group = "Sidewalks", id = "Z-06", replaces = { "Sidewalks/Z-06_NinthNorth_W" } },
+	{ asset = "AST-032_SidewalkTile", x = -98.8, y = -0.08, z = -24, rotY = 0, parts = { ["AST-032_SidewalkTile"] = { 0, 0.24, 0, size = { 24.8, 0.48, 16 } } }, group = "Sidewalks", id = "Z-06", replaces = { "Sidewalks/Z-06_NinthNorth_W" } },
+	{ asset = "AST-032_SidewalkTile", x = -123.6, y = -0.08, z = -24, rotY = 0, parts = { ["AST-032_SidewalkTile"] = { 0, 0.24, 0, size = { 24.8, 0.48, 16 } } }, group = "Sidewalks", id = "Z-06", replaces = { "Sidewalks/Z-06_NinthNorth_W" } },
+	{ asset = "AST-032_SidewalkTile", x = 24.4, y = -0.08, z = -24, rotY = 0, parts = { ["AST-032_SidewalkTile"] = { 0, 0.24, 0, size = { 24.8, 0.48, 16 } } }, group = "Sidewalks", id = "Z-06", replaces = { "Sidewalks/Z-06_NinthNorth_E" } },
+	{ asset = "AST-032_SidewalkTile", x = 49.2, y = -0.08, z = -24, rotY = 0, parts = { ["AST-032_SidewalkTile"] = { 0, 0.24, 0, size = { 24.8, 0.48, 16 } } }, group = "Sidewalks", id = "Z-06", replaces = { "Sidewalks/Z-06_NinthNorth_E" } },
+	{ asset = "AST-032_SidewalkTile", x = 74, y = -0.08, z = -24, rotY = 0, parts = { ["AST-032_SidewalkTile"] = { 0, 0.24, 0, size = { 24.8, 0.48, 16 } } }, group = "Sidewalks", id = "Z-06", replaces = { "Sidewalks/Z-06_NinthNorth_E" } },
+	{ asset = "AST-032_SidewalkTile", x = 98.8, y = -0.08, z = -24, rotY = 0, parts = { ["AST-032_SidewalkTile"] = { 0, 0.24, 0, size = { 24.8, 0.48, 16 } } }, group = "Sidewalks", id = "Z-06", replaces = { "Sidewalks/Z-06_NinthNorth_E" } },
+	{ asset = "AST-032_SidewalkTile", x = 123.6, y = -0.08, z = -24, rotY = 0, parts = { ["AST-032_SidewalkTile"] = { 0, 0.24, 0, size = { 24.8, 0.48, 16 } } }, group = "Sidewalks", id = "Z-06", replaces = { "Sidewalks/Z-06_NinthNorth_E" } },
+	{ asset = "AST-032_SidewalkTile", x = -24.4, y = -0.08, z = 24, rotY = 0, parts = { ["AST-032_SidewalkTile"] = { 0, 0.24, 0, size = { 24.8, 0.48, 16 } } }, group = "Sidewalks", id = "Z-02", replaces = { "Sidewalks/Z-02_NinthSouth_W" } },
+	{ asset = "AST-032_SidewalkTile", x = -49.2, y = -0.08, z = 24, rotY = 0, parts = { ["AST-032_SidewalkTile"] = { 0, 0.24, 0, size = { 24.8, 0.48, 16 } } }, group = "Sidewalks", id = "Z-02", replaces = { "Sidewalks/Z-02_NinthSouth_W" } },
+	{ asset = "AST-032_SidewalkTile", x = -74, y = -0.08, z = 24, rotY = 0, parts = { ["AST-032_SidewalkTile"] = { 0, 0.24, 0, size = { 24.8, 0.48, 16 } } }, group = "Sidewalks", id = "Z-02", replaces = { "Sidewalks/Z-02_NinthSouth_W" } },
+	{ asset = "AST-032_SidewalkTile", x = -98.8, y = -0.08, z = 24, rotY = 0, parts = { ["AST-032_SidewalkTile"] = { 0, 0.24, 0, size = { 24.8, 0.48, 16 } } }, group = "Sidewalks", id = "Z-02", replaces = { "Sidewalks/Z-02_NinthSouth_W" } },
+	{ asset = "AST-032_SidewalkTile", x = -123.6, y = -0.08, z = 24, rotY = 0, parts = { ["AST-032_SidewalkTile"] = { 0, 0.24, 0, size = { 24.8, 0.48, 16 } } }, group = "Sidewalks", id = "Z-02", replaces = { "Sidewalks/Z-02_NinthSouth_W" } },
+	{ asset = "AST-032_SidewalkTile", x = 24.4, y = -0.08, z = 24, rotY = 0, parts = { ["AST-032_SidewalkTile"] = { 0, 0.24, 0, size = { 24.8, 0.48, 16 } } }, group = "Sidewalks", id = "Z-02", replaces = { "Sidewalks/Z-02_NinthSouth_E" } },
+	{ asset = "AST-032_SidewalkTile", x = 49.2, y = -0.08, z = 24, rotY = 0, parts = { ["AST-032_SidewalkTile"] = { 0, 0.24, 0, size = { 24.8, 0.48, 16 } } }, group = "Sidewalks", id = "Z-02", replaces = { "Sidewalks/Z-02_NinthSouth_E" } },
+	{ asset = "AST-032_SidewalkTile", x = 74, y = -0.08, z = 24, rotY = 0, parts = { ["AST-032_SidewalkTile"] = { 0, 0.24, 0, size = { 24.8, 0.48, 16 } } }, group = "Sidewalks", id = "Z-02", replaces = { "Sidewalks/Z-02_NinthSouth_E" } },
+	{ asset = "AST-032_SidewalkTile", x = 98.8, y = -0.08, z = 24, rotY = 0, parts = { ["AST-032_SidewalkTile"] = { 0, 0.24, 0, size = { 24.8, 0.48, 16 } } }, group = "Sidewalks", id = "Z-02", replaces = { "Sidewalks/Z-02_NinthSouth_E" } },
+	{ asset = "AST-032_SidewalkTile", x = 123.6, y = -0.08, z = 24, rotY = 0, parts = { ["AST-032_SidewalkTile"] = { 0, 0.24, 0, size = { 24.8, 0.48, 16 } } }, group = "Sidewalks", id = "Z-02", replaces = { "Sidewalks/Z-02_NinthSouth_E" } },
 
 	{ asset = "AST-032_SidewalkTile", x = -24, y = -0.24, z = -44, rotY = 0, group = "Sidewalks", id = "Z-07", replaces = { "Sidewalks/JuniperNorth_W" } },
 	{ asset = "AST-032_SidewalkTile", x = -24, y = -0.24, z = -68, rotY = 0, group = "Sidewalks", id = "Z-07", replaces = { "Sidewalks/JuniperNorth_W" } },
