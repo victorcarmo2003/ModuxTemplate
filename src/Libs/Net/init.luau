@@ -345,7 +345,14 @@ return Lync.define("game", {
 		Leader = Lync.f64(),
 		Members = Lync.array(Lync.f64(), 1, 4), -- party order, leader first; max = PartyRules.Rules.MaxSize
 		Ready = Lync.map(Lync.f64(), Lync.bool(), 0, 4), -- every member; the leader is always true
-		State = Lync.enum({ "Forming", "Starting" }),
+		-- Forming = invite squad; Configuring = platform squad being set up (platform red); Starting = countdown, then
+		-- reserve + teleport (platform green)
+		State = Lync.enum({ "Forming", "Configuring", "Starting" }),
+		-- §16.6 squad platforms (user request 2026-10-11, Provisional)
+		Platform = Lync.int(0, 4), -- LOBBY-SQUAD-n owned by this squad; 0 = none (invite squad)
+		FriendsOnly = Lync.bool(), -- only friends of the leader may step in
+		MaxPlayers = Lync.int(1, 4), -- set by the leader, never below the member count
+		StartAt = Lync.f64(), -- workspace:GetServerTimeNow() when the teleport starts; 0 = no countdown
 	})),
 	-- §16.2 c -> s. New squad with the sender as leader (refused when already in one)
 	PartyCreate = Lync.packet(Lync.empty()),
@@ -375,6 +382,11 @@ return Lync.define("game", {
 	})),
 	-- §16.2 c -> s. Leader only, every member Ready: reserve a server and teleport the squad (Role "Game")
 	PartyStart = Lync.packet(Lync.empty()),
+	-- §16.6 c -> s. Leader only, not Starting: platform squad settings (MaxPlayers clamped to the member count)
+	PartyConfigure = Lync.packet(Lync.struct({
+		FriendsOnly = Lync.bool(),
+		MaxPlayers = Lync.int(1, 4),
+	})),
 	-- §16.3 s -> player. Key = PartyRules.NoticeKeys; UserId = the other player when the notice names one
 	PartyNotice = Lync.packet(Lync.struct({
 		Key = Lync.enum(PartyRules.NoticeKeys),

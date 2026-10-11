@@ -1,41 +1,79 @@
 --!strict
--- Squad (party) in the lobby (architecture.md §20.2; network.md §16; user request 2026-10-11, Provisional; TASK-155).
--- Lobby roles only (Lobby, PrivateLobby): elsewhere every squad packet answers PartyNotice "WrongServer".
--- Single writer of the Party set (record = PartyId). Responders for PartyCreate/Invite/Respond/Leave/Kick/Ready/Start.
+-- Squad (party) in the lobby (architecture.md §20.2, §20.6; network.md §16; user request 2026-10-11, Provisional;
+-- TASK-155). Lobby roles only (Lobby, PrivateLobby): elsewhere every squad packet answers PartyNotice "WrongServer".
+-- Single writer of the Party set (record = PartyId). Responders for PartyCreate/Invite/Respond/Leave/Kick/Ready/Start/
+-- Configure.
 --
--- Rules (Provisional; DEC-179 "plataformas" is replaced by invites at the user's request of 2026-10-11, see
--- architecture.md §20.2): up to PartyRules.Rules.MaxSize (4, DEC-012) members; the creator leads; only the leader
--- invites, kicks and starts; inviting without a squad creates one; accepting an invite leaves the current squad;
--- the leader is always ready, Start needs every other member ready; leader leaves = first member left leads.
--- Start: State "Starting" -> ReserveServer -> TeleportAsync(game.PlaceId, members, ReservedServerAccessCode +
+-- Rules (Provisional): up to PartyRules.Rules.MaxSize (4, DEC-012) members, and never more than the squad's
+-- MaxPlayers; the creator leads; only the leader invites, kicks, configures and starts; inviting without a squad
+-- creates one; accepting an invite leaves the current squad; the leader is always ready, Start needs every other
+-- member ready; leader leaves = first member left leads.
+--
+-- Squad platforms (user request 2026-10-11, emends DEC-179 back to physical platforms, invites kept): the 4 lobby
+-- platforms (Content.Lobby.Zones with Platform 1..4; centre = MapPoint LOBBY-SQUAD-n) are watched here every
+-- Content.Lobby.Squad.Poll s from each HumanoidRootPart (shared.Lobby.LobbyZones, with hysteresis). Stepping on a free
+-- platform = a new squad with Platform n and State "Configuring" that you lead (the leader of an invite squad takes
+-- the platform with the squad instead). Stepping on an owned platform = joining it when it is not Starting, has room
+-- (MaxPlayers) and, when FriendsOnly, you are a friend of the leader (Player:IsFriendsWith, run aside: it yields).
+-- Platform members are ready by standing there. Stepping off (or dying) = leaving the squad. A refused player (full,
+-- friends only, starting, left or kicked by hand) is not tried again until they step off.
+--
+-- Start (every squad): State "Starting" + StartAt = server time of the teleport, Rules.Countdown s later (members may
+-- still step off meanwhile); at 0: ReserveServer -> TeleportAsync(game.PlaceId, members, ReservedServerAccessCode +
 -- TeleportData { Role = "Game", PartyId, Members, Leader }). Reserve or teleport failing retries after 2/5/10 s
--- (PartyRules.Rules.TeleportRetries); all failing = back to "Forming" + "TeleportFailed". A member whose own teleport
--- fails later (TeleportInitFailed) retries alone with the same options (same server). Studio cannot teleport:
--- Start answers "StudioNoTeleport" and nothing changes.
--- Server never trusts the client: membership, leadership, state, size, presence of the target and rate are checked
--- here; TeleportData is written only by this service.
+-- (PartyRules.Rules.TeleportRetries); all failing = back to the idle state + "TeleportFailed". A member whose own
+-- teleport fails later (TeleportInitFailed) retries alone with the same options (same server). Studio cannot teleport:
+-- the countdown runs, then "StudioNoTeleport" and back to the idle state.
+-- Server never trusts the client: membership, leadership, state, size, presence of the target, friendship and rate
+-- are checked here; TeleportData is written only by this service.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local ServerScriptService = game:GetService("ServerScriptService")
 local TeleportService = game:GetService("TeleportService")
+local Content = require(ReplicatedStorage.shared.Content)
+local LobbyZones = require(ReplicatedStorage.shared.Lobby.LobbyZones)
 local PartyRules = require(ReplicatedStorage.shared.Party.PartyRules)
 local Teleport = require(script.Teleport)
 local Modux = require(ServerScriptService.server.Modux)
 
-export type State = "Forming" | "Starting"
+export type State = "Forming" | "Configuring" | "Starting"
 export type Party = {
 	Id: number,
 	Leader: number,
 	Members: { number }, -- party order, leader first after any change of leader
 	Ready: { [number]: boolean },
 	State: State,
+	Platform: number, -- 1..4 = owns LOBBY-SQUAD-n; 0 = invite squad
+	FriendsOnly: boolean,
+	MaxPlayers: number, -- 1..Rules.MaxSize, never below #Members when set
+	StartAt: number, -- workspace:GetServerTimeNow() of the teleport; 0 = no countdown
+	Launched: boolean, -- countdown over: reserve / teleport running
 }
 type Invite = { From: number, ExpiresAt: number }
 type Flight = { Options: TeleportOptions, Tries: number, PartyId: number }
+type Record = {
+	Leader: number,
+	Members: { number },
+	Ready: { [number]: boolean },
+	State: State,
+	Platform: number,
+	FriendsOnly: boolean,
+	MaxPlayers: number,
+	StartAt: number,
+}
 
 const RULES = PartyRules.Rules
-const WATCHDOG = 45 -- s a squad may stay "Starting" with members still in the lobby before it opens again
+const WATCHDOG = 45 -- s a squad may stay "Starting" (after the countdown) with members still in the lobby
+
+-- Not starting: members may join, leave, be kicked, get ready; the leader may configure and start.
+local function isOpen(party: Party): boolean
+	return party.State ~= "Starting"
+end
+
+local function idleState(party: Party): State
+	return if party.Platform > 0 then "Configuring" else "Forming"
+end
 
 local function isUserId(value: any): boolean
 	return type(value) == "number" and value == value and value >= 1 and value % 1 == 0 and value < 2 ^ 53
@@ -60,6 +98,13 @@ function PartyService:Setup()
 	self.RateCount = {} :: { [Player]: number }
 	-- UserId -> squad teleport accepted by Roblox, not arrived yet
 	self.InFlight = {} :: { [number]: Flight }
+	-- UserId -> platform the player stands on (hysteresis applied)
+	self.OnPlatform = {} :: { [number]: number }
+	-- UserId -> platform that refused them (or that they left by hand) until they step off
+	self.Refused = {} :: { [number]: number }
+	-- UserId -> friends-only check in flight
+	self.Checking = {} :: { [number]: boolean }
+	self.PollAt = 0 :: number
 end
 
 -- Reads -----------------------------------------------------------------------------------------------------------
@@ -82,6 +127,15 @@ function PartyService:PlayersOf(party: Party): { Player }
 		end
 	end
 	return out
+end
+
+function PartyService:PartyOnPlatform(platform: number): Party?
+	for _, party in self.Parties do
+		if party.Platform == platform then
+			return party
+		end
+	end
+	return nil
 end
 
 -- Network ----------------------------------------------------------------------------------------------------------
@@ -130,7 +184,7 @@ function PartyService:NoticeParty(party: Party, key: string, userId: number?)
 end
 
 -- Party set record (copies: Lync keeps what it is given)
-local function record(party: Party): { Leader: number, Members: { number }, Ready: { [number]: boolean }, State: string }
+local function record(party: Party): Record
 	const ready: { [number]: boolean } = {}
 	for _, userId in party.Members do
 		ready[userId] = userId == party.Leader or party.Ready[userId] == true
@@ -140,6 +194,10 @@ local function record(party: Party): { Leader: number, Members: { number }, Read
 		Members = table.clone(party.Members),
 		Ready = ready,
 		State = party.State,
+		Platform = party.Platform,
+		FriendsOnly = party.FriendsOnly,
+		MaxPlayers = party.MaxPlayers,
+		StartAt = party.StartAt,
 	}
 end
 
@@ -166,7 +224,8 @@ function PartyService:NewId(): number
 	error("[PartyService] no free PartyId", 0)
 end
 
-function PartyService:Create(leader: number): Party?
+-- platform 0 = invite squad ("Forming"); 1..4 = platform squad ("Configuring")
+function PartyService:Create(leader: number, platform: number): Party?
 	if self.PartyOf[leader] ~= nil then
 		return nil
 	end
@@ -175,7 +234,12 @@ function PartyService:Create(leader: number): Party?
 		Leader = leader,
 		Members = { leader },
 		Ready = { [leader] = true },
-		State = "Forming",
+		State = if platform > 0 then "Configuring" else "Forming",
+		Platform = platform,
+		FriendsOnly = RULES.DefaultFriendsOnly,
+		MaxPlayers = math.clamp(RULES.DefaultMaxPlayers, 1, RULES.MaxSize),
+		StartAt = 0,
+		Launched = false,
 	}
 	self.Parties[party.Id] = party
 	self.PartyOf[leader] = party.Id
@@ -188,6 +252,14 @@ function PartyService:Disband(party: Party)
 		return
 	end
 	self.Parties[party.Id] = nil
+	if party.Platform > 0 then
+		-- the platform is free again: whoever stands on it is tried again
+		for userId, platform in self.Refused do
+			if platform == party.Platform then
+				self.Refused[userId] = nil
+			end
+		end
+	end
 	for _, userId in party.Members do
 		if self.PartyOf[userId] == party.Id then
 			self.PartyOf[userId] = nil
@@ -198,7 +270,7 @@ function PartyService:Disband(party: Party)
 	end
 end
 
--- Takes a member out (leave, kick, left the server, left behind by a failed teleport). Empty squad = gone.
+-- Takes a member out (leave, kick, left the server, stepped off, left behind by a failed teleport). Empty squad = gone.
 function PartyService:RemoveMember(userId: number, kicked: boolean)
 	const party = self:PartyOfUser(userId)
 	self.PartyOf[userId] = nil
@@ -226,12 +298,21 @@ function PartyService:RemoveMember(userId: number, kicked: boolean)
 	self:Publish(party, false)
 end
 
-function PartyService:Join(party: Party, userId: number)
+function PartyService:Join(party: Party, userId: number, ready: boolean)
 	table.insert(party.Members, userId)
-	party.Ready[userId] = false
+	party.Ready[userId] = ready
 	self.PartyOf[userId] = party.Id
 	self:Publish(party, false)
 	self:NoticeParty(party, "Joined", userId)
+end
+
+-- Leaves by hand (packet, accepted invite): standing on the squad's platform does not pull them back in.
+function PartyService:Leave(userId: number)
+	const party = self:PartyOfUser(userId)
+	if party ~= nil and party.Platform > 0 and self.OnPlatform[userId] == party.Platform then
+		self.Refused[userId] = party.Platform
+	end
+	self:RemoveMember(userId, false)
 end
 
 -- Requests (already rate limited and role checked) -----------------------------------------------------------------
@@ -241,7 +322,7 @@ function PartyService:HandleCreate(player: Player)
 		self:Notice(player, "AlreadyInParty", nil)
 		return
 	end
-	if self:Create(player.UserId) ~= nil then
+	if self:Create(player.UserId, 0) ~= nil then
 		self:Notice(player, "Created", nil)
 	end
 end
@@ -260,7 +341,7 @@ function PartyService:HandleInvite(player: Player, target: number)
 
 	local found = self:PartyOfUser(from)
 	if found == nil then
-		found = self:Create(from)
+		found = self:Create(from, 0)
 		if found ~= nil then
 			self:Notice(player, "Created", nil)
 		end
@@ -273,7 +354,7 @@ function PartyService:HandleInvite(player: Player, target: number)
 		self:Notice(player, "NotLeader", nil)
 		return
 	end
-	if party.State ~= "Forming" then
+	if not isOpen(party) then
 		self:Notice(player, "Busy", nil)
 		return
 	end
@@ -281,7 +362,7 @@ function PartyService:HandleInvite(player: Player, target: number)
 		self:Notice(player, "AlreadyInParty", target)
 		return
 	end
-	if #party.Members >= RULES.MaxSize then
+	if #party.Members >= party.MaxPlayers then
 		self:Notice(player, "PartyFull", nil)
 		return
 	end
@@ -313,7 +394,7 @@ function PartyService:HandleRespond(player: Player, partyId: number, accept: boo
 		bucket[partyId] = nil
 	end
 	const party = self.Parties[partyId]
-	if invite == nil or os.clock() > invite.ExpiresAt or party == nil or party.State ~= "Forming" then
+	if invite == nil or os.clock() > invite.ExpiresAt or party == nil or not isOpen(party) then
 		self:Notice(player, "InviteExpired", nil)
 		return
 	end
@@ -324,19 +405,19 @@ function PartyService:HandleRespond(player: Player, partyId: number, accept: boo
 	if table.find(party.Members, userId) ~= nil then
 		return
 	end
-	if #party.Members >= RULES.MaxSize then
+	if #party.Members >= party.MaxPlayers then
 		self:Notice(player, "PartyFull", nil)
 		return
 	end
 	const current = self:PartyOfUser(userId)
 	if current ~= nil then
-		if current.State ~= "Forming" then
+		if not isOpen(current) then
 			self:Notice(player, "Busy", nil)
 			return
 		end
-		self:RemoveMember(userId, false)
+		self:Leave(userId)
 	end
-	self:Join(party, userId)
+	self:Join(party, userId, party.Platform > 0 and self.OnPlatform[userId] == party.Platform)
 end
 
 function PartyService:HandleLeave(player: Player)
@@ -344,7 +425,7 @@ function PartyService:HandleLeave(player: Player)
 		self:Notice(player, "NotInParty", nil)
 		return
 	end
-	self:RemoveMember(player.UserId, false)
+	self:Leave(player.UserId)
 end
 
 function PartyService:HandleKick(player: Player, target: number)
@@ -357,13 +438,16 @@ function PartyService:HandleKick(player: Player, target: number)
 		self:Notice(player, "NotLeader", nil)
 		return
 	end
-	if party.State ~= "Forming" then
+	if not isOpen(party) then
 		self:Notice(player, "Busy", nil)
 		return
 	end
 	if target == player.UserId or table.find(party.Members, target) == nil then
 		self:Notice(player, "PlayerNotFound", nil)
 		return
+	end
+	if party.Platform > 0 and self.OnPlatform[target] == party.Platform then
+		self.Refused[target] = party.Platform
 	end
 	self:RemoveMember(target, true)
 end
@@ -374,7 +458,7 @@ function PartyService:HandleReady(player: Player, ready: boolean)
 		self:Notice(player, "NotInParty", nil)
 		return
 	end
-	if party.State ~= "Forming" then
+	if not isOpen(party) then
 		self:Notice(player, "Busy", nil)
 		return
 	end
@@ -383,6 +467,34 @@ function PartyService:HandleReady(player: Player, ready: boolean)
 	end
 	party.Ready[player.UserId] = ready
 	self:Publish(party, false)
+end
+
+function PartyService:HandleConfigure(player: Player, friendsOnly: boolean, maxPlayers: number)
+	const party = self:PartyOfUser(player.UserId)
+	if party == nil then
+		self:Notice(player, "NotInParty", nil)
+		return
+	end
+	if party.Leader ~= player.UserId then
+		self:Notice(player, "NotLeader", nil)
+		return
+	end
+	if not isOpen(party) then
+		self:Notice(player, "Busy", nil)
+		return
+	end
+	const max = math.clamp(math.floor(maxPlayers), math.max(#party.Members, 1), RULES.MaxSize)
+	if party.FriendsOnly == friendsOnly and party.MaxPlayers == max then
+		return
+	end
+	party.FriendsOnly = friendsOnly
+	party.MaxPlayers = max
+	self:Publish(party, false)
+	for _, userId in party.Members do
+		if userId ~= party.Leader then
+			self:Notice(userId, "Configured", nil)
+		end
+	end
 end
 
 function PartyService:HandleStart(player: Player)
@@ -395,7 +507,7 @@ function PartyService:HandleStart(player: Player)
 		self:Notice(player, "NotLeader", nil)
 		return
 	end
-	if party.State ~= "Forming" then
+	if not isOpen(party) then
 		self:Notice(player, "Busy", nil)
 		return
 	end
@@ -405,18 +517,12 @@ function PartyService:HandleStart(player: Player)
 			return
 		end
 	end
-	if RunService:IsStudio() then
-		self:Notice(player, "StudioNoTeleport", nil)
-		return
-	end
 	party.State = "Starting"
+	party.StartAt = workspace:GetServerTimeNow() + RULES.Countdown
 	self:Publish(party, false)
 	self:NoticeParty(party, "Starting", nil)
-	task.spawn(function()
-		self:Launch(party)
-	end)
-	task.delay(WATCHDOG, function()
-		self:Reopen(party, true)
+	task.delay(RULES.Countdown, function()
+		self:Fire(party)
 	end)
 end
 
@@ -431,7 +537,27 @@ function PartyService:LaunchData(party: Party): { [string]: any }
 	}
 end
 
--- Back to "Forming" (others not ready again) when the squad is still "Starting" with nobody in flight.
+-- End of the countdown: reserve + teleport (Studio cannot: back to the idle state).
+function PartyService:Fire(party: Party)
+	if self.Parties[party.Id] ~= party or party.State ~= "Starting" or party.Launched then
+		return
+	end
+	if RunService:IsStudio() then
+		self:NoticeParty(party, "StudioNoTeleport", nil)
+		self:Reopen(party, false)
+		return
+	end
+	party.Launched = true
+	task.spawn(function()
+		self:Launch(party)
+	end)
+	task.delay(WATCHDOG, function()
+		self:Reopen(party, true)
+	end)
+end
+
+-- Back to the idle state (the others not ready again, unless standing on the platform) when the squad is still
+-- "Starting" with nobody in flight.
 function PartyService:Reopen(party: Party, notify: boolean)
 	if self.Parties[party.Id] ~= party or party.State ~= "Starting" then
 		return
@@ -441,10 +567,12 @@ function PartyService:Reopen(party: Party, notify: boolean)
 			return
 		end
 	end
-	party.State = "Forming"
+	party.State = idleState(party)
+	party.StartAt = 0
+	party.Launched = false
 	for _, userId in party.Members do
 		if userId ~= party.Leader then
-			party.Ready[userId] = false
+			party.Ready[userId] = party.Platform > 0 and self.OnPlatform[userId] == party.Platform
 		end
 	end
 	self:Publish(party, false)
@@ -524,10 +652,166 @@ function PartyService:HandleInitFailed(player: Player, result: Enum.TeleportResu
 	end)
 end
 
+-- Platforms --------------------------------------------------------------------------------------------------------
+
+-- Where the player stands: the platform kept with hysteresis, else the first one entered; 0 = none (or dead).
+function PartyService:PlatformOf(player: Player, was: number): number
+	const character = player.Character
+	const root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
+	const humanoid = if character ~= nil then character:FindFirstChildOfClass("Humanoid") else nil
+	if root == nil or not root:IsA("BasePart") or humanoid == nil or humanoid.Health <= 0 then
+		return 0
+	end
+	const position = root.Position
+	if was > 0 then
+		const zone = LobbyZones.Platform(was)
+		if zone ~= nil and LobbyZones.Inside(zone, position, true) then
+			return was
+		end
+	end
+	for _, zone in LobbyZones.List() do
+		if zone.Platform > 0 and LobbyZones.Inside(zone, position, false) then
+			return zone.Platform
+		end
+	end
+	return 0
+end
+
+-- nil = may join; else the PartyNotice key of the refusal.
+function PartyService:CanJoinPlatform(party: Party, platform: number): string?
+	if self.Parties[party.Id] ~= party or party.Platform ~= platform or not isOpen(party) then
+		return "Busy"
+	end
+	if #party.Members >= party.MaxPlayers then
+		return "PartyFull"
+	end
+	return nil
+end
+
+function PartyService:JoinPlatform(player: Player, party: Party)
+	const userId = player.UserId
+	const current = self:PartyOfUser(userId)
+	if current == party then
+		return
+	end
+	if current ~= nil then
+		if not isOpen(current) then
+			return
+		end
+		self:RemoveMember(userId, false)
+	end
+	self:Join(party, userId, true)
+end
+
+function PartyService:Refuse(player: Player, platform: number, key: string)
+	self.Refused[player.UserId] = platform
+	self:Notice(player, key, nil)
+end
+
+function PartyService:EnterPlatform(player: Player, platform: number)
+	const userId = player.UserId
+	const current = self:PartyOfUser(userId)
+	if current ~= nil and current.Platform == platform then
+		if current.Ready[userId] ~= true and isOpen(current) then
+			current.Ready[userId] = true -- back on its platform: ready again
+			self:Publish(current, false)
+		end
+		return
+	end
+	if current ~= nil and not isOpen(current) then
+		return -- its squad is starting elsewhere
+	end
+	const owner = self:PartyOnPlatform(platform)
+	if owner == nil then
+		if current ~= nil and current.Platform == 0 and current.Leader == userId then
+			-- the leader of an invite squad takes the platform with the squad
+			current.Platform = platform
+			current.State = "Configuring"
+			self:Publish(current, false)
+			return
+		end
+		if current ~= nil then
+			self:RemoveMember(userId, false)
+		end
+		if self:Create(userId, platform) ~= nil then
+			self:Notice(player, "Created", nil)
+		end
+		return
+	end
+	const problem = self:CanJoinPlatform(owner, platform)
+	if problem ~= nil then
+		self:Refuse(player, platform, problem)
+		return
+	end
+	if not owner.FriendsOnly then
+		self:JoinPlatform(player, owner)
+		return
+	end
+	-- friends only: IsFriendsWith yields, so it runs aside and everything is checked again after it
+	self.Checking[userId] = true
+	const leader = owner.Leader
+	task.spawn(function()
+		const ok, friend = pcall(function(): boolean
+			return player:IsFriendsWith(leader)
+		end)
+		self.Checking[userId] = nil
+		if player.Parent == nil or self.OnPlatform[userId] ~= platform then
+			return
+		end
+		if not ok or friend ~= true or owner.Leader ~= leader then
+			self:Refuse(player, platform, "FriendsOnly")
+			return
+		end
+		const later = self:CanJoinPlatform(owner, platform)
+		if later ~= nil then
+			self:Refuse(player, platform, later)
+			return
+		end
+		self:JoinPlatform(player, owner)
+	end)
+end
+
+function PartyService:ExitPlatform(player: Player, platform: number)
+	const userId = player.UserId
+	if self.Refused[userId] == platform then
+		self.Refused[userId] = nil
+	end
+	const party = self:PartyOfUser(userId)
+	if party ~= nil and party.Platform == platform and not party.Launched then
+		self:RemoveMember(userId, false)
+	end
+end
+
+function PartyService:PollPlatforms()
+	for _, player in Players:GetPlayers() do
+		const userId = player.UserId
+		const was = self.OnPlatform[userId] or 0
+		const now = self:PlatformOf(player, was)
+		if now ~= was then
+			self.OnPlatform[userId] = if now > 0 then now else nil
+			if was > 0 then
+				self:ExitPlatform(player, was)
+			end
+			if now > 0 then
+				self:EnterPlatform(player, now)
+			end
+		elseif now > 0 and self.Refused[userId] ~= now and not self.Checking[userId] then
+			-- still standing there outside its squad (platform freed, refusal cleared): try again
+			const party = self:PartyOfUser(userId)
+			if party == nil or party.Platform ~= now then
+				self:EnterPlatform(player, now)
+			end
+		end
+	end
+end
+
 function PartyService:Forget(player: Player)
 	const userId = player.UserId
 	self.InFlight[userId] = nil
 	self.Invites[userId] = nil
+	self.OnPlatform[userId] = nil
+	self.Refused[userId] = nil
+	self.Checking[userId] = nil
 	self.RateStart[player] = nil
 	self.RateCount[player] = nil
 	if self.PartyOf[userId] ~= nil then
@@ -590,6 +874,11 @@ PartyService:OnInit(function(self)
 			self:HandleStart(player)
 		end
 	end)
+	net.PartyConfigure:onServer(function(data, player: Player)
+		if self:Gate(player) then
+			self:HandleConfigure(player, data.FriendsOnly == true, data.MaxPlayers)
+		end
+	end)
 
 	self.Dependencies.PlayerService.PlayerRemoving:Connect(function(player)
 		self:Forget(player)
@@ -599,6 +888,22 @@ PartyService:OnInit(function(self)
 	end
 	TeleportService.TeleportInitFailed:Connect(function(player, result, message)
 		self:HandleInitFailed(player, result, message)
+	end)
+end)
+
+PartyService:OnStart(function(self)
+	if not self.Active then
+		return
+	end
+	-- platforms: one cheap check of every root every Content.Lobby.Squad.Poll s
+	const poll = Content.Lobby.Squad.Poll
+	RunService.Heartbeat:Connect(function()
+		const now = os.clock()
+		if now < self.PollAt then
+			return
+		end
+		self.PollAt = now + poll
+		self:PollPlatforms()
 	end)
 end)
 

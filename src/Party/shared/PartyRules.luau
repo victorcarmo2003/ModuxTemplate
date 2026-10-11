@@ -1,6 +1,8 @@
 --!strict
 -- Squad (party) rules shared by PartyService (lobby), PartyRunService (game) and the lobby UI (architecture.md §20.2;
 -- network.md §16). ReplicatedStorage.shared.Party.PartyRules. Pure: no Modux, Lync, Vide nor self.Libs.
+-- Platform squads (user request 2026-10-11): a squad may own one of the 4 lobby platforms (Platform 1..4, 0 = none);
+-- State "Forming" = invite squad, "Configuring" = platform squad being set up, "Starting" = countdown / teleport.
 -- MaxSize comes from the party price table (4 = DEC-012 "party de até 4"), the same source RunStateService uses.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
@@ -31,6 +33,9 @@ const NOTICE_KEYS = table.freeze({
 	"ReturningToLobby", -- game server: teleport back to the lobby on its way
 	"ReturnFailed", -- game server: every attempt to go back failed
 	"WrongServer", -- squad packet outside a lobby / return packet outside a game
+	-- squad platforms (user request 2026-10-11, Provisional; network.md §16.6)
+	"FriendsOnly", -- stepped on a friends-only platform of someone who is not a friend
+	"Configured", -- to the squad: the leader changed Friends only / Max players
 })
 
 const RULES = table.freeze({
@@ -43,6 +48,11 @@ const RULES = table.freeze({
 	ReturnDelay = 12, -- s after RunEnded before the game server sends everyone back (RunEnd lasts 15 s)
 	JoinWindow = Content.RunParams.JoinWindow, -- 60 s: the run waits this long for the squad (DEC-098)
 	PartyIdMax = 65535, -- Party set record ids cycle in 1..PartyIdMax
+	-- squad platforms (Content.Lobby.Squad; network.md §16.6)
+	Platforms = 4, -- LOBBY-SQUAD-1..4
+	Countdown = Content.Lobby.Squad.Countdown, -- s between Start and the teleport (every squad, platform or not)
+	DefaultMaxPlayers = Content.Lobby.Squad.DefaultMaxPlayers,
+	DefaultFriendsOnly = Content.Lobby.Squad.DefaultFriendsOnly,
 })
 
 local isKey: { [string]: boolean } = {}

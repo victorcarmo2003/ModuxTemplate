@@ -67,6 +67,12 @@
 						"optional": "src/Light/shared"
 					}
 				},
+				"Lobby": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Lobby/shared"
+					}
+				},
 				"Modux": {
 					"$path": {
 						"optional": "src/Modux/shared"

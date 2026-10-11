@@ -27,6 +27,18 @@
 	Play: outside a squad = PartyCreate, then PartyStart as soon as the new squad (me as leader) arrives (solo run);
 	leader = PartyStart (enabled when everyone is ready); member = Ready / Not ready.
 
+	Zones (user request 2026-10-11, Provisional; Content.Lobby, shared.Lobby.LobbyZones): every lobby zone is a circle
+	on the floor (Classes in front of the stage, Gem Shop, Codes, the 4 squad platforms). Walking in opens its panel,
+	walking out closes it (only if that panel is still the open one); checked every Trigger.Poll s from the own
+	HumanoidRootPart, with hysteresis. The HUD tiles and keys stay as shortcuts. A panel closed by hand stays closed
+	until the player walks out and in again.
+	  SquadSetup    the platform window (Panel "Platform"): the squad on the platform the player stands on, Friends
+	                only, Max players, Start (leader) or the countdown. Joining / leaving is the server's (PartyService
+	                watches the platforms); this client only sends PartyConfigure / PartyStart.
+	Ring VFX (Rings.luau): one Heartbeat for every zone; platform colours follow the Party set (free / squad / starting).
+	Camera: normal third person in the lobby (CameraController External; CameraMode Classic). While the class screen
+	shows the world stage every character is hidden locally (LocalTransparencyModifier; LOBBY.md §11).
+
 	Binds (InputController; touch = the HUD tiles and buttons, >= 44 px):
 	  Classes C / ButtonY · Shop B / DPadUp · Codes K / DPadLeft · Squad P / DPadRight · Play Return / DPadDown
 	  Close (Menu) ButtonB · previous / next class (Menu) Left / Right, ButtonL1 / ButtonR1
@@ -37,10 +49,12 @@ local GuiService = game:GetService("GuiService")
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local CrewRig = require(ReplicatedStorage.shared.Crew.CrewRig)
+local LobbyZones = require(ReplicatedStorage.shared.Lobby.LobbyZones)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
 local PartyRules = require(ReplicatedStorage.shared.Party.PartyRules)
 local Roles = require(ReplicatedStorage.shared.ServerRole.Roles)
@@ -53,17 +67,23 @@ local GemShop = require(StarterPlayer.StarterPlayerScripts.client.Interface.Comp
 local InvitePopup = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.InvitePopup)
 local LobbyHud = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.LobbyHud)
 local SquadPanel = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.SquadPanel)
+local SquadSetup = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.SquadSetup)
 local ToastStack = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Toast.Stack)
+local Rings = require(script.Rings)
 local Stage = require(script.Stage)
 local Text = require(script.Text)
 
-export type Panel = "None" | "Classes" | "Shop" | "Codes" | "Squad"
+export type Panel = "None" | "Classes" | "Shop" | "Codes" | "Squad" | "Platform"
 
 export type PartyRecord = {
 	Leader: number,
 	Members: { number },
 	Ready: { [number]: boolean },
-	State: "Forming" | "Starting",
+	State: "Forming" | "Configuring" | "Starting",
+	Platform: number,
+	FriendsOnly: boolean,
+	MaxPlayers: number,
+	StartAt: number,
 }
 
 export type Invite = {
@@ -104,6 +124,7 @@ const FIRST_SELECTION: { [Panel]: { string } } = {
 	Shop = { "Buy" },
 	Codes = { "Redeem" },
 	Squad = { "Start", "Ready", "Create", "Invite" },
+	Platform = { "Start", "Toggle" },
 }
 
 -- Root instance of each panel (component Name), where SelectFirst looks.
@@ -113,7 +134,13 @@ const PANEL_ROOT: { [Panel]: string } = {
 	Shop = "GemShop",
 	Codes = "CodeRedeem",
 	Squad = "SquadPanel",
+	Platform = "SquadSetup",
 }
+
+const LOBBY = Content.Lobby
+const HIDE_STEP = "LobbyController.HideCharacters"
+const HIDE_PRIORITY = Enum.RenderPriority.Camera.Value + 2 -- after the stock camera and CameraController
+const CLOCK_INTERVAL = 0.1 -- s between two countdown clock ticks
 
 local function isLobby(placeRole: Roles.Role): boolean
 	if Roles.IsLobby(placeRole) then
@@ -175,6 +202,16 @@ function LobbyController:Setup()
 	self.Invites = Vide.source({}) :: Vide.Source<{ Invite }>
 	-- os.clock() of a solo Play waiting for its squad; 0 = none
 	self.PlayAfterCreate = 0 :: number
+
+	-- zones
+	-- zone key -> the own root is inside (hysteresis)
+	self.ZoneInside = {} :: { [string]: boolean }
+	-- squad platform the own root stands on; 0 = none
+	self.Standing = Vide.source(0) :: Vide.Source<number>
+	-- server time, ticked every CLOCK_INTERVAL s (countdowns)
+	self.Clock = Vide.source(0) :: Vide.Source<number>
+	self.Rings = nil :: Rings.Rings?
+	self.Hiding = false :: boolean
 
 	self.Gui = nil :: ScreenGui?
 	self.Unmount = nil :: (() -> ())?
@@ -338,9 +375,41 @@ function LobbyController:TakeCamera()
 	if current then
 		self.FovBefore = current.FieldOfView
 	end
+	self:HideCharacters(true)
+end
+
+-- Every character hidden locally while the world stage shows (the stage camera stands in the walkable area, and the
+-- class zone is right in front of it: LOBBY.md §11, P-L10). Every frame, after the stock camera.
+local function setCharacterTransparency(value: number)
+	for _, player in Players:GetPlayers() do
+		const character = player.Character
+		if character then
+			for _, descendant in character:GetDescendants() do
+				if descendant:IsA("BasePart") or descendant:IsA("Decal") then
+					descendant.LocalTransparencyModifier = value
+				end
+			end
+		end
+	end
+end
+
+function LobbyController:HideCharacters(on: boolean)
+	if on == self.Hiding then
+		return
+	end
+	self.Hiding = on
+	if on then
+		RunService:BindToRenderStep(HIDE_STEP, HIDE_PRIORITY, function()
+			setCharacterTransparency(1)
+		end)
+	else
+		RunService:UnbindFromRenderStep(HIDE_STEP)
+		setCharacterTransparency(0)
+	end
 end
 
 function LobbyController:ReleaseCamera()
+	self:HideCharacters(false)
 	const current = workspace.CurrentCamera
 	if current then
 		current.FieldOfView = self.FovBefore
@@ -658,6 +727,172 @@ function LobbyController:CheckPlayAfterCreate()
 	end
 end
 
+-- Squad platforms ---------------------------------------------------------------------------------------------------
+
+-- The squad that owns platform n (Party set); nil = free.
+function LobbyController:PlatformParty(n: number): PartyRecord?
+	if n <= 0 then
+		return nil
+	end
+	for _, record in self.Parties() do
+		if record.Platform == n then
+			return record
+		end
+	end
+	return nil
+end
+
+-- The squad shown in the platform window: the one on the platform I stand on, else my own platform squad.
+function LobbyController:SetupParty(): PartyRecord?
+	const standing = self:PlatformParty(self.Standing())
+	if standing then
+		return standing
+	end
+	const _, mine = self:MyParty()
+	return if mine and mine.Platform > 0 then mine else nil
+end
+
+function LobbyController:SetupMembers(): { SquadSetup.Member }
+	const party = self:SetupParty()
+	const list: { SquadSetup.Member } = {}
+	if party == nil then
+		return list
+	end
+	const me = Players.LocalPlayer.UserId
+	self.Roster()
+	for _, userId in party.Members do
+		table.insert(list, {
+			UserId = userId,
+			Name = if userId == me then `{nameOf(userId)} (you)` else nameOf(userId),
+			Leader = userId == party.Leader,
+			Me = userId == me,
+		})
+	end
+	return list
+end
+
+-- Seconds before the teleport of the shown squad; nil = not starting.
+function LobbyController:Countdown(): number?
+	const party = self:SetupParty()
+	if party == nil or party.State ~= "Starting" or party.StartAt <= 0 then
+		return nil
+	end
+	return math.max(party.StartAt - self.Clock(), 0)
+end
+
+function LobbyController:Configure(friendsOnly: boolean, maxPlayers: number)
+	self.Libs.Net.PartyConfigure:fireServer({
+		FriendsOnly = friendsOnly,
+		MaxPlayers = math.clamp(maxPlayers, 1, PartyRules.Rules.MaxSize),
+	})
+end
+
+-- Ring colour of each platform: free / owned by a squad (someone is setting it up) / starting.
+function LobbyController:PaintPlatforms()
+	const rings = self.Rings
+	if rings == nil then
+		return
+	end
+	const colors = LOBBY.Squad.Colors
+	for n = 1, PartyRules.Rules.Platforms do
+		const party = self:PlatformParty(n)
+		const color = if party == nil
+			then colors.Free
+			elseif party.State == "Starting" then colors.Starting
+			else colors.Busy
+		rings.SetColor(`Squad{n}`, color)
+	end
+end
+
+-- Zones -------------------------------------------------------------------------------------------------------------
+
+function LobbyController:OnZone(zone: LobbyZones.Zone, inside: boolean)
+	if zone.Platform > 0 then
+		if inside then
+			self.Standing(zone.Platform)
+		elseif Vide.untrack(self.Standing) == zone.Platform then
+			self.Standing(0)
+		end
+	end
+	const panel: Panel = zone.Panel
+	if inside then
+		if Vide.untrack(self.Panel) ~= panel then
+			self:Click()
+			self:SetPanel(panel)
+		end
+	elseif Vide.untrack(self.Panel) == panel then
+		self:SetPanel("None")
+	end
+end
+
+-- Own root against every zone (hysteresis in LobbyZones.Inside). Exits first, so walking from one zone straight
+-- into the next opens the new panel last.
+function LobbyController:CheckZones()
+	const character = Players.LocalPlayer.Character
+	const root = if character then character:FindFirstChild("HumanoidRootPart") else nil
+	const position = if root and root:IsA("BasePart") then root.Position else nil
+	const entered: { LobbyZones.Zone } = {}
+	for _, zone in LobbyZones.List() do
+		const was = self.ZoneInside[zone.Key] == true
+		const inside = position ~= nil and LobbyZones.Inside(zone, position, was)
+		if inside ~= was then
+			self.ZoneInside[zone.Key] = if inside then true else nil
+			if inside then
+				table.insert(entered, zone)
+			else
+				self:OnZone(zone, false)
+			end
+		end
+	end
+	for _, zone in entered do
+		self:OnZone(zone, true)
+	end
+end
+
+-- One Heartbeat for the lobby: ring VFX every frame, zones every Trigger.Poll s, the countdown clock.
+function LobbyController:RunZones()
+	self.Rings = Rings()
+	self:PaintPlatforms()
+	local t = 0
+	local nextZones = 0
+	local nextClock = 0
+	RunService.Heartbeat:Connect(function(dt: number)
+		t += dt
+		const rings = self.Rings
+		if rings then
+			const camera = workspace.CurrentCamera
+			rings.Step(t, if camera then camera.CFrame.Position else nil)
+		end
+		const now = os.clock()
+		if now >= nextZones then
+			nextZones = now + LOBBY.Trigger.Poll
+			self:CheckZones()
+		end
+		if now >= nextClock then
+			nextClock = now + CLOCK_INTERVAL
+			self.Clock(workspace:GetServerTimeNow())
+		end
+	end)
+end
+
+-- Third person in the lobby (the game is locked first person): CameraController hands-off, stock Classic camera,
+-- pushed out of a first-person zoom once.
+function LobbyController:ThirdPerson()
+	const player = Players.LocalPlayer
+	const rules = LOBBY.Camera
+	self.Dependencies.CameraController:SetMode("External")
+	player.CameraMode = Enum.CameraMode.Classic
+	player.CameraMaxZoomDistance = rules.MaxZoom
+	player.CameraMinZoomDistance = math.min(rules.StartZoom, rules.MaxZoom)
+	task.delay(0.5, function()
+		player.CameraMinZoomDistance = rules.MinZoom
+	end)
+	const camera = workspace.CurrentCamera
+	if camera and Vide.untrack(self.Panel) ~= "Classes" then
+		camera.CameraType = Enum.CameraType.Custom
+	end
+end
+
 -- Panels and input --------------------------------------------------------------------------------------------------
 
 function LobbyController:SelectFirst(panel: Panel)
@@ -866,6 +1101,15 @@ function LobbyController:Mount(playerGui: Instance)
 			end)
 		end)
 
+		-- Platform ring colours follow the Party set
+		Vide.effect(function()
+			self.Parties()
+			Vide.untrack(function()
+				self:PaintPlatforms()
+				return nil
+			end)
+		end)
+
 		-- Class swap on the world stage
 		Vide.effect(function()
 			const key = self.Focus()
@@ -1066,6 +1310,54 @@ function LobbyController:Mount(playerGui: Instance)
 				Scale = self.Scale,
 			}),
 
+			SquadSetup({
+				Visible = isOpen("Platform"),
+				Platform = self.Standing,
+				Members = function()
+					return self:SetupMembers()
+				end,
+				IsLeader = function()
+					const party = self:SetupParty()
+					return party ~= nil and party.Leader == Players.LocalPlayer.UserId
+				end,
+				FriendsOnly = function()
+					const party = self:SetupParty()
+					return party ~= nil and party.FriendsOnly
+				end,
+				MaxPlayers = function()
+					const party = self:SetupParty()
+					return if party then party.MaxPlayers else PartyRules.Rules.DefaultMaxPlayers
+				end,
+				MaxSize = PartyRules.Rules.MaxSize,
+				Countdown = function()
+					return self:Countdown()
+				end,
+				CanStart = function()
+					const party = self:SetupParty()
+					return party ~= nil and party.State ~= "Starting" and self:AllReady(party)
+				end,
+				OnFriendsOnly = function(on: boolean)
+					self:Click()
+					const party = self:SetupParty()
+					if party then
+						self:Configure(on, party.MaxPlayers)
+					end
+				end,
+				OnMaxPlayers = function(count: number)
+					self:Click()
+					const party = self:SetupParty()
+					if party then
+						self:Configure(party.FriendsOnly, count)
+					end
+				end,
+				OnStart = function()
+					self:Click()
+					self.Libs.Net.PartyStart:fireServer()
+				end,
+				OnClose = close,
+				Scale = self.Scale,
+			}),
+
 			InvitePopup({
 				Invite = function()
 					return self:CurrentInvite()
@@ -1171,6 +1463,8 @@ LobbyController:OnStart(function(self)
 	self:WatchViewport()
 	self:WatchRoster()
 	self:LoadPrices()
+	self:ThirdPerson()
+	self:RunZones()
 
 	MarketplaceService.PromptProductPurchaseFinished:Connect(function(userId: number, _productId: number, _bought: boolean)
 		if userId ~= Players.LocalPlayer.UserId then

@@ -1,43 +1,36 @@
 --!strict
 -- Lobby spawn (architecture.md §20.4; user request 2026-10-11, Provisional; TASK-155). Lobby roles only.
--- The lobby map lives in the same place as MAP-01, away from it; its spawn is the MapPoint "LOBBY-SPAWN" (tag
--- MapPoint, attribute PointId; more spawns = "LOBBY-SPAWN-2", "LOBBY-SPAWN-3"... any id starting with LOBBY-SPAWN,
--- one picked at random). Missing = one warning and the first SpawnLocation of the Workspace, else wherever
--- LoadCharacter puts the character.
--- The character is the crew rig of the selected class (DEC-146, DEC-147), built like CharacterService does in the
--- game (CrewRig.Build parked as StarterPlayer.StarterCharacter for one LoadCharacter; one spawn at a time). In the
--- game role CharacterService owns spawning and this service does nothing. Selecting another class in the lobby
--- rebuilds the character where it stands; dying respawns it at the lobby spawn.
-local CollectionService = game:GetService("CollectionService")
+-- In the lobby the character is the player's own Roblox avatar, R15 (user request 2026-10-11): Roblox loads it
+-- (Players.CharacterAutoLoads = true here, whatever the place file says; the game role keeps it false and spawns the
+-- class crew rig through CharacterService). The class rig is only shown on the class stage (client, ClassStage).
+-- This service only places each new character on the MapPoint "LOBBY-SPAWN" (tag MapPoint, attribute PointId; more
+-- spawns = "LOBBY-SPAWN-2"... any id starting with LOBBY-SPAWN, one picked at random, spread a little). Missing = one
+-- warning and the first SpawnLocation of the Workspace, else wherever Roblox put it.
+-- A StarterPlayer.StarterCharacter left in the place (the game parks the crew rig there for one LoadCharacter) is
+-- taken out on lobby servers, so nobody spawns as a crew rig. When the experience forces R6 avatars (Creator Hub
+-- setting), the loaded R6 character is swapped once for an R15 model of the same avatar
+-- (Players:CreateHumanoidModelFromDescription).
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 local StarterPlayer = game:GetService("StarterPlayer")
-local Content = require(ReplicatedStorage.shared.Content)
-local CrewRig = require(ReplicatedStorage.shared.Crew.CrewRig)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
 local Modux = require(ServerScriptService.server.Modux)
 
 const SPAWN_PREFIX = "LOBBY-SPAWN"
 const SPAWN_LIFT = Vector3.new(0, 3, 0) -- architecture.md §18.5
 const SPREAD = 6 -- studs: random offset around the point so a squad does not stack
-const OUTFIT = "crew"
 const TEMPLATE_NAME = "StarterCharacter"
-const FALLBACK_CLASS = "class_dog"
-const AVATAR_CLASSES = { "Accessory", "Clothing", "ShirtGraphic", "BodyColors", "CharacterMesh" }
-
-type Job = { Player: Player, Keep: boolean }
+const R15_ATTRIBUTE = "LobbyR15" -- on a character this service built as R15
+const ROOT_WAIT = 5 -- s
 
 const LobbyService = Modux.Service("LobbyService", {
-	Require = { "RoleService", "PlayerService", "ProfileService" },
+	Require = { "RoleService", "PlayerService" },
 	Priority = 675,
 })
 
 function LobbyService:Setup()
-	self.Queue = {} :: { Job }
-	self.Working = false :: boolean
 	self.Warned = false :: boolean
-	self.Cleanups = {} :: { [Player]: { () -> () } }
 	self.Random = Random.new() :: Random
 end
 
@@ -68,102 +61,49 @@ function LobbyService:SpawnCFrame(): CFrame?
 	return nil
 end
 
--- Spawn ------------------------------------------------------------------------------------------------------------
+-- Avatar -----------------------------------------------------------------------------------------------------------
 
-function LobbyService:SpeciesOf(player: Player): string
-	const profiles = self.Dependencies.ProfileService
-	const profile = profiles:Get(player)
-	const key = if profile ~= nil then profiles:SelectedClass(profile) else FALLBACK_CLASS
-	const class = Content.Classes.ByKey[key] or Content.Classes.ByKey[FALLBACK_CLASS]
-	return class.Species
-end
-
-function LobbyService:Spawn(player: Player, keep: boolean)
-	if player.Parent == nil then
-		return
-	end
-	local where: CFrame? = nil
-	const old = player.Character
-	if keep and old ~= nil and old.Parent ~= nil then
-		where = old:GetPivot()
-	end
-
-	const template = CrewRig.Build(self:SpeciesOf(player), OUTFIT, { LookPack = "Day", Name = TEMPLATE_NAME })
-	template.Parent = StarterPlayer
-	const ok, problem = pcall(function()
-		player:LoadCharacter()
+-- The same avatar as an R15 model (experience forced to R6). Test players (UserId <= 0) get the default look.
+function LobbyService:SwapToR15(player: Player, old: Model, at: CFrame)
+	const ok, result = pcall(function(): Model
+		const description = if player.UserId > 0
+			then Players:GetHumanoidDescriptionFromUserId(player.UserId)
+			else Instance.new("HumanoidDescription")
+		return Players:CreateHumanoidModelFromDescription(description, Enum.HumanoidRigType.R15)
 	end)
-	template:Destroy()
 	if not ok then
-		error(problem, 0)
-	end
-
-	const character = player.Character
-	if character == nil then
+		warn(`[LobbyService] R15 avatar of {player.Name} unavailable ({result}); keeping the loaded one`)
 		return
 	end
-	for _, className in AVATAR_CLASSES do
-		for _, child in character:GetChildren() do
-			if child:IsA(className) then
-				child:Destroy()
-			end
-		end
+	if player.Parent == nil or player.Character ~= old then
+		result:Destroy()
+		return
 	end
-	const point = where or self:SpawnCFrame()
-	if point ~= nil then
-		character:PivotTo(point)
-	end
-	const humanoid = character:FindFirstChildOfClass("Humanoid")
-	if humanoid ~= nil then
-		humanoid.Died:Connect(function()
-			task.delay(Players.RespawnTime, function()
-				if player.Character == character then
-					self:Enqueue(player, false)
-				end
-			end)
-		end)
-	end
+	const model = result
+	model.Name = player.Name
+	model:SetAttribute(R15_ATTRIBUTE, true)
+	model:PivotTo(at)
+	player.Character = model
+	model.Parent = workspace
+	old:Destroy()
 end
 
--- One spawn at a time: StarterCharacter is a single slot.
-function LobbyService:Enqueue(player: Player, keep: boolean)
-	for _, job in self.Queue do
-		if job.Player == player then
+function LobbyService:OnCharacter(player: Player, character: Model)
+	if character:GetAttribute(R15_ATTRIBUTE) == true then
+		return -- built here, already placed
+	end
+	task.spawn(function()
+		const root = character:WaitForChild("HumanoidRootPart", ROOT_WAIT)
+		if root == nil or player.Character ~= character then
 			return
 		end
-	end
-	table.insert(self.Queue, { Player = player, Keep = keep })
-	if self.Working then
-		return
-	end
-	self.Working = true
-	task.spawn(function()
-		while #self.Queue > 0 do
-			const job = table.remove(self.Queue, 1) :: Job
-			const ok, problem = pcall(function()
-				self:Spawn(job.Player, job.Keep)
-			end)
-			if not ok then
-				warn(`[LobbyService] spawn of {job.Player.Name} failed: {problem}`)
-			end
+		const at = self:SpawnCFrame() or character:GetPivot()
+		character:PivotTo(at)
+		const humanoid = character:FindFirstChildOfClass("Humanoid")
+		if humanoid ~= nil and humanoid.RigType ~= Enum.HumanoidRigType.R15 then
+			self:SwapToR15(player, character, at)
 		end
-		self.Working = false
 	end)
-end
-
-function LobbyService:Forget(player: Player)
-	const cleanups = self.Cleanups[player]
-	self.Cleanups[player] = nil
-	if cleanups ~= nil then
-		for _, cleanup in cleanups do
-			cleanup()
-		end
-	end
-	for index = #self.Queue, 1, -1 do
-		if self.Queue[index].Player == player then
-			table.remove(self.Queue, index)
-		end
-	end
 end
 
 LobbyService:OnInit(function(self)
@@ -172,35 +112,31 @@ LobbyService:OnInit(function(self)
 		return
 	end
 
-	Players.CharacterAutoLoads = false -- this service is the only spawner in the lobby
-	const profiles = self.Dependencies.ProfileService
-	profiles.Loaded:Connect(function(player, profile)
-		self:Enqueue(player, false)
-		-- another class selected in the lobby: rebuild where the player stands
-		const stop = self.Libs.Charm.subscribe(function(): string
-			return profiles:SelectedClass(profile)
-		end, function()
-			if player.Character ~= nil then
-				self:Enqueue(player, true)
-			end
-		end)
-		const bucket = self.Cleanups[player] or {}
-		table.insert(bucket, stop)
-		self.Cleanups[player] = bucket
-	end)
-	-- a character this service did not build (Studio autoload before CharacterAutoLoads = false): replaced
+	const parked = StarterPlayer:FindFirstChild(TEMPLATE_NAME)
+	if parked ~= nil then
+		warn(`[LobbyService] StarterPlayer.{TEMPLATE_NAME} found on a lobby server: removed (lobby uses the avatar)`)
+		parked.Parent = nil
+	end
+	Players.CharacterAutoLoads = true -- the avatar, loaded and respawned by Roblox
+
 	self.Dependencies.PlayerService.CharacterAdded:Connect(function(player, character)
-		if CollectionService:HasTag(character, CrewRig.Tag) then
-			return
-		end
-		task.defer(function()
-			if player.Character == character and profiles:Get(player) ~= nil then
-				self:Enqueue(player, true)
-			end
-		end)
+		self:OnCharacter(player, character)
 	end)
-	self.Dependencies.PlayerService.PlayerRemoving:Connect(function(player)
-		self:Forget(player)
+end)
+
+LobbyService:OnStart(function(self)
+	if not self.Dependencies.RoleService:IsLobby() then
+		return
+	end
+	-- joined while the place setting (CharacterAutoLoads false) still held: load them now
+	task.defer(function()
+		for _, player in Players:GetPlayers() do
+			if player.Character == nil and player.Parent ~= nil then
+				pcall(function()
+					player:LoadCharacter()
+				end)
+			end
+		end
 	end)
 end)
 

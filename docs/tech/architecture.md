@@ -2318,8 +2318,13 @@ Vigia: 45 s em `Starting` sem ninguém em voo → reabre. **Studio não teleport
 
 ### 20.4 Spawn no lobby (`LobbyService`, prioridade 675, papéis de lobby)
 
-`CharacterAutoLoads = false`; o personagem é o rig da crew da classe selecionada (mesma técnica do `CharacterService`:
-`CrewRig.Build` como `StarterCharacter` por um `LoadCharacter`, um por vez). Ponto: `MapPoint` com `PointId`
+**Atualizado 2026-10-11 (pedido do usuário, Provisório; §20.6):** no lobby o personagem é o **avatar Roblox do jogador
+em R15**, não o rig da crew: `CharacterAutoLoads = true` só nos papéis de lobby (o `Game` segue `false` e a classe pelo
+`CharacterService`); um `StarterPlayer.StarterCharacter` esquecido na place é tirado no servidor de lobby; se a
+experiência forçar R6, o personagem carregado é trocado uma vez por `Players:CreateHumanoidModelFromDescription(..., R15)`.
+O rig da classe aparece só no palco da tela de classes (client). Texto original, substituído: ~~`CharacterAutoLoads =
+false`; o personagem é o rig da crew da classe selecionada (mesma técnica do `CharacterService`:
+`CrewRig.Build` como `StarterCharacter` por um `LoadCharacter`, um por vez).~~ Ponto: `MapPoint` com `PointId`
 **`LOBBY-SPAWN`** (vários: qualquer id começando com `LOBBY-SPAWN`, sorteado, ±3 studs). Sem ponto: `warn` 1× e o 1º
 `SpawnLocation` do Workspace; sem ele, onde o `LoadCharacter` puser. Trocar de classe no lobby reconstrói o rig no
 lugar; morrer renasce no ponto. No `Game` o spawn segue o fluxo atual (`PS-*`, `CharacterService`); não existe
@@ -2328,6 +2333,31 @@ lugar; morrer renasce no ponto. No `Game` o spawn segue o fluxo atual (`PS-*`, `
 Para o level-designer: o mapa do lobby fica na mesma place, longe do MAP-01, **fora** do `MapBinding` e sem a tag
 `MapBinding`; só pontos `LOBBY-*` são aceitos fora da raiz pelo `MapIndex.Validate`. `check_map01` (edit-time) ainda
 não conhece essa exceção.
+
+### 20.6 Zonas do lobby, anéis, plataformas de squad e câmera (pedido do usuário 2026-10-11; Provisório)
+
+Dados: `Content.Lobby` (`src/Shared/Content/Lobby.luau`: `Zones`, `Trigger`, `Rings`, `Squad`, `Camera`). Geometria
+compartilhada: `ReplicatedStorage.shared.Lobby.LobbyZones` (`src/Lobby/shared/LobbyZones.luau`): centro = `MapPoint`
+(`PointId`) quando existe, senão `Center` do Content; `Inside(zone, pos, was)` com histerese.
+
+| Zona | Centro (WORLD) | Raio | Abre | Anel |
+|---|---|---|---|---|
+| Classes | (0, 0, −587,5), na frente do cordão do palco | 3,5 | tela de classes | amarelo |
+| Gem Shop | `LOBBY-SHOP` (−19,5, 0, −600) | 3,5 | loja de gemas | verde |
+| Codes | `LOBBY-CODES` (−10, 0, −622,5) | 3,5 | códigos | azul |
+| Squad 1..4 | `LOBBY-SQUAD-1..4` (20, 0,3, −588/−598/−608/−618) | 4 | janela da plataforma (`SquadSetup`) | branco livre / vermelho com squad / verde `Starting` |
+
+- **Gatilho (client, `LobbyController`)**: a cada `Trigger.Poll` (0,1 s) o `HumanoidRootPart` local contra cada zona;
+  entrar abre o painel, sair fecha (se ainda for o aberto). Fechar no X não reabre até sair e entrar.
+- **Anéis (client, `LobbyController/Rings.luau`)**: por zona, `Rings.Count` partes invisíveis ancoradas com
+  `Points` `Attachment`s tangentes num círculo e um `Beam` curvo entre vizinhos (textura da referência do usuário);
+  um `Heartbeat` só, um `BulkMoveTo` por frame; sobem em loop, giram (alternando o sentido), wobble de inclinação e
+  deriva; fade na base e no topo; zona a > 80 studs da câmera sai do Workspace.
+- **Plataformas (servidor, `PartyService`)**: detecção, criação/entrada/saída de squad, `FriendsOnly`
+  (`Player:IsFriendsWith`), `MaxPlayers`, contagem de 5 s antes do teleporte (`network.md` §16.6).
+- **Câmera**: no lobby, `CameraController` em `External` e `CameraMode Classic` (terceira pessoa, zoom 0,5..30,
+  empurrada a 12 uma vez); a 1ª pessoa travada continua no `Game`. Com a tela de classes aberta todos os personagens
+  ficam invisíveis localmente (LOBBY.md §11).
 
 ### 20.5 Configuração no site (Creator Hub)
 

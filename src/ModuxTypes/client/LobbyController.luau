@@ -3,6 +3,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
+local LobbyZones = require(ReplicatedStorage.shared.Lobby.LobbyZones)
 local ClassSelect = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.ClassSelect)
 local ClassEntries = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.ClassSelect.Entries)
 local CodeRedeem = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.CodeRedeem)
@@ -10,16 +11,22 @@ local GemShop = require(StarterPlayer.StarterPlayerScripts.client.Interface.Comp
 local InvitePopup = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.InvitePopup)
 local LobbyHud = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.LobbyHud)
 local SquadPanel = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.SquadPanel)
+local SquadSetup = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.SquadSetup)
 local ToastStack = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Toast.Stack)
+local Rings = require(StarterPlayer.StarterPlayerScripts.client.Lobby.LobbyController.Rings)
 local Stage = require(StarterPlayer.StarterPlayerScripts.client.Lobby.LobbyController.Stage)
 local Text = require(StarterPlayer.StarterPlayerScripts.client.Lobby.LobbyController.Text)
 
-export type Panel = "None" | "Classes" | "Shop" | "Codes" | "Squad"
+export type Panel = "None" | "Classes" | "Shop" | "Codes" | "Squad" | "Platform"
 export type PartyRecord = {
 	Leader: number,
 	Members: { number },
 	Ready: { [number]: boolean },
-	State: "Forming" | "Starting",
+	State: "Forming" | "Configuring" | "Starting",
+	Platform: number,
+	FriendsOnly: boolean,
+	MaxPlayers: number,
+	StartAt: number,
 }
 export type Invite = {
 	PartyId: number,
@@ -31,11 +38,13 @@ export type Invite = {
 export type Public = {
 	Active: boolean,
 	CameraBefore: string?,
+	Clock: Vide.Source<number>,
 	CodeFeedback: Vide.Source<CodeRedeem.Feedback>,
 	Entries: { ClassEntries.Entry },
 	Focus: Vide.Source<string>,
 	FovBefore: number,
 	Gui: ScreenGui?,
+	Hiding: boolean,
 	Invites: Vide.Source<{ Invite }>,
 	Panel: Vide.Source<Panel>,
 	Parties: Vide.Source<{ [number]: PartyRecord }>,
@@ -46,14 +55,17 @@ export type Public = {
 	PromptClass: string,
 	Prompting: Vide.Source<boolean>,
 	RigWarned: boolean,
+	Rings: Rings.Rings?,
 	Roster: Vide.Source<{ Player }>,
 	Scale: Vide.Source<number>,
 	Sent: Vide.Source<{ [number]: boolean }>,
 	Stage: Stage.Stage?,
 	StagePoint: CFrame?,
+	Standing: Vide.Source<number>,
 	Toasts: Vide.Source<{ ToastStack.Entry }>,
 	Unmount: (() -> ())?,
 	WorldStage: Vide.Source<boolean>,
+	ZoneInside: { [string]: boolean },
 	Setup: (self: Public) -> (),
 	Toast: (self: Public, text: string, kind: Text.Kind) -> (),
 	ToastDone: (self: Public, entry: ToastStack.Entry) -> (),
@@ -70,6 +82,7 @@ export type Public = {
 	BuildRig: (self: Public, species: string) -> Model?,
 	PlayIdle: (self: Public, model: Model) -> (),
 	TakeCamera: (self: Public) -> (),
+	HideCharacters: (self: Public, on: boolean) -> (),
 	ReleaseCamera: (self: Public) -> (),
 	FindStagePoint: (self: Public) -> CFrame?,
 	OpenStage: (self: Public) -> (),
@@ -90,6 +103,16 @@ export type Public = {
 	PlayStatus: (self: Public) -> string,
 	Play: (self: Public) -> (),
 	CheckPlayAfterCreate: (self: Public) -> (),
+	PlatformParty: (self: Public, n: number) -> PartyRecord?,
+	SetupParty: (self: Public) -> PartyRecord?,
+	SetupMembers: (self: Public) -> { SquadSetup.Member },
+	Countdown: (self: Public) -> number?,
+	Configure: (self: Public, friendsOnly: boolean, maxPlayers: number) -> (),
+	PaintPlatforms: (self: Public) -> (),
+	OnZone: (self: Public, zone: LobbyZones.Zone, inside: boolean) -> (),
+	CheckZones: (self: Public) -> (),
+	RunZones: (self: Public) -> (),
+	ThirdPerson: (self: Public) -> (),
 	SelectFirst: (self: Public, panel: Panel) -> (),
 	SetPanel: (self: Public, panel: Panel) -> (),
 	Toggle: (self: Public, panel: Panel) -> (),

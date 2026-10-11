@@ -35,6 +35,8 @@ const PARTY: { [string]: Line } = {
 	ReturningToLobby = { Text = "Heading back to the lobby...", Kind = "Info" },
 	ReturnFailed = { Text = "Couldn't go back to the lobby", Kind = "Alert" },
 	WrongServer = { Text = "Not available here", Kind = "Alert" },
+	FriendsOnly = { Text = "This squad is friends only", Kind = "Alert" },
+	Configured = { Text = "The leader changed the squad settings", Kind = "Info" },
 }
 
 -- {class} = class name

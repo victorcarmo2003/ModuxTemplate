@@ -13,6 +13,9 @@ quem lê, frequência e por quê; remoção do legado `Vitals`/`Round`; `Lights`
 (§15): packets `ClassBuy`/`ClassBuyResult` e `CodeRedeem`/`CodeRedeemResult`. **Sem set `Wallet`**: saldo e classes
 possuídas já viajam no packet privado `Profile` (§4.5). Robux: o client chama `PromptProductPurchase`; o servidor só
 processa recibo (`ShopService`).
+**Versão 5.6, 2026-10-11 (pedido do usuário, Provisório):** plataformas de squad (§16.6): set `Party` ganha
+`Platform`, `FriendsOnly`, `MaxPlayers`, `StartAt` e o estado `Configuring`; packet novo `PartyConfigure`; avisos
+`FriendsOnly`, `Configured`; `PartyStart` passa a ter contagem de 5 s.
 **Versão 5.2, 2026-10-10 (DEC-221):** set `Hides` sai; janela do trailer = atributo `Shutter` no `Model` do veículo
 (§13.6, T61); `Actions` perde `hide`/`get_up` e ganha `shutter_toggle`; `Notices` troca `hide_taken` por `shutter_closed`.
 Versão 4, 2026-10-10 (**TASK-001**: estado DEC-140 a DEC-201, núcleo da onda 1). Versão anterior: 3.1, 2026-10-08.
@@ -1141,7 +1144,11 @@ Party = Lync.replicate(Lync.struct({
 	Leader = Lync.f64(),
 	Members = Lync.array(Lync.f64(), 1, 4), -- ordem da squad, líder primeiro
 	Ready = Lync.map(Lync.f64(), Lync.bool(), 0, 4), -- todo membro; o líder sempre true
-	State = Lync.enum({ "Forming", "Starting" }),
+	State = Lync.enum({ "Forming", "Configuring", "Starting" }),
+	Platform = Lync.int(0, 4), -- §16.6: LOBBY-SQUAD-n da squad; 0 = squad de convite
+	FriendsOnly = Lync.bool(), -- §16.6
+	MaxPlayers = Lync.int(1, 4), -- §16.6
+	StartAt = Lync.f64(), -- §16.6: workspace:GetServerTimeNow() do teleporte; 0 = sem contagem
 })),
 ```
 
@@ -1150,19 +1157,20 @@ Party = Lync.replicate(Lync.struct({
 | Escreve | `PartyService` (só no lobby), único escritor |
 | Audiência | todos no lobby (sem `keyBy`); o client acha a própria squad procurando o seu UserId em `Members` |
 | Vida | `add` ao criar; `update` (registro inteiro) a cada mudança; `remove` quando fica vazia. Não existe no `Game` |
-| `State` | `Forming` = montando; `Starting` = reserva/teleporte em curso (nada muda até acabar; falha volta a `Forming`) |
+| `State` | `Forming` = squad de convite montando; `Configuring` = squad de plataforma montando (§16.6); `Starting` = contagem (`StartAt`) e depois reserva/teleporte (nada muda até acabar, só sair; falha volta ao estado de antes) |
 
 ### 16.2 Pedidos (c → s; responde `PartyService`)
 
 | Packet | Payload | Validação no servidor | Resposta |
 |---|---|---|---|
 | `PartyCreate` | — | fora de squad | set + `Created` / `AlreadyInParty` |
-| `PartyInvite` | `{ UserId }` | líder (sem squad: cria e vira líder), alvo no servidor, não é ele mesmo, fora da squad, `Forming`, vaga, 3 s por alvo | `PartyInviteReceived` ao alvo + `InviteSent{UserId}` / `InviteSelf`, `PlayerNotFound`, `NotLeader`, `Busy`, `AlreadyInParty{UserId}`, `PartyFull`, `TooFast` |
+| `PartyInvite` | `{ UserId }` | líder (sem squad: cria e vira líder), alvo no servidor, não é ele mesmo, fora da squad, não `Starting`, vaga (`MaxPlayers`), 3 s por alvo | `PartyInviteReceived` ao alvo + `InviteSent{UserId}` / `InviteSelf`, `PlayerNotFound`, `NotLeader`, `Busy`, `AlreadyInParty{UserId}`, `PartyFull`, `TooFast` |
 | `PartyRespond` | `{ PartyId, Accept }` | convite existe e não expirou (60 s), squad existe e `Forming`, vaga; a squad atual (se houver) está `Forming` | aceito: set + `Joined{UserId}` à squad; recusado: `InviteDeclined{UserId}` ao líder; `InviteExpired`, `PartyFull`, `Busy` |
 | `PartyLeave` | — | está numa squad (vale até em `Starting`) | set + `Left{UserId}` aos que ficam (+ `NewLeader{UserId}` se era o líder) / `NotInParty` |
 | `PartyKick` | `{ UserId }` | líder, `Forming`, alvo é membro e não é ele | `Kicked` ao alvo + `Left{UserId}` à squad / `NotLeader`, `Busy`, `PlayerNotFound` |
 | `PartyReady` | `{ Ready }` | membro não-líder, `Forming` | set / `NotInParty`, `Busy` |
-| `PartyStart` | — | líder, `Forming`, todos os outros prontos, fora do Studio | set `Starting` + `Starting` à squad → teleporte (`TeleportRetry` a cada nova tentativa; `TeleportFailed` se todas falharem) / `NotLeader`, `Busy`, `NotAllReady{UserId}`, `StudioNoTeleport` |
+| `PartyStart` | — | líder, `Forming`/`Configuring`, todos os outros prontos | set `Starting` + `StartAt` + `Starting` à squad → `Rules.Countdown` s (5) depois, teleporte (`TeleportRetry` a cada nova tentativa; `TeleportFailed` se todas falharem); no Studio a contagem roda e termina em `StudioNoTeleport` (volta ao estado de antes) / `NotLeader`, `Busy`, `NotAllReady{UserId}` |
+| `PartyConfigure` | `{ FriendsOnly, MaxPlayers }` | líder, não `Starting`; `MaxPlayers` preso a `[max(#Members, 1), 4]` | set + `Configured` aos outros membros / `NotInParty`, `NotLeader`, `Busy` |
 
 ### 16.3 Avisos (s → jogador)
 
@@ -1177,7 +1185,8 @@ PartyNotice = Lync.packet(Lync.struct({
 `PartyNotice.Key` (o client é dono dos textos): `Created`, `AlreadyInParty`, `NotInParty`, `NotLeader`, `PartyFull`,
 `PlayerNotFound`, `InviteSelf`, `InviteSent`, `InviteExpired`, `InviteDeclined`, `Joined`, `Left`, `Kicked`,
 `NewLeader`, `NotAllReady`, `Busy`, `TooFast`, `Starting`, `TeleportRetry`, `TeleportFailed`, `StudioNoTeleport`,
-`ReturningToLobby`, `ReturnFailed`, `WrongServer`. **Acréscimo ao combinado**: o campo opcional `UserId` (o frontend
+`ReturningToLobby`, `ReturnFailed`, `WrongServer`, `FriendsOnly` (§16.6: plataforma só de amigos recusou), `Configured`
+(§16.6: o líder mudou as opções). **Acréscimo ao combinado**: o campo opcional `UserId` (o frontend
 pode ignorar).
 
 ### 16.4 `LobbyReturn` (c → s, papel `Game`; responde `PartyRunService`) — **entrada nova**
@@ -1201,3 +1210,33 @@ Lido no servidor reservado por `RoleService` (`player:GetJoinData().TeleportData
 `Roles.ParseLaunch`). Não é autorização: só servidores do jogo têm o código do reservado.
 
 Orçamento: eventos por clique e um set de ≤ 4 UserIds por squad; irrelevante.
+
+### 16.6 Plataformas de squad (v5.6, pedido do usuário 2026-10-11; **Provisório**; emenda a DEC-179 de volta às plataformas, convite mantido)
+
+As 4 plataformas do lobby (`Content.Lobby.Zones`, `Platform` 1..4, centro = `MapPoint` `LOBBY-SQUAD-n`, raio 4) são
+**detectadas no servidor**: o `PartyService` lê o `HumanoidRootPart` de cada jogador a cada `Content.Lobby.Squad.Poll`
+(0,15 s) com histerese (`shared.Lobby.LobbyZones`: entra a ≤ raio, sai a > raio + 1,25, |dy| ≤ 8). Nada disso passa
+pelo Lync: o client só vê o resultado no set `Party`.
+
+| Evento | Regra |
+|---|---|
+| Pisa numa plataforma livre | squad nova com `Platform = n`, `State = "Configuring"`, ele lidera (`Created`). Líder de squad de convite (`Platform 0`) leva a squad para a plataforma |
+| Pisa numa plataforma com squad | entra se a squad não está `Starting`, tem vaga (`#Members < MaxPlayers`) e, com `FriendsOnly`, ele é amigo do líder (`Player:IsFriendsWith`, fora do loop: rende; tudo é conferido de novo depois). Membro de plataforma entra **pronto** (`Ready = true`). Recusa = `Busy` / `PartyFull` / `FriendsOnly`, uma vez; não tenta de novo até ele sair da plataforma |
+| Sai da plataforma (ou morre) | sai da squad (`Left`; líder → `NewLeader`); squad vazia some e a plataforma fica livre (quem ainda estiver em cima é tentado de novo). Depois que o teleporte começou, sair não tira ninguém |
+| Sai pelo botão / é expulso em cima da plataforma | não volta sozinho até sair e pisar de novo |
+| `PartyConfigure` | só o líder, fora de `Starting` (tabela do §16.2) |
+| `PartyStart` | igual a toda squad: contagem de `Rules.Countdown` s com `StartAt`, depois teleporte (§16.2) |
+
+Cores no client (anéis, `Content.Lobby.Squad.Colors`): sem squad = **branco**; com squad (`Forming`/`Configuring`,
+alguém configurando) = **vermelho**; `Starting` = **verde**. A tela da plataforma (`SquadSetup`) mostra a squad da
+plataforma em que o jogador está; contagem = `StartAt - workspace:GetServerTimeNow()`.
+
+```lua
+PartyConfigure = Lync.packet(Lync.struct({
+	FriendsOnly = Lync.bool(),
+	MaxPlayers = Lync.int(1, 4),
+})),
+```
+
+Orçamento: o set `Party` ganha 4 campos pequenos por squad; a detecção é só no servidor (≤ N jogadores × 4 círculos a
+6–7 Hz). Irrelevante.
