@@ -336,6 +336,14 @@ E copie por cima de `src/Modux`, menos os quatro arquivos gerados
 (`*/Manifest/init.luau`, `*/Modules.luau`, `shared/Libs.luau`), que o
 `modux generate` reescreve. Os dois `Bootstrap` são seus.
 
+## Console de admin (Conch)
+
+`src/Admin/` traz o console Conch/ConchUI, aberto com **F2**, só para admins (Studio sempre; servidor publicado só
+`UserId` em `src/Admin/shared/AdminSettings.luau`). `dev <comando>` é a ponte para o `DevService` (mesmos comandos do
+chat `/dev`), mais `day`, `cash`, `gems`, `upgrade`, `tp` e `content`. Conch e ConchUI são requeridos direto, fora de
+`src/Libs`. Política e detalhes em `docs/tech/admin.md`. Depois de puxar a feature: `wally install`, o
+`wally-package-types` do Setup, `rogen build`, `modux generate` e reconectar o Rojo.
+
 ## A armadilha da UI no centro da tela em 1ª pessoa
 
 Em primeira pessoa o cursor fica travado no centro. Qualquer `GuiObject` com `Active = true` (botão, `BillboardGui` ativo) sob o centro da tela consome o movimento do mouse e a câmera para de girar. Balões e pílulas no mundo só podem ser clicáveis no celular (`Tappable` no `PromptBillboard`); no PC e no gamepad a ação vai pela tecla.

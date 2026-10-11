@@ -7,6 +7,8 @@ realm = "shared"
 [dependencies]
 Lync = "axp3cter/lync@4.0.2"
 Charm = "littensy/charm@0.11.0"
+Conch = "alicesaidhi/conch@0.4.0"
+ConchUI = "alicesaidhi/conch-ui@0.4.0"
 Vide = "centau/vide@0.4.1"
 
 [server-dependencies]

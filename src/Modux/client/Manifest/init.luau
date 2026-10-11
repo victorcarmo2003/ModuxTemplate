@@ -1,6 +1,7 @@
 --!strict
 
 local StarterPlayer = game:GetService("StarterPlayer")
+local AdminController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.AdminController)
 local AnimController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.AnimController)
 local AnomalyController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.AnomalyController)
 local AudioController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.AudioController)
@@ -40,6 +41,7 @@ local VehicleController = require(StarterPlayer.StarterPlayerScripts.client.Modu
 local VitalController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.VitalController)
 
 export type AllControllers = {
+	AdminController: AdminController.Public,
 	AnimController: AnimController.Public,
 	AnomalyController: AnomalyController.Public,
 	AudioController: AudioController.Public,

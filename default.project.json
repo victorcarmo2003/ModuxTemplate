@@ -32,6 +32,12 @@
 			"shared": {
 				"$className": "Folder",
 				"$ignoreUnknownInstances": false,
+				"Admin": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Admin/shared"
+					}
+				},
 				"Content": {
 					"$path": {
 						"optional": "src/Shared/Content"
@@ -144,6 +150,12 @@
 			"server": {
 				"$className": "Folder",
 				"$ignoreUnknownInstances": false,
+				"Admin": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Admin/server"
+					}
+				},
 				"Anomaly": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
@@ -371,6 +383,12 @@
 				"client": {
 					"$className": "Folder",
 					"$ignoreUnknownInstances": false,
+					"Admin": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Admin/client"
+						}
+					},
 					"Anim": {
 						"$ignoreUnknownInstances": false,
 						"$path": {

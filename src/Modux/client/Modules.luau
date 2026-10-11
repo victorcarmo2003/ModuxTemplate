@@ -3,6 +3,7 @@
 local StarterPlayer = game:GetService("StarterPlayer")
 
 return {
+	StarterPlayer.StarterPlayerScripts.client.Admin.AdminController,
 	StarterPlayer.StarterPlayerScripts.client.Anim.AnimController,
 	StarterPlayer.StarterPlayerScripts.client.Anomaly.AnomalyController,
 	StarterPlayer.StarterPlayerScripts.client.Audio.AudioController,
