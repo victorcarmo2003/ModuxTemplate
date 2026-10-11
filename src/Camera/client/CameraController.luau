@@ -267,6 +267,13 @@ local function rootPosition(character: Model?): Vector3?
 end
 
 -- A mate's character this client can sit in: in the Workspace, with a Humanoid and a Head.
+-- The loading screen (Loading/Boot) is still up: the cursor stays free until it lifts (playtest 2026-10-11)
+local function loadingShown(): boolean
+	const playerGui = Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+	const gui = if playerGui ~= nil then playerGui:FindFirstChild("LoadingScreen") else nil
+	return gui ~= nil and gui:GetAttribute("Done") ~= true
+end
+
 local function bodyOf(userId: number?): Model?
 	if userId == nil then
 		return nil
@@ -892,6 +899,19 @@ end
 function CameraController:ApplyCamera(dt: number)
 	const mode = Vide.untrack(self.Mode)
 	const camera = workspace.CurrentCamera
+	if loadingShown() then
+		-- under the curtain: no first-person / POV lock, the cursor moves freely
+		self:UnlockMouse()
+		const player = Players.LocalPlayer
+		if player.CameraMode ~= Enum.CameraMode.Classic then
+			player.CameraMode = Enum.CameraMode.Classic
+		end
+		if UserInputService.MouseBehavior ~= Enum.MouseBehavior.Default then
+			UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+		end
+		UserInputService.MouseIconEnabled = true
+		return
+	end
 	if mode == "External" or camera == nil then
 		self:UnlockMouse()
 		return
