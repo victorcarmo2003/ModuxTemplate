@@ -1,16 +1,18 @@
 --!strict
--- Lobby zone rings (user request 2026-10-11, Provisional; Content.Lobby.Rings): every lobby zone is covered by a
--- cylinder of glowing rings that rise from the floor while they spin, with a clumsy wobble (sine tilt and sideways
--- drift per ring), fading in at the floor and out at the top. A take on the user's reference beam
--- (workspace.BeamExample: Texture 16892386886, Stretch, LightEmission 1, LightInfluence 0) bent into rings.
---
--- Build: one anchored invisible Part per ring (local, never replicated) holding `Points` Attachments on a circle,
--- each tangent to it (Axis = tangent), and one Beam between each pair of neighbours, curved into an arc
--- (CurveSize = 4/3 * tan(step / 4) * r, cubic Bezier circle; Rings.CurveSign flips it if a build of the engine reads
--- CurveSize1 the other way). FaceCamera ribbons, so a ring reads as a band from any side.
--- Animation: the caller's single Heartbeat calls Step(t); one BulkMoveTo moves every ring Part (the attachments
--- follow), transparency is written only when it changed by more than a step, colours only on SetColor. A zone farther
--- than ActiveDistance from the camera is unparented and skipped. Presentation only.
+-- Lobby zone VFX, "light column" (user choice 2026-10-11, Provisional; Content.Lobby.Column / Rings / Floor / ZoneVfx).
+-- Every zone read from LobbyZones (any count, no position in code) gets:
+--  * a soft cylinder of light in the zone colour: Column.Panels vertical Beams on the sides of a prism around the
+--    circle (FaceCamera off, attachment X = up, Y = outward normal, Z = tangent, so the ribbon width runs along the
+--    tangent; Column.Roll turns them if an engine build reads the width on the other axis). The user's reference beam
+--    (workspace.BeamExample): texture 16892386886, Stretch, LightEmission 1, LightInfluence 0, scrolling up; the
+--    transparency goes Base at the floor -> Middle at half height -> 1 at the top, breathing +-PulseAlpha;
+--  * Rings.Count thin rings (a CylinderHandleAdornment with InnerRadius each: a clean circle, one instance) a bit
+--    lighter than the column, rising from the floor with a fade in/out, staggered, with a very light tilt wobble;
+--  * a thin ring on the floor (same adornment kind) pulsing with the column.
+-- SetColor tweens a zone to a colour in ZoneVfx.ColorTween s (squad platforms: free / busy / starting).
+-- Cost: Panels beams + Count + 1 adornments per zone; the caller's single Heartbeat calls Step(t); transparency is
+-- written only when it moved by more than a step; a zone farther than ActiveDistance from the camera is unparented
+-- and skipped. Local only, never replicated. Presentation only: the server decides squads and colours' meaning.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 local LobbyZones = require(ReplicatedStorage.shared.Lobby.LobbyZones)
@@ -22,8 +24,7 @@ export type Rings = {
 }
 
 type Ring = {
-	Part: BasePart,
-	Beams: { Beam },
+	Adornment: CylinderHandleAdornment,
 	Index: number,
 	Alpha: number, -- last transparency written
 }
@@ -31,24 +32,54 @@ type Ring = {
 type ZoneVfx = {
 	Zone: LobbyZones.Zone,
 	Folder: Folder,
+	Anchor: BasePart,
+	Panels: { Beam },
 	Rings: { Ring },
+	Floor: CylinderHandleAdornment,
 	Seed: number,
-	Color: Color3,
+	Color: Color3, -- shown now
+	From: Color3, -- tween start
+	Target: Color3, -- tween end
+	TweenAt: number, -- t the tween started; < 0 = no tween running
+	PanelAlpha: number, -- last pulse offset written to the panels
+	FloorAlpha: number,
 	Shown: boolean,
 }
 
-const RULES = Content.Lobby.Rings
+const LOBBY = Content.Lobby
+const COLUMN = LOBBY.Column
+const RINGS = LOBBY.Rings
+const FLOOR = LOBBY.Floor
+const VFX = LOBBY.ZoneVfx
 const ALPHA_STEP = 0.02
 const LIFT = 0.05 -- studs over the floor (no z-fight with the platform top)
+const WHITE = Color3.new(1, 1, 1)
+const FLAT = CFrame.Angles(math.pi / 2, 0, 0) -- a handle cylinder runs along its Z axis: lay it flat
 
 local function smooth(x: number): number
 	const c = math.clamp(x, 0, 1)
 	return c * c * (3 - 2 * c)
 end
 
-local function newPart(name: string, parent: Instance): Part
+local function quantize(x: number): number
+	return math.floor(x / ALPHA_STEP + 0.5) * ALPHA_STEP
+end
+
+local function ringColor(color: Color3): Color3
+	return color:Lerp(WHITE, math.clamp(RINGS.Lighten, 0, 1))
+end
+
+local function panelSequence(pulse: number): NumberSequence
+	return NumberSequence.new({
+		NumberSequenceKeypoint.new(0, math.clamp(COLUMN.Base + pulse, 0, 1)),
+		NumberSequenceKeypoint.new(0.5, math.clamp(COLUMN.Middle + pulse, 0, 1)),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+end
+
+local function newAnchor(zone: LobbyZones.Zone, parent: Instance): Part
 	const part = Instance.new("Part")
-	part.Name = name
+	part.Name = "Anchor"
 	part.Size = Vector3.new(0.2, 0.2, 0.2)
 	part.Transparency = 1
 	part.Anchored = true
@@ -57,54 +88,138 @@ local function newPart(name: string, parent: Instance): Part
 	part.CanTouch = false
 	part.CastShadow = false
 	part.Massless = true
+	part.CFrame = CFrame.new(zone.Center)
 	part.Parent = parent
 	return part
 end
 
-local function buildRing(zone: LobbyZones.Zone, index: number, color: Color3, parent: Instance): Ring
-	const part = newPart(`Ring{index}`, parent)
-	part.CFrame = CFrame.new(zone.Center)
-	const count = math.max(RULES.Points, 3)
-	const radius = zone.Radius * RULES.RadiusScale
+local function newBand(
+	name: string,
+	anchor: BasePart,
+	outer: number,
+	width: number,
+	thickness: number,
+	color: Color3,
+	alpha: number
+): CylinderHandleAdornment
+	const band = Instance.new("CylinderHandleAdornment")
+	band.Name = name
+	band.Adornee = anchor
+	band.Radius = math.max(outer, 0.1)
+	band.InnerRadius = math.clamp(outer - width, 0, band.Radius)
+	band.Height = math.max(thickness, 0.01)
+	band.CFrame = CFrame.new(0, LIFT, 0) * FLAT
+	band.Color3 = color
+	band.Transparency = alpha
+	band.AlwaysOnTop = false
+	band.ZIndex = 0
+	band.Parent = anchor
+	return band
+end
+
+local function buildPanels(zone: LobbyZones.Zone, anchor: BasePart, color: Color3): { Beam }
+	const count = math.max(math.floor(COLUMN.Panels), 3)
+	const radius = zone.Radius * COLUMN.RadiusScale
 	const step = 2 * math.pi / count
-	const curve = RULES.CurveSign * (4 / 3) * math.tan(step / 4) * radius
-	const attachments: { Attachment } = {}
-	for i = 1, count do
-		const angle = (i - 1) * step
-		const position = Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
-		const tangent = Vector3.new(-math.sin(angle), 0, math.cos(angle))
-		const attachment = Instance.new("Attachment")
-		attachment.Name = `A{i}`
-		attachment.CFrame = CFrame.fromMatrix(position, tangent, Vector3.yAxis)
-		attachment.Parent = part
-		attachments[i] = attachment
-	end
+	const apothem = radius * math.cos(step / 2)
+	const width = 2 * radius * math.sin(step / 2) * COLUMN.Overlap
+	const height = math.max(COLUMN.Height, 0.5)
+	const roll = CFrame.Angles(math.rad(COLUMN.Roll), 0, 0)
+	const colors = ColorSequence.new(color)
+	const transparency = panelSequence(0)
 	const beams: { Beam } = {}
-	const transparency = NumberSequence.new(1)
 	for i = 1, count do
+		const angle = (i - 0.5) * step
+		const normal = Vector3.new(math.cos(angle), 0, math.sin(angle))
+		const bottom = Instance.new("Attachment")
+		bottom.Name = `P{i}Bottom`
+		bottom.CFrame = CFrame.fromMatrix(normal * apothem + Vector3.new(0, LIFT, 0), Vector3.yAxis, normal) * roll
+		bottom.Parent = anchor
+		const top = Instance.new("Attachment")
+		top.Name = `P{i}Top`
+		top.CFrame = CFrame.fromMatrix(normal * apothem + Vector3.new(0, height, 0), Vector3.yAxis, normal) * roll
+		top.Parent = anchor
 		const beam = Instance.new("Beam")
-		beam.Name = `B{i}`
-		beam.Attachment0 = attachments[i]
-		beam.Attachment1 = attachments[i % count + 1]
-		beam.CurveSize0 = curve
-		beam.CurveSize1 = curve
-		beam.Segments = RULES.Segments
-		beam.Width0 = RULES.Width
-		beam.Width1 = RULES.Width
-		beam.FaceCamera = true
-		beam.Texture = RULES.Texture
+		beam.Name = `P{i}`
+		beam.Attachment0 = bottom
+		beam.Attachment1 = top
+		beam.CurveSize0 = 0
+		beam.CurveSize1 = 0
+		beam.Segments = math.max(math.floor(COLUMN.Segments), 1)
+		beam.Width0 = width
+		beam.Width1 = width
+		beam.FaceCamera = false
+		beam.Texture = COLUMN.Texture
 		beam.TextureMode = Enum.TextureMode.Stretch
-		beam.TextureLength = 1
-		beam.TextureSpeed = RULES.TextureSpeed
-		beam.LightEmission = RULES.LightEmission
+		beam.TextureLength = COLUMN.TextureLength
+		beam.TextureSpeed = COLUMN.TextureSpeed
+		beam.LightEmission = COLUMN.LightEmission
 		beam.LightInfluence = 0
-		beam.Brightness = RULES.Brightness
-		beam.Color = ColorSequence.new(color)
+		beam.Brightness = COLUMN.Brightness
+		beam.Color = colors
 		beam.Transparency = transparency
-		beam.Parent = part
+		beam.Parent = anchor
 		beams[i] = beam
 	end
-	return { Part = part, Beams = beams, Index = index, Alpha = 1 }
+	return beams
+end
+
+local function buildZone(zone: LobbyZones.Zone, color: Color3, seed: number): ZoneVfx
+	const folder = Instance.new("Folder")
+	folder.Name = zone.Key
+	const anchor = newAnchor(zone, folder)
+	const panels = buildPanels(zone, anchor, color)
+	const rings: { Ring } = {}
+	for index = 1, math.max(math.floor(RINGS.Count), 0) do
+		const band = newBand(
+			`Ring{index}`,
+			anchor,
+			zone.Radius * RINGS.RadiusScale,
+			RINGS.Width,
+			RINGS.Thickness,
+			ringColor(color),
+			1
+		)
+		table.insert(rings, { Adornment = band, Index = index, Alpha = 1 })
+	end
+	const floor = newBand(
+		"Floor",
+		anchor,
+		zone.Radius * FLOOR.RadiusScale,
+		FLOOR.Width,
+		FLOOR.Thickness,
+		color,
+		FLOOR.Transparency
+	)
+	return {
+		Zone = zone,
+		Folder = folder,
+		Anchor = anchor,
+		Panels = panels,
+		Rings = rings,
+		Floor = floor,
+		Seed = seed,
+		Color = color,
+		From = color,
+		Target = color,
+		TweenAt = -1,
+		PanelAlpha = 0,
+		FloorAlpha = FLOOR.Transparency,
+		Shown = false,
+	}
+end
+
+local function paint(entry: ZoneVfx, color: Color3)
+	entry.Color = color
+	const sequence = ColorSequence.new(color)
+	for _, beam in entry.Panels do
+		beam.Color = sequence
+	end
+	const light = ringColor(color)
+	for _, ring in entry.Rings do
+		ring.Adornment.Color3 = light
+	end
+	entry.Floor.Color3 = color
 end
 
 return function(): Rings
@@ -115,28 +230,23 @@ return function(): Rings
 	const vfx: { [string]: ZoneVfx } = {}
 	const order: { ZoneVfx } = {}
 	const random = Random.new()
+	local clock = 0
 
 	local function build()
+		const kept: { [string]: ZoneVfx } = table.clone(vfx)
 		for _, entry in order do
 			entry.Folder:Destroy()
 		end
 		table.clear(order)
 		table.clear(vfx)
 		for _, zone in LobbyZones.List() do
-			const folder = Instance.new("Folder")
-			folder.Name = zone.Key
-			const rings: { Ring } = {}
-			for index = 1, RULES.Count do
-				table.insert(rings, buildRing(zone, index, zone.Color, folder))
+			const old = kept[zone.Key]
+			const entry = buildZone(zone, if old then old.Color else zone.Color, random:NextNumber(0, 100))
+			if old then
+				entry.From = old.From
+				entry.Target = old.Target
+				entry.TweenAt = old.TweenAt
 			end
-			const entry: ZoneVfx = {
-				Zone = zone,
-				Folder = folder,
-				Rings = rings,
-				Seed = random:NextNumber(0, 100),
-				Color = zone.Color,
-				Shown = false,
-			}
 			vfx[zone.Key] = entry
 			table.insert(order, entry)
 		end
@@ -144,16 +254,12 @@ return function(): Rings
 
 	local function setColor(key: string, color: Color3)
 		const entry = vfx[key]
-		if entry == nil or entry.Color == color then
+		if entry == nil or entry.Target == color then
 			return
 		end
-		entry.Color = color
-		const sequence = ColorSequence.new(color)
-		for _, ring in entry.Rings do
-			for _, beam in ring.Beams do
-				beam.Color = sequence
-			end
-		end
+		entry.From = entry.Color
+		entry.Target = color
+		entry.TweenAt = clock
 	end
 
 	-- Zones resolved again when the lobby map streamed in (a point moved): rebuilt in place, colours kept.
@@ -163,75 +269,75 @@ return function(): Rings
 			return true
 		end
 		for i, zone in zones do
-			if order[i].Zone.Center ~= zone.Center or order[i].Zone.Key ~= zone.Key then
+			const entry = order[i]
+			if entry.Zone.Center ~= zone.Center or entry.Zone.Key ~= zone.Key or entry.Zone.Radius ~= zone.Radius then
 				return true
 			end
 		end
 		return false
 	end
 
-	const parts: { BasePart } = {}
-	const frames: { CFrame } = {}
-	const tilt = math.rad(RULES.WobbleTilt)
-	const spin = math.rad(RULES.Spin)
-	const count = math.max(RULES.Count, 1)
-	const height = math.max(RULES.Height, 0.1)
-	const fadeIn = math.max(RULES.FadeIn, 0.001)
-	const fadeOut = math.max(RULES.FadeOut, 0.001)
+	const ringCount = math.max(math.floor(RINGS.Count), 1)
+	const reach = math.max(COLUMN.Height * RINGS.Reach, 0.1)
+	const period = math.max(RINGS.Period, 0.1)
+	const pulsePeriod = math.max(COLUMN.PulsePeriod, 0.1)
+	const fadeIn = math.max(RINGS.FadeIn, 0.001)
+	const fadeOut = math.max(RINGS.FadeOut, 0.001)
+	const tilt = math.rad(RINGS.WobbleTilt)
+	const tween = math.max(VFX.ColorTween, 0.001)
 
 	local function step(t: number, camera: Vector3?)
+		clock = t
 		if moved() then
-			const colors: { [string]: Color3 } = {}
-			for key, entry in vfx do
-				colors[key] = entry.Color
-			end
 			build()
-			for key, color in colors do
-				setColor(key, color)
-			end
 		end
-		table.clear(parts)
-		table.clear(frames)
 		for _, entry in order do
+			if entry.TweenAt >= 0 then
+				const k = (t - entry.TweenAt) / tween
+				if k >= 1 then
+					entry.TweenAt = -1
+					paint(entry, entry.Target)
+				else
+					paint(entry, entry.From:Lerp(entry.Target, smooth(k)))
+				end
+			end
 			const center = entry.Zone.Center
-			const near = camera == nil or (camera - center).Magnitude <= RULES.ActiveDistance
+			const near = camera == nil or (camera - center).Magnitude <= VFX.ActiveDistance
 			if near ~= entry.Shown then
 				entry.Shown = near
 				entry.Folder.Parent = if near then root else nil
 			end
 			if near then
 				const seed = entry.Seed
+				const wave = math.sin(2 * math.pi * t / pulsePeriod + seed)
+				const pulse = quantize(COLUMN.PulseAlpha * wave)
+				if pulse ~= entry.PanelAlpha then
+					entry.PanelAlpha = pulse
+					const sequence = panelSequence(pulse)
+					for _, beam in entry.Panels do
+						beam.Transparency = sequence
+					end
+				end
+				const floorAlpha = math.clamp(quantize(FLOOR.Transparency - FLOOR.PulseAlpha * wave), 0, 1)
+				if floorAlpha ~= entry.FloorAlpha then
+					entry.FloorAlpha = floorAlpha
+					entry.Floor.Transparency = floorAlpha
+				end
 				for _, ring in entry.Rings do
 					const i = ring.Index - 1
-					const phase = (t * RULES.Rise / height + i / count + seed) % 1
+					const phase = (t / period + i / ringCount + seed) % 1
 					const strength = smooth(phase / fadeIn) * smooth((1 - phase) / fadeOut)
-					const wobble = t * RULES.WobbleSpeed + seed
+					const wobble = t * RINGS.WobbleSpeed + seed
 					const rx = tilt * math.sin(wobble + i * 1.9)
 					const rz = tilt * math.cos(wobble * 0.83 + i * 2.7)
-					const dx = RULES.WobbleShift * math.sin(wobble * 0.7 + i)
-					const dz = RULES.WobbleShift * math.cos(wobble * 0.55 + i * 1.4)
-					const turn = (if i % 2 == 0 then spin else -spin) * t + i * 0.9
-					table.insert(parts, ring.Part)
-					table.insert(
-						frames,
-						CFrame.new(center.X + dx, center.Y + LIFT + phase * height, center.Z + dz)
-							* CFrame.Angles(rx, 0, rz)
-							* CFrame.Angles(0, turn, 0)
-					)
-					local alpha = 1 - (1 - RULES.Transparency) * strength
-					alpha = math.floor(alpha / ALPHA_STEP + 0.5) * ALPHA_STEP
+					ring.Adornment.CFrame = CFrame.new(0, LIFT + phase * reach, 0) * CFrame.Angles(rx, 0, rz) * FLAT
+					const alpha = math.clamp(quantize(1 - (1 - RINGS.Transparency) * strength), 0, 1)
 					if alpha ~= ring.Alpha then
 						ring.Alpha = alpha
-						const sequence = NumberSequence.new(math.clamp(alpha, 0, 1))
-						for _, beam in ring.Beams do
-							beam.Transparency = sequence
-						end
+						ring.Adornment.Transparency = alpha
 					end
 				end
 			end
-		end
-		if #parts > 0 then
-			workspace:BulkMoveTo(parts, frames, Enum.BulkMoveMode.FireCFrameChanged)
 		end
 	end
 

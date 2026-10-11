@@ -20,26 +20,52 @@ export type Zone = {
 	Color: Color3, -- ring colour (platforms: Squad.Colors by state instead)
 }
 
-export type Rings = {
-	Count: number, -- rings stacked per zone
-	Points: number, -- attachments per ring (beams = Points, curved into a circle)
-	RadiusScale: number, -- ring radius = zone Radius * this
-	Height: number, -- studs a ring rises before it loops back to the floor
-	Rise: number, -- studs/s
-	Spin: number, -- deg/s (odd rings spin the other way)
-	Width: number, -- beam width (studs)
-	Segments: number, -- beam segments (curve smoothness)
-	CurveSign: number, -- 1 or -1: flips the arc of each beam if the rings look like a star instead of a circle
+-- "Light column" zone VFX (user choice 2026-10-11, Provisional): a soft cylinder of light in the zone colour made of
+-- vertical Beam panels (the user's reference beam, workspace.BeamExample, texture scrolling up), thin coloured rings
+-- rising and fading inside it, and a thin ring on the floor. Read by LobbyController/Rings.luau.
+export type Column = {
+	Height: number, -- studs from the floor to the top of the column
+	Panels: number, -- vertical Beams around the circle (one per side of the prism)
+	RadiusScale: number, -- column radius = zone Radius * this
+	Overlap: number, -- panel width = side of the prism * this (hides the seams; >1.15 shows bright overlaps)
+	Roll: number, -- deg: extra roll of each panel around its own vertical axis (90 if the panels read as spokes)
 	Texture: string,
-	TextureSpeed: number,
+	TextureSpeed: number, -- > 0 scrolls the texture up (bottom attachment -> top attachment)
+	TextureLength: number,
+	Segments: number,
 	LightEmission: number,
-	Brightness: number,
-	Transparency: number, -- 0..1 at full strength (middle of the climb)
+	Brightness: number, -- keep at 1: higher washes the colour into white
+	Base: number, -- transparency at the floor
+	Middle: number, -- transparency at half height (the top is always 1: fades out)
+	PulsePeriod: number, -- s of one brightness breath
+	PulseAlpha: number, -- +- transparency of the breath
+}
+
+export type Rings = {
+	Count: number, -- thin rings per zone (staggered over one Period)
+	RadiusScale: number, -- outer radius = zone Radius * this (a hair outside the column)
+	Width: number, -- studs: ring band (outer - inner radius)
+	Thickness: number, -- studs: vertical thickness of the band
+	Lighten: number, -- 0..1 towards white (a ring is a bit lighter than its column)
+	Period: number, -- s for one ring to climb from the floor to Reach
+	Reach: number, -- 0..1 of Column.Height the ring climbs before it loops back
+	Transparency: number, -- 0..1 at full strength
 	FadeIn: number, -- 0..1 of the climb: fades in from the floor
 	FadeOut: number, -- 0..1 of the climb: fades out before the top
-	WobbleTilt: number, -- deg: sine tilt of each ring (the "clumsy" look)
+	WobbleTilt: number, -- deg: sine tilt of each ring (very light)
 	WobbleSpeed: number, -- rad/s of the tilt
-	WobbleShift: number, -- studs: sine sideways drift of the ring centre
+}
+
+export type Floor = {
+	RadiusScale: number, -- outer radius = zone Radius * this
+	Width: number, -- studs
+	Thickness: number, -- studs
+	Transparency: number,
+	PulseAlpha: number, -- +- transparency, on Column.PulsePeriod
+}
+
+export type ZoneVfx = {
+	ColorTween: number, -- s of a colour change (squad platform state)
 	ActiveDistance: number, -- studs from the camera: farther zones are hidden and not animated
 }
 
@@ -50,7 +76,10 @@ export type Lobby = {
 		Height: number, -- studs: max |dy| between the root and the zone floor
 		Poll: number, -- s between two client checks
 	},
+	Column: Column,
 	Rings: Rings,
+	Floor: Floor,
+	ZoneVfx: ZoneVfx,
 	Squad: {
 		Poll: number, -- s between two server checks of the platforms
 		Countdown: number, -- s between Start and the teleport (the platform is green)
@@ -123,26 +152,46 @@ const lobby: Lobby = {
 		Height = 8,
 		Poll = 0.1,
 	},
-	Rings = {
-		Count = 4,
-		Points = 8,
+	Column = {
+		Height = 7,
+		Panels = 10,
 		RadiusScale = 1,
-		Height = 4.5,
-		Rise = 1.1,
-		Spin = 40,
-		Width = 0.45,
-		Segments = 10,
-		CurveSign = 1,
+		Overlap = 1.08,
+		Roll = 0,
 		Texture = "rbxassetid://16892386886", -- the user's reference beam (workspace.BeamExample)
-		TextureSpeed = 0.4,
+		TextureSpeed = 0.5,
+		TextureLength = 1,
+		Segments = 10,
 		LightEmission = 1,
-		Brightness = 2,
+		Brightness = 1,
+		Base = 0.35,
+		Middle = 0.6,
+		PulsePeriod = 2,
+		PulseAlpha = 0.08,
+	},
+	Rings = {
+		Count = 3,
+		RadiusScale = 1.04,
+		Width = 0.15,
+		Thickness = 0.04,
+		Lighten = 0.25,
+		Period = 2.5,
+		Reach = 0.85,
 		Transparency = 0.15,
 		FadeIn = 0.2,
-		FadeOut = 0.35,
-		WobbleTilt = 7,
-		WobbleSpeed = 2.4,
-		WobbleShift = 0.15,
+		FadeOut = 0.45,
+		WobbleTilt = 2,
+		WobbleSpeed = 1.6,
+	},
+	Floor = {
+		RadiusScale = 1.04,
+		Width = 0.2,
+		Thickness = 0.04,
+		Transparency = 0.25,
+		PulseAlpha = 0.2,
+	},
+	ZoneVfx = {
+		ColorTween = 0.3,
 		ActiveDistance = 80,
 	},
 	Squad = {
