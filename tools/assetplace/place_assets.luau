@@ -799,8 +799,12 @@ end
 --[[ Place.runInto(placements, ids, rootName) -> report (2026-10-11, lobby). Builds a WORLD-coordinate placement table
 	(LOBBY_placements.luau: no MAP_FRAME, no blockout, `replaces` ignored) into workspace.<rootName>, rebuilt from scratch.
 	Same build() rules as Place.run. MAP01_Assets and the blockout are never touched. ]]
-function Place.runInto(placements: { any }, ids: { [string]: any }, rootName: string): string
+function Place.runInto(placements: { any }, ids: { [string]: any }, rootName: string, force: boolean?): string
 	local old = workspace:FindFirstChild(rootName)
+	-- the user edits the lobby by hand in Studio (2026-10-11): never rebuild over it unless asked
+	if old and not force then
+		return "[skip] workspace." .. rootName .. " exists (hand-edited): Place.runInto(..., true) to rebuild it"
+	end
 	if old then
 		old:Destroy()
 	end
