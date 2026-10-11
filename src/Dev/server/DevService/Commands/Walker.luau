@@ -2,11 +2,11 @@
 -- Walker command (TASK-115; tests/wave-3.md R18). Writes the Step of the running ANM-007 occurrence through the same
 -- path as a gaze step (Anomalies set, cues post_flicker/walker_step, Fail -> LoseNight("critical") at the last step).
 -- Dev only: needs the Walker running (/dev anomaly ANM-007 during the Night phase).
---   walker <0..10>   sets the step
+--   walker <0..4>    sets the step (Steps = 4 posts, MAP-01 §5.6)
 local ServerScriptService = game:GetService("ServerScriptService")
 local Api = require(script.Parent.Parent.Api)
 
-const USAGE = "walker <0..10>"
+const USAGE = "walker <0..4>"
 
 type WalkerModule = { DevStep: (step: number) -> string }
 
@@ -18,7 +18,7 @@ const Walker: Api.Module = function(_ctx: Api.Context): { Api.Command }
 		{
 			Name = "walker",
 			Usage = USAGE,
-			Help = "sets the step of the running Walker (ANM-007) through the module path (10 = critical)",
+			Help = "sets the step of the running Walker (ANM-007) through the module path (4 = WALKER-10, critical)",
 			Run = function(args: { string }, _caller: Player?): string?
 				if module == nil or not module:IsA("ModuleScript") then
 					error("Anomalies/ANM-007 is not in this build", 0)

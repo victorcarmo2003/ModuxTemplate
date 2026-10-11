@@ -4,7 +4,7 @@
 -- night at once, no 10 s window (RoundService:LoseNight("critical")). Verb "dont_look", party target: the Walker
 -- advances one step per StepEvery seconds of party time in which any active player has it in the cone (not summed
 -- per player), and backs one step every BackEvery seconds with nobody looking. Ignoring it is the right answer.
---   Steps      step that loses the night (step 0 = JL-09 ... 9 = P-01, StreetLight Order - 1; Steps = WALKER-10)
+--   Steps      step that loses the night (step 0 = NL-01 ... 3 = NL-04, StreetLight Order - 1; Steps = WALKER-10)
 --   StepEvery  s of accumulated party gaze per step forward
 --   BackEvery  s without any gaze per step back
 --   Duration   s the occurrence lasts (npcs.md NPC-015 "45 s"); then the Walker backs into the dark and is gone
@@ -16,7 +16,7 @@ return {
 	Window = 0,
 	IsCritical = true,
 	Params = {
-		Steps = 5, -- 5 Juniper posts (user, 2026-10-10; MAP-01 §5.6)
+		Steps = 4, -- 4 Walker posts on the Ninth north curb, seen from the trailer window (user, 2026-10-10; MAP-01 §5.6)
 		StepEvery = 1,
 		BackEvery = 10,
 		Duration = 45,

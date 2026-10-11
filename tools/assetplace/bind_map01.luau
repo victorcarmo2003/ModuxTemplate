@@ -41,9 +41,14 @@
 	  W8. AutoDoor (DoorController contract): the LEAF of the Mart door (MapId MKT-DOOR; placeholder glass Door_Leaf
 	      when the mesh has none), D1 and SP-B gets tag AutoDoor + DoorId, DoorLeaf, DoorHinge (Left/Right), DoorAngle
 	      (signed: opens inward), DoorRadius 8 and CanCollide false on the server (only the client animates).
-	  Walker posts: 5 Juniper posts JL-01..05 every 16 studs + P-01 (Order 1..6: JL-05 = 1 ... JL-01 = 5, P-01 = 6);
-	      Walker steps 0..4 = Order 1..5, step 5 = WALKER-10; Hush = 6 posts x 2.5 s (Content.LightGroups). The blockout
-	      lights of the old JL-06..09 posts are disabled.
+	  W9. (2026-10-10, ambience pass, user request) the stray default Workspace.SpawnLocation (Roblox template, star
+	      decal, 12 x 1 x 12 in the middle of the crossing / X-T) moves to ServerStorage.DevScenes. Players are placed
+	      by CharacterService on PS-* / PS-N*; the blockout SpawnLocation_PS on the Pad stays the engine spawn.
+	  Walker posts (2026-10-10, user: the Juniper posts were not visible from the trailer window): 4 posts NL-01..04 on
+	      the Ninth north curb (bank / parking side) every 20 studs, X 118 -> 58, + P-01 (Order 1..5: NL-01 = 1 ...
+	      NL-04 = 4, P-01 = 5); Walker steps 0..3 = Order 1..4, step 4 = WALKER-10 (48, 14) across the Ninth from the
+	      window; Hush = 5 posts x 3 s (Content.LightGroups). The blockout lights of JL-01..09 and of the decorative
+	      Post_NinthN_E1 (it stood between NL-01 and NL-02) are disabled.
 	  Awning: ClosedAngle from the measured slant of the Awning (bbox diagonal + raycast profile), hanging 3 degrees
 	      outwards; a degenerate angle (< 5 degrees) falls back to the Shutter_Panel.
 
@@ -78,9 +83,10 @@ Contract: docs/tech/architecture.md §18 (tags §18.1, attributes §18.2, anchor
 	     Zone_Center, DRAWER fittings. The empty sale shell (MapId TRL-SALE) is removed: the real trailer parks there.
 	  4. Map anchors (wave 1): OPEN sign, Mart shelves (MKT-SHELVES), GEAR WALL. Wave 2: street bins AST-034_TrashCan
 	     -> tag StreetBin + Prompt_Discard (discard; T60, Q-166 b: all three, Provisório).
-	  5. Street lights: JL-01..09 + P-01 -> one Model per post (pole + head) with tag StreetLight, PostId,
-	     Group = "juniper_posts", Order 1..10 in Hush order (JL-09 = 1 ... JL-01 = 9, P-01 = 10). The blockout
-	     SpotLight of each post is copied into LampHead/Light_Lamp and the blockout one is disabled (no double light).
+	  5. Street lights (2026-10-10: Walker posts moved to the Ninth): NL-01..04 + P-01 -> one Model per post (pole +
+	     head) with tag StreetLight, PostId, Group = "juniper_posts", Order 1..5 in Hush order (NL-01 = 1 ... NL-04 = 4,
+	     P-01 = 5). A blockout SpotLight of the same id (P-01) is copied into LampHead/Light_Lamp and the blockout one is
+	     disabled (no double light); posts with no blockout twin (NL-*) get a default SpotLight.
 	  6. workspace.MapBinding: MapPoint parts (wave 1 + PS-N1..4, REV-1..4, TRL, TRL-SALE, CART, SPEC-P, SPEC-M,
 	     DROP-T, L1..L3, ST-R, SIGN-T) and the NpcNode graph (wave 1 + thief nodes up to the lurks). Floor Y by
 	     raycast; vehicle poses are the model pivots (no raycast); SPEC-* are camera points at absolute height.
@@ -274,8 +280,9 @@ local POINTS = {
 	{ id = "AS-2", x = 100, z = 18, floor = 0.4, faceTo = { 41, 40 }, spawn = "actor", despawn = true }, -- behind the TRUCK
 	{ id = "AS-3", x = -30, z = -104, floor = 0.4, faceTo = { 41, 40 }, spawn = "actor", despawn = true }, -- beyond BAR-N, west side alley
 	{ id = "AS-4", x = -40, z = -36, floor = 0.4, faceTo = { -40, 0 }, spawn = "actor", despawn = true, door = "SP-B" }, -- behind the laundry door
-	-- Walker step 10 (MAP-01 §5.6, fixed); steps 0..9 are the StreetLight posts (Order - 1)
-	{ id = "WALKER-10", x = 28, z = 29, floor = 0.4, faceTo = { 41, 35 } },
+	-- Walker last step (MAP-01 §5.6, fixed, 2026-10-10): south gutter of the Ninth right across from the trailer window,
+	-- outside LZ-3 (28 from the trailer centre) and CW-3, off the EB lane (Z 5); steps 0..3 are the posts NL-01..04
+	{ id = "WALKER-10", x = 48, z = 14, floor = 0, faceTo = { 41, 35 } },
 	-- traffic entries / exits (MAP-01 §5.4), on the road top, facing the travel direction
 	{ id = "W-IN", x = -136, z = 5, floor = 0, face = EAST },
 	{ id = "W-OUT", x = -136, z = -5, floor = 0, face = WEST },
@@ -487,19 +494,19 @@ local BENCH = {
 	{ slot = "B5", action = "bench_buy_upgrade", z = 55.5 },
 }
 
--- Street lights of the Hush / Walker chain (MAP-01 §5.6, 2026-10-10: 5 Juniper posts every 16 studs, user's choice):
--- Order = Hush order (JL-05 first, P-01 last). Walker: step = Order - 1 for Order 1..5 (JL-05..JL-01), step 5 =
--- WALKER-10; P-01 (Order 6) is only the Hush's corner post.
+-- Street lights of the Hush / Walker chain (MAP-01 §5.6, 2026-10-10: 4 posts on the Ninth north curb, seen from the
+-- trailer window, user's request). Order = Hush order (NL-01 farthest first, P-01 last). Walker: step = Order - 1 for
+-- Order 1..4 (NL-01..NL-04), step 4 = WALKER-10; P-01 (Order 5) is only the Hush's corner post.
 local POSTS = {
-	{ id = "JL-05", order = 1 },
-	{ id = "JL-04", order = 2 },
-	{ id = "JL-03", order = 3 },
-	{ id = "JL-02", order = 4 },
-	{ id = "JL-01", order = 5 },
-	{ id = "P-01", order = 6 },
+	{ id = "NL-01", order = 1 },
+	{ id = "NL-02", order = 2 },
+	{ id = "NL-03", order = 3 },
+	{ id = "NL-04", order = 4 },
+	{ id = "P-01", order = 5 },
 }
--- blockout posts that no longer exist on the map: their SpotLight is switched off (W: Walker posts)
-local RETIRED_POSTS = { "JL-06", "JL-07", "JL-08", "JL-09" }
+-- blockout posts that no longer carry the chain: their SpotLight is switched off (W: Walker posts). The Juniper keeps
+-- two decorative posts (no light, no tag); Post_NinthN_E1 left the Ninth north curb (it stood among the NL posts).
+local RETIRED_POSTS = { "JL-01", "JL-02", "JL-03", "JL-04", "JL-05", "JL-06", "JL-07", "JL-08", "JL-09", "Post_NinthN_E1" }
 local POST_GROUP = "juniper_posts" -- Content.LightGroups (content-data.md §6.4); visual only, no volume (DEC-196)
 
 -- Light volumes (MAP-01 §10.2). Trailer zones are given in the trailer's Pad frame (offset from TRL_POSE), the
@@ -1816,7 +1823,7 @@ local function ensureLampLight(post: Instance, head: Instance?, id: string)
 		sl.Brightness = 2
 		sl.Color = Color3.fromRGB(255, 214, 150)
 		light = sl
-		log("warn", ("%s: no blockout light found; default SpotLight created (style guide §5.1: Range 16-20, no shadow)"):format(id))
+		log("new", ("%s: no blockout twin; default SpotLight created (style guide §5.1: Range 16-20, no shadow)"):format(id))
 	end
 	if light:IsA("SpotLight") then
 		light.Face = Enum.NormalId.Bottom
@@ -1869,7 +1876,7 @@ local function bindStreetLights(assets: Instance)
 		ensureLampLight(post, head, spec.id)
 		log("ok", ("StreetLight %s: Order %d, Group %s (%d model(s))"):format(spec.id, spec.order, POST_GROUP, #parts))
 	end
-	-- retired posts (5-post Juniper, 2026-10-10): their blockout light would still shine (hidden parts keep lights)
+	-- retired posts (Walker posts on the Ninth, 2026-10-10): their blockout light would still shine (hidden parts keep lights)
 	local blockout = Workspace:FindFirstChild("MAP01_Blockout")
 	local folder = blockout and blockout:FindFirstChild("StreetLights")
 	local off = 0
@@ -2327,6 +2334,12 @@ local function bindShutterPiece(trl: Instance, padPose: CFrame)
 					d:Destroy()
 				end
 			end
+			if awning:GetAttribute("AwningHiddenByBind") then
+				awning.Transparency = awning:GetAttribute("OrigAwningTransparency") or 0
+				awning.CanQuery = true
+				awning.CanCollide = awning:GetAttribute("OrigAwningCanCollide") ~= false
+				awning:SetAttribute("AwningHiddenByBind", nil)
+			end
 			newHinge(awning, padPose:PointToWorldSpace(hinge), deg)
 			log("ok", ("TRL: Shutter_Hinge on the AST-027 Awning, ClosedAngle %.1f (%s)"):format(deg, info))
 			return
@@ -2363,8 +2376,24 @@ local function bindShutterPiece(trl: Instance, padPose: CFrame)
 		pp.CFrame = FCF(openCF)
 	end
 	newHinge(pp, hingeCF.Position, -90)
-	log("new", ("TRL: Shutter_Panel placeholder %s, open at %s, Shutter_Hinge ClosedAngle -90; Awning stays fixed (P51: %s)"):format(
-		fmtV(SHUTTER_PANEL_SIZE), fmtV(M(pp.Position)), why))
+	-- 2026-10-10 (Walker sight, MAP-01 §5.6): the AST-027 Awning of the current FBX is a vertical plate hanging over the
+	-- whole window (Y 5.9..10.7 at the wall face), i.e. the flap already CLOSED. Left fixed it blocked every ray out of
+	-- the window (raycast from PS-N1..4 and the window centre). With the placeholder panel as the flap, the fixed
+	-- Awning is hidden (reversible: Orig* attributes; restored when an Awning that works as a flap comes back).
+	local hid = ""
+	if awning and not awning:GetAttribute("AwningHiddenByBind") then
+		awning:SetAttribute("OrigAwningTransparency", awning.Transparency)
+		awning:SetAttribute("OrigAwningCanCollide", awning.CanCollide)
+		awning:SetAttribute("AwningHiddenByBind", true)
+		awning.Transparency = 1
+		awning.CanCollide = false
+		awning.CanQuery = false
+		hid = "; fixed Awning hidden (it hung over the window)"
+	elseif awning then
+		hid = "; fixed Awning already hidden"
+	end
+	log("new", ("TRL: Shutter_Panel placeholder %s, open at %s, Shutter_Hinge ClosedAngle -90%s (P51: %s)"):format(
+		fmtV(SHUTTER_PANEL_SIZE), fmtV(M(pp.Position)), hid, why))
 end
 
 -- Leftovers of the hide spots inside the trailer (DEC-221): bind-created Prompt_Hide / Hide_Pose outside the
@@ -2696,6 +2725,24 @@ local function lockHelpers(assets: Instance, root: Instance): number
 	return n
 end
 
+-- W9: the default SpawnLocation template (star decal) left in the crossing goes to ServerStorage.DevScenes (reversible).
+local function parkStraySpawn(): number
+	local n = 0
+	for _, d in Workspace:GetChildren() do
+		if d:IsA("SpawnLocation") and d.Name == "SpawnLocation" then
+			local dev = ServerStorage:FindFirstChild("DevScenes")
+			if not dev then
+				dev = Instance.new("Folder")
+				dev.Name = "DevScenes"
+				dev.Parent = ServerStorage
+			end
+			d.Parent = dev
+			n += 1
+		end
+	end
+	return n
+end
+
 -- Persistent on every Model that is, or contains, a tagged instance (§18.0 item 6).
 local function persistAll(): number
 	local n = 0
@@ -2768,6 +2815,10 @@ function Bind.run(opts: AnchorOpts?): string
 	bindLightZones(root, padPose)
 	bindWindows(assets, root)
 	bindTraffic(root)
+	local parked = parkStraySpawn()
+	if parked > 0 then
+		log("conv", ("W9: %d stray Workspace.SpawnLocation (star decal in the crossing) moved to ServerStorage.DevScenes"):format(parked))
+	end
 	local locked = lockHelpers(assets, root)
 	log("ok", ("helpers: %d invisible / helper part(s) Locked (no click-select), CanTouch off, CanQuery off where they do not collide (W7)"):format(locked))
 	local p = persistAll()

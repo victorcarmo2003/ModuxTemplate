@@ -15,7 +15,7 @@ const rule: Api.Rule = {
 	IsCritical = false,
 	Params = {
 		-- s from the first post to the corner post. Fallback only: the real moment is the one LightService uses
-		-- (largest StreetLight Order x LightGroups.juniper_posts.Step = 10 x 1.5 = 15)
+		-- (largest StreetLight Order x LightGroups.juniper_posts.Step = 5 x 3 = 15; NL-01..04 + P-01, MAP-01 §5.6)
 		PostsOff = 15,
 		-- s the posts stay out after the corner post (then they come back and the occurrence resolves)
 		HoldFor = 20,

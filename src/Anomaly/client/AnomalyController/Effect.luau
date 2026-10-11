@@ -52,7 +52,7 @@ export type Record = {
 	Anomaly: string, -- Content.Anomalies key
 	Phase: Phase,
 	StartedAt: number, -- server time (workspace:GetServerTimeNow)
-	Step: number, -- Walker: step 0..10; Hush: posts out; others 0
+	Step: number, -- Walker: step 0..Steps (4); Hush: posts out; others 0
 	Anchor: number, -- NpcId of the customer anomaly, or anchor index; 0 = none (meaning is per anomaly)
 }
 

@@ -18,13 +18,17 @@ type Preset = {
 	Ambient: Color3,
 	OutdoorAmbient: Color3,
 	ColorShiftTop: Color3,
+	ColorShiftBottom: Color3,
 	EnvDiffuse: number,
 	EnvSpecular: number,
 	ShadowSoftness: number,
 	AtmDensity: number,
 	AtmHaze: number,
+	AtmOffset: number,
+	AtmGlare: number,
 	AtmColor: Color3,
 	AtmDecay: Color3,
+	CCBrightness: number,
 	Saturation: number,
 	Contrast: number,
 	Tint: Color3,
@@ -32,6 +36,7 @@ type Preset = {
 	BloomSize: number,
 	BloomThreshold: number,
 	SunRays: number,
+	SunRaysSpread: number,
 }
 
 export type Public = {

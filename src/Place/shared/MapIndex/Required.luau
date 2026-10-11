@@ -203,7 +203,7 @@ wave2.Tagged = {
 	{
 		Tag = "StreetLight",
 		Attribute = "PostId",
-		Ids = { "JL-01", "JL-02", "JL-03", "JL-04", "JL-05", "P-01" },
+		Ids = { "NL-01", "NL-02", "NL-03", "NL-04", "P-01" }, -- Walker / Hush posts (MAP-01 §5.6, 2026-10-10)
 	},
 }
 -- thief routes from the street spawn to each lurk (MAP-01 §9.2; AvoidCrossings is the thief's own query)
@@ -239,7 +239,7 @@ local function union(list: { string }, extra: { string }): { string }
 	return out
 end
 
-const STREET_POSTS = { "JL-01", "JL-02", "JL-03", "JL-04", "JL-05", "P-01" }
+const STREET_POSTS = { "NL-01", "NL-02", "NL-03", "NL-04", "P-01" }
 
 -- MapPoints a cutscene stands on, walks to or looks at (Marks, MoveTo with "{slot}" = 1..4, LookAt). LookAt on a
 -- street post is the StreetLight itself (PostId), not a point. Client actors start and end on the explicit ones
@@ -315,7 +315,7 @@ wave3.Tags = union(wave2.Tags, { "AnomalyAnchor", "TrafficPath", "TrafficLine", 
 wave3.Points = union(
 	wave2.Points,
 	concat(
-		-- safe spot (SS, §19.14), anomaly anchors and hidden actor spawns (MAP-01 §10.3), Walker step 10 (§5.6, fixed)
+		-- safe spot (SS, §19.14), anomaly anchors and hidden actor spawns (MAP-01 §10.3), Walker last step (§5.6, fixed)
 		{ "SS", "AN-04", "AN-05", "AN-11", "AN-12", "AS-1", "AS-2", "AS-3", "AS-4", "WALKER-10" },
 		cutscenePoints(),
 		-- traffic entries and exits (MAP-01 §5.4)

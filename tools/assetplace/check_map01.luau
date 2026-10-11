@@ -26,6 +26,11 @@
 	 13. (wave 3, MAP-01 §9.8) spawn / despawn points out of sight of PS-1..4, Q1..Q5, MKT-DOOR, SS (raycast, 9 rays
 	     per viewer, <= 200 studs): an edge point in sight = warning, a door point = info; AutoDoor leaves of
 	     MKT-DOOR / D1 / SP-B present and not colliding. Ghost upgrade pieces (NoVisual) are reported as info (rule 9)
+	 14. (wave 3, MAP-01 §5.6, 2026-10-10) Walker sight: every Walker post (StreetLight Group juniper_posts, Order 1..4)
+	     and WALKER-10 must be seen from the trailer window (centre of the service window with the trailer on the Pad,
+	     MAP-01 (41.5, 8.2, 36.6)): ERROR when no ray reaches the figure (feet+1, waist, head) or the lamp; from each
+	     PS-N1..4 eye a miss is a warning. Same blockers as rule 13 (vehicles excluded: the window frame is measured
+	     by hand, MAP-01 §5.6)
 
 	Reads only tags and attributes (never the bind script's data). Items of §18.7 (wave 1) + §19.22 (wave 2):
 	  1. tags present (wave 1: MapBinding MapPoint NpcNode Vehicle Station Interactable UpgradePiece; wave 2: + LightZone
@@ -123,8 +128,9 @@ local CUTSCENE_POINTS_EMBEDDED = {
 	"CutsceneMark1", "CutsceneMark2", "CutsceneMark3", "CutsceneMark4", "CS-2", "CS-3", "CS-4", "CS-5",
 	"CS-P1", "CS-P2", "CS-P3", "CS-P4", "CART", "SS-1", "SS-2", "SS-3", "SS-4", "WALT-1", "RL-END",
 }
--- 2026-10-10: 5 Juniper posts (user's choice, MAP-01 §5.6). Required.luau (src/Place) still lists JL-06..09: to fix there.
-local STREET_POSTS = { "JL-01", "JL-02", "JL-03", "JL-04", "JL-05", "P-01" }
+-- 2026-10-10 (user): Walker posts NL-01..04 on the Ninth north curb, seen from the trailer window (MAP-01 §5.6);
+-- same list as Required.luau (src/Place).
+local STREET_POSTS = { "NL-01", "NL-02", "NL-03", "NL-04", "P-01" }
 local WINDOWS_W3 = { ["WV-1"] = 31, ["WV-2"] = 38, ["WV-3"] = 45 } -- AnchorId -> window centre X (AST-045)
 -- Traffic, embedded copy of Content.Traffic (routes: entry point, stop lines in order, conflict boxes)
 local TRAFFIC_EMBEDDED = {
@@ -228,9 +234,11 @@ local ZONES = { -- ZoneId -> Group, shape
 	["LZ-4"] = { group = "mart", shape = "Block" },
 	["LZ-5"] = { group = "mart", shape = "Ball" },
 }
-local POSTS = { -- PostId -> Order (Hush order: JL-05 first, P-01 last; Walker step = Order - 1 for Order 1..5)
-	["JL-05"] = 1, ["JL-04"] = 2, ["JL-03"] = 3, ["JL-02"] = 4, ["JL-01"] = 5, ["P-01"] = 6,
+local POSTS = { -- PostId -> Order (Hush order: NL-01 first, P-01 last; Walker step = Order - 1 for Order 1..4)
+	["NL-01"] = 1, ["NL-02"] = 2, ["NL-03"] = 3, ["NL-04"] = 4, ["P-01"] = 5,
 }
+local WALKER_POSTS = 4 -- Rules/ANM-007 Steps: Order 1..4 are Walker steps, WALKER-10 is the last one
+local TRAILER_WINDOW = Vector3.new(41.5, 8.2, 36.6) -- MAP-01: centre of the service window, trailer on the Pad (§7.2)
 local POST_GROUP = "juniper_posts"
 
 -- MAP-01 rectangles -> world rectangles (MapFrame.box)
@@ -1247,7 +1255,7 @@ local function checkWave2(points: { [string]: Instance }, vehicles: { [string]: 
 	for _, m in tagged("StreetLight") do
 		local id = m:GetAttribute("PostId")
 		if typeof(id) ~= "string" or POSTS[id] == nil then
-			err(("3: StreetLight %s PostId = %s (valid JL-01..JL-09, P-01)"):format(name(m), tostring(id)))
+			err(("3: StreetLight %s PostId = %s (valid NL-01..NL-04, P-01)"):format(name(m), tostring(id)))
 			continue
 		end
 		if posts[id] then
@@ -1262,7 +1270,7 @@ local function checkWave2(points: { [string]: Instance }, vehicles: { [string]: 
 		end
 		local o = m:GetAttribute("Order")
 		if o ~= POSTS[id] then
-			err(("2: StreetLight %s Order = %s, need %d (Hush JL-09 -> JL-01 -> P-01, MAP-01 §5.6)"):format(id, tostring(o), POSTS[id]))
+			err(("2: StreetLight %s Order = %s, need %d (Hush NL-01 -> NL-04 -> P-01, MAP-01 §5.6)"):format(id, tostring(o), POSTS[id]))
 		elseif typeof(o) == "number" then
 			if orders[o] then
 				err(("1: Order %d used by %s and %s"):format(o, orders[o], id))
@@ -1653,7 +1661,7 @@ end
 -- SIGHT_SEE_THROUGH transparent; the binding, the blockout Markers / Limits, NPCs and the two vehicles are ignored
 -- (the cart / trailer move; worst case). Edge points seen = warning; door points seen = info (rule a: they appear
 -- in the doorway while the AutoDoor leaf opens). Also: AutoDoor leaves present (info / warning).
-local function checkSpawnSight(points: { [string]: Instance })
+local function sightClear(): (Vector3, Vector3, Instance?) -> boolean
 	local exclude: { Instance } = {}
 	local binding = Workspace:FindFirstChild("MapBinding")
 	if binding then
@@ -1682,8 +1690,11 @@ local function checkSpawnSight(points: { [string]: Instance })
 	end
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
-	local function clear(a: Vector3, b: Vector3): boolean
+	return function(a: Vector3, b: Vector3, skip: Instance?): boolean
 		local ex = table.clone(exclude)
+		if skip then
+			table.insert(ex, skip)
+		end
 		for _ = 1, 24 do
 			params.FilterDescendantsInstances = ex
 			local hit = Workspace:Raycast(a, b - a, params)
@@ -1697,6 +1708,89 @@ local function checkSpawnSight(points: { [string]: Instance })
 		end
 		return true
 	end
+end
+
+-- 14 (MAP-01 §5.6, 2026-10-10): the Walker has to be seen from the trailer window. Targets: posts Order 1..WALKER_POSTS
+-- of the juniper_posts group (the figure stands under the lamp head: feet+1, waist, head, and the lamp itself) and
+-- WALKER-10 (feet+1, waist, head). Window centre blocked = error; each PS-N eye blocked = warning.
+local function checkWalkerSight(points: { [string]: Instance })
+	local clear = sightClear()
+	local targets: { { id: string, pts: { Vector3 }, skip: Instance? } } = {}
+	local byOrder: { [number]: Instance } = {}
+	for _, m in tagged("StreetLight") do
+		local o = m:GetAttribute("Order")
+		if m:GetAttribute("Group") == POST_GROUP and typeof(o) == "number" and o >= 1 and o <= WALKER_POSTS then
+			byOrder[o] = m
+		end
+	end
+	for o = 1, WALKER_POSTS do
+		local m = byOrder[o]
+		if not m then
+			err(("14: Walker post Order %d missing (StreetLight, Group %s)"):format(o, POST_GROUP))
+			continue
+		end
+		local head: Instance? = nil
+		for _, d in m:GetDescendants() do
+			if d:GetAttribute("Asset") == "AST-036_LampHead" then
+				head = d
+			end
+		end
+		-- the figure stands under the dome (LampHead box centre), on the ground of the post (its pivot height)
+		local foot = pos(m)
+		local dome = foot + Vector3.new(0, 13, 0)
+		if head then
+			local cf = if head:IsA("Model") then (head :: Model):GetBoundingBox() elseif head:IsA("BasePart") then (head :: BasePart).CFrame else nil
+			if cf then
+				dome = cf.Position
+			end
+		end
+		local ground = Vector3.new(dome.X, foot.Y, dome.Z)
+		table.insert(targets, {
+			id = ("%s (Order %d)"):format(tostring(m:GetAttribute("PostId")), o),
+			pts = { ground + Vector3.new(0, 1, 0), ground + Vector3.new(0, 3.5, 0), ground + Vector3.new(0, 6, 0), dome },
+			skip = m,
+		})
+	end
+	local w = points["WALKER-10"]
+	if w then
+		local p = pos(w)
+		table.insert(targets, { id = "WALKER-10", pts = { p + Vector3.new(0, 1, 0), p + Vector3.new(0, 3.5, 0), p + Vector3.new(0, 6, 0) } })
+	else
+		err("14: MapPoint WALKER-10 missing")
+	end
+	local window = F(TRAILER_WINDOW)
+	for _, t in targets do
+		local function seenFrom(eye: Vector3): number
+			local n = 0
+			for _, q in t.pts do
+				if clear(eye, q, t.skip) then
+					n += 1
+				end
+			end
+			return n
+		end
+		local nWin = seenFrom(window)
+		if nWin == 0 then
+			err(("14: Walker %s is NOT seen from the trailer window (MAP-01 §5.6: move the post or the blocker)"):format(t.id))
+		else
+			local blind: { string } = {}
+			for _, vid in { "PS-N1", "PS-N2", "PS-N3", "PS-N4" } do
+				local v = points[vid]
+				if v and seenFrom(pos(v) + Vector3.new(0, SIGHT_EYE, 0)) == 0 then
+					table.insert(blind, vid)
+				end
+			end
+			if #blind > 0 then
+				warn_(("14: Walker %s seen from the window (%d/%d rays) but not from %s"):format(t.id, nWin, #t.pts, table.concat(blind, ", ")))
+			else
+				info(("14: Walker %s seen from the window (%d/%d rays) and from PS-N1..4"):format(t.id, nWin, #t.pts))
+			end
+		end
+	end
+end
+
+local function checkSpawnSight(points: { [string]: Instance })
+	local clear = sightClear()
 
 	local spawns: { string } = {}
 	for id, p in points do
@@ -2374,6 +2468,7 @@ function Check.run(opts: { write: boolean?, wave: number? }?): (string, number)
 	checkGraph(root)
 	if WAVE >= 3 then
 		checkSpawnSight(points)
+		checkWalkerSight(points)
 	end
 
 	local pc, nc, ic = #tagged("MapPoint"), #tagged("NpcNode"), #tagged("Interactable")

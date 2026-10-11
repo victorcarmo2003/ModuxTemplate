@@ -238,7 +238,8 @@ end
 	           orientation (asset frame, Y * X * Z), new size (MeshPart scaled)
 	  copies = { { part = name, x, y, z, rotY = deg?, size = {..}? } }   extra clones of a part, same pose rule
 	  pivot  = { x, y, z, rotY }   Model.WorldPivot in the PLACEMENT frame (same coordinates as x/y/z), when the
-	           pivot was moved off the asset origin by hand ]]
+	           pivot was moved off the asset origin by hand
+	  collide = false      every BasePart CanCollide false (small props, facade details) ]]
 local function build(p: { [string]: any }, tpl: Instance): Instance
 	local inst = tpl:Clone()
 	inst.Name = if p.id then (p.id .. "_" .. p.asset) else p.asset
@@ -300,6 +301,15 @@ local function build(p: { [string]: any }, tpl: Instance): Instance
 	end
 	if p.pivot and inst:IsA("Model") then
 		inst.WorldPivot = frameOf(p.pivot[1], p.pivot[2], p.pivot[3], p.pivot[4])
+	end
+	-- collide = false (2026-10-10, ambience pass): small props next to walking lines / out of reach (AC units,
+	-- clotheslines) do not block characters; CanQuery stays (raycasts and the line-of-sight checks still see them)
+	if p.collide == false then
+		for _, d in (if inst:IsA("BasePart") then { inst } else inst:GetDescendants()) do
+			if d:IsA("BasePart") then
+				d.CanCollide = false
+			end
+		end
 	end
 	return inst
 end

@@ -193,7 +193,7 @@ return Lync.define("game", {
 		Anomaly = Lync.enum(Content.Anomalies.Keys),
 		Phase = Lync.enum({ "Signal", "Active", "Resolved", "Failed" }),
 		StartedAt = Lync.f64(),
-		-- Walker: step 0..10; Hush: posts out; others 0
+		-- Walker: step 0..Steps (4); Hush: posts out; others 0
 		Step = Lync.int(0, 20),
 		-- NpcId of the customer anomaly, or anchor index (AnchorId/MapPoint); 0 = none
 		Anchor = Lync.int(0, 65535),

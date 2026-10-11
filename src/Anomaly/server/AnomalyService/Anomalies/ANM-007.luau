@@ -4,8 +4,8 @@
 --
 -- The Walker is a client-only actor (TASK-116) standing under the post of its Step; the server only keeps Step in the
 -- Anomalies record and tests the gaze against the same spot:
---   step 0..9  StreetLight posts of the Juniper, Order = step + 1 (JL-09 = 1 ... P-01 = 10; MAP-01 §18 binding)
---   step 10    MapPoint WALKER-10 (28, 29), fixed: the edge of the trailer light, with or without the switch or
+--   step 0..Steps-1  StreetLight posts NL-01..NL-04 of the Ninth north curb, Order = step + 1 (MAP-01 §5.6, 2026-10-10)
+--   step Steps MapPoint WALKER-10 (48, 14), fixed: across the Ninth from the window, outside the trailer light, with or without the switch or
 --              Trailer Lights (npcs.md N7, resolves N3 x N7)
 --
 --   Start   every position bound -> Phase Signal, Step 0, cue "post_buzz" on post Order 1 (DEC-123, ~2 s, heard by
@@ -37,7 +37,7 @@ const FIGURE_HEIGHT = 4.5 -- studs above the ground: upper body of a tall figure
 const MAX_DT = 0.5 -- s; a late tick never counts more than this
 const EPSILON = 1e-3 -- s; float slack of 5 x 0.2 s against 1 s
 -- Defaults when Rules/ANM-007 is missing (same numbers as the rule file)
-const DEFAULT_STEPS = 5
+const DEFAULT_STEPS = 4
 const DEFAULT_STEP_EVERY = 1
 const DEFAULT_BACK_EVERY = 10
 const DEFAULT_DURATION = 45

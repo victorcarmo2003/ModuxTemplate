@@ -268,24 +268,27 @@ Velocidade de cliente a pé: ~8 studs/s (texto antigo; `CustomerTypes` usa 9–1
 
 ### 5.6 Walker e Hush (ANM-007, ANM-010)
 
-| Passo do Walker | Posição | Nota |
-|---|---|---|
-**2026-10-10 (usuário: menos postes, 5 passos; Provisório):** 5 postes na Juniper a cada 16 studs; passos 0–4 nos postes, passo 5 em WALKER-10. P-01 sai da cadeia do Walker (fica só como poste da esquina do Hush). `StreetLight.Order`: JL-05 = 1 … JL-01 = 5, P-01 = 6; passo = `Order − 1` para Order 1..5. O `PointId` continua `WALKER-10` (é o id exigido pelo `Required.luau` e pelo código; o nome não é o número do passo).
+**2026-10-10, pedido do usuário (Provisório): os postes do Walker saíram da Juniper e foram para a Ninth.** De dentro do trailer (janela de serviço) a fileira da Juniper Norte não era vista. Medição com raycast no Studio (trailer posto no Pad): **a malha `Awning` do AST-027 é uma placa vertical que tapa a janela inteira** (Y 5,9..10,7 na face da parede, Z 34,6..34,8), ou seja, a aba já vem *fechada* no FBX; como o `ClosedAngle` medido sai degenerado, o `Bind` usa o `Shutter_Panel` como aba e a `Awning` ficava fixa na frente do vidro — **nenhum raio saía da janela** (PS-N1..4 e centro). Correção no `bind_map01` (`bindShutterPiece`): no caminho do `Shutter_Panel`, a `Awning` fixa é **escondida** (Transparency 1, sem colisão/consulta, `Orig*` guardados; volta se um dia a `Awning` servir de aba). Com isso, a janela enxerga a rua.
 
-| Passo do Walker | Posição | Nota |
-|---|---|---|
-| 0 (início) | JL-05 (−16, −88) | "sob o último poste da Juniper"; **~135 studs** da janela (mesma ponta de antes). Além de BAR-N. Sinal de início: JL-05 **zumbe ~2 s** [DEC-123] |
-| 1 | JL-04 (−16, −72) | ~121; **4 studs dentro de BAR-N** (o jogador pode chegar perto, P53). O poste onde ele está pisca |
-| 2 | JL-03 (−16, −56) | ~107 |
-| 3 | JL-02 (−16, −40) | ~94 |
-| 4 | JL-01 (−16, −24) | ~82; quina NO |
-| 5 (perde a noite) | **WALKER-10 = (28, 29), fixo** | calçada sul, quina NO do Pad, ~15 studs do centro do trailer. Salto de ~68 studs desde JL-01 (antes passava por P-01). **Não muda** com o interruptor nem com Trailer Lights |
+A fileira nova fica na **calçada norte da Ninth, lado do banco / estacionamento** (o lado que a janela encara), **4 postes a cada 20 studs**, vindo na direção do trailer. Braço sobre a pista (rotY 0), poste no meio-fio como os outros da Ninth. A boca do estacionamento (X 62..78, long car AN-12) fica livre; os carros PARK-N 5 e 6 (X 84 / 98) foram para o oeste (X −133 / −118), para nada estacionar entre a janela e os postes.
 
-Cada passo agora anda 16 studs (antes 8): o avanço fica mais legível no celular. Os passos 0–1 ficam além dos ~110 do style guide (emenda ~135, P33). Alternativa (P52): 4 postes JL + P-01 como passo 4, para o último salto não atravessar o cruzamento inteiro.
+| Passo | Posição (cabeça do poste) | Distância / direção da janela (41,5; 36,6) | Nota |
+|---|---|---|---|
+| 0 (início) | **NL-01** (118, −14,4) | ~92 studs, 56° a leste do norte | além de BAR-E (fora da área jogável); zumbe ~2 s [DEC-123] |
+| 1 | **NL-02** (98, −14,4) | ~76, 48° | |
+| 2 | **NL-03** (78, −14,4) | ~63, 36° | borda leste da boca do estacionamento |
+| 3 | **NL-04** (58, −14,4) | ~54, 18° | em frente à cerca do estacionamento |
+| 4 (perde a noite) | **WALKER-10 = (48, 14), fixo** | ~24, 16° | sarjeta sul da Ninth bem em frente à janela; fora de LZ-3 (28 do centro do trailer), de CW-3 e da faixa EB (Z 5). Não muda com interruptor nem Trailer Lights |
 
-Hush: apaga JL-05 → JL-01 → **P-01** (**6 postes**, **2,5 s por poste** em `Content.LightGroups.juniper_posts.Step`, total **15 s** como antes). "O poste da esquina" de `anomalies.md` N10 = **P-01**. Quando P-01 apaga, quem não está em SS errou.
+`StreetLight.Order`: NL-01 = 1 … NL-04 = 4, **P-01 = 5** (só o poste da esquina do Hush). Passo = `Order − 1` para Order 1..4; passo 4 = `WALKER-10` (o id continua o mesmo: é o exigido pelo `Required.luau`). `Steps = 4` em `Rules/ANM-007` (e `DEFAULT_STEPS` / `STEPS` no servidor e no client; comando dev `walker <0..4>`). Group continua `juniper_posts` (nome antigo, lido por código e binding; não renomeado de propósito).
 
-Arquivos de código que ainda assumem 10 postes / passos 0..9 + 10 (não editados aqui, lista para backend/frontend): `src/Place/shared/MapIndex/Required.luau` (linhas `Ids` da onda 2 e `STREET_POSTS` da onda 3 listam JL-06..09: **o `Validate` acusa erro no Studio até mudar**), `src/Anomaly/server/AnomalyService/Rules/ANM-007.luau` (`Steps = 10` → 5; comentário dos passos), `src/Anomaly/server/AnomalyService/Anomalies/ANM-007.luau` (comentários "step 0..9", "step 10"), `src/Anomaly/client/AnomalyController/Effects/ANM-007.luau` (`STEPS = 10` → 5), `src/Anomaly/server/AnomalyService/Rules/ANM-010.luau` (comentário "10 x 1.5" → "6 x 2.5"; `PostsOff = 15` continua certo).
+Hush: apaga NL-01 → NL-04 → **P-01** (**5 postes × 3 s** = **15 s**, `Content.LightGroups.juniper_posts.Step = 3`; `PostsOff = 15` continua certo). Quando P-01 apaga, quem não está em SS errou.
+
+Juniper Norte: ficaram **2 postes decorativos** (`Post_JuniperN_1/2`, Z −40 e −72; sem tag, sem luz); as luzes do blockout JL-01..09 e do antigo `Post_NinthN_E1` (que ficava entre NL-01 e NL-02) são desligadas pelo `Bind` (`RETIRED_POSTS`).
+
+**Linha de visão (raycast no Studio, trailer no Pad, carrinho fora, `Awning` escondida):** do centro da janela, NL-01..04 e WALKER-10 vistos em todos os raios (pé +1, cintura, cabeça e lâmpada). Dos olhos PS-N1..4 (a 4,5 do piso, colados ao balcão): PS-N1 vê os quatro (o pé de NL-01/02 some atrás do trilho); PS-N2 vê a parte alta de todos; **PS-N3 não vê NL-01** e **PS-N4 (X 50, ponta leste) não vê NL-01..03** — a parede leste da janela tapa (basta um passo para oeste). WALKER-10 até 6 de altura fica atrás das estações para quem está colado ao balcão em PS-N2..4 (PS-N1 vê); a figura (~7) aparece por cima do balcão. `check_map01` **regra 14** confere isso a cada rodada: posto/WALKER-10 invisível do centro da janela = **erro**; PS-N cego = aviso.
+
+Cada passo anda ~20 studs (o último, ~32, atravessa a Ninth). Correr para o Mart (oeste) deixa os postes nas costas: o N7 × N10 do §6 continua valendo (melhor que antes: nem a CW-1 obriga a olhar para eles).
 
 ## 6. Distâncias e linhas de visão (checagem dos requisitos)
 
@@ -302,8 +305,8 @@ Arquivos de código que ainda assumem 10 postes / passos 0..9 + 10 (não editado
 | Luz do trailer raio 18 | DEC-055 | cobre Q1–Q5 e a frente do Pad; não cobre P-01 (29), a rua nem a praça | sim |
 | Ponto seguro sob o letreiro do Mart, ~100–120 studs | `anomalies.md` N10 (Aprovado) | porta do trailer → SS: **~103** até a borda, ~110 até o centro. 6,5 s a 16 (Line Cook 15: 6,9 s; Runner 18: 5,7 s). Janela do Hush ~15 s; durante o Hush não há trânsito (FEAT-033), então CW-1 não exige esperar | sim |
 | Correr para o Mart sem precisar olhar a Juniper | `anomalies.md` N7 × N10 | rota sai pela traseira do Pad e anda para oeste (≤ 14° ao norte do oeste). Com JL-09 mais perto (Z −88), a folga caiu: atrás do trailer o casco (altura ~11) tapa a linha para a Juniper; saindo de trás dele (borda oeste do Pad, X ~24) o fim da Juniper fica a **~59°** da direção de marcha, e passa de 75° depois de CW-1 (meia largura da visão no celular deitado: ~51–57°). Dentro de SS, olhando para o Mart ou para o Pad, a Juniper fica fora da tela. **Atenção:** sem semáforo, quem espera em CW-1 olha para o **norte** para ver carro saindo do cruzamento, e o fim da Juniper entra na tela. De dia não há Walker; à noite a proposta é **zero carro na Juniper** (§9.5, P32), então não há o que olhar. Se `Q-102`/`Q-103` puserem carro na Juniper à noite, esse olhar vira risco N7 × N10 | sim (depende da noite sem carros na Juniper) |
-| Linha de visão longa da janela para a Juniper | `anomalies.md` N7, N10 | janela (X 30..53, Z 35) → JL-09: **~135** studs, ~25° a oeste do norte (dentro da tela enquanto se trabalha). Postes na calçada **oeste**: a linha mais crítica (da ponta leste da janela para JL-09) passa ~8 studs a oeste da quina do banco (antes 1) | sim |
-| Fim da Juniper legível do trailer | `art/style-guide.md` §5 (~110) **emendado pelo usuário para ~135** (LD-15 / P33) | JL-09 a ~135; JL-06 a ~114; JL-05 a ~107. Todos os passos dentro de ~135 | sim (com a emenda; art-director anota no style guide) |
+| Linha de visão longa da janela para a Juniper (**histórico**: desde 2026-10-10 os postes do Walker estão na Ninth, §5.6) | `anomalies.md` N7, N10 | janela (X 30..53, Z 35) → JL-09: **~135** studs, ~25° a oeste do norte (dentro da tela enquanto se trabalha). Postes na calçada **oeste**: a linha mais crítica (da ponta leste da janela para JL-09) passa ~8 studs a oeste da quina do banco (antes 1) | sim |
+| Fim da Juniper legível do trailer (**histórico**; desde 2026-10-10 o passo 0 é NL-01 a ~92 studs, §5.6) | `art/style-guide.md` §5 (~110) **emendado pelo usuário para ~135** (LD-15 / P33) | JL-09 a ~135; JL-06 a ~114; JL-05 a ~107. Todos os passos dentro de ~135 | sim (com a emenda; art-director anota no style guide) |
 | Janelas do N6 "lá em cima" | `anomalies.md` N6, `world.md` §3 | WV-1..3 a ~70 studs e 19–28 de altura (olho a ~6,5 dentro do trailer): **10–17° acima do horizonte**. Ficam no alto da tela, não fora dela (ver §15 P25) | parcial |
 | Relógio do banco visível do balcão | `anomalies.md` N3 | C-01 a ~73 studs, ~6° acima do horizonte (centro a ~14) | sim |
 | Teto de 12 NPCs | DEC-045 | §9.4 (médicos, Opal e veículos fora do teto) | sim |
@@ -1186,3 +1189,60 @@ Mudar `K` (outro giro) = mudar `map_frame.luau` e o `MAP_K` de `Required.luau` /
 Asfalto no Y 0 em toda parte (pista y −0,24): faixas CW-1..4, linhas SL-* e linhas amarelas/brancas do blockout continuam por cima (0,01–0,05), nas mesmas posições do trânsito. Degrau de 0,16 entre calçada da Juniper (0,24) e da Ninth (0,4) continua como antes.
 
 **Rodado em 2026-10-10:** `Place.diff` antes (referencial novo, placements antigos): só os postes esperados (JL-02..05 a 8/16/24/32 do lugar novo, JL-06..09 sobrando). `Place.run` 244/244 → `Bind.run` (err 0) → `Pieces.run` (21/21, err 0) → `Check.run({ wave = 3 })` **PASS, 0 erros**, 24 avisos (fittings de arte, barreiras, AS-1/2/3 e SP-S à vista — SP-S do SS através do vidro do B5; giro rígido, então já valia antes). `Place.diff` depois: **0 diferenças** (243 iguais). `Shutter_Hinge` no `Shutter_Panel` (`ClosedAngle −90`: a `Awning` medida deu ângulo degenerado). `Workspace.Model` (CrewDemo) e `Workspace.Rig` foram para `ServerStorage.DevScenes`.
+
+### 16.10 Walker na Ninth, aba do trailer e ambientação (2026-10-10) — Provisório
+
+| Item | O que muda | Onde |
+|---|---|---|
+| Postes do Walker | NL-01..04 na calçada norte da Ninth (X 118 / 98 / 78 / 58), Order 1..4, P-01 = 5; `WALKER-10` em (48, 14); 2 postes decorativos na Juniper; `RETIRED_POSTS` = JL-01..09 + `Post_NinthN_E1`; NL sem gêmeo no blockout ganha `SpotLight` padrão (log `new`) | `MAP-01_placements.luau` §3, `bind_map01.luau` (`POSTS`, `RETIRED_POSTS`, ponto `WALKER-10`) |
+| Aba da janela | no caminho `Shutter_Panel`, a `Awning` fixa do AST-027 (placa vertical sobre a janela) é escondida (`AwningHiddenByBind`, `OrigAwning*`) | `bind_map01.luau` `bindShutterPiece` |
+| Código | `Steps = 4` (`Rules/ANM-007`), `DEFAULT_STEPS = 4`, `STEPS = 4` (client), Hush `Step = 3` (`LightGroups`), lista de postes `NL-01..04, P-01` em `Required.luau` (onda 2 `Tagged` e onda 3 `STREET_POSTS`), comando dev `walker <0..4>` | `src/` (`tools/analyze.ps1` 0 erro) |
+| Check | regra 14: linha de visão do centro da janela (trailer no Pad, MAP-01 (41,5; 8,2; 36,6)) até cada poste do Walker (pé +1, cintura, cabeça, lâmpada) e WALKER-10 — **erro** se nenhum raio passa; PS-N1..4 cego = aviso. Lista de postes NL | `check_map01.luau` |
+| Spawn de teste | o `SpawnLocation` padrão do Roblox (placa 12 × 1 × 12 com decal de estrela) que estava no meio do cruzamento (X-T) vai para `ServerStorage.DevScenes` (W9). Personagens nascem pelo `CharacterService` em PS-* / PS-N*; o `SpawnLocation_PS` do blockout no Pad continua | `bind_map01.luau` W9 |
+| `collide = false` | campo novo da tabela: todas as `BasePart` do modelo sem colisão (props de fachada, varais) | `place_assets.luau` `build` |
+
+## 17. Ambientação (2026-10-10, pedido do usuário: "mapa muito pequeno, precisa de mais ambiente") — Provisório
+
+Tudo na seção 8 de `MAP-01_placements.luau` (números gerados por um script descartável do level-designer a partir das regras abaixo; dali em diante a tabela é a fonte e pode ser editada à mão). Nada de gameplay muda: nenhum nó, rota, faixa ou ponto novo.
+
+**17.1 Massas de fundo (`Fill_*`).** Os 7 volumes cinza do blockout ficam escondidos (`replaces`) e viram prédios:
+
+| Fill | O que entra |
+|---|---|
+| `Fill_N_BankRear` (X 24..52, Z −88..−64) | 4 Kenney (2 de frente para a Juniper, 2 para o estacionamento), alturas 0 / −0,3 / −0,6 / −0,9 para os telhados sobrepostos não brigarem; 0,6 de folga do fundo do banco. Continua tapando SP-A |
+| `Fill_N_ParkingRear` (X 32..104, Z −136..−88) | 5 Kenney de frente para o estacionamento (Z −88), cartões na BackStreet e cartões altos (×1,5–2,0) no meio. Beco de SP-A (X 24..32) aberto |
+| `Fill_NW` (X −136..−36, Z −136..−64) | 5 Kenney de frente para a faixa AS-3 / Juniper (X −36), cartões na BackStreet, duas fileiras de cartões altos atrás de B3 (skyline vista da Ninth) |
+| `Fill_SW_West` (X −136..−100, Z 32..120) | 2 Kenney na Ninth (fecham a quina NO do Mart), cartões na avenida oeste, cartões altos atrás do Mart (vistos do Pad por cima do telhado) |
+| `Fill_SW_MartRear` | cartões ×1,3 de frente para o norte atrás do Mart + cartões na South Street |
+| `Fill_SE_B1Rear` | 2 Kenney na Juniper Sul (X 24; continuam tapando SP-S / ST-R), cartões altos atrás de B1, cartões na South Street |
+| `Fill_E` | Kenney na esquina da Ninth, 2 Kenney no beco EX-E, cartões na avenida leste |
+
+**`Block_*` invisíveis** (`B1.Block_East`, `B1.Block_Rear` e os blocos de B2–B5 / banco): são os volumes do blockout que os prédios de asset substituíram. Já estão escondidos (Transparency 1), **sem colisão e sem consulta**, e travados (`Locked`, W7). **Nenhum código lê** (conferido: `src/` não cita; só `MAP-01_placements.luau` os esconde) e **não servem de limite**: os limites do jogador são `Limits/BAR-*` (com colisão) e as fachadas dos assets. Ficam no place só para o `Place.restore()` voltar ao blockout; pode ignorar. (Os de B1 estão deslocados em relação ao lote — movidos à mão em algum momento; como são invisíveis, não importa.)
+
+**17.2 Cidade além dos limites (só visual).** Ruas novas, todas AST-032 escaladas, sem rota de trânsito nem nó de NPC:
+- avenidas em **X ±154** (pista X 144..164) de Z −250 a 250, com cruzamentos na Ninth, na BackStreet e na **South Street** nova (Z 124..144);
+- a Ninth continua até X ±250 depois das avenidas; a BackStreet e a South Street também; a Juniper continua ao norte da BackStreet e ao sul da South Street até Z ±250;
+- placa de chão (SidewalkTile 900 × 900, topo −0,3) embaixo de tudo e placas de calçada (topo 0,24) nos quarteirões.
+
+Prédios: **Kenney A/H onde uma rua vista da área jogável termina** (Ninth leste/oeste depois das avenidas, Juniper norte/sul depois das ruas transversais) e **cartões AST-033 BG_Card** (90–118 tris) no resto: frentes a 6 studs do meio-fio, miolo dos quarteirões com fileiras de cartões a cada 26, e um **anel de skyline** de cartões ×1,8–2,6 em X ±262 / Z ±262. Postes decorativos e 8 carros estacionados nas ruas de fora (estáticos).
+
+Aviso (trânsito): os carros continuam nascendo em W/E-IN (X ±136) e JN/JS-IN; agora há rua depois desses pontos, então um carro que aparece em X ±136 pode ser notado do Pad a ~95 studs (antes ele surgia na borda do mundo). Proposta para o architect / `Q-102`: levar W/E-IN/OUT para as avenidas (X ±154, virando a esquina) — não feito aqui.
+
+**17.3 Ruas jogáveis.** Conferido por script contra o grafo `NpcNode` (folga ≥ raio + 1,5 da aresta), rotas TR-* (≥ raio + 4), caixas CW-1..4 / X-T, pontos Q / PS / REV / CS / SS / spawn (≥ raio + 2) e linhas de visão (janela → NL-01..04 e WALKER-10, Pad → WV-1..3, câmeras da abertura → vitrines NO HELP WANTED, carrinho → trailer à venda):
+
+| Tipo | Onde |
+|---|---|
+| Árvores (TreeLarge / TreeSmall) | T-07..T-16: pontas da Ninth além de BAR-W / BAR-E, Ninth sul X −60, Juniper Sul (X ±20..22, Z 62..74), praça do Mart (X −47 e −33) |
+| Bancos | B3a (−80, −29,5) e B1 (100, 29,5), de frente para a rua |
+| Vasos | B4 (100, −30,5), B1 (76 e 106, 30,8) |
+| Hidrantes / correio / placas | hidrantes (−100, 17,5), (96, −17,5), (22,5, 48); correio (58, −29,5) na cerca do estacionamento; placas de rua nas quinas NO e SE |
+| Caçambas (novo `AST-034_Dumpster`) | beco EX-E (116,5, 66), vão B3a/B2b (−68,7, −45,5), faixa AS-3 (−32, −70) |
+| Ar-condicionado (novo `AST-034_ACUnit`, sem colisão) | 12 nas fachadas de B3, B2b, B4, B1, B5 e fundo do banco, a 9,5–12 de altura (fora do alcance) |
+| Varais (novo `AST-034_Clothesline`, sem colisão) | vão B3a/B2b (Z −40, y 13) e beco EX-E (Z 58 e 72) |
+| Carros parados no estacionamento | (76, −81) e (100, −64) |
+
+Não entrou: lixeiras novas (o `Bind` transforma toda `AST-034_TrashCan` em `StreetBin` com prompt de descarte — seria gameplay) e toldos de fachada (o `detail-awning` do pack é só uma prancha com pés).
+
+**17.4 Orçamento.** Seção 8: ~490 entradas (≈ 490 instâncias), **≈ 104 mil tris no total** da cidade nova (37 Kenney ≈ 51 mil, ~300 cartões ≈ 30 mil, carros ≈ 11 mil; o resto < 1 mil por tipo); só a parte perto das ruas visíveis entra na tela ao mesmo tempo (a névoa da noite termina em 200; de dia a `Atmosphere` apaga o anel de skyline). Malhas repetidas (mesmo `MeshId` + textura) são instanciadas pelo motor. Nenhuma luz nova além dos 4 NL (5 postes na cadeia com P-01; antes 6). A conferir no MicroProfiler do celular (art-director, §13).
+
+**Rodado em 2026-10-10 (ids AST-034_ACUnit / _Clothesline / _Dumpster recebidos):** `Place.diff` antes: 229 iguais, diferenças só nas entradas novas, nos postes JL / `Post_NinthN_E1` substituídos e nos carros PARK-N 5/6 movidos (edições à mão do §16.0 presentes). `Place.run` 737/737 → `Bind.run` (err 0; W9 moveu o `SpawnLocation`; `Awning` escondida; NL-01..04 com `SpotLight` padrão) → `Pieces.run` 21/21 (err 0) → `Check.run({ wave = 3 })` **PASS, 0 erros**, 23 avisos (os mesmos de antes, menos SP-S; regra 14: NL-01..04 e WALKER-10 vistos da janela, 4/4 e 3/3 raios). `Place.diff` depois: **0 diferenças** (736 iguais). Lighting não foi tocado.

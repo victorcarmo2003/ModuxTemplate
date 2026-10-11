@@ -43,7 +43,8 @@ return Table.new({
 		Cooldown = 0,
 		Step = 0,
 	},
-	-- MAP-01 §5.6: 2.5 s per post in the Hush (6 posts JL-05..JL-01 + P-01 = 15 s, same window as the old 10 x 1.5;
-	-- level-designer 2026-10-10, Provisional: the user chose 5 Juniper posts); no volume on the Pad <-> Mart route (DEC-196)
-	{ Key = "juniper_posts", Kind = "Posts", HushOff = true, Zones = {}, Cooldown = 0, Step = 2.5 },
+	-- MAP-01 §5.6: 3 s per post in the Hush (5 posts NL-01..NL-04 + P-01 = 15 s, same window as the old 10 x 1.5).
+	-- 2026-10-10 (user): the Walker posts moved from the Juniper to the Ninth north curb (seen from the trailer window),
+	-- 4 posts; the key keeps its old name (code and binding read it). No volume on the Pad <-> Mart route (DEC-196)
+	{ Key = "juniper_posts", Kind = "Posts", HushOff = true, Zones = {}, Cooldown = 0, Step = 3 },
 } :: { LightGroup })

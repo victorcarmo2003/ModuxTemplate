@@ -8,10 +8,10 @@
 	local Walker changes nothing on the server).
 
 	Positions (same as the server):
-	  step 0..9  StreetLight post with Group "juniper_posts" and Order = step + 1 (JL-09 = 1 ... P-01 = 10). The
+	  step 0..3  StreetLight post with Group "juniper_posts" and Order = step + 1 (NL-01 = 1 ... NL-04 = 4). The
 	             Walker stands on the `Walker_Spot` fitting of the AST-036 when present, else on the ground under the
 	             lamp (the server aims its cone at the box centre of the post, < 2 studs away: same view at 130+ studs).
-	  step 10    MapPoint WALKER-10 (edge of the trailer light), facing as the point.
+	  step 4     MapPoint WALKER-10 (across the Ninth from the window, outside the trailer light), facing as the point.
 	Record:
 	  Signal     hidden: only the buzz (cue `post_buzz`, DEC-123) — the figure is there when the buzz stops dry.
 	  Active     standing under the post of `Step`, facing down the street (towards the next step); every change of
@@ -22,7 +22,7 @@
 	  post_buzz     entity = post Order (1): `post_buzz` from that lamp (exclusive to the real N7, DEC-123).
 	  post_flicker  entity = post Order of the new step (0 = WALKER-10: the last post he left flickers). Local dim of
 	                the lamp (LocalTransparencyModifier + Light.Brightness): LightController keeps Material/Enabled.
-	  walker_step   entity = step: one muffled heavy step from his spot (step 10 marked opts.Scare, DEC-173 cap).
+	  walker_step   entity = step: one muffled heavy step from his spot (the last step, WALKER-10, marked opts.Scare, DEC-173 cap).
 
 	PROVISIONAL (frontend-coder, TASK-116): Part placeholder until AST-064 ships (TASK-124): tall dark "high
 	trapezoid" (#14162A, ~7 studs, wide-brim hat, coat opening like a skirt, no arms, no ears, no face, resembles no
@@ -40,7 +40,7 @@ const REF = "ANM-007"
 const POST_TAG = "StreetLight"
 const POST_GROUP = "juniper_posts"
 const LAST_POINT = "WALKER-10"
-const STEPS = 5 -- Rules/ANM-007 Steps (server); step STEPS = WALKER-10
+const STEPS = 4 -- Rules/ANM-007 Steps (server); step STEPS = WALKER-10 (4 posts NL-01..04, MAP-01 §5.6)
 const ASSET_NAME = "AST-064_Walker"
 const SPOT_NAME = "Walker_Spot" -- AST-036 fitting
 const RETRY = 1 -- s between two lookups of a position not streamed in yet
