@@ -219,6 +219,34 @@ local function joint(model: Model, at: Vector3, d: number, color: Color3)
 	p.Parent = model
 end
 
+-- Free strokes (icons) in a sign plane, same tubes as the letters; points are { u, v } pairs in grid units of k,
+-- u to the reader's right. With `parent`, the tubes go into that model (several colours in one sign).
+local function neonShape(name: string, strokes: { { number } }, cf: CFrame, k: number, color: Color3, d: number?, parent: Model?): Model
+	local model = parent or Instance.new("Model")
+	model.Name = name
+	local dd = d or math.max(0.12, k * 0.3)
+	local function at(u: number, v: number): Vector3
+		return (cf * CFrame.new(-u * k, v * k, 0)).Position
+	end
+	for _, st in strokes do
+		local prev: Vector3? = nil
+		for j = 1, #st, 2 do
+			local q = at(st[j], st[j + 1])
+			if prev then
+				tube(model, prev, q, dd, color)
+			end
+			joint(model, q, dd, color)
+			prev = q
+		end
+	end
+	if not parent then
+		model:SetAttribute("Color", color)
+		game:GetService("CollectionService"):AddTag(model, "NeonSign")
+		model.Parent = folder
+	end
+	return model
+end
+
 -- Neon text centred on `cf`, readable by someone standing on the cf.LookVector side looking back at it.
 -- vertical = letters stacked top to bottom.
 local function neonText(name: string, text: string, cf: CFrame, height: number, color: Color3, vertical: boolean?): Model
@@ -420,6 +448,154 @@ function Decor.run(): string
 	end
 
 	return "decor_mart: " .. table.concat(log, ", ")
+end
+
+--[[ Decor.runPad(): the empty strip behind the cart / trailer pad (user 2026-10-11: the area behind the stand looks
+	empty). Pad X -64..-24, Z 3.9 (back wall of B1) .. 35.9, WORLD coordinates. Kept clear on purpose: the thief lane
+	N-Z01-04 -> L3 (Z 9..14), the player stations PS-1..4 / PS-N (Z 24..28) and the queue. Rebuilds MAP01_Assets.PadDecor. ]]
+function Decor.runPad(): string
+	local root = workspace:FindFirstChild(ROOT)
+	if not root then
+		return "[err] no workspace." .. ROOT
+	end
+	local old = root:FindFirstChild("PadDecor")
+	if old then
+		old:Destroy()
+	end
+	folder = Instance.new("Folder")
+	folder.Name = "PadDecor"
+	folder.Parent = root
+	local WALL_Z = 3.95
+	local WOOD = Color3.fromRGB(196, 132, 84)
+	local WOOD_D = Color3.fromRGB(150, 92, 58)
+	local KETCHUP = Color3.fromRGB(235, 70, 60)
+	local log = {}
+
+	-- pad floor: slab texture (the floor colour gives the tint)
+	local blockout = workspace:FindFirstChild("MAP01_Blockout")
+	local padGroup = blockout and blockout:FindFirstChild("Pad")
+	local padFloor = padGroup and padGroup:FindFirstChild("PadFloor")
+	if padFloor and padFloor:IsA("BasePart") then
+		local t = padFloor:FindFirstChild("SlabTexture") or Instance.new("Texture")
+		t.Name = "SlabTexture"
+		;(t :: Texture).Texture = SLAB_TEXTURE
+		;(t :: Texture).Face = Enum.NormalId.Top
+		;(t :: Texture).StudsPerTileU = 6
+		;(t :: Texture).StudsPerTileV = 6
+		t.Parent = padFloor
+	end
+
+	-- 1. back wall neon: CORNER DOGS + hot dog icon, on a dark raceway board
+	local wallCF = CFrame.lookAt(Vector3.new(-44, 0, WALL_Z), Vector3.new(-44, 0, WALL_Z + 1)) -- LookVector +Z: faces the pad
+	local board = part("SignBoard", Vector3.new(26, 4.6, 0.3), wallCF * CFrame.new(0, 11.2, -0.15), INK)
+	board.CastShadow = false
+	neonText("Neon_CornerDogs", "CORNER DOGS", wallCF * CFrame.new(3.2, 11.2, -0.45), 2.2, MUSTARD)
+	local icon = Instance.new("Model")
+	local icf = wallCF * CFrame.new(-8.8, 10.1, -0.45)
+	neonShape("Neon_HotDog", {
+		{ 0, 0.6, 0.5, 0.1, 1.5, 0, 4.5, 0, 5.5, 0.1, 6, 0.6 },
+		{ 0, 1.9, 0.5, 2.4, 1.5, 2.5, 4.5, 2.5, 5.5, 2.4, 6, 1.9 },
+	}, icf, 0.55, Color3.fromRGB(255, 176, 80), 0.2, icon)
+	neonShape("Neon_HotDog", {
+		{ -0.4, 1.25, 0.2, 0.75, 1, 0.65, 5, 0.65, 5.8, 0.75, 6.4, 1.25, 5.8, 1.75, 5, 1.85, 1, 1.85, 0.2, 1.75, -0.4, 1.25 },
+	}, icf, 0.55, KETCHUP, 0.2, icon)
+	neonShape("Neon_HotDog", {
+		{ 0.8, 1.2, 1.4, 1.5, 2, 1, 2.6, 1.5, 3.2, 1, 3.8, 1.5, 4.4, 1, 5, 1.4 },
+	}, icf, 0.55, MUSTARD, 0.14, icon)
+	icon.Name = "Neon_HotDog"
+	icon:SetAttribute("Color", KETCHUP)
+	icon:SetAttribute("Flicker", true)
+	game:GetService("CollectionService"):AddTag(icon, "NeonSign")
+	icon.Parent = folder
+	light(wallCF * CFrame.new(0, 10.5, -3), "Point", Color3.fromRGB(255, 200, 120), 1.4, 18)
+
+	-- 2. menu board on the wall (chalkboard) at the east end
+	local menu = part("MenuBoard", Vector3.new(5.5, 4, 0.25), wallCF * CFrame.new(16.5, 5.2, -0.3), Color3.fromRGB(52, 70, 60))
+	part("MenuFrame", Vector3.new(5.9, 4.4, 0.18), wallCF * CFrame.new(16.5, 5.2, -0.1), WOOD_D)
+	label(menu, Enum.NormalId.Front, "MENU\nHOT DOG ... $5\nTOPPINGS +$1\nCOFFEE ... $3", CREAM, Color3.fromRGB(30, 40, 35))
+
+	-- 3. string lights: swags from the wall to two poles at Z 21 (behind the stations)
+	local bulbs = 0
+	for _, p in { Vector3.new(-30, 0.4, 21), Vector3.new(-58, 0.4, 21) } do
+		part("LightPole", Vector3.new(0.35, 9.6, 0.35), CFrame.new(p + Vector3.new(0, 4.8, 0)), INK)
+		part("LightPoleFoot", Vector3.new(1.2, 0.3, 1.2), CFrame.new(p + Vector3.new(0, 0.15, 0)), INK)
+	end
+	local spans = {
+		{ Vector3.new(-30, 10, 21), Vector3.new(-30, 10, WALL_Z + 0.2) },
+		{ Vector3.new(-30, 10, 21), Vector3.new(-58, 10, 21) },
+		{ Vector3.new(-58, 10, 21), Vector3.new(-58, 10, WALL_Z + 0.2) },
+		{ Vector3.new(-30, 10, 21), Vector3.new(-44, 10.5, WALL_Z + 0.2) },
+		{ Vector3.new(-58, 10, 21), Vector3.new(-44, 10.5, WALL_Z + 0.2) },
+	}
+	local bulbColors = { MUSTARD, CREAM, PINK, MINT }
+	for _, sp in spans do
+		local a, b = sp[1], sp[2]
+		local n = math.max(4, math.floor((b - a).Magnitude / 2.2))
+		local prev = a
+		for i = 1, n do
+			local t = i / n
+			local q = a:Lerp(b, t) - Vector3.new(0, math.sin(t * math.pi) * 1.1, 0)
+			local w = part("Wire", Vector3.new((q - prev).Magnitude, 0.06, 0.06), CFrame.lookAt((q + prev) / 2, q) * CFrame.Angles(0, math.rad(90), 0), INK)
+			w.CastShadow = false
+			if i < n then
+				local bulb = part("Bulb", Vector3.new(0.32, 0.32, 0.32), CFrame.new(q - Vector3.new(0, 0.22, 0)), bulbColors[(i % #bulbColors) + 1], Enum.Material.Neon)
+				bulb.Shape = Enum.PartType.Ball
+				bulb:SetAttribute("Emissive", true)
+				bulbs += 1
+			end
+			prev = q
+		end
+	end
+	light(CFrame.new(-44, 8, 14), "Point", Color3.fromRGB(255, 214, 160), 1, 20)
+	table.insert(log, ("bulbs: %d"):format(bulbs))
+
+	-- 4. seating (west, Z 15..21, clear of the thief lane): two picnic tables with small parasols
+	for _, c in { Vector3.new(-60, 0.4, 18.2), Vector3.new(-52.5, 0.4, 18.2) } do
+		local top = part("TableTop", Vector3.new(4.6, 0.25, 2.2), CFrame.new(c + Vector3.new(0, 2.5, 0)), WOOD)
+		top.CanCollide = true
+		for _, sz in { -1.55, 1.55 } do
+			part("TableSeat", Vector3.new(4.6, 0.22, 0.8), CFrame.new(c + Vector3.new(0, 1.5, sz)), WOOD)
+		end
+		for _, sx in { -1.9, 1.9 } do
+			part("TableLeg", Vector3.new(0.25, 2.5, 3.6), CFrame.new(c + Vector3.new(sx, 1.25, 0)), WOOD_D)
+		end
+		part("ParasolPole", Vector3.new(0.18, 5.2, 0.18), CFrame.new(c + Vector3.new(0, 2.6, 0)), CREAM)
+		local shade = part("ParasolTop", Vector3.new(0.4, 4.4, 4.4), CFrame.new(c + Vector3.new(0, 5.3, 0)) * CFrame.Angles(0, 0, math.rad(90)), KETCHUP)
+		shade.Shape = Enum.PartType.Cylinder
+		part("ParasolTip", Vector3.new(0.4, 0.4, 0.4), CFrame.new(c + Vector3.new(0, 5.6, 0)), CREAM)
+		for _, cup in { Vector3.new(-1.2, 2.75, 0.4), Vector3.new(0.9, 2.75, -0.5) } do
+			local k = part("Cup", Vector3.new(0.4, 0.25, 0.25), CFrame.new(c + cup) * CFrame.Angles(0, 0, math.rad(90)), MUSTARD)
+			k.Shape = Enum.PartType.Cylinder
+		end
+	end
+
+	-- 5. supply corner (east, against the wall): crates and a barrel
+	local crates = {
+		{ Vector3.new(-27.2, 0.4, 5.6), "BUNS", 4 },
+		{ Vector3.new(-29.6, 0.4, 5.6), "DOGS", -3 },
+		{ Vector3.new(-28.4, 2.4, 5.6), "MUSTARD", 2 },
+	}
+	for _, c in crates do
+		local box = part("Crate", Vector3.new(2.2, 2, 2.2), CFrame.new(c[1] + Vector3.new(0, 1, 0)) * CFrame.Angles(0, math.rad(c[3]), 0), WOOD)
+		box.CanCollide = true
+		part("CrateBand", Vector3.new(2.3, 0.25, 2.3), box.CFrame * CFrame.new(0, 0.6, 0), WOOD_D)
+		label(box, Enum.NormalId.Back, c[2], CREAM, WOOD_D)
+	end
+	local barrel = part("Barrel", Vector3.new(2.6, 1.8, 1.8), CFrame.new(-25.2, 1.7, 6.6) * CFrame.Angles(0, 0, math.rad(90)), KETCHUP)
+	barrel.Shape = Enum.PartType.Cylinder
+	barrel.CanCollide = true
+
+	-- 6. planters along the wall
+	for _, x in { -36, -52 } do
+		local pot = part("Planter", Vector3.new(3.4, 1.2, 1.4), CFrame.new(x, 1, WALL_Z + 0.9), WOOD_D)
+		pot.CanCollide = true
+		for i = -1, 1 do
+			local bush = part("Bush", Vector3.new(1.3, 1.3, 1.3), CFrame.new(x + i * 1.05, 2.05 + (if i == 0 then 0.25 else 0), WALL_Z + 0.9), MINT)
+			bush.Shape = Enum.PartType.Ball
+		end
+	end
+
+	return "decor_pad: " .. table.concat(log, ", ")
 end
 
 return Decor
