@@ -1,67 +1,56 @@
 --!strict
--- Lobby zones, ring VFX, platform squads and camera (user request 2026-10-11, Provisional; docs/levels/LOBBY.md v2
+-- Lobby zones, zone VFX, platform squads and camera (user request 2026-10-11, Provisional; docs/levels/LOBBY.md v2
 -- §V2-4, §V2-5; architecture.md §20.6; network.md §16). Pure data, read by PartyService (server, platform occupancy),
--- LobbyController (client: zone triggers, ring VFX, camera) and ReplicatedStorage.shared.Lobby.LobbyZones.
+-- LobbyController (client: zone triggers, zone VFX, camera) and ReplicatedStorage.shared.Lobby.LobbyZones.
 -- Owner: frontend-coder. Every number Provisional (DEC-044: adjusted in playtest).
 --
--- A zone is a circle on the floor. Center = the MapPoint `PointId` when the map has it (WORLD), else `Center`.
--- Walking in (planar distance <= Radius, |dy| <= Trigger.Height) opens its panel; walking out (distance >
--- Radius + Trigger.Hysteresis) closes it. Squad zones (Platform 1..4; lobby v2 scaled x1.3 around the spawn, 2026-10-11) are the squad platforms: the server watches them.
+-- The MAP places the zones (user 2026-10-11: the floors are moved in Studio): a BasePart in Workspace tagged
+-- "LobbyZone" with the attribute Zone = Key below is the zone floor. A Cylinder Part standing on its axis (or the
+-- attribute Shape = "Circle") is a circle of half its diameter; anything else is a rectangle oriented with the Part
+-- (its two horizontal sizes; attribute Shape = "Rect" forces it). Squad pads tagged "PartyPlatform" (attribute
+-- Party = n) also count for Squad n. A row with no tagged Part falls back to a circle: centre = the MapPoint PointId
+-- (WORLD) when the map has it, else Center; radius = Radius. Walking in (|dy| <= Trigger.Height from the floor top)
+-- opens its panel; walking out (past the edge + Trigger.Hysteresis) closes it. Squad zones (Platform 1..4) are the
+-- squad platforms: the server watches them.
 
 export type Panel = "Classes" | "Shop" | "Codes" | "Platform"
 
 export type Zone = {
-	Key: string,
+	Key: string, -- = attribute Zone of the tagged floor Part
 	Panel: Panel,
 	Platform: number, -- 1..8 = squad platform n; 0 = not a platform
-	PointId: string?, -- MapPoint that places the zone; nil = Center only
-	Center: Vector3, -- WORLD, floor level (fallback of PointId)
-	Radius: number, -- studs, planar
-	Color: Color3, -- ring colour (platforms: Squad.Colors by state instead)
+	PointId: string?, -- fallback: MapPoint that places the zone; nil = Center only
+	Center: Vector3, -- fallback: WORLD, floor level (of PointId)
+	Radius: number, -- fallback: studs, planar
+	Color: Color3, -- frame colour (platforms: Squad.Colors by state instead)
 }
 
--- "Light column" zone VFX (user choice 2026-10-11, Provisional): a soft cylinder of light in the zone colour made of
--- vertical Beam panels (the user's reference beam, workspace.BeamExample, texture scrolling up), thin coloured rings
--- rising and fading inside it, and a thin ring on the floor. Read by LobbyController/Rings.luau.
-export type Column = {
-	Height: number, -- studs from the floor to the top of the column
-	Panels: number, -- vertical Beams around the circle (one per side of the prism)
-	RadiusScale: number, -- column radius = zone Radius * this
-	Overlap: number, -- panel width = side of the prism * this (hides the seams; >1.15 shows bright overlaps)
-	Roll: number, -- deg: extra roll of each panel around its own vertical axis (90 if the panels read as spokes)
-	Texture: string,
-	TextureSpeed: number, -- > 0 scrolls the texture up (bottom attachment -> top attachment)
-	TextureLength: number,
-	Segments: number,
-	LightEmission: number,
-	Brightness: number, -- keep at 1: higher washes the colour into white
-	Base: number, -- transparency at the floor
-	Middle: number, -- transparency at half height (the top is always 1: fades out)
-	PulsePeriod: number, -- s of one brightness breath
-	PulseAlpha: number, -- +- transparency of the breath
-}
-
-export type Rings = {
-	Count: number, -- thin rings per zone (staggered over one Period)
-	RadiusScale: number, -- outer radius = zone Radius * this (a hair outside the column)
-	Width: number, -- studs: ring band (outer - inner radius)
-	Thickness: number, -- studs: vertical thickness of the band
-	Lighten: number, -- 0..1 towards white (a ring is a bit lighter than its column)
-	Period: number, -- s for one ring to climb from the floor to Reach
-	Reach: number, -- 0..1 of Column.Height the ring climbs before it loops back
-	Transparency: number, -- 0..1 at full strength
+-- Neon zone frame (user 2026-10-11, Provisional; LobbyController/Rings.luau): local Neon Parts following the floor
+-- edge, a square frame on rectangles and a ring of segments on circles. The base frame stays on the floor and
+-- pulses; Count "ghost" frames rise from the edge up to Height and fade out, with a light wobble.
+export type Frame = {
+	Thickness: number, -- studs: square cross-section of every bar
+	Height: number, -- studs a ghost climbs before it is gone
+	Count: number, -- ghost frames per zone (staggered over one Period)
+	Period: number, -- s for one ghost to climb
+	Segments: number, -- bars of the base ring of a circle
+	GhostSegments: number, -- bars of a ghost ring (fewer: keeps a disc near 40 Parts)
+	Outset: number, -- studs the frame sits outside the floor edge
+	Lift: number, -- studs over the floor top (no z-fight)
+	Base: number, -- transparency of the base frame at its brightest
+	PulseAlpha: number, -- + transparency at the dim end of the breath
+	PulsePeriod: number, -- s of one breath
+	Ghost: number, -- transparency of a ghost at full strength
+	Lighten: number, -- 0..1 towards white for the ghosts
 	FadeIn: number, -- 0..1 of the climb: fades in from the floor
 	FadeOut: number, -- 0..1 of the climb: fades out before the top
-	WobbleTilt: number, -- deg: sine tilt of each ring (very light)
+	WobbleTilt: number, -- deg: sine tilt of each ghost
 	WobbleSpeed: number, -- rad/s of the tilt
-}
-
-export type Floor = {
-	RadiusScale: number, -- outer radius = zone Radius * this
-	Width: number, -- studs
-	Thickness: number, -- studs
-	Transparency: number,
-	PulseAlpha: number, -- +- transparency, on Column.PulsePeriod
+	Light: {
+		Brightness: number, -- PointLight in the zone colour over the centre; 0 = none
+		Range: number,
+		Height: number, -- studs over the floor
+	},
 }
 
 export type ZoneVfx = {
@@ -72,13 +61,11 @@ export type ZoneVfx = {
 export type Lobby = {
 	Zones: { Zone },
 	Trigger: {
-		Hysteresis: number, -- studs added to the radius to count as "out"
-		Height: number, -- studs: max |dy| between the root and the zone floor
+		Hysteresis: number, -- studs added to the edge (radius / half size) to count as "out"
+		Height: number, -- studs: max |dy| between the root and the zone floor top
 		Poll: number, -- s between two client checks
 	},
-	Column: Column,
-	Rings: Rings,
-	Floor: Floor,
+	Frame: Frame,
 	ZoneVfx: ZoneVfx,
 	Squad: {
 		Poll: number, -- s between two server checks of the platforms
@@ -153,43 +140,29 @@ const lobby: Lobby = {
 		Height = 8,
 		Poll = 0.1,
 	},
-	Column = {
-		Height = 7,
-		Panels = 0, -- 0 = no light column, rings only (user 2026-10-11)
-		RadiusScale = 1,
-		Overlap = 1.08,
-		Roll = 0,
-		Texture = "rbxassetid://16892386886", -- the user's reference beam (workspace.BeamExample)
-		TextureSpeed = 0.5,
-		TextureLength = 1,
-		Segments = 10,
-		LightEmission = 1,
-		Brightness = 1,
-		Base = 0.35,
-		Middle = 0.6,
-		PulsePeriod = 2,
-		PulseAlpha = 0.08,
-	},
-	Rings = {
-		Count = 3,
-		RadiusScale = 1.04,
-		Width = 0.15,
-		Thickness = 0.04,
-		Lighten = 0.25,
-		Period = 2.5,
-		Reach = 0.85,
-		Transparency = 0.15,
-		FadeIn = 0.2,
-		FadeOut = 0.45,
-		WobbleTilt = 2,
-		WobbleSpeed = 1.6,
-	},
-	Floor = {
-		RadiusScale = 1.04,
-		Width = 0.2,
-		Thickness = 0.04,
-		Transparency = 0.25,
-		PulseAlpha = 0.2,
+	Frame = {
+		Thickness = 0.22,
+		Height = 5,
+		Count = 2,
+		Period = 2.4,
+		Segments = 24,
+		GhostSegments = 12,
+		Outset = 0.05,
+		Lift = 0.02,
+		Base = 0,
+		PulseAlpha = 0.35,
+		PulsePeriod = 1.6,
+		Ghost = 0.1,
+		Lighten = 0.15,
+		FadeIn = 0.12,
+		FadeOut = 0.55,
+		WobbleTilt = 3,
+		WobbleSpeed = 1.8,
+		Light = {
+			Brightness = 1,
+			Range = 12,
+			Height = 2,
+		},
 	},
 	ZoneVfx = {
 		ColorTween = 0.3,

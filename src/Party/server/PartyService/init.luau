@@ -9,8 +9,9 @@
 -- creates one; accepting an invite leaves the current squad; the leader is always ready, Start needs every other
 -- member ready; leader leaves = first member left leads.
 --
--- Squad platforms (user request 2026-10-11, emends DEC-179 back to physical platforms, invites kept): the 8 lobby
--- platforms (Content.Lobby.Zones with Platform 1..8; centre = MapPoint LOBBY-SQUAD-n) are watched here every
+-- Squad platforms (user request 2026-10-11, emends DEC-179 back to physical platforms, invites kept): the 4 lobby
+-- platforms (Content.Lobby.Zones with Platform 1..4; shape and place = the floor Part tagged LobbyZone with
+-- Zone = "Squad<n>", same source as the client) are watched here every
 -- Content.Lobby.Squad.Poll s from each HumanoidRootPart (shared.Lobby.LobbyZones, with hysteresis). Stepping on a free
 -- platform = a new squad with Platform n and State "Configuring" that you lead (the leader of an invite squad takes
 -- the platform with the squad instead). Stepping on an owned platform = joining it when it is not Starting, has room

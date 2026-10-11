@@ -27,15 +27,17 @@
 	Play: outside a squad = PartyCreate, then PartyStart as soon as the new squad (me as leader) arrives (solo run);
 	leader = PartyStart (enabled when everyone is ready); member = Ready / Not ready.
 
-	Zones (user request 2026-10-11, Provisional; Content.Lobby, shared.Lobby.LobbyZones): every lobby zone is a circle
-	on the floor (Classes in front of the stage, Gem Shop, Codes, the 8 squad platforms). Walking in opens its panel,
+	Zones (user request 2026-10-11, Provisional; Content.Lobby, shared.Lobby.LobbyZones): every lobby zone is a floor
+	Part of the map tagged "LobbyZone" (attribute Zone = Classes / Shop / Codes / Squad1..4; circle on a disc, oriented
+	rectangle otherwise; Content position as fallback). Walking in opens its panel,
 	walking out closes it (only if that panel is still the open one); checked every Trigger.Poll s from the own
 	HumanoidRootPart, with hysteresis. The HUD tiles and keys stay as shortcuts. A panel closed by hand stays closed
 	until the player walks out and in again.
 	  SquadSetup    the platform window (Panel "Platform"): the squad on the platform the player stands on, Friends
 	                only, Max players, Start (leader) or the countdown. Joining / leaving is the server's (PartyService
 	                watches the platforms); this client only sends PartyConfigure / PartyStart.
-	Ring VFX (Rings.luau): one Heartbeat for every zone; platform colours follow the Party set (free / squad / starting).
+	Zone VFX (Rings.luau): local Neon frames on the floor edges (square / ring) with rising ghost frames, one Heartbeat
+	for every zone; platform colours follow the Party set (free / squad / starting).
 	Camera: normal third person in the lobby (CameraController External; CameraMode Classic). While the class screen
 	shows the world stage every character is hidden locally (LocalTransparencyModifier; LOBBY.md §11).
 
