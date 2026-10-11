@@ -33,8 +33,18 @@ Critérios de aceite
 | UPG-005 | Trailer Lights | 0–1 | $100 | só trailer | bancada B5 (após a compra do trailer) | não |
 | UPG-006 | Food Trailer (veículo) | — | $300 × party | troca | prompt no trailer, estacionamento | não (DEC-107) |
 | UPG-007 | Coffee Maker | incluída | $0 (vem com o trailer) | só trailer | — | — |
+| UPG-008 | Patio Tables (mesas do Pad) — Provisório | 0–5 (1 mesa por nível) | $315 | **Pad** (as duas, não recomeça na troca, `Q-179`) | na própria mesa fantasma no Pad (`Q-178`) | não |
+| UPG-009 | Patio Lights — Provisório | 0–1 | $120 | Pad | na mesa `TBL-1` (placa) no Pad (`Q-178`) | não |
+| UPG-010 | Back Bar (bancada externa do trailer) — Provisório, cortável | 0–1 | $90 | só trailer | na própria bancada dobrada, no trailer (`Q-178`, `Q-179`) | não |
 
 Soma de tudo que se compra com dinheiro (solo): $210 + $170 + $230 + $80 + $100 + $300 = **$1.090**.
+Com as mesas (2026-10-11, Provisório): + $315 + $120 + $90 = **$1.615** (ainda abaixo dos ~$2.860 ganhos numa run solo; sobra ~$1.245, `economy.md` §7).
+
+**Onde se compra — mesas (2026-10-11, Provisório, `Q-178`):** UPG-008 a UPG-010 **não** vão para o Gear Stand (os 6
+pedestais B1–B5 + S1 estão ocupados e o layout 3 + Opal + 3 é simétrico, FEAT-015 v2). Compra **no lugar**, como o
+trailer (DEC-107): a mesa ainda não comprada aparece "fantasma" no Pad com o prompt "Buy Table — $N". Isso contraria a
+leitura literal de DEC-101 ("upgrades na bancada do Mart") e por isso volta ao usuário; a mesa não é equipamento do
+veículo, então o critério da FEAT-015 "nenhum prompt de compra em equipamento do veículo" segue valendo.
 
 ---
 
@@ -134,6 +144,47 @@ Soma de tudo que se compra com dinheiro (solo): $210 + $170 + $230 + $80 + $100 
 
 - Critérios de aceite: um café por vez; sem dose, o prompt mostra "Out of coffee".
 
+### UPG-008 — Patio Tables (mesas do Pad)
+
+- Status: Rascunho (Provisório, 2026-10-11) · Origem: pedido do usuário 2026-10-11; regras em **FEAT-037** · Veículo: **Pad** (vale para carrinho e trailer; `Scope = "Pad"`, não recomeça na troca, `Q-179`) · Compra: na mesa fantasma, hold 1,5 s, ordem fixa `TBL-1` → `TBL-5` · Libera: Day 2
+
+| Nível (mesas) | Preço | Efeito de dia | Efeito de noite | Peça visível |
+|---|---|---|---|---|
+| 0 | — | ninguém senta | ninguém senta | 5 mesas fantasma (só a próxima com prompt) |
+| 1 | $30 | 1 mesa: clientes Completos sentam (`SitChance`), deixam $2/pessoa na mesa | igual, `SitChance` × 0,75; `MaxDiners` 2 | `TBL-1` sólida (AST-100) |
+| 2 | $45 | 2 mesas | igual | + `TBL-2` |
+| 3 | $60 | 3 mesas | igual | + `TBL-3` |
+| 4 | $80 | 4 mesas (= `MaxDiners` de dia: cada diner pode ter mesa própria) | igual | + `TBL-4` |
+| 5 | $100 | 5 mesas (a 5ª serve de folga para mesa suja) | igual | + `TBL-5` |
+
+- DEC-006: efeito de dia e de noite declarados (à noite pesa mais: limpar fora da luz custa escuro, ligação com UPG-005/UPG-009).
+- Critérios de aceite: os da FEAT-037; comprar não mexe em diners já sentados; a mesa nova nasce limpa e livre.
+
+### UPG-009 — Patio Lights
+
+- Status: Rascunho (Provisório, 2026-10-11) · Origem: pedido do usuário ("decoração ligada às mesas") · Veículo: Pad · Compra: placa ao lado de `TBL-1`, hold 1,5 s · Pré-requisito: **UPG-008 nível ≥ 2** · Libera: Day 2
+
+| Nível | Preço | Efeito de dia | Efeito de noite | Peça visível |
+|---|---|---|---|---|
+| 0 | — | — | mesas no escuro (salvo as que caem no raio do Trailer Lights) | — |
+| 1 | $120 | `SitChance` **+0,10** (pátio decorado) | `SitChance` +0,10 **e** `LightZone` `LZ-PATIO` cobrindo todas as mesas compradas, ligada pelo **mesmo interruptor** do trailer (FEAT-020; a ANM-003 apaga junto; o Hush apaga) | cordão de lâmpadas em postes baixos sobre as mesas + vaso por mesa |
+
+- Antes do trailer o efeito de noite não existe (não há noite); a compra no Day 2–5 é só pelo dia.
+- Critérios de aceite: com Patio Lights e interruptor ligado, jogador limpando qualquer mesa comprada não perde sanidade por escuro; interruptor desligado apaga `LZ-PATIO`; mesa comprada depois da luz entra na zona na hora.
+
+### UPG-010 — Back Bar (bancada externa do trailer)
+
+- Status: Rascunho (Provisório, **cortável**, 2026-10-11) · Origem: pedido do usuário ("mesas do trailer; ele tem um banco/bancada traseira"); leitura em `Q-179` · Veículo: **só trailer** (`Scope = "Vehicle"`) · Compra: na própria bancada dobrada, hold 1,5 s · Libera: depois da compra do trailer
+
+| Nível | Preço | Efeito de dia | Efeito de noite | Peça visível |
+|---|---|---|---|---|
+| 0 | — | — | — | bancada dobrada contra a parede externa (fantasma da banqueta) |
+| 1 | $90 | +1 lugar de mesa (`TBL-6`, 3 banquetas; 1 cliente ou 1 dupla) | igual, e já dentro da luz do trailer (LZ-2 ou raio do Trailer Lights; o level-designer garante): limpar não custa escuro | bancada aberta + 3 banquetas (AST-014 reaproveitada) |
+
+- Posição (level-designer, TASK-149): parede **externa** do trailer, lado oeste (engate) ou traseira, **a ≥ 6 studs da porta dos fundos e da janelinha AN-05** (a ANM-009 bate ali e ninguém pode estar "do lado de fora da porta") e fora da linha janela → Juniper (ANM-007). Clientes **nunca** entram no trailer (DEC-054: porta dos fundos não abre por fora).
+- Conta em `MaxDiners` como qualquer mesa; não entra no teto de mesas do UPG-008.
+- Critérios de aceite: só aparece depois da troca; durante a ANM-009 ninguém senta no Back Bar e quem está sentado sai (regra de tensão da FEAT-037).
+
 ---
 
 ## Tabela de balanceamento comparável
@@ -174,6 +225,44 @@ Leitura:
 | Trailer Lights | $100 | igual | +0,82 | 122 | lucro + luz à noite |
 | Food Trailer | $300 | $660 | — | — | marco; abre a noite |
 | Rescue Whistle (ITM-021, especial, 15%/turno, DEC-129) | $200 | $440 | 0 | — | seguro: evita espectador permanente / noite perdida |
+| Patio Table 1 / 2 / 3 / 4 / 5 (UPG-008, Provisório) | $30 / $45 / $60 / $80 / $100 | igual | +1,17 / +0,47 / +0,23 / +0,12 / +0,02 | 26 / 96 / 261 / 667 / — | lucro (1–2) → sumidouro/decoração (3–5 solo; 3–4 ainda rendem em party) |
+| Patio Lights (UPG-009) | $120 | igual | +0,28 | ~430 | decoração + luz nas mesas à noite |
+| Back Bar (UPG-010, trailer) | $90 | igual | só depois do trailer | ~45 ciclos | decoração + mesa iluminada |
+
+### Mesas: tabela comparável (2026-10-11, Provisório; FEAT-037)
+
+Estimativa de mesa (a simulação manda). Base: solo Day 6 (~20 Completos em 6 min, $107/dia) e Night 5 (~25 Completos
+em 24 min, $135). `SitChance` médio 0,43 dia / 0,30 noite → ~8,6 candidatos de dia e ~7,5 à noite. "Diners" =
+candidatos que acharam mesa limpa e livre, com limpeza a cada ~60 s. Líquido = bruto × 0,7 de dia (tempo longe do
+balcão) e × 0,8 à noite (menos fila, mas escuro). Gorjeta de mesa $2/pessoa.
+
+| Mesas | Diners/dia | Líquido/dia | % do dia | Δ $/min (dia) | Diners/noite (`MaxDiners` 2) | Líquido/noite | Δ por ciclo dia+noite | Payback do nível |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 5,0 | $7,0 | +6,5% | +1,17 | 5,0 | $8,0 | +$15,0 | **4,3 dias** antes do trailer · 2 ciclos depois |
+| 2 | 7,0 | $9,8 | +9,2% | +0,47 | 6,5 | $10,4 | +$5,2 | ~9 ciclos |
+| 3 | 8,0 | $11,2 | +10,5% | +0,23 | 7,2 | $11,5 | +$2,5 | ~24 ciclos |
+| 4 | 8,5 | $11,9 | +11,1% | +0,12 | 7,2 | $11,5 | +$0,7 | sumidouro |
+| 5 | 8,6 | $12,0 | +11,2% | +0,02 | 7,2 | $11,5 | ~0 | sumidouro |
+
+Party de 4 (Day 6, lucro ~$230/dia; balcão cheio no pico, então `SitHeadroom` barra boa parte):
+
+| Mesas | Provisório (diners dentro do teto) | Com `Q-180` B (sentado fora do teto, `MaxSeated` 4) |
+|---|---|---|
+| 1 | 7 diners · +5,5% | 8 · +6,3% |
+| 2 | 10 · +7,8% | 14 · +11% |
+| 3 | 12 · +9,4% | 19 · +15% |
+| 4 | 12 · +9,4% | 22 · +17% |
+| 5 | 12 · +9,4% | 24 · +19% |
+
+Leitura:
+
+- Mesa 1 é uma compra boa cedo ($30, paga em ~4 dias), no nível do Grill 2 e do Lock; mesa 2 paga depois do trailer.
+  Mesas 3–5, Patio Lights e Back Bar são, no solo, **uso para o dinheiro que sobra** (DEC-082, `economy.md` §7 "decoração"),
+  com efeito real pequeno. Em party, as mesas 3–4 rendem como o Counter 3.
+- Teto de efeito: 5 mesas + Patio Lights ≈ **+12–13%** solo, abaixo de Grill 3 + Counter 3 somados (+36%) e do mesmo
+  porte de um upgrade grande; não quebra a curva (o lucro extra exige trabalho fora do balcão).
+- Duplas (FEAT-038) somam ~+7% de pessoas e sentam mais (+0,20), o que puxa as mesas 2–3 para cima de dia.
+- Ordem esperada (solo): Grill 2 → **Mesa 1** → Lock → (trailer) → Counter 2 → Trailer Lights → **Mesa 2** → Grill 3 → … → mesas 3–5, Patio Lights, Back Bar.
 
 ## Critérios de aceite (balanceamento)
 
@@ -181,6 +270,8 @@ Leitura:
 - Simulação solo: cada upgrade fica a ±3 p.p. do ganho da tabela; se ficar fora, ajusta-se o número na tabela, não o código.
 - Simulação party de 4: Counter 2 rende mais que Grill 2 em lucro/min.
 - Simulação solo com compras na bancada do Mart combinadas com reposição: tudo comprado até o fim do Day 8 em ≥ 80% das execuções.
+- Mesas (Provisório): simulação solo com Grill 2 + Mesa 1 + Lock até o Day 3: o trailer continua comprável até o fim do Day 6.
+- Mesas: simulação solo Day 6 com 5 mesas + Patio Lights fica entre +9% e +15% de lucro/dia; se passar de +15%, baixa-se `TableTip` ou `SitChance` na tabela.
 
 ## Propostas pendentes (upgrades)
 
@@ -189,5 +280,7 @@ Leitura:
 | **Q-075** Nível passa ao trailer | sim, mesmo nível; peça visível nos dois veículos | não |
 | **Q-120 a, g, h** Bancada | 5 posições fixas (B1–B5) + 1 slot especial (S1); prateleiras não rotacionam; impacto na curva: nenhum para básicos, Rescue Whistle custa ~$570/run solo da sobra (chance e preço: DEC-129) | não |
 | **Q-064** Interruptor x Trailer Lights | interruptor vem com o trailer; Trailer Lights fixo em B5 depois da compra | não |
+| **Q-178** Onde/como se compra mesa | compra no lugar (mesa fantasma no Pad), uma mesa por vez, ordem fixa | **sim** (DEC-101) |
+| **Q-179** Mesas na troca de veículo; bancada do trailer | mesas são do Pad e ficam; Back Bar externo, trailer-only, cortável | **sim** (DEC-184) |
 
 Decidida: **Q-124** cafeteira → **DEC-125** (fixa no trailer, não vendida).

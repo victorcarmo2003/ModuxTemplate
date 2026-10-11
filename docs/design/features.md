@@ -131,6 +131,8 @@ Pendências — Q-### / notas
 | FEAT-034 | Desmaio, ambulância e reviver | SOBREVIVER | Noite |
 | FEAT-035 | Oferta especial da bancada (sorteio por turno) | GERENCIAR, SOBREVIVER | Dia/Noite |
 | FEAT-036 | Item no chão (derrubar e pegar) | GERENCIAR | Dia/Noite |
+| FEAT-037 | Mesas do Pad / área de consumo (2026-10-11, Provisório) | VENDER, GERENCIAR, PROGREDIR | Dia/Noite |
+| FEAT-038 | Clientes em dupla (2026-10-11, Provisório) | VENDER | Dia/Noite |
 
 ---
 
@@ -1577,6 +1579,180 @@ Peso econômico (solo, `economy.md` §5): $200 ≈ 2 dias de lucro ou ~0,8 ciclo
   - Pacote derrubado na rua e não pego some em 60 s ± 1.
   - Hot Dog derrubado nunca pode ser servido.
   - Item caído na pista aparece na calçada mais próxima.
+
+# Pad: mesas e grupos (2026-10-11)
+
+Ideia do usuário (2026-10-11): mesas compradas como progressão; cliente pode sentar para comer em vez de ir embora;
+vale também para o trailer; clientes em duplas ou casais. Escrito pelo game-designer como **Rascunho / Provisório**
+(DEC-193). Pontos que dependem do usuário: `Q-178` a `Q-182`. O usuário já pôs no place **5 mesas de piquenique**
+(`AST-100_PicnicTable` em `workspace.MAP01_Assets.PadDecor`, atrás do carrinho), cada uma com 4 Parts `Seat1..Seat4` na
+altura do tronco do NPC sentado e com o `LookVector` virado para a mesa (conferido pelo usuário com um NPC sentado).
+
+Restrições que continuam valendo e moldaram a proposta: **sem reputação** (DEC-051), **sem XP** (DEC-081), **teto de 12
+NPCs** e de 8/6 clientes vivos (DEC-045), todo pagamento cai na **gaveta** (DEC-050), toda compra tem **peça visível**
+(DEC-052) e **efeito de dia e de noite** (DEC-006), anomalias só sem sistema novo (DEC-195; `anomalies.md` Aprovado),
+"rua deserta" em tensão (DEC-183, `Q-162` b), dinheiro sobrando depois de ~Day 8 aceito e "decoração" como uso futuro
+(DEC-082, `economy.md` §7).
+
+### FEAT-037 — Mesas do Pad / área de consumo
+
+- Status: Rascunho (Provisório) · Pilares: VENDER, GERENCIAR, PROGREDIR · Origem: pedido do usuário 2026-10-11; **[DEC-006, DEC-045, DEC-050, DEC-051, DEC-052, DEC-082, DEC-183, DEC-195]**; fichas UPG-008, UPG-009, UPG-010
+- Resumo: a party compra até **5 mesas** no Pad, uma por vez, na própria mesa "fantasma". Cliente que recebeu pedido
+  **Completo** pode sentar para comer em vez de ir embora. Ao levantar, deixa **bandeja + $2 de gorjeta de mesa** em
+  cima da mesa. A mesa fica **suja** (ninguém senta) até um jogador fazer "Clean Table": a gorjeta vai para a gaveta e
+  a mesa volta a receber cliente. É um trabalho **opcional**: ignorar as mesas nunca piora a nota nem o fluxo; cuidar
+  delas rende dinheiro, mas tira o jogador do balcão (de dia expõe a gaveta ao ladrão; à noite pode custar escuro).
+
+Por que esse efeito (alternativas consideradas):
+
+| Opção de efeito | Prós | Contras | Escolha |
+|---|---|---|---|
+| **A. Gorjeta de mesa + limpeza** | tangível (moeda em cima da mesa); cria um papel novo em party; liga com ladrão (raio 14) e com escuro/luz à noite; zero mudança nas fórmulas da DEC-072 | 1 prompt novo, 1 estado por mesa; solo tem de dividir atenção | **recomendada** |
+| B. Bônus na nota do turno (sentado conta 1,5 satisfeito) | sem prompt novo | invisível; mexe na DEC-051; nota A ficaria fácil | não |
+| C. Fluxo +x% por mesa ("atrai clientes") | só número (`DayFlowBonus` já existe) | o gargalo é o balcão, efeito some quando a fila enche; nada para fazer | não |
+| D. Segundo pedido na mesa ("Seconds") | lucro forte; usa "Take Order"/"Serve" que já existem | entrega fora do balcão, balão no Pad, validação nova; escopo maior | **fora do MVP** (fase 2) |
+
+| Regra | Valor (dados em `Content.Seating`, proposta) |
+|---|---|
+| Mesas | 5 posições fixas no Pad: `TBL-1`..`TBL-5` = as 5 `AST-100_PicnicTable` já no place; 4 assentos cada (`Seat1..Seat4`). Pares de assento: `Seat1`+`Seat2` no mesmo banco, `Seat3`+`Seat4` no banco da frente; `Seat1` encara `Seat3` (o level-designer confere e renomeia se preciso, TASK-149) |
+| Liberação | **Day 2** (o Day 1 é tutorial; sem fantasma no Day 1) |
+| Antes da compra | mesa "fantasma": malha a 70% de transparência, sem colisão, sem assento; só a **próxima** da ordem mostra placa e prompt; as outras ficam fantasma sem prompt |
+| Ordem de compra | fixa, da mais perto da fila para a mais longe (`TBL-1` → `TBL-5`); o level-designer define a ordem pela distância a Q1 |
+| Compra | prompt na mesa fantasma: **"Buy Table — $N"**, hold **1,5 s**, Radius 7; qualquer membro; dinheiro da party; recusa `not_enough_cash` (`Q-178`: compra no Pad × Gear Stand) |
+| Preço por mesa | **$30 · $45 · $60 · $80 · $100** (total **$315**) — UPG-008 |
+| Efeito da compra | imediato: a mesa ganha cor e colisão com VFX de "pronto" + SFX-065; toast "Table added!" 3 s para a party |
+| Quem pode sentar | cliente normal (NPC-001 a NPC-006) com o pedido **Completo** (grupo: FEAT-038). Incompleto, Errado, Desistiu, Recusado: vai embora como hoje. **Nunca**: ator de anomalia (NPC-009 a NPC-018), ladrão, Mr. Pickett (âncora da ANM-004), passante, Opal |
+| Chance de sentar | `CustomerTypes.SitChance` do tipo (tabela abaixo) × **0,75 à noite**; +**0,20** se grupo; +**0,10** com Patio Lights (UPG-009); teto 0,95 |
+| Condições (todas) | (1) há mesa comprada, **limpa e livre**; (2) diners vivos < `MaxDiners` (**Day 4 · Night 2** NPCs); (3) folga no teto: clientes vivos ≤ `MaxCustomers` − **2** (`SitHeadroom`), contando o próprio; (4) fase `Open` ou `Night`; (5) nenhuma tensão ativa (abaixo). Falhou uma: vai embora como hoje |
+| Escolha da mesa | a mesa limpa e livre **mais perto de Q1** (legível, previsível) |
+| Ocupação | **1 cliente ou 1 grupo por mesa**, nunca estranhos juntos. Sozinho: `Seat1`. Dupla: `Seat1`+`Seat3` (frente a frente); casal: `Seat1`+`Seat2` (lado a lado) |
+| Caminho | Q1 → mesa (nós novos do grafo, TASK-149) → depois da refeição, mesa → saída normal (EX-E 60% / D1 40%, invariante 7). Nenhuma rota de mesa cruza a fila nem passa na frente do balcão |
+| Tempo sentado (`EatTime`) | dia **20 s** · noite **24 s**, ±3 s; grupo +4 s. Come o hot dog que recebeu (3 mordidas, clipe se existir, senão idle sentado) |
+| Ao levantar | deixa **bandeja** (embalagem amassada) e **moeda** de gorjeta de mesa sobre o tampo; mesa vira **suja** |
+| Gorjeta de mesa (`TableTip`) | **$2 por cliente** que sentou (dupla = $4), dia e noite; fica na mesa, não na gaveta, até a limpeza. Independe da gorjeta de balcão (DEC-072 não muda) |
+| Limpar | prompt **"Clean Table"** na mesa suja, hold **1 s**, Radius 7, qualquer membro `Active`; a gorjeta entra na **gaveta** (DEC-050; "+$4" flutuante na mesa e na gaveta); bandeja some; mesa volta a limpa |
+| Mesa suja | ninguém senta; sem prazo, sem penalidade de nota, sem cheiro/mosca no MVP |
+| Todas ocupadas ou sujas | o cliente vai embora como hoje (nada muda no loop) |
+| `Closing` | ninguém senta; quem está sentado termina o tempo e sai |
+| `Summary` | diners restantes somem fora de vista (já saindo); mesas limpam sozinhas; **gorjeta não recolhida se perde** (`Q-181`); compras de mesa ficam (são da run) |
+| Snapshot / noite perdida / retomada | **compras** de mesa entram no snapshot (como upgrades, FEAT-015); estado limpa/suja e gorjeta na mesa **não** (começa limpa). Gorjeta da noite perdida some com a gaveta (DEC-053) |
+| Troca de veículo | as mesas são do **Pad**, não do veículo: continuam compradas depois da troca para o trailer (`Q-179`; leitura de DEC-184) |
+| Ladrão (dia) | não mexe na mesa. A zona do ladrão continua o raio 14 de `CART`: limpar uma mesa fora dele deixa a gaveta exposta (escolha visível do jogador) |
+| Tensão (noite) | durante ANM-007 (do zumbido ao fim), ANM-008, ANM-009 e ANM-010, e enquanto houver ator de anomalia de cliente vivo: ninguém senta; quem está sentado **levanta e vai embora** (bandeja e gorjeta ficam). Mesma lógica de "rua deserta" (DEC-183) |
+| Escuro (noite) | mesa fora de `LightZone` ativa: quem limpa paga escuro normal (> 3 s → −1/s, FEAT-020). Trailer Lights (raio 18) cobre as mesas que estiverem no raio; Patio Lights (UPG-009) cobre todas |
+| Sanidade baixa | diners são clientes: o observador com sanidade < 40 os vê no pack Night (DEC-168), sem regra nova |
+| Janela fechada (DEC-221) | não afeta quem já está sentado; a janela só bloqueia o balcão |
+
+`SitChance` por tipo (campo novo em `CustomerTypes`; Provisório):
+
+| Tipo | `SitChance` dia | Noite (× 0,75) | Leitura |
+|---|---|---|---|
+| NPC-001 Office Worker | 0,30 | 0,23 | come rápido, volta ao escritório |
+| NPC-002 Student | 0,60 | — | turma que fica |
+| NPC-003 Jogger | 0,10 | — | come andando |
+| NPC-004 Construction Worker | 0,50 | 0,38 | pausa do almoço |
+| NPC-005 Grandparent | 0,70 | — | sem pressa |
+| NPC-006 Night Shift Worker | — | 0,30 (valor base 0,40) | intervalo do turno |
+| NPC-021 Mr. Pickett | 0 | 0 | âncora da ANM-004: comportamento fixo |
+
+Média ponderada pelos pesos de spawn: dia **~0,43**, noite **~0,30**.
+
+Invariante novo de cliente (para o padrão da DEC-010; nenhuma anomalia nova usa isso no MVP): **cliente sentado sempre
+come, sempre levanta depois do `EatTime`, sempre deixa bandeja e moeda e sai pela saída normal**. Uma futura
+anomalia "o que não levanta" fica anotada para depois do MVP (exige DEC; `anomalies.md` é Aprovado e DEC-195 veta
+sistema novo agora).
+
+Orçamento de NPC (DEC-045): **Provisório** = diners são clientes e contam em `MaxCustomers` (8 dia / 6 noite) e no teto
+de 12 — nenhum número da DEC muda. `SitHeadroom = 2` garante que sentar nunca faz a próxima tentativa de spawn sair
+`SkippedCap` por causa de uma mesa. Custo: em party de 4 no pico (balcão cheio) quase ninguém senta. Alternativa em
+`Q-180`: NPC sentado "estacionado" (ancorado, sem pathfinding, sem `Humanoid` ativo) fora do teto de 12, com teto
+próprio `MaxSeated` 4/2, como a Opal; mexe na DEC-045, volta ao usuário. Dado: `Seating.SeatedOutsideCap` (false).
+
+Dados (proposta para o architect, TASK-144):
+
+| Tabela / campo | Valor |
+|---|---|
+| `Content.Seating` (novo, registro) | `UnlockDay` 2 · `EatTime` { Day 20, Night 24, Jitter 3, GroupExtra 4 } · `TableTip` 2 · `MaxDiners` { Day 4, Night 2 } · `SitHeadroom` 2 · `NightSitMult` 0,75 · `GroupSitBonus` 0,20 · `SitChanceCap` 0,95 · `CleanHold` 1 · `BuyHold` 1,5 · `PromptRadius` 7 · `TipLostAtSummary` true · `SeatedOutsideCap` false · `SitPhases` { `Open`, `Night` } · `TensionAnomalies` { anm_007, anm_008, anm_009, anm_010 } · `GhostTransparency` 0,7 |
+| `Content.Upgrades` | UPG-008 `patio_tables` (níveis 0..5, `Effects.TableCount`), UPG-009 `patio_lights`, UPG-010 `back_bar`; campo novo de **onde se compra** (`SoldAt = "InPlace"`, com `PlaceSpots`) e de **escopo** (`Scope = "Pad"`: não recomeça na troca de veículo) |
+| `Content.CustomerTypes` | campo `SitChance` (tabela acima) |
+| `MapIndex` | `TBL-1..5` (ordem), `Seat1..4` por mesa, `Prompt_BuyTable`, `Prompt_CleanTable`, âncora da bandeja `Tray_Anchor`, nós do grafo mesa ↔ Q1/saída |
+
+- Party: qualquer membro compra e limpa; a gorjeta da mesa é da party (gaveta). Em party, "quem limpa" vira papel
+  natural; o balcão continua sendo o gargalo (Counter, FEAT-009).
+- Fora do MVP: segundo pedido na mesa ("Seconds"), sujeira que piora com o tempo (moscas, nota), cliente que espera mesa,
+  decoração cosmética por mesa (guarda-sol, vaso, toalha), anomalia "o que não levanta".
+- Critérios de aceite:
+  - Antes do Day 2 nenhuma mesa fantasma nem prompt de compra aparece; do Day 2 em diante só a próxima mesa da ordem tem prompt.
+  - Comprar a mesa n debita exatamente o preço da tabela; sem saldo, nada muda e o servidor responde `not_enough_cash`.
+  - Em 1.000 clientes simulados de cada tipo com mesa livre, folga e sem tensão, a fração que senta fica a ±3 p.p. do `SitChance` (× 0,75 à noite).
+  - Cliente Incompleto, Errado, Desistiu ou Recusado nunca senta; ator de anomalia, ladrão, Pickett e passante nunca sentam.
+  - Nunca há mais diners vivos que `MaxDiners` do turno; nunca dois grupos/clientes estranhos na mesma mesa.
+  - Com `SitHeadroom` 2, nenhuma tentativa de spawn sai `SkippedCap` por causa de um cliente que sentou (contador do `CustomerService`).
+  - O cliente sentado levanta em `EatTime` ± 3 s (± 0,2 s de tolerância de medição), deixa bandeja e $2 por pessoa na mesa e sai por EX-E ou D1.
+  - "Clean Table" só aparece em mesa suja; depois do hold a gaveta sobe exatamente o valor da mesa para todos os jogadores e a mesa volta a receber cliente.
+  - No `Summary`, toda mesa está limpa e a gorjeta não recolhida não entra na gaveta.
+  - Durante ANM-007/008/009/010, ninguém senta e todo diner vivo levanta em ≤ 1 s.
+  - Depois da troca para o trailer, as mesas compradas continuam (com `Scope = "Pad"`); a próxima mesa fantasma continua com o mesmo preço.
+  - Noite perdida e repetida: mesas compradas continuam, todas limpas, sem gorjeta nas mesas.
+- Pendências: `Q-178` (onde e como se compra), `Q-179` (mesas × troca de veículo; bancada traseira do trailer), `Q-180` (teto de NPC), `Q-181` (limpeza e gorjeta perdida).
+
+### FEAT-038 — Clientes em dupla
+
+- Status: Rascunho (Provisório) · Pilares: VENDER · Origem: pedido do usuário 2026-10-11; **[DEC-010, DEC-045, DEC-071, DEC-072, DEC-188]**
+- Resumo: uma tentativa de spawn pode gerar **2 clientes juntos** (dupla de amigos/colegas ou casal). A dupla ocupa **1 vaga**
+  da fila, faz **um pedido com 2 hot dogs**, paga por hot dog e, se for sentar, senta junta na mesma mesa (FEAT-037).
+
+| Regra | Valor (dados em `Flow.Groups`, proposta) |
+|---|---|
+| Chance por tentativa | Day 1: **0** · Day 2+: **0,20** · Night 1: **0** · Night 2+: **0,10** (`Q-182`) |
+| Espaço | a dupla só nasce se couberem **2** no teto de clientes vivos e no teto de 12; senão nasce **1** cliente (a tentativa sai `Spawned` igual) |
+| Intervalo depois de uma dupla | próximo intervalo **× 1,6** (`IntervalMult`): com 20% de duplas, pessoas/min **+7%**, tentativas/min −11%; o fluxo da DEC-045 fica quase igual |
+| Composição | tabela `Groups.Pairs` (abaixo): cada membro tem o próprio tipo, espécie, roupa e acessório. **Nunca** os dois com mesma espécie **e** mesma roupa (invariante 3); **à noite, nunca a mesma espécie** (não pode lembrar as cópias da ANM-004) |
+| Casal | par com `Couple = true`: anda lado a lado e senta lado a lado (`Seat1`+`Seat2`); dupla comum anda em fila e senta frente a frente. Tom Mild: sem gesto romântico, só "chegam juntos" (falas com o narrative-writer) |
+| Andar | líder com pathfinding; parceiro **segue** o líder (alvo = posição do líder + deslocamento de 2 studs), sem pathfinding próprio (custo de IA ~1 NPC) |
+| Fila | **1 vaga**; o líder no ponto Q, o parceiro **1,8 stud ao lado** (o level-designer confere que não invade a vaga vizinha, 5 studs entre vagas) |
+| Pedido | um "Take Order" anota os dois; K de cada hot dog sorteado à parte (fase + `KShift` do tipo de cada um); balão com **2 linhas** (uma por hot dog) |
+| Paciência | 40 + 5 × (K1 + K2) + Counter + **10 s** (`PatienceBonus`) **[fórmula da DEC-072 com K = soma]** |
+| Janela de gorjeta | 16 + 4 × (K1 + K2) s; **$1 por hot dog Completo** dentro da janela (Hawker $2 por hot dog; Shift Lead $0) |
+| Serve | cada Hot Dog é entregue sozinho; o servidor casa com o item pendente: **igual** → Completo; **subconjunto** → Incompleto do item com menos faltas; tem complemento que nenhum item pendente pede → **Errado** (volta para a mão) |
+| Pagamento | por hot dog, na hora, na gaveta (DEC-050) |
+| Ir embora | quando os 2 itens estão resolvidos. Paciência zerou: itens pendentes = Desistiu. "Refuse" recusa a dupla inteira |
+| Nota do turno | conta como **2 clientes** (um por hot dog) |
+| Mesas | a dupla decide junta: chance do tipo do **líder** + 0,20; senta se os 2 itens saíram Completos ou Incompletos e **≥ 1 Completo**; 1 mesa só |
+| Exclusões | atores de anomalia, ladrão, Mr. Pickett e passantes nunca em dupla |
+
+`Groups.Pairs` (Provisório; pesos dentro do turno):
+
+| Turno | Par (líder + parceiro) | Peso | Casal? |
+|---|---|---|---|
+| Dia | Student + Student (Hamster + Rato) | 30 | não |
+| Dia | Office Worker + Office Worker (roupas diferentes) | 20 | não |
+| Dia | Grandparent + Grandparent (Tartaruga + Ovelha) | 15 | **sim** |
+| Dia | Construction Worker + Construction Worker (roupas diferentes) | 15 | não |
+| Dia | Office Worker + Student | 10 | não |
+| Dia | Construction Worker + Office Worker | 10 | não |
+| Noite | Night Shift Worker + Construction Worker | 40 | não |
+| Noite | Night Shift Worker + Office Worker | 35 | não |
+| Noite | Office Worker + Construction Worker | 25 | não |
+
+Par com tipo ainda bloqueado no dia (ex.: Grandparent antes do Day 3) tem peso 0.
+
+Leitura de balanço (solo, Day 6, estimativa de mesa): +7% de pessoas → ~+$5/dia se o jogador der conta; 2 hot dogs de
+uma vez pesam mais na tábua (2 vagas no carrinho, DEC-215) e na grelha; o +10 s de paciência e a janela pela soma de K
+cobrem a montagem dobrada (~2 × 8–10 s). Em party, dupla é ótima (2 jogadores montam em paralelo).
+
+- Party: nada muda além do fluxo; qualquer jogador serve qualquer item.
+- Fora do MVP: grupos de 3–4, família com filhote, pedido "para dividir".
+- Critérios de aceite:
+  - Em 10.000 tentativas simuladas (Day 2+, com espaço), 20% ± 1 p.p. viram dupla; Night 2+: 10% ± 1 p.p.; Day 1 e Night 1: 0.
+  - Sem espaço para 2, nasce 1 cliente e o contador registra `Spawned` (nunca `SkippedCap` por causa da dupla).
+  - A dupla ocupa exatamente 1 vaga; com Counter 1 e uma dupla na fila ainda há 2 vagas livres.
+  - Nenhuma dupla com mesma espécie e mesma roupa; à noite nenhuma com a mesma espécie.
+  - Paciência e janela de gorjeta batem com as fórmulas pela soma de K (± 0,2 s).
+  - Servir o mesmo hot dog Completo duas vezes: o 2º é avaliado contra o item que sobrou (Completo só se igual).
+  - Recusar a dupla tira os 2 da fila e conta 2 insatisfeitos na nota.
+  - Parceiro nunca usa pathfinding próprio (conferir no `CustomerService`) e nunca fica a > 4 studs do líder andando.
+- Pendências: `Q-182` (dupla à noite e leitura de "casal").
 
 ---
 

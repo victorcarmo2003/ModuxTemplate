@@ -165,6 +165,11 @@ Decidido: **opção A** — o dinheiro sobrando depois de ~Day 8 é aceito no MV
 Solo termina a run com ~$1.770 sem uso (~$1.200 se comprar todos os Rescue Whistles); no dia infinito, tudo está comprado por volta do Day 10–12.
 Futuro (fora do MVP, sem data): decoração do veículo com dinheiro (opção C), respeitando DEC-006.
 Uso opcional que já existe no MVP: Rescue Whistle (§5.4), sem ter sido criado para isso.
+**2026-10-11 (Provisório, pedido do usuário):** mesas do Pad e decoração ligada a elas (UPG-008 a UPG-010, FEAT-037)
+somam **$525** de compras novas; mesa 1–2 dão lucro, o resto funciona como o uso "decoração" previsto acima, com efeito
+pequeno de dia e de noite (DEC-006). Sobra solo no fim da run: ~$1.770 → **~$1.245** (sem apitos). Nova fonte de Money:
+gorjeta de mesa $2 por cliente sentado, recolhida na limpeza e depositada na gaveta (DEC-050). Duplas (FEAT-038): ~+7%
+de pessoas por dia. Tabela comparável em `upgrades.md` ("Mesas: tabela comparável").
 
 ## 8. Escala por party
 
