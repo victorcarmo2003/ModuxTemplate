@@ -46,11 +46,10 @@ function OpenSignController:Paint(board: Instance, open: boolean)
 	end
 end
 
-function OpenSignController:Refresh(force: boolean?)
+-- Repaints every tick (2 Hz, a few labels): the stand streams in part by part (the "Board" proxy can arrive after the
+-- tagged mesh), so painting only on a phase change could leave a late part on the old face.
+function OpenSignController:Refresh()
 	const open = self:IsOpen()
-	if open == self.Shown and not force then
-		return
-	end
 	self.Shown = open
 	for _, board in CollectionService:GetTagged(TAG) do
 		self:Paint(board, open)
@@ -65,7 +64,7 @@ OpenSignController:OnStart(function(self)
 	CollectionService:GetInstanceAddedSignal(TAG):Connect(function(board)
 		self:Paint(board, self:IsOpen())
 	end)
-	self:Refresh(true)
+	self:Refresh()
 end)
 
 OpenSignController:OnTick(function(self)
