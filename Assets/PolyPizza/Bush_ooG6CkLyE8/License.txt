@@ -1,0 +1,8 @@
+Title: Bush
+Creator: Quaternius
+Source: https://poly.pizza/m/ooG6CkLyE8
+Licence (as published on the Poly Pizza page, field "Licence"): CC0 1.0
+Licence text: https://creativecommons.org/publicdomain/zero/1.0/
+Attribution not required (credited voluntarily).
+Triangles (Poly Pizza): 360
+Downloaded: 2026-10-11 from https://static.poly.pizza/6bbb833e-26cb-4bf9-ae67-a31b98e30bd9.glb

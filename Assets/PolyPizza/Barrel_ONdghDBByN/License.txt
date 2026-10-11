@@ -1,0 +1,8 @@
+Title: Barrel
+Creator: Quaternius
+Source: https://poly.pizza/m/ONdghDBByN
+Licence (as published on the Poly Pizza page, field "Licence"): CC0 1.0
+Licence text: https://creativecommons.org/publicdomain/zero/1.0/
+Attribution not required (credited voluntarily).
+Triangles (Poly Pizza): 1384
+Downloaded: 2026-10-11 from https://static.poly.pizza/6d3e8847-bda4-4d6c-8004-7b03cf848b13.glb

@@ -316,8 +316,9 @@ Critérios de aceite (anomalias):
 | Anomalias | nunca é alvo nem ator de anomalia; nunca some, nem no Hush (o Mart nunca apaga) |
 | Corte de escopo | 2º a sair (depois dos pedestres); se cortada, só somem as falas; nada do roteiro quebra |
 
+- **Mart v2 (2026-10-11, Provisório, `Q-175`):** o caixa sai e a Opal passa para trás do **balcão central do Gear Stand** (bancada-quiosque de upgrades; OP-1 em WORLD (98, 20), de frente para a loja; `MAP-01.md` §18.4). Continua **sem vender** e sem prompt (as compras são nos pedestais); balão de visita igual; sem balão enquanto a porta de enrolar do meio está fechada (FEAT-015 v2). Reação opcional à compra: aceno + 1 fala do pool `Purchase` (1 a cada 20 s, só para quem está a ≤ 12 studs), cortável.
 - Critérios de aceite:
-  - Opal nunca sai de trás do caixa e não tem prompt.
+  - Opal nunca sai de trás do caixa (Mart v2: do balcão do Gear Stand) e não tem prompt.
   - Um jogador que fica parado no raio recebe no máximo 1 fala a cada 90 s.
   - A fala sorteada é sempre da fase do turno atual.
 

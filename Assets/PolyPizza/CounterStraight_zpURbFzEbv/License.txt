@@ -1,0 +1,8 @@
+Title: Counter Straight
+Creator: Quaternius
+Source: https://poly.pizza/m/zpURbFzEbv
+Licence (as published on the Poly Pizza page, field "Licence"): CC0 1.0
+Licence text: https://creativecommons.org/publicdomain/zero/1.0/
+Attribution not required (credited voluntarily).
+Triangles (Poly Pizza): 464
+Downloaded: 2026-10-11 from https://static.poly.pizza/e8741d48-e367-40ad-a624-bdaa2fffaf47.glb

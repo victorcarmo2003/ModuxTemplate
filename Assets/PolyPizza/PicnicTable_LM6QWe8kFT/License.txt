@@ -1,0 +1,9 @@
+Title: Picnic Table
+Creator: J-Toastie
+Source: https://poly.pizza/m/LM6QWe8kFT
+Licence (as published on the Poly Pizza page, field "Licence"): CC-BY 3.0
+Licence text: https://creativecommons.org/licenses/by/3.0/
+ATTRIBUTION REQUIRED in the game credits:
+  "Picnic Table by J-Toastie (https://poly.pizza/m/LM6QWe8kFT), CC-BY 3.0 (https://creativecommons.org/licenses/by/3.0/)"
+Triangles (Poly Pizza): 428
+Downloaded: 2026-10-11 from https://static.poly.pizza/95f17ebc-7edb-4c8b-a073-1b8f910b1497.glb

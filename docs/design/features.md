@@ -467,6 +467,7 @@ Fora da D-04, mesma regra (chaves aceitas e criadas em `Notices` pela TASK-047):
 | Bloqueio | prateleira de ingrediente ainda não liberado mostra o pacote com a etiqueta "Out of stock" e, embaixo, "Day N" (proposta para **Q-088**); Coffee só aparece depois do trailer |
 | Sem saldo | prompt mostra preço em vermelho e não executa |
 | Prateleiras rotacionam? | **não**: ingredientes sempre à venda pelo preço da tabela (DEC-049; proposta para **Q-120 g**) |
+| Seções (Mart v2, 2026-10-11, Provisório) | BAKERY (Buns), MEAT & DELI (Sausages, Bacon), SAUCES (Ketchup, Mustard), SNACKS · COFFEE (Potato Sticks, Ground Coffee), DAIRY (Cheese, Cream Cheese), FRESH PRODUCE (cenário); 3 corredores de 6 studs; caixa sai, Opal vai para a bancada (`Q-175`); pacotes seguem na prateleira (`Q-177`). Planta: `MAP-01.md` §18 |
 
 - Critérios de aceite:
   - O expositor de frutas/verduras não tem nenhum prompt.
@@ -732,6 +733,57 @@ Impacto na curva: comprar exige ida ao Mart (~25 s ida e volta de dia; à noite 
   - Todo upgrade comprado muda o modelo do veículo para todos os jogadores em ≤ 1 s, sem ninguém precisar ir ao veículo.
   - B1–B4 estão à venda em 100% dos turnos; B5 em 100% dos turnos depois da compra do trailer.
   - Não existe prompt de compra de upgrade em nenhum equipamento do veículo.
+
+#### FEAT-015 v2 — "Gear Stand": bancada-quiosque com porta de enrolar e pedestais (2026-10-11, Provisório)
+
+Feedback do usuário (2026-10-11): o painel de nichos não ficou bom; a bancada vira um **quiosque estilo trailer** na mesma
+parede, com **porta de enrolar de ripas de madeira**, **atendente atrás do balcão** e **pedestais com a miniatura do
+upgrade flutuando**. Layout e coordenadas: `MAP-01.md` §18. Regras abaixo substituem as linhas "Layout da bancada" e
+"Cada posição mostra..." acima quando a TASK-138 ligar o modelo. **Nada de preço, efeito ou rotação muda**: DEC-101,
+DEC-106, DEC-107, DEC-129 seguem; o que está aqui é apresentação + quando a bancada atende. Dúvidas: `Q-175` (Opal),
+`Q-176` (porta), `Q-177` (pacotes).
+
+| Regra | Valor (dados em `Content.Mart`, TASK-135) |
+|---|---|
+| Pedestais | **6**: B1 Grill, B2 Cooler, B3 Counter · [Opal no meio] · B4 Drawer Lock, B5 Trailer Lights, S1 especial (da esquerda para a direita de quem olha) |
+| Oferta | B1–B5 **fixos** (DEC-106), sempre o **próximo nível** no veículo atual (DEC-184: depois da troca, o trailer recomeça do nível 2); S1 = FEAT-035 (sorteio por turno) |
+| Miniatura | modelo da peça do próximo nível (`Upgrades.Levels[veículo][n+1].Part`), escala para a maior dimensão = **1,6 studs**; centro **1,2** acima do topo do pedestal |
+| Movimento | sobe/desce **±0,25** num seno de **3,0 s**; gira **45°/s** (1 volta em 8 s); só no client e só com a câmera a **≤ 60 studs** do Gear Stand (fora disso, parada e sem custo) |
+| Estado "à venda" | flutua e gira; anel do pedestal aceso; placa: nome do nível ("Double Grill"), efeito em 1 linha ("3 spots · 10 s"), preço Mustard |
+| Sem saldo | igual, preço **vermelho**; o servidor recusa com `not_enough_cash` |
+| "Maxed" | mini do nível **atual**, parada; anel apagado; placa "MAX"; sem prompt |
+| "Trailer only" | B5 no carrinho: mini parada a 50% de transparência; placa "Trailer only"; sem prompt (DEC-055) |
+| S1 vazio / com item / vendido | vazio: pedestal sem mini, placa "Nothing special today" · com item: mini do Rescue Whistle (ITM-021) flutuando, moldura e anel **Mustard** + lâmpada Neon + `VFX_Rare` · vendido: mini some, placa "Sold out" até o fim do turno (FEAT-035) |
+| Compra | prompt na frente da mini; "Buy {upgrade} — ${preço}", **hold 1,5 s**, Radius 7; o alvo é o prompt mais perto do centro da tela (`PromptController`) |
+| Porta aberta | fases `Prep`, `Open`, `Closing`, `Night`, `NightEnd` |
+| Porta fechada | fases `Summary`, `Call`, `NightLost`, `Resume`, `Intro`, `Finale`, `RunEnd`. Prompts dos pedestais desligados; o servidor recusa compra com a porta fechada (inclusive hold que termina no instante da troca de fase) |
+| Troca por turno | a porta desce no `Summary`; o S1 é sorteado no início do `Prep` (FEAT-035); a porta sobe já com a oferta nova. Noite perdida/retomada: desce no `NightLost`, sobe no `Prep` com **a mesma** oferta (snapshot) |
+| Animação da porta | 3 portas (L, C, R); **desce em 2,0 s**, **sobe em 1,6 s**; defasagem **0,25 s** entre portas (L → C → R); só client, derivada da fase (zero rede nova); quem chega no meio vê o estado final |
+| À noite | **aberta** (DEC-049; o S1 só existe depois do trailer, então quase todo uso dele é à noite; e o trailer recompra upgrades do nível 1, DEC-184) |
+| Sem oferta | **não fecha** (tudo "MAX" e S1 vazio = pedestais parados e placas "MAX"); a Opal tem de continuar à vista (DEC-079, pistas do final) |
+| Opal | atrás do balcão central (OP-1 do §18.4, `Q-175`); **não vende**, sem prompt; balão de visita igual ao NPC-020 (8 studs, 90 s); sem balão com a porta C fechada |
+| Feedback da compra | (1) hold 1,5 s; (2) sucesso: a mini dá 1 volta rápida e "estoura" (escala 1 → 1,3 → 0 em **0,4 s**), **14 confetes** (AST-092) e SFX-064 `buy` no pedestal; (3) **0,5 s** depois, a mini do nível seguinte **sobe de dentro do pedestal em 0,6 s** (ou a placa vira "MAX"); (4) no veículo: peça nova + SFX-065 + confete (já existe); (5) toast para a party "Grill upgraded!" 3 s (acima); (6) opcional, cortável: Opal acena e diz 1 fala do pool `Purchase` (1 a cada 20 s, só para quem está a ≤ 12 studs) |
+| Recusa | sem saldo: preço vermelho + `not_enough_cash`; outro jogador comprando o mesmo upgrade: `bench_busy`; "Maxed": sem prompt |
+
+Tempo da porta na economia: fechada no máximo `Summary` (15/20 s) + `Call` (≤ 60 s) por virada de turno; nenhuma compra
+de upgrade depende desse tempo (o efeito é imediato e a party pode comprar em qualquer fase aberta). Prateleiras não fecham.
+
+Comparação (orçamento do client, por quadro, com o jogador dentro do Mart):
+
+| Opção de animação | Peças movidas | Custo |
+|---|---|---|
+| Mini por `PivotTo` em cada quadro | 6 modelos | desprezível (6 CFrames) |
+| Porta por ripa (14 × 3 Parts) | 42 Parts só nos 2 s da transição | baixo |
+| **Porta por painel com `Texture` de ripas + rolo girando (recomendado)** | 3 painéis + 3 rolos | mínimo |
+
+- Critérios de aceite (v2):
+  - Em 100% das fases `Summary` a porta está fechada e nenhum prompt de pedestal aparece; no início do `Prep` ela abre em ≤ 0,2 s depois da troca de fase no client.
+  - 1.000 tentativas de compra com o hold terminando na virada `Closing` → `Summary`: nenhuma compra registrada depois que a fase virou.
+  - A mini de cada B1–B5 é sempre a peça do **próximo** nível do veículo atual; depois da troca para o trailer, mostra o nível 2 do trailer.
+  - "Maxed" e "Trailer only" não têm prompt e a mini fica parada.
+  - Com a câmera a mais de 60 studs do Gear Stand, nenhuma mini é atualizada por quadro.
+  - 4 jogadores compram 4 pedestais diferentes ao mesmo tempo: as 4 compras saem, o saldo nunca fica negativo.
+  - Da porta do Mart, a mini da S1 é visível no fim do corredor principal (`MAP-01.md` §18.10).
 
 ### FEAT-016 — Compra do trailer e troca de veículo
 
@@ -1479,7 +1531,7 @@ Janela de 10 s — todos caídos **[DEC-094, DEC-102]**:
 | Preço | **$200 × multiplicador da party** (mesmo de DEC-047, party contada como em DEC-121): 1p $200 · 2p $300 · 3p $380 · 4p $440 **[DEC-129]**; prompt "Buy Whistle (${preço})" |
 | Limite | 1 por jogador na hotbar (FEAT-005); sem limite por run (a raridade limita; limite por turno/run segue em aberto com o game-designer, DEC-129) |
 | Garantia | nenhuma (a raridade é a regra "raramente" de DEC-092) |
-| Aviso | notificação "Something rare is on the Mart's back wall!" (`ui-text.md`, 4 s) no início do turno em que S1 tem o apito; S1 tem lâmpada acesa |
+| Aviso | notificação "Something rare is on the Mart's back wall!" (`ui-text.md`, 4 s) no início do turno em que S1 tem o apito; S1 tem lâmpada acesa. **Mart v2 (2026-10-11, Provisório):** o S1 vira o pedestal da ponta direita do Gear Stand (`MAP-01.md` §18.4); a porta de enrolar desce no `Summary` e sobe no `Prep` já com o sorteio novo (FEAT-015 v2); texto do aviso a trocar "back wall" pelo nome da bancada (TASK-142) |
 
 Probabilidade numa run perfeita (19 turnos depois do trailer: Night 1–10 + Day 6–14):
 

@@ -1,0 +1,8 @@
+Title: Can Fridge
+Creator: Quaternius
+Source: https://poly.pizza/m/8OHbykvREu
+Licence (as published on the Poly Pizza page, field "Licence"): CC0 1.0
+Licence text: https://creativecommons.org/publicdomain/zero/1.0/
+Attribution not required (credited voluntarily).
+Triangles (Poly Pizza): 2784
+Downloaded: 2026-10-11 from https://static.poly.pizza/ee72093e-8e20-4f27-83fa-50bc794e9b56.glb

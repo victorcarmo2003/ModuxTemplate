@@ -421,6 +421,9 @@ Medidas (iguais a AST-027): casco 28 × 12 (X 26..54, Z 35..47), interior 26 × 
 
 ### 7.4 Interior do Ninth Street Mart
 
+> **2026-10-11:** redesenho do interior em **§18 (Mart v2, Provisório)**, pedido do usuário (bancada-quiosque com porta de
+> enrolar, seções por tipo de produto, corredores largos). Esta seção vale até o binding da TASK-138; depois fica como histórico.
+
 36 × 32 studs (X −100..−64, Z 32..64), um cômodo, pé-direito 12 (AST-028). Porta na **quina NE** chanfrada. Vidro na fachada **norte** (calçada da Ninth, SS) e na fachada **leste** de Z 32 a Z 56 (praça e Pad). Gôndolas correm **leste-oeste**: quem está num corredor olhando para leste vê o carrinho pelo vidro (DEC-018).
 
 Três áreas [DEC-101]: **prateleiras** de ingredientes (gôndolas e geladeiras), **expositor de frutas/verduras** (só cenário, sem prompt [DEC-109]) e **bancada de upgrades** na parede do fundo [DEC-101, DEC-106]. Opal no balcão do caixa [DEC-079, DEC-099].
@@ -1248,3 +1251,245 @@ Não entrou: lixeiras novas (o `Bind` transforma toda `AST-034_TrashCan` em `Str
 **17.4 Orçamento.** Seção 8: ~490 entradas (≈ 490 instâncias), **≈ 104 mil tris no total** da cidade nova (37 Kenney ≈ 51 mil, ~300 cartões ≈ 30 mil, carros ≈ 11 mil; o resto < 1 mil por tipo); só a parte perto das ruas visíveis entra na tela ao mesmo tempo (a névoa da noite termina em 200; de dia a `Atmosphere` apaga o anel de skyline). Malhas repetidas (mesmo `MeshId` + textura) são instanciadas pelo motor. Nenhuma luz nova além dos 4 NL (5 postes na cadeia com P-01; antes 6). A conferir no MicroProfiler do celular (art-director, §13).
 
 **Rodado em 2026-10-10 (ids AST-034_ACUnit / _Clothesline / _Dumpster recebidos):** `Place.diff` antes: 229 iguais, diferenças só nas entradas novas, nos postes JL / `Post_NinthN_E1` substituídos e nos carros PARK-N 5/6 movidos (edições à mão do §16.0 presentes). `Place.run` 737/737 → `Bind.run` (err 0; W9 moveu o `SpawnLocation`; `Awning` escondida; NL-01..04 com `SpotLight` padrão) → `Pieces.run` 21/21 (err 0) → `Check.run({ wave = 3 })` **PASS, 0 erros**, 23 avisos (os mesmos de antes, menos SP-S; regra 14: NL-01..04 e WALKER-10 vistos da janela, 4/4 e 3/3 raios). `Place.diff` depois: **0 diferenças** (736 iguais). Lighting não foi tocado.
+
+## 18. Mart v2 — seções, corredores largos e bancada-quiosque "Gear Stand" (2026-10-11) — Provisório
+
+Autor: game-designer, a pedido do orquestrador, sobre o feedback do usuário de 2026-10-11 ("o painel de upgrades não
+ficou bom"; "faltam seções"; "difícil andar lá dentro"). **Rascunho / Provisório** (DEC-193): vale como base para as
+TASK-135 a TASK-143 até o usuário decidir `Q-175` a `Q-177`. Substitui o §7.4 depois do binding (TASK-138).
+
+### 18.0 Restrições que continuam valendo
+
+| Fonte | O que obriga aqui |
+|---|---|
+| DEC-049 | pacote físico comprado **na prateleira** (prompt → Tool na mão → Restock); Mart aberto **à noite** |
+| DEC-101, DEC-106 | upgrades comprados na bancada do fundo; **básicos sempre à venda**, só o especial (S1) é sorteado por turno |
+| DEC-107, DEC-125 | trailer e cafeteira **fora** da bancada |
+| DEC-109 | frutas/verduras só cenário |
+| DEC-079, DEC-099, DEC-191 | Opal fixa dia e noite, **não vende**, sem prompt, fora do teto, nunca anomalia. Mudar o lugar dela (caixa → bancada) está em **`Q-175`** |
+| DEC-180 | ingrediente não liberado aparece com "Out of stock" |
+| DEC-018, FEAT-008 | da porta e dos corredores se vê o carrinho pelo vidro da praça |
+| Casca AST-028 | 36 × 32, pé-direito 12, porta na quina chanfrada, vidro na rua e na praça; **nada muda na casca** |
+
+**Coordenadas desta seção: WORLD (place)**, como o usuário pediu. Entre parênteses, o mesmo ponto em MAP-01 (as tabelas
+do `bind_map01.luau` são em MAP): `MAP = (−X, 67,887 − Z)`. Nomes de parede pelo que ficam de frente, para não confundir
+o "leste" do usuário (WORLD X 100, onde está o GEAR WALL hoje) com o "oeste" do MAP-01 (X −100), que são **a mesma parede**:
+
+| Parede | WORLD | MAP | O que é |
+|---|---|---|---|
+| Fundo (oposta à porta) | X 100 | X −100 | Gear Stand (posição atual do GEAR WALL, mantida) |
+| Vidro da rua | Z 35,9 | Z 32 | Ninth Avenue, inteira de vidro |
+| Vidro da praça | X 64, Z 11,9..35,9 | X −64, Z 32..56 | vidro; vista do carrinho (DEC-018) |
+| Cega da praça | X 64, Z 3,9..11,9 | X −64, Z 56..64 | parede |
+| Parede de trás | Z 3,9 | Z 64 | parede (geladeiras de laticínios) |
+| Porta | quina (64, 31,9)–(68, 35,9) | quina (−64, 36)–(−68, 32) | porta chanfrada (AST-028), `AutoDoor` |
+
+### 18.1 Planta baixa (WORLD)
+
+Escala: **1 coluna = 1 stud em X** (64 → 100), **1 linha = 2 studs em Z**; a coluna da esquerda é o centro de cada
+linha em Z. Rua (Z 35,9) em cima, parede de trás (Z 3,9) embaixo. Aproximado (±1); as tabelas 18.2–18.4 são a fonte.
+
+```
+ Z\X 64    70   75   80        90  94  100
+         \ggggggggggggggggggggggggggggggg+    vidro da rua (Ninth Avenue)
+  35    D..BBBB.PPPPPPPPP................|    B = BAKERY (Buns)   P = FRESH PRODUCE (cenário)
+  33  D....BBBB.PPPPPPPPP..........#.....|    D = porta chanfrada; # = poste da fachada do Gear Stand
+  31 g.............................:.....|    corredor principal (Z 26,9..32,9): porta -> Gear Stand
+  29 g.............................:.*...|    * = S1 (especial) no eixo do corredor principal: visto da porta
+  27 g.............................:.5...|    5 = B5 Trailer Lights
+  25 g......MMMMMMMMM..............:.4...|    M = MEAT & DELI (Sausages, Bacon)   4 = B4 Drawer Lock
+  23 g.............................#.....|    corredor 2 (Z 17,9..23,9)
+  21 g.............................:==.O.|    O = Opal (OP-1) atrás do balcão central (=), no eixo do corredor 2
+  19 g.............................:==...|
+  17 g......SSSSSSSSS..............#.3...|    S = SAUCES (Ketchup, Mustard)        3 = B3 Counter
+  15 g......KKKKKKKKK..............:.....|    K = SNACKS + COFFEE (Potato Sticks, Ground Coffee)
+  13 g.............................:.2...|    2 = B2 Cooler; corredor 3 (Z 6,9..12,9)
+  11 |.............................:.....|
+   9 |.............................:.1...|    1 = B1 Grill, no eixo do corredor 3
+   7 |.............................#.....|
+   5 |......FFFFFFFFF....................|    F = DAIRY (Cheese, Cream Cheese), geladeiras na parede de trás
+     +-----------------------------------+    parede de trás (Z 3,9)
+```
+
+Colunas: X 64..71 hall/corredor de entrada · X 71..80 ilhas · X 80..94 praça do Gear Stand · X 94..100 Gear Stand.
+`g` = vidro da praça (X 64); `|` à esquerda = parede cega; `:` = linha das portas de enrolar (X 94); `#` = postes; `=` = balcão da Opal.
+
+Leitura: **3 corredores paralelos à rua** (6 studs cada), ligados nas duas pontas por um **corredor de entrada**
+(X 64..71) e pela **praça do Gear Stand** (X 80..94). Sem beco sem saída: qualquer corredor dá a volta. Cada corredor
+termina num ponto do Gear Stand (principal → S1, 2 → Opal, 3 → B1), então a bancada é vista de todos.
+Olhando para o lado da porta (−X), os três corredores mostram a praça e o carrinho pelo vidro (DEC-018).
+
+### 18.2 Zonas e medidas (WORLD)
+
+| ID | Zona | X | Z | Medida | Nota |
+|---|---|---|---|---|---|
+| MV-HALL | Hall + corredor de entrada | 64..71 | 3,9..35,9 | 7 de largura | nada a menos de 4 da porta; tapete WELCOME fica |
+| MV-STRIP | Faixa da vitrine (rua) | 70..84 | 32,9..35,9 | 3 de fundo | móveis ≤ 3,5 de altura (o interior aceso continua visível da rua) |
+| MV-A1 | Corredor principal | 64..94 | 26,9..32,9 | **6** | eixo Z 29,9 → S1 |
+| MV-I1 | Ilha 1: MEAT & DELI | 71..80 | 23,9..26,9 | 9 × 3, altura ≤ 3,2 | expositor baixo: dá para ver por cima |
+| MV-A2 | Corredor 2 | 71..94 | 17,9..23,9 | **6** | eixo Z 20,9 → Opal |
+| MV-I2 | Ilha 2: SAUCES / SNACKS + COFFEE | 71..80 | 12,9..17,9 | 9 × 5 (2 gôndolas costas com costas), altura 6 | face norte = SAUCES; face sul = SNACKS + COFFEE |
+| MV-A3 | Corredor 3 | 64..94 | 6,9..12,9 | **6** | eixo Z 9,9 → B1 |
+| MV-DAIRY | Geladeiras de laticínios | 71,5..79,5 | 4,4..6,9 | 8 × 2,5, altura 7 | encostadas na parede de trás |
+| MV-PLAZA | Praça do Gear Stand | 80..94 | 3,9..32,9 (até 35,9 depois de X 84) | 14 de fundo | livre; cabem 4 jogadores em frente aos pedestais |
+| GEAR_STAND | Bancada-quiosque | 94..100 | 7,5..32,5 | 6 × 25, altura 11 | §18.4; **não enterável** |
+| MV-NOOK | Cantos | 80..94 × 32,9..35,9; 64..71 × 3,9..6,9 | — | — | decoração baixa, sem prompt. **Não recolocar** o que o usuário apagou à mão (carrinhos, cestas, retorno de garrafas, §16.0) |
+
+### 18.3 Seções e pontos de compra das prateleiras (9 pacotes, `Content.Packages`)
+
+Altura da âncora = acima do piso do Mart (topo 0,4). Distância = reta do ponto de dentro da porta (WORLD (67, 33)).
+
+| Pacote | ITM | Preço | Desbloqueio | Seção / móvel | Âncora WORLD (X, Z; h) | MAP (X, Z) | Dist. da porta |
+|---|---|---|---|---|---|---|---|
+| Buns | ITM-012 | $4 | Day 1 | **BAKERY** — rack de pão (AST-050_BunDisplay), face no corredor principal | (72, 32,7; 3,0) | (−72, 35,19) | 5 |
+| Sausages | ITM-011 | $6 | Day 1 | **MEAT & DELI** — expositor refrigerado aberto (baixo), tampo | (73,5, 25,4; 3,6) | (−73,5, 42,49) | 10 |
+| Bacon | ITM-016 | $9 | Day 3 | **MEAT & DELI**, mesmo expositor | (77,5, 25,4; 3,6) | (−77,5, 42,49) | 13 |
+| Ketchup | ITM-013 | $4 | Day 1 | **SAUCES** — gôndola (AST-029), face norte | (73,25, 18,1; 4,5) | (−73,25, 49,79) | 16 |
+| Mustard | ITM-014 | $4 | Day 1 | **SAUCES**, face norte | (77,75, 18,1; 4,5) | (−77,75, 49,79) | 18 |
+| Potato Sticks | ITM-017 | $5 | Day 4 | **SNACKS** — gôndola (AST-029 bags), face sul | (73,25, 12,7; 4,5) | (−73,25, 55,19) | 21 |
+| Ground Coffee | ITM-019 | $5 | trailer | **COFFEE** — mesma gôndola, face sul | (77,75, 12,7; 4,5) | (−77,75, 55,19) | 23 |
+| Cheese | ITM-015 | $6 | Day 2 | **DAIRY** — geladeira vertical (AST-030), porta 1 | (73,5, 7,1; 4,5) | (−73,5, 60,79) | 27 |
+| Cream Cheese | ITM-018 | $6 | Day 6 | **DAIRY**, porta 2 | (77,5, 7,1; 4,5) | (−77,5, 60,79) | 28 |
+
+- O que mais se compra (pão, salsicha) fica a **≤ 10** da porta; o que se libera tarde fica no fundo.
+- **≥ 4 studs** entre âncoras vizinhas (antes ≥ 3). A âncora do MEAT & DELI fica no meio do tampo: alcança dos dois corredores (Radius 7).
+- Nenhuma prateleira rotaciona (FEAT-008). Antes do desbloqueio: pacote com "Out of stock" + "Day N" (DEC-180); Coffee "Out of stock" até o trailer.
+- Viagem típica de reposição (pão + salsicha): porta → BAKERY → MEAT & DELI → porta ≈ 25 studs, **~2 s** dentro da loja. A ida inteira ao Mart (FEAT-008, ~25 s) não muda.
+
+### 18.4 Gear Stand (bancada-quiosque na parede do fundo)
+
+Fachada de **trailer/quiosque** encostada na parede X 100, centrada em Z 20 (mesmo centro do GEAR WALL atual, Z 19,9).
+**Três portas de enrolar de ripas de madeira** (estilo banca de rua: as ripas sobem e se enrolam num rolo sob a testeira).
+Atrás delas: **6 pedestais** com a **miniatura flutuando** e, no meio, **Opal atrás de um balcão curto**.
+
+| Peça | WORLD | Medida | Nota |
+|---|---|---|---|
+| Fachada (testeira) | X 93,6..94,4, Z 7,5..32,5, h 7,0..11,0 | 25 × 4 | rolo das portas (Ø 1,4) em h 7,0..8,4; acima, o neon **UPGRADES** que já existe (MartDecor) + nome da bancada (texto `Q`/TASK-142) |
+| Postes | Z 7,5..8,0 · 17,5..18,0 · 22,0..22,5 · 32,0..32,5 | 0,5 × 0,8 × 7 | com colisão; guias das portas |
+| Porta L (B1–B3) | Z 8,0..17,5 | 9,5 × 7,0 | 14 ripas de 0,5 |
+| Porta C (Opal) | Z 18,0..22,0 | 4,0 × 7,0 | |
+| Porta R (B4, B5, S1) | Z 22,5..32,0 | 9,5 × 7,0 | |
+| Grade de vidro baixa | X 94,0..94,3, nos vãos L e R | h 2,6 | com colisão: o jogador **não entra** no quiosque; prompts alcançados por cima |
+| Balcão da Opal | X 95,0..96,6, Z 18,0..22,0 | 4 × 1,6 × 3,5 | caixa registradora decorativa, campainha, revista de palavras cruzadas, caneca (reuso do AST-031) |
+| Fundo interno | X 99,8 | 25 × 7 | painel Teal do MartDecor (`UpgradeBackdrop`) + prateleirinhas com caixas (cenário) |
+| Luz | 3 `SpotLight` do MartDecor reapontados para os pedestais + anéis Neon dos pedestais (sem luz real) | — | 0 luz nova no orçamento (≤ 18, §13) |
+
+| Pedestal | Oferta (`BenchSlot`, `Content.Upgrades.BenchSpot`) | Centro WORLD (X, Z) | MAP (X, Z) | Âncora do prompt (WORLD; h) | Eixo |
+|---|---|---|---|---|---|
+| **B1** | Grill (UPG-001), próximo nível | (95,5, 10) | (−95,5, 57,887) | (95,0, 10; 4,2) | corredor 3 |
+| **B2** | Cooler (UPG-002) | (95,5, 13) | (−95,5, 54,887) | (95,0, 13; 4,2) | |
+| **B3** | Counter (UPG-003) | (95,5, 16) | (−95,5, 51,887) | (95,0, 16; 4,2) | |
+| — | **Opal** (OP-1), sem prompt | (98,0, 20), de frente para −X | (−98, 47,887), de frente para **leste** (MAP) | — | corredor 2 |
+| **B4** | Cash Drawer Lock (UPG-004) | (95,5, 24) | (−95,5, 43,887) | (95,0, 24; 4,2) | |
+| **B5** | Trailer Lights (UPG-005) | (95,5, 27) | (−95,5, 40,887) | (95,0, 27; 4,2) | |
+| **S1** | especial do turno (FEAT-035; hoje só o Rescue Whistle / Revive Kit, ITM-021) | (95,5, 30) | (−95,5, 37,887) | (95,0, 30; 4,2) | **corredor principal** |
+
+- Pedestal: cilindro Ø 1,6 × 3,0 (topo em h 3,0), anel Neon no topo na cor Teal (S1: moldura e anel **Mustard**, DEC-144, + lâmpada Neon); placa do preço na face da frente do topo (`Price_Anchor_<Slot>`), inclinada 30°.
+- Miniatura: centro **1,2 acima do topo** (h 4,2, altura do olho 4,5), maior dimensão **1,6**. Regras de flutuar/girar/estado em FEAT-015 ("Gear Stand").
+- Jogador usa de X ≤ 93,5 (atrás da grade): distância à âncora 1,5–2,5. Espaçamento entre pedestais: **3**; a seleção do prompt é o alvo mais perto do centro da tela (`PromptController`), então vizinhos não brigam.
+- Da porta (67, 33), S1 fica a ~28 em linha reta, no fim do corredor principal; o neon UPGRADES (letras 1,1) lê a ~30.
+- Opal: raio de fala 8 a partir de OP-1 → alcança quem está na grade (X ≤ 93,5) entre Z ~14 e ~26.
+
+### 18.5 Regras (resumo; a ficha é FEAT-015 "Gear Stand")
+
+- **Porta aberta** em `Prep`, `Open`, `Closing`, `Night`, `NightEnd`; **fechada** em `Summary`, `Call`, `NightLost`,
+  `Resume`, `Intro`, `Finale`, `RunEnd`. Desce no fim do turno, o especial (S1) é sorteado no início do `Prep` seguinte
+  (FEAT-035) e a porta sobe já com a oferta nova: a "troca por turno" fica visível. **Não fecha à noite** (DEC-049,
+  FEAT-015; o S1 só é elegível depois do trailer, então quase todo uso dele é à noite) e **não fecha por falta de
+  oferta** (Opal precisa ficar à vista, DEC-079). Opções em `Q-176`.
+- Ofertas: **B1–B5 fixos** (DEC-106) mostram sempre o **próximo nível** do veículo atual; **S1** sorteado por turno.
+- Compra: prompt no pedestal, hold 1,5 s, dinheiro da party; com a porta fechada o servidor recusa.
+- Pacotes de ingrediente **continuam nas prateleiras** (DEC-049); o caixa sai. Opções em `Q-177`.
+
+### 18.6 Sinalização e fluxo
+
+| Placa | Onde (WORLD) | Tipo | Cor de acento (art-director confirma) |
+|---|---|---|---|
+| UPGRADES + nome da bancada | testeira do Gear Stand, h 9–11 | neon existente (MartDecor) + `SurfaceGui` | Mustard |
+| BAKERY | pendurada sobre (72, 34), h 8 | placa dupla-face 4 × 1,2, letras ≥ 0,9 + ícone AST-071 | Bun |
+| FRESH PRODUCE | pendurada sobre (79,5, 34), h 8 | idem | Mint |
+| MEAT & DELI | pendurada sobre (75,5, 25,4), h 8,5 | idem, dupla-face | Ketchup |
+| SAUCES / SNACKS · COFFEE | pendurada sobre (75,5, 15,4), h 9 | **frente norte "SAUCES", verso sul "SNACKS · COFFEE"** | Mustard / Coffee |
+| DAIRY | parede de trás sobre as geladeiras (75,5, Z 4,0), h 8,5 | placa de parede 6 × 1,4 | Teal |
+
+- Todas as placas legíveis do hall (≤ 30 studs) e acima de h 8 (não tapam a visão dos corredores). Textos em inglês (DEC-022), finais com o narrative-writer (TASK-142).
+- Fluxo de mobile/1ª pessoa: **corredores de 6** (3 corpos lado a lado; colisão entre jogadores já é desligada, DEC-175), **nenhuma curva fechada** (só cruzamentos em T de 90°), **nenhum beco**, **nenhum objeto com colisão** saindo da linha das ilhas, âncoras de compra entre h 3,0 e 4,5 (centro da tela em 1ª pessoa).
+- Três trajetos típicos: **reposição** (porta → BAKERY → MEAT & DELI → porta); **coberturas** (porta → corredor de entrada → corredor 2 ou 3 → ilha 2 / DAIRY → praça → corredor principal → porta); **upgrade** (porta → corredor principal reto → S1 → pedestais).
+
+### 18.7 Noite
+
+- O Mart **não fecha** (DEC-049): ilha de luz (`LightZone` LZ-4 cobre o interior inteiro: dentro não há perda de sanidade de escuro), letreiro OPEN 24 nunca apaga (ANM-010).
+- Gear Stand **aberto**; os anéis Neon dos pedestais e a lâmpada da S1 leem bem no escuro da rua pelo vidro.
+- Opal fica (dia e noite), falas pela fase (dia, noites 1–3, 4–6, 7–10; `OpalLines`). Nunca é anomalia (DEC-191).
+- Nada no Mart muda de regra à noite; só a luz de fora e as falas.
+
+### 18.8 O que sai e o que muda no binding
+
+| Item | Agora | Mart v2 |
+|---|---|---|
+| Caixa da Opal (AST-031, `OP-1` em MAP (−77,1, 35,5)) | balcão no vidro da rua | **sai**; o móvel vira o balcão curto da Opal dentro do Gear Stand (estreitar para 4) |
+| GEAR WALL (AST-049, `GEAR_WALL`) | balcão 18 + painel com nichos | **sai**; substituído pelo modelo `GEAR_STAND` (mesmos `BenchSlot` B1..B5 + S1, mesmas ações) |
+| Ponto Coffee na ponta do caixa | (−68, 35) MAP | **COFFEE** na ilha 2 (§18.3) |
+| `SHELVES` do `bind_map01.luau` | coordenadas do §7.4 | coordenadas MAP do §18.3 |
+| `BENCH` do `bind_map01.luau` | Z 40,5..55,5 na parede | pedestais do §18.4, encaixes dentro do `GEAR_STAND` |
+| `OP-1` | (−75, 33,5) MAP, frente sul | (−98, 47,887) MAP, **frente leste** (check_map01 `FACING`) |
+| Gôndolas/geladeira/expositores | posições editadas à mão | reposicionados (§18.2); antes, `Place.capture` para não perder edições fora do interior |
+| MartDecor (congelado pelo usuário) | neon UPGRADES, fundo Teal e 3 spots na parede X 100 | **reaproveitados** no Gear Stand, movidos **à mão** (sem `Decor.run(true)`) |
+| `LightZone` LZ-4 | interior do Mart | igual |
+
+### 18.9 Assets (o que existe e o que falta)
+
+**Já no projeto (reusar):**
+
+| Para quê | Asset | Status |
+|---|---|---|
+| Casca, porta, marquise | AST-028 | Aprovado / Em revisão |
+| Gôndolas SAUCES e SNACKS · COFFEE | AST-029 (`MM/shelf-boxes`, `shelf-bags`, `shelf-end`) + recheio | Aprovado |
+| Geladeiras DAIRY | AST-030 (`MM/freezers-standing`) | Aprovado |
+| Rack BAKERY | AST-050 `BunDisplay` (`MM/display-bread` + 10 pães AST-001) | Aprovado |
+| FRESH PRODUCE | AST-050 (expositor + caixotes) + AST-098 (bancada de feira) | Aprovado / Rascunho |
+| Balcão da Opal | AST-031 (`MM/cash-register`), estreitado | Aprovado |
+| Opal | rig da crew (coruja, DEC-203) via `CrewRig` + AST-057 (ficha) | modelo do rig aprovado |
+| Pacotes nas prateleiras | AST-011 | Aprovado |
+| Fontes das miniaturas | peças de upgrade do kit (TASK-084): `Grill_L1..L3`, `Cooler_L1..L3`, `DrawerLock_L1`, `TrailerLights_L1` | conferir no `ReplicatedStorage.Assets` |
+| Mini da S1 | AST-051 Revive Kit / Rescue Whistle | Aprovado (forma em revisão) |
+| Mini do Drawer Lock (se faltar peça) | "Padlock" Quaternius (DEC-155) | no projeto |
+| Expositor de carnes | `Assets/MiniMarket/.../freezer.fbx` (Kenney, CC0) | **sem ficha**: conferir se é horizontal e baixo |
+| Neon, spots, fundo Teal | MartDecor (`decor_mart.luau`, `neonText`) | no place (congelado) |
+| VFX/SFX de compra | AST-092 confete; SFX-064 `buy`, SFX-065 `upgrade_done` | existentes |
+
+**Falta (buscar em pack CC0 ou modelar no estilo Kenney/KayKit, DEC-136):**
+
+| # | Asset | Medida | Sugestão de busca | Plano B |
+|---|---|---|---|---|
+| 1 | **Porta de enrolar de ripas de madeira** (3 portas: 9,5 / 4 / 9,5 × 7) + rolo + guias | ripa 0,5 | "roll up door", "shutter", "garage door", "kiosk shutter" | **Parts**: 1 painel por porta com `Texture` de ripas + cilindro do rolo (anima melhor que malha) |
+| 2 | **Fachada de quiosque/trailer** (testeira, postes, cantos arredondados, toldinho opcional) | 25 × 11 × 0,8 | "food stall", "kiosk", "market stall", "food truck front" (Kenney City Kit Commercial, KayKit Restaurant Bits, Quaternius) | modelar no estilo (caixas chanfradas) |
+| 3 | **Pedestal de exposição** com anel de luz | Ø 1,6 × 3,0 | "pedestal", "display stand", "plinth" | cilindro + anel Neon (Parts) |
+| 4 | **Expositor refrigerado de carnes**, baixo e aberto | ~4,5 × 3 × 3,2 (2 unidades) | "deli case", "chest freezer", "meat display" | `MM/freezer.fbx` recolor |
+| 5 | **Placas de seção** penduradas (6) | 4 × 1,2 | — | Parts + `SurfaceGui` ou `neonText` (sem flicker) + ícones AST-071 |
+| 6 | **Mini do Counter** (UPG-003 não tem peça visível, P58) | ≤ 1,6 | "counter", "bar stool", "queue barrier / stanchion" | balcão curto + 2 banquinhos (KayKit/AST-024) |
+| 7 | **Mini do Trailer Lights** (se `TrailerLights_L1` não existir no kit) | ≤ 1,6 | "string lights", "spotlight" | refletor + fio com 5 bolinhas Neon |
+| 8 | Props do quiosque: campainha de balcão, caixas de produto nas prateleirinhas | pequenos | FoodPack/KitchenPack | — |
+| 9 | **SFX da porta de enrolar** (subir / descer, chocalho de ripas, ~1,6–2,0 s) | — | biblioteca com licença (DEC-220: o usuário separa o áudio) | silêncio até existir (`Content.Sounds` sem chave) |
+
+Licença de tudo que vier de fora: `art/credits.md` antes do import (CLAUDE.md).
+
+### 18.10 Critérios de aceite do layout
+
+- Os 3 corredores medem **≥ 6** de largura livre em todo o comprimento; o corredor de entrada **≥ 7**; nenhum beco.
+- As 9 âncoras de compra ficam a **≥ 4** entre si e entre h 3,0 e 4,5; Buns e Sausages a **≤ 10** da porta.
+- Da porta (WORLD (67, 4,5, 33)) um raio até a mini da S1 passa livre; do corredor 2 a Opal é vista; do corredor 3, o pedestal B1.
+- De qualquer ponto dos 3 corredores, olhando para −X, o vidro da praça mostra a gaveta do carrinho (DEC-018; checagem do level-designer).
+- Nada na faixa da vitrine (MV-STRIP) passa de 3,5 de altura.
+- Nenhum jogador consegue entrar no Gear Stand (grade + postes com colisão) e todos os prompts dos pedestais são alcançáveis de fora.
+- Teto de luzes do §13 mantido (0 luz nova).
+
+### 18.11 Pendências
+
+| # | Pendência | Proposta |
+|---|---|---|
+| P60 | Opal muda do caixa para o Gear Stand (DEC-079 diz "atrás do balcão do caixa") | Provisório: muda (`Q-175` A). Se o usuário escolher B, OP-1 volta e o Gear Stand fica com o balcão central vazio |
+| P61 | `freezer.fbx` do Mini Market serve como expositor de carnes? | art-director confere forma/altura; plano B na tabela 18.9 |
+| P62 | MartDecor congelado: mover neon/fundo/spots à mão | level-designer pede ok ao usuário antes de mexer no `MartDecor` |
+| P63 | Gôndola de 6 de altura na ilha 2 tapa a vista do corredor 3 a partir do principal? | aceitável: as placas a h 9 e os eixos dos corredores dão a orientação; se o playtest reclamar, gôndola baixa (4) |
+| P64 | Nome da bancada ("Gear Stand" é placeholder; `world.md` §3.1 chamava o landmark de "GEAR WALL") | narrative-writer (TASK-142) |

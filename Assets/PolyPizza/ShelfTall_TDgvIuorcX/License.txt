@@ -1,0 +1,8 @@
+Title: Shelf Tall
+Creator: Quaternius
+Source: https://poly.pizza/m/TDgvIuorcX
+Licence (as published on the Poly Pizza page, field "Licence"): CC0 1.0
+Licence text: https://creativecommons.org/publicdomain/zero/1.0/
+Attribution not required (credited voluntarily).
+Triangles (Poly Pizza): 536
+Downloaded: 2026-10-11 from https://static.poly.pizza/511a3bba-fe26-475d-8a1b-0307e929d5a1.glb

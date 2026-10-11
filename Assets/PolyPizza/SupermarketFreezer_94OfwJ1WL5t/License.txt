@@ -1,0 +1,9 @@
+Title: Supermarket Freezer
+Creator: Dave Edwards
+Source: https://poly.pizza/m/94OfwJ1WL5t
+Licence (as published on the Poly Pizza page, field "Licence"): CC-BY 3.0
+Licence text: https://creativecommons.org/licenses/by/3.0/
+ATTRIBUTION REQUIRED in the game credits:
+  "Supermarket Freezer by Dave Edwards (https://poly.pizza/m/94OfwJ1WL5t), CC-BY 3.0 (https://creativecommons.org/licenses/by/3.0/)"
+Triangles (Poly Pizza): 573
+Downloaded: 2026-10-11 from https://static.poly.pizza/cdb45ab8-0daf-4977-9493-fe3beab87b4b.glb

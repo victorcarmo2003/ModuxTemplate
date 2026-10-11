@@ -1,0 +1,8 @@
+Title: Column Round
+Creator: Quaternius
+Source: https://poly.pizza/m/n8ZvVFcJhl
+Licence (as published on the Poly Pizza page, field "Licence"): CC0 1.0
+Licence text: https://creativecommons.org/publicdomain/zero/1.0/
+Attribution not required (credited voluntarily).
+Triangles (Poly Pizza): 332
+Downloaded: 2026-10-11 from https://static.poly.pizza/105dfd4b-6af3-4732-8c29-a89b15135b07.glb
