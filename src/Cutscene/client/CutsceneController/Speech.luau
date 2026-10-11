@@ -66,6 +66,16 @@ const POLL = 0.1 -- s between two progress reads of Preload
 
 const Speech = {}
 
+-- Text sent to AudioTextToSpeech. Roblox filters TTS text and refuses lines with phone-number-like digit runs
+-- ("Failed to load sound : FilteredText", 2026-10-11: "555-0179... Here goes."); the subtitle keeps the number, the
+-- voice skips it.
+function Speech.Spoken(text: string): string
+	local out = string.gsub(text, "%d[%d%-%s]*%d", "")
+	out = string.gsub(out, "^[%s%.,!%?]+", "")
+	out = string.gsub(out, "%s+", " ")
+	return out
+end
+
 local function keyOf(line: Beat): string
 	return `{line.Speaker or "walt"}\0{line.Text or ""}`
 end
@@ -199,7 +209,7 @@ function Speech.new(volume: () -> number): Speech
 		const ok, created = pcall(function(): AudioTextToSpeech
 			const voice = Instance.new("AudioTextToSpeech")
 			voice.Name = `Line_{entry.Speaker}`
-			voice.Text = entry.Line.Text or ""
+			voice.Text = Speech.Spoken(entry.Line.Text or "")
 			voice.VoiceId = entry.VoiceId
 			if row ~= nil and row.Speed ~= nil then
 				voice.Speed = row.Speed
