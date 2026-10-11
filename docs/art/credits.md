@@ -53,7 +53,7 @@ Nenhum modelo do Sketchfab entrou até agora. **Poly Pizza:** "Trashcan" by Kenn
 
 ## Música (2026-10-10)
 
-Faixas enviadas pelo usuário ao grupo do jogo ("Axiom Project Studio"); licença e origem sob responsabilidade do usuário (confirmar e registrar autor/licença de cada faixa aqui).
+Faixas enviadas pelo usuário ao grupo do jogo ("Axiom Project Studio"); Origem: gerado com IA pelo usuário (confirmado em 2026-10-10); uso comercial sob responsabilidade do usuário, termos da ferramenta de IA.
 
 | Faixa | Asset ID | Uso (`Content.Sounds`) |
 |---|---|---|
@@ -68,7 +68,7 @@ Sem música de créditos (decisão do usuário, 2026-10-10; `docs/audio/sound-li
 
 ## Ambiente (2026-10-10)
 
-Faixas enviadas pelo usuário ao grupo do jogo ("Axiom Project Studio"); licença e origem sob responsabilidade do usuário (**licença a confirmar**: registrar autor/licença de cada faixa aqui).
+Faixas enviadas pelo usuário ao grupo do jogo ("Axiom Project Studio"); Origem: gerado com IA pelo usuário (confirmado em 2026-10-10); uso comercial sob responsabilidade do usuário, termos da ferramenta de IA.
 
 | Faixa | Asset ID | Uso (`Content.Sounds`) |
 |---|---|---|
@@ -76,7 +76,7 @@ Faixas enviadas pelo usuário ao grupo do jogo ("Axiom Project Studio"); licenç
 | NightCrickets | 98652860867664 | `amb_night_street` |
 | SuperMarket Ambient | 121312424334285 | `amb_mart_hum` (dentro do Mart, LZ-4) |
 
-## SFX (2026-10-10, uploads do usuário em ReplicatedStorage.Assets.SFX; licença a confirmar)
+## SFX (2026-10-10, uploads do usuário em ReplicatedStorage.Assets.SFX; gerados com IA pelo usuário)
 
 | Arquivo | Asset ID | Chave(s) |
 |---|---|---|
@@ -96,9 +96,9 @@ Em 2026-10-10 os Sounds de `ReplicatedStorage.Assets.SFX`, `.AmbientSFX` e `.Mus
 `Content.Sounds` (pedido do usuário; o nome original ficou no atributo `OriginalName`; Sound usado por duas chaves tem o nome
 da primeira + atributo `Keys`).
 
-## SFX, segundo lote (2026-10-10, uploads do usuário; licença a confirmar)
+## SFX, segundo lote (2026-10-10, uploads do usuário; gerados com IA pelo usuário)
 
-Mesma regra das tabelas acima: origem e licença de cada arquivo sob responsabilidade do usuário (**licença a confirmar**).
+Mesma regra das tabelas acima: Origem: gerado com IA pelo usuário (confirmado em 2026-10-10); uso comercial sob responsabilidade do usuário, termos da ferramenta de IA.
 IDs baixos (365956378, 320662396, 1228230799, 1014740409, 6080419021, 1604497989, 5646714647, 6586979979 e os 90xxxxxxxx/91xxxxxxxx) parecem da
 biblioteca de áudio do Roblox: se forem, vão para "Recursos da plataforma" com o ID; se o dono não for o grupo do jogo,
 conferir se o áudio está público/liberado para a experiência (senão não toca).
