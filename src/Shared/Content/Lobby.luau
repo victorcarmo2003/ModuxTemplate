@@ -1,19 +1,19 @@
 --!strict
--- Lobby zones, ring VFX, platform squads and camera (user request 2026-10-11, Provisional; docs/levels/LOBBY.md §5,
--- §7; architecture.md §20.6; network.md §16). Pure data, read by PartyService (server, platform occupancy),
+-- Lobby zones, ring VFX, platform squads and camera (user request 2026-10-11, Provisional; docs/levels/LOBBY.md v2
+-- §V2-4, §V2-5; architecture.md §20.6; network.md §16). Pure data, read by PartyService (server, platform occupancy),
 -- LobbyController (client: zone triggers, ring VFX, camera) and ReplicatedStorage.shared.Lobby.LobbyZones.
 -- Owner: frontend-coder. Every number Provisional (DEC-044: adjusted in playtest).
 --
 -- A zone is a circle on the floor. Center = the MapPoint `PointId` when the map has it (WORLD), else `Center`.
 -- Walking in (planar distance <= Radius, |dy| <= Trigger.Height) opens its panel; walking out (distance >
--- Radius + Trigger.Hysteresis) closes it. Squad zones (Platform 1..4) are the squad platforms: the server watches them.
+-- Radius + Trigger.Hysteresis) closes it. Squad zones (Platform 1..8) are the squad platforms: the server watches them.
 
 export type Panel = "Classes" | "Shop" | "Codes" | "Platform"
 
 export type Zone = {
 	Key: string,
 	Panel: Panel,
-	Platform: number, -- 1..4 = squad platform n; 0 = not a platform
+	Platform: number, -- 1..8 = squad platform n; 0 = not a platform
 	PointId: string?, -- MapPoint that places the zone; nil = Center only
 	Center: Vector3, -- WORLD, floor level (fallback of PointId)
 	Radius: number, -- studs, planar
@@ -100,13 +100,14 @@ const BLUE = Color3.fromRGB(45, 120, 255)
 const WHITE = Color3.fromRGB(255, 250, 240)
 const RED = Color3.fromRGB(235, 70, 60) -- KETCHUP
 
-local function squad(n: number, z: number): Zone
+-- LOBBY v2 §V2-4: two rows of 4 (X 16 = near row 1..4, X 34 = far row 5..8), pitch 18 (10 studs between edges)
+local function squad(n: number, x: number, z: number): Zone
 	return {
 		Key = `Squad{n}`,
 		Panel = "Platform",
 		Platform = n,
 		PointId = `LOBBY-SQUAD-{n}`,
-		Center = Vector3.new(20, 0.3, z),
+		Center = Vector3.new(x, 0.3, z),
 		Radius = 4,
 		Color = WHITE,
 	}
@@ -114,14 +115,14 @@ end
 
 const lobby: Lobby = {
 	Zones = {
-		-- in front of the stage rope (LW-STAGE blocks Z > -585): the class screen opens here
+		-- in front of the stage rope (LW-STAGE blocks Z > -580): the class screen opens here; holds the class camera eye
 		{
 			Key = "Classes",
 			Panel = "Classes",
 			Platform = 0,
 			PointId = nil,
-			Center = Vector3.new(0, 0, -587.5),
-			Radius = 3.5,
+			Center = Vector3.new(0, 0, -587),
+			Radius = 7,
 			Color = YELLOW,
 		},
 		{
@@ -129,8 +130,8 @@ const lobby: Lobby = {
 			Panel = "Shop",
 			Platform = 0,
 			PointId = "LOBBY-SHOP",
-			Center = Vector3.new(-19.5, 0, -600),
-			Radius = 3.5,
+			Center = Vector3.new(-29, 0, -620),
+			Radius = 5.5,
 			Color = GREEN,
 		},
 		{
@@ -138,14 +139,18 @@ const lobby: Lobby = {
 			Panel = "Codes",
 			Platform = 0,
 			PointId = "LOBBY-CODES",
-			Center = Vector3.new(-10, 0, -622.5),
-			Radius = 3.5,
+			Center = Vector3.new(-10, 0, -650.5),
+			Radius = 5,
 			Color = BLUE,
 		},
-		squad(1, -588),
-		squad(2, -598),
-		squad(3, -608),
-		squad(4, -618),
+		squad(1, 16, -647),
+		squad(2, 16, -629),
+		squad(3, 16, -611),
+		squad(4, 16, -593),
+		squad(5, 34, -647),
+		squad(6, 34, -629),
+		squad(7, 34, -611),
+		squad(8, 34, -593),
 	},
 	Trigger = {
 		Hysteresis = 1.25,
@@ -192,7 +197,7 @@ const lobby: Lobby = {
 	},
 	ZoneVfx = {
 		ColorTween = 0.3,
-		ActiveDistance = 80,
+		ActiveDistance = 110, -- v2 plaza diagonal ~150 (LOBBY.md §V2-14)
 	},
 	Squad = {
 		Poll = 0.15,

@@ -9,8 +9,8 @@
 -- creates one; accepting an invite leaves the current squad; the leader is always ready, Start needs every other
 -- member ready; leader leaves = first member left leads.
 --
--- Squad platforms (user request 2026-10-11, emends DEC-179 back to physical platforms, invites kept): the 4 lobby
--- platforms (Content.Lobby.Zones with Platform 1..4; centre = MapPoint LOBBY-SQUAD-n) are watched here every
+-- Squad platforms (user request 2026-10-11, emends DEC-179 back to physical platforms, invites kept): the 8 lobby
+-- platforms (Content.Lobby.Zones with Platform 1..8; centre = MapPoint LOBBY-SQUAD-n) are watched here every
 -- Content.Lobby.Squad.Poll s from each HumanoidRootPart (shared.Lobby.LobbyZones, with hysteresis). Stepping on a free
 -- platform = a new squad with Platform n and State "Configuring" that you lead (the leader of an invite squad takes
 -- the platform with the squad instead). Stepping on an owned platform = joining it when it is not Starting, has room
@@ -44,7 +44,7 @@ export type Party = {
 	Members: { number }, -- party order, leader first after any change of leader
 	Ready: { [number]: boolean },
 	State: State,
-	Platform: number, -- 1..4 = owns LOBBY-SQUAD-n; 0 = invite squad
+	Platform: number, -- 1..8 = owns LOBBY-SQUAD-n; 0 = invite squad
 	FriendsOnly: boolean,
 	MaxPlayers: number, -- 1..Rules.MaxSize, never below #Members when set
 	StartAt: number, -- workspace:GetServerTimeNow() of the teleport; 0 = no countdown
@@ -224,7 +224,7 @@ function PartyService:NewId(): number
 	error("[PartyService] no free PartyId", 0)
 end
 
--- platform 0 = invite squad ("Forming"); 1..4 = platform squad ("Configuring")
+-- platform 0 = invite squad ("Forming"); 1..8 = platform squad ("Configuring")
 function PartyService:Create(leader: number, platform: number): Party?
 	if self.PartyOf[leader] ~= nil then
 		return nil

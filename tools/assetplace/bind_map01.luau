@@ -3189,19 +3189,24 @@ local function bindTables(assets: Instance, root: Instance?): number
 	return #tables
 end
 
--- Lobby points (docs/levels/LOBBY.md §5, 2026-10-11): WORLD coordinates (no MAP_FRAME), in MapBinding/Lobby so the
--- lobby services find them with the same MapPoint index. Rebuilt with the rest of the binding.
+-- Lobby points (docs/levels/LOBBY.md v2 §V2-4, 2026-10-11): WORLD coordinates (no MAP_FRAME), in MapBinding/Lobby so
+-- the lobby services find them with the same MapPoint index. Rebuilt with the rest of the binding.
+-- Squads: near row 1..4 at X 16, far row 5..8 at X 34, Z -647 / -629 / -611 / -593 (pitch 18, 10 between edges).
 local LOBBY_POINTS = {
-	{ id = "LOBBY-SPAWN", pos = Vector3.new(2, 0, -602), look = Vector3.new(0, 0, 1) },
-	{ id = "LOBBY-CLASS-STAGE", pos = Vector3.new(0, 1.02, -580.5), look = Vector3.new(0, 0, -1) },
-	{ id = "LOBBY-CLASS-CAM", pos = Vector3.new(0, 4.5, -592.5), look = Vector3.new(0, 0, 1), attrs = { Pitch = 2.39, Fov = 50 } },
-	{ id = "LOBBY-SHOP", pos = Vector3.new(-19.5, 0, -600), look = Vector3.new(-1, 0, 0) },
-	{ id = "LOBBY-CODES", pos = Vector3.new(-10, 0, -622.5), look = Vector3.new(0, 0, -1) },
-	{ id = "LOBBY-SQUAD-1", pos = Vector3.new(20, 0.3, -588), look = Vector3.new(1, 0, 0) },
-	{ id = "LOBBY-SQUAD-2", pos = Vector3.new(20, 0.3, -598), look = Vector3.new(1, 0, 0) },
-	{ id = "LOBBY-SQUAD-3", pos = Vector3.new(20, 0.3, -608), look = Vector3.new(1, 0, 0) },
-	{ id = "LOBBY-SQUAD-4", pos = Vector3.new(20, 0.3, -618), look = Vector3.new(1, 0, 0) },
-	{ id = "LOBBY-START", pos = Vector3.new(26.5, 0, -603), look = Vector3.new(1, 0, 0) },
+	{ id = "LOBBY-SPAWN", pos = Vector3.new(5, 0, -620), look = Vector3.new(0, 0, 1) },
+	{ id = "LOBBY-CLASS-STAGE", pos = Vector3.new(0, 1.02, -575.5), look = Vector3.new(0, 0, -1) },
+	{ id = "LOBBY-CLASS-CAM", pos = Vector3.new(0, 4.5, -587.5), look = Vector3.new(0, 0, 1), attrs = { Pitch = 2.39, Fov = 50 } },
+	{ id = "LOBBY-SHOP", pos = Vector3.new(-29, 0, -620), look = Vector3.new(-1, 0, 0) },
+	{ id = "LOBBY-CODES", pos = Vector3.new(-10, 0, -650.5), look = Vector3.new(0, 0, -1) },
+	{ id = "LOBBY-SQUAD-1", pos = Vector3.new(16, 0.3, -647), look = Vector3.new(1, 0, 0) },
+	{ id = "LOBBY-SQUAD-2", pos = Vector3.new(16, 0.3, -629), look = Vector3.new(1, 0, 0) },
+	{ id = "LOBBY-SQUAD-3", pos = Vector3.new(16, 0.3, -611), look = Vector3.new(1, 0, 0) },
+	{ id = "LOBBY-SQUAD-4", pos = Vector3.new(16, 0.3, -593), look = Vector3.new(1, 0, 0) },
+	{ id = "LOBBY-SQUAD-5", pos = Vector3.new(34, 0.3, -647), look = Vector3.new(1, 0, 0) },
+	{ id = "LOBBY-SQUAD-6", pos = Vector3.new(34, 0.3, -629), look = Vector3.new(1, 0, 0) },
+	{ id = "LOBBY-SQUAD-7", pos = Vector3.new(34, 0.3, -611), look = Vector3.new(1, 0, 0) },
+	{ id = "LOBBY-SQUAD-8", pos = Vector3.new(34, 0.3, -593), look = Vector3.new(1, 0, 0) },
+	{ id = "LOBBY-START", pos = Vector3.new(44.5, 0, -620), look = Vector3.new(1, 0, 0) },
 }
 local function bindLobby(root: Instance): number
 	if not Workspace:FindFirstChild("LOBBY_Assets") then
@@ -3278,7 +3283,7 @@ function Bind.run(opts: AnchorOpts?): string
 	end
 	local root = bindPoints({ cart = cart, trailer = trl, poses = { cart = cartPose, trl = padPose, sale = salePose }, assets = assets })
 	bindLightZones(root, padPose)
-	log("ok", ("Lobby: %d lobby MapPoint(s) in MapBinding/Lobby (LOBBY.md §5)"):format(bindLobby(root)))
+	log("ok", ("Lobby: %d lobby MapPoint(s) in MapBinding/Lobby (LOBBY.md §V2-4)"):format(bindLobby(root)))
 	log("ok", ("SeatTable: %d picnic table(s) tagged, TableIndex nearest to Q1 first (FEAT-037)"):format(bindTables(assets, root)))
 	bindWindows(assets, root)
 	bindTraffic(root)

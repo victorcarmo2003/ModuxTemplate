@@ -28,7 +28,7 @@
 	leader = PartyStart (enabled when everyone is ready); member = Ready / Not ready.
 
 	Zones (user request 2026-10-11, Provisional; Content.Lobby, shared.Lobby.LobbyZones): every lobby zone is a circle
-	on the floor (Classes in front of the stage, Gem Shop, Codes, the 4 squad platforms). Walking in opens its panel,
+	on the floor (Classes in front of the stage, Gem Shop, Codes, the 8 squad platforms). Walking in opens its panel,
 	walking out closes it (only if that panel is still the open one); checked every Trigger.Poll s from the own
 	HumanoidRootPart, with hysteresis. The HUD tiles and keys stay as shortcuts. A panel closed by hand stays closed
 	until the player walks out and in again.

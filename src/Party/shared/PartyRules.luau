@@ -1,7 +1,8 @@
 --!strict
 -- Squad (party) rules shared by PartyService (lobby), PartyRunService (game) and the lobby UI (architecture.md §20.2;
 -- network.md §16). ReplicatedStorage.shared.Party.PartyRules. Pure: no Modux, Lync, Vide nor self.Libs.
--- Platform squads (user request 2026-10-11): a squad may own one of the 4 lobby platforms (Platform 1..4, 0 = none);
+-- Platform squads (user request 2026-10-11): a squad may own one of the 8 lobby platforms (Platform 1..8, 0 = none;
+-- LOBBY.md v2 §V2-4);
 -- State "Forming" = invite squad, "Configuring" = platform squad being set up, "Starting" = countdown / teleport.
 -- MaxSize comes from the party price table (4 = DEC-012 "party de até 4"), the same source RunStateService uses.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -49,7 +50,7 @@ const RULES = table.freeze({
 	JoinWindow = Content.RunParams.JoinWindow, -- 60 s: the run waits this long for the squad (DEC-098)
 	PartyIdMax = 65535, -- Party set record ids cycle in 1..PartyIdMax
 	-- squad platforms (Content.Lobby.Squad; network.md §16.6)
-	Platforms = 4, -- LOBBY-SQUAD-1..4
+	Platforms = 8, -- LOBBY-SQUAD-1..8 (LOBBY.md v2; = #Content.Lobby.Zones with Platform > 0)
 	Countdown = Content.Lobby.Squad.Countdown, -- s between Start and the teleport (every squad, platform or not)
 	DefaultMaxPlayers = Content.Lobby.Squad.DefaultMaxPlayers,
 	DefaultFriendsOnly = Content.Lobby.Squad.DefaultFriendsOnly,

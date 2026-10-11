@@ -349,7 +349,7 @@ return Lync.define("game", {
 		-- reserve + teleport (platform green)
 		State = Lync.enum({ "Forming", "Configuring", "Starting" }),
 		-- §16.6 squad platforms (user request 2026-10-11, Provisional)
-		Platform = Lync.int(0, 4), -- LOBBY-SQUAD-n owned by this squad; 0 = none (invite squad)
+		Platform = Lync.int(0, 8), -- PartyRules.Rules.Platforms (LOBBY v2: 8); LOBBY-SQUAD-n owned by this squad; 0 = none (invite squad)
 		FriendsOnly = Lync.bool(), -- only friends of the leader may step in
 		MaxPlayers = Lync.int(1, 4), -- set by the leader, never below the member count
 		StartAt = Lync.f64(), -- workspace:GetServerTimeNow() when the teleport starts; 0 = no countdown

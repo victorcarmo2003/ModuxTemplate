@@ -6,7 +6,7 @@ export type Party = {
 	Members: { number }, -- party order, leader first after any change of leader
 	Ready: { [number]: boolean },
 	State: State,
-	Platform: number, -- 1..4 = owns LOBBY-SQUAD-n; 0 = invite squad
+	Platform: number, -- 1..8 = owns LOBBY-SQUAD-n; 0 = invite squad
 	FriendsOnly: boolean,
 	MaxPlayers: number, -- 1..Rules.MaxSize, never below #Members when set
 	StartAt: number, -- workspace:GetServerTimeNow() of the teleport; 0 = no countdown
