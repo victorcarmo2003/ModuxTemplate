@@ -1,5 +1,6 @@
 --!strict
--- TutorialPointer on a phone-sized frame: "Angle" turns the arrow; "X"/"Y" move the badge (px in the frame).
+-- TutorialPointer on a phone-sized frame: "Angle" turns the arrow; "X"/"Y" move the badge (px in the frame); "Scale"
+-- = Theme.Scale; "Strong" pulses it (no progress reminder).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -12,6 +13,8 @@ type Controls = {
 	Angle: () -> number,
 	X: () -> number,
 	Y: () -> number,
+	Scale: () -> number,
+	Strong: () -> boolean,
 }
 
 return UILabs.CreateVideStory({
@@ -21,6 +24,8 @@ return UILabs.CreateVideStory({
 		Angle = UILabs.Slider(0, -180, 180, 5),
 		X = UILabs.Slider(620, 0, 667, 1),
 		Y = UILabs.Slider(190, 0, 375, 1),
+		Scale = UILabs.Slider(1, 0.86, 1.6, 0.02),
+		Strong = false,
 	},
 }, function(props)
 	-- UI Labs types the control sources loosely; pin them to what the story reads.
@@ -40,6 +45,8 @@ return UILabs.CreateVideStory({
 				return Vector2.new(controls.X(), controls.Y())
 			end,
 			Angle = controls.Angle,
+			Scale = controls.Scale,
+			Strong = controls.Strong,
 		}),
 	})
 end)

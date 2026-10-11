@@ -7,9 +7,12 @@
 --   optional "STEP 2 OF 7" label (14 px), the instruction (17 px Ink, starts with the verb) and an optional hint line
 --   (14 px, Ink top tone) that wraps instead of shrinking
 --   Cream "Skip" tag hanging off the bottom-right corner (>= 44 px tall touch target), with the key of the device
+-- Urgent (the player made no progress for a while): the card turns Mustard and pulses until the step changes; the owner
+-- swaps the hint for the short reminder.
 -- Pops in/out (Motion.Pop) and jumps each time the step number goes up (Motion.Bump).
 -- Pure: only props. TutorialController owns the step, the texts, the skip bind and when it shows.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Theme)
 local Motion = require(script.Parent.Motion)
@@ -38,6 +41,8 @@ export type Props = {
 	-- Skip tag text ("Skip (Q)"); "" hides the tag.
 	SkipText: () -> string,
 	OnSkip: (() -> ())?,
+	-- No progress for a while: Mustard card that pulses. Default false.
+	Urgent: (() -> boolean)?,
 	-- UI scale of the owner (1 on the smallest phone).
 	Scale: (() -> number)?,
 	-- Reactive so the owner can follow its UI scale. Default: top centre, 50 px down.
@@ -57,6 +62,8 @@ const SKIP_SIZE = 15
 const LABEL_SIZE = 14
 const CHECK = "Ui/check"
 const CHECK_SIZE = 24
+const URGE_PULSE = 0.05 -- extra size at the peak of the urgent pulse
+const URGE_SPEED = 6 -- rad/s
 
 return function(props: Props): Frame
 	const pop = Motion.Pop(props.Shown)
@@ -76,6 +83,23 @@ return function(props: Props): Frame
 		return if props.Done then props.Done() else false
 	end
 
+	local function urgent(): boolean
+		return if props.Urgent then props.Urgent() else false
+	end
+
+	const pulse = Vide.source(0)
+	const connection = RunService.Heartbeat:Connect(function()
+		const value = if Vide.untrack(urgent) and Vide.untrack(props.Shown)
+			then math.abs(math.sin(os.clock() * URGE_SPEED)) * URGE_PULSE
+			else 0
+		if value ~= Vide.untrack(pulse) then
+			pulse(value)
+		end
+	end)
+	Vide.cleanup(function()
+		connection:Disconnect()
+	end)
+
 	local function label(): string
 		return if props.Label then props.Label() else ""
 	end
@@ -94,7 +118,7 @@ return function(props: Props): Frame
 		createRaw("UISizeConstraint")({ MinSize = Vector2.new(MIN_WIDTH, 0), MaxSize = Vector2.new(MAX_WIDTH, 10000) }),
 		createRaw("UIScale")({
 			Scale = function()
-				return (if props.Scale then props.Scale() else 1) * pop() * bump()
+				return (if props.Scale then props.Scale() else 1) * pop() * bump() * (1 + pulse())
 			end,
 		}),
 
@@ -102,7 +126,9 @@ return function(props: Props): Frame
 			Name = "Card",
 			Size = UDim2.fromScale(1, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
-			Tone = Theme.Tone.Cream,
+			Tone = function()
+				return if urgent() then Theme.Tone.Mustard else Theme.Tone.Cream
+			end,
 			Outline = Theme.Outline.Thick,
 			Radius = Theme.Radius.Card,
 			Decor = {

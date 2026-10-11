@@ -3,8 +3,11 @@
 -- request 2026-10-11). Mustard round badge (CartoonPanel) with the AST-091 `Ui/arrow_right` icon turned to `Angle`
 -- (0 = right, 90 = down; one rotated image), a Mustard ">" glyph while the sheet is missing. 56 px (touch-sized look,
 -- not clickable). Pops in/out (Motion.Pop).
+-- Scale = the owner's global UI scale (Theme.ScaleOf); Strong = no progress for a while: the badge pulses (up to
+-- +STRONG_PULSE).
 -- Pure: only props. The owner computes the edge position (px in the parent frame) and the angle every frame.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Theme)
 local Icons = require(script.Parent.Icons)
@@ -22,15 +25,32 @@ export type Props = {
 	Position: () -> Vector2,
 	-- Degrees; 0 = right, 90 = down.
 	Angle: () -> number,
+	-- Global UI scale of the owner (default 1).
+	Scale: (() -> number)?,
+	-- Size pulse (default false).
+	Strong: (() -> boolean)?,
 	Name: string?,
 }
 
 const ICON = "Ui/arrow_right"
 const SIZE = 56
+const STRONG_PULSE = 0.25
+const STRONG_SPEED = 4.5 -- rad/s
 
 return function(props: Props): Frame
 	const pop = Motion.Pop(props.Shown)
 	const rect = Icons.Rect(ICON)
+	const pulse = Vide.source(0)
+	const connection = RunService.Heartbeat:Connect(function()
+		const urged = props.Strong ~= nil and Vide.untrack(props.Strong) and Vide.untrack(pop) > 0.02
+		const value = if urged then math.abs(math.sin(os.clock() * STRONG_SPEED)) * STRONG_PULSE else 0
+		if value ~= Vide.untrack(pulse) then
+			pulse(value)
+		end
+	end)
+	Vide.cleanup(function()
+		connection:Disconnect()
+	end)
 
 	return create("Frame")({
 		Name = props.Name or "TutorialPointer",
@@ -44,7 +64,11 @@ return function(props: Props): Frame
 		Visible = function()
 			return pop() > 0.02
 		end,
-		createRaw("UIScale")({ Scale = pop }),
+		createRaw("UIScale")({
+			Scale = function()
+				return pop() * (if props.Scale then props.Scale() else 1) * (1 + pulse())
+			end,
+		}),
 
 		CartoonPanel({
 			Name = "Badge",

@@ -1,6 +1,7 @@
 --!strict
 -- The arrow is a BillboardGui, so it is previewed in the 3D viewport: a temporary part 8 studs in front of the Studio
--- camera (removed when the story closes). "Shown" pops it in/out; "Target" off clears the adornee (hides it too).
+-- camera (removed when the story closes). "Shown" pops it in/out; "Target" off clears the adornee (hides it too);
+-- "Scale" = Theme.Scale; "Strong" = the no-progress pulse.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -13,6 +14,8 @@ const cleanup = Vide.cleanup
 type Controls = {
 	Shown: () -> boolean,
 	Target: () -> boolean,
+	Scale: () -> number,
+	Strong: () -> boolean,
 }
 
 return UILabs.CreateVideStory({
@@ -20,6 +23,8 @@ return UILabs.CreateVideStory({
 	controls = {
 		Shown = true,
 		Target = true,
+		Scale = UILabs.Slider(1, 0.86, 1.6, 0.02),
+		Strong = false,
 	},
 }, function(props)
 	-- UI Labs types the control sources loosely; pin them to what the story reads.
@@ -41,6 +46,8 @@ return UILabs.CreateVideStory({
 			return if controls.Target() then anchor else nil
 		end,
 		Shown = controls.Shown,
+		Scale = controls.Scale,
+		Strong = controls.Strong,
 	})
 	billboard.Parent = anchor
 

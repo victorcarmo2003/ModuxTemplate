@@ -6,7 +6,11 @@
 	    light Mustard fill (FillTransparency ~0.8), always on top so it reads through the counter and the awning.
 	  - 3D arrow over it: a Mustard arrow built from three parts (shaft + a two-wedge head pointing down) that bobs and
 	    spins slowly, with an Ink outline; its own Highlight draws it through walls too (AlwaysOnTop, half fill).
-	Local only (client parts in a Workspace folder, no collision, no query, no touch, no shadow). Pure presentation:
+	  - Tip: an invisible anchored part kept at the arrow tip (no bob) where the owner hangs the screen-sized billboard
+    arrow (TutorialArrow) that stays readable from far away.
+  - Urge(true) (no progress on the step for a while, TutorialController IDLE): faster, wider bob, faster pulse and a
+    stronger fill until the owner turns it off (the step changed).
+Local only (client parts in a Workspace folder, no collision, no query, no touch, no shadow). Pure presentation:
 	the owner (TutorialController) says what to mark (Set) and calls Step every frame.
 ]]
 local StarterPlayer = game:GetService("StarterPlayer")
@@ -16,6 +20,10 @@ export type Beacon = {
 	-- adornee to mark (nil = nothing); lift = studs between its top and the arrow tip
 	Set: (adornee: Instance?, lift: number) -> (),
 	Step: () -> (),
+	-- stronger pulse while the player made no progress (false = normal)
+	Urge: (on: boolean) -> (),
+	-- invisible part at the arrow tip (parented to the folder while something is marked)
+	Tip: BasePart,
 	Destroy: () -> (),
 }
 
@@ -33,6 +41,11 @@ const FILL_MIN = 0.72 -- target fill transparency range (~0.8)
 const FILL_MAX = 0.88
 const OUTLINE_MAX = 0.55 -- target outline fades this far at the low of the pulse
 const ARROW_FILL = 0.35 -- the arrow's own highlight: half fill, solid when seen through a wall
+-- Urge (no progress): PROVISIONAL
+const URGE_BOB = 0.8
+const URGE_BOB_SPEED = 8
+const URGE_PULSE_SPEED = 10
+const URGE_FILL_MIN = 0.45
 
 const Beacon = {}
 
@@ -69,6 +82,7 @@ end
 function Beacon.new(container: () -> Instance): Beacon
 	local adornee: Instance? = nil
 	local lift = 1
+	local urged = false
 
 	const model = Instance.new("Model")
 	model.Name = "TutorialArrow3D"
@@ -77,6 +91,9 @@ function Beacon.new(container: () -> Instance): Beacon
 	const left = part("WedgePart", "HeadLeft", Vector3.new(THICKNESS, HEAD_HEIGHT, HEAD_WIDTH / 2), model)
 	const right = part("WedgePart", "HeadRight", Vector3.new(THICKNESS, HEAD_HEIGHT, HEAD_WIDTH / 2), model)
 	model.PrimaryPart = shaft
+	const tip = part("Part", "TutorialTip", Vector3.new(0.2, 0.2, 0.2), model)
+	tip.Transparency = 1
+	tip.Parent = nil
 
 	const outline = Instance.new("Highlight")
 	outline.Name = "Outline"
@@ -120,6 +137,7 @@ function Beacon.new(container: () -> Instance): Beacon
 		glow.Enabled = false
 		glow.Adornee = nil
 		model.Parent = nil
+		tip.Parent = nil
 	end
 
 	return {
@@ -138,7 +156,12 @@ function Beacon.new(container: () -> Instance): Beacon
 			glow.Adornee = target
 			glow.Enabled = true
 			model.Parent = folder
+			tip.Parent = folder
 		end,
+		Urge = function(on: boolean)
+			urged = on
+		end,
+		Tip = tip,
 		Step = function()
 			const target = adornee
 			if target == nil then
@@ -151,21 +174,26 @@ function Beacon.new(container: () -> Instance): Beacon
 				return
 			end
 			const clock = os.clock()
-			const pulse = (math.sin(clock * PULSE_SPEED) + 1) / 2
+			const pulse = (math.sin(clock * (if urged then URGE_PULSE_SPEED else PULSE_SPEED)) + 1) / 2
+			const fillMin = if urged then URGE_FILL_MIN else FILL_MIN
 			glow.OutlineTransparency = OUTLINE_MAX * (1 - pulse)
-			glow.FillTransparency = FILL_MAX - (FILL_MAX - FILL_MIN) * pulse
+			glow.FillTransparency = FILL_MAX - (FILL_MAX - fillMin) * pulse
 			const top = topOf(target)
 			if top == nil then
 				return
 			end
-			const tip = top + Vector3.new(0, lift + BOB * (1 + math.sin(clock * BOB_SPEED)), 0)
-			const base = CFrame.new(tip) * CFrame.Angles(0, clock * SPIN_SPEED, 0)
+			const rest = top + Vector3.new(0, lift, 0)
+			tip.CFrame = CFrame.new(rest)
+			const bob = if urged then URGE_BOB else BOB
+			const at = rest + Vector3.new(0, bob * (1 + math.sin(clock * (if urged then URGE_BOB_SPEED else BOB_SPEED))), 0)
+			const base = CFrame.new(at) * CFrame.Angles(0, clock * SPIN_SPEED, 0)
 			left.CFrame = base * leftFrame
 			right.CFrame = base * rightFrame
 			shaft.CFrame = base * shaftFrame
 		end,
 		Destroy = function()
 			adornee = nil
+			tip:Destroy()
 			glow:Destroy()
 			model:Destroy()
 		end,

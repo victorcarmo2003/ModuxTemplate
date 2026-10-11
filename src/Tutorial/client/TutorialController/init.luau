@@ -36,7 +36,10 @@
 	"3/9" chip, "STEP 3 OF 9", the instruction starting with the verb, hint, Skip), Beacon.luau (pulsing Mustard
 	Highlight on the exact piece of the step: the pot, the grill, the bun crate, the board, the customer; and a 3D
 	arrow bobbing over it), TutorialPointer on the screen edge while the target is off screen, and Spotlight on the
-	money pill for the UI step. A step completed (the panel number goes up) turns the chip Green with a check for
+	money pill for the UI step. From far away (camera > ARROW_FAR studs from the target) the 3D arrow gets small, so a
+	screen-sized bouncing billboard arrow (TutorialArrow, scaled like the HUD) hangs over the same spot. Pieces without a
+	visible part of their own (the OPEN sign's anchor on its stand, an invisible Mart shelf anchor) mark the small model
+	around them or the nearest visible piece (highlightOf). A step completed (the panel number goes up) turns the chip Green with a check for
 	CHECK_TIME s and plays `prompt_done`.
 	Prompt focus: Focuses(anchor) says whether a prompt belongs to the current step (true for every prompt when the
 	tutorial is not running or the step has no world target). PromptController can use it to hide or dim the others;
@@ -50,7 +53,13 @@
 	the day shift is over without a sale (Closing, Summary, night). Each end fires `TutorialComplete` once; the server
 	(TutorialService) saves TutorialDone = true, so it never runs again for this player.
 
-	PROVISIONAL: texts, CALL_WAIT, NUDGE, TALK_TIME, TALK_MIN, REASK, CHECK_TIME, skip keys (Q, DPadDown), "a served
+	No progress (playtest 2026-10-11: on "Open the shop" a distracted player thought the game froze): a step with a
+	Remind line and no progress for IDLE s (same step, not getting PROGRESS studs closer to the target) turns urgent:
+	Walt says the short Remind line (when on the line and quiet), the panel hint shows it on a Mustard card that pulses,
+	the Highlight / 3D arrow / billboard arrow / edge pointer pulse harder. Again every IDLE s; over when the step changes.
+	Steps without Remind (waiting rows) keep the plain NUDGE repeat of their Say lines.
+
+	PROVISIONAL: texts, IDLE, PROGRESS, ARROW_FAR, CALL_WAIT, NUDGE, TALK_TIME, TALK_MIN, REASK, CHECK_TIME, skip keys (Q, DPadDown), "a served
 	sale of the tutorial customer" as the first sale, ending on the day shift end.
 ]]
 local CollectionService = game:GetService("CollectionService")
@@ -65,6 +74,7 @@ local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Cinematic = require(StarterPlayer.StarterPlayerScripts.client.Interface.Cinematic)
 local Spotlight = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Spotlight)
 local TutorialPanel = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.TutorialPanel)
+local TutorialArrow = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.TutorialArrow)
 local TutorialPointer = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.TutorialPointer)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
 local Rules = require(StarterPlayer.StarterPlayerScripts.client.Interaction.PromptController.Rules)
@@ -88,7 +98,11 @@ const REASK = 15 -- s without a tutorial customer around before TutorialBegin go
 const CHECK_TIME = 0.9 -- s the panel chip shows the green check of a completed step
 const TUTORIAL_CALL = Content.BossCallRules.Tutorial.Call
 const CALL_WAIT = 12 -- s of a silent phone before the tutorial goes on without Walt (panel only)
-const NUDGE = 20 -- s on the same step before Walt says it again
+const NUDGE = 20 -- s on the same step before Walt says it again (steps without Remind)
+const IDLE = 12 -- s without progress on a step with Remind before it turns urgent (and again every IDLE s)
+const PROGRESS = 2 -- studs closer to the target that count as progress (walking to it resets IDLE)
+const ARROW_FAR = 22 -- studs from the camera to the target from where the billboard arrow shows
+const ARROW_MAX = 400 -- studs: the billboard arrow's MaxDistance (the Mart door across the street)
 const TALK_MIN = 1.5 -- s a talk step stays at least while Walt is on the line
 const TALK_TIME = 7 -- s of a talk step without the call
 const STEP_SOUND = "prompt_done"
@@ -105,6 +119,11 @@ const DONE_TEXT: { [string]: string } = {
 }
 -- Highlight a station model only when it is about this big (studs); else the part of the anchor
 const HIGHLIGHT_MAX = 7
+-- a plain model around an anchor outside any station (the OPEN sign stand) is marked whole up to this size (studs)
+const MODEL_MAX = 12
+-- a part this transparent does not show a Highlight: mark a visible piece next to it instead
+const INVISIBLE = 0.95
+const NEARBY = 3 -- studs around an invisible anchor part where a visible piece is looked for
 const ARROW_LIFT = 0.8 -- studs between the top of the marked piece and the 3D arrow tip
 const CUSTOMER_LIFT = 3.2 -- over the head: above the order bubble and the prompt pill on the neck
 const EDGE_MARGIN = 56 -- px from the screen edge for the pointer
@@ -166,6 +185,13 @@ function TutorialController:Setup()
 	self.PointerAt = Vide.source(Vector2.zero) :: Vide.Source<Vector2>
 	self.PointerAngle = Vide.source(0) :: Vide.Source<number>
 	self.Scale = Vide.source(1) :: Vide.Source<number>
+	-- billboard arrow shown (the target is on screen and far from the camera)
+	self.ArrowFar = Vide.source(false) :: Vide.Source<boolean>
+	-- no progress on the step for IDLE s: reminder, stronger pulse (until the step changes)
+	self.Urgent = Vide.source(false) :: Vide.Source<boolean>
+	-- os.clock of the last progress on the step (step start, getting closer, a reminder) and the closest distance
+	self.IdleAt = 0 :: number
+	self.IdleDistance = math.huge :: number
 	-- green check on the panel chip: a step was just completed (until CheckUntil, os.clock)
 	self.Checked = Vide.source(false) :: Vide.Source<boolean>
 	self.CheckUntil = 0 :: number
@@ -683,6 +709,37 @@ local function pieceOf(anchor: Instance): Instance?
 	return best
 end
 
+-- Nearest visible small piece around an invisible anchor part (a Mart shelf anchor: the rack or the packs on it), or
+-- nil. Cached per anchor part (the map does not move; a weak table forgets parts that are gone).
+const nearbyCache: { [BasePart]: BasePart | false } = setmetatable({}, { __mode = "k" }) :: any
+local function visibleNear(host: BasePart): BasePart?
+	const cached = nearbyCache[host]
+	if cached ~= nil then
+		return if cached and cached:IsDescendantOf(Workspace) then cached else nil
+	end
+	const params = OverlapParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { host }
+	local best: BasePart? = nil
+	local bestDistance = math.huge
+	for _, found in Workspace:GetPartBoundsInRadius(host.Position, NEARBY, params) do
+		if found.Transparency >= INVISIBLE or extent(found) > HIGHLIGHT_MAX then
+			continue
+		end
+		-- never a character (a player or an NPC walking by)
+		const rig = found:FindFirstAncestorOfClass("Model")
+		if rig and rig:FindFirstChildOfClass("Humanoid") then
+			continue
+		end
+		const distance = (found.Position - host.Position).Magnitude
+		if distance < bestDistance then
+			best, bestDistance = found, distance
+		end
+	end
+	nearbyCache[host] = best or false
+	return best
+end
+
 -- What the Highlight and the arrow mark: the customer rig, the exact pot of a per-ingredient anchor (one topping of
 -- the toppings station), a small station model (the grill, the bun crate, the board), else the part of the anchor
 local function highlightOf(anchor: Instance): Instance?
@@ -707,12 +764,23 @@ local function highlightOf(anchor: Instance): Instance?
 	if station and station:IsA("Model") and extent(station) <= HIGHLIGHT_MAX then
 		return station
 	end
-	if anchor:IsA("BasePart") then
-		return anchor
-	end
 	const parent = anchor.Parent
-	if parent and parent:IsA("BasePart") then
-		return parent
+	const host: BasePart? = if anchor:IsA("BasePart")
+		then anchor
+		elseif parent and parent:IsA("BasePart") then parent
+		else nil
+	if station == nil then
+		-- outside any station (the OPEN sign: an Attachment on one part of its stand): the whole small model around it
+		const model = ancestorWith(anchor, function(instance)
+			return instance:IsA("Model")
+		end)
+		-- never the whole cart / trailer (a vehicle model can be that small)
+		if model and not CollectionService:HasTag(model, VEHICLE_TAG) and extent(model) <= MODEL_MAX then
+			return model
+		end
+	end
+	if host then
+		return if host.Transparency < INVISIBLE then host else visibleNear(host) or host
 	end
 	-- a plain model target (the Mart door)
 	return station or (if anchor:IsA("Model") then anchor else nil)
@@ -751,13 +819,22 @@ function TutorialController:ClearGuidance()
 	Vide.batch(function()
 		self.Target(false)
 		self.PointerShown(false)
+		self.ArrowFar(false)
 		self.Spot(false)
 	end)
 	self:SetHighlight(nil)
+	self:ResetIdle()
+end
+
+-- Billboard arrow over the target only from far away (the 3D arrow reads fine up close)
+function TutorialController:SetFar(far: boolean)
+	if Vide.untrack(self.ArrowFar) ~= far then
+		self.ArrowFar(far)
+	end
 end
 
 -- Edge pointer toward the target while it is off screen (every frame; the overlay ignores the GUI inset, so its
--- pixels are viewport pixels)
+-- pixels are viewport pixels). Its margin follows the UI scale, so the scaled badge never leaves the screen.
 function TutorialController:UpdatePointer()
 	const target = Vide.untrack(self.Target)
 	const camera = Workspace.CurrentCamera
@@ -766,10 +843,13 @@ function TutorialController:UpdatePointer()
 		if Vide.untrack(self.PointerShown) then
 			self.PointerShown(false)
 		end
+		self:SetFar(false)
 		return
 	end
+	const margin = EDGE_MARGIN * Vide.untrack(self.Scale)
 	const viewport = camera.ViewportSize
 	const point, onScreen = camera:WorldToViewportPoint(position)
+	self:SetFar(onScreen and (position - camera.CFrame.Position).Magnitude > ARROW_FAR)
 	const centre = viewport / 2
 	local delta = Vector2.new(point.X, point.Y) - centre
 	if point.Z < 0 then
@@ -777,18 +857,18 @@ function TutorialController:UpdatePointer()
 		delta = -delta
 	end
 	const inside = onScreen
-		and point.X > EDGE_MARGIN
-		and point.X < viewport.X - EDGE_MARGIN
-		and point.Y > EDGE_MARGIN
-		and point.Y < viewport.Y - EDGE_MARGIN
+		and point.X > margin
+		and point.X < viewport.X - margin
+		and point.Y > margin
+		and point.Y < viewport.Y - margin
 	if inside or delta.Magnitude < 1 then
 		if Vide.untrack(self.PointerShown) then
 			self.PointerShown(false)
 		end
 		return
 	end
-	const halfX = math.max(viewport.X / 2 - EDGE_MARGIN, 1)
-	const halfY = math.max(viewport.Y / 2 - EDGE_MARGIN, 1)
+	const halfX = math.max(viewport.X / 2 - margin, 1)
+	const halfY = math.max(viewport.Y / 2 - margin, 1)
 	const t = math.min(
 		if delta.X ~= 0 then halfX / math.abs(delta.X) else math.huge,
 		if delta.Y ~= 0 then halfY / math.abs(delta.Y) else math.huge
@@ -841,7 +921,51 @@ function TutorialController:SetStep(key: string, target: Instance?, item: string
 	end
 	if previous ~= key then
 		self.StepAt = os.clock()
+		self:ResetIdle()
 		self:SpeakStep(before, after)
+	end
+end
+
+-- No progress ----------------------------------------------------------------------------------------------------
+
+-- A new step (or the tutorial stopped): not urgent, the IDLE count starts over
+function TutorialController:ResetIdle()
+	self.IdleAt = os.clock()
+	self.IdleDistance = math.huge
+	if Vide.untrack(self.Urgent) then
+		self.Urgent(false)
+	end
+	self.Beacon.Urge(false)
+end
+
+-- Every tick on a step that waits for the player: getting PROGRESS studs closer to the target is progress; IDLE s
+-- without it turns the step urgent (Remind line, stronger pulse), again every IDLE s. Steps without Remind keep the
+-- NUDGE repeat of their Say lines.
+function TutorialController:TickIdle(step: Steps.Step, target: Instance?)
+	const now = os.clock()
+	const remind = step.Remind
+	if remind == nil then
+		if step.Say and not self.Call.Busy() and now - self.StepAt > NUDGE and self:Voiced() then
+			self.StepAt = now
+			self.Call.Queue(step.Say)
+		end
+		return
+	end
+	const distance = self:DistanceTo(target)
+	if distance < math.huge and distance < self.IdleDistance - PROGRESS then
+		self.IdleDistance = distance
+		self.IdleAt = now
+	end
+	if now - self.IdleAt < IDLE then
+		return
+	end
+	self.IdleAt = now
+	if not Vide.untrack(self.Urgent) then
+		self.Urgent(true)
+	end
+	self.Beacon.Urge(true)
+	if self:Voiced() and not self.Call.Busy() then
+		self.Call.Queue({ remind })
 	end
 end
 
@@ -1020,11 +1144,10 @@ function TutorialController:Tick()
 	end
 	const key, target, item = self:Decide()
 	self:SetStep(key, target, item)
-	-- reminder: the same step for NUDGE s and Walt quiet
+	-- reminder: no progress for IDLE s (Remind), or the same waiting step for NUDGE s and Walt quiet
 	const step = Steps.ByKey[key]
-	if step and step.Say and not self.Call.Busy() and os.clock() - self.StepAt > NUDGE and self:Voiced() then
-		self.StepAt = os.clock()
-		self.Call.Queue(step.Say)
+	if step then
+		self:TickIdle(step, target)
 	end
 end
 
@@ -1093,10 +1216,15 @@ function TutorialController:Mount(playerGui: Instance)
 					return self:StepLabel()
 				end,
 				Done = self.Checked,
+				-- no progress for a while: the short reminder in place of the hint
 				Hint = function()
 					const step = self:Step()
-					return if step then step.Hint else ""
+					if step == nil then
+						return ""
+					end
+					return if self.Urgent() and step.Remind then step.Remind else step.Hint
 				end,
+				Urgent = self.Urgent,
 				SkipText = function()
 					return self:SkipText()
 				end,
@@ -1154,9 +1282,28 @@ function TutorialController:Mount(playerGui: Instance)
 				end,
 				Position = self.PointerAt,
 				Angle = self.PointerAngle,
+				Scale = scale,
+				Strong = self.Urgent,
 			}),
 		})
 		overlay.Parent = playerGui
+
+		-- Screen-sized bouncing arrow over the target (Beacon's tip part) while it is far from the camera; straight in
+		-- PlayerGui (a BillboardGui does not draw inside a ScreenGui)
+		const arrow = TutorialArrow({
+			Name = "TutorialWorldArrow",
+			Adornee = function(): Instance?
+				return if self.Target() ~= false then self.Beacon.Tip else nil
+			end,
+			Shown = function()
+				return shown() and self.ArrowFar() and not Cinematic.Active()
+			end,
+			Offset = Vector3.zero,
+			MaxDistance = ARROW_MAX,
+			Scale = scale,
+			Strong = self.Urgent,
+		})
+		arrow.Parent = playerGui
 	end)
 	table.insert(self.Unmounts, unmount)
 end

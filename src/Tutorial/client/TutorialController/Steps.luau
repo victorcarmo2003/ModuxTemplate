@@ -15,6 +15,7 @@
 -- "mart" stands in for the four.
 -- Number = the step shown in the panel ("3/13"); waiting rows share the number of the step they wait for.
 -- Action = the prompt the arrow points at (nil = no prompt: waiting, or a talk step).
+-- Remind = the short nudge after IDLE s without progress (TutorialController), voiced like Say (generated ahead).
 -- Talk = no world action: the step moves on once Walt has said it (or after TALK_TIME without the call; "Got it").
 -- The order of the cooking steps is decided live from the replicated state (TutorialController:Decide), never stored.
 -- Say lines are fixed strings (no "{item}"): the voice is generated ahead (Prepare), a live text could not be. The
@@ -28,6 +29,10 @@ export type Step = {
 	Action: string?,
 	Say: { string }?, -- Walt's lines when the step starts (nil = silent waiting row)
 	Done: string?, -- Walt's praise when the player moves past this step
+	-- Short reminder (<= 42 chars, a subtitle line) when the player made no progress on the step for a while
+	-- (TutorialController IDLE): Walt says it, the panel hint shows it and the arrow pulses harder. nil = no reminder
+	-- (waiting rows, talk steps)
+	Remind: string?,
 	Talk: boolean?,
 }
 
@@ -40,6 +45,7 @@ const LIST: { Step } = {
 		Text = "Answer the phone",
 		Hint = 'Your boss is calling. Press "Answer" on the cart phone.',
 		Action = "answer_phone",
+		Remind = "The phone's ringing! Press Answer.",
 	},
 	{
 		Key = "wait_call",
@@ -64,6 +70,7 @@ const LIST: { Step } = {
 		Action = "take_order",
 		Say = { "Go on, take their order." },
 		Done = "Hot dog with ketchup. Easy.",
+		Remind = "They're waiting. Take the order!",
 	},
 	{
 		Key = "grill",
@@ -73,6 +80,7 @@ const LIST: { Step } = {
 		Action = "grill_place",
 		Say = { "Grab a sausage from the cooler.", "It goes right on the grill." },
 		Done = "Nice!",
+		Remind = "Sausage on the grill. Follow the arrow.",
 	},
 	{
 		Key = "slice",
@@ -82,6 +90,7 @@ const LIST: { Step } = {
 		Action = "bun_cut",
 		Say = { "Slice a bun while it cooks." },
 		Done = "Good.",
+		Remind = "Hold Slice Bun at the bun crate.",
 	},
 	{ Key = "slicing", Number = 4, Text = "Slicing the bun...", Hint = "Keep holding!", Action = nil },
 	{
@@ -100,6 +109,7 @@ const LIST: { Step } = {
 		Action = "grill_collect",
 		Say = { "It's ready! Grab it off the grill." },
 		Done = "Got it!",
+		Remind = "It's ready! Collect it off the grill.",
 	},
 	{
 		Key = "assemble",
@@ -109,6 +119,7 @@ const LIST: { Step } = {
 		Action = "board_add_sausage",
 		Say = { "Now put the sausage in the bun, on the board." },
 		Done = "Beautiful.",
+		Remind = "Sausage in the bun, at the board.",
 	},
 	{
 		Key = "toppings",
@@ -118,6 +129,7 @@ const LIST: { Step } = {
 		Action = "topping_add",
 		Say = { "They want ketchup. Go add some.", "Only what they asked. Nothing extra." },
 		Done = "Perfect.",
+		Remind = "Ketchup! Hold Add at the ketchup.",
 	},
 	{
 		Key = "discard",
@@ -126,6 +138,7 @@ const LIST: { Step } = {
 		Hint = "That's not what they asked. Hold \"Throw Away\" at the bin, then make a new one.",
 		Action = "discard",
 		Say = { "Whoa, that's not what they ordered.", "Toss it in the bin and make a new one." },
+		Remind = "Toss it. Hold Throw Away at the bin.",
 	},
 	{
 		Key = "open",
@@ -135,6 +148,7 @@ const LIST: { Step } = {
 		Action = "open_sign",
 		Say = { "Flip the sign to open the shop first." },
 		Done = "We're open!",
+		Remind = "Shop's closed! Press Open Shop at the sign.",
 	},
 	{
 		Key = "serve",
@@ -143,6 +157,7 @@ const LIST: { Step } = {
 		Hint = 'Press "Serve" on the customer.',
 		Action = "serve",
 		Say = { "That's what they wanted. Now serve it!" },
+		Remind = "Hand it over. Press Serve on them.",
 	},
 	{
 		Key = "money",
@@ -165,6 +180,7 @@ const LIST: { Step } = {
 			"Look both ways! These drivers don't brake.",
 		},
 		Done = "That's the place.",
+		Remind = "Mart's across the street. Follow the arrow.",
 	},
 	{
 		Key = "mart_buy",
@@ -174,6 +190,7 @@ const LIST: { Step } = {
 		Action = "buy_package",
 		Say = { "Bakery shelf. Grab a pack of buns." },
 		Done = "Eight buns. That'll do.",
+		Remind = "Bakery shelf. Hold Buy Buns.",
 	},
 	{
 		Key = "mart_back",
@@ -182,6 +199,7 @@ const LIST: { Step } = {
 		Hint = "Carry the pack back to your cart.",
 		Action = nil,
 		Say = { "Now bring 'em back to the cart." },
+		Remind = "Bring the buns back to the cart.",
 	},
 	{
 		Key = "restock",
@@ -191,6 +209,7 @@ const LIST: { Step } = {
 		Action = "restock",
 		Say = { "Hold Restock on the bun crate." },
 		Done = "Stocked up!",
+		Remind = "Hold Restock at the bun crate.",
 	},
 	-- stands in for the four shopping steps when the buns did not run out (no tutorial stock)
 	{
@@ -247,6 +266,9 @@ local function allLines(): { string }
 		end
 		if step.Done then
 			add(step.Done)
+		end
+		if step.Remind then
+			add(step.Remind)
 		end
 	end
 	for _, text in GOODBYE do

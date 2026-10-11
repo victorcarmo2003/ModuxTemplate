@@ -1,7 +1,7 @@
 --!strict
 -- TutorialPanel on a phone-sized frame (iPhone SE landscape, 667 x 375) or the whole viewport. Move "Step" up to see
 -- the jump; "Shown" pops it in/out; "Done" shows the green check chip; clear "Label", "Hint" or "Skip" to hide those
--- lines. Skip clicks are counted.
+-- lines; "Urgent" turns the card Mustard and pulses it (no progress reminder). Skip clicks are counted.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -20,6 +20,7 @@ type Controls = {
 	Text: () -> string,
 	Label: () -> string,
 	Done: () -> boolean,
+	Urgent: () -> boolean,
 	Hint: () -> string,
 	Skip: () -> string,
 }
@@ -35,6 +36,7 @@ return UILabs.CreateVideStory({
 		Text = "Grill a sausage",
 		Label = "STEP 3 OF 9",
 		Done = false,
+		Urgent = false,
 		Hint = 'Grab one at the cooler: press "Grill".',
 		Skip = "Skip (Q)",
 	},
@@ -60,6 +62,7 @@ return UILabs.CreateVideStory({
 			Text = controls.Text,
 			Label = controls.Label,
 			Done = controls.Done,
+			Urgent = controls.Urgent,
 			Hint = controls.Hint,
 			SkipText = controls.Skip,
 			OnSkip = function()
