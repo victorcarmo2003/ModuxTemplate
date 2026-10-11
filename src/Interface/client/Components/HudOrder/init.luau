@@ -10,6 +10,8 @@
 -- Pixel sizes at UI scale 1 (smallest phone): icons 44 px, title 16 px.
 -- Cartoon pass (AST-091): white CartoonPanel bubble (gradient, lip, thick Ink outline), the patience ring drawn just
 -- inside the outline, the title on a small Ink tab over the top-left corner.
+-- Pair order (FEAT-038, TASK-148): `Toppings2` returning a list adds a 2nd row (bun + sausage + its toppings) under
+-- the first; nil (or no prop) keeps the single-row card. Existing callers are unchanged.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Icons = require(script.Parent.Icons)
@@ -26,6 +28,8 @@ export type Props = {
 	Shown: () -> boolean,
 	-- Content.Ingredients topping keys in display order (max 3, DEC-071). Empty = plain hot dog (K = 0).
 	Toppings: () -> { string },
+	-- Pair (FEAT-038): topping keys of the 2nd hot dog (2nd row). nil = one row. Default nil.
+	Toppings2: (() -> { string }?)?,
 	-- true = blank customer (ANM-001): no icon. Default false.
 	Empty: (() -> boolean)?,
 	-- Patience left, 0..1. Negative = no ring.
@@ -43,7 +47,8 @@ const CELL = 44
 const GAP = 6
 const PAD = 8
 const LIP = 4
-const CARD_HEIGHT = CELL + PAD * 2 + LIP
+const CARD_HEIGHT = CELL + PAD * 2 + LIP -- one row
+const ROW_GAP = 6 -- between the two rows of a pair
 const TITLE_HEIGHT = 24
 const TITLE_GAP = -6 -- the tab overlaps the card edge
 const RING = 4
@@ -148,13 +153,13 @@ return function(props: Props): Frame
 		return false
 	end
 
-	-- Keys drawn in the row: bun, sausage, then the toppings; nothing for a blank customer.
-	local function keys(): { string }
+	-- Keys drawn in a row: bun, sausage, then the toppings; nothing for a blank customer.
+	local function rowKeys(toppings: { string }): { string }
 		if empty() then
 			return {}
 		end
 		const list = table.clone(BASE)
-		for index, key in props.Toppings() do
+		for index, key in toppings do
 			if index > MAX_TOPPINGS then
 				break
 			end
@@ -163,9 +168,53 @@ return function(props: Props): Frame
 		return list
 	end
 
+	local function keys(): { string }
+		return rowKeys(props.Toppings())
+	end
+
+	-- 2nd row (pair): nil = none; never on a blank customer
+	local function keys2(): { string }?
+		const read = props.Toppings2
+		if empty() or read == nil then
+			return nil
+		end
+		const second = read()
+		return if second ~= nil then rowKeys(second) else nil
+	end
+
+	local function rows(): number
+		return if keys2() ~= nil then 2 else 1
+	end
+
 	local function width(): number
-		const cells = math.max(#keys(), 1)
+		local cells = math.max(#keys(), 1)
+		const second = keys2()
+		if second ~= nil then
+			cells = math.max(cells, #second)
+		end
 		return PAD * 2 + cells * CELL + (cells - 1) * GAP
+	end
+
+	local function cardHeight(): number
+		return CARD_HEIGHT + (rows() - 1) * (CELL + ROW_GAP)
+	end
+
+	local function iconRow(name: string, order: number, list: () -> { string }, visible: () -> boolean): Frame
+		return create("Frame")({
+			Name = name,
+			LayoutOrder = order,
+			Size = UDim2.new(1, 0, 0, CELL),
+			BackgroundTransparency = 1,
+			Visible = visible,
+			create("UIListLayout")({
+				FillDirection = Enum.FillDirection.Horizontal,
+				HorizontalAlignment = Enum.HorizontalAlignment.Center,
+				VerticalAlignment = Enum.VerticalAlignment.Center,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, GAP),
+			}),
+			indexes(list, cell),
+		})
 	end
 
 	return create("Frame")({
@@ -173,7 +222,7 @@ return function(props: Props): Frame
 		AnchorPoint = props.AnchorPoint or Vector2.zero,
 		Position = props.Position or UDim2.fromOffset(12, 114),
 		Size = function()
-			return UDim2.fromOffset(width(), TITLE_HEIGHT + TITLE_GAP + CARD_HEIGHT)
+			return UDim2.fromOffset(width(), TITLE_HEIGHT + TITLE_GAP + cardHeight())
 		end,
 		BackgroundTransparency = 1,
 		Visible = props.Shown,
@@ -181,7 +230,9 @@ return function(props: Props): Frame
 		CartoonPanel({
 			Name = "Card",
 			Position = UDim2.fromOffset(0, TITLE_HEIGHT + TITLE_GAP),
-			Size = UDim2.new(1, 0, 0, CARD_HEIGHT),
+			Size = function()
+				return UDim2.new(1, 0, 0, cardHeight())
+			end,
 			Tone = Theme.Tone.White,
 			Outline = Theme.Outline.Thick,
 			Radius = UDim.new(0, (CARD_HEIGHT - LIP) / 2),
@@ -220,13 +271,20 @@ return function(props: Props): Frame
 					BackgroundTransparency = 1,
 					ZIndex = 2,
 					create("UIListLayout")({
-						FillDirection = Enum.FillDirection.Horizontal,
+						FillDirection = Enum.FillDirection.Vertical,
 						HorizontalAlignment = Enum.HorizontalAlignment.Center,
 						VerticalAlignment = Enum.VerticalAlignment.Center,
 						SortOrder = Enum.SortOrder.LayoutOrder,
-						Padding = UDim.new(0, GAP),
+						Padding = UDim.new(0, ROW_GAP),
 					}),
-					indexes(keys, cell),
+					iconRow("Row1", 1, keys, function()
+						return true
+					end),
+					iconRow("Row2", 2, function()
+						return keys2() or {}
+					end, function()
+						return rows() == 2
+					end),
 				}),
 			},
 		}),

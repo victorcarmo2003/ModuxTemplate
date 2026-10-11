@@ -2,6 +2,8 @@
 -- OrderBubble is a BillboardGui, so it is previewed in the 3D viewport: a temporary "head" part 8 studs in front of
 -- the Studio camera (removed when the story closes). Tick the toppings (only the first 3 show, DEC-071), drag the
 -- patience, turn the ring off (patience unknown, T41), or make it Empty (ANM-001 blank folks: no icon at all).
+-- Pair (FEAT-038, TASK-148): tick Pair for the 2-row bubble (2nd hot dog = Pair2 toppings) and pick Done 1/2 to see a
+-- row resolved (veil + check).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -22,6 +24,11 @@ type Controls = {
 	Ring: () -> boolean,
 	Empty: () -> boolean,
 	Patience: () -> number,
+	Pair: () -> boolean,
+	Pair2Ketchup: () -> boolean,
+	Pair2Bacon: () -> boolean,
+	Pair2PotatoSticks: () -> boolean,
+	Done: () -> number,
 }
 
 return UILabs.CreateVideStory({
@@ -36,6 +43,11 @@ return UILabs.CreateVideStory({
 		Ring = true,
 		Empty = false,
 		Patience = UILabs.Slider(0.8, 0, 1, 0.01),
+		Pair = false,
+		Pair2Ketchup = false,
+		Pair2Bacon = true,
+		Pair2PotatoSticks = true,
+		Done = UILabs.Slider(0, 0, 2, 1),
 	},
 }, function(props)
 	-- UI Labs types the control sources loosely; pin them to what the story reads.
@@ -76,6 +88,25 @@ return UILabs.CreateVideStory({
 			end
 			return list
 		end,
+		Toppings2 = function(): { OrderBubble.Topping }?
+			if not controls.Pair() then
+				return nil
+			end
+			const list: { OrderBubble.Topping } = {}
+			const second: { [string]: () -> boolean } = {
+				ketchup = controls.Pair2Ketchup,
+				bacon = controls.Pair2Bacon,
+				potato_sticks = controls.Pair2PotatoSticks,
+			}
+			for _, key in Content.Ingredients.ToppingKeys do
+				const on = second[key]
+				if on and on() then
+					table.insert(list, { Key = key, Icon = Content.Ingredients.ByKey[key].Icon })
+				end
+			end
+			return list
+		end,
+		Done = controls.Done,
 		Empty = controls.Empty,
 		Patience = function()
 			return if controls.Ring() then controls.Patience() else -1

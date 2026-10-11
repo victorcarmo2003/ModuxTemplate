@@ -594,6 +594,10 @@ function HudController:OrderCard(): Frame
 		Toppings = function()
 			return customer:CardToppings()
 		end,
+		-- pair (FEAT-038, TASK-148): 2nd row
+		Toppings2 = function()
+			return customer:CardToppings2()
+		end,
 		Empty = function()
 			return customer:CardEmpty()
 		end,

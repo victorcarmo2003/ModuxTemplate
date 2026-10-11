@@ -40,6 +40,12 @@
 	    Waiting (the nearest one if more than one); 0 = no card. Read at TICK_RATE. The card reads CardShown /
 	    CardToppings / CardEmpty / CardPatience (reactive). A blank customer = the card with no icon.
 
+	Pairs (TASK-148; FEAT-038; network.md §14.2): the leader's record carries `Order2` (2nd hot dog still pending): the
+	bubble and the HUD card draw 2 rows (OrderBubble/HudOrder `Toppings2`). The record always shows the pending items,
+	so when one is resolved `Order2` goes nil: the resolved row is kept for DONE_TIME s with a veil + check (`Done`),
+	then the bubble is back to 1 row. Which row went: `Order` unchanged = the 2nd, else the 1st. The partner (record
+	with `Leader`) never mounts a bubble nor gets the card. The ring span counts K1 + K2 + Flow.Groups.PatienceBonus.
+
 	Listeners in OnInit (before Lync.start, README "Rede"); the late joiner gets the current records through onAdded.
 	Rigs are scanned in OnStart. No input: nothing here is clickable (FEAT-032).
 ]]
@@ -67,6 +73,8 @@ const BLANK = "blank" -- ANM-001: no icons in the bubble
 -- px under the bubble's tail: clears the prompt pill (48 px tall, centred on the neck anchor) at any distance
 const BUBBLE_LIFT = 28
 const FRONT_SLOT = 1 -- Q1
+const DONE_TIME = 1.2 -- s a resolved row of a pair stays on the bubble (veil + check)
+const PAIR_BONUS = Content.Flow.Groups.PatienceBonus
 
 export type Record = {
 	State: string,
@@ -74,7 +82,12 @@ export type Record = {
 	Order: { [string]: boolean },
 	PatienceEndsAt: number,
 	Mood: string,
+	Order2: { [string]: boolean }?, -- pair leader: 2nd pending hot dog (network.md §14.2)
+	Leader: number?, -- pair partner: NpcId of its leader (no bubble)
 }
+
+-- Resolved row of a pair while it is shown (DONE_TIME): row 1 or 2 and its toppings.
+type Done = { Row: number, Toppings: { OrderBubble.Topping } }
 
 type Entry = {
 	Id: number,
@@ -87,6 +100,8 @@ type Entry = {
 	Gui: Instance?,
 	Face: string?,
 	Variant: Vide.Source<string | false>, -- rig attribute Variant (TASK-110); false = ordinary customer
+	Done: Vide.Source<Done | false>, -- pair row just resolved (TASK-148)
+	DoneTimer: thread?,
 }
 
 type Reaction = {
@@ -135,9 +150,14 @@ end
 
 -- Topping keys of an order, in display order (ToppingKeys order), max 3 (DEC-071).
 function CustomerController:ToppingsOf(record: Record): { OrderBubble.Topping }
+	return self:ToppingsOfOrder(record.Order)
+end
+
+-- Same for any bitfield of the order (Order or Order2).
+function CustomerController:ToppingsOfOrder(order: { [string]: boolean }): { OrderBubble.Topping }
 	const list: { OrderBubble.Topping } = {}
 	for _, key in Content.Ingredients.ToppingKeys do
-		if record.Order[key] then
+		if order[key] then
 			table.insert(list, { Key = key, Icon = Content.Ingredients.ByKey[key].Icon })
 			if #list >= ORDER_RULES.MaxToppings then
 				break
@@ -168,9 +188,25 @@ function CustomerController:NewEntry(id: number): Entry
 		Gui = nil,
 		Face = nil,
 		Variant = Vide.source(false :: string | false) :: Vide.Source<string | false>,
+		Done = Vide.source(false :: Done | false) :: Vide.Source<Done | false>,
+		DoneTimer = nil,
 	}
 	self.Entries[id] = entry
 	return entry
+end
+
+local function sameOrder(a: { [string]: boolean }, b: { [string]: boolean }): boolean
+	for key, on in a do
+		if on and not b[key] then
+			return false
+		end
+	end
+	for key, on in b do
+		if on and not a[key] then
+			return false
+		end
+	end
+	return true
 end
 
 -- Copies: the set may reuse its record table between frames, and Vide needs a new value to notice a change.
@@ -186,10 +222,18 @@ function CustomerController:WriteRecord(id: number, record: Record?)
 		Order = table.clone(record.Order),
 		PatienceEndsAt = record.PatienceEndsAt,
 		Mood = record.Mood,
+		Order2 = if record.Order2 then table.clone(record.Order2) else nil,
+		Leader = record.Leader,
 	}
 	const old = Vide.untrack(entry.Record)
 	if old ~= false and old.State ~= "Waiting" and copy.State == "Waiting" then
 		self:Cue(id, "order_take")
+	end
+	const oldSecond = if old ~= false then old.Order2 else nil
+	if old ~= false and oldSecond ~= nil and copy.Order2 == nil and copy.State == "Waiting" then
+		-- one hot dog of the pair resolved: Order unchanged = the 2nd row went, else the 1st
+		const row = if sameOrder(old.Order, copy.Order) then 2 else 1
+		self:MarkDone(entry, row, self:ToppingsOfOrder(if row == 2 then oldSecond else old.Order))
 	end
 	const now = workspace:GetServerTimeNow()
 	if copy.PatienceEndsAt <= 0 then
@@ -197,14 +241,59 @@ function CustomerController:WriteRecord(id: number, record: Record?)
 		entry.Total = 0
 	elseif copy.PatienceEndsAt ~= entry.EndsAt then
 		entry.EndsAt = copy.PatienceEndsAt
-		const k = #self:ToppingsOf(copy)
-		const formula = ORDER_RULES.PatienceBase + ORDER_RULES.PatiencePerK * k
+		local k = #self:ToppingsOf(copy)
+		local bonus = 0
+		const second = copy.Order2
+		if second ~= nil then
+			k += #self:ToppingsOfOrder(second)
+			bonus = PAIR_BONUS
+		end
+		const formula = ORDER_RULES.PatienceBase + ORDER_RULES.PatiencePerK * k + bonus
 		entry.Total = math.max(formula, copy.PatienceEndsAt - now)
 	end
 	self.Now(now)
 	const source: Vide.Source<Record | false> = entry.Record
 	source(copy)
 	self:Sync(id)
+end
+
+-- Keep the resolved row of a pair on the bubble for DONE_TIME s.
+function CustomerController:MarkDone(entry: Entry, row: number, toppings: { OrderBubble.Topping })
+	self:ClearDone(entry)
+	entry.Done({ Row = row, Toppings = toppings })
+	entry.DoneTimer = task.delay(DONE_TIME, function()
+		entry.DoneTimer = nil
+		entry.Done(false)
+	end)
+end
+
+function CustomerController:ClearDone(entry: Entry)
+	const timer = entry.DoneTimer
+	entry.DoneTimer = nil
+	if timer ~= nil and coroutine.running() ~= timer and coroutine.status(timer) == "suspended" then
+		task.cancel(timer)
+	end
+	if Vide.untrack(entry.Done) ~= false then
+		entry.Done(false)
+	end
+end
+
+-- Reactive rows of the bubble: row 1, row 2 (nil = single row) and the resolved row (0 = none).
+function CustomerController:RowsOf(entry: Entry): ({ OrderBubble.Topping }, { OrderBubble.Topping }?, number)
+	const record = entry.Record()
+	if record == false then
+		return {}, nil, 0
+	end
+	const current = self:ToppingsOf(record)
+	const done = entry.Done()
+	const second = record.Order2
+	if done ~= false and second == nil then
+		if done.Row == 1 then
+			return done.Toppings, current, 1
+		end
+		return current, done.Toppings, 2
+	end
+	return current, if second ~= nil then self:ToppingsOfOrder(second) else nil, 0
 end
 
 -- The customer left the set: bubble and face go with it.
@@ -214,6 +303,7 @@ function CustomerController:Drop(id: number)
 		return
 	end
 	self.Entries[id] = nil
+	self:ClearDone(entry)
 	self:Detach(entry)
 	self:Fill()
 	if Vide.untrack(self.Focus) == id then
@@ -293,7 +383,8 @@ function CustomerController:Sync(id: number)
 		self.Dependencies.RigController:SetExpression(model, face)
 	end
 
-	if entry.Unmount == nil then
+	-- a pair partner never has a bubble (FEAT-038): the leader's shows both hot dogs
+	if entry.Unmount == nil and record.Leader == nil then
 		self:Mount(entry, model)
 	end
 end
@@ -313,14 +404,23 @@ function CustomerController:Mount(entry: Entry, model: Model)
 			end,
 			Visible = function()
 				const record = entry.Record()
-				return record ~= false and record.State == "Waiting" and not entry.Reacting()
+				return record ~= false and record.State == "Waiting" and record.Leader == nil and not entry.Reacting()
 			end,
 			Toppings = function()
-				const record = entry.Record()
-				if record == false or entry.Variant() == BLANK then
+				if entry.Variant() == BLANK then
 					return {}
 				end
-				return self:ToppingsOf(record)
+				const first = self:RowsOf(entry)
+				return first
+			end,
+			-- pair (TASK-148): 2nd hot dog, and the row just resolved
+			Toppings2 = function()
+				const _, second = self:RowsOf(entry)
+				return second
+			end,
+			Done = function()
+				const _, _, done = self:RowsOf(entry)
+				return done
 			end,
 			Patience = function()
 				return self:PatienceOf(entry)
@@ -475,7 +575,7 @@ function CustomerController:FocusEntry(): (Entry?, Record?)
 		return nil, nil
 	end
 	const record = entry.Record()
-	if record == false or record.State ~= "Waiting" then
+	if record == false or record.State ~= "Waiting" or record.Leader ~= nil then
 		return nil, nil
 	end
 	return entry, record
@@ -499,6 +599,20 @@ function CustomerController:CardToppings(): { string }
 		return keys
 	end
 	for _, topping in self:ToppingsOf(record) do
+		table.insert(keys, topping.Key)
+	end
+	return keys
+end
+
+-- Topping keys of the 2nd hot dog of a pair on the card (TASK-148); nil = single row.
+function CustomerController:CardToppings2(): { string }?
+	const entry, record = self:FocusEntry()
+	const second = if record ~= nil then record.Order2 else nil
+	if entry == nil or second == nil or entry.Variant() == BLANK then
+		return nil
+	end
+	const keys: { string } = {}
+	for _, topping in self:ToppingsOfOrder(second) do
 		table.insert(keys, topping.Key)
 	end
 	return keys

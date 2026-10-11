@@ -14,6 +14,10 @@
 -- Cartoon pass (AST-091 "Balão de pedido"): white CartoonPanel bubble (gradient, lip, thick Ink outline), the patience
 -- ring just inside the outline, tail under it; icons from the AST-071 sheet when the topping has no own `Icon`
 -- (`Ingredient/<key>`, base = `Item/hot_dog`), the drawn chips stay as the last fallback.
+-- Pair order (FEAT-038, TASK-148): `Toppings2` returning a list draws a 2nd row (one row per hot dog, same icon order)
+-- and the bubble grows to fit both; returning nil (or no prop) keeps the single row. `Done` (1 or 2) draws that row
+-- resolved for a moment: white veil + green check over it (the controller keeps it ~1 s, then the row goes away).
+-- Every existing prop keeps its meaning: a caller that never passes Toppings2 gets the same single-row bubble.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Cinematic = require(script.Parent.Parent.Cinematic)
@@ -37,6 +41,10 @@ export type Props = {
 	Visible: () -> boolean,
 	-- In the order's display order (max 3, DEC-071). Empty = plain hot dog (K = 0).
 	Toppings: () -> { Topping },
+	-- Pair (FEAT-038): toppings of the 2nd hot dog (2nd row). nil = one row. Default nil.
+	Toppings2: (() -> { Topping }?)?,
+	-- Row drawn as resolved (veil + check): 0 = none, 1 or 2. Default 0.
+	Done: (() -> number)?,
 	-- true = empty bubble (ANM-001 blank folks): no icon at all. Default false.
 	Empty: (() -> boolean)?,
 	-- Patience left, 0..1. Negative = no ring (patience unknown: PatienceEndsAt = 0, T41).
@@ -57,9 +65,10 @@ const CELL = 44 -- icon size (min touch/readable size, Theme.MinTouch)
 const GAP = 6
 const PAD = 10
 const LIP = 4
-const BUBBLE_HEIGHT = CELL + PAD * 2 + LIP
+const BUBBLE_HEIGHT = CELL + PAD * 2 + LIP -- one row
+const ROW_GAP = 8 -- between the two rows of a pair
 const TAIL = 16 -- tail square side (rotated 45°)
-const HEIGHT = BUBBLE_HEIGHT + TAIL
+const CHECK = 32 -- check badge over a resolved row
 const RING = 4
 const LABEL_SIZE = 16
 
@@ -227,11 +236,95 @@ local function ringTransparency(fraction: number): NumberSequence
 	})
 end
 
+-- First 3 toppings of a list (DEC-071).
+local function firstThree(list: { Topping }): { Topping }
+	if #list <= 3 then
+		return list
+	end
+	return { list[1], list[2], list[3] }
+end
+
+-- One hot dog: base icon + toppings in a row; `resolved` lays the veil and the check over it.
+local function row(props: {
+	Name: string,
+	Order: number,
+	Toppings: () -> { Topping },
+	Empty: () -> boolean,
+	Visible: () -> boolean,
+	Resolved: () -> boolean,
+}): Frame
+	return create("Frame")({
+		Name = props.Name,
+		LayoutOrder = props.Order,
+		Size = UDim2.new(1, 0, 0, CELL),
+		BackgroundTransparency = 1,
+		Visible = props.Visible,
+
+		create("Frame")({
+			Name = "Icons",
+			Size = UDim2.fromScale(1, 1),
+			BackgroundTransparency = 1,
+			create("UIListLayout")({
+				FillDirection = Enum.FillDirection.Horizontal,
+				HorizontalAlignment = Enum.HorizontalAlignment.Center,
+				VerticalAlignment = Enum.VerticalAlignment.Center,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, GAP),
+			}),
+			baseIcon(props.Empty),
+			indexes(function()
+				return firstThree(props.Toppings())
+			end, toppingIcon),
+		}),
+
+		-- Resolved: white veil over the icons and a green check in the middle
+		create("Frame")({
+			Name = "Veil",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.new(1, 4, 1, 4),
+			BackgroundColor3 = WHITE,
+			BackgroundTransparency = 0.3,
+			ZIndex = 3,
+			Visible = props.Resolved,
+			create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+			CartoonPanel({
+				Name = "Check",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = UDim2.fromOffset(CHECK, CHECK),
+				Tone = Theme.Tone.Green,
+				Outline = Theme.Outline.Normal,
+				Radius = UDim.new(0.5, 0),
+				Lip = 2,
+				ZIndex = 4,
+				Children = {
+					create("ImageLabel")({
+						Name = "Icon",
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						Position = UDim2.fromScale(0.5, 0.5),
+						Size = UDim2.fromScale(0.8, 0.8),
+						BackgroundTransparency = 1,
+						ScaleType = Enum.ScaleType.Fit,
+						Image = Icons.ImageOf("Ui/check"),
+						ImageRectOffset = (Icons.Rect("Ui/check") or { Offset = Vector2.zero, Size = Vector2.zero }).Offset,
+						ImageRectSize = (Icons.Rect("Ui/check") or { Offset = Vector2.zero, Size = Vector2.zero }).Size,
+						ZIndex = 5,
+					}),
+				},
+			}),
+		}),
+	})
+end
+
 return function(props: Props): BillboardGui
 	const warnAt = props.WarnAt or 1 / 3
 	const lift = math.max(props.Lift or 0, 0)
 	const empty = props.Empty or function(): boolean
 		return false
+	end
+	const done = props.Done or function(): number
+		return 0
 	end
 
 	-- shown toppings: none in an empty bubble
@@ -242,16 +335,38 @@ return function(props: Props): BillboardGui
 		return props.Toppings()
 	end
 
+	-- 2nd row (pair, FEAT-038): never in an empty bubble
+	local function toppings2(): { Topping }?
+		const second = props.Toppings2
+		if empty() or second == nil then
+			return nil
+		end
+		return second()
+	end
+
+	local function rows(): number
+		return if toppings2() ~= nil then 2 else 1
+	end
+
 	local function width(): number
-		const cells = 1 + math.min(#toppings(), 3)
+		local most = #toppings()
+		const second = toppings2()
+		if second ~= nil then
+			most = math.max(most, #second)
+		end
+		const cells = 1 + math.min(most, 3)
 		return PAD * 2 + cells * CELL + (cells - 1) * GAP
+	end
+
+	local function bubbleHeight(): number
+		return BUBBLE_HEIGHT + (rows() - 1) * (CELL + ROW_GAP)
 	end
 
 	return create("BillboardGui")({
 		Name = props.Name or "OrderBubble",
 		Adornee = props.Adornee,
 		Size = function()
-			return UDim2.fromOffset(width(), HEIGHT + lift)
+			return UDim2.fromOffset(width(), bubbleHeight() + TAIL + lift)
 		end,
 		-- bottom of the gui (tail tip + lift) sits on the offset point
 		SizeOffset = Vector2.new(0, 0.5),
@@ -268,7 +383,9 @@ return function(props: Props): BillboardGui
 		create("Frame")({
 			Name = "Tail",
 			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.new(0.5, 0, 0, BUBBLE_HEIGHT - 3),
+			Position = function()
+				return UDim2.new(0.5, 0, 0, bubbleHeight() - 3)
+			end,
 			Size = UDim2.fromOffset(TAIL, TAIL),
 			Rotation = 45,
 			BackgroundColor3 = Theme.Tone.White.Lip,
@@ -281,7 +398,9 @@ return function(props: Props): BillboardGui
 
 		CartoonPanel({
 			Name = "Bubble",
-			Size = UDim2.new(1, 0, 0, BUBBLE_HEIGHT),
+			Size = function()
+				return UDim2.new(1, 0, 0, bubbleHeight())
+			end,
 			Tone = Theme.Tone.White,
 			Outline = Theme.Outline.Thick,
 			Radius = UDim.new(0, (BUBBLE_HEIGHT - LIP) / 2),
@@ -316,25 +435,43 @@ return function(props: Props): BillboardGui
 				}),
 
 				create("Frame")({
-					Name = "Icons",
+					Name = "Rows",
 					Size = UDim2.fromScale(1, 1),
 					BackgroundTransparency = 1,
 					ZIndex = 2,
 					create("UIListLayout")({
-						FillDirection = Enum.FillDirection.Horizontal,
+						FillDirection = Enum.FillDirection.Vertical,
 						HorizontalAlignment = Enum.HorizontalAlignment.Center,
 						VerticalAlignment = Enum.VerticalAlignment.Center,
 						SortOrder = Enum.SortOrder.LayoutOrder,
-						Padding = UDim.new(0, GAP),
+						Padding = UDim.new(0, ROW_GAP),
 					}),
-					baseIcon(empty),
-					indexes(function()
-						const list = toppings()
-						if #list <= 3 then
-							return list
-						end
-						return { list[1], list[2], list[3] }
-					end, toppingIcon),
+					row({
+						Name = "Row1",
+						Order = 1,
+						Toppings = toppings,
+						Empty = empty,
+						Visible = function()
+							return true
+						end,
+						Resolved = function()
+							return done() == 1 and rows() == 2
+						end,
+					}),
+					row({
+						Name = "Row2",
+						Order = 2,
+						Toppings = function()
+							return toppings2() or {}
+						end,
+						Empty = empty,
+						Visible = function()
+							return rows() == 2
+						end,
+						Resolved = function()
+							return done() == 2 and rows() == 2
+						end,
+					}),
 				}),
 			},
 		}),
