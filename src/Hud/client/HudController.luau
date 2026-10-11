@@ -100,6 +100,32 @@ const ALERT: { [string]: boolean } = {
 	not_enough_gems = true,
 	class_locked = true,
 }
+-- Refusal notices (an action the server turned down): `error` instead of `toast` (user request 2026-10-10)
+const REFUSAL: { [string]: boolean } = {
+	hands_full = true,
+	package_limit = true,
+	not_enough_cash = true,
+	not_enough_gems = true,
+	class_locked = true,
+	grill_full = true,
+	rail_full = true,
+	board_full = true,
+	out_of_stock = true,
+	topping_max = true,
+	topping_repeat = true,
+	stock_full = true,
+	shelf_locked = true,
+	bench_busy = true,
+	upgrade_maxed = true,
+	shop_closed = true,
+	coffee_cooldown = true,
+	coffee_full = true,
+	coffee_night_only = true,
+	coffee_has_one = true,
+	shutter_closed = true,
+}
+const REFUSAL_SOUND = "error"
+const TOAST_SOUND = "toast"
 const GOOD: { [string]: boolean } = {
 	upgrade_bought = true,
 	ingredient_unlocked = true,
@@ -156,6 +182,7 @@ const HudController = Modux.Controller("HudController", {
 		"VitalController",
 		"InputController",
 		"CustomerController",
+		"AudioController",
 	},
 	Priority = 500,
 })
@@ -235,15 +262,17 @@ function HudController:PushToast(kind: string, value: number)
 		return
 	end
 	const toastKind: Toast.Kind = if ALERT[kind] then "Alert" elseif GOOD[kind] then "Good" else "Info"
-	self:PushText(text, toastKind)
+	if self:PushText(text, toastKind) then
+		self.Dependencies.AudioController:Play(if REFUSAL[kind] then REFUSAL_SOUND else TOAST_SOUND)
+	end
 end
 
--- One toast line; the same text already queued is dropped
-function HudController:PushText(text: string, toastKind: Toast.Kind)
+-- One toast line; the same text already queued is dropped (false)
+function HudController:PushText(text: string, toastKind: Toast.Kind): boolean
 	const list = table.clone(self.Toasts())
 	for _, entry in list do
 		if entry.Text == text then
-			return
+			return false
 		end
 	end
 	if #list >= MAX_TOASTS then
@@ -252,6 +281,7 @@ function HudController:PushText(text: string, toastKind: Toast.Kind)
 	end
 	table.insert(list, { Text = text, Kind = toastKind, Duration = TOAST_DURATION })
 	self.Toasts(list)
+	return true
 end
 
 function HudController:ToastDone(entry: ToastStack.Entry)

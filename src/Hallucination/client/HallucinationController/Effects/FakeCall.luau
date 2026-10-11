@@ -12,6 +12,7 @@ const PHONE_ACTION = "answer_phone"
 const LIGHT_NAME = "Light_Ring"
 const LAMP_SUFFIX = "_Lamp"
 const RING_KEY = "phone_ring"
+const GLITCH_KEY = "phone_glitch" -- the "line" of the fake call: glitched phone noise (user request 2026-10-10)
 const SPEAKER = "Walt"
 const TEXT = "..." -- ui-text.md §12.4 "Walt: ..."
 const RING_TIME = 3.5 -- s: about two rings
@@ -121,6 +122,7 @@ const FakeCall: Context.Effect = {
 			return
 		end
 		env.Subtitle(SPEAKER, TEXT)
+		env.Sound(GLITCH_KEY, host)
 		const shown = os.clock()
 		while os.clock() - shown < LINE_TIME do
 			if not env.CallIdle() or not run:Wait(STEP) then

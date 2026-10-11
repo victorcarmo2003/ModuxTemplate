@@ -14,6 +14,10 @@
 	  - `Folder()` (Workspace.AnomalyEffects) holds local actors; emptied when the night ends (safety net: the server
 	    also clears the set).
 
+	  - stings (user request 2026-10-10, Content.SoundRules.Stings): AnomalyStart (horror_sting) when a record
+	    appears less than STING_FRESH s after its StartedAt (a late joiner hears nothing); AnomalyResolved
+	    (horror_chase_stop) when a live record turns Resolved. Both on screen with the DEC-173 scare cap.
+
 	Public reads: `Count` (Vide source, live occurrences), `RecordOf(id)`, `Occurrences(key?)`.
 ]]
 local CollectionService = game:GetService("CollectionService")
@@ -44,6 +48,8 @@ const ANCHOR_TAG = "AnomalyAnchor"
 const ANCHOR_ATTRIBUTE = "AnchorId"
 const FOLDER_NAME = "AnomalyEffects"
 const SEED_SPAN = 65536
+const STING_FRESH = 3 -- s: a record older than this when it reaches the client does not sting
+const STINGS = Content.SoundRules.Stings
 
 const AnomalyController = Modux.Controller("AnomalyController", {
 	Require = {
@@ -270,12 +276,24 @@ function AnomalyController:Write(id: number, raw: any?)
 	const record = copy(raw)
 	const live = self.Lives[id]
 	if live and live.Occurrence.Key == record.Anomaly then
+		const previous = Vide.untrack(live.Source).Phase
 		live.Source(record)
+		if record.Phase == "Resolved" and previous ~= "Resolved" then
+			self:Sting(STINGS.AnomalyResolved)
+		end
 		return
 	end
 	-- new record, or the cyclic id now carries another anomaly
 	self:Unmount(id)
 	self:Mount(id, record)
+	const fresh = Workspace:GetServerTimeNow() - record.StartedAt <= STING_FRESH
+	if fresh and record.Phase ~= "Resolved" and record.Phase ~= "Failed" then
+		self:Sting(STINGS.AnomalyStart)
+	end
+end
+
+function AnomalyController:Sting(key: string)
+	self.Dependencies.AudioController:Play(key, nil, { Scare = true })
 end
 
 -- Reactive read of a record (nil = no such occurrence). For other controllers and debugging.

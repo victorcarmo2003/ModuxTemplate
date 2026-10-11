@@ -6,6 +6,7 @@ local Rules = require(StarterPlayer.StarterPlayerScripts.client.Interaction.Prom
 
 export type Public = {
 	Gui: Instance?,
+	HoldSound: Sound?,
 	HoldThread: thread?,
 	Holding: Prompt.Prompt?,
 	LastFire: number,

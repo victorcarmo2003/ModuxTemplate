@@ -18,6 +18,9 @@
 	    through the door need the server copy of the leaf with CanCollide false (map binding).
 	  * Leaf parts must be Anchored (an unanchored leaf is skipped with a warning).
 
+	  * Sound (user request 2026-10-10): `door_creak` when it starts to open, `door_close` when it starts to close,
+	    from the closed leaf centre (AudioController, spatial).
+
 	No input, no packet, never writes a set.
 ]]
 local CollectionService = game:GetService("CollectionService")
@@ -35,6 +38,8 @@ const SWING_ANGLE = 90 -- degrees
 const MAX_LEAF_WIDTH = 10 -- studs; wider = the wall itself got the tag
 const TICK_RATE = 10
 const LEAF_PATTERN = "leaf"
+const OPEN_SOUND = "door_creak"
+const CLOSE_SOUND = "door_close"
 
 type Leaf = {
 	Part: BasePart,
@@ -57,7 +62,7 @@ type Door = {
 	Overlap: OverlapParams,
 }
 
-const DoorController = Modux.Controller("DoorController", { Priority = 300 })
+const DoorController = Modux.Controller("DoorController", { Require = { "AudioController" }, Priority = 300 })
 
 function DoorController:Setup()
 	self.Doors = {} :: { [Instance]: Door }
@@ -253,6 +258,7 @@ function DoorController:Animate(door: Door, open: boolean, from: Vector3?)
 		{ Value = goal }
 	)
 	door.Tween = tween
+	self.Dependencies.AudioController:Play(if open then OPEN_SOUND else CLOSE_SOUND, door.Closed.Position)
 	if not open then
 		tween.Completed:Connect(function(state)
 			if state == Enum.PlaybackState.Completed and not door.Open then

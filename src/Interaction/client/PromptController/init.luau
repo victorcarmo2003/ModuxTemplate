@@ -18,6 +18,9 @@
 	`Vitals[me].State` is not Active; anchors on the local character (own `Prompt_Give`) are never candidates;
 	`PromptText` changes ("Take Coffee") update the pill live and cancel a hold in progress; `give_coffee` is
 	pre-checked against the mate's state and equipped Tool.
+
+	Sound (user request 2026-10-10): `prompt_hold` (Ui) plays on screen while a hold is in progress and stops when it
+	ends (released, cancelled or fired).
 ]]
 local Players = game:GetService("Players")
 local CollectionService = game:GetService("CollectionService")
@@ -37,10 +40,11 @@ const BIND_NAME = "Interact"
 const MIN_FIRE_INTERVAL = 1 / 8
 const TOUCH_SIZE = 72
 const KEY_LABEL = { KeyboardMouse = "E", Gamepad = "X", Touch = "" }
+const HOLD_SOUND = "prompt_hold"
 
 const PromptController = Modux.Controller(
 	"PromptController",
-	{ Require = { "InputController", "RoundController" }, Priority = 620 }
+	{ Require = { "InputController", "RoundController", "AudioController" }, Priority = 620 }
 )
 
 function PromptController:Setup()
@@ -48,6 +52,7 @@ function PromptController:Setup()
 	self.Target = nil :: Prompt.Prompt?
 	self.Holding = nil :: Prompt.Prompt?
 	self.HoldThread = nil :: thread?
+	self.HoldSound = nil :: Sound?
 	self.LastFire = 0 :: number
 	self.Gui = nil :: Instance?
 end
@@ -119,6 +124,11 @@ function PromptController:CancelHold()
 		self.Holding = nil
 		Prompt.SetHolding(holding, false)
 	end
+	const sound = self.HoldSound
+	if sound then
+		self.HoldSound = nil
+		sound:Stop()
+	end
 end
 
 function PromptController:BeginHold(prompt: Prompt.Prompt)
@@ -133,6 +143,7 @@ function PromptController:BeginHold(prompt: Prompt.Prompt)
 
 	self.Holding = prompt
 	Prompt.SetHolding(prompt, true)
+	self.HoldSound = self.Dependencies.AudioController:Play(HOLD_SOUND)
 	const id, action, text = prompt.Id, prompt.Target.Action, prompt.Text()
 	self.HoldThread = task.delay(prompt.Hold, function()
 		self.HoldThread = nil

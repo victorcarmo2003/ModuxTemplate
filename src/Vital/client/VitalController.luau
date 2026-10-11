@@ -26,6 +26,10 @@
 	second and only on change; a drop of up to 2 x DarkPerSecond counts as a dark tick, and the dark holds for
 	DARK_HOLD seconds after the last one. Bigger drops (anomaly, broken rule) do not light the dark vignette.
 	Swap for `Zones.IsLit(HRP)` over the `Lights` set when TASK-059 lands.
+
+	Anomaly seen (user request 2026-10-10): the server sends no event for VitalService:SeeAnomaly, so a single drop of
+	at least Sanity.SeeAnomaly and below Sanity.RuleBroken (dark ticks are <= 2 x DarkPerSecond) plays
+	SoundRules.Stings.AnomalySeen (anomaly_see) on screen with the DEC-173 cap. Provisional: a packet would be exact.
 ]]
 local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
@@ -83,7 +87,7 @@ local function approach(current: number, target: number, dt: number): number
 	return current + (target - current) * alpha
 end
 
-const VitalController = Modux.Controller("VitalController", { Priority = 800 })
+const VitalController = Modux.Controller("VitalController", { Require = { "AudioController" }, Priority = 800 })
 
 function VitalController:Setup()
 	self.Sanity = Vide.source(0) :: Vide.Source<number>
@@ -133,6 +137,12 @@ function VitalController:ApplySanity(value: number, max: number)
 	if max > 0 and previousMax > 0 and value < previous then
 		if previous - value <= Content.Sanity.DarkPerSecond * 2 then
 			self.DarkTickAt = os.clock()
+		end
+	end
+	if max > 0 and previousMax > 0 then
+		const drop = previous - value
+		if drop >= Content.Sanity.SeeAnomaly and drop < Content.Sanity.RuleBroken then
+			self.Dependencies.AudioController:Play(Content.SoundRules.Stings.AnomalySeen, nil, { Scare = true })
 		end
 	end
 	if max <= 0 then

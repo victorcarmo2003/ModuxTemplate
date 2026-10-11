@@ -472,3 +472,46 @@ Reusos nas cutscenes: buzina (SFX-112), motor (SFX-110), ônibus (SFX-111), celu
 | Chuva no trailer (ANM-005, sabor; DEC-195 manda o game-designer classificar) | **entra** como VFX + SFX-144 (efeito temporário de área, sem sistema novo); "Thank you, dear." entra como balão, sem som; "pedidos esfriam" entra só como VFX |
 | Export do AnimalPlane (`Bell`, `Pop`, `ClickHover`, `ChargeUp`; `Q-045`) | se vier, cobre SFX-001/002/008/009/022 |
 | Humor dinâmico (DEC-187, `Q-164`) | sem som novo até o desenho; usa SFX-045 a SFX-048 |
+
+## 9. Chaves ligadas aos uploads do usuário (2026-10-10, segundo lote)
+
+Pedido do usuário (2026-10-10). Ids em `src/Shared/Content/Sounds.luau` (`UPLOADED` para Sfx/Ui, `Id` direto para ambiente).
+No Studio, cada Sound de `ReplicatedStorage.Assets.SFX/AmbientSFX/Musics` agora tem o **nome da chave** (lista e nomes originais em
+`docs/art/credits.md`). Chaves **novas** marcadas com ★.
+
+| Chave | Grupo / volume | Onde toca (client) |
+|---|---|---|
+| `coffee_brew` (loop), `coffee_ready` | Sfx 0,6 | `KitchenController/Coffee` |
+| `coffee_drink` | Sfx 0,6 | **sem chamada no client ainda** |
+| `serve`, `tip`, `order_take`, `cust_happy`, `cust_complain`, `cust_wrong`, `cust_leave`, `refuse` | Sfx 0,6 | `CustomerController` (reações), `EconomyController` (`tip`) |
+| `thief_open`, `thief_caught` | Sfx 0,6 | **sem chamada no client ainda** (`ThiefController`) |
+| `walker_step`, `post_buzz` | Sfx 0,6 | ANM-007 (Walker) |
+| `prompt_done`, `summary` | Ui 0,5 | `CutsceneController` (`prompt_done`); `summary` ainda sem chamada |
+| `door_knock`, `curtain`, `roof_step`, `shadow_whoosh`, `smoke_poof`, `whisper`, `splash` | Sfx 0,6 | efeitos de anomalia/alucinação/cutscene que já pedem a chave |
+| `switch_click`, `revive`, `faint` | Sfx 0,6 | **sem chamada no client ainda** |
+| `amb_clock_tick`, `amb_fog` | Ambient 0,4 (loop) | ANM-003 / ANM-010 |
+| `door_creak`, ★`door_close` | Sfx 0,6 | ANM-009 (`door_creak`); `DoorController`: abre = `door_creak`, fecha = `door_close` |
+| `car_honk_soft` | Sfx 0,6 | ANM-008 cue `car_honk` |
+| ★`car_honk_goofy` | Sfx **1,0**, alcance 160 studs, **fora** do teto de susto | ANM-008: a SUV estaciona e o farol alto acende pela 1ª vez (susto cômico; quem entra atrasado com o farol já aceso não ouve) |
+| ★`phone_hangup` | Sfx 0,6 | `BossController`: fim da ligação (Talking → outro estado), no alto-falante do telefone |
+| ★`phone_glitch` | Sfx 0,6 | alucinação `FakeCall`: junto com a legenda "Walt: ..." |
+| ★`anomaly_see` | Sfx tela 0,5, teto de susto | `VitalController`: queda única de sanidade ≥ `SeeAnomaly` e < `RuleBroken` (o servidor não manda evento de "viu"; heurística Provisória) |
+| ★`horror_sting` | Sfx tela 0,4, teto de susto | `AnomalyController`: registro novo de anomalia (≤ 3 s do início; entrou atrasado não ouve) |
+| ★`horror_chase_stop` | Sfx tela 0,4, teto de susto | `AnomalyController`: anomalia vira `Resolved` |
+| ★`jumpscare` | Sfx tela 0,5, teto de susto | ANM-007: último passo do Walker (WALKER-10, N7 falhando) |
+| ★`horror_dramatic` | Sfx tela 0,5, teto de susto | `AudioController`: entrada na fase `NightLost` |
+| ★`scary_violins` | Sfx tela 0,4, teto de susto | `AudioController`: janela da noite vira `Last` (5–6 AM) |
+| ★`amb_horror` | Ambient 0,4, loop com crossfade | `AudioController`: camada **por cima** da rua na janela `Last` (`Rules.Tension`; o client não vê `NpcService.Tension`, Provisório) |
+| ★`error` | Ui 0,5 | `HudController`: toast de recusa (hands_full, not_enough_cash, grill_full, ...); os outros toasts tocam `toast` |
+| ★`prompt_hold` | Ui 0,35 | `PromptController`: toca durante o hold, para ao soltar/cancelar/concluir |
+| ★`ui_click` | Ui 0,4 | `ClassController` (tela Crew): foco em outro card, ação e fechar |
+
+Regras dos stingers: `Content.SoundRules.Stings` e `Content.SoundRules.Tension` (validados em `Validate.luau`).
+
+**Conflito a registrar (secretário):** `horror_sting` (anomalia começa) e `anomaly_see` (jogador vê anomalia) contrariam o §6
+("Ver anomalia: sem som"; "música não muda quando uma anomalia aparece") e o style guide §4.4 (**Aprovado**, DEC-126): o som aponta que
+há anomalia. Foram ligados por pedido do usuário em 2026-10-10; precisam de DEC para valer sobre o §4.4 (ou saem trocando a chave em
+`Rules.Stings` por uma sem id).
+
+Ainda sem id (silêncio): `drawer`, `upgrade_done`, `trash`, `phone_pickup`, `car_engine`, `hit_boing`, `siren_soft`, `post_tunk`,
+`hotdog_assemble`, `post_click`, `neon_click`, `skip_vote`.

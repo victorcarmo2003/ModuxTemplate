@@ -33,6 +33,7 @@ export type Public = {
 	Mount: (self: Public, id: number, record: Record) -> (),
 	Unmount: (self: Public, id: number) -> (),
 	Write: (self: Public, id: number, raw: any?) -> (),
+	Sting: (self: Public, key: string) -> (),
 	RecordOf: (self: Public, id: number) -> Record?,
 	OnCue: (self: Public, raw: any) -> (),
 	WatchNight: (self: Public) -> (),

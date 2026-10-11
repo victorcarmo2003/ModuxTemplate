@@ -127,6 +127,8 @@ function BossController:Apply(record: Record)
 	end)
 	if previous == "Ringing" and record.State == "Talking" then
 		self:PlayOnce("phone_pickup")
+	elseif previous == "Talking" and record.State ~= "Talking" then
+		self:PlayOnce("phone_hangup") -- end of the call (user request 2026-10-10)
 	end
 	self:Refresh()
 end

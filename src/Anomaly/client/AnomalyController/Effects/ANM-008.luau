@@ -73,6 +73,10 @@ const VEHICLE_TAG = "Vehicle"
 const FLASH = { { false, 0.15 }, { true, 0.2 }, { false, 0.15 }, { true, 0 } }
 const HONK_SPEED = 0.75 -- lower pitch: "buzina grave, curta, baixa" (SFX-154 has no key yet)
 const HONK_VOLUME = 0.8
+-- Comic scare (user request 2026-10-10): `car_honk_goofy` at full row volume (not opts.Scare: outside the DEC-173 cap)
+-- the first time the beam turns on with the car parked. A car already parked with the beam on when this client
+-- mounts it (late joiner) does not honk.
+const GOOFY_HONK = "car_honk_goofy"
 
 -- Trailer blackout (cue trailer_blackout): groups of the trailer, lamp look when off (LightController's)
 const BLACKOUT_GROUPS = { "trailer_interior", "trailer_lights" }
@@ -100,6 +104,7 @@ type CarState = {
 	Flashing: boolean, -- beam forced by the flash sequence
 	FlashOn: boolean,
 	Parked: boolean, -- already placed on the spot
+	Honked: boolean, -- goofy honk already played (or skipped for a late joiner)
 	LeaveAt: number?, -- server time the car starts to pull out
 	TurnLength: number,
 	Orphan: boolean, -- the record left the set
@@ -377,6 +382,7 @@ local function buildCar(ctx: Effect.Context, occ: Effect.Occurrence): CarState
 		Flashing = false,
 		FlashOn = false,
 		Parked = false,
+		Honked = ctx.Now() - startedAt > ARRIVE_TIME and Vide.untrack(occ.Record).Phase == "Active",
 		LeaveAt = nil,
 		TurnLength = curveLength(l0, l1, l2),
 		Orphan = false,
@@ -463,6 +469,10 @@ local function step(state: CarState, occId: number)
 		beam = parked and state.FlashOn
 	end
 	setBeam(state, beam)
+	if beam and not state.Honked then
+		state.Honked = true
+		state.Ctx.Audio:Play(GOOFY_HONK, state.Body)
+	end
 	if parked then
 		-- parked pose is fixed: move only once after arriving
 		if not state.Parked then

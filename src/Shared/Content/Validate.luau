@@ -821,6 +821,19 @@ local function checkMedia()
 			fail("SoundRules", nil, nil, `AmbientOff '{phase}' not in Shift`)
 		end
 	end
+	const tension = Sounds.ByKey[rules.Tension.Key]
+	if tension == nil or tension.Group ~= "Ambient" or not tension.Looped then
+		fail("SoundRules", nil, rules.Tension.Key, `Tension '{rules.Tension.Key}' is not a looped Ambient sound`)
+	end
+	if (Nights.Windows :: any)[rules.Tension.Window] == nil then
+		fail("SoundRules", nil, nil, `Tension.Window '{rules.Tension.Window}' not in Nights.Windows`)
+	end
+	for field, key in rules.Stings :: any do
+		const sound = Sounds.ByKey[key]
+		if sound == nil or sound.Looped then
+			fail("SoundRules", nil, key, `Stings.{field} '{key}' is not a one-shot sound`)
+		end
+	end
 end
 
 local function checkWave2Records()

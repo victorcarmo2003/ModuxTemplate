@@ -25,6 +25,12 @@
 	  SoundRules.AmbientOff phases); inside a LightZone of SoundRules.AmbientZones (LZ-4 = Mart interior, character
 	  position, AMBIENT_RATE Hz) that zone's bed replaces the street. Each bed is a crossfaded loop of two copies
 	  (Bed.luau, Sound.Crossfade); a change of bed crossfades too. Beds are apart from the MaxVoices pool, like music.
+	- Tension layer (user request 2026-10-10): SoundRules.Tension.Key (amb_horror) plays as a second crossfaded bed
+	  on top of the street while the night window is SoundRules.Tension.Window ("Last", 5-6 AM) and a street/zone bed
+	  plays. Provisional: the client does not see NpcService.Tension, so the window stands in for it.
+	- Stings (SoundRules.Stings): NightLost on entering the NightLost phase, LastWindow on the window turning
+	  Tension.Window. Only on a change this client saw (a late joiner hears nothing). The anomaly stings are played by
+	  AnomalyController / VitalController.
 	- Ducking: while the Call set (network.md §13.3, record 1) is "Talking", the Music group goes to
 	  SoundRules.DuckOnCall.
 	- Id "" = silence: Play/Loop return nil, no error and no warn (every Id is "" until Q-168). An unknown key warns
@@ -125,6 +131,11 @@ function AudioController:Setup()
 	-- ZoneId -> LightZone part (rescanned when it leaves the Workspace)
 	self.ZoneParts = {} :: { [string]: BasePart }
 	self.Unmount = nil :: (() -> ())?
+	-- tension layer bed (nil = off)
+	self.TensionBed = nil :: AmbientBed?
+	-- last phase / night window seen (nil = nothing seen yet: no sting on the first read)
+	self.SeenPhase = nil :: string?
+	self.SeenWindow = nil :: string?
 end
 
 function AudioController:WarnOnce(tag: string, message: string)
@@ -620,6 +631,45 @@ function AudioController:SetAmbient(key: string?)
 	self.Bed = Bed.start(row, screen, self.Groups.Ambient)
 end
 
+-- Tension layer on/off (crossfaded bed over the street, SoundRules.Tension)
+function AudioController:SetTension(on: boolean)
+	if (self.TensionBed ~= nil) == on then
+		return
+	end
+	if not on then
+		const bed = self.TensionBed
+		self.TensionBed = nil
+		if bed then
+			bed.Stop()
+		end
+		return
+	end
+	const row = self:Row(RULES.Tension.Key)
+	const screen = self.Screen
+	if row == nil or screen == nil then
+		return
+	end
+	self.TensionBed = Bed.start(row, screen, self.Groups.Ambient)
+end
+
+-- Phase / window stings, only on a change seen by this client
+function AudioController:OnStingState(phase: string, window: string?)
+	const previousPhase = self.SeenPhase
+	const previousWindow = self.SeenWindow
+	self.SeenPhase = phase
+	self.SeenWindow = window
+	if previousPhase ~= nil and phase ~= previousPhase and phase == "NightLost" then
+		self:Play(RULES.Stings.NightLost, nil, { Scare = true })
+	end
+	if
+		previousWindow ~= nil
+		and window ~= previousWindow
+		and window == RULES.Tension.Window
+	then
+		self:Play(RULES.Stings.LastWindow, nil, { Scare = true })
+	end
+end
+
 function AudioController:ZonePart(id: string): BasePart?
 	const cached = self.ZoneParts[id]
 	if cached and cached:IsDescendantOf(Workspace) then
@@ -720,6 +770,16 @@ AudioController:OnStart(function(self)
 				end
 				self:SetMusic(cue)
 				self:SetAmbient(ambient)
+				self:SetTension(ambient ~= nil and state.IsNight and state.Window == RULES.Tension.Window)
+				return nil
+			end)
+		end)
+		Vide.effect(function()
+			const ready = round.Ready()
+			const phase = round.Phase()
+			const window = (round.NightWindow :: () -> ("Calm" | "Last" | "Shift")?)()
+			Vide.untrack(function()
+				self:OnStingState(if ready then phase else "", window)
 				return nil
 			end)
 		end)

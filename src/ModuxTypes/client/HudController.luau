@@ -68,7 +68,7 @@ export type Public = {
 	Setup: (self: Public) -> (),
 	NoticeText: (self: Public, kind: string, value: number) -> string?,
 	PushToast: (self: Public, kind: string, value: number) -> (),
-	PushText: (self: Public, text: string, toastKind: Toast.Kind) -> (),
+	PushText: (self: Public, text: string, toastKind: Toast.Kind) -> boolean,
 	ToastDone: (self: Public, entry: ToastStack.Entry) -> (),
 	CancelReport: (self: Public) -> (),
 	HideReport: (self: Public) -> (),

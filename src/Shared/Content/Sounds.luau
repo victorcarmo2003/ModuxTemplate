@@ -55,6 +55,24 @@ export type SoundRules = {
 	Ambient: ShiftAmbient, -- street ambience looped through the shift
 	AmbientZones: { [string]: string }, -- LightZone ZoneId -> Ambient key that replaces the street inside it
 	AmbientOff: { string }, -- keys of Shift without street ambience (cutscenes, end of run)
+	-- horror layer on top of the street bed (user request 2026-10-10): the client has no NpcService.Tension, so it
+	-- follows the night window (Nights.Windows) instead. Provisional.
+	Tension: TensionLayer,
+	Stings: Stings,
+}
+
+export type TensionLayer = {
+	Key: string, -- key of Sounds (Group Ambient, looped, crossfaded like the other beds)
+	Window: string, -- key of Nights.Windows where the layer plays
+}
+
+-- one-shot stingers keyed by game event (keys of Sounds; user request 2026-10-10)
+export type Stings = {
+	AnomalyStart: string, -- a fresh anomaly record appears (AnomalyController)
+	AnomalyResolved: string, -- an anomaly goes Resolved (AnomalyController)
+	AnomalySeen: string, -- own sanity drops by the SeeAnomaly penalty (VitalController)
+	NightLost: string, -- phase NightLost starts (AudioController)
+	LastWindow: string, -- night window turns Tension.Window (AudioController)
 }
 
 export type ShiftPool = {
@@ -97,7 +115,8 @@ local function ambient(key: string, spatial: boolean, id: string?, ref: string?)
 	}
 end
 
--- SFX uploaded by the user (ReplicatedStorage.Assets.SFX, 2026-10-10); key -> rbxassetid
+-- SFX uploaded by the user (ReplicatedStorage.Assets.SFX, 2026-10-10; the Sound in Studio is named after the key,
+-- a Sound shared by two keys carries the attribute `Keys`); key -> rbxassetid
 const UPLOADED: { [string]: string } = {
 	grill_sizzle = "rbxassetid://6383276435",
 	grill_drop = "rbxassetid://126425746730419",
@@ -111,28 +130,79 @@ const UPLOADED: { [string]: string } = {
 	buy = "rbxassetid://135428907715078",
 	phone_ring = "rbxassetid://94426589952590",
 	toast = "rbxassetid://82845990304289",
+	-- second batch (2026-10-10)
+	coffee_drink = "rbxassetid://9119956292",
+	coffee_brew = "rbxassetid://365956378",
+	coffee_ready = "rbxassetid://9113797219",
+	serve = "rbxassetid://9120360136",
+	tip = "rbxassetid://136997066809686",
+	cust_complain = "rbxassetid://117138471132867",
+	cust_wrong = "rbxassetid://117138471132867",
+	cust_happy = "rbxassetid://78566355879660",
+	order_take = "rbxassetid://5646714647",
+	cust_leave = "rbxassetid://136969027013552",
+	thief_open = "rbxassetid://9098369357",
+	thief_caught = "rbxassetid://9066673412",
+	walker_step = "rbxassetid://132709106261511",
+	refuse = "rbxassetid://87519554692663",
+	error = "rbxassetid://87519554692663",
+	prompt_hold = "rbxassetid://130114397986399",
+	prompt_done = "rbxassetid://6586979979",
+	summary = "rbxassetid://85797456007679",
+	switch_click = "rbxassetid://139658322785649",
+	door_knock = "rbxassetid://9114141961",
+	curtain = "rbxassetid://320662396",
+	roof_step = "rbxassetid://73343053773763",
+	shadow_whoosh = "rbxassetid://112608566235074",
+	smoke_poof = "rbxassetid://18319185077",
+	whisper = "rbxassetid://1228230799",
+	splash = "rbxassetid://18816874251",
+	revive = "rbxassetid://78076438768803",
+	faint = "rbxassetid://1604497989",
+	door_creak = "rbxassetid://125209584906878",
+	door_close = "rbxassetid://140470748655921",
+	car_honk_soft = "rbxassetid://81569612419754",
+	car_honk_goofy = "rbxassetid://132205340213071",
+	phone_hangup = "rbxassetid://18979737221",
+	post_buzz = "rbxassetid://9043345732",
+	anomaly_see = "rbxassetid://139376960218145",
+	jumpscare = "rbxassetid://127224418529132",
+	horror_sting = "rbxassetid://1014740409",
+	horror_dramatic = "rbxassetid://72200450832308",
+	scary_violins = "rbxassetid://6080419021",
+	phone_glitch = "rbxassetid://140367728848843",
+	horror_chase_stop = "rbxassetid://123355946453444",
+	ui_click = "rbxassetid://127105730240202",
 }
 
-local function sfx(key: string, looped: boolean?): Sound
+-- Per-row overrides of the sfx() defaults
+export type SfxOptions = {
+	Volume: number?,
+	Spatial: boolean?,
+	MaxDistance: number?,
+}
+
+local function sfx(key: string, looped: boolean?, opts: SfxOptions?): Sound
+	const spatial = if opts and opts.Spatial ~= nil then opts.Spatial else true
 	return {
 		Key = key,
 		Id = UPLOADED[key] or "",
 		Group = "Sfx",
-		Volume = 0.6,
+		Volume = if opts and opts.Volume then opts.Volume else 0.6,
 		Looped = looped == true,
-		Spatial = true,
-		MaxDistance = 60,
+		Spatial = spatial,
+		MaxDistance = if not spatial then 0 elseif opts and opts.MaxDistance then opts.MaxDistance else 60,
 		Ref = "",
 		Crossfade = 0,
 	}
 end
 
-local function ui(key: string): Sound
+local function ui(key: string, volume: number?): Sound
 	return {
 		Key = key,
 		Id = UPLOADED[key] or "",
 		Group = "Ui",
-		Volume = 0.5,
+		Volume = volume or 0.5,
 		Looped = false,
 		Spatial = false,
 		MaxDistance = 0,
@@ -155,8 +225,10 @@ const base = Table.new({
 	ambient("amb_night_street", false, "rbxassetid://98652860867664", "NightCrickets (Axiom Project Studio upload)"),
 	-- inside the Mart (LZ-4), replaces the street bed (Rules.AmbientZones)
 	ambient("amb_mart_hum", false, "rbxassetid://121312424334285", "SuperMarket Ambient (Axiom Project Studio upload)"),
-	ambient("amb_clock_tick", true), -- C-01
-	ambient("amb_fog", false), -- N10
+	ambient("amb_clock_tick", true, "rbxassetid://9043366464", "Clock(Looped) (user upload)"), -- C-01
+	ambient("amb_fog", false, "rbxassetid://9118748093", "Ambient Fog (user upload)"), -- N10
+	-- horror layer over the street bed in the tense window (Rules.Tension)
+	ambient("amb_horror", false, "rbxassetid://88784462446827", "HorrorAmbient (user upload)"),
 	-- Sfx
 	sfx("grill_sizzle", true),
 	sfx("bun_slice"),
@@ -208,11 +280,26 @@ const base = Table.new({
 	sfx("post_click"),
 	sfx("neon_click"),
 	sfx("shadow_whoosh"),
+	-- second batch (user request 2026-10-10)
+	sfx("door_close"),
+	sfx("car_honk_goofy", false, { Volume = 1, MaxDistance = 160 }), -- comic scare on the N8 SUV, outside the scare cap
+	sfx("phone_hangup"),
+	-- horror stingers: on screen (not spatial)
+	sfx("anomaly_see", false, { Spatial = false, Volume = 0.5 }),
+	sfx("jumpscare", false, { Spatial = false, Volume = 0.5 }),
+	sfx("horror_sting", false, { Spatial = false, Volume = 0.4 }),
+	sfx("horror_dramatic", false, { Spatial = false, Volume = 0.5 }),
+	sfx("scary_violins", false, { Spatial = false, Volume = 0.4 }),
+	sfx("phone_glitch"),
+	sfx("horror_chase_stop", false, { Spatial = false, Volume = 0.4 }),
 	-- Ui
 	ui("toast"),
 	ui("summary"),
 	ui("prompt_done"),
 	ui("skip_vote"),
+	ui("error"),
+	ui("prompt_hold", 0.35),
+	ui("ui_click", 0.4),
 	-- Voice: empty in the MVP (subtitles without voice)
 } :: { Sound })
 
@@ -237,6 +324,14 @@ const rules: SoundRules = {
 	Ambient = { Day = "amb_day_street", Night = "amb_night_street" },
 	AmbientZones = { ["LZ-4"] = "amb_mart_hum" }, -- MAP-01 §10.2: LZ-4 = Mart interior
 	AmbientOff = { "Intro", "Finale", "RunEnd" },
+	Tension = { Key = "amb_horror", Window = "Last" }, -- 5-6 AM (Provisional: no Tension on the client)
+	Stings = {
+		AnomalyStart = "horror_sting",
+		AnomalyResolved = "horror_chase_stop",
+		AnomalySeen = "anomaly_see",
+		NightLost = "horror_dramatic",
+		LastWindow = "scary_violins",
+	},
 }
 
 return Table.with(base, {

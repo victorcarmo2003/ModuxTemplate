@@ -23,6 +23,7 @@
 	  post_flicker  entity = post Order of the new step (0 = WALKER-10: the last post he left flickers). Local dim of
 	                the lamp (LocalTransparencyModifier + Light.Brightness): LightController keeps Material/Enabled.
 	  walker_step   entity = step: one muffled heavy step from his spot (the last step, WALKER-10, marked opts.Scare, DEC-173 cap).
+	                The last step also plays `jumpscare` on screen (Scare cap).
 
 	PROVISIONAL (frontend-coder, TASK-116): Part placeholder until AST-064 ships (TASK-124): tall dark "high
 	trapezoid" (#14162A, ~7 studs, wide-brim hat, coat opening like a skirt, no arms, no ears, no face, resembles no
@@ -485,6 +486,10 @@ const Walker: Effect.Module = {
 		elseif cue.Cue == "walker_step" then
 			const step = math.clamp(math.floor(cue.Entity), 0, STEPS)
 			ctx.Play("walker_step", spotOf(ctx, step), step >= STEPS)
+			if step >= STEPS then
+				-- last step (WALKER-10, N7 failing): jumpscare on screen, DEC-173 cap (user request 2026-10-10)
+				ctx.Play("jumpscare", nil, true)
+			end
 		end
 	end,
 }

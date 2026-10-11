@@ -87,3 +87,63 @@ Faixas enviadas pelo usuário ao grupo do jogo ("Axiom Project Studio"); licenç
 | MoneySpend | 135428907715078 | `buy` |
 | PhoneRinging | 94426589952590 | `phone_ring` |
 | Notification | 82845990304289 | `toast` |
+
+Em 2026-10-10 os Sounds de `ReplicatedStorage.Assets.SFX`, `.AmbientSFX` e `.Musics` foram **renomeados para a chave** de
+`Content.Sounds` (pedido do usuário; o nome original ficou no atributo `OriginalName`; Sound usado por duas chaves tem o nome
+da primeira + atributo `Keys`).
+
+## SFX, segundo lote (2026-10-10, uploads do usuário; licença a confirmar)
+
+Mesma regra das tabelas acima: origem e licença de cada arquivo sob responsabilidade do usuário (**licença a confirmar**).
+IDs baixos (365956378, 320662396, 1228230799, 1014740409, 6080419021, 1604497989, 5646714647, 6586979979 e os 90xxxxxxxx/91xxxxxxxx) parecem da
+biblioteca de áudio do Roblox: se forem, vão para "Recursos da plataforma" com o ID; se o dono não for o grupo do jogo,
+conferir se o áudio está público/liberado para a experiência (senão não toca).
+
+| Nome original | Asset ID | Chave(s) |
+|---|---|---|
+| CoffeeSip | 9119956292 | `coffee_drink` |
+| CoffeeBrew | 365956378 | `coffee_brew` (loop) |
+| CoffeeMug | 9113797219 | `coffee_ready` |
+| Serve | 9120360136 | `serve` |
+| Tip | 136997066809686 | `tip` |
+| AngryMumble | 117138471132867 | `cust_complain`, `cust_wrong` |
+| HappyMumble | 78566355879660 | `cust_happy` |
+| AskingMumble | 5646714647 | `order_take` |
+| ImpacientMumble | 136969027013552 | `cust_leave` |
+| Thief Laugh | 9098369357 | `thief_open` |
+| Thief Punch | 9066673412 | `thief_caught` |
+| Step | 132709106261511 | `walker_step` |
+| Error | 87519554692663 | `refuse`, `error` |
+| ChargeUp | 130114397986399 | `prompt_hold` |
+| Pop | 6586979979 | `prompt_done` |
+| Done | 85797456007679 | `summary` |
+| Switch | 139658322785649 | `switch_click` |
+| DoorNock | 9114141961 | `door_knock` |
+| Curtains | 320662396 | `curtain` |
+| RoofFootstep | 73343053773763 | `roof_step` |
+| Woosh | 112608566235074 | `shadow_whoosh` |
+| Poof | 18319185077 | `smoke_poof` |
+| Whisper | 1228230799 | `whisper` |
+| Splash | 18816874251 | `splash` |
+| Clock(Looped) | 9043366464 | `amb_clock_tick` (loop) |
+| Ambient Fog | 9118748093 | `amb_fog` (loop) |
+| revive sound | 78076438768803 | `revive` |
+| Faint - Pizza Place | 1604497989 | `faint` |
+| Door Creak Open | 125209584906878 | `door_creak` |
+| door close | 140470748655921 | `door_close` |
+| chiikawa-car-honk | 81569612419754 | `car_honk_soft` (nome remete a personagem de terceiros: conferir origem/licença com atenção) |
+| Goofy car honk sound effect | 132205340213071 | `car_honk_goofy` |
+| phone-hang-up | 18979737221 | `phone_hangup` |
+| WalkerSpawn | 9043345732 | `post_buzz` |
+| AnomalySee | 139376960218145 | `anomaly_see` |
+| JumpScare | 127224418529132 | `jumpscare` |
+| horror sting | 1014740409 | `horror_sting` |
+| horror dramatic sound | 72200450832308 | `horror_dramatic` |
+| Scary Violins | 6080419021 | `scary_violins` |
+| GlitchedPhone | 140367728848843 | `phone_glitch` |
+| Stop HorrorChase | 123355946453444 | `horror_chase_stop` |
+| Keyboard Click | 127105730240202 | `ui_click` |
+
+| Nome original (AmbientSFX) | Asset ID | Chave |
+|---|---|---|
+| HorrorAmbient | 88784462446827 | `amb_horror` (camada de tensão, loop com crossfade) |

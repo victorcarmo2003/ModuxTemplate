@@ -33,6 +33,7 @@ const CLOSE = "CrewClose"
 const TOUCH_SIZE = 56
 const PENDING_TIMEOUT = 3 -- s without an answer: the button comes back (the server may have dropped it, 2/s)
 const PREVIEW_OUTFIT = "crew"
+const CLICK_SOUND = "ui_click"
 -- UI scale: 1 on the smallest landscape phone (panel 620 x 320 + margins), grows up to 2
 const BASE_WIDTH = 660
 const BASE_HEIGHT = 340
@@ -70,7 +71,7 @@ end
 
 const ClassController = Modux.Controller(
 	"ClassController",
-	{ Require = { "ProfileController", "InputController", "PlaceController" }, Priority = 450 }
+	{ Require = { "ProfileController", "InputController", "PlaceController", "AudioController" }, Priority = 450 }
 )
 
 function ClassController:Setup()
@@ -295,13 +296,19 @@ function ClassController:Mount(playerGui: Instance)
 				Busy = function()
 					return self:Busy()
 				end,
+				-- ui_click on every button of the Crew screen (user request 2026-10-10)
 				OnFocus = function(key: string)
+					if Vide.untrack(self.Focus) ~= key then
+						self.Dependencies.AudioController:Play(CLICK_SOUND)
+					end
 					self.Focus(key)
 				end,
 				OnAction = function(key: string)
+					self.Dependencies.AudioController:Play(CLICK_SOUND)
 					self:Act(key)
 				end,
 				OnClose = function()
+					self.Dependencies.AudioController:Play(CLICK_SOUND)
 					self:SetOpen(false)
 				end,
 				Rig = function(species: string): Model?
