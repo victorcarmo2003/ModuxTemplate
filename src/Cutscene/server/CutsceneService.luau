@@ -19,6 +19,10 @@
 -- Votes >= Needed = ceil(0.5 x connected participants), recomputed when someone leaves. Everything else in the
 -- beats (fade, text, lines, actors, look, prompt) is client presentation (CutsceneController, TASK-121).
 -- Traffic: TrafficService:Hold("cutscene", on) while a chain plays (runtime lookup: Traffic is not in Require).
+-- Ready gate (user feedback 2026-10-11: the start of the intro was lost under the client's loading): a chain does not
+-- start at Play. The participants are frozen and the record says Waiting (Scene "none") until every connected
+-- participant sent ClientReady (LoadingController: loading screen done) or Rules.ReadyTimeout s passed; then the
+-- first segment begins with StartedAt = now, so nobody misses its first beats.
 -- PROVISIONAL (TASK-120 note): side-by-side spacing on shared targets (Rules.LineSpacing); walk pace = Rules.Walk;
 -- intro end moves participants to their spawn point (PS-n, "at work"); chain ends when no participant is connected.
 local Players = game:GetService("Players")
@@ -183,6 +187,11 @@ function CutsceneService:Setup()
 	self.Traffic = nil :: TrafficHook?
 	-- Fired when a chain starts (scene key) and ends ("none")
 	self.Changed = self.Libs.Signal.new() :: SignalLib.Signal<string>
+	-- chain held for the participants' ClientReady (nil = none) and since when (os.clock)
+	self.Pending = nil :: string?
+	self.PendingSince = 0 :: number
+	-- players whose client finished loading (ClientReady)
+	self.Loaded = {} :: { [Player]: boolean }
 end
 
 -- Reads -----------------------------------------------------------------------------------------------------------
@@ -192,7 +201,23 @@ function CutsceneService:IsPlaying(): boolean
 end
 
 function CutsceneService:IsParticipant(player: Player): boolean
-	return self:IsPlaying() and table.find(self.Participants, player.UserId) ~= nil
+	return (self:IsPlaying() or self:IsWaiting()) and table.find(self.Participants, player.UserId) ~= nil
+end
+
+-- A chain is held for the participants' ClientReady
+function CutsceneService:IsWaiting(): boolean
+	return self.Pending ~= nil
+end
+
+-- Every connected participant finished loading (a disconnected one does not hold the others)
+function CutsceneService:AllLoaded(): boolean
+	for _, userId in self.Participants do
+		const player = self:Connected(userId)
+		if player ~= nil and not self.Loaded[player] then
+			return false
+		end
+	end
+	return true
 end
 
 function CutsceneService:SlotOf(userId: number): number?
@@ -248,6 +273,7 @@ function CutsceneService:Write()
 		StartedAt = if playing then self.StartedAt else 0,
 		Votes = if playing then math.clamp(self:VoteCount(), 0, MAX_WIRE) else 0,
 		Needed = if playing then math.clamp(self:Needed(), 0, MAX_WIRE) else 0,
+		Waiting = self.Pending ~= nil,
 	}
 	if self.Written then
 		self.Libs.Net.Cutscene:update(RECORD, record)
@@ -372,7 +398,8 @@ function CutsceneService:Place(player: Player, slot: number)
 	end
 end
 
--- Freeze every connected participant and place any body not yet placed in this segment
+-- Freeze every connected participant and place any body not yet placed in this segment (only freeze while the
+-- chain waits for ClientReady: there is no segment to place them in yet)
 function CutsceneService:Hold()
 	const characters = self.Dependencies.CharacterService
 	for slot, userId in self.Participants do
@@ -383,6 +410,9 @@ function CutsceneService:Hold()
 		if not self.Frozen[player] then
 			self.Frozen[player] = true
 			characters:Freeze(player, FREEZE_REASON, true)
+		end
+		if not self:IsPlaying() then
+			continue
 		end
 		const character = self:BodyOf(player)
 		if character ~= nil and not self.Placed[character] then
@@ -449,7 +479,7 @@ function CutsceneService:Play(key: string, owner: string?): boolean
 		warn(`[CutsceneService] no cutscene {key}`)
 		return false
 	end
-	if self:IsPlaying() then
+	if self:IsPlaying() or self:IsWaiting() then
 		self:Finish()
 	end
 	const runState = self.Dependencies.RunStateService
@@ -469,13 +499,47 @@ function CutsceneService:Play(key: string, owner: string?): boolean
 	self.Done = false
 	self:DressPoster()
 	self:HoldTraffic(true)
+	-- held until every participant's client is ready (Rules.ReadyTimeout at most)
+	self.Pending = key
+	self.PendingSince = os.clock()
+	self:Hold()
+	self:Write()
+	self:StepPending()
+	return true
+end
+
+-- Starts the held chain once every connected participant is loaded, or at the timeout
+function CutsceneService:StepPending()
+	const key = self.Pending
+	if key == nil then
+		return
+	end
+	const waited = os.clock() - self.PendingSince
+	if not self:AllLoaded() and waited < RULES.ReadyTimeout then
+		self:Hold()
+		return
+	end
+	if waited >= RULES.ReadyTimeout and not self:AllLoaded() then
+		warn(`[CutsceneService] {key}: starting after {RULES.ReadyTimeout} s without every ClientReady`)
+	end
+	self.Pending = nil
 	self:Begin(key)
 	self.Changed:Fire(key)
-	return true
 end
 
 -- Ends the chain: everyone free, traffic back, record idle. After the intro the party is "at work" (PS-n).
 function CutsceneService:Finish()
+	if self:IsWaiting() and not self:IsPlaying() then
+		-- held chain dropped before it started (phase over, nobody left, dev stop)
+		self.Pending = nil
+		self.Owner = nil
+		self.Done = true
+		self.Participants = {}
+		self:ReleaseAll()
+		self:HoldTraffic(false)
+		self:Write()
+		return
+	end
 	if not self:IsPlaying() then
 		self.Done = true
 		return
@@ -536,6 +600,14 @@ end
 
 -- Votes and Needed after a vote or a departure; enough votes end the segment
 function CutsceneService:Settle()
+	if self:IsWaiting() then
+		if self:ConnectedCount() == 0 then
+			self:Finish()
+		else
+			self:StepPending()
+		end
+		return
+	end
 	if not self:IsPlaying() then
 		return
 	end
@@ -552,6 +624,10 @@ function CutsceneService:Settle()
 end
 
 function CutsceneService:Step()
+	if self:IsWaiting() then
+		self:StepPending()
+		return
+	end
 	const scene = sceneOf(self.Scene)
 	if scene == nil then
 		return
@@ -572,7 +648,7 @@ end
 -- Round phases ------------------------------------------------------------------------------------------------------
 
 function CutsceneService:OnPhaseChanged(phase: string)
-	if self:IsPlaying() and self.Owner ~= nil and self.Owner ~= phase then
+	if (self:IsPlaying() or self:IsWaiting()) and self.Owner ~= nil and self.Owner ~= phase then
 		-- the phase cap (or a dev skip) ended the phase first
 		self:Finish()
 	end
@@ -593,6 +669,16 @@ end
 
 CutsceneService:OnInit(function(self)
 	self:Setup()
+	-- registered on every place: the client sends it wherever it loads
+	self.Libs.Net.ClientReady:onServer(function(_, player: Player)
+		self.Loaded[player] = true
+		if self.Enabled and self:IsWaiting() then
+			self:StepPending()
+		end
+	end)
+	Players.PlayerRemoving:Connect(function(player)
+		self.Loaded[player] = nil
+	end)
 	if not self.Dependencies.PlaceService:Is("Run") then
 		return
 	end

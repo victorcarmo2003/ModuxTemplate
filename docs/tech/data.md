@@ -550,3 +550,10 @@ captura a `SessionService:WriteSnapshot(snap)` (onda 4). Antes disso, captura s�
 | Back Bar (UPG-010) | `UpgradeService` (só trailer, escopo `Vehicle`) | como upgrade; ainda não vendido (sem TBL-6) |
 
 Nenhuma chave nova de snapshot, nenhum campo novo no perfil.
+
+### 5.7 Papéis de servidor e squad (TASK-154 a TASK-156; `architecture.md` §20; Provisório)
+
+**Nada novo é persistido.** Papel do servidor, squads do lobby e convites vivem só na memória do servidor do lobby;
+o roster da run vem do `TeleportData` (`network.md` §16.5) e fica no `RunStateService` como antes (§2.1). Sem
+MemoryStore: quem sai de um servidor `Game` não tem como voltar à mesma run (§3 segue como plano). O `Template` do
+perfil não muda.

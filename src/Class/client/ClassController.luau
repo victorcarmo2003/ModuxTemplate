@@ -88,9 +88,9 @@ function ClassController:Setup()
 end
 
 -- Lobby, or the Run in dev mode (wave 1). The server checks the same rule (ClassService:CanWrite).
+-- The lobby uses the new class screen (LobbyController / ClassSelect, 2026-10-11); the old Crew screen stays for dev.
 function ClassController:Available(): boolean
-	const place = self.Dependencies.PlaceController
-	return place:Is("Lobby") or place:IsDev()
+	return self.Dependencies.PlaceController:IsDev()
 end
 
 function ClassController:StateOf(key: string): CardState.State

@@ -1,6 +1,7 @@
 --!strict
--- Net v3 (waves 1-3) + v3.1 (TASK-144: Tables set, Customers.Order2/Leader; network.md §14). Contract: docs/tech/network.md v4 (wave 1), v5 §13.1-§13.4 (wave 2) and §13.5-§13.7 (wave 3):
--- schema, writer, reader and rate of every entry.
+-- Net v3 (waves 1-3) + v3.1 (TASK-144: Tables set, Customers.Order2/Leader; network.md §14) + v3.2 (TASK-160..162:
+-- shop, codes, ClassBuy; network.md §15). Contract: docs/tech/network.md v4 (wave 1), v5 §13.1-§13.4 (wave 2) and
+-- §13.5-§13.7 (wave 3): schema, writer, reader and rate of every entry.
 -- Rules: set = state the party sees (late joiners get it ready); packet = event or private data.
 -- No keyBy (T14). Enums and bitfields come from Content keys (T13): Lync sorts the names, both sides require the
 -- same Content, code reads and writes strings. Owner of this file: TASK-004 (wave 1), TASK-048 (wave 2), TASK-097
@@ -8,6 +9,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Lync = require(ReplicatedStorage.Packages.Lync)
 local Content = require(ReplicatedStorage.shared.Content)
+local PartyRules = require(ReplicatedStorage.shared.Party.PartyRules) -- squad notices (§16, TASK-154)
 
 return Lync.define("game", {
 	-- c -> s handshake (NetService.Audience)
@@ -26,6 +28,10 @@ return Lync.define("game", {
 	-- first-hot-dog tutorial ended (finished or skipped) on this client: the profile flag goes true. Cosmetic only
 	-- (no money, item or stat rides on it), so the client is trusted to say it.
 	TutorialComplete = Lync.packet(Lync.empty()),
+	-- c -> s (Provisional, user request 2026-10-11). Responder: TutorialService. The rookie answered Walt's tutorial
+	-- call (or it never came): the server spawns the tutorial customer (CustomerService:RequestTutorial) when this
+	-- player still has TutorialDone = false. Idempotent while one is around.
+	TutorialBegin = Lync.packet(Lync.empty()),
 
 	-- Run sets, wave 1 ---------------------------------------------------------------------------------------------
 
@@ -245,10 +251,17 @@ return Lync.define("game", {
 		StartedAt = Lync.f64(),
 		Votes = Lync.int(0, 4),
 		Needed = Lync.int(0, 4),
+		-- true while the server holds the chain for the participants' ClientReady (Scene = "none" meanwhile)
+		Waiting = Lync.bool(),
 	})),
 
 	-- §13.7 c -> s, <= 1 per segment. Responder: CutsceneService
 	SkipVote = Lync.packet(Lync.empty()),
+
+	-- c -> s, once per join: this client finished its loading screen (game loaded, controllers started, crew kit,
+	-- intro sounds/images and intro voices preloaded; LoadingController). Responder: CutsceneService (the intro waits
+	-- for every participant, up to Content.Cutscenes.Rules.ReadyTimeout). Not the Net handshake (`Ready`).
+	ClientReady = Lync.packet(Lync.empty()),
 
 	-- §13.7 (§6.2 schema; architecture.md §8.1), record = car slot 1..8. Writer: TrafficService, on events only.
 	-- Route = Content.Traffic.Routes.IndexOf; Look = Content.Traffic.LookIndex (4 shapes x 5 paints = 20; room to 32).
@@ -281,4 +294,93 @@ return Lync.define("game", {
 		StopDist = Lync.f32(),
 		HeldUntil = Lync.f64(),
 	})),
+
+	-- Shop, codes, classes by Robux (network.md §15; user request 2026-10-11, Provisional; TASK-160..162) -------------
+	-- Balance and owned classes ride the existing private Profile packet (Gems, Classes): no Wallet set.
+
+	-- §15.1 c -> s, <= 2/s (shared with ClassAction). Responder: ClassService. "Gems" buys; "Robux" is a pre-check
+	-- (answer "Prompt" = the client may PromptProductPurchase Content.Shop.ClassProducts[Class].ProductId)
+	ClassBuy = Lync.packet(Lync.struct({
+		Class = Lync.enum(Content.Classes.Keys),
+		Currency = Lync.enum({ "Gems", "Robux" }),
+	})),
+	-- §15.1 s -> owner. Writers: ClassService (answer to ClassBuy), ShopService (Robux receipt: Granted / Converted)
+	ClassBuyResult = Lync.packet(Lync.struct({
+		Class = Lync.enum(Content.Classes.Keys),
+		Ok = Lync.bool(),
+		Reason = Lync.enum({
+			"Ok",
+			"Prompt",
+			"Granted",
+			"Converted",
+			"Owned",
+			"NotEnoughGems",
+			"NotForSale",
+			"Unavailable",
+			"Busy",
+		}),
+	})),
+
+	-- §15.2 c -> s. Responder: CodesService (normalizes: trim, no spaces, upper case; own rate limit)
+	CodeRedeem = Lync.packet(Lync.struct({
+		Code = Lync.str(0, 32),
+	})),
+	-- §15.2 s -> owner. Writer: CodesService. Reward = what was credited (Gems includes a class converted to gems)
+	CodeRedeemResult = Lync.packet(Lync.struct({
+		Ok = Lync.bool(),
+		Reason = Lync.enum({ "Ok", "Invalid", "Expired", "Already", "Busy" }),
+		Reward = Lync.struct({
+			Gems = Lync.int(0, 1000000),
+			Class = Lync.optional(Lync.enum(Content.Classes.Keys)),
+		}),
+	})),
+
+	-- Squad (party) in the lobby and the way back (network.md §16; architecture.md §20; user request 2026-10-11,
+	-- Provisional; TASK-154..156). Responders: PartyService (lobby roles), PartyRunService (LobbyReturn, game role).
+	-- UserIds travel as f64 (exact up to 2^53). Every c -> s entry shares PartyRules.Rules.RateMax per RateWindow.
+
+	-- §16.1, record = PartyId (1..PartyRules.Rules.PartyIdMax). Writer: PartyService (lobby only). Everyone in the
+	-- lobby sees every squad (no keyBy); a client finds its own by looking for its UserId in Members
+	Party = Lync.replicate(Lync.struct({
+		Leader = Lync.f64(),
+		Members = Lync.array(Lync.f64(), 1, 4), -- party order, leader first; max = PartyRules.Rules.MaxSize
+		Ready = Lync.map(Lync.f64(), Lync.bool(), 0, 4), -- every member; the leader is always true
+		State = Lync.enum({ "Forming", "Starting" }),
+	})),
+	-- §16.2 c -> s. New squad with the sender as leader (refused when already in one)
+	PartyCreate = Lync.packet(Lync.empty()),
+	-- §16.2 c -> s. Leader invites a player of this server (no squad yet = one is created first)
+	PartyInvite = Lync.packet(Lync.struct({
+		UserId = Lync.f64(),
+	})),
+	-- §16.2 s -> invited player. From = leader UserId. Valid PartyRules.Rules.InviteTtl s
+	PartyInviteReceived = Lync.packet(Lync.struct({
+		From = Lync.f64(),
+		PartyId = Lync.int(1, 65535),
+	})),
+	-- §16.2 c -> s. Answer to an invite (Accept = leave the current squad and join)
+	PartyRespond = Lync.packet(Lync.struct({
+		PartyId = Lync.int(1, 65535),
+		Accept = Lync.bool(),
+	})),
+	-- §16.2 c -> s
+	PartyLeave = Lync.packet(Lync.empty()),
+	-- §16.2 c -> s. Leader only, Forming only
+	PartyKick = Lync.packet(Lync.struct({
+		UserId = Lync.f64(),
+	})),
+	-- §16.2 c -> s. Members other than the leader; Forming only
+	PartyReady = Lync.packet(Lync.struct({
+		Ready = Lync.bool(),
+	})),
+	-- §16.2 c -> s. Leader only, every member Ready: reserve a server and teleport the squad (Role "Game")
+	PartyStart = Lync.packet(Lync.empty()),
+	-- §16.3 s -> player. Key = PartyRules.NoticeKeys; UserId = the other player when the notice names one
+	PartyNotice = Lync.packet(Lync.struct({
+		Key = Lync.enum(PartyRules.NoticeKeys),
+		UserId = Lync.optional(Lync.f64()),
+	})),
+	-- §16.4 c -> s, game role only. Responder: PartyRunService. Go back to the lobby now (end-of-run screen button;
+	-- also accepted mid-run: leaving is always allowed, DEC-067)
+	LobbyReturn = Lync.packet(Lync.empty()),
 })

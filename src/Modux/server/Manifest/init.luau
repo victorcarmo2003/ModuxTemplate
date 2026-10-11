@@ -5,6 +5,7 @@ local AnomalyService = require(ServerScriptService.server.ModuxTypes.AnomalyServ
 local BossService = require(ServerScriptService.server.ModuxTypes.BossService)
 local CharacterService = require(ServerScriptService.server.ModuxTypes.CharacterService)
 local ClassService = require(ServerScriptService.server.ModuxTypes.ClassService)
+local CodesService = require(ServerScriptService.server.ModuxTypes.CodesService)
 local CustomerService = require(ServerScriptService.server.ModuxTypes.CustomerService)
 local CutsceneService = require(ServerScriptService.server.ModuxTypes.CutsceneService)
 local DevService = require(ServerScriptService.server.ModuxTypes.DevService)
@@ -13,9 +14,12 @@ local InteractionService = require(ServerScriptService.server.ModuxTypes.Interac
 local ItemService = require(ServerScriptService.server.ModuxTypes.ItemService)
 local KitchenService = require(ServerScriptService.server.ModuxTypes.KitchenService)
 local LightService = require(ServerScriptService.server.ModuxTypes.LightService)
+local LobbyService = require(ServerScriptService.server.ModuxTypes.LobbyService)
 local MarketService = require(ServerScriptService.server.ModuxTypes.MarketService)
 local NetService = require(ServerScriptService.server.ModuxTypes.NetService)
 local NpcService = require(ServerScriptService.server.ModuxTypes.NpcService)
+local PartyRunService = require(ServerScriptService.server.ModuxTypes.PartyRunService)
+local PartyService = require(ServerScriptService.server.ModuxTypes.PartyService)
 local PedestrianService = require(ServerScriptService.server.ModuxTypes.PedestrianService)
 local PlaceService = require(ServerScriptService.server.ModuxTypes.PlaceService)
 local PlayerService = require(ServerScriptService.server.ModuxTypes.PlayerService)
@@ -24,6 +28,8 @@ local RewardService = require(ServerScriptService.server.ModuxTypes.RewardServic
 local RoundService = require(ServerScriptService.server.ModuxTypes.RoundService)
 local RunStateService = require(ServerScriptService.server.ModuxTypes.RunStateService)
 local SeatingService = require(ServerScriptService.server.ModuxTypes.SeatingService)
+local RoleService = require(ServerScriptService.server.ModuxTypes.RoleService)
+local ShopService = require(ServerScriptService.server.ModuxTypes.ShopService)
 local ThiefService = require(ServerScriptService.server.ModuxTypes.ThiefService)
 local TrafficService = require(ServerScriptService.server.ModuxTypes.TrafficService)
 local TutorialService = require(ServerScriptService.server.ModuxTypes.TutorialService)
@@ -36,6 +42,7 @@ export type AllServices = {
 	BossService: BossService.Public,
 	CharacterService: CharacterService.Public,
 	ClassService: ClassService.Public,
+	CodesService: CodesService.Public,
 	CustomerService: CustomerService.Public,
 	CutsceneService: CutsceneService.Public,
 	DevService: DevService.Public,
@@ -44,9 +51,12 @@ export type AllServices = {
 	ItemService: ItemService.Public,
 	KitchenService: KitchenService.Public,
 	LightService: LightService.Public,
+	LobbyService: LobbyService.Public,
 	MarketService: MarketService.Public,
 	NetService: NetService.Public,
 	NpcService: NpcService.Public,
+	PartyRunService: PartyRunService.Public,
+	PartyService: PartyService.Public,
 	PedestrianService: PedestrianService.Public,
 	PlaceService: PlaceService.Public,
 	PlayerService: PlayerService.Public,
@@ -55,6 +65,8 @@ export type AllServices = {
 	RoundService: RoundService.Public,
 	RunStateService: RunStateService.Public,
 	SeatingService: SeatingService.Public,
+	RoleService: RoleService.Public,
+	ShopService: ShopService.Public,
 	ThiefService: ThiefService.Public,
 	TrafficService: TrafficService.Public,
 	TutorialService: TutorialService.Public,

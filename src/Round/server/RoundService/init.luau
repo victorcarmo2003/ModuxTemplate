@@ -125,6 +125,9 @@ function RoundService:Setup()
 	self.VehicleProbe = nil :: (() -> string)?
 	self.VerdictProbe = nil :: (() -> boolean)?
 	self.RunSteps = {} :: { Step }
+	-- Run start gate (architecture.md §20.3, TASK-156): nil = start on the first member (dev / solo); set by
+	-- PartyRunService on a squad server so the run waits for the squad (or Content.RunParams.JoinWindow, DEC-098)
+	self.StartGate = nil :: (() -> boolean)?
 	-- Signals are created here so lower-priority services connect in their OnInit (architecture.md §3.1)
 	self.PhaseChanged = self.Libs.Signal.new() :: SignalLib.Signal<Phase, number, number>
 	self.ShiftStarted = self.Libs.Signal.new() :: SignalLib.Signal<ShiftInfo>
@@ -305,6 +308,11 @@ function RoundService:SetWipe(endsAt: number, frozen: boolean)
 end
 
 -- RewardService (T59): fills RunReport fields per player. Runs in registration order, in pcall, no yield.
+-- Run start gate (TASK-156): StartRun waits until gate() is true; Step polls it while a member is in.
+function RoundService:SetStartGate(gate: () -> boolean)
+	self.StartGate = gate
+end
+
 function RoundService:AddRunReportStep(name: string, step: RunReportStep)
 	if type(name) ~= "string" or name == "" or type(step) ~= "function" then
 		error("[RoundService] AddRunReportStep needs a name and a function", 2)
@@ -532,7 +540,14 @@ function RoundService:Advance(startedAt: number)
 end
 
 function RoundService:Step()
-	if not self.Started or self.Busy then
+	if not self.Started then
+		-- squad server: the gate opens when the squad is in or the join window ran out (TASK-156)
+		if self.StartGate ~= nil and next(self.Dependencies.RunStateService.Members()) ~= nil then
+			self:StartRun()
+		end
+		return
+	end
+	if self.Busy then
 		return
 	end
 	const now = workspace:GetServerTimeNow()
@@ -568,6 +583,10 @@ end
 -- an empty dev server). Network writes start here; Lync.start already ran (NetService OnStart, priority 1000).
 function RoundService:StartRun()
 	if self.Started then
+		return
+	end
+	const gate = self.StartGate
+	if gate ~= nil and not gate() then
 		return
 	end
 	self.Started = true

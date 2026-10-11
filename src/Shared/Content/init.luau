@@ -31,6 +31,7 @@ local RunParams = require(script.RunParams)
 local Sanity = require(script.Sanity)
 local Seating = require(script.Seating)
 local Shift = require(script.Shift)
+local Shop = require(script.Shop)
 local Sounds = require(script.Sounds)
 local Species = require(script.Species)
 local Stations = require(script.Stations)
@@ -88,8 +89,12 @@ export type Revive = Revive.Revive
 export type RunParams = RunParams.RunParams
 export type Sanity = Sanity.Sanity
 export type Seating = Seating.Seating
+export type Shop = Shop.Shop
+export type ShopGemPack = Shop.GemPack
+export type ShopClassProduct = Shop.ClassProduct
 export type GroupPair = Flow.GroupPair
 export type Groups = Flow.Groups
+export type Adopt = Flow.Adopt
 export type Sound = Sounds.Sound
 export type SoundRules = Sounds.SoundRules
 export type Species = Species.Species
@@ -169,4 +174,8 @@ return table.freeze({
 	-- Pad tables and pairs (TASK-144; FEAT-037, FEAT-038; content-data.md §3.25). Numbers Provisional; Flow.Groups
 	-- lives in Flow
 	Seating = Seating,
+
+	-- Robux shop: gem packs and class products (user request 2026-10-11, TASK-160; data.md §1.7). Ids 0 until the
+	-- Creator Hub products exist; prices Provisional (Q-190)
+	Shop = Shop,
 })

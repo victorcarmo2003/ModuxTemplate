@@ -53,12 +53,23 @@
 -- Tables (TASK-145/146; FEAT-037): SetSeater(fn) lets SeatingService take a customer (or pair) that ends its order
 -- instead of the exit walk: a lone Complete/Perfect, or a pair with >= 1 Complete and no Wrong/Left. A diner is
 -- Leaving on the wire with Dining = true (no exit walk, no leave timeout) until SeatingService calls Dismiss(id).
+--
+-- Tutorial customer (user request 2026-10-11, Provisional; shared.Tutorial.Rules): RequestTutorial() (TutorialService,
+-- when a rookie answered Walt's call) spawns one customer in a day Prep/Open as soon as the counter and the NPC pool
+-- have room. Its rig carries the attribute Rules.Attribute = true (the client guides the rookie through it). It orders
+-- Rules.Order, never runs out of patience (no ring: PatienceEndsAt 0 on the wire), never counts on the shift ledger
+-- (no CountArrival / CountResult), gets no anomaly rule (no AddServeRule, no Acted, never copied by a mirror), cannot
+-- be refused and never sits. "Take Order" works on it even in Prep (the drawer is closed there); "Serve" still needs
+-- the drawer open (the rookie opens the shop first). The regular flow waits while it is at the counter.
+-- EndTutorial() (nobody has the tutorial pending any more) sends an unserved one away with no outcome.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 local Content = require(ReplicatedStorage.shared.Content)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
+local TutorialRules = require(ReplicatedStorage.shared.Tutorial.Rules)
+local Adopt = require(script.Adopt)
 local Group = require(script.Group)
 local Orders = require(script.Orders)
 local Queue = require(script.Queue)
@@ -95,6 +106,9 @@ export type Customer = {
 	Faced: boolean, -- partner: already turned like its standing leader
 	-- Tables (TASK-145/146)
 	Dining: boolean, -- handed to SeatingService: no exit walk, no leave timeout until Dismiss
+	-- Tutorial customer (RequestTutorial): fixed order, endless patience, out of the ledger
+	Tutorial: boolean,
+	Model: Model?, -- tutorial customer: rig carrying TutorialRules.Attribute (cleared when the record goes)
 }
 
 -- What SeatingService gets when a customer or pair ends its order (SetSeater). Leader = the customer with the ticket.
@@ -174,6 +188,8 @@ const ANNOYED = "Annoyed"
 const COMPLAINING = "Complaining"
 const LEAVE_TIMEOUT = 45 -- s; a leaving customer that never reaches its exit is despawned anyway
 const NEUTRAL = "Neutral" -- arrival mood (Content.Moods)
+-- day phases where the tutorial customer may spawn (the tutorial runs in Prep and Open)
+const TUTORIAL_PHASES: { [string]: boolean } = { Prep = true, Open = true }
 -- Exit split by shift: Content.Flow.Spawns.Exits (MAP-01 §9.8, Provisional; EX-E 60 / D1 40).
 
 -- djb2 over a string, exact in doubles (h x 33 + byte < 2^38). Run seed hash, architecture.md §4 rule 6.
@@ -265,6 +281,11 @@ function CustomerService:Setup()
 	self.LastWasPair = false :: boolean
 	-- Dev: force the next attempt to be this pair (DevSpawnPair)
 	self.ForcedPair = nil :: Group.Pair?
+	-- Tutorial customer asked (RequestTutorial) and not spawned yet; server time of the next try
+	self.TutorialWanted = false :: boolean
+	self.TutorialTryAt = 0 :: number
+	-- look draws of the tutorial customer: never shifts the seeded customer draws
+	self.TutorialRng = Random.new() :: Random
 end
 
 function CustomerService:WarnOnce(key: string, message: string)
@@ -321,6 +342,11 @@ function CustomerService:HasActor(): boolean
 		end
 	end
 	return false
+end
+
+-- PedestrianService (TASK-163): passers-by that may become customers (Adopt.luau). Returns the dev controls.
+function CustomerService:SetAdopter(adopter: Adopt.Adopter?): Adopt.Controls
+	return Adopt.Set(self, adopter)
 end
 
 -- SeatingService (TASK-145): called when a customer or pair ends its order and may sit. One seater.
@@ -505,8 +531,8 @@ function CustomerService:Join(customer: Customer)
 	customer.JoinedAt = now()
 	Queue.join(self.Line, customer.Id)
 	self:Publish(customer, false)
-	if customer.Variant == nil then
-		-- FEAT-014 denominator; skipped spawns never get here. Actors are excluded (DEC-051)
+	if customer.Variant == nil and not customer.Tutorial then
+		-- FEAT-014 denominator; skipped spawns never get here. Actors (DEC-051) and the tutorial customer are excluded
 		self.Dependencies.EconomyService:CountArrival()
 	end
 	-- The partner joins with its leader: no slot of its own, but it counts as an arrival (a pair = 2, FEAT-038)
@@ -543,7 +569,7 @@ function CustomerService:Attempt(): (Outcome, number?)
 		if pair ~= nil then
 			id = self:SpawnPair(pair)
 		else
-			id = npc:Spawn({ Rng = self.Rng })
+			id = Adopt.Spawn(self) or npc:Spawn({ Rng = self.Rng }) -- passer-by noticed (Adopt.luau, TASK-163)
 			if id ~= nil then
 				self:Create(id)
 			end
@@ -617,8 +643,9 @@ function CustomerService:SpawnPair(pair: Group.Pair): number?
 	return id
 end
 
--- New record. `leader` = this is the partner of that leader: no walk of its own (StepPairs moves it).
-function CustomerService:Create(id: number, variant: Variant?, leader: number?)
+-- New record. `leader` = this is the partner of that leader: no walk of its own (StepPairs moves it). `tutorial` =
+-- the tutorial customer (RequestTutorial).
+function CustomerService:Create(id: number, variant: Variant?, leader: number?, tutorial: boolean?)
 	const customer: Customer = {
 		Id = id,
 		State = "Arriving",
@@ -640,7 +667,17 @@ function CustomerService:Create(id: number, variant: Variant?, leader: number?)
 		FollowAt = 0,
 		Faced = false,
 		Dining = false,
+		Tutorial = tutorial == true,
+		Model = nil,
 	}
+	if customer.Tutorial then
+		-- before the first replication of the record: the client knows it is the tutorial customer from the start
+		const model = self.Dependencies.NpcService:GetModel(id)
+		if model ~= nil then
+			model:SetAttribute(TutorialRules.Attribute, true)
+			customer.Model = model
+		end
+	end
 	self.Customers[id] = customer
 	self:SetPrompts(id, false)
 	self:Publish(customer, true)
@@ -677,7 +714,13 @@ function CustomerService:SpawnActor(spec: CustomerActorSpec): number?
 		end
 		const original = self.Customers[spec.CopyOf]
 		const source = npc:Get(spec.CopyOf)
-		if original == nil or original.Variant ~= nil or original.State == "Leaving" or source == nil then
+		if
+			original == nil
+			or original.Variant ~= nil
+			or original.Tutorial
+			or original.State == "Leaving"
+			or source == nil
+		then
 			return nil
 		end
 		customerType = source.CustomerType
@@ -713,6 +756,9 @@ end
 
 -- First non-nil result of the Serve rules, or nil. A rule that errors is skipped (warned).
 function CustomerService:ServeOverride(customer: Customer, tool: Tool, player: Player): SaleResult?
+	if customer.Tutorial then
+		return nil -- no anomaly rule on the tutorial customer
+	end
 	for _, rule in table.clone(self.ServeRules) do
 		const ok, result = pcall(rule, customer, tool, player)
 		if not ok then
@@ -872,6 +918,12 @@ function CustomerService:Forget(id: number): boolean
 	end
 	customer.Move += 1
 	self.Customers[id] = nil
+	const model = customer.Model
+	if model ~= nil then
+		-- the rig goes back to the pool: the next customer on it is not the tutorial one
+		model:SetAttribute(TutorialRules.Attribute, nil)
+		customer.Model = nil
+	end
 	const wasQueued = Queue.leave(self.Line, id)
 	if self.Dependencies.NetService:IsRunning() then
 		self.Libs.Net.Customers:remove(id)
@@ -983,6 +1035,13 @@ function CustomerService:OpenTicket(id: number)
 	if customer == nil or npc == nil then
 		return
 	end
+	if customer.Tutorial then
+		-- fixed order, patience that never runs out (no draw: the seeded order stream stays the same)
+		const ticket = Orders.Ticket({ table.clone(TutorialRules.Order) }, now(), 0)
+		ticket.PatienceEndsAt = math.huge
+		self.Tickets[id] = ticket
+		return
+	end
 	const round = self.Dependencies.RoundService
 	const lines = { Orders.Roll(round:GetDay(), npc.CustomerType, self.OrderRng, round:IsNight()) }
 	local bonus = self.Dependencies.UpgradeService:GetEffect("PatienceBonus")
@@ -1040,11 +1099,13 @@ function CustomerService:CanAct(player: Player, anchor: Instance, state: State?)
 	if not self.Dependencies.RunStateService:IsActive(player) then
 		return false
 	end
-	if not self.Dependencies.EconomyService:IsDrawerOpen() then
-		return false
-	end
 	const id, customer = self:TicketAt(anchor)
 	if id == nil or customer == nil or self:Front() ~= id or customer.Slot ~= 1 then
+		return false
+	end
+	-- the tutorial customer's order can be taken before the shop opens (Prep); serving it still needs the drawer
+	const early = customer.Tutorial and state == "Ordering"
+	if not early and not self.Dependencies.EconomyService:IsDrawerOpen() then
 		return false
 	end
 	if state ~= nil and customer.State ~= state then
@@ -1087,7 +1148,7 @@ end
 -- Actors stay out of the ledger (DEC-051): their module counts a failure itself.
 function CustomerService:Settle(id: number, result: SaleResult, amount: number)
 	const customer = self.Customers[id]
-	if customer == nil or customer.Variant == nil then
+	if customer == nil or (customer.Variant == nil and not customer.Tutorial) then
 		self.Dependencies.EconomyService:CountResult(result)
 	end
 	const net = self.Dependencies.NetService
@@ -1118,13 +1179,16 @@ function CustomerService:TakeOrder(player: Player, anchor: Instance)
 	const written = self:Update(id, {
 		State = "Waiting",
 		Order = Orders.Set(ticket.Lines[1].Toppings),
-		PatienceEndsAt = ticket.PatienceEndsAt,
+		-- the tutorial customer has no time limit: no ring on the wire
+		PatienceEndsAt = if customer.Tutorial then 0 else ticket.PatienceEndsAt,
 	})
 	if not written then
 		return
 	end
 	anchor:SetAttribute("PromptAction", SERVE)
-	self.Acted:Fire(id, TAKE_ORDER, player, nil)
+	if not customer.Tutorial then
+		self.Acted:Fire(id, TAKE_ORDER, player, nil)
+	end
 end
 
 -- "Serve" (FEAT-011, DEC-072): validates the held hot dog against the order and pays into the drawer. A pair
@@ -1165,7 +1229,9 @@ function CustomerService:Serve(player: Player, anchor: Instance)
 	end
 	line.Result = result
 	self:Settle(self:LineOwner(customer, index), result, amount)
-	self.Acted:Fire(id, SERVE, player, result)
+	if not customer.Tutorial then
+		self.Acted:Fire(id, SERVE, player, result)
+	end
 	if #Orders.Pending(ticket) > 0 then
 		self:ShowPending(customer, ticket) -- pair: the other hot dog is still on the balloon
 		self:Publish(customer, false)
@@ -1202,7 +1268,11 @@ function CustomerService:Conclude(customer: Customer, ticket: Orders.Ticket)
 		end
 	end
 	const mood: string? = if bad then COMPLAINING elseif complete == #ticket.Lines then HAPPY else nil
-	const seat = customer.Variant == nil and complete >= 1 and not bad and self:OfferSeat(customer)
+	const seat = customer.Variant == nil
+		and not customer.Tutorial
+		and complete >= 1
+		and not bad
+		and self:OfferSeat(customer)
 	self:Leave(customer.Id, mood, "service", seat)
 end
 
@@ -1268,7 +1338,7 @@ function CustomerService:StepOrders(t: number)
 	for _, id in ids do
 		const ticket = self.Tickets[id]
 		const customer = self.Customers[id]
-		if ticket == nil or customer == nil or customer.State == "Leaving" then
+		if ticket == nil or customer == nil or customer.State == "Leaving" or customer.Tutorial then
 			continue
 		end
 		if t >= ticket.PatienceEndsAt then
@@ -1305,6 +1375,10 @@ function CustomerService:RegisterOrders()
 	})
 	interaction:RegisterAction(REFUSE, {
 		Validate = function(player: Player, anchor: Instance): boolean
+			const _, customer = self:TicketAt(anchor)
+			if customer ~= nil and customer.Tutorial then
+				return false -- the tutorial customer cannot be turned away
+			end
 			return self:CanAct(player, anchor, nil)
 		end,
 		Run = function(player: Player, anchor: Instance)
@@ -1345,7 +1419,10 @@ end
 
 function CustomerService:Step()
 	const t = now()
-	if self.NextSpawnAt > 0 and t >= self.NextSpawnAt and self:IsSelling() then
+	self:StepTutorial(t)
+	-- the regular flow waits while the tutorial customer is at (or walking to) the counter: the next attempt comes
+	-- right after it was served
+	if self.NextSpawnAt > 0 and t >= self.NextSpawnAt and self:IsSelling() and not self:HasTutorial() then
 		self:Attempt()
 		local interval = self:NextInterval()
 		if interval ~= nil and self.LastWasPair then
@@ -1420,6 +1497,69 @@ function CustomerService:StepPairs(t: number)
 			customer.FollowTarget = nil
 		end
 	end
+end
+
+-- Tutorial customer (user request 2026-10-11, Provisional) ---------------------------------------------------------
+
+-- The tutorial customer still at or walking to the counter (not leaving), or nil.
+function CustomerService:TutorialCustomer(): Customer?
+	for _, customer in self.Customers do
+		if customer.Tutorial and customer.State ~= "Leaving" then
+			return customer
+		end
+	end
+	return nil
+end
+
+function CustomerService:HasTutorial(): boolean
+	return self:TutorialCustomer() ~= nil
+end
+
+-- TutorialService: a rookie started the tutorial. One tutorial customer spawns as soon as there is room
+-- (StepTutorial); nothing new while one is around or already asked. false = not in a run.
+function CustomerService:RequestTutorial(): boolean
+	if not self.Enabled then
+		return false
+	end
+	if self.TutorialWanted or self:HasTutorial() then
+		return true
+	end
+	self.TutorialWanted = true
+	self.TutorialTryAt = 0
+	return true
+end
+
+-- TutorialService: nobody has the tutorial pending any more (finished, skipped, left). An unserved tutorial customer
+-- walks off with no outcome; a request not spawned yet is dropped.
+function CustomerService:EndTutorial()
+	self.TutorialWanted = false
+	const customer = self:TutorialCustomer()
+	if customer ~= nil then
+		self:Leave(customer.Id, nil, "service")
+	end
+end
+
+-- Spawns the asked tutorial customer in a day Prep/Open with a free counter slot and room in the NPC pool (tried
+-- again every TutorialRules.Retry s). It walks to the queue like any customer.
+function CustomerService:StepTutorial(t: number)
+	if not self.TutorialWanted or t < self.TutorialTryAt then
+		return
+	end
+	self.TutorialTryAt = t + TutorialRules.Retry
+	const round = self.Dependencies.RoundService
+	if not round:IsStarted() or self:IsNightShift() or not TUTORIAL_PHASES[round:GetPhase()] then
+		return
+	end
+	const npc = self.Dependencies.NpcService
+	if Queue.isFull(self:Occupants(), self:QueueSize()) or npc:Count() >= npc:Capacity() then
+		return
+	end
+	const id = npc:Spawn({ Rng = self.TutorialRng })
+	if id == nil then
+		return
+	end
+	self.TutorialWanted = false
+	self:Create(id, nil, nil, true)
 end
 
 -- Dev hook (Command Bar; R5 counter is TASK-045) ------------------------------------------------------------------
@@ -1514,6 +1654,7 @@ CustomerService:OnInit(function(self)
 	self.Removed:Connect(function(id: number)
 		self.Tickets[id] = nil
 	end)
+	Adopt.Init(self) -- passers-by turning customers + first attempt sooner (TASK-163); after the PhaseChanged above
 end)
 
 CustomerService:OnTick(function(self)

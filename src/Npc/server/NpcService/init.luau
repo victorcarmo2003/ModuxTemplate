@@ -19,7 +19,10 @@
 --   - queue slots Q1..Q5 are never intermediate route steps (MAP-01 §9.1 note): AvoidQueue on by default;
 --   - at most ROUTES_PER_FRAME A* searches per frame (§12.3);
 --   - crosswalk edges wait for TrafficService:ReserveCrossing(cw, NpcId) on the near curb (§8.1, DEC-133; TASK-122,
---     Walker.Follow); released on the far curb, on the failsafe snap and on cancel.
+--     Walker.Follow); released on the far curb, on the failsafe snap and on cancel;
+--   - adopted passer-by (TASK-163, Provisional): SpawnRequest.At puts the rig where the walker stood (From is still the
+--     graph node it routes from), Plain builds it without the type accessories (the walker had none) and Walker writes
+--     the rig attribute FromWalker = Pedestrians slot before it enters the Workspace (client hand-off, TASK-164).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local PhysicsService = game:GetService("PhysicsService")
@@ -62,6 +65,10 @@ export type SpawnRequest = {
 	Outfit: string?, -- forced civil outfit
 	From: string?, -- spawn node/point id (default: SPAWN_POINTS)
 	Rng: Random?, -- seeded Random of the run (architecture.md §4 rule 6); default: the service Random
+	-- Adopted passer-by (TASK-163): floor pose to stand on instead of the From point (From = node it routes from)
+	At: CFrame?,
+	Plain: boolean?, -- no customer-type accessories (keeps the passer-by's look)
+	Walker: number?, -- Pedestrians slot it came from: rig attribute FromWalker
 }
 
 export type WalkOptions = {
@@ -80,6 +87,8 @@ const THIEF_NPC = "NPC-007" -- Species/Outfits.ReservedFor of Quick Quentin
 const THIEF_HAT = "ThiefHat" -- kit name, Assets.Crew.Hats (AST-053, DEC-159)
 const THIEF_KEY = "Thief" -- pool geometry key suffix (no customer type, no accessories)
 const VARIANT_ATTRIBUTE = "Variant" -- rig attribute read by the client (TASK-110)
+const WALKER_ATTRIBUTE = "FromWalker" -- adopted passer-by: its Pedestrians slot (TASK-163/164)
+const PLAIN_KEY = "Plain" -- pool geometry key suffix of a rig without type accessories
 const VARIANTS: { [string]: true } = { blank = true, mirror = true, raincoat = true }
 const NIGHT_PACK = "Night"
 const MAX_ID = 65535 -- NpcId wire range (Customers id, Sale.Npc)
@@ -316,7 +325,9 @@ function NpcService:Spawn(request: SpawnRequest?): number?
 		return nil
 	end
 	const point = MapIndex.FindPoint(from)
-	const rotation = if point then point.Rotation else CFrame.identity
+	const rotation = if r.At then r.At.Rotation elseif point then point.Rotation else CFrame.identity
+	const floor = if r.At then r.At.Position else position
+	const plain = r.Plain == true and not isThief
 
 	const id = self:AllocateId()
 	const parking = self.Parking
@@ -325,12 +336,13 @@ function NpcService:Spawn(request: SpawnRequest?): number?
 		return nil
 	end
 
-	const poolKey = Look.Key(choice.Species, if isThief then THIEF_KEY else choice.CustomerType)
+	const poolKey =
+		Look.Key(choice.Species, if isThief then THIEF_KEY elseif plain then PLAIN_KEY else choice.CustomerType)
 	const rig = Pool.acquire(self.Pool, poolKey, function(): Pool.Rig?
 		const spec: Pool.BuildSpec = {
 			Species = choice.Species,
 			Outfit = choice.Outfit,
-			CustomerType = if isThief then nil else choice.CustomerType,
+			CustomerType = if isThief or plain then nil else choice.CustomerType,
 			Hat = if isThief then THIEF_HAT else nil,
 			Group = GROUP,
 			Parking = parking,
@@ -353,10 +365,11 @@ function NpcService:Spawn(request: SpawnRequest?): number?
 	model:SetAttribute("LookPack", self:PackFor(role, choice.Outfit))
 	model:SetAttribute("NpcId", id)
 	model:SetAttribute(VARIANT_ATTRIBUTE, if role == "Actor" then r.Variant else nil)
+	model:SetAttribute(WALKER_ATTRIBUTE, r.Walker)
 	if not isThief then
 		rig.Humanoid.WalkSpeed = Content.CustomerTypes.ByKey[choice.CustomerType].WalkSpeed
 	end
-	model:PivotTo(CFrame.new(position + Vector3.new(0, LIFT, 0)) * rotation)
+	model:PivotTo(CFrame.new(floor + Vector3.new(0, LIFT, 0)) * rotation)
 	model.Parent = folder
 	if rig.Root:CanSetNetworkOwnership() then
 		rig.Root:SetNetworkOwner(nil) -- server owns NPC physics (architecture.md §12.3)

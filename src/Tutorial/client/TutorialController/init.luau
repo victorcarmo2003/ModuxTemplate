@@ -3,15 +3,20 @@
 	TutorialController (user request 2026-10-11; Provisional until a FEAT/TASK is written for it)
 
 	First-hot-dog tutorial, only while the own profile says TutorialDone = false (ProfileController, Profile packet).
-	After the intro cutscene it walks the player through the first sale:
-	  answer the phone -> grill -> slice -> (cooking) -> collect -> assemble -> open shop (Prep only) -> take order
-	  -> toppings -> serve -> money (UI step: the money pill pops in under a spotlight) -> mart (restock, talk only)
-	  -> Walt's goodbye
+	After the intro cutscene it walks the player through the first sale, following the order of one tutorial customer
+	(user request 2026-10-11, Provisional):
+	  answer the phone -> (the tutorial customer walks up) take the order -> grill -> slice -> (cooking) -> collect
+	  -> assemble -> toppings of the order (or throw away a wrong one) -> open the shop (only if still in Prep: the
+	  drawer is closed there) -> serve -> money (UI step: the money pill pops in under a spotlight) -> mart (restock,
+	  talk only) -> Walt's goodbye
+	Tutorial customer: once the call is answered (or it never came) `TutorialBegin` goes out once; TutorialService has
+	CustomerService spawn one customer with the rig attribute shared.Tutorial.Rules.Attribute (fixed order, no time
+	limit, out of the grade). Asked again every REASK s while none is around and no sale came.
 	Steps.luau holds the texts; which step is current is decided live (Decide) from what the server replicated: the
-	Stations set (grill / rail / board records), the Customers set, the CustomerController order card, the Tool in the
-	own hand (ItemService parents it) and the `Sale` packet. Nothing is predicted: a step only moves when the server
-	state moved, whoever made it move (a crewmate grilling also counts), and going back (hot dog thrown away) shows
-	the earlier step again.
+	Stations set (grill / rail / board records), the Customers record of the tutorial customer (State, Order), the Tool
+	in the own hand (ItemService parents it), the round phase and the `Sale` packet of that customer. Nothing is
+	predicted: a step only moves when the server state moved, whoever made it move (a crewmate grilling also counts),
+	and going back (hot dog thrown away) shows the earlier step again.
 
 	Walt on the phone (user request 2026-10-11, Provisional): BossService rings the tutorial call (BossCalls Trigger
 	Tutorial) while this player has the tutorial ahead, and holds it open. Step 1 points at the ringing phone; once the
@@ -21,9 +26,15 @@
 	says goodbye and TutorialComplete goes out; the server hangs up Rules.Tutorial.Goodbye s later (the click). No call
 	within CALL_WAIT s of a silent phone = the tutorial goes on with the panel only.
 
-	Guidance: TutorialPanel (Cream card, top centre: "3/7", instruction, hint, Skip), TutorialArrow (bouncing arrow
-	over the prompt anchor to use), a Highlight on the station or customer, TutorialPointer on the screen edge while
-	the target is off screen, and Spotlight on the money pill for the UI step.
+	Guidance (user request 2026-10-11: "very clear what to interact with"): TutorialPanel (Cream card, top centre:
+	"3/9" chip, "STEP 3 OF 9", the instruction starting with the verb, hint, Skip), Beacon.luau (pulsing Mustard
+	Highlight on the exact piece of the step: the pot, the grill, the bun crate, the board, the customer; and a 3D
+	arrow bobbing over it), TutorialPointer on the screen edge while the target is off screen, and Spotlight on the
+	money pill for the UI step. A step completed (the panel number goes up) turns the chip Green with a check for
+	CHECK_TIME s and plays `prompt_done`.
+	Prompt focus: Focuses(anchor) says whether a prompt belongs to the current step (true for every prompt when the
+	tutorial is not running or the step has no world target). PromptController can use it to hide or dim the others;
+	that hook is the PromptController owner's (not wired from here).
 
 	Progressive HUD (HudController reads ShowCash / ShowClock): during a first run the money pill stays hidden until
 	the first sale, the clock and day pills until the shift opens (phase Open). Everything shows when the tutorial
@@ -33,8 +44,8 @@
 	the day shift is over without a sale (Closing, Summary, night). Each end fires `TutorialComplete` once; the server
 	(TutorialService) saves TutorialDone = true, so it never runs again for this player.
 
-	PROVISIONAL: texts, CALL_WAIT, NUDGE, TALK_TIME, TALK_MIN, skip keys (Q, DPadDown), "any served sale while the step is serve or a hot dog was
-	in hand in the last SALE_WINDOW s" as the first sale, ending on the day shift end.
+	PROVISIONAL: texts, CALL_WAIT, NUDGE, TALK_TIME, TALK_MIN, REASK, CHECK_TIME, skip keys (Q, DPadDown), "a served
+	sale of the tutorial customer" as the first sale, ending on the day shift end.
 ]]
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -47,11 +58,11 @@ local Content = require(ReplicatedStorage.shared.Content)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Cinematic = require(StarterPlayer.StarterPlayerScripts.client.Interface.Cinematic)
 local Spotlight = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Spotlight)
-local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
-local TutorialArrow = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.TutorialArrow)
 local TutorialPanel = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.TutorialPanel)
 local TutorialPointer = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.TutorialPointer)
 local Rules = require(StarterPlayer.StarterPlayerScripts.client.Interaction.PromptController.Rules)
+local TutorialRules = require(ReplicatedStorage.shared.Tutorial.Rules)
+local Beacon = require(script.Beacon)
 local Call = require(script.Call)
 local Steps = require(script.Steps)
 
@@ -64,8 +75,10 @@ const TICK_RATE = 10
 const RUN_PHASES: { [string]: boolean } = { Prep = true, Open = true }
 -- Phases that end a tutorial still running without a sale (the day is over)
 const END_PHASES: { [string]: boolean } = { Closing = true, Summary = true }
-const SERVED: { [string]: boolean } = { Perfect = true, Complete = true, Incomplete = true, Wrong = true }
-const SALE_WINDOW = 3 -- s: a sale this soon after the hot dog left the own hand counts as the first sale
+-- a sale of the tutorial customer with these results is the first sale (Wrong keeps the hot dog in hand)
+const SERVED: { [string]: boolean } = { Perfect = true, Complete = true, Incomplete = true }
+const REASK = 15 -- s without a tutorial customer around before TutorialBegin goes out again
+const CHECK_TIME = 0.9 -- s the panel chip shows the green check of a completed step
 const TUTORIAL_CALL = Content.BossCallRules.Tutorial.Call
 const CALL_WAIT = 12 -- s of a silent phone before the tutorial goes on without Walt (panel only)
 const NUDGE = 20 -- s on the same step before Walt says it again
@@ -85,8 +98,8 @@ const DONE_TEXT: { [string]: string } = {
 }
 -- Highlight a station model only when it is about this big (studs); else the part of the anchor
 const HIGHLIGHT_MAX = 7
-const ARROW_LIFT = Vector3.new(0, 1.2, 0)
-const CUSTOMER_LIFT = Vector3.new(0, 3.6, 0) -- over the order bubble and the prompt pill on the neck
+const ARROW_LIFT = 0.8 -- studs between the top of the marked piece and the 3D arrow tip
+const CUSTOMER_LIFT = 3.2 -- over the head: above the order bubble and the prompt pill on the neck
 const EDGE_MARGIN = 56 -- px from the screen edge for the pointer
 -- UI scale like the HUD: 1 on the smallest phone (375 px tall), up to 2
 const BASE_HEIGHT = 540
@@ -97,6 +110,8 @@ const MONEY_STEP = "money"
 
 -- Stations set record fields read here (network.md §3.5)
 type SlotRecord = { Kind: string, State: string, Count: number }
+-- Customers set record fields read here (network.md §3.6)
+type GuestRecord = { State: string, Order: { [string]: boolean } }
 type Held = { Item: string, Toppings: { [string]: boolean } }
 type Kitchen = {
 	GrillWorking: boolean,
@@ -135,10 +150,17 @@ function TutorialController:Setup()
 	self.PointerAt = Vide.source(Vector2.zero) :: Vide.Source<Vector2>
 	self.PointerAngle = Vide.source(0) :: Vide.Source<number>
 	self.Scale = Vide.source(1) :: Vide.Source<number>
-	self.Highlight = nil :: Highlight?
+	-- green check on the panel chip: a step was just completed (until CheckUntil, os.clock)
+	self.Checked = Vide.source(false) :: Vide.Source<boolean>
+	self.CheckUntil = 0 :: number
 	self.Folder = nil :: Folder?
-	-- os.clock() of the last tick with a hot dog in hand (0 = never)
-	self.LastHotDogAt = 0 :: number
+	-- Highlight + 3D arrow on the piece of the current step
+	self.Beacon = Beacon.new(function(): Instance
+		return self:FxFolder()
+	end) :: Beacon.Beacon
+	-- Tutorial customer: TutorialBegin sent (os.clock of the last one, 0 = never); its NpcId once seen (0 = none)
+	self.AskedAt = 0 :: number
+	self.GuestId = 0 :: number
 	-- Walt on the line: the tutorial call was answered (from here he leads), the greeting went out, no call came
 	self.Answered = false :: boolean
 	self.Greeted = false :: boolean
@@ -190,6 +212,12 @@ function TutorialController:PanelText(): string
 		return ""
 	end
 	return (string.gsub(step.Text, "{item}", (string.gsub(self.Item(), "%%", "%%%%"))))
+end
+
+-- "STEP 3 OF 9" over the instruction
+function TutorialController:StepLabel(): string
+	const step = self:Step()
+	return if step then `STEP {step.Number} OF {Steps.Total}` else ""
 end
 
 function TutorialController:SkipText(): string
@@ -269,15 +297,27 @@ function TutorialController:Kitchen(): Kitchen
 	return state
 end
 
--- NpcIds of customers at the counter waiting for "Take Order"
-function TutorialController:Ordering(): { [number]: boolean }
-	const ids: { [number]: boolean } = {}
-	for id, record in self.Libs.Net.Customers:entries() do
-		if record.State == "Ordering" then
-			ids[id] = true
+-- The tutorial customer (rig attribute TutorialRules.Attribute, set by CustomerService): NpcId, record and rig.
+-- nil = none around (not spawned yet, or its record is gone).
+function TutorialController:Guest(): (number?, GuestRecord?, Model?)
+	const models = self.Dependencies.CustomerController.Models
+	for id, raw in self.Libs.Net.Customers:entries() do
+		const model = models[id]
+		if model and model:GetAttribute(TutorialRules.Attribute) == true and model:GetAttribute("NpcId") == id then
+			return id, raw :: GuestRecord, model
 		end
 	end
-	return ids
+	return nil, nil, nil
+end
+
+-- Asks the server for the tutorial customer (TutorialBegin); again every REASK s while none is around
+function TutorialController:AskGuest()
+	const now = os.clock()
+	if self.AskedAt > 0 and now - self.AskedAt < REASK then
+		return
+	end
+	self.AskedAt = now
+	self.Libs.Net.TutorialBegin:fireServer()
 end
 
 -- Nearest live anchor of `action` (vehicle in use only); `enabled` = only anchors the server switched on
@@ -425,46 +465,47 @@ function TutorialController:Decide(): (string, Instance?, string)
 		return phoneKey, phoneTarget, ""
 	end
 
-	const round = self.Dependencies.RoundController
-	const phase = Vide.untrack(round.Phase)
-	const held = self:Held()
+	-- Walt is on the line (or never called): the tutorial customer comes
+	const guestId, guest, rig = self:Guest()
+	if guestId == nil or guest == nil or guest.State == "Leaving" then
+		self:AskGuest()
+		return "wait_customer", nil, ""
+	end
+	self.GuestId = guestId
+	local function onGuest(anchor: Instance): boolean
+		return npcIdOf(anchor) == guestId
+	end
+	if guest.State == "Arriving" or guest.State == "Queued" then
+		-- walking up: mark the customer itself
+		return "wait_customer", rig, ""
+	end
+	if guest.State == "Ordering" then
+		return "order", self:Anchor("take_order", false, onGuest) or rig, ""
+	end
 
+	const held = self:Held()
 	if held and held.Item == HOT_DOG then
-		self.LastHotDogAt = os.clock()
-		if phase == "Prep" then
+		-- a topping they did not ask for: Wrong at the counter, throw it away
+		for key in held.Toppings do
+			if not guest.Order[key] then
+				return "discard", self:Anchor("discard", false), ""
+			end
+		end
+		for _, key in Content.Ingredients.ToppingKeys do
+			if guest.Order[key] and not held.Toppings[key] then
+				const row = Content.Ingredients.ByKey[key]
+				return "toppings",
+					self:Anchor("topping_add", false, function(anchor)
+						return anchor:GetAttribute("Ingredient") == key
+					end),
+					if row then row.Name else key
+			end
+		end
+		-- the hot dog is right: the drawer must be open to sell (Prep: open the shop first)
+		if Vide.untrack(self.Dependencies.RoundController.Phase) == "Prep" then
 			return "open", self:Anchor("open_sign", false), ""
 		end
-		const customer = self.Dependencies.CustomerController
-		const cardShown = Vide.untrack(function(): boolean
-			return customer:CardShown()
-		end)
-		if cardShown then
-			const focus = Vide.untrack(customer.Focus)
-			const order = Vide.untrack(function(): { string }
-				return customer:CardToppings()
-			end)
-			for _, key in order do
-				if not held.Toppings[key] then
-					const row = Content.Ingredients.ByKey[key]
-					return "toppings",
-						self:Anchor("topping_add", false, function(anchor)
-							return anchor:GetAttribute("Ingredient") == key
-						end),
-						if row then row.Name else key
-				end
-			end
-			return "serve", self:Anchor("serve", false, function(anchor)
-				return focus == 0 or npcIdOf(anchor) == focus
-			end), ""
-		end
-		const ordering = self:Ordering()
-		if next(ordering) ~= nil then
-			return "order", self:Anchor("take_order", false, function(anchor)
-				const id = npcIdOf(anchor)
-				return id ~= nil and ordering[id] == true
-			end), ""
-		end
-		return "wait_customer", nil, ""
+		return "serve", self:Anchor("serve", false, onGuest) or rig, ""
 	end
 
 	const kitchen = self:Kitchen()
@@ -501,22 +542,52 @@ function TutorialController:FxFolder(): Folder
 	return folder
 end
 
--- What the Highlight wraps: the customer rig, a small station model, else the part of the anchor
+local function extent(instance: Instance): number
+	if instance:IsA("Model") then
+		const _, size = instance:GetBoundingBox()
+		return math.max(size.X, size.Y, size.Z)
+	elseif instance:IsA("BasePart") then
+		return math.max(instance.Size.X, instance.Size.Y, instance.Size.Z)
+	end
+	return math.huge
+end
+
+-- Outermost part or model holding the anchor below its station (one pot of a toppings station), or nil
+local function pieceOf(anchor: Instance): Instance?
+	local best: Instance? = if anchor:IsA("BasePart") then anchor else nil
+	local current = anchor.Parent
+	while current and current ~= Workspace and not CollectionService:HasTag(current, STATION_TAG) do
+		if current:IsA("BasePart") or current:IsA("Model") then
+			best = current
+		end
+		current = current.Parent
+	end
+	return best
+end
+
+-- What the Highlight and the arrow mark: the customer rig, the exact pot of a per-ingredient anchor (one topping of
+-- the toppings station), a small station model (the grill, the bun crate, the board), else the part of the anchor
 local function highlightOf(anchor: Instance): Instance?
+	if anchor:IsA("Model") and typeof(anchor:GetAttribute("NpcId")) == "number" then
+		return anchor
+	end
 	const rig = ancestorWith(anchor, function(instance)
 		return typeof(instance:GetAttribute("NpcId")) == "number" and instance:IsA("Model")
 	end)
 	if rig then
 		return rig
 	end
+	if typeof(anchor:GetAttribute("Ingredient")) == "string" then
+		const piece = pieceOf(anchor)
+		if piece and extent(piece) <= HIGHLIGHT_MAX then
+			return piece
+		end
+	end
 	const station = ancestorWith(anchor, function(instance)
 		return CollectionService:HasTag(instance, STATION_TAG)
 	end)
-	if station and station:IsA("Model") then
-		const _, size = station:GetBoundingBox()
-		if math.max(size.X, size.Y, size.Z) <= HIGHLIGHT_MAX then
-			return station
-		end
+	if station and station:IsA("Model") and extent(station) <= HIGHLIGHT_MAX then
+		return station
 	end
 	if anchor:IsA("BasePart") then
 		return anchor
@@ -528,34 +599,33 @@ local function highlightOf(anchor: Instance): Instance?
 	return station
 end
 
+-- Pulsing Highlight + 3D arrow on what the anchor belongs to (Beacon.luau); nil clears both
 function TutorialController:SetHighlight(anchor: Instance?)
 	const adornee = if anchor then highlightOf(anchor) else nil
-	local highlight = self.Highlight
-	if adornee == nil then
-		if highlight then
-			highlight.Enabled = false
-			highlight.Adornee = nil
-		end
-		return
+	const lift = if adornee and adornee:IsA("Model") and typeof(adornee:GetAttribute("NpcId")) == "number"
+		then CUSTOMER_LIFT
+		else ARROW_LIFT
+	self.Beacon.Set(adornee, lift)
+end
+
+-- Whether a prompt anchor belongs to the current step (for PromptController to hide or dim the others). true for
+-- every anchor while the tutorial does not run or the step has no world target.
+function TutorialController:Focuses(anchor: Instance): boolean
+	if not Vide.untrack(self.Running) then
+		return true
 	end
-	if highlight == nil or highlight.Parent == nil then
-		const created = Instance.new("Highlight")
-		created.Name = "TutorialHighlight"
-		created.FillColor = Theme.Color.Mustard
-		created.FillTransparency = 0.7
-		created.OutlineColor = Theme.Color.Mustard
-		created.OutlineTransparency = 0
-		created.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-		created.Parent = self:FxFolder()
-		self.Highlight = created
-		highlight = created
+	const target = Vide.untrack(self.Target)
+	if target == false then
+		return true
 	end
-	if highlight then
-		if highlight.Adornee ~= adornee then
-			highlight.Adornee = adornee
-		end
-		highlight.Enabled = true
+	if anchor == target then
+		return true
 	end
+	-- same piece (the customer rig with its two anchors, one pot): the step's own action only
+	const step = Steps.ByKey[Vide.untrack(self.StepKey)]
+	return step ~= nil
+		and anchor:GetAttribute("PromptAction") == step.Action
+		and highlightOf(anchor) == highlightOf(target)
 end
 
 function TutorialController:ClearGuidance()
@@ -643,7 +713,12 @@ function TutorialController:SetStep(key: string, target: Instance?, item: string
 	end)
 	self:SetHighlight(target)
 	if before and after and after.Number > before.Number then
+		-- step completed: short sound + green check on the panel chip
 		self.Dependencies.AudioController:Play(STEP_SOUND)
+		self.CheckUntil = os.clock() + CHECK_TIME
+		if not Vide.untrack(self.Checked) then
+			self.Checked(true)
+		end
 	end
 	if previous ~= key then
 		self.StepAt = os.clock()
@@ -659,16 +734,13 @@ local function cashPill(): GuiObject?
 	return if pill and pill:IsA("GuiObject") then pill else nil
 end
 
-function TutorialController:OnSale(result: string)
-	if not Vide.untrack(self.Running) or not SERVED[result] then
+-- Sale packet: the tutorial customer paid (whoever served it) = the first sale
+function TutorialController:OnSale(npc: number, result: string)
+	if not Vide.untrack(self.Running) or not SERVED[result] or npc ~= self.GuestId or self.GuestId == 0 then
 		return
 	end
-	const step = Vide.untrack(self.StepKey)
-	const current = Steps.ByKey[step]
+	const current = Steps.ByKey[Vide.untrack(self.StepKey)]
 	if current and current.Talk then
-		return
-	end
-	if step ~= "serve" and os.clock() - self.LastHotDogAt > SALE_WINDOW then
 		return
 	end
 	Vide.batch(function()
@@ -757,6 +829,9 @@ end
 function TutorialController:Tick()
 	self:Rescale()
 	self:UpdateCall()
+	if Vide.untrack(self.Checked) and os.clock() >= self.CheckUntil then
+		self.Checked(false)
+	end
 	const firstRun = Vide.untrack(function(): boolean
 		return self:FirstRun()
 	end)
@@ -869,6 +944,10 @@ function TutorialController:Mount(playerGui: Instance)
 				Text = function()
 					return self:PanelText()
 				end,
+				Label = function()
+					return self:StepLabel()
+				end,
+				Done = self.Checked,
 				Hint = function()
 					const step = self:Step()
 					return if step then step.Hint else ""
@@ -915,23 +994,6 @@ function TutorialController:Mount(playerGui: Instance)
 			}),
 		})
 		overlay.Parent = playerGui
-
-		const arrow = TutorialArrow({
-			Name = "TutorialArrow",
-			Adornee = function(): Instance?
-				const target = self.Target()
-				return if target then target else nil
-			end,
-			Shown = function()
-				return shown() and not Cinematic.Active()
-			end,
-			Offset = ARROW_LIFT,
-		})
-		Vide.effect(function()
-			const target = self.Target()
-			arrow.StudsOffsetWorldSpace = if target and npcIdOf(target) then CUSTOMER_LIFT else ARROW_LIFT
-		end)
-		arrow.Parent = playerGui
 	end)
 	table.insert(self.Unmounts, unmount)
 end
@@ -940,7 +1002,7 @@ TutorialController:OnInit(function(self)
 	self:Setup()
 
 	self.Libs.Net.Sale:onClient(function(sale)
-		self:OnSale(sale.Result)
+		self:OnSale(sale.Npc, sale.Result)
 	end)
 end)
 
@@ -953,6 +1015,8 @@ TutorialController:OnStart(function(self)
 		self:Mount(Players.LocalPlayer:WaitForChild("PlayerGui"))
 	end)
 	RunService.Heartbeat:Connect(function()
+		-- the Beacon only moves while something is marked (ClearGuidance unmarks it when the tutorial stops)
+		self.Beacon.Step()
 		if Vide.untrack(self.Running) then
 			self:UpdatePointer()
 		elseif Vide.untrack(self.PointerShown) then

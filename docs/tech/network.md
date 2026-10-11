@@ -937,6 +937,8 @@ Não é o handshake `Ready` do `NetService`.
 
 ### 13.8 Lobby e sessão (onda 4)
 
+> **v5.5 (2026-10-11):** `Parties`/`PartyAction` não foram implementados; valem o set `Party` e os packets do **§16**.
+
 ```lua
 Parties = Lync.replicate(Lync.struct({       -- id = plataforma (atributo Party), place Lobby
 	Owner = Lync.f64(),                       -- UserId do 1º a pisar; 0 = vazia
@@ -1118,3 +1120,83 @@ do pacote). Preço exibido: `MarketplaceService:GetProductInfo(id, Enum.InfoType
 `Robux` da tabela só como fallback.
 
 Orçamento: eventos raros, por clique; irrelevante.
+
+## 16. Squad (party) no lobby e volta ao lobby (v5.5, TASK-154 a TASK-156; `architecture.md` §20; Provisório)
+
+Pedido do usuário (2026-10-11). Substitui, para o que foi implementado, o §13.8 (`Parties`/`PartyAction` por
+plataforma): os nomes abaixo foram combinados com o frontend. `Reconnect`/`ReconnectReply` (§13.8) seguem só plano.
+Papel do servidor **não passa pelo Lync**: atributo `ReplicatedStorage.ServerRole` (`"Lobby"`, `"Game"`,
+`"PrivateLobby"`), lido no client por `PlaceController:GetServerRole()`.
+
+Regras comuns: UserId viaja como `f64` (exato até 2^53). Todo pacote c → s de squad soma na taxa de
+`PartyRules.Rules.RateMax` (8) por segundo por jogador; o excedente é descartado e o 1º excedente recebe `TooFast`.
+Fora de um papel de lobby, todo pacote de squad responde `PartyNotice{ Key = "WrongServer" }`. Constantes e chaves:
+`ReplicatedStorage.shared.Party.PartyRules` (`Rules`, `NoticeKeys`).
+
+### 16.1 `Party` (set, id = `PartyId` 1..65535)
+
+```lua
+Party = Lync.replicate(Lync.struct({
+	Leader = Lync.f64(),
+	Members = Lync.array(Lync.f64(), 1, 4), -- ordem da squad, líder primeiro
+	Ready = Lync.map(Lync.f64(), Lync.bool(), 0, 4), -- todo membro; o líder sempre true
+	State = Lync.enum({ "Forming", "Starting" }),
+})),
+```
+
+| | |
+|---|---|
+| Escreve | `PartyService` (só no lobby), único escritor |
+| Audiência | todos no lobby (sem `keyBy`); o client acha a própria squad procurando o seu UserId em `Members` |
+| Vida | `add` ao criar; `update` (registro inteiro) a cada mudança; `remove` quando fica vazia. Não existe no `Game` |
+| `State` | `Forming` = montando; `Starting` = reserva/teleporte em curso (nada muda até acabar; falha volta a `Forming`) |
+
+### 16.2 Pedidos (c → s; responde `PartyService`)
+
+| Packet | Payload | Validação no servidor | Resposta |
+|---|---|---|---|
+| `PartyCreate` | — | fora de squad | set + `Created` / `AlreadyInParty` |
+| `PartyInvite` | `{ UserId }` | líder (sem squad: cria e vira líder), alvo no servidor, não é ele mesmo, fora da squad, `Forming`, vaga, 3 s por alvo | `PartyInviteReceived` ao alvo + `InviteSent{UserId}` / `InviteSelf`, `PlayerNotFound`, `NotLeader`, `Busy`, `AlreadyInParty{UserId}`, `PartyFull`, `TooFast` |
+| `PartyRespond` | `{ PartyId, Accept }` | convite existe e não expirou (60 s), squad existe e `Forming`, vaga; a squad atual (se houver) está `Forming` | aceito: set + `Joined{UserId}` à squad; recusado: `InviteDeclined{UserId}` ao líder; `InviteExpired`, `PartyFull`, `Busy` |
+| `PartyLeave` | — | está numa squad (vale até em `Starting`) | set + `Left{UserId}` aos que ficam (+ `NewLeader{UserId}` se era o líder) / `NotInParty` |
+| `PartyKick` | `{ UserId }` | líder, `Forming`, alvo é membro e não é ele | `Kicked` ao alvo + `Left{UserId}` à squad / `NotLeader`, `Busy`, `PlayerNotFound` |
+| `PartyReady` | `{ Ready }` | membro não-líder, `Forming` | set / `NotInParty`, `Busy` |
+| `PartyStart` | — | líder, `Forming`, todos os outros prontos, fora do Studio | set `Starting` + `Starting` à squad → teleporte (`TeleportRetry` a cada nova tentativa; `TeleportFailed` se todas falharem) / `NotLeader`, `Busy`, `NotAllReady{UserId}`, `StudioNoTeleport` |
+
+### 16.3 Avisos (s → jogador)
+
+```lua
+PartyInviteReceived = Lync.packet(Lync.struct({ From = Lync.f64(), PartyId = Lync.int(1, 65535) })),
+PartyNotice = Lync.packet(Lync.struct({
+	Key = Lync.enum(PartyRules.NoticeKeys),
+	UserId = Lync.optional(Lync.f64()), -- o outro jogador, quando o aviso nomeia alguém
+})),
+```
+
+`PartyNotice.Key` (o client é dono dos textos): `Created`, `AlreadyInParty`, `NotInParty`, `NotLeader`, `PartyFull`,
+`PlayerNotFound`, `InviteSelf`, `InviteSent`, `InviteExpired`, `InviteDeclined`, `Joined`, `Left`, `Kicked`,
+`NewLeader`, `NotAllReady`, `Busy`, `TooFast`, `Starting`, `TeleportRetry`, `TeleportFailed`, `StudioNoTeleport`,
+`ReturningToLobby`, `ReturnFailed`, `WrongServer`. **Acréscimo ao combinado**: o campo opcional `UserId` (o frontend
+pode ignorar).
+
+### 16.4 `LobbyReturn` (c → s, papel `Game`; responde `PartyRunService`) — **entrada nova**
+
+```lua
+LobbyReturn = Lync.packet(Lync.empty()),
+```
+
+Botão "Back to lobby" (tela de fim de run; aceito também no meio da run, DEC-067). 1 por 2 s por jogador. Resposta:
+`ReturningToLobby` e teleporte para um servidor público da place; `ReturnFailed` depois de 3 tentativas;
+`StudioNoTeleport` no Studio; `WrongServer` fora de servidor reservado `Game`. No `RunEnded` o servidor manda todos
+sozinho depois de 12 s (cada um recebe `ReturningToLobby`).
+
+### 16.5 TeleportData (não é Lync; escrito só pelo `PartyService`)
+
+```lua
+{ Role = "Game", PartyId = number, Members = { UserId }, Leader = UserId }
+```
+
+Lido no servidor reservado por `RoleService` (`player:GetJoinData().TeleportData` do 1º jogador, validado por
+`Roles.ParseLaunch`). Não é autorização: só servidores do jogo têm o código do reservado.
+
+Orçamento: eventos por clique e um set de ≤ 4 UserIds por squad; irrelevante.

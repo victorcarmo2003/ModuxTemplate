@@ -28,6 +28,10 @@ export type SpawnRequest = {
 	Outfit: string?, -- forced civil outfit
 	From: string?, -- spawn node/point id (default: SPAWN_POINTS)
 	Rng: Random?, -- seeded Random of the run (architecture.md §4 rule 6); default: the service Random
+	-- Adopted passer-by (TASK-163): floor pose to stand on instead of the From point (From = node it routes from)
+	At: CFrame?,
+	Plain: boolean?, -- no customer-type accessories (keeps the passer-by's look)
+	Walker: number?, -- Pedestrians slot it came from: rig attribute FromWalker
 }
 export type WalkOptions = {
 	AvoidQueue: boolean?, -- default true: Q1..Q5 only as start or goal

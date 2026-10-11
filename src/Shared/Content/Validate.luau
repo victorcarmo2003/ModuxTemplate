@@ -1156,8 +1156,15 @@ local function checkCutscenes()
 		inRange("Cutscenes.Rules", nil, car, "Cars.Look", row.Look, 1, #Traffic.Looks.Shapes * #Traffic.Looks.Paints)
 	end
 	const intro = Cutscenes.ByKey.intro
-	if intro.Cap > Shift.ByKey.Intro.Duration then
-		fail("Cutscenes", nil, "intro", `Cap {intro.Cap} above the Intro phase cap ({Shift.ByKey.Intro.Duration} s)`)
+	-- the intro starts after the ClientReady wait (Rules.ReadyTimeout at most), inside the same phase
+	const introNeeds = intro.Cap + Cutscenes.Rules.ReadyTimeout
+	if introNeeds > Shift.ByKey.Intro.Duration then
+		fail(
+			"Cutscenes",
+			nil,
+			"intro",
+			`Cap {intro.Cap} + ReadyTimeout {Cutscenes.Rules.ReadyTimeout} above the Intro phase cap ({Shift.ByKey.Intro.Duration} s)`
+		)
 	end
 	-- finale and its Next chain play inside the Finale phase
 	local total, hops = 0, 0
@@ -1441,6 +1448,23 @@ local function checkSeating()
 	inRange(g, nil, nil, "PatienceBonus", groups.PatienceBonus, 0, 120)
 	inRange(g, nil, nil, "PartnerSpeedMult", groups.PartnerSpeedMult, 1, 3)
 	inRange(g, nil, nil, "Leash", groups.Leash, 1, 50)
+	-- Flow.Adopt (TASK-163, Provisional)
+	const adopt = Flow.Adopt
+	const a = "Flow.Adopt"
+	inRange(a, nil, nil, "ChanceDay", adopt.ChanceDay, 0, 1)
+	inRange(a, nil, nil, "ChanceNight", adopt.ChanceNight, 0, 1)
+	inRange(a, nil, nil, "FromDay", adopt.FromDay, 1, 10000)
+	inRange(a, nil, nil, "FromNight", adopt.FromNight, 0, 10)
+	inRange(a, nil, nil, "MaxDistance", adopt.MaxDistance, 0, 200)
+	inRange(a, nil, nil, "MinGapSeconds", adopt.MinGapSeconds, 0, 600)
+	inRange(a, nil, nil, "NoticeLead", adopt.NoticeLead, 0, 5)
+	inRange(a, nil, nil, "Beat", adopt.Beat, 0, 5)
+	if #adopt.FirstDelay ~= 2 or adopt.FirstDelay[1] > adopt.FirstDelay[2] then
+		fail(a, nil, nil, "FirstDelay must be {min, max} with min <= max")
+	end
+	for _, value in adopt.FirstDelay do
+		inRange(a, nil, nil, "FirstDelay", value, 0, 600)
+	end
 	for index, pair in groups.Pairs do
 		const label = `{pair.Leader}+{pair.Partner}`
 		const leader = CustomerTypes.ByKey[pair.Leader]

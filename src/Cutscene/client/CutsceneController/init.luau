@@ -22,6 +22,11 @@
 	            flyer, Mart bell. A car with Rules.Cars[].Cross is synced to the own body: it passes when the body
 	            reaches fraction At of the crossing + the planned time to its stop + After (CrossClock)
 
+	Ready gate: the server holds a chain (record Waiting = true, Scene "none") until every participant's client sent
+	ClientReady (LoadingController); `Waiting` mirrors it so the loading screen stays up meanwhile. The intro voices
+	are loaded under that loading screen (PreloadVoices -> Speech.Preload: one request at a time, retry, voice
+	fallback), and the same Speech is used when the chain starts.
+
 	Cutscene active (for the HUD and anyone else): `CutsceneController.Active` (Vide source, true from the first
 	segment to the end of the chain) and the attribute `CutsceneActive` (true / nil) on Players.LocalPlayer.
 
@@ -71,12 +76,13 @@ local Walker = require(script.Walker)
 type Beat = Content.CutsceneBeat
 type Scene = Content.Cutscene
 
-export type Record = { Scene: string, StartedAt: number, Votes: number, Needed: number }
+export type Record = { Scene: string, StartedAt: number, Votes: number, Needed: number, Waiting: boolean }
 -- HudBanner.Shown, local so the generated type file needs no component require
 type Shown = { Title: string, Line: string } | false
 
 const RECORD = 1
 const NONE = "none"
+const INTRO = "intro"
 const BIND_NAME = "CutsceneSkip"
 const KEY_LABEL = { KeyboardMouse = "E", Gamepad = "X", Touch = "" }
 const RENDER_STEP = "CutsceneController.Timeline"
@@ -124,6 +130,8 @@ function CutsceneController:Setup()
 	self.SceneKey = Vide.source(NONE) :: Vide.Source<string>
 	self.Votes = Vide.source(0) :: Vide.Source<number>
 	self.Needed = Vide.source(0) :: Vide.Source<number>
+	-- the server holds the next chain until every participant's client is ready (LoadingController, ClientReady)
+	self.Waiting = Vide.source(false) :: Vide.Source<boolean>
 	-- presentation
 	self.Fade = Vide.source(0) :: Vide.Source<number>
 	self.Speaker = Vide.source("") :: Vide.Source<string>
@@ -490,17 +498,47 @@ function CutsceneController:VoiceVolume(): number
 	return (volumes.Master or 1) * (volumes.Voice or 1)
 end
 
+-- The text-to-speech of the session (built on first use; destroyed at the end of a chain)
+function CutsceneController:SpeechOf(): Speech.Speech
+	const existing = self.Speech
+	if existing ~= nil then
+		return existing
+	end
+	const speech = Speech.new(function(): number
+		return self:VoiceVolume()
+	end)
+	self.Speech = speech
+	return speech
+end
+
+-- Loads the voices of every intro line ahead (LoadingController, under the loading screen): the variant this
+-- client will most likely see first (party = more than one player now), then the other. Yields until all are
+-- settled or `timeout`; what is left keeps loading in the background. progress(0..1).
+function CutsceneController:PreloadVoices(timeout: number, progress: ((number) -> ())?)
+	const scene = Content.Cutscenes.ByKey[INTRO]
+	if scene == nil then
+		if progress ~= nil then
+			progress(1)
+		end
+		return
+	end
+	const party = #Players:GetPlayers() > 1
+	const lines = Timeline.Beats(scene, party)
+	for _, beat in Timeline.Beats(scene, not party) do
+		if table.find(lines, beat) == nil then
+			table.insert(lines, beat)
+		end
+	end
+	self:SpeechOf().Preload(lines, timeout, progress)
+end
+
 function CutsceneController:BeginChain()
 	self.Playing = true
 	self.EndedAt = nil
 	self.Windows = nil
 	self.Active(true)
 	Players.LocalPlayer:SetAttribute(ACTIVE_ATTRIBUTE, true)
-	if self.Speech == nil then
-		self.Speech = Speech.new(function(): number
-			return self:VoiceVolume()
-		end)
-	end
+	self:SpeechOf()
 	self.Party = #Players:GetPlayers() > 1
 	const input = self.Dependencies.InputController
 	self.PreviousContext = input.Context
@@ -576,6 +614,7 @@ function CutsceneController:Apply(record: Record?)
 		self.SceneKey(key)
 		self.Votes(if record ~= nil then record.Votes else 0)
 		self.Needed(if record ~= nil then record.Needed else 0)
+		self.Waiting(if record ~= nil then record.Waiting else false)
 	end)
 	if key == NONE or Content.Cutscenes.ByKey[key] == nil then
 		self:EndChain()

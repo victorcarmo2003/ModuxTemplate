@@ -1,12 +1,27 @@
 {
 	"globIgnorePaths": [
-		"**/*.md"
+		"**/*.md",
+		"src/Loading/boot/**"
 	],
 	"name": "ModuxTemplate",
 	"tree": {
 		"$className": "DataModel",
 		"Lighting": {},
-		"ReplicatedFirst": {},
+		"ReplicatedFirst": {
+			"LoadingBoot": {
+				"$path": "src/Loading/boot/LoadingBoot.client.luau"
+			},
+			"client": {
+				"$className": "Folder",
+				"$ignoreUnknownInstances": false,
+				"Loading": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Loading/replicatedfirst"
+					}
+				}
+			}
+		},
 		"ReplicatedStorage": {
 			"DevPackages": {
 				"$path": "DevPackages"
@@ -66,6 +81,12 @@
 						}
 					}
 				},
+				"Party": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Party/shared"
+					}
+				},
 				"Pedestrian": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
@@ -78,10 +99,22 @@
 						"optional": "src/Place/shared"
 					}
 				},
+				"ServerRole": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/ServerRole/shared"
+					}
+				},
 				"Traffic": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
 						"optional": "src/Traffic/shared"
+					}
+				},
+				"Tutorial": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Tutorial/shared"
 					}
 				},
 				"Types": {
@@ -127,6 +160,12 @@
 					"$ignoreUnknownInstances": false,
 					"$path": {
 						"optional": "src/Class/server"
+					}
+				},
+				"Codes": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Codes/server"
 					}
 				},
 				"Customer": {
@@ -177,6 +216,12 @@
 						"optional": "src/Light/server"
 					}
 				},
+				"Lobby": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Lobby/server"
+					}
+				},
 				"Market": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
@@ -204,6 +249,12 @@
 					"$ignoreUnknownInstances": false,
 					"$path": {
 						"optional": "src/Npc/server"
+					}
+				},
+				"Party": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Party/server"
 					}
 				},
 				"Pedestrian": {
@@ -252,6 +303,18 @@
 					"$ignoreUnknownInstances": false,
 					"$path": {
 						"optional": "src/Seating/server"
+					}
+				},
+				"ServerRole": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/ServerRole/server"
+					}
+				},
+				"Shop": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Shop/server"
 					}
 				},
 				"Thief": {
@@ -422,6 +485,18 @@
 							"optional": "src/Light/client"
 						}
 					},
+					"Loading": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Loading/client"
+						}
+					},
+					"Lobby": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Lobby/client"
+						}
+					},
 					"Market": {
 						"$ignoreUnknownInstances": false,
 						"$path": {
@@ -479,6 +554,12 @@
 						"$ignoreUnknownInstances": false,
 						"$path": {
 							"optional": "src/Round/client"
+						}
+					},
+					"Seating": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Seating/client"
 						}
 					},
 					"Stage": {

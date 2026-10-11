@@ -194,6 +194,7 @@ const HudController = Modux.Controller("HudController", {
 		"CustomerController",
 		"AudioController",
 		"TutorialController",
+		"PlaceController",
 	},
 	Priority = 500,
 })
@@ -781,6 +782,11 @@ HudController:OnInit(function(self)
 end)
 
 HudController:OnStart(function(self)
+	-- the game HUD only lives in Game servers; the lobby has its own HUD (LobbyController, 2026-10-11)
+	const place = self.Dependencies.PlaceController
+	if place:Is("Lobby") then
+		return
+	end
 	self:WatchViewport()
 	-- PlayerGui may arrive a frame late; do not hold up the other OnStart.
 	task.spawn(function()

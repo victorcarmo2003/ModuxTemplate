@@ -21,6 +21,7 @@ type Cache = {
 }
 
 const ROOT_TAG = "MapBinding"
+const LOBBY_PREFIX = "LOBBY-" -- lobby MapPoints may sit outside the MapBinding root (architecture.md §20.4)
 const DEFAULT_WAIT = 30 -- seconds WaitReady waits for streaming by default
 const POLL = 0.1
 -- Root present but a count short and nothing new streamed in for this long: the counts are stale (the binding changed
@@ -358,7 +359,8 @@ function MapIndex.Validate(required: List): { string }
 			add(`1: PointId {id} duplicated ({nameOf(points[id])}, {nameOf(instance)})`)
 		end
 		points[id] = instance
-		if root ~= nil and not instance:IsDescendantOf(root) then
+		-- LOBBY-* points belong to the lobby map, which lives in the same place outside MAP-01 (architecture.md §20.4)
+		if root ~= nil and not instance:IsDescendantOf(root) and string.sub(id, 1, #LOBBY_PREFIX) ~= LOBBY_PREFIX then
 			add(`5: MapPoint {id} outside the MapBinding root`)
 		end
 		if not instance:IsA("BasePart") then

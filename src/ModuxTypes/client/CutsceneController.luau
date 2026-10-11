@@ -10,7 +10,7 @@ local Walker = require(StarterPlayer.StarterPlayerScripts.client.Cutscene.Cutsce
 
 type Beat = Content.CutsceneBeat
 type Scene = Content.Cutscene
-export type Record = { Scene: string, StartedAt: number, Votes: number, Needed: number }
+export type Record = { Scene: string, StartedAt: number, Votes: number, Needed: number, Waiting: boolean }
 type Shown = { Title: string, Line: string } | false
 
 export type Public = {
@@ -49,6 +49,7 @@ export type Public = {
 	Unmounts: { () -> () },
 	Voted: Vide.Source<boolean>,
 	Votes: Vide.Source<number>,
+	Waiting: Vide.Source<boolean>,
 	Walker: Walker.Walker?,
 	Warned: { [string]: boolean },
 	Windows: { BasePart }?,
@@ -63,6 +64,8 @@ export type Public = {
 	ActorFolder: (self: Public) -> Folder,
 	ClearSegment: (self: Public) -> (),
 	VoiceVolume: (self: Public) -> number,
+	SpeechOf: (self: Public) -> Speech.Speech,
+	PreloadVoices: (self: Public, timeout: number, progress: ((number) -> ())?) -> (),
 	BeginChain: (self: Public) -> (),
 	EndChain: (self: Public) -> (),
 	BeginSegment: (self: Public, key: string, startedAt: number) -> (),

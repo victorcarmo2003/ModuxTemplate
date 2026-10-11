@@ -3,8 +3,9 @@
 -- ui-text.md). Top centre, under the clock row, narrow (50% of the width, 300..520 px) so it never covers the
 -- crosshair, the hotbar or the thumb controls on a phone.
 --   Cream CartoonPanel card, thick Ink outline (reading surface: light, high contrast)
---   Mustard step chip "2/7" on the left
---   instruction (20 px Ink) and an optional hint line (16 px, Ink top tone) that wraps instead of shrinking
+--   Mustard step chip "2/7" on the left; it turns Green with a check while `Done` is true (step just completed)
+--   optional "STEP 2 OF 7" label (14 px), the instruction (20 px Ink, starts with the verb) and an optional hint line
+--   (16 px, Ink top tone) that wraps instead of shrinking
 --   Cream "Skip" tag hanging off the bottom-right corner (>= 44 px tall touch target), with the key of the device
 -- Pops in/out (Motion.Pop) and jumps each time the step number goes up (Motion.Bump).
 -- Pure: only props. TutorialController owns the step, the texts, the skip bind and when it shows.
@@ -15,6 +16,7 @@ local Motion = require(script.Parent.Motion)
 local CartoonPanel = require(script.Parent.CartoonPanel)
 local CartoonLabel = require(script.Parent.CartoonLabel)
 local CartoonButton = require(script.Parent.CartoonButton)
+local Icons = require(script.Parent.Icons)
 
 const create = Vide.create
 -- Vide 0.4.1 types `create` for 19 classes only; UIScale, UIPadding, UIListLayout and UISizeConstraint are not among
@@ -27,6 +29,10 @@ export type Props = {
 	Step: () -> number,
 	Total: () -> number,
 	Text: () -> string,
+	-- Small line over the instruction ("STEP 2 OF 7"); nil or "" hides it.
+	Label: (() -> string)?,
+	-- The step was just completed: Green chip with a check. Default false.
+	Done: (() -> boolean)?,
 	-- Line under the instruction; "" hides it.
 	Hint: () -> string,
 	-- Skip tag text ("Skip (Q)"); "" hides the tag.
@@ -47,13 +53,25 @@ const MIN_WIDTH = 300
 const MAX_WIDTH = 520
 const GAP = 10
 const SKIP_SIZE = 16
+const LABEL_SIZE = 14
+const CHECK = "Ui/check"
+const CHECK_SIZE = 30
 
 return function(props: Props): Frame
 	const pop = Motion.Pop(props.Shown)
 	const bump = Motion.Bump(props.Step, 1.08)
+	const checkRect = Icons.Rect(CHECK)
 
 	local function hasChip(): boolean
 		return props.Total() > 0
+	end
+
+	local function done(): boolean
+		return if props.Done then props.Done() else false
+	end
+
+	local function label(): string
+		return if props.Label then props.Label() else ""
 	end
 
 	return create("Frame")({
@@ -98,7 +116,9 @@ return function(props: Props): Frame
 					Name = "Chip",
 					LayoutOrder = 1,
 					Size = UDim2.fromOffset(CHIP, CHIP),
-					Tone = Theme.Tone.Mustard,
+					Tone = function()
+						return if done() then Theme.Tone.Green else Theme.Tone.Mustard
+					end,
 					Outline = Theme.Outline.Normal,
 					Lip = 3,
 					Visible = hasChip,
@@ -108,10 +128,34 @@ return function(props: Props): Frame
 							TextSize = 16,
 							Color = Theme.Color.Dark,
 							Stroke = 0,
+							Visible = function()
+								return not done()
+							end,
 							Text = function()
 								return `{props.Step()}/{props.Total()}`
 							end,
 						}),
+						-- check of a completed step (the "V" glyph while the UI sheet is missing)
+						if checkRect
+							then create("ImageLabel")({
+								Name = "Check",
+								AnchorPoint = Vector2.new(0.5, 0.5),
+								Position = UDim2.fromScale(0.5, 0.5),
+								Size = UDim2.fromOffset(CHECK_SIZE, CHECK_SIZE),
+								BackgroundTransparency = 1,
+								Image = Icons.ImageOf(CHECK),
+								ImageRectOffset = checkRect.Offset,
+								ImageRectSize = checkRect.Size,
+								Visible = done,
+							})
+							else CartoonLabel({
+								Name = "Check",
+								Box = UDim2.fromScale(1, 1),
+								TextSize = 22,
+								Color = Theme.Color.Text,
+								Text = "V",
+								Visible = done,
+							}),
 					},
 				}),
 
@@ -128,6 +172,20 @@ return function(props: Props): Frame
 						FillDirection = Enum.FillDirection.Vertical,
 						SortOrder = Enum.SortOrder.LayoutOrder,
 						Padding = UDim.new(0, 2),
+					}),
+					CartoonLabel({
+						Name = "Label",
+						LayoutOrder = 0,
+						Box = UDim2.fromScale(1, 0),
+						AutomaticSize = Enum.AutomaticSize.Y,
+						TextSize = LABEL_SIZE,
+						Color = Theme.Tone.Ink.Top,
+						Stroke = 0,
+						XAlignment = Enum.TextXAlignment.Left,
+						Text = label,
+						Visible = function()
+							return label() ~= ""
+						end,
 					}),
 					CartoonLabel({
 						Name = "Text",

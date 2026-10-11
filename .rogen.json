@@ -10,6 +10,11 @@
 		"name": "ModuxTemplate",
 		"tree": {
 			"$className": "DataModel",
+			"ReplicatedFirst": {
+				"LoadingBoot": {
+					"$path": "src/Loading/boot/LoadingBoot.client.luau"
+				}
+			},
 			"ReplicatedStorage": {
 				"Packages": {
 					"$path": "Packages"
@@ -26,6 +31,7 @@
 		}
 	},
 	"globIgnorePaths": [
-		"**/*.md"
+		"**/*.md",
+		"src/Loading/boot/**"
 	]
 }

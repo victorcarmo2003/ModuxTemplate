@@ -14,9 +14,9 @@
 	            wider than Rules.Sign.MinWidth wins, then the first along the sidewalk line (Rules.Sign.Line) within
 	            Range. CFrame at its centre. nil = no tagged sign (callers fall back).
 	  SignStand()
-	            where the body stops for the sign: the point of the sidewalk line nearest to the sign, at least
-	            Rules.Sign.MinDistance from it (pulled back along the line), on the ground, facing the sign.
-	            No sign: the Rules.Sign.Fallback MapPoint.
+	            where the body stops for the sign: Rules.Sign.Distance studs straight out of its printed face (the
+	            face turned towards the sidewalk line), on the ground, facing the sign. No sign: the
+	            Rules.Sign.Fallback MapPoint.
 	  Spot(target, slot, count)
 	            where a body of `slot` stands for a MoveTo target: Rules.Stand.Target ("CS-P{slot}") = in front of the
 	            phone (Rules.Stand.Slots: slot 1 ~3 studs, mates in a half moon), facing it; any other target = its
@@ -233,10 +233,12 @@ local function signLine(): (Vector3?, Vector3?)
 	return if a ~= nil then a.Position else nil, if b ~= nil then b.Position else nil
 end
 
-function Anchors.Sign(): CFrame?
+-- The tagged NO HELP WANTED sign of the stop (Rules.Sign) and its centre
+local function signInstance(): (Instance?, Vector3?)
 	const rules = RULES.Sign
 	const a, b = signLine()
-	local best: Vector3? = nil
+	local best: Instance? = nil
+	local bestCentre: Vector3? = nil
 	local bestScore = math.huge
 	for _, instance in CollectionService:GetTagged(rules.Tag) do
 		if not instance:IsDescendantOf(Workspace) then
@@ -255,38 +257,84 @@ function Anchors.Sign(): CFrame?
 		end
 		if score < bestScore then
 			bestScore = score
-			best = centre
+			best = instance
+			bestCentre = centre
 		end
 	end
-	return if best ~= nil then CFrame.new(best) else nil
+	return best, bestCentre
 end
 
--- Stop in front of the NO HELP WANTED sign (Rules.Sign), facing it; the Fallback MapPoint without a sign
+-- Horizontal axis of a box that is its thinnest (the normal of a flat card), among the mostly horizontal ones
+local function thinAxis(frame: CFrame, size: Vector3): Vector3?
+	local best: Vector3? = nil
+	local thinnest = math.huge
+	for _, pair in { { frame.RightVector, size.X }, { frame.UpVector, size.Y }, { frame.LookVector, size.Z } } do
+		const axis = pair[1] :: Vector3
+		const extent = pair[2] :: number
+		if math.abs(axis.Y) < 0.7 and extent < thinnest then
+			thinnest = extent
+			best = axis
+		end
+	end
+	return if best ~= nil then flat(best) else nil
+end
+
+-- Outward normal of a sign (either side): the face of its SurfaceGui, else the thinnest horizontal axis of the card
+local function signNormal(instance: Instance): Vector3?
+	if instance:IsA("BasePart") then
+		for _, child in instance:GetChildren() do
+			if child:IsA("SurfaceGui") then
+				return flat(printedFace(instance))
+			end
+		end
+		return thinAxis(instance.CFrame, instance.Size)
+	elseif instance:IsA("Model") then
+		for _, descendant in instance:GetDescendants() do
+			if descendant:IsA("SurfaceGui") and descendant.Parent ~= nil and descendant.Parent:IsA("BasePart") then
+				return flat(printedFace(descendant.Parent :: BasePart))
+			end
+		end
+		const box, size = instance:GetBoundingBox()
+		return thinAxis(box, size)
+	end
+	return nil
+end
+
+function Anchors.Sign(): CFrame?
+	const _, centre = signInstance()
+	return if centre ~= nil then CFrame.new(centre) else nil
+end
+
+-- Stop right in front of the NO HELP WANTED sign (Rules.Sign.Distance out of its face, on the side of the sidewalk
+-- line), facing it; the Fallback MapPoint without a sign
 function Anchors.SignStand(): CFrame?
 	const rules = RULES.Sign
-	const sign = Anchors.Sign()
+	const instance, centre = signInstance()
 	const a, b = signLine()
-	if sign == nil or a == nil or b == nil then
+	if instance == nil or centre == nil then
 		return mapPoint(rules.Fallback)
 	end
-	const direction = flat(b - a)
-	if direction == nil then
+	-- towards the sidewalk: the foot of the sign on the line (or, on the line itself, back towards where the walk
+	-- comes from)
+	local toward: Vector3? = nil
+	local groundY = centre.Y
+	if a ~= nil and b ~= nil then
+		const t = math.clamp((along(a, b, centre)), 0, 1)
+		const foot = a:Lerp(b, t)
+		groundY = foot.Y
+		toward = flat(foot - centre) or flat(a - b)
+	end
+	local normal = signNormal(instance) or toward
+	if normal == nil then
 		return mapPoint(rules.Fallback)
 	end
-	const centre = sign.Position
-	const length = Vector3.new(b.X - a.X, 0, b.Z - a.Z).Magnitude
-	const t = math.clamp((along(a, b, centre)), 0, 1)
-	local s = t * length
-	const foot = a:Lerp(b, t)
-	const off = Vector3.new(centre.X - foot.X, 0, centre.Z - foot.Z).Magnitude
-	if off < rules.MinDistance then
-		-- the sign stands right by the line: stop before it
-		s = math.max(s - math.sqrt(rules.MinDistance * rules.MinDistance - off * off), 0)
+	if toward ~= nil and normal:Dot(toward) < 0 then
+		normal = -normal
 	end
-	const at = a:Lerp(b, if length > 1e-3 then s / length else 0)
-	const y = groundAt(at + Vector3.new(0, GROUND_LIFT, 0), at.Y) or at.Y
+	const at = Vector3.new(centre.X, groundY, centre.Z) + normal * rules.Distance
+	const y = groundAt(at + Vector3.new(0, GROUND_LIFT, 0), groundY) or groundY
 	const stand = Vector3.new(at.X, y, at.Z)
-	const face = flat(centre - stand) or direction
+	const face = flat(centre - stand) or -normal
 	return CFrame.lookAt(stand, stand + face)
 end
 

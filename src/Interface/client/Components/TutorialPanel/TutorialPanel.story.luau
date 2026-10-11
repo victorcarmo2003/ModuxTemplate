@@ -1,6 +1,7 @@
 --!strict
 -- TutorialPanel on a phone-sized frame (iPhone SE landscape, 667 x 375) or the whole viewport. Move "Step" up to see
--- the jump; "Shown" pops it in/out; clear "Hint" or "Skip" to hide those lines. Skip clicks are counted.
+-- the jump; "Shown" pops it in/out; "Done" shows the green check chip; clear "Label", "Hint" or "Skip" to hide those
+-- lines. Skip clicks are counted.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -17,6 +18,8 @@ type Controls = {
 	Step: () -> number,
 	Total: () -> number,
 	Text: () -> string,
+	Label: () -> string,
+	Done: () -> boolean,
 	Hint: () -> string,
 	Skip: () -> string,
 }
@@ -27,10 +30,12 @@ return UILabs.CreateVideStory({
 		Phone = true,
 		Scale = UILabs.Slider(1, 1, 2, 0.05),
 		Shown = true,
-		Step = UILabs.Slider(1, 1, 7, 1),
-		Total = UILabs.Slider(7, 0, 9, 1),
-		Text = "Put a sausage on the grill",
-		Hint = 'Walk to the cooler and press "Grill".',
+		Step = UILabs.Slider(3, 1, 9, 1),
+		Total = UILabs.Slider(9, 0, 9, 1),
+		Text = "Grill a sausage",
+		Label = "STEP 3 OF 9",
+		Done = false,
+		Hint = 'Grab one at the cooler: press "Grill".',
 		Skip = "Skip (Q)",
 	},
 }, function(props)
@@ -53,6 +58,8 @@ return UILabs.CreateVideStory({
 			Step = controls.Step,
 			Total = controls.Total,
 			Text = controls.Text,
+			Label = controls.Label,
+			Done = controls.Done,
 			Hint = controls.Hint,
 			SkipText = controls.Skip,
 			OnSkip = function()

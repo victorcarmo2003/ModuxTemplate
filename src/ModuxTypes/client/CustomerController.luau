@@ -11,6 +11,8 @@ export type Record = {
 	Order: { [string]: boolean },
 	PatienceEndsAt: number,
 	Mood: string,
+	Order2: { [string]: boolean }?, -- pair leader: 2nd pending hot dog (network.md §14.2)
+	Leader: number?, -- pair partner: NpcId of its leader (no bubble)
 }
 type Entry = {
 	Id: number,
@@ -23,6 +25,8 @@ type Entry = {
 	Gui: Instance?,
 	Face: string?,
 	Variant: Vide.Source<string | false>, -- rig attribute Variant (TASK-110); false = ordinary customer
+	Done: Vide.Source<Done | false>, -- pair row just resolved (TASK-148)
+	DoneTimer: thread?,
 }
 type Reaction = {
 	Id: number,
@@ -34,6 +38,7 @@ type Tracked = {
 	Id: number?,
 	Connections: { RBXScriptConnection },
 }
+type Done = { Row: number, Toppings: { OrderBubble.Topping } }
 
 export type Public = {
 	Entries: { [number]: Entry },
@@ -49,9 +54,13 @@ export type Public = {
 	RecordOf: (self: Public, id: number) -> Record?,
 	VariantOf: (self: Public, id: number) -> string?,
 	ToppingsOf: (self: Public, record: Record) -> { OrderBubble.Topping },
+	ToppingsOfOrder: (self: Public, order: { [string]: boolean }) -> { OrderBubble.Topping },
 	PatienceOf: (self: Public, entry: Entry) -> number,
 	NewEntry: (self: Public, id: number) -> Entry,
 	WriteRecord: (self: Public, id: number, record: Record?) -> (),
+	MarkDone: (self: Public, entry: Entry, row: number, toppings: { OrderBubble.Topping }) -> (),
+	ClearDone: (self: Public, entry: Entry) -> (),
+	RowsOf: (self: Public, entry: Entry) -> ({ OrderBubble.Topping }, { OrderBubble.Topping }?, number),
 	Drop: (self: Public, id: number) -> (),
 	Detach: (self: Public, entry: Entry) -> (),
 	Unmount: (self: Public, entry: Entry) -> (),
@@ -68,6 +77,7 @@ export type Public = {
 	CardShown: (self: Public) -> boolean,
 	CardEmpty: (self: Public) -> boolean,
 	CardToppings: (self: Public) -> { string },
+	CardToppings2: (self: Public) -> { string }?,
 	CardPatience: (self: Public) -> number,
 	Bind: (self: Public, model: Model) -> (),
 	Track: (self: Public, instance: Instance) -> (),

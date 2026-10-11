@@ -20,6 +20,8 @@ local PromptController = require(StarterPlayer.StarterPlayerScripts.client.Modux
 local ItemController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ItemController)
 local KitchenController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.KitchenController)
 local LightController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.LightController)
+local LoadingController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.LoadingController)
+local LobbyController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.LobbyController)
 local MarketController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.MarketController)
 local NeonController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.NeonController)
 local OpenSignController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.OpenSignController)
@@ -29,6 +31,7 @@ local PedestrianController = require(StarterPlayer.StarterPlayerScripts.client.M
 local PlaceController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PlaceController)
 local ProfileController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ProfileController)
 local RoundController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.RoundController)
+local SeatingController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.SeatingController)
 local StageController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.StageController)
 local ThiefController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ThiefController)
 local TrafficController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.TrafficController)
@@ -56,6 +59,8 @@ export type AllControllers = {
 	ItemController: ItemController.Public,
 	KitchenController: KitchenController.Public,
 	LightController: LightController.Public,
+	LoadingController: LoadingController.Public,
+	LobbyController: LobbyController.Public,
 	MarketController: MarketController.Public,
 	NeonController: NeonController.Public,
 	OpenSignController: OpenSignController.Public,
@@ -65,6 +70,7 @@ export type AllControllers = {
 	PlaceController: PlaceController.Public,
 	ProfileController: ProfileController.Public,
 	RoundController: RoundController.Public,
+	SeatingController: SeatingController.Public,
 	StageController: StageController.Public,
 	ThiefController: ThiefController.Public,
 	TrafficController: TrafficController.Public,

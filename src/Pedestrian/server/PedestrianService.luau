@@ -23,8 +23,17 @@
 	    them is off the road. Failsafe (§8.1): still on the road when it expires -> new record at the far curb (logged).
 	  * Loop distances are folded into one lap on every new record.
 
-	API: Count(), Target(), Status(); dev: DevSpawn(pathKey?), DevClear(). Reservation id of a walker = -slot (never
-	an NpcId of NpcService, which are 1..65535).
+	API: Count(), Target(), Status(); dev: DevSpawn(pathKey?), DevClear(), DevAdopt(). Reservation id of a walker =
+	-slot (never an NpcId of NpcService, which are 1..65535).
+
+	Adoption (TASK-163; user request 2026-10-11; CustomerService/Adopt.luau decides when, PROVISIONAL): registered
+	with CustomerService:SetAdopter in OnInit (T42: this service requires CustomerService, never the other way).
+	  * Pick: nearest walker within the radius that is not on a crosswalk nor near the end of its path, whose look
+	    the customer side accepts; it is "noticed": StopDist moves to where it can brake now (anchor kept, so the
+	    past of the record is unchanged on every client), and it never asks for a crosswalk meanwhile;
+	  * Peek / Take: look, floor point, heading and the nearer node of its sidewalk; Take removes the record (the
+	    customer rig appears there in the same frame). The slot refills from a path start like any leaving walker;
+	  * Release: walks on from where it stands.
 
 	PROVISIONAL (backend-coder, TASK-122; the user is away):
 	  (a) tension removes every walker at once (the client may fade them, TASK-123); spawns resume after it, one by
@@ -80,7 +89,12 @@ type Walker = {
 	-- leaving: Loop -> removed at this distance (lap seam)
 	Leaving: boolean,
 	LapEnd: number?,
+	-- braking / standing for the customer side (adoption): no crosswalk request until released or taken
+	Noticed: boolean,
 }
+
+-- What the customer side reads of a noticed walker (CustomerService/Adopt.luau Handoff)
+export type Handoff = { Species: string, Outfit: string, Position: Vector3, Heading: Vector3, Node: string }
 
 -- One reservation held by this service on a crosswalk (key = crosswalk)
 type Hold = {
@@ -98,6 +112,8 @@ const RIDE_MARGIN = 0.5 -- seconds: a rider must be off the road this long befor
 const PATH_RETRY = 5 -- seconds between lookups of a path whose nodes are missing
 const HORIZON = 30 -- seconds Motion.TimeAt may look ahead
 const MIN_STOP = 0.1 -- studs: StopDist 0 means "no stop", so a curb at distance 0 stops here
+const NOTICE_ROOM = 0.25 -- studs added to the braking distance of a noticed walker
+const END_ROOM = 6 -- studs: a walker this close to the end of a through path is never picked
 const PREFIX = "[PedestrianService]"
 
 const EPSILON = Motion.Epsilon
@@ -206,7 +222,7 @@ local function onRoad(geo: WalkGeo.Geo, s: number): boolean
 end
 
 const PedestrianService = Modux.Service("PedestrianService", {
-	Require = { "PlaceService", "NetService", "RoundService", "TrafficService", "AnomalyService" },
+	Require = { "PlaceService", "NetService", "RoundService", "TrafficService", "AnomalyService", "CustomerService" },
 	Priority = 545,
 })
 
@@ -226,6 +242,8 @@ function PedestrianService:Setup()
 	const species, outfits = lookLists()
 	self.SpeciesList = species :: { string }
 	self.OutfitList = outfits :: { string }
+	-- dev controls of the customer side (CustomerService:SetAdopter)
+	self.Adoption = nil :: { Force: () -> string, Status: () -> string }?
 end
 
 function PedestrianService:WarnOnce(key: string, message: string)
@@ -376,6 +394,7 @@ function PedestrianService:Spawn(row: WalkPath, geo: WalkGeo.Geo, dist: number, 
 		Crossing = nil,
 		Leaving = false,
 		LapEnd = nil,
+		Noticed = false,
 	}
 	self.Walkers[id] = walker
 	self:Anchor(walker, dist, true, t, true)
@@ -464,6 +483,9 @@ end
 -- Tick ------------------------------------------------------------------------------------------------------------
 
 function PedestrianService:StepWalker(walker: Walker, t: number)
+	if walker.Noticed then
+		return -- stands for the customer side until Take / Release
+	end
 	const crossing = walker.Crossing
 	if crossing ~= nil then
 		if walker.Dist >= crossing.Exit - EPSILON then
@@ -661,6 +683,132 @@ function PedestrianService:Step()
 	self:TrySpawn(t)
 end
 
+-- Adoption (TASK-163; CustomerService/Adopt.luau) ------------------------------------------------------------------
+
+-- Inside the road part of a crosswalk (the near curb itself is sidewalk)
+local function onCrosswalk(geo: WalkGeo.Geo, s: number): boolean
+	const folded = WalkGeo.Fold(geo, s)
+	for _, crossing in geo.Crossings do
+		if folded > crossing.From + 0.5 and folded < crossing.To + 0.5 then
+			return true
+		end
+	end
+	return false
+end
+
+-- Nearest free walker within `radius` (XZ) of `center` whose look `accept`s; it brakes there. Returns its slot.
+function PedestrianService:AdoptPick(
+	center: Vector3,
+	radius: number,
+	accept: (species: string, outfit: string) -> boolean
+): number?
+	if not self:CanWalk() then
+		return nil
+	end
+	local best: Walker? = nil
+	local bestDistance = radius
+	for _, walker in self.Walkers do
+		const geo = walker.Geo
+		if
+			walker.Noticed
+			or walker.Crossing ~= nil
+			or onCrosswalk(geo, walker.Dist)
+			or (not geo.Loop and walker.Dist > geo.Length - END_ROOM)
+		then
+			continue
+		end
+		const offset = WalkGeo.PointAt(geo, walker.Dist) - center
+		const distance = Vector3.new(offset.X, 0, offset.Z).Magnitude
+		if distance <= bestDistance and accept(walker.Record.Species, walker.Record.Outfit) then
+			best = walker
+			bestDistance = distance
+		end
+	end
+	if best == nil then
+		return nil
+	end
+	const walker = best :: Walker
+	-- brake from where it is now: StopDist past the braking distance + one grid step of Motion (so the record's past
+	-- does not change); a nearer stop already set is kept
+	const record = walker.Record
+	walker.Dist, walker.Speed = Motion.Sample(walker.Profile, record, walker.Cursor, now())
+	local stopAt = walker.Dist + walker.Speed * walker.Speed / (2 * WalkGeo.Brake) + walker.Speed * 0.1 + NOTICE_ROOM
+	if record.StopDist > 0 and record.StopDist >= walker.Dist - EPSILON and record.StopDist < stopAt then
+		stopAt = record.StopDist
+	end
+	if not walker.Geo.Loop then
+		stopAt = math.min(stopAt, walker.Geo.Length - MIN_STOP)
+	end
+	record.StopDist = f32(math.max(stopAt, MIN_STOP))
+	record.HeldUntil = 0
+	walker.Cursor = Motion.Cursor(walker.Profile, record)
+	walker.Noticed = true
+	walker.ParkedAt = nil
+	self:Publish(walker, false)
+	return walker.Id
+end
+
+function PedestrianService:NoticedWalker(slot: number): Walker?
+	const walker = self.Walkers[slot]
+	return if walker ~= nil and walker.Noticed then walker else nil
+end
+
+-- Look and place of the noticed walker of `slot`, nil when it is gone
+function PedestrianService:AdoptPeek(slot: number): Handoff?
+	const walker = self:NoticedWalker(slot)
+	if walker == nil then
+		return nil
+	end
+	const geo = walker.Geo
+	const row = Content.WalkPaths.ByKey[geo.Key]
+	if row == nil then
+		return nil
+	end
+	const nodes = row.Nodes
+	const cum = geo.Path.Cum
+	const folded = WalkGeo.Fold(geo, walker.Dist)
+	-- segment [i, i + 1] holding the walker; the nearer of its two nodes (a Loop closes back to node 1)
+	local index = 1
+	for i = 1, #cum - 1 do
+		if folded >= cum[i] then
+			index = i
+		end
+	end
+	const nextIndex = if index >= #nodes then 1 else index + 1
+	const toNext = (cum[index + 1] or cum[index]) - folded
+	const toPrevious = folded - cum[index]
+	const node = if toNext < toPrevious then nodes[nextIndex] else nodes[index]
+	return {
+		Species = walker.Record.Species,
+		Outfit = walker.Record.Outfit,
+		Position = WalkGeo.PointAt(geo, walker.Dist),
+		Heading = WalkGeo.Heading(geo, walker.Dist),
+		Node = node,
+	}
+end
+
+-- The noticed walker became a customer: its record goes (the slot refills from a path start)
+function PedestrianService:AdoptTake(slot: number): boolean
+	const walker = self:NoticedWalker(slot)
+	if walker == nil then
+		return false
+	end
+	self:Remove(walker)
+	return true
+end
+
+-- Nobody took the noticed walker: it walks on from where it stands
+function PedestrianService:AdoptRelease(slot: number)
+	const walker = self:NoticedWalker(slot)
+	if walker == nil then
+		return
+	end
+	walker.Noticed = false
+	const t = now()
+	walker.Dist, walker.Speed = Motion.Sample(walker.Profile, walker.Record, walker.Cursor, t)
+	self:Anchor(walker, walker.Dist, true, t, false)
+end
+
 -- Dev (DevService/Commands/Pedestrian.luau) -------------------------------------------------------------------------
 
 function PedestrianService:Status(): string
@@ -669,6 +817,10 @@ function PedestrianService:Status(): string
 	if self.Enabled and self.Dependencies.AnomalyService:IsTension() then
 		table.insert(parts, "tension")
 	end
+	const adoption = self.Adoption
+	if adoption ~= nil then
+		table.insert(parts, adoption.Status())
+	end
 	for id = 1, RULES.Slots do
 		const walker = self.Walkers[id]
 		if walker then
@@ -676,7 +828,7 @@ function PedestrianService:Status(): string
 			table.insert(
 				parts,
 				string.format(
-					"#%d %s %.0f/%.0f v%.1f stop %s%s%s",
+					"#%d %s %.0f/%.0f v%.1f stop %s%s%s%s",
 					id,
 					walker.Geo.Key,
 					WalkGeo.Fold(walker.Geo, walker.Dist),
@@ -684,7 +836,8 @@ function PedestrianService:Status(): string
 					walker.Speed,
 					if stop then `{stop.Crosswalk or stop.Kind}@{math.floor(stop.At)}` else "-",
 					if walker.Crossing then ` crossing {walker.Crossing.Crosswalk}` else "",
-					if walker.Leaving then " leaving" else ""
+					if walker.Leaving then " leaving" else "",
+					if walker.Noticed then " noticed" else ""
 				)
 			)
 		end
@@ -726,6 +879,15 @@ function PedestrianService:DevSpawn(pathKey: string?): string
 	return `walker #{walker.Id} on {(row :: WalkPath).Key} ({walker.Record.Species}, {walker.Record.Outfit}, {walker.Record.Speed} studs/s)`
 end
 
+-- The next customer attempt adopts a walker near the queue if one fits (chance and gap ignored)
+function PedestrianService:DevAdopt(): string
+	const adoption = self.Adoption
+	if adoption == nil then
+		error("adoption runs only in the Run place", 0)
+	end
+	return adoption.Force()
+end
+
 function PedestrianService:DevClear(): number
 	const count = self:Count()
 	self:RemoveAll()
@@ -740,6 +902,21 @@ PedestrianService:OnInit(function(self)
 		return
 	end
 	self.Enabled = true
+	-- passers-by that may become customers (TASK-163); CustomerService (590) set up in its own OnInit, before ours
+	self.Adoption = self.Dependencies.CustomerService:SetAdopter({
+		Pick = function(center: Vector3, radius: number, accept: (species: string, outfit: string) -> boolean): number?
+			return self:AdoptPick(center, radius, accept)
+		end,
+		Peek = function(slot: number): Handoff?
+			return self:AdoptPeek(slot)
+		end,
+		Take = function(slot: number): boolean
+			return self:AdoptTake(slot)
+		end,
+		Release = function(slot: number)
+			self:AdoptRelease(slot)
+		end,
+	})
 	if #self.SpeciesList == 0 or #self.OutfitList == 0 then
 		self:WarnOnce("look", "no species with Pedestrian = true or no civil outfit: no walkers")
 	end

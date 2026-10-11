@@ -134,6 +134,9 @@ architect por delegação da DEC-208: técnica, sem regra de jogo nova).
 
 ## 1. Topologia: dois places, um código
 
+> **v4.3 (2026-10-11, TASK-154):** substituído por **uma place com papéis de servidor** (`Lobby` público, `Game`
+> reservado por squad, `PrivateLobby`): ver **§20**. `Workspace.PlaceRole` só vale no Studio como legado.
+
 | Place | Tipo de servidor | MaxPlayers | Papel |
 |---|---|---|---|
 | **Lobby** (start place) | público | 24 (ajustável) | perfil, loja de classes, party, oferta de reconexão/retomada, teleporte, recibos pendentes |
@@ -252,7 +255,7 @@ Quem usa estado de outro no próprio `OnInit` precisa de prioridade menor. `effe
 | 950 | `PlaceService` | — | L+R | |
 | 900 | `PlayerService` | — | L+R | existente |
 | 800 | `ProfileService` | PlayerService, NetService | L+R | +migração, +`RequestSave` |
-| 790 | `MonetizationService` | ProfileService, PlaceService | L+R | `ProcessReceipt` no `OnStart`; handlers registrados por outros no `OnInit` (prioridade menor) |
+| 790 | `MonetizationService` → **`ShopService`** (TASK-160) | ProfileService, NetService | L+R | `ProcessReceipt` no `OnStart`; handlers registrados por outros no `OnInit` (prioridade menor) |
 | 780 | `SessionService` | PlaceService, PlayerService, NetService | L+R | MemoryStore, TeleportService |
 | 760 | `RunStateService` | PlaceService, SessionService, PlayerService, ProfileService, NetService | R | roster, membros, registro de snapshot |
 | 750 | `RoundService` | PlaceService, NetService, RunStateService, InteractionService (v4.1, A5: **sem** `VitalService`; o Vital entra por probe, §19.2, T42) | R | sinais de fase criados no `Setup` |
@@ -263,6 +266,7 @@ Quem usa estado de outro no próprio `OnInit` precisa de prioridade menor. `effe
 | 700 | `VitalService` | PlayerService, RunStateService, RoundService, CharacterService, NetService | R | sanidade + vida |
 | 690 | `ClassService` | ProfileService, PlaceService, NetService | L+R | |
 | 680 | `PartyService` | PlaceService, SessionService, ProfileService, NetService | L | |
+| 670 | `CodesService` (TASK-161) | ProfileService, NetService | L+R | resgate de códigos; tabela só no servidor |
 | 650 | `KitchenService` | InteractionService, ItemService, EconomyService, ClassService | R | |
 | 630 | `UpgradeService` | EconomyService, RunStateService | R | sem prompt próprio (DEC-101) |
 | 620 | `VehicleService` | InteractionService, EconomyService, UpgradeService, RunStateService | R | compra do trailer pelo prompt no próprio trailer (DEC-107) |
@@ -678,6 +682,11 @@ ajuda o próprio jogador num jogo cooperativo (R10, aceito).
 ## 10. Monetização e persistência por evento
 
 ### 10.1 `MonetizationService` (DEC-092)
+
+> **2026-10-11 (TASK-160, Provisório):** implementado como **`ShopService`** (`src/Shop/server/ShopService.luau`,
+> prioridade 790, L+R; Require ProfileService, NetService), com pacotes de gemas e classe por Robux de
+> `Content.Shop`. `RegisterProduct(productId, nome, handler)`; detalhes em `data.md` §1.4/§1.7. Códigos:
+> `CodesService` (`src/Codes/server/CodesService/`, prioridade 670, L+R). Rede: `network.md` §15.
 
 - **Único** `MarketplaceService.ProcessReceipt` do place (Lobby e Run). Outros Services registram
   `RegisterProduct(kind, handler(player, receipt): GrantResult)` no `OnInit`.
@@ -2015,6 +2024,9 @@ Passantes (DEC-183; T46, Provisório até `Q-162` a):
 
 ### 19.19 Lobby, party, sessão e reconexão (onda 4; FEAT-001, 030; DEC-067, 080, 098, 119, 179, 205)
 
+> **v4.3:** lobby, squad por convite e teleporte implementados como no **§20** (sem plataformas, sem MemoryStore). A
+> tabela abaixo segue como plano para reconexão/retomada.
+
 §5 vale. Contratos de código:
 
 | Peça | Contrato |
@@ -2213,3 +2225,113 @@ InteractionService, UpgradeService, NpcService, CustomerService, AnomalyService.
 | Dev | `/dev seating [buy|sit|dirty n|clean n]`, `/dev customer group [leader+partner]` |
 | Fallbacks registrados | mesas por nome em `MAP01_Assets.PadDecor` ordenadas pela distância a Q1 (warn 1×, escreve tag/atributo); âncora runtime `Prompt_Table`; nó mais próximo; notas do `MapIndex.SeatingNotes` só avisam (`PlaceService`) |
 | Pendente | `LZ-PATIO` (UPG-009 à noite) precisa de linha em `LightGroups` + volume no bind, e o `Required` cobra toda zona de `LightGroups`: entra junto com a TASK-149. Medir 4 NPCs sentados no MicroProfiler do celular (`Q-180` B) |
+
+## 20. Uma place, papéis de servidor; squad no lobby (v4.3, TASK-154 a TASK-156; pedido do usuário 2026-10-11; Provisório)
+
+Pedido do usuário (2026-10-11, testes com amigos): **uma única place** com papéis de servidor. Substitui a topologia
+"dois places" do §1 e o `Workspace.PlaceRole` autoral; o §5 (MemoryStore, reconexão, retomada) **segue como plano** e
+não foi implementado (a run continua só em memória; quem sai não volta à mesma run). Onde o §1, §5.2 e §19.19 divergem
+deste §20, **vale o §20**.
+
+### 20.1 Papel do servidor (`src/ServerRole/`)
+
+| Papel | Quando | O que roda |
+|---|---|---|
+| `Lobby` | servidor **público** publicado | Profile, Class, Shop/Codes, `PartyService`, `LobbyService` (spawn); nenhum Service de run |
+| `Game` | servidor **reservado** criado pelo lobby (`TeleportData.Role = "Game"`, ou sem TeleportData) | a run inteira (como hoje) + `PartyRunService` |
+| `PrivateLobby` | reservado com `TeleportData.Role = "PrivateLobby"` (ou `"Lobby"`), ou servidor VIP | igual ao `Lobby` |
+
+Resolução (uma vez, no `OnInit` do `RoleService`, prioridade **990**):
+
+1. Reservado (`PrivateServerId ~= ""` e `PrivateServerOwnerId == 0`): espera o 1º jogador (até 30 s; o servidor só
+   existe porque um teleporte está chegando) e lê `player:GetJoinData().TeleportData`. Sem dados válidos → `Game` (solo).
+2. VIP (`PrivateServerOwnerId ~= 0`) → `PrivateLobby`.
+3. Resto (público publicado, Studio, Team Test): atributo de Workspace **`ServerRoleOverride`** (`"Lobby"`, `"Game"`,
+   `"PrivateLobby"`) se válido — vale também publicado, com `warn`; **no Studio**, sem override: `Workspace.PlaceRole`
+   legado (`"Lobby"` → Lobby) ou **`Game`** (padrão, para os testes atuais não mudarem); publicado → `Lobby`.
+
+Publicado: **deixe `ServerRoleOverride` vazio** (ou `"Lobby"`). Com `"Game"` todo servidor público vira run, sem lobby
+— útil só como "botão de pânico" para jogar como antes se o fluxo de lobby falhar.
+
+Exposição: atributo **`ReplicatedStorage.ServerRole`** (escrito pelo `RoleService`). Server: `RoleService:Get()`,
+`Is(role)`, `IsLobby()`, `IsGame()`, `IsReserved()`, `GetLaunch()`. Client: `PlaceController:GetServerRole()` (o
+`OnInit` espera o atributo até 30 s; fallback `Game`). Módulo puro `ReplicatedStorage.shared.ServerRole.Roles`
+(`Parse`, `ParseLaunch`, `Read`, `Wait`, `IsLobby`, `PlaceRole`).
+
+**Ponto único de corte do loop da run:** `PlaceService`/`PlaceController` passam a derivar `"Lobby" | "Run"` do papel
+(`Game` = `"Run"`). Todo Service de gameplay já retorna no topo quando `not PlaceService:Is("Run")` (§3.1), então no
+lobby **nada** de run sobe (Round, Customer, Npc, Traffic, Pedestrian, Kitchen, Vital, Character, Cutscene, Anomaly,
+Boss, Thief, Light, Market, Upgrade, Vehicle, Seating, Item, Interaction, Economy, Reward, Tutorial, RunState) e
+`Profile`, `Class` (escrita liberada fora da Run), `Shop`, `Codes` continuam. `PlaceService:ValidateMap` só roda no `Game`.
+
+Nomes: `RoleService` e `Roles.luau` (não `ServerRoleService`/`ServerRole.luau`) porque o rogen tira o prefixo
+"Server" do nome do arquivo e o joga no `ServerScriptService`; e não há `src/ServerRole/client`, porque o gerador do
+Modux lê caminho com "Server" como código de servidor.
+
+O que mudou em código existente (mínimo):
+
+| Arquivo | Mudança |
+|---|---|
+| `src/Place/server/PlaceService.luau` | `Require = { "RoleService" }`; papel vem de `Roles.PlaceRole(RoleService:Get())`; não lê mais `PlaceRole` |
+| `src/Place/client/PlaceController.luau` | papel de `Roles.Wait(30)`; `GetServerRole()` novo |
+| `src/Place/shared/MapIndex/init.luau` | `Validate`: `MapPoint` com `PointId` começando em `LOBBY-` pode ficar fora do `MapBinding` (mapa do lobby na mesma place) |
+| `src/Round/server/RoundService/init.luau` | `SetStartGate(gate)`: `StartRun` espera `gate()`; `Step` testa o portão a 10 Hz enquanto houver membro. Sem portão = comportamento antigo |
+
+### 20.2 Squad no lobby (`PartyService`, prioridade 680, papéis de lobby)
+
+**Emenda Provisória da DEC-179** (plataformas físicas): o usuário pediu em 2026-10-11 squad por **convite** (clique no
+jogador ou lista), líder, pronto e botão Start. Registrar com o secretário.
+
+| Regra | Valor (Provisório) |
+|---|---|
+| Tamanho máximo | `PartyRules.Rules.MaxSize` = `#Content.RunParams.PartyPriceMult` = **4** (DEC-012) |
+| Criar | `PartyCreate`; recusado se já está numa squad. Convidar sem squad cria uma |
+| Convidar | só o líder; alvo neste servidor, fora da squad, squad `Forming` e com vaga; mesmo alvo a cada 3 s; convite vale 60 s |
+| Aceitar | sai da squad atual (se `Forming`) e entra; `Ready = false` |
+| Sair / cair | sai; squad vazia some; líder saiu → 1º membro restante lidera (`NewLeader`) |
+| Expulsar | só o líder, só em `Forming` |
+| Pronto | membros não-líderes; o líder é sempre pronto |
+| Start | só o líder, todos prontos, `Forming` → `Starting` |
+| Taxa | 8 pacotes de squad por jogador por segundo (`TooFast`) |
+
+Start (thread própria): `ReserveServer(game.PlaceId)` → `TeleportOptions{ ReservedServerAccessCode = code }` +
+`SetTeleportData{ Role = "Game", PartyId, Members, Leader }` → `TeleportAsync(game.PlaceId, membros presentes, options)`.
+Reserva ou teleporte falhando: nova tentativa após 2/5/10 s (`TeleportRetry`); todas falharam → volta a `Forming`
+(não-líderes despronto) + `TeleportFailed`. Aceito pelo Roblox mas falhou para um membro depois
+(`TeleportInitFailed`): ele tenta sozinho com as **mesmas** opções (mesmo servidor), 3 vezes; depois `TeleportFailed`.
+Vigia: 45 s em `Starting` sem ninguém em voo → reabre. **Studio não teleporta**: Start responde `StudioNoTeleport`.
+`TeleportData` não é autorização (só o servidor tem o código do reservado); é só o roster.
+
+### 20.3 Squad no servidor `Game` (`PartyRunService`, prioridade 745)
+
+- Lê `RoleService:GetLaunch()` (TeleportData do 1º jogador). Senta os membros no roster do `RunStateService`
+  (`Seat`, na ordem da squad) **antes** de qualquer admissão: o roster é a squad (DEC-205).
+- Portão do `RoundService`: a run começa quando todos os membros da squad estão no servidor, ou
+  `Content.RunParams.JoinWindow` (60 s, DEC-098) depois do 1º; quem chega depois spawna no trabalho, sem intro
+  (DEC-205, já no `CharacterService`). Participantes da cutscene = conectados no início (§19.16, sem mudança).
+- Sem launch (Studio, Team Test, reservado sem TeleportData) = **solo/dev**: quem entra vira membro, run começa no 1º.
+- Jogador fora da squad num servidor com squad → `PartyNotice WrongServer` e volta ao lobby em 3 s (DEC-205).
+- Fim da run: `RunEnded` → 12 s depois (`RunEnd` dura 15 s) todos vão para um servidor **público** da place
+  (`TeleportAsync(game.PlaceId, players)` sem código = `Lobby`), com retry 2/5/10 s e `ReturnFailed`. Packet
+  `LobbyReturn` manda um jogador a qualquer momento (botão da tela de fim de run; sair sempre pode, DEC-067). Só em
+  servidor reservado; Studio responde `StudioNoTeleport`. Se o teleporte falhar, o `EndRun` de sempre recomeça a run.
+
+### 20.4 Spawn no lobby (`LobbyService`, prioridade 675, papéis de lobby)
+
+`CharacterAutoLoads = false`; o personagem é o rig da crew da classe selecionada (mesma técnica do `CharacterService`:
+`CrewRig.Build` como `StarterCharacter` por um `LoadCharacter`, um por vez). Ponto: `MapPoint` com `PointId`
+**`LOBBY-SPAWN`** (vários: qualquer id começando com `LOBBY-SPAWN`, sorteado, ±3 studs). Sem ponto: `warn` 1× e o 1º
+`SpawnLocation` do Workspace; sem ele, onde o `LoadCharacter` puser. Trocar de classe no lobby reconstrói o rig no
+lugar; morrer renasce no ponto. No `Game` o spawn segue o fluxo atual (`PS-*`, `CharacterService`); não existe
+`MAP-SPAWN`.
+
+Para o level-designer: o mapa do lobby fica na mesma place, longe do MAP-01, **fora** do `MapBinding` e sem a tag
+`MapBinding`; só pontos `LOBBY-*` são aceitos fora da raiz pelo `MapIndex.Validate`. `check_map01` (edit-time) ainda
+não conhece essa exceção.
+
+### 20.5 Configuração no site (Creator Hub)
+
+Nada obrigatório para teleporte na mesma place: `ReserveServer`/`TeleportAsync` funcionam no jogo publicado sem
+liberar nada. Conferir: place publicada (não só salva), jogo com acesso para os amigos (público ou amigos), e
+`Max Players` (Places → Settings) ≥ o lobby desejado (o reservado usa o mesmo valor; a squad é 4).
+Teleporte **não** funciona no Studio (nem Play Solo, nem Team Test).

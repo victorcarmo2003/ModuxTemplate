@@ -1,16 +1,27 @@
 --!strict
 --[[
-	Speech: text-to-speech of the cutscene lines (AudioTextToSpeech, Roblox audio API). Defensive by design: the class,
-	a property, the load or the play may be missing or fail (beta API, voice ids, region) and then the line simply
-	stays a subtitle, with one warning.
+	Speech: text-to-speech of the cutscene lines (AudioTextToSpeech: Text, VoiceId, Speed, Pitch, Volume, LoadAsync ->
+	Enum.AssetFetchStatus, IsLoaded, Play/Pause). Defensive by design: the class, a property, the load or the play may
+	be missing or fail, and then the line simply stays a subtitle.
 
 	Graph: one AudioTextToSpeech per line -> Wire -> AudioFader (volume = AudioController Master x Voice group x the
 	speaker's Content volume) -> Wire -> AudioDeviceOutput (this client only). Voices per speaker in
 	Content.Cutscenes.Rules.Voices (VoiceId, Speed, Pitch, Volume); VoiceId "" = that speaker is silent.
 
-	Prepare(lines) loads every line of the segment up front (generation takes time), so Say(line) starts on the beat
-	together with the subtitle. A line not loaded yet starts when it loads, if that is still within LATE s of its
-	beat; a new line cuts the one playing.
+	Loading (playtest 2026-10-11: every line of the segment called LoadAsync in the same frame and the engine refused
+	them all with "Failed to load sound : Rate limited by the client" + one "Failed to load text to speech" error each):
+	  * one request at a time (GAP s between two), never a burst;
+	  * a failed load is retried (MAX_TRIES) after a growing pause (BACKOFF x 2^n, up to MAX_BACKOFF) that holds the
+	    whole queue, so a rate limit clears before the next request;
+	  * a VoiceId that never loaded a single line after MAX_TRIES is judged bad; its lines move to a voice that did
+	    load (one warning), or wait for one;
+	  * GIVE_UP failures in a row switch text-to-speech off for the session (one warning, subtitles only).
+	The engine prints its own error for each failed request (not catchable); the queue keeps that to a handful.
+
+	Preload(lines, timeout, progress) queues every line and yields until all are settled (loaded or failed) or the
+	timeout; the rest keeps loading in the background (LoadingController, before the intro). Prepare(lines) queues
+	without waiting. Say(line) plays a loaded line on its beat; one still loading jumps to the front of the queue and
+	plays when it loads, if that is still within LATE s of its beat. A new line cuts the one playing.
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local SoundService = game:GetService("SoundService")
@@ -20,33 +31,40 @@ type Beat = Content.CutsceneBeat
 
 export type Speech = {
 	Prepare: (lines: { Beat }) -> (),
+	-- yields; progress(fraction 0..1) while it waits
+	Preload: (lines: { Beat }, timeout: number, progress: ((number) -> ())?) -> (),
 	Say: (line: Beat) -> (),
 	Stop: () -> (),
 	Destroy: () -> (),
 }
 
+type State = "Queued" | "Loading" | "Loaded" | "Failed"
+
 type Entry = {
-	Voice: Instance?, -- the AudioTextToSpeech (typed loosely: the API may not exist)
-	Loaded: boolean,
-	Failed: boolean,
+	Line: Beat,
+	Speaker: string,
+	VoiceId: string, -- the id in use (the speaker's, or the fallback after a bad id)
+	Voice: AudioTextToSpeech?,
+	State: State,
+	Tries: number,
 	Wanted: number?, -- os.clock when Say asked for it before the load finished
+	BadVoice: boolean, -- failed because its VoiceId is bad (re-queued when a good voice appears)
 }
 
 const VOICES = Content.Cutscenes.Rules.Voices
 const FOLDER = "CutsceneVoice"
 const LATE = 1 -- s: a line that loads later than this after its beat is not voiced
+const GAP = 0.2 -- s between two load requests
+const MAX_TRIES = 3 -- load attempts per line (same VoiceId)
+const BACKOFF = 1.5 -- s of pause after a failure, doubled per try of that line
+const MAX_BACKOFF = 6
+const GIVE_UP = 6 -- failures in a row (no success between) that switch text-to-speech off
+const POLL = 0.1 -- s between two progress reads of Preload
 
 const Speech = {}
 
 local function keyOf(line: Beat): string
 	return `{line.Speaker or "walt"}\0{line.Text or ""}`
-end
-
--- Sets a property that may not exist on this engine version
-local function try(instance: Instance, property: string, value: any): boolean
-	return (pcall(function()
-		(instance :: any)[property] = value
-	end))
 end
 
 local function wire(source: Instance, target: Instance, parent: Instance): boolean
@@ -60,23 +78,36 @@ end
 
 function Speech.new(volume: () -> number): Speech
 	local enabled = true
-	local warned = false
+	local alive = true
+	const warned: { [string]: boolean } = {}
 	const entries: { [string]: Entry } = {}
-	local playing: Instance? = nil
+	const queue: { Entry } = {}
+	local working = false
+	local pause = 0 -- s the queue waits before its next request (backoff)
+	local streak = 0 -- failures in a row
+	const goodVoices: { [string]: boolean } = {}
+	const badVoices: { [string]: boolean } = {}
+	local playing: AudioTextToSpeech? = nil
 
 	local folder: Instance? = nil
-	local fader: Instance? = nil
+	local fader: AudioFader? = nil
+
+	local function warnOnce(key: string, message: string)
+		if warned[key] then
+			return
+		end
+		warned[key] = true
+		warn(`[CutsceneController] {message}`)
+	end
 
 	local function disable(reason: string)
 		enabled = false
-		if not warned then
-			warned = true
-			warn(`[CutsceneController] text-to-speech off, subtitles only: {reason}`)
-		end
+		table.clear(queue)
+		warnOnce("off", `text-to-speech off, subtitles only: {reason}`)
 	end
 
 	-- Fader + device output, built once
-	local function graph(): Instance?
+	local function graph(): AudioFader?
 		if fader ~= nil and fader.Parent ~= nil then
 			return fader
 		end
@@ -104,7 +135,9 @@ function Speech.new(volume: () -> number): Speech
 	local function refreshVolume()
 		const fade = fader
 		if fade ~= nil then
-			try(fade, "Volume", math.clamp(volume(), 0, 2))
+			pcall(function()
+				fade.Volume = math.clamp(volume(), 0, 2)
+			end)
 		end
 	end
 
@@ -116,127 +149,288 @@ function Speech.new(volume: () -> number): Speech
 		const previous = playing
 		if previous ~= nil and previous ~= voice then
 			pcall(function()
-				(previous :: any):Pause()
+				previous:Pause()
 			end)
 		end
 		refreshVolume()
 		playing = voice
 		const ok, problem = pcall(function()
-			(voice :: any).TimePosition = 0;
-			(voice :: any):Play()
+			voice.TimePosition = 0
+			voice:Play()
 		end)
 		if not ok then
 			disable(`Play failed: {problem}`)
 		end
 	end
 
-	local function load(line: Beat)
-		const key = keyOf(line)
-		if entries[key] ~= nil then
-			return
-		end
-		const speaker = line.Speaker or "walt"
+	-- VoiceId a speaker uses now: its own, or a voice that loaded when its own is bad
+	local function voiceIdOf(speaker: string): string?
 		const row = VOICES[speaker]
-		const entry: Entry = { Voice = nil, Loaded = false, Failed = row == nil or row.VoiceId == "", Wanted = nil }
-		entries[key] = entry
-		if entry.Failed or row == nil then
-			return
+		if row == nil or row.VoiceId == "" then
+			return nil
+		end
+		if not badVoices[row.VoiceId] then
+			return row.VoiceId
+		end
+		for id in goodVoices do
+			return id
+		end
+		return nil
+	end
+
+	-- The AudioTextToSpeech of an entry, built for its current VoiceId (nil = cannot build: entry failed)
+	local function build(entry: Entry): AudioTextToSpeech?
+		const existing = entry.Voice
+		if existing ~= nil then
+			if existing.VoiceId == entry.VoiceId then
+				return existing
+			end
+			existing:Destroy()
+			entry.Voice = nil
 		end
 		const fade = graph()
 		if fade == nil then
-			entry.Failed = true
-			return
+			return nil
 		end
-		const ok, created = pcall(function(): Instance
-			return Instance.new("AudioTextToSpeech" :: any)
+		const row = VOICES[entry.Speaker]
+		const ok, created = pcall(function(): AudioTextToSpeech
+			const voice = Instance.new("AudioTextToSpeech")
+			voice.Name = `Line_{entry.Speaker}`
+			voice.Text = entry.Line.Text or ""
+			voice.VoiceId = entry.VoiceId
+			if row ~= nil and row.Speed ~= nil then
+				voice.Speed = row.Speed
+			end
+			if row ~= nil and row.Pitch ~= nil then
+				voice.Pitch = row.Pitch
+			end
+			voice.Volume = if row ~= nil then row.Volume else 1
+			voice.Parent = folder
+			return voice
 		end)
 		if not ok then
-			entry.Failed = true
 			disable(`AudioTextToSpeech unavailable ({created})`)
-			return
+			return nil
 		end
-		const voice = created :: Instance
-		voice.Name = `Line_{speaker}`
-		if not try(voice, "Text", line.Text or "") or not try(voice, "VoiceId", row.VoiceId) then
-			entry.Failed = true
-			voice:Destroy()
-			disable("Text/VoiceId not settable")
-			return
-		end
-		if row.Speed ~= nil then
-			try(voice, "Speed", row.Speed)
-		end
-		if row.Pitch ~= nil then
-			try(voice, "Pitch", row.Pitch)
-		end
-		try(voice, "Volume", row.Volume)
-		voice.Parent = folder
+		const voice = created :: AudioTextToSpeech
 		if not wire(voice, fade, voice) then
-			entry.Failed = true
 			voice:Destroy()
-			return
+			disable("Wire unavailable")
+			return nil
 		end
 		entry.Voice = voice
-		task.spawn(function()
-			const loaded, status = pcall(function(): any
-				return (voice :: any):LoadAsync()
-			end)
-			if voice.Parent == nil then
-				return
-			end
-			if not loaded or (status ~= nil and status ~= Enum.AssetFetchStatus.Success) then
-				-- only this line stays silent (a bad VoiceId of one speaker does not mute the others)
-				entry.Failed = true
-				if not warned then
-					warned = true
-					warn(`[CutsceneController] text-to-speech load failed ({status}, VoiceId "{row.VoiceId}"): subtitle only`)
+		return voice
+	end
+
+	local pump: () -> ()
+
+	-- A voice loaded: lines that failed on a bad VoiceId get another chance with it
+	local function rescue()
+		for _, entry in entries do
+			if entry.State == "Failed" and entry.BadVoice then
+				const id = voiceIdOf(entry.Speaker)
+				if id ~= nil and not badVoices[id] then
+					entry.VoiceId = id
+					entry.State = "Queued"
+					entry.Tries = 0
+					entry.BadVoice = false
+					table.insert(queue, entry)
 				end
-				return
 			end
-			entry.Loaded = true
-			const wanted = entry.Wanted
-			if wanted ~= nil and os.clock() - wanted <= LATE and enabled then
-				entry.Wanted = nil
-				start(entry)
+		end
+	end
+
+	local function failed(entry: Entry, status: string)
+		entry.Tries += 1
+		streak += 1
+		pause = math.min(BACKOFF * 2 ^ (entry.Tries - 1), MAX_BACKOFF)
+		if streak >= GIVE_UP then
+			entry.State = "Failed"
+			disable(`{streak} loads failed in a row (last: {status})`)
+			return
+		end
+		if entry.Tries < MAX_TRIES then
+			entry.State = "Queued"
+			table.insert(queue, 1, entry)
+			return
+		end
+		entry.State = "Failed"
+		const id = entry.VoiceId
+		if goodVoices[id] then
+			return -- the voice works: only this line stays a subtitle
+		end
+		badVoices[id] = true
+		entry.BadVoice = true
+		const fallback = voiceIdOf(entry.Speaker)
+		if fallback ~= nil and fallback ~= id then
+			warnOnce(`voice:{id}`, `text-to-speech VoiceId "{id}" did not load ({status}): using "{fallback}"`)
+			rescue()
+		else
+			warnOnce(`voice:{id}`, `text-to-speech VoiceId "{id}" did not load ({status}): subtitle only for now`)
+		end
+		-- the other lines of that voice move to the fallback right away (no need to fail each of them)
+		for _, other in queue do
+			if other.State == "Queued" and other.VoiceId == id and fallback ~= nil and fallback ~= id then
+				other.VoiceId = fallback
+				other.Tries = 0
 			end
+		end
+	end
+
+	local function loadOne(entry: Entry)
+		const voice = build(entry)
+		if voice == nil then
+			entry.State = "Failed"
+			return
+		end
+		entry.State = "Loading"
+		const ok, status = pcall(function(): Enum.AssetFetchStatus
+			return voice:LoadAsync()
 		end)
+		if not alive or voice.Parent == nil then
+			return
+		end
+		if ok and status == Enum.AssetFetchStatus.Success then
+			entry.State = "Loaded"
+			streak = 0
+			pause = 0
+			const fresh = not goodVoices[entry.VoiceId]
+			goodVoices[entry.VoiceId] = true
+			if fresh then
+				rescue()
+			end
+			const wanted = entry.Wanted
+			if wanted ~= nil and enabled then
+				entry.Wanted = nil
+				if os.clock() - wanted <= LATE then
+					start(entry)
+				end
+			end
+			return
+		end
+		failed(entry, if ok then tostring(status) else `error: {status}`)
+	end
+
+	pump = function()
+		if working or not enabled or not alive then
+			return
+		end
+		working = true
+		task.spawn(function()
+			while alive and enabled and #queue > 0 do
+				if pause > 0 then
+					task.wait(pause)
+					pause = 0
+				end
+				const entry = table.remove(queue, 1)
+				if entry ~= nil and entry.State == "Queued" then
+					loadOne(entry)
+					task.wait(GAP)
+				end
+			end
+			working = false
+		end)
+	end
+
+	-- Entry of a line (created and queued the first time). nil = no voice for its speaker.
+	local function ensure(line: Beat, front: boolean): Entry?
+		const key = keyOf(line)
+		const existing = entries[key]
+		if existing ~= nil then
+			return existing
+		end
+		const speaker = line.Speaker or "walt"
+		const id = voiceIdOf(speaker)
+		if id == nil then
+			return nil
+		end
+		const entry: Entry = {
+			Line = line,
+			Speaker = speaker,
+			VoiceId = id,
+			Voice = nil,
+			State = "Queued",
+			Tries = 0,
+			Wanted = nil,
+			BadVoice = false,
+		}
+		entries[key] = entry
+		if front then
+			table.insert(queue, 1, entry)
+		else
+			table.insert(queue, entry)
+		end
+		return entry
+	end
+
+	local function queueAll(lines: { Beat }): { Entry }
+		const list: { Entry } = {}
+		if not enabled then
+			return list
+		end
+		for _, line in lines do
+			if line.Kind == "Line" and (line.Text or "") ~= "" then
+				const entry = ensure(line, false)
+				if entry ~= nil and table.find(list, entry) == nil then
+					table.insert(list, entry)
+				end
+			end
+		end
+		pump()
+		return list
 	end
 
 	return {
 		Prepare = function(lines: { Beat })
-			if not enabled then
-				return
-			end
-			for _, line in lines do
-				if line.Kind == "Line" then
-					load(line)
-					if not enabled then
-						return
+			queueAll(lines)
+		end,
+		Preload = function(lines: { Beat }, timeout: number, progress: ((number) -> ())?)
+			const list = queueAll(lines)
+			const deadline = os.clock() + timeout
+			while true do
+				local settled = 0
+				for _, entry in list do
+					if entry.State == "Loaded" or entry.State == "Failed" then
+						settled += 1
 					end
 				end
+				const done = not enabled or not alive or settled >= #list
+				if progress ~= nil then
+					progress(if done or #list == 0 then 1 else settled / #list)
+				end
+				if done or os.clock() >= deadline then
+					return
+				end
+				task.wait(POLL)
 			end
 		end,
 		Say = function(line: Beat)
 			if not enabled then
 				return
 			end
-			load(line)
-			const entry = entries[keyOf(line)]
-			if entry == nil or entry.Failed then
+			const entry = ensure(line, true)
+			if entry == nil or entry.State == "Failed" then
 				return
 			end
-			if entry.Loaded then
+			if entry.State == "Loaded" then
 				start(entry)
-			else
-				entry.Wanted = os.clock()
+				return
 			end
+			entry.Wanted = os.clock()
+			-- late line: first in the queue
+			const index = table.find(queue, entry)
+			if index ~= nil and index > 1 then
+				table.remove(queue, index)
+				table.insert(queue, 1, entry)
+			end
+			pump()
 		end,
 		Stop = function()
 			const current = playing
 			playing = nil
 			if current ~= nil then
 				pcall(function()
-					(current :: any):Pause()
+					current:Pause()
 				end)
 			end
 			for _, entry in entries do
@@ -244,6 +438,8 @@ function Speech.new(volume: () -> number): Speech
 			end
 		end,
 		Destroy = function()
+			alive = false
+			table.clear(queue)
 			for _, entry in entries do
 				if entry.Voice ~= nil then
 					entry.Voice:Destroy()

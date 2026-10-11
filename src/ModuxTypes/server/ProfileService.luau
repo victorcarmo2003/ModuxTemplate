@@ -22,6 +22,8 @@ export type Public = {
 	Update: (self: Public, player: Player, patch: Struct.Partial<Data>) -> (),
 	RequestSave: (self: Public, player: Player) -> (),
 	OwnedClasses: (self: Public, profile: Profile) -> { [string]: boolean },
+	WithClass: (self: Public, profile: Profile, key: string) -> { [string]: boolean },
+	SaveConfirmed: (self: Public, player: Player, saved: (data: { [string]: any }) -> boolean, timeout: number?) -> boolean,
 	SelectedClass: (self: Public, profile: Profile) -> string,
 	Replicate: (self: Public, player: Player) -> (),
 	Migrate: (self: Public, data: { [string]: any }) -> (),

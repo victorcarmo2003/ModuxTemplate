@@ -4,6 +4,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 local Content = require(ReplicatedStorage.shared.Content)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
+local TutorialRules = require(ReplicatedStorage.shared.Tutorial.Rules)
+local Adopt = require(ServerScriptService.server.Customer.CustomerService.Adopt)
 local Group = require(ServerScriptService.server.Customer.CustomerService.Group)
 local Orders = require(ServerScriptService.server.Customer.CustomerService.Orders)
 local Queue = require(ServerScriptService.server.Customer.CustomerService.Queue)
@@ -34,6 +36,9 @@ export type Customer = {
 	Faced: boolean, -- partner: already turned like its standing leader
 	-- Tables (TASK-145/146)
 	Dining: boolean, -- handed to SeatingService: no exit walk, no leave timeout until Dismiss
+	-- Tutorial customer (RequestTutorial): fixed order, endless patience, out of the ledger
+	Tutorial: boolean,
+	Model: Model?, -- tutorial customer: rig carrying TutorialRules.Attribute (cleared when the record goes)
 }
 export type Seater = (party: SeatParty) -> boolean
 export type Patch = {
@@ -91,6 +96,9 @@ export type Public = {
 	ServeRules: { ServeRule },
 	SpawnAttempted: SignalLib.Signal<Outcome>,
 	Tickets: { [number]: Orders.Ticket },
+	TutorialRng: Random,
+	TutorialTryAt: number,
+	TutorialWanted: boolean,
 	Warned: { [string]: boolean },
 	Setup: (self: Public) -> (),
 	WarnOnce: (self: Public, key: string, message: string) -> (),
@@ -100,6 +108,7 @@ export type Public = {
 	Count: (self: Public) -> number,
 	Occupants: (self: Public) -> number,
 	HasActor: (self: Public) -> boolean,
+	SetAdopter: (self: Public, adopter: Adopt.Adopter?) -> Adopt.Controls,
 	SetSeater: (self: Public, seater: Seater?) -> (),
 	IsCounterEmpty: (self: Public) -> boolean,
 	QueueSize: (self: Public) -> number,
@@ -121,7 +130,7 @@ export type Public = {
 	Attempt: (self: Public) -> (Outcome, number?),
 	RollPair: (self: Public) -> Group.Pair?,
 	SpawnPair: (self: Public, pair: Group.Pair) -> number?,
-	Create: (self: Public, id: number, variant: Variant?, leader: number?) -> (),
+	Create: (self: Public, id: number, variant: Variant?, leader: number?, tutorial: boolean?) -> (),
 	SpawnActor: (self: Public, spec: CustomerActorSpec) -> number?,
 	AddServeRule: (self: Public, rule: ServeRule) -> () -> (),
 	ServeOverride: (self: Public, customer: Customer, tool: Tool, player: Player) -> SaleResult?,
@@ -160,6 +169,11 @@ export type Public = {
 	OnPhase: (self: Public, phase: string) -> (),
 	Step: (self: Public) -> (),
 	StepPairs: (self: Public, t: number) -> (),
+	TutorialCustomer: (self: Public) -> Customer?,
+	HasTutorial: (self: Public) -> boolean,
+	RequestTutorial: (self: Public) -> boolean,
+	EndTutorial: (self: Public) -> (),
+	StepTutorial: (self: Public, t: number) -> (),
 	DevSpawnPair: (self: Public, leader: string?, partner: string?) -> (Outcome, number?),
 	DevSpawn: (self: Public) -> (Outcome, number?),
 }

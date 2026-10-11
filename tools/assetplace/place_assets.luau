@@ -38,6 +38,8 @@ local function loadMapFrame(): any
 end
 local MapFrame = loadMapFrame()
 local MAP_FRAME: CFrame = MapFrame.FRAME
+-- frame used by frameOf: MAP_FRAME for MAP-01, identity while Place.runInto builds a WORLD-coordinate table (lobby)
+local FRAME: CFrame = MAP_FRAME
 
 local Place = {}
 
@@ -207,7 +209,7 @@ end
 -- y-rotation frame in placement coordinates: { x, y, z, rotY } (rotY in degrees, optional) -> WORLD CFrame
 -- (MAP_FRAME applied: placements are MAP-01 coordinates, the place is turned 180 in Y)
 local function frameOf(x: number?, y: number?, z: number?, rotY: number?): CFrame
-	return MAP_FRAME * CFrame.new(x or 0, y or 0, z or 0) * CFrame.Angles(0, math.rad(rotY or 0), 0)
+	return FRAME * CFrame.new(x or 0, y or 0, z or 0) * CFrame.Angles(0, math.rad(rotY or 0), 0)
 end
 
 -- Part pose in the asset frame: centre o = { x, y, z, rotY = extra yaw, rotX / rotZ = extra pitch / roll over the
@@ -792,6 +794,58 @@ function Place.capture(placements: { any }, ids: { [string]: any }?): string
 	local report = Place.diff(placements, ids, { capture = cap })
 	cap.report = string.match(report, "^[^\n]*")
 	return game:GetService("HttpService"):JSONEncode(cap)
+end
+
+--[[ Place.runInto(placements, ids, rootName) -> report (2026-10-11, lobby). Builds a WORLD-coordinate placement table
+	(LOBBY_placements.luau: no MAP_FRAME, no blockout, `replaces` ignored) into workspace.<rootName>, rebuilt from scratch.
+	Same build() rules as Place.run. MAP01_Assets and the blockout are never touched. ]]
+function Place.runInto(placements: { any }, ids: { [string]: any }, rootName: string): string
+	local old = workspace:FindFirstChild(rootName)
+	if old then
+		old:Destroy()
+	end
+	local root = Instance.new("Folder")
+	root.Name = rootName
+	local groups: { [string]: Folder } = {}
+	local placed, problems = 0, {}
+	FRAME = CFrame.identity
+	local ok, err = pcall(function()
+		for i, p in placements do
+			local tpl, terr = template(p.asset, ids)
+			if not tpl then
+				table.insert(problems, terr :: string)
+				continue
+			end
+			local gname = p.group or "Misc"
+			local g = groups[gname]
+			if not g then
+				g = Instance.new("Folder")
+				g.Name = gname
+				g.Parent = root
+				groups[gname] = g
+			end
+			local inst = build(p, tpl)
+			inst:SetAttribute("Asset", p.asset)
+			if p.id then
+				inst:SetAttribute("MapId", p.id)
+			end
+			inst.Parent = g
+			placed += 1
+			if i % 25 == 0 then
+				task.wait()
+			end
+		end
+	end)
+	FRAME = MAP_FRAME
+	if not ok then
+		table.insert(problems, "build error: " .. tostring(err))
+	end
+	root.Parent = workspace
+	local msg = string.format("%s: placed %d / %d", rootName, placed, #placements)
+	if #problems > 0 then
+		msg ..= "\n" .. table.concat(problems, "\n")
+	end
+	return msg
 end
 
 return Place

@@ -3,9 +3,11 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
+local Beacon = require(StarterPlayer.StarterPlayerScripts.client.Tutorial.TutorialController.Beacon)
 local Call = require(StarterPlayer.StarterPlayerScripts.client.Tutorial.TutorialController.Call)
 local Steps = require(StarterPlayer.StarterPlayerScripts.client.Tutorial.TutorialController.Steps)
 
+type GuestRecord = { State: string, Order: { [string]: boolean } }
 type Held = { Item: string, Toppings: { [string]: boolean } }
 type Kitchen = {
 	GrillWorking: boolean,
@@ -17,16 +19,19 @@ type Kitchen = {
 
 export type Public = {
 	Answered: boolean,
+	AskedAt: number,
+	Beacon: Beacon.Beacon,
 	Call: Call.Call,
 	CashRevealed: Vide.Source<boolean>,
+	CheckUntil: number,
+	Checked: Vide.Source<boolean>,
 	ClockRevealed: Vide.Source<boolean>,
 	Finished: Vide.Source<boolean>,
 	Folder: Folder?,
 	Greeted: boolean,
-	Highlight: Highlight?,
+	GuestId: number,
 	Holding: boolean,
 	Item: Vide.Source<string>,
-	LastHotDogAt: number,
 	PointerAngle: Vide.Source<number>,
 	PointerAt: Vide.Source<Vector2>,
 	PointerShown: Vide.Source<boolean>,
@@ -47,11 +52,13 @@ export type Public = {
 	ShowClock: (self: Public) -> boolean,
 	Step: (self: Public) -> Steps.Step?,
 	PanelText: (self: Public) -> string,
+	StepLabel: (self: Public) -> string,
 	SkipText: (self: Public) -> string,
 	Root: (self: Public) -> BasePart?,
 	Held: (self: Public) -> Held?,
 	Kitchen: (self: Public) -> Kitchen,
-	Ordering: (self: Public) -> { [number]: boolean },
+	Guest: (self: Public) -> (number?, GuestRecord?, Model?),
+	AskGuest: (self: Public) -> (),
 	Anchor: (self: Public, action: string, enabled: boolean, filter: ((Instance) -> boolean)?) -> Instance?,
 	VoiceVolume: (self: Public) -> number,
 	CallState: (self: Public) -> string,
@@ -62,11 +69,12 @@ export type Public = {
 	Decide: (self: Public) -> (string, Instance?, string),
 	FxFolder: (self: Public) -> Folder,
 	SetHighlight: (self: Public, anchor: Instance?) -> (),
+	Focuses: (self: Public, anchor: Instance) -> boolean,
 	ClearGuidance: (self: Public) -> (),
 	UpdatePointer: (self: Public) -> (),
 	Rescale: (self: Public) -> (),
 	SetStep: (self: Public, key: string, target: Instance?, item: string) -> (),
-	OnSale: (self: Public, result: string) -> (),
+	OnSale: (self: Public, npc: number, result: string) -> (),
 	TickTalk: (self: Public) -> (),
 	NextTalk: (self: Public) -> (),
 	Skip: (self: Public) -> (),

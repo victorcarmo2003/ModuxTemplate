@@ -28,7 +28,10 @@ type Walker = {
 	-- leaving: Loop -> removed at this distance (lap seam)
 	Leaving: boolean,
 	LapEnd: number?,
+	-- braking / standing for the customer side (adoption): no crosswalk request until released or taken
+	Noticed: boolean,
 }
+export type Handoff = { Species: string, Outfit: string, Position: Vector3, Heading: Vector3, Node: string }
 type Hold = {
 	Holder: number, -- reservation id given to TrafficService
 	Expires: number, -- server time: GrantedAt + the duration asked (mirror of TrafficService, >= Crossing.MaxWait)
@@ -46,6 +49,7 @@ export type Record = {
 }
 
 export type Public = {
+	Adoption: { Force: () -> string, Status: () -> string }?,
 	Drawn: boolean,
 	Enabled: boolean,
 	FillPending: boolean,
@@ -81,8 +85,14 @@ export type Public = {
 	RandomSpot: (self: Public, geo: WalkGeo.Geo) -> number?,
 	TrySpawn: (self: Public, t: number) -> (),
 	Step: (self: Public) -> (),
+	AdoptPick: (self: Public, center: Vector3, radius: number, accept: (species: string, outfit: string) -> boolean) -> number?,
+	NoticedWalker: (self: Public, slot: number) -> Walker?,
+	AdoptPeek: (self: Public, slot: number) -> Handoff?,
+	AdoptTake: (self: Public, slot: number) -> boolean,
+	AdoptRelease: (self: Public, slot: number) -> (),
 	Status: (self: Public) -> string,
 	DevSpawn: (self: Public, pathKey: string?) -> string,
+	DevAdopt: (self: Public) -> string,
 	DevClear: (self: Public) -> number,
 }
 

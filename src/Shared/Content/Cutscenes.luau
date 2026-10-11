@@ -115,19 +115,21 @@ export type Rules = {
 		Phone: string, -- the number (fictional 555)
 	},
 	-- NO HELP WANTED sign of the first stop (instances tagged Tag, read at runtime; the user moves them in Studio).
-	-- The stop is the point of the sidewalk line Line[1] -> Line[2] nearest to the sign, at least MinDistance studs
-	-- from it (pulled back along the line), facing it. Several tagged: a card wider than MinWidth studs wins (the big
-	-- one), then the first along the line within Range studs of it. None: Fallback MapPoint.
+	-- The stop is right in front of the sign: Distance studs out of its printed face (the face turned towards the
+	-- sidewalk line Line[1] -> Line[2]), on the ground, facing it. Several tagged: a card wider than MinWidth studs
+	-- wins (the big one), then the first along the line within Range studs of it. None: Fallback MapPoint.
 	Sign: {
 		Tag: string,
 		Line: { string },
-		MinDistance: number,
+		Distance: number,
 		MinWidth: number,
 		Range: number,
 		Fallback: string,
 	},
 	Voices: { [string]: Voice },
 	Cars: { [string]: Car },
+	-- s the server holds a chain for the participants' ClientReady (loading screen) before it starts anyway
+	ReadyTimeout: number,
 }
 
 const PHONE = "555-0179" -- script.md §1 ("Call Bramble's Corner Dogs — 555-0179")
@@ -194,7 +196,7 @@ const rules: Rules = {
 	Sign = {
 		Tag = "NoHelpWantedSign",
 		Line = { "CS-1", "CS-3" }, -- Ninth north sidewalk, walked east (MAP-01 §11.1)
-		MinDistance = 4.5,
+		Distance = 3.5, -- user feedback 2026-10-11: stop close, right in front of the sign (~3-4 studs)
 		MinWidth = 3, -- the big AST-033 card (3.96 studs wide); the window cards are smaller
 		Range = 30,
 		Fallback = "CS-2",
@@ -217,6 +219,7 @@ const rules: Rules = {
 		-- eastbound on the Ninth, in front of the party at the phone, before the turn to the cart
 		CarCorner = { Route = "TR-1", Near = "Phone", Pass = 2, Look = 7, Horn = "car_honk_soft" },
 	},
+	ReadyTimeout = 25,
 }
 
 const scenes = Table.new({
@@ -229,12 +232,13 @@ const scenes = Table.new({
 		Marks = {},
 		Beats = {},
 	},
-	-- Opening, ~65 s with dramatic pauses, cap 70 (FEAT-004; PROVISIONAL frontend-coder 2026-10-11, user feedback after
-	-- play); script.md §1 shots 1-10; MAP-01 §11.1 CS-1..CS-7
+	-- Opening, ~73 s with dramatic pauses, cap 76 (FEAT-004; PROVISIONAL frontend-coder 2026-10-11, user feedback after
+	-- play); script.md §1 shots 1-10; MAP-01 §11.1 CS-1..CS-7. Starts once every participant's client is ready
+	-- (Rules.ReadyTimeout), so the Intro phase cap (Shift.luau) covers that wait + Cap.
 	{
 		Key = "intro",
-		Duration = 67.2,
-		Cap = 70,
+		Duration = 72.6,
+		Cap = 76,
 		Skippable = true,
 		Participants = "ConnectedAtStart",
 		Music = "lobby", -- PROVISIONAL stand-in for MUS-005 (Abertura); the shift track waits for the end of the chain
@@ -246,57 +250,61 @@ const scenes = Table.new({
 			-- (Rules.Sign, read from the map), turn to it, read it, pause.
 			{ At = 1.2, Kind = "MoveTo", Target = "Sign", Arrive = 6.4 },
 			crew(2.4, "Empty. Again."),
-			focus(5, "Sign", 55),
-			crew(6.9, "Hm, a job?"),
-			crew(8.8, '..."No help wanted." Of course.'),
+			-- user request 2026-10-11: the rookie says why the sign matters before reading it
+			crew(3.9, "I really need a job right now... but nobody's hiring."),
+			focus(7.4, "Sign", 55),
+			crew(9.3, "Hm, a job?"),
+			crew(11.2, '..."No help wanted." Of course.'),
 			-- Beat 2, CW-2: one flowing walk to the NW corner and into the stripes. At 40% of the crossing the car
 			-- (synced to the body, Rules.Cars.CarNinth.Cross) is due; hard stop near the middle, the car crosses right
 			-- in front, "Whoa!", a step back, a pause, then the rest of the crossing.
-			focus(11.4, "Walk"),
-			{ At = 11.6, Kind = "MoveTo", Target = "CS-3" },
-			{ At = 11.8, Kind = "MoveTo", Target = "CS-3|CS-4@0.46", Arrive = 20.4, Brake = 40 },
-			{ At = 14, Kind = "Actor", Target = "CarNinth" }, -- real car on its lane, never brakes (DEC-130, DEC-133)
-			focus(19.9, "CarNinth"),
-			crew(20.5, "Whoa!"),
+			focus(13.8, "Walk"),
+			{ At = 14, Kind = "MoveTo", Target = "CS-3" },
+			{ At = 14.2, Kind = "MoveTo", Target = "CS-3|CS-4@0.46", Arrive = 22.8, Brake = 40 },
+			{ At = 16.4, Kind = "Actor", Target = "CarNinth" }, -- real car on its lane, never brakes (DEC-130, DEC-133)
+			focus(22.3, "CarNinth"),
+			crew(22.9, "Whoa!"),
 			{
-				At = 20.6,
+				At = 23,
 				Kind = "MoveTo",
 				Target = "CS-3|CS-4@0.4",
-				Arrive = 21.3,
+				Arrive = 23.7,
 				Accel = 25,
 				Brake = 25,
 				Backward = true,
 			},
-			focus(22.3, "CS-4"),
+			focus(24.7, "CS-4"),
 			-- Beat 3, CW-1 and the poster: seen from the far curb, stop, look, "What's that?", walk up to it, read
-			{ At = 23.6, Kind = "MoveTo", Target = "CS-4" },
-			{ At = 23.8, Kind = "MoveTo", Target = "CS-5W" }, -- west curb of CW-1, along the Juniper South sidewalk
-			focus(24, "Walk"),
-			{ At = 24.2, Kind = "MoveTo", Target = "CS-5E", Arrive = 31.8, Face = "Poster" }, -- across CW-1
-			focus(31, "Poster", 60),
-			crew(32.4, "What's that?"),
-			{ At = 34.4, Kind = "MoveTo", Target = "CS-P{slot}", Arrive = 37 }, -- in front of the poster (Rules.Stand)
-			focus(36.4, "Poster", 45), -- reading the flyer and its number (shot 6)
-			crew(39.6, "At least it's a job opportunity..."),
-			crew(42.2, "I think I'll give them a call.", "Solo"),
-			crew(42.2, "Let's give them a call.", "Party"),
+			{ At = 26, Kind = "MoveTo", Target = "CS-4" },
+			{ At = 26.2, Kind = "MoveTo", Target = "CS-5W" }, -- west curb of CW-1, along the Juniper South sidewalk
+			focus(26.4, "Walk"),
+			{ At = 26.6, Kind = "MoveTo", Target = "CS-5E", Arrive = 34.2, Face = "Poster" }, -- across CW-1
+			focus(33.4, "Poster", 60),
+			crew(34.8, "What's that?"),
+			{ At = 36.8, Kind = "MoveTo", Target = "CS-P{slot}", Arrive = 39.4 }, -- in front of the poster (Rules.Stand)
+			focus(38.8, "Poster", 45), -- reading the flyer and its number (shot 6)
+			crew(42, "At least it's a job opportunity..."),
+			crew(44.6, "I think I'll give them a call.", "Solo"),
+			crew(44.6, "Let's give them a call.", "Party"),
 			-- Beat 4, the call (shots 7-8)
-			focus(44.9, "Phone", 55),
-			crew(45.1, `{PHONE}...`),
-			{ At = 45.2, Kind = "Prompt", Target = "Phone", Text = `Call {PHONE}` },
-			{ At = 46.5, Kind = "Actor", Target = "FlipPhone" }, -- slot 1 only, already open (AST-038)
-			walt(47, "Bramble's Corner Dogs! Walt speaking."),
-			walt(49.6, "The flyer? Huh. Nobody's called about that one in years.", "Solo"),
-			walt(49.6, "The flyer? All of you? Huh. Nobody's called in years.", "Party"),
-			walt(52.4, "But you noticed it. That counts for a lot.", "Solo"),
-			walt(52.4, "You all noticed it. That counts for a lot. Heh.", "Party"),
-			walt(55, "Can you start today? Great. Wonderful."),
-			walt(57.4, "The cart's right on the corner. Ninth and Juniper."),
-			walt(59.9, "Keys are under the mustard. See you around, Rookie."),
-			{ At = 61, Kind = "Actor", Target = "CarCorner" }, -- street life on the Ninth, no camera focus
-			-- Beat 5: everyone turns to the cart (CS-7) and holds on it; fade out; the game fades in after the chain
-			focus(62.6, "CART", 55),
-			{ At = 65.8, Kind = "Fade", Target = "Out" },
+			focus(47.3, "Phone", 55),
+			crew(47.5, `{PHONE}...`),
+			{ At = 47.6, Kind = "Prompt", Target = "Phone", Text = `Call {PHONE}` },
+			{ At = 48.9, Kind = "Actor", Target = "FlipPhone" }, -- slot 1 only, already open (AST-038)
+			walt(49.4, "Bramble's Corner Dogs! Walt speaking."),
+			walt(52, "The flyer? Huh. Nobody's called about that one in years.", "Solo"),
+			walt(52, "The flyer? All of you? Huh. Nobody's called in years.", "Party"),
+			walt(54.8, "But you noticed it. That counts for a lot.", "Solo"),
+			walt(54.8, "You all noticed it. That counts for a lot. Heh.", "Party"),
+			walt(57.4, "Can you start today? Great. Wonderful."),
+			walt(59.8, "The cart's right on the corner. Ninth and Juniper."),
+			walt(62.3, "Keys are under the mustard. See you around, Rookie."),
+			{ At = 63.4, Kind = "Actor", Target = "CarCorner" }, -- street life on the Ninth, no camera focus
+			-- Beat 5 (user feedback 2026-10-11: the view left the phone while Walt still talked): the focus stays on
+			-- the phone/poster through the whole call; the flip closes at 66.9 (Actors FLIP_TIME, hang-up click), a
+			-- breath, then everyone turns to the cart (CS-7, eased) and holds on it; fade out; the game fades in after
+			focus(67.8, "CART", 55),
+			{ At = 71.2, Kind = "Fade", Target = "Out" },
 		},
 	},
 	-- Dawn of Night 10, variant A1 (DEC-075, DEC-076); <= 60 s; MAP-01 §11.3 SS-1..4, WALT-1, RL-1 -> RL-END

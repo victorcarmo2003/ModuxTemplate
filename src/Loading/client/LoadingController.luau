@@ -1,0 +1,326 @@
+--!strict
+--[[
+	LoadingController: the "client ready" gate of a join (user feedback 2026-10-11: the start of the intro was lost
+	while the client was still loading, and the voices failed to load). Drives the loading screen that Loading/Boot
+	(ReplicatedFirst) put up, then tells the server with `ClientReady`; CutsceneService holds the intro until every
+	participant sent it (Content.Cutscenes.Rules.ReadyTimeout at most).
+
+	Steps (weights of the real progress bar), the slow ones in parallel:
+	  Game     game:IsLoaded()                                                     (the engine join)
+	  Start    every Modux controller ran its OnStart: this controller has the lowest priority, so the Loader
+	           (descending priority, OnInit of all then OnStart of all) reaches its OnStart last
+	  Kit      RigController warm-up done (crew meshes, expressions, look textures: RigController:Warmup)
+	  Assets   ContentProvider:PreloadAsync of the intro sounds (music cue, phone, horns, car, prompt, skip, day
+	           ambience) and the UI images (Icons.Ids)
+	  Voices   Run place only: every text-to-speech line of the intro (CutsceneController:PreloadVoices; the queue
+	           there loads one line at a time with retry, see Speech.luau)
+	Every step has its own timeout and the whole gate STEP_CAP; a step that fails or times out never blocks the join.
+	After ClientReady the curtain stays while the server says the intro is Waiting for the other participants
+	(Cutscene set) up to the server's ReadyTimeout + margin, then lifts (attribute Done on the ScreenGui).
+
+	Ready = Vide source, true once the curtain lifted (the gate is over for this join).
+]]
+local ContentProvider = game:GetService("ContentProvider")
+local Players = game:GetService("Players")
+local ReplicatedFirst = game:GetService("ReplicatedFirst")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterPlayer = game:GetService("StarterPlayer")
+local Vide = require(ReplicatedStorage.Packages.Vide)
+local Content = require(ReplicatedStorage.shared.Content)
+local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
+local Icons = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Icons)
+
+type Texts = { Status: { [string]: string } }
+
+const GUI_NAME = "LoadingScreen"
+const KIT_TIMEOUT = 25 -- s for the crew kit warm-up (RigController has its own cap too)
+const ASSET_TIMEOUT = 20 -- s for PreloadAsync of sounds and images
+const VOICE_TIMEOUT = 22 -- s for the intro voices (the rest keeps loading in the background)
+const STEP_CAP = 40 -- s for all steps together
+const CREW_MARGIN = 3 -- s past the server's ReadyTimeout that the curtain waits for the others
+const POLL = 0.1
+const INTRO = "intro"
+-- intro sounds besides the scene's music cue and the car horns (Content.Sounds keys; missing keys are skipped)
+const INTRO_SOUNDS = {
+	"phone_pickup",
+	"phone_hangup",
+	"phone_ring",
+	"prompt_done",
+	"skip_vote",
+	"car_engine",
+	"amb_day_street",
+}
+-- weights of the steps on the bar
+const WEIGHTS: { [string]: number } = { Game = 1, Start = 0.5, Kit = 2, Assets = 2, Voices = 3 }
+-- texts (ReplicatedFirst/client/Loading/Tips); fallback when the boot folder is missing (Studio without it)
+const FALLBACK_STATUS: { [string]: string } = {
+	Game = "Loading...",
+	Kit = "Loading...",
+	Assets = "Loading...",
+	Voices = "Loading...",
+	Crew = "Waiting for the crew...",
+	Done = "Ready!",
+}
+
+local function texts(): { [string]: string }
+	const folder = ReplicatedFirst:FindFirstChild("client")
+	const loading = if folder ~= nil then folder:FindFirstChild("Loading") else nil
+	const module = if loading ~= nil then loading:FindFirstChild("Tips") else nil
+	if module == nil or not module:IsA("ModuleScript") then
+		return FALLBACK_STATUS
+	end
+	const ok, result = pcall(function(): Texts
+		return (require :: any)(module)
+	end)
+	return if ok and type(result) == "table" and type(result.Status) == "table" then result.Status else FALLBACK_STATUS
+end
+
+const LoadingController = Modux.Controller("LoadingController", {
+	Require = { "PlaceController", "RigController", "CutsceneController" },
+	-- lowest priority of the client: its OnStart runs after every other controller's OnStart
+	Priority = -1000,
+})
+
+function LoadingController:Setup()
+	self.Ready = Vide.source(false) :: Vide.Source<boolean>
+	self.Progress = Vide.source(0) :: Vide.Source<number>
+	self.Status = texts() :: { [string]: string }
+	-- fraction 0..1 of each step
+	self.Steps = { Game = 0, Start = 0, Kit = 0, Assets = 0, Voices = 0 } :: { [string]: number }
+	self.Gui = nil :: ScreenGui?
+	self.Sent = false :: boolean
+end
+
+function LoadingController:FindGui(): ScreenGui?
+	const existing = self.Gui
+	if existing ~= nil and existing.Parent ~= nil then
+		return existing
+	end
+	const playerGui = Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+	const gui = if playerGui ~= nil then playerGui:FindFirstChild(GUI_NAME) else nil
+	if gui ~= nil and gui:IsA("ScreenGui") then
+		self.Gui = gui
+		return gui
+	end
+	return nil
+end
+
+function LoadingController:SetStatus(key: string)
+	const gui = self:FindGui()
+	if gui ~= nil then
+		gui:SetAttribute("Status", self.Status[key] or FALLBACK_STATUS[key] or "")
+	end
+end
+
+-- Step fraction -> weighted bar (never goes back)
+function LoadingController:Mark(step: string, fraction: number)
+	const steps = self.Steps
+	steps[step] = math.max(steps[step] or 0, math.clamp(fraction, 0, 1))
+	local total, done = 0, 0
+	for key, weight in WEIGHTS do
+		total += weight
+		done += weight * (steps[key] or 0)
+	end
+	const value = if total > 0 then done / total else 1
+	self.Progress(value)
+	const gui = self:FindGui()
+	if gui ~= nil then
+		const shown = gui:GetAttribute("Progress")
+		if type(shown) ~= "number" or value > shown then
+			gui:SetAttribute("Progress", value)
+		end
+	end
+end
+
+-- Sounds and images of the intro, as PreloadAsync items
+function LoadingController:AssetList(): { any }
+	const list: { any } = {}
+	const keys: { string } = table.clone(INTRO_SOUNDS)
+	const scene = Content.Cutscenes.ByKey[INTRO]
+	if scene ~= nil and scene.Music ~= nil then
+		const cue = Content.Music.ByKey[scene.Music]
+		if cue ~= nil then
+			table.insert(keys, cue.Sound)
+		end
+	end
+	for _, car in Content.Cutscenes.Rules.Cars do
+		table.insert(keys, car.Horn)
+	end
+	const seen: { [string]: boolean } = {}
+	for _, key in keys do
+		const row = Content.Sounds.ByKey[key]
+		if row == nil or row.Id == "" or seen[row.Id] then
+			continue
+		end
+		seen[row.Id] = true
+		const sound = Instance.new("Sound")
+		sound.Name = key
+		sound.SoundId = row.Id
+		table.insert(list, sound)
+	end
+	const ids: { [string]: string } = Icons.Ids :: any
+	for _, id in ids do
+		if id ~= "" and not seen[id] then
+			seen[id] = true
+			table.insert(list, id)
+		end
+	end
+	return list
+end
+
+-- Runs `work(progress)` in its own thread; returns when it ends or after `timeout` (the work keeps running)
+local function within(timeout: number, work: () -> ())
+	local finished = false
+	task.spawn(function()
+		const ok, problem = pcall(work)
+		if not ok then
+			warn(`[LoadingController] loading step failed: {problem}`)
+		end
+		finished = true
+	end)
+	const deadline = os.clock() + timeout
+	while not finished and os.clock() < deadline do
+		task.wait(POLL)
+	end
+end
+
+function LoadingController:StepKit()
+	const rig = self.Dependencies.RigController
+	const started = os.clock()
+	within(KIT_TIMEOUT, function()
+		while not rig.Warm do
+			-- the warm-up has no progress of its own: creep towards 90 % while it runs
+			self:Mark("Kit", math.min((os.clock() - started) / 8, 0.9))
+			task.wait(POLL)
+		end
+	end)
+	self:Mark("Kit", 1)
+end
+
+function LoadingController:StepAssets()
+	const list = self:AssetList()
+	const total = #list
+	local done = 0
+	within(ASSET_TIMEOUT, function()
+		if total == 0 then
+			return
+		end
+		ContentProvider:PreloadAsync(list, function()
+			done += 1
+			self:Mark("Assets", done / total)
+		end)
+	end)
+	self:Mark("Assets", 1)
+	for _, item in list do
+		if typeof(item) == "Instance" then
+			(item :: Instance):Destroy()
+		end
+	end
+end
+
+function LoadingController:StepVoices()
+	if not self.Dependencies.PlaceController:Is("Run") then
+		self:Mark("Voices", 1)
+		return
+	end
+	self:SetStatus("Voices")
+	within(VOICE_TIMEOUT + 1, function()
+		self.Dependencies.CutsceneController:PreloadVoices(VOICE_TIMEOUT, function(fraction: number)
+			self:Mark("Voices", fraction)
+		end)
+	end)
+	self:Mark("Voices", 1)
+end
+
+function LoadingController:Run()
+	-- 1. the engine join
+	self:SetStatus("Game")
+	if not game:IsLoaded() then
+		game.Loaded:Wait()
+	end
+	self:Mark("Game", 1)
+	-- 2. every controller started (this OnStart is the last one)
+	self:Mark("Start", 1)
+
+	-- 3-5. kit, assets and voices together
+	self:SetStatus("Kit")
+	local pending = 3
+	local function done()
+		pending -= 1
+	end
+	task.spawn(function()
+		self:StepKit()
+		self:SetStatus("Assets")
+		done()
+	end)
+	task.spawn(function()
+		self:StepAssets()
+		done()
+	end)
+	task.spawn(function()
+		self:StepVoices()
+		done()
+	end)
+	const deadline = os.clock() + STEP_CAP
+	while pending > 0 and os.clock() < deadline do
+		task.wait(POLL)
+	end
+	for key in WEIGHTS do
+		self:Mark(key, 1)
+	end
+
+	-- the server may start the intro now
+	self:SendReady()
+
+	-- hold the curtain while the intro waits for the other participants
+	const cutscene = self.Dependencies.CutsceneController
+	if self.Dependencies.PlaceController:Is("Run") then
+		const holdUntil = os.clock() + Content.Cutscenes.Rules.ReadyTimeout + CREW_MARGIN
+		-- one beat for the set to arrive after the packet
+		task.wait(0.3)
+		if Vide.untrack(cutscene.Waiting) then
+			self:SetStatus("Crew")
+		end
+		while Vide.untrack(cutscene.Waiting) and os.clock() < holdUntil do
+			task.wait(POLL)
+		end
+	end
+
+	self:SetStatus("Done")
+	self:Lift()
+end
+
+function LoadingController:SendReady()
+	if self.Sent then
+		return
+	end
+	self.Sent = true
+	self.Libs.Net.ClientReady:fireServer()
+end
+
+function LoadingController:Lift()
+	self.Ready(true)
+	const gui = self:FindGui()
+	if gui ~= nil then
+		gui:SetAttribute("Done", true)
+	end
+end
+
+LoadingController:OnInit(function(self)
+	self:Setup()
+end)
+
+LoadingController:OnStart(function(self)
+	task.spawn(function()
+		const ok, problem = pcall(function()
+			self:Run()
+		end)
+		if not ok then
+			warn(`[LoadingController] loading gate failed, letting the player in: {problem}`)
+			self:SendReady()
+			self:Lift()
+		end
+	end)
+end)
+
+return LoadingController

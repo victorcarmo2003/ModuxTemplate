@@ -17,6 +17,12 @@
 -- outfit; at night never the same species (ANM-004 copies). Couple = walks and sits side by side (no gesture, Q-182 b).
 -- The partner follows the leader (no pathfinding of its own): FollowGap behind (Couple: beside), QueueGap beside
 -- while standing, snapped back to its spot past Leash studs.
+-- Adopt (user request 2026-10-11, TASK-163; FEAT-009 note, Provisional): a passer-by near the queue may become the
+-- next customer instead of a spawn at a door. NoticeLead s before an attempt, with Chance (per shift) and at most one
+-- adoption per MinGapSeconds, the nearest passer-by within MaxDistance studs of Q5 whose species fits a customer type
+-- of the shift stops on the sidewalk; at the attempt it becomes that customer (same species and outfit, no type
+-- accessory), faces the cart for Beat s and walks to Q5. FirstDelay: the first attempt of a selling phase comes
+-- {min, max} s after it starts (was one whole interval), so the first customer is at the counter in ~8-12 s.
 local Table = require(script.Parent.Table)
 
 export type SpawnWeight = { Point: string, Weight: number }
@@ -49,6 +55,18 @@ export type Groups = {
 	Pairs: { GroupPair },
 }
 
+export type Adopt = {
+	ChanceDay: number, -- 0..1 per attempt
+	ChanceNight: number, -- 0..1 per attempt (night walkers keep to the far west: few are ever in range)
+	FromDay: number, -- first day with adoptions (Day 1 = 1)
+	FromNight: number, -- first night with adoptions (0 = never at night)
+	MaxDistance: number, -- studs (horizontal) from Q5
+	MinGapSeconds: number, -- at least this long between two adoptions
+	NoticeLead: number, -- s before the attempt the passer-by brakes (>= its braking time)
+	Beat: number, -- s the new customer faces the cart before walking to the queue
+	FirstDelay: { number }, -- {min, max} s from the start of a selling phase to its first attempt
+}
+
 export type Flow = {
 	BaseInterval: number, -- seconds between spawns, solo, Day 1
 	GrowthPerDay: number,
@@ -66,6 +84,7 @@ export type Flow = {
 	NightInterval: number, -- seconds between spawns at night, solo; fallback when a night has no own value
 	Spawns: Spawns, -- MAP-01 §9.8 (Provisional)
 	Groups: Groups, -- FEAT-038 (Provisional)
+	Adopt: Adopt, -- TASK-163 (Provisional)
 }
 
 const flow: Flow = {
@@ -128,6 +147,17 @@ const flow: Flow = {
 			{ Shift = "Night", Leader = "night_shift_worker", Partner = "office_worker", Weight = 35, Couple = false },
 			{ Shift = "Night", Leader = "office_worker", Partner = "construction_worker", Weight = 25, Couple = false },
 		},
+	},
+	Adopt = {
+		ChanceDay = 0.5, -- Provisional (user request 2026-10-11: ~50% by day)
+		ChanceNight = 0.15, -- Provisional: lower at night
+		FromDay = 1, -- Day 1 morning too (never the tutorial customer)
+		FromNight = 1,
+		MaxDistance = 60, -- ~4-5 s to Q5 at customer pace
+		MinGapSeconds = 8,
+		NoticeLead = 0.8, -- a walker at 12 studs/s brakes in 0.75 s (WalkGeo.Brake 16)
+		Beat = 0.6,
+		FirstDelay = { 3, 5 }, -- + walk (adopted ~5 s, door ~8 s) = first customer at Q5 in ~8-12 s
 	},
 }
 

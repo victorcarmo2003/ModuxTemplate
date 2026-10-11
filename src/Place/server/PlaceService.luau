@@ -1,10 +1,11 @@
 --!strict
--- Place role and dev mode (architecture.md §1, §2.1, §3.1; TASK-010).
--- Role = authored attribute Workspace.PlaceRole ("Lobby" | "Run"). Same code runs on both places; services that
--- belong to one role return at the top of OnInit/OnStart when Is(role) is false (architecture.md §3.1).
--- Dev mode = Run place in Studio without PrivateServerId: roster = whoever joins, no MemoryStore, snapshot in memory.
--- Provisional (TASK-010): a missing PlaceRole reads as "Run" (wave 1 ships only the Run place), and dev mode also
--- needs RunService:IsStudio(), so a public Run server can never expose dev commands (gems, skip day).
+-- Place role and dev mode (architecture.md §1, §2.1, §3.1, §20.1; TASK-010, TASK-154).
+-- Role = "Lobby" | "Run", derived from RoleService (one place, server roles; architecture.md §20): Game = "Run",
+-- Lobby and PrivateLobby = "Lobby". Same code runs on every server; services that belong to one role return at the
+-- top of OnInit/OnStart when Is(role) is false (architecture.md §3.1) — this is the single switch that keeps the run
+-- loop (Round, Customer, Traffic...) off in the lobby while Profile, Class and Shop keep running.
+-- The authored Workspace.PlaceRole is now read only by RoleService, in Studio (legacy).
+-- Dev mode = Run in Studio without PrivateServerId: roster = whoever joins, no MemoryStore, snapshot in memory.
 -- OnStart runs MapIndex.Validate (architecture.md §18.8) against Required.ForWave(Content.RunParams.BindingWave)
 -- (§19.22, TASK-048): problem in Studio = error (loud), published = warn. Provisional (TASK-048): while the binding of
 -- the configured wave is still being authored (TASK-083), a place that passes the previous wave only warns, so the
@@ -14,31 +15,15 @@ local RunService = game:GetService("RunService")
 local ServerScriptService = game:GetService("ServerScriptService")
 local Content = require(ReplicatedStorage.shared.Content)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
+local Roles = require(ReplicatedStorage.shared.ServerRole.Roles)
 local Modux = require(ServerScriptService.server.Modux)
 
 export type Role = "Lobby" | "Run"
 
-const ROLE_ATTRIBUTE = "PlaceRole"
-const DEFAULT_ROLE: Role = "Run"
-
-local function readRole(): (Role, string?)
-	const raw = workspace:GetAttribute(ROLE_ATTRIBUTE)
-	if raw == "Lobby" or raw == "Run" then
-		return raw, nil
-	end
-	if raw == nil then
-		return DEFAULT_ROLE, `Workspace.{ROLE_ATTRIBUTE} is not set; reading as "{DEFAULT_ROLE}" (wave 1)`
-	end
-	return DEFAULT_ROLE, `Workspace.{ROLE_ATTRIBUTE} = {tostring(raw)} is not "Lobby"/"Run"; reading as "{DEFAULT_ROLE}"`
-end
-
-const PlaceService = Modux.Service("PlaceService", { Priority = 950 })
+const PlaceService = Modux.Service("PlaceService", { Require = { "RoleService" }, Priority = 950 })
 
 function PlaceService:Setup()
-	const role, problem = readRole()
-	if problem then
-		warn(`[PlaceService] {problem}`)
-	end
+	const role = Roles.PlaceRole(self.Dependencies.RoleService:Get())
 	self.Role = role :: Role
 	self.Dev = (role == "Run" and game.PrivateServerId == "" and RunService:IsStudio()) :: boolean
 end
