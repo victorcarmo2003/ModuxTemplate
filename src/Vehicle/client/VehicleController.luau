@@ -78,6 +78,7 @@ const HINGE_RETRY = 5 -- s: one more look for the hinge when the Model replicate
 const MIN_SWING = math.rad(5) -- a smaller computed swing means the flap already hangs down (needs ClosedAngle)
 const SOUND_CLOSE = "shutter_close"
 const SOUND_OPEN = "shutter_open"
+const SOUND_BUTTON = "switch_click" -- the window button, with the flap sound (not on the late-join pose)
 
 type Shutter = {
 	Model: Model,
@@ -362,8 +363,10 @@ function VehicleController:SwingShutter(shutter: Shutter)
 	end
 
 	const sound = if isClosed then SOUND_CLOSE else SOUND_OPEN
+	const audio = self.Dependencies.AudioController
+	audio:Play(SOUND_BUTTON, shutter.Hinge.WorldPosition)
 	if Content.Sounds.ByKey[sound] ~= nil then
-		self.Dependencies.AudioController:Play(sound, shutter.Hinge.WorldPosition)
+		audio:Play(sound, shutter.Hinge.WorldPosition)
 	end
 end
 

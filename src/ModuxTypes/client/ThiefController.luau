@@ -29,6 +29,7 @@ export type Public = {
 	Apply: (self: Public, record: Record) -> (),
 	Tick: (self: Public) -> (),
 	FindVehicle: (self: Public) -> Instance?,
+	PlayOpen: (self: Public) -> (),
 	Clear: (self: Public) -> (),
 	Draw: (self: Public, adornee: Instance, offset: Vector3) -> (),
 	Resolve: (self: Public) -> (),

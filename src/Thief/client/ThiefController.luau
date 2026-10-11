@@ -17,6 +17,10 @@
 	No fitting at all = no bar, no error. A late fitting (streaming, model swap) re-resolves.
 	Billboard size has a pixel floor so it reads from the Mart door (~114 studs; MaxDistance >= 130, MAP-01 §6).
 
+	Sound (user request 2026-10-10): `thief_open` at the drawer when the record turns Opening. Not for a late joiner who
+	gets an Opening already under way (StartedAt older than OPEN_SOUND_WINDOW). The catch sound is the `thief_caught`
+	notice (HudController).
+
 	Presentation only: the client never decides catch or theft (ThiefService does).
 ]]
 local CollectionService = game:GetService("CollectionService")
@@ -42,6 +46,8 @@ const OFFSET_DRAWER = 2.6 -- plus half the part height
 -- Scale part grows with the world, offset part keeps it readable far away (Provisional, MAP-01 §6).
 const BAR_SIZE = UDim2.new(1.6, 72, 0.3, 12)
 const MAX_DISTANCE = 140
+const OPEN_SOUND = "thief_open"
+const OPEN_SOUND_WINDOW = 1 -- s of server time: an older Opening is the state a joiner found, not a new one
 
 export type Record = {
 	State: string,
@@ -55,7 +61,8 @@ type Mount = {
 	Unmount: () -> (),
 }
 
-const ThiefController = Modux.Controller("ThiefController", { Require = { "RoundController" }, Priority = 600 })
+const ThiefController =
+	Modux.Controller("ThiefController", { Require = { "RoundController", "AudioController" }, Priority = 600 })
 
 function ThiefController:Setup()
 	self.State = Vide.source("None") :: Vide.Source<string>
@@ -78,6 +85,7 @@ function ThiefController:Progress(): number
 end
 
 function ThiefController:Apply(record: Record)
+	const opened = record.State == VISIBLE_STATE and Vide.untrack(self.State) ~= VISIBLE_STATE
 	Vide.batch(function()
 		self.StartedAt(record.StartedAt)
 		self.Duration(record.Duration)
@@ -85,6 +93,9 @@ function ThiefController:Apply(record: Record)
 		self.State(record.State)
 	end)
 	self:Tick()
+	if opened and workspace:GetServerTimeNow() - record.StartedAt <= OPEN_SOUND_WINDOW then
+		self:PlayOpen()
+	end
 end
 
 -- Heartbeat only while the bar is up.
@@ -169,6 +180,17 @@ local function locate(vehicle: Instance): (Instance?, Vector3)
 		return part, Vector3.new(0, part.Size.Y / 2 + OFFSET_DRAWER, 0)
 	end
 	return nil, Vector3.zero
+end
+
+-- At the drawer of the current vehicle (the bar adornee, else the drawer top); on screen when neither is found.
+function ThiefController:PlayOpen()
+	const mount = self.Mount
+	local at: Instance? = if mount then mount.Adornee else nil
+	if at == nil then
+		const vehicle = self.Vehicle or self:FindVehicle()
+		at = if vehicle then findDrawerTop(vehicle) else nil
+	end
+	self.Dependencies.AudioController:Play(OPEN_SOUND, at)
 end
 
 function ThiefController:Clear()

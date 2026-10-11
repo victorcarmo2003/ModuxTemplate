@@ -27,12 +27,19 @@
 	  bulb/neon/disc or ending in "lamp(s)". Off = SmoothPlastic Cream (AST-036: "de dia, Cream sem Neon").
 
 	No input (the switch is a prompt, PromptController), no packet, never writes a set.
+
+	Sound (user request 2026-10-10): `switch_click` at the switch (PromptAction switch_light in the current vehicle, else
+	the group's first fixture) when a Switch group record flips by the party switch. The record also flips with the
+	shift, the vehicle and the Hush, so the click needs, once the update batch landed: night, no night / attempt /
+	vehicle change in the last CONTEXT_GRACE s, and every Always / Posts group on (day end and Hush put them out).
+	Provisional: the server sends no event for the switch. Never on the first record (join).
 ]]
 local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Workspace = game:GetService("Workspace")
+local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 
@@ -87,6 +94,9 @@ const DECAL_NAME = "Pool_Decal" -- AST-036 On_Fake
 const EMISSIVE_ATTRIBUTE = "Emissive"
 const POST_GROUP_DEFAULT = "juniper_posts"
 const FALLBACK_NAME = "LightController_Fallback"
+const SWITCH_ACTION = "switch_light" -- PromptAction of the switch anchor (LightService)
+const SWITCH_SOUND = "switch_click"
+const CONTEXT_GRACE = 1.5 -- s after a night / attempt / vehicle change in which a Switch flip is the shift's, not a click
 
 const TICK_RATE = 20 -- Hz: Hush steps of 1.5 s and preset blends stay smooth; each pass only writes on change
 const POST_LIGHT_RANGE = 150 -- studs from the camera (T31)
@@ -282,7 +292,8 @@ local function effect(className: string): any
 	return created
 end
 
-const LightController = Modux.Controller("LightController", { Require = { "RoundController" }, Priority = 500 })
+const LightController =
+	Modux.Controller("LightController", { Require = { "RoundController", "AudioController" }, Priority = 500 })
 
 function LightController:Setup()
 	self.Records = {} :: { [string]: Record }
@@ -303,6 +314,8 @@ function LightController:Setup()
 	self.FromClock = DAY_CLOCK_MIN :: number
 	self.BlendStart = 0 :: number
 	self.Mode = "" :: string -- "day" | "night:<k>"; a change starts a blend
+	-- os.clock() of the last night / attempt / vehicle change (switch click guard)
+	self.ContextAt = 0 :: number
 end
 
 -- Night number of the shift (RoundController.Night lands with TASK-055; until then first night).
@@ -734,6 +747,66 @@ function LightController:RefreshPreset()
 	self:Write(preset, outClock)
 end
 
+-- Switch click ---------------------------------------------------------------------------------------------------
+
+-- Marks every night / attempt / vehicle change (the Lights records that change with it are not a click)
+function LightController:WatchContext()
+	const round = self.Dependencies.RoundController
+	Vide.root(function()
+		local last = ""
+		Vide.effect(function()
+			const context = `{round.IsNight()}:{round.Night()}:{round.Attempt()}:{round.Vehicle()}`
+			if context ~= last then
+				last = context
+				self.ContextAt = os.clock()
+			end
+		end)
+	end)
+end
+
+-- Switch anchor of the current vehicle; nil when it is not streamed in
+function LightController:SwitchAnchor(): Instance?
+	const current = self.Dependencies.RoundController.Vehicle()
+	for _, vehicle in CollectionService:GetTagged(VEHICLE_TAG) do
+		if vehicle:GetAttribute("Vehicle") ~= current then
+			continue
+		end
+		for _, d in vehicle:GetDescendants() do
+			if d:GetAttribute("PromptAction") == SWITCH_ACTION and (d:IsA("BasePart") or d:IsA("Attachment")) then
+				return d
+			end
+		end
+	end
+	return nil
+end
+
+-- A Switch group record flipped (deferred: the whole update batch is stored)
+function LightController:CheckSwitch(key: string, on: boolean)
+	const record = self.Records[key]
+	if record == nil or record.On ~= on then
+		return
+	end
+	if not self.Dependencies.RoundController.IsNight() or os.clock() - self.ContextAt < CONTEXT_GRACE then
+		return
+	end
+	for _, group in Content.LightGroups.List do
+		if group.Kind == "Always" or group.Kind == "Posts" then
+			const other = self.Records[group.Key]
+			if other == nil or not other.On then
+				return
+			end
+		end
+	end
+	local at: Vector3 | Instance | nil = self:SwitchAnchor()
+	if at == nil then
+		const fixtures = self.Fixtures[key]
+		if fixtures and fixtures[1] then
+			at = fixtures[1].Position
+		end
+	end
+	self.Dependencies.AudioController:Play(SWITCH_SOUND, at)
+end
+
 -- Lifecycle ------------------------------------------------------------------------------------------------------
 
 LightController:OnInit(function(self)
@@ -749,7 +822,19 @@ LightController:OnInit(function(self)
 	end
 	lights:onAdded(store)
 	lights:onChanged(function(id, record)
+		const key = keys[id]
+		const group = if key then Content.LightGroups.ByKey[key] else nil
+		const previous = if key then self.Records[key] else nil
 		store(id, record)
+		if key == nil or group == nil or group.Kind ~= "Switch" then
+			return
+		end
+		if previous ~= nil and previous.On ~= record.On then
+			const on = record.On
+			task.defer(function()
+				self:CheckSwitch(key, on)
+			end)
+		end
 	end)
 	lights:onRemoved(function(id)
 		const key = keys[id]
@@ -769,6 +854,7 @@ LightController:OnStart(function(self)
 	self:Track(VEHICLE_TAG, true)
 	self:Track("UpgradePiece", true)
 	self:Track(LIGHT_ZONE_TAG, false)
+	self:WatchContext()
 end)
 
 LightController:OnTick(function(self)

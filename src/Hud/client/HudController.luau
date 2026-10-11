@@ -126,6 +126,11 @@ const REFUSAL: { [string]: boolean } = {
 }
 const REFUSAL_SOUND = "error"
 const TOAST_SOUND = "toast"
+-- Notices with their own sound instead of the toast one (live packet only: nothing plays for a late joiner)
+const NOTICE_SOUND: { [string]: string } = {
+	thief_caught = "thief_caught",
+}
+const SUMMARY_SOUND = "summary"
 const GOOD: { [string]: boolean } = {
 	upgrade_bought = true,
 	ingredient_unlocked = true,
@@ -263,7 +268,9 @@ function HudController:PushToast(kind: string, value: number)
 	end
 	const toastKind: Toast.Kind = if ALERT[kind] then "Alert" elseif GOOD[kind] then "Good" else "Info"
 	if self:PushText(text, toastKind) then
-		self.Dependencies.AudioController:Play(if REFUSAL[kind] then REFUSAL_SOUND else TOAST_SOUND)
+		self.Dependencies.AudioController:Play(
+			NOTICE_SOUND[kind] or (if REFUSAL[kind] then REFUSAL_SOUND else TOAST_SOUND)
+		)
 	end
 end
 
@@ -314,6 +321,7 @@ function HudController:ShowReport(report: Report)
 		else "C"
 	const profile = self.Dependencies.ProfileController
 	self:CancelReport()
+	self.Dependencies.AudioController:Play(SUMMARY_SOUND)
 	self.Report({
 		Title = if report.IsNight then `Night {report.Night}` else `Day {report.Day}`,
 		Arrived = report.Arrived,

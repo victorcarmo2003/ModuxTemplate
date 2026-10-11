@@ -14,6 +14,7 @@ export type Member = {
 }
 
 export type Public = {
+	ActiveSince: number,
 	Band: Vide.Source<Band>,
 	Blackout: Vide.Source<number>,
 	Blur: BlurEffect?,
@@ -40,6 +41,7 @@ export type Public = {
 	ApplyMember: (self: Public, userId: number, record: Member) -> (),
 	RemoveMember: (self: Public, userId: number) -> (),
 	SetLocalState: (self: Public, state: LifeState) -> (),
+	PlayLifeSound: (self: Public, userId: number, previous: LifeState, state: LifeState) -> (),
 	FaintAmount: (self: Public, now: number) -> (number, number),
 	Effects: (self: Public) -> (ColorCorrectionEffect, BlurEffect),
 	Step: (self: Public, dt: number) -> (),

@@ -46,6 +46,7 @@ export type Public = {
 	BlendStart: number,
 	Bloom: BloomEffect?,
 	ColorCorrection: ColorCorrectionEffect?,
+	ContextAt: number,
 	Dirty: boolean,
 	Fallbacks: { [string]: Instance },
 	Fixtures: { [string]: { Fixture } },
@@ -75,6 +76,9 @@ export type Public = {
 	Target: (self: Public) -> (Preset, number, string),
 	Write: (self: Public, preset: Preset, clock: number) -> (),
 	RefreshPreset: (self: Public) -> (),
+	WatchContext: (self: Public) -> (),
+	SwitchAnchor: (self: Public) -> Instance?,
+	CheckSwitch: (self: Public, key: string, on: boolean) -> (),
 }
 
 return {}

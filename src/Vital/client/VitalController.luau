@@ -30,6 +30,12 @@
 	Anomaly seen (user request 2026-10-10): the server sends no event for VitalService:SeeAnomaly, so a single drop of
 	at least Sanity.SeeAnomaly and below Sanity.RuleBroken (dark ticks are <= 2 x DarkPerSecond) plays
 	SoundRules.Stings.AnomalySeen (anomaly_see) on screen with the DEC-173 cap. Provisional: a packet would be exact.
+
+	Sounds (user request 2026-10-10), never for the first record of a member (join / admission):
+	  coffee_drink  own sanity goes up at night while Active (coffee is the only restore, VitalService:Drink). On
+	                screen, at the end of the drink. Provisional: no packet for the use; dev "sanity" also rises.
+	  faint         a member's record goes Active -> Down; at that member's character (spatial: crewmates nearby hear it)
+	  revive        a member's record goes back to Active from Down / Reviving / Spectator; at the character
 ]]
 local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
@@ -80,6 +86,10 @@ const EPSILON = 0.002
 const COLOR_NAME = "VitalColor"
 const BLUR_NAME = "VitalBlur"
 const BANDS = Content.Sanity.Bands
+const COFFEE_SOUND = "coffee_drink"
+const FAINT_SOUND = "faint"
+const REVIVE_SOUND = "revive"
+const COFFEE_AFTER_ACTIVE = 1 -- s: a rise this soon after coming back to Active is the revive resend, not coffee
 
 local function approach(current: number, target: number, dt: number): number
 	-- Exponential ease, ~98% of the way in EnterTime.
@@ -102,6 +112,7 @@ function VitalController:Setup()
 
 	self.DarkTickAt = NO_TICK :: number
 	self.FaintAt = nil :: number?
+	self.ActiveSince = 0 :: number
 	self.NextBlurAt = 0 :: number
 	self.BlurUntil = 0 :: number
 	self.Shown = { Vignette = 0, Saturation = 0, Tint = 0 } :: Shown
@@ -144,6 +155,13 @@ function VitalController:ApplySanity(value: number, max: number)
 		if drop >= Content.Sanity.SeeAnomaly and drop < Content.Sanity.RuleBroken then
 			self.Dependencies.AudioController:Play(Content.SoundRules.Stings.AnomalySeen, nil, { Scare = true })
 		end
+		if
+			value > previous
+			and Vide.untrack(self.LocalState) == "Active"
+			and os.clock() - self.ActiveSince >= COFFEE_AFTER_ACTIVE
+		then
+			self.Dependencies.AudioController:Play(COFFEE_SOUND)
+		end
 	end
 	if max <= 0 then
 		self.DarkTickAt = NO_TICK
@@ -156,6 +174,10 @@ function VitalController:ApplySanity(value: number, max: number)
 end
 
 function VitalController:ApplyMember(userId: number, record: Member)
+	const previous = Vide.untrack(self.State)[userId]
+	if previous ~= nil and previous ~= record.State then
+		self:PlayLifeSound(userId, previous, record.State)
+	end
 	const members = table.clone(Vide.untrack(self.Members))
 	const states = table.clone(Vide.untrack(self.State))
 	members[userId] = table.clone(record) :: Member
@@ -192,8 +214,32 @@ function VitalController:SetLocalState(state: LifeState)
 		self.FaintAt = os.clock()
 	elseif state == "Active" then
 		self.FaintAt = nil
+		self.ActiveSince = os.clock()
 	end
 	self.LocalState(state)
+end
+
+-- faint / revive at the member's character; the own one falls back to the screen, a crewmate without a character
+-- (streamed out, far away) plays nothing.
+function VitalController:PlayLifeSound(userId: number, previous: LifeState, state: LifeState)
+	local key: string? = nil
+	if state == "Down" and previous ~= "Away" then
+		key = FAINT_SOUND
+	elseif state == "Active" and (previous == "Down" or previous == "Reviving" or previous == "Spectator") then
+		key = REVIVE_SOUND
+	end
+	if key == nil then
+		return
+	end
+	const player = Players:GetPlayerByUserId(userId)
+	const character = if player then player.Character else nil
+	const anchor = if character
+		then character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
+		else nil
+	if anchor == nil and userId ~= Players.LocalPlayer.UserId then
+		return
+	end
+	self.Dependencies.AudioController:Play(key, anchor)
 end
 
 -- 0..1 dark screen of the faint and how far the closing part is (0..1); (0, 0) when no faint is running.
