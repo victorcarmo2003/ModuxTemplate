@@ -26,10 +26,10 @@ export type Props = {
 	Name: string?,
 }
 
-const WIDTH = 84
-const HEIGHT = 36
+const WIDTH = 72
+const HEIGHT = 30
 const LOW = Theme.ToneOf(Theme.Color.Low)
-const TEXT_SIZE = 20
+const TEXT_SIZE = 17
 
 return function(props: Props): BillboardGui
 	const visible = props.Visible or function(): boolean

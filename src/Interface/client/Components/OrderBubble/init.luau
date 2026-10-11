@@ -61,16 +61,16 @@ export type Props = {
 	Name: string?,
 }
 
-const CELL = 44 -- icon size (min touch/readable size, Theme.MinTouch)
+const CELL = 36 -- icon size (readable at 10-20 studs; not touched)
 const GAP = 6
-const PAD = 10
+const PAD = 8
 const LIP = 4
 const BUBBLE_HEIGHT = CELL + PAD * 2 + LIP -- one row
-const ROW_GAP = 8 -- between the two rows of a pair
-const TAIL = 16 -- tail square side (rotated 45°)
-const CHECK = 32 -- check badge over a resolved row
+const ROW_GAP = 6 -- between the two rows of a pair
+const TAIL = 12 -- tail square side (rotated 45°)
+const CHECK = 26 -- check badge over a resolved row
 const RING = 4
-const LABEL_SIZE = 16
+const LABEL_SIZE = 14
 
 const WHITE = Color3.fromHex("#FFFFFF")
 -- Placeholder look per ingredient until Q-152 (colors from style guide §2.1 food palette where there is one).

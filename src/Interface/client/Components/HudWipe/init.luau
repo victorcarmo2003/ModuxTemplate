@@ -29,12 +29,12 @@ export type Props = {
 	Position: UDim2?,
 }
 
-const RING = 128
-const DOT = 18
-const NUMBER_SIZE = 56
-const TITLE_SIZE = 28
-const LINE_SIZE = 18
-const WIDTH = 300
+const RING = 108
+const DOT = 15
+const NUMBER_SIZE = 46
+const TITLE_SIZE = 24
+const LINE_SIZE = 16
+const WIDTH = 260
 
 local function dot(index: number, total: number, seconds: () -> number): Frame
 	-- Clockwise from 12 o'clock; dot `index` is lit while more than index - 1 seconds are left.

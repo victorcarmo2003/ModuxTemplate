@@ -26,9 +26,9 @@ export type Icon = "None" | "Coin" | "Sun" | "Moon" | "Clock"
 export type Props = {
 	Text: () -> string,
 	Icon: (() -> Icon)?,
-	-- Pixel height of the pill (>= Theme.MinTouch). Default 44.
+	-- Pixel height of the pill (>= Theme.MinChip: status only, never touched). Default 36.
 	Height: number?,
-	-- Pixel text size (>= Theme.MinTextSize). Default 22.
+	-- Pixel text size (>= Theme.MinTextSize). Default 18.
 	TextSize: number?,
 	-- Minimum pill width, so a short text ("Day 1") does not make a tiny pill.
 	MinWidth: number?,
@@ -77,8 +77,8 @@ local function drawn(kind: () -> Icon, size: number, hasArt: () -> boolean): Fra
 end
 
 return function(props: Props): Frame
-	const height = math.max(props.Height or Theme.MinTouch, Theme.MinTouch)
-	const textSize = math.max(props.TextSize or 22, Theme.MinTextSize)
+	const height = math.max(props.Height or 36, Theme.MinChip)
+	const textSize = math.max(props.TextSize or 18, Theme.MinTextSize)
 	const iconKind: () -> Icon = props.Icon or function(): Icon
 		return "None"
 	end

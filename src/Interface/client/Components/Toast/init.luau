@@ -33,12 +33,12 @@ export type Props = {
 	LayoutOrder: (() -> number)?,
 }
 
-const WIDTH = 260
-const TEXT_SIZE = 17
-const TAB = 40
-const ICON = 28
-const PAD_X = 10
-const PAD_Y = 8
+const WIDTH = 220
+const TEXT_SIZE = 15
+const TAB = 32
+const ICON = 22
+const PAD_X = 8
+const PAD_Y = 6
 -- Spare width kept out of the measure so the rounded text size under UIScale never re-wraps.
 const WRAP_SLACK = 8
 const MIN_DURATION = 3
@@ -107,11 +107,11 @@ return function(props: Props): Frame
 	local function iconName(): string
 		return ICON_NAME[kind()]
 	end
-	-- Card height for the text at the fixed width (lip under it, never below a touch target).
+	-- Card height for the text at the fixed width (lip under it; a toast is never touched: chip height minimum).
 	local function cardHeight(): number
 		const width = WIDTH - TAB - PAD_X * 2 - WRAP_SLACK
 		const bounds = TextService:GetTextSize(props.Text(), TEXT_SIZE, Enum.Font.FredokaOne, Vector2.new(width, math.huge))
-		return math.max(Theme.MinTouch, math.ceil(bounds.Y) + PAD_Y * 2) + Theme.Lip
+		return math.max(Theme.MinChip, math.ceil(bounds.Y) + PAD_Y * 2) + Theme.Lip
 	end
 	local function rect(): Icons.Rect
 		return Icons.Rect(iconName()) or { Offset = Vector2.zero, Size = Vector2.zero }
@@ -176,7 +176,7 @@ return function(props: Props): Frame
 						CartoonLabel({
 							Name = "Glyph",
 							Box = UDim2.fromScale(1, 1),
-							TextSize = 26,
+							TextSize = 20,
 							Text = function()
 								return GLYPH[kind()]
 							end,

@@ -71,7 +71,7 @@ return UILabs.CreateVideStory({
 				const look = CrewLooks.Species[controls.Species()]
 				return if look then look.Fur else Theme.Color.Cream
 			end,
-			Position = UDim2.new(0.5, 0, 0, 62),
+			Position = UDim2.new(0.5, 0, 0, 50),
 		}),
 	})
 end)

@@ -32,11 +32,11 @@ export type Props = {
 	Position: UDim2?,
 }
 
-const TITLE_SIZE = 44
-const LINE_SIZE = 18
-const RIBBON = 64 -- ribbon height
-const TAIL = 40 -- tail width
-const WIDTH = 420
+const TITLE_SIZE = 36
+const LINE_SIZE = 16
+const RIBBON = 52 -- ribbon height
+const TAIL = 32 -- tail width
+const WIDTH = 360
 const HEIGHT = RIBBON + 12 + LINE_SIZE + 22
 
 -- One folded tail behind a ribbon end: darker Violet, lower than the ribbon, with an Ink outline. The list layout of

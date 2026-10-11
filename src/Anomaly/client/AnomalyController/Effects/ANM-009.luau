@@ -29,6 +29,7 @@ local RunService = game:GetService("RunService")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
+local UiScale = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.UiScale)
 local Effect = require(script.Parent.Parent.Effect)
 
 const create = Vide.create
@@ -71,11 +72,11 @@ const WISP_COLOR = Color3.fromHex("#C7E6F5")
 const WISP_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
 
 -- Subtitle strip
-const TEXT_SIZE = 18 -- >= Theme.MinTextSize on the smallest phone
+const TEXT_SIZE = 16 -- >= Theme.MinTextSize on the smallest phone
 const BOTTOM_GAP = 150 -- above the boss call strip (84 + its height)
-const WIDTH_SCALE = 0.6
-const MIN_WIDTH = 300
-const MAX_WIDTH = 560
+const WIDTH_SCALE = 0.55
+const MIN_WIDTH = 260
+const MAX_WIDTH = 460
 
 type Subtitle = {
 	Text: Vide.Source<string>,
@@ -133,13 +134,14 @@ local function strip(): Subtitle
 				Visible = function()
 					return text() ~= "" or alpha() < 0.99
 				end,
-				create("UICorner")({ CornerRadius = UDim.new(0, 16) }),
+				create("UICorner")({ CornerRadius = UDim.new(0, 14) }),
+				createRaw("UIScale")({ Scale = UiScale.Current }), -- global UI scale (Theme.ScaleOf)
 				createRaw("UISizeConstraint")({ MinSize = Vector2.new(MIN_WIDTH, 0), MaxSize = Vector2.new(MAX_WIDTH, 10000) }),
 				createRaw("UIPadding")({
-					PaddingLeft = UDim.new(0, 16),
-					PaddingRight = UDim.new(0, 16),
-					PaddingTop = UDim.new(0, 10),
-					PaddingBottom = UDim.new(0, 10),
+					PaddingLeft = UDim.new(0, 12),
+					PaddingRight = UDim.new(0, 12),
+					PaddingTop = UDim.new(0, 8),
+					PaddingBottom = UDim.new(0, 8),
 				}),
 				create("TextLabel")({
 					Name = "Line",

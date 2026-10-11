@@ -29,8 +29,8 @@ export type Props = {
 }
 
 const ICON = "Ui/arrow_right"
-const SIZE = 64
-const BOB = 10 -- px
+const SIZE = 52
+const BOB = 8 -- px
 const BOB_SPEED = 5 -- rad/s
 
 return function(props: Props): BillboardGui
@@ -87,7 +87,7 @@ return function(props: Props): BillboardGui
 				else CartoonLabel({
 					Name = "Arrow",
 					Box = UDim2.fromScale(1, 1),
-					TextSize = 48,
+					TextSize = 40,
 					Color = Theme.Color.Mustard,
 					Stroke = Theme.Outline.Thick,
 					Text = "V",

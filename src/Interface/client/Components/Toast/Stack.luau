@@ -46,7 +46,7 @@ return function(props: Props): Frame
 			FillDirection = Enum.FillDirection.Vertical,
 			HorizontalAlignment = Enum.HorizontalAlignment.Right,
 			SortOrder = Enum.SortOrder.LayoutOrder,
-			Padding = UDim.new(0, 10), -- room for the lean of the tags
+			Padding = UDim.new(0, 8), -- room for the lean of the tags
 		}),
 
 		values(visible, function(entry: Entry, index: () -> number)

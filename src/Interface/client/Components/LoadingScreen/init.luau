@@ -164,7 +164,8 @@ return function(props: Props): Frame
 	const screen = source(FIT)
 	const scale = function(): number
 		const size = screen()
-		return math.clamp(math.min(size.X / FIT.X, size.Y / FIT.Y), MIN_SCALE, MAX_SCALE)
+		-- fits the screen, and never bigger than the global UI scale (Theme.ScaleOf)
+		return math.clamp(math.min(size.X / FIT.X, size.Y / FIT.Y, Theme.ScaleOf(size)), MIN_SCALE, MAX_SCALE)
 	end
 
 	const studs = Icons.Ids.Studs

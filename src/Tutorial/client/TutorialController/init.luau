@@ -60,6 +60,7 @@ local Cinematic = require(StarterPlayer.StarterPlayerScripts.client.Interface.Ci
 local Spotlight = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Spotlight)
 local TutorialPanel = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.TutorialPanel)
 local TutorialPointer = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.TutorialPointer)
+local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
 local Rules = require(StarterPlayer.StarterPlayerScripts.client.Interaction.PromptController.Rules)
 local TutorialRules = require(ReplicatedStorage.shared.Tutorial.Rules)
 local Beacon = require(script.Beacon)
@@ -101,10 +102,8 @@ const HIGHLIGHT_MAX = 7
 const ARROW_LIFT = 0.8 -- studs between the top of the marked piece and the 3D arrow tip
 const CUSTOMER_LIFT = 3.2 -- over the head: above the order bubble and the prompt pill on the neck
 const EDGE_MARGIN = 56 -- px from the screen edge for the pointer
--- UI scale like the HUD: 1 on the smallest phone (375 px tall), up to 2
-const BASE_HEIGHT = 540
-const MAX_SCALE = 2
-const PANEL_TOP = 62 -- px at scale 1, under the clock row (HudScreen TOP 6 + 48 + gap 8)
+-- UI scale like the HUD: global rule (Theme.ScaleOf)
+const PANEL_TOP = 50 -- px at scale 1, under the clock row (HudScreen TOP 6 + 38 + gap 6)
 const CASH_NAME = "Cash" -- HudPill of the money in the Hud ScreenGui
 const MONEY_STEP = "money"
 
@@ -688,7 +687,7 @@ function TutorialController:Rescale()
 	if camera == nil then
 		return
 	end
-	const scale = math.clamp(camera.ViewportSize.Y / BASE_HEIGHT, 1, MAX_SCALE)
+	const scale = Theme.ScaleOf(camera.ViewportSize)
 	if math.abs(scale - Vide.untrack(self.Scale)) > 0.01 then
 		self.Scale(scale)
 	end
@@ -907,7 +906,7 @@ end
 
 function TutorialController:Mount(playerGui: Instance)
 	const scale = function(): number
-		return math.max(self.Scale(), 1)
+		return self.Scale()
 	end
 	const shown = function(): boolean
 		return self.Running() and self.StepKey() ~= ""

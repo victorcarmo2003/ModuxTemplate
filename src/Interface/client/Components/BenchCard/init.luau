@@ -44,12 +44,12 @@ export type Props = {
 	Name: string?,
 }
 
-const WIDTH = 2.8 -- studs; one GEAR WALL module is 3 wide (AST-049)
-const HEIGHT = 3.4
+const WIDTH = 2.4 -- studs; one GEAR WALL module is 3 wide (AST-049)
+const HEIGHT = 2.9
 -- Gear Stand plate: a pedestal is 1.6 wide and its neighbours 3 apart (MAP-01 §18.4); the player reads it from
 -- 1.5-2.5 studs, where the effect line stays >= 14 px on the smallest phone.
-const PLATE_WIDTH = 2.6
-const PLATE_HEIGHT = 1.9
+const PLATE_WIDTH = 2.2
+const PLATE_HEIGHT = 1.6
 const MAX_TEXT = 64
 
 const TAG_TONE: { [Mode]: Theme.Tone } = {

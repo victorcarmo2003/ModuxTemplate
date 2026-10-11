@@ -15,6 +15,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Theme)
+local UiScale = require(script.Parent.UiScale)
 local Icons = require(script.Parent.Icons)
 local Motion = require(script.Parent.Motion)
 local CartoonPanel = require(script.Parent.CartoonPanel)
@@ -115,7 +116,7 @@ return function(props: Props): Frame
 	end
 
 	const scale = function(): number
-		return if props.Scale then math.max(props.Scale(), 1) else 1
+		return if props.Scale then math.max(math.min(props.Scale(), UiScale.Current()), Theme.Scale.Min) else 1
 	end
 	const pop = Motion.Pop(props.Visible)
 	const scaled = function(): number

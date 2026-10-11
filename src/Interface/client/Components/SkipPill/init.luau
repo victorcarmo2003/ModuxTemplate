@@ -43,11 +43,11 @@ export type Props = {
 
 const HINT = "Hold to skip"
 const SKIPPING = "Skipping..."
-const PILL_HEIGHT = 48 -- >= Theme.MinTouch
-const MIN_WIDTH = 150
-const TEXT_SIZE = 20 -- >= Theme.MinTextSize on the smallest phone
-const HINT_SIZE = 16
-const CHIP_SIZE = 32
+const PILL_HEIGHT = 44 -- >= Theme.MinTouch
+const MIN_WIDTH = 130
+const TEXT_SIZE = 17 -- >= Theme.MinTextSize on the smallest phone
+const HINT_SIZE = 14
+const CHIP_SIZE = 28
 
 local function isPointer(input: InputObject): boolean
 	return input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch

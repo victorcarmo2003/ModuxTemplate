@@ -103,7 +103,7 @@ return function(props: Props): Frame
 	end
 
 	const scale = function(): number
-		return if props.Scale then math.max(props.Scale(), 1) else 1
+		return if props.Scale then props.Scale() else 1
 	end
 
 	const bodyHeight = HEIGHT - PAD * 2 - HEADER - GAP - PANEL_LIP

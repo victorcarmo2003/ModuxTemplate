@@ -51,13 +51,13 @@ export type Props = {
 	Position: UDim2?,
 }
 
-const WIDTH = 320
-const ROW_HEIGHT = 28
-const TEXT_SIZE = 18
-const TITLE_SIZE = 26
-const GRADE = 72 -- badge
-const GRADE_SIZE = 48
-const ICON = 26
+const WIDTH = 280
+const ROW_HEIGHT = 24
+const TEXT_SIZE = 16
+const TITLE_SIZE = 22
+const GRADE = 60 -- badge
+const GRADE_SIZE = 40
+const ICON = 22
 
 const GRADE_TONE: { [Grade]: Theme.Tone } = {
 	A = Theme.Tone.Mustard,
@@ -226,7 +226,7 @@ return function(props: Props): Frame
 			Lip = 6,
 			Studs = true,
 			Gloss = false,
-			Padding = { Left = 18, Right = 18, Top = 46, Bottom = 14 },
+			Padding = { Left = 18, Right = 18, Top = 40, Bottom = 12 },
 			Children = {
 				create("UIListLayout")({
 					FillDirection = Enum.FillDirection.Vertical,
@@ -250,7 +250,7 @@ return function(props: Props): Frame
 		CartoonPanel({
 			Name = "Title",
 			Position = UDim2.fromOffset(16, 0),
-			Size = UDim2.fromOffset(0, 40),
+			Size = UDim2.fromOffset(0, 34),
 			AutomaticSize = Enum.AutomaticSize.X,
 			Rotation = -2,
 			Tone = Theme.Tone.Ink,

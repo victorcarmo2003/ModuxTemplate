@@ -26,9 +26,9 @@ export type Options = {
 
 const DURATION = 1.2
 const FADE_AT = 0.7
-const RISE = 70
-const TEXT_SIZE = 28
-const HEIGHT = 34
+const RISE = 60
+const TEXT_SIZE = 24
+const HEIGHT = 30
 
 local function cancel(thread: thread)
 	if coroutine.status(thread) == "suspended" then

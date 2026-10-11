@@ -49,13 +49,13 @@ export type Props = {
 const FULL = Color3.fromHex("#FFD45A")
 const EMPTY = Theme.Color.Violet -- #6A5ACD
 const MID_RING = FULL:Lerp(EMPTY, 0.5)
-const PORTRAIT = 48 -- touch-sized circle (not clickable, but readable at a glance)
-const BAR_HEIGHT = 26
-const MIN_BAR = 140
-const MAX_BAR = 320
-const TEXT_SIZE = 20
+const PORTRAIT = 40 -- circle (not clickable, readable at a glance)
+const BAR_HEIGHT = 22
+const MIN_BAR = 120
+const MAX_BAR = 260
+const TEXT_SIZE = 17
 const GAP = 8
-const VALUE_WIDTH = 40 -- "100" at TEXT_SIZE
+const VALUE_WIDTH = 34 -- "100" at TEXT_SIZE
 -- Offset width of everything that is not the bar: portrait, gaps, number
 const SIDES = PORTRAIT + GAP * 2 + VALUE_WIDTH
 -- style guide §7.2: "abaixo de 25 pulsa devagar"
@@ -111,7 +111,7 @@ local function portrait(props: Props): Frame
 			CartoonLabel({
 				Name = "Letter",
 				Box = UDim2.fromScale(1, 1),
-				TextSize = 24,
+				TextSize = 20,
 				Color = function()
 					return letterColor(fur())
 				end,

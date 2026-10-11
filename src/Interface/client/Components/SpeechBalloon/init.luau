@@ -26,11 +26,11 @@ export type Props = {
 	Name: string?,
 }
 
-const WIDTH = 240 -- px of the balloon body
-const HEIGHT = 120 -- px of the billboard: up to 3 lines of TEXT_SIZE plus padding, lip and the tail
-const TEXT_SIZE = 18 -- >= Theme.MinTextSize on the smallest phone
-const PADDING = 10
-const TAIL = 16
+const WIDTH = 210 -- px of the balloon body
+const HEIGHT = 104 -- px of the billboard: up to 3 lines of TEXT_SIZE plus padding, lip and the tail
+const TEXT_SIZE = 16 -- >= Theme.MinTextSize on the smallest phone
+const PADDING = 8
+const TAIL = 12
 const OUTLINE = Theme.Outline.Normal
 
 return function(props: Props): BillboardGui

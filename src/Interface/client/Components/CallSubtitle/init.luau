@@ -2,7 +2,7 @@
 -- CallSubtitle: the boss call subtitle (style guide §7.2 "Legenda de ligação": bottom strip above the hotbar, phone
 -- icon of the vehicle + "Walt:" + one line; no portrait, DEC-076; no replay button, DEC-077; ui-text.md §12.4).
 -- One line at a time (lines are <= 42 characters, ui-text.md §11); a longer line wraps to a 2nd row instead of
--- shrinking, so the text never goes under Theme.MinTextSize. Narrow on purpose (60% of the width, 300..560 px) so it
+-- shrinking, so the text never goes under Theme.MinTextSize. Narrow on purpose (55% of the width, 260..460 px) so it
 -- stays clear of the thumbstick and the jump button on a phone.
 -- Cartoon pass (AST-091): round phone badge (CartoonPanel in the phone colour) with the AST-071 `Hud/phone` icon
 -- (drawn handset while missing); pops and slides up (Motion.Pop + spring).
@@ -39,11 +39,11 @@ export type Props = {
 	Name: string?,
 }
 
-const TEXT_SIZE = 18 -- >= Theme.MinTextSize on the smallest phone
-const WIDTH_SCALE = 0.6
-const MIN_WIDTH = 300
-const MAX_WIDTH = 560
-const BADGE = Theme.MinTouch -- 44 px round badge
+const TEXT_SIZE = 16 -- >= Theme.MinTextSize on the smallest phone
+const WIDTH_SCALE = 0.55
+const MIN_WIDTH = 260
+const MAX_WIDTH = 460
+const BADGE = 34 -- round badge (not touchable)
 -- Clear of the native hotbar (DEC-040) on the bottom centre
 const BOTTOM_GAP = 84
 const SLIDE = 24
@@ -135,15 +135,15 @@ return function(props: Props): Frame
 			Outline = Theme.Outline.Thick,
 			Radius = Theme.Radius.Card,
 			Decor = {
-				createRaw("UISizeConstraint")({ MinSize = Vector2.new(0, BADGE + 12 + Theme.Lip) }),
+				createRaw("UISizeConstraint")({ MinSize = Vector2.new(0, BADGE + 8 + Theme.Lip) }),
 			},
-			Padding = { Left = 8, Right = 16, Top = 6, Bottom = 6 },
+			Padding = { Left = 6, Right = 12, Top = 4, Bottom = 4 },
 			Children = {
 				createRaw("UIListLayout")({
 					FillDirection = Enum.FillDirection.Horizontal,
 					VerticalAlignment = Enum.VerticalAlignment.Center,
 					SortOrder = Enum.SortOrder.LayoutOrder,
-					Padding = UDim.new(0, 10),
+					Padding = UDim.new(0, 8),
 				}),
 
 				-- Phone badge
@@ -186,7 +186,7 @@ return function(props: Props): Frame
 				CartoonLabel({
 					Name = "Line",
 					LayoutOrder = 2,
-					Box = UDim2.new(1, -(BADGE + 10), 0, 0),
+					Box = UDim2.new(1, -(BADGE + 8), 0, 0),
 					AutomaticSize = Enum.AutomaticSize.Y,
 					TextSize = TEXT_SIZE,
 					Color = Theme.Color.Dark,
@@ -199,8 +199,8 @@ return function(props: Props): Frame
 					end,
 					Children = {
 						createRaw("UIPadding")({
-							PaddingTop = UDim.new(0, 6),
-							PaddingBottom = UDim.new(0, 6),
+							PaddingTop = UDim.new(0, 4),
+							PaddingBottom = UDim.new(0, 4),
 						}),
 					},
 				}),

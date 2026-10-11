@@ -34,12 +34,12 @@ export type Props = {
 	Name: string?,
 }
 
-const WIDTH = 240
-const ICON = 52
-const LINE_HEIGHT = 34
+const WIDTH = 200
+const ICON = 42
+const LINE_HEIGHT = 28
 const GAP = 4
 const HEIGHT = ICON + GAP + LINE_HEIGHT
-const TEXT_SIZE = 16
+const TEXT_SIZE = 14
 const POP_TIME = 0.25
 
 const WHITE = Color3.fromHex("#FFFFFF")
@@ -133,7 +133,7 @@ local function cloud(): Frame
 			Position = UDim2.fromScale(0, 0.04),
 			BackgroundTransparency = 1,
 			FontFace = Theme.Font.Title,
-			TextSize = 22,
+			TextSize = 18,
 			TextColor3 = Theme.Color.Text,
 			Text = "~~",
 			ZIndex = 2,
@@ -156,7 +156,7 @@ local function dots(): Frame
 			Position = UDim2.fromScale(0, -0.12),
 			BackgroundTransparency = 1,
 			FontFace = Theme.Font.Title,
-			TextSize = 22,
+			TextSize = 18,
 			TextColor3 = Theme.Color.Ink,
 			Text = "...",
 		}),

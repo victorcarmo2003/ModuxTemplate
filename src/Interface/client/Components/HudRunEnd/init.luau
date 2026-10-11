@@ -43,12 +43,12 @@ export type Props = {
 	Name: string?,
 }
 
-const WIDTH = 340
-const TITLE_SIZE = 30
-const ROW_SIZE = 20
-const QUOTE_SIZE = 16
-const FOOTER_SIZE = 16
-const ICON = 30
+const WIDTH = 300
+const TITLE_SIZE = 26
+const ROW_SIZE = 17
+const QUOTE_SIZE = 14
+const FOOTER_SIZE = 14
+const ICON = 26
 
 -- Dawn behind the card (style guide §5.2/§7.4): night violet over a warm horizon.
 const DAWN = ColorSequence.new({
@@ -171,7 +171,7 @@ return function(props: Props): Frame
 				Lip = 6,
 				Studs = true,
 				Gloss = false,
-				Padding = { Left = 18, Right = 18, Top = 40, Bottom = 16 },
+				Padding = { Left = 18, Right = 18, Top = 36, Bottom = 14 },
 				Children = {
 					create("UIListLayout")({
 						FillDirection = Enum.FillDirection.Vertical,
@@ -197,7 +197,7 @@ return function(props: Props): Frame
 				Name = "Title",
 				AnchorPoint = Vector2.new(0.5, 0),
 				Position = UDim2.fromScale(0.5, 0),
-				Size = UDim2.fromOffset(0, 48),
+				Size = UDim2.fromOffset(0, 42),
 				AutomaticSize = Enum.AutomaticSize.X,
 				Rotation = -2,
 				Tone = function()
@@ -216,7 +216,7 @@ return function(props: Props): Frame
 					create("ImageLabel")({
 						Name = "Trophy",
 						LayoutOrder = 1,
-						Size = UDim2.fromOffset(40, 40),
+						Size = UDim2.fromOffset(34, 34),
 						BackgroundTransparency = 1,
 						Image = Icons.ImageOf("Ui/trophy"),
 						ImageRectOffset = (Icons.Rect("Ui/trophy") or { Offset = Vector2.zero }).Offset,

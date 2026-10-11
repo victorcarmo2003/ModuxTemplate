@@ -11,6 +11,7 @@
 -- Pure: only props. Mount it inside a ScreenGui with `ScreenInsets = CoreUISafeInsets` (clear of the Roblox top bar).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
+local Theme = require(script.Parent.Theme)
 local HudPill = require(script.Parent.HudPill)
 local Motion = require(script.Parent.Motion)
 local Money = require(script.Parent.HudPill.Money)
@@ -29,22 +30,23 @@ export type Props = {
 	Toasts: () -> { ToastStack.Entry },
 	OnToastDone: (entry: ToastStack.Entry) -> (),
 	Report: () -> HudSummary.Shown, -- false = no summary
-	-- UI scale (>= 1). 1 = smallest phone (iPhone SE landscape); bigger screens grow everything proportionally.
+	-- UI scale (Theme.ScaleOf). 1 = smallest phone (iPhone SE landscape); 1.4 at 1080p.
 	Scale: (() -> number)?,
 	-- Progressive reveal (first-run tutorial): money pill, and the clock + day pills. nil = always shown.
 	ShowCash: (() -> boolean)?,
 	ShowClock: (() -> boolean)?,
 }
 
-const MARGIN = 12
+const MARGIN = 10
 const TOP = 6
-const BIG = 48 -- money and clock: ~5% of a 375 px tall screen at text 24 (style guide §7.1)
-const SMALL = 44 -- day pill: touch-sized minimum
-const ROW_GAP = 8
+-- Status pills are not touchable, so they go under the 44 px touch size (user request 2026-10-11: UI too big)
+const BIG = 38 -- money and clock, text 20
+const SMALL = Theme.MinChip -- day pill, text 16
+const ROW_GAP = 6
 
 return function(props: Props): Frame
 	const scale = function(): number
-		return if props.Scale then math.max(props.Scale(), 1) else 1
+		return if props.Scale then props.Scale() else 1
 	end
 
 	-- Shown money rolls from the old value to the new one (the bump still reads the real value).
@@ -79,8 +81,8 @@ return function(props: Props): Frame
 				Name = "Cash",
 				LayoutOrder = 1,
 				Height = BIG,
-				TextSize = 24,
-				MinWidth = 120,
+				TextSize = 20,
+				MinWidth = 96,
 				Icon = function(): HudPill.Icon
 					return "Coin"
 				end,
@@ -95,8 +97,8 @@ return function(props: Props): Frame
 				Name = "Shift",
 				LayoutOrder = 2,
 				Height = SMALL,
-				TextSize = 18,
-				MinWidth = 100,
+				TextSize = 16,
+				MinWidth = 80,
 				Icon = function(): HudPill.Icon
 					return if props.IsNight() then "Moon" else "Sun"
 				end,
@@ -110,8 +112,8 @@ return function(props: Props): Frame
 			AnchorPoint = Vector2.new(0.5, 0),
 			Position = UDim2.new(0.5, 0, 0, TOP),
 			Height = BIG,
-			TextSize = 24,
-			MinWidth = 140,
+			TextSize = 20,
+			MinWidth = 112,
 			Icon = function(): HudPill.Icon
 				return "Clock"
 			end,

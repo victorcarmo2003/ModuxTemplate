@@ -86,7 +86,7 @@ return UILabs.CreateVideStory({
 				return if controls.Ring() then controls.Patience() else -1
 			end,
 			WarnAt = Content.Moods.Rules.AnnoyedAt,
-			Position = UDim2.fromOffset(12, 114),
+			Position = UDim2.fromOffset(10, 88),
 		}),
 	})
 end)

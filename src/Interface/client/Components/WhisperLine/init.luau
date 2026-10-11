@@ -20,7 +20,7 @@ export type Props = {
 	Name: string?,
 }
 
-const TEXT_SIZE = 20 -- >= Theme.MinTextSize on the smallest phone
+const TEXT_SIZE = 18 -- >= Theme.MinTextSize on the smallest phone
 const SHOWN = 0.35 -- text transparency when shown: faint on purpose
 const DRIFT = 10 -- px it rises while fading in
 

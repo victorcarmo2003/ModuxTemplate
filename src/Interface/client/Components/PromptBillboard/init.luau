@@ -7,7 +7,9 @@
 -- Pure: only props. PromptController (TASK-014) owns targeting, input and the hold timer; this only
 -- draws `Holding` over `HoldDuration`. Taps on the pill reach OnPress/OnRelease only when the
 -- BillboardGui is parented under PlayerGui.
--- Fixed pixel size (not studs) so the text keeps >= 14 px and the pill >= 44 px tall on a phone.
+-- Fixed pixel size (not studs) so the text keeps >= 14 px and the pill >= 44 px tall on a phone. Trimmed (user request
+-- 2026-10-11: UI too big): a pill that takes taps (touch) stays TOUCH_HEIGHT (>= Theme.MinTouch); a pill that only
+-- shows the key (desktop / gamepad) is PILL_HEIGHT.
 -- Light pass (user request 2026-10-11: the Ink pill read as grey text on dark): Cream toy pill with a darker Cream lip,
 -- thick Ink outline, Ink text without stroke, Mustard key chip with an Ink letter. The hold fill is a hard-edged
 -- horizontal gradient on the face (Mustard up to the progress, Cream after), so the round corners stay intact
@@ -58,17 +60,18 @@ export type Props = {
 	Name: string?,
 }
 
-const PILL_HEIGHT = 50 -- face 46 + lip 4 (>= Theme.MinTouch)
+const PILL_HEIGHT = 40 -- face 36 + lip 4, desktop / gamepad (not tapped)
+const TOUCH_HEIGHT = 48 -- face 44 + lip 4 (>= Theme.MinTouch): the pill takes taps
 const LIP = Theme.Lip
-const CHIP_SIZE = 34
-const DOT_SIZE = 20
-const TEXT_SIZE = 20
-const PAD_LEFT = 8 -- before the chip
-const PAD_TEXT = 18 -- before the text when there is no chip, and after the text
-const GAP = 10 -- chip -> text
+const CHIP_SIZE = 28
+const DOT_SIZE = 16
+const TEXT_SIZE = 17
+const PAD_LEFT = 6 -- before the chip
+const PAD_TEXT = 14 -- before the text when there is no chip, and after the text
+const GAP = 8 -- chip -> text
 const RELEASE_TIME = 0.15
-const GUI_WIDTH = 420
-const GUI_HEIGHT = 76
+const GUI_WIDTH = 360
+const GUI_HEIGHT = 68
 -- Legacy enum of the cartoon font, for TextService:GetTextSize (same face as Theme.Font.Body)
 const MEASURE_FONT = Enum.Font.FredokaOne
 
@@ -84,15 +87,14 @@ const FLASH_FROM = Color3.new(1, 1, 1)
 const FLASH_TO = Theme.Tone.Green.Top
 const FLASH_START = 0.15 -- transparency of the flash at the trigger
 const FLASH_TIME = 0.3
-const CHECK_SIZE = 44
-const CHECK_RISE = 34 -- px the check jumps above its start
+const CHECK_SIZE = 36
+const CHECK_RISE = 28 -- px the check jumps above its start
 const CHECK_IN = 0.18 -- s of the scale-in (Back overshoot)
 const CHECK_UP = 0.45 -- s of the rise
 const CHECK_FADE_DELAY = 0.22
 const CHECK_FADE = 0.23
 const CHECK_ICON = if Icons.Has("Ui/check") then "Ui/check" else "Reaction/star"
 const CHECK_RECT = Icons.Rect(CHECK_ICON)
-const CHECK_START = UDim2.new(0.5, 0, 0.5, -PILL_HEIGHT // 2 - 4)
 
 -- Face colour along the pill: Mustard up to `fill` (0..1), Cream after it.
 local function fillSequence(fill: number): ColorSequence
@@ -110,7 +112,7 @@ local function fillSequence(fill: number): ColorSequence
 end
 
 local function textWidth(text: string): number
-	const bounds = TextService:GetTextSize(text, TEXT_SIZE, MEASURE_FONT, Vector2.new(GUI_WIDTH, PILL_HEIGHT))
+	const bounds = TextService:GetTextSize(text, TEXT_SIZE, MEASURE_FONT, Vector2.new(GUI_WIDTH, TOUCH_HEIGHT))
 	return math.ceil(bounds.X)
 end
 
@@ -120,6 +122,15 @@ return function(props: Props): BillboardGui
 	local function tappable(): boolean
 		const prop = props.Tappable
 		return if prop then prop() else props.OnPress ~= nil
+	end
+
+	-- Pill height: touch target size only when the pill takes taps
+	local function pillHeight(): number
+		return if tappable() then TOUCH_HEIGHT else PILL_HEIGHT
+	end
+	-- Start of the check jump: just over the top edge of the pill
+	local function checkStart(): UDim2
+		return UDim2.new(0.5, 0, 0.5, -untrack(pillHeight) // 2 - 4)
 	end
 
 	local function isPrompt(): boolean
@@ -147,7 +158,7 @@ return function(props: Props): BillboardGui
 	const check = create("ImageLabel")({
 		Name = "Check",
 		AnchorPoint = Vector2.new(0.5, 1),
-		Position = CHECK_START,
+		Position = checkStart(),
 		Size = UDim2.fromOffset(CHECK_SIZE, CHECK_SIZE),
 		BackgroundTransparency = 1,
 		Image = Icons.ImageOf(CHECK_ICON),
@@ -168,7 +179,8 @@ return function(props: Props): BillboardGui
 			BackgroundTransparency = 1,
 		}):Play()
 
-		check.Position = CHECK_START
+		const start = checkStart()
+		check.Position = start
 		check.ImageTransparency = 0
 		checkScale.Scale = 0
 		TweenService:Create(checkScale, TweenInfo.new(CHECK_IN, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
@@ -176,7 +188,7 @@ return function(props: Props): BillboardGui
 		}):Play()
 		TweenService
 			:Create(check, TweenInfo.new(CHECK_UP, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-				Position = CHECK_START - UDim2.fromOffset(0, CHECK_RISE),
+				Position = start - UDim2.fromOffset(0, CHECK_RISE),
 			})
 			:Play()
 		TweenService
@@ -281,7 +293,7 @@ return function(props: Props): BillboardGui
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = UDim2.fromScale(0.5, 0.5),
 			Size = function()
-				return UDim2.fromOffset(pillWidth(), PILL_HEIGHT)
+				return UDim2.fromOffset(pillWidth(), pillHeight())
 			end,
 			BackgroundColor3 = LIP_COLOR,
 			Visible = function()
@@ -380,7 +392,7 @@ return function(props: Props): BillboardGui
 					Name = "Action",
 					LayoutOrder = 2,
 					Size = function()
-						return UDim2.fromOffset(labelWidth(), PILL_HEIGHT - LIP)
+						return UDim2.fromOffset(labelWidth(), pillHeight() - LIP)
 					end,
 					BackgroundTransparency = 1,
 					FontFace = Theme.Font.Body,

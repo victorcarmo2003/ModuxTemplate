@@ -38,7 +38,7 @@ return UILabs.CreateVideStory({
 		Night = UILabs.Slider(7, 1, 10, 1),
 		Text = "Clock stops? Lights off, count five, lights on.",
 		Vehicle = UILabs.Choose({ "trailer", "cart" }),
-		Scale = UILabs.Slider(1, 1, 2, 0.05),
+		Scale = UILabs.Slider(1, 0.86, 1.6, 0.02), -- Theme.Scale: 1 phone, 1.4 at 1080p
 	},
 }, function(props)
 	-- UI Labs types the control sources loosely; pin them to what the story reads.

@@ -24,6 +24,7 @@ local Content = require(ReplicatedStorage.shared.Content)
 local CrewRig = require(ReplicatedStorage.shared.Crew.CrewRig)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local CrewScreen = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.CrewScreen)
+local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
 local CardState = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.CrewCard.State)
 
 export type Action = "Buy" | "Select"
@@ -34,10 +35,8 @@ const TOUCH_SIZE = 56
 const PENDING_TIMEOUT = 3 -- s without an answer: the button comes back (the server may have dropped it, 2/s)
 const PREVIEW_OUTFIT = "crew"
 const CLICK_SOUND = "ui_click"
--- UI scale: 1 on the smallest landscape phone (panel 620 x 320 + margins), grows up to 2
-const BASE_WIDTH = 660
-const BASE_HEIGHT = 340
-const MAX_SCALE = 2
+-- UI scale: global rule (Theme.ScaleOf), never so big that the panel (620 x 320 + margins) leaves the screen
+const FIT = Vector2.new(660, 340)
 
 const CLASS_NOTICES: { [string]: boolean } = {
 	class_bought = true,
@@ -236,7 +235,7 @@ function ClassController:Rescale(camera: Camera?)
 		return
 	end
 	const size = camera.ViewportSize
-	const scale = math.clamp(math.min(size.X / BASE_WIDTH, size.Y / BASE_HEIGHT), 1, MAX_SCALE)
+	const scale = Theme.ScaleOf(size, FIT)
 	if math.abs(scale - self.Scale()) > 0.01 then
 		self.Scale(scale)
 	end

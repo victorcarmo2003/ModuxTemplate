@@ -68,6 +68,7 @@ local PromptBillboard = require(StarterPlayer.StarterPlayerScripts.client.Interf
 local ScreenFade = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.ScreenFade)
 local SkipPill = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.SkipPill)
 local SpeechBalloon = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.SpeechBalloon)
+local UiScale = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.UiScale)
 local Actors = require(script.Actors)
 local Speech = require(script.Speech)
 local Timeline = require(script.Timeline)
@@ -79,6 +80,9 @@ type Scene = Content.Cutscene
 export type Record = { Scene: string, StartedAt: number, Votes: number, Needed: number, Waiting: boolean }
 -- HudBanner.Shown, local so the generated type file needs no component require
 type Shown = { Title: string, Line: string } | false
+
+-- Vide 0.4.1 types `create` for 19 classes only; UIScale is not among them.
+const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }) -> Instance
 
 const RECORD = 1
 const NONE = "none"
@@ -942,34 +946,45 @@ function CutsceneController:Mount(gui: Instance)
 			DisplayOrder = UI_ORDER,
 			ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 
-			HudBanner({ Name = "CutsceneTitle", Banner = self.Banner }),
-			CallSubtitle({
-				Name = "CutsceneSubtitle",
-				Visible = self.LineShown,
-				Speaker = self.Speaker,
-				Text = self.LineText,
-				Phone = function()
-					return "cart"
+			-- global UI scale (Theme.ScaleOf); the frame shrinks by the same factor to keep covering the screen
+			Vide.create("Frame")({
+				Name = "Scaled",
+				Size = function()
+					const s = UiScale.Current()
+					return UDim2.fromScale(1 / s, 1 / s)
 				end,
-			}),
-			SkipPill({
-				Name = "CutsceneSkip",
-				Visible = function()
-					return self.SceneKey() ~= NONE and self.Skippable()
-				end,
-				Votes = self.Votes,
-				Needed = self.Needed,
-				Voted = self.Voted,
-				Progress = self.Progress,
-				KeyLabel = function()
-					return KEY_LABEL[input.Device()]
-				end,
-				OnPress = function()
-					self:PressSkip()
-				end,
-				OnRelease = function()
-					self:ReleaseSkip()
-				end,
+				BackgroundTransparency = 1,
+				createRaw("UIScale")({ Scale = UiScale.Current }),
+
+				HudBanner({ Name = "CutsceneTitle", Banner = self.Banner }),
+				CallSubtitle({
+					Name = "CutsceneSubtitle",
+					Visible = self.LineShown,
+					Speaker = self.Speaker,
+					Text = self.LineText,
+					Phone = function()
+						return "cart"
+					end,
+				}),
+				SkipPill({
+					Name = "CutsceneSkip",
+					Visible = function()
+						return self.SceneKey() ~= NONE and self.Skippable()
+					end,
+					Votes = self.Votes,
+					Needed = self.Needed,
+					Voted = self.Voted,
+					Progress = self.Progress,
+					KeyLabel = function()
+						return KEY_LABEL[input.Device()]
+					end,
+					OnPress = function()
+						self:PressSkip()
+					end,
+					OnRelease = function()
+						self:ReleaseSkip()
+					end,
+				}),
 			}),
 		})
 	end)

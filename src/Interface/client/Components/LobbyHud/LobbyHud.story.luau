@@ -31,7 +31,7 @@ return UILabs.CreateVideStory({
 	vide = Vide,
 	controls = {
 		Phone = true,
-		Scale = UILabs.Slider(1, 1, 2, 0.05),
+		Scale = UILabs.Slider(1, 0.86, 1.6, 0.02), -- Theme.Scale: 1 phone, 1.4 at 1080p
 		Gems = UILabs.Slider(120, 0, 9999, 1),
 		Play = UILabs.Choose({ "Solo", "Ready", "NotReady", "Start", "Waiting" }),
 		Squad = "2/4",

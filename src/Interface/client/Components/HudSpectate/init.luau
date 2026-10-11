@@ -34,19 +34,19 @@ export type Props = {
 	Target: () -> string,
 	-- Switch hint for the current device; "" hides it.
 	Hint: () -> string,
-	-- Top of the card in px (under the clock). Default 62.
+	-- Top of the card in px (under the clock). Default 50.
 	CardTop: number?,
 	-- Distance of the pill from the bottom in px (above the hotbar). Default 84.
 	Bottom: number?,
 	Name: string?,
 }
 
-const CARD_WIDTH = 300
-const TITLE_SIZE = 26
-const LINE_SIZE = 17
-const HINT_SIZE = 16
-const PILL = 48
-const ARROW = 34
+const CARD_WIDTH = 260
+const TITLE_SIZE = 22
+const LINE_SIZE = 15
+const HINT_SIZE = 14
+const PILL = 40
+const ARROW = 28
 
 const LINES: { [Mode]: { string } } = {
 	None = {},
@@ -115,7 +115,7 @@ return function(props: Props): Frame
 		CartoonPanel({
 			Name = "Card",
 			AnchorPoint = Vector2.new(0.5, 0),
-			Position = UDim2.new(0.5, 0, 0, props.CardTop or 62),
+			Position = UDim2.new(0.5, 0, 0, props.CardTop or 50),
 			Size = UDim2.fromOffset(CARD_WIDTH, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
 			Tone = Theme.Tone.Cream,
@@ -220,7 +220,7 @@ return function(props: Props): Frame
 						glyph(1, "Ui/spectate", "", PILL - 8),
 						CartoonLabel({
 							LayoutOrder = 2,
-							TextSize = 20,
+							TextSize = 17,
 							Text = function()
 								const target = props.Target()
 								return if target == "" then "Watching the trailer" else `Watching: {target}`

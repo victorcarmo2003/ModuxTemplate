@@ -6,6 +6,8 @@
 --   thick Ink outline, round corners, a darker "lip" under every surface (offset 0,4), two-tone vertical gradient
 --   with a thin white inner rim, optional studs texture, one round fat font (Fredoka One) with Ink stroke on all text.
 
+local UserInputService = game:GetService("UserInputService")
+
 -- Two-tone surface: Top (light) -> Bottom (base) gradient, Lip = the darker band under it (the "drop").
 export type Tone = { Top: Color3, Bottom: Color3, Lip: Color3, Text: Color3, Stroke: boolean }
 
@@ -78,10 +80,28 @@ const Theme = {
 		),
 	},
 
-	-- Smallest readable size on a phone (frontend rule: text >= 14 px on the smallest screen).
+	-- Smallest readable size on a phone (frontend rule: text >= 14 px on the smallest screen). Never below 12 real px:
+	-- the global scale only goes under 1 without touch (Scale.Min 0.86 x 14 = 12).
 	MinTextSize = 14,
-	-- Smallest touch target (44 px).
+	-- Smallest touch target (44 px). Touch screens never scale below 1, so a 44 px button stays 44 real px.
 	MinTouch = 44,
+	-- Height of a status chip / pill that is NOT touchable (money, clock, day, toast): smaller than a touch target
+	-- (user request 2026-10-11: "as interfaces no geral, todas estão muito grandes").
+	MinChip = 32,
+
+	-- Global UI scale (user request 2026-10-11). Every ScreenGui scales its px layout (drawn at scale 1 for the
+	-- smallest landscape phone, 667 x 375) by ScaleOf(viewport):
+	--   scale = clamp(viewportY / Reference * Factor, Min (MinTouch on touch screens), Max)
+	-- 1080p -> 1.4 (was 2; with the trimmed component sizes about 35-40% smaller on desktop). THE KNOB: Factor
+	-- (bigger = bigger UI everywhere, e.g. 1.6 = +15%, 1.2 = -15%);
+	-- Min / Max bound it on small windows and 1440p+ monitors.
+	Scale = {
+		Reference = 1080, -- viewport height (px) where the scale is Factor
+		Factor = 1.4,
+		Min = 0.86, -- mouse / gamepad: 14 px text x 0.86 = 12 real px
+		MinTouch = 1, -- touch: 44 px targets and 14 px text stay real px
+		Max = 1.6,
+	},
 	-- Text stroke for small text (kept for callers outside the kit). Bigger text: Theme.TextStroke(size).
 	Stroke = 2,
 
@@ -98,9 +118,9 @@ const Theme = {
 
 	Radius = {
 		Pill = UDim.new(0.5, 0),
-		Card = UDim.new(0, 18),
-		Chip = UDim.new(0, 12),
-		Small = UDim.new(0, 8),
+		Card = UDim.new(0, 14),
+		Chip = UDim.new(0, 10),
+		Small = UDim.new(0, 6),
 	},
 
 	-- Px of one stud tile on screen.
@@ -124,6 +144,18 @@ const Theme = {
 -- Ink stroke of text by size: 2 px for small text, 3 px from 22 px, 4 px for big titles.
 local function textStroke(size: number): number
 	return if size >= 40 then 4 elseif size >= 22 then 3 else 2
+end
+
+-- Global UI scale for a viewport (Theme.Scale). `fit` = px size of a fixed layout that must stay on screen (a panel
+-- drawn at scale 1): the scale never makes it overflow, but never goes under the floor (touch targets, text).
+local function scaleOf(viewport: Vector2, fit: Vector2?): number
+	const rule = Theme.Scale
+	local value = viewport.Y / rule.Reference * rule.Factor
+	if fit ~= nil then
+		value = math.min(value, viewport.X / fit.X, viewport.Y / fit.Y)
+	end
+	const floor = if UserInputService.TouchEnabled then rule.MinTouch else rule.Min
+	return math.clamp(value, floor, rule.Max)
 end
 
 -- Two-tone vertical gradient of a Tone (UIGradient.Color, Rotation 90).
@@ -153,6 +185,9 @@ return table.freeze({
 	Font = table.freeze(Theme.Font),
 	MinTextSize = Theme.MinTextSize,
 	MinTouch = Theme.MinTouch,
+	MinChip = Theme.MinChip,
+	Scale = table.freeze(Theme.Scale),
+	ScaleOf = scaleOf,
 	Stroke = Theme.Stroke,
 	Outline = table.freeze(Theme.Outline),
 	Lip = Theme.Lip,

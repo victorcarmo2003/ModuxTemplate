@@ -1,11 +1,11 @@
 --!strict
 -- TutorialPanel: the instruction card of the first-hot-dog tutorial (user request 2026-10-11; texts Provisional until
--- ui-text.md). Top centre, under the clock row, narrow (50% of the width, 300..520 px) so it never covers the
+-- ui-text.md). Top centre, under the clock row, narrow (50% of the width, 260..440 px) so it never covers the
 -- crosshair, the hotbar or the thumb controls on a phone.
 --   Cream CartoonPanel card, thick Ink outline (reading surface: light, high contrast)
 --   Mustard step chip "2/7" on the left; it turns Green with a check while `Done` is true (step just completed)
---   optional "STEP 2 OF 7" label (14 px), the instruction (20 px Ink, starts with the verb) and an optional hint line
---   (16 px, Ink top tone) that wraps instead of shrinking
+--   optional "STEP 2 OF 7" label (14 px), the instruction (17 px Ink, starts with the verb) and an optional hint line
+--   (14 px, Ink top tone) that wraps instead of shrinking
 --   Cream "Skip" tag hanging off the bottom-right corner (>= 44 px tall touch target), with the key of the device
 -- Pops in/out (Motion.Pop) and jumps each time the step number goes up (Motion.Bump).
 -- Pure: only props. TutorialController owns the step, the texts, the skip bind and when it shows.
@@ -40,22 +40,22 @@ export type Props = {
 	OnSkip: (() -> ())?,
 	-- UI scale of the owner (1 on the smallest phone).
 	Scale: (() -> number)?,
-	-- Reactive so the owner can follow its UI scale. Default: top centre, 62 px down.
+	-- Reactive so the owner can follow its UI scale. Default: top centre, 50 px down.
 	Position: (() -> UDim2)?,
 	Name: string?,
 }
 
-const TEXT_SIZE = 20
-const HINT_SIZE = 16
-const CHIP = Theme.MinTouch -- 44 px round step chip
+const TEXT_SIZE = 17
+const HINT_SIZE = 14
+const CHIP = 36 -- round step chip (not touchable)
 const WIDTH_SCALE = 0.5
-const MIN_WIDTH = 300
-const MAX_WIDTH = 520
-const GAP = 10
-const SKIP_SIZE = 16
+const MIN_WIDTH = 260
+const MAX_WIDTH = 440
+const GAP = 8
+const SKIP_SIZE = 15
 const LABEL_SIZE = 14
 const CHECK = "Ui/check"
-const CHECK_SIZE = 30
+const CHECK_SIZE = 24
 
 return function(props: Props): Frame
 	const pop = Motion.Pop(props.Shown)
@@ -77,7 +77,7 @@ return function(props: Props): Frame
 	return create("Frame")({
 		Name = props.Name or "TutorialPanel",
 		AnchorPoint = Vector2.new(0.5, 0),
-		Position = props.Position or UDim2.new(0.5, 0, 0, 62),
+		Position = props.Position or UDim2.new(0.5, 0, 0, 50),
 		Size = UDim2.fromScale(WIDTH_SCALE, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
@@ -100,9 +100,9 @@ return function(props: Props): Frame
 			Outline = Theme.Outline.Thick,
 			Radius = Theme.Radius.Card,
 			Decor = {
-				createRaw("UISizeConstraint")({ MinSize = Vector2.new(0, CHIP + 16 + Theme.Lip) }),
+				createRaw("UISizeConstraint")({ MinSize = Vector2.new(0, CHIP + 12 + Theme.Lip) }),
 			},
-			Padding = { Left = 10, Right = 16, Top = 8, Bottom = 14 },
+			Padding = { Left = 8, Right = 12, Top = 6, Bottom = 12 },
 			Children = {
 				createRaw("UIListLayout")({
 					FillDirection = Enum.FillDirection.Horizontal,
@@ -125,7 +125,7 @@ return function(props: Props): Frame
 					Children = {
 						CartoonLabel({
 							Box = UDim2.fromScale(1, 1),
-							TextSize = 16,
+							TextSize = 14,
 							Color = Theme.Color.Dark,
 							Stroke = 0,
 							Visible = function()
@@ -151,7 +151,7 @@ return function(props: Props): Frame
 							else CartoonLabel({
 								Name = "Check",
 								Box = UDim2.fromScale(1, 1),
-								TextSize = 22,
+								TextSize = 18,
 								Color = Theme.Color.Text,
 								Text = "V",
 								Visible = done,
@@ -226,7 +226,7 @@ return function(props: Props): Frame
 			Text = props.SkipText,
 			TextSize = SKIP_SIZE,
 			Tone = Theme.Tone.White,
-			Padding = 12,
+			Padding = 10,
 			Selectable = false,
 			Visible = function()
 				return props.SkipText() ~= ""

@@ -63,8 +63,6 @@ const RIPPLE_SIZE = UDim2.new(2, 60, 2, 60)
 const RIPPLE_RISE = 0.4
 const RIPPLE_PERIOD = 1.2
 const RIPPLE_MAX_DISTANCE = 70
-const BASE_HEIGHT = 540 -- UI scale 1 on the smallest phone, up to 2 (as HudController)
-const MAX_SCALE = 2
 
 export type Record = {
 	Call: string,
@@ -516,7 +514,7 @@ function BossController:Rescale(camera: Camera?)
 	if camera == nil then
 		return
 	end
-	const scale = math.clamp(camera.ViewportSize.Y / BASE_HEIGHT, 1, MAX_SCALE)
+	const scale = Theme.ScaleOf(camera.ViewportSize) -- global UI scale (as HudController)
 	if math.abs(scale - self.Scale()) > 0.01 then
 		self.Scale(scale)
 	end

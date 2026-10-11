@@ -43,17 +43,17 @@ export type Props = {
 	Name: string?,
 }
 
-const CELL = 44
+const CELL = 36
 const GAP = 6
 const PAD = 8
 const LIP = 4
 const CARD_HEIGHT = CELL + PAD * 2 + LIP -- one row
 const ROW_GAP = 6 -- between the two rows of a pair
-const TITLE_HEIGHT = 24
+const TITLE_HEIGHT = 22
 const TITLE_GAP = -6 -- the tab overlaps the card edge
 const RING = 4
-const TITLE_SIZE = 16
-const LABEL_SIZE = 16
+const TITLE_SIZE = 14
+const LABEL_SIZE = 14
 const MAX_TOPPINGS = 3
 const BASE: { string } = { "bun", "sausage" }
 
@@ -220,7 +220,7 @@ return function(props: Props): Frame
 	return create("Frame")({
 		Name = props.Name or "HudOrder",
 		AnchorPoint = props.AnchorPoint or Vector2.zero,
-		Position = props.Position or UDim2.fromOffset(12, 114),
+		Position = props.Position or UDim2.fromOffset(10, 88),
 		Size = function()
 			return UDim2.fromOffset(width(), TITLE_HEIGHT + TITLE_GAP + cardHeight())
 		end,

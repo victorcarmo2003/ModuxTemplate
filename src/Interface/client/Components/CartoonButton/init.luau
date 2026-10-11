@@ -80,7 +80,7 @@ return function(props: Props): TextButton
 		return if props.Tone then readTone(props.Tone) else Theme.Tone.Mustard
 	end
 	const scale = Motion.Press(pressed, hovered)
-	const textSize = math.max(props.TextSize or 20, Theme.MinTextSize)
+	const textSize = math.max(props.TextSize or 17, Theme.MinTextSize)
 	const iconSize = props.IconSize or math.floor(textSize * 1.6)
 	const auto = props.AutomaticSize
 		or (if props.Size then Enum.AutomaticSize.None else Enum.AutomaticSize.X)
@@ -188,7 +188,7 @@ return function(props: Props): TextButton
 			Studs = props.Studs,
 			Padding = if props.Children
 				then (props.Padding or 0)
-				else { Left = props.Padding or 16, Right = props.Padding or 16 },
+				else { Left = props.Padding or 14, Right = props.Padding or 14 },
 			Children = content,
 		}),
 	}) :: TextButton

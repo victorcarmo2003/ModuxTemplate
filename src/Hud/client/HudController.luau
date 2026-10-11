@@ -67,15 +67,13 @@ const TOAST_DURATION = 4
 -- Notices waiting beyond this are dropped (the oldest waiting first); 3 are on screen at a time
 const MAX_TOASTS = 6
 const MAX_VISIBLE = 3
--- UI scale: 1 on the smallest phone (375 px tall), grows with the screen up to 2 (1080p)
-const BASE_HEIGHT = 540
-const MAX_SCALE = 2
+-- UI scale: global rule (Theme.ScaleOf: 1 on a phone, 1.4 at 1080p)
 
--- Wave 2 layout (px at scale 1): sanity meter and spectate card sit under the clock pill (TOP 6 + 48 + gap 8)
-const UNDER_CLOCK = 62
--- Order card under the day pill (HudScreen: TOP 6 + money 48 + gap 8 + day 44 + gap 8)
-const ORDER_TOP = 114
-const ORDER_LEFT = 12
+-- Wave 2 layout (px at scale 1): sanity meter and spectate card sit under the clock pill (TOP 6 + 38 + gap 6)
+const UNDER_CLOCK = 50
+-- Order card under the day pill (HudScreen: TOP 6 + money 38 + gap 6 + day 32 + gap 6)
+const ORDER_TOP = 88
+const ORDER_LEFT = 10
 -- Run end screen on screen (architecture.md §19.16)
 const RUN_END_TIME = 15
 -- Banner on screen; a phase change older than BANNER_FRESH s (late joiner, reconnect) gets no banner
@@ -540,7 +538,7 @@ end
 -- Full-screen frame scaled like HudScreen (UIScale also scales the frame, so it is shrunk by the same factor)
 function HudController:Layer(name: string, zIndex: number, children: { Instance }): Frame
 	const scale = function(): number
-		return math.max(self.Scale(), 1)
+		return self.Scale()
 	end
 	return Vide.create("Frame")({
 		Name = name,
@@ -616,7 +614,7 @@ function HudController:Rescale(camera: Camera?)
 	if camera == nil then
 		return
 	end
-	const scale = math.clamp(camera.ViewportSize.Y / BASE_HEIGHT, 1, MAX_SCALE)
+	const scale = Theme.ScaleOf(camera.ViewportSize)
 	if math.abs(scale - self.Scale()) > 0.01 then
 		self.Scale(scale)
 	end

@@ -35,11 +35,11 @@ export type Props = {
 	Name: string?,
 }
 
-const WIDTH = 220
-const HEIGHT = 150
-const PILL_HEIGHT = 48
-const COIN_SIZE = 44
-const TEXT_SIZE = 26
+const WIDTH = 190
+const HEIGHT = 130
+const PILL_HEIGHT = 40
+const COIN_SIZE = 36
+const TEXT_SIZE = 22
 
 -- 1234 -> "$1,234"
 local function money(value: number): string
@@ -119,7 +119,7 @@ return function(props: Props): BillboardGui
 						createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = Theme.Outline.Normal }),
 						CartoonLabel({
 							Box = UDim2.fromScale(1, 1),
-							TextSize = 18,
+							TextSize = 16,
 							Color = Theme.Color.Dark,
 							Stroke = 0,
 							Text = "$",

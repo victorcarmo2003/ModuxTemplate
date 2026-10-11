@@ -30,8 +30,8 @@ export type Props = {
 	Name: string?,
 }
 
-const WIDTH = 4.2 -- studs
-const HEIGHT = 1.1
+const WIDTH = 3.6 -- studs
+const HEIGHT = 0.95
 const MAX_TEXT = 48
 const DEFAULT_DISTANCE = 40
 

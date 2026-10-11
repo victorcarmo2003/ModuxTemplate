@@ -30,7 +30,7 @@ return UILabs.CreateVideStory({
 		Loop = true,
 		Shown = true,
 		Text = "Rookie...",
-		Scale = UILabs.Slider(1, 1, 2, 0.05),
+		Scale = UILabs.Slider(1, 0.86, 1.6, 0.02), -- Theme.Scale: 1 phone, 1.4 at 1080p
 	},
 }, function(props)
 	const controls: Controls = (props.controls :: any)

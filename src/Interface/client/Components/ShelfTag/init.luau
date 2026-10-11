@@ -35,8 +35,8 @@ export type Props = {
 	Name: string?,
 }
 
-const WIDTH = 2.4 -- studs
-const HEIGHT = 1.1
+const WIDTH = 2.0 -- studs
+const HEIGHT = 0.95
 const TAG_HEIGHT = 0.6 -- fraction of HEIGHT
 const PRICE_WIDTH = 0.5 -- fraction of WIDTH for a short "$6"
 const MAX_TEXT = 64

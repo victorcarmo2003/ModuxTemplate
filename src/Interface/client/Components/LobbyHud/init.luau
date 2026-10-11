@@ -9,6 +9,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Theme)
+local UiScale = require(script.Parent.UiScale)
 local Icons = require(script.Parent.Icons)
 local Motion = require(script.Parent.Motion)
 local CartoonPanel = require(script.Parent.CartoonPanel)
@@ -46,12 +47,12 @@ export type Props = {
 }
 
 const MARGIN = 12
-const TILE = 62
+const TILE = 56
 const TILE_GAP = 6
 const TOP = 60 -- first tile under the gem pill
 const PILL = 44
-const PLAY_WIDTH = 190
-const PLAY_HEIGHT = 60
+const PLAY_WIDTH = 170
+const PLAY_HEIGHT = 52
 
 const PLAY_TONE: { [PlayKind]: Theme.Tone } = {
 	Go = Theme.Tone.Green,
@@ -70,7 +71,7 @@ const TILES: { TileDef } = {
 
 return function(props: Props): Frame
 	const scale = function(): number
-		return if props.Scale then math.max(props.Scale(), 1) else 1
+		return if props.Scale then math.max(math.min(props.Scale(), UiScale.Current()), Theme.Scale.Min) else 1
 	end
 	const pop = Motion.Pop(props.Visible)
 	const scaled = function(): number
@@ -108,10 +109,10 @@ return function(props: Props): Frame
 							VerticalAlignment = Enum.VerticalAlignment.Center,
 							SortOrder = Enum.SortOrder.LayoutOrder,
 						}),
-						Icon(def.Icon, 30, 1),
+						Icon(def.Icon, 26, 1),
 						CartoonLabel({
 							LayoutOrder = 1,
-							TextSize = 22,
+							TextSize = 20,
 							Text = def.Fallback,
 							Visible = not Icons.Has(def.Icon),
 						}),
@@ -272,7 +273,7 @@ return function(props: Props): Frame
 			CartoonButton({
 				Name = "Play",
 				Size = UDim2.fromScale(1, 1),
-				TextSize = 30,
+				TextSize = 26,
 				Outline = Theme.Outline.Thick,
 				Radius = Theme.Radius.Card,
 				Studs = true,
