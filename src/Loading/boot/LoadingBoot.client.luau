@@ -41,10 +41,19 @@ const COMPONENTS = { "LoadingScreen", "Theme", "Icons", "Motion", "CartoonPanel"
 const BACKDROP = Color3.fromHex("#F6B71B")
 const INK = Color3.fromHex("#2B2233")
 
+-- Only the ReplicatedFirst copy runs: a stale copy left in StarterPlayerScripts by an old sync made a second curtain
+-- that nothing lifted (2026-10-11). One curtain per player, whoever comes second leaves.
+if not script:IsDescendantOf(ReplicatedFirst) then
+	return
+end
+
 ReplicatedFirst:RemoveDefaultLoadingScreen()
 
 const player = Players.LocalPlayer
 const playerGui = player:WaitForChild("PlayerGui")
+if playerGui:FindFirstChild(GUI_NAME) then
+	return
+end
 
 const gui = Instance.new("ScreenGui")
 gui.Name = GUI_NAME
