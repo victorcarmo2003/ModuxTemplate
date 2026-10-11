@@ -233,9 +233,15 @@ return function(props: Props): Frame
 					SortOrder = Enum.SortOrder.LayoutOrder,
 					Padding = UDim.new(0, 4),
 				}),
+				-- Rows build components with their own effects: untrack gives them a scope of their own (Vide refuses
+				-- a new reactive scope inside this reactive child).
 				function(): { Instance }
 					const report = last()
-					return if report then rows(report) else {}
+					return if report
+						then untrack(function()
+							return rows(report)
+						end)
+						else {}
 				end,
 			},
 		}),

@@ -4,7 +4,10 @@
 -- TagTilt), a coloured tab with the kind icon on its left (Info Teal, Good Green, Alert Mustard; never red), Ink text.
 -- Pops in from the right with overshoot, stays `Duration` seconds (clamped to 3..6), shrinks away, then calls OnDone
 -- so the owner can drop it from its list. Pure: only props. Toast/Stack.luau places several in the top-right corner.
+-- Fixed size: the card is measured once (TextService, unscaled) instead of AutomaticSize, so the pop (UIScale)
+-- cannot re-wrap the text mid-animation and scale children cannot inflate the card.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TextService = game:GetService("TextService")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Theme)
 local Icons = require(script.Parent.Icons)
@@ -16,7 +19,7 @@ const create = Vide.create
 const source = Vide.source
 const spring = Vide.spring
 const cleanup = Vide.cleanup
--- Vide 0.4.1 types `create` for 19 classes only; UIScale and UISizeConstraint are not among them.
+-- Vide 0.4.1 types `create` for 19 classes only; UIScale and UIPadding are not among them.
 const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }) -> Instance
 
 export type Kind = "Info" | "Good" | "Alert"
@@ -30,10 +33,14 @@ export type Props = {
 	LayoutOrder: (() -> number)?,
 }
 
-const WIDTH = 280
+const WIDTH = 260
 const TEXT_SIZE = 17
-const TAB = 46
-const ICON = 34
+const TAB = 40
+const ICON = 28
+const PAD_X = 10
+const PAD_Y = 8
+-- Spare width kept out of the measure so the rounded text size under UIScale never re-wraps.
+const WRAP_SLACK = 8
 const MIN_DURATION = 3
 const MAX_DURATION = 6
 const OUT_TIME = 0.35
@@ -100,14 +107,21 @@ return function(props: Props): Frame
 	local function iconName(): string
 		return ICON_NAME[kind()]
 	end
+	-- Card height for the text at the fixed width (lip under it, never below a touch target).
+	local function cardHeight(): number
+		const width = WIDTH - TAB - PAD_X * 2 - WRAP_SLACK
+		const bounds = TextService:GetTextSize(props.Text(), TEXT_SIZE, Enum.Font.FredokaOne, Vector2.new(width, math.huge))
+		return math.max(Theme.MinTouch, math.ceil(bounds.Y) + PAD_Y * 2) + Theme.Lip
+	end
 	local function rect(): Icons.Rect
 		return Icons.Rect(iconName()) or { Offset = Vector2.zero, Size = Vector2.zero }
 	end
 
 	return create("Frame")({
 		Name = "Toast",
-		Size = UDim2.fromOffset(WIDTH, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
+		Size = function()
+			return UDim2.fromOffset(WIDTH, cardHeight())
+		end,
 		BackgroundTransparency = 1,
 		LayoutOrder = order,
 
@@ -116,8 +130,7 @@ return function(props: Props): Frame
 			Position = function()
 				return UDim2.fromOffset(offset(), 0)
 			end,
-			Size = UDim2.fromOffset(WIDTH, 0),
-			AutomaticSize = Enum.AutomaticSize.Y,
+			Size = UDim2.fromScale(1, 1),
 			-- Tags lean, alternating with their slot.
 			Rotation = function()
 				return if order() % 2 == 0 then Theme.Motion.TagTilt else -Theme.Motion.TagTilt
@@ -128,7 +141,6 @@ return function(props: Props): Frame
 			Gloss = false,
 			Decor = {
 				createRaw("UIScale")({ Scale = scale }),
-				createRaw("UISizeConstraint")({ MinSize = Vector2.new(WIDTH, Theme.MinTouch + Theme.Lip) }),
 			},
 			Children = {
 				-- Coloured tab with the kind icon
@@ -178,8 +190,7 @@ return function(props: Props): Frame
 				CartoonLabel({
 					Name = "Message",
 					Position = UDim2.fromOffset(TAB, 0),
-					Box = UDim2.new(1, -TAB, 0, 0),
-					AutomaticSize = Enum.AutomaticSize.Y,
+					Box = UDim2.new(1, -TAB, 1, 0),
 					TextSize = TEXT_SIZE,
 					Color = Theme.Color.Dark,
 					Stroke = 0,
@@ -188,10 +199,10 @@ return function(props: Props): Frame
 					Text = props.Text,
 					Children = {
 						createRaw("UIPadding")({
-							PaddingLeft = UDim.new(0, 10),
-							PaddingRight = UDim.new(0, 12),
-							PaddingTop = UDim.new(0, 10),
-							PaddingBottom = UDim.new(0, 10),
+							PaddingLeft = UDim.new(0, PAD_X),
+							PaddingRight = UDim.new(0, PAD_X),
+							PaddingTop = UDim.new(0, PAD_Y),
+							PaddingBottom = UDim.new(0, PAD_Y),
 						}),
 					},
 				}),
