@@ -546,7 +546,7 @@ local function checkBossCalls()
 		if row.Short ~= nil and kind ~= "NightCall" then
 			fail("BossCalls", index, row.Key, "Short only on NightCall rows")
 		end
-		if kind == "DayPrep" or kind == "DayInfinite" or kind == "Hint" then
+		if kind == "DayPrep" or kind == "DayInfinite" or kind == "Hint" or kind == "Tutorial" then
 			if #row.Lines > rules.DayMaxLines then
 				fail("BossCalls", index, row.Key, `{#row.Lines} lines, day calls have at most {rules.DayMaxLines}`)
 			end
@@ -582,6 +582,18 @@ local function checkBossCalls()
 				fail("BossCalls", index, row.Key, `second hint for '{action}' (first '{hints[action]}')`)
 			end
 			hints[action] = row.Key
+		end
+	end
+	-- first-hot-dog tutorial call (Provisional): one Tutorial row, named by Rules.Tutorial; Covers are real actions
+	const tutorial = rules.Tutorial
+	const tutorialRow = BossCalls.ByKey[tutorial.Call]
+	if tutorialRow == nil or tutorialRow.Trigger.Kind ~= "Tutorial" then
+		fail("BossCallRules", nil, nil, `Tutorial.Call '{tutorial.Call}' is not a Tutorial row`)
+	end
+	inRange("BossCallRules", nil, nil, "Tutorial.Goodbye", tutorial.Goodbye, 1, 15)
+	for _, action in tutorial.Covers do
+		if not Actions.ByKey[action] then
+			fail("BossCallRules", nil, nil, `Tutorial.Covers '{action}' not in Actions`)
 		end
 	end
 	for night = 1, RunParams.Nights do

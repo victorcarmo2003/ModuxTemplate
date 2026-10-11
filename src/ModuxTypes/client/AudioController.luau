@@ -4,6 +4,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 
+export type PendingShift = { Id: string, IsNight: boolean }
 export type AmbientBed = {
 	Key: string,
 	Stop: (fade: number?) -> (),
@@ -30,6 +31,7 @@ export type Voice = {
 export type Public = {
 	AmbientKey: string?,
 	Bed: AmbientBed?,
+	CutsceneOn: Vide.Source<boolean>,
 	Ducked: Vide.Source<boolean>,
 	Groups: { [string]: SoundGroup },
 	Idle: { [string]: { Sound } },
@@ -38,6 +40,7 @@ export type Public = {
 	Master: SoundGroup?,
 	MusicCue: Vide.Source<string>,
 	MusicStack: Vide.Source<{ string }>,
+	PendingShift: PendingShift?,
 	Rng: Random,
 	Screen: Folder?,
 	SeenPhase: string?,
@@ -76,8 +79,10 @@ export type Public = {
 	FadeOut: (self: Public, sound: Sound, time: number) -> (),
 	SetMusic: (self: Public, cueKey: string?) -> (),
 	StopShiftTrack: (self: Public, time: number) -> (),
-	PlayShiftTrack: (self: Public, isNight: boolean) -> (),
+	PlayShiftTrack: (self: Public, isNight: boolean, fadeIn: number?) -> (),
+	MusicBusy: (self: Public) -> boolean,
 	OnShiftState: (self: Public, ready: boolean, phase: string, id: string, isNight: boolean) -> (),
+	FlushShift: (self: Public) -> (),
 	SetAmbient: (self: Public, key: string?) -> (),
 	SetTension: (self: Public, on: boolean) -> (),
 	OnStingState: (self: Public, phase: string, window: string?) -> (),

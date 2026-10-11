@@ -58,6 +58,7 @@ export type Public = {
 	TargetPosition: (self: Public, target: string) -> Vector3?,
 	WindowCards: (self: Public) -> { BasePart },
 	FocusGetter: (self: Public, target: string) -> (() -> Vector3?)?,
+	CrossClock: (self: Public, target: string) -> (() -> number?)?,
 	ActorContext: (self: Public) -> Actors.Context,
 	ActorFolder: (self: Public) -> Folder,
 	ClearSegment: (self: Public) -> (),

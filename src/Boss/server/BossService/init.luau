@@ -19,6 +19,14 @@
 -- Once rows are marked played when they start Talking (heard), so a shift capture taken at the shift start does
 -- not hold the call of that shift: a Resume plays it again. Snapshot "Bs" = sorted played keys, restored as is.
 --
+-- Tutorial call (user request 2026-10-11, Provisional; BossCalls Trigger Tutorial): while a player in the server has
+-- the first-hot-dog tutorial ahead (TutorialService:AnyPending), the tutorial call is queued in a day Prep/Open
+-- (Priority 4, ahead of the day call; on Day 1 it replaces the DayPrep call, marked heard). It never answers itself
+-- (answering is the tutorial's first step), and once answered it is held Talking (the rookie's client voices the
+-- step lines) until nobody has the tutorial pending; then it stays Rules.Tutorial.Goodbye s for Walt's goodbye and
+-- hangs up. Nobody pending while it rings = the ring stops. Leaving the day Prep/Open hangs it up. Queuing it marks the
+-- Hint rows of Rules.Tutorial.Covers as heard (the tutorial teaches those), so no second phone talks over it.
+--
 -- PROVISIONAL (TASK-070): chaining without a new ring; Resume blocks calls like NightLost; any Swapped to a vehicle
 -- other than RunParams.StartVehicle counts as the trailer purchase.
 -- Require follows architecture.md §19.2: VehicleService (Swapped) and ThiefService (owner of the quentin_caught_day
@@ -50,6 +58,9 @@ const SNAPSHOT = "Bs"
 const LINE_TIME = Content.BossCallRules.LineTime
 const AUTO_ANSWER = Content.BossCallRules.AutoAnswer
 const MAX_QUEUE = 32 -- far above any real sequence; guards a runaway trigger
+const TUTORIAL = Content.BossCallRules.Tutorial
+-- day phases where the tutorial call may ring and talk
+const TUTORIAL_PHASES: { [string]: boolean } = { Prep = true, Open = true }
 -- No call starts here; entering one hangs up (architecture.md §19.9 "Fila")
 const BLOCKED: { [string]: boolean } = { Intro = true, Finale = true, NightLost = true, RunEnd = true, Resume = true }
 -- Entering one of these also empties the queue
@@ -68,6 +79,7 @@ const BossService = Modux.Service("BossService", {
 		"InteractionService",
 		"VehicleService",
 		"ThiefService",
+		"TutorialService",
 	},
 	Priority = 560,
 })
@@ -158,6 +170,15 @@ function BossService:Enqueue(key: string, forced: boolean?, front: boolean?): bo
 	return true
 end
 
+function BossService:Unqueue(key: string)
+	for index, entry in self.Queue do
+		if entry.Key == key then
+			table.remove(self.Queue, index)
+			return
+		end
+	end
+end
+
 function BossService:Pop(): string?
 	const entry = table.remove(self.Queue, 1)
 	return if entry then entry.Key else nil
@@ -216,7 +237,8 @@ function BossService:Talk(key: string, at: number)
 	if row and row.Trigger.Kind == "TrailerBought" then
 		self.TrailerPending = false
 	end
-	self.EndsAt = at + #self:LinesOf(key) * LINE_TIME
+	-- the tutorial call is held open until no tutorial is pending (StepTutorial)
+	self.EndsAt = if key == TUTORIAL.Call then math.huge else at + #self:LinesOf(key) * LINE_TIME
 	self:Write(key, "Talking", at)
 end
 
@@ -252,8 +274,13 @@ end
 function BossService:Step()
 	const record = self.Record()
 	const t = now()
+	self:StepTutorial(t)
+	if record ~= self.Record() then
+		return
+	end
 	if record.State == "Ringing" then
-		if t >= record.StartedAt + AUTO_ANSWER then
+		-- the tutorial call never answers itself: answering is the tutorial's first step
+		if t >= record.StartedAt + AUTO_ANSWER and record.Call ~= TUTORIAL.Call then
 			self:Answer()
 		end
 	elseif record.State == "Talking" then
@@ -265,6 +292,54 @@ function BossService:Step()
 		if key then
 			self:Ring(key)
 		end
+	end
+end
+
+-- Tutorial call ----------------------------------------------------------------------------------------------------
+
+function BossService:TutorialAllowed(): boolean
+	const round = self.Dependencies.RoundService
+	return self.Enabled and round:IsStarted() and not round:IsNight() and TUTORIAL_PHASES[round:GetPhase()] == true
+end
+
+-- Queues the tutorial call; the Hint rows it teaches count as heard (and leave the queue)
+function BossService:QueueTutorial()
+	if not self:Enqueue(TUTORIAL.Call) then
+		return
+	end
+	for _, action in TUTORIAL.Covers do
+		const hint = Calls.hint(action)
+		if hint then
+			self.Played[hint] = true
+			self:Unqueue(hint)
+		end
+	end
+end
+
+-- Rings, holds and hangs up the tutorial call from TutorialService:AnyPending (polled: a rookie finishing, skipping or
+-- leaving all end the same way)
+function BossService:StepTutorial(t: number)
+	const key = TUTORIAL.Call
+	const record = self.Record()
+	const allowed = self:TutorialAllowed()
+	const pending = allowed and self.Dependencies.TutorialService:AnyPending()
+	if record.Call == key and record.State ~= "Idle" then
+		if not allowed or (not pending and record.State == "Ringing") then
+			self:Stop(false)
+		elseif not pending and self.EndsAt == math.huge then
+			-- the last rookie is done: Walt's goodbye, then the hang up (Step -> Finish)
+			self.EndsAt = t + TUTORIAL.Goodbye
+		end
+		return
+	end
+	if self:IsQueued(key) then
+		if not pending then
+			self:Unqueue(key)
+		end
+		return
+	end
+	if pending then
+		self:QueueTutorial()
 	end
 end
 
@@ -284,6 +359,12 @@ function BossService:OnDayPrep(day: number, night: number)
 		return
 	end
 	const row = Calls.row(key)
+	if row and row.Trigger.Kind == "DayPrep" and row.Trigger.Day == 1 and self.Dependencies.TutorialService:AnyPending() then
+		-- Day 1 call = the old tutorial opener: the tutorial call replaces it (heard, so a Resume does not ring it)
+		self.Played[key] = true
+		self:QueueTutorial()
+		return
+	end
 	if row and row.Trigger.Kind == "DayInfinite" then
 		self.LastInfinite = key
 	end

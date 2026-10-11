@@ -821,6 +821,8 @@ Formação: 2 × 2 (colunas a ±2 studs do eixo, fileiras a 3 studs). Solo: no e
 
 **Binding (TASK-098, Provisório).** Marcas de partida `CutsceneMark1..4` (`Content.Cutscenes` intro `Marks`) em volta de CS-1, 2 × 2 virado para o leste: (−100, −26) · (−100, −22) · (−103, −26) · (−103, −22). `CS-1..5`, `CS-P1..4` como na tabela (CS-3 → CS-4 corre dentro de CW-2; CS-5 = meio de CW-1). `CS-5W` (−14, 38) e `CS-5E` (14, 38), meios-fios de CW-1, já no place e usados pela intro desde P46 (CS-4 → CS-5W → CS-5E → CS-P{slot}).
 
+**Beats com pausas (frontend-coder, 2026-10-11, Provisório; feedback do usuário após jogar; `Content.Cutscenes` intro, ~67 s, cap 70).** (1) Parada na placa: a party anda pela calçada norte e para no ponto da linha CS-1 → CS-3 mais próximo da placa com tag `NoHelpWantedSign` (o cartão grande, largura > 3 studs, lido em runtime; sem placa: CS-2), vira para ela e fala. (2) CW-2: entra na faixa sem parar no meio-fio; quando o próprio corpo chega a 40% de CS-3 → CS-4, o carro da TR-1 (sentido leste, metade sul) é sincronizado para cruzar a faixa 0,35 s depois da parada brusca a 46%; "Whoa!", um passo para trás (40%), pausa, segue. (3) Depois de CW-1 para em CS-5E virada para o panfleto, "What's that?", anda até CS-P{slot}, lê, decide ligar. (4) Ligação 555-0179 como antes. (5) Foco no carrinho (CART), fade out, o jogo entra com fade in.
+
 ### 11.2 Outros momentos de câmera
 
 - **Troca carrinho → trailer** (DEC-047): fade; plano do trailer já no Pad (C-01 marcando 6 PM) + ligação.

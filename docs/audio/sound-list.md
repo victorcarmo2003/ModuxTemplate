@@ -134,6 +134,11 @@ Padrão aprendido é o que as anomalias quebram (DEC-010). Estes sons têm dono 
 > 5. Mantidas: `music_lobby` ("Lobby", rbxassetid://133495425923316, loop no lobby) e `music_finale` ("Melancolic City", rbxassetid://86360851369933)
 >    no final. Ducking na ligação do chefe continua (vale também para a música do turno).
 >
+> **Uma música por vez (correção, frontend-coder 2026-10-11, Provisório).** `music_lobby` só toca antes do primeiro registro de turno (lobby);
+> durante a cutscene de abertura toca a música da cena (`Content.Cutscenes` intro `Music = "lobby"`, tapa-buraco até o MUS-005) e a faixa do turno
+> fica **pendente** até a cutscene acabar, entrando com fade de 1,5 s enquanto a da cena sai. Bug corrigido: o cue `lobby` (When vazio) valia em
+> qualquer fase, então tocava na cutscene e continuava por baixo da faixa do turno.
+>
 > Implementação: `src/Shared/Content/Sounds.luau` (`Rules.ShiftMusic`, `ShiftMusicPhase`, `ShiftMusicFresh`, `Ambient`, `AmbientZones`, `AmbientOff`),
 > `src/Audio/client/AudioController/` (`init.luau`, `Cues.luau`, `Bed.luau`).
 

@@ -816,6 +816,7 @@ Call = Lync.replicate(Lync.struct({          -- registro 1
 | Escreve / lê | `BossService` / `BossController` (toque, legenda), `HudController`, `AudioController` (ducking) |
 | Por quê set (T44) | FEAT-018: quem reconecta no meio ouve só as linhas restantes; o set entrega o estado atual e o client calcula a linha. Packet por linha perderia a ligação na reconexão e mandaria 7–18 pacotes |
 | Atender | `Interact{ Action = "answer_phone" }` (âncora `Prompt_Answer`); sem packet novo |
+| Ligação do tutorial (Provisório, pedido do usuário 2026-10-11) | linha `call_tutorial` (Trigger `Tutorial`): toca em Prep/Open de dia enquanto `TutorialService:AnyPending()`; no Day 1 substitui `call_day_1`; não atende sozinha; fica `Talking` (StartedAt fixo) até ninguém ter tutorial pendente e então mais `BossCallRules.Tutorial.Goodbye` s. As falas do novato são locais (`TutorialController` → `BossController:Hold/Say` + TTS); quem não está no tutorial ouve as `Lines` da linha. Sem campo novo no set |
 
 ### 13.4 `Thief` (onda 2)
 

@@ -13,6 +13,11 @@
 --   LostCritical / LostLastChance   after NightResolved("Lost"); played in the Call of the repeated night
 --   RunOver        never rung (no call in NightLost/RunEnd): the run end screen quotes its lines (Provisional)
 --   Hint           first time Trigger.Action is performed in the run (InteractionService.Performed)
+--   Tutorial       first-hot-dog tutorial call (user request 2026-10-11, Provisional): rings in a day Prep/Open while a
+--                  player of the server still has TutorialDone = false; on Day 1 it replaces the DayPrep call. Never
+--                  answers itself and is held open until no player has the tutorial pending, then stays
+--                  Rules.Tutorial.Goodbye s more (Walt's goodbye) and hangs up. The tutorial player's client voices
+--                  the step lines (TutorialController, Steps.luau); Lines are what everyone else hears.
 -- Speaker nil = Walt. A line lasts Rules.LineTime; the current line = floor((now - StartedAt) / LineTime).
 local Table = require(script.Parent.Table)
 
@@ -32,6 +37,7 @@ export type TriggerKind =
 	| "LostLastChance"
 	| "RunOver"
 	| "Hint"
+	| "Tutorial"
 
 export type Trigger = {
 	Kind: TriggerKind,
@@ -52,11 +58,20 @@ export type BossCall = {
 	Short: { Line }?, -- NightCall only: the lines that follow the NightRepeat opener on a repeat
 }
 
+-- First-hot-dog tutorial call (Trigger Tutorial). PROVISIONAL (frontend-coder, user request 2026-10-11).
+export type TutorialRules = {
+	Call: string, -- key of the Tutorial row
+	Goodbye: number, -- s the call stays on after the last tutorial ended (Walt's goodbye line), then hangs up
+	-- actions the tutorial teaches: their Hint rows count as heard once the tutorial call is queued
+	Covers: { string },
+}
+
 export type Rules = {
 	LineTime: number, -- seconds per line (subtitle and voice)
-	AutoAnswer: number, -- seconds ringing before the call answers itself
+	AutoAnswer: number, -- seconds ringing before the call answers itself (not the Tutorial call)
 	DayMaxLines: number,
 	NightMaxSeconds: number,
+	Tutorial: TutorialRules,
 }
 
 local function lines(...: string): { Line }
@@ -437,6 +452,16 @@ const base = Table.new({
 		Once = false,
 	},
 
+	-- first-hot-dog tutorial (Trigger Tutorial, Provisional): Walt stays on the line while a rookie learns; these
+	-- lines are only for whoever is not doing the tutorial (the rookie hears TutorialController's step lines)
+	{
+		Key = "call_tutorial",
+		Lines = lines("Got a rookie on the cart today!", "I'll walk 'em through it. Help 'em out."),
+		Trigger = { Kind = "Tutorial" },
+		Priority = 4,
+		Once = false,
+	},
+
 	-- Day 1 tutorial hints (ui-text.md §11.1): each plays once, after the first time the party performs the action
 	hint("hint_grill_place", "grill_place", lines("When the bar fills up, grab it.")),
 	hint("hint_grill_collect", "grill_collect", lines("It waits on the warmer. Now slice a bun.")),
@@ -472,6 +497,11 @@ const rules: Rules = {
 	AutoAnswer = 15, -- FEAT-018
 	DayMaxLines = 7,
 	NightMaxSeconds = 45,
+	Tutorial = {
+		Call = "call_tutorial",
+		Goodbye = 6,
+		Covers = { "grill_place", "grill_collect", "bun_cut", "board_add_sausage", "open_sign", "take_order", "serve" },
+	},
 }
 
 -- Lines actually spoken for a call. A NightRepeat call continues with the Short lines of the night being repeated;

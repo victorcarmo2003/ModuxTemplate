@@ -24,6 +24,8 @@ type Scene = Content.Cutscene
 export type Walker = {
 	Step: (elapsed: number, dt: number) -> (),
 	Stop: () -> (),
+	-- the own walk plan (nil = slot not found yet)
+	Plan: () -> Route.Plan?,
 }
 
 const FROZEN_ATTRIBUTE = "Frozen"
@@ -178,6 +180,13 @@ function Walker.new(scene: Scene, count: number): Walker
 			end
 		end,
 		Stop = release,
+		Plan = function(): Route.Plan?
+			if plan == nil and slot ~= nil then
+				plan = planOf(slot :: number)
+				builtAt = os.clock()
+			end
+			return plan
+		end,
 	}
 end
 

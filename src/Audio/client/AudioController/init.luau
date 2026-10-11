@@ -19,8 +19,11 @@
 	- Shift music (user decision 2026-10-10, sound-list §3): when RoundController enters SoundRules.ShiftMusicPhase
 	  (Prep) of a new shift, one track of SoundRules.ShiftMusic.Day/Night plays once (no loop), not the same track as
 	  the last shift of that kind. A client that sees the phase more than ShiftMusicFresh s after it started (late
-	  joiner, reconnect) hears nothing; a retried night counts as a new shift. A cue (lobby, finale, cutscene push)
-	  fades the shift track out.
+	  joiner, reconnect) hears nothing; a retried night counts as a new shift. One music at a time: a cue (finale,
+	  cutscene push) or a cutscene playing (attribute CutsceneActive on the LocalPlayer, set by CutsceneController)
+	  fades the shift track out, and a shift that starts while one of them is on keeps its track pending until both
+	  are off (still in that shift's ShiftMusicPhase), then fades it in over SHIFT_FADE while the cue fades out.
+	  The lobby cue (empty When) only plays before the first Shift record (Cues.Matches).
 	- Ambience: SoundRules.Ambient.Day/Night on screen while a shift runs (not in the lobby, during a pushed cue or in
 	  SoundRules.AmbientOff phases); inside a LightZone of SoundRules.AmbientZones (LZ-4 = Mart interior, character
 	  position, AMBIENT_RATE Hz) that zone's bed replaces the street. Each bed is a crossfaded loop of two copies
@@ -68,6 +71,9 @@ const DUCK_TIME = 0.5 -- s
 const SCREEN_ANCHOR = "screen"
 const SHIFT_FADE = 1.5 -- s: fade of a shift track cut by a cue or by the next shift
 const AMBIENT_RATE = 4 -- Hz: zone check of the local character (Mart bed)
+const CUTSCENE_ATTRIBUTE = "CutsceneActive" -- CutsceneController (true while a chain plays, nil otherwise)
+
+export type PendingShift = { Id: string, IsNight: boolean }
 
 export type AmbientBed = {
 	Key: string,
@@ -123,6 +129,10 @@ function AudioController:Setup()
 	self.ShiftMusic = Vide.source("") :: Vide.Source<string>
 	self.ShiftId = nil :: string?
 	self.LastShiftTrack = {} :: { [string]: string }
+	-- shift whose track waits for the cue / cutscene to end (nil = none)
+	self.PendingShift = nil :: PendingShift?
+	-- a cutscene chain plays (LocalPlayer attribute CutsceneActive)
+	self.CutsceneOn = Vide.source(false) :: Vide.Source<boolean>
 	-- ambience key and bed playing now (nil = none)
 	self.AmbientKey = nil :: string?
 	self.Bed = nil :: AmbientBed?
@@ -558,8 +568,9 @@ function AudioController:StopShiftTrack(time: number)
 	self:FadeOut(track, time)
 end
 
--- One track of the shift pool, once (sound-list §3); nil key or Id "" = silence
-function AudioController:PlayShiftTrack(isNight: boolean)
+-- One track of the shift pool, once (sound-list §3); nil key or Id "" = silence. fadeIn > 0 = rises from 0 (the
+-- crossfade with a cue that is fading out)
+function AudioController:PlayShiftTrack(isNight: boolean, fadeIn: number?)
 	const kind = if isNight then "Night" else "Day"
 	const pool = if isNight then RULES.ShiftMusic.Night else RULES.ShiftMusic.Day
 	const key = Cues.PickTrack(pool, self.LastShiftTrack[kind], self.Rng)
@@ -577,8 +588,12 @@ function AudioController:PlayShiftTrack(isNight: boolean)
 	sound.SoundId = row.Id
 	sound.SoundGroup = self.Groups.Music
 	sound.Looped = false
-	sound.Volume = row.Volume
+	const rise = fadeIn or 0
+	sound.Volume = if rise > 0 then 0 else row.Volume
 	sound.Parent = self.Screen
+	if rise > 0 then
+		TweenService:Create(sound, TweenInfo.new(rise), { Volume = row.Volume }):Play()
+	end
 	sound.Ended:Once(function()
 		if self.ShiftTrack == sound then
 			self.ShiftTrack = nil
@@ -591,8 +606,19 @@ function AudioController:PlayShiftTrack(isNight: boolean)
 	sound:Play()
 end
 
--- Shift start: plays the shift track once per shift, only for a client that saw the phase begin
+-- Another music owns the screen: a pushed cue or a cutscene chain
+function AudioController:MusicBusy(): boolean
+	return #Vide.untrack(self.MusicStack) > 0 or Vide.untrack(self.CutsceneOn)
+end
+
+-- Shift start: plays the shift track once per shift, only for a client that saw the phase begin; while another
+-- music owns the screen (intro cutscene) the track waits (PendingShift, FlushShift)
 function AudioController:OnShiftState(ready: boolean, phase: string, id: string, isNight: boolean)
+	const pending = self.PendingShift
+	if pending ~= nil and (not ready or phase ~= RULES.ShiftMusicPhase or id ~= pending.Id) then
+		-- the shift moved on before the cutscene ended: that track is not played late
+		self.PendingShift = nil
+	end
 	if not ready then
 		-- lobby: the next run starts clean
 		self.ShiftId = nil
@@ -604,9 +630,24 @@ function AudioController:OnShiftState(ready: boolean, phase: string, id: string,
 	self.ShiftId = id
 	const clock = self.Dependencies.RoundController.Clock
 	const fresh = clock ~= nil and Workspace:GetServerTimeNow() - clock.PhaseStartedAt <= RULES.ShiftMusicFresh
-	if fresh and #self.MusicStack() == 0 then
+	if not fresh then
+		return
+	end
+	if self:MusicBusy() then
+		self.PendingShift = { Id = id, IsNight = isNight }
+	else
 		self:PlayShiftTrack(isNight)
 	end
+end
+
+-- The cue / cutscene is over: a pending shift track starts, crossfading with the cue that fades out
+function AudioController:FlushShift()
+	const pending = self.PendingShift
+	if pending == nil or self:MusicBusy() then
+		return
+	end
+	self.PendingShift = nil
+	self:PlayShiftTrack(pending.IsNight, SHIFT_FADE)
 end
 
 -- Crossfades to the bed of `key` (nil = silence): the old bed fades out over the new bed's Crossfade
@@ -752,6 +793,15 @@ end)
 
 AudioController:OnStart(function(self)
 	const round = self.Dependencies.RoundController
+	const player = Players.LocalPlayer
+	local function readCutscene()
+		const on = player:GetAttribute(CUTSCENE_ATTRIBUTE) == true
+		if Vide.untrack(self.CutsceneOn) ~= on then
+			self.CutsceneOn(on)
+		end
+	end
+	player:GetAttributeChangedSignal(CUTSCENE_ATTRIBUTE):Connect(readCutscene)
+	readCutscene()
 	self.Unmount = Vide.root(function()
 		Vide.effect(function()
 			const state: Cues.State = {
@@ -790,6 +840,18 @@ AudioController:OnStart(function(self)
 			const id = Cues.ShiftId(round.Day(), round.Night(), round.Attempt(), isNight)
 			Vide.untrack(function()
 				self:OnShiftState(ready, phase, id, isNight)
+				return nil
+			end)
+		end)
+		-- one music at a time: no shift track under a cue or a cutscene; a pending one starts when both are off
+		Vide.effect(function()
+			const busy = #self.MusicStack() > 0 or self.CutsceneOn()
+			Vide.untrack(function()
+				if busy then
+					self:StopShiftTrack(SHIFT_FADE)
+				else
+					self:FlushShift()
+				end
 				return nil
 			end)
 		end)

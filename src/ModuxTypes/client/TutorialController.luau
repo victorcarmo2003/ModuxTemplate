@@ -3,6 +3,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
+local Call = require(StarterPlayer.StarterPlayerScripts.client.Tutorial.TutorialController.Call)
 local Steps = require(StarterPlayer.StarterPlayerScripts.client.Tutorial.TutorialController.Steps)
 
 type Held = { Item: string, Toppings: { [string]: boolean } }
@@ -15,24 +16,31 @@ type Kitchen = {
 }
 
 export type Public = {
+	Answered: boolean,
+	Call: Call.Call,
 	CashRevealed: Vide.Source<boolean>,
 	ClockRevealed: Vide.Source<boolean>,
 	Finished: Vide.Source<boolean>,
 	Folder: Folder?,
+	Greeted: boolean,
 	Highlight: Highlight?,
+	Holding: boolean,
 	Item: Vide.Source<string>,
 	LastHotDogAt: number,
-	MoneyThread: thread?,
 	PointerAngle: Vide.Source<number>,
 	PointerAt: Vide.Source<Vector2>,
 	PointerShown: Vide.Source<boolean>,
+	Prepared: boolean,
 	Running: Vide.Source<boolean>,
 	Scale: Vide.Source<number>,
 	Sent: boolean,
 	Spot: Vide.Source<GuiObject | false>,
+	StepAt: number,
 	StepKey: Vide.Source<string>,
 	Target: Vide.Source<Instance | false>,
+	Uncalled: boolean,
 	Unmounts: { () -> () },
+	WaitStarted: number,
 	Setup: (self: Public) -> (),
 	FirstRun: (self: Public) -> boolean,
 	ShowCash: (self: Public) -> boolean,
@@ -45,6 +53,12 @@ export type Public = {
 	Kitchen: (self: Public) -> Kitchen,
 	Ordering: (self: Public) -> { [number]: boolean },
 	Anchor: (self: Public, action: string, enabled: boolean, filter: ((Instance) -> boolean)?) -> Instance?,
+	VoiceVolume: (self: Public) -> number,
+	CallState: (self: Public) -> string,
+	Voiced: (self: Public) -> boolean,
+	UpdateCall: (self: Public) -> (),
+	SpeakStep: (self: Public, before: Steps.Step?, after: Steps.Step?) -> (),
+	DecidePhone: (self: Public) -> (string?, Instance?),
 	Decide: (self: Public) -> (string, Instance?, string),
 	FxFolder: (self: Public) -> Folder,
 	SetHighlight: (self: Public, anchor: Instance?) -> (),
@@ -53,7 +67,10 @@ export type Public = {
 	Rescale: (self: Public) -> (),
 	SetStep: (self: Public, key: string, target: Instance?, item: string) -> (),
 	OnSale: (self: Public, result: string) -> (),
-	Finish: (self: Public) -> (),
+	TickTalk: (self: Public) -> (),
+	NextTalk: (self: Public) -> (),
+	Skip: (self: Public) -> (),
+	Finish: (self: Public, reason: string) -> (),
 	Tick: (self: Public) -> (),
 	BindSkip: (self: Public, on: boolean) -> (),
 	Mount: (self: Public, playerGui: Instance) -> (),

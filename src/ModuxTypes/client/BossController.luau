@@ -25,6 +25,7 @@ type Lamp = {
 export type Public = {
 	Call: Vide.Source<string>,
 	Gui: ScreenGui?,
+	Held: boolean,
 	LampOn: boolean,
 	LineIndex: number,
 	Lines: { Content.BossCallLine },
@@ -45,6 +46,8 @@ export type Public = {
 	Setup: (self: Public) -> (),
 	Night: (self: Public) -> number,
 	Apply: (self: Public, record: Record) -> (),
+	Hold: (self: Public, on: boolean) -> (),
+	Say: (self: Public, text: string?) -> (),
 	Refresh: (self: Public) -> (),
 	FindVehicle: (self: Public) -> Instance?,
 	SetLamp: (self: Public, on: boolean) -> (),

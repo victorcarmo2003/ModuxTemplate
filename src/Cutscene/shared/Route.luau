@@ -11,11 +11,14 @@
 	make it ends late), and brakes at the same rate. A run without Arrive walks at Rules.Walk.Cruise.
 
 	Facing: along the walk; while braking it blends to the facing of the end spot (a MoveTo point's facing, or the
-	phone for the stand spots), so the body ends turned the right way without a snap.
+	phone for the stand spots, or the beat's Face anchor), so the body ends turned the right way without a snap.
+	The beat that closes a run may set Accel (start) and Brake (stop) in studs/s^2 (a startled stop is a hard Brake)
+	and Backward (the body keeps its end facing for the whole run: a step back).
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 local Motion = require(ReplicatedStorage.shared.Traffic.Motion)
+local Anchors = require(script.Parent.Anchors)
 
 type Scene = Content.Cutscene
 type Beat = Content.CutsceneBeat
@@ -26,7 +29,9 @@ export type Run = {
 	Path: Motion.Path,
 	Length: number,
 	Cruise: number,
-	Accel: number,
+	Accel: number, -- studs/s^2 of the start
+	Brake: number, -- studs/s^2 of the stop
+	Backward: boolean, -- keeps Face for the whole run
 	Face: Vector3, -- horizontal facing at the end
 }
 
@@ -42,6 +47,7 @@ const WALK = Content.Cutscenes.Rules.Walk
 const CORNER_SAMPLES = 6
 const MIN_RUN = 0.4 -- studs: a shorter run is a turn in place
 const HEADING_HALF = 1 -- studs each side for the walking heading
+const BLEND_MIN = 1.5 -- studs: shortest blend from the walk heading to the end facing
 
 const Route = {}
 
@@ -85,39 +91,42 @@ local function rounded(points: { Vector3 }): { Vector3 }
 	return clean
 end
 
--- Cruise speed and duration of a trapezoid walk of `length` studs that should last `time` s (nil = free pace)
-local function pace(length: number, time: number?): (number, number)
-	const accel = WALK.Accel
+-- Cruise speed and duration of a trapezoid walk of `length` studs that should last `time` s (nil = free pace),
+-- starting at `accel` and stopping at `brake` studs/s^2
+local function pace(length: number, time: number?, accel: number, brake: number): (number, number)
+	-- the ramps cover k v^2 studs less than cruising all along: k = 1 / (2 accel) + 1 / (2 brake)
+	const k = 0.5 / accel + 0.5 / brake
 	local speed: number
 	if time == nil or time <= 0 then
 		speed = WALK.Cruise
 	else
-		-- length = v (T - v / a)  ->  v = a (T - sqrt(T^2 - 4 L / a)) / 2
-		const disc = time * time - 4 * length / accel
-		speed = if disc < 0 then WALK.MaxSpeed else accel * (time - math.sqrt(disc)) / 2
+		-- length = v T - k v^2  ->  v = (T - sqrt(T^2 - 4 k L)) / (2 k)
+		const disc = time * time - 4 * k * length
+		speed = if disc < 0 then WALK.MaxSpeed else (time - math.sqrt(disc)) / (2 * k)
 	end
 	speed = math.clamp(speed, WALK.MinSpeed, WALK.MaxSpeed)
 	-- too short to reach that speed: triangle profile
-	speed = math.min(speed, math.sqrt(length * accel))
-	return speed, length / speed + speed / accel
+	speed = math.min(speed, math.sqrt(length / k))
+	return speed, length / speed + speed * k
 end
 
 -- Distance and speed after `tau` s of a run
 local function along(run: Run, tau: number): (number, number)
-	const a, v, length = run.Accel, run.Cruise, run.Length
+	const a, d, v, length = run.Accel, run.Brake, run.Cruise, run.Length
 	const total = run.T1 - run.T0
-	const ramp = v / a
+	const rampUp = v / a
+	const rampDown = v / d
 	if tau <= 0 then
 		return 0, 0
 	elseif tau >= total then
 		return length, 0
-	elseif tau < ramp then
+	elseif tau < rampUp then
 		return 0.5 * a * tau * tau, a * tau
-	elseif tau > total - ramp then
+	elseif tau > total - rampDown then
 		const left = total - tau
-		return length - 0.5 * a * left * left, a * left
+		return length - 0.5 * d * left * left, d * left
 	end
-	return 0.5 * a * ramp * ramp + v * (tau - ramp), v
+	return 0.5 * a * rampUp * rampUp + v * (tau - rampUp), v
 end
 
 function Route.Build(scene: Scene, slot: number, count: number, spot: Spot): Plan
@@ -140,12 +149,16 @@ function Route.Build(scene: Scene, slot: number, count: number, spot: Spot): Pla
 	local points: { Vector3 }? = nil
 	local t0 = 0
 	local endFace: Vector3? = nil
+	local accel, brake, backward = WALK.Accel, WALK.Accel, false
 
 	for index, beat in moves do
 		const target = spot(beat.Target, slot, count)
 		if target == nil then
 			plan.Missing = true
 			continue
+		end
+		if Anchors.OnFallback(beat.Target) then
+			plan.Missing = true -- the sign may stream in later: build again
 		end
 		if cursor == nil then
 			-- no mark: the first target is where the body already is
@@ -156,14 +169,22 @@ function Route.Build(scene: Scene, slot: number, count: number, spot: Spot): Pla
 		if points == nil then
 			points = { cursor :: Vector3 }
 			t0 = math.max(beat.At, free)
+			accel, brake, backward = WALK.Accel, WALK.Accel, false
 		end
 		table.insert(points :: { Vector3 }, target.Position)
 		endFace = flat(target.LookVector)
+		const faceAnchor = if beat.Face ~= nil then Anchors.Point(beat.Face) else nil
+		if faceAnchor ~= nil then
+			endFace = flat(faceAnchor.Position - target.Position) or endFace
+		end
+		accel = beat.Accel or accel
+		brake = beat.Brake or brake
+		backward = beat.Backward == true or backward
 		if beat.Arrive ~= nil or index == #moves then
 			const line = Motion.Path(rounded(points :: { Vector3 }))
 			if line ~= nil and line.Length >= MIN_RUN then
 				const time = if beat.Arrive ~= nil then beat.Arrive - t0 else nil
-				const speed, duration = pace(line.Length, time)
+				const speed, duration = pace(line.Length, time, accel, brake)
 				const lastHeading = Motion.Heading(line, line.Length, HEADING_HALF)
 				table.insert(plan.Runs, {
 					T0 = t0,
@@ -171,7 +192,9 @@ function Route.Build(scene: Scene, slot: number, count: number, spot: Spot): Pla
 					Path = line,
 					Length = line.Length,
 					Cruise = speed,
-					Accel = WALK.Accel,
+					Accel = accel,
+					Brake = brake,
+					Backward = backward,
 					Face = endFace or lastHeading,
 				})
 				free = t0 + duration
@@ -195,8 +218,11 @@ function Route.Sample(plan: Plan, t: number): (Vector3?, Vector3, Vector3?)
 		if t <= run.T1 then
 			const s, speed = along(run, t - run.T0)
 			const heading = Motion.Heading(run.Path, s, HEADING_HALF)
-			-- braking: blend to the end facing
-			const brake = run.Cruise * run.Cruise / (2 * run.Accel)
+			if run.Backward then
+				return Motion.PointAt(run.Path, s), heading * speed, run.Face
+			end
+			-- braking: blend to the end facing (over at least BLEND_MIN studs, so a hard stop still turns smoothly)
+			const brake = math.max(run.Cruise * run.Cruise / (2 * run.Brake), math.min(BLEND_MIN, run.Length))
 			const w = if brake > 1e-3 then math.clamp((s - (run.Length - brake)) / brake, 0, 1) else 1
 			local face = heading:Lerp(run.Face, w * w)
 			face = if face.Magnitude > 1e-3 then face.Unit else run.Face
@@ -206,6 +232,16 @@ function Route.Sample(plan: Plan, t: number): (Vector3?, Vector3, Vector3?)
 		facing = run.Face
 	end
 	return position, Vector3.zero, facing
+end
+
+-- Run that covers segment time `t` (nil = standing between runs, before or after the walk)
+function Route.RunAt(plan: Plan, t: number): Run?
+	for _, run in plan.Runs do
+		if t >= run.T0 and t <= run.T1 then
+			return run
+		end
+	end
+	return nil
 end
 
 -- Segment time when the last run ends (0 = no walk)

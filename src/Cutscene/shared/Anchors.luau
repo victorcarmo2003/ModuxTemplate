@@ -10,12 +10,20 @@
 	            facing CS-P1. The user moves it in Studio: everything follows.
 	  Phone()   a phone the party calls from: tag `CutscenePhone` or an instance named CutscenePhone / Payphone.
 	            None in the map today -> the poster (the number is on it).
+	  Sign()    the NO HELP WANTED sign of the first stop (Rules.Sign): instances tagged `NoHelpWantedSign`; a card
+	            wider than Rules.Sign.MinWidth wins, then the first along the sidewalk line (Rules.Sign.Line) within
+	            Range. CFrame at its centre. nil = no tagged sign (callers fall back).
+	  SignStand()
+	            where the body stops for the sign: the point of the sidewalk line nearest to the sign, at least
+	            Rules.Sign.MinDistance from it (pulled back along the line), on the ground, facing the sign.
+	            No sign: the Rules.Sign.Fallback MapPoint.
 	  Spot(target, slot, count)
 	            where a body of `slot` stands for a MoveTo target: Rules.Stand.Target ("CS-P{slot}") = in front of the
 	            phone (Rules.Stand.Slots: slot 1 ~3 studs, mates in a half moon), facing it; any other target = its
-	            MapPoint ("{slot}" = slot), side by side (Rules.LineSpacing) on a shared one. nil = not in the map
+	            Point ("{slot}" = slot), side by side (Rules.LineSpacing) on a shared one. nil = not in the map
 	            (or not streamed in yet on a client).
-	  Point(id)  MapPoint by id; "a|b" = the middle of two MapPoints; "Poster" / "Phone" = those anchors.
+	  Point(id)  MapPoint by id; "a|b" / "a|b@f" = the point at fraction f (default 0.5) from MapPoint a to b, facing
+	            a -> b; "Poster" / "Phone" = those anchors; "Sign" = SignStand().
 ]]
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -35,6 +43,8 @@ const RETRY = 1 -- s between two Workspace searches of something that is not the
 const GROUND_DROP = 14 -- studs searched under a stand spot
 const GROUND_ABOVE = 1.5 -- a hit this far above the fallback ground is a prop, not the sidewalk
 const STREETLIGHT_TAG = "StreetLight"
+const SIGN_TARGET = "Sign" -- MoveTo / Focus target of the NO HELP WANTED stop
+const GROUND_LIFT = 4 -- studs above a sidewalk point where the ground ray starts
 
 const Anchors = {}
 
@@ -170,25 +180,6 @@ function Anchors.Phone(): CFrame?
 	return frame or Anchors.Poster()
 end
 
--- "Poster" / "Phone" / "a|b" (middle of two MapPoints) / MapPoint id
-function Anchors.Point(id: string): CFrame?
-	if id == "Poster" then
-		return Anchors.Poster()
-	elseif id == "Phone" then
-		return Anchors.Phone()
-	end
-	const a, b = string.match(id, "^([^|]+)|([^|]+)$")
-	if a ~= nil and b ~= nil then
-		const pa = mapPoint(a)
-		const pb = mapPoint(b)
-		if pa == nil or pb == nil then
-			return nil
-		end
-		return pa:Lerp(pb, 0.5)
-	end
-	return mapPoint(id)
-end
-
 -- Ground under `position`: raycast down (bodies, actors and cars ignored), else `fallback`
 local function groundAt(position: Vector3, fallback: number?): number?
 	const ignore: { Instance } = {}
@@ -214,6 +205,128 @@ local function groundAt(position: Vector3, fallback: number?): number?
 	return fallback
 end
 
+-- Centre and horizontal width of a sign instance
+local function signBox(instance: Instance): (Vector3?, number)
+	if instance:IsA("BasePart") then
+		return instance.Position, math.max(instance.Size.X, instance.Size.Z)
+	elseif instance:IsA("Model") then
+		const box, size = instance:GetBoundingBox()
+		return box.Position, math.max(size.X, size.Z)
+	end
+	return nil, 0
+end
+
+-- Fraction along a -> b of `position` (XZ) and its horizontal distance off that segment
+local function along(a: Vector3, b: Vector3, position: Vector3): (number, number)
+	const ab = Vector3.new(b.X - a.X, 0, b.Z - a.Z)
+	const ap = Vector3.new(position.X - a.X, 0, position.Z - a.Z)
+	const length2 = ab:Dot(ab)
+	const t = if length2 > 1e-6 then ap:Dot(ab) / length2 else 0
+	return t, (ap - ab * math.clamp(t, 0, 1)).Magnitude
+end
+
+-- The sidewalk line of the sign stop (Rules.Sign.Line)
+local function signLine(): (Vector3?, Vector3?)
+	const line = RULES.Sign.Line
+	const a = mapPoint(line[1])
+	const b = mapPoint(line[2])
+	return if a ~= nil then a.Position else nil, if b ~= nil then b.Position else nil
+end
+
+function Anchors.Sign(): CFrame?
+	const rules = RULES.Sign
+	const a, b = signLine()
+	local best: Vector3? = nil
+	local bestScore = math.huge
+	for _, instance in CollectionService:GetTagged(rules.Tag) do
+		if not instance:IsDescendantOf(Workspace) then
+			continue
+		end
+		const centre, width = signBox(instance)
+		if centre == nil then
+			continue
+		end
+		-- the big card first (+0, small +100), then within Range of the line (+10, farther +20); the first along
+		-- the line wins inside a group
+		local score = if width > rules.MinWidth then 0 else 100
+		if a ~= nil and b ~= nil then
+			const t, off = along(a, b, centre)
+			score += (if off <= rules.Range then 10 else 20) + math.clamp(t, -1, 2)
+		end
+		if score < bestScore then
+			bestScore = score
+			best = centre
+		end
+	end
+	return if best ~= nil then CFrame.new(best) else nil
+end
+
+-- Stop in front of the NO HELP WANTED sign (Rules.Sign), facing it; the Fallback MapPoint without a sign
+function Anchors.SignStand(): CFrame?
+	const rules = RULES.Sign
+	const sign = Anchors.Sign()
+	const a, b = signLine()
+	if sign == nil or a == nil or b == nil then
+		return mapPoint(rules.Fallback)
+	end
+	const direction = flat(b - a)
+	if direction == nil then
+		return mapPoint(rules.Fallback)
+	end
+	const centre = sign.Position
+	const length = Vector3.new(b.X - a.X, 0, b.Z - a.Z).Magnitude
+	const t = math.clamp((along(a, b, centre)), 0, 1)
+	local s = t * length
+	const foot = a:Lerp(b, t)
+	const off = Vector3.new(centre.X - foot.X, 0, centre.Z - foot.Z).Magnitude
+	if off < rules.MinDistance then
+		-- the sign stands right by the line: stop before it
+		s = math.max(s - math.sqrt(rules.MinDistance * rules.MinDistance - off * off), 0)
+	end
+	const at = a:Lerp(b, if length > 1e-3 then s / length else 0)
+	const y = groundAt(at + Vector3.new(0, GROUND_LIFT, 0), at.Y) or at.Y
+	const stand = Vector3.new(at.X, y, at.Z)
+	const face = flat(centre - stand) or direction
+	return CFrame.lookAt(stand, stand + face)
+end
+
+-- true when `target` stands on a fallback that the real instance may replace once it streams in (plans built on it
+-- are built again later, Route Missing)
+function Anchors.OnFallback(target: string): boolean
+	return target == SIGN_TARGET and Anchors.Sign() == nil
+end
+
+-- "Poster" / "Phone" / "Sign" / "a|b@f" (fraction f of MapPoint a -> b, default the middle, facing a -> b) /
+-- MapPoint id
+function Anchors.Point(id: string): CFrame?
+	if id == "Poster" then
+		return Anchors.Poster()
+	elseif id == "Phone" then
+		return Anchors.Phone()
+	elseif id == SIGN_TARGET then
+		return Anchors.SignStand()
+	end
+	const a, rest = string.match(id, "^([^|]+)|(.+)$")
+	if a ~= nil and rest ~= nil then
+		local b = rest
+		local fraction = 0.5
+		const name, f = string.match(rest, "^([^@]+)@([%d%.%-]+)$")
+		if name ~= nil and f ~= nil then
+			b = name
+			fraction = tonumber(f) or 0.5
+		end
+		const pa = mapPoint(a)
+		const pb = mapPoint(b)
+		if pa == nil or pb == nil then
+			return nil
+		end
+		const position = pa.Position:Lerp(pb.Position, fraction)
+		const direction = flat(pb.Position - pa.Position)
+		return if direction ~= nil then CFrame.lookAt(position, position + direction) else pa:Lerp(pb, fraction)
+	end
+	return mapPoint(id)
+end
+
 function Anchors.Spot(target: string, slot: number, count: number): CFrame?
 	const id = (string.gsub(target, SLOT_TOKEN, tostring(slot)))
 	if target == RULES.Stand.Target then
@@ -230,7 +343,7 @@ function Anchors.Spot(target: string, slot: number, count: number): CFrame?
 			return CFrame.lookAt(stand, Vector3.new(phone.Position.X, y, phone.Position.Z))
 		end
 	end
-	const point = mapPoint(id)
+	const point = Anchors.Point(id)
 	if point == nil then
 		return nil
 	end

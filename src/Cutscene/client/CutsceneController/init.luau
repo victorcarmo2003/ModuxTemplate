@@ -12,13 +12,15 @@
 	  MoveTo    the own body walks the shared Route (Walker.luau: eased start/stop, flowing waypoints, smooth turn);
 	            the server only places bodies and re-places one that is far (CutsceneService)
 	  LookAt    focus on a point / post / Walt's mark (CameraController:Focus, elastic free look, eased switch)
-	  Focus     focus on a live target: a car actor (followed), "Poster", "Phone" (real map instances, Anchors),
-	            "Windows" (nearest NO HELP WANTED card ahead) or "Walk" (where the body walks); Fov narrows the view
+	  Focus     focus on a live target: a car actor (followed), "Poster", "Phone", "Sign" (real map instances,
+	            Anchors; "Sign" = the tagged NO HELP WANTED sign, else the nearest card ahead), "Windows" (nearest
+	            NO HELP WANTED card ahead), a MapPoint or "Walk" (where the body walks); Fov narrows the view
 	  Prompt    PromptBillboard on the target that fills by itself (input locked, script.md §1)
 	  Line      subtitle strip (CallSubtitle): "Walt" lines, or "You" for crew lines + a SpeechBalloon over each mate;
 	            voiced by text-to-speech when the engine has it (Speech.luau, Rules.Voices; subtitles only otherwise)
 	  Actor     local actors (Actors.luau): street cars of the traffic kit, flip phone, Walt, coffee, Raincoat Lady,
-	            flyer, Mart bell
+	            flyer, Mart bell. A car with Rules.Cars[].Cross is synced to the own body: it passes when the body
+	            reaches fraction At of the crossing + the planned time to its stop + After (CrossClock)
 
 	Cutscene active (for the HUD and anyone else): `CutsceneController.Active` (Vide source, true from the first
 	segment to the end of the chain) and the attribute `CutsceneActive` (true / nil) on Players.LocalPlayer.
@@ -31,7 +33,9 @@
 	shown is always the server's. A new segment (finale -> credits) clears the own vote.
 
 	While a chain plays: CameraController:Cutscene(true), input context "Menu" (world prompts off; the skip bind has
-	no context), music cue pushed per scene (AudioController:PushMusic). All restored when Scene goes back to "none".
+	no context), music cue of the scene pushed (Content.Cutscenes[].Music, AudioController:PushMusic; the shift track
+	waits for the end of the chain). All restored when Scene goes back to "none"; the screen stays black END_HOLD s
+	and then fades into the game.
 
 	PROVISIONAL (TASK-121):
 	  * Solo/Party variant = more than one player in the server when the chain starts (the set has no roster).
@@ -52,6 +56,7 @@ local Content = require(ReplicatedStorage.shared.Content)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Anchors = require(ReplicatedStorage.shared.Cutscene.Anchors)
+local Route = require(ReplicatedStorage.shared.Cutscene.Route)
 local CallSubtitle = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.CallSubtitle)
 local HudBanner = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.HudBanner)
 local PromptBillboard = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.PromptBillboard)
@@ -81,6 +86,7 @@ const RENDER_PRIORITY = Enum.RenderPriority.Camera.Value - 1 -- LookAt lands bef
 const HOLD_TIME = 0.6 -- s of hold for a skip vote ("Hold to skip", ui-text.md §7)
 const FADE_TIME = 1 -- s of each Fade beat
 const END_FADE = 0.8 -- s back to clear when the chain ends
+const END_HOLD = 0.35 -- s the screen holds its fade before that (bodies land at their spawn under the black)
 const LINE_HOLD = 3.5 -- s a line stays without a next one
 const TITLE_HOLD = 3 -- s of a title
 const PROMPT_TIME = 1.2 -- s the "Call" prompt takes to fill by itself
@@ -93,9 +99,6 @@ const LIVE_WINDOW = 0.75 -- s: a beat crossed later than this after its At is ca
 const FADE_ORDER = 51 -- above the vehicle fade (50) and the HUD
 const UI_ORDER = 52 -- subtitles and skip over the black
 const SPEAKERS: { [string]: string } = { walt = "Walt", crew = "You" }
--- music cue per scene (Content.Music); nil = the default cue of the phase (credits: the finale cue of the Finale
--- phase keeps playing; no credits music, user decision 2026-10-10)
-const SCENE_MUSIC: { [string]: string } = { finale = "finale" }
 const PROMPT_SOUND = "prompt_done"
 const VOTE_SOUND = "skip_vote"
 const VOTE_CLIP = "wave_skip"
@@ -104,6 +107,12 @@ const ACTOR_LIFT = Vector3.new(0, 2, 0) -- focus on a car: a bit above its base
 const WINDOW_PATTERN = "NoHelp" -- NO HELP WANTED cards (AST-033_NoHelpSign, blockout Window_NoHelpWanted_*)
 const WINDOW_RANGE = 34 -- studs: cards farther than this are not glanced at
 const WINDOW_AHEAD = 0.15 -- dot with the walk heading: only cards ahead or beside
+const SIGN_TARGET = "Sign" -- the tagged NO HELP WANTED sign (Rules.Sign)
+-- car synced to the walker (Rules.Cars[].Cross; PROVISIONAL frontend-coder 2026-10-11)
+const CROSS_STEP = 0.05 -- s between two samples of the planned walk
+const CROSS_WIDTH = 8 -- studs off the crossing line that still count as on it
+const CROSS_OVER = 1.2 -- fraction past the far end where a body no longer triggers (already crossed)
+const CROSS_WAIT = 2 -- s the car waits at most for a body behind its plan
 
 const CutsceneController = Modux.Controller("CutsceneController", {
 	Require = { "InputController", "CameraController", "AnimController", "AudioController" },
@@ -192,6 +201,10 @@ end
 -- Where a LookAt / Prompt target is: the real poster / phone, a MapPoint (+ LOOK_LIFT) or a street post (flyer
 -- height). "P-01" (the flyer post) is the poster itself when the map has it.
 function CutsceneController:TargetPosition(target: string): Vector3?
+	if target == SIGN_TARGET then
+		const sign = Anchors.Sign()
+		return if sign ~= nil then sign.Position else nil
+	end
 	if target == "Poster" or target == "Phone" or target == "P-01" then
 		const anchor = Anchors.Point(if target == "P-01" then "Poster" else target)
 		if anchor ~= nil then
@@ -269,6 +282,16 @@ function CutsceneController:FocusGetter(target: string): (() -> Vector3?)?
 		return function(): Vector3?
 			return self:TargetPosition(target)
 		end
+	elseif target == SIGN_TARGET then
+		-- the tagged sign (read live: the user may move it); none in the map -> the nearest card ahead
+		const cards = self:FocusGetter("Windows")
+		return function(): Vector3?
+			const sign = self:TargetPosition(SIGN_TARGET)
+			if sign ~= nil then
+				return sign
+			end
+			return if cards ~= nil then cards() else nil
+		end
 	elseif Content.Cutscenes.Rules.Cars[target] ~= nil then
 		return function(): Vector3?
 			const entry = self.Actors[target]
@@ -286,6 +309,89 @@ function CutsceneController:FocusGetter(target: string): (() -> Vector3?)?
 	end
 	return function(): Vector3?
 		return fixed
+	end
+end
+
+-- Fraction of `position` along a -> b (XZ, unclamped) and its horizontal distance off that segment
+local function crossProgress(a: Vector3, b: Vector3, position: Vector3): (number, number)
+	const ab = Vector3.new(b.X - a.X, 0, b.Z - a.Z)
+	const ap = Vector3.new(position.X - a.X, 0, position.Z - a.Z)
+	const length2 = ab:Dot(ab)
+	const t = if length2 > 1e-6 then ap:Dot(ab) / length2 else 0
+	return t, (ap - ab * math.clamp(t, 0, 1)).Magnitude
+end
+
+local function ownRoot(): BasePart?
+	const character = Players.LocalPlayer.Character
+	const root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
+	return if root ~= nil and root:IsA("BasePart") then root else nil
+end
+
+-- Pass time of a car synced to the own body (Rules.Cars[target].Cross), in s after its Actor beat, read every frame.
+-- Planned: the first instant the planned walk reaches fraction Cross.At of From -> To; the car passes Near at the
+-- end of that walk (the stop) + Cross.After. Live: when the real body reaches that fraction, the clock starts there
+-- (a body behind its plan holds the car back up to CROSS_WAIT s). nil = not a synced car / crossing not walked.
+function CutsceneController:CrossClock(target: string): (() -> number?)?
+	const row = Content.Cutscenes.Rules.Cars[target]
+	const cross = if row ~= nil then row.Cross else nil
+	const scene = self.Scene
+	if cross == nil or scene == nil then
+		return nil
+	end
+	const from = Anchors.Point(cross.From)
+	const to = Anchors.Point(cross.To)
+	if from == nil or to == nil then
+		self:WarnOnce(`cross:{target}`, `car "{target}": crossing {cross.From} -> {cross.To} not in the map, fixed Pass`)
+		return nil
+	end
+	const a, b = from.Position, to.Position
+	const walker = self.Walker
+	local plan = if walker ~= nil then walker.Plan() else nil
+	if plan == nil then
+		plan = Route.Build(scene, 1, #Players:GetPlayers(), Anchors.Spot)
+	end
+	const walk = plan :: Route.Plan
+	local planned: number? = nil
+	local stop = 0
+	local t = 0
+	const finish = Route.EndTime(walk)
+	while t <= finish do
+		const position = Route.Sample(walk, t)
+		if position ~= nil then
+			const progress, off = crossProgress(a, b, position)
+			if progress >= cross.At and progress <= CROSS_OVER and off <= CROSS_WIDTH then
+				planned = t
+				const run = Route.RunAt(walk, t)
+				stop = if run ~= nil then run.T1 else t
+				break
+			end
+		end
+		t += CROSS_STEP
+	end
+	if planned == nil then
+		self:WarnOnce(`cross:{target}`, `car "{target}": the walk never crosses {cross.From} -> {cross.To}, fixed Pass`)
+		return nil
+	end
+	const plannedAt = planned :: number
+	const lead = stop - plannedAt + cross.After
+	local actual: number? = nil
+	return function(): number?
+		const entry = self.Actors[target]
+		if entry == nil then
+			return nil
+		end
+		const elapsed = self.LastElapsed
+		if actual == nil then
+			const root = ownRoot()
+			if root ~= nil then
+				const progress, off = crossProgress(a, b, root.Position)
+				if progress >= cross.At and progress <= CROSS_OVER and off <= CROSS_WIDTH then
+					actual = elapsed
+				end
+			end
+		end
+		const trigger = actual or math.clamp(elapsed, plannedAt, plannedAt + CROSS_WAIT)
+		return trigger + lead - entry.At
 	end
 end
 
@@ -313,6 +419,9 @@ function CutsceneController:ActorContext(): Actors.Context
 		end,
 		Warn = function(key: string, message: string)
 			self:WarnOnce(key, message)
+		end,
+		PassAt = function(target: string): (() -> number?)?
+			return self:CrossClock(target)
 		end,
 		Bind = function(model: Model, set: string)
 			anim:Bind(model, set)
@@ -452,7 +561,8 @@ function CutsceneController:BeginSegment(key: string, startedAt: number)
 	if speech ~= nil then
 		speech.Prepare(self.Beats)
 	end
-	const music = SCENE_MUSIC[key]
+	-- one music at a time: the scene's cue overrides the phase (AudioController keeps the shift track off meanwhile)
+	const music = scene.Music
 	if music ~= nil then
 		self.Music = music
 		self.Dependencies.AudioController:PushMusic(music)
@@ -734,7 +844,7 @@ function CutsceneController:StartStepping()
 		end
 		-- after the chain: back to clear, then stop
 		const endedAt = self.EndedAt
-		const progress = if endedAt ~= nil then (os.clock() - endedAt) / END_FADE else 1
+		const progress = if endedAt ~= nil then (os.clock() - endedAt - END_HOLD) / END_FADE else 1
 		self.Fade(self.EndAlpha * (1 - math.clamp(progress, 0, 1)))
 		if progress >= 1 then
 			self:StopStepping()

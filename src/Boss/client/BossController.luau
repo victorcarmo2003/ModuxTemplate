@@ -25,6 +25,10 @@
 
 	Public sources (read-only for other controllers): State ("Idle" | "Ringing" | "Talking"), Call (key), Text,
 	Speaker, Showing (subtitle on screen).
+
+	Held subtitle (user request 2026-10-11, Provisional): during the first-hot-dog tutorial call (BossCalls Trigger
+	Tutorial) TutorialController owns the strip: Hold(true) stops the timed lines, Say(text) shows one of Walt's step
+	lines (nil hides). Hold(false) gives the strip back to the timed lines (by then past their time: hidden).
 ]]
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -105,6 +109,8 @@ function BossController:Setup()
 	self.RippleUnmount = nil :: (() -> ())?
 	self.RingSound = nil :: Sound?
 	self.Gui = nil :: ScreenGui?
+	-- TutorialController drives the subtitle (Hold/Say)
+	self.Held = false :: boolean
 end
 
 -- Records ------------------------------------------------------------------------------------------------------------
@@ -124,6 +130,9 @@ function BossController:Apply(record: Record)
 	Vide.batch(function()
 		self.Call(key)
 		self.State(record.State)
+		if self.Held and record.State ~= "Talking" then
+			self.Showing(false) -- hung up: the held line goes with the call
+		end
 	end)
 	if previous == "Ringing" and record.State == "Talking" then
 		self:PlayOnce("phone_pickup")
@@ -131,6 +140,35 @@ function BossController:Apply(record: Record)
 		self:PlayOnce("phone_hangup") -- end of the call (user request 2026-10-10)
 	end
 	self:Refresh()
+end
+
+-- The tutorial takes (true) or gives back (false) the subtitle strip
+function BossController:Hold(on: boolean)
+	if self.Held == on then
+		return
+	end
+	self.Held = on
+	if on then
+		self.LineIndex = 0
+		self.Showing(false)
+	else
+		self.LineIndex = -1 -- rewrite from the timed lines
+		self:Refresh()
+	end
+end
+
+-- One line of Walt while held (nil hides the strip)
+function BossController:Say(text: string?)
+	if not self.Held then
+		return
+	end
+	Vide.batch(function()
+		if text ~= nil then
+			self.Text(text)
+			self.Speaker(SPEAKER)
+		end
+		self.Showing(text ~= nil)
+	end)
 end
 
 -- Current line by server time; writes the sources only when something changed.
@@ -155,7 +193,7 @@ function BossController:Refresh()
 			index = at
 		end
 	end
-	if index ~= self.LineIndex then
+	if not self.Held and index ~= self.LineIndex then
 		self.LineIndex = index
 		const line = self.Lines[index]
 		Vide.batch(function()

@@ -4,13 +4,22 @@
 
 	First-hot-dog tutorial, only while the own profile says TutorialDone = false (ProfileController, Profile packet).
 	After the intro cutscene it walks the player through the first sale:
-	  grill -> slice -> (cooking) -> collect -> assemble -> open shop (Prep only) -> take order -> toppings -> serve
-	  -> money (UI step: the money pill pops in under a spotlight)
+	  answer the phone -> grill -> slice -> (cooking) -> collect -> assemble -> open shop (Prep only) -> take order
+	  -> toppings -> serve -> money (UI step: the money pill pops in under a spotlight) -> mart (restock, talk only)
+	  -> Walt's goodbye
 	Steps.luau holds the texts; which step is current is decided live (Decide) from what the server replicated: the
 	Stations set (grill / rail / board records), the Customers set, the CustomerController order card, the Tool in the
 	own hand (ItemService parents it) and the `Sale` packet. Nothing is predicted: a step only moves when the server
 	state moved, whoever made it move (a crewmate grilling also counts), and going back (hot dog thrown away) shows
 	the earlier step again.
+
+	Walt on the phone (user request 2026-10-11, Provisional): BossService rings the tutorial call (BossCalls Trigger
+	Tutorial) while this player has the tutorial ahead, and holds it open. Step 1 points at the ringing phone; once the
+	call is Talking, Walt leads: each step's Say lines go to the call subtitle (BossController:Hold/Say) and to Walt's
+	text-to-speech voice (Call.luau), his Done praise when the player moves past a step, a reminder after NUDGE s on
+	the same step. Talk steps (money, mart) move on when Walt finished them or on "Got it". At the end (or on Skip) Walt
+	says goodbye and TutorialComplete goes out; the server hangs up Rules.Tutorial.Goodbye s later (the click). No call
+	within CALL_WAIT s of a silent phone = the tutorial goes on with the panel only.
 
 	Guidance: TutorialPanel (Cream card, top centre: "3/7", instruction, hint, Skip), TutorialArrow (bouncing arrow
 	over the prompt anchor to use), a Highlight on the station or customer, TutorialPointer on the screen edge while
@@ -20,11 +29,11 @@
 	the first sale, the clock and day pills until the shift opens (phase Open). Everything shows when the tutorial
 	ends, is skipped, or when it is not a first run.
 
-	End: after the money step (MONEY_TIME s or "Got it"), on Skip (Q / D-pad down / the Skip tag on touch), or when
+	End: after the talk steps (Walt finished them or "Got it"), on Skip (Q / D-pad down / the Skip tag on touch), or when
 	the day shift is over without a sale (Closing, Summary, night). Each end fires `TutorialComplete` once; the server
 	(TutorialService) saves TutorialDone = true, so it never runs again for this player.
 
-	PROVISIONAL: texts, MONEY_TIME, skip keys (Q, DPadDown), "any served sale while the step is serve or a hot dog was
+	PROVISIONAL: texts, CALL_WAIT, NUDGE, TALK_TIME, TALK_MIN, skip keys (Q, DPadDown), "any served sale while the step is serve or a hot dog was
 	in hand in the last SALE_WINDOW s" as the first sale, ending on the day shift end.
 ]]
 local CollectionService = game:GetService("CollectionService")
@@ -43,6 +52,7 @@ local TutorialArrow = require(StarterPlayer.StarterPlayerScripts.client.Interfac
 local TutorialPanel = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.TutorialPanel)
 local TutorialPointer = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.TutorialPointer)
 local Rules = require(StarterPlayer.StarterPlayerScripts.client.Interaction.PromptController.Rules)
+local Call = require(script.Call)
 local Steps = require(script.Steps)
 
 const TAG = "Interactable"
@@ -56,7 +66,11 @@ const RUN_PHASES: { [string]: boolean } = { Prep = true, Open = true }
 const END_PHASES: { [string]: boolean } = { Closing = true, Summary = true }
 const SERVED: { [string]: boolean } = { Perfect = true, Complete = true, Incomplete = true, Wrong = true }
 const SALE_WINDOW = 3 -- s: a sale this soon after the hot dog left the own hand counts as the first sale
-const MONEY_TIME = 7 -- s of the money step
+const TUTORIAL_CALL = Content.BossCallRules.Tutorial.Call
+const CALL_WAIT = 12 -- s of a silent phone before the tutorial goes on without Walt (panel only)
+const NUDGE = 20 -- s on the same step before Walt says it again
+const TALK_MIN = 1.5 -- s a talk step stays at least while Walt is on the line
+const TALK_TIME = 7 -- s of a talk step without the call
 const STEP_SOUND = "prompt_done"
 const SKIP_BIND = "TutorialSkip"
 const SKIP_TEXT: { [string]: string } = {
@@ -100,6 +114,7 @@ const TutorialController = Modux.Controller("TutorialController", {
 		"InputController",
 		"AudioController",
 		"PlaceController",
+		"BossController",
 	},
 	Priority = 520,
 })
@@ -124,7 +139,22 @@ function TutorialController:Setup()
 	self.Folder = nil :: Folder?
 	-- os.clock() of the last tick with a hot dog in hand (0 = never)
 	self.LastHotDogAt = 0 :: number
-	self.MoneyThread = nil :: thread?
+	-- Walt on the line: the tutorial call was answered (from here he leads), the greeting went out, no call came
+	self.Answered = false :: boolean
+	self.Greeted = false :: boolean
+	self.Uncalled = false :: boolean
+	-- os.clock of the first tick with a silent phone (0 = not waiting)
+	self.WaitStarted = 0 :: number
+	-- os.clock the current step started (talk steps, reminder)
+	self.StepAt = 0 :: number
+	-- BossController strip held by this tutorial
+	self.Holding = false :: boolean
+	self.Prepared = false :: boolean
+	self.Call = Call.new(function(text: string?)
+		self.Dependencies.BossController:Say(text)
+	end, function(): number
+		return self:VoiceVolume()
+	end) :: Call.Call
 	self.Sent = false :: boolean
 	self.Unmounts = {} :: { () -> () }
 end
@@ -164,7 +194,8 @@ end
 
 function TutorialController:SkipText(): string
 	const device = self.Dependencies.InputController.Device()
-	const texts = if self.StepKey() == MONEY_STEP then DONE_TEXT else SKIP_TEXT
+	const step = self:Step()
+	const texts = if step and step.Talk then DONE_TEXT else SKIP_TEXT
 	return texts[device] or texts.KeyboardMouse
 end
 
@@ -284,10 +315,116 @@ function TutorialController:Anchor(action: string, enabled: boolean, filter: ((I
 	return best
 end
 
+-- Walt on the phone ----------------------------------------------------------------------------------------------
+
+function TutorialController:VoiceVolume(): number
+	const volumes = self.Dependencies.AudioController.Volumes
+	return (volumes.Master or 1) * (volumes.Voice or 1)
+end
+
+-- "ringing" / "talking" = the tutorial call; "busy" = another call on the phone; "idle" = silent phone
+function TutorialController:CallState(): string
+	const boss = self.Dependencies.BossController
+	const state = Vide.untrack(boss.State)
+	if state == "Idle" then
+		return "idle"
+	end
+	if Vide.untrack(boss.Call) ~= TUTORIAL_CALL then
+		return "busy"
+	end
+	return if state == "Talking" then "talking" else "ringing"
+end
+
+-- Walt is on the line for this player: the tutorial call was answered and is still talking
+function TutorialController:Voiced(): boolean
+	return self.Answered and self:CallState() == "talking"
+end
+
+-- Subtitle strip and line queue in step with the call (every tick, also after the tutorial ended: the goodbye)
+function TutorialController:UpdateCall()
+	const voiced = self:Voiced()
+	if voiced ~= self.Holding then
+		self.Holding = voiced
+		if not voiced then
+			self.Call.Cut() -- hides the strip while still held
+		end
+		self.Dependencies.BossController:Hold(voiced)
+	end
+	if voiced then
+		self.Call.Step()
+	end
+end
+
+-- Walt's lines for a step change: the greeting first, the praise of a step left forward, then the new step
+function TutorialController:SpeakStep(before: Steps.Step?, after: Steps.Step?)
+	if after == nil or not self:Voiced() then
+		return
+	end
+	const lines: { string } = {}
+	if not self.Greeted then
+		self.Greeted = true
+		for _, text in Steps.Greeting do
+			table.insert(lines, text)
+		end
+	elseif before and before.Done and (Steps.IndexOf[after.Key] or 0) > (Steps.IndexOf[before.Key] or 0) then
+		table.insert(lines, before.Done)
+	end
+	for _, text in after.Say or {} do
+		table.insert(lines, text)
+	end
+	if #lines > 0 then
+		self.Call.Replace(lines)
+	end
+end
+
+-- Before Walt is on the line: the phone step (or waiting for the call). nil = the call is on, or never came.
+function TutorialController:DecidePhone(): (string?, Instance?)
+	if self.Answered then
+		return nil, nil
+	end
+	const state = self:CallState()
+	if state == "talking" then
+		self.Answered = true
+		return nil, nil
+	end
+	-- without the call so far, only the tutorial call itself brings the phone step back
+	const ringing = Vide.untrack(self.Dependencies.BossController.State) == "Ringing"
+		and (not self.Uncalled or state == "ringing")
+	if ringing then
+		-- any ringing call is answered the same way (a late tutorial call takes the lead back from the panel)
+		self.WaitStarted = 0
+		self.Uncalled = false
+		return "phone", self:Anchor("answer_phone", true)
+	end
+	if self.Uncalled then
+		return nil, nil
+	end
+	if state == "busy" then
+		-- another call talking: the tutorial call is queued after it
+		self.WaitStarted = 0
+		return "wait_call", nil
+	end
+	-- silent phone: BossService queues the call within a tick; without a call the panel goes on alone
+	const now = os.clock()
+	if self.WaitStarted == 0 then
+		self.WaitStarted = now
+	end
+	if now - self.WaitStarted > CALL_WAIT then
+		self.Uncalled = true
+		return nil, nil
+	end
+	return "wait_call", nil
+end
+
 -- Decide ---------------------------------------------------------------------------------------------------------
 
 -- Current step and the anchor to point at, from the replicated state
 function TutorialController:Decide(): (string, Instance?, string)
+	const phoneKey, phoneTarget = self:DecidePhone()
+	if phoneKey then
+		return phoneKey, phoneTarget, ""
+	end
+
 	const round = self.Dependencies.RoundController
 	const phase = Vide.untrack(round.Phase)
 	const held = self:Held()
@@ -508,6 +645,10 @@ function TutorialController:SetStep(key: string, target: Instance?, item: string
 	if before and after and after.Number > before.Number then
 		self.Dependencies.AudioController:Play(STEP_SOUND)
 	end
+	if previous ~= key then
+		self.StepAt = os.clock()
+		self:SpeakStep(before, after)
+	end
 end
 
 -- The money pill of the HUD (spotlight target of the UI step)
@@ -523,7 +664,8 @@ function TutorialController:OnSale(result: string)
 		return
 	end
 	const step = Vide.untrack(self.StepKey)
-	if step == MONEY_STEP then
+	const current = Steps.ByKey[step]
+	if current and current.Talk then
 		return
 	end
 	if step ~= "serve" and os.clock() - self.LastHotDogAt > SALE_WINDOW then
@@ -538,23 +680,67 @@ function TutorialController:OnSale(result: string)
 	self:SetHighlight(nil)
 	-- the pill pops in this frame: spotlight it once it is laid out
 	task.defer(function()
-		self.Spot(cashPill() or false)
-	end)
-	self.MoneyThread = task.delay(MONEY_TIME, function()
-		self.MoneyThread = nil
-		self:Finish()
+		if Vide.untrack(self.StepKey) == MONEY_STEP then
+			self.Spot(cashPill() or false)
+		end
 	end)
 end
 
--- Ends the tutorial for good (finished, skipped, or the day ran out); the server saves the flag
-function TutorialController:Finish()
+-- Talk step: over once Walt said it (at least TALK_MIN s), or after TALK_TIME s without the call
+function TutorialController:TickTalk()
+	const elapsed = os.clock() - self.StepAt
+	const over = if self:Voiced() then elapsed >= TALK_MIN and not self.Call.Busy() else elapsed >= TALK_TIME
+	if over then
+		self:NextTalk()
+	end
+end
+
+-- Next talk step; after the last one the tutorial is done
+function TutorialController:NextTalk()
+	const current = Vide.untrack(self.StepKey)
+	local nextKey: string? = nil
+	for index, key in Steps.Talks do
+		if key == current then
+			nextKey = Steps.Talks[index + 1]
+			break
+		end
+	end
+	if nextKey == nil then
+		self:Finish("done")
+		return
+	end
+	self.Spot(false)
+	self:SetStep(nextKey, nil, "")
+end
+
+-- Skip key / tag: "Got it" on a talk step (next one), else skips the tutorial
+function TutorialController:Skip()
+	const step = Steps.ByKey[Vide.untrack(self.StepKey)]
+	if step and step.Talk then
+		if self:Voiced() then
+			self.Call.Cut()
+		end
+		self:NextTalk()
+		return
+	end
+	self:Finish("skip")
+end
+
+-- Ends the tutorial for good; the server saves the flag (and hangs up the call after Walt's goodbye).
+-- reason: "done" (last talk step), "skip" (the player skipped), "over" (the day shift ended first)
+function TutorialController:Finish(reason: string)
 	if Vide.untrack(self.Finished) then
 		return
 	end
-	const thread = self.MoneyThread
-	self.MoneyThread = nil
-	if thread and coroutine.running() ~= thread and coroutine.status(thread) == "suspended" then
-		task.cancel(thread)
+	if self:Voiced() then
+		if reason == "done" then
+			self.Call.Replace(Steps.Goodbye)
+		elseif reason == "skip" then
+			self.Call.Cut()
+			self.Call.Queue(Steps.SkipGoodbye)
+		else
+			self.Call.Cut()
+		end
 	end
 	Vide.batch(function()
 		self.Finished(true)
@@ -570,6 +756,7 @@ end
 
 function TutorialController:Tick()
 	self:Rescale()
+	self:UpdateCall()
 	const firstRun = Vide.untrack(function(): boolean
 		return self:FirstRun()
 	end)
@@ -583,7 +770,7 @@ function TutorialController:Tick()
 
 	-- the day shift is over without a sale: end it, show the whole HUD
 	if ready and Vide.untrack(self.Running) and (night or END_PHASES[phase]) then
-		self:Finish()
+		self:Finish("over")
 		return
 	end
 	if ready and phase ~= "Prep" and phase ~= "Intro" and not Vide.untrack(self.ClockRevealed) then
@@ -601,11 +788,24 @@ function TutorialController:Tick()
 	if not Vide.untrack(self.Running) then
 		self.Running(true)
 	end
-	if Vide.untrack(self.StepKey) == MONEY_STEP then
+	if not self.Prepared then
+		-- generate Walt's voice ahead, while the phone rings
+		self.Prepared = true
+		self.Call.Prepare(Steps.Lines)
+	end
+	const current = Steps.ByKey[Vide.untrack(self.StepKey)]
+	if current and current.Talk then
+		self:TickTalk()
 		return
 	end
 	const key, target, item = self:Decide()
 	self:SetStep(key, target, item)
+	-- reminder: the same step for NUDGE s and Walt quiet
+	const step = Steps.ByKey[key]
+	if step and step.Say and not self.Call.Busy() and os.clock() - self.StepAt > NUDGE and self:Voiced() then
+		self.StepAt = os.clock()
+		self.Call.Queue(step.Say)
+	end
 end
 
 -- Skip: Q / D-pad down while it runs; touch uses the Skip tag of the panel
@@ -626,7 +826,7 @@ function TutorialController:BindSkip(on: boolean)
 			Context = "Gameplay",
 		})
 		.OnPress(function()
-			self:Finish()
+			self:Skip()
 		end)
 end
 
@@ -677,7 +877,7 @@ function TutorialController:Mount(playerGui: Instance)
 					return self:SkipText()
 				end,
 				OnSkip = function()
-					self:Finish()
+					self:Skip()
 				end,
 				Scale = scale,
 				-- under the clock row, scaled like the HUD

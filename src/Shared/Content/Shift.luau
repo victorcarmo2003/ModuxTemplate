@@ -36,10 +36,11 @@ end
 const base = Table.new({
 	-- Resume wait after a reconnect (DEC-080); = RunParams.ResumeWait (architect). Clock held.
 	{ Key = "Resume", Duration = 15, ClockFrom = 0, ClockTo = 0, Kind = "Any", Selling = false, SkipWithoutProbe = false },
-	-- Intro cutscene, first shift of a new run only; cap 50 s (FEAT-004). Clock stopped at 7:00 AM.
+	-- Intro cutscene, first shift of a new run only; cap 70 s (FEAT-004; PROVISIONAL frontend-coder 2026-10-11: the
+	-- intro got dramatic pauses after the user's play feedback, was 50 s). Clock stopped at 7:00 AM.
 	{
 		Key = "Intro",
-		Duration = 50,
+		Duration = 70,
 		ClockFrom = hours(7),
 		ClockTo = hours(7),
 		Kind = "Day",

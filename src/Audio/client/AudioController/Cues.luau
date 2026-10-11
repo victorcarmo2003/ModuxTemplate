@@ -1,7 +1,9 @@
 --!strict
 -- Default music cue for the shift state (architecture.md §19.21; content-data.md §3.21). Pure: no instance, no Vide.
 -- The cue with the highest Priority whose When holds wins; a nil field in When means "any". Before the first Shift
--- record (Ready = false) only the cues with an empty When qualify (lobby). Ties keep the first in list order.
+-- record (Ready = false) only the cues with an empty When qualify (lobby); once a shift runs (Ready) an empty When
+-- never qualifies (bug 2026-10-11: the lobby cue matched every phase, so it played through the intro cutscene and
+-- under the shift track, two musics at once). Ties keep the first in list order.
 -- Also the pure picks of the shift track (once per shift, user decision 2026-10-10) and of the street ambience.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
@@ -17,8 +19,8 @@ const Cues = {}
 
 function Cues.Matches(when: { IsNight: boolean?, Phase: { string }?, Window: string? }, state: State): boolean
 	const empty = when.IsNight == nil and when.Phase == nil and when.Window == nil
-	if not state.Ready then
-		return empty
+	if not state.Ready or empty then
+		return empty and not state.Ready
 	end
 	if when.IsNight ~= nil and when.IsNight ~= state.IsNight then
 		return false

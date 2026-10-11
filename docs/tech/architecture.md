@@ -1621,7 +1621,7 @@ próxima fase e próximo turno; testável em lune).
 
 | Fase | Turno | Relógio | Duração (s) | Termina | Próxima |
 |---|---|---|---|---|---|
-| `Intro` | 1º turno de run nova | 7:00 AM parado | cap 50 | probe `Intro` (Cutscene) ou cap | `Prep` |
+| `Intro` | 1º turno de run nova | 7:00 AM parado | cap 70 (Provisório 2026-10-11, era 50) | probe `Intro` (Cutscene) ou cap | `Prep` |
 | `Call` | noite | 7:00 PM parado (FEAT-018: relógio não corre na ligação) | cap 60 | probe `Call` (Boss: fila vazia) ou cap | `Prep` |
 | `Prep` | dia / noite | 7→8 AM / 7→8 PM | 60 / 90 | "Open Shop" ou cap | `Open` / `Night` |
 | `Open` | dia | 8 AM→6 PM | 360 | cap | `Closing` |

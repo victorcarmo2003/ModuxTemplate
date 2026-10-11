@@ -45,6 +45,8 @@ export type Context = {
 	-- where slot 1 stands to make the call (in front of the real phone/poster)
 	Caller: () -> Vector3?,
 	Warn: (key: string, message: string) -> (),
+	-- pass time of a car synced to the walker (Rules.Cars[].Cross), s after its beat; nil = its fixed Pass
+	PassAt: (target: string) -> (() -> number?)?,
 	-- AnimController
 	Bind: (model: Model, set: string) -> (),
 	Action: (model: Model, key: string) -> (),
@@ -53,7 +55,7 @@ export type Context = {
 
 const SPAWN_LIFT = Vector3.new(0, 3, 0) -- architecture.md §18.5
 const FLYER_HEIGHT = 4.5 -- studs above the post base (eye height, style guide)
-const FLIP_TIME = 15.8 -- s on screen: shot 7 (27.1 s) to the car before the turn to the cart (43 s)
+const FLIP_TIME = 17 -- s on screen: shot 7 (46.5 s) to the end of Walt's last line (~63.4 s)
 const FLIP_OFFSET = CFrame.new(0.55, -0.8, -1.7) * CFrame.Angles(math.rad(20), math.rad(-15), 0)
 const WALT_SPEED = 3 -- studs/s, hunched with a cane
 const COFFEE_FLY = 1.2
@@ -513,6 +515,7 @@ function Actors.Create(target: string, ctx: Context): Actor?
 			end,
 			Loop = ctx.Loop,
 			Folder = ctx.Folder,
+			PassAt = ctx.PassAt(target),
 		})
 		if actor == nil then
 			ctx.Warn(`car:{target}`, `car "{target}" not shown: {problem}`)

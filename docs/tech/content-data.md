@@ -1030,7 +1030,7 @@ janela fechada e dentro do trailer, `architecture.md` §19.14); N10 `PostsOff = 
 | Tabela | Campos | Valores iniciais |
 |---|---|---|
 | Hallucinations | `Key`, `MaxSanity` (60 / 40 / 20), `Effect` (nome do módulo em `Effects/`), `Cooldown`, `Weight` | FEAT-019: `fake_call` (< 60), `grill_hiss` (< 60), `roof_steps` (< 40), `ghost_customer` (< 40), `post_flicker` (< 40, sem zumbido, DEC-123), `whisper` (< 20), `mart_sign_blink` (< 20), `window_shadow` (< 20) |
-| Cutscenes | como §3.19 + `Participants = "ConnectedAtStart"` | `intro` 45 s (cap 50), `finale` ≤ 60, `credits` ≤ 75 (FEAT-004, FEAT-027) |
+| Cutscenes | como §3.19 + `Participants = "ConnectedAtStart"` | `intro` 67,2 s (cap 70, Provisório 2026-10-11; era 45 s, cap 50), `finale` ≤ 60, `credits` ≤ 75 (FEAT-004, FEAT-027) |
 | WalkPaths | `Key`, `Nodes = { NodeId }`, `Loop`, `Shift = "Day" \| "Night" \| "Any"`, `Weight` | caminhos de calçada do MAP-01 (level-designer); faixa = par de nós com `Crosswalk` |
 
 ### 6.12 Onda 4

@@ -5,8 +5,8 @@
 	driven along a TrafficPath of the binding (`PathId` = the route): on its lane, never across a sidewalk or the Pad.
 	It slows inside the conflict box (X-T) like the traffic (SpeedCrossing) and never brakes for anyone (DEC-133).
 
-	Timing: the car is nearest to `Near` (Anchors.Point) at `Pass` s after its beat; the horn sounds HORN_LEAD s
-	before. Shown only within REACH studs of that point; engine loop while shown. A pure function of its time, like
+	Timing: the car is nearest to `Near` (Anchors.Point) at `Pass` s after its beat (or at hooks.PassAt(), read every
+	frame, for a car synced to the walker: Rules.Cars[].Cross); the horn sounds HORN_LEAD s before. Shown only within REACH studs of that point; engine loop while shown. A pure function of its time, like
 	every actor (late join lands on the same frame).
 	No TrafficPath in the map -> no car (warned by the caller), never a car off the road.
 ]]
@@ -29,6 +29,9 @@ export type Hooks = {
 	Play: (sound: string, at: Instance) -> (),
 	Loop: (sound: string, at: Instance, on: boolean) -> (),
 	Folder: Instance,
+	-- s after the beat when the car is nearest to Near, read every frame (a car synced to the walker, row.Cross);
+	-- nil = row.Pass
+	PassAt: (() -> number?)?,
 }
 
 const TRAFFIC = Content.Traffic
@@ -260,6 +263,8 @@ function Cars.Create(name: string, row: Row, hooks: Hooks): (Car?, string?)
 	local shown = false
 	local lastS: number? = nil
 	local spin = 0
+	local honked = false
+	const passHook = hooks.PassAt
 
 	local function hide()
 		if shown then
@@ -272,7 +277,8 @@ function Cars.Create(name: string, row: Row, hooks: Hooks): (Car?, string?)
 	return {
 		Model = model,
 		Update = function(t: number, last: number)
-			const s = distanceAt(times, passTime + (t - row.Pass), path.Length)
+			const pass = (if passHook ~= nil then passHook() else nil) or row.Pass
+			const s = distanceAt(times, passTime + (t - pass), path.Length)
 			if s < math.max(passAt - REACH, 0) or s > math.min(passAt + REACH, path.Length) then
 				hide()
 				lastS = nil
@@ -299,8 +305,10 @@ function Cars.Create(name: string, row: Row, hooks: Hooks): (Car?, string?)
 				cframes[wheel.Index] = frame * centre * roll * centre:Inverse() * offsets[wheel.Index]
 			end
 			Workspace:BulkMoveTo(parts, cframes, Enum.BulkMoveMode.FireCFrameChanged)
-			const honk = row.Pass - HORN_LEAD
-			if last < honk and honk <= t then
+			-- once, only when crossed live (the pass time of a synced car may move a little)
+			const honk = pass - HORN_LEAD
+			if not honked and last < honk and honk <= t then
+				honked = true
 				hooks.Play(row.Horn, model)
 			end
 		end,

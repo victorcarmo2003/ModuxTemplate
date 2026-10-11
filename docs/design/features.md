@@ -278,7 +278,7 @@ O que é e o que não é cutscene (proposta):
 
 | Parâmetro | Valor |
 |---|---|
-| Intro: duração alvo | 35–45 s (`script.md` §1); teto de segurança 50 s |
+| Intro: duração alvo | ~65 s com pausas dramáticas (placa NO HELP WANTED, susto do carro no meio da CW-2, panfleto visto de longe, ligação, olhar para o carrinho); teto de segurança 70 s — **Provisório** (frontend-coder, 2026-10-11, feedback do usuário após jogar; era 35–45 s, teto 50) |
 | Quando | intro uma vez por run, logo após o teleporte; final uma vez por run |
 | Sincronia | o **servidor** inicia e encerra; todos os clients tocam a mesma cutscene no mesmo instante (tolerância ≤ 0,5 s) |
 | Voto | durante a cutscene, hold 1 s no botão de interagir = "Skip"; o voto é individual, não se desfaz e vale só para o segmento atual |
@@ -296,7 +296,7 @@ O que é e o que não é cutscene (proposta):
   - Solo: hold 1 s pula a cutscene na hora.
   - Party de 4: 1 voto não pula; 2 votos pulam para todos ao mesmo tempo.
   - Party de 3 com 1 desconectado durante a cutscene: o limiar cai de 2 para 1 sem reiniciar a cutscene.
-  - Day(1) começa no máximo 50 s após o fim do teleporte.
+  - Day(1) começa no máximo 70 s após o fim do teleporte (Provisório, era 50 s).
   - A intro não mostra nenhum elemento sobrenatural.
   - Nenhuma transição, sequência de ambulância nem ligação oferece "Skip".
   - Party de 4: cada jogador vê os outros 3 avatares na cena e não vê o próprio corpo; a câmera é a do próprio avatar.
