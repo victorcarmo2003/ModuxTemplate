@@ -392,7 +392,7 @@ return {
 
 	-- Interior (Mart floor top 0.4)
 	{ asset = "AST-049_GearWall", x = -99, y = 0.4, z = 48, rotY = 270, group = "MartInterior", id = "GEAR_WALL", replaces = { "Mart/Interior/GEAR_WALL/Bench", "Mart/Interior/GEAR_WALL/BenchTopTrim", "Mart/Interior/GEAR_WALL/Panel", "Mart/Interior/GEAR_WALL/Title", "Mart/Interior/GEAR_WALL/S1_Vitrine" }, note = "Slot_B1 lands on Z 40.5, S1 on 46.5, B5 on 55.5 (= MAP-01 7.4); Title SurfaceGui still renders when hidden" },
-	{ asset = "AST-031_MartCheckout", x = -77.1, y = 0.4, z = 35.5, rotY = 0, group = "MartInterior", id = "OP-1", replaces = { "Mart/Interior/CheckoutCounter" }, note = "6 wide (blockout 10); detail side (-Z) towards Opal, confirm" },
+	{ asset = "AST-031_MartCheckout", x = -77.1, y = 0.4, z = 35.5, rotY = 0, parts = { ["AST-031_MartCheckout"] = { 0, 1.75, 0.7, size = { 6, 3.5, 3.9 } } }, group = "MartInterior", id = "OP-1", replaces = { "Mart/Interior/CheckoutCounter" }, note = "6 wide (blockout 10); detail side (-Z) towards Opal, confirm" },
 	{ asset = "AST-029_GondolaBoxes", x = -83.813, y = 0.4, z = 33.086, rotY = 0, group = "MartInterior", id = "MKT", replaces = { "Mart/Interior/GondolaN_Shelf" }, note = "user 2026-10-11: edited in Studio (captured)" },
 	{ asset = "AST-029_GondolaBags", x = -88.3, y = 0.4, z = 33.081, rotY = 0, group = "MartInterior", id = "MKT", replaces = { "Mart/Interior/GondolaN_Shelf" }, note = "user 2026-10-11: edited in Studio (captured)" },
 	{ asset = "AST-029_GondolaEnd", x = -92.8, y = 0.4, z = 33.15, rotY = 0, group = "MartInterior", id = "MKT", replaces = { "Mart/Interior/GondolaN_Shelf" }, note = "user 2026-10-11: edited in Studio (captured)" },
@@ -420,7 +420,7 @@ return {
 	---------------------------------------------------------------------------------------------
 	-- 6. STREET FURNITURE (proposed spots, Provisório; nothing > 3 tall in the Z 30..47 band)
 	---------------------------------------------------------------------------------------------
-	{ asset = "AST-034_ParkBench", x = 58, y = 0.45, z = 58, rotY = 0, group = "StreetFurniture", id = "L3", replaces = { "Pad/PadBench_L3" }, note = "faces north (drawer)" },
+	{ asset = "AST-034_ParkBench", x = 59.5, y = 0.45, z = 62.12, rotY = 0, group = "StreetFurniture", id = "L3", replaces = { "Pad/PadBench_L3" }, note = "faces north (drawer)" },
 	{ asset = "AST-034_ParkBench", x = -39, y = 0.4, z = 54.5, rotY = 0, group = "StreetFurniture", id = "Z-12", replaces = {} },
 	{ asset = "AST-034_Planter", x = -54, y = 0.4, z = 54.5, rotY = 0, group = "StreetFurniture", id = "Z-12", replaces = {} },
 	{ asset = "AST-034_Planter", x = -28, y = 0.4, z = 54.5, rotY = 0, group = "StreetFurniture", id = "Z-12", replaces = {} },
@@ -983,4 +983,6 @@ return {
 	{ asset = "AST-028_MartAwning", x = -59.916, y = 6.065, z = 56.042, rotY = -90, parts = { ["AST-028_MartAwning"] = { 0, 1.913, -0.585, rotX = -17 } }, group = "Mart", id = "MKT", replaces = {  }, note = "user 2026-10-11: added in Studio (captured)" },
 	{ asset = "AST-028_MartAwning", x = -59.916, y = 6.065, z = 48.042, rotY = -90, parts = { ["AST-028_MartAwning"] = { 0, 1.913, -0.585, rotX = -17 } }, group = "Mart", id = "MKT", replaces = {  }, note = "user 2026-10-11: added in Studio (captured)" },
 	{ asset = "AST-028_MartAwning", x = -59.916, y = 6.065, z = 40.042, rotY = -90, parts = { ["AST-028_MartAwning"] = { 0, 1.913, -0.585, rotX = -17 } }, group = "Mart", id = "MKT", replaces = {  }, note = "user 2026-10-11: added in Studio (captured)" },
+	-- captured from Studio 2026-10-11 (user additions)
+	{ asset = "AST-034_ParkBench", x = 44, y = 0.45, z = 62.12, rotY = 0, group = "StreetFurniture", id = "L3", replaces = {  }, note = "user 2026-10-11: added in Studio (captured)" },
 }

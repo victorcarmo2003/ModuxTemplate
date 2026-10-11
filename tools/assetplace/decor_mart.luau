@@ -1,6 +1,9 @@
 --[[
 	Mart dressing pass (user 2026-10-11: "the Mart looks dead / disguised in the map").
-	Idempotent: rebuilds workspace.MAP01_Assets.MartDecor and re-applies the surface details. Run after
+	FROZEN 2026-10-11: the user edited MartDecor / PadDecor by hand in Studio (deleted the carts, baskets, bottle
+	return, tables, bushes, barrel; moved and duplicated pieces). The place holds the result now. Decor.run / runPad
+	refuse to touch an existing folder unless called with force = true (that would bring back what the user deleted).
+	Originally: rebuilds workspace.MAP01_Assets.MartDecor and re-applies the surface details. Run after
 	place_assets / bind_map01 (it only adds, never moves an entry of the placements):
 		local Decor = require(<this module>)
 		Decor.run()
@@ -362,10 +365,13 @@ local function marqueeFascia(root: Instance): number
 	return 2
 end
 
-function Decor.run(): string
+function Decor.run(force: boolean?): string
 	local root = workspace:FindFirstChild(ROOT)
 	if not root then
 		return "[err] no workspace." .. ROOT
+	end
+	if root:FindFirstChild(FOLDER) and not force then
+		return "[skip] MartDecor exists and was edited by hand: Decor.run(true) to rebuild it anyway"
 	end
 	local old = root:FindFirstChild(FOLDER)
 	if old then
@@ -453,10 +459,13 @@ end
 --[[ Decor.runPad(): the empty strip behind the cart / trailer pad (user 2026-10-11: the area behind the stand looks
 	empty). Pad X -64..-24, Z 3.9 (back wall of B1) .. 35.9, WORLD coordinates. Kept clear on purpose: the thief lane
 	N-Z01-04 -> L3 (Z 9..14), the player stations PS-1..4 / PS-N (Z 24..28) and the queue. Rebuilds MAP01_Assets.PadDecor. ]]
-function Decor.runPad(): string
+function Decor.runPad(force: boolean?): string
 	local root = workspace:FindFirstChild(ROOT)
 	if not root then
 		return "[err] no workspace." .. ROOT
+	end
+	if root:FindFirstChild("PadDecor") and not force then
+		return "[skip] PadDecor exists and was edited by hand: Decor.runPad(true) to rebuild it anyway"
 	end
 	local old = root:FindFirstChild("PadDecor")
 	if old then
