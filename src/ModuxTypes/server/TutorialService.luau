@@ -13,6 +13,10 @@ export type Public = {
 	Seed: (self: Public) -> (),
 	OnDiscarded: (self: Public, item: string) -> (),
 	Begin: (self: Public, player: Player) -> (),
+	DevCheck: (self: Public, name: string) -> (),
+	DevSend: (self: Public, player: Player, command: string, text: string?) -> (),
+	DevReset: (self: Public, player: Player) -> (),
+	DevStatus: (self: Public) -> string,
 	Step: (self: Public) -> (),
 }
 

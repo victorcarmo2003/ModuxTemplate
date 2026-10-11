@@ -60,6 +60,23 @@
 	the Highlight / 3D arrow / billboard arrow / edge pointer pulse harder. Again every IDLE s; over when the step changes.
 	Steps without Remind (waiting rows) keep the plain NUDGE repeat of their Say lines.
 
+	One ring (user request 2026-10-11, Provisional): the phone rings once at the start; answered once (Answered stays
+	true for the session), Walt stays on the line through the whole tutorial, Mart trip included (BossService holds the
+	call with no proximity rule and, if it was cut anyway, resumes it Talking without a second ring). No "phone" step
+	after the first one.
+
+	Voices ahead (user request 2026-10-11): LoadingController calls PreloadVoices under the loading screen of a rookie
+	(TutorialDone = false), so Walt's lines are "Loaded" when the call starts (Steps.Lines is in the order the call
+	needs them).
+
+	Dev tools (Studio Run place only, user request 2026-10-11): the dev-only `DevClient` packet (from the DevService chat
+	commands, DevService/Commands/Tutorial.luau) runs here: tutorial_reset (restart the session state after the server
+	put TutorialDone back to false), tutorial_step <key> (jump to a step until the live flow passes it; "auto" = back
+	to the live flow), tutorial_status (prints the debug readout), voice <text> / voice_tutorial / voice_stop (Walt's
+	voice through the call's Speech, status per line: Queued/Loading/Loaded/Failed, reason, Master x Voice, fader),
+	tutdebug (the TutorialDebug panel; F8 too). With dev mode on, a profile that already has TutorialDone = true says
+	so once in the Output (the tutorial never runs for it: /dev tutorial reset).
+
 	PROVISIONAL: texts, IDLE, PROGRESS, ARROW_FAR, CALL_WAIT, NUDGE, TALK_TIME, TALK_MIN, REASK, CHECK_TIME, skip keys (Q, DPadDown), "a served
 	sale of the tutorial customer" as the first sale, ending on the day shift end.
 ]]
@@ -77,6 +94,7 @@ local Spotlight = require(StarterPlayer.StarterPlayerScripts.client.Interface.Co
 local TutorialPanel = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.TutorialPanel)
 local TutorialArrow = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.TutorialArrow)
 local TutorialPointer = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.TutorialPointer)
+local TutorialDebug = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.TutorialDebug)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
 local Rules = require(StarterPlayer.StarterPlayerScripts.client.Interaction.PromptController.Rules)
 local TutorialRules = require(ReplicatedStorage.shared.Tutorial.Rules)
@@ -143,7 +161,13 @@ const DOOR_SEARCH = 16 -- an AutoDoor this close to MKT-DOOR is the one marked
 const NEAR_DOOR = 8 -- the player reached the Mart: from here the shelf is marked
 const NEAR_SHELF = 18
 const NEAR_CRATE = 12 -- back at the cart: "Restock the buns"
-
+-- Voices ahead / dev tools
+const PROFILE_WAIT = 3 -- s PreloadVoices waits for the Profile packet before it gives up (Tick prepares later)
+const DEBUG_BIND = "TutorialDebug"
+const DEBUG_RATE = 0.25 -- s between two refreshes of the debug panel text
+const VOICE_WAIT = 20 -- s the voice test waits for one line to load
+const VOICE_TAIL = 0.4 -- s after a line of the voice test before the next one
+const DEV_PREFIX = "[TutorialDev]"
 -- Stations set record fields read here (network.md §3.5)
 type SlotRecord = { Kind: string, State: string, Count: number }
 -- Customers set record fields read here (network.md §3.6)
@@ -224,7 +248,17 @@ function TutorialController:Setup()
 	-- shopping steps after the first sale (the buns ran out); InMart = the player reached the Mart once
 	self.Shopping = false :: boolean
 	self.InMart = false :: boolean
+	-- bun stock when the shopping steps began (they end once it goes above: whoever restocked)
+	self.ShopFrom = 0 :: number
 	self.Unmounts = {} :: { () -> () }
+	-- Dev tools: step forced by /dev tutorial step (nil = the live flow), debug panel, voice test run, one-time note
+	self.Forced = nil :: string?
+	self.Debug = Vide.source(false) :: Vide.Source<boolean>
+	self.DebugText = Vide.source("") :: Vide.Source<string>
+	self.DebugAt = 0 :: number
+	self.VoiceRun = 0 :: number
+	self.DevNoted = false :: boolean
+	self.Mounted = false :: boolean
 end
 
 -- Reactive -------------------------------------------------------------------------------------------------------
@@ -598,8 +632,19 @@ end
 
 -- Decide ---------------------------------------------------------------------------------------------------------
 
--- Current step and the anchor to point at, from the replicated state
+-- Current step and the anchor to point at: the live flow, or the step forced by /dev tutorial step until the live
+-- flow passes it
 function TutorialController:Decide(): (string, Instance?, string)
+	const key, target, item = self:DecideLive()
+	const forced, forcedTarget, forcedItem = self:DecideForced(key)
+	if forced ~= nil then
+		return forced, forcedTarget, forcedItem
+	end
+	return key, target, item
+end
+
+-- Current step and the anchor to point at, from the replicated state
+function TutorialController:DecideLive(): (string, Instance?, string)
 	const phoneKey, phoneTarget = self:DecidePhone()
 	if phoneKey then
 		return phoneKey, phoneTarget, ""
@@ -990,6 +1035,7 @@ function TutorialController:OnSale(npc: number, result: string)
 	if current and current.Talk then
 		return
 	end
+	self.Forced = nil
 	Vide.batch(function()
 		self.CashRevealed(true)
 		self.ClockRevealed(true)
@@ -1022,6 +1068,7 @@ function TutorialController:NextTalk()
 		self.Spot(false)
 		if self:StockAmount(BUN) == 0 then
 			self.Shopping = true
+			self.ShopFrom = 0
 			const key, target, item = self:DecideShop()
 			self:SetStep(key, target, item)
 		else
@@ -1063,6 +1110,7 @@ function TutorialController:Finish(reason: string)
 	if Vide.untrack(self.Finished) then
 		return
 	end
+	self.Forced = nil
 	if self:Voiced() then
 		if reason == "done" then
 			-- the praise of the last step first ("Stocked up!"), then the goodbye
@@ -1100,10 +1148,12 @@ function TutorialController:Tick()
 	if Vide.untrack(self.Checked) and os.clock() >= self.CheckUntil then
 		self.Checked(false)
 	end
+	self:RefreshDebug()
 	const firstRun = Vide.untrack(function(): boolean
 		return self:FirstRun()
 	end)
 	if not firstRun then
+		self:NoteDone()
 		return
 	end
 	const round = self.Dependencies.RoundController
@@ -1136,13 +1186,14 @@ function TutorialController:Tick()
 		self.Prepared = true
 		self.Call.Prepare(Steps.Lines)
 	end
+	self:ApplyForced()
 	const current = Steps.ByKey[Vide.untrack(self.StepKey)]
 	if current and current.Talk then
 		self:TickTalk()
 		return
 	end
 	-- shopping over: the buns are back in the crate (whoever restocked)
-	if self.Shopping and (self:StockAmount(BUN) or 0) > 0 then
+	if self.Shopping and (self:StockAmount(BUN) or 0) > self.ShopFrom then
 		self:Finish("done")
 		return
 	end
@@ -1153,6 +1204,360 @@ function TutorialController:Tick()
 	if step then
 		self:TickIdle(step, target)
 	end
+end
+
+-- Voices ahead ---------------------------------------------------------------------------------------------------
+
+-- LoadingController, under the loading screen: Walt's tutorial lines loaded ahead for a rookie (yields until settled
+-- or `timeout` s; the rest keeps loading in the background). Waits up to PROFILE_WAIT s (inside `timeout`) for the
+-- Profile packet; a veteran, another place or a late profile get progress 1 at once (Tick prepares them later).
+-- true = the lines were queued.
+function TutorialController:PreloadVoices(timeout: number, progress: ((number) -> ())?): boolean
+	const started = os.clock()
+	const profile = self.Dependencies.ProfileController
+	while not Vide.untrack(profile.Ready) and os.clock() - started < math.min(PROFILE_WAIT, timeout) do
+		task.wait(0.1)
+	end
+	const rookie = self.Dependencies.PlaceController:Is("Run")
+		and Vide.untrack(profile.Ready)
+		and not Vide.untrack(profile.TutorialDone)
+	if not rookie then
+		if progress ~= nil then
+			progress(1)
+		end
+		return false
+	end
+	self.Prepared = true
+	self.Call.Preload(Steps.Lines, math.max(timeout - (os.clock() - started), 1), progress)
+	return true
+end
+
+-- Dev tools ------------------------------------------------------------------------------------------------------
+
+function TutorialController:IsDev(): boolean
+	return self.Dependencies.PlaceController:IsDev()
+end
+
+-- Dev mode: a profile that already finished the tutorial says so once (the tutorial never runs for it)
+function TutorialController:NoteDone()
+	if self.DevNoted or not self:IsDev() then
+		return
+	end
+	const profile = self.Dependencies.ProfileController
+	if not Vide.untrack(profile.Ready) or not Vide.untrack(profile.TutorialDone) or Vide.untrack(self.Finished) then
+		return
+	end
+	self.DevNoted = true
+	print(
+		`{DEV_PREFIX} tutorial off: this profile has TutorialDone = true (saved by an earlier test: finished, skipped with Q or the day ended). "/dev tutorial reset" runs it again.`
+	)
+end
+
+-- The step forced by /dev tutorial step and its target, while the live flow (`live`) has not passed it
+function TutorialController:DecideForced(live: string): (string?, Instance?, string)
+	const key = self.Forced
+	if key == nil then
+		return nil, nil, ""
+	end
+	const step = Steps.ByKey[key]
+	const passed = (Steps.IndexOf[live] or 0) > (Steps.IndexOf[key] or 0)
+	const opened = key == "open" and Vide.untrack(self.Dependencies.RoundController.Phase) ~= "Prep"
+	if step == nil or passed or opened then
+		self.Forced = nil
+		print(`{DEV_PREFIX} forced step {key} done: back to the live flow ({live})`)
+		return nil, nil, ""
+	end
+	const guestId, _, rig = self:Guest()
+	local function onGuest(anchor: Instance): boolean
+		return guestId ~= nil and npcIdOf(anchor) == guestId
+	end
+	if key == "wait_customer" then
+		return key, rig, ""
+	elseif key == "order" or key == "serve" then
+		return key, self:Anchor(step.Action or "", false, onGuest) or rig, ""
+	elseif key == "toppings" then
+		const topping = TutorialRules.Order[1]
+		const row = Content.Ingredients.ByKey[topping]
+		return key,
+			self:Anchor("topping_add", false, function(anchor)
+				return anchor:GetAttribute("Ingredient") == topping
+			end),
+			if row then row.Name else topping
+	end
+	const action = step.Action
+	return key, if action then self:Anchor(action, false) else nil, ""
+end
+
+-- Steps that are not decided from the world (talk, shopping, phone) take effect at once; the others stay forced
+-- (DecideForced) until the live flow passes them
+function TutorialController:ApplyForced()
+	const key = self.Forced
+	if key == nil then
+		return
+	end
+	const step = Steps.ByKey[key]
+	if step == nil then
+		self.Forced = nil
+		return
+	end
+	if table.find(Steps.Shopping, key) ~= nil then
+		self.Forced = nil
+		self.Shopping = true
+		self.InMart = key ~= "mart_go"
+		self.ShopFrom = self:StockAmount(BUN) or 0
+		Vide.batch(function()
+			self.CashRevealed(true)
+			self.ClockRevealed(true)
+		end)
+		const shopKey, target, item = self:DecideShop()
+		self:SetStep(shopKey, target, item)
+		return
+	end
+	self.Shopping = false
+	if step.Talk then
+		self.Forced = nil
+		if key == MONEY_STEP then
+			Vide.batch(function()
+				self.CashRevealed(true)
+				self.ClockRevealed(true)
+			end)
+		end
+		self:SetStep(key, nil, "")
+		return
+	end
+	if key == "phone" or key == "wait_call" then
+		self.Forced = nil
+		self.Answered = false
+		self.Uncalled = false
+		self.WaitStarted = 0
+	end
+end
+
+-- Effective voice volume and the state of the call's text-to-speech, one line
+function TutorialController:VolumeText(): string
+	const volumes = self.Dependencies.AudioController.Volumes
+	const master = volumes.Master or 1
+	const voice = volumes.Voice or 1
+	const stats = self.Call.Voice().Stats()
+	const fader = if stats.Fader ~= nil then string.format("%.2f", stats.Fader) else "none yet"
+	const tts = if stats.Enabled
+		then "on"
+		else `OFF ({if stats.OffReason ~= "" then stats.OffReason else "destroyed"})`
+	return string.format("master %.2f x voice %.2f = %.2f, fader %s, tts %s", master, voice, master * voice, fader, tts)
+end
+
+local function nameOf(instance: Instance?): string
+	if instance == nil then
+		return "none"
+	end
+	if instance.Parent == nil then
+		return `{instance.Name} (gone)`
+	end
+	const full = instance:GetFullName()
+	return if #full > 60 then "..." .. string.sub(full, -57) else full
+end
+
+local function flag(value: boolean): string
+	return if value then "yes" else "no"
+end
+
+-- Debug readout (panel and /dev tutorial)
+function TutorialController:DebugLines(): string
+	const profile = self.Dependencies.ProfileController
+	const round = self.Dependencies.RoundController
+	const boss = self.Dependencies.BossController
+	const key = Vide.untrack(self.StepKey)
+	const step = Steps.ByKey[key]
+	const target = Vide.untrack(self.Target)
+	const stats = self.Call.Voice().Stats()
+	const guestId, guest = self:Guest()
+	const firstRun = Vide.untrack(function(): boolean
+		return self:FirstRun()
+	end)
+	const gui = Players.LocalPlayer:FindFirstChild("PlayerGui")
+	const panel = if gui then gui:FindFirstChild("Tutorial") else nil
+	const guestText = if guestId ~= nil then `{guestId} {if guest then guest.State else "?"}` else "none"
+	return table.concat({
+		`profile    ready {flag(Vide.untrack(profile.Ready))}  TutorialDone {flag(Vide.untrack(profile.TutorialDone))}  finished {flag(Vide.untrack(self.Finished))}`,
+		`first run  {flag(firstRun)}  running {flag(Vide.untrack(self.Running))}  cinematic {flag(Vide.untrack(Cinematic.Active))}`,
+		`round      {Vide.untrack(round.Phase)}  ready {flag(Vide.untrack(round.Ready))}  night {flag(Vide.untrack(round.IsNight))}`,
+		`step       {if key ~= "" then key else "-"} ({if step then step.Number else 0}/{Steps.Total})  forced {self.Forced or "-"}  shop {flag(self.Shopping)}`,
+		`call       {self:CallState()}  boss {Vide.untrack(boss.State)} {Vide.untrack(boss.Call)}`,
+		`answered   {flag(self.Answered)}  voiced {flag(self:Voiced())}  greeted {flag(self.Greeted)}  uncalled {flag(self.Uncalled)}  held {flag(self.Holding)}`,
+		`target     {nameOf(if target then target else nil)}`,
+		`beacon     mounted {flag(self.Beacon.Mounted())}  marked {nameOf(self.Beacon.Marked())}`,
+		`arrow      far {flag(Vide.untrack(self.ArrowFar))}  pointer {flag(Vide.untrack(self.PointerShown))}  panel {flag(self.Mounted and panel ~= nil)}`,
+		`guest      {guestText}`,
+		`voice      queued {stats.Queued}  loading {stats.Loading}  loaded {stats.Loaded}  failed {stats.Failed}  waiting {stats.Waiting}`,
+		`lines      to say {self.Call.Pending()}  busy {flag(self.Call.Busy())}`,
+		`volume     {self:VolumeText()}`,
+	}, "\n")
+end
+
+function TutorialController:RefreshDebug()
+	if not Vide.untrack(self.Debug) then
+		return
+	end
+	const now = os.clock()
+	if now - self.DebugAt < DEBUG_RATE then
+		return
+	end
+	self.DebugAt = now
+	const text = self:DebugLines()
+	if text ~= Vide.untrack(self.DebugText) then
+		self.DebugText(text)
+	end
+end
+
+function TutorialController:ToggleDebug()
+	self.Debug(not Vide.untrack(self.Debug))
+	self.DebugAt = 0
+	self:RefreshDebug()
+	print(`{DEV_PREFIX} debug panel {if Vide.untrack(self.Debug) then "on" else "off"}`)
+end
+
+-- /dev tutorial reset (after the server put TutorialDone back to false): the session state starts over
+function TutorialController:DevReset()
+	self.VoiceRun += 1
+	self.Call.Cut()
+	if self.Holding then
+		self.Holding = false
+		self.Dependencies.BossController:Hold(false)
+	end
+	Vide.batch(function()
+		self.Finished(false)
+		self.Running(false)
+		self.StepKey("")
+		self.Item("")
+		self.CashRevealed(false)
+		self.ClockRevealed(false)
+		self.Spot(false)
+	end)
+	self:ClearGuidance()
+	self.Answered = false
+	self.Greeted = false
+	self.Uncalled = false
+	self.WaitStarted = 0
+	self.AskedAt = 0
+	self.GuestId = 0
+	self.StepAt = 0
+	self.Sent = false
+	self.Shopping = false
+	self.InMart = false
+	self.ShopFrom = 0
+	self.Forced = nil
+	self.DevNoted = false
+	print(`{DEV_PREFIX} tutorial reset: it starts on the next day Prep/Open tick (phone first)`)
+end
+
+-- /dev voice: says each text with Walt's voice (the call's Speech), printing the load status of every line
+function TutorialController:VoiceTest(texts: { string })
+	self.VoiceRun += 1
+	const run = self.VoiceRun
+	task.spawn(function()
+		const speech = self.Call.Voice()
+		const lines: { Content.CutsceneBeat } = {}
+		for _, text in texts do
+			table.insert(lines, self.Call.Line(text))
+		end
+		speech.Prepare(lines)
+		print(`{DEV_PREFIX} voice test: {#lines} line(s); {self:VolumeText()}`)
+		local voiced = 0
+		for index, line in lines do
+			if self.VoiceRun ~= run then
+				print(`{DEV_PREFIX} voice test stopped`)
+				return
+			end
+			const text = line.Text or ""
+			const started = os.clock()
+			local last = ""
+			local status = speech.Fetch(line)
+			while (status == "Queued" or status == "Loading") and os.clock() - started < VOICE_WAIT do
+				if status ~= last then
+					last = status
+					print(`{DEV_PREFIX} {index}/{#lines} {status}: "{text}"`)
+				end
+				task.wait(0.1)
+				if self.VoiceRun ~= run then
+					print(`{DEV_PREFIX} voice test stopped`)
+					return
+				end
+				status = speech.Fetch(line)
+			end
+			const reason = speech.Reason(line)
+			const length = speech.Length(line)
+			const why = if reason ~= "" then ` ({reason})` else ""
+			const span = if length ~= nil then string.format("%.1f s", length) else "?"
+			print(
+				`{DEV_PREFIX} {index}/{#lines} {status} after {string.format("%.1f", os.clock() - started)} s{why}, length {span}: "{text}"; {self:VolumeText()}`
+			)
+			if status == "Loaded" then
+				voiced += 1
+				speech.Say(line)
+				task.wait((length or 2) + VOICE_TAIL)
+			end
+		end
+		print(`{DEV_PREFIX} voice test done: {voiced}/{#lines} voiced`)
+	end)
+end
+
+-- DevClient packet (dev mode only; DevService/Commands/Tutorial.luau)
+function TutorialController:OnDev(command: string, text: string)
+	if not self:IsDev() then
+		return
+	end
+	if command == "tutorial_reset" then
+		self:DevReset()
+	elseif command == "tutorial_step" then
+		if text == "auto" then
+			self.Forced = nil
+			print(`{DEV_PREFIX} back to the live flow`)
+			return
+		end
+		if Steps.ByKey[text] == nil then
+			const keys: { string } = {}
+			for _, step in Steps.List do
+				table.insert(keys, step.Key)
+			end
+			warn(`{DEV_PREFIX} unknown step "{text}"; steps: {table.concat(keys, ", ")}, auto`)
+			return
+		end
+		const firstRun = Vide.untrack(function(): boolean
+			return self:FirstRun()
+		end)
+		if not firstRun then
+			warn(`{DEV_PREFIX} the tutorial is not on for this profile: "/dev tutorial reset" first`)
+			return
+		end
+		self.Forced = text
+		print(`{DEV_PREFIX} step {text} forced (until the live flow passes it; "/dev tutorial step auto" = live flow)`)
+	elseif command == "tutorial_status" then
+		print(`{DEV_PREFIX} status\n{self:DebugLines()}`)
+	elseif command == "voice" then
+		self:VoiceTest({ text })
+	elseif command == "voice_tutorial" then
+		self:VoiceTest(Steps.Lines)
+	elseif command == "voice_stop" then
+		self.VoiceRun += 1
+		self.Call.Voice().Stop()
+	elseif command == "tutdebug" then
+		self:ToggleDebug()
+	end
+end
+
+-- F8 toggles the debug panel (dev mode only; "/dev tutdebug" from the chat on any device)
+function TutorialController:BindDebug()
+	if not self:IsDev() then
+		return
+	end
+	self.Dependencies.InputController
+		:Bind({
+			Name = DEBUG_BIND,
+			Key = Enum.KeyCode.F8,
+		})
+		.OnPress(function()
+			self:ToggleDebug()
+		end)
 end
 
 -- Skip: Q / D-pad down while it runs; touch uses the Skip tag of the panel
@@ -1308,7 +1713,25 @@ function TutorialController:Mount(playerGui: Instance)
 			Strong = self.Urgent,
 		})
 		arrow.Parent = playerGui
+
+		-- dev only: tutorial debug readout (F8 / "/dev tutdebug"), shown even when the tutorial is off
+		if self:IsDev() then
+			const debug = Vide.create("ScreenGui")({
+				Name = "TutorialDebug",
+				ResetOnSpawn = false,
+				IgnoreGuiInset = false,
+				ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets,
+				ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+				DisplayOrder = 50,
+				TutorialDebug({
+					Shown = self.Debug,
+					Text = self.DebugText,
+				}),
+			})
+			debug.Parent = playerGui
+		end
 	end)
+	self.Mounted = true
 	table.insert(self.Unmounts, unmount)
 end
 
@@ -1317,6 +1740,10 @@ TutorialController:OnInit(function(self)
 
 	self.Libs.Net.Sale:onClient(function(sale)
 		self:OnSale(sale.Npc, sale.Result)
+	end)
+	-- dev-only client commands (sent by TutorialService:DevSend in dev mode; ignored otherwise)
+	self.Libs.Net.DevClient:onClient(function(data)
+		self:OnDev(data.Command, data.Text)
 	end)
 end)
 
@@ -1328,6 +1755,7 @@ TutorialController:OnStart(function(self)
 	task.spawn(function()
 		self:Mount(Players.LocalPlayer:WaitForChild("PlayerGui"))
 	end)
+	self:BindDebug()
 	RunService.Heartbeat:Connect(function()
 		-- the Beacon only moves while something is marked (ClearGuidance unmarks it when the tutorial stops)
 		self.Beacon.Step()

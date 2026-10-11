@@ -13,7 +13,9 @@
 	  Assets   LoadQueue (the one audio queue, small batches) of the intro sounds (music cue, phone, horns, car, prompt, skip, day
 	           ambience) and the UI images (Icons.Ids)
 	  Voices   Run place only: every text-to-speech line of the intro (CutsceneController:PreloadVoices; the queue
-	           there loads one line at a time with retry, see Speech.luau)
+	           there loads one line at a time with retry, see Speech.luau), then, for a rookie (TutorialDone = false),
+	           Walt's tutorial call lines (TutorialController:PreloadVoices, user request 2026-10-11): what does not
+	           load in TUTORIAL_VOICE_TIMEOUT keeps loading in the background during the intro
 	Every step has its own timeout and the whole gate STEP_CAP; a step that fails or times out never blocks the join.
 	After ClientReady the curtain stays while the server says the intro is Waiting for the other participants
 	(Cutscene set) up to the server's ReadyTimeout + margin, then lifts (attribute Done on the ScreenGui).
@@ -37,6 +39,8 @@ const GUI_NAME = "LoadingScreen"
 const KIT_TIMEOUT = 25 -- s for the crew kit warm-up (RigController has its own cap too)
 const ASSET_TIMEOUT = 20 -- s for PreloadAsync of sounds and images
 const VOICE_TIMEOUT = 22 -- s for the intro voices (the rest keeps loading in the background)
+const TUTORIAL_VOICE_TIMEOUT = 12 -- s for Walt's tutorial lines after the intro ones (rookies only)
+const INTRO_SHARE = 0.6 -- part of the Voices step the intro lines fill on the bar
 const STEP_CAP = 40 -- s for all steps together
 const CREW_MARGIN = 3 -- s past the server's ReadyTimeout that the curtain waits for the others
 const POLL = 0.1
@@ -77,7 +81,7 @@ local function texts(): { [string]: string }
 end
 
 const LoadingController = Modux.Controller("LoadingController", {
-	Require = { "PlaceController", "RigController", "CutsceneController" },
+	Require = { "PlaceController", "RigController", "CutsceneController", "TutorialController" },
 	-- lowest priority of the client: its OnStart runs after every other controller's OnStart
 	Priority = -1000,
 })
@@ -243,7 +247,14 @@ function LoadingController:StepVoices()
 	self:SetStatus("Voices")
 	within(VOICE_TIMEOUT + 1, function()
 		self.Dependencies.CutsceneController:PreloadVoices(VOICE_TIMEOUT, function(fraction: number)
-			self:Mark("Voices", fraction)
+			self:Mark("Voices", fraction * INTRO_SHARE)
+		end)
+	end)
+	self:Mark("Voices", INTRO_SHARE)
+	-- a rookie: Walt's tutorial call lines too (a veteran returns at once)
+	within(TUTORIAL_VOICE_TIMEOUT + 1, function()
+		self.Dependencies.TutorialController:PreloadVoices(TUTORIAL_VOICE_TIMEOUT, function(fraction: number)
+			self:Mark("Voices", INTRO_SHARE + (1 - INTRO_SHARE) * fraction)
 		end)
 	end)
 	self:Mark("Voices", 1)

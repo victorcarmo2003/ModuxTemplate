@@ -19,6 +19,7 @@ export type Public = {
 	Random: Random,
 	Record: Charm.Atom<Record>,
 	TrailerPending: boolean,
+	TutorialAnswered: boolean,
 	Setup: (self: Public) -> (),
 	GetState: (self: Public) -> State,
 	GetCall: (self: Public) -> string,
@@ -56,6 +57,7 @@ export type Public = {
 	DevCall: (self: Public, key: string) -> (),
 	DevAnswer: (self: Public) -> (),
 	DevStop: (self: Public) -> (),
+	DevResetTutorial: (self: Public) -> (),
 	DevStatus: (self: Public) -> string,
 }
 

@@ -24,6 +24,9 @@ export type Beacon = {
 	Urge: (on: boolean) -> (),
 	-- invisible part at the arrow tip (parented to the folder while something is marked)
 	Tip: BasePart,
+	-- what is marked now (nil = nothing) and whether the Highlight + 3D arrow are in the Workspace (debug panel)
+	Marked: () -> Instance?,
+	Mounted: () -> boolean,
 	Destroy: () -> (),
 }
 
@@ -162,6 +165,12 @@ function Beacon.new(container: () -> Instance): Beacon
 			urged = on
 		end,
 		Tip = tip,
+		Marked = function(): Instance?
+			return adornee
+		end,
+		Mounted = function(): boolean
+			return model.Parent ~= nil and glow.Enabled and glow.Parent ~= nil
+		end,
 		Step = function()
 			const target = adornee
 			if target == nil then

@@ -43,6 +43,8 @@
 	Fetch(line) (Walt's tutorial call) queues the line first and returns its state, so a caller without a fixed
 	timeline can hold the line until the voice is ready ("Loaded") or gone ("Failed" / "Off": subtitle only).
 	Reason(line) says why a line has no voice (for the caller's warning). Length(line) = seconds of a loaded line.
+	Peek(line) = state of a line without queueing or hurrying it; Stats() = lines per state, load queue size, fader
+	volume, on/off (dev tools: TutorialController /dev voice, tutorial debug panel).
 	Warnings: once per kind per session, for every Speech together (module-level).
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -55,8 +57,23 @@ type Beat = Content.CutsceneBeat
 
 export type Status = "Queued" | "Loading" | "Loaded" | "Failed" | "Off"
 
+-- Lines per load state, pieces waiting, fader volume (nil = no graph yet), on/off and why off
+export type Stats = {
+	Queued: number,
+	Loading: number,
+	Loaded: number,
+	Failed: number,
+	Waiting: number,
+	Fader: number?,
+	Enabled: boolean,
+	OffReason: string,
+}
+
 export type Speech = {
 	Prepare: (lines: { Beat }) -> (),
+	-- state of a line without queueing it (nil = never queued)
+	Peek: (line: Beat) -> Status?,
+	Stats: () -> Stats,
 	-- queues the line first (if not loaded yet) and returns its state; "Off" = no voice for it (subtitle only)
 	Fetch: (line: Beat) -> Status,
 	-- why the line has no voice right now ("" = it has one, or it is on its way)
@@ -647,6 +664,44 @@ function Speech.new(volume: () -> number): Speech
 	return {
 		Prepare = function(lines: { Beat })
 			queueAll(lines)
+		end,
+		Peek = function(line: Beat): Status?
+			if not enabled or not alive then
+				return "Off"
+			end
+			const entry = entries[keyOf(line)]
+			return if entry ~= nil then stateOf(entry) else nil
+		end,
+		Stats = function(): Stats
+			const stats: Stats = {
+				Queued = 0,
+				Loading = 0,
+				Loaded = 0,
+				Failed = 0,
+				Waiting = #queue,
+				Fader = nil,
+				Enabled = enabled and alive,
+				OffReason = offReason,
+			}
+			for _, entry in entries do
+				const state = stateOf(entry)
+				if state == "Queued" then
+					stats.Queued += 1
+				elseif state == "Loading" then
+					stats.Loading += 1
+				elseif state == "Loaded" then
+					stats.Loaded += 1
+				else
+					stats.Failed += 1
+				end
+			end
+			const fade = fader
+			if fade ~= nil then
+				pcall(function()
+					stats.Fader = fade.Volume
+				end)
+			end
+			return stats
 		end,
 		Fetch = function(line: Beat): Status
 			if not enabled or not alive then

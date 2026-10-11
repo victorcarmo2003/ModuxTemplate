@@ -18,6 +18,11 @@
 	together) once it is "Loaded", or after HOLD s / when the voice is "Failed" / "Off" (subtitle only, Speech warns
 	once per session). A loaded line holds the screen for its real length (TimeLength) when longer than the reading
 	time.
+
+	Preload(lines, timeout, progress) (LoadingController, under the loading screen of a rookie) queues every line and
+	yields until all are settled or the timeout; the rest keeps loading in the background, so Walt's lines are
+	"Loaded" when the call starts. Voice() / Line(text) give the dev tools (/dev voice, the debug panel) the same Speech
+	and beat the call uses.
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
@@ -26,6 +31,13 @@ local Speech = require(StarterPlayer.StarterPlayerScripts.client.Cutscene.Cutsce
 
 export type Call = {
 	Prepare: (lines: { string }) -> (),
+	-- yields until every line is settled or `timeout` s; progress(0..1)
+	Preload: (lines: { string }, timeout: number, progress: ((number) -> ())?) -> (),
+	-- the Speech of the call (built on first use) and the beat of one of Walt's lines
+	Voice: () -> Speech.Speech,
+	Line: (text: string) -> Content.CutsceneBeat,
+	-- lines waiting to be said
+	Pending: () -> number,
 	Queue: (lines: { string }) -> (),
 	Replace: (lines: { string }) -> (),
 	Cut: () -> (),
@@ -94,13 +106,25 @@ function Call.new(show: (text: string?) -> (), volume: () -> number): Call
 		return #queue > 0 or (endsAt > 0 and os.clock() < endsAt)
 	end
 
+	local function beats(lines: { string }): { Content.CutsceneBeat }
+		const out: { Content.CutsceneBeat } = {}
+		for _, text in lines do
+			table.insert(out, beat(text))
+		end
+		return out
+	end
+
 	return {
 		Prepare = function(lines: { string })
-			const beats: { Content.CutsceneBeat } = {}
-			for _, text in lines do
-				table.insert(beats, beat(text))
-			end
-			voice().Prepare(beats)
+			voice().Prepare(beats(lines))
+		end,
+		Preload = function(lines: { string }, timeout: number, progress: ((number) -> ())?)
+			voice().Preload(beats(lines), timeout, progress)
+		end,
+		Voice = voice,
+		Line = beat,
+		Pending = function(): number
+			return #queue
 		end,
 		Queue = function(lines: { string })
 			for _, text in lines do

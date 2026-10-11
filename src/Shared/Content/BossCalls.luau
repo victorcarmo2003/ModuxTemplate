@@ -500,7 +500,20 @@ const rules: Rules = {
 	Tutorial = {
 		Call = "call_tutorial",
 		Goodbye = 6,
-		Covers = { "grill_place", "grill_collect", "bun_cut", "board_add_sausage", "open_sign", "take_order", "serve" },
+		-- every action the tutorial walks through (Mart trip included): no hint call rings after Walt's goodbye
+		Covers = {
+			"grill_place",
+			"grill_collect",
+			"bun_cut",
+			"board_add_sausage",
+			"open_sign",
+			"take_order",
+			"serve",
+			"topping_add",
+			"discard",
+			"buy_package",
+			"restock",
+		},
 	},
 }
 

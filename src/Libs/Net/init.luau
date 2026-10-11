@@ -44,6 +44,13 @@ return Lync.define("game", {
 	-- call (or it never came): the server spawns the tutorial customer (CustomerService:RequestTutorial) when this
 	-- player still has TutorialDone = false. Idempotent while one is around.
 	TutorialBegin = Lync.packet(Lync.empty()),
+	-- s -> owner, dev mode only (Studio Run place; user request 2026-10-11, Provisional). Writer: TutorialService
+	-- (DevSend, from the DevService chat commands tutorial / voice / tutdebug). Responder: TutorialController (OnInit).
+	-- Client-side dev tools: Command = what to run on the client, Text = its arguments (free text, trimmed).
+	DevClient = Lync.packet(Lync.struct({
+		Command = Lync.str(0, 32),
+		Text = Lync.str(0, 200),
+	})),
 
 	-- Run sets, wave 1 ---------------------------------------------------------------------------------------------
 

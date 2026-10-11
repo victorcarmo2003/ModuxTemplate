@@ -253,7 +253,9 @@ for index, step in LIST do
 	IndexOf[step.Key] = index
 end
 
--- Every line Walt may say in the tutorial (the voice is generated ahead with these)
+-- Every line Walt may say in the tutorial (the voice is generated ahead with these), in the order the call needs
+-- them: greeting, each step's Say + Done in flow order, the goodbye, then the reminders and the skip goodbye (the
+-- loading screen preloads from the top, the rest keeps loading in the background)
 local function allLines(): { string }
 	const out: { string } = {}
 	const seen: { [string]: boolean } = {}
@@ -273,12 +275,14 @@ local function allLines(): { string }
 		if step.Done then
 			add(step.Done)
 		end
-		if step.Remind then
-			add(step.Remind)
-		end
 	end
 	for _, text in GOODBYE do
 		add(text)
+	end
+	for _, step in LIST do
+		if step.Remind then
+			add(step.Remind)
+		end
 	end
 	for _, text in SKIP_GOODBYE do
 		add(text)

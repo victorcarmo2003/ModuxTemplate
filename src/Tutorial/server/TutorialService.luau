@@ -14,6 +14,9 @@
 -- customer still waits, a hot dog thrown away gives the bun back (never stuck without a bun for the first sale). When
 -- the buns run out with a rookie pending, Cash is topped up to the package price (EconomyService:TopUp) so the
 -- purchase never stalls on money. Server decides: the client only reads the Stock set.
+-- Dev tools (Provisional, user request 2026-10-11; DevService/Commands/Tutorial.luau): DevReset puts TutorialDone back
+-- to false (the client restarts the tutorial without the intro), DevSend forwards a client-side dev command (voice
+-- test, debug panel, step jump) to one player through the dev-only `DevClient` packet. Both refuse outside dev mode.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -125,6 +128,53 @@ function TutorialService:Begin(player: Player)
 	if self.Dependencies.CustomerService:RequestTutorial() then
 		self.Asked = true
 	end
+end
+
+-- Dev hooks ---------------------------------------------------------------------------------------------------------
+
+function TutorialService:DevCheck(name: string)
+	if not self.Dependencies.PlaceService:IsDev() then
+		error(`[TutorialService] {name} is dev mode only`, 3)
+	end
+	if not self.Enabled then
+		error(`[TutorialService] {name}: not the Run place`, 3)
+	end
+end
+
+-- A client-side dev command for `player` (TutorialController runs it)
+function TutorialService:DevSend(player: Player, command: string, text: string?)
+	self:DevCheck("DevSend")
+	self.Libs.Net.DevClient:fireClient(player, {
+		Command = string.sub(command, 1, 32),
+		Text = string.sub(text or "", 1, 200),
+	})
+end
+
+-- TutorialDone = false for `player` (saved), the tutorial customer and the tutorial stock start over; the client is
+-- told to restart its tutorial state (DevClient "tutorial_reset")
+function TutorialService:DevReset(player: Player)
+	self:DevCheck("DevReset")
+	const profiles = self.Dependencies.ProfileService
+	if profiles:Get(player) == nil then
+		error("[TutorialService] DevReset: no loaded profile", 2)
+	end
+	profiles:Update(player, { TutorialDone = false })
+	profiles:RequestSave(player)
+	self.Asked = false
+	self.Seeded = false
+	self.Dependencies.CustomerService:EndTutorial()
+	self:DevSend(player, "tutorial_reset", "")
+end
+
+-- One line: who has the tutorial pending, customer, stock seed
+function TutorialService:DevStatus(): string
+	const pending: { string } = {}
+	for _, player in Players:GetPlayers() do
+		const profile = self.Dependencies.ProfileService:Get(player)
+		const state = if profile == nil then "no profile" elseif profile.TutorialDone() then "done" else "pending"
+		table.insert(pending, `{player.Name}={state}`)
+	end
+	return `tutorial [{table.concat(pending, ", ")}]; customer asked {self.Asked}, around {self.Dependencies.CustomerService:HasTutorial()}; seeded {self.Seeded}; buns {self.Dependencies.KitchenService:GetStock(BUN)}`
 end
 
 function TutorialService:Step()

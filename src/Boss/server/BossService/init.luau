@@ -26,6 +26,10 @@
 -- step lines) until nobody has the tutorial pending; then it stays Rules.Tutorial.Goodbye s for Walt's goodbye and
 -- hangs up. Nobody pending while it rings = the ring stops. Leaving the day Prep/Open hangs it up. Queuing it marks the
 -- Hint rows of Rules.Tutorial.Covers as heard (the tutorial teaches those), so no second phone talks over it.
+-- One ring per tutorial (user request 2026-10-11, Provisional): the phone rings once at the start; once answered, Walt
+-- stays on the line for the whole tutorial (Mart trip included: no proximity rule). If the held call is cut anyway
+-- (another call forced through dev, a phase hiccup) it comes back straight to Talking when it leaves the queue, never
+-- ringing again (TutorialAnswered), until nobody has the tutorial pending.
 --
 -- PROVISIONAL (TASK-070): chaining without a new ring; Resume blocks calls like NightLost; any Swapped to a vehicle
 -- other than RunParams.StartVehicle counts as the trailer purchase.
@@ -99,6 +103,8 @@ function BossService:Setup()
 	self.TrailerPending = false :: boolean
 	self.LastInfinite = "" :: string
 	self.Random = Random.new() :: Random
+	-- the tutorial call was answered once while a tutorial is pending: it never rings again, it resumes Talking
+	self.TutorialAnswered = false :: boolean
 end
 
 -- Reads -----------------------------------------------------------------------------------------------------------
@@ -267,6 +273,9 @@ end
 function BossService:Answer()
 	const record = self.Record()
 	if record.State == "Ringing" then
+		if record.Call == TUTORIAL.Call then
+			self.TutorialAnswered = true
+		end
 		self:Talk(record.Call, now())
 	end
 end
@@ -289,8 +298,13 @@ function BossService:Step()
 		end
 	elseif #self.Queue > 0 and self:CanStart() then
 		const key = self:Pop()
-		if key then
-			self:Ring(key)
+		if key ~= nil then
+			if key == TUTORIAL.Call and self.TutorialAnswered then
+				-- the rookie already picked up: Walt is back on the line without a second ring
+				self:Talk(key, t)
+			else
+				self:Ring(key)
+			end
 		end
 	end
 end
@@ -323,6 +337,10 @@ function BossService:StepTutorial(t: number)
 	const record = self.Record()
 	const allowed = self:TutorialAllowed()
 	const pending = allowed and self.Dependencies.TutorialService:AnyPending()
+	if not pending and not (record.Call == key and record.State ~= "Idle") then
+		-- tutorial over (or off for now): a later tutorial starts with a ring again
+		self.TutorialAnswered = false
+	end
 	if record.Call == key and record.State ~= "Idle" then
 		if not allowed or (not pending and record.State == "Ringing") then
 			self:Stop(false)
@@ -518,6 +536,17 @@ function BossService:DevStop()
 	self:Stop(true)
 end
 
+-- Tutorial restarted (/dev tutorial reset): its call off the phone and the queue, the next one rings again
+function BossService:DevResetTutorial()
+	self:DevCheck("DevResetTutorial")
+	const record = self.Record()
+	if record.Call == TUTORIAL.Call and record.State ~= "Idle" then
+		self:Stop(false)
+	end
+	self:Unqueue(TUTORIAL.Call)
+	self.TutorialAnswered = false
+end
+
 -- One line: state, call, current line and queue
 function BossService:DevStatus(): string
 	const record = self.Record()
@@ -536,7 +565,7 @@ function BossService:DevStatus(): string
 	for _, entry in self.Queue do
 		table.insert(queued, entry.Key)
 	end
-	text ..= `; queue [{table.concat(queued, ", ")}]; played {#self:CaptureBoss()}`
+	text ..= `; queue [{table.concat(queued, ", ")}]; played {#self:CaptureBoss()}; tutorial answered {self.TutorialAnswered}`
 	if #self.Pending > 0 then
 		text ..= `; pending [{table.concat(self.Pending, ", ")}]`
 	end
