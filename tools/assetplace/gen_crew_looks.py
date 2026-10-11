@@ -67,9 +67,28 @@ def fur_hex(asset: str) -> str:
     return f"{r:02X}{g:02X}{b:02X}"
 
 
+def sheet_alpha_problems(stem: str) -> list[str]:
+    """Day/Mid outfit sheets: fur texels (hands, forearms) must be alpha 0 so MeshPart.Color (species fur) shows.
+    Roblox renders partial alpha on a MeshPart TextureID almost opaque: a shared grey overlay hid every species'
+    fur on the arms (Mid pack, NPCs at night). Night keeps its navy overlay on purpose (matches the navy heads)."""
+    from PIL import Image
+
+    out: list[str] = []
+    for pack in ("Day", "Mid"):
+        path = TEX_DIR / f"T_{stem}_{pack}.png"
+        if not path.exists():
+            continue
+        partial = sum(1 for p in Image.open(path).convert("RGBA").getdata() if 0 < p[3] < 255)
+        if partial:
+            out.append(f"{path.name}: {partial} partial-alpha texels (fur must be alpha 0 or the arms lose the fur colour)")
+    return out
+
+
 def build() -> str:
     tex: dict[str, str] = json.loads(TEX_JSON.read_text(encoding="utf-8"))
     problems: list[str] = []
+    for stem in OUTFITS.values():
+        problems.extend(sheet_alpha_problems(stem))
 
     def need(key: str) -> str:
         v = tex.get(key)

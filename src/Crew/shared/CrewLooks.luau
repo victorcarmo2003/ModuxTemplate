@@ -127,15 +127,15 @@ const looks: CrewLooks = {
 		},
 	},
 	Outfits = { -- keys of Content.Outfits
-		crew = { Day = "rbxassetid://126563974146984", Mid = "rbxassetid://106662229671142", Night = "rbxassetid://103334701190511" }, -- T_Crew_Uniform_<Pack>
-		civil_a = { Day = "rbxassetid://97616680802748", Mid = "rbxassetid://97999940286068", Night = "rbxassetid://135720364131239" }, -- T_Civil_A_<Pack>
-		civil_b = { Day = "rbxassetid://112240592320193", Mid = "rbxassetid://139824851938299", Night = "rbxassetid://85890262029135" }, -- T_Civil_B_<Pack>
-		civil_c = { Day = "rbxassetid://94281920788567", Mid = "rbxassetid://126318951887721", Night = "rbxassetid://72622301270632" }, -- T_Civil_C_<Pack>
-		civil_d = { Day = "rbxassetid://128146109488496", Mid = "rbxassetid://111196450516029", Night = "rbxassetid://107393511788800" }, -- T_Civil_D_<Pack>
-		civil_e = { Day = "rbxassetid://119015553806245", Mid = "rbxassetid://101592335903965", Night = "rbxassetid://87426123361900" }, -- T_Civil_E_<Pack>
-		civil_f = { Day = "rbxassetid://112012204265828", Mid = "rbxassetid://122125522834668", Night = "rbxassetid://72279489985274" }, -- T_Civil_F_<Pack>
-		civil_g = { Day = "rbxassetid://137849749893658", Mid = "rbxassetid://88532471517662", Night = "rbxassetid://76884338625302" }, -- T_Civil_G_<Pack>
-		civil_h = { Day = "rbxassetid://123735535525882", Mid = "rbxassetid://86427394611908", Night = "rbxassetid://129277167106216" }, -- T_Civil_H_<Pack>
+		crew = { Day = "rbxassetid://126563974146984", Mid = "rbxassetid://114890931933787", Night = "rbxassetid://103334701190511" }, -- T_Crew_Uniform_<Pack>
+		civil_a = { Day = "rbxassetid://97616680802748", Mid = "rbxassetid://122707545391807", Night = "rbxassetid://135720364131239" }, -- T_Civil_A_<Pack>
+		civil_b = { Day = "rbxassetid://112240592320193", Mid = "rbxassetid://81378538548000", Night = "rbxassetid://85890262029135" }, -- T_Civil_B_<Pack>
+		civil_c = { Day = "rbxassetid://94281920788567", Mid = "rbxassetid://139118851715001", Night = "rbxassetid://72622301270632" }, -- T_Civil_C_<Pack>
+		civil_d = { Day = "rbxassetid://128146109488496", Mid = "rbxassetid://130757489843641", Night = "rbxassetid://107393511788800" }, -- T_Civil_D_<Pack>
+		civil_e = { Day = "rbxassetid://119015553806245", Mid = "rbxassetid://120844857227492", Night = "rbxassetid://87426123361900" }, -- T_Civil_E_<Pack>
+		civil_f = { Day = "rbxassetid://112012204265828", Mid = "rbxassetid://75810283065984", Night = "rbxassetid://72279489985274" }, -- T_Civil_F_<Pack>
+		civil_g = { Day = "rbxassetid://137849749893658", Mid = "rbxassetid://95950344902436", Night = "rbxassetid://76884338625302" }, -- T_Civil_G_<Pack>
+		civil_h = { Day = "rbxassetid://123735535525882", Mid = "rbxassetid://85568088967052", Night = "rbxassetid://129277167106216" }, -- T_Civil_H_<Pack>
 		thief = { Day = "rbxassetid://91137161763918" }, -- T_Civil_Thief_<Pack>
 	},
 	Atlas = { Mid = "rbxassetid://132760639192955", Night = "rbxassetid://123212356689218" },
