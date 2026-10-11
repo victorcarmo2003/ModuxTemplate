@@ -4,8 +4,10 @@
 -- One line at a time (lines are <= 42 characters, ui-text.md §11); a longer line wraps to a 2nd row instead of
 -- shrinking, so the text never goes under Theme.MinTextSize. Narrow on purpose (60% of the width, 300..560 px) so it
 -- stays clear of the thumbstick and the jump button on a phone.
--- Cartoon pass (AST-091): Ink CartoonPanel strip, round phone badge (CartoonPanel in the phone colour) with the
--- AST-071 `Hud/phone` icon (drawn handset while missing); pops and slides up (Motion.Pop + spring).
+-- Cartoon pass (AST-091): round phone badge (CartoonPanel in the phone colour) with the AST-071 `Hud/phone` icon
+-- (drawn handset while missing); pops and slides up (Motion.Pop + spring).
+-- Light pass (user request 2026-10-11: the Ink strip read dark with low-contrast text): Cream strip with a thick Ink
+-- outline, Ink line text without stroke, speaker name in SPEAKER_COLOR (dark Ketchup, high contrast on Cream).
 -- Pure: only props. The owner (BossController) decides the speaker, the line and when it shows.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -45,6 +47,8 @@ const BADGE = Theme.MinTouch -- 44 px round badge
 -- Clear of the native hotbar (DEC-040) on the bottom centre
 const BOTTOM_GAP = 84
 const SLIDE = 24
+-- Speaker name on the Cream strip: the Ketchup lip (dark red-orange), contrast > 5:1 on Cream
+const SPEAKER_COLOR = Theme.Tone.Ketchup.Lip
 
 -- AST-042 colours (style guide §2.1): Ketchup phone on the cart, Cream phone in the trailer
 const PHONE_TONE: { [string]: Theme.Tone } = {
@@ -127,8 +131,7 @@ return function(props: Props): Frame
 			end,
 			Size = UDim2.fromScale(1, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
-			Tone = Theme.Tone.Ink,
-			Transparency = Theme.Transparency.Panel,
+			Tone = Theme.Tone.Cream,
 			Outline = Theme.Outline.Thick,
 			Radius = Theme.Radius.Card,
 			Decor = {
@@ -186,11 +189,13 @@ return function(props: Props): Frame
 					Box = UDim2.new(1, -(BADGE + 10), 0, 0),
 					AutomaticSize = Enum.AutomaticSize.Y,
 					TextSize = TEXT_SIZE,
+					Color = Theme.Color.Dark,
+					Stroke = 0,
 					Wrapped = true,
 					RichText = true,
 					XAlignment = Enum.TextXAlignment.Left,
 					Text = function()
-						return `<font color="{hex(Theme.Color.Mustard)}">{escape(props.Speaker())}:</font> {escape(props.Text())}`
+						return `<font color="{hex(SPEAKER_COLOR)}">{escape(props.Speaker())}:</font> {escape(props.Text())}`
 					end,
 					Children = {
 						createRaw("UIPadding")({

@@ -29,6 +29,10 @@
 	Order card (user request after Play): HudOrder on the top-left column, under the money and day pills, with the
 	order of the customer CustomerController picks (prompt target, else Q1 in Waiting); hidden while Down/Spectator.
 
+	Cinematic and reveal (user request 2026-10-11): the whole Hud ScreenGui is off while Interface/Cinematic is on
+	(StageController: intro / finale / credits), and during a first run the money pill and the clock + day pills pop in
+	as the tutorial reaches them (TutorialController ShowCash / ShowClock).
+
 	Status only: no button, no input binding (FEAT-032: nothing clickable for an Active player). No reputation, no boss
 	chances (Shift.Chances is never read, DEC-053), no XP. The client never writes money, sanity or life state: the
 	numbers come from the server's sets and packets. Texts from ui-text.md (Provisional, TASK-082).
@@ -40,6 +44,7 @@ local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local CrewLooks = require(ReplicatedStorage.shared.Crew.CrewLooks)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
+local Cinematic = require(StarterPlayer.StarterPlayerScripts.client.Interface.Cinematic)
 local HudOrder = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.HudOrder)
 local HudBanner = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.HudBanner)
 local HudRunEnd = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.HudRunEnd)
@@ -188,6 +193,7 @@ const HudController = Modux.Controller("HudController", {
 		"InputController",
 		"CustomerController",
 		"AudioController",
+		"TutorialController",
 	},
 	Priority = 500,
 })
@@ -633,6 +639,7 @@ end
 function HudController:Mount(playerGui: Instance)
 	const round = self.Dependencies.RoundController
 	const economy = self.Dependencies.EconomyController
+	const tutorial = self.Dependencies.TutorialController
 
 	const unmount, gui = Vide.root(function()
 		-- A new shift clears a summary / run end screen that is still up (e.g. dev "skip" shortened the phase)
@@ -666,6 +673,10 @@ function HudController:Mount(playerGui: Instance)
 			ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets,
 			ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 			DisplayOrder = 1,
+			-- no HUD while a cinematic owns the screen (intro / finale / credits; Interface/Cinematic)
+			Enabled = function()
+				return not Cinematic.Active()
+			end,
 
 			-- Wave 2 night layer, under the wave-1 HUD so toasts stay readable on a narrow phone
 			self:Layer("Night", 0, {
@@ -703,6 +714,13 @@ function HudController:Mount(playerGui: Instance)
 				end,
 				Report = self.Report,
 				Scale = self.Scale,
+				-- progressive reveal of the first-run tutorial (TutorialController)
+				ShowCash = function()
+					return tutorial:ShowCash()
+				end,
+				ShowClock = function()
+					return tutorial:ShowClock()
+				end,
 			}),
 
 			-- End of run covers everything (15 s)

@@ -18,7 +18,14 @@ return Lync.define("game", {
 		Gems = Lync.int(0, 2147483647),
 		Classes = Lync.bitfield(Content.Classes.Keys), -- unlocked classes
 		Selected = Lync.enum(Content.Classes.Keys),
+		-- first-hot-dog tutorial done or skipped (data.md §1.1 TutorialDone; user request 2026-10-11, Provisional)
+		TutorialDone = Lync.bool(),
 	})),
+
+	-- c -> s, at most once per session (Provisional, user request 2026-10-11). Responder: TutorialService. The
+	-- first-hot-dog tutorial ended (finished or skipped) on this client: the profile flag goes true. Cosmetic only
+	-- (no money, item or stat rides on it), so the client is trusted to say it.
+	TutorialComplete = Lync.packet(Lync.empty()),
 
 	-- Run sets, wave 1 ---------------------------------------------------------------------------------------------
 

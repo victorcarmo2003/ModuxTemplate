@@ -27,8 +27,10 @@ local PedestrianController = require(StarterPlayer.StarterPlayerScripts.client.M
 local PlaceController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PlaceController)
 local ProfileController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ProfileController)
 local RoundController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.RoundController)
+local StageController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.StageController)
 local ThiefController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ThiefController)
 local TrafficController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.TrafficController)
+local TutorialController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.TutorialController)
 local VehicleController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.VehicleController)
 local VitalController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.VitalController)
 
@@ -59,8 +61,10 @@ export type AllControllers = {
 	PlaceController: PlaceController.Public,
 	ProfileController: ProfileController.Public,
 	RoundController: RoundController.Public,
+	StageController: StageController.Public,
 	ThiefController: ThiefController.Public,
 	TrafficController: TrafficController.Public,
+	TutorialController: TutorialController.Public,
 	VehicleController: VehicleController.Public,
 	VitalController: VitalController.Public,
 }

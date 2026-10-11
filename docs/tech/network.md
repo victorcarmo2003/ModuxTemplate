@@ -384,7 +384,12 @@ Profile = Lync.packet(Lync.struct({
 	Gems = Lync.int(0, 2147483647),
 	Classes = Lync.bitfield(Content.Classes.Keys), -- desbloqueadas
 	Selected = Lync.enum(Content.Classes.Keys),
+	TutorialDone = Lync.bool(), -- Provisório (2026-10-11): tutorial do 1º cachorro-quente concluído/pulado
 }))
+
+-- c -> s, Provisório (2026-10-11). Responder: TutorialService. Marca TutorialDone = true (idempotente).
+-- Flag cosmética: o servidor confia no client (nada de dinheiro, item ou stat depende dela).
+TutorialComplete = Lync.packet(Lync.empty())
 ```
 
 | | |

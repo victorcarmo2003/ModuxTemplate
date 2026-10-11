@@ -6,6 +6,7 @@
 -- Cartoon pass (AST-091): Ink CartoonPanel pill (Ketchup when Low) with a heavy-stroke number.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
+local Cinematic = require(script.Parent.Parent.Cinematic)
 local Theme = require(script.Parent.Theme)
 local CartoonPanel = require(script.Parent.CartoonPanel)
 local CartoonLabel = require(script.Parent.CartoonLabel)
@@ -49,7 +50,10 @@ return function(props: Props): BillboardGui
 		AlwaysOnTop = false,
 		LightInfluence = 0,
 		ResetOnSpawn = false,
-		Enabled = visible,
+		-- Off while a cinematic owns the screen (Interface/Cinematic).
+		Enabled = function()
+			return visible() and not Cinematic.Active()
+		end,
 
 		CartoonPanel({
 			Name = "Pill",

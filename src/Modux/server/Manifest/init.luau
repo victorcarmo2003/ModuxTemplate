@@ -25,6 +25,7 @@ local RoundService = require(ServerScriptService.server.ModuxTypes.RoundService)
 local RunStateService = require(ServerScriptService.server.ModuxTypes.RunStateService)
 local ThiefService = require(ServerScriptService.server.ModuxTypes.ThiefService)
 local TrafficService = require(ServerScriptService.server.ModuxTypes.TrafficService)
+local TutorialService = require(ServerScriptService.server.ModuxTypes.TutorialService)
 local UpgradeService = require(ServerScriptService.server.ModuxTypes.UpgradeService)
 local VehicleService = require(ServerScriptService.server.ModuxTypes.VehicleService)
 local VitalService = require(ServerScriptService.server.ModuxTypes.VitalService)
@@ -54,6 +55,7 @@ export type AllServices = {
 	RunStateService: RunStateService.Public,
 	ThiefService: ThiefService.Public,
 	TrafficService: TrafficService.Public,
+	TutorialService: TutorialService.Public,
 	UpgradeService: UpgradeService.Public,
 	VehicleService: VehicleService.Public,
 	VitalService: VitalService.Public,

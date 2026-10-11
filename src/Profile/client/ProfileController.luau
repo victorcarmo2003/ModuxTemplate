@@ -1,5 +1,5 @@
 --!strict
--- Private profile view (network.md §4.5): Gems, unlocked Classes and Selected class as Vide sources.
+-- Private profile view (network.md §4.5): Gems, unlocked Classes, Selected class and TutorialDone as Vide sources.
 -- Ready stays false until the first Profile packet; the defaults mirror a new account (Template v1).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
@@ -15,6 +15,8 @@ function ProfileController:Setup()
 	self.Classes = Vide.source({ [DEFAULT_CLASS] = true }) :: Vide.Source<{ [string]: boolean }>
 	self.Selected = Vide.source(DEFAULT_CLASS) :: Vide.Source<string>
 	self.Ready = Vide.source(false) :: Vide.Source<boolean>
+	-- first-hot-dog tutorial done or skipped (TutorialController reads it once Ready)
+	self.TutorialDone = Vide.source(false) :: Vide.Source<boolean>
 end
 
 function ProfileController:Owns(class: string): boolean
@@ -28,6 +30,7 @@ ProfileController:OnInit(function(self)
 		self.Gems(data.Gems)
 		self.Classes(table.freeze(data.Classes))
 		self.Selected(data.Selected)
+		self.TutorialDone(data.TutorialDone)
 		self.Ready(true)
 	end)
 end)

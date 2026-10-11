@@ -110,6 +110,7 @@ function ProfileService:Replicate(player: Player)
 		Gems = math.clamp(profile.Gems(), 0, 2147483647),
 		Classes = self:OwnedClasses(profile),
 		Selected = self:SelectedClass(profile),
+		TutorialDone = profile.TutorialDone() == true,
 	})
 end
 

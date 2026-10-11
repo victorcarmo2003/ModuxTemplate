@@ -9,6 +9,7 @@
 -- `Reaction/scribble_cloud`; drawn shapes stay as the fallback), the line sits on a white CartoonPanel pill.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
+local Cinematic = require(script.Parent.Parent.Cinematic)
 local Theme = require(script.Parent.Theme)
 local Icons = require(script.Parent.Icons)
 local UseTween = require(script.Parent.UseTween)
@@ -189,6 +190,10 @@ return function(props: Props): BillboardGui
 		MaxDistance = props.MaxDistance or 60,
 		LightInfluence = 0,
 		ResetOnSpawn = false,
+		-- Off while a cinematic owns the screen (Interface/Cinematic).
+		Enabled = function()
+			return not Cinematic.Active()
+		end,
 
 		create("Frame")({
 			Name = "Pop",

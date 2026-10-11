@@ -5,6 +5,7 @@
 -- and drives `Progress`, usually from `(GetServerTimeNow() - StartedAt) / Duration`.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
+local Cinematic = require(script.Parent.Parent.Cinematic)
 local Bar = require(script.Bar)
 
 const create = Vide.create
@@ -31,7 +32,11 @@ return function(props: Props): BillboardGui
 		MaxDistance = props.MaxDistance or 60,
 		LightInfluence = 0,
 		ResetOnSpawn = false,
-		Enabled = props.Visible or true,
+		-- Off while a cinematic owns the screen (Interface/Cinematic).
+		Enabled = function()
+			const visible = props.Visible
+			return (if visible then visible() else true) and not Cinematic.Active()
+		end,
 
 		Bar({
 			Progress = props.Progress,

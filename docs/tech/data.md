@@ -84,13 +84,17 @@ return {
 		BestDay = 0,
 		Revives = 0,           -- vezes que foi revivido (telemetria de monetização)
 	},
+
+	-- Onboarding (Provisório, pedido do usuário 2026-10-11): tutorial do 1º cachorro-quente concluído ou pulado
+	TutorialDone = false,
 }
 ```
 
 Notas:
 - Chaves de conteúdo = `Key` da tabela (`class_dog`, `class_cat`…, DEC-186; `content-data.md` §3.10). Nunca índice.
 - O animal **é** a classe (DEC-147): o perfil não guarda espécie separada; `Content.Classes[k].Species` resolve.
-- `Profile` (packet) manda ao client só `Gems`, `Classes`, `Selected` (`network.md` §4.5).
+- `Profile` (packet) manda ao client só `Gems`, `Classes`, `Selected` e `TutorialDone` (`network.md` §4.5).
+- `TutorialDone` (Provisório, 2026-10-11) entrou sem migração: `Reconcile` acrescenta `false` aos perfis antigos.
 - O perfil é reativo **por campo de topo** (`Atomic.Table`): campo aninhado (`Classes`, `RunRewards`, `Stats`,
   `Receipts`) muda **por cópia** (`profile.Classes(withKey(profile.Classes(), key))`). Mutar no lugar não dispara o
   `effect` e não persiste.
@@ -110,6 +114,7 @@ Notas:
 | `ReviveCredits` | `ReviveService` (+1 pelo recibo, −1 no uso) | L+R | recibo; uso | `Save()` imediato no recibo (§1.4) |
 | `Receipts` | `MonetizationService` | L+R | todo recibo concedido | `Save()` + espera `OnAfterSave` |
 | `Stats` | `RewardService`, `ReviveService` | R | eventos | `RequestSave` |
+| `TutorialDone` | `TutorialService` (packet `TutorialComplete`, Provisório) | R | fim ou skip do tutorial | `RequestSave` |
 
 Custo de escrita: ≤ 4 eventos por turno por jogador → muito abaixo de 60 + 40 × jogadores escritas/min por servidor.
 Limite por chave hoje é 4 MB/min (sem o antigo cooldown de 6 s).

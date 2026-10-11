@@ -28,6 +28,12 @@
 						"optional": "src/Crew/shared"
 					}
 				},
+				"Cutscene": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Cutscene/shared"
+					}
+				},
 				"Item": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
@@ -254,6 +260,12 @@
 						"optional": "src/Traffic/server"
 					}
 				},
+				"Tutorial": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Tutorial/server"
+					}
+				},
 				"Upgrade": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
@@ -457,6 +469,12 @@
 							"optional": "src/Round/client"
 						}
 					},
+					"Stage": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Stage/client"
+						}
+					},
 					"Thief": {
 						"$ignoreUnknownInstances": false,
 						"$path": {
@@ -467,6 +485,12 @@
 						"$ignoreUnknownInstances": false,
 						"$path": {
 							"optional": "src/Traffic/client"
+						}
+					},
+					"Tutorial": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Tutorial/client"
 						}
 					},
 					"Vehicle": {

@@ -31,6 +31,9 @@ export type Props = {
 	Report: () -> HudSummary.Shown, -- false = no summary
 	-- UI scale (>= 1). 1 = smallest phone (iPhone SE landscape); bigger screens grow everything proportionally.
 	Scale: (() -> number)?,
+	-- Progressive reveal (first-run tutorial): money pill, and the clock + day pills. nil = always shown.
+	ShowCash: (() -> boolean)?,
+	ShowClock: (() -> boolean)?,
 }
 
 const MARGIN = 12
@@ -85,6 +88,7 @@ return function(props: Props): Frame
 					return Money(math.floor(rolled() + 0.5))
 				end,
 				Bump = props.Cash,
+				Shown = props.ShowCash,
 			}),
 
 			HudPill({
@@ -97,6 +101,7 @@ return function(props: Props): Frame
 					return if props.IsNight() then "Moon" else "Sun"
 				end,
 				Text = props.Shift,
+				Shown = props.ShowClock,
 			}),
 		}),
 
@@ -111,6 +116,7 @@ return function(props: Props): Frame
 				return "Clock"
 			end,
 			Text = props.Clock,
+			Shown = props.ShowClock,
 		}),
 
 		ToastStack({

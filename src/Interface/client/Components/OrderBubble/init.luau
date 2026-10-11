@@ -16,6 +16,7 @@
 -- (`Ingredient/<key>`, base = `Item/hot_dog`), the drawn chips stay as the last fallback.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
+local Cinematic = require(script.Parent.Parent.Cinematic)
 local Theme = require(script.Parent.Theme)
 local Icons = require(script.Parent.Icons)
 local CartoonPanel = require(script.Parent.CartoonPanel)
@@ -259,7 +260,10 @@ return function(props: Props): BillboardGui
 		MaxDistance = props.MaxDistance or 60,
 		LightInfluence = 0,
 		ResetOnSpawn = false,
-		Enabled = props.Visible,
+		-- Off while a cinematic owns the screen (Interface/Cinematic).
+		Enabled = function()
+			return props.Visible() and not Cinematic.Active()
+		end,
 
 		create("Frame")({
 			Name = "Tail",

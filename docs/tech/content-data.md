@@ -247,7 +247,7 @@ existem com `Keys` corretas e valores preenchidos nas TASK-008/009.
 | Campo | Tipo | Valor inicial |
 |---|---|---|
 | `Phases` | lista `{ Key, Duration, ClockFrom, ClockTo, Kind = "Day"/"Night"/"Any" }` | **Resume 15 s** · Intro · Prep 60 s 7:00→8:00 · Open 360 s 8:00→18:00 · Closing ≤ 30 s · Summary 15 s · Call · Night (duração por `Nights`) 20:00→06:00 · NightEnd · NightLost · Finale · RunEnd |
-| `ClockStepMinutes` | int | 10 |
+| `ClockStepMinutes` | int | 5 (pedido do usuário 2026-10-11; era 10) |
 | `PhaseKeys` | derivado | enum do set `Shift` |
 
 Onda 1 (TASK-008): só as fases de dia têm números (Prep 60 s, Open 360 s, Closing ≤ 30 s, Summary 15 s); as de noite

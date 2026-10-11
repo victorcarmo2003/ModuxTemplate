@@ -1,0 +1,183 @@
+--!strict
+-- TutorialPanel: the instruction card of the first-hot-dog tutorial (user request 2026-10-11; texts Provisional until
+-- ui-text.md). Top centre, under the clock row, narrow (50% of the width, 300..520 px) so it never covers the
+-- crosshair, the hotbar or the thumb controls on a phone.
+--   Cream CartoonPanel card, thick Ink outline (reading surface: light, high contrast)
+--   Mustard step chip "2/7" on the left
+--   instruction (20 px Ink) and an optional hint line (16 px, Ink top tone) that wraps instead of shrinking
+--   Cream "Skip" tag hanging off the bottom-right corner (>= 44 px tall touch target), with the key of the device
+-- Pops in/out (Motion.Pop) and jumps each time the step number goes up (Motion.Bump).
+-- Pure: only props. TutorialController owns the step, the texts, the skip bind and when it shows.
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Vide = require(ReplicatedStorage.Packages.Vide)
+local Theme = require(script.Parent.Theme)
+local Motion = require(script.Parent.Motion)
+local CartoonPanel = require(script.Parent.CartoonPanel)
+local CartoonLabel = require(script.Parent.CartoonLabel)
+local CartoonButton = require(script.Parent.CartoonButton)
+
+const create = Vide.create
+-- Vide 0.4.1 types `create` for 19 classes only; UIScale, UIPadding, UIListLayout and UISizeConstraint are not among
+-- them.
+const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }) -> Instance
+
+export type Props = {
+	Shown: () -> boolean,
+	-- Step number (1-based) and how many steps there are; Total 0 hides the chip.
+	Step: () -> number,
+	Total: () -> number,
+	Text: () -> string,
+	-- Line under the instruction; "" hides it.
+	Hint: () -> string,
+	-- Skip tag text ("Skip (Q)"); "" hides the tag.
+	SkipText: () -> string,
+	OnSkip: (() -> ())?,
+	-- UI scale of the owner (1 on the smallest phone).
+	Scale: (() -> number)?,
+	-- Reactive so the owner can follow its UI scale. Default: top centre, 62 px down.
+	Position: (() -> UDim2)?,
+	Name: string?,
+}
+
+const TEXT_SIZE = 20
+const HINT_SIZE = 16
+const CHIP = Theme.MinTouch -- 44 px round step chip
+const WIDTH_SCALE = 0.5
+const MIN_WIDTH = 300
+const MAX_WIDTH = 520
+const GAP = 10
+const SKIP_SIZE = 16
+
+return function(props: Props): Frame
+	const pop = Motion.Pop(props.Shown)
+	const bump = Motion.Bump(props.Step, 1.08)
+
+	local function hasChip(): boolean
+		return props.Total() > 0
+	end
+
+	return create("Frame")({
+		Name = props.Name or "TutorialPanel",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = props.Position or UDim2.new(0.5, 0, 0, 62),
+		Size = UDim2.fromScale(WIDTH_SCALE, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundTransparency = 1,
+		Visible = function()
+			return props.Shown() or pop() > 0.02
+		end,
+
+		createRaw("UISizeConstraint")({ MinSize = Vector2.new(MIN_WIDTH, 0), MaxSize = Vector2.new(MAX_WIDTH, 10000) }),
+		createRaw("UIScale")({
+			Scale = function()
+				return (if props.Scale then props.Scale() else 1) * pop() * bump()
+			end,
+		}),
+
+		CartoonPanel({
+			Name = "Card",
+			Size = UDim2.fromScale(1, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			Tone = Theme.Tone.Cream,
+			Outline = Theme.Outline.Thick,
+			Radius = Theme.Radius.Card,
+			Decor = {
+				createRaw("UISizeConstraint")({ MinSize = Vector2.new(0, CHIP + 16 + Theme.Lip) }),
+			},
+			Padding = { Left = 10, Right = 16, Top = 8, Bottom = 14 },
+			Children = {
+				createRaw("UIListLayout")({
+					FillDirection = Enum.FillDirection.Horizontal,
+					VerticalAlignment = Enum.VerticalAlignment.Center,
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					Padding = UDim.new(0, GAP),
+				}),
+
+				-- Step chip "2/7"
+				CartoonPanel({
+					Name = "Chip",
+					LayoutOrder = 1,
+					Size = UDim2.fromOffset(CHIP, CHIP),
+					Tone = Theme.Tone.Mustard,
+					Outline = Theme.Outline.Normal,
+					Lip = 3,
+					Visible = hasChip,
+					Children = {
+						CartoonLabel({
+							Box = UDim2.fromScale(1, 1),
+							TextSize = 16,
+							Color = Theme.Color.Dark,
+							Stroke = 0,
+							Text = function()
+								return `{props.Step()}/{props.Total()}`
+							end,
+						}),
+					},
+				}),
+
+				-- Instruction + hint
+				create("Frame")({
+					Name = "Lines",
+					LayoutOrder = 2,
+					Size = function()
+						return UDim2.new(1, if hasChip() then -(CHIP + GAP) else 0, 0, 0)
+					end,
+					AutomaticSize = Enum.AutomaticSize.Y,
+					BackgroundTransparency = 1,
+					createRaw("UIListLayout")({
+						FillDirection = Enum.FillDirection.Vertical,
+						SortOrder = Enum.SortOrder.LayoutOrder,
+						Padding = UDim.new(0, 2),
+					}),
+					CartoonLabel({
+						Name = "Text",
+						LayoutOrder = 1,
+						Box = UDim2.fromScale(1, 0),
+						AutomaticSize = Enum.AutomaticSize.Y,
+						TextSize = TEXT_SIZE,
+						Color = Theme.Color.Dark,
+						Stroke = 0,
+						Wrapped = true,
+						XAlignment = Enum.TextXAlignment.Left,
+						Text = props.Text,
+					}),
+					CartoonLabel({
+						Name = "Hint",
+						LayoutOrder = 2,
+						Box = UDim2.fromScale(1, 0),
+						AutomaticSize = Enum.AutomaticSize.Y,
+						TextSize = HINT_SIZE,
+						Color = Theme.Tone.Ink.Top,
+						Stroke = 0,
+						Wrapped = true,
+						XAlignment = Enum.TextXAlignment.Left,
+						Text = props.Hint,
+						Visible = function()
+							return props.Hint() ~= ""
+						end,
+					}),
+				}),
+			},
+		}),
+
+		-- Skip tag hanging off the bottom-right corner (outside the measured card)
+		CartoonButton({
+			Name = "Skip",
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.new(1, -12, 1, -2),
+			Text = props.SkipText,
+			TextSize = SKIP_SIZE,
+			Tone = Theme.Tone.White,
+			Padding = 12,
+			Selectable = false,
+			Visible = function()
+				return props.SkipText() ~= ""
+			end,
+			OnActivated = function()
+				if props.OnSkip then
+					props.OnSkip()
+				end
+			end,
+		}),
+	})
+end

@@ -27,6 +27,7 @@ return {
 	ServerScriptService.server.Run.RunStateService,
 	ServerScriptService.server.Thief.ThiefService,
 	ServerScriptService.server.Traffic.TrafficService,
+	ServerScriptService.server.Tutorial.TutorialService,
 	ServerScriptService.server.Upgrade.UpgradeService,
 	ServerScriptService.server.Vehicle.VehicleService,
 	ServerScriptService.server.Vital.VitalService,

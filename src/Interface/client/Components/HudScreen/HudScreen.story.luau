@@ -1,6 +1,7 @@
 --!strict
 -- HudScreen: the full HUD on a phone-sized frame (iPhone SE landscape, 667 x 375) or the whole viewport.
--- "Toast" pushes a notice; "Summary" shows the end-of-shift card; move "Cash" up to see the bump.
+-- "Toast" pushes a notice; "Summary" shows the end-of-shift card; move "Cash" up to see the bump; "ShowCash" /
+-- "ShowClock" play the progressive reveal of the first-run tutorial.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -23,6 +24,8 @@ type Controls = {
 	Cash: () -> number,
 	Toast: () -> boolean,
 	Summary: () -> boolean,
+	ShowCash: () -> boolean,
+	ShowClock: () -> boolean,
 }
 
 const NOTICES: { { Text: string, Kind: "Info" | "Good" | "Alert" } } = {
@@ -43,6 +46,8 @@ return UILabs.CreateVideStory({
 		Cash = UILabs.Slider(123, 0, 5000, 1),
 		Toast = false,
 		Summary = false,
+		ShowCash = true, -- tutorial reveal: toggle to see the pill pop in / shrink away
+		ShowClock = true,
 	},
 }, function(props)
 	-- UI Labs types the control sources loosely; pin them to what the story reads.
@@ -102,6 +107,8 @@ return UILabs.CreateVideStory({
 			}
 		end,
 		Scale = controls.Scale,
+		ShowCash = controls.ShowCash,
+		ShowClock = controls.ShowClock,
 	})
 
 	return create("Frame")({

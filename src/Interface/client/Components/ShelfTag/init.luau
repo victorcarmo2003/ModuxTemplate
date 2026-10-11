@@ -11,6 +11,7 @@
 -- sized in studs: a thick pixel outline would swallow it from far away), tilted a little like a hung price tag.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
+local Cinematic = require(script.Parent.Parent.Cinematic)
 local Theme = require(script.Parent.Theme)
 local CartoonPanel = require(script.Parent.CartoonPanel)
 local CartoonLabel = require(script.Parent.CartoonLabel)
@@ -59,7 +60,10 @@ return function(props: Props): BillboardGui
 		MaxDistance = props.MaxDistance or 30,
 		LightInfluence = 0,
 		ResetOnSpawn = false,
-		Enabled = props.Visible,
+		-- Off while a cinematic owns the screen (Interface/Cinematic).
+		Enabled = function()
+			return props.Visible() and not Cinematic.Active()
+		end,
 
 		CartoonPanel({
 			Name = "Tag",

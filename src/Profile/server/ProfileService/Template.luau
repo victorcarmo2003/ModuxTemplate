@@ -35,6 +35,9 @@ export type Data = {
 	Receipts: { string },
 	RunRewards: RunRewards,
 	Stats: Stats,
+	-- First-hot-dog tutorial finished or skipped (user request 2026-10-11, Provisional). Reconcile adds it as false to
+	-- older profiles, so no migration.
+	TutorialDone: boolean,
 }
 
 const Template: Data = {
@@ -69,6 +72,9 @@ const Template: Data = {
 		BestDay = 0,
 		Revives = 0, -- times revived (monetization telemetry)
 	},
+
+	-- Onboarding: the first-hot-dog tutorial ran to the end or was skipped (TutorialService)
+	TutorialDone = false,
 }
 
 return Template

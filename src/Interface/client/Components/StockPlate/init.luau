@@ -7,6 +7,7 @@
 -- Pure: only props. The caller picks the face that looks at the operator and parents the SurfaceGui.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
+local Cinematic = require(script.Parent.Parent.Cinematic)
 local Theme = require(script.Parent.Theme)
 
 const create = Vide.create
@@ -52,8 +53,12 @@ return function(props: Props): SurfaceGui
 		PixelsPerStud = props.PixelsPerStud or 200,
 		LightInfluence = 1,
 		AlwaysOnTop = false,
-		MaxDistance = props.MaxDistance or 60,
+		MaxDistance = props.MaxDistance or 30,
 		ResetOnSpawn = false,
+		-- Off while a cinematic owns the screen (Interface/Cinematic).
+		Enabled = function()
+			return not Cinematic.Active()
+		end,
 		ClipsDescendants = true,
 
 		create("Frame")({

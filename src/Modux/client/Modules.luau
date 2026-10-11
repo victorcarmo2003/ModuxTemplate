@@ -29,8 +29,10 @@ return {
 	StarterPlayer.StarterPlayerScripts.client.Place.PlaceController,
 	StarterPlayer.StarterPlayerScripts.client.Profile.ProfileController,
 	StarterPlayer.StarterPlayerScripts.client.Round.RoundController,
+	StarterPlayer.StarterPlayerScripts.client.Stage.StageController,
 	StarterPlayer.StarterPlayerScripts.client.Thief.ThiefController,
 	StarterPlayer.StarterPlayerScripts.client.Traffic.TrafficController,
+	StarterPlayer.StarterPlayerScripts.client.Tutorial.TutorialController,
 	StarterPlayer.StarterPlayerScripts.client.Vehicle.VehicleController,
 	StarterPlayer.StarterPlayerScripts.client.Vital.VitalController,
 } :: { ModuleScript }

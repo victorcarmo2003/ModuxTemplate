@@ -58,7 +58,9 @@ const MAP_WAIT = 60 -- seconds MapIndex.WaitReady may wait for streaming
 const DEFAULT_SIGN_HEIGHT = 4.8
 -- Gap between the top of the sign model and the centre of the plate (studs).
 const SIGN_GAP = 0.8
-const SIGN_DISTANCE = 90 -- readable from the Pad (~80 studs to the lot)
+-- Short on purpose (user request 2026-10-11): the plate is a small studs-sized tag read up close at the lot, not a
+-- billboard over the street; it is not drawn from the Pad (~80 studs) nor during a cinematic (SaleSign).
+const SIGN_DISTANCE = 40
 
 -- Fade of the swap (T58): 1.5 s total. Short fade-in because the server pivots right after sending the packet;
 -- Provisional until the VehicleService (TASK-054) fixes its own wait before PivotTo.

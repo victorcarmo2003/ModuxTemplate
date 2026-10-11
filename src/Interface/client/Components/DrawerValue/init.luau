@@ -8,6 +8,7 @@
 -- missing).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
+local Cinematic = require(script.Parent.Parent.Cinematic)
 local Theme = require(script.Parent.Theme)
 local Icons = require(script.Parent.Icons)
 local Motion = require(script.Parent.Motion)
@@ -69,11 +70,15 @@ return function(props: Props): BillboardGui
 		-- The pill sits at the bottom of the gui, right over the anchor; pops rise in the space above it.
 		SizeOffset = Vector2.new(0, 0.5),
 		StudsOffsetWorldSpace = props.Offset or Vector3.zero,
-		MaxDistance = props.MaxDistance or 60,
+		MaxDistance = props.MaxDistance or 40,
 		AlwaysOnTop = false,
 		LightInfluence = 0,
 		ResetOnSpawn = false,
 		ClipsDescendants = false,
+		-- Off while a cinematic owns the screen (Interface/Cinematic).
+		Enabled = function()
+			return not Cinematic.Active()
+		end,
 
 		CartoonPanel({
 			Name = "Pill",

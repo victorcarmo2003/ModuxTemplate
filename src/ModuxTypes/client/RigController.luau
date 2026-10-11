@@ -8,12 +8,18 @@ type Rig = { Connections: { RBXScriptConnection }, Pending: boolean }
 
 export type Public = {
 	CharacterConnection: RBXScriptConnection?,
+	Concealed: { [Model]: RBXScriptConnection },
 	Expressions: { [Model]: string },
 	HiddenFaces: { [Model]: boolean },
 	LowBand: boolean,
 	Preloaded: { [string]: boolean },
 	Rigs: { [Model]: Rig },
+	Warm: boolean,
 	Setup: (self: Public) -> (),
+	Conceal: (self: Public, model: Model) -> (),
+	Reveal: (self: Public, model: Model) -> (),
+	EndWarmup: (self: Public) -> (),
+	Warmup: (self: Public) -> (),
 	VariantOf: (self: Public, model: Model) -> string?,
 	Resolve: (self: Public, model: Model) -> (Pack, string?),
 	SetExpression: (self: Public, model: Model, expression: string?) -> (),

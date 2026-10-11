@@ -121,5 +121,5 @@ const base = Table.new({
 
 return Table.with(base, {
 	PhaseKeys = base.Keys,
-	ClockStepMinutes = 10, -- HUD updates every 10 game minutes (6 s real on day) (DEC-048)
+	ClockStepMinutes = 5, -- HUD updates every 5 game minutes (3 s real on day) (DEC-048; user request 2026-10-11, was 10)
 })

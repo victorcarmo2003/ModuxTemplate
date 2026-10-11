@@ -17,7 +17,7 @@ local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 const RECORD_ID = 1 -- single record (network.md §1, rule 5)
 const STEP = Content.Shift.ClockStepMinutes
 const MINUTES_PER_DAY = 1440
-const TICK_RATE = 10 -- Hz; one clock step is >= 2 s real (night 10: 1800 s / 60 steps), 0.1 s is inside "<= 1 step"
+const TICK_RATE = 10 -- Hz; one 5-minute clock step is >= 1.5 s real (Open: 360 s / 120 steps = 3 s), 0.1 s is inside "<= 1 step"
 const NIGHT_PHASE = "Night"
 const WINDOW_ORDER = { "Calm", "Shift", "Last" }
 
@@ -122,7 +122,7 @@ function RoundController:Setup()
 	self.Minutes = NO_MINUTE :: number
 end
 
--- Rewrites ClockText / NightWindow only when the stepped minute changes (once per 10 game minutes)
+-- Rewrites ClockText / NightWindow only when the stepped minute changes (once per Content.Shift.ClockStepMinutes game minutes)
 function RoundController:Refresh()
 	const clock = self.Clock
 	if not clock then
