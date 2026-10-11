@@ -30,6 +30,11 @@
 	    they enter the DataModel (CollectionService only signals tagged instances inside it), including the local
 	    Night of the low band. `Prepare(model)` dresses one synchronously before it is parented, so a pooled rig never
 	    shows the Day pack for a frame.
+
+	Warm-up (playtest fix, Day 1 morning): at start the whole character kit (ReplicatedStorage.Assets.Crew meshes,
+	CrewExpressions, every CrewLooks texture) is preloaded once. Until that finishes (or WARMUP_TIMEOUT), NPC rigs
+	(outfit Use ~= "Crew") are hidden locally with LocalTransparencyModifier, so nobody sees a half-downloaded NPC
+	(dark body, no head/arms) during the intro. Only during the warm-up: no conflict with night anomaly effects.
 ]]
 local CollectionService = game:GetService("CollectionService")
 local ContentProvider = game:GetService("ContentProvider")
@@ -59,6 +64,8 @@ const VARIANT_FACE = table.freeze({
 	raincoat = "EyesClosed", -- AST-059 T_Expr_EyesClosed
 }) :: { [string]: string }
 const MIRROR_SUFFIX = "_mirror" -- CrewLooks.Outfits key of the mirrored sheet (AST-062), Provisional
+-- s: NPC rigs are revealed after this even if the kit preload has not finished (Provisional).
+const WARMUP_TIMEOUT = 20
 
 const RigController = Modux.Controller("RigController", { Priority = 680 })
 
@@ -72,6 +79,100 @@ function RigController:Setup()
 	self.Preloaded = {} :: { [string]: boolean }
 	-- Rigs whose face shell this controller hid (blank without its expression); weak keys.
 	self.HiddenFaces = setmetatable({}, { __mode = "k" }) :: { [Model]: boolean }
+	-- Kit warm-up done (or timed out): NPC rigs are shown as they arrive.
+	self.Warm = false :: boolean
+	-- NPC rigs hidden while the kit warms up -> their DescendantAdded connection.
+	self.Concealed = {} :: { [Model]: RBXScriptConnection }
+end
+
+local function isNpcRig(model: Model): boolean
+	if model == Players.LocalPlayer.Character then
+		return false
+	end
+	const outfit = model:GetAttribute("Outfit")
+	const row = if typeof(outfit) == "string" then Content.Outfits.ByKey[outfit] else nil
+	return row == nil or row.Use ~= "Crew"
+end
+
+local function setHidden(instance: Instance, hidden: boolean)
+	const modifier = if hidden then 1 else 0
+	if instance:IsA("BasePart") then
+		instance.LocalTransparencyModifier = modifier
+	end
+	for _, descendant in instance:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			descendant.LocalTransparencyModifier = modifier
+		end
+	end
+end
+
+-- Hides an NPC rig locally until the warm-up ends (parts that stream in later are hidden too).
+function RigController:Conceal(model: Model)
+	if self.Warm or self.Concealed[model] ~= nil or not isNpcRig(model) then
+		return
+	end
+	setHidden(model, true)
+	self.Concealed[model] = model.DescendantAdded:Connect(function(descendant: Instance)
+		setHidden(descendant, true)
+	end)
+end
+
+function RigController:Reveal(model: Model)
+	const connection = self.Concealed[model]
+	if connection == nil then
+		return
+	end
+	connection:Disconnect()
+	self.Concealed[model] = nil
+	setHidden(model, false)
+	self.HiddenFaces[model] = nil
+	self:Schedule(model) -- re-applies a variant's hidden face (ApplyVariant)
+end
+
+function RigController:EndWarmup()
+	if self.Warm then
+		return
+	end
+	self.Warm = true
+	for model in self.Concealed do
+		self:Reveal(model)
+	end
+end
+
+-- Preloads every mesh and texture a rig can use, then reveals the concealed NPC rigs. Best effort, async.
+function RigController:Warmup()
+	task.delay(WARMUP_TIMEOUT, function()
+		self:EndWarmup()
+	end)
+	task.spawn(function()
+		const list: { any } = {}
+		const assets = ReplicatedStorage:WaitForChild("Assets", 10)
+		const crew = if assets then assets:WaitForChild("Crew", 10) else nil
+		if crew ~= nil then
+			table.insert(list, crew)
+		end
+		const expressions = ReplicatedStorage:FindFirstChild("CrewExpressions")
+		if expressions ~= nil then
+			table.insert(list, expressions)
+		end
+		for _, look in CrewLooks.Species do
+			for _, id in look.Head do
+				table.insert(list, id)
+			end
+		end
+		for _, sheets in CrewLooks.Outfits do
+			for _, id in sheets do
+				table.insert(list, id)
+			end
+		end
+		for _, id in CrewLooks.Atlas do
+			table.insert(list, id)
+		end
+		pcall(function()
+			ContentProvider:PreloadAsync(list)
+		end)
+		self:EndWarmup()
+	end)
 end
 
 -- Customer-anomaly variant of a rig (nil = ordinary). Not reactive.
@@ -238,6 +339,7 @@ function RigController:Add(instance: Instance)
 	const model = instance
 	const rig: Rig = { Connections = {}, Pending = false }
 	self.Rigs[model] = rig
+	self:Conceal(model)
 	local function schedule()
 		self:Schedule(model)
 	end
@@ -264,6 +366,11 @@ function RigController:Add(instance: Instance)
 		model.Destroying:Connect(function()
 			self.Expressions[model] = nil
 			self.HiddenFaces[model] = nil
+			const concealed = self.Concealed[model]
+			if concealed ~= nil then
+				concealed:Disconnect()
+				self.Concealed[model] = nil
+			end
 			self:Remove(model)
 		end)
 	)
@@ -309,6 +416,7 @@ RigController:OnInit(function(self)
 end)
 
 RigController:OnStart(function(self)
+	self:Warmup()
 	const player = Players.LocalPlayer
 	player.CharacterAdded:Connect(function(character: Model)
 		self:WatchCharacter(character)
