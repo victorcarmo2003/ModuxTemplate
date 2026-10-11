@@ -3154,6 +3154,41 @@ local function hideMartMarkers(): number
 	return n
 end
 
+-- Seating (FEAT-037, TASK-149): the picnic tables the user placed by hand in MAP01_Assets.PadDecor
+-- (AST-100_PicnicTable with Seat1..Seat4) get tag SeatTable + TableIndex 1..N, nearest to Q1 first (SeatingService
+-- reads them; it would tag them itself with a warning otherwise). Persistent so every client has them.
+local function bindTables(assets: Instance, root: Instance?): number
+	local decor = assets:FindFirstChild("PadDecor")
+	if not decor then
+		return 0
+	end
+	local q1 = root and root:FindFirstChild("Q1", true)
+	local q1Pos = if q1 and q1:IsA("BasePart") then q1.Position else FCF(CFrame.new(52, 0, 33)).Position
+	local tables = {}
+	for _, m in decor:GetChildren() do
+		if m:IsA("Model") and m.Name == "AST-100_PicnicTable" and m:FindFirstChild("Seat1") then
+			table.insert(tables, m)
+		end
+	end
+	table.sort(tables, function(a, b)
+		return (a:GetPivot().Position - q1Pos).Magnitude < (b:GetPivot().Position - q1Pos).Magnitude
+	end)
+	for i, m in tables do
+		CollectionService:AddTag(m, "SeatTable")
+		m:SetAttribute("TableIndex", i)
+		;(m :: Model).ModelStreamingMode = Enum.ModelStreamingMode.Persistent
+		for _, d in m:GetDescendants() do
+			if d:IsA("BasePart") and string.match(d.Name, "^Seat%d$") then
+				d.Transparency = 1
+				d.CanCollide = false
+				d.CanQuery = false
+				d.CanTouch = false
+			end
+		end
+	end
+	return #tables
+end
+
 function Bind.run(opts: AnchorOpts?): string
 	local o: AnchorOpts = opts or {}
 	table.clear(report)
@@ -3202,6 +3237,7 @@ function Bind.run(opts: AnchorOpts?): string
 	end
 	local root = bindPoints({ cart = cart, trailer = trl, poses = { cart = cartPose, trl = padPose, sale = salePose }, assets = assets })
 	bindLightZones(root, padPose)
+	log("ok", ("SeatTable: %d picnic table(s) tagged, TableIndex nearest to Q1 first (FEAT-037)"):format(bindTables(assets, root)))
 	bindWindows(assets, root)
 	bindTraffic(root)
 	local parked = parkStraySpawn()
