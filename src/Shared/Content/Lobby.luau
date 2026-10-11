@@ -108,7 +108,7 @@ local function squad(n: number, x: number, z: number): Zone
 		Platform = n,
 		PointId = `LOBBY-SQUAD-{n}`,
 		Center = Vector3.new(x, 0.39, z),
-		Radius = 5.2,
+		Radius = 8, -- pad diameter 16 (user 2026-10-11: pads were too small)
 		Color = WHITE,
 	}
 end
