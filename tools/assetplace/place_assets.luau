@@ -467,6 +467,120 @@ function Place.diff(placements: { any }, ids: { [string]: any }?, opts: { [strin
 	local function bare(n: string): string
 		return (string.gsub(n, "^Fixed_", ""))
 	end
+	-- opts.capture = {} (2026-10-11): also record, for every differing entry, the placement fields that rebuild what
+	-- is live now (x/y/z/rotY from the live pivot, parts / drop / copies against the clean template). Used by
+	-- Place.capture to write hand edits back into MAP-01_placements.luau.
+	local function r3(n: number): number
+		return math.floor(n * 1000 + 0.5) / 1000
+	end
+	local function captureEntry(p: { [string]: any }, liveModel: Instance): { [string]: any }
+		local rec: { [string]: any } = { warn = {} }
+		local livePivot = (liveModel :: any):GetPivot() :: CFrame
+		local m = MAP_FRAME:Inverse() * livePivot
+		local rx, ry, rz = m:ToEulerAnglesYXZ()
+		if math.abs(math.deg(rx)) > 0.5 or math.abs(math.deg(rz)) > 0.5 then
+			table.insert(rec.warn, string.format("pivot tilted (rotX %.1f, rotZ %.1f): kept as yaw only, parts carry the rest", math.deg(rx), math.deg(rz)))
+		end
+		rec.x, rec.y, rec.z, rec.rotY = r3(m.X), r3(m.Y), r3(m.Z), r3(math.deg(ry))
+		local tpl = template(p.asset, ids or {})
+		if not tpl then
+			table.insert(rec.warn, "no template")
+			return rec
+		end
+		local clean: { [string]: any } = {}
+		for k, v in p do
+			clean[k] = v
+		end
+		clean.x, clean.y, clean.z, clean.rotY = rec.x, rec.y, rec.z, rec.rotY
+		clean.parts, clean.copies, clean.pivot = nil, nil, nil
+		local exp = build(clean, tpl)
+		local origin = frameOf(rec.x, rec.y, rec.z, rec.rotY)
+		local expParts, liveParts = ownParts(exp), ownParts(liveModel)
+		local nameCount: { [string]: number } = {}
+		for _, ep in expParts do
+			nameCount[ep.Name] = (nameCount[ep.Name] or 0) + 1
+		end
+		local pp = {}
+		for _, ep in expParts do
+			for _, lp in liveParts do
+				if bare(lp.Name) == ep.Name then
+					table.insert(pp, { ep = ep, lp = lp, d = (lp.Position - ep.Position).Magnitude })
+				end
+			end
+		end
+		table.sort(pp, function(a, b)
+			return a.d < b.d
+		end)
+		local match, taken = {}, {}
+		for _, pr in pp do
+			if not match[pr.ep] and not taken[pr.lp] then
+				match[pr.ep] = pr.lp
+				taken[pr.lp] = true
+			end
+		end
+		local function pose(relT: CFrame, lp: BasePart, tplSize: Vector3): { [any]: any }
+			local relL = origin:ToObjectSpace(lp.CFrame)
+			local ex, ey, ez = (relL.Rotation * relT.Rotation:Inverse()):ToEulerAnglesYXZ()
+			-- `pos` (not array slots): a mixed table does not survive JSONEncode
+			local o2: { [any]: any } = { pos = { r3(relL.X), r3(relL.Y), r3(relL.Z) } }
+			if math.abs(math.deg(ey)) > 0.05 then
+				o2.rotY = r3(math.deg(ey))
+			end
+			if math.abs(math.deg(ex)) > 0.05 then
+				o2.rotX = r3(math.deg(ex))
+			end
+			if math.abs(math.deg(ez)) > 0.05 then
+				o2.rotZ = r3(math.deg(ez))
+			end
+			if (lp.Size - tplSize).Magnitude > 0.005 then
+				o2.size = { r3(lp.Size.X), r3(lp.Size.Y), r3(lp.Size.Z) }
+			end
+			return o2
+		end
+		local relOf: { [string]: CFrame } = {}
+		local sizeOf: { [string]: Vector3 } = {}
+		for _, ep in expParts do
+			relOf[ep.Name] = relOf[ep.Name] or origin:ToObjectSpace(ep.CFrame)
+			sizeOf[ep.Name] = sizeOf[ep.Name] or ep.Size
+			local lp = match[ep]
+			if not lp then
+				rec.drop = rec.drop or {}
+				table.insert(rec.drop, ep.Name)
+				if nameCount[ep.Name] > 1 then
+					table.insert(rec.warn, "dropped one of several parts named " .. ep.Name .. ": drop removes all of them")
+				end
+				continue
+			end
+			local relT = origin:ToObjectSpace(ep.CFrame)
+			local relL = origin:ToObjectSpace(lp.CFrame)
+			local _, ang = relT:ToObjectSpace(relL):ToAxisAngle()
+			if (relL.Position - relT.Position).Magnitude > tolPos or math.deg(math.abs(ang)) > tolDeg or (lp.Size - ep.Size).Magnitude > tolPos then
+				if nameCount[ep.Name] > 1 then
+					table.insert(rec.warn, "moved one of several parts named " .. ep.Name .. ": parts{} moves the first only")
+				end
+				rec.parts = rec.parts or {}
+				rec.parts[ep.Name] = pose(relT, lp, ep.Size)
+			end
+		end
+		for _, lp in liveParts do
+			if not taken[lp] then
+				local n = bare(lp.Name)
+				if relOf[n] then
+					rec.copies = rec.copies or {}
+					local c = pose(relOf[n], lp, sizeOf[n])
+					c.part = n
+					table.insert(rec.copies, c)
+				else
+					table.insert(rec.warn, "extra live part not in the template: " .. lp:GetFullName())
+				end
+			end
+		end
+		exp:Destroy()
+		if #rec.warn == 0 then
+			rec.warn = nil
+		end
+		return rec
+	end
 	-- Pass 1: build every expected model (never parented) and group the entries by their stable key MapId|Asset.
 	type Entry = { i: number, p: { [string]: any }, key: string, move: CFrame?, exp: Instance?, err: string?, live: Instance?, dist: number }
 	local entries: { Entry } = {}
@@ -613,6 +727,17 @@ function Place.diff(placements: { any }, ids: { [string]: any }?, opts: { [strin
 		end
 		exp:Destroy()
 		local where = if best then " <-> " .. best:GetFullName() else ""
+		if o.capture and real > 0 then
+			if move then
+				table.insert(o.capture.skipped, i)
+			elseif best then
+				local rec = captureEntry(e.p, best)
+				rec.i = i
+				table.insert(o.capture.changes, rec)
+			else
+				table.insert(o.capture.removed, i)
+			end
+		end
 		if real > 0 then
 			nDiff += 1
 			table.insert(lines, string.format("#%d %s%s%s: %s", i, key, if move then " [moved]" else "", where, table.concat(msgs, " | ")))
@@ -631,6 +756,13 @@ function Place.diff(placements: { any }, ids: { [string]: any }?, opts: { [strin
 			for _, a in list do
 				if not used[a] and string.sub(k, 1, 9) ~= "TRL-SALE|" then
 					nDiff += 1
+					if o.capture then
+						local id, asset = string.match(k, "^(.-)|(.*)$")
+						local rec = captureEntry({ asset = asset, id = id }, a)
+						rec.asset, rec.id = asset, id
+						rec.group = (a.Parent and a.Parent ~= root) and a.Parent.Name or "Misc"
+						table.insert(o.capture.added, rec)
+					end
 					table.insert(lines, "live model not in the placements: " .. a:GetFullName())
 				end
 			end
@@ -649,6 +781,17 @@ function Place.diff(placements: { any }, ids: { [string]: any }?, opts: { [strin
 		)
 	)
 	return table.concat(lines, "\n"), nDiff
+end
+
+--[[ Place.capture(placements, ids?) -> JSON string (2026-10-11). Read-only. Runs Place.diff with the capture option and
+	returns { changes = { { i, x, y, z, rotY, parts?, drop?, copies?, warn? } }, removed = { i }, added = { { asset, id,
+	group, x, y, z, rotY, parts?, ... } }, skipped = { i } } for tools/assetplace/apply_capture.py, which writes it into
+	MAP-01_placements.luau (entries matched by their position in the list). Entries that follow the trailer are skipped. ]]
+function Place.capture(placements: { any }, ids: { [string]: any }?): string
+	local cap = { changes = {}, removed = {}, added = {}, skipped = {} }
+	local report = Place.diff(placements, ids, { capture = cap })
+	cap.report = string.match(report, "^[^\n]*")
+	return game:GetService("HttpService"):JSONEncode(cap)
 end
 
 return Place
