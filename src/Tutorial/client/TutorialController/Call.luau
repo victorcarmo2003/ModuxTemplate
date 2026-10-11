@@ -9,6 +9,15 @@
 
 	Replace(lines) drops the lines not started yet (the step changed again) and queues the new ones; the line on
 	screen finishes first. The last line lingers LINGER s, then the strip hides. Pure presentation: nothing is sent.
+
+	Voice in sync (playtest 2026-10-11: the subtitle "Here comes your first customer." showed, Walt stayed silent).
+	Cause: Say() only voices a line already loaded or loading within Speech's LATE (1 s) of the call, and the call
+	gave every line its beat the moment the previous one ended, so any line whose text-to-speech was still in the load
+	queue (about 45 lines prepared one by one, each a server request) was shown silent and never voiced. Now the next
+	line waits for its own voice: Speech.Fetch puts it first in the load queue, and the line starts (subtitle + voice
+	together) once it is "Loaded", or after HOLD s / when the voice is "Failed" / "Off" (subtitle only, Speech warns
+	once per session). A loaded line holds the screen for its real length (TimeLength) when longer than the reading
+	time.
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
@@ -32,6 +41,8 @@ const WORD_TIME = 0.36
 const MIN_TIME = 1.4
 const GAP = 0.25 -- s of silence between two lines
 const LINGER = 4 -- s the last line stays on screen after it was said
+const HOLD = 3 -- s a line waits for its voice before it goes on as a subtitle only
+const TAIL = 0.3 -- s after the voice ends before the next line
 
 const Call = {}
 
@@ -53,6 +64,7 @@ function Call.new(show: (text: string?) -> (), volume: () -> number): Call
 	const queue: { string } = {}
 	local endsAt = 0 -- os.clock when the line on screen is over (0 = none)
 	local hideAt = 0 -- os.clock when the strip hides (0 = hidden)
+	local waitFrom = 0 -- os.clock the next line started waiting for its voice (0 = not waiting)
 
 	local function voice(): Speech.Speech
 		const existing = speech
@@ -83,12 +95,14 @@ function Call.new(show: (text: string?) -> (), volume: () -> number): Call
 		end,
 		Replace = function(lines: { string })
 			table.clear(queue)
+			waitFrom = 0
 			for _, text in lines do
 				table.insert(queue, text)
 			end
 		end,
 		Cut = function()
 			table.clear(queue)
+			waitFrom = 0
 			endsAt = 0
 			hideAt = 0
 			const current = speech
@@ -103,13 +117,32 @@ function Call.new(show: (text: string?) -> (), volume: () -> number): Call
 			if endsAt > 0 and now < endsAt then
 				return
 			end
-			const text = table.remove(queue, 1)
+			const text = queue[1]
 			if text ~= nil then
-				const time = readTime(text)
+				const line = beat(text)
+				const speech = voice()
+				const status = speech.Fetch(line)
+				if status == "Queued" or status == "Loading" then
+					if waitFrom == 0 then
+						waitFrom = now
+					end
+					if now - waitFrom < HOLD then
+						return -- the voice is on its way: the line starts with it
+					end
+				end
+				table.remove(queue, 1)
+				waitFrom = 0
+				local time = readTime(text)
+				if status == "Loaded" then
+					const length = speech.Length(line)
+					if length ~= nil then
+						time = math.max(time, length + TAIL)
+					end
+				end
 				endsAt = now + time + GAP
 				hideAt = now + time + LINGER
 				show(text)
-				voice().Say(beat(text))
+				speech.Say(line)
 				return
 			end
 			endsAt = 0

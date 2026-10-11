@@ -39,6 +39,7 @@ export type Public = {
 	Deposit: (self: Public, info: ShiftInfo) -> Report,
 	BeginShift: (self: Public) -> (),
 	RestoreCash: (self: Public, data: any) -> (),
+	TopUp: (self: Public, amount: number) -> number,
 	DevAddCash: (self: Public, amount: number) -> number,
 	Record: (self: Public) -> { Cash: number, Drawer: number },
 }

@@ -7,8 +7,13 @@
 -- current objective (Text, starting with the verb + Hint) as a short support, under "Step N of M".
 -- Tutorial customer (user request 2026-10-11): right after the call is answered one customer comes (shared.Tutorial
 -- .Rules: fixed order, no time limit) and the steps follow its order: take the order -> grill -> slice -> collect ->
--- assemble -> toppings -> (open the shop, only if still in Prep) -> serve -> money -> mart.
--- Number = the step shown in the panel ("3/9"); waiting rows share the number of the step they wait for.
+-- assemble -> toppings -> (open the shop, only if still in Prep) -> serve -> money -> shopping.
+-- Shopping (user request 2026-10-11, Provisional): the tutorial run starts with ONE bun (server, TutorialService), so
+-- the first sale empties the crate; Walt sends the rookie to the Mart: mart_go (arrow to the Mart door) -> mart_buy
+-- (the BAKERY shelf, "Buy Buns") -> mart_back (the pack in hand, back to the cart) -> restock (hold "Restock" at the
+-- bun crate) -> goodbye. When the buns did not run out (a party with a veteran: no tutorial stock), the old talk step
+-- "mart" stands in for the four.
+-- Number = the step shown in the panel ("3/13"); waiting rows share the number of the step they wait for.
 -- Action = the prompt the arrow points at (nil = no prompt: waiting, or a talk step).
 -- Talk = no world action: the step moves on once Walt has said it (or after TALK_TIME without the call; "Got it").
 -- The order of the cooking steps is decided live from the replicated state (TutorialController:Decide), never stored.
@@ -26,7 +31,7 @@ export type Step = {
 	Talk: boolean?,
 }
 
-const TOTAL = 9
+const TOTAL = 13
 
 const LIST: { Step } = {
 	{
@@ -149,8 +154,48 @@ const LIST: { Step } = {
 		Talk = true,
 	},
 	{
+		Key = "mart_go",
+		Number = 10,
+		Text = "Go to the Mart",
+		Hint = "Ninth Street Mart, across the street. Look both ways!",
+		Action = nil,
+		Say = {
+			"Uh-oh. That was your last bun.",
+			"Head to the Mart, across the street.",
+			"Look both ways! These drivers don't brake.",
+		},
+		Done = "That's the place.",
+	},
+	{
+		Key = "mart_buy",
+		Number = 11,
+		Text = "Buy a pack of buns",
+		Hint = 'Hold "Buy Buns" at the BAKERY shelf.',
+		Action = "buy_package",
+		Say = { "Bakery shelf. Grab a pack of buns." },
+		Done = "Eight buns. That'll do.",
+	},
+	{
+		Key = "mart_back",
+		Number = 12,
+		Text = "Bring it back",
+		Hint = "Carry the pack back to your cart.",
+		Action = nil,
+		Say = { "Now bring 'em back to the cart." },
+	},
+	{
+		Key = "restock",
+		Number = 13,
+		Text = "Restock the buns",
+		Hint = 'Hold "Restock" at the bun crate.',
+		Action = "restock",
+		Say = { "Hold Restock on the bun crate." },
+		Done = "Stocked up!",
+	},
+	-- stands in for the four shopping steps when the buns did not run out (no tutorial stock)
+	{
 		Key = "mart",
-		Number = 9,
+		Number = 10,
 		Text = "Restock at the Mart",
 		Hint = "Ninth Street Mart, across the street: buy a package, bring it back.",
 		Action = nil,
@@ -163,8 +208,11 @@ const LIST: { Step } = {
 	},
 }
 
--- Talk steps in order after the first sale; the last one ends the tutorial
+-- Talk steps in order after the first sale; the last one ends the tutorial. After "money" the controller goes to the
+-- shopping steps instead of "mart" when the buns ran out (TutorialController:NextTalk).
 const TALKS: { string } = { "money", "mart" }
+-- Shopping steps (decided live from the hand, the bun stock and where the player stands)
+const SHOPPING: { string } = { "mart_go", "mart_buy", "mart_back", "restock" }
 
 -- Walt when the call is answered (before the first step line)
 const GREETING: { string } = { "Morning, Rookie! Walt here.", "I'll stay on the line and walk you through it." }
@@ -216,6 +264,7 @@ return table.freeze({
 	ByKey = table.freeze(ByKey),
 	IndexOf = table.freeze(IndexOf),
 	Talks = table.freeze(TALKS),
+	Shopping = table.freeze(SHOPPING),
 	Greeting = table.freeze(GREETING),
 	Goodbye = table.freeze(GOODBYE),
 	SkipGoodbye = table.freeze(SKIP_GOODBYE),

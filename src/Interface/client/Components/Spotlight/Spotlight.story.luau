@@ -1,6 +1,7 @@
 --!strict
 -- Spotlight over a phone-sized mock HUD: a money pill top-left is the target. "Shown" fades the dim in/out, "Target"
--- off dims everything, "X" moves the pill (the hole follows it).
+-- off dims everything, "X" moves the pill (the hole follows it), "Scale" scales the mock HUD like Theme.Scale (the
+-- hole must still match the pill exactly).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -10,11 +11,14 @@ local CartoonLabel = require(script.Parent.Parent.CartoonLabel)
 local Spotlight = require(script.Parent)
 
 const create = Vide.create
+-- Vide 0.4.1 types `create` for 19 classes only; UIScale is not among them.
+const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }) -> Instance
 
 type Controls = {
 	Shown: () -> boolean,
 	Target: () -> boolean,
 	X: () -> number,
+	Scale: () -> number,
 }
 
 return UILabs.CreateVideStory({
@@ -23,6 +27,7 @@ return UILabs.CreateVideStory({
 		Shown = true,
 		Target = true,
 		X = UILabs.Slider(12, 0, 500, 1),
+		Scale = UILabs.Slider(1, 0.86, 1.6, 0.02),
 	},
 }, function(props)
 	-- UI Labs types the control sources loosely; pin them to what the story reads.
@@ -52,7 +57,16 @@ return UILabs.CreateVideStory({
 		BackgroundColor3 = Color3.fromHex("#8FD3F4"),
 		ClipsDescendants = true,
 
-		pill,
+		-- mock HUD layer scaled like HudScreen (frame shrunk by the same factor)
+		create("Frame")({
+			Name = "Hud",
+			Size = function()
+				return UDim2.fromScale(1 / controls.Scale(), 1 / controls.Scale())
+			end,
+			BackgroundTransparency = 1,
+			createRaw("UIScale")({ Scale = controls.Scale }),
+			pill,
+		}),
 		Spotlight({
 			Shown = controls.Shown,
 			Target = function(): GuiObject?

@@ -8,7 +8,8 @@
 --   Steal(amount)                 thief (FEAT-013): takes up to the drawer, counted in the ledger's Stolen
 --   CountArrival(), CountResult() ledger for the grade (CustomerService, TASK-032/033)
 --   AddReportStep(name, fn)       fills ShiftReport fields of other features before it is sent (T48)
--- Payments go to the drawer, never to Cash (DEC-050): Cash only changes by Spend, the deposit and DevAddCash.
+--   TopUp(amount)                 first-run tutorial: Cash up to at least amount (TutorialService, Provisional)
+-- Payments go to the drawer, never to Cash (DEC-050): Cash only changes by Spend, the deposit, TopUp and DevAddCash.
 -- Deposit on RoundService.ShiftEnded (start of Summary): grade A-D, bonus floor(drawer x %), Cash += drawer + bonus,
 -- Drawer = 0, report steps, ShiftReport to the group, Reported(info, report).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -327,6 +328,23 @@ function EconomyService:RestoreCash(data: any)
 		self.Drawer(0)
 	end)
 	self.Shift = Ledger.new()
+end
+
+-- First-run tutorial (user request 2026-10-11, Provisional; TutorialService): Cash goes up to at least `amount` (the
+-- price of the package Walt sends the rookie to buy), so the shopping lesson never stalls on money. Never lowers Cash.
+-- Returns what was added.
+function EconomyService:TopUp(amount: number): number
+	const value = amountOf(amount)
+	if value == nil then
+		fail(`[EconomyService] TopUp: amount must be a non-negative integer, got {amount}`)
+		return 0
+	end
+	const cash = self.Cash()
+	if cash >= value then
+		return 0
+	end
+	self.Cash(math.min(value, CASH_MAX))
+	return value - cash
 end
 
 -- Dev hook (board TASK-021 v1.1, R2; command in TASK-043). `amount` may be negative; Cash never goes below 0.

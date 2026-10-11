@@ -23,6 +23,11 @@
 	timeout; the rest keeps loading in the background (LoadingController, before the intro). Prepare(lines) queues
 	without waiting. Say(line) plays a loaded line on its beat; one still loading jumps to the front of the queue and
 	plays when it loads, if that is still within LATE s of its beat. A new line cuts the one playing.
+	Fetch(line) (Walt's tutorial call, user feedback 2026-10-11: his lines were said before their voice had loaded and
+	stayed silent) queues the line first and returns its state, so a caller without a fixed timeline can hold the line
+	until the voice is ready ("Loaded") or gone ("Failed" / "Off": subtitle only). Length(line) = seconds of a loaded
+	line (TimeLength), nil when unknown.
+	Warnings: one per session for every Speech together (module-level), the rest of the session is silent.
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local SoundService = game:GetService("SoundService")
@@ -32,8 +37,14 @@ local LoadQueue = require(StarterPlayer.StarterPlayerScripts.client.Audio.AudioC
 
 type Beat = Content.CutsceneBeat
 
+export type Status = "Queued" | "Loading" | "Loaded" | "Failed" | "Off"
+
 export type Speech = {
 	Prepare: (lines: { Beat }) -> (),
+	-- queues the line first (if not loaded yet) and returns its state; "Off" = no voice for it (subtitle only)
+	Fetch: (line: Beat) -> Status,
+	-- seconds of a loaded line (nil = not loaded or unknown)
+	Length: (line: Beat) -> number?,
 	-- yields; progress(fraction 0..1) while it waits
 	Preload: (lines: { Beat }, timeout: number, progress: ((number) -> ())?) -> (),
 	Say: (line: Beat) -> (),
@@ -65,6 +76,9 @@ const GIVE_UP = 6 -- failures in a row (no success between) that switch text-to-
 const POLL = 0.1 -- s between two progress reads of Preload
 
 const Speech = {}
+
+-- one text-to-speech warning per session, shared by every Speech (intro and tutorial call)
+local warnedOnce = false
 
 -- Text sent to AudioTextToSpeech. Roblox filters TTS text and refuses lines with phone-number-like digit runs
 -- ("Failed to load sound : FilteredText", 2026-10-11: "555-0179... Here goes."); the subtitle keeps the number, the
@@ -110,7 +124,11 @@ function Speech.new(volume: () -> number): Speech
 			return
 		end
 		warned[key] = true
-		warn(`[CutsceneController] {message}`)
+		if warnedOnce then
+			return
+		end
+		warnedOnce = true
+		warn(`[Speech] {message}`)
 	end
 
 	local function disable(reason: string)
@@ -398,9 +416,43 @@ function Speech.new(volume: () -> number): Speech
 		return list
 	end
 
+	-- Moves a queued entry to the front of the load queue
+	local function hurry(entry: Entry)
+		const index = table.find(queue, entry)
+		if index ~= nil and index > 1 then
+			table.remove(queue, index)
+			table.insert(queue, 1, entry)
+		end
+	end
+
 	return {
 		Prepare = function(lines: { Beat })
 			queueAll(lines)
+		end,
+		Fetch = function(line: Beat): Status
+			if not enabled or not alive then
+				return "Off"
+			end
+			const entry = ensure(line, true)
+			if entry == nil then
+				return "Off"
+			end
+			if entry.State == "Queued" then
+				hurry(entry)
+				pump()
+			end
+			return entry.State
+		end,
+		Length = function(line: Beat): number?
+			const entry = entries[keyOf(line)]
+			const voice = if entry ~= nil and entry.State == "Loaded" then entry.Voice else nil
+			if voice == nil then
+				return nil
+			end
+			const ok, length = pcall(function(): number
+				return voice.TimeLength
+			end)
+			return if ok and type(length) == "number" and length > 0 then length else nil
 		end,
 		Preload = function(lines: { Beat }, timeout: number, progress: ((number) -> ())?)
 			const list = queueAll(lines)
@@ -436,11 +488,7 @@ function Speech.new(volume: () -> number): Speech
 			end
 			entry.Wanted = os.clock()
 			-- late line: first in the queue
-			const index = table.find(queue, entry)
-			if index ~= nil and index > 1 then
-				table.remove(queue, index)
-				table.insert(queue, 1, entry)
-			end
+			hurry(entry)
 			pump()
 		end,
 		Stop = function()

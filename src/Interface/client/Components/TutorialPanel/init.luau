@@ -48,6 +48,7 @@ export type Props = {
 const TEXT_SIZE = 17
 const HINT_SIZE = 14
 const CHIP = 36 -- round step chip (not touchable)
+const CHIP_WIDE = 52 -- chip width for a two-digit count ("10/13" at 14 px)
 const WIDTH_SCALE = 0.5
 const MIN_WIDTH = 260
 const MAX_WIDTH = 440
@@ -64,6 +65,11 @@ return function(props: Props): Frame
 
 	local function hasChip(): boolean
 		return props.Total() > 0
+	end
+
+	-- "10/13" does not fit the round chip: it stretches into a pill
+	local function chipWidth(): number
+		return if props.Total() >= 10 then CHIP_WIDE else CHIP
 	end
 
 	local function done(): boolean
@@ -115,7 +121,9 @@ return function(props: Props): Frame
 				CartoonPanel({
 					Name = "Chip",
 					LayoutOrder = 1,
-					Size = UDim2.fromOffset(CHIP, CHIP),
+					Size = function()
+						return UDim2.fromOffset(chipWidth(), CHIP)
+					end,
 					Tone = function()
 						return if done() then Theme.Tone.Green else Theme.Tone.Mustard
 					end,
@@ -164,7 +172,7 @@ return function(props: Props): Frame
 					Name = "Lines",
 					LayoutOrder = 2,
 					Size = function()
-						return UDim2.new(1, if hasChip() then -(CHIP + GAP) else 0, 0, 0)
+						return UDim2.new(1, if hasChip() then -(chipWidth() + GAP) else 0, 0, 0)
 					end,
 					AutomaticSize = Enum.AutomaticSize.Y,
 					BackgroundTransparency = 1,

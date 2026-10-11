@@ -7,8 +7,14 @@
 	(user request 2026-10-11, Provisional):
 	  answer the phone -> (the tutorial customer walks up) take the order -> grill -> slice -> (cooking) -> collect
 	  -> assemble -> toppings of the order (or throw away a wrong one) -> open the shop (only if still in Prep: the
-	  drawer is closed there) -> serve -> money (UI step: the money pill pops in under a spotlight) -> mart (restock,
-	  talk only) -> Walt's goodbye
+	  drawer is closed there) -> serve -> money (UI step: the money pill pops in under a spotlight) -> shopping ->
+	  Walt's goodbye
+	Shopping (user request 2026-10-11, Provisional): the tutorial run starts with one bun (TutorialService, server), so
+	the first sale empties the crate. With the bun stock at 0 after the money step: mart_go (arrow on the Mart door,
+	MapPoint MKT-DOOR / its AutoDoor) -> mart_buy (the BAKERY shelf anchor, buy_package of TutorialRules.Package; from
+	the moment the player reached the door or the shelf) -> mart_back (the pack in hand, arrow on the bun crate restock
+	anchor) -> restock (near the crate) -> the bun stock goes above 0 (whoever restocked) = done. With buns left (no
+	tutorial stock: a party with a veteran) the talk step "mart" stands in for the four.
 	Tutorial customer: once the call is answered (or it never came) `TutorialBegin` goes out once; TutorialService has
 	CustomerService spawn one customer with the rig attribute shared.Tutorial.Rules.Attribute (fixed order, no time
 	limit, out of the grade). Asked again every REASK s while none is around and no sale came.
@@ -106,6 +112,17 @@ const EDGE_MARGIN = 56 -- px from the screen edge for the pointer
 const PANEL_TOP = 50 -- px at scale 1, under the clock row (HudScreen TOP 6 + 38 + gap 6)
 const CASH_NAME = "Cash" -- HudPill of the money in the Hud ScreenGui
 const MONEY_STEP = "money"
+const MART_TALK = "mart"
+-- Shopping steps (PROVISIONAL distances, studs)
+const BUN = "bun"
+const PACK = TutorialRules.Package -- package Tool item key of the shopping steps (pack_buns)
+const POINT_TAG = "MapPoint"
+const DOOR_TAG = "AutoDoor"
+const MART_DOOR = "MKT-DOOR" -- MapPoint of the Mart entrance (MAP-01)
+const DOOR_SEARCH = 16 -- an AutoDoor this close to MKT-DOOR is the one marked
+const NEAR_DOOR = 8 -- the player reached the Mart: from here the shelf is marked
+const NEAR_SHELF = 18
+const NEAR_CRATE = 12 -- back at the cart: "Restock the buns"
 
 -- Stations set record fields read here (network.md §3.5)
 type SlotRecord = { Kind: string, State: string, Count: number }
@@ -177,6 +194,9 @@ function TutorialController:Setup()
 		return self:VoiceVolume()
 	end) :: Call.Call
 	self.Sent = false :: boolean
+	-- shopping steps after the first sale (the buns ran out); InMart = the player reached the Mart once
+	self.Shopping = false :: boolean
+	self.InMart = false :: boolean
 	self.Unmounts = {} :: { () -> () }
 end
 
@@ -354,6 +374,100 @@ function TutorialController:Anchor(action: string, enabled: boolean, filter: ((I
 	return best
 end
 
+-- Units of an ingredient in the cart (Stock set, record id = Content.Ingredients.IndexOf). nil = not replicated yet.
+function TutorialController:StockAmount(ingredient: string): number?
+	const index = Content.Ingredients.IndexOf[ingredient]
+	if index == nil then
+		return nil
+	end
+	for id, raw in self.Libs.Net.Stock:entries() do
+		if id == index then
+			const record = raw :: { Amount: number }
+			return record.Amount
+		end
+	end
+	return nil
+end
+
+-- Studs from the own character to an instance (math.huge = unknown)
+function TutorialController:DistanceTo(instance: Instance?): number
+	const root = self:Root()
+	const position = if instance then positionOf(instance) else nil
+	if root == nil or position == nil then
+		return math.huge
+	end
+	return (position - root.Position).Magnitude
+end
+
+-- What marks the Mart entrance: the AutoDoor next to MapPoint MKT-DOOR, else the point part itself (nil = not
+-- streamed in)
+function TutorialController:MartDoor(): Instance?
+	local point: BasePart? = nil
+	for _, instance in CollectionService:GetTagged(POINT_TAG) do
+		if
+			instance:IsA("BasePart")
+			and instance:GetAttribute("PointId") == MART_DOOR
+			and instance:IsDescendantOf(Workspace)
+		then
+			point = instance
+			break
+		end
+	end
+	if point == nil then
+		return nil
+	end
+	local best: Instance = point
+	local bestDistance = DOOR_SEARCH
+	for _, door in CollectionService:GetTagged(DOOR_TAG) do
+		const position = if door:IsDescendantOf(Workspace) then positionOf(door) else nil
+		if position ~= nil then
+			const distance = (position - point.Position).Magnitude
+			if distance < bestDistance then
+				best, bestDistance = door, distance
+			end
+		end
+	end
+	return best
+end
+
+-- The "restock" anchor of the bun crate on the vehicle in use
+function TutorialController:CrateAnchor(): Instance?
+	return self:Anchor("restock", false, function(anchor)
+		const own = anchor:GetAttribute("Ingredient")
+		if own ~= nil then
+			return own == BUN
+		end
+		const station = ancestorWith(anchor, function(instance)
+			return CollectionService:HasTag(instance, STATION_TAG)
+		end)
+		return station ~= nil
+			and (station:GetAttribute("Ingredient") == BUN or station:GetAttribute("StationKind") == "bun_crate")
+	end)
+end
+
+-- Shopping step and its target, from the hand, the bun stock and where the player stands
+function TutorialController:DecideShop(): (string, Instance?, string)
+	const held = self:Held()
+	if held and held.Item == PACK then
+		const crate = self:CrateAnchor()
+		if crate ~= nil and self:DistanceTo(crate) <= NEAR_CRATE then
+			return "restock", crate, ""
+		end
+		return "mart_back", crate, ""
+	end
+	const shelf = self:Anchor("buy_package", true, function(anchor)
+		return anchor:GetAttribute("Package") == PACK
+	end)
+	const door = self:MartDoor()
+	if not self.InMart and (self:DistanceTo(door) <= NEAR_DOOR or self:DistanceTo(shelf) <= NEAR_SHELF) then
+		self.InMart = true
+	end
+	if self.InMart then
+		return "mart_buy", shelf or door, ""
+	end
+	return "mart_go", door or shelf, ""
+end
+
 -- Walt on the phone ----------------------------------------------------------------------------------------------
 
 function TutorialController:VoiceVolume(): number
@@ -462,6 +576,11 @@ function TutorialController:Decide(): (string, Instance?, string)
 	const phoneKey, phoneTarget = self:DecidePhone()
 	if phoneKey then
 		return phoneKey, phoneTarget, ""
+	end
+
+	-- after the first sale with the buns gone: the shopping steps
+	if self.Shopping then
+		return self:DecideShop()
 	end
 
 	-- Walt is on the line (or never called): the tutorial customer comes
@@ -595,7 +714,8 @@ local function highlightOf(anchor: Instance): Instance?
 	if parent and parent:IsA("BasePart") then
 		return parent
 	end
-	return station
+	-- a plain model target (the Mart door)
+	return station or (if anchor:IsA("Model") then anchor else nil)
 end
 
 -- Pulsing Highlight + 3D arrow on what the anchor belongs to (Beacon.luau); nil clears both
@@ -766,9 +886,21 @@ function TutorialController:TickTalk()
 	end
 end
 
--- Next talk step; after the last one the tutorial is done
+-- Next talk step; after the last one the tutorial is done. After "money": the shopping steps when the buns ran out
+-- (the tutorial stock of one bun), else the talk step "mart".
 function TutorialController:NextTalk()
 	const current = Vide.untrack(self.StepKey)
+	if current == MONEY_STEP then
+		self.Spot(false)
+		if self:StockAmount(BUN) == 0 then
+			self.Shopping = true
+			const key, target, item = self:DecideShop()
+			self:SetStep(key, target, item)
+		else
+			self:SetStep(MART_TALK, nil, "")
+		end
+		return
+	end
 	local nextKey: string? = nil
 	for index, key in Steps.Talks do
 		if key == current then
@@ -805,7 +937,16 @@ function TutorialController:Finish(reason: string)
 	end
 	if self:Voiced() then
 		if reason == "done" then
-			self.Call.Replace(Steps.Goodbye)
+			-- the praise of the last step first ("Stocked up!"), then the goodbye
+			const lines: { string } = {}
+			const last = Steps.ByKey[Vide.untrack(self.StepKey)]
+			if last and last.Done then
+				table.insert(lines, last.Done)
+			end
+			for _, text in Steps.Goodbye do
+				table.insert(lines, text)
+			end
+			self.Call.Replace(lines)
 		elseif reason == "skip" then
 			self.Call.Cut()
 			self.Call.Queue(Steps.SkipGoodbye)
@@ -870,6 +1011,11 @@ function TutorialController:Tick()
 	const current = Steps.ByKey[Vide.untrack(self.StepKey)]
 	if current and current.Talk then
 		self:TickTalk()
+		return
+	end
+	-- shopping over: the buns are back in the crate (whoever restocked)
+	if self.Shopping and (self:StockAmount(BUN) or 0) > 0 then
+		self:Finish("done")
 		return
 	end
 	const key, target, item = self:Decide()
@@ -966,10 +1112,14 @@ function TutorialController:Mount(playerGui: Instance)
 		})
 		panel.Parent = playerGui
 
-		const overlay = Vide.create("ScreenGui")({
-			Name = "TutorialOverlay",
+		-- Spotlight in a ScreenGui with the HUD's insets (the money pill's ScreenGui): both frames share one origin, so
+		-- the hole sits exactly on the pill on any device / top bar / UI scale; its dim bands overscan the insets
+		-- (playtest 2026-10-11: undimmed strip at the top, hole off the pill)
+		const focus = Vide.create("ScreenGui")({
+			Name = "TutorialSpotlight",
 			ResetOnSpawn = false,
-			IgnoreGuiInset = true,
+			IgnoreGuiInset = false,
+			ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets,
 			ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 			DisplayOrder = 5,
 			Enabled = function()
@@ -984,6 +1134,20 @@ function TutorialController:Mount(playerGui: Instance)
 					return if spot then spot else nil
 				end,
 			}),
+		})
+		focus.Parent = playerGui
+
+		-- Edge pointer: viewport pixels (WorldToViewportPoint), so the whole screen with no inset
+		const overlay = Vide.create("ScreenGui")({
+			Name = "TutorialOverlay",
+			ResetOnSpawn = false,
+			IgnoreGuiInset = true,
+			ScreenInsets = Enum.ScreenInsets.None,
+			ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+			DisplayOrder = 5,
+			Enabled = function()
+				return not Cinematic.Active()
+			end,
 			TutorialPointer({
 				Shown = function()
 					return shown() and self.PointerShown()

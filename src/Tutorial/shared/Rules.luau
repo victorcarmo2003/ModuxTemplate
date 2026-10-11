@@ -12,4 +12,9 @@ return table.freeze({
 	Attribute = "TutorialCustomer",
 	-- s between two spawn tries while the counter is full or the NPC pool is busy
 	Retry = 2,
+	-- Shopping lesson (user request 2026-10-11, Provisional): a tutorial run starts with this many buns (TutorialService
+	-- caps the bun stock when the call is answered and every player in the server is a rookie), so the first sale
+	-- empties the crate and Walt sends the rookie to buy Package (Content.Packages key) and restock it.
+	Buns = 1,
+	Package = "pack_buns",
 })

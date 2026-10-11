@@ -30,8 +30,8 @@ return UILabs.CreateVideStory({
 		Phone = true,
 		Scale = UILabs.Slider(1, 0.86, 1.6, 0.02), -- Theme.Scale: 1 phone, 1.4 at 1080p
 		Shown = true,
-		Step = UILabs.Slider(3, 1, 9, 1),
-		Total = UILabs.Slider(9, 0, 9, 1),
+		Step = UILabs.Slider(3, 1, 13, 1),
+		Total = UILabs.Slider(13, 0, 13, 1),
 		Text = "Grill a sausage",
 		Label = "STEP 3 OF 9",
 		Done = false,
