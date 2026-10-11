@@ -607,4 +607,187 @@ function Decor.runPad(force: boolean?): string
 	return "decor_pad: " .. table.concat(log, ", ")
 end
 
+--[[ Decor.runDetails() (user 2026-10-11): street names on the blank street sign blades, the hot dog logo (DEC-206,
+	AST-072_logo_hotdog.png) on the customer side of the cart and of the trailer, OPEN / CLOSED faces on the Pad sign
+	stand (OpenSignController switches them), a bulb string along the trailer window. Idempotent: every piece is named
+	"Detail_*" and carries BindCreated = true (Place.diff / capture ignore it); a run removes the old ones first. The
+	pieces live inside their vehicle models, so they travel with the cart / trailer. ]]
+local LOGO = "rbxassetid://94237270233660"
+
+local function detailPart(parent: Instance, name: string, size: Vector3, cf: CFrame, color: Color3?, material: Enum.Material?): Part
+	local p = Instance.new("Part")
+	p.Name = "Detail_" .. name
+	p.Size = size
+	p.CFrame = cf
+	p.Color = color or Color3.new(1, 1, 1)
+	p.Material = material or Enum.Material.SmoothPlastic
+	p.Transparency = if color then 0 else 1
+	p.Anchored, p.CanCollide, p.CanTouch, p.CanQuery, p.CastShadow = true, false, false, false, false
+	p:SetAttribute("BindCreated", true)
+	p.Parent = parent
+	return p
+end
+
+local function clearDetails(root: Instance)
+	for _, d in root:GetDescendants() do
+		if string.sub(d.Name, 1, 7) == "Detail_" then
+			d:Destroy()
+		end
+	end
+end
+
+local function streetText(on: BasePart, text: string)
+	for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
+		local gui = Instance.new("SurfaceGui")
+		gui.Name = "Detail_Text"
+		gui.Face = face
+		gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+		gui.PixelsPerStud = 80
+		gui.LightInfluence = 0.5
+		local t = Instance.new("TextLabel")
+		t.Size = UDim2.fromScale(0.94, 0.8)
+		t.AnchorPoint = Vector2.new(0.5, 0.5)
+		t.Position = UDim2.fromScale(0.5, 0.5)
+		t.BackgroundTransparency = 1
+		t.FontFace = FONT
+		t.Text = text
+		t.TextScaled = true
+		t.TextColor3 = Color3.new(1, 1, 1)
+		local s = Instance.new("UIStroke")
+		s.Color = Color3.fromRGB(20, 80, 60)
+		s.Thickness = 2
+		s.Parent = t
+		t.Parent = gui
+		gui.Parent = on
+	end
+end
+
+function Decor.runDetails(): string
+	local root = workspace:FindFirstChild(ROOT)
+	if not root then
+		return "[err] no workspace." .. ROOT
+	end
+	clearDetails(root)
+	local log = {}
+
+	-- 1. street signs: lower blade runs along the model X (RightVector), upper blade along the model Z
+	local n = 0
+	for _, m in root:GetDescendants() do
+		if m:IsA("Model") and m:GetAttribute("Asset") == "AST-034_StreetSign" then
+			local base = m:GetPivot()
+			local function name(dir: Vector3): string
+				return if math.abs(dir.X) > math.abs(dir.Z) then "NINTH AVE" else "JUNIPER ST"
+			end
+			local lower = detailPart(m, "BladeLower", Vector3.new(3.3, 0.7, 0.5), base * CFrame.new(0, 7.35, -1.385))
+			streetText(lower, name(base.RightVector))
+			local upper = detailPart(m, "BladeUpper", Vector3.new(3.2, 0.7, 0.5), base * CFrame.new(1.385, 8.55, 0.1) * CFrame.Angles(0, math.rad(90), 0))
+			streetText(upper, name(base.LookVector))
+			n += 1
+		end
+	end
+	table.insert(log, ("street signs: %d"):format(n))
+
+	-- 2. cart logo on the customer face of the body (body front = local -Z)
+	local cart = root:FindFirstChild("CART_AST-026_CornerCart", true)
+	local body = cart and cart:FindFirstChild("Body", true)
+	if body and body:IsA("BasePart") then
+		local plate = detailPart(cart :: Instance, "Logo", Vector3.new(4.4, 2.75, 0.05), body.CFrame * CFrame.new(0, 0.05, -body.Size.Z / 2 - 0.04))
+		local decal = Instance.new("Decal")
+		decal.Name = "Detail_LogoDecal"
+		decal.Texture = LOGO
+		decal.Face = Enum.NormalId.Front
+		decal.Parent = plate
+		table.insert(log, "cart logo")
+	end
+
+	-- 3. trailer: logo under the counter and a bulb string along the window top (trailer frame: window side local -Z)
+	local trl = root:FindFirstChild("TRL_AST-027_OpenLateTrailer", true)
+	if trl and trl:IsA("Model") then
+		local pv = trl:GetPivot()
+		local plate = detailPart(trl, "Logo", Vector3.new(5.2, 3.25, 0.05), pv * CFrame.new(-6, 3.6, -6.2))
+		local decal = Instance.new("Decal")
+		decal.Name = "Detail_LogoDecal"
+		decal.Texture = LOGO
+		decal.Face = Enum.NormalId.Front
+		decal.Parent = plate
+		local colors = { MUSTARD, CREAM, PINK, MINT }
+		local hooks = {}
+		for x = -13, 12, 3.125 do
+			table.insert(hooks, pv * CFrame.new(x, 11.15, -6.25))
+		end
+		local bulbs = 0
+		for i = 1, #hooks - 1 do
+			local a, b = hooks[i].Position, hooks[i + 1].Position
+			local prev = a
+			for k = 1, 4 do
+				local t = k / 4
+				local q = a:Lerp(b, t) - Vector3.new(0, math.sin(t * math.pi) * 0.35, 0)
+				detailPart(trl, "Wire", Vector3.new((q - prev).Magnitude, 0.05, 0.05), CFrame.lookAt((q + prev) / 2, q) * CFrame.Angles(0, math.rad(90), 0), INK)
+				if k < 4 then
+					local bulb = detailPart(trl, "Bulb", Vector3.new(0.28, 0.28, 0.28), CFrame.new(q - Vector3.new(0, 0.18, 0)), colors[(bulbs % #colors) + 1], Enum.Material.Neon)
+					bulb.Shape = Enum.PartType.Ball
+					bulb:SetAttribute("Emissive", true)
+					bulbs += 1
+				end
+				prev = q
+			end
+		end
+		local glow = detailPart(trl, "BulbLight", Vector3.new(0.2, 0.2, 0.2), pv * CFrame.new(0, 10.6, -7))
+		local l = Instance.new("PointLight")
+		l.Color = Color3.fromRGB(255, 214, 160)
+		l.Brightness = 0.9
+		l.Range = 16
+		l.Parent = glow
+		table.insert(log, ("trailer bulbs: %d"):format(bulbs))
+	end
+
+	-- 4. OPEN / CLOSED faces on the Pad sign stand (OpenSignController shows one by the shop phase)
+	local stand = root:FindFirstChild("OPEN_AST-024_SignStand", true)
+	local board = stand and stand:FindFirstChildWhichIsA("BasePart", true)
+	if board then
+		for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
+			local gui = Instance.new("SurfaceGui")
+			gui.Name = "Detail_OpenSign"
+			gui.Face = face
+			gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+			gui.PixelsPerStud = 100
+			gui.LightInfluence = 0.3
+			for _, state in { "Open", "Closed" } do
+				local t = Instance.new("TextLabel")
+				t.Name = state
+				t.Size = UDim2.fromScale(0.86, 0.36)
+				t.AnchorPoint = Vector2.new(0.5, 0.5)
+				t.Position = UDim2.fromScale(0.5, 0.5)
+				t.BackgroundTransparency = 1
+				t.FontFace = FONT
+				t.Text = if state == "Open" then "OPEN" else "CLOSED"
+				t.TextScaled = true
+				t.TextColor3 = if state == "Open" then Color3.fromRGB(46, 170, 90) else Color3.fromRGB(220, 60, 60)
+				t.Visible = state == "Closed"
+				local s = Instance.new("UIStroke")
+				s.Color = CREAM
+				s.Thickness = 3
+				s.Parent = t
+				t.Parent = gui
+			end
+			local sub = Instance.new("TextLabel")
+			sub.Name = "Brand"
+			sub.Size = UDim2.fromScale(0.86, 0.14)
+			sub.AnchorPoint = Vector2.new(0.5, 0)
+			sub.Position = UDim2.fromScale(0.5, 0.72)
+			sub.BackgroundTransparency = 1
+			sub.FontFace = FONT
+			sub.Text = "CORNER DOGS"
+			sub.TextScaled = true
+			sub.TextColor3 = INK
+			sub.Parent = gui
+			gui.Parent = board
+		end
+		game:GetService("CollectionService"):AddTag(board, "OpenSignBoard")
+		table.insert(log, "open sign")
+	end
+
+	return "details: " .. table.concat(log, ", ")
+end
+
 return Decor

@@ -24,6 +24,7 @@ return {
 	StarterPlayer.StarterPlayerScripts.client.Light.LightController,
 	StarterPlayer.StarterPlayerScripts.client.Market.MarketController,
 	StarterPlayer.StarterPlayerScripts.client.Neon.NeonController,
+	StarterPlayer.StarterPlayerScripts.client.Neon.OpenSignController,
 	StarterPlayer.StarterPlayerScripts.client.Net.NetController,
 	StarterPlayer.StarterPlayerScripts.client.Opal.OpalController,
 	StarterPlayer.StarterPlayerScripts.client.Pedestrian.PedestrianController,

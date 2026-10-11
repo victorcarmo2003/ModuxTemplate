@@ -22,6 +22,7 @@ local KitchenController = require(StarterPlayer.StarterPlayerScripts.client.Modu
 local LightController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.LightController)
 local MarketController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.MarketController)
 local NeonController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.NeonController)
+local OpenSignController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.OpenSignController)
 local NetController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.NetController)
 local OpalController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.OpalController)
 local PedestrianController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PedestrianController)
@@ -57,6 +58,7 @@ export type AllControllers = {
 	LightController: LightController.Public,
 	MarketController: MarketController.Public,
 	NeonController: NeonController.Public,
+	OpenSignController: OpenSignController.Public,
 	NetController: NetController.Public,
 	OpalController: OpalController.Public,
 	PedestrianController: PedestrianController.Public,
