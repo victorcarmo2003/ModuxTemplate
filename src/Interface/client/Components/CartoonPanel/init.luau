@@ -9,6 +9,9 @@
 --   Content  the children, inside the face area (padding and layouts go here)
 -- Native only (Frames, UICorner, UIStroke, UIGradient): crisp at any UI scale, no CanvasGroup (cheap on a phone).
 -- AutomaticSize works on any axis: the content drives the size, the lip and the outline are added around it.
+-- The body itself never uses Roblox AutomaticSize: the full-size Face would feed its last size back into the bounds
+-- and the panel only ever grows (sticky after a pop or a re-wrap). Only Content auto-sizes; the body copies its
+-- measured size (AbsoluteSize over the UIScale above it, read from a 100 px probe) on the auto axes.
 -- Pure: only props. Reactive props accept a value or a source (`Value<T>`).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -16,6 +19,8 @@ local Theme = require(script.Parent.Theme)
 local Icons = require(script.Parent.Icons)
 
 const create = Vide.create
+const source = Vide.source
+const cleanup = Vide.cleanup
 -- Vide 0.4.1 types `create` for 19 classes only; UIStroke, UIPadding and UIGradient are not among them.
 const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }) -> Instance
 
@@ -88,11 +93,11 @@ local function padding(value: Padding?): Instance
 	})
 end
 
--- Content size: Scale 1 on the axes the body does not size by itself, auto (0) on the axes it does.
-local function contentSize(auto: Enum.AutomaticSize): UDim2
-	const autoX = auto == Enum.AutomaticSize.X or auto == Enum.AutomaticSize.XY
-	const autoY = auto == Enum.AutomaticSize.Y or auto == Enum.AutomaticSize.XY
-	return UDim2.fromScale(if autoX then 0 else 1, if autoY then 0 else 1)
+const PROBE = 100
+
+-- Content size: the face area on the axes the body does not size by itself, auto (0) on the axes it does.
+local function contentSize(autoX: boolean, autoY: boolean, lip: number): UDim2
+	return UDim2.new(if autoX then 0 else 1, 0, if autoY then 0 else 1, if autoY then 0 else -lip)
 end
 
 return function(props: Props): Frame
@@ -100,6 +105,8 @@ return function(props: Props): Frame
 	const lip = props.Lip or Theme.Lip
 	const radius = props.Radius or Theme.Radius.Pill
 	const auto = props.AutomaticSize or Enum.AutomaticSize.None
+	const autoX = auto == Enum.AutomaticSize.X or auto == Enum.AutomaticSize.XY
+	const autoY = auto == Enum.AutomaticSize.Y or auto == Enum.AutomaticSize.XY
 	const transparency: Value<number> = props.Transparency or 0
 	const outline: Value<number> = props.Outline or Theme.Outline.Normal
 
@@ -165,13 +172,55 @@ return function(props: Props): Frame
 		table.insert(content, props.Children)
 	end
 
+	-- Measured content size in offset px (UIScale undone), for the auto axes.
+	const measured = source(Vector2.zero)
+	const probe = create("Frame")({
+		Name = "ScaleProbe",
+		Size = UDim2.fromOffset(PROBE, PROBE),
+		BackgroundTransparency = 1,
+		Visible = false,
+	})
+	const contentFrame = create("Frame")({
+		Name = "Content",
+		Size = contentSize(autoX, autoY, lip),
+		AutomaticSize = auto,
+		BackgroundTransparency = 1,
+		ZIndex = 1,
+		content,
+	})
+	if autoX or autoY then
+		local function measure()
+			const scale = probe.AbsoluteSize.X / PROBE
+			if scale > 0 then
+				measured(contentFrame.AbsoluteSize / scale)
+			end
+		end
+		const a = contentFrame:GetPropertyChangedSignal("AbsoluteSize"):Connect(measure)
+		const b = probe:GetPropertyChangedSignal("AbsoluteSize"):Connect(measure)
+		cleanup(function()
+			a:Disconnect()
+			b:Disconnect()
+		end)
+	end
+
+	-- Size on the auto axes: the given offset is a minimum, like Roblox AutomaticSize.
+	const size = if autoX or autoY
+		then function(): UDim2
+			const base: UDim2 = call(props.Size) or UDim2.new()
+			const m = measured()
+			return UDim2.new(
+				if autoX then UDim.new(0, math.max(base.X.Offset, math.ceil(m.X))) else base.X,
+				if autoY then UDim.new(0, math.max(base.Y.Offset, math.ceil(m.Y) + lip)) else base.Y
+			)
+		end
+		else props.Size or UDim2.new()
+
 	return create("Frame")({
 		Name = props.Name or "CartoonPanel",
 		LayoutOrder = props.LayoutOrder or 0,
 		AnchorPoint = props.AnchorPoint or Vector2.zero,
 		Position = props.Position or UDim2.new(),
-		Size = props.Size or UDim2.new(),
-		AutomaticSize = auto,
+		Size = size,
 		Rotation = props.Rotation or 0,
 		Visible = if props.Visible == nil then true else props.Visible,
 		ZIndex = props.ZIndex or 1,
@@ -191,26 +240,19 @@ return function(props: Props): Frame
 			end,
 			Transparency = transparency,
 		}),
-		-- The lip shows under the face: the body pads its children up by `lip`.
-		createRaw("UIPadding")({ PaddingBottom = UDim.new(0, lip) }),
 		props.Decor or {},
+		probe,
 
 		create("Frame")({
 			Name = "Face",
-			Size = UDim2.fromScale(1, 1),
+			-- The lip shows under the face.
+			Size = UDim2.new(1, 0, 1, -lip),
 			BackgroundColor3 = Color3.new(1, 1, 1),
 			BackgroundTransparency = transparency,
 			ZIndex = 0,
 			face,
 		}),
 
-		create("Frame")({
-			Name = "Content",
-			Size = contentSize(auto),
-			AutomaticSize = auto,
-			BackgroundTransparency = 1,
-			ZIndex = 1,
-			content,
-		}),
+		contentFrame,
 	})
 end

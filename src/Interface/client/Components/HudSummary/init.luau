@@ -226,7 +226,7 @@ return function(props: Props): Frame
 			Lip = 6,
 			Studs = true,
 			Gloss = false,
-			Padding = { Left = 18, Right = 18, Top = 34, Bottom = 14 },
+			Padding = { Left = 18, Right = 18, Top = 46, Bottom = 14 },
 			Children = {
 				create("UIListLayout")({
 					FillDirection = Enum.FillDirection.Vertical,
@@ -274,7 +274,7 @@ return function(props: Props): Frame
 		CartoonPanel({
 			Name = "Grade",
 			AnchorPoint = Vector2.new(1, 0),
-			Position = UDim2.new(1, 10, 0, -14),
+			Position = UDim2.new(1, 16, 0, -22),
 			Size = UDim2.fromOffset(GRADE, GRADE),
 			Rotation = 10,
 			Tone = function()
