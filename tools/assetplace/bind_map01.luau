@@ -217,6 +217,7 @@ local AUTHORED_ATTRS = {
 	"Group",
 	"PostId",
 	"Order",
+	"Decor", -- decorative StreetLight posts (bindDecorLamps)
 }
 
 local NORTH = Vector3.new(0, 0, -1)
@@ -1775,21 +1776,36 @@ local PREP_SPACING = 3.5
 local PREP_STAND = { y = 2.0, z = -0.85 }
 local PREP_FOCUS = { y = 5.12, z = -3.25 }
 local PREP_CAM = { y = 2.5 * math.sin(math.rad(55)), z = 2.5 * math.cos(math.rad(55)) } -- Content.Prep.Rules.Camera
-local PREP_PROMPT = { y = 3.72, z = -0.20 }
+local PREP_PROMPT = { y = 5.82, z = -0.20 } -- DEC-224: chest height (was 3.72 = hip, out of the first-person view)
+-- DEC-224 (Provisional): the seats stay 4 (logical, co-op) but only two natural prompts exist: Prompt_Work of Station_1 on the
+-- GRILL (PromptStep Grill) and of Station_3 on the CUTTING BOARD (PromptStep Build); Station_2 / 4 have none. Every station has
+-- the grill view (Att_Stand, CamAnchor, Focus) and the board view (Att_Stand_Build, CamAnchor_Build, Focus_Build), the stands
+-- staggered PREP_STAGGER apart around the view centre. Same numbers as tools/assetplace/stations_prep.luau.
+local PREP_STAGGER = 1.0
+local PREP_GRILL_N, PREP_BOARD_N = 1, 3
 local function bindPrepStations(trl: Instance, padPose: CFrame)
 	local board = byMapId(trl, "TRL-T")
 	for n = 1, 4 do
-		local dx = PREP_SPACING * (n - 2.5)
 		local origin = padPose.Position
-		local function mapAt(y: number, z: number): Vector3
-			return origin + Vector3.new(dx, y, z)
+		local function view(centreN: number, shift: number)
+			local dx = PREP_SPACING * (centreN - 2.5) + shift
+			local function mapAt(y: number, z: number): Vector3
+				return origin + Vector3.new(dx, y, z)
+			end
+			local standW = FCF(CFrame.new(mapAt(PREP_STAND.y, PREP_STAND.z))).Position
+			local focusW = FCF(CFrame.new(mapAt(PREP_FOCUS.y, PREP_FOCUS.z))).Position
+			-- the camera stands on the cook's side: MAP-01 +Z (south), 1.43 behind the focus
+			local camW = FCF(CFrame.new(mapAt(PREP_FOCUS.y + PREP_CAM.y, PREP_FOCUS.z + PREP_CAM.z))).Position
+			local promptW = FCF(CFrame.new(mapAt(PREP_PROMPT.y, PREP_PROMPT.z))).Position
+			return standW, focusW, camW, promptW
 		end
-		local standW = FCF(CFrame.new(mapAt(PREP_STAND.y, PREP_STAND.z))).Position
+		local shift = (n - 2.5) * PREP_STAGGER
+		local standW, focusW, camW = view(PREP_GRILL_N, shift)
 		local standCF = CFrame.lookAt(standW, standW + Vector3.new(0, 0, 1)) -- world +Z = toward the window
-		local focusW = FCF(CFrame.new(mapAt(PREP_FOCUS.y, PREP_FOCUS.z))).Position
-		-- the camera stands on the cook's side: MAP-01 +Z (south), 1.43 behind the focus
-		local camW = FCF(CFrame.new(mapAt(PREP_FOCUS.y + PREP_CAM.y, PREP_FOCUS.z + PREP_CAM.z))).Position
-		local promptW = FCF(CFrame.new(mapAt(PREP_PROMPT.y, PREP_PROMPT.z))).Position
+		local standBW, focusBW, camBW = view(PREP_BOARD_N, shift)
+		local standBCF = CFrame.lookAt(standBW, standBW + Vector3.new(0, 0, 1))
+		local promptN = if n == PREP_BOARD_N then PREP_BOARD_N else PREP_GRILL_N
+		local _, _, _, promptW = view(promptN, 0)
 		local st = trl:FindFirstChild("Station_" .. n)
 		local created = false
 		if not st then
@@ -1829,7 +1845,15 @@ local function bindPrepStations(trl: Instance, padPose: CFrame)
 		att("Att_Stand", standCF)
 		att("CamAnchor", CFrame.lookAt(camW, focusW))
 		att("Focus", CFrame.new(focusW))
-		interactable(att("Prompt_Work", CFrame.new(promptW)), "prep_work")
+		att("Att_Stand_Build", standBCF)
+		att("CamAnchor_Build", CFrame.lookAt(camBW, focusBW))
+		att("Focus_Build", CFrame.new(focusBW))
+		local work = mp:FindFirstChild("Prompt_Work")
+		if n == PREP_GRILL_N or n == PREP_BOARD_N then
+			interactable(att("Prompt_Work", CFrame.new(promptW)), "prep_work", { PromptStep = if n == PREP_BOARD_N then "Build" else "Grill" })
+		elseif work then
+			CollectionService:RemoveTag(work, "Interactable") -- V2: no prompt of its own (the snippet moves it to the backup)
+		end
 		local slot = if board then findNamed(board, "Att_Bun" .. n) else nil
 		local bun = att("Att_Bun", CFrame.new(if slot then anchorPos(slot) else focusW))
 		bun:SetAttribute("Slot", n)
@@ -2253,6 +2277,92 @@ local function ensureLampLight(post: Instance, head: Instance?, id: string)
 	log("new", ("%s: %s moved to LampHead/Light_Lamp at %s%s"):format(id, light.ClassName, fmtV(pos), if src then " (blockout light disabled)" else ""))
 end
 
+-- Decorative posts (Post_*, POST-OUT*, Post_L2: AST-036_LampHead outside NL-01..04 / P-01). PlaceService wants every
+-- StreetLight tag on a Model with a unique PostId and Persistent. A StreetLight tag on a Bulb MeshPart (seen 2026-10-12, 34
+-- of them, after the last bind) is moved to the LampHead Model: PostId "DECOR-<MapId>-<x>_<z>", Decor = true, no Group /
+-- Order (LightController: Order 0). Persistent comes from persistAll. Stand-alone twin: streetlights_bind.luau.
+local function bindDecorLamps(assets: Instance)
+	local ids: { [string]: boolean } = {}
+	local owners: { Instance } = {}
+	local function realPost(m: Instance): boolean
+		return m:IsA("Model") and m:GetAttribute("Decor") ~= true and m:GetAttribute("PostId") ~= nil
+	end
+	for _, inst in CollectionService:GetTagged("StreetLight") do
+		if not inst:IsDescendantOf(Workspace) then
+			continue
+		end
+		if inst:IsA("Model") then
+			if inst:GetAttribute("Decor") == true or inst:GetAttribute("PostId") == nil then
+				table.insert(owners, inst)
+			end
+			continue
+		end
+		CollectionService:RemoveTag(inst, "StreetLight")
+		local head: Instance? = nil
+		local inReal = false
+		local c = inst.Parent
+		while c and c ~= Workspace do
+			if c:IsA("Model") then
+				if realPost(c) then
+					inReal = true
+					break
+				end
+				if head == nil and c:GetAttribute("Asset") == "AST-036_LampHead" then
+					head = c
+				end
+			end
+			c = c.Parent
+		end
+		if not inReal and head then
+			table.insert(owners, head)
+		end
+	end
+	const unique: { [Instance]: boolean } = {}
+	local deduped: { Instance } = {}
+	for _, m in owners do
+		if not unique[m] then
+			unique[m] = true
+			table.insert(deduped, m)
+		end
+	end
+	owners = deduped
+	table.sort(owners, function(a, b)
+		return a:GetFullName() < b:GetFullName()
+	end)
+	for _, d in assets:GetDescendants() do
+		local id = d:GetAttribute("PostId")
+		if typeof(id) == "string" and d:GetAttribute("Decor") ~= true then
+			ids[id] = true
+		end
+	end
+	local n = 0
+	for _, m in owners do
+		if m:GetAttribute("Decor") == true and ids[m:GetAttribute("PostId") :: any] == nil then
+			ids[m:GetAttribute("PostId") :: any] = true
+			CollectionService:AddTag(m, "StreetLight")
+			continue
+		end
+		const pos = (m :: any):GetPivot().Position
+		const mapId = m:GetAttribute("MapId")
+		const base = ("DECOR-%s-%d_%d"):format(
+			if typeof(mapId) == "string" then mapId else (string.match(m.Name, "^(.-)_AST%-") or m.Name),
+			math.round(pos.X),
+			math.round(pos.Z)
+		)
+		local id, k = base, 1
+		while ids[id] do
+			k += 1
+			id = base .. "-" .. k
+		end
+		ids[id] = true
+		CollectionService:AddTag(m, "StreetLight")
+		m:SetAttribute("PostId", id)
+		m:SetAttribute("Decor", true)
+		n += 1
+	end
+	log("ok", ("StreetLight: %d decorative post(s) tagged with a PostId (Decor); stray Bulb tags moved to the LampHead Model"):format(n))
+end
+
 -- Street lights: one Model per post with tag StreetLight (§19.6).
 local function bindStreetLights(assets: Instance)
 	for _, spec in POSTS do
@@ -2319,6 +2429,7 @@ local function bindStreetLights(assets: Instance)
 		end
 	end
 	log("ok", ("StreetLight: %d blockout light(s) of the retired posts %s switched off"):format(off, table.concat(RETIRED_POSTS, ", ")))
+	bindDecorLamps(assets)
 end
 
 type Ctx = { cart: Instance?, trailer: Instance?, poses: { [string]: CFrame }, assets: Instance? }

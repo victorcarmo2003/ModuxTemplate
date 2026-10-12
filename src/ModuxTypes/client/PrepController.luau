@@ -102,7 +102,7 @@ export type Public = {
 	Bind: (self: Public, on: boolean) -> (),
 	Mount: (self: Public) -> (),
 	Unmounted: (self: Public) -> (),
-	Enter: (self: Public, station: number, mock: boolean?) -> boolean,
+	Enter: (self: Public, station: number, mock: boolean?, tab: string?) -> boolean,
 	MoveTo: (self: Public, station: number) -> (),
 	Leave: (self: Public, reason: string, forced: boolean?, fromServer: boolean?) -> (),
 	Finish: (self: Public, takeover: boolean) -> (),

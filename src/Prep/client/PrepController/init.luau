@@ -298,7 +298,12 @@ function PrepController:SetTab(tab: string)
 	if previous ~= nil and previous.OnLeave ~= nil then
 		previous.OnLeave(self)
 	end
+	const viewBefore = Poses.ViewOf(untrack(self.Tab))
 	self.Tab(tab)
+	-- Grill / Order look at the grill, Build / Serve at the cutting board: the camera glides when the view changes
+	if self.InMode and not self.Leaving and not self.Mock and Poses.ViewOf(tab) ~= viewBefore then
+		self:MoveTo(untrack(self.Station))
+	end
 	-- keep the step on a tab that owns it
 	const step = prep.Steps.ByKey[untrack(self.Step)]
 	if step == nil or step.Tab ~= tab then
@@ -808,7 +813,7 @@ function PrepController:Unmounted()
 end
 
 -- Enters the station. `mock` = the dev preview (no seat, no packets). Returns whether it did.
-function PrepController:Enter(station: number, mock: boolean?): boolean
+function PrepController:Enter(station: number, mock: boolean?, tab: string?): boolean
 	if self.InMode then
 		if untrack(self.Station) ~= station and not self.Leaving then
 			self:MoveTo(station)
@@ -828,7 +833,9 @@ function PrepController:Enter(station: number, mock: boolean?): boolean
 		end
 		return false
 	end
-	local pose = Poses.Of(station)
+	-- the tab it opens on: the one of the prompt used (the seat record), Order when it is not known
+	const startTab = if tab ~= nil and prep.Tabs.ByKey[tab] ~= nil then tab else "Order"
+	local pose = Poses.Of(station, Poses.ViewOf(startTab))
 	if pose == nil and mock then
 		pose = Poses.Mock()
 	end
@@ -866,8 +873,8 @@ function PrepController:Enter(station: number, mock: boolean?): boolean
 	self.Pose = pose
 	self.Vignette(not dof)
 	self.Shown(false)
-	self.Tab("Order")
-	self.Step("grill")
+	self.Tab(startTab)
+	self.Step(if startTab == "Build" then "bun" elseif startTab == "Serve" then "serve" else "grill")
 	self.Needs({})
 	self.Assist(false)
 	self.Toasts(false)
@@ -896,11 +903,27 @@ function PrepController:Enter(station: number, mock: boolean?): boolean
 		end
 	end))
 	self:Bind(true)
-	self:Mount()
-
-	const stage = self:StageOf("Order")
-	if stage ~= nil and stage.OnEnter ~= nil then
-		stage.OnEnter(self)
+	-- a stage that errors while the UI is built must never leave the player seated and frozen without a UI: give the seat
+	-- back and warn (the Output has the cause)
+	const mounted, mountError = pcall(function()
+		self:Mount()
+		-- the Order stage starts the Feed (the shared picture of the line and the grill), whatever tab opens first
+		const order = self:StageOf("Order")
+		if order ~= nil and order.OnEnter ~= nil then
+			order.OnEnter(self)
+		end
+		if startTab ~= "Order" then
+			const first = self:StageOf(startTab)
+			if first ~= nil and first.OnEnter ~= nil then
+				first.OnEnter(self)
+			end
+		end
+	end)
+	if not mounted then
+		warn(`[PrepController] the UI of station {station} failed to mount, leaving the mode: {mountError}`)
+		self:Unmounted()
+		self:Leave("MountFailed", false, false)
+		return false
 	end
 	self.NextBeat = os.clock() + rules.Heartbeat
 	task.delay(if reduced then 0 else CHROME_DELAY, function()
@@ -913,7 +936,7 @@ end
 
 -- Another station while seated (the server moved the seat): new pose, same session.
 function PrepController:MoveTo(station: number)
-	const pose = Poses.Of(station)
+	const pose = Poses.Of(station, Poses.ViewOf(untrack(self.Tab)))
 	if pose == nil then
 		return
 	end
@@ -1086,7 +1109,7 @@ PrepController:OnInit(function(self)
 	-- a seat of mine = the mode; the seat gone or given to someone else = out
 	local function onSeat(id: number, record: any)
 		if record.User == me then
-			self:Enter(id, false)
+			self:Enter(id, false, record.Step)
 		elseif untrack(self.Station) == id and self.InMode then
 			self:Leave("Seat", false, true)
 		end

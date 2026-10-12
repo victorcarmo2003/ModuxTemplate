@@ -54,13 +54,27 @@ local function stationModel(station: number): Instance?
 	return workspace:FindFirstChild(name, true)
 end
 
--- The pose of station `station`, nil when neither the anchors nor the trailer exist (not streamed in yet).
-function Poses.Of(station: number): Pose?
+-- Camera view of a tab: Order and Grill look at the grill, Build and Serve at the cutting board (DEC-224: the seats are logical,
+-- the two views are the two natural places; the Station_n model carries CamAnchor / Focus for the grill and
+-- CamAnchor_Build / Focus_Build for the board).
+function Poses.ViewOf(tab: string): string
+	return if tab == "Build" or tab == "Serve" then "Build" else "Grill"
+end
+
+-- The pose of station `station` for a view ("Grill" default), nil when neither the anchors nor the trailer exist (not streamed
+-- in yet).
+function Poses.Of(station: number, view: string?): Pose?
 	const model = stationModel(station)
 	if model ~= nil then
-		const anchor = frameOf(model:FindFirstChild("CamAnchor", true))
+		const suffix = if view == "Build" then "_Build" else ""
+		local anchor = frameOf(model:FindFirstChild("CamAnchor" .. suffix, true))
+		local focusName = "Focus" .. suffix
+		if anchor == nil and suffix ~= "" then
+			anchor = frameOf(model:FindFirstChild("CamAnchor", true))
+			focusName = "Focus"
+		end
 		if anchor ~= nil then
-			const focusFrame = frameOf(model:FindFirstChild("Focus", true))
+			const focusFrame = frameOf(model:FindFirstChild(focusName, true))
 			const focus = if focusFrame ~= nil then focusFrame.Position else anchor.Position + anchor.LookVector * cfg.Distance
 			return { Frame = anchor, Focus = focus, Source = "Anchor" }
 		end

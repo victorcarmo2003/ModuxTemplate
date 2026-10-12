@@ -24,11 +24,11 @@ export type Buckets = { [string]: Bucket }
 
 const Session = {}
 
-function Session.new(player: Player, station: number, serverTime: number, now: number): Seat
+function Session.new(player: Player, station: number, serverTime: number, now: number, step: string): Seat
 	return {
 		Player = player,
 		Station = station,
-		Step = "Order",
+		Step = step,
 		Ticket = 0,
 		Since = serverTime,
 		LastSeen = now,

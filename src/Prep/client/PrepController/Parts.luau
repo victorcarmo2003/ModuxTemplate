@@ -85,7 +85,11 @@ function Parts.Ingredients(controller: any, layout: () -> any): Frame
 			controller:OnPick(key)
 		end,
 		Focus = view.Focus,
-		Refused = view.Refused,
+		-- the view-model keeps `false` for "none"; the panel wants nil (it indexes `.Key` of what it gets)
+		Refused = function(): { Key: string, Id: number }?
+			const value = view.Refused()
+			return if value ~= false then value else nil
+		end,
 	})
 end
 

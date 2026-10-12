@@ -125,7 +125,8 @@ function CharacterController:GetControls(): Controls?
 		-- harmless: the server freezes the body anyway (CharacterService:Freeze zeroes walk/jump), later lookups
 		-- pick the module up if it arrives after MODULE_WAIT, and meanwhile the lock sinks the inputs. Studio only.
 		if module == nil and RunService:IsStudio() then
-			warn("[CharacterController] no PlayerScripts.PlayerModule yet: the lock sinks walk/jump input instead")
+			-- info, not a warning: this place ships without the stock PlayerModule (custom input), so the sink is the normal path
+			print("[CharacterController] no PlayerScripts.PlayerModule: the lock sinks walk/jump input instead")
 		end
 	end
 	if module == nil or not module:IsA("ModuleScript") then

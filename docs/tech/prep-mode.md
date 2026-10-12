@@ -1,5 +1,7 @@
 Status: Rascunho
 
+> **Nota (2026-10-12, feedback do dono "é tudo 3d"): a interface do minigame mudou de rumo.** `docs/tech/prep-3d.md` (Rascunho, Provisório) supera deste documento **a UI 2D do miolo**: tábua 2D, painel de ingredientes, células da grelha, cartões de Order/Serve e StrokeCanvas (§2 coluna "Cliente", §5 Mobile "arrasto sobre Frames", §6 "UI é 2D (Frames...)", DT-8). O minigame passa a ser interação direta com os objetos 3D do trailer (raio do ponteiro, anéis, brilhos, partículas); só ticket, abas, Leave, Next/Serve, Assist, nota/selo, dica e toast ficam em 2D. **Continua valendo daqui, sem mudança:** rede e autoridade (§3), co-op e assentos (§4), noite e saídas forçadas (§5), mapa `Station_n` e `Content.Prep` (§6), migração dos prompts e `WorldKitchenPrompts` (§7), riscos e métricas (§9). Migração por flag `Prep.Rules.ThreeD`; tasks TASK-194 a TASK-215 (`docs/tasks/board.md`); TASK-174, 175, 177, 178 e 179 marcadas "Substituída parcialmente por 3D".
+
 # Modo de preparo focado (V1): desenho técnico
 
 Autor: architect · 2026-10-12 · Base: decisões do dono D1 (modo focado V1, 100% focado), D2 (Food Trailer é o veículo único), D3 (intro curta), FEAT-039, Q-218 a Q-223. Tudo **Provisório**; nada aqui é código. `DT-n` = proposta de DEC técnica (o secretário numera; o dono pode vetar), lista em §10. Estende `KitchenService`, `ItemService`, `CustomerService`, `CameraController`; **não** cria economia nem estoque paralelos.

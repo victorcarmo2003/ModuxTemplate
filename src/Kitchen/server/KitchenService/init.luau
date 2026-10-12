@@ -87,6 +87,8 @@ const TICK_RATE = 10 -- station timers (architecture.md §18.12)
 const ALTER_PHASE = "Night" -- altered items only exist while the night is being played (ITM-020)
 const ALTER_KINDS: { [string]: boolean } = { rail = true, board = true }
 const HOT_DOG = "hot_dog"
+-- StationKinds with no module in Stations/ on purpose (their state lives in another service)
+const EXTERNAL_KINDS: { [string]: boolean } = { prep = true }
 const COFFEE = "coffee"
 -- Prompt actions of the kitchen that the prep mode replaces (prep-mode.md §7). Station anchors only: the street bin
 -- (no Station) keeps working.
@@ -543,6 +545,9 @@ function KitchenService:AddStation(instance: Instance)
 	if module ~= nil then
 		report(`Bind of {row.Key}`, pcall(module.Bind, self.Context, station))
 		self:Publish(station)
+	elseif EXTERNAL_KINDS[row.Key] then
+		-- explicit no-op: the seat state of this kind lives in another service (prep: PrepService, PrepSeats set)
+		self.Warned[row.Key] = true
 	elseif not self.Warned[row.Key] then
 		-- Provisional: warn, not error, while TASK-026/027/028 are not in (restock still works on these stations).
 		self.Warned[row.Key] = true

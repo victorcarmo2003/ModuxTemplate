@@ -36,8 +36,13 @@ export type SeatRecord = { User: number, Step: string, Ticket: number, Since: nu
 const STATION_TAG = "Station"
 const PREP_KIND = "prep"
 const WORK_ACTION = "prep_work"
-const WORK_ANCHOR = "Prompt_Work"
 const STAND_ATTACHMENT = "Att_Stand"
+-- DEC-224 (Provisional): seats are logical, only two natural prompts exist (the grill and the cutting board). The prompt used
+-- says where the player starts (attribute PromptStep on the Prompt_Work attachment) and which stand the rig takes
+-- (Att_Stand = grill, Att_Stand_Build = board); the seat itself is the next free one.
+const STEP_ATTRIBUTE = "PromptStep"
+const VIEW_STAND: { [string]: string } = { Grill = "Att_Stand", Build = "Att_Stand_Build" }
+const DEFAULT_STEP = "Grill"
 const WORKING_ATTRIBUTE = "Working"
 const FREEZE_REASON = "Prep"
 const GATE = "Prep"
@@ -228,10 +233,14 @@ end
 
 -- Where the rig stands: Att_Stand of the Station model, else the MapIndex point Station_n. nil = the map has neither yet
 -- (TASK-172): the seat still works, the character is not moved and no reach check is possible.
-function PrepService:StandOf(station: number): CFrame?
+function PrepService:StandOf(station: number, step: string?): CFrame?
 	const model = self:StationModel(station)
 	if model ~= nil then
-		const attachment = model:FindFirstChild(STAND_ATTACHMENT, true)
+		const name = VIEW_STAND[step or DEFAULT_STEP] or STAND_ATTACHMENT
+		local attachment = model:FindFirstChild(name, true)
+		if attachment == nil then
+			attachment = model:FindFirstChild(STAND_ATTACHMENT, true)
+		end
 		if attachment ~= nil and attachment:IsA("Attachment") then
 			return attachment.WorldCFrame
 		end
@@ -242,20 +251,41 @@ function PrepService:StandOf(station: number): CFrame?
 	return nil
 end
 
--- Position the reach check measures: Prompt_Work of the model, else the stand point
-function PrepService:WorkPosition(station: number): Vector3?
-	const model = self:StationModel(station)
-	if model ~= nil then
-		const anchor = model:FindFirstChild(WORK_ANCHOR, true)
-		if anchor ~= nil then
-			const position = self.Dependencies.InteractionService:Position(anchor)
-			if position ~= nil then
-				return position
+-- The Work prompt closest to a position (the reach check of the PrepEnter packet; the prompt path is checked by
+-- InteractionService). nil = the map has no prompt yet.
+function PrepService:WorkDistance(position: Vector3): number?
+	local best: number? = nil
+	for _, anchor in CollectionService:GetTagged("Interactable") do
+		if anchor:GetAttribute("PromptAction") == WORK_ACTION then
+			const at = self.Dependencies.InteractionService:Position(anchor)
+			if at ~= nil then
+				const distance = (at - position).Magnitude
+				if best == nil or distance < best then
+					best = distance
+				end
 			end
 		end
 	end
-	const stand = self:StandOf(station)
-	return if stand ~= nil then stand.Position else nil
+	return best
+end
+
+-- Lowest free seat among the active ones (any prompt gives the next one), nil = all taken
+function PrepService:NextSeat(): number?
+	for station = 1, self.Count do
+		if self.BySeat[station] == nil then
+			return station
+		end
+	end
+	return nil
+end
+
+-- Step a Work prompt opens on (attribute PromptStep of the anchor, a Content.Prep.Tabs key)
+function PrepService:StepOfAnchor(anchor: Instance): string
+	const value = anchor:GetAttribute(STEP_ATTRIBUTE)
+	if type(value) == "string" and VIEW_STAND[value] ~= nil then
+		return value
+	end
+	return DEFAULT_STEP
 end
 
 -- Network ---------------------------------------------------------------------------------------------------------------
@@ -321,7 +351,7 @@ end
 -- Enter and leave -------------------------------------------------------------------------------------------------------
 
 -- ("None" | reason, stand). Everything PrepEnter and the prompt check before committing.
-function PrepService:CheckEnter(player: Player, station: number, skipReach: boolean?): (string, CFrame?)
+function PrepService:CheckEnter(player: Player, station: number, skipReach: boolean?, step: string?): (string, CFrame?)
 	if not self.Active or not rules.Enabled then
 		return "Locked", nil
 	end
@@ -350,29 +380,26 @@ function PrepService:CheckEnter(player: Player, station: number, skipReach: bool
 	if self.BySeat[station] ~= nil then
 		return "Busy", nil
 	end
-	const stand = self:StandOf(station)
+	const stand = self:StandOf(station, step)
 	if skipReach ~= true then
-		const position = self:WorkPosition(station)
 		const root = self.Dependencies.InteractionService:RootOf(player)
-		if position ~= nil then
-			const reach = Content.Actions.ByKey[WORK_ACTION].Radius + RANGE_SLACK
-			if root == nil or (root.Position - position).Magnitude > reach then
-				return "NoStation", nil
-			end
+		const distance = if root ~= nil then self:WorkDistance(root.Position) else nil
+		if root == nil or (distance ~= nil and distance > Content.Actions.ByKey[WORK_ACTION].Radius + RANGE_SLACK) then
+			return "NoStation", nil
 		end
 	end
 	return "None", stand
 end
 
 -- (ok, reason). Checks and commits in one synchronous step.
-function PrepService:Enter(player: Player, station: number, skipReach: boolean?): (boolean, string)
-	const reason, stand = self:CheckEnter(player, station, skipReach)
+function PrepService:Enter(player: Player, station: number, skipReach: boolean?, step: string?): (boolean, string)
+	const reason, stand = self:CheckEnter(player, station, skipReach, step)
 	if reason ~= "None" then
 		return false, reason
 	end
 	const now = os.clock()
 	const serverTime = workspace:GetServerTimeNow()
-	const seat = Session.new(player, station, serverTime, now)
+	const seat = Session.new(player, station, serverTime, now, step or DEFAULT_STEP)
 	self.Sessions[player] = seat
 	self.BySeat[station] = seat
 	self:WriteSeat(station, { User = player.UserId, Step = seat.Step, Ticket = 0, Since = serverTime })
@@ -662,12 +689,8 @@ function PrepService:RegisterWork()
 	const interaction = self.Dependencies.InteractionService
 	interaction:RegisterAction(WORK_ACTION, {
 		Validate = function(player: Player, anchor: Instance, _id: number): boolean
-			const _, station = self:StationOfAnchor(anchor)
-			if station == nil then
-				return false
-			end
-			-- the prompt already passed the range check of InteractionService
-			const reason = self:CheckEnter(player, station, true)
+			-- any Work prompt gives the next free seat (the seats are logical, DEC-224)
+			const reason = self:CheckEnter(player, self:NextSeat() or 1, true, self:StepOfAnchor(anchor))
 			if reason ~= "None" then
 				self:Reply(player, "Enter", false, reason, nil, nil)
 				return false
@@ -675,11 +698,8 @@ function PrepService:RegisterWork()
 			return true
 		end,
 		Run = function(player: Player, anchor: Instance, _id: number)
-			const _, station = self:StationOfAnchor(anchor)
-			if station == nil then
-				return
-			end
-			const ok, reason = self:Enter(player, station, true)
+			const station = self:NextSeat() or 1
+			const ok, reason = self:Enter(player, station, true, self:StepOfAnchor(anchor))
 			self:Reply(player, "Enter", ok, reason, nil, if ok then station else nil)
 		end,
 	})
@@ -810,9 +830,10 @@ function PrepService:DevSeats(): string
 end
 
 -- Sits `player` at `station` (dev: no reach check; every other rule applies)
-function PrepService:DevEnter(player: Player, station: number): string
+function PrepService:DevEnter(player: Player, station: number, step: string?): string
 	self:DevGuard()
-	const ok, reason = self:Enter(player, clampStation(station), true)
+	-- `step` = the tab of the prompt it stands in for (Grill or Build, the PromptStep of the real prompts)
+	const ok, reason = self:Enter(player, clampStation(station), true, if step ~= nil and VIEW_STAND[step] ~= nil then step else nil)
 	self:Reply(player, "Enter", ok, reason, nil, if ok then station else nil)
 	if ok then
 		return `{player.Name} sits at station {station}`

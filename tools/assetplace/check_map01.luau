@@ -1259,6 +1259,15 @@ local function checkWave2(points: { [string]: Instance }, vehicles: { [string]: 
 	local orders: { [number]: string } = {}
 	for _, m in tagged("StreetLight") do
 		local id = m:GetAttribute("PostId")
+		if m:GetAttribute("Decor") == true then
+			-- decorative post (bind_map01 bindDecorLamps / streetlights_bind): unique PostId + Model + Persistent only
+			if typeof(id) ~= "string" or POSTS[id] ~= nil then
+				err(("3: decorative StreetLight %s needs its own PostId (DECOR-...), has %s"):format(name(m), tostring(id)))
+			elseif not m:IsA("Model") then
+				err(("5: decorative StreetLight %s is a %s (must be a Model)"):format(id, m.ClassName))
+			end
+			continue
+		end
 		if typeof(id) ~= "string" or POSTS[id] == nil then
 			err(("3: StreetLight %s PostId = %s (valid NL-01..NL-04, P-01)"):format(name(m), tostring(id)))
 			continue
@@ -2571,8 +2580,22 @@ local function checkPrepStations(vehicles: { [string]: Instance })
 		if not bun or bun:GetAttribute("Slot") ~= seat then
 			err(("17: %s: Att_Bun missing or Slot ~= %d"):format(st.Name, seat))
 		end
-		if not work or work:GetAttribute("PromptAction") ~= "prep_work" or not CollectionService:HasTag(work, "Interactable") then
-			err(("17: %s: Prompt_Work missing, without PromptAction prep_work or without the Interactable tag"):format(st.Name))
+		-- DEC-224: only Station_1 (grill, PromptStep Grill) and Station_3 (cutting board, PromptStep Build) own a Work prompt;
+		-- the other two seats are logical (their Prompt_Work, if still there, must not be tagged Interactable)
+		local wantStep = if seat == 1 then "Grill" elseif seat == 3 then "Build" else nil
+		if wantStep then
+			if not work or work:GetAttribute("PromptAction") ~= "prep_work" or not CollectionService:HasTag(work, "Interactable") then
+				err(("17: %s: Prompt_Work missing, without PromptAction prep_work or without the Interactable tag"):format(st.Name))
+			elseif work:GetAttribute("PromptStep") ~= wantStep then
+				err(("17: %s: Prompt_Work PromptStep must be %s (is %s)"):format(st.Name, wantStep, tostring(work:GetAttribute("PromptStep"))))
+			end
+		elseif work and CollectionService:HasTag(work, "Interactable") then
+			err(("17: %s: has its own Prompt_Work (V2: seats 2 and 4 are logical, no prompt)"):format(st.Name))
+		end
+		for _, extra in { "Att_Stand_Build", "CamAnchor_Build", "Focus_Build" } do
+			if not st:FindFirstChild(extra, true) then
+				warn_(("17: %s: %s missing (the board view falls back to the grill pose)"):format(st.Name, extra))
+			end
 		end
 		if not cam then
 			warn_(("17: %s: CamAnchor missing (the camera falls back to the TRL pose)"):format(st.Name))

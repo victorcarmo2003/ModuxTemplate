@@ -27,6 +27,8 @@ function PlaceService:Setup()
 	const role = Roles.PlaceRole(self.Dependencies.RoleService:Get())
 	self.Role = role :: Role
 	self.Dev = (role == "Run" and game.PrivateServerId == "" and RunService:IsStudio()) :: boolean
+	-- read by PlaceController (the client cannot check PrivateServerId without an engine message)
+	ReplicatedStorage:SetAttribute("PlaceDev", self.Dev)
 end
 
 function PlaceService:Is(role: Role): boolean

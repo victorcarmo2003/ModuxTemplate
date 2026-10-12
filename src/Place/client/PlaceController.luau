@@ -13,6 +13,7 @@ local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 export type Role = "Lobby" | "Run"
 
 const SERVER_ROLE_WAIT = 30 -- s
+const DEV_ATTRIBUTE = "PlaceDev" -- ReplicatedStorage attribute written by PlaceService:Setup
 
 const PlaceController = Modux.Controller("PlaceController", { Priority = 950 })
 
@@ -21,7 +22,10 @@ function PlaceController:Setup()
 	self.ServerRole = serverRole :: Roles.Role
 	const role = Roles.PlaceRole(serverRole)
 	self.Role = role :: Role
-	self.Dev = (role == "Run" and game.PrivateServerId == "" and RunService:IsStudio()) :: boolean
+	-- game.PrivateServerId must not be read on the client (the engine prints "PrivateServerId cannot be checked on the
+	-- client"): PlaceService publishes its Dev flag as an attribute of ReplicatedStorage; without it, Studio = Dev.
+	const published = ReplicatedStorage:GetAttribute(DEV_ATTRIBUTE)
+	self.Dev = (if type(published) == "boolean" then published else (role == "Run" and RunService:IsStudio())) :: boolean
 end
 
 function PlaceController:Is(role: Role): boolean

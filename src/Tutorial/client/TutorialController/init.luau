@@ -872,7 +872,11 @@ function TutorialController:KitchenAnchor(action: string, enabled: boolean): Ins
 	if self:Seated() then
 		return nil
 	end
-	return self:Anchor("prep_work", false)
+	-- DEC-224: two natural Work prompts; the grill steps point at the grill one, the bun and board steps at the board one
+	const step = if action == "grill_place" or action == "grill_collect" then "Grill" else "Build"
+	return self:Anchor("prep_work", false, function(anchor: Instance): boolean
+		return anchor:GetAttribute("PromptStep") == step
+	end) or self:Anchor("prep_work", false)
 end
 
 -- Presentation ---------------------------------------------------------------------------------------------------

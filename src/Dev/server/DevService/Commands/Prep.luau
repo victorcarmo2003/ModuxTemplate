@@ -2,7 +2,7 @@
 -- Focused prep mode dev commands (docs/tech/prep-mode.md; TASK P0).
 --   prep grade   runs the table of Prep.Grade cases (pure math, no service needed) and prints ok / FAIL per case plus
 --                the totals; any failure makes the command error so the Command Bar shows it as a warning
---   prep seats | enter <n> | leave | finish [force] [topping...]   PrepService without the UI (TASK-170): seat table,
+--   prep seats | enter <n> [Grill|Build] | leave | finish [force] [topping...]   PrepService without the UI (TASK-170): seat table,
 --                sit / leave as the caller (first player from the Command Bar), perfect summary through the real path
 --                ("force" ages the plate past the Perfect floor; without it the server clock answers TooFast)
 --   prep ui [n]  opens / closes the focused UI on the caller's client with mock data (PrepController, TASK-173; no seat)
@@ -173,7 +173,7 @@ const Prep: Api.Module = function(ctx: Api.Context): { Api.Command }
 	return {
 		{
 			Name = "prep",
-			Usage = "prep grade | kitchen | seats | ui [n] [tab] | enter <n> | leave | finish [force] [topping...]",
+			Usage = "prep grade | kitchen | seats | ui [n] [tab] | enter <n> [Grill|Build] | leave | finish [force] [topping...]",
 			Help = "prep grade: Prep.Grade cases; kitchen: KitchenService plate/grill/flag scenarios (TASK-169); seats / enter / leave / finish: PrepService without the UI (TASK-170)",
 			Run = function(args: { string }, caller: Player?): string?
 				const verb = args[1]
@@ -190,7 +190,7 @@ const Prep: Api.Module = function(ctx: Api.Context): { Api.Command }
 						error("no player to act as", 0)
 					end
 					if verb == "enter" then
-						return service:DevEnter(player, tonumber(args[2]) or 1)
+						return service:DevEnter(player, tonumber(args[2]) or 1, args[3])
 					elseif verb == "leave" then
 						return service:DevLeave(player)
 					end
@@ -218,7 +218,7 @@ const Prep: Api.Module = function(ctx: Api.Context): { Api.Command }
 					return `prep ui sent to {player.Name} (run it again to leave)`
 				end
 				if verb ~= "grade" then
-					error("usage: prep grade | kitchen | seats | enter <n> | leave | finish [force] [topping...]", 0)
+					error("usage: prep grade | kitchen | seats | enter <n> [Grill|Build] | leave | finish [force] [topping...]", 0)
 				end
 				const all: { Case } = table.clone(cases)
 				for _, case in sweepRows() do
