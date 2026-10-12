@@ -25,7 +25,7 @@ export type Code = {
 
 return Table.new({
 	-- Provisional test codes (TASK-161, Q-191): replace or switch off before launch.
-	{ Key = "HOTDOG", Reward = { Gems = 50 }, Note = "test code, Provisional" },
+	{ Key = "HOTDOGS", Reward = { Gems = 50 }, Note = "test code, Provisional" },
 	{
 		Key = "BUNNYHOP",
 		Reward = { Class = "class_rabbit" },

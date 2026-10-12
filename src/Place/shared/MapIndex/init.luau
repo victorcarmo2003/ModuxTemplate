@@ -881,30 +881,40 @@ function MapIndex.SeatingNotes(required: List): { string }
 		byIndex[index] = list
 		table.insert(list, instance)
 	end
-	-- the place may hold fewer tables than Content.Seating.Tables: 1..N contiguous, N >= 1 (the rest is not sold)
-	local count = 0
-	for index = rule.Tables, 1, -1 do
-		if byIndex[index] ~= nil then
-			count = index
-			break
-		end
-	end
-	if count == 0 then
-		table.insert(notes, `no {rule.Tag} with {rule.IndexAttribute} 1..{rule.Tables} (no Pad tables)`)
-	end
-	for index = 1, count do
-		const list = byIndex[index] or {}
-		if #list ~= 1 then
-			table.insert(notes, `{rule.Tag} {rule.IndexAttribute} = {index} found {#list} time(s), need 1 (1..{count} contiguous)`)
-			continue
-		end
-		const model = list[1]
-		for seat = 1, rule.SeatCount do
-			const part = model:FindFirstChild(`{rule.SeatPrefix}{seat}`, true)
-			if part == nil or not part:IsA("BasePart") then
-				table.insert(notes, `{rule.Tag} {index}: no BasePart {rule.SeatPrefix}{seat}`)
+	-- the place may hold fewer tables than a group's Count: per group (Pad 1..5, Trailer 6..9) First..N contiguous (the rest
+	-- is not sold). A group with no table at all is fine (e.g. no Trailer tables yet).
+	local any = false
+	for _, group in Content.Seating.Groups do
+		local last = 0
+		for index = group.First + group.Count - 1, group.First, -1 do
+			if byIndex[index] ~= nil then
+				last = index
+				break
 			end
 		end
+		if last > 0 then
+			any = true
+		end
+		for index = group.First, last do
+			const list = byIndex[index] or {}
+			if #list ~= 1 then
+				table.insert(
+					notes,
+					`{rule.Tag} {rule.IndexAttribute} = {index} found {#list} time(s), need 1 ({group.First}..{last} contiguous in group {group.Key})`
+				)
+				continue
+			end
+			const model = list[1]
+			for seat = 1, rule.SeatCount do
+				const part = model:FindFirstChild(`{rule.SeatPrefix}{seat}`, true)
+				if part == nil or not part:IsA("BasePart") then
+					table.insert(notes, `{rule.Tag} {index}: no BasePart {rule.SeatPrefix}{seat}`)
+				end
+			end
+		end
+	end
+	if not any then
+		table.insert(notes, `no {rule.Tag} with {rule.IndexAttribute} 1..{rule.Tables} (no Pad tables)`)
 	end
 	return notes
 end

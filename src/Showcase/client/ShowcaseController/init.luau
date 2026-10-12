@@ -167,10 +167,11 @@ function ShowcaseController:WatchViewport()
 end
 
 function ShowcaseController:Mount(playerGui: Instance)
-	const rows = Vide.derive(function(): { Row }
-		return self:BuildRows()
-	end)
 	const _, gui = Vide.root(function()
+		-- derive needs a stable scope: it lives inside the root (user report 2026-10-12)
+		const rows = Vide.derive(function(): { Row }
+			return self:BuildRows()
+		end)
 		return Vide.create("ScreenGui")({
 			Name = "Showcase",
 			ResetOnSpawn = false,
