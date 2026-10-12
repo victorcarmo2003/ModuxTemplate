@@ -1,21 +1,24 @@
 --!strict
 -- HudOrder: the order card on the HUD (user request after Play: the awning hid the world bubble). Same reading as
--- the OrderBubble (style guide §7.3): white rounded card, bun + sausage + up to 3 toppings in a row, the border is the
+-- the OrderBubble (style guide §7.3): white rounded card, one hot dog icon + up to 3 toppings in a row, the border is the
 -- patience ring that drains (Green, Mustard under WarnAt). Icons from the AST-071 sheet (Interface/Components/Icons,
 -- `Ingredient/<key>`); a key without a cell gets a flat letter chip. Empty (ANM-001 blank folks) = the card with no
 -- icon at all, one cell wide.
 -- Status only (FEAT-032): Frames, labels and images, nothing clickable. Pure: only props. CustomerController picks
 -- the customer (prompt target, else the Q1 customer in Waiting) and HudController mounts it on the top-left column,
--- under the money and day pills: clear of the joystick, hotbar and interact button (style guide §7.2).
+-- under the Roblox bar and the sanity meter (2026-10-12): clear of the joystick, hotbar and interact button (style guide §7.2).
 -- Pixel sizes at UI scale 1 (smallest phone): icons 44 px, title 16 px.
 -- Cartoon pass (AST-091): white CartoonPanel bubble (gradient, lip, thick Ink outline), the patience ring drawn just
 -- inside the outline, the title on a small Ink tab over the top-left corner.
 -- Pair order (FEAT-038, TASK-148): `Toppings2` returning a list adds a 2nd row (bun + sausage + its toppings) under
 -- the first; nil (or no prop) keeps the single-row card. Existing callers are unchanged.
+-- Progressive reveal (Content.HudReveal): `Revealed` scales the card in (0.25 s, Motion.Reveal) the first time the order
+-- card is released; nil = always. Position (HudController): top-left, under the sanity meter when that is on screen.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Icons = require(script.Parent.Icons)
 local Theme = require(script.Parent.Theme)
+local Motion = require(script.Parent.Motion)
 local CartoonPanel = require(script.Parent.CartoonPanel)
 local CartoonLabel = require(script.Parent.CartoonLabel)
 
@@ -38,6 +41,8 @@ export type Props = {
 	WarnAt: number?,
 	-- Title over the card (ui-text.md, Provisional). Default "Order".
 	Title: string?,
+	-- Progressive reveal: scales in when true, away when false. nil = always.
+	Revealed: (() -> boolean)?,
 	Position: (UDim2 | () -> UDim2)?,
 	AnchorPoint: Vector2?,
 	Name: string?,
@@ -55,13 +60,14 @@ const RING = 4
 const TITLE_SIZE = 14
 const LABEL_SIZE = 14
 const MAX_TOPPINGS = 3
-const BASE: { string } = { "bun", "sausage" }
+-- Same base as the OrderBubble: ONE hot dog icon (bun + sausage), then the toppings in the same order.
+const BASE_KEY = "__base"
+const BASE: { string } = { BASE_KEY }
 
 const WHITE = Color3.fromHex("#FFFFFF")
 -- Letter chip for a key with no cell in the sheet (same colors as the OrderBubble placeholders).
 const CHIP: { [string]: { Color: Color3, Label: string } } = {
-	bun = { Color = Color3.fromHex("#E8B36B"), Label = "B" },
-	sausage = { Color = Color3.fromHex("#B5482E"), Label = "S" },
+	__base = { Color = Color3.fromHex("#E8B36B"), Label = "HD" },
 	ketchup = { Color = Color3.fromHex("#E2402E"), Label = "K" },
 	mustard = { Color = Color3.fromHex("#F6C12B"), Label = "M" },
 	cheese = { Color = Color3.fromHex("#F39C2B"), Label = "Ch" },
@@ -75,6 +81,9 @@ local function chipOf(key: string): { Color: Color3, Label: string }
 end
 
 local function iconName(key: string): string
+	if key == BASE_KEY then
+		return "Item/hot_dog"
+	end
 	return `Ingredient/{key}`
 end
 
@@ -152,6 +161,9 @@ return function(props: Props): Frame
 	const empty = props.Empty or function(): boolean
 		return false
 	end
+	const reveal = Motion.Reveal(function()
+		return props.Revealed == nil or props.Revealed()
+	end)
 
 	-- Keys drawn in a row: bun, sausage, then the toppings; nothing for a blank customer.
 	local function rowKeys(toppings: { string }): { string }
@@ -225,7 +237,10 @@ return function(props: Props): Frame
 			return UDim2.fromOffset(width(), TITLE_HEIGHT + TITLE_GAP + cardHeight())
 		end,
 		BackgroundTransparency = 1,
-		Visible = props.Shown,
+		Visible = function()
+			return props.Shown() and reveal() > 0.02
+		end,
+		createRaw("UIScale")({ Scale = reveal }),
 
 		CartoonPanel({
 			Name = "Card",

@@ -1,9 +1,11 @@
 --!strict
--- Toast: small notification card (style guide §7.2, "Notificação": top right, closes by itself; DEC-063).
+-- Toast: small notification card (style guide §7.2, "Notificação": closes by itself; DEC-063). Lives at the bottom
+-- centre of the HUD, above the hotbar (owner request 2026-10-12: never in the top right, which belongs to the clock,
+-- day and money).
 -- Cartoon pass (AST-091): a Cream "tag" (CartoonPanel) leaning a little (alternating with its slot, Theme.Motion
 -- TagTilt), a coloured tab with the kind icon on its left (Info Teal, Good Green, Alert Mustard; never red), Ink text.
--- Pops in from the right with overshoot, stays `Duration` seconds (clamped to 3..6), shrinks away, then calls OnDone
--- so the owner can drop it from its list. Pure: only props. Toast/Stack.luau places several in the top-right corner.
+-- Pops in (from below by default, or from the right) with overshoot, stays `Duration` seconds (clamped to 3..6), shrinks away, then calls OnDone
+-- so the owner can drop it from its list. Pure: only props. Toast/Stack.luau places several (bottom centre).
 -- Fixed size: the card is measured once (TextService, unscaled) instead of AutomaticSize, so the pop (UIScale)
 -- cannot re-wrap the text mid-animation and scale children cannot inflate the card.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -24,6 +26,8 @@ const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }
 
 export type Kind = "Info" | "Good" | "Alert"
 
+export type Slide = "Bottom" | "Right"
+
 export type Props = {
 	Text: () -> string,
 	Kind: (() -> Kind)?,
@@ -31,9 +35,14 @@ export type Props = {
 	Duration: number?,
 	OnDone: (() -> ())?,
 	LayoutOrder: (() -> number)?,
+	-- Card width in px at UI scale 1 (narrow screens shrink it). Default 220, never under MIN_WIDTH.
+	Width: (() -> number)?,
+	-- Side the card slides in from. Default "Bottom".
+	Slide: Slide?,
 }
 
 const WIDTH = 220
+const MIN_WIDTH = 120
 const TEXT_SIZE = 15
 const TAB = 32
 const ICON = 22
@@ -97,6 +106,10 @@ return function(props: Props): Frame
 	const offset = spring(function()
 		return if shown() then 0 else SLIDE
 	end, 0.25, 0.7)
+	const fromRight = props.Slide == "Right"
+	local function width(): number
+		return math.max(if props.Width then props.Width() else WIDTH, MIN_WIDTH)
+	end
 
 	local function kind(): Kind
 		return if props.Kind then props.Kind() else "Info"
@@ -109,8 +122,8 @@ return function(props: Props): Frame
 	end
 	-- Card height for the text at the fixed width (lip under it; a toast is never touched: chip height minimum).
 	local function cardHeight(): number
-		const width = WIDTH - TAB - PAD_X * 2 - WRAP_SLACK
-		const bounds = TextService:GetTextSize(props.Text(), TEXT_SIZE, Enum.Font.FredokaOne, Vector2.new(width, math.huge))
+		const room = width() - TAB - PAD_X * 2 - WRAP_SLACK
+		const bounds = TextService:GetTextSize(props.Text(), TEXT_SIZE, Enum.Font.FredokaOne, Vector2.new(room, math.huge))
 		return math.max(Theme.MinChip, math.ceil(bounds.Y) + PAD_Y * 2) + Theme.Lip
 	end
 	local function rect(): Icons.Rect
@@ -120,7 +133,7 @@ return function(props: Props): Frame
 	return create("Frame")({
 		Name = "Toast",
 		Size = function()
-			return UDim2.fromOffset(WIDTH, cardHeight())
+			return UDim2.fromOffset(width(), cardHeight())
 		end,
 		BackgroundTransparency = 1,
 		LayoutOrder = order,
@@ -128,7 +141,7 @@ return function(props: Props): Frame
 		CartoonPanel({
 			Name = "Card",
 			Position = function()
-				return UDim2.fromOffset(offset(), 0)
+				return if fromRight then UDim2.fromOffset(offset(), 0) else UDim2.fromOffset(0, offset())
 			end,
 			Size = UDim2.fromScale(1, 1),
 			-- Tags lean, alternating with their slot.

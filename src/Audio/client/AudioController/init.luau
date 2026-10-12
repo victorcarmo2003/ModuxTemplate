@@ -56,6 +56,7 @@ local Bed = require(script.Bed)
 local Cues = require(script.Cues)
 local LoadQueue = require(script.LoadQueue)
 local Stats = require(script.Stats)
+local Tiers = require(script.Tiers)
 
 const RULES = Content.SoundRules
 const GROUPS = { "Music", "Ambient", "Sfx", "Voice", "Ui" }
@@ -67,6 +68,8 @@ const SIREN_KEY = "siren_soft" -- DEC-005
 const VARY = 0.05 -- sound-list §2: +-5% pitch when there is a single variation
 const ROLLOFF_MIN = 8 -- studs at full volume around a spatial sound
 const IDLE_PER_KEY = 3 -- pooled Sounds kept per key
+const IDLE_TTL = 60 -- s: a pooled Sound idle this long is destroyed (the sweep runs every SWEEP s)
+const SWEEP = 10 -- s: idle sweep + retry of ids whose backoff ended
 const STALE_AFTER = 1 -- s: a one-shot not playing after this is released (failed load never fires Ended)
 const DUCK_TIME = 0.5 -- s
 const SCREEN_ANCHOR = "screen"
@@ -113,6 +116,13 @@ function AudioController:Setup()
 	-- one-shots and loops playing, oldest first
 	self.Voices = {} :: { Voice }
 	self.Idle = {} :: { [string]: { Sound } }
+	-- os.clock() at which a pooled Sound went idle (Sweep destroys the ones idle longer than IDLE_TTL)
+	self.IdleSince = {} :: { [Sound]: number }
+	-- ids of the tiers (Tiers.luau); CoreWarm = the core tier was requested, NightWarm = the night tier was
+	self.CoreIds = {} :: { string }
+	self.NightIds = {} :: { string }
+	self.NightWarm = false :: boolean
+	self.CoreWarm = false :: boolean
 	-- Loops[key][anchor] (anchor = Instance, tostring(Vector3) or "screen")
 	self.Loops = {} :: { [string]: { [any]: Voice } }
 	self.Warned = {} :: { [string]: boolean }
@@ -266,10 +276,25 @@ function AudioController:Place(row: Content.Sound, at: At?): (Instance?, Attachm
 	return self.Screen, nil
 end
 
+-- false = the id is backing off after a failed load (quota): no Sound is created, nothing is asked again. An id that
+-- is not loaded yet is asked once (LoadQueue.Want) and the sound plays as soon as the engine has it.
+function AudioController:Ensure(row: Content.Sound): boolean
+	const state = LoadQueue.State(row.Id)
+	if state == "cooldown" then
+		return false
+	end
+	if state == "unknown" then
+		LoadQueue.Want(row.Id)
+	end
+	return true
+end
+
 function AudioController:Take(row: Content.Sound): Sound
 	const idle = self.Idle[row.Key]
 	if idle and #idle > 0 then
-		return table.remove(idle) :: Sound
+		const reused = table.remove(idle) :: Sound
+		self.IdleSince[reused] = nil
+		return reused
 	end
 	Stats.Mark("new")
 	const sound = Instance.new("Sound")
@@ -329,6 +354,7 @@ function AudioController:Release(voice: Voice)
 		self.Idle[voice.Key] = idle
 	end
 	if alive and #idle < IDLE_PER_KEY then
+		self.IdleSince[sound] = os.clock()
 		table.insert(idle, sound)
 	else
 		sound:Destroy()
@@ -368,6 +394,9 @@ function AudioController:MakeRoom(key: string): boolean
 end
 
 function AudioController:Start(row: Content.Sound, at: At?, opts: PlayOptions?, looped: boolean, anchor: any): Sound?
+	if not self:Ensure(row) then
+		return nil
+	end
 	if not self:MakeRoom(row.Key) then
 		return nil
 	end
@@ -544,7 +573,7 @@ function AudioController:SetMusic(cueKey: string?)
 		return
 	end
 	const row = self:Row(soundKey)
-	if row == nil then
+	if row == nil or not self:Ensure(row) then
 		return
 	end
 	Stats.Mark("new")
@@ -584,7 +613,7 @@ function AudioController:PlayShiftTrack(isNight: boolean, fadeIn: number?)
 	self.LastShiftTrack[kind] = key
 	self:StopShiftTrack(SHIFT_FADE)
 	const row = self:Row(key)
-	if row == nil then
+	if row == nil or not self:Ensure(row) then
 		return
 	end
 	Stats.Mark("new")
@@ -667,7 +696,7 @@ function AudioController:SetAmbient(key: string?)
 	if old then
 		old.Stop(if row then row.Crossfade else nil)
 	end
-	if row == nil then
+	if row == nil or not self:Ensure(row) then
 		return
 	end
 	const screen = self.Screen
@@ -692,7 +721,7 @@ function AudioController:SetTension(on: boolean)
 	end
 	const row = self:Row(RULES.Tension.Key)
 	const screen = self.Screen
-	if row == nil or screen == nil then
+	if row == nil or screen == nil or not self:Ensure(row) then
 		return
 	end
 	self.TensionBed = Bed.start(row, screen, self.Groups.Ambient)
@@ -748,22 +777,83 @@ function AudioController:ZoneAt(): string?
 	return nil
 end
 
-function AudioController:Preload()
-	const ids: { string } = {}
-	for _, row in Content.Sounds.List do
-		if row.Id ~= "" then
-			table.insert(ids, row.Id)
-		end
+-- Tier lists (Tiers.luau): core = what the day needs, night = the rest minus the lazy ones
+function AudioController:PlanTiers()
+	const list: any = Content.Sounds.List
+	const byKey: any = Content.Sounds.ByKey
+	const dayKeys: { string } = { RULES.Ambient.Day }
+	for _, key in RULES.ShiftMusic.Day do
+		table.insert(dayKeys, key)
 	end
+	for _, key in RULES.AmbientZones do
+		table.insert(dayKeys, key)
+	end
+	const core, night = Tiers.Plan(list, byKey, dayKeys)
+	self.CoreIds = core
+	self.NightIds = night
+end
+
+-- Background job of the one audio queue (LoadQueue): never a burst next to the loading screen and the voices. Ids
+-- already loaded or backing off are skipped by LoadQueue, so asking again (Warm / Sweep) costs nothing.
+function AudioController:Request(ids: { string })
 	if #ids == 0 then
 		return
 	end
-	-- background job of the one audio queue (LoadQueue): never a burst next to the loading screen and the voices
-	const ok, err = pcall(function()
-		LoadQueue.Preload(ids)
+	task.spawn(function()
+		const ok, err = pcall(function()
+			LoadQueue.Preload(ids)
+		end)
+		if not ok then
+			warn(`[AudioController] preload failed: {err}`)
+		end
 	end)
-	if not ok then
-		warn(`[AudioController] preload failed: {err}`)
+end
+
+function AudioController:Preload()
+	self:PlanTiers()
+	self.CoreWarm = true
+	self:Request(self.CoreIds)
+end
+
+-- The night comes close (phase Closing onwards or IsNight): the night tier starts loading, once
+function AudioController:Warm(phase: string, isNight: boolean)
+	if self.NightWarm or not self.CoreWarm then
+		return
+	end
+	if isNight or Tiers.IsNightPhase(phase) then
+		self.NightWarm = true
+		self:Request(self.NightIds)
+	end
+end
+
+-- Every SWEEP s: destroys pooled Sounds idle for IDLE_TTL, asks again for ids whose backoff ended, and brings back
+-- an ambience bed that was skipped because its id was backing off
+function AudioController:Sweep()
+	const now = os.clock()
+	for key, idle in self.Idle do
+		for index = #idle, 1, -1 do
+			const sound = idle[index]
+			const since = self.IdleSince[sound]
+			if since == nil or now - since > IDLE_TTL then
+				table.remove(idle, index)
+				self.IdleSince[sound] = nil
+				sound:Destroy()
+			end
+		end
+		if #idle == 0 then
+			self.Idle[key] = nil
+		end
+	end
+	if self.CoreWarm then
+		self:Request(self.CoreIds)
+		if self.NightWarm then
+			self:Request(self.NightIds)
+		end
+	end
+	const key = self.AmbientKey
+	if key ~= nil and self.Bed == nil then
+		self.AmbientKey = nil
+		self:SetAmbient(key)
 	end
 end
 
@@ -840,6 +930,7 @@ AudioController:OnStart(function(self)
 				end
 				self:SetMusic(cue)
 				self:SetAmbient(ambient)
+				self:Warm(if state.Ready then state.Phase else "", state.IsNight)
 				self:SetTension(ambient ~= nil and state.IsNight and state.Window == RULES.Tension.Window)
 				return nil
 			end)
@@ -886,6 +977,10 @@ AudioController:OnStart(function(self)
 
 	task.spawn(function()
 		self:Preload()
+		while true do
+			task.wait(SWEEP)
+			self:Sweep()
+		end
 	end)
 end)
 

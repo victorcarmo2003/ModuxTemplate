@@ -12,6 +12,7 @@ local Cutscenes = require(script.Parent.Cutscenes)
 local Flow = require(script.Parent.Flow)
 local GemRewards = require(script.Parent.GemRewards)
 local Hallucinations = require(script.Parent.Hallucinations)
+local HudReveal = require(script.Parent.HudReveal)
 local Ingredients = require(script.Parent.Ingredients)
 local Items = require(script.Parent.Items)
 local LightGroups = require(script.Parent.LightGroups)
@@ -96,6 +97,7 @@ local function checkKeySets()
 	checkKeys("Actions", Actions, KEY_PATTERN)
 	checkKeys("Classes", Classes, KEY_PATTERN)
 	checkKeys("CustomerTypes", CustomerTypes, KEY_PATTERN)
+	checkKeys("HudReveal", HudReveal, KEY_PATTERN)
 	checkKeys("Ingredients", Ingredients, KEY_PATTERN)
 	checkKeys("Items", Items, KEY_PATTERN)
 	checkKeys("Moods", Moods, VALUE_PATTERN)
@@ -1680,8 +1682,40 @@ local function checkMart()
 	end
 end
 
+-- HudController asks for exactly these keys (src/Hud/client/HudController.luau)
+const HUD_REVEAL_REQUIRED: { string } = { "clock", "order_card", "toasts", "money", "shift", "sanity" }
+
+local function checkHudReveal()
+	for index, row in HudReveal.List do
+		if row.Trigger ~= "Start" and row.Trigger ~= "Step" and row.Trigger ~= "TutorialEnd" and row.Trigger ~= "Night" then
+			fail("HudReveal", index, row.Key, `Trigger '{tostring(row.Trigger)}' is not Start, Step, TutorialEnd or Night`)
+		end
+		if row.Trigger == "Step" then
+			if not string.match(row.Step, KEY_PATTERN) then
+				fail("HudReveal", index, row.Key, `Trigger Step needs a tutorial step key, got '{row.Step}'`)
+			end
+		elseif row.Step ~= "" then
+			fail("HudReveal", index, row.Key, "Step is only for Trigger Step")
+		end
+		if row.Trigger == "Night" then
+			inRange("HudReveal", index, row.Key, "Night", row.Night, 1, 99)
+		elseif row.Night ~= 0 then
+			fail("HudReveal", index, row.Key, "Night is only for Trigger Night")
+		end
+		if row.Pulse and row.Trigger ~= "Night" then
+			fail("HudReveal", index, row.Key, "Pulse is only for Trigger Night")
+		end
+	end
+	for _, key in HUD_REVEAL_REQUIRED do
+		if HudReveal.ByKey[key] == nil then
+			fail("HudReveal", nil, nil, `missing row '{key}' (HudController needs it)`)
+		end
+	end
+end
+
 return function()
 	checkKeySets()
+	checkHudReveal()
 	checkUpgrades()
 	checkIngredients()
 	checkItems()

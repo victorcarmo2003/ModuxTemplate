@@ -35,7 +35,9 @@ function Bed.start(row: Row, parent: Instance, group: SoundGroup?): Bed
 	const copies: { Sound } = {}
 	const tweens: { [Sound]: Tween } = {}
 
-	for index = 1, 2 do
+	-- Same SoundId twice, but the second copy is only created at the first handover (the first one is loaded by then):
+	-- one load request per bed, not two (quota, 2026-10-12)
+	local function make(index: number): Sound
 		Stats.Mark("new")
 		const sound = Instance.new("Sound")
 		sound.Name = `Amb_{row.Key}_{index}`
@@ -44,8 +46,10 @@ function Bed.start(row: Row, parent: Instance, group: SoundGroup?): Bed
 		sound.Looped = false
 		sound.Volume = 0
 		sound.Parent = parent
-		table.insert(copies, sound)
+		copies[index] = sound
+		return sound
 	end
+	make(1)
 
 	local function fade(sound: Sound, volume: number, time: number, done: (() -> ())?)
 		const previous = tweens[sound]
@@ -70,7 +74,7 @@ function Bed.start(row: Row, parent: Instance, group: SoundGroup?): Bed
 		if not alive then
 			return
 		end
-		const sound = copies[current]
+		const sound = copies[current] or make(current)
 		sound.TimePosition = 0
 		sound.Volume = 0
 		sound:Play()

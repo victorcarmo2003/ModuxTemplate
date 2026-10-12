@@ -1,7 +1,8 @@
 --!strict
 -- HudOrder: tick the toppings (only the first 3 show, DEC-071), drag the patience (Mustard under 1/3), turn the ring
 -- off, or make it Empty (ANM-001 blank folks: card with no icon). Phone = 667 x 375 (iPhone SE landscape); the card
--- sits under the money and day pills like in the HUD. Pair (FEAT-038): tick Pair for the 2-row card (2nd hot dog =
+-- sits top left under the Roblox bar (and under the sanity meter at night, see HudSanity) like in the HUD. "Revealed"
+-- plays the progressive reveal. Pair (FEAT-038): tick Pair for the 2-row card (2nd hot dog =
 -- bacon + potato sticks).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
@@ -15,6 +16,7 @@ const create = Vide.create
 type Controls = {
 	Phone: () -> boolean,
 	Shown: () -> boolean,
+	Revealed: () -> boolean,
 	Ketchup: () -> boolean,
 	Mustard: () -> boolean,
 	Cheese: () -> boolean,
@@ -32,6 +34,7 @@ return UILabs.CreateVideStory({
 	controls = {
 		Phone = true,
 		Shown = true,
+		Revealed = true,
 		Ketchup = true,
 		Mustard = false,
 		Cheese = true,
@@ -86,7 +89,8 @@ return UILabs.CreateVideStory({
 				return if controls.Ring() then controls.Patience() else -1
 			end,
 			WarnAt = Content.Moods.Rules.AnnoyedAt,
-			Position = UDim2.fromOffset(10, 88),
+			Revealed = controls.Revealed,
+			Position = UDim2.fromOffset(8, 68),
 		}),
 	})
 end)

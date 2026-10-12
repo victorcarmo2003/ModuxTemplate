@@ -14,6 +14,7 @@ local Cutscenes = require(script.Cutscenes)
 local Flow = require(script.Flow)
 local GemRewards = require(script.GemRewards)
 local Hallucinations = require(script.Hallucinations)
+local HudReveal = require(script.HudReveal)
 local Ingredients = require(script.Ingredients)
 local Items = require(script.Items)
 local LightGroups = require(script.LightGroups)
@@ -66,6 +67,8 @@ export type CutsceneRules = Cutscenes.Rules
 export type CutsceneVoice = Cutscenes.Voice
 export type GemRewards = GemRewards.GemRewards
 export type Hallucination = Hallucinations.Hallucination
+export type HudRevealElement = HudReveal.Element
+export type HudRevealTrigger = HudReveal.Trigger
 export type HallucinationRules = Hallucinations.Rules
 export type Ingredient = Ingredients.Ingredient
 export type Item = Items.Item
@@ -196,4 +199,7 @@ return table.freeze({
 	-- Lobby zones (auto-open triggers), ring VFX, platform squads, lobby camera (user request 2026-10-11; LobbyController,
 	-- PartyService). Provisional
 	Lobby = Lobby,
+
+	-- Progressive HUD reveal: which element appears when (owner request 2026-10-12; HudController). Provisional
+	HudReveal = HudReveal,
 })

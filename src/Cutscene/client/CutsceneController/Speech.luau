@@ -167,6 +167,16 @@ const warned: { [string]: boolean } = {}
 -- one LoadAsync runs belongs to it: the failure is deterministic (same text, same result) and is never retried.
 local filteredCount = 0
 local filteredWatch = false
+-- "Failed to load sound : NotEnoughQuota" (playtest 2026-10-12): the text-to-speech quota of the client is spent. Every
+-- further request (and each retry) spends more of it, so a quota failure is no retry: session-wide pause that grows
+-- QUOTA_FIRST -> QUOTA_MAX s per quota failure in a row (reset by a load that works); the lines stay subtitles and Fetch
+-- asks for them again only after the pause.
+const MAX_AHEAD = 12 -- loaded pieces not played yet: past it only a line somebody waits for loads (quota, 2026-10-12)
+const QUOTA_FIRST = 10 -- s
+const QUOTA_MAX = 60 -- s
+local quotaUntil = 0 -- os.clock until which no text-to-speech request goes out
+local quotaStep = 0 -- quota failures in a row
+local quotaHits = 0 -- quota failures of the session (the one warn)
 
 local function watchFiltered()
 	if filteredWatch then
@@ -484,6 +494,35 @@ function Speech.new(volume: () -> number): Speech
 		return if alive and token == mine then "Done" else "Cut"
 	end
 
+	-- Pieces loaded and not played yet (each is a live AudioTextToSpeech + Wire: 94 of them were alive in the playtest)
+	local function loadedAhead(): number
+		local count = 0
+		for _, entry in entries do
+			for _, piece in entry.Pieces do
+				if piece.State == "Loaded" then
+					count += 1
+				end
+			end
+		end
+		return count
+	end
+
+	-- A line that played to its end gives its voices back (Destroy) and leaves `entries`: a later Say loads it again
+	local function release(entry: Entry, line: Beat)
+		for _, piece in entry.Pieces do
+			const voice = piece.Voice
+			piece.Voice = nil
+			if voice ~= nil then
+				pcall(function()
+					voice:Destroy()
+				end)
+			end
+		end
+		if entries[keyOf(line)] == entry then
+			entries[keyOf(line)] = nil
+		end
+	end
+
 	-- A line never cuts the one speaking (user feedback 2026-10-11: every voice was cut): it waits its turn in
 	-- `spoken` and starts once the line before it ended, LINE_GAP s later. Only Stop / Destroy (halt) cut the chain.
 	local function start(job: Job)
@@ -511,6 +550,9 @@ function Speech.new(volume: () -> number): Speech
 					-- "Done" or "Failed": started lines end, lines with nothing to play are missed
 					if next.Done then
 						notify(next, "End")
+						if result == "Done" then
+							release(next.Entry, next.Line)
+						end
 					else
 						miss(next)
 					end
@@ -688,6 +730,7 @@ function Speech.new(volume: () -> number): Speech
 		piece.State = "Loading"
 		watchFiltered()
 		const filteredBefore = filteredCount
+		const quotaBefore = LoadQueue.QuotaMessages()
 		-- inside the one audio queue of the client (LoadQueue, urgent): never next to another sound load
 		local ok, status: any = false, nil
 		local returned = false
@@ -713,6 +756,7 @@ function Speech.new(volume: () -> number): Speech
 			streak = 0
 			giveUps = 0
 			pause = 0
+			quotaStep = 0
 			const fresh = not goodVoices[piece.VoiceId]
 			goodVoices[piece.VoiceId] = true
 			badVoices[piece.VoiceId] = nil
@@ -741,6 +785,25 @@ function Speech.new(volume: () -> number): Speech
 		if not alive then
 			return
 		end
+		if ok and LoadQueue.QuotaMessages() > quotaBefore then
+			-- quota spent: no retry, no streak, the voice stays good; the line waits out the pause as a subtitle
+			quotaStep += 1
+			quotaHits += 1
+			const wait = math.min(QUOTA_FIRST * 2 ^ (quotaStep - 1), QUOTA_MAX)
+			quotaUntil = os.clock() + wait
+			piece.State = "Failed"
+			piece.BadVoice = false
+			const owner = piece.Owner
+			owner.FailedAt = os.clock() + wait - RETRY_AFTER
+			owner.Reason = "text-to-speech quota"
+			dropWanted(owner)
+			warnOnce(
+				"quota",
+				`text-to-speech quota spent (NotEnoughQuota): no voice requests for {wait} s (then {QUOTA_MAX} s at most), `
+					.. "lines stay subtitles"
+			)
+			return
+		end
 		if ok and filteredCount > filteredBefore then
 			-- filtered text: no retry, no backoff, no streak, the voice stays good; subtitle only for this line
 			piece.State = "Failed"
@@ -765,6 +828,14 @@ function Speech.new(volume: () -> number): Speech
 				if pause > 0 then
 					task.wait(pause)
 					pause = 0
+				end
+				const quotaWait = quotaUntil - os.clock()
+				if quotaWait > 0 then
+					task.wait(quotaWait)
+				end
+				if loadedAhead() >= MAX_AHEAD and queue[1] ~= nil and queue[1].Owner.Wanted == nil then
+					task.wait(1) -- enough voices ready: the rest waits for a line that is asked for
+					continue
 				end
 				const piece = table.remove(queue, 1)
 				if piece ~= nil and piece.State == "Queued" then
@@ -982,9 +1053,10 @@ function Speech.new(volume: () -> number): Speech
 						end
 					end
 				end
-				const done = not enabled or not alive or settled >= total
+				const goal = math.min(total, MAX_AHEAD) -- the loader keeps MAX_AHEAD voices ready, no more
+				const done = not enabled or not alive or settled >= goal
 				if progress ~= nil then
-					progress(if done or total == 0 then 1 else settled / total)
+					progress(if done or goal == 0 then 1 else settled / goal)
 				end
 				if done or os.clock() >= deadline then
 					return

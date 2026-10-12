@@ -77,5 +77,9 @@ return Table.new({
 	{ Key = "item_dropped", Text = "Dropped {item}!", Audience = "Player", ValueFrom = "Items", Wave = 3 }, -- FEAT-036
 	-- Pad tables (TASK-144; FEAT-037): after a purchase in place, to the party (Value = table index 1..5); placeholder
 	-- until ui-text.md (TASK-150). A refusal for cash reuses not_enough_cash.
+	-- Serve with no hot dog to use (owner request 2026-10-12, Provisional): a hot dog sits in the hotbar but none is in hand /
+	-- exact for the order, or the player carries none at all. A wrong hot dog in hand is still served (existing rules).
+	{ Key = "serve_hold_hot_dog", Text = "Hold the hot dog you want to serve", Audience = "Player", ValueFrom = "None", Wave = 3 },
+	{ Key = "serve_nothing", Text = "Nothing to serve yet", Audience = "Player", ValueFrom = "None", Wave = 3 },
 	{ Key = "table_added", Text = "Table added!", Audience = "Party", ValueFrom = "Number", Wave = 3 },
 } :: { Notice })

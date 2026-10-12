@@ -1,8 +1,13 @@
 --!strict
--- HudSanity: night sanity meter (FEAT-019, DEC-056, DEC-167; style guide §7.2; ui-text.md §12.1). Top centre, under
--- the clock. No word on it (Q-054): the portrait of the band face on the left + a bar + the number (no "/max": the
--- max changes by class). Bar fill goes from `#FFD45A` (full) to `#6A5ACD` (empty); below 25 it breathes slowly.
+-- HudSanity: night sanity meter (FEAT-019, DEC-056, DEC-167; style guide §7.2; ui-text.md §12.1). Top LEFT, just under
+-- the Roblox menu / chat bar (owner request 2026-10-12; HudController places it), COMPACT so it is as small as that bar.
+-- No word on it (Q-054): the portrait of the class animal on the left + a bar + the number (no "/max": the max changes
+-- by class). Bar fill goes from `#FFD45A` (full) to `#6A5ACD` (empty); below 25 it breathes slowly.
 -- Never red, no heart, no skull.
+-- Sizes (px at UI scale 1): Compact (phone) portrait 34, bar 110 x 10, number 11 px (owner's number; smaller than the
+-- 14 px rule on purpose, it only repeats the bar); desktop portrait 44, bar 180 x 14, number 15 px.
+-- Reveal (Content.HudReveal): `Revealed` scales it in (0.25 s, Motion.Reveal); `Intro` = true makes a Mustard ring pulse
+-- around it, once, the first time it is shown and revealed (night 1 presentation).
 -- Portrait until AST-086 (TASK-093): the class icon of the AST-071 sheet (`Class/class_<x>`, Day head render) on the
 -- species fur colour; species letter when the icon is missing. The band shows as the ring colour (Day warm, Mid
 -- between, Night violet) and a darker portrait on Night.
@@ -17,6 +22,7 @@ local RunService = game:GetService("RunService")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Theme)
 local Icons = require(script.Parent.Icons)
+local Motion = require(script.Parent.Motion)
 local CartoonPanel = require(script.Parent.CartoonPanel)
 local CartoonLabel = require(script.Parent.CartoonLabel)
 
@@ -44,11 +50,15 @@ export type Props = {
 	Icon: (() -> string)?,
 	Letter: () -> string,
 	Fur: () -> Color3,
-	-- Bar width as a fraction of the screen width (style guide: 30%). Default 0.3.
-	Width: number?,
+	-- Phone-sized layout (portrait 34, bar 110 x 10). false/nil = desktop (44, 180 x 14).
+	Compact: (() -> boolean)?,
+	-- Progressive reveal: scales in when true, away when false. nil = always.
+	Revealed: (() -> boolean)?,
+	-- true = the meter pulses a ring once, the first time it is shown and revealed. nil = never.
+	Intro: (() -> boolean)?,
 	Name: string?,
 	AnchorPoint: Vector2?,
-	Position: UDim2?,
+	Position: (UDim2 | () -> UDim2)?,
 	-- Breathing Mustard ring around the bar while true (Night 1 coffee lesson).
 	Emphasis: (() -> boolean)?,
 	-- Last coffee gain; each new value flashes the bar green and floats "+Amount".
@@ -58,24 +68,36 @@ export type Props = {
 const FULL = Color3.fromHex("#FFD45A")
 const EMPTY = Theme.Color.Violet -- #6A5ACD
 const MID_RING = FULL:Lerp(EMPTY, 0.5)
-const PORTRAIT = 40 -- circle (not clickable, readable at a glance)
-const BAR_HEIGHT = 22
-const MIN_BAR = 120
-const MAX_BAR = 260
-const TEXT_SIZE = 17
-const GAP = 8
-const VALUE_WIDTH = 34 -- "100" at TEXT_SIZE
--- Offset width of everything that is not the bar: portrait, gaps, number
-const SIDES = PORTRAIT + GAP * 2 + VALUE_WIDTH
+
+type Dims = {
+	Portrait: number, -- circle (not clickable)
+	Bar: number, -- bar track width
+	BarHeight: number,
+	Text: number, -- number size
+	Gap: number,
+	ValueWidth: number, -- "100" at Text
+	Ring: number, -- band ring thickness around the disc
+	Outline: number, -- Ink outline of the portrait and the bar
+	Stroke: number, -- Ink stroke of the number
+}
+
+const COMPACT: Dims = { Portrait = 34, Bar = 110, BarHeight = 10, Text = 11, Gap = 6, ValueWidth = 24, Ring = 3, Outline = 2, Stroke = 1 }
+const LARGE: Dims = { Portrait = 44, Bar = 180, BarHeight = 14, Text = 15, Gap = 8, ValueWidth = 34, Ring = 4, Outline = 3, Stroke = 2 }
+const BAR_PAD = 2 -- px between the track outline and the fill
+const INTRO_TIME = 2.4 -- s of the presentation pulse (3 beats)
+const INTRO_BEATS = 3
+const INTRO_GROW = 8 -- px the ring swells at a beat
+const REVEAL_FROM = 0.6 -- scale at the start of the reveal
 -- style guide §7.2: "abaixo de 25 pulsa devagar"
 const PULSE_BELOW = 25
 const PULSE_HZ = 0.5
 const PULSE_DEPTH = 0.35
 const HINT_HZ = 1.2 -- breathing of the emphasis ring
-const HINT_RING = 4 -- px the ring sits outside the bar
+const HINT_RING = 3 -- px the ring sits outside the bar
 const GAIN_TIME = 1.6 -- s of the green flash and the floating number
 const GAIN_COLOR = Color3.fromHex("#7BE08A")
-const GAIN_RISE = 16 -- px the "+N" drifts down while it fades
+const GAIN_RISE = 12 -- px the "+N" drifts down while it fades
+const GAIN_TEXT = 18
 
 const RING: { [Band]: Color3 } = {
 	Day = FULL,
@@ -89,7 +111,8 @@ local function letterColor(fur: Color3): Color3
 	return if luminance > 0.6 then Theme.Color.Ink else Theme.Color.Text
 end
 
-local function portrait(props: Props): Frame
+
+local function portrait(props: Props, dims: () -> Dims): Frame
 	const fur = function(): Color3
 		const base = props.Fur()
 		return if props.Band() == "Night" then base:Lerp(Theme.Color.Ink, 0.35) else base
@@ -104,17 +127,28 @@ local function portrait(props: Props): Frame
 	-- Band ring (thick, coloured) inside an Ink outline, the portrait disc inside the ring.
 	return create("Frame")({
 		Name = "Portrait",
-		Size = UDim2.fromOffset(PORTRAIT, PORTRAIT),
+		Size = function()
+			const size = dims().Portrait
+			return UDim2.fromOffset(size, size)
+		end,
 		BackgroundColor3 = function()
 			return RING[props.Band()]
 		end,
 		create("UICorner")({ CornerRadius = Theme.Radius.Pill }),
-		createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = Theme.Outline.Normal }),
+		createRaw("UIStroke")({
+			Color = Theme.Color.Ink,
+			Thickness = function()
+				return dims().Outline
+			end,
+		}),
 		create("Frame")({
 			Name = "Disc",
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.new(1, -8, 1, -8),
+			Size = function()
+				const inset = dims().Ring * 2
+				return UDim2.new(1, -inset, 1, -inset)
+			end,
 			BackgroundColor3 = fur,
 			create("UICorner")({ CornerRadius = Theme.Radius.Pill }),
 			createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = 2 }),
@@ -125,7 +159,7 @@ local function portrait(props: Props): Frame
 			CartoonLabel({
 				Name = "Letter",
 				Box = UDim2.fromScale(1, 1),
-				TextSize = 20,
+				TextSize = 16,
 				Color = function()
 					return letterColor(fur())
 				end,
@@ -159,13 +193,25 @@ local function portrait(props: Props): Frame
 end
 
 return function(props: Props): Frame
-	const widthScale = props.Width or 0.3
+	const dims = function(): Dims
+		return if props.Compact ~= nil and props.Compact() then COMPACT else LARGE
+	end
+	-- Offset x of the bar track (portrait + gap)
+	const barX = function(): number
+		const d = dims()
+		return d.Portrait + d.Gap
+	end
 
 	const ratio = function(): number
 		const max = props.Max()
 		return if max > 0 then math.clamp(props.Value() / max, 0, 1) else 0
 	end
 	const fill = spring(ratio, 0.25, 1)
+
+	-- Progressive reveal: 0 -> 1 in Theme.Motion.Reveal s (instant with reduced motion)
+	const reveal = Motion.Reveal(function()
+		return props.Revealed == nil or props.Revealed()
+	end)
 
 	-- Slow breathing below PULSE_BELOW: a per-frame phase only while low and shown.
 	const pulse = source(0)
@@ -223,32 +269,89 @@ return function(props: Props): Frame
 		end)
 	end)
 
+	-- Presentation pulse (Intro): once per meter, the first moment it is shown AND revealed. Progress 0..1 (1 = idle).
+	-- The Heartbeat connection lives outside the effect (the effect re-runs on every Max / Shown change).
+	const intro = source(1)
+	local introLive: RBXScriptConnection? = nil
+	local introWasVisible = false
+	local introDone = false
+	effect(function()
+		const visible = props.Shown() and props.Max() > 0 and (props.Revealed == nil or props.Revealed())
+		const wanted = props.Intro ~= nil and props.Intro()
+		if visible and not introWasVisible and wanted and not introDone then
+			introDone = true
+			untrack(function()
+				const started = os.clock()
+				intro(0)
+				introLive = RunService.Heartbeat:Connect(function()
+					const progress = math.clamp((os.clock() - started) / INTRO_TIME, 0, 1)
+					intro(progress)
+					if progress >= 1 and introLive ~= nil then
+						introLive:Disconnect()
+						introLive = nil
+					end
+				end)
+			end)
+		end
+		introWasVisible = visible
+	end)
+	cleanup(function()
+		if introLive ~= nil then
+			introLive:Disconnect()
+			introLive = nil
+		end
+	end)
+	-- 0..1 strength of the pulse ring: 3 beats (a steady fade with reduced motion)
+	const introAlpha = function(): number
+		const t = intro()
+		if t >= 1 then
+			return 0
+		end
+		if Motion.Reduced() then
+			return 1 - t
+		end
+		return math.abs(math.sin(t * math.pi * INTRO_BEATS)) * (1 - t * 0.3)
+	end
+
 	return create("Frame")({
 		Name = props.Name or "HudSanity",
-		AnchorPoint = props.AnchorPoint or Vector2.new(0.5, 0),
-		Position = props.Position or UDim2.fromScale(0.5, 0),
-		-- The bar takes `Width` of the screen; portrait and number are added on its sides.
-		Size = UDim2.new(widthScale, SIDES, 0, PORTRAIT),
+		AnchorPoint = props.AnchorPoint or Vector2.zero,
+		Position = props.Position or UDim2.fromOffset(8, 8),
+		-- portrait + gap + bar + gap + number
+		Size = function()
+			const d = dims()
+			return UDim2.fromOffset(d.Portrait + d.Gap * 2 + d.Bar + d.ValueWidth, d.Portrait)
+		end,
 		BackgroundTransparency = 1,
-		Visible = props.Shown,
-		createRaw("UISizeConstraint")({
-			MinSize = Vector2.new(MIN_BAR + SIDES, PORTRAIT),
-			MaxSize = Vector2.new(MAX_BAR + SIDES, PORTRAIT),
+		Visible = function()
+			return props.Shown() and reveal() > 0.02
+		end,
+		createRaw("UIScale")({
+			Scale = function()
+				return REVEAL_FROM + (1 - REVEAL_FROM) * reveal()
+			end,
 		}),
 
-		portrait(props),
+		portrait(props, dims),
 
 		-- Bar: Ink track (style guide §7.2), glossy fill by sanity / max.
 		CartoonPanel({
 			Name = "Bar",
 			AnchorPoint = Vector2.new(0, 0.5),
-			Position = UDim2.new(0, PORTRAIT + GAP, 0.5, 0),
-			Size = UDim2.new(1, -SIDES, 0, BAR_HEIGHT),
+			Position = function()
+				return UDim2.new(0, barX(), 0.5, 0)
+			end,
+			Size = function()
+				const d = dims()
+				return UDim2.fromOffset(d.Bar, d.BarHeight)
+			end,
 			Tone = Theme.Tone.Ink,
-			Outline = Theme.Outline.Normal,
+			Outline = function()
+				return dims().Outline
+			end,
 			Lip = 0,
 			Gloss = false,
-			Padding = 3,
+			Padding = BAR_PAD,
 			Children = {
 				create("Frame")({
 					Name = "Fill",
@@ -272,10 +375,14 @@ return function(props: Props): Frame
 					create("Frame")({
 						Name = "Gloss",
 						AnchorPoint = Vector2.new(0.5, 0),
-						Position = UDim2.new(0.5, 0, 0, 2),
-						Size = UDim2.new(1, -8, 0.32, 0),
+						Position = UDim2.new(0.5, 0, 0, 1),
+						Size = UDim2.new(1, -6, 0.32, 0),
 						BackgroundColor3 = Color3.new(1, 1, 1),
 						BackgroundTransparency = 0.55,
+						-- too thin to carry a highlight on the phone bar
+						Visible = function()
+							return dims().BarHeight > COMPACT.BarHeight
+						end,
 						create("UICorner")({ CornerRadius = Theme.Radius.Pill }),
 					}),
 				}),
@@ -286,8 +393,13 @@ return function(props: Props): Frame
 		create("Frame")({
 			Name = "HintRing",
 			AnchorPoint = Vector2.new(0, 0.5),
-			Position = UDim2.new(0, PORTRAIT + GAP - HINT_RING, 0.5, 0),
-			Size = UDim2.new(1, -SIDES + HINT_RING * 2, 0, BAR_HEIGHT + HINT_RING * 2),
+			Position = function()
+				return UDim2.new(0, barX() - HINT_RING, 0.5, 0)
+			end,
+			Size = function()
+				const d = dims()
+				return UDim2.fromOffset(d.Bar + HINT_RING * 2, d.BarHeight + HINT_RING * 2)
+			end,
 			BackgroundTransparency = 1,
 			Visible = function()
 				return hint() > 0
@@ -304,8 +416,13 @@ return function(props: Props): Frame
 		create("Frame")({
 			Name = "GainFlash",
 			AnchorPoint = Vector2.new(0, 0.5),
-			Position = UDim2.new(0, PORTRAIT + GAP - HINT_RING, 0.5, 0),
-			Size = UDim2.new(1, -SIDES + HINT_RING * 2, 0, BAR_HEIGHT + HINT_RING * 2),
+			Position = function()
+				return UDim2.new(0, barX() - HINT_RING, 0.5, 0)
+			end,
+			Size = function()
+				const d = dims()
+				return UDim2.fromOffset(d.Bar + HINT_RING * 2, d.BarHeight + HINT_RING * 2)
+			end,
 			BackgroundColor3 = GAIN_COLOR,
 			BackgroundTransparency = function()
 				return 0.45 + 0.55 * gain()
@@ -326,9 +443,9 @@ return function(props: Props): Frame
 			Name = "GainNumber",
 			AnchorPoint = Vector2.new(0.5, 0),
 			Position = function()
-				return UDim2.new(0.5, 0, 1, 2 + GAIN_RISE * gain())
+				return UDim2.new(0.5, 0, 1, 4 + GAIN_RISE * gain())
 			end,
-			TextSize = 22,
+			TextSize = GAIN_TEXT,
 			Color = GAIN_COLOR,
 			Text = function()
 				return `+{gainAmount()}`
@@ -342,16 +459,58 @@ return function(props: Props): Frame
 			ZIndex = 5,
 		}),
 
-		CartoonLabel({
+		-- Presentation pulse: a Mustard ring around the whole meter (night 1)
+		create("Frame")({
+			Name = "IntroRing",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = function()
+				const grow = 10 + INTRO_GROW * introAlpha()
+				return UDim2.new(1, grow, 1, grow)
+			end,
+			BackgroundTransparency = 1,
+			Visible = function()
+				return introAlpha() > 0.01
+			end,
+			create("UICorner")({ CornerRadius = Theme.Radius.Pill }),
+			createRaw("UIStroke")({
+				Color = Theme.Color.Mustard,
+				Thickness = 3,
+				Transparency = function()
+					return 1 - 0.95 * introAlpha()
+				end,
+			}),
+		}),
+
+		-- Number (no "/max"). Plain TextLabel: CartoonLabel never goes under 14 px and the phone meter asks for 11.
+		create("TextLabel")({
 			Name = "Value",
-			AnchorPoint = Vector2.new(1, 0),
-			Position = UDim2.fromScale(1, 0),
-			Box = UDim2.fromOffset(VALUE_WIDTH, PORTRAIT),
-			TextSize = TEXT_SIZE,
-			XAlignment = Enum.TextXAlignment.Left,
+			AnchorPoint = Vector2.new(0, 0.5),
+			Position = function()
+				const d = dims()
+				return UDim2.new(0, d.Portrait + d.Gap * 2 + d.Bar, 0.5, 0)
+			end,
+			Size = function()
+				const d = dims()
+				return UDim2.fromOffset(d.ValueWidth, d.Portrait)
+			end,
+			BackgroundTransparency = 1,
+			FontFace = Theme.Font.Title,
+			TextSize = function()
+				return dims().Text
+			end,
+			TextColor3 = Theme.Color.Text,
+			TextXAlignment = Enum.TextXAlignment.Left,
 			Text = function()
 				return tostring(math.floor(props.Value()))
 			end,
+			createRaw("UIStroke")({
+				Color = Theme.Color.Ink,
+				LineJoinMode = Enum.LineJoinMode.Round,
+				Thickness = function()
+					return dims().Stroke
+				end,
+			}),
 		}),
 	})
 end

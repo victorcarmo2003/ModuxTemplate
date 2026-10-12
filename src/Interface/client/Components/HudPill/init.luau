@@ -4,7 +4,7 @@
 -- moon, clock) and a CartoonLabel. A drawn coin/sun/moon stays as the fallback while a sheet is missing.
 -- Status only (DEC-015, FEAT-032): Frames and labels, nothing clickable.
 -- `Bump`: when that number goes up the pill jumps and settles (Motion.Bump; style guide §7.2 "ao ganhar, número pula").
--- `Shown`: progressive reveal (Motion.Pop), e.g. the money pill appears with the first sale of the tutorial.
+-- `Shown`: progressive reveal (Motion.Reveal, 0.25 s; Content.HudReveal), e.g. the money pill appears with the first sale.
 -- Stays Ink on purpose (style guide §7.1): a status pill floats over a sunny, busy street; Ink with white text and an
 -- Ink stroke keeps the highest contrast on any background, while reading surfaces (prompts, subtitles, tutorial)
 -- went Cream (user request 2026-10-11).
@@ -33,7 +33,7 @@ export type Props = {
 	-- Minimum pill width, so a short text ("Day 1") does not make a tiny pill.
 	MinWidth: number?,
 	Bump: (() -> number)?,
-	-- Pops in when it turns true and shrinks away when false (progressive HUD reveal of the tutorial). nil = shown.
+	-- Scales in when it turns true and shrinks away when false (progressive HUD reveal, Content.HudReveal). nil = shown.
 	Shown: (() -> boolean)?,
 	Name: string?,
 	LayoutOrder: number?,
@@ -102,7 +102,7 @@ return function(props: Props): Frame
 		return 1
 	end
 	const shownOn = props.Shown
-	const pop = if shownOn then Motion.Pop(shownOn) else function(): number
+	const pop = if shownOn then Motion.Reveal(shownOn) else function(): number
 		return 1
 	end
 	const scale = function(): number

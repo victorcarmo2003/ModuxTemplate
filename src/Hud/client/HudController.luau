@@ -14,8 +14,9 @@
 	    20 s at night, or as soon as the next shift starts.
 
 	Wave 2 (TASK-065; architecture.md §19.3, §19.7, §19.16; network.md §13.1; ui-text.md §12, §14):
-	  - sanity meter (HudSanity) under the clock: VitalController Sanity/Max/Band, only with Max > 0 and own state
-	    Active; portrait = class icon of the AST-071 sheet on the species fur colour until AST-086 (letter fallback);
+	  - sanity meter (HudSanity) TOP LEFT under the Roblox menu / chat bar (owner request 2026-10-12): VitalController
+	    Sanity/Max/Band, only with Max > 0 and own state Active; compact on a phone (34 px portrait, 110 x 10 bar),
+	    bigger on desktop; portrait = class icon of the AST-071 sheet on the species fur colour (letter fallback);
 	  - banners (HudBanner): night start "Night k" (repeated night: "Same night. Same rules."), 6:00 AM "You made
 	    it!", from the Shift set on a fresh phase change only (a late joiner gets no old banner);
 	  - 10 s window (HudWipe) from Shift.WipeEndsAt (server time; WipeFrozen holds the number, wave 4);
@@ -26,13 +27,19 @@
 	The Shift set is read here only for WipeEndsAt/WipeFrozen and the banner timing (network.md §3.1 lists the HUD as
 	a reader); Day/Night/Phase/clock still come from RoundController.
 
-	Order card (user request after Play): HudOrder on the top-left column, under the Roblox menu / chat buttons (money and
-	day are top right, 2026-10-12; the Hud ScreenGui has DeviceSafeInsets, the player list is hidden), with the
-	order of the customer CustomerController picks (prompt target, else Q1 in Waiting); hidden while Down/Spectator.
+	Order card (user request after Play): HudOrder on the top-left column, under the Roblox menu / chat buttons and under
+	the sanity meter when that is on screen (money and day are top right, 2026-10-12; the Hud ScreenGui has
+	DeviceSafeInsets, the player list is hidden), with the order of the customer CustomerController picks (prompt target,
+	else Q1 in Waiting); hidden while Down/Spectator.
 
-	Cinematic and reveal (user request 2026-10-11): the whole Hud ScreenGui is off while Interface/Cinematic is on
-	(StageController: intro / finale / credits), and during a first run the money pill and the clock + day pills pop in
-	as the tutorial reaches them (TutorialController ShowCash / ShowClock).
+	Toasts (owner request 2026-10-12): bottom centre above the hotbar (HudScreen), never in the top right.
+
+	Cinematic and progressive reveal (user request 2026-10-11, owner request 2026-10-12): the whole Hud ScreenGui is off
+	while Interface/Cinematic is on (StageController: intro / finale / credits). During a first run the HUD starts with
+	only the essentials and releases the rest as the tutorial moves (Content.HudReveal: element -> trigger; the client
+	reads TutorialController StepKey / Finished and the shift; EvaluateReveal latches each element for the session, the
+	server is not involved). A player who skips the tutorial, a run past Day 1 and every night shift see everything. Dev:
+	`/dev hud reveal all|reset|status` (DevClient command "hud_reveal").
 
 	Status only: no button, no input binding (FEAT-032: nothing clickable for an Active player). No reputation, no boss
 	chances (Shift.Chances is never read, DEC-053), no XP. The client never writes money, sanity or life state: the
@@ -48,6 +55,7 @@ local Content = require(ReplicatedStorage.shared.Content)
 local CrewLooks = require(ReplicatedStorage.shared.Crew.CrewLooks)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Cinematic = require(StarterPlayer.StarterPlayerScripts.client.Interface.Cinematic)
+local Steps = require(StarterPlayer.StarterPlayerScripts.client.Tutorial.TutorialController.Steps)
 local HudOrder = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.HudOrder)
 local HudBanner = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.HudBanner)
 local HudRunEnd = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.HudRunEnd)
@@ -74,12 +82,23 @@ const MAX_TOASTS = 6
 const MAX_VISIBLE = 3
 -- UI scale: global rule (Theme.ScaleOf: 1 on a phone, 1.4 at 1080p)
 
--- Wave 2 layout (px at scale 1): sanity meter and spectate card sit under the clock pill (TOP 6 + 38 + gap 6)
+-- Wave 2 layout (px at scale 1): the spectate card sits under the clock pill (TOP 6 + 38 + gap 6)
 const UNDER_CLOCK = 50
 -- Order card: top-left column UNDER the Roblox menu / chat buttons (the HUD gui has DeviceSafeInsets, so the Roblox top
 -- bar overlaps its top; money and day moved to the right, 2026-10-12). Real px of the top bar from GuiService.
 const ORDER_GAP = 8
-const ORDER_LEFT = 10
+const ORDER_LEFT = 8
+-- Sanity meter: left margin as the order card; height in UI px with the Ink outline (HudSanity: portrait 34 + 2 x 2 on a
+-- phone, 44 + 2 x 3 on desktop)
+const SANITY_LEFT = 8
+const SANITY_ROW_COMPACT = 38
+const SANITY_ROW_LARGE = 50
+const DEV_PREFIX = "[HudReveal]"
+-- Real px the Roblox top-left bar (menu, chat) takes on a phone; GetGuiInset reports 0 there (user report 2026-10-12)
+const TOPBAR_REAL = 60
+-- Same threshold as HudScreen (px at UI scale 1): under it money / day stack in a column (6 + 38 + 6 + 38)
+const NARROW_WIDTH = 560
+const UNDER_PILL_COLUMN = 88
 -- Run end screen on screen (architecture.md §19.16)
 const RUN_END_TIME = 15
 -- Banner on screen; a phase change older than BANNER_FRESH s (late joiner, reconnect) gets no banner
@@ -216,6 +235,15 @@ function HudController:Setup()
 	-- false = no summary on screen (a Source of an optional type is ambiguous to call under the new solver)
 	self.Report = Vide.source(false :: HudSummary.Shown) :: Vide.Source<HudSummary.Shown>
 	self.Scale = Vide.source(1) :: Vide.Source<number>
+	self.Viewport = Vide.source(Vector2.new(1000, 700)) :: Vide.Source<Vector2>
+	-- progressive reveal: Content.HudReveal rows already on screen (latched for the session), the ones that opened with
+	-- a presentation pulse, and the dev switches (all = everything open, gate = apply the reveal outside a first run,
+	-- epoch = a reset happened)
+	self.Open = Vide.source({} :: { [string]: boolean }) :: Vide.Source<{ [string]: boolean }>
+	self.Intros = Vide.source({} :: { [string]: boolean }) :: Vide.Source<{ [string]: boolean }>
+	self.DevAll = Vide.source(false) :: Vide.Source<boolean>
+	self.DevGate = Vide.source(false) :: Vide.Source<boolean>
+	self.Epoch = Vide.source(0) :: Vide.Source<number>
 	self.ReportThread = nil :: thread?
 	self.Gui = nil :: ScreenGui?
 	self.Unmount = nil :: (() -> ())?
@@ -289,6 +317,10 @@ end
 
 -- One toast line; the same text already queued is dropped (false)
 function HudController:PushText(text: string, toastKind: Toast.Kind): boolean
+	-- not released yet (first run, before the first customer): nothing to show, and no sound
+	if not self:IsOpenNow("toasts") then
+		return false
+	end
 	const list = table.clone(self.Toasts())
 	for _, entry in list do
 		if entry.Text == text then
@@ -574,6 +606,7 @@ function HudController:SanityMeter(): Frame
 		Shown = function()
 			return vital.Max() > 0 and vital.LocalState() == "Active"
 		end,
+		-- class animal of the player (Content.Species Class icon, AST-071 sheet)
 		Icon = function()
 			const row = speciesRow()
 			return if row and row.Class then `Class/{row.Class}` else ""
@@ -587,8 +620,20 @@ function HudController:SanityMeter(): Frame
 			const look = if species then CrewLooks.Species[species] else nil
 			return if look then look.Fur else Theme.Color.Cream
 		end,
-		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, UNDER_CLOCK),
+		Compact = function()
+			return self:Compact()
+		end,
+		-- top left, under the Roblox menu / chat bar (the order card goes under it)
+		Position = function()
+			return UDim2.fromOffset(SANITY_LEFT, self:TopLeftY())
+		end,
+		-- progressive reveal (night 1): scales in with a presentation pulse
+		Revealed = function()
+			return self:IsOpen("sanity")
+		end,
+		Intro = function()
+			return self.Intros().sanity == true
+		end,
 		-- Night 1 coffee lesson + coffee gain feedback (VitalController, server cue SanityCue)
 		Emphasis = vital.CoffeeHint,
 		Gain = vital.CoffeeGain,
@@ -598,7 +643,40 @@ end
 -- Height in real px of the Roblox top bar (menu / chat buttons), which the HUD gui does not inset for.
 function HudController:TopBar(): number
 	const inset = GuiService:GetGuiInset()
-	return inset.Y
+	return math.max(inset.Y, TOPBAR_REAL)
+end
+
+-- Top of the top-left column (UI px): just under the Roblox menu / chat bar (it covers about 0-60 px tall, 0-270 px
+-- wide; the GUI inset reads 0 on a phone, so TOPBAR_REAL is the floor), clear of the joystick (bottom left).
+function HudController:TopLeftY(): number
+	return math.ceil(self:TopBar() / self.Scale()) + ORDER_GAP
+end
+
+-- Phone-sized layout of the sanity meter: the touch device (compact portrait and bar); keyboard / gamepad get the bigger one
+function HudController:Compact(): boolean
+	return self.Dependencies.InputController.Device() == "Touch"
+end
+
+-- The sanity meter is on screen (alive, a night with sanity, released by the reveal)
+function HudController:SanityOn(): boolean
+	const vital = self.Dependencies.VitalController
+	return vital.Max() > 0 and vital.LocalState() == "Active" and self:IsOpen("sanity")
+end
+
+-- Order card position (UI px): the top-left column, stacked under the sanity meter when that is on screen (night: the
+-- sanity first, then the order). Portrait / narrow (the pills stack in a column): never above the end of that column.
+function HudController:OrderPosition(): UDim2
+	const scale = self.Scale()
+	const viewport = self.Viewport()
+	local top = self:TopLeftY()
+	if viewport.X / scale < NARROW_WIDTH then
+		top = UNDER_PILL_COLUMN + ORDER_GAP
+	end
+	if self:SanityOn() then
+		const row = if self:Compact() then SANITY_ROW_COMPACT else SANITY_ROW_LARGE
+		top = math.max(top, self:TopLeftY() + row + ORDER_GAP)
+	end
+	return UDim2.fromOffset(ORDER_LEFT, top)
 end
 
 function HudController:OrderCard(): Frame
@@ -621,10 +699,118 @@ function HudController:OrderCard(): Frame
 			return customer:CardPatience()
 		end,
 		WarnAt = Content.Moods.Rules.AnnoyedAt,
+		Revealed = function()
+			return self:IsOpen("order_card")
+		end,
 		Position = function()
-			return UDim2.fromOffset(ORDER_LEFT, math.ceil(self:TopBar() / self.Scale()) + ORDER_GAP)
+			return self:OrderPosition()
 		end,
 	})
+end
+
+-- Progressive reveal (Content.HudReveal) ---------------------------------------------------------------------------------
+
+-- Row `key` is on screen (latched). Read inside a reactive binding: tracks the Open source.
+function HudController:IsOpen(key: string): boolean
+	return self.Open()[key] == true
+end
+
+-- Same, without tracking (for plain code: notices)
+function HudController:IsOpenNow(key: string): boolean
+	return Vide.untrack(self.Open)[key] == true
+end
+
+-- Opens the rows whose trigger fired and latches them (never closes one). Reads (tracked): the tutorial (StepKey, Finished,
+-- first-run state), the shift (phase, night, readiness), the cinematic and the dev switches, so it runs again on any of them.
+-- Waits for the profile and the round: a first run is only known after the Profile packet (else everything would open).
+function HudController:EvaluateReveal()
+	const tutorial = self.Dependencies.TutorialController
+	const round = self.Dependencies.RoundController
+	self.Epoch()
+	const ready = self.Dependencies.ProfileController.Ready() and round.Ready()
+	const everything = self.DevAll()
+	const gated = tutorial:FirstRun() or self.DevGate()
+	const night = round.IsNight()
+	const nightNumber = round.Night()
+	const phase = round.Phase()
+	const finished = tutorial.Finished()
+	const stepIndex = Steps.IndexOf[tutorial.StepKey()] or 0
+	const cinematic = Cinematic.Active()
+	if not ready then
+		return
+	end
+
+	Vide.untrack(function()
+		const open = self.Open()
+		const intros = self.Intros()
+		const nextOpen = table.clone(open)
+		const nextIntros = table.clone(intros)
+		local changed = false
+		for _, row in Content.HudReveal.List do
+			if open[row.Key] then
+				continue
+			end
+			local on = false
+			if everything then
+				on = true
+			elseif row.Trigger == "Night" then
+				-- its own trigger, also outside a first run: the first night with it is the introduction
+				on = night and nightNumber >= row.Night
+				if on and row.Pulse then
+					nextIntros[row.Key] = true
+				end
+			elseif not gated or night then
+				on = true
+			elseif row.Trigger == "Start" then
+				on = phase ~= "Intro" and not cinematic
+			elseif row.Trigger == "Step" then
+				on = stepIndex > 0 and stepIndex >= (Steps.IndexOf[row.Step] or math.huge)
+			elseif row.Trigger == "TutorialEnd" then
+				on = finished
+			end
+			if on then
+				nextOpen[row.Key] = true
+				changed = true
+			end
+		end
+		if changed then
+			Vide.batch(function()
+				self.Open(nextOpen)
+				self.Intros(nextIntros)
+			end)
+		end
+		return nil
+	end)
+end
+
+-- `/dev hud reveal all|reset|status` (DevClient command "hud_reveal", plugged into TutorialController:SetDevHandler)
+function HudController:DevReveal(text: string)
+	const arg = string.lower(string.match(text, "^%s*(%S*)") or "")
+	if arg == "all" then
+		Vide.batch(function()
+			self.DevAll(true)
+			self.DevGate(false)
+		end)
+		print(`{DEV_PREFIX} everything on screen`)
+	elseif arg == "reset" then
+		Vide.batch(function()
+			self.DevAll(false)
+			self.DevGate(true)
+			self.Open({})
+			self.Intros({})
+			self.Epoch(Vide.untrack(self.Epoch) + 1)
+		end)
+		print(`{DEV_PREFIX} reset: only the essentials; the steps release the rest ("/dev tutorial reset" to play them)`)
+	elseif arg == "status" or arg == "" then
+		const open = Vide.untrack(self.Open)
+		const lines: { string } = {}
+		for _, row in Content.HudReveal.List do
+			table.insert(lines, `{row.Key}={if open[row.Key] then "on" else "off"} ({row.Trigger})`)
+		end
+		print(`{DEV_PREFIX} {table.concat(lines, ", ")}`)
+	else
+		warn(`{DEV_PREFIX} usage: /dev hud reveal all | reset | status`)
+	end
 end
 
 -- Wave 1 -----------------------------------------------------------------------------------------------------------
@@ -634,6 +820,9 @@ function HudController:Rescale(camera: Camera?)
 		return
 	end
 	const scale = Theme.ScaleOf(camera.ViewportSize)
+	if camera.ViewportSize ~= self.Viewport() then
+		self.Viewport(camera.ViewportSize)
+	end
 	if math.abs(scale - self.Scale()) > 0.01 then
 		self.Scale(scale)
 	end
@@ -661,9 +850,13 @@ end
 function HudController:Mount(playerGui: Instance)
 	const round = self.Dependencies.RoundController
 	const economy = self.Dependencies.EconomyController
-	const tutorial = self.Dependencies.TutorialController
 
 	const unmount, gui = Vide.root(function()
+		-- Progressive reveal: opens the HUD elements as their triggers fire (Content.HudReveal)
+		Vide.effect(function()
+			self:EvaluateReveal()
+		end)
+
 		-- A new shift clears a summary / run end screen that is still up (e.g. dev "skip" shortened the phase)
 		Vide.effect(function()
 			if NEW_SHIFT[round.Phase()] then
@@ -735,12 +928,9 @@ function HudController:Mount(playerGui: Instance)
 				end,
 				Report = self.Report,
 				Scale = self.Scale,
-				-- progressive reveal of the first-run tutorial (TutorialController)
-				ShowCash = function()
-					return tutorial:ShowCash()
-				end,
-				ShowClock = function()
-					return tutorial:ShowClock()
+				-- progressive reveal (Content.HudReveal): clock, shift, money, toasts
+				Reveal = function(key: string)
+					return self:IsOpen(key)
 				end,
 			}),
 
@@ -803,7 +993,7 @@ HudController:OnStart(function(self)
 	if place:Is("Lobby") then
 		return
 	end
-	-- The money / day / toast column lives top right: the Roblox player list would sit under it
+	-- The money / day pills live top right: the Roblox player list would sit under them
 	const ok, err = pcall(function()
 		StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, false)
 	end)
@@ -811,6 +1001,16 @@ HudController:OnStart(function(self)
 		warn(`[HudController] could not hide the player list: {err}`)
 	end
 	self:WatchViewport()
+	-- a reveal table row naming a step the tutorial does not have would never open: say so at once
+	for _, row in Content.HudReveal.List do
+		if row.Trigger == "Step" and Steps.ByKey[row.Step] == nil then
+			warn(`[HudController] HudReveal '{row.Key}': unknown tutorial step '{row.Step}'`)
+		end
+	end
+	-- dev only: /dev hud reveal (the server sends it through the DevClient packet; TutorialController routes it here)
+	self.Dependencies.TutorialController:SetDevHandler("hud_reveal", function(text: string)
+		self:DevReveal(text)
+	end)
 	-- PlayerGui may arrive a frame late; do not hold up the other OnStart.
 	task.spawn(function()
 		self:Mount(Players.LocalPlayer:WaitForChild("PlayerGui"))

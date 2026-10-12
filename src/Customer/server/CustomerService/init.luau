@@ -202,6 +202,8 @@ const SHOP_CLOSED = "shop_closed" -- Content.Notices key (D-04 #10)
 -- Same notice to the same player at most once per this many seconds (FEAT-005 anti-spam). PROVISIONAL constant:
 -- no Content field holds it yet.
 const NOTICE_GAP = 2
+const SERVE_HOLD_HINT = "serve_hold_hot_dog" -- Content.Notices keys (owner request 2026-10-12, Provisional)
+const SERVE_EMPTY_HINT = "serve_nothing"
 const HOT_DOG = "hot_dog"
 const HAPPY = "Happy"
 const ANNOYED = "Annoyed"
@@ -1365,12 +1367,12 @@ function CustomerService:Serve(player: Player, anchor: Instance)
 end
 
 -- "Serve" at the table (serve_table, SeatingService anchor; Q-209): same check, pay, tip and Sale as the counter; the
--- customer is `id` (the leader of a pair). false = nothing to serve (not at a table, no hot dog in hand, drawer closed).
+-- customer is `id` (the leader of a pair). false = nothing to serve (not at a table, drawer closed). The hand is not
+-- checked: ServeCustomer uses the exact hot dog of the hotbar, or sends a hint.
 function CustomerService:CanServeTable(player: Player, id: number): boolean
 	return self.Dependencies.RunStateService:IsActive(player)
 		and self.Dependencies.EconomyService:IsDrawerOpen()
 		and self:IsWaitingAtTable(id)
-		and self.Dependencies.ItemService:Holding(player, HOT_DOG) ~= nil
 end
 
 function CustomerService:ServeTable(player: Player, id: number)
@@ -1383,7 +1385,7 @@ function CustomerService:ServeTable(player: Player, id: number)
 end
 
 function CustomerService:ServeCustomer(player: Player, id: number, customer: Customer, ticket: Orders.Ticket)
-	const tool = self.Dependencies.ItemService:Holding(player, HOT_DOG)
+	const tool = self:PickServeTool(player, ticket)
 	if tool == nil then
 		return
 	end
@@ -1401,8 +1403,8 @@ function CustomerService:ServeCustomer(player: Player, id: number, customer: Cus
 	if override == nil and (first == "Complete" or first == "Perfect") then
 		-- the other hot dog of the hotbar, exact for the line still pending
 		const rest = Orders.Pending(ticket)
-		const other = if override == nil and #rest == 1 then self:OtherHotDog(player, tool) else nil
-		if other ~= nil and Orders.Evaluate(ticket.Lines[rest[1]].Toppings, self.Dependencies.ItemService:Toppings(other)) == "Complete" then
+		const other = if override == nil and #rest == 1 then self:OtherHotDog(player, tool, ticket.Lines[rest[1]].Toppings) else nil
+		if other ~= nil then
 			self:SellLine(id, customer, ticket, player, other, rest[1], "Complete", at)
 		end
 	end
@@ -1414,15 +1416,66 @@ function CustomerService:ServeCustomer(player: Player, id: number, customer: Cus
 	self:Conclude(customer, ticket)
 end
 
--- Another hot dog Tool of the player's hotbar (not `except`), nil when none.
-function CustomerService:OtherHotDog(player: Player, except: Tool): Tool?
+-- Another hot dog Tool of the player's inventory (not `except`) that is EXACT (Complete) for `order`, nil when none.
+function CustomerService:OtherHotDog(player: Player, except: Tool, order: { string }): Tool?
 	const items = self.Dependencies.ItemService
 	for _, candidate in items:Tools(player) do
-		if candidate ~= except and items:ItemOf(candidate) == HOT_DOG then
+		if
+			candidate ~= except
+			and items:ItemOf(candidate) == HOT_DOG
+			and Orders.Evaluate(order, items:Toppings(candidate)) == "Complete"
+		then
 			return candidate
 		end
 	end
 	return nil
+end
+
+-- Hot dog a Serve uses (owner request 2026-10-12). Server-authoritative:
+--   1. the hand holds a hot dog that is exact for a pending line -> it;
+--   2. else an inventory hot dog (hotbar / backpack) that is exact for a pending line -> equipped and used (auto);
+--   3. else a hot dog in hand (wrong / incomplete) -> it, with the existing Errado / Incompleto consequence;
+--   4. else nothing is served and the player gets a hint (hold a hot dog / nothing to serve yet).
+function CustomerService:PickServeTool(player: Player, ticket: Orders.Ticket): Tool?
+	const items = self.Dependencies.ItemService
+	const held = items:Holding(player, HOT_DOG)
+	const pending = Orders.Pending(ticket)
+	local function exact(tool: Tool): boolean
+		const toppings = items:Toppings(tool)
+		for _, index in pending do
+			if Orders.Evaluate(ticket.Lines[index].Toppings, toppings) == "Complete" then
+				return true
+			end
+		end
+		return false
+	end
+	if held ~= nil and exact(held) then
+		return held
+	end
+	local anyHotDog = held ~= nil
+	for _, candidate in items:Tools(player) do
+		if candidate ~= held and items:ItemOf(candidate) == HOT_DOG then
+			anyHotDog = true
+			if exact(candidate) then
+				self:Equip(player, candidate)
+				return candidate
+			end
+		end
+	end
+	if held ~= nil then
+		return held
+	end
+	self:NotifyThrottled(player, if anyHotDog then SERVE_HOLD_HINT else SERVE_EMPTY_HINT)
+	return nil
+end
+
+-- Puts a backpack Tool in the player's hand (the server's Humanoid:EquipTool replaces the Tool held now).
+function CustomerService:Equip(player: Player, tool: Tool)
+	const character = player.Character
+	const humanoid = if character then character:FindFirstChildOfClass("Humanoid") else nil
+	if humanoid ~= nil and humanoid.Health > 0 then
+		humanoid:EquipTool(tool)
+	end
 end
 
 -- Pays one served hot dog against line `index` of the ticket: consumes it (not on Wrong: it stays in the hand),
@@ -1589,9 +1642,8 @@ function CustomerService:RegisterOrders()
 				return false
 			end
 			const _, _, ticket = self:TicketAt(anchor)
-			return ticket ~= nil
-				and ticket.TakenAt > 0
-				and self.Dependencies.ItemService:Holding(player, HOT_DOG) ~= nil
+			-- no hand rule here: ServeCustomer picks the exact hot dog of the hotbar or answers with a hint
+			return ticket ~= nil and ticket.TakenAt > 0
 		end,
 		Run = function(player: Player, anchor: Instance)
 			self:Serve(player, anchor)

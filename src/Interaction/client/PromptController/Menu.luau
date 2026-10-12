@@ -108,6 +108,45 @@ function Menu.IconOf(target: Rules.Target): string
 	return if Icons.Has(name) then name else ""
 end
 
+-- Short label of the touch fan ("Serve", "Ketchup", "Collect"): one word where the sheet allows it. `text` is the live
+-- prompt text (it may carry the ingredient, the price or a server override such as "Take Coffee").
+const SHORT: { [string]: string } = {
+	take_order = "Order",
+	serve = "Serve",
+	serve_table = "Serve",
+	refuse = "Refuse",
+	collect_cash = "Collect",
+	open_sign = "Open",
+	grill_place = "Grill",
+	grill_collect = "Collect",
+	bun_cut = "Slice",
+	board_add_sausage = "Sausage",
+	discard = "Trash",
+	restock = "Restock",
+	pick_up_item = "Take",
+	brew_coffee = "Brew",
+	switch_light = "Lights",
+	answer_phone = "Answer",
+	safe_spot = "Hide",
+	shutter_toggle = "Window",
+	trailer_enter = "Enter",
+	trailer_exit = "Exit",
+	clean_table = "Clean",
+	buy_trailer = "Trailer",
+}
+
+function Menu.ShortOf(target: Rules.Target, text: string): string
+	const action = target.Action
+	if action == "topping_add" then
+		const topping = string.gsub(text, "^Add ", "")
+		return topping
+	elseif string.sub(action, 1, 3) == "buy" and action ~= "buy_trailer" then
+		const price = string.match(text, "%$%d+")
+		return if price then `Buy {price}` else "Buy"
+	end
+	return SHORT[action] or text
+end
+
 local function priorityOf(prompt: Prompt.Prompt): number
 	return Menu.PriorityOf(prompt.Target.Action)
 end

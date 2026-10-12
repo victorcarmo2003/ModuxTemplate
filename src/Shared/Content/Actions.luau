@@ -42,7 +42,8 @@ return Table.new({
 	{ Key = "discard", Text = "Throw Away", Hold = 0.5, Radius = 7, Requires = { Held = "hot_dog" }, Night = "Any", Wave = 1 },
 	-- Customer prompts: 10 (was 8; owner playtest 2026-10-12, customers too far). The anchor rides on the customer rig.
 	{ Key = "take_order", Text = "Take Order", Hold = 0, Radius = 10, Requires = {}, Night = "Any", Wave = 1 },
-	{ Key = "serve", Text = "Serve", Hold = 0, Radius = 10, Requires = { Held = "hot_dog" }, Night = "Any", Wave = 1 },
+	-- no Requires.Held: the server picks the exact hot dog from the hotbar, or answers with a hint (2026-10-12)
+	{ Key = "serve", Text = "Serve", Hold = 0, Radius = 10, Requires = {}, Night = "Any", Wave = 1 },
 	{ Key = "refuse", Text = "Refuse", Hold = 1, Radius = 10, Requires = {}, Night = "Any", Wave = 1 },
 	-- Cash register (Q-201, Provisional): drawer -> party Cash now. Anchor Prompt_Collect on the DRAWER / TRL-DRAWER model
 	-- (CashDeskService); only enabled while the drawer is open and holds money. Short hold, smaller radius than the
@@ -101,5 +102,5 @@ return Table.new({
 	{ Key = "clean_table", Text = "Clean Table", Hold = 1, Radius = 7, Requires = {}, Night = "Any", Wave = 3 },
 	-- Order at the table (Q-209, Provisional): the customer sat after "Take Order"; the prompt sits on the table
 	-- (ServeAnchor, SeatingService) and its PromptText names the table and the order ("Serve Table 2: Ketchup + Cheese").
-	{ Key = "serve_table", Text = "Serve Table", Hold = 0, Radius = 8, Requires = { Held = "hot_dog" }, Night = "Any", Wave = 3 },
+	{ Key = "serve_table", Text = "Serve Table", Hold = 0, Radius = 8, Requires = {}, Night = "Any", Wave = 3 },
 } :: { Action })

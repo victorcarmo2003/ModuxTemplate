@@ -382,6 +382,17 @@ Interação é toda no mundo (DEC-015, DEC-066). A tela só mostra status. Exce�
 
 Zona livre: centro da tela e terço inferior direito (Tool na mão, alvo do prompt). Nenhum HUD ali.
 
+#### 7.2.1 Menu de interação compacto (**Provisória**, pedido do dono 2026-10-12)
+
+Quando há 1+ interações ao alcance (componente `InteractionMenu`; ordem, histerese de 1,5 s e seleção em `PromptController/Menu`). Escala global (`Theme.Scale`) e safe area aplicadas; nunca centralizado.
+
+| Dispositivo | Visual |
+|---|---|
+| **Toque** | **Círculo de ação** de 64 px à direita, logo **acima do botão de pulo** do Roblox (borda direita a 28 px, base a 112 px), com o ícone da ação principal. Toque executa; ação de hold (comprar, coletar) enche um **anel** verde no círculo. Com 2+ opções aparece um contador no canto e as opções abrem em **leque** (arco para cima/esquerda, raio 108 px, passo 38°, ordem estável de prioridade, índice 1 = para cima), até 4 botões redondos de **52 px** com ícone e rótulo curto embaixo (`Serve`, `Ketchup`, `Collect`, `Buy $4`). `Refuse` é uma opção própria do leque, ao lado de `Serve`/`Take Order`. Sem botões de toque do CAS. Não cobre o joystick (esquerda-baixo), o pulo, a coluna do lobby nem o HUD do topo direito |
+| **Desktop / gamepad** | **Coluna compacta** (184 px, linhas de 36 px, texto 15 px) à direita da mira, na meia altura. Chip `1`–`4` (ou `X` na linha selecionada), rodapé `1-N · wheel · E` / `D-pad · X`. Uma única interação continua sendo a pílula no mundo |
+
+Selecionada = Mustard, demais Cream; fora de alcance (ainda na carência) = esmaecida e inerte.
+
 ### 7.3 UI no mundo
 
 | Elemento | Visual |

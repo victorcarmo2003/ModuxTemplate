@@ -1,8 +1,9 @@
 --!strict
--- InteractionMenu on a phone-sized frame (iPhone SE landscape, 667 x 375) or the whole viewport. Controls: number of
--- rows (1..6; the real menu caps at 4, the story shows what the component does with more), device (chips and footer),
--- selected row, a row out of reach (dimmed), hold on the selected row, the refuse hint, and a "Done" counter to see the
--- row pop. With Tappable on, click a row (hold = fill) to see OnSelect / OnPress / OnRelease move the selection.
+-- InteractionMenu on a phone-sized frame (iPhone SE landscape, 667 x 375) or the whole viewport. Controls: device
+-- (Touch = action circle + fan above the jump button, KeyboardMouse / Gamepad = compact column right of the crosshair),
+-- number of options (1..4, the real menu caps at 4), selected option, an option out of reach (dimmed), hold on the
+-- selected option (ring / row fill), the refuse hint (desktop footer) and a "Done" counter to see the pop. With Tappable
+-- on (always on Touch), click the circle or an option (hold = ring) to see OnSelect / OnPress / OnRelease move the selection.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -29,22 +30,22 @@ type Controls = {
 }
 
 const SAMPLES = {
-	{ "Take Order", "Ui/megaphone" },
-	{ "Collect Cash", "Ui/cash" },
-	{ "Add Ketchup", "Ingredient/ketchup" },
-	{ "Throw Away", "Ui/close" },
-	{ "Buy Hot Dog Buns — $4", "Item/pack_buns" },
-	{ "Open Window", "Ui/bell" },
+	{ "Take Order", "Ui/megaphone", "Order" },
+	{ "Collect Cash", "Ui/cash", "Collect" },
+	{ "Add Ketchup", "Ingredient/ketchup", "Ketchup" },
+	{ "Refuse", "Ui/close", "Refuse" },
+	{ "Buy Hot Dog Buns — $4", "Item/pack_buns", "Buy $4" },
+	{ "Open Window", "Ui/bell", "Window" },
 }
 
 return UILabs.CreateVideStory({
 	vide = Vide,
 	controls = {
 		PhoneFrame = true,
-		Count = UILabs.Slider(4, 1, 6, 1),
-		Device = UILabs.Choose({ "KeyboardMouse", "Gamepad", "Touch" }),
-		Selected = UILabs.Slider(1, 1, 6, 1),
-		DimmedRow = UILabs.Slider(0, 0, 6, 1), -- 0 = none
+		Count = UILabs.Slider(3, 1, 4, 1),
+		Device = UILabs.Choose({ "Touch", "KeyboardMouse", "Gamepad" }),
+		Selected = UILabs.Slider(1, 1, 4, 1),
+		DimmedRow = UILabs.Slider(0, 0, 4, 1), -- 0 = none
 		Holding = false,
 		HoldDuration = UILabs.Slider(1, 0.2, 3, 0.1),
 		Done = UILabs.Slider(0, 0, 50, 1),
@@ -66,10 +67,13 @@ return UILabs.CreateVideStory({
 	-- One stable table per sample, like PromptController keeps one per prompt
 	const pool: { InteractionMenu.Item } = {}
 	for index, sample in SAMPLES do
-		const text, icon = sample[1], sample[2]
+		const text, icon, short = sample[1], sample[2], sample[3]
 		table.insert(pool, {
 			Text = function()
 				return text
+			end,
+			Short = function()
+				return short
 			end,
 			Icon = function()
 				return icon
@@ -118,7 +122,7 @@ return UILabs.CreateVideStory({
 			ClipsDescendants = true,
 			createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = Theme.Stroke }),
 
-			-- Crosshair: the menu must stay clear of it
+			-- Crosshair: the column sits to its right, the circle and fan stay far from it
 			create("Frame")({
 				Name = "Crosshair",
 				AnchorPoint = Vector2.new(0.5, 0.5),
@@ -137,9 +141,6 @@ return UILabs.CreateVideStory({
 				end,
 				Tappable = function()
 					return controls.Tappable() or controls.Device() == "Touch"
-				end,
-				Right = function()
-					return if controls.Device() == "Touch" then 190 else 16
 				end,
 				Scale = function()
 					return 1

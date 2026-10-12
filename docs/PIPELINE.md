@@ -56,3 +56,13 @@ Dúvida que surge durante a construção:
 1. Está respondida em `docs/`? Use.
 2. Não está e **não bloqueia**: siga a recomendação do especialista, marque **Provisória**, abra `Q-###` não bloqueante.
 3. Não está e **bloqueia** (muda escopo, história ou monetização): abra `Q-###` bloqueante e passe para outra task.
+
+## Documentação em lote (rodada de playtest/produção)
+
+Para gastar menos tokens e não ter dois lugares dizendo a mesma coisa, **durante uma rodada os agentes não editam documentos de design** (`docs/design`, `docs/story`, `docs/tech`, `docs/levels`, GDD em geral). Só código, snippets e o registro do dia.
+
+1. **Registro do dia** = `docs/tasks/playtest-YYYY-MM-DD.md` (modelo: `docs/tasks/_TEMPLATE-rodada.md`): checklist item a item + tabela **Valores provisórios** com as colunas `Valor | Onde (arquivo) | Antes | Depois | Precisa decidir?`. Cada agente acrescenta suas linhas no fim do trabalho (um dono por linha; o orquestrador consolida).
+2. **Só decisão real do dono vira `Q-###`** em `docs/open-questions.md`, com recomendação. Número ajustado por conta própria é só linha na tabela (Provisório, sem DEC, `Precisa decidir? = Não`).
+3. **Fim da rodada**: o `secretary` lê o registro do dia e o `git diff` da rodada, atualiza os documentos de design afetados (marcando Provisório) e fecha ou atualiza os `Q-###`. Só então a rodada está "documentada".
+4. Regras permanentes para agentes: `docs/AGENT-BRIEF.md`. Teste de fumaça ao fim da rodada: `/dev smoke` (`tools/studio/smoke.md`).
+

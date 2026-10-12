@@ -1,11 +1,16 @@
 --!strict
 -- HudScreen: the whole wave-1 HUD (FEAT-032; style guide §7.2, mobile first), status only (DEC-015):
---   top right  money of the party (coin, bumps when it goes up) and "Day N" / "Night" (sun / moon), then the toasts
---              (DEC-063) under them, one right-aligned column. The top LEFT is free for the Roblox menu / chat buttons
---              (user request 2026-10-12, phone playtest). Short wide screens (under 440 px tall, 520 px or wider at UI
---              scale 1) put money and day side by side, so the column stays low and clear of the jump button
+--   top right  "Day N" / "Night" (sun / moon) on the LEFT and the money of the party (coin, bumps when it goes up) on
+--              the RIGHT, side by side, same height as the centred clock (one line). NOTHING else lives up there: the top is
+--              the clock, the day and the money only (owner request 2026-10-12). The top LEFT is free for the Roblox menu /
+--              chat buttons and, under them, the sanity meter and the order card (HudController).
+--              Narrow screens (under 560 px at UI scale 1, portrait) stack the two pills in a column
 --   top centre clock "8:00 AM" (DEC-048)
+--   bottom     toasts (DEC-063): bottom centre, above the hotbar and the call subtitle, stacking up, with side margins that
+--              keep them off the joystick (left) and the jump button (right)
 --   centre     end-of-shift summary (FEAT-014), fades out by itself
+-- Progressive reveal (Content.HudReveal): `Reveal(key)` says whether the element of that row is on screen yet; the pills
+-- scale in (0.25 s) when it turns true. nil = everything shown.
 -- Nothing here is clickable (FEAT-032 acceptance): Frames and TextLabels only. No reputation, boss chances, XP or
 -- sanity (sanity is night only, wave 2). The bottom third stays free for the hotbar, joystick and interact button.
 -- Cartoon pass (AST-091): Ink pills with big icons; the money rolls up to the new value (Motion.Count) and the pill
@@ -36,19 +41,23 @@ export type Props = {
 	Report: () -> HudSummary.Shown, -- false = no summary
 	-- UI scale (Theme.ScaleOf). 1 = smallest phone (iPhone SE landscape); 1.4 at 1080p.
 	Scale: (() -> number)?,
-	-- Progressive reveal (first-run tutorial): money pill, and the clock + day pills. nil = always shown.
-	ShowCash: (() -> boolean)?,
-	ShowClock: (() -> boolean)?,
+	-- Progressive reveal (Content.HudReveal): keys "clock", "shift", "money", "toasts". nil = always shown.
+	Reveal: ((key: string) -> boolean)?,
 }
 
 const MARGIN = 10
 const TOP = 6
 -- Status pills are not touchable, so they go under the 44 px touch size (user request 2026-10-11: UI too big)
-const BIG = 38 -- money and clock, text 20
-const SMALL = Theme.MinChip -- day pill, text 16
+const BIG = 38 -- money, day and clock: ONE height, text size and outline so they sit on the same line (2026-10-12)
 const ROW_GAP = 6
-const SHORT = 440 -- real px tall: money and day side by side
-const ROW_MIN_WIDTH = 520 -- px at UI scale 1: the row (182 px) must clear the centred clock (112 px) on both sides
+const ROW_MIN_WIDTH = 560 -- px at UI scale 1: the row (day 96 + money 96 + gap) must clear the centred clock (112 px)
+-- Toasts (owner request 2026-10-12): bottom centre, stacking up. The bottom edge sits above the Roblox hotbar (84 px, as
+-- the call subtitle) and the subtitle strip itself; the side margin keeps the column off the joystick and the jump button.
+const TOAST_BOTTOM = 140
+const TOAST_SIDE = 180 -- px at UI scale 1 kept free on each side (>= 180)
+const TOAST_WIDTH = 220
+const TOAST_MIN_WIDTH = 140 -- portrait phones cannot keep 180 px on both sides: the card shrinks to this
+const SHORT_SCREEN = 480 -- px at UI scale 1: under this height 2 toasts show at a time, not 3
 
 return function(props: Props): Frame
 	const scale = function(): number
@@ -62,7 +71,16 @@ return function(props: Props): Frame
 	const area = source(Vector2.new(1000, 700))
 	const sideBySide = function(): boolean
 		const real = area()
-		return real.Y < SHORT and real.X / scale() >= ROW_MIN_WIDTH
+		return real.X / scale() >= ROW_MIN_WIDTH
+	end
+	const revealed = function(key: string): boolean
+		return props.Reveal == nil or props.Reveal(key)
+	end
+	const toastWidth = function(): number
+		return math.clamp(area().X / scale() - TOAST_SIDE * 2, TOAST_MIN_WIDTH, TOAST_WIDTH)
+	end
+	const toastCount = function(): number
+		return if area().Y / scale() < SHORT_SCREEN then 2 else 3
 	end
 
 	const root = create("Frame")({
@@ -76,7 +94,7 @@ return function(props: Props): Frame
 
 		createRaw("UIScale")({ Scale = scale }),
 
-		-- Right column: money and day on top, toasts under them (one list, never overlapping)
+		-- Right column: day and money, nothing under them
 		create("Frame")({
 			Name = "Right",
 			AnchorPoint = Vector2.new(1, 0),
@@ -111,7 +129,7 @@ return function(props: Props): Frame
 
 				HudPill({
 					Name = "Cash",
-					LayoutOrder = 1,
+					LayoutOrder = 2,
 					Height = BIG,
 					TextSize = 20,
 					MinWidth = 96,
@@ -122,28 +140,39 @@ return function(props: Props): Frame
 						return Money(math.floor(rolled() + 0.5))
 					end,
 					Bump = props.Cash,
-					Shown = props.ShowCash,
+					Shown = function()
+						return revealed("money")
+					end,
 				}),
 
 				HudPill({
 					Name = "Shift",
-					LayoutOrder = 2,
-					Height = SMALL,
-					TextSize = 16,
-					MinWidth = 80,
+					LayoutOrder = 1,
+					Height = BIG,
+					TextSize = 20,
+					MinWidth = 96,
 					Icon = function(): HudPill.Icon
 						return if props.IsNight() then "Moon" else "Sun"
 					end,
 					Text = props.Shift,
-					Shown = props.ShowClock,
+					Shown = function()
+						return revealed("shift")
+					end,
 				}),
 			}),
+		}),
 
-			ToastStack({
-				Entries = props.Toasts,
-				OnDone = props.OnToastDone,
-				MaxVisible = 3,
-			}),
+		ToastStack({
+			Entries = props.Toasts,
+			OnDone = props.OnToastDone,
+			MaxVisible = toastCount,
+			Width = toastWidth,
+			Direction = "Up",
+			AnchorPoint = Vector2.new(0.5, 1),
+			Position = UDim2.new(0.5, 0, 1, -TOAST_BOTTOM),
+			Visible = function()
+				return revealed("toasts")
+			end,
 		}),
 
 		HudPill({
@@ -157,7 +186,9 @@ return function(props: Props): Frame
 				return "Clock"
 			end,
 			Text = props.Clock,
-			Shown = props.ShowClock,
+			Shown = function()
+				return revealed("clock")
+			end,
 		}),
 
 		HudSummary({

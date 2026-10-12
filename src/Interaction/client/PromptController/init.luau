@@ -30,13 +30,25 @@
 	"hold R: Refuse". When there is no customer prompt (a customer waiting for food and an empty hand) the Refuse
 	anchor is an ordinary prompt on E, as before. The server still checks everything on the Refuse anchor.
 
-	Interaction menu (user request 2026-10-12): when two or more prompts are in view at once (counter: Take Order, Collect
-	Cash, ketchup...) the pills give way to ONE ordered column of buttons (Interface/Components/InteractionMenu, order and
-	selection in `Menu`): priority tier then distance, stable (new rows are inserted, listed rows never reshuffle), a row that
-	leaves reach stays 1.5 s dimmed. The selected row is the target: E / X / the touch button / hold act on it. PC: wheel or
-	Up/Down moves, 1..4 pick and press directly; gamepad D-pad up/down; touch taps the rows (held rows fill). Refuse stays on
-	R / Y with the customer row. One candidate = the pill as before. Billboards show the dot while the menu is up. Same
-	Interact packet, same server checks: the menu only chooses which prompt the existing path fires.
+	Interaction menu (user request 2026-10-12, compact pass same day): order and selection in `Menu`, drawn by
+	Interface/Components/InteractionMenu. Priority tier then distance, stable (new rows are inserted, listed rows never
+	reshuffle), a row that leaves reach stays 1.5 s dimmed. The selected row is the target: E / X / a tap / hold act on it.
+	  Touch          ONE action circle above the jump button (one or more candidates) running the selected action, a hold
+	                 fills a ring on it; with 2+ options they fan out in an arc up/left of it (max 4, Refuse is its own
+	                 option next to Serve / Take Order). No CAS touch buttons: the circle and the fan are the only touch input.
+	  Desktop/pad    two or more candidates -> a compact column right of the crosshair; wheel or Up/Down moves, 1..4 pick and
+	                 press directly, gamepad D-pad up/down. Refuse stays on R / Y with the customer row.
+	One candidate on desktop = the pill as before. Billboards show the dot while the menu is up. Same Interact packet,
+	same server checks: the menu only chooses which prompt the existing path fires.
+
+	Input rules of the menu (owner request 2026-10-12):
+	  Number keys    1..n (n = rows listed, max 4) are bound at High priority and SINK: the hotbar Tool of that slot is not
+	                 equipped. A key without a row is not bound, so it passes and the hotbar swaps the item as usual. The binds
+	                 leave (Unbind) the moment the menu closes. The footer says so ("1-n: menu · n+1-9: items").
+	  Mouse wheel    captured (Sink) only while the menu is up on desktop with 2+ live rows; otherwise Pass.
+	  Gamepad        D-pad up/down walk the rows (High, Sink on those two buttons only), X uses, hold Y refuses. Never ButtonA
+	                 (jump) nor the sticks. Glyphs come from UserInputService:GetImageForKeyCode. Native console focus: only the
+	                 selected row button is Selectable and GuiService.SelectedObject follows it (ring); cleared on close.
 
 	Completion pop (user request 2026-10-11): the moment an Interact is actually sent (hold completed or tap), the
 	pill pops (Prompt.Celebrate -> PromptBillboard bump/flash/check), a few sparkles burst at the anchor (Burst) and
@@ -44,6 +56,8 @@
 ]]
 local Players = game:GetService("Players")
 local CollectionService = game:GetService("CollectionService")
+local ContextActionService = game:GetService("ContextActionService")
+local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local UserInputService = game:GetService("UserInputService")
@@ -63,7 +77,6 @@ const HYSTERESIS_MARGIN_FRACTION = 0.05
 const BIND_NAME = "Interact"
 -- Client-side floor between two Interact (network.md §4.1: <= 8/s); the server drops the excess anyway.
 const MIN_FIRE_INTERVAL = 1 / 8
-const TOUCH_SIZE = 72
 const KEY_LABEL = { KeyboardMouse = "E", Gamepad = "X", Touch = "" }
 const HOLD_SOUND = "prompt_hold"
 const DONE_SOUND = "prompt_done"
@@ -82,8 +95,26 @@ const MENU_PICK_BIND = "InteractMenuPick"
 const MENU_PICK_KEYS: { Enum.KeyCode } = { Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three, Enum.KeyCode.Four }
 const MENU_PICK_PAD: { Enum.KeyCode } =
 	{ Enum.KeyCode.KeypadOne, Enum.KeyCode.KeypadTwo, Enum.KeyCode.KeypadThree, Enum.KeyCode.KeypadFour }
-const MENU_RIGHT = 16
-const MENU_RIGHT_TOUCH = 190 -- clears the jump and use buttons of a phone
+const MENU_MAX = 4 -- rows / fan options shown at once (Refuse included on touch)
+const MENU_WHEEL_BIND = "InteractMenuWheel"
+const FOCUS_NAME = "Focus" -- name of the row button the component reports
+
+-- Console glyphs of the controller in use (Xbox / PlayStation); "" when the engine has no image for the key
+local function glyphOf(key: Enum.KeyCode): string
+	const ok, image = pcall(function(): string
+		return UserInputService:GetImageForKeyCode(key)
+	end)
+	return if ok and type(image) == "string" then image else ""
+end
+
+local function readGlyphs(): InteractionMenu.Glyphs
+	return {
+		Use = glyphOf(Enum.KeyCode.ButtonX),
+		Refuse = glyphOf(Enum.KeyCode.ButtonY),
+		Up = glyphOf(Enum.KeyCode.DPadUp),
+		Down = glyphOf(Enum.KeyCode.DPadDown),
+	}
+end
 
 const PromptController = Modux.Controller(
 	"PromptController",
@@ -113,7 +144,15 @@ function PromptController:Setup()
 	self.MenuList = Vide.source({}) :: Vide.Source<{ InteractionMenu.Item }>
 	self.MenuSelected = Vide.source(nil) :: Vide.Source<InteractionMenu.Item?>
 	self.MenuVisible = Vide.source(false) :: Vide.Source<boolean>
+	self.MenuGlyphs = Vide.source(readGlyphs()) :: Vide.Source<InteractionMenu.Glyphs>
+	-- Console focus: row Item -> its Selectable button (reported by the component), and the AutoSelectGuiEnabled to give back
+	self.FocusButtons = {} :: { [InteractionMenu.Item]: GuiButton }
+	self.AutoSelectSaved = nil :: boolean?
 	self.Refuses = {} :: { [Prompt.Prompt]: Prompt.Prompt }
+	-- Refuse anchor -> its customer prompt
+	self.RefuseOwner = {} :: { [Prompt.Prompt]: Prompt.Prompt }
+	-- Mirror of AltHolding for the component (the touch fan fills the Refuse option, not the customer one)
+	self.AltHoldingSource = Vide.source(false) :: Vide.Source<boolean>
 end
 
 function PromptController:SetGate(gate: ((Instance) -> boolean)?)
@@ -245,6 +284,7 @@ function PromptController:CancelHold()
 		Prompt.SetHolding(holding, false)
 		if self.AltHolding then
 			self.AltHolding = false
+			self.AltHoldingSource(false)
 			Prompt.Refresh(holding) -- the pill goes back to the hold of its own action
 		end
 	end
@@ -295,6 +335,7 @@ function PromptController:BeginAltHold()
 	end
 	self.Holding = target
 	self.AltHolding = true
+	self.AltHoldingSource(true)
 	Prompt.SetHolding(target, true)
 	target.HoldDuration(alt.Hold)
 	self.HoldSound = self.Dependencies.AudioController:Play(HOLD_SOUND)
@@ -324,9 +365,8 @@ function PromptController:SetAlt(alt: Prompt.Prompt?)
 					Name = ALT_BIND_NAME,
 					Key = Enum.KeyCode.R,
 					Keys = { Enum.KeyCode.ButtonY },
-					TouchButton = true,
-					Title = "Refuse",
-					TouchSize = TOUCH_SIZE,
+					-- no CAS touch button: on a phone the action comes from the interaction menu (2026-10-12)
+					TouchButton = false,
 					Priority = Enum.ContextActionPriority.High.Value,
 					Context = "Gameplay",
 				})
@@ -377,9 +417,8 @@ function PromptController:SetTarget(prompt: Prompt.Prompt?)
 				Name = BIND_NAME,
 				Key = Enum.KeyCode.E,
 				Keys = { Enum.KeyCode.ButtonX },
-				TouchButton = true,
-				Title = "Use",
-				TouchSize = TOUCH_SIZE,
+				-- no CAS touch button: on a phone the action comes from the interaction menu (2026-10-12)
+				TouchButton = false,
 				Priority = Enum.ContextActionPriority.High.Value,
 				Context = "Gameplay",
 			})
@@ -404,14 +443,26 @@ function PromptController:MenuItemOf(prompt: Prompt.Prompt): InteractionMenu.Ite
 		return existing.Item
 	end
 	const enabled = Vide.source(true)
+	const input = self.Dependencies.InputController
+	const isRefuse = prompt.Target.Action == REFUSE_ACTION
 	const item: InteractionMenu.Item = {
 		Text = prompt.Text,
+		Short = function()
+			return Menu.ShortOf(prompt.Target, prompt.Text())
+		end,
 		-- reads Text first: the icon follows the same refresh (a topping prompt changes ingredient with its text)
 		Icon = function()
 			prompt.Text()
 			return Menu.IconOf(prompt.Target)
 		end,
-		Holding = prompt.Holding,
+		-- A Refuse option (touch fan) fills while the customer prompt runs its alt hold; the customer option does not
+		Holding = function()
+			if isRefuse then
+				const owner = self.RefuseOwner[prompt]
+				return owner ~= nil and owner.Holding() and self.AltHoldingSource()
+			end
+			return prompt.Holding() and not (input.Device() == "Touch" and self.AltHoldingSource())
+		end,
 		HoldDuration = prompt.HoldDuration,
 		Done = prompt.Done,
 		Enabled = enabled,
@@ -449,8 +500,23 @@ end
 function PromptController:PublishMenu()
 	const state = self.MenuState
 	const list: { InteractionMenu.Item } = {}
+	const touch = self.Dependencies.InputController.Device() == "Touch"
 	for _, prompt in state.Order do
 		table.insert(list, self:MenuItemOf(prompt))
+		-- Touch: Refuse is its own fan option right after the customer one (no R key on a phone)
+		const refuse = if touch then self.Refuses[prompt] else nil
+		if refuse then
+			table.insert(list, self:MenuItemOf(refuse))
+		end
+	end
+	-- Never more than MENU_MAX: drop from the end, keeping the selected row
+	const selectedItem = if state.Selected then self:MenuItemOf(state.Selected) else nil
+	while #list > MENU_MAX do
+		local drop = #list
+		if list[drop] == selectedItem then
+			drop -= 1
+		end
+		table.remove(list, drop)
 	end
 	const published = Vide.untrack(self.MenuList)
 	local same = #published == #list
@@ -466,7 +532,8 @@ function PromptController:PublishMenu()
 		self.MenuList(list)
 	end
 	for prompt, entry in self.MenuItems do
-		entry.Enabled(state.Current[prompt] ~= nil)
+		const owner = self.RefuseOwner[prompt]
+		entry.Enabled((if owner then state.Current[owner] else state.Current[prompt]) ~= nil)
 	end
 	const selected = if state.Selected then self:MenuItemOf(state.Selected) else nil
 	if Vide.untrack(self.MenuSelected) ~= selected then
@@ -489,6 +556,7 @@ function PromptController:MenuStep(delta: number)
 	end
 	if Menu.Move(self.MenuState, delta) then
 		self:ApplyMenuTarget()
+		self:SyncFocus()
 	end
 end
 
@@ -502,6 +570,18 @@ function PromptController:MenuPress(prompt: Prompt.Prompt)
 	end
 	self:ApplyMenuTarget()
 	self:BeginHold(prompt)
+end
+
+-- Touch Refuse option: select the customer row, then hold the Refuse that rides on it.
+function PromptController:MenuPressRefuse(owner: Prompt.Prompt)
+	if not self.MenuActive or self.Holding then
+		return
+	end
+	if not Menu.Select(self.MenuState, owner) then
+		return
+	end
+	self:ApplyMenuTarget()
+	self:BeginAltHold()
 end
 
 -- Direct keys 1..n for the listed rows, kept in step with the list length while the menu is up.
@@ -566,11 +646,81 @@ function PromptController:SetMenuActive(active: boolean)
 			.OnPress(function()
 				self:MenuStep(-1)
 			end)
+		ContextActionService:BindActionAtPriority(
+			MENU_WHEEL_BIND,
+			function(_name: string, state: Enum.UserInputState, wheel: InputObject): Enum.ContextActionResult
+				return self:OnWheel(state, wheel)
+			end,
+			false,
+			Enum.ContextActionPriority.High.Value,
+			Enum.UserInputType.MouseWheel
+		)
 	else
 		input:Unbind(MENU_NEXT_BIND)
 		input:Unbind(MENU_PREV_BIND)
+		ContextActionService:UnbindAction(MENU_WHEEL_BIND)
 	end
 	self:BindMenuPicks(#self.MenuState.Order)
+	self:SyncFocus()
+end
+
+-- Mouse wheel over the menu: walks the rows and keeps the hotbar from swapping the Tool. Sinks only on desktop with 2+ live
+-- rows (nothing to choose otherwise: the wheel passes to the hotbar / camera).
+function PromptController:OnWheel(state: Enum.UserInputState, wheel: InputObject): Enum.ContextActionResult
+	if
+		not self.MenuActive
+		or self.Dependencies.InputController.Device() ~= "KeyboardMouse"
+		or Menu.CurrentCount(self.MenuState) < 2
+	then
+		return Enum.ContextActionResult.Pass
+	end
+	if state == Enum.UserInputState.Change and wheel.Position.Z ~= 0 then
+		self:MenuStep(if wheel.Position.Z > 0 then -1 else 1)
+	end
+	return Enum.ContextActionResult.Sink
+end
+
+-- Console focus (GuiService selection), gamepad only. The menu is the only thing that owns the selection while it is up:
+--   Selectable            only the selected row (component), so the stick cannot walk the ring off the menu while walking
+--   NextSelectionUp/Down  chained in list order, wrapping; Left/Right unset, SelectionBehaviorLeft/Right = Stop
+--   SelectedObject        = the selected row button (default focus ring, no custom SelectionImageObject)
+--   AutoSelectGuiEnabled  false while the menu holds the focus, given back after
+-- Closing the menu, or leaving the gamepad, clears SelectedObject so the console focus is never left on the UI.
+function PromptController:SyncFocus()
+	const pad = self.Dependencies.InputController.Device() == "Gamepad"
+	const selected = Vide.untrack(self.MenuSelected)
+	const want = if self.MenuActive and pad and selected ~= nil then self.FocusButtons[selected] else nil
+	if want == nil then
+		const current = GuiService.SelectedObject
+		if current ~= nil and current.Name == FOCUS_NAME and current:IsDescendantOf(Players.LocalPlayer) then
+			GuiService.SelectedObject = nil
+		end
+		if self.AutoSelectSaved ~= nil then
+			GuiService.AutoSelectGuiEnabled = self.AutoSelectSaved
+		self.AutoSelectSaved = nil
+		end
+		return
+	end
+	if self.AutoSelectSaved == nil then
+		self.AutoSelectSaved = GuiService.AutoSelectGuiEnabled
+		GuiService.AutoSelectGuiEnabled = false
+	end
+	const buttons: { GuiButton } = {}
+	for _, item in Vide.untrack(self.MenuList) do
+		const button = self.FocusButtons[item]
+		if button ~= nil then
+			table.insert(buttons, button)
+		end
+	end
+	for index, button in buttons do
+		button.NextSelectionUp = buttons[(index - 2) % #buttons + 1]
+		button.NextSelectionDown = buttons[index % #buttons + 1]
+		button.SelectionBehaviorLeft = Enum.SelectionBehavior.Stop
+		button.SelectionBehaviorRight = Enum.SelectionBehavior.Stop
+	end
+	if GuiService.SelectedObject ~= want and want.Selectable and want:IsDescendantOf(Players.LocalPlayer) then
+		GuiService.SelectedObject = want
+	end
 end
 
 function PromptController:MountMenu(gui: Instance)
@@ -588,16 +738,23 @@ function PromptController:MountMenu(gui: Instance)
 				Selected = self.MenuSelected,
 				Visible = self.MenuVisible,
 				Device = input.Device,
+				Glyphs = self.MenuGlyphs,
+				OnFocusButton = function(item: InteractionMenu.Item, button: GuiButton?)
+					self.FocusButtons[item] = button
+				end,
 				Tappable = function()
 					return input.Device() == "Touch"
 				end,
-				Right = function()
-					return if input.Device() == "Touch" then MENU_RIGHT_TOUCH else MENU_RIGHT
-				end,
-				-- a tap selects and presses in one go
+				-- a tap selects and presses in one go; the Refuse option selects its customer and starts the alt hold
 				OnPress = function(item)
 					const prompt = self.MenuPrompts[item]
-					if prompt then
+					if prompt == nil then
+						return
+					end
+					const owner = self.RefuseOwner[prompt]
+					if owner then
+						self:MenuPressRefuse(owner)
+					else
 						self:MenuPress(prompt)
 					end
 				end,
@@ -735,6 +892,10 @@ function PromptController:Tick()
 	end
 
 	self.Refuses = refuses
+	table.clear(self.RefuseOwner)
+	for owner, refuse in refuses do
+		self.RefuseOwner[refuse] = owner
+	end
 
 	-- InteractionMenu: several candidates in view -> an ordered list of buttons instead of one pill (see Menu.luau).
 	-- A row the tutorial gate no longer allows goes at once; the others get a grace period.
@@ -751,9 +912,11 @@ function PromptController:Tick()
 		end
 	end
 	Menu.Update(menu, inView, os.clock(), self.Holding ~= nil, margin)
-	-- Enter with two live rows; stay while two rows remain (one may be in grace) so the list does not collapse under
-	-- the selection.
-	const showMenu = Menu.CurrentCount(menu) >= 2 or (self.MenuActive and #menu.Order >= 2)
+	-- Enter with two live rows (desktop / gamepad) or one (touch: the action circle is the only button); stay while that
+	-- many rows remain (one may be in grace) so the list does not collapse under the selection.
+	const touch = self.Dependencies.InputController.Device() == "Touch"
+	const minRows = if touch then 1 else 2
+	const showMenu = Menu.CurrentCount(menu) >= minRows or (self.MenuActive and #menu.Order >= minRows)
 	self:SetMenuActive(showMenu)
 
 	if showMenu then
@@ -761,6 +924,7 @@ function PromptController:Tick()
 		self:SetAlt(if menu.Selected then refuses[menu.Selected] else nil)
 		self:PublishMenu()
 		self:BindMenuPicks(#menu.Order)
+		self:SyncFocus()
 	else
 		local best: Prompt.Prompt? = nil
 		local bestDistance = math.huge
@@ -788,7 +952,8 @@ function PromptController:Tick()
 	end
 
 	for _, prompt in self.Prompts do
-		if prompt == self.Target and not showMenu then
+		-- touch with one option keeps the pill (the circle has no label); several options show the dot only
+		if prompt == self.Target and (not showMenu or (touch and #Vide.untrack(self.MenuList) <= 1)) then
 			Prompt.SetState(prompt, "Prompt")
 		elseif candidates[prompt] then
 			Prompt.SetState(prompt, "Indicator")
@@ -809,11 +974,20 @@ PromptController:OnStart(function(self)
 		end
 	end)
 
-	-- Mouse wheel walks the interaction menu (observe only: the camera is locked first person, nothing else uses it)
-	UserInputService.InputChanged:Connect(function(input: InputObject)
-		if input.UserInputType == Enum.UserInputType.MouseWheel and input.Position.Z ~= 0 then
-			self:MenuStep(if input.Position.Z > 0 then -1 else 1)
+	-- The wheel is a CAS bind while the menu is up (OnWheel); the glyphs follow the controller in use
+	local function refreshGlyphs()
+		const glyphs = readGlyphs()
+		const old = Vide.untrack(self.MenuGlyphs)
+		if glyphs.Use ~= old.Use or glyphs.Refuse ~= old.Refuse or glyphs.Up ~= old.Up or glyphs.Down ~= old.Down then
+		self.MenuGlyphs(glyphs)
 		end
+	end
+	UserInputService.GamepadConnected:Connect(refreshGlyphs)
+	UserInputService.LastInputTypeChanged:Connect(function(inputType: Enum.UserInputType)
+		if string.sub(inputType.Name, 1, 7) == "Gamepad" then
+			refreshGlyphs()
+		end
+		self:SyncFocus()
 	end)
 
 	-- PlayerGui may arrive a frame late; do not hold up the other OnStart.

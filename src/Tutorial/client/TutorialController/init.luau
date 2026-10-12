@@ -46,9 +46,10 @@
 	tutorial is not running or the step has no world target). PromptController can use it to hide or dim the others;
 	that hook is the PromptController owner's (not wired from here).
 
-	Progressive HUD (HudController reads ShowCash / ShowClock): during a first run the money pill stays hidden until
-	the first sale, the clock and day pills until the shift opens (phase Open). Everything shows when the tutorial
-	ends, is skipped, or when it is not a first run.
+	Progressive HUD (owner request 2026-10-12): which HUD element appears at which step is Content.HudReveal; HudController
+	reads Step / Finished / FirstRun from here (self.StepKey, self.Finished, :FirstRun()) and decides. Everything shows
+	when the tutorial ends, is skipped, or when it is not a first run. HudController also plugs a DevClient command in
+	through SetDevHandler ("hud_reveal", /dev hud reveal).
 
 	End: after the talk steps (Walt finished them or "Got it"), on Skip (Q / D-pad down / the Skip tag on touch), or when
 	the day shift is over without a sale (Closing, Summary, night). Each end fires `TutorialComplete` once; the server
@@ -274,6 +275,8 @@ function TutorialController:Setup()
 	self.VoiceRun = 0 :: number
 	self.DevNoted = false :: boolean
 	self.Mounted = false :: boolean
+	-- DevClient commands other controllers plug in (SetDevHandler): command -> handler(text)
+	self.DevHandlers = {} :: { [string]: (text: string) -> () }
 end
 
 -- Reactive -------------------------------------------------------------------------------------------------------
@@ -295,16 +298,6 @@ function TutorialController:FirstRun(): boolean
 	return self.Dependencies.ProfileController.Ready()
 		and not self.PastDay1()
 		and self.Dependencies.RoundController.Day() <= 1
-end
-
--- HUD reveal (HudController): money pill / clock + day pills. A night shift always shows everything (a first-run
--- player who joined a run at night gets the tutorial on the next day shift).
-function TutorialController:ShowCash(): boolean
-	return not self:FirstRun() or self.CashRevealed() or self.Dependencies.RoundController.IsNight()
-end
-
-function TutorialController:ShowClock(): boolean
-	return not self:FirstRun() or self.ClockRevealed() or self.Dependencies.RoundController.IsNight()
 end
 
 function TutorialController:Step(): Steps.Step?
@@ -1706,6 +1699,11 @@ function TutorialController:OnDev(command: string, text: string)
 	if not self:IsDev() then
 		return
 	end
+	const handler = self.DevHandlers[command]
+	if handler ~= nil then
+		handler(text)
+		return
+	end
 	if command == "tutorial_reset" then
 		self:DevReset()
 	elseif command == "tutorial_step" then
@@ -1743,6 +1741,11 @@ function TutorialController:OnDev(command: string, text: string)
 	elseif command == "tutdebug" then
 		self:ToggleDebug()
 	end
+end
+
+-- Another controller handles a DevClient command (dev mode only; HudController: "hud_reveal")
+function TutorialController:SetDevHandler(command: string, handler: (text: string) -> ())
+	self.DevHandlers[command] = handler
 end
 
 -- F8 toggles the debug panel (dev mode only; "/dev tutdebug" from the chat on any device)

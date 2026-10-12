@@ -3,6 +3,10 @@
 --   Bump(value)    scale that jumps (Theme.Motion.BumpScale) and settles each time the number goes up
 --   Count(value)   number that rolls from the old value to the new one (money "pulando")
 --   Pop(shown)     scale 0 -> 1 with overshoot when shown, back to 0 when hidden (clamped >= 0)
+--   Reveal(shown)  progressive HUD reveal (Content.HudReveal): 0 -> 1 in Theme.Motion.Reveal s, no overshoot; with the
+--                  "reduced motion" setting of the player it jumps (0 or 1) instead of animating
+--   Reduced()      whether the player asked for reduced motion (UserGameSettings.ReducedMotion; false when the engine
+--                  has no such setting)
 --   Press(pressed, hovered?)  squash on press, slight grow on hover
 -- Must be called inside a Vide scope (a component). Pure: no instances.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -86,6 +90,28 @@ local function count(value: () -> number, duration: number?): () -> number
 	end
 end
 
+-- Read on every call: the setting can change while playing. A missing property is an error, caught: no setting = false.
+local function reduced(): boolean
+	const ok, value = pcall(function(): any
+		return (UserSettings():GetService("UserGameSettings") :: any).ReducedMotion
+	end)
+	return ok and value == true
+end
+
+local function reveal(shown: () -> boolean): () -> number
+	if reduced() then
+		return function(): number
+			return if shown() then 1 else 0
+		end
+	end
+	const s = spring(function()
+		return if shown() then 1 else 0
+	end, Theme.Motion.Reveal, 0.9)
+	return function(): number
+		return math.clamp(s(), 0, 1)
+	end
+end
+
 local function pop(shown: () -> boolean): () -> number
 	const s = spring(function()
 		return if shown() then 1 else 0
@@ -113,5 +139,7 @@ return table.freeze({
 	Bump = bump,
 	Count = count,
 	Pop = pop,
+	Reveal = reveal,
+	Reduced = reduced,
 	Press = press,
 })

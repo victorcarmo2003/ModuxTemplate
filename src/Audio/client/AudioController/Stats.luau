@@ -62,7 +62,9 @@ function Stats.Report(pooled: number, voices: number): string
 		.. `[Audio] last {WINDOW}s: plays={lastMinute("play")} new sounds={lastMinute("new")} `
 		.. `(session: plays={totals.play or 0} new={totals.new or 0})\n`
 		.. `[Audio] LoadQueue: urgent={queue.Urgent} background={queue.Background} working={queue.Working} held={queue.Held} `
-		.. `requests/min={queue.PerMinute} timeouts={queue.Timeouts} failures={queue.Failures}`
+		.. `requests/min={queue.PerMinute} timeouts={queue.Timeouts} failures={queue.Failures}\n`
+		.. `[Audio] ids: requested={queue.Requested} loaded={queue.Loaded} in flight={queue.InFlight} `
+		.. `(peak {queue.PeakInFlight}) in backoff (failed)={queue.Cooldown} NotEnoughQuota lines={queue.QuotaMessages}`
 end
 
 return table.freeze(Stats)

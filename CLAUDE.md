@@ -76,7 +76,7 @@ Mudar para **Aprovado** só com decisão do usuário registrada (`DEC-###`).
 | `qa-tester` | plano de teste por feature, análise estática, validação de critérios |
 | `debugger` | causa raiz de bug, correção mínima |
 
-Fluxo e paralelismo: `docs/PIPELINE.md`.
+Fluxo e paralelismo: `docs/PIPELINE.md`. Regras fixas para todo agente (gate, Lync, Studio, UI, docs em lote): `docs/AGENT-BRIEF.md`.
 
 ---
 

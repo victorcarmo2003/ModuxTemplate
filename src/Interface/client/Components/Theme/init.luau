@@ -129,6 +129,7 @@ const Theme = {
 	Motion = {
 		Pop = 0.32, -- spring period of a pop-in (with overshoot)
 		PopDamping = 0.55,
+		Reveal = 0.25, -- progressive HUD reveal (Content.HudReveal), seconds, no overshoot
 		Press = 0.12, -- squash on press
 		PressScale = 0.92,
 		HoverScale = 1.05,
