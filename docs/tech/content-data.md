@@ -171,7 +171,7 @@ O que o código em `src/Shared/Content/` fixou além do texto acima (forma decid
 | Actions | campo novo `Wave` (1ª onda com prompt ativo). `Requires` só carrega o que o client pré-checa (`Held`, `NotHasTopping`, `Phase`); o resto da coluna Requires da §3.18 é regra do servidor. `Held = "Package"` = categoria. `pick_up_item` = "Take", toque, ativo na onda 1 (N-03; item derrubado da onda 3 usa `PromptHold = 0.5` na âncora, FEAT-036) |
 | Notices | campo novo `ValueFrom` (`None`, `Number`, `Ingredients`, `Upgrades`, `Classes`): diz ao client como ler `Notice.Value`. Placeholder `{class}` para as notices de classe |
 | Upgrades | `Levels[veículo]` lista **todos** os níveis de `StartLevel` ao máximo, em ordem; a 1ª linha é o que o veículo traz (`Price = 0`; nível 0 de Cash Drawer Lock e Trailer Lights incluído, com os efeitos "sem upgrade") |
-| CustomerTypes | `Role` (`Customer`/`Pedestrian`), `UnlockDay`/`UnlockNight`, `Weight = { Day, Night }`, `KShift = { Delta, Chance }`, `IngredientMult` por chave de topping; `pedestrian` com `Species = {}` (= qualquer espécie com `Pedestrian`) |
+| CustomerTypes | `Role` (`Customer`/`Pedestrian`), `UnlockDay`/`UnlockNight`, `Weight = { Day, Night }`, `KShift = { Delta, Chance }`, `IngredientMult` por chave de topping, `PatienceMult = { Queue, Order }` opcional (multiplica as duas paciências; ausente = 1; Q-192, Provisório); `pedestrian` com `Species = {}` (= qualquer espécie com `Pedestrian`) |
 | OrderPhases | chaves `day_1`, `day_2_3`, `day_4_5`, `day_6_plus`, `night`; `ToDay = 0` = sem teto |
 | OpalLines | chaves `day`, `n1_3`, `n4_6`, `n7_10` (+ `FromNight`/`ToNight`) |
 | Stubs | `Classes`, `Species`, `Shift`, `Vehicles`, `Upgrades`, `RunParams`, `Flow`, `Orders`, `CustomerTypes`, `OpalLines` já saem com os números desta versão e de `upgrades.md`/`npcs.md`/FEAT-010 onde existiam; TASK-008/009 revisam e completam (nomes, falas, acessórios, noites) |
@@ -655,7 +655,7 @@ não fixou):
 |---|---|
 | Flow | `BaseInterval` 22 · `GrowthPerDay` 0.08 · `GrowthCap` 0.40 · `PartyMult` {1.0, 1.6, 2.1, 2.5} · **`PartySource = "Connected"`** (jogadores conectados, DEC-185; substitui `ActiveAtShiftStart`) · `RecalcOn = "ShiftStarted"` (**Provisório**, DEC-185) · `Jitter` 0.25 · `MaxCustomersDay` 8 · `MaxCustomersNight` 6 · `MaxActorsNight` 3 · `MaxNpc` 12 (DEC-045; passantes fora ou dentro do teto: `Q-162`) · `DayWalkers` {6, 8} e `NightWalkers` {1, 2} (DEC-183, onda 2) · **`Adopt`** (passante vira cliente, TASK-163, **Provisório**, pedido do usuário 2026-10-11): `ChanceDay` 0,5 · `ChanceNight` 0,15 · `FromDay` 1 · `FromNight` 1 (0 = nunca à noite) · `MaxDistance` 60 (studs de Q5, plano XZ) · `MinGapSeconds` 8 · `NoticeLead` 0,8 s (o passante freia antes da tentativa) · `Beat` 0,6 s (de frente para o carrinho antes de andar) · `FirstDelay` {3, 5} s (1ª tentativa da fase de venda; antes era um intervalo inteiro). `Validate`: chances 0..1, `FromNight` 0..10, `MaxDistance` 0..200, `FirstDelay` = {min ≤ max} |
 | OrderPhases | `{ FromDay, ToDay, IsNight, KWeights }` (FEAT-010) |
-| OrderRules | `BasePrice` 4 · `MaxToppings` 3 · `NewIngredientBoost` 1.5 · `TipAmount` 1 · `TipWindowBase` 16 · `TipWindowPerK` 4 · `PatienceBase` 40 · `PatiencePerK` 5 · `IncompletePct` 50 (floor) · `GradeThresholds` {A 0.90, B 0.75, C 0.50} · `GradeBonusPct` {A 20, B 10, C 0, D 0} · `NoCustomerGrade = "C"` (DEC-051) |
+| OrderRules | `BasePrice` 4 · `MaxToppings` 3 · `NewIngredientBoost` 1.5 · `TipAmount` 1 · `TipWindowBase` 16 · `TipWindowPerK` 4 · `QueuePatience` 45 · `OrderPatienceBase` 75 · `OrderPatiencePerK` 5 · `WireSpanMax` 255 (Q-192, Provisório; substituem `PatienceBase` 40 e `PatiencePerK` 5 da DEC-072) · `IncompletePct` 50 (floor) · `GradeThresholds` {A 0.90, B 0.75, C 0.50} · `GradeBonusPct` {A 20, B 10, C 0, D 0} · `NoCustomerGrade = "C"` (DEC-051) |
 | Thief | `ChanceByDay`, `MaxPerDay`, `WindowClock`, `LurkMax`, `ZoneRadius`, `ZoneEmptyTime`, **`ApproachTime` 4** (fixo; velocidade = distância ÷ 4, DEC-182), `OpenTime`, `StealPct`, `MinDrawer`, `CatchReward` (onda 2) |
 | Sanity | `Start` 100 · `SeeAnomaly` −5 · `SeeTime` · `SeeAngle` · `SeeRange` · `RuleBroken` −35 · `DarkDelay` 3 · `DarkPerSecond` −1 · `Coffee` +25 · `CoffeeCooldown` 60 · `CoffeeBrew` 6 · `TrailerLightRadius` 18 · `BasicLampRadius` (lâmpada de fábrica do trailer, DEC-189; número com o game-designer) · **`Bands = { High = 60, Mid = 40 }`** (≥ 60 → `Day`, 40–59 → `Mid`, < 40 → `Night`; pontos absolutos, DEC-167) · `BandMinHold` 0 s (1 s se piscar no teste, **Provisório**, DEC-167) (onda 2) |
 
@@ -692,7 +692,7 @@ não fixou):
 | `Neutral` | `Normal` | chegada |
 | `Happy` | `Happy` | venda Completo/Perfeito |
 | `Annoyed` | `Skeptical` | resta ≤ `MoodRules.AnnoyedAt` da paciência |
-| `Complaining` | `Stressed` | desistiu (paciência zerou), Errado, Refuse |
+| `Complaining` | `Stressed` | desistiu (paciência de fila ou de preparo zerou), Errado, Refuse |
 
 `MoodRules` (registro único): `AnnoyedAt = 0.33` (fração da paciência restante), `AffectsPay = false` (onda 1). O humor
 dinâmico completo (DEC-187: sobe e desce, muda pagamento) acrescenta linhas e campos aqui; o `Net` não muda.

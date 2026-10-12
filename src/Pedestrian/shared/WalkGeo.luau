@@ -40,9 +40,19 @@ export type Geo = {
 const ACCEL = 16 -- studs/s^2, PROVISIONAL: 0 -> 8 studs/s in 0.5 s
 const BRAKE = 16 -- studs/s^2, PROVISIONAL: stops in ~2 studs at 8 studs/s
 const HEADING_HALF = 1.5 -- studs each side for the heading chord
+-- Lanes (playtest 2026-10-11: walkers piled on the same zebra line). Offset of lane k is LANES[k] studs to the RIGHT of
+-- the walking direction, so two walkers crossing in opposite directions are always on opposite halves of the zebra
+-- (>= 2 * LANES[1] apart) and neighbours of one direction are >= LANE_GAP apart. The lane is a function of the record
+-- slot (LaneOfSlot): the server picks the slot, every client derives the same lane (no new field in the record).
+-- The offset is full on the road part of a crosswalk (curb node to curb node, so waiting walkers on the curb spread
+-- too) and fades to 0 over LANE_RAMP studs before / after it.
+const LANES = { 0.9, 2.5 }
+const LANE_RAMP = 3 -- studs
 
 const WalkGeo = {}
 
+WalkGeo.LaneCount = #LANES
+WalkGeo.LaneGap = LANES[2] - LANES[1]
 WalkGeo.Accel = ACCEL
 WalkGeo.Brake = BRAKE
 
@@ -120,6 +130,40 @@ end
 -- Horizontal unit heading at distance `s`
 function WalkGeo.Heading(geo: Geo, s: number): Vector3
 	return Motion.Heading(geo.Path, WalkGeo.Fold(geo, s), HEADING_HALF)
+end
+
+-- Lane (1..LaneCount) of a record slot
+function WalkGeo.LaneOfSlot(slot: number): number
+	return (slot - 1) % #LANES + 1
+end
+
+-- Studs to the right of the walking direction of lane `lane` (customers on foot use the same lanes, NpcService)
+function WalkGeo.LaneDistance(lane: number): number
+	return LANES[lane] or LANES[1]
+end
+
+-- Horizontal offset of lane `lane` at distance `s`: right of the heading, scaled by how close `s` is to a crosswalk
+function WalkGeo.LaneOffset(geo: Geo, s: number, lane: number): Vector3
+	if #geo.Crossings == 0 then
+		return Vector3.zero
+	end
+	const folded = WalkGeo.Fold(geo, s)
+	local weight = 0
+	for _, crossing in geo.Crossings do
+		const rising = (folded - (crossing.From - LANE_RAMP)) / LANE_RAMP
+		const falling = ((crossing.To + LANE_RAMP) - folded) / LANE_RAMP
+		weight = math.max(weight, math.clamp(math.min(rising, falling), 0, 1))
+	end
+	if weight <= 0 then
+		return Vector3.zero
+	end
+	const heading = Motion.Heading(geo.Path, folded, HEADING_HALF)
+	return Vector3.new(-heading.Z, 0, heading.X) * (LANES[lane] or LANES[1]) * weight
+end
+
+-- Floor point of a walker in lane `lane`
+function WalkGeo.LanePointAt(geo: Geo, s: number, lane: number): Vector3
+	return WalkGeo.PointAt(geo, s) + WalkGeo.LaneOffset(geo, s, lane)
 end
 
 -- A through path is over at its end; a Loop path never is

@@ -21,6 +21,7 @@ type Walker = {
 	Cursor: Motion.Cursor,
 	Dist: number,
 	Speed: number,
+	Lane: number, -- WalkGeo.LaneOfSlot(Id): lateral lane on the crosswalks (same rule on every client)
 	Stop: Stop?, -- stop the current record heads to
 	ParkedAt: number?,
 	-- on the road under a reservation: crosswalk and far curb (absolute)
@@ -80,6 +81,9 @@ export type Public = {
 	RemoveAll: (self: Public) -> (),
 	OffRoad: (self: Public, walker: Walker) -> (),
 	TryCross: (self: Public, walker: Walker, stop: Stop, t: number) -> (),
+	PlaceOf: (self: Public, walker: Walker) -> Vector3,
+	RiderNear: (self: Public, walker: Walker, key: string) -> boolean,
+	LeaderSpeed: (self: Public, walker: Walker, key: string) -> number?,
 	Ahead: (self: Public, walker: Walker, reach: number) -> boolean,
 	Hold: (self: Public, walker: Walker, brake: number, t: number) -> boolean,
 	StepWalker: (self: Public, walker: Walker, t: number) -> (),

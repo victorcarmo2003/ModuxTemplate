@@ -36,6 +36,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local ServerStorage = game:GetService("ServerStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
+local WalkGeo = require(ReplicatedStorage.shared.Pedestrian.WalkGeo)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 local Look = require(script.Look)
 local Pool = require(script.Pool)
@@ -94,12 +95,19 @@ const PASS_ASSETS: { [string]: true } = {
 	["AST-036_StreetLightCurved"] = true,
 	["AST-036_LampHead"] = true,
 	["AST-034_StreetSign"] = true,
+	["AST-047_Barrier"] = true, -- SIDEWALK CLOSED fence at BAR-N / BAR-S: the street-end spawns are beyond it
 }
 const ASSETS_ROOT = "MAP01_Assets"
 -- Spacing gate (Blocked), PROVISIONAL
 const SPACING = 2.5 -- studs: another rig closer than this ahead = wait
 const SPACING_CONE = 0.8 -- cos of the half-angle of "ahead" (~37 degrees)
 const ONCOMING = -1 -- studs/s: a rig coming at us faster than this is passed, not waited for
+-- Crosswalk lanes (playtest 2026-10-11: rigs crossed through each other on the zebra), PROVISIONAL: each walk over a
+-- crosswalk edge takes the least used lane of its direction (same lanes as the passers-by, WalkGeo), both curb waypoints
+-- are shifted sideways by it, and a rig only steps on the road when no other rig is within CROWD studs of it.
+const LANE_HOLD = 30 -- seconds a lane counts as used after it is picked (wait + crossing)
+const CROWD = 1.6 -- studs: centre-to-centre minimum before a rig steps onto a crosswalk
+const CROWD_MAX = 4 -- seconds a rig waits for the room before it goes anyway
 const FOLDER_NAME = "Npcs"
 const PARKING_NAME = "NpcPool"
 const THIEF_NPC = "NPC-007" -- Species/Outfits.ReservedFor of Quick Quentin
@@ -151,6 +159,19 @@ local function passThinProps(): number
 			end
 		end
 	end
+	-- Player-only limits (MAP01_Blockout.Limits: BAR-N/S/E/W) and the AST-047 street-closed fences: NPCs spawn and despawn
+	-- beyond them (MAP-01 §9.8), so they must not collide with the Npc group (playtest 2026-10-11: stuck + snapped at
+	-- N-Z02-09 / EX-E / N-Z08-01). Players keep colliding: NpcPass collides with everything but Npc.
+	const blockout = workspace:FindFirstChild("MAP01_Blockout")
+	const limits = if blockout then blockout:FindFirstChild("Limits") else nil
+	if limits ~= nil then
+		for _, part in limits:GetDescendants() do
+			if part:IsA("BasePart") and part.CollisionGroup ~= PASS_GROUP then
+				part.CollisionGroup = PASS_GROUP
+				count += 1
+			end
+		end
+	end
 	return count
 end
 
@@ -167,6 +188,7 @@ function NpcService:Setup()
 	self.NextId = 0 :: number
 	self.Random = Random.new() :: Random
 	self.Frame = 1 :: number
+	self.LaneUse = {} :: { [string]: { { Lane: number, Until: number } } }
 	self.RouteFrame = 0 :: number
 	self.RoutesInFrame = 0 :: number
 	self.Folder = nil :: Folder?
@@ -485,6 +507,32 @@ function NpcService:Route(from: string, to: string, options: WalkOptions?): { st
 	})
 end
 
+-- Least used lane (1..WalkGeo.LaneCount) for crossing `cw` along `direction` (flat, non-zero); counts it as used
+function NpcService:PickLane(cw: string, direction: Vector3): number
+	const key = `{cw}:{if direction.X + direction.Z * 0.37 >= 0 then 1 else -1}`
+	const clock = os.clock()
+	const live: { { Lane: number, Until: number } } = {}
+	const used: { [number]: number } = {}
+	for _, entry in self.LaneUse[key] or {} do
+		if entry.Until > clock then
+			table.insert(live, entry)
+			used[entry.Lane] = (used[entry.Lane] or 0) + 1
+		end
+	end
+	local best = 1
+	local bestUse = math.huge
+	const first = math.random(1, WalkGeo.LaneCount)
+	for step = 0, WalkGeo.LaneCount - 1 do
+		const lane = (first + step - 1) % WalkGeo.LaneCount + 1
+		if (used[lane] or 0) < bestUse then
+			best, bestUse = lane, used[lane] or 0
+		end
+	end
+	table.insert(live, { Lane = best, Until = clock + LANE_HOLD })
+	self.LaneUse[key] = live
+	return best
+end
+
 -- Walks NPC `id` from its last node to node `target` along the graph. YIELDS until it arrives (true) or the walk
 -- is cancelled by Stop, a newer WalkTo or Despawn, or there is no route (false). Call from its own thread.
 function NpcService:WalkTo(id: number, target: string, options: WalkOptions?): boolean
@@ -519,6 +567,20 @@ function NpcService:WalkTo(id: number, target: string, options: WalkOptions?): b
 		const previous = MapIndex.Node(path[index - 1])
 		if node.Crosswalk ~= nil and node.Crosswalk == previous.Crosswalk then
 			crossings[index - 1] = node.Crosswalk
+		end
+	end
+	-- crosswalk lanes: the curb waypoints of a crosswalk edge move to this walk's lane (right of the way across)
+	for index, cw in crossings do
+		const from = if index >= 2 then points[index - 1] else npc.Rig.Root.Position
+		const way = Vector3.new(points[index].X - from.X, 0, points[index].Z - from.Z)
+		if way.Magnitude < 1e-3 then
+			continue
+		end
+		const heading = way.Unit
+		const shift = Vector3.new(-heading.Z, 0, heading.X) * WalkGeo.LaneDistance(self:PickLane(cw, heading))
+		points[index] += shift
+		if index >= 2 and crossings[index - 1] == nil then
+			points[index - 1] += shift
 		end
 	end
 	-- spacing gate (the thief runs: it never waits)
@@ -573,16 +635,51 @@ function NpcService:Blocked(id: number, direction: Vector3): boolean
 	return false
 end
 
+-- Another rig (not a tether, not seated) closer than CROWD studs to NPC `id`
+function NpcService:Crowded(id: number): boolean
+	const npc = self.Active[id]
+	if npc == nil then
+		return false
+	end
+	const position = npc.Rig.Root.Position
+	for otherId, other in self.Active do
+		if otherId == id or other.Tether then
+			continue
+		end
+		const root = other.Rig.Root
+		if root.Anchored or not root:IsDescendantOf(workspace) then
+			continue
+		end
+		if Vector3.new(root.Position.X - position.X, 0, root.Position.Z - position.Z).Magnitude < CROWD then
+			return true
+		end
+	end
+	return false
+end
+
 -- Crosswalk reservations of NPC `id` for Walker.Follow (TrafficService runs in game time only, never in OnInit)
 function NpcService:Crossing(id: number, at: { [number]: string }): Walker.Crossing?
 	if next(at) == nil then
 		return nil
 	end
 	const traffic = self.Dependencies.TrafficService
+	local crowdedSince: number? = nil
 	return {
 		At = at,
 		Reserve = function(cw: string): boolean
-			return traffic:ReserveCrossing(cw, id)
+			-- room on the curb: wait while another rig stands on our place (at most CROWD_MAX s)
+			const clock = os.clock()
+			if crowdedSince == nil then
+				crowdedSince = clock
+			end
+			if self:Crowded(id) and clock - (crowdedSince :: number) < CROWD_MAX then
+				return false
+			end
+			const granted = traffic:ReserveCrossing(cw, id)
+			if granted then
+				crowdedSince = nil
+			end
+			return granted
 		end,
 		Release = function(cw: string)
 			traffic:ReleaseCrossing(cw, id)

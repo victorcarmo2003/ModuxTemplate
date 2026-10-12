@@ -866,7 +866,7 @@ end
 
 -- Pad tables (TASK-144; FEAT-037): soft checks, returned as notes (PlaceService warns, never errors) until TASK-149
 -- binds the tables. Each TableIndex 1..N once on a `Tag` Model (N = highest found, 1 <= N <= Tables), with Seat1..SeatN BaseParts; optional anchors
--- (Prompt_BuyTable, Prompt_CleanTable, Tray_Anchor) noted when missing (SeatingService creates a runtime prompt).
+-- (Prompt_BuyTable, Prompt_CleanTable, Tray_Anchor) are NOT noted: SeatingService/SeatingController fall back (runtime prompt, table top).
 function MapIndex.SeatingNotes(required: List): { string }
 	const rule = required.Seating
 	const notes: { string } = {}
@@ -903,11 +903,6 @@ function MapIndex.SeatingNotes(required: List): { string }
 			const part = model:FindFirstChild(`{rule.SeatPrefix}{seat}`, true)
 			if part == nil or not part:IsA("BasePart") then
 				table.insert(notes, `{rule.Tag} {index}: no BasePart {rule.SeatPrefix}{seat}`)
-			end
-		end
-		for _, anchor in rule.Anchors do
-			if model:FindFirstChild(anchor, true) == nil then
-				table.insert(notes, `{rule.Tag} {index}: no {anchor} (optional)`)
 			end
 		end
 	end

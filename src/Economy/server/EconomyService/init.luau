@@ -46,7 +46,7 @@ const CLOSING = "Closing"
 const KINDS: { [string]: boolean } = { Sale = true, Tip = true, Catch = true }
 -- Sale.Result enum (network.md §4.3)
 const RESULTS: { [string]: boolean } =
-	{ Perfect = true, Complete = true, Incomplete = true, Wrong = true, Left = true, Refused = true }
+	{ Perfect = true, Complete = true, Incomplete = true, Wrong = true, Left = true, Refused = true, Slow = true }
 
 local function fail(message: string)
 	if RunService:IsStudio() then

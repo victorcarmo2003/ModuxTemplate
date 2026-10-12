@@ -48,7 +48,7 @@ for _, phase in Content.Mart.KioskClosedPhases do
 	KIOSK_CLOSED[phase] = true
 end
 const SPECIES = "owl" -- DEC-203
--- PROVISIONAL (AST-057 sheet is Rascunho): no Opal outfit in the kit yet (Mart vest, green cardigan, glasses on a
+-- PROVISIONAL (AST-057 sheet is Draft): no Opal outfit in the kit yet (Mart vest, green cardigan, glasses on a
 -- chain); a civil outfit without the crew cap stands in until the art-director's sheet ships.
 const OUTFIT = "civil_a"
 const PACK: CrewRig.Pack = "Day" -- the Mart never goes dark (NPC-020); not affected by the local Night swap

@@ -6,6 +6,7 @@
 -- Commands:
 --   dev <command> [args]   bridge to DevService (same commands, args and help as chat "/dev"); no logic here.
 --   day / cash / gems / upgrade   typed shortcuts that forward to the same DevService commands.
+--   help                   lists the commands above plus DevService help.
 --   tp, content            native and safe in production (no DevService needed).
 -- Policy: DevService only exists in Studio dev mode (PlaceService:IsDev). Published servers therefore expose only
 -- the native commands; the bridge answers "dev commands are off". Do not add Content/profile mutations here
@@ -71,6 +72,19 @@ function AdminService:RunDev(name: string, args: { string })
 	end
 end
 
+function AdminService:CommandHelp()
+	if not executor() then
+		return fail("not allowed")
+	end
+	conch.log("normal", "Admin commands: dev <command> [args] | day <n> | cash <amount> | gems <amount> [player] | upgrade [key] [level] | tp [target] <to> | content item|ingredient|class <key> | help")
+	const dev = self.Dependencies.DevService
+	if dev.Enabled then
+		conch.log("normal", dev:Help())
+	else
+		conch.log("normal", "dev commands are off here (DevService runs only in Studio dev mode)")
+	end
+end
+
 function AdminService:CommandTeleport(a: Player, b: Player?)
 	const caller = executor()
 	if not caller then
@@ -107,11 +121,9 @@ function AdminService:Register()
 	conch.register("dev", {
 		permissions = { PERMISSION },
 		description = "Run a DevService command (same as chat /dev). 'dev help' lists them",
+		-- one signature (command + rest of the line as text): an overload of string vs string+any is ambiguous in Conch
 		arguments = function()
-			return conch.args.overload({
-				{ conch.args.string("command") } :: { any },
-				{ conch.args.string("command"), conch.args.variadic(conch.args.any("arg")) } :: { any },
-			})
+			return conch.args.string("command"), conch.args.variadic(conch.args.string("arg"))
 		end,
 		callback = function(name: string, ...: any)
 			const args: { string } = {}
@@ -119,6 +131,15 @@ function AdminService:Register()
 				table.insert(args, tostring(value))
 			end
 			self:RunDev(name, args)
+		end,
+	})
+
+	conch.register("help", {
+		permissions = { PERMISSION },
+		description = "List the admin commands and the DevService commands",
+		arguments = function() end,
+		callback = function()
+			self:CommandHelp()
 		end,
 	})
 

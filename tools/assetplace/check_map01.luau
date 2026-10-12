@@ -1,6 +1,6 @@
 --[[
 	MAP-01 binding check, waves 1 + 2 + 3 (TASK-005, TASK-083, TASK-098; docs/tech/architecture.md §18.7, §19.22).
-	Edit-mode tool, NOT gameplay code. Status: Rascunho (level-designer, 2026-10-10). §18.7 calls this tool
+	Edit-mode tool, NOT gameplay code. Status: Draft (level-designer, 2026-10-10). §18.7 calls this tool
 	check_binding.luau; this is that tool for MAP-01. The runtime twin is MapIndex.Validate +
 	src/Place/shared/MapIndex/Required.luau (Required.Wave1 / Wave2 / Wave3 from TASK-048 / TASK-097): keep the lists
 	below in sync with it (wave 2 list: MAP-01 §16.4; wave 3: MAP-01 §16.6). Wave 3 names that are game data
@@ -51,7 +51,7 @@
 	  6. graph: connected, Links resolve, no space in Links, edge <= 40, <= 80 nodes, no edge over a carriageway
 	     except a crosswalk edge, queue chain Q5-Q4-Q3-Q2-Q1; wave 2: thief routes exist without queue slots and
 	     without crosswalk edges (MAP-01 §9.2: never crosses a road)
-	  7. pivots of the counter stations: cart at y 3.45 (DEC-157, Provisório until Q-153); trailer at pivot + 5.5
+	  7. pivots of the counter stations: cart at y 3.45 (DEC-157, Provisional until Q-153); trailer at pivot + 5.5
 	  9. (TASK-085) UpgradePiece: one Model per Content.Upgrades row with Part ~= "" in each vehicle of the wave, inside
 	     that Vehicle, valid Upgrade / integer Level, nothing interactive inside (T38). Warnings: authored state not
 	     "StartLevel only", invisible piece parts without UpgHidden, fixed grill / cooler / Lock / TRL-LIGHTS parts
@@ -287,7 +287,7 @@ local ROUTES_W2 = { -- thief (MAP-01 §9.2): never a queue slot, never a crosswa
 }
 local MAX_EDGE = 40
 local MAX_NODES = 80
--- MAP-01 §9.8 (2026-10-10, Provisório): spawn / despawn rules
+-- MAP-01 §9.8 (2026-10-10, Provisional): spawn / despawn rules
 local SPAWN_ROUTE_MAX = 130 -- studs spawn -> Q5 (10 s at 13 studs/s)
 local SIGHT_VIEWERS = { "PS-1", "PS-2", "PS-3", "PS-4", "Q1", "Q2", "Q3", "Q4", "Q5", "MKT-DOOR", "SS" } -- Pad, queue, Mart
 local SIGHT_EYE = 4.5 -- R6 eye over the floor point
@@ -1078,7 +1078,7 @@ local function checkMapAnchors()
 				warn_(("StreetBin %s has %d discard anchor(s) (expected 1)"):format(name(b), n))
 			end
 		end
-		info(("street bins: %d StreetBin (Q-166 b, Provisório: all AST-034_TrashCan)"):format(#bins))
+		info(("street bins: %d StreetBin (Q-166 b, Provisional: all AST-034_TrashCan)"):format(#bins))
 	end
 end
 
@@ -1164,7 +1164,7 @@ local function checkPivots(vehicles: { [string]: Instance })
 				local y = (m :: any):GetPivot().Position.Y
 				if spec.counter.absY then
 					if math.abs(y - spec.counter.absY) > COUNTER_TOL then
-						err(("7: %s pivot at y %.3f, need %.2f (DEC-157, Provisório until Q-153)"):format(id, y, spec.counter.absY))
+						err(("7: %s pivot at y %.3f, need %.2f (DEC-157, Provisional until Q-153)"):format(id, y, spec.counter.absY))
 					end
 				elseif math.abs((y - base) - spec.counter.relY) > COUNTER_TOL then
 					err(("7: %s pivot %.3f above the trailer pivot, need %.2f (floor +2, counter 3.5)"):format(id, y - base, spec.counter.relY))
@@ -2072,6 +2072,31 @@ local function checkGraph(root: Instance?)
 					warn_(("edge %s-%s blocked at knee/chest height by %s%s"):format(id, nb, fn, why))
 				end
 			end
+		end
+	end
+	-- every NpcNode (MapPoint nodes too) is a Walker waypoint: its body column must be free of solid parts (the player-only
+	-- Limits / Barriers pass through the NpcPass group at runtime, NpcService) and the floor under it must be at its Y.
+	-- Playtest 2026-10-11: N-Z02-09, EX-E and N-Z08-01 stood in BAR-E / BAR-S / the AST-047 fence: stuck + snapped each walk.
+	for id, n in nodes do
+		local params = OverlapParams.new()
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		params.FilterDescendantsInstances = exclude
+		local blocker: Instance? = nil
+		for _, part in Workspace:GetPartBoundsInRadius(n.p + Vector3.new(0, 3, 0), 1.2, params) do
+			local fn = part:GetFullName()
+			if part.CanCollide and not string.find(fn, "Limits") and not string.find(fn, "BAR%-") and not string.find(fn, "Barriers") then
+				blocker = part
+				break
+			end
+		end
+		if blocker then
+			err(("6: waypoint %s at %s is inside solid geometry (%s)"):format(id, tostring(n.p), (blocker :: Instance):GetFullName()))
+		end
+		local down = Workspace:Raycast(n.p + Vector3.new(0, 4, 0), Vector3.new(0, -8, 0), params)
+		if down == nil then
+			warn_(("waypoint %s at %s has no floor under it"):format(id, tostring(n.p)))
+		elseif math.abs(down.Position.Y - n.p.Y) > 0.35 then
+			warn_(("waypoint %s: floor top y %.2f but the node is at y %.2f"):format(id, down.Position.Y, n.p.Y))
 		end
 	end
 	for cw, ids in cwUse do

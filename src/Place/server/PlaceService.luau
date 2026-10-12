@@ -42,6 +42,19 @@ local function report(wave: number, problems: { string }): string
 end
 
 -- Problems that break the game, and rule 4 (anchor spacing: prompt comfort only, warned, never an error)
+-- Soft notes (optional items, fallbacks in use): one summary line; the details only in dev with Workspace attribute
+-- VerboseBinding = true. Hard problems and Seating's required parts stay warnings.
+local function soft(self: any, title: string, notes: { string })
+	if #notes == 0 then
+		return
+	end
+	if self.Dev and workspace:GetAttribute("VerboseBinding") == true then
+		print(`[PlaceService] {title} has {#notes} note(s):\n  {table.concat(notes, "\n  ")}`)
+	else
+		print(`[PlaceService] {title}: {#notes} note(s) (set Workspace attribute VerboseBinding in dev to list)`)
+	end
+end
+
 local function split(all: { string }): ({ string }, { string })
 	const hard: { string } = {}
 	const spacing: { string } = {}
@@ -64,21 +77,21 @@ function PlaceService:ValidateMap()
 	-- Mart v2 Gear Stand (TASK-135): soft, warnings only while TASK-138 builds the kiosk.
 	const notes = MapIndex.KioskNotes(MapIndex.Required.ForWave(wave))
 	if #notes > 0 then
-		warn(`[PlaceService] Gear Stand binding (Mart v2) has {#notes} note(s):\n  {table.concat(notes, "\n  ")}`)
+		soft(self, "Gear Stand binding (Mart v2)", notes)
 	end
-	-- Pad tables (TASK-144): soft, warnings only until TASK-149 binds them (SeatingService falls back).
+	-- Pad tables (TASK-144): soft, warnings only (SeatingService falls back); the optional anchors are no longer noted.
 	const seats = MapIndex.SeatingNotes(MapIndex.Required.ForWave(wave))
 	if #seats > 0 then
-		warn(`[PlaceService] Pad tables binding has {#seats} note(s):\n  {table.concat(seats, "\n  ")}`)
+		warn(`[PlaceService] Pad tables binding has {#seats} problem(s):\n  {table.concat(seats, "\n  ")}`)
 	end
 	-- the cutscene's NO HELP WANTED stop falls back to Rules.Sign.Fallback without a tagged sign: a note, not a problem
 	const signTag = Content.Cutscenes.Rules.Sign.Tag
 	if #CollectionService:GetTagged(signTag) == 0 then
-		warn(`[PlaceService] no instance tagged {signTag}: the intro stops at MapPoint {Content.Cutscenes.Rules.Sign.Fallback}`)
+		soft(self, "intro sign", { `no instance tagged {signTag}: the intro stops at MapPoint {Content.Cutscenes.Rules.Sign.Fallback}` })
 	end
 	const problems, spacing = split(MapIndex.Validate(MapIndex.Required.ForWave(wave)))
 	if #spacing > 0 then
-		warn(`[PlaceService] anchor spacing (rule 4) has {#spacing} note(s):\n  {table.concat(spacing, "\n  ")}`)
+		soft(self, "anchor spacing (rule 4)", spacing)
 	end
 	if #problems == 0 then
 		return

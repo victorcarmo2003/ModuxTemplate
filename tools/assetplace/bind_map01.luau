@@ -1,6 +1,6 @@
 --[[
 	MAP-01 binding, waves 1 + 2 + 3 (TASK-005, TASK-083, TASK-098, TASK-132). Edit-mode tool, same status as place_assets.luau:
-	NOT gameplay code. Status: Rascunho (level-designer, 2026-10-10).
+	NOT gameplay code. Status: Draft (level-designer, 2026-10-10).
 
 	Wave 3 (TASK-098, TASK-132; architecture.md §19.22, §8, §19.13-§19.17; MAP-01 §5.4-§5.6, §7.2, §9.3, §9.5, §10.3,
 	§11, §16.5):
@@ -28,7 +28,7 @@
 	      LineId; LookVector = travel direction of the lane that stops there), Boxes/X-T + CW-1..4 (volume, tag
 	      TrafficBox, BoxId). All invisible, no collision, no query (Provisional, TASK-097 note d).
 
-	2026-10-10 additions (level-designer, all Provisório; MAP-01 §9.8, §5.6, §16.8):
+	2026-10-10 additions (level-designer, all Provisional; MAP-01 §9.8, §5.6, §16.8):
 	  W6. Spawn / despawn points (MAP-01 §9.8): every point where an NPC appears or vanishes carries Spawn (comma list of
 	      roles: customer, thief, pedestrian, actor), Despawn (bool) and SpawnKind ("door" = a building door, rule a;
 	      "edge" = a street end beyond the player limits, out of sight of the Pad and the Mart, rule b); door points
@@ -38,8 +38,8 @@
 	  W7. Helpers locked: every invisible helper (MapBinding parts, created anchors / lamp holders / placeholders, the
 	      blockout Markers, Limits, hidden and ghost parts) gets Locked = true (no click-select in Studio) and CanTouch
 	      false; CanQuery false unless it still collides (player limits keep their collision).
-	  W8. AutoDoor (DoorController contract): the LEAF of the Mart door (MapId MKT-DOOR; placeholder glass Door_Leaf
-	      when the mesh has none), D1 and SP-B gets tag AutoDoor + DoorId, DoorLeaf, DoorHinge (Left/Right), DoorAngle
+	  W8. AutoDoor (DoorController contract): the LEAVES of the Mart door (MapId MKT-DOOR; real MeshParts Door_Leaf_L / Door_Leaf_R since the
+	      AST-028_MartWallDoor split, 2026-10-11; placeholder glass Door_Leaf only when a mesh has none), D1 and SP-B gets tag AutoDoor + DoorId, DoorLeaf, DoorHinge (Left/Right), DoorAngle
 	      (signed: opens inward), DoorRadius 8 and CanCollide false on the server (only the client animates).
 	  W9. (2026-10-10, ambience pass, user request) the stray default Workspace.SpawnLocation (Roblox template, star
 	      decal, 12 x 1 x 12 in the middle of the crossing / X-T) moves to ServerStorage.DevScenes. Players are placed
@@ -52,7 +52,7 @@
 	  Awning: ClosedAngle from the measured slant of the Awning (bbox diagonal + raycast profile), hanging 3 degrees
 	      outwards; a degenerate angle (< 5 degrees) falls back to the Shutter_Panel.
 
-	Mart v2 "Gear Stand" (TASK-138, 2026-10-11, Provisório; MAP-01 §18.3, §18.4, §18.8; architecture.md §18.4 Mart v2
+	Mart v2 "Gear Stand" (TASK-138, 2026-10-11, Provisional; MAP-01 §18.3, §18.4, §18.8; architecture.md §18.4 Mart v2
 table; Content.Mart):
   M1. Shelves: the 9 BUY-* anchors at the §18.3 MAP positions and heights (Coffee on island 2, no longer at the
       checkout). The table wins on every run (moved = "conv"); no blockout BUY-* is read.
@@ -100,7 +100,7 @@ Contract: docs/tech/architecture.md §18 (tags §18.1, attributes §18.2, anchor
 	     Zone_Center, DRAWER fittings. The empty sale shell (MapId TRL-SALE) is removed: the real trailer parks there.
 	  4. Map anchors (wave 1): OPEN sign, Mart shelves (MKT-SHELVES), Gear Stand (Mart v2 below; the GEAR WALL is gone).
 	     Wave 2: street bins AST-034_TrashCan
-	     -> tag StreetBin + Prompt_Discard (discard; T60, Q-166 b: all three, Provisório).
+	     -> tag StreetBin + Prompt_Discard (discard; T60, Q-166 b: all three, Provisional).
 	  5. Street lights (2026-10-10: Walker posts moved to the Ninth): NL-01..04 + P-01 -> one Model per post (pole +
 	     head) with tag StreetLight, PostId, Group = "juniper_posts", Order 1..5 in Hush order (NL-01 = 1 ... NL-04 = 4,
 	     P-01 = 5). A blockout SpotLight of the same id (P-01) is copied into LampHead/Light_Lamp and the blockout one is
@@ -112,7 +112,7 @@ Contract: docs/tech/architecture.md §18 (tags §18.1, attributes §18.2, anchor
 	     (only active with the trailer as current vehicle: LightGroups condition), never on the Pad <-> Mart route.
 	  8. Tarp (VehicleCover): authored hidden (Transparency 1, CanCollide/CanQuery false) with OrigTransparency /
 	     OrigCanCollide / OrigCanQuery = the visible values (same attribute names as place_assets.hide). The
-	     VehicleService shows it while the cart is at TRL-SALE (T38). Provisório until AST-043 is modelled.
+	     VehicleService shows it while the cart is at TRL-SALE (T38). Provisional until AST-043 is modelled.
 	  9. ModelStreamingMode = Persistent on every Model that is, or contains, a tagged instance (§18.0 item 6).
 	 10. Last: the trailer is pivoted to TRL-SALE (start of a run: cart on the Pad, trailer for sale, DEC-047).
 	     Every anchor is bound with the trailer on the Pad, so the fallbacks are in MAP-01 coordinates.
@@ -166,7 +166,7 @@ local BINDING_ROOT = "MapBinding"
 local CREATED = "BindCreated"
 local SRC_NAME = "SrcName"
 
-local COUNTER_Y = 3.45 -- cart counter top (DEC-157; Provisório until Q-153)
+local COUNTER_Y = 3.45 -- cart counter top (DEC-157; Provisional until Q-153)
 local TRAILER_COUNTER_DY = 5.5 -- trailer counter top over the trailer pivot: floor +2, counter 3.5 (MAP-01 §2, §7.2)
 
 -- Vehicle poses = model pivots (T36: VehicleService does vehicle:PivotTo(MapIndex.Point(id))). Same numbers as the
@@ -282,7 +282,7 @@ local POINTS = {
 	{ id = "SPEC-M", x = -48, y = 14, z = 40, faceTo = { -50, 13 } },
 	-- thief (MAP-01 §5.3, §9.2). L1 is 2 studs NE of the P-01 pole foot (20, 20), not inside the pole; L3 stands
 	-- in front of the Pad bench (58, 58). All face the drawer.
-	-- 2026-10-11 (debugger, playtest: NPCs stuck on the poles; Provisório): L1 (21.5, 22) -> (22.5, 22.2), so the edge
+	-- 2026-10-11 (debugger, playtest: NPCs stuck on the poles; Provisional): L1 (21.5, 22) -> (22.5, 22.2), so the edge
 	-- from N-Z02-02 keeps >= 2.5 from the P-01 foot; L2 (84, 22) stood 0.4 from the Post_L2 foot (84, 21.6) and inside
 	-- its collision box -> (84, 24.6), on the building side of the post.
 	{ id = "L1", x = 22.5, z = 22.2, floor = 0.4, faceTo = DRAWER_XZ, node = true },
@@ -347,7 +347,7 @@ local POINTS = {
 	{ id = "RL-1", x = -100, z = -22, floor = 0.4, face = EAST },
 	{ id = "RL-END", x = -76, z = -22, floor = 0.4, face = EAST },
 
-	-- spawn / despawn (MAP-01 §9.8, 2026-10-10, Provisório) ------------------------------------------------------
+	-- spawn / despawn (MAP-01 §9.8, 2026-10-10, Provisional) ------------------------------------------------------
 	-- doors (rule a): the NPC appears / vanishes on the threshold, 0.8 in front of the leaf (resolve = measured on the
 	-- placed door model when found; x / z = fallback). The AutoDoor leaf opens for it (W8, client).
 	{ id = "DR-APT", x = 32, z = -31, floor = 0.4, face = SOUTH, node = true, spawn = "customer,pedestrian", despawn = true, door = "DR-APT",
@@ -360,7 +360,7 @@ local POINTS = {
 }
 
 -- NpcNode-only parts (NodeId = N-<zone>-<nn>, §18.6). crosswalk = the two curb nodes of a crosswalk.
--- 2026-10-11 (debugger, playtest: NPCs stuck on the street-light poles; Provisório). The AST-036 pole's collision
+-- 2026-10-11 (debugger, playtest: NPCs stuck on the street-light poles; Provisional). The AST-036 pole's collision
 -- fills its whole bbox (foot -> arm tip, 4.7 studs, knee height included), so a lane under the arm is walled: every
 -- edge keeps its centre line out of those boxes and >= 2.5 studs from each pole foot (NPC radius 1 + pole + 1).
 -- Pole feet on the Ninth sidewalks stand at |Z| ~21 (south 21.5, north -20.9..-21.5), arms over the curb strip:
@@ -385,7 +385,9 @@ local NODES = {
 	-- ROUTE-EXIT-E: Q1 -> LANE-E (Z 26..27, east of the queue; 2+ studs from LANE-W) -> EX-E
 	{ id = "N-Z02-07", x = 55, z = 27, floor = 0.4 },
 	{ id = "N-Z02-08", x = 84, z = 27, floor = 0.4 },
-	{ id = "N-Z02-09", x = 112, z = 26, floor = 0.4 },
+	-- 2026-10-11 (debugger): was (112, 26) = inside the BAR-E wall (X 111.75..112.25). Now past it, on the alley mouth, in line
+	-- with EX-E (116.5, 40): the straight leg south keeps 3.3 from the B1 corner (X 113.2) and from FILL-E (X 120).
+	{ id = "N-Z02-09", x = 116.5, z = 29, floor = 0.4 },
 	-- ROUTE-EXIT-D1: Q1 -> east of the cart -> D1
 	{ id = "N-Z01-02", x = 58, z = 33, floor = 0.45 },
 	{ id = "N-Z01-03", x = 58, z = 47, floor = 0.45 },
@@ -509,7 +511,7 @@ local TOPPINGS = {
 	{ key = "cream_cheese", suf = "CreamCheese", x = 49, z = 38.5 },
 }
 
--- Mart shelf purchase points (Mart v2, MAP-01 §18.3, TASK-138; Provisório). MAP-01 coordinates; the WORLD point of
+-- Mart shelf purchase points (Mart v2, MAP-01 §18.3, TASK-138; Provisional). MAP-01 coordinates; the WORLD point of
 -- §18.3 is in the comment (WORLD = (-x, y, 67.887 - z)). h = anchor height above the Mart floor (0.4), 3.0 .. 4.5.
 -- >= 4 studs between anchors (§18.10). The table is the source: every run puts each BUY-* at its position.
 local SHELVES = {
@@ -598,7 +600,7 @@ local WINDOWS = {
 	{ id = "WV-2", n = 2, x = 38 },
 	{ id = "WV-3", n = 3, x = 45 },
 }
-local WINDOW_Y, WINDOW_Z = 26.3, -32.2 -- glass 24.6..28 (AST-045, Em revisão); facade at Z -32 (MAP-01)
+local WINDOW_Y, WINDOW_Z = 26.3, -32.2 -- glass 24.6..28 (AST-045, In review); facade at Z -32 (MAP-01)
 
 -- Traffic (MAP-01 §5.4, §9.5; architecture.md §8.1; Content.Traffic). Lanes: Ninth EB Z 5, WB Z -5; Juniper SB
 -- X -6, NB X 6. Turns are 2-3 corner nodes inside the X-T box. Path = Content.Traffic.Routes[].Path (= Key).
@@ -2083,7 +2085,7 @@ local function bindMart(assets: Instance, opts: AnchorOpts)
 	end
 end
 
--- Street bins (DEC-200, T60): every AST-034_TrashCan on the map. Q-166 b (how many): all, Provisório.
+-- Street bins (DEC-200, T60): every AST-034_TrashCan on the map. Q-166 b (how many): all, Provisional.
 local function bindStreetBins(assets: Instance, opts: AnchorOpts)
 	local n = 0
 	for _, d in assets:GetDescendants() do
@@ -2107,7 +2109,7 @@ local function bindStreetBins(assets: Instance, opts: AnchorOpts)
 			end, opts, label), "discard")
 		end
 	end
-	log(if n > 0 then "ok" else "warn", ("StreetBin: %d street bin(s) interactive (DEC-200; Q-166 b Provisório: all)"):format(n))
+	log(if n > 0 then "ok" else "warn", ("StreetBin: %d street bin(s) interactive (DEC-200; Q-166 b Provisional: all)"):format(n))
 end
 
 -- Copies the blockout SpotLight of a post into LampHead/Light_Lamp (pointing down) and disables the blockout one.
@@ -2377,7 +2379,7 @@ local function bindPoints(ctx: Ctx): Instance
 			CollectionService:AddTag(p, "NpcNode")
 			p:SetAttribute("Links", table.concat(links[pt.id] or {}, ","))
 		end
-		-- spawn / despawn contract (MAP-01 §9.8, Provisório)
+		-- spawn / despawn contract (MAP-01 §9.8, Provisional)
 		if pt.spawn or pt.despawn then
 			p:SetAttribute("Spawn", pt.spawn or "")
 			p:SetAttribute("Despawn", pt.despawn == true)
@@ -2867,9 +2869,9 @@ local function bindTraffic(root: Instance)
 	end
 end
 
--- W8: AutoDoor leaves (2026-10-10, Provisório; the client controller opens them by proximity, another agent).
+-- W8: AutoDoor leaves (2026-10-10, Provisional; the client controller opens them by proximity, another agent).
 -- Leaf = a visible BasePart of the door model whose name contains "door"/"leaf"/"glass"/"panel" (or DoorLeaf = true)
--- and not "frame" / "wall" / "jamb" / "header"; none in the Mart door -> placeholder glass Door_Leaf (contract of the
+-- and not "frame" / "wall" / "jamb" / "header"; none in a door -> placeholder glass Door_Leaf (D1/SP-B have a leaf; the Mart door has Door_Leaf_L/R; contract of the
 -- DoorController). Per leaf: tag AutoDoor, DoorId, DoorLeaf, DoorHinge, DoorAngle, DoorRadius (see below) and an
 -- informative Attachment Door_Hinge on the hinge edge (double door: each leaf its outer edge; a hand-made one is kept).
 -- CanCollide false on the server (DoorOrigCanCollide keeps the old value).
@@ -2894,6 +2896,23 @@ local function bindAutoDoors(assets: Instance)
 		if not model then
 			log("warn", ("AutoDoor %s: %s (%s) not placed"):format(spec.id, spec.mapId, spec.asset))
 			continue
+		end
+		-- AST-028_MartWallDoor was split (2026-10-11): Door_Frame + Door_Leaf_L + Door_Leaf_R MeshParts. With real leaves
+		-- the bind-created placeholder glass Door_Leaf must not exist (it would count as a third leaf).
+		local hasRealLeaf = false
+		for _, d in model:GetDescendants() do
+			if d:IsA("MeshPart") and isLeafName(d.Name) and not d:GetAttribute(CREATED) then
+				hasRealLeaf = true
+				break
+			end
+		end
+		if hasRealLeaf then
+			for _, d in model:GetDescendants() do
+				if d.Name == "Door_Leaf" and d:IsA("Part") and d:GetAttribute(CREATED) then
+					d:Destroy()
+					log("ok", ("AutoDoor %s: placeholder Door_Leaf removed (real leaves in the mesh)"):format(spec.id))
+				end
+			end
 		end
 		local leaves: { BasePart } = {}
 		local names: { string } = {}
@@ -2986,7 +3005,7 @@ local function bindAutoDoors(assets: Instance)
 				p:SetAttribute("DoorOrigCanCollide", p.CanCollide)
 			end
 			-- DoorController contract (commit of the frontend): tag on the LEAF (<= 10 wide, Anchored), DoorLeaf,
-			-- DoorHinge Left/Right (turns 90; Right = hinge on the leaf's +RightVector edge, Provisório), DoorAngle
+			-- DoorHinge Left/Right (turns 90; Right = hinge on the leaf's +RightVector edge, Provisional), DoorAngle
 			-- (signed so the leaf swings INTO the building), DoorRadius 8. Only the client animates: the leaf has
 			-- no collision on the server so NPCs walk through the doorway.
 			if w > 10 then

@@ -1,6 +1,6 @@
 --[[
 	MAP-01 upgrade pieces binding (TASK-085, closes bug B-02). Edit-mode tool, same status as bind_map01.luau: NOT
-	gameplay code. Status: Rascunho (level-designer, 2026-10-10).
+	gameplay code. Status: Draft (level-designer, 2026-10-10).
 
 	Contract: docs/tech/architecture.md §18.1 (tag UpgradePiece), §18.2 (Upgrade, Level), §18.4 "Peças de upgrade"
 	(T38: toggled by visibility, never reparented; no Interactable / slot Attachment inside a piece; anchors stay on the
@@ -43,14 +43,14 @@
 	               (see SHARED PROMPTS).
 	     After the moves, the closest anchor of another owner in the same vehicle is reported (check_map01 rule 4).
 
-	SHARED PROMPTS (Provisório, level-designer, TASK-085): only KitchenService filters slot Attachments by Level; the
+	SHARED PROMPTS (Provisional, level-designer, TASK-085): only KitchenService filters slot Attachments by Level; the
 	InteractionService / PromptController do not filter Interactable by Level, so one anchor per level would show three
 	prompts. Each cooler prompt goes to the X/Z of the level whose kit anchor is furthest out in front (L3 fridge, so it
 	is never inside the body), Y = the lowest level (2026-10-10, was the median), then each one is lifted on its own
 	until it is 0.3 above the counter top (the cart cooler sits low inside the cart body). If the code ever filters Interactable by
 	Level, switch to one anchor per level with Level (T38).
 
-	COUNTER (Provisório, level-designer, TASK-085; AST-078 replaces the trailer one, TASK-088): the kit counter is a
+	COUNTER (Provisional, level-designer, TASK-085; AST-078 replaces the trailer one, TASK-088): the kit counter is a
 	customer bar standing on the Pad, top 3.0 (cart) / 3.5 (trailer), front (stools, L3 return) = local -Z = north =
 	queue. Origin centred on Q1 (X 52) so the two L2 stools straddle the Q1 customer; cart row Z 34.5..35.5 (in front of
 	the station line Z 36..39), trailer row Z 33.9..34.9 (against the front wall Z 35). The L3 return (X 55..56, Z down
@@ -384,7 +384,7 @@ local function hidePiece(piece: Instance)
 	end
 end
 
--- GHOST (2026-10-10, user request, Provisório): upgrades whose kit piece is a stand-in without its own model stay
+-- GHOST (2026-10-10, user request, Provisional): upgrades whose kit piece is a stand-in without its own model stay
 -- INVISIBLE at every level. The pieces still exist (tag UpgradePiece, Upgrade / Level: UpgradeService and check_map01
 -- find them, the upgrade keeps working) but the "original" values UpgradeService restores when it shows a level are
 -- the hidden ones, so showing the bought level changes nothing on screen. Attribute NoVisual = true on the piece.
@@ -702,7 +702,7 @@ local function bindGroup(vehicle: Instance, g: Group, kit: Instance): number
 	if spec.pose then
 		local pad = spec.pose[g.vkey]
 		pose = ((vehicle :: any):GetPivot() :: CFrame) * padPose(g.vkey):Inverse() * pad
-		log("note", ("%s: no fixed counter; piece origin at Pad %s (MAP-01), front north (Provisório, TASK-085; AST-078 for the trailer)"):format(label, fmtV(M(pad.Position))))
+		log("note", ("%s: no fixed counter; piece origin at Pad %s (MAP-01), front north (Provisional, TASK-085; AST-078 for the trailer)"):format(label, fmtV(M(pad.Position))))
 	elseif spec.match then
 		local cands: { BasePart } = {}
 		for _, m in fixedModels do

@@ -38,6 +38,7 @@ local Content = require(ReplicatedStorage.shared.Content)
 local CrewRig = require(ReplicatedStorage.shared.Crew.CrewRig)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
 local Motion = require(ReplicatedStorage.shared.Traffic.Motion)
+local WalkGeo = require(ReplicatedStorage.shared.Pedestrian.WalkGeo)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 
 -- Fields of a Pedestrians record (network.md §13.7)
@@ -55,6 +56,7 @@ export type Record = {
 type Walk = {
 	Line: Motion.Path,
 	Loop: boolean,
+	Geo: WalkGeo.Geo, -- same geometry as the server (crossings, lane offsets)
 }
 
 type Walker = {
@@ -93,22 +95,12 @@ const SNAP_GAP = 10
 
 -- Polyline of a WalkPaths row (nil while a node is missing: not streamed in, or binding without it)
 local function buildWalk(row: Content.WalkPath): (Walk?, string?)
-	const points: { Vector3 } = {}
-	for _, id in row.Nodes do
-		const ok, info = pcall(MapIndex.Node, id)
-		if not ok then
-			return nil, id
-		end
-		table.insert(points, (info :: MapIndex.NodeInfo).Position)
+	-- shared with PedestrianService: the lane offsets on the crosswalks come from the same geometry
+	const geo, problem = WalkGeo.Build(row)
+	if geo == nil then
+		return nil, problem or row.Key
 	end
-	if row.Loop and #points > 0 then
-		table.insert(points, points[1])
-	end
-	const line = Motion.Path(points)
-	if line == nil then
-		return nil, row.Key
-	end
-	return { Line = line, Loop = row.Loop }, nil
+	return { Line = geo.Path, Loop = row.Loop, Geo = geo }, nil
 end
 
 -- Rig ------------------------------------------------------------------------------------------------------------
@@ -418,7 +410,7 @@ function PedestrianController:Step()
 			self:Hide(walker)
 			continue
 		end
-		const ground = Motion.PointAt(walk.Line, s)
+		const ground = WalkGeo.LanePointAt(walk.Geo, s, WalkGeo.LaneOfSlot(walker.Id))
 		const distance = (ground - eye).Magnitude
 		const limit = if walker.Shown then LOD_DISTANCE + LOD_MARGIN else LOD_DISTANCE
 		if distance > limit then

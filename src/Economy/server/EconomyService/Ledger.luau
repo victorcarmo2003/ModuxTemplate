@@ -6,7 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 
 export type Grade = "A" | "B" | "C" | "D"
-export type SaleResult = "Perfect" | "Complete" | "Incomplete" | "Wrong" | "Left" | "Refused"
+export type SaleResult = "Perfect" | "Complete" | "Incomplete" | "Wrong" | "Left" | "Refused" | "Slow"
 -- Where drawer money comes from: order price, tip, thief caught (+$5 "Nice catch!", FEAT-013: money, not a customer)
 export type DrawerKind = "Sale" | "Tip" | "Catch"
 

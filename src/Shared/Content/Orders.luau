@@ -4,7 +4,9 @@
 -- Formulas live in the services; this table only holds their parameters (rule §1.3.3):
 --   price    = BasePrice + sum(Ingredients[k].OrderPrice)                      (DEC-071)
 --   tip      = TipAmount if Complete within TipWindowBase + TipWindowPerK x K s (DEC-072)
---   patience = PatienceBase + PatiencePerK x K + Counter PatienceBonus s        (DEC-072, DEC-046)
+--   queue patience = QueuePatience x type mult + Counter PatienceBonus s, from Q1 until "Take Order" (Q-192, Provisional)
+--   order patience = OrderPatienceBase + OrderPatiencePerK x K (+ pair bonus) x type mult, from "Take Order" until the
+--                    hot dog is served (Q-192, Provisional; replaces the single 40 + 5K clock of DEC-072)
 --   incomplete pays floor(price x IncompletePct / 100), no tip                  (DEC-072)
 -- Ingredient weights are Ingredients[k].Weight (DEC-071); x NewIngredientBoost if unlocked today (FEAT-010).
 local Table = require(script.Parent.Table)
@@ -26,8 +28,10 @@ export type OrderRules = {
 	TipAmount: number,
 	TipWindowBase: number,
 	TipWindowPerK: number,
-	PatienceBase: number,
-	PatiencePerK: number,
+	QueuePatience: number, -- s at Q1 before "Take Order" (phase Queue)
+	OrderPatienceBase: number, -- s after "Take Order" (phase Order)
+	OrderPatiencePerK: number, -- + s per topping of the ticket (K1 + K2 on a pair)
+	WireSpanMax: number, -- patience span on the wire is an int 0..this (Net.Customers.PatienceSpan)
 	IncompletePct: number, -- floor
 	GradeThresholds: { A: number, B: number, C: number },
 	GradeBonusPct: { [Grade]: number },
@@ -50,8 +54,10 @@ const rules: OrderRules = {
 	TipAmount = 1, -- fixed $1 (DEC-072); class modifiers via Stat TipAmount (DEC-069)
 	TipWindowBase = 16, -- 16 + 4K s (DEC-072)
 	TipWindowPerK = 4,
-	PatienceBase = 40, -- 40 + 5K s (DEC-072)
-	PatiencePerK = 5,
+	QueuePatience = 45, -- Q-192 (Provisional): 45 s at the counter before being attended
+	OrderPatienceBase = 75, -- Q-192 (Provisional): 75 + 5K s (K 0..3 = 75..90; pair K1 + K2 up to 105 + bonus)
+	OrderPatiencePerK = 5,
+	WireSpanMax = 255,
 	IncompletePct = 50, -- floor(50%) (DEC-072)
 	GradeThresholds = { A = 0.90, B = 0.75, C = 0.50 }, -- satisfied share (DEC-051, FEAT-014)
 	GradeBonusPct = { A = 20, B = 10, C = 0, D = 0 }, -- boss bonus, % of the drawer, floored (DEC-051, FEAT-014)

@@ -18,7 +18,9 @@ export type Customer = {
 	State: State,
 	Slot: number, -- 0 = out of the queue; 1..5 = Q1..Q5 (target slot while walking up)
 	Order: { [string]: boolean }, -- Customers.Order bitfield; empty until "Take Order" (TASK-033)
-	PatienceEndsAt: number, -- 0 until "Take Order" (T41)
+	PatienceEndsAt: number, -- deadline of the running patience phase; 0 = no clock (Q-192)
+	Phase: Orders.Phase, -- Queue (Q1 until "Take Order"), Order ("Take Order" until served), None
+	PatienceSpan: number, -- whole seconds of the running phase (0 = none)
 	Mood: string, -- Content.Moods key
 	SpawnedAt: number, -- server time
 	JoinedAt: number, -- server time it reached the queue (0 = still arriving); patience base for TASK-033
@@ -45,6 +47,8 @@ export type Patch = {
 	State: State?,
 	Order: { [string]: boolean }?,
 	PatienceEndsAt: number?,
+	Phase: Orders.Phase?,
+	PatienceSpan: number?,
 	Mood: string?,
 }
 export type Wire = {
@@ -52,11 +56,13 @@ export type Wire = {
 	Slot: number,
 	Order: { [string]: boolean },
 	PatienceEndsAt: number,
+	Phase: Orders.Phase,
+	PatienceSpan: number,
 	Mood: string,
 	Order2: { [string]: boolean }?,
 	Leader: number?,
 }
-export type SaleResult = "Perfect" | "Complete" | "Incomplete" | "Wrong" | "Left" | "Refused"
+export type SaleResult = "Perfect" | "Complete" | "Incomplete" | "Wrong" | "Left" | "Refused" | "Slow"
 export type Variant = "blank" | "mirror" | "raincoat"
 export type CustomerActorSpec = {
 	Variant: Variant,

@@ -58,6 +58,7 @@ local Content = require(ReplicatedStorage.shared.Content)
 local CrewRig = require(ReplicatedStorage.shared.Crew.CrewRig)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local OrderBubble = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.OrderBubble)
+local PatienceBar = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.PatienceBar)
 local ReactionBubble = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.ReactionBubble)
 local Reactions = require(script.Reactions)
 
@@ -74,13 +75,18 @@ const BLANK = "blank" -- ANM-001: no icons in the bubble
 const BUBBLE_LIFT = 28
 const FRONT_SLOT = 1 -- Q1
 const DONE_TIME = 1.2 -- s a resolved row of a pair stays on the bubble (veil + check)
-const PAIR_BONUS = Content.Flow.Groups.PatienceBonus
+-- px a bubble takes over BUBBLE_LIFT (tail included), so the patience bar floats above it (OrderBubble: 1 row 68, 2 rows 110)
+const BUBBLE_ONE_ROW = 68
+const BUBBLE_TWO_ROWS = 110
+const BAR_GAP = 4
 
 export type Record = {
 	State: string,
 	Slot: number,
 	Order: { [string]: boolean },
-	PatienceEndsAt: number,
+	PatienceEndsAt: number, -- deadline of the running patience phase; 0 = none (Q-192)
+	Phase: string, -- "None" | "Queue" (Q1 until "Take Order") | "Order" ("Take Order" until served)
+	PatienceSpan: number, -- whole seconds of the running phase
 	Mood: string,
 	Order2: { [string]: boolean }?, -- pair leader: 2nd pending hot dog (network.md §14.2)
 	Leader: number?, -- pair partner: NpcId of its leader (no bubble)
@@ -98,6 +104,8 @@ type Entry = {
 	Model: Model?, -- rig the bubble and the face are on
 	Unmount: (() -> ())?,
 	Gui: Instance?,
+	BarUnmount: (() -> ())?, -- patience bar over the bubble (Q-192)
+	BarGui: Instance?,
 	Face: string?,
 	Variant: Vide.Source<string | false>, -- rig attribute Variant (TASK-110); false = ordinary customer
 	Done: Vide.Source<Done | false>, -- pair row just resolved (TASK-148)
@@ -186,6 +194,8 @@ function CustomerController:NewEntry(id: number): Entry
 		Model = nil,
 		Unmount = nil,
 		Gui = nil,
+		BarUnmount = nil,
+		BarGui = nil,
 		Face = nil,
 		Variant = Vide.source(false :: string | false) :: Vide.Source<string | false>,
 		Done = Vide.source(false :: Done | false) :: Vide.Source<Done | false>,
@@ -221,6 +231,8 @@ function CustomerController:WriteRecord(id: number, record: Record?)
 		Slot = record.Slot,
 		Order = table.clone(record.Order),
 		PatienceEndsAt = record.PatienceEndsAt,
+		Phase = record.Phase,
+		PatienceSpan = record.PatienceSpan,
 		Mood = record.Mood,
 		Order2 = if record.Order2 then table.clone(record.Order2) else nil,
 		Leader = record.Leader,
@@ -236,20 +248,13 @@ function CustomerController:WriteRecord(id: number, record: Record?)
 		self:MarkDone(entry, row, self:ToppingsOfOrder(if row == 2 then oldSecond else old.Order))
 	end
 	const now = workspace:GetServerTimeNow()
-	if copy.PatienceEndsAt <= 0 then
+	-- the server sends the length of the running phase (Q-192): nothing to derive here
+	if copy.PatienceEndsAt <= 0 or copy.Phase == "None" then
 		entry.EndsAt = 0
 		entry.Total = 0
-	elseif copy.PatienceEndsAt ~= entry.EndsAt then
+	else
 		entry.EndsAt = copy.PatienceEndsAt
-		local k = #self:ToppingsOf(copy)
-		local bonus = 0
-		const second = copy.Order2
-		if second ~= nil then
-			k += #self:ToppingsOfOrder(second)
-			bonus = PAIR_BONUS
-		end
-		const formula = ORDER_RULES.PatienceBase + ORDER_RULES.PatiencePerK * k + bonus
-		entry.Total = math.max(formula, copy.PatienceEndsAt - now)
+		entry.Total = math.max(copy.PatienceSpan, copy.PatienceEndsAt - now)
 	end
 	self.Now(now)
 	const source: Vide.Source<Record | false> = entry.Record
@@ -324,6 +329,16 @@ function CustomerController:Detach(entry: Entry)
 end
 
 function CustomerController:Unmount(entry: Entry)
+	const barUnmount = entry.BarUnmount
+	if barUnmount then
+		entry.BarUnmount = nil
+		barUnmount()
+	end
+	const barGui = entry.BarGui
+	if barGui then
+		entry.BarGui = nil
+		barGui:Destroy()
+	end
 	const unmount = entry.Unmount
 	if unmount then
 		entry.Unmount = nil
@@ -422,8 +437,9 @@ function CustomerController:Mount(entry: Entry, model: Model)
 				const _, _, done = self:RowsOf(entry)
 				return done
 			end,
+			-- the ring is gone: the PatienceBar above carries both clocks (Q-192)
 			Patience = function()
-				return self:PatienceOf(entry)
+				return -1
 			end,
 			WarnAt = WARN_AT,
 			Offset = Vector3.new(0, head.Size.Y / 2 + HEAD_GAP, 0),
@@ -435,6 +451,42 @@ function CustomerController:Mount(entry: Entry, model: Model)
 	billboard.Parent = gui
 	entry.Unmount = unmount
 	entry.Gui = billboard
+
+	-- Patience bar (Q-192): Queue clock while Ordering, Order clock while Waiting; floats over the bubble when there is one
+	const barUnmount, bar = Vide.root(function()
+		return PatienceBar({
+			Name = `PatienceBar_{entry.Id}`,
+			Adornee = head,
+			Visible = function()
+				const record = entry.Record()
+				return record ~= false
+					and record.Leader == nil
+					and record.Phase ~= "None"
+					and (record.State == "Ordering" or record.State == "Waiting")
+					and not entry.Reacting()
+			end,
+			Phase = function(): PatienceBar.Phase
+				const record = entry.Record()
+				return if record ~= false and record.Phase == "Order" then "Order" else "Queue"
+			end,
+			Fraction = function()
+				return math.max(self:PatienceOf(entry), 0)
+			end,
+			Lift = function()
+				const record = entry.Record()
+				if record ~= false and record.State == "Waiting" then
+					return BUBBLE_LIFT + BAR_GAP + (if record.Order2 ~= nil then BUBBLE_TWO_ROWS else BUBBLE_ONE_ROW)
+				end
+				return BUBBLE_LIFT
+			end,
+			WarnAt = WARN_AT,
+			Offset = Vector3.new(0, head.Size.Y / 2 + HEAD_GAP, 0),
+			MaxDistance = MAX_DISTANCE,
+		})
+	end)
+	bar.Parent = gui
+	entry.BarUnmount = barUnmount
+	entry.BarGui = bar
 	self.Mounted += 1
 end
 

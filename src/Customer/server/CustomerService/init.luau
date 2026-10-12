@@ -11,15 +11,17 @@
 --
 -- Life cycle: Arriving (spawn point -> Q5) -> Queued (walks up slot by slot as the queue moves) -> Ordering (reached
 -- Q1) -> Waiting (written by TASK-033 on "Take Order") -> Leaving (Q1 -> EX-E / D1) -> removed and despawned.
--- The customer at Q1 keeps the slot until it leaves (Ordering and Waiting). PatienceEndsAt stays 0 here: TASK-033
--- writes it together with Order and Waiting (T41, K hidden). Prompts stay disabled here (TASK-033 owns them).
+-- The customer at Q1 keeps the slot until it leaves (Ordering and Waiting). PatienceEndsAt stays 0 until Q1 (Q-192):
+-- OnFronted starts the Queue clock, "Take Order" swaps it for the Order clock. Prompts stay disabled here (TASK-033).
 -- Shift end: Summary sends every customer still around away; a new shift (and a snapshot restore) starts empty
 -- (data.md: customers are not in the snapshot). Closing ends as soon as nobody is at or walking to the counter
 -- (RoundService:SetCounterProbe).
 --
 -- Orders (TASK-033; FEAT-010, FEAT-011; DEC-071, DEC-072; Orders.luau, OrderRoll.luau): the order is drawn when the
--- customer reaches the queue (K hidden, server-only Ticket) and patience runs from there. "Take Order" (Q1, Ordering)
--- writes Order + PatienceEndsAt + Waiting in one set write (T41), opens the tip window of the taker and turns the
+-- customer reaches the queue (K hidden, server-only Ticket). Patience has two clocks (Q-192, Provisional): Queue (from
+-- Q1 until "Take Order"; out = "Left", never attended) and Order (from "Take Order" until served; out = "Slow", the
+-- food took too long). "Take Order" (Q1, Ordering) writes Order + Phase + PatienceEndsAt + PatienceSpan + Waiting in
+-- one set write (T41), opens the tip window of the taker and turns the
 -- customer prompt into "Serve". "Serve" checks the held hot dog against the order and pays into the drawer; "Refuse"
 -- and patience running out send the customer away with $0. Every outcome: EconomyService:CountResult + Sale packet.
 -- Mood (PROVISIONAL, Q-164): visual only — Annoyed at MoodRules.AnnoyedAt, Happy on Complete/Perfect, Complaining on
@@ -45,7 +47,7 @@
 -- Pairs (TASK-146; FEAT-038; Content.Flow.Groups; Group.luau; Q-182 A): an attempt may bring a leader + partner. Both
 -- are records of the Customers set (they count 2 in every cap and 2 on the grade) but only the leader is in the
 -- queue (1 slot), has prompts and orders: one ticket with 2 lines (leader's and partner's hot dog, K drawn apart),
--- patience 40 + 5(K1+K2) + Counter + Groups.PatienceBonus, tip window by K1+K2. "Serve" answers one line at a time
+-- Order clock by K1+K2 + Counter + Groups.PatienceBonus, tip window by K1+K2. "Serve" answers one line at a time
 -- (Orders.Match), pays per line and settles per line (Sale.Npc = the line's owner); the pair leaves when no line is
 -- pending. The partner never pathfinds: StepPairs moves it towards Group.Spot of the leader at TICK_RATE (Leader on
 -- the wire, State Arriving / Queued / Leaving only, no balloon). No room for 2 = a lone customer ("spawned").
@@ -88,7 +90,9 @@ export type Customer = {
 	State: State,
 	Slot: number, -- 0 = out of the queue; 1..5 = Q1..Q5 (target slot while walking up)
 	Order: { [string]: boolean }, -- Customers.Order bitfield; empty until "Take Order" (TASK-033)
-	PatienceEndsAt: number, -- 0 until "Take Order" (T41)
+	PatienceEndsAt: number, -- deadline of the running patience phase; 0 = no clock (Q-192)
+	Phase: Orders.Phase, -- Queue (Q1 until "Take Order"), Order ("Take Order" until served), None
+	PatienceSpan: number, -- whole seconds of the running phase (0 = none)
 	Mood: string, -- Content.Moods key
 	SpawnedAt: number, -- server time
 	JoinedAt: number, -- server time it reached the queue (0 = still arriving); patience base for TASK-033
@@ -127,6 +131,8 @@ export type Patch = {
 	State: State?,
 	Order: { [string]: boolean }?,
 	PatienceEndsAt: number?,
+	Phase: Orders.Phase?,
+	PatienceSpan: number?,
 	Mood: string?,
 }
 
@@ -136,13 +142,15 @@ export type Wire = {
 	Slot: number,
 	Order: { [string]: boolean },
 	PatienceEndsAt: number,
+	Phase: Orders.Phase,
+	PatienceSpan: number,
 	Mood: string,
 	Order2: { [string]: boolean }?,
 	Leader: number?,
 }
 
 -- Sale.Result (network.md §4.3) = EconomyService SaleResult
-export type SaleResult = "Perfect" | "Complete" | "Incomplete" | "Wrong" | "Left" | "Refused"
+export type SaleResult = "Perfect" | "Complete" | "Incomplete" | "Wrong" | "Left" | "Refused" | "Slow"
 
 -- Customer-anomaly variant (= NpcService.Variant; rig attribute "Variant", read by the client)
 export type Variant = "blank" | "mirror" | "raincoat"
@@ -271,7 +279,7 @@ function CustomerService:Setup()
 	self.Left = self.Libs.Signal.new() :: SignalLib.Signal<number, LeaveReason>
 	self.Removed = self.Libs.Signal.new() :: SignalLib.Signal<number>
 	-- Acted(id, action, player, result): a customer action finished (TASK-053). take_order: result nil;
-	-- serve: the SaleResult (Wrong included); refuse: "Refused"; give_up: player nil, "Left".
+	-- serve: the SaleResult (Wrong included); refuse: "Refused"; give_up: player nil, "Left" (Queue clock) or "Slow" (Order clock, Q-192).
 	self.Acted = self.Libs.Signal.new() :: SignalLib.Signal<number, ActedAction, Player?, SaleResult?>
 	-- Last time each notice went to each player (FEAT-005 anti-spam)
 	self.NoticeAt = {} :: { [Player]: { [string]: number } }
@@ -463,6 +471,8 @@ function CustomerService:Record(customer: Customer): Wire
 		Slot = customer.Slot,
 		Order = customer.Order,
 		PatienceEndsAt = customer.PatienceEndsAt,
+		Phase = customer.Phase,
+		PatienceSpan = customer.PatienceSpan,
 		Mood = customer.Mood,
 		Order2 = customer.Order2,
 		Leader = customer.Leader,
@@ -652,6 +662,8 @@ function CustomerService:Create(id: number, variant: Variant?, leader: number?, 
 		Slot = 0,
 		Order = {},
 		PatienceEndsAt = 0,
+		Phase = "None",
+		PatienceSpan = 0,
 		Mood = NEUTRAL,
 		SpawnedAt = now(),
 		JoinedAt = 0,
@@ -993,6 +1005,11 @@ function CustomerService:Update(id: number, patch: Patch): boolean
 		warn("[CustomerService] Update: PatienceEndsAt must be a finite number >= 0")
 		return false
 	end
+	const span = patch.PatienceSpan
+	if span ~= nil and (span ~= span or span < 0 or span > Content.OrderRules.WireSpanMax) then
+		warn("[CustomerService] Update: PatienceSpan must be 0..WireSpanMax")
+		return false
+	end
 	if patch.Order ~= nil then
 		for key in patch.Order do
 			if not table.find(Content.Ingredients.ToppingKeys, key) then
@@ -1007,6 +1024,12 @@ function CustomerService:Update(id: number, patch: Patch): boolean
 	end
 	if ends ~= nil then
 		customer.PatienceEndsAt = ends
+	end
+	if patch.Phase ~= nil then
+		customer.Phase = patch.Phase
+	end
+	if span ~= nil then
+		customer.PatienceSpan = math.floor(span)
 	end
 	if patch.Mood ~= nil then
 		customer.Mood = patch.Mood
@@ -1037,22 +1060,24 @@ function CustomerService:OpenTicket(id: number)
 	end
 	if customer.Tutorial then
 		-- fixed order, patience that never runs out (no draw: the seeded order stream stays the same)
-		const ticket = Orders.Ticket({ table.clone(TutorialRules.Order) }, now(), 0)
+		const ticket = Orders.Ticket({ table.clone(TutorialRules.Order) }, now(), 0, 0, nil)
 		ticket.PatienceEndsAt = math.huge
 		self.Tickets[id] = ticket
 		return
 	end
 	const round = self.Dependencies.RoundService
 	const lines = { Orders.Roll(round:GetDay(), npc.CustomerType, self.OrderRng, round:IsNight()) }
-	local bonus = self.Dependencies.UpgradeService:GetEffect("PatienceBonus")
-	-- Pair (FEAT-038): the partner's hot dog is drawn apart with its own type; patience by K1 + K2 + PatienceBonus
+	const bonus = self.Dependencies.UpgradeService:GetEffect("PatienceBonus")
+	local pairBonus = 0
+	-- Pair (FEAT-038): the partner's hot dog is drawn apart with its own type; Order clock by K1 + K2 + pair bonus
 	const partner = if customer.Partner then self.Dependencies.NpcService:Get(customer.Partner) else nil
 	if partner ~= nil then
 		table.insert(lines, Orders.Roll(round:GetDay(), partner.CustomerType, self.OrderRng, round:IsNight()))
-		bonus += Content.Flow.Groups.PatienceBonus
+		pairBonus = Content.Flow.Groups.PatienceBonus
 	end
 	const arrivedAt = if customer.JoinedAt > 0 then customer.JoinedAt else now()
-	self.Tickets[id] = Orders.Ticket(lines, arrivedAt, bonus)
+	const typeRow = Content.CustomerTypes.ByKey[npc.CustomerType]
+	self.Tickets[id] = Orders.Ticket(lines, arrivedAt, bonus, pairBonus, if typeRow then typeRow.PatienceMult else nil)
 end
 
 -- NpcId that owns line `index` of a leader's ticket: line 2 = the partner (while alive), else the leader.
@@ -1070,8 +1095,19 @@ function CustomerService:ShowPending(customer: Customer, ticket: Orders.Ticket)
 	customer.Order2 = if pending[2] then Orders.Set(ticket.Lines[pending[2]].Toppings) else nil
 end
 
--- Reached Q1: "Take Order" and "Refuse" come on (the client still hides them by state, network.md §3.6).
+-- Reached Q1: "Take Order" and "Refuse" come on (the client still hides them by state, network.md §3.6). The Queue
+-- patience clock starts here (Q-192); the tutorial customer has no clock.
 function CustomerService:OnFronted(id: number)
+	const queued = self.Customers[id]
+	const queuedTicket = self.Tickets[id]
+	if queued ~= nil and queuedTicket ~= nil and not queued.Tutorial then
+		Orders.BeginQueue(queuedTicket, now())
+		self:Update(id, {
+			PatienceEndsAt = queuedTicket.PatienceEndsAt,
+			Phase = "Queue",
+			PatienceSpan = Orders.WireSpan(queuedTicket),
+		})
+	end
 	const customerAnchor = self.Dependencies.NpcService:Anchors(id)
 	if customerAnchor ~= nil then
 		customerAnchor:SetAttribute("PromptAction", TAKE_ORDER)
@@ -1174,6 +1210,10 @@ function CustomerService:TakeOrder(player: Player, anchor: Instance)
 	ticket.TakenAt = at
 	ticket.TipEndsAt = at + Orders.TipWindow(ticket.K, class:GetModifier(player, "TipWindow"))
 	ticket.TipAmount = class:GetModifier(player, "TipAmount")
+	-- the Queue clock ends, the Order clock starts (Q-192); the tutorial customer keeps no clock
+	if not customer.Tutorial then
+		Orders.BeginOrder(ticket, at)
+	end
 	const second = ticket.Lines[2]
 	customer.Order2 = if second then Orders.Set(second.Toppings) else nil
 	const written = self:Update(id, {
@@ -1181,6 +1221,9 @@ function CustomerService:TakeOrder(player: Player, anchor: Instance)
 		Order = Orders.Set(ticket.Lines[1].Toppings),
 		-- the tutorial customer has no time limit: no ring on the wire
 		PatienceEndsAt = if customer.Tutorial then 0 else ticket.PatienceEndsAt,
+		Phase = if customer.Tutorial then "None" else "Order",
+		PatienceSpan = if customer.Tutorial then 0 else Orders.WireSpan(ticket),
+		Mood = if customer.Tutorial then nil else NEUTRAL, -- the queue's annoyance does not carry over
 	})
 	if not written then
 		return
@@ -1316,15 +1359,17 @@ function CustomerService:Refuse(player: Player, anchor: Instance)
 	self:Leave(id, COMPLAINING)
 end
 
--- Patience ran out (FEAT-011 "Desistiu"): $0, unsatisfied; every pending line of a pair gave up.
+-- Patience ran out (FEAT-011 "Desistiu"): $0, unsatisfied; every pending line of a pair gave up. Two kinds (Q-192):
+-- the Queue clock = "Left" (never attended); the Order clock = "Slow" (the food took too long).
 function CustomerService:GiveUp(id: number)
 	const ticket = self.Tickets[id]
 	const customer = self.Customers[id]
 	if ticket == nil or customer == nil then
 		return
 	end
-	self:SettlePending(customer, ticket, "Left")
-	self.Acted:Fire(id, GIVE_UP, nil, "Left")
+	const result: SaleResult = if ticket.Phase == "Order" then "Slow" else "Left"
+	self:SettlePending(customer, ticket, result)
+	self.Acted:Fire(id, GIVE_UP, nil, result)
 	self:Leave(id, COMPLAINING)
 end
 
@@ -1340,6 +1385,9 @@ function CustomerService:StepOrders(t: number)
 		const customer = self.Customers[id]
 		if ticket == nil or customer == nil or customer.State == "Leaving" or customer.Tutorial then
 			continue
+		end
+		if ticket.Phase == "None" then
+			continue -- behind Q1: no clock yet (Q-192)
 		end
 		if t >= ticket.PatienceEndsAt then
 			self:GiveUp(id)

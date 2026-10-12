@@ -596,8 +596,8 @@ Pesos base: Ketchup 10, Mustard 10, Cheese 7, Bacon 6, Potato Sticks 6, Cream Ch
 
 | Etapa | Regra |
 |---|---|
-| Chegada | cliente ocupa vaga livre do balcão; **paciência** começa: 40 + 5 × K s (+10/+20 s com Counter 2/3) **[DEC-072]**. K é sorteado na chegada (oculto) para a paciência ser conhecida |
-| Take Order | toque no cliente; balão aparece; começa a **janela de gorjeta**: 16 + 4 × K s (Hawker −4 s) **[DEC-072]** |
+| Chegada | cliente ocupa vaga livre do balcão. Ao chegar em Q1 começa a **paciência de fila**: 45 s (+10/+20 s com Counter 2/3), barra azul → amarela com ícone de relógio **[Q-192, Provisório; substitui a paciência única 40 + 5K da DEC-072]**. K é sorteado na chegada (oculto) |
+| Take Order | toque no cliente; balão aparece; a paciência de fila termina e começa a **paciência de preparo**: 75 + 5 × K s (+ Counter), barra verde → vermelha com ícone de pão (a barra troca com animação); começa a **janela de gorjeta**: 16 + 4 × K s (Hawker −4 s) **[DEC-072; preparo: Q-192, Provisório]** |
 | Serve | toque com Hot Dog na mão; validação no servidor |
 | Recusar | hold 1 s "Refuse"; cliente vai embora; $0; conta como insatisfeito, salvo cliente-anomalia com verbo "recusar" (FEAT-023) **[DEC-051]** |
 
@@ -608,7 +608,8 @@ Validação **[DEC-072]**:
 | Completo | pão + salsicha + exatamente os complementos | $4 + Σ complementos | +$1 na janela (Hawker $2; Shift Lead $0) | satisfeito |
 | Incompleto | falta ≥ 1 pedido, nada a mais | floor(50%) | — | insatisfeito |
 | Errado | complemento não pedido | $0; Hot Dog volta para a mão de quem serviu | — | insatisfeito |
-| Desistiu | paciência zerou | $0 | — | insatisfeito |
+| Desistiu (fila) | paciência de fila zerou, ninguém atendeu (`Left`) | $0 | — | insatisfeito |
+| Desistiu (preparo) | paciência de preparo zerou, a comida demorou (`Slow`; reação de reclamação própria) | $0 | — | insatisfeito **[Q-192, Provisório]** |
 
 | Regra | Valor |
 |---|---|
@@ -1725,7 +1726,7 @@ Dados (proposta para o architect, TASK-144):
 | Andar | líder com pathfinding; parceiro **segue** o líder (alvo = posição do líder + deslocamento de 2 studs), sem pathfinding próprio (custo de IA ~1 NPC) |
 | Fila | **1 vaga**; o líder no ponto Q, o parceiro **1,8 stud ao lado** (o level-designer confere que não invade a vaga vizinha, 5 studs entre vagas) |
 | Pedido | um "Take Order" anota os dois; K de cada hot dog sorteado à parte (fase + `KShift` do tipo de cada um); balão com **2 linhas** (uma por hot dog) |
-| Paciência | 40 + 5 × (K1 + K2) + Counter + **10 s** (`PatienceBonus`) **[fórmula da DEC-072 com K = soma]** |
+| Paciência | fila 45 s + Counter (só o líder em Q1); preparo 75 + 5 × (K1 + K2) + Counter + **10 s** (`PatienceBonus`) **[Q-192, Provisório; K = soma]** |
 | Janela de gorjeta | 16 + 4 × (K1 + K2) s; **$1 por hot dog Completo** dentro da janela (Hawker $2 por hot dog; Shift Lead $0) |
 | Serve | cada Hot Dog é entregue sozinho; o servidor casa com o item pendente: **igual** → Completo; **subconjunto** → Incompleto do item com menos faltas; tem complemento que nenhum item pendente pede → **Errado** (volta para a mão) |
 | Pagamento | por hot dog, na hora, na gaveta (DEC-050) |

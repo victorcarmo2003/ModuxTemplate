@@ -1,6 +1,6 @@
 --[[
 	LOBBY "Bramble's Corner Dogs HQ" - placement table of the real assets.
-	DATA ONLY. Status: Rascunho / Provisório (level-designer, 2026-10-11). Not gameplay code.
+	DATA ONLY. Status: Draft / Provisional (level-designer, 2026-10-11). Not gameplay code.
 	Layout, points, lights and procedural pieces: docs/levels/LOBBY.md (source of truth for the numbers).
 
 	==============================================================================================

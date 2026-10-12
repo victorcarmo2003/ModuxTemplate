@@ -13,7 +13,7 @@
 	  Dark          predicted "in the dark" (see below)
 	  Vignette, Blackout  what the screen layer shows (0..1)
 
-	Screen layer (AST-084, Rascunho; only on this client, DEC-038; no red, no shake):
+	Screen layer (AST-084, Draft; only on this client, DEC-038; no red, no shake):
 	  dark           vignette 0.25, Saturation -0.10
 	  band Mid       vignette 0.20
 	  band Night     vignette 0.35, Saturation -0.15, colder Tint
@@ -61,7 +61,7 @@ export type Member = {
 	Class: string,
 }
 
--- Screen values from AST-084 (Rascunho, art-director). Art numbers, not game rules: no Content table for them.
+-- Screen values from AST-084 (Draft, art-director). Art numbers, not game rules: no Content table for them.
 const LOOK = table.freeze({
 	Dark = table.freeze({ Vignette = 0.25, Saturation = -0.10 }),
 	Mid = table.freeze({ Vignette = 0.20, Saturation = 0 }),

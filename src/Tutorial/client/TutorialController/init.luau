@@ -243,6 +243,8 @@ function TutorialController:Setup()
 		self.Dependencies.BossController:Say(text)
 	end, function(): number
 		return self:VoiceVolume()
+	end, function(message: string)
+		self:Trace(`call: {message}`)
 	end) :: Call.Call
 	self.Sent = false :: boolean
 	-- shopping steps after the first sale (the buns ran out); InMart = the player reached the Mart once
@@ -319,6 +321,33 @@ local function positionOf(instance: Instance): Vector3?
 	end
 	return nil
 end
+
+-- Glass is never what a step marks (a Highlight on a pane reads as "the window"): glass material, see-through or named
+-- like a pane
+const GLASS_TRANSPARENCY = 0.3
+local function isGlass(part: BasePart): boolean
+	if part.Material == Enum.Material.Glass or part.Transparency > GLASS_TRANSPARENCY then
+		return true
+	end
+	const name = string.lower(part.Name)
+	return string.find(name, "glass", 1, true) ~= nil
+		or string.find(name, "pane", 1, true) ~= nil
+		or string.find(name, "window", 1, true) ~= nil
+		or string.find(name, "vitrine", 1, true) ~= nil
+end
+
+-- Whether a model has glass in it (a Highlight on the model would light the panes too)
+local function hasGlass(model: Instance): boolean
+	for _, descendant in model:GetDescendants() do
+		if descendant:IsA("BasePart") and isGlass(descendant) and descendant.Transparency < 1 then
+			return true
+		end
+	end
+	return false
+end
+
+-- Door parts MartDoor resolved: highlightOf marks exactly the part (never the wall model around it)
+const doorPieces: { [Instance]: true } = setmetatable({}, { __mode = "k" }) :: any
 
 local function ancestorWith(instance: Instance, test: (Instance) -> boolean): Instance?
 	local current = instance.Parent
@@ -477,18 +506,59 @@ function TutorialController:MartDoor(): Instance?
 	if point == nil then
 		return nil
 	end
-	local best: Instance = point
-	local bestDistance = DOOR_SEARCH
+	-- the nearest AutoDoor leaf that is not glass; else the nearest leaf of any kind (its model holds the solid door)
+	local solid: BasePart? = nil
+	local solidDistance = DOOR_SEARCH
+	local anyLeaf: BasePart? = nil
+	local anyDistance = DOOR_SEARCH
 	for _, door in CollectionService:GetTagged(DOOR_TAG) do
-		const position = if door:IsDescendantOf(Workspace) then positionOf(door) else nil
-		if position ~= nil then
-			const distance = (position - point.Position).Magnitude
-			if distance < bestDistance then
-				best, bestDistance = door, distance
-			end
+		if not door:IsA("BasePart") or not door:IsDescendantOf(Workspace) then
+			continue
+		end
+		const distance = (door.Position - point.Position).Magnitude
+		if distance < anyDistance then
+			anyLeaf, anyDistance = door, distance
+		end
+		if distance < solidDistance and not isGlass(door) then
+			solid, solidDistance = door, distance
 		end
 	end
-	return best
+	if solid ~= nil then
+		doorPieces[solid] = true
+		return solid
+	end
+	-- only glass leaves: the door itself is a solid part of the same model (a leaf named door/leaf, not frame/wall)
+	const model = if anyLeaf then anyLeaf:FindFirstAncestorOfClass("Model") else nil
+	if model ~= nil then
+		local best: BasePart? = nil
+		local bestDistance = math.huge
+		for _, descendant in model:GetDescendants() do
+			if not descendant:IsA("BasePart") or isGlass(descendant) or descendant.Transparency >= INVISIBLE then
+				continue
+			end
+			const name = string.lower(descendant.Name)
+			if
+				(string.find(name, "door", 1, true) == nil and string.find(name, "leaf", 1, true) == nil)
+				or string.find(name, "frame", 1, true) ~= nil
+				or string.find(name, "wall", 1, true) ~= nil
+				or string.find(name, "jamb", 1, true) ~= nil
+				or string.find(name, "header", 1, true) ~= nil
+				or string.find(name, "sign", 1, true) ~= nil
+			then
+				continue
+			end
+			const distance = (descendant.Position - point.Position).Magnitude
+			if distance < bestDistance then
+				best, bestDistance = descendant, distance
+			end
+		end
+		if best ~= nil then
+			doorPieces[best] = true
+			return best
+		end
+	end
+	-- no solid door piece: the invisible MKT-DOOR point (highlightOf looks for a solid piece next to it, never glass)
+	return point
 end
 
 -- The "restock" anchor of the bun crate on the vehicle in use
@@ -558,6 +628,9 @@ end
 function TutorialController:UpdateCall()
 	const voiced = self:Voiced()
 	if voiced ~= self.Holding then
+		self:Trace(
+			`voiced {tostring(voiced)} (answered {tostring(self.Answered)}, call {self:CallState()}, greeted {tostring(self.Greeted)})`
+		)
 		self.Holding = voiced
 		if not voiced then
 			self.Call.Cut() -- hides the strip while still held
@@ -571,7 +644,11 @@ end
 
 -- Walt's lines for a step change: the greeting first, the praise of a step left forward, then the new step
 function TutorialController:SpeakStep(before: Steps.Step?, after: Steps.Step?)
-	if after == nil or not self:Voiced() then
+	if after == nil then
+		return
+	end
+	if not self:Voiced() then
+		self:Trace(`step {after.Key}: Walt not on the line, no lines (answered {tostring(self.Answered)}, call {self:CallState()})`)
 		return
 	end
 	const lines: { string } = {}
@@ -587,7 +664,9 @@ function TutorialController:SpeakStep(before: Steps.Step?, after: Steps.Step?)
 		table.insert(lines, text)
 	end
 	if #lines > 0 then
-		self.Call.Replace(lines)
+		-- queued behind what Walt has yet to say (a step change never drops the greeting nor cuts a line)
+		self:Trace(`step {after.Key}: {#lines} line(s) queued`)
+		self.Call.Queue(lines)
 	end
 end
 
@@ -598,6 +677,7 @@ function TutorialController:DecidePhone(): (string?, Instance?)
 	end
 	const state = self:CallState()
 	if state == "talking" then
+		self:Trace("answered: the tutorial call is talking")
 		self.Answered = true
 		return nil, nil
 	end
@@ -769,7 +849,7 @@ local function visibleNear(host: BasePart): BasePart?
 	local best: BasePart? = nil
 	local bestDistance = math.huge
 	for _, found in Workspace:GetPartBoundsInRadius(host.Position, NEARBY, params) do
-		if found.Transparency >= INVISIBLE or extent(found) > HIGHLIGHT_MAX then
+		if found.Transparency >= INVISIBLE or extent(found) > HIGHLIGHT_MAX or isGlass(found) then
 			continue
 		end
 		-- never a character (a player or an NPC walking by)
@@ -807,7 +887,11 @@ local function highlightOf(anchor: Instance): Instance?
 	const station = ancestorWith(anchor, function(instance)
 		return CollectionService:HasTag(instance, STATION_TAG)
 	end)
-	if station and station:IsA("Model") and extent(station) <= HIGHLIGHT_MAX then
+	-- the Mart door: exactly its solid part (the wall model around it has the windows)
+	if doorPieces[anchor] and anchor:IsA("BasePart") and not isGlass(anchor) then
+		return anchor
+	end
+	if station and station:IsA("Model") and extent(station) <= HIGHLIGHT_MAX and not hasGlass(station) then
 		return station
 	end
 	const parent = anchor.Parent
@@ -821,12 +905,21 @@ local function highlightOf(anchor: Instance): Instance?
 			return instance:IsA("Model")
 		end)
 		-- never the whole cart / trailer (a vehicle model can be that small)
-		if model and not CollectionService:HasTag(model, VEHICLE_TAG) and extent(model) <= MODEL_MAX then
+		if
+			model
+			and not CollectionService:HasTag(model, VEHICLE_TAG)
+			and extent(model) <= MODEL_MAX
+			and not hasGlass(model)
+		then
 			return model
 		end
 	end
 	if host then
-		return if host.Transparency < INVISIBLE then host else visibleNear(host) or host
+		if host.Transparency < INVISIBLE and not isGlass(host) then
+			return host
+		end
+		-- never glass: a solid piece next to it, else the (invisible) anchor part itself
+		return visibleNear(host) or (if isGlass(host) and host.Transparency < INVISIBLE then nil else host)
 	end
 	-- a plain model target (the Mart door)
 	return station or (if anchor:IsA("Model") then anchor else nil)
@@ -1236,6 +1329,13 @@ end
 
 function TutorialController:IsDev(): boolean
 	return self.Dependencies.PlaceController:IsDev()
+end
+
+-- One diagnostic line per transition of the call (dev mode only)
+function TutorialController:Trace(message: string)
+	if self:IsDev() then
+		print(`{DEV_PREFIX} {message}`)
+	end
 end
 
 -- Dev mode: a profile that already finished the tutorial says so once (the tutorial never runs for it)

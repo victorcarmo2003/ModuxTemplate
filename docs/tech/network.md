@@ -276,7 +276,9 @@ Customers = Lync.replicate(Lync.struct({
 	State = Lync.enum({ "Arriving", "Queued", "Ordering", "Waiting", "Leaving" }),
 	Slot = Lync.int(0, 8),                               -- 0 = fora da fila; 1..5 = Q1..Q5 (Counter 3/4/5)
 	Order = Lync.bitfield(Content.Ingredients.ToppingKeys), -- vazio até "Take Order"; nunca o K antes disso (FEAT-011)
-	PatienceEndsAt = Lync.f64(),                         -- 0 até "Take Order"; depois 40 + 5K (+ Counter) desde a chegada ao balcão (DEC-072)
+	PatienceEndsAt = Lync.f64(),                         -- prazo da fase de paciência em curso (hora do servidor); 0 = sem relógio (Q-192)
+	Phase = Lync.enum({ "None", "Queue", "Order" }),     -- Q-192 (Provisório): Queue = Q1 até "Take Order"; Order = "Take Order" até servir; None = sem relógio
+	PatienceSpan = Lync.int(0, 255),                     -- Q-192: duração da fase em s inteiros (a barra é (PatienceEndsAt - agora) / PatienceSpan); 8 bits de propósito (set com 8+ registros)
 	Mood = Lync.enum(Content.Moods.Keys),                -- Provisório (Q-164): Neutral, Happy, Annoyed, Complaining
 }))
 ```
@@ -289,7 +291,8 @@ Customers = Lync.replicate(Lync.struct({
 | Aparência | **não está aqui**: espécie, roupa, tipo/acessório e pack vão em atributos do modelo do NPC (§5.2). O modelo é achado pelo atributo `NpcId` = id do registro. Os prompts "Take Order"/"Serve" e "Refuse" são âncoras `Interactable` no rig com `EntityId` próprios (`architecture.md` §18.4); o `InteractionService` resolve âncora → rig → `NpcId` |
 | Humor (onda 1, **Provisório**, `Q-164`) | só visual: Neutral na chegada → Annoyed quando falta ≤ 1/3 da paciência (`MoodRules.AnnoyedAt`) → Complaining ao desistir, em Errado ou Refuse; Happy em venda Completo/Perfeito (`content-data.md` §3.16). **Não** mexe no pagamento da DEC-072 até o desenho do game-designer (DEC-187: humor dinâmico completo, que muda pagamento, vem depois). O enum vem de `Content.Moods`: estender o humor não muda o `Net` |
 | Gorjeta | a janela de gorjeta (16 + 4K) **não** vai no set: não aparece no HUD (DEC-015) e o resultado só existe no servidor |
-| Paciência e K oculto (**T41**, decidida pelo architect, DEC-208 delegada; L-06 do QA, TASK-040) | `PatienceEndsAt` deixaria o client deduzir K (40 + 5K) antes do "Take Order", contra FEAT-011 ("K oculto"). Regra: o servidor escreve `PatienceEndsAt = 0` enquanto o cliente está `Arriving`/`Queued`/`Ordering` e o valor real (contado desde a chegada ao balcão, sem mudar a regra da DEC-072) na mesma escrita em que preenche `Order` e passa a `Waiting`. Nenhum visual da onda 1 precisa da paciência antes disso (`Annoyed` é escrito pelo servidor no `Mood`). Descartada: aceitar o vazamento (custo zero, mas abre leitura de K por exploit do client). Afeta TASK-033 (escrita) e TASK-034 (barra/rosto só com `PatienceEndsAt > 0`) |
+| Duas paciências (**Q-192**, Provisório) | fila (`Phase = Queue`, 45 s) começa quando o cliente chega a Q1 (`Ordering`) e **não** revela K (não depende dele); no "Take Order" o servidor troca para `Phase = Order` (75 + 5K s) na mesma escrita de `Order`/`Waiting`, e zera o humor. O client não deriva mais nada: lê `PatienceEndsAt` + `PatienceSpan` e escolhe a barra por `Phase` (azul/amarela com relógio; verde/vermelha com pão). Queue esgotada = `Sale.Result Left`; Order esgotada = `Slow`. Cliente do tutorial: `Phase None`, `PatienceEndsAt 0` |
+| Paciência e K oculto (**T41**, parcialmente substituída pela linha acima; o K segue oculto; decidida pelo architect, DEC-208 delegada; L-06 do QA, TASK-040) | `PatienceEndsAt` deixaria o client deduzir K (40 + 5K) antes do "Take Order", contra FEAT-011 ("K oculto"). Regra: o servidor escreve `PatienceEndsAt = 0` enquanto o cliente está `Arriving`/`Queued`/`Ordering` e o valor real (contado desde a chegada ao balcão, sem mudar a regra da DEC-072) na mesma escrita em que preenche `Order` e passa a `Waiting`. Nenhum visual da onda 1 precisa da paciência antes disso (`Annoyed` é escrito pelo servidor no `Mood`). Descartada: aceitar o vazamento (custo zero, mas abre leitura de K por exploit do client). Afeta TASK-033 (escrita) e TASK-034 (barra/rosto só com `PatienceEndsAt > 0`) |
 
 ### 3.7 `Upgrades` (id = `Content.Upgrades.IndexOf[key]`)
 
@@ -347,7 +350,7 @@ Notice = Lync.packet(Lync.struct({
 ```lua
 Sale = Lync.packet(Lync.struct({
 	Npc = Lync.int(1, 65535),                   -- NpcId
-	Result = Lync.enum({ "Perfect", "Complete", "Incomplete", "Wrong", "Left", "Refused" }),
+	Result = Lync.enum({ "Perfect", "Complete", "Incomplete", "Wrong", "Left", "Refused", "Slow" }), -- Left = não atendido (fila); Slow = a comida demorou (preparo, Q-192)
 	Amount = Lync.int(0, 1000),                 -- valor que entrou na gaveta (com gorjeta)
 }))
 ```

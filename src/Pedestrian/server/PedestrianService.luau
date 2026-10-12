@@ -82,6 +82,7 @@ type Walker = {
 	Cursor: Motion.Cursor,
 	Dist: number,
 	Speed: number,
+	Lane: number, -- WalkGeo.LaneOfSlot(Id): lateral lane on the crosswalks (same rule on every client)
 	Stop: Stop?, -- stop the current record heads to
 	ParkedAt: number?,
 	-- on the road under a reservation: crosswalk and far curb (absolute)
@@ -126,6 +127,13 @@ const HOLD_SAME = 0.3 -- min dot of the two headings: same way (perpendicular an
 const HOLD_MIN = 0.3 -- studs: closer than this along the line is "beside", not ahead
 const HOLD_MAX = 10 -- seconds: safety, a hold never lasts longer (one stud later it brakes again if still blocked)
 const HOLD_SPEED = 0.5 -- studs/s: slower than this is standing (no new hold)
+-- Lanes on crosswalks (playtest 2026-10-11: walkers crossed through each other on the same line), PROVISIONAL:
+-- the slot decides the lane (WalkGeo.LaneOfSlot; FreeSlot gives the least used lane), the lane is a lateral offset on
+-- the road part. A walker only steps on the road when no rider is closer than CROSS_GAP studs (centre to centre) to
+-- its place, and walks no faster than the rider ahead of it in the same lane.
+const CROSS_GAP = 1.6 -- studs: minimum centre-to-centre separation on a crossing
+const CROSS_LOOK = 14 -- studs: a rider this far ahead in the same lane caps the speed of the one entering behind it
+const SPAWN_CLEAR = 3.2 -- studs: a path start must be this far (world space) from every walker to take a new one
 const PREFIX = "[PedestrianService]"
 
 const EPSILON = Motion.Epsilon
@@ -366,13 +374,23 @@ end
 
 -- Walkers ---------------------------------------------------------------------------------------------------------
 
+-- Free slot whose lane is the least used (lowest slot on a tie)
 function PedestrianService:FreeSlot(): number?
+	const use: { [number]: number } = {}
+	for _, walker in self.Walkers do
+		use[walker.Lane] = (use[walker.Lane] or 0) + 1
+	end
+	local best: number? = nil
+	local bestUse = math.huge
 	for id = 1, RULES.Slots do
 		if self.Walkers[id] == nil then
-			return id
+			const used = use[WalkGeo.LaneOfSlot(id)] or 0
+			if used < bestUse then
+				best, bestUse = id, used
+			end
 		end
 	end
-	return nil
+	return best
 end
 
 function PedestrianService:Spawn(row: WalkPath, geo: WalkGeo.Geo, dist: number, t: number): Walker?
@@ -402,6 +420,7 @@ function PedestrianService:Spawn(row: WalkPath, geo: WalkGeo.Geo, dist: number, 
 		Cursor = Motion.Cursor(profile, record),
 		Dist = 0,
 		Speed = 0,
+		Lane = WalkGeo.LaneOfSlot(id),
 		Stop = nil,
 		ParkedAt = nil,
 		Crossing = nil,
@@ -459,6 +478,12 @@ function PedestrianService:TryCross(walker: Walker, stop: Stop, t: number)
 	if key == nil then
 		return
 	end
+	-- never faster than the rider ahead in the same lane (it would catch up and walk through it)
+	const cap = self:LeaderSpeed(walker, key)
+	if cap ~= nil and cap < walker.Record.Speed then
+		walker.Record.Speed = cap
+		walker.Profile = WalkGeo.Profile(walker.Geo, cap)
+	end
 	-- time to the far curb from rest here
 	const probe: Record = table.clone(walker.Record)
 	probe.AnchorAt = t
@@ -467,6 +492,10 @@ function PedestrianService:TryCross(walker: Walker, stop: Stop, t: number)
 	probe.HeldUntil = 0
 	const arrival = Motion.TimeAt(walker.Profile, probe, stop.Exit, t + HORIZON)
 	if arrival == nil then
+		return
+	end
+	-- lateral + longitudinal separation on entering: wait on the curb while a rider stands on our place
+	if self:RiderNear(walker, key) then
 		return
 	end
 	local hold = self.Holds[key]
@@ -490,21 +519,70 @@ function PedestrianService:TryCross(walker: Walker, stop: Stop, t: number)
 	end
 	const granted = hold :: Hold
 	granted.Riders[walker.Id] = true
+
 	walker.Crossing = { Crosswalk = key, Exit = stop.Exit }
 	self:Anchor(walker, walker.Dist, false, t, false)
 end
 
 -- Spacing ---------------------------------------------------------------------------------------------------------
 
+-- World place of a walker (floor point plus the lane offset)
+function PedestrianService:PlaceOf(walker: Walker): Vector3
+	return WalkGeo.LanePointAt(walker.Geo, walker.Dist, walker.Lane)
+end
+
+-- A walker on the road of crosswalk `key` (or about to be) closer than CROSS_GAP to where `walker` stands
+function PedestrianService:RiderNear(walker: Walker, key: string): boolean
+	const place = self:PlaceOf(walker)
+	for _, other in self.Walkers do
+		if other == walker then
+			continue
+		end
+		const riding = other.Crossing ~= nil and other.Crossing.Crosswalk == key
+		if not riding then
+			continue
+		end
+		const offset = self:PlaceOf(other) - place
+		if Vector3.new(offset.X, 0, offset.Z).Magnitude < CROSS_GAP then
+			return true
+		end
+	end
+	return false
+end
+
+-- Speed of the nearest rider ahead of `walker` (same crosswalk, same lane, same way, within CROSS_LOOK), nil if none
+function PedestrianService:LeaderSpeed(walker: Walker, key: string): number?
+	const place = self:PlaceOf(walker)
+	const heading = WalkGeo.Heading(walker.Geo, walker.Dist)
+	local best: number? = nil
+	local bestAlong = CROSS_LOOK
+	for _, other in self.Walkers do
+		if other == walker or other.Lane ~= walker.Lane then
+			continue
+		end
+		const theirs = other.Crossing
+		if theirs == nil or theirs.Crosswalk ~= key then
+			continue
+		end
+		const offset = self:PlaceOf(other) - place
+		const along = offset.X * heading.X + offset.Z * heading.Z
+		const otherHeading = WalkGeo.Heading(other.Geo, other.Dist)
+		if along > 0 and along < bestAlong and otherHeading.X * heading.X + otherHeading.Z * heading.Z > HOLD_SAME then
+			best, bestAlong = other.Record.Speed, along
+		end
+	end
+	return best
+end
+
 -- Another walker stands or walks the same way less than `reach` studs ahead of `walker`, near its line
 function PedestrianService:Ahead(walker: Walker, reach: number): boolean
-	const position = WalkGeo.PointAt(walker.Geo, walker.Dist)
+	const position = self:PlaceOf(walker)
 	const heading = WalkGeo.Heading(walker.Geo, walker.Dist)
 	for _, other in self.Walkers do
 		if other == walker then
 			continue
 		end
-		const offset = WalkGeo.PointAt(other.Geo, other.Dist) - position
+		const offset = self:PlaceOf(other) - position
 		const along = offset.X * heading.X + offset.Z * heading.Z
 		if along <= HOLD_MIN or along > reach then
 			continue
@@ -662,8 +740,15 @@ function PedestrianService:PickPath(night: boolean, startClear: boolean): (WalkP
 		end
 		if startClear then
 			local clear = true
+			const start = WalkGeo.PointAt(geo, 0)
 			for _, walker in self.Walkers do
 				if walker.Geo == geo and WalkGeo.Fold(geo, walker.Dist) < SPACING then
+					clear = false
+					break
+				end
+				-- another path starting at the same place (EX-E, a door) or a walker passing by it
+				const offset = self:PlaceOf(walker) - start
+				if Vector3.new(offset.X, 0, offset.Z).Magnitude < SPAWN_CLEAR then
 					clear = false
 					break
 				end
@@ -796,7 +881,7 @@ function PedestrianService:AdoptPick(
 		then
 			continue
 		end
-		const offset = WalkGeo.PointAt(geo, walker.Dist) - center
+		const offset = self:PlaceOf(walker) - center
 		const distance = Vector3.new(offset.X, 0, offset.Z).Magnitude
 		if distance <= bestDistance and accept(walker.Record.Species, walker.Record.Outfit) then
 			best = walker
@@ -860,7 +945,7 @@ function PedestrianService:AdoptPeek(slot: number): Handoff?
 	return {
 		Species = walker.Record.Species,
 		Outfit = walker.Record.Outfit,
-		Position = WalkGeo.PointAt(geo, walker.Dist),
+		Position = self:PlaceOf(walker),
 		Heading = WalkGeo.Heading(geo, walker.Dist),
 		Node = node,
 	}

@@ -39,7 +39,8 @@
 	Preload(lines, timeout, progress) queues every line and yields until all are settled (loaded or failed) or the
 	timeout; the rest keeps loading in the background (LoadingController, before the intro). Prepare(lines) queues
 	without waiting. Say(line) plays a loaded line on its beat; one still loading jumps to the front of the queue and
-	plays when it loads, if that is still within LATE s of its beat. A new line cuts the one playing.
+	plays when it loads, if that is still within LATE s of its beat. A new line NEVER cuts the one speaking: it waits its
+turn (Busy() = speaking or queued); only Stop / Destroy cut.
 	Fetch(line) (Walt's tutorial call) queues the line first and returns its state, so a caller without a fixed
 	timeline can hold the line until the voice is ready ("Loaded") or gone ("Failed" / "Off": subtitle only).
 	Reason(line) says why a line has no voice (for the caller's warning). Length(line) = seconds of a loaded line.
@@ -83,6 +84,8 @@ export type Speech = {
 	-- yields; progress(fraction 0..1) while it waits
 	Preload: (lines: { Beat }, timeout: number, progress: ((number) -> ())?) -> (),
 	Say: (line: Beat) -> (),
+	-- a line is speaking or waiting its turn (lines never cut each other: they queue)
+	Busy: () -> boolean,
 	Stop: () -> (),
 	Destroy: () -> (),
 }
@@ -128,6 +131,7 @@ const PAUSE_ASK = 0.45 -- after "?" or "!"
 const PAUSE_DOTS = 0.6 -- after "..."
 const PAUSE_ALONE = 0.3 -- a "..." standing alone adds this to the pause before it
 const PIECE_SLACK = 0.5 -- s past a piece's TimeLength before the chain moves on without its Ended
+const LINE_GAP = 0.15 -- s between the end of a line and the next one
 const PIECE_MAX = 12 -- s a piece of unknown length may play before the chain moves on
 
 const Speech = {}
@@ -239,7 +243,9 @@ function Speech.new(volume: () -> number): Speech
 	local streak = 0 -- failures in a row
 	local giveUps = 0 -- GIVE_UP pauses in a row (no success between)
 	local playing: AudioTextToSpeech? = nil
-	local token = 0 -- the chain of pieces playing (a new line or Stop bumps it)
+	local token = 0 -- the chain of pieces playing (Stop bumps it)
+	const spoken: { Entry } = {} -- lines waiting for the one speaking to end
+	local speaking = false -- a chain is running (playing or waiting its turn)
 
 	local folder: Instance? = nil
 	local fader: AudioFader? = nil
@@ -289,6 +295,8 @@ function Speech.new(volume: () -> number): Speech
 	-- Stops the chain playing (if any)
 	local function halt()
 		token += 1
+		speaking = false
+		table.clear(spoken)
 		const current = playing
 		playing = nil
 		if current ~= nil then
@@ -320,17 +328,31 @@ function Speech.new(volume: () -> number): Speech
 		end
 		const length = timeLength(voice)
 		const started = os.clock()
-		const deadline = started + (if length ~= nil then length + PIECE_SLACK else PIECE_MAX)
-		while alive and token == mine and not ended and os.clock() < deadline do
+		-- soft deadline: the piece's length plus slack (start latency included); past it the piece is only waited for
+		-- while the engine still says it is playing, up to a hard cap (a voice is never cut by a clock that is short)
+		const soft = started + (if length ~= nil then length * 1.25 + PIECE_SLACK + 1 else PIECE_MAX)
+		const hard = started + (if length ~= nil then length * 2 + PIECE_MAX else PIECE_MAX * 2)
+		local sawPlaying = false
+		while alive and token == mine and not ended do
+			const now = os.clock()
+			if now >= hard or (now >= soft and not sawPlaying) then
+				break
+			end
 			task.wait(0.05)
-			-- Ended missing on this engine: IsPlaying going false ends the piece too
-			if os.clock() - started > 0.3 then
-				const okPlaying, isPlaying = pcall(function(): boolean
-					return voice.IsPlaying
-				end)
-				if okPlaying and isPlaying == false then
+			const okPlaying, isPlaying = pcall(function(): boolean
+				return voice.IsPlaying
+			end)
+			if okPlaying and isPlaying == true then
+				sawPlaying = true
+			elseif okPlaying and isPlaying == false then
+				-- Ended missing on this engine: IsPlaying going false after it was true ends the piece (never before it
+				-- was seen true: playback may take a moment to start)
+				if sawPlaying then
 					break
 				end
+			end
+			if now >= soft and okPlaying and isPlaying == false then
+				break
 			end
 		end
 		if ok then
@@ -340,27 +362,51 @@ function Speech.new(volume: () -> number): Speech
 	end
 
 	-- Plays a line: its pieces in order, with the pause after each (a new line or Stop cuts it)
+	-- Plays a line to its end: its pieces in order, with the pause after each. false = the chain was cut or failed.
+	local function playEntry(entry: Entry, mine: number): boolean
+		for index, piece in entry.Pieces do
+			if not alive or token ~= mine then
+				return false
+			end
+			const voice = piece.Voice
+			if piece.State == "Loaded" and voice ~= nil and voice.Parent ~= nil then
+				if not playPiece(voice, mine) then
+					return false
+				end
+			end
+			if index < #entry.Pieces and piece.Pause > 0 and token == mine then
+				task.wait(piece.Pause)
+			end
+		end
+		return alive and token == mine
+	end
+
+	-- A line never cuts the one speaking (user feedback 2026-10-11: every voice was cut): it waits its turn in
+	-- `spoken` and starts once the line before it ended, LINE_GAP s later. Only Stop / Destroy (halt) cut the chain.
 	local function start(entry: Entry)
-		halt()
+		if table.find(spoken, entry) ~= nil then
+			return
+		end
 		refreshVolume()
+		table.insert(spoken, entry)
+		if speaking then
+			return
+		end
+		speaking = true
 		const mine = token
 		task.spawn(function()
-			for index, piece in entry.Pieces do
-				if not alive or token ~= mine then
-					return
+			while alive and token == mine and #spoken > 0 do
+				const next = table.remove(spoken, 1)
+				if next ~= nil and not playEntry(next, mine) then
+					break
 				end
-				const voice = piece.Voice
-				if piece.State == "Loaded" and voice ~= nil and voice.Parent ~= nil then
-					if not playPiece(voice, mine) then
-						return
-					end
-				end
-				if index < #entry.Pieces and piece.Pause > 0 and token == mine then
-					task.wait(piece.Pause)
+				if token == mine and #spoken > 0 then
+					task.wait(LINE_GAP)
 				end
 			end
 			if token == mine then
 				playing = nil
+				speaking = false
 			end
 		end)
 	end
@@ -815,6 +861,9 @@ function Speech.new(volume: () -> number): Speech
 			-- late line: first in the queue
 			hurry(entry)
 			pump()
+		end,
+		Busy = function(): boolean
+			return speaking and alive
 		end,
 		Stop = function()
 			halt()

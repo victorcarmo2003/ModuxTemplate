@@ -53,7 +53,9 @@ const WORD_TIME = 0.36
 const MIN_TIME = 1.4
 const GAP = 0.25 -- s of silence between two lines
 const LINGER = 4 -- s the last line stays on screen after it was said
-const HOLD = 4 -- s a line waits for its voice before it goes on as a subtitle only
+-- s a line waits for its voice before it goes on as a subtitle only (was 4: a LoadQueue job stuck up to 8 s made the
+-- greeting skip its voice for good, a line that loads later is never voiced)
+const HOLD = 12
 const MAX_WARNINGS = 3 -- subtitle-only warnings per session (one per distinct reason)
 const TAIL = 0.3 -- s after the voice ends before the next line
 
@@ -85,7 +87,7 @@ local function readTime(text: string): number
 end
 
 -- show(text) puts a line on the subtitle (nil hides it); volume() = Master x Voice of AudioController
-function Call.new(show: (text: string?) -> (), volume: () -> number): Call
+function Call.new(show: (text: string?) -> (), volume: () -> number, trace: (message: string) -> ()): Call
 	local speech: Speech.Speech? = nil
 	const queue: { string } = {}
 	local endsAt = 0 -- os.clock when the line on screen is over (0 = none)
@@ -137,8 +139,10 @@ function Call.new(show: (text: string?) -> (), volume: () -> number): Call
 			for _, text in lines do
 				table.insert(queue, text)
 			end
+			trace(`replace: {#lines} line(s) queued (the line on screen finishes first)`)
 		end,
 		Cut = function()
+			trace("cut: queue cleared, voice stopped")
 			table.clear(queue)
 			waitFrom = 0
 			endsAt = 0
@@ -155,6 +159,11 @@ function Call.new(show: (text: string?) -> (), volume: () -> number): Call
 			if endsAt > 0 and now < endsAt then
 				return
 			end
+			-- a line is never cut by the next: wait until the voice actually ended (timers only estimate it)
+			const talking = speech
+			if talking ~= nil and talking.Busy() then
+				return
+			end
 			const text = queue[1]
 			if text ~= nil then
 				const line = beat(text)
@@ -163,6 +172,7 @@ function Call.new(show: (text: string?) -> (), volume: () -> number): Call
 				if status == "Queued" or status == "Loading" then
 					if waitFrom == 0 then
 						waitFrom = now
+						trace(`line waits for its voice ({status}): "{text}"`)
 					end
 					if now - waitFrom < HOLD then
 						return -- the voice is on its way: the line starts with it
@@ -187,6 +197,7 @@ function Call.new(show: (text: string?) -> (), volume: () -> number): Call
 				end
 				endsAt = now + time + GAP
 				hideAt = now + time + LINGER
+				trace(`say ({status}, {string.format("%.1f", time)} s, {#queue} left): "{text}"`)
 				show(text)
 				speech.Say(line)
 				return

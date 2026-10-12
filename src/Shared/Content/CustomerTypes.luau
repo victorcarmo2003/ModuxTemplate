@@ -3,7 +3,7 @@
 -- TASK-009:
 -- - Species and accessory per type from DEC-188 b (1-2 fixed species + accessory; civil outfit A-H drawn uniformly).
 --   Never the crew uniform nor the raccoon (DEC-186, DEC-188): Validate checks both.
--- - Numbers from npcs.md "Tabela CustomerTypes" (game-designer, Rascunho; DEC-045, DEC-071, DEC-072).
+-- - Numbers from npcs.md "Tabela CustomerTypes" (game-designer, Draft; DEC-045, DEC-071, DEC-072).
 -- - Accessories: mesh names under ReplicatedStorage.Assets.Crew.Accessories (architecture.md §18.9.1). PROVISIONAL
 --   names until the kit exists (TASK-006, AST-054); CrewRig (TASK-016) must skip a missing mesh, not fail.
 -- - Playable species and the pig (DEC-188 a, DEC-192/214) are in no type: Q-165 (Provisional: pedestrians only,
@@ -34,6 +34,8 @@ export type CustomerType = {
 	-- Chance to sit at a Pad table after a Complete order (FEAT-037, TASK-144; Provisional). Day value; at night
 	-- x Seating.NightSitMult. 0 = never sits.
 	SitChance: number,
+	-- Optional multipliers of the two patience clocks (Orders.Rules.QueuePatience / OrderPatience*); nil = 1 (Q-192, Provisional)
+	PatienceMult: { Queue: number, Order: number }?,
 }
 
 -- Civil outfits A-H, drawn uniformly for every type (DEC-188 b, DEC-160, DEC-163).
@@ -94,6 +96,7 @@ return Table.new({
 		IngredientMult = { mustard = 1.2, bacon = 0.5, cream_cheese = 0.5 },
 		Lines = {},
 		SitChance = 0.10,
+		PatienceMult = { Queue = 0.8, Order = 0.85 }, -- in a hurry (Q-192, Provisional)
 	},
 	{
 		Key = "construction_worker",
@@ -130,6 +133,7 @@ return Table.new({
 		IngredientMult = { cream_cheese = 1.6, cheese = 1.2, mustard = 0.5, bacon = 0.6 },
 		Lines = {},
 		SitChance = 0.70,
+		PatienceMult = { Queue = 1.3, Order = 1.3 }, -- takes it slow (Q-192, Provisional)
 	},
 	{
 		Key = "night_shift_worker",

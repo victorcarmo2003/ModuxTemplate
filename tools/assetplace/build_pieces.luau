@@ -123,7 +123,7 @@ end
 -- Assets (M = measured on the uploaded .fbx, base centre origin, 1 unit = 1 stud) ---------------------------------
 
 const ASSETS: { [string]: AssetSpec } = {
-	-- AST-012 new roller grill (modeler-3d 2026-10-10, Em revisão): 3 overlapping variants on one origin
+	-- AST-012 new roller grill (modeler-3d 2026-10-10, In review): 3 overlapping variants on one origin
 	["AST-012_RollerGrill"] = {
 		parts = {
 			Grill_L1 = { box = box(-0.457, 0, -1.15, 2.257, 0.78, 1.21), tris = 688 },

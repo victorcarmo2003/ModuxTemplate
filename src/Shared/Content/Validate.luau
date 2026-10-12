@@ -464,12 +464,20 @@ local function checkCustomerTypes()
 		end
 		inRange("CustomerTypes", index, row.Key, "KShift.Chance", row.KShift.Chance, 0, 1)
 		inRange("CustomerTypes", index, row.Key, "WalkSpeed", row.WalkSpeed, 1, 50)
+		if row.PatienceMult ~= nil then
+			inRange("CustomerTypes", index, row.Key, "PatienceMult.Queue", row.PatienceMult.Queue, 0.25, 4)
+			inRange("CustomerTypes", index, row.Key, "PatienceMult.Order", row.PatienceMult.Order, 0.25, 4)
+		end
 	end
 end
 
 local function checkOrders()
 	const rules = Orders.Rules
 	inRange("OrderRules", nil, nil, "MaxToppings", rules.MaxToppings, 0, #Ingredients.ToppingKeys)
+	inRange("OrderRules", nil, nil, "QueuePatience", rules.QueuePatience, 1, rules.WireSpanMax)
+	inRange("OrderRules", nil, nil, "OrderPatienceBase", rules.OrderPatienceBase, 1, rules.WireSpanMax)
+	inRange("OrderRules", nil, nil, "OrderPatiencePerK", rules.OrderPatiencePerK, 0, 60)
+	inRange("OrderRules", nil, nil, "WireSpanMax", rules.WireSpanMax, 1, 255)
 	for index, row in Orders.List do
 		if #row.KWeights ~= rules.MaxToppings + 1 then
 			fail("OrderPhases", index, row.Key, `KWeights needs {rules.MaxToppings + 1} entries (K = 0..MaxToppings)`)

@@ -91,12 +91,13 @@ Carros de trânsito somem durante ANM-008, ANM-010, cutscenes e Final (FEAT-033)
 | Estado | O que faz | Duração / regra |
 |---|---|---|
 | Chegar | nasce fora de vista num dos 2 pontos de entrada da calçada; anda pela calçada até a vaga livre do balcão | caminho fixo do level-designer |
-| Esperar | para de frente para o balcão; ícone "!" sobre a cabeça; paciência corre | 40 + 5 × K s + Counter **[DEC-072]** |
-| Pedido anotado | balão com ícones (pão, salsicha, até 3 complementos); idle de espera | janela de gorjeta 16 + 4 × K s |
+| Esperar (fila) | para de frente para o balcão (Q1); barra azul → amarela com ícone de relógio sobre a cabeça; a **paciência de fila** corre até alguém atendê-lo | 45 s + Counter, × `PatienceMult.Queue` do tipo **[Q-192, Provisório; antes 40 + 5K s da DEC-072]** |
+| Pedido anotado (preparo) | balão com ícones (pão, salsicha, até 3 complementos); idle de espera; barra verde → vermelha com ícone de pão troca a barra da fila (com um "pop"); corre a **paciência de preparo** | 75 + 5 × K s + Counter, × `PatienceMult.Order` **[Q-192, Provisório]**; janela de gorjeta 16 + 4 × K s |
 | Pagar | animação de entregar dinheiro; "+$" na gaveta | 1 s |
 | Reagir | balão feliz / neutro / reclamação / devolve (errado) | 1,5 s |
 | Ir embora | mesmo caminho de volta até sumir fora de vista | — |
-| Desistir | bufa, vai embora | paciência 0 |
+| Desistir (fila) | bufa, vai embora, "não foi atendido" (`Left`) | paciência de fila 0 **[Q-192]** |
+| Desistir (preparo) | reclama e vai embora, "demorou a comida" (`Slow`, reação própria) | paciência de preparo 0 **[Q-192]** |
 | Recusado | aceno, vai embora | — |
 
 Invariantes (o jogador aprende de dia; as anomalias quebram **um** deles por vez) **[DEC-010]**:
@@ -243,7 +244,7 @@ Correspondência de IDs **[DEC-096]**: NPC-009 = ANM-001 · NPC-010 = ANM-002 ·
 | NPC-010 | N2 | The wrong food | item | 0 | descartar | shared | até ser usado ou descartado; some às 6:00 AM | servir Hot Dog com o item (paga quem serviu) | **não** | até resolver | não |
 | NPC-011 | N3 | The stopped clock | environment | 0 | luz (sequência) | shared | 60 s após o relógio parar | — (sequência errada não falha; só não conta) | **sim**: todos os ativos | ≤ 60 s | não |
 | NPC-012 | N4 | The copies | customer (a cópia) | 1 | recusar (a cópia) | shared | paciência | "Take Order" na cópia (paga quem tocou) | **não** | paciência | não |
-| NPC-013 | N5 | The Raincoat Lady | customer | 1 | atender | shared | paciência (40 + 5K s + Counter) | "Refuse" (paga quem recusou) | **sim**: paciência zerada → todos os ativos | paciência | não |
+| NPC-013 | N5 | The Raincoat Lady | customer | 1 | atender | shared | paciência (fila 45 s, preparo 75 + 5K s + Counter; Q-192) | "Refuse" (paga quem recusou) | **sim**: paciência zerada → todos os ativos | paciência | não |
 | NPC-014 | N6 | The wavers | environment (silhueta animada na janela, sem humanoide) | 0 | não olhar | personal | 20 s | — | quem manteve a janela no cone por **≥ 3 s contínuos** | 20 s | não |
 | NPC-015 | N7 | The Walker | walker | 1 | não olhar | shared (aproximação) | 45 s | — | o Walker chega ao passo 10 | 45 s | **sim (a única)** |
 | NPC-016 | N8 | The long car | vehicle | 1 | esconder | personal (zona do trailer) | 8 s após o farol alto acender | levantar antes do carro sair | não escondido quando o farol pisca 2× | ~25 s (2 + 8 + 15 s) | não |

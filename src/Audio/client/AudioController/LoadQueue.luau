@@ -15,7 +15,7 @@
 ]]
 local ContentProvider = game:GetService("ContentProvider")
 
-type Job = { Work: () -> boolean?, Done: boolean }
+type Job = { Work: () -> boolean?, Done: boolean, Name: string? }
 
 const BATCH = 4 -- assets per PreloadAsync
 const GAP = 0.25 -- s between two jobs
@@ -27,6 +27,7 @@ const urgentJobs: { Job } = {}
 const backgroundJobs: { Job } = {}
 const loaded: { [string]: boolean } = {}
 local working = false
+local warnedTimeout = false
 
 local function pump()
 	if working then
@@ -51,7 +52,10 @@ local function pump()
 			end
 			job.Done = true
 			if not finished then
-				warn(`[LoadQueue] load job still running after {JOB_TIMEOUT} s: moving on`)
+				if not warnedTimeout then
+					warnedTimeout = true -- once per session; later timeouts are routine
+					warn(`[LoadQueue] load job {job.Name or "?"} still running after {JOB_TIMEOUT} s: moving on`)
+				end
 				ok, result = true, true
 			elseif not ok then
 				warn(`[LoadQueue] load job failed: {result}`)
@@ -62,8 +66,8 @@ local function pump()
 	end)
 end
 
-local function enqueue(work: () -> boolean?, urgent: boolean?): Job
-	const job: Job = { Work = work, Done = false }
+local function enqueue(work: () -> boolean?, urgent: boolean?, name: string?): Job
+	const job: Job = { Work = work, Done = false, Name = name }
 	table.insert(if urgent then urgentJobs else backgroundJobs, job)
 	pump()
 	return job
@@ -127,7 +131,7 @@ function LoadQueue.Preload(items: { any }, progress: ((done: number, total: numb
 					progress(math.min(done, total), total)
 				end
 				return failed
-			end, urgent)
+			end, urgent, `{tostring(keyOf(batch[1]))} (+{#batch - 1})`)
 		)
 	end
 	for _, job in jobs do

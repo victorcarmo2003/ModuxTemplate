@@ -3,7 +3,10 @@
 -- Content.OrderRules / Content.Moods.Rules, no Service, no network, no money moved (CustomerService pays through
 -- EconomyService). The draw is OrderRoll.Roll only (R3).
 --
---   patience   = PatienceBase + PatiencePerK x K + Counter PatienceBonus, from the arrival at the queue (DEC-072)
+--   patience   = two clocks (Q-192, Provisional; replaces the single 40 + 5K s of DEC-072):
+--                Queue = QueuePatience x type mult + Counter PatienceBonus, from Q1 until "Take Order" (no order shown)
+--                Order = (OrderPatienceBase + OrderPatiencePerK x K) x type mult + PatienceBonus (+ pair bonus), from
+--                "Take Order" until served
 --   tip window = TipWindowBase + TipWindowPerK x K + class TipWindow offset, from "Take Order" (DEC-072, DEC-069)
 --   price      = BasePrice + sum(Ingredients[k].OrderPrice)                                  (DEC-071)
 --   Complete   = exactly the ordered toppings: price (+ tip inside the window = Perfect)
@@ -17,6 +20,7 @@ local Content = require(ReplicatedStorage.shared.Content)
 local OrderRoll = require(script.Parent.OrderRoll)
 
 export type Verdict = "Complete" | "Incomplete" | "Wrong"
+export type Phase = "None" | "Queue" | "Order"
 
 -- One hot dog of a ticket. Result nil = still pending; else the SaleResult it ended with.
 export type Line = {
@@ -30,8 +34,13 @@ export type Line = {
 export type Ticket = {
 	Lines: { Line }, -- 1 (customer) or 2 (pair: leader's hot dog, partner's hot dog)
 	K: number, -- sum of the lines' K (patience, tip window)
-	ArrivedAt: number, -- server time it reached the queue (patience base)
-	PatienceEndsAt: number,
+	ArrivedAt: number, -- server time it reached the queue
+	-- Patience (Q-192): one clock at a time. Phase None = not running (behind Q1, tutorial customer: PatienceEndsAt huge)
+	Phase: Phase,
+	PhaseStartedAt: number,
+	PatienceEndsAt: number, -- deadline of the running phase (math.huge = none)
+	QueueSpan: number, -- s of the Queue phase
+	OrderSpan: number, -- s of the Order phase
 	Taker: Player?, -- who did "Take Order" ("own order", content-data.md §3.10, Provisional)
 	TakenAt: number, -- 0 = not taken
 	TipEndsAt: number, -- 0 = not taken
@@ -45,9 +54,15 @@ function Orders.Roll(day: number, customerType: string, rng: Random, isNight: bo
 	return OrderRoll.Roll(day, customerType, rng, isNight)
 end
 
-function Orders.Patience(k: number, bonus: number): number
+-- Seconds of the Queue clock (Q1 until "Take Order"). `mult` = the customer type's PatienceMult.Queue (1 if none).
+function Orders.QueuePatience(bonus: number, mult: number): number
+	return Content.OrderRules.QueuePatience * mult + math.max(bonus, 0)
+end
+
+-- Seconds of the Order clock ("Take Order" until served), scaled by the ticket's toppings (K1 + K2 on a pair).
+function Orders.OrderPatience(k: number, bonus: number, mult: number): number
 	const rules = Content.OrderRules
-	return rules.PatienceBase + rules.PatiencePerK * k + math.max(bonus, 0)
+	return (rules.OrderPatienceBase + rules.OrderPatiencePerK * k) * mult + math.max(bonus, 0)
 end
 
 function Orders.TipWindow(k: number, offset: number): number
@@ -67,7 +82,14 @@ function Orders.Price(toppings: { string }): number
 end
 
 -- New ticket for a customer (1 line) or a pair (2 lines) that reached the queue at `arrivedAt`.
-function Orders.Ticket(lines: { { string } }, arrivedAt: number, patienceBonus: number): Ticket
+-- `patienceBonus` (Counter) adds to both clocks; `pairBonus` only to the Order clock. `mult` = type PatienceMult.
+function Orders.Ticket(
+	lines: { { string } },
+	arrivedAt: number,
+	patienceBonus: number,
+	pairBonus: number,
+	mult: { Queue: number, Order: number }?
+): Ticket
 	local k = 0
 	const out: { Line } = {}
 	for _, toppings in lines do
@@ -78,7 +100,11 @@ function Orders.Ticket(lines: { { string } }, arrivedAt: number, patienceBonus: 
 		Lines = out,
 		K = k,
 		ArrivedAt = arrivedAt,
-		PatienceEndsAt = arrivedAt + Orders.Patience(k, patienceBonus),
+		Phase = "None",
+		PhaseStartedAt = 0,
+		PatienceEndsAt = math.huge,
+		QueueSpan = Orders.QueuePatience(patienceBonus, if mult then mult.Queue else 1),
+		OrderSpan = Orders.OrderPatience(k, patienceBonus + pairBonus, if mult then mult.Order else 1),
 		Taker = nil,
 		TakenAt = 0,
 		TipEndsAt = 0,
@@ -164,9 +190,34 @@ function Orders.Tip(ticket: Ticket, at: number): number
 	return math.max(math.floor(ticket.TipAmount), 0)
 end
 
--- Patience left at or below MoodRules.AnnoyedAt (Provisional, Q-164: visual only).
+-- Starts the Queue clock (the customer is at Q1, nobody attended it yet).
+function Orders.BeginQueue(ticket: Ticket, at: number)
+	ticket.Phase = "Queue"
+	ticket.PhaseStartedAt = at
+	ticket.PatienceEndsAt = at + ticket.QueueSpan
+end
+
+-- Starts the Order clock ("Take Order"); the Queue clock is over.
+function Orders.BeginOrder(ticket: Ticket, at: number)
+	ticket.Phase = "Order"
+	ticket.PhaseStartedAt = at
+	ticket.PatienceEndsAt = at + ticket.OrderSpan
+end
+
+-- Whole seconds of the running phase for the wire (Net.Customers.PatienceSpan, 0..WireSpanMax).
+function Orders.WireSpan(ticket: Ticket): number
+	if ticket.Phase == "None" then
+		return 0
+	end
+	return math.clamp(math.ceil(ticket.PatienceEndsAt - ticket.PhaseStartedAt), 1, Content.OrderRules.WireSpanMax)
+end
+
+-- Patience left at or below MoodRules.AnnoyedAt (Provisional, Q-164: visual only). Per running phase.
 function Orders.IsAnnoyed(ticket: Ticket, at: number): boolean
-	const total = ticket.PatienceEndsAt - ticket.ArrivedAt
+	if ticket.Phase == "None" then
+		return false
+	end
+	const total = ticket.PatienceEndsAt - ticket.PhaseStartedAt
 	if total <= 0 then
 		return true
 	end

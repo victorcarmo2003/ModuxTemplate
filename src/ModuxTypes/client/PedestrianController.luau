@@ -3,6 +3,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Motion = require(ReplicatedStorage.shared.Traffic.Motion)
+local WalkGeo = require(ReplicatedStorage.shared.Pedestrian.WalkGeo)
 
 export type Record = {
 	Path: number,
@@ -17,6 +18,7 @@ export type Record = {
 type Walk = {
 	Line: Motion.Path,
 	Loop: boolean,
+	Geo: WalkGeo.Geo, -- same geometry as the server (crossings, lane offsets)
 }
 type Walker = {
 	Id: number,

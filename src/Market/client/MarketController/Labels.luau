@@ -2,10 +2,10 @@
 -- World texts of the Mart (FEAT-008, FEAT-015; `story/ui-text.md` §2-§3). Pure functions over Content: no Vide,
 -- no network, no Modux. Owner of the wording: narrative-writer; this file only applies it.
 -- Provisional (TASK-037):
---   * level names are the ui-text.md §3 proposals (Rascunho), Content.Upgrades has only the upgrade name;
+--   * level names are the ui-text.md §3 proposals (Draft), Content.Upgrades has only the upgrade name;
 --   * effect lines ("3 spots · 10 s") are written here from the level Effects until ui-text.md has them;
 --   * "MAX" on the Gear Stand plate (FEAT-015 v2 table, ui-text.md §2; was "Maxed" on the GEAR WALL card, TASK-140);
---   * "Day N" under "Out of stock" (FEAT-008 proposal, DEC-180 keeps it Rascunho);
+--   * "Day N" under "Out of stock" (FEAT-008 proposal, DEC-180 keeps it Draft);
 --   * badge = first letter of the upgrade until the AST-071 renders exist (Q-152).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)

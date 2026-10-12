@@ -3,7 +3,7 @@
 -- lines from story/ui-text.md §8, English in game). Pure: no Vide, no network.
 -- Provisional (TASK-034): Refused = Neutral with no line (ui-text §8 has no line for it); Incomplete uses the line
 -- without {item}, since the client does not know what was served. Owner of the texts: narrative-writer.
-export type Result = "Perfect" | "Complete" | "Incomplete" | "Wrong" | "Left" | "Refused"
+export type Result = "Perfect" | "Complete" | "Incomplete" | "Wrong" | "Left" | "Refused" | "Slow"
 export type Kind = "Happy" | "Neutral" | "Complaint"
 
 const KIND: { [string]: Kind } = {
@@ -12,6 +12,7 @@ const KIND: { [string]: Kind } = {
 	Incomplete = "Complaint",
 	Wrong = "Complaint",
 	Left = "Complaint",
+	Slow = "Complaint",
 	Refused = "Neutral",
 }
 
@@ -20,14 +21,18 @@ const LINES: { [string]: { string } } = {
 	Complete = { "Perfect, thanks!", "Yum!", "See you tomorrow!" },
 	Incomplete = { "Something's missing..." },
 	Wrong = { "That's not what I asked for." },
-	Left = { "Too slow... bye.", "I'll eat somewhere else." },
+	-- Left = the Queue clock ran out: nobody attended them (Q-192, Provisional texts)
+	Left = { "Nobody's serving?! Bye.", "I'll eat somewhere else." },
+	-- Slow = the Order clock ran out: the food took too long (Q-192, Provisional texts)
+	Slow = { "My food never came...", "Too slow... bye.", "Forget the order, I'm late!" },
 	Refused = {},
 }
 
 -- TASK-079: sound (sound-list §5.4) and one-shot clip (Content.Animations) per Sale result.
 -- Perfect/Complete -> SFX-045 + npc_happy (Cust_Happy; the "pay" beat is the coin on the drawer, EconomyController);
 -- Incomplete -> SFX-046 + npc_complain; Wrong -> SFX-047 + npc_complain; Left -> SFX-048 + npc_refuse_leave;
--- Refused -> SFX-049 + npc_refuse_leave. Served = something was handed over (SFX-042 `serve`).
+-- Refused -> SFX-049 + npc_refuse_leave; Slow (the food took too long, Q-192) -> SFX-046 + npc_complain (they were
+-- attended, so they complain instead of just walking off). Served = something was handed over (SFX-042 `serve`).
 export type Feedback = {
 	Sound: string, -- Content.Sounds key ("" = none)
 	Clip: string, -- Content.Animations key ("" = none)
@@ -40,6 +45,7 @@ const FEEDBACK: { [string]: Feedback } = {
 	Incomplete = { Sound = "cust_complain", Clip = "npc_complain", Served = true },
 	Wrong = { Sound = "cust_wrong", Clip = "npc_complain", Served = true },
 	Left = { Sound = "cust_leave", Clip = "npc_refuse_leave", Served = false },
+	Slow = { Sound = "cust_complain", Clip = "npc_complain", Served = false },
 	Refused = { Sound = "refuse", Clip = "npc_refuse_leave", Served = false },
 }
 const NO_FEEDBACK: Feedback = { Sound = "", Clip = "", Served = false }

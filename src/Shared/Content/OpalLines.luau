@@ -1,7 +1,7 @@
 --!strict
 -- Opal's lines by shift phase (content-data.md §3.19; NPC-020, CHR-003, DEC-079, DEC-099, DEC-191).
 -- Keys: day, n1_3, n4_6, n7_10 (content-data "Phase" Day/N1_3/N4_6/N7_10, lowercased by rule §1.3).
--- TASK-009: text from story/characters.md CHR-003 (narrative-writer, Rascunho; <= 70 characters each).
+-- TASK-009: text from story/characters.md CHR-003 (narrative-writer, Draft; <= 70 characters each).
 -- One balloon per visit, drawn locally by the client (OpalController, TASK-038) without repeating the player's last.
 -- Opal is an owl (DEC-203) and never an anomaly (DEC-191); her species lives in the controller, not here.
 -- Not here (conditional lines, no pool shape yet): first Mart exit "Look both ways, Rookie." (proposal),

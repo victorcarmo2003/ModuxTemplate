@@ -105,6 +105,7 @@ export type Public = {
 	Tick: (self: Public) -> (),
 	PreloadVoices: (self: Public, timeout: number, progress: ((number) -> ())?) -> boolean,
 	IsDev: (self: Public) -> boolean,
+	Trace: (self: Public, message: string) -> (),
 	NoteDone: (self: Public) -> (),
 	DecideForced: (self: Public, live: string) -> (string?, Instance?, string),
 	ApplyForced: (self: Public) -> (),

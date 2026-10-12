@@ -1,5 +1,5 @@
 --!strict
--- Vignette: dark screen edges for the dark and low sanity (AST-084, Rascunho; DEC-038: only on the owner's client).
+-- Vignette: dark screen edges for the dark and low sanity (AST-084, Draft; DEC-038: only on the owner's client).
 -- Four edge bands, each a Frame with a linear UIGradient (opaque at the edge, clear inward), until the
 -- `T_Vignette` texture (AST-084, 512²) exists. A full-screen `Blackout` layer covers the faint fade (FEAT-025).
 -- Never red, never shakes (AST-084 rules): the color is a cold near-black from the night palette (style guide §5.3).

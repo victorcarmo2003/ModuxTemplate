@@ -108,7 +108,13 @@ return Lync.define("game", {
 		State = Lync.enum({ "Arriving", "Queued", "Ordering", "Waiting", "Leaving" }),
 		Slot = Lync.int(0, 8), -- 0 = out of the queue; 1..5 = Q1..Q5
 		Order = Lync.bitfield(Content.Ingredients.ToppingKeys), -- empty until "Take Order" (FEAT-011)
-		PatienceEndsAt = Lync.f64(), -- 0 until "Take Order" (T41: K stays hidden)
+		PatienceEndsAt = Lync.f64(), -- deadline of the current patience phase (server time); 0 = no clock running (Q-192)
+		-- Q-192 (Provisional): which patience clock runs. Queue = at Q1 until "Take Order"; Order = from "Take Order"
+		-- until served; None = not running (arriving, behind Q1, tutorial customer). Written with PatienceEndsAt.
+		Phase = Lync.enum({ "None", "Queue", "Order" }),
+		-- Q-192: length of the current phase in whole seconds (the client's bar is (EndsAt - now) / Span). 8 bits on
+		-- purpose (the set has 8+ records, Lync keyframe floor); 0 = none. Capped at OrderRules.WireSpanMax (255).
+		PatienceSpan = Lync.int(0, 255),
 		Mood = Lync.enum(Content.Moods.Keys), -- Provisional (Q-164)
 		-- §14.2 (TASK-144; FEAT-038). Pair leader: the 2nd hot dog still pending (nil = none or a lone customer; the
 		-- record always shows the pending items, Order = the 1st pending one). Written with Order at "Take Order".
@@ -155,7 +161,7 @@ return Lync.define("game", {
 	-- §4.3 s -> group. Writer: CustomerService
 	Sale = Lync.packet(Lync.struct({
 		Npc = Lync.int(1, 65535), -- NpcId
-		Result = Lync.enum({ "Perfect", "Complete", "Incomplete", "Wrong", "Left", "Refused" }),
+		Result = Lync.enum({ "Perfect", "Complete", "Incomplete", "Wrong", "Left", "Refused", "Slow" }), -- Left = never attended (queue clock), Slow = food took too long (order clock, Q-192)
 		Amount = Lync.int(0, 1000), -- what went into the drawer (tip included)
 	})),
 
