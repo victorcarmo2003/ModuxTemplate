@@ -38,7 +38,7 @@ export type Props = {
 	WarnAt: number?,
 	-- Title over the card (ui-text.md, Provisional). Default "Order".
 	Title: string?,
-	Position: UDim2?,
+	Position: (UDim2 | () -> UDim2)?,
 	AnchorPoint: Vector2?,
 	Name: string?,
 }

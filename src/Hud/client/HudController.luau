@@ -26,7 +26,8 @@
 	The Shift set is read here only for WipeEndsAt/WipeFrozen and the banner timing (network.md §3.1 lists the HUD as
 	a reader); Day/Night/Phase/clock still come from RoundController.
 
-	Order card (user request after Play): HudOrder on the top-left column, under the money and day pills, with the
+	Order card (user request after Play): HudOrder on the top-left column, under the Roblox menu / chat buttons (money and
+	day are top right, 2026-10-12; the Hud ScreenGui has DeviceSafeInsets, the player list is hidden), with the
 	order of the customer CustomerController picks (prompt target, else Q1 in Waiting); hidden while Down/Spectator.
 
 	Cinematic and reveal (user request 2026-10-11): the whole Hud ScreenGui is off while Interface/Cinematic is on
@@ -37,7 +38,9 @@
 	chances (Shift.Chances is never read, DEC-053), no XP. The client never writes money, sanity or life state: the
 	numbers come from the server's sets and packets. Texts from ui-text.md (Provisional, TASK-082).
 ]]
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
+local StarterGui = game:GetService("StarterGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -73,8 +76,9 @@ const MAX_VISIBLE = 3
 
 -- Wave 2 layout (px at scale 1): sanity meter and spectate card sit under the clock pill (TOP 6 + 38 + gap 6)
 const UNDER_CLOCK = 50
--- Order card under the day pill (HudScreen: TOP 6 + money 38 + gap 6 + day 32 + gap 6)
-const ORDER_TOP = 88
+-- Order card: top-left column UNDER the Roblox menu / chat buttons (the HUD gui has DeviceSafeInsets, so the Roblox top
+-- bar overlaps its top; money and day moved to the right, 2026-10-12). Real px of the top bar from GuiService.
+const ORDER_GAP = 8
 const ORDER_LEFT = 10
 -- Run end screen on screen (architecture.md §19.16)
 const RUN_END_TIME = 15
@@ -591,6 +595,12 @@ function HudController:SanityMeter(): Frame
 	})
 end
 
+-- Height in real px of the Roblox top bar (menu / chat buttons), which the HUD gui does not inset for.
+function HudController:TopBar(): number
+	const inset = GuiService:GetGuiInset()
+	return inset.Y
+end
+
 function HudController:OrderCard(): Frame
 	const customer = self.Dependencies.CustomerController
 	return HudOrder({
@@ -611,7 +621,9 @@ function HudController:OrderCard(): Frame
 			return customer:CardPatience()
 		end,
 		WarnAt = Content.Moods.Rules.AnnoyedAt,
-		Position = UDim2.fromOffset(ORDER_LEFT, ORDER_TOP),
+		Position = function()
+			return UDim2.fromOffset(ORDER_LEFT, math.ceil(self:TopBar() / self.Scale()) + ORDER_GAP)
+		end,
 	})
 end
 
@@ -679,8 +691,7 @@ function HudController:Mount(playerGui: Instance)
 		return Vide.create("ScreenGui")({
 			Name = "Hud",
 			ResetOnSpawn = false,
-			IgnoreGuiInset = false,
-			ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets,
+			ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets,
 			ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 			DisplayOrder = 1,
 			-- no HUD while a cinematic owns the screen (intro / finale / credits; Interface/Cinematic)
@@ -791,6 +802,13 @@ HudController:OnStart(function(self)
 	const place = self.Dependencies.PlaceController
 	if place:Is("Lobby") then
 		return
+	end
+	-- The money / day / toast column lives top right: the Roblox player list would sit under it
+	const ok, err = pcall(function()
+		StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, false)
+	end)
+	if not ok then
+		warn(`[HudController] could not hide the player list: {err}`)
 	end
 	self:WatchViewport()
 	-- PlayerGui may arrive a frame late; do not hold up the other OnStart.

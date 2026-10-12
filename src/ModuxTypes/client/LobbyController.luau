@@ -4,6 +4,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local LobbyZones = require(ReplicatedStorage.shared.Lobby.LobbyZones)
+local PartyRules = require(ReplicatedStorage.shared.Party.PartyRules)
 local ClassSelect = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.ClassSelect)
 local ClassEntries = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.ClassSelect.Entries)
 local CodeRedeem = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.CodeRedeem)
@@ -28,7 +29,7 @@ export type PartyRecord = {
 	Ready: { [number]: boolean },
 	State: "Forming" | "Configuring" | "Starting",
 	Platform: number,
-	FriendsOnly: boolean,
+	Access: string, -- PartyRules.Access
 	MaxPlayers: number,
 	StartAt: number,
 }
@@ -66,7 +67,9 @@ export type Public = {
 	Roster: Vide.Source<{ Player }>,
 	Scale: Vide.Source<number>,
 	Sent: Vide.Source<{ [number]: boolean }>,
+	SetupStage: Vide.Source<number>,
 	Stage: Stage.Stage?,
+	StageParty: number,
 	StagePoint: CFrame?,
 	Standing: Vide.Source<number>,
 	Toasts: Vide.Source<{ ToastStack.Entry }>,
@@ -107,6 +110,9 @@ export type Public = {
 	Answer: (self: Public, accept: boolean) -> (),
 	CurrentInvite: (self: Public) -> InvitePopup.Invite?,
 	ReceiveInvite: (self: Public, from: number, partyId: number) -> (),
+	CanCancel: (self: Public) -> boolean,
+	Cancel: (self: Public) -> (),
+	CancelKey: (self: Public) -> string,
 	PlayButton: (self: Public) -> LobbyHud.PlayButton,
 	PlayStatus: (self: Public) -> string,
 	PlayCard: (self: Public) -> SquadStatus.Info,
@@ -117,8 +123,11 @@ export type Public = {
 	PlatformParty: (self: Public, n: number) -> PartyRecord?,
 	SetupParty: (self: Public) -> PartyRecord?,
 	SetupMembers: (self: Public) -> { SquadSetup.Member },
+	SetupStageNow: (self: Public) -> number,
+	CheckStage: (self: Public, id: number, record: PartyRecord) -> (),
+	PickCount: (self: Public, count: number) -> (),
 	Countdown: (self: Public) -> number?,
-	Configure: (self: Public, friendsOnly: boolean, maxPlayers: number) -> (),
+	Configure: (self: Public, access: string, maxPlayers: number) -> (),
 	PadMembers: (self: Public, n: number) -> number,
 	PadMax: (self: Public, n: number) -> number,
 	PadState: (self: Public, n: number) -> PadTag.State,

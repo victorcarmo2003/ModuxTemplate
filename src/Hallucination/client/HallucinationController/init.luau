@@ -281,8 +281,7 @@ function HallucinationController:Mount(playerGui: Instance)
 		return Vide.create("ScreenGui")({
 			Name = "Hallucination",
 			ResetOnSpawn = false,
-			IgnoreGuiInset = false,
-			ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets,
+			ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets,
 			ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 			DisplayOrder = 2, -- same layer as the real call strip (BossCall)
 

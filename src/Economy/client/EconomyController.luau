@@ -225,6 +225,7 @@ function EconomyController:Fly(amount: number, position: Vector3?)
 		created.Name = "CashFly"
 		created.ResetOnSpawn = false
 		created.IgnoreGuiInset = true
+		created.ScreenInsets = Enum.ScreenInsets.None
 		created.DisplayOrder = 40
 		created.Parent = parent
 		self.FlyGui = created

@@ -37,7 +37,19 @@ const NOTICE_KEYS = table.freeze({
 	-- squad platforms (user request 2026-10-11, Provisional; network.md §16.6)
 	"FriendsOnly", -- stepped on a friends-only platform of someone who is not a friend
 	"Configured", -- to the squad: the leader changed Friends only / Max players
+	-- cancel the countdown (user request 2026-10-12, Provisional; network.md §16.8)
+	"StartCancelled", -- to the other members: UserId = the leader who cancelled
+	"CancelTooLate", -- to the leader: the cancel window is over, the teleport is on its way
+	-- two-stage room (user request 2026-10-12, Provisional; network.md §16.9)
+	"SetupFirst", -- to the leader: Start / invite before the room is confirmed (Access "Setup")
+	"RoomClosed", -- the room is not open (Access "Setup" or "Closed"): pad entry or invite refused
+	"InviteOnly", -- stepped on an invite-only pad
 })
+
+-- PartyConfigure.Access / Party.Access. "Setup" = created, private, the leader is still choosing (nobody can join,
+-- Start is refused); the others are the confirmed room: Open (pad or invite), Friends (friends of the leader, pad or
+-- invite), Invite (invite only, pads refuse), Closed (nobody joins). A squad of one (Play Solo) is "Closed".
+const ACCESS = table.freeze({ "Setup", "Open", "Friends", "Invite", "Closed" })
 
 const RULES = table.freeze({
 	MaxSize = #Content.RunParams.PartyPriceMult, -- 4 (DEC-012, DEC-047)
@@ -52,17 +64,23 @@ const RULES = table.freeze({
 	-- squad platforms (Content.Lobby.Squad; network.md §16.6)
 	Platforms = 4, -- LOBBY-SQUAD-1..4 (user 2026-10-11: 4 pads are enough; = #Content.Lobby.Zones with Platform > 0)
 	Countdown = Content.Lobby.Squad.Countdown, -- s between Start and the teleport (every squad, platform or not)
+	CancelCutoff = 0.5, -- s before StartAt after which PartyCancel is refused (the client hides the button then)
 	DefaultMaxPlayers = Content.Lobby.Squad.DefaultMaxPlayers,
-	DefaultFriendsOnly = Content.Lobby.Squad.DefaultFriendsOnly,
 })
 
 local isKey: { [string]: boolean } = {}
 for _, key in NOTICE_KEYS do
 	isKey[key] = true
 end
+local isAccess: { [string]: boolean } = {}
+for _, key in ACCESS do
+	isAccess[key] = true
+end
 
 return table.freeze({
 	NoticeKeys = NOTICE_KEYS,
+	Access = ACCESS,
+	IsAccess = table.freeze(isAccess),
 	IsNoticeKey = table.freeze(isKey),
 	Rules = RULES,
 })

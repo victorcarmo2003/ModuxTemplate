@@ -701,8 +701,7 @@ function BossController:Mount(playerGui: Instance)
 		return Vide.create("ScreenGui")({
 			Name = "BossCall",
 			ResetOnSpawn = false,
-			IgnoreGuiInset = false,
-			ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets,
+			ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets,
 			ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 			DisplayOrder = 2,
 

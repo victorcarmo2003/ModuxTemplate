@@ -884,3 +884,24 @@ por cima; o jogador também não alcança o teto do quiosque, 11,4).
 4. Nenhum jogador consegue sair da área (paredes do §12.10), subir no palco ou entrar no quiosque.
 5. Nada do MAP-01 aparece atrás dos prédios do HQ na altura do olho.
 6. ≤ 10 luzes locais, 1 com sombra; `Lighting` sem alteração.
+
+---
+
+# Texturização do lobby (2026-10-12, Provisório)
+
+Pedido do dono: piso e superfícies eram cor lisa lilás/branca, estourada. Snippet de Studio (Edit, sem Place.run, só **adiciona**
+filhos `Texture` nomeados `TexLobby_*` e uma Part): `tools/assetplace/texture_lobby.luau` (idempotente; `UNDO = true` remove tudo).
+Texturas originais geradas por `tools/assetplace/gen_lobby_textures.py` (`Assets/textures/lobby/`, créditos em `art/credits.md`).
+
+| Alvo | Textura (asset id) | Escala |
+|---|---|---|
+| `LobbyFloor` (27 malhas Kenney AST-032, face Top) | `T_LobbyPave` 106237538351376 (cinza-bege quente, 2 x 2 lajotas de 4 studs, juntas) + `T_LobbyStain` 116968848192402 (manchas, ZIndex 2) | 8 / 24 studs por tile |
+| `Apron_Classes/Shop/Codes` | `T_LobbyPaveLight` 119408403372428 (mais claro: ainda lê como "área especial"; filetes neon intocados) | 8 |
+| `Stage_Top` | `T_LobbyWood` 80430039847457 | 6 |
+| `Stage_Body` (4 faces laterais) | `T_LobbyBrick` 84014969468829 com `Color3` = cor do corpo (segue Ketchup) | 5 |
+| Food court | Part nova `TexLobby_FoodDeck` (não colide, 0,08) com `T_LobbyWood` sob as mesas M1..M3 | 6 |
+
+Não tocado: estrada (textura própria), pads de squad / medalhão / setas (cores semânticas), água, fachadas (malhas Kenney com atlas
+próprio), luzes. Juntas não alinham entre malhas vizinhas (cada malha tila a partir do seu canto); a emenda cai sempre numa junta.
+Testado em Edit (Lighting de Edit é frio e claro) e em Play com `ServerRoleOverride = "Lobby"` (preset real: âmbar, noite): o piso
+fica bege-alaranjado com juntas visíveis, sem estourar. **Os assets novos só aparecem depois de carregarem (primeira captura veio sem textura).**

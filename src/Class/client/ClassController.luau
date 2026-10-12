@@ -31,7 +31,6 @@ export type Action = "Buy" | "Select"
 
 const TOGGLE = "CrewToggle"
 const CLOSE = "CrewClose"
-const TOUCH_SIZE = 56
 const PENDING_TIMEOUT = 3 -- s without an answer: the button comes back (the server may have dropped it, 2/s)
 const PREVIEW_OUTFIT = "crew"
 const CLICK_SOUND = "ui_click"
@@ -212,9 +211,6 @@ function ClassController:Bind()
 			Name = TOGGLE,
 			Key = Enum.KeyCode.C,
 			Keys = { Enum.KeyCode.ButtonY },
-			TouchButton = true,
-			Title = "Crew",
-			TouchSize = TOUCH_SIZE,
 		})
 		.OnPress(function()
 			self:Toggle()
@@ -278,8 +274,7 @@ function ClassController:Mount(playerGui: Instance)
 		return Vide.create("ScreenGui")({
 			Name = "Crew",
 			ResetOnSpawn = false,
-			IgnoreGuiInset = false,
-			ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets,
+			ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets,
 			ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 			DisplayOrder = 5,
 			Enabled = self.Open,

@@ -111,7 +111,7 @@ export type PartyRecord = {
 	Ready: { [number]: boolean },
 	State: "Forming" | "Configuring" | "Starting",
 	Platform: number,
-	FriendsOnly: boolean,
+	Access: string, -- PartyRules.Access
 	MaxPlayers: number,
 	StartAt: number,
 }
@@ -146,6 +146,8 @@ const PLAY_CHOICES: { { Name: string, Key: Enum.KeyCode, Choice: PlayChoice.Choi
 	{ Name = "LobbyPlaySolo", Key = Enum.KeyCode.One, Choice = "Solo" },
 	{ Name = "LobbyPlaySquad", Key = Enum.KeyCode.Two, Choice = "Squad" },
 }
+const CANCEL = "LobbyCancel"
+const CANCEL_MARGIN = 0.1 -- s: the button goes away this much before the server window closes (clock tick, latency)
 const CLOSE = "LobbyClose"
 const PREVIOUS = "LobbyPrevious"
 const NEXT = "LobbyNext"
@@ -242,6 +244,10 @@ function LobbyController:Setup()
 	self.Roster = Vide.source({}) :: Vide.Source<{ Player }>
 	self.Sent = Vide.source({}) :: Vide.Source<{ [number]: boolean }>
 	self.Invites = Vide.source({}) :: Vide.Source<{ Invite }>
+	-- two-stage room (network.md §16.9): 1 = pick the size, 2 = pick who can join (local, while my room is "Setup")
+	self.SetupStage = Vide.source(1) :: Vide.Source<number>
+	-- PartyId whose setup stage was started
+	self.StageParty = 0 :: number
 	-- a quick play (PartyQuickPlay) waiting for its squad
 	self.QuickPending = Vide.source(false) :: Vide.Source<boolean>
 	self.QuickMode = "Solo" :: PlayChoice.Choice
@@ -699,6 +705,30 @@ function LobbyController:ReceiveInvite(from: number, partyId: number)
 	end)
 end
 
+-- The leader (and a solo player) may abort the countdown until PartyRules.Rules.CancelCutoff s before the teleport; the
+-- server refuses later, and the button is gone by then (user request 2026-10-12; network.md §16.8). Reactive (Clock).
+function LobbyController:CanCancel(): boolean
+	const _, party = self:MyParty()
+	if party == nil or party.State ~= "Starting" or party.StartAt <= 0 then
+		return false
+	end
+	if party.Leader ~= Players.LocalPlayer.UserId then
+		return false
+	end
+	return party.StartAt - self.Clock() > PartyRules.Rules.CancelCutoff + CANCEL_MARGIN
+end
+
+function LobbyController:Cancel()
+	-- event handlers run outside any reactive scope: plain reads
+	if self:CanCancel() then
+		self.Libs.Net.PartyCancel:fireServer()
+	end
+end
+
+function LobbyController:CancelKey(): string
+	return if self.Dependencies.InputController.Device() == "Touch" then "" else "X"
+end
+
 function LobbyController:PlayButton(): LobbyHud.PlayButton
 	const _, party = self:MyParty()
 	if party == nil then
@@ -707,11 +737,16 @@ function LobbyController:PlayButton(): LobbyHud.PlayButton
 			else { Text = "PLAY", Kind = "Go", Enabled = true }
 	end
 	if party.State == "Starting" then
+		if self:CanCancel() then
+			return { Text = "CANCEL", Kind = "Cancel", Enabled = true }
+		end
 		return { Text = "STARTING...", Kind = "Go", Enabled = true }
 	end
 	const me = Players.LocalPlayer.UserId
 	if party.Leader == me then
-		return { Text = "START SQUAD", Kind = "Wait", Enabled = true }
+		return if party.Access == "Setup"
+			then { Text = "SET UP ROOM", Kind = "Wait", Enabled = true }
+			else { Text = "START SQUAD", Kind = "Wait", Enabled = true }
 	end
 	return if party.Ready[me] == true
 		then { Text = "READY!", Kind = "Go", Enabled = true }
@@ -730,6 +765,9 @@ function LobbyController:PlayStatus(): string
 		const left = party.StartAt - self.Clock()
 		return if left > 0 then `Starting in {math.ceil(left)}...` else "Here we go!"
 	end
+	if party.Access == "Setup" then
+		return "Setting up the room..."
+	end
 	local waiting = 0
 	for _, userId in party.Members do
 		if userId ~= party.Leader and party.Ready[userId] ~= true then
@@ -746,13 +784,16 @@ end
 function LobbyController:PlayCard(): SquadStatus.Info
 	const _, party = self:MyParty()
 	const me = Players.LocalPlayer.UserId
+	self.Roster() -- names follow players joining / leaving
 	if party == nil then
 		return {
 			Squad = false,
-			Members = { { UserId = me, Leader = true, Ready = true } },
+			Members = { { UserId = me, Leader = true, Ready = true, Name = nameOf(me) } },
 			Max = 1,
 			FriendsOnly = false,
 			Status = self:PlayStatus(),
+			CanInvite = false,
+			Starting = self.QuickPending(),
 		}
 	end
 	const members: { SquadStatus.Member } = {}
@@ -761,6 +802,7 @@ function LobbyController:PlayCard(): SquadStatus.Info
 			UserId = userId,
 			Leader = userId == party.Leader,
 			Ready = party.Ready[userId] == true or userId == party.Leader,
+			Name = nameOf(userId),
 		})
 	end
 	-- a squad of one that is already starting is a solo run (Play Solo)
@@ -769,14 +811,23 @@ function LobbyController:PlayCard(): SquadStatus.Info
 		Squad = not solo,
 		Members = members,
 		Max = if solo then 1 else math.max(party.MaxPlayers, #members),
-		FriendsOnly = party.FriendsOnly and not solo,
+		FriendsOnly = party.Access == "Friends" and not solo,
+		Access = if solo then nil else party.Access,
 		Status = self:PlayStatus(),
+		CanInvite = party.Leader == me
+			and party.State ~= "Starting"
+			and (party.Access == "Open" or party.Access == "Friends" or party.Access == "Invite"),
+		Starting = party.State == "Starting",
 	}
 end
 
 -- Play button: outside a squad the choice (Play Solo / Create Squad); in a squad its setup window.
 function LobbyController:Play()
 	-- event handlers run outside any reactive scope: plain reads
+	if self:CanCancel() then
+		self:Cancel()
+		return
+	end
 	const id = self:MyParty()
 	if id == nil then
 		if not Vide.untrack(self.QuickPending) then
@@ -883,6 +934,36 @@ function LobbyController:SetupMembers(): { SquadSetup.Member }
 	return list
 end
 
+-- Two-stage room (network.md §16.9). A room I lead that is still "Setup" shows stage 1 (size) then 2 (who can join);
+-- anything else (members, a confirmed room) shows the room itself, stage 3. The stages are local; the server only keeps
+-- the room private ("Setup") until the leader picks an Access.
+function LobbyController:SetupStageNow(): number
+	const party = self:SetupParty()
+	if party == nil or party.Access ~= "Setup" or party.Leader ~= Players.LocalPlayer.UserId then
+		return 3
+	end
+	return Vide.untrack(self.SetupStage)
+end
+
+-- A room of mine (re)appears in "Setup": start at stage 1.
+function LobbyController:CheckStage(id: number, record: PartyRecord)
+	if record.Access == "Setup" and record.Leader == Players.LocalPlayer.UserId and self.StageParty ~= id then
+		self.StageParty = id
+		self.SetupStage(1)
+	end
+end
+
+-- Stage 1 button: the room size. 1 = a closed room of one at once; more = on to "who can join".
+function LobbyController:PickCount(count: number)
+	const size = math.clamp(count, 1, PartyRules.Rules.MaxSize)
+	if size == 1 then
+		self:Configure("Closed", 1)
+		return
+	end
+	self:Configure("Setup", size)
+	self.SetupStage(2)
+end
+
 -- Seconds before the teleport of the shown squad; nil = not starting.
 function LobbyController:Countdown(): number?
 	const party = self:SetupParty()
@@ -892,9 +973,9 @@ function LobbyController:Countdown(): number?
 	return math.max(party.StartAt - self.Clock(), 0)
 end
 
-function LobbyController:Configure(friendsOnly: boolean, maxPlayers: number)
+function LobbyController:Configure(access: string, maxPlayers: number)
 	self.Libs.Net.PartyConfigure:fireServer({
-		FriendsOnly = friendsOnly,
+		Access = access :: any,
 		MaxPlayers = math.clamp(maxPlayers, 1, PartyRules.Rules.MaxSize),
 	})
 end
@@ -907,23 +988,26 @@ end
 
 function LobbyController:PadMax(n: number): number
 	const party = self:PlatformParty(n)
-	return if party then math.max(party.MaxPlayers, #party.Members) else PartyRules.Rules.MaxSize
+	-- no fixed capacity per pad: a free pad or a room still being set up has no size
+	return if party and party.Access ~= "Setup" then math.max(party.MaxPlayers, #party.Members) else 0
 end
 
 function LobbyController:PadState(n: number): PadTag.State
 	const party = self:PlatformParty(n)
 	if party == nil then
-		return "Open"
+		return "Free"
 	elseif party.State == "Starting" then
 		return "Starting"
+	elseif party.Access == "Setup" then
+		return "Configuring"
 	end
-	return if #party.Members >= math.max(party.MaxPlayers, 1) then "Full" else "Busy"
+	return if party.Access == "Closed" or #party.Members >= math.max(party.MaxPlayers, 1) then "Closed" else "Open"
 end
 
 function LobbyController:PadStatus(n: number): string
 	const party = self:PlatformParty(n)
 	if party == nil then
-		return "OPEN"
+		return "FREE"
 	end
 	if party.State == "Starting" then
 		if party.StartAt <= 0 then
@@ -932,11 +1016,20 @@ function LobbyController:PadStatus(n: number): string
 		const left = party.StartAt - self.Clock()
 		return if left > 0 then `STARTING IN {math.ceil(left)}...` else "GO!"
 	end
-	const free = math.max(party.MaxPlayers - #party.Members, 0)
-	if free == 0 then
+	if party.Access == "Setup" then
+		return "CONFIGURING"
+	elseif party.Access == "Closed" then
+		return "CLOSED"
+	elseif #party.Members >= math.max(party.MaxPlayers, 1) then
 		return "FULL"
 	end
-	return if party.FriendsOnly then "FRIENDS ONLY" else `ROOM FOR {free}`
+	const count = `{#party.Members}/{math.max(party.MaxPlayers, #party.Members)}`
+	if party.Access == "Friends" then
+		return "FRIENDS ONLY"
+	elseif party.Access == "Invite" then
+		return "INVITE ONLY"
+	end
+	return `OPEN {count}`
 end
 
 -- Ring colour of each platform: free / owned by a squad (someone is setting it up) / starting.
@@ -1169,6 +1262,20 @@ function LobbyController:Bind()
 				self:Play()
 			end
 		end)
+	-- X / gamepad X: cancel the countdown (any context: the squad window may be open over it)
+	input
+		:Bind({
+			Name = CANCEL,
+			Key = Enum.KeyCode.X,
+			Keys = { Enum.KeyCode.ButtonX },
+			Priority = BIND_PRIORITY,
+		})
+		.OnPress(function()
+			if self:CanCancel() then
+				self:Click()
+				self:Cancel()
+			end
+		end)
 	for _, choice in PLAY_CHOICES do
 		input
 			:Bind({
@@ -1352,8 +1459,7 @@ function LobbyController:Mount(playerGui: Instance)
 		return Vide.create("ScreenGui")({
 			Name = "Lobby",
 			ResetOnSpawn = false,
-			IgnoreGuiInset = false,
-			ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets,
+			ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets,
 			ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 			DisplayOrder = 6,
 
@@ -1393,6 +1499,13 @@ function LobbyController:Mount(playerGui: Instance)
 				OnPlay = function()
 					self:Click()
 					self:Play()
+				end,
+				OnInvite = function()
+					self:Click()
+					self:SetPanel("Squad")
+				end,
+				CancelKey = function()
+					return self:CancelKey()
 				end,
 				Scale = self.Scale,
 			}),
@@ -1543,9 +1656,20 @@ function LobbyController:Mount(playerGui: Instance)
 					const party = self:SetupParty()
 					return party ~= nil and party.Leader == Players.LocalPlayer.UserId
 				end,
-				FriendsOnly = function()
+				Access = function()
 					const party = self:SetupParty()
-					return party ~= nil and party.FriendsOnly
+					return if party then party.Access else "Setup"
+				end,
+				Stage = function()
+					return self:SetupStageNow()
+				end,
+				OnCount = function(count: number)
+					self:Click()
+					self:PickCount(count)
+				end,
+				OnBack = function()
+					self:Click()
+					self.SetupStage(1)
 				end,
 				MaxPlayers = function()
 					const party = self:SetupParty()
@@ -1557,25 +1681,35 @@ function LobbyController:Mount(playerGui: Instance)
 				end,
 				CanStart = function()
 					const party = self:SetupParty()
-					return party ~= nil and party.State ~= "Starting" and self:AllReady(party)
+					return party ~= nil
+						and party.State ~= "Starting"
+						and party.Access ~= "Setup"
+						and self:AllReady(party)
 				end,
-				OnFriendsOnly = function(on: boolean)
+				OnAccess = function(access: string)
 					self:Click()
 					const party = self:SetupParty()
 					if party then
-						self:Configure(on, party.MaxPlayers)
+						self:Configure(access, party.MaxPlayers)
 					end
 				end,
 				OnMaxPlayers = function(count: number)
 					self:Click()
 					const party = self:SetupParty()
 					if party then
-						self:Configure(party.FriendsOnly, count)
+						self:Configure(party.Access, count)
 					end
 				end,
 				OnStart = function()
 					self:Click()
 					self.Libs.Net.PartyStart:fireServer()
+				end,
+				CanCancel = function()
+					return self:CanCancel()
+				end,
+				OnCancel = function()
+					self:Click()
+					self:Cancel()
 				end,
 				OnClose = close,
 				Scale = self.Scale,
@@ -1650,7 +1784,35 @@ function LobbyController:Mount(playerGui: Instance)
 			}),
 		})
 	end)
-	self.Unmount = unmount
+	-- Full-screen dim behind the modal windows (Shop, Codes, Squad, Play, Setup): its own ScreenGui with no insets, so
+	-- it covers the whole screen (no lighter strip at the notch / under the Roblox bar); the windows themselves stay
+	-- inside the safe area of the Lobby gui (LobbyWindow has no backdrop of its own)
+	const unmountDim, dim = Vide.root(function()
+		return Vide.create("ScreenGui")({
+			Name = "LobbyDim",
+			ResetOnSpawn = false,
+			IgnoreGuiInset = true,
+			ScreenInsets = Enum.ScreenInsets.None,
+			ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+			DisplayOrder = 5,
+			Enabled = function()
+				const panel = self.Panel()
+				return panel ~= "None" and panel ~= "Classes"
+			end,
+			Vide.create("Frame")({
+				Name = "Dim",
+				Size = UDim2.fromScale(1, 1),
+				BackgroundColor3 = Theme.Color.Ink,
+				BackgroundTransparency = 0.5,
+				Active = true,
+			}),
+		})
+	end)
+	dim.Parent = playerGui
+	self.Unmount = function()
+		unmountDim()
+		unmount()
+	end
 	self.Gui = gui
 	gui.Parent = playerGui
 	-- capacity signs over the squad pads (BillboardGuis in PlayerGui, adorned to local anchor Parts)
@@ -1686,12 +1848,14 @@ LobbyController:OnInit(function(self)
 		const copy = table.clone(Vide.untrack(self.Parties))
 		copy[id] = record :: any
 		self.Parties(copy)
+		self:CheckStage(id, record :: any)
 		self:CheckQuickPlay()
 	end)
 	net.Party:onChanged(function(id, record)
 		const copy = table.clone(Vide.untrack(self.Parties))
 		copy[id] = record :: any
 		self.Parties(copy)
+		self:CheckStage(id, record :: any)
 		self:CheckQuickPlay()
 	end)
 	net.Party:onRemoved(function(id)

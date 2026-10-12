@@ -1,6 +1,6 @@
 --!strict
 -- CrewScreen: the "Crew" screen (TASK-020; DEC-186, FEAT-001 class part, FEAT-028; style guide §7.1), mobile first.
--- Laid out for the smallest landscape phone (620 x 320 px at Scale 1, inside CoreUISafeInsets); `Scale` grows it.
+-- Laid out for the smallest landscape phone (620 x 320 px at Scale 1, inside DeviceSafeInsets); `Scale` grows it.
 --   header   "Crew" · gem balance · close button (44 px)
 --   left     preview of the focused animal (ViewportFrame with CrewRig) · description · main button
 --   right    3 x 2 grid of CrewCard (the 6 MVP classes; panda/lion are not playable, DEC-186)

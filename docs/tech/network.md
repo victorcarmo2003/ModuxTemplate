@@ -16,6 +16,10 @@ processa recibo (`ShopService`).
 **Versão 5.6, 2026-10-11 (pedido do usuário, Provisório):** plataformas de squad (§16.6): set `Party` ganha
 `Platform`, `FriendsOnly`, `MaxPlayers`, `StartAt` e o estado `Configuring`; packet novo `PartyConfigure`; avisos
 `FriendsOnly`, `Configured`; `PartyStart` passa a ter contagem de 5 s.
+**Versão 5.8, 2026-10-12 (pedido do usuário, Provisório; Q-217):** cancelar a contagem do Start (§16.8): packet novo
+`PartyCancel` (c → s, vazio); avisos `StartCancelled`, `CancelTooLate`. Sala em dois estágios (§16.9): o set `Party`
+troca `FriendsOnly` por `Access`; `PartyConfigure` troca `FriendsOnly` por `Access`; avisos `SetupFirst`, `RoomClosed`,
+`InviteOnly`; plataformas sem capacidade fixa.
 **Versão 5.7, 2026-10-11 (pedido do usuário, Provisório):** botão Play do lobby com escolha (§16.7): packet novo
 `PartyQuickPlay { Mode = "Solo" | "Squad" }`; squad "Solo" de 1 começa já e some ao voltar ao estado ocioso.
 **Versão 5.2, 2026-10-10 (DEC-221):** set `Hides` sai; janela do trailer = atributo `Shutter` no `Model` do veículo
@@ -1168,7 +1172,7 @@ Party = Lync.replicate(Lync.struct({
 	Ready = Lync.map(Lync.f64(), Lync.bool(), 0, 4), -- todo membro; o líder sempre true
 	State = Lync.enum({ "Forming", "Configuring", "Starting" }),
 	Platform = Lync.int(0, 4), -- §16.6: LOBBY-SQUAD-n da squad; 0 = squad de convite
-	FriendsOnly = Lync.bool(), -- §16.6
+	Access = Lync.enum(PartyRules.Access), -- §16.9 (era FriendsOnly, §16.6)
 	MaxPlayers = Lync.int(1, 4), -- §16.6
 	StartAt = Lync.f64(), -- §16.6: workspace:GetServerTimeNow() do teleporte; 0 = sem contagem
 })),
@@ -1192,7 +1196,8 @@ Party = Lync.replicate(Lync.struct({
 | `PartyKick` | `{ UserId }` | líder, `Forming`, alvo é membro e não é ele | `Kicked` ao alvo + `Left{UserId}` à squad / `NotLeader`, `Busy`, `PlayerNotFound` |
 | `PartyReady` | `{ Ready }` | membro não-líder, `Forming` | set / `NotInParty`, `Busy` |
 | `PartyStart` | — | líder, `Forming`/`Configuring`, todos os outros prontos | set `Starting` + `StartAt` + `Starting` à squad → `Rules.Countdown` s (5) depois, teleporte (`TeleportRetry` a cada nova tentativa; `TeleportFailed` se todas falharem); no Studio a contagem roda e termina em `StudioNoTeleport` (volta ao estado de antes) / `NotLeader`, `Busy`, `NotAllReady{UserId}` |
-| `PartyConfigure` | `{ FriendsOnly, MaxPlayers }` | líder, não `Starting`; `MaxPlayers` preso a `[max(#Members, 1), 4]` | set + `Configured` aos outros membros / `NotInParty`, `NotLeader`, `Busy` |
+| `PartyConfigure` | `{ Access, MaxPlayers }` | líder, não `Starting` (§16.9: `Access = "Setup"` só com o líder sozinho); `MaxPlayers` preso a `[max(#Members, 1), 4]` | set + `Configured` aos outros membros / `NotInParty`, `NotLeader`, `Busy` |
+| `PartyCancel` | — | líder, `Starting`, antes de `StartAt - Rules.CancelCutoff` (§16.8) | set volta ao estado ocioso (solo: some) + `StartCancelled{UserId = líder}` aos outros / `NotLeader`, `NotInParty`, `CancelTooLate` |
 | `PartyQuickPlay` | `{ Mode }` (`"Solo"`/`"Squad"`) | fora de squad (§16.7) | `Solo`: set (`Platform 0`, `MaxPlayers 1`) já em `Starting` + `Starting`; `Squad`: set `Forming` + `Created` / `AlreadyInParty` |
 
 ### 16.3 Avisos (s → jogador)
@@ -1209,7 +1214,8 @@ PartyNotice = Lync.packet(Lync.struct({
 `PlayerNotFound`, `InviteSelf`, `InviteSent`, `InviteExpired`, `InviteDeclined`, `Joined`, `Left`, `Kicked`,
 `NewLeader`, `NotAllReady`, `Busy`, `TooFast`, `Starting`, `TeleportRetry`, `TeleportFailed`, `StudioNoTeleport`,
 `ReturningToLobby`, `ReturnFailed`, `WrongServer`, `FriendsOnly` (§16.6: plataforma só de amigos recusou), `Configured`
-(§16.6: o líder mudou as opções). **Acréscimo ao combinado**: o campo opcional `UserId` (o frontend
+(§16.6: o líder mudou as opções), `StartCancelled` (§16.8: o líder cancelou a contagem), `CancelTooLate` (§16.8:
+cancelou tarde demais). **Acréscimo ao combinado**: o campo opcional `UserId` (o frontend
 pode ignorar).
 
 ### 16.4 `LobbyReturn` (c → s, papel `Game`; responde `PartyRunService`) — **entrada nova**
@@ -1256,7 +1262,7 @@ plataforma em que o jogador está; contagem = `StartAt - workspace:GetServerTime
 
 ```lua
 PartyConfigure = Lync.packet(Lync.struct({
-	FriendsOnly = Lync.bool(),
+	Access = Lync.enum(PartyRules.Access), -- §16.9 (era FriendsOnly)
 	MaxPlayers = Lync.int(1, 4),
 })),
 ```
@@ -1283,3 +1289,56 @@ PartyQuickPlay = Lync.packet(Lync.struct({
 Validação: rate e papel comuns (§16); já em squad = `AlreadyInParty`. `Solo` é campo só do servidor (não viaja no set).
 Client: botões ficam desligados até o registro da squad chegar no set (ou 6 s / `AlreadyInParty` / `TooFast` /
 `WrongServer`). Orçamento: um evento por clique.
+
+### 16.8 Cancelar a contagem: `PartyCancel` (v5.8, pedido do usuário 2026-10-12; **Provisório**, Q-217)
+
+Durante `Starting` (contagem de `Rules.Countdown` = 5 s do Start de squad ou do Play Solo) o botão Play do lobby vira
+**CANCEL** (mostarda escura, tecla X / X do gamepad; na janela `SquadSetup` há um botão Cancel).
+
+```lua
+PartyCancel = Lync.packet(Lync.empty()), -- c -> s
+```
+
+Servidor (`PartyService:HandleCancel`): rate e papel comuns (§16); sem squad = `NotInParty`; não líder = `NotLeader`;
+`State ~= "Starting"` = ignorado (idempotente); `Launched` ou `GetServerTimeNow() >= StartAt - Rules.CancelCutoff`
+(0,5 s) = `CancelTooLate` ao líder, nada muda. Aceito: `Token` da squad sobe (a thread da contagem de `Begin` só dispara
+se o `Token` ainda for o seu, então não há corrida com `Fire`/`ReserveServer`/`TeleportAsync`), `StartAt = 0`, estado
+volta ao ocioso (`Forming`/`Configuring`; os Ready dos membros ficam como estavam) e o set é publicado; squad Solo é
+desfeita (o Play oferece a escolha de novo). Os outros membros recebem `StartCancelled{UserId = líder}` ("Leader
+cancelled"). **Client**: o botão só existe para o líder enquanto `StartAt - agora > CancelCutoff + 0,1 s`; depois
+volta a "STARTING...". Orçamento: um evento por clique.
+
+### 16.9 Sala em dois estágios e plataformas sem capacidade fixa (v5.8, pedido do usuário 2026-10-12; **Provisório**, Q-217)
+
+Cada plataforma (e o **Create Squad** do Play) cria a sala **privada** e o líder a monta em dois estágios no
+`SquadSetup`; o servidor só guarda o resultado. **Nenhuma plataforma tem capacidade própria**: o tamanho é o `MaxPlayers`
+(1..4, `Rules.MaxSize`, DEC-012) que o líder escolhe na criação.
+
+```lua
+Access = Lync.enum(PartyRules.Access), -- { "Setup", "Open", "Friends", "Invite", "Closed" } (set Party e PartyConfigure)
+```
+
+| `Access` | Quem entra | Start |
+|---|---|---|
+| `Setup` | **ninguém** (sala privada; plataforma recusa `RoomClosed`, convite `SetupFirst` ao líder) | recusado (`SetupFirst`) |
+| `Open` | qualquer um pisando na plataforma ou por convite, até `MaxPlayers` | sim |
+| `Friends` | amigos do líder (`IsFriendsWith`) na plataforma; convite do líder vale | sim |
+| `Invite` | só por convite (plataforma recusa `InviteOnly`) | sim |
+| `Closed` | ninguém (`RoomClosed`; squad de 1 do Play Solo é `Closed`) | sim |
+
+Estágios (client, locais): **1** "How many players?" (botões 1–4; `1` = sala fechada de um só: `PartyConfigure
+{ Access = "Closed", MaxPlayers = 1 }` e vai direto ao estágio 3) → `PartyConfigure { Access = "Setup", MaxPlayers = n }`
+e **2** "Who can join?" (Open / Friends only / Invite only / Closed; Back volta ao 1) → `PartyConfigure { Access = escolha,
+MaxPlayers }`: **só aí** a sala sai de `Setup` e os outros podem entrar. **3** = a sala (líder: Who can join com ciclo,
+Max players −/+, Start, Cancel; membros: leitura). Squads criadas por `PartyCreate`/`PartyInvite` nascem `Invite`
+(convite imediato, como antes); `PartyQuickPlay "Squad"` e as plataformas nascem `Setup`; `"Solo"` nasce `Closed`.
+
+Servidor (`PartyService`): `HandleConfigure` (líder, não `Starting`) clampa `MaxPlayers` a `[max(#Members,1), 4]` e recusa
+`Setup` com mais de um membro (mantém o `Access` atual); `Join` pela plataforma e `HandleRespond` rechecam o `Access`;
+`PartyStart` em `Setup` = `SetupFirst`. Avisos novos: `SetupFirst`, `RoomClosed`, `InviteOnly`.
+
+Placa da plataforma (`PadTag`): **FREE** (livre) / **CONFIGURING** (`Setup`) / **OPEN n/máx** (+ **FRIENDS ONLY**,
+**INVITE ONLY**) / **CLOSED** (`Closed` ou lotada: **FULL**) / **STARTING IN n...**; o "n/máx" só aparece quando a sala
+tem tamanho. Orçamento: o campo `Access` é um enum de 3 bits dentro de um registro largo (ids `f64`), então não há risco do
+`drop.section` do README (set pequeno, poucos registros).
+

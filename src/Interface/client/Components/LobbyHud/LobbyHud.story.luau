@@ -34,6 +34,7 @@ const PLAY: { [string]: LobbyHud.PlayButton } = {
 	NotReady = { Text = "READY", Kind = "Wait", Enabled = true },
 	Ready = { Text = "READY!", Kind = "Go", Enabled = true },
 	Starting = { Text = "STARTING...", Kind = "Go", Enabled = true },
+	Cancel = { Text = "CANCEL", Kind = "Cancel", Enabled = true },
 	Waiting = { Text = "...", Kind = "Off", Enabled = false },
 }
 
@@ -43,17 +44,21 @@ local function infoOf(state: string): SquadStatus.Info
 		return {
 			Squad = true,
 			Members = {
-				{ UserId = me, Leader = state == "Leader", Ready = state ~= "NotReady" },
-				{ UserId = 1, Leader = state ~= "Leader", Ready = false },
+				{ UserId = me, Leader = state == "Leader", Ready = state ~= "NotReady", Name = "You" },
+				{ UserId = 1, Leader = state ~= "Leader", Ready = false, Name = "Roblox" },
 			},
 			Max = 4,
 			FriendsOnly = state == "Leader",
 			Status = "Waiting for 1 player",
+			CanInvite = state == "Leader",
 		}
-	elseif state == "Starting" then
+	elseif state == "Starting" or state == "Cancel" then
 		return {
 			Squad = true,
-			Members = { { UserId = me, Leader = true, Ready = true }, { UserId = 1, Leader = false, Ready = true } },
+			Members = {
+				{ UserId = me, Leader = true, Ready = true, Name = "You" },
+				{ UserId = 1, Leader = false, Ready = true, Name = "Roblox" },
+			},
 			Max = 2,
 			FriendsOnly = false,
 			Status = "Starting in 3...",
@@ -78,7 +83,7 @@ return UILabs.CreateVideStory({
 	controls = {
 		Screen = UILabs.Choose({ "667x375", "360x640", "1280x720", "1920x1080", "Fill" }),
 		Gems = UILabs.Slider(120, 0, 9999, 1),
-		Play = UILabs.Choose({ "Solo", "Leader", "NotReady", "Ready", "Starting", "Waiting" }),
+		Play = UILabs.Choose({ "Solo", "Leader", "NotReady", "Ready", "Starting", "Cancel", "Waiting" }),
 		Squad = "2/4",
 		Keys = true,
 	},
@@ -113,6 +118,12 @@ return UILabs.CreateVideStory({
 			end,
 			Card = function()
 				return infoOf(controls.Play())
+			end,
+			CancelKey = function()
+				return if controls.Keys() then "X" else ""
+			end,
+			OnInvite = function()
+				print("[LobbyHud story] invite")
 			end,
 			Keys = function()
 				if not controls.Keys() then

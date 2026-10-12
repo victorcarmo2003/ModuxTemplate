@@ -1154,7 +1154,7 @@ function CutsceneController:Mount(gui: Instance)
 		return Vide.create("ScreenGui")({
 			Name = "CutsceneScreen",
 			ResetOnSpawn = false,
-			IgnoreGuiInset = false,
+			ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets,
 			DisplayOrder = UI_ORDER,
 			ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 

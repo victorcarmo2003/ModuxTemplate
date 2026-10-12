@@ -40,9 +40,10 @@ return Table.new({
 		Wave = 1,
 	},
 	{ Key = "discard", Text = "Throw Away", Hold = 0.5, Radius = 7, Requires = { Held = "hot_dog" }, Night = "Any", Wave = 1 },
-	{ Key = "take_order", Text = "Take Order", Hold = 0, Radius = 8, Requires = {}, Night = "Any", Wave = 1 },
-	{ Key = "serve", Text = "Serve", Hold = 0, Radius = 8, Requires = { Held = "hot_dog" }, Night = "Any", Wave = 1 },
-	{ Key = "refuse", Text = "Refuse", Hold = 1, Radius = 8, Requires = {}, Night = "Any", Wave = 1 },
+	-- Customer prompts: 10 (was 8; owner playtest 2026-10-12, customers too far). The anchor rides on the customer rig.
+	{ Key = "take_order", Text = "Take Order", Hold = 0, Radius = 10, Requires = {}, Night = "Any", Wave = 1 },
+	{ Key = "serve", Text = "Serve", Hold = 0, Radius = 10, Requires = { Held = "hot_dog" }, Night = "Any", Wave = 1 },
+	{ Key = "refuse", Text = "Refuse", Hold = 1, Radius = 10, Requires = {}, Night = "Any", Wave = 1 },
 	-- Cash register (Q-201, Provisional): drawer -> party Cash now. Anchor Prompt_Collect on the DRAWER / TRL-DRAWER model
 	-- (CashDeskService); only enabled while the drawer is open and holds money. Short hold, smaller radius than the
 	-- counter prompts so it never fights the ketchup / customer pills.

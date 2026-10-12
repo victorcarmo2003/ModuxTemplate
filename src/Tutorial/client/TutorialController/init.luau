@@ -149,6 +149,10 @@ const CUSTOMER_LIFT = 3.2 -- over the head: above the order bubble and the promp
 const EDGE_MARGIN = 56 -- px from the screen edge for the pointer
 -- UI scale like the HUD: global rule (Theme.ScaleOf)
 const PANEL_TOP = 50 -- px at scale 1, under the clock row (HudScreen TOP 6 + 38 + gap 6)
+-- Narrow screens (under 520 px at scale 1, phone in portrait): money and day stack at the top right and would touch the
+-- 260 px panel, so the panel sits under them (6 + 38 + 6 + 32 + 6 = 88)
+const PANEL_TOP_NARROW = 88
+const PANEL_NARROW = 520
 const CASH_NAME = "Cash" -- HudPill of the money in the Hud ScreenGui
 const MONEY_STEP = "money"
 const MART_TALK = "mart"
@@ -1796,8 +1800,7 @@ function TutorialController:Mount(playerGui: Instance)
 		const panel = Vide.create("ScreenGui")({
 			Name = "Tutorial",
 			ResetOnSpawn = false,
-			IgnoreGuiInset = false,
-			ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets,
+			ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets,
 			ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 			DisplayOrder = 6,
 			Enabled = function()
@@ -1837,7 +1840,10 @@ function TutorialController:Mount(playerGui: Instance)
 				Scale = scale,
 				-- under the clock row, scaled like the HUD
 				Position = function()
-					return UDim2.new(0.5, 0, 0, PANEL_TOP * scale())
+					const s = scale()
+					const camera = workspace.CurrentCamera
+					const narrow = camera ~= nil and camera.ViewportSize.X / s < PANEL_NARROW
+					return UDim2.new(0.5, 0, 0, (if narrow then PANEL_TOP_NARROW else PANEL_TOP) * s)
 				end,
 			}),
 		})
@@ -1849,8 +1855,7 @@ function TutorialController:Mount(playerGui: Instance)
 		const focus = Vide.create("ScreenGui")({
 			Name = "TutorialSpotlight",
 			ResetOnSpawn = false,
-			IgnoreGuiInset = false,
-			ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets,
+			ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets,
 			ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 			DisplayOrder = 5,
 			Enabled = function()
@@ -1913,8 +1918,7 @@ function TutorialController:Mount(playerGui: Instance)
 			const debug = Vide.create("ScreenGui")({
 				Name = "TutorialDebug",
 				ResetOnSpawn = false,
-				IgnoreGuiInset = false,
-				ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets,
+				ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets,
 				ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 				DisplayOrder = 50,
 				TutorialDebug({

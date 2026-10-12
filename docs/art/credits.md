@@ -55,6 +55,10 @@ Sugestão de crédito no jogo: "UI icons by RhosGFX".
 |---|---|---|---|---|
 | Rig "CommunityR6" (R6 IK/FK para Blender: armatures de controle e interna, drivers, scripts `RigBootstrap.py`, `RigSelector.py`, `RigSettings.py`, `RigUtilities.py`, `RigEvents.py`) | **Aeresei ("Fancy Ducc", @distinguished_duccer)** — conforme `bl_info` dos scripts ("the R6 rig I made for everyone") | **não declarada no arquivo** (distribuído à comunidade; cópia fornecida pelo usuário em `C:\Users\hakor\Documents\Rigs\CommunityR6.blend`) | `Assets/blender/character/AST-069_AnimalRig.blend` (cópia adaptada: malhas genéricas do Roblox removidas, malhas da crew AST-053, troca de espécie, "Pin Joint") | **ferramenta de animação**: nenhum pedaço do rig vai para o jogo, só as animações que fazemos nele (AST-069). Antes de publicar o repositório ou distribuir o `.blend`, confirmar a licença com o autor; manter o crédito |
 
+## Texturas do lobby (2026-10-12, obra original)
+
+`Assets/textures/lobby/T_Lobby{Pave,PaveLight,Stain,Wood,Brick}.png`, geradas proceduralmente por `tools/assetplace/gen_lobby_textures.py` (numpy/scipy/PIL, ruído sintético). **Sem fonte de terceiros, sem licença a verificar.** Ids de upload em `tools/assetplace/texture_lobby.luau`.
+
 ## Recursos da plataforma (não são asset de terceiros no repositório)
 
 | Recurso | Origem | Nota |

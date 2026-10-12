@@ -15,7 +15,8 @@
 -- Content.Lobby.Squad.Poll s from each HumanoidRootPart (shared.Lobby.LobbyZones, with hysteresis). Stepping on a free
 -- platform = a new squad with Platform n and State "Configuring" that you lead (the leader of an invite squad takes
 -- the platform with the squad instead). Stepping on an owned platform = joining it when it is not Starting, has room
--- (MaxPlayers) and, when FriendsOnly, you are a friend of the leader (Player:IsFriendsWith, run aside: it yields).
+-- (MaxPlayers) and Access: "Open" any, "Friends" friends of the leader (Player:IsFriendsWith, run aside: it yields), "Invite" or
+-- "Closed" nobody by pad; "Setup" (a new room: platform, Play > Create Squad) is private until the leader confirms (§16.9).
 -- Platform members are ready by standing there. Stepping off (or dying) = leaving the squad. A refused player (full,
 -- friends only, starting, left or kicked by hand) is not tried again until they step off.
 --
@@ -30,6 +31,8 @@
 -- once (same countdown and teleport as Start); when it comes back to the idle state (Studio, every teleport failing)
 -- it is disbanded, so Play offers the choice again. Mode "Squad" = an open invite squad ("Forming") to set up and
 -- invite into; its leader may still take it to a free platform.
+-- Cancel (PartyCancel, user request 2026-10-12): the leader aborts the countdown until Rules.CancelCutoff s before the
+-- teleport (Token invalidates the pending Fire; Launched / late = "CancelTooLate"); idle state again, solo squad gone.
 -- Server never trusts the client: membership, leadership, state, size, presence of the target, friendship and rate
 -- are checked here; TeleportData is written only by this service.
 local Players = game:GetService("Players")
@@ -51,11 +54,12 @@ export type Party = {
 	Ready: { [number]: boolean },
 	State: State,
 	Platform: number, -- 1..8 = owns LOBBY-SQUAD-n; 0 = invite squad
-	FriendsOnly: boolean,
+	Access: string, -- PartyRules.Access: "Setup" (private, being set up) | "Open" | "Friends" | "Invite" | "Closed"
 	MaxPlayers: number, -- 1..Rules.MaxSize, never below #Members when set
 	StartAt: number, -- workspace:GetServerTimeNow() of the teleport; 0 = no countdown
 	Launched: boolean, -- countdown over: reserve / teleport running
 	Solo: boolean, -- quick play "Solo": disbanded instead of going back to the idle state
+	Token: number, -- bumped by every Begin and Cancel: a countdown thread only fires for the token it was born with
 }
 type Invite = { From: number, ExpiresAt: number }
 type Flight = { Options: TeleportOptions, Tries: number, PartyId: number }
@@ -65,7 +69,7 @@ type Record = {
 	Ready: { [number]: boolean },
 	State: State,
 	Platform: number,
-	FriendsOnly: boolean,
+	Access: string,
 	MaxPlayers: number,
 	StartAt: number,
 }
@@ -202,7 +206,7 @@ local function record(party: Party): Record
 		Ready = ready,
 		State = party.State,
 		Platform = party.Platform,
-		FriendsOnly = party.FriendsOnly,
+		Access = party.Access,
 		MaxPlayers = party.MaxPlayers,
 		StartAt = party.StartAt,
 	}
@@ -232,7 +236,7 @@ function PartyService:NewId(): number
 end
 
 -- platform 0 = invite squad ("Forming"); 1..8 = platform squad ("Configuring")
-function PartyService:Create(leader: number, platform: number): Party?
+function PartyService:Create(leader: number, platform: number, access: string): Party?
 	if self.PartyOf[leader] ~= nil then
 		return nil
 	end
@@ -243,11 +247,12 @@ function PartyService:Create(leader: number, platform: number): Party?
 		Ready = { [leader] = true },
 		State = if platform > 0 then "Configuring" else "Forming",
 		Platform = platform,
-		FriendsOnly = RULES.DefaultFriendsOnly,
+		Access = access,
 		MaxPlayers = math.clamp(RULES.DefaultMaxPlayers, 1, RULES.MaxSize),
 		StartAt = 0,
 		Launched = false,
 		Solo = false,
+		Token = 0,
 	}
 	self.Parties[party.Id] = party
 	self.PartyOf[leader] = party.Id
@@ -330,7 +335,7 @@ function PartyService:HandleCreate(player: Player)
 		self:Notice(player, "AlreadyInParty", nil)
 		return
 	end
-	if self:Create(player.UserId, 0) ~= nil then
+	if self:Create(player.UserId, 0, "Invite") ~= nil then
 		self:Notice(player, "Created", nil)
 	end
 end
@@ -349,7 +354,7 @@ function PartyService:HandleInvite(player: Player, target: number)
 
 	local found = self:PartyOfUser(from)
 	if found == nil then
-		found = self:Create(from, 0)
+		found = self:Create(from, 0, "Invite")
 		if found ~= nil then
 			self:Notice(player, "Created", nil)
 		end
@@ -364,6 +369,13 @@ function PartyService:HandleInvite(player: Player, target: number)
 	end
 	if not isOpen(party) then
 		self:Notice(player, "Busy", nil)
+		return
+	end
+	if party.Access == "Setup" then
+		self:Notice(player, "SetupFirst", nil)
+		return
+	elseif party.Access == "Closed" then
+		self:Notice(player, "RoomClosed", nil)
 		return
 	end
 	if table.find(party.Members, target) ~= nil then
@@ -402,7 +414,14 @@ function PartyService:HandleRespond(player: Player, partyId: number, accept: boo
 		bucket[partyId] = nil
 	end
 	const party = self.Parties[partyId]
-	if invite == nil or os.clock() > invite.ExpiresAt or party == nil or not isOpen(party) then
+	if
+		invite == nil
+		or os.clock() > invite.ExpiresAt
+		or party == nil
+		or not isOpen(party)
+		or party.Access == "Setup"
+		or party.Access == "Closed"
+	then
 		self:Notice(player, "InviteExpired", nil)
 		return
 	end
@@ -477,7 +496,7 @@ function PartyService:HandleReady(player: Player, ready: boolean)
 	self:Publish(party, false)
 end
 
-function PartyService:HandleConfigure(player: Player, friendsOnly: boolean, maxPlayers: number)
+function PartyService:HandleConfigure(player: Player, requested: string, maxPlayers: number)
 	const party = self:PartyOfUser(player.UserId)
 	if party == nil then
 		self:Notice(player, "NotInParty", nil)
@@ -492,15 +511,22 @@ function PartyService:HandleConfigure(player: Player, friendsOnly: boolean, maxP
 		return
 	end
 	const max = math.clamp(math.floor(maxPlayers), math.max(#party.Members, 1), RULES.MaxSize)
-	if party.FriendsOnly == friendsOnly and party.MaxPlayers == max then
+	-- "Setup" (back to private) only while the leader is alone; with company it keeps the current access
+	local access = requested
+	if not PartyRules.IsAccess[access] or (access == "Setup" and #party.Members > 1) then
+		access = party.Access
+	end
+	if party.Access == access and party.MaxPlayers == max then
 		return
 	end
-	party.FriendsOnly = friendsOnly
+	party.Access = access
 	party.MaxPlayers = max
 	self:Publish(party, false)
-	for _, userId in party.Members do
-		if userId ~= party.Leader then
-			self:Notice(userId, "Configured", nil)
+	if access ~= "Setup" then
+		for _, userId in party.Members do
+			if userId ~= party.Leader then
+				self:Notice(userId, "Configured", nil)
+			end
 		end
 	end
 end
@@ -519,6 +545,10 @@ function PartyService:HandleStart(player: Player)
 		self:Notice(player, "Busy", nil)
 		return
 	end
+	if party.Access == "Setup" then
+		self:Notice(player, "SetupFirst", nil)
+		return
+	end
 	for _, userId in party.Members do
 		if userId ~= party.Leader and party.Ready[userId] ~= true then
 			self:Notice(player, "NotAllReady", userId)
@@ -532,11 +562,49 @@ end
 function PartyService:Begin(party: Party)
 	party.State = "Starting"
 	party.StartAt = workspace:GetServerTimeNow() + RULES.Countdown
+	party.Token += 1
+	const token = party.Token
 	self:Publish(party, false)
 	self:NoticeParty(party, "Starting", nil)
 	task.delay(RULES.Countdown, function()
-		self:Fire(party)
+		if party.Token == token then
+			self:Fire(party)
+		end
 	end)
+end
+
+-- Leader aborts the countdown (user request 2026-10-12, Provisional; network.md §16.8). Allowed only while the squad is
+-- "Starting", not launched, and before StartAt - CancelCutoff, so it never races the reserve / TeleportAsync call.
+function PartyService:HandleCancel(player: Player)
+	const party = self:PartyOfUser(player.UserId)
+	if party == nil then
+		self:Notice(player, "NotInParty", nil)
+		return
+	end
+	if party.Leader ~= player.UserId then
+		self:Notice(player, "NotLeader", nil)
+		return
+	end
+	if party.State ~= "Starting" then
+		return -- idempotent: already cancelled (or never started)
+	end
+	if party.Launched or workspace:GetServerTimeNow() >= party.StartAt - RULES.CancelCutoff then
+		self:Notice(player, "CancelTooLate", nil)
+		return
+	end
+	party.Token += 1 -- the countdown thread of this Begin does nothing now
+	party.StartAt = 0
+	if party.Solo then
+		self:Disband(party) -- a solo quick play is not a squad to keep: Play offers the choice again
+		return
+	end
+	party.State = idleState(party)
+	self:Publish(party, false)
+	for _, userId in party.Members do
+		if userId ~= party.Leader then
+			self:Notice(userId, "StartCancelled", party.Leader)
+		end
+	end
 end
 
 -- Play button outside a squad: "Solo" = a squad of one started now; "Squad" = an open invite squad to set up.
@@ -546,7 +614,8 @@ function PartyService:HandleQuickPlay(player: Player, mode: string)
 		self:Notice(player, "AlreadyInParty", nil)
 		return
 	end
-	const party = self:Create(userId, 0)
+	-- Solo: a squad of one, closed; Squad: private "Setup" until the leader picks the size and who may join (§16.9)
+	const party = self:Create(userId, 0, if mode == "Solo" then "Closed" else "Setup")
 	if party == nil then
 		return
 	end
@@ -723,6 +792,11 @@ function PartyService:CanJoinPlatform(party: Party, platform: number): string?
 	if self.Parties[party.Id] ~= party or party.Platform ~= platform or not isOpen(party) then
 		return "Busy"
 	end
+	if party.Access == "Setup" or party.Access == "Closed" then
+		return "RoomClosed"
+	elseif party.Access == "Invite" then
+		return "InviteOnly"
+	end
 	if #party.Members >= party.MaxPlayers then
 		return "PartyFull"
 	end
@@ -774,7 +848,7 @@ function PartyService:EnterPlatform(player: Player, platform: number)
 		if current ~= nil then
 			self:RemoveMember(userId, false)
 		end
-		if self:Create(userId, platform) ~= nil then
+		if self:Create(userId, platform, "Setup") ~= nil then
 			self:Notice(player, "Created", nil)
 		end
 		return
@@ -784,7 +858,7 @@ function PartyService:EnterPlatform(player: Player, platform: number)
 		self:Refuse(player, platform, problem)
 		return
 	end
-	if not owner.FriendsOnly then
+	if owner.Access ~= "Friends" then
 		self:JoinPlatform(player, owner)
 		return
 	end
@@ -917,7 +991,12 @@ PartyService:OnInit(function(self)
 	end)
 	net.PartyConfigure:onServer(function(data, player: Player)
 		if self:Gate(player) then
-			self:HandleConfigure(player, data.FriendsOnly == true, data.MaxPlayers)
+			self:HandleConfigure(player, data.Access, data.MaxPlayers)
+		end
+	end)
+	net.PartyCancel:onServer(function(_, player: Player)
+		if self:Gate(player) then
+			self:HandleCancel(player)
 		end
 	end)
 	net.PartyQuickPlay:onServer(function(data, player: Player)

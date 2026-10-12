@@ -117,8 +117,7 @@ local function strip(): Subtitle
 		const gui = create("ScreenGui")({
 			Name = "AnomalySubtitle",
 			ResetOnSpawn = false,
-			IgnoreGuiInset = false,
-			ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets,
+			ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets,
 			ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 			DisplayOrder = 2,
 

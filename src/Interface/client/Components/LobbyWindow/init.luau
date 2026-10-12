@@ -1,6 +1,8 @@
 --!strict
 -- LobbyWindow: the modal window of the lobby screens (Shop, Codes, Squad), cartoon kit (AST-091), mobile first.
---   backdrop  full-screen Ink at 50% (Active: a tap outside never reaches the world)
+--   backdrop  full-screen, transparent, Active (a tap outside never reaches the world). The Ink 50% dim is NOT drawn
+--             here: the owner mounts it in a separate ScreenGui with ScreenInsets = None (LobbyController "LobbyDim"), so
+--             it also covers the notch / Roblox bar area while this window stays inside the safe area
 --   panel     Ink CartoonPanel with studs that pops in (Motion.Pop), `Size` px at UI scale 1, times `Scale`
 --   header    Mustard title tab (icon + title) · optional gem balance pill · round Teal close button (44 px)
 --   body      `Children`, under the header (Body frame, full width)
@@ -141,8 +143,7 @@ return function(props: Props): Frame
 	const root = create("Frame")({
 		Name = props.Name or "LobbyWindow",
 		Size = UDim2.fromScale(1, 1),
-		BackgroundColor3 = Theme.Color.Ink,
-		BackgroundTransparency = 0.5,
+		BackgroundTransparency = 1,
 		Active = true,
 		Visible = props.Visible,
 

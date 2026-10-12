@@ -1,10 +1,11 @@
 --!strict
--- PadTag: the capacity sign over a lobby squad pad (user request 2026-10-12), cartoon kit (AST-091; style guide §7.3
--- UI in the world). One Ink-lipped plate in the colour of the pad state, readable from far away:
---   title row   "SQUAD 3" (left) and "2/4" (right)
---   slots row   four round slots: filled (a player), empty, or closed (the squad takes fewer than 4 players)
---   state row   "OPEN" / "ROOM FOR 2" / "FRIENDS ONLY" / "FULL" / "STARTING IN 3..." (text from the owner)
--- Colours: Open Green (free), Busy Mustard (a squad is forming, room left), Full Ketchup, Starting Teal.
+-- PadTag: the room sign over a lobby squad pad (user request 2026-10-12), cartoon kit (AST-091; style guide §7.3
+-- UI in the world). One Ink-lipped plate in the colour of the pad state, readable from far away. A pad has NO fixed
+-- capacity: the room takes the size its leader chose (Max), a free pad shows none.
+--   title row   "SQUAD 3" (left) and "2/3" (right, only while a room has a size)
+--   slots row   four round slots: filled (a player), empty, or faded (beyond the size the leader chose / free pad)
+--   state row   "FREE" / "CONFIGURING" / "OPEN 2/3" / "FRIENDS ONLY" / "INVITE ONLY" / "CLOSED" / "STARTING IN 3..."
+-- Colours: Free Green, Configuring Mustard, Open Teal, Closed Slate, Starting Violet (never red: style guide §7.4).
 -- Sized in studs (a BillboardGui with a fixed size, like TableSign): it shrinks with distance like a real sign, so two
 -- pads never overlap; MaxDistance 140 studs by default. Pure: only props; LobbyController owns the data, parents the
 -- BillboardGui and decides every text (the server decides the squads).
@@ -19,7 +20,7 @@ const create = Vide.create
 -- Vide 0.4.1 types `create` for 19 classes only; UIPadding and UIAspectRatioConstraint are not among them.
 const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }) -> Instance
 
-export type State = "Open" | "Busy" | "Full" | "Starting"
+export type State = "Free" | "Configuring" | "Open" | "Closed" | "Starting"
 
 export type Props = {
 	Adornee: Instance?,
@@ -28,7 +29,7 @@ export type Props = {
 	Title: string,
 	-- players in the squad on the pad (0 = free)
 	Count: () -> number,
-	-- players the squad takes (the free pad shows the table size)
+	-- players the room takes (the size its leader chose); 0 = no size yet (free pad, room being set up)
 	Max: () -> number,
 	State: () -> State,
 	-- "OPEN" / "FULL" / "STARTING IN 3..."
@@ -48,10 +49,11 @@ const DEFAULT_DISTANCE = 140
 const DEFAULT_SLOTS = 4
 
 const TONE: { [State]: Theme.Tone } = {
-	Open = Theme.Tone.Green,
-	Busy = Theme.Tone.Mustard,
-	Full = Theme.Tone.Ketchup,
-	Starting = Theme.Tone.Teal,
+	Free = Theme.Tone.Green,
+	Configuring = Theme.Tone.Mustard,
+	Open = Theme.Tone.Teal,
+	Closed = Theme.Tone.Slate,
+	Starting = Theme.Tone.Violet,
 }
 
 local function padded(vertical: number, horizontal: number): Instance
@@ -111,7 +113,7 @@ return function(props: Props): BillboardGui
 			return index <= props.Count()
 		end
 		const closed = function(): boolean
-			return index > math.max(props.Max(), props.Count())
+			return index > math.max(props.Max(), props.Count()) -- no size yet: every slot faded
 		end
 		table.insert(
 			slots,
@@ -194,6 +196,9 @@ return function(props: Props): BillboardGui
 					XAlignment = Enum.TextXAlignment.Right,
 					Color = textColor,
 					Stroke = stroke,
+					Visible = function()
+						return props.Max() > 0
+					end,
 					Text = function()
 						return `{props.Count()}/{props.Max()}`
 					end,

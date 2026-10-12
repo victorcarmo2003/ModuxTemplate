@@ -7,7 +7,7 @@
 -- rescales (Theme.Scale UIScale) or a pill that pops in is tracked; AbsolutePosition/AbsoluteSize already carry every
 -- UIScale above the target, and this component has no UIScale of its own (only the ring pulse).
 -- Playtest 2026-10-11 (an undimmed strip at the top, the hole off the money pill): mount it in a ScreenGui with the
--- SAME insets as the target's ScreenGui (the HUD: IgnoreGuiInset = false, ScreenInsets = CoreUISafeInsets), so both
+-- SAME insets as the target's ScreenGui (the HUD: ScreenInsets = DeviceSafeInsets), so both
 -- frames share one origin whatever the top bar / safe area of the device; the dim bands overscan OVERSCAN px past the
 -- frame on every side, so the top bar and the notch areas are dimmed too.
 -- Pure: only props.

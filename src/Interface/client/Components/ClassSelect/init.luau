@@ -1,6 +1,6 @@
 --!strict
 -- ClassSelect: the lobby class screen (user request 2026-10-11, "Animal Hospital" style), cartoon kit (AST-091).
--- Laid out for the smallest landscape phone (620 x 340 px at Scale 1, inside CoreUISafeInsets); `Scale` grows it.
+-- Laid out for the smallest landscape phone (620 x 340 px at Scale 1, inside DeviceSafeInsets); `Scale` grows it.
 --   centre   the class rig standing, facing the camera: the world stage (LobbyController moves the camera, nothing
 --            here) or `Stage` (a ClassStage viewport) behind the panels; arrows under it cycle the classes
 --   left     Ink list of every class (Content.Classes): icon, name, animal, lock / "Soon" / equipped check

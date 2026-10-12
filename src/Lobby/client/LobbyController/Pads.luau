@@ -1,7 +1,7 @@
 --!strict
 -- Capacity signs of the lobby squad pads (user request 2026-10-12). One PadTag (Interface/Components/PadTag, a studs-sized
--- BillboardGui) over every squad platform: "SQUAD n", four slots, "n/4" and the state (Open / Room for n / Full /
--- Starting in 3...), green free, yellow taken, red full. Each pad is read from LobbyZones (the tagged PartyPlatform /
+-- BillboardGui) over every squad platform: "SQUAD n", four slots, "n/max" of the room (no fixed capacity per pad) and
+-- the state (Free / Configuring / Open / Closed / Starting in 3...). Each pad is read from LobbyZones (the tagged PartyPlatform /
 -- LobbyZone floor Part of the map, any count, no position in code); the sign hangs from a local invisible anchor Part
 -- over the pad centre (Workspace.LobbyPadTags, created by this client, never replicated). LobbyZones.Version() moving
 -- (a pad edited / streamed in) re-places the signs. Presentation only: the owner reads the Party set the server

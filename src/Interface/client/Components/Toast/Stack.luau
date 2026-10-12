@@ -2,7 +2,7 @@
 -- ToastStack: column of Toasts pinned to the top-right corner (style guide §7.2). Shows at most
 -- `MaxVisible` entries, newest at the bottom. Entries are keyed by table identity: the owner keeps
 -- the same table for an entry while it lives and removes it in OnDone.
--- Put it in a ScreenGui with `ScreenInsets = CoreUISafeInsets` so it stays clear of the Roblox top bar.
+-- Put it in a ScreenGui with `ScreenInsets = DeviceSafeInsets` (HUD standard); the owner places it clear of the Roblox buttons.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Toast = require(script.Parent)

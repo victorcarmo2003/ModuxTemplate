@@ -1,14 +1,17 @@
 --!strict
 -- LobbyHud: the lobby HUD (user request 2026-10-11; layout 2026-10-12), cartoon kit (AST-091), mobile first.
--- Laid out for the smallest landscape phone (620 x 340 px at Scale 1, inside CoreUISafeInsets); `Scale` grows it.
+-- Laid out for the smallest landscape phone (620 x 340 px at Scale 1, inside DeviceSafeInsets); `Scale` grows it.
 -- ALL of the lobby UI lives on the RIGHT side; the left side stays free for the Roblox menu and chat.
---   top right      gem balance pill (a button: opens the gem shop), gem icon + amount + "+"
+--   right, a little above the middle of the screen (never over the mobile jump button: the lowest ~200 px of the right
+--                  edge stay free; short screens pin it to the top)
+--                  gem balance pill (a button: opens the gem shop), gem icon + amount + "+"
 --   under the pill four big tiles: Classes, Shop, Codes, Squad (Squad shows "2/4" when in a squad). One column
 --                  (56 px tiles); on a short screen (under 440 px tall, phones in landscape) a 2 x 2 grid in the same
 --                  order, so it stays clear of the mobile jump button (bottom right); tiles 48 px (over the 44 px
 --                  touch target) on narrow screens
 --   bottom centre  squad status card (SquadStatus: Solo / Squad n/4, member heads, Friends only) over the big Play
---                  button (text and colour from `Play`: PLAY green, START SQUAD mustard, READY, STARTING...)
+--                  button (text and colour from `Play`: PLAY green, START SQUAD mustard, READY, STARTING..., CANCEL dark
+--                  mustard while the countdown can still be aborted)
 -- Kept clear of the mobile thumbstick (bottom left) and jump button (bottom right). Key badges ("C", "Y"...) on the
 -- tiles when the device is not touch (`Keys`). Pure: only props.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -32,7 +35,8 @@ const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }
 
 export type Tile = "Classes" | "Shop" | "Codes" | "Squad"
 
-export type PlayKind = "Go" | "Wait" | "Off"
+-- Cancel: the countdown can still be aborted (dark mustard, never red: style guide 7.4)
+export type PlayKind = "Go" | "Wait" | "Off" | "Cancel"
 
 export type PlayButton = {
 	Text: string,
@@ -52,6 +56,10 @@ export type Props = {
 	Keys: () -> { [string]: string },
 	OnOpen: (tile: Tile) -> (),
 	OnPlay: () -> (),
+	-- Tap on a free slot of the card (opens the invite list).
+	OnInvite: (() -> ())?,
+	-- Key chip on the Play button while it says CANCEL ("X", "ButtonX"); "" or missing = none (touch).
+	CancelKey: (() -> string)?,
 	Scale: (() -> number)?,
 }
 
@@ -67,11 +75,25 @@ const PLAY_HEIGHT = 52
 const CARD_GAP = 8
 const SHORT = 440 -- px tall screens under this get the 2 x 2 grid
 const NARROW = 420 -- px wide screens under this get the small tiles
+-- The column sits at 45% of the screen height, but never lower than this many real px from the bottom edge: the Roblox
+-- jump / use buttons live bottom right (360 x 640, 667 x 375, 844 x 390, 1280 x 720 all keep the corner clear)
+const FREE_BOTTOM = 200
+const CENTER = 0.45
+
+-- Dark mustard, Ink text stroke: reads as "stop" next to the green PLAY without the forbidden alert red.
+const CANCEL_TONE: Theme.Tone = {
+	Top = Color3.fromHex("#D9A21E"),
+	Bottom = Color3.fromHex("#B07A0C"),
+	Lip = Color3.fromHex("#6E4A05"),
+	Text = Color3.new(1, 1, 1),
+	Stroke = true,
+}
 
 const PLAY_TONE: { [PlayKind]: Theme.Tone } = {
 	Go = Theme.Tone.Green,
 	Wait = Theme.Tone.Mustard,
 	Off = Theme.Tone.Slate,
+	Cancel = CANCEL_TONE,
 }
 
 type TileDef = { Key: Tile, Text: string, Icon: string, Tone: Theme.Tone, Fallback: string }
@@ -99,6 +121,15 @@ return function(props: Props): Frame
 	end
 	const tile = function(): number
 		return if compact() or area().X < NARROW then TILE_SMALL else TILE
+	end
+	-- Real px height of the right column (it scales by `scaled`): decides where it sits
+	const sideHeight = source(0)
+	const sideTop = function(): number
+		const real = area()
+		const height = sideHeight()
+		const centred = real.Y * CENTER - height / 2
+		const lowest = real.Y - FREE_BOTTOM - height
+		return math.max(TOP, math.min(centred, lowest))
 	end
 	const tileSize = function(): UDim2
 		return UDim2.fromOffset(tile(), tile())
@@ -195,7 +226,9 @@ return function(props: Props): Frame
 		create("Frame")({
 			Name = "Side",
 			AnchorPoint = Vector2.new(1, 0),
-			Position = UDim2.new(1, -MARGIN, 0, TOP),
+			Position = function()
+				return UDim2.new(1, -MARGIN, 0, sideTop())
+			end,
 			Size = UDim2.fromOffset(0, 0),
 			AutomaticSize = Enum.AutomaticSize.XY,
 			BackgroundTransparency = 1,
@@ -286,6 +319,7 @@ return function(props: Props): Frame
 				AnchorPoint = Vector2.new(0.5, 1),
 				Position = UDim2.new(0.5, 0, 0, -CARD_GAP),
 				Info = props.Card,
+				OnInvite = props.OnInvite,
 			}),
 
 			CartoonButton({
@@ -306,6 +340,17 @@ return function(props: Props): Frame
 				end,
 				OnActivated = props.OnPlay,
 			}),
+			-- key badge of CANCEL, on the top-left corner of the button
+			KeyChip({
+				Name = "CancelKey",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromOffset(4, 2),
+				ZIndex = 5,
+				Text = function()
+					const key = if props.CancelKey then props.CancelKey() else ""
+					return if props.Play().Kind == "Cancel" then key else ""
+				end,
+			}),
 		}),
 	}) :: Frame
 
@@ -315,8 +360,19 @@ return function(props: Props): Frame
 		end
 	end
 	const connection = root:GetPropertyChangedSignal("AbsoluteSize"):Connect(measure)
+	const side = root:FindFirstChild("Side") :: Frame?
+	const measureSide = function()
+		if side and side.AbsoluteSize.Y > 0 then
+			sideHeight(side.AbsoluteSize.Y)
+		end
+	end
+	const sideConnection = if side then side:GetPropertyChangedSignal("AbsoluteSize"):Connect(measureSide) else nil
+	measureSide()
 	cleanup(function()
 		connection:Disconnect()
+		if sideConnection then
+			sideConnection:Disconnect()
+		end
 	end)
 	return root
 end

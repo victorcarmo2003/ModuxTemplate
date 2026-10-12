@@ -1,6 +1,6 @@
 --!strict
 -- SquadSetup on a phone-sized frame (iPhone SE landscape, 667 x 375) or the whole viewport, with a fake server:
--- Friends only / Max players answer after "Latency" s; Start runs a 5 s countdown and goes back (as in Studio).
+-- Who can join / Max players answer after "Latency" s; the two setup stages (size, who can join) run as in the lobby; Start runs a 5 s countdown and goes back (as in Studio).
 -- "Leader" off shows the member view; "Members" sets how many stand on the platform. "Invite" = an invite squad (Play ->
 -- Create Squad): Ready / Not ready tags, the members' Ready button, Invite players / Leave in the foot.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -41,7 +41,8 @@ return UILabs.CreateVideStory({
 	},
 }, function(props)
 	const controls: Controls = (props.controls :: any)
-	const friendsOnly = source(false)
+	const access = source("Setup")
+	const stage = source(1)
 	const maxPlayers = source(4)
 	const startAt = source(0)
 	const now = source(os.clock())
@@ -105,7 +106,21 @@ return UILabs.CreateVideStory({
 				return list
 			end,
 			IsLeader = controls.Leader,
-			FriendsOnly = friendsOnly,
+			Access = access,
+			Stage = function()
+				return if access() == "Setup" and controls.Leader() then stage() else 3
+			end,
+			OnCount = function(count: number)
+				maxPlayers(count)
+				if count == 1 then
+					access("Closed")
+				else
+					stage(2)
+				end
+			end,
+			OnBack = function()
+				stage(1)
+			end,
 			MaxPlayers = function()
 				return math.max(maxPlayers(), math.floor(controls.Members()))
 			end,
@@ -120,9 +135,9 @@ return UILabs.CreateVideStory({
 			CanStart = function()
 				return startAt() == 0
 			end,
-			OnFriendsOnly = function(on: boolean)
+			OnAccess = function(value: string)
 				later(function()
-					friendsOnly(on)
+					access(value)
 				end)
 			end,
 			OnMaxPlayers = function(count: number)

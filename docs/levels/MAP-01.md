@@ -183,8 +183,8 @@ Três linhas que organizam o mapa:
 | TRL-SALE | Trailer à venda (dias 1–5) | (78, −58) | janela de serviço virada para o sul; visível do carrinho [DEC-047]. Depois da troca: carrinho com lona nesta vaga (`Q-082`) |
 | SIGN-T | Placa "Available on Day 5" | (78, −40) | só leitura; o prompt de compra fica no trailer [DEC-047] |
 | DRAWER | Gaveta do caixa | (52, 37) | fim da linha (entrega). Valor visível no mundo [DEC-050] |
-| Q1 | Vaga 1 (balcão) | (52, 33) | na frente da entrega/gaveta; 8 studs do jogador na entrega |
-| Q2–Q5 | Vagas 2 a 5 | (46, 29) · (41, 29) · (36, 29) · (31, 29) | fila corre para oeste na calçada. Counter 1 = Q1–Q3; Counter 2 = +Q4; Counter 3 = +Q5 [DEC-046] |
+| Q1 | Vaga 1 (balcão) | (52, 33) | na frente da entrega/gaveta; ~7 studs do jogador na entrega (raio de Take Order / Serve = 10); a 3,0 da face do balcão do carrinho (Z 36); não chega mais perto porque o balcão dobrável do trailer ocupa Z 33,5..34,5 |
+| Q2–Q5 | Vagas 2 a 5 | (49,8, 31,5) · (47,6, 31,5) · (45,4, 31,5) · (43,2, 31,5) | **2026-10-12 (playtest do dono: clientes longe demais do prompt; Provisório)**: eram (46, 29) · (41, 29) · (36, 29) · (31, 29), 5 studs entre vagas, 11–16 do balcão. Agora 2,2 studs entre vagas, na borda do Pad (Z 31,5, calçada), a ~8–10,6 de quem está na entrega. Só o cliente de Q1 tem prompt (`OnFronted`). Patch vivo: `tools/assetplace/fix_queue_points.luau`. Fila corre para oeste. Counter 1 = Q1–Q3; Counter 2 = +Q4; Counter 3 = +Q5 [DEC-046] |
 | OPEN | Placa OPEN/CLOSED (prompt) | (25, 35) | canto NO do Pad; altura ≤ 3 (fica na faixa de visão do Mart) [DEC-048] |
 | BIN-C | Lixeira do carrinho | (56, 42) | ponta direita do corredor |
 | PS-1..4 | Spawn dos jogadores (dia) | (32, 42) · (38, 42) · (44, 42) · (50, 42) | olhando para o norte. Também reconexão [DEC-063] e membro atrasado [DEC-098] |
@@ -355,9 +355,9 @@ Escala: **1 coluna = 1 stud (X)**, **1 linha = 2 studs (Z)**. X de 12 a 71.
   22  ::::::::::::--->--->--->--->--->--->--->--->--->--->--->--->  faixa leste (LANE-E)
   24  ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
   26  ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-  28  :::::::::::::::::::5::::4::::3::::2:::::::::::::::::::::::::  fila Q5..Q2
+  28  ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
   30  ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-  32  ::::::::::::,,,,,,,,,,,,,,,,,,,,,,,,,,,,1,,,,,,,,,,,########  Q1 / início do Pad
+  32  ::::::::::::,,,,,,,,,,,,,,,,,,,,,,,,,,,,1,,,,,,,,,,,########  Q1 / início do Pad (fila Q5..Q2 em Z 31,5, X 43..50, logo acima)
   34  ::::::::::::,o,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,########
   36  ::::::::::::,,,,SSSGGGGGRRRBBTTTKKKKKKHH$H,,,,,,,,,,########  estações
   38  ::::::::::::,,,,SSSGGGGGRRRBBTTTKKKKKKHH$H,,,,,,,,,,########

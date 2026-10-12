@@ -241,10 +241,13 @@ local POINTS = {
 	{ id = "PS-3", x = 44, z = 42, floor = 0.45, face = NORTH },
 	{ id = "PS-4", x = 50, z = 42, floor = 0.45, face = NORTH },
 	{ id = "Q1", x = 52, z = 33, floor = 0.45, face = SOUTH, node = true },
-	{ id = "Q2", x = 46, z = 29, floor = 0.4, face = EAST, node = true },
-	{ id = "Q3", x = 41, z = 29, floor = 0.4, face = EAST, node = true },
-	{ id = "Q4", x = 36, z = 29, floor = 0.4, face = EAST, node = true },
-	{ id = "Q5", x = 31, z = 29, floor = 0.4, face = EAST, node = true },
+	-- 2026-10-12 (owner playtest: customers too far from the prompt): Q2..Q5 were (46|41|36|31, 29), 5 studs apart;
+	-- now on the Pad lip (Z 31.5), 2.2 apart behind Q1, so the line stays inside Take Order / Serve reach (10).
+	-- Live patch without Place.run: tools/assetplace/fix_queue_points.luau (keep both in step).
+	{ id = "Q2", x = 49.8, z = 31.5, floor = 0.4, face = EAST, node = true },
+	{ id = "Q3", x = 47.6, z = 31.5, floor = 0.4, face = EAST, node = true },
+	{ id = "Q4", x = 45.4, z = 31.5, floor = 0.4, face = EAST, node = true },
+	{ id = "Q5", x = 43.2, z = 31.5, floor = 0.4, face = EAST, node = true },
 	-- D1 (user 2026-10-11): moved from B1's west wall (next to the cart) to B1's Ninth front, wall Z 32, door X 88.6.
 	-- Point 1 stud out, on the sidewalk, so an NPC never spawns inside the wall. Faces north (out of the door).
 	{ id = "D1", x = 88.6, z = 30.3, floor = 0.45, face = NORTH, node = true, spawn = "customer,actor", despawn = true, door = "D1" },

@@ -579,8 +579,7 @@ function PromptController:MountMenu(gui: Instance)
 		return Vide.create("ScreenGui")({
 			Name = "InteractionMenu",
 			ResetOnSpawn = false,
-			IgnoreGuiInset = false,
-			ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets,
+			ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets,
 			ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 			DisplayOrder = 2,
 

@@ -474,7 +474,9 @@ return Lync.define("game", {
 		State = Lync.enum({ "Forming", "Configuring", "Starting" }),
 		-- §16.6 squad platforms (user request 2026-10-11, Provisional)
 		Platform = Lync.int(0, 8), -- PartyRules.Rules.Platforms (LOBBY v2: 8); LOBBY-SQUAD-n owned by this squad; 0 = none (invite squad)
-		FriendsOnly = Lync.bool(), -- only friends of the leader may step in
+		-- §16.9 who may join: "Setup" private while the leader chooses, Open, Friends (friends of the leader), Invite
+		-- (invites only), Closed. Small enum: the record is wide (f64 ids), so no drop.section risk
+		Access = Lync.enum(PartyRules.Access),
 		MaxPlayers = Lync.int(1, 4), -- set by the leader, never below the member count
 		StartAt = Lync.f64(), -- workspace:GetServerTimeNow() when the teleport starts; 0 = no countdown
 	})),
@@ -508,7 +510,7 @@ return Lync.define("game", {
 	PartyStart = Lync.packet(Lync.empty()),
 	-- §16.6 c -> s. Leader only, not Starting: platform squad settings (MaxPlayers clamped to the member count)
 	PartyConfigure = Lync.packet(Lync.struct({
-		FriendsOnly = Lync.bool(),
+		Access = Lync.enum(PartyRules.Access), -- "Setup" is only kept (stage 1: count change while still private)
 		MaxPlayers = Lync.int(1, 4),
 	})),
 	-- §16.7 c -> s. Lobby Play button outside a squad: Solo = a squad of one started at once (countdown + teleport);
@@ -516,6 +518,9 @@ return Lync.define("game", {
 	PartyQuickPlay = Lync.packet(Lync.struct({
 		Mode = Lync.enum({ "Solo", "Squad" }),
 	})),
+	-- §16.8 c -> s. Leader only, State "Starting" and still before StartAt - Rules.CancelCutoff: aborts the countdown
+	-- (idle state again; a solo quick play squad is disbanded). Idempotent: later or repeated = notice / no-op
+	PartyCancel = Lync.packet(Lync.empty()),
 	-- §16.3 s -> player. Key = PartyRules.NoticeKeys; UserId = the other player when the notice names one
 	PartyNotice = Lync.packet(Lync.struct({
 		Key = Lync.enum(PartyRules.NoticeKeys),

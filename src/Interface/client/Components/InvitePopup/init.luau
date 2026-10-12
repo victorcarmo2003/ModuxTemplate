@@ -1,6 +1,6 @@
 --!strict
 -- InvitePopup: squad invite card of the lobby (user request 2026-10-11), cartoon kit (AST-091), mobile first.
--- A Cream card at the top centre (340 x 128 at Scale 1, under the Roblox top bar with CoreUISafeInsets): avatar head
+-- A Cream card at the top centre (340 x 128 at Scale 1, inside DeviceSafeInsets): avatar head
 -- shot, "<name> invited you to their squad!", Accept (Green) and Decline (Slate), 44 px buttons. Pops in when `Invite`
 -- returns an invite, shrinks away when it returns nil. Pure: only props; the caller answers PartyRespond.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
