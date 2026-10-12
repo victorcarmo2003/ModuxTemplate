@@ -47,7 +47,66 @@ export type Stage = {
 	OnEvent: ((controller: any, event: any) -> ())?,
 }
 
+-- Stage3D: the contract of World/Stages/*.luau (docs/tech/prep-3d.md §11.3, TASK-194). Same discovery as Stages/ (a new stage is a
+-- new file), other folder, no Board and no Panel: the 3D stage draws in the world through the World layer (Aim, Targets, Fx), never
+-- with GuiObjects of its own (the HUD chrome is PrepShell). A module serves one or more TABS of Content.Prep.Tabs3D (Build.luau
+-- serves Board and Toppings). It is used for a tab only when Stage.Armed(rules, tab) is true; otherwise the 2D Stage of the same
+-- tab runs (per-stage rollback, no code). Everything is Provisional until the dono approves prep-3d.md.
+--   Tabs        Content.Prep.Tabs3D keys this stage owns
+--   Enter       a tab of the stage came to the front (the world: register targets, show the ghosts, arm the tool)
+--   Leave       it went to the back (disarm everything Enter did; the controller destroys the World pools on leaving the mode)
+--   Step        the plate step changed to `step` (a Content.Prep.Steps3D key of this stage, e.g. bun -> place); also called once
+--               right after Enter with the current step
+--   Hint        one line (<= 36 characters), reactive
+--   Next        the corner button, reactive
+--   OnNext      the corner button was pressed
+--   OnAim       a World aim message (World/Types.luau `AimMsg`): Hover, Press, Move, Release, Drop, Cancel
+--   OnResult    a PrepResult arrived while the stage is in front
+--   OnEvent     events the controller broadcasts whatever tab is in front (same shape as Stage.OnEvent)
+export type Stage3D = {
+	Tabs: { string },
+	Enter: (controller: any, tab: string) -> (),
+	Leave: (controller: any, tab: string) -> (),
+	Step: (controller: any, step: string) -> (),
+	Hint: (controller: any) -> string,
+	Next: (controller: any) -> Next,
+	OnNext: ((controller: any) -> ())?,
+	OnAim: ((controller: any, message: any) -> ())?,
+	OnResult: ((controller: any, result: any) -> ())?,
+	OnEvent: ((controller: any, event: any) -> ())?,
+}
+
 const Stage = {}
+
+-- A problem with a module returned by World/Stages/<name>.luau, nil when it is a Stage3D.
+function Stage.check3D(module: any, name: string, tabs3D: { [string]: any }): string?
+	if type(module) ~= "table" then
+		return `{name}: must return a table`
+	end
+	if type(module.Tabs) ~= "table" or #module.Tabs == 0 then
+		return `{name}: Tabs (a list of Content.Prep.Tabs3D keys) is missing`
+	end
+	for _, tab in module.Tabs do
+		if tabs3D[tab] == nil then
+			return `{name}: Tabs has '{tostring(tab)}', not a Content.Prep.Tabs3D key`
+		end
+	end
+	for _, field in { "Enter", "Leave", "Step", "Hint", "Next" } do
+		if type(module[field]) ~= "function" then
+			return `{name}: {field} must be a function`
+		end
+	end
+	if module.Board ~= nil or module.Panel ~= nil or module.HasPanel ~= nil then
+		return `{name}: a 3D stage has no Board, Panel or HasPanel (it draws in the world)`
+	end
+	return nil
+end
+
+-- Whether the 3D stage serves `tab` right now: Rules.ThreeD and the World.Stages switch of the tab (the Serve switch also arms
+-- the Take in the Window view; Order is its own switch for the Take on the customer).
+function Stage.Armed(rules: any, tab: string): boolean
+	return rules.ThreeD == true and rules.World.Stages[tab] == true
+end
 
 -- A problem with a module returned by Stages/<name>.luau, nil when it is a stage.
 function Stage.check(module: any, name: string): string?

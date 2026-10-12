@@ -1748,7 +1748,8 @@ end
 
 -- Focused prep mode (prep-mode.md §6; DEC-223). Every key here becomes a wire enum in Net (PrepTab, PrepGrill, PrepOrder,
 -- PrepFinish, PrepResult), so duplicates and bad names fail here, not in Lync.start().
-const PREP_NEEDS: { [string]: boolean } = { Nothing = true, BunCut = true, PlateBuilt = true, TicketPicked = true }
+const PREP_NEEDS: { [string]: boolean } = { Nothing = true, BunCut = true, PlateBuilt = true, SausagePlaced = true, TicketPicked = true }
+const PREP_TOOLS_REQUIRED: { string } = { "Bottle", "Slice", "Strip", "Pinch" }
 const PREP_BANDS: { string } = { "Perfect", "Good", "Messy" }
 const PREP_REQUIRED_TARGETS: { string } = { "bun_cut", "sausage_place", "grill_flip" }
 
@@ -1758,9 +1759,50 @@ local function checkPrepIcon(table_: string, index: number, key: string, icon: s
 	end
 end
 
+-- A tab set: labels, one-line hints (the hint line of the HUD), wire membership.
+local function checkPrepTabSet(name: string, tabsOf: Table.Table<Prep.TabRow>, wire: { [string]: boolean }, maxHint: number)
+	for index, row in tabsOf.List do
+		if row.Label == "" or row.Hint == "" then
+			fail(name, index, row.Key, "empty Label or Hint")
+		end
+		if #row.Hint > maxHint then
+			fail(name, index, row.Key, `Hint is one line of at most {maxHint} characters`)
+		end
+		if not wire[row.Key] then
+			fail(name, index, row.Key, "key missing in Prep.WireTabs")
+		end
+		checkPrepIcon(name, index, row.Key, row.Icon)
+	end
+end
+
+-- A step set: its tab belongs to the same tab set, its view exists, its need is known.
+local function checkPrepStepSet(name: string, stepsOf: Table.Table<Prep.Step>, tabsOf: Table.Table<Prep.TabRow>, maxHint: number)
+	for index, row in stepsOf.List do
+		if not tabsOf.ByKey[row.Tab] then
+			fail(name, index, row.Key, `Tab '{row.Tab}' not in the tabs of the same set`)
+		end
+		if not Prep.Views.ByKey[row.View] then
+			fail(name, index, row.Key, `View '{row.View}' not in Prep.Views`)
+		end
+		if not PREP_NEEDS[row.Needs] then
+			fail(name, index, row.Key, `Needs '{row.Needs}' is not a known condition`)
+		end
+		if row.Label == "" or row.Hint == "" or row.NextLabel == "" then
+			fail(name, index, row.Key, "empty Label, Hint or NextLabel")
+		end
+		if #row.Hint > maxHint then
+			fail(name, index, row.Key, `Hint is one line of at most {maxHint} characters`)
+		end
+		checkPrepIcon(name, index, row.Key, row.Icon)
+	end
+end
+
 local function checkPrep()
-	checkKeys("Prep.Tabs", Prep.Tabs, VALUE_PATTERN)
-	checkKeys("Prep.Steps", Prep.Steps, KEY_PATTERN)
+	checkKeys("Prep.TabsLegacy", Prep.TabsLegacy, VALUE_PATTERN)
+	checkKeys("Prep.Tabs3D", Prep.Tabs3D, VALUE_PATTERN)
+	checkKeys("Prep.StepsLegacy", Prep.StepsLegacy, KEY_PATTERN)
+	checkKeys("Prep.Steps3D", Prep.Steps3D, KEY_PATTERN)
+	checkKeys("Prep.Views", Prep.Views, VALUE_PATTERN)
 	checkKeys("Prep.Gestures", Prep.Gestures, KEY_PATTERN)
 	checkKeys("Prep.Tolerances", Prep.Tolerances, KEY_PATTERN)
 	checkKeys("Prep.Reasons", Prep.Reasons, VALUE_PATTERN)
@@ -1768,23 +1810,66 @@ local function checkPrep()
 		fail("Prep.Reasons", nil, nil, "needs the row 'None' and at most 255 rows")
 	end
 
-	for index, row in Prep.Tabs.List do
-		if row.Label == "" or row.Hint == "" then
-			fail("Prep.Tabs", index, row.Key, "empty Label or Hint")
-		end
-		checkPrepIcon("Prep.Tabs", index, row.Key, row.Icon)
+	-- Tabs and Steps are one of the two fixed sets, chosen by Rules.ThreeD (prep-3d.md §11.3); the wire enum is the union
+	const threeD = Prep.Rules.ThreeD
+	if Prep.Tabs ~= (if threeD then Prep.Tabs3D else Prep.TabsLegacy) or Prep.Steps ~= (if threeD then Prep.Steps3D else Prep.StepsLegacy) then
+		fail("Prep", nil, nil, "Tabs / Steps must be the set of Rules.ThreeD")
 	end
-	for index, row in Prep.Steps.List do
-		if not Prep.Tabs.ByKey[row.Tab] then
-			fail("Prep.Steps", index, row.Key, `Tab '{row.Tab}' not in Prep.Tabs`)
+	const wire = setOf(Prep.WireTabs)
+	checkPrepTabSet("Prep.TabsLegacy", Prep.TabsLegacy, wire, 40)
+	checkPrepTabSet("Prep.Tabs3D", Prep.Tabs3D, wire, 36)
+	for key in wire do
+		if not Prep.TabsLegacy.ByKey[key] and not Prep.Tabs3D.ByKey[key] then
+			fail("Prep.WireTabs", nil, key, "not a tab of either set")
 		end
-		if not PREP_NEEDS[row.Needs] then
-			fail("Prep.Steps", index, row.Key, `Needs '{row.Needs}' is not a known condition`)
+	end
+	for alias, target in Prep.TabAlias do
+		if not wire[alias] or not wire[target] then
+			fail("Prep.TabAlias", nil, alias, "alias and target must be wire tabs")
 		end
-		if row.Label == "" or row.Hint == "" or row.NextLabel == "" then
-			fail("Prep.Steps", index, row.Key, "empty Label, Hint or NextLabel")
+	end
+	checkPrepStepSet("Prep.StepsLegacy", Prep.StepsLegacy, Prep.TabsLegacy, 40)
+	checkPrepStepSet("Prep.Steps3D", Prep.Steps3D, Prep.Tabs3D, 36)
+	-- the 3D set: every section (tab) has a view and a first step, and the views chain without a loop
+	for index, row in Prep.Tabs3D.List do
+		local found = false
+		for _, view in Prep.Views.List do
+			found = found or view.Tab == row.Key
 		end
-		checkPrepIcon("Prep.Steps", index, row.Key, row.Icon)
+		if not found then
+			fail("Prep.Tabs3D", index, row.Key, "no Prep.Views row shows this tab")
+		end
+		found = false
+		for _, step in Prep.Steps3D.List do
+			found = found or step.Tab == row.Key
+		end
+		if not found then
+			fail("Prep.Tabs3D", index, row.Key, "no Prep.Steps3D row uses this tab")
+		end
+	end
+	for index, row in Prep.Views.List do
+		if not Prep.Tabs3D.ByKey[row.Tab] then
+			fail("Prep.Views", index, row.Key, `Tab '{row.Tab}' not in Prep.Tabs3D`)
+		end
+		if row.Anchor == "" or row.Focus == "" then
+			fail("Prep.Views", index, row.Key, "empty Anchor or Focus")
+		end
+		if row.Fov ~= 0 then
+			inRange("Prep.Views", index, row.Key, "Fov", row.Fov, 20, 100)
+		end
+		if row.Fallback ~= "" and row.Fallback ~= Prep.LegacyView.Key and not Prep.Views.ByKey[row.Fallback] then
+			fail("Prep.Views", index, row.Key, `Fallback '{row.Fallback}' is neither a view nor the legacy Build pair`)
+		end
+		-- no loop: follow the chain, at most #Views hops
+		local walk: string = row.Fallback
+		local hops = 0
+		while walk ~= "" and walk ~= Prep.LegacyView.Key do
+			hops += 1
+			if hops > #Prep.Views.List then
+				fail("Prep.Views", index, row.Key, "Fallback chain loops")
+			end
+			walk = Prep.Views.ByKey[walk].Fallback
+		end
 	end
 	for index, row in Prep.Gestures.List do
 		inRange("Prep.Gestures", index, row.Key, "Hz", row.Hz, 0, 60)
@@ -1863,6 +1948,87 @@ local function checkPrep()
 		inRange("Prep.Rules", nil, nil, `Rates.{field}`, rate, 1, 60)
 	end
 	inRange("Prep", nil, nil, "Stations", Prep.Stations, 1, 4)
+
+	-- 3D world (prep-3d.md §2, §8, §9)
+	const world = rules.World
+	if world.Tag == "" or world.Attr.Kind == "" or world.Attr.Slot == "" or world.Attr.Key == "" or world.Attr.Fov == "" then
+		fail("Prep.Rules", nil, nil, "World.Tag and World.Attr names must not be empty")
+	end
+	inRange("Prep.Rules", nil, nil, "World.Hitbox.MinPx", world.Hitbox.MinPx, 1, 200)
+	inRange("Prep.Rules", nil, nil, "World.Hitbox.MinStuds", world.Hitbox.MinStuds, 0.05, 3)
+	inRange("Prep.Rules", nil, nil, "World.Hitbox.AssistScale", world.Hitbox.AssistScale, 1, 3)
+	inRange("Prep.Rules", nil, nil, "World.Hitbox.Sausage.Length", world.Hitbox.Sausage.Length, 0.1, 5)
+	inRange("Prep.Rules", nil, nil, "World.Hitbox.Sausage.Width", world.Hitbox.Sausage.Width, 0.1, 5)
+	inRange("Prep.Rules", nil, nil, "World.Lift", world.Lift, 0, 3)
+	const ring = world.Ring
+	if not (ring.To > 0 and ring.To < ring.From and ring.From <= 5) then
+		fail("Prep.Rules", nil, nil, "World.Ring needs 0 < To < From <= 5")
+	end
+	inRange("Prep.Rules", nil, nil, "World.Ring.Good", ring.Good, 0.005, 1)
+	inRange("Prep.Rules", nil, nil, "World.Ring.Perfect", ring.Perfect, ring.Good, 1)
+	inRange("Prep.Rules", nil, nil, "World.Ring.Late", ring.Late, 0.1, ring.From)
+	inRange("Prep.Rules", nil, nil, "World.Ring.Turn", ring.Turn, 0, 3)
+	inRange("Prep.Rules", nil, nil, "World.Ring.Hop", ring.Hop, 0, 3)
+	inRange("Prep.Rules", nil, nil, "World.Hover.Grow", world.Hover.Grow, 0, 1)
+	inRange("Prep.Rules", nil, nil, "World.Hover.Rise", world.Hover.Rise, 0, 1)
+	inRange("Prep.Rules", nil, nil, "World.Attract", world.Attract, 0, 400)
+	inRange("Prep.Rules", nil, nil, "World.Marker", world.Marker, 0.01, 2)
+	inRange("Prep.Rules", nil, nil, "World.Settle", world.Settle, 0, 3)
+	for field, value in world.Budget :: any do
+		inRange("Prep.Rules", nil, nil, `World.Budget.{field}`, value, 0, 1000)
+	end
+	if world.Budget.Hitboxes < 1 or world.Budget.RaysPerFrame < 1 or world.Budget.ColorHz < 1 then
+		fail("Prep.Rules", nil, nil, "World.Budget Hitboxes, RaysPerFrame and ColorHz are at least 1")
+	end
+	if world.Budget.SauceSegmentsPerStroke > world.Budget.SaucePool or world.Budget.SauceSegmentsPerPlate > world.Budget.SaucePool then
+		fail("Prep.Rules", nil, nil, "World.Budget sauce segments per stroke and per plate must fit the pool")
+	end
+
+	-- plate mask (N3): cut, sausage and every topping key are bits of a byte
+	const mask = Prep.PlateMask
+	if #Ingredients.ToppingKeys > mask.MaxToppingKeys then
+		fail("Prep.PlateMask", nil, nil, `#Ingredients.ToppingKeys = {#Ingredients.ToppingKeys} does not fit {mask.MaxToppingKeys} topping bits`)
+	end
+	if mask.FirstTopping + mask.MaxToppingKeys > mask.Bits or mask.Bits > 8 or mask.Cut == mask.Sausage then
+		fail("Prep.PlateMask", nil, nil, "Cut, Sausage and the topping bits must fit in Bits (<= 8) without overlap")
+	end
+	if mask.Cut >= mask.FirstTopping or mask.Sausage >= mask.FirstTopping then
+		fail("Prep.PlateMask", nil, nil, "Cut and Sausage come before the topping bits")
+	end
+	if Orders.Rules.MaxToppings > mask.MaxToppingKeys then
+		fail("Prep.PlateMask", nil, nil, "OrderRules.MaxToppings is above the topping bits of the mask")
+	end
+
+	-- tools and targets
+	const targetKinds = setOf(Prep.TargetKinds :: any)
+	const toolKinds = setOf(Prep.ToolKinds :: any)
+	if not toolKinds.None or #Prep.TargetKinds ~= 10 then
+		fail("Prep", nil, nil, "ToolKinds needs 'None' and TargetKinds has the 10 kinds of prep-3d.md §2.2")
+	end
+	for _, tool in PREP_TOOLS_REQUIRED do
+		if not toolKinds[tool] then
+			fail("Prep.ToolKinds", nil, tool, "missing")
+		end
+	end
+	for _, key in Ingredients.ToppingKeys do
+		const tool = Prep.ToolOf[key]
+		if tool == nil or tool == "None" or not toolKinds[tool] then
+			fail("Prep.ToolOf", nil, key, "every topping needs a tool of ToolKinds (not None)")
+		end
+	end
+	for key in Prep.ToolOf do
+		if not setOf(Ingredients.ToppingKeys)[key] then
+			fail("Prep.ToolOf", nil, key, "not an Ingredients topping")
+		end
+	end
+	if not targetKinds.Topping or not targetKinds.GrillSlot then
+		fail("Prep.TargetKinds", nil, nil, "needs GrillSlot and Topping")
+	end
+	for stage in world.Stages :: any do
+		if stage ~= "Grill" and stage ~= "Board" and stage ~= "Toppings" and stage ~= "Order" and stage ~= "Serve" then
+			fail("Prep.Rules", nil, nil, `World.Stages.{stage} is not a stage`)
+		end
+	end
 
 	const grades = Prep.Grades
 	const points = grades.Points

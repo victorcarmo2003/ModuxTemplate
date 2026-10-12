@@ -1342,3 +1342,17 @@ Placa da plataforma (`PadTag`): **FREE** (livre) / **CONFIGURING** (`Setup`) / *
 tem tamanho. Orçamento: o campo `Access` é um enum de 3 bits dentro de um registro largo (ids `f64`), então não há risco do
 `drop.section` do README (set pequeno, poucos registros).
 
+
+## 17. Preparo 3D (TASK-194; `prep-3d.md` §7, §15; Provisório)
+
+Nenhum pacote novo. Três mudanças de schema, todas **aditivas** (campos `optional`; o cliente e o servidor 2D de hoje compilam e codificam sem mudar):
+
+| # | Onde | Campo | Regra |
+|---|---|---|---|
+| N1 | `PrepGrill` | (nenhum campo novo) | `Place` com `Slot` 1..8 = **preferência** (livre: usa; ocupado: o primeiro livre); `Slot 0` = como hoje. Servidor: TASK-195 |
+| N2 | set `Stations` | `Flip = optional(int(0, 101))` | só vaga de grelha: nota do virar + 1 (1..101); nil/0 = não virada. Escreve `Grill.Flip`; zera no `Collect` e no `Place`. O set tem 8+ registros: o campo cabe em 7 bits (101 < 128), então o piso de `drop.section` do README não se aplica |
+| N3 | `PrepTab` e set `PrepSeats` | `Plate = optional(int(0, 255))` | máscara **cosmética** do prato aberto (`Content.Prep.PlateMask`, `Prep/shared/PlateMask.luau`): bit 0 pão cortado, bit 1 salsicha posta, bits 2..7 os toppings na ordem de `Ingredients.ToppingKeys`. Servidor: só cresce, <= `MaxToppings` bits de topping, nenhum bit sem chave (`PlateMask.Valid`), zera no Begin/Finish/Trash/Leave; ignora sem erro o que violar. `PrepSeats` <= 4 registros |
+
+Enum de aba: `PrepTab.Step` e `PrepSeats.Step` usam `Content.Prep.WireTabs` (união dos conjuntos 2D `Order, Grill, Build, Serve` e 3D `Grill, Board, Toppings, Serve`); o servidor só aceita o conjunto ativo (`Content.Prep.Tabs`, definido por `Rules.ThreeD`) e `Content.Prep.TabAlias` traduz a chave do outro modo (inclusive o atributo `PromptStep` do mapa).
+
+Tráfego: `PrepTab` ainda <= 4/s por jogador e só quando algo muda (+1 byte opcional); `Stations.Flip` = 1 escrita por virada; `PrepSeats.Plate` ~1 escrita/s no total. Mão fantasma (`PrepHand`, Q-233) **não** existe: fica atrás de `Rules.World.GhostHand = false`.

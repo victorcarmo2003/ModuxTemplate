@@ -183,6 +183,10 @@ return Lync.define("game", {
 		-- Wave 3 (§13.5, ANM-002): 0 or nil = nothing altered; grill/board: 1 = this slot; rail: position 1..Count.
 		-- Optional so the wave 1-2 writer keeps compiling and encoding until TASK-109 writes it (nil reads as 0).
 		Altered = Lync.optional(Lync.int(0, 30)),
+		-- prep-3d.md §7.2 N2 (TASK-194): grill slot only. Flip score of the sausage + 1 (1..101) once flipped, nil or 0 =
+		-- not flipped. Written by the grill on Flip, cleared on Collect / Place. Optional like Altered: the set has 8+ records
+		-- and the value needs 7 bits (101 < 128), so Lync's drop.section floor does not apply
+		Flip = Lync.optional(Lync.int(0, 101)),
 	})),
 
 	-- §3.6, record = NpcId. Writer: CustomerService. Looks are model attributes (network.md §5), not here
@@ -540,9 +544,14 @@ return Lync.define("game", {
 	-- c -> s. Leave the seat (the reserved bun is refunded when no plate was finished)
 	PrepLeave = Lync.packet(Lync.empty()),
 	-- c -> s. Tab change, also the keep-alive (every Rules.Heartbeat s). Ticket 0 = none pinned (a guide, not a lock)
+	-- Step is any tab of the wire (Content.Prep.WireTabs: the 2D and the 3D sets); the server accepts only the active set
+	-- (Content.Prep.Tabs, TabAlias maps the other). Plate (prep-3d.md §7.2 N3, TASK-194) = cosmetic mask of the open plate
+	-- (Content.Prep.PlateMask, Prep/shared/PlateMask): nil = unchanged (the 2D client never sends it); a mask that shrinks,
+	-- has more than MaxToppings topping bits or a bit past ToppingKeys is ignored by the server
 	PrepTab = Lync.packet(Lync.struct({
-		Step = Lync.enum(Content.Prep.Tabs.Keys),
+		Step = Lync.enum(Content.Prep.WireTabs),
 		Ticket = Lync.int(0, 65535),
+		Plate = Lync.optional(Lync.int(0, 255)),
 	})),
 	-- c -> s. Grill action; Slot 0 = the server picks (Place), else the slot (Flip, Collect). The flip is stamped with
 	-- the server clock
@@ -588,8 +597,11 @@ return Lync.define("game", {
 	-- README "drop.section" (8+ records) cannot happen; User is f64 and Since f64, both far above a byte
 	PrepSeats = Lync.replicate(Lync.struct({
 		User = Lync.f64(), -- UserId, 0 = free
-		Step = Lync.enum(Content.Prep.Tabs.Keys),
+		Step = Lync.enum(Content.Prep.WireTabs),
 		Ticket = Lync.int(0, 65535), -- pinned NpcId, 0 = none
 		Since = Lync.f64(), -- server time of the seat
+		-- prep-3d.md §7.2 N3 (TASK-194): cosmetic plate mask of the seat (Content.Prep.PlateMask), nil or 0 = no open plate.
+		-- Not authority: PrepFinish revalidates everything. At most 4 records, so no drop.section floor
+		Plate = Lync.optional(Lync.int(0, 255)),
 	})),
 })

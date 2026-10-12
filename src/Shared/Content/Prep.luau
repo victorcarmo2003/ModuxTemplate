@@ -13,9 +13,46 @@
 --   is refused (Rules, server clock)
 local Table = require(script.Parent.Table)
 
-export type Tab = "Order" | "Grill" | "Build" | "Serve"
+-- Every tab key that exists on the wire. Order and Build are the 2D set (Rules.ThreeD = false, the one that runs today);
+-- Board and Toppings are the 3D set (prep-3d.md §3.0). Grill and Serve are in both.
+export type Tab = "Order" | "Grill" | "Build" | "Board" | "Toppings" | "Serve"
 export type Band = "Perfect" | "Good" | "Messy"
-export type Need = "Nothing" | "BunCut" | "PlateBuilt" | "TicketPicked"
+-- SausagePlaced = the 3D Board section: bun cut AND sausage in the groove (prep-3d.md §3.0)
+export type Need = "Nothing" | "BunCut" | "PlateBuilt" | "SausagePlaced" | "TicketPicked"
+
+-- Camera views, one per 3D section (prep-3d.md §4.1). Window is the view of the Serve tab.
+export type ViewKey = "Grill" | "Board" | "Toppings" | "Window"
+
+-- Things the pointer ray can hit (TargetKind attribute of a PrepTarget hitbox, prep-3d.md §2.2)
+export type TargetKind =
+	"GrillSlot"
+	| "SausageStock"
+	| "Rail"
+	| "BunCrate"
+	| "Board"
+	| "Knife"
+	| "Topping"
+	| "Bin"
+	| "Hatch"
+	| "Customer"
+
+-- What the pointer carries (prep-3d.md §2.6). Knife cuts, Sausage is the grilled one, Bottle pours a sauce, Ladle spoons,
+-- Slice is the cheese, Strip a bacon strip, Pinch the potato sticks, Plate carries the finished plate to the Hatch or the Bin,
+-- Spatula is the optional grill cursor.
+export type ToolKind = "None" | "Knife" | "Sausage" | "Bottle" | "Ladle" | "Slice" | "Strip" | "Pinch" | "Plate" | "Spatula"
+
+-- Render state of one grill slot in the 3D world (client only, derived from Stations + the server clock + local prediction)
+export type SlotPhase = "Free" | "Ghost" | "Cooking" | "FlipWindow" | "Late" | "Flipped" | "Ready"
+
+-- One thing the ray can hit. Id is unique inside a seat (`GrillSlot:3`, `Topping:ketchup`, `Bin`); Slot 1..8 for GrillSlot and
+-- Rail (the seat number for Board), 0 otherwise; Topping = Ingredients key for Topping, "" otherwise. Authoring: tag `PrepTarget`
+-- on an invisible hitbox, attributes TargetKind / Slot / Key (World.Attr).
+export type PrepTarget = {
+	Kind: TargetKind,
+	Id: string,
+	Slot: number,
+	Topping: string,
+}
 
 export type TabRow = {
 	Key: string, -- Tab (wire enum value, PascalCase)
@@ -27,11 +64,79 @@ export type TabRow = {
 export type Step = {
 	Key: string,
 	Tab: Tab,
+	View: ViewKey, -- camera view of the step (Views row)
 	Label: string,
 	Hint: string,
 	NextLabel: string, -- text of the corner button on this step
 	Needs: Need, -- what enables the corner button
 	Icon: string,
+}
+
+-- One camera view = one 3D section. Anchor / Focus are the child names inside Station_n (CFrame of the camera, point looked at).
+-- Fallback = the view tried when this one has no anchor: a Views key, "Build" (the legacy CamAnchor_Build / Focus_Build pair,
+-- LegacyView) or "" (then the Grill view, which always exists, then the TRL fallback of Poses). Fov 0 = Rules.Camera.Fov; an
+-- anchor attribute `Fov` overrides both.
+export type View = {
+	Key: ViewKey,
+	Tab: Tab, -- the tab that shows it
+	Label: string,
+	Anchor: string,
+	Focus: string,
+	Fallback: string,
+	Fov: number,
+}
+
+export type LegacyViewRow = { Key: string, Anchor: string, Focus: string }
+
+-- Numbers of the 3D world (prep-3d.md §2, §8, §9; all Provisional, TASK-212 retouches them)
+export type WorldRules = {
+	-- tag and attribute names of the PrepTarget authoring contract (§2.2)
+	Tag: string,
+	Attr: { Kind: string, Slot: string, Key: string, Fov: string },
+	-- hitbox sizing (§2.1): a target is at least MinPx on screen (touch target) and MinStuds in the world, x AssistScale with
+	-- Assist; the sausage hitbox is Sausage.Length x Sausage.Width studs
+	Hitbox: { MinPx: number, MinStuds: number, AssistScale: number, Sausage: { Length: number, Width: number } },
+	Lift: number, -- studs: carried objects float this far over the work plane (§2.3)
+	-- flip ring (§2.4): scale From -> To while the grill progress goes through Rules.Grill From..To; the ring is Good thick
+	-- (Perfect thick inside the Perfect window); Late = scale of the small opaque ring after the window
+	Ring: { From: number, To: number, Good: number, Perfect: number, Late: number, Turn: number, Hop: number },
+	Hover: { Grow: number, Rise: number }, -- hovered target: scale x (1 + Grow), up Rise studs
+	Attract: number, -- px: gamepad cursor snaps to a target closer than this (§9)
+	Marker: number, -- studs: diameter of the 3D pointer marker
+	Settle: number, -- s: snap with a tween when the server disagrees with the prediction (§2.5)
+	-- per player client budget (§8); the 3D code never exceeds a row
+	Budget: {
+		Hitboxes: number,
+		RaysPerFrame: number,
+		Highlights: number,
+		Rings: number,
+		SauceSegmentsPerStroke: number,
+		SauceSegmentsPerPlate: number,
+		SaucePool: number,
+		SauceMinStep: number, -- studs: stroke samples closer than this are dropped
+		Tools: number,
+		Ghosts: number,
+		Sausages: number,
+		Particles: number,
+		Emitters: number,
+		Tweens: number,
+		ColorHz: number, -- cooking colour refresh
+		EditableMeshes: number,
+		LowQuality: number, -- GraphicsQualityLevel at or under which Highlight and bursts are skipped
+	},
+	-- Per-stage switch (prep-3d.md §11.3): false = that stage stays 2D. Only read when Rules.ThreeD is true.
+	Stages: { Grill: boolean, Board: boolean, Toppings: boolean, Order: boolean, Serve: boolean },
+	Editable: boolean, -- EditableMesh layer (prep-3d.md §6A); false until the S1b spike passes
+	GhostHand: boolean, -- colleague's ghost hand (Q-233)
+}
+
+-- Cosmetic plate mask on PrepTab.Plate / PrepSeats.Plate (prep-3d.md §7.2 N3), see Prep/shared/PlateMask.luau
+export type PlateMaskRules = {
+	Bits: number, -- wire bits (Lync.int(0, 255))
+	Cut: number, -- bit index of "bun cut"
+	Sausage: number, -- bit index of "sausage placed"
+	FirstTopping: number, -- bit index of Ingredients.ToppingKeys[1]; topping i is bit FirstTopping + i - 1
+	MaxToppingKeys: number, -- Validate: #Ingredients.ToppingKeys must fit
 }
 
 export type Gesture = {
@@ -62,6 +167,11 @@ export type Rules = {
 	Enabled: boolean,
 	-- true brings the old world prompts back (grill_place ... discard); false hides them (prep-mode.md §7, DT-5)
 	WorldKitchenPrompts: boolean,
+	-- 3D-first prep (docs/tech/prep-3d.md, TASK-194). false = the 2D mode that runs today: `Tabs` and `Steps` below are the
+	-- legacy sets (Order, Grill, Build, Serve). true = the 3D sets (Grill, Board, Toppings, Serve) and World.Stages decides per
+	-- stage. Rollback without code: Stages.<X> = false, or ThreeD = false.
+	ThreeD: boolean,
+	World: WorldRules,
 	Camera: { Fov: number, Travel: number, Leave: number, Pitch: number, Distance: number },
 	ForcedExit: { Signal: number, NoInput: number }, -- s: leave animation on an anomaly signal, input block after it
 	CueLock: number, -- s: re-entry locked after a forced exit by anomaly signal (Provisional, Q-221)
@@ -110,29 +220,170 @@ export type Texts = {
 	Taken: string,
 }
 
--- Tabs (top bar). Order is the bar order.
-const tabs = Table.new({
+-- Tabs, 2D set (top bar, Rules.ThreeD = false). Order is the bar order.
+const tabsLegacy = Table.new({
 	{ Key = "Order", Label = "Order", Hint = "Take a ticket", Icon = "" },
 	{ Key = "Grill", Label = "Grill", Hint = "Add sausages, flip near the middle", Icon = "" },
 	{ Key = "Build", Label = "Build", Hint = "Slice, place, add toppings", Icon = "" },
 	{ Key = "Serve", Label = "Serve", Hint = "Pick the matching customer", Icon = "" },
 } :: { TabRow })
 
--- Steps: ordered flow of one plate; Bun and Build share the Build tab.
-const steps = Table.new({
-	{ Key = "grill", Tab = "Grill", Label = "Grill", Hint = "Flip when the ring glows", NextLabel = "Next", Needs = "Nothing", Icon = "" },
-	{ Key = "bun", Tab = "Build", Label = "Bun", Hint = "Drag the knife along the line", NextLabel = "Next", Needs = "BunCut", Icon = "" },
+-- Tabs, 3D set (bottom bar, sections in sequence; prep-3d.md §3.0, DT-22). Order left the bar (Take is on the ticket and on
+-- the customer in the Window view); Build split into Board and Toppings. Hints are one line, 36 characters at most.
+const tabs3D = Table.new({
+	{ Key = "Grill", Label = "Grill", Hint = "Flip when the ring closes", Icon = "" },
+	{ Key = "Board", Label = "Board", Hint = "Cut the bun, place the sausage", Icon = "" },
+	{ Key = "Toppings", Label = "Toppings", Hint = "Pick a topping, or press Next", Icon = "" },
+	{ Key = "Serve", Label = "Serve", Hint = "Drag the plate to the window", Icon = "" },
+} :: { TabRow })
+
+-- Steps, 2D set: ordered flow of one plate; Bun and Build share the Build tab. View = the section it belongs to in 3D.
+const stepsLegacy = Table.new({
+	{
+		Key = "grill",
+		Tab = "Grill",
+		View = "Grill",
+		Label = "Grill",
+		Hint = "Flip when the ring glows",
+		NextLabel = "Next",
+		Needs = "Nothing",
+		Icon = "",
+	},
+	{
+		Key = "bun",
+		Tab = "Build",
+		View = "Board",
+		Label = "Bun",
+		Hint = "Drag the knife along the line",
+		NextLabel = "Next",
+		Needs = "BunCut",
+		Icon = "",
+	},
 	{
 		Key = "build",
 		Tab = "Build",
+		View = "Board",
 		Label = "Build",
 		Hint = "Drag the sausage in, then add toppings",
 		NextLabel = "Next",
 		Needs = "PlateBuilt",
 		Icon = "",
 	},
-	{ Key = "serve", Tab = "Serve", Label = "Serve", Hint = "Pick the matching customer", NextLabel = "Serve", Needs = "TicketPicked", Icon = "" },
+	{
+		Key = "serve",
+		Tab = "Serve",
+		View = "Window",
+		Label = "Serve",
+		Hint = "Pick the matching customer",
+		NextLabel = "Serve",
+		Needs = "TicketPicked",
+		Icon = "",
+	},
 } :: { Step })
+
+-- Steps, 3D set: the old `build` splits into `place` (Board section) and `toppings` (Toppings section).
+const steps3D = Table.new({
+	{
+		Key = "grill",
+		Tab = "Grill",
+		View = "Grill",
+		Label = "Grill",
+		Hint = "Flip when the ring closes",
+		NextLabel = "Next",
+		Needs = "Nothing",
+		Icon = "",
+	},
+	{
+		Key = "bun",
+		Tab = "Board",
+		View = "Board",
+		Label = "Bun",
+		Hint = "Drag the knife along the line",
+		NextLabel = "Next",
+		Needs = "BunCut",
+		Icon = "",
+	},
+	{
+		Key = "place",
+		Tab = "Board",
+		View = "Board",
+		Label = "Place",
+		Hint = "Drag the sausage into the bun",
+		NextLabel = "Next",
+		Needs = "SausagePlaced",
+		Icon = "",
+	},
+	{
+		Key = "toppings",
+		Tab = "Toppings",
+		View = "Toppings",
+		Label = "Toppings",
+		Hint = "Pick a topping, or press Next",
+		NextLabel = "Next",
+		Needs = "Nothing",
+		Icon = "",
+	},
+	{
+		Key = "serve",
+		Tab = "Serve",
+		View = "Window",
+		Label = "Serve",
+		Hint = "Drag the plate to the window",
+		NextLabel = "Serve",
+		Needs = "TicketPicked",
+		Icon = "",
+	},
+} :: { Step })
+
+-- Camera views, one per 3D section (prep-3d.md §4.1, DT-14). The anchors live in each Station_n model; a missing anchor falls
+-- back through Fallback (Poses, TASK-198). Toppings is the wide one: the bun in the middle and the bowls on both sides.
+const views = Table.new({
+	{ Key = "Grill", Tab = "Grill", Label = "Grill", Anchor = "CamAnchor", Focus = "Focus", Fallback = "", Fov = 0 },
+	{ Key = "Board", Tab = "Board", Label = "Board", Anchor = "CamAnchor_Board", Focus = "Focus_Board", Fallback = "Build", Fov = 0 },
+	{
+		Key = "Toppings",
+		Tab = "Toppings",
+		Label = "Toppings",
+		Anchor = "CamAnchor_Toppings",
+		Focus = "Focus_Toppings",
+		Fallback = "Board",
+		Fov = 62,
+	},
+	{ Key = "Window", Tab = "Serve", Label = "Window", Anchor = "CamAnchor_Window", Focus = "Focus_Window", Fallback = "Board", Fov = 0 },
+} :: { View })
+
+-- The pair of the 2D mode, the Fallback "Build" of the Board view
+const legacyView: LegacyViewRow = { Key = "Build", Anchor = "CamAnchor_Build", Focus = "Focus_Build" }
+
+-- Every tab key that can cross the wire (PrepTab.Step, PrepSeats.Step enum), in first-seen order. Lync sorts enum names.
+local wireTabs: { string } = {}
+do
+	const seen: { [string]: boolean } = {}
+	for _, set in { tabsLegacy.Keys, tabs3D.Keys } do
+		for _, key in set do
+			if not seen[key] then
+				seen[key] = true
+				table.insert(wireTabs, key)
+			end
+		end
+	end
+	table.freeze(wireTabs)
+end
+
+-- Tab key of the other mode with the same meaning: lets the server and the map attribute `PromptStep` survive the flag
+-- (resolve with `Tabs.ByKey[key] and key or TabAlias[key]`). Order was never a prompt step; it maps to the first section.
+const tabAlias: { [string]: string } = { Order = "Grill", Build = "Board", Board = "Build", Toppings = "Build" }
+
+-- Tool each topping puts in the hand (prep-3d.md §3.4; Provisional, TASK-201 fichas). Ladle is the spoon for a topping that
+-- gets scooped; no topping uses it yet.
+const toolOf = {
+	ketchup = "Bottle",
+	mustard = "Bottle",
+	cream_cheese = "Bottle",
+	cheese = "Slice",
+	bacon = "Strip",
+	potato_sticks = "Pinch",
+}
 
 -- Gestures. Sampling 30 Hz; a sauce stroke is resampled to at most 64 points (prep-mode.md §6, performance).
 const gestures = Table.new({
@@ -197,6 +448,42 @@ const reasons = Table.new({
 const rules: Rules = {
 	Enabled = true,
 	WorldKitchenPrompts = false, -- DEC-223: the world prompts of the kitchen are hidden; true = rollback without code
+	ThreeD = false, -- prep-3d.md §11.3: flips Tabs / Steps to the 3D sets and arms World.Stages (the 2D mode runs while false)
+	World = {
+		Tag = "PrepTarget",
+		Attr = { Kind = "TargetKind", Slot = "Slot", Key = "Key", Fov = "Fov" },
+		-- 44 px touch target = 0.31 stud at 2.5 studs from the camera (prep-3d.md §2.1); x1.3 with Assist (Rules.Assist applies to
+		-- the tolerances, this one to the hitboxes)
+		Hitbox = { MinPx = 44, MinStuds = 0.31, AssistScale = 1.3, Sausage = { Length = 1.1, Width = 0.5 } },
+		Lift = 0.35,
+		Ring = { From = 1.8, To = 1.0, Good = 0.04, Perfect = 0.07, Late = 0.6, Turn = 0.2, Hop = 0.25 },
+		Hover = { Grow = 0.04, Rise = 0.05 },
+		Attract = 80,
+		Marker = 0.12,
+		Settle = 0.15,
+		Budget = {
+			Hitboxes = 40,
+			RaysPerFrame = 1,
+			Highlights = 12,
+			Rings = 10,
+			SauceSegmentsPerStroke = 24,
+			SauceSegmentsPerPlate = 72,
+			SaucePool = 80,
+			SauceMinStep = 0.08,
+			Tools = 1,
+			Ghosts = 3,
+			Sausages = 8,
+			Particles = 150,
+			Emitters = 8,
+			Tweens = 6,
+			ColorHz = 10,
+			EditableMeshes = 6,
+			LowQuality = 3,
+		},
+		Stages = { Grill = false, Board = false, Toppings = false, Order = false, Serve = false },
+		Editable = false,
+		GhostHand = false,
+	},
 	Camera = { Fov = 55, Travel = 0.35, Leave = 0.30, Pitch = -55, Distance = 2.5 }, -- FEAT-039
 	ForcedExit = { Signal = 0.4, NoInput = 0.5 }, -- Q-221 A
 	CueLock = 6,
@@ -215,6 +502,16 @@ const rules: Rules = {
 	Grill = { Target = 0.5, From = 0.4, To = 0.6 }, -- FEAT-039 / Q-222: flip near the middle, no burning
 	Rates = { Enter = 2, Leave = 2, Tab = 4, Grill = 6, Begin = 1, Finish = 1, Trash = 2, Order = 4 },
 }
+
+-- What the code sees as `Tabs` / `Steps`: the set of the current mode. All 2D code keeps reading these and gets the legacy
+-- sets while Rules.ThreeD is false (compat, TASK-194); the 3D code and the wire read the named sets.
+const tabs = if rules.ThreeD then tabs3D else tabsLegacy
+const steps = if rules.ThreeD then steps3D else stepsLegacy
+
+-- PrepTab.Plate / PrepSeats.Plate (prep-3d.md §7.2 N3): bit 0 bun cut, bit 1 sausage placed, bits 2..7 the toppings in the
+-- order of Ingredients.ToppingKeys. Cosmetic only (the colleague's puppet); the server accepts a mask that only grows and
+-- has at most OrderRules.MaxToppings topping bits; zero at Begin / Finish / Trash / Leave. Helpers: Prep/shared/PlateMask.
+const plateMask: PlateMaskRules = { Bits = 8, Cut = 0, Sausage = 1, FirstTopping = 2, MaxToppingKeys = 6 }
 
 const grades: Grades = {
 	Points = { Perfect = 100, Good = 70, Messy = 30 }, -- FEAT-039
@@ -299,6 +596,31 @@ return Table.record({
 	Rules = rules,
 	Tabs = tabs,
 	Steps = steps,
+	-- the fixed sets, whatever Rules.ThreeD says (Tabs / Steps above equal one of each pair)
+	TabsLegacy = tabsLegacy,
+	Tabs3D = tabs3D,
+	StepsLegacy = stepsLegacy,
+	Steps3D = steps3D,
+	WireTabs = wireTabs, -- every tab key on the wire: Net PrepTab.Step and PrepSeats.Step
+	TabAlias = tabAlias,
+	Views = views,
+	LegacyView = legacyView,
+	TargetKinds = {
+		"GrillSlot",
+		"SausageStock",
+		"Rail",
+		"BunCrate",
+		"Board",
+		"Knife",
+		"Topping",
+		"Bin",
+		"Hatch",
+		"Customer",
+	} :: { TargetKind },
+	ToolKinds = { "None", "Knife", "Sausage", "Bottle", "Ladle", "Slice", "Strip", "Pinch", "Plate", "Spatula" } :: { ToolKind },
+	ToolOf = toolOf :: { [string]: ToolKind },
+	SlotPhases = { "Free", "Ghost", "Cooking", "FlipWindow", "Late", "Flipped", "Ready" } :: { SlotPhase },
+	PlateMask = plateMask,
 	Gestures = gestures,
 	Tolerances = tolerances,
 	Grades = grades,

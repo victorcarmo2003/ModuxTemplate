@@ -9,7 +9,7 @@ Sem XP, sem nível (DEC-081): nenhum texto de UI fala em XP, "level up" ou rank.
 Conciliado com DEC-106, DEC-110 a DEC-116, DEC-124, DEC-129 e `consistency-report.md` (2026-10-08, NW-14, NW-16 a NW-23).
 Revisão 2026-10-10 (TASK-082, onda 2): §10 a §15 novas (avisos, ligações do Walt, HUD noturno, placa do trailer, fim de
 run); D-02 e D-03 do `tests/wave-1-report.md` resolvidos **do lado do documento** (§2, §15). Tudo da revisão é
-**Provisório** (DEC-193): o usuário não revisou.
+**Provisório** (DEC-193): o usuário não revisou. Revisão 2026-10-12 (TASK-213): §16 Preparo 3D (dicas, recusas, selos, tutorial 3D com ids `PREP3D_*`), Provisório.
 
 ## 1. Nome do medidor (Q-054, arquivada; "Sanity" provisório)
 
@@ -456,3 +456,312 @@ again..." (§7, sem mudança).
 |---|---|---|---|
 | D-02 "Maxed" × "MAX" | **"Maxed"** | já está em FEAT-015, no código (`MarketController/Labels.luau`) e nos testes T036-08/10 | só este documento (§2). AST-049, se tiver "MAX" pintado, alinha com o art-director (texto da etiqueta é gerado no código) |
 | D-03 "Buy {upgrade} — ${price}" × "Buy {upgrade} ({price})" | **"Buy {x} — ${price}"** | já está em `Actions`, FEAT-015 e §19.5; o "$" deixa claro que é dinheiro da party | §2: prateleira, bancada, Whistle e trailer no mesmo formato |
+
+## 16. Preparo 3D (TASK-213, 2026-10-12, Provisório)
+
+Fontes: `docs/tech/prep-3d.md` (§2.2 alvos, §3.0 seções, §3.2 a §3.5 estágios, §5 HUD), `docs/art/prep-ui-spec.md` §6 a §7,
+`Content.Prep` (`Texts`, `Build.Texts.Hints`, `Reasons`, `Grades.Labels`), `Notices.luau`, `Steps.luau`, `tools/voice/lines.json`.
+**Tudo Provisório, sem DEC.** Texto de jogo em inglês (DEC-022). Nomes de seção em inglês: **Grill, Board, Toppings, Serve**
+(`prep-3d.md` §3.0). Vocabulário fixo: **trailer** (nunca "cart"), **frank** na voz, **rail** (trilho), **roller** (rolete),
+**crate** (caixa de pães), **box** (caixa de franks), **bin** (lixeira), **window** (janela de entrega).
+
+**Limites (Provisório):**
+
+| Onde | Limite |
+|---|---|
+| Dica (uma linha, acima da barra de seções) | **<= 36 caracteres**, 1 linha, 16 px |
+| Toast | **<= 36 caracteres** (teto 40, §10), 1 por vez |
+| Rótulo de botão, aba ou chip | **<= 12 caracteres** |
+| Fala do Walt (voz) | **<= 8 palavras** (alvo 6), sem dígito, sem "sausage" (use "frank" ou "hot dog"), sem "cart", sem número de telefone |
+| Texto de UI (não falado) | pode dizer "sausage" e dígitos; a voz não |
+
+Regra de escrita: o verbo vem primeiro, o alvo vem depois ("Drag the knife along the line"). Nunca só cor: onde a dica fala
+de "ring" ou "mark", há forma e som também (`prep-3d.md` §2.4). Sem vermelho, sem bronca: a recusa diz o que falta.
+
+### 16.1 Dicas por alvo (`PrepTarget`, `prep-3d.md` §2.2)
+
+Aparecem na linha de dica quando o alvo está em hover (mouse, foco do gamepad) ou pulsando (toque). `{item}` = nome do topping.
+
+| Id | Alvo (`TargetKind`) · estado | Dica |
+|---|---|---|
+| PREP3D_TIP_GRILL | seção Grill, ao entrar | "Drop franks on the rollers" |
+| PREP3D_TIP_BOX | `SausageStock` (caixa de franks) | "Tap the box or drag a frank out" |
+| PREP3D_TIP_ROLLER_FREE | `GrillSlot` livre | "Drop it on a free roller" |
+| PREP3D_TIP_ROLLER_COOK | `GrillSlot` cozinhando, antes da janela | "Cooking. Wait for the ring." |
+| PREP3D_TIP_ROLLER_FLIP | `GrillSlot` na janela de virar (40 a 60%) | "Tap it when the ring closes" |
+| PREP3D_TIP_ROLLER_LATE | `GrillSlot` depois da janela, ainda não virado | "Late flip. It still counts." |
+| PREP3D_TIP_ROLLER_READY | `GrillSlot` pronto | "Ready! Tap it to collect" |
+| PREP3D_TIP_RAIL | `Rail` (trilho) | "Ready franks wait on the rail" |
+| PREP3D_TIP_CRATE | `BunCrate` (caixa de pães) | "Tap the crate for a bun" |
+| PREP3D_TIP_BOARD | `Board`, pão fechado | "Cut the bun with the knife" |
+| PREP3D_TIP_KNIFE | `Knife` | "Drag the knife along the line" |
+| PREP3D_TIP_BOARD_OPEN | `Board`, pão aberto sem salsicha | "Drag the frank into the bun" |
+| PREP3D_TIP_BOWL | `Topping`, qualquer tigela livre (hover) | "Tap to pick up {item}" |
+| PREP3D_TIP_BOWL_KETCHUP | tigela/garrafa de ketchup | "Ketchup: trace the zig-zag" |
+| PREP3D_TIP_BOWL_MUSTARD | tigela/garrafa de mustard | "Mustard: trace the zig-zag" |
+| PREP3D_TIP_BOWL_CREAM | tigela/garrafa de cream cheese | "Cream cheese: trace the zig-zag" |
+| PREP3D_TIP_BOWL_CHEESE | tigela de cheese | "Cheese: drag the slice on" |
+| PREP3D_TIP_BOWL_BACON | tigela de bacon | "Bacon: tap each ring as it closes" |
+| PREP3D_TIP_BOWL_POTATO | tigela de potato sticks | "Potato sticks: hold, then let go" |
+| PREP3D_TIP_BOWL_USED | tigela já usada neste prato | "Already on the plate" |
+| PREP3D_TIP_BOWL_LOCKED | tigela de ingrediente do dia futuro | "Not in stock yet" |
+| PREP3D_TIP_BIN | `Bin` (lixeira), com prato na mão | "Drag the plate to the bin" |
+| PREP3D_TIP_HATCH | `Hatch` (janela), prato pronto | "Drag the plate to the window" |
+| PREP3D_TIP_CUSTOMER | `Customer` em `Q1`, `Ordering` | "Tap the customer for the order" |
+| PREP3D_TIP_TICKET | ticket 2D, mais de um na fila | "Tap a ticket to pin it" |
+| PREP3D_TIP_TAKE | botão Take do ticket | "Take the order" |
+| PREP3D_TIP_LEAVE | Leave | "Leave. Your plate waits 20 s" |
+| PREP3D_TIP_NEXT_GRILL | Next, seção Grill | "Next: on to the board" |
+| PREP3D_TIP_NEXT_BOARD | Next, seção Board, habilitado | "Next: add toppings" |
+| PREP3D_TIP_NEXT_BOARD_OFF | Next, seção Board, desabilitado | "Cut the bun and add the frank first" |
+| PREP3D_TIP_NEXT_TOP | Next, seção Toppings | "Next: close the bun" |
+| PREP3D_TIP_SERVE_OFF | Serve desabilitado | "Finish the plate first" |
+| PREP3D_TIP_PAD_A | glifo no gamepad | "{A}: pick up or drop" |
+| PREP3D_TIP_PAD_X | glifo no gamepad | "{X}: next target" |
+
+Notas: PREP3D_TIP_NEXT_BOARD_OFF tem 35 caracteres (o teto é 36). `20 s` é `Rules.ClientIdle` (valor lido de `Content.Prep`; se mudar, o texto
+usa `{n}`).
+
+### 16.2 Seções (abas embaixo) e progresso (`prep-3d.md` §3.0, §5)
+
+| Id | Elemento | Texto |
+|---|---|---|
+| PREP3D_UI_TAB_GRILL | aba 1 | "Grill" |
+| PREP3D_UI_TAB_BOARD | aba 2 | "Board" |
+| PREP3D_UI_TAB_TOPPINGS | aba 3 | "Toppings" |
+| PREP3D_UI_TAB_SERVE | aba 4 | "Serve" |
+| PREP3D_TIP_TAB_GRILL | dica da aba 1 | "Grill: franks cook while you work" |
+| PREP3D_TIP_TAB_BOARD | dica da aba 2 | "Board: cut the bun, add the frank" |
+| PREP3D_TIP_TAB_TOPPINGS | dica da aba 3 | "Toppings: up to 3, any order" |
+| PREP3D_TIP_TAB_SERVE | dica da aba 4 | "Serve: send the plate out" |
+| PREP3D_TIP_TABS_FREE | primeira vez que o jogador troca de aba | "Tabs are free. Next keeps the order" |
+| PREP3D_UI_PROG_GRILL | cartão de progresso, Grill | "Grilling" |
+| PREP3D_UI_PROG_BOARD | cartão de progresso, Board | "Cutting {n}%" |
+| PREP3D_UI_PROG_TOP | cartão de progresso, Toppings | "Toppings {n}/{k}" |
+| PREP3D_UI_PROG_SERVE | cartão de progresso, Serve | "Serving" |
+| PREP3D_UI_PIPS | três pips de nota (Cut, Place, Top) | "Cut" · "Place" · "Top" |
+| PREP3D_UI_BADGE_READY | badge da aba Grill (tooltip) | "{n} ready" |
+| PREP3D_UI_WAITING | prato esperando salsicha (já existe em `Texts.Waiting`) | "Waiting for the grill" |
+
+### 16.3 Dicas por gesto (substituem `Build.Texts.Hints`)
+
+Mesmas chaves de `Content.Prep.Build.Texts.Hints`; a coluna "Antes" é o texto de hoje. Ficam na linha de dica durante o gesto.
+
+| Id | Chave | Dica 3D | Antes |
+|---|---|---|---|
+| PREP3D_GST_SLICE | `slice` | "Drag the knife along the line" | igual |
+| PREP3D_GST_SLICE_HOLD | `slice_hold` | "Hold the knife on the line" | "Hold on the line" |
+| PREP3D_GST_PLACE | `place` | "Drag the frank into the bun" | "Drag the sausage into the bun" |
+| PREP3D_GST_PLACE_HOLD | `place_hold` | "Hold where the frank goes" | "Hold where the sausage goes" |
+| PREP3D_GST_TRACE | `trace` | "Trace the zig-zag" | igual |
+| PREP3D_GST_TRACE_HOLD | `trace_hold` | "Hold to pour, let go at the mark" | "Hold to pour, release in the green" (só cor) |
+| PREP3D_GST_SLIDE | `slide` | "Drag the slice onto the bun" | igual |
+| PREP3D_GST_SLIDE_HOLD | `slide_hold` | "Hold where the slice goes" | igual |
+| PREP3D_GST_TAPS | `taps` | "Tap each ring as it closes" | igual |
+| PREP3D_GST_HOLD | `hold` | "Hold, let go at the ring" | "Hold, release in the green" (só cor) |
+| PREP3D_GST_ADD | `add` | "Add a topping or press Next" | igual |
+| PREP3D_GST_FLIP | grelha (`grill_flip`) | "Tap it when the ring closes" | "Flip when the ring glows" |
+| PREP3D_GST_COLLECT | grelha (`Collect`) | "Tap it or drag it to the rail" | (novo) |
+
+Textos soltos do Build que mudam de palavra (`Build.Texts`): `Sausage` "Sausage" -> "Frank"; `PlaceFirst` "Place the sausage first" -> **"Place the frank first"**; `Full` "Plate is full. Press Next" -> "3 toppings max. Press Next".
+
+### 16.4 "Tap mode" e "Assist" (chips de 44 px, ao lado do Leave; `prep-3d.md` §5 item 6)
+
+Leitura (Provisório; o frontend decide o comportamento exato): **Tap mode** = nenhum gesto exige arrastar; cada gesto vira "toque, toque"
+(o `*_hold` atual é a base). **Assist** = alvos maiores, tolerância +30% (`Rules.Assist`) e guia sempre visível.
+
+| Id | Elemento | Texto |
+|---|---|---|
+| PREP3D_UI_TAPMODE | rótulo do chip | "Tap mode" |
+| PREP3D_UI_TAPMODE_TIP | tooltip | "Tap mode: tap, no dragging" |
+| PREP3D_UI_TAPMODE_ON | toast ao ligar | "Tap mode on" |
+| PREP3D_UI_TAPMODE_OFF | toast ao desligar | "Tap mode off" |
+| PREP3D_UI_ASSIST | rótulo do chip (já existe em `Texts.Assist`) | "Assist" |
+| PREP3D_UI_ASSIST_TIP | tooltip | "Assist: bigger targets, easier marks" |
+| PREP3D_UI_ASSIST_ON | toast ao ligar | "Assist on" |
+| PREP3D_UI_ASSIST_OFF | toast ao desligar | "Assist off" |
+
+Dicas dos gestos com **Tap mode** ligado (sobrepõem a 16.3):
+
+| Id | Gesto | Dica |
+|---|---|---|
+| PREP3D_TAP_SLICE | `slice` | "Tap the bun to cut" |
+| PREP3D_TAP_PLACE | `place` | "Tap the frank, then the bun" |
+| PREP3D_TAP_TRACE | `trace` | "Tap to pour, tap to stop" |
+| PREP3D_TAP_SLIDE | `slide` | "Tap the slice, then the bun" |
+| PREP3D_TAP_HOLD | `hold` | "Tap to start, tap to stop" |
+| PREP3D_TAP_TAPS | `taps` | "Tap each ring as it closes" |
+| PREP3D_TAP_PLATE | prato (lixeira ou janela) | "Tap the plate, then the spot" |
+
+### 16.5 Recusas e toasts
+
+Chaves que **já existem** em `Notices.luau` ou em §10 mantêm o texto (coluna "Existe"). Nenhuma recusa fala de "chance", "erro seu" ou
+"errado": diz o que falta.
+
+| Id | Situação (`Reason`) | Texto | Existe |
+|---|---|---|---|
+| PREP3D_REF_NOFRANKS | `NoStock`, caixa de franks vazia | "Out of franks! Restock it." | `out_of_stock` com `{item}` cobre; texto novo só se o dono quiser "frank" no toast |
+| PREP3D_REF_NOBUNS | `NoStock`, caixa de pães vazia | "Out of buns! Restock it." | idem |
+| PREP3D_REF_NOTOPPING | `NoStock`, topping | "Out of {item}! Restock it." | `out_of_stock` |
+| PREP3D_REF_GRILL_FULL | grelha cheia | "The grill is full." | `grill_full` (§10.3) |
+| PREP3D_REF_RAIL_FULL | trilho cheio (a pronta fica no rolete) | "The rail is full." | novo |
+| PREP3D_REF_RAIL_EMPTY | `NoSausage` (nada pronto no trilho) | "No ready franks yet." | substitui `prep_no_sausage` "No sausage on the warmer yet." |
+| PREP3D_REF_TOO_EARLY | virar antes da janela | "Not yet. Wait for the ring." | novo |
+| PREP3D_REF_FLIPPED | virar duas vezes | "Already flipped." | novo |
+| PREP3D_REF_TOO_FAST | `TooFast` | "Too fast! Try again." | `prep_too_fast` |
+| PREP3D_REF_CUT_FIRST | encaixar sem cortar | "Cut the bun first" | novo |
+| PREP3D_REF_PLACE_FIRST | topping sem salsicha | "Place the frank first" | substitui `Build.Texts.PlaceFirst` |
+| PREP3D_REF_TOP_MAX | quarto topping | "3 toppings max!" | `topping_max` (§10.3) |
+| PREP3D_REF_TOP_REPEAT | topping repetido | "It already has {item}." | `topping_repeat` (§10.3) |
+| PREP3D_REF_ONE_TOOL | pegar 2ª ferramenta | "Put that tool down first" | novo |
+| PREP3D_REF_HANDS | `HandsFull` | "Hands full" | `hands_full` |
+| PREP3D_REF_BUSY | `Busy` | "Someone's already there." | `prep_busy` |
+| PREP3D_REF_LOCKED | `Locked` | "Not right now." | `prep_locked` |
+| PREP3D_REF_NOT_READY | Serve sem prato pronto | "Nothing to serve yet" | novo |
+| PREP3D_REF_NO_TICKET | Serve sem ticket fixado | "Pin a ticket first" | novo |
+| PREP3D_REF_CLOSED | `NotSelling` | "We are closed" | `Build.Texts.Closed` / `shop_closed` |
+| PREP3D_REF_SHUTTER | janela fechada à noite | "The window's shut. Open it to serve." | `shutter_closed` (§10.1) |
+| PREP3D_REF_SAVED | Leave com prato em curso | "Plate saved for 20 s" | `prep-ui-spec` §6.1 |
+| PREP3D_REF_EXPIRED | prato expirou | "Plate expired" | `Build.Texts.Expired` |
+| PREP3D_REF_TRASHED | lixeira, havia salsicha | "Plate trashed" | `prep-ui-spec` §6.5 |
+| PREP3D_REF_KICKED | `Kick*` | "Prep interrupted." | `prep_kicked` |
+| PREP3D_REF_IDLE | `KickIdle` | "Stepped away from the station." | `prep_idle` |
+| PREP3D_REF_RETRY | `PrepFinish` recusado | "Pick the tab again to retry" | `Build.Texts.Retry` |
+
+Palavra "sausage" nos toasts existentes (`prep_no_sausage`) é só texto, não voz; a proposta é trocar por "frank" para o vocabulário fechar.
+
+### 16.6 Selos Perfect, Good, Messy (`Grades.Labels`, `prep-ui-spec` §7)
+
+| Id | Elemento | Texto |
+|---|---|---|
+| PREP3D_SEAL_PERFECT | selo, forma estrela | "Perfect!" |
+| PREP3D_SEAL_GOOD | selo, forma círculo-check | "Good" |
+| PREP3D_SEAL_MESSY | selo, forma mancha | "Messy" |
+| PREP3D_SEAL_TIP | gorjeta do Perfect (valor de `Effects.Perfect.Tip`) | "+${tip} tip" |
+
+Motivo do Messy (uma linha pequena sob o selo, só da pior etapa; chave = `Tolerances.Key`; Provisório):
+
+| Id | Etapa | Texto |
+|---|---|---|
+| PREP3D_SEAL_WHY_CUT | `bun_cut` | "The cut wandered" |
+| PREP3D_SEAL_WHY_PLACE | `sausage_place` | "The frank sat off-center" |
+| PREP3D_SEAL_WHY_SAUCE_LOW | molho, pouca cobertura | "Sauce missed the bun" |
+| PREP3D_SEAL_WHY_SAUCE_HIGH | molho, excesso | "Too much sauce" |
+| PREP3D_SEAL_WHY_CHEESE | `cheese` | "The cheese slid off-center" |
+| PREP3D_SEAL_WHY_BACON | `bacon` | "Bacon timing was off" |
+| PREP3D_SEAL_WHY_POTATO | `potato_sticks` | "The sticks piled wrong" |
+| PREP3D_SEAL_WHY_FLIP | `grill_flip` | "Flipped too early or late" |
+
+Selo de entrega (carimbo no ticket, forma diferente do selo de nota; `prep-3d.md` §3.5): "Complete" · "Incomplete" · "Wrong".
+
+### 16.7 Tutorial do Day 1 adaptado ao fluxo 3D
+
+Fluxo (`prep-3d.md` §3.0): phone -> open the trailer -> customer -> take order (**inalterados**, ver `script.md` §3) e depois
+**Work na grelha -> pôr -> virar -> coletar -> aba Board -> pão -> corte -> salsicha no pão -> aba Toppings -> ketchup -> Next -> servir**;
+depois `money`, `mart_*`, `restock` e a despedida (**inalterados**). `Pulse` = alvo 3D que o `World/Coach` pulsa (TASK-209).
+Regras mantidas de `script.md` §3: <= 3 falas por passo, Walt curto, "Nothing extra" (DEC-072), pulável.
+
+Convenções: **Say** = falas ao começar o passo · **Done** = elogio ao passar · **Remind** = lembrete após ocioso (`IDLE`).
+**Áudio**: `E` = o texto exato já está em `tools/voice/lines.json` (conferido; há áudio pré-gerado em `Content.VoiceLines`);
+`NOVA` = exige regeneração. Passos antigos que **somem** (`grill`, `slice`, `slicing`, `cooking`, `collect`, `assemble`,
+`toppings`, `discard`) são substituídos pelos `p3_*`; os textos antigos viram falas sem uso (o áudio fica, não é apagado).
+
+**Passos inalterados (só ganham `PrepHint` novo, sem fala nova):**
+
+| Passo | Pulse | `PrepHint` (painel) |
+|---|---|---|
+| `phone`, `wait_call`, `open`, `wait_customer` | sem mudança | sem mudança |
+| `order` | `Customer` em `Q1` (vista Window) ou botão Take do ticket | "Tap the customer or press Take." |
+
+**Passos novos (3D):**
+
+| Passo | Pulse | Fala | Id | Papel | Palavras | Áudio |
+|---|---|---|---|---|---|---|
+| `p3_work` | `Prompt_Work` da grelha | "Press Work at the grill." | PREP3D_V_WORK_S1 | Say | 5 | NOVA |
+| | | "Hit Work by the grill." | PREP3D_V_WORK_R | Remind | 5 | NOVA |
+| `p3_place` | caixa de franks, depois rolete livre | "Frank from the box." | PREP3D_V_PLACE_S1 | Say | 4 | NOVA |
+| | | "Onto the grill." | PREP3D_V_PLACE_S2 | Say | 3 | E |
+| | | "Nice." | PREP3D_V_PLACE_D | Done | 1 | E |
+| | | "Drag a frank to a roller." | PREP3D_V_PLACE_R | Remind | 6 | NOVA |
+| `p3_flip` | a salsicha e o anel | "Wait for the ring." | PREP3D_V_FLIP_S1 | Say | 4 | NOVA |
+| | | "Tap it as it closes." | PREP3D_V_FLIP_S2 | Say | 5 | NOVA |
+| | | "Perfect." | PREP3D_V_FLIP_D_PERFECT | Done (nota Perfect) | 1 | E |
+| | | "Nice." | PREP3D_V_FLIP_D_GOOD | Done (nota Good) | 1 | E |
+| | | "Bit late. Still fine." | PREP3D_V_FLIP_D_MESSY | Done (nota Messy) | 4 | NOVA |
+| | | "Tap the glowing frank." | PREP3D_V_FLIP_R | Remind | 4 | NOVA |
+| `p3_collect` | salsicha pronta, depois `Rail` | "Ready. Grab it." | PREP3D_V_COLLECT_S1 | Say | 3 | E |
+| | | "Got it." | PREP3D_V_COLLECT_D | Done | 2 | E |
+| | | "Tap it, or drag to the rail." | PREP3D_V_COLLECT_R | Remind | 6 | NOVA |
+| `p3_board_tab` | aba Board | "Tap Board, down below." | PREP3D_V_BOARDTAB_S1 | Say | 4 | NOVA |
+| | | "Board tab, down below." | PREP3D_V_BOARDTAB_R | Remind | 4 | NOVA |
+| `p3_bun` | `BunCrate` | "Bun from the crate." | PREP3D_V_BUN_S1 | Say | 4 | NOVA |
+| | | "Tap the bun crate." | PREP3D_V_BUN_R | Remind | 4 | NOVA |
+| `p3_cut` | `Knife` e a guia de corte | "Drag the knife across." | PREP3D_V_CUT_S1 | Say | 4 | NOVA |
+| | | "Good." | PREP3D_V_CUT_D | Done | 1 | E |
+| | | "Knife along the line." | PREP3D_V_CUT_R | Remind | 4 | NOVA |
+| `p3_assemble` | frente do `Rail`, depois vão do pão | "Frank in the bun." | PREP3D_V_ASM_S1 | Say | 4 | E |
+| | | "Drag it from the rail." | PREP3D_V_ASM_S2 | Say | 5 | NOVA |
+| | | "Beautiful." | PREP3D_V_ASM_D | Done | 1 | E |
+| | | "Put it in the bun." | PREP3D_V_ASM_R | Remind | 5 | E |
+| `p3_toppings_tab` | aba Toppings | "Now tap Toppings." | PREP3D_V_TOPTAB_S1 | Say | 3 | NOVA |
+| | | "Toppings tab, down below." | PREP3D_V_TOPTAB_R | Remind | 4 | NOVA |
+| `p3_ketchup` | tigela/garrafa de ketchup, depois o pão | "They want ketchup." | PREP3D_V_KET_S1 | Say | 3 | E |
+| | | "Grab the bottle." | PREP3D_V_KET_S2 | Say | 3 | NOVA |
+| | | "Nothing extra." | PREP3D_V_KET_S3 | Say | 2 | E |
+| | | "Perfect." / "Nice." / "Bit late. Still fine." | PREP3D_V_KET_D_* | Done por nota (mesmas falas do `p3_flip`) | 1 a 4 | E / E / NOVA (já contada) |
+| | | "Trace the squiggle on the bun." | PREP3D_V_KET_R | Remind | 6 | NOVA |
+| `p3_next` | botão Next | "Press Next when it's done." | PREP3D_V_NEXT_S1 | Say | 5 | NOVA |
+| | | "Press Next, Rookie." | PREP3D_V_NEXT_R | Remind | 3 | NOVA |
+| `p3_discard` (se o prato não bater) | `Bin` | "Not what they asked. Toss it." | PREP3D_V_BIN_S1 | Say | 6 | E |
+| | | "Drag it to the bin." | PREP3D_V_BIN_R | Remind | 5 | NOVA |
+| `p3_serve` | prato, depois `Hatch` | "Now serve it." | PREP3D_V_SERVE_S1 | Say | 3 | E |
+| | | "Plate to the window." | PREP3D_V_SERVE_S2 | Say | 4 | NOVA |
+| | | "Hand it over." | PREP3D_V_SERVE_R | Remind | 3 | E |
+
+**`PrepHint` (painel de apoio, texto, <= 36 caracteres por linha):**
+
+| Id | Passo | Texto |
+|---|---|---|
+| PREP3D_PH_WORK | `p3_work` | 'Press "Work" at the grill.' |
+| PREP3D_PH_PLACE | `p3_place` | "Drag a frank onto a roller." |
+| PREP3D_PH_FLIP | `p3_flip` | "Tap it when the ring closes." |
+| PREP3D_PH_COLLECT | `p3_collect` | "Tap the ready frank." |
+| PREP3D_PH_BOARDTAB | `p3_board_tab` | "Tap the Board tab." |
+| PREP3D_PH_BUN | `p3_bun` | "Tap the bun crate." |
+| PREP3D_PH_CUT | `p3_cut` | "Drag the knife along the line." |
+| PREP3D_PH_ASM | `p3_assemble` | "Drag the frank into the bun." |
+| PREP3D_PH_TOPTAB | `p3_toppings_tab` | "Tap the Toppings tab." |
+| PREP3D_PH_KETCHUP | `p3_ketchup` | "Pick the ketchup, trace the zig-zag." |
+| PREP3D_PH_NEXT | `p3_next` | "Press Next." |
+| PREP3D_PH_BIN | `p3_discard` | "Drag the plate to the bin." |
+| PREP3D_PH_SERVE | `p3_serve` | "Drag the plate to the window." |
+
+**`hint_*` do Walt depois da ação (`BossCalls`, `Trigger.Hint`; opcional, só se continuarem ativos no 3D).** As de §11.1 falam de "bar"
+e de "Pop a sausage": ficam obsoletas no 3D. Substitutas propostas (texto da dica = fala, ≤ 6 palavras):
+
+| Id | Gatilho | Fala | Áudio |
+|---|---|---|---|
+| PREP3D_V_HINT_GRILL | `grill_place` (substitui "When the bar fills up, grab it.") | "Watch for the ring." | NOVA |
+| PREP3D_V_HINT_COLLECT | `grill_collect` (substitui "It waits on the warmer. Now slice a bun.") | "Now cut a bun." | NOVA |
+| PREP3D_V_HINT_CUT | `bun_cut` (substitui "Pop a sausage in the bun.") | "Frank goes in the bun." | NOVA |
+
+Pendência de coerência (não alterei §11.1 nem `script.md` §3: a TASK-213 só autoriza o `script.md` se a TASK-183 já fechou, e não confirmei):
+`call_day_1` (§11.1) diz "Tap the sausage box" (palavra vetada na voz); `script.md` §3 e esta tabela devem ser conciliados pelo
+secretário no fim da rodada.
+
+### 16.8 O que a regeneração de voz precisa
+
+- **Falas NOVAS que exigem áudio** (texto único, contadas uma vez): 24 do tutorial (`PREP3D_V_*` com "NOVA") + 3 de `hint_*` opcionais = **27**.
+- **Falas `E` (já geradas)**: 14 textos únicos reaproveitados ("Onto the grill.", "Nice.", "Perfect.", "Ready. Grab it.", "Got it.",
+  "Good.", "Frank in the bun.", "Beautiful.", "Put it in the bun.", "They want ketchup.", "Nothing extra.",
+  "Not what they asked. Toss it.", "Now serve it.", "Hand it over."), mais as dos passos inalterados.
+- **Falas que deixam de ser usadas** (áudio fica, sem apagar): "Frank from the cooler.", "Frank on the grill.", "Slice a bun while it cooks.",
+  "Hold to slice the bun.", "Wait for the bar.", "Grab it off the grill.", "Ketchup. Hold to add.", "Toss it in the bin." (as 8 viram `p3_*` acima).
+- Onde mora: as falas precisam estar em `Steps.luau` nos campos `Say`, `Done`, `Remind` (o `tools/voice/collect_lines.py` só lê esses campos, mais
+  `GREETING`, `GOODBYE` e `SKIP_GOODBYE`). **A fala `Done` por nota** (Perfect, Good, Messy) precisa de campo que o coletor reconheça (por exemplo,
+  três strings em `Say` de um passo-sombra) **ou** o coletor ganha o nome do campo novo; senão `Bit late. Still fine.` fica sem áudio e cai no
+  `AudioTextToSpeech` (voz diferente da do Walt).
+- Ordem do pipeline em `tools/voice/`: `collect_lines.py` (gera `lines.json`) -> `generate.py` (síntese) -> `upload.py` -> `build_content.py` (reescreve
+  `src/Shared/Content/VoiceLines.luau`). Ordem de `generate`/`upload` inferida dos nomes; conferir o cabeçalho de cada script. Não gerei áudio.
+- Todas as falas novas passam no filtro: sem "sausage", sem dígito, sem número de telefone, <= 6 palavras.
+- Nada a regenerar para a despedida, saudação, `money`, `mart_*` e `restock`.
