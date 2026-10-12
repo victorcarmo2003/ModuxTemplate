@@ -14,7 +14,7 @@
 	  1. Backup: MAP01_Blockout.Pad.CART, MAP01_Blockout.Trailer.TRL-SALE / SIGN-T, MapPoints TRL-SALE and SIGN-T, and the
 	     buy_trailer anchor (Prompt_Buy) of the trailer.
 	  2. MapPoints in the trailer frame: TRL = the pivot, CART (legacy name, kept for the cutscene / customers: the service
-	     window front), Q1..Q5 (queue in front of the window, 3.4 studs from the drawer / counter edge), PS-1..4 = PS-N1..4
+	     window front), Q1..Q5 (queue in front of the window, 1.6 studs in front of the folding shelf Body.Shelf_Fold), PS-1..4 = PS-N1..4
 	     (inside, on the floor), DROP-T, AN-05, L3 (thief lurk moved out of the trailer to the east side), new TRL-OUT
 	     (Exit Trailer landing on the west strip). LightZones LZ-1 / LZ-2 / LZ-3 follow the trailer.
 	  3. NpcNodes: new N-PAD-1..3 (gate, row behind the tables, west exit) and TBL-1..4 (one behind each table); the Q chain
@@ -231,8 +231,8 @@ end
 
 -- 2. MapPoints in the trailer frame --------------------------------------------------------------------------------------
 setPoint("TRL", PIVOT)
--- queue in front of the window: world Z of the row = 7.5 in front of the pivot, 3.4 from the drawer (Z 13.2)
-local QROW = -7.5
+-- queue in front of the window: the row is 8 studs in front of the pivot, 1.6 in front of the folding shelf
+local QROW = -8.0 -- world Z 19.7: 1.6 studs in front of Body.Shelf_Fold (its plane is Z 18.1)
 local Q_LX = { 11.08, 8.88, 6.68, 4.48, 2.28 }
 for i = 1, 5 do
 	local pos = W(Q_LX[i], GROUND, QROW)
@@ -240,7 +240,7 @@ for i = 1, 5 do
 	local dir = if i == 1 then -FRONT else Vector3.new(-1, 0, 0)
 	setPoint("Q" .. i, face(pos, dir))
 end
-setPoint("CART", face(W(1.5, GROUND, -6.5), FRONT)) -- legacy: cutscene focus / customers face the service window
+setPoint("CART", face(W(1.5, GROUND, -7.0), FRONT)) -- legacy: cutscene focus / customers face the service window
 for i = 1, 4 do
 	local lx = ({ -8, -2, 4, 10 })[i]
 	local cf = face(W(lx, FLOOR, 0), FRONT)
@@ -249,8 +249,8 @@ for i = 1, 4 do
 end
 setPoint("DROP-T", face(W(11.5, FLOOR, 3.5), FRONT))
 setPoint("AN-05", face(W(9.0, 7.45, 5.5), FRONT))
--- thief lurk out of the trailer: east of the east wall, 17 studs from the zone centre
-setPoint("L3", face(W(-17.4, GROUND, -3.9), FRONT))
+-- thief lurk out of the trailer: east of the chassis (ends 18 studs east of the pivot), 23 studs from the zone centre
+setPoint("L3", face(W(-18.9, GROUND, -13.3), FRONT))
 local ptOut = point("TRL-OUT")
 if not ptOut then
 	ptOut = point("DROP-T"):Clone()
@@ -325,7 +325,7 @@ if #list >= 4 then
 	-- thief lurk
 	local n04 = nodePart("N-Z01-04")
 	if n04 then
-		n04.CFrame = CFrame.new(W(-18.4, GROUND, 1.1))
+		n04.CFrame = CFrame.new(W(-21.4, GROUND, -5.3))
 	end
 	addLink("L3", "N-PAD-2")
 	-- old Pad west corner

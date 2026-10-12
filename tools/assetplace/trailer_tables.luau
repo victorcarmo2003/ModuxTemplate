@@ -1,4 +1,5 @@
 --!nonstrict
+-- OBSOLETE since 2026-10-12 (trailer is the only vehicle, tables are TBL-1..4): use trailer_only_map.luau. Kept as history.
 --[[
 	trailer_tables.luau: Studio snippet (edit mode, run once, safe to run again) for the TRAILER tables (FEAT-037, UPG-011,
 	Q-209). Paste it in the command bar / Studio MCP execute_luau. NEVER Place.run, never rewrites the map: it does not

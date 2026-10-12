@@ -2060,7 +2060,10 @@ local function checkGraph(root: Instance?)
 		if blocker then
 			err(("6: waypoint %s at %s is inside solid geometry (%s)"):format(id, tostring(n.p), (blocker :: Instance):GetFullName()))
 		end
-		local down = Workspace:Raycast(n.p + Vector3.new(0, 4, 0), Vector3.new(0, -8, 0), params)
+		local rayParams = RaycastParams.new() -- the overlap params above cannot be passed to Raycast (2026-10-12 fix)
+		rayParams.FilterType = Enum.RaycastFilterType.Exclude
+		rayParams.FilterDescendantsInstances = exclude
+		local down = Workspace:Raycast(n.p + Vector3.new(0, 4, 0), Vector3.new(0, -8, 0), rayParams)
 		if down == nil then
 			warn_(("waypoint %s at %s has no floor under it"):format(id, tostring(n.p)))
 		elseif math.abs(down.Position.Y - n.p.Y) > 0.35 then
@@ -2470,14 +2473,13 @@ end
 -- (nobody can walk to it: add TBL-<n> next to it). Info: how many tables per group were found.
 local function checkTables()
 	local groups = {
-		{ key = "Pad", first = 1, last = 5 },
-		{ key = "Trailer", first = 6, last = 9 },
+		{ key = "Trailer", first = 1, last = 4 }, -- one group since 2026-10-12 (trailer only, TBL-1..4)
 	}
 	local byIndex: { [number]: { Instance } } = {}
 	for _, m in tagged("SeatTable") do
 		local idx = m:GetAttribute("TableIndex")
-		if typeof(idx) ~= "number" or idx ~= math.floor(idx) or idx < 1 or idx > 9 then
-			warn_(("16: SeatTable %s: TableIndex must be 1..9 (got %s)"):format(m:GetFullName(), tostring(idx)))
+		if typeof(idx) ~= "number" or idx ~= math.floor(idx) or idx < 1 or idx > 4 then
+			warn_(("16: SeatTable %s: TableIndex must be 1..4 (got %s)"):format(m:GetFullName(), tostring(idx)))
 			continue
 		end
 		byIndex[idx] = byIndex[idx] or {}

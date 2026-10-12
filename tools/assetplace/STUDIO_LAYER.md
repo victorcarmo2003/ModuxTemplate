@@ -17,12 +17,24 @@ que esta listado aqui, que vive em snippets que rodam DEPOIS do Place.run.
 5. `fix_trailer_height.luau`: **NAO rodar apos um Place.run** (ver tabela). So num place que ainda tenha os meshes antigos.
 6. `fix_mart_shelf_packs.luau`: packs AST-011 nas gondolas (le os BUY-* do passo 2).
 7. `fix_mart_fridge.luau`: packs de queijo / cream cheese nas geladeiras (le os BUY-* do passo 2).
-8. `trailer_tables.luau`: tag SeatTable, TableIndex 6..9, TableGroup "Trailer" e Seat1..4 das 4 mesas do trailer.
-9. `check_map01.luau` (`Check.run({ wave = 3 })`) e, no fim, `Place.diff` outra vez (esperado: so as linhas da secao "Diferencas esperadas").
+8. `trailer_tables.luau`: **OBSOLETO** desde o trailer unico (2026-10-12); nao rodar (o passo 9 renumera as mesas 1..4).
+9. `trailer_only_map.luau`, depois `trailer_only_lights.luau` (secao "Trailer unico" abaixo): carrinho e venda para o backup, pontos Q / PS / DROP-T / L3 / TRL-OUT no referencial do trailer, nos TBL-1..4 e N-PAD-1..3, mesas 1..4, varais ligados ao trailer. Se o `Place.run` recolocou o trailer no lote de venda (Z > 60) o snippet o leva a `DEFAULT_POSE`.
+10. `check_map01.luau` (`Check.run({ wave = 3 })`) e, no fim, `Place.diff` outra vez (esperado: so as linhas da secao "Diferencas esperadas").
 
 Lobby: **nunca** `Place.runInto(..., true)` (force) sem sincronizar antes; sem `force` o runInto recusa (`[skip]`). A ordem do lobby, quando
 for reconstruir de proposito: `runInto(LOBBY_v2_placements, ids, "LOBBY_Assets", true)` -> `Decor.runLobby(true)` (decor_mart.luau) ->
 `bind_map01` (bindLobby) -> `warm_lobby.luau`.
+
+## Trailer unico (2026-10-12, DEC-224, Provisorio)
+
+O Food Trailer e o veiculo unico; o carrinho saiu da run. Dois snippets de Studio, idempotentes, nada e apagado (o que sai vai para `ServerStorage.CART_Backup_20261012`, com `OrigPath` e `OrigTags`; as tags de gameplay saem do backup para nenhum servico ler fantasma; o `CARRINHO BACKUP` do dono so perde as tags):
+
+| Snippet | O que faz |
+|---|---|
+| `trailer_only_map.luau` | backup de `MAP01_Blockout.Pad.CART`, `Trailer.TRL-SALE` / `SIGN-T`, MapPoints `TRL-SALE` / `SIGN-T`, `Prompt_Buy` (buy_trailer) do trailer. Pontos no referencial do pivo do trailer: `TRL` = pivo, `CART` (nome legado, janela de servico; a cutscene e os clientes ainda o leem), `Q1..Q5` (3,4 studs da gaveta, sob a aba), `PS-1..4` = `PS-N1..4` (dentro, piso 2,6), `DROP-T`, `AN-05`, `L3` (espreita do ladrao, fora do trailer, a leste), novo `TRL-OUT` (pouso do Exit Trailer, faixa oeste). `LZ-1/2/3` acompanham o trailer. NpcNodes novos `N-PAD-1..3` e `TBL-1..4`; `Q5 <-> N-PAD-2`, `Q1 <-> N-PAD-3`; `N-Z01-02/03` vao para o backup. Mesas: os 4 `SeatTable` do Workspace viram `TableIndex` 1..4 por X (oeste = 1), `MapId` `TTBL-n`, `TableGroup` "Trailer". Marcas `Qn_AST-019_QueueMark` vao para os Q. Tudo deriva do pivo atual do trailer: se o dono o mover, rodar de novo. |
+| `trailer_only_lights.luau` | varais: 3 arcos (trailer -> poste oeste, trailer -> poste leste, poste -> poste) com as mesmas `Wire` / `Bulb` (clones), minimo 9,5 studs, sem luzes novas (17/18). Pecas antigas (83) vao para `ServerStorage.PadLights_Backup_20261012`; novas em `Workspace.MAP01_Assets.PadDecor.TrailerStringLights_V1` (refeito a cada execucao; reler as pontas do `TRL-LIGHTS` e das duas `LightPole`). |
+
+Pos-`Place.run`: o run recria `MAP01_Assets.Cart`, o carrinho, `TRL-SALE` e o trailer no lote; os dois snippets acima o desfazem (rodar depois do `bind_map01` e do `bind_pieces`). `tools/studio/sync_src.luau` e so um substituto do botao Connect do Rojo (copia o Source dos scripts do `sourcemap.json`).
 
 ## Snippets pos-run, um a um
 
@@ -31,7 +43,7 @@ for reconstruir de proposito: `runInto(LOBBY_v2_placements, ids, "LOBBY_Assets",
 | `swap_mart_door.luau` | porta do Mart separada: `Door_Frame` + `Door_Leaf_L` + `Door_Leaf_R` (modelo 140495801903917) e o contrato AutoDoor das folhas | a entrada #165 (`AST-028_MartWallDoor`) constroi o mesh unico antigo; o split e uma troca de MeshPart (MeshId nao e scriptable). A captura NAO grava `drop` + 3 partes extras para essa entrada (quebraria o swap) | idempotente: se `Door_Frame` existe so reconfigura as folhas |
 | `fix_mart_shelf_packs.luau` | `ShelfPacks` (3 packs x 2 andares por face) nas 4+ gondolas `AST-029_GondolaBoxesBare` | os packs sao Parts clonadas dos modelos AST-011, nao mesh do placement; a entrada ja usa `GondolaBoxesBare` (mesh sem estoque) | idempotente (pula gondola com pasta `ShelfPacks`; `FORCE = true` refaz; obrigatorio se um BUY-* mudou) |
 | `fix_mart_fridge.luau` | `ShelfPacks` + `Light_Inner` das geladeiras `AST-030_FridgeDisplayShelves` (queijo / cream cheese) | idem; as entradas #193/#194 ja constroem a geladeira nova (Body/Trim/Doors/Shelves/Led, estilo em `FRIDGE_STYLE` do place_assets) | idempotente (pula quem tem `ShelfPacks`) |
-| `trailer_tables.luau` | tag `SeatTable`, `TableIndex` 6..9, `TableGroup`, Seat1..4 invisiveis das mesas `TTBL-6..9` | o placement so cria o mesh (`AST-100_PicnicTable`); build() nao grava tags nem atributos | idempotente; ordena por distancia ao Q1 (6 = mais perto). Os indices originais eram 6 (-61.3,112.2) 7 (-61.3,104.9) 8 (-87.6,113.3) 9 (-87.6,106.0), mundo |
+| `trailer_tables.luau` (OBSOLETO, trailer unico) | tag `SeatTable`, `TableIndex` 6..9, `TableGroup`, Seat1..4 invisiveis das mesas `TTBL-6..9` | o placement so cria o mesh (`AST-100_PicnicTable`); build() nao grava tags nem atributos | idempotente; ordena por distancia ao Q1 (6 = mais perto). Os indices originais eram 6 (-61.3,112.2) 7 (-61.3,104.9) 8 (-87.6,113.3) 9 (-87.6,106.0), mundo |
 | `fix_trailer_height.luau` | trailer rebaixado (Counters topo +4.6, Body, Awning, Shelf_Fold novos; bancos AST-040 novos; estacoes -0.9) | JA ESTA nos placements: `_asset_ids.json` aponta para o AST-027 / AST-040 novos e as entradas TRL-S/G/R/B/T/K/DRAWER/COFFEE ja usam y 5.05 (antes 5.95) | **perigo**: depois de um Place.run as estacoes nao tem o atributo `TrailerLoweredV1`, entao o passo 3 do snippet baixaria 0.9 de novo. Nao rodar apos rebuild. Conferir com Place.diff (entrada #79 = so o deslocamento do trailer) |
 
 Constantes ja alinhadas: `bind_map01.luau` SHELVES confere com as ancoras BUY-* vivas (9 de 9, x/z/h iguais; lidas do Studio em 2026-10-12).
@@ -69,3 +81,11 @@ reaplicar o snippet).
 - Os 2 `Mast_Topper` (neon do cachorro-quente, costas com costas) foram para cima do `Start_Board` (x 62,7, y 17,6, z -620), escala 1,7, + 2 `Portico_Strut`.
 - Novos varais: `LobbyProcedural.LobbyDeclutter_V1` (94 Wire + 89 Bulb): so postes do perimetro, 5 vaos (C-H, H-A, A-B, B-G, F-E), fio no minimo y 12,0, longe do centro (>= 54 do spawn).
 - Intactos: SpawnLocation, MapPoints LOBBY-*, PartyPlatform, piso, 17 luzes (`WarmLobby_Plaza` segue em (5, 14,5, -628,5), agora sem o mastro).
+
+## Lighting salvo igual ao Day (2026-10-12, `lighting_edit_default.luau`)
+
+Pedido do dono: o Studio (Edit) aparecia estourado. O Lighting salvo do place era Brightness 3, Ambient/OutdoorAmbient cinza (70,70,70), Atmosphere azul fria (Color 70,98,199; Decay 92,76,125; Haze 0),
+ColorCorrection Sat 0.5 / Contrast 0.1 / Tint branco, Bloom 1.0, SunRays 0.01. O snippet (idempotente, `UNDO = true` restaura) grava o look do preset Day: Brightness 2.0, ExposureCompensation -0.15 (so Edit),
+Ambient (104,90,78), OutdoorAmbient (132,112,94), ColorShift_Top (255,226,186), EnvSpecular 0.8, ShadowSoftness 0.25, Atmosphere (0.4 / 1 / 1.6 / 0.6, cores quentes), CC (0.03 / Sat 0.2 / Contrast 0.05 / Tint 255,244,228), Bloom 0.5, SunRays 0.04.
+Backup nos atributos de `ServerStorage.Lighting_Backup_20261012` (prefixos L_ A_ C_ B_ R_; criado so na primeira vez). Sky, DepthOfField e VitalColor/VitalBlur intactos. Nenhum script de runtime.
+O preset Day em Content tambem baixou (Brightness 2.8 -> 2.0, Sat 0.4 -> 0.2, Contrast 0.1 -> 0.05, Bloom 0.8 -> 0.5; Golden e Cinematic em proporcao): com 2.8 fachadas e o caminhao clipavam em branco. O dono salva (Ctrl+S).
