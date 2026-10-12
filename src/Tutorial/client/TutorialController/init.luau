@@ -152,6 +152,8 @@ const PANEL_TOP = 50 -- px at scale 1, under the clock row (HudScreen TOP 6 + 38
 -- Narrow screens (under 520 px at scale 1, phone in portrait): money and day stack at the top right and would touch the
 -- 260 px panel, so the panel sits under them (6 + 38 + 6 + 32 + 6 = 88)
 const PANEL_TOP_NARROW = 88
+const PANEL_TOP_EDGE = 6 -- px at scale 1: the card hugs the top edge
+const ROBLOX_BAR = 270 -- px: width of the Roblox logo + menu / chat / mic cluster at the top left
 const PANEL_NARROW = 520
 const CASH_NAME = "Cash" -- HudPill of the money in the Hud ScreenGui
 const MONEY_STEP = "money"
@@ -1838,12 +1840,15 @@ function TutorialController:Mount(playerGui: Instance)
 					self:Skip()
 				end,
 				Scale = scale,
-				-- under the clock row, scaled like the HUD
+				-- top edge, right of the Roblox top-left buttons (user request 2026-10-12: the card sat too low and covered the
+				-- scene; it goes in the red box of the screenshot: y 6, left edge after the Roblox cluster)
 				Position = function()
 					const s = scale()
 					const camera = workspace.CurrentCamera
-					const narrow = camera ~= nil and camera.ViewportSize.X / s < PANEL_NARROW
-					return UDim2.new(0.5, 0, 0, (if narrow then PANEL_TOP_NARROW else PANEL_TOP) * s)
+					const width = if camera ~= nil then camera.ViewportSize.X else 1280
+					const panelWidth = math.clamp(width * 0.5, 260, 440) -- the panel's own constraint (TutorialPanel)
+					const centre = math.max(width / 2, ROBLOX_BAR + panelWidth / 2 + 8)
+					return UDim2.new(0, centre, 0, PANEL_TOP_EDGE * s)
 				end,
 			}),
 		})

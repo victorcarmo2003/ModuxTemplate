@@ -2,4 +2,4 @@
 local ServerScriptService = game:GetService("ServerScriptService")
 local Modux = require(ServerScriptService.server.Modux)
 
-Modux.Start({ DebugLevel = "Medium", Profiling = false })
+Modux.Start({ DebugLevel = "Low", Profiling = false })
