@@ -24,6 +24,7 @@ local OpalLines = require(script.Parent.OpalLines)
 local Orders = require(script.Parent.Orders)
 local Outfits = require(script.Parent.Outfits)
 local Packages = require(script.Parent.Packages)
+local Prep = require(script.Parent.Prep)
 local Revive = require(script.Parent.Revive)
 local RunParams = require(script.Parent.RunParams)
 local Sanity = require(script.Parent.Sanity)
@@ -37,7 +38,6 @@ local Table = require(script.Parent.Table)
 local Thief = require(script.Parent.Thief)
 local Traffic = require(script.Parent.Traffic)
 local Upgrades = require(script.Parent.Upgrades)
-local Trailer = require(script.Parent.Trailer)
 local Vehicles = require(script.Parent.Vehicles)
 local WalkPaths = require(script.Parent.WalkPaths)
 
@@ -220,13 +220,13 @@ local function checkUpgrades()
 			inRange("Upgrades", index, row.Key, "Requires.Level", requires.Level, 1, 9)
 		end
 	end
-	if not Upgrades.ByKey.cooler or not Upgrades.ByKey.cooler.Levels.cart then
-		fail("Upgrades", nil, nil, "cooler with cart levels is required (Ingredients.Capacity)")
+	if not Upgrades.ByKey.cooler or not Upgrades.ByKey.cooler.Levels.trailer then
+		fail("Upgrades", nil, nil, "cooler with trailer levels is required (Ingredients.Capacity)")
 	end
 end
 
 local function checkIngredients()
-	const coolerLevels = #Upgrades.ByKey.cooler.Levels.cart
+	const coolerLevels = #Upgrades.ByKey.cooler.Levels.trailer
 	for index, row in Ingredients.List do
 		if not Stations.ByKey[row.Station] then
 			fail("Ingredients", index, row.Key, `Station '{row.Station}' not in Stations`)
@@ -672,13 +672,9 @@ local function checkBossCalls()
 	-- Calls sharing one Call phase play in Priority order and must fit its cap (L2-12 of the wave 2 test plan).
 	const callCap = Shift.ByKey.Call.Duration
 	const firstNight = BossCalls.ByKey[nightCalls[1]]
-	const trailerP, trailerN = kindStats("TrailerBought")
-	if trailerN > 0 and trailerP <= firstNight.Priority then
-		fail("BossCalls", nil, nil, "TrailerBought needs a higher Priority than NightCall (plays first on Night 1)")
-	end
 	const _, coffeeN = kindStats("NightCoffee")
-	if (trailerN + #firstNight.Lines + coffeeN) * rules.LineTime > callCap then
-		fail("BossCalls", nil, nil, `trailer call + {firstNight.Key} + coffee call exceed the Call cap ({callCap} s)`)
+	if (#firstNight.Lines + coffeeN) * rules.LineTime > callCap then
+		fail("BossCalls", nil, nil, `{firstNight.Key} + coffee call exceed the Call cap ({callCap} s)`)
 	end
 	const repeatRow = BossCalls.ByKey[repeatKey]
 	const criticalP, criticalN = kindStats("LostCritical")
@@ -914,13 +910,9 @@ local function checkMedia()
 end
 
 local function checkWave2Records()
-	const trailer = Vehicles.ByKey.trailer
-	const reminder = if trailer then trailer.Reminder else nil
-	if trailer and reminder then
-		inRange("Vehicles", nil, "trailer", "Reminder.FirstNight", reminder.FirstNight, trailer.OfferAfterNight, 1000)
-		inRange("Vehicles", nil, "trailer", "Reminder.Every", reminder.Every, 1, 100)
+	if #Vehicles.List ~= 1 or Vehicles.List[1].Key ~= "trailer" or RunParams.StartVehicle ~= "trailer" then
+		fail("Vehicles", nil, nil, "the Food Trailer is the only vehicle (user decision 2026-10-12): Vehicles = { trailer }, StartVehicle = trailer")
 	end
-	inRange("Trailer", nil, nil, "OfferAfterNight", Trailer.OfferAfterNight, 1, RunParams.Nights - 1)
 	inRange("RunParams", nil, nil, "BindingWave", RunParams.BindingWave, 1, 4)
 	for index, row in Items.List do
 		if row.Use and row.Kind ~= "Consumable" and row.Kind ~= "Revive" then
@@ -1003,16 +995,9 @@ local function checkAnomalies()
 		if row.Name == "" then
 			fail("Anomalies", index, key, "empty Name")
 		end
-		-- Cart / trailer classification (user request 2026-10-12): the nights before the trailer is offered are cart-only
+		-- Trailer classification (kept as history; the trailer is the only vehicle since 2026-10-12, so nothing is stood in)
 		if row.Trailer ~= "None" and row.Trailer ~= "Helps" and row.Trailer ~= "Needs" then
 			fail("Anomalies", index, key, `Trailer '{tostring(row.Trailer)}' is not None, Helps or Needs`)
-		elseif row.Trailer ~= "None" and row.Night <= Trailer.OfferAfterNight then
-			fail(
-				"Anomalies",
-				index,
-				key,
-				`Trailer {row.Trailer} on night {row.Night}: nights up to {Trailer.OfferAfterNight} are always in the cart and need Trailer None`
-			)
 		elseif row.Trailer == "Needs" and Anomalies.StandIn(row) == nil then
 			fail("Anomalies", index, key, "Trailer Needs without an earlier anomaly with Trailer None to stand in")
 		end
@@ -1170,8 +1155,29 @@ local function checkCutscenes()
 				fail("Cutscenes", index, key, `Beats[{position}].Fov = {fov}: LookAt/Focus only, 20..100`)
 			end
 		end
+		local shotAt = -1
+		for position, shot in row.Shots or {} do
+			if shot.At < shotAt or shot.At >= row.Duration then
+				fail("Cutscenes", index, key, `Shots[{position}].At = {shot.At} out of order or after Duration`)
+			end
+			shotAt = shot.At
+			const shotFov = shot.Fov
+			if shotFov ~= nil and (#shotFov ~= 2 or shotFov[1] < 20 or shotFov[1] > 100 or shotFov[2] < 20 or shotFov[2] > 100) then
+				fail("Cutscenes", index, key, `Shots[{position}].Fov must be a pair (from, to) in 20..100`)
+			end
+			if shot.Cue ~= nil and not Sounds.ByKey[shot.Cue] then
+				fail("Cutscenes", index, key, `Shots[{position}].Cue '{shot.Cue}' is not a sound`)
+			end
+		end
 	end
 	const rules = Cutscenes.Rules
+	for _, sound in { rules.Cinema.TitleSound, rules.Cinema.DipSound } do
+		if not Sounds.ByKey[sound] then
+			fail("Cutscenes.Rules", nil, "Cinema", `sound '{sound}' is not a sound`)
+		end
+	end
+	inRange("Cutscenes.Rules", nil, "Cinema", "Ratio", rules.Cinema.Ratio, 1.5, 3)
+	inRange("Cutscenes.Rules", nil, "Cinema", "MaxBar", rules.Cinema.MaxBar, 0, 0.25)
 	if #rules.Stand.Slots ~= 4 then
 		fail("Cutscenes.Rules", nil, "Stand", `{#rules.Stand.Slots} Stand.Slots, a party of 4 needs 4`)
 	end
@@ -1199,6 +1205,25 @@ local function checkCutscenes()
 			"intro",
 			`Cap {intro.Cap} + ReadyTimeout {Cutscenes.Rules.ReadyTimeout} above the Intro phase cap ({Shift.ByKey.Intro.Duration} s)`
 		)
+	end
+	-- owner D3 2026-10-12: short, clean intro (no street cars, no crossing); Cap = Duration + a few s, never past 52 s
+	if intro.Cap > 52 then
+		fail("Cutscenes", nil, "intro", `Cap {intro.Cap} s above 52 s: the intro must stay short (owner D3 2026-10-12)`)
+	end
+	for _, beat in intro.Beats do
+		if beat.Kind == "Actor" and Cutscenes.Rules.Cars[beat.Target] ~= nil then
+			fail("Cutscenes", nil, "intro", `Actor '{beat.Target}' is a street car: the intro has none (owner D3 2026-10-12)`)
+		end
+	end
+	-- the last Line (+ the 3 s of its voice) must end inside the scene
+	local lastLine = 0
+	for _, beat in intro.Beats do
+		if beat.Kind == "Line" then
+			lastLine = math.max(lastLine, beat.At)
+		end
+	end
+	if lastLine + 3 > intro.Duration then
+		fail("Cutscenes", nil, "intro", `last Line at {lastLine} s leaves under 3 s before Duration {intro.Duration} s`)
 	end
 	-- finale and its Next chain play inside the Finale phase
 	local total, hops = 0, 0
@@ -1403,8 +1428,8 @@ local function checkSeating()
 	inRange(name, nil, nil, "UnlockDay", Seating.UnlockDay, 1, 100)
 	inRange(name, nil, nil, "Tables", Seating.Tables, 1, 16)
 	const tables = Upgrades.ByKey[Seating.UpgradeKey]
-	if tables == nil or tables.SoldAt ~= "InPlace" or tables.Scope ~= "Pad" then
-		fail(name, nil, nil, `UpgradeKey '{Seating.UpgradeKey}' must be an InPlace upgrade with Scope Pad`)
+	if tables == nil or tables.SoldAt ~= "InPlace" then
+		fail(name, nil, nil, `UpgradeKey '{Seating.UpgradeKey}' must be an InPlace upgrade`)
 	end
 	-- Groups: contiguous TableIndex 1..Tables, each with its own InPlace upgrade whose last level buys them all
 	local expectedFirst = 1
@@ -1434,7 +1459,7 @@ local function checkSeating()
 		fail(name, nil, nil, `Groups cover {expectedFirst - 1} tables, Tables is {Seating.Tables}`)
 	end
 	if Seating.Groups[1].UpgradeKey ~= Seating.UpgradeKey then
-		fail(name, nil, nil, "Groups[1] is the Pad group: its UpgradeKey must be Seating.UpgradeKey")
+		fail(name, nil, nil, "Groups[1] is the table group: its UpgradeKey must be Seating.UpgradeKey")
 	end
 	const lights = Upgrades.ByKey[Seating.LightsKey]
 	if lights == nil or lights.SoldAt ~= "InPlace" then
@@ -1713,6 +1738,165 @@ local function checkHudReveal()
 	end
 end
 
+-- Focused prep mode (prep-mode.md §6; DEC-223). Every key here becomes a wire enum in Net (PrepTab, PrepGrill, PrepOrder,
+-- PrepFinish, PrepResult), so duplicates and bad names fail here, not in Lync.start().
+const PREP_NEEDS: { [string]: boolean } = { Nothing = true, BunCut = true, PlateBuilt = true, TicketPicked = true }
+const PREP_BANDS: { string } = { "Perfect", "Good", "Messy" }
+const PREP_REQUIRED_TARGETS: { string } = { "bun_cut", "sausage_place", "grill_flip" }
+
+local function checkPrepIcon(table_: string, index: number, key: string, icon: string)
+	if icon ~= "" and not string.match(icon, "^rbxassetid://%d+$") then
+		fail(table_, index, key, `Icon '{icon}' is neither empty nor rbxassetid://<n>`)
+	end
+end
+
+local function checkPrep()
+	checkKeys("Prep.Tabs", Prep.Tabs, VALUE_PATTERN)
+	checkKeys("Prep.Steps", Prep.Steps, KEY_PATTERN)
+	checkKeys("Prep.Gestures", Prep.Gestures, KEY_PATTERN)
+	checkKeys("Prep.Tolerances", Prep.Tolerances, KEY_PATTERN)
+	checkKeys("Prep.Reasons", Prep.Reasons, VALUE_PATTERN)
+	if #Prep.Reasons.List > 255 or not Prep.Reasons.ByKey.None then
+		fail("Prep.Reasons", nil, nil, "needs the row 'None' and at most 255 rows")
+	end
+
+	for index, row in Prep.Tabs.List do
+		if row.Label == "" or row.Hint == "" then
+			fail("Prep.Tabs", index, row.Key, "empty Label or Hint")
+		end
+		checkPrepIcon("Prep.Tabs", index, row.Key, row.Icon)
+	end
+	for index, row in Prep.Steps.List do
+		if not Prep.Tabs.ByKey[row.Tab] then
+			fail("Prep.Steps", index, row.Key, `Tab '{row.Tab}' not in Prep.Tabs`)
+		end
+		if not PREP_NEEDS[row.Needs] then
+			fail("Prep.Steps", index, row.Key, `Needs '{row.Needs}' is not a known condition`)
+		end
+		if row.Label == "" or row.Hint == "" or row.NextLabel == "" then
+			fail("Prep.Steps", index, row.Key, "empty Label, Hint or NextLabel")
+		end
+		checkPrepIcon("Prep.Steps", index, row.Key, row.Icon)
+	end
+	for index, row in Prep.Gestures.List do
+		inRange("Prep.Gestures", index, row.Key, "Hz", row.Hz, 0, 60)
+		inRange("Prep.Gestures", index, row.Key, "MaxPoints", row.MaxPoints, 1, 255)
+		inRange("Prep.Gestures", index, row.Key, "MinPoints", row.MinPoints, 1, row.MaxPoints)
+		if row.Hz == 0 and row.Drag then
+			fail("Prep.Gestures", index, row.Key, "Drag needs a sampling rate (Hz > 0)")
+		end
+	end
+
+	const toppings = setOf(Ingredients.ToppingKeys)
+	const required = setOf(PREP_REQUIRED_TARGETS)
+	for index, row in Prep.Tolerances.List do
+		if not toppings[row.Key] and not required[row.Key] then
+			fail("Prep.Tolerances", index, row.Key, "key is neither an Ingredients topping nor bun_cut, sausage_place, grill_flip")
+		end
+		if not Prep.Gestures.ByKey[row.Gesture] then
+			fail("Prep.Tolerances", index, row.Key, `Gesture '{row.Gesture}' not in Prep.Gestures`)
+		end
+		if not (row.Perfect > 0 and row.Perfect < row.Good and row.Good < row.Worst) then
+			fail("Prep.Tolerances", index, row.Key, "needs 0 < Perfect < Good < Worst")
+		end
+		inRange("Prep.Tolerances", index, row.Key, "Worst", row.Worst, 1, 1000)
+		inRange("Prep.Tolerances", index, row.Key, "ExcessWeight", row.ExcessWeight, 0, 10)
+		checkPrepIcon("Prep.Tolerances", index, row.Key, row.Icon)
+	end
+	for key in toppings do
+		if not Prep.Tolerances.ByKey[key] then
+			fail("Prep.Tolerances", nil, key, "every order topping needs a tolerance row (prep-mode.md §6)")
+		end
+	end
+	for key in required do
+		if not Prep.Tolerances.ByKey[key] then
+			fail("Prep.Tolerances", nil, key, "required target is missing")
+		end
+	end
+	for index, row in Prep.Reasons.List do
+		if row.Notice ~= nil and not Notices.ByKey[row.Notice] then
+			fail("Prep.Reasons", index, row.Key, `Notice '{row.Notice}' not in Notices`)
+		end
+	end
+
+	const rules = Prep.Rules
+	const camera = rules.Camera
+	inRange("Prep.Rules", nil, nil, "Camera.Fov", camera.Fov, 20, 100)
+	inRange("Prep.Rules", nil, nil, "Camera.Travel", camera.Travel, 0, 3)
+	inRange("Prep.Rules", nil, nil, "Camera.Leave", camera.Leave, 0, 3)
+	inRange("Prep.Rules", nil, nil, "Camera.Pitch", camera.Pitch, -89, 0)
+	inRange("Prep.Rules", nil, nil, "Camera.Distance", camera.Distance, 0.5, 20)
+	inRange("Prep.Rules", nil, nil, "ForcedExit.Signal", rules.ForcedExit.Signal, 0, 5)
+	inRange("Prep.Rules", nil, nil, "ForcedExit.NoInput", rules.ForcedExit.NoInput, 0, 5)
+	inRange("Prep.Rules", nil, nil, "CueLock", rules.CueLock, 0, 60)
+	inRange("Prep.Rules", nil, nil, "Heartbeat", rules.Heartbeat, 1, 60)
+	inRange("Prep.Rules", nil, nil, "ClientIdle", rules.ClientIdle, 1, 300)
+	inRange("Prep.Rules", nil, nil, "SeatIdle", rules.SeatIdle, rules.Heartbeat * 2, 600)
+	inRange("Prep.Rules", nil, nil, "PlateMax", rules.PlateMax, 10, 600)
+	inRange("Prep.Rules", nil, nil, "Reach", rules.Reach, 1, 100)
+	inRange("Prep.Rules", nil, nil, "MinPlate", rules.MinPlate, 0, 60)
+	inRange("Prep.Rules", nil, nil, "PerTopping", rules.PerTopping, 0, 30)
+	inRange("Prep.Rules", nil, nil, "PerfectMin", rules.PerfectMin, rules.MinPlate, 120)
+	inRange("Prep.Rules", nil, nil, "MsSlack", rules.MsSlack, 0, 10)
+	inRange("Prep.Rules", nil, nil, "Assist", rules.Assist, 1, 3)
+	inRange("Prep.Rules", nil, nil, "TouchOffset", rules.TouchOffset, 0, 200)
+	-- the time floors must fit inside PlateMax with the biggest plate, and Ms on the wire is Net.PrepFinish.Ms (0..120000)
+	if rules.PerfectMin + rules.PerTopping * Orders.Rules.MaxToppings >= rules.PlateMax then
+		fail("Prep.Rules", nil, nil, "PerfectMin + PerTopping x MaxToppings must stay under PlateMax")
+	end
+	if rules.PlateMax * 1000 > 120000 then
+		fail("Prep.Rules", nil, nil, "PlateMax above 120 s does not fit PrepFinish.Ms (0..120000)")
+	end
+	const grill = rules.Grill
+	if not (grill.From >= 0 and grill.From < grill.Target and grill.Target < grill.To and grill.To <= 1) then
+		fail("Prep.Rules", nil, nil, "Grill needs 0 <= From < Target < To <= 1")
+	end
+	for field, rate in rules.Rates :: any do
+		inRange("Prep.Rules", nil, nil, `Rates.{field}`, rate, 1, 60)
+	end
+	inRange("Prep", nil, nil, "Stations", Prep.Stations, 1, 4)
+
+	const grades = Prep.Grades
+	const points = grades.Points
+	if not (points.Messy >= 0 and points.Messy < points.Good and points.Good < points.Perfect and points.Perfect <= 100) then
+		fail("Prep.Grades", nil, nil, "Points need 0 <= Messy < Good < Perfect <= 100")
+	end
+	if not (grades.Bands.Good > 0 and grades.Bands.Good < grades.Bands.Perfect and grades.Bands.Perfect < 100) then
+		fail("Prep.Grades", nil, nil, "Bands need 0 < Good < Perfect < 100")
+	end
+	if not (grades.Plate.GoodAvg > points.Messy and grades.Plate.GoodAvg < grades.Plate.PerfectAvg and grades.Plate.PerfectAvg <= points.Perfect) then
+		fail("Prep.Grades", nil, nil, "Plate needs Points.Messy < GoodAvg < PerfectAvg <= Points.Perfect")
+	end
+	inRange("Prep.Grades", nil, nil, "Unflipped", grades.Unflipped, 0, grades.Bands.Good - 1)
+	for _, band in PREP_BANDS do
+		const effect = (grades.Effects :: any)[band]
+		const label = (grades.Labels :: any)[band]
+		if effect == nil or label == nil or label == "" then
+			fail("Prep.Grades", nil, band, "Effects and Labels need every band")
+		end
+		inRange("Prep.Grades", nil, band, "Effects.TipWindow", effect.TipWindow, 0, 60)
+		inRange("Prep.Grades", nil, band, "Effects.Mood", effect.Mood, -3, 0)
+		if effect.Tip ~= nil then
+			inRange("Prep.Grades", nil, band, "Effects.Tip", effect.Tip, 0, 1000)
+		end
+	end
+	if grades.Effects.Messy.Tip ~= 0 then
+		fail("Prep.Grades", nil, "Messy", "Messy pays no tip (Q-219 B)")
+	end
+	if (grades.Effects.Perfect.Tip or 0) < Orders.Rules.TipAmount then
+		fail("Prep.Grades", nil, "Perfect", "Perfect tip is below the base tip (OrderRules.TipAmount)")
+	end
+
+	-- cross references with the rest of Content
+	const station = Stations.ByKey.prep
+	if station == nil or station.Record ~= "None" or not table.find(station.Actions, "prep_work") then
+		fail("Prep", nil, nil, "Stations.prep with Record None and the action prep_work is required")
+	end
+	if not Animations.ByKey.work then
+		fail("Prep", nil, nil, "Animations.work is required (the rig at the station)")
+	end
+end
+
 return function()
 	checkKeySets()
 	checkHudReveal()
@@ -1742,4 +1926,5 @@ return function()
 	checkWalkPaths()
 	checkMart()
 	checkSeating()
+	checkPrep()
 end

@@ -51,6 +51,70 @@ export type Beat = {
 	Brake: number?, -- MoveTo: studs/s^2 of the stop of the run this beat closes (nil = Rules.Walk.Accel)
 	Backward: boolean?, -- MoveTo: the run keeps its end facing (steps back instead of turning around)
 	Face: string?, -- MoveTo: anchor faced at the end of the run (nil = the target's own facing)
+	Sub: string?, -- Text: small line on the tag under the title ("Ninth & Juniper")
+	Hold: number?, -- Text: s the title stays (nil = the controller's TITLE_HOLD)
+}
+
+-- Camera language of a scene (owner request 2026-10-12, PROVISIONAL). Shots are sorted by At and last until the next
+-- one (or the scene's Duration). Every From/To pair eases over the shot (Sine by default), and the first
+-- Blend seconds cross-fade from where the previous shot ended (no pop), unless the shot starts with a Dip (a short
+-- fade through black). The camera is still the avatar's head, except in a Boom shot (detached "establishing" camera).
+-- Vectors are camera space (X right, Y up, Z forward) unless said otherwise; angles are degrees.
+export type Shot = {
+	At: number,
+	Name: string,
+	Cut: "Dip"?, -- begins with a fade through black (Cinema.DipDown / DipUp), the shot changes at the black
+	Blend: number?, -- s of cross-fade from the previous shot (nil = Cinema.Blend)
+	Ease: ("Sine" | "Quad")?,
+	Fov: { number }?, -- {from, to}; overrides the Focus beat's Fov while the shot holds (30..60 in the intro)
+	Dolly: { Vector3 }?, -- {from, to} offset of the eye, camera space (push-in = +Z)
+	Boom: { Vector3 }?, -- {from, to} detached camera, walker space (X right, Y up, Z forward of the own body)
+	BoomLook: Vector3?, -- point looked at in a Boom shot, walker space (from the head)
+	Orbit: { number }?, -- {from, to} degrees the eye circles the focus target (Poster, Phone...)
+	Roll: { number }?, -- {from, to} degrees of dutch angle
+	Sway: number?, -- 0..1 hand-held shake (off with reduced motion)
+	Far: number?, -- depth of field far blur intensity (nil = the controller's own)
+	Rack: number?, -- 1/s how fast the depth of field follows the focus (rack focus)
+	Cue: string?, -- Content.Sounds key played when the shot starts (live only)
+}
+
+export type Cinema = {
+	Ratio: number, -- letterbox aspect (2.35)
+	MaxBar: number, -- most a bar may take of the screen height
+	MinAspect: number, -- below this screen aspect (portrait phone) there are no bars
+	BarsIn: number, -- s the bars take to close in from the start
+	BarsOut: number, -- s they take to open before the end fade
+	DipDown: number, -- s to black before a Dip shot
+	DipUp: number, -- s back from black
+	Blend: number, -- default shot cross-fade
+	Vignette: number, -- 0..1 edge darkness
+	TitleSound: string, -- Content.Sounds key when a title appears
+	DipSound: string, -- Content.Sounds key on a Dip
+	Sway: { Amp: number, Tilt: number, Rate: number }, -- studs and degrees at Sway = 1, Hz
+	Quality: { MaxFrameTime: number }, -- s: a slower average frame turns particles off
+}
+
+-- Passers-by of the background, client only (Ambience.luau): a rig walking From -> To (MapPoint "a|b@f" ids, fractions
+-- may pass 0..1) at Lateral studs to the right of the walking direction; they stay at the end of the walk.
+export type Extra = {
+	Start: number, -- s into the scene
+	From: string,
+	To: string,
+	Lateral: number,
+	Speed: number,
+	Species: string,
+	Outfit: string,
+}
+
+-- A flock crossing the sky: Count birds from Point + Start to Point + End (world axes, studs) in Time s from At.
+export type Flock = {
+	At: number,
+	Time: number,
+	Point: string,
+	Start: Vector3,
+	End: Vector3,
+	Count: number,
+	Gull: boolean, -- gulls (big, white) or pigeons (small, grey)
 }
 
 -- Text-to-speech voice of a speaker (AudioTextToSpeech). VoiceId "" = no voice for that speaker.
@@ -128,6 +192,9 @@ export type Rules = {
 	},
 	Voices: { [string]: Voice },
 	Cars: { [string]: Car },
+	Cinema: Cinema,
+	Extras: { Extra },
+	Flocks: { Flock },
 	-- s the server holds a chain for the participants' ClientReady (loading screen) before it starts anyway
 	ReadyTimeout: number,
 }
@@ -144,6 +211,10 @@ export type Cutscene = {
 	Music: string?, -- Content.Music cue pushed while this scene plays (nil = no cutscene music; the phase cue rules)
 	Marks: { string },
 	Beats: { Beat },
+	-- cinematic dressing (owner request 2026-10-12; nil = none): letterbox, vignette, shots, Look preset, ambience
+	Cinema: boolean?,
+	Look: string?, -- Content.LightPresets key LightController applies while this scene plays ("Cinematic")
+	Shots: { Shot }?,
 }
 
 local function walt(at: number, text: string, variant: Variant?): Beat
@@ -195,7 +266,7 @@ const rules: Rules = {
 	},
 	Sign = {
 		Tag = "NoHelpWantedSign",
-		Line = { "CS-1", "CS-3" }, -- Ninth north sidewalk, walked east (MAP-01 §11.1)
+		Line = { "CS-1", "CS-3" }, -- Ninth south sidewalk in front of the Pad (owner D3 2026-10-12); the intro no longer stops at a sign
 		Distance = 3.5, -- user feedback 2026-10-11: stop close, right in front of the sign (~3-4 studs)
 		MinWidth = 3, -- the big AST-033 card (3.96 studs wide); the window cards are smaller
 		Range = 30,
@@ -206,20 +277,28 @@ const rules: Rules = {
 		walt = { VoiceId = "1", Speed = 0.9, Volume = 1 },
 		crew = { VoiceId = "2", Speed = 1.05, Volume = 0.9 },
 	},
-	Cars = {
-		-- eastbound on the Ninth (south half, MAP-01 §2), in front of the party stopped mid CW-2: its clock starts when
-		-- the own body reaches 40% of CS-3 -> CS-4 and it crosses the stripes 0.35 s after the startled stop
-		CarNinth = {
-			Route = "TR-1",
-			Near = "CS-3|CS-4@0.62",
-			Pass = 1.6,
-			Look = 5,
-			Horn = "car_honk_soft",
-			Cross = { From = "CS-3", To = "CS-4", At = 0.4, After = 0.35 },
-		},
-		-- eastbound on the Ninth, in front of the party at the phone, before the turn to the cart
-		CarCorner = { Route = "TR-1", Near = "Phone", Pass = 2, Look = 7, Horn = "car_honk_soft" },
+	-- no street cars in the intro (owner D3 2026-10-12: short, clean scene); the type stays for other scenes
+	Cars = {},
+	-- PROVISIONAL (frontend-coder, 2026-10-12, owner request "more cinematic"): every number
+	Cinema = {
+		Ratio = 2.35,
+		MaxBar = 0.13,
+		MinAspect = 1.5,
+		BarsIn = 1.6,
+		BarsOut = 0.9,
+		DipDown = 0.18,
+		DipUp = 0.35,
+		Blend = 0.9,
+		Vignette = 0.3,
+		TitleSound = "toast",
+		DipSound = "curtain",
+		Sway = { Amp = 0.06, Tilt = 0.35, Rate = 1.3 },
+		Quality = { MaxFrameTime = 1 / 28 },
 	},
+	-- No passers-by and no birds crossing the street in the intro (owner D3 2026-10-12); the dust, leaves, papers and
+	-- trailer steam of Ambience stay
+	Extras = {},
+	Flocks = {},
 	ReadyTimeout = 30, -- s: above the loading gate STEP_CAP (18 s) + 10 s margin for a laggy ClientReady (playtest 2026-10-11)
 }
 
@@ -233,82 +312,131 @@ const scenes = Table.new({
 		Marks = {},
 		Beats = {},
 	},
-	-- Opening, ~73 s with dramatic pauses, cap 76 (FEAT-004; PROVISIONAL frontend-coder 2026-10-11, user feedback after
-	-- play); script.md §1 shots 1-10; MAP-01 §11.1 CS-1..CS-7. Starts once every participant's client is ready
+	-- Opening, ~44 s (FEAT-004; owner decision D3 2026-10-12, PROVISIONAL: short and objective, was 73 s / cap 76).
+	-- It starts on the sidewalk of the Ninth in front of the trailer's Pad (MapPoints CS-1..CS-3, CutsceneMark1..4;
+	-- tools/assetplace/cutscene_points.luau), walks LEFT (east of the map frame, +X of the world) along it to the
+	-- P-01 post with the Help Wanted flyer (no street crossing, no cars), reads it, calls Walt and ends looking at the
+	-- trailer (MapPoint TRL). Lines keep their text and their order (the voices are pre-generated); only the times
+	-- moved. The Walt block is 15.4 s of voice + pauses (as tuned in the 2026-10-11 playtest), so the scene cannot be
+	-- shorter than ~44 s: Cap 48 = Duration + 3.8. Starts once every participant's client is ready
 	-- (Rules.ReadyTimeout), so the Intro phase cap (Shift.luau) covers that wait + Cap.
 	{
 		Key = "intro",
-		Duration = 72.6,
-		Cap = 76,
+		Duration = 44.2,
+		Cap = 48,
 		Skippable = true,
 		Participants = "ConnectedAtStart",
 		Music = "lobby", -- PROVISIONAL stand-in for MUS-005 (Abertura); the shift track waits for the end of the chain
 		Marks = { "CutsceneMark1", "CutsceneMark2", "CutsceneMark3", "CutsceneMark4" },
+		Cinema = true,
+		Look = "Cinematic",
+		-- Shots (owner request 2026-10-12, PROVISIONAL): the cuts follow the beats below.
+		Shots = {
+			-- 1 establishing: a detached camera behind and above the walker, craning down along the sidewalk, over the title
+			{
+				At = 0,
+				Name = "Establish",
+				Boom = { Vector3.new(4, 22, -26), Vector3.new(2.5, 12.5, -15) },
+				BoomLook = Vector3.new(0, 2, 24),
+				Fov = { 36, 46 },
+				Far = 0.5,
+				Rack = 3,
+			},
+			-- 2 the walk: back to the head through a dip, hand-held, along the sidewalk
+			{ At = 3.8, Name = "Walk", Cut = "Dip", Fov = { 54, 56 }, Sway = 0.6, Far = 0 },
+			-- 3 the poster: lazy orbit, then the push-in while it reads
+			{
+				At = 11.8,
+				Name = "Poster",
+				Fov = { 58, 48 },
+				Orbit = { -10, 3 },
+				Dolly = { Vector3.zero, Vector3.new(0, 0, 0.4) },
+				Sway = 0.12,
+				Far = 0.5,
+				Rack = 3,
+			},
+			{
+				At = 15,
+				Name = "Read",
+				Fov = { 46, 34 },
+				Orbit = { 3, 9 },
+				Dolly = { Vector3.new(0, 0, 0.4), Vector3.new(0, 0, 0.9) },
+				Sway = 0.1,
+				Far = 0.6,
+			},
+			-- 4 the call: match cut through black on the number, slow push-in while it rings
+			{
+				At = 20,
+				Name = "Phone",
+				Cut = "Dip",
+				Fov = { 50, 36 },
+				Orbit = { 0, -7 },
+				Sway = 0.08,
+				Far = 0.6,
+				Rack = 2.5,
+			},
+			{
+				At = 30.5,
+				Name = "Drift",
+				Fov = { 36, 40 },
+				Orbit = { -7, 4 },
+				Roll = { 0, 0.8 },
+				Sway = 0.1,
+				Far = 0.6,
+				Blend = 1.5,
+			},
+			-- 5 the trailer: crane up to reveal it in the sun
+			{
+				At = 41.2,
+				Name = "Reveal",
+				Fov = { 44, 54 },
+				Dolly = { Vector3.new(0, -0.8, 0), Vector3.new(0, 1.2, 0) },
+				Sway = 0.2,
+				Far = 0.3,
+				Blend = 1,
+			},
+		},
 		Beats = {
 			{ At = 0, Kind = "Fade", Target = "In" },
-			{ At = 0, Kind = "Text", Target = "Title", Text = "Bellmoor" },
-			-- Beat 1, the NO HELP WANTED sign: east along the Ninth north sidewalk, stop in front of the sign
-			-- (Rules.Sign, read from the map), turn to it, read it, pause.
-			{ At = 1.2, Kind = "MoveTo", Target = "Sign", Arrive = 6.4 },
-			crew(2.4, "Empty. Again."),
-			-- user request 2026-10-11: the rookie says why the sign matters before reading it
-			crew(3.9, "I really need a job right now... but nobody's hiring."),
-			focus(7.4, "Sign", 55),
-			crew(9.3, "Hm, a job?"),
-			crew(11.2, '..."No help wanted." Of course.'),
-			-- Beat 2, CW-2: one flowing walk to the NW corner and into the stripes. At 40% of the crossing the car
-			-- (synced to the body, Rules.Cars.CarNinth.Cross) is due; hard stop near the middle, the car crosses right
-			-- in front, "Whoa!", a step back, a pause, then the rest of the crossing.
-			focus(13.8, "Walk"),
-			{ At = 14, Kind = "MoveTo", Target = "CS-3" },
-			{ At = 14.2, Kind = "MoveTo", Target = "CS-3|CS-4@0.46", Arrive = 22.8, Brake = 40 },
-			{ At = 16.4, Kind = "Actor", Target = "CarNinth" }, -- real car on its lane, never brakes (DEC-130, DEC-133)
-			focus(22.3, "CarNinth"),
-			crew(22.9, "Whoa!"),
-			{
-				At = 23,
-				Kind = "MoveTo",
-				Target = "CS-3|CS-4@0.4",
-				Arrive = 23.7,
-				Accel = 25,
-				Brake = 25,
-				Backward = true,
-			},
-			focus(24.7, "CS-4"),
-			-- Beat 3, CW-1 and the poster: seen from the far curb, stop, look, "What's that?", walk up to it, read
-			{ At = 26, Kind = "MoveTo", Target = "CS-4" },
-			{ At = 26.2, Kind = "MoveTo", Target = "CS-5W" }, -- west curb of CW-1, along the Juniper South sidewalk
-			focus(26.4, "Walk"),
-			{ At = 26.6, Kind = "MoveTo", Target = "CS-5E", Arrive = 34.2, Face = "Poster" }, -- across CW-1
-			focus(33.4, "Poster", 60),
-			crew(34.8, "What's that?"),
-			{ At = 36.8, Kind = "MoveTo", Target = "CS-P{slot}", Arrive = 39.4 }, -- in front of the poster (Rules.Stand)
-			focus(38.8, "Poster", 45), -- reading the flyer and its number (shot 6)
-			crew(42, "At least it's a job opportunity..."),
-			crew(44.6, "I think I'll give them a call.", "Solo"),
-			crew(44.6, "Let's give them a call.", "Party"),
-			-- Beat 4, the call (shots 7-8)
-			focus(47.3, "Phone", 55),
-			crew(47.5, `{PHONE}...`),
-			{ At = 47.6, Kind = "Prompt", Target = "Phone", Text = `Call {PHONE}` },
-			{ At = 48.9, Kind = "Actor", Target = "FlipPhone" }, -- slot 1 only, already open (AST-038)
+			{ At = 0.6, Kind = "Text", Target = "Title", Text = "Sell Hotdogs!", Sub = "Ninth & Juniper", Hold = 3.2 },
+			-- Beat 1, the walk: from CutsceneMark (CS-1, right end of the sidewalk) straight along it (one gentle turn at
+			-- CS-3) to the stand in front of the P-01 flyer (Rules.Stand), eased to a stop by 13 s
+			crew(1.8, "Empty. Again."),
+			-- user request 2026-10-11: the rookie says why the flyer matters before reading it
+			crew(3.3, "I really need a job right now... but nobody's hiring."),
+			focus(3.8, "Walk"),
+			{ At = 3.8, Kind = "MoveTo", Target = "CS-3" },
+			{ At = 4, Kind = "MoveTo", Target = "CS-P{slot}", Arrive = 13 },
+			crew(7.6, "Hm, a job?"),
+			crew(9.2, '..."No help wanted." Of course.'),
+			-- Beat 2, the poster: seen from the sidewalk, "What's that?", read it
+			focus(11.8, "Poster", 55),
+			crew(13.2, "What's that?"),
+			focus(15, "Poster", 45), -- reading the flyer and its number
+			crew(15.4, "At least it's a job opportunity..."),
+			crew(17.8, "I think I'll give them a call.", "Solo"),
+			crew(17.8, "Let's give them a call.", "Party"),
+			-- Beat 3, the call
+			focus(20, "Phone", 55),
+			crew(20.2, `{PHONE}...`),
+			{ At = 20.3, Kind = "Prompt", Target = "Phone", Text = `Call {PHONE}` },
+			{ At = 21.6, Kind = "Actor", Target = "FlipPhone" }, -- slot 1 only, already open (AST-038)
 			-- user feedback 2026-10-11 (pauses, calmer tone): the voice speaks sentence by sentence with a pause after
 			-- . ? ! and a longer one after "..." (Speech.Pieces), so the lines are spaced for those pauses and the
-			-- hang-up (Actors FLIP_TIME) waits for the last one
-			walt(49.4, "Bramble's Corner Dogs. Walt speaking."),
-			walt(51.8, "The flyer? Huh. Nobody's called about that one in years.", "Solo"),
-			walt(51.8, "The flyer? All of you? Huh. Nobody's called in years.", "Party"),
-			walt(55.8, "But you noticed it. That counts for a lot.", "Solo"),
-			walt(55.8, "You all noticed it. That counts for a lot. Heh.", "Party"),
-			walt(59.2, "Can you start today? ... Great."),
-			walt(61.8, "The cart's right on the corner. Ninth and Juniper."),
-			{ At = 63.4, Kind = "Actor", Target = "CarCorner" }, -- street life on the Ninth, no camera focus
-			walt(64.8, "Keys are under the mustard. See you around, Rookie."),
-			-- Beat 5 (user feedback 2026-10-11: the view left the phone while Walt still talked): the focus stays on
-			-- the phone/poster through the whole call; the flip closes at 67.9 (Actors FLIP_TIME, hang-up click), a
-			-- breath, then everyone turns to the cart (CS-7, eased) and holds on it; fade out; the game fades in after
-			focus(68.6, "CART", 55),
-			{ At = 71.2, Kind = "Fade", Target = "Out" },
+			-- hang-up (Actors FLIP_TIME, 19 s after the flip) waits for the last one
+			walt(22.1, "Bramble's Corner Dogs. Walt speaking."),
+			walt(24.5, "The flyer? Huh. Nobody's called about that one in years.", "Solo"),
+			walt(24.5, "The flyer? All of you? Huh. Nobody's called in years.", "Party"),
+			walt(28.5, "But you noticed it. That counts for a lot.", "Solo"),
+			walt(28.5, "You all noticed it. That counts for a lot. Heh.", "Party"),
+			walt(31.9, "Can you start today? ... Great."),
+			walt(34.5, "The cart's right on the corner. Ninth and Juniper."),
+			walt(37.5, "Keys are under the mustard. See you around, Rookie."),
+			-- Beat 4: the focus stays on the phone/poster through the whole call; the flip closes at 40.6 (hang-up click),
+			-- a breath, then everyone turns to the trailer (MapPoint TRL, eased) and holds on it; fade out; the game
+			-- fades in after
+			focus(41.2, "TRL", 55),
+			{ At = 42.8, Kind = "Fade", Target = "Out" },
 		},
 	},
 	-- Dawn of Night 10, variant A1 (DEC-075, DEC-076); <= 60 s; MAP-01 §11.3 SS-1..4, WALT-1, RL-1 -> RL-END

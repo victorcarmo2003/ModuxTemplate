@@ -1,10 +1,8 @@
 --!strict
 -- Pad table commands (board TASK-145; FEAT-037). Thin wrappers over SeatingService (Dev* check IsDev).
 --   seating                 tables (group, state, price, tip, party), diners and tension
---   seating buy [pad|trailer]  next table of the group for free (default: the group that seats now; UpgradeService
---                           level, no Spend, no notice)
---   seating trailer [buy]   the Trailer tables (TBL-6..9, UPG-011); "buy" = next one for free (hidden until the trailer
---                           is the vehicle: /dev vehicle trailer)
+--   seating buy             next table for free (the one group, TBL-1..4; UpgradeService level, no Spend, no notice)
+--   seating trailer [buy]   the same group by its name (UPG-011); "buy" = next one for free
 --   seating sit             the next customer/pair that takes its order sits at a free table (Q-209; /dev customer sit
 --                           also spawns one)
 --   seating dirty <n> [tip] table n dirty with a tip (default Seating.TableTip)
@@ -13,7 +11,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 local Api = require(script.Parent.Parent.Api)
 
-const USAGE = "seating [buy [pad|trailer] | trailer [buy] | sit | dirty <n> [tip] | clean <n>]"
+const USAGE = "seating [buy | trailer [buy] | sit | dirty <n> [tip] | clean <n>]"
 
 type Seating = {
 	DevList: (self: any, group: string?) -> string,
@@ -38,7 +36,7 @@ const Seating: Api.Module = function(ctx: Api.Context): { Api.Command }
 		{
 			Name = "seating",
 			Usage = USAGE,
-			Help = "Pad / Trailer tables: list, free purchase, force the next sit, dirty / clean a table",
+			Help = "Pad tables: list, free purchase, force the next sit, dirty / clean a table",
 			Run = function(args: { string }, _caller: Player?): string?
 				const verb = args[1]
 				if verb == nil then

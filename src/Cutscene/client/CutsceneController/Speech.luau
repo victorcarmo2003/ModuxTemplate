@@ -47,7 +47,17 @@ turn (Busy() = speaking or queued); only Stop / Destroy cut.
 	Peek(line) = state of a line without queueing or hurrying it; Stats() = lines per state, load queue size, fader
 	volume, on/off (dev tools: TutorialController /dev voice, tutorial debug panel).
 	Warnings: once per kind per session, for every Speech together (module-level).
+
+	Pre-generated lines (Kokoro-82M, tools/voice -> Content.VoiceLines): a line whose "speaker NUL spoken text" is in
+	Content.VoiceLines.Index is one piece played by a Sound (Content id; volume = volume() x the speaker's Content
+	volume, volume() being Master x Voice already), loaded through LoadQueue (urgent) and never an AudioTextToSpeech:
+	no text-to-speech quota, filter or voice health is involved, and it works even when text-to-speech is off. A line
+	not in the catalog (or rejected by moderation: not listed) is spoken by AudioTextToSpeech as before. Length of
+	such a line = the catalog Length. A failed clip load retries (MAX_TRIES; LoadQueue backs off), then Fetch asks
+	again after RETRY_AFTER s. Set the attribute SpeechLog = true on SoundService to print "voiced from asset" / "TTS"
+	for every line played.
 ]]
+local ContentProvider = game:GetService("ContentProvider")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LogService = game:GetService("LogService")
 local SoundService = game:GetService("SoundService")
@@ -67,6 +77,7 @@ export type Stats = {
 	Failed: number,
 	Waiting: number,
 	Fader: number?,
+	Asset: number, -- lines (any state) voiced from the catalog
 	Enabled: boolean,
 	OffReason: string,
 }
@@ -115,6 +126,8 @@ type Piece = {
 	State: State,
 	Tries: number,
 	BadVoice: boolean, -- failed because its VoiceId is bad (re-queued when a good voice appears)
+	Clip: Sound?, -- catalog line: the Sound that plays it (Voice stays nil)
+	Asset: Content.VoiceLine?, -- catalog row (nil = text-to-speech piece)
 }
 
 -- One Say of a line: its handlers and where it stands
@@ -133,6 +146,7 @@ type Entry = {
 	WantedJob: Job?, -- that Say
 	FailedAt: number, -- os.clock of the last failure (Fetch tries it again RETRY_AFTER s later)
 	Reason: string, -- last load problem ("" = none)
+	Key: string?, -- catalog key (v_...) when the line is voiced from an asset
 }
 
 const VOICES = Content.Cutscenes.Rules.Voices
@@ -256,6 +270,20 @@ local function keyOf(line: Beat): string
 	return `{line.Speaker or "walt"}\0{line.Text or ""}`
 end
 
+-- Catalog row of a line (speaker NUL spoken text), nil = not pre-generated (tools/voice, Content.VoiceLines)
+local function assetOf(line: Beat): (string?, Content.VoiceLine?)
+	const catalog = Content.VoiceLines
+	const key = catalog.Index[`{line.Speaker or "walt"}\0{Speech.Spoken(line.Text or "")}`]
+	if key == nil then
+		return nil, nil
+	end
+	const row = catalog.Lines[key]
+	if row == nil or row.Id == "" then
+		return nil, nil
+	end
+	return key, row
+end
+
 local function wire(source: Instance, target: Instance, parent: Instance): boolean
 	return (pcall(function()
 		const link = Instance.new("Wire")
@@ -278,11 +306,26 @@ local function stateOf(entry: Entry): State
 	return if loading then "Loading" elseif queued then "Queued" else "Loaded"
 end
 
-local function timeLength(voice: AudioTextToSpeech): number?
+local function timeLength(voice: any): number?
 	const ok, length = pcall(function(): number
 		return voice.TimeLength
 	end)
 	return if ok and type(length) == "number" and length > 0 then length else nil
+end
+
+-- Output of what plays (SoundService attribute SpeechLog = true): "voiced from asset" or "TTS"
+local function logPlay(entry: Entry)
+	local on = false
+	pcall(function()
+		on = SoundService:GetAttribute("SpeechLog") == true
+	end)
+	if on then
+		print(
+			if entry.Key ~= nil
+				then `[Speech] {entry.Speaker}: voiced from asset {entry.Key}`
+				else `[Speech] {entry.Speaker}: TTS`
+		)
+	end
 end
 
 function Speech.new(volume: () -> number): Speech
@@ -347,7 +390,16 @@ function Speech.new(volume: () -> number): Speech
 		offReason = reason
 		table.clear(queue)
 		for _, entry in entries do
-			dropWanted(entry)
+			if entry.Key == nil then
+				dropWanted(entry)
+			else
+				-- catalog lines do not need text-to-speech: they stay queued
+				for _, piece in entry.Pieces do
+					if piece.State == "Queued" then
+						table.insert(queue, piece)
+					end
+				end
+			end
 		end
 		warnOnce("off", `text-to-speech off, subtitles only: {reason}`)
 	end
@@ -402,7 +454,7 @@ function Speech.new(volume: () -> number): Speech
 	end
 
 	-- Plays one piece and yields until it ended (or the chain was cut). false = Play failed.
-	local function playPiece(voice: AudioTextToSpeech, mine: number, onStart: () -> ()): boolean
+	local function playPiece(voice: any, mine: number, onStart: () -> ()): boolean
 		local ended = false
 		const ok, connection = pcall(function(): RBXScriptConnection
 			return voice.Ended:Once(function()
@@ -483,8 +535,17 @@ function Speech.new(volume: () -> number): Speech
 			if not alive or token ~= mine then
 				return "Cut"
 			end
-			const voice = piece.Voice
+			const voice: Instance? = piece.Voice or piece.Clip
 			if piece.State == "Loaded" and voice ~= nil and voice.Parent ~= nil then
+				if index == 1 then
+					logPlay(entry)
+				end
+				if piece.Clip ~= nil then
+					const row = VOICES[entry.Speaker]
+					pcall(function()
+						(voice :: Sound).Volume = math.clamp(volume() * (if row ~= nil then row.Volume else 1), 0, 10)
+					end)
+				end
 				if not playPiece(voice, mine, onStart) then
 					return "Failed"
 				end
@@ -504,7 +565,7 @@ function Speech.new(volume: () -> number): Speech
 		end
 		for _, entry in entries do
 			for _, piece in entry.Pieces do
-				if piece.State == "Loaded" then
+				if piece.State == "Loaded" and piece.Clip == nil then
 					count += 1
 				end
 			end
@@ -529,6 +590,13 @@ function Speech.new(volume: () -> number): Speech
 			if voice ~= nil then
 				pcall(function()
 					voice:Destroy()
+				end)
+			end
+			const clip = piece.Clip
+			piece.Clip = nil
+			if clip ~= nil then
+				pcall(function()
+					clip:Destroy()
 				end)
 			end
 		end
@@ -654,6 +722,14 @@ function Speech.new(volume: () -> number): Speech
 
 	-- A failed piece back in the queue (front), with the voice its speaker uses now. false = no voice for it.
 	local function rearm(piece: Piece): boolean
+		if piece.Asset ~= nil then
+			piece.State = "Queued"
+			piece.Tries = 0
+			if table.find(queue, piece) == nil then
+				table.insert(queue, 1, piece)
+			end
+			return true
+		end
 		const id = voiceIdOf(piece.Owner.Speaker)
 		if id == nil or badVoices[id] then
 			return false
@@ -737,6 +813,75 @@ function Speech.new(volume: () -> number): Speech
 		end
 	end
 
+	-- A piece just loaded: the Say that waited for its line starts (or is missed when it is late)
+	local function settleLoaded(piece: Piece)
+		const owner = piece.Owner
+		const wanted = owner.Wanted
+		if wanted ~= nil and (enabled or owner.Key ~= nil) and stateOf(owner) == "Loaded" then
+			const job = owner.WantedJob
+			owner.Wanted = nil
+			owner.WantedJob = nil
+			if job ~= nil and not job.Cancelled then
+				if os.clock() - wanted <= LATE then
+					start(job)
+				else
+					miss(job)
+				end
+			end
+		end
+	end
+
+	-- Catalog piece: the Sound of the pre-generated line, loaded in the one audio queue (urgent). Failure retries
+	-- MAX_TRIES times (LoadQueue holds BACKOFF s between), then the line is Failed (a later Fetch tries it again).
+	local function loadClip(piece: Piece)
+		const asset = piece.Asset
+		if asset == nil then
+			piece.State = "Failed"
+			return
+		end
+		local clip = piece.Clip
+		if clip == nil or clip.Parent == nil then
+			const made = Instance.new("Sound")
+			made.Name = `Voice_{piece.Owner.Speaker}`
+			made.SoundId = asset.Id
+			made.Parent = SoundService
+			piece.Clip = made
+			clip = made
+		end
+		const sound = clip :: Sound
+		piece.State = "Loading"
+		local success = false
+		local returned = false
+		LoadQueue.Run(function(): boolean?
+			pcall(function()
+				ContentProvider:PreloadAsync({ sound }, function(_: string, status: Enum.AssetFetchStatus)
+					success = status == Enum.AssetFetchStatus.Success
+				end)
+			end)
+			returned = true
+			return not success
+		end, true)
+		if not alive or sound.Parent == nil then
+			return
+		end
+		if success then
+			piece.State = "Loaded"
+			settleLoaded(piece)
+			return
+		end
+		piece.Tries += 1
+		piece.Owner.Reason = if returned then "voice asset did not load" else "voice asset load timed out"
+		if piece.Tries < MAX_TRIES then
+			piece.State = "Queued"
+			table.insert(queue, 1, piece)
+			return
+		end
+		piece.State = "Failed"
+		piece.Owner.FailedAt = os.clock()
+		dropWanted(piece.Owner)
+		warnOnce(`asset:{piece.Owner.Key}`, `voice asset did not load ({asset.Id}), line stays a subtitle`)
+	end
+
 	local function loadOne(piece: Piece)
 		const voice = build(piece)
 		if voice == nil then
@@ -782,20 +927,7 @@ function Speech.new(volume: () -> number): Speech
 			if fresh then
 				rescue()
 			end
-			const owner = piece.Owner
-			const wanted = owner.Wanted
-			if wanted ~= nil and enabled and stateOf(owner) == "Loaded" then
-				const job = owner.WantedJob
-				owner.Wanted = nil
-				owner.WantedJob = nil
-				if job ~= nil and not job.Cancelled then
-					if os.clock() - wanted <= LATE then
-						start(job)
-					else
-						miss(job)
-					end
-				end
-			end
+			settleLoaded(piece)
 			return
 		end
 		if ok then
@@ -843,12 +975,25 @@ function Speech.new(volume: () -> number): Speech
 	end
 
 	local function pump()
-		if working or not enabled or not alive then
+		if working or not alive then
 			return
 		end
 		working = true
 		task.spawn(function()
-			while alive and enabled and #queue > 0 do
+			while alive and #queue > 0 do
+				-- catalog clips: no text-to-speech backoff, quota or cap applies to them
+				const head = queue[1]
+				if head ~= nil and head.Asset ~= nil then
+					table.remove(queue, 1)
+					if head.State == "Queued" then
+						loadClip(head)
+					end
+					continue
+				end
+				if not enabled then
+					table.clear(queue)
+					break
+				end
 				if pause > 0 then
 					task.wait(pause)
 					pause = 0
@@ -880,6 +1025,38 @@ function Speech.new(volume: () -> number): Speech
 			return existing
 		end
 		const speaker = line.Speaker or "walt"
+		-- pre-generated line: one piece played by a Sound, never a text-to-speech
+		const assetKey, asset = assetOf(line)
+		if assetKey ~= nil and asset ~= nil then
+			const entry: Entry = {
+				Speaker = speaker,
+				Pieces = {},
+				Wanted = nil,
+				WantedJob = nil,
+				FailedAt = 0,
+				Reason = "",
+				Key = assetKey,
+			}
+			const piece: Piece = {
+				Text = line.Text or "",
+				Pause = 0,
+				Owner = entry,
+				VoiceId = "",
+				Voice = nil,
+				State = "Queued",
+				Tries = 0,
+				BadVoice = false,
+				Clip = nil,
+				Asset = asset,
+			}
+			entry.Pieces[1] = piece
+			table.insert(queue, if front then 1 else #queue + 1, piece)
+			entries[key] = entry
+			return entry
+		end
+		if not enabled then
+			return nil
+		end
 		const id = voiceIdOf(speaker)
 		if id == nil then
 			return nil
@@ -888,7 +1065,15 @@ function Speech.new(volume: () -> number): Speech
 		if #parts == 0 then
 			return nil
 		end
-		const entry: Entry = { Speaker = speaker, Pieces = {}, Wanted = nil, WantedJob = nil, FailedAt = 0, Reason = "" }
+		const entry: Entry = {
+			Speaker = speaker,
+			Pieces = {},
+			Wanted = nil,
+			WantedJob = nil,
+			FailedAt = 0,
+			Reason = "",
+			Key = nil,
+		}
 		for index, part in parts do
 			const piece: Piece = {
 				Text = part.Text,
@@ -899,6 +1084,8 @@ function Speech.new(volume: () -> number): Speech
 				State = "Queued",
 				Tries = 0,
 				BadVoice = false,
+				Clip = nil,
+				Asset = nil,
 			}
 			entry.Pieces[index] = piece
 			if front then
@@ -913,7 +1100,7 @@ function Speech.new(volume: () -> number): Speech
 
 	local function queueAll(lines: { Beat }): { Entry }
 		const list: { Entry } = {}
-		if not enabled then
+		if not alive then
 			return list
 		end
 		for _, line in lines do
@@ -958,10 +1145,13 @@ function Speech.new(volume: () -> number): Speech
 			queueAll(lines)
 		end,
 		Peek = function(line: Beat): Status?
-			if not enabled or not alive then
+			if not alive then
 				return "Off"
 			end
 			const entry = entries[keyOf(line)]
+			if entry == nil and not enabled then
+				return "Off"
+			end
 			return if entry ~= nil then stateOf(entry) else nil
 		end,
 		Stats = function(): Stats
@@ -972,11 +1162,15 @@ function Speech.new(volume: () -> number): Speech
 				Failed = 0,
 				Waiting = #queue,
 				Fader = nil,
+				Asset = 0,
 				Enabled = enabled and alive,
 				OffReason = offReason,
 			}
 			for _, entry in entries do
 				const state = stateOf(entry)
+				if entry.Key ~= nil then
+					stats.Asset += 1
+				end
 				if state == "Queued" then
 					stats.Queued += 1
 				elseif state == "Loading" then
@@ -996,7 +1190,7 @@ function Speech.new(volume: () -> number): Speech
 			return stats
 		end,
 		Fetch = function(line: Beat): Status
-			if not enabled or not alive then
+			if not alive then
 				return "Off"
 			end
 			const entry = ensure(line, true)
@@ -1015,11 +1209,11 @@ function Speech.new(volume: () -> number): Speech
 			if not alive then
 				return "speech destroyed"
 			end
-			if not enabled then
-				return `text-to-speech off ({offReason})`
-			end
 			const speaker = line.Speaker or "walt"
 			const entry = entries[keyOf(line)]
+			if not enabled and (entry == nil or entry.Key == nil) and assetOf(line) == nil then
+				return `text-to-speech off ({offReason})`
+			end
 			if entry == nil then
 				const row = VOICES[speaker]
 				if row == nil or row.VoiceId == "" then
@@ -1046,6 +1240,10 @@ function Speech.new(volume: () -> number): Speech
 			const entry = entries[keyOf(line)]
 			if entry == nil or stateOf(entry) ~= "Loaded" then
 				return nil
+			end
+			const catalog = if entry.Key ~= nil then entry.Pieces[1].Asset else nil
+			if catalog ~= nil then
+				return catalog.Length
 			end
 			local total = 0
 			for index, piece in entry.Pieces do
@@ -1078,7 +1276,13 @@ function Speech.new(volume: () -> number): Speech
 					end
 				end
 				const goal = math.min(total, MAX_AHEAD) -- the loader keeps MAX_AHEAD voices ready, no more
-				const done = not enabled or not alive or settled >= goal
+				local pending = false -- a catalog clip still loading keeps the wait going even with text-to-speech off
+				for _, entry in list do
+					if entry.Key ~= nil and stateOf(entry) ~= "Loaded" and stateOf(entry) ~= "Failed" then
+						pending = true
+					end
+				end
+				const done = not alive or settled >= goal or (not enabled and not pending)
 				if progress ~= nil then
 					progress(if done or goal == 0 then 1 else settled / goal)
 				end
@@ -1102,7 +1306,7 @@ function Speech.new(volume: () -> number): Speech
 					table.remove(spoken, index)
 				end
 			end
-			if not enabled or not alive then
+			if not alive then
 				miss(job)
 				return cancel
 			end
@@ -1150,6 +1354,11 @@ function Speech.new(volume: () -> number): Speech
 					piece.Voice = nil
 					if voice ~= nil then
 						voice:Destroy()
+					end
+					const clip = piece.Clip
+					piece.Clip = nil
+					if clip ~= nil then
+						clip:Destroy()
 					end
 				end
 			end

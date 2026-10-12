@@ -1,7 +1,7 @@
 --!strict
--- Capacity signs of the lobby squad pads (user request 2026-10-12). One PadTag (Interface/Components/PadTag, a studs-sized
--- BillboardGui) over every squad platform: "SQUAD n", four slots, "n/max" of the room (no fixed capacity per pad) and
--- the state (Free / Configuring / Open / Closed / Starting in 3...). Each pad is read from LobbyZones (the tagged PartyPlatform /
+-- Room signs of the lobby squad pads (user request 2026-10-12). One PadTag (Interface/Components/PadTag, a studs-sized
+-- BillboardGui) over every squad platform: a count pill ("n/max" of the room, no fixed capacity per pad; FREE / SETUP /
+-- FULL by state), the run seal ("D1") and the leader's name. It also reports somebody stepping on / off (OnCount). Each pad is read from LobbyZones (the tagged PartyPlatform /
 -- LobbyZone floor Part of the map, any count, no position in code); the sign hangs from a local invisible anchor Part
 -- over the pad centre (Workspace.LobbyPadTags, created by this client, never replicated). LobbyZones.Version() moving
 -- (a pad edited / streamed in) re-places the signs. Presentation only: the owner reads the Party set the server
@@ -22,6 +22,12 @@ export type Props = {
 	Max: (n: number) -> number,
 	State: (n: number) -> PadTag.State,
 	Status: (n: number) -> string,
+	-- Name of the leader of the squad on pad n ("" = none).
+	Leader: (n: number) -> string,
+	-- Text of the run seal ("D1"; Content.Lobby.Squad.Pad.Badge).
+	Badge: string,
+	-- Somebody stepped on / off pad n (the number of players on it changed). Presentation hook: sound, ring shiver.
+	OnCount: (n: number, from: number, to: number) -> (),
 	-- The sign shows only while this is true (a screen that owns the view hides them).
 	Visible: () -> boolean,
 }
@@ -38,7 +44,7 @@ type Sign = {
 }
 
 const FOLDER = "LobbyPadTags"
-const LIFT = 8.4 -- studs over the pad floor to the sign centre: over a standing player's head
+const LIFT = 9.6 -- studs over the pad floor to the sign centre (the sign is 7.2 tall: its foot clears a standing player)
 const DISTANCE = 140 -- studs the signs stay on
 
 return function(props: Props): Pads
@@ -74,11 +80,28 @@ return function(props: Props): Pads
 		anchor.CFrame = CFrame.new(center)
 		anchor.Parent = root
 		const unmount, billboard = Vide.root(function()
+			local last = Vide.untrack(function(): number
+				return props.Members(n)
+			end)
+			Vide.effect(function()
+				const now = props.Members(n)
+				Vide.untrack(function()
+					if now ~= last then
+						const from = last
+						last = now
+						props.OnCount(n, from, now)
+					end
+					return nil
+				end)
+			end)
 			return PadTag({
 				Name = `PadTag{n}`,
 				Adornee = anchor,
 				Visible = props.Visible,
-				Title = `SQUAD {n}`,
+				Badge = props.Badge,
+				Leader = function()
+					return props.Leader(n)
+				end,
 				Count = function()
 					return props.Members(n)
 				end,

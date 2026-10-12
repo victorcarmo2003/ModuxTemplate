@@ -41,7 +41,6 @@ return {
 	StarterPlayer.StarterPlayerScripts.client.Thief.ThiefController,
 	StarterPlayer.StarterPlayerScripts.client.Traffic.TrafficController,
 	StarterPlayer.StarterPlayerScripts.client.Tutorial.TutorialController,
-	StarterPlayer.StarterPlayerScripts.client.Vehicle.PadHideController,
 	StarterPlayer.StarterPlayerScripts.client.Vehicle.VehicleController,
 	StarterPlayer.StarterPlayerScripts.client.Vital.VitalController,
 } :: { ModuleScript }

@@ -53,11 +53,13 @@
 	                Ready (members), Invite players and Leave. Joining / leaving a platform is the server's
 	                (PartyService watches the platforms); this client sends PartyConfigure / PartyStart / PartyReady /
 	                PartyLeave. Opened by Play too; closes by itself when there is no squad left to show.
-	Pad signs (Pads.luau + Interface/Components/PadTag): over every squad pad a studs-sized sign "SQUAD n", four slots,
-	"n/4" and the state (Open / Room for n / Friends only / Full / Starting in 3...), green free, yellow taken, red full,
-	all read from the Party set (Platform, Members, MaxPlayers, StartAt).
+	Pad signs (Pads.luau + Interface/Components/PadTag, user request 2026-10-12): over every squad pad a studs-sized
+	sign: a big count pill (FREE / SETUP / "n/max" / FULL, green free and open, mustard configuring, Slate closed, Teal
+	breathing while starting), a round run seal under it (Content.Lobby.Squad.Pad.Badge, "D1" Provisional) and the
+	leader's name; all read from the Party set (Platform, Members, MaxPlayers, StartAt). The pill pops when someone
+	steps on / off (+ ui click, ring shiver).
 	Zone VFX (Rings.luau): local Neon frames on the floor edges (square / ring) with rising ghost frames, one Heartbeat
-	for every zone; platform colours follow the Party set (free / squad / starting).
+	for every zone; pad rings follow the room state (colour, breath speed, floor glow discs, sparks while occupied).
 	Camera: normal third person in the lobby (CameraController External; CameraMode Classic). While the class screen
 	shows the world stage every character is hidden locally (LocalTransparencyModifier; LOBBY.md §11).
 
@@ -183,6 +185,7 @@ const LOBBY = Content.Lobby
 const HIDE_STEP = "LobbyController.HideCharacters"
 const HIDE_PRIORITY = Enum.RenderPriority.Camera.Value + 2 -- after the stock camera and CameraController
 const CLOCK_INTERVAL = 0.1 -- s between two countdown clock ticks
+const PAD_SOUND_RANGE = 24 -- studs past a pad edge where somebody stepping on / off it still clicks
 
 local function isLobby(placeRole: Roles.Role): boolean
 	if Roles.IsLobby(placeRole) then
@@ -1007,7 +1010,7 @@ end
 function LobbyController:PadStatus(n: number): string
 	const party = self:PlatformParty(n)
 	if party == nil then
-		return "FREE"
+		return "STEP IN"
 	end
 	if party.State == "Starting" then
 		if party.StartAt <= 0 then
@@ -1032,20 +1035,41 @@ function LobbyController:PadStatus(n: number): string
 	return `OPEN {count}`
 end
 
--- Ring colour of each platform: free / owned by a squad (someone is setting it up) / starting.
+-- Display name of the leader of the squad on pad n ("" = free pad).
+function LobbyController:PadLeader(n: number): string
+	const party = self:PlatformParty(n)
+	if party == nil then
+		return ""
+	end
+	self.Roster() -- names follow players joining / leaving
+	return nameOf(party.Leader)
+end
+
+-- Ring + floor glow of each platform by room state (Content.Lobby.Squad.Pad): green free / open, mustard configuring,
+-- Slate full / closed, Teal starting; the breath speeds up with the countdown; sparks while someone stands on it.
 function LobbyController:PaintPlatforms()
 	const rings = self.Rings
 	if rings == nil then
 		return
 	end
-	const colors = LOBBY.Squad.Colors
+	const pad = LOBBY.Squad.Pad
 	for n = 1, PartyRules.Rules.Platforms do
-		const party = self:PlatformParty(n)
-		const color = if party == nil
-			then colors.Free
-			elseif party.State == "Starting" then colors.Starting
-			else colors.Busy
-		rings.SetColor(`Squad{n}`, color)
+		const state = self:PadState(n)
+		rings.SetPad(`Squad{n}`, pad.Colors[state], pad.Pulse[state], self:PadMembers(n) > 0)
+	end
+end
+
+-- Somebody stepped on / off pad n: the ring shivers; a click when it is the own pad or one close by.
+function LobbyController:OnPadCount(n: number, _from: number, _to: number)
+	const rings = self.Rings
+	if rings then
+		rings.Kick(`Squad{n}`)
+	end
+	const zone = LobbyZones.Platform(n)
+	const character = Players.LocalPlayer.Character
+	const root = if character then character:FindFirstChild("HumanoidRootPart") else nil
+	if zone and root and root:IsA("BasePart") and (root.Position - zone.Center).Magnitude <= zone.Radius + PAD_SOUND_RANGE then
+		self:Click()
 	end
 end
 
@@ -1830,6 +1854,13 @@ function LobbyController:Mount(playerGui: Instance)
 		end,
 		Status = function(n: number)
 			return self:PadStatus(n)
+		end,
+		Leader = function(n: number)
+			return self:PadLeader(n)
+		end,
+		Badge = LOBBY.Squad.Pad.Badge,
+		OnCount = function(n: number, from: number, to: number)
+			self:OnPadCount(n, from, to)
 		end,
 		Visible = function()
 			return self.Panel() ~= "Classes"

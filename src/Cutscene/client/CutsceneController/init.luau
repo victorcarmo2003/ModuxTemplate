@@ -18,7 +18,7 @@
 	  Prompt    PromptBillboard on the target that fills by itself (input locked, script.md §1)
 	  Line      subtitle strip (CallSubtitle): "Walt" lines, or "You" for crew lines + a SpeechBalloon over each mate;
 	            voiced by text-to-speech when the engine has it (Speech.luau, Rules.Voices; subtitles only otherwise)
-	  Actor     local actors (Actors.luau): street cars of the traffic kit, flip phone, Walt, coffee, Raincoat Lady,
+	  Actor     local actors (Actors.luau): flip phone, Walt, coffee, Raincoat Lady, street cars (none in the intro),
 	            flyer, Mart bell. A car with Rules.Cars[].Cross is synced to the own body: it passes when the body
 	            reaches fraction At of the crossing + the planned time to its stop + After (CrossClock)
 
@@ -68,8 +68,12 @@ local PromptBillboard = require(StarterPlayer.StarterPlayerScripts.client.Interf
 local ScreenFade = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.ScreenFade)
 local SkipPill = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.SkipPill)
 local SpeechBalloon = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.SpeechBalloon)
+local Motion = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Motion)
 local UiScale = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.UiScale)
+local Vignette = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Vignette)
 local Actors = require(script.Actors)
+local Ambience = require(script.Ambience)
+local Director = require(script.Director)
 local Speech = require(script.Speech)
 local Timeline = require(script.Timeline)
 local Walker = require(script.Walker)
@@ -139,6 +143,9 @@ const PROMPT_SOUND = "prompt_done"
 const VOTE_SOUND = "skip_vote"
 const VOTE_CLIP = "wave_skip"
 const ACTIVE_ATTRIBUTE = "CutsceneActive"
+const LOOK_ATTRIBUTE = "CutsceneLook" -- Content.Cutscenes[].Look: LightController applies that preset while the scene plays
+const CINEMA_ORDER = 50 -- letterbox and vignette: under the fade (51) and the subtitles (52)
+const VIGNETTE_COLOR = Color3.fromRGB(34, 20, 12) -- warm dark edge, never the night blue
 const ACTOR_LIFT = Vector3.new(0, 2, 0) -- focus on a car: a bit above its base
 const WINDOW_PATTERN = "NoHelp" -- NO HELP WANTED cards (AST-033_NoHelpSign, blockout Window_NoHelpWanted_*)
 const WINDOW_RANGE = 34 -- studs: cards farther than this are not glanced at
@@ -175,6 +182,11 @@ function CutsceneController:Setup()
 	self.Skippable = Vide.source(false) :: Vide.Source<boolean>
 	-- a chain plays (HUD and others hide what does not belong in a cutscene); also attribute CutsceneActive
 	self.Active = Vide.source(false) :: Vide.Source<boolean>
+	-- cinema dressing (Content.Cutscenes[].Cinema): letterbox bar height as a fraction of the screen, vignette strength
+	self.Bars = Vide.source(0) :: Vide.Source<number>
+	self.Vignette = Vide.source(0) :: Vide.Source<number>
+	self.EndBars = 0 :: number
+	self.Ambience = nil :: Ambience.Ambience?
 
 	-- segment
 	self.Scene = nil :: Scene?
@@ -207,6 +219,7 @@ function CutsceneController:Setup()
 	self.Folder = nil :: Folder?
 	self.Warned = {} :: { [string]: boolean }
 	self.Stepping = false :: boolean
+	self.ShotIndex = 0 :: number
 	-- last CutsceneSnapshot packet (fallback while the Cutscene set has no record 1)
 	self.Snapshot = nil :: Record?
 end
@@ -515,10 +528,19 @@ function CutsceneController:ClearSegment()
 	if music ~= nil then
 		self.Dependencies.AudioController:PopMusic(music)
 	end
+	-- cinema dressing off: shot rig, ambience and the scene's lighting look (LightController blends back)
+	self.Dependencies.CameraController:SetRig(nil)
+	const ambience = self.Ambience
+	self.Ambience = nil
+	if ambience ~= nil then
+		ambience.Destroy()
+	end
+	Players.LocalPlayer:SetAttribute(LOOK_ATTRIBUTE, nil)
 	self.Scene = nil
 	self.Beats = {}
 	table.clear(self.Fired)
 	self.LookIndex = 0
+	self.ShotIndex = 0
 	self.HoldStart = nil
 	Vide.batch(function()
 		self.Voted(false)
@@ -601,6 +623,7 @@ function CutsceneController:EndChain()
 	end
 	self.Playing = false
 	self.EndAlpha = Vide.untrack(self.Fade)
+	self.EndBars = Vide.untrack(self.Bars)
 	self.EndedAt = os.clock()
 	self:ClearSegment()
 	const speech = self.Speech
@@ -640,6 +663,18 @@ function CutsceneController:BeginSegment(key: string, startedAt: number)
 	self.LastElapsed = if elapsed <= LIVE_WINDOW then -LIVE_WINDOW else elapsed
 	self.Dependencies.CameraController:Focus(nil, nil)
 	self.Skippable(scene.Skippable)
+	-- cinema dressing: the scene's lighting look and the living background
+	if scene.Look ~= nil then
+		Players.LocalPlayer:SetAttribute(LOOK_ATTRIBUTE, scene.Look)
+	end
+	if scene.Cinema == true then
+		const anim = self.Dependencies.AnimController
+		self.Ambience = Ambience.new({
+			Bind = function(model: Model, set: string)
+				anim:Bind(model, set)
+			end,
+		})
+	end
 	-- the own walk along the shared Route, and the voices of this segment loaded ahead
 	self.Walker = Walker.new(scene, #Players:GetPlayers())
 	const speech = self.Speech
@@ -926,6 +961,60 @@ local function crossed(at: number, elapsed: number, last: number): boolean
 	return last < at and at <= elapsed
 end
 
+-- Cinema of this frame (scenes with Shots / Cinema): the camera rig of the shot, the black of a dip and the height of the
+-- letterbox bars. Sounds (title, dip, shot cues) fire for instants crossed live only. Returns (dip, bar fraction).
+function CutsceneController:StepCinema(scene: Scene, elapsed: number, last: number): (number, number)
+	if scene.Cinema ~= true and scene.Shots == nil then
+		return 0, 0
+	end
+	const cinema = Content.Cutscenes.Rules.Cinema
+	const audio = self.Dependencies.AudioController
+	const live = elapsed - last <= LIVE_WINDOW
+	if scene.Shots ~= nil then
+		self.Dependencies.CameraController:SetRig(Director.Rig(scene, elapsed, not Motion.Reduced()))
+		if live then
+			const shot, index = Director.ShotAt(scene, elapsed)
+			if shot ~= nil and index ~= self.ShotIndex then
+				self.ShotIndex = index
+				if shot.Cue ~= nil and crossed(shot.At, elapsed, last) then
+					audio:Play(shot.Cue)
+				end
+			end
+			if Director.DipStarting(scene, elapsed, last) ~= nil then
+				audio:Play(cinema.DipSound)
+			end
+		end
+	end
+	const title = Timeline.Last(self.Beats, "Text", elapsed)
+	if live and title ~= nil and title.Target ~= "Credits" and crossed(title.At, elapsed, last) then
+		audio:Play(cinema.TitleSound)
+	end
+	const ambience = self.Ambience
+	if ambience ~= nil then
+		ambience.Step(elapsed, math.clamp(elapsed - last, 0, 0.1))
+	end
+	if scene.Cinema ~= true then
+		return Director.Dip(scene, elapsed), 0
+	end
+	return Director.Dip(scene, elapsed), self:BarFraction(Director.Bars(scene, elapsed))
+end
+
+-- Height of one letterbox bar as a fraction of the screen for `amount` (0..1) of closing: the bars of the 2.35:1 frame,
+-- none on a screen narrower than MinAspect (portrait phone), never more than MaxBar
+function CutsceneController:BarFraction(amount: number): number
+	const camera = Workspace.CurrentCamera
+	if camera == nil then
+		return 0
+	end
+	const cinema = Content.Cutscenes.Rules.Cinema
+	const size = camera.ViewportSize
+	const aspect = size.X / math.max(size.Y, 1)
+	if aspect < cinema.MinAspect then
+		return 0
+	end
+	return math.min((1 - aspect / cinema.Ratio) / 2, cinema.MaxBar) * amount
+end
+
 function CutsceneController:Step()
 	const scene = self.Scene
 	if scene == nil then
@@ -976,6 +1065,8 @@ function CutsceneController:Step()
 		entry.Actor.Update(elapsed - entry.At, last - entry.At)
 	end
 
+	const dip, bars = self:StepCinema(scene, elapsed, last)
+
 	const line = self:StepCaptions(elapsed)
 	const title = Timeline.Title(self.Beats, elapsed, TITLE_HOLD, scene.Duration)
 	const prompt = Timeline.Prompt(self.Beats, elapsed, PROMPT_TIME)
@@ -985,7 +1076,9 @@ function CutsceneController:Step()
 		self.Dependencies.AudioController:Play(PROMPT_SOUND)
 	end
 	Vide.batch(function()
-		self.Fade(Timeline.Fade(self.Beats, elapsed, FADE_TIME))
+		self.Fade(math.max(Timeline.Fade(self.Beats, elapsed, FADE_TIME), dip))
+		self.Bars(bars)
+		self.Vignette(if scene.Cinema == true then Content.Cutscenes.Rules.Cinema.Vignette * Director.Bars(scene, elapsed) else 0)
 		if line ~= nil then
 			const speaker = SPEAKERS[line.Speaker or "walt"] or "Walt"
 			if Vide.untrack(self.Speaker) ~= speaker then
@@ -1000,8 +1093,8 @@ function CutsceneController:Step()
 		end
 		const banner = Vide.untrack(self.Banner)
 		if title ~= nil then
-			if banner == false or banner.Title ~= (title.Text or "") then
-				self.Banner({ Title = title.Text or "", Line = "" })
+			if banner == false or banner.Title ~= (title.Text or "") or banner.Line ~= (title.Sub or "") then
+				self.Banner({ Title = title.Text or "", Line = title.Sub or "" })
 			end
 		elseif banner ~= false then
 			self.Banner(false)
@@ -1101,6 +1194,8 @@ function CutsceneController:StartStepping()
 		const endedAt = self.EndedAt
 		const progress = if endedAt ~= nil then (os.clock() - endedAt - END_HOLD) / END_FADE else 1
 		self.Fade(self.EndAlpha * (1 - math.clamp(progress, 0, 1)))
+		self.Bars(self.EndBars * (1 - math.clamp(progress, 0, 1)))
+		self.Vignette(0)
 		if progress >= 1 then
 			self:StopStepping()
 		end
@@ -1114,6 +1209,8 @@ function CutsceneController:StopStepping()
 	self.Stepping = false
 	RunService:UnbindFromRenderStep(RENDER_STEP)
 	self.Fade(0)
+	self.Bars(0)
+	self.Vignette(0)
 end
 
 -- UI ------------------------------------------------------------------------------------------------------------
@@ -1132,6 +1229,41 @@ function CutsceneController:Mount(gui: Instance)
 	holder.CanTouch = false
 	holder.CastShadow = false
 	self.PromptHolder = holder
+
+	-- letterbox + vignette (scenes with Cinema), under the fade and the subtitles
+	const unmountCinema, cinemaGui = Vide.root(function()
+		const bar = function(name: string, anchor: Vector2, position: UDim2): Frame
+			return Vide.create("Frame")({
+				Name = name,
+				AnchorPoint = anchor,
+				Position = position,
+				Size = function()
+					return UDim2.fromScale(1, self.Bars())
+				end,
+				BackgroundColor3 = Color3.new(0, 0, 0),
+				BorderSizePixel = 0,
+				Visible = function()
+					return self.Bars() > 0.001
+				end,
+			})
+		end
+		return Vide.create("ScreenGui")({
+			Name = "CutsceneCinema",
+			ResetOnSpawn = false,
+			IgnoreGuiInset = true,
+			ScreenInsets = Enum.ScreenInsets.None,
+			DisplayOrder = CINEMA_ORDER,
+			ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+			Vignette({ Name = "CutsceneVignette", Strength = self.Vignette, Color = VIGNETTE_COLOR }),
+			bar("BarTop", Vector2.zero, UDim2.fromScale(0, 0)),
+			bar("BarBottom", Vector2.new(0, 1), UDim2.fromScale(0, 1)),
+		})
+	end)
+	cinemaGui.Parent = gui
+	table.insert(self.Unmounts, function()
+		unmountCinema()
+		cinemaGui:Destroy()
+	end)
 
 	const unmountFade, fadeGui = Vide.root(function()
 		return Vide.create("ScreenGui")({
@@ -1171,11 +1303,13 @@ function CutsceneController:Mount(gui: Instance)
 				HudBanner({ Name = "CutsceneTitle", Banner = self.Banner }),
 				CallSubtitle({
 					Name = "CutsceneSubtitle",
-					Visible = self.LineShown,
+					Visible = function()
+						return self.LineShown() and self.LineText() ~= ""
+					end,
 					Speaker = self.Speaker,
 					Text = self.LineText,
 					Phone = function()
-						return "cart"
+						return "trailer"
 					end,
 				}),
 				SkipPill({

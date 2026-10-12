@@ -13,12 +13,6 @@
 --                  cue CoffeeHint starts the sanity-bar / coffee-machine emphasis (VitalService:StartCoffeeHint)
 --   NightRepeat    Call phase of a repeated night (Attempt > 0): exactly one row; its lines are followed by the
 --                  Short lines of that night's NightCall (LinesOf below)
---   TrailerOffer   Prep of the first day after night Content.Trailer.OfferAfterNight (or any later day while the trailer
---                  is not bought): Walt sends the rookie to the FOR SALE sign and hands over the money (cues
---                  TrailerFocus, TrailerCash). Rings after that day's own call (user request 2026-10-12, Provisional)
---   TrailerBought  right after the purchase (VehicleService.Purchase; the phone of the cart rings, Walt says why the
---                  trailer helps). Without a free phone (closed phase) it waits and plays in the first Call of the
---                  trailer, before that night's call
 --   LostCritical / LostLastChance   after NightResolved("Lost"); played in the Call of the repeated night
 --   RunOver        never rung (no call in NightLost/RunEnd): the run end screen quotes its lines (Provisional)
 --   Hint           first time Trigger.Action is performed in the run (InteractionService.Performed)
@@ -29,7 +23,6 @@
 --                  the step lines (TutorialController, Steps.luau); Lines are what everyone else hears.
 -- Speaker nil = Walt. A line lasts Rules.LineTime; the current line = floor((now - StartedAt) / LineTime).
 local Table = require(script.Parent.Table)
-local Trailer = require(script.Parent.Trailer)
 
 export type Line = {
 	Text: string,
@@ -43,8 +36,6 @@ export type TriggerKind =
 	| "NightCall"
 	| "NightCoffee"
 	| "NightRepeat"
-	| "TrailerOffer"
-	| "TrailerBought"
 	| "LostCritical"
 	| "LostLastChance"
 	| "RunOver"
@@ -52,10 +43,8 @@ export type TriggerKind =
 	| "Tutorial"
 
 -- Cue = something the server does when line `Line` (1-based) of a call starts talking (once per call):
---   TrailerFocus  the party's camera looks at the FOR SALE sign for a few seconds (VehicleService:FocusSign)
---   TrailerCash   Walt's till tops the party's cash up to the trailer price, once per run (BossService)
 --   CoffeeHint    Night 1: the sanity bar and the coffee machine are emphasised until the first coffee (VitalService)
-export type CueKind = "TrailerFocus" | "TrailerCash" | "CoffeeHint"
+export type CueKind = "CoffeeHint"
 
 export type Cue = {
 	Line: number,
@@ -75,7 +64,7 @@ export type BossCall = {
 	Lines: { Line },
 	Trigger: Trigger,
 	-- 1 (low) .. 4 (highest); one call at a time, highest first. Fixed orders inside one Call phase (Validate):
-	-- TrailerBought > NightCall; LostCritical > LostLastChance > NightRepeat.
+	-- LostCritical > LostLastChance > NightRepeat.
 	Priority: number,
 	Once: boolean, -- once per run (snapshot Bs)
 	Short: { Line }?, -- NightCall only: the lines that follow the NightRepeat opener on a repeat
@@ -178,7 +167,7 @@ const base = Table.new({
 		)
 	),
 
-	-- Day 2 (ui-text.md §11.2; user request 2026-10-12): the first day shift that is followed by a night in the cart, so
+	-- Day 2 (ui-text.md §11.2; user request 2026-10-12): the first day shift that is followed by a night in the trailer, so
 	-- Walt warns about it. Days 3+ are the call_day_after_<k> rows below (their old "day N" calls were folded into them).
 	day(
 		"call_day_2",
@@ -188,7 +177,7 @@ const base = Table.new({
 			"Morning! Cheese came in. Folks love cheese.",
 			"Oh — keep an eye on your cash drawer.",
 			"Some folks have quick hands.",
-			"And tonight? You work late. Same cart.",
+			"And tonight? You work late. Same trailer.",
 			"I'll ring when the sun goes down."
 		)
 	),
@@ -255,49 +244,9 @@ const base = Table.new({
 	infinite(1, "Another day, another dog."),
 	infinite(2, "Proud of you, Rookie. Really."),
 	infinite(3, "Grill's hot. Let's go."),
-	infinite(4, "The trailer's still there. Just saying."),
+	infinite(4, "Corner's quiet. Too quiet. Heh."),
 	infinite(5, "Nice and normal. Just how I like it."),
 	infinite(6, "Ketchup, mustard, a smile. That's the job."),
-
-	-- trailer offer (user request 2026-10-12, Provisional): the morning after Night OfferAfterNight, right after the
-	-- day's own call. Line 2 turns the party's camera to the FOR SALE sign, line 3 hands over the money (only what is
-	-- missing, once per run). Why the trailer helps, without spoilers: the window that shuts, the light the late crowd
-	-- respects, the Mart sign that never goes out. No numbers in the voice: the price depends on the party (DEC-047);
-	-- the toast says it. TTS-friendly: short lines, "..." for the pause, no "sausage".
-	{
-		Key = "call_trailer_offer",
-		Lines = lines(
-			"One more thing, Rookie. The old trailer.",
-			"See that sign? FOR SALE. Go take a look.",
-			"Here. The money's from Walt's own till.",
-			"She's got a service window. It shuts tight.",
-			"Her lights reach far. Folks respect a light.",
-			"And the Mart's sign never goes out. Remember that.",
-			"You'll be safer in there... mostly.",
-			"Walk up to the sign. Buy her."
-		),
-		Trigger = { Kind = "TrailerOffer", Night = Trailer.OfferAfterNight },
-		Priority = 2,
-		Once = true,
-		Cues = { { Line = 2, Kind = "TrailerFocus" }, { Line = 3, Kind = "TrailerCash" } },
-	},
-
-	-- trailer bought (ui-text.md §11.5; user request 2026-10-12, Provisional): rings right after the purchase on the
-	-- phone of the cart. The night was already explained on Night 1, so this one only says what the trailer is for.
-	-- Priority 4 > any night call: if it could not ring before, it plays first in the Call of the first night in it.
-	{
-		Key = "call_trailer_bought",
-		Lines = lines(
-			"You bought the old girl! Heh.",
-			"The cart gets a rest. She takes the corner.",
-			"Close her window when things get strange.",
-			"Keep her light on. That's half the job.",
-			"Welcome to the real shop, Rookie."
-		),
-		Trigger = { Kind = "TrailerBought" },
-		Priority = 4,
-		Once = true,
-	},
 
 	-- Night 1 coffee (user request 2026-10-11, Provisional): the night starts at 50 sanity (Sanity.FirstNightStart) and Walt
 	-- sends the rookie to the coffee machine right after the rules call. Short, TTS-friendly ("..." for the pauses, no
@@ -317,7 +266,7 @@ const base = Table.new({
 		1,
 		lines(
 			"Evening, Rookie. Your first night shift.",
-			"Same cart. Same grill. Different customers.",
+			"Same trailer. Same grill. Different customers.",
 			"Some of them might look a little off.",
 			"If someone walks up with no face —",
 			"no eyes, no mouth — don't serve them.",
@@ -348,7 +297,7 @@ const base = Table.new({
 			"If it stops, the trailer's lights fix it.",
 			"Lights off. Count to five. Then back on.",
 			"That gets it going again.",
-			"No trailer yet? Then the clock behaves. Heh.",
+			"Do it right and the clock behaves. Heh.",
 			"Clock stops? Trailer lights off, count five, on."
 		),
 		lines("Clock stops? Trailer lights off, count five, on.")
@@ -419,7 +368,7 @@ const base = Table.new({
 			"with its lights on you —",
 			"get out of its sight.",
 			"In the trailer? Close the window. Stay inside.",
-			"On the cart? Walk to the Mart. Wait there.",
+			"Window won't help? Walk to the Mart. Wait there.",
 			"Don't come back till it drives away.",
 			"Regular cars never stop there. That one does.",
 			WALKER,
@@ -435,7 +384,7 @@ const base = Table.new({
 			"If someone knocks and says it's me —",
 			"it isn't.",
 			"In the trailer? Close the window. Stay inside.",
-			"On the cart? Walk to the Mart. Wait there.",
+			"Window won't help? Walk to the Mart. Wait there.",
 			"Keep away till the knocking stops.",
 			"...I'm sorry I didn't tell you sooner.",
 			WALKER,
@@ -504,7 +453,7 @@ const base = Table.new({
 	-- lines are only for whoever is not doing the tutorial (the rookie hears TutorialController's step lines)
 	{
 		Key = "call_tutorial",
-		Lines = lines("Got a rookie on the cart today!", "I'll walk 'em through it. Help 'em out."),
+		Lines = lines("Got a rookie at the trailer today!", "I'll walk 'em through it. Help 'em out."),
 		Trigger = { Kind = "Tutorial" },
 		Priority = 4,
 		Once = false,
@@ -537,7 +486,7 @@ const base = Table.new({
 	),
 	hint("hint_restock", "restock", lines("That's how you restock. Easy.")),
 	hint("hint_discard", "discard", lines("Messed one up? Toss it. No harm done.")),
-	hint("hint_bench_buy_upgrade", "bench_buy_upgrade", lines("New gear's already on the cart. Heh.")),
+	hint("hint_bench_buy_upgrade", "bench_buy_upgrade", lines("New gear's already on the trailer. Heh.")),
 } :: { BossCall })
 
 const rules: Rules = {

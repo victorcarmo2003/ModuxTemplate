@@ -4,6 +4,10 @@ Status: Rascunho
 
 Autor: narrative-writer, 2026-10-08. Nada aqui é decisão.
 Base: DEC-008, DEC-019, DEC-021 a DEC-025, DEC-028, DEC-036, DEC-037, DEC-047, DEC-048, DEC-050, DEC-051, DEC-053, DEC-060, DEC-065; rodadas 7–11: DEC-073 a DEC-078, DEC-081, DEC-084, DEC-086 a DEC-088, DEC-091 a DEC-095, DEC-097, DEC-098, DEC-100 a DEC-104; rodadas 12–15: DEC-106, DEC-110 a DEC-116, DEC-122 a DEC-124, DEC-129; rodadas 16–17: DEC-130 (sem semáforo; plano 4 e tutorial reescritos), rota trailer ↔ Mart cruza a Juniper Sul (resposta a `Q-128`, DEC a registrar); GDD V1 §8, §9.
+**Decisões do dono de 2026-10-12 (secretário; Provisório nos detalhes; revisão do texto pelo narrative-writer pendente):**
+- **DEC-224:** o **trailer é o veículo único desde o Day 1**; o carrinho saiu. Onde este roteiro diz "cart"/"carrinho", leia **trailer**. **Saem** a compra do trailer (§4.1b `call_trailer_offer` e `call_trailer_bought`, §4.2) e a cena "compra do trailer" (placa FOR SALE, repasse do Walt, foco da câmera). O dia 4 volta a ser um dia comum (`call_day_after_2` sem a oferta). **A explicação das regras do Walt passa para a primeira chamada de noite** (§5, Noite 1: já é onde as regras abrem; nenhuma regra é explicada em outro lugar).
+- **DEC-225:** a **abertura é curta** e começa na **calçada em frente ao Pad** (§1 reescrito abaixo; o roteiro antigo fica como histórico).
+- **DEC-223:** o preparo vira o **modo focado** (V1): o tutorial do Day 1 (§3) ensina por estações (Order, Grill, Build, Serve) em vez de prompts no mundo; as falas dos passos "perto do pão", "pão cortado", "montando" e "hot dog pronto" precisam de reescrita.
 Conciliado com `consistency-report.md` (2026-10-08, NW-4 a NW-13, NW-16, NW-20).
 Falas em inglês (texto de jogo). Personagens em `characters.md`; regras das anomalias em `anomalies.md` (Aprovado); final em `ending.md` (Aprovado).
 
@@ -16,7 +20,26 @@ Formato das ligações (alinhado a FEAT-018, `design/features.md`):
 
 ---
 
-## 1. Cutscene de abertura (DEC-021, DEC-088) — party de 1–4
+## 1. Cutscene de abertura (DEC-021, DEC-088, **DEC-225**) — party de 1–4
+
+### 1.0 Abertura curta (DEC-225, 2026-10-12, Provisório; VALE no lugar da tabela de 10 planos abaixo)
+
+Duração alvo: **≤ 35 s**. Começa na linha da rua do trailer; sem carros. POV 1ª pessoa compartilhado segue (dúvida em `Q-226`).
+
+| # | Ponto | O que acontece | Texto |
+|---|---|---|---|
+| 1 | calçada em frente ao Pad, ponta **direita**, perto da planta | Fade in; manhã; título "Sell Hotdogs!" curto. O olhar levanta e baixa; a party começa a andar | título |
+| 2 | calçada → poste `P-01` | Caminha **para a esquerda** até o poste do cartaz HELP WANTED; colegas lado a lado (fila de até 4) | — |
+| 3 | `P-01` (CS-P1..P4) | Para; o olhar vai ao panfleto; close (FOV fecha); prompt **"Call"** se completa sozinho | prompt "Call" |
+| 4 | `P-01` | Flip aberto no trilho 1; ligação de Walt em viva-voz (ligação abaixo, com "trailer" no lugar de "cart") | legenda |
+| 5 | `P-01` → trailer | O flip some; todos viram a cabeça para o **trailer** no Pad, sob o sol (sem carro passando) | — |
+| 6 | FIM | Fade → controle liberado, 7:00 AM; o telefone fixo do trailer toca (§3) | "Day 1" |
+
+Cortados em relação ao roteiro antigo: ônibus, pombos, mariposa, vitrines "NO HELP WANTED", travessia da Ninth com o carro roteirizado, carro de brinquedo do plano 9 e o "Empty. Again.". O "olhe antes" fica só no tutorial (§3: "Look both ways! These drivers don't brake. Heh.").
+
+Panfleto (texto de jogo, Provisório, narrative-writer confirma): "HELP WANTED! Run a hot dog **trailer**. No experience needed. Must notice things. Call Bramble's Corner Dogs — 555-0179". Ligação: linha 5 "The **trailer's** right on the corner. Ninth and Juniper."
+
+### 1.1 Roteiro antigo (HISTÓRICO, superado por DEC-225 onde conflita)
 
 Duração alvo: 35–45 s. **1ª pessoa** (POV de cada jogador), cena **compartilhada**: cada jogador vê os avatares dos colegas, não o próprio (DEC-088). Pontos de câmera e posições em `levels/MAP-01.md` §11.1 (CS-1 a CS-7).
 **Sem braços** (DEC-097). Regras de câmera e de gesto desta cena:
@@ -71,8 +94,8 @@ Membro atrasado (DEC-098): sugestão para `Q-112` (c) — não vê a cutscene; a
 
 ## 2. Arco do chefe por turno (GDD §9)
 
-**Cronologia (pedido do dono 2026-10-12, Provisório, Q-207):** Day 1 (tutorial) → Day 2 → **Night 1 (no carrinho)** → Day 3 → Night 2 → Day 4
-(**oferta do trailer** de manhã; compra opcional) → Night 3 → … → Day 11 → Night 10 → Final. A noite *k* é jogada no fim do dia *k + 1*; a ligação
+**Cronologia (pedido do dono 2026-10-12, Provisório, Q-207; DEC-224: sem carrinho e sem oferta do trailer):** Day 1 (tutorial) → Day 2 → **Night 1 (no trailer)** → Day 3 → Night 2 → Day 4
+(~~**oferta do trailer** de manhã; compra opcional~~: **saiu**, DEC-224) → Night 3 → … → Day 11 → Night 10 → Final. A noite *k* é jogada no fim do dia *k + 1*; a ligação
 da manhã seguinte é `call_day_after_<k>` (dia *k + 2*). Antes: dias 1–5 → compra do trailer → noite 1 → dia 6 → … (SUPERADO).
 
 | Estágio | Frase-guia | Turnos |
@@ -124,7 +147,8 @@ Walt atende e **fica na linha em viva-voz** durante o dia 1: cada dica sai pelo 
 
 Pista leve, a partir do dia 3, só se o ladrão foi pego no dia anterior (substitui a 2ª linha): "Heard you caught Quentin in the act. Nice." (Walt não estava lá.)
 
-### 4.1b Oferta do trailer — manhã depois da noite `Content.Trailer.OfferAfterNight` (= 2) — Provisório (pedido do dono, 2026-10-12)
+### 4.1b Oferta do trailer — **OBSOLETA (DEC-224, 2026-10-12): o trailer é o veículo único desde o Day 1; não há oferta, repasse, placa nem `call_trailer_bought`.** Histórico:
+Manhã depois da noite `Content.Trailer.OfferAfterNight` (= 2) — Provisório (pedido do dono, 2026-10-12)
 
 Substitui "dia 5 — compra do trailer". A noite 1 já acontece no carrinho (Walt explica a noite na própria noite 1); o trailer é oferecido depois porque **ajuda contra as anomalias**. Na manhã seguinte à noite 2 (Prep, depois da fala normal do dia, `call_day_after_2`) o Walt liga (`call_trailer_offer`, 8 linhas, 20 s). A linha 2 vira a câmera da party para a placa FOR SALE (~3 s, o corpo fica parado 3,6 s); a linha 3 faz o **repasse**: o caixa do Walt completa o dinheiro da party até o preço do trailer ($300 × fator da party; só a diferença, uma vez por run; toast "Walt's till: +$N for the trailer!" + som `coin`). A seta/Highlight (ObjectiveController) fica na placa até a compra, e o prompt de compra mora na placa.
 
@@ -147,7 +171,7 @@ Depois da compra (`call_trailer_bought`, toca na hora no telefone do carrinho; a
 
 A dica "See that old trailer in the lot? Not yet. Heh." saiu da fala do dia 4. Voz: todas as chamadas do Walt agora têm TTS (BossController, Speech compartilhado); linhas sem "sausage" e sem números.
 
-### 4.2 Trailer (antigo: fim do dia 5 — SUPERADO por 4.1b ou do dia em que for comprado — DEC-047, DEC-086)
+### 4.2 Trailer (antigo: fim do dia 5 — SUPERADO por 4.1b e, depois, **OBSOLETO por DEC-224**: sem compra do trailer; as falas deste bloco ("I need someone on nights", "a few house rules") **não existem mais**: a explicação das regras passa para a ligação da Noite 1, §5, e o narrative-writer pode trazer uma linha de "house rules" para lá)
 
 Comprou (fade + ligação no telefone do carrinho, a última dele; próximo turno = noite 1, trailer já na esquina):
 
@@ -204,7 +228,7 @@ Linhas marcadas com † são **novas** desta revisão e não mudam a regra aprov
 
 ### Noite 1 — ANM-001 The blank folks (estágio 3)
 
-Nova (2026-10-12): a noite 1 acontece no **carrinho**; a ligação abre as regras do Walt. Depois dela toca `call_night_1_coffee` (café, sanidade 50).
+Nova (2026-10-12): a noite 1 acontece no **trailer** (DEC-224; antes "carrinho"); a ligação abre as regras do Walt e é **a primeira chamada de noite**, onde a explicação das regras vive (DEC-224). Texto da fala 1 e do resto: "Same cart" → "Same trailer" (narrative-writer). Depois dela toca `call_night_1_coffee` (café, sanidade 50).
 
 1. "Evening, Rookie. Your first night shift. Same cart. Same grill. Different customers."
 2. "Some of them might look a little off."

@@ -39,7 +39,6 @@ local StageController = require(StarterPlayer.StarterPlayerScripts.client.ModuxT
 local ThiefController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ThiefController)
 local TrafficController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.TrafficController)
 local TutorialController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.TutorialController)
-local PadHideController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PadHideController)
 local VehicleController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.VehicleController)
 local VitalController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.VitalController)
 
@@ -82,7 +81,6 @@ export type AllControllers = {
 	ThiefController: ThiefController.Public,
 	TrafficController: TrafficController.Public,
 	TutorialController: TutorialController.Public,
-	PadHideController: PadHideController.Public,
 	VehicleController: VehicleController.Public,
 	VitalController: VitalController.Public,
 }

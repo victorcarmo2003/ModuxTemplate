@@ -57,7 +57,7 @@ const VERB_TEXT: { [string]: string } = {
 	serve = "Serve her",
 	dont_look = "Do NOT look at it",
 	light = "Light switch off ~5 s, then on",
-	shutter = "Close the service window (cart: leave for the Mart)",
+	shutter = "Close the service window (or leave for the Mart)",
 	discard = "Throw the altered item away",
 	safe_spot = "Stand at the Mart sign (safe spot)",
 }
@@ -309,7 +309,7 @@ local function mechanicItems(): { Item }
 			"Street",
 			"mech_thief",
 			"Thief (Quick Quentin)",
-			"By day a thief lurks near the cart and grabs from the drawer. Whistle or catch him. The panel spawns him now at a lurk spot.",
+			"By day a thief lurks near the trailer and grabs from the drawer. Whistle or catch him. The panel spawns him now at a lurk spot.",
 			"Chase or whistle him away",
 			{
 				act("dev", "Spawn (any)", "thief now"),
@@ -347,12 +347,11 @@ local function mechanicItems(): { Item }
 		mech(
 			"Trailer",
 			"mech_vehicle",
-			"Cart or trailer",
-			"The run starts in the cart; the trailer is a later unlock (window, lights, coffee). Swap now to test both.",
+			"Food Trailer",
+			"The trailer is the only vehicle from Day 1 (window, lights, coffee). Status shows the window and the pose.",
 			"n/a",
 			{
-				act("dev", "Swap to trailer", "trailer swap"),
-				act("dev", "Back to cart", "trailer reset"),
+				act("dev", "Open the window", "trailer reset"),
 				act("dev", "Status", "trailer status"),
 			}
 		),

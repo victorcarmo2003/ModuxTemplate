@@ -5,6 +5,7 @@ local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local Actors = require(StarterPlayer.StarterPlayerScripts.client.Cutscene.CutsceneController.Actors)
+local Ambience = require(StarterPlayer.StarterPlayerScripts.client.Cutscene.CutsceneController.Ambience)
 local Speech = require(StarterPlayer.StarterPlayerScripts.client.Cutscene.CutsceneController.Speech)
 local Walker = require(StarterPlayer.StarterPlayerScripts.client.Cutscene.CutsceneController.Walker)
 
@@ -28,12 +29,15 @@ type Caption = {
 export type Public = {
 	Active: Vide.Source<boolean>,
 	Actors: { [string]: { Actor: Actors.Actor, At: number } },
+	Ambience: Ambience.Ambience?,
 	Balloons: { () -> () },
 	Banner: Vide.Source<Shown>,
+	Bars: Vide.Source<number>,
 	Beats: { Beat },
 	Caption: Caption?,
 	Captions: { Caption },
 	EndAlpha: number,
+	EndBars: number,
 	EndedAt: number?,
 	Fade: Vide.Source<number>,
 	Fired: { [number]: boolean },
@@ -55,6 +59,7 @@ export type Public = {
 	PromptText: Vide.Source<string>,
 	Scene: Scene?,
 	SceneKey: Vide.Source<string>,
+	ShotIndex: number,
 	Skippable: Vide.Source<boolean>,
 	Snapshot: Record?,
 	Speaker: Vide.Source<string>,
@@ -62,6 +67,7 @@ export type Public = {
 	StartedAt: number,
 	Stepping: boolean,
 	Unmounts: { () -> () },
+	Vignette: Vide.Source<number>,
 	Voted: Vide.Source<boolean>,
 	Votes: Vide.Source<number>,
 	Waiting: Vide.Source<boolean>,
@@ -92,6 +98,8 @@ export type Public = {
 	StepCaptions: (self: Public, elapsed: number) -> Beat?,
 	CrewBalloons: (self: Public, text: string) -> (),
 	PlacePrompt: (self: Public, target: string) -> (),
+	StepCinema: (self: Public, scene: Scene, elapsed: number, last: number) -> (number, number),
+	BarFraction: (self: Public, amount: number) -> number,
 	Step: (self: Public) -> (),
 	CanVote: (self: Public) -> boolean,
 	PressSkip: (self: Public) -> (),

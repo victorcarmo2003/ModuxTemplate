@@ -310,9 +310,9 @@ return Lync.define("game", {
 		Event = Lync.enum({ "Down", "Revived", "Spectating", "Hit", "Wipe", "WipeCleared" }),
 	})),
 
-	-- §13.1 s -> group. Writer: VehicleService (1.5 s fade of the vehicle swap, T58)
+	-- §13.1 s -> group. Writer: TrailerDoorService (VehicleSwap / TrailerFocus are legacy values, nobody sends them since 2026-10-12)
 	Transition = Lync.packet(Lync.struct({
-		Kind = Lync.enum({ "VehicleSwap", "TrailerFocus", "TrailerDoor" }), -- TrailerFocus: camera on the FOR SALE sign (day-5 call); TrailerDoor: 0.6 s fade of Exit/Enter Trailer (only to who used the door)
+		Kind = Lync.enum({ "VehicleSwap", "TrailerFocus", "TrailerDoor" }), -- TrailerDoor: 0.6 s fade of Exit/Enter Trailer (only to who used the door)
 		StartedAt = Lync.f64(),
 	})),
 
@@ -529,4 +529,66 @@ return Lync.define("game", {
 	-- §16.4 c -> s, game role only. Responder: PartyRunService. Go back to the lobby now (end-of-run screen button;
 	-- also accepted mid-run: leaving is always allowed, DEC-067)
 	LobbyReturn = Lync.packet(Lync.empty()),
+
+	-- Focused prep mode (DEC-223; docs/tech/prep-mode.md §3). Single responder of every c -> s packet below:
+	-- PrepService (OnInit). Per-player rate = Content.Prep.Rules.Rates. Enums come from Content.Prep (Lync sorts names).
+	-- c -> s. Sit at Station_n (1..4); refused with Busy / Seated / NotSelling / Locked
+	PrepEnter = Lync.packet(Lync.struct({
+		Station = Lync.int(1, Content.Prep.Stations),
+	})),
+	-- c -> s. Leave the seat (the reserved bun is refunded when no plate was finished)
+	PrepLeave = Lync.packet(Lync.empty()),
+	-- c -> s. Tab change, also the keep-alive (every Rules.Heartbeat s). Ticket 0 = none pinned (a guide, not a lock)
+	PrepTab = Lync.packet(Lync.struct({
+		Step = Lync.enum(Content.Prep.Tabs.Keys),
+		Ticket = Lync.int(0, 65535),
+	})),
+	-- c -> s. Grill action; Slot 0 = the server picks (Place), else the slot (Flip, Collect). The flip is stamped with
+	-- the server clock
+	PrepGrill = Lync.packet(Lync.struct({
+		Act = Lync.enum(Content.Prep.GrillActs),
+		Slot = Lync.int(0, 8),
+	})),
+	-- c -> s. Opens the plate: reserves one bun and the board slot of the seat
+	PrepBegin = Lync.packet(Lync.empty()),
+	-- c -> s. One summary per plate: scores 0..100 per stage, toppings in the order added (unique, <= MaxToppings), Ms =
+	-- client plate time. Ms is 17 bits on purpose: Rules.PlateMax (90 s) does not fit 65535 ms
+	PrepFinish = Lync.packet(Lync.struct({
+		Cut = Lync.int(0, 100),
+		Place = Lync.int(0, 100),
+		Toppings = Lync.array(
+			Lync.struct({
+				Key = Lync.enum(Content.Ingredients.ToppingKeys),
+				Score = Lync.int(0, 100),
+			}),
+			0,
+			Content.OrderRules.MaxToppings
+		),
+		Ms = Lync.int(0, 120000),
+	})),
+	-- c -> s. Bin: drops the open plate (bun and sausage are lost, like the street bin)
+	PrepTrash = Lync.packet(Lync.empty()),
+	-- c -> s. Order / Serve tabs: same path as the world prompts of the CustomerService (Npc = NpcId)
+	PrepOrder = Lync.packet(Lync.struct({
+		Act = Lync.enum(Content.Prep.OrderActs),
+		Npc = Lync.int(1, 65535),
+	})),
+	-- s -> owner (fireClient, private). One answer per request; Act = Kick carries the forced-exit reason. Grade None
+	-- unless the act graded something; Value = grade points / station / ingredient index (by Act), 8 bits
+	PrepResult = Lync.packet(Lync.struct({
+		Act = Lync.enum(Content.Prep.Acts),
+		Ok = Lync.bool(),
+		Reason = Lync.enum(Content.Prep.Reasons.Keys),
+		Grade = Lync.enum(Content.Prep.GradeKeys),
+		Value = Lync.int(0, 255),
+	})),
+	-- Set, record id = station 1..Content.Prep.Stations (only the active ones: clamp(connected members, 1, 4), grows only).
+	-- Writer: PrepService. Who works where, for the StationTag and late joiners. At most 4 records, so the keyframe floor of
+	-- README "drop.section" (8+ records) cannot happen; User is f64 and Since f64, both far above a byte
+	PrepSeats = Lync.replicate(Lync.struct({
+		User = Lync.f64(), -- UserId, 0 = free
+		Step = Lync.enum(Content.Prep.Tabs.Keys),
+		Ticket = Lync.int(0, 65535), -- pinned NpcId, 0 = none
+		Since = Lync.f64(), -- server time of the seat
+	})),
 })

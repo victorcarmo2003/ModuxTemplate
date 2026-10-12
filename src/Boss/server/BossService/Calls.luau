@@ -28,7 +28,7 @@ const infinite: { string } = {}
 const coffeeByNight: { [number]: string } = {}
 -- action key -> hint key
 const hints: { [string]: string } = {}
--- trigger kind -> first key of that kind (TrailerBought, LostCritical, LostLastChance)
+-- trigger kind -> first key of that kind (LostCritical, LostLastChance)
 const firstOfKind: { [string]: string } = {}
 
 for _, row in Content.BossCalls.List do

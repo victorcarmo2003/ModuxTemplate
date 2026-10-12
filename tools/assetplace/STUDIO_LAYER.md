@@ -57,3 +57,15 @@ Lobby (`LOBBY_v2_placements.luau`): o lobby foi escalado x1.3 em torno do spawn 
 148 entradas (x/y/z/rotY e `parts` com size / pos em escala), 37 entradas comentadas como removidas (squads 5..8, slots de fila, LB-WELCOME), 1 `pivot` obsoleto removido (LB-CART-DRAWER).
 LB-TRL (trailer do lobby): so a pose; o mesh vivo ainda e o AST-027 ANTIGO x1.3 com partes de nome duplicado, entao um runInto reconstroi o trailer novo SEM escala (ajustar a mao depois).
 Floor / estrada / predios: os tamanhos viraram `parts.size` em cada entrada (por isso as linhas ficaram grandes).
+
+## Lobby: praca desimpedida (2026-10-12, `declutter_lobby_plaza.luau`)
+
+Pedido do dono: o mastro central (poste + floreira laranja + varais radiais) bloqueava a travessia e poluia o ceu. Snippet de Studio, idempotente,
+com `UNDO = true`; **roda DEPOIS** de `Decor.runLobby` / `warm_lobby.luau` (o `decor_mart.luau` ainda recria o mastro: um `runInto` + `Decor.runLobby` o traz de volta,
+reaplicar o snippet).
+
+- Movidos para `ServerStorage.LOBBY_Backup_20261012` (nada apagado, atributo `OrigFolder`): `Mast_Pole`, `Mast_Planter`, `Mast_Soil`, `LB-MAST-BUSH` (entrada comentada em `LOBBY_v2_placements.luau`), 171 `Wire` + 163 `Bulb` radiais.
+- `Mast_Ring` virou disco achatado no chao (5, -631), Ø 6,6; novos: `Emblem_Disc` (tinta) e `Floor_HotDogEmblem` (clone achatado de um `Mast_Topper`), tudo y 0,10..0,18, CanCollide false.
+- Os 2 `Mast_Topper` (neon do cachorro-quente, costas com costas) foram para cima do `Start_Board` (x 62,7, y 17,6, z -620), escala 1,7, + 2 `Portico_Strut`.
+- Novos varais: `LobbyProcedural.LobbyDeclutter_V1` (94 Wire + 89 Bulb): so postes do perimetro, 5 vaos (C-H, H-A, A-B, B-G, F-E), fio no minimo y 12,0, longe do centro (>= 54 do spawn).
+- Intactos: SpawnLocation, MapPoints LOBBY-*, PartyPlatform, piso, 17 luzes (`WarmLobby_Plaza` segue em (5, 14,5, -628,5), agora sem o mastro).

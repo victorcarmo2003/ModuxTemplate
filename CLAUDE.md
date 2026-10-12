@@ -93,6 +93,7 @@ Leia `README.md` (raiz) antes de escrever qualquer código. Resumo do que não p
 - Luau `--!strict`, `LuauSolverV2`, `const` para valores imutáveis.
 - Ordem de build: `rogen build` → `modux generate` → `rojo serve`.
 - Verificação: `modux check` e `tools/analyze.ps1` (zero erro antes de entregar).
+- Preparo do hot dog é o **modo focado** (DEC-223): contratos em `Content.Prep` e `src/Prep/shared/Grade.luau`, desenho em `docs/tech/prep-mode.md`. A nota é calculada só em `Grade`; teste com `/dev prep grade`.
 
 Código, identificadores e commits em inglês. Documentação e conversa em pt-BR.
 

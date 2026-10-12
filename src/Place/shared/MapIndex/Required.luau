@@ -5,7 +5,9 @@
 -- Counts that are game data come from Content (packages, toppings, bench spots, slot counts, light zones); map ids
 -- (PointId, PostId, roads, crosswalks) come from MAP-01 and live here. Pure data: no Modux, Lync, Vide or self.Libs.
 -- A6 (architecture.md §19.26): nothing here is "the current vehicle". Vehicles lists every vehicle that must be
--- authored in the place; which one is current is VehicleService's state.
+-- authored in the place; which one is current is VehicleService's state. Since 2026-10-12 (user decision, Provisional)
+-- the Food Trailer is the only vehicle: the cart, the tarp, TRL-SALE and SIGN-T left the binding (CART stays as a legacy
+-- point: the opening cutscene looks at it and the customers face it; it sits at the trailer service window).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 
@@ -205,7 +207,7 @@ local function base(wave: number): List
 		Points = WAVE1_POINTS,
 		Nodes = WAVE1_NODES,
 		Vehicles = {
-			cart = { Stations = kitchen("cart"), Actions = {} },
+			trailer = { Stations = kitchen("trailer"), Actions = {} },
 		},
 		Toppings = Content.Ingredients.ToppingKeys,
 		MapActions = { open_sign = 1 }, -- the sign stays on the map, not in the vehicle (MAP-01 §7.3)
@@ -226,14 +228,13 @@ local function base(wave: number): List
 	}
 end
 
--- Wave 1: the cart and its kitchen (§18.4-§18.7). Unchanged from TASK-010.
+-- Wave 1: the vehicle and its kitchen (§18.4-§18.7; the trailer since 2026-10-12).
 const wave1 = base(1)
 
--- Wave 2 (§19.22): trailer kitchen with coffee machine, phones on both vehicles, the trailer's buy prompt and light
--- switch, tarp, light zones, street lights, night/revive/spectate/swap points, thief lurks.
+-- Wave 2 (§19.22): trailer kitchen with coffee machine, phone, light switch, light zones, street lights, night/revive/spectate/swap points, thief lurks.
 -- Street bins (Prompt_Discard, DEC-200) are not counted: how many is open (Q-166).
 const wave2 = base(2)
-wave2.Tags = concat(WAVE1_TAGS, { "VehicleCover", "LightZone", "StreetLight" })
+wave2.Tags = concat(WAVE1_TAGS, { "LightZone", "StreetLight" })
 wave2.Points = concat(WAVE1_POINTS, {
 	"PS-N1",
 	"PS-N2",
@@ -244,7 +245,6 @@ wave2.Points = concat(WAVE1_POINTS, {
 	"REV-3",
 	"REV-4",
 	"TRL",
-	"TRL-SALE",
 	"CART",
 	"SPEC-P",
 	"SPEC-M",
@@ -258,8 +258,7 @@ wave2.Nodes = concat(WAVE1_NODES, { "ST-R", "L1", "L2", "L3" })
 const trailerKitchen = kitchen("trailer")
 trailerKitchen.coffee_machine = { Actions = { brew_coffee = 1, restock = 1 } } -- FEAT-021
 wave2.Vehicles = {
-	cart = { Stations = kitchen("cart"), Actions = { answer_phone = 1 } }, -- DEC-124
-	trailer = { Stations = trailerKitchen, Actions = { answer_phone = 1, switch_light = 1, buy_trailer = 1 } },
+	trailer = { Stations = trailerKitchen, Actions = { answer_phone = 1, switch_light = 1 } }, -- DEC-124
 }
 wave2.Tagged = {
 	{ Tag = "LightZone", Attribute = "ZoneId", Ids = lightZones() },
@@ -405,11 +404,10 @@ wave3.Nodes = union(wave2.Nodes, walkNodes())
 const trailer3 = kitchen("trailer")
 trailer3.coffee_machine = { Actions = { brew_coffee = 1, restock = 1 } }
 wave3.Vehicles = {
-	cart = { Stations = kitchen("cart"), Actions = { answer_phone = 1 } },
 	trailer = {
 		Stations = trailer3,
 		-- service window button TRL-SHUTTER (Prompt_Shutter) next to the switch (DEC-221); H1..H4 left the place
-		Actions = { answer_phone = 1, switch_light = 1, buy_trailer = 1, shutter_toggle = 1 },
+		Actions = { answer_phone = 1, switch_light = 1, shutter_toggle = 1 },
 	},
 }
 wave3.Tagged = concat(wave2.Tagged, {

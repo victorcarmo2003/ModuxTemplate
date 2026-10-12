@@ -9,7 +9,7 @@
 -- Shift boundary (end of Summary), fixed order: BeforeShift(prev) -> Flow.Next -> RunStateService:SetEndless(false) ->
 -- StartShift (atoms in one batch -> ShiftStarted -> PhaseChanged(first) -> Capture).
 -- Run flow (user request 2026-10-12, Provisional Q-207): D1 (tutorial, day only), D2, N1, D3, N2 ... D11, N10, Finale.
--- Every night is played in the vehicle in use (the cart until the optional trailer is bought); the vehicle no longer
+-- Every night is played in the vehicle in use (the trailer, the only vehicle since 2026-10-12); the vehicle no longer
 -- decides whether a night comes, and endless days are gone (Flow.Next, RunParams.NightsFromDay).
 -- Lost night: NightLost (6 s) -> SpendChance -> Restore("RepeatNight") (Sh comes back with Attempt + 1 and a new
 -- capture) or RunEnd + RunEnded("Failed"). Night 10 won: NightEnd -> Finale -> RunEnd + RunEnded("Success").

@@ -83,6 +83,15 @@ const base = Table.new({
 		Ingredient = "coffee",
 		Params = { BrewTime = 6 },
 	},
+	{
+		-- focused prep seats Station_1..4 (DEC-223, prep-mode.md §6): the seat state lives in the PrepSeats set, not in
+		-- Stations; Att_Stand, CamAnchor, Focus, Att_Bun and Prompt_Work hang from the model
+		Key = "prep",
+		Letter = "W",
+		Record = "None",
+		Actions = { "prep_work" },
+		Params = {},
+	},
 } :: { Station })
 
 return Table.with(base, {

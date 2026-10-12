@@ -1,35 +1,20 @@
 --!strict
--- Vehicle in use, trailer purchase and the end-of-shift swap (architecture.md §19.5, T36, T38, T58; network.md §13.1
--- `Transition`; data.md §3.3 "Veh"; FEAT-016, FEAT-017; DEC-047, DEC-086, DEC-107, DEC-121, DEC-184, DEC-199;
--- TASK-056). Run place only.
--- State: Vehicle (atom, key of Content.Vehicles), Purchased (the sale vehicle was bought this run) and Pending (swap at the
--- next shift boundary). The two vehicles live in the Workspace (tag Vehicle, attribute Vehicle = key) and only move
--- by PivotTo (T36): before the swap the start vehicle sits at its Pad point and the sale vehicle at the lot
--- (TRL-SALE); after it the sale vehicle takes its Pad point and the start vehicle goes to the lot under its tarp
--- (VehicleCover, shown by visibility with the Orig* attributes of the binding, T38).
--- Purchase prompt (user request 2026-10-11, Provisional): the buy_trailer prompt lives on the FOR SALE sign (model MapId
--- "SIGN-T" of the lot, point SIGN-T), not on the trailer. Anchor = an Interactable buy_trailer anchor outside any Vehicle
--- if the place has one (the user can add an Attachment "Prompt_Buy" on the sign in Studio), else an Attachment this
--- service creates at runtime on the sign (EnsureSignAnchor; never edits the place). The Prompt_Buy of the trailer shell
--- stays disabled while a sign anchor exists and is the fallback when there is none. FocusSign (day-5 call, BossService
--- cue TrailerFocus): Transition TrailerFocus to the party, who are held in place for FOCUS_TIME s (Freeze "TrailerFocus").
--- Purchase: anchor Prompt_Buy (buy_trailer) on the sale vehicle; price = TrailerBasePrice x PartyPriceMult[PriceParty]
--- (DEC-047, DEC-121). Swap: RoundService.BeforeShift with Pending -> Transition packet -> state + SetVehicle ->
--- Swapped -> PivotTo under the fade. Reminders (FEAT-017) from Vehicles[sale].Reminder at the end of a day shift.
--- Others read: Current() (RoundService probe, ItemService, KitchenService), IsBought(), Price(); signals
--- Bought(player) and Swapped(from, to). The sale vehicle Model carries attribute Bought for clients that join between
--- the purchase and the swap (VehicleController, TASK-058).
+-- The vehicle in use and the service window (architecture.md §19.5, §19.14 v4.2; network.md §13.1, §13.6; FEAT-016, FEAT-023;
+-- DEC-204, DEC-221; TASK-056, TASK-130). Run place only.
+-- 2026-10-12 (user decision, Provisional): ONE vehicle. The Food Trailer is the vehicle from Day 1 and stays where the
+-- owner placed it at the Pad (MapPoint TRL = its pose; this service never moves it): no cart, no trailer purchase, no FOR
+-- SALE sign, no offer call, no swap and no tarp. The cart models live in ServerStorage (CART_Backup). Kept for the
+-- others: Current() (always the trailer key), Models(). The Swapped signal and the "Veh" snapshot stay as inert history
+-- (Swapped never fires; Restore ignores the stored key) so the services that still connect to them do not break.
 -- Service window (architecture.md §19.14 v4.2, network.md §13.6, T61; FEAT-023; DEC-204, DEC-221; TASK-130): state of
--- the current vehicle when Content.Vehicles[v].HasShutter (the trailer). Single writer of the attribute Shutter on the
--- vehicle Models (true = closed; the vehicle for sale / parked is always closed, AST-027 ForSale). Action
--- shutter_toggle (Prompt_Shutter, hold 0.5, night only, party cooldown 1 s, Active member, anchor of the current
--- vehicle, caller inside the trailer = LightZone LZ-1); opens by itself on ShiftStarted, NightLost, Resume, restore and swap; not in the snapshot. Gate "Shutter":
--- take_order/serve/refuse refused while closed (reason Shutter:Closed) + Notice shutter_closed to who acted (one per
--- NOTICE_EVERY s). API IsShutterClosed, IsInside, IsInsidePoint, IsProtected, SetShutter; signal ShutterChanged.
+-- the trailer (Content.Vehicles[v].HasShutter). Single writer of the attribute Shutter on the vehicle Models (true =
+-- closed). Action shutter_toggle (Prompt_Shutter, hold 0.5, night only, party cooldown 1 s, Active member, anchor of the
+-- trailer, caller inside the trailer = LightZone LZ-1); opens by itself on ShiftStarted, NightLost, Resume and restore;
+-- not in the snapshot. Gate "Shutter": take_order/serve/refuse refused while closed (reason Shutter:Closed) + Notice
+-- shutter_closed to who acted (one per NOTICE_EVERY s). API IsShutterClosed, IsInside, IsInsidePoint, IsProtected,
+-- SetShutter; signal ShutterChanged.
 local CollectionService = game:GetService("CollectionService")
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 local ServerScriptService = game:GetService("ServerScriptService")
 local Charm = require(ReplicatedStorage.Packages.Charm)
 local Content = require(ReplicatedStorage.shared.Content)
@@ -39,34 +24,13 @@ local Modux = require(ServerScriptService.server.Modux)
 local Shutter = require(script.Shutter)
 
 const VEHICLE_TAG = "Vehicle"
-const COVER_TAG = "VehicleCover"
-const ANCHOR_TAG = "Interactable"
-const BUY_ACTION = "buy_trailer"
-const BOUGHT_NOTICE = "trailer_bought"
-const AVAILABLE_NOTICE = "trailer_available"
-const WAITING_NOTICE = "trailer_waiting"
-const BOUGHT_ATTRIBUTE = "Bought"
 const SNAPSHOT = "Veh"
-const START_VEHICLE = Content.RunParams.StartVehicle
--- Binding points (MAP-01 §16.3: point = model pivot). Pad point of each vehicle when in use; the lot otherwise.
-const START_POINT = "CART"
-const SALE_POINT = "TRL"
-const LOT_POINT = "TRL-SALE"
--- Phases where nobody buys even by day: waiting for the roster / opening cutscene (RoundService Busy-like phases)
+const VEHICLE = Content.RunParams.StartVehicle
+-- MapPoint of the trailer pose at the Pad (MAP-01 §16.3: point = model pivot). Checked, never used to move it.
+const TRL_POINT = "TRL"
+const POSE_TOLERANCE = 1.5 -- studs between the model pivot and the TRL point before a warning
+-- Phases where the window cannot be closed (waiting for the roster / opening cutscene / run end)
 const CLOSED_PHASES = { "Resume", "Intro", "RunEnd", "NightLost" }
--- Seconds between the Transition packet and the PivotTo: fade-in (0.2) + half the black hold (0.5) of the
--- VehicleController fade (T58, 1.5 s total), so the pivot lands under the cover on every client. Provisional.
-const PIVOT_DELAY = 0.45
--- FOR SALE sign (Provisional): its model has MapId SIGN_MAP_ID (placements) and stands at MapPoint SIGN_POINT
-const SIGN_MAP_ID = "SIGN-T"
-const SIGN_POINT = "SIGN-T"
-const SIGN_ANCHOR = "Prompt_BuyTrailer"
-const SIGN_ANCHOR_LIFT = 2 -- studs over the point when the sign model is not found
-const SIGN_RETRY = 2 -- s between two looks for the sign while it is missing (the assets may stream in late)
-const SIGN_RETRIES = 15
--- Camera focus on the sign (client ObjectiveController holds it ~3.2 s): the party stands still FOCUS_TIME s
-const FOCUS_REASON = "TrailerFocus"
-const FOCUS_TIME = 3.6
 -- Service window (§19.14)
 const SHUTTER_ACTION = "shutter_toggle"
 const SHUTTER_ATTRIBUTE = "Shutter"
@@ -82,25 +46,6 @@ const OPEN_TEXT = "Open Window"
 -- Phases where the window opens by itself (NightLost; Resume = restore waiting for the roster)
 const OPEN_PHASES = { "NightLost", "Resume" }
 
-local function fail(message: string)
-	if RunService:IsStudio() then
-		error(message, 0)
-	end
-	warn(message)
-end
-
--- Vehicle sold in the lot: the first row with OfferAfterNight > 0 (the trailer; content-data.md §3.8)
-local function saleVehicle(): Content.Vehicle?
-	for _, vehicle in Content.Vehicles.List do
-		if vehicle.OfferAfterNight > 0 then
-			return vehicle
-		end
-	end
-	return nil
-end
-
-const SALE = saleVehicle()
-
 -- Model tagged Vehicle that contains `instance` (or is it), with its key
 local function vehicleOf(instance: Instance): (Instance?, string?)
 	local current: Instance? = instance
@@ -114,27 +59,6 @@ local function vehicleOf(instance: Instance): (Instance?, string?)
 	return nil, nil
 end
 
--- Visible = Orig* values of the binding (default visible), hidden = transparent and without collision (T38)
-local function setVisible(instance: Instance, visible: boolean)
-	if instance:IsA("BasePart") then
-		if visible then
-			const transparency = instance:GetAttribute("OrigTransparency")
-			instance.Transparency = if type(transparency) == "number" then transparency else 0
-			instance.CanCollide = instance:GetAttribute("OrigCanCollide") ~= false
-			instance.CanQuery = instance:GetAttribute("OrigCanQuery") ~= false
-			instance.CanTouch = instance:GetAttribute("OrigCanTouch") ~= false
-		else
-			instance.Transparency = 1
-			instance.CanCollide = false
-			instance.CanQuery = false
-			instance.CanTouch = false
-		end
-	elseif instance:IsA("Decal") then
-		const transparency = instance:GetAttribute("OrigTransparency")
-		instance.Transparency = if not visible then 1 elseif type(transparency) == "number" then transparency else 0
-	end
-end
-
 const VehicleService = Modux.Service("VehicleService", {
 	Require = {
 		"PlaceService",
@@ -142,7 +66,6 @@ const VehicleService = Modux.Service("VehicleService", {
 		"RunStateService",
 		"RoundService",
 		"InteractionService",
-		"EconomyService",
 		"UpgradeService",
 		"CharacterService",
 	},
@@ -150,21 +73,11 @@ const VehicleService = Modux.Service("VehicleService", {
 })
 
 function VehicleService:Setup()
-	self.Vehicle = self.Libs.Charm.atom(START_VEHICLE) :: Charm.Atom<string>
-	self.Purchased = self.Libs.Charm.atom(false) :: Charm.Atom<boolean>
-	self.Pending = self.Libs.Charm.atom(false) :: Charm.Atom<boolean>
-	-- Bumped on every placement request: a delayed PivotTo only runs if nothing newer came after it
-	self.PlaceToken = 0 :: number
+	self.Vehicle = self.Libs.Charm.atom(VEHICLE) :: Charm.Atom<string>
 	self.MissingPoints = {} :: { [string]: boolean }
-	-- Created here so lower-priority services connect in their OnInit; higher ones (Item, Kitchen) in OnStart
-	self.Bought = self.Libs.Signal.new() :: SignalLib.Signal<Player>
+	-- Legacy (never fired since the trailer is the only vehicle): Item, Kitchen, Light and TrailerDoor still connect
 	self.Swapped = self.Libs.Signal.new() :: SignalLib.Signal<string, string>
-	-- The trailer was bought (player = who paid; nil = dev). BossService (560) connects in OnInit: rings the night call
-	self.Purchase = self.Libs.Signal.new() :: SignalLib.Signal<Player?>
-	-- Anchor of the buy prompt on the FOR SALE sign (nil = none yet: the trailer keeps its own prompt)
-	self.SignAnchor = nil :: Instance?
-	self.SignTries = 0 :: number
-	-- Service window of the current vehicle (only meaningful with HasShutter)
+	-- Service window of the trailer
 	self.ShutterClosed = false :: boolean
 	self.ShutterAt = 0 :: number -- os.clock() of the last shutter_toggle (party cooldown; 0 = none yet)
 	self.ShutterAnchors = {} :: { [Instance]: boolean }
@@ -180,51 +93,7 @@ function VehicleService:Current(): string
 	return self.Vehicle()
 end
 
-function VehicleService:IsBought(): boolean
-	return self.Purchased()
-end
-
-function VehicleService:IsPending(): boolean
-	return self.Pending()
-end
-
--- TrailerBasePrice x PartyPriceMult[PriceParty] (DEC-047, DEC-121). PriceParty is 0 until the end of Day 1: the
--- solo multiplier until then (the trailer is never on sale before its offer night anyway).
-function VehicleService:Price(): number
-	const params = Content.RunParams
-	const mults = params.PartyPriceMult
-	const party = math.clamp(self.Dependencies.RunStateService.PriceParty(), 1, #mults)
-	return math.floor(params.TrailerBasePrice * mults[party] + 0.5)
-end
-
--- Shift and phase allow the purchase (Actions.buy_trailer Night / Requires.Phase, Vehicles[sale].OfferAfterNight)
-function VehicleService:IsOnSale(): boolean
-	if SALE == nil or self.Purchased() or self.Pending() or self.Vehicle() ~= START_VEHICLE then
-		return false
-	end
-	const round = self.Dependencies.RoundService
-	-- on sale from the day after Content.Trailer.OfferAfterNight (nights played; user request 2026-10-12)
-	if not round:IsStarted() or round:GetNight() < SALE.OfferAfterNight then
-		return false
-	end
-	const phase = round:GetPhase()
-	if table.find(CLOSED_PHASES, phase) ~= nil then
-		return false
-	end
-	const row = Content.Actions.ByKey[BUY_ACTION]
-	const night = round:IsNight()
-	if (row.Night == "DayOnly" and night) or (row.Night == "NightOnly" and not night) then
-		return false
-	end
-	const phases = row.Requires.Phase
-	return phases == nil or table.find(phases, phase) ~= nil
-end
-
-function VehicleService:PromptText(): string
-	return (string.gsub(Content.Actions.ByKey[BUY_ACTION].Text, "{price}", tostring(self:Price())))
-end
-
--- World -----------------------------------------------------------------------------------------------------------
+-- World ------------------------------------------------------------------------------------------------------------
 
 function VehicleService:Models(): { Instance }
 	const out = {}
@@ -236,163 +105,26 @@ function VehicleService:Models(): { Instance }
 	return out
 end
 
--- Pad point when in use, the lot otherwise (MAP-01 §16.3)
-function VehicleService:PointFor(key: string): string
-	if key ~= self.Vehicle() then
-		return LOT_POINT
-	end
-	return if key == START_VEHICLE then START_POINT else SALE_POINT
-end
-
-function VehicleService:IsBuyAnchor(anchor: Instance): boolean
-	if anchor:GetAttribute("PromptAction") ~= BUY_ACTION then
-		return false
-	end
-	const _, key = vehicleOf(anchor)
-	return SALE ~= nil and (key == SALE.Key or (key == nil and self:IsSignAnchor(anchor)))
-end
-
--- A buy_trailer anchor in the Workspace that is not on a vehicle: the one of the FOR SALE sign
-function VehicleService:IsSignAnchor(anchor: Instance): boolean
-	if anchor:GetAttribute("PromptAction") ~= BUY_ACTION or not anchor:IsDescendantOf(workspace) then
-		return false
-	end
-	const model = vehicleOf(anchor)
-	return model == nil
-end
-
--- Model of the FOR SALE sign in the Workspace (MapId SIGN-T, outside every Vehicle)
-function VehicleService:SignModel(): Model?
-	const root = workspace:FindFirstChild("MAP01_Assets") or workspace
-	for _, descendant in root:GetDescendants() do
-		if descendant:IsA("Model") and descendant:GetAttribute("MapId") == SIGN_MAP_ID and vehicleOf(descendant) == nil then
-			return descendant
-		end
-	end
-	return nil
-end
-
--- World position of the sign (centre of its model, else the SIGN-T point lifted); nil = not in the map
-function VehicleService:SignPosition(): Vector3?
-	const model = self:SignModel()
-	if model ~= nil then
-		const box = model:GetBoundingBox()
-		return box.Position
-	end
-	const point = if MapIndex.HasBinding() then MapIndex.FindPoint(SIGN_POINT) else nil
-	return if point ~= nil then point.Position + Vector3.new(0, SIGN_ANCHOR_LIFT, 0) else nil
-end
-
--- The buy anchor of the sign: an existing one outside the vehicles, else a runtime Attachment on the sign. nil while
--- the sign is not in the Workspace (the trailer prompt works meanwhile).
-function VehicleService:EnsureSignAnchor(): Instance?
-	const existing = self.SignAnchor
-	if existing ~= nil and existing:IsDescendantOf(workspace) then
-		return existing
-	end
-	self.SignAnchor = nil
-	for _, anchor in CollectionService:GetTagged(ANCHOR_TAG) do
-		if self:IsSignAnchor(anchor) then
-			self.SignAnchor = anchor
-			return anchor
-		end
-	end
-	const position = self:SignPosition()
-	if position == nil then
-		return nil
-	end
-	const model = self:SignModel()
-	const host = if model ~= nil then (model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart", true)) else nil
-	const anchor = Instance.new("Attachment")
-	anchor.Name = SIGN_ANCHOR
-	anchor:SetAttribute("PromptAction", BUY_ACTION)
-	anchor.Parent = if host ~= nil then host else workspace.Terrain
-	anchor.WorldPosition = position
-	self.SignAnchor = anchor -- before the tag: its signal calls RefreshSale, which must find it
-	CollectionService:AddTag(anchor, ANCHOR_TAG)
-	return anchor
-end
-
--- Tarp shown on a vehicle that is not in use and has CoveredAfter (the cart after the swap, DEC-199)
-function VehicleService:RefreshCover(cover: Instance)
-	const _, key = vehicleOf(cover)
-	const row = if key then Content.Vehicles.ByKey[key] else nil
-	const visible = row ~= nil and row.CoveredAfter ~= nil and key ~= self.Vehicle()
-	setVisible(cover, visible)
-	for _, descendant in cover:GetDescendants() do
-		setVisible(descendant, visible)
-	end
-end
-
-function VehicleService:RefreshCovers()
-	for _, cover in CollectionService:GetTagged(COVER_TAG) do
-		if cover:IsDescendantOf(workspace) then
-			self:RefreshCover(cover)
-		end
-	end
-end
-
--- PivotTo of every vehicle to the point of the current state, then the tarps. Idempotent.
-function VehicleService:PlaceNow()
+-- The trailer sits where the owner put it; the TRL point must say the same (anomaly zones, the trailer door and the
+-- cutscene read it). A mismatch is warned once, never fixed here.
+function VehicleService:CheckPose()
 	if not MapIndex.HasBinding() then
 		return
 	end
-	for _, model in self:Models() do
-		const key = model:GetAttribute("Vehicle") :: string
-		const pointId = self:PointFor(key)
-		const point = MapIndex.FindPoint(pointId)
-		if point == nil then
-			if not self.MissingPoints[pointId] then
-				self.MissingPoints[pointId] = true
-				warn(`[VehicleService] MapPoint {pointId} not found (binding wave 2, MAP-01 §16); {key} not moved`)
-			end
-			continue
+	const point = MapIndex.FindPoint(TRL_POINT)
+	if point == nil then
+		if not self.MissingPoints[TRL_POINT] then
+			self.MissingPoints[TRL_POINT] = true
+			warn(`[VehicleService] MapPoint {TRL_POINT} not found (MAP-01 §16)`)
 		end
-		if model:IsA("PVInstance") and not model:GetPivot():FuzzyEq(point, 1e-3) then
-			model:PivotTo(point)
-		end
-	end
-	self:RefreshCovers()
-end
-
--- delay > 0: under the fade of the swap. A newer request cancels an older delayed one.
-function VehicleService:Place(delay: number)
-	self.PlaceToken += 1
-	const token = self.PlaceToken
-	if delay <= 0 then
-		self:PlaceNow()
 		return
 	end
-	task.delay(delay, function()
-		if self.PlaceToken == token then
-			self:PlaceNow()
-		end
-	end)
-end
-
--- Prompt_Buy state and the Bought attribute of the sale vehicle (one effect, see OnStart)
-function VehicleService:RefreshSale()
-	const sale = SALE
-	if sale == nil then
-		return
-	end
-	const interaction = self.Dependencies.InteractionService
-	const enabled = self:IsOnSale()
-	const text = self:PromptText()
-	const bought = self.Purchased()
-	-- the sign carries the prompt when it has an anchor; the trailer shell only without one
-	const sign = self:EnsureSignAnchor()
-	if sign ~= nil then
-		interaction:SetPrompt(sign, enabled, text)
-	end
 	for _, model in self:Models() do
-		if model:GetAttribute("Vehicle") ~= sale.Key then
-			continue
-		end
-		model:SetAttribute(BOUGHT_ATTRIBUTE, bought)
-		for _, descendant in model:GetDescendants() do
-			if descendant:GetAttribute("PromptAction") == BUY_ACTION and self:IsBuyAnchor(descendant) then
-				interaction:SetPrompt(descendant, enabled and sign == nil, if sign == nil then text else nil)
+		if model:IsA("PVInstance") and (model:GetPivot().Position - point.Position).Magnitude > POSE_TOLERANCE then
+			const key = `pose:{model.Name}`
+			if not self.MissingPoints[key] then
+				self.MissingPoints[key] = true
+				warn(`[VehicleService] {model.Name} is not at MapPoint {TRL_POINT}: the point must follow the model (trailer_only_map.luau)`)
 			end
 		end
 	end
@@ -419,7 +151,7 @@ function VehicleService:Interior(): BasePart?
 	return self.InteriorPart
 end
 
--- Point inside the trailer interior while the current vehicle has a window (the cart has no interior to protect)
+-- Point inside the trailer interior
 function VehicleService:IsInsidePoint(position: Vector3): boolean
 	if typeof(position) ~= "Vector3" or not hasShutter(self.Vehicle()) then
 		return false
@@ -428,7 +160,7 @@ function VehicleService:IsInsidePoint(position: Vector3): boolean
 	return part ~= nil and Shutter.contains(part, position)
 end
 
--- Root of the player's character inside the current vehicle
+-- Root of the player's character inside the trailer
 function VehicleService:IsInside(player: Player): boolean
 	const character = player.Character
 	const root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
@@ -447,7 +179,7 @@ function VehicleService:IsShutterAnchor(anchor: Instance): boolean
 	return anchor:GetAttribute("PromptAction") == SHUTTER_ACTION
 end
 
--- Attribute Shutter of every Model with a window (current = its state, parked/for sale = closed) and the prompts
+-- Attribute Shutter of every Model with a window and the prompts
 function VehicleService:ApplyShutter()
 	const current = self.Vehicle()
 	for _, model in self:Models() do
@@ -506,8 +238,7 @@ function VehicleService:ShutterPhase(): boolean
 	return round:IsStarted() and round:IsNight() and table.find(CLOSED_PHASES, round:GetPhase()) == nil
 end
 
--- shutter_toggle Validate: Active member, anchor of the current vehicle with a window, caller inside it, phase,
--- party cooldown
+-- shutter_toggle Validate: Active member, anchor of the trailer, caller inside it, phase, party cooldown
 function VehicleService:CanToggleShutter(player: Player, anchor: Instance): boolean
 	if not self.Dependencies.RunStateService:IsActive(player) or not self:ShutterPhase() then
 		return false
@@ -531,135 +262,12 @@ function VehicleService:NotifyClosed(player: Player)
 	self.Dependencies.RunStateService:Notify(player, SHUTTER_NOTICE)
 end
 
--- Writes ----------------------------------------------------------------------------------------------------------
-
--- buy_trailer Run: atomic Spend, then Purchased + Pending (swap at the next boundary) and the party notice
-function VehicleService:Buy(player: Player): boolean
-	if not self:IsOnSale() then
-		return false
-	end
-	if not self.Dependencies.EconomyService:Spend(self:Price(), player) then
-		return false
-	end
-	self:MarkBought(player)
-	return true
-end
-
-function VehicleService:MarkBought(player: Player?)
-	self.Libs.Charm.batch(function()
-		self.Purchased(true)
-		self.Pending(true)
-	end)
-	self.Dependencies.RunStateService:Notify("all", BOUGHT_NOTICE)
-	if player then
-		self.Bought:Fire(player)
-	end
-	self.Purchase:Fire(player)
-end
-
--- Camera focus on the FOR SALE sign for the party (cue TrailerFocus of the day-5 call). Only while the trailer is on
--- sale. The clients look at it (ObjectiveController); here the Active members stand still for FOCUS_TIME s.
--- Returns whether it started.
-function VehicleService:FocusSign(): boolean
-	if not self:IsOnSale() then
-		return false
-	end
-	const net = self.Dependencies.NetService
-	if net:IsRunning() then
-		self.Libs.Net.Transition:fireClient(net.Audience, {
-			Kind = "TrailerFocus",
-			StartedAt = workspace:GetServerTimeNow(),
-		})
-	end
-	const characters = self.Dependencies.CharacterService
-	const runState = self.Dependencies.RunStateService
-	const held: { Player } = {}
-	for _, player in Players:GetPlayers() do
-		if runState:IsActive(player) then
-			table.insert(held, player)
-			characters:Freeze(player, FOCUS_REASON, true)
-		end
-	end
-	task.delay(FOCUS_TIME, function()
-		for _, player in held do
-			if player.Parent ~= nil then
-				characters:Freeze(player, FOCUS_REASON, false)
-			end
-		end
-	end)
-	return true
-end
-
--- Applies the pending swap (RoundService.BeforeShift, before Flow.Next reads the probe): fade packet, state,
--- UpgradeService levels of the new vehicle, Swapped; the pivots follow under the fade.
-function VehicleService:Swap()
-	if SALE == nil then
-		return
-	end
-	const from = self.Vehicle()
-	const to = SALE.Key
-	self.Pending(false)
-	if from == to then
-		return
-	end
-	const net = self.Dependencies.NetService
-	const covered = net:IsRunning()
-	if covered then
-		self.Libs.Net.Transition:fireClient(net.Audience, {
-			Kind = "VehicleSwap",
-			StartedAt = workspace:GetServerTimeNow(),
-		})
-	end
-	self.Vehicle(to)
-	self.Dependencies.UpgradeService:SetVehicle(to)
-	self:SetShutter(false, nil, true) -- the new current opens, the parked one closes (ApplyShutter below)
-	self:ApplyShutter()
-	self.Swapped:Fire(from, to)
-	self:Place(if covered then PIVOT_DELAY else 0)
-end
-
--- End of a day shift without the purchase: trailer_available when Reminder.FirstNight nights were played,
--- trailer_waiting every Reminder.Every nights after (FEAT-017; counted in nights since 2026-10-12)
-function VehicleService:Remind(info: { Day: number, Night: number, IsNight: boolean })
-	if SALE == nil or info.IsNight or self.Purchased() or self.Vehicle() ~= START_VEHICLE then
-		return
-	end
-	const reminder = SALE.Reminder
-	if reminder == nil then
-		return
-	end
-	const night = info.Night
-	if night == reminder.FirstNight then
-		self.Dependencies.RunStateService:Notify("all", AVAILABLE_NOTICE)
-	elseif night > reminder.FirstNight and reminder.Every > 0 and (night - reminder.FirstNight) % reminder.Every == 0 then
-		self.Dependencies.RunStateService:Notify("all", WAITING_NOTICE)
-	end
-end
-
--- Snapshot "Veh" (data.md §3.3): the key of the current vehicle. Restore = positions + SetVehicle + Bought =
--- (Veh ~= StartVehicle); a pending swap is dropped (the capture is taken after the boundary applied it). A change of
--- vehicle on restore (ResetDev back to the cart, Resume on a fresh server) fires Swapped too, so the stations follow.
-function VehicleService:Restore(data: any)
-	local key = START_VEHICLE
-	if type(data) == "string" and Content.Vehicles.ByKey[data] ~= nil then
-		key = data
-	elseif data ~= nil then
-		fail(`[VehicleService] snapshot Veh: unknown vehicle {tostring(data)}, using {START_VEHICLE}`)
-	end
-	const from = self.Vehicle()
-	self.Libs.Charm.batch(function()
-		self.Vehicle(key)
-		self.Purchased(key ~= START_VEHICLE)
-		self.Pending(false)
-	end)
-	self.Dependencies.UpgradeService:SetVehicle(key)
-	self:Place(0)
-	-- the window is not in the snapshot: every restore opens it (§19.14)
+-- Snapshot "Veh" (data.md §3.3): the key of the vehicle. Only one exists now, so a restore just re-opens the window
+-- (it is not in the snapshot, §19.14); an old snapshot that says "cart" is accepted and ignored.
+function VehicleService:Restore(_data: any)
+	self.Vehicle(VEHICLE)
 	self:SetShutter(false, nil, true)
 	self:ApplyShutter()
-	if from ~= key then
-		self.Swapped:Fire(from, key)
-	end
 end
 
 -- Dev hooks (Commands/Vehicle.luau) ------------------------------------------------------------------------------
@@ -668,38 +276,25 @@ function VehicleService:DevCheck(name: string)
 	if not self.Dependencies.PlaceService:IsDev() then
 		error(`[VehicleService] {name} is dev mode only`, 3)
 	end
-	if SALE == nil then
-		error(`[VehicleService] {name}: no vehicle for sale in Content.Vehicles`, 3)
-	end
 end
 
--- Free purchase on any day and phase (no Spend); the swap still waits for the boundary
-function VehicleService:DevBuy(): boolean
-	self:DevCheck("DevBuy")
-	if self.Purchased() or self.Vehicle() ~= START_VEHICLE then
-		return false
-	end
-	self:MarkBought(nil)
-	return true
-end
-
--- /dev trailer reset: back to the cart, not bought, nothing pending (Restore does the placing and the Swapped signal)
+-- /dev trailer reset: window open again
 function VehicleService:DevReset()
 	self:DevCheck("DevReset")
-	self:Restore(START_VEHICLE)
+	self:Restore(VEHICLE)
 end
 
--- Swap now, buying for free first if needed (the shift keeps going; nights start at the next boundary)
-function VehicleService:DevSwap(): boolean
-	self:DevCheck("DevSwap")
-	if SALE ~= nil and self.Vehicle() == SALE.Key then
-		return false
+-- /dev trailer status: vehicle, window, distance of the model to the TRL point
+function VehicleService:DevStatus(): string
+	self:DevCheck("DevStatus")
+	local drift = "no model"
+	const point = if MapIndex.HasBinding() then MapIndex.FindPoint(TRL_POINT) else nil
+	for _, model in self:Models() do
+		if model:IsA("PVInstance") and point ~= nil then
+			drift = string.format("%.2f studs from TRL", (model:GetPivot().Position - point.Position).Magnitude)
+		end
 	end
-	if not self.Purchased() then
-		self:MarkBought(nil)
-	end
-	self:Swap()
-	return true
+	return `vehicle {self.Vehicle()}; window {if self:IsShutterClosed() then "closed" else "open"}; {drift}`
 end
 
 VehicleService:OnInit(function(self)
@@ -707,21 +302,10 @@ VehicleService:OnInit(function(self)
 	if not self.Dependencies.PlaceService:Is("Run") then
 		return
 	end
-	if SALE == nil then
-		warn("[VehicleService] no vehicle with OfferAfterNight > 0 in Content.Vehicles; nothing for sale")
-	end
 
 	const round = self.Dependencies.RoundService
 	round:SetVehicleProbe(function(): string
 		return self.Vehicle()
-	end)
-	round.BeforeShift:Connect(function(_prev)
-		if self.Pending() then
-			self:Swap()
-		end
-	end)
-	round.ShiftEnded:Connect(function(info)
-		self:Remind(info)
 	end)
 
 	self.Dependencies.RunStateService:RegisterSnapshot(SNAPSHOT, function()
@@ -730,17 +314,7 @@ VehicleService:OnInit(function(self)
 		self:Restore(data)
 	end)
 
-	-- InteractionService (730) built its handler table in its OnInit, before this one
-	self.Dependencies.InteractionService:RegisterAction(BUY_ACTION, {
-		Validate = function(_player: Player, anchor: Instance, _id: number): boolean
-			return self:IsBuyAnchor(anchor) and self:IsOnSale()
-		end,
-		Run = function(player: Player, _anchor: Instance, _id: number)
-			self:Buy(player)
-		end,
-	})
-
-	-- Service window (§19.14)
+	-- Service window (§19.14). InteractionService (730) built its handler table in its OnInit, before this one
 	const interaction = self.Dependencies.InteractionService
 	interaction:RegisterAction(SHUTTER_ACTION, {
 		Validate = function(player: Player, anchor: Instance, _id: number): boolean
@@ -775,50 +349,24 @@ VehicleService:OnStart(function(self)
 		return
 	end
 
-	-- Binding state = start of a run (MAP-01 §16.3); a restore before this point already placed them
-	self:Place(0)
-
-	-- the FOR SALE sign may stream in after the start: look again for a while (the prompt moves to it once found)
-	task.spawn(function()
-		while self.SignAnchor == nil and self.SignTries < SIGN_RETRIES do
-			self.SignTries += 1
-			task.wait(SIGN_RETRY)
-			if self:EnsureSignAnchor() ~= nil then
-				self:RefreshSale()
-			end
-		end
-	end)
-
-	-- Day, phase, PriceParty, purchase: every input of the prompt is an atom read inside RefreshSale
-	self.Libs.Charm.effect(function()
-		self:RefreshSale()
-	end)
-
-	CollectionService:GetInstanceAddedSignal(ANCHOR_TAG):Connect(function(anchor)
-		if self:IsBuyAnchor(anchor) then
-			self:RefreshSale()
-		end
+	CollectionService:GetInstanceAddedSignal("Interactable"):Connect(function(anchor)
 		self:AddShutterAnchor(anchor)
 	end)
 
-	-- Service window: anchors, attribute of every vehicle and the interior volume
-	for _, anchor in CollectionService:GetTagged(ANCHOR_TAG) do
+	-- Service window: anchors, attribute of the vehicle and the interior volume
+	for _, anchor in CollectionService:GetTagged("Interactable") do
 		if self:IsShutterAnchor(anchor) then
 			self.ShutterAnchors[anchor] = true
 		end
 	end
-	if SALE ~= nil and SALE.HasShutter and self:Interior() == nil then
+	if self:Interior() == nil then
 		warn(`[VehicleService] LightZone {Shutter.InteriorZone} not bound (MAP-01 §16); IsInside is always false`)
 	end
-	if SALE ~= nil and SALE.HasShutter and next(self.ShutterAnchors) == nil then
+	if next(self.ShutterAnchors) == nil then
 		warn("[VehicleService] no Prompt_Shutter (PromptAction shutter_toggle) in the Workspace (MAP-01 §16.5)")
 	end
 	self:ApplyShutter()
-	CollectionService:GetInstanceAddedSignal(COVER_TAG):Connect(function(cover)
-		if cover:IsDescendantOf(workspace) then
-			self:RefreshCover(cover)
-		end
-	end)
+	self:CheckPose()
 end)
 
 return VehicleService

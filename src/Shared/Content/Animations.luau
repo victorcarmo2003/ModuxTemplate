@@ -57,6 +57,7 @@ const base = Table.new({
 	anim("give", "Crew", false, "Action"),
 	anim("answer_phone", "Crew", true, "Action"),
 	anim("wave_skip", "Crew", false, "Action"), -- cutscene skip vote (optional)
+	anim("work", "Crew", true, "Action"), -- standing at a prep station (prep-mode.md §4; falls back to the idle, DEC-220)
 
 	-- Npc
 	anim("npc_idle", "Npc", true, "Idle"),

@@ -4,6 +4,18 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 
 export type Mode = "FirstPerson" | "Spectate" | "Fixed" | "Cutscene" | "External"
+export type Rig = {
+	Dolly: Vector3, -- eye offset, camera space (X right, Y up, Z forward)
+	Boom: Vector3?, -- detached eye in walker space (X right, Y up, Z forward of the own body): the establishing shot
+	BoomLook: Vector3?, -- what a boom looks at, walker space from the head
+	Orbit: number, -- radians the eye circles the focus target
+	Roll: number,
+	Fov: number?, -- overrides the focus fov
+	Far: number?, -- depth of field far blur
+	Rack: number?, -- 1/s the depth of field follows the focus
+	Shake: Vector3, -- hand-held, camera space studs
+	Tilt: Vector3, -- hand-held, radians (pitch, yaw, roll)
+}
 type Group = "Head" | "Arm" | "Body"
 
 export type Public = {
@@ -44,14 +56,17 @@ export type Public = {
 	NextStream: number,
 	PointId: string?,
 	Retarget: boolean,
+	Rig: Rig?,
 	Target: number?,
 	TouchDelta: Vector2,
 	Transition: { FromYaw: number, FromPitch: number, At: number, Time: number }?,
+	WasBoom: boolean,
 	Watching: Vide.Source<number?>,
 	Setup: (self: Public) -> (),
 	SetMode: (self: Public, mode: Mode) -> (),
 	ResetLook: (self: Public) -> (),
 	Cutscene: (self: Public, on: boolean) -> (),
+	SetRig: (self: Public, rig: Rig?) -> (),
 	Focus: (self: Public, getter: (() -> Vector3?)?, fov: number?) -> (),
 	LookAt: (self: Public, position: Vector3?) -> (),
 	SetArmsVisible: (self: Public, visible: boolean) -> (),
@@ -68,7 +83,10 @@ export type Public = {
 	UnlockMouse: (self: Public) -> (),
 	LookInput: (self: Public, dt: number) -> (number, number),
 	ApplyPov: (self: Public, mode: Mode, camera: Camera, dt: number) -> (),
+	BoomView: (self: Public, rig: Rig, head: Vector3, facing: Vector3) -> Vector3,
+	OrbitEye: (self: Public, eye: Vector3, angle: number) -> Vector3,
 	CutsceneBase: (self: Public, eye: Vector3, facing: Vector3, camera: Camera, dt: number, now: number) -> (),
+	CutsceneLens: (self: Public, camera: Camera, dt: number, distance: number?) -> (),
 	ElasticLook: (self: Public, dYaw: number, dPitch: number, dt: number, now: number) -> (),
 	ApplyCamera: (self: Public, dt: number) -> (),
 	IsFirstPerson: (self: Public) -> boolean,

@@ -4,7 +4,7 @@
 -- about the player), so a player at night could not leave the trailer to walk to the Mart. Two actions, both ours:
 --   trailer_exit    "Exit Trailer", anchor just inside the door; the caller must be inside (VehicleService:IsInside)
 --   trailer_enter   "Enter Trailer", anchor outside the steps; the caller must be outside
--- Both only while the trailer is the vehicle in use (at the Pad). The move is server-side: a 0.6 s fade (Transition
+-- (The trailer is the only vehicle since 2026-10-12, so both are always on.) The move is server-side: a 0.6 s fade (Transition
 -- "TrailerDoor", only to who used the door), the body held still (Freeze "TrailerDoor") and PivotTo under the black.
 -- Refused (the prompt stays, nothing happens): not Active, frozen (cutscene, focus, another door use), knocked or
 -- fainted (ragdoll), phases Intro / Resume / NightLost / Finale / RunEnd, cooldown COOLDOWN s per player.
@@ -34,22 +34,25 @@ const FREEZE = "TrailerDoor"
 const DOOR_ATTRIBUTE = "DoorOpen" -- on the trailer Model while a use runs (art hook; nothing reads it today)
 const ANCHOR_IN_NAME = "Prompt_ExitTrailer"
 const ANCHOR_OUT_NAME = "Prompt_EnterTrailer"
--- Door of MAP-01 §5.5 in the world frame of the trailer at the Pad (TRL): wall Z 47, door X 47..51
-const DOOR_X = 49
-const WALL_Z = 47
-const ANCHOR_IN = Vector3.new(DOOR_X, 5.2, 44) -- y over the Pad floor (trailer floor +2, chest height)
-const ANCHOR_OUT = Vector3.new(DOOR_X, 3.2, 50.5) -- y over the Pad floor; 4 studs radius keeps the two prompts apart
-const LAND_IN = Vector3.new(48.5, 0, 42.5) -- inside, a step in front of the door, clear of the bin (43.5, 44)
-const FLOOR_LIFT = 2 -- trailer floor over the Pad (MAP-01 §5.5)
--- Outside candidates (x, z) in the Pad frame, steps first; tried from a UserId based start so mates do not stack
+-- Door of MAP-01 §5.5 in the FRAME OF THE TRL POINT (object space of the trailer pose: local +Z = the back wall, local
+-- +X = world -X; the trailer pivot is its centre). Before 2026-10-12 these were absolute MAP numbers and only worked
+-- with the trailer parked at the old Pad spot. The back wall now stands against the building, so Exit Trailer lands
+-- on the free strip along the west wall (MapPoint TRL-OUT when authored) and Enter Trailer is a prompt there.
+const DOOR_X = 9 -- local X of the door (MAP X 47..51 minus the pivot 40)
+const WALL_Z = 6 -- local Z of the back wall
+const ANCHOR_IN = Vector3.new(DOOR_X, 5.2, 2.5) -- y over the TRL point (trailer floor +2, chest height); inside the door
+const ANCHOR_OUT = Vector3.new(16.3, 3.2, 3.6) -- outside, on the west strip; 4 studs radius keeps the two prompts apart
+const LAND_IN = Vector3.new(8.5, 0, 1.5) -- inside, a step in front of the door, clear of the bin
+const FLOOR_LIFT = 2 -- trailer floor over the TRL point (MAP-01 §5.5)
+-- Outside candidates (local x, local z), the west strip first; tried from a UserId based start so mates do not stack
 const OUT_CANDIDATES: { Vector2 } = {
-	Vector2.new(DOOR_X, 53),
-	Vector2.new(DOOR_X - 4, 53),
-	Vector2.new(DOOR_X + 4, 53),
-	Vector2.new(DOOR_X - 8, 53),
-	Vector2.new(DOOR_X, 57),
-	Vector2.new(DOOR_X - 4, 57),
-	Vector2.new(DOOR_X + 4, 57),
+	Vector2.new(16.5, 0.2),
+	Vector2.new(16.5, 2),
+	Vector2.new(16.5, -1.8),
+	Vector2.new(16.5, 4),
+	Vector2.new(16.5, -3.6),
+	Vector2.new(15.5, 0.2),
+	Vector2.new(15.5, -1.8),
 }
 const COOLDOWN = 1 -- s per player
 const SWAP_DELAY = 0.2 -- s after the packet: the cover is black from 0.15 s (VehicleController DOOR_IN)
@@ -173,15 +176,14 @@ function TrailerDoorService:Host(model: Model): BasePart?
 	return best
 end
 
--- Attachment on the trailer at `world` (in the Pad frame of the TRL point), tagged Interactable
-function TrailerDoorService:Create(model: Model, host: BasePart, pad: CFrame, name: string, action: string, world: Vector3)
+-- Attachment on the trailer at `offset` (in the frame of the TRL point; Y over it), tagged Interactable
+function TrailerDoorService:Create(model: Model, host: BasePart, pad: CFrame, name: string, action: string, offset: Vector3)
 	const anchor = Instance.new("Attachment")
 	anchor.Name = name
 	anchor:SetAttribute("PromptAction", action)
 	anchor.Parent = host
 	-- the anchor is placed from the trailer's own pose: right at the Pad, and the same after any PivotTo
-	const offset = pad:PointToObjectSpace(world)
-	anchor.WorldPosition = model:GetPivot():PointToWorldSpace(offset)
+	anchor.WorldPosition = model:GetPivot():PointToWorldSpace(offset + Vector3.new(0, pad.Position.Y - model:GetPivot().Position.Y, 0))
 	if action == EXIT then
 		self.ExitAnchors[anchor] = true
 	else
@@ -216,12 +218,11 @@ function TrailerDoorService:EnsureAnchors(): boolean
 	if host == nil then
 		return false
 	end
-	const padY = pad.Position.Y
 	if needExit then
-		self:Create(model, host, pad, ANCHOR_IN_NAME, EXIT, Vector3.new(ANCHOR_IN.X, padY + ANCHOR_IN.Y, ANCHOR_IN.Z))
+		self:Create(model, host, pad, ANCHOR_IN_NAME, EXIT, ANCHOR_IN)
 	end
 	if needEnter then
-		self:Create(model, host, pad, ANCHOR_OUT_NAME, ENTER, Vector3.new(ANCHOR_OUT.X, padY + ANCHOR_OUT.Y, ANCHOR_OUT.Z))
+		self:Create(model, host, pad, ANCHOR_OUT_NAME, ENTER, ANCHOR_OUT)
 	end
 	return true
 end
@@ -300,13 +301,14 @@ function TrailerDoorService:OutsideFor(player: Player): Vector3?
 	const count = #OUT_CANDIDATES
 	for step = 0, count - 1 do
 		const candidate = OUT_CANDIDATES[(player.UserId + step) % count + 1]
-		const ground = self:Ground(candidate.X, candidate.Y, pad.Position.Y + RAY_UP, params)
+		const world = pad:PointToWorldSpace(Vector3.new(candidate.X, 0, candidate.Y))
+		const ground = self:Ground(world.X, world.Z, pad.Position.Y + RAY_UP, params)
 		if ground ~= nil and math.abs(ground.Y - pad.Position.Y) <= GROUND_BAND and self:IsFree(ground) then
 			return ground
 		end
 	end
 	-- fallback: the closest REV-n (sidewalk next to the trailer, binding point, floor level)
-	const door = Vector3.new(DOOR_X, pad.Position.Y, WALL_Z)
+	const door = pad:PointToWorldSpace(Vector3.new(DOOR_X, 0, WALL_Z))
 	local best: Vector3? = nil
 	local bestDistance = math.huge
 	for _, point in MapIndex.Points("REV-") do
@@ -321,7 +323,8 @@ function TrailerDoorService:OutsideFor(player: Player): Vector3?
 		return best
 	end
 	self:WarnOnce("outside_raw", `[TrailerDoorService] no free ground and no REV point: dropping at the steps`)
-	return Vector3.new(DOOR_X, pad.Position.Y, 53)
+	const raw: Vector3 = pad:PointToWorldSpace(Vector3.new(ANCHOR_OUT.X, 0, ANCHOR_OUT.Z))
+	return raw
 end
 
 -- Floor point inside, a step in front of the door
@@ -339,13 +342,13 @@ function TrailerDoorService:InsideFor(player: Player): Vector3?
 	end
 	-- a small spread along the door so two mates never share the same spot
 	const jitter = ((player.UserId % 4) - 1.5) * 0.8
-	const x = LAND_IN.X + jitter
+	const world = pad:PointToWorldSpace(Vector3.new(LAND_IN.X + jitter, 0, LAND_IN.Z))
 	const params = self:CastParams()
-	const ground = self:Ground(x, LAND_IN.Z, pad.Position.Y + FLOOR_LIFT + 6, params)
+	const ground = self:Ground(world.X, world.Z, pad.Position.Y + FLOOR_LIFT + 6, params)
 	if ground ~= nil and math.abs(ground.Y - (pad.Position.Y + FLOOR_LIFT)) <= GROUND_BAND then
 		return ground
 	end
-	return Vector3.new(x, pad.Position.Y + FLOOR_LIFT, LAND_IN.Z)
+	return Vector3.new(world.X, pad.Position.Y + FLOOR_LIFT, world.Z)
 end
 
 -- Rules ------------------------------------------------------------------------------------------------------------
@@ -422,8 +425,8 @@ function TrailerDoorService:Move(player: Player, action: string)
 	if floor == nil then
 		return
 	end
-	-- facing: away from the door when leaving (south), toward the interior when entering (north)
-	const look = if action == EXIT then Vector3.new(0, 0, 1) else Vector3.new(0, 0, -1)
+	-- facing: the service window / the street (world +Z) both ways (the world is turned 180 degrees from the MAP frame)
+	const look = Vector3.new(0, 0, 1)
 	const target = floor + BODY_LIFT
 	character:PivotTo(CFrame.lookAt(target, target + look))
 	root.AssemblyLinearVelocity = Vector3.zero

@@ -21,6 +21,10 @@ local LobbyZones = require(ReplicatedStorage.shared.Lobby.LobbyZones)
 export type Rings = {
 	Step: (t: number, camera: Vector3?) -> (),
 	SetColor: (key: string, color: Color3) -> (),
+	-- Squad pad: ring + floor glow colour, breath (nil = the zone default), someone standing on it (sparks).
+	SetPad: (key: string, color: Color3, pulse: Content.LobbyPadPulse?, occupied: boolean) -> (),
+	-- Colour shiver of the ring (someone stepped on / off).
+	Kick: (key: string) -> (),
 	Destroy: () -> (),
 }
 
@@ -43,6 +47,14 @@ type ZoneVfx = {
 	Base: { BasePart },
 	Ghosts: { Ghost },
 	Light: PointLight?,
+	-- squad pads only: flat neon discs (floor glow) and the sparks rising while someone stands on it
+	Glow: { BasePart },
+	GlowAlpha: { number }, -- last transparency written per disc
+	Sparks: ParticleEmitter?,
+	Pulse: Content.LobbyPadPulse?, -- breath override (pad state); nil = Content.Lobby.Frame
+	Phase: number, -- radians of the breath
+	Occupied: boolean,
+	KickAt: number, -- t of the colour shiver; < 0 = none
 	Seed: number,
 	Color: Color3, -- shown now
 	From: Color3, -- tween start
@@ -55,7 +67,9 @@ type ZoneVfx = {
 const LOBBY = Content.Lobby
 const FRAME = LOBBY.Frame
 const VFX = LOBBY.ZoneVfx
+const PAD = LOBBY.Squad.Pad
 const ALPHA_STEP = 0.02
+const GLOW_GROW = 1.4 -- studs each glow disc reaches past the one inside it
 const WHITE = Color3.new(1, 1, 1)
 const FOLDER = "LobbyZoneVfx"
 
@@ -152,6 +166,81 @@ local function newLight(zone: LobbyZones.Zone, color: Color3, parent: Instance):
 	return light
 end
 
+-- Flat Neon disc (a block on a rectangle) over the floor: the glow of a squad pad. Disc 1 covers the pad, the next
+-- ones reach past its edge, fainter; the bigger the disc, the lower it lies (no z-fight).
+local function newGlow(zone: LobbyZones.Zone, index: number, color: Color3, parent: Instance): Part
+	const grow = (index - 1) * GLOW_GROW
+	const part = Instance.new("Part")
+	part.Name = `Glow{index}`
+	part.Material = Enum.Material.Neon
+	part.Color = color
+	part.Transparency = math.min(PAD.GlowAlpha + (index - 1) * 0.04, 0.98)
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	part.CastShadow = false
+	part.Massless = true
+	part.Locked = true
+	part.TopSurface = Enum.SurfaceType.Smooth
+	part.BottomSurface = Enum.SurfaceType.Smooth
+	const y = FRAME.Lift + 0.01 * (PAD.GlowRings - index + 1)
+	if zone.Shape == "Rect" then
+		part.Size = Vector3.new(2 * zone.HalfX + 2 * grow, 0.04, 2 * zone.HalfZ + 2 * grow)
+		part.CFrame = zone.CFrame * CFrame.new(0, y + 0.02, 0)
+	else
+		part.Shape = Enum.PartType.Cylinder
+		const diameter = 2 * (zone.Radius + grow)
+		part.Size = Vector3.new(0.04, diameter, diameter)
+		part.CFrame = zone.CFrame * CFrame.new(0, y + 0.02, 0) * CFrame.Angles(0, 0, math.pi / 2)
+	end
+	part.Parent = parent
+	return part
+end
+
+-- Sparks rising from the pad while someone stands on it (off until then; Step switches it by occupancy and distance).
+local function newSparks(zone: LobbyZones.Zone, color: Color3, parent: Instance): ParticleEmitter
+	const anchor = Instance.new("Part")
+	anchor.Name = "SparkAnchor"
+	anchor.Size = Vector3.new(zone.HalfX * 1.3, 0.2, zone.HalfZ * 1.3)
+	anchor.Transparency = 1
+	anchor.Anchored = true
+	anchor.CanCollide = false
+	anchor.CanQuery = false
+	anchor.CanTouch = false
+	anchor.CastShadow = false
+	anchor.Massless = true
+	anchor.Locked = true
+	anchor.CFrame = zone.CFrame * CFrame.new(0, 0.5, 0)
+	anchor.Parent = parent
+	const emitter = Instance.new("ParticleEmitter")
+	emitter.Name = "Sparks"
+	emitter.Enabled = false
+	emitter.Rate = PAD.Sparks.Rate
+	emitter.Lifetime = NumberRange.new(1.2, 1.8)
+	emitter.Speed = NumberRange.new(3, 4.5)
+	emitter.EmissionDirection = Enum.NormalId.Top
+	emitter.SpreadAngle = Vector2.new(12, 12)
+	emitter.Drag = 0.6
+	emitter.Rotation = NumberRange.new(0, 360)
+	emitter.RotSpeed = NumberRange.new(-60, 60)
+	emitter.LightEmission = 0.7
+	emitter.LightInfluence = 0
+	emitter.Color = ColorSequence.new(color:Lerp(WHITE, 0.35))
+	emitter.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0),
+		NumberSequenceKeypoint.new(0.2, 0.45),
+		NumberSequenceKeypoint.new(1, 0),
+	})
+	emitter.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(0.2, 0.15),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	emitter.Parent = anchor
+	return emitter
+end
+
 local function buildZone(zone: LobbyZones.Zone, color: Color3, seed: number): ZoneVfx
 	const folder = Instance.new("Folder")
 	folder.Name = zone.Key
@@ -174,12 +263,29 @@ local function buildZone(zone: LobbyZones.Zone, color: Color3, seed: number): Zo
 		end
 		table.insert(ghosts, { Parts = parts, Offsets = offsets, Targets = targets, Index = index, Alpha = 1 })
 	end
+	const glow: { BasePart } = {}
+	const glowAlpha: { number } = {}
+	local sparks: ParticleEmitter? = nil
+	if zone.Platform > 0 then
+		for i = 1, math.max(math.floor(PAD.GlowRings), 0) do
+			glow[i] = newGlow(zone, i, color, folder)
+			glowAlpha[i] = glow[i].Transparency
+		end
+		sparks = newSparks(zone, color, folder)
+	end
 	return {
 		Zone = zone,
 		Folder = folder,
 		Base = base,
 		Ghosts = ghosts,
 		Light = newLight(zone, color, folder),
+		Glow = glow,
+		GlowAlpha = glowAlpha,
+		Sparks = sparks,
+		Pulse = nil,
+		Phase = seed,
+		Occupied = false,
+		KickAt = -1,
 		Seed = seed,
 		Color = color,
 		From = color,
@@ -190,10 +296,16 @@ local function buildZone(zone: LobbyZones.Zone, color: Color3, seed: number): Zo
 	}
 end
 
+-- Writes `color` to every part of the zone (entry.Color stays the colour the zone is heading to / resting at).
 local function paint(entry: ZoneVfx, color: Color3)
-	entry.Color = color
 	for _, part in entry.Base do
 		part.Color = color
+	end
+	for _, part in entry.Glow do
+		part.Color = color
+	end
+	if entry.Sparks then
+		entry.Sparks.Color = ColorSequence.new(color:Lerp(WHITE, 0.35))
 	end
 	const light = ghostColor(color)
 	for _, ghost in entry.Ghosts do
@@ -232,6 +344,10 @@ return function(): Rings
 				entry.From = old.From
 				entry.Target = old.Target
 				entry.TweenAt = old.TweenAt
+				entry.Pulse = old.Pulse
+				entry.Phase = old.Phase
+				entry.Occupied = old.Occupied
+				entry.KickAt = old.KickAt
 			end
 			vfx[zone.Key] = entry
 			table.insert(order, entry)
@@ -249,6 +365,23 @@ return function(): Rings
 		entry.TweenAt = clock
 	end
 
+	local function setPad(key: string, color: Color3, pulse: Content.LobbyPadPulse?, occupied: boolean)
+		const entry = vfx[key]
+		if entry == nil then
+			return
+		end
+		entry.Pulse = pulse
+		entry.Occupied = occupied
+		setColor(key, color)
+	end
+
+	local function kick(key: string)
+		const entry = vfx[key]
+		if entry then
+			entry.KickAt = clock
+		end
+	end
+
 	const ghostCount = math.max(math.floor(FRAME.Count), 1)
 	const period = math.max(FRAME.Period, 0.1)
 	const pulsePeriod = math.max(FRAME.PulsePeriod, 0.1)
@@ -258,19 +391,36 @@ return function(): Rings
 	const tween = math.max(VFX.ColorTween, 0.001)
 
 	local function step(t: number, camera: Vector3?)
+		const dt = math.clamp(t - clock, 0, 0.1)
 		clock = t
 		if LobbyZones.Version() ~= built then
 			build()
 		end
 		for _, entry in order do
+			local repaint = false
 			if entry.TweenAt >= 0 then
 				const k = (t - entry.TweenAt) / tween
 				if k >= 1 then
 					entry.TweenAt = -1
-					paint(entry, entry.Target)
+					entry.Color = entry.Target
 				else
-					paint(entry, entry.From:Lerp(entry.Target, smooth(k)))
+					entry.Color = entry.From:Lerp(entry.Target, smooth(k))
 				end
+				repaint = true
+			end
+			local shown = entry.Color
+			if entry.KickAt >= 0 then
+				const k = (t - entry.KickAt) / math.max(PAD.KickTime, 0.05)
+				if k >= 1 then
+					entry.KickAt = -1 -- last repaint with the resting colour
+				else
+					-- quick shiver towards white, fading out
+					shown = shown:Lerp(WHITE, 0.8 * (1 - k) * (0.5 + 0.5 * math.sin(k * 45)))
+				end
+				repaint = true
+			end
+			if repaint then
+				paint(entry, shown)
 			end
 			const zone = entry.Zone
 			const near = camera == nil or (camera - zone.Center).Magnitude <= VFX.ActiveDistance + zone.Radius
@@ -280,9 +430,28 @@ return function(): Rings
 			end
 			if near then
 				const seed = entry.Seed
-				-- base frame: brightest at wave 1, dims by PulseAlpha
-				const wave = 0.5 + 0.5 * math.sin(2 * math.pi * t / pulsePeriod + seed)
-				const baseAlpha = math.clamp(quantize(FRAME.Base + FRAME.PulseAlpha * (1 - wave)), 0, 1)
+				-- base frame: brightest at wave 1, dims by the breath depth (a pad state sets its own period and depth)
+				const pulse = entry.Pulse
+				entry.Phase += dt * 2 * math.pi / math.max(if pulse then pulse.Period else pulsePeriod, 0.1)
+				const wave = 0.5 + 0.5 * math.sin(entry.Phase)
+				const depth = if pulse then pulse.Alpha else FRAME.PulseAlpha
+				const baseAlpha = math.clamp(quantize(FRAME.Base + depth * (1 - wave)), 0, 1)
+				-- floor glow follows the breath, brighter while someone stands on the pad
+				for i, part in entry.Glow do
+					const faint = math.min(PAD.GlowAlpha + (i - 1) * 0.04, 0.98)
+					const alpha = math.clamp(quantize(faint - (if entry.Occupied then 0.06 else 0) - 0.06 * wave), 0, 1)
+					if alpha ~= entry.GlowAlpha[i] then
+						entry.GlowAlpha[i] = alpha
+						part.Transparency = alpha
+					end
+				end
+				const sparks = entry.Sparks
+				if sparks then
+					const on = entry.Occupied and (camera == nil or (camera - zone.Center).Magnitude <= PAD.Sparks.Distance)
+					if sparks.Enabled ~= on then
+						sparks.Enabled = on
+					end
+				end
 				if baseAlpha ~= entry.BaseAlpha then
 					entry.BaseAlpha = baseAlpha
 					for _, part in entry.Base do
@@ -325,6 +494,8 @@ return function(): Rings
 	return {
 		Step = step,
 		SetColor = setColor,
+		SetPad = setPad,
+		Kick = kick,
 		Destroy = destroy,
 	}
 end

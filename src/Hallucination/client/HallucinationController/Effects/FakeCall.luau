@@ -7,7 +7,7 @@ local StarterPlayer = game:GetService("StarterPlayer")
 local Context = require(script.Parent.Parent.Context)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
 
-const PHONE_IDS: { [string]: boolean } = { ["CART-PHONE"] = true, ["TRL-PHONE"] = true }
+const PHONE_IDS: { [string]: boolean } = { ["TRL-PHONE"] = true }
 const PHONE_ACTION = "answer_phone"
 const LIGHT_NAME = "Light_Ring"
 const LAMP_SUFFIX = "_Lamp"

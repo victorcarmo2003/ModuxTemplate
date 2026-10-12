@@ -6,7 +6,7 @@
 	auto-answer, line timing). Nothing here is ever sent back: answering is the phone's `Prompt_Answer`
 	(answer_phone) through PromptController/InteractionService.
 
-	  Ringing  the phone of the current vehicle (RoundController.Vehicle: cart by day, trailer at night) blinks its
+	  Ringing  the phone of the current vehicle (RoundController.Vehicle: the trailer, the only vehicle) blinks its
 	           lamp and shows 2D sound ripples; the `phone_ring` loop plays at the phone (3D roll-off = quieter far
 	           away). No subtitle while ringing (ui-text.md §12.4).
 	  Talking  subtitle "Walt: <line>" at the bottom (CallSubtitle). Line = floor((now - StartedAt) / LineTime) of
@@ -15,8 +15,8 @@
 	  Idle     everything off, lamp restored as authored.
 
 	Fittings (AST-042): `Light_Ring` (Neon part) and `VFX_Ring` (ripples) are not on the model yet. Fallbacks, no
-	error and no warn: lamp = parts named `*_Lamp` of the phone model (Cart_Lamp / Trailer_Lamp); ripples = on the
-	lamp, else above the phone's top. Phone = model with MapId CART-PHONE / TRL-PHONE inside the current `Vehicle`,
+	error and no warn: lamp = parts named `*_Lamp` of the phone model (Trailer_Lamp); ripples = on the
+	lamp, else above the phone's top. Phone = model with MapId TRL-PHONE inside the current `Vehicle`,
 	else the model holding the `answer_phone` anchor. A late fitting (streaming, swap) re-resolves.
 
 	Sound: ids are "" until TASK-087 (Q-168): no Sound is created, nothing is played. The voice (SFX-082) has no key
@@ -34,7 +34,7 @@
 	voice): every other call is voiced here with Walt's text-to-speech, the cutscene's Speech module (Voices.walt of
 	Content.Cutscenes.Rules; the voice health, the warnings and the one audio LoadQueue are shared with the intro and the
 	tutorial call, which keep their own Speech instance). Lines are loaded ahead: the lines of the call that rings or
-	talks, and of the calls of this shift and the next one (day / night / trailer / hints, PrepareUpcoming, queued after
+	talks, and of the calls of this shift and the next one (day / night / hints, PrepareUpcoming, queued after
 	the loading gate), so a line is Loaded by its beat. Say(line) plays on the server timeline (subtitle and voice
 	start together; a line never cuts the one speaking). A line that gets no voice warns once per reason with its cause.
 	The tutorial call (Held) is voiced by TutorialController, never here.
@@ -62,7 +62,7 @@ const BLINK_HZ = 2
 const VEHICLE_TAG = "Vehicle"
 const INTERACTABLE_TAG = "Interactable"
 const PHONE_ACTION = "answer_phone"
-const PHONE_IDS: { [string]: boolean } = { ["CART-PHONE"] = true, ["TRL-PHONE"] = true }
+const PHONE_IDS: { [string]: boolean } = { ["TRL-PHONE"] = true }
 const LIGHT_NAME = "Light_Ring"
 const VFX_NAME = "VFX_Ring"
 const LAMP_SUFFIX = "_Lamp"
@@ -194,7 +194,7 @@ function BossController:PrepareUpcoming()
 				else trigger.Night ~= nil and (trigger.Night == night or trigger.Night == night + 1)
 		elseif kind == "NightCall" or kind == "NightCoffee" then
 			wanted = trigger.Night == night or trigger.Night == night + 1
-		elseif kind == "TrailerOffer" or kind == "TrailerBought" or kind == "Hint" or kind == "NightRepeat" then
+		elseif kind == "Hint" or kind == "NightRepeat" then
 			wanted = true
 		elseif kind == "LostCritical" or kind == "LostLastChance" then
 			wanted = round.IsNight()

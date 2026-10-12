@@ -10,6 +10,8 @@ TASK-129 a TASK-134 (tabela da onda 3, "Ajuste DEC-221").
 v2.0: **ondas 2 e 3** quebradas em TASK-047 a TASK-128, sobre `architecture.md` v4.0 §19 (ondas §19.24, ajustes
 §19.26 A1–A10), `network.md` v5 §13, `data.md` v5 §5, `content-data.md` v5 §6, `asset-list.md` ("Levantamento
 pós-onda 1"), `audio/sound-list.md` e `tests/wave-1-report.md` (B-02, D-04, D-09, B-05). Onda 4 segue só listada.
+v2.2 (2026-10-12, **DEC-223/224/225**): **modo de preparo focado** (FEAT-039, V1) e migração para o trailer único
+quebrados em TASK-166 a TASK-193 (seção "Tabela de tasks — Modo de preparo focado", sobre `docs/tech/prep-mode.md`).
 
 Base: `CLAUDE.md`, `README.md` (Modux V3), `docs/PIPELINE.md`, `docs/tech/architecture.md`, `network.md`, `data.md`,
 `content-data.md` (v3.1), `docs/design/*.md`, `docs/levels/MAP-01.md`, `docs/art/asset-list.md`, `decisions.md`
@@ -434,6 +436,209 @@ mais cedo. Spec: nota **Provisória** na FEAT-009 (`features.md`), `Content.Flow
 
 ---
 
+## Tabela de tasks — Modo de preparo focado (FEAT-039 V1, DEC-223) e trailer único (DEC-224)
+
+Base: `docs/tech/prep-mode.md` (architect, Rascunho: **Provisório**; §8 ondas P0..P11, §10 DT-1..DT-10), FEAT-039,
+DEC-223, DEC-224, DEC-225, `Q-219`, `Q-221` a `Q-226`. Nada daqui depende de DEC nova: pergunta nova vira `Q-###` não
+bloqueante e o trabalho segue com a recomendação do `prep-mode.md`.
+
+**Mapa P → TASK:** P0 = 167 + 168 · P1 = 169 · P2 = 170 · P3 = 171 · P4 = 172 · P5 = 173 · P6 = 174 + 175 ·
+P7 = 176 a 179 · P8 = 180 · P9 = 181 + 182 · P10 = 183 + 184 · P11 = 192 + 193. Apoio: 166 (trailer único), 185 e 186
+(áudio), 187 a 189 (arte 2D), 190 (plano de teste), 191 (números e ritmo).
+
+**Nome da feature.** DEC-223 sugere `Focus*`; o `prep-mode.md` usa `Prep*` (`PrepSeats` faz o papel de `FocusBoards`) e
+as tasks abaixo seguem `Prep*`. Renomear é barato **só antes da TASK-167**; depois, não. O architect fecha isso no
+começo da 167 (sem consultar o dono: recomendação `Prep*`, Provisória).
+
+**Donos de arquivo (acréscimo às "Regras do board"):**
+- `src/Libs/Net/init.luau`, `src/Shared/Content/init.luau`, `Validate.luau` e as tabelas `Actions`, `Stations`,
+  `Animations`, `Notices`, `Sounds` (chaves novas): **167 → 168** (architect). Depois só 186 mexe em `Sounds.luau`
+  (ids) e só 189 em `Prep.luau` (subtabela `Art`). `Content/Prep.luau`: 167 → 191 (números) → 189 (arte). A 168 espera
+  a TASK-133 (Em QA) e, para `Actions`/`Notices`/`Vehicles`, a TASK-166 `Em QA` (a migração remove `buy_trailer` e afins).
+- `KitchenService/init.luau`, `StationApi.luau`, `Stations/*`, novo `KitchenService/Plate.luau`: **só 169**.
+- `CustomerService/init.luau` e `Orders`, `ItemService/init.luau` e `Snapshot`: **só 171**.
+- `src/Prep/server/PrepService/{init,Session,Validate}`: **só 170**; `PrepService/Exits.luau` e `AnomalyService/Api.luau`
+  (+ 2 linhas no `init`): **só 181** (depois da TASK-130 `Em QA`).
+- `src/Prep/client/PrepController/{init,Session,Cursor}`, `CameraController.luau`, `PromptController/{Rules,Prompt}`:
+  **só 173**. `Gestures/*`: só 176. `Stages/Order`, `Stages/Grill`: só 177; `Stages/Bun`, `Stages/Build`: só 178;
+  `Stages/Serve`: só 179. O `init` do `PrepController` **descobre** `Stages/*` (a 173 entrega o registro com estágio
+  stub), então 177 a 179 nunca editam o `init`. Presença: 180 (`Presence.luau`, novo). Client das saídas e `HudController`: 182.
+- `Interface/client/Components/Prep*`: 174 (PrepShell, TicketRail, StationTag) e 175 (IngredientPanel, PlateView,
+  StrokeCanvas), pastas distintas. `Components/Icons`: só 189.
+- `src/Tutorial/**`: só 184. `docs/story/script.md` §3 e `docs/story/ui-text.md`: só 183. `docs/art/asset-list.md`
+  (próximo livre **AST-108**): só 187. `docs/audio/sound-list.md` (próximo livre **SFX-217**): só 185. Confirmar os
+  números livres no arquivo antes de gravar.
+- **Studio (place):** `Workspace` = 166 (parte do mapa) → 172, em sequência, nunca duas sessões de Studio; `ReplicatedStorage.Assets` = 188
+  por snippet idempotente. Nunca `Place.run` sem pedido do dono (`AGENT-BRIEF.md` §3).
+- `CameraController.luau` e `Content/{Cutscenes,LightPresets,Lobby,Shift}.luau` estão com mudança **sem commit** de
+  outra sessão (cutscene curta, DEC-225): a 173 só começa a editar a câmera depois que essa sessão commitar.
+
+| ID | Título | Dono | Depende de | Arquivos / pastas | Spec | Status |
+|---|---|---|---|---|---|---|
+| TASK-166 | **Migração para o trailer único** (D2/DEC-224): sem carrinho, sem compra/oferta/placa FOR SALE, trailer no Pad desde o Day 1 com mesas e varais, fila, âncoras e prompts | backend-coder + frontend-coder + level-designer (**outro agente**, orquestrador) | — | `src/Vehicle/**` (`VehicleService`, `VehicleController`, `PadHideController`, `TrailerDoorService`), `src/Shared/Content/{Vehicles,Trailer,RunParams,Actions,Notices,Anomalies}.luau`, `bind_map01`, `MAP-01_placements.luau`, `check_map01.luau`, place | DEC-224; `MAP-01.md` TRL; `upgrades.md` UPG-006 obsoleto | **Em andamento** (outro agente, sem relatório; lista de arquivos a **reconciliar** com o relatório dele) |
+| TASK-167 | **P0a** Contrato de conteúdo: `Content/Prep.luau` (`Rules`, `Steps`, `Gestures`, `Tolerances`, `Grades`, `Art` vazio), `Validate`, `src/Prep/shared/Grade` (pontuação pura) + teste de tabela | architect | — | `src/Shared/Content/Prep.luau` (novo), `Content/init.luau`, `Validate.luau`, `src/Prep/shared/Grade.luau` (novo), teste de tabela em `src/Prep/shared/` | `prep-mode.md` §6, §8 P0; FEAT-039 (Nota, tolerâncias) | Pronta |
+| TASK-168 | **P0b** Contrato de rede: 7 entradas `Prep*` + `PrepResult` + set `PrepSeats` em `Net`; linhas novas de `Actions` (`prep_work`), `Stations` (`prep`, `Record = "None"`), `Animations` (`work`), `Notices` (recusas e `Kick`), chaves `Sounds` `prep_*`; `network.md` § novo | architect | 167; 133 (Em QA); 166 (`Em QA`, só para Actions/Notices/Vehicles) | `src/Libs/Net/init.luau`, `Content/{Actions,Stations,Animations,Notices,Sounds}.luau`, `Content/Vehicles.luau` (`BoardSlots = 4`), `docs/tech/network.md` | `prep-mode.md` §3, §6, DT-3 | Bloqueada (167) |
+| TASK-169 | **P1** Backend Kitchen: `Plate.luau` (`BeginPlate`, `FinishPlate`, `RefundPlate`, `GrillAct`), nota da salsicha no `Entry` do `Rail`, `Flip` no `Grill`, flag `WorldKitchenPrompts` em `RefreshPrompts` | backend-coder | 167, 168 | `src/Kitchen/server/KitchenService/{init,StationApi,Plate}.luau`, `Stations/{Grill,Rail,Board}.luau` | `prep-mode.md` §2 (Finish), §6, §7, DT-5 | Bloqueada (168) |
+| TASK-170 | **P2** Backend `PrepService`: assentos, sessão, validação por plausibilidade, `Freeze`, gate de `Interact`, `PrepSeats`, batimento e timeouts | backend-coder | 167, 168 (mock de `KitchenService` por tipo até 169) | `src/Prep/server/PrepService/{init,Session,Validate}.luau` (novos), `InteractionService` só por gate público | `prep-mode.md` §2, §3, §4, DT-2, DT-9 | Bloqueada (168) |
+| TASK-171 | **P3** Backend Customer/Item: `Quality` no `Give`/`QualityOf`/snapshot, `TakeOrderFor`, `ServeFor`, `Refuse`, gorjeta e humor por qualidade em `SellLine` | backend-coder | 167, 168 | `src/Customer/server/CustomerService/{init,Orders}.luau`, `src/Item/server/ItemService/{init,Snapshot}.luau`, `Content/Items.luau` (só atributo) | `prep-mode.md` §2 (Nota), §6; FEAT-039 Nota; DEC-072; Q-219 B | Bloqueada (168) |
+| TASK-172 | **P4** Mapa: `Station_1..4` no trailer (`Att_Stand`, `CamAnchor`, `Focus`, `Prompt_Work`, `Att_Bun`), esconder as âncoras de cozinha antigas, `BoardSlots = 4`, snippet idempotente, câmera de cada estação | level-designer | 166 (`Em QA`), 168 | place (`Workspace`), `tools/assetplace/{bind_map01,check_map01,MAP-01_placements}.luau`, `docs/levels/MAP-01.md` (§ novo, Provisório) | `prep-mode.md` §6 (Mapa), P4; FEAT-039 (Câmera) | Bloqueada (166, 168) |
+| TASK-173 | **P5** Frontend núcleo: `PrepController` (estado, rede, registro de `Stages/*` com stub), modo `Prep` do `CameraController` (+DOF `PrepFocus`), `PromptController:AddGate`, cursor virtual, saída | frontend-coder | 167, 168 | `src/Prep/client/PrepController/{init,Session,Cursor}.luau` (novos), `src/Camera/client/CameraController.luau`, `src/Interaction/client/PromptController/{Rules,Prompt}.luau`, `Input/client/InputController.luau` (só contexto `Menu`) | `prep-mode.md` §2 (Ativar), §5 Mobile, DT-4; FEAT-039 Câmera | Bloqueada (168) |
+| TASK-174 | **P6a** UI kit A (Vide, stories): `PrepShell` (abas, Next/Serve, Leave), `TicketRail`, `StationTag` | frontend-coder | 167 | `src/Interface/client/Components/{PrepShell,TicketRail,StationTag}/` (+ `.story.luau`) | `prep-mode.md` §2 (UI), §4, §8 P6; style-guide | Bloqueada (167) |
+| TASK-175 | **P6b** UI kit B (Vide, stories): `IngredientPanel`, `PlateView`, `StrokeCanvas` | frontend-coder | 167 | `src/Interface/client/Components/{IngredientPanel,PlateView,StrokeCanvas}/` (+ stories) | `prep-mode.md` §2, §6 (Performance), P6 | Bloqueada (167) |
+| TASK-176 | **P7a** Gestos do cliente: `Gestures/{slice,place,trace,slide,taps,hold}`, amostragem 30 Hz, nota local 0 a 100 pela mesma `Grade`, `Assist` x1,3 | frontend-coder | 173, 175 | `src/Prep/client/PrepController/Gestures/*.luau` (novos) | `prep-mode.md` §6 (`Gestures`, `Tolerances`); FEAT-039 gestos | Bloqueada (173, 175) |
+| TASK-177 | **P7b** Estágios Order e Grill: fila de tickets, Take/fixar, grelha (`+ Sausage`, janela de virar, Collect) | frontend-coder | 169, 170, 173, 174; 172 (só para aceite em Play) | `src/Prep/client/PrepController/Stages/{Order,Grill}.luau` | `prep-mode.md` §2 (Order, a) | Bloqueada (169, 170, 173, 174) |
+| TASK-178 | **P7c** Estágios Bun e Build: cortar, arrastar salsicha, molhos, queijo, bacon, batata, lixeira, Next; resumo `PrepFinish` | frontend-coder | 169, 170, 173, 175, 176; 172 (aceite em Play) | `src/Prep/client/PrepController/Stages/{Bun,Build}.luau` | `prep-mode.md` §2 (b, c, Finish), §3 | Bloqueada (176) |
+| TASK-179 | **P7d** Estágio Serve: selo Perfect/Good/Messy, cartões do balcão e das mesas, `PrepOrder Serve` | frontend-coder | 170, 171, 173, 174 | `src/Prep/client/PrepController/Stages/Serve.luau` | `prep-mode.md` §2 (d), DT-6 | Bloqueada (171, 173, 174) |
+| TASK-180 | **P8** Co-op e presença: `PrepSeats` no client, atributo `Working`, clipe `work` (idle até o usuário animar, DEC-220), chip de conflito de ticket, entrada tardia | frontend-coder | 170, 174 | `src/Prep/client/PrepController/Presence.luau` (novo), `Components/StationTag` (uso), `Animations`/`CrewRig` só leitura do clipe | `prep-mode.md` §4 | Bloqueada (170, 174) |
+| TASK-181 | **P9a** Saídas forçadas no servidor: `AnomalyService.Cued`/`HasLive`, `PrepService:Kick` por Vital/Cutscene/Boss/Thief/Closing, `CueLock`, `/dev prep` | backend-coder | 170; 130 (Em QA) | `src/Prep/server/PrepService/Exits.luau` (novo), `src/Anomaly/server/AnomalyService/{Api,init}.luau`, `src/Dev/server/DevService/Commands/Prep.luau` (novo) | `prep-mode.md` §5 (Saída forçada), Q-221 A | Bloqueada (170) |
+| TASK-182 | **P9b** Saídas no client e HUD em foco: sinal de anomalia (0,4 s, tremor, 0,5 s sem input), motivo do `Kick`, reentrada travada, `HudOrder` some e o resto fica | frontend-coder | 173, 181 | `src/Prep/client/PrepController/Exit.luau` (novo), `src/Hud/client/HudController.luau`, `Content/HudReveal.luau` (só linha) | `prep-mode.md` §5 (HUD, Saída), Q-221 | Bloqueada (181) |
+| TASK-183 | **P10a** Texto: reescrita do tutorial do Day 1 (script.md §3: passos "perto do pão", "pão cortado", "montando", "hot dog pronto") em estações; textos de UI do modo (abas, selos, recusas, `Kick`); troca de "cart" por "trailer" nas falas do tutorial | narrative-writer | — (nomes de passo em `prep-mode.md` §5; chaves finais de `Notices` ao fechar a 168) | `docs/story/script.md` §3, `docs/story/ui-text.md` (§ novo "Modo de preparo") | DEC-223 (Provisório: Day 1 ensina o focado); DEC-224 (texto); `AGENT-BRIEF.md` §4 (sem "sausage" na voz TTS, sem vermelho) | Pronta |
+| TASK-184 | **P10b** Tutorial reescrito + `PrepCoach` (lê `PrepController.Step` e eventos `placed/flipped/cut/built/served`, pulsa o alvo da UI); `TutorialPromptGate` gateia `prep_work`; pulável | frontend-coder | 177, 178, 179, 183 | `src/Tutorial/client/TutorialController/{init,Steps,PrepCoach}.luau`, `src/Tutorial/shared/Rules.luau` | `prep-mode.md` §5 (Tutorial), §7 | Bloqueada (177 a 179, 183) |
+| TASK-185 | **Áudio A** lista de SFX de gesto: sizzle (loop), virar, corte, pão abre, salsicha encaixa, esguicho (loop com pitch por vazão), polvilhar, tap de bacon, queijo cai, selos Perfect/Good/Messy, trocar aba, ticket, lixeira, saída forçada | art-director (som) | — | `docs/audio/sound-list.md` (SFX-217 em diante) | FEAT-039 (feedback por gesto); `prep-mode.md` §6 (`Sounds prep_*`) | Pronta |
+| TASK-186 | **Áudio B** ids e hooks: preencher `Content.Sounds prep_*` com os ids enviados e ligar os disparos nos estágios; tier `core` | frontend-coder | 185, 168, 177, 178, 179; upload/licença (Q-168) | `src/Shared/Content/Sounds.luau` (só ids), `Audio/client/AudioController/Tiers.luau`, linhas de disparo nos `Stages/*` já do dono | `prep-mode.md` §6; `docs/art/credits.md` | Bloqueada (usuário: upload e licença) |
+| TASK-187 | **Arte A** fichas 2D: ícones de ingrediente e de estágio (salsicha crua/meia/pronta, pão fechado/aberto/cortado, 6 complementos, ticket, prato, 3 selos, 4 abas, lixeira, faca/garrafa/bico como cursor), estilo e tamanhos | art-director | — | `docs/art/asset-list.md` (AST-108 em diante), `docs/art/style-guide.md` (só se preciso) | DEC-223; `prep-mode.md` §9 (risco de sprites), Q-152 | Pronta |
+| TASK-188 | **Arte B** produção dos sprites: renders dos modelos existentes (`Assets/FoodPack`, `Assets/KitchenPack`, AST-001/004/005/011) em PNG com fundo transparente, upload e ids | modeler-3d | 187 (fichas Aprovadas por DEC do dono) | `Assets/blender/ui/`, `Assets/textures/prep/`, `docs/art/credits.md` (se vier de pack) | fichas AST da 187 | Bloqueada (DEC: aprovar fichas) |
+| TASK-189 | **Arte C** integração: ids em `Content.Prep.Art`, trocar os placeholders (Frames) por imagens em `Icons`/`PlateView`/`IngredientPanel`/`PrepShell` | frontend-coder | 188, 174, 175 | `src/Shared/Content/Prep.luau` (`Art`), `Components/Icons/init.luau`, props nos componentes `Prep*` | AST da 187 | Bloqueada (188) |
+| TASK-190 | Plano de teste do modo focado (casos por TASK, 4 jogadores, toque, gamepad, ping alto, anomalia, rollback do flag) | qa-tester | 167 (contratos); `prep-mode.md` | `docs/tests/prep-mode.md` (novo) | `prep-mode.md` §3, §5, §9; FEAT-039 | Pronta |
+| TASK-191 | Números e ritmo: validar `Grades`/`Tolerances`/`Rules` (Perfect 100/Good 70/Messy 30, 9–12 s hábil, gorjeta $2, janela +4 s) contra o fluxo de 14 s e o dia de ~4,6 min; simulação solo e 4p; upgrades Sharp Knife/Fine Nozzle/Wide Board como proposta | game-designer | 167 | `docs/design/economy.md` (§ novo, se existir) e **só os números** de `Content/Prep.luau` depois da 167 `Em QA`; linha no registro do dia | FEAT-039 (Ritmo, Nota); `Q-219`, `Q-222`, `Q-223` | Bloqueada (167) |
+| TASK-192 | **P11a** QA integrada e balanceamento: executa o plano da 190 em Studio (solo e 4 jogadores), mede as métricas do §9 (p50/p90 de prato, % Perfect/Good/Messy, `Left`/`Slow` contra o baseline, saídas forçadas, abandono, desperdício), rollback do flag | qa-tester | 172, 176 a 182, 184, 190, 191 | `docs/tests/prep-mode.md` (resultados) | `prep-mode.md` §9 | Bloqueada (tudo) |
+| TASK-193 | **P11b** Mobile, gamepad e performance: 667x375 e 844x390, alvos >= 44 px, Assist, cursor deslocado, <= 1 pacote/s por jogador, `PrepSeats` <= 4, DOF desligado em qualidade <= 3, memória/frame em celular fraco | qa-tester | 173, 174, 175, 176 a 180, 182 | `docs/tests/prep-mode.md` (§ mobile/perf), `docs/tests/` (log) | `prep-mode.md` §5 Mobile, §6 Performance, §9 | Bloqueada (tudo da UI) |
+
+### Detalhe (aceite, riscos, o que é Provisório)
+
+**TASK-166 — Trailer único.** Aceite: no Day 1 o trailer já está em `TRL` (40, 41) com 4 mesas TBL-6..9 e varais presos;
+`rg "buy_trailer|TrailerOffer|Prompt_Buy|PadHide" src/` sem resultado fora de comentário de histórico; fila Q1..Q5 e
+`DRAWER` na janela do trailer; `/dev smoke` ok; `modux check` e analyze 0 erro. Risco: mexe em `Vehicles`, `Actions`,
+`Notices`, tutorial e Mart ao mesmo tempo que o Prep: por isso a 168 espera a 166 `Em QA` para essas tabelas e a 172
+só começa depois. Esta linha só rastreia; ao chegar o relatório do agente, reconciliar arquivos e abrir task de correção
+se algum critério falhar. Provisório: `Q-224`, `Q-225`.
+
+**TASK-167 (P0a).** Aceite: `modux check` e analyze 0 erro; `Validate.luau` falha o boot (teste negativo) se uma chave de
+`Tolerances` não existir em `Ingredients`/`Stations`/`Actions`; `Grade` é Luau puro sem `require` de Modux e tem teste de
+tabela com pelo menos 12 casos (limiares Perfect/Good/Messy de FEAT-039; média >= 88 sem nenhuma Messy = Perfect;
+>= 60 = Good; teto de nota por tempo abaixo de `PerfectMin`); `Prep.Rules.WorldKitchenPrompts = false`; topping novo =
+uma linha em `Tolerances` (verificado por teste). Risco: o nome `Prep*` x `Focus*` (acima). Provisório: todos os números
+(`MinPlate`, `PerTopping`, `PerfectMin`, `MsSlack` 1,5 s, `Assist` 1,3, `TouchOffset` 28).
+
+**TASK-168 (P0b).** Aceite: `Lync.start()` sobe no Studio sem erro de schema (boot **testado**, não só `check`);
+`PrepSeats` com no máximo 4 registros e campo de pelo menos 7 bits (`drop.section`, `AGENT-BRIEF.md` §2: usar
+`Lync.int(0, 255)` e clamp no servidor onde um registro tiver < 7 bits); nenhum `keyBy` fora de campo finito; os 7 pacotes
+c->s com o ritmo de §3 (2/s, 4/s, 6/s, 1/s...); `network.md` ganha a seção do Prep com o mesmo schema; `grep` das chaves
+`prep_work`, `prep` e `work` presente em `Actions`/`Stations`/`Animations` e `Validate` verde. Risco: ponto único de
+conflito em `Net/init.luau`; aguardar 166 para `Actions`/`Notices`. Provisório: textos de `Notices` (a 183 entrega os finais).
+
+**TASK-169 (P1).** Aceite: `BeginPlate`/`FinishPlate` atômicos: falta de estoque, trilho vazio ou `hands_full` = recusa
+**sem alterar** estoque, trilho nem vaga (teste por `/dev` com 3 cenários); `RefundPlate` devolve o pão reservado; flag
+`WorldKitchenPrompts = false` deixa `PromptEnabled = false` em `grill_place`, `grill_collect`, `bun_cut`,
+`board_add_sausage`, `topping_add`, `discard` e `= true` devolve o fluxo antigo **sem outra mudança de código**; `Flip`
+carimba o relógio do servidor e a nota da salsicha (distância a 50% da `Duration`; sem virar = Messy; sem queimar);
+2 chamadas simultâneas de `TakeStock` nunca consomem a mesma unidade; `modux check`, analyze 0 erro, `/dev smoke` ok.
+Risco: regressão do fluxo antigo (ligar o flag deve passar nos testes da onda 1). Provisório: janela 40% a 60%, `Q-222`.
+
+**TASK-170 (P2).** Aceite: 2 `PrepEnter` no mesmo frame para a mesma estação = 1 `Busy`; `PrepFinish` com tempo de
+servidor < `MinPlate + PerTopping x K`, topping repetido, > `MaxToppings`, chave `Blocked`, nota fora de 0..100 ou
+`Ms > servidor + 1,5 s` = recusado com `Reason` e sem mutação; abaixo de `PerfectMin` o prato nunca passa de Good;
+desconexão, `Away` ou 60 s sem batimento libera o assento e devolve o pão; `Freeze(player, "Prep", true)` liga e desliga
+sem vazar; > 6 pacotes/s do mesmo jogador descartados; `PrepSeats` só cresce com a party durante o turno. Risco: dependência
+em `KitchenService` (usar a interface da 169 por tipo; trocar o mock quando a 169 fechar). Provisório: `SeatIdle` 60 s, `PlateMax` 90 s.
+
+**TASK-171 (P3).** Aceite: Completo/Incompleto/Errado (DEC-072) idênticos ao baseline em 6 pratos de teste (diff de
+`Sale`); Perfect paga gorjeta $2 e janela +4 s, Messy sem gorjeta e -1 faixa de humor, Good = como hoje; preço base nunca
+muda; `Quality` sobrevive ao snapshot da run (`data.md` §3.3) e some ao servir; nenhuma dependência nova de `Require`.
+Risco: `CustomerService` e `ItemService` são donos de outras tasks de onda 2/3 (053/108/122/163): conferir o status
+delas antes de começar. Provisório: `Q-219` B (só gorjeta e humor).
+
+**TASK-172 (P4).** Aceite: 4 `Station_n` com tag `Station`, `StationKind = "prep"` e os 5 filhos; `check_map01` sem erro
+e com aviso se faltar `CamAnchor`/`Focus`; `/dev smoke` ok; cada `CamAnchor` enquadra a tábua inteira em 667x375 e 844x390
+(captura por estação anexada ao relatório); `Prompt_Work` a >= 2,5 studs de outros donos; os prompts de cozinha antigos
+não ficam clicáveis com o flag desligado; `Place.diff` = 0 antes e salvar depois (`studio-hand-edits`). Risco: edição à
+mão do dono no Studio; nunca `Place.run`. Provisório: pitch -55 graus, 2,5 studs, FOV 55 (`prep-mode.md` §6).
+
+**TASK-173 (P5).** Aceite: entrar e sair 20 vezes seguidas não vaza câmera, controles nem contexto de input (câmera volta
+ao modo anterior, `InputController` volta ao contexto anterior, prompts do mundo voltam); sair em 0,30 s (0,4 s na saída
+forçada); "reduced motion" = viagem instantânea; DOF só em qualidade > 3; `AddGate(name, fn)` suporta 2 gates ao mesmo
+tempo (tutorial + Prep) sem quebrar o `SetGate`; `Stages/*` descobertos sem editar o `init`. Risco: modos de câmera
+(Cutscene, Spectate, Fixed, External): `Prep` é exclusivo e toda saída forçada vem antes de trocar de modo. Aguardar o
+commit da sessão de cutscene que já alterou `CameraController`.
+
+**TASK-174 / TASK-175 (P6).** Aceite (cada uma): alvos >= 44 px; texto >= 14 px (o número de 11 px da sanidade compacta não vale
+aqui); sem vermelho; 667x375 sem sobreposição e respeitando `DeviceSafeInsets`; uma story por componente no UI Labs
+(estados vazio, cheio, desabilitado); `derive`/`effect`/`source` só dentro de root; sem rede nos componentes; placeholder em
+Frames Mustard/Cream/Ink (sem imagens: ícones vêm da 189). `StrokeCanvas` reaproveita <= 64 pontos. Risco: falta de sprites
+(`Icon = ""`, Q-152). Provisório: rótulos em inglês das abas (DEC-022).
+
+**TASK-176 (P7a).** Aceite: cada gesto devolve medida 0 a 100 igual à da `Grade` para 10 entradas sintéticas por gesto
+(teste de tabela); amostragem 30 Hz e mínimo de pontos de `Gestures`; `Assist` aumenta a tolerância em 30% (diferença
+medida); modo "segurar" no lugar de arrastar disponível para toque; cursor deslocado 28 px acima do dedo; gamepad com
+stick esquerdo + A + B. Provisório: `Gestures` mínimos.
+
+**TASK-177 / TASK-178 / TASK-179 (P7b a d).** Aceite combinado: jogador hábil faz o prato (K = 2) em 9 a 12 s e o
+iniciante em até 18 s (cronômetro em `/dev prep`); todo resumo gerado passa a validação da 170 (0 recusas em 20 pratos
+legítimos); Order: Take e fixar usam o mesmo caminho do `CustomerService`; Grill: salsicha cozinha com o jogador em outra
+aba; Build: ordem de toppings livre, até 3, sem repetir, lixeira descarta e perde pão e salsicha; Serve: o cartão que
+combina vem destacado e o resultado Completo/Incompleto/Errado do servidor aparece no selo; Perfect/Good/Messy com ícone e
+texto (sem vermelho); `PrepFinish` recusado mostra aviso e mantém o prato no cliente (`Parked`). Aceite em Play exige a
+172. Risco: ritmo (foco 12 a 18 s contra 8 a 10 s do modo antigo); medir antes de afinar.
+
+**TASK-180 (P8).** Aceite: com 4 clientes de teste (Team Test) cada um vê os outros 3 com `StationTag` correta (nome e aba);
+entrar tarde mostra o estado atual; chip de conflito quando 2 fixam o mesmo ticket (sem travar); `Working` aparece e some
+com a saída; clipe `work` cai no idle até o usuário animar. Provisório: sem clipe novo (DEC-220).
+
+**TASK-181 (P9a).** Aceite: sinal de anomalia expulsa o jogador do foco em até 0,4 s (log de servidor com timestamp);
+mudança de faixa de sanidade, `Down`, cutscene/ligação do chefe, `Summary`/`Closing` e ladrão `Approaching`/`Opening` também
+expulsam, cada um com `Kick` de motivo próprio; reentrada travada só durante `Signal` + `CueLock` (6 s); `AnomalyService.Cued`
+e `HasLive` documentados em `Api.luau` sem tocar nos arquivos `ANM-*`; `/dev prep` cobre entrar, sair, expulsar e `Parked`.
+Risco: `AnomalyService/Api.luau` é ponto de conflito (130 → 181). Provisório: `CueLock` 6 s, Q-221 A ("até resolver" prenderia
+o jogador fora da cozinha).
+
+**TASK-182 (P9b).** Aceite: ao ver o sinal o client sai sozinho (apresentação) e o servidor confirma; tremor curto e 0,5 s
+sem input; aviso do motivo do `Kick` em um toast no rodapé; `HudOrder` some em foco e volta ao sair; dinheiro, dia, relógio,
+sanidade e avisos ficam visíveis; "ver" -5 conta depois da saída. Provisório: `HudReveal` (Q do HUD progressivo).
+
+**TASK-183 (P10a).** Aceite: `script.md` §3 com os passos do tutorial em estações (Work, Grill, Bun, Build, Next, Serve)
+com falas curtas, uma por frase, sem a palavra "sausage" e sem número de telefone nas falas de voz TTS (`frank`); `ui-text.md`
+com abas, selos, recusas (uma por motivo de `PrepResult.Reason`) e `Kick`; "cart" trocado por "trailer" nas falas do tutorial;
+texto em inglês na UI; lista de chaves de `Notices` entregue ao architect antes de a 168 fechar. Provisório: Day 1 ensina o
+focado (DEC-223, Provisório).
+
+**TASK-184 (P10b).** Aceite: um rookie completa o primeiro hot dog no foco guiado em <= 90 s sem ajuda externa (3 testes
+de tela); `PrepCoach` pulsa o alvo certo em cada passo (sem seta fixa no mundo); pulável e sem salvar (Q-193); `prep_work`
+só aparece no passo certo; nenhum prompt do mundo piscando durante o foco. Provisório: texto da 183.
+
+**TASK-185 e TASK-186 (áudio).** 185: cada SFX com id `SFX-###` (a partir de 217), descrição, duração, loop sim/não, tier,
+volume relativo e referência de timbre; cobre sizzle, virar, corte, encaixe, esguicho, polvilhar, bacon, queijo, selos,
+aba, ticket, lixeira, saída forçada (mínimo 14 linhas); nada de som com marca. 186: nenhuma chave `prep_*` sem id (som
+ausente é silêncio, não erro); ids com licença registrada em `docs/art/credits.md`; `NotEnoughQuota` não piora (medido 60 s de
+Play: <= baseline de 6 a 8 linhas, pedido 15 do dia). Bloqueada pelo upload (Q-168): o jogo funciona sem som, nada espera por isso.
+
+**TASK-187 a TASK-189 (arte 2D).** 187: uma ficha por grupo (ingredientes crus/estágios, complementos, ticket/prato/selos,
+abas, cursor) com tamanho (<= 128 px nos ícones, 256 px nos pratos), estilo toy low-poly/Mustard/Cream/Ink, sem vermelho de
+alerta, limite de orçamento do `style-guide.md`. 188: PNGs com fundo transparente, nomes `AST-###_<nome>.png`, ids
+registrados; asset de pack só com licença em `credits.md`. 189: nenhum componente `Prep*` com `Icon = ""`; story sem
+imagem quebrada; fallback de Frame se o id falhar. O jogo roda inteiro com placeholders (risco de `prep-mode.md` §9): 188
+e 189 nunca bloqueiam as ondas de código.
+
+**TASK-190.** Aceite: casos por TASK (167 a 186) com passos, resultado esperado e prioridade; matriz de plataforma (desktop,
+toque, gamepad) x jogadores (1 a 4) x período (dia, noite); casos de abuso (resumo forjado, pacotes em rajada, 2 jogadores
+no mesmo assento); caso de rollback do flag; lacunas `L-###` listadas.
+
+**TASK-191.** Aceite: tabela de simulação (solo e 4p) com `Left`/`Slow` por dia comparando o modo antigo (baseline de 8 a 10 s)
+e o novo (9 a 18 s); números finais propostos para `Grades`, `Tolerances` e `Rules` (`Provisório`, `Precisa decidir? = Não`
+na tabela do dia, salvo o que mexe em dinheiro); margem de gorjeta Perfect <= +14% do ticket médio (FEAT-039); upgrades
+com teto x1,25. Risco: fila de 14 s com 1 jogador: validar que Order e Serve permitem atender sem sair.
+
+**TASK-192 (P11a).** Aceite: métricas do §9 dentro do alvo (p90 de prato <= 18 s no Day 3, abandono do foco < 15%, `Left`+`Slow`
+no máximo +10 pontos percentuais sobre o baseline do modo antigo); 0 vazamentos de câmera/controle em 50 entradas e saídas;
+0 pedidos de resumo aceitos fora das regras do §3 em 30 casos de abuso; flag `WorldKitchenPrompts = true` restaura o fluxo
+antigo (rollback verificado); cada falha vira task de correção com `Falhou QA`.
+
+**TASK-193 (P11b).** Aceite: em 667x375 e 844x390, 0 elementos fora da área segura e 0 alvos < 44 px; completa um dia
+inteiro só com toque e Assist; gamepad completa um prato sem mouse; rede <= 1 pacote/s por jogador em média (log de servidor)
+e <= 6/s no pico; `PrepSeats` <= 4 registros; DOF ausente em qualidade <= 3; frame médio no foco >= 30 fps no emulador de
+celular fraco e sem aumento de memória após 20 entradas e saídas (`/dev` ou `Stats`).
+
+---
+
 ## Próximas paralelizáveis
 
 O que pode começar **agora** (v2.0), por agente:
@@ -447,6 +652,22 @@ O que pode começar **agora** (v2.0), por agente:
 | modeler-3d | TASK-084 → TASK-099 (088–093 e 124–126 esperam DEC) |
 | qa-tester | TASK-094 → TASK-127 (TASK-041 da onda 1 continua em andamento) |
 | game-designer · narrative-writer | TASK-081 · TASK-082 (parte nos docs já; tabelas depois da 047) |
+
+**Modo de preparo focado e trailer único (v2.2, TASK-166 a 193).** Por agente, em ondas (cada onda abre quando a anterior
+fecha; dentro dela tudo é paralelo, arquivos distintos):
+
+| Onda | architect | backend-coder | frontend-coder | level / modeler | outros |
+|---|---|---|---|---|---|
+| **A (agora)** | **167** (P0a) | — | — | 166 em andamento (outro agente) | narrative **183** · art-director **185**, **187** · qa **190** |
+| **B (167 fecha)** | **168** (P0b; só depois da 133 e, nas tabelas, da 166 `Em QA`) | — | **174**, **175** (2 sessões) | modeler **188** quando as fichas da 187 forem aprovadas (DEC) | game-designer **191** |
+| **C (168 fecha)** | — | **169**, **170**, **171** (3 sessões) | **173** (depois do commit da sessão de cutscene na câmera) | level **172** (depois da 166 `Em QA`) | — |
+| **D (169, 170, 171, 173)** | — | **181** (depois da 130 `Em QA`) | **176**, **177**, **179**, **180**; **178** (depois da 176) | — | — |
+| **E** | — | — | **182**, **184** (183 e 177 a 179), **189** (188), **186** (upload, Q-168) | — | — |
+| **F** | — | — | — | — | qa **192** e **193** (2 sessões) |
+
+**Caminho crítico do preparo focado:** 167 → 168 → 173 → 176 → 178 → 184 → 192 (7 etapas; 170 e 172 entram em paralelo e
+precisam estar prontas antes do aceite em Play da 178). Em paralelo e fora do caminho: 166, 183, 185 a 189, 190, 191 (nada
+disso bloqueia o código; o jogo roda com placeholders). Sessões de Studio: só uma por vez (166 → 172).
 
 ### Ordem recomendada — ondas 2 e 3 (etapas)
 

@@ -1,7 +1,7 @@
 --!strict
 -- PadTag is a BillboardGui, so it is previewed in the 3D viewport: a temporary pad 14 studs in front of the Studio camera
--- (removed when the story closes). "State" / "Count" / "Max" / "Status" drive the plate; move the camera away to check
--- it from 60+ studs.
+-- (removed when the story closes). "State" / "Count" / "Max" / "Status" / "Leader" / "Badge" drive the sign; change
+-- Count or State to see the pill pop; "Shown" fades the sign in and out; move the camera away to check it from 60+ studs.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -16,17 +16,21 @@ type Controls = {
 	Count: () -> number,
 	Max: () -> number,
 	Status: () -> string,
-	Title: () -> string,
+	Leader: () -> string,
+	Badge: () -> string,
+	Shown: () -> boolean,
 }
 
 return UILabs.CreateVideStory({
 	vide = Vide,
 	controls = {
-		State = UILabs.Choose({ "Open", "Busy", "Full", "Starting" }),
-		Count = UILabs.Slider(0, 0, 4, 1),
-		Max = UILabs.Slider(4, 1, 4, 1),
-		Status = "OPEN",
-		Title = "SQUAD 1",
+		State = UILabs.Choose({ "Free", "Configuring", "Open", "Closed", "Starting" }),
+		Count = UILabs.Slider(1, 0, 4, 1),
+		Max = UILabs.Slider(2, 0, 4, 1),
+		Status = "FULL",
+		Leader = "Ana the Long-Named",
+		Badge = "D1",
+		Shown = true,
 	},
 }, function(props)
 	-- UI Labs types the control sources loosely; pin them to what the story reads.
@@ -46,17 +50,16 @@ return UILabs.CreateVideStory({
 
 	const billboard = PadTag({
 		Adornee = anchor,
-		Visible = function()
-			return true
-		end,
-		Title = controls.Title(),
+		Visible = controls.Shown,
+		Badge = controls.Badge(),
+		Leader = controls.Leader,
 		Count = controls.Count,
 		Max = controls.Max,
 		State = function(): PadTag.State
 			return controls.State() :: PadTag.State
 		end,
 		Status = controls.Status,
-		Offset = Vector3.new(0, 7, 0),
+		Offset = Vector3.new(0, 9, 0),
 	})
 	billboard.Parent = anchor
 

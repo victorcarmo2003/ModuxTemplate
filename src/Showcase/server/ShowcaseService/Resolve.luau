@@ -115,7 +115,7 @@ local function shutterOrLeave(env: Env, ref: string): string
 	if not env.Teleport(env.Player, "SS") then
 		error("no window in this vehicle and no SS point to leave the zone", 0)
 	end
-	return "cart has no window: left the trailer zone for the Mart (SS)"
+	return "no window to close: left the trailer zone for the Mart (SS)"
 end
 
 correct["ANM-008"] = function(env: Env): string

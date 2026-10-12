@@ -9,6 +9,12 @@ Lacunas: ver `Q-###` citadas em cada seção (`docs/open-questions.md`).
 
 ---
 
+> **Decisões do dono de 2026-10-12 (DEC-223, DEC-224, DEC-225), a ler antes do resto deste documento:**
+> - **DEC-224:** o **Food Trailer é o veículo único desde o Day 1**; o **carrinho saiu** da run; **sem compra do trailer** (sem preço $300 × party, sem "5º dia", sem placa FOR SALE, sem troca de veículo). Onde este documento diz "carrinho", "comprar o trailer", "trailer a partir do 5º dia", "modo dia infinito" ou "§12 upgrade ou trailer?", vale o histórico marcado: lê-se **trailer desde o início** (o modo dia infinito já saiu por `Q-207`). A motivação 2 do §2 ("comprar o trailer") deixa de ser meta; a ficção segue: o chefe liga e pede o **turno da noite**.
+> - **DEC-223:** o preparo do hot dog vira o **modo de preparo focado (FEAT-039, V1)**, 100% focado, com abas de estação; substitui o preparo por prompts no mundo.
+> - **DEC-225:** a cutscene de abertura é **curta** e começa na calçada em frente ao trailer, sem carros.
+> Nada disto torna o documento **Aprovado**.
+
 ## 1. Pitch
 
 **Sell Hotdogs!** — jogo de Roblox de progressão e gerenciamento de um negócio de hot dogs que vira, aos poucos, uma experiência de anomalias e terror. (§1)

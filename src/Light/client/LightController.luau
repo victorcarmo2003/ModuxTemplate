@@ -16,6 +16,8 @@
 	    light shows its Pool_Decal (On_Fake, AST-036) when lit.
 	  * Lighting preset (Content.LightPresets, warm pass 2026-10-11): lobby servers = Lobby (fixed night clock); game =
 	    day locked with ClockTime following the clock, golden hour 4 -> 6 PM; night interpolated Night 1 -> Night 10.
+	    While a cutscene with a Look plays (attribute CutsceneLook of the local player, set by CutsceneController) the
+	    day preset is replaced by Content.LightPresets.Cinematic (owner request 2026-10-12) and comes back after it.
 	    Changes blend (smoothstep) over BLEND_TIME; the first write happens in OnStart, without blend.
 
 	Fixtures (binding, MAP-01 §16):
@@ -37,6 +39,7 @@
 ]]
 local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Workspace = game:GetService("Workspace")
@@ -134,6 +137,9 @@ const GOLDEN: Preset = PRESETS.Golden
 const NIGHT_1: Preset = PRESETS.Night1
 const NIGHT_10: Preset = PRESETS.Night10
 const LOBBY: Preset = PRESETS.Lobby
+const CINEMATIC: Preset = PRESETS.Cinematic
+-- attribute of the local player CutsceneController sets while a scene with a Look plays (Content.Cutscenes[].Look)
+const LOOK_ATTRIBUTE = "CutsceneLook"
 
 local function lerp(a: number, b: number, t: number): number
 	return a + (b - a) * t
@@ -572,7 +578,17 @@ end
 
 -- Lighting preset ------------------------------------------------------------------------------------------------
 
+-- Cutscene look on top of the day: the scene's own preset instead of the day one (same clock), blended like any change
 function LightController:Target(): (Preset, number, string)
+	const preset, clock, mode = self:BaseTarget()
+	const look = Players.LocalPlayer:GetAttribute(LOOK_ATTRIBUTE)
+	if look == "Cinematic" and mode == "day" then
+		return CINEMATIC, clock, `look:{look}`
+	end
+	return preset, clock, mode
+end
+
+function LightController:BaseTarget(): (Preset, number, string)
 	if self.Dependencies.PlaceController:Is("Lobby") then
 		return LOBBY, LOBBY_CLOCK, "lobby"
 	end

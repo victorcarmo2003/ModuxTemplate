@@ -9,6 +9,7 @@ Autor: level-designer. Versão 1: 2026-10-08. **Revisão 2 (2026-10-08): concili
 **Binding da onda 3 (2026-10-10, TASK-098): esconderijos H1..H4 com `Slot` e `Hide_Pose` (§7.2); passantes com 7 caminhos de calçada e 17 nós novos (§9.3, `Content.WalkPaths`); `CutsceneMark1..4` e `CS-5W`/`CS-5E` (§11.1); AN/AS/WALKER-10/SS como pontos (§10.3); trânsito com `TrafficPath`/`TrafficLine`/`TrafficBox` (§9.5); §16.5–§16.6; P46–P50. Provisório.**
 **Spawn e despawn (2026-10-10, level-designer, pedido do usuário; tudo Provisório):** regra "NPC nunca aparece nem some à vista" com pontos novos/movidos e contrato `Spawn`/`Despawn`/`SpawnKind`/`Door` (§9.8, `Content.Flow.Spawns`, `Content.WalkPaths`); **5 postes na Juniper** (JL-01..05 a cada 16, passos 0–4 + WALKER-10, §5.6); peças de balcão sem visual; ajudantes travados no Studio; `AutoDoor` nas portas; ângulo da aba recalculado (§16.8; P52–P59).
 **DEC-221 (2026-10-10, architect a pedido do orquestrador):** esconderijos `H1..H4` (AST-041) **saem**; entra o botão da janela de serviço `TRL-SHUTTER` (`Prompt_Shutter` → `shutter_toggle`) ao lado de `TRL-SWITCH` e a aba `Awning` do AST-027 como peça animável (§7.2, §16.2, §16.5, §16.6, P51). Provisório.
+**DEC-224 e DEC-225 (2026-10-12, secretário a pedido do orquestrador; dono decidiu; Provisório nos detalhes):** (1) **o carrinho saiu da run**: o **trailer é o veículo único desde o Day 1**, posicionado no Pad (`TRL`) com **4 mesas** (TBL-6..9) e **varais de luz presos a ele**. **Obsoletos (não apagar; level-designer limpa na próxima revisão):** `CART`, `TRL-SALE`, `SIGN-T` ("Available on Day 5"), `Prompt_Buy`/`buy_trailer`, o Pad do carrinho (`Pad.CART`, `PadDecor` do carrinho, `PadHideController`), a vaga do estacionamento com o trailer à venda (Z-05) e a **lona** do carrinho (AST-043, `VehicleCover`, L01-18), `Q-082`, P2, P41. **Reapontar para o trailer:** fila Q1..Q5 (relativa à janela do trailer), `DRAWER`/`TRL-DRAWER`, `OPEN`, `BIN-C`, `answer_phone`, spawn `PS-1..4` (dia) × `PS-N1..4` (hoje só noite), poses e âncoras de prompts; tudo que dizia "carrinho" nos critérios de §17 e nas linhas de visão vira "trailer". (2) **Abertura curta (DEC-225):** começa na **calçada em frente ao Pad** e termina no poste `P-01`; os planos CS-1..CS-4 (rua Ninth, vitrines, CW-2, carro roteirizado) **saem** (§11.1). (3) **Modo de preparo focado (DEC-223):** a tábua do trailer ganha **4 pontos de foco `Focus_n`**, um por jogador (§7.2, a fazer pelo level-designer).
 Nomes de lugares vêm de `story/world.md` (`Q-096`): cidade **Bellmoor**, esquina **Ninth & Juniper**, **Ninth Avenue**, **Juniper Street**, **Ninth Street Mart**, **Bellmoor Savings**. O nome do mapa, a lavanderia, B1 e B4 seguem placeholders para o narrative-writer (DEC-022: textos do jogo em inglês).
 Números de gameplay citados são valores iniciais ajustáveis (DEC-044). Medidas de mapa são **proposta do level-designer**; o que tem `[DEC-###]` é requisito decidido. `Provisório` = recomendação do level-designer que depende de pergunta aberta.
 Anomalias: `ANM-001`…`ANM-010` = N1…N10 (DEC-096).
@@ -178,10 +179,10 @@ Três linhas que organizam o mapa:
 
 | ID | O quê | Posição (X, Z) | Observação |
 |---|---|---|---|
-| CART | Carrinho do chefe (centro) | (41, 40) | linha de estações X 28..54, Z 36..39; corredor de trabalho Z 39..45 |
-| TRL | Food Trailer no Pad (centro) | (40, 41) | casco X 26..54, Z 35..47; piso +2 studs; engate a oeste até X 22. Trabalha aqui [DEC-086] |
-| TRL-SALE | Trailer à venda (dias 1–5) | (78, −58) | janela de serviço virada para o sul; visível do carrinho [DEC-047]. Depois da troca: carrinho com lona nesta vaga (`Q-082`) |
-| SIGN-T | Placa "Available on Day 5" | (78, −40) | só leitura; o prompt de compra fica no trailer [DEC-047] |
+| ~~CART~~ | ~~Carrinho do chefe (centro)~~ **OBSOLETO (DEC-224)** | (41, 40) | ~~linha de estações X 28..54, Z 36..39; corredor de trabalho Z 39..45~~ (o trailer ocupa a mesma área, `TRL`) |
+| TRL | Food Trailer no Pad (centro) | (40, 41) | casco X 26..54, Z 35..47; piso +2 studs; engate a oeste até X 22. **Veículo único desde o Day 1 (DEC-224)**, com as 4 mesas TBL-6..9 e os varais de luz presos a ele. Antes: "trabalha aqui [DEC-086]" |
+| ~~TRL-SALE~~ | ~~Trailer à venda (dias 1–5)~~ **OBSOLETO (DEC-224)** | (78, −58) | ~~janela virada para o sul; carrinho com lona nesta vaga (`Q-082`)~~ |
+| ~~SIGN-T~~ | ~~Placa "Available on Day 5"~~ **OBSOLETO (DEC-224)** | (78, −40) | ~~só leitura; prompt de compra no trailer [DEC-047]~~ (placa FOR SALE e `Prompt_Buy` saem) |
 | DRAWER | Gaveta do caixa | (52, 37) | fim da linha (entrega). Valor visível no mundo [DEC-050] |
 | Q1 | Vaga 1 (balcão) | (52, 33) | na frente da entrega/gaveta; ~7 studs do jogador na entrega (raio de Take Order / Serve = 10); a 3,0 da face do balcão do carrinho (Z 36); não chega mais perto porque o balcão dobrável do trailer ocupa Z 33,5..34,5 |
 | Q2–Q5 | Vagas 2 a 5 | (49,8, 31,5) · (47,6, 31,5) · (45,4, 31,5) · (43,2, 31,5) | **2026-10-12 (playtest do dono: clientes longe demais do prompt; Provisório)**: eram (46, 29) · (41, 29) · (36, 29) · (31, 29), 5 studs entre vagas, 11–16 do balcão. Agora 2,2 studs entre vagas, na borda do Pad (Z 31,5, calçada), a ~8–10,6 de quem está na entrega. Só o cliente de Q1 tem prompt (`OnFronted`). Patch vivo: `tools/assetplace/fix_queue_points.luau`. Fila corre para oeste. Counter 1 = Q1–Q3; Counter 2 = +Q4; Counter 3 = +Q5 [DEC-046] |
@@ -190,6 +191,8 @@ Três linhas que organizam o mapa:
 | PS-1..4 | Spawn dos jogadores (dia) | (32, 42) · (38, 42) · (44, 42) · (50, 42) | olhando para o norte. Também reconexão [DEC-063] e membro atrasado [DEC-098] |
 | PS-N1..4 | Spawn dos jogadores (noite) | (32, 41) · (38, 41) · (44, 41) · (50, 41) | dentro do trailer. Também reconexão e atrasado à noite |
 | DROP-T | Itens do espectador (FEAT-025, §19.12 do `architecture.md`) | (51.5, 44.5), piso do trailer (+2) | **novo (TASK-083)**. Canto de trás à direita, ao lado da porta dos fundos, dentro de LZ-1: os pacotes e o apito de quem virou espectador caem aqui às 6:00 AM. Fora da linha de estações (nenhum prompt de estação a < 5 studs) e visível de quem entra pela porta. Provisório |
+
+> **OBSOLETO (DEC-224):** o parágrafo seguinte e o "Pad vazio com o trailer" (`Q-216`) descrevem a troca carrinho → trailer. Com o trailer único não há troca nem Pad "vazio". Fica a regra: trailer em `TRL` desde o início. Histórico:
 
 Poses dos veículos (`MapPoint`, T36): `CART` = pivô do carrinho **(41, 37.5)** (o "centro (41, 40)" da tabela é o visual; o código usa o pivô do modelo, base-centro do AST-026), `TRL` = pivô do trailer no Pad (40, 41), virado para o norte; `TRL-SALE` = (78, −58), virado para o sul. O `VehicleService` faz `PivotTo` do modelo para o ponto: carrinho em `CART` e trailer em `TRL-SALE` no começo da run; depois da troca, trailer em `TRL` e carrinho (com a lona) em `TRL-SALE`. `SIGN-T` também vira `MapPoint` (78, −40), virado para o sul: é onde o `VehicleController` desenha "Available on Day 5" (§16.3).
 
@@ -827,6 +830,8 @@ POV em 1ª pessoa; em party, cena **compartilhada**: cada jogador vê pela próp
 
 ### 11.1 Abertura (~35–45 s)
 
+> **DEC-225 (2026-10-12, dono; Provisório nos detalhes): abertura curta, começa na calçada do trailer.** Fade in na calçada **em frente ao Pad**, ponta **direita** (perto da planta); a party caminha **para a esquerda** até o poste do cartaz HELP WANTED (`P-01`, slots CS-P1..P4); lê, liga (Walt), vira para o **trailer** no Pad (`TRL`), fade → Day 1, 7:00 AM. **Saem** CS-1, CS-2, CS-3, CS-4 e `CS-5W`/`CS-5E` (a party já começa do lado do poste), o ônibus, os pombos, a mariposa, as vitrines, a travessia e **qualquer carro** (susto e foco nos carros). Duração-alvo ≤ 35 s. Os pontos novos de partida (calçada do Pad, `CutsceneMark1..4`) são do level-designer. A tabela abaixo é **histórico** onde conflita. Dúvida sobre DEC-088/DEC-097 (POV): `Q-226`.
+
 Formação: 2 × 2 (colunas a ±2 studs do eixo, fileiras a 3 studs). Solo: no eixo.
 
 | Ponto | Posição | Beat (`script.md` §1) |
@@ -846,7 +851,7 @@ Formação: 2 × 2 (colunas a ±2 studs do eixo, fileiras a 3 studs). Solo: no e
 
 ### 11.2 Outros momentos de câmera
 
-- **Troca carrinho → trailer** (DEC-047): fade; plano do trailer já no Pad (C-01 marcando 6 PM) + ligação.
+- ~~**Troca carrinho → trailer** (DEC-047): fade; plano do trailer já no Pad (C-01 marcando 6 PM) + ligação.~~ **OBSOLETO (DEC-224):** não há troca de veículo nem cena de compra.
 - **Noite perdida** (DEC-053, emendada por DEC-122): luzes piscam e apagam → tela escura → **todos acordam em pé na calçada ao lado do trailer** (REV-1..4, virados para o Pad), enquanto a ambulância sai de AMB-P com a sirene desligada → ligação do chefe → noite repetida (§9.6). O banco do fundo não entra na cena.
 - **Queda e espectador** (DEC-091, DEC-093): SPEC-P / SPEC-M (§5.5).
 

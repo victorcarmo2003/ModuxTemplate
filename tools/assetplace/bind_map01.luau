@@ -322,14 +322,16 @@ local POINTS = {
 	{ id = "JN-OUT", x = 6, z = -140, floor = 0, face = NORTH },
 	{ id = "JS-IN", x = 6, z = 116, floor = 0, face = NORTH },
 	{ id = "JS-OUT", x = -6, z = 116, floor = 0, face = SOUTH },
-	-- opening cutscene (MAP-01 §11.1). Marks = 2 x 2 around CS-1 (columns +-2 of the axis, rows 3 apart), facing east
-	{ id = "CutsceneMark1", x = -100, z = -26, floor = 0.4, face = EAST },
-	{ id = "CutsceneMark2", x = -100, z = -22, floor = 0.4, face = EAST },
-	{ id = "CutsceneMark3", x = -103, z = -26, floor = 0.4, face = EAST },
-	{ id = "CutsceneMark4", x = -103, z = -22, floor = 0.4, face = EAST },
-	{ id = "CS-1", x = -100, z = -24, floor = 0.4, face = EAST },
-	{ id = "CS-2", x = -60, z = -24, floor = 0.4, face = EAST },
-	{ id = "CS-3", x = -18, z = -22, floor = 0.4, face = SOUTH }, -- NW corner; CS-3 -> CS-4 runs inside CW-2
+	-- opening cutscene (owner decision D3 2026-10-12; keep in step with tools/assetplace/cutscene_points.luau, world
+	-- coordinates there): it walks along the Ninth's south sidewalk in front of the trailer's Pad, from the planter at its
+	-- right end to the P-01 flyer, facing MAP west (world +X). Marks = 2 x 2 around CS-1, rows 4 apart.
+	{ id = "CutsceneMark1", x = 68, z = 22.887, floor = 0.4, face = WEST },
+	{ id = "CutsceneMark2", x = 68, z = 26.887, floor = 0.4, face = WEST },
+	{ id = "CutsceneMark3", x = 71, z = 22.887, floor = 0.4, face = WEST },
+	{ id = "CutsceneMark4", x = 71, z = 26.887, floor = 0.4, face = WEST },
+	{ id = "CS-1", x = 68, z = 24.887, floor = 0.4, face = WEST },
+	{ id = "CS-2", x = 42, z = 24.887, floor = 0.4, face = WEST },
+	{ id = "CS-3", x = 24, z = 24.887, floor = 0.4, face = WEST }, -- the only waypoint, before the stand at the flyer
 	{ id = "CS-4", x = -18, z = 22, floor = 0.4, face = SOUTH }, -- SW corner after CW-2
 	{ id = "CS-5", x = 0, z = 38, floor = 0, face = EAST }, -- middle of CW-1
 	-- proposal (MAP-01 P46): curb marks so every MoveTo segment stays on the sidewalk or inside the stripes

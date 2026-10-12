@@ -68,7 +68,6 @@ return Table.new({
 	-- service window actions from FEAT-021/FEAT-023 (A7, architecture.md §19.26). Every wave 2-3 row is here already, so the
 	-- wave 3 content task does not reopen this file.
 	{ Key = "bench_buy_item", Text = "Buy {item} — ${price}", Hold = 1.5, Radius = 7, Requires = {}, Night = "Any", Wave = 4 },
-	{ Key = "buy_trailer", Text = "Buy Trailer — ${price}", Hold = 2, Radius = 10, Requires = {}, Night = "DayOnly", Wave = 2 },
 	-- "Take Coffee" when the machine is Ready (PromptText from CoffeeMachine.luau, architecture.md §19.8)
 	{ Key = "brew_coffee", Text = "Brew Coffee", Hold = 1, Radius = 7, Requires = {}, Night = "Any", Wave = 2 },
 	-- on the Prompt_Give anchor of a crew mate's HRP (CharacterService); the owner never targets its own
@@ -82,7 +81,7 @@ return Table.new({
 		Wave = 2,
 	},
 	{ Key = "switch_light", Text = "Lights", Hold = 0, Radius = 7, Requires = {}, Night = "Any", Wave = 2 },
-	-- Prompt_Answer on the cart and trailer phones (FEAT-018, DEC-124)
+	-- Prompt_Answer on the trailer phone (FEAT-018, DEC-124)
 	{ Key = "answer_phone", Text = "Answer", Hold = 0, Radius = 7, Requires = {}, Night = "Any", Wave = 2 },
 	-- the safe spot is a zone, not a prompt: the key exists for the enum only (content-data.md §6.9)
 	{ Key = "safe_spot", Text = "Safe Spot", Hold = 0, Radius = 7, Requires = {}, Night = "NightOnly", Wave = 3 },
@@ -103,4 +102,8 @@ return Table.new({
 	-- Order at the table (Q-209, Provisional): the customer sat after "Take Order"; the prompt sits on the table
 	-- (ServeAnchor, SeatingService) and its PromptText names the table and the order ("Serve Table 2: Ketchup + Cheese").
 	{ Key = "serve_table", Text = "Serve Table", Hold = 0, Radius = 8, Requires = {}, Night = "Any", Wave = 3 },
+
+	-- Focused prep mode (DEC-223; prep-mode.md §2): Prompt_Work on each Station_n of the trailer; owner PrepService.
+	-- Tap, selling phases only; the server revalidates seat, phase and the other station of the player.
+	{ Key = "prep_work", Text = "Work", Hold = 0, Radius = 5, Requires = { Phase = { "Open", "Night" } }, Night = "Any", Wave = 3 },
 } :: { Action })

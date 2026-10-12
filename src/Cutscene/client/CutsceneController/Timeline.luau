@@ -101,13 +101,13 @@ function Timeline.Line(beats: { Beat }, elapsed: number, hold: number): Beat?
 	return if elapsed < ends then last else nil
 end
 
--- Title on screen: `hold` seconds; a "Credits" title stays until the next Fade beat (or the end of the scene)
+-- Title on screen: the beat's Hold or `hold` seconds; a "Credits" title stays until the next Fade beat (or the end of the scene)
 function Timeline.Title(beats: { Beat }, elapsed: number, hold: number, duration: number): Beat?
 	const last, index = Timeline.Last(beats, "Text", elapsed)
 	if last == nil then
 		return nil
 	end
-	local ends = last.At + hold
+	local ends = last.At + (last.Hold or hold)
 	if last.Target == "Credits" then
 		const fade = Timeline.Next(beats, "Fade", index)
 		ends = if fade ~= nil then fade.At else duration

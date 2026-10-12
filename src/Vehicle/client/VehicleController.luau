@@ -3,22 +3,11 @@
 	VehicleController (TASK-058; FEAT-016, FEAT-017; DEC-047, DEC-086, DEC-199; architecture.md §19.5 "Client", T58;
 	network.md §13.1 `Transition`; ui-text.md §13)
 
-	Presentation of the vehicle swap, nothing else:
-	  * Sale sign at the `SIGN-T` MapPoint (MAP-01 §5.1, P40): "Available after Night N" before the offer (Content.Trailer.OfferAfterNight),
-	    "FOR SALE" from then until the purchase, gone after it (the billboard and, locally, the AST-024 sign model).
-	  * Fade of the `Transition { Kind = "VehicleSwap" }` packet: 1.5 s black cover timed from the server StartedAt, for
-	    everyone in the group (the server pivots the vehicles under it).
-	  * Tarp (`VehicleCover`, AST-043): nothing here. VehicleService toggles its visibility (T38) and it replicates as
-	    an instance; the drawer value of the parked cart is hidden by EconomyController (current vehicle only).
+	Presentation of the vehicle, nothing else. 2026-10-12 (user decision, Provisional): the Food Trailer is the only vehicle,
+	so the FOR SALE sign, the swap fade, the trailer purchase latch and the offer camera focus left this file; what stays
+	is the short cover of the trailer door (Transition "TrailerDoor", TrailerDoorService) and the service window flap.
 
-	No state of its own (§19.5): the vehicle in use is RoundController.Vehicle (Shift.Vehicle). The only local memory is
-	the `trailer_bought` Notice between the purchase and the swap (Shift.Vehicle still says "cart" until the next
-	shift). The sale vehicle Model also carries the `Bought` attribute (written by the VehicleService): a client that
-	(re)joins in that window reads it and hides the sign too. The last value read is kept while the Model is streamed
-	out.
-
-	The client never buys nor moves a vehicle: the prompt (`Prompt_Buy`, buy_trailer) belongs to the VehicleService and
-	PromptController, the pivots to the server.
+	No state of its own (§19.5): the vehicle in use is RoundController.Vehicle (Shift.Vehicle).
 
 	Service window (TASK-131, DEC-221, architecture.md §19.14 v4.2, network.md §13.6): the `Shutter` attribute of each
 	`Vehicle` Model with `Vehicles[v].HasShutter` (true = closed, false/absent = open) is written only by the
@@ -40,35 +29,13 @@ local StarterPlayer = game:GetService("StarterPlayer")
 local TweenService = game:GetService("TweenService")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
-local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local PromptRules = require(StarterPlayer.StarterPlayerScripts.client.Interaction.PromptController.Rules)
-local SaleSign = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.SaleSign)
 local ScreenFade = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.ScreenFade)
 
-const START_VEHICLE = Content.RunParams.StartVehicle
-const SIGN_POINT = "SIGN-T"
-const SIGN_MAP_ID = "SIGN-T" -- MapId of the AST-024 stand placed at the point (MAP-01_placements.luau)
-const BOUGHT_NOTICE = "trailer_bought"
 const VEHICLE_TAG = "Vehicle"
 const VEHICLE_ATTRIBUTE = "Vehicle"
-const BOUGHT_ATTRIBUTE = "Bought"
-const MAP_WAIT = 60 -- seconds MapIndex.WaitReady may wait for streaming
--- Billboard centre over the point when the sign model is not streamed in: AST-024 is 4 studs tall (+ half plate).
-const DEFAULT_SIGN_HEIGHT = 4.8
--- Gap between the top of the sign model and the centre of the plate (studs).
-const SIGN_GAP = 0.8
--- Short on purpose (user request 2026-10-11): the plate is a small studs-sized tag read up close at the lot, not a
--- billboard over the street; it is not drawn from the Pad (~80 studs) nor during a cinematic (SaleSign).
-const SIGN_DISTANCE = 40
--- Trailer offer call (Transition TrailerFocus, user request 2026-10-11, Provisional): the camera looks at the sign for
--- FOCUS_TIME s (the server holds the body 3.6 s), then the objective marks (Highlight + arrows) stay on it until
--- the purchase. Arrow lift over the top of the sign model.
-const FOCUS_TIME = 3.2
-const HINT_LIFT = 0.6
-
--- Fade of the swap (T58): 1.5 s total. Short fade-in because the server pivots right after sending the packet;
--- Provisional until the VehicleService (TASK-054) fixes its own wait before PivotTo.
+-- Legacy fade of the old vehicle swap (Transition "VehicleSwap"; nobody sends it since 2026-10-12): 1.5 s total.
 const FADE_IN = 0.2
 const FADE_HOLD = 0.5
 const FADE_OUT = 0.8
@@ -104,18 +71,6 @@ type Shutter = {
 	StartedAt: number?, -- os.clock of the tween in progress; nil = at rest
 	Connections: { RBXScriptConnection },
 }
-
--- Vehicle sold in the lot: the first row with OfferAfterNight > 0 (the trailer; content-data.md §3.8)
-local function saleVehicle(): Content.Vehicle?
-	for _, vehicle in Content.Vehicles.List do
-		if vehicle.OfferAfterNight > 0 then
-			return vehicle
-		end
-	end
-	return nil
-end
-
-const SALE = saleVehicle()
 
 -- 0..1 cover at `elapsed` seconds since StartedAt
 local function fadeAlpha(elapsed: number, fadeIn: number, hold: number, out: number): number
@@ -185,14 +140,6 @@ function VehicleController:Setup()
 	self.FadeStartedAt = 0 :: number
 	self.FadeIsDoor = false :: boolean
 	self.FadeConnection = nil :: RBXScriptConnection?
-	-- `trailer_bought` seen this session and Day it arrived (cleared by the swap or a new run)
-	self.Bought = Vide.source(false) :: Vide.Source<boolean>
-	self.BoughtDay = 0 :: number
-	-- `Bought` attribute of the sale vehicle Model (VehicleService; authoritative, also for late joiners)
-	self.SaleBought = Vide.source(false) :: Vide.Source<boolean>
-	self.SaleModels = {} :: { [Instance]: RBXScriptConnection }
-	self.SignModel = nil :: Model?
-	self.SignAnchor = nil :: Attachment?
 	self.Unmounts = {} :: { () -> () }
 	-- Service window flaps by vehicle Model (TASK-131)
 	self.Shutters = {} :: { [Instance]: Shutter }
@@ -208,85 +155,14 @@ function VehicleController:WarnOnce(tag: string, message: string)
 	end
 end
 
--- Nights already finished (RoundController.Night is the night in progress on a night shift)
-function VehicleController:NightsPlayed(): number
-	const round = self.Dependencies.RoundController
-	return round.Night() - (if round.IsNight() then 1 else 0)
-end
-
--- Text of the sign by the nights played (ui-text.md §13; the offer is after Night Content.Trailer.OfferAfterNight)
-function VehicleController:SignText(nights: number): string
-	if SALE and nights < SALE.OfferAfterNight then
-		return `Available after Night {SALE.OfferAfterNight}`
-	end
-	return "FOR SALE"
-end
-
--- Shown while the run is still on the starting vehicle and nobody bought the trailer
-function VehicleController:SignVisible(): boolean
-	const round = self.Dependencies.RoundController
-	return SALE ~= nil
-		and round.Ready()
-		and round.Vehicle() == START_VEHICLE
-		and not self.Bought()
-		and not self.SaleBought()
-end
-
--- World position the focus looks at: the middle of the sign model, else the plate anchor at the SIGN-T point
-function VehicleController:SignFocusPosition(): Vector3?
-	const model = self.SignModel
-	if model ~= nil and model:IsDescendantOf(workspace) then
-		return (model:GetBoundingBox()).Position
-	end
-	const anchor = self.SignAnchor
-	if anchor ~= nil and anchor.Parent ~= nil then
-		return anchor.WorldPosition
-	end
-	return nil
-end
-
--- The day-5 call sent the party to the FOR SALE sign: short camera focus, then the objective marks stay until bought
-function VehicleController:RevealSign()
-	if not self:SignVisible() then
-		return
-	end
-	const objective = self.Dependencies.ObjectiveController
-	objective:Focus(function(): Vector3?
-		return self:SignFocusPosition()
-	end, FOCUS_TIME, nil)
-	const model = self.SignModel
-	const adornee: Instance? = if model ~= nil and model:IsDescendantOf(workspace) then model else self.SignAnchor
-	if adornee ~= nil then
-		objective:Mark(adornee, HINT_LIFT)
-	end
-end
-
--- Tagged Vehicle model: sale sign latch and service window flap
+-- Tagged Vehicle model: service window flap
 function VehicleController:WatchVehicle(model: Instance)
-	self:WatchSale(model)
 	if model:IsA("Model") then
 		self:WatchShutter(model, true)
 	end
 end
 
--- Follows the `Bought` attribute when it is the sale vehicle
-function VehicleController:WatchSale(model: Instance)
-	if SALE == nil or self.SaleModels[model] ~= nil or model:GetAttribute(VEHICLE_ATTRIBUTE) ~= SALE.Key then
-		return
-	end
-	const read = function()
-		self.SaleBought(model:GetAttribute(BOUGHT_ATTRIBUTE) == true)
-	end
-	self.SaleModels[model] = model:GetAttributeChangedSignal(BOUGHT_ATTRIBUTE):Connect(read)
-	read()
-end
-
 function VehicleController:UnwatchVehicle(model: Instance)
-	const connection = self.SaleModels[model]
-	if connection then
-		self.SaleModels[model] = nil
-		connection:Disconnect()
-	end
 	self.ShutterPending[model] = nil
 	const shutter = self.Shutters[model]
 	if shutter then
@@ -491,71 +367,9 @@ function VehicleController:StepFade()
 	self.Fade(fadeAlpha(elapsed, fadeIn, hold, out))
 end
 
-function VehicleController:OnBought()
-	self.BoughtDay = self.Dependencies.RoundController.Day()
-	self.Bought(true)
-end
-
--- AST-024 stand placed at SIGN-T: a Model with MapId "SIGN-T" outside any Vehicle (nil when not streamed in)
-local function findSignModel(): Model?
-	const root = workspace:FindFirstChild("MAP01_Assets") or workspace
-	for _, descendant in root:GetDescendants() do
-		if descendant:IsA("Model") and descendant:GetAttribute("MapId") == SIGN_MAP_ID then
-			local inside = false
-			for _, vehicle in CollectionService:GetTagged(VEHICLE_TAG) do
-				if descendant:IsDescendantOf(vehicle) then
-					inside = true
-					break
-				end
-			end
-			if not inside then
-				return descendant
-			end
-		end
-	end
-	return nil
-end
-
--- Local only: hides the physical sign after the purchase (the server keeps it; nothing replicates)
-local function setSignHidden(model: Model, hidden: boolean)
-	const modifier = if hidden then 1 else 0
-	for _, descendant in model:GetDescendants() do
-		if descendant:IsA("BasePart") then
-			descendant.LocalTransparencyModifier = modifier
-		elseif descendant:IsA("Decal") then
-			descendant.LocalTransparencyModifier = modifier
-		end
-	end
-end
-
--- Fade cover and the purchase latch: mounted at once, so a Transition right after the join still shows
+-- Fade cover: mounted at once, so a Transition right after the join still shows
 function VehicleController:MountFade(playerGui: Instance)
-	const round = self.Dependencies.RoundController
 	const unmount, gui = Vide.root(function()
-		-- The objective marks on the sign end with the purchase, the swap or a new run (Day back before the sale day)
-		Vide.effect(function()
-			const visible = self:SignVisible()
-			const nights = self:NightsPlayed()
-			Vide.untrack(function()
-				if not visible or (SALE ~= nil and nights < SALE.OfferAfterNight) then
-					self.Dependencies.ObjectiveController:Clear()
-				end
-				return nil
-			end)
-		end)
-
-		-- The swap (Vehicle leaves the start vehicle) or a new run (Day goes back) clears the purchase latch
-		Vide.effect(function()
-			const vehicle = round.Vehicle()
-			const day = round.Day()
-			Vide.untrack(function()
-				if self.Bought() and (vehicle ~= START_VEHICLE or day < self.BoughtDay) then
-					self.Bought(false)
-				end
-				return nil
-			end)
-		end)
-
 		return Vide.create("ScreenGui")({
 			Name = "VehicleFade",
 			ResetOnSpawn = false,
@@ -569,60 +383,6 @@ function VehicleController:MountFade(playerGui: Instance)
 	end)
 	table.insert(self.Unmounts, unmount)
 	gui.Parent = playerGui
-end
-
--- Sale sign: waits for the binding to stream in (Attachment in Terrain over the SIGN-T point)
-function VehicleController:MountSign(playerGui: Instance)
-	if SALE == nil then
-		warn("[VehicleController] no vehicle with OfferAfterNight > 0 in Content.Vehicles; sale sign not shown")
-		return
-	end
-	if not MapIndex.WaitReady(MAP_WAIT) then
-		warn("[VehicleController] MapBinding not streamed in; sale sign not shown")
-		return
-	end
-	const point = MapIndex.FindPoint(SIGN_POINT)
-	if point == nil then
-		warn(`[VehicleController] MapPoint {SIGN_POINT} not found (binding wave 2, MAP-01 §16); sale sign not shown`)
-		return
-	end
-
-	const model = findSignModel()
-	self.SignModel = model
-	local height = DEFAULT_SIGN_HEIGHT
-	if model then
-		const box, size = model:GetBoundingBox()
-		height = box.Position.Y + size.Y / 2 - point.Position.Y + SIGN_GAP
-	end
-	const anchor = Instance.new("Attachment")
-	anchor.Name = "VehicleSaleSign"
-	anchor.WorldPosition = point.Position + Vector3.new(0, height, 0)
-	anchor.Parent = workspace.Terrain
-	self.SignAnchor = anchor
-
-	const round = self.Dependencies.RoundController
-	const unmount, sign = Vide.root(function()
-		const visible = function(): boolean
-			return self:SignVisible()
-		end
-		const signModel = model
-		if signModel then
-			Vide.effect(function()
-				setSignHidden(signModel, not visible())
-			end)
-		end
-		return SaleSign({
-			Name = "VehicleSaleSign",
-			Adornee = anchor,
-			Visible = visible,
-			Text = function()
-				return self:SignText(self:NightsPlayed())
-			end,
-			MaxDistance = SIGN_DISTANCE,
-		})
-	end)
-	table.insert(self.Unmounts, unmount)
-	sign.Parent = playerGui
 end
 
 VehicleController:OnInit(function(self)
@@ -639,14 +399,6 @@ VehicleController:OnInit(function(self)
 			self:PlayFade(transition.StartedAt)
 		elseif transition.Kind == "TrailerDoor" then
 			self:PlayFade(transition.StartedAt, true)
-		elseif transition.Kind == "TrailerFocus" then
-			self:RevealSign()
-		end
-	end)
-
-	self.Libs.Net.Notice:onClient(function(notice)
-		if notice.Kind == BOUGHT_NOTICE then
-			self:OnBought()
 		end
 	end)
 end)
@@ -662,11 +414,10 @@ VehicleController:OnStart(function(self)
 		self:UnwatchVehicle(model)
 	end)
 
-	-- PlayerGui and the MapBinding may arrive late; do not hold up the other OnStart.
+	-- PlayerGui may arrive late; do not hold up the other OnStart.
 	task.spawn(function()
 		const playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 		self:MountFade(playerGui)
-		self:MountSign(playerGui)
 	end)
 end)
 

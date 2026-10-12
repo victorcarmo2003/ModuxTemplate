@@ -32,6 +32,13 @@ Fontes: `CLAUDE.md`, `README.md`, `docs/PIPELINE.md`, `tools/assetplace/STUDIO_L
 - Não altere o mapa fora do escopo da tarefa. Edit lighting é frio: julgue cor em Play.
 - Teste de fumaça: `/dev smoke` (`tools/studio/smoke.md`). Rode antes de entregar mudança de servidor.
 
+## 3b. Modo de preparo focado (`docs/tech/prep-mode.md`, DEC-223)
+
+- Contratos prontos (onda P0): `Content.Prep` (`src/Shared/Content/Prep.luau`: `Rules`, `Tabs`, `Steps`, `Gestures`, `Tolerances`, `Grades`, `Reasons`, `Texts`), packets `PrepEnter/Leave/Tab/Grill/Begin/Finish/Trash/Order`, `PrepResult` (privado) e o set `PrepSeats` em `Libs/Net`. Número novo de nota ou tolerância = linha nova em `Prep.luau`, nunca constante no código; topping novo exige linha em `Tolerances` (o `Validate` cobra).
+- A conta de nota vive em um lugar só: `src/Prep/shared/Grade.luau` (puro, usado pelo client para a prévia e pelo servidor para o veredito). Não reimplemente.
+- Mexeu em `Grade`, `Prep.luau` ou nas tolerâncias: rode `/dev prep grade` em Play (`tools/studio/README.md`, `run_snippet`); precisa terminar com `N/N ok`. Sem Studio, o mesmo teste roda em Luau puro (`luau.exe` do rokit, sem Roblox, trocando `const` por `local`).
+- `Prep.Rules.WorldKitchenPrompts = false` esconde os prompts de cozinha do mundo; `true` devolve o fluxo antigo (rollback sem código).
+
 ## 4. Conteúdo, voz e UI
 
 - Voz TTS: sem a palavra **"sausage"** (filtro) e **sem números de telefone**; use `frank`. Falas curtas, por frase, com pausas.

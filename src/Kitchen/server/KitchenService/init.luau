@@ -107,7 +107,9 @@ end
 local function startAmounts(): Amounts
 	const out: Amounts = {}
 	for _, row in Content.Ingredients.List do
-		const open = not blockedOn(row, 1, Content.RunParams.StartVehicle)
+		-- the coffee (a vehicle-bound ingredient) starts empty: SeedCoffee gives its first doses on Night 1 (user decision
+		-- 2026-10-12: the trailer is the start vehicle, so it is no longer blocked, but the lesson stock stays as it was)
+		const open = row.Vehicle == nil and not blockedOn(row, 1, Content.RunParams.StartVehicle)
 		out[row.Key] = if open and Content.RunParams.StartStockFull then capacityAt(row, 1) else 0
 	end
 	return table.freeze(out)
@@ -248,7 +250,7 @@ function KitchenService:SeedCoffee()
 	if self.CoffeeSeeded then
 		return
 	end
-	-- any vehicle: Night 1 can be worked in the cart (no machine there; the doses wait, blocked, for the trailer)
+	-- first night: the doses come with the first night of the run (the trailer has the machine from the start)
 	const row = Content.Ingredients.ByKey[COFFEE]
 	if row == nil then
 		return
@@ -258,7 +260,7 @@ function KitchenService:SeedCoffee()
 	self:SetAmount(COFFEE, math.max(have, math.min(Content.Sanity.CoffeeStock, capacityAt(row, 1))))
 end
 
--- Dev: sets the coffee doses (clamped to the capacity; on the cart they stay blocked until the trailer).
+-- Dev: sets the coffee doses (clamped to the capacity).
 function KitchenService:DevSetCoffee(amount: number): number
 	const capacity = self:GetCapacity(COFFEE)
 	const value = math.clamp(wholeNumber(amount, 0, AMOUNT_MAX), 0, math.max(capacity, 0))

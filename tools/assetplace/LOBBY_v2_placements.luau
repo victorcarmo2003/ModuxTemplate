@@ -256,7 +256,8 @@ return {
 	---------------------------------------------------------------------------------------------
 	-- 12. PLAZA DECOR: mast planter bush, welcome easel, bleacher benches (south-east), photo booth corner (north-east).
 	---------------------------------------------------------------------------------------------
-	{ asset = "AST-102_Bush", x = 5, y = 1.56, z = -631.05, rotY = 0, parts = { ["AST-102_Bush"] = { 0, 1.43, 0, size = { 4.633, 2.86, 4.633 } } }, group = "LobbyDecor", id = "LB-MAST-BUSH", replaces = {}, note = "on the mast planter (V2-12.9, top Y 1.2); must not hide the pole" },
+	-- REMOVED 2026-10-12 (declutter_lobby_plaza.luau, owner: central pillar blocked the plaza; moved to ServerStorage.LOBBY_Backup_20261012):
+	-- { asset = "AST-102_Bush", x = 5, y = 1.56, z = -631.05, rotY = 0, parts = { ["AST-102_Bush"] = { 0, 1.43, 0, size = { 4.633, 2.86, 4.633 } } }, group = "LobbyDecor", id = "LB-MAST-BUSH", replaces = {}, note = "on the mast planter (V2-12.9, top Y 1.2); must not hide the pole" },
 	-- removed by the user in Studio 2026-10-12: { asset = "AST-024_SignStand", x = -3, y = 0, z = -609, rotY = 0, parts = SIGN_UP, group = "LobbyDecor", id = "LB-WELCOME", replaces = {}, note = "faces the spawn (-Z): WELCOME, CREW! + 4 arrows (SurfaceGui, text P-L11); clear of the CLASSES route (X 1.3..3.5)" },
 	{ asset = "AST-034_ParkBench", x = 27.1, y = 0, z = -668.1, rotY = -180, parts = { ["Bench"] = { 0, 1.69, 0.033, size = { 6.5, 3.38, 2.08 } } }, group = "LobbyDecor", id = "LB-BLEACH-1", replaces = {}, note = "faces the pads (+Z)" },
 	{ asset = "AST-034_ParkBench", x = 37.5, y = 0, z = -668.1, rotY = -180, parts = { ["Bench"] = { 0, 1.69, 0.033, size = { 6.5, 3.38, 2.08 } } }, group = "LobbyDecor", id = "LB-BLEACH-2", replaces = {}, note = "user 2026-10-12: edited in Studio (captured)" },

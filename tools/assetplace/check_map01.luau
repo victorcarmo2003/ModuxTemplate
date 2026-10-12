@@ -85,7 +85,7 @@ local Check = {}
 
 -- UpgradePiece (§18.1, wave 1): kit TASK-084, bound by bind_pieces.luau (TASK-085). Rule 9 below.
 local EDIT_TAGS_W1 = { "MapBinding", "MapPoint", "NpcNode", "Vehicle", "Station", "Interactable", "UpgradePiece" }
-local EDIT_TAGS_W2 = { "LightZone", "StreetLight", "VehicleCover" }
+local EDIT_TAGS_W2 = { "LightZone", "StreetLight" } -- VehicleCover left with the cart (2026-10-12)
 local EDIT_TAGS_W3 = { "AnomalyAnchor", "TrafficPath", "TrafficLine", "TrafficBox" }
 local OPTIONAL_TAGS = { "StreetBin", "GearPedestal", "GearShutter" } -- StreetBin: DEC-200 / T60, never required (Q-166 b); Gear*: rule 15
 
@@ -104,7 +104,7 @@ local OPAL_SEARCH_DEPTH = 4 -- same as OpalController KIOSK_SEARCH_DEPTH
 -- Content.Upgrades wins). start = StartLevel (the piece visible in the authored place).
 local PIECE_ROWS_EMBEDDED = (function()
 	local rows = {}
-	for _, v in { "cart", "trailer" } do
+	for _, v in { "trailer" } do
 		for level = 1, 3 do
 			table.insert(rows, { upgrade = "grill", vehicle = v, level = level, part = "Grill_L" .. level, start = 1 })
 			table.insert(rows, { upgrade = "cooler", vehicle = v, level = level, part = "Cooler_L" .. level, start = 1 })
@@ -127,11 +127,10 @@ local POINTS_W1 = { "PS-1", "PS-2", "PS-3", "PS-4", "Q1", "Q2", "Q3", "Q4", "Q5"
 local POINTS_W2 = {
 	"PS-N1", "PS-N2", "PS-N3", "PS-N4",
 	"REV-1", "REV-2", "REV-3", "REV-4",
-	"TRL", "TRL-SALE", "CART",
+	"TRL", "CART", -- CART = legacy point at the trailer window (cutscene focus, customers face it)
 	"SPEC-P", "SPEC-M",
 	"DROP-T",
 	"L1", "L2", "L3", "ST-R",
-	"SIGN-T", -- level-designer proposal (MAP-01 §16): where VehicleController draws the sale sign
 }
 local NODES_W1 = { "SP-A", "D1", "EX-E", "Q1", "Q2", "Q3", "Q4", "Q5" }
 local NODES_W2 = { "ST-R", "L1", "L2", "L3" }
@@ -196,7 +195,7 @@ local FACING = { -- expected LookVector of points (warn when > 10 degrees off)
 	["OP-1"] = E, -- Mart v2 (MAP-01 §18.4): behind the Gear Stand counter, facing the store (MAP east = WORLD -X)
 	["PS-N1"] = N, ["PS-N2"] = N, ["PS-N3"] = N, ["PS-N4"] = N,
 	["REV-1"] = S, ["REV-2"] = S, ["REV-3"] = S, ["REV-4"] = S,
-	TRL = N, CART = N, ["TRL-SALE"] = S, ["SIGN-T"] = S, ["DROP-T"] = N, ["ST-R"] = N,
+	TRL = N, CART = N, ["DROP-T"] = N, ["ST-R"] = N,
 	-- wave 3
 	["AN-04"] = S, ["AN-05"] = N, ["AN-11"] = S, ["AN-12"] = S,
 	["W-IN"] = E, ["W-OUT"] = W, ["E-IN"] = W, ["E-OUT"] = E,
@@ -220,18 +219,11 @@ local STATION_RULES = {
 	coffee_machine = { actions = { brew_coffee = 1, restock = 1 } }, -- §19.8
 }
 local VEHICLE_SPEC = {
-	cart = {
-		wave = 1,
-		kinds = { "sausage_stock", "grill", "rail", "bun_crate", "board", "toppings", "trash" },
-		own = { [2] = { answer_phone = 1 } }, -- vehicle-level prompts (owner not a Station), by wave
-		slots = { RailSlots = 6, BoardSlots = 2 },
-		counter = { ids = { "CART-G", "CART-R", "CART-B", "CART-T", "CART-K", "DRAWER" }, absY = 3.45 },
-	},
 	trailer = {
 		wave = 2,
 		kinds = { "sausage_stock", "grill", "rail", "bun_crate", "board", "toppings", "trash", "coffee_machine" },
 		-- wave 3: service window button TRL-SHUTTER (DEC-221; Required.Wave3 of TASK-129); hide H1..H4 left
-		own = { [2] = { answer_phone = 1, switch_light = 1, buy_trailer = 1 }, [3] = { shutter_toggle = 1 } },
+		own = { [2] = { answer_phone = 1, switch_light = 1 }, [3] = { shutter_toggle = 1 } },
 		slots = { RailSlots = 8, BoardSlots = 3 },
 		counter = { ids = { "TRL-G", "TRL-R", "TRL-B", "TRL-T", "TRL-K", "TRL-DRAWER" }, relY = 4.6 },
 	},
@@ -304,17 +296,17 @@ local FALLBACK = {
 	Actions = {
 		"open_sign", "grill_place", "grill_collect", "bun_cut", "board_add_sausage", "topping_add", "discard",
 		"take_order", "serve", "refuse", "restock", "buy_package", "bench_buy_upgrade", "bench_buy_item",
-		"buy_trailer", "brew_coffee", "give_coffee", "switch_light", "safe_spot", "pick_up_item",
+		"brew_coffee", "give_coffee", "switch_light", "safe_spot", "pick_up_item",
 		"answer_phone", "get_up", "shutter_toggle", -- "hide" left with DEC-221 (TASK-132)
 	},
 	Ingredients = { "bun", "sausage", "ketchup", "mustard", "cheese", "bacon", "potato_sticks", "cream_cheese", "coffee" },
 	Packages = REQUIRED_PACKAGES,
-	Vehicles = { "cart", "trailer" },
+	Vehicles = { "trailer" },
 	LightGroups = { "mart", "trailer_interior", "trailer_lights", "juniper_posts" },
 	Upgrades = { "grill", "cooler", "counter", "cash_drawer_lock", "trailer_lights" },
 }
 local WAVE2_KEYS = {
-	Actions = { answer_phone = true, get_up = true, buy_trailer = true, brew_coffee = true, switch_light = true },
+	Actions = { answer_phone = true, get_up = true, brew_coffee = true, switch_light = true },
 	LightGroups = { mart = true, trailer_interior = true, trailer_lights = true, juniper_posts = true },
 	Stations = { coffee_machine = true },
 }
@@ -1179,7 +1171,7 @@ end
 
 -- wave 2: vehicle poses, tarp, light zones, street lights, DROP-T in the light
 local function checkWave2(points: { [string]: Instance }, vehicles: { [string]: Instance })
-	-- vehicle poses (T36): start of a run = cart at CART, trailer at TRL-SALE
+	-- vehicle pose: the trailer is the only vehicle and stays at MapPoint TRL (user decision 2026-10-12)
 	local function near(v: Instance?, pid: string, label: string)
 		local p = points[pid]
 		if not (v and p and p:IsA("BasePart")) then
@@ -1188,37 +1180,10 @@ local function checkWave2(points: { [string]: Instance }, vehicles: { [string]: 
 		local vp = (v :: any):GetPivot() :: CFrame
 		local cf = (p :: BasePart).CFrame
 		if (vp.Position - cf.Position).Magnitude > 0.1 or vp.LookVector:Dot(cf.LookVector) < 0.999 then
-			warn_(("%s pivot %s is not at MapPoint %s %s (start of a run: run Bind.run again)"):format(label, fmtV(vp.Position), pid, fmtV(cf.Position)))
+			warn_(("%s pivot %s is not at MapPoint %s %s (run trailer_only_map.luau)"):format(label, fmtV(vp.Position), pid, fmtV(cf.Position)))
 		end
 	end
-	near(vehicles.cart, "CART", "cart")
-	near(vehicles.trailer, "TRL-SALE", "trailer")
-	local trlPt, salePt = points.TRL, points["TRL-SALE"]
-	if trlPt and salePt and (pos(trlPt) - pos(salePt)).Magnitude < 20 then
-		err("2: TRL and TRL-SALE are closer than 20 studs (wrong vehicle poses)")
-	end
-
-	-- tarp (DEC-199, T38)
-	local covers = tagged("VehicleCover")
-	if #covers ~= 1 then
-		err(("2: %d VehicleCover (need 1)"):format(#covers))
-	end
-	for _, c in covers do
-		if not c:IsA("Model") then
-			err(("5: VehicleCover %s is a %s (must be a Model)"):format(name(c), c.ClassName))
-		end
-		if not (vehicles.cart and c:IsDescendantOf(vehicles.cart)) then
-			warn_(("VehicleCover %s is not inside the cart Vehicle (it must travel with the cart, T36)"):format(name(c)))
-		end
-		if not isHidden(c) then
-			warn_(("VehicleCover %s is visible in the place (authored hidden until the swap, §19.22)"):format(name(c)))
-		end
-		for _, d in c:GetDescendants() do
-			if d:IsA("BasePart") and d:GetAttribute("OrigTransparency") == nil then
-				warn_(("VehicleCover part %s without OrigTransparency/OrigCanCollide/OrigCanQuery (visible values for T38)"):format(name(d)))
-			end
-		end
-	end
+	near(vehicles.trailer, "TRL", "trailer")
 
 	-- light zones (§19.6)
 	local zones: { [string]: Instance } = {}

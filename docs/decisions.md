@@ -3140,3 +3140,69 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
 - Coerente com DEC-173 (jumpscare permitido, pontual, ligado a anomalia). Fecha o "Conflito a registrar" de `sound-list.md` §9.
 - Detalhes de implementação (volumes, gatilhos no client, `ShiftMusicFresh`, crossfade 4 s) seguem **Provisórios** como estão em `sound-list.md` §3 e §9; esta DEC não os aprova.
 - Impacto: **frontend-coder** (já ligado em `Sounds.luau` / `AudioController`; nada novo), **art-director** (§4.4 e §11 com nota do secretário, feito), **game-designer** (`sound-list.md` com nota do secretário, feito), **qa-tester** (casos que esperam "ver anomalia sem som" ou música em loop mudam). `README.md` → secretário.
+
+### DEC-223 — 2026-10-12 — Modo de preparo focado (FEAT-039, V1) é o único jeito de fazer o hot dog: substitui o preparo por prompts no mundo (fecha Q-218, Q-220)
+
+- Origem: conversa do dono com o orquestrador (2026-10-12), registrada pelo secretário a pedido do orquestrador. Palavras do dono, resumidas: "vai limpar MUITO a interface e deixar o game mais divertido".
+- Decidido pelo dono:
+  - **V1, 100% focado.** O modo de preparo focado (FEAT-039) **substitui** o modo atual de prompts no mundo para fazer o hot dog (cortar o pão, posicionar a salsicha, aplicar molhos e complementos). As variantes **V2** (opcional por prompt, com "Quick Slice") e **V3** (só pedidos "Deluxe") ficam **descartadas** (mantidas no histórico de `features.md`).
+  - Motivo: **limpar muito a interface** e deixar o jogo **mais divertido**.
+  - **Interface inspirada nas estações de jogos de preparo por estações** (ordem / grelha / montagem / entrega): **abas de estação**, **ticket do pedido**, **lixeira**, **botão "próximo"**. Com **identidade própria** (paleta Mustard, arte, nomes e textos originais; nada de nome, asset, layout ou fala de jogo de terceiros, `CLAUDE.md`).
+  - **Câmera focada** na estação.
+  - **1 a 4 tábuas/estações pelo número de jogadores** (1 jogador = 1, ..., 4 = 4), como o dono propôs em `Q-220` (opção A).
+- Responde: **`Q-218`** (substitui, V1) e **`Q-220`** (opção A, por jogador).
+- **Emendas (append-only):**
+  - `FEAT-006` e `FEAT-010`: o modo de preparo **no mundo** (prompts nas estações de salsicha, grelha, trilho, pão, tábua e complementos) é **substituído** pelo focado. **Não muda:** o conteúdo do pedido, o preço e Completo/Incompleto/Errado (**DEC-072**), K complementos (**DEC-071**), estoque e consumo.
+  - **DEC-190** e **DEC-215** (tábua física compartilhada de 2 vagas no carrinho e 3 no trailer, Tool "HotDog" por prompt): deixam de valer **para o preparo**; o número de estações passa a ser o de jogadores (1–4). `BoardSlots` e os `Att_Bun*` físicos viram só **visual**. O Tool "HotDog" pronto e a entrega por "Serve" seguem como estão (Provisório, ver abaixo).
+  - **DEC-015** ("interação no mundo; HUD só de status") e **FEAT-005** (critério "toda ação executável só com o botão de interagir"): emendadas **só no preparo**, que passa a ser uma tela de estação em foco. O resto do jogo segue com prompts no mundo.
+  - **DEC-016** (preparo por estações) mantida na essência; muda a forma (de prompts espalhados para estações em foco).
+- **Provisório** (inferido pelo secretário; o game-designer valida, nada disto foi perguntado ao dono):
+  - **Abas**: **Order** (ticket e fila de pedidos), **Grill** (salsichas cozinhando; segue em paralelo e **sem queimar**, FEAT-006), **Build** (cortar, posicionar, molhos e complementos, a parte já desenhada no FEAT-039), **Serve** (conferir o prato contra o ticket e entregar). Nomes de aba em inglês (DEC-022).
+  - **Lixeira** descarta o prato em montagem (o estoque gasto não volta). **Next** passa ao próximo ticket/etapa.
+  - **Entrar** na estação por **um único prompt** na tábua; o prompt de entrega no cliente ("Serve", "Serve Table n") continua no mundo.
+  - **Day 1 (tutorial)** passa a ensinar o modo focado desde o início (a regra "Day 1 sem modo focado" do rascunho cai); `script.md` §3 e `ui-text.md` a reescrever pelo narrative-writer.
+  - Sem o "modo rápido" como piso, **Assist** (tolerância +30%), "hold to do" no toque e "Reduced motion" passam a ser **obrigatórios** (não opcionais) na fase 1.
+  - Demais números do rascunho (tempos-alvo 9–12 s hábil / 15–18 s iniciante, notas, `Content.Focus`) seguem Provisórios; `UnlockDay` passa de 2 para 1.
+- **Seguem abertas** (não bloqueantes): `Q-219` (nota × dinheiro), `Q-221` (noite: risco e saída forçada), `Q-222` (grelha: "ponto", sem queimar; a **aba Grill** já é V1), `Q-223` (exceções de UI e plataforma: agora **essencial**, porque não há modo rápido de reserva).
+- Impacto: **game-designer** (FEAT-039 atualizada pelo secretário; `Content.Focus`; abas; revisar Q-219, Q-221, Q-222, Q-223), **architect** (packets `Focus*`, set `FocusBoards`, estações = jogadores, retirar vagas de tábua como regra), **frontend-coder** (`FocusController`, UI Vide por abas; remover os prompts de preparo do mundo quando o focado existir), **backend-coder** (`FocusService`), **level-designer** (pontos `Focus_n` de 1–4 jogadores no trailer), **art-director/modeler-3d** (props de faca, garrafa, bico; ícones de aba), **narrative-writer** (tutorial do Day 1 no modo focado; textos), **qa-tester** (4 jogadores, toque, ping alto, anomalia + foco). **Sem `TASK-###` criada** (pedido do orquestrador).
+
+### DEC-224 — 2026-10-12 — Food Trailer é o veículo único desde o início; o carrinho sai da run; some a compra do trailer (supera Q-206, Q-207, Q-216; supera partes de DEC-047, DEC-086, DEC-107)
+
+- Origem: conversa do dono com o orquestrador (2026-10-12), registrada pelo secretário a pedido do orquestrador.
+- Decidido pelo dono ("migrar tudo para o trailer"):
+  - O **Food Trailer** é o **único veículo desde o começo do jogo** (Day 1 em diante).
+  - O **carrinho (cart)** **sai da run**.
+  - **Somem** a venda e a compra do trailer e a **cena "compra do trailer"**: placa FOR SALE, repasse de dinheiro do Walt, chamada de oferta, foco da câmera na placa.
+  - O trailer fica **posicionado no Pad**, com as **4 mesas** e os **varais de luz presos a ele**.
+  - **Atualizar tudo** que envolve prompts, posição da fila, âncoras etc. (**implementação por outros agentes**; este registro só documenta).
+- **Supera (sem apagar o histórico, que segue nas DEC antigas; "supera" = deixa de valer no ponto citado):**
+  - **Q-207** (c) trailer opcional, oferecido depois da noite 2, e (f) as noites 1–2 no carrinho / ramo "no carrinho" das anomalias `Trailer = None/Helps/Needs`; **Q-206** (oferta, repasse, foco na placa, prompt na placa) e **Q-216** (Pad vazio quando o trailer chega) ficam **sem objeto**; **Q-209** parte do trailer (mesas escondidas "até comprar o trailer"): ver `Q-225`.
+  - **DEC-047** (preço $300 × party do trailer, compra, tensão "upgrade ou trailer?"): a compra e o preço **saem**. **DEC-107** (compra fixa a partir do dia 5), **DEC-037** (trailer a partir do 5º dia), **DEC-007** (trailer como "marco que abre a noite"; a noite já abre pelo fluxo da Q-207), **DEC-019** (trailer comprado pelo jogador; na ficção o trailer já é do Walt), **DEC-020** (carrinho fixo na esquina), **DEC-052** (tiers carrinho → trailer), **DEC-086** (troca no Pad; não há troca), **DEC-184** (trailer recomeça do nível 1 após a troca; sem troca a regra é só "o nível inicial do veículo", `Q-224`), **DEC-199** (carrinho coberto por lona na vaga; **AST-043** sem uso), **DEC-215/DEC-190** (tábua do carrinho: só o que sobra do trailer, ver DEC-223).
+  - Continuam valendo: **DEC-189** (lâmpada básica + interruptor), **DEC-221** (janela de serviço, N8/N9), **DEC-125** (cafeteira fixa no trailer), **DEC-124** (telefone fixo do veículo, agora só o do trailer), **DEC-121** (party fixa no fim do Day 1, agora só para o Revive Kit $200 × party).
+- **Provisório** (inferido pelo secretário; game-designer, level-designer e narrative-writer validam):
+  - **Fluxo da run** segue o da `Q-207` (D1 tutorial, D2, N1, D3 ... D11, N10, Final; noites 9 → 15 min) **sem** a oferta do trailer. Noite 1 no trailer. `Content.Trailer.OfferAfterNight` e a regra "noites até `OfferAfterNight` são `None`" ficam sem uso.
+  - **Anomalias**: todas jogadas no trailer. **N3 (stopped clock)** acontece normalmente (interruptor existe), sem o "reserva ANM-002"; **N8/N9** = fechar a janela; o campo `Trailer` de `Content.Anomalies` perde o sentido (sempre trailer).
+  - **Explicação das regras do Walt** passa para a **primeira chamada de noite** (`script.md` §5, Noite 1): já é a ligação que abre as regras; some só o dia da compra e a chamada de oferta. `call_day_2` ainda avisa que "tonight, you work late".
+  - **Economia**: o **preço $300 × party** do trailer **sai**; soma de compras com dinheiro vai de $1.090 para **$790** (sem mesas) e de $1.615 para **$1.210** com as mesas do trailer (UPG-011 $330 + UPG-010 $90) se UPG-008/009 ficarem obsoletos (`Q-225`).
+  - **Itens "do trailer"** (cafeteira, interruptor "Lights", janela, tábuas, trilho de 8, telefone) existem **desde o Day 1**; quando cada um é apresentado ao jogador é pelo HUD progressivo (`Q-224`).
+  - **Pad**: o trailer em `TRL` (40, 41) desde o início; o `PadHideController`, o `PadDecor` do carrinho e `Pad.CART` perdem a razão de existir; `TRL-SALE`, `SIGN-T`, `Prompt_Buy`/`buy_trailer`, lona (AST-043) e o estacionamento com o trailer à venda saem (marcar **obsoleto** em `MAP-01.md`, sem apagar).
+  - **Texto de ficção**: panfleto, letreiro e falas que dizem "cart" ("Run a hot dog cart", "The cart's right on the corner") passam a dizer "trailer"; revisão pelo narrative-writer.
+- Dúvidas para lote: `Q-224` (trailer de fábrica e economia), `Q-225` (mesas, luzes e o que ficou do Pad).
+- Impacto: **backend-coder** (`VehicleService`/troca, `TrailerOffer`, `buy_trailer`, `Vehicles.cart`, snapshot), **frontend-coder** (`PadHideController`, `VehicleController`, cena da placa, âncoras e fila do trailer), **level-designer** (`MAP-01.md`: CART, TRL-SALE, SIGN-T, spawn PS-1..4 vs PS-N1..4, fila Q1..Q5 e `DRAWER` na janela do trailer), **game-designer** (`upgrades.md` e `progression.md` marcados pelo secretário; `economy.md`, simulações), **narrative-writer** (`script.md` §1 e §4 marcados; textos de UI "Available on Day 5"), **architect** (`Vehicles`, contratos de rede, `Content.Trailer`), **art-director** (AST-026 carrinho e AST-043 lona sem uso), **qa-tester** (casos de compra do trailer e de carrinho saem).
+
+### DEC-225 — 2026-10-12 — Abertura curta e objetiva: começa na calçada do trailer, sem susto de carro (supera partes de `script.md` §1 e MAP-01 §11.1; dúvida sobre DEC-088/DEC-097 em `Q-226`)
+
+- Origem: conversa do dono com o orquestrador (2026-10-12), registrada pelo secretário a pedido do orquestrador.
+- Decidido pelo dono:
+  - A cutscene de abertura começa **na linha da rua do trailer**: a **calçada em frente ao Pad**, saindo da **ponta direita, perto da planta**, e **caminhando para a esquerda até o poste do cartaz HELP WANTED**. **Sem recuar para o começo da rua.**
+  - **Remover o susto do carro passando perto** e o **foco nos carros** ("mais clean").
+  - A intro fica **mais rápida**.
+- **Emendas (append-only):** `script.md` §1 e `levels/MAP-01.md` §11.1: saem os planos da Ninth (CS-1 a CS-4: ônibus e pombos, vitrines "NO HELP WANTED", travessia da Ninth com o carro roteirizado) e o plano 9 (carro de brinquedo entre a party e o carrinho). O `Content.Cutscenes` de 11 planos (playtest 2026-10-12) a reduzir pelo frontend-coder.
+- **Não afirmado:** se isto **supera** DEC-088 (cutscene em 1ª pessoa, compartilhada) ou DEC-097 (câmera = cabeça, sem braços) **só no ponto de câmera de abertura**. O dono falou de **onde começa e o que sai**, não da câmera. Dúvida registrada em **`Q-226`**; até lá o POV 1ª pessoa compartilhado (DEC-088/DEC-097/DEC-219) segue valendo.
+- **Provisório** (inferido pelo secretário; level-designer e narrative-writer validam):
+  - Roteiro: fade in na ponta direita da calçada do Pad (planta) → anda para a esquerda até o poste (`P-01`, slots CS-P1..P4 de MAP-01 §11.1) → lê o panfleto → liga (Walt, ligação de `script.md` §1) → vira para o **trailer** no Pad → fade → Day 1, 7:00 AM.
+  - **Fora**: ônibus, pombos, mariposa, vitrines, travessia de rua, qualquer carro. O ensino "olhe antes, carro não para" fica só no tutorial do Day 1 (já existe a fala "Look both ways!", `script.md` §3).
+  - **Duração-alvo** ≤ 35 s de conteúdo (hoje ~67 s, cap 70; `Phase.Intro` 108 s inclui loading). Pulável como hoje (DEC-078, DEC-194).
+  - Texto da ligação e do panfleto troca "cart" por "trailer" (DEC-224).
+  - A direção "direita/esquerda" é a da câmera de quem caminha; o level-designer fixa os pontos no place (calçada em frente ao Pad: borda Z ~31,5, poste `P-01` em torno de X 13–23, Z 22–27).
+- Impacto: **level-designer** (MAP-01 §11.1: `CutsceneMark1..4`, novo ponto de partida), **frontend-coder** (`Content.Cutscenes`, `Director`, `Ambience`: tirar planos de rua e carro; duração), **narrative-writer** (`script.md` §1, panfleto), **qa-tester** (intro sem carro, ≤ 35 s, pulável).

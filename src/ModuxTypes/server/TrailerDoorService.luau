@@ -14,7 +14,7 @@ export type Public = {
 	IsPadded: (self: Public) -> boolean,
 	Register: (self: Public, anchor: Instance) -> (),
 	Host: (self: Public, model: Model) -> BasePart?,
-	Create: (self: Public, model: Model, host: BasePart, pad: CFrame, name: string, action: string, world: Vector3) -> (),
+	Create: (self: Public, model: Model, host: BasePart, pad: CFrame, name: string, action: string, offset: Vector3) -> (),
 	EnsureAnchors: (self: Public) -> boolean,
 	Refresh: (self: Public) -> (),
 	CastParams: (self: Public) -> RaycastParams,

@@ -56,7 +56,7 @@ type Notice = { Slot: number, Due: number, Until: number }
 
 const STEP = 0.1 -- s between checks
 const GRACE = 1.5 -- s after the attempt time a noticed walker is still kept
-const CART = "CART" -- MapPoint the new customer faces (fallback: Q1)
+const CART = "CART" -- legacy name: MapPoint the new customer faces, now at the trailer service window (fallback: Q1)
 const RULES = Content.Flow.Adopt
 
 const Adopt = {}

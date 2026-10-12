@@ -9,8 +9,10 @@ Nomes de nível propostos pelo narrative-writer (`ui-text.md` §3, Rascunho): Ol
 Tabela `Upgrades` (id, nível, preço, efeitos tipados, peça visível, pré-requisito, `benchSlot`).
 
 **Onde se compra (rodadas 11–12):** todos os upgrades UPG-001 a UPG-005 são comprados na **bancada da parede do fundo do Ninth Street Mart** **[DEC-101]**, sempre à venda, sem rotação **[DEC-106]** (FEAT-015). O efeito e a peça aparecem no veículo na hora.
-O **Food Trailer** (UPG-006) **não** está na bancada: compra fixa no próprio trailer, a partir da manhã depois da noite `Content.Trailer.OfferAfterNight` (= 2; antes: Day 5; pedido do dono 2026-10-12, Provisório, Q-206) **[DEC-107]**; o prompt de compra fica na **placa FOR SALE**, não no trailer; o Walt liga, repassa o dinheiro que falta e manda olhar a placa (`script.md` §4.1b). A **cafeteira** (UPG-007, "Coffee Maker") vem com o trailer e não é vendida **[DEC-055, DEC-125]**.
-**Pad vazio (pedido do dono 2026-10-12, Provisório, `Q-216`):** com o trailer em uso o carrinho, o `PadDecor` e as mesas do Pad (UPG-008, TBL-1..5; e a placa Patio Lights, UPG-009) somem por completo do Pad; o nível comprado fica guardado (Pad scope) e só volta a valer se o carrinho voltar. As mesas do trailer (UPG-011) seguem como estão.
+> **DEC-224 (2026-10-12, dono): o Food Trailer é o veículo ÚNICO desde o Day 1; o carrinho sai da run; a compra do trailer acaba.** **UPG-006 deixa de ser upgrade/compra** (fica abaixo como histórico, **Obsoleto**): saem o preço $300 × party, a oferta, o repasse do Walt e a placa FOR SALE. Tudo que abaixo diz "carrinho", "só trailer", "após a compra do trailer", "troca de veículo" ou "antes do trailer" lê-se: **o trailer, sempre**. Cafeteira, interruptor, janela, 3 tábuas e trilho de 8 vêm **de fábrica** (detalhe em `Q-224`). Soma de compras com dinheiro: **$790** (UPG-001 a 005; era $1.090 com o trailer); com as mesas do trailer (UPG-011 $330) e o Back Bar (UPG-010 $90) = **$1.210** (era $1.615; UPG-008/009 do Pad em dúvida, `Q-225`). A tensão "upgrade ou trailer?" (DEC-045, DEC-047) e a regra "trailer comprável até o fim do Day 6" **deixam de existir**. Efeito nas perguntas: **Q-206 e Q-207 (c, f) sem objeto, Q-216 sem objeto, Q-209 (parte do trailer) em `Q-225`** (todas "Decidida: DEC-224").
+
+~~O **Food Trailer** (UPG-006) **não** está na bancada: compra fixa no próprio trailer, a partir da manhã depois da noite `Content.Trailer.OfferAfterNight` (= 2; antes: Day 5; pedido do dono 2026-10-12, Provisório, Q-206) **[DEC-107]**; o prompt de compra fica na **placa FOR SALE**, não no trailer; o Walt liga, repassa o dinheiro que falta e manda olhar a placa (`script.md` §4.1b). A **cafeteira** (UPG-007, "Coffee Maker") vem com o trailer e não é vendida **[DEC-055, DEC-125]**.~~ (histórico; vale só a cafeteira de fábrica)
+~~**Pad vazio (pedido do dono 2026-10-12, Provisório, `Q-216`):** com o trailer em uso o carrinho, o `PadDecor` e as mesas do Pad (UPG-008, TBL-1..5; e a placa Patio Lights, UPG-009) somem por completo do Pad; o nível comprado fica guardado (Pad scope) e só volta a valer se o carrinho voltar. As mesas do trailer (UPG-011) seguem como estão.~~ (histórico: sem carrinho, o Pad não "esvazia"; `Q-216` sem objeto, DEC-224)
 
 O único item rotativo da bancada é especial, não upgrade: Rescue Whistle (ITM-021, FEAT-035; "Revive Kit" em DEC-129).
 
@@ -33,15 +35,15 @@ Critérios de aceite
 | UPG-003 | Counter | 1–3 | $230 | ambos | bancada B3 | não |
 | UPG-004 | Cash Drawer Lock | 0–1 | $80 | ambos | bancada B4 | não |
 | UPG-005 | Trailer Lights | 0–1 | $100 | só trailer | bancada B5 (após a compra do trailer) | não |
-| UPG-006 | Food Trailer (veículo) | — | $300 × party | troca | prompt no trailer, estacionamento | não (DEC-107) |
+| ~~UPG-006~~ | ~~Food Trailer (veículo)~~ **OBSOLETO (DEC-224): veículo único desde o Day 1, sem compra** | — | ~~$300 × party~~ (sai) | — | — | — |
 | UPG-007 | Coffee Maker | incluída | $0 (vem com o trailer) | só trailer | — | — |
 | UPG-008 | Patio Tables (mesas do Pad) — Provisório | 0–5 (1 mesa por nível) | $315 | **Pad** (as duas, não recomeça na troca, `Q-179`) | na própria mesa fantasma no Pad (`Q-178`) | não |
 | UPG-009 | Patio Lights — Provisório | 0–1 | $120 | Pad | na mesa `TBL-1` (placa) no Pad (`Q-178`) | não |
 | UPG-011 | Trailer Table (4 mesas do trailer, `TBL-6..9`) — Provisório (`Q-209`) | 0–4 (1 mesa por nível) | $330 ($50 / $70 / $90 / $120) | **só trailer** (`Scope = "Vehicle"`) | na própria mesa fantasma, só depois de comprar o trailer (`Q-209`) | não |
 | UPG-010 | Back Bar (bancada externa do trailer) — Provisório, cortável | 0–1 | $90 | só trailer | na própria bancada dobrada, no trailer (`Q-178`, `Q-179`) | não |
 
-Soma de tudo que se compra com dinheiro (solo): $210 + $170 + $230 + $80 + $100 + $300 = **$1.090**.
-Com as mesas (2026-10-11, Provisório): + $315 + $120 + $90 = **$1.615** (ainda abaixo dos ~$2.860 ganhos numa run solo; sobra ~$1.245, `economy.md` §7).
+Soma de tudo que se compra com dinheiro (solo): $210 + $170 + $230 + $80 + $100 = **$790** (DEC-224: o trailer, $300, **não se compra mais**; era $1.090).
+Com as mesas do trailer (UPG-011 $330) e o Back Bar (UPG-010 $90), Provisório: **$1.210**. Se as mesas do Pad (UPG-008 $315, UPG-009 $120) voltarem (`Q-225`): $1.645. Antes (2026-10-11): $1.615. Os ~$2.860 ganhos por run solo vêm do fluxo antigo (DEC-057); a simulação de `economy.md` §7 deve ser refeita com o fluxo da `Q-207`.
 
 **Onde se compra — mesas (2026-10-11, Provisório, `Q-178`):** UPG-008 a UPG-010 **não** vão para o Gear Stand (os 6
 pedestais B1–B5 + S1 estão ocupados e o layout 3 + Opal + 3 é simétrico, FEAT-015 v2). Compra **no lugar**, como o
@@ -116,7 +118,9 @@ veículo, então o critério da FEAT-015 "nenhum prompt de compra em equipamento
 - O Walker (ANM-007) mira um ponto fixo (passo 10, borda da luz do trailer); comprar Trailer Lights **não** encurta o caminho dele.
 - Critérios de aceite: os de `proposals-round-1.md` Q-014; desligar o interruptor apaga também o raio externo.
 
-### UPG-006 — Food Trailer (veículo)
+### UPG-006 — Food Trailer (veículo) — **OBSOLETO (DEC-224, 2026-10-12)**
+
+> **Obsoleto, mantido como histórico.** O trailer é o veículo único desde o Day 1; **sem preço, sem compra, sem troca de veículo, sem "Available on Day 5"**. O que a tabela chamava de "Acrescenta" (cafeteira, interruptor, janela, tábuas, trilho de 8, telefone fixo) vem **de fábrica** no trailer. Efeito em **Q-207**: partes (c) e (f) sem objeto; **Q-206** e **Q-216** sem objeto; **Q-209**, parte do trailer, passa a `Q-225`. Cooldown por veículo, "recomeçar do nível 1 na troca" (DEC-184) e `Vehicles.cart` ficam sem uso. Nível inicial dos upgrades no trailer único: `Q-224`.
 
 - Origem: **[DEC-007, DEC-019, DEC-037, DEC-047, DEC-052, DEC-057]** · detalhe da compra em FEAT-016
 
@@ -228,7 +232,7 @@ a simulação de balanceamento manda).
 
 Leitura:
 
-- **Antes do trailer** (dias 1–5, horizonte de ~30 min de loja aberta), só Grill 2 e o Lock se pagam. Isso é a tensão aprovada "upgrade ou trailer?" (DEC-045, DEC-047): o solo que compra Grill 2 + Lock ($140) ainda compra o trailer no Day 5 ou 6.
+- ~~**Antes do trailer** (dias 1–5...), só Grill 2 e o Lock se pagam. Tensão "upgrade ou trailer?" (DEC-045, DEC-047)~~: **sem objeto** (DEC-224: não há compra do trailer; o dinheiro vai todo para upgrades e mesas). Leitura histórica abaixo.
 - **Depois do trailer**, cada ciclo dia + noite rende ~$250 solo (`economy.md`); os percentuais valem também à noite. Grill 3 se paga em ~6 ciclos, Counter 3 em ~10, Cooler 3 em ~19 ciclos. Por isso Cooler 3 se justifica pela **noite** (menos idas pela rua escura, DEC-006), não pelo lucro.
 - **Em party**, Counter vira o melhor upgrade (gargalo é a vaga no balcão); em solo, Grill.
 - Ordem ótima esperada (solo): Grill 2 → Lock → (trailer) → Counter 2 → Trailer Lights → Grill 3 → Cooler 2 → Counter 3 → Cooler 3.
@@ -244,7 +248,7 @@ Leitura:
 | Counter 2 / 3 | $70 / $160 | igual | +1,10 / +0,82 | 64 / 195 | lucro (melhor em party) |
 | Cash Drawer Lock | $80 | igual | +1,67 equiv. | 48 | proteção de dia |
 | Trailer Lights | $100 | igual | +0,82 | 122 | lucro + luz à noite |
-| Food Trailer | $300 | $660 | — | — | marco; abre a noite |
+| ~~Food Trailer~~ (obsoleto, DEC-224) | ~~$300~~ | ~~$660~~ | — | — | ~~marco; abre a noite~~: não se compra mais |
 | Rescue Whistle (ITM-021, especial, 15%/turno, DEC-129) | $200 | $440 | 0 | — | seguro: evita espectador permanente / noite perdida |
 | Patio Table 1 / 2 / 3 / 4 / 5 (UPG-008, Provisório) | $30 / $45 / $60 / $80 / $100 | igual | +1,17 / +0,47 / +0,23 / +0,12 / +0,02 | 26 / 96 / 261 / 667 / — | lucro (1–2) → sumidouro/decoração (3–5 solo; 3–4 ainda rendem em party) |
 | Patio Lights (UPG-009) | $120 | igual | +0,28 | ~430 | decoração + luz nas mesas à noite |
@@ -299,11 +303,11 @@ Feedback do usuário (2026-10-11): o momento ideal de comprar é o **fim do expe
 
 ## Critérios de aceite (balanceamento)
 
-- Simulação solo Rookie, dias 1–5: com Grill 2 + Lock comprados até o Day 3, o trailer ($300) é comprável até o fim do Day 6.
+- ~~Simulação solo Rookie, dias 1–5: com Grill 2 + Lock comprados até o Day 3, o trailer ($300) é comprável até o fim do Day 6.~~ **Obsoleto (DEC-224).** Novo critério (Provisório): simulação solo com o fluxo da `Q-207` e o trailer único: todos os upgrades UPG-001 a 005 comprados até o Day 8 em ≥ 80% das execuções.
 - Simulação solo: cada upgrade fica a ±3 p.p. do ganho da tabela; se ficar fora, ajusta-se o número na tabela, não o código.
 - Simulação party de 4: Counter 2 rende mais que Grill 2 em lucro/min.
 - Simulação solo com compras na bancada do Mart combinadas com reposição: tudo comprado até o fim do Day 8 em ≥ 80% das execuções.
-- Mesas (Provisório): simulação solo com Grill 2 + Mesa 1 + Lock até o Day 3: o trailer continua comprável até o fim do Day 6.
+- ~~Mesas (Provisório): simulação solo com Grill 2 + Mesa 1 + Lock até o Day 3: o trailer continua comprável até o fim do Day 6.~~ **Obsoleto (DEC-224).**
 - Mesas: simulação solo Day 6 com 5 mesas + Patio Lights fica entre +9% e +15% de lucro/dia; se passar de +15%, baixa-se `TableTip` ou `SitChance` na tabela.
 
 ## Propostas pendentes (upgrades)
@@ -318,3 +322,5 @@ Feedback do usuário (2026-10-11): o momento ideal de comprar é o **fim do expe
 | **Q-179** Mesas na troca de veículo; bancada do trailer | mesas são do Pad e ficam; Back Bar externo, trailer-only, cortável | **sim** (DEC-184) |
 
 Decidida: **Q-124** cafeteira → **DEC-125** (fixa no trailer, não vendida).
+
+**2026-10-12 (DEC-224):** **Q-075** e **Q-179** (carrinho → trailer, mesas na troca) ficam sem objeto: não há troca de veículo. Novas, não bloqueantes: **`Q-224`** (o que o trailer tem de fábrica, nível inicial e economia sem a compra) e **`Q-225`** (mesas UPG-008/009/011, varais de luz e UPG-005).

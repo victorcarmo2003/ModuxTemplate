@@ -157,14 +157,12 @@ const TOAST_SOUND = "toast"
 -- Notices with their own sound instead of the toast one (live packet only: nothing plays for a late joiner)
 const NOTICE_SOUND: { [string]: string } = {
 	thief_caught = "thief_caught",
-	trailer_cash = "coin", -- Walt's till money for the trailer
 }
 const SUMMARY_SOUND = "summary"
 const GOOD: { [string]: boolean } = {
 	upgrade_bought = true,
 	ingredient_unlocked = true,
 	class_bought = true,
-	trailer_cash = true,
 }
 
 -- Fields of the ShiftReport packet this controller reads (network.md §4.4)

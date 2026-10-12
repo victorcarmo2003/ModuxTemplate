@@ -12,11 +12,10 @@
 --             Free -> Occupied -> Dirty -> (Clean Table) Free. Not bought = no collision (CanCollide off, written
 --             here); the ghost look (transparency) is the client's (TASK-147).
 --   Purchase  buy_in_place on the next ghost: UpgradeService:Buy(group.UpgradeKey, player, quiet) -> the group's Stat
---             + 1 (Pad group: Pad scope, kept across the vehicle swap and in the "Upg" snapshot), notice table_added.
---   Groups    (Content.Seating.Groups, Q-209) Pad = TBL-1..5 (UPG-008, cart and trailer), Trailer = TBL-6..9 (UPG-011,
---             trailer only). A group is Locked (hidden, no collision) while its vehicle is not the current one; the
---             Trailer group shows only the next table for sale (GhostAll = false). A party stays in one group: once a
---             Trailer table is bought only the Trailer group seats, before that the Pad tables still serve.
+--             + 1 (kept in the "Upg" snapshot), notice table_added.
+--   Groups    (Content.Seating.Groups, Q-209; one group since 2026-10-12) Trailer = TBL-1..4 (UPG-011), the four tables
+--             on the Pad in front of the trailer. A group is Locked (hidden, no collision) while its vehicle is not the
+--             current one; the group shows only the next table for sale (GhostAll = false).
 --             Other anchors with buy_in_place + attribute Upgrade = Seating.LightsKey sell Patio Lights (UPG-009).
 --   Sitting   CustomerService:SetSeater({ Offer, Left }) -> Offer(party) at "Take Order" (Q-209, Provisional): the 5
 --             conditions (free table of the group that seats, MaxDiners, SitHeadroom, SitPhases, no tension), then the

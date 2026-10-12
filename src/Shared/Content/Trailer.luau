@@ -1,19 +1,16 @@
 --!strict
--- Trailer offer (user request 2026-10-11/12, Provisional; replaces "the trailer is bought on Day 5", DEC-037/DEC-047):
--- the night shift starts in the cart, and the old trailer is offered later because it helps against the anomalies (the
--- service window, the trailer light, the safe spot). One number says when.
---   OfferAfterNight  the trailer goes on sale from the day after this night (nights played >= it). That morning Walt
---                    rings (BossCalls "TrailerOffer"): the camera looks at the FOR SALE sign, his till tops the
---                    party's cash up to the price (the missing part only, once per run) and he sends the rookie to
---                    the sign. The price stays RunParams.TrailerBasePrice x PartyPriceMult (DEC-047, DEC-121).
+-- Trailer (user decision 2026-10-12, Provisional; replaces the 2026-10-11/12 "offer after Night 2" and DEC-037/DEC-047):
+-- the Food Trailer is the only vehicle and the party owns it from Day 1. There is no purchase, no FOR SALE sign, no
+-- offer call and no vehicle swap any more; the cart left the run. The record only states that, for the code that
+-- still wants to ask (Validate, dev status).
 local Table = require(script.Parent.Table)
 
 export type Trailer = {
-	OfferAfterNight: number,
+	OwnedFromStart: boolean,
 }
 
 const trailer: Trailer = {
-	OfferAfterNight = 2, -- user request 2026-10-12: the morning after Night 2
+	OwnedFromStart = true,
 }
 
 return Table.record(trailer)

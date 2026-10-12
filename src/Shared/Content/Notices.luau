@@ -48,11 +48,7 @@ return Table.new({
 	{ Key = "shop_closed", Text = "Open the shop first!", Audience = "Player", ValueFrom = "None", Wave = 2 },
 
 	-- wave 2 (content-data.md §6.9; ui-text.md §10.1, §10.2)
-	{ Key = "trailer_available", Text = "Old trailer for sale! Check the lot.", Audience = "Party", ValueFrom = "None", Wave = 2 },
-	{ Key = "trailer_waiting", Text = "The trailer's still waiting in the lot.", Audience = "Party", ValueFrom = "None", Wave = 2 },
-	-- Walt's till tops the party cash up to the trailer price (user request 2026-10-11, Provisional); Value = what was added
-	{ Key = "trailer_cash", Text = "Walt's till: +${value} for the trailer!", Audience = "Party", ValueFrom = "Number", Wave = 2 },
-	{ Key = "trailer_bought", Text = "Trailer bought! It's yours next shift.", Audience = "Party", ValueFrom = "None", Wave = 2 },
+	-- (trailer_available / trailer_waiting / trailer_cash / trailer_bought left with the trailer purchase, 2026-10-12)
 	{ Key = "gems_gained", Text = "+{value} Gems!", Audience = "Player", ValueFrom = "Number", Wave = 2 }, -- DEC-104
 	{ Key = "afk_no_gems", Text = "No gems today. Serve 3 full orders!", Audience = "Party", ValueFrom = "None", Wave = 2 },
 	{
@@ -82,4 +78,12 @@ return Table.new({
 	{ Key = "serve_hold_hot_dog", Text = "Hold the hot dog you want to serve", Audience = "Player", ValueFrom = "None", Wave = 3 },
 	{ Key = "serve_nothing", Text = "Nothing to serve yet", Audience = "Player", ValueFrom = "None", Wave = 3 },
 	{ Key = "table_added", Text = "Table added!", Audience = "Party", ValueFrom = "Number", Wave = 3 },
+
+	-- Focused prep mode (DEC-223; Prep.Reasons points at these). Only to the player who acted; Provisional texts
+	{ Key = "prep_busy", Text = "Someone's already there.", Audience = "Player", ValueFrom = "None", Wave = 3 },
+	{ Key = "prep_locked", Text = "Not right now.", Audience = "Player", ValueFrom = "None", Wave = 3 },
+	{ Key = "prep_no_sausage", Text = "No sausage on the warmer yet.", Audience = "Player", ValueFrom = "None", Wave = 3 },
+	{ Key = "prep_too_fast", Text = "Too fast! Try again.", Audience = "Player", ValueFrom = "None", Wave = 3 },
+	{ Key = "prep_kicked", Text = "Prep interrupted.", Audience = "Player", ValueFrom = "None", Wave = 3 },
+	{ Key = "prep_idle", Text = "Stepped away from the station.", Audience = "Player", ValueFrom = "None", Wave = 3 },
 } :: { Notice })

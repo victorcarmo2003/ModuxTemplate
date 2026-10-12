@@ -46,7 +46,6 @@ const PRIORITY: { [string]: number } = {
 	bench_buy_upgrade = 4,
 	bench_buy_item = 4,
 	buy_in_place = 4,
-	buy_trailer = 4,
 	clean_table = 4,
 	switch_light = 5,
 	shutter_toggle = 5,
@@ -73,7 +72,6 @@ const ICONS: { [string]: string } = {
 	bench_buy_upgrade = "Ui/cash",
 	bench_buy_item = "Ui/cash",
 	buy_in_place = "Ui/cash",
-	buy_trailer = "Notice/trailer",
 	pick_up_item = "Reaction/star",
 	brew_coffee = "Item/coffee",
 	give_coffee = "Item/coffee",
@@ -132,7 +130,6 @@ const SHORT: { [string]: string } = {
 	trailer_enter = "Enter",
 	trailer_exit = "Exit",
 	clean_table = "Clean",
-	buy_trailer = "Trailer",
 }
 
 function Menu.ShortOf(target: Rules.Target, text: string): string
@@ -140,7 +137,7 @@ function Menu.ShortOf(target: Rules.Target, text: string): string
 	if action == "topping_add" then
 		const topping = string.gsub(text, "^Add ", "")
 		return topping
-	elseif string.sub(action, 1, 3) == "buy" and action ~= "buy_trailer" then
+	elseif string.sub(action, 1, 3) == "buy" then
 		const price = string.match(text, "%$%d+")
 		return if price then `Buy {price}` else "Buy"
 	end

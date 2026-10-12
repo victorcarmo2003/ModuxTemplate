@@ -133,6 +133,7 @@ Pendências — Q-### / notas
 | FEAT-036 | Item no chão (derrubar e pegar) | GERENCIAR | Dia/Noite |
 | FEAT-037 | Mesas do Pad / área de consumo (2026-10-11, Provisório) | VENDER, GERENCIAR, PROGREDIR | Dia/Noite |
 | FEAT-038 | Clientes em dupla (2026-10-11, Provisório) | VENDER | Dia/Noite |
+| FEAT-039 | Modo de preparo focado (estações de preparo) (2026-10-12, Rascunho; **V1 100% focado decidida pelo dono, DEC-223**; substitui o preparo por prompts de FEAT-006) | VENDER, OBSERVAR | Dia/Noite |
 
 ---
 
@@ -402,6 +403,7 @@ Fora da D-04, mesma regra (chaves aceitas e criadas em `Notices` pela TASK-047):
 
 - Status: Rascunho · Pilares: VENDER · Origem: **[DEC-016, DEC-004, DEC-029, DEC-072]**
 - Resumo: salsicha → grelha → trilho de descanso; pão → tábua; salsicha no pão vira Tool "Hot Dog"; complementos nas estações; entrega no cliente.
+- **SUBSTITUÍDO NO PREPARO (DEC-223, 2026-10-12):** o modo de prompts no mundo (passos 1 a 6 abaixo: caixa de salsicha, grelha, trilho, pão, tábua, complementos) é **substituído** pelo modo de preparo focado **V1** (FEAT-039), 100% focado, com abas de estação. Esta ficha segue valendo como **referência de regras** (consumo de estoque, tempos da grelha 12/10/8 s, sem queimar, Tool "HotDog", Completo/Incompleto/Errado) e como **modo atual até o focado existir em código**; **não** é mais o piso nem o alvo. `Q-218` decidida; pendências `Q-219`, `Q-221` a `Q-223`.
 
 | Passo | Estação | Ação | Resultado | Números |
 |---|---|---|---|---|
@@ -575,6 +577,7 @@ Party e reconexão (proposta para **Q-067**): o multiplicador de party usa os jo
 
 - Status: Rascunho · Pilares: VENDER · Origem: **[DEC-064, DEC-071, DEC-072]**
 - Resumo: ao "Take Order", o servidor sorteia o pedido: pão + salsicha + K complementos distintos dos liberados.
+- **Nota (DEC-223, 2026-10-12):** as regras de pedido, preço e Completo/Incompleto/Errado **não mudam**; o que muda é **como** o jogador monta o prato: modo focado V1 (FEAT-039), não mais prompts no mundo.
 
 | Passo | Regra |
 |---|---|
@@ -809,7 +812,9 @@ Comparação (orçamento do client, por quadro, com o jogador dentro do Mart):
   - 4 jogadores compram 4 pedestais diferentes ao mesmo tempo: as 4 compras saem, o saldo nunca fica negativo.
   - Da porta do Mart, a mini da S1 é visível no fim do corredor principal (`MAP-01.md` §18.10).
 
-### FEAT-016 — Compra do trailer e troca de veículo
+### FEAT-016 — Compra do trailer e troca de veículo — **OBSOLETO (DEC-224, 2026-10-12)**
+
+> **Obsoleto:** o Food Trailer é o veículo único desde o Day 1; não há compra, preço, oferta, placa FOR SALE nem troca de veículo. Texto abaixo mantido só como histórico.
 
 - Status: Rascunho · Pilares: PROGREDIR, DESCOBRIR · Origem: **[DEC-007, DEC-019, DEC-028, DEC-037, DEC-047, DEC-052, DEC-086, DEC-107]**
 - Resumo: ficha UPG-006. Preço $300 × multiplicador da party (1p $300 · 2p $450 · 3p $570 · 4p $660), tamanho = roster que entrou até o fim do Day 1 **[DEC-121]** (FEAT-001); disponível do Day 5 em diante; **fora da rotação da bancada**, compra fixa por prompt no próprio trailer **[DEC-107]**; visível no estacionamento desde o Day 1 com placa "Available on Day 5"; hold 2 s no trailer; troca no fim do turno (fade + ligação); o trailer passa a trabalhar **na esquina, no Pad do carrinho** **[DEC-086]**; próximo turno = Night 1.
@@ -1788,6 +1793,285 @@ cobrem a montagem dobrada (~2 × 8–10 s). Em party, dupla é ótima (2 jogador
   - Recusar a dupla tira os 2 da fila e conta 2 insatisfeitos na nota.
   - Parceiro nunca usa pathfinding próprio (conferir no `CustomerService`) e nunca fica a > 4 studs do líder andando.
 - Pendências: `Q-182` (dupla à noite e leitura de "casal").
+
+### FEAT-039 — Modo de preparo focado (estações de preparo)
+
+- Status: **Rascunho (Provisório)** · Pilares: VENDER (noite: OBSERVAR, SOBREVIVER) · Origem: **ideia do dono, 2026-10-12**; autor: secretário, a validar pelo game-designer. Toca FEAT-005, FEAT-006, FEAT-010, FEAT-011, FEAT-019, FEAT-022, FEAT-023, FEAT-037, FEAT-038.
+- **Decidido pelo dono em 2026-10-12 (DEC-223):** **V1, 100% focado**: é o **único** jeito de fazer o hot dog e **substitui** o modo de prompts no mundo; interface por **abas de estação** (Order, Grill, Build, Serve) + ticket + lixeira + botão Next, com identidade própria; câmera focada; **1–4 estações = nº de jogadores**. Responde `Q-218` e `Q-220`. O **corpo abaixo** foi ajustado a V1; onde ainda aparece "modo rápido", "Quick Slice" ou "V2", leia como **modo atual substituído** (só referência). **Provisório** = detalhes inferidos (abas, lixeira, Day 1, Assist obrigatório). Segue sem `Aprovado` do documento.
+- Inspiração (conceito, não cópia; **CLAUDE.md**): jogos flash de preparo por estações e um jogo de anomalia em que se descasca e se frita batata para vender. O jogo das batatas **não foi identificado**: o único candidato achado, "Sell Fries (Anomaly)", tem confiança média-baixa (um post em rede social; sem loja, criador ou drive-thru confirmados); pedir o nome ao dono. Nomes, personagens, falas, assets e layout de outros jogos **não entram**.
+- Resumo: ao ativar uma **tábua**, a câmera se aproxima da bancada e o jogador monta o hot dog com **mini-etapas manuais** (cortar o pão, posicionar a salsicha, aplicar molhos e coberturas), com barra de progresso, feedback tátil e uma **nota de precisão** (Perfect / Good / Messy). O resultado é o mesmo Tool "HotDog" de hoje, com um atributo de qualidade. **Substitui** o modo de prompts no mundo do FEAT-006 (DEC-223); não troca o conteúdo do pedido (DEC-072 não muda).
+
+#### Interface por estações (DEC-223, Provisório nos detalhes)
+
+Inspirada em jogos de preparo por estações (conceito, não cópia; nomes, arte e layout próprios). Uma tela de foco por jogador, com **abas de estação** em uma barra única (Mustard, cantos arredondados, sem vermelho):
+
+| Aba | O que mostra | Ação | Notas (Provisório) |
+|---|---|---|---|
+| **Order** | ticket do pedido (balões do "Take Order", ordem de chegada), troca de ticket | escolher o ticket; **Next** passa ao próximo | o ticket fica sempre visível nas outras abas (miniatura) |
+| **Grill** | o roller grill (DEC-201) com as salsichas cozinhando e a barra de cada uma | pôr salsicha do estoque; coletar a pronta para o trilho | cozinha **em paralelo**, mesmo com o jogador em outra aba; **sem queimar** (FEAT-006); "ponto" em `Q-222` |
+| **Build** | tábua: cortar o pão, posicionar a salsicha, molhos e complementos (os gestos abaixo) | arrastar/segurar | é o miolo já desenhado neste FEAT |
+| **Serve** | prato pronto × ticket (selo de nota) | conferir e levar à janela/mesa | a entrega ao cliente continua um prompt no mundo (`Serve`, `Serve Table n`) |
+
+- **Lixeira** (canto): descarta o prato em montagem; o estoque gasto não volta.
+- **Next**: botão Mustard no canto, avança o ticket/etapa (nada centralizado em 1ª pessoa).
+- Sem prompts de preparo no mundo: o jogador entra na estação por **um prompt** na tábua e **tudo** acontece na tela de foco.
+
+#### Por que (e o que o dono gostou)
+
+- Foca totalmente no produto: o jogador "toca" a comida (câmera próxima, ação tátil, barra de progresso).
+- Dá habilidade e identidade ao gesto mais repetido do jogo; a nota cria motivo para melhorar.
+- Funciona em co-op: cada jogador na sua tábua.
+- Tensão com o resto do jogo: o dia é curto (~4,6 min, Q-200) e o fluxo solo é ~1 cliente a cada 14 s. O modo focado só serve se couber nesse ritmo (alvo abaixo) e se não abrir fuga das anomalias (§Noite).
+
+#### Lições de referência (resumo da pesquisa; fontes oficiais deram 403, itens marcados "?" não foram confirmados)
+
+1. Prato em 3–4 mini-etapas curtas, cada uma com um gesto próprio.
+2. Câmera próxima, foco total na comida.
+3. Feedback imediato por gesto: barra, partículas, som, pequeno tremor ao acertar.
+4. Nota por precisão em cada etapa, com o motivo do erro visível; o cliente julga o prato final.
+5. Gorjeta ligada à precisão, não só à velocidade; esperar demais custa nota.
+6. Ticket sempre visível durante a montagem (?).
+7. Upgrades que mudam a estação (tolerância, novos ingredientes), não só números.
+8. Dificuldade cresce com pedidos mais complexos e fila maior.
+9. Co-op: 1–4 tábuas, cada jogador numa estação (ideia do dono; um jogo de cozinha cooperativo no Roblox usa estações com minijogos em times, sem fonte oficial).
+10. Mobile: toque/arrasto simples, alvos grandes, alternativa de toque no lugar da precisão fina; servidor valida o resumo do minijogo, cliente roda local (latência 100–300 ms típica).
+
+Riscos da pesquisa: tédio por repetição, fila × tempo de preparo, arrasto no dedo, jogador parado sem função, validação sem punir ping alto.
+
+#### Variantes (**decidido pelo dono: V1, DEC-223**)
+
+| Variante | O que é | Situação |
+|---|---|---|
+| **V1 — Substitui tudo** | Só existe o modo focado; tábuas = jogadores (1–4); abas de estação incluindo a grelha | **ESCOLHIDA (DEC-223).** Riscos aceitos pelo dono: ritmo e fila, mobile sem alternativa, FEAT-005 (aceite do mobile) emendado, FEAT-006 (grelha em paralelo, sem queimar) mantido. Mitigação em Riscos e em `Q-223` |
+| ~~V2 — Opcional por prompt~~ | A tábua oferecia "Prepare" (focado) e "Quick Slice" (modo atual) | **Descartada (DEC-223).** Era a recomendação do secretário; o dono preferiu o foco total. Fica só como histórico |
+| ~~V3 — Só pedidos "Deluxe"~~ | Focado só para clientes que pedem "caprichado" | **Descartada (DEC-223).** Histórico |
+
+#### Escopo (fase 1, V1)
+
+| Dentro | Fora da fase 1 (ver "Fora do MVP") |
+|---|---|
+| Modo focado como **único** preparo: abas Order/Grill/Build/Serve, cortar pão, posicionar salsicha, molhos e coberturas, entrega ao Tool | "Virar/ponto" da salsicha e queimar — `Q-222` (a aba Grill existe, sem queimar) |
+| Nota Perfect/Good/Messy por etapa e do prato | Bebidas, sobremesa, estações novas |
+| Câmera focada, travar movimento, HUD de etapa e ticket | Replays, estrelas por cliente, ranking |
+| Controles de desktop, toque e gamepad; opção Assist | Animações novas dos braços (o usuário anima, DEC-220) |
+| Tabela de dados `Content.Focus` | Segundo pedido na mesa (FEAT-037 D) |
+
+#### Loop passo a passo (um hot dog)
+
+Estado por tábua (servidor): `Idle` → `Focused` (etapa `Cut` → `Place` → `Topping[i]` → `Done`) → `Parked` (saiu no meio) → `Idle`. Cada etapa é aberta e fechada com mensagem ao servidor (§Rede).
+
+| # | Passo | O que o jogador faz | Número (Provisório) | Gasto de estoque |
+|---|---|---|---|---|
+| 0 | **Entrar** | prompt "Prepare" na tábua (toque, 0 s); a câmera viaja ao ponto de foco; o jogador fica parado; o ticket mais antigo sem dono é sugerido | viagem 0,35 s (instantânea com "reduced motion"); sair 0,30 s | nenhum |
+| 1 | **Cortar o pão** | um pão (modelo AST-001 aberto em linha) aparece com a **linha tracejada** do corte; o jogador **arrasta a faca** ao longo da linha da esquerda para a direita; barra de progresso acompanha; som de corte contínuo | duração ~1,2–2,0 s; precisa cobrir ≥ 95% da linha | **1 Bun** ao abrir a etapa |
+| 2 | **Posicionar a salsicha** | salsicha pronta do trilho (a mais antiga, como "Add Sausage") flutua ao lado; **arrastar até o vão do pão**; imã de encaixe a 20% do alvo; se não há salsicha pronta, a etapa **espera** (tela "Waiting for the grill"), o jogador pode sair (`Parked`) | ~1,0 s | **1 Sausage** ao abrir a etapa (tirada do trilho) |
+| 3..5 | **Complementos** (0 a 3, na ordem do ticket) | gesto por tipo (tabela abaixo) | ~1,5–2,5 s cada | **1 uso** do complemento ao abrir a etapa, qualquer que seja a nota |
+| 6 | **Fechar e entregar** | o pão fecha com animação (0,4 s); selo de nota; o Tool "HotDog" vai para a mão (ou hotbar cheia: `hands_full`, fica na tábua `Parked`); câmera volta | 0,5 s + 0,3 s | — |
+
+Gestos por complemento (os 6 do `items.md`):
+
+| Complemento | Gesto | Perfect | Good | Messy |
+|---|---|---|---|---|
+| Ketchup, Mustard (`AST-004/005`, garrafa com `Fill` que desce) | segurar e **traçar o zigue-zague** guia sobre a salsicha | cobertura ≥ 85% da guia e excesso ≤ 10% | ≥ 60% e ≤ 25% | abaixo disso |
+| Cream Cheese | igual aos molhos, guia em linha ondulada mais curta | idem | idem | idem |
+| Cheese | **arrastar a fatia** até o alvo sobre a salsicha | desvio ≤ 12% | ≤ 25% | acima |
+| Bacon | **3 toques** nos anéis que fecham | ±120 ms | ±250 ms | acima |
+| Potato Sticks | **segurar para polvilhar e soltar** quando a barra cai na faixa verde | ±8% | ±18% | acima |
+
+Tabela de etapas de corte e posição:
+
+| Etapa | Medida | Perfect | Good | Messy |
+|---|---|---|---|---|
+| Cortar | desvio lateral médio da linha, em % da largura do pão | ≤ 6% | ≤ 15% | > 15% |
+| Posicionar | distância do centro ao alvo, em % do comprimento do pão | ≤ 10% | ≤ 22% | > 22% |
+
+Ritmo-alvo (precisa caber no dia de ~4,6 min e no fluxo de 14 s):
+
+| Situação | Tempo total no foco (K = 2) |
+|---|---|
+| Jogador hábil | **9–12 s** |
+| Iniciante (1ª semana) | 15–18 s |
+| Modo de prompts de hoje (referência; **substituído**, DEC-223) | 8–10 s |
+| Teto de paciência de preparo (FEAT-011) | 75 + 5 × K s: o foco **não** pausa a barra |
+
+Etapa não tem relógio próprio (a paciência do cliente é o único relógio, como hoje). Parar sem input 20 s sai do foco (`Parked`).
+
+#### Nota (qualidade)
+
+| Regra | Valor |
+|---|---|
+| Pontos por etapa | Perfect 100 · Good 70 · Messy 30 |
+| Nota do prato | média das etapas: **Perfect** se ≥ 88 e nenhuma Messy · **Good** se ≥ 60 · **Messy** se < 60 |
+| ~~Modo rápido~~ | ~~prato "Good neutro" (piso)~~: **não existe em V1** (DEC-223); a nota vale para todo hot dog |
+| Efeito (proposta, `Q-219`) | **Perfect**: gorjeta $2 (igual ao Hawker, não soma) e janela de gorjeta +4 s · **Good**: como hoje · **Messy**: sem gorjeta; com humor dinâmico (DEC-187, `Q-164`), −1 faixa |
+| O que **não** muda | preço base, complementos, Completo/Incompleto/Errado (DEC-072) |
+| Piso de pagamento | Messy continua pago igual: errar o gesto não cria prato errado |
+| Atributo | `Quality` (`Perfect`/`Good`/`Messy`) no Tool "HotDog"; some ao servir |
+| UI | selo na tela ao fechar: "Perfect!", "Good", "Messy"; **sem vermelho** (Mustard brilhante / creme / tinta) |
+| Teto de ganho | ≈ +14% do ticket médio no melhor caso; vigiar o ±12% de classes (DEC-069) |
+
+#### Controles por plataforma
+
+| Plataforma | Cortar / posicionar / molhos | Sair | Notas |
+|---|---|---|---|
+| Desktop (mouse) | segurar o botão esquerdo e arrastar; o cursor vira a faca/garrafa; raycast do ponteiro ao plano da tábua | Esc, Q ou pílula "Exit" | teclado também: Espaço = soltar item |
+| Toque | arrastar com um dedo, fora da área do joystick; marca de alvo maior (≥ 44 px, `style-guide`); o dedo não cobre o alvo (cursor deslocado 28 px acima do dedo) | pílula "Exit" Mustard no canto superior direito | opção **Assist**: tolerância +30%, "hold to do" no lugar de arrastar |
+| Gamepad | stick direito move o cursor (velocidade fixa), A segura/solta, B sai; D-pad = trocar ticket | B | magnetismo leve na linha guia |
+| Acessibilidade | "Reduced motion" sem viagem de câmera nem tremor; **Assist e "hold to do" obrigatórios** (não há mais modo rápido de reserva, DEC-223; Provisório) | | Mobile e pouca habilidade nunca bloqueiam progressão: Assist garante a conclusão (`Q-223`) |
+
+#### Câmera e travamento
+
+| Regra | Valor (Provisório) |
+|---|---|
+| Câmera | `Scriptable`; ponto de foco `Focus_n` por tábua (âncora do level-designer), ~2,5 studs da bancada, pitch ~−55°, FOV 55 |
+| Travessia | tween 0,35 s ease-out; saída 0,30 s; sem "reduced motion" |
+| Movimento | travado: `WalkSpeed` e `JumpPower` 0 por atributo `Focused` replicado e checado no servidor |
+| Personagem | os outros jogadores veem o colega parado na tábua com a pose de "trabalhando" (idle atual até o usuário animar, DEC-220) |
+| Braços | em foco os braços reais ficam ocultos e as mãos são **props** (faca, garrafa) seguindo o cursor; ao sair, `SetArmsVisible(true)` (DEC-219). Se o art-director preferir braços em IK (AST-069), decide na ficha |
+| Outros jogadores | seguem livres; colisão jogador-jogador desligada (DEC-175) |
+| Sombras | `CastShadow` do corpo segue desligado em 1ª pessoa (pedido 28) |
+| Saída forçada | cutscene/ligação; mudança para `Summary`; sanidade 0 (`Down`); sinal de anomalia e mudança de faixa de sanidade à noite; ladrão no raio (dia); ver a seção "Noite" |
+
+#### Estações por nº de jogadores
+
+| Jogadores conectados no início do turno | Estações focadas ativas | Tábua física (DEC-215, **superada para o preparo** por DEC-223) |
+|---|---|---|
+| 1 | 1 | só visual (`BoardSlots`/`Att_Bun*`) |
+| 2 | 2 | idem |
+| 3 | 3 | idem |
+| 4 | 4 | idem |
+
+- **Decidido (DEC-223, `Q-220` opção A):** estações = jogadores. Cada jogador usa **a estação que ativar**; estação ocupada mostra o nome de quem está nela e o prompt "Prepare" some para os outros. Reserva no servidor no toque.
+- O carrinho **saiu da run** (DEC-224): só o trailer; ele precisa de **4 pontos de foco `Focus_n`** na bancada (level-designer valida o espaço lado a lado; colisão jogador-jogador desligada, DEC-175).
+
+#### Co-op e fila
+
+- **Ticket**: a lista de pedidos "Take Order" (balões) aparece no HUD do foco. Ao entrar, o servidor sugere o ticket **mais antigo sem dono**; o jogador troca com D-pad/toque. A "reserva" é só guia: a entrega segue as regras do FEAT-038 (igual → Completo; subconjunto → Incompleto; extra → Errado).
+- **Papéis** com 4 jogadores: um em Take Order/Serve, dois nas tábuas, um em grelha/estoque/mesas; todos trocam por prompt.
+- **Trilho de salsichas** compartilhado: quem pede a salsicha primeiro leva a mais antiga.
+- **Relógio**: a paciência do cliente continua enquanto o jogador está no foco (DEC-085: relógio não pausa). Se zerar (`Slow`), o pedido some, um aviso aparece no HUD do foco e o prato fica na tábua (`Parked`) para servir a outro ticket compatível ou jogar fora.
+- **Grelha**: no mundo (FEAT-006). O jogador pode **cortar o pão enquanto a salsicha cozinha**: a etapa 2 espera pela salsicha.
+- **Dupla** (FEAT-038): ticket com 2 itens vira dois pratos seguidos na mesma tábua; a entrega junta de hoje vale.
+
+#### Noite, sanidade e anomalias (tensão central do design)
+
+A câmera focada **cega o ambiente**. É a oportunidade de tensão que o dono sentiu, mas também uma fuga possível dos verbos "não olhar" (FEAT-023) e do −5 de "ver" (FEAT-019, que mede o olhar do jogador).
+
+| Regra (recomendação A de `Q-221`, Provisória) | Valor |
+|---|---|
+| Disponível | dia e noite; o tutorial do Day 1 não usa (§Tutorial) |
+| Sinal de anomalia (`AnomalyCue`, visto por todos, DEC-204) | **saída forçada** em 0,4 s com um tremor curto da câmera; sem input por 0,5 s; reentrada travada até a anomalia resolver ou acabar; prato `Parked` |
+| "Ver" −5 e "não olhar" | contam depois da saída; ficar no foco **nunca** vale como "não olhar" (a saída é imediata) |
+| Mudança de faixa de sanidade | saída forçada (o retrato do rosto muda, DEC-167); reentrada livre |
+| Escuro (FEAT-020) | a tábua do veículo fica em `LightZone` (LZ-2 no carrinho ligado); o −1/s segue valendo se a luz apagar (N3/N10) e o foco **não** pausa |
+| Ladrão (dia, FEAT-013) | ícone no HUD do foco quando entra no raio 14; saída forçada ao entrar; a gaveta segue exposta enquanto o jogador está parado |
+| Sanidade < 20 (opcional) | **alucinação só no client** no fundo da tábua (um rosto na janela, um som), não interativa, não conta como anomalia (DEC-038); raro e leve, sem gore (DEC-173, Mild DEC-172) |
+| Café | beber é uma ação do mundo: sair do foco para beber |
+| Anomalias que não dão sinal antes | o foco não muda a regra delas; o cone de "ver" mede a câmera de quem **voltou** ao mundo |
+
+Opções de `Q-221`: (A) esta, (B) ~~só modo rápido à noite~~ (sem objeto em V1: não há modo rápido, DEC-223), (C) livre à noite sem saída forçada (risco proposital, abre a fuga).
+
+#### Relação com o modo atual (prompts no mundo)
+
+| Ponto | Regra (V1, DEC-223) |
+|---|---|
+| Convivência | **não há convivência**: o modo de prompts no mundo (FEAT-006) é **substituído**; a tábua tem um único prompt "Prepare"; mesmo Tool "HotDog" no fim |
+| ~~Modo rápido~~ | ~~piso de acessibilidade~~: **removido**. FEAT-005 (aceite do mobile) emendado só no preparo; exceção em `Q-223` |
+| Incentivo ao focado | Perfect paga mais gorjeta e janela maior (`Q-219`); Good = como hoje |
+| Acessibilidade | Assist, "hold to do", reduced motion **obrigatórios** (Provisório); toda a run concluível só com um dedo |
+| Day 1 | **ensina o modo focado** (único modo); tutorial reescrito pelo narrative-writer (`script.md` §3) |
+
+#### Upgrades de estação (propostas; IDs `UPG-###` só quando virarem ficha em `upgrades.md`)
+
+| Nome provisório | Efeito | Preço Provisório | Onde |
+|---|---|---|---|
+| Sharp Knife | corte e posição: faixas Perfect/Good ×1,25 | $70 | Gear Stand (FEAT-015 v2), mini de faca; mesma regra de cooldown de `Q-203` |
+| Fine Nozzle | molhos e cremes: faixas ×1,25 | $70 | idem, mini de bico |
+| Wide Board | imã de encaixe da salsicha e do queijo maior (+10% do raio) | $90 | idem |
+| Grill (UPG-001 existente) | na fase 2 (`Q-222`): janela de "ponto" 6 → 8 → 10 s por nível | já pago | — |
+| Teto | nenhum upgrade passa de ×1,25; ninguém "compra" o Perfect: o gesto continua necessário | — | — |
+| Classes | passivas de DEC-186 **não** mudam; nova passiva só com DEC | — | — |
+
+(Valiam "só no focado" na V2 descartada; em V1 valem para todo preparo.)
+
+#### Interação com o tutorial
+
+| Regra | Valor |
+|---|---|
+| Day 1 | **ensina o modo focado** (DEC-223; Provisório; antes: "sem modo focado"): Walt na linha, uma aba por vez (Order → Grill → Build → Serve), HUD progressivo; `script.md` §3 e `ui-text.md` a reescrever |
+| Primeira ativação (Day 1) | chamada curta do Walt ("Take your time on the board, kid."), mão-fantasma no gesto 1, **pão de treino grátis** (não gasta estoque) na 1ª vez; a barra de paciência do pedido de treino fica parada |
+| Dicas | `hint_focus_cut`, `hint_focus_place`, `hint_focus_sauce` (1× cada, FEAT-018 `hint_<passo>`) |
+| Voz | sem a palavra "sausage" (TTS), `frank`; falas curtas |
+| HUD progressivo | o ticket e os pontos de etapa entram com o foco (`Content/HudReveal`); sem vermelho |
+
+#### Rede e carga técnica (para o architect validar; **Rascunho**, sem código)
+
+| Item | Proposta |
+|---|---|
+| Autoridade | servidor decide: reserva da tábua, consumo de estoque, nota, criação do Tool "HotDog" com `Quality` |
+| Cliente | roda o minijogo local (sem esperar a rede), câmera `Scriptable`, UI em Vide, input por plataforma |
+| Packets Lync (`src/Libs/Net`) | `FocusEnter(board)` → `FocusStepBegin(board, step, item)` → `FocusStepEnd(board, step, ms, pts[≤32], cada ponto `Lync.int(0, 255)`)` → `FocusExit(board)`; set `FocusBoards` (replicate) com dono e etapa de cada tábua, para os colegas verem |
+| Validação | tempo mínimo por etapa (Cortar 0,6 s, Posicionar 0,4 s, Molho 0,8 s); pontos monotônicos na guia do corte; faixas de valor; taxa 1 pacote por 0,3 s; ping alto não pune (tolerância de 250 ms nas janelas de timing) |
+| Anti-abuso | etapa com tempo abaixo do mínimo ou trilha implausível = no máximo Good; 5 etapas suspeitas seguidas = nota fixa Good no resto do turno e log (sem modo rápido em V1) |
+| Estado | `Parked` guarda o prato na tábua até o fim da fase; ingredientes já gastos ficam gastos |
+| Persistência | nada persiste; snapshot de turno não guarda tábua (começa `Idle`) |
+| Orçamento | 1 câmera, ~30 partes de prop por tábua, 4 tábuas; UI Vide com 1 árvore de foco; sem física nos itens (posição por script) |
+| Dados | `Content.Focus` (tabela abaixo) e `Content.Upgrades` ganha efeitos de tolerância |
+
+`Content.Focus` (Provisório): `Enabled` true · `UnlockDay` 1 (DEC-223; era 2) · `MaxBoards` 4 · `Travel` {In 0,35, Out 0,30} · `IdleExit` 20 · `MinStep` {Cut 0,6, Place 0,4, Sauce 0,8} · `Grades` {Perfect 100, Good 70, Messy 30; PerfectAt 88, GoodAt 60} · `Bands` (tabelas de Cortar, Posicionar e dos 6 complementos) · `PerfectTip` 2 · `PerfectTipWindow` +4 · `MessyTip` 0 · `ForcedExit` {Cue true, SanityBand true, Thief true} · `ReentryLockOnCue` true · `Assist` ×1,30 · `UpgradeCap` ×1,25 · `PointsMax` 32.
+
+#### Riscos e métricas
+
+| Risco | Mitigação / métrica (Provisória) |
+|---|---|
+| Fila: preparo lento demais | mediana no foco ≤ 12 s (K = 2, hábil); **sem modo rápido de reserva (DEC-223)**: se o `Slow` passar da meta de referência (modo de prompts, ~8–10 s) +3 p.p. na simulação, ajustam-se `Flow` (intervalo, paciência) e as faixas de tolerância, não se recria o modo rápido sem DEC |
+| Tédio por repetição | gestos diferentes por complemento; Perfect só com atenção; upgrades de conforto; Assist sem culpa |
+| Fuga das anomalias | saída forçada no sinal; reentrada travada; métrica: nº de "ver"/"não olhar" falhados com e sem foco, **sem diferença significativa** |
+| Mobile | alvos ≥ 44 px, Assist, cursor deslocado; teste em aparelho; taxa de Perfect no toque ≥ 60% da do mouse |
+| Ping alto | tolerância de 250 ms; validação por plausibilidade, não por exatidão |
+| Co-op sem função | 4 jogadores = papéis (Take Order/Serve, tábuas, grelha/estoque/mesas) |
+| Camera sickness | viagem curta, reduced motion, sem balanço |
+| Exploração do Perfect | teto de ganho +14% do ticket; upgrades nunca zeram o gesto |
+| Metas gerais | Perfect ≥ 25% (hábil) e ~10% (iniciante); (adoção do focado: sem objeto, é o único modo); saída no meio < 15%; custo de CPU do cliente no foco < 1,5 ms/quadro no celular alvo (celular-alvo adiado, DEC-090) |
+
+#### Fora do MVP
+
+Grelha focada com "virar/ponto" (`Q-222`), queimar, bebidas e sobremesas, segunda estação de montagem (batata frita, chili), decoração por estrelas, ranking, replays, minigame de descascar (não há batata no cardápio), skins de faca/garrafa pagas.
+
+#### Critérios de aceite (proposta)
+
+- Desde o Day 1 a tábua mostra um único prompt "Prepare"; **nenhum** prompt de preparo (pegar salsicha, cortar pão, complementos) existe no mundo; "Quick Slice" não existe.
+- A tela de foco tem as abas Order, Grill, Build e Serve, ticket sempre visível, lixeira e Next; a grelha segue cozinhando com o jogador em outra aba.
+- 1 a 4 estações ativas = jogadores conectados no início do turno (DEC-223).
+- Entrar no foco trava o movimento do jogador (servidor recusa `WalkSpeed` ≠ 0) e os outros seguem livres.
+- A câmera viaja em 0,35 ± 0,05 s e volta em 0,30 ± 0,05 s; com "reduced motion" é instantânea.
+- Cada etapa só abre com estoque ≥ 1 do item; estoque cai exatamente 1 por etapa; sair no meio não devolve.
+- Dois jogadores tocando a mesma tábua ao mesmo tempo: só um entra.
+- O Tool "HotDog" final tem os complementos pedidos e atributo `Quality`; o preço pago é o mesmo do modo de prompts antigo (a menos que `Q-219` decida diferente); Completo/Incompleto/Errado seguem DEC-072.
+- Etapa enviada em menos que o mínimo ou com trilha impossível nunca dá Perfect.
+- Cortar com desvio ≤ 6% dá Perfect; > 15% dá Messy (±1 p.p. de tolerância de medição).
+- Em 10 pratos com 3 etapas Perfect, a nota do prato é Perfect; uma única Messy impede Perfect.
+- `AnomalyCue` ativo: a câmera sai em ≤ 0,5 s; reentrada recusada até acabar.
+- O foco não pausa o relógio, a paciência do cliente nem o ladrão.
+- Em um dispositivo de toque, todo o fluxo é concluível só com um dedo e o botão "Exit" (e com Assist, sem arrastar).
+- Sem vermelho de alerta na UI do foco; textos em inglês.
+
+#### Rascunho de tarefas (sugestão; **sem `TASK-###`**, só se o dono pedir)
+
+| Dono | Bloco |
+|---|---|
+| game-designer | `Content.Focus`, gestos e faixas por complemento, upgrades (UPG), números de gorjeta (`Q-219`) |
+| architect | packets Lync, set `FocusBoards`, validação e anti-abuso, orçamento de câmera/UI |
+| backend-coder | `FocusService` (reserva da tábua, consumo, nota, Tool com `Quality`, `Parked`, saída forçada), integração com `CustomerService`, `Notices` |
+| frontend-coder | `FocusController` (câmera Scriptable, travessia, input mouse/toque/gamepad), UI Vide (ticket, etapas, selo, "Exit"), props das mãos, `reduced motion` |
+| level-designer | âncoras `Focus_n` e posições de 1–4 jogadores no carrinho e no trailer; conferência de espaço |
+| art-director / modeler-3d | props: faca, garrafa com `Fill` (AST-004/005), bico, mão-fantasma; luz do foco; mini de upgrades |
+| narrative-writer | falas do Walt, dicas `hint_focus_*`, textos "Perfect!/Good/Messy" |
+| audio (usuário, DEC-220) | SFX de corte, aperto, encaixe, selo; lista em `audio/sound-list.md` |
+| qa-tester | plano por plataforma, anomalia + foco, 4 jogadores, ping alto |
+
+- Decididas: `Q-218` (substitui, V1) e `Q-220` (estações = jogadores) por **DEC-223**.
+- Pendências: `Q-219` (nota × dinheiro), `Q-221` (noite), `Q-222` (grelha: "ponto"; a aba Grill já é V1), `Q-223` (exceções de UI e plataforma; **essencial**, sem modo rápido). Liga a `Q-164` (humor dinâmico).
 
 ---
 

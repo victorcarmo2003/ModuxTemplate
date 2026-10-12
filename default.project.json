@@ -111,6 +111,12 @@
 						"optional": "src/Place/shared"
 					}
 				},
+				"Prep": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Prep/shared"
+					}
+				},
 				"ServerRole": {
 					"$ignoreUnknownInstances": false,
 					"$path": {

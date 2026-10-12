@@ -58,6 +58,29 @@ export type ZoneVfx = {
 	ActiveDistance: number, -- studs from the camera: farther zones are hidden and not animated
 }
 
+-- Pad state keys (PadTag.State): Free / Configuring / Open / Closed / Starting.
+export type PadPulse = {
+	Period: number, -- s of one breath of the ring
+	Alpha: number, -- + transparency at the dim end of the breath
+}
+
+-- Squad pad presentation (user request 2026-10-12, Provisional): ring + floor glow colour and breath per state, the
+-- seal of the sign, the rising sparks. Read by LobbyController (Rings, Pads) and PadTag.
+export type Pad = {
+	Colors: { [string]: Color3 }, -- by pad state key
+	Pulse: { [string]: PadPulse }, -- by pad state key
+	-- What the seal under the count pill says: what the run will be ("D1" = day 1, "N1" = night 1). Provisional: every
+	-- run starts at day 1; swap this for the real source (class / day of the room) when the run setup is decided.
+	Badge: string,
+	GlowRings: number, -- flat neon discs around the pad (floor glow; no lights, the lobby is at its 18 light budget)
+	GlowAlpha: number, -- transparency of the innermost disc (the outer ones are fainter)
+	Sparks: {
+		Rate: number, -- particles per second while someone stands on the pad
+		Distance: number, -- studs from the camera: farther pads emit nothing
+	},
+	KickTime: number, -- s of the colour shiver when someone steps on / off
+}
+
 export type Lobby = {
 	Zones: { Zone },
 	Trigger: {
@@ -73,6 +96,7 @@ export type Lobby = {
 		DefaultMaxPlayers: number,
 		DefaultFriendsOnly: boolean,
 		Colors: { Free: Color3, Busy: Color3, Starting: Color3 },
+		Pad: Pad,
 	},
 	Camera: {
 		MinZoom: number,
@@ -85,7 +109,6 @@ const YELLOW = Color3.fromRGB(255, 200, 61) -- MUSTARD (LOBBY.md §12)
 const GREEN = Color3.fromRGB(64, 224, 170) -- MINT
 const BLUE = Color3.fromRGB(45, 120, 255)
 const WHITE = Color3.fromRGB(255, 250, 240)
-const RED = Color3.fromRGB(235, 70, 60) -- KETCHUP
 
 -- LOBBY v2 §V2-4: two rows of 4 (X 16 = near row 1..4, X 34 = far row 5..8), pitch 18 (10 studs between edges)
 local function squad(n: number, x: number, z: number): Zone
@@ -173,7 +196,29 @@ const lobby: Lobby = {
 		Countdown = 5, -- FEAT-001 "contagem de 5 s"
 		DefaultMaxPlayers = 4, -- DEC-012
 		DefaultFriendsOnly = false,
-		Colors = { Free = WHITE, Busy = RED, Starting = GREEN },
+		-- legacy ring colours (no longer read by the lobby: Pad.Colors replaced them; no red, style guide §7.4)
+		Colors = { Free = WHITE, Busy = YELLOW, Starting = GREEN },
+		Pad = {
+			Colors = {
+				Free = Color3.fromRGB(95, 200, 120), -- Green
+				Configuring = Color3.fromRGB(255, 200, 61), -- Mustard
+				Open = Color3.fromRGB(95, 200, 120),
+				Closed = Color3.fromRGB(138, 143, 163), -- Slate
+				Starting = Color3.fromRGB(63, 167, 181), -- Teal
+			},
+			Pulse = {
+				Free = { Period = 2, Alpha = 0.35 },
+				Configuring = { Period = 2.6, Alpha = 0.2 },
+				Open = { Period = 2.2, Alpha = 0.25 },
+				Closed = { Period = 3.2, Alpha = 0.1 },
+				Starting = { Period = 0.7, Alpha = 0.5 },
+			},
+			Badge = "D1",
+			GlowRings = 3,
+			GlowAlpha = 0.86,
+			Sparks = { Rate = 6, Distance = 60 },
+			KickTime = 0.45,
+		},
 	},
 	Camera = {
 		MinZoom = 0.5,

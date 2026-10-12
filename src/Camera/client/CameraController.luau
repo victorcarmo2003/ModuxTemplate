@@ -68,6 +68,20 @@ local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 
 export type Mode = "FirstPerson" | "Spectate" | "Fixed" | "Cutscene" | "External"
 
+-- Camera rig of a cutscene shot (CutsceneController/Director.luau; owner request 2026-10-12), all optional
+export type Rig = {
+	Dolly: Vector3, -- eye offset, camera space (X right, Y up, Z forward)
+	Boom: Vector3?, -- detached eye in walker space (X right, Y up, Z forward of the own body): the establishing shot
+	BoomLook: Vector3?, -- what a boom looks at, walker space from the head
+	Orbit: number, -- radians the eye circles the focus target
+	Roll: number,
+	Fov: number?, -- overrides the focus fov
+	Far: number?, -- depth of field far blur
+	Rack: number?, -- 1/s the depth of field follows the focus
+	Shake: Vector3, -- hand-held, camera space studs
+	Tilt: Vector3, -- hand-held, radians (pitch, yaw, roll)
+}
+
 type Group = "Head" | "Arm" | "Body"
 
 const RENDER_STEP = "CameraController.BodyVisibility"
@@ -109,6 +123,7 @@ const CUT_YAW = math.rad(CUT_LOOK.Yaw)
 const CUT_PITCH = math.rad(CUT_LOOK.Pitch)
 const CUT_JUMP = math.rad(25) -- a live focus that jumps this much in a frame (next window card) eases like a new one
 const FOV_RATE = 3 -- 1/s ease of the field of view
+const SHOT_FOV_RATE = 14 -- 1/s: a shot animates its own fov, the camera only smooths it
 const DOF_RATE = 4 -- 1/s ease of the depth of field
 const DOF_FAR = 0.3 -- far blur while a focus holds (none while walking)
 const DOF_RADIUS_MIN = 8 -- studs in focus around the focus distance
@@ -334,6 +349,9 @@ function CameraController:Setup()
 	self.Transition = nil :: { FromYaw: number, FromPitch: number, At: number, Time: number }?
 	-- free look spring velocity (rad/s) and the view settings restored after the cutscene
 	self.LookVelocity = Vector2.zero :: Vector2
+	-- shot rig of the cutscene (SetRig) and whether the last frame was a detached boom
+	self.Rig = nil :: Rig?
+	self.WasBoom = false :: boolean
 	self.BaseFov = nil :: number?
 	self.Dof = nil :: DepthOfFieldEffect?
 	-- kept for ResetLook (older cutscene base)
@@ -404,6 +422,8 @@ function CameraController:Cutscene(on: boolean)
 	elseif Vide.untrack(self.Mode) == "Cutscene" then
 		self.FocusGetter = nil
 		self.FocusFov = nil
+		self.Rig = nil
+		self.WasBoom = false
 		const dof = self.Dof
 		self.Dof = nil
 		if dof ~= nil then
@@ -417,6 +437,11 @@ function CameraController:Cutscene(on: boolean)
 		self:SetMode("FirstPerson")
 		self.NextDrive = 0
 	end
+end
+
+-- Shot rig of this frame (CutsceneController, every frame of a scene with shots); nil = the plain head POV
+function CameraController:SetRig(rig: Rig?)
+	self.Rig = rig
 end
 
 -- Focus of the cutscene POV (beats `LookAt` / `Focus`): a live position (re-read every frame, so a moving car is
@@ -744,8 +769,30 @@ function CameraController:ApplyPov(mode: Mode, camera: Camera, dt: number)
 	const root = body:FindFirstChild("HumanoidRootPart")
 	const facing: Vector3 = if root and root:IsA("BasePart") then root.CFrame.LookVector else head.CFrame.LookVector
 	const now = os.clock()
+	local eye = head.Position
+	const rig = if mode == "Cutscene" then self.Rig else nil
+	local boom = false
 	if mode == "Cutscene" then
-		self:CutsceneBase(head.Position, facing, camera, dt, now)
+		boom = rig ~= nil and rig.Boom ~= nil and rig.BoomLook ~= nil
+		if boom then
+			eye = self:BoomView(rig :: Rig, head.Position, facing)
+			if self.WasBoom == false then
+				self.WasBoom = true
+			end
+			self:CutsceneLens(camera, dt, (eye - head.Position).Magnitude)
+		else
+			if self.WasBoom then
+				-- back to the head: the base view starts from the focus again (a dip hides the cut)
+				self.WasBoom = false
+				self.BaseYaw = nil
+				self.Transition = nil
+				self.LastTargetYaw = nil
+			end
+			if rig ~= nil and rig.Orbit ~= 0 then
+				eye = self:OrbitEye(eye, rig.Orbit)
+			end
+			self:CutsceneBase(eye, facing, camera, dt, now)
+		end
 	else
 		const targetYaw = yawOf(facing)
 		const ease = 1 - math.exp(-FOLLOW_RATE * dt)
@@ -778,7 +825,42 @@ function CameraController:ApplyPov(mode: Mode, camera: Camera, dt: number)
 
 	const yaw = (self.BaseYaw :: number) + self.LookYaw
 	const pitch = math.clamp(self.BasePitch + self.LookPitch, -PITCH_LIMIT, PITCH_LIMIT)
-	camera.CFrame = CFrame.new(head.Position) * CFrame.fromOrientation(pitch, yaw, 0)
+	local frame = CFrame.new(eye) * CFrame.fromOrientation(pitch, yaw, 0)
+	if rig ~= nil then
+		-- shot: hand-held tilt and roll, then the dolly and shake along the camera axes
+		frame *= CFrame.Angles(rig.Tilt.X, rig.Tilt.Y, rig.Tilt.Z + rig.Roll)
+		const shift = Vector3.new(rig.Dolly.X + rig.Shake.X, rig.Dolly.Y + rig.Shake.Y, -(rig.Dolly.Z + rig.Shake.Z))
+		frame += frame:VectorToWorldSpace(shift)
+	end
+	camera.CFrame = frame
+end
+
+-- Eye of a boom shot: the walker's head plus the boom vector in the body's own axes; the base view looks at BoomLook
+function CameraController:BoomView(rig: Rig, head: Vector3, facing: Vector3): Vector3
+	const space = CFrame.fromOrientation(0, yawOf(facing), 0)
+	const boom = rig.Boom :: Vector3
+	const look = rig.BoomLook :: Vector3
+	const eye = head + space:VectorToWorldSpace(Vector3.new(boom.X, boom.Y, -boom.Z))
+	const target = head + space:VectorToWorldSpace(Vector3.new(look.X, look.Y, -look.Z))
+	const direction = target - eye
+	if direction.Magnitude > 0.01 then
+		const unit = direction.Unit
+		self.BaseYaw = yawOf(unit)
+		self.BasePitch = math.asin(math.clamp(unit.Y, -1, 1))
+	end
+	return eye
+end
+
+-- The eye circles the focus target by `angle` radians around the vertical (orbit shot)
+function CameraController:OrbitEye(eye: Vector3, angle: number): Vector3
+	const getter = self.FocusGetter
+	const target = if getter ~= nil then getter() else nil
+	if target == nil then
+		return eye
+	end
+	const offset = eye - target
+	const flat = CFrame.Angles(0, angle, 0):VectorToWorldSpace(Vector3.new(offset.X, 0, offset.Z))
+	return target + flat + Vector3.new(0, offset.Y, 0)
 end
 
 -- Cutscene base view: eased switch to a new focus, then follows it; FOV and depth of field of the focus.
@@ -834,17 +916,24 @@ function CameraController:CutsceneBase(eye: Vector3, facing: Vector3, camera: Ca
 	end
 	self.LastTargetYaw = targetYaw
 
-	-- field of view of the focus
+	self:CutsceneLens(camera, dt, distance)
+end
+
+-- Field of view and depth of field of the cutscene: the focus sharp, the far background a little soft (none while
+-- walking); a shot rig sets its own fov, far blur and rack speed. `distance` = to the focus (nil = none).
+function CameraController:CutsceneLens(camera: Camera, dt: number, distance: number?)
+	const rig = self.Rig
 	const baseFov = self.BaseFov or camera.FieldOfView
-	const fov = self.FocusFov or baseFov
+	const fov = (if rig ~= nil then rig.Fov else nil) or self.FocusFov or baseFov
 	if math.abs(camera.FieldOfView - fov) > 0.01 then
-		camera.FieldOfView += (fov - camera.FieldOfView) * (1 - math.exp(-FOV_RATE * dt))
+		const rate = if rig ~= nil and rig.Fov ~= nil then SHOT_FOV_RATE else FOV_RATE
+		camera.FieldOfView += (fov - camera.FieldOfView) * (1 - math.exp(-rate * dt))
 	end
-	-- depth of field: the focus sharp, the far background a little soft (none while walking)
 	const dof = self.Dof
 	if dof ~= nil then
-		const ease = 1 - math.exp(-DOF_RATE * dt)
-		const far = if distance ~= nil then DOF_FAR else 0
+		const ease = 1 - math.exp(-((if rig ~= nil then rig.Rack else nil) or DOF_RATE) * dt)
+		const shotFar = if rig ~= nil then rig.Far else nil
+		const far = shotFar or (if distance ~= nil then DOF_FAR else 0)
 		dof.FarIntensity += (far - dof.FarIntensity) * ease
 		if distance ~= nil then
 			dof.FocusDistance += (distance - dof.FocusDistance) * ease

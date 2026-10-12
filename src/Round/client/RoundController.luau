@@ -23,7 +23,7 @@ const WINDOW_ORDER = { "Calm", "Shift", "Last" }
 
 -- Fallback before the first record arrives (Ready = false): start of the day prep (7:00 AM)
 const DEFAULT_PHASE = "Prep"
-const DEFAULT_VEHICLE = "cart" -- wave 1 always starts on the cart
+const DEFAULT_VEHICLE = "trailer" -- the only vehicle (2026-10-12)
 const NO_MINUTE = -1 -- forces the next Refresh to write ClockText
 
 export type Window = "Calm" | "Shift" | "Last"

@@ -10,3 +10,7 @@ sourcemap.json
 
 # Blender auto-backups
 *.blend1
+
+# voice tooling
+/tools/voice/.venv/
+/tools/voice/samples/

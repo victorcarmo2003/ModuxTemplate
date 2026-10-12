@@ -36,13 +36,12 @@ end
 const base = Table.new({
 	-- Resume wait after a reconnect (DEC-080); = RunParams.ResumeWait (architect). Clock held.
 	{ Key = "Resume", Duration = 15, ClockFrom = 0, ClockTo = 0, Kind = "Any", Selling = false, SkipWithoutProbe = false },
-	-- Intro cutscene, first shift of a new run only (FEAT-004; PROVISIONAL frontend-coder 2026-10-11: the intro got
-	-- dramatic pauses after the user's play feedback, was 50 s). Cap 108 s = the wait for every participant's
-	-- ClientReady (Cutscenes.Rules.ReadyTimeout 30 s) + the intro Cap (76 s) + margin; the probe ends it as soon as
-	-- the chain is over. Clock stopped at 7:00 AM.
+	-- Intro cutscene, first shift of a new run only (FEAT-004; PROVISIONAL frontend-coder 2026-10-12, owner D3: short
+	-- intro, was 108 s). Cap 80 s = the wait for every participant's ClientReady (Cutscenes.Rules.ReadyTimeout 30 s) +
+	-- the intro Cap (48 s) + 2 s margin; the probe ends it as soon as the chain is over. Clock stopped at 7:00 AM.
 	{
 		Key = "Intro",
-		Duration = 108,
+		Duration = 80,
 		ClockFrom = hours(7),
 		ClockTo = hours(7),
 		Kind = "Day",

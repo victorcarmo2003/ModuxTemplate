@@ -74,6 +74,7 @@ export type Public = {
 	Paint: (self: Public, fixture: Fixture, lit: boolean, live: boolean) -> (),
 	RefreshFixtures: (self: Public) -> (),
 	Target: (self: Public) -> (Preset, number, string),
+	BaseTarget: (self: Public) -> (Preset, number, string),
 	Write: (self: Public, preset: Preset, clock: number) -> (),
 	RefreshPreset: (self: Public) -> (),
 	WatchContext: (self: Public) -> (),

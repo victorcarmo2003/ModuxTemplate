@@ -44,6 +44,7 @@ export type LightPresets = {
 	Night1: LightPreset,
 	Night10: LightPreset,
 	Lobby: LightPreset,
+	Cinematic: LightPreset, -- the opening cutscene only (Cutscenes[].Look): warm, contrasty, soft bloom and sun rays
 	LobbyClock: number, -- ClockTime of the lobby (the user set it at night)
 	NightClock: number, -- ClockTime of every night (§5.3: fixed near 0)
 	GoldenFrom: number, -- hour the golden hour starts (§5.2: 4 PM)
@@ -181,6 +182,34 @@ const presets: LightPresets = {
 		BloomThreshold = 1.2,
 		SunRays = 0,
 		SunRaysSpread = 0.1,
+	},
+	-- Intro cutscene look (owner request 2026-10-12, PROVISIONAL): the Day preset pushed warmer and more contrasty, a
+	-- softer wider bloom, stronger sun rays, a touch more haze for depth. LightController applies it while a scene
+	-- with `Look = "Cinematic"` plays (blend over BlendTime) and takes it away at the end; the clock stays the day's.
+	Cinematic = {
+		Brightness = 3,
+		Ambient = Color3.fromRGB(100, 84, 72),
+		OutdoorAmbient = Color3.fromRGB(128, 106, 88),
+		ColorShiftTop = Color3.fromRGB(255, 214, 160),
+		ColorShiftBottom = Color3.fromRGB(0, 0, 0),
+		EnvDiffuse = 1,
+		EnvSpecular = 0.9,
+		ShadowSoftness = 0.3,
+		AtmDensity = 0.42,
+		AtmOffset = 1,
+		AtmGlare = 2.2,
+		AtmHaze = 1.0,
+		AtmColor = Color3.fromRGB(222, 192, 162),
+		AtmDecay = Color3.fromRGB(238, 164, 108),
+		CCBrightness = 0.02,
+		Saturation = 0.42,
+		Contrast = 0.2,
+		Tint = Color3.fromRGB(255, 238, 212),
+		BloomIntensity = 1.05,
+		BloomSize = 34,
+		BloomThreshold = 1.6,
+		SunRays = 0.12,
+		SunRaysSpread = 0.28,
 	},
 	LobbyClock = 20.75,
 	NightClock = 0,

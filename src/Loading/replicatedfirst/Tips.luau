@@ -19,7 +19,7 @@ return table.freeze({
 	-- steps of LoadingController (and the boot before it)
 	Status = table.freeze({
 		Boot = "Unfolding the umbrella...",
-		Game = "Rolling the cart to the corner...",
+		Game = "Parking the trailer on the corner...",
 		Kit = "Waking up the crew...",
 		Assets = "Warming the grill...",
 		Voices = "Rehearsing the phone call...",

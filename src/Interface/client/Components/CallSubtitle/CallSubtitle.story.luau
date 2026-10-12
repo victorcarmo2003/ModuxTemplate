@@ -26,7 +26,7 @@ type Controls = {
 	Scale: () -> number,
 }
 
-const CALLS = { "call_night_7", "call_day_1", "call_night_4", "call_night_short", "hint_serve", "call_trailer_bought" }
+const CALLS = { "call_night_7", "call_day_1", "call_night_4", "call_night_short", "hint_serve", "call_night_2" }
 
 return UILabs.CreateVideStory({
 	vide = Vide,

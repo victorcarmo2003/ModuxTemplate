@@ -2,7 +2,7 @@
 --[[
 	SeatingController (TASK-147; FEAT-037; UPG-008; network.md §14; architecture.md §19.28)
 
-	Presents the Pad tables from the server; decides nothing (SeatingService buys, seats, cleans and pays).
+	Presents the tables from the server; decides nothing (SeatingService buys, seats, cleans and pays).
 
 	  - Tables set (record id = table index 1..Content.Seating.Tables) -> one Vide source per table.
 	  - The table Model is found by the tag Seating.Binding.Tag + attribute TableIndex (bound place, TASK-149, or
@@ -30,8 +30,8 @@
 	set through CustomerController. It goes when the food is served (the customer is Leaving and eats; `Eating`
 	on the rig, Meal.luau) or the customer leaves.
 
-	Groups (Q-209): the Trailer tables (TBL-6..9) arrive Locked (hidden) until the trailer is the vehicle, then the next one
-	is a Ghost with a plate "Trailer Table $N"; a ghost the party cannot pay is drawn fainter (GhostDimTransparency).
+	Groups (Q-209): one group since 2026-10-12, the tables TBL-1..4; the next one for sale is a Ghost with a plate
+	"Table $N"; a ghost the party cannot pay is drawn fainter (GhostDimTransparency).
 
 	Not here yet (TASK-147 rest): Patio Lights string (UPG-009) and Back Bar (UPG-010): no model nor binding yet
 	(TASK-149 / TASK-153). Listeners in OnInit (before Lync.start); tags and rigs are scanned in OnStart.
@@ -55,7 +55,7 @@ local Meal = require(script.Meal)
 const SEATING = Content.Seating
 const BINDING = SEATING.Binding
 const ECONOMY_ID = 1 -- single record (network.md §1 rule 5)
-const SIGN_TITLE = "Patio Table" -- ui-text.md (TASK-150), Provisional (Pad group; the others use Group.Label)
+const SIGN_TITLE = "Table" -- ui-text.md (TASK-150), Provisional (fallback; every group uses Group.Label)
 const SIGN_LIFT = 2.8 -- studs over the table top: clears the prompt pill (anchor at +0.6)
 const SIGN_DISTANCE = 45
 const ORDER_LIFT = 4.2 -- studs over the table top: the order bubble sits over the "TABLE n" plate (Q-209)
@@ -403,11 +403,11 @@ function SeatingController:RefreshDim()
 	end
 end
 
--- Plate title of a table: its group's label (Pad keeps "Patio Table").
+-- Plate title of a table: its group's label.
 local function titleOf(index: number): string
 	for _, group in SEATING.Groups do
 		if index >= group.First and index < group.First + group.Count then
-			return if group.Key == "Pad" then SIGN_TITLE else group.Label
+			return group.Label
 		end
 	end
 	return SIGN_TITLE

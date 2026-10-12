@@ -45,6 +45,7 @@ const HINT = "Hold to skip"
 const SKIPPING = "Skipping..."
 const PILL_HEIGHT = 44 -- >= Theme.MinTouch
 const MIN_WIDTH = 130
+const PILL_WIDTH = 190 -- fixed: an auto-sized pill grew to ~800 px on a phone (owner screenshot 2026-10-12)
 const TEXT_SIZE = 17 -- >= Theme.MinTextSize on the smallest phone
 const HINT_SIZE = 14
 const CHIP_SIZE = 28
@@ -128,8 +129,7 @@ return function(props: Props): Frame
 		create("TextButton")({
 			Name = "Pill",
 			LayoutOrder = 2,
-			Size = UDim2.fromOffset(0, PILL_HEIGHT),
-			AutomaticSize = Enum.AutomaticSize.X,
+			Size = UDim2.fromOffset(PILL_WIDTH, PILL_HEIGHT),
 			BackgroundTransparency = 1,
 			AutoButtonColor = false,
 			Text = "",
@@ -153,14 +153,15 @@ return function(props: Props): Frame
 
 			CartoonPanel({
 				Name = "Body",
-				Size = UDim2.fromOffset(0, PILL_HEIGHT),
-				AutomaticSize = Enum.AutomaticSize.X,
+				Size = UDim2.fromOffset(PILL_WIDTH, PILL_HEIGHT),
+				-- only while the own press holds, the own vote is in or the server counts votes (the hint is the idle
+				-- state; the pill area stays the touch target)
+				Visible = function()
+					return pressed() or props.Voted() or props.Votes() > 0 or props.Progress() > 0
+				end,
 				Tone = Theme.Tone.Ink,
 				Transparency = Theme.Transparency.Panel,
 				Outline = Theme.Outline.Thick,
-				Decor = {
-					createRaw("UISizeConstraint")({ MinSize = Vector2.new(MIN_WIDTH, PILL_HEIGHT) }),
-				},
 				Children = {
 					-- Hold fill, under the content: a Mustard pill growing from the left
 					create("Frame")({
@@ -184,13 +185,12 @@ return function(props: Props): Frame
 
 					create("Frame")({
 						Name = "Content",
-						Size = UDim2.new(0, 0, 1, 0),
-						AutomaticSize = Enum.AutomaticSize.X,
+						Size = UDim2.fromScale(1, 1),
 						BackgroundTransparency = 1,
 						ZIndex = 1,
 						createRaw("UIPadding")({
 							PaddingLeft = UDim.new(0, 8),
-							PaddingRight = UDim.new(0, 18),
+							PaddingRight = UDim.new(0, 12),
 						}),
 						createRaw("UIListLayout")({
 							FillDirection = Enum.FillDirection.Horizontal,

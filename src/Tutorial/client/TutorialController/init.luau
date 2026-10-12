@@ -168,7 +168,7 @@ const MART_DOOR = "MKT-DOOR" -- MapPoint of the Mart entrance (MAP-01)
 const DOOR_SEARCH = 16 -- an AutoDoor this close to MKT-DOOR is the one marked
 const NEAR_DOOR = 8 -- the player reached the Mart: from here the shelf is marked
 const NEAR_SHELF = 18
-const NEAR_CRATE = 12 -- back at the cart: "Restock the buns"
+const NEAR_CRATE = 12 -- back at the trailer: "Restock the buns"
 -- Voices ahead / dev tools
 const PROFILE_WAIT = 3 -- s PreloadVoices waits for the Profile packet before it gives up (Tick prepares later)
 const DEBUG_BIND = "TutorialDebug"
@@ -480,7 +480,7 @@ function TutorialController:Anchor(action: string, enabled: boolean, filter: ((I
 	return best
 end
 
--- Units of an ingredient in the cart (Stock set, record id = Content.Ingredients.IndexOf). nil = not replicated yet.
+-- Units of an ingredient in the trailer (Stock set, record id = Content.Ingredients.IndexOf). nil = not replicated yet.
 function TutorialController:StockAmount(ingredient: string): number?
 	const index = Content.Ingredients.IndexOf[ingredient]
 	if index == nil then
@@ -952,7 +952,7 @@ local function highlightOf(anchor: Instance): Instance?
 		const model = ancestorWith(anchor, function(instance)
 			return instance:IsA("Model")
 		end)
-		-- never the whole cart / trailer (a vehicle model can be that small)
+		-- never the whole trailer (a vehicle model can be that small)
 		if
 			model
 			and not CollectionService:HasTag(model, VEHICLE_TAG)

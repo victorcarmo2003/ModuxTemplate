@@ -168,3 +168,14 @@ conferir se o áudio está público/liberado para a experiência (senão não to
 | Nome original (AmbientSFX) | Asset ID | Chave |
 |---|---|---|
 | HorrorAmbient | 88784462446827 | `amb_horror` (camada de tensão, loop com crossfade) |
+
+## Voz (2026-10-12, falas pré-geradas)
+
+- Ferramenta: **Kokoro-82M** (hexgrad/Kokoro-82M, pacote `kokoro` >= 0.9.4, fonemização espeak-ng), TTS offline.
+- Licença: **Apache 2.0** (modelo e pacote); uso comercial permitido, sem obrigação de crédito no jogo, registrada aqui.
+- Nota: **áudio gerado por IA (Kokoro-82M)**. Vozes: `am_fenrir` (Walt, pós-processado em ffmpeg), `af_heart` (equipe).
+- Pós-processamento: ffmpeg (pitch, EQ, compressão, saturação suave, filtro de telefone nas chamadas), tudo em
+  `tools/voice/config.json`. Reprodutível: `tools/voice/README.md`.
+- Catálogo: `tools/voice/lines.json` (244 falas) -> `tools/voice/assets.json` (assetIds) ->
+  `src/Shared/Content/VoiceLines.luau`. Uploads no grupo 773736808 como Audio (`v_<chave>`).
+- Substitui o Fish Audio (saldo insuficiente) e é preferido ao AudioTextToSpeech do Roblox, que continua só como reserva.

@@ -695,9 +695,10 @@ function MarketController:StepHint()
 	end
 	-- the tutorial owns the guidance on Day 1 (one arrow at a time): no gear-stand hint until it ends or is skipped
 	const tutorial = self.Dependencies.TutorialController
-	if Vide.untrack(function(): boolean
+	const tutorialOn = Vide.untrack(function(): boolean
 		return tutorial:FirstRun()
-	end) then
+	end)
+	if tutorialOn then
 		hint:Set(false)
 		return
 	end

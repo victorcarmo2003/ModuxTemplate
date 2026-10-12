@@ -9,6 +9,7 @@ Chances do chefe: **1 por run inteira** **[DEC-110, DEC-112]**. Noite repetida: 
 
 ## 0. Fluxo da run — NOVO (pedido do dono 2026-10-12, **Provisório**, Q-207)
 
+> **DEC-224 (2026-10-12, dono): o trailer é o veículo ÚNICO desde o Day 1; o carrinho saiu; a compra/oferta do trailer acabou.** Nas linhas "Night k", "Day k + 2", "Trailer (opcional, depois)" e na tabela "Anomalias no carrinho" abaixo, **leia sempre "trailer"**: as colunas "No carrinho" e `Trailer = None/Helps/Needs` ficam como **histórico** (todas as noites no trailer; **N3 acontece normalmente**, sem "reserva ANM-002"; N8/N9 = fechar a janela; `OfferAfterNight` sem uso; "Day 4 (oferta do trailer)" é um dia comum). A camada "Veículo" do §1 (carrinho → trailer, Day 5) e os marcos de "trailer comprado" dos §3 e §9 ficam **obsoletos**. Fluxo D1, D2, N1 ... D11, N10 e as durações **seguem** (Q-207 a, b, d, e). Perguntas novas: `Q-224`, `Q-225`.
 > Este bloco **substitui** o que os §1–§3, §4.1, §6 e §8 dizem sobre "nights só com trailer", "trailer no Day 5" e "modo dia infinito".
 > Eles ficam abaixo como histórico, marcados. Nada aqui é **Aprovado**: depende de DEC do usuário (Q-207).
 
@@ -55,7 +56,7 @@ Chances do chefe: **1 por run inteira** **[DEC-110, DEC-112]**. Noite repetida: 
 Dia = Prep 30 + Open 216 + Closing ≤ 20 + Summary 8 s. Noite = Call ~35 s + Prep 90 s + Night + NightEnd 3 s + Closing ≤ 30 s + Summary 10 s (~2,9 min fora a noite em si).
 Run perfeita ≈ **3,4 h** (era ≈ 6,4 h; o "~6 h" do DEC-057 deixa de valer: Q-207). A noite perdida (1 por run, DEC-110) acrescenta 12–18 min.
 
-**Trailer (opcional, depois):** deixa de ser compra obrigatória do Day 5. É oferecido na manhã depois da Night
+**~~Trailer (opcional, depois)~~ — OBSOLETO (DEC-224): sem compra; veículo único desde o Day 1.** Histórico: deixa de ser compra obrigatória do Day 5. É oferecido na manhã depois da Night
 `Content.Trailer.OfferAfterNight` (2) e comprado na placa FOR SALE (preço DEC-047 × party). Ele **ajuda** contra as anomalias
 (janela que fecha, luzes, café, ponto seguro). Antes da compra todas as noites são no carrinho; **quem nunca compra** joga as 10 noites no carrinho,
 com dificuldade maior (sem janela e sem interruptor; ver tabela abaixo). **O modo dia infinito acaba**: nunca ocorre "dia sem noite"
@@ -86,7 +87,7 @@ Regra de conteúdo (`Validate`): as noites até `OfferAfterNight` (1 e 2) têm d
 |---|---|---|---|
 | Ingredientes | 2 → 6 complementos, automático por dia | Day 1–6 | DEC-071 |
 | Equipamentos | Grill, Cooler, Counter, Lock, Lights — bancada do Mart, sempre à venda | Day 2 → ~Day 8 (solo) | DEC-046, DEC-101, DEC-106 |
-| Veículo | carrinho → trailer (compra fixa, fora da rotação; trabalha na esquina) | Day 5 | DEC-047, DEC-052, DEC-086, DEC-107 |
+| ~~Veículo~~ | ~~carrinho → trailer (compra fixa...)~~ **OBSOLETO (DEC-224): trailer único desde o Day 1** | — | ~~DEC-047, DEC-052, DEC-086, DEC-107~~ |
 | Seguro (opcional) | Rescue Whistle (ITM-021) no slot especial da bancada, 15%/turno | Night 1 → fim da run | DEC-100, DEC-108, DEC-129 |
 | Noites | 1 anomalia nova por noite, cumulativo | Night 1–10 | DEC-025, DEC-060 |
 | Mistério | ligações de Walt Bramble → pistas (`ending.md` §3) → Walt em pessoa no final | Night 1–10 | DEC-065, rodada 7 |

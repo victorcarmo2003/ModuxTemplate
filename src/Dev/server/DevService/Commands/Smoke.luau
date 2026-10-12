@@ -6,7 +6,7 @@
 --   smoke           starts the run in the background (about 60 s); the report prints in the Output when it ends
 --   smoke status    "running" / the last report
 -- Report: "SMOKE: N ok, M failures, K warnings" then one line per failed step, error line and warning.
--- Dev mode only (DevService loads Commands/ only then). It changes the run state (day, night, vehicle, tables, tutorial):
+-- Dev mode only (DevService loads Commands/ only then). It changes the run state (day, night, tables, tutorial):
 -- run it in a throwaway Play session.
 local LogService = game:GetService("LogService")
 local Players = game:GetService("Players")
@@ -219,13 +219,13 @@ const Smoke: Api.Module = function(ctx: Api.Context): { Api.Command }
 			end,
 		},
 		{
-			Name = "trailer swap",
+			Name = "trailer ready",
 			Run = function(): string?
-				const reply = dev("trailer", "swap")
-				settle(3)
+				const reply = dev("trailer", "status")
+				settle(1)
 				const vehicle = (service("VehicleService") :: Vehicles):Current()
 				if vehicle ~= "trailer" then
-					error(`vehicle after swap: {vehicle}`, 0)
+					error(`vehicle is {vehicle}, the trailer is the only vehicle`, 0)
 				end
 				return `{reply}; {vehicle}`
 			end,
@@ -308,7 +308,7 @@ const Smoke: Api.Module = function(ctx: Api.Context): { Api.Command }
 		{
 			Name = "smoke",
 			Usage = "smoke [status]",
-			Help = "smoke test: boot, intro skip, tutorial, day customer, seating, night 1, anomaly, trailer swap; prints 'SMOKE: N ok, M failures, K warnings'",
+			Help = "smoke test: boot, intro skip, tutorial, day customer, seating, night 1, anomaly, trailer ready, trailer tables; prints 'SMOKE: N ok, M failures, K warnings'",
 			Run = function(args: { string }, _caller: Player?): string?
 				if args[1] == "status" then
 					return if running then "smoke running" else lastReport
