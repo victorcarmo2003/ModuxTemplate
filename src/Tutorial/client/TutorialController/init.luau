@@ -117,6 +117,7 @@ const REASK = 15 -- s without a tutorial customer around before TutorialBegin go
 const CHECK_TIME = 0.9 -- s the panel chip shows the green check of a completed step
 const TUTORIAL_CALL = Content.BossCallRules.Tutorial.Call
 const CALL_WAIT = 12 -- s of a silent phone before the tutorial goes on without Walt (panel only)
+const RUSH_TIME = 4 -- s between two step changes under which the player is rushing (no praise)
 const NUDGE = 20 -- s on the same step before Walt says it again (steps without Remind)
 const IDLE = 12 -- s without progress on a step with Remind before it turns urgent (and again every IDLE s)
 const PROGRESS = 2 -- studs closer to the target that count as progress (walking to it resets IDLE)
@@ -234,6 +235,8 @@ function TutorialController:Setup()
 	-- Walt on the line: the tutorial call was answered (from here he leads), the greeting went out, no call came
 	self.Answered = false :: boolean
 	self.Greeted = false :: boolean
+	self.GreetPinned = false :: boolean -- the greeting survives step changes until the first action step is past
+	self.SpokeAt = 0 :: number -- os.clock of the last SpeakStep (rush detection)
 	self.Uncalled = false :: boolean
 	-- os.clock of the first tick with a silent phone (0 = not waiting)
 	self.WaitStarted = 0 :: number
@@ -655,7 +658,11 @@ function TutorialController:UpdateCall()
 	end
 end
 
--- Walt's lines for a step change: the greeting first, the praise of a step left forward, then the new step
+-- Walt's lines for a step change, in step with the player (user request 2026-10-11: rushing the tutorial). The step
+-- on screen is the one Walt talks about: a change cuts the line in progress (voice and subtitle) and drops what was
+-- queued, then says the praise of the step left (only when Walt was idle and the player is not rushing, and no step
+-- with lines was skipped) and the lines of the new step. Exceptions: the greeting is never cut before the first action
+-- step is past; a silent waiting row of the same number (slicing) lets the line in progress finish.
 function TutorialController:SpeakStep(before: Steps.Step?, after: Steps.Step?)
 	if after == nil then
 		return
@@ -664,23 +671,46 @@ function TutorialController:SpeakStep(before: Steps.Step?, after: Steps.Step?)
 		self:Trace(`step {after.Key}: Walt not on the line, no lines (answered {tostring(self.Answered)}, call {self:CallState()})`)
 		return
 	end
-	const lines: { string } = {}
+	const now = os.clock()
+	const lastAt = self.SpokeAt
+	self.SpokeAt = now
+	const say = after.Say or {}
+	const afterIndex = Steps.IndexOf[after.Key] or 0
 	if not self.Greeted then
 		self.Greeted = true
-		for _, text in Steps.Greeting do
-			table.insert(lines, text)
-		end
-	elseif before and before.Done and (Steps.IndexOf[after.Key] or 0) > (Steps.IndexOf[before.Key] or 0) then
+		self.GreetPinned = true
+		self.Call.Queue(Steps.Greeting, true)
+		self.Call.Queue(say)
+		self:Trace(`step {after.Key}: greeting + {#say} line(s) queued`)
+		return
+	end
+	if before == nil then
+		self.Call.Queue(say)
+		return
+	end
+	const beforeIndex = Steps.IndexOf[before.Key] or 0
+	if self.GreetPinned and afterIndex > (Steps.IndexOf.order or 0) then
+		self.GreetPinned = false -- past the first action: the greeting is obsolete
+	end
+	if self.GreetPinned then
+		-- the greeting stays (at most the unspoken lines of an older step are dropped)
+		self.Call.Replace(say)
+		self:Trace(`step {after.Key}: greeting kept, {#say} line(s) replaced`)
+		return
+	end
+	if #say == 0 and after.Number == before.Number then
+		return -- silent waiting row of the same step: what Walt is saying still holds
+	end
+	const lines: { string } = {}
+	if before.Done and afterIndex > beforeIndex and afterIndex - beforeIndex <= 1 and not self.Call.Busy()
+		and now - lastAt >= RUSH_TIME then
 		table.insert(lines, before.Done)
 	end
-	for _, text in after.Say or {} do
+	for _, text in say do
 		table.insert(lines, text)
 	end
-	if #lines > 0 then
-		-- queued behind what Walt has yet to say (a step change never drops the greeting nor cuts a line)
-		self:Trace(`step {after.Key}: {#lines} line(s) queued`)
-		self.Call.Queue(lines)
-	end
+	self:Trace(`step {after.Key}: interrupt, {#lines} line(s)`)
+	self.Call.Interrupt(lines)
 end
 
 -- Before Walt is on the line: the phone step (or waiting for the call). nil = the call is on, or never came.
@@ -1565,6 +1595,8 @@ function TutorialController:DevReset()
 	self:ClearGuidance()
 	self.Answered = false
 	self.Greeted = false
+	self.GreetPinned = false
+	self.SpokeAt = 0
 	self.Uncalled = false
 	self.WaitStarted = 0
 	self.AskedAt = 0

@@ -102,6 +102,7 @@ const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }
 const RECORD = 1
 const NONE = "none"
 const INTRO = "intro"
+const VOICE_AHEAD = 25 -- s of the intro whose voices the loading screen waits for (the later ones load in the background)
 const BIND_NAME = "CutsceneSkip"
 const KEY_LABEL = { KeyboardMouse = "E", Gamepad = "X", Touch = "" }
 const RENDER_STEP = "CutsceneController.Timeline"
@@ -565,7 +566,17 @@ function CutsceneController:PreloadVoices(timeout: number, progress: ((number) -
 			table.insert(lines, beat)
 		end
 	end
-	self:SpeechOf().Preload(lines, timeout, progress)
+	-- the loading screen waits only for the lines of the first VOICE_AHEAD s of the scene; every line is queued in
+	-- order of use, so the rest keeps loading in the background while the intro plays
+	const speech = self:SpeechOf()
+	const early: { Beat } = {}
+	for _, beat in lines do
+		if beat.At <= VOICE_AHEAD then
+			table.insert(early, beat)
+		end
+	end
+	speech.Prepare(lines)
+	speech.Preload(early, timeout, progress)
 end
 
 function CutsceneController:BeginChain()

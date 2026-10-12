@@ -147,7 +147,7 @@ const base = Table.new({
 		nil,
 		lines(
 			"Morning, Rookie! I'll stay on the line.",
-			"Tap the sausage box. It goes on the grill.",
+			"Tap the frank box. It goes on the grill.",
 			"Flip the sign to OPEN when you're ready."
 		)
 	),
@@ -286,7 +286,7 @@ const base = Table.new({
 		lines(
 			"Night two. You did fine last night.",
 			"Check your food before it goes out.",
-			"A gray sausage, or a bun with a bite",
+			"A gray frank, or a bun with a bite",
 			"in it you didn't take — toss it.",
 			"Trash can. Don't serve it.",
 			"And still no faces. Remember faces.",
@@ -465,7 +465,7 @@ const base = Table.new({
 	-- Day 1 tutorial hints (ui-text.md §11.1): each plays once, after the first time the party performs the action
 	hint("hint_grill_place", "grill_place", lines("When the bar fills up, grab it.")),
 	hint("hint_grill_collect", "grill_collect", lines("It waits on the warmer. Now slice a bun.")),
-	hint("hint_bun_cut", "bun_cut", lines("Pop a sausage in the bun.")),
+	hint("hint_bun_cut", "bun_cut", lines("Pop a frank in the bun.")),
 	hint("hint_board_add_sausage", "board_add_sausage", lines("There's your hot dog. Wait for an order.")),
 	hint("hint_open_sign", "open_sign", lines("We're open! Folks line up at the counter.")),
 	hint(

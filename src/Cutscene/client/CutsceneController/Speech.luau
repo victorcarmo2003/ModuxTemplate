@@ -49,6 +49,7 @@ turn (Busy() = speaking or queued); only Stop / Destroy cut.
 	Warnings: once per kind per session, for every Speech together (module-level).
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LogService = game:GetService("LogService")
 local SoundService = game:GetService("SoundService")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Content = require(ReplicatedStorage.shared.Content)
@@ -137,7 +138,7 @@ type Entry = {
 const VOICES = Content.Cutscenes.Rules.Voices
 const FOLDER = "CutsceneVoice"
 const LATE = 1 -- s: a line that loads later than this after its beat is not voiced
-const GAP = 0.2 -- s between two load requests
+const GAP = 0.1 -- s between two load requests (LoadQueue adds its own gap)
 const MAX_TRIES = 3 -- load attempts per piece (same VoiceId)
 const BACKOFF = 1.5 -- s of pause after a failure, doubled per try of that piece
 const MAX_BACKOFF = 6
@@ -160,6 +161,26 @@ const Speech = {}
 const goodVoices: { [string]: boolean } = {}
 const badVoices: { [string]: boolean } = {}
 const warned: { [string]: boolean } = {}
+
+-- "Failed to load sound : FilteredText" (Roblox filters the TTS text) reaches the output, not the LoadAsync status
+-- (that is a plain Failure, like a rate limit). Loads are serialized by LoadQueue, so a message that arrives while
+-- one LoadAsync runs belongs to it: the failure is deterministic (same text, same result) and is never retried.
+local filteredCount = 0
+local filteredWatch = false
+
+local function watchFiltered()
+	if filteredWatch then
+		return
+	end
+	filteredWatch = true
+	pcall(function()
+		LogService.MessageOut:Connect(function(message: string)
+			if string.find(message, "FilteredText", 1, true) then
+				filteredCount += 1
+			end
+		end)
+	end)
+end
 
 local function warnOnce(key: string, message: string)
 	if warned[key] then
@@ -665,6 +686,8 @@ function Speech.new(volume: () -> number): Speech
 			return
 		end
 		piece.State = "Loading"
+		watchFiltered()
+		const filteredBefore = filteredCount
 		-- inside the one audio queue of the client (LoadQueue, urgent): never next to another sound load
 		local ok, status: any = false, nil
 		local returned = false
@@ -710,6 +733,23 @@ function Speech.new(volume: () -> number): Speech
 					end
 				end
 			end
+			return
+		end
+		if ok then
+			task.wait(0.05) -- the log line can land a frame after LoadAsync returns
+		end
+		if not alive then
+			return
+		end
+		if ok and filteredCount > filteredBefore then
+			-- filtered text: no retry, no backoff, no streak, the voice stays good; subtitle only for this line
+			piece.State = "Failed"
+			piece.BadVoice = false
+			const owner = piece.Owner
+			owner.FailedAt = math.huge -- Fetch never tries it again
+			owner.Reason = "text filtered by Roblox"
+			dropWanted(owner)
+			warnOnce(`filtered:{piece.Text}`, `text-to-speech text was filtered, line stays a subtitle: "{piece.Text}"`)
 			return
 		end
 		failed(piece, if ok then tostring(status) else `error: {status}`)

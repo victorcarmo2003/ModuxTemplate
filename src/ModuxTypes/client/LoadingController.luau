@@ -18,6 +18,7 @@ export type Public = {
 	StepKit: (self: Public) -> (),
 	StepAssets: (self: Public) -> (),
 	StepVoices: (self: Public) -> (),
+	BackgroundVoices: (self: Public) -> (),
 	Run: (self: Public) -> (),
 	SendReady: (self: Public) -> (),
 	Lift: (self: Public) -> (),

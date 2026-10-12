@@ -220,7 +220,7 @@ const rules: Rules = {
 		-- eastbound on the Ninth, in front of the party at the phone, before the turn to the cart
 		CarCorner = { Route = "TR-1", Near = "Phone", Pass = 2, Look = 7, Horn = "car_honk_soft" },
 	},
-	ReadyTimeout = 50, -- s: above the loading gate STEP_CAP (40 s) + margin for a laggy ClientReady (playtest 2026-10-11)
+	ReadyTimeout = 30, -- s: above the loading gate STEP_CAP (18 s) + 10 s margin for a laggy ClientReady (playtest 2026-10-11)
 }
 
 const scenes = Table.new({

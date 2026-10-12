@@ -65,7 +65,7 @@ const VARIANT_FACE = table.freeze({
 }) :: { [string]: string }
 const MIRROR_SUFFIX = "_mirror" -- CrewLooks.Outfits key of the mirrored sheet (AST-062), Provisional
 -- s: NPC rigs are revealed after this even if the kit preload has not finished (Provisional).
-const WARMUP_TIMEOUT = 20
+const WARMUP_TIMEOUT = 12
 
 const RigController = Modux.Controller("RigController", { Priority = 680 })
 

@@ -38,8 +38,13 @@ export type Call = {
 	Line: (text: string) -> Content.CutsceneBeat,
 	-- lines waiting to be said
 	Pending: () -> number,
-	Queue: (lines: { string }) -> (),
+	-- pinned = the lines survive Replace (the greeting); Interrupt and Cut drop them too
+	Queue: (lines: { string }, pinned: boolean?) -> (),
+	-- drops the unpinned lines not started and queues the new ones; the line on screen finishes first
 	Replace: (lines: { string }) -> (),
+	-- the step moved on (the player rushed it): stops the voice, hides the subtitle now, drops the whole queue and
+	-- queues `lines` (may be empty = just cut)
+	Interrupt: (lines: { string }) -> (),
 	Cut: () -> (),
 	Busy: () -> boolean,
 	Step: () -> (),
@@ -91,6 +96,7 @@ end
 function Call.new(show: (text: string?) -> (), volume: () -> number, trace: (message: string) -> ()): Call
 	local speech: Speech.Speech? = nil
 	const queue: { string } = {}
+	const pins: { boolean } = {} -- pins[i] = queue[i] survives Replace
 	local endsAt = 0 -- os.clock when the line on screen is over (0 = none)
 	local hideAt = 0 -- os.clock when the strip hides (0 = hidden)
 	local waitFrom = 0 -- os.clock the next line started waiting for its voice (0 = not waiting)
@@ -136,22 +142,61 @@ function Call.new(show: (text: string?) -> (), volume: () -> number, trace: (mes
 		Pending = function(): number
 			return #queue
 		end,
-		Queue = function(lines: { string })
+		Queue = function(lines: { string }, pinned: boolean?)
 			for _, text in lines do
 				table.insert(queue, text)
+				table.insert(pins, pinned == true)
 			end
 		end,
 		Replace = function(lines: { string })
+			-- keep the pinned lines (in order), drop the rest
+			const kept: { string } = {}
+			for index, text in queue do
+				if pins[index] then
+					table.insert(kept, text)
+				end
+			end
 			table.clear(queue)
+			table.clear(pins)
+			for _, text in kept do
+				table.insert(queue, text)
+				table.insert(pins, true)
+			end
 			waitFrom = 0
 			for _, text in lines do
 				table.insert(queue, text)
+				table.insert(pins, false)
 			end
 			trace(`replace: {#lines} line(s) queued (the line on screen finishes first)`)
+		end,
+		Interrupt = function(lines: { string })
+			trace(`interrupt: voice cut, {#queue} line(s) dropped, {#lines} queued`)
+			table.clear(queue)
+			table.clear(pins)
+			waitFrom = 0
+			endsAt = 0
+			hideAt = 0
+			phase = ""
+			generation += 1 -- handlers of the line cut do nothing (no stuck subtitle)
+			const cancel = cancelVoice
+			cancelVoice = nil
+			if cancel ~= nil then
+				cancel()
+			end
+			const current = speech
+			if current ~= nil then
+				current.Stop()
+			end
+			show(nil)
+			for _, text in lines do
+				table.insert(queue, text)
+				table.insert(pins, false)
+			end
 		end,
 		Cut = function()
 			trace("cut: queue cleared, voice stopped")
 			table.clear(queue)
+			table.clear(pins)
 			waitFrom = 0
 			endsAt = 0
 			hideAt = 0
@@ -209,6 +254,7 @@ function Call.new(show: (text: string?) -> (), volume: () -> number, trace: (mes
 					end
 				end
 				table.remove(queue, 1)
+				table.remove(pins, 1)
 				const waited = if waitFrom > 0 then now - waitFrom else 0
 				waitFrom = 0
 				if status ~= "Loaded" then
@@ -270,6 +316,7 @@ function Call.new(show: (text: string?) -> (), volume: () -> number, trace: (mes
 		end,
 		Destroy = function()
 			table.clear(queue)
+			table.clear(pins)
 			endsAt = 0
 			hideAt = 0
 			phase = ""

@@ -83,9 +83,9 @@ const LIST: { Step } = {
 		Text = "Grill a sausage",
 		Hint = 'Grab one at the cooler: press "Grill".',
 		Action = "grill_place",
-		Say = { "Grab a sausage from the cooler.", "It goes right on the grill." },
+		Say = { "Grab a frank from the cooler.", "It goes right on the grill." },
 		Done = "Nice.",
-		Remind = "Sausage on the grill. Follow the arrow.",
+		Remind = "Frank on the grill. Follow the arrow.",
 	},
 	{
 		Key = "slice",
@@ -122,9 +122,9 @@ const LIST: { Step } = {
 		Text = "Put the sausage in the bun",
 		Hint = 'Press "Add Sausage" at the board.',
 		Action = "board_add_sausage",
-		Say = { "Now put the sausage in the bun, on the board." },
+		Say = { "Now put the hot dog in the bun, on the board." },
 		Done = "Beautiful.",
-		Remind = "Sausage in the bun, at the board.",
+		Remind = "Frank in the bun, at the board.",
 	},
 	{
 		Key = "toppings",

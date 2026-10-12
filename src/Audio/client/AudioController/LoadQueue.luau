@@ -7,7 +7,8 @@
 	One job at a time, GAP s between two jobs; a job that reports a failure holds the queue BACKOFF s (a rate limit
 	clears before the next request). A job still running after JOB_TIMEOUT s counts as failed and the queue moves on
 	(playtest 2026-10-11: one text-to-speech LoadAsync that never returned held every later line, Walt's voice
-	included, for the whole session); the stuck call keeps running on its own thread. Urgent jobs (loading screen, text-to-speech) go before the background ones.
+	included, for the whole session); the stuck call keeps running on its own thread. Urgent jobs (loading screen, text-to-speech) go before the background ones, and background jobs wait for Release()
+	(LoadingController, loading screen over; failsafe HOLD_FAILSAFE s).
 	  Preload(items, progress?, urgent?)  ContentProvider:PreloadAsync in batches of BATCH (Sound instances or content
 	                                      ids); ids already loaded are skipped. Yields until every batch ran.
 	  Run(work, urgent?)                  runs work() inside the queue (work returns true on failure); yields until it ran.
@@ -26,17 +27,21 @@ const JOB_TIMEOUT = 8 -- s before a job that has not returned is abandoned (coun
 const urgentJobs: { Job } = {}
 const backgroundJobs: { Job } = {}
 const loaded: { [string]: boolean } = {}
+const HOLD_FAILSAFE = 40 -- s: background jobs are released even if nobody calls Release
+local held = true -- background jobs wait for the loading screen (LoadingController calls Release)
 local working = false
 local warnedTimeout = false
 
-local function pump()
+local pump: () -> ()
+
+pump = function()
 	if working then
 		return
 	end
 	working = true
 	task.spawn(function()
 		while true do
-			const job = table.remove(urgentJobs, 1) or table.remove(backgroundJobs, 1)
+			const job = table.remove(urgentJobs, 1) or (if held then nil else table.remove(backgroundJobs, 1))
 			if job == nil then
 				break
 			end
@@ -92,6 +97,18 @@ local function keyOf(item: any): string?
 end
 
 const LoadQueue = {}
+
+-- Background jobs (AudioController's preload of every sound) wait until the loading screen is over, so they never
+-- compete with the kit, the intro sounds and the voices; urgent jobs are not held.
+function LoadQueue.Release()
+	if not held then
+		return
+	end
+	held = false
+	pump()
+end
+
+task.delay(HOLD_FAILSAFE, LoadQueue.Release)
 
 function LoadQueue.Run(work: () -> boolean?, urgent: boolean?)
 	waitFor(enqueue(work, urgent))

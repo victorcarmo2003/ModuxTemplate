@@ -12,11 +12,12 @@
 	  Kit      RigController warm-up done (crew meshes, expressions, look textures: RigController:Warmup)
 	  Assets   LoadQueue (the one audio queue, small batches) of the intro sounds (music cue, phone, horns, car, prompt, skip, day
 	           ambience) and the UI images (Icons.Ids)
-	  Voices   Run place only: every text-to-speech line of the intro (CutsceneController:PreloadVoices; the queue
-	           there loads one line at a time with retry, see Speech.luau), then, on Day 1 of the run (the tutorial),
-	           Walt's tutorial call lines (TutorialController:PreloadVoices, user request 2026-10-11): what does not
-	           load in TUTORIAL_VOICE_TIMEOUT keeps loading in the background during the intro
-	Every step has its own timeout and the whole gate STEP_CAP; a step that fails or times out never blocks the join.
+	  Voices   Run place only: the text-to-speech lines of the first seconds of the intro (CutsceneController:
+	           PreloadVoices; one piece at a time with retry, see Speech.luau); the later intro lines keep loading in
+	           order of use. Walt's tutorial lines (rookies) load in the background after the curtain lifts
+	           (BackgroundVoices), during the intro that comes before the tutorial (playtest 2026-10-11: the gate took
+	           ~45 s with all of them blocking)
+	Every step has its own timeout and the whole gate STEP_CAP (18 s); a step that fails or times out never blocks the join.
 	After ClientReady the curtain stays while the server says the intro is Waiting for the other participants
 	(Cutscene set) up to the server's ReadyTimeout + margin, then lifts (attribute Done on the ScreenGui).
 
@@ -36,12 +37,11 @@ local LoadQueue = require(StarterPlayer.StarterPlayerScripts.client.Audio.AudioC
 type Texts = { Status: { [string]: string } }
 
 const GUI_NAME = "LoadingScreen"
-const KIT_TIMEOUT = 25 -- s for the crew kit warm-up (RigController has its own cap too)
-const ASSET_TIMEOUT = 20 -- s for PreloadAsync of sounds and images
-const VOICE_TIMEOUT = 22 -- s for the intro voices (the rest keeps loading in the background)
-const TUTORIAL_VOICE_TIMEOUT = 12 -- s for Walt's tutorial lines after the intro ones (rookies only)
-const INTRO_SHARE = 0.6 -- part of the Voices step the intro lines fill on the bar
-const STEP_CAP = 40 -- s for all steps together
+const KIT_TIMEOUT = 10 -- s for the crew kit warm-up (it keeps going in the background; RigController has its own cap)
+const ASSET_TIMEOUT = 12 -- s for PreloadAsync of sounds and images
+const VOICE_TIMEOUT = 8 -- s for the intro voices of the first seconds (the rest keeps loading in the background)
+const TUTORIAL_VOICE_TIMEOUT = 150 -- s the background load of Walt's tutorial lines may run (rookies only)
+const STEP_CAP = 18 -- s for all steps together (the server's ReadyTimeout stays 10 s above it)
 const CREW_MARGIN = 3 -- s past the server's ReadyTimeout that the curtain waits for the others
 const POLL = 0.1
 const INTRO = "intro"
@@ -245,19 +245,29 @@ function LoadingController:StepVoices()
 		return
 	end
 	self:SetStatus("Voices")
+	-- only the intro lines of its first seconds are waited for (CutsceneController:PreloadVoices queues the whole
+	-- scene in order of use); Walt's tutorial lines load in the background after the curtain lifts (Lift)
 	within(VOICE_TIMEOUT + 1, function()
 		self.Dependencies.CutsceneController:PreloadVoices(VOICE_TIMEOUT, function(fraction: number)
-			self:Mark("Voices", fraction * INTRO_SHARE)
-		end)
-	end)
-	self:Mark("Voices", INTRO_SHARE)
-	-- a rookie: Walt's tutorial call lines too (a veteran returns at once)
-	within(TUTORIAL_VOICE_TIMEOUT + 1, function()
-		self.Dependencies.TutorialController:PreloadVoices(TUTORIAL_VOICE_TIMEOUT, function(fraction: number)
-			self:Mark("Voices", INTRO_SHARE + (1 - INTRO_SHARE) * fraction)
+			self:Mark("Voices", fraction)
 		end)
 	end)
 	self:Mark("Voices", 1)
+end
+
+-- After the curtain: the tutorial voices of a rookie load during the intro (~2 min before the tutorial starts)
+function LoadingController:BackgroundVoices()
+	if not self.Dependencies.PlaceController:Is("Run") then
+		return
+	end
+	task.spawn(function()
+		const ok, problem = pcall(function()
+			self.Dependencies.TutorialController:PreloadVoices(TUTORIAL_VOICE_TIMEOUT)
+		end)
+		if not ok then
+			warn(`[LoadingController] background tutorial voices failed: {problem}`)
+		end
+	end)
 end
 
 function LoadingController:Run()
@@ -327,6 +337,9 @@ function LoadingController:SendReady()
 end
 
 function LoadingController:Lift()
+	-- the audio queue may run its background jobs now; the tutorial voices start loading behind the intro
+	LoadQueue.Release()
+	self:BackgroundVoices()
 	self.Ready(true)
 	const gui = self:FindGui()
 	if gui ~= nil then
