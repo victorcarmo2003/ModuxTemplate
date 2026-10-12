@@ -23,6 +23,8 @@ export type SlotRecord = {
 	-- Wave 3 (TASK-110, ANM-002, network.md §13.5): 0 = nothing altered; grill/board 1 = this slot holds the altered
 	-- item (AST-061); rail: position 1..Count of the gray sausage. nil on the wire reads as 0.
 	Altered: number,
+	-- prep-3d.md N2: grill slot only, flip score + 1 once flipped, 0 = not flipped
+	Flip: number,
 }
 
 -- Sound hooks (TASK-079). Never reactive (safe inside effects). Every call is for one station: nothing plays for a

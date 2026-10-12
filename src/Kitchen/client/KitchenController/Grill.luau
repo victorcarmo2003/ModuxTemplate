@@ -29,6 +29,8 @@ const SMOKE_RISE = 0.3
 
 const KIND = "grill"
 const SAUSAGE_HEIGHT = 0.24 -- AST-002 (build_items.luau)
+const OVERLAY_SCALE = 1.012 -- the grilled model over the raw one: no z-fight
+const FADE_FROM = 0.1 -- cooking share at which the grilled colour starts to show (Provisional, S1)
 
 local function spotPosition(spot: Slots.Spot): Vector3
 	return (spot.Host.CFrame * spot.Offset).Position
@@ -65,34 +67,84 @@ local function mountSlot(
 		end)
 	end)
 
-	const model = derive(function(): string?
+	-- One container per slot with the raw sausage and, laid over it (1.2 % bigger), the grilled one: the colour of the cooking is
+	-- the grilled model fading in by the server clock (S1 of prep-3d.md: cross-fade of the two real models, no EditableMesh).
+	-- The pair is made once when the slot fills and lives until it empties, so a hover contour, a flip turn or a hop of the 3D
+	-- prep mode never loses its model at the "ready" instant. A wrong (altered) sausage stays a single model.
+	const entry = Slots.Track(station, KIND, spot)
+	const mode = derive(function(): string?
 		const record = read()
 		if record == nil or record.State == "Empty" then
 			return nil
 		elseif record.Altered > 0 then
-			return "SausageWrong" -- AST-061 (network.md §13.5 allows it on the grill; TASK-109 does not use it today)
+			return "Wrong" -- AST-061 (network.md §13.5 allows it on the grill; TASK-109 does not use it today)
 		end
-		return if progress() >= 1 then "SausageGrilled" else "SausageRaw"
+		return "Pair"
 	end)
 
-	local shown: string? = nil
+	local lastProgress = 0
+	local shownAlpha = -1
 	effect(function()
-		const name = model()
-		const previous = shown
-		shown = name
-		if name then
-			Slots.Food(name, spot, station)
+		const kind = mode()
+		entry.Container = nil
+		entry.Raw = nil
+		entry.Over = nil
+		if kind ~= nil then
+			const record = untrack(read)
+			const turn = if record ~= nil and record.Flip > 0 then math.pi else 0
+			const holder = Instance.new("Model")
+			holder.Name = `Sausage_Slot{spot.Slot}`
+			holder.Parent = station
+			cleanup(holder)
+			if kind == "Wrong" then
+				entry.Raw = Slots.Food("SausageWrong", spot, holder, { Turn = turn })
+			else
+				entry.Raw = Slots.Food("SausageRaw", spot, holder, { Turn = turn })
+				entry.Over = Slots.Food("SausageGrilled", spot, holder, { Turn = turn, Scale = OVERLAY_SCALE })
+			end
+			entry.Container = holder
+			lastProgress = untrack(progress)
 		end
-		if previous == "SausageRaw" and name == "SausageGrilled" then
-			untrack(function()
+		shownAlpha = -1
+		Slots.Notify(entry)
+	end)
+
+	-- the cooking colour: raw until FADE_FROM, grilled fully over it at 1 (and then alone)
+	effect(function()
+		const kind = mode()
+		const p = progress()
+		untrack(function()
+			const over = entry.Over
+			const raw = entry.Raw
+			if kind ~= "Pair" or over == nil or raw == nil then
+				return nil
+			end
+			const done = p >= 1
+			const fade = math.clamp((p - FADE_FROM) / (1 - FADE_FROM), 0, 1)
+			const alpha = if done then 0 else math.floor((1 - fade) * 50 + 0.5) / 50 -- Transparency of the grilled one, 50 steps
+			if alpha ~= shownAlpha then
+				shownAlpha = alpha
+				for _, part in over:GetDescendants() do
+					if part:IsA("BasePart") then
+						part.Transparency = alpha
+					end
+				end
+				for _, part in raw:GetDescendants() do
+					if part:IsA("BasePart") then
+						part.Transparency = if done then 1 else 0
+					end
+				end
+			end
+			if lastProgress < 1 and done then
 				if audio.Current(station) then
 					const at = spotPosition(spot) + Vector3.new(0, SAUSAGE_HEIGHT, 0)
 					audio.Play(station, "grill_ready", at)
 					Fx.Burst(at, "Ready", 10)
 				end
-				return nil
-			end)
-		end
+			end
+			lastProgress = p
+			return nil
+		end)
 	end)
 
 	Slots.Bar(spot, SAUSAGE_HEIGHT, progress, function()

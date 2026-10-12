@@ -37,6 +37,7 @@ function Rail.Mount(station: Instance, context: Context.Context)
 	const spots = Slots.Spots(station, false)
 	RailSlot.Spots(station, spots)
 	for slot, spot in spots do
+		Slots.Track(station, KIND, spot) -- where the 3D prep mode flies a collected sausage to
 		const model = derive(function(): string?
 			if count() < slot then
 				return nil

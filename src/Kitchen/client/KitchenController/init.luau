@@ -32,6 +32,7 @@ local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Context = require(script.Context)
+local Slots = require(script.Slots)
 local Stock = require(script.Stock)
 local Grill = require(script.Grill)
 local Rail = require(script.Rail)
@@ -117,6 +118,7 @@ function KitchenController:WriteSlot(id: number, record: SlotRecord?)
 		Duration = record.Duration,
 		Count = record.Count,
 		Altered = record.Altered or 0, -- wave 3 (TASK-110): optional on the wire, nil = nothing altered
+		Flip = record.Flip or 0, -- prep-3d N2: flip score + 1, nil = not flipped
 	})
 end
 
@@ -203,6 +205,19 @@ function KitchenController:Context(): Context.Context
 			return self:SlotOf(id)
 		end,
 	}
+end
+
+-- The live slot of a kind ("grill", "rail") on the station in use: its Spot (where the food goes), and the models on it. Used by the
+-- 3D prep mode (World/Stages/Grill). Not reactive: read it each frame or on `OnSlotChanged`.
+function KitchenController:SlotView(kind: string, slot: number): Slots.Live?
+	return Slots.Find(kind, slot, function(station: Instance): boolean
+		return self:IsCurrent(station)
+	end)
+end
+
+-- fn(entry) when a slot's models were made or destroyed. Returns the disconnect.
+function KitchenController:OnSlotChanged(fn: (entry: Slots.Live) -> ()): () -> ()
+	return Slots.OnChanged(fn)
 end
 
 function KitchenController:Mount(station: Instance)

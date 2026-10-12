@@ -638,16 +638,17 @@ function Feed.Take(controller: any, id: number)
 	send(controller, "Order", "Take", 0, id)
 end
 
-function Feed.Place(controller: any)
-	send(controller, "Grill", "Place", 0, 0)
+-- `slot` = the roller the sausage was dropped on (prep-3d.md N1); 0 / nil = the server picks. false = not sent (too many in flight).
+function Feed.Place(controller: any, slot: number?): boolean
+	return send(controller, "Grill", "Place", slot or 0, 0)
 end
 
-function Feed.Flip(controller: any, slot: number)
-	send(controller, "Grill", "Flip", slot, 0)
+function Feed.Flip(controller: any, slot: number): boolean
+	return send(controller, "Grill", "Flip", slot, 0)
 end
 
-function Feed.Collect(controller: any, slot: number)
-	send(controller, "Grill", "Collect", slot, 0)
+function Feed.Collect(controller: any, slot: number): boolean
+	return send(controller, "Grill", "Collect", slot, 0)
 end
 
 -- A card to the Serve selection / the ticket rail (only a taken customer can be pinned).

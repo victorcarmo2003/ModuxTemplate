@@ -34,6 +34,8 @@ export type Registry = {
 	Version: number,
 	Add: (self: Registry, spec: Spec) -> Types.Target,
 	Remove: (self: Registry, id: string) -> (),
+	-- A stage changed `Pulse` / `Model` of a target it owns: wakes Aim and Highlight (the version moves).
+	Touch: (self: Registry) -> (),
 	Get: (self: Registry, id: string) -> Types.Target?,
 	-- The target a raycast part belongs to (nil when none, or it is disabled).
 	ByPart: (self: Registry, part: Instance) -> Types.Target?,
@@ -43,7 +45,9 @@ export type Registry = {
 	IsEnabled: (self: Registry, target: Types.Target) -> boolean,
 	HasEnabled: (self: Registry) -> boolean,
 	-- Builds the registry from the tagged hitboxes under `root` that belong to seat `station` (the other seats are puppets).
-	Scan: (self: Registry, root: Instance, station: number) -> number,
+	-- `enabled` = whether the scanned targets answer the ray until a stage re-adds them with its own Enabled (default true; the 3D
+		-- stages pass false and opt in, so a hitbox of another section never hovers).
+		Scan: (self: Registry, root: Instance, station: number, enabled: boolean?) -> number,
 	-- Re-evaluates Enabled and resizes the hitboxes for the camera; true when the enabled set changed.
 	Refresh: (self: Registry, camera: Camera, assist: boolean) -> boolean,
 	Params: (self: Registry) -> RaycastParams,
@@ -155,6 +159,11 @@ function Targets.new(rules: Content.PrepWorldRules, folder: Folder?): Registry
 		self.Version = version
 	end
 
+	function self.Touch(_: any)
+		version += 1
+		self.Version = version
+	end
+
 	function self.Get(_: any, id: string): Types.Target?
 		const entry = byId[id]
 		return if entry ~= nil then entry.Target else nil
@@ -198,7 +207,7 @@ function Targets.new(rules: Content.PrepWorldRules, folder: Folder?): Registry
 		return false
 	end
 
-	function self.Scan(_: any, root: Instance, station: number): number
+	function self.Scan(_: any, root: Instance, station: number, enabled: boolean?): number
 		const found: { [string]: { Kind: string, Slot: number, Key: string, Parts: { BasePart }, Model: Instance? } } = {}
 		const order: { string } = {}
 		const attr = rules.Attr

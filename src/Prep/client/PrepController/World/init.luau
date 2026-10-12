@@ -68,7 +68,7 @@ function World.Enter(station: number, pointer: Pointer.Pointer?)
 	folder.Name = Types.FolderName
 	folder.Parent = camera
 	const registry = Targets.new(rules, folder)
-	registry:Scan(workspace, station)
+	registry:Scan(workspace, station, not World.Active())
 	const outline = Highlight.new(folder, rules, nil)
 	const marker = Marker.new(folder, rules)
 	local aim: Aim.Aim? = nil

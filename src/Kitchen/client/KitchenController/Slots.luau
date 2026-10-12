@@ -29,6 +29,8 @@ const cleanup = Vide.cleanup
 const BAR_GAP = 1.0 -- style guide §7.3: bar 1.0 stud above the food
 const BAR_MAX_DISTANCE = 40
 const MIN_SPAN = 0.05
+-- the pivot of food is the base centre: a turn about the long axis goes through the middle of the body, half of AST-002's 0.24
+const FLIP_CENTER = 0.12
 
 export type Spot = {
 	Slot: number,
@@ -38,7 +40,26 @@ export type Spot = {
 
 export type Reader = () -> Context.SlotRecord?
 
+-- What the 3D prep mode (World/Stages/Grill) reads about a slot: where the food goes (Spot), and, for a grill slot, the models
+-- on it right now (Container holds Raw and Over, the grilled one laid over the raw one and faded in by the cooking time).
+-- Container = nil while the slot is empty. Written by the Grill part, read through KitchenController:SlotView.
+export type Live = {
+	Station: Instance,
+	Kind: string,
+	Slot: number,
+	Spot: Spot,
+	Container: Model?,
+	Raw: Model?,
+	Over: Model?,
+}
+
 const Slots = {}
+
+Slots.FlipCenter = FLIP_CENTER
+
+-- Live slots by station, then by `kind:slot` (weak on the station: a destroyed station drops out). Listeners hear every change.
+const live: { [Instance]: { [string]: Live } } = setmetatable({}, { __mode = "k" }) :: any
+const listeners: { (entry: Live) -> () } = {}
 
 -- StationId -----------------------------------------------------------------------------------------------------------
 
@@ -216,7 +237,8 @@ const FALLBACK = table.freeze({
 }) :: { [string]: string }
 
 -- Local clone on the spot (client only; the server never creates station food, §18.9.5). Destroyed with the scope.
-function Slots.Food(name: string, spot: Spot, parent: Instance): Model?
+-- options.Turn = radians about the long axis of the food (a flipped sausage), options.Scale = uniform scale (the overlay).
+function Slots.Food(name: string, spot: Spot, parent: Instance, options: { Turn: number?, Scale: number? }?): Model?
 	const fallback = FALLBACK[name]
 	const template = kit(name) or (if fallback then kit(fallback) else nil)
 	if template == nil or spot.Host.Parent == nil then
@@ -235,7 +257,11 @@ function Slots.Food(name: string, spot: Spot, parent: Instance): Model?
 			table.insert(parts, descendant)
 		end
 	end
-	copy:PivotTo(spot.Host.CFrame * spot.Offset)
+	if options ~= nil and options.Scale ~= nil and options.Scale ~= 1 then
+		copy:ScaleTo(options.Scale)
+	end
+	const turn = if options ~= nil and options.Turn ~= nil then options.Turn else 0
+	copy:PivotTo(spot.Host.CFrame * spot.Offset * CFrame.new(0, FLIP_CENTER, 0) * CFrame.Angles(turn, 0, 0) * CFrame.new(0, -FLIP_CENTER, 0))
 	copy.Parent = parent
 	cleanup(copy)
 	-- welded (not anchored) so it rides along when the vehicle is moved by the server
@@ -247,6 +273,86 @@ function Slots.Food(name: string, spot: Spot, parent: Instance): Model?
 		part.Anchored = false
 	end
 	return copy
+end
+
+-- Weld / unweld a model to its host, so the 3D prep mode can animate it (flip, hop) and give it back ---------------------------
+
+-- Anchored and free of its welds: the caller moves it with PivotTo.
+function Slots.Detach(model: Model)
+	for _, descendant in model:GetDescendants() do
+		if descendant:IsA("WeldConstraint") then
+			descendant:Destroy()
+		elseif descendant:IsA("BasePart") then
+			descendant.Anchored = true
+		end
+	end
+end
+
+-- Welds the model, where it is now, to the host again (the vehicle can move it once more).
+function Slots.Attach(model: Model, host: BasePart)
+	for _, descendant in model:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			const weld = Instance.new("WeldConstraint")
+			weld.Part0 = host
+			weld.Part1 = descendant
+			weld.Parent = descendant
+			descendant.Anchored = false
+		end
+	end
+end
+
+-- Live registry ----------------------------------------------------------------------------------------------------------------
+
+-- Registers a slot of the station (inside the part's Vide root: it leaves with the station).
+function Slots.Track(station: Instance, kind: string, spot: Spot): Live
+	const entry: Live = { Station = station, Kind = kind, Slot = spot.Slot, Spot = spot, Container = nil, Raw = nil, Over = nil }
+	const key = `{kind}:{spot.Slot}`
+	local byKey = live[station]
+	if byKey == nil then
+		byKey = {}
+		live[station] = byKey
+	end
+	byKey[key] = entry
+	cleanup(function()
+		const current = live[station]
+		if current ~= nil and current[key] == entry then
+			current[key] = nil
+		end
+		entry.Container = nil
+		entry.Raw = nil
+		entry.Over = nil
+		for _, fn in table.clone(listeners) do
+			fn(entry)
+		end
+	end)
+	return entry
+end
+
+function Slots.Notify(entry: Live)
+	for _, fn in table.clone(listeners) do
+		fn(entry)
+	end
+end
+
+-- Every tracked slot of a kind on the stations accepted by `current`.
+function Slots.Find(kind: string, slot: number, current: (station: Instance) -> boolean): Live?
+	for station, byKey in live do
+		const entry = byKey[`{kind}:{slot}`]
+		if entry ~= nil and station.Parent ~= nil and current(station) then
+			return entry
+		end
+	end
+	return nil
+end
+
+function Slots.OnChanged(fn: (entry: Live) -> ()): () -> ()
+	table.insert(listeners, fn)
+	return function()
+		const index = table.find(listeners, fn)
+		if index ~= nil then
+			table.remove(listeners, index)
+		end
+	end
 end
 
 -- Bar -----------------------------------------------------------------------------------------------------------------

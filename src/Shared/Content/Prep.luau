@@ -104,6 +104,19 @@ export type WorldRules = {
 	Attract: number, -- px: gamepad cursor snaps to a target closer than this (§9)
 	Marker: number, -- studs: diameter of the 3D pointer marker
 	Settle: number, -- s: snap with a tween when the server disagrees with the prediction (§2.5)
+	-- the 3D grill (TASK-203; Provisional, TASK-212 retouches): ghost, ring and the little animations
+	Grill: {
+		GhostAlpha: number, -- Transparency of the ghost sausage on a free roller
+		GhostBreath: number, -- how much it breathes (Transparency swing)
+		RingRadius: number, -- studs: radius of the flip ring at Ring scale 1.0 (about the length of the sausage)
+		Collect: number, -- s: flight of a collected sausage to the rail
+		CollectArc: number, -- studs: height of that flight
+		Shake: number, -- s: refusal shake of a sausage / the box
+		ShakeAmount: number, -- studs
+		Early: number, -- s: the shiver of a tap before the window (nothing is sent)
+		CheckSize: number, -- studs: the check mark of a ready sausage
+		Drag: number, -- px: a press that moves further than this is a drag, not a tap
+	},
 	-- per player client budget (§8); the 3D code never exceeds a row
 	Budget: {
 		Hitboxes: number,
@@ -448,7 +461,7 @@ const reasons = Table.new({
 const rules: Rules = {
 	Enabled = true,
 	WorldKitchenPrompts = false, -- DEC-223: the world prompts of the kitchen are hidden; true = rollback without code
-	ThreeD = false, -- prep-3d.md §11.3: flips Tabs / Steps to the 3D sets and arms World.Stages (the 2D mode runs while false)
+	ThreeD = true, -- prep-3d.md §11.3: flips Tabs / Steps to the 3D sets and arms World.Stages (the 2D mode runs while false). On since TASK-203 (the owner plays the 3D grill); Board, Toppings and Serve still use the 2D stages through TabAlias
 	World = {
 		Tag = "PrepTarget",
 		Attr = { Kind = "TargetKind", Slot = "Slot", Key = "Key", Fov = "Fov" },
@@ -456,11 +469,23 @@ const rules: Rules = {
 		-- the tolerances, this one to the hitboxes)
 		Hitbox = { MinPx = 44, MinStuds = 0.31, AssistScale = 1.3, Sausage = { Length = 1.1, Width = 0.5 } },
 		Lift = 0.35,
-		Ring = { From = 1.8, To = 1.0, Good = 0.04, Perfect = 0.07, Late = 0.6, Turn = 0.2, Hop = 0.25 },
+		Ring = { From = 1.8, To = 1.0, Good = 0.06, Perfect = 0.1, Late = 0.6, Turn = 0.2, Hop = 0.25 },
 		Hover = { Grow = 0.04, Rise = 0.05 },
 		Attract = 80,
 		Marker = 0.12,
 		Settle = 0.15,
+		Grill = {
+			GhostAlpha = 0.5,
+			GhostBreath = 0.08,
+			RingRadius = 0.62,
+			Collect = 0.22,
+			CollectArc = 0.45,
+			Shake = 0.3,
+			ShakeAmount = 0.06,
+			Early = 0.25,
+			CheckSize = 0.34,
+			Drag = 14,
+		},
 		Budget = {
 			Hitboxes = 40,
 			RaysPerFrame = 1,
@@ -480,7 +505,7 @@ const rules: Rules = {
 			EditableMeshes = 6,
 			LowQuality = 3,
 		},
-		Stages = { Grill = false, Board = false, Toppings = false, Order = false, Serve = false },
+		Stages = { Grill = true, Board = false, Toppings = false, Order = false, Serve = false },
 		Editable = false,
 		GhostHand = false,
 	},
