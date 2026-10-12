@@ -9,6 +9,7 @@ return {
 	ServerScriptService.server.Character.CharacterService,
 	ServerScriptService.server.Class.ClassService,
 	ServerScriptService.server.Codes.CodesService,
+	ServerScriptService.server.Coffee.CoffeeHandService,
 	ServerScriptService.server.Customer.CustomerService,
 	ServerScriptService.server.Cutscene.CutsceneService,
 	ServerScriptService.server.Dev.DevService,

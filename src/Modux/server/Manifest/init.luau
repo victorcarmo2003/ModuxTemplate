@@ -7,6 +7,7 @@ local BossService = require(ServerScriptService.server.ModuxTypes.BossService)
 local CharacterService = require(ServerScriptService.server.ModuxTypes.CharacterService)
 local ClassService = require(ServerScriptService.server.ModuxTypes.ClassService)
 local CodesService = require(ServerScriptService.server.ModuxTypes.CodesService)
+local CoffeeHandService = require(ServerScriptService.server.ModuxTypes.CoffeeHandService)
 local CustomerService = require(ServerScriptService.server.ModuxTypes.CustomerService)
 local CutsceneService = require(ServerScriptService.server.ModuxTypes.CutsceneService)
 local DevService = require(ServerScriptService.server.ModuxTypes.DevService)
@@ -49,6 +50,7 @@ export type AllServices = {
 	CharacterService: CharacterService.Public,
 	ClassService: ClassService.Public,
 	CodesService: CodesService.Public,
+	CoffeeHandService: CoffeeHandService.Public,
 	CustomerService: CustomerService.Public,
 	CutsceneService: CutsceneService.Public,
 	DevService: DevService.Public,

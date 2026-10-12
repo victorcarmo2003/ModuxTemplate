@@ -8,6 +8,8 @@
 -- the phase ends early; the phase cap still wins (leaving the phase stops the scene).
 -- Participants: members connected (not Away) when the chain starts, in roster order (slot 1..4). A late member is
 -- not one: no vote, no freeze; during the Intro CharacterService keeps it without a body until the phase ends.
+-- ONE avatar per cutscene (owner 2026-10-12): every participant walks the plan of slot 1 (first mark, first stand spot) and
+-- each client hides the other players' characters (CutsceneController/Hide); votes, freeze and the record are per player.
 -- Avatars: CharacterService:Freeze(p, "Cutscene", true); at the start of each segment the body is pivoted to
 -- Marks[slot]. The walk itself is the shared Route (src/Cutscene/shared/Route.luau): each client steers its own body
 -- along it (smooth start/stop, no dry stop at a waypoint, CutsceneController/Walker). At each MoveTo beat a body far

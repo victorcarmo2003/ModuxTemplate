@@ -106,6 +106,7 @@ local Steps = require(script.Steps)
 const TAG = "Interactable"
 const VEHICLE_TAG = "Vehicle"
 const STATION_TAG = "Station"
+const WORK_ACTION = "prep_work" -- Prompt_Work of Station_n (PrepService)
 const HOT_DOG = "hot_dog"
 const TICK_RATE = 10
 -- Phases where the tutorial runs (day shift, before the summary)
@@ -233,6 +234,8 @@ function TutorialController:Setup()
 	self.Checked = Vide.source(false) :: Vide.Source<boolean>
 	self.CheckUntil = 0 :: number
 	self.Folder = nil :: Folder?
+	-- invisible markers of Prompt_Work attachments (WorkMarker)
+	self.Markers = {} :: { [Attachment]: BasePart }
 	-- Highlight + 3D arrow on the piece of the current step
 	self.Beacon = Beacon.new(function(): Instance
 		return self:FxFolder()
@@ -806,17 +809,22 @@ function TutorialController:DecideLive(): (string, Instance?, string)
 		-- a topping they did not ask for: Wrong at the counter, throw it away
 		for key in held.Toppings do
 			if not guest.Order[key] then
-				return "discard", self:Anchor("discard", false), ""
+				-- the street bin first: the one of the kitchen is hidden in the focused mode
+				return "discard", self:Anchor("discard", true) or self:Anchor("discard", false), ""
 			end
 		end
-		for _, key in Content.Ingredients.ToppingKeys do
-			if guest.Order[key] and not held.Toppings[key] then
-				const row = Content.Ingredients.ByKey[key]
-				return "toppings",
-					self:Anchor("topping_add", false, function(anchor)
-						return anchor:GetAttribute("Ingredient") == key
-					end),
-					if row then row.Name else key
+		-- focused kitchen: the toppings were chosen on the Build tab before the hot dog existed and no world prompt adds
+		-- one now; a hot dog short of a topping is served as it is (Incomplete counts as the first sale)
+		if not self:Focused() then
+			for _, key in Content.Ingredients.ToppingKeys do
+				if guest.Order[key] and not held.Toppings[key] then
+					const row = Content.Ingredients.ByKey[key]
+					return "toppings",
+						self:Anchor("topping_add", false, function(anchor)
+							return anchor:GetAttribute("Ingredient") == key
+						end),
+						if row then row.Name else key
+				end
 			end
 		end
 		-- the hot dog is right: serve it (the trailer was opened before the customer came)
@@ -825,25 +833,69 @@ function TutorialController:DecideLive(): (string, Instance?, string)
 
 	const kitchen = self:Kitchen()
 	if kitchen.Rail > 0 and kitchen.BoardReady then
-		return "assemble", self:Anchor("board_add_sausage", false), ""
+		return "assemble", self:KitchenAnchor("board_add_sausage", false), ""
 	end
 	if kitchen.GrillReady then
-		return "collect", self:Anchor("grill_collect", true), ""
+		return "collect", self:KitchenAnchor("grill_collect", true), ""
 	end
 	if kitchen.Rail == 0 and not kitchen.GrillWorking then
-		return "grill", self:Anchor("grill_place", false), ""
+		return "grill", self:KitchenAnchor("grill_place", false), ""
 	end
 	if not kitchen.BoardReady and not kitchen.BoardWorking then
-		return "slice", self:Anchor("bun_cut", false), ""
+		return "slice", self:KitchenAnchor("bun_cut", false), ""
 	end
 	if kitchen.BoardWorking then
 		return "slicing", nil, ""
 	end
 	-- grill working, bun sliced: wait for the sausage
-	return "cooking", self:Anchor("grill_collect", false), ""
+	return "cooking", self:KitchenAnchor("grill_collect", false), ""
+end
+
+-- Focused prep mode (Content.Prep.Rules.WorldKitchenPrompts = false): the kitchen prompts of the world are gone and the
+-- kitchen steps are done at a station of the trailer (prep-mode.md §5; shim until the rewrite, TASK-183/184)
+function TutorialController:Focused(): boolean
+	return not Content.Prep.Rules.WorldKitchenPrompts
+end
+
+-- The player works at a station now (the server sets Working = n on the character, PrepService)
+function TutorialController:Seated(): boolean
+	const character = Players.LocalPlayer.Character
+	return character ~= nil and typeof(character:GetAttribute("Working")) == "number"
+end
+
+-- What a kitchen step points at: the world prompt of the action, or in the focused mode the Work prompt of the nearest
+-- station (nothing while the player is already at one: the prep UI is the guide)
+function TutorialController:KitchenAnchor(action: string, enabled: boolean): Instance?
+	if not self:Focused() then
+		return self:Anchor(action, enabled)
+	end
+	if self:Seated() then
+		return nil
+	end
+	return self:Anchor("prep_work", false)
 end
 
 -- Presentation ---------------------------------------------------------------------------------------------------
+
+-- Invisible client part on a Prompt_Work attachment: what the 3D arrow of a kitchen step stands on (focused prep mode)
+function TutorialController:WorkMarker(anchor: Attachment): BasePart
+	local marker = self.Markers[anchor]
+	if marker == nil or marker.Parent == nil then
+		marker = Instance.new("Part")
+		marker.Name = "TutorialWorkMarker"
+		marker.Size = Vector3.one
+		marker.Transparency = 1
+		marker.Anchored = true
+		marker.CanCollide = false
+		marker.CanQuery = false
+		marker.CanTouch = false
+		marker.CastShadow = false
+		marker.Parent = self:FxFolder()
+		self.Markers[anchor] = marker
+	end
+	marker.CFrame = anchor.WorldCFrame
+	return marker
+end
 
 function TutorialController:FxFolder(): Folder
 	const existing = self.Folder
@@ -917,6 +969,10 @@ local function highlightOf(anchor: Instance): Instance?
 	if anchor:IsA("Model") and typeof(anchor:GetAttribute("NpcId")) == "number" then
 		return anchor
 	end
+	-- Prompt_Work of a station: its model holds only attachments, nothing to outline (SetHighlight puts a marker)
+	if anchor:IsA("Attachment") and anchor:GetAttribute("PromptAction") == WORK_ACTION then
+		return nil
+	end
 	const rig = ancestorWith(anchor, function(instance)
 		return typeof(instance:GetAttribute("NpcId")) == "number" and instance:IsA("Model")
 	end)
@@ -972,7 +1028,11 @@ end
 
 -- Pulsing Highlight + 3D arrow on what the anchor belongs to (Beacon.luau); nil clears both
 function TutorialController:SetHighlight(anchor: Instance?)
-	const adornee = if anchor then highlightOf(anchor) else nil
+	local adornee = if anchor then highlightOf(anchor) else nil
+	if adornee == nil and anchor ~= nil and anchor:IsA("Attachment") and anchor:GetAttribute("PromptAction") == WORK_ACTION then
+		-- Prompt_Work of a station is an Attachment inside a model with no parts: the arrow stands on an invisible marker
+		adornee = self:WorkMarker(anchor)
+	end
 	const lift = if adornee and adornee:IsA("Model") and typeof(adornee:GetAttribute("NpcId")) == "number"
 		then CUSTOMER_LIFT
 		else ARROW_LIFT
@@ -1830,7 +1890,10 @@ function TutorialController:Mount(playerGui: Instance)
 					if step == nil then
 						return ""
 					end
-					return if self.Urgent() and step.Remind then step.Remind else step.Hint
+					if self.Urgent() and step.Remind then
+						return step.Remind
+					end
+					return if self:Focused() and step.PrepHint then step.PrepHint else step.Hint
 				end,
 				Urgent = self.Urgent,
 				SkipText = function()

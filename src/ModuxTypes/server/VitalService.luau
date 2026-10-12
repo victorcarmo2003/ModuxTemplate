@@ -88,7 +88,7 @@ export type Public = {
 	DarkTick: (self: Public, t: number) -> (),
 	Step: (self: Public) -> (),
 	RestoreOf: (self: Public, player: Player, tool: Tool) -> number,
-	CanDrink: (self: Public, player: Player, _tool: Tool) -> (boolean, string?),
+	CanDrink: (self: Public, player: Player, tool: Tool) -> (boolean, string?),
 	Drink: (self: Public, player: Player, tool: Tool) -> (),
 	SendCue: (self: Public, player: Player, kind: "Hint" | "Gain" | "End", amount: number, untilT: number) -> (),
 	EndHint: (self: Public, player: Player, entry: Entry) -> (),

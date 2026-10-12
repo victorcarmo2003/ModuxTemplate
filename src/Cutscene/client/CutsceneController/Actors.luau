@@ -9,8 +9,7 @@
 --   CarNinth, CarCorner (any key of Content.Cutscenes.Rules.Cars)
 --                  real car of the traffic kit on its TrafficPath lane, past the party, never braking (Cars.luau;
 --                  DEC-130, DEC-133). Replaces the old toy-box placeholders (user feedback 2026-10-11)
---   FlipPhone      the open flip (AST-038, no opening animation) of the avatar standing at the phone (slot 1, Q-106 c):
---                  low in the own view when that avatar is this client, in the right hand of a mate otherwise
+--   FlipPhone      the open flip (AST-038, no opening animation) of the one avatar (the own): low in the own view
 --   MartDoor       Mart door bell at MKT-DOOR (sound only; the door is map geometry)
 --   Walt           Walt Bramble (CHR-001, turtle, DEC-202): MKT-DOOR -> WALT-1 at a slow walk, cane, beard, coffee
 --   WaltCoffee     Walt's offer: a coffee flies from his hand to the front of THIS client's camera (ending.md §2.2)
@@ -20,7 +19,6 @@
 -- PROVISIONAL (TASK-121): Walt and the Raincoat Lady are CrewRig placeholders (civil outfit + Part props) until the
 -- sheets AST-059 / CHR-001 ship (TASK-125); the flip, the coffee, the puddle and the flyer are Part placeholders;
 -- every speed and time below.
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local Content = require(ReplicatedStorage.shared.Content)
@@ -175,24 +173,6 @@ end
 
 -- Actors --------------------------------------------------------------------------------------------------------
 
--- Character standing nearest to a point (the avatar the server walked to CS-P1)
-local function nearestCharacter(point: Vector3): Model?
-	local best: Model? = nil
-	local bestDistance = math.huge
-	for _, player in Players:GetPlayers() do
-		const character = player.Character
-		const root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
-		if character ~= nil and root ~= nil and root:IsA("BasePart") then
-			const distance = (root.Position - point).Magnitude
-			if distance < bestDistance then
-				best = character
-				bestDistance = distance
-			end
-		end
-	end
-	return best
-end
-
 local function flipModel(parent: Instance?): (Model, BasePart)
 	const model = Instance.new("Model")
 	model.Name = "FlipPhone"
@@ -216,34 +196,11 @@ local function flipModel(parent: Instance?): (Model, BasePart)
 end
 
 local function flipPhone(ctx: Context): Actor?
-	const caller = ctx.Caller()
-	if caller == nil then
+	if ctx.Caller() == nil then
 		return nil
 	end
-	const holder = nearestCharacter(caller)
-	if holder == nil then
-		return nil
-	end
-	const own = holder == Players.LocalPlayer.Character
-	const model, base = flipModel(nil)
-	if own then
-		-- low in the own view (no hand, script.md §1 shot 7)
-		model.Parent = Workspace.CurrentCamera
-	else
-		const hand = limb(holder, "Right Arm")
-		if hand == nil then
-			model:Destroy()
-			return nil
-		end
-		base.CFrame = hand.CFrame * CFrame.new(0, -1.15, -0.25)
-		base.Anchored = false
-		base.Massless = true
-		const weld = Instance.new("WeldConstraint")
-		weld.Part0 = hand
-		weld.Part1 = base
-		weld.Parent = base
-		model.Parent = holder
-	end
+	-- one avatar per cutscene (owner 2026-10-12): the flip is always low in the own view (no hand, script.md §1 shot 7)
+	const model = flipModel(Workspace.CurrentCamera)
 
 	return {
 		Model = model,
@@ -252,18 +209,16 @@ local function flipPhone(ctx: Context): Actor?
 				model.Parent = nil
 				return
 			end
-			if own then
-				const camera = Workspace.CurrentCamera
-				if camera ~= nil then
-					model.Parent = camera
-					model:PivotTo(camera.CFrame * FLIP_OFFSET)
-				end
+			const camera = Workspace.CurrentCamera
+			if camera ~= nil then
+				model.Parent = camera
+				model:PivotTo(camera.CFrame * FLIP_OFFSET)
 			end
 			if crossed(0.05, t, last) then
-				ctx.Play("phone_pickup", if own then nil else base)
+				ctx.Play("phone_pickup", nil)
 			end
 			if crossed(FLIP_TIME - HANGUP_LEAD, t, last) then
-				ctx.Play("phone_hangup", if own then nil else base)
+				ctx.Play("phone_hangup", nil)
 			end
 		end,
 		Destroy = function()

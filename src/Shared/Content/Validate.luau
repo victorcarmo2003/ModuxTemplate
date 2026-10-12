@@ -1124,8 +1124,9 @@ local function checkCutscenes()
 		if row.Participants ~= "ConnectedAtStart" then
 			fail("Cutscenes", index, key, "Participants must be ConnectedAtStart (DEC-205)")
 		end
-		if key ~= "none" and #row.Marks ~= 4 then
-			fail("Cutscenes", index, key, `{#row.Marks} Marks, a party of 4 needs 4`)
+		if key ~= "none" and #row.Marks < 1 then
+			-- one avatar per cutscene (owner 2026-10-12): Route only reads the first mark
+			fail("Cutscenes", index, key, "needs at least 1 Mark (only the first is used)")
 		end
 		const nextKey = row.Next
 		if nextKey ~= nil and (nextKey == key or nextKey == "none" or not Cutscenes.ByKey[nextKey]) then

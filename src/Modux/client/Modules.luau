@@ -12,6 +12,7 @@ return {
 	StarterPlayer.StarterPlayerScripts.client.Character.CharacterController,
 	StarterPlayer.StarterPlayerScripts.client.Class.ClassController,
 	StarterPlayer.StarterPlayerScripts.client.Coffee.CoffeeCupController,
+	StarterPlayer.StarterPlayerScripts.client.Coffee.CoffeeHandController,
 	StarterPlayer.StarterPlayerScripts.client.Crew.RigController,
 	StarterPlayer.StarterPlayerScripts.client.Customer.CustomerController,
 	StarterPlayer.StarterPlayerScripts.client.Cutscene.CutsceneController,

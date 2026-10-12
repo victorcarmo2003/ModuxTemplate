@@ -57,6 +57,7 @@ export type Public = {
 	DevGuard: (self: Public) -> (),
 	DevSeats: (self: Public) -> string,
 	DevEnter: (self: Public, player: Player, station: number) -> string,
+	DevWhy: (self: Public, player: Player, station: number, reason: string) -> string,
 	DevLeave: (self: Public, player: Player) -> string,
 	DevFinish: (self: Public, player: Player, keys: { string }, force: boolean) -> string,
 }

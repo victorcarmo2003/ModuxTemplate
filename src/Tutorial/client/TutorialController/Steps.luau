@@ -30,6 +30,9 @@ export type Step = {
 	Number: number,
 	Text: string, -- panel objective, starts with the verb; "{item}" = the topping name
 	Hint: string,
+	-- Hint while the kitchen is the focused prep mode (Content.Prep.Rules.WorldKitchenPrompts = false): the world prompts
+	-- of the kitchen are gone, the step is done at a station (shim until the tutorial is rewritten, TASK-183/184)
+	PrepHint: string?,
 	Action: string?,
 	Say: { string }?, -- Walt's lines when the step starts (nil = silent waiting row)
 	Done: string?, -- Walt's praise when the player moves past this step
@@ -97,6 +100,7 @@ const LIST: { Step } = {
 		Number = 4,
 		Text = "Grill a sausage",
 		Hint = 'Grab one at the cooler: press "Grill".',
+		PrepHint = 'Press "Work" at a station, then add a sausage on the Grill tab.',
 		Action = "grill_place",
 		Say = { "Frank from the cooler.", "Onto the grill." },
 		Done = "Nice.",
@@ -107,17 +111,26 @@ const LIST: { Step } = {
 		Number = 5,
 		Text = "Slice a bun",
 		Hint = 'Hold "Slice Bun" at the bun crate.',
+		PrepHint = 'Press "Work" at a station. On the Build tab, drag the knife along the line.',
 		Action = "bun_cut",
 		Say = { "Slice a bun while it cooks." },
 		Done = "Good.",
 		Remind = "Hold to slice the bun.",
 	},
-	{ Key = "slicing", Number = 5, Text = "Slicing the bun...", Hint = "Keep holding!", Action = nil },
+	{
+		Key = "slicing",
+		Number = 5,
+		Text = "Slicing the bun...",
+		Hint = "Keep holding!",
+		PrepHint = "Build the hot dog: sausage, ketchup, then Next.",
+		Action = nil,
+	},
 	{
 		Key = "cooking",
 		Number = 6,
 		Text = "Wait for the sausage",
 		Hint = 'It gets a "Collect" button when ready.',
+		PrepHint = "Flip the sausage when the ring glows, then wait for it to finish.",
 		Action = "grill_collect",
 		Say = { "Wait for the bar." },
 	},
@@ -126,6 +139,7 @@ const LIST: { Step } = {
 		Number = 6,
 		Text = "Collect the sausage",
 		Hint = 'Press "Collect" on the grill.',
+		PrepHint = 'Press "Work" at a station, then "Collect" on the Grill tab.',
 		Action = "grill_collect",
 		Say = { "Ready. Grab it." },
 		Done = "Got it.",
@@ -136,6 +150,7 @@ const LIST: { Step } = {
 		Number = 7,
 		Text = "Put the sausage in the bun",
 		Hint = 'Press "Add Sausage" at the board.',
+		PrepHint = 'Press "Work" at a station. On the Build tab, drag the sausage onto the bun.',
 		Action = "board_add_sausage",
 		Say = { "Frank in the bun." },
 		Done = "Beautiful.",
@@ -245,7 +260,9 @@ const SHOPPING: { string } = { "mart_go", "mart_buy", "mart_back", "restock" }
 -- TutorialPromptGate (PromptController filter, presentation only): prompts shown during a step = the step's own Action +
 -- the actions of the next step(s) listed here (so a player who gets ahead is never locked out) + ALWAYS. Waiting steps
 -- release nothing extra. Server stays authoritative.
-const ALWAYS: { string } = { "answer_phone" }
+-- prep_work (Prompt_Work of Station_n, focused prep mode): the kitchen steps are done at a station, so the prompt is
+-- never gated (it only exists in the selling phases anyway: Content.Actions Requires.Phase).
+const ALWAYS: { string } = { "answer_phone", "prep_work" }
 const NEXT_ACTIONS: { [string]: { string } } = {
 	phone = { "open_sign" },
 	open = { "take_order" },

@@ -2,13 +2,15 @@
 -- SkipPill: the cutscene skip vote (DEC-078, DEC-194; style guide §7.2 "Skip da cutscene": bottom right, only in a
 -- cutscene, pill "Skip (1/2)" with the vote count; ui-text.md §7: "Hold to skip" · "Skip {votes}/{needed}" ·
 -- "Skipping...").
---   hint   "Hold to skip" above the pill while the own vote is not in
---   pill   key chip (desktop/gamepad; none on touch) + "Skip (votes/needed)"; fills Mustard while held, stays full
---          once the own vote is in; "Skipping..." when the server count reaches the threshold
+-- ONE fixed-size pill (no AutomaticSize, no layout on the root: a size driven by its content grew to a tall block on
+-- desktop, owner screenshot 2026-10-12), visible from the first second of the scene:
+--   idle     key chip (desktop/gamepad; none on touch) + "Hold to skip" on a translucent Ink pill with an outline
+--   holding  a Mustard fill grows from the left (hold progress); "Skip (votes/needed)"; stays full once the own vote is in
+--   server   "Skipping..." when the count reaches the threshold
 -- Sits left of the mobile jump button and right of the call strip, so it never covers either on a phone. The pill is
--- the mobile control (>= 44 px tall): press/release go to OnPress/OnRelease; the owner times the hold.
--- Cartoon pass (AST-091): Ink CartoonPanel pill with a Mustard hold fill (pill shaped, grows from the left), Cream
--- key chip, squash on press (Motion.Press).
+-- the pointer control (>= 44 px tall; mouse hold, touch hold): press/release go to OnPress/OnRelease; the owner times
+-- the hold and binds keyboard/gamepad.
+-- Cartoon pass (AST-091): Ink CartoonPanel pill with a Mustard hold fill, Cream key chip, squash on press.
 -- Pure: only props. Votes and Needed come from the server (`Cutscene` set); nothing is counted here.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -44,10 +46,8 @@ export type Props = {
 const HINT = "Hold to skip"
 const SKIPPING = "Skipping..."
 const PILL_HEIGHT = 44 -- >= Theme.MinTouch
-const MIN_WIDTH = 130
-const PILL_WIDTH = 190 -- fixed: an auto-sized pill grew to ~800 px on a phone (owner screenshot 2026-10-12)
+const PILL_WIDTH = 176 -- fixed (px at UI scale 1): chip 28 + "Hold to skip" at 17 px + padding
 const TEXT_SIZE = 17 -- >= Theme.MinTextSize on the smallest phone
-const HINT_SIZE = 14
 const CHIP_SIZE = 28
 
 local function isPointer(input: InputObject): boolean
@@ -64,6 +64,9 @@ return function(props: Props): Frame
 	const label = function(): string
 		if skipping() then
 			return SKIPPING
+		end
+		if not (pressed() or props.Voted() or props.Votes() > 0 or props.Progress() > 0) then
+			return HINT
 		end
 		return `Skip ({props.Votes()}/{math.max(props.Needed(), 1)})`
 	end
@@ -94,8 +97,7 @@ return function(props: Props): Frame
 		Name = props.Name or "SkipPill",
 		AnchorPoint = Vector2.new(1, 1),
 		Position = UDim2.new(1, -(props.Right or 112), 1, -(props.Bottom or 24)),
-		Size = UDim2.fromOffset(0, 0),
-		AutomaticSize = Enum.AutomaticSize.XY,
+		Size = UDim2.fromOffset(PILL_WIDTH, PILL_HEIGHT),
 		BackgroundTransparency = 1,
 		Visible = function()
 			return props.Visible() or pop() > 0.02
@@ -106,29 +108,9 @@ return function(props: Props): Frame
 				return pop() * press()
 			end,
 		}),
-		createRaw("UIListLayout")({
-			FillDirection = Enum.FillDirection.Vertical,
-			HorizontalAlignment = Enum.HorizontalAlignment.Right,
-			SortOrder = Enum.SortOrder.LayoutOrder,
-			Padding = UDim.new(0, 4),
-		}),
-
-		CartoonLabel({
-			Name = "Hint",
-			LayoutOrder = 1,
-			Box = UDim2.fromOffset(MIN_WIDTH, HINT_SIZE + 6),
-			TextSize = HINT_SIZE,
-			Color = Theme.Color.Cream,
-			XAlignment = Enum.TextXAlignment.Right,
-			Text = HINT,
-			Visible = function()
-				return not props.Voted() and not skipping()
-			end,
-		}),
 
 		create("TextButton")({
 			Name = "Pill",
-			LayoutOrder = 2,
 			Size = UDim2.fromOffset(PILL_WIDTH, PILL_HEIGHT),
 			BackgroundTransparency = 1,
 			AutoButtonColor = false,
@@ -154,11 +136,6 @@ return function(props: Props): Frame
 			CartoonPanel({
 				Name = "Body",
 				Size = UDim2.fromOffset(PILL_WIDTH, PILL_HEIGHT),
-				-- only while the own press holds, the own vote is in or the server counts votes (the hint is the idle
-				-- state; the pill area stays the touch target)
-				Visible = function()
-					return pressed() or props.Voted() or props.Votes() > 0 or props.Progress() > 0
-				end,
 				Tone = Theme.Tone.Ink,
 				Transparency = Theme.Transparency.Panel,
 				Outline = Theme.Outline.Thick,

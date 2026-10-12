@@ -10,6 +10,7 @@ local CameraController = require(StarterPlayer.StarterPlayerScripts.client.Modux
 local CharacterController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.CharacterController)
 local ClassController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ClassController)
 local CoffeeCupController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.CoffeeCupController)
+local CoffeeHandController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.CoffeeHandController)
 local RigController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.RigController)
 local CustomerController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.CustomerController)
 local CutsceneController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.CutsceneController)
@@ -57,6 +58,7 @@ export type AllControllers = {
 	CharacterController: CharacterController.Public,
 	ClassController: ClassController.Public,
 	CoffeeCupController: CoffeeCupController.Public,
+	CoffeeHandController: CoffeeHandController.Public,
 	RigController: RigController.Public,
 	CustomerController: CustomerController.Public,
 	CutsceneController: CutsceneController.Public,

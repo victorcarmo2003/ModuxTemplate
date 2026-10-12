@@ -9,7 +9,7 @@
 	    WalkSpeed = that speed: the Route's acceleration and braking are what the body does (no dry stop).
 	  * Facing: AutoRotate off during the scene; the root yaw eases to the Route facing (walk heading, then the end
 	    spot's facing while braking). AutoRotate comes back when the scene ends.
-	  * Slot: not on the wire; the one whose planned spot is nearest to the body (the server placed it there).
+	  * Slot: always 1 (one avatar per cutscene); it waits until the server placed the body on that spot.
 	  * WalkSpeed is only written while `Frozen` is set: when the server unfreezes, its WalkSpeed wins.
 	PROVISIONAL (frontend-coder, 2026-10-11): PULL, TURN_RATE, SNAP, LOCK_DISTANCE.
 ]]
@@ -36,7 +36,7 @@ const TURN_RATE = 7 -- 1/s ease of the root yaw
 const SNAP = 18 -- studs off the plan: put the body back on it
 const LOCK_DISTANCE = 6 -- studs: the body stands on this slot's planned spot
 const REBUILD = 1 -- s between two builds of a plan with a missing target
-const MAX_SLOTS = 4
+const MAX_SLOTS = 1 -- one avatar per cutscene: every body walks the plan of slot 1
 const SEARCH_EVERY = 0.25 -- s between two slot searches
 
 const Walker = {}

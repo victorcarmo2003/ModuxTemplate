@@ -22,7 +22,7 @@
 --   Verdict       RoundService:SetVerdict: someone present Active/Reviving
 --   Gate "Vital"  only Active, not knocked, interacts (InteractionService:AddGate)
 --   Coffee        ItemService:RegisterUse("coffee"): night only (Sanity.CoffeeNightOnly, Q-170 A Provisional),
---                 cooldown, not full; drink CoffeeDrinkTime s, +Restore of the Tool, Consume
+--                 cooldown, not full; one sip (Content.CoffeeCup.Sips): the whole Restore once, then Consume
 --
 -- Hooks left for other tasks (§19.0 rule 1, no Require back):
 --   LightService (TASK-059)  in Require (architecture.md §19.2; Light does not require Vital, no cycle). IsLit is read
@@ -693,9 +693,13 @@ function VitalService:RestoreOf(player: Player, tool: Tool): number
 	return self.Dependencies.ClassService:GetModifier(player, "CoffeeRestore", Content.Sanity.Coffee)
 end
 
--- Validate of the coffee use. Day (Q-170 A): toast, the Tool stays. Cooldown: toast with the seconds left.
-function VitalService:CanDrink(player: Player, _tool: Tool): (boolean, string?)
+-- Validate of the coffee use. Day (Q-170 A): toast, the Tool stays. Cooldown: toast with the seconds left. A coffee that
+-- is already being drunk (Tool attribute `Drinking`) cannot be used again.
+function VitalService:CanDrink(player: Player, tool: Tool): (boolean, string?)
 	const rows = Content.Sanity
+	if tool:GetAttribute(Content.CoffeeCup.Sips.DrinkingAttribute) == true then
+		return false, nil
+	end
 	const entry = self:Ensure(player)
 	const night = self.Dependencies.RoundService:IsNight() and entry.Max > 0
 	if rows.CoffeeNightOnly and not night then
@@ -715,10 +719,13 @@ function VitalService:CanDrink(player: Player, _tool: Tool): (boolean, string?)
 	return true, nil
 end
 
--- Run of the coffee use: the drink takes CoffeeDrinkTime (the owner's client plays "drink"); the hand, the state and
--- the rules are checked again at the end. Never above the max (Sanity.restore through AddSanity's clamp).
+-- Run of the coffee use: ONE sip drinks the whole cup (Content.CoffeeCup.Sips, owner request 2026-10-12, Provisional).
+-- It takes Sips.DrinkTime; the hand, the state and the rules are checked again at the end. The Restore applies once,
+-- right then, with the Tool marked `Drinking` (no second use, the hand cup sinks on every client), and the Tool is
+-- consumed Sips.EmptySeconds later. Never above the max (Sanity.restore through AddSanity's clamp).
 function VitalService:Drink(player: Player, tool: Tool)
-	task.wait(Content.Sanity.CoffeeDrinkTime)
+	const sips = Content.CoffeeCup.Sips
+	task.wait(sips.DrinkTime)
 	if player.Parent == nil or not self.Dependencies.RunStateService:IsActive(player) then
 		return
 	end
@@ -731,13 +738,18 @@ function VitalService:Drink(player: Player, tool: Tool)
 	end
 	const entry = self:Ensure(player)
 	const restore = self:RestoreOf(player, tool)
-	self.Dependencies.ItemService:Consume(player, tool)
+	tool:SetAttribute(sips.DrinkingAttribute, true)
 	entry.CoffeeReadyAt = now() + Content.Sanity.CoffeeCooldown
 	const before = entry.Sanity
 	const after = self:AddSanity(player, Sanity.restore(entry.Sanity, entry.Max, restore) - entry.Sanity, COFFEE)
 	-- feedback for the owner (green glow + "+N" on the bar) and the end of the Night 1 emphasis
 	self:SendCue(player, "Gain", math.max(0, after - before), 0)
 	self:EndHint(player, entry)
+	task.wait(sips.EmptySeconds)
+	self.Dependencies.ItemService:Consume(player, tool)
+	if tool.Parent ~= nil then
+		tool:Destroy() -- handed to a mate during the sip: still gone
+	end
 end
 
 -- Night 1 coffee lesson (user request 2026-10-11, Provisional) -----------------------------------------------------

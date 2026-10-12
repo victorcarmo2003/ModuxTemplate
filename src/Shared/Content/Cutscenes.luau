@@ -329,7 +329,8 @@ const scenes = Table.new({
 		Skippable = true,
 		Participants = "ConnectedAtStart",
 		Music = "lobby", -- PROVISIONAL stand-in for MUS-005 (Abertura); the shift track waits for the end of the chain
-		Marks = { "CutsceneMark1", "CutsceneMark2", "CutsceneMark3", "CutsceneMark4" },
+		-- one avatar (owner 2026-10-12): only the first mark; every client shows just its own body (CutsceneMark2..4 stay in the map)
+		Marks = { "CutsceneMark1" },
 		Cinema = true,
 		Look = "Cinematic",
 		-- Shots (owner request 2026-10-12, PROVISIONAL): the cuts follow the beats below.

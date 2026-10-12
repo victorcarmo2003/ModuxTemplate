@@ -821,6 +821,11 @@ function PrepController:Enter(station: number, mock: boolean?): boolean
 	const camera = self.Dependencies.CameraController
 	const vital = self.Dependencies.VitalController
 	if untrack(camera.Mode) ~= "FirstPerson" or untrack(vital.LocalState) ~= "Active" then
+		-- the server already seated (and froze) us: hand the seat back instead of staying stuck in place
+		if not mock then
+			warn(`[PrepController] cannot enter station {station}: camera {untrack(camera.Mode)}, state {untrack(vital.LocalState)}`)
+			self.Libs.Net.PrepLeave:fireServer()
+		end
 		return false
 	end
 	local pose = Poses.Of(station)
@@ -847,6 +852,9 @@ function PrepController:Enter(station: number, mock: boolean?): boolean
 		Far = 0.7,
 	})
 	if untrack(camera.Mode) ~= "Prep" then
+		if not mock then
+			self.Libs.Net.PrepLeave:fireServer()
+		end
 		return false
 	end
 

@@ -6,6 +6,7 @@ local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local Actors = require(StarterPlayer.StarterPlayerScripts.client.Cutscene.CutsceneController.Actors)
 local Ambience = require(StarterPlayer.StarterPlayerScripts.client.Cutscene.CutsceneController.Ambience)
+local Hide = require(StarterPlayer.StarterPlayerScripts.client.Cutscene.CutsceneController.Hide)
 local Speech = require(StarterPlayer.StarterPlayerScripts.client.Cutscene.CutsceneController.Speech)
 local Walker = require(StarterPlayer.StarterPlayerScripts.client.Cutscene.CutsceneController.Walker)
 
@@ -48,6 +49,7 @@ export type Public = {
 	LineShown: Vide.Source<boolean>,
 	LineText: Vide.Source<string>,
 	LookIndex: number,
+	Mates: Hide.Hide?,
 	Music: string?,
 	Needed: Vide.Source<number>,
 	Party: boolean,
@@ -96,7 +98,6 @@ export type Public = {
 	FireBeat: (self: Public, beat: Beat, live: boolean) -> (),
 	QueueCaption: (self: Public, beat: Beat, live: boolean) -> (),
 	StepCaptions: (self: Public, elapsed: number) -> Beat?,
-	CrewBalloons: (self: Public, text: string) -> (),
 	PlacePrompt: (self: Public, target: string) -> (),
 	StepCinema: (self: Public, scene: Scene, elapsed: number, last: number) -> (number, number),
 	BarFraction: (self: Public, amount: number) -> number,

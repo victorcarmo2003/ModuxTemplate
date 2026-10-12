@@ -129,7 +129,10 @@ local function along(run: Run, tau: number): (number, number)
 	return 0.5 * a * rampUp * rampUp + v * (tau - rampUp), v
 end
 
-function Route.Build(scene: Scene, slot: number, count: number, spot: Spot): Plan
+-- One avatar per cutscene (owner 2026-10-12): `slot` and `count` are kept for the Spot contract but every body walks the
+-- plan of slot 1 of 1 (the first mark, the first stand spot); each client shows only its own body.
+function Route.Build(scene: Scene, _slot: number, _count: number, spot: Spot): Plan
+	const slot, count = 1, 1
 	const marks = scene.Marks
 	const start = if #marks > 0 then spot(marks[math.min(slot, #marks)], slot, count) else nil
 	const plan: Plan = { Start = start, Runs = {}, Missing = start == nil and #marks > 0 }

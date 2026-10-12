@@ -16,7 +16,7 @@
 	            Anchors; "Sign" = the tagged NO HELP WANTED sign, else the nearest card ahead), "Windows" (nearest
 	            NO HELP WANTED card ahead), a MapPoint or "Walk" (where the body walks); Fov narrows the view
 	  Prompt    PromptBillboard on the target that fills by itself (input locked, script.md §1)
-	  Line      subtitle strip (CallSubtitle): "Walt" lines, or "You" for crew lines + a SpeechBalloon over each mate;
+	  Line      subtitle strip (CallSubtitle): "Walt" lines, or "You" for crew lines (no balloons: one avatar);
 	            voiced by text-to-speech when the engine has it (Speech.luau, Rules.Voices; subtitles only otherwise)
 	  Actor     local actors (Actors.luau): flip phone, Walt, coffee, Raincoat Lady, street cars (none in the intro),
 	            flyer, Mart bell. A car with Rules.Cars[].Cross is synced to the own body: it passes when the body
@@ -43,9 +43,10 @@
 	and then fades into the game.
 
 	PROVISIONAL (TASK-121):
-	  * Solo/Party variant = more than one player in the server when the chain starts (the set has no roster).
-	  * Slot 1 of the flip phone (Q-106 c) = the avatar standing nearest to CS-P1 when the beat fires.
-	  * HOLD_TIME, FADE_TIME, LINE_HOLD, TITLE_HOLD, PROMPT_TIME, BALLOON_TIME, look heights; crew speaker "You".
+	  * ONE avatar (owner 2026-10-12): the own. Route/Walker use slot 1 of 1 for everybody, the other players' characters
+	    are hidden for this client (Hide.luau) until the chain ends or is skipped, the variant is always Solo and the
+	    flip phone is always in the own view. Each client sees its own scene alone; the server record is unchanged.
+	  * HOLD_TIME, FADE_TIME, LINE_HOLD, TITLE_HOLD, PROMPT_TIME, look heights; crew speaker "You".
 	  * Finale lines also use the call strip (its phone badge has no "in person" variant yet).
 	  * Credits show the title only (the roll from docs/art/credits.md is not in Content yet).
 	  * A non-participant (late member, DEC-205) sees the same presentation; its vote is ignored by the server.
@@ -67,13 +68,13 @@ local HudBanner = require(StarterPlayer.StarterPlayerScripts.client.Interface.Co
 local PromptBillboard = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.PromptBillboard)
 local ScreenFade = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.ScreenFade)
 local SkipPill = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.SkipPill)
-local SpeechBalloon = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.SpeechBalloon)
 local Motion = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Motion)
 local UiScale = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.UiScale)
 local Vignette = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Vignette)
 local Actors = require(script.Actors)
 local Ambience = require(script.Ambience)
 local Director = require(script.Director)
+local Hide = require(script.Hide)
 local Speech = require(script.Speech)
 local Timeline = require(script.Timeline)
 local Walker = require(script.Walker)
@@ -126,11 +127,8 @@ const CAPTION_VERY_LATE = 3 -- s past its At a line whose voice did not start wi
 const CAPTION_VOICE_WAIT = 1.5 -- s a loaded line has to start its voice once it is the current one
 const TITLE_HOLD = 3 -- s of a title
 const PROMPT_TIME = 1.2 -- s the "Call" prompt takes to fill by itself
-const BALLOON_TIME = 2.5 -- s of a crew balloon over a mate
 const LOOK_LIFT = Vector3.new(0, 3, 0) -- look target above a ground point
 const FLYER_HEIGHT = 4.5 -- the P-01 flyer, same as Actors
-const BALLOON_OFFSET = Vector3.new(0, 2.6, 0)
-const BALLOON_DISTANCE = 60
 const LIVE_WINDOW = 0.75 -- s: a beat crossed later than this after its At is catch-up (no sound, no balloon)
 -- watchdog (a lost Cutscene frame must not leave the camera/input in a chain): how often the set's store is read
 -- back, and how long past the scene's server Cap a chain may run before the client ends it by itself
@@ -198,6 +196,8 @@ function CutsceneController:Setup()
 	self.LookIndex = 0 :: number
 	self.Music = nil :: string?
 	self.Walker = nil :: Walker.Walker?
+	-- hides every other player's character for this client while the chain plays (one avatar: the own)
+	self.Mates = nil :: Hide.Hide?
 	self.Speech = nil :: Speech.Speech?
 	-- subtitle lines fired and waiting their turn, and the one on screen (or waiting for its voice)
 	self.Captions = {} :: { Caption }
@@ -404,7 +404,7 @@ function CutsceneController:CrossClock(target: string): (() -> number?)?
 	const walker = self.Walker
 	local plan = if walker ~= nil then walker.Plan() else nil
 	if plan == nil then
-		plan = Route.Build(scene, 1, #Players:GetPlayers(), Anchors.Spot)
+		plan = Route.Build(scene, 1, 1, Anchors.Spot)
 	end
 	const walk = plan :: Route.Plan
 	local planned: number? = nil
@@ -470,7 +470,7 @@ function CutsceneController:ActorContext(): Actors.Context
 			audio:Loop(sound, at, on)
 		end,
 		Caller = function(): Vector3?
-			const spot = Anchors.Spot(Content.Cutscenes.Rules.Stand.Target, 1, #Players:GetPlayers())
+			const spot = Anchors.Spot(Content.Cutscenes.Rules.Stand.Target, 1, 1)
 			return if spot ~= nil then spot.Position else nil
 		end,
 		Warn = function(key: string, message: string)
@@ -581,13 +581,8 @@ function CutsceneController:PreloadVoices(timeout: number, progress: ((number) -
 		end
 		return
 	end
-	const party = #Players:GetPlayers() > 1
-	const lines = Timeline.Beats(scene, party)
-	for _, beat in Timeline.Beats(scene, not party) do
-		if table.find(lines, beat) == nil then
-			table.insert(lines, beat)
-		end
-	end
+	-- one avatar: always the Solo variant
+	const lines = Timeline.Beats(scene, false)
 	-- the loading screen waits only for the lines of the first VOICE_AHEAD s of the scene; every line is queued in
 	-- order of use, so the rest keeps loading in the background while the intro plays
 	const speech = self:SpeechOf()
@@ -608,7 +603,9 @@ function CutsceneController:BeginChain()
 	self.Active(true)
 	Players.LocalPlayer:SetAttribute(ACTIVE_ATTRIBUTE, true)
 	self:SpeechOf()
-	self.Party = #Players:GetPlayers() > 1
+	-- one avatar in the scene whatever the server holds: always the Solo variant
+	self.Party = false
+	self.Mates = Hide.new()
 	const input = self.Dependencies.InputController
 	self.PreviousContext = input.Context
 	input:SetContext("Menu")
@@ -632,6 +629,11 @@ function CutsceneController:EndChain()
 		speech.Destroy()
 	end
 	self.Windows = nil
+	const mates = self.Mates
+	self.Mates = nil
+	if mates ~= nil then
+		mates.Restore()
+	end
 	self.Active(false)
 	Players.LocalPlayer:SetAttribute(ACTIVE_ATTRIBUTE, nil)
 	self.Skippable(false)
@@ -676,7 +678,7 @@ function CutsceneController:BeginSegment(key: string, startedAt: number)
 		})
 	end
 	-- the own walk along the shared Route, and the voices of this segment loaded ahead
-	self.Walker = Walker.new(scene, #Players:GetPlayers())
+	self.Walker = Walker.new(scene, 1)
 	const speech = self.Speech
 	if speech ~= nil then
 		speech.Prepare(self.Beats)
@@ -825,9 +827,6 @@ function CutsceneController:StepCaptions(elapsed: number): Beat?
 	local function show(caption: Caption, state: string)
 		caption.State = state
 		caption.ShownElapsed = elapsed
-		if not caption.Silent and caption.Beat.Speaker == "crew" then
-			self:CrewBalloons(caption.Beat.Text or "")
-		end
 	end
 
 	for _ = 1, 16 do
@@ -901,49 +900,6 @@ function CutsceneController:StepCaptions(elapsed: number): Beat?
 		end
 	end
 	return nil
-end
-
--- "crew" lines: a balloon over each mate (each client sees the others, not itself, DEC-088)
-function CutsceneController:CrewBalloons(text: string)
-	const gui = self.Gui
-	if gui == nil or text == "" then
-		return
-	end
-	for _, player in Players:GetPlayers() do
-		if player == Players.LocalPlayer then
-			continue
-		end
-		const character = player.Character
-		const head = if character ~= nil then character:FindFirstChild("Head") else nil
-		if head == nil then
-			continue
-		end
-		const shown = Vide.source(true)
-		const unmount, balloon = Vide.root(function()
-			return SpeechBalloon({
-				Name = "CutsceneBalloon",
-				Adornee = head,
-				Visible = shown,
-				Text = function()
-					return text
-				end,
-				StudsOffset = BALLOON_OFFSET,
-				MaxDistance = BALLOON_DISTANCE,
-			})
-		end)
-		balloon.Parent = gui
-		local done = false
-		local function close()
-			if done then
-				return
-			end
-			done = true
-			unmount()
-			balloon:Destroy()
-		end
-		table.insert(self.Balloons, close)
-		task.delay(BALLOON_TIME, close)
-	end
 end
 
 function CutsceneController:PlacePrompt(target: string)
@@ -1056,6 +1012,10 @@ function CutsceneController:Step()
 		end
 	end
 
+	const mates = self.Mates
+	if mates ~= nil then
+		mates.Update()
+	end
 	const walker = self.Walker
 	if walker ~= nil then
 		walker.Step(elapsed, math.clamp(elapsed - last, 0, 0.1))

@@ -814,7 +814,40 @@ function PrepService:DevEnter(player: Player, station: number): string
 	self:DevGuard()
 	const ok, reason = self:Enter(player, clampStation(station), true)
 	self:Reply(player, "Enter", ok, reason, nil, if ok then station else nil)
-	return if ok then `{player.Name} sits at station {station}` else `refused: {reason}`
+	if ok then
+		return `{player.Name} sits at station {station}`
+	end
+	return `refused: {reason} - {self:DevWhy(player, clampStation(station), reason)}`
+end
+
+-- Plain words for a refusal of CheckEnter, with the state that caused it (dev commands only)
+function PrepService:DevWhy(player: Player, station: number, reason: string): string
+	const round = self.Dependencies.RoundService
+	const characters = self.Dependencies.CharacterService
+	if reason == "NotSelling" then
+		return `phase is {round.Phase()}: the shop must be open (Open or Night: press the red switch on the trailer wall first)`
+	elseif reason == "NoStation" then
+		return `only {self.Count} station(s) active (party size), asked for {station}`
+	elseif reason == "Busy" then
+		const seat = self.BySeat[station]
+		return `station {station} is taken by {if seat ~= nil then seat.Player.Name else "someone"}`
+	elseif reason == "Seated" then
+		return `already seated at station {self:SeatOf(player) or 0}: /dev prep leave`
+	elseif reason == "Locked" then
+		if not self.Active or not rules.Enabled then
+			return "Content.Prep.Rules.Enabled is false (or not the Run place)"
+		elseif not self.Dependencies.RunStateService:IsActive(player) then
+			return "the player is not an Active member of the run"
+		elseif characters:CharacterOf(player) == nil then
+			return "no character yet"
+		elseif characters:IsFainted(player) or characters:IsKnocked(player) then
+			return "the character is fainted or knocked"
+		elseif characters:IsFrozen(player) then
+			return "the character is frozen by another system (a cutscene, the trailer door)"
+		end
+		return "re-entry lock after a forced exit (Rules.CueLock)"
+	end
+	return "see Content.Prep.Reasons"
 end
 
 function PrepService:DevLeave(player: Player): string
