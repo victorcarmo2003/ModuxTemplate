@@ -59,6 +59,7 @@ export type Public = {
 	Mock: boolean,
 	Needs: Vide.Source<{ [string]: boolean }>,
 	NextBeat: number,
+	PlateMask: number,
 	Pointer: Pointer.Pointer?,
 	PointerStops: { () -> () },
 	Pose: Poses.Pose?,

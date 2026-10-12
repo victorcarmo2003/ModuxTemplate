@@ -638,6 +638,18 @@ function Feed.Take(controller: any, id: number)
 	send(controller, "Order", "Take", 0, id)
 end
 
+-- The customer at the counter (Q1) that waits to be taken, 0 = none. Reactive when read inside a binding (the Take button of the
+-- ticket rail, the Take target of the Window view; TASK-206).
+function Feed.Front(): number
+	for _, id in Feed.Ids() do
+		const card = Feed.CardOf(id)()
+		if card.Status == "Ready" and card.Place == "Counter" then
+			return id
+		end
+	end
+	return 0
+end
+
 -- `slot` = the roller the sausage was dropped on (prep-3d.md N1); 0 / nil = the server picks. false = not sent (too many in flight).
 function Feed.Place(controller: any, slot: number?): boolean
 	return send(controller, "Grill", "Place", slot or 0, 0)

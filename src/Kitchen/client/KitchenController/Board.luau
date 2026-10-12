@@ -96,6 +96,8 @@ function Board.Mount(station: Instance, context: Context.Context)
 		return Slots.AnyWorking(readers)
 	end)
 	for slot, spot in spots do
+		-- where the 3D prep mode finds the board's bun to hide it locally (SlotView("board", slot).Station)
+		Slots.Track(station, KIND, spot)
 		mountSlot(station, spot, readers[slot], clock, context.Audio)
 	end
 end

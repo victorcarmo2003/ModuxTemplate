@@ -17,6 +17,7 @@ local Theme = require(script.Parent.Theme)
 local CartoonPanel = require(script.Parent.CartoonPanel)
 local CartoonLabel = require(script.Parent.CartoonLabel)
 local Chip = require(script.Parent.IngredientPanel.Chip)
+local CartoonButton = require(script.Parent.CartoonButton)
 
 const create = Vide.create
 -- Vide 0.4.1 types `create` for 19 classes only; UIStroke and UIListLayout children are fine, UIPadding is not.
@@ -36,8 +37,17 @@ export type Ticket = {
 	State: State,
 }
 
+-- The Take button of the customer at the counter (TASK-206): shown while someone waits to be taken; a bar at the bottom of the
+-- card. Its tap never cycles the ticket.
+export type Take = {
+	Visible: () -> boolean,
+	Text: () -> string,
+	OnPress: () -> (),
+}
+
 export type Props = {
 	Ticket: () -> Ticket?,
+	Take: Take?,
 	-- Tickets waiting behind this one.
 	Queue: () -> number,
 	-- One wide row (portrait) instead of the card.
@@ -444,6 +454,23 @@ return function(props: Props): Frame
 		},
 	})
 
+	-- Take (the customer at the counter): a bar over the bottom of the card
+	local take: any = nil
+	const takeProps = props.Take
+	if takeProps ~= nil then
+		take = CartoonButton({
+			Name = "Take",
+			Text = takeProps.Text,
+			TextSize = 16,
+			Visible = takeProps.Visible,
+			AnchorPoint = Vector2.new(0.5, 1),
+			Position = UDim2.fromScale(0.5, 1),
+			Size = UDim2.new(1, 0, 0, 48),
+			OnActivated = takeProps.OnPress,
+		})
+		take.ZIndex = 6
+	end
+
 	-- the whole thing is one touch target (cycle to the next ticket)
 	return create("TextButton")({
 		Name = props.Name or "TicketRail",
@@ -463,5 +490,6 @@ return function(props: Props): Frame
 		band,
 		pin,
 		stamp,
+		take,
 	}) :: any
 end

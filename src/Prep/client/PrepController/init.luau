@@ -185,6 +185,8 @@ function PrepController:Setup()
 	self.Forced = false :: boolean
 	self.LeaveReason = "" :: string
 	self.NextBeat = 0 :: number
+	-- cosmetic plate mask of PrepTab.Plate (Prep/shared/PlateMask), written by the 3D Board / Toppings stage (TASK-204, 205)
+	self.PlateMask = 0 :: number
 	self.ToastId = 0 :: number
 	self.Stages = {} :: { [string]: Stage.Stage }
 	-- 3D stages (World/Stages/*.luau, Rules.ThreeD only): by tab, and once each in a list
@@ -538,6 +540,8 @@ function PrepController:ResetPlate()
 	end)
 	self:Need("BunCut", false)
 	self:Need("PlateBuilt", false)
+	self:Need("SausagePlaced", false)
+	self.PlateMask = 0
 end
 
 -- One line at the bottom (one at a time, a new one replaces the old).
@@ -646,6 +650,7 @@ function PrepController:SendTab()
 	self.Libs.Net.PrepTab:fireServer({
 		Step = untrack(self.Tab),
 		Ticket = if ticket ~= false then math.clamp(ticket.Id, 0, 65535) else 0,
+		Plate = self.PlateMask,
 	})
 end
 
@@ -949,6 +954,22 @@ function PrepController:Mount()
 							Strip = function(): boolean
 								return layout().TicketStrip
 							end,
+							-- the customer at the counter waits to be taken (TASK-206): the Take of the ticket rail
+							Take = {
+								Visible = function(): boolean
+									return Feed.Front() ~= 0
+								end,
+								Text = function(): string
+									const id = Feed.Front()
+									return if id ~= 0 then `{prep.Texts.Take} {Feed.CardOf(id)().Name}` else prep.Texts.Take
+								end,
+								OnPress = function()
+									const id = untrack(Feed.Front)
+									if id ~= 0 then
+										Feed.Take(self, id)
+									end
+								end,
+							},
 							OnCycle = function()
 								self:CycleTicket()
 							end,

@@ -65,6 +65,9 @@ export type Stage = {
 --   OnEvent     events the controller broadcasts whatever tab is in front (same shape as Stage.OnEvent)
 export type Stage3D = {
 	Tabs: { string },
+	-- An overlay owns no tab (Tabs = {}): another stage drives it (World/Stages/Order.luau, the Take on the customer, is armed by
+	-- the Serve stage in the Window view); it only hears the broadcast events (OnEvent). TASK-206.
+	Overlay: boolean?,
 	Enter: (controller: any, tab: string) -> (),
 	Leave: (controller: any, tab: string) -> (),
 	Step: (controller: any, step: string) -> (),
@@ -83,7 +86,7 @@ function Stage.check3D(module: any, name: string, tabs3D: { [string]: any }): st
 	if type(module) ~= "table" then
 		return `{name}: must return a table`
 	end
-	if type(module.Tabs) ~= "table" or #module.Tabs == 0 then
+	if type(module.Tabs) ~= "table" or (#module.Tabs == 0 and module.Overlay ~= true) then
 		return `{name}: Tabs (a list of Content.Prep.Tabs3D keys) is missing`
 	end
 	for _, tab in module.Tabs do

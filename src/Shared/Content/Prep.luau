@@ -35,6 +35,7 @@ export type TargetKind =
 	| "Bin"
 	| "Hatch"
 	| "Customer"
+	| "Plate"
 
 -- What the pointer carries (prep-3d.md §2.6). Knife cuts, Sausage is the grilled one, Bottle pours a sauce, Ladle spoons,
 -- Slice is the cheese, Strip a bacon strip, Pinch the potato sticks, Plate carries the finished plate to the Hatch or the Bin,
@@ -88,6 +89,31 @@ export type View = {
 
 export type LegacyViewRow = { Key: string, Anchor: string, Focus: string }
 
+-- The 3D Board section (TASK-204): the working bun is drawn Scale times the kit bun so a finger can cut it; every number Provisional
+export type BoardRules = {
+	Scale: number, -- the working bun, x the AST-001 bun
+	Lift: number, -- studs over the board
+	Guide: { Dashes: number, Width: number, Lift: number }, -- the dashed cut line (Parts, pool of Dashes)
+	Open: { Time: number, Hop: number }, -- BunClosed -> BunOpen: seconds and hop in studs
+	Close: number, -- s: the bun closes over the plate on Next
+	Knife: { Height: number, Tilt: number, Spring: number }, -- the tool: studs over the bun, degrees of lean, 1/s catch-up
+	Carry: { Spring: number, Alpha: number }, -- a carried sausage / plate: catch-up and ghost Transparency
+	Bin: { Right: number, Back: number, Size: number }, -- PLACEHOLDER bin on the bench: studs to the right / toward the player of the plate
+	Shift: { Right: number, Back: number }, -- the plate slides this far (studs) when the Toppings view takes over (the bowls fill the right)
+	Slide: number, -- s: that slide
+	Crumbs: number, -- particles of the cut
+}
+
+-- The 3D Toppings section (TASK-205): tools in hand and the sauce stroke; every number Provisional
+export type ToppingRules = {
+	Stroke: { Width: number, Height: number }, -- a sauce segment (cylinder lying on the bun)
+	Bottle: { Length: number, Radius: number, Tilt: number, Rise: number, Spring: number }, -- placeholder bottle (degrees, studs)
+	Dot: { Size: number, Step: number }, -- guide dots of the zig-zag
+	Ring: { Radius: number, Thick: number }, -- bacon rings and the potato target ring (x the bun scale)
+	Potato: { From: number }, -- share of the mound at the start of the hold
+	Hand: { Spring: number, Rise: number }, -- cheese slice / strip / pinch following the pointer
+}
+
 -- Numbers of the 3D world (prep-3d.md §2, §8, §9; all Provisional, TASK-212 retouches them)
 export type WorldRules = {
 	-- tag and attribute names of the PrepTarget authoring contract (§2.2)
@@ -117,6 +143,18 @@ export type WorldRules = {
 		CheckSize: number, -- studs: the check mark of a ready sausage
 		Drag: number, -- px: a press that moves further than this is a drag, not a tap
 	},
+	-- the 3D serve at the window (TASK-206; Provisional, TASK-212 retouches): the plate rests on the cook side of the sill and is
+	-- dragged (or tapped, or Serve) to the Hatch; the customer takes it
+	Serve: {
+		RestSide: number, -- studs: the resting plate sits this far to the left of the tray (the Window view looks steeply down at the sill)
+		RestAway: number, -- studs: and this far from the camera toward the window
+		PlateRadius: number, -- studs: the placeholder plate (no plate model exists yet, AST-120+)
+		TrayLength: number, -- studs: the placeholder tray on the sill (the Hatch target)
+		Fly: number, -- s: the plate flies to the customer after Serve is sent
+		Return: number, -- s: it flies back (refused, or a Wrong verdict that keeps the plate)
+		Verdict: number, -- s: the verdict line stays over the customer (under the 1.2 s the plate is cleared after)
+		HandLift: number, -- studs over the customer's root part the plate ends at
+	},
 	-- per player client budget (§8); the 3D code never exceeds a row
 	Budget: {
 		Hitboxes: number,
@@ -139,6 +177,9 @@ export type WorldRules = {
 	},
 	-- Per-stage switch (prep-3d.md §11.3): false = that stage stays 2D. Only read when Rules.ThreeD is true.
 	Stages: { Grill: boolean, Board: boolean, Toppings: boolean, Order: boolean, Serve: boolean },
+	-- the 3D Board and Toppings sections (TASK-204, 205; Provisional, TASK-212 retouches): the working bun, the cut guide, the tools
+	Board: BoardRules,
+	Toppings: ToppingRules,
 	Editable: boolean, -- EditableMesh layer (prep-3d.md §6A); false until the S1b spike passes
 	GhostHand: boolean, -- colleague's ghost hand (Q-233)
 }
@@ -486,6 +527,16 @@ const rules: Rules = {
 			CheckSize = 0.34,
 			Drag = 14,
 		},
+		Serve = {
+			RestSide = 2.3,
+			RestAway = 0.35,
+			PlateRadius = 0.58,
+			TrayLength = 2.2,
+			Fly = 0.32,
+			Return = 0.25,
+			Verdict = 1.0,
+			HandLift = 0.2,
+		},
 		Budget = {
 			Hitboxes = 40,
 			RaysPerFrame = 1,
@@ -505,7 +556,28 @@ const rules: Rules = {
 			EditableMeshes = 6,
 			LowQuality = 3,
 		},
-		Stages = { Grill = true, Board = false, Toppings = false, Order = false, Serve = false },
+		Stages = { Grill = true, Board = true, Toppings = true, Order = true, Serve = true },
+		Board = {
+			Scale = 2.1,
+			Lift = 0.04,
+			Guide = { Dashes = 14, Width = 0.05, Lift = 0.03 },
+			Open = { Time = 0.28, Hop = 0.22 },
+			Close = 0.4,
+			Knife = { Height = 0.3, Tilt = 26, Spring = 20 },
+			Carry = { Spring = 22, Alpha = 0.4 },
+			Bin = { Right = -0.9, Back = 1.3, Size = 0.8 },
+			Shift = { Right = 0.9, Back = 0 },
+			Slide = 0.35,
+			Crumbs = 8,
+		},
+		Toppings = {
+			Stroke = { Width = 0.09, Height = 0.07 },
+			Bottle = { Length = 1.5, Radius = 0.24, Tilt = 105, Rise = 0.6, Spring = 18 },
+			Dot = { Size = 0.07, Step = 0.11 },
+			Ring = { Radius = 0.34, Thick = 0.05 },
+			Potato = { From = 0.15 },
+			Hand = { Spring = 16, Rise = 0.5 },
+		},
 		Editable = false,
 		GhostHand = false,
 	},
@@ -641,6 +713,7 @@ return Table.record({
 		"Bin",
 		"Hatch",
 		"Customer",
+		"Plate",
 	} :: { TargetKind },
 	ToolKinds = { "None", "Knife", "Sausage", "Bottle", "Ladle", "Slice", "Strip", "Pinch", "Plate", "Spatula" } :: { ToolKind },
 	ToolOf = toolOf :: { [string]: ToolKind },

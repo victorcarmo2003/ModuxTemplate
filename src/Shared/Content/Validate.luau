@@ -2002,8 +2002,8 @@ local function checkPrep()
 	-- tools and targets
 	const targetKinds = setOf(Prep.TargetKinds :: any)
 	const toolKinds = setOf(Prep.ToolKinds :: any)
-	if not toolKinds.None or #Prep.TargetKinds ~= 10 then
-		fail("Prep", nil, nil, "ToolKinds needs 'None' and TargetKinds has the 10 kinds of prep-3d.md §2.2")
+	if not toolKinds.None or #Prep.TargetKinds ~= 11 then
+		fail("Prep", nil, nil, "ToolKinds needs 'None' and TargetKinds has the 11 kinds of prep-3d.md §2.2 (+ Plate, TASK-206)")
 	end
 	for _, tool in PREP_TOOLS_REQUIRED do
 		if not toolKinds[tool] then

@@ -64,6 +64,10 @@ type Entry = {
 
 const Targets = {}
 
+local function off(): boolean
+	return false
+end
+
 -- the Station_n model a hitbox sits in (nil when none): only the hitboxes of the own seat are targets
 local function stationOf(instance: Instance): number?
 	local current: Instance? = instance
@@ -281,6 +285,8 @@ function Targets.new(rules: Content.PrepWorldRules, folder: Folder?): Registry
 				Target = Types.Target(record.Kind :: Content.PrepTargetKind, record.Slot, record.Key),
 				Parts = record.Parts,
 				Model = record.Model,
+				-- `enabled` false: off until a stage re-adds the target with its own Enabled (a hitbox of another section never hovers)
+				Enabled = if enabled == false then off else nil,
 			})
 		end
 		if #entries > rules.Budget.Hitboxes then
