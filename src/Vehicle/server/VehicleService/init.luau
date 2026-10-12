@@ -7,6 +7,12 @@
 -- by PivotTo (T36): before the swap the start vehicle sits at its Pad point and the sale vehicle at the lot
 -- (TRL-SALE); after it the sale vehicle takes its Pad point and the start vehicle goes to the lot under its tarp
 -- (VehicleCover, shown by visibility with the Orig* attributes of the binding, T38).
+-- Purchase prompt (user request 2026-10-11, Provisional): the buy_trailer prompt lives on the FOR SALE sign (model MapId
+-- "SIGN-T" of the lot, point SIGN-T), not on the trailer. Anchor = an Interactable buy_trailer anchor outside any Vehicle
+-- if the place has one (the user can add an Attachment "Prompt_Buy" on the sign in Studio), else an Attachment this
+-- service creates at runtime on the sign (EnsureSignAnchor; never edits the place). The Prompt_Buy of the trailer shell
+-- stays disabled while a sign anchor exists and is the fallback when there is none. FocusSign (day-5 call, BossService
+-- cue TrailerFocus): Transition TrailerFocus to the party, who are held in place for FOCUS_TIME s (Freeze "TrailerFocus").
 -- Purchase: anchor Prompt_Buy (buy_trailer) on the sale vehicle; price = TrailerBasePrice x PartyPriceMult[PriceParty]
 -- (DEC-047, DEC-121). Swap: RoundService.BeforeShift with Pending -> Transition packet -> state + SetVehicle ->
 -- Swapped -> PivotTo under the fade. Reminders (FEAT-017) from Vehicles[sale].Reminder at the end of a day shift.
@@ -21,6 +27,7 @@
 -- take_order/serve/refuse refused while closed (reason Shutter:Closed) + Notice shutter_closed to who acted (one per
 -- NOTICE_EVERY s). API IsShutterClosed, IsInside, IsInsidePoint, IsProtected, SetShutter; signal ShutterChanged.
 local CollectionService = game:GetService("CollectionService")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -50,6 +57,16 @@ const CLOSED_PHASES = { "Resume", "Intro", "RunEnd", "NightLost" }
 -- Seconds between the Transition packet and the PivotTo: fade-in (0.2) + half the black hold (0.5) of the
 -- VehicleController fade (T58, 1.5 s total), so the pivot lands under the cover on every client. Provisional.
 const PIVOT_DELAY = 0.45
+-- FOR SALE sign (Provisional): its model has MapId SIGN_MAP_ID (placements) and stands at MapPoint SIGN_POINT
+const SIGN_MAP_ID = "SIGN-T"
+const SIGN_POINT = "SIGN-T"
+const SIGN_ANCHOR = "Prompt_BuyTrailer"
+const SIGN_ANCHOR_LIFT = 2 -- studs over the point when the sign model is not found
+const SIGN_RETRY = 2 -- s between two looks for the sign while it is missing (the assets may stream in late)
+const SIGN_RETRIES = 15
+-- Camera focus on the sign (client ObjectiveController holds it ~3.2 s): the party stands still FOCUS_TIME s
+const FOCUS_REASON = "TrailerFocus"
+const FOCUS_TIME = 3.6
 -- Service window (§19.14)
 const SHUTTER_ACTION = "shutter_toggle"
 const SHUTTER_ATTRIBUTE = "Shutter"
@@ -72,10 +89,10 @@ local function fail(message: string)
 	warn(message)
 end
 
--- Vehicle sold in the lot: the first row with BuyFromDay > 0 (the trailer; content-data.md §3.8)
+-- Vehicle sold in the lot: the first row with OfferAfterNight > 0 (the trailer; content-data.md §3.8)
 local function saleVehicle(): Content.Vehicle?
 	for _, vehicle in Content.Vehicles.List do
-		if vehicle.BuyFromDay > 0 then
+		if vehicle.OfferAfterNight > 0 then
 			return vehicle
 		end
 	end
@@ -127,6 +144,7 @@ const VehicleService = Modux.Service("VehicleService", {
 		"InteractionService",
 		"EconomyService",
 		"UpgradeService",
+		"CharacterService",
 	},
 	Priority = 620,
 })
@@ -141,6 +159,11 @@ function VehicleService:Setup()
 	-- Created here so lower-priority services connect in their OnInit; higher ones (Item, Kitchen) in OnStart
 	self.Bought = self.Libs.Signal.new() :: SignalLib.Signal<Player>
 	self.Swapped = self.Libs.Signal.new() :: SignalLib.Signal<string, string>
+	-- The trailer was bought (player = who paid; nil = dev). BossService (560) connects in OnInit: rings the night call
+	self.Purchase = self.Libs.Signal.new() :: SignalLib.Signal<Player?>
+	-- Anchor of the buy prompt on the FOR SALE sign (nil = none yet: the trailer keeps its own prompt)
+	self.SignAnchor = nil :: Instance?
+	self.SignTries = 0 :: number
 	-- Service window of the current vehicle (only meaningful with HasShutter)
 	self.ShutterClosed = false :: boolean
 	self.ShutterAt = 0 :: number -- os.clock() of the last shutter_toggle (party cooldown; 0 = none yet)
@@ -166,7 +189,7 @@ function VehicleService:IsPending(): boolean
 end
 
 -- TrailerBasePrice x PartyPriceMult[PriceParty] (DEC-047, DEC-121). PriceParty is 0 until the end of Day 1: the
--- solo multiplier until then (the trailer is never on sale before BuyFromDay anyway).
+-- solo multiplier until then (the trailer is never on sale before its offer night anyway).
 function VehicleService:Price(): number
 	const params = Content.RunParams
 	const mults = params.PartyPriceMult
@@ -174,13 +197,14 @@ function VehicleService:Price(): number
 	return math.floor(params.TrailerBasePrice * mults[party] + 0.5)
 end
 
--- Shift and phase allow the purchase (Actions.buy_trailer Night / Requires.Phase, Vehicles[sale].BuyFromDay)
+-- Shift and phase allow the purchase (Actions.buy_trailer Night / Requires.Phase, Vehicles[sale].OfferAfterNight)
 function VehicleService:IsOnSale(): boolean
 	if SALE == nil or self.Purchased() or self.Pending() or self.Vehicle() ~= START_VEHICLE then
 		return false
 	end
 	const round = self.Dependencies.RoundService
-	if not round:IsStarted() or round:GetDay() < SALE.BuyFromDay then
+	-- on sale from the day after Content.Trailer.OfferAfterNight (nights played; user request 2026-10-12)
+	if not round:IsStarted() or round:GetNight() < SALE.OfferAfterNight then
 		return false
 	end
 	const phase = round:GetPhase()
@@ -225,7 +249,68 @@ function VehicleService:IsBuyAnchor(anchor: Instance): boolean
 		return false
 	end
 	const _, key = vehicleOf(anchor)
-	return SALE ~= nil and key == SALE.Key
+	return SALE ~= nil and (key == SALE.Key or (key == nil and self:IsSignAnchor(anchor)))
+end
+
+-- A buy_trailer anchor in the Workspace that is not on a vehicle: the one of the FOR SALE sign
+function VehicleService:IsSignAnchor(anchor: Instance): boolean
+	if anchor:GetAttribute("PromptAction") ~= BUY_ACTION or not anchor:IsDescendantOf(workspace) then
+		return false
+	end
+	const model = vehicleOf(anchor)
+	return model == nil
+end
+
+-- Model of the FOR SALE sign in the Workspace (MapId SIGN-T, outside every Vehicle)
+function VehicleService:SignModel(): Model?
+	const root = workspace:FindFirstChild("MAP01_Assets") or workspace
+	for _, descendant in root:GetDescendants() do
+		if descendant:IsA("Model") and descendant:GetAttribute("MapId") == SIGN_MAP_ID and vehicleOf(descendant) == nil then
+			return descendant
+		end
+	end
+	return nil
+end
+
+-- World position of the sign (centre of its model, else the SIGN-T point lifted); nil = not in the map
+function VehicleService:SignPosition(): Vector3?
+	const model = self:SignModel()
+	if model ~= nil then
+		const box = model:GetBoundingBox()
+		return box.Position
+	end
+	const point = if MapIndex.HasBinding() then MapIndex.FindPoint(SIGN_POINT) else nil
+	return if point ~= nil then point.Position + Vector3.new(0, SIGN_ANCHOR_LIFT, 0) else nil
+end
+
+-- The buy anchor of the sign: an existing one outside the vehicles, else a runtime Attachment on the sign. nil while
+-- the sign is not in the Workspace (the trailer prompt works meanwhile).
+function VehicleService:EnsureSignAnchor(): Instance?
+	const existing = self.SignAnchor
+	if existing ~= nil and existing:IsDescendantOf(workspace) then
+		return existing
+	end
+	self.SignAnchor = nil
+	for _, anchor in CollectionService:GetTagged(ANCHOR_TAG) do
+		if self:IsSignAnchor(anchor) then
+			self.SignAnchor = anchor
+			return anchor
+		end
+	end
+	const position = self:SignPosition()
+	if position == nil then
+		return nil
+	end
+	const model = self:SignModel()
+	const host = if model ~= nil then (model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart", true)) else nil
+	const anchor = Instance.new("Attachment")
+	anchor.Name = SIGN_ANCHOR
+	anchor:SetAttribute("PromptAction", BUY_ACTION)
+	anchor.Parent = if host ~= nil then host else workspace.Terrain
+	anchor.WorldPosition = position
+	self.SignAnchor = anchor -- before the tag: its signal calls RefreshSale, which must find it
+	CollectionService:AddTag(anchor, ANCHOR_TAG)
+	return anchor
 end
 
 -- Tarp shown on a vehicle that is not in use and has CoveredAfter (the cart after the swap, DEC-199)
@@ -295,14 +380,19 @@ function VehicleService:RefreshSale()
 	const enabled = self:IsOnSale()
 	const text = self:PromptText()
 	const bought = self.Purchased()
+	-- the sign carries the prompt when it has an anchor; the trailer shell only without one
+	const sign = self:EnsureSignAnchor()
+	if sign ~= nil then
+		interaction:SetPrompt(sign, enabled, text)
+	end
 	for _, model in self:Models() do
 		if model:GetAttribute("Vehicle") ~= sale.Key then
 			continue
 		end
 		model:SetAttribute(BOUGHT_ATTRIBUTE, bought)
 		for _, descendant in model:GetDescendants() do
-			if self:IsBuyAnchor(descendant) then
-				interaction:SetPrompt(descendant, enabled, text)
+			if descendant:GetAttribute("PromptAction") == BUY_ACTION and self:IsBuyAnchor(descendant) then
+				interaction:SetPrompt(descendant, enabled and sign == nil, if sign == nil then text else nil)
 			end
 		end
 	end
@@ -464,6 +554,40 @@ function VehicleService:MarkBought(player: Player?)
 	if player then
 		self.Bought:Fire(player)
 	end
+	self.Purchase:Fire(player)
+end
+
+-- Camera focus on the FOR SALE sign for the party (cue TrailerFocus of the day-5 call). Only while the trailer is on
+-- sale. The clients look at it (ObjectiveController); here the Active members stand still for FOCUS_TIME s.
+-- Returns whether it started.
+function VehicleService:FocusSign(): boolean
+	if not self:IsOnSale() then
+		return false
+	end
+	const net = self.Dependencies.NetService
+	if net:IsRunning() then
+		self.Libs.Net.Transition:fireClient(net.Audience, {
+			Kind = "TrailerFocus",
+			StartedAt = workspace:GetServerTimeNow(),
+		})
+	end
+	const characters = self.Dependencies.CharacterService
+	const runState = self.Dependencies.RunStateService
+	const held: { Player } = {}
+	for _, player in Players:GetPlayers() do
+		if runState:IsActive(player) then
+			table.insert(held, player)
+			characters:Freeze(player, FOCUS_REASON, true)
+		end
+	end
+	task.delay(FOCUS_TIME, function()
+		for _, player in held do
+			if player.Parent ~= nil then
+				characters:Freeze(player, FOCUS_REASON, false)
+			end
+		end
+	end)
+	return true
 end
 
 -- Applies the pending swap (RoundService.BeforeShift, before Flow.Next reads the probe): fade packet, state,
@@ -494,9 +618,9 @@ function VehicleService:Swap()
 	self:Place(if covered then PIVOT_DELAY else 0)
 end
 
--- End of a day shift without the purchase: trailer_available on Reminder.FirstDay, trailer_waiting every
--- Reminder.Every days after (FEAT-017)
-function VehicleService:Remind(info: { Day: number, IsNight: boolean })
+-- End of a day shift without the purchase: trailer_available when Reminder.FirstNight nights were played,
+-- trailer_waiting every Reminder.Every nights after (FEAT-017; counted in nights since 2026-10-12)
+function VehicleService:Remind(info: { Day: number, Night: number, IsNight: boolean })
 	if SALE == nil or info.IsNight or self.Purchased() or self.Vehicle() ~= START_VEHICLE then
 		return
 	end
@@ -504,10 +628,10 @@ function VehicleService:Remind(info: { Day: number, IsNight: boolean })
 	if reminder == nil then
 		return
 	end
-	const day = info.Day
-	if day == reminder.FirstDay then
+	const night = info.Night
+	if night == reminder.FirstNight then
 		self.Dependencies.RunStateService:Notify("all", AVAILABLE_NOTICE)
-	elseif day > reminder.FirstDay and reminder.Every > 0 and (day - reminder.FirstDay) % reminder.Every == 0 then
+	elseif night > reminder.FirstNight and reminder.Every > 0 and (night - reminder.FirstNight) % reminder.Every == 0 then
 		self.Dependencies.RunStateService:Notify("all", WAITING_NOTICE)
 	end
 end
@@ -559,6 +683,12 @@ function VehicleService:DevBuy(): boolean
 	return true
 end
 
+-- /dev trailer reset: back to the cart, not bought, nothing pending (Restore does the placing and the Swapped signal)
+function VehicleService:DevReset()
+	self:DevCheck("DevReset")
+	self:Restore(START_VEHICLE)
+end
+
 -- Swap now, buying for free first if needed (the shift keeps going; nights start at the next boundary)
 function VehicleService:DevSwap(): boolean
 	self:DevCheck("DevSwap")
@@ -578,7 +708,7 @@ VehicleService:OnInit(function(self)
 		return
 	end
 	if SALE == nil then
-		warn("[VehicleService] no vehicle with BuyFromDay > 0 in Content.Vehicles; nothing for sale")
+		warn("[VehicleService] no vehicle with OfferAfterNight > 0 in Content.Vehicles; nothing for sale")
 	end
 
 	const round = self.Dependencies.RoundService
@@ -647,6 +777,17 @@ VehicleService:OnStart(function(self)
 
 	-- Binding state = start of a run (MAP-01 §16.3); a restore before this point already placed them
 	self:Place(0)
+
+	-- the FOR SALE sign may stream in after the start: look again for a while (the prompt moves to it once found)
+	task.spawn(function()
+		while self.SignAnchor == nil and self.SignTries < SIGN_RETRIES do
+			self.SignTries += 1
+			task.wait(SIGN_RETRY)
+			if self:EnsureSignAnchor() ~= nil then
+				self:RefreshSale()
+			end
+		end
+	end)
 
 	-- Day, phase, PriceParty, purchase: every input of the prompt is an atom read inside RefreshSale
 	self.Libs.Charm.effect(function()

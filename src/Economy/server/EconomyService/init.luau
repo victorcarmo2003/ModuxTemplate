@@ -8,9 +8,10 @@
 --   Steal(amount)                 thief (FEAT-013): takes up to the drawer, counted in the ledger's Stolen
 --   CountArrival(), CountResult() ledger for the grade (CustomerService, TASK-032/033)
 --   AddReportStep(name, fn)       fills ShiftReport fields of other features before it is sent (T48)
+--   Collect()                     "Collect Cash" (Q-201): drawer -> Cash now; the ledger remembers it for the report
 --   TopUp(amount)                 first-run tutorial: Cash up to at least amount (TutorialService, Provisional)
--- Payments go to the drawer, never to Cash (DEC-050): Cash only changes by Spend, the deposit, TopUp and DevAddCash.
--- Deposit on RoundService.ShiftEnded (start of Summary): grade A-D, bonus floor(drawer x %), Cash += drawer + bonus,
+-- Payments go to the drawer, never to Cash (DEC-050): Cash only changes by Spend, Collect, the deposit, TopUp and DevAddCash.
+-- Deposit on RoundService.ShiftEnded (start of Summary): grade A-D, bonus floor(day take x %), Cash += drawer left + bonus,
 -- Drawer = 0, report steps, ShiftReport to the group, Reported(info, report).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -195,6 +196,28 @@ function EconomyService:Steal(amount: number): number
 	return taken
 end
 
+-- "Collect Cash" (user playtest 2026-10-11, Provisional Q-201): everything in the drawer goes to Cash right now, so the
+-- crew can buy ingredients mid-shift. Same drawer rules as AddToDrawer (selling phase or Closing). The ledger keeps
+-- the amount (Collected), so the report and the grade bonus still count the whole day take. Returns what moved (0 =
+-- nothing: empty drawer, drawer closed, Cash at its cap).
+function EconomyService:Collect(): number
+	if not self:IsDrawerOpen() then
+		return 0
+	end
+	const drawer = self.Drawer()
+	const cash = self.Cash()
+	const moved = math.min(drawer, CASH_MAX - cash)
+	if moved <= 0 then
+		return 0
+	end
+	self.Libs.Charm.batch(function()
+		self.Cash(cash + moved)
+		self.Drawer(drawer - moved)
+	end)
+	self.Shift.Collected += moved
+	return moved
+end
+
 -- A customer reached the counter (FEAT-014 denominator). Called once per customer by CustomerService.
 function EconomyService:CountArrival()
 	if not self:IsDrawerOpen() then
@@ -277,7 +300,8 @@ function EconomyService:Deposit(info: ShiftInfo): Report
 	const settlement = Ledger.settle(ledger, drawer, self:BossPoints())
 
 	self.Libs.Charm.batch(function()
-		self.Cash(math.min(self.Cash() + settlement.Deposited, CASH_MAX))
+		-- what was collected during the shift is already in Cash (Collect)
+		self.Cash(math.min(self.Cash() + settlement.Deposited - ledger.Collected, CASH_MAX))
 		self.Drawer(0)
 	end)
 
@@ -287,7 +311,7 @@ function EconomyService:Deposit(info: ShiftInfo): Report
 		IsNight = info.IsNight,
 		Arrived = math.min(ledger.Arrived, COUNT_MAX),
 		Completed = math.min(ledger.Completed, COUNT_MAX),
-		Drawer = math.min(drawer, DRAWER_MAX),
+		Drawer = math.min(drawer + ledger.Collected, DRAWER_MAX), -- day take: collected + still in the drawer
 		Tips = math.min(ledger.Tips, TIPS_MAX),
 		Stolen = math.min(ledger.Stolen, DRAWER_MAX),
 		Grade = settlement.Grade,

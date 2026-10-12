@@ -335,6 +335,12 @@
 						"optional": "src/Shop/server"
 					}
 				},
+				"Showcase": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Showcase/server"
+					}
+				},
 				"Thief": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
@@ -550,6 +556,12 @@
 							"optional": "src/Net/client"
 						}
 					},
+					"Objective": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Objective/client"
+						}
+					},
 					"Opal": {
 						"$ignoreUnknownInstances": false,
 						"$path": {
@@ -584,6 +596,12 @@
 						"$ignoreUnknownInstances": false,
 						"$path": {
 							"optional": "src/Seating/client"
+						}
+					},
+					"Showcase": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Showcase/client"
 						}
 					},
 					"Stage": {

@@ -3,7 +3,7 @@
 -- card with studs, title on an Ink ribbon tab, huge grade letter on a round badge (A Mustard, B Green, C Teal,
 -- D Slate; never red) tilted like a sticker, money lines, gems of the shift when there are any.
 -- Status only (DEC-015, FEAT-032): no close button. The owner shows it by setting `Report` and hides it by setting
--- false (HudController does it after 15 s day / 20 s night); the card pops in (Motion.Pop) and shrinks away with the
+-- false (HudController does it after 8 s day / 10 s night, Q-200); the card pops in (Motion.Pop) and shrinks away with the
 -- last report on it.
 -- No reputation, no boss chances, no XP (DEC-051, DEC-053, DEC-081). Texts are placeholders until ui-text.md.
 -- Pure: only props.

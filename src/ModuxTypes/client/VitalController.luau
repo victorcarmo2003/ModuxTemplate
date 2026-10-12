@@ -5,6 +5,7 @@ local Vide = require(ReplicatedStorage.Packages.Vide)
 
 export type LifeState = "Active" | "Down" | "Reviving" | "Spectator" | "Away"
 export type Band = "Day" | "Mid" | "Night"
+export type Gain = { Amount: number, Id: number }
 export type Shown = { Vignette: number, Saturation: number, Tint: number }
 export type Member = {
 	State: LifeState,
@@ -19,11 +20,16 @@ export type Public = {
 	Blackout: Vide.Source<number>,
 	Blur: BlurEffect?,
 	BlurUntil: number,
+	CoffeeGain: Vide.Source<Gain?>,
+	CoffeeHint: Vide.Source<boolean>,
 	Color: ColorCorrectionEffect?,
 	Dark: Vide.Source<boolean>,
 	DarkTickAt: number,
 	FaintAt: number?,
+	GainId: number,
 	Gui: ScreenGui?,
+	HintMachine: Instance?,
+	HintUntil: number,
 	LocalState: Vide.Source<LifeState>,
 	Max: Vide.Source<number>,
 	Members: Vide.Source<{ [number]: Member }>,
@@ -38,6 +44,10 @@ export type Public = {
 	StateOf: (self: Public, userId: number) -> LifeState?,
 	IsActive: (self: Public) -> boolean,
 	ApplySanity: (self: Public, value: number, max: number) -> (),
+	FindCoffeeMachine: (self: Public) -> Instance?,
+	BeginHint: (self: Public, untilT: number) -> (),
+	EndHint: (self: Public) -> (),
+	ApplyCue: (self: Public, kind: string, amount: number, untilT: number) -> (),
 	ApplyMember: (self: Public, userId: number, record: Member) -> (),
 	RemoveMember: (self: Public, userId: number) -> (),
 	SetLocalState: (self: Public, state: LifeState) -> (),

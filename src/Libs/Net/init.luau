@@ -51,6 +51,87 @@ return Lync.define("game", {
 		Command = Lync.str(0, 32),
 		Text = Lync.str(0, 200),
 	})),
+	-- s -> owner, dev mode only (user request 2026-10-11, Provisional). Writer: DevService command `audio` (through
+	-- NetService). Responder: AudioController (OnInit). Command = "report": the client prints its audio counters.
+	DevAudio = Lync.packet(Lync.struct({
+		Command = Lync.str(0, 32),
+	})),
+
+	-- Dev showcase (docs/tech/showcase.md; user request 2026-10-12, Provisional). Packets only, dev mode only (Studio
+	-- Run place): the responder lives in ShowcaseService, which refuses unless PlaceService:IsDev and
+	-- AdminSettings.IsAllowed on EVERY request. Nothing here exists in a published server (no responder, no sender).
+	-- c -> s. Action = open | close | trigger | resolve | stop | reset | extra | scare | ctl; Id = item id ("ANM-007",
+	-- "mech_thief", "fake_call") or control name; Arg / Value = parameters of that action.
+	ShowcaseDo = Lync.packet(Lync.struct({
+		Action = Lync.str(0, 24),
+		Id = Lync.str(0, 40),
+		Arg = Lync.str(0, 80),
+		Value = Lync.f64(),
+	})),
+	-- s -> owner, on open. The item list (names, descriptions and the correct verb come from the server: T10 keeps the
+	-- verbs off the client in production, and this packet never goes out there).
+	ShowcaseCatalog = Lync.packet(Lync.struct({
+		Items = Lync.array(
+			Lync.struct({
+				Tab = Lync.str(0, 12),
+				Group = Lync.str(0, 24),
+				Id = Lync.str(0, 40),
+				Name = Lync.str(0, 48),
+				Ref = Lync.str(0, 16),
+				Desc = Lync.str(0, 300),
+				Verb = Lync.str(0, 160),
+				Actions = Lync.array(
+					Lync.struct({
+						Id = Lync.str(0, 24),
+						Label = Lync.str(0, 28),
+						Arg = Lync.str(0, 80),
+					}),
+					0,
+					8
+				),
+			}),
+			0,
+			80
+		),
+	})),
+	-- s -> owner, 2 Hz while the panel is open. Live readout of the run (night, clock, sanity, flags, occurrences)
+	ShowcaseState = Lync.packet(Lync.struct({
+		Night = Lync.int(0, 10),
+		Phase = Lync.str(0, 16),
+		Clock = Lync.f64(),
+		Sanity = Lync.int(0, 200),
+		SanityMax = Lync.int(0, 200),
+		Life = Lync.str(0, 16),
+		Revives = Lync.int(0, 99),
+		Frozen = Lync.bool(),
+		God = Lync.bool(),
+		Dark = Lync.str(0, 8),
+		Held = Lync.bool(),
+		Switch = Lync.bool(),
+		Shutter = Lync.bool(),
+		Vehicle = Lync.str(0, 24),
+		Running = Lync.array(
+			Lync.struct({
+				Ref = Lync.str(0, 12),
+				Phase = Lync.str(0, 12),
+				Step = Lync.int(0, 20),
+				Age = Lync.f64(),
+				Live = Lync.bool(),
+			}),
+			0,
+			32
+		),
+	})),
+	-- s -> owner. Result line of a request ("ok" / "error" / "info"); "open" = the panel must open (chat / Conch)
+	ShowcaseLog = Lync.packet(Lync.struct({
+		Kind = Lync.enum({ "info", "ok", "error", "open" }),
+		Text = Lync.str(0, 400),
+	})),
+	-- s -> owner. Plays one hallucination / sting on THIS client (client-only effects, HallucinationController)
+	ShowcaseScare = Lync.packet(Lync.struct({
+		Id = Lync.str(0, 40),
+		Stop = Lync.bool(),
+	})),
 
 	-- Run sets, wave 1 ---------------------------------------------------------------------------------------------
 
@@ -130,10 +211,14 @@ return Lync.define("game", {
 		-- >= 1 byte per record, but 8 records x 4 bits + 1-bit id steps pack below that, so a keyframe that ended its
 		-- frame was refused on the client ("drop.section ... more records than its own bytes could hold").
 		Level = Lync.int(0, 255),
+		-- Gear Stand cooldown (Q-203 Provisional): shifts left before the line is on sale again, 0 = on sale. 8 bits for
+		-- the same keyframe reason as Level.
+		Wait = Lync.int(0, 255),
 	})),
 
-	-- §14.1 (TASK-144; FEAT-037), record = table index 1..Content.Seating.Tables (TBL-n; 6 = Back Bar, not written
-	-- yet). Writer: SeatingService. Locked = before Seating.UnlockDay (hidden); Ghost = not bought (Price > 0 only on
+	-- §14.1 (TASK-144; FEAT-037), record = table index 1..Content.Seating.Tables (TBL-n; Pad 1..5, Trailer 6..9, Q-209).
+	-- 9 records: every field of the struct is wide (Price 10 bits, Npc 16, Tip 10; State 3 bits rides with them), so a
+	-- record is far above the 1 byte Lync 4.0.2 bounds a keyframe record at (see Upgrades.Level, 8 bits for that). Writer: SeatingService. Locked = before Seating.UnlockDay (hidden); Ghost = not bought (Price > 0 only on
 	-- the next one for sale); Free / Occupied / Dirty = bought. Npc1/Npc2 = NpcId of the diners (0 = none). Tip = $
 	-- on the table (Dirty), moved to the drawer by "Clean Table"
 	Tables = Lync.replicate(Lync.struct({
@@ -163,6 +248,11 @@ return Lync.define("game", {
 		Npc = Lync.int(1, 65535), -- NpcId
 		Result = Lync.enum({ "Perfect", "Complete", "Incomplete", "Wrong", "Left", "Refused", "Slow" }), -- Left = never attended (queue clock), Slow = food took too long (order clock, Q-192)
 		Amount = Lync.int(0, 1000), -- what went into the drawer (tip included)
+	})),
+
+	-- §4.3b s -> group. Writer: CashDeskService ("Collect Cash", Q-201): the drawer went to Cash. Presentation only
+	CashCollected = Lync.packet(Lync.struct({
+		Amount = Lync.int(1, 1000000),
 	})),
 
 	-- §4.4 s -> group, start of Summary. Writer: EconomyService
@@ -205,6 +295,15 @@ return Lync.define("game", {
 		Max = Lync.int(0, 200),
 	})),
 
+	-- §13.1 s -> owner. Writer: VitalService (user request 2026-10-11, Provisional). Night 1 coffee lesson and the
+	-- coffee gain feedback: Hint = emphasise the sanity bar and the coffee machine until `Until` (server time);
+	-- Gain = a coffee gave `Amount` (bar glows green, "+N" floats); End = emphasis over (drunk, timed out, night end)
+	SanityCue = Lync.packet(Lync.struct({
+		Kind = Lync.enum({ "Hint", "Gain", "End" }),
+		Amount = Lync.int(0, 200),
+		Until = Lync.f64(),
+	})),
+
 	-- §13.1 s -> group. Writers: VitalService, TrafficService (Hit, wave 3). The state itself is in Vitals
 	LifeEvent = Lync.packet(Lync.struct({
 		UserId = Lync.f64(),
@@ -213,7 +312,7 @@ return Lync.define("game", {
 
 	-- §13.1 s -> group. Writer: VehicleService (1.5 s fade of the vehicle swap, T58)
 	Transition = Lync.packet(Lync.struct({
-		Kind = Lync.enum({ "VehicleSwap" }),
+		Kind = Lync.enum({ "VehicleSwap", "TrailerFocus", "TrailerDoor" }), -- TrailerFocus: camera on the FOR SALE sign (day-5 call); TrailerDoor: 0.6 s fade of Exit/Enter Trailer (only to who used the door)
 		StartedAt = Lync.f64(),
 	})),
 

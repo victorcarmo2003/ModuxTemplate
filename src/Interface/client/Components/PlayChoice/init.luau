@@ -9,7 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Theme)
 local Icons = require(script.Parent.Icons)
-local CartoonPanel = require(script.Parent.CartoonPanel)
+local KeyChip = require(script.Parent.KeyChip)
 local CartoonButton = require(script.Parent.CartoonButton)
 local CartoonLabel = require(script.Parent.CartoonLabel)
 local LobbyWindow = require(script.Parent.LobbyWindow)
@@ -125,28 +125,11 @@ return function(props: Props): Frame
 							Text = def.Line,
 						}),
 					}),
-					-- key chip (desktop / gamepad)
-					CartoonPanel({
+					-- key chip (desktop / gamepad): inside the top-left corner of the card, number centred in the badge
+					KeyChip({
 						Name = "Key",
-						AnchorPoint = Vector2.new(1, 0),
-						Position = UDim2.new(1, 4, 0, -4),
-						Size = UDim2.fromOffset(24, 24),
-						AutomaticSize = Enum.AutomaticSize.X,
-						Tone = Theme.Tone.Ink,
-						Lip = 2,
-						Outline = 2,
-						Padding = { Left = 4, Right = 4 },
-						Visible = function()
-							return keyText() ~= ""
-						end,
-						Children = {
-							CartoonLabel({
-								Box = UDim2.new(0, 0, 1, 0),
-								AutomaticSize = Enum.AutomaticSize.X,
-								TextSize = Theme.MinTextSize,
-								Text = keyText,
-							}),
-						},
+						Position = UDim2.fromOffset(2, 2),
+						Text = keyText,
 					}),
 				},
 			})

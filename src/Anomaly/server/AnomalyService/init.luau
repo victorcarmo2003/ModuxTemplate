@@ -193,6 +193,8 @@ function AnomalyService:Setup()
 	-- shift the agenda belongs to (seeds of the occurrences)
 	self.Shift = { Day = 1, Night = 0, IsNight = false, Attempt = 0 } :: { Day: number, Night: number, IsNight: boolean, Attempt: number }
 	self.DevSerial = 0 :: number
+	-- dev showcase: the natural agenda waits while true (ShowcaseService; never set outside dev mode)
+	self.DevHeld = false :: boolean
 	-- the Night phase of this shift has started (the agenda is dropped when it ends)
 	self.InNight = false :: boolean
 	self.Gazes = {} :: { [Player]: Gaze }
@@ -873,8 +875,23 @@ function AnomalyService:BuildAgenda(info: { Day: number, Night: number, IsNight:
 	const night = nights[math.clamp(info.Night, 1, #nights)]
 	const phase = Content.Shift.ByKey[NIGHT_PHASE]
 	const candidates: { Scheduler.Candidate } = {}
+	-- Cart nights (user request 2026-10-12): an anomaly whose only answer is a trailer object (Trailer "Needs": the light
+	-- switch) is replaced, slot by slot and with the same age (3/2/1 occurrences), by its stand-in, an earlier anomaly
+	-- the cart can handle. The trailer brings the anomaly back; without it the night just repeats older ones.
+	const vehicle: Content.Vehicle? = Content.Vehicles.ByKey[self.Dependencies.VehicleService:Current()]
+	const hasSwitch: boolean = vehicle ~= nil and vehicle.HasSwitch
 	for _, row in Content.Anomalies.ActiveOn(info.Night) do
-		table.insert(candidates, candidate(row))
+		local stand: Content.Anomaly? = nil
+		if row.Trailer == "Needs" and not hasSwitch then
+			stand = Content.Anomalies.StandIn(row)
+		end
+		if stand ~= nil then
+			const swapped = candidate(stand)
+			swapped.Night = row.Night
+			table.insert(candidates, swapped)
+		else
+			table.insert(candidates, candidate(row))
+		end
 	end
 	const rng = Random.new(
 		Scheduler.Seed(self.Dependencies.RunStateService.Seed(), info.Day, info.Night, info.Attempt, DOMAIN)
@@ -912,6 +929,9 @@ end
 
 -- Due entries of the agenda (Night phase only).
 function AnomalyService:StepAgenda(t: number)
+	if self.DevHeld then
+		return
+	end
 	const minutes = self.Dependencies.RoundService:Minutes()
 	const windowEnd = Content.Nights.Windows.Shift[2]
 	const limits = self:Limits()
@@ -1067,6 +1087,88 @@ function AnomalyService:DevStop(): string
 	const count = #self:RunningCandidates()
 	self:StopAll("Restore")
 	return `stopped {count} occurrence(s)`
+end
+
+-- Dev showcase hooks (src/Showcase/server/ShowcaseService; docs/tech/showcase.md). Same dev gate as the commands.
+
+-- Holds the natural agenda (no scheduled start while true); forced occurrences are unaffected.
+function AnomalyService:DevHoldAgenda(on: boolean)
+	self:DevCheck()
+	self.DevHeld = on
+end
+
+function AnomalyService:DevIsHeld(): boolean
+	return self.DevHeld
+end
+
+-- Live occurrences for the panel: id, key, Ref, wire phase, step, age (s). Oldest first.
+function AnomalyService:DevRuns(): { any }
+	const out: { any } = {}
+	const t = now()
+	for id, run in self.Running do
+		if not run.Done then
+			table.insert(
+				out,
+				{
+					Id = id,
+					Key = run.Occ.Key,
+					Ref = run.Occ.Ref,
+					Phase = run.Record.Phase,
+					Step = run.Record.Step,
+					Age = t - run.Occ.StartedAt,
+				}
+			)
+		end
+	end
+	table.sort(out, function(a: { Id: number }, b: { Id: number }): boolean
+		return a.Id < b.Id
+	end)
+	return out
+end
+
+-- Newest live occurrence of an anomaly (key, Ref or night number), or nil.
+function AnomalyService:DevOccurrence(anomaly: string): any
+	const row = rowOf(anomaly)
+	if row == nil then
+		return nil
+	end
+	local found: any = nil
+	for _, run in self.Running do
+		if not run.Done and run.Occ.Key == row.Key and (found == nil or run.Occ.StartedAt >= found.StartedAt) then
+			found = run.Occ
+		end
+	end
+	return found
+end
+
+-- Stops the live occurrences of ONE anomaly ("Restore", like the dev stop). Returns how many.
+function AnomalyService:DevStopKey(anomaly: string): number
+	self:DevCheck()
+	const row = rowOf(anomaly)
+	if row == nil then
+		error(`unknown anomaly "{anomaly}"`, 0)
+	end
+	local count = 0
+	for id, run in self.Running do
+		if run.Occ.Key == row.Key and not run.Done then
+			run.Done = true
+			self.Running[id] = nil
+			if run.Added then
+				self.Removing[id] = now() + LINGER
+			end
+			self:CallStop(run, "Restore")
+			count += 1
+		end
+	end
+	self:RefreshTension()
+	return count
+end
+
+-- Injects an event as if the player had done the action (the occurrence judges it as in play). Used by the showcase
+-- when the real action needs setup that the panel cannot do (a made hot dog, a discard at the bin).
+function AnomalyService:DevEmit(event: any)
+	self:DevCheck()
+	self:Emit(event)
 end
 
 function AnomalyService:DevStatus(): string

@@ -304,6 +304,8 @@ function CameraController:Setup()
 
 	self.Character = nil :: Model?
 	self.Groups = {} :: { [BasePart]: Group }
+	-- arm parts whose shadow the first-person view switched off (restored with the body)
+	self.ArmShadowOff = {} :: { [BasePart]: boolean }
 	self.Dirty = true
 	self.Applied = false
 	self.CharacterConnections = {} :: { RBXScriptConnection }
@@ -1032,6 +1034,10 @@ function CameraController:Restore()
 			part.LocalTransparencyModifier = 0
 		end
 	end
+	for part in self.ArmShadowOff do
+		part.CastShadow = true
+	end
+	table.clear(self.ArmShadowOff)
 	self.Applied = false
 end
 
@@ -1075,6 +1081,11 @@ function CameraController:Update(dt: number)
 		const target = if group == "Arm" then armTransparency else 1
 		if part.LocalTransparencyModifier ~= target then
 			part.LocalTransparencyModifier = target
+		end
+		-- the first-person arms never cast a shadow (user request 2026-10-12)
+		if group == "Arm" and part.CastShadow then
+			part.CastShadow = false
+			self.ArmShadowOff[part] = true
 		end
 	end
 	self.Applied = true

@@ -57,9 +57,11 @@ local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Compon
 local ToastStack = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Toast.Stack)
 local Toast = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Toast)
 
--- FEAT-014: summary on screen 15 s on day (= Content.Shift Summary), 20 s at night
+-- FEAT-014: summary on screen as long as the Summary phase (Content.Shift: 8 s day, 10 s night; halved by Q-200)
 const DAY_SUMMARY = Content.Shift.ByKey.Summary.Duration
-const NIGHT_SUMMARY = 20
+const NIGHT_SUMMARY = if Content.Shift.ByKey.Summary.Night ~= nil
+	then Content.Shift.ByKey.Summary.Night.Duration
+	else DAY_SUMMARY
 -- Phases that start a new shift: an old summary (or run end screen) still on screen goes away
 const NEW_SHIFT: { [string]: boolean } = { Intro = true, Prep = true, Open = true, Call = true, Night = true }
 -- network.md §4.2: toast on screen 3-6 s
@@ -132,12 +134,14 @@ const TOAST_SOUND = "toast"
 -- Notices with their own sound instead of the toast one (live packet only: nothing plays for a late joiner)
 const NOTICE_SOUND: { [string]: string } = {
 	thief_caught = "thief_caught",
+	trailer_cash = "coin", -- Walt's till money for the trailer
 }
 const SUMMARY_SOUND = "summary"
 const GOOD: { [string]: boolean } = {
 	upgrade_bought = true,
 	ingredient_unlocked = true,
 	class_bought = true,
+	trailer_cash = true,
 }
 
 -- Fields of the ShiftReport packet this controller reads (network.md §4.4)
@@ -581,6 +585,9 @@ function HudController:SanityMeter(): Frame
 		end,
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 0, UNDER_CLOCK),
+		-- Night 1 coffee lesson + coffee gain feedback (VitalController, server cue SanityCue)
+		Emphasis = vital.CoffeeHint,
+		Gain = vital.CoffeeGain,
 	})
 end
 

@@ -4,6 +4,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 
 export type Public = {
+	HintedShift: string,
 	LastBuy: { [Player]: number },
 	LastNotice: { [Player]: { [string]: number } },
 	Setup: (self: Public) -> (),
@@ -13,6 +14,10 @@ export type Public = {
 	IsKioskOpen: (self: Public) -> boolean,
 	OnSale: (self: Public, upgrade: Content.Upgrade) -> boolean,
 	UpgradeText: (self: Public, upgrade: Content.Upgrade, row: Content.UpgradeLevel) -> string,
+	CheapestOnSale: (self: Public) -> number?,
+	NeverBought: (self: Public) -> boolean,
+	HintDue: (self: Public) -> boolean,
+	OnPhase: (self: Public, phase: string, info: { Day: number, Night: number, IsNight: boolean }) -> (),
 	Refresh: (self: Public, anchor: Instance) -> (),
 	RefreshAll: (self: Public) -> (),
 	Refuse: (self: Public, player: Player, key: string, value: number) -> (),

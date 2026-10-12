@@ -7,6 +7,7 @@
 -- playing copies out over `fade` (the crossfade between two beds: the new bed fades in over its own F).
 -- Fallback: TimeLength unknown after LOAD_TIMEOUT or F = 0 -> one copy with Looped = true and a plain fade-in.
 local TweenService = game:GetService("TweenService")
+local Stats = require(script.Parent.Stats)
 
 const LOAD_TIMEOUT = 15 -- s
 const LOAD_STEP = 0.1 -- s
@@ -35,6 +36,7 @@ function Bed.start(row: Row, parent: Instance, group: SoundGroup?): Bed
 	const tweens: { [Sound]: Tween } = {}
 
 	for index = 1, 2 do
+		Stats.Mark("new")
 		const sound = Instance.new("Sound")
 		sound.Name = `Amb_{row.Key}_{index}`
 		sound.SoundId = row.Id

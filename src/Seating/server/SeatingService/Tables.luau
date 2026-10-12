@@ -11,23 +11,27 @@ const SEATING = Content.Seating
 
 const Tables = {}
 
--- State of table `index` when it is not in use: bought (Free), for sale / waiting its turn (Ghost), or not yet
--- (Locked: before Seating.UnlockDay nobody sees a ghost, FEAT-037).
-function Tables.Idle(index: number, owned: number, unlocked: boolean): State
+-- State of table `index` (position inside its group, 1..Count) when it is not in use: bought (Free), for sale / waiting
+-- its turn (Ghost), or not visible yet (Locked: before Seating.UnlockDay nobody sees a ghost, FEAT-037; a group with
+-- ghostAll = false shows only the next table for sale, the later ones stay Locked until it is bought).
+function Tables.Idle(index: number, owned: number, unlocked: boolean, ghostAll: boolean): State
 	if index <= owned then
 		return "Free"
 	end
-	return if unlocked then "Ghost" else "Locked"
+	if not unlocked or (not ghostAll and index > owned + 1) then
+		return "Locked"
+	end
+	return "Ghost"
 end
 
 -- A bought table keeps Occupied / Dirty; anything else follows the purchases.
-function Tables.Next(current: State, index: number, owned: number, unlocked: boolean): State
+function Tables.Next(current: State, index: number, owned: number, unlocked: boolean, ghostAll: boolean): State
 	if index <= owned and current == "Occupied" then
 		return "Occupied"
 	elseif index <= owned and current == "Dirty" then
 		return "Dirty"
 	end
-	return Tables.Idle(index, owned, unlocked)
+	return Tables.Idle(index, owned, unlocked, ghostAll)
 end
 
 -- Sit chance (FEAT-037): SitChance of the leader's type, x NightSitMult at night, + GroupSitBonus for a pair, + the
@@ -70,7 +74,8 @@ function Tables.Seats(size: number, couple: boolean): { number }
 	return if couple then SEATING.Seats.Couple else SEATING.Seats.Pair
 end
 
--- Lowest index whose state is Free and `usable(index)` says yes (the table nearest to Q1, FEAT-037). nil = none.
+-- Lowest index whose state is Free and `usable(index)` says yes (the table nearest to Q1, FEAT-037; `usable` also
+-- keeps the party inside one group). nil = none.
 function Tables.Pick(states: { State }, usable: (index: number) -> boolean): number?
 	for index, state in states do
 		if state == "Free" and usable(index) then

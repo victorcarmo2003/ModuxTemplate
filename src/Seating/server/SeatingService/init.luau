@@ -11,14 +11,24 @@
 --   States    Locked (before Seating.UnlockDay) -> Ghost (not bought; only the next one has Price and a prompt) ->
 --             Free -> Occupied -> Dirty -> (Clean Table) Free. Not bought = no collision (CanCollide off, written
 --             here); the ghost look (transparency) is the client's (TASK-147).
---   Purchase  buy_in_place on the next ghost: UpgradeService:Buy("patio_tables", player, quiet) -> TableCount + 1
---             (Pad scope: kept across the vehicle swap and in the "Upg" snapshot), notice table_added to the party.
+--   Purchase  buy_in_place on the next ghost: UpgradeService:Buy(group.UpgradeKey, player, quiet) -> the group's Stat
+--             + 1 (Pad group: Pad scope, kept across the vehicle swap and in the "Upg" snapshot), notice table_added.
+--   Groups    (Content.Seating.Groups, Q-209) Pad = TBL-1..5 (UPG-008, cart and trailer), Trailer = TBL-6..9 (UPG-011,
+--             trailer only). A group is Locked (hidden, no collision) while its vehicle is not the current one; the
+--             Trailer group shows only the next table for sale (GhostAll = false). A party stays in one group: once a
+--             Trailer table is bought only the Trailer group seats, before that the Pad tables still serve.
 --             Other anchors with buy_in_place + attribute Upgrade = Seating.LightsKey sell Patio Lights (UPG-009).
---   Sitting   CustomerService:SetSeater -> TrySeat(party) when an order ends well: the 5 conditions (free table,
---             MaxDiners, SitHeadroom, SitPhases, no tension) then the chance (Tables.Chance). The table is reserved
---             (Occupied, Npc1/Npc2) at once; the party walks Q1 -> node TBL-n (or the nearest graph node, fallback)
---             -> approach point -> seat (Diner.Sit), eats Tables.EatTime, stands (Diner.Stand), leaves TableTip per
---             diner on the table (Dirty), walks back to the node and CustomerService:Dismiss sends it out.
+--   Sitting   CustomerService:SetSeater({ Offer, Left }) -> Offer(party) at "Take Order" (Q-209, Provisional): the 5
+--             conditions (free table of the group that seats, MaxDiners, SitHeadroom, SitPhases, no tension), then the
+--             old chance only when Seating.SitChanceApplies. The table is reserved (Occupied, Npc1/Npc2) at once; the
+--             party walks Q1 -> node TBL-n (or the nearest graph node, fallback) -> approach point -> seat (Diner.Sit)
+--             and WAITS (Phase Seated: rig attribute Seated, no food). The table anchor ServeAnchor carries
+--             serve_table (PromptText "Serve Table n: Ketchup + Cheese", one block per pending hot dog, "|" between a
+--             pair's); CustomerService:ServeTable pays it like the counter. Served well -> Left(leader, true) ->
+--             Phase Eating (rig attribute Eating: the client gives it the hot dog) for Tables.EatTime, stands
+--             (Diner.Stand), leaves TableTip per diner on the table (Dirty), walks back to the node and
+--             CustomerService:Dismiss sends it out. Wrong item, patience out, tension or a shift end -> Left(leader,
+--             false) / StandAll: up at once, no tray, no tip (the table is Free).
 --   Tension   while an anomaly of Seating.TensionAnomalies runs or a customer anomaly is alive: nobody sits, every
 --             diner stands within one tick (TICK_RATE).
 --   Phases    Closing: nobody sits, diners finish. Any other non-selling phase: diners stand at once. Drawer closed
@@ -39,11 +49,14 @@ export type Record = { State: State, Price: number, Npc1: number, Npc2: number, 
 
 export type Spot = {
 	Index: number,
+	Serve: Instance?, -- anchor of serve_table (bound or runtime)
+	ServeText: string, -- last PromptText written on it ("" = off)
 	Model: Model?, -- nil = not in the binding (record still published: the client ignores it)
 	Seats: { [number]: BasePart },
 	Buy: Instance?, -- anchor of buy_in_place
 	Clean: Instance?, -- anchor of clean_table (same instance as Buy when both are the runtime anchor)
 	Node: string?, -- graph node next to the table (TBL-n, or the nearest node)
+	Group: Content.SeatingGroup,
 	Collide: { [BasePart]: boolean }, -- authored CanCollide of every part
 	State: State,
 	Price: number,
@@ -53,7 +66,7 @@ export type Spot = {
 
 export type Member = { Id: number, Seat: number, Rig: Diner.Rig? }
 
-export type Phase = "Walking" | "Seated" | "Leaving"
+export type Phase = "Walking" | "Seated" | "Eating" | "Leaving"
 
 export type Party = {
 	Leader: number,
@@ -62,7 +75,7 @@ export type Party = {
 	Table: number,
 	Phase: Phase,
 	StartedAt: number,
-	Until: number, -- Seated: server time it stands up
+	Until: number, -- Eating: server time it stands up (0 while it waits for the food)
 	EatTime: number,
 	Height: number, -- root Y while standing (approach / stand point)
 	Token: number, -- bumped to cancel the walk thread
@@ -72,6 +85,7 @@ export type SeatParty = { Leader: number, Partner: number?, Couple: boolean, Cus
 
 const SEATING = Content.Seating
 const BINDING = SEATING.Binding
+const MAX_NODE_GAP = 20 -- studs: a table farther than this from every graph node is warned (nobody can walk to it)
 const BUY = "buy_in_place"
 const CLEAN = "clean_table"
 const ANCHOR_TAG = "Interactable"
@@ -80,13 +94,30 @@ const TICK_RATE = 5 -- Hz (tension: diners up within 1 s, FEAT-037)
 const SEED_MAX = 2147483646
 const SEED_DOMAIN = "seating"
 const CLOSING = "Closing"
+const SERVE = "serve_table"
+const SERVE_LIFT = 0.6 -- studs over the top of the table (runtime serve anchor)
 const ADDED_NOTICE = "table_added"
 const BOUGHT_NOTICE = "upgrade_bought"
 const ANCHOR_LIFT = 0.6 -- studs over the top of the table (runtime anchor)
 const PARTNER_WALK = 4 -- s for the partner's straight walk to its seat
 const DEFAULT_HEIGHT = 3 -- root over the floor when nothing better is known (architecture.md §18.5)
--- In-place upgrades this build sells (UPG-010 Back Bar has no TBL-6 yet: refused, Q-179 b)
-const SOLD: { [string]: boolean } = { [SEATING.UpgradeKey] = true, [SEATING.LightsKey] = true }
+-- In-place upgrades this build sells (UPG-010 Back Bar has no table yet: refused, Q-179 b)
+const SOLD: { [string]: boolean } = { [SEATING.LightsKey] = true }
+-- upgrade key of a table group -> its group
+const GROUP_OF_UPGRADE: { [string]: Content.SeatingGroup } = {}
+for _, group in SEATING.Groups do
+	SOLD[group.UpgradeKey] = true
+	GROUP_OF_UPGRADE[group.UpgradeKey] = group
+end
+
+local function groupOfIndex(index: number): Content.SeatingGroup
+	for _, group in SEATING.Groups do
+		if index >= group.First and index < group.First + group.Count then
+			return group
+		end
+	end
+	return SEATING.Groups[1]
+end
 
 local function now(): number
 	return workspace:GetServerTimeNow()
@@ -157,9 +188,34 @@ function SeatingService:Get(index: number): Spot?
 	return self.Spots[index]
 end
 
--- Tables bought (UPG-008 TableCount on the current vehicle; Pad scope = the same on every vehicle).
-function SeatingService:Owned(): number
-	return math.clamp(self.Dependencies.UpgradeService:GetEffect("TableCount"), 0, SEATING.Tables)
+-- Tables bought of a group (its Stat on the current vehicle; the Pad group has Pad scope = the same on every vehicle);
+-- without a group: every table bought.
+function SeatingService:Owned(group: Content.SeatingGroup?): number
+	if group == nil then
+		local total = 0
+		for _, each in SEATING.Groups do
+			total += self:Owned(each)
+		end
+		return total
+	end
+	return math.clamp(self.Dependencies.UpgradeService:GetEffect(group.Stat), 0, group.Count)
+end
+
+-- The group is shown and sold on the current vehicle (Trailer tables: only once the trailer is the vehicle).
+function SeatingService:IsActive(group: Content.SeatingGroup): boolean
+	return table.find(group.Vehicles, self.Dependencies.UpgradeService:GetVehicle()) ~= nil
+end
+
+-- Group that seats now: Trailer as soon as the trailer is the vehicle and one of its tables is bought, else Pad
+-- (a party never mixes groups).
+function SeatingService:SeatingGroup(): string
+	for index = #SEATING.Groups, 2, -1 do
+		const group = SEATING.Groups[index]
+		if self:IsActive(group) and self:Owned(group) > 0 then
+			return group.Key
+		end
+	end
+	return SEATING.Groups[1].Key
 end
 
 function SeatingService:IsUnlocked(): boolean
@@ -229,6 +285,13 @@ function SeatingService:FindModels(): { [number]: Model }
 		if instance:IsA("Model") and instance:IsDescendantOf(workspace) and typeof(index) == "number" then
 			if index >= 1 and index <= SEATING.Tables and found[index] == nil then
 				found[index] = instance
+				const declared = instance:GetAttribute(BINDING.GroupAttribute)
+				if typeof(declared) == "string" and declared ~= groupOfIndex(index).Key then
+					self:WarnOnce(
+						`group:{index}`,
+						`{instance:GetFullName()}: {BINDING.GroupAttribute} = {declared} but {BINDING.IndexAttribute} {index} is the {groupOfIndex(index).Key} group`
+					)
+				end
 			end
 		end
 	end
@@ -261,8 +324,8 @@ function SeatingService:FindModels(): { [number]: Model }
 		return distance[a] < distance[b]
 	end)
 	for index, model in models do
-		if index > SEATING.Tables then
-			break
+		if index > SEATING.Groups[1].Count then
+			break -- only the Pad group is found by name; the Trailer tables come tagged (Q-209)
 		end
 		-- written here so the clients find the tables like a bound place (same contract)
 		model:SetAttribute(BINDING.IndexAttribute, index)
@@ -285,10 +348,10 @@ local function boundAnchor(model: Model, name: string): Instance?
 	return nil
 end
 
--- Runtime anchor over the top of the table (centre of its bounding box, ANCHOR_LIFT above the top).
-local function runtimeAnchor(model: Model): Attachment?
+-- Runtime anchor over the top of the table (centre of its bounding box, `lift` above the top).
+local function runtimeAnchor(model: Model, name: string, lift: number): Attachment?
 	const frame, size = model:GetBoundingBox()
-	const top = frame.Position + Vector3.new(0, size.Y / 2 + ANCHOR_LIFT, 0)
+	const top = frame.Position + Vector3.new(0, size.Y / 2 + lift, 0)
 	local host: BasePart? = model.PrimaryPart
 	if host == nil then
 		local best = -1
@@ -306,7 +369,7 @@ local function runtimeAnchor(model: Model): Attachment?
 		return nil
 	end
 	const attachment = Instance.new("Attachment")
-	attachment.Name = BINDING.RuntimeAnchor
+	attachment.Name = name
 	attachment.Parent = host
 	attachment.WorldPosition = top
 	return attachment
@@ -316,7 +379,9 @@ end
 local function prepareAnchor(anchor: Instance, action: string, index: number?, upgrade: string)
 	anchor:SetAttribute("PromptAction", action)
 	anchor:SetAttribute("PromptEnabled", false)
-	anchor:SetAttribute(UPGRADE_ATTRIBUTE, upgrade)
+	if upgrade ~= "" then
+		anchor:SetAttribute(UPGRADE_ATTRIBUTE, upgrade)
+	end
 	if index ~= nil then
 		anchor:SetAttribute(BINDING.IndexAttribute, index)
 	end
@@ -328,11 +393,14 @@ end
 function SeatingService:BuildSpot(index: number, model: Model?): Spot
 	const spot: Spot = {
 		Index = index,
+		Serve = nil,
+		ServeText = "",
 		Model = model,
 		Seats = {},
 		Buy = nil,
 		Clean = nil,
 		Node = nil,
+		Group = groupOfIndex(index),
 		Collide = {},
 		State = "Locked",
 		Price = 0,
@@ -356,17 +424,23 @@ function SeatingService:BuildSpot(index: number, model: Model?): Spot
 	local buy = boundAnchor(model, BINDING.BuyAnchor)
 	local clean = boundAnchor(model, BINDING.CleanAnchor)
 	if buy == nil or clean == nil then
-		const shared = runtimeAnchor(model)
+		const shared = runtimeAnchor(model, BINDING.RuntimeAnchor, ANCHOR_LIFT)
 		buy = buy or shared
 		clean = clean or shared
 	end
 	spot.Buy = buy
 	spot.Clean = clean
 	if buy ~= nil then
-		prepareAnchor(buy, BUY, index, SEATING.UpgradeKey)
+		prepareAnchor(buy, BUY, index, spot.Group.UpgradeKey)
 	end
 	if clean ~= nil and clean ~= buy then
-		prepareAnchor(clean, CLEAN, index, SEATING.UpgradeKey)
+		prepareAnchor(clean, CLEAN, index, spot.Group.UpgradeKey)
+	end
+	-- serve_table anchor (Q-209): its own, on while a customer waits there for its food
+	const serve = boundAnchor(model, BINDING.ServeAnchor) or runtimeAnchor(model, BINDING.RuntimeServeAnchor, SERVE_LIFT)
+	spot.Serve = serve
+	if serve ~= nil then
+		prepareAnchor(serve, SERVE, index, "")
 	end
 	-- Graph node next to the table: TBL-n (TASK-149), else the nearest node that is not a queue slot (fallback)
 	const named = `{BINDING.NodePrefix}{index}`
@@ -374,6 +448,13 @@ function SeatingService:BuildSpot(index: number, model: Model?): Spot
 		spot.Node = named
 	else
 		spot.Node = MapIndex.NearestNode(model:GetPivot().Position, isQueueNode)
+		const ok, node = pcall(MapIndex.Node, spot.Node :: string)
+		if not ok or (node.Position - model:GetPivot().Position).Magnitude > MAX_NODE_GAP then
+			self:WarnOnce(
+				`gap:{index}`,
+				`TBL-{index} ({spot.Group.Key}) has no graph node within {MAX_NODE_GAP} studs: add NpcNode {named} next to it and an edge to the queue`
+			)
+		end
 	end
 	return spot
 end
@@ -385,7 +466,7 @@ function SeatingService:FindPlaceAnchors()
 			continue
 		end
 		const key = anchor:GetAttribute(UPGRADE_ATTRIBUTE)
-		if typeof(key) ~= "string" or key == SEATING.UpgradeKey then
+		if typeof(key) ~= "string" or GROUP_OF_UPGRADE[key] ~= nil then
 			continue
 		end
 		table.insert(self.PlaceAnchors, anchor)
@@ -416,7 +497,44 @@ local function buyText(label: string, price: number): string
 	return (string.gsub(string.gsub(text, "{item}", label), "{price}", tostring(price)))
 end
 
+-- "Serve Table 2: Ketchup + Cheese" / "... | Mustard" (a pair): one block per pending hot dog, toppings by name.
+local function serveText(index: number, lines: { { string } }): string
+	const parts: { string } = {}
+	for _, toppings in lines do
+		const names: { string } = {}
+		for _, key in toppings do
+			const row = Content.Ingredients.ByKey[key]
+			table.insert(names, if row then row.Name else key)
+		end
+		table.insert(parts, if #names > 0 then table.concat(names, " + ") else "Plain")
+	end
+	return `Serve Table {index}: {table.concat(parts, " | ")}`
+end
+
+-- The serve_table prompt: on while the party sits at the table and its food is still pending; the text names the table
+-- and what it ordered (Q-209). Writes only when the text changed.
+function SeatingService:RefreshServe(spot: Spot)
+	const anchor = spot.Serve
+	if anchor == nil then
+		return
+	end
+	const party = if spot.Party then self.Parties[spot.Party] else nil
+	local text = ""
+	if party ~= nil and party.Phase == "Seated" then
+		const customers = self.Dependencies.CustomerService
+		if customers:IsWaitingAtTable(party.Leader) then
+			text = serveText(spot.Index, customers:PendingToppings(party.Leader))
+		end
+	end
+	if text == spot.ServeText then
+		return
+	end
+	spot.ServeText = text
+	self.Dependencies.InteractionService:SetPrompt(anchor, text ~= "", if text ~= "" then text else nil)
+end
+
 function SeatingService:ApplyPrompts(spot: Spot)
+	self:RefreshServe(spot)
 	const interaction = self.Dependencies.InteractionService
 	const buy = spot.Buy
 	const clean = spot.Clean
@@ -429,28 +547,42 @@ function SeatingService:ApplyPrompts(spot: Spot)
 			interaction:SetPrompt(buy, true)
 		else
 			buy:SetAttribute("PromptAction", BUY)
-			interaction:SetPrompt(buy, forSale, if forSale then buyText(SEATING.TableLabel, spot.Price) else nil)
+			interaction:SetPrompt(buy, forSale, if forSale then buyText(spot.Group.Label, spot.Price) else nil)
 		end
 		return
 	end
 	if buy ~= nil then
-		interaction:SetPrompt(buy, forSale, if forSale then buyText(SEATING.TableLabel, spot.Price) else nil)
+		interaction:SetPrompt(buy, forSale, if forSale then buyText(spot.Group.Label, spot.Price) else nil)
 	end
 	if clean ~= nil then
 		interaction:SetPrompt(clean, dirty)
 	end
 end
 
--- Recomputes every table from the purchases and the day; writes what changed.
+-- State of a table not in use: its group's purchases, the day and the vehicle.
+function SeatingService:Idle(spot: Spot): State
+	const group = spot.Group
+	const position = spot.Index - group.First + 1
+	if not self:IsActive(group) then
+		return "Locked" -- the Trailer tables before the trailer is bought: hidden, no collision
+	end
+	return Tables.Next(spot.State, position, self:Owned(group), self:IsUnlocked(), group.GhostAll)
+end
+
+-- Recomputes every table from the purchases, the day and the vehicle; writes what changed.
 function SeatingService:Refresh()
-	const owned = self:Owned()
-	const unlocked = self:IsUnlocked()
 	const upgrades = self.Dependencies.UpgradeService
-	const nextRow = upgrades:NextLevel(SEATING.UpgradeKey)
 	for _, spot in self.Spots do
-		const state = Tables.Next(spot.State, spot.Index, owned, unlocked)
+		const group = spot.Group
+		const position = spot.Index - group.First + 1
+		const busy = spot.State == "Occupied" or spot.State == "Dirty"
+		const state = if busy and not self:IsActive(group) then spot.State else self:Idle(spot)
+		const nextRow = upgrades:NextLevel(group.UpgradeKey)
 		-- a table missing from the map (the place may have fewer than Seating.Tables) is never for sale
-		const price = if state == "Ghost" and spot.Index == owned + 1 and nextRow ~= nil and spot.Model ~= nil
+		const price = if state == "Ghost"
+				and position == self:Owned(group) + 1
+				and nextRow ~= nil
+				and spot.Model ~= nil
 			then nextRow.Price
 			else 0
 		if state == spot.State and price == spot.Price then
@@ -479,7 +611,8 @@ function SeatingService:RefreshPlaceAnchors()
 		if typeof(key) == "string" and SOLD[key] then
 			const row = upgrades:NextLevel(key)
 			const ok = upgrades:CanBuy(key)
-			on = ok and row ~= nil
+			-- the Pad is an empty lot on the trailer (Q-216): its Patio Lights sign is not sold there
+			on = ok and row ~= nil and self:IsActive(SEATING.Groups[1])
 			if on and row ~= nil then
 				text = buyText(Content.Upgrades.ByKey[key].Name, row.Price)
 			end
@@ -533,8 +666,8 @@ local function hasSeats(spot: Spot, seats: { number }): boolean
 	return true
 end
 
--- CustomerService seater (SetSeater): the party just ended its order. Must not yield (runs inside the Serve Run).
--- true = reserved a table, the party is ours until Dismiss.
+-- CustomerService seater (SetSeater.Offer): the party just had its order taken. Must not yield (runs inside the Take
+-- Order Run). true = reserved a table, the party is ours until Dismiss.
 function SeatingService:TrySeat(party: SeatParty): boolean
 	if not self.Enabled or not self.Live then
 		return false
@@ -563,19 +696,26 @@ function SeatingService:TrySeat(party: SeatParty): boolean
 	for index, spot in self.Spots do
 		states[index] = spot.State
 	end
+	const seating = self:SeatingGroup()
 	const index = Tables.Pick(states, function(candidate: number): boolean
-		return hasSeats(self.Spots[candidate], seats)
+		const spot = self.Spots[candidate]
+		return spot.Group.Key == seating and hasSeats(spot, seats)
 	end)
 	if index == nil then
 		return false
 	end
-	-- chance (FEAT-037), drawn only for an eligible party
+	-- chance (FEAT-037), drawn only for an eligible party and only when the build still uses it (Q-209: a free table
+	-- seats whoever took the order; a type that never sits, SitChance 0, still never does)
 	const row = Content.CustomerTypes.ByKey[party.CustomerType]
-	const bonus = self.Dependencies.UpgradeService:GetEffect("SitBonus")
-	const chance = Tables.Chance(if row then row.SitChance else 0, isNight, size > 1, bonus)
-	const roll = self.Rng:NextNumber()
-	if not self.ForceSit and roll >= chance then
+	if not self.ForceSit and (row == nil or row.SitChance <= 0) then
 		return false
+	end
+	if SEATING.SitChanceApplies and not self.ForceSit and row ~= nil then
+		const bonus = self.Dependencies.UpgradeService:GetEffect("SitBonus")
+		const chance = Tables.Chance(row.SitChance, isNight, size > 1, bonus)
+		if self.Rng:NextNumber() >= chance then
+			return false
+		end
 	end
 	self.ForceSit = false
 	self:Reserve(index, party, seats, isNight)
@@ -655,9 +795,42 @@ function SeatingService:SitDown(party: Party)
 			Diner.Sit(rig, seat, party.Table)
 		end
 	end
+	-- it waits for the food (Q-209): the serve_table prompt is on, nothing times it out here (the Order patience clock
+	-- is CustomerService's)
 	party.Phase = "Seated"
-	party.Until = now() + party.EatTime
+	party.Until = 0
+	self:RefreshServe(spot)
 	self:Publish(spot)
+end
+
+-- The food was served (CustomerService Left(leader, true)): the diners eat for EatTime, then StandUp.
+function SeatingService:StartMeal(party: Party)
+	if party.Phase ~= "Seated" then
+		return
+	end
+	party.Phase = "Eating"
+	party.Until = now() + party.EatTime
+	for _, member in party.Members do
+		if member.Rig ~= nil then
+			Diner.Eat(member.Rig)
+		end
+	end
+	self:RefreshServe(self.Spots[party.Table])
+	self:Publish(self.Spots[party.Table])
+end
+
+-- CustomerService Left(leader, ate): a customer of ours is leaving. ate = served well: it eats first; else it stands
+-- up at once. A party already standing (StandUp started it) is left alone.
+function SeatingService:OnCustomerLeft(leader: number, ate: boolean)
+	const party = self.Parties[leader]
+	if party == nil or party.Phase == "Leaving" then
+		return
+	end
+	if ate and party.Phase == "Seated" then
+		self:StartMeal(party)
+	else
+		self:StandUp(party)
+	end
 end
 
 -- Up from the table: tray + TableTip per diner on it (Dirty), back to the graph, then CustomerService sends them out.
@@ -665,11 +838,18 @@ function SeatingService:StandUp(party: Party)
 	if party.Phase == "Leaving" then
 		return
 	end
-	const wasSeated = party.Phase == "Seated"
+	const wasSeated = party.Phase == "Seated" or party.Phase == "Eating"
+	const ate = party.Phase == "Eating"
 	party.Phase = "Leaving"
 	party.Token += 1
 	const spot = self.Spots[party.Table]
 	const npc = self.Dependencies.NpcService
+	-- still waiting for the food (patience, shift end, tension): the customer record goes too (Q-209)
+	const customers = self.Dependencies.CustomerService
+	const record = customers:Get(party.Leader)
+	if record ~= nil and record.State ~= "Leaving" then
+		customers:Leave(party.Leader, nil, "service", false)
+	end
 	for _, member in party.Members do
 		const rig = member.Rig
 		if rig ~= nil and self.Dependencies.CustomerService:Get(member.Id) ~= nil then
@@ -678,13 +858,14 @@ function SeatingService:StandUp(party: Party)
 		end
 	end
 	spot.Party = nil
-	if wasSeated then
-		-- FEAT-037 invariant: whoever sat leaves a tray and the tip, whatever made them stand
+	if ate then
+		-- FEAT-037 invariant: whoever ate leaves a tray and the tip, whatever made them stand (Q-209: no meal, no tray)
 		spot.Tip = Tables.Tip(spot.Tip, #party.Members)
 		self:SetState(spot, "Dirty")
 	else
 		self:SetState(spot, "Free")
 	end
+	self:RefreshServe(spot)
 	task.spawn(function()
 		const leader = party.Members[1]
 		if spot.Node ~= nil and self.Dependencies.CustomerService:Get(leader.Id) ~= nil then
@@ -785,8 +966,10 @@ function SeatingService:Step()
 		return
 	end
 	for _, party in table.clone(self.Parties) do
-		if party.Phase == "Seated" and t >= party.Until then
+		if party.Phase == "Eating" and t >= party.Until then
 			self:StandUp(party)
+		elseif party.Phase == "Seated" then
+			self:RefreshServe(self.Spots[party.Table]) -- the pending hot dogs of a pair change after a partial serve
 		elseif party.Phase == "Walking" and t - party.StartedAt > SEATING.StandTimeout then
 			self:WarnOnce("walk", `party of {party.Leader} never reached TBL-{party.Table}: sent away`)
 			self:StandUp(party)
@@ -808,10 +991,17 @@ function SeatingService:CanBuyAt(anchor: Instance): boolean
 	if typeof(key) ~= "string" or not SOLD[key] then
 		return false
 	end
-	if key == SEATING.UpgradeKey then
+	const group = GROUP_OF_UPGRADE[key]
+	if group ~= nil then
 		const index = indexOf(anchor)
 		const spot = if index then self.Spots[index] else nil
-		if spot == nil or spot.State ~= "Ghost" or spot.Price <= 0 or spot.Index ~= self:Owned() + 1 then
+		if
+			spot == nil
+			or spot.Group ~= group
+			or spot.State ~= "Ghost"
+			or spot.Price <= 0
+			or spot.Index ~= group.First + self:Owned(group)
+		then
 			return false
 		end
 	end
@@ -828,8 +1018,9 @@ function SeatingService:BuyAt(player: Player, anchor: Instance)
 	if not ok then
 		return
 	end
-	if key == SEATING.UpgradeKey then
-		self.Dependencies.RunStateService:Notify("all", ADDED_NOTICE, index or self:Owned())
+	const group = GROUP_OF_UPGRADE[key]
+	if group ~= nil then
+		self.Dependencies.RunStateService:Notify("all", ADDED_NOTICE, index or (group.First + self:Owned(group) - 1))
 	else
 		self.Dependencies.RunStateService:Notify("all", BOUGHT_NOTICE, Content.Upgrades.IndexOf[key])
 	end
@@ -860,8 +1051,38 @@ function SeatingService:Clean(anchor: Instance)
 	self:SetState(spot, "Free")
 end
 
+-- serve_table: leader NpcId of the party sitting at the table of this anchor and waiting for its food, else nil.
+function SeatingService:ServeLeader(anchor: Instance): number?
+	const index = indexOf(anchor)
+	const spot = if index then self.Spots[index] else nil
+	const party = if spot and spot.Party then self.Parties[spot.Party] else nil
+	if spot == nil or party == nil or party.Phase ~= "Seated" or spot.Serve ~= anchor then
+		return nil
+	end
+	return party.Leader
+end
+
 function SeatingService:RegisterActions()
 	const interaction = self.Dependencies.InteractionService
+	-- the verdict, pay, tip and Sale are the counter's (CustomerService:ServeTable)
+	interaction:RegisterAction(SERVE, {
+		Validate = function(player: Player, anchor: Instance): boolean
+			const leader = self:ServeLeader(anchor)
+			return leader ~= nil and self.Dependencies.CustomerService:CanServeTable(player, leader)
+		end,
+		Run = function(player: Player, anchor: Instance)
+			const leader = self:ServeLeader(anchor)
+			if leader == nil then
+				return
+			end
+			self.Dependencies.CustomerService:ServeTable(player, leader)
+			const index = indexOf(anchor)
+			const spot = if index then self.Spots[index] else nil
+			if spot ~= nil then
+				self:RefreshServe(spot)
+			end
+		end,
+	})
 	interaction:RegisterAction(BUY, {
 		Validate = function(_player: Player, anchor: Instance): boolean
 			return self:CanBuyAt(anchor)
@@ -908,20 +1129,35 @@ function SeatingService:DevCheck()
 	end
 end
 
--- Free purchase of the next table. Returns the tables owned after it.
-function SeatingService:DevBuy(): number
-	self:DevCheck()
-	const upgrades = self.Dependencies.UpgradeService
-	const nextRow = upgrades:NextLevel(SEATING.UpgradeKey)
-	if nextRow == nil then
-		error("every table is bought", 2)
+-- Group by key ("pad" / "trailer", any case); nil = the one that seats now.
+function SeatingService:DevGroup(key: string?): Content.SeatingGroup
+	const wanted = if key then string.lower(key) else string.lower(self:SeatingGroup())
+	for _, group in SEATING.Groups do
+		if string.lower(group.Key) == wanted then
+			return group
+		end
 	end
-	upgrades:SetLevel(upgrades:GetVehicle(), SEATING.UpgradeKey, nextRow.Level)
-	self:Refresh()
-	return self:Owned()
+	error(`unknown table group '{wanted}'`, 3)
 end
 
--- The next eligible party sits whatever the chance (conditions still apply).
+-- Free purchase of the next table of a group (default: the one that seats now). The Trailer group can be bought
+-- while the cart is the vehicle (its level lives on the trailer; the tables show once the trailer is bought).
+-- Returns the tables of that group owned after it.
+function SeatingService:DevBuy(groupKey: string?): number
+	self:DevCheck()
+	const group = self:DevGroup(groupKey)
+	const upgrades = self.Dependencies.UpgradeService
+	const vehicle = if self:IsActive(group) then upgrades:GetVehicle() else group.Vehicles[1]
+	const nextRow = upgrades:NextLevel(group.UpgradeKey, vehicle)
+	if nextRow == nil then
+		error(`every {group.Key} table is bought`, 2)
+	end
+	upgrades:SetLevel(vehicle, group.UpgradeKey, nextRow.Level)
+	self:Refresh()
+	return self:Owned(group)
+end
+
+-- The next customer that takes its order sits whatever its type (the conditions still apply: free table, phase...).
 function SeatingService:DevForceSit()
 	self:DevCheck()
 	self.ForceSit = true
@@ -930,7 +1166,7 @@ end
 function SeatingService:DevDirty(index: number, tip: number?)
 	self:DevCheck()
 	const spot = self.Spots[index]
-	if spot == nil or index > self:Owned() then
+	if spot == nil or index - spot.Group.First + 1 > self:Owned(spot.Group) or not self:IsActive(spot.Group) then
 		error(`table {index} is not bought`, 2)
 	end
 	if spot.Party ~= nil then
@@ -949,20 +1185,34 @@ function SeatingService:DevClean(index: number)
 	self:Clean(spot.Clean or spot.Buy or (spot.Model :: Instance))
 end
 
-function SeatingService:DevList(): string
+function SeatingService:DevList(groupKey: string?): string
+	self:DevCheck()
+	const only = if groupKey then self:DevGroup(groupKey) else nil
 	const parts: { string } = {}
 	for _, spot in self.Spots do
+		if only ~= nil and spot.Group ~= only then
+			continue
+		end
 		const party = if spot.Party then self.Parties[spot.Party] else nil
 		table.insert(
 			parts,
-			`TBL-{spot.Index} {spot.State}{if spot.Price > 0 then ` ${spot.Price}` else ""}`
+			`TBL-{spot.Index} {spot.Group.Key} {spot.State}{if spot.Price > 0 then ` ${spot.Price}` else ""}`
 				.. `{if spot.Tip > 0 then ` tip ${spot.Tip}` else ""}`
 				.. `{if party then ` {party.Phase} {#party.Members}p` else ""}`
 				.. `{if spot.Model == nil then " (no model)" else ""}`
 		)
 	end
-	return `owned {self:Owned()}, diners {self:Diners()}/{Tables.MaxDiners(self:IsNight())}, tense {self:IsTense()}\n  `
-		.. table.concat(parts, "\n  ")
+	const bought: { string } = {}
+	for _, group in SEATING.Groups do
+		table.insert(
+			bought,
+			`{group.Key} {self:Owned(group)}/{group.Count}{if self:IsActive(group) then "" else " (hidden: not this vehicle)"}`
+		)
+	end
+	const header = `vehicle {self.Dependencies.UpgradeService:GetVehicle()}, seating group {self:SeatingGroup()}`
+		.. `, owned {table.concat(bought, ", ")}, diners {self:Diners()}/{Tables.MaxDiners(self:IsNight())}`
+		.. `, tense {self:IsTense()}`
+	return header .. "\n  " .. table.concat(parts, "\n  ")
 end
 
 SeatingService:OnInit(function(self)
@@ -980,9 +1230,14 @@ SeatingService:OnInit(function(self)
 	self:RegisterActions()
 
 	const customers = self.Dependencies.CustomerService
-	customers:SetSeater(function(party): boolean
-		return self:TrySeat(party)
-	end)
+	customers:SetSeater({
+		Offer = function(party): boolean
+			return self:TrySeat(party)
+		end,
+		Left = function(leader: number, ate: boolean)
+			self:OnCustomerLeft(leader, ate)
+		end,
+	})
 	customers.Removed:Connect(function(id: number)
 		self:OnRemoved(id)
 	end)
@@ -1016,10 +1271,9 @@ SeatingService:OnStart(function(self)
 	end
 	self:FindPlaceAnchors()
 	self:Reseed()
-	const owned = self:Owned()
-	const unlocked = self:IsUnlocked()
+	-- every table starts Locked (hidden, no collision); Refresh below writes what each group says
 	for _, spot in self.Spots do
-		spot.State = Tables.Idle(spot.Index, owned, unlocked)
+		spot.State = "Locked"
 		self:ApplyCollision(spot)
 		self:Publish(spot, true)
 	end

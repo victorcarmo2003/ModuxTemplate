@@ -200,6 +200,7 @@ function PoolModule.release(pool: Pool, rig: Rig, now: number, parking: Instance
 		end
 	end
 	rig.Model:SetAttribute(SEATED_ATTRIBUTE, nil)
+	rig.Model:SetAttribute("Eating", nil) -- SeatingService/Diner.Eat (Q-209)
 	rig.Model:SetAttribute("NpcId", nil)
 	rig.Model:SetAttribute("Variant", nil) -- actor variant (TASK-108): a reused rig is a plain customer again
 	rig.Model:SetAttribute("FromWalker", nil) -- adopted passer-by (TASK-163)

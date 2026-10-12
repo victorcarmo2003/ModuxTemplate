@@ -1,7 +1,10 @@
 --!strict
 -- The ten nights (content-data.md §6.3; FEAT-003, FEAT-009, FEAT-022; DEC-060, DEC-073, DEC-127).
 -- Owner: game-designer (numbers) + narrative-writer (calls live in BossCalls). Not a wire enum (no Keys on the wire).
--- Duration = real seconds of the Night phase (8 PM -> 6 AM), increasing (DEC-127).
+-- Duration = real seconds of the Night phase (8 PM -> 6 AM), increasing (DEC-127). Shortened with the new run flow
+-- (user request 2026-10-12, Provisional Q-207): nights now follow a day shift from Day 2, so Night 1 is ~9 min and the
+-- length grows 40 s per night to ~15 min on Night 10 (was 20 -> 30 min). MinGap and MaxSimultaneous did not change:
+-- the agenda still fits (N10: 14 starts in a 720 s window, ~51 s per slot, MinGap 25 s).
 -- NewAnomaly = key of Anomalies (wave 3 table, TASK-096 checks the reference); here only the key pattern is checked.
 -- Call / ShortCall = keys of BossCalls (Trigger NightCall for this night / the single NightRepeat call).
 -- Customers.BaseInterval = seconds between spawns at night, solo (40 N1-5, 36 N6-10; Provisional, TASK-081, FEAT-009);
@@ -64,17 +67,19 @@ local function night(
 end
 
 const base = Table.new({
-	-- Duration DEC-127; MaxSimultaneous and MinGap FEAT-022; interval FEAT-009 (40 s / 36 s, Provisional, TASK-081)
-	night(1, 1200, "anm_001_blank_folks", 1, 60, 40),
-	night(2, 1260, "anm_002_wrong_food", 1, 60, 40),
-	night(3, 1320, "anm_003_stopped_clock", 1, 60, 40),
-	night(4, 1380, "anm_004_copies", 2, 60, 40),
-	night(5, 1440, "anm_005_raincoat_lady", 2, 40, 40),
-	night(6, 1560, "anm_006_wavers", 2, 40, 36),
-	night(7, 1620, "anm_007_walker", 2, 40, 36),
-	night(8, 1680, "anm_008_long_car", 3, 25, 36),
-	night(9, 1740, "anm_009_knock", 3, 25, 36),
-	night(10, 1800, "anm_010_hush", 3, 25, 36),
+	-- Duration 540 s + 40 s per night (2026-10-12; DEC-127 shape, was 1200..1800); MaxSimultaneous and MinGap FEAT-022;
+	-- interval FEAT-009 (40 s / 36 s, Provisional, TASK-081). Nights 1-2 are always in the cart and only have
+	-- anomalies with Trailer None (blank folks: refuse, wrong food: discard).
+	night(1, 540, "anm_001_blank_folks", 1, 60, 40),
+	night(2, 580, "anm_002_wrong_food", 1, 60, 40),
+	night(3, 620, "anm_003_stopped_clock", 1, 60, 40),
+	night(4, 660, "anm_004_copies", 2, 60, 40),
+	night(5, 700, "anm_005_raincoat_lady", 2, 40, 40),
+	night(6, 740, "anm_006_wavers", 2, 40, 36),
+	night(7, 780, "anm_007_walker", 2, 40, 36),
+	night(8, 820, "anm_008_long_car", 3, 25, 36),
+	night(9, 860, "anm_009_knock", 3, 25, 36),
+	night(10, 900, "anm_010_hush", 3, 25, 36),
 } :: { Night })
 
 const windows: Windows = {

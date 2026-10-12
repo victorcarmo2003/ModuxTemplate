@@ -538,7 +538,8 @@ function LightController:Paint(fixture: Fixture, lit: boolean, live: boolean)
 	if fixture.Live ~= live then
 		fixture.Live = live
 		for _, light in fixture.Lights do
-			light.Enabled = live
+			-- PadHideController: lights of the hidden cart / Pad stay off while the trailer is the vehicle
+			light.Enabled = live and light:GetAttribute("PadHidden") ~= true
 		end
 	end
 	const showDecal = lit and not live

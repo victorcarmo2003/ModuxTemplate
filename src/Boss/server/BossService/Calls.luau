@@ -21,9 +21,11 @@ const VARIANT_BASE = ""
 
 -- Day -> variant ("" or "quentin") -> key
 const byDay: { [number]: { [string]: string } } = {}
--- night k -> key of the first day after it (call_day_after_<k>)
-const afterNight: { [number]: string } = {}
+-- night k -> variant ("" or "quentin") -> key of the first day after it (call_day_after_<k>[_quentin])
+const afterNight: { [number]: { [string]: string } } = {}
 const infinite: { string } = {}
+-- night k -> key of its NightCoffee call (Night 1)
+const coffeeByNight: { [number]: string } = {}
 -- action key -> hint key
 const hints: { [string]: string } = {}
 -- trigger kind -> first key of that kind (TrailerBought, LostCritical, LostLastChance)
@@ -38,8 +40,12 @@ for _, row in Content.BossCalls.List do
 			byDay[trigger.Day] = variants
 			variants[trigger.Variant or VARIANT_BASE] = row.Key
 		elseif trigger.Night ~= nil then
-			afterNight[trigger.Night] = row.Key
+			const variants = afterNight[trigger.Night] or {}
+			afterNight[trigger.Night] = variants
+			variants[trigger.Variant or VARIANT_BASE] = row.Key
 		end
+	elseif kind == "NightCoffee" and trigger.Night ~= nil then
+		coffeeByNight[trigger.Night] = row.Key
 	elseif kind == "DayInfinite" then
 		table.insert(infinite, row.Key)
 	elseif kind == "Hint" and trigger.Action ~= nil then
@@ -70,6 +76,11 @@ function Calls.hint(action: string): string?
 	return hints[action]
 end
 
+-- Coffee call that follows the call of night k (nil = none)
+function Calls.nightCoffee(night: number): string?
+	return coffeeByNight[night]
+end
+
 -- Night k: (first-attempt call, repeated-night opener) from Content.Nights
 function Calls.night(night: number): (string?, string?)
 	const row = Content.Nights.List[night]
@@ -82,10 +93,19 @@ end
 -- Prep of a day shift: the day after night k first, then the fixed day N call (quentin variant when the thief was
 -- caught the day before), then the endless pool. nil = no call today.
 function Calls.day(query: DayQuery, random: Random): string?
+	-- The thief was caught the day before: the quentin variant of a day call (user request 2026-10-12: from Day 3 on
+	-- every day follows a night, so the day-after calls carry it too)
+	const quentinDay = query.CaughtDay >= 1 and query.CaughtDay == query.Day - 1
 	if query.Night >= 1 then
-		const after = afterNight[query.Night]
-		if after ~= nil and not query.Played[after] then
-			return after
+		const afterVariants = afterNight[query.Night]
+		if afterVariants ~= nil then
+			-- one call per day: any variant already played closes it
+			for _, key in afterVariants do
+				if query.Played[key] then
+					return nil
+				end
+			end
+			return (if quentinDay then afterVariants.quentin else nil) or afterVariants[VARIANT_BASE]
 		end
 	end
 
@@ -98,7 +118,7 @@ function Calls.day(query: DayQuery, random: Random): string?
 			end
 		end
 		const quentin = variants.quentin
-		if quentin ~= nil and query.CaughtDay >= 1 and query.CaughtDay == query.Day - 1 then
+		if quentin ~= nil and quentinDay then
 			return quentin
 		end
 		return variants[VARIANT_BASE]

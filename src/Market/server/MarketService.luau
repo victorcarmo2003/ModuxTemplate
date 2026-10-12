@@ -14,6 +14,8 @@
 --     Content.Mart.KioskClosedPhases (Summary, Call, NightLost, Resume, Intro, Finale, RunEnd). Closed = bench prompts
 --     off and every bench purchase refused in silence, in Validate AND Run (a hold that ends on the phase change buys
 --     nothing). Shelves (buy_package) never close (Q-177 A). No network: the client derives the shutter from Shift.
+--   Cooldown (Q-203 Provisional): a line bought on the stand is "Sold out" for Content.Mart.Cooldown.Turns shifts
+--     (UpgradeService owns the state); its prompt is off and the purchase refused in silence, the other lines stay free.
 -- Refusal toasts (FEAT-005 D-04; TASK-080), only to the player who acted, the same key at most once every
 -- NOTICE_GAP seconds: shelf Blocked -> shelf_locked {item}; bench "busy" (another buyer inside UpgradeService's guard)
 -- -> bench_busy; bench "maxed" -> upgrade_maxed {upgrade}. Silent: run not started / member not Active (life state),
@@ -87,6 +89,8 @@ function MarketService:Setup()
 	self.LastBuy = {} :: { [Player]: number }
 	-- os.clock() of the last refusal toast per player and Notices key (NOTICE_GAP)
 	self.LastNotice = {} :: { [Player]: { [string]: number } }
+	-- identity of the last shift that got the "Closing time" hint (once per shift)
+	self.HintedShift = "" :: string
 end
 
 -- Reads -----------------------------------------------------------------------------------------------------------
@@ -112,13 +116,15 @@ function MarketService:IsKioskOpen(): boolean
 	return not KIOSK_CLOSED[self.Dependencies.RoundService:GetPhase()]
 end
 
--- Bench slot sells now: upgrade exists on the current vehicle, not maxed, unlocked today. Money and the post-purchase
+-- Bench slot sells now: upgrade exists on the current vehicle, not maxed, unlocked today, not resting after a
+-- purchase (Gear Stand cooldown, Q-203: the line is "Sold out" for Content.Mart.Cooldown shifts). Money and the post-purchase
 -- guard are checked by UpgradeService:Buy.
 function MarketService:OnSale(upgrade: Content.Upgrade): boolean
 	const upgrades = self.Dependencies.UpgradeService
 	return upgrades:GetLevel(upgrade.Key) ~= nil
 		and upgrades:NextLevel(upgrade.Key) ~= nil
 		and self.Dependencies.RoundService:GetDay() >= upgrade.UnlockDay
+		and upgrades:GetWait(upgrade.Key) == 0
 end
 
 -- "Buy Grill 2 — $60" (Content.Actions.bench_buy_upgrade.Text with {upgrade} and {price})
@@ -127,6 +133,60 @@ function MarketService:UpgradeText(upgrade: Content.Upgrade, row: Content.Upgrad
 	const name = if buyableLevels(upgrade, vehicle) > 1 then `{upgrade.Name} {row.Level}` else upgrade.Name
 	const text = Content.Actions.ByKey[UPGRADE_ACTION].Text
 	return (string.gsub(string.gsub(text, "{upgrade}", name), "{price}", tostring(row.Price)))
+end
+
+-- Closing-time hint (user feedback 2026-10-11; Q-203 Provisional) -----------------------------------------------------
+
+-- Cheapest next level among the stand's lines that sell now, nil when nothing sells
+function MarketService:CheapestOnSale(): number?
+	const upgrades = self.Dependencies.UpgradeService
+	local cheapest: number? = nil
+	for _, upgrade in Content.Upgrades.List do
+		if upgrade.SoldAt ~= "Bench" or not self:OnSale(upgrade) then
+			continue
+		end
+		const row = upgrades:NextLevel(upgrade.Key)
+		if row ~= nil and (cheapest == nil or row.Price < cheapest) then
+			cheapest = row.Price
+		end
+	end
+	return cheapest
+end
+
+-- Nothing bought yet on the current vehicle (any Bench line still at its start level)
+function MarketService:NeverBought(): boolean
+	const upgrades = self.Dependencies.UpgradeService
+	for _, upgrade in Content.Upgrades.List do
+		const level = if upgrade.SoldAt == "Bench" then upgrades:GetLevel(upgrade.Key) else nil
+		if level ~= nil and level > upgrade.StartLevel then
+			return false
+		end
+	end
+	return true
+end
+
+-- The party can afford a line (cash + the drawer about to be collected) or never bought one. Same rule on the client
+-- for the arrow (MarketController/Hint.luau).
+function MarketService:HintDue(): boolean
+	const cheapest = self:CheapestOnSale()
+	if cheapest == nil then
+		return false
+	end
+	const economy = self.Dependencies.EconomyService
+	return economy:GetCash() + economy:GetDrawer() >= cheapest or self:NeverBought()
+end
+
+-- Closing starts: one toast per shift to the party. Never blocks a purchase (the stand is open all day).
+function MarketService:OnPhase(phase: string, info: { Day: number, Night: number, IsNight: boolean })
+	if phase ~= "Closing" then
+		return
+	end
+	const key = `{info.Day}/{info.Night}/{if info.IsNight then 1 else 0}`
+	if key == self.HintedShift or not self:HintDue() then
+		return
+	end
+	self.HintedShift = key
+	self.Dependencies.RunStateService:Notify("all", "mart_hint", 0)
 end
 
 -- Prompts ---------------------------------------------------------------------------------------------------------
@@ -240,6 +300,7 @@ function MarketService:ValidateUpgrade(player: Player, anchor: Instance): boolea
 	elseif reason == "maxed" then
 		self:Refuse(player, "upgrade_maxed", Content.Upgrades.IndexOf[upgrade.Key] or 0)
 	end
+	-- "cooldown": silent, the prompt is already off and the plate says "Sold out"
 	return ok
 end
 
@@ -276,6 +337,10 @@ MarketService:OnInit(function(self)
 		end,
 	})
 
+	self.Dependencies.RoundService.PhaseChanged:Connect(function(phase, _day, _night)
+		self:OnPhase(phase, self.Dependencies.RoundService:Info())
+	end)
+
 	self.Dependencies.PlayerService.PlayerRemoving:Connect(function(player)
 		self.LastBuy[player] = nil
 		self.LastNotice[player] = nil
@@ -296,6 +361,8 @@ MarketService:OnStart(function(self)
 		round:GetPhase()
 		upgrades:GetVehicle()
 		upgrades:Capture()
+		upgrades.Cooldown()
+		upgrades.Turn()
 		self:RefreshAll()
 	end)
 

@@ -109,6 +109,17 @@ local function patioTables(): { Level }
 	}
 end
 
+-- UPG-011 Trailer Tables (FEAT-037; user request 2026-10-12; Provisional, Q-209): the four tables placed for the
+-- trailer, trailer only, bought in place at the ghost table once the trailer is the vehicle: TBL-6 -> TBL-9;
+-- $50 / $70 / $90 / $120 = $330 (the trailer comes after Night 2: more cash than the cart days, so dearer than UPG-008).
+const trailerTablesTrailer: { Level } = {
+	{ Level = 0, Price = 0, Effects = { TrailerTableCount = 0 }, Part = "" },
+	{ Level = 1, Price = 50, Effects = { TrailerTableCount = 1 }, Part = "" },
+	{ Level = 2, Price = 70, Effects = { TrailerTableCount = 2 }, Part = "" },
+	{ Level = 3, Price = 90, Effects = { TrailerTableCount = 3 }, Part = "" },
+	{ Level = 4, Price = 120, Effects = { TrailerTableCount = 4 }, Part = "" },
+}
+
 -- UPG-009 Patio Lights (FEAT-037; Provisional): $120, SitChance +0.10 day and night; at night the LZ-PATIO light zone
 -- on the trailer switch (not wired yet: needs the LightGroups row + the binding volume, board note of TASK-145).
 local function patioLights(): { Level }
@@ -118,8 +129,8 @@ local function patioLights(): { Level }
 	}
 end
 
--- UPG-010 Back Bar (Q-179 b; Provisional, cuttable): $90, trailer only, one more table spot (TBL-6). Listed for the
--- contract; SeatingService does not sell it yet (no TBL-6 in the binding).
+-- UPG-010 Back Bar (Q-179 b; Provisional, cuttable): $90, trailer only, one more table spot (TBL-BAR). Listed for the
+-- contract; SeatingService does not sell it yet (TBL-6..9 became the Trailer tables, UPG-011).
 const backBarTrailer: { Level } = {
 	{ Level = 0, Price = 0, Effects = {}, Part = "" },
 	{ Level = 1, Price = 90, Effects = {}, Part = "" },
@@ -230,7 +241,20 @@ return Table.new({
 		UnlockDay = 1,
 		SoldAt = "InPlace",
 		BenchSpot = "",
-		PlaceSpots = { "TBL-6" },
+		PlaceSpots = { "TBL-BAR" }, -- TBL-6..9 are the Trailer tables (UPG-011)
+		Scope = "Vehicle",
+	},
+	{
+		Key = "trailer_tables",
+		Ref = "UPG-011",
+		Name = "Trailer Table",
+		Vehicles = { "trailer" },
+		StartLevel = 0,
+		Levels = { trailer = trailerTablesTrailer },
+		UnlockDay = 1,
+		SoldAt = "InPlace",
+		BenchSpot = "",
+		PlaceSpots = { "TBL-6", "TBL-7", "TBL-8", "TBL-9" },
 		Scope = "Vehicle",
 	},
 } :: { Upgrade })

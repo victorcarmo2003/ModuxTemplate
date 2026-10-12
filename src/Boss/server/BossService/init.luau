@@ -31,6 +31,15 @@
 -- (another call forced through dev, a phase hiccup) it comes back straight to Talking when it leaves the queue, never
 -- ringing again (TutorialAnswered), until nobody has the tutorial pending.
 --
+-- Trailer offer (user request 2026-10-12, Provisional): on the Prep of the first day after night Content.Trailer.OfferAfterNight
+-- (or any later day while the trailer is not bought) call_trailer_offer rings after the day's own call.
+-- Trailer reveal (user request 2026-10-11, Provisional; BossCalls Cues): that call carries two cues, run when their line
+-- starts to talk: TrailerFocus (VehicleService:FocusSign, the party's camera looks at the FOR SALE sign) and TrailerCash
+-- (EconomyService:TopUp to the trailer price, only the missing difference, once per run: the "@trailer_cash" flag lives in
+-- the Bs snapshot with the heard calls, so a Resume that restores the old cash gives it again). The purchase itself
+-- (VehicleService.Purchase) rings call_trailer_bought at once: Walt says why the trailer helps; without a free phone it
+-- waits for the next night Call as before.
+--
 -- PROVISIONAL (TASK-070): chaining without a new ring; Resume blocks calls like NightLost; any Swapped to a vehicle
 -- other than RunParams.StartVehicle counts as the trailer purchase.
 -- Require follows architecture.md §19.2: VehicleService (Swapped) and ThiefService (owner of the quentin_caught_day
@@ -59,6 +68,9 @@ const VEHICLE_ATTRIBUTE = "Vehicle"
 const PHONE_ACTION = "answer_phone"
 const CAUGHT_COUNTER = "quentin_caught_day" -- written by ThiefService (TASK-072)
 const SNAPSHOT = "Bs"
+-- Not a call key: the trailer money was given this run (kept in Played, so it is part of the Bs snapshot)
+const CASH_FLAG = "@trailer_cash"
+const CASH_NOTICE = "trailer_cash"
 const LINE_TIME = Content.BossCallRules.LineTime
 const AUTO_ANSWER = Content.BossCallRules.AutoAnswer
 const MAX_QUEUE = 32 -- far above any real sequence; guards a runaway trigger
@@ -84,6 +96,8 @@ const BossService = Modux.Service("BossService", {
 		"VehicleService",
 		"ThiefService",
 		"TutorialService",
+		"EconomyService",
+		"VitalService",
 	},
 	Priority = 560,
 })
@@ -105,6 +119,8 @@ function BossService:Setup()
 	self.Random = Random.new() :: Random
 	-- the tutorial call was answered once while a tutorial is pending: it never rings again, it resumes Talking
 	self.TutorialAnswered = false :: boolean
+	-- cues already run for the call that is talking (id = key # index @ StartedAt)
+	self.Cued = {} :: { [string]: boolean }
 end
 
 -- Reads -----------------------------------------------------------------------------------------------------------
@@ -243,6 +259,7 @@ function BossService:Talk(key: string, at: number)
 	if row and row.Trigger.Kind == "TrailerBought" then
 		self.TrailerPending = false
 	end
+	table.clear(self.Cued)
 	-- the tutorial call is held open until no tutorial is pending (StepTutorial)
 	self.EndsAt = if key == TUTORIAL.Call then math.huge else at + #self:LinesOf(key) * LINE_TIME
 	self:Write(key, "Talking", at)
@@ -293,6 +310,7 @@ function BossService:Step()
 			self:Answer()
 		end
 	elseif record.State == "Talking" then
+		self:RunCues(record, t)
 		if t >= self.EndsAt then
 			self:Finish(t)
 		end
@@ -307,6 +325,48 @@ function BossService:Step()
 			end
 		end
 	end
+end
+
+-- Cues (trailer reveal) ----------------------------------------------------------------------------------------------
+
+-- Runs the cues of the talking call whose line has started (once each)
+function BossService:RunCues(record: Record, t: number)
+	const row = Calls.row(record.Call)
+	const cues = if row then row.Cues else nil
+	if cues == nil then
+		return
+	end
+	const line = math.floor((t - record.StartedAt) / LINE_TIME) + 1
+	for index, cue in cues do
+		const id = `{record.Call}#{index}@{record.StartedAt}`
+		if line >= cue.Line and not self.Cued[id] then
+			self.Cued[id] = true
+			if cue.Kind == "TrailerFocus" then
+				self.Dependencies.VehicleService:FocusSign()
+			elseif cue.Kind == "TrailerCash" then
+				self:GiveTrailerCash()
+			elseif cue.Kind == "CoffeeHint" then
+				-- seconds of this call still to run: the emphasis lasts that long plus Sanity.CoffeeHint
+				const callLeft = math.max(0, self.EndsAt - t)
+				self.Dependencies.VitalService:StartCoffeeHint(callLeft)
+			end
+		end
+	end
+end
+
+-- Walt's till: the party's cash goes up to the trailer price (only what is missing), once per run. Not after the
+-- purchase. Returns what was added.
+function BossService:GiveTrailerCash(): number
+	const vehicles = self.Dependencies.VehicleService
+	if self.Played[CASH_FLAG] or vehicles:IsBought() or vehicles:IsPending() then
+		return 0
+	end
+	self.Played[CASH_FLAG] = true
+	const given = self.Dependencies.EconomyService:TopUp(vehicles:Price())
+	if given > 0 then
+		self.Dependencies.RunStateService:Notify("all", CASH_NOTICE, given)
+	end
+	return given
 end
 
 -- Tutorial call ----------------------------------------------------------------------------------------------------
@@ -390,6 +450,19 @@ function BossService:OnDayPrep(day: number, night: number)
 end
 
 -- Call phase of a night: trailer (Night 1) and lost-night calls first by Priority, then the night's own call
+-- Prep of a day shift: the trailer offer once the offer night has passed, while the cart is still the vehicle
+function BossService:OnTrailerOffer(night: number)
+	const key = Calls.ofKind("TrailerOffer")
+	if key == nil or night < Content.Trailer.OfferAfterNight or self.Played[key] then
+		return
+	end
+	const vehicles = self.Dependencies.VehicleService
+	if vehicles:IsBought() or vehicles:IsPending() then
+		return
+	end
+	self:Enqueue(key)
+end
+
 function BossService:OnNightCall(night: number, attempt: number)
 	if self.TrailerPending then
 		const trailer = Calls.ofKind("TrailerBought")
@@ -406,6 +479,11 @@ function BossService:OnNightCall(night: number, attempt: number)
 	if key then
 		self:Enqueue(key)
 	end
+	-- Night 1 teaches the coffee: after the rules call (lower Priority), on a repeat too (the night starts at 50 again)
+	const coffee = Calls.nightCoffee(night)
+	if coffee then
+		self:Enqueue(coffee)
+	end
 end
 
 function BossService:OnPhase(phase: string, day: number, night: number)
@@ -420,6 +498,7 @@ function BossService:OnPhase(phase: string, day: number, night: number)
 	const round = self.Dependencies.RoundService
 	if phase == "Prep" and not round:IsNight() then
 		self:OnDayPrep(day, night)
+		self:OnTrailerOffer(night)
 	elseif phase == "Call" then
 		self:OnNightCall(night, round:Info().Attempt)
 	end
@@ -455,6 +534,16 @@ function BossService:OnPerformed(action: string)
 	end
 end
 
+-- The trailer was bought (VehicleService.Purchase): Walt rings on the phone of the cart to ask for the night shift
+function BossService:OnPurchase()
+	const trailer = Calls.ofKind("TrailerBought")
+	if trailer == nil or self.Played[trailer] then
+		return
+	end
+	self.TrailerPending = true
+	self:Enqueue(trailer)
+end
+
 function BossService:OnSwapped(to: string)
 	if to == Content.RunParams.StartVehicle then
 		return
@@ -484,7 +573,7 @@ function BossService:RestoreBoss(data: any)
 	const played: { [string]: boolean } = {}
 	if type(data) == "table" then
 		for _, key in data do
-			if type(key) == "string" and Calls.row(key) ~= nil then
+			if type(key) == "string" and (key == CASH_FLAG or Calls.row(key) ~= nil) then
 				played[key] = true
 			end
 		end
@@ -533,6 +622,20 @@ end
 
 function BossService:DevStop()
 	self:DevCheck("DevStop")
+	self:Stop(true)
+end
+
+-- /dev trailer reset: the offer call, the bought call and the money flag are forgotten, the phone and queue are empty
+function BossService:DevResetTrailer()
+	self:DevCheck("DevResetTrailer")
+	self.Played[CASH_FLAG] = nil
+	for _, kind in { "TrailerOffer", "TrailerBought" } do
+		const key = Calls.ofKind(kind)
+		if key ~= nil then
+			self.Played[key] = nil
+		end
+	end
+	self.TrailerPending = false
 	self:Stop(true)
 end
 
@@ -619,6 +722,9 @@ BossService:OnInit(function(self)
 	-- VehicleService (620) built its signals in its own OnInit, before ours (§19.0 rule 2)
 	self.Dependencies.VehicleService.Swapped:Connect(function(_from: string, to: string)
 		self:OnSwapped(to)
+	end)
+	self.Dependencies.VehicleService.Purchase:Connect(function()
+		self:OnPurchase()
 	end)
 end)
 

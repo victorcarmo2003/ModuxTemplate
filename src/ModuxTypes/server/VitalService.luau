@@ -20,6 +20,8 @@ export type Entry = {
 	DarkSince: number?,
 	ProtectUntil: number,
 	CoffeeReadyAt: number,
+	-- Night 1 coffee lesson: server time the HUD emphasis ends (0 = none running); see StartCoffeeHint
+	HintUntil: number,
 	RevivesTonight: number,
 	Seen: { [string]: boolean },
 	StateEndsAt: number,
@@ -34,6 +36,7 @@ export type Entry = {
 export type Band = Sanity.Band
 
 export type Public = {
+	DevGodMode: boolean,
 	DevLit: boolean?,
 	Enabled: boolean,
 	Entries: { [number]: Entry },
@@ -87,9 +90,18 @@ export type Public = {
 	RestoreOf: (self: Public, player: Player, tool: Tool) -> number,
 	CanDrink: (self: Public, player: Player, _tool: Tool) -> (boolean, string?),
 	Drink: (self: Public, player: Player, tool: Tool) -> (),
+	SendCue: (self: Public, player: Player, kind: "Hint" | "Gain" | "End", amount: number, untilT: number) -> (),
+	EndHint: (self: Public, player: Player, entry: Entry) -> (),
+	StartCoffeeHint: (self: Public, callLeft: number) -> number,
+	ResendHint: (self: Public, player: Player) -> (),
+	StepHints: (self: Public, t: number, over: boolean) -> (),
 	DevSetSanity: (self: Public, player: Player, value: number) -> number,
 	DevFall: (self: Public, player: Player, state: LifeState?) -> (),
 	DevDark: (self: Public, mode: boolean?) -> (),
+	DevGod: (self: Public, on: boolean) -> (),
+	IsDevGod: (self: Public) -> boolean,
+	DevDarkMode: (self: Public) -> number,
+	DevRevive: (self: Public, player: Player) -> string,
 }
 
 return {}

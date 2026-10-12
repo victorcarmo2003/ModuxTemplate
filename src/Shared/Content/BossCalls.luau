@@ -3,13 +3,22 @@
 -- FEAT-018; DEC-025, DEC-076, DEC-077, DEC-124, DEC-194). Keys are the Call.Call enum (sentinel "none").
 -- Owner: narrative-writer (Lines from docs/story/ui-text.md §11; TASK-082 revises) + game-designer (triggers).
 -- Trigger.Kind:
---   DayPrep        Prep of Day = Trigger.Day (days 1-5; Variant "quentin": the thief was caught the day before), or
---                  Prep of the first day after night Trigger.Night (call_day_after_<k>; Provisional, ui-text §11.3)
+--   DayPrep        Prep of Day = Trigger.Day (Day 1 tutorial and Day 2; with the run flow of 2026-10-12 every day from
+--                  Day 3 comes after a night, so the days 3+ are the call_day_after_<k> rows), or Prep of the first day
+--                  after night Trigger.Night (call_day_after_<k>; Variant "quentin": the thief was caught the day
+--                  before; Provisional, ui-text §11.3)
 --   DayInfinite    Prep of an endless day: one row of the pool at random, never the same twice in a row
 --   NightCall      Call phase of Night = Trigger.Night, first attempt
+--   NightCoffee    Call phase of Night = Trigger.Night (Night 1), right after that night's own call (lower Priority); its
+--                  cue CoffeeHint starts the sanity-bar / coffee-machine emphasis (VitalService:StartCoffeeHint)
 --   NightRepeat    Call phase of a repeated night (Attempt > 0): exactly one row; its lines are followed by the
 --                  Short lines of that night's NightCall (LinesOf below)
---   TrailerBought  VehicleService.Swapped; plays in the Call of Night 1, before call_night_1
+--   TrailerOffer   Prep of the first day after night Content.Trailer.OfferAfterNight (or any later day while the trailer
+--                  is not bought): Walt sends the rookie to the FOR SALE sign and hands over the money (cues
+--                  TrailerFocus, TrailerCash). Rings after that day's own call (user request 2026-10-12, Provisional)
+--   TrailerBought  right after the purchase (VehicleService.Purchase; the phone of the cart rings, Walt says why the
+--                  trailer helps). Without a free phone (closed phase) it waits and plays in the first Call of the
+--                  trailer, before that night's call
 --   LostCritical / LostLastChance   after NightResolved("Lost"); played in the Call of the repeated night
 --   RunOver        never rung (no call in NightLost/RunEnd): the run end screen quotes its lines (Provisional)
 --   Hint           first time Trigger.Action is performed in the run (InteractionService.Performed)
@@ -20,6 +29,7 @@
 --                  the step lines (TutorialController, Steps.luau); Lines are what everyone else hears.
 -- Speaker nil = Walt. A line lasts Rules.LineTime; the current line = floor((now - StartedAt) / LineTime).
 local Table = require(script.Parent.Table)
+local Trailer = require(script.Parent.Trailer)
 
 export type Line = {
 	Text: string,
@@ -31,13 +41,26 @@ export type TriggerKind =
 	| "DayPrep"
 	| "DayInfinite"
 	| "NightCall"
+	| "NightCoffee"
 	| "NightRepeat"
+	| "TrailerOffer"
 	| "TrailerBought"
 	| "LostCritical"
 	| "LostLastChance"
 	| "RunOver"
 	| "Hint"
 	| "Tutorial"
+
+-- Cue = something the server does when line `Line` (1-based) of a call starts talking (once per call):
+--   TrailerFocus  the party's camera looks at the FOR SALE sign for a few seconds (VehicleService:FocusSign)
+--   TrailerCash   Walt's till tops the party's cash up to the trailer price, once per run (BossService)
+--   CoffeeHint    Night 1: the sanity bar and the coffee machine are emphasised until the first coffee (VitalService)
+export type CueKind = "TrailerFocus" | "TrailerCash" | "CoffeeHint"
+
+export type Cue = {
+	Line: number,
+	Kind: CueKind,
+}
 
 export type Trigger = {
 	Kind: TriggerKind,
@@ -56,6 +79,7 @@ export type BossCall = {
 	Priority: number,
 	Once: boolean, -- once per run (snapshot Bs)
 	Short: { Line }?, -- NightCall only: the lines that follow the NightRepeat opener on a repeat
+	Cues: { Cue }?, -- server effects tied to a line (see Cue)
 }
 
 -- First-hot-dog tutorial call (Trigger Tutorial). PROVISIONAL (frontend-coder, user request 2026-10-11).
@@ -73,6 +97,8 @@ export type Rules = {
 	NightMaxSeconds: number,
 	Tutorial: TutorialRules,
 }
+
+const QUENTIN = "Heard you caught Quentin in the act. Nice."
 
 local function lines(...: string): { Line }
 	const out: { Line } = {}
@@ -92,12 +118,13 @@ local function day(key: string, dayIndex: number, variant: string?, body: { Line
 	}
 end
 
--- Prep of the first day after night k (the day number varies with the trailer purchase)
-local function dayAfter(night: number, body: { Line }): BossCall
+-- Prep of the first day after night k (night k is played on day k + 1, so this is Day k + 2). Variant "quentin" is the
+-- same call with Walt's Quentin line inserted as the 2nd line (the thief was caught the day before)
+local function dayAfter(night: number, body: { Line }, variant: string?): BossCall
 	return {
-		Key = `call_day_after_{night}`,
+		Key = if variant then `call_day_after_{night}_{variant}` else `call_day_after_{night}`,
 		Lines = body,
-		Trigger = { Kind = "DayPrep", Night = night },
+		Trigger = { Kind = "DayPrep", Night = night, Variant = variant },
 		Priority = 2,
 		Once = true,
 	}
@@ -135,7 +162,6 @@ local function hint(key: string, action: string, body: { Line }): BossCall
 end
 
 const WALKER = "And never watch the Walker."
-const QUENTIN = "Heard you caught Quentin in the act. Nice."
 
 const base = Table.new({
 	{ Key = "none", Lines = {}, Trigger = { Kind = "None" }, Priority = 1, Once = false },
@@ -152,7 +178,8 @@ const base = Table.new({
 		)
 	),
 
-	-- days 2-5 (ui-text.md §11.2); variant "quentin" inserts the Quentin line as the 2nd line (day >= 3)
+	-- Day 2 (ui-text.md §11.2; user request 2026-10-12): the first day shift that is followed by a night in the cart, so
+	-- Walt warns about it. Days 3+ are the call_day_after_<k> rows below (their old "day N" calls were folded into them).
 	day(
 		"call_day_2",
 		2,
@@ -161,68 +188,52 @@ const base = Table.new({
 			"Morning! Cheese came in. Folks love cheese.",
 			"Oh — keep an eye on your cash drawer.",
 			"Some folks have quick hands.",
-			"Stay close to the cart."
+			"And tonight? You work late. Same cart.",
+			"I'll ring when the sun goes down."
 		)
 	),
-	day("call_day_3", 3, nil, lines("Bacon day! Smell that?", "That's the smell of money.", "You're doing great, Rookie. Really.")),
-	day(
-		"call_day_3_quentin",
-		3,
-		"quentin",
-		lines("Bacon day! Smell that?", QUENTIN, "That's the smell of money.", "You're doing great, Rookie. Really.")
-	),
-	day(
-		"call_day_4",
-		4,
-		nil,
+	-- the day after night k (ui-text.md §11.3). Day 3 (after N1) carries the old "bacon" call and Day 4 (after N2) the
+	-- "potato sticks" one, each with its quentin variant (the old call_day_3/call_day_4, which could never ring any more).
+	dayAfter(
+		1,
 		lines(
-			"New stuff: potato sticks. Kids love 'em.",
-			"Bigger grill on the Mart's back wall.",
-			"See that old trailer in the lot?",
-			"Not yet. Heh."
+			"Morning! You made it.",
+			"Told you nights were quiet.",
+			"Bacon's in today. Smell that?",
+			"Grill's hot. Go sell some dogs."
 		)
 	),
-	day(
-		"call_day_4_quentin",
-		4,
-		"quentin",
+	dayAfter(
+		1,
 		lines(
-			"New stuff: potato sticks. Kids love 'em.",
+			"Morning! You made it.",
 			QUENTIN,
-			"Bigger grill on the Mart's back wall.",
-			"See that old trailer in the lot?",
-			"Not yet. Heh."
+			"Told you nights were quiet.",
+			"Bacon's in today. Smell that?",
+			"Grill's hot. Go sell some dogs."
+		),
+		"quentin"
+	),
+	dayAfter(
+		2,
+		lines(
+			"Morning, Rookie. Sleep okay?",
+			"Good. Don't think about it too hard.",
+			"New stuff: potato sticks. Kids love 'em.",
+			"Bigger grill on the Mart's back wall."
 		)
 	),
-	day(
-		"call_day_5",
-		5,
-		nil,
+	dayAfter(
+		2,
 		lines(
-			"Big day, Rookie. See that old trailer?",
-			"It's for sale. Buy it with the shop money.",
-			"Don't ask how that works. Just trust me.",
-			"She's been waiting for the right person.",
-			"A long time."
-		)
-	),
-	day(
-		"call_day_5_quentin",
-		5,
-		"quentin",
-		lines(
-			"Big day, Rookie. See that old trailer?",
+			"Morning, Rookie. Sleep okay?",
 			QUENTIN,
-			"It's for sale. Buy it with the shop money.",
-			"Don't ask how that works. Just trust me.",
-			"She's been waiting for the right person.",
-			"A long time."
-		)
+			"Good. Don't think about it too hard.",
+			"New stuff: potato sticks. Kids love 'em.",
+			"Bigger grill on the Mart's back wall."
+		),
+		"quentin"
 	),
-
-	-- the day after night k (ui-text.md §11.3)
-	dayAfter(1, lines("Morning! You made it.", "Told you nights were quiet.", "Grill's hot. Go sell some dogs.")),
-	dayAfter(2, lines("Morning, Rookie. Sleep okay?", "Good. Don't think about it too hard.")),
 	dayAfter(3, lines("Bank clock's ticking fine today. See?", "Nice and normal. Sell some dogs.")),
 	dayAfter(4, lines("Just one Mr. Pickett today, I hope. Heh.", "...That was a joke. Mostly.")),
 	dayAfter(5, lines("She liked you. The lady. I can tell.", "Forget I said that. Grill's waiting.")),
@@ -248,21 +259,56 @@ const base = Table.new({
 	infinite(5, "Nice and normal. Just how I like it."),
 	infinite(6, "Ketchup, mustard, a smile. That's the job."),
 
-	-- trailer bought (ui-text.md §11.5): in the Call of Night 1, before call_night_1 (Priority 4 > 3)
+	-- trailer offer (user request 2026-10-12, Provisional): the morning after Night OfferAfterNight, right after the
+	-- day's own call. Line 2 turns the party's camera to the FOR SALE sign, line 3 hands over the money (only what is
+	-- missing, once per run). Why the trailer helps, without spoilers: the window that shuts, the light the late crowd
+	-- respects, the Mart sign that never goes out. No numbers in the voice: the price depends on the party (DEC-047);
+	-- the toast says it. TTS-friendly: short lines, "..." for the pause, no "sausage".
+	{
+		Key = "call_trailer_offer",
+		Lines = lines(
+			"One more thing, Rookie. The old trailer.",
+			"See that sign? FOR SALE. Go take a look.",
+			"Here. The money's from Walt's own till.",
+			"She's got a service window. It shuts tight.",
+			"Her lights reach far. Folks respect a light.",
+			"And the Mart's sign never goes out. Remember that.",
+			"You'll be safer in there... mostly.",
+			"Walk up to the sign. Buy her."
+		),
+		Trigger = { Kind = "TrailerOffer", Night = Trailer.OfferAfterNight },
+		Priority = 2,
+		Once = true,
+		Cues = { { Line = 2, Kind = "TrailerFocus" }, { Line = 3, Kind = "TrailerCash" } },
+	},
+
+	-- trailer bought (ui-text.md §11.5; user request 2026-10-12, Provisional): rings right after the purchase on the
+	-- phone of the cart. The night was already explained on Night 1, so this one only says what the trailer is for.
+	-- Priority 4 > any night call: if it could not ring before, it plays first in the Call of the first night in it.
 	{
 		Key = "call_trailer_bought",
 		Lines = lines(
 			"You bought the old girl! Heh.",
-			"She looks good on that corner.",
-			"The cart gets a rest now.",
-			"Listen... I need someone on nights.",
-			"Can you cover the night shift? Tonight?",
-			"There are a few... house rules.",
-			"Nothing big. I'll tell you as we go."
+			"The cart gets a rest. She takes the corner.",
+			"Close her window when things get strange.",
+			"Keep her light on. That's half the job.",
+			"Welcome to the real shop, Rookie."
 		),
 		Trigger = { Kind = "TrailerBought" },
 		Priority = 4,
 		Once = true,
+	},
+
+	-- Night 1 coffee (user request 2026-10-11, Provisional): the night starts at 50 sanity (Sanity.FirstNightStart) and Walt
+	-- sends the rookie to the coffee machine right after the rules call. Short, TTS-friendly ("..." for the pauses, no
+	-- numbers, no sausage). Line 1 starts the HUD emphasis (CoffeeHint). Not Once: a repeated Night 1 starts at 50 again.
+	{
+		Key = "call_night_1_coffee",
+		Lines = lines("You sound tired, Rookie...", "Have some coffee.", "It'll keep your head on straight."),
+		Trigger = { Kind = "NightCoffee", Night = 1 },
+		Priority = 2,
+		Once = false,
+		Cues = { { Line = 1, Kind = "CoffeeHint" } },
 	},
 
 	-- nights (ui-text.md §11.6); the last line is the short form of the rule. Short = what follows the NightRepeat
@@ -270,9 +316,9 @@ const base = Table.new({
 	nightCall(
 		1,
 		lines(
-			"Evening, Rookie. First night.",
-			"Nights are... quieter.",
-			"Some customers might look a little off.",
+			"Evening, Rookie. Your first night shift.",
+			"Same cart. Same grill. Different customers.",
+			"Some of them might look a little off.",
 			"If someone walks up with no face —",
 			"no eyes, no mouth — don't serve them.",
 			"Just refuse. They'll wander off.",
@@ -299,13 +345,13 @@ const base = Table.new({
 		lines(
 			"Evening. Can you see the bank clock?",
 			"Keep an eye on it. And an ear. It ticks.",
-			"If it stops, flip the trailer lights off.",
-			"Count to five. Then back on.",
+			"If it stops, the trailer's lights fix it.",
+			"Lights off. Count to five. Then back on.",
 			"That gets it going again.",
-			"Don't leave it stuck. Trust me on this.",
-			"Clock stops? Lights off, count five, lights on."
+			"No trailer yet? Then the clock behaves. Heh.",
+			"Clock stops? Trailer lights off, count five, on."
 		),
-		lines("Clock stops? Lights off, count five, lights on.")
+		lines("Clock stops? Trailer lights off, count five, on.")
 	),
 	nightCall(
 		4,
@@ -353,7 +399,7 @@ const base = Table.new({
 		lines(
 			"Rookie. Listen close. This one matters most.",
 			"Down Juniper Street, someone walks",
-			"toward the trailer.",
+			"toward your stand.",
 			"Every time you look at them,",
 			"they get closer.",
 			"Whatever you do,",
@@ -371,29 +417,31 @@ const base = Table.new({
 			"Evening. You're doing better than I ever did.",
 			"If a long car parks across the street",
 			"with its lights on you —",
-			"close the service window. Stay inside.",
-			"Don't open it till you hear it drive away.",
-			"Can't serve with it shut. Folks will wait.",
+			"get out of its sight.",
+			"In the trailer? Close the window. Stay inside.",
+			"On the cart? Walk to the Mart. Wait there.",
+			"Don't come back till it drives away.",
 			"Regular cars never stop there. That one does.",
 			WALKER,
-			"Long car? Close the window. Keep it shut."
+			"Long car? Window shut, or off to the Mart."
 		),
-		lines("Long car? Close the window. Keep it shut.", WALKER)
+		lines("Long car? Window shut, or off to the Mart.", WALKER)
 	),
 	nightCall(
 		9,
 		lines(
 			"One more thing. This is important.",
-			"I never come to the trailer at night. Never.",
-			"If someone knocks on the back door",
-			"and says it's me —",
-			"it isn't. Close the window. Stay inside.",
-			"Keep it shut till the knocking stops.",
+			"I never come to your corner at night. Never.",
+			"If someone knocks and says it's me —",
+			"it isn't.",
+			"In the trailer? Close the window. Stay inside.",
+			"On the cart? Walk to the Mart. Wait there.",
+			"Keep away till the knocking stops.",
 			"...I'm sorry I didn't tell you sooner.",
 			WALKER,
-			"Knocking? It's not me. Close the window."
+			"Knocking? It's not me. Window shut, or off to the Mart."
 		),
-		lines("Knocking? It's not me. Close the window.", WALKER)
+		lines("Knocking? It's not me. Window shut, or off to the Mart.", WALKER)
 	),
 	nightCall(
 		10,
@@ -403,7 +451,7 @@ const base = Table.new({
 			"Tonight the street might go dark.",
 			"Lamp by lamp.",
 			"When the lamps start going out,",
-			"leave the trailer.",
+			"leave your post.",
 			"Go to the Mart. Stand under the OPEN sign.",
 			"It never goes out.",
 			"Come back when the lamps come back.",

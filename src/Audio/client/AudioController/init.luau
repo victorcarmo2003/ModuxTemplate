@@ -55,6 +55,7 @@ local Zones = require(ReplicatedStorage.shared.Light.Zones)
 local Bed = require(script.Bed)
 local Cues = require(script.Cues)
 local LoadQueue = require(script.LoadQueue)
+local Stats = require(script.Stats)
 
 const RULES = Content.SoundRules
 const GROUPS = { "Music", "Ambient", "Sfx", "Voice", "Ui" }
@@ -270,6 +271,7 @@ function AudioController:Take(row: Content.Sound): Sound
 	if idle and #idle > 0 then
 		return table.remove(idle) :: Sound
 	end
+	Stats.Mark("new")
 	const sound = Instance.new("Sound")
 	sound.Name = row.Key
 	sound.SoundId = row.Id
@@ -406,6 +408,7 @@ function AudioController:Start(row: Content.Sound, at: At?, opts: PlayOptions?, 
 			end)
 		end)
 	)
+	Stats.Mark("play")
 	sound:Play()
 	return sound
 end
@@ -544,6 +547,7 @@ function AudioController:SetMusic(cueKey: string?)
 	if row == nil then
 		return
 	end
+	Stats.Mark("new")
 	const sound = Instance.new("Sound")
 	sound.Name = `Music_{cue.Key}`
 	sound.SoundId = row.Id
@@ -583,6 +587,7 @@ function AudioController:PlayShiftTrack(isNight: boolean, fadeIn: number?)
 	if row == nil then
 		return
 	end
+	Stats.Mark("new")
 	const sound = Instance.new("Sound")
 	sound.Name = `Shift_{key}`
 	sound.SoundId = row.Id
@@ -762,6 +767,15 @@ function AudioController:Preload()
 	end
 end
 
+-- `/dev audio` (dev mode only; DevService/Commands/Audio.luau): live audio instances, pool, plays and LoadQueue
+function AudioController:DevReport()
+	local pooled = 0
+	for _, idle in self.Idle do
+		pooled += #idle
+	end
+	print(Stats.Report(pooled, #self.Voices))
+end
+
 function AudioController:SetDucked(record: { State: string }?)
 	const ducked = record ~= nil and record.State == TALKING
 	if self.Ducked() ~= ducked then
@@ -772,6 +786,11 @@ end
 AudioController:OnInit(function(self)
 	self:Setup()
 	self:BuildGroups()
+
+	-- dev-only (the server fires it from `/dev audio` in dev mode; never otherwise)
+	self.Libs.Net.DevAudio:onClient(function(_data)
+		self:DevReport()
+	end)
 
 	-- network.md §13.3: AudioController reads Call for the ducking only
 	const call = self.Libs.Net.Call

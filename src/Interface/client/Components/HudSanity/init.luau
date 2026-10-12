@@ -9,6 +9,8 @@
 -- The owner hides it with `Shown` (Max > 0 and own state Active). Status only: nothing clickable (FEAT-032).
 -- Cartoon pass (AST-091 "Barra de sanidade"): portrait in a thick band ring with an Ink outline, the bar is an Ink
 -- CartoonPanel track with a glossy two-tone fill, the number with a heavy Ink stroke.
+-- Coffee lesson (user request 2026-10-11, Provisional): `Emphasis` makes a Mustard ring breathe around the bar (Night 1,
+-- until the first coffee); `Gain` = a coffee gave N: a Green flash over the bar, a Green ring and a floating "+N".
 -- Pure: only props.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -29,6 +31,9 @@ const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }
 
 export type Band = "Day" | "Mid" | "Night"
 
+-- A new table (new Id) = a new gain to play
+export type Gain = { Amount: number, Id: number }
+
 export type Props = {
 	Value: () -> number,
 	Max: () -> number,
@@ -44,6 +49,10 @@ export type Props = {
 	Name: string?,
 	AnchorPoint: Vector2?,
 	Position: UDim2?,
+	-- Breathing Mustard ring around the bar while true (Night 1 coffee lesson).
+	Emphasis: (() -> boolean)?,
+	-- Last coffee gain; each new value flashes the bar green and floats "+Amount".
+	Gain: (() -> Gain?)?,
 }
 
 const FULL = Color3.fromHex("#FFD45A")
@@ -62,6 +71,11 @@ const SIDES = PORTRAIT + GAP * 2 + VALUE_WIDTH
 const PULSE_BELOW = 25
 const PULSE_HZ = 0.5
 const PULSE_DEPTH = 0.35
+const HINT_HZ = 1.2 -- breathing of the emphasis ring
+const HINT_RING = 4 -- px the ring sits outside the bar
+const GAIN_TIME = 1.6 -- s of the green flash and the floating number
+const GAIN_COLOR = Color3.fromHex("#7BE08A")
+const GAIN_RISE = 16 -- px the "+N" drifts down while it fades
 
 const RING: { [Band]: Color3 } = {
 	Day = FULL,
@@ -170,6 +184,45 @@ return function(props: Props): Frame
 		end)
 	end)
 
+	-- Emphasis ring: breathes while the owner says so and the meter is shown.
+	const hint = source(0)
+	effect(function()
+		const on = props.Emphasis ~= nil and props.Emphasis() and props.Shown() and props.Max() > 0
+		if not on then
+			if untrack(hint) ~= 0 then
+				hint(0)
+			end
+			return
+		end
+		const connection = RunService.Heartbeat:Connect(function()
+			hint((math.sin(os.clock() * 2 * math.pi * HINT_HZ) + 1) / 2)
+		end)
+		cleanup(function()
+			connection:Disconnect()
+		end)
+	end)
+
+	-- Gain flash: progress 0..1 of the last gain (1 = idle), the amount shown by the label.
+	const gain = source(1)
+	const gainAmount = source(0)
+	effect(function()
+		const event = if props.Gain then props.Gain() else nil
+		if event == nil then
+			return
+		end
+		const started = os.clock()
+		untrack(function()
+			gainAmount(event.Amount)
+			gain(0)
+		end)
+		const connection = RunService.Heartbeat:Connect(function()
+			gain(math.clamp((os.clock() - started) / GAIN_TIME, 0, 1))
+		end)
+		cleanup(function()
+			connection:Disconnect()
+		end)
+	end)
+
 	return create("Frame")({
 		Name = props.Name or "HudSanity",
 		AnchorPoint = props.AnchorPoint or Vector2.new(0.5, 0),
@@ -227,6 +280,66 @@ return function(props: Props): Frame
 					}),
 				}),
 			},
+		}),
+
+		-- Ring of the coffee lesson (Mustard, breathing) and of the gain (Green, fading)
+		create("Frame")({
+			Name = "HintRing",
+			AnchorPoint = Vector2.new(0, 0.5),
+			Position = UDim2.new(0, PORTRAIT + GAP - HINT_RING, 0.5, 0),
+			Size = UDim2.new(1, -SIDES + HINT_RING * 2, 0, BAR_HEIGHT + HINT_RING * 2),
+			BackgroundTransparency = 1,
+			Visible = function()
+				return hint() > 0
+			end,
+			create("UICorner")({ CornerRadius = Theme.Radius.Pill }),
+			createRaw("UIStroke")({
+				Color = Theme.Color.Mustard,
+				Thickness = 3,
+				Transparency = function()
+					return 0.55 - 0.55 * hint()
+				end,
+			}),
+		}),
+		create("Frame")({
+			Name = "GainFlash",
+			AnchorPoint = Vector2.new(0, 0.5),
+			Position = UDim2.new(0, PORTRAIT + GAP - HINT_RING, 0.5, 0),
+			Size = UDim2.new(1, -SIDES + HINT_RING * 2, 0, BAR_HEIGHT + HINT_RING * 2),
+			BackgroundColor3 = GAIN_COLOR,
+			BackgroundTransparency = function()
+				return 0.45 + 0.55 * gain()
+			end,
+			Visible = function()
+				return gain() < 1
+			end,
+			create("UICorner")({ CornerRadius = Theme.Radius.Pill }),
+			createRaw("UIStroke")({
+				Color = GAIN_COLOR,
+				Thickness = 3,
+				Transparency = function()
+					return gain() * gain()
+				end,
+			}),
+		}),
+		CartoonLabel({
+			Name = "GainNumber",
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = function()
+				return UDim2.new(0.5, 0, 1, 2 + GAIN_RISE * gain())
+			end,
+			TextSize = 22,
+			Color = GAIN_COLOR,
+			Text = function()
+				return `+{gainAmount()}`
+			end,
+			Transparency = function()
+				return math.clamp((gain() - 0.55) / 0.45, 0, 1)
+			end,
+			Visible = function()
+				return gain() < 1
+			end,
+			ZIndex = 5,
 		}),
 
 		CartoonLabel({

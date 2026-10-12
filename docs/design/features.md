@@ -183,7 +183,11 @@ Spawn do atrasado (proposta, **Q-112 c, d**; alinhado com a sugestão do narrati
 - Status: Rascunho · Pilares: PROGREDIR, DESCOBRIR · Origem: **[DEC-024, DEC-028, DEC-035, DEC-036, DEC-037, DEC-053, DEC-057, DEC-058, DEC-060, DEC-065, DEC-067, DEC-080, DEC-110, DEC-112, DEC-119, DEC-127]**
 - Resumo: a run é uma sequência de turnos controlada pelo servidor, definida pela tabela `RunConfig` (cenário L).
 
-Estados:
+**NOVO FLUXO (pedido do dono 2026-10-12, PROVISÓRIO, Q-207; vale sobre o texto abaixo):** D1 (tutorial, só dia) → D2 → N1 → D3 → N2 → … → D11 → N10 → Finale.
+Todo dia a partir do Day 2 é seguido da noite no **carrinho**; o trailer é opcional (FEAT-016) e a noite *k* é jogada no Day *k* + 1. `RunParams.NightsFromDay = 2`.
+Não existe modo dia infinito (FEAT-017 removido). Estados antigos, mantidos como histórico:
+
+Estados (HISTÓRICO, substituído pelo bloco acima):
 
 ```
 RunStart → Intro (FEAT-004) → Day(1) → Day(2) … → Day(n)
@@ -202,15 +206,17 @@ Snapshot de turno **[DEC-080]**: tirado no início da Preparação de **todo** t
 
 | Parâmetro `RunConfig` (cenário L) | Valor | Origem |
 |---|---|---|
-| Dia de liberação do trailer | 5 | DEC-037 |
+| Dia de liberação do trailer | ~~5~~ depois da noite 2 (`Content.Trailer.OfferAfterNight`; Provisório 2026-10-12) | DEC-037 (emendado, Q-207) |
+| Primeiro dia seguido de noite | 2 (`RunParams.NightsFromDay`; Provisório 2026-10-12) | pedido do dono |
 | Noites | 10 | DEC-027, DEC-060 |
-| Duração da noite N (min reais) | 20, 21, 22, 23, 24, 26, 27, 28, 29, 30 (crescente) | DEC-127 |
+| Duração da noite N (min reais) | ~~20 … 30~~ **9, 9,7, 10,3, 11, 11,7, 12,3, 13, 13,7, 14,3, 15** (540 s + 40 s por noite; Provisório 2026-10-12) | DEC-127 (números emendados, Q-207) |
 | Chances do chefe | **1 por run inteira** | DEC-110, DEC-112 (emenda DEC-057) |
 | Dinheiro inicial | $30 | DEC-045 |
 | Estoque inicial | cheio (capacidade nível 1) | DEC-049 |
 | Alternância após trailer | dia, noite, dia, noite… | DEC-036 |
 
-Duração estimada da run completa: 1 min de intro + 14 dias × 7,5 min + 10 noites (250 min + ~2,5 min de Preparação/ligação/resumo cada) + final ~3 min ≈ **384 min (~6,4 h)**. Detalhe em `progression.md` §2.
+Duração estimada da run completa no fluxo novo: ~2 min de intro + 11 dias × 4,6 min + 10 noites (120 min + ~2,9 min de ligação/preparação/resumo cada) + final ~2,5 min ≈ **204 min (~3,4 h)**; `progression.md` §0.
+Estimativa antiga (histórico): 1 min de intro + 14 dias × 7,5 min + 10 noites (250 min + ~2,5 min de Preparação/ligação/resumo cada) + final ~3 min ≈ **384 min (~6,4 h)**. Detalhe em `progression.md` §2.
 
 - Party: estado da run é da party **[DEC-059]**; sanidade, Tools e classe são por jogador **[DEC-056, DEC-069]**.
 - Critérios de aceite:
@@ -226,14 +232,14 @@ Duração estimada da run completa: 1 min de intro + 14 dias × 7,5 min + 10 noi
 - Status: Rascunho · Pilares: GERENCIAR, OBSERVAR · Origem: **[DEC-048, DEC-024, DEC-036]**
 - Resumo: relógio de jogo no servidor; o turno termina pelo relógio.
 
-Turno de dia **[DEC-048]**:
+Turno de dia **[DEC-048]** (durações encurtadas por feedback de playtest 2026-10-11, **Provisório, Q-200**: turno ≈ 4,6 min, era 7,7; valores só em `Content.Shift`, sem número de dia):
 
 | Fase | Relógio | Tempo real | O que acontece |
 |---|---|---|---|
-| Preparação | 7:00 → 8:00 AM | até 60 s | sem clientes nem ladrão; mercado aberto; upgrades; ligação do dia (FEAT-018). Prompt "Open Shop" na placa (qualquer jogador) abre antes |
-| Loja aberta | 8:00 AM → 6:00 PM | 360 s (1 h = 36 s) | clientes, ladrão |
-| Fechamento | 6:00 PM | até 30 s | placa "CLOSED"; não nasce cliente; fila do balcão ainda é atendida; termina quando o balcão esvazia ou em 30 s |
-| Resumo | — | 15 s | tela de turno (FEAT-014) |
+| Preparação | 7:00 → 8:00 AM | até 30 s | sem clientes nem ladrão; mercado aberto; upgrades; ligação do dia (FEAT-018). Prompt "Open Shop" na placa (qualquer jogador) abre antes |
+| Loja aberta | 8:00 AM → 6:00 PM | 216 s (1 h = 21,6 s) | clientes, ladrão |
+| Fechamento | 6:00 PM | até 20 s | placa "CLOSED"; não nasce cliente; fila do balcão ainda é atendida; termina quando o balcão esvazia ou em 20 s |
+| Resumo | — | 8 s | tela de turno (FEAT-014) |
 
 Turno de noite (proposta; duração D_N de `RunConfig`):
 
@@ -427,6 +433,8 @@ Fora da D-04, mesma regra (chaves aceitas e criadas em `Notices` pela TASK-047):
 
 ### FEAT-007 — Estoque e Restock
 
+> Pacote grátis do dia de liberação (DEC-071, 2026-10-11, Provisório): todo dia que começa (fluxo normal, `/dev day`, Conch `day`, retomada) põe no mundo o pacote de **todo** ingrediente com `1 < UnlockDay <= dia` ainda não dado na run (inclui dias pulados; uma vez cada, flag `Given` no snapshot `Fp`). Pegar com a hotbar/limite de pacotes **cheios** não bloqueia: o pacote vai **direto para o estoque** do ingrediente (bandeja, até a capacidade) com o toast "New: {item} (stocked)" (`ingredient_stocked`). Com espaço na mão: o pacote vai para a mão (comportamento anterior), o estoque enche no Restock normal.
+
 - Status: Rascunho · Pilares: GERENCIAR · Origem: **[DEC-017, DEC-031, DEC-049, DEC-071]**
 - Resumo: cada ingrediente tem estoque na estação, com capacidade pelo nível do Cooler (UPG-002). Estação consome; Restock enche com pacote do mercado.
 
@@ -554,7 +562,7 @@ Party e reconexão (proposta para **Q-067**): o multiplicador de party usa os jo
 - Critérios de aceite (método: contador de tentativas do `CustomerService` por resultado, lido por log/comando de dev;
   turno real ou relógio acelerado pelo dev, a fórmula é a mesma):
   - Nunca há mais de 12 NPCs de servidor vivos.
-  - Solo, Day 1, conta-se **tentativas** (não nascidos): cada um de 5 turnos de `Open` (360 s ÷ 22 s) tem **14–18**
+  - Solo, Day 1, conta-se **tentativas** (não nascidos): cada um de 5 turnos de `Open` (216 s ÷ 14 s ≈ 15, Q-200) tem **12–17**
     tentativas. Para medir nascidos = tentativas, o testador mantém o balcão com vaga (Refuse ou serve rápido);
     nesse caso `SkippedFull = 0` e nascidos = tentativas.
   - Com o balcão cheio, a tentativa sai como `SkippedFull`, nenhum cliente nasce e o relógio rearma (o pulado não vira
@@ -688,7 +696,7 @@ Nota **[DEC-051]**: satisfeitos = completos ÷ clientes que chegaram ao balcão 
 | C | ≥ 50% | 0% | +5% |
 | D | < 50% | 0% e ligação/fala do chefe (FEAT-018) | 0% |
 
-Tela de resumo (15 s dia / 20 s noite; não bloqueia, some sozinha):
+Tela de resumo (8 s dia / 10 s noite, Q-200; não bloqueia, some sozinha):
 
 | Linha | Exemplo |
 |---|---|
@@ -817,7 +825,11 @@ Comparação (orçamento do client, por quadro, com o jogador dentro do Mart):
 
 - Critérios de aceite: os de `proposals-round-1.md` Q-032, mais: depois da troca, os níveis de upgrade e o estoque são idênticos aos do fim do turno.
 
-### FEAT-017 — Modo dia infinito
+### FEAT-017 — Modo dia infinito — **REMOVIDO em 2026-10-12 (Provisório, Q-207)**
+
+> Com o fluxo novo as noites começam no carrinho: não comprar o trailer **não** gera dias sem noite. `RoundService` não liga mais o `Endless`,
+> `RunParams.EndlessFromDay` e `EndlessRequiresNoTrailer` ficam sem uso e o contador "Day 100" (DEC-084, FEAT-031) não anda. O texto abaixo é histórico;
+> o que sobra do FEAT-017 é só o lembrete "trailer à venda" (agora contado em noites, `Vehicles.trailer.Reminder.FirstNight/Every`).
 
 - Status: Rascunho · Pilares: PROGREDIR · Origem: **[DEC-028, DEC-058, DEC-070]**
 
@@ -1610,9 +1622,17 @@ NPCs** e de 8/6 clientes vivos (DEC-045), todo pagamento cai na **gaveta** (DEC-
 
 ### FEAT-037 — Mesas do Pad / área de consumo
 
-- Status: Rascunho (Provisório) · Pilares: VENDER, GERENCIAR, PROGREDIR · Origem: pedido do usuário 2026-10-11; **[DEC-006, DEC-045, DEC-050, DEC-051, DEC-052, DEC-082, DEC-183, DEC-195]**; fichas UPG-008, UPG-009, UPG-010
+- Status: Rascunho (Provisório) · Pilares: VENDER, GERENCIAR, PROGREDIR · **Atualização 2026-10-12 (`Q-209`):** as mesas têm **grupos** — Pad (`TBL-1..5`, UPG-008) e Trailer (`TBL-6..9`, UPG-011, só com o trailer, invisíveis até lá, uma por vez como fantasma); uma party nunca mistura grupos · Origem: pedido do usuário 2026-10-11; **[DEC-006, DEC-045, DEC-050, DEC-051, DEC-052, DEC-082, DEC-183, DEC-195]**; fichas UPG-008, UPG-009, UPG-010
+- **Fluxo com mesa (2026-10-12, pedido do dono, Provisório, `Q-209`):** o cliente pede, o jogador faz **Take Order** e o
+  cliente **senta na mesa** (mesa livre do veículo ativo; sem mesa fica no balcão como antes). O jogador **leva o hot
+  dog até a mesa** e usa **"Serve Table n: <pedido>"** (ação `serve_table`; o texto e a etiqueta "TABLE n" dizem qual
+  item vai para qual cliente; o menu de interação mostra uma linha por mesa). Entrega = regras do balcão (Completo /
+  Incompleto / Errado; dupla com 2 hot dogs). A paciência do preparo segue contando sentado; servido bem, ele come e
+  deixa bandeja + gorjeta de mesa; errado / paciência / tensão / fim de turno: levanta sem comer. A "chance de sentar"
+  da tabela abaixo **não vale mais** (mesa livre = senta; `SitChanceApplies`); as linhas "Quem pode sentar" /
+  "Condições" valem no **Take Order** em vez de depois da entrega.
 - Resumo: a party compra até **5 mesas** no Pad, uma por vez, na própria mesa "fantasma". Cliente que recebeu pedido
-  **Completo** pode sentar para comer em vez de ir embora. Ao levantar, deixa **bandeja + $2 de gorjeta de mesa** em
+  **Completo** pode sentar para comer em vez de ir embora (**histórico**, ver o fluxo acima). Ao levantar, deixa **bandeja + $2 de gorjeta de mesa** em
   cima da mesa. A mesa fica **suja** (ninguém senta) até um jogador fazer "Clean Table": a gorjeta vai para a gaveta e
   a mesa volta a receber cliente. É um trabalho **opcional**: ignorar as mesas nunca piora a nota nem o fluxo; cuidar
   delas rende dinheiro, mas tira o jogador do balcão (de dia expõe a gaveta ao ladrão; à noite pode custar escuro).
@@ -1729,6 +1749,7 @@ Dados (proposta para o architect, TASK-144):
 | Paciência | fila 45 s + Counter (só o líder em Q1); preparo 75 + 5 × (K1 + K2) + Counter + **10 s** (`PatienceBonus`) **[Q-192, Provisório; K = soma]** |
 | Janela de gorjeta | 16 + 4 × (K1 + K2) s; **$1 por hot dog Completo** dentro da janela (Hawker $2 por hot dog; Shift Lead $0) |
 | Serve | cada Hot Dog é entregue sozinho; o servidor casa com o item pendente: **igual** → Completo; **subconjunto** → Incompleto do item com menos faltas; tem complemento que nenhum item pendente pede → **Errado** (volta para a mão) |
+| Entrega dos dois de uma vez (2026-10-11, Provisório) | se o hot dog na mão bate **exatamente** (Completo) com um item pendente **e** o outro hot dog da hotbar bate **exatamente** com o item que sobra, **uma só interação** ("Serve") recolhe os dois: cada item é pago, com gorjeta e resultado/`Sale` por conta própria (mesmas regras de duas entregas); o relógio de paciência do preparo cobre os dois. Só um bate (ou é Incompleto/Errado): entrega só aquele, como antes. Regra de `AddServeRule` (override) nunca entrega em dobro |
 | Pagamento | por hot dog, na hora, na gaveta (DEC-050) |
 | Ir embora | quando os 2 itens estão resolvidos. Paciência zerou: itens pendentes = Desistiu. "Refuse" recusa a dupla inteira |
 | Nota do turno | conta como **2 clientes** (um por hot dog) |

@@ -35,6 +35,7 @@ export type Wire = { Anomaly: string, Phase: Api.Phase, StartedAt: number, Step:
 
 export type Public = {
 	Context: Api.Context?,
+	DevHeld: boolean,
 	DevSerial: number,
 	Enabled: boolean,
 	Example: Api.Module?,
@@ -93,6 +94,12 @@ export type Public = {
 	DevCheck: (self: Public) -> (),
 	DevForce: (self: Public, anomaly: string, example: boolean) -> string,
 	DevStop: (self: Public) -> string,
+	DevHoldAgenda: (self: Public, on: boolean) -> (),
+	DevIsHeld: (self: Public) -> boolean,
+	DevRuns: (self: Public) -> { any },
+	DevOccurrence: (self: Public, anomaly: string) -> any,
+	DevStopKey: (self: Public, anomaly: string) -> number,
+	DevEmit: (self: Public, event: any) -> (),
 	DevStatus: (self: Public) -> string,
 	DevAgenda: (self: Public) -> string,
 }

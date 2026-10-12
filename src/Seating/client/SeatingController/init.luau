@@ -23,6 +23,16 @@
 	  - Diners (Meal.luau): rigs with the `Seated` attribute hold a hot dog that shrinks in 3 bites; npc_sit /
 	    npc_eat_seated play through AnimController when they have an Id.
 
+	Order at the table (Q-209, Provisional): a customer sits right after "Take Order" and waits (rig attribute `Seated`,
+	empty hands); the server table anchor carries "Serve Table n: <order>" (PromptController / interaction menu). Over an
+	Occupied table whose customer is Waiting this controller mounts the order label: a plate "TABLE n" with the topping
+	names in the tag and an OrderBubble with the topping icons (a pair: one row per hot dog), read from the Customers
+	set through CustomerController. It goes when the food is served (the customer is Leaving and eats; `Eating`
+	on the rig, Meal.luau) or the customer leaves.
+
+	Groups (Q-209): the Trailer tables (TBL-6..9) arrive Locked (hidden) until the trailer is the vehicle, then the next one
+	is a Ghost with a plate "Trailer Table $N"; a ghost the party cannot pay is drawn fainter (GhostDimTransparency).
+
 	Not here yet (TASK-147 rest): Patio Lights string (UPG-009) and Back Bar (UPG-010): no model nor binding yet
 	(TASK-149 / TASK-153). Listeners in OnInit (before Lync.start); tags and rigs are scanned in OnStart.
 ]]
@@ -35,6 +45,7 @@ local Content = require(ReplicatedStorage.shared.Content)
 local CrewRig = require(ReplicatedStorage.shared.Crew.CrewRig)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local TableSign = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.TableSign)
+local OrderBubble = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.OrderBubble)
 local Pop = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.DrawerValue.Pop)
 local Fx = require(StarterPlayer.StarterPlayerScripts.client.Kitchen.KitchenController.Fx)
 local Look = require(script.Look)
@@ -44,9 +55,11 @@ local Meal = require(script.Meal)
 const SEATING = Content.Seating
 const BINDING = SEATING.Binding
 const ECONOMY_ID = 1 -- single record (network.md §1 rule 5)
-const SIGN_TITLE = "Patio Table" -- ui-text.md (TASK-150), Provisional
+const SIGN_TITLE = "Patio Table" -- ui-text.md (TASK-150), Provisional (Pad group; the others use Group.Label)
 const SIGN_LIFT = 2.8 -- studs over the table top: clears the prompt pill (anchor at +0.6)
 const SIGN_DISTANCE = 45
+const ORDER_LIFT = 4.2 -- studs over the table top: the order bubble sits over the "TABLE n" plate (Q-209)
+const ORDER_DISTANCE = 60
 const POP_LIFT = 1.2 -- studs over the table top where the "+$N" starts
 const POP_WIDTH = 180
 const POP_HEIGHT = 130
@@ -72,13 +85,16 @@ type Spot = {
 	TrayAt: CFrame?, -- where the tray goes
 	Tray: Model?,
 	TrayTip: number, -- tip the tray was built with
+	Dim: boolean, -- ghost drawn fainter: for sale but the party cannot pay it yet (like the bench)
 	Unmount: (() -> ())?,
 	Gui: Instance?,
+	OrderUnmounts: { () -> () }, -- order label (plate + bubble) of a customer waiting at the table (Q-209)
+	OrderGuis: { Instance },
 }
 
 const SeatingController = Modux.Controller(
 	"SeatingController",
-	{ Require = { "RoundController", "AudioController", "AnimController" }, Priority = 680 }
+	{ Require = { "RoundController", "AudioController", "AnimController", "CustomerController" }, Priority = 680 }
 )
 
 function SeatingController:Setup()
@@ -127,8 +143,11 @@ function SeatingController:SpotOf(index: number): Spot
 		TrayAt = nil,
 		Tray = nil,
 		TrayTip = 0,
+		Dim = false,
 		Unmount = nil,
 		Gui = nil,
+		OrderUnmounts = {},
+		OrderGuis = {},
 	}
 	self.Spots[index] = spot
 	return spot
@@ -229,6 +248,7 @@ function SeatingController:Bind(spot: Spot, model: Model)
 	attachment.Parent = workspace.Terrain
 	spot.Top = attachment
 	self:MountSign(spot)
+	self:MountOrder(spot)
 	self:Apply(spot)
 end
 
@@ -247,6 +267,7 @@ function SeatingController:Unbind(spot: Spot)
 		spot.Gui:Destroy()
 		spot.Gui = nil
 	end
+	self:UnmountOrder(spot)
 	if spot.Top then
 		spot.Top:Destroy()
 		spot.Top = nil
@@ -328,7 +349,9 @@ function SeatingController:Apply(spot: Spot)
 		then "Hidden"
 		elseif record.State == "Ghost" then "Ghost"
 		else "Solid"
-	Look.Apply(saved, mode, SEATING.GhostTransparency)
+	const dim = record.State == "Ghost" and record.Price > 0 and not self:CanPayNow(record.Price)
+	spot.Dim = dim
+	Look.Apply(saved, mode, if dim then SEATING.GhostDimTransparency else SEATING.GhostTransparency)
 	if record.State == "Dirty" then
 		self:ShowTray(spot, record.Tip)
 	else
@@ -361,6 +384,35 @@ function SeatingController:CanPay(price: number): boolean
 	return not self.CashReady() or self.Cash() >= price
 end
 
+-- Same, readable outside a reactive scope (Apply).
+function SeatingController:CanPayNow(price: number): boolean
+	return Vide.untrack(function(): boolean
+		return self:CanPay(price)
+	end)
+end
+
+-- The party cash changed: a ghost for sale turns faint / solid-ghost when the price crosses it.
+function SeatingController:RefreshDim()
+	for _, spot in self.Spots do
+		const record = Vide.untrack(spot.Record)
+		if record ~= false and record.State == "Ghost" and record.Price > 0 then
+			if spot.Dim == self:CanPayNow(record.Price) then
+				self:Apply(spot)
+			end
+		end
+	end
+end
+
+-- Plate title of a table: its group's label (Pad keeps "Patio Table").
+local function titleOf(index: number): string
+	for _, group in SEATING.Groups do
+		if index >= group.First and index < group.First + group.Count then
+			return if group.Key == "Pad" then SIGN_TITLE else group.Label
+		end
+	end
+	return SIGN_TITLE
+end
+
 -- Price plate of the table (mounted once per bound table; shown only on the next one for sale).
 function SeatingController:MountSign(spot: Spot)
 	const gui = self.Gui
@@ -383,7 +435,7 @@ function SeatingController:MountSign(spot: Spot)
 				return if self:CanPay(price()) then "Buy" else "NoCash"
 			end,
 			Title = function()
-				return SIGN_TITLE
+				return titleOf(spot.Index)
 			end,
 			Price = function()
 				return `${price()}`
@@ -395,6 +447,117 @@ function SeatingController:MountSign(spot: Spot)
 	billboard.Parent = gui
 	spot.Unmount = unmount
 	spot.Gui = billboard
+end
+
+-- NpcId of the customer waiting at the table (reactive), or nil: the table is Occupied and its first diner (the leader
+-- of the order) is Waiting for its food (Q-209).
+function SeatingController:WaitingAt(spot: Spot): number?
+	const record = spot.Record()
+	if record == false or record.State ~= "Occupied" or record.Npc1 == 0 then
+		return nil
+	end
+	const customer = self.Dependencies.CustomerController:RecordOf(record.Npc1)
+	if customer == nil or customer.State ~= "Waiting" then
+		return nil
+	end
+	return record.Npc1
+end
+
+-- "Ketchup + Cheese" (a pair: "Ketchup + Cheese | Mustard"): names of the pending hot dogs of the order.
+local function orderNames(rows: { { OrderBubble.Topping } }): string
+	const parts: { string } = {}
+	for _, row in rows do
+		const names: { string } = {}
+		for _, topping in row do
+			const ingredient = Content.Ingredients.ByKey[topping.Key]
+			table.insert(names, if ingredient then ingredient.Name else topping.Key)
+		end
+		table.insert(parts, if #names > 0 then table.concat(names, " + ") else "Plain")
+	end
+	return table.concat(parts, " | ")
+end
+
+-- Pending rows of the customer at the table: 1st hot dog, and the pair's 2nd one.
+function SeatingController:OrderRows(spot: Spot): { { OrderBubble.Topping } }
+	const id = self:WaitingAt(spot)
+	const rows: { { OrderBubble.Topping } } = {}
+	const controller = self.Dependencies.CustomerController
+	const customer = if id then controller:RecordOf(id) else nil
+	if customer == nil then
+		return rows
+	end
+	table.insert(rows, controller:ToppingsOf(customer))
+	if customer.Order2 ~= nil then
+		table.insert(rows, controller:ToppingsOfOrder(customer.Order2))
+	end
+	return rows
+end
+
+-- Order label over a table: plate "TABLE n" (tag = topping names) + bubble with the icons. Visible only while the
+-- customer of the table waits for its food (Q-209). Mounted with the table, once the gui exists.
+function SeatingController:MountOrder(spot: Spot)
+	const gui = self.Gui
+	const top = spot.Top
+	if gui == nil or top == nil or #spot.OrderUnmounts > 0 then
+		return
+	end
+	local function waiting(): boolean
+		return self:WaitingAt(spot) ~= nil
+	end
+	const unmountPlate, plate = Vide.root(function()
+		return TableSign({
+			Name = `TableOrder_{spot.Index}`,
+			Adornee = top,
+			Visible = waiting,
+			Mode = function(): TableSign.Mode
+				return "Buy"
+			end,
+			Title = function()
+				return `TABLE {spot.Index}`
+			end,
+			Price = function()
+				return orderNames(self:OrderRows(spot))
+			end,
+			Offset = Vector3.new(0, SIGN_LIFT, 0),
+			MaxDistance = SIGN_DISTANCE,
+		})
+	end)
+	plate.Parent = gui
+	table.insert(spot.OrderUnmounts, unmountPlate)
+	table.insert(spot.OrderGuis, plate)
+	const unmountBubble, bubble = Vide.root(function()
+		return OrderBubble({
+			Name = `TableOrderBubble_{spot.Index}`,
+			Adornee = top,
+			Visible = waiting,
+			Toppings = function()
+				return self:OrderRows(spot)[1] or {}
+			end,
+			Toppings2 = function()
+				return self:OrderRows(spot)[2]
+			end,
+			Patience = function()
+				return -1 -- the patience bar over the customer carries the clock
+			end,
+			Offset = Vector3.new(0, ORDER_LIFT, 0),
+			MaxDistance = ORDER_DISTANCE,
+			AlwaysOnTop = true,
+		})
+	end)
+	bubble.Parent = gui
+	table.insert(spot.OrderUnmounts, unmountBubble)
+	table.insert(spot.OrderGuis, bubble)
+end
+
+function SeatingController:UnmountOrder(spot: Spot)
+	for _, unmount in spot.OrderUnmounts do
+		unmount()
+	end
+	table.clear(spot.OrderUnmounts)
+	for _, gui in spot.OrderGuis do
+		gui:Destroy()
+	end
+	table.clear(spot.OrderGuis)
 end
 
 -- Ghost -> bought: confetti + SFX-065 on the table.
@@ -463,6 +626,7 @@ function SeatingController:Watch(gui: Instance)
 	-- signs of tables bound before the gui existed
 	for _, spot in self.Spots do
 		self:MountSign(spot)
+		self:MountOrder(spot)
 	end
 
 	CollectionService:GetInstanceAddedSignal(CrewRig.Tag):Connect(function(instance)
@@ -496,6 +660,7 @@ SeatingController:OnInit(function(self)
 				self.Cash(record.Cash)
 				self.CashReady(true)
 			end)
+			self:RefreshDim()
 		end
 	end
 	net.Economy:onAdded(applyCash)
@@ -503,6 +668,7 @@ SeatingController:OnInit(function(self)
 	net.Economy:onRemoved(function(id)
 		if id == ECONOMY_ID then
 			self.CashReady(false)
+			self:RefreshDim()
 		end
 	end)
 end)

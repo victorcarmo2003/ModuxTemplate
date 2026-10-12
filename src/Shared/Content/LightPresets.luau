@@ -155,27 +155,30 @@ const presets: LightPresets = {
 		SunRaysSpread = 0.1,
 	},
 	Lobby = {
-		Brightness = 1.2,
-		Ambient = Color3.fromRGB(95, 70, 55),
-		OutdoorAmbient = Color3.fromRGB(120, 90, 70),
-		ColorShiftTop = Color3.fromRGB(224, 162, 110), -- soft amber
-		ColorShiftBottom = Color3.fromRGB(48, 30, 22),
-		EnvDiffuse = 0.7,
-		EnvSpecular = 0.5,
-		ShadowSoftness = 0.3,
-		AtmDensity = 0.3, -- moderate: the ~60x60 lobby stays clear, the far edge goes soft
+		-- Warm pass 2 (owner 2026-10-12: "lobby too cold"; then "same look as the run, still night, warm with a hint of unease"). All PROVISIONAL (Q-208). Brightness and ambient
+		-- readable for 20-30 players, but moody: low warm-dark haze, deep plum shadows, amber pools of light against the dark; every blue/mauve tone moved to amber/peach/cream; shadows warm plum-brown (ColorShiftBottom).
+		-- Before: Brightness 1.2, Ambient (95,70,55), Outdoor (120,90,70), Atm (176,124,124)/(122,70,82), Sat 0.15.
+		Brightness = 1.6,
+		Ambient = Color3.fromRGB(112, 82, 66),
+		OutdoorAmbient = Color3.fromRGB(138, 102, 80),
+		ColorShiftTop = Color3.fromRGB(240, 170, 112), -- soft amber
+		ColorShiftBottom = Color3.fromRGB(52, 30, 30), -- warm plum-brown shadows (no blue)
+		EnvDiffuse = 0.8,
+		EnvSpecular = 0.6,
+		ShadowSoftness = 0.2,
+		AtmDensity = 0.32, -- moderate: the ~110x110 lobby stays clear, the far edge goes soft
 		AtmOffset = 0.5,
-		AtmGlare = 0.4,
-		AtmHaze = 1,
-		AtmColor = Color3.fromRGB(176, 124, 124), -- muted peach-mauve (not coral)
-		AtmDecay = Color3.fromRGB(122, 70, 82), -- warm purple
-		CCBrightness = 0.02,
-		Saturation = 0.15,
+		AtmGlare = 0.3,
+		AtmHaze = 1.4,
+		AtmColor = Color3.fromRGB(172, 116, 92), -- peach haze (not coral)
+		AtmDecay = Color3.fromRGB(120, 64, 56), -- warm amber-plum horizon
+		CCBrightness = 0.04,
+		Saturation = 0.18,
 		Contrast = 0.08,
-		Tint = Color3.fromRGB(255, 236, 215), -- cream-amber
-		BloomIntensity = 0.6, -- soft glow on the lobby neons
+		Tint = Color3.fromRGB(255, 226, 196), -- cream-amber
+		BloomIntensity = 0.8, -- soft amber glow on the lobby neons (Bloom has no colour: the warmth comes from Tint)
 		BloomSize = 28,
-		BloomThreshold = 1.4,
+		BloomThreshold = 1.2,
 		SunRays = 0,
 		SunRaysSpread = 0.1,
 	},

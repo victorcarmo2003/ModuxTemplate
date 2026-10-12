@@ -6,8 +6,11 @@
 -- The clock never pauses (DEC-085 a): a phase ends at PhaseStartedAt + Duration whoever is connected. Early ends:
 -- "Open Shop" (Prep), a phase probe (Intro, Call, Closing, Finale, Resume), LoseNight, dev commands. Every end goes
 -- through Advance, the same path as the timer.
--- Shift boundary (end of Summary), fixed order: BeforeShift(prev) -> Flow.Next -> RunStateService:SetEndless ->
+-- Shift boundary (end of Summary), fixed order: BeforeShift(prev) -> Flow.Next -> RunStateService:SetEndless(false) ->
 -- StartShift (atoms in one batch -> ShiftStarted -> PhaseChanged(first) -> Capture).
+-- Run flow (user request 2026-10-12, Provisional Q-207): D1 (tutorial, day only), D2, N1, D3, N2 ... D11, N10, Finale.
+-- Every night is played in the vehicle in use (the cart until the optional trailer is bought); the vehicle no longer
+-- decides whether a night comes, and endless days are gone (Flow.Next, RunParams.NightsFromDay).
 -- Lost night: NightLost (6 s) -> SpendChance -> Restore("RepeatNight") (Sh comes back with Attempt + 1 and a new
 -- capture) or RunEnd + RunEnded("Failed"). Night 10 won: NightEnd -> Finale -> RunEnd + RunEnded("Success").
 -- End of RunEnd: waves 2-3 go back to the first capture (RunStateService:ResetDev, T56) through the Resume phase;
@@ -83,6 +86,7 @@ const MAX_CLOCK = 2880 -- Shift.ClockFrom/To wire range
 const MAX_CHANCES = 9 -- Shift.Chances wire range
 const MAX_GEMS = 100000 -- RunReport.Gems wire range
 const LAST_NIGHT = math.min(Content.RunParams.Nights, #Content.Nights.List)
+const FIRST_NIGHT_DAY = Content.RunParams.NightsFromDay -- first day shift followed by a night shift
 const TICK_RATE = 10 -- Hz; phase ends at most 0.1 s late, the next phase starts at the exact deadline
 const LAST_CHANCE_STEP = "LastChanceUsed"
 
@@ -241,6 +245,7 @@ function RoundService:CurrentVehicle(): string
 	return Content.RunParams.StartVehicle
 end
 
+-- Kept for the type surface: every vehicle works nights now (the flow no longer reads it)
 function RoundService:VehicleHasNight(): boolean
 	return Content.Vehicles.ByKey[self:CurrentVehicle()].HasNight
 end
@@ -468,9 +473,8 @@ end
 function RoundService:Boundary(startedAt: number)
 	const prev = self:Info()
 	self.BeforeShift:Fire(prev)
-	const hasNight = self:VehicleHasNight()
-	const nextShift = Flow.Next(prev, hasNight, LAST_NIGHT, MAX_DAY)
-	self.Dependencies.RunStateService:SetEndless(Flow.Endless(nextShift, hasNight, Content.RunParams.EndlessFromDay))
+	const nextShift = Flow.Next(prev, LAST_NIGHT, MAX_DAY, FIRST_NIGHT_DAY)
+	self.Dependencies.RunStateService:SetEndless(false)
 	self:StartShift(nextShift, startedAt, true, false)
 end
 
@@ -720,7 +724,8 @@ function RoundService:DevSkipPhase()
 	self:Advance(workspace:GetServerTimeNow())
 end
 
--- Prep of Day n (keeps the nights already played)
+-- Prep of Day n. Nights played = the ones that come before that day in the natural sequence (Day d follows Night
+-- d - 2: D3 after N1, D4 after N2 ...), so /dev day 4 is the morning after Night 2 (trailer offer morning).
 function RoundService:DevSetDay(day: number)
 	self:DevCheck("DevSetDay")
 	if type(day) ~= "number" or day ~= math.floor(day) or day < 1 or day > MAX_DAY then
@@ -731,13 +736,14 @@ function RoundService:DevSetDay(day: number)
 	if day > 1 then
 		runState:FixPriceParty()
 	end
-	const info: ShiftInfo = { Day = day, Night = self.Night(), IsNight = false, Attempt = 0 }
-	const hasNight = self:VehicleHasNight()
-	runState:SetEndless(Flow.Endless(info, hasNight, Content.RunParams.EndlessFromDay))
+	const info: ShiftInfo =
+		{ Day = day, Night = Flow.NightsBefore(day, LAST_NIGHT, FIRST_NIGHT_DAY), IsNight = false, Attempt = 0 }
+	runState:SetEndless(false)
 	self:StartShift(info, workspace:GetServerTimeNow(), true, false)
 end
 
--- Night k on the current day, from its first phase (Call, skipped without BossService)
+-- Night k on its own day (Day = k + 1: the evening of the day shift before it), from its first phase (Call, skipped
+-- without BossService)
 function RoundService:DevSetNight(night: number)
 	self:DevCheck("DevSetNight")
 	if type(night) ~= "number" or night ~= math.floor(night) or night < 1 or night > LAST_NIGHT then
@@ -746,7 +752,8 @@ function RoundService:DevSetNight(night: number)
 	const runState = self.Dependencies.RunStateService
 	runState:FixPriceParty()
 	runState:SetEndless(false)
-	const info: ShiftInfo = { Day = self.Day(), Night = night, IsNight = true, Attempt = 0 }
+	const info: ShiftInfo =
+		{ Day = Flow.DayOfNight(night, FIRST_NIGHT_DAY), Night = night, IsNight = true, Attempt = 0 }
 	self:StartShift(info, workspace:GetServerTimeNow(), true, false)
 end
 
@@ -757,6 +764,21 @@ function RoundService:DevWinNight()
 		error("[RoundService] DevWinNight: only in Call, Prep or Night of a night shift", 2)
 	end
 	self:WinNight(workspace:GetServerTimeNow())
+end
+
+-- Showcase clock (ShowcaseService; docs/tech/showcase.md): seconds the current phase has run, and a rewrite of its start
+-- so the clock reads another time (or stays frozen when called every tick). Moves only PhaseStartedAt: the deadline
+-- follows it, nothing else is touched.
+function RoundService:DevPhaseElapsed(): number
+	return workspace:GetServerTimeNow() - self.PhaseStartedAt()
+end
+
+function RoundService:DevSetPhaseElapsed(seconds: number)
+	self:DevCheck("DevSetPhaseElapsed")
+	if not finite(seconds) then
+		error("[RoundService] DevSetPhaseElapsed: seconds must be a finite number", 2)
+	end
+	self.PhaseStartedAt(workspace:GetServerTimeNow() - math.max(0, seconds))
 end
 
 RoundService:OnInit(function(self)

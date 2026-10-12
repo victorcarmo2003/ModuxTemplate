@@ -1,0 +1,59 @@
+# Camada do Studio (o que um Place.run NAO recria sozinho)
+
+Atualizado em 2026-10-12 (captura das edicoes a mao do dono; Place.diff MAP-01: 29 diferencas restantes, todas
+explicadas abaixo; lobby: 2 -> 1, explicada). Ferramentas de rede: `python -m http.server 8772` na raiz do repo
+(os snippets carregam `place_assets.luau`, placements e ids por HTTP).
+
+`Place.run` reconstroi `workspace.MAP01_Assets` inteiro a partir de `MAP-01_placements.luau` e apaga qualquer edicao que nao
+esteja la. Tudo o que o dono fez a mao esta agora nos placements (campos `parts`, `drop`, `copies`, entradas novas) EXCETO o
+que esta listado aqui, que vive em snippets que rodam DEPOIS do Place.run.
+
+## Ordem depois de um Place.run (MAP-01)
+
+1. `Place.run(placements, ids)` (so depois de `Place.diff` = 0 reais e o dono salvar o place; ver memoria `studio-hand-edits`).
+2. `bind_map01.luau` (`Bind.run()`): ancoras, MKT-SHELVES (BUY-*), portas, trailer, luzes.
+3. `swap_mart_door.luau`: divide a porta do Mart (ver tabela).
+4. `bind_pieces.luau` (`Pieces.run()`): pecas de upgrade. O Bind.run desfaz o Pieces: sempre depois dele.
+5. `fix_trailer_height.luau`: **NAO rodar apos um Place.run** (ver tabela). So num place que ainda tenha os meshes antigos.
+6. `fix_mart_shelf_packs.luau`: packs AST-011 nas gondolas (le os BUY-* do passo 2).
+7. `fix_mart_fridge.luau`: packs de queijo / cream cheese nas geladeiras (le os BUY-* do passo 2).
+8. `trailer_tables.luau`: tag SeatTable, TableIndex 6..9, TableGroup "Trailer" e Seat1..4 das 4 mesas do trailer.
+9. `check_map01.luau` (`Check.run({ wave = 3 })`) e, no fim, `Place.diff` outra vez (esperado: so as linhas da secao "Diferencas esperadas").
+
+Lobby: **nunca** `Place.runInto(..., true)` (force) sem sincronizar antes; sem `force` o runInto recusa (`[skip]`). A ordem do lobby, quando
+for reconstruir de proposito: `runInto(LOBBY_v2_placements, ids, "LOBBY_Assets", true)` -> `Decor.runLobby(true)` (decor_mart.luau) ->
+`bind_map01` (bindLobby) -> `warm_lobby.luau`.
+
+## Snippets pos-run, um a um
+
+| Snippet | O que repoe | Por que nao esta nos placements | Estado apos Place.run |
+|---|---|---|---|
+| `swap_mart_door.luau` | porta do Mart separada: `Door_Frame` + `Door_Leaf_L` + `Door_Leaf_R` (modelo 140495801903917) e o contrato AutoDoor das folhas | a entrada #165 (`AST-028_MartWallDoor`) constroi o mesh unico antigo; o split e uma troca de MeshPart (MeshId nao e scriptable). A captura NAO grava `drop` + 3 partes extras para essa entrada (quebraria o swap) | idempotente: se `Door_Frame` existe so reconfigura as folhas |
+| `fix_mart_shelf_packs.luau` | `ShelfPacks` (3 packs x 2 andares por face) nas 4+ gondolas `AST-029_GondolaBoxesBare` | os packs sao Parts clonadas dos modelos AST-011, nao mesh do placement; a entrada ja usa `GondolaBoxesBare` (mesh sem estoque) | idempotente (pula gondola com pasta `ShelfPacks`; `FORCE = true` refaz; obrigatorio se um BUY-* mudou) |
+| `fix_mart_fridge.luau` | `ShelfPacks` + `Light_Inner` das geladeiras `AST-030_FridgeDisplayShelves` (queijo / cream cheese) | idem; as entradas #193/#194 ja constroem a geladeira nova (Body/Trim/Doors/Shelves/Led, estilo em `FRIDGE_STYLE` do place_assets) | idempotente (pula quem tem `ShelfPacks`) |
+| `trailer_tables.luau` | tag `SeatTable`, `TableIndex` 6..9, `TableGroup`, Seat1..4 invisiveis das mesas `TTBL-6..9` | o placement so cria o mesh (`AST-100_PicnicTable`); build() nao grava tags nem atributos | idempotente; ordena por distancia ao Q1 (6 = mais perto). Os indices originais eram 6 (-61.3,112.2) 7 (-61.3,104.9) 8 (-87.6,113.3) 9 (-87.6,106.0), mundo |
+| `fix_trailer_height.luau` | trailer rebaixado (Counters topo +4.6, Body, Awning, Shelf_Fold novos; bancos AST-040 novos; estacoes -0.9) | JA ESTA nos placements: `_asset_ids.json` aponta para o AST-027 / AST-040 novos e as entradas TRL-S/G/R/B/T/K/DRAWER/COFFEE ja usam y 5.05 (antes 5.95) | **perigo**: depois de um Place.run as estacoes nao tem o atributo `TrailerLoweredV1`, entao o passo 3 do snippet baixaria 0.9 de novo. Nao rodar apos rebuild. Conferir com Place.diff (entrada #79 = so o deslocamento do trailer) |
+
+Constantes ja alinhadas: `bind_map01.luau` SHELVES confere com as ancoras BUY-* vivas (9 de 9, x/z/h iguais; lidas do Studio em 2026-10-12).
+
+## Diferencas esperadas do Place.diff (MAP-01) apos esta captura
+
+- `#79 TRL [moved]`: o trailer vive em `Night_Trailer`; o diff compara depois do deslocamento do trailer (`d=148.093` igual em todas as partes = pose relativa identica).
+- `#165 MKT-DOOR`: mesh unico no placement vs. Door_Frame / Leaf_L / Leaf_R vivos (swap_mart_door).
+- `#178-180, #740-742 MartAwning`: `a=17.0`. O pivo vivo esta inclinado 17 graus (rotX), o placement grava a inclinacao em `parts` (a mesma geometria; as partes batem).
+- `#193, #194, #199, #794-796`: so "part extra live ... ShelfPacks" (fix_mart_shelf_packs / fix_mart_fridge).
+- `#185-#192, #195-#198, #200-#202` (15 entradas "MISSING"): GEAR_WALL, checkout OP-1 e as gondolas antigas (Boxes / Bags / End) que o dono tirou do Mart. Ficam nos placements de proposito:
+  elas tem `drop` do mesh inteiro e o `replaces` mantem o blockout escondido. Efeito de um Place.run: nascem 15 Models vazios (so Attachments) que o `bind_map01` ja avisa (GEAR_WALL).
+  Opcional apos o run (nao testado em Place.run real): destruir os Models sem BasePart com MapId em { GEAR_WALL, OP-1 } ou Asset em AST-029_GondolaBoxes / Bags / End.
+- `#797-#800 TTBL-6..9`: MISSING ate o `cleanup_stray.luau` mover as mesas soltas para `MAP01_Assets.TrailerTables` (ele tambem grava MapId / Asset nelas).
+
+## O que a captura gravou (2026-10-12)
+
+MAP-01 (`MAP-01_placements.luau`, 793 -> 800 entradas): 24 registros de mudanca (6 sao as marquises, sem mudanca real; o resto: poste NinthS_W2, GondolaBoxesBare, FruitDisplay, ProduceStand,
+2 LettuceCrate, TreeLarge T-03, GearStand `Structure` size, 3 sinais, BunDisplay, 2 MeatCase, 2 sinais), 3 entradas novas (`GondolaBoxesBare` x3), 4 entradas novas
+das mesas do trailer (`TTBL-6..9`, group `TrailerTables`), 15 entradas "removidas" mantidas (acima), 1 pulada (trailer, segue o trailer).
+
+Lobby (`LOBBY_v2_placements.luau`): o lobby foi escalado x1.3 em torno do spawn (5, 0, -620) e ficou com 4 plataformas de squad (o `bind_map01` ja descreve isso). Capturadas
+148 entradas (x/y/z/rotY e `parts` com size / pos em escala), 37 entradas comentadas como removidas (squads 5..8, slots de fila, LB-WELCOME), 1 `pivot` obsoleto removido (LB-CART-DRAWER).
+LB-TRL (trailer do lobby): so a pose; o mesh vivo ainda e o AST-027 ANTIGO x1.3 com partes de nome duplicado, entao um runInto reconstroi o trailer novo SEM escala (ajustar a mao depois).
+Floor / estrada / predios: os tamanhos viraram `parts.size` em cada entrada (por isso as linhas ficaram grandes).

@@ -36,6 +36,7 @@ local Table = require(script.Parent.Table)
 local Thief = require(script.Parent.Thief)
 local Traffic = require(script.Parent.Traffic)
 local Upgrades = require(script.Parent.Upgrades)
+local Trailer = require(script.Parent.Trailer)
 local Vehicles = require(script.Parent.Vehicles)
 local WalkPaths = require(script.Parent.WalkPaths)
 
@@ -500,6 +501,7 @@ local function checkRecords()
 	if not Vehicles.ByKey[RunParams.StartVehicle] then
 		fail("RunParams", nil, nil, `StartVehicle '{RunParams.StartVehicle}' not in Vehicles`)
 	end
+	inRange("RunParams", nil, nil, "NightsFromDay", RunParams.NightsFromDay, 2, 50)
 	if #RunParams.PartyPriceMult ~= 4 then
 		fail("RunParams", nil, nil, "PartyPriceMult needs 4 entries (party 1..4)")
 	end
@@ -596,6 +598,13 @@ local function checkBossCalls()
 				fail("BossCalls", index, row.Key, `Lines[{position}] is empty`)
 			end
 		end
+		if row.Cues ~= nil then
+			for position, cue in row.Cues do
+				if cue.Line < 1 or cue.Line > #row.Lines then
+					fail("BossCalls", index, row.Key, `Cues[{position}].Line {cue.Line} is outside 1..{#row.Lines}`)
+				end
+			end
+		end
 		if row.Short ~= nil and kind ~= "NightCall" then
 			fail("BossCalls", index, row.Key, "Short only on NightCall rows")
 		end
@@ -665,8 +674,9 @@ local function checkBossCalls()
 	if trailerN > 0 and trailerP <= firstNight.Priority then
 		fail("BossCalls", nil, nil, "TrailerBought needs a higher Priority than NightCall (plays first on Night 1)")
 	end
-	if (trailerN + #firstNight.Lines) * rules.LineTime > callCap then
-		fail("BossCalls", nil, nil, `trailer call + {firstNight.Key} exceed the Call cap ({callCap} s)`)
+	const _, coffeeN = kindStats("NightCoffee")
+	if (trailerN + #firstNight.Lines + coffeeN) * rules.LineTime > callCap then
+		fail("BossCalls", nil, nil, `trailer call + {firstNight.Key} + coffee call exceed the Call cap ({callCap} s)`)
 	end
 	const repeatRow = BossCalls.ByKey[repeatKey]
 	const criticalP, criticalN = kindStats("LostCritical")
@@ -905,9 +915,10 @@ local function checkWave2Records()
 	const trailer = Vehicles.ByKey.trailer
 	const reminder = if trailer then trailer.Reminder else nil
 	if trailer and reminder then
-		inRange("Vehicles", nil, "trailer", "Reminder.FirstDay", reminder.FirstDay, trailer.BuyFromDay, 1000)
+		inRange("Vehicles", nil, "trailer", "Reminder.FirstNight", reminder.FirstNight, trailer.OfferAfterNight, 1000)
 		inRange("Vehicles", nil, "trailer", "Reminder.Every", reminder.Every, 1, 100)
 	end
+	inRange("Trailer", nil, nil, "OfferAfterNight", Trailer.OfferAfterNight, 1, RunParams.Nights - 1)
 	inRange("RunParams", nil, nil, "BindingWave", RunParams.BindingWave, 1, 4)
 	for index, row in Items.List do
 		if row.Use and row.Kind ~= "Consumable" and row.Kind ~= "Revive" then
@@ -989,6 +1000,19 @@ local function checkAnomalies()
 		end
 		if row.Name == "" then
 			fail("Anomalies", index, key, "empty Name")
+		end
+		-- Cart / trailer classification (user request 2026-10-12): the nights before the trailer is offered are cart-only
+		if row.Trailer ~= "None" and row.Trailer ~= "Helps" and row.Trailer ~= "Needs" then
+			fail("Anomalies", index, key, `Trailer '{tostring(row.Trailer)}' is not None, Helps or Needs`)
+		elseif row.Trailer ~= "None" and row.Night <= Trailer.OfferAfterNight then
+			fail(
+				"Anomalies",
+				index,
+				key,
+				`Trailer {row.Trailer} on night {row.Night}: nights up to {Trailer.OfferAfterNight} are always in the cart and need Trailer None`
+			)
+		elseif row.Trailer == "Needs" and Anomalies.StandIn(row) == nil then
+			fail("Anomalies", index, key, "Trailer Needs without an earlier anomaly with Trailer None to stand in")
 		end
 		const night = Nights.List[row.Night]
 		if night and night.NewAnomaly ~= key then
@@ -1375,16 +1399,40 @@ local function checkSeating()
 	const name = "Seating"
 	const phases = setOf(Shift.PhaseKeys)
 	inRange(name, nil, nil, "UnlockDay", Seating.UnlockDay, 1, 100)
-	inRange(name, nil, nil, "Tables", Seating.Tables, 1, 8)
+	inRange(name, nil, nil, "Tables", Seating.Tables, 1, 16)
 	const tables = Upgrades.ByKey[Seating.UpgradeKey]
 	if tables == nil or tables.SoldAt ~= "InPlace" or tables.Scope ~= "Pad" then
 		fail(name, nil, nil, `UpgradeKey '{Seating.UpgradeKey}' must be an InPlace upgrade with Scope Pad`)
 	end
-	for _, vehicle in tables.Vehicles do
-		const levels = tables.Levels[vehicle]
-		if levels[#levels].Effects.TableCount ~= Seating.Tables then
-			fail(name, nil, nil, `UpgradeKey max TableCount on {vehicle} must be Tables ({Seating.Tables})`)
+	-- Groups: contiguous TableIndex 1..Tables, each with its own InPlace upgrade whose last level buys them all
+	local expectedFirst = 1
+	for _, group in Seating.Groups do
+		if group.First ~= expectedFirst or group.Count < 1 then
+			fail(name, nil, nil, `Groups '{group.Key}': First {group.First} must continue the previous group ({expectedFirst}) with Count >= 1`)
 		end
+		expectedFirst = group.First + group.Count
+		const upgrade = Upgrades.ByKey[group.UpgradeKey]
+		if upgrade == nil or upgrade.SoldAt ~= "InPlace" then
+			fail(name, nil, nil, `Groups '{group.Key}': UpgradeKey '{group.UpgradeKey}' must be an InPlace upgrade`)
+		end
+		if not Stats.Has[group.Stat] then
+			fail(name, nil, nil, `Groups '{group.Key}': Stat '{group.Stat}' is not a key of Stats`)
+		end
+		for _, vehicle in group.Vehicles do
+			const levels = upgrade.Levels[vehicle]
+			if levels == nil then
+				fail(name, nil, nil, `Groups '{group.Key}': upgrade '{group.UpgradeKey}' has no levels on '{vehicle}'`)
+			end
+			if (levels[#levels].Effects :: any)[group.Stat] ~= group.Count then
+				fail(name, nil, nil, `Groups '{group.Key}': max {group.Stat} on {vehicle} must be Count ({group.Count})`)
+			end
+		end
+	end
+	if expectedFirst - 1 ~= Seating.Tables then
+		fail(name, nil, nil, `Groups cover {expectedFirst - 1} tables, Tables is {Seating.Tables}`)
+	end
+	if Seating.Groups[1].UpgradeKey ~= Seating.UpgradeKey then
+		fail(name, nil, nil, "Groups[1] is the Pad group: its UpgradeKey must be Seating.UpgradeKey")
 	end
 	const lights = Upgrades.ByKey[Seating.LightsKey]
 	if lights == nil or lights.SoldAt ~= "InPlace" then
@@ -1404,6 +1452,7 @@ local function checkSeating()
 	inRange(name, nil, nil, "GroupSitBonus", Seating.GroupSitBonus, 0, 1)
 	inRange(name, nil, nil, "SitChanceCap", Seating.SitChanceCap, 0, 1)
 	inRange(name, nil, nil, "GhostTransparency", Seating.GhostTransparency, 0, 1)
+	inRange(name, nil, nil, "GhostDimTransparency", Seating.GhostDimTransparency, Seating.GhostTransparency, 1)
 	inRange(name, nil, nil, "StandTimeout", Seating.StandTimeout, 1, 120)
 	inRange(name, nil, nil, "WalkTimeout", Seating.WalkTimeout, 1, 30)
 	inRange(name, nil, nil, "Approach", Seating.Approach, 0, 10)
@@ -1467,6 +1516,25 @@ local function checkSeating()
 	inRange(a, nil, nil, "MinGapSeconds", adopt.MinGapSeconds, 0, 600)
 	inRange(a, nil, nil, "NoticeLead", adopt.NoticeLead, 0, 5)
 	inRange(a, nil, nil, "Beat", adopt.Beat, 0, 5)
+	-- Flow.Guarantee (Q-202, Provisional): limits in seconds; Day 1 never waits longer than later days
+	const guarantee = Flow.Guarantee
+	const gu = "Flow.Guarantee"
+	inRange(gu, nil, nil, "MaxEmpty", guarantee.MaxEmpty, 1, 120)
+	inRange(gu, nil, nil, "MaxEmptyDay1", guarantee.MaxEmptyDay1, 1, guarantee.MaxEmpty)
+	inRange(gu, nil, nil, "Spread", guarantee.Spread, 0, 30)
+	-- Day length (Q-200): a day shift (Prep + Open + Closing + Summary) must stay a short turn, and the flow must
+	-- bring at least 8 customers in the open shop on Day 1 (mean interval x jitter)
+	const openRow = Shift.ByKey.Open
+	if Flow.BaseInterval > 0 and openRow.Duration / Flow.BaseInterval < 8 then
+		fail("Flow", nil, nil, `Open {openRow.Duration} s / BaseInterval {Flow.BaseInterval} s brings fewer than 8 customers on Day 1`)
+	end
+	const dayTurn = Shift.ByKey.Prep.Duration
+		+ openRow.Duration
+		+ Shift.ByKey.Closing.Duration
+		+ Shift.ByKey.Summary.Duration
+	if dayTurn > 330 then
+		fail("Shift", nil, nil, `day turn is {dayTurn} s (Prep + Open + Closing + Summary): playtest target is ~270 s, cap 330`)
+	end
 	if #adopt.FirstDelay ~= 2 or adopt.FirstDelay[1] > adopt.FirstDelay[2] then
 		fail(a, nil, nil, "FirstDelay must be {min, max} with min <= max")
 	end
@@ -1586,6 +1654,26 @@ local function checkMart()
 	inRange("Mart", nil, nil, "Purchase.OpalLineGap", Mart.Purchase.OpalLineGap, 0, 600)
 	inRange("Mart", nil, nil, "Purchase.OpalLineRadius", Mart.Purchase.OpalLineRadius, 0, 100)
 	inRange("Mart", nil, nil, "Plate.Distance", Mart.Plate.Distance, 1, 500)
+	inRange("Mart", nil, nil, "Plate.Lift", Mart.Plate.Lift, 0.5, 6)
+	inRange("Mart", nil, nil, "Plate.Width", Mart.Plate.Width, 120, 400)
+	-- Gear Stand cooldown (Q-203): whole shifts, 2 = one full shift off; the wire field Upgrades.Wait is 0..255
+	inRange("Mart", nil, nil, "Cooldown.Turns", Mart.Cooldown.Turns, 1, 20)
+	if Mart.Cooldown.Turns ~= math.floor(Mart.Cooldown.Turns) then
+		fail("Mart", nil, nil, "Cooldown.Turns must be a whole number of shifts")
+	end
+	inRange("Mart", nil, nil, "Hint.Reach", Mart.Hint.Reach, 1, 100)
+	const hinted: { [string]: boolean } = {}
+	for _, phase in Mart.Hint.Phases do
+		if not phases[phase] then
+			fail("Mart", nil, nil, `Hint.Phases '{phase}' is not a Shift phase`)
+		elseif Shift.ByKey[phase].Selling then
+			fail("Mart", nil, nil, `Hint.Phases '{phase}' is a selling phase: the hint is for the end of the shift`)
+		end
+		if hinted[phase] then
+			fail("Mart", nil, nil, `Hint.Phases '{phase}' repeated`)
+		end
+		hinted[phase] = true
+	end
 	inRange("Mart", nil, nil, "Fallback.DoorHeight", Mart.Fallback.DoorHeight, 1, 30)
 	if Mart.Tags.Pedestal == "" or Mart.Tags.Shutter == "" or Mart.Tags.Slot == "" then
 		fail("Mart", nil, nil, "Tags must not be empty")

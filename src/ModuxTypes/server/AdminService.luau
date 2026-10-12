@@ -2,7 +2,9 @@
 
 export type Public = {
 	RunDev: (self: Public, name: string, args: { string }) -> (),
-	CommandHelp: (self: Public) -> (),
+	CommandDevHelp: (self: Public) -> string,
+	RunShowcase: (self: Public, action: string, id: string, arg: string) -> (),
+	CommandShowcase: (self: Public) -> (),
 	CommandTeleport: (self: Public, a: Player, b: Player?) -> (),
 	CommandContent: (self: Public, kind: string, key: string) -> (),
 	Register: (self: Public) -> (),

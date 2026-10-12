@@ -6,20 +6,29 @@
 -- "Lost" (splat / spill drawn locally for Items[k].DropDespawn seconds). Lost models are named "Splat".
 --   Keep: display copy of the kit Tool (a Model, never a Tool) with an Interactable anchor -> pick_up_item (hold
 --         DROP_HOLD). Item, Count and Toppings stay on the server (entry by anchor), not on the model. On the street
---         it vanishes after Items[k].DropDespawn seconds; on the counter (spectator, DROP-T) at the end of the next
---         shift. A drop that lands on a carriageway moves to the nearest sidewalk NpcNode.
+--         it vanishes after Items[k].DropDespawn seconds (90 s, blinking in the last BLINK_TIME s); on the counter
+--         (spectator, DROP-T) at the end of the next shift. A drop that lands on a carriageway moves to the nearest
+--         sidewalk NpcNode. Car-hit drops (Owner = userId of who dropped) are tossed from the body to the ground
+--         (pastelao arc) and go BACK to the owner (Deps.Return) when the phase changes (Drops.recall) or, while
+--         Deps.ReturnOnExpire() holds (day 1 / tutorial), when the timer runs out. The exact state travels in Extra
+--         (Stash form: hot dog "ketchup,cheese" / "!..." altered, coffee Restore), so Give rebuilds the same Tool.
 --   Lost: invisible anchored marker named "Splat" for Items[k].DropDespawn seconds (2 s); nothing to pick up.
 -- Nothing here enters the snapshot (FEAT-036): Clear on every restore.
 local CollectionService = game:GetService("CollectionService")
+local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local Content = require(ReplicatedStorage.shared.Content)
 local Required = require(ReplicatedStorage.shared.Place.MapIndex.Required)
+local Stash = require(script.Parent.Stash)
 
 export type Deps = {
 	Template: (item: string) -> Tool?,
 	Display: (template: Tool?, item: string, name: string) -> Model,
-	Give: (player: Player, item: string, count: number, toppings: string?) -> Tool?,
+	Give: (player: Player, item: string, count: number, extra: string?) -> Tool?,
+		-- Item goes back to who dropped it (hands, else stash): phase change, or expiry while ReturnOnExpire().
+		Return: (userId: number, item: string, count: number, extra: string?) -> (),
+		ReturnOnExpire: () -> boolean,
 	IsActive: (player: Player) -> boolean,
 	SetPrompt: (anchor: Instance, enabled: boolean) -> (),
 	SetPromptHold: (anchor: Instance, hold: number) -> (),
@@ -28,7 +37,8 @@ export type Deps = {
 export type Entry = {
 	Item: string,
 	Count: number,
-	Toppings: string?,
+	Extra: string?, -- Stash.Entry.Extra: hot dog toppings ("!" prefix = altered), coffee Restore
+	Owner: number?, -- UserId of who dropped it (car hit); nil = counter drop
 	Model: Model,
 	Anchor: Attachment?,
 	-- Counter drops: removed on the ShiftEnded whose shift index reaches this value (nil = timed street drop).
@@ -55,6 +65,14 @@ const RAY_UP = 3 -- studs above the drop point where the ground ray starts
 const RAY_DOWN = 20 -- studs the ground ray travels
 const COUNTER_SPREAD = 1.25 -- studs between items dropped together on the counter
 const MARKER_SIZE = 0.2
+const BLINK_TIME = 10 -- seconds of blinking before a street drop vanishes
+const BLINK_STEP = 0.25
+const BLINK_TRANSPARENCY = 0.75
+const TOSS_MIN = 0.35 -- seconds of the pastelao toss (grows with the distance, capped at TOSS_MAX)
+const TOSS_MAX = 1
+const TOSS_LIFT = 2 -- studs above the body where the item leaves
+const TOSS_ARC = 3 -- studs of arc height (plus 10% of the distance)
+const TOSS_SPIN = math.rad(540)
 
 const Drops = {}
 
@@ -136,8 +154,74 @@ local function remove(drops: Drops, entry: Entry)
 	entry.Model:Destroy()
 end
 
+local function expire(drops: Drops, entry: Entry)
+	if not drops.Live[entry] then
+		return
+	end
+	if entry.Owner ~= nil and drops.Deps.ReturnOnExpire() then
+		drops.Deps.Return(entry.Owner, entry.Item, entry.Count, entry.Extra)
+	end
+	remove(drops, entry)
+end
+
+-- Parts blink (server side, replicated) for the last BLINK_TIME seconds, then the drop expires.
+local function lifetime(drops: Drops, entry: Entry, despawn: number)
+	task.spawn(function()
+		const deadline = os.clock() + despawn
+		task.wait(math.max(0, despawn - BLINK_TIME))
+		const parts: { [BasePart]: number } = {}
+		for _, part in entry.Model:GetDescendants() do
+			if part:IsA("BasePart") then
+				parts[part] = part.Transparency
+			end
+		end
+		local on = false
+		while drops.Live[entry] and os.clock() < deadline do
+			on = not on
+			for part, base in parts do
+				part.Transparency = if on then math.max(base, BLINK_TRANSPARENCY) else base
+			end
+			task.wait(BLINK_STEP)
+		end
+		expire(drops, entry)
+	end)
+end
+
+-- Pastelao toss: the anchored model flies from `from` to its resting pivot on a short arc, spinning a little.
+local function toss(drops: Drops, entry: Entry, from: Vector3, final: CFrame)
+	const model = entry.Model
+	const start = from + Vector3.yAxis * TOSS_LIFT
+	const distance = (final.Position - start).Magnitude
+	const duration = math.clamp(TOSS_MIN + distance / 40, TOSS_MIN, TOSS_MAX)
+	const arc = TOSS_ARC + distance * 0.1
+	const rotation = final - final.Position
+	model:PivotTo(CFrame.new(start) * rotation)
+	task.spawn(function()
+		local elapsed = 0
+		while elapsed < duration and drops.Live[entry] do
+			elapsed += RunService.Heartbeat:Wait()
+			const alpha = math.min(1, elapsed / duration)
+			const position = start:Lerp(final.Position, alpha) + Vector3.yAxis * (arc * 4 * alpha * (1 - alpha))
+			model:PivotTo(CFrame.new(position) * CFrame.Angles(0, TOSS_SPIN * (1 - alpha), 0) * rotation)
+		end
+		if drops.Live[entry] then
+			model:PivotTo(final)
+		end
+	end)
+end
+
 -- Recoverable item resting on `ground` (bottom of the model there). untilShift = counter rule, nil = street timer.
-function Drops.keep(drops: Drops, item: string, count: number, toppings: string?, ground: Vector3, untilShift: number?): Entry?
+-- owner = who dropped it (car hit); from = where the body was (toss start), nil = appears in place.
+function Drops.keep(
+	drops: Drops,
+	item: string,
+	count: number,
+	extra: string?,
+	ground: Vector3,
+	untilShift: number?,
+	owner: number?,
+	from: Vector3?
+): Entry?
 	const row = Content.Items.ByKey[item]
 	if row == nil then
 		return nil
@@ -147,7 +231,8 @@ function Drops.keep(drops: Drops, item: string, count: number, toppings: string?
 	model:SetAttribute("Drop", "Keep")
 	const cframe, size = model:GetBoundingBox()
 	const offset = model:GetPivot().Position - cframe.Position
-	model:PivotTo(CFrame.new(ground + Vector3.yAxis * (size.Y / 2) + offset))
+	const final = CFrame.new(ground + Vector3.yAxis * (size.Y / 2) + offset)
+	model:PivotTo(final)
 
 	const primary = model.PrimaryPart :: BasePart
 	const anchor = Instance.new("Attachment")
@@ -161,7 +246,8 @@ function Drops.keep(drops: Drops, item: string, count: number, toppings: string?
 	const entry: Entry = {
 		Item = item,
 		Count = count,
-		Toppings = toppings,
+		Extra = extra,
+		Owner = owner,
 		Model = model,
 		Anchor = anchor,
 		UntilShift = untilShift,
@@ -172,14 +258,44 @@ function Drops.keep(drops: Drops, item: string, count: number, toppings: string?
 	model.Parent = folderOf(drops)
 	-- Tag last: InteractionService gives the EntityId as soon as the tagged anchor is in the Workspace.
 	CollectionService:AddTag(anchor, TAG)
+	if from ~= nil then
+		toss(drops, entry, from, final)
+	end
 
 	const despawn = row.DropDespawn
 	if untilShift == nil and type(despawn) == "number" then
-		task.delay(despawn, function()
-			remove(drops, entry)
-		end)
+		lifetime(drops, entry, despawn)
 	end
 	return entry
+end
+
+-- Phase change: every street drop goes back to who dropped it (no litter between phases); counter drops stay.
+function Drops.recall(drops: Drops)
+	const all: { Entry } = {}
+	for entry in drops.Live do
+		if entry.Anchor ~= nil and entry.UntilShift == nil then
+			table.insert(all, entry)
+		end
+	end
+	for _, entry in all do
+		if entry.Owner ~= nil then
+			drops.Deps.Return(entry.Owner, entry.Item, entry.Count, entry.Extra)
+		end
+		remove(drops, entry)
+	end
+end
+
+-- Altered hot dogs never outlive the Night phase (ITM-020), on the ground either.
+function Drops.clearAltered(drops: Drops)
+	const all: { Entry } = {}
+	for entry in drops.Live do
+		if Stash.isAltered({ Kind = entry.Item, Count = entry.Count, Extra = entry.Extra }) then
+			table.insert(all, entry)
+		end
+	end
+	for _, entry in all do
+		remove(drops, entry)
+	end
 end
 
 -- Lost item (hot dog splat, spilled coffee): marker named "Splat" for Items[k].DropDespawn seconds.
@@ -204,7 +320,7 @@ function Drops.lost(drops: Drops, item: string, ground: Vector3): Entry?
 	model:SetAttribute("Item", item)
 	model:SetAttribute("Drop", "Lost")
 
-	const entry: Entry = { Item = item, Count = 1, Toppings = nil, Model = model, Anchor = nil, UntilShift = nil }
+	const entry: Entry = { Item = item, Count = 1, Extra = nil, Owner = nil, Model = model, Anchor = nil, UntilShift = nil }
 	drops.Live[entry] = true
 	CollectionService:AddTag(model, DROP_TAG)
 	model.Parent = folderOf(drops)
@@ -237,7 +353,7 @@ function Drops.take(drops: Drops, player: Player, anchor: Instance)
 	if entry == nil or not drops.Live[entry] then
 		return
 	end
-	if drops.Deps.Give(player, entry.Item, entry.Count, entry.Toppings) ~= nil then
+	if drops.Deps.Give(player, entry.Item, entry.Count, entry.Extra) ~= nil then
 		remove(drops, entry)
 	end
 end

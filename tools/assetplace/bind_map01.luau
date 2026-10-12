@@ -167,7 +167,7 @@ local CREATED = "BindCreated"
 local SRC_NAME = "SrcName"
 
 local COUNTER_Y = 3.45 -- cart counter top (DEC-157; Provisional until Q-153)
-local TRAILER_COUNTER_DY = 5.5 -- trailer counter top over the trailer pivot: floor +2, counter 3.5 (MAP-01 §2, §7.2)
+local TRAILER_COUNTER_DY = 4.6 -- trailer counter top over the trailer pivot: floor +2, counter 2.6 (2026-10-11: was 5.5 / 3.5, first person hid the window; MAP-01 §7.2)
 
 -- Vehicle poses = model pivots (T36: VehicleService does vehicle:PivotTo(MapIndex.Point(id))). Same numbers as the
 -- CART / TRL / TRL-SALE entries of MAP-01_placements.luau: change both together. MAP-01 frame (world = FCF(pose)).
@@ -511,19 +511,22 @@ local TOPPINGS = {
 	{ key = "cream_cheese", suf = "CreamCheese", x = 49, z = 38.5 },
 }
 
--- Mart shelf purchase points (Mart v2, MAP-01 §18.3, TASK-138; Provisional). MAP-01 coordinates; the WORLD point of
+-- Mart shelf purchase points (Mart v2, MAP-01 §18.3, TASK-138; Provisional). 2026-10-12: re-aligned to the displays the user moved
+-- (gondola packs row z 5.05, meat cases, bun display, dairy fridges); comments with WORLD points below are the OLD ones. MAP-01 coordinates; the WORLD point of
 -- §18.3 is in the comment (WORLD = (-x, y, 67.887 - z)). h = anchor height above the Mart floor (0.4), 3.0 .. 4.5.
 -- >= 4 studs between anchors (§18.10). The table is the source: every run puts each BUY-* at its position.
+-- Pack display on the gondolas (AST-011 on AST-029_GondolaBoxesBare, 3 x 2 tiers per face) is NOT done here: run tools/assetplace/fix_mart_shelf_packs.luau
+-- after Place.run + this bind (idempotent; it reads the BUY-* anchors below, so moving one means FORCE = true there).
 local SHELVES = {
-	{ name = "Buns", package = "pack_buns", x = -72, z = 35.187, h = 3.0 }, -- BAKERY rack, main aisle face (WORLD 72, 32.7)
-	{ name = "Sausages", package = "pack_sausages", x = -73.5, z = 42.487, h = 3.6 }, -- MEAT & DELI case top (WORLD 73.5, 25.4)
-	{ name = "Bacon", package = "pack_bacon", x = -77.5, z = 42.487, h = 3.6 }, -- MEAT & DELI (WORLD 77.5, 25.4)
-	{ name = "Ketchup", package = "pack_ketchup", x = -73.25, z = 49.787, h = 4.5 }, -- SAUCES, island 2 north face (WORLD 73.25, 18.1)
-	{ name = "Mustard", package = "pack_mustard", x = -77.75, z = 49.787, h = 4.5 }, -- SAUCES (WORLD 77.75, 18.1)
-	{ name = "PotatoSticks", package = "pack_potato_sticks", x = -73.25, z = 55.187, h = 4.5 }, -- SNACKS, south face (WORLD 73.25, 12.7)
-	{ name = "Coffee", package = "pack_coffee", x = -77.75, z = 55.187, h = 4.5 }, -- COFFEE, same gondola; was at the checkout (WORLD 77.75, 12.7)
-	{ name = "Cheese", package = "pack_cheese", x = -73.5, z = 60.787, h = 4.5 }, -- DAIRY fridge door 1 (WORLD 73.5, 7.1)
-	{ name = "CreamCheese", package = "pack_cream_cheese", x = -77.5, z = 60.787, h = 4.5 }, -- DAIRY door 2 (WORLD 77.5, 7.1)
+	{ name = "Buns", package = "pack_buns", x = -76.1, z = 33.587, h = 3.4 }, -- BAKERY BunDisplay AST-050 (user moved it; prompt above its centre, WORLD 76.1, 34.3; 2026-10-12)
+	{ name = "Sausages", package = "pack_sausages", x = -74.5, z = 48.587, h = 3.75 }, -- MEAT & DELI case top (WORLD 73.5, 25.4)
+	{ name = "Bacon", package = "pack_bacon", x = -81.3, z = 48.587, h = 3.75 }, -- MEAT & DELI (WORLD 77.5, 25.4)
+	{ name = "Ketchup", package = "pack_ketchup", x = -76.55, z = 60.902, h = 3.8 }, -- SAUCES, island 2 north face (WORLD 73.25, 18.1)
+	{ name = "Mustard", package = "pack_mustard", x = -81.05, z = 60.902, h = 3.8 }, -- SAUCES (WORLD 77.75, 18.1)
+	{ name = "PotatoSticks", package = "pack_potato_sticks", x = -90.05, z = 60.902, h = 3.8 }, -- SNACKS, south face (WORLD 73.25, 12.7)
+	{ name = "Coffee", package = "pack_coffee", x = -85.55, z = 60.902, h = 3.8 }, -- COFFEE, same gondola; was at the checkout (WORLD 77.75, 12.7)
+	{ name = "Cheese", package = "pack_cheese", x = -67.7, z = 60.537, h = 4.2 }, -- DAIRY fridge door 1 (WORLD 73.5, 7.1)
+	{ name = "CreamCheese", package = "pack_cream_cheese", x = -71.7, z = 60.537, h = 4.2 }, -- DAIRY door 2 (WORLD 77.5, 7.1)
 }
 local MART_FLOOR = 0.4
 
@@ -589,9 +592,9 @@ local SHUTTER_BUTTON_SIZE = Vector3.new(0.5, 0.7, 0.15) -- placeholder plate unt
 local SHUTTER_BUTTON_COLOR = Color3.fromRGB(246, 193, 43) -- Mustard #F6C12B (style guide: interactive accent)
 local SHUTTER_PROMPT_OUT = 0.3 -- Prompt_Shutter in front of the plate (corridor side), like Prompt_Switch
 local SHUTTER_GAP = 2.6 -- >= this from anchors of other owners in the trailer (§18.7 item 4 + margin, like the phone)
-local WINDOW_LOCAL = { x0 = -9.75, x1 = 12.75, sill = 5.5, top = 10.0, wallZ = -6 } -- X 30.25..52.75 on the Pad
+local WINDOW_LOCAL = { x0 = -9.75, x1 = 12.75, sill = 4.6, top = 10.0, wallZ = -6 } -- X 30.25..52.75 on the Pad
 local AWNING_TOL = 0.3 -- slack when deciding whether the Awning covers the window
-local SHUTTER_PANEL_SIZE = Vector3.new(22.5, 4.6, 0.2)
+local SHUTTER_PANEL_SIZE = Vector3.new(22.5, 5.4, 0.2) -- window top 10.0 - sill 4.6 (was 4.6 tall for sill 5.5)
 local SHUTTER_PANEL_COLOR = Color3.fromRGB(198, 204, 210) -- Aluminum mid (#E3E7EB -> #A9B1B9)
 
 -- Apartment windows (AST-045 Window_Up_<n>, MAP-01 §5.2 / §10.3). Fallback Part when the asset lacks them.
@@ -3018,9 +3021,9 @@ local function bindAutoDoors(assets: Instance)
 			p:SetAttribute("DoorId", spec.id)
 			p:SetAttribute("DoorLeaf", true)
 			p:SetAttribute("DoorHinge", side)
-			p:SetAttribute("DoorAngle", sign * DOOR_OPEN)
+			p:SetAttribute("DoorAngle", DOOR_OPEN) -- positive always: DoorController swings away from the character and flips per hinge side itself (a signed value made one leaf of a pair open the other way, 2026-10-12)
 			p:SetAttribute("DoorRadius", 8)
-			log("new", ("AutoDoor %s: leaf %s, DoorHinge %s (Door_Hinge %s), DoorAngle %d (inward), CanCollide off"):format(spec.id, p:GetFullName(), side, fmtV(h), sign * DOOR_OPEN))
+			log("new", ("AutoDoor %s: leaf %s, DoorHinge %s (Door_Hinge %s), DoorAngle %d (away from the character), CanCollide off"):format(spec.id, p:GetFullName(), side, fmtV(h), DOOR_OPEN))
 		end
 		setPersistent(model)
 	end
@@ -3185,29 +3188,108 @@ local function hideMartMarkers(): number
 	return n
 end
 
--- Seating (FEAT-037, TASK-149): the picnic tables the user placed by hand in MAP01_Assets.PadDecor
--- (AST-100_PicnicTable with Seat1..Seat4) get tag SeatTable + TableIndex 1..N, nearest to Q1 first (SeatingService
--- reads them; it would tag them itself with a warning otherwise). Persistent so every client has them.
+-- Seating (FEAT-037, TASK-149; Q-209): the tables the user placed by hand. Groups (Content.Seating.Groups): Pad = TableIndex
+-- 1..5 (the picnic tables behind the cart), Trailer = 6..9 (the four tables placed for the trailer). Never overwrites the
+-- user's work: a table that already has tag + TableIndex (1..9) keeps both (and its group attribute is only completed);
+-- only untagged tables get the next free index of their group. Candidates: Models named AST-100_PicnicTable with a
+-- Seat1 in MAP01_Assets.PadDecor, and every Model already tagged SeatTable under MAP01_Assets. Group of a new table:
+-- attribute TableGroup ("Pad" | "Trailer") when set, else "Trailer" when it sits more than TABLE_FAR studs (flat) from
+-- the Pad tables already bound (Q1 when there are none), else "Pad". Order inside a group: nearest to Q1 first.
+-- Persistent so every client has them; Seat parts invisible, no collision. Tools: tools/assetplace/trailer_tables.luau
+-- (Studio snippet that tags / seats the trailer tables without moving them).
+local TABLE_GROUPS = { { key = "Pad", first = 1, last = 5 }, { key = "Trailer", first = 6, last = 9 } }
+local TABLE_FAR = 40
+
 local function bindTables(assets: Instance, root: Instance?): number
-	local decor = assets:FindFirstChild("PadDecor")
-	if not decor then
-		return 0
-	end
 	local q1 = root and root:FindFirstChild("Q1", true)
 	local q1Pos = if q1 and q1:IsA("BasePart") then q1.Position else FCF(CFrame.new(52, 0, 33)).Position
-	local tables = {}
-	for _, m in decor:GetChildren() do
-		if m:IsA("Model") and m.Name == "AST-100_PicnicTable" and m:FindFirstChild("Seat1") then
-			table.insert(tables, m)
+	local function flat(a: Vector3, b: Vector3): number
+		return Vector3.new(a.X - b.X, 0, a.Z - b.Z).Magnitude
+	end
+	local candidates: { Model } = {}
+	local seen: { [Instance]: boolean } = {}
+	local function consider(m: Instance, needSeat: boolean)
+		if m:IsA("Model") and not seen[m] and (not needSeat or m:FindFirstChild("Seat1")) then
+			seen[m] = true
+			table.insert(candidates, m)
 		end
 	end
-	table.sort(tables, function(a, b)
-		return (a:GetPivot().Position - q1Pos).Magnitude < (b:GetPivot().Position - q1Pos).Magnitude
-	end)
-	for i, m in tables do
+	local decor = assets:FindFirstChild("PadDecor")
+	if decor then
+		for _, m in decor:GetChildren() do
+			if m.Name == "AST-100_PicnicTable" then
+				consider(m, true)
+			end
+		end
+	end
+	for _, m in CollectionService:GetTagged("SeatTable") do
+		if m:IsDescendantOf(assets) then
+			consider(m, false)
+		end
+	end
+	local function groupOfIndex(i: number)
+		for _, g in TABLE_GROUPS do
+			if i >= g.first and i <= g.last then
+				return g
+			end
+		end
+		return nil
+	end
+	-- 1) tables that already own an index keep it
+	local used: { [number]: Model } = {}
+	local pending: { Model } = {}
+	for _, m in candidates do
+		local i = m:GetAttribute("TableIndex")
+		if typeof(i) == "number" and i == math.floor(i) and groupOfIndex(i) and not used[i] then
+			used[i] = m
+		else
+			table.insert(pending, m)
+		end
+	end
+	-- 2) the rest: group, then the next free index nearest to Q1 first
+	local padRef, padN = Vector3.zero, 0
+	for i, m in used do
+		if i <= TABLE_GROUPS[1].last then
+			padRef += m:GetPivot().Position
+			padN += 1
+		end
+	end
+	padRef = if padN > 0 then padRef / padN else q1Pos
+	local byGroup: { [string]: { Model } } = { Pad = {}, Trailer = {} }
+	for _, m in pending do
+		local declared = m:GetAttribute("TableGroup")
+		local key = if declared == "Pad" or declared == "Trailer"
+			then declared
+			elseif flat(m:GetPivot().Position, padRef) > TABLE_FAR then "Trailer"
+			else "Pad"
+		table.insert(byGroup[key], m)
+	end
+	for _, g in TABLE_GROUPS do
+		local list = byGroup[g.key]
+		table.sort(list, function(a, b)
+			return flat(a:GetPivot().Position, q1Pos) < flat(b:GetPivot().Position, q1Pos)
+		end)
+		local nextIndex = g.first
+		for _, m in list do
+			while used[nextIndex] ~= nil and nextIndex <= g.last do
+				nextIndex += 1
+			end
+			if nextIndex > g.last then
+				log("warn", ("SeatTable: %s group is full (%d..%d): %s left untagged"):format(g.key, g.first, g.last, m:GetFullName()))
+				continue
+			end
+			used[nextIndex] = m
+		end
+	end
+	local n = 0
+	for i, m in used do
+		local g = groupOfIndex(i)
 		CollectionService:AddTag(m, "SeatTable")
 		m:SetAttribute("TableIndex", i)
-		;(m :: Model).ModelStreamingMode = Enum.ModelStreamingMode.Persistent
+		if g then
+			m:SetAttribute("TableGroup", g.key)
+		end
+		m.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
 		for _, d in m:GetDescendants() do
 			if d:IsA("BasePart") and string.match(d.Name, "^Seat%d$") then
 				d.Transparency = 1
@@ -3216,8 +3298,9 @@ local function bindTables(assets: Instance, root: Instance?): number
 				d.CanTouch = false
 			end
 		end
+		n += 1
 	end
-	return #tables
+	return n
 end
 
 -- Lobby points (docs/levels/LOBBY.md v2 §V2-4, 2026-10-11): WORLD coordinates (no MAP_FRAME), in MapBinding/Lobby so
@@ -3312,7 +3395,7 @@ function Bind.run(opts: AnchorOpts?): string
 	local root = bindPoints({ cart = cart, trailer = trl, poses = { cart = cartPose, trl = padPose, sale = salePose }, assets = assets })
 	bindLightZones(root, padPose)
 	log("ok", ("Lobby: %d lobby MapPoint(s) in MapBinding/Lobby (LOBBY.md §V2-4)"):format(bindLobby(root)))
-	log("ok", ("SeatTable: %d picnic table(s) tagged, TableIndex nearest to Q1 first (FEAT-037)"):format(bindTables(assets, root)))
+	log("ok", ("SeatTable: %d table(s) tagged (Pad 1..5, Trailer 6..9; existing TableIndex kept, FEAT-037, Q-209)"):format(bindTables(assets, root)))
 	bindWindows(assets, root)
 	bindTraffic(root)
 	local parked = parkStraySpawn()

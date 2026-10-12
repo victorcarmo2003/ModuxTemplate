@@ -386,6 +386,8 @@ local function build(species: string, outfit: string, opts: Options?): Model
 	const humanoid = Instance.new("Humanoid")
 	humanoid.RigType = Enum.HumanoidRigType.R6
 	humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+	-- first-person eye at the height of the rig's round head (user request 2026-10-12: camera a bit higher)
+	humanoid.CameraOffset = Vector3.new(0, 0.6, 0)
 	humanoid.Parent = model
 
 	model.PrimaryPart = root

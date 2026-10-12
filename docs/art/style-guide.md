@@ -305,6 +305,15 @@ das 4:00 PM às 6:00 PM entra a hora dourada (laranja suave), única pista de qu
 | `Bloom` | Intensity 0,35 · Size 24 · Threshold 1,8 |
 | `SunRays` | Intensity 0,04 |
 
+### 5.2b Lobby (nota Provisória, 2026-10-12, Q-208)
+
+O lobby é uma praça noturna **aconchegante**, não a noite tensa do jogo: preset próprio `Lobby` em `Content.LightPresets`
+(ClockTime 20,75; `Brightness` 1,6; `Ambient` `#705242` / `OutdoorAmbient` `#8A6650`; sombras ameixa-marrom `#341E1E`;
+`Atmosphere` Color `#AC745C` · Decay `#784038` · Density 0,32 · Haze 1,4 (névoa baixa e quente-escura); `ColorCorrection` Saturation +0,18 · Tint `#FFE2C4`; Bloom 0,8).
+Regra: **nenhum tom azul** na luz ambiente do lobby (o azul-violeta `#1B2140` é só a noite do jogo, §5.3). Luzes locais do lobby
+em sódio/creme `#FFB25A..#FFD9A0` (o teal fica só em L-RIM e L-FOUNTAIN, como acento de contraste com o neon). Cores semânticas das
+zonas (classes amarelo, gems verde, codes azul, pads branco/vermelho/verde) não mudam. Números a revisar pelo art-director.
+
 ### 5.3 Noite
 
 `ClockTime` fixo próximo de 0 (o relógio do HUD anda; o céu não precisa). A tensão cresce **por noite** com valores de tabela

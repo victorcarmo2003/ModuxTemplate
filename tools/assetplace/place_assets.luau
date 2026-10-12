@@ -57,6 +57,25 @@ local function cacheFolder(): Folder
 	return f :: Folder
 end
 
+local FRIDGE_STYLE: { [string]: (MeshPart) -> () } = {
+	Fridge_Body = function(p)
+		p.Material, p.CollisionFidelity = Enum.Material.SmoothPlastic, Enum.CollisionFidelity.Box
+	end,
+	Fridge_Trim = function(p)
+		p.Material, p.Color, p.CanCollide = Enum.Material.SmoothPlastic, Color3.fromRGB(63, 167, 181), false
+	end,
+	Fridge_Doors = function(p)
+		p.Material, p.Color, p.Transparency, p.Reflectance = Enum.Material.Glass, Color3.fromRGB(143, 201, 209), 0.55, 0.08
+		p.CastShadow, p.CollisionFidelity = false, Enum.CollisionFidelity.Box
+	end,
+	Fridge_Shelves = function(p)
+		p.Material, p.CanCollide = Enum.Material.SmoothPlastic, false
+	end,
+	Fridge_Led = function(p)
+		p.Material, p.Color, p.CanCollide, p.CastShadow = Enum.Material.Neon, Color3.fromRGB(222, 243, 236), false, false
+	end,
+}
+
 -- Loads (once) the asset model for `name` and returns the cached template.
 local function template(name: string, ids: { [string]: any }): (Instance?, string?)
 	local cache = cacheFolder()
@@ -88,6 +107,10 @@ local function template(name: string, ids: { [string]: any }): (Instance?, strin
 			if string.sub(d.Name, 1, 5) == "Glass" then
 				d.Transparency = 0.5
 				d.CastShadow = false
+			end
+			-- AST-030_FridgeDisplayShelves (DAIRY): glass doors, teal trim, neon LED strips (tools/assetplace/fix_mart_fridge.luau mirrors this)
+			if d:IsA("MeshPart") and FRIDGE_STYLE[d.Name] then
+				FRIDGE_STYLE[d.Name](d)
 			end
 		end
 	end

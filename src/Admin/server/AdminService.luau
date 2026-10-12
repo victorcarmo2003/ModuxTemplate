@@ -6,7 +6,10 @@
 -- Commands:
 --   dev <command> [args]   bridge to DevService (same commands, args and help as chat "/dev"); no logic here.
 --   day / cash / gems / upgrade   typed shortcuts that forward to the same DevService commands.
---   help                   lists the commands above plus DevService help.
+--   dev-help               returns the DevService help text; the client-side "help" (AdminController) uses it.
+--   showcase               opens the dev showcase panel (ShowcaseService; same gate: Studio dev mode + allowed admin).
+--   anomaly <id> trigger|resolve|wrong|stop   forces / resolves / fails / stops one anomaly (ANM-###, key or night n).
+--   scare <id>             plays a hallucination (key) or a sting ("sting:<sound key>") on your client.
 --   tp, content            native and safe in production (no DevService needed).
 -- Policy: DevService only exists in Studio dev mode (PlaceService:IsDev). Published servers therefore expose only
 -- the native commands; the bridge answers "dev commands are off". Do not add Content/profile mutations here
@@ -24,7 +27,7 @@ const ROLE = "super-user"
 const PERMISSION = "admin"
 
 const AdminService = Modux.Service("AdminService", {
-	Require = { "PlayerService", "DevService" },
+	Require = { "PlayerService", "DevService", "ShowcaseService" },
 	Priority = 50, -- below DevService (100): its OnStart has already loaded the commands when ours runs
 })
 
@@ -72,17 +75,39 @@ function AdminService:RunDev(name: string, args: { string })
 	end
 end
 
-function AdminService:CommandHelp()
+-- Text of the DevService help, returned (not logged) so the client "help" command can merge it into its own list.
+function AdminService:CommandDevHelp(): string
 	if not executor() then
+		fail("not allowed")
+		return "not allowed"
+	end
+	const dev = self.Dependencies.DevService
+	if not dev.Enabled then
+		return "dev commands are off here (DevService runs only in Studio dev mode)"
+	end
+	return dev:Help()
+end
+
+-- Showcase commands: ShowcaseService checks dev mode and the whitelist again. It yields (night jumps), and the Conch
+-- context is only valid inside the callback, so the executor is read first and the work runs in its own thread.
+function AdminService:RunShowcase(action: string, id: string, arg: string)
+	const caller = executor()
+	if not caller then
 		return fail("not allowed")
 	end
-	conch.log("normal", "Admin commands: dev <command> [args] | day <n> | cash <amount> | gems <amount> [player] | upgrade [key] [level] | tp [target] <to> | content item|ingredient|class <key> | help")
-	const dev = self.Dependencies.DevService
-	if dev.Enabled then
-		conch.log("normal", dev:Help())
-	else
-		conch.log("normal", "dev commands are off here (DevService runs only in Studio dev mode)")
+	task.spawn(function()
+		const ok, text = self.Dependencies.ShowcaseService:Run(caller, action, id, arg, 0)
+		conch.log(if ok then "success" else "error", text)
+	end)
+end
+
+function AdminService:CommandShowcase()
+	const caller = executor()
+	if not caller then
+		return fail("not allowed")
 	end
+	const ok, text = self.Dependencies.ShowcaseService:Open(caller)
+	conch.log(if ok then "success" else "error", text)
 end
 
 function AdminService:CommandTeleport(a: Player, b: Player?)
@@ -134,12 +159,14 @@ function AdminService:Register()
 		end,
 	})
 
-	conch.register("help", {
+	-- NOT named "help": the client registers the real "help" locally (AdminController). Same name here would
+	-- overwrite it in the client globals when the server replicates.
+	conch.register("dev-help", {
 		permissions = { PERMISSION },
-		description = "List the admin commands and the DevService commands",
+		description = "Return the DevService command list (used by help)",
 		arguments = function() end,
-		callback = function()
-			self:CommandHelp()
+		callback = function(): string
+			return self:CommandDevHelp()
 		end,
 	})
 
@@ -211,6 +238,55 @@ function AdminService:Register()
 				table.insert(args, tostring(value))
 			end
 			self:RunDev("upgrade", args)
+		end,
+	})
+
+	conch.register("showcase", {
+		permissions = { PERMISSION },
+		description = "Open the dev showcase panel (anomalies, scares, mechanics); F9 toggles it",
+		arguments = function() end,
+		callback = function()
+			self:CommandShowcase()
+		end,
+	})
+
+	conch.register("anomaly", {
+		permissions = { PERMISSION },
+		description = "Showcase: anomaly <ANM-###|key|night> trigger|resolve|wrong|stop (dev mode only)",
+		arguments = function()
+			return conch.args.string("id", "ANM-###, anomaly key or night number"),
+				conch.args.string("action", "trigger | resolve | wrong | stop")
+		end,
+		callback = function(id: string, action: string)
+			const verb = string.lower(action)
+			if verb ~= "trigger" and verb ~= "resolve" and verb ~= "wrong" and verb ~= "stop" then
+				return fail("action must be trigger, resolve, wrong or stop")
+			end
+			-- "7" / "anm_007_walker" / "ANM-007" -> the Ref the catalog uses
+			const found = (Content.Anomalies.ByKey :: any)[id]
+			local ref = id
+			if found ~= nil then
+				ref = found.Ref
+			else
+				const number = tonumber(id)
+				for _, row in Content.Anomalies.List do
+					if row.Ref == string.upper(id) or (number ~= nil and row.Night == number) then
+						ref = row.Ref
+					end
+				end
+			end
+			self:RunShowcase(verb, ref, "")
+		end,
+	})
+
+	conch.register("scare", {
+		permissions = { PERMISSION },
+		description = "Showcase: play a hallucination (fake_call, whisper...) or 'sting:<sound key>' on your client",
+		arguments = function()
+			return conch.args.string("id", "hallucination key or sting:<sound key>")
+		end,
+		callback = function(id: string)
+			self:RunShowcase("scare", id, "")
 		end,
 	})
 

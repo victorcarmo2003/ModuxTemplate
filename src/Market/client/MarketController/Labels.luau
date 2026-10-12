@@ -26,7 +26,13 @@ const Labels = {
 	Maxed = "MAX",
 	TrailerOnly = "Trailer only",
 	NothingSpecial = "Nothing special today",
+	SoldOut = "Sold out",
 }
+
+-- "Back next shift" / "Back in 2 shifts" (Gear Stand cooldown, Q-203): shifts left before the line is on sale again.
+function Labels.Back(wait: number): string
+	return if wait <= 1 then "Back next shift" else `Back in {string.format("%d", wait)} shifts`
+end
 
 local function number(value: number): string
 	return if value % 1 == 0 then string.format("%d", value) else string.format("%g", value)

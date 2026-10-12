@@ -204,6 +204,26 @@ N7–N10 = pressão, regra crítica, eventos que tiram o jogador do balcão enqu
 
 ---
 
+## Anotação PROVISÓRIA (2026-10-12, Q-207): noites no carrinho × trailer
+
+Não altera o conteúdo aprovado acima (conceito, sinal, verbo, erro, tipo, escopo, ordem N1–N10, regra crítica só na N7). Registra **onde cada anomalia é jogada**
+com o novo fluxo (D1, D2, N1, D3, N2 … N10; a noite começa no carrinho, o trailer é um desbloqueio opcional depois da noite 2):
+
+| Anomalia | Verbo | `Trailer` (Content) | No carrinho |
+|---|---|---|---|
+| N1 blank folks | recusar | None | igual |
+| N2 wrong food | descartar | None | igual |
+| N3 stopped clock | luz | **Needs** | o interruptor é do trailer; sem ele a noite 3 repete a N2 no lugar (mesmo número de ocorrências); a ligação diz "No trailer yet? Then the clock behaves" |
+| N4 copies | recusar | None | igual |
+| N5 raincoat lady | atender | None | igual |
+| N6 wavers | não olhar | None | igual |
+| N7 walker | não olhar (crítica) | None | igual |
+| N8 long car | fechar a janela | Helps | **sair da zona do carrinho e ficar no Mart**: só quem está na zona (raio 24 do ponto TRL) é testado no 2º clarão do farol |
+| N9 knock | fechar a janela | Helps | idem |
+| N10 hush | ponto seguro | None | igual (Mart) |
+
+As noites 1 e 2 (sempre no carrinho) só têm anomalias `None`: recusar e descartar. A ordem não mudou porque DEC-096 liga `ANM-00k` à noite de estreia.
+
 ## Interações que o game-designer deve checar
 
 - **N3 × N7**: desligar a luz (N3) diminui a área iluminada; o Walker (N7) mede "chegar à luz". Sugestão: com a luz desligada o alvo do Walker é a porta do trailer.

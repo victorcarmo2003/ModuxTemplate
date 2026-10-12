@@ -17,6 +17,8 @@ local CartoonLabel = require(script.Parent.CartoonLabel)
 local Icon = require(script.Icon)
 
 const create = Vide.create
+const source = Vide.source
+const cleanup = Vide.cleanup
 -- Vide 0.4.1 types `create` for 19 classes only; UIScale and UISizeConstraint are not among them.
 const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }) -> Instance
 
@@ -42,8 +44,11 @@ const PANEL_LIP = 6
 
 return function(props: Props): Frame
 	const pop = Motion.Pop(props.Visible)
+	-- Real px size of the screen (this root fills it): a window drawn for a landscape phone shrinks to fit a narrow one.
+	const area = source(Vector2.zero)
 	const scale = function(): number
-		return if props.Scale then math.max(math.min(props.Scale(), UiScale.Current()), Theme.Scale.Min) else 1
+		const base = if props.Scale then math.max(math.min(props.Scale(), UiScale.Current()), Theme.Scale.Min) else 1
+		return UiScale.Fit(base, area(), props.Size)
 	end
 	const bodyHeight = props.Size.Y - PAD * 2 - HEADER - GAP - PANEL_LIP
 
@@ -133,7 +138,7 @@ return function(props: Props): Frame
 		)
 	end
 
-	return create("Frame")({
+	const root = create("Frame")({
 		Name = props.Name or "LobbyWindow",
 		Size = UDim2.fromScale(1, 1),
 		BackgroundColor3 = Theme.Color.Ink,
@@ -172,4 +177,14 @@ return function(props: Props): Frame
 			},
 		}),
 	}) :: Frame
+	const measure = function()
+		if root.AbsoluteSize.X > 0 then
+			area(root.AbsoluteSize)
+		end
+	end
+	const connection = root:GetPropertyChangedSignal("AbsoluteSize"):Connect(measure)
+	cleanup(function()
+		connection:Disconnect()
+	end)
+	return root
 end

@@ -17,6 +17,8 @@ export type Public = {
 	AssetList: (self: Public) -> { any },
 	StepKit: (self: Public) -> (),
 	StepAssets: (self: Public) -> (),
+	MapAssetList: (self: Public) -> { Instance },
+	StepMap: (self: Public) -> (),
 	StepVoices: (self: Public) -> (),
 	BackgroundVoices: (self: Public) -> (),
 	Run: (self: Public) -> (),

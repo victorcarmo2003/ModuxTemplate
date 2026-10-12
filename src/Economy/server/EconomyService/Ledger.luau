@@ -19,6 +19,7 @@ export type Ledger = {
 	Tips: number, -- $ from tips (DEC-072)
 	Catches: number, -- $ from caught thieves (FEAT-013)
 	Stolen: number, -- $ taken by the thief (EconomyService:Steal)
+	Collected: number, -- $ moved from the drawer to Cash during the shift ("Collect Cash", Q-201); counts in the report
 }
 
 -- ShiftReport packet (network.md §4.4)
@@ -49,7 +50,7 @@ export type Settlement = {
 const Ledger = {}
 
 function Ledger.new(): Ledger
-	return { Arrived = 0, Served = 0, Completed = 0, Sales = 0, Tips = 0, Catches = 0, Stolen = 0 }
+	return { Arrived = 0, Served = 0, Completed = 0, Sales = 0, Tips = 0, Catches = 0, Stolen = 0, Collected = 0 }
 end
 
 -- Counts one customer outcome. Left/Refused/Wrong only matter through Arrived (they are not satisfied).
@@ -90,7 +91,8 @@ function Ledger.grade(arrived: number, completed: number): Grade
 	return "D"
 end
 
--- Bonus = floor(drawer x %) (FEAT-014). bossPoints = party BossBonusPP (Shift Lead, +5, not stacking); FEAT-014
+-- Bonus = floor(day take x %) (FEAT-014); the day take = what is still in the drawer + what was collected during the
+-- shift (Q-201), so the grade bonus and the report do not depend on when the crew collected. bossPoints = party BossBonusPP (Shift Lead, +5, not stacking); FEAT-014
 -- table: it adds to A/B/C and never to D (D stays 0% and triggers the boss line).
 function Ledger.settle(ledger: Ledger, drawer: number, bossPoints: number): Settlement
 	const grade = Ledger.grade(ledger.Arrived, ledger.Completed)
@@ -98,8 +100,10 @@ function Ledger.settle(ledger: Ledger, drawer: number, bossPoints: number): Sett
 	if grade ~= "D" then
 		pct += math.max(bossPoints, 0)
 	end
-	const bonus = math.floor(drawer * pct / 100)
-	return { Grade = grade, BonusPct = pct, Bonus = bonus, Deposited = drawer + bonus }
+	const take = drawer + ledger.Collected
+	const bonus = math.floor(take * pct / 100)
+	-- Deposited = the whole day take + bonus (report); Cash already got `Collected` while the shift ran
+	return { Grade = grade, BonusPct = pct, Bonus = bonus, Deposited = take + bonus }
 end
 
 return Ledger

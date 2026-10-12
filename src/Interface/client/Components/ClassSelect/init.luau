@@ -25,6 +25,8 @@ local Icon = require(script.Parent.LobbyWindow.Icon)
 
 const create = Vide.create
 const effect = Vide.effect
+const source = Vide.source
+const cleanup = Vide.cleanup
 const untrack = Vide.untrack
 -- Vide 0.4.1 types `create` for 19 classes only; UIScale, UIPadding, ScrollingFrame are not among them.
 const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }) -> Instance
@@ -77,6 +79,7 @@ const ROW_GAP = 6
 const PAD = 10
 const BUTTON = 44
 const ARROW = 48
+const DESIGN = Vector2.new(620, 340)
 
 type Line = { Text: string, Icon: string, Fallback: string, Color: Color3 }
 
@@ -115,8 +118,11 @@ return function(props: Props): Frame
 		props.OnFocus(props.Entries[(index - 1 + delta) % n + 1].Key)
 	end
 
+	-- Real px size of the screen (this root fills it): the screen shrinks to fit a narrow one (design 620 x 340).
+	const area = source(Vector2.zero)
 	const scale = function(): number
-		return if props.Scale then math.max(math.min(props.Scale(), UiScale.Current()), Theme.Scale.Min) else 1
+		const base = if props.Scale then math.max(math.min(props.Scale(), UiScale.Current()), Theme.Scale.Min) else 1
+		return UiScale.Fit(base, area(), DESIGN)
 	end
 	const pop = Motion.Pop(props.Visible)
 	const scaled = function(): number
@@ -361,7 +367,7 @@ return function(props: Props): Frame
 	}
 
 	const textWidth = CARD_WIDTH - PAD * 2 - 8 - 24
-	return create("Frame")({
+	const root = create("Frame")({
 		Name = "ClassSelect",
 		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
@@ -690,4 +696,14 @@ return function(props: Props): Frame
 			}),
 		}),
 	}) :: Frame
+	const measure = function()
+		if root.AbsoluteSize.X > 0 then
+			area(root.AbsoluteSize)
+		end
+	end
+	const connection = root:GetPropertyChangedSignal("AbsoluteSize"):Connect(measure)
+	cleanup(function()
+		connection:Disconnect()
+	end)
+	return root
 end

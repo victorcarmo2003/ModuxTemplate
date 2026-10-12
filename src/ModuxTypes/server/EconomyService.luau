@@ -31,6 +31,7 @@ export type Public = {
 	Spend: (self: Public, amount: number, player: Player?) -> boolean,
 	AddToDrawer: (self: Public, amount: number, kind: DrawerKind) -> number,
 	Steal: (self: Public, amount: number) -> number,
+	Collect: (self: Public) -> number,
 	CountArrival: (self: Public) -> (),
 	CountResult: (self: Public, result: SaleResult) -> (),
 	AddReportStep: (self: Public, name: string, fn: ReportStep) -> (),

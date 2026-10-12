@@ -3,6 +3,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
+local OrderBubble = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.OrderBubble)
 local Look = require(StarterPlayer.StarterPlayerScripts.client.Seating.SeatingController.Look)
 local Meal = require(StarterPlayer.StarterPlayerScripts.client.Seating.SeatingController.Meal)
 
@@ -16,8 +17,11 @@ type Spot = {
 	TrayAt: CFrame?, -- where the tray goes
 	Tray: Model?,
 	TrayTip: number, -- tip the tray was built with
+	Dim: boolean, -- ghost drawn fainter: for sale but the party cannot pay it yet (like the bench)
 	Unmount: (() -> ())?,
 	Gui: Instance?,
+	OrderUnmounts: { () -> () }, -- order label (plate + bubble) of a customer waiting at the table (Q-209)
+	OrderGuis: { Instance },
 }
 export type State = "Locked" | "Ghost" | "Free" | "Occupied" | "Dirty"
 
@@ -44,7 +48,13 @@ export type Public = {
 	ShowTray: (self: Public, spot: Spot, tip: number) -> (),
 	ClearTray: (self: Public, spot: Spot) -> (),
 	CanPay: (self: Public, price: number) -> boolean,
+	CanPayNow: (self: Public, price: number) -> boolean,
+	RefreshDim: (self: Public) -> (),
 	MountSign: (self: Public, spot: Spot) -> (),
+	WaitingAt: (self: Public, spot: Spot) -> number?,
+	OrderRows: (self: Public, spot: Spot) -> { { OrderBubble.Topping } },
+	MountOrder: (self: Public, spot: Spot) -> (),
+	UnmountOrder: (self: Public, spot: Spot) -> (),
 	Bought: (self: Public, spot: Spot) -> (),
 	Cleaned: (self: Public, spot: Spot, tip: number) -> (),
 	Watch: (self: Public, gui: Instance) -> (),

@@ -123,6 +123,8 @@ export type Public = {
 	DevSetDay: (self: Public, day: number) -> (),
 	DevSetNight: (self: Public, night: number) -> (),
 	DevWinNight: (self: Public) -> (),
+	DevPhaseElapsed: (self: Public) -> number,
+	DevSetPhaseElapsed: (self: Public, seconds: number) -> (),
 }
 
 return {}

@@ -1,11 +1,16 @@
 --!strict
--- LobbyHud: the lobby HUD (user request 2026-10-11), cartoon kit (AST-091), mobile first.
+-- LobbyHud: the lobby HUD (user request 2026-10-11; layout 2026-10-12), cartoon kit (AST-091), mobile first.
 -- Laid out for the smallest landscape phone (620 x 340 px at Scale 1, inside CoreUISafeInsets); `Scale` grows it.
---   top left     gem balance pill (a button: opens the gem shop), gem icon + amount + "+"
---   left column  four big tiles (62 px): Classes · Shop · Codes · Squad (Squad shows "2/4" when in a squad)
---   bottom centre the big Play button (text and colour from `Play`: Play / Squad / Start / Starting...)
--- Kept clear of the mobile thumbstick (bottom left) and jump button (bottom right). Key chips ("C", "Y"...) on the tiles
--- when the device is not touch (`Keys`). Pure: only props.
+-- ALL of the lobby UI lives on the RIGHT side; the left side stays free for the Roblox menu and chat.
+--   top right      gem balance pill (a button: opens the gem shop), gem icon + amount + "+"
+--   under the pill four big tiles: Classes, Shop, Codes, Squad (Squad shows "2/4" when in a squad). One column
+--                  (56 px tiles); on a short screen (under 440 px tall, phones in landscape) a 2 x 2 grid in the same
+--                  order, so it stays clear of the mobile jump button (bottom right); tiles 48 px (over the 44 px
+--                  touch target) on narrow screens
+--   bottom centre  squad status card (SquadStatus: Solo / Squad n/4, member heads, Friends only) over the big Play
+--                  button (text and colour from `Play`: PLAY green, START SQUAD mustard, READY, STARTING...)
+-- Kept clear of the mobile thumbstick (bottom left) and jump button (bottom right). Key badges ("C", "Y"...) on the
+-- tiles when the device is not touch (`Keys`). Pure: only props.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Theme)
@@ -15,10 +20,14 @@ local Motion = require(script.Parent.Motion)
 local CartoonPanel = require(script.Parent.CartoonPanel)
 local CartoonButton = require(script.Parent.CartoonButton)
 local CartoonLabel = require(script.Parent.CartoonLabel)
+local KeyChip = require(script.Parent.KeyChip)
+local SquadStatus = require(script.Parent.SquadStatus)
 local Icon = require(script.Parent.LobbyWindow.Icon)
 
 const create = Vide.create
--- Vide 0.4.1 types `create` for 19 classes only; UIScale is not among them.
+const source = Vide.source
+const cleanup = Vide.cleanup
+-- Vide 0.4.1 types `create` for 19 classes only; UIScale and UIGridLayout are not among them.
 const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }) -> Instance
 
 export type Tile = "Classes" | "Shop" | "Codes" | "Squad"
@@ -37,22 +46,27 @@ export type Props = {
 	-- "2/4" while in a squad; "" = no badge.
 	Squad: () -> string,
 	Play: () -> PlayButton,
+	-- Card over the Play button: solo or squad, members, friends only, one status line.
+	Card: () -> SquadStatus.Info,
 	-- Key chip per tile ("C", "Y"); "" or missing = no chip (touch).
 	Keys: () -> { [string]: string },
 	OnOpen: (tile: Tile) -> (),
 	OnPlay: () -> (),
 	Scale: (() -> number)?,
-	-- Short line over the Play button ("Waiting for 1 more"); "" = none.
-	Status: (() -> string)?,
 }
 
 const MARGIN = 12
+const TOP = 8
 const TILE = 56
+const TILE_SMALL = 48 -- compact / narrow: still over the 44 px touch target
 const TILE_GAP = 6
-const TOP = 60 -- first tile under the gem pill
+const SIDE_GAP = 8 -- between the pill and the tiles
 const PILL = 44
-const PLAY_WIDTH = 170
+const PLAY_WIDTH = 210
 const PLAY_HEIGHT = 52
+const CARD_GAP = 8
+const SHORT = 440 -- px tall screens under this get the 2 x 2 grid
+const NARROW = 420 -- px wide screens under this get the small tiles
 
 const PLAY_TONE: { [PlayKind]: Theme.Tone } = {
 	Go = Theme.Tone.Green,
@@ -78,6 +92,18 @@ return function(props: Props): Frame
 		return scale() * pop()
 	end
 
+	-- Real px size of the screen (this root fills it): decides the grid and the tile size.
+	const area = source(Vector2.new(1000, 700))
+	const compact = function(): boolean
+		return area().Y < SHORT
+	end
+	const tile = function(): number
+		return if compact() or area().X < NARROW then TILE_SMALL else TILE
+	end
+	const tileSize = function(): UDim2
+		return UDim2.fromOffset(tile(), tile())
+	end
+
 	const tiles: { Instance } = {}
 	for index, def in TILES do
 		const keyText = function(): string
@@ -91,7 +117,7 @@ return function(props: Props): Frame
 			CartoonButton({
 				Name = def.Key,
 				LayoutOrder = index,
-				Size = UDim2.fromOffset(TILE, TILE),
+				Size = tileSize,
 				Tone = def.Tone,
 				Outline = Theme.Outline.Thick,
 				Radius = Theme.Radius.Card,
@@ -109,7 +135,7 @@ return function(props: Props): Frame
 							VerticalAlignment = Enum.VerticalAlignment.Center,
 							SortOrder = Enum.SortOrder.LayoutOrder,
 						}),
-						Icon(def.Icon, 26, 1),
+						Icon(def.Icon, 24, 1),
 						CartoonLabel({
 							LayoutOrder = 1,
 							TextSize = 20,
@@ -124,34 +150,18 @@ return function(props: Props): Frame
 							Text = def.Text,
 						}),
 					}),
-					-- key chip (desktop / gamepad)
-					CartoonPanel({
+					-- key badge (desktop / gamepad), centred on the top-left corner: free of the screen edge
+					KeyChip({
 						Name = "Key",
-						AnchorPoint = Vector2.new(1, 0),
-						Position = UDim2.new(1, 10, 0, -12),
-						Size = UDim2.fromOffset(24, 24),
-						AutomaticSize = Enum.AutomaticSize.X,
-						Tone = Theme.Tone.Ink,
-						Lip = 2,
-						Outline = 2,
-						Padding = { Left = 4, Right = 4 },
-						Visible = function()
-							return keyText() ~= ""
-						end,
-						Children = {
-							CartoonLabel({
-								Box = UDim2.new(0, 0, 1, 0),
-								AutomaticSize = Enum.AutomaticSize.X,
-								TextSize = Theme.MinTextSize,
-								Text = keyText,
-							}),
-						},
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						Position = UDim2.fromOffset(2, 2),
+						Text = keyText,
 					}),
-					-- squad badge
+					-- squad badge, centred on the bottom-right corner
 					CartoonPanel({
 						Name = "Badge",
-						AnchorPoint = Vector2.new(1, 1),
-						Position = UDim2.new(1, 12, 1, 8),
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						Position = UDim2.new(1, -2, 1, -6),
 						Size = UDim2.fromOffset(0, 24),
 						AutomaticSize = Enum.AutomaticSize.X,
 						Tone = Theme.Tone.Violet,
@@ -175,23 +185,32 @@ return function(props: Props): Frame
 		)
 	end
 
-	return create("Frame")({
+	const root = create("Frame")({
 		Name = "LobbyHud",
 		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
 		Visible = props.Visible,
 
-		-- Gem balance: opens the shop
+		-- Right column: gem pill on top, the tiles under it (one stable order, one UIScale)
 		create("Frame")({
-			Name = "GemsAnchor",
-			Position = UDim2.fromOffset(MARGIN, 8),
-			Size = UDim2.fromOffset(0, PILL),
-			AutomaticSize = Enum.AutomaticSize.X,
+			Name = "Side",
+			AnchorPoint = Vector2.new(1, 0),
+			Position = UDim2.new(1, -MARGIN, 0, TOP),
+			Size = UDim2.fromOffset(0, 0),
+			AutomaticSize = Enum.AutomaticSize.XY,
 			BackgroundTransparency = 1,
 			createRaw("UIScale")({ Scale = scaled }),
+			create("UIListLayout")({
+				FillDirection = Enum.FillDirection.Vertical,
+				HorizontalAlignment = Enum.HorizontalAlignment.Right,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, SIDE_GAP),
+			}),
 
+			-- Gem balance: opens the shop
 			CartoonButton({
 				Name = "Gems",
+				LayoutOrder = 1,
 				Size = UDim2.fromOffset(0, PILL),
 				AutomaticSize = Enum.AutomaticSize.X,
 				Tone = Theme.Tone.Ink,
@@ -231,24 +250,29 @@ return function(props: Props): Frame
 					}),
 				},
 			}),
-		}),
 
-		-- Left column of tiles
-		create("Frame")({
-			Name = "Tiles",
-			Position = UDim2.fromOffset(MARGIN, TOP),
-			Size = UDim2.fromOffset(TILE, TILE * #TILES + TILE_GAP * (#TILES - 1)),
-			BackgroundTransparency = 1,
-			createRaw("UIScale")({ Scale = scaled }),
-			create("UIListLayout")({
-				FillDirection = Enum.FillDirection.Vertical,
-				SortOrder = Enum.SortOrder.LayoutOrder,
-				Padding = UDim.new(0, TILE_GAP),
+			-- Tiles: a column, or a 2 x 2 grid on short screens (same order)
+			create("Frame")({
+				Name = "Tiles",
+				LayoutOrder = 2,
+				Size = UDim2.fromOffset(0, 0),
+				AutomaticSize = Enum.AutomaticSize.XY,
+				BackgroundTransparency = 1,
+				createRaw("UIGridLayout")({
+					FillDirection = Enum.FillDirection.Horizontal,
+					FillDirectionMaxCells = function()
+						return if compact() then 2 else 1
+					end,
+					HorizontalAlignment = Enum.HorizontalAlignment.Right,
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					CellSize = tileSize,
+					CellPadding = UDim2.fromOffset(TILE_GAP, TILE_GAP),
+				}),
+				tiles,
 			}),
-			tiles,
 		}),
 
-		-- Play
+		-- Play, with the squad status card over it
 		create("Frame")({
 			Name = "PlayAnchor",
 			AnchorPoint = Vector2.new(0.5, 1),
@@ -257,23 +281,17 @@ return function(props: Props): Frame
 			BackgroundTransparency = 1,
 			createRaw("UIScale")({ Scale = scaled }),
 
-			CartoonLabel({
-				Name = "Status",
+			SquadStatus({
+				Name = "Card",
 				AnchorPoint = Vector2.new(0.5, 1),
-				Position = UDim2.new(0.5, 0, 0, -4),
-				TextSize = 16,
-				Text = function()
-					return if props.Status then props.Status() else ""
-				end,
-				Visible = function()
-					return props.Status ~= nil and props.Status() ~= ""
-				end,
+				Position = UDim2.new(0.5, 0, 0, -CARD_GAP),
+				Info = props.Card,
 			}),
 
 			CartoonButton({
 				Name = "Play",
 				Size = UDim2.fromScale(1, 1),
-				TextSize = 26,
+				TextSize = 24,
 				Outline = Theme.Outline.Thick,
 				Radius = Theme.Radius.Card,
 				Studs = true,
@@ -290,4 +308,15 @@ return function(props: Props): Frame
 			}),
 		}),
 	}) :: Frame
+
+	const measure = function()
+		if root.AbsoluteSize.X > 0 then
+			area(root.AbsoluteSize)
+		end
+	end
+	const connection = root:GetPropertyChangedSignal("AbsoluteSize"):Connect(measure)
+	cleanup(function()
+		connection:Disconnect()
+	end)
+	return root
 end

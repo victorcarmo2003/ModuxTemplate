@@ -23,6 +23,16 @@ executável. Toda linha tem `Ref` apontando para o ID da ficha.
 
 ## 0. O que mudou
 
+### 0.00 Novo fluxo da run (pedido do dono 2026-10-12, **Provisório**, Q-207)
+
+Sequência D1, D2, N1, D3, N2 … D11, N10, Final (a noite *k* no fim do dia *k* + 1), noites no carrinho; o trailer é um desbloqueio opcional
+(`Content.Trailer.OfferAfterNight`, do agente do trailer). Mudanças de conteúdo: `RunParams.NightsFromDay = 2` (novo); `RunParams.TrailerDay`
+obsoleto; `EndlessFromDay` / `EndlessRequiresNoTrailer` **sem uso** (sem dia infinito); `Vehicles.cart.HasNight = true`; `Nights[k].Duration` = 540 + 40 (k − 1) s
+(540 … 900; `MinGap`, `MaxSimultaneous` iguais); `Anomalies[].Trailer` ∈ `None | Helps | Needs` (novo; `Content.Anomalies.StandIn(row)`);
+`BossCalls`: `call_day_3/4` (e variantes) viraram `call_day_after_1/2` (+ `_quentin`), `Trigger.Variant` vale também em `DayPrep` por noite, `call_day_2` avisa da noite,
+chamadas das noites 3, 7, 8, 9, 10 neutras quanto ao veículo. `Validate`: `NightsFromDay` 2..50; `Trailer` válido; nenhuma anomalia com `Trailer ≠ None` em noite
+≤ `Content.Trailer.OfferAfterNight` (as noites 1–2 são sempre no carrinho); `Needs` precisa de reserva (`StandIn`). Ver `design/progression.md` §0.
+
 ### 0.0 Versão 4 (TASK-001; DEC-140 a DEC-201)
 
 | Tabela | Mudança | Origem |
@@ -224,7 +234,8 @@ existem com `Keys` corretas e valores preenchidos nas TASK-008/009.
 
 | Campo | Tipo | Valor inicial | Origem |
 |---|---|---|---|
-| `TrailerDay` | int | 5 | DEC-037 |
+| `NightsFromDay` | int | **2** (Provisório 2026-10-12, Q-207): 1º dia de turno cujo fim é seguido de noite; a noite *k* é jogada no Day *k* + `NightsFromDay` − 1 | pedido do dono |
+| `TrailerDay` | int | 5 — **obsoleto** (substituído por `Content.Trailer.OfferAfterNight`, 2026-10-12) | DEC-037 |
 | `TrailerBasePrice` | int | 300 | DEC-047 |
 | `PartyPriceMult` | `{ number }` por 1–4 | 1.0, 1.5, 1.9, 2.2 | DEC-047; vale para o trailer e para o Revive Kit (DEC-121, DEC-129) |
 | `PricePartyFrom` | `"JoinedByDay1End"` (fixo) | membros do roster que entraram até o fim do Day 1; fixado ali, não muda depois | DEC-121 (regra: mudar exige DEC) |
@@ -237,8 +248,8 @@ existem com `Keys` corretas e valores preenchidos nas TASK-008/009.
 | `JoinWindow` | s | 60 | DEC-098 |
 | `ResumeWindow` | s | 900 (15 min) | DEC-080 |
 | `ResumeWait` | s | 15 (fase `Resume`) | architect |
-| `EndlessFromDay` | int | 6 | DEC-084 ("a partir do Day 6") |
-| `EndlessRequiresNoTrailer` | bool | true | DEC-084 ("dias sem trailer"); game-designer confirma |
+| `EndlessFromDay` | int | 6 — **sem uso** desde 2026-10-12 (sem dia infinito; Q-207) | DEC-084 ("a partir do Day 6") |
+| `EndlessRequiresNoTrailer` | bool | true — **sem uso** | DEC-084 ("dias sem trailer"); game-designer confirma |
 | `AntiAfkMinCompleted` | int | 3 | DEC-083 |
 | `AntiAfkAppliesToGradeA` | bool | true (leitura do secretário, a confirmar) | DEC-083 |
 
@@ -392,7 +403,7 @@ Chaves alinhadas ao binding da TASK-002 (`architecture.md` §18.4, §18.14 item 
 |---|---|---|---|
 | `Ref`, `Name` | AST-026, "Corner Cart" | UPG-006 / AST-027, "Open Late Trailer" | DEC-139, DEC-141 |
 | (modelo) | `Model` com tag `Vehicle`, `Vehicle = "cart"` no `Workspace` (T36; sai o campo `Model`) | idem, `"trailer"` | `architecture.md` §18.1, §18.14 |
-| `HasNight` | false | true | DEC-007 |
+| `HasNight` | ~~false~~ **true** (2026-10-12: a noite começa no carrinho) | true | DEC-007 (emendado, Q-207) |
 | `RailSlots` | 6 | 8 | FEAT-006 |
 | `BoardSlots` | **2** | **3** | **DEC-190**, **DEC-215** |
 | `HasCoffee`, `HasSwitch`, `HasShutter` (v5.2; sai `HidePoints`) | false, false, false | true, true, true | DEC-125, DEC-189, DEC-221 |
@@ -701,8 +712,8 @@ dinâmico completo (DEC-187: sobe e desce, muda pagamento) acrescenta linhas e c
 
 | Tabela | Campos |
 |---|---|
-| Nights | `Index` 1–10 · `Duration` (s; DEC-127: 1200, 1260, 1320, 1380, 1440, 1560, 1620, 1680, 1740, 1800) · `NewAnomaly` (chave ANM) · `IntroCall`, `RepeatCall` (versão curta, `Q-077` d) · `MaxSimultaneous` · `TrafficDensity` (override opcional, `Q-103`) |
-| Anomalies (shared) | `Key` (`anm_blank_folks`…), `Ref` (`ANM-001`…`ANM-010`), `Actor` (`Customer`/`World`/`Ambient`/`Vehicle`), `Look`, `Scope` (`Party`/`PerPlayer`, DEC-073) |
+| Nights | `Index` 1–10 · `Duration` (s; DEC-127 emendado em 2026-10-12, Provisório: 540, 580, 620, 660, 700, 740, 780, 820, 860, 900; era 1200 … 1800) · `NewAnomaly` (chave ANM) · `IntroCall`, `RepeatCall` (versão curta, `Q-077` d) · `MaxSimultaneous` · `TrafficDensity` (override opcional, `Q-103`) |
+| Anomalies (shared) | `Key` (`anm_blank_folks`…), `Ref` (`ANM-001`…`ANM-010`), `Actor` (`Customer`/`World`/`Ambient`/`Vehicle`), `Look`, `Scope` (`Party`/`PerPlayer`, DEC-073), **`Trailer`** (`None`/`Helps`/`Needs`, 2026-10-12: o que o carrinho pode fazer; `Needs` = o agendador usa a reserva `StandIn`) |
 | AnomalyCues | `Key`, `Kind`, parâmetros |
 | AnomalyRules (servidor) | `Anomaly`, `Signal`, `CorrectVerb`, `LikelyWrongVerb`, `Window`, `IsCritical` (só `ANM-007`, `Validate()` garante, DEC-074) |
 
@@ -919,7 +930,7 @@ Campos novos por linha: `Selling: boolean` (nasce cliente, gaveta conta), `SkipW
 | Campo | Tipo | Valor inicial | Origem |
 |---|---|---|---|
 | `Index` | 1..10 | — | DEC-060 |
-| `Duration` | s (8 PM → 6 AM) | 1200, 1260, 1320, 1380, 1440, 1560, 1620, 1680, 1740, 1800 | DEC-127 |
+| `Duration` | s (8 PM → 6 AM) | 540, 580, 620, 660, 700, 740, 780, 820, 860, 900 (Provisório 2026-10-12, Q-207; era 1200 … 1800) | DEC-127 |
 | `NewAnomaly` | chave de `Anomalies` | `anm_001_blank_folks` … `anm_010_hush` | DEC-073 |
 | `Call`, `ShortCall` | chaves de `BossCalls` | `call_night_<N>`, `call_night_short` | FEAT-018 |
 | `MaxSimultaneous` | int | 1, 1, 1, 2, 2, 2, 2, 3, 3, 3 | FEAT-022 |

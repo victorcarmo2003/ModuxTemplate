@@ -77,7 +77,7 @@ Anomalias: `ANM-001`…`ANM-010` = N1…N10 (DEC-096).
 - **+X = leste**, **+Z = sul**, **norte = −Z**. Coordenadas no texto são `(X, Z)` em studs.
 - **Referencial do place (2026-10-10, decisão do usuário):** o mapa inteiro foi girado 180° em Y no Studio em volta de `(0, 33,94)`. Todas as coordenadas deste documento (e das tabelas das ferramentas) continuam no referencial MAP-01 acima; no place, um ponto `(x, y, z)` daqui fica em **`(−x, y, 67,887287 − z)`**, e as direções viram (norte = +Z do mundo, leste = −X do mundo). A transformação única é `MAP_FRAME` em `tools/assetplace/map_frame.luau` (§16.9).
 - Personagem **R6** [DEC-089, DEC-097]: altura 5 studs (pernas 2, tronco 2, cabeça 1), olho ~4,5, largura 2. WalkSpeed padrão 16 studs/s (classes: Runner 18, Line Cook 15, DEC-069).
-- Altura de bancada: **3,5 studs**, igual ao `art/style-guide.md` §4 (Aprovado, DEC-126: R6, olho 4,5, bancada 3,5). Proposta: fechar `Q-095` por DEC-126. **Exceção, DEC-157 (2026-10-10): bancada do carrinho (AST-026) a 3,0** do Pad (y 3,45 no mapa; Pad 0,45); trailer e demais bancadas seguem 3,5; style guide em `Q-153`. Trailer: pé-direito **8,5** sobre o piso a +2, altura externa **~11** (AST-027). Porta: 4 × 7,5.
+- Altura de bancada: **3,5 studs**, igual ao `art/style-guide.md` §4 (Aprovado, DEC-126: R6, olho 4,5, bancada 3,5). Proposta: fechar `Q-095` por DEC-126. **Exceção, DEC-157 (2026-10-10): bancada do carrinho (AST-026) a 3,0** do Pad (y 3,45 no mapa; Pad 0,45); trailer e demais bancadas seguem 3,5; style guide em `Q-153`. **Atualização 2026-10-11 (Provisória, pedido do usuário em 1ª pessoa, noite):** bancada interna e peitoril da janela do **trailer** caem **0,9**: topo a **2,6** sobre o piso (+2) = **pivô + 4,6** (era 3,5 / +5,5); estações do balcão, Shelf_Fold, toldo e Shutter_Panel acompanham; topo da janela segue em 10,0 (abertura 5,4). Telefone, interruptor e botão do shutter ficam (montados na parede). Precisa de DEC para virar regra (exceção ao style guide como a DEC-157). Trailer: pé-direito **8,5** sobre o piso a +2, altura externa **~11** (AST-027). Porta: 4 × 7,5.
 - Trânsito em **mão direita**: na Ninth, sentido oeste (WB) na metade norte da pista, sentido leste (EB) na metade sul. Na Juniper (Norte e Sul), sentido sul (SB) no lado oeste, sentido norte (NB) no lado leste.
 - Diagramas ASCII são **aproximados** (±4 studs). As tabelas de coordenadas (§5) são a fonte da verdade.
 
@@ -192,6 +192,22 @@ Três linhas que organizam o mapa:
 | DROP-T | Itens do espectador (FEAT-025, §19.12 do `architecture.md`) | (51.5, 44.5), piso do trailer (+2) | **novo (TASK-083)**. Canto de trás à direita, ao lado da porta dos fundos, dentro de LZ-1: os pacotes e o apito de quem virou espectador caem aqui às 6:00 AM. Fora da linha de estações (nenhum prompt de estação a < 5 studs) e visível de quem entra pela porta. Provisório |
 
 Poses dos veículos (`MapPoint`, T36): `CART` = pivô do carrinho **(41, 37.5)** (o "centro (41, 40)" da tabela é o visual; o código usa o pivô do modelo, base-centro do AST-026), `TRL` = pivô do trailer no Pad (40, 41), virado para o norte; `TRL-SALE` = (78, −58), virado para o sul. O `VehicleService` faz `PivotTo` do modelo para o ponto: carrinho em `CART` e trailer em `TRL-SALE` no começo da run; depois da troca, trailer em `TRL` e carrinho (com a lona) em `TRL-SALE`. `SIGN-T` também vira `MapPoint` (78, −40), virado para o sul: é onde o `VehicleController` desenha "Available on Day 5" (§16.3).
+
+**Pad vazio com o trailer (pedido do dono 2026-10-12, Provisório, `Q-216`).** Quando o veículo em uso é o trailer, o Pad vira um terreno vazio (ambiente de terror): somem o carrinho (e a lona), tudo de `PadDecor` (neon, menu, luzes em fio, caixotes, plantas), as mesas TBL-1..5 e o blockout `Pad.CART`, sem malha, sem colisão, sem luz e sem prompt (cliente: `PadHideController`; estado = `Shift.Vehicle`; servidor: grupo Pad `Vehicles = { "cart" }`). Ficam o piso, as bordas, as marcas Q1..Q5 e o letreiro OPEN (único `open_sign`). O trailer usa as mesmas âncoras `TRL`. Volta ao carrinho = tudo reaparece.
+
+### 5.1b Mesas do Pad e mesas do trailer (FEAT-037; UPG-008, UPG-011; `Q-209`, Provisório, 2026-10-12)
+
+Duas famílias de mesa, cada uma um **grupo** de `Content.Seating.Groups` (o `Model` leva a tag `SeatTable`, o atributo `TableIndex` e, opcional, `TableGroup`):
+
+| Grupo | `TableIndex` | Onde | Quando aparece | Upgrade |
+|---|---|---|---|---|
+| Pad | 1..5 | as 5 `AST-100_PicnicTable` em `MAP01_Assets.PadDecor`, atrás do carrinho (mão do usuário) | desde o Day 2, fantasmas | UPG-008 ($30..$100) |
+| Trailer | 6..9 | as 4 mesas que o dono colocou no Studio para o trailer (coordenadas informadas ~ x −66..−92, z 108..135; **conferir no place**: `tools/assetplace/trailer_tables.luau` lista os candidatos com a distância a Q1) | **escondidas** (invisíveis, sem colisão) até o trailer ser o veículo; depois só a próxima à venda, como fantasma com preço; compradas = sólidas | UPG-011 ($50 / $70 / $90 / $120) |
+
+- Cada mesa: `Seat1..Seat4` (BaseParts; o snippet cria as que faltam, copiando a pose das mesas do Pad quando elas existem), `Prompt_BuyTable` / `Prompt_CleanTable` / `Tray_Anchor` opcionais (o servidor cria o prompt sobre o tampo).
+- **Nenhuma posição do usuário é tocada**: o snippet só põe tag, atributos e assentos que faltam; `bind_map01` (`bindTables`) mantém `TableIndex` já existente e só numera as mesas novas (grupo = atributo `TableGroup`, senão "Trailer" se estiver a mais de 40 studs das mesas do Pad). `check_map01` regra 16 (só avisos): índice 1..9 sem repetição, `TableGroup` coerente, `Seat1..4`, `NpcNode` a ≤ 20 studs.
+- **Pendência do level-designer**: `NpcNode` `TBL-6..9` perto de cada mesa do trailer e aresta até a fila/EX; sem nó a ≤ 20 studs o servidor avisa uma vez e o cliente que senta ali volta sozinho depois de 30 s. Se as mesas ficam mesmo longe do trailer parado no Pad, a rota Q1 → mesa precisa cruzar a rua por faixa de pedestre (CW-n).
+- Regra de uso: com o trailer e ≥ 1 mesa do trailer comprada, **só** o grupo Trailer senta (não mistura com o Pad); antes disso as mesas do Pad ainda servem.
 
 ### 5.2 Mart, ruas e marcos
 

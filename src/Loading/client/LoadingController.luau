@@ -38,6 +38,7 @@ type Texts = { Status: { [string]: string } }
 
 const GUI_NAME = "LoadingScreen"
 const KIT_TIMEOUT = 10 -- s for the crew kit warm-up (it keeps going in the background; RigController has its own cap)
+const MAP_TIMEOUT = 14 -- s for the meshes and textures of the map / lobby (the rest keeps loading behind the curtain)
 const ASSET_TIMEOUT = 12 -- s for PreloadAsync of sounds and images
 const VOICE_TIMEOUT = 8 -- s for the intro voices of the first seconds (the rest keeps loading in the background)
 const TUTORIAL_VOICE_TIMEOUT = 150 -- s the background load of Walt's tutorial lines may run (rookies only)
@@ -56,7 +57,7 @@ const INTRO_SOUNDS = {
 	"amb_day_street",
 }
 -- weights of the steps on the bar
-const WEIGHTS: { [string]: number } = { Game = 1, Start = 0.5, Kit = 2, Assets = 2, Voices = 3 }
+const WEIGHTS: { [string]: number } = { Game = 1, Start = 0.5, Kit = 2, Assets = 2, Voices = 3, Map = 3 }
 -- texts (ReplicatedFirst/client/Loading/Tips); fallback when the boot folder is missing (Studio without it)
 const FALLBACK_STATUS: { [string]: string } = {
 	Game = "Loading...",
@@ -91,7 +92,7 @@ function LoadingController:Setup()
 	self.Progress = Vide.source(0) :: Vide.Source<number>
 	self.Status = texts() :: { [string]: string }
 	-- fraction 0..1 of each step
-	self.Steps = { Game = 0, Start = 0, Kit = 0, Assets = 0, Voices = 0 } :: { [string]: number }
+	self.Steps = { Game = 0, Start = 0, Kit = 0, Assets = 0, Voices = 0, Map = 0 } :: { [string]: number }
 	self.Gui = nil :: ScreenGui?
 	self.Sent = false :: boolean
 end
@@ -239,6 +240,56 @@ function LoadingController:StepAssets()
 	end
 end
 
+-- Meshes, textures and decals of the world the player lands in (lobby or run map): one representative instance per
+-- distinct mesh + texture pair goes to PreloadAsync, so the pieces do not show up untextured (user report 2026-10-12)
+function LoadingController:MapAssetList(): { Instance }
+	const list: { Instance } = {}
+	const seen: { [string]: boolean } = {}
+	for _, root in workspace:GetChildren() do
+		if not (string.match(root.Name, "_Assets$") or string.match(root.Name, "^LOBBY") or root.Name == "MapBinding") then
+			continue
+		end
+		for _, item in root:GetDescendants() do
+			local key: string? = nil
+			if item:IsA("MeshPart") then
+				key = `{item.MeshId}|{item.TextureID}`
+			elseif item:IsA("Decal") or item:IsA("Texture") then
+				key = `d|{(item :: Decal).Texture}`
+			elseif item:IsA("SurfaceAppearance") then
+				key = `s|{item.ColorMap}|{item.NormalMap}`
+			end
+			if key ~= nil and not seen[key] then
+				seen[key] = true
+				table.insert(list, item)
+			end
+		end
+	end
+	return list
+end
+
+function LoadingController:StepMap()
+	const list = self:MapAssetList()
+	const total = #list
+	if total == 0 then
+		self:Mark("Map", 1)
+		return
+	end
+	local done = 0
+	within(MAP_TIMEOUT, function()
+		-- batches keep the progress honest and let a slow asset hold back only its own batch
+		const BATCH = 24
+		for first = 1, total, BATCH do
+			const batch = table.move(list, first, math.min(first + BATCH - 1, total), 1, {})
+			pcall(function()
+				ContentProvider:PreloadAsync(batch)
+			end)
+			done += #batch
+			self:Mark("Map", math.min(done / total, 0.99))
+		end
+	end)
+	self:Mark("Map", 1)
+end
+
 function LoadingController:StepVoices()
 	if not self.Dependencies.PlaceController:Is("Run") then
 		self:Mark("Voices", 1)
@@ -282,7 +333,7 @@ function LoadingController:Run()
 
 	-- 3-5. kit, assets and voices together
 	self:SetStatus("Kit")
-	local pending = 3
+	local pending = 4
 	local function done()
 		pending -= 1
 	end
@@ -297,6 +348,10 @@ function LoadingController:Run()
 	end)
 	task.spawn(function()
 		self:StepVoices()
+		done()
+	end)
+	task.spawn(function()
+		self:StepMap()
 		done()
 	end)
 	const deadline = os.clock() + STEP_CAP

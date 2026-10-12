@@ -430,7 +430,8 @@ function Minis.Set(self: Minis, slotKey: string, target: Target)
 		slot.RiseAt = now + PURCHASE.RiseDelay
 	else
 		clear(old)
-		slot.RiseAt = 0
+		-- a line back on sale after its cooldown (Empty -> Sale) rises out of the pedestal like a bought one
+		slot.RiseAt = if previous.State == "Empty" and target.State == "Sale" then now else 0
 	end
 	const shown = slot.Shown
 	slot.Buried = shown ~= nil and slot.RiseAt > 0

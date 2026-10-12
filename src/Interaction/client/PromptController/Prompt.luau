@@ -35,6 +35,7 @@ export type Prompt = {
 	Target: Rules.Target,
 	State: Vide.Source<State>,
 	Text: Vide.Source<string>,
+	Hint: Vide.Source<string>, -- suffix on the pill ("hold R: Refuse"): the controller owns it, never part of `Text`
 	Holding: Vide.Source<boolean>,
 	HoldDuration: Vide.Source<number>,
 	Done: Vide.Source<number>, -- completion counter: +1 = the billboard plays its pop
@@ -210,6 +211,7 @@ function Prompt.new(anchor: Instance, hooks: Hooks): Prompt
 		Target = { Action = NO_ACTION },
 		State = Vide.source("Hidden" :: State),
 		Text = Vide.source(""),
+		Hint = Vide.source(""),
 		Holding = Vide.source(false),
 		HoldDuration = Vide.source(0),
 		Done = Vide.source(0),
@@ -239,7 +241,9 @@ function Prompt.new(anchor: Instance, hooks: Hooks): Prompt
 			Name = "Prompt",
 			Adornee = anchor,
 			State = self.State,
-			Text = self.Text,
+			Text = function()
+				return self.Text() .. self.Hint()
+			end,
 			KeyLabel = hooks.KeyLabel,
 			Tappable = hooks.Tappable,
 			Holding = self.Holding,

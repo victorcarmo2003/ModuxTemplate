@@ -23,6 +23,7 @@ export type Stat =
 	| "LightRadius"
 	| "DayFlowBonus"
 	| "TableCount" -- UPG-008 Patio Tables: tables bought on the Pad (FEAT-037)
+	| "TrailerTableCount" -- UPG-011 Trailer Tables: tables bought for the trailer (FEAT-037)
 	| "SitBonus" -- UPG-009 Patio Lights: added to every SitChance (FEAT-037)
 
 const LIST: { Stat } = {
@@ -46,6 +47,7 @@ const LIST: { Stat } = {
 	"LightRadius",
 	"DayFlowBonus",
 	"TableCount",
+	"TrailerTableCount",
 	"SitBonus",
 }
 

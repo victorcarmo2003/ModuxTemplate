@@ -25,6 +25,9 @@ export type Sanity = {
 	CoffeeCooldown: number, -- seconds between two drinks
 	CoffeeDrinkTime: number, -- seconds of the drink animation
 	CoffeeNightOnly: boolean, -- Provisional (Q-170)
+	FirstNightStart: number, -- Night 1 only: the night starts at this value (capped by the class Max), teaches the coffee
+	CoffeeStock: number, -- doses in the coffee machine when the trailer comes into use (once per run)
+	CoffeeHint: number, -- seconds the Night 1 coffee emphasis lasts after Walt's coffee call ends
 	BasicLampRadius: number, -- studs of the factory lamp beyond its LightZone volumes (0: LZ-1 and LZ-2 only)
 	Bands: Bands,
 	BandMinHold: number, -- seconds a band must hold before the look changes (Provisional, DEC-167)
@@ -44,6 +47,9 @@ const sanity: Sanity = {
 	CoffeeCooldown = 60, -- FEAT-021
 	CoffeeDrinkTime = 1.5, -- FEAT-021
 	CoffeeNightOnly = true, -- Q-170 option A (Provisional): brewed by day, drunk only at night
+	FirstNightStart = 50, -- Provisional (user request 2026-10-11, Night 1 teaches coffee); progression.md "10 doses"
+	CoffeeStock = 10, -- Provisional: initial doses; refills are bought at the Mart (Ground Coffee, 10 doses)
+	CoffeeHint = 25, -- Provisional: HUD emphasis ends at the first coffee or this many seconds after the call
 	BasicLampRadius = 0, -- Provisional (TASK-081, DEC-189)
 	Bands = { High = 60, Mid = 40 }, -- DEC-167
 	BandMinHold = 0, -- 1 s if it flickers in the wave 2 test (Provisional)

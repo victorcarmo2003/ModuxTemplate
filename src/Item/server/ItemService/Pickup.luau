@@ -7,8 +7,14 @@
 -- station, with an Interactable Attachment -> pick_up_item ("Take", tap). The taker gets the full package Tool through
 -- ItemService:Give (hotbar 4, DEC-174; package limit 2 / bear 3); refused = Notice from Give and the model stays.
 -- It stays in the world until taken: it does not vanish at the end of the day and never comes back once given.
--- Only the day actually entered spawns (DevSetDay jumps skip the days in between). Day 1 ingredients are the start
--- kit, not an unlock: no free package (Provisional).
+-- Every day entered (ShiftStarted, DevSetDay / Conch `day`, snapshot resume) places the packages of ALL ingredients
+-- with 1 < UnlockDay <= day that were not given yet in this run (Given, snapshot "Fp"): a jump of days never skips
+-- the packages of the days in between, and each is given once (idempotent). Day 1 ingredients are the start kit,
+-- not an unlock: no free package (Provisional).
+-- Hands full (hotbar or package limit): the taker does NOT need a free hand. The package is deposited straight into
+-- the cart stock of its ingredient (the tray), with the toast "New: {item} (stocked)", and the model goes away.
+-- With room in the hand the current behaviour stays: the package Tool goes to the hand (stock is filled later by
+-- the usual Restock on the station).
 -- Restock of the taken package is KitchenService's (TASK-025): the Tool is a regular pack_* Tool from Give.
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -17,7 +23,11 @@ local Content = require(ReplicatedStorage.shared.Content)
 
 export type Deps = {
 	Template: (item: string) -> Tool?, -- kit Tool of a Content.Items key
-	Give: (player: Player, item: string) -> Tool?, -- ItemService:Give (Notice on refusal)
+	Give: (player: Player, item: string, silent: boolean?) -> Tool?, -- ItemService:Give (Notice on refusal unless silent)
+	-- Direct deposit in the cart stock (KitchenService:StockFree through ItemService:SetStockSink): units stocked
+	-- (0 = nothing: ingredient closed, stock full or no sink yet).
+	Stock: (ingredient: string, amount: number) -> number,
+	Notify: (player: Player, key: string, value: number?) -> (), -- RunStateService:Notify
 	IsActive: (player: Player) -> boolean, -- RunStateService:IsActive
 	SetPrompt: (anchor: Instance, enabled: boolean) -> (), -- InteractionService:SetPrompt
 }
@@ -54,6 +64,15 @@ local function packageOf(ingredient: string): string?
 		end
 	end
 	return nil
+end
+
+local function packageAmount(item: string): number
+	for _, row in Content.Packages.List do
+		if row.Item == item then
+			return row.Amount
+		end
+	end
+	return 0
 end
 
 local function vehicleOf(instance: Instance): string?
@@ -226,13 +245,14 @@ function Pickup.remove(pickup: Pickup, entry: Entry)
 	entry.Model:Destroy()
 end
 
--- ShiftStarted: every ingredient unlocking exactly on `day` (and allowed on the vehicle) that never got its package.
+-- ShiftStarted: every ingredient unlocked by `day` (1 < UnlockDay <= day, allowed on the vehicle) that never got its
+-- package: the day itself and the days a jump skipped.
 function Pickup.shift(pickup: Pickup, day: number, vehicle: string)
 	if day <= FIRST_DAY then
 		return
 	end
 	for _, row in Content.Ingredients.List do
-		if row.UnlockDay ~= day or pickup.Given[row.Key] then
+		if row.UnlockDay <= FIRST_DAY or row.UnlockDay > day or pickup.Given[row.Key] then
 			continue
 		end
 		if row.Vehicle ~= nil and row.Vehicle ~= vehicle then
@@ -276,8 +296,17 @@ function Pickup.take(pickup: Pickup, player: Player, anchor: Instance)
 	if entry == nil then
 		return
 	end
-	if pickup.Deps.Give(player, entry.Item) ~= nil then
+	if pickup.Deps.Give(player, entry.Item, true) ~= nil then
 		Pickup.remove(pickup, entry)
+		return
+	end
+	-- No room in the hotbar (or package limit): straight into the stock of the ingredient
+	const moved = pickup.Deps.Stock(entry.Ingredient, packageAmount(entry.Item))
+	if moved > 0 then
+		Pickup.remove(pickup, entry)
+		pickup.Deps.Notify(player, "ingredient_stocked", Content.Ingredients.IndexOf[entry.Ingredient])
+	else
+		pickup.Deps.Notify(player, "hands_full", nil) -- stock closed or full: the package stays in the world
 	end
 end
 

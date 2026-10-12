@@ -15,7 +15,7 @@ Trechos marcados **[SPOILER]** revelam a história; pule se este documento for p
 **Pitch:**
 - Você é um desempregado que vê um panfleto de vaga num poste, liga e vira **funcionário** do Walt, dono do carrinho Bramble's Corner Dogs.
 - De dia o jogo é gerenciamento físico e fofo: grelhar, montar, atender, comprar estoque, melhorar o carrinho.
-- No 5º dia a party compra o **Food Trailer**. A partir daí o Walt pede que alguém cubra o **turno da noite**.
+- Do 2º dia em diante, depois do turno do dia, a party segue direto para o **turno da noite, no próprio carrinho** (Provisório, pedido do dono 2026-10-12). Mais tarde (depois da noite 2) o Walt oferece o **Food Trailer**, um desbloqueio opcional que ajuda contra as anomalias (janela que fecha, luzes, café).
 - A noite é a mesma cidade, o mesmo trabalho, mas com **regras ditas por telefone** e **anomalias** que é preciso observar, lembrar e tratar do jeito certo.
 - Pilares (DEC-002): Vender, Progredir, Gerenciar, Observar, Sobreviver, Descobrir.
 - North Star: "Estou construindo uma vida melhor vendendo hot dogs... mas alguma coisa está muito errada aqui."
@@ -51,16 +51,18 @@ Inspiração de estrutura: "Animal Hospital" (Roblox). Só inspiração, nada de
 
 ```
 LOBBY -> squad (1-4) -> RUN
-cutscene -> dias 1-5 (carrinho) -> compra do trailer no dia 5
--> noite 1 -> dia -> noite 2 -> ... -> noite 10 -> final -> gemas -> lobby (classes)
+cutscene -> dia 1 (tutorial) -> dia 2 -> noite 1 (carrinho) -> dia 3 -> noite 2 -> ... -> dia 11 -> noite 10 -> final
+-> gemas -> lobby (classes)       (a noite k é jogada no fim do dia k + 1; trailer oferecido depois da noite 2, opcional)
 ```
 
-- Turno de dia: ~7,5 min reais (preparação 7:00 AM, loja aberta 8:00 AM a 6:00 PM, fechamento, resumo).
-- Noite: relógio 8:00 PM a 6:00 AM, **20 min reais na noite 1 até 30 min na noite 10**.
+- Turno de dia: ~4,6 min reais (preparação 7:00 AM, loja aberta 8:00 AM a 6:00 PM, fechamento, resumo; Q-200).
+- Noite: relógio 8:00 PM a 6:00 AM, **9 min reais na noite 1 até 15 min na noite 10** (+40 s por noite; Provisório, Q-207). Run perfeita ~3,4 h.
+- **Dia 1** é o tutorial e não tem noite. **Nights 1 e 2** só têm anomalias simples e compatíveis com o carrinho (recusar, descartar).
+- **Trailer (opcional):** oferecido na manhã seguinte à noite 2 (`Content.Trailer.OfferAfterNight`), comprado na placa FOR SALE. Dá janela de serviço, luzes e café; sem ele as 10 noites seguem no carrinho, com dificuldade maior.
 - Fim de turno: gaveta vira dinheiro da party, **nota A–D** com bônus do chefe (A +20%, B +10%), compra de upgrades.
 - Sem save entre runs. Persistem só gemas, classes e o contador do "Day 100".
 - Quem cai da conexão pode voltar enquanto houver alguém da party na run. Se todos saem, a run fica guardada **15 min** num snapshot.
-- Quem não compra o trailer joga um **modo dia infinito**, sem fim.
+- **Não existe mais "modo dia infinito"**: não comprar o trailer não pula as noites (Provisório, Q-207; o contador "Day 100" fica parado até uma decisão).
 
 ## 4. Mecânicas principais
 
@@ -120,9 +122,9 @@ cutscene -> dias 1-5 (carrinho) -> compra do trailer no dia 5
 
 | Tema | Regra |
 |---|---|
-| Ordem da run | dias 1 a 5, trailer no dia 5, depois noite e dia alternados até a noite 10 |
+| Ordem da run | D1 (tutorial), D2, N1, D3, N2 … D11, N10, final; trailer opcional depois da noite 2 (Provisório 2026-10-12, Q-207) |
 | Dinheiro inicial | $30 (da party). Sem XP, sem níveis, sem reputação no MVP |
-| Desbloqueios | ingredientes por dia (§4.1) e upgrades por compra; trailer só do dia 5 |
+| Desbloqueios | ingredientes por dia (§4.1) e upgrades por compra; trailer só depois da noite 2 |
 | Dinheiro sem uso | aceito após comprar tudo (~dia 8 solo); decoração fica para depois |
 | Gemas (por jogador, salvas a cada evento) | dia concluído 2 (+1 com nota A, e só com 3 ou mais pedidos completos); noite N dá 15 + 2(N-1); final +100; "Day 100" +300 |
 | Uso das gemas | classes (45, 120, 180) |
@@ -217,10 +219,10 @@ cutscene -> dias 1-5 (carrinho) -> compra do trailer no dia 5
 
 | Termo | Significado |
 |---|---|
-| Run | uma partida completa (~6 h): dias 1 a 5, depois 10 noites |
+| Run | uma partida completa (~3,4 h, Provisório): dia 1 (tutorial), dia 2, depois noite e dia alternados até a noite 10 |
 | Party / squad | grupo de 1 a 4 jogadores, uma plataforma no lobby |
 | Pad | piso de concreto na esquina onde ficam o carrinho e o trailer |
-| Carrinho / Food Trailer | veículos de trabalho; o trailer é comprado no dia 5 e abre a noite |
+| Carrinho / Food Trailer | veículos de trabalho; o trailer é um desbloqueio opcional depois da noite 2; a noite começa no carrinho |
 | Mart | Ninth Street Mart, mercadinho 24 h (estoque, upgrades, ponto seguro) |
 | Crew / HotDog Crew | animais jogáveis; cada um é uma classe |
 | Gemas | moeda entre runs, compra classes |

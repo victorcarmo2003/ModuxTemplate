@@ -13,7 +13,10 @@ local LobbyHud = require(StarterPlayer.StarterPlayerScripts.client.Interface.Com
 local PlayChoice = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.PlayChoice)
 local SquadPanel = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.SquadPanel)
 local SquadSetup = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.SquadSetup)
+local SquadStatus = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.SquadStatus)
+local PadTag = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.PadTag)
 local ToastStack = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Toast.Stack)
+local Pads = require(StarterPlayer.StarterPlayerScripts.client.Lobby.LobbyController.Pads)
 local Rings = require(StarterPlayer.StarterPlayerScripts.client.Lobby.LobbyController.Rings)
 local Stage = require(StarterPlayer.StarterPlayerScripts.client.Lobby.LobbyController.Stage)
 local Text = require(StarterPlayer.StarterPlayerScripts.client.Lobby.LobbyController.Text)
@@ -47,6 +50,7 @@ export type Public = {
 	Gui: ScreenGui?,
 	Hiding: boolean,
 	Invites: Vide.Source<{ Invite }>,
+	Pads: Pads.Pads?,
 	Panel: Vide.Source<Panel>,
 	Parties: Vide.Source<{ [number]: PartyRecord }>,
 	Pending: Vide.Source<string>,
@@ -67,6 +71,7 @@ export type Public = {
 	Standing: Vide.Source<number>,
 	Toasts: Vide.Source<{ ToastStack.Entry }>,
 	Unmount: (() -> ())?,
+	Viewport: Vide.Source<Vector2>,
 	WorldStage: Vide.Source<boolean>,
 	ZoneInside: { [string]: boolean },
 	Setup: (self: Public) -> (),
@@ -104,6 +109,7 @@ export type Public = {
 	ReceiveInvite: (self: Public, from: number, partyId: number) -> (),
 	PlayButton: (self: Public) -> LobbyHud.PlayButton,
 	PlayStatus: (self: Public) -> string,
+	PlayCard: (self: Public) -> SquadStatus.Info,
 	Play: (self: Public) -> (),
 	ClearQuickPlay: (self: Public) -> (),
 	QuickPlay: (self: Public, choice: PlayChoice.Choice) -> (),
@@ -113,11 +119,17 @@ export type Public = {
 	SetupMembers: (self: Public) -> { SquadSetup.Member },
 	Countdown: (self: Public) -> number?,
 	Configure: (self: Public, friendsOnly: boolean, maxPlayers: number) -> (),
+	PadMembers: (self: Public, n: number) -> number,
+	PadMax: (self: Public, n: number) -> number,
+	PadState: (self: Public, n: number) -> PadTag.State,
+	PadStatus: (self: Public, n: number) -> string,
 	PaintPlatforms: (self: Public) -> (),
 	OnZone: (self: Public, zone: LobbyZones.Zone, inside: boolean) -> (),
 	CheckZones: (self: Public) -> (),
 	RunZones: (self: Public) -> (),
 	ThirdPerson: (self: Public) -> (),
+	NoticeScale: (self: Public) -> number,
+	ClearLeftSide: (self: Public) -> (),
 	SelectFirst: (self: Public, panel: Panel) -> (),
 	SetPanel: (self: Public, panel: Panel) -> (),
 	Toggle: (self: Public, panel: Panel) -> (),

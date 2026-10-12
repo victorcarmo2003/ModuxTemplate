@@ -27,16 +27,19 @@ local MarketController = require(StarterPlayer.StarterPlayerScripts.client.Modux
 local NeonController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.NeonController)
 local OpenSignController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.OpenSignController)
 local NetController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.NetController)
+local ObjectiveController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ObjectiveController)
 local OpalController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.OpalController)
 local PedestrianController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PedestrianController)
 local PlaceController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PlaceController)
 local ProfileController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ProfileController)
 local RoundController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.RoundController)
 local SeatingController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.SeatingController)
+local ShowcaseController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ShowcaseController)
 local StageController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.StageController)
 local ThiefController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ThiefController)
 local TrafficController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.TrafficController)
 local TutorialController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.TutorialController)
+local PadHideController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PadHideController)
 local VehicleController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.VehicleController)
 local VitalController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.VitalController)
 
@@ -67,16 +70,19 @@ export type AllControllers = {
 	NeonController: NeonController.Public,
 	OpenSignController: OpenSignController.Public,
 	NetController: NetController.Public,
+	ObjectiveController: ObjectiveController.Public,
 	OpalController: OpalController.Public,
 	PedestrianController: PedestrianController.Public,
 	PlaceController: PlaceController.Public,
 	ProfileController: ProfileController.Public,
 	RoundController: RoundController.Public,
 	SeatingController: SeatingController.Public,
+	ShowcaseController: ShowcaseController.Public,
 	StageController: StageController.Public,
 	ThiefController: ThiefController.Public,
 	TrafficController: TrafficController.Public,
 	TutorialController: TutorialController.Public,
+	PadHideController: PadHideController.Public,
 	VehicleController: VehicleController.Public,
 	VitalController: VitalController.Public,
 }

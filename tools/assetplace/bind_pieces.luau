@@ -127,7 +127,7 @@ local PAD_POSE = { -- world (MAP-01 numbers through the map frame)
 }
 local PAD_POINT = { cart = "CART", trailer = "TRL" }
 -- counter top over the vehicle pivot: cart Pad 0.45 + 3.0 (DEC-157); trailer floor +2, counter 3.5 (MAP-01 §7.2)
-local COUNTER_TOP_DY = { cart = 3.0, trailer = 5.5 }
+local COUNTER_TOP_DY = { cart = 3.0, trailer = 4.6 } -- trailer 2026-10-11: counter lowered 0.9 (was 5.5)
 local PROMPT_ABOVE_COUNTER = 0.3
 
 -- Counter piece origin in Pad coordinates (see COUNTER above). rotY 0: local -Z (front, stools) = north = queue.

@@ -56,6 +56,8 @@ export type Entry = {
 	DarkSince: number?,
 	ProtectUntil: number,
 	CoffeeReadyAt: number,
+	-- Night 1 coffee lesson: server time the HUD emphasis ends (0 = none running); see StartCoffeeHint
+	HintUntil: number,
 	RevivesTonight: number,
 	Seen: { [string]: boolean },
 	StateEndsAt: number,
@@ -94,6 +96,7 @@ local function newEntry(userId: number): Entry
 		DarkSince = nil,
 		ProtectUntil = 0,
 		CoffeeReadyAt = 0,
+		HintUntil = 0,
 		RevivesTonight = 0,
 		Seen = {},
 		StateEndsAt = 0,
@@ -145,6 +148,8 @@ function VitalService:Setup()
 	self.PickupHandler = nil :: PickupHandler?
 	-- dev override of IsLit: nil = probe, true = everything lit, false = everything dark
 	self.DevLit = nil :: boolean?
+	-- dev showcase: sanity never reaches 0 by itself (no natural fall); explicit dev falls still work
+	self.DevGodMode = false :: boolean
 	self.WarnedLight = false :: boolean
 	self.MemberStateChanged = self.Libs.Signal.new() :: SignalLib.Signal<number, LifeState, LifeState>
 	self.Wipe = self.Libs.Signal.new() :: SignalLib.Signal<boolean, number>
@@ -190,8 +195,11 @@ function VitalService:Ensure(player: Player): Entry
 			classes:GetModifier(player, "SanityStart", rows.Start),
 			classes:GetModifier(player, "SanityMax", rows.Start)
 		)
-		entry.Sanity = start
+		-- Night 1 starts low so the rookie learns the coffee (user request 2026-10-11, Provisional): never raises
+		const first = if self.Dependencies.RoundService:GetNight() == 1 then rows.FirstNightStart else start
+		entry.Sanity = Sanity.clamp(math.min(start, first), max)
 		entry.Max = max
+		entry.HintUntil = 0
 	end
 	return entry
 end
@@ -368,6 +376,9 @@ function VitalService:AddSanity(player: Player, delta: number, cause: string): n
 	end
 	const before = entry.Sanity
 	entry.Sanity = Sanity.clamp(before + delta, entry.Max)
+	if self.DevGodMode and entry.Sanity <= 0 then
+		entry.Sanity = math.min(1, entry.Max)
+	end
 	if entry.Sanity == before then
 		return before
 	end
@@ -597,6 +608,9 @@ function VitalService:OnShiftStarted(info: { IsNight: boolean })
 end
 
 function VitalService:OnPhase(phase: string)
+	if not isDarkPhase(phase) then
+		self:StepHints(now(), true)
+	end
 	if phase == "NightEnd" then
 		self:EndDowns()
 	end
@@ -613,6 +627,7 @@ function VitalService:OnJoined(player: Player)
 	self:RefreshBand(player.UserId, true)
 	self:ApplyLook(player.UserId)
 	self:SendSanity(player, true)
+	self:ResendHint(player)
 	self:QueueWipe()
 end
 
@@ -650,6 +665,7 @@ end
 
 function VitalService:Step()
 	const t = now()
+	self:StepHints(t, false)
 	if self.WipeEndsAt > 0 and t >= self.WipeEndsAt then
 		self:ExpireWipe()
 	end
@@ -717,7 +733,85 @@ function VitalService:Drink(player: Player, tool: Tool)
 	const restore = self:RestoreOf(player, tool)
 	self.Dependencies.ItemService:Consume(player, tool)
 	entry.CoffeeReadyAt = now() + Content.Sanity.CoffeeCooldown
-	self:AddSanity(player, Sanity.restore(entry.Sanity, entry.Max, restore) - entry.Sanity, COFFEE)
+	const before = entry.Sanity
+	const after = self:AddSanity(player, Sanity.restore(entry.Sanity, entry.Max, restore) - entry.Sanity, COFFEE)
+	-- feedback for the owner (green glow + "+N" on the bar) and the end of the Night 1 emphasis
+	self:SendCue(player, "Gain", math.max(0, after - before), 0)
+	self:EndHint(player, entry)
+end
+
+-- Night 1 coffee lesson (user request 2026-10-11, Provisional) -----------------------------------------------------
+
+-- Cue packet to the owner of the sanity (SanityCue; only when the client is ready)
+function VitalService:SendCue(player: Player, kind: "Hint" | "Gain" | "End", amount: number, untilT: number)
+	const net = self.Dependencies.NetService
+	if not net:IsRunning() or player.Parent == nil or not net:IsReady(player) then
+		return
+	end
+	self.Libs.Net.SanityCue:fireClient(player, {
+		Kind = kind,
+		Amount = math.clamp(math.floor(amount + 0.5), 0, Sanity.WIRE_MAX),
+		Until = untilT,
+	})
+end
+
+function VitalService:EndHint(player: Player, entry: Entry)
+	if entry.HintUntil > 0 then
+		entry.HintUntil = 0
+		self:SendCue(player, "End", 0, 0)
+	end
+end
+
+-- Walt's coffee call (BossService cue CoffeeHint): every Active member with sanity to gain gets the emphasis of the
+-- sanity bar and the coffee machine until the first coffee or Sanity.CoffeeHint s after the call ends (`callLeft` =
+-- seconds of the call still to run). Server-authoritative: the clients only draw it. Returns how many players got it.
+function VitalService:StartCoffeeHint(callLeft: number): number
+	if not self.Enabled or not finite(callLeft) then
+		return 0
+	end
+	const untilT = now() + math.max(0, callLeft) + Content.Sanity.CoffeeHint
+	const vehicle = Content.Vehicles.ByKey[self.Dependencies.RoundService:CurrentVehicle()]
+	const machine = vehicle ~= nil and vehicle.HasCoffee
+	local count = 0
+	for _, player in Players:GetPlayers() do
+		if not self.Dependencies.RunStateService:IsActive(player) then
+			continue
+		end
+		const entry = self:Ensure(player)
+		if entry.Max <= 0 or entry.Sanity >= entry.Max then
+			continue
+		end
+		entry.HintUntil = untilT
+		self:SendCue(player, "Hint", 0, untilT)
+		count += 1
+		-- vehicle without a coffee machine (the cart): the lesson cup goes straight into the hand, no brewing
+		if not machine then
+			self.Dependencies.ItemService:Give(player, COFFEE, { Restore = Content.Sanity.Coffee, Silent = true })
+		end
+	end
+	return count
+end
+
+-- A client that (re)joins while the emphasis runs gets it again
+function VitalService:ResendHint(player: Player)
+	const entry = self.Entries[player.UserId]
+	if entry ~= nil and entry.HintUntil > now() then
+		self:SendCue(player, "Hint", 0, entry.HintUntil)
+	end
+end
+
+-- Timed end of the emphasis, and the end when the night is over (any phase but Call, Prep, Night)
+function VitalService:StepHints(t: number, over: boolean)
+	for userId, entry in self.Entries do
+		if entry.HintUntil > 0 and (over or t >= entry.HintUntil) then
+			const player = Players:GetPlayerByUserId(userId)
+			if player ~= nil then
+				self:EndHint(player, entry)
+			else
+				entry.HintUntil = 0
+			end
+		end
+	end
 end
 
 -- Dev (Commands/Vital.luau) -----------------------------------------------------------------------------------------
@@ -747,6 +841,72 @@ end
 
 function VitalService:DevDark(mode: boolean?)
 	self.DevLit = if mode == nil then nil else not mode
+end
+
+-- Showcase (ShowcaseService): no natural fall while on (sanity stops at 1).
+function VitalService:DevGod(on: boolean)
+	if not self.Dependencies.PlaceService:IsDev() then
+		error("dev mode only", 2)
+	end
+	self.DevGodMode = on
+end
+
+function VitalService:IsDevGod(): boolean
+	return self.DevGodMode
+end
+
+-- -1 forced dark, 1 forced lit, 0 = LightService (readout for the showcase panel)
+function VitalService:DevDarkMode(): number
+	if self.DevLit == nil then
+		return 0
+	end
+	return if self.DevLit then 1 else -1
+end
+
+-- Stand-in for the wave 4 ReviveService (no ambulance in this build): a Down or Spectator member comes back Active
+-- with half of the sanity, a new character at the normal spawn and the stash returned. A Down counts as a revive used.
+function VitalService:DevRevive(player: Player): string
+	if not self.Dependencies.PlaceService:IsDev() then
+		error("dev mode only", 2)
+	end
+	const runState = self.Dependencies.RunStateService
+	const state = self:GetState(player.UserId)
+	if state ~= "Down" and state ~= "Spectator" then
+		error(`{player.Name} is {state or "not a member"}: only Down or Spectator can be revived`, 0)
+	end
+	const entry = self:Ensure(player)
+	if entry.Max > 0 then
+		entry.Sanity = math.max(1, math.floor(entry.Max * 0.5 + 0.5))
+	end
+	if state == "Down" then
+		entry.RevivesTonight += 1
+	end
+	entry.StateEndsAt = 0
+	entry.KnockedUntil = 0
+	if not runState:SetLifeState(player.UserId, "Active") then
+		error("SetLifeState refused", 0)
+	end
+	const characters = self.Dependencies.CharacterService
+	characters:RemoveBody(player, true)
+	task.spawn(function()
+		const ok, problem = pcall(function()
+			characters:Spawn(player)
+		end)
+		if not ok then
+			warn(`[VitalService] DevRevive spawn: {problem}`)
+			return
+		end
+		-- the character finishes loading after LoadCharacter returns: give the stash back once it can hold tools
+		task.delay(1.5, function()
+			if player.Parent ~= nil then
+				pcall(function()
+					self.Dependencies.ItemService:Unstash(player)
+				end)
+			end
+		end)
+	end)
+	self:FireLife(player.UserId, "Revived")
+	return `{player.Name} revived ({state} -> Active, sanity {entry.Sanity}/{entry.Max})`
 end
 
 -- Lifecycle -----------------------------------------------------------------------------------------------------------
@@ -804,6 +964,7 @@ VitalService:OnInit(function(self)
 	self.Dependencies.NetService.ClientReady:Connect(function(player)
 		if runState:IsMember(player) then
 			self:SendSanity(player, true)
+			self:ResendHint(player)
 		end
 	end)
 	-- respawn: the packet again (network.md §6.1); CharacterService reapplies the LookPack it keeps per UserId

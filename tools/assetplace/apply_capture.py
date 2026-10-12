@@ -1,6 +1,6 @@
 """Write a Place.capture JSON (place_assets.luau) back into MAP-01_placements.luau.
 
-Usage: python tools/assetplace/apply_capture.py <capture.json> [--dry]
+Usage: python tools/assetplace/apply_capture.py <capture.json> [--dry] [--file <placements.luau>]
 
 Entries are the one-line `{ asset = ... },` tables of the placement list, numbered in file order (the same order as
 the Luau array Place.capture saw). For each change the pose fields x/y/z/rotY are rewritten and parts/copies are
@@ -14,9 +14,9 @@ import re
 import sys
 from pathlib import Path
 
-PLACEMENTS = Path(__file__).with_name("MAP-01_placements.luau")
+PLACEMENTS = Path(__file__).with_name("MAP-01_placements.luau")  # --file <path> overrides (lobby: LOBBY_v2_placements.luau)
 ENTRY = re.compile(r"^\t\{ asset = ")
-DATE = "2026-10-11"
+DATE = "2026-10-12"
 
 
 def num(v):
@@ -104,6 +104,9 @@ def get_list(line, key):
 
 
 def main():
+    global PLACEMENTS
+    if "--file" in sys.argv:
+        PLACEMENTS = Path(sys.argv[sys.argv.index("--file") + 1])
     capture = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
     dry = "--dry" in sys.argv
     lines = PLACEMENTS.read_text(encoding="utf-8").split("\n")
@@ -152,7 +155,7 @@ def main():
                 report.append(f"added {rec['asset']}: {w}")
         lines[close:close] = new
     if not dry:
-        PLACEMENTS.write_text("\n".join(lines), encoding="utf-8")
+        PLACEMENTS.write_text("\n".join(lines), encoding="utf-8", newline="\n")
     print(f"changes {len(capture.get('changes', []))}, removed {len(removed)}, added {len(added)}" + (" (dry run)" if dry else ""))
     for r in report:
         print(r)

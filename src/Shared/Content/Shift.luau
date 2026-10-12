@@ -49,10 +49,12 @@ const base = Table.new({
 		Selling = false,
 		SkipWithoutProbe = true,
 	},
-	-- Prep: 7:00 -> 8:00 AM, up to 60 s; "Open Shop" ends it early (DEC-048, FEAT-003). Night: 7 -> 8 PM, 90 s.
+	-- Day shortened (user playtest 2026-10-11, PROVISIONAL Q-200): day turn ~7.7 min -> ~4.6 min (Prep 60 -> 30 s,
+	-- Open 360 -> 216 s, Closing 30 -> 20 s, Summary 15 -> 8 s; night shift: Summary 20 -> 10 s).
+	-- Prep: 7:00 -> 8:00 AM, up to 30 s; "Open Shop" ends it early (DEC-048, FEAT-003). Night: 7 -> 8 PM, 90 s.
 	{
 		Key = "Prep",
-		Duration = 60,
+		Duration = 30,
 		ClockFrom = hours(7),
 		ClockTo = hours(8),
 		Kind = "Any",
@@ -60,12 +62,12 @@ const base = Table.new({
 		SkipWithoutProbe = false,
 		Night = { Duration = 90, ClockFrom = hours(19), ClockTo = hours(20) },
 	},
-	-- Open: 8:00 AM -> 6:00 PM in 360 s, 1 game hour = 36 s (DEC-048, FEAT-003).
-	{ Key = "Open", Duration = 360, ClockFrom = hours(8), ClockTo = hours(18), Kind = "Day", Selling = true, SkipWithoutProbe = false },
-	-- Closing: sign CLOSED, queue still served; ends when the counter empties or at 30 s (DEC-048). 6 PM / 6 AM.
+	-- Open: 8:00 AM -> 6:00 PM in 216 s, 1 game hour = 21.6 s (DEC-048, FEAT-003; was 360 s / 36 s, Q-200).
+	{ Key = "Open", Duration = 216, ClockFrom = hours(8), ClockTo = hours(18), Kind = "Day", Selling = true, SkipWithoutProbe = false },
+	-- Closing: sign CLOSED, queue still served; ends when the counter empties or at 20 s (DEC-048; was 30 s, Q-200). 6 PM / 6 AM.
 	{
 		Key = "Closing",
-		Duration = 30,
+		Duration = 20,
 		ClockFrom = hours(18),
 		ClockTo = hours(18),
 		Kind = "Any",
@@ -73,16 +75,16 @@ const base = Table.new({
 		SkipWithoutProbe = false,
 		Night = { Duration = 30, ClockFrom = hours(30), ClockTo = hours(30) },
 	},
-	-- Summary: 15 s on day, 20 s at night (DEC-048, FEAT-014). Clock stopped.
+	-- Summary: 8 s on day, 10 s at night (DEC-048, FEAT-014; was 15 / 20 s, halved by Q-200). Clock stopped.
 	{
 		Key = "Summary",
-		Duration = 15,
+		Duration = 8,
 		ClockFrom = hours(18),
 		ClockTo = hours(18),
 		Kind = "Any",
 		Selling = false,
 		SkipWithoutProbe = false,
-		Night = { Duration = 20, ClockFrom = hours(30), ClockTo = hours(30) },
+		Night = { Duration = 10, ClockFrom = hours(30), ClockTo = hours(30) },
 	},
 	-- Boss call before the night; cap 60 s, clock stopped at 7:00 PM (FEAT-018). Ends by the Boss probe.
 	{
@@ -124,5 +126,5 @@ const base = Table.new({
 
 return Table.with(base, {
 	PhaseKeys = base.Keys,
-	ClockStepMinutes = 5, -- HUD updates every 5 game minutes (3 s real on day) (DEC-048; user request 2026-10-11, was 10)
+	ClockStepMinutes = 5, -- HUD updates every 5 game minutes (1.8 s real on day) (DEC-048; user request 2026-10-11, was 10)
 })

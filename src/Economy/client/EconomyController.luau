@@ -27,6 +27,7 @@ Cash drawer (user request 2026-10-10): the sale opens the drawer (`drawer`) righ
 again, it only pushes the close back (no stacked open/close pairs on a burst of sales).
 ]]
 local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
@@ -34,6 +35,7 @@ local Vide = require(ReplicatedStorage.Packages.Vide)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Content = require(ReplicatedStorage.shared.Content)
 local DrawerValue = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.DrawerValue)
+local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
 -- shared VFX budget (AST-092 ceiling counts the whole screen)
 local Fx = require(StarterPlayer.StarterPlayerScripts.client.Kitchen.KitchenController.Fx)
 
@@ -52,6 +54,10 @@ const COINS = 4 -- AST-092 payment Emit(4)
 const TIP_COINS = 1 -- AST-092 tip Emit(1)
 const TIP_SPEED = 1.2 -- tip with no `tip` row yet: the coin again, higher (Provisional)
 const DRAWER_CLOSE_DELAY = 0.8 -- s after the last sale
+-- "Collect Cash" (Q-201): "+$N" leaves the register and flies to the money pill of the HUD (HudScreen: left 10, top 6, 38 tall)
+const FLY_TIME = 0.8 -- s
+const FLY_COINS = 8 -- coins of the burst at the register
+const HUD_PILL = Vector2.new(10 + 56, 6 + 19) -- px at scale 1: where the money pill reads
 
 type Mount = {
 	Vehicle: Instance,
@@ -79,6 +85,7 @@ function EconomyController:Setup()
 	self.Pops = Vide.source({} :: { DrawerValue.Pop }) :: Vide.Source<{ DrawerValue.Pop }>
 	self.Mounts = {} :: { [Instance]: Mount }
 	self.Gui = nil :: Instance?
+	self.FlyGui = nil :: ScreenGui?
 	self.Unmount = nil :: (() -> ())?
 	-- pending `drawer_close` (nil = drawer closed)
 	self.DrawerClose = nil :: thread?
@@ -183,6 +190,79 @@ function EconomyController:Chime(amount: number, result: string)
 			Fx.Burst(position, "Tip", TIP_COINS)
 		end
 	end
+end
+
+-- "Collect Cash" feedback (presentation only: Cash already changed with the Economy record): coins and the drawer
+-- sound at the register, and a "+$N" that flies from the register to the money pill of the HUD.
+function EconomyController:Collected(amount: number)
+	const anchor = self:DrawerAnchor()
+	const position = if anchor then positionOf(anchor) else nil
+	if anchor ~= nil then
+		const audio = self.Dependencies.AudioController
+		self:OpenDrawer(anchor)
+		if Content.Sounds.ByKey.coin then
+			audio:Play("coin", anchor)
+			task.delay(0.12, function()
+				audio:Play("coin", anchor, { Speed = 1.15 })
+			end)
+		end
+	end
+	if position ~= nil then
+		Fx.Burst(position, "Coins", FLY_COINS)
+	end
+	self:Fly(amount, position)
+end
+
+function EconomyController:Fly(amount: number, position: Vector3?)
+	const camera = workspace.CurrentCamera
+	const parent = self.Gui
+	if camera == nil or parent == nil then
+		return
+	end
+	local screen = self.FlyGui :: ScreenGui?
+	if screen == nil or screen.Parent == nil then
+		const created = Instance.new("ScreenGui")
+		created.Name = "CashFly"
+		created.ResetOnSpawn = false
+		created.IgnoreGuiInset = true
+		created.DisplayOrder = 40
+		created.Parent = parent
+		self.FlyGui = created
+		screen = created
+	end
+	const viewport = camera.ViewportSize
+	local start = viewport / 2
+	if position ~= nil then
+		const point, onScreen = camera:WorldToViewportPoint(position)
+		if onScreen then
+			start = Vector2.new(point.X, point.Y)
+		end
+	end
+	const scale = Theme.ScaleOf(viewport)
+	const label = Instance.new("TextLabel")
+	label.Name = "Fly"
+	label.AnchorPoint = Vector2.new(0.5, 0.5)
+	label.Position = UDim2.fromOffset(start.X, start.Y)
+	label.Size = UDim2.fromOffset(120 * scale, 36 * scale)
+	label.BackgroundTransparency = 1
+	label.Text = `+${amount}`
+	label.FontFace = Theme.Font.Title
+	label.TextSize = math.round(24 * scale)
+	label.TextColor3 = Theme.Color.Mustard
+	label.TextStrokeTransparency = 0
+	label.TextStrokeColor3 = Theme.Color.Ink
+	label.ZIndex = 5
+	label.Parent = screen
+	const target = HUD_PILL * scale
+	const tween = TweenService:Create(
+		label,
+		TweenInfo.new(FLY_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+		{ Position = UDim2.fromOffset(target.X, target.Y), TextTransparency = 0.35, TextSize = math.round(16 * scale) }
+	)
+	tween.Completed:Once(function()
+		label:Destroy()
+	end)
+	tween:Play()
 end
 
 -- Value_Anchor inside the vehicle, Attachment or BasePart (the same helper rule as the prompts, §18.3)
@@ -409,6 +489,11 @@ EconomyController:OnInit(function(self)
 		if id == RECORD_ID then
 			self:Apply(record)
 		end
+	end)
+
+	-- "Collect Cash": the drawer went to Cash (Economy already says so); coins and the flying "+$N" are presentation
+	self.Libs.Net.CashCollected:onClient(function(collected)
+		self:Collected(collected.Amount)
 	end)
 
 	-- Presentation only: the drawer number itself comes from Economy. Wrong/Left/Refused carry Amount 0.

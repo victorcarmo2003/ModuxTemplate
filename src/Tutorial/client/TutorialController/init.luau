@@ -191,6 +191,7 @@ const TutorialController = Modux.Controller("TutorialController", {
 		"AudioController",
 		"PlaceController",
 		"BossController",
+		"PromptController",
 	},
 	Priority = 520,
 })
@@ -821,6 +822,11 @@ function TutorialController:DecideLive(): (string, Instance?, string)
 		return "serve", self:Anchor("serve", false, onGuest) or rig, ""
 	end
 
+	-- the shop opens right after the order (never in the middle of serving); `open` below covers a hot dog already in hand
+	if Vide.untrack(self.Dependencies.RoundController.Phase) == "Prep" then
+		return "open_first", self:Anchor("open_sign", false), ""
+	end
+
 	const kitchen = self:Kitchen()
 	if kitchen.Rail > 0 and kitchen.BoardReady then
 		return "assemble", self:Anchor("board_add_sausage", false), ""
@@ -995,6 +1001,33 @@ function TutorialController:Focuses(anchor: Instance): boolean
 	return step ~= nil
 		and anchor:GetAttribute("PromptAction") == step.Action
 		and highlightOf(anchor) == highlightOf(target)
+end
+
+-- TutorialPromptGate (user request 2026-10-11: "too many prompts, confusing"): while the tutorial runs for this player,
+-- only the prompts of the current step's action, of the next step(s) (Steps.NextActions: so getting ahead never locks
+-- the player out) and Steps.AlwaysActions show. Everything shows again the moment the tutorial is not running
+-- (Finish / skip / past Day 1 / night / cinematic). Presentation only: the server still decides every Interact.
+function TutorialController:PromptAllowed(anchor: Instance): boolean
+	if not Vide.untrack(self.Running) or Vide.untrack(self.Finished) or not self:FirstRun() then
+		return true
+	end
+	const action = anchor:GetAttribute("PromptAction")
+	if typeof(action) ~= "string" then
+		return true
+	end
+	if table.find(Steps.AlwaysActions, action) ~= nil then
+		return true
+	end
+	const key = Vide.untrack(self.StepKey)
+	const step = Steps.ByKey[key]
+	if step == nil then
+		return true
+	end
+	if step.Action == action then
+		return true
+	end
+	const next = Steps.NextActions[key]
+	return next ~= nil and table.find(next, action) ~= nil
 end
 
 function TutorialController:ClearGuidance()
@@ -1418,7 +1451,7 @@ function TutorialController:DecideForced(live: string): (string?, Instance?, str
 	end
 	const step = Steps.ByKey[key]
 	const passed = (Steps.IndexOf[live] or 0) > (Steps.IndexOf[key] or 0)
-	const opened = key == "open" and Vide.untrack(self.Dependencies.RoundController.Phase) ~= "Prep"
+	const opened = (key == "open" or key == "open_first") and Vide.untrack(self.Dependencies.RoundController.Phase) ~= "Prep"
 	if step == nil or passed or opened then
 		self.Forced = nil
 		print(`{DEV_PREFIX} forced step {key} done: back to the live flow ({live})`)
@@ -1912,6 +1945,10 @@ TutorialController:OnStart(function(self)
 	if not self.Dependencies.PlaceController:Is("Run") then
 		return
 	end
+	-- TutorialPromptGate: PromptController asks this for every anchor (presentation only)
+	self.Dependencies.PromptController:SetGate(function(anchor: Instance): boolean
+		return self:PromptAllowed(anchor)
+	end)
 	-- PlayerGui may arrive a frame late; do not hold up the other OnStart.
 	task.spawn(function()
 		self:Mount(Players.LocalPlayer:WaitForChild("PlayerGui"))

@@ -2,7 +2,7 @@
 -- Hotbar Tools and ItemRules (content-data.md §3.5; DEC-040, DEC-103, DEC-174, DEC-190). Owner: game-designer.
 -- The Tool in the kit is ReplicatedStorage.Assets.Items.Tools/<key> (architecture.md §18.9.1).
 -- Tool attributes (written only by ItemService, network.md §7.1): Item, Count, Toppings (HotDog), Altered (wave 3).
--- Drop rules: FEAT-036 (only the equipped Tool drops when hit). DropDespawn = seconds on the street (60 s, DEC-197,
+-- Drop rules: FEAT-036 (only the equipped Tool drops when hit). DropDespawn = seconds on the street (90 s Provisional, DEC-197,
 -- A10); items left by a spectator on the counter (DROP-T) last until the end of the next shift (ItemService rule).
 local Table = require(script.Parent.Table)
 
@@ -37,7 +37,7 @@ local function pack(key: string, ref: string, name: string): Item
 		Category = "Package",
 		Stackable = true,
 		DropOnHit = "Keep",
-		DropDespawn = 60, -- FEAT-036, DEC-197
+		DropDespawn = 90, -- FEAT-036; 90 s Provisional (DEC-197 said 60; user request 2026-10-11)
 		KeepOnSpectate = false,
 		Use = false,
 	}
@@ -60,8 +60,8 @@ const base = Table.new({
 		Kind = "Consumable",
 		Category = "Coffee",
 		Stackable = true,
-		DropOnHit = "Lost",
-		DropDespawn = 2,
+		DropOnHit = "Keep", -- Provisional (user request 2026-10-11): a car hit never destroys what was bought / made
+		DropDespawn = 90,
 		KeepOnSpectate = false,
 		Use = true, -- drink at night (FEAT-021; Q-170)
 	},
@@ -72,8 +72,8 @@ const base = Table.new({
 		Kind = "Product",
 		Category = "HotDog",
 		Stackable = false,
-		DropOnHit = "Lost",
-		DropDespawn = 2,
+		DropOnHit = "Keep", -- Provisional (user request 2026-10-11), toppings travel with the drop
+		DropDespawn = 90,
 		KeepOnSpectate = false,
 		Use = false,
 	},
@@ -97,7 +97,7 @@ const base = Table.new({
 		Category = "Revive",
 		Stackable = false,
 		DropOnHit = "Keep",
-		DropDespawn = 60, -- FEAT-036, DEC-197
+		DropDespawn = 90, -- FEAT-036; 90 s Provisional (DEC-197 said 60; user request 2026-10-11)
 		KeepOnSpectate = false,
 		Use = true, -- wave 4 (ReviveService)
 	},

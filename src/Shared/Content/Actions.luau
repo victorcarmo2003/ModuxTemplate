@@ -40,9 +40,13 @@ return Table.new({
 		Wave = 1,
 	},
 	{ Key = "discard", Text = "Throw Away", Hold = 0.5, Radius = 7, Requires = { Held = "hot_dog" }, Night = "Any", Wave = 1 },
-	{ Key = "take_order", Text = "Take Order", Hold = 0, Radius = 10, Requires = {}, Night = "Any", Wave = 1 },
-	{ Key = "serve", Text = "Serve", Hold = 0, Radius = 10, Requires = { Held = "hot_dog" }, Night = "Any", Wave = 1 },
-	{ Key = "refuse", Text = "Refuse", Hold = 1, Radius = 10, Requires = {}, Night = "Any", Wave = 1 },
+	{ Key = "take_order", Text = "Take Order", Hold = 0, Radius = 8, Requires = {}, Night = "Any", Wave = 1 },
+	{ Key = "serve", Text = "Serve", Hold = 0, Radius = 8, Requires = { Held = "hot_dog" }, Night = "Any", Wave = 1 },
+	{ Key = "refuse", Text = "Refuse", Hold = 1, Radius = 8, Requires = {}, Night = "Any", Wave = 1 },
+	-- Cash register (Q-201, Provisional): drawer -> party Cash now. Anchor Prompt_Collect on the DRAWER / TRL-DRAWER model
+	-- (CashDeskService); only enabled while the drawer is open and holds money. Short hold, smaller radius than the
+	-- counter prompts so it never fights the ketchup / customer pills.
+	{ Key = "collect_cash", Text = "Collect Cash", Hold = 0.4, Radius = 5, Requires = {}, Night = "Any", Wave = 1 },
 	{ Key = "restock", Text = "Restock", Hold = 1, Radius = 7, Requires = { Held = "Package" }, Night = "Any", Wave = 1 },
 	{ Key = "buy_package", Text = "Buy {item} — ${price}", Hold = 0.5, Radius = 7, Requires = {}, Night = "Any", Wave = 1 },
 	{
@@ -84,9 +88,17 @@ return Table.new({
 	-- PromptText "Close Window"/"Open Window" by state, cooldown 1 s in Validate (Q-173, placeholder until ui-text.md)
 	{ Key = "shutter_toggle", Text = "Close Window", Hold = 0.5, Radius = 7, Requires = {}, Night = "NightOnly", Wave = 3 },
 
+	-- Trailer door (user request 2026-10-11, Provisional; owner TrailerDoorService): the back door only opens by prompt.
+	-- Exit Trailer inside by the door, Enter Trailer outside by the steps; both only while the trailer is the vehicle in use.
+	{ Key = "trailer_exit", Text = "Exit Trailer", Hold = 0.3, Radius = 4, Requires = {}, Night = "Any", Wave = 3 },
+	{ Key = "trailer_enter", Text = "Enter Trailer", Hold = 0.3, Radius = 4, Requires = {}, Night = "Any", Wave = 3 },
+
 	-- Pad tables (TASK-144; FEAT-037, UPG-008/009; Q-178 A, Q-181 A). Owner SeatingService; texts placeholder until
 	-- ui-text.md (TASK-150). buy_in_place: "{item}" = "Table" / the upgrade name, "{price}" filled by the owner
 	-- (PromptText); the anchor carries the attribute Upgrade (and TableIndex on a table).
 	{ Key = "buy_in_place", Text = "Buy {item} — ${price}", Hold = 1.5, Radius = 7, Requires = {}, Night = "Any", Wave = 3 },
 	{ Key = "clean_table", Text = "Clean Table", Hold = 1, Radius = 7, Requires = {}, Night = "Any", Wave = 3 },
+	-- Order at the table (Q-209, Provisional): the customer sat after "Take Order"; the prompt sits on the table
+	-- (ServeAnchor, SeatingService) and its PromptText names the table and the order ("Serve Table 2: Ketchup + Cheese").
+	{ Key = "serve_table", Text = "Serve Table", Hold = 0, Radius = 8, Requires = { Held = "hot_dog" }, Night = "Any", Wave = 3 },
 } :: { Action })

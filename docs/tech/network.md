@@ -188,13 +188,19 @@ Shift = Lync.replicate(Lync.struct({
 | Onda 1 | escreve `Day`, `Phase` (Prep, Open, Closing, Summary), `PhaseStartedAt`, `PhaseDuration`, `ClockFrom/To`, `Vehicle = "cart"`. Fixos: `Night = 0`, `IsNight = false`, `Attempt = 0`, `Chances = 1`, `WipeEndsAt = 0`, `WipeFrozen = false`. Placa OPEN/CLOSED é **derivada** de `Phase` (Prep: CLOSED com prompt "Open Shop"; Open: OPEN; Closing/Summary: CLOSED), sem campo |
 | Relógio | `ClockText` = `ClockFrom + (ClockTo − ClockFrom) × (now − PhaseStartedAt) / PhaseDuration`, arredondado para baixo a 10 min (DEC-048). Na Prep, `PhaseDuration` = 60 mesmo que "Open Shop" abra antes: o servidor troca a fase e o relógio pula para 8:00 |
 
+**Novo fluxo da run (pedido do dono 2026-10-12, Provisório, Q-207): sem mudança de schema.** A sequência passa a ser D1, D2, N1, D3, N2 … D11, N10
+(a noite *k* tem `Day = k + 1`); `Night` (0..10), `IsNight`, `Vehicle` (`cart` ou `trailer`: as noites começam no carrinho) e `Day` já comportam isso.
+`PhaseDuration` da fase `Night` passa a ser 540..900 s (cabe em `int(0, 3600)`). `Endless` fica sempre `false`. O set tem **1** registro,
+então nenhum campo precisa ser de 8 bits; os campos novos de sets com ≥ 8 registros (p. ex. `Upgrades.Wait`) seguem a regra do `Level`.
+Nenhum pacote novo.
+
 ### 3.2 `RunState` (registro único, id `1`)
 
 ```lua
 RunState = Lync.replicate(Lync.struct({
 	PriceParty = Lync.int(0, 4),  -- 0 até o fim do Day 1; depois fixo (DEC-121). Multiplica trailer e Revive Kit
 	RosterSize = Lync.int(1, 4),
-	Endless = Lync.bool(),        -- modo dia infinito (DEC-084)
+	Endless = Lync.bool(),        -- modo dia infinito (DEC-084). SEMPRE false desde 2026-10-12 (Q-207): o campo fica por compatibilidade
 }))
 ```
 
@@ -297,13 +303,13 @@ Customers = Lync.replicate(Lync.struct({
 ### 3.7 `Upgrades` (id = `Content.Upgrades.IndexOf[key]`)
 
 ```lua
-Upgrades = Lync.replicate(Lync.struct({ Level = Lync.int(0, 255) })) -- valor real 0..9; fio de 8 bits por causa do limite de keyframe do Lync 4.0.2 (comentário em src/Libs/Net)
+Upgrades = Lync.replicate(Lync.struct({ Level = Lync.int(0, 255), Wait = Lync.int(0, 255) })) -- Level real 0..9; Wait = turnos até a linha voltar à venda (cooldown do Gear Stand, Q-203), 0 = à venda; fio de 8 bits por causa do limite de keyframe do Lync 4.0.2 (comentário em src/Libs/Net)
 ```
 
 | | |
 |---|---|
 | Escreve | `UpgradeService` |
-| Lê | `MarketController` (bancada B1–B5: nível atual, próximo preço, "Maxed", "Trailer only"). v5.1 (D-07): **não** há `UpgradeController`; a peça visível no veículo (DEC-052) é alternada pelo servidor (`UpgradeService/Pieces.luau`, T38) e chega ao client como instância, sem leitura do set |
+| Lê | `MarketController` (bancada B1–B5: nível atual, próximo preço, "Maxed", "Trailer only", `Wait` > 0 = "Sold out", mini some). `Wait` = turnos restantes calculados no servidor (`UpgradeService:GetWait`; o contador de turnos não vai ao client). Cooldown: `design/upgrades.md`. v5.1 (D-07): **não** há `UpgradeController`; a peça visível no veículo (DEC-052) é alternada pelo servidor (`UpgradeService/Pieces.luau`, T38) e chega ao client como instância, sem leitura do set |
 | Frequência | por compra; na troca de veículo, todos os registros de uma vez (num `batch`) |
 | Nível por veículo (**DEC-184**) | o servidor guarda `Levels[vehicle][upgrade]`; o set mostra **só o veículo atual** (`Shift.Vehicle`). Na troca carrinho → trailer, o set é reescrito com os níveis do trailer (todos 1, ou 0 nos de compra única). O client nunca precisa do nível de um veículo que não está em uso |
 | Onda 1 | só `cart`; 5 registros (UPG-001..005). `trailer_lights` existe com `Level = 0` e a bancada mostra "Trailer only" pela tabela (`Upgrades[k].Vehicles` não contém `cart`) |
@@ -342,7 +348,7 @@ Notice = Lync.packet(Lync.struct({
 |---|---|
 | Dispara | qualquer Service por `RunStateService:Notify(player | "all", key, value)` (TASK-010) |
 | Lê | `HudController` (toast no canto superior direito, 3–6 s) |
-| Onda 1 | `hands_full`, `package_limit`, `not_enough_cash`, `upgrade_bought` (Value = `IndexOf` do upgrade, "Grill upgraded!", grupo), `ingredient_unlocked` (Value = `IndexOf` do ingrediente, grupo, no `ShiftStarted`), `class_bought`, `class_selected`, `not_enough_gems`, `class_locked` (`content-data.md` §3.19) |
+| Onda 1 | `hands_full`, `package_limit`, `not_enough_cash`, `upgrade_bought` (Value = `IndexOf` do upgrade, "Grill upgraded!", grupo), `ingredient_unlocked` (Value = `IndexOf` do ingrediente, grupo, no `ShiftStarted`), `class_bought`, `class_selected`, `not_enough_gems`, `class_locked`, `mart_hint` (dica do Closing, grupo, uma vez por turno, Q-203), `class_locked` (`content-data.md` §3.19) |
 | Frequência | evento (< 1/s) |
 
 ### 4.3 `Sale` (s → grupo)
@@ -599,7 +605,7 @@ Parties = Lync.replicate(Lync.struct({ ... })),    -- lobby; plataformas física
 |---|---|---|
 | Tools (pacotes, HotDog, café, Revive Kit) | Backpack nativo; atributos na Tool (§7.1) | DEC-040 |
 | Aparência de personagem (pack, rosto, espécie, roupa) | atributos + vestir no client (§5) | T40 |
-| Pacote grátis do dia de liberação | **modelo de exibição** (não `Tool`, sem `Handle` tocável) sobre a estação nova, com âncora `Interactable` → `pick_up_item` (prompt "Take", toque, raio 7, `Content.Actions`); o servidor valida hotbar de 4 (DEC-174) e limite de pacotes (2, Urso 3), cheio → `Notice hands_full`/`package_limit` e o pacote fica no mundo; pego → vira a Tool `pack_*` na mão. **Provisório** (N-03 do board, L-03 do QA). Dono: TASK-046 | DEC-071 |
+| Pacote grátis do dia de liberação | **modelo de exibição** (não `Tool`, sem `Handle` tocável) sobre a estação nova, com âncora `Interactable` → `pick_up_item` (prompt "Take", toque, raio 7, `Content.Actions`); o servidor valida hotbar de 4 (DEC-174) e limite de pacotes (2, Urso 3), cheio → o pacote vai **direto ao estoque** do ingrediente (`Notice ingredient_stocked`, 2026-10-11; sem estoque a receber → `hands_full` e o pacote fica no mundo); pego com espaço → vira a Tool `pack_*` na mão; todo dia com `1 < UnlockDay <= dia` (inclusive dias pulados) põe o pacote uma vez. **Provisório** (N-03 do board, L-03 do QA). Dono: TASK-046 | DEC-071 |
 | Prompts (`PromptEnabled`, `PromptText`, `PromptHold`) | atributos das peças, mantidos pelo servidor (TASK-011; nomes no binding da TASK-002) | prompt é do mundo |
 | Peças de upgrade, troca de veículo | instâncias no `Workspace`; peça alternada **pelo servidor** por visibilidade (T38), sem controller no client (v5.1, D-07) | DEC-052 |
 | NPCs (posição, animação) | física + `Animator` no servidor (T11); passantes por `Motor6D.Transform` (DEC-183, Provisório, onda 2) | |
@@ -643,7 +649,7 @@ return Lync.define("game", {
 	Stock = Lync.replicate(Lync.struct({ Amount = Lync.int(0, 999), Capacity = Lync.int(0, 999), Blocked = Lync.bool() })),
 	Stations = Lync.replicate(Lync.struct({ --[[ §3.5 ]] })),
 	Customers = Lync.replicate(Lync.struct({ --[[ §3.6 ]] })),
-	Upgrades = Lync.replicate(Lync.struct({ Level = Lync.int(0, 255) })), -- 0..9 real (§3.7)
+	Upgrades = Lync.replicate(Lync.struct({ Level = Lync.int(0, 255), Wait = Lync.int(0, 255) })), -- Level 0..9 real, Wait = turnos de cooldown (§3.7)
 
 	-- packets (onda 1)
 	Interact = Lync.packet(Lync.struct({ --[[ §4.1 ]] })),
@@ -750,6 +756,9 @@ validado). Uma task de contrato por onda escreve as entradas da onda em `src/Lib
 | `Call` | set | `1` | `BossService` | `BossController`, `HudController` | ~3 por ligação | 2 |
 | `Thief` | set | `1` | `ThiefService` | `ThiefController` | ~4 por ladrão | 2 |
 | `Transition` | packet s → grupo | grupo | `VehicleService` | `VehicleController` | 1 por run | 2 |
+| `Transition` Kind `TrailerFocus` | packet s → grupo | grupo | `VehicleService` (cue da chamada `call_trailer_offer`) | `VehicleController` → `ObjectiveController` (foco da câmera ~3 s na placa) | 1 por run | 3 |
+| `Transition` Kind `TrailerDoor` | packet s → jogador | quem usou a porta | `TrailerDoorService` | `VehicleController` (fade 0,65 s) | por uso, cooldown 1 s | 3 |
+| `SanityCue` | packet s → dono | dono | `VitalService` | `VitalController` / `HudSanity` | Hint 1x na noite 1; Gain por café | 3 |
 | `RunReport` | packet s → jogador | jogador | `RoundService` (`Gems` pelo passo do `RewardService`, T59) | `HudController` | 1 por run | 2 |
 | `Anomalies` | set | ocorrência 1..255 | `AnomalyService` | `AnomalyController`, `LightController`, `AudioController` | ≤ 2/s com Walker ativo | 3 |
 | `AnomalyCue` | packet s → grupo | grupo (DEC-204) | `AnomalyService` | `AnomalyController` | evento | 3 |
@@ -1017,7 +1026,7 @@ Contrato de código: `architecture.md` §19.28. Tabelas: `content-data.md` §3.2
 usa `Notice` (`table_added`), o "+$N" da limpeza sai do próprio set (`Tip` → 0 e `State` Dirty → Free na mesma
 escrita; a gaveta sobe pelo `Economy`).
 
-### 14.1 `Tables` (set, id = índice da mesa 1..`Content.Seating.Tables`)
+### 14.1 `Tables` (set, id = índice da mesa 1..`Content.Seating.Tables` = 9: Pad 1..5, Trailer 6..9, `Q-209`)
 
 ```lua
 Tables = Lync.replicate(Lync.struct({
@@ -1031,8 +1040,8 @@ Tables = Lync.replicate(Lync.struct({
 
 | | |
 |---|---|
-| Escreve | `SeatingService` (único). Registros 1..5 sempre presentes (`add` no `OnStart`); 6 = Back Bar (UPG-010), **não escrito** nesta versão |
-| Lê | `SeatingController` (TASK-147): `Locked` = mesa escondida (antes do Day 2, nada aparece); `Ghost` = malha a `Seating.GhostTransparency`, placa de preço só com `Price > 0`; `Free`/`Occupied` = mesa normal; `Dirty` = bandeja + moeda no `Tray_Anchor` (ou no topo da mesa). Limpeza = escrita com `Dirty → Free` e `Tip → 0`: o client mostra "+$N" com o `Tip` anterior. `PromptController` só lê os atributos da âncora |
+| Escreve | `SeatingService` (único). Registros 1..9 sempre presentes (`add` no `OnStart`, todos `Locked`; o `Refresh` escreve o estado real). **Grupos** (`Content.Seating.Groups`): Pad = 1..5, Trailer = 6..9. Mesa do grupo Trailer fica `Locked` enquanto o veículo não for o trailer e, depois, só a próxima à venda é `Ghost` (as seguintes `Locked`). Back Bar (UPG-010) não tem registro. **Schema inalterado**: 9 registros, mas todo registro carrega campos de 10 e 16 bits (`Price`, `Npc1`, `Npc2`, `Tip`; `State` de 3 bits vai junto), muito acima do 1 byte por registro de keyframe do Lync 4.0.2 (a armadilha do `Upgrades.Level`, 8 bits de propósito, vale para sets com 8+ registros de campos pequenos; `Upgrades` agora tem 9 registros e segue com `Level`/`Wait` de 8 bits) |
+| Lê | `SeatingController` (TASK-147): `Locked` = mesa escondida (antes do Day 2, ou mesa do trailer antes de o trailer ser o veículo); `Ghost` = malha a `Seating.GhostTransparency` (a `GhostDimTransparency`, mais fraca, quando `Price > 0` e a party não paga), placa de preço só com `Price > 0` (título do grupo: "Patio Table" / "Trailer Table"); `Free`/`Occupied` = mesa normal; `Dirty` = bandeja + moeda no `Tray_Anchor` (ou no topo da mesa). Limpeza = escrita com `Dirty → Free` e `Tip → 0`: o client mostra "+$N" com o `Tip` anterior. `PromptController` só lê os atributos da âncora |
 | Frequência | por evento (compra, sentar, levantar, limpar, fase): < 1/s |
 | Colisão | mesa `Locked`/`Ghost` tem `CanCollide = false` escrito **pelo servidor** (replica); a transparência é do client |
 | Por que set | estado do mundo que todos veem e quem entra no meio precisa pronto (bandeja, fantasma) |
@@ -1046,22 +1055,25 @@ Leader = Lync.optional(Lync.int(1, 65535)),                              -- parc
 
 | | |
 |---|---|
+| Escrita | `Customers:update` **não limpa** campo opcional passado como `nil` (o `for` do Lync pula chaves nil; só `Lync.none` limpa). `CustomerService:Publish` manda `Order2 = Lync.none` / `Leader = Lync.none` quando nil: sem isso o cliente mantinha o `Order2` antigo ao lado do novo `Order` e o pedido restante aparecia **duplicado** (balão e cartão HUD). Sem mudança de schema |
 | `Order2` | só no líder de uma dupla, escrito junto com `Order` no "Take Order" (T41 continua: nada antes). O registro mostra sempre **os itens pendentes**: `Order` = 1º pendente, `Order2` = 2º pendente; ao resolver um, o que sobra vira `Order` e `Order2` vai a `nil` (o balão volta a 1 linha, TASK-148) |
 | `Leader` | só no parceiro. O parceiro nunca tem balão nem prompt e seu `State` é só `Arriving` → `Queued` → `Leaving` (`Slot = 0`); o rosto segue o `Mood` do líder (copiado pelo servidor) |
 | `Sale` | uma por hot dog; `Npc` = dono da linha (linha 1 = líder, linha 2 = parceiro): a reação aparece sobre quem pediu |
-| Cliente sentado | continua `Leaving` no set (não há estado novo); quem está na mesa se lê no `Tables` (`Npc1`/`Npc2`) e no atributo `Seated` do rig (§14.3) |
+| Cliente sentado | **Q-209 (2026-10-12):** sem campo novo. Esperando a comida na mesa: `State = Waiting`, `Slot = 0`, `Phase = Order` (o balão e a barra de paciência seguem); `Tables[n]` = `Occupied` com `Npc1`/`Npc2`. Servido bem: `Leaving` (come, sem mais prompts). A mesa que ele espera se lê no `Tables` e no atributo `Seated` do rig (§14.3) |
 
 ### 14.3 Atributos (sem Lync)
 
 | Onde | Atributo | Escreve | Uso |
 |---|---|---|---|
 | `Model` da mesa (tag `SeatTable`) | `TableIndex` (1..5) | bind do mapa (TASK-149); no fallback por nome, o `SeatingService` escreve tag e atributo em runtime | client acha a mesa do registro |
+| rig do NPC | `Eating` = `true` quando a comida foi servida (Q-209); só com `Seated` | `SeatingService` | `Meal.luau` só põe o hot dog na mão e morde com `Eating`; sentado esperando = mãos vazias |
 | rig do NPC | `Seated` = índice da mesa (nil = de pé) | `SeatingService` | client toca `npc_sit`/`npc_eat_seated` quando tiverem Id; sem Id o servidor já dobra quadril/ombro por `Motor6D.C0` (replica) |
 | `Motor6D` do rig | `RestC0` (CFrame) | `SeatingService` (`Diner.luau`) | C0 de repouso; `NpcService/Pool` restaura ao devolver o rig ao pool |
 | âncora de mesa (`Prompt_Table` runtime, ou `Prompt_BuyTable`/`Prompt_CleanTable` do bind) | `PromptAction` (`buy_in_place` ↔ `clean_table` na âncora única), `PromptEnabled`, `PromptText` ("Buy Table — $30"), `Upgrade` = `patio_tables`, `TableIndex` | `SeatingService` | `PromptController` como qualquer âncora |
+| âncora de entrega (`Prompt_Serve` runtime, ou `Prompt_ServeTable` do bind) | `PromptAction = serve_table`, `PromptEnabled` (só com cliente sentado esperando), `PromptText` ("Serve Table 2: Ketchup + Cheese"; dupla `A \| B`), `TableIndex` | `SeatingService` | `PromptController` e o menu de interação (uma linha por mesa) |
 | placa do Patio Lights (`Prompt_PatioLights`) | `PromptAction = buy_in_place`, `Upgrade = patio_lights` | bind (TASK-149) + `SeatingService` | idem |
 
-`Interact` ganha `buy_in_place` (hold 1,5, raio 7) e `clean_table` (hold 1, raio 7) pelo enum de `Content.Actions`;
+`Interact` ganha `buy_in_place` (hold 1,5, raio 7), `clean_table` (hold 1, raio 7) e `serve_table` (tap, raio 8, mão = hot dog; Q-209: o enum cresce 1 valor, nenhum campo novo; o set `Tables` já tem registro largo, `Customers` não muda) pelo enum de `Content.Actions`;
 `Notice` ganha `table_added` (Party, `Value` = índice da mesa). Orçamento: +< 5 B/s por client.
 
 ---

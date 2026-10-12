@@ -17,7 +17,7 @@ local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 const RECORD_ID = 1 -- single record (network.md §1, rule 5)
 const STEP = Content.Shift.ClockStepMinutes
 const MINUTES_PER_DAY = 1440
-const TICK_RATE = 10 -- Hz; one 5-minute clock step is >= 1.5 s real (Open: 360 s / 120 steps = 3 s), 0.1 s is inside "<= 1 step"
+const TICK_RATE = 10 -- Hz; one 5-minute clock step is >= 1.5 s real (Open: 216 s / 120 steps = 1.8 s), 0.1 s is inside "<= 1 step"
 const NIGHT_PHASE = "Night"
 const WINDOW_ORDER = { "Calm", "Shift", "Last" }
 

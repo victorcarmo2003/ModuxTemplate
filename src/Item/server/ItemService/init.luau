@@ -122,8 +122,15 @@ function ItemService:Setup()
 		Template = function(key: string): Tool?
 			return self:Template(key)
 		end,
-		Give = function(player: Player, key: string): Tool?
-			return self:Give(player, key)
+		Give = function(player: Player, key: string, silent: boolean?): Tool?
+			return self:Give(player, key, if silent then { Silent = true } else nil)
+		end,
+		Stock = function(ingredient: string, amount: number): number
+			const sink = self.StockSink
+			return if sink then sink(ingredient, amount) else 0
+		end,
+		Notify = function(player: Player, key: string, value: number?)
+			self.Dependencies.RunStateService:Notify(player, key, value)
 		end,
 		IsActive = function(player: Player): boolean
 			return self.Dependencies.RunStateService:IsActive(player)
@@ -132,14 +139,28 @@ function ItemService:Setup()
 			self.Dependencies.InteractionService:SetPrompt(anchor, enabled)
 		end,
 	}) :: Pickup.Pickup
+	-- Direct deposit in the cart stock, set by KitchenService (it requires ItemService, so the link goes this way)
+	self.StockSink = nil :: ((ingredient: string, amount: number) -> number)?
 	-- Items on the ground (TASK-066, FEAT-036).
 	self.Drops = Drops.new({
 		Template = function(key: string): Tool?
 			return self:Template(key)
 		end,
 		Display = Pickup.display,
-		Give = function(player: Player, key: string, count: number, toppings: string?): Tool?
-			return self:Give(player, key, { Count = count, Toppings = toppings })
+		Give = function(player: Player, key: string, count: number, extra: string?): Tool?
+			const rebuild = Stash.rebuild({ Kind = key, Count = count, Extra = extra })
+			return self:Give(player, key, {
+				Count = rebuild.Count,
+				Toppings = rebuild.Toppings,
+				Restore = rebuild.Restore,
+				Altered = rebuild.Altered,
+			})
+		end,
+		Return = function(userId: number, key: string, count: number, extra: string?)
+			self:ReturnDrop(userId, { Kind = key, Count = count, Extra = extra })
+		end,
+		ReturnOnExpire = function(): boolean
+			return self.Dependencies.RoundService:GetDay() <= 1 -- day 1 = tutorial day: nothing dropped is ever lost
 		end,
 		IsActive = function(player: Player): boolean
 			return self.Dependencies.RunStateService:IsActive(player)
@@ -817,8 +838,14 @@ function ItemService:DropHeld(player: Player, _reason: string): boolean
 	elseif handle and handle:IsA("BasePart") then
 		position = handle.Position
 	end
-	const count = math.max(1, self:Count(tool))
-	const toppings = tool:GetAttribute("Toppings")
+	-- Exact state of the Tool (Count, Toppings, Restore, Altered), read before the Tool is removed
+	const entry = Stash.entry(
+		item.Key,
+		tool:GetAttribute("Count"),
+		tool:GetAttribute("Toppings"),
+		tool:GetAttribute(RESTORE),
+		tool:GetAttribute(ALTERED)
+	)
 	self:Consume(player, tool)
 	if position == nil or item.DropOnHit == "Vanish" then
 		return true
@@ -827,12 +854,40 @@ function ItemService:DropHeld(player: Player, _reason: string): boolean
 	const ignore: { Instance } = if character then { character } else {}
 	if item.DropOnHit == "Keep" then
 		const ground = Drops.ground(self.Drops, Drops.sidewalk(position), ignore)
-		Drops.keep(self.Drops, item.Key, count, if type(toppings) == "string" then toppings else nil, ground, nil)
+		if entry ~= nil then
+			Drops.keep(self.Drops, item.Key, entry.Count, entry.Extra, ground, nil, player.UserId, position)
+		end
 	else
 		Drops.lost(self.Drops, item.Key, Drops.ground(self.Drops, position, ignore))
 	end
 	self.Dependencies.RunStateService:Notify(player, "item_dropped", Content.Items.IndexOf[item.Key])
 	return true
+end
+
+-- Dropped item goes back to who dropped it: into the hands when there is room (no notice), else into the member stash
+-- (Unstash gives it back as soon as there is room). A player who left the run loses it. Not a purchase refund: the
+-- item itself returns, with its exact state.
+function ItemService:ReturnDrop(userId: number, entry: Stash.Entry)
+	const player = Players:GetPlayerByUserId(userId)
+	if player ~= nil and self:CanHold(player) then
+		const rebuild = Stash.rebuild(entry)
+		const tool = self:Give(player, entry.Kind, {
+			Count = rebuild.Count,
+			Toppings = rebuild.Toppings,
+			Restore = rebuild.Restore,
+			Altered = rebuild.Altered,
+			Equip = false,
+			Silent = true,
+		})
+		if tool ~= nil then
+			return
+		end
+	end
+	const runState = self.Dependencies.RunStateService
+	const member = runState.Members()[userId]
+	if member ~= nil then
+		runState:SetStash(userId, Stash.merge(member.Stash, { entry }))
+	end
 end
 
 -- Permanent spectator (FEAT-025, VitalService at 6 AM): Tools in play are stashed, then the stash empties. Keep items
@@ -857,7 +912,8 @@ function ItemService:DropStash(userId: number, pointId: string)
 		end
 		if item.KeepOnSpectate then
 			table.insert(kept, entry)
-		elseif item.DropOnHit == "Keep" then
+		elseif item.DropOnHit == "Keep" and (item.Kind == "Package" or item.Kind == "Revive") then
+			-- the counter keeps packages and the whistle only (hot dog / coffee are Keep on a car hit, not here)
 			table.insert(drop, entry)
 		end
 	end
@@ -874,6 +930,11 @@ function ItemService:DropStash(userId: number, pointId: string)
 		const spot = Drops.spread(point, index, #drop)
 		Drops.keep(self.Drops, entry.Kind, entry.Count, entry.Extra, Drops.ground(self.Drops, spot, {}), self.ShiftIndex + 1)
 	end
+end
+
+-- KitchenService hands in the stock writer (free package with the hands full, FEAT-007; DEC-071).
+function ItemService:SetStockSink(sink: (ingredient: string, amount: number) -> number)
+	self.StockSink = sink
 end
 
 -- Free package (TASK-046) and vehicle swap ---------------------------------------------------------------------------
@@ -948,7 +1009,10 @@ function ItemService:WireWave2()
 	self.Dependencies.RoundService.PhaseChanged:Connect(function(phase: string)
 		if phase ~= ALTER_PHASE then
 			self:ClearAltered()
+			Drops.clearAltered(self.Drops)
 		end
+		-- Phase change (day <-> night, prep/open...): what a car hit left on the street goes back to its owner
+		Drops.recall(self.Drops)
 	end)
 end
 

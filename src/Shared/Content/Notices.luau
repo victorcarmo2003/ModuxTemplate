@@ -23,7 +23,11 @@ return Table.new({
 	{ Key = "package_limit", Text = "You can carry {value} packs", Audience = "Player", ValueFrom = "Number", Wave = 1 },
 	{ Key = "not_enough_cash", Text = "Not enough cash (${value})", Audience = "Player", ValueFrom = "Number", Wave = 1 },
 	{ Key = "upgrade_bought", Text = "{upgrade} upgraded!", Audience = "Party", ValueFrom = "Upgrades", Wave = 1 }, -- FEAT-015
+	-- Gear Stand hint at closing time (Q-203 Provisional; MarketService: once per shift, only with money for an upgrade or before the first purchase)
+	{ Key = "mart_hint", Text = "Closing time. Upgrades are on sale at the Mart.", Audience = "Party", ValueFrom = "None", Wave = 1 },
 	{ Key = "ingredient_unlocked", Text = "New: {item}!", Audience = "Party", ValueFrom = "Ingredients", Wave = 1 }, -- FEAT-032
+	-- free package of the unlock day taken with the hands full: straight into the stock (Provisional, FEAT-007)
+	{ Key = "ingredient_stocked", Text = "New: {item} (stocked)", Audience = "Player", ValueFrom = "Ingredients", Wave = 1 },
 	{ Key = "class_bought", Text = "{class} unlocked!", Audience = "Player", ValueFrom = "Classes", Wave = 1 }, -- DEC-186
 	{ Key = "class_selected", Text = "Now playing as {class}", Audience = "Player", ValueFrom = "Classes", Wave = 1 },
 	{ Key = "not_enough_gems", Text = "Not enough gems ({value})", Audience = "Player", ValueFrom = "Number", Wave = 1 },
@@ -46,6 +50,8 @@ return Table.new({
 	-- wave 2 (content-data.md §6.9; ui-text.md §10.1, §10.2)
 	{ Key = "trailer_available", Text = "Old trailer for sale! Check the lot.", Audience = "Party", ValueFrom = "None", Wave = 2 },
 	{ Key = "trailer_waiting", Text = "The trailer's still waiting in the lot.", Audience = "Party", ValueFrom = "None", Wave = 2 },
+	-- Walt's till tops the party cash up to the trailer price (user request 2026-10-11, Provisional); Value = what was added
+	{ Key = "trailer_cash", Text = "Walt's till: +${value} for the trailer!", Audience = "Party", ValueFrom = "Number", Wave = 2 },
 	{ Key = "trailer_bought", Text = "Trailer bought! It's yours next shift.", Audience = "Party", ValueFrom = "None", Wave = 2 },
 	{ Key = "gems_gained", Text = "+{value} Gems!", Audience = "Player", ValueFrom = "Number", Wave = 2 }, -- DEC-104
 	{ Key = "afk_no_gems", Text = "No gems today. Serve 3 full orders!", Audience = "Party", ValueFrom = "None", Wave = 2 },

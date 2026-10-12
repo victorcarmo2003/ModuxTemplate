@@ -227,7 +227,17 @@ trailer e o palco foi fechado pelo LW-TRUCK).
 Nenhum NPC de servidor (teto 0). Rig de classe: 1 local por client. Bichos sentados nos bancos/mesas continuam fora do
 escopo (P-L14).
 
-## V2-10. Iluminação (14 luzes locais, 1 com sombra; `Lighting` intocado)
+## V2-10. Iluminação (14 luzes locais + 3 de aquecimento = 17, 1 com sombra)
+
+> **Passe quente 2 (2026-10-12, pedido do dono: "lobby muito frio", Provisório, Q-208).** O `Lighting` do lobby vem do preset
+> `Content.LightPresets.Lobby` (aplicado só pelo `LightController` quando `PlaceController:Is("Lobby")`; o jogo usa
+> Day/Golden/Night, separado): Brightness 1,2 → **1,6**; Ambient (95,70,55) → **(112,82,66)**; OutdoorAmbient (120,90,70) →
+> **(138,102,80)**; ColorShiftTop → âmbar (240,170,112); sombras (ColorShiftBottom) → ameixa-marrom (52,30,30); Atmosphere
+> Color mauve → **(172,116,92)**, Decay roxo → **(120,64,56)**, Density 0,3 → 0,32, Haze 1 → 1,4; Saturation 0,15 → 0,18;
+> Tint (255,226,196); Bloom 0,6 → 0,8 / Threshold 1,2; sombras (52,30,30). Nenhum azul; sem coral. Luzes locais: valores abaixo são os
+> **de base**; `tools/assetplace/warm_lobby.luau` (snippet de Studio, idempotente) sobe Brilho/alcance e esquenta as cores
+> (cores semânticas das zonas e anéis intocadas) e adiciona 3 luzes quentes: `WarmLobby_Spawn` (5, 7,5, −620), `WarmLobby_Plaza`
+> (5, 14,5, −628,5), `WarmLobby_Squads` (25, 8,5, −620), todas sem sombra. Total 17 ≤ 18.
 
 | ID | Tipo | Posição WORLD | Mira / dados | Cor | Brilho / alcance | Sombra |
 |---|---|---|---|---|---|---|

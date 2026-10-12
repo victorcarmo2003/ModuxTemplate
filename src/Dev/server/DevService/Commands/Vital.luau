@@ -4,6 +4,7 @@
 -- Command Bar (no caller) the only player in the server.
 --   /dev sanity [player]              value, max, state, band, revives tonight, coffee cooldown, last cause
 --   /dev sanity <n> [player]          sets the sanity of an Active member at night (0 = falls)
+--   /dev sanity hint                  starts the Night 1 coffee emphasis now (HUD bar + arrow on the machine)
 --   /dev sanity dark on|off|auto      forces every position dark / lit, or back to LightService (TASK-059)
 --   /dev down [player]                falls now as Down (sanity 0, faint, stash, StateEndsAt = 6:00 AM)
 --   /dev spectate [player]            falls now as Spectator (DEC-129 path: faint, DropStash)
@@ -26,10 +27,11 @@ type Vital = {
 	DevSetSanity: (self: any, player: Player, value: number) -> number,
 	DevFall: (self: any, player: Player, state: string?) -> (),
 	DevDark: (self: any, mode: boolean?) -> (),
+	StartCoffeeHint: (self: any, callLeft: number) -> number,
 	WipeEndsAt: number,
 }
 
-const USAGE_SANITY = "sanity [<n> | dark on|off|auto] [player]"
+const USAGE_SANITY = "sanity [<n> | hint | dark on|off|auto] [player]"
 
 local function findPlayer(query: string): Player
 	const needle = string.lower(query)
@@ -100,6 +102,9 @@ const Vital: Api.Module = function(ctx: Api.Context): { Api.Command }
 						error(`usage: {USAGE_SANITY}`, 0)
 					end
 					return `dark forced: {mode}`
+				end
+				if first ~= nil and string.lower(first) == "hint" then
+					return `coffee emphasis sent to {vital:StartCoffeeHint(0)} player(s)`
 				end
 				const value = if first ~= nil then tonumber(first) else nil
 				if value == nil then

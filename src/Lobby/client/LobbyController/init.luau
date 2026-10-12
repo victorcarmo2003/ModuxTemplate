@@ -6,8 +6,16 @@
 	PlaceController:GetServerRole(), which waits for it; missing = "Game"), or Workspace "ServerRole" = "Lobby" as a
 	Studio override. Elsewhere nothing is bound or mounted.
 
+	Layout (user request 2026-10-12): ALL the lobby UI is on the RIGHT (gem pill + tiles column at the top right, 2 x 2 grid
+	on short screens), the squad status card and the Play button at the bottom centre; the LEFT stays free for the Roblox
+	menu and chat (the Roblox player list is turned off in the lobby: the squad panel lists the players). The windows are
+	centred full-screen modals over a dim backdrop and hide the HUD, so nothing sits over another screen: opening one
+	closes the previous (one Panel), the Roblox menu (Esc) closes it too, and a window shrinks to fit a narrow screen.
+	Toasts and the invite popup share one column at the top centre.
+
 	Screens (Interface/Components; one open at a time, input context "Menu" while open):
-	  LobbyHud      gem balance (opens the shop), tiles Classes · Shop · Codes · Squad, the big Play button
+	  LobbyHud      gem balance (opens the shop), tiles Classes · Shop · Codes · Squad, a status card (Solo / Squad
+	                n/4, members, Friends only) over the big Play button (PLAY green · START SQUAD mustard · READY)
 	  ClassSelect   every class (Content.Classes): list, card with perks / drawbacks, Buy with Gems / Buy with Robux /
 	                Equip. The rig stands in the middle: on the MapPoint LOBBY-CLASS-STAGE with the camera locked in
 	                front of it when the map has one (Stage.luau, CameraController External), else in a ClassStage
@@ -45,6 +53,9 @@
 	                Ready (members), Invite players and Leave. Joining / leaving a platform is the server's
 	                (PartyService watches the platforms); this client sends PartyConfigure / PartyStart / PartyReady /
 	                PartyLeave. Opened by Play too; closes by itself when there is no squad left to show.
+	Pad signs (Pads.luau + Interface/Components/PadTag): over every squad pad a studs-sized sign "SQUAD n", four slots,
+	"n/4" and the state (Open / Room for n / Friends only / Full / Starting in 3...), green free, yellow taken, red full,
+	all read from the Party set (Platform, Members, MaxPlayers, StartAt).
 	Zone VFX (Rings.luau): local Neon frames on the floor edges (square / ring) with rising ghost frames, one Heartbeat
 	for every zone; platform colours follow the Party set (free / squad / starting).
 	Camera: normal third person in the lobby (CameraController External; CameraMode Classic). While the class screen
@@ -62,6 +73,7 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
@@ -81,7 +93,12 @@ local LobbyHud = require(StarterPlayer.StarterPlayerScripts.client.Interface.Com
 local PlayChoice = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.PlayChoice)
 local SquadPanel = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.SquadPanel)
 local SquadSetup = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.SquadSetup)
+local SquadStatus = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.SquadStatus)
+local PadTag = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.PadTag)
+local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
+local UiScale = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.UiScale)
 local ToastStack = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Toast.Stack)
+local Pads = require(script.Pads)
 local Rings = require(script.Rings)
 local Stage = require(script.Stage)
 local Text = require(script.Text)
@@ -132,6 +149,10 @@ const PLAY_CHOICES: { { Name: string, Key: Enum.KeyCode, Choice: PlayChoice.Choi
 const CLOSE = "LobbyClose"
 const PREVIOUS = "LobbyPrevious"
 const NEXT = "LobbyNext"
+-- Notices column (invite popup + toasts), top centre: px from the top; on a narrow screen under the HUD column
+const NOTICE_TOP = 8
+const NOTICE_TOP_NARROW = 290
+const NARROW_VIEWPORT = 420
 const BIND_PRIORITY = 10 -- over ClassController's Crew toggle (priority 0) on C / ButtonY
 
 -- First button a gamepad selects when a panel opens (by instance name, searched in the panel).
@@ -189,6 +210,8 @@ function LobbyController:Setup()
 	self.Active = false :: boolean
 	self.Panel = Vide.source("None" :: Panel) :: Vide.Source<Panel>
 	self.Scale = Vide.source(1) :: Vide.Source<number>
+	-- camera viewport px (the invite / toast column steps under the HUD column on a narrow screen)
+	self.Viewport = Vide.source(Vector2.new(1280, 720)) :: Vide.Source<Vector2>
 	self.Toasts = Vide.source({}) :: Vide.Source<{ ToastStack.Entry }>
 
 	-- classes
@@ -233,6 +256,7 @@ function LobbyController:Setup()
 	-- server time, ticked every CLOCK_INTERVAL s (countdowns)
 	self.Clock = Vide.source(0) :: Vide.Source<number>
 	self.Rings = nil :: Rings.Rings?
+	self.Pads = nil :: Pads.Pads?
 	self.Hiding = false :: boolean
 
 	self.Gui = nil :: ScreenGui?
@@ -680,24 +704,24 @@ function LobbyController:PlayButton(): LobbyHud.PlayButton
 	if party == nil then
 		return if self.QuickPending()
 			then { Text = "...", Kind = "Off", Enabled = false }
-			else { Text = "Play", Kind = "Go", Enabled = true }
+			else { Text = "PLAY", Kind = "Go", Enabled = true }
 	end
 	if party.State == "Starting" then
-		return { Text = "Starting...", Kind = "Go", Enabled = true }
+		return { Text = "STARTING...", Kind = "Go", Enabled = true }
 	end
 	const me = Players.LocalPlayer.UserId
 	if party.Leader == me then
-		return if self:AllReady(party)
-			then { Text = "Start", Kind = "Go", Enabled = true }
-			else { Text = "Squad", Kind = "Wait", Enabled = true }
+		return { Text = "START SQUAD", Kind = "Wait", Enabled = true }
 	end
-	return { Text = "Squad", Kind = if party.Ready[me] == true then "Go" else "Wait", Enabled = true }
+	return if party.Ready[me] == true
+		then { Text = "READY!", Kind = "Go", Enabled = true }
+		else { Text = "READY", Kind = "Wait", Enabled = true }
 end
 
 function LobbyController:PlayStatus(): string
 	const _, party = self:MyParty()
 	if party == nil then
-		return ""
+		return if self.QuickPending() then "Starting..." else "Pick solo or squad"
 	end
 	if party.State == "Starting" then
 		if party.StartAt <= 0 then
@@ -713,9 +737,41 @@ function LobbyController:PlayStatus(): string
 		end
 	end
 	if waiting == 0 then
-		return if #party.Members > 1 then "Everyone is ready!" else ""
+		return if #party.Members > 1 then "Everyone is ready!" else "Invite your friends"
 	end
 	return if waiting == 1 then "Waiting for 1 player" else `Waiting for {waiting} players`
+end
+
+-- Status card over the Play button: alone ("Solo") or in a squad ("Squad 2/4"), who is in it, Friends only.
+function LobbyController:PlayCard(): SquadStatus.Info
+	const _, party = self:MyParty()
+	const me = Players.LocalPlayer.UserId
+	if party == nil then
+		return {
+			Squad = false,
+			Members = { { UserId = me, Leader = true, Ready = true } },
+			Max = 1,
+			FriendsOnly = false,
+			Status = self:PlayStatus(),
+		}
+	end
+	const members: { SquadStatus.Member } = {}
+	for _, userId in party.Members do
+		table.insert(members, {
+			UserId = userId,
+			Leader = userId == party.Leader,
+			Ready = party.Ready[userId] == true or userId == party.Leader,
+		})
+	end
+	-- a squad of one that is already starting is a solo run (Play Solo)
+	const solo = #members == 1 and party.State == "Starting"
+	return {
+		Squad = not solo,
+		Members = members,
+		Max = if solo then 1 else math.max(party.MaxPlayers, #members),
+		FriendsOnly = party.FriendsOnly and not solo,
+		Status = self:PlayStatus(),
+	}
 end
 
 -- Play button: outside a squad the choice (Play Solo / Create Squad); in a squad its setup window.
@@ -843,6 +899,46 @@ function LobbyController:Configure(friendsOnly: boolean, maxPlayers: number)
 	})
 end
 
+-- Pad signs: players on the pad (0 = free), table size, state and the line under the slots.
+function LobbyController:PadMembers(n: number): number
+	const party = self:PlatformParty(n)
+	return if party then #party.Members else 0
+end
+
+function LobbyController:PadMax(n: number): number
+	const party = self:PlatformParty(n)
+	return if party then math.max(party.MaxPlayers, #party.Members) else PartyRules.Rules.MaxSize
+end
+
+function LobbyController:PadState(n: number): PadTag.State
+	const party = self:PlatformParty(n)
+	if party == nil then
+		return "Open"
+	elseif party.State == "Starting" then
+		return "Starting"
+	end
+	return if #party.Members >= math.max(party.MaxPlayers, 1) then "Full" else "Busy"
+end
+
+function LobbyController:PadStatus(n: number): string
+	const party = self:PlatformParty(n)
+	if party == nil then
+		return "OPEN"
+	end
+	if party.State == "Starting" then
+		if party.StartAt <= 0 then
+			return "STARTING..."
+		end
+		const left = party.StartAt - self.Clock()
+		return if left > 0 then `STARTING IN {math.ceil(left)}...` else "GO!"
+	end
+	const free = math.max(party.MaxPlayers - #party.Members, 0)
+	if free == 0 then
+		return "FULL"
+	end
+	return if party.FriendsOnly then "FRIENDS ONLY" else `ROOM FOR {free}`
+end
+
 -- Ring colour of each platform: free / owned by a squad (someone is setting it up) / starting.
 function LobbyController:PaintPlatforms()
 	const rings = self.Rings
@@ -919,6 +1015,10 @@ function LobbyController:RunZones()
 			const camera = workspace.CurrentCamera
 			rings.Step(t, if camera then camera.CFrame.Position else nil)
 		end
+		const pads = self.Pads
+		if pads then
+			pads.Step()
+		end
 		const now = os.clock()
 		if now >= nextZones then
 			nextZones = now + LOBBY.Trigger.Poll
@@ -947,6 +1047,27 @@ function LobbyController:ThirdPerson()
 	if camera and Vide.untrack(self.Panel) ~= "Classes" then
 		camera.CameraType = Enum.CameraType.Custom
 	end
+end
+
+-- UI scale of the notices column (same rule as the windows).
+function LobbyController:NoticeScale(): number
+	return math.max(math.min(self.Scale(), UiScale.Current()), Theme.Scale.Min)
+end
+
+-- The left side stays free for the Roblox menu and chat: the player list (top right on desktop, under our column) is off
+-- in the lobby, and the Roblox menu (Esc) closes the open window so the two never stack.
+function LobbyController:ClearLeftSide()
+	const ok, err = pcall(function()
+		StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, false)
+	end)
+	if not ok then
+		warn(`[LobbyController] could not hide the player list: {err}`)
+	end
+	GuiService.MenuOpened:Connect(function()
+		if Vide.untrack(self.Panel) ~= "None" then
+			self:SetPanel("None")
+		end
+	end)
 end
 
 -- Panels and input --------------------------------------------------------------------------------------------------
@@ -1108,6 +1229,9 @@ function LobbyController:Rescale(camera: Camera?)
 		return
 	end
 	const size = camera.ViewportSize
+	if size ~= Vide.untrack(self.Viewport) then
+		self.Viewport(size)
+	end
 	const scale = math.clamp(math.min(size.X / BASE_WIDTH, size.Y / BASE_HEIGHT), 1, MAX_SCALE)
 	if math.abs(scale - Vide.untrack(self.Scale)) > 0.01 then
 		self.Scale(scale)
@@ -1257,8 +1381,8 @@ function LobbyController:Mount(playerGui: Instance)
 				Play = function()
 					return self:PlayButton()
 				end,
-				Status = function()
-					return self:PlayStatus()
+				Card = function()
+					return self:PlayCard()
 				end,
 				Keys = function()
 					return self:DeviceKeys()
@@ -1478,33 +1602,77 @@ function LobbyController:Mount(playerGui: Instance)
 				end,
 			}),
 
-			InvitePopup({
-				Invite = function()
-					return self:CurrentInvite()
+			-- Notices column, top centre (clear of the right-hand HUD): the invite popup, the toasts under it. One UIScale.
+			-- On a narrow screen it steps down under the HUD column instead of running into it.
+			Vide.create("Frame")({
+				Name = "Notices",
+				AnchorPoint = Vector2.new(0.5, 0),
+				Position = function()
+					const narrow = self.Viewport().X < NARROW_VIEWPORT
+					return UDim2.new(0.5, 0, 0, if narrow then NOTICE_TOP_NARROW * self:NoticeScale() else NOTICE_TOP)
 				end,
-				OnAccept = function()
-					self:Click()
-					self:Answer(true)
-				end,
-				OnDecline = function()
-					self:Click()
-					self:Answer(false)
-				end,
-				Scale = self.Scale,
-			}),
+				Size = UDim2.fromOffset(0, 0),
+				AutomaticSize = Enum.AutomaticSize.XY,
+				BackgroundTransparency = 1,
+				(Vide.create :: any)("UIScale")({
+					Scale = function()
+						return self:NoticeScale()
+					end,
+				}),
+				Vide.create("UIListLayout")({
+					FillDirection = Enum.FillDirection.Vertical,
+					HorizontalAlignment = Enum.HorizontalAlignment.Center,
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					Padding = UDim.new(0, 6),
+				}),
 
-			ToastStack({
-				Entries = self.Toasts,
-				OnDone = function(entry: ToastStack.Entry)
-					self:ToastDone(entry)
-				end,
-				Position = UDim2.new(1, -16, 0, 64),
+				InvitePopup({
+					Invite = function()
+						return self:CurrentInvite()
+					end,
+					OnAccept = function()
+						self:Click()
+						self:Answer(true)
+					end,
+					OnDecline = function()
+						self:Click()
+						self:Answer(false)
+					end,
+				}),
+
+				ToastStack({
+					Entries = self.Toasts,
+					MaxVisible = 2,
+					OnDone = function(entry: ToastStack.Entry)
+						self:ToastDone(entry)
+					end,
+				}),
 			}),
 		})
 	end)
 	self.Unmount = unmount
 	self.Gui = gui
 	gui.Parent = playerGui
+	-- capacity signs over the squad pads (BillboardGuis in PlayerGui, adorned to local anchor Parts)
+	self.Pads = Pads({
+		Parent = playerGui,
+		Count = PartyRules.Rules.Platforms,
+		Members = function(n: number)
+			return self:PadMembers(n)
+		end,
+		Max = function(n: number)
+			return self:PadMax(n)
+		end,
+		State = function(n: number)
+			return self:PadState(n)
+		end,
+		Status = function(n: number)
+			return self:PadStatus(n)
+		end,
+		Visible = function()
+			return self.Panel() ~= "Classes"
+		end,
+	})
 end
 
 -- Lifecycle ---------------------------------------------------------------------------------------------------------
@@ -1585,6 +1753,7 @@ LobbyController:OnStart(function(self)
 	self:LoadPrices()
 	self:ThirdPerson()
 	self:RunZones()
+	self:ClearLeftSide()
 
 	MarketplaceService.PromptProductPurchaseFinished:Connect(function(userId: number, _productId: number, _bought: boolean)
 		if userId ~= Players.LocalPlayer.UserId then

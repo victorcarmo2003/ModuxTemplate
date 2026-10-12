@@ -32,6 +32,9 @@
 	     PS-N1..4 eye a miss is a warning. Same blockers as rule 13 (vehicles excluded: the window frame is measured
 	     by hand, MAP-01 §5.6)
 
+	 16. (FEAT-037, Q-209) SeatTable tables, warnings only: TableIndex 1..9 once each (Pad 1..5, Trailer 6..9), TableGroup
+	     consistent with the index, Seat1..Seat4 BaseParts, an NpcNode within 20 studs (TBL-n)
+
 	Reads only tags and attributes (never the bind script's data). Items of §18.7 (wave 1) + §19.22 (wave 2):
 	  1. tags present (wave 1: MapBinding MapPoint NpcNode Vehicle Station Interactable UpgradePiece; wave 2: + LightZone
 	     StreetLight VehicleCover); exactly one MapBinding; PointId / NodeId / ZoneId / PostId unique
@@ -51,7 +54,7 @@
 	  6. graph: connected, Links resolve, no space in Links, edge <= 40, <= 80 nodes, no edge over a carriageway
 	     except a crosswalk edge, queue chain Q5-Q4-Q3-Q2-Q1; wave 2: thief routes exist without queue slots and
 	     without crosswalk edges (MAP-01 §9.2: never crosses a road)
-	  7. pivots of the counter stations: cart at y 3.45 (DEC-157, Provisional until Q-153); trailer at pivot + 5.5
+	  7. pivots of the counter stations: cart at y 3.45 (DEC-157, Provisional until Q-153); trailer at pivot + 4.6 (2026-10-11, was 5.5)
 	  9. (TASK-085) UpgradePiece: one Model per Content.Upgrades row with Part ~= "" in each vehicle of the wave, inside
 	     that Vehicle, valid Upgrade / integer Level, nothing interactive inside (T38). Warnings: authored state not
 	     "StartLevel only", invisible piece parts without UpgHidden, fixed grill / cooler / Lock / TRL-LIGHTS parts
@@ -230,7 +233,7 @@ local VEHICLE_SPEC = {
 		-- wave 3: service window button TRL-SHUTTER (DEC-221; Required.Wave3 of TASK-129); hide H1..H4 left
 		own = { [2] = { answer_phone = 1, switch_light = 1, buy_trailer = 1 }, [3] = { shutter_toggle = 1 } },
 		slots = { RailSlots = 8, BoardSlots = 3 },
-		counter = { ids = { "TRL-G", "TRL-R", "TRL-B", "TRL-T", "TRL-K", "TRL-DRAWER" }, relY = 5.5 },
+		counter = { ids = { "TRL-G", "TRL-R", "TRL-B", "TRL-T", "TRL-K", "TRL-DRAWER" }, relY = 4.6 },
 	},
 }
 local REQUIRED_PACKAGES = {
@@ -1167,7 +1170,7 @@ local function checkPivots(vehicles: { [string]: Instance })
 						err(("7: %s pivot at y %.3f, need %.2f (DEC-157, Provisional until Q-153)"):format(id, y, spec.counter.absY))
 					end
 				elseif math.abs((y - base) - spec.counter.relY) > COUNTER_TOL then
-					err(("7: %s pivot %.3f above the trailer pivot, need %.2f (floor +2, counter 3.5)"):format(id, y - base, spec.counter.relY))
+					err(("7: %s pivot %.3f above the trailer pivot, need %.2f (floor +2, counter 2.6)"):format(id, y - base, spec.counter.relY))
 				end
 			end
 		end
@@ -2495,6 +2498,62 @@ local function checkPieces(vehicles: { [string]: Instance })
 	info(("9: UpgradePiece %s (rows from %s)"):format(table.concat(parts, ", "), src))
 end
 
+-- 16. Pad / Trailer tables (FEAT-037, Q-209; Content.Seating.Groups). Never an error (the tables are the owner's hand
+-- work and SeatingService falls back): warnings for a SeatTable without TableIndex 1..9, a duplicated index, a
+-- TableGroup attribute that disagrees with the index (Pad 1..5, Trailer 6..9), a table without Seat1..Seat4 BaseParts
+-- (the Studio snippet tools/assetplace/trailer_tables.luau adds them), and a table with no NpcNode within 20 studs
+-- (nobody can walk to it: add TBL-<n> next to it). Info: how many tables per group were found.
+local function checkTables()
+	local groups = {
+		{ key = "Pad", first = 1, last = 5 },
+		{ key = "Trailer", first = 6, last = 9 },
+	}
+	local byIndex: { [number]: { Instance } } = {}
+	for _, m in tagged("SeatTable") do
+		local idx = m:GetAttribute("TableIndex")
+		if typeof(idx) ~= "number" or idx ~= math.floor(idx) or idx < 1 or idx > 9 then
+			warn_(("16: SeatTable %s: TableIndex must be 1..9 (got %s)"):format(m:GetFullName(), tostring(idx)))
+			continue
+		end
+		byIndex[idx] = byIndex[idx] or {}
+		table.insert(byIndex[idx], m)
+		for _, g in groups do
+			local declared = m:GetAttribute("TableGroup")
+			if idx >= g.first and idx <= g.last and typeof(declared) == "string" and declared ~= g.key then
+				warn_(("16: SeatTable %s: TableGroup %s but TableIndex %d is the %s group"):format(m:GetFullName(), declared, idx, g.key))
+			end
+		end
+		for seat = 1, 4 do
+			local part = m:FindFirstChild("Seat" .. seat, true)
+			if not (part and part:IsA("BasePart")) then
+				warn_(("16: SeatTable %s (TBL-%d): no BasePart Seat%d"):format(m:GetFullName(), idx, seat))
+			end
+		end
+		local nearest = math.huge
+		for _, n in tagged("NpcNode") do
+			nearest = math.min(nearest, (pos(n) - pos(m)).Magnitude)
+		end
+		if nearest > 20 then
+			warn_(("16: TBL-%d is %.0f studs from the nearest NpcNode (> 20): add NpcNode TBL-%d next to it with an edge to the queue"):format(idx, nearest, idx))
+		end
+	end
+	local counts = {}
+	for _, g in groups do
+		local n = 0
+		for idx = g.first, g.last do
+			local list = byIndex[idx]
+			if list then
+				n += 1
+				if #list > 1 then
+					warn_(("16: TableIndex %d is on %d tables"):format(idx, #list))
+				end
+			end
+		end
+		table.insert(counts, ("%s %d/%d"):format(g.key, n, g.last - g.first + 1))
+	end
+	info("16: SeatTable " .. table.concat(counts, ", "))
+end
+
 -- 15. Mart v2 Gear Stand (TASK-138; MAP-01 §18.3, §18.4, §18.10). Errors: pedestal / shutter count per Slot, shutter
 -- without Slat_* / Door_Panel, bench prompt of a slot outside its pedestal. Warnings: Slot_ / Price_Anchor_ missing,
 -- shutter without Roll, Att_Opal missing / off OP-1 / not facing the store, shelf heights, prompts out of reach of the
@@ -2674,6 +2733,7 @@ function Check.run(opts: { write: boolean?, wave: number? }?): (string, number)
 	checkPieces(vehicles)
 	checkMapAnchors()
 	checkMart(points)
+	checkTables()
 	checkVehicleDistances(vehicles)
 	checkStreaming()
 	checkPivots(vehicles)

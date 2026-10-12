@@ -1,8 +1,10 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
+local Speech = require(StarterPlayer.StarterPlayerScripts.client.Cutscene.CutsceneController.Speech)
 
 export type Record = {
 	Call: string,
@@ -24,6 +26,7 @@ type Lamp = {
 
 export type Public = {
 	Call: Vide.Source<string>,
+	CancelSay: (() -> ())?,
 	Gui: ScreenGui?,
 	Held: boolean,
 	LampOn: boolean,
@@ -31,6 +34,8 @@ export type Public = {
 	Lines: { Content.BossCallLine },
 	LinesNight: number,
 	Phone: Phone?,
+	Prepared: { [string]: boolean },
+	PreparedFor: string,
 	RingSound: Sound?,
 	RippleAt: Vide.Source<number>,
 	RippleGui: BillboardGui?,
@@ -38,12 +43,22 @@ export type Public = {
 	Scale: Vide.Source<number>,
 	Showing: Vide.Source<boolean>,
 	Speaker: Vide.Source<string>,
+	Speech: Speech.Speech?,
 	StartedAt: number,
+	StartedClock: number,
 	State: Vide.Source<string>,
 	Text: Vide.Source<string>,
 	Vehicle: Instance?,
 	VehicleConnections: { RBXScriptConnection },
+	Warned: { [string]: boolean },
+	Warnings: number,
 	Setup: (self: Public) -> (),
+	Voice: (self: Public) -> Speech.Speech,
+	PrepareCall: (self: Public, key: string, night: number) -> (),
+	PrepareUpcoming: (self: Public) -> (),
+	WarnSilent: (self: Public, line: Content.CutsceneBeat) -> (),
+	Speak: (self: Public, text: string) -> (),
+	Quiet: (self: Public) -> (),
 	Night: (self: Public) -> number,
 	Apply: (self: Public, record: Record) -> (),
 	Hold: (self: Public, on: boolean) -> (),

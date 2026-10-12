@@ -29,6 +29,15 @@
 	Held subtitle (user request 2026-10-11, Provisional): during the first-hot-dog tutorial call (BossCalls Trigger
 	Tutorial) TutorialController owns the strip: Hold(true) stops the timed lines, Say(text) shows one of Walt's step
 	lines (nil hides). Hold(false) gives the strip back to the timed lines (by then past their time: hidden).
+
+	Voice (user request 2026-10-11: the day-5 call showed the subtitle and Walt stayed mute; only the tutorial call had a
+	voice): every other call is voiced here with Walt's text-to-speech, the cutscene's Speech module (Voices.walt of
+	Content.Cutscenes.Rules; the voice health, the warnings and the one audio LoadQueue are shared with the intro and the
+	tutorial call, which keep their own Speech instance). Lines are loaded ahead: the lines of the call that rings or
+	talks, and of the calls of this shift and the next one (day / night / trailer / hints, PrepareUpcoming, queued after
+	the loading gate), so a line is Loaded by its beat. Say(line) plays on the server timeline (subtitle and voice
+	start together; a line never cuts the one speaking). A line that gets no voice warns once per reason with its cause.
+	The tutorial call (Held) is voiced by TutorialController, never here.
 ]]
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -37,6 +46,7 @@ local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
+local Speech = require(StarterPlayer.StarterPlayerScripts.client.Cutscene.CutsceneController.Speech)
 local Components = StarterPlayer.StarterPlayerScripts.client.Interface.Components
 local CallSubtitle = require(Components.CallSubtitle)
 local Theme = require(Components.Theme)
@@ -64,6 +74,11 @@ const RIPPLE_RISE = 0.4
 const RIPPLE_PERIOD = 1.2
 const RIPPLE_MAX_DISTANCE = 70
 
+-- Voice (Provisional): Walt's key in Content.Cutscenes.Rules.Voices; the lines of the calls are loaded ahead
+const VOICE_SPEAKER = "walt"
+const VOICE_WARNINGS = 3 -- no-voice warnings per session (one per distinct reason)
+const PREPARE_AFTER = 8 -- s after the start before the background load of the upcoming calls (loading gate first)
+
 export type Record = {
 	Call: string,
 	State: string,
@@ -85,7 +100,7 @@ type Phone = {
 }
 
 const BossController =
-	Modux.Controller("BossController", { Require = { "RoundController" }, Priority = 660 })
+	Modux.Controller("BossController", { Require = { "RoundController", "AudioController" }, Priority = 660 })
 
 function BossController:Setup()
 	self.State = Vide.source("Idle") :: Vide.Source<string>
@@ -109,6 +124,128 @@ function BossController:Setup()
 	self.Gui = nil :: ScreenGui?
 	-- TutorialController drives the subtitle (Hold/Say)
 	self.Held = false :: boolean
+	-- Walt's voice for the calls (built on first use) and the call keys already queued for loading
+	self.Speech = nil :: Speech.Speech?
+	self.Prepared = {} :: { [string]: boolean }
+	self.PreparedFor = "" :: string -- "day:night" of the last PrepareUpcoming
+	self.StartedClock = os.clock() :: number
+	self.Warned = {} :: { [string]: boolean }
+	self.Warnings = 0 :: number
+	self.CancelSay = nil :: (() -> ())?
+end
+
+-- Voice -----------------------------------------------------------------------------------------------------------
+
+function BossController:Voice(): Speech.Speech
+	const existing = self.Speech
+	if existing ~= nil then
+		return existing
+	end
+	const created = Speech.new(function(): number
+		const volumes = self.Dependencies.AudioController.Volumes
+		return (volumes.Master or 1) * (volumes.Voice or 1)
+	end)
+	self.Speech = created
+	return created
+end
+
+local function beatOf(text: string): Content.CutsceneBeat
+	return { At = 0, Kind = "Line", Target = VOICE_SPEAKER, Speaker = VOICE_SPEAKER, Text = text }
+end
+
+-- Queues the voice of every line of a call (once per key and night: a repeated night appends its Short lines)
+function BossController:PrepareCall(key: string, night: number)
+	const id = `{key}:{night}`
+	if self.Prepared[id] or Content.BossCalls.ByKey[key] == nil then
+		return
+	end
+	self.Prepared[id] = true
+	const beats: { Content.CutsceneBeat } = {}
+	for _, line in Content.BossCalls.LinesOf(key, night) do
+		table.insert(beats, beatOf(line.Text))
+	end
+	if #beats > 0 then
+		self:Voice().Prepare(beats)
+	end
+end
+
+-- Calls of this shift and the next: day / night / trailer rows by trigger, plus the one-liner hints. Never the
+-- tutorial call (TutorialController voices it).
+function BossController:PrepareUpcoming()
+	const round = self.Dependencies.RoundController
+	if not round.Ready() then
+		return
+	end
+	const day = round.Day()
+	const night = round.Night()
+	const stamp = `{day}:{night}`
+	if stamp == self.PreparedFor then
+		return
+	end
+	self.PreparedFor = stamp
+	const tutorial = Content.BossCallRules.Tutorial.Call
+	for _, row in Content.BossCalls.List do
+		const trigger = row.Trigger
+		const kind = trigger.Kind
+		local wanted = false
+		if kind == "DayPrep" then
+			wanted = if trigger.Day ~= nil
+				then trigger.Day == day or trigger.Day == day + 1
+				else trigger.Night ~= nil and (trigger.Night == night or trigger.Night == night + 1)
+		elseif kind == "NightCall" or kind == "NightCoffee" then
+			wanted = trigger.Night == night or trigger.Night == night + 1
+		elseif kind == "TrailerOffer" or kind == "TrailerBought" or kind == "Hint" or kind == "NightRepeat" then
+			wanted = true
+		elseif kind == "LostCritical" or kind == "LostLastChance" then
+			wanted = round.IsNight()
+		end
+		if wanted and row.Key ~= tutorial then
+			self:PrepareCall(row.Key, night)
+			if kind == "NightCall" and row.Short ~= nil then
+				-- the short form that follows the NightRepeat opener
+				const beats: { Content.CutsceneBeat } = {}
+				for _, line in row.Short do
+					table.insert(beats, beatOf(line.Text))
+				end
+				self:Voice().Prepare(beats)
+			end
+		end
+	end
+end
+
+function BossController:WarnSilent(line: Content.CutsceneBeat)
+	const reason = self:Voice().Reason(line)
+	const key = if reason ~= "" then reason else "late"
+	if self.Warned[key] or self.Warnings >= VOICE_WARNINGS then
+		return
+	end
+	self.Warned[key] = true
+	self.Warnings += 1
+	const why = if reason ~= "" then reason else "its voice was not loaded in time"
+	warn(`[BossController] Walt's line "{line.Text or ""}" goes on as a subtitle only: {why}`)
+end
+
+-- Walt says the line on screen now; the subtitle never waits for it
+function BossController:Speak(text: string)
+	const beat = beatOf(text)
+	self.CancelSay = self:Voice().Say(beat, {
+		OnMiss = function(_line: Content.CutsceneBeat)
+			self:WarnSilent(beat)
+		end,
+	})
+end
+
+-- The call ended or changed: the voice stops (nothing speaks over the next call)
+function BossController:Quiet()
+	const cancel = self.CancelSay
+	self.CancelSay = nil
+	if cancel ~= nil then
+		cancel()
+	end
+	const speech = self.Speech
+	if speech ~= nil then
+		speech.Stop()
+	end
 end
 
 -- Records ------------------------------------------------------------------------------------------------------------
@@ -120,7 +257,14 @@ end
 
 function BossController:Apply(record: Record)
 	const previous = self.State()
+	const previousCall = self.Call()
 	const key = if Content.BossCalls.ByKey[record.Call] then record.Call else NONE
+	if key ~= previousCall or record.State ~= "Talking" or record.StartedAt ~= self.StartedAt then
+		self:Quiet()
+	end
+	if key ~= NONE and record.State ~= "Idle" and key ~= Content.BossCallRules.Tutorial.Call then
+		self:PrepareCall(key, self:Night())
+	end
 	self.StartedAt = record.StartedAt
 	self.LinesNight = self:Night()
 	self.Lines = if key == NONE then {} else Content.BossCalls.LinesOf(key, self.LinesNight)
@@ -201,6 +345,9 @@ function BossController:Refresh()
 			end
 			self.Showing(line ~= nil)
 		end)
+		if line ~= nil and self.Call() ~= Content.BossCallRules.Tutorial.Call then
+			self:Speak(line.Text)
+		end
 	end
 
 	const ringing = state == "Ringing"
@@ -612,6 +759,9 @@ BossController:OnStart(function(self)
 end)
 
 BossController:OnTick(function(self)
+	if os.clock() - self.StartedClock >= PREPARE_AFTER then
+		self:PrepareUpcoming()
+	end
 	if self.State() ~= "Idle" or self.LineIndex ~= 0 or self.LampOn then
 		self:Refresh()
 	end

@@ -4,7 +4,7 @@
 	network.md §13.1 `Transition`; ui-text.md §13)
 
 	Presentation of the vehicle swap, nothing else:
-	  * Sale sign at the `SIGN-T` MapPoint (MAP-01 §5.1, P40): "Available on Day 5" before Vehicles.trailer.BuyFromDay,
+	  * Sale sign at the `SIGN-T` MapPoint (MAP-01 §5.1, P40): "Available after Night N" before the offer (Content.Trailer.OfferAfterNight),
 	    "FOR SALE" from then until the purchase, gone after it (the billboard and, locally, the AST-024 sign model).
 	  * Fade of the `Transition { Kind = "VehicleSwap" }` packet: 1.5 s black cover timed from the server StartedAt, for
 	    everyone in the group (the server pivots the vehicles under it).
@@ -61,6 +61,11 @@ const SIGN_GAP = 0.8
 -- Short on purpose (user request 2026-10-11): the plate is a small studs-sized tag read up close at the lot, not a
 -- billboard over the street; it is not drawn from the Pad (~80 studs) nor during a cinematic (SaleSign).
 const SIGN_DISTANCE = 40
+-- Trailer offer call (Transition TrailerFocus, user request 2026-10-11, Provisional): the camera looks at the sign for
+-- FOCUS_TIME s (the server holds the body 3.6 s), then the objective marks (Highlight + arrows) stay on it until
+-- the purchase. Arrow lift over the top of the sign model.
+const FOCUS_TIME = 3.2
+const HINT_LIFT = 0.6
 
 -- Fade of the swap (T58): 1.5 s total. Short fade-in because the server pivots right after sending the packet;
 -- Provisional until the VehicleService (TASK-054) fixes its own wait before PivotTo.
@@ -69,6 +74,10 @@ const FADE_HOLD = 0.5
 const FADE_OUT = 0.8
 const FADE_TOTAL = FADE_IN + FADE_HOLD + FADE_OUT
 const FADE_ORDER = 50 -- above the HUD (DisplayOrder 1)
+-- Trailer door (TrailerDoorService, user request 2026-10-11): short cover, the server moves the body at DOOR_SWAP s
+const DOOR_IN = 0.15
+const DOOR_HOLD = 0.2
+const DOOR_OUT = 0.3
 
 -- Service window (TASK-131; Provisional numbers).
 const SHUTTER_ATTRIBUTE = "Shutter"
@@ -96,10 +105,10 @@ type Shutter = {
 	Connections: { RBXScriptConnection },
 }
 
--- Vehicle sold in the lot: the first row with BuyFromDay > 0 (the trailer; content-data.md §3.8)
+-- Vehicle sold in the lot: the first row with OfferAfterNight > 0 (the trailer; content-data.md §3.8)
 local function saleVehicle(): Content.Vehicle?
 	for _, vehicle in Content.Vehicles.List do
-		if vehicle.BuyFromDay > 0 then
+		if vehicle.OfferAfterNight > 0 then
 			return vehicle
 		end
 	end
@@ -109,13 +118,13 @@ end
 const SALE = saleVehicle()
 
 -- 0..1 cover at `elapsed` seconds since StartedAt
-local function fadeAlpha(elapsed: number): number
-	if elapsed < FADE_IN then
-		return math.max(elapsed, 0) / FADE_IN
-	elseif elapsed < FADE_IN + FADE_HOLD then
+local function fadeAlpha(elapsed: number, fadeIn: number, hold: number, out: number): number
+	if elapsed < fadeIn then
+		return math.max(elapsed, 0) / fadeIn
+	elseif elapsed < fadeIn + hold then
 		return 1
 	end
-	return math.clamp(1 - (elapsed - FADE_IN - FADE_HOLD) / FADE_OUT, 0, 1)
+	return math.clamp(1 - (elapsed - fadeIn - hold) / out, 0, 1)
 end
 
 -- Shutter_Hinge of a vehicle: the one on Shutter_Panel when both exist (P51), else the first one on a BasePart
@@ -168,12 +177,13 @@ end
 
 const VehicleController = Modux.Controller(
 	"VehicleController",
-	{ Require = { "RoundController", "AudioController" }, Priority = 760 }
+	{ Require = { "RoundController", "AudioController", "ObjectiveController" }, Priority = 760 }
 )
 
 function VehicleController:Setup()
 	self.Fade = Vide.source(0) :: Vide.Source<number>
 	self.FadeStartedAt = 0 :: number
+	self.FadeIsDoor = false :: boolean
 	self.FadeConnection = nil :: RBXScriptConnection?
 	-- `trailer_bought` seen this session and Day it arrived (cleared by the swap or a new run)
 	self.Bought = Vide.source(false) :: Vide.Source<boolean>
@@ -198,10 +208,16 @@ function VehicleController:WarnOnce(tag: string, message: string)
 	end
 end
 
--- Text of the sign for `day` (ui-text.md §13)
-function VehicleController:SignText(day: number): string
-	if SALE and day < SALE.BuyFromDay then
-		return `Available on Day {SALE.BuyFromDay}`
+-- Nights already finished (RoundController.Night is the night in progress on a night shift)
+function VehicleController:NightsPlayed(): number
+	const round = self.Dependencies.RoundController
+	return round.Night() - (if round.IsNight() then 1 else 0)
+end
+
+-- Text of the sign by the nights played (ui-text.md §13; the offer is after Night Content.Trailer.OfferAfterNight)
+function VehicleController:SignText(nights: number): string
+	if SALE and nights < SALE.OfferAfterNight then
+		return `Available after Night {SALE.OfferAfterNight}`
 	end
 	return "FOR SALE"
 end
@@ -214,6 +230,35 @@ function VehicleController:SignVisible(): boolean
 		and round.Vehicle() == START_VEHICLE
 		and not self.Bought()
 		and not self.SaleBought()
+end
+
+-- World position the focus looks at: the middle of the sign model, else the plate anchor at the SIGN-T point
+function VehicleController:SignFocusPosition(): Vector3?
+	const model = self.SignModel
+	if model ~= nil and model:IsDescendantOf(workspace) then
+		return (model:GetBoundingBox()).Position
+	end
+	const anchor = self.SignAnchor
+	if anchor ~= nil and anchor.Parent ~= nil then
+		return anchor.WorldPosition
+	end
+	return nil
+end
+
+-- The day-5 call sent the party to the FOR SALE sign: short camera focus, then the objective marks stay until bought
+function VehicleController:RevealSign()
+	if not self:SignVisible() then
+		return
+	end
+	const objective = self.Dependencies.ObjectiveController
+	objective:Focus(function(): Vector3?
+		return self:SignFocusPosition()
+	end, FOCUS_TIME, nil)
+	const model = self.SignModel
+	const adornee: Instance? = if model ~= nil and model:IsDescendantOf(workspace) then model else self.SignAnchor
+	if adornee ~= nil then
+		objective:Mark(adornee, HINT_LIFT)
+	end
 end
 
 -- Tagged Vehicle model: sale sign latch and service window flap
@@ -412,11 +457,14 @@ function VehicleController:IsShutterClosed(): boolean
 end
 
 -- Transition packet: start (or restart) the cover from the server time; a late packet only plays what is left
-function VehicleController:PlayFade(startedAt: number)
-	if workspace:GetServerTimeNow() - startedAt >= FADE_TOTAL then
+function VehicleController:PlayFade(startedAt: number, door: boolean?)
+	const isDoor = door == true
+	const total = if isDoor then DOOR_IN + DOOR_HOLD + DOOR_OUT else FADE_TOTAL
+	if workspace:GetServerTimeNow() - startedAt >= total then
 		return
 	end
 	self.FadeStartedAt = startedAt
+	self.FadeIsDoor = isDoor
 	if self.FadeConnection == nil then
 		self.FadeConnection = RunService.RenderStepped:Connect(function()
 			self:StepFade()
@@ -427,7 +475,11 @@ end
 
 function VehicleController:StepFade()
 	const elapsed = workspace:GetServerTimeNow() - self.FadeStartedAt
-	if elapsed >= FADE_TOTAL then
+	const isDoor = self.FadeIsDoor
+	const fadeIn = if isDoor then DOOR_IN else FADE_IN
+	const hold = if isDoor then DOOR_HOLD else FADE_HOLD
+	const out = if isDoor then DOOR_OUT else FADE_OUT
+	if elapsed >= fadeIn + hold + out then
 		self.Fade(0)
 		const connection = self.FadeConnection
 		if connection then
@@ -436,7 +488,7 @@ function VehicleController:StepFade()
 		end
 		return
 	end
-	self.Fade(fadeAlpha(elapsed))
+	self.Fade(fadeAlpha(elapsed, fadeIn, hold, out))
 end
 
 function VehicleController:OnBought()
@@ -480,6 +532,18 @@ end
 function VehicleController:MountFade(playerGui: Instance)
 	const round = self.Dependencies.RoundController
 	const unmount, gui = Vide.root(function()
+		-- The objective marks on the sign end with the purchase, the swap or a new run (Day back before the sale day)
+		Vide.effect(function()
+			const visible = self:SignVisible()
+			const nights = self:NightsPlayed()
+			Vide.untrack(function()
+				if not visible or (SALE ~= nil and nights < SALE.OfferAfterNight) then
+					self.Dependencies.ObjectiveController:Clear()
+				end
+				return nil
+			end)
+		end)
+
 		-- The swap (Vehicle leaves the start vehicle) or a new run (Day goes back) clears the purchase latch
 		Vide.effect(function()
 			const vehicle = round.Vehicle()
@@ -510,7 +574,7 @@ end
 -- Sale sign: waits for the binding to stream in (Attachment in Terrain over the SIGN-T point)
 function VehicleController:MountSign(playerGui: Instance)
 	if SALE == nil then
-		warn("[VehicleController] no vehicle with BuyFromDay > 0 in Content.Vehicles; sale sign not shown")
+		warn("[VehicleController] no vehicle with OfferAfterNight > 0 in Content.Vehicles; sale sign not shown")
 		return
 	end
 	if not MapIndex.WaitReady(MAP_WAIT) then
@@ -552,7 +616,7 @@ function VehicleController:MountSign(playerGui: Instance)
 			Adornee = anchor,
 			Visible = visible,
 			Text = function()
-				return self:SignText(round.Day())
+				return self:SignText(self:NightsPlayed())
 			end,
 			MaxDistance = SIGN_DISTANCE,
 		})
@@ -573,6 +637,10 @@ VehicleController:OnInit(function(self)
 	self.Libs.Net.Transition:onClient(function(transition)
 		if transition.Kind == "VehicleSwap" then
 			self:PlayFade(transition.StartedAt)
+		elseif transition.Kind == "TrailerDoor" then
+			self:PlayFade(transition.StartedAt, true)
+		elseif transition.Kind == "TrailerFocus" then
+			self:RevealSign()
 		end
 	end)
 

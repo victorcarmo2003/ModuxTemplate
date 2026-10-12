@@ -31,6 +31,10 @@ const HOLD_FAILSAFE = 40 -- s: background jobs are released even if nobody calls
 local held = true -- background jobs wait for the loading screen (LoadingController calls Release)
 local working = false
 local warnedTimeout = false
+const STATS_WINDOW = 60 -- s: window of the requests-per-minute counter (Stats)
+const starts: { number } = {} -- os.clock() of every job that started in the last STATS_WINDOW s
+local timeouts = 0
+local failures = 0
 
 local pump: () -> ()
 
@@ -109,6 +113,24 @@ function LoadQueue.Release()
 end
 
 task.delay(HOLD_FAILSAFE, LoadQueue.Release)
+
+-- Dev counter (`/dev audio`): queue size and jobs started in the last minute (one job = one PreloadAsync batch or one
+-- text-to-speech LoadAsync, so it is the request rate this client sends to the audio loader).
+function LoadQueue.Stats(): { Urgent: number, Background: number, Working: boolean, Held: boolean, PerMinute: number, Timeouts: number, Failures: number }
+	const now = os.clock()
+	while #starts > 0 and now - starts[1] > STATS_WINDOW do
+		table.remove(starts, 1)
+	end
+	return {
+		Urgent = #urgentJobs,
+		Background = #backgroundJobs,
+		Working = working,
+		Held = held,
+		PerMinute = #starts,
+		Timeouts = timeouts,
+		Failures = failures,
+	}
+end
 
 function LoadQueue.Run(work: () -> boolean?, urgent: boolean?)
 	waitFor(enqueue(work, urgent))

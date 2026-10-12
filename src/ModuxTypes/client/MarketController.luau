@@ -4,13 +4,14 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
-local BenchCard = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.BenchCard)
+local GearTag = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.GearTag)
+local Hint = require(StarterPlayer.StarterPlayerScripts.client.Market.MarketController.Hint)
 local Kiosk = require(StarterPlayer.StarterPlayerScripts.client.Market.MarketController.Kiosk)
 local Minis = require(StarterPlayer.StarterPlayerScripts.client.Market.MarketController.Minis)
 
 export type View = {
 	Visible: boolean,
-	Mode: BenchCard.Mode,
+	Mode: GearTag.Mode,
 	Title: string,
 	Detail: string,
 	Tag: string,
@@ -18,13 +19,17 @@ export type View = {
 type Mounted = {
 	Gui: BillboardGui,
 	Unmount: () -> (),
+	Slot: string?, -- bench slot whose plate this is (adornee follows the miniature)
 }
 type Availability = "Unknown" | "Open" | "Blocked"
 
 export type Public = {
 	Cash: Vide.Source<number>,
 	CashReady: Vide.Source<boolean>,
+	Drawer: Vide.Source<number>,
 	Gui: Instance?,
+	Hint: Hint.Hint?,
+	HintDismissed: boolean,
 	Kiosk: Kiosk.Kiosk,
 	KioskOpen: Vide.Source<boolean>,
 	KioskSynced: boolean,
@@ -35,9 +40,11 @@ export type Public = {
 	Minis: Minis.Minis,
 	Mounted: { [Instance]: Mounted },
 	Pedestals: { [string]: Instance },
+	Plates: { [string]: Part },
 	Stock: { [string]: Vide.Source<Availability> },
 	SwappedAt: number,
 	Unmount: (() -> ())?,
+	Waits: { [string]: Vide.Source<number> },
 	Setup: (self: Public) -> (),
 	BenchAnchor: (self: Public, slot: string) -> Instance?,
 	CurrentVehicle: (self: Public) -> Model?,
@@ -46,10 +53,11 @@ export type Public = {
 	OnLevel: (self: Public, upgrade: Content.Upgrade, level: number) -> (),
 	CanPay: (self: Public, price: number) -> boolean,
 	UpgradeAt: (self: Public, slot: string) -> Content.Upgrade?,
-	BenchView: (self: Public, upgrade: Content.Upgrade, vehicle: string, level: number) -> View,
-	MiniTarget: (self: Public, upgrade: Content.Upgrade, vehicle: string, level: number) -> Minis.Target,
-	PlateFitting: (self: Public, anchor: Instance, slot: string) -> Instance?,
+	BenchView: (self: Public, upgrade: Content.Upgrade, vehicle: string, level: number, wait: number) -> View,
+	MiniTarget: (self: Public, upgrade: Content.Upgrade, vehicle: string, level: number, wait: number) -> Minis.Target,
 	MountShelf: (self: Public, anchor: Instance, packageKey: string) -> Mounted?,
+	PlatePart: (self: Public, slot: string) -> Part?,
+	SyncPlates: (self: Public) -> (),
 	MountBench: (self: Public, anchor: Instance, slot: string) -> Mounted?,
 	SlotAnchor: (self: Public, slot: string) -> Instance?,
 	Rebind: (self: Public, slot: string) -> (),
@@ -58,6 +66,10 @@ export type Public = {
 	ApplyPhase: (self: Public, phase: string, ready: boolean) -> (),
 	WatchMinis: (self: Public) -> (),
 	WatchKiosk: (self: Public) -> (),
+	CheapestOnSale: (self: Public) -> number?,
+	NeverBought: (self: Public) -> boolean,
+	HintTarget: (self: Public) -> Instance?,
+	StepHint: (self: Public) -> (),
 	Step: (self: Public) -> (),
 	Add: (self: Public, anchor: Instance) -> (),
 	Remove: (self: Public, anchor: Instance) -> (),

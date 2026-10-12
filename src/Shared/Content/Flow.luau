@@ -67,6 +67,15 @@ export type Adopt = {
 	FirstDelay: { number }, -- {min, max} s from the start of a selling phase to its first attempt
 }
 
+-- Guarantee (user request 2026-10-11, Provisional; Q-202): on a day shift, when no customer is in the queue nor on the
+-- way for MaxEmpty s (Day 1: MaxEmptyDay1), the next spawn attempt is forced now (the NPC cap, the queue size and
+-- the tutorial still apply). Each empty gap draws its own limit: Max + [0, Spread] s, so it never feels robotic.
+export type Guarantee = {
+	MaxEmpty: number, -- seconds without any customer (day 2+)
+	MaxEmptyDay1: number, -- same on Day 1
+	Spread: number, -- seconds added at random to each gap's limit
+}
+
 export type Flow = {
 	BaseInterval: number, -- seconds between spawns, solo, Day 1
 	GrowthPerDay: number,
@@ -85,10 +94,13 @@ export type Flow = {
 	Spawns: Spawns, -- MAP-01 §9.8 (Provisional)
 	Groups: Groups, -- FEAT-038 (Provisional)
 	Adopt: Adopt, -- TASK-163 (Provisional)
+	Guarantee: Guarantee, -- Q-202 (Provisional)
 }
 
 const flow: Flow = {
-	BaseInterval = 22, -- 1 customer every 22 s, solo, Day 1 (DEC-045)
+	-- 1 customer every 14 s, solo, Day 1. PROVISIONAL Q-200: was 22 s (DEC-045) when the open shop lasted 360 s; the
+	-- open shop is now 216 s (x0.6), so the rate went x1.6 and a day still brings ~15 customers
+	BaseInterval = 14,
 	GrowthPerDay = 0.08, -- +8% rate per day (DEC-045)
 	GrowthCap = 0.40, -- rate cap +40% (DEC-045; FEAT-009 formula)
 	PartyMult = { 1.0, 1.6, 2.1, 2.5 }, -- 1p..4p on the rate (DEC-045)
@@ -159,6 +171,7 @@ const flow: Flow = {
 		Beat = 0.6,
 		FirstDelay = { 3, 5 }, -- + walk (adopted ~5 s, door ~8 s) = first customer at Q5 in ~8-12 s
 	},
+	Guarantee = { MaxEmpty = 9, MaxEmptyDay1 = 5, Spread = 2 }, -- day 2+: 9-11 s (~10), Day 1: 5-7 s (~6)
 }
 
 return Table.record(flow)

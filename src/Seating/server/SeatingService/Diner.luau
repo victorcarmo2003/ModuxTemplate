@@ -15,6 +15,7 @@ export type Rig = { Model: Model, Root: BasePart, Humanoid: Humanoid }
 
 const REST_ATTRIBUTE = "RestC0"
 const SEATED_ATTRIBUTE = "Seated" -- table index on the rig while seated (client contract, network.md §14.3)
+const EATING_ATTRIBUTE = "Eating" -- true on a seated rig once its food was served (Q-209): the client gives it the hot dog
 const SIT_CLIP = "npc_sit"
 const HALF_PI = math.pi / 2
 -- Motor -> angle around its Z axis (the R6 Animate sit pose: hips +-90, shoulders +-90)
@@ -78,6 +79,11 @@ function Diner.Sit(rig: Rig, seat: BasePart, tableIndex: number)
 	rig.Model:SetAttribute(SEATED_ATTRIBUTE, tableIndex)
 end
 
+-- The food was served: the seated rig eats (client: Meal.luau).
+function Diner.Eat(rig: Rig)
+	rig.Model:SetAttribute(EATING_ATTRIBUTE, true)
+end
+
 -- Joints back to rest and the seated mark gone. Safe on a rig that never sat or that went back to the pool.
 function Diner.Unpose(rig: Rig)
 	for _, motor in motors(rig) do
@@ -87,6 +93,7 @@ function Diner.Unpose(rig: Rig)
 		end
 	end
 	rig.Model:SetAttribute(SEATED_ATTRIBUTE, nil)
+	rig.Model:SetAttribute(EATING_ATTRIBUTE, nil)
 end
 
 -- Up from the seat, standing on `standAt` (root position), facing away from the table.

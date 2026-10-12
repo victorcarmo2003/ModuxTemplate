@@ -52,9 +52,14 @@
 -- pending. The partner never pathfinds: StepPairs moves it towards Group.Spot of the leader at TICK_RATE (Leader on
 -- the wire, State Arriving / Queued / Leaving only, no balloon). No room for 2 = a lone customer ("spawned").
 -- The interval after a pair is x Groups.IntervalMult.
--- Tables (TASK-145/146; FEAT-037): SetSeater(fn) lets SeatingService take a customer (or pair) that ends its order
--- instead of the exit walk: a lone Complete/Perfect, or a pair with >= 1 Complete and no Wrong/Left. A diner is
--- Leaving on the wire with Dining = true (no exit walk, no leave timeout) until SeatingService calls Dismiss(id).
+-- Tables (TASK-145/146; FEAT-037; Q-209 flow, user request 2026-10-12, Provisional): SetSeater({ Offer, Left }) lets
+-- SeatingService seat a customer (or pair) RIGHT AFTER "Take Order": Offer(party) true = a free table of the active
+-- vehicle was reserved; the customer leaves the counter queue (Slot 0, the queue moves up, it no longer counts as a
+-- counter occupant) and walks to the table with State Waiting, its balloon and its Order clock still running (AtTable =
+-- true). It is served AT the table (action serve_table, SeatingService anchor -> ServeTable, same verdict / pay / tip /
+-- Sale as the counter "Serve"); no table = it waits at Q1 as before. Once every line is answered a good result sends
+-- it to eat (Leaving on the wire with Dining = true: no exit walk, no leave timeout) until SeatingService calls
+-- Dismiss(id); a bad one, patience out or a shift end stand it up with no meal (Left(id, ate)).
 --
 -- Tutorial customer (user request 2026-10-11, Provisional; shared.Tutorial.Rules): RequestTutorial() (TutorialService,
 -- when a rookie answered Walt's call) spawns one customer in a day Prep/Open as soon as the counter and the NPC pool
@@ -68,6 +73,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 local Content = require(ReplicatedStorage.shared.Content)
+local Lync = require(ReplicatedStorage.Packages.Lync)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 local TutorialRules = require(ReplicatedStorage.shared.Tutorial.Rules)
@@ -110,12 +116,13 @@ export type Customer = {
 	Faced: boolean, -- partner: already turned like its standing leader
 	-- Tables (TASK-145/146)
 	Dining: boolean, -- handed to SeatingService: no exit walk, no leave timeout until Dismiss
+	AtTable: boolean, -- Q-209: seated (or walking to its table) waiting for its food; out of the counter queue
 	-- Tutorial customer (RequestTutorial): fixed order, endless patience, out of the ledger
 	Tutorial: boolean,
 	Model: Model?, -- tutorial customer: rig carrying TutorialRules.Attribute (cleared when the record goes)
 }
 
--- What SeatingService gets when a customer or pair ends its order (SetSeater). Leader = the customer with the ticket.
+-- What SeatingService gets when a customer or pair takes its order (Seater.Offer). Leader = the customer with the ticket.
 export type SeatParty = {
 	Leader: number,
 	Partner: number?,
@@ -123,8 +130,13 @@ export type SeatParty = {
 	CustomerType: string, -- leader's type (SitChance)
 }
 
--- true = SeatingService took the party (it now owns the walk until Dismiss); false = walk out as usual
-export type Seater = (party: SeatParty) -> boolean
+-- SeatingService hooks (SetSeater). Offer: true = a table was reserved, the party is SeatingService's until Dismiss;
+-- false = it stays at the counter. Left(leader, ate): an AtTable party is leaving (ate = served well: it eats first;
+-- else it stands up at once). Neither may yield.
+export type Seater = {
+	Offer: (party: SeatParty) -> boolean,
+	Left: (leader: number, ate: boolean) -> (),
+}
 
 -- Fields TASK-033 may write (Leaving goes through Leave)
 export type Patch = {
@@ -287,8 +299,15 @@ function CustomerService:Setup()
 	self.Seater = nil :: Seater?
 	-- The last attempt brought a pair: the next interval is x Groups.IntervalMult (FEAT-038)
 	self.LastWasPair = false :: boolean
+	-- Guarantee (Flow.Guarantee, Q-202): server time the counter became empty (0 = not empty / not counting) and the
+	-- limit drawn for this gap. Own Random: it never shifts the seeded customer draws
+	self.EmptySince = 0 :: number
+	self.EmptyLimit = 0 :: number
+	self.GuaranteeRng = Random.new() :: Random
 	-- Dev: force the next attempt to be this pair (DevSpawnPair)
 	self.ForcedPair = nil :: Group.Pair?
+	-- Dev: topping lists of the next pair's two hot dogs (DevSpawnPair `orders`), consumed by its OpenTicket
+	self.ForcedOrders = nil :: { { string } }?
 	-- Tutorial customer asked (RequestTutorial) and not spawned yet; server time of the next try
 	self.TutorialWanted = false :: boolean
 	self.TutorialTryAt = 0 :: number
@@ -330,12 +349,12 @@ function CustomerService:Count(): number
 	return count
 end
 
--- Counter slots taken: customers at or walking to the counter (everyone but Leaving). A pair takes 1 (the partner
--- is not counted, FEAT-038).
+-- Counter slots taken: customers at or walking to the counter (everyone but Leaving and the ones already at a table).
+-- A pair takes 1 (the partner is not counted, FEAT-038).
 function CustomerService:Occupants(): number
 	local count = 0
 	for _, customer in self.Customers do
-		if customer.State ~= "Leaving" and customer.Leader == nil then
+		if customer.State ~= "Leaving" and customer.Leader == nil and not customer.AtTable then
 			count += 1
 		end
 	end
@@ -357,13 +376,22 @@ function CustomerService:SetAdopter(adopter: Adopt.Adopter?): Adopt.Controls
 	return Adopt.Set(self, adopter)
 end
 
--- SeatingService (TASK-145): called when a customer or pair ends its order and may sit. One seater.
+-- SeatingService (TASK-145; Q-209): called when a customer or pair takes its order and may sit. One seater.
 function CustomerService:SetSeater(seater: Seater?)
 	self.Seater = seater
 end
 
+-- Nobody at the counter and nobody waiting at a table for the food (the day Closing waits for them, patience ends it).
 function CustomerService:IsCounterEmpty(): boolean
-	return self:Occupants() == 0
+	if self:Occupants() > 0 then
+		return false
+	end
+	for _, customer in self.Customers do
+		if customer.AtTable and customer.State ~= "Leaving" then
+			return false
+		end
+	end
+	return true
 end
 
 -- Active queue slots now (Counter level, UPG-003). Read live: a Counter bought mid-shift opens Q4 at once.
@@ -486,7 +514,17 @@ function CustomerService:Publish(customer: Customer, added: boolean)
 	if added then
 		self.Libs.Net.Customers:add(customer.Id, self:Record(customer))
 	else
-		self.Libs.Net.Customers:update(customer.Id, self:Record(customer))
+		-- A nil field is skipped by Lync's update (the old value would stay on the wire): clearing needs Lync.none.
+		-- Order2 goes nil when one hot dog of a pair is resolved; without this the client kept the old Order2 next to
+		-- the new Order = the remaining order drawn twice.
+		const record = self:Record(customer) :: any
+		if record.Order2 == nil then
+			record.Order2 = Lync.none
+		end
+		if record.Leader == nil then
+			record.Leader = Lync.none
+		end
+		self.Libs.Net.Customers:update(customer.Id, record)
 	end
 end
 
@@ -679,6 +717,7 @@ function CustomerService:Create(id: number, variant: Variant?, leader: number?, 
 		FollowAt = 0,
 		Faced = false,
 		Dining = false,
+		AtTable = false,
 		Tutorial = tutorial == true,
 		Model = nil,
 	}
@@ -845,6 +884,12 @@ function CustomerService:Leave(id: number, mood: string?, reason: LeaveReason?, 
 	if partner ~= nil then
 		table.insert(members, partner)
 	end
+	-- Q-209: a customer at a table is SeatingService's until Dismiss; `dining` = it ate (served well), else it just stands up
+	const atTable = customer.AtTable
+	const ate = atTable and dining == true
+	if atTable then
+		dining = true
+	end
 	for _, member in members do
 		member.State = "Leaving"
 		member.Slot = 0
@@ -862,6 +907,16 @@ function CustomerService:Leave(id: number, mood: string?, reason: LeaveReason?, 
 	end
 	if wasQueued then
 		self:Refresh()
+	end
+	if atTable then
+		const seater = self.Seater
+		if seater ~= nil then
+			const ok, err = pcall(seater.Left, id, ate)
+			if not ok then
+				warn(`[CustomerService] seater Left failed: {err}`)
+			end
+		end
+		return true -- SeatingService walks the party now (Dismiss)
 	end
 	if dining then
 		return true -- SeatingService walks the party now (Dismiss)
@@ -893,10 +948,12 @@ function CustomerService:Dismiss(id: number): boolean
 	end
 	const t = now()
 	customer.Dining = false
+	customer.AtTable = false
 	customer.LeftAt = t
 	const partner = if customer.Partner then self.Customers[customer.Partner] else nil
 	if partner ~= nil then
 		partner.Dining = false
+		partner.AtTable = false
 		partner.Held = false
 		partner.LeftAt = t
 	end
@@ -1066,13 +1123,19 @@ function CustomerService:OpenTicket(id: number)
 		return
 	end
 	const round = self.Dependencies.RoundService
-	const lines = { Orders.Roll(round:GetDay(), npc.CustomerType, self.OrderRng, round:IsNight()) }
+	local lines = { Orders.Roll(round:GetDay(), npc.CustomerType, self.OrderRng, round:IsNight()) }
 	const bonus = self.Dependencies.UpgradeService:GetEffect("PatienceBonus")
 	local pairBonus = 0
 	-- Pair (FEAT-038): the partner's hot dog is drawn apart with its own type; Order clock by K1 + K2 + pair bonus
 	const partner = if customer.Partner then self.Dependencies.NpcService:Get(customer.Partner) else nil
 	if partner ~= nil then
 		table.insert(lines, Orders.Roll(round:GetDay(), partner.CustomerType, self.OrderRng, round:IsNight()))
+		const forced = self.ForcedOrders
+		if forced ~= nil then
+			-- dev (`/dev customer pair`): known orders for both hot dogs; the draws above still ran (stream unchanged)
+			self.ForcedOrders = nil
+			lines = { table.clone(forced[1]), table.clone(forced[2]) }
+		end
 		pairBonus = Content.Flow.Groups.PatienceBonus
 	end
 	const arrivedAt = if customer.JoinedAt > 0 then customer.JoinedAt else now()
@@ -1232,19 +1295,98 @@ function CustomerService:TakeOrder(player: Player, anchor: Instance)
 	if not customer.Tutorial then
 		self.Acted:Fire(id, TAKE_ORDER, player, nil)
 	end
+	-- Q-209: a free table of the active vehicle takes the customer now; the food is served there
+	if self.Customers[id] == customer and customer.State == "Waiting" then
+		self:SeatAtOrder(customer)
+	end
+end
+
+-- Asks SeatingService for a table (Seater.Offer). Taken: the customer (and its partner) leaves the counter queue, its
+-- prompts go off (the table has the "Serve" prompt) and the queue moves up. Actors, the tutorial customer and partners
+-- never sit.
+function CustomerService:SeatAtOrder(customer: Customer)
+	if customer.Variant ~= nil or customer.Tutorial or customer.Leader ~= nil or customer.AtTable then
+		return
+	end
+	if not self:OfferSeat(customer) then
+		return
+	end
+	const partner = if customer.Partner then self.Customers[customer.Partner] else nil
+	customer.AtTable = true
+	customer.Move += 1 -- the queue walk of the counter no longer applies
+	if partner ~= nil then
+		partner.AtTable = true
+		partner.Move += 1
+	end
+	customer.Slot = 0
+	const wasQueued = Queue.leave(self.Line, customer.Id)
+	self:SetPrompts(customer.Id, false)
+	self:Publish(customer, false)
+	if wasQueued then
+		self:Refresh()
+	end
+end
+
+-- Hot dogs a customer at a table still waits for, one topping-key list per pending line (display order). Empty = none.
+function CustomerService:PendingToppings(id: number): { { string } }
+	const out: { { string } } = {}
+	const ticket = self.Tickets[id]
+	if ticket ~= nil then
+		for _, index in Orders.Pending(ticket) do
+			table.insert(out, table.clone(ticket.Lines[index].Toppings))
+		end
+	end
+	return out
+end
+
+-- The customer is at its table (or on the way), waiting for its food, and can be served there.
+function CustomerService:IsWaitingAtTable(id: number): boolean
+	const customer = self.Customers[id]
+	const ticket = self.Tickets[id]
+	return customer ~= nil
+		and ticket ~= nil
+		and customer.AtTable
+		and customer.State == "Waiting"
+		and ticket.TakenAt > 0
+		and #Orders.Pending(ticket) > 0
 end
 
 -- "Serve" (FEAT-011, DEC-072): validates the held hot dog against the order and pays into the drawer. A pair
 -- (FEAT-038): the hot dog answers one pending line (Orders.Match), paid and settled per line; the pair stays until
--- no line is pending.
+-- no line is pending. Both hands (FEAT-038, DEC-071 hotbar of 2): when the held hot dog is exact (Complete) for one
+-- line and ANOTHER hot dog of the hotbar is exact for the other pending line, one interaction takes both: each line
+-- is paid, tipped and settled on its own (same rules as two serves), the patience clock of the Order phase covers both.
 function CustomerService:Serve(player: Player, anchor: Instance)
 	const id, customer, ticket = self:TicketAt(anchor)
-	const tool = self.Dependencies.ItemService:Holding(player, HOT_DOG)
-	if id == nil or customer == nil or ticket == nil or tool == nil then
+	if id == nil or customer == nil or ticket == nil then
 		return
 	end
-	const items = self.Dependencies.ItemService
-	const economy = self.Dependencies.EconomyService
+	self:ServeCustomer(player, id, customer, ticket)
+end
+
+-- "Serve" at the table (serve_table, SeatingService anchor; Q-209): same check, pay, tip and Sale as the counter; the
+-- customer is `id` (the leader of a pair). false = nothing to serve (not at a table, no hot dog in hand, drawer closed).
+function CustomerService:CanServeTable(player: Player, id: number): boolean
+	return self.Dependencies.RunStateService:IsActive(player)
+		and self.Dependencies.EconomyService:IsDrawerOpen()
+		and self:IsWaitingAtTable(id)
+		and self.Dependencies.ItemService:Holding(player, HOT_DOG) ~= nil
+end
+
+function CustomerService:ServeTable(player: Player, id: number)
+	const customer = self.Customers[id]
+	const ticket = self.Tickets[id]
+	if customer == nil or ticket == nil or not self:IsWaitingAtTable(id) then
+		return
+	end
+	self:ServeCustomer(player, id, customer, ticket)
+end
+
+function CustomerService:ServeCustomer(player: Player, id: number, customer: Customer, ticket: Orders.Ticket)
+	const tool = self.Dependencies.ItemService:Holding(player, HOT_DOG)
+	if tool == nil then
+		return
+	end
 	const at = now()
 	-- AddServeRule (TASK-108): an override replaces the order check (on the first pending line)
 	const override = self:ServeOverride(customer, tool, player)
@@ -1255,6 +1397,48 @@ function CustomerService:Serve(player: Player, anchor: Instance)
 	if index == nil then
 		return
 	end
+	const first = self:SellLine(id, customer, ticket, player, tool, index, verdict, at)
+	if override == nil and (first == "Complete" or first == "Perfect") then
+		-- the other hot dog of the hotbar, exact for the line still pending
+		const rest = Orders.Pending(ticket)
+		const other = if override == nil and #rest == 1 then self:OtherHotDog(player, tool) else nil
+		if other ~= nil and Orders.Evaluate(ticket.Lines[rest[1]].Toppings, self.Dependencies.ItemService:Toppings(other)) == "Complete" then
+			self:SellLine(id, customer, ticket, player, other, rest[1], "Complete", at)
+		end
+	end
+	if #Orders.Pending(ticket) > 0 then
+		self:ShowPending(customer, ticket) -- pair: the other hot dog is still on the balloon
+		self:Publish(customer, false)
+		return
+	end
+	self:Conclude(customer, ticket)
+end
+
+-- Another hot dog Tool of the player's hotbar (not `except`), nil when none.
+function CustomerService:OtherHotDog(player: Player, except: Tool): Tool?
+	const items = self.Dependencies.ItemService
+	for _, candidate in items:Tools(player) do
+		if candidate ~= except and items:ItemOf(candidate) == HOT_DOG then
+			return candidate
+		end
+	end
+	return nil
+end
+
+-- Pays one served hot dog against line `index` of the ticket: consumes it (not on Wrong: it stays in the hand),
+-- drawer + tip, line result, Sale packet and Acted. Returns the SaleResult of the line.
+function CustomerService:SellLine(
+	id: number,
+	customer: Customer,
+	ticket: Orders.Ticket,
+	player: Player,
+	tool: Tool,
+	index: number,
+	verdict: Orders.Verdict,
+	at: number
+): SaleResult
+	const items = self.Dependencies.ItemService
+	const economy = self.Dependencies.EconomyService
 	const line = ticket.Lines[index]
 	local result: SaleResult = verdict
 	local amount = 0
@@ -1275,12 +1459,7 @@ function CustomerService:Serve(player: Player, anchor: Instance)
 	if not customer.Tutorial then
 		self.Acted:Fire(id, SERVE, player, result)
 	end
-	if #Orders.Pending(ticket) > 0 then
-		self:ShowPending(customer, ticket) -- pair: the other hot dog is still on the balloon
-		self:Publish(customer, false)
-		return
-	end
-	self:Conclude(customer, ticket)
+	return result
 end
 
 -- Line a served hot dog answers and its verdict: the order check (Orders.Match), or an AddServeRule override on the
@@ -1298,8 +1477,8 @@ function CustomerService:Judge(ticket: Orders.Ticket, tool: Tool, override: Sale
 	return first, "Wrong"
 end
 
--- Every line answered: mood, and the table or the exit. Sits (SetSeater) only a lone Complete/Perfect or a pair with
--- >= 1 Complete and no Wrong/Left/Refused (FEAT-037, FEAT-038); actors never.
+-- Every line answered: mood, and the table or the exit. A customer at a table eats there only after a lone
+-- Complete/Perfect or a pair with >= 1 Complete and no Wrong/Left/Refused (FEAT-037, FEAT-038, Q-209).
 function CustomerService:Conclude(customer: Customer, ticket: Orders.Ticket)
 	local complete = 0
 	local bad = false
@@ -1311,15 +1490,12 @@ function CustomerService:Conclude(customer: Customer, ticket: Orders.Ticket)
 		end
 	end
 	const mood: string? = if bad then COMPLAINING elseif complete == #ticket.Lines then HAPPY else nil
-	const seat = customer.Variant == nil
-		and not customer.Tutorial
-		and complete >= 1
-		and not bad
-		and self:OfferSeat(customer)
-	self:Leave(customer.Id, mood, "service", seat)
+	-- at a table (Q-209): a good result = it eats there first; the others stand up and go
+	const eats = customer.AtTable and complete >= 1 and not bad
+	self:Leave(customer.Id, mood, "service", eats)
 end
 
--- Asks SeatingService to take the party (SetSeater). false = no seater, refused, or it errored (warned).
+-- Asks SeatingService to take the party at "Take Order" (Seater.Offer). false = no seater, refused, or it errored (warned).
 function CustomerService:OfferSeat(customer: Customer): boolean
 	const seater = self.Seater
 	const npc = self.Dependencies.NpcService:Get(customer.Id)
@@ -1327,7 +1503,7 @@ function CustomerService:OfferSeat(customer: Customer): boolean
 		return false
 	end
 	const partner = if customer.Partner and self.Customers[customer.Partner] then customer.Partner else nil
-	const ok, taken = pcall(seater, {
+	const ok, taken = pcall(seater.Offer, {
 		Leader = customer.Id,
 		Partner = partner,
 		Couple = customer.Couple,
@@ -1448,6 +1624,7 @@ function CustomerService:Reseed()
 end
 
 function CustomerService:OnPhase(phase: string)
+	self.EmptySince = 0
 	if self:IsSelling() then
 		-- PROVISIONAL (DEC-185 says "start of the shift"): locked when the selling phase starts (Open, Night), so a
 		-- member who joins during the Prep counts on this shift. The first attempt is one drawn interval later.
@@ -1465,9 +1642,51 @@ function CustomerService:OnPhase(phase: string)
 	self:SendAllAway()
 end
 
+-- A customer is in the queue or on the way to it (not leaving, not at a table).
+function CustomerService:HasLiveCustomer(): boolean
+	for _, customer in self.Customers do
+		if customer.State ~= "Leaving" then
+			return true
+		end
+	end
+	return false
+end
+
+-- Never an empty counter for long (user playtest 2026-10-11, Q-202; Flow.Guarantee): on a day shift, when nobody is
+-- in the queue nor walking to it for the limit of this gap (Day 1 shorter, plus a random spread), the next attempt
+-- is due now. The ordinary attempt still applies every cap (NPC pool, queue, customer cap) and the tutorial customer
+-- keeps the flow waiting.
+function CustomerService:StepGuarantee(t: number)
+	if
+		self.NextSpawnAt <= 0
+		or not self:IsSelling()
+		or self:IsNightShift()
+		or self.TutorialWanted
+		or self:HasTutorial()
+		or self:HasLiveCustomer()
+	then
+		self.EmptySince = 0
+		return
+	end
+	const guarantee = Content.Flow.Guarantee
+	if self.EmptySince <= 0 then
+		self.EmptySince = t
+		const base = if self.Dependencies.RoundService:GetDay() <= 1 then guarantee.MaxEmptyDay1 else guarantee.MaxEmpty
+		self.EmptyLimit = base + self.GuaranteeRng:NextNumber() * guarantee.Spread
+		return
+	end
+	if t - self.EmptySince >= self.EmptyLimit then
+		self.EmptySince = 0 -- a new gap (and a new limit) starts if the attempt is skipped
+		if self.NextSpawnAt > t then
+			self.NextSpawnAt = t
+		end
+	end
+end
+
 function CustomerService:Step()
 	const t = now()
 	self:StepTutorial(t)
+	self:StepGuarantee(t)
 	-- the regular flow waits while the tutorial customer is at (or walking to) the counter: the next attempt comes
 	-- right after it was served
 	if self.NextSpawnAt > 0 and t >= self.NextSpawnAt and self:IsSelling() and not self:HasTutorial() then
@@ -1518,7 +1737,7 @@ function CustomerService:StepPairs(t: number)
 		if leader == nil or leaderRig == nil or rig == nil or not leaderRig.Root:IsDescendantOf(workspace) then
 			continue
 		end
-		if leader.Dining and leaderRig.Root.Anchored then
+		if (leader.Dining or leader.AtTable) and leaderRig.Root.Anchored then
 			continue -- seated: SeatingService holds both
 		end
 		const velocity = leaderRig.Root.AssemblyLinearVelocity
@@ -1614,7 +1833,7 @@ end
 
 -- Pair now (dev /customer group, TASK-146): `leader` / `partner` = CustomerTypes keys of a Flow.Groups.Pairs row
 -- of the current shift (nil = weighted draw). Ignores the chance; caps and queue still apply. Returns the outcome.
-function CustomerService:DevSpawnPair(leader: string?, partner: string?): (Outcome, number?)
+function CustomerService:DevSpawnPair(leader: string?, partner: string?, orders: { { string } }?): (Outcome, number?)
 	if not self.Dependencies.PlaceService:IsDev() then
 		error("[CustomerService] DevSpawnPair is dev mode only", 2)
 	end
@@ -1634,8 +1853,12 @@ function CustomerService:DevSpawnPair(leader: string?, partner: string?): (Outco
 		error(`[CustomerService] no pair {leader or "?"}+{partner or "?"} for this shift`, 2)
 	end
 	self.ForcedPair = chosen
+	self.ForcedOrders = orders
 	const outcome, id = self:Attempt()
 	self.ForcedPair = nil
+	if id == nil then
+		self.ForcedOrders = nil
+	end
 	return outcome, id
 end
 

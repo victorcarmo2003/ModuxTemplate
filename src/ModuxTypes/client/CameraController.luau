@@ -8,6 +8,7 @@ type Group = "Head" | "Arm" | "Body"
 
 export type Public = {
 	Applied: boolean,
+	ArmShadowOff: { [BasePart]: boolean },
 	ArmsVisible: Vide.Source<boolean>,
 	BaseFov: number?,
 	BasePitch: number,

@@ -77,6 +77,19 @@ const LIST: { Step } = {
 		Done = "Hot dog with ketchup... Easy.",
 		Remind = "They're waiting. Take the order!",
 	},
+	-- Playtest 2026-10-11: the shop was only asked to open at the counter, after the whole hot dog was made. Now it is
+	-- asked right after the order (still Prep), so serving never stops for it. Same number as "order".
+	{
+		Key = "open_first",
+		Number = 2,
+		Text = "Open the shop",
+		Hint = 'Before cooking, press "Open Shop" at the sign.',
+		Action = "open_sign",
+		Say = { "First, flip the sign to open the shop." },
+		Done = "We're open.",
+		AlwaysArrow = true,
+		Remind = "Shop's closed! Press Open Shop at the sign.",
+	},
 	{
 		Key = "grill",
 		Number = 3,
@@ -239,6 +252,33 @@ const TALKS: { string } = { "money", "mart" }
 -- Shopping steps (decided live from the hand, the bun stock and where the player stands)
 const SHOPPING: { string } = { "mart_go", "mart_buy", "mart_back", "restock" }
 
+-- TutorialPromptGate (PromptController filter, presentation only): prompts shown during a step = the step's own Action +
+-- the actions of the next step(s) listed here (so a player who gets ahead is never locked out) + ALWAYS. Waiting steps
+-- release nothing extra. Server stays authoritative.
+const ALWAYS: { string } = { "answer_phone" }
+const NEXT_ACTIONS: { [string]: { string } } = {
+	phone = { "take_order" },
+	wait_customer = { "take_order" },
+	order = { "open_sign", "grill_place" },
+	open_first = { "grill_place" },
+	grill = { "bun_cut", "grill_collect" },
+	slice = { "grill_collect", "grill_place" },
+	slicing = { "grill_collect" },
+	cooking = { "board_add_sausage" },
+	collect = { "board_add_sausage", "bun_cut" },
+	assemble = { "topping_add" },
+	toppings = { "open_sign", "serve" },
+	discard = { "grill_place", "board_add_sausage" },
+	open = { "serve" },
+	serve = {},
+	money = { "buy_package" },
+	mart_go = { "buy_package" },
+	mart_buy = { "restock" },
+	mart_back = { "restock" },
+	restock = {},
+	mart = { "buy_package", "restock" },
+}
+
 -- Walt when the call is answered (before the first step line)
 const GREETING: { string } = { "Morning, Rookie. Walt here.", "I'll stay on the line... and walk you through it." }
 -- after the last talk step; the server hangs up after BossCallRules.Tutorial.Goodbye s (the click)
@@ -297,6 +337,8 @@ return table.freeze({
 	IndexOf = table.freeze(IndexOf),
 	Talks = table.freeze(TALKS),
 	Shopping = table.freeze(SHOPPING),
+	AlwaysActions = table.freeze(ALWAYS),
+	NextActions = table.freeze(NEXT_ACTIONS),
 	Greeting = table.freeze(GREETING),
 	Goodbye = table.freeze(GOODBYE),
 	SkipGoodbye = table.freeze(SKIP_GOODBYE),

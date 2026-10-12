@@ -94,6 +94,7 @@ export type Public = {
 	FxFolder: (self: Public) -> Folder,
 	SetHighlight: (self: Public, anchor: Instance?) -> (),
 	Focuses: (self: Public, anchor: Instance) -> boolean,
+	PromptAllowed: (self: Public, anchor: Instance) -> boolean,
 	ClearGuidance: (self: Public) -> (),
 	SetFar: (self: Public, far: boolean) -> (),
 	UpdatePointer: (self: Public) -> (),

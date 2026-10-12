@@ -50,8 +50,19 @@ export type Mart = {
 		OpalLineGap: number, -- s between two Opal purchase lines (optional, pool "Purchase")
 		OpalLineRadius: number, -- studs from Opal: only players this close get the line
 	},
+	Cooldown: {
+		Turns: number, -- a Bench line bought in shift T is on sale again when shift T + Turns starts (2 = one full shift off)
+	},
 	Plate: {
 		Distance: number, -- studs, BillboardGui MaxDistance of the price plate
+		Lift: number, -- studs from the miniature centre up to the plate (it floats above the miniature, never in the glass)
+		Width: number, -- px, fixed size like PatienceBar / OrderBubble (BillboardGui, UI scale does not reach it)
+	},
+	Hint: {
+		-- "Closing time" hint: toast (server, once per shift) and arrow to the stand while the phase is one of these and
+		-- Cash + Drawer >= the cheapest line on sale (or nothing bought yet). Ends with Open or on reaching the stand.
+		Phases: { string },
+		Reach: number, -- studs from the stand where the arrow is dismissed
 	},
 	Tags: {
 		Pedestal: string, -- Model (or BasePart) of one pedestal, attribute Slot = BenchSlot
@@ -102,7 +113,10 @@ const mart: Mart = {
 		OpalLineGap = 20,
 		OpalLineRadius = 12,
 	},
-	Plate = { Distance = 45 },
+	-- Q-203 Provisional: one full shift off the stand after a purchase (user feedback 2026-10-11).
+	Cooldown = { Turns = 2 },
+	Plate = { Distance = 45, Lift = 1.3, Width = 190 },
+	Hint = { Phases = { "Closing", "Summary", "Prep" }, Reach = 9 },
 	Tags = { Pedestal = "GearPedestal", Shutter = "GearShutter", Slot = "Slot" },
 	Fallback = { DoorHeight = 7, DoorAhead = 1, AnchorHeight = 4.2, Margin = 1.5 },
 }

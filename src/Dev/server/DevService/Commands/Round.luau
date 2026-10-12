@@ -32,7 +32,7 @@ const Round: Api.Module = function(ctx: Api.Context): { Api.Command }
 		{
 			Name = "day",
 			Usage = "day <n>",
-			Help = "go to the Prep of Day n (ShiftStarted fires as on a natural rollover)",
+			Help = "go to the Prep of Day n; nights played = those before it in the flow D1, D2, N1, D3, N2 ... (Day 3 follows Night 1); ShiftStarted fires as on a natural rollover and places the free packages of every unlocked day not given yet",
 			Run = function(args: { string }, _caller: Player?): string?
 				const day = tonumber(args[1])
 				if day == nil then
@@ -40,13 +40,15 @@ const Round: Api.Module = function(ctx: Api.Context): { Api.Command }
 				end
 				const before = where()
 				round:DevSetDay(day)
-				return `{before} -> {where()}`
+				const packs = workspace:FindFirstChild("FreePacks")
+				const waiting = if packs then #packs:GetChildren() else 0
+				return `{before} -> {where()} (free packages waiting: {waiting})`
 			end,
 		},
 		{
 			Name = "night",
 			Usage = "night <k>",
-			Help = "start Night k on the current day (Call, skipped without a boss, then Prep)",
+			Help = "start Night k on its own day (Night k is on Day k + 1: the evening of the day shift before it), any vehicle: Call, skipped without a boss, then Prep. Gives the unlocked free packages. Night 1: sanity 50, coffee stock 10, Walt's coffee call",
 			Run = function(args: { string }, _caller: Player?): string?
 				const night = tonumber(args[1])
 				if night == nil then

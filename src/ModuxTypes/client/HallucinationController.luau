@@ -29,6 +29,9 @@ export type Public = {
 	Candidates: (self: Public, now: number, env: Context.Env) -> { Content.Hallucination },
 	Start: (self: Public, row: Content.Hallucination, env: Context.Env, now: number) -> (),
 	Step: (self: Public) -> (),
+	DevPlay: (self: Public, key: string) -> string,
+	DevStop: (self: Public) -> string,
+	DevActive: (self: Public) -> string,
 	Mount: (self: Public, playerGui: Instance) -> (),
 }
 

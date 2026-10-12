@@ -61,7 +61,7 @@ Custo = $1,25 (pão + salsicha) + Σ custo por uso. Tabela por ingrediente: `ite
 
 | Parâmetro | Dia | Noite |
 |---|---|---|
-| Intervalo base solo | 22 s **[DEC-045]** | 40 s (N1–5) · 36 s (N6–10) **(proposta)** |
+| Intervalo base solo | 14 s (era 22 s **[DEC-045]**; Provisório Q-200: loja aberta 360 → 216 s, mesma média de clientes por dia) | 40 s (N1–5) · 36 s (N6–10) **(proposta)** |
 | Crescimento | taxa × min(1 + 0,08(d − 1), 1,4) **[DEC-045]** | — |
 | Party | ×1,0 / 1,6 / 2,1 / 2,5 na taxa **[DEC-045]**; jogadores **ativos** (conectados e não espectadores) no início do turno **(proposta, Q-067)**; atrasado conta a partir do turno seguinte à chegada (Q-112 d) | igual |
 | Trailer Lights | ×1,1 **[DEC-055]** | — |

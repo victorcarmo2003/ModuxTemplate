@@ -15,6 +15,12 @@
 -- whole Pad: SetLevel and Restore write it on every vehicle where the upgrade exists, so the swap keeps it. SoldAt
 -- "InPlace" upgrades are bought by SeatingService (Buy with quiet = true: it sends its own notice); Requires = another
 -- upgrade's minimum level on the current vehicle ("locked" until then).
+-- Gear Stand cooldown (user feedback 2026-10-11; Q-203 Provisional): a Bench upgrade bought on the stand leaves its
+-- line (vehicle + upgrade key) off sale for Content.Mart.Cooldown.Turns shifts counting the current one: bought in
+-- shift T, it comes back when shift T + Turns starts, so one whole shift (T + 1) passes in between. Other lines stay
+-- free. State: Turn (shift counter, +1 per new shift identity, so a repeated night does not count) and Cooldown
+-- ["vehicle/key"] = Turn when the line returns. Both ride in the snapshot "UpgCd" (a lost night undoes the purchase and
+-- its cooldown). The set carries the shifts left (Upgrades.Wait, 0 = on sale). InPlace upgrades (Patio) are exempt.
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -26,13 +32,15 @@ local Pieces = require(script.Pieces)
 local Modux = require(ServerScriptService.server.Modux)
 
 -- Why a purchase was refused. "not_enough_cash" already sent the Notice to the buyer (EconomyService:Spend).
-export type Reason = "unknown" | "not_on_vehicle" | "maxed" | "locked" | "busy" | "not_enough_cash"
+export type Reason = "unknown" | "not_on_vehicle" | "maxed" | "locked" | "cooldown" | "busy" | "not_enough_cash"
 
 -- [vehicle][upgrade key] = level. Frozen: the atom holds immutable tables.
 export type Levels = { [string]: { [string]: number } }
 
 const LEVEL_MIN = 0 -- Upgrades.Level wire range (network.md §3.7)
 const LEVEL_MAX = 9
+const WAIT_MAX = 255 -- Upgrades.Wait wire range
+const COOLDOWN_TURNS = Content.Mart.Cooldown.Turns
 const BUY_ACTION = "bench_buy_upgrade"
 const BOUGHT_NOTICE = "upgrade_bought"
 -- Provisional (TASK-035, T035-06): after a purchase the same upgrade is refused for one bench hold. A second player
@@ -90,6 +98,10 @@ function UpgradeService:Setup()
 	self.Levels = self.Libs.Charm.atom(startLevels()) :: Charm.Atom<Levels>
 	-- "vehicle/key" -> os.clock() of the last purchase (BUY_GUARD)
 	self.BoughtAt = {} :: { [string]: number }
+	-- Gear Stand cooldown: shift counter, identity of the last shift seen and "vehicle/key" -> Turn of the return
+	self.Turn = self.Libs.Charm.atom(1) :: Charm.Atom<number>
+	self.ShiftKey = "" :: string
+	self.Cooldown = self.Libs.Charm.atom({} :: { [string]: number }) :: Charm.Atom<{ [string]: number }>
 	-- Created here so lower-priority services (Vehicle 620, Market 615, Customer 590) connect in their OnInit
 	self.Changed = self.Libs.Signal.new() :: SignalLib.Signal<string, number, string>
 end
@@ -117,10 +129,10 @@ function UpgradeService:CurrentRow(key: string, vehicle: string?): Content.Upgra
 	return rowOf(upgrade, target, level)
 end
 
--- What the bench sells next on the current vehicle (Price, Effects). nil = maxed or not on this vehicle.
-function UpgradeService:NextLevel(key: string): Content.UpgradeLevel?
+-- What the bench sells next on `vehicle` (default: current; Price, Effects). nil = maxed or not on this vehicle.
+function UpgradeService:NextLevel(key: string, vehicleKey: string?): Content.UpgradeLevel?
 	const upgrade = Content.Upgrades.ByKey[key]
-	const vehicle = self.Vehicle()
+	const vehicle = vehicleKey or self.Vehicle()
 	const level = self:GetLevel(key, vehicle)
 	if upgrade == nil or level == nil then
 		return nil
@@ -174,6 +186,16 @@ function UpgradeService:GuardKey(key: string): string
 	return `{self.Vehicle()}/{key}`
 end
 
+-- Shifts left before the line is on sale again on `vehicle` (default: current); 0 = on sale. Bench upgrades only.
+function UpgradeService:GetWait(key: string, vehicle: string?): number
+	const upgrade = Content.Upgrades.ByKey[key]
+	if upgrade == nil or upgrade.SoldAt ~= "Bench" then
+		return 0
+	end
+	const back = self.Cooldown()[`{vehicle or self.Vehicle()}/{key}`]
+	return if back == nil then 0 else math.clamp(back - self.Turn(), 0, WAIT_MAX)
+end
+
 -- Everything but the money: upgrade exists on the current vehicle, not maxed, unlocked today, not just bought.
 function UpgradeService:CanBuy(key: string): (boolean, Reason?)
 	const upgrade = Content.Upgrades.ByKey[key]
@@ -192,6 +214,9 @@ function UpgradeService:CanBuy(key: string): (boolean, Reason?)
 	const requires = upgrade.Requires
 	if requires ~= nil and (self:GetLevel(requires.Upgrade) or 0) < requires.Level then
 		return false, "locked"
+	end
+	if self:GetWait(key) > 0 then
+		return false, "cooldown" -- sold out until the shift counter reaches the return turn
 	end
 	const last = self.BoughtAt[self:GuardKey(key)]
 	if last ~= nil and os.clock() - last < BUY_GUARD then
@@ -214,6 +239,11 @@ function UpgradeService:Buy(key: string, player: Player?, quiet: boolean?): (boo
 		return false, "not_enough_cash"
 	end
 	self.BoughtAt[self:GuardKey(key)] = os.clock()
+	if Content.Upgrades.ByKey[key].SoldAt == "Bench" then
+		const cooldown = table.clone(self.Cooldown())
+		cooldown[self:GuardKey(key)] = self.Turn() + COOLDOWN_TURNS
+		self.Cooldown(cooldown)
+	end
 	self:SetLevel(self.Vehicle(), key, nextRow.Level)
 	if not quiet then
 		self.Dependencies.RunStateService:Notify("all", BOUGHT_NOTICE, Content.Upgrades.IndexOf[key])
@@ -330,6 +360,67 @@ function UpgradeService:Restore(data: any)
 	end
 end
 
+-- Cooldown (Gear Stand) --------------------------------------------------------------------------------------------
+
+-- A shift starts: +1 on the counter when it is a new shift (a repeated night keeps the same identity).
+function UpgradeService:OnShift(info: { Day: number, Night: number, IsNight: boolean })
+	const key = `{info.Day}/{info.Night}/{if info.IsNight then 1 else 0}`
+	if key == self.ShiftKey then
+		return
+	end
+	if self.ShiftKey ~= "" then
+		self.Turn(self.Turn() + 1)
+	end
+	self.ShiftKey = key
+end
+
+-- Dev (/dev market reset): every line on sale again
+function UpgradeService:ResetCooldowns()
+	self.Cooldown({})
+end
+
+-- Dev (/dev market): { vehicle/key = shifts left } of the lines still resting, and the counter
+function UpgradeService:CooldownReport(): (number, { [string]: number })
+	const out: { [string]: number } = {}
+	const turn = self.Turn()
+	for name, back in self.Cooldown() do
+		if back > turn then
+			out[name] = back - turn
+		end
+	end
+	return turn, out
+end
+
+function UpgradeService:CaptureCooldown(): { [string]: any }
+	return { T = self.Turn(), K = self.ShiftKey, C = table.clone(self.Cooldown()) }
+end
+
+function UpgradeService:RestoreCooldown(data: any)
+	local turn = 1
+	local shiftKey = ""
+	const cooldown: { [string]: number } = {}
+	if type(data) == "table" then
+		if type(data.T) == "number" and data.T == data.T and data.T >= 1 and data.T < 1e6 then
+			turn = math.floor(data.T)
+		end
+		if type(data.K) == "string" then
+			shiftKey = data.K
+		end
+		if type(data.C) == "table" then
+			for name, back in data.C do
+				if type(name) == "string" and type(back) == "number" and back == back and back < 1e6 then
+					cooldown[name] = math.floor(back)
+				end
+			end
+		end
+	end
+	self.Libs.Charm.batch(function()
+		self.Turn(turn)
+		self.Cooldown(cooldown)
+	end)
+	self.ShiftKey = shiftKey
+end
+
 -- Pieces ----------------------------------------------------------------------------------------------------------
 
 -- Shows the piece of the current level of its own vehicle, hides the others (DEC-052, T38)
@@ -356,11 +447,14 @@ end
 -- Network ----------------------------------------------------------------------------------------------------------
 
 -- Set record of each upgrade on the current vehicle (0 where it does not exist, network.md §3.7)
-function UpgradeService:Records(): { { Level: number } }
+function UpgradeService:Records(): { { Level: number, Wait: number } }
 	const levels = self.Levels()[self.Vehicle()] or {}
 	const out = {}
 	for index, upgrade in Content.Upgrades.List do
-		out[index] = { Level = math.clamp(levels[upgrade.Key] or 0, LEVEL_MIN, LEVEL_MAX) }
+		out[index] = {
+			Level = math.clamp(levels[upgrade.Key] or 0, LEVEL_MIN, LEVEL_MAX),
+			Wait = math.clamp(self:GetWait(upgrade.Key), 0, WAIT_MAX),
+		}
 	end
 	return out
 end
@@ -375,6 +469,15 @@ UpgradeService:OnInit(function(self)
 		return self:Capture()
 	end, function(data, _mode)
 		self:Restore(data)
+	end)
+	self.Dependencies.RunStateService:RegisterSnapshot("UpgCd", function()
+		return self:CaptureCooldown()
+	end, function(data, _mode)
+		self:RestoreCooldown(data)
+	end)
+	-- ShiftStarted fires before the shift capture, so the snapshot already holds the new counter
+	self.Dependencies.RoundService.ShiftStarted:Connect(function(info)
+		self:OnShift(info)
 	end)
 end)
 

@@ -21,11 +21,21 @@
 -- street). Provisional (Q-159, Q-162): the N7..N10 pressure band; customer anomalies stay off so the actor keeps its
 -- sign and normal customers never become false positives (Q-147 c).
 -- Cues: keys of Cues that this anomaly may send through the AnomalyCue packet.
+-- Trailer (user request 2026-10-12, Provisional Q-207): nights start in the cart and the trailer is an optional later
+-- unlock, so every anomaly says what the cart can do about it:
+--   None   same play in the cart and in the trailer (refuse, serve, discard, do not look, the Mart safe spot)
+--   Helps  the trailer has the easy answer (close the service window); in the cart the same occurrence is solved by
+--          leaving the cart zone for the Mart (the rule only tests players inside the zone, ANM-008/009)
+--   Needs  the only answer is a trailer object (the light switch): without the trailer the scheduler plays the stand-in
+--          anomaly (the newest earlier anomaly with Trailer None) in its slots (AnomalyService:BuildAgenda)
+-- Validate: the anomalies debuting on a night up to Content.Trailer.OfferAfterNight must be None (those nights are
+-- always in the cart).
 local Table = require(script.Parent.Table)
 
 export type Actor = "Customer" | "Street" | "Vehicle" | "World" | "Audio" | "Item"
 export type Scope = "Party" | "PerPlayer"
 export type SeeMode = "Cone" | "AudioZone"
+export type TrailerUse = "None" | "Helps" | "Needs"
 
 export type Scripted = {
 	Night: number,
@@ -46,6 +56,7 @@ export type Anomaly = {
 	Scripted: Scripted?,
 	Tension: boolean,
 	Cues: { string },
+	Trailer: TrailerUse,
 }
 
 export type CueKind = "Visual" | "Audio" | "Both"
@@ -103,6 +114,7 @@ local function anomaly(
 		ExclusiveWith = exclusiveWith,
 		Tension = tension,
 		Cues = cueKeys,
+		Trailer = "None",
 	}
 end
 
@@ -111,6 +123,7 @@ const knock = anomaly(9, "anm_009_knock", "The knock", "Audio", 0, "PerPlayer", 
 	"anm_010_hush",
 }, { "knock", "door_crack" })
 knock.SeeMode = "AudioZone" -- FEAT-019: seen = in the trailer zone when the first knock sounds
+knock.Trailer = "Helps" -- window in the trailer; in the cart: leave the zone
 
 const walker = anomaly(7, "anm_007_walker", "The Walker", "Street", 1, "Party", 300, true, {}, {
 	"post_buzz",
@@ -127,15 +140,23 @@ const hush = anomaly(10, "anm_010_hush", "The Hush", "World", 0, "PerPlayer", 20
 }, { "hush_fog" })
 hush.Scripted = { Night = 10, Clock = 1785 } -- FEAT-027: 3rd occurrence of Night 10 at 5:45 AM, leads to the Final
 
+const stoppedClock = anomaly(3, "anm_003_stopped_clock", "The stopped clock", "World", 0, "Party", 100, false, {
+	"anm_010_hush",
+}, { "clock_stop", "clock_resume" })
+stoppedClock.Trailer = "Needs" -- the verb is the trailer's light switch
+
+const longCar = anomaly(8, "anm_008_long_car", "The long car", "Vehicle", 1, "PerPlayer", 100, true, {
+	"anm_005_raincoat_lady",
+	"anm_010_hush",
+}, { "car_highbeam", "car_flash", "car_honk", "trailer_blackout" })
+longCar.Trailer = "Helps" -- window in the trailer; in the cart: leave the zone
+
 const base = Table.new({
 	-- ViewRange: 60 default, 80 N6, 300 N7 (FEAT-019); 100 N3/N8 and 200 N10 Provisional (C-01 ~73 studs,
 	-- AN-12 ~63, Juniper posts 82-135 from the counter; MAP-01 §6, §10.3)
 	anomaly(1, "anm_001_blank_folks", "The blank folks", "Customer", 1, "Party", 60, false, {}, { "blank_coin" }),
 	anomaly(2, "anm_002_wrong_food", "The wrong food", "Item", 0, "Party", 60, false, {}, { "smoke" }),
-	anomaly(3, "anm_003_stopped_clock", "The stopped clock", "World", 0, "Party", 100, false, { "anm_010_hush" }, {
-		"clock_stop",
-		"clock_resume",
-	}),
+	stoppedClock,
 	anomaly(4, "anm_004_copies", "The copies", "Customer", 1, "Party", 60, false, {}, { "mirror_smile" }),
 	anomaly(5, "anm_005_raincoat_lady", "The Raincoat Lady", "Customer", 1, "Party", 60, false, {
 		"anm_008_long_car",
@@ -144,13 +165,22 @@ const base = Table.new({
 	}, { "raincoat_drip" }),
 	anomaly(6, "anm_006_wavers", "The wavers", "World", 0, "PerPlayer", 80, false, {}, { "curtain", "waver_more" }),
 	walker,
-	anomaly(8, "anm_008_long_car", "The long car", "Vehicle", 1, "PerPlayer", 100, true, {
-		"anm_005_raincoat_lady",
-		"anm_010_hush",
-	}, { "car_highbeam", "car_flash", "car_honk", "trailer_blackout" }),
+	longCar,
 	knock,
 	hush,
 } :: { Anomaly })
+
+-- Anomaly that plays in the slots of a "Needs" anomaly when the vehicle has no switch: the newest anomaly debuting
+-- before it with Trailer None (nil if there is none, which Validate forbids)
+local function standIn(row: Anomaly): Anomaly?
+	local found: Anomaly? = nil
+	for _, other in base.List do
+		if other.Night < row.Night and other.Trailer == "None" and (found == nil or other.Night > found.Night) then
+			found = other
+		end
+	end
+	return found
+end
 
 -- Active anomalies of night k, in list order (DEC-025: N1..Nk). Used by the scheduler and by dev tools.
 local function activeOn(night: number): { Anomaly }
@@ -166,4 +196,5 @@ end
 return Table.with(base, {
 	Cues = cues,
 	ActiveOn = activeOn,
+	StandIn = standIn,
 })

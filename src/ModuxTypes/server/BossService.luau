@@ -9,6 +9,7 @@ export type Record = { Call: string, State: State, StartedAt: number }
 export type Entry = { Key: string, Priority: number, Order: number }
 
 export type Public = {
+	Cued: { [string]: boolean },
 	Enabled: boolean,
 	EndsAt: number,
 	LastInfinite: string,
@@ -42,14 +43,18 @@ export type Public = {
 	Finish: (self: Public, at: number) -> (),
 	Answer: (self: Public) -> (),
 	Step: (self: Public) -> (),
+	RunCues: (self: Public, record: Record, t: number) -> (),
+	GiveTrailerCash: (self: Public) -> number,
 	TutorialAllowed: (self: Public) -> boolean,
 	QueueTutorial: (self: Public) -> (),
 	StepTutorial: (self: Public, t: number) -> (),
 	OnDayPrep: (self: Public, day: number, night: number) -> (),
+	OnTrailerOffer: (self: Public, night: number) -> (),
 	OnNightCall: (self: Public, night: number, attempt: number) -> (),
 	OnPhase: (self: Public, phase: string, day: number, night: number) -> (),
 	OnNightResolved: (self: Public, result: string, reason: string?) -> (),
 	OnPerformed: (self: Public, action: string) -> (),
+	OnPurchase: (self: Public) -> (),
 	OnSwapped: (self: Public, to: string) -> (),
 	CaptureBoss: (self: Public) -> { string },
 	RestoreBoss: (self: Public, data: any) -> (),
@@ -57,6 +62,7 @@ export type Public = {
 	DevCall: (self: Public, key: string) -> (),
 	DevAnswer: (self: Public) -> (),
 	DevStop: (self: Public) -> (),
+	DevResetTrailer: (self: Public) -> (),
 	DevResetTutorial: (self: Public) -> (),
 	DevStatus: (self: Public) -> string,
 }

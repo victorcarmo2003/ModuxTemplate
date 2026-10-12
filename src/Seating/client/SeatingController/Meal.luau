@@ -1,6 +1,8 @@
 --!strict
 -- SeatingController/Meal: a seated diner eats (FEAT-037 "Come o hot dog que recebeu"; network.md §14.3; TASK-147).
--- Local only. While a server rig has the `Seated` attribute (table index, written by SeatingService/Diner):
+-- Local only. While a server rig has the `Seated` attribute (table index, written by SeatingService/Diner) it sits
+-- (`npc_sit` loops when it has an Id) and WAITS with empty hands (Q-209: the order is served at the table). Once the
+-- server also writes `Eating` = true (the food was served) it eats:
 --   * a hot dog in its right hand: a clone of the kit Tool ReplicatedStorage.Assets.Items.Tools.hot_dog (AST-003)
 --     held like a Tool (R6 RightGrip frame x Tool.Grip), welded to the "Right Arm"; plain bun + sausage drawn here
 --     while the kit is missing. The server pose (shoulders at +-90 by Motor6D.C0) puts the hand over the table; the
@@ -13,6 +15,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 const SEATED_ATTRIBUTE = "Seated"
+const EATING_ATTRIBUTE = "Eating"
 const TOOL_NAME = "hot_dog"
 const ARM = "Right Arm"
 const BITES = 3
@@ -30,6 +33,7 @@ export type Anim = {
 }
 
 type Diner = {
+	Eating: boolean,
 	Food: Model?,
 	Grip: WeldConstraint?, -- hand weld (arm -> handle)
 	Thread: thread?,
@@ -170,9 +174,18 @@ function Meal.Sit(self: Meal, rig: Model)
 	if self.Diners[rig] ~= nil then
 		return
 	end
-	const diner: Diner = { Food = nil, Grip = nil, Thread = nil }
+	const diner: Diner = { Eating = false, Food = nil, Grip = nil, Thread = nil }
 	self.Diners[rig] = diner
 	self.Anim.Play(rig, "npc_sit", true)
+end
+
+-- The food arrived: the hot dog goes into the hand and the bites start.
+function Meal.Eat(self: Meal, rig: Model)
+	const diner = self.Diners[rig]
+	if diner == nil or diner.Eating then
+		return
+	end
+	diner.Eating = true
 	diner.Thread = task.spawn(function()
 		task.wait(SETTLE)
 		if self.Diners[rig] ~= diner then
@@ -210,6 +223,9 @@ function Meal.Refresh(self: Meal, rig: Model)
 	const seated = rig:GetAttribute(SEATED_ATTRIBUTE)
 	if typeof(seated) == "number" and rig:IsDescendantOf(workspace) then
 		self:Sit(rig)
+		if rig:GetAttribute(EATING_ATTRIBUTE) == true then
+			self:Eat(rig)
+		end
 	else
 		self:Stand(rig)
 	end
@@ -225,6 +241,7 @@ function Meal.Track(self: Meal, instance: Instance)
 	end
 	self.Tracked[rig] = {
 		rig:GetAttributeChangedSignal(SEATED_ATTRIBUTE):Connect(refresh),
+		rig:GetAttributeChangedSignal(EATING_ATTRIBUTE):Connect(refresh),
 		rig.AncestryChanged:Connect(refresh),
 		rig.Destroying:Connect(function()
 			self:Untrack(rig)

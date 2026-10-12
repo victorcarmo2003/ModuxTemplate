@@ -201,7 +201,7 @@ Legenda: **E** = existe e será estendido; **N** = novo. Place: L, R, L+R.
 | `Item` (N) | `ItemService` | `ItemController` | Tools (pacotes, Coffee, HotDog, **Revive**), contagem, limite, **stash** (sair, cair, respawn), **item derrubado** no mundo |
 | `Character` (N) | `CharacterService` | `CharacterController` | spawn controlado (`LoadCharacter`), grupo de colisão, **ragdoll R6 só no atropelamento** (juntas pré-montadas), **desmaio por animação** (sanidade 0), "atordoado até", controles desligados em cutscene |
 | `Kitchen` (N) | `KitchenService` + módulos `Stations/*.luau` (§18.12) | `KitchenController` + visuais | estoque, estações, montagem, restock |
-| `Market` (N) | `MarketService` (prateleiras e vagas da bancada são âncoras `Interactable`, §18.4) | `MarketController` | prateleiras (pacotes), **bancada** (upgrades básicos sempre à venda + **1 vaga especial** sorteada por turno, DEC-106). O Food Trailer **não** passa aqui (DEC-107) |
+| `Market` (N) | `MarketService` (prateleiras e vagas da bancada são âncoras `Interactable`, §18.4) | `MarketController` | prateleiras (pacotes), **bancada** (upgrades básicos à venda, com cooldown por linha após a compra, Q-203 + **1 vaga especial** sorteada por turno, DEC-106). O Food Trailer **não** passa aqui (DEC-107) |
 | `Upgrade` (N) | `UpgradeService` (+ `Pieces.luau`) | — (v4.1, D-07: sem controller; a peça visível é alternada pelo servidor, T38, e o nível chega ao client pelo set `Upgrades`, lido no `MarketController`) | nível por upgrade, efeito, peça visível; **compra delegada pela bancada** |
 | `Vehicle` (N) | `VehicleService` | — | carrinho → trailer; **prompt de compra no próprio trailer** no estacionamento a partir do dia 5 (DEC-107, FEAT-016), preço × `PriceParty`; troca no fim do turno |
 | `Npc` (N) | `NpcService` + `Walker` | `NpcController` | pool R6, teto de 12, rotas por grafo, LOD; nó de faixa pede reserva ao `TrafficService` (DEC-133, §8.1) |
@@ -1652,11 +1652,11 @@ próxima fase e próximo turno; testável em lune).
 
 | Fase | Turno | Relógio | Duração (s) | Termina | Próxima |
 |---|---|---|---|---|---|
-| `Intro` | 1º turno de run nova | 7:00 AM parado | cap 70 (Provisório 2026-10-11, era 50) | probe `Intro` (Cutscene) ou cap | `Prep` |
+| `Intro` | 1º turno de run nova (só o Day 1) | 7:00 AM parado | cap 70 (Provisório 2026-10-11, era 50) | probe `Intro` (Cutscene) ou cap | `Prep` |
 | `Call` | noite | 7:00 PM parado (FEAT-018: relógio não corre na ligação) | cap 60 | probe `Call` (Boss: fila vazia) ou cap | `Prep` |
 | `Prep` | dia / noite | 7→8 AM / 7→8 PM | 60 / 90 | "Open Shop" ou cap | `Open` / `Night` |
 | `Open` | dia | 8 AM→6 PM | 360 | cap | `Closing` |
-| `Night` | noite | 8 PM→6 AM | `Nights[k].Duration` | cap → `Verdict()`; antes, só `LoseNight` | `NightEnd` ou `NightLost` |
+| `Night` | noite | 8 PM→6 AM | `Nights[k].Duration` (540 s na N1 → 900 s na N10, +40 s por noite; era 1200 → 1800, Provisório 2026-10-12) | cap → `Verdict()`; antes, só `LoseNight` | `NightEnd` ou `NightLost` |
 | `NightEnd` | noite | 6:00 AM | 3 | cap | `Closing`; Night 10 → `Finale` |
 | `Closing` | ambos | 6 PM / 6 AM | ≤ 30 | balcão vazio (probe existente) ou cap | `Summary` |
 | `Summary` | ambos | parado | 15 / 20 | cap | fronteira |
@@ -1671,9 +1671,12 @@ do relógio (`Content.Nights` registro `Windows`); usam Anomaly (agenda) e Traff
 
 **Fronteira** (fim do `Summary`), ordem fixa:
 1. `BeforeShift:Fire(prev)` — `VehicleService` aplica a troca pendente (§19.5).
-2. `next = Flow.Next(prev, vehicleHasNight)`: `prev.IsNight` → Day(D+1); dia e veículo atual com `HasNight` →
-   Night(N+1); senão Day(D+1). `vehicleHasNight = Content.Vehicles.ByKey[VehicleProbe()].HasNight`.
-3. `RunStateService:SetEndless(not vehicleHasNight and next.Day >= RunParams.EndlessFromDay)` (DEC-084).
+2. `next = Flow.Next(prev, LAST_NIGHT, MAX_DAY, RunParams.NightsFromDay)` (**novo fluxo, pedido do dono 2026-10-12, Provisório,
+   Q-207**): `prev.IsNight` → Day(D+1); dia com `prev.Day >= NightsFromDay (2)` e `prev.Night < LAST_NIGHT` → Night(N+1) **no mesmo Day**,
+   qualquer veículo (o veículo não decide mais); senão Day(D+1). Sequência D1, D2, N1, D3, N2 … D11, N10, `Finale`.
+   `Flow.NightsBefore(day)` e `Flow.DayOfNight(k)` (= k + 1) servem os comandos de dev. Antes: noite só com `HasNight` (trailer).
+3. `RunStateService:SetEndless(false)`: o modo dia infinito (DEC-084) acabou; `RunParams.EndlessFromDay` / `EndlessRequiresNoTrailer`
+   ficam sem uso e `Vehicles.cart.HasNight = true` (a API `RoundService:VehicleHasNight()` continua só por compatibilidade de tipos).
 4. `StartShift(next, capture = true)`: atoms em `batch` → `ShiftStarted(info)` → `PhaseChanged(first)` → `Capture()`.
    Primeira fase: dia → `Prep` (`Intro` antes, só no 1º turno de run nova); noite → `Call`.
 
@@ -1714,9 +1717,12 @@ RunEnded(result: "Success" | "Failed")
 
 `ShiftEnded(info)` continua no início do `Summary` (dia e noite). Snapshot `Sh` = `{ D, N, Ni, A }` (sem mudança);
 restore `RepeatNight` → `A + 1` e captura nova; `Resume` → fase `Resume` e captura nova no início do turno.
+**Sequência de turnos (2026-10-12):** `Day = k + 1` para a noite *k* (`RunParams.NightsFromDay = 2`); o snapshot `Sh` aceita qualquer
+`(D, N, Ni)` dessa sequência (`D` 1..10000, `N` 0..10): nenhuma mudança de formato, e o `Resume`/`RepeatNight` reentram na noite no veículo
+que estiver em uso (`Veh` restaura o veículo antes). `Shift.Night` (Lync `int(0, 10)`) e `Shift.Day` continuam como estão; nenhum campo de rede novo.
 `Shift.Vehicle` vem do `VehicleProbe` (`RunParams.StartVehicle` sem probe); `Shift.Chances` de
 `RunStateService.Chances()` (não vai ao HUD, DEC-053). Comandos de dev (`Commands/Round.luau`, existente):
-+ `night <k>`, `lose wipe|critical`, `win`.
++ `night <k>` (a noite k no **seu** dia, Day k + 1; `day <n>` deriva as noites jogadas do dia: Day 3 vem depois da Night 1), `lose wipe|critical`, `win`.
 
 ### 19.5 Trailer e troca de veículo (`VehicleService`; FEAT-016, 017; DEC-047, 086, 107, 121, 184, 199)
 
@@ -2204,6 +2210,8 @@ podem subir para a onda 3** sem conflito de arquivo (só `RunStateService/` com 
 | `Q-170` | Café de dia (sanidade não existe de dia) | só bebe à noite; de dia a Tool fica guardada (não ativa) |
 
 ### 19.28 Mesas do Pad e duplas (TASK-144 a TASK-146; FEAT-037, FEAT-038; Provisório)
+
+**Grupos de mesa (2026-10-12, `Q-209`):** `Content.Seating.Groups` = { Pad: `TBL-1..5`, UPG-008 (`TableCount`), cart + trailer; Trailer: `TBL-6..9`, UPG-011 (`TrailerTableCount`), só trailer, mostra só a próxima à venda }. `Seating.Tables` = 9. O `SeatingService` guarda o `Group` de cada `Spot`, calcula o estado por grupo (`Tables.Idle/Next` ganham `ghostAll`), esconde (`Locked`, sem colisão) o grupo cujo veículo não é o atual e só deixa sentar no grupo que manda (`SeatingGroup()`: Trailer com o trailer e ≥ 1 mesa comprada, senão Pad). Binding: `TableIndex` global 1..9 (+ `TableGroup` opcional conferido); `bindTables` e `tools/assetplace/trailer_tables.luau` só acrescentam, nunca movem. Dev: `/dev seating trailer [buy]`, `/dev seating buy [pad|trailer]`.
 
 Feature nova `src/Seating/server/SeatingService/` (`init.luau`, `Tables.luau` puro, `Diner.luau`), prioridade **568**
 (abaixo do `AnomalyService` 570), `Require` PlaceService, NetService, RunStateService, RoundService, EconomyService,

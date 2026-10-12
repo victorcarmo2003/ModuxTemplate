@@ -89,6 +89,7 @@ export type Public = {
 	ZonePart: (self: Public, id: string) -> BasePart?,
 	ZoneAt: (self: Public) -> string?,
 	Preload: (self: Public) -> (),
+	DevReport: (self: Public) -> (),
 	SetDucked: (self: Public, record: { State: string }?) -> (),
 }
 

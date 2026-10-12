@@ -57,8 +57,23 @@ local function current(): number
 	return shared()()
 end
 
+-- Smallest fit factor (a window on a very narrow screen shrinks at most to this; under it the text would be unreadable).
+const FIT_FLOOR = 0.5
+const FIT_MARGIN = 16
+
+-- `base` capped so a fixed layout of `design` px (drawn at scale 1) stays inside `area` (the real px size of the
+-- ScreenGui, read from a full-size frame: it follows CoreUISafeInsets and the story frame alike). area 0 = unknown.
+local function fit(base: number, area: Vector2, design: Vector2): number
+	if area.X <= 0 or area.Y <= 0 then
+		return base
+	end
+	const limit = math.min((area.X - FIT_MARGIN) / design.X, (area.Y - FIT_MARGIN / 2) / design.Y)
+	return math.min(base, math.max(limit, FIT_FLOOR))
+end
+
 return table.freeze({
 	Current = current,
+	Fit = fit,
 	-- Same rule for a given viewport (and optional fixed layout to keep on screen); see Theme.ScaleOf.
 	Of = Theme.ScaleOf,
 })

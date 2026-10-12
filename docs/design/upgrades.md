@@ -9,7 +9,9 @@ Nomes de nível propostos pelo narrative-writer (`ui-text.md` §3, Rascunho): Ol
 Tabela `Upgrades` (id, nível, preço, efeitos tipados, peça visível, pré-requisito, `benchSlot`).
 
 **Onde se compra (rodadas 11–12):** todos os upgrades UPG-001 a UPG-005 são comprados na **bancada da parede do fundo do Ninth Street Mart** **[DEC-101]**, sempre à venda, sem rotação **[DEC-106]** (FEAT-015). O efeito e a peça aparecem no veículo na hora.
-O **Food Trailer** (UPG-006) **não** está na bancada: compra fixa no próprio trailer, do Day 5 em diante **[DEC-107]**. A **cafeteira** (UPG-007, "Coffee Maker") vem com o trailer e não é vendida **[DEC-055, DEC-125]**.
+O **Food Trailer** (UPG-006) **não** está na bancada: compra fixa no próprio trailer, a partir da manhã depois da noite `Content.Trailer.OfferAfterNight` (= 2; antes: Day 5; pedido do dono 2026-10-12, Provisório, Q-206) **[DEC-107]**; o prompt de compra fica na **placa FOR SALE**, não no trailer; o Walt liga, repassa o dinheiro que falta e manda olhar a placa (`script.md` §4.1b). A **cafeteira** (UPG-007, "Coffee Maker") vem com o trailer e não é vendida **[DEC-055, DEC-125]**.
+**Pad vazio (pedido do dono 2026-10-12, Provisório, `Q-216`):** com o trailer em uso o carrinho, o `PadDecor` e as mesas do Pad (UPG-008, TBL-1..5; e a placa Patio Lights, UPG-009) somem por completo do Pad; o nível comprado fica guardado (Pad scope) e só volta a valer se o carrinho voltar. As mesas do trailer (UPG-011) seguem como estão.
+
 O único item rotativo da bancada é especial, não upgrade: Rescue Whistle (ITM-021, FEAT-035; "Revive Kit" em DEC-129).
 
 ## Template de ficha
@@ -35,6 +37,7 @@ Critérios de aceite
 | UPG-007 | Coffee Maker | incluída | $0 (vem com o trailer) | só trailer | — | — |
 | UPG-008 | Patio Tables (mesas do Pad) — Provisório | 0–5 (1 mesa por nível) | $315 | **Pad** (as duas, não recomeça na troca, `Q-179`) | na própria mesa fantasma no Pad (`Q-178`) | não |
 | UPG-009 | Patio Lights — Provisório | 0–1 | $120 | Pad | na mesa `TBL-1` (placa) no Pad (`Q-178`) | não |
+| UPG-011 | Trailer Table (4 mesas do trailer, `TBL-6..9`) — Provisório (`Q-209`) | 0–4 (1 mesa por nível) | $330 ($50 / $70 / $90 / $120) | **só trailer** (`Scope = "Vehicle"`) | na própria mesa fantasma, só depois de comprar o trailer (`Q-209`) | não |
 | UPG-010 | Back Bar (bancada externa do trailer) — Provisório, cortável | 0–1 | $90 | só trailer | na própria bancada dobrada, no trailer (`Q-178`, `Q-179`) | não |
 
 Soma de tudo que se compra com dinheiro (solo): $210 + $170 + $230 + $80 + $100 + $300 = **$1.090**.
@@ -172,6 +175,24 @@ veículo, então o critério da FEAT-015 "nenhum prompt de compra em equipamento
 - Antes do trailer o efeito de noite não existe (não há noite); a compra no Day 2–5 é só pelo dia.
 - Critérios de aceite: com Patio Lights e interruptor ligado, jogador limpando qualquer mesa comprada não perde sanidade por escuro; interruptor desligado apaga `LZ-PATIO`; mesa comprada depois da luz entra na zona na hora.
 
+### UPG-011 — Trailer Table (mesas do trailer)
+
+- Status: Rascunho (Provisório, 2026-10-12) · Origem: pedido do dono 2026-10-12 (4 mesas colocadas por ele junto do trailer; ver `Q-209`) · Veículo: **só trailer** (`Scope = "Vehicle"`: no carrinho o nível nem existe) · Compra: na mesa fantasma, hold 1,5 s (`buy_in_place`, "Buy Table — $N"), ordem fixa `TBL-6` → `TBL-9` (a mais perto da fila primeiro) · Libera: assim que o trailer é o veículo
+- Mesmas regras de sentar, comer, gorjeta e limpar do UPG-008/FEAT-037 (`SitChance`, `EatTime`, `TableTip`, `MaxDiners`). Outro grupo de mesas (`Content.Seating.Groups`): **não mistura** com as mesas do Pad (com o trailer e ≥ 1 mesa comprada aqui, só estas sentam).
+
+| Nível (mesas) | Preço | Efeito de dia | Efeito de noite | Peça visível |
+|---|---|---|---|---|
+| 0 | — | antes do trailer: nada aparece (mesas escondidas, sem colisão); depois: só a 1ª aparece como fantasma com preço | igual | — |
+| 1 | $50 | 1 mesa do trailer | igual (`SitChance` × 0,75; `MaxDiners` 2) | `TBL-6` sólida; `TBL-7` fantasma |
+| 2 | $70 | 2 mesas | igual | + `TBL-7`; `TBL-8` fantasma |
+| 3 | $90 | 3 mesas | igual | + `TBL-8`; `TBL-9` fantasma |
+| 4 | $120 | 4 mesas | igual | + `TBL-9` |
+
+- Fantasma esmaecido (mais transparente, com o preço) enquanto a party não tem o dinheiro, como a bancada do Gear Stand.
+- Cada mesa precisa de `NpcNode` `TBL-n` perto e aresta até a fila (os clientes caminham até lá); sem isso a party volta depois de 30 s (`Seating.StandTimeout`).
+- Preços **do agente** (o trailer chega depois da Noite 2: mais dinheiro que no carrinho). Ajuste fino na simulação.
+- Critérios de aceite: no carrinho as 4 mesas estão invisíveis e sem colisão; ao comprar o trailer a 1ª vira fantasma com preço; comprar torna a mesa sólida e a próxima fantasma; cliente `Completo` senta na mesa do trailer, come, deixa gorjeta, a bandeja suja e "Clean Table" limpa; nunca senta numa mesa do Pad enquanto o grupo Trailer manda.
+
 ### UPG-010 — Back Bar (bancada externa do trailer)
 
 - Status: Rascunho (Provisório, **cortável**, 2026-10-11) · Origem: pedido do usuário ("mesas do trailer; ele tem um banco/bancada traseira"); leitura em `Q-179` · Veículo: **só trailer** (`Scope = "Vehicle"`) · Compra: na própria bancada dobrada, hold 1,5 s · Libera: depois da compra do trailer
@@ -179,7 +200,7 @@ veículo, então o critério da FEAT-015 "nenhum prompt de compra em equipamento
 | Nível | Preço | Efeito de dia | Efeito de noite | Peça visível |
 |---|---|---|---|---|
 | 0 | — | — | — | bancada dobrada contra a parede externa (fantasma da banqueta) |
-| 1 | $90 | +1 lugar de mesa (`TBL-6`, 3 banquetas; 1 cliente ou 1 dupla) | igual, e já dentro da luz do trailer (LZ-2 ou raio do Trailer Lights; o level-designer garante): limpar não custa escuro | bancada aberta + 3 banquetas (AST-014 reaproveitada) |
+| 1 | $90 | +1 lugar de mesa (`TBL-BAR`, 3 banquetas; 1 cliente ou 1 dupla; `TBL-6..9` são as mesas do trailer, UPG-011) | igual, e já dentro da luz do trailer (LZ-2 ou raio do Trailer Lights; o level-designer garante): limpar não custa escuro | bancada aberta + 3 banquetas (AST-014 reaproveitada) |
 
 - Posição (level-designer, TASK-149): parede **externa** do trailer, lado oeste (engate) ou traseira, **a ≥ 6 studs da porta dos fundos e da janelinha AN-05** (a ANM-009 bate ali e ninguém pode estar "do lado de fora da porta") e fora da linha janela → Juniper (ANM-007). Clientes **nunca** entram no trailer (DEC-054: porta dos fundos não abre por fora).
 - Conta em `MaxDiners` como qualquer mesa; não entra no teto de mesas do UPG-008.
@@ -264,6 +285,18 @@ Leitura:
 - Duplas (FEAT-038) somam ~+7% de pessoas e sentam mais (+0,20), o que puxa as mesas 2–3 para cima de dia.
 - Ordem esperada (solo): Grill 2 → **Mesa 1** → Lock → (trailer) → Counter 2 → Trailer Lights → **Mesa 2** → Grill 3 → … → mesas 3–5, Patio Lights, Back Bar.
 
+## Cooldown da bancada (Gear Stand) — Provisório, Q-203
+
+Feedback do usuário (2026-10-11): o momento ideal de comprar é o **fim do expediente**, não correndo no meio do turno.
+
+- **Regra:** comprar um upgrade da bancada (B1–B5, `SoldAt = "Bench"`) tira **aquela linha** de venda (chave `veículo/upgrade`) por `Content.Mart.Cooldown.Turns = 2` turnos **contando o atual**. Comprou no turno T → a linha volta no **início do turno T+2**; o turno T+1 passa inteiro. Comprar no Closing ou no Prep/Open do mesmo turno dá o mesmo retorno (T+2); a vantagem de comprar no fim é gastar o caixa do dia já, sem esperar.
+- **Só aquela linha trava.** Outras linhas (Grill, Cooler, Counter, Lock...) continuam à venda; níveis múltiplos da mesma linha (Cooler 2 → 3) respeitam o cooldown entre si. Upgrades `InPlace` (mesas, Patio Lights) e a compra do veículo (Food Trailer) **não** têm cooldown. Slot especial S1 (FEAT-035) ficará fora até existir.
+- **Visível:** o miniatura da linha some (pedestal vazio), a plaquinha vira cinza com "Sold out" e "Back next shift" (ou "Back in 2 shifts" no turno da compra), o prompt some. Ao voltar, o mini do próximo nível sobe do pedestal.
+- **Trailer:** o cooldown é por veículo; a troca carrinho → trailer começa com todas as linhas livres.
+- **Turno repetido:** um turno é identificado por (dia, noite, noturno?); repetir a noite perdida não conta como turno novo, e a restauração do snapshot desfaz a compra **e** o cooldown.
+- **Dica de fechamento:** no início do Closing, uma vez por turno, toast "Closing time. Upgrades are on sale at the Mart." (só com caixa + gaveta para a linha mais barata à venda, ou se nunca comprou) e seta guia ao Mart até o início do Open ou até o jogador chegar. Nunca bloqueia compra durante o turno.
+- **Dev:** `/dev market` lista pedestais, contador de turnos e cooldowns; `/dev market reset` zera os cooldowns.
+
 ## Critérios de aceite (balanceamento)
 
 - Simulação solo Rookie, dias 1–5: com Grill 2 + Lock comprados até o Day 3, o trailer ($300) é comprável até o fim do Day 6.
@@ -281,6 +314,7 @@ Leitura:
 | **Q-120 a, g, h** Bancada | 5 posições fixas (B1–B5) + 1 slot especial (S1); prateleiras não rotacionam; impacto na curva: nenhum para básicos, Rescue Whistle custa ~$570/run solo da sobra (chance e preço: DEC-129) | não |
 | **Q-064** Interruptor x Trailer Lights | interruptor vem com o trailer; Trailer Lights fixo em B5 depois da compra | não |
 | **Q-178** Onde/como se compra mesa | compra no lugar (mesa fantasma no Pad), uma mesa por vez, ordem fixa | **sim** (DEC-101) |
+| **Q-203** Cooldown da bancada | 1 turno cheio parado por linha (`Cooldown.Turns = 2`) | **sim** (confirmar o número) |
 | **Q-179** Mesas na troca de veículo; bancada do trailer | mesas são do Pad e ficam; Back Bar externo, trailer-only, cortável | **sim** (DEC-184) |
 
 Decidida: **Q-124** cafeteira → **DEC-125** (fixa no trailer, não vendida).

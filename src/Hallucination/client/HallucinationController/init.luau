@@ -230,6 +230,50 @@ function HallucinationController:Step()
 	self:Schedule(now)
 end
 
+-- Showcase (ShowcaseController; docs/tech/showcase.md): plays one effect now, ignoring sanity, the night phase, the
+-- cooldowns and the roll timer (the natural roll resumes afterwards). A failed CanRun is reported, not obeyed, so the
+-- effect can be seen even where its usual precondition is missing (it may then show nothing). Returns a result line.
+function HallucinationController:DevPlay(key: string): string
+	const env = self.Env
+	if env == nil then
+		return "hallucination env not ready yet"
+	end
+	local found: Content.Hallucination? = nil
+	for _, row in ROWS do
+		if row.Key == key then
+			found = row
+			break
+		end
+	end
+	if found == nil then
+		return `no hallucination "{key}"`
+	end
+	const effect = self.Effects[found.Effect]
+	if effect == nil then
+		return `{key}: Effects/{found.Effect} is not loaded`
+	end
+	self:Cancel()
+	local note = ""
+	if effect.CanRun then
+		const ok, can = pcall(effect.CanRun, env)
+		if not (ok and can == true) then
+			note = " (CanRun was false: forced anyway)"
+		end
+	end
+	self:Start(found, env, os.clock())
+	return `{key} playing{note}`
+end
+
+function HallucinationController:DevStop(): string
+	const was = self.ActiveKey
+	self:Cancel()
+	return if was ~= "" then `stopped {was}` else "nothing playing"
+end
+
+function HallucinationController:DevActive(): string
+	return self.ActiveKey
+end
+
 function HallucinationController:Mount(playerGui: Instance)
 	const boss = self.Dependencies.BossController
 	const round = self.Dependencies.RoundController

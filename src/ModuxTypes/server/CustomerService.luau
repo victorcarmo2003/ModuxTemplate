@@ -38,11 +38,15 @@ export type Customer = {
 	Faced: boolean, -- partner: already turned like its standing leader
 	-- Tables (TASK-145/146)
 	Dining: boolean, -- handed to SeatingService: no exit walk, no leave timeout until Dismiss
+	AtTable: boolean, -- Q-209: seated (or walking to its table) waiting for its food; out of the counter queue
 	-- Tutorial customer (RequestTutorial): fixed order, endless patience, out of the ledger
 	Tutorial: boolean,
 	Model: Model?, -- tutorial customer: rig carrying TutorialRules.Attribute (cleared when the record goes)
 }
-export type Seater = (party: SeatParty) -> boolean
+export type Seater = {
+	Offer: (party: SeatParty) -> boolean,
+	Left: (leader: number, ate: boolean) -> (),
+}
 export type Patch = {
 	State: State?,
 	Order: { [string]: boolean }?,
@@ -85,9 +89,13 @@ export type Public = {
 	Acted: SignalLib.Signal<number, ActedAction, Player?, SaleResult?>,
 	ActorRng: Random,
 	Customers: { [number]: Customer },
+	EmptyLimit: number,
+	EmptySince: number,
 	Enabled: boolean,
+	ForcedOrders: { { string } }?,
 	ForcedPair: Group.Pair?,
 	Fronted: SignalLib.Signal<number>,
+	GuaranteeRng: Random,
 	Joined: SignalLib.Signal<number>,
 	LastWasPair: boolean,
 	Left: SignalLib.Signal<number, LeaveReason>,
@@ -162,7 +170,15 @@ export type Public = {
 	NoticeShopClosed: (self: Public, player: Player, anchor: Instance) -> (),
 	Settle: (self: Public, id: number, result: SaleResult, amount: number) -> (),
 	TakeOrder: (self: Public, player: Player, anchor: Instance) -> (),
+	SeatAtOrder: (self: Public, customer: Customer) -> (),
+	PendingToppings: (self: Public, id: number) -> { { string } },
+	IsWaitingAtTable: (self: Public, id: number) -> boolean,
 	Serve: (self: Public, player: Player, anchor: Instance) -> (),
+	CanServeTable: (self: Public, player: Player, id: number) -> boolean,
+	ServeTable: (self: Public, player: Player, id: number) -> (),
+	ServeCustomer: (self: Public, player: Player, id: number, customer: Customer, ticket: Orders.Ticket) -> (),
+	OtherHotDog: (self: Public, player: Player, except: Tool) -> Tool?,
+	SellLine: (self: Public, id: number, customer: Customer, ticket: Orders.Ticket, player: Player, tool: Tool, index: number, verdict: Orders.Verdict, at: number) -> SaleResult,
 	Judge: (self: Public, ticket: Orders.Ticket, tool: Tool, override: SaleResult?) -> (number?, Orders.Verdict),
 	Conclude: (self: Public, customer: Customer, ticket: Orders.Ticket) -> (),
 	OfferSeat: (self: Public, customer: Customer) -> boolean,
@@ -173,6 +189,8 @@ export type Public = {
 	RegisterOrders: (self: Public) -> (),
 	Reseed: (self: Public) -> (),
 	OnPhase: (self: Public, phase: string) -> (),
+	HasLiveCustomer: (self: Public) -> boolean,
+	StepGuarantee: (self: Public, t: number) -> (),
 	Step: (self: Public) -> (),
 	StepPairs: (self: Public, t: number) -> (),
 	TutorialCustomer: (self: Public) -> Customer?,
@@ -180,7 +198,7 @@ export type Public = {
 	RequestTutorial: (self: Public) -> boolean,
 	EndTutorial: (self: Public) -> (),
 	StepTutorial: (self: Public, t: number) -> (),
-	DevSpawnPair: (self: Public, leader: string?, partner: string?) -> (Outcome, number?),
+	DevSpawnPair: (self: Public, leader: string?, partner: string?, orders: { { string } }?) -> (Outcome, number?),
 	DevSpawn: (self: Public) -> (Outcome, number?),
 }
 

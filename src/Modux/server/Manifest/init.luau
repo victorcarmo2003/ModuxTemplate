@@ -10,6 +10,7 @@ local CodesService = require(ServerScriptService.server.ModuxTypes.CodesService)
 local CustomerService = require(ServerScriptService.server.ModuxTypes.CustomerService)
 local CutsceneService = require(ServerScriptService.server.ModuxTypes.CutsceneService)
 local DevService = require(ServerScriptService.server.ModuxTypes.DevService)
+local CashDeskService = require(ServerScriptService.server.ModuxTypes.CashDeskService)
 local EconomyService = require(ServerScriptService.server.ModuxTypes.EconomyService)
 local InteractionService = require(ServerScriptService.server.ModuxTypes.InteractionService)
 local ItemService = require(ServerScriptService.server.ModuxTypes.ItemService)
@@ -31,10 +32,12 @@ local RunStateService = require(ServerScriptService.server.ModuxTypes.RunStateSe
 local SeatingService = require(ServerScriptService.server.ModuxTypes.SeatingService)
 local RoleService = require(ServerScriptService.server.ModuxTypes.RoleService)
 local ShopService = require(ServerScriptService.server.ModuxTypes.ShopService)
+local ShowcaseService = require(ServerScriptService.server.ModuxTypes.ShowcaseService)
 local ThiefService = require(ServerScriptService.server.ModuxTypes.ThiefService)
 local TrafficService = require(ServerScriptService.server.ModuxTypes.TrafficService)
 local TutorialService = require(ServerScriptService.server.ModuxTypes.TutorialService)
 local UpgradeService = require(ServerScriptService.server.ModuxTypes.UpgradeService)
+local TrailerDoorService = require(ServerScriptService.server.ModuxTypes.TrailerDoorService)
 local VehicleService = require(ServerScriptService.server.ModuxTypes.VehicleService)
 local VitalService = require(ServerScriptService.server.ModuxTypes.VitalService)
 
@@ -48,6 +51,7 @@ export type AllServices = {
 	CustomerService: CustomerService.Public,
 	CutsceneService: CutsceneService.Public,
 	DevService: DevService.Public,
+	CashDeskService: CashDeskService.Public,
 	EconomyService: EconomyService.Public,
 	InteractionService: InteractionService.Public,
 	ItemService: ItemService.Public,
@@ -69,10 +73,12 @@ export type AllServices = {
 	SeatingService: SeatingService.Public,
 	RoleService: RoleService.Public,
 	ShopService: ShopService.Public,
+	ShowcaseService: ShowcaseService.Public,
 	ThiefService: ThiefService.Public,
 	TrafficService: TrafficService.Public,
 	TutorialService: TutorialService.Public,
 	UpgradeService: UpgradeService.Public,
+	TrailerDoorService: TrailerDoorService.Public,
 	VehicleService: VehicleService.Public,
 	VitalService: VitalService.Public,
 }

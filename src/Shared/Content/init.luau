@@ -43,6 +43,7 @@ local Thief = require(script.Thief)
 local Traffic = require(script.Traffic)
 local Upgrades = require(script.Upgrades)
 local Validate = require(script.Validate)
+local Trailer = require(script.Trailer)
 local Vehicles = require(script.Vehicles)
 local WalkPaths = require(script.WalkPaths)
 
@@ -96,6 +97,7 @@ export type Revive = Revive.Revive
 export type RunParams = RunParams.RunParams
 export type Sanity = Sanity.Sanity
 export type Seating = Seating.Seating
+export type SeatingGroup = Seating.Group
 export type Shop = Shop.Shop
 export type ShopGemPack = Shop.GemPack
 export type ShopClassProduct = Shop.ClassProduct
@@ -113,6 +115,7 @@ export type TrafficDensity = Traffic.Density
 export type TrafficRoute = Traffic.Route
 export type Upgrade = Upgrades.Upgrade
 export type UpgradeLevel = Upgrades.Level
+export type Trailer = Trailer.Trailer
 export type Vehicle = Vehicles.Vehicle
 export type WalkPath = WalkPaths.WalkPath
 export type WalkPathRules = WalkPaths.Rules
@@ -145,6 +148,7 @@ return table.freeze({
 	Shift = Shift,
 	Species = Species,
 	Upgrades = Upgrades,
+	Trailer = Trailer,
 	Vehicles = Vehicles,
 
 	-- wave 2 (TASK-047; content-data.md §6). Numbers and texts Provisional (TASK-081, TASK-082); ids empty (Q-167, Q-168)

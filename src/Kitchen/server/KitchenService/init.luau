@@ -71,6 +71,7 @@ const TICK_RATE = 10 -- station timers (architecture.md §18.12)
 const ALTER_PHASE = "Night" -- altered items only exist while the night is being played (ITM-020)
 const ALTER_KINDS: { [string]: boolean } = { rail = true, board = true }
 const HOT_DOG = "hot_dog"
+const COFFEE = "coffee"
 
 -- Package Tool item key -> package row (what a held package restocks).
 const packageByItem: { [string]: Content.Package } = {}
@@ -163,6 +164,8 @@ function KitchenService:Setup()
 	-- Blocked at the last ShiftStarted (ingredient_unlocked)
 	self.WasBlocked = {} :: { [string]: boolean }
 	self.Warned = {} :: { [string]: boolean }
+	-- the machine got its first doses of the run (SeedCoffee)
+	self.CoffeeSeeded = false :: boolean
 	-- Amount of an ingredient changed (ingredient, amount). For services that react to stock (wave 2+).
 	self.StockChanged = self.Libs.Signal.new() :: SignalLib.Signal<string, number>
 	-- Wave 3 (TASK-109). Throw Away removed a Tool: (player, item key, Altered attribute, "Vehicle" | "Street").
@@ -221,6 +224,47 @@ function KitchenService:SetAmount(ingredient: string, amount: number)
 	nextAmounts[ingredient] = value
 	self.Amounts(table.freeze(nextAmounts))
 	self.StockChanged:Fire(ingredient, value)
+end
+
+-- Free package with no hand free (Pickup.take): adds up to `amount` units, never above capacity, on an open
+-- ingredient. Returns the units stocked (0 = closed or already full).
+function KitchenService:StockFree(ingredient: string, amount: number): number
+	if Content.Ingredients.ByKey[ingredient] == nil or self:IsBlocked(ingredient) then
+		return 0
+	end
+	const have, capacity = self:GetStock(ingredient)
+	const moved = math.min(math.floor(amount), capacity - have)
+	if moved <= 0 then
+		return 0
+	end
+	self:SetAmount(ingredient, have + moved)
+	return moved
+end
+
+-- First night of the run (any vehicle) or first swap to a vehicle, whichever comes first: the coffee stock starts with
+-- Content.Sanity.CoffeeStock doses so the player learns the mechanic (user request 2026-10-11, Provisional; the
+-- progression.md "10 doses iniciais"). Once per run; later doses are bought at the Mart (Ground Coffee, 10 doses).
+function KitchenService:SeedCoffee()
+	if self.CoffeeSeeded then
+		return
+	end
+	-- any vehicle: Night 1 can be worked in the cart (no machine there; the doses wait, blocked, for the trailer)
+	const row = Content.Ingredients.ByKey[COFFEE]
+	if row == nil then
+		return
+	end
+	self.CoffeeSeeded = true
+	const have = self.Amounts()[COFFEE] or 0
+	self:SetAmount(COFFEE, math.max(have, math.min(Content.Sanity.CoffeeStock, capacityAt(row, 1))))
+end
+
+-- Dev: sets the coffee doses (clamped to the capacity; on the cart they stay blocked until the trailer).
+function KitchenService:DevSetCoffee(amount: number): number
+	const capacity = self:GetCapacity(COFFEE)
+	const value = math.clamp(wholeNumber(amount, 0, AMOUNT_MAX), 0, math.max(capacity, 0))
+	self.CoffeeSeeded = true
+	self:SetAmount(COFFEE, value)
+	return value
 end
 
 -- Takes n units if all of them are there and the ingredient is open. Synchronous: two callers in the same frame can
@@ -1117,6 +1161,9 @@ KitchenService:OnInit(function(self)
 	-- InteractionService (730) built its handler table in its own OnInit, before this one (650).
 	self:LoadModules()
 	self:RegisterActions()
+	self.Dependencies.ItemService:SetStockSink(function(ingredient: string, amount: number): number
+		return self:StockFree(ingredient, amount)
+	end)
 
 	const runState = self.Dependencies.RunStateService
 	runState:RegisterSnapshot("Stk", function()
@@ -1131,7 +1178,10 @@ KitchenService:OnInit(function(self)
 	end)
 
 	-- Signals exist since RoundService's OnInit (750 > 650)
-	self.Dependencies.RoundService.ShiftStarted:Connect(function()
+	self.Dependencies.RoundService.ShiftStarted:Connect(function(info)
+		if info.IsNight then
+			self:SeedCoffee() -- first night of the run, any vehicle (Provisional, user request 2026-10-11)
+		end
 		self:AnnounceUnlocks()
 	end)
 	-- ITM-020: altered items never outlive the Night phase (NightEnd at 6:00 AM, NightLost, any later phase).
@@ -1167,6 +1217,7 @@ KitchenService:OnStart(function(self)
 	-- VehicleService (620) creates Swapped in its OnInit, after ours (650): connect here. UpgradeService already moved
 	-- to the new vehicle when it fires (§19.5), so Capacity/Blocked and IsCurrent read the new one.
 	self.Dependencies.VehicleService.Swapped:Connect(function(_from: string, _to: string)
+		self:SeedCoffee()
 		self:PushStock()
 		self:RefreshAllPrompts()
 	end)

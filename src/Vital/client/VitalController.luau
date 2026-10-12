@@ -37,6 +37,7 @@
 	  faint         a member's record goes Active -> Down; at that member's character (spatial: crewmates nearby hear it)
 	  revive        a member's record goes back to Active from Down / Reviving / Spectator; at the character
 ]]
+local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -49,6 +50,7 @@ local Vignette = require(StarterPlayer.StarterPlayerScripts.client.Interface.Com
 
 export type LifeState = "Active" | "Down" | "Reviving" | "Spectator" | "Away"
 export type Band = "Day" | "Mid" | "Night"
+export type Gain = { Amount: number, Id: number }
 
 -- Fields of the Vitals record (network.md §13.1).
 -- Smoothed screen values (the pulse and the faint go on top).
@@ -89,6 +91,10 @@ const BANDS = Content.Sanity.Bands
 const COFFEE_SOUND = "coffee_drink"
 const FAINT_SOUND = "faint"
 const REVIVE_SOUND = "revive"
+const STATION_TAG = "Station"
+const MACHINE_KIND = "coffee_machine"
+const MACHINE_LIFT = 1.2 -- studs between the top of the machine and the arrow tip
+const HINT_RETRY = 0.5 -- s between two looks for the machine while it is not in the Workspace yet
 const COFFEE_AFTER_ACTIVE = 1 -- s: a rise this soon after coming back to Active is the revive resend, not coffee
 
 local function approach(current: number, target: number, dt: number): number
@@ -97,7 +103,7 @@ local function approach(current: number, target: number, dt: number): number
 	return current + (target - current) * alpha
 end
 
-const VitalController = Modux.Controller("VitalController", { Require = { "AudioController" }, Priority = 800 })
+const VitalController = Modux.Controller("VitalController", { Require = { "AudioController", "ObjectiveController" }, Priority = 800 })
 
 function VitalController:Setup()
 	self.Sanity = Vide.source(0) :: Vide.Source<number>
@@ -109,6 +115,12 @@ function VitalController:Setup()
 	self.Dark = Vide.source(false) :: Vide.Source<boolean>
 	self.Vignette = Vide.source(0) :: Vide.Source<number>
 	self.Blackout = Vide.source(0) :: Vide.Source<number>
+	-- Night 1 coffee lesson (server cue SanityCue): the HUD ring is on while true; the last coffee gain (new table per gain)
+	self.CoffeeHint = Vide.source(false) :: Vide.Source<boolean>
+	self.CoffeeGain = Vide.source(nil :: Gain?) :: Vide.Source<Gain?>
+	self.GainId = 0 :: number
+	self.HintUntil = 0 :: number -- server time the emphasis ends
+	self.HintMachine = nil :: Instance? -- coffee machine marked by this emphasis
 
 	self.DarkTickAt = NO_TICK :: number
 	self.FaintAt = nil :: number?
@@ -171,6 +183,68 @@ function VitalController:ApplySanity(value: number, max: number)
 		self.Max(max)
 		self.Band(self:BandOf(value, max))
 	end)
+end
+
+-- Coffee lesson (Night 1) ----------------------------------------------------------------------------------------------
+
+-- Coffee machine Model of the vehicle in use (tag Station, StationKind coffee_machine); nil while not streamed in
+function VitalController:FindCoffeeMachine(): Instance?
+	for _, station in CollectionService:GetTagged(STATION_TAG) do
+		if station:GetAttribute("StationKind") == MACHINE_KIND and station:IsDescendantOf(workspace) then
+			return station
+		end
+	end
+	return nil
+end
+
+-- Server cue: emphasis on until `untilT` (server time) or an End / the first coffee. Arrow + Highlight on the machine.
+function VitalController:BeginHint(untilT: number)
+	self.HintUntil = untilT
+	if Vide.untrack(self.CoffeeHint) then
+		return
+	end
+	self.CoffeeHint(true)
+	task.spawn(function()
+		while Vide.untrack(self.CoffeeHint) do
+			const objective = self.Dependencies.ObjectiveController
+			if workspace:GetServerTimeNow() >= self.HintUntil then
+				self:EndHint()
+				return
+			end
+			if self.HintMachine == nil then
+				const machine = self:FindCoffeeMachine()
+				if machine ~= nil then
+					self.HintMachine = machine
+					objective:Mark(machine, MACHINE_LIFT)
+				end
+			end
+			task.wait(HINT_RETRY)
+		end
+	end)
+end
+
+function VitalController:EndHint()
+	if Vide.untrack(self.CoffeeHint) then
+		self.CoffeeHint(false)
+	end
+	const machine = self.HintMachine
+	self.HintMachine = nil
+	-- only takes down our own mark (the objective of another system stays)
+	if machine ~= nil and self.Dependencies.ObjectiveController.Beacon.Marked() == machine then
+		self.Dependencies.ObjectiveController:Clear()
+	end
+end
+
+function VitalController:ApplyCue(kind: string, amount: number, untilT: number)
+	if kind == "Hint" then
+		self:BeginHint(untilT)
+	elseif kind == "Gain" then
+		self.GainId += 1
+		self.CoffeeGain({ Amount = amount, Id = self.GainId })
+		self:EndHint()
+	else
+		self:EndHint()
+	end
 end
 
 function VitalController:ApplyMember(userId: number, record: Member)
@@ -401,6 +475,10 @@ VitalController:OnInit(function(self)
 
 	net.Sanity:onClient(function(data)
 		self:ApplySanity(data.Value, data.Max)
+	end)
+
+	net.SanityCue:onClient(function(cue)
+		self:ApplyCue(cue.Kind, cue.Amount, cue.Until)
 	end)
 
 	net.Vitals:onAdded(function(id, record)
