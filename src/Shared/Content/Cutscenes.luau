@@ -313,11 +313,12 @@ const scenes = Table.new({
 		Beats = {},
 	},
 	-- Opening, ~35 s (FEAT-004; owner D3 2026-10-12 rev. 2, PROVISIONAL: short and objective; was 44 s, before 73 s).
-	-- It starts on the NORTH sidewalk of the Ninth, across from the trailer's Pad (MapPoints CutsceneMark1..4;
+	-- It starts on the NORTH sidewalk of the Ninth, straight across from the trailer (MapPoints CutsceneMark1..4;
 	-- tools/assetplace/cutscene_points.luau), walks east to the crosswalk CW-4 (CS-1, the nearest one to the flyer and the
 	-- widest: 12 studs), CROSSES the empty street on its stripes (CS-1 -> CS-3; traffic is held for the whole scene and no
-	-- car or passer-by is in it) and arrives at the P-01 post with the Help Wanted flyer (it stands on the trailer's side
-	-- of the Ninth, at the south end of CW-4), reads it, calls Walt and ends looking at the trailer (MapPoint TRL).
+	-- car or passer-by is in it), then walks west along the trailer's side of the Ninth to the stand in front of the Help
+	-- Wanted flyer (rev. 3: the owner moved it to X -36, its printed face looks east; Rules.Stand reads the live flyer),
+	-- reads it, calls Walt and ends looking at the trailer (MapPoint TRL).
 	-- Lines are short (<= 6 words; Walt on the phone: 3 lines). The call is ~12 s of voice + pauses, so the scene cannot
 	-- be much shorter than 35 s: Cap 38 = Duration + 3. Starts once every participant's client is ready
 	-- (Rules.ReadyTimeout), so the Intro phase cap (Shift.luau) covers that wait + Cap.
@@ -401,8 +402,8 @@ const scenes = Table.new({
 			{ At = 0, Kind = "Fade", Target = "In" },
 			{ At = 0.6, Kind = "Text", Target = "Title", Text = "Sell Hotdogs!", Sub = "Ninth & Juniper", Hold = 3.2 },
 			-- Beat 1, the walk: one run from CutsceneMark (north sidewalk, across from the trailer) east to CS-1 (curb, in line
-			-- with the crosswalk), straight across the stripes (CS-2, then a bend east) to CS-3 (their south end, east of the P-01 pole) and
-			-- to the stand in front of the P-01 flyer (Rules.Stand), eased to a stop by 14 s
+			-- with the crosswalk), straight across the stripes (CS-2) to CS-3 (their south end) and west to the stand in front
+			-- of the P-01 flyer (Rules.Stand), ~74 studs, eased to a stop by 14 s
 			focus(3.8, "Walk"),
 			{ At = 3.8, Kind = "MoveTo", Target = "CS-1" },
 			{ At = 3.9, Kind = "MoveTo", Target = "CS-2" },

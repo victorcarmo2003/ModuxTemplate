@@ -322,16 +322,17 @@ local POINTS = {
 	{ id = "JN-OUT", x = 6, z = -140, floor = 0, face = NORTH },
 	{ id = "JS-IN", x = 6, z = 116, floor = 0, face = NORTH },
 	{ id = "JS-OUT", x = -6, z = 116, floor = 0, face = SOUTH },
-	-- opening cutscene (owner decision D3 2026-10-12; keep in step with tools/assetplace/cutscene_points.luau, world
-	-- coordinates there): it walks along the Ninth's south sidewalk in front of the trailer's Pad, from the planter at its
-	-- right end to the P-01 flyer, facing MAP west (world +X). Marks = 2 x 2 around CS-1, rows 4 apart.
-	{ id = "CutsceneMark1", x = 68, z = 22.887, floor = 0.4, face = WEST },
-	{ id = "CutsceneMark2", x = 68, z = 26.887, floor = 0.4, face = WEST },
-	{ id = "CutsceneMark3", x = 71, z = 22.887, floor = 0.4, face = WEST },
-	{ id = "CutsceneMark4", x = 71, z = 26.887, floor = 0.4, face = WEST },
-	{ id = "CS-1", x = 68, z = 24.887, floor = 0.4, face = WEST },
-	{ id = "CS-2", x = 42, z = 24.887, floor = 0.4, face = WEST },
-	{ id = "CS-3", x = 24, z = 24.887, floor = 0.4, face = WEST }, -- the only waypoint, before the stand at the flyer
+	-- opening cutscene (owner decision D3 rev. 3 2026-10-12; keep in step with tools/assetplace/cutscene_points.luau, world
+	-- coordinates there: MAP x = -world X, MAP z = 67.887 - world Z (the place is turned 180 degrees)): starts on the north sidewalk of the Ninth straight across
+	-- from the trailer, walks east to the crosswalk CW-4, crosses it and walks west to the P-01 flyer (world (-36.1, 50.08),
+	-- printed face +X). Marks face MAP west (world +X); CS-* face MAP south (world -Z).
+	{ id = "CutsceneMark1", x = 43, z = -25.613, floor = 0.4, face = WEST },
+	{ id = "CutsceneMark2", x = 43, z = -22.613, floor = 0.4, face = WEST },
+	{ id = "CutsceneMark3", x = 46, z = -25.613, floor = 0.4, face = WEST },
+	{ id = "CutsceneMark4", x = 46, z = -22.613, floor = 0.4, face = WEST },
+	{ id = "CS-1", x = 19, z = -22.113, floor = 0.4, face = SOUTH },
+	{ id = "CS-2", x = 19, z = 1.887, floor = 0.25, face = SOUTH },
+	{ id = "CS-3", x = 19, z = 14.387, floor = 0.3, face = SOUTH }, -- south end of CW-4; the stand is 14 studs west
 	{ id = "CS-4", x = -18, z = 22, floor = 0.4, face = SOUTH }, -- SW corner after CW-2
 	{ id = "CS-5", x = 0, z = 38, floor = 0, face = EAST }, -- middle of CW-1
 	-- proposal (MAP-01 P46): curb marks so every MoveTo segment stays on the sidewalk or inside the stripes

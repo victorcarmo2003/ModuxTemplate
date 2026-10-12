@@ -116,3 +116,21 @@ Constantes que um rebuild precisa: `trailer_ground.DROP = 2,08` e `trailer_only_
 Pedido do dono: segundo interruptor no trailer, no estilo do da luz, em outra cor. `trailer_open_switch.luau` (idempotente, `run("trailer_open_switch", "undo")`): clona o `TRL-SWITCH` (AST-039 LightSwitch) como `TRL-SWITCH-OPEN` (MapId, Persistent), 5,1 studs ao longo da parede para +X (depois do botao amarelo `TRL-SHUTTER`, que fica a 2,6). Anchor `Prompt_Open` na `Box` (`Interactable`, `PromptAction = open_sign`). Cores: a `Lever` vira cor solida (`TextureID` vazio + `Color`, porque `MeshPart.Color` nao tem efeito com `TextureID`; o MeshId nao e tocado): **VERMELHO** (235,70,60) no da loja, **AZUL** (70,130,245) no da luz (`OrigColor` / `OrigTexture` guardam o original). O `TRL-OPEN` (painel da janela) sai do trailer para `ServerStorage.Trailer_Backup_20261012` com a tag `Interactable` removida; o painel (`Shutter_Panel`) continua descendo/subindo sozinho (client).
 
 Codigo: `RoundService` (`Paused` no set `Shift`, `SetPaused`, texto Open Shop / Close Shop, cooldown 1 s), `CustomerService:IsPaused` (para spawn, garantia, adocao, anomalia), `RoundController.Paused`, `OpenSignController` (neon CLOSED) e `VehicleController.WantClosed` (aba desce), `SwitchLeverController` (alavanca dos dois interruptores vira para cima/baixo), `Steps.luau` (passo `open` antes do cliente), dev `/dev closed [on|off]`.
+
+## Rota da intro para o cartaz movido (2026-10-12, `cutscene_points.luau`, Provisorio)
+
+O dono moveu `MAP01_Blockout.Signs.P-01_Flyer` para (-36,11, 4,61, 50,08), LookVector +X (SurfaceGui Front: a face impressa olha para leste). Snippet idempotente `assetplace/cutscene_points` (marca `CutsceneIntroD3c`), rodado em Edit: move so MapPoints existentes de `MapBinding.Points`. Desfazer: Ctrl+Z ("cutscene_points: before/after") ou voltar os valores antigos em `TARGET` (marcas (-33/-36, 93,5/90,5), CS-1 (-21, 90), CS-2 (-21, 66), CS-3 (-15,5, 53,5)) e rodar de novo.
+
+| Ponto | Antes | Depois |
+|---|---|---|
+| CutsceneMark1..4 (+X) | (-33/-36, 93,5/90,5) | (-43/-46, 93,5/90,5), de frente para o trailer (X -44,9) |
+| CS-1 / CS-2 / CS-3 (-Z) | (-21, 90) / (-21, 66) / (-15,5, 53,5) | (-19, 90) / (-19, 66) / (-19, 53,5) |
+| Stand (calculado do cartaz ao vivo) | (-15,1, 48,1) | (-33,1, 50,1), olhando para oeste |
+
+Faixa: CW-4 continua a mais proxima (listras X -24..-12; CW-3 fica em X -60..-54, 6 de largura, a 21 studs do stand). Depois da faixa a rota segue 14 studs para oeste ate o cartaz. Validado por Spherecast (raio 1, alturas 2,2 e 4,5) nos 4 corpos: sem colisor. `bind_map01.luau` (POINTS, coordenadas MAP) acompanha; so vale no proximo Bind.run.
+
+## Semaforos funcionais (2026-10-12, feitos a mao no Studio; NAO estao nos placements)
+
+`workspace.MAP01_Assets.TrafficLights` (criado pelo dono / outro agente direto no Studio): 4 modelos `Signal_WB` (x 16,5; z 50..58), `Signal_EB` (x -11; z 77..86), `Signal_NB` (x -11..-2; z 50), `Signal_SB` (x 1..11; z 85,5), cada um com 3 `SignalHead` (tag `TrafficSignal`, atributo `Axis` = EW | NS) e 2 `PedSignal` (tag `PedSignal`, `Axis`). Lentes: Parts separadas `Red` / `Yellow` / `Green` (head) e `Walk` / `Hand` (ped), Neon quando acesas.
+Logica: `TrafficLightCycle` (Script, `RunContext = Client`, dentro da pasta) com `workspace:GetServerTimeNow()`; `GREEN_TIME` 10, `YELLOW_TIME` 3, `ALL_RED_TIME` 1,5, `PED_FLASH_TIME` 4, `OFF_DIM` 0,18 (tabela `PHASES` no topo). Acende = Neon + `OnColor`; apaga = SmoothPlastic + cor x 0,18. Pedestre e visual (nada no servidor le isso).
+**Risco**: `Place.run` reconstroi `MAP01_Assets` e apaga esta pasta (junto com o script). Antes de qualquer `Place.run`, salvar o place e exportar `TrafficLights` (ou capturar nos placements). Nao ha snippet de rebuild ainda.
