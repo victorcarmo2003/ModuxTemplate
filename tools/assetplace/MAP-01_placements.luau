@@ -1044,8 +1044,8 @@ return {
 	-- 2026-10-12: the 4 TRAILER picnic tables (FEAT-037, UPG-011): the owner put them by hand in Studio (loose in the Workspace root,
 	-- SeatTable / TableGroup "Trailer" / TableIndex 6..9). Recorded here so a Place.run recreates them; the tag, TableIndex and the
 	-- Seat1..4 parts are NOT in the placement: run tools/assetplace/trailer_tables.luau after bind_map01 (see tools/assetplace/STUDIO_LAYER.md).
-	{ asset = "AST-100_PicnicTable", x = 61.3, y = 0.02, z = -44.3, rotY = 0, group = "TrailerTables", id = "TTBL-6", replaces = {  }, note = "owner 2026-10-12: trailer table TableIndex 6 (world -61.3, 112.2)" },
-	{ asset = "AST-100_PicnicTable", x = 61.3, y = 0.02, z = -37, rotY = 0, group = "TrailerTables", id = "TTBL-7", replaces = {  }, note = "owner 2026-10-12: trailer table TableIndex 7 (world -61.3, 104.9)" },
-	{ asset = "AST-100_PicnicTable", x = 87.6, y = 0.02, z = -45.4, rotY = 0, group = "TrailerTables", id = "TTBL-8", replaces = {  }, note = "owner 2026-10-12: trailer table TableIndex 8 (world -87.6, 113.3)" },
-	{ asset = "AST-100_PicnicTable", x = 87.6, y = 0.02, z = -38.1, rotY = 0, group = "TrailerTables", id = "TTBL-9", replaces = {  }, note = "owner 2026-10-12: trailer table TableIndex 9 (world -87.6, 106.0)" },
+	{ asset = "AST-100_PicnicTable", x = 47.9, y = 0.4, z = 54.587, rotY = 0, group = "TrailerTables", id = "TTBL-6", replaces = {  }, note = "owner 2026-10-12: trailer table TableIndex 6 moved to the Pad (same spot as Pad table 1, world -47.9, 13.3; they vanish when the trailer arrives)" },
+	{ asset = "AST-100_PicnicTable", x = 56.5, y = 0.4, z = 54.587, rotY = 0, group = "TrailerTables", id = "TTBL-7", replaces = {  }, note = "owner 2026-10-12: trailer table TableIndex 7 moved to the Pad (same spot as Pad table 2, world -56.5, 13.3; they vanish when the trailer arrives)" },
+	{ asset = "AST-100_PicnicTable", x = 38.9, y = 0.4, z = 54.587, rotY = 0, group = "TrailerTables", id = "TTBL-8", replaces = {  }, note = "owner 2026-10-12: trailer table TableIndex 8 moved to the Pad (same spot as Pad table 3, world -38.9, 13.3; they vanish when the trailer arrives)" },
+	{ asset = "AST-100_PicnicTable", x = 29.6, y = 0.4, z = 54.587, rotY = 0, group = "TrailerTables", id = "TTBL-9", replaces = {  }, note = "owner 2026-10-12: trailer table TableIndex 9 moved to the Pad (same spot as Pad table 4, world -29.6, 13.3; they vanish when the trailer arrives)" },
 }
