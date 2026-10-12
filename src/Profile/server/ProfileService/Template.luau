@@ -35,8 +35,8 @@ export type Data = {
 	Receipts: { string },
 	RunRewards: RunRewards,
 	Stats: Stats,
-	-- First-hot-dog tutorial finished or skipped (user request 2026-10-11, Provisional). Reconcile adds it as false to
-	-- older profiles, so no migration.
+	-- Legacy, unused (tutorial: Day 1 of every run, in memory; user request 2026-10-11, Provisional). Kept so saved
+	-- profiles and the Profile packet keep their shape; Reconcile adds false to older profiles, so no migration.
 	TutorialDone: boolean,
 	-- Codes redeemed by this account: normalized code -> os.time() of the redeem (CodesService; user request
 	-- 2026-10-11, Provisional, data.md §1.7). Reconcile adds it as {} to older profiles, so no migration.
@@ -76,7 +76,8 @@ const Template: Data = {
 		Revives = 0, -- times revived (monetization telemetry)
 	},
 
-	-- Onboarding: the first-hot-dog tutorial ran to the end or was skipped (TutorialService)
+	-- Legacy (2026-10-11, Provisional): no longer read or written. The tutorial runs on Day 1 of every run and is kept in
+	-- memory by TutorialService; the field stays so saved data and the Profile packet keep their shape
 	TutorialDone = false,
 
 	-- Codes: one redeem per code per account (CodesService, data.md §1.7)

@@ -81,6 +81,21 @@ export type Record = { Scene: string, StartedAt: number, Votes: number, Needed: 
 -- HudBanner.Shown, local so the generated type file needs no component require
 type Shown = { Title: string, Line: string } | false
 
+-- A subtitle line following its voice: Pending (waiting for the voice to start, or to miss) -> Voice (the voice
+-- speaks) -> Tail, or Pending -> Text (no voice: reading time)
+type Caption = {
+	Beat: Beat,
+	State: string,
+	Started: boolean, -- Speech OnStart
+	Ended: boolean, -- Speech OnEnd
+	Missed: boolean, -- Speech OnMiss (no voice for it)
+	Silent: boolean, -- catch-up line: text only, no balloon
+	Cancel: (() -> ())?,
+	ActiveAt: number, -- os.clock it became the current caption
+	ShownElapsed: number, -- segment time it went on screen
+	TailUntil: number,
+}
+
 -- Vide 0.4.1 types `create` for 19 classes only; UIScale is not among them.
 const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }) -> Instance
 
@@ -97,7 +112,13 @@ const HOLD_TIME = 0.6 -- s of hold for a skip vote ("Hold to skip", ui-text.md Â
 const FADE_TIME = 1 -- s of each Fade beat
 const END_FADE = 0.8 -- s back to clear when the chain ends
 const END_HOLD = 0.35 -- s the screen holds its fade before that (bodies land at their spawn under the black)
-const LINE_HOLD = 3.5 -- s a line stays without a next one
+const LINE_HOLD = 3.5 -- s a line without a voice stays without a next one
+-- subtitles follow the voice (playtest 2026-10-11: the text ran ahead of it)
+const CAPTION_TAIL = 0.4 -- s the text stays after its voice ended
+const CAPTION_TEXT_MIN = 1.2 -- s a text-only line stays at least
+const CAPTION_LOAD_LATE = 1.5 -- s past its At a line whose voice is still loading goes on as text only
+const CAPTION_VERY_LATE = 3 -- s past its At a line whose voice did not start within CAPTION_VOICE_WAIT does too
+const CAPTION_VOICE_WAIT = 1.5 -- s a loaded line has to start its voice once it is the current one
 const TITLE_HOLD = 3 -- s of a title
 const PROMPT_TIME = 1.2 -- s the "Call" prompt takes to fill by itself
 const BALLOON_TIME = 2.5 -- s of a crew balloon over a mate
@@ -165,6 +186,9 @@ function CutsceneController:Setup()
 	self.Music = nil :: string?
 	self.Walker = nil :: Walker.Walker?
 	self.Speech = nil :: Speech.Speech?
+	-- subtitle lines fired and waiting their turn, and the one on screen (or waiting for its voice)
+	self.Captions = {} :: { Caption }
+	self.Caption = nil :: Caption?
 	self.Windows = nil :: { BasePart }?
 	-- chain
 	self.Playing = false :: boolean
@@ -483,6 +507,8 @@ function CutsceneController:ClearSegment()
 	if speech ~= nil then
 		speech.Stop()
 	end
+	table.clear(self.Captions)
+	self.Caption = nil
 	const music = self.Music
 	self.Music = nil
 	if music ~= nil then
@@ -691,17 +717,144 @@ function CutsceneController:FireBeat(beat: Beat, live: boolean)
 			return
 		end
 		self.Actors[beat.Target] = { Actor = actor, At = beat.At }
-	elseif beat.Kind == "Line" and live then
-		const speech = self.Speech
-		if speech ~= nil then
-			speech.Say(beat)
-		end
-		if beat.Speaker == "crew" then
-			self:CrewBalloons(beat.Text or "")
-		end
+	elseif beat.Kind == "Line" then
+		self:QueueCaption(beat, live)
 	elseif beat.Kind == "Prompt" and live then
 		self:PlacePrompt(beat.Target)
 	end
+end
+
+-- A fired Line beat joins the subtitle queue and asks the voice for its turn (live beats only; a catch-up line is shown
+-- as text if it is still fresh). The text goes on screen when its voice STARTS (StepCaptions), not at the beat's At.
+function CutsceneController:QueueCaption(beat: Beat, live: boolean)
+	const caption: Caption = {
+		Beat = beat,
+		State = "Pending",
+		Started = false,
+		Ended = false,
+		Missed = false,
+		Silent = not live,
+		Cancel = nil,
+		ActiveAt = 0,
+		ShownElapsed = 0,
+		TailUntil = 0,
+	}
+	if not live then
+		if Workspace:GetServerTimeNow() - self.StartedAt - beat.At > LINE_HOLD then
+			return
+		end
+		caption.Missed = true
+		table.insert(self.Captions, caption)
+		return
+	end
+	table.insert(self.Captions, caption)
+	const speech = self.Speech
+	if speech == nil then
+		caption.Missed = true
+		return
+	end
+	-- handlers may fire inside Say (no voice at all): the caption is already queued
+	caption.Cancel = speech.Say(beat, {
+		OnStart = function()
+			caption.Started = true
+		end,
+		OnEnd = function()
+			caption.Ended = true
+		end,
+		OnMiss = function()
+			caption.Missed = true
+		end,
+	})
+end
+
+-- The line on screen now (nil = none). One caption at a time, in order: it appears when its voice starts, stays until
+-- the voice ended (+ CAPTION_TAIL); a line without a voice (off, failed, late, still loading) is read for LINE_HOLD s
+-- like before. A voice that is late makes the text wait, never the opposite.
+function CutsceneController:StepCaptions(elapsed: number): Beat?
+	const now = os.clock()
+	const queue = self.Captions
+	const speech = self.Speech
+	local current = self.Caption
+
+	local function show(caption: Caption, state: string)
+		caption.State = state
+		caption.ShownElapsed = elapsed
+		if not caption.Silent and caption.Beat.Speaker == "crew" then
+			self:CrewBalloons(caption.Beat.Text or "")
+		end
+	end
+
+	for _ = 1, 16 do
+		if current == nil then
+			const head = table.remove(queue, 1)
+			if head == nil then
+				self.Caption = nil
+				return nil
+			end
+			head.ActiveAt = now
+			current = head
+			self.Caption = head
+		end
+		const caption = current :: Caption
+		if caption.State == "Pending" then
+			if caption.Started or caption.Ended then
+				show(caption, "Voice")
+			elseif caption.Missed then
+				show(caption, "Text")
+			else
+				const late = elapsed - caption.Beat.At
+				const status = if speech ~= nil then speech.Peek(caption.Beat) else "Off"
+				const loading = status == nil or status == "Queued" or status == "Loading"
+				if
+					status == "Off"
+					or status == "Failed"
+					or (loading and late > CAPTION_LOAD_LATE)
+					or (late > CAPTION_VERY_LATE and now - caption.ActiveAt > CAPTION_VOICE_WAIT)
+				then
+					-- no voice is coming in time: this line is text only, and its voice (if it comes) is dropped
+					caption.Missed = true
+					if caption.Cancel ~= nil then
+						caption.Cancel()
+					end
+					show(caption, "Text")
+				else
+					return nil
+				end
+			end
+		end
+		if caption.State == "Voice" then
+			if caption.Ended then
+				caption.State = "Tail"
+				caption.TailUntil = now + CAPTION_TAIL
+			else
+				return caption.Beat
+			end
+		end
+		if caption.State == "Tail" then
+			if now >= caption.TailUntil then
+				current = nil
+				self.Caption = nil
+			else
+				return caption.Beat
+			end
+		elseif caption.State == "Text" then
+			const shown = elapsed - caption.ShownElapsed
+			local over = shown >= LINE_HOLD
+			if not over and shown >= CAPTION_TEXT_MIN then
+				const following = queue[1]
+				if following ~= nil then
+					over = following.Started or (following.Missed and following.Beat.At <= elapsed)
+				end
+			end
+			if over then
+				current = nil
+				self.Caption = nil
+			else
+				return caption.Beat
+			end
+		end
+	end
+	return nil
 end
 
 -- "crew" lines: a balloon over each mate (each client sees the others, not itself, DEC-088)
@@ -812,7 +965,7 @@ function CutsceneController:Step()
 		entry.Actor.Update(elapsed - entry.At, last - entry.At)
 	end
 
-	const line = Timeline.Line(self.Beats, elapsed, LINE_HOLD)
+	const line = self:StepCaptions(elapsed)
 	const title = Timeline.Title(self.Beats, elapsed, TITLE_HOLD, scene.Duration)
 	const prompt = Timeline.Prompt(self.Beats, elapsed, PROMPT_TIME)
 	-- the prompt "completes" when its fill ends (crossed live only)

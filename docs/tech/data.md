@@ -92,7 +92,8 @@ return {
 		Revives = 0,           -- vezes que foi revivido (telemetria de monetização)
 	},
 
-	-- Onboarding (Provisório, pedido do usuário 2026-10-11): tutorial do 1º cachorro-quente concluído ou pulado
+	-- Legado (Provisório, 2026-10-11; Q-193): não é mais lido nem escrito. O tutorial roda no dia 1 de toda run e fica em
+	-- memória do TutorialService; o campo permanece para não quebrar dados salvos nem o packet Profile
 	TutorialDone = false,
 
 	-- Códigos resgatados (Provisório, pedido do usuário 2026-10-11; §1.7): código normalizado → os.time() do resgate
@@ -104,7 +105,7 @@ Notas:
 - Chaves de conteúdo = `Key` da tabela (`class_dog`, `class_cat`…, DEC-186; `content-data.md` §3.10). Nunca índice.
 - O animal **é** a classe (DEC-147): o perfil não guarda espécie separada; `Content.Classes[k].Species` resolve.
 - `Profile` (packet) manda ao client só `Gems`, `Classes`, `Selected` e `TutorialDone` (`network.md` §4.5).
-- `TutorialDone` (Provisório, 2026-10-11) entrou sem migração: `Reconcile` acrescenta `false` aos perfis antigos.
+- `TutorialDone` (legado, Provisório, 2026-10-11, Q-193): sem uso desde que o tutorial passou a rodar sempre no dia 1 (estado só em memória, por run). Fica no schema e no packet por compatibilidade; `Reconcile` acrescenta `false` aos perfis antigos, sem migração. Pode sair do schema numa limpeza futura (aí exige migração que ignore o campo).
 - O perfil é reativo **por campo de topo** (`Atomic.Table`): campo aninhado (`Classes`, `RunRewards`, `Stats`,
   `Receipts`) muda **por cópia** (`profile.Classes(withKey(profile.Classes(), key))`). Mutar no lugar não dispara o
   `effect` e não persiste.
@@ -126,7 +127,7 @@ Notas:
 | `Gems` (crédito de pacote), `Classes` (classe por Robux) | `ShopService` | L+R | recibo de Developer Product (§1.7) | no mesmo `Update` do `PurchaseId` + `SaveConfirmed` |
 | `Gems`, `Classes`, `RedeemedCodes` | `CodesService` | L+R | código resgatado (§1.7) | `RequestSave` |
 | `Stats` | `RewardService`, `ReviveService` | R | eventos | `RequestSave` |
-| `TutorialDone` | `TutorialService` (packet `TutorialComplete`, Provisório) | R | fim ou skip do tutorial | `RequestSave` |
+| `TutorialDone` | ninguém (legado; Q-193) | — | — | — |
 
 Custo de escrita: ≤ 4 eventos por turno por jogador → muito abaixo de 60 + 40 × jogadores escritas/min por servidor.
 Limite por chave hoje é 4 MB/min (sem o antigo cooldown de 6 s).

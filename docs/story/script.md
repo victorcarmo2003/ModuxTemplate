@@ -83,6 +83,8 @@ Ordem da run (cenário L, DEC-057): dias 1–5 → noite 1 → dia 6 → noite 2
 
 ## 3. Tutorial do dia 1 (Walt na linha)
 
+Provisório (Q-193, 2026-10-11): o tutorial roda **sempre no dia 1 de toda run**, para todos, e **não é salvo** como concluído nem obrigatório (Skip vale só para a run). Passou do dia 1, não volta na mesma run.
+
 O dia 1 começa com o telefone do carrinho tocando (plano 10 do §1). Isso ensina o prompt **"Answer"** logo de cara.
 Walt atende e **fica na linha em viva-voz** durante o dia 1: cada dica sai pelo alto-falante do telefone, uma vez, quando a party chega àquele passo pela primeira vez. Sem painel, sem botão: a ação é sempre o prompt no mundo (DEC-015, DEC-066).
 

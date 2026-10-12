@@ -14,7 +14,7 @@
 --   RunOver        never rung (no call in NightLost/RunEnd): the run end screen quotes its lines (Provisional)
 --   Hint           first time Trigger.Action is performed in the run (InteractionService.Performed)
 --   Tutorial       first-hot-dog tutorial call (user request 2026-10-11, Provisional): rings in a day Prep/Open while a
---                  player of the server still has TutorialDone = false; on Day 1 it replaces the DayPrep call. Never
+--                  player of the server has the tutorial pending (Day 1 of the run, TutorialService:AnyPending); on Day 1 it replaces the DayPrep call. Never
 --                  answers itself and is held open until no player has the tutorial pending, then stays
 --                  Rules.Tutorial.Goodbye s more (Walt's goodbye) and hangs up. The tutorial player's client voices
 --                  the step lines (TutorialController, Steps.luau); Lines are what everyone else hears.

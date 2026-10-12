@@ -32,17 +32,17 @@ return Lync.define("game", {
 		Gems = Lync.int(0, 2147483647),
 		Classes = Lync.bitfield(Content.Classes.Keys), -- unlocked classes
 		Selected = Lync.enum(Content.Classes.Keys),
-		-- first-hot-dog tutorial done or skipped (data.md §1.1 TutorialDone; user request 2026-10-11, Provisional)
+		-- Legacy (data.md §1.1): no longer read by anyone, the tutorial runs on Day 1 of every run (Provisional, 2026-10-11)
 		TutorialDone = Lync.bool(),
 	})),
 
 	-- c -> s, at most once per session (Provisional, user request 2026-10-11). Responder: TutorialService. The
-	-- first-hot-dog tutorial ended (finished or skipped) on this client: the profile flag goes true. Cosmetic only
-	-- (no money, item or stat rides on it), so the client is trusted to say it.
+	-- first-hot-dog tutorial ended (finished or skipped) on this client: closed for this run in server memory (nothing
+	-- is saved). Cosmetic only (no money, item or stat rides on it), so the client is trusted to say it.
 	TutorialComplete = Lync.packet(Lync.empty()),
 	-- c -> s (Provisional, user request 2026-10-11). Responder: TutorialService. The rookie answered Walt's tutorial
 	-- call (or it never came): the server spawns the tutorial customer (CustomerService:RequestTutorial) when this
-	-- player still has TutorialDone = false. Idempotent while one is around.
+	-- player has the tutorial pending (Day 1 of the run, not finished or skipped). Idempotent while one is around.
 	TutorialBegin = Lync.packet(Lync.empty()),
 	-- s -> owner, dev mode only (Studio Run place; user request 2026-10-11, Provisional). Writer: TutorialService
 	-- (DevSend, from the DevService chat commands tutorial / voice / tutdebug). Responder: TutorialController (OnInit).

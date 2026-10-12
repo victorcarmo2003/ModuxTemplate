@@ -13,7 +13,7 @@
 	  Assets   LoadQueue (the one audio queue, small batches) of the intro sounds (music cue, phone, horns, car, prompt, skip, day
 	           ambience) and the UI images (Icons.Ids)
 	  Voices   Run place only: every text-to-speech line of the intro (CutsceneController:PreloadVoices; the queue
-	           there loads one line at a time with retry, see Speech.luau), then, for a rookie (TutorialDone = false),
+	           there loads one line at a time with retry, see Speech.luau), then, on Day 1 of the run (the tutorial),
 	           Walt's tutorial call lines (TutorialController:PreloadVoices, user request 2026-10-11): what does not
 	           load in TUTORIAL_VOICE_TIMEOUT keeps loading in the background during the intro
 	Every step has its own timeout and the whole gate STEP_CAP; a step that fails or times out never blocks the join.

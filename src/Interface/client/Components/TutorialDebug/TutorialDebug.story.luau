@@ -12,7 +12,7 @@ type Controls = {
 }
 
 const SAMPLE = table.concat({
-	"first run  true (profile ready, TutorialDone false)",
+	"first run  true (profile ready, day 1)",
 	"running    true  phase Prep  cinematic false",
 	"step       grill (3/13)  forced -",
 	"call       talking  boss Talking call_tutorial",

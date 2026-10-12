@@ -83,11 +83,21 @@ export type Speech = {
 	Length: (line: Beat) -> number?,
 	-- yields; progress(fraction 0..1) while it waits
 	Preload: (lines: { Beat }, timeout: number, progress: ((number) -> ())?) -> (),
-	Say: (line: Beat) -> (),
+	-- Plays a line when its turn comes. handlers.OnStart(line) = the first piece really plays, OnEnd(line) = the last
+	-- piece (and its pauses) ended, OnMiss(line) = the line will not be voiced (off / failed / late / cut by a failure).
+	-- Exactly one of OnStart or OnMiss fires (OnEnd follows OnStart), unless Stop / Destroy cut it (nothing fires).
+	-- Returns cancel(): drops the line if it has not started yet (no handler fires).
+	Say: (line: Beat, handlers: Handlers?) -> () -> (),
 	-- a line is speaking or waiting its turn (lines never cut each other: they queue)
 	Busy: () -> boolean,
 	Stop: () -> (),
 	Destroy: () -> (),
+}
+
+export type Handlers = {
+	OnStart: ((line: Beat) -> ())?,
+	OnEnd: ((line: Beat) -> ())?,
+	OnMiss: ((line: Beat) -> ())?,
 }
 
 -- One sentence of a line to speak, and the pause after it
@@ -106,10 +116,20 @@ type Piece = {
 	BadVoice: boolean, -- failed because its VoiceId is bad (re-queued when a good voice appears)
 }
 
+-- One Say of a line: its handlers and where it stands
+type Job = {
+	Entry: Entry,
+	Line: Beat,
+	Handlers: Handlers?,
+	Cancelled: boolean,
+	Done: boolean, -- a handler of start / miss already fired
+}
+
 type Entry = {
 	Speaker: string,
 	Pieces: { Piece },
 	Wanted: number?, -- os.clock when Say asked for it before the load finished
+	WantedJob: Job?, -- that Say
 	FailedAt: number, -- os.clock of the last failure (Fetch tries it again RETRY_AFTER s later)
 	Reason: string, -- last load problem ("" = none)
 }
@@ -244,16 +264,58 @@ function Speech.new(volume: () -> number): Speech
 	local giveUps = 0 -- GIVE_UP pauses in a row (no success between)
 	local playing: AudioTextToSpeech? = nil
 	local token = 0 -- the chain of pieces playing (Stop bumps it)
-	const spoken: { Entry } = {} -- lines waiting for the one speaking to end
+	const spoken: { Job } = {} -- lines waiting for the one speaking to end
 	local speaking = false -- a chain is running (playing or waiting its turn)
 
 	local folder: Instance? = nil
 	local fader: AudioFader? = nil
 
+	-- A handler of a Say (never throws into the chain)
+	local function notify(job: Job, which: string)
+		const handlers = job.Handlers
+		if handlers == nil then
+			return
+		end
+		const callback = if which == "Start"
+			then handlers.OnStart
+			elseif which == "End" then handlers.OnEnd
+			else handlers.OnMiss
+		if callback ~= nil then
+			const ok, problem = pcall(function()
+				callback(job.Line)
+			end)
+			if not ok then
+				warn(`[Speech] handler On{which} failed: {problem}`)
+			end
+		end
+	end
+
+	-- The line will not be voiced
+	local function miss(job: Job)
+		if job.Done or job.Cancelled then
+			return
+		end
+		job.Done = true
+		notify(job, "Miss")
+	end
+
+	-- A line that waited for its load and will not get its voice
+	local function dropWanted(entry: Entry)
+		const job = entry.WantedJob
+		entry.Wanted = nil
+		entry.WantedJob = nil
+		if job ~= nil then
+			miss(job)
+		end
+	end
+
 	local function disable(reason: string)
 		enabled = false
 		offReason = reason
 		table.clear(queue)
+		for _, entry in entries do
+			dropWanted(entry)
+		end
 		warnOnce("off", `text-to-speech off, subtitles only: {reason}`)
 	end
 
@@ -307,7 +369,7 @@ function Speech.new(volume: () -> number): Speech
 	end
 
 	-- Plays one piece and yields until it ended (or the chain was cut). false = Play failed.
-	local function playPiece(voice: AudioTextToSpeech, mine: number): boolean
+	local function playPiece(voice: AudioTextToSpeech, mine: number, onStart: () -> ()): boolean
 		local ended = false
 		const ok, connection = pcall(function(): RBXScriptConnection
 			return voice.Ended:Once(function()
@@ -333,6 +395,13 @@ function Speech.new(volume: () -> number): Speech
 		const soft = started + (if length ~= nil then length * 1.25 + PIECE_SLACK + 1 else PIECE_MAX)
 		const hard = started + (if length ~= nil then length * 2 + PIECE_MAX else PIECE_MAX * 2)
 		local sawPlaying = false
+		local announced = false
+		local function announce()
+			if not announced then
+				announced = true
+				onStart()
+			end
+		end
 		while alive and token == mine and not ended do
 			const now = os.clock()
 			if now >= hard or (now >= soft and not sawPlaying) then
@@ -344,6 +413,9 @@ function Speech.new(volume: () -> number): Speech
 			end)
 			if okPlaying and isPlaying == true then
 				sawPlaying = true
+				if token == mine then
+					announce()
+				end
 			elseif okPlaying and isPlaying == false then
 				-- Ended missing on this engine: IsPlaying going false after it was true ends the piece (never before it
 				-- was seen true: playback may take a moment to start)
@@ -358,37 +430,50 @@ function Speech.new(volume: () -> number): Speech
 		if ok then
 			(connection :: RBXScriptConnection):Disconnect()
 		end
+		if token == mine then
+			announce() -- a piece too short to be seen playing still counts as started
+		end
 		return true
 	end
 
-	-- Plays a line: its pieces in order, with the pause after each (a new line or Stop cuts it)
-	-- Plays a line to its end: its pieces in order, with the pause after each. false = the chain was cut or failed.
-	local function playEntry(entry: Entry, mine: number): boolean
+	-- Plays a line to its end: its pieces in order, with the pause after each. Returns "Cut" (Stop / Destroy), "Failed"
+	-- (a play failed) or "Done"; job.Done = true once the first piece played (OnStart fired).
+	local function playEntry(job: Job, mine: number): string
+		const entry = job.Entry
+		local function onStart()
+			if not job.Done then
+				job.Done = true
+				notify(job, "Start")
+			end
+		end
 		for index, piece in entry.Pieces do
 			if not alive or token ~= mine then
-				return false
+				return "Cut"
 			end
 			const voice = piece.Voice
 			if piece.State == "Loaded" and voice ~= nil and voice.Parent ~= nil then
-				if not playPiece(voice, mine) then
-					return false
+				if not playPiece(voice, mine, onStart) then
+					return "Failed"
 				end
 			end
 			if index < #entry.Pieces and piece.Pause > 0 and token == mine then
 				task.wait(piece.Pause)
 			end
 		end
-		return alive and token == mine
+		return if alive and token == mine then "Done" else "Cut"
 	end
 
 	-- A line never cuts the one speaking (user feedback 2026-10-11: every voice was cut): it waits its turn in
 	-- `spoken` and starts once the line before it ended, LINE_GAP s later. Only Stop / Destroy (halt) cut the chain.
-	local function start(entry: Entry)
-		if table.find(spoken, entry) ~= nil then
-			return
+	local function start(job: Job)
+		for _, waiting in spoken do
+			if waiting.Entry == job.Entry then
+				miss(job) -- the same line is already waiting its turn
+				return
+			end
 		end
 		refreshVolume()
-		table.insert(spoken, entry)
+		table.insert(spoken, job)
 		if speaking then
 			return
 		end
@@ -397,14 +482,32 @@ function Speech.new(volume: () -> number): Speech
 		task.spawn(function()
 			while alive and token == mine and #spoken > 0 do
 				const next = table.remove(spoken, 1)
-				if next ~= nil and not playEntry(next, mine) then
-					break
+				if next ~= nil and not next.Cancelled then
+					const result = playEntry(next, mine)
+					if result == "Cut" then
+						break
+					end
+					-- "Done" or "Failed": started lines end, lines with nothing to play are missed
+					if next.Done then
+						notify(next, "End")
+					else
+						miss(next)
+					end
+					if result == "Failed" then
+						break
+					end
 				end
 				if token == mine and #spoken > 0 then
 					task.wait(LINE_GAP)
 				end
 			end
 			if token == mine then
+				-- a failure left lines behind: they will not be voiced
+				const rest = table.clone(spoken)
+				table.clear(spoken)
+				for _, job in rest do
+					miss(job)
+				end
 				playing = nil
 				speaking = false
 			end
@@ -527,6 +630,7 @@ function Speech.new(volume: () -> number): Speech
 		end
 		piece.State = "Failed"
 		owner.FailedAt = os.clock()
+		dropWanted(owner)
 		const id = piece.VoiceId
 		if goodVoices[id] then
 			-- the voice works: only this line stays a subtitle (tried again on a later Fetch)
@@ -557,6 +661,7 @@ function Speech.new(volume: () -> number): Speech
 			piece.State = "Failed"
 			piece.Owner.FailedAt = os.clock()
 			piece.Owner.Reason = if offReason ~= "" then offReason else "could not build the voice"
+			dropWanted(piece.Owner)
 			return
 		end
 		piece.State = "Loading"
@@ -594,9 +699,15 @@ function Speech.new(volume: () -> number): Speech
 			const owner = piece.Owner
 			const wanted = owner.Wanted
 			if wanted ~= nil and enabled and stateOf(owner) == "Loaded" then
+				const job = owner.WantedJob
 				owner.Wanted = nil
-				if os.clock() - wanted <= LATE then
-					start(owner)
+				owner.WantedJob = nil
+				if job ~= nil and not job.Cancelled then
+					if os.clock() - wanted <= LATE then
+						start(job)
+					else
+						miss(job)
+					end
 				end
 			end
 			return
@@ -642,7 +753,7 @@ function Speech.new(volume: () -> number): Speech
 		if #parts == 0 then
 			return nil
 		end
-		const entry: Entry = { Speaker = speaker, Pieces = {}, Wanted = nil, FailedAt = 0, Reason = "" }
+		const entry: Entry = { Speaker = speaker, Pieces = {}, Wanted = nil, WantedJob = nil, FailedAt = 0, Reason = "" }
 		for index, part in parts do
 			const piece: Piece = {
 				Text = part.Text,
@@ -841,26 +952,47 @@ function Speech.new(volume: () -> number): Speech
 				task.wait(POLL)
 			end
 		end,
-		Say = function(line: Beat)
+		Say = function(line: Beat, handlers: Handlers?): () -> ()
+			const job: Job = { Entry = nil :: any, Line = line, Handlers = handlers, Cancelled = false, Done = false }
+			local function cancel()
+				job.Cancelled = true
+				const owner = job.Entry
+				if owner ~= nil and owner.WantedJob == job then
+					owner.Wanted = nil
+					owner.WantedJob = nil
+				end
+				const index = table.find(spoken, job)
+				if index ~= nil then
+					table.remove(spoken, index)
+				end
+			end
 			if not enabled or not alive then
-				return
+				miss(job)
+				return cancel
 			end
 			const entry = ensure(line, true)
 			if entry == nil then
-				return
+				miss(job)
+				return cancel
 			end
+			job.Entry = entry
 			const state = stateOf(entry)
 			if state == "Failed" then
-				return
+				miss(job)
+				return cancel
 			end
 			if state == "Loaded" then
-				start(entry)
-				return
+				start(job)
+				return cancel
 			end
+			-- a newer Say of the same line takes over the wait
+			dropWanted(entry)
 			entry.Wanted = os.clock()
+			entry.WantedJob = job
 			-- late line: first in the queue
 			hurry(entry)
 			pump()
+			return cancel
 		end,
 		Busy = function(): boolean
 			return speaking and alive
@@ -869,6 +1001,7 @@ function Speech.new(volume: () -> number): Speech
 			halt()
 			for _, entry in entries do
 				entry.Wanted = nil
+				entry.WantedJob = nil
 			end
 		end,
 		Destroy = function()

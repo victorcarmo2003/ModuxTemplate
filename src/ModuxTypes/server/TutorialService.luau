@@ -2,11 +2,16 @@
 
 export type Public = {
 	Asked: boolean,
+	Closed: { [number]: boolean },
 	Enabled: boolean,
+	Past: boolean,
+	Revived: { [number]: boolean },
 	Seeded: boolean,
 	Setup: (self: Public) -> (),
 	Complete: (self: Public, player: Player) -> (),
+	OnDayOne: (self: Public) -> boolean,
 	IsPending: (self: Public, player: Player) -> boolean,
+	Reason: (self: Public, player: Player) -> string?,
 	AnyPending: (self: Public) -> boolean,
 	AllPending: (self: Public) -> boolean,
 	EnsureCash: (self: Public) -> (),

@@ -12,6 +12,18 @@ type Beat = Content.CutsceneBeat
 type Scene = Content.Cutscene
 export type Record = { Scene: string, StartedAt: number, Votes: number, Needed: number, Waiting: boolean }
 type Shown = { Title: string, Line: string } | false
+type Caption = {
+	Beat: Beat,
+	State: string,
+	Started: boolean, -- Speech OnStart
+	Ended: boolean, -- Speech OnEnd
+	Missed: boolean, -- Speech OnMiss (no voice for it)
+	Silent: boolean, -- catch-up line: text only, no balloon
+	Cancel: (() -> ())?,
+	ActiveAt: number, -- os.clock it became the current caption
+	ShownElapsed: number, -- segment time it went on screen
+	TailUntil: number,
+}
 
 export type Public = {
 	Active: Vide.Source<boolean>,
@@ -19,6 +31,8 @@ export type Public = {
 	Balloons: { () -> () },
 	Banner: Vide.Source<Shown>,
 	Beats: { Beat },
+	Caption: Caption?,
+	Captions: { Caption },
 	EndAlpha: number,
 	EndedAt: number?,
 	Fade: Vide.Source<number>,
@@ -74,6 +88,8 @@ export type Public = {
 	Current: (self: Public) -> Record?,
 	Watch: (self: Public) -> (),
 	FireBeat: (self: Public, beat: Beat, live: boolean) -> (),
+	QueueCaption: (self: Public, beat: Beat, live: boolean) -> (),
+	StepCaptions: (self: Public, elapsed: number) -> Beat?,
 	CrewBalloons: (self: Public, text: string) -> (),
 	PlacePrompt: (self: Public, target: string) -> (),
 	Step: (self: Public) -> (),

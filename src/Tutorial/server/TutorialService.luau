@@ -1,11 +1,14 @@
 --!strict
--- TutorialService (user request 2026-10-11, Provisional): single responder of `TutorialComplete` (network.md, Profile
--- packet field TutorialDone; data.md §1.1). Sets the profile flag TutorialDone = true when the client says the
--- first-hot-dog tutorial ended (finished or skipped) and asks a save. Idempotent: a second packet changes nothing.
--- Cosmetic flag (nothing else reads it on the server): the client is trusted to say it. Run place only.
+-- TutorialService (user request 2026-10-11, Provisional; Q-### "tutorial always on Day 1, never saved"): single
+-- responder of `TutorialComplete` (network.md). The tutorial is NOT saved and NOT mandatory: it is pending for every
+-- player on Day 1 of the run (normal and infinite mode alike) until that player finishes or skips it (client packet
+-- TutorialComplete, idempotent) or the run goes past Day 1 (latched: coming back to Day 1 does not reopen it). State
+-- is in memory of this server (one run per server), per UserId; a player who leaves and comes back starts over.
+-- The profile field TutorialDone stays in the schema for compatibility with saved data, but nothing reads or writes
+-- it any more. Run place only.
 -- AnyPending (Provisional, user request 2026-10-11): BossService rings and holds the tutorial call (BossCalls Trigger
 -- Tutorial) while a player in the server still has the tutorial ahead.
--- Tutorial customer (Provisional, user request 2026-10-11): `TutorialBegin` from a rookie (TutorialDone = false) asks
+-- Tutorial customer (Provisional, user request 2026-10-11): `TutorialBegin` from a player with the tutorial pending asks
 -- CustomerService for the tutorial customer (one at a time, shared.Tutorial.Rules). Once nobody has the tutorial
 -- pending any more (finished, skipped, left), an unserved tutorial customer is sent away (CustomerService:EndTutorial).
 -- Shopping lesson (Provisional, user request 2026-10-11; shared.Tutorial.Rules Buns / Package): on the first
@@ -14,8 +17,8 @@
 -- customer still waits, a hot dog thrown away gives the bun back (never stuck without a bun for the first sale). When
 -- the buns run out with a rookie pending, Cash is topped up to the package price (EconomyService:TopUp) so the
 -- purchase never stalls on money. Server decides: the client only reads the Stock set.
--- Dev tools (Provisional, user request 2026-10-11; DevService/Commands/Tutorial.luau): DevReset puts TutorialDone back
--- to false (the client restarts the tutorial without the intro), DevSend forwards a client-side dev command (voice
+-- Dev tools (Provisional, user request 2026-10-11; DevService/Commands/Tutorial.luau): DevReset reopens the tutorial for
+-- the player in this run, at any day, without touching the profile (the client restarts the tutorial without the intro), DevSend forwards a client-side dev command (voice
 -- test, debug panel, step jump) to one player through the dev-only `DevClient` packet. Both refuse outside dev mode.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -32,7 +35,7 @@ const BUN = if PACKAGE then PACKAGE.Ingredient else "bun"
 const TutorialService = Modux.Service(
 	"TutorialService",
 	{
-		Require = { "ProfileService", "PlaceService", "CustomerService", "KitchenService", "EconomyService" },
+		Require = { "PlaceService", "CustomerService", "KitchenService", "EconomyService", "RoundService" },
 		Priority = 500,
 	}
 )
@@ -43,22 +46,48 @@ function TutorialService:Setup()
 	self.Asked = false :: boolean
 	-- the tutorial stock (Rules.Buns) was applied in this server
 	self.Seeded = false :: boolean
+	-- UserId -> finished or skipped in this run (memory only, never saved)
+	self.Closed = {} :: { [number]: boolean }
+	-- UserId -> reopened by /dev tutorial reset: ignores the day gate until it ends again
+	self.Revived = {} :: { [number]: boolean }
+	-- the run went past Day 1 (latched)
+	self.Past = false :: boolean
 end
 
+-- The player finished or skipped the tutorial: over for this run (idempotent, not saved)
 function TutorialService:Complete(player: Player)
-	const profiles = self.Dependencies.ProfileService
-	const profile = profiles:Get(player)
-	if profile == nil or profile.TutorialDone() == true then
-		return
-	end
-	profiles:Update(player, { TutorialDone = true })
-	profiles:RequestSave(player)
+	self.Closed[player.UserId] = true
+	self.Revived[player.UserId] = nil
 end
 
--- A player in the server with a loaded profile still has the tutorial ahead (TutorialDone = false)
+-- Day 1 of the run still on (latches off once the day moves on or a night shift starts)
+function TutorialService:OnDayOne(): boolean
+	if not self.Past then
+		const round = self.Dependencies.RoundService
+		if round:GetDay() > 1 or round:IsNight() then
+			self.Past = true
+		end
+	end
+	return not self.Past
+end
+
+-- A player in the server still has the tutorial ahead: Day 1 of the run and not finished / skipped (or reopened by dev)
 function TutorialService:IsPending(player: Player): boolean
-	const profile = self.Dependencies.ProfileService:Get(player)
-	return profile ~= nil and profile.TutorialDone() == false
+	if player.Parent == nil or self.Closed[player.UserId] then
+		return false
+	end
+	return self.Revived[player.UserId] == true or self:OnDayOne()
+end
+
+-- Why the tutorial is not pending for the player (dev messages), nil = pending
+function TutorialService:Reason(player: Player): string?
+	if self:IsPending(player) then
+		return nil
+	end
+	if self.Closed[player.UserId] then
+		return "done or skipped this run"
+	end
+	return `day {self.Dependencies.RoundService:GetDay()} is past day 1`
 end
 
 function TutorialService:AnyPending(): boolean
@@ -150,16 +179,12 @@ function TutorialService:DevSend(player: Player, command: string, text: string?)
 	})
 end
 
--- TutorialDone = false for `player` (saved), the tutorial customer and the tutorial stock start over; the client is
+-- Tutorial reopened for `player` in this run (memory only), the tutorial customer and the tutorial stock start over; the client is
 -- told to restart its tutorial state (DevClient "tutorial_reset")
 function TutorialService:DevReset(player: Player)
 	self:DevCheck("DevReset")
-	const profiles = self.Dependencies.ProfileService
-	if profiles:Get(player) == nil then
-		error("[TutorialService] DevReset: no loaded profile", 2)
-	end
-	profiles:Update(player, { TutorialDone = false })
-	profiles:RequestSave(player)
+	self.Closed[player.UserId] = nil
+	self.Revived[player.UserId] = true
 	self.Asked = false
 	self.Seeded = false
 	self.Dependencies.CustomerService:EndTutorial()
@@ -170,8 +195,7 @@ end
 function TutorialService:DevStatus(): string
 	const pending: { string } = {}
 	for _, player in Players:GetPlayers() do
-		const profile = self.Dependencies.ProfileService:Get(player)
-		const state = if profile == nil then "no profile" elseif profile.TutorialDone() then "done" else "pending"
+		const state = self:Reason(player) or "pending"
 		table.insert(pending, `{player.Name}={state}`)
 	end
 	return `tutorial [{table.concat(pending, ", ")}]; customer asked {self.Asked}, around {self.Dependencies.CustomerService:HasTutorial()}; seeded {self.Seeded}; buns {self.Dependencies.KitchenService:GetStock(BUN)}`
@@ -190,6 +214,11 @@ TutorialService:OnInit(function(self)
 		return
 	end
 	self.Enabled = true
+	Players.PlayerRemoving:Connect(function(player: Player)
+		-- a player who comes back starts over (the client lost its session state too)
+		self.Closed[player.UserId] = nil
+		self.Revived[player.UserId] = nil
+	end)
 	self.Libs.Net.TutorialComplete:onServer(function(_, player: Player)
 		self:Complete(player)
 	end)

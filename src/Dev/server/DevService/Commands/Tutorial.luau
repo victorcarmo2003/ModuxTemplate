@@ -3,8 +3,8 @@
 -- BossService, CutsceneService and RoundService; the client side (voice test, debug panel, step jump, status) goes to
 -- the caller through TutorialService:DevSend (dev-only `DevClient` packet) and prints in the client Output.
 --   tutorial                 server status (who has it pending, customer, buns, phone) + the client's status
---   tutorial reset           TutorialDone = false (saved), intro skipped if it is on, tutorial call and customer start
---                            over, the client restarts its tutorial (no intro needed)
+--   tutorial reset           reopens the tutorial in this run (any day, memory only: the profile is not touched), intro
+--                            skipped if it is on, tutorial call and customer start over, the client restarts its tutorial
 --   tutorial step <key>      the client jumps to a step (Steps.luau keys; "auto" = back to the live flow)
 --   intro skip               ends the intro cutscene and its phase now (straight to the day Prep: the tutorial)
 --   voice <text>             the client says <text> with Walt's voice (the tutorial call's Speech) and prints its
@@ -73,7 +73,7 @@ const Tutorial: Api.Module = function(ctx: Api.Context): { Api.Command }
 		{
 			Name = "tutorial",
 			Usage = TUTORIAL_USAGE,
-			Help = "first-hot-dog tutorial: status; reset (TutorialDone=false, restart without the intro); jump to a step",
+			Help = "first-hot-dog tutorial: status; reset (reopen in this run, restart without the intro); jump to a step",
 			Run = function(args: { string }, caller: Player?): string?
 				const sub = if args[1] then string.lower(args[1]) else nil
 				if sub == nil then
@@ -81,12 +81,12 @@ const Tutorial: Api.Module = function(ctx: Api.Context): { Api.Command }
 					return `{tutorials:DevStatus()} | {boss:DevStatus()} (client status in the client Output)`
 				elseif sub == "reset" then
 					const player = target(caller)
-					-- profile first: the Day 1 Prep reached by the intro skip then queues the tutorial call, not the
+					-- tutorial state first: the Day 1 Prep reached by the intro skip then queues the tutorial call, not the
 					-- regular day call
 					boss:DevResetTutorial()
 					tutorials:DevReset(player)
 					const intro = skipIntro()
-					return `{player.Name}: TutorialDone = false, tutorial restarts ({intro})`
+					return `{player.Name}: tutorial reopened in this run (nothing saved), restarts ({intro})`
 				elseif sub == "step" then
 					const key = args[2]
 					if key == nil then

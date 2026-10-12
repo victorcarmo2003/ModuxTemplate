@@ -398,15 +398,15 @@ Profile = Lync.packet(Lync.struct({
 	Gems = Lync.int(0, 2147483647),
 	Classes = Lync.bitfield(Content.Classes.Keys), -- desbloqueadas
 	Selected = Lync.enum(Content.Classes.Keys),
-	TutorialDone = Lync.bool(), -- Provisório (2026-10-11): tutorial do 1º cachorro-quente concluído/pulado
+	TutorialDone = Lync.bool(), -- legado (Q-193): ninguém lê; o tutorial roda no dia 1 de toda run
 }))
 
--- c -> s, Provisório (2026-10-11). Responder: TutorialService. Marca TutorialDone = true (idempotente).
--- Flag cosmética: o servidor confia no client (nada de dinheiro, item ou stat depende dela).
+-- c -> s, Provisório (2026-10-11). Responder: TutorialService. Fecha o tutorial desta run para o jogador, só na
+-- memória do servidor (nada é salvo; idempotente; Q-193). O servidor confia no client (nada de dinheiro, item ou stat depende disso).
 TutorialComplete = Lync.packet(Lync.empty())
 
 -- c -> s, Provisório (2026-10-11). Responder: TutorialService. O novato atendeu a ligação do tutorial (ou ela não
--- veio): se ele ainda tem TutorialDone = false, CustomerService:RequestTutorial() traz o cliente de tutorial (um por
+-- veio): se ele ainda tem o tutorial pendente (dia 1 da run, não concluído nem pulado), CustomerService:RequestTutorial() traz o cliente de tutorial (um por
 -- vez; pedido fixo, sem paciência, fora da nota; atributo de rig `TutorialCustomer` = true). Idempotente.
 TutorialBegin = Lync.packet(Lync.empty())
 ```

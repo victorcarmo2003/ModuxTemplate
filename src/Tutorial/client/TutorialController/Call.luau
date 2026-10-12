@@ -57,7 +57,8 @@ const LINGER = 4 -- s the last line stays on screen after it was said
 -- greeting skip its voice for good, a line that loads later is never voiced)
 const HOLD = 12
 const MAX_WARNINGS = 3 -- subtitle-only warnings per session (one per distinct reason)
-const TAIL = 0.3 -- s after the voice ends before the next line
+const TAIL = 0.4 -- s the subtitle stays after the voice ends (and before the next line)
+const VOICE_WAIT = 20 -- s a line waits for its voice to start before it goes on as a subtitle only
 
 const Call = {}
 
@@ -93,6 +94,13 @@ function Call.new(show: (text: string?) -> (), volume: () -> number, trace: (mes
 	local endsAt = 0 -- os.clock when the line on screen is over (0 = none)
 	local hideAt = 0 -- os.clock when the strip hides (0 = hidden)
 	local waitFrom = 0 -- os.clock the next line started waiting for its voice (0 = not waiting)
+	-- the line handed to the voice: "" = none, "Voice" = waiting for it to start / speaking (the subtitle follows it)
+	local phase = ""
+	local voiceBy = 0 -- os.clock past which a voice that did not start is given up (subtitle only)
+	local generation = 0 -- bumped by every line / Cut, so a late handler of an old line does nothing
+	local cancelVoice: (() -> ())? = nil
+	local pendingText = "" -- the line waiting for its voice, and its reading time
+	local pendingTime = 0
 
 	local function voice(): Speech.Speech
 		const existing = speech
@@ -105,7 +113,7 @@ function Call.new(show: (text: string?) -> (), volume: () -> number, trace: (mes
 	end
 
 	local function busy(): boolean
-		return #queue > 0 or (endsAt > 0 and os.clock() < endsAt)
+		return #queue > 0 or phase ~= "" or (endsAt > 0 and os.clock() < endsAt)
 	end
 
 	local function beats(lines: { string }): { Content.CutsceneBeat }
@@ -147,6 +155,9 @@ function Call.new(show: (text: string?) -> (), volume: () -> number, trace: (mes
 			waitFrom = 0
 			endsAt = 0
 			hideAt = 0
+			phase = ""
+			generation += 1
+			cancelVoice = nil
 			const current = speech
 			if current ~= nil then
 				current.Stop()
@@ -156,6 +167,25 @@ function Call.new(show: (text: string?) -> (), volume: () -> number, trace: (mes
 		Busy = busy,
 		Step = function()
 			const now = os.clock()
+			if phase ~= "" then
+				-- the voice of the line on screen: its subtitle waits for the start and stays until the end
+				if now >= voiceBy and phase == "Waiting" then
+					-- the voice never started (muted engine, stuck load): the subtitle goes on without it
+					const cancel = cancelVoice
+					cancelVoice = nil
+					if cancel ~= nil then
+						cancel()
+					end
+					generation += 1
+					phase = ""
+					endsAt = now + pendingTime + GAP
+					hideAt = now + pendingTime + LINGER
+					show(pendingText)
+					return
+				else
+					return
+				end
+			end
 			if endsAt > 0 and now < endsAt then
 				return
 			end
@@ -188,18 +218,48 @@ function Call.new(show: (text: string?) -> (), volume: () -> number, trace: (mes
 					end
 					warnSilent(status, if reason ~= "" then reason else status, text)
 				end
-				local time = readTime(text)
-				if status == "Loaded" then
-					const length = speech.Length(line)
-					if length ~= nil then
-						time = math.max(time, length + TAIL)
-					end
-				end
-				endsAt = now + time + GAP
-				hideAt = now + time + LINGER
-				trace(`say ({status}, {string.format("%.1f", time)} s, {#queue} left): "{text}"`)
-				show(text)
-				speech.Say(line)
+				const time = readTime(text)
+				pendingText = text
+				pendingTime = time
+				const mine = generation + 1
+				generation = mine
+				phase = "Waiting"
+				endsAt = 0
+				voiceBy = now + VOICE_WAIT
+				trace(`say ({status}, {#queue} left): "{text}"`)
+				-- the subtitle follows the voice: it shows when the voice starts and stays until it ended (+ TAIL); a line
+				-- without a voice (off, failed, late) shows now for its reading time
+				cancelVoice = speech.Say(line, {
+					OnStart = function()
+						if generation ~= mine then
+							return
+						end
+						phase = "Voice"
+						endsAt = 0
+						show(text)
+					end,
+					OnEnd = function()
+						if generation ~= mine then
+							return
+						end
+						const ended = os.clock()
+						phase = ""
+						cancelVoice = nil
+						endsAt = ended + TAIL + GAP
+						hideAt = ended + TAIL + LINGER
+					end,
+					OnMiss = function()
+						if generation ~= mine then
+							return
+						end
+						const shownAt = os.clock()
+						phase = ""
+						cancelVoice = nil
+						endsAt = shownAt + time + GAP
+						hideAt = shownAt + time + LINGER
+						show(text)
+					end,
+				})
 				return
 			end
 			endsAt = 0
@@ -212,6 +272,9 @@ function Call.new(show: (text: string?) -> (), volume: () -> number, trace: (mes
 			table.clear(queue)
 			endsAt = 0
 			hideAt = 0
+			phase = ""
+			generation += 1
+			cancelVoice = nil
 			const current = speech
 			speech = nil
 			if current ~= nil then

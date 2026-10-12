@@ -2,7 +2,7 @@
 --[[
 	TutorialController (user request 2026-10-11; Provisional until a FEAT/TASK is written for it)
 
-	First-hot-dog tutorial, only while the own profile says TutorialDone = false (ProfileController, Profile packet).
+	First-hot-dog tutorial, on Day 1 of every run for everyone (user request 2026-10-11, Provisional; nothing is saved: no profile flag).
 	After the intro cutscene it walks the player through the first sale, following the order of one tutorial customer
 	(user request 2026-10-11, Provisional):
 	  answer the phone -> (the tutorial customer walks up) take the order -> grill -> slice -> (cooking) -> collect
@@ -52,7 +52,7 @@
 
 	End: after the talk steps (Walt finished them or "Got it"), on Skip (Q / D-pad down / the Skip tag on touch), or when
 	the day shift is over without a sale (Closing, Summary, night). Each end fires `TutorialComplete` once; the server
-	(TutorialService) saves TutorialDone = true, so it never runs again for this player.
+	(TutorialService) only remembers it in memory for this run (never saved). Past Day 1 it does not come back (FirstRun).
 
 	No progress (playtest 2026-10-11: on "Open the shop" a distracted player thought the game froze): a step with a
 	Remind line and no progress for IDLE s (same step, not getting PROGRESS studs closer to the target) turns urgent:
@@ -66,15 +66,15 @@
 	after the first one.
 
 	Voices ahead (user request 2026-10-11): LoadingController calls PreloadVoices under the loading screen of a rookie
-	(TutorialDone = false), so Walt's lines are "Loaded" when the call starts (Steps.Lines is in the order the call
+	(Day 1 of the run, FirstRun rules), so Walt's lines are "Loaded" when the call starts (Steps.Lines is in the order the call
 	needs them).
 
 	Dev tools (Studio Run place only, user request 2026-10-11): the dev-only `DevClient` packet (from the DevService chat
 	commands, DevService/Commands/Tutorial.luau) runs here: tutorial_reset (restart the session state after the server
-	put TutorialDone back to false), tutorial_step <key> (jump to a step until the live flow passes it; "auto" = back
+	reopened it in this run), tutorial_step <key> (jump to a step until the live flow passes it; "auto" = back
 	to the live flow), tutorial_status (prints the debug readout), voice <text> / voice_tutorial / voice_stop (Walt's
 	voice through the call's Speech, status per line: Queued/Loading/Loaded/Failed, reason, Master x Voice, fader),
-	tutdebug (the TutorialDebug panel; F8 too). With dev mode on, a profile that already has TutorialDone = true says
+	tutdebug (the TutorialDebug panel; F8 too). With dev mode on, past Day 1, or done or skipped, says
 	so once in the Output (the tutorial never runs for it: /dev tutorial reset).
 
 	PROVISIONAL: texts, IDLE, PROGRESS, ARROW_FAR, CALL_WAIT, NUDGE, TALK_TIME, TALK_MIN, REASK, CHECK_TIME, skip keys (Q, DPadDown), "a served
@@ -197,6 +197,9 @@ const TutorialController = Modux.Controller("TutorialController", {
 function TutorialController:Setup()
 	-- ended (finished, skipped or the day ran out) in this session; the profile flag follows from the server
 	self.Finished = Vide.source(false) :: Vide.Source<boolean>
+	-- the run went past Day 1 (latched) / the dev reset brought the tutorial back in this run
+	self.PastDay1 = Vide.source(false) :: Vide.Source<boolean>
+	self.Revived = Vide.source(false) :: Vide.Source<boolean>
 	self.Running = Vide.source(false) :: Vide.Source<boolean>
 	self.CashRevealed = Vide.source(false) :: Vide.Source<boolean>
 	self.ClockRevealed = Vide.source(false) :: Vide.Source<boolean>
@@ -265,13 +268,23 @@ end
 
 -- Reactive -------------------------------------------------------------------------------------------------------
 
--- This player still has the tutorial ahead (first run) and it did not end in this session
+-- The tutorial runs on Day 1 of every run (user request 2026-10-11, Provisional; Q-### in open-questions.md), for
+-- everyone, and is never saved: it has the tutorial ahead while the run is on Day 1 (PastDay1 latches once the run
+-- moves on, so a return to Day 1 does not bring it back) and it did not end (finished / skipped) in this session.
+-- /dev tutorial reset (Revived) ignores the day.
 function TutorialController:FirstRun(): boolean
 	if not self.Dependencies.PlaceController:Is("Run") then
 		return false
 	end
-	const profile = self.Dependencies.ProfileController
-	return profile.Ready() and not profile.TutorialDone() and not self.Finished()
+	if self.Finished() then
+		return false
+	end
+	if self.Revived() then
+		return true
+	end
+	return self.Dependencies.ProfileController.Ready()
+		and not self.PastDay1()
+		and self.Dependencies.RoundController.Day() <= 1
 end
 
 -- HUD reveal (HudController): money pill / clock + day pills. A night shift always shows everything (a first-run
@@ -1242,6 +1255,14 @@ function TutorialController:Tick()
 		self.Checked(false)
 	end
 	self:RefreshDebug()
+	-- latch: once the run is past Day 1 the tutorial never comes back in this run
+	if
+		not Vide.untrack(self.PastDay1)
+		and Vide.untrack(self.Dependencies.RoundController.Ready)
+		and Vide.untrack(self.Dependencies.RoundController.Day) > 1
+	then
+		self.PastDay1(true)
+	end
 	const firstRun = Vide.untrack(function(): boolean
 		return self:FirstRun()
 	end)
@@ -1311,9 +1332,10 @@ function TutorialController:PreloadVoices(timeout: number, progress: ((number) -
 	while not Vide.untrack(profile.Ready) and os.clock() - started < math.min(PROFILE_WAIT, timeout) do
 		task.wait(0.1)
 	end
+	-- every run starts on Day 1 with the tutorial (no saved flag); a run already past Day 1 skips the preload
 	const rookie = self.Dependencies.PlaceController:Is("Run")
-		and Vide.untrack(profile.Ready)
-		and not Vide.untrack(profile.TutorialDone)
+		and Vide.untrack(self.Dependencies.RoundController.Day) <= 1
+		and not Vide.untrack(self.PastDay1)
 	if not rookie then
 		if progress ~= nil then
 			progress(1)
@@ -1338,19 +1360,24 @@ function TutorialController:Trace(message: string)
 	end
 end
 
--- Dev mode: a profile that already finished the tutorial says so once (the tutorial never runs for it)
+-- Dev mode: says once why the tutorial is off in this run (nothing is saved: Day 1 of every run has it)
 function TutorialController:NoteDone()
 	if self.DevNoted or not self:IsDev() then
 		return
 	end
-	const profile = self.Dependencies.ProfileController
-	if not Vide.untrack(profile.Ready) or not Vide.untrack(profile.TutorialDone) or Vide.untrack(self.Finished) then
+	if not self.Dependencies.PlaceController:Is("Run") or not Vide.untrack(self.Dependencies.RoundController.Ready) then
+		return
+	end
+	const day = Vide.untrack(self.Dependencies.RoundController.Day)
+	const reason = if Vide.untrack(self.Finished)
+		then "done or skipped this run"
+		elseif Vide.untrack(self.PastDay1) or day > 1 then `day {day} is past day 1`
+		else nil
+	if reason == nil then
 		return
 	end
 	self.DevNoted = true
-	print(
-		`{DEV_PREFIX} tutorial off: this profile has TutorialDone = true (saved by an earlier test: finished, skipped with Q or the day ended). "/dev tutorial reset" runs it again.`
-	)
+	print(`{DEV_PREFIX} tutorial off: {reason}. "/dev tutorial reset" runs it again in this run.`)
 end
 
 -- The step forced by /dev tutorial step and its target, while the live flow (`live`) has not passed it
@@ -1478,7 +1505,7 @@ function TutorialController:DebugLines(): string
 	const panel = if gui then gui:FindFirstChild("Tutorial") else nil
 	const guestText = if guestId ~= nil then `{guestId} {if guest then guest.State else "?"}` else "none"
 	return table.concat({
-		`profile    ready {flag(Vide.untrack(profile.Ready))}  TutorialDone {flag(Vide.untrack(profile.TutorialDone))}  finished {flag(Vide.untrack(self.Finished))}`,
+		`profile    ready {flag(Vide.untrack(profile.Ready))}  day {Vide.untrack(round.Day)}  past day 1 {flag(Vide.untrack(self.PastDay1))}  revived {flag(Vide.untrack(self.Revived))}  finished {flag(Vide.untrack(self.Finished))}`,
 		`first run  {flag(firstRun)}  running {flag(Vide.untrack(self.Running))}  cinematic {flag(Vide.untrack(Cinematic.Active))}`,
 		`round      {Vide.untrack(round.Phase)}  ready {flag(Vide.untrack(round.Ready))}  night {flag(Vide.untrack(round.IsNight))}`,
 		`step       {if key ~= "" then key else "-"} ({if step then step.Number else 0}/{Steps.Total})  forced {self.Forced or "-"}  shop {flag(self.Shopping)}`,
@@ -1516,7 +1543,7 @@ function TutorialController:ToggleDebug()
 	print(`{DEV_PREFIX} debug panel {if Vide.untrack(self.Debug) then "on" else "off"}`)
 end
 
--- /dev tutorial reset (after the server put TutorialDone back to false): the session state starts over
+-- /dev tutorial reset (after the server reopened the tutorial in this run): the session state starts over
 function TutorialController:DevReset()
 	self.VoiceRun += 1
 	self.Call.Cut()
@@ -1524,7 +1551,9 @@ function TutorialController:DevReset()
 		self.Holding = false
 		self.Dependencies.BossController:Hold(false)
 	end
+	self.DevNoted = false
 	Vide.batch(function()
+		self.Revived(true)
 		self.Finished(false)
 		self.Running(false)
 		self.StepKey("")
