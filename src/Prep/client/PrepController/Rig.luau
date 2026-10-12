@@ -20,6 +20,9 @@ export type Rig = {
 	Enter: (self: Rig, camera: Vector3, focus: Vector3) -> (),
 	-- Moves the pose (another station) without a fade.
 	SetPose: (self: Rig, camera: Vector3, focus: Vector3) -> (),
+	-- The NPC (attribute `NpcId`) that is never cut or ghosted while it is set: the customer at the counter in the 3D Window view
+	-- (prep-3d.md §4.4, he is the target of the Take). nil = judged like everybody else.
+	SetSpared: (self: Rig, npc: number?) -> (),
 	-- Own rig starts to come back (60 % of the way out); NPCs return too.
 	Release: (self: Rig) -> (),
 	-- Per rendered frame.
@@ -109,6 +112,7 @@ function Rig.new(): Rig
 	-- NPCs and other players
 	const tracked: { [Model]: Tracked } = {}
 	local judgeIn = 0
+	local spared: number? = nil
 
 	local function refreshOwn(now: number)
 		const character = Players.LocalPlayer.Character
@@ -176,6 +180,9 @@ function Rig.new(): Rig
 					distance = 0
 				end
 				found.Zone = zoneOf(distance, found.Zone)
+				if spared ~= nil and model:GetAttribute("NpcId") == spared then
+					found.Zone = "Normal"
+				end
 			end
 			-- the name tag goes with a hidden rig
 			const humanoid = model:FindFirstChildOfClass("Humanoid")
@@ -213,6 +220,12 @@ function Rig.new(): Rig
 		camera = cameraPosition
 		focus = focusPosition
 		judgeIn = 0
+	end
+	function self.SetSpared(_: any, npc: number?)
+		if npc ~= spared then
+			spared = npc
+			judgeIn = 0
+		end
 	end
 	function self.Release(_: any)
 		released = true
@@ -285,6 +298,7 @@ function Rig.new(): Rig
 		entered = false
 		ownAlpha = 0
 		ownTarget = 0
+		spared = nil
 	end
 	return self :: Rig
 end

@@ -19,6 +19,7 @@ type Kitchen = {
 	PlateOf: (self: any, player: Player) -> any?,
 	DevFeedRail: (self: any, score: number?) -> boolean,
 	DevAgeGrill: (self: any, slot: number, seconds: number) -> number,
+	DevFlipWire: (self: any, slot: number) -> number,
 	DevWorldPrompts: (self: any, on: boolean?) -> (),
 	RailCount: (self: any) -> number,
 	BoardFree: (self: any) -> number,
@@ -270,6 +271,41 @@ local function run(api: Api.Context, caller: Player?): string
 					collectC ~= nil and collectC.Band == "Messy" and collectC.Score == Content.Prep.Grades.Unflipped
 				)
 			end
+		end
+		drain()
+
+		-- 9b. Slot preference (prep-3d N1) and Stations.Flip (N2)
+		kitchen:SetAmount("sausage", math.max(saved.sausage, 8))
+		const pref = kitchen:GrillAct(player, "Place", 2)
+		check("place with Slot 2 uses slot 2 when free", pref ~= nil and pref.Slot == 2, if pref then tostring(pref.Slot) else "nil")
+		const occupied = kitchen:GrillAct(player, "Place", 2)
+		check("place with an occupied Slot takes the first free", occupied ~= nil and occupied.Slot ~= 2, if occupied then tostring(occupied.Slot) else "nil")
+		kitchen:DevAgeGrill(2, 1000)
+		kitchen:GrillAct(player, "Collect", 2)
+		if occupied ~= nil then
+			kitchen:DevAgeGrill(occupied.Slot :: number, 1000)
+			kitchen:GrillAct(player, "Collect", occupied.Slot :: number)
+		end
+		const plain = kitchen:GrillAct(player, "Place", 0)
+		check("place with Slot 0 takes the lowest free", plain ~= nil and plain.Slot == 1, if plain then tostring(plain.Slot) else "nil")
+		const farSlot = kitchen:GrillAct(player, "Place", 8)
+		check("place with an inactive Slot takes the first free", farSlot ~= nil and farSlot.Slot ~= 8, if farSlot then tostring(farSlot.Slot) else "nil")
+		if plain ~= nil then
+			const slot = plain.Slot :: number
+			check("Flip wire is 0 before the flip", kitchen:DevFlipWire(slot) == 0)
+			const flip = kitchen:GrillAct(player, "Flip", slot)
+			check(
+				"Flip wire is score + 1 after the flip",
+				flip ~= nil and kitchen:DevFlipWire(slot) == math.clamp(math.floor((flip.Score :: number) + 0.5), 0, 100) + 1,
+				tostring(kitchen:DevFlipWire(slot))
+			)
+			kitchen:DevAgeGrill(slot, 1000)
+			kitchen:GrillAct(player, "Collect", slot)
+			check("Flip wire is 0 after the collect", kitchen:DevFlipWire(slot) == 0)
+		end
+		if farSlot ~= nil then
+			kitchen:DevAgeGrill(farSlot.Slot :: number, 1000)
+			kitchen:GrillAct(player, "Collect", farSlot.Slot :: number)
 		end
 		drain()
 

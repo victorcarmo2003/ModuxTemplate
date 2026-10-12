@@ -255,7 +255,8 @@ function Plate.new(deps: Deps): PlateApi
 			if stock == nil then
 				return nil, "NoStation"
 			end
-			const placed, reason = Grill.PlaceFor(ctx, stock, player)
+			-- slot = the preference of PrepGrill.Slot (prep-3d.md §7.2 N1); isSlot guards the range
+			const placed, reason = Grill.PlaceFor(ctx, stock, player, if slot ~= nil and isSlot(slot) then slot else nil)
 			if placed == nil then
 				if reason == "NoStock" then
 					return nil, "NoStock"

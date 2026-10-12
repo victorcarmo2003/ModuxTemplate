@@ -21,6 +21,7 @@ local LightGroups = require(script.LightGroups)
 local LightPresets = require(script.LightPresets)
 local CoffeeCup = require(script.CoffeeCup)
 local Trash = require(script.Trash)
+local RailSlot = require(script.RailSlot)
 local Lobby = require(script.Lobby)
 local Mart = require(script.Mart)
 local Moods = require(script.Moods)
@@ -247,4 +248,7 @@ return table.freeze({
 
 	-- Table trash dumpsters: the cleaned tray flies to the nearest bin (owner request 2026-10-12; TrashController). Provisional
 	Trash = Trash,
+
+	-- Sausage pose on the RestRail Parts (owner request 2026-10-12; Kitchen/shared/RailSlot). Provisional
+	RailSlot = RailSlot,
 })

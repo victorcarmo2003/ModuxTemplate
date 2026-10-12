@@ -6,6 +6,7 @@
 export type Plate = {
 	StartedAt: number, -- os.clock() at PrepBegin (re-based after a refusal that keeps the plate, see PrepService)
 	Reserved: boolean, -- KitchenService reserved a bun and the board slot (BeginPlate); false = nothing to refund
+	PreCut: boolean?, -- the bun came already sliced (altered bun): the mask may carry the sausage without the cut bit
 }
 
 export type Seat = {
@@ -16,6 +17,7 @@ export type Seat = {
 	Since: number, -- workspace:GetServerTimeNow() of the seat
 	LastSeen: number, -- os.clock() of the last accepted packet (keep-alive, Rules.SeatIdle)
 	Plate: Plate?,
+	Mask: number, -- accepted cosmetic plate mask (PlateMask, prep-3d.md §7.2 N3); 0 = none; zeroed with the plate
 }
 
 -- Token bucket per packet kind (capacity = rate, refill = rate per second)
@@ -33,6 +35,7 @@ function Session.new(player: Player, station: number, serverTime: number, now: n
 		Since = serverTime,
 		LastSeen = now,
 		Plate = nil,
+		Mask = 0,
 	}
 end
 

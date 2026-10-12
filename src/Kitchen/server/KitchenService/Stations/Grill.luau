@@ -114,8 +114,17 @@ local function sync(ctx: Context, station: Station): boolean
 	return changed
 end
 
--- Lowest free active slot over the vehicle's grills (read only: a slot without a record yet counts as free).
-local function freeSlot(ctx: Context, vehicle: string): (Station?, number?)
+-- Lowest free active slot over the vehicle's grills (read only: a slot without a record yet counts as free). `preferred`
+-- (prep-3d.md §7.2 N1, TASK-195): that slot when it is active and free, otherwise the lowest one (nil / 0 = as before).
+local function freeSlot(ctx: Context, vehicle: string, preferred: number?): (Station?, number?)
+	if preferred ~= nil and preferred >= 1 then
+		for _, grill in grillsOf(vehicle) do
+			const record = grill.Records[preferred]
+			if table.find(activeSlots(ctx, grill), preferred) ~= nil and (record == nil or record.State == "Empty") then
+				return grill, preferred
+			end
+		end
+	end
 	for _, grill in grillsOf(vehicle) do
 		for _, slot in activeSlots(ctx, grill) do
 			const record = grill.Records[slot]
@@ -200,8 +209,8 @@ end
 
 -- Moves one sausage from the stock station to the lowest free grill slot. Synchronous, all or nothing: the unit
 -- leaves the stock only together with a free slot. Returns (slot, grill) or (nil, nil, reason): "NoStock" | "Full".
-local function placeSausage(ctx: Context, stock: Station, player: Player): (number?, Station?, string?)
-	const grill, slot = freeSlot(ctx, stock.Vehicle)
+local function placeSausage(ctx: Context, stock: Station, player: Player, preferred: number?): (number?, Station?, string?)
+	const grill, slot = freeSlot(ctx, stock.Vehicle, preferred)
 	if grill == nil or slot == nil then
 		return nil, nil, "Full"
 	end
@@ -214,6 +223,7 @@ local function placeSausage(ctx: Context, stock: Station, player: Player): (numb
 		StartedAt = ctx.Now(),
 		Duration = cookTime(ctx, player),
 		Count = 0,
+		Flip = nil,
 	}
 	flippedOf(grill)[slot] = nil
 	sync(ctx, grill)
@@ -313,11 +323,12 @@ const Grill = {
 -- Public API for the prep mode (KitchenService/Plate.luau; every call is synchronous) ------------------------------------
 
 -- Sausage from `stock` (a sausage_stock station) to the lowest free grill slot. (slot, nil) or (nil, reason): "NoStock" | "Full".
-function Grill.PlaceFor(ctx: Context, stock: Station, player: Player): (number?, string?)
+-- `preferred` = the slot the player dropped on (PrepGrill Slot 1..8): used when free, else the lowest free one; nil / 0 = lowest.
+function Grill.PlaceFor(ctx: Context, stock: Station, player: Player, preferred: number?): (number?, string?)
 	if stock.Kind ~= STOCK then
 		return nil, "Full"
 	end
-	const slot, _, reason = placeSausage(ctx, stock, player)
+	const slot, _, reason = placeSausage(ctx, stock, player, preferred)
 	return slot, reason
 end
 
@@ -335,6 +346,9 @@ function Grill.Flip(ctx: Context, vehicle: string, slot: number): (number?, stri
 	const tolerance = Content.Prep.Tolerances.ByKey["grill_flip"]
 	const score = Grade.FlipScore(Content.Prep, tolerance, record.StartedAt, ctx.Now(), record.Duration)
 	flipped[slot] = score
+	-- N2: the stamp goes on the wire as score + 1 (0 / nil = not flipped), cleared by Collect (empty record) and Place
+	record.Flip = math.clamp(math.floor(score + 0.5), 0, 100) + 1
+	ctx.Publish(grill)
 	return score, nil
 end
 
@@ -366,6 +380,12 @@ function Grill.DevAge(ctx: Context, vehicle: string, slot: number, seconds: numb
 	ctx.Publish(grill)
 	refreshCollect(ctx, grill)
 	return true
+end
+
+-- Dev: Flip field of the record of `slot` as the wire carries it (score + 1), 0 = nil / no record.
+function Grill.DevFlipWire(vehicle: string, slot: number): number
+	const _, record = findSlot(vehicle, slot)
+	return if record and record.Flip then record.Flip else 0
 end
 
 -- Dev: Duration of the sausage in `slot`, 0 = none.

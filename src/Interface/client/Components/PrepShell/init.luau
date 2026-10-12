@@ -12,6 +12,9 @@
 --   trash          bottom left, only with a plate; HOLD 0.5 s (a plain tap never trashes); a Green fill shows the hold
 --   assist         the +30 % tolerance toggle (Content.Prep.Rules.Assist), left of Next
 --   toast          one at a time, bottom centre
+-- Minimal 3D mode (`Minimal`, docs/tech/prep-3d.md §5, TASK-199): the world is the minigame. Only a thin progress card (top
+-- centre), the ticket (left), the section tabs + Leave / Assist / Tap + Next at the bottom, a one-line hint, the toast and the
+-- plate seal stay; no Board, Panel, Trash or own status (the Hud keeps money, clock and sanity on screen). Layout.Compute(.., true).
 -- Layout (Layout.luau) is computed from the area of the ScreenGui divided by the global UI scale (Theme.ScaleOf): phone
 -- landscape 667 x 375 up, desktop, portrait. The ScreenGui must use ScreenInsets = DeviceSafeInsets (the spec margins are
 -- inside the safe area). Tabs and buttons are CartoonButtons: touch targets >= 44 px, Selectable for the gamepad. No red.
@@ -67,6 +70,13 @@ export type AssistButton = {
 
 export type Toast = { Text: string, Kind: "Info" | "Good" | "Alert", Id: number }
 
+-- The thin progress card of the minimal 3D mode (top centre): the verb of the section, `Value` 0..1 over the whole run (the
+-- bar has one division per tab), the three grade pips on the right of the label.
+export type ProgressCard = {
+	Label: () -> string,
+	Value: () -> number,
+}
+
 export type Slots = {
 	Ticket: (layout: () -> Layout.Result) -> any,
 	Board: (layout: () -> Layout.Result) -> any,
@@ -100,6 +110,18 @@ export type Props = {
 	Scale: (() -> number)?,
 	-- Ink vignette on the edges (the fallback of a camera without depth of field).
 	Vignette: (() -> boolean)?,
+	-- The minimal 3D mode (docs/tech/prep-3d.md §5, TASK-199): no Board, Panel, Trash, notch or own status (the Hud shows money,
+	-- clock and sanity); the section tabs and the buttons go to the bottom, a thin progress card to the top centre. nil / false =
+	-- the 2D chrome above, unchanged.
+	Minimal: (() -> boolean)?,
+	Progress: ProgressCard?,
+	-- The seal of the finished plate (transient, 96 px) and the word under it.
+	Seal: (() -> Seal.Grade?)?,
+	SealLabel: ((grade: Seal.Grade) -> string)?,
+	-- "Tap and tap" accessibility chip, next to Assist (nil = no chip).
+	TapMode: AssistButton?,
+	-- The gamepad is the device: the buttons wear their button glyph (B Leave, Y Next, LB / RB the first / last tab).
+	Pad: (() -> boolean)?,
 	Name: string?,
 }
 
@@ -107,6 +129,8 @@ const BADGE_TONE: { [string]: Theme.Tone } = {
 	Order = Theme.Tone.Teal,
 	Grill = Theme.Tone.Green,
 	Build = Theme.Tone.Cream,
+	Board = Theme.Tone.Cream,
+	Toppings = Theme.Tone.Teal,
 	Serve = Theme.Tone.Mustard,
 }
 const LIFT = 3 -- px the active tab rises
@@ -180,6 +204,32 @@ local function glyph(name: string, fallback: Color3, side: number): Frame
 	})
 end
 
+-- A gamepad glyph on the corner of a button ("B", "Y", "LB", "RB"): shown only when the gamepad is the device. A round chip with
+-- the letter, so the cue is the shape and the text, not the colour.
+local function padGlyph(text: string, visible: () -> boolean): Frame
+	return create("Frame")({
+		Name = "PadGlyph",
+		AnchorPoint = Vector2.new(0, 0),
+		Position = UDim2.fromOffset(-6, -8),
+		Size = UDim2.fromOffset(if #text > 1 then 28 else 22, 22),
+		BackgroundColor3 = Theme.Color.Cream,
+		ZIndex = 7,
+		Visible = visible,
+		create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+		createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
+		CartoonLabel({
+			Text = text,
+			TextSize = Theme.MinTextSize,
+			Color = Theme.Color.Ink,
+			Stroke = 0,
+			Box = UDim2.fromScale(1, 1),
+			XAlignment = Enum.TextXAlignment.Center,
+			YAlignment = Enum.TextYAlignment.Center,
+			ZIndex = 8,
+		}),
+	})
+end
+
 -- The bin drawn with Frames (lid, handle, body).
 local function binGlyph(): Frame
 	local function bar(x: number, y: number, w: number, h: number, color: Color3, corner: number): Frame
@@ -248,9 +298,36 @@ return function(props: Props): Frame
 		end
 		return 1
 	end
+	const minimal = function(): boolean
+		return props.Minimal ~= nil and props.Minimal()
+	end
+	const pad = function(): boolean
+		return props.Pad ~= nil and props.Pad()
+	end
 	const layout = Vide.derive(function(): Layout.Result
-		return Layout.Compute(canvas(), props.HasPanel(), #tabs, activeIndex())
+		return Layout.Compute(canvas(), props.HasPanel(), #tabs, activeIndex(), minimal())
 	end)
+	-- position / size of a block of the minimal mode (zero in the 2D chrome: those blocks are hidden there)
+	local function miniRect(pick: (Layout.Mini) -> Layout.Rect): () -> Layout.Rect
+		return function(): Layout.Rect
+			const mini = layout().Mini
+			return if mini ~= nil then pick(mini) else { X = 0, Y = 0, W = 0, H = 0 }
+		end
+	end
+	local function atMini(pick: (Layout.Mini) -> Layout.Rect): () -> UDim2
+		const rectOf = miniRect(pick)
+		return function(): UDim2
+			const r = rectOf()
+			return UDim2.fromOffset(r.X, r.Y)
+		end
+	end
+	local function sizedMini(pick: (Layout.Mini) -> Layout.Rect): () -> UDim2
+		const rectOf = miniRect(pick)
+		return function(): UDim2
+			const r = rectOf()
+			return UDim2.fromOffset(r.W, r.H)
+		end
+	end
 
 	-- position / size of a block, reactive on the layout
 	local function at(pick: (Layout.Result) -> Layout.Rect): () -> UDim2
@@ -290,6 +367,7 @@ return function(props: Props): Frame
 				XAlignment = Enum.TextXAlignment.Center,
 				YAlignment = Enum.TextYAlignment.Center,
 			}),
+			padGlyph("B", pad),
 		},
 	})
 
@@ -339,6 +417,12 @@ return function(props: Props): Frame
 						XAlignment = Enum.TextXAlignment.Center,
 						YAlignment = Enum.TextYAlignment.Center,
 					}),
+					-- LB / RB walk the tabs: the glyph sits on the first and the last one (the minimal mode, gamepad)
+					if index == 1 or index == #tabs
+						then padGlyph(if index == 1 then "LB" else "RB", function(): boolean
+							return pad() and minimal()
+						end)
+						else nil,
 					-- the count of what waits on this tab
 					create("Frame")({
 						Name = "Badge",
@@ -387,6 +471,9 @@ return function(props: Props): Frame
 		Rotation = 45,
 		BackgroundColor3 = Theme.Tone.Mustard.Bottom,
 		ZIndex = 2,
+		Visible = function(): boolean
+			return not minimal()
+		end,
 		create("UICorner")({ CornerRadius = UDim.new(0, 2) }),
 		createRaw("UIStroke")({
 			Color = Theme.Color.Ink,
@@ -401,6 +488,10 @@ return function(props: Props): Frame
 		Tone = Theme.Tone.Ink,
 		Radius = Theme.Radius.Pill,
 		Lip = 3,
+		-- the minimal mode leaves money, clock and sun / moon to the Hud
+		Visible = function(): boolean
+			return not minimal()
+		end,
 		Position = at(function(l)
 			return l.Status
 		end),
@@ -467,7 +558,7 @@ return function(props: Props): Frame
 		BackgroundColor3 = Theme.Tone.Ink.Bottom,
 		Visible = function()
 			const value = if props.Sanity ~= nil then props.Sanity() else nil
-			return props.IsNight() and value ~= nil
+			return props.IsNight() and value ~= nil and not minimal()
 		end,
 		create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
 		createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
@@ -549,6 +640,9 @@ return function(props: Props): Frame
 		Name = "Board",
 		Tone = Theme.Tone.Cream,
 		Radius = Theme.Radius.Card,
+		Visible = function(): boolean
+			return not minimal()
+		end,
 		Position = at(function(l)
 			return l.Board
 		end),
@@ -624,7 +718,9 @@ return function(props: Props): Frame
 			return l.Panel
 		end),
 		BackgroundTransparency = 1,
-		Visible = props.HasPanel,
+		Visible = function(): boolean
+			return props.HasPanel() and not minimal()
+		end,
 		if props.Slots.Panel ~= nil then props.Slots.Panel(layout) else nil,
 	})
 
@@ -694,6 +790,7 @@ return function(props: Props): Frame
 		BackgroundTransparency = 1,
 		createRaw("UIScale")({ Scale = pulseScale }),
 		nextButton,
+		padGlyph("Y", pad),
 	})
 	-- a tap on the disabled button: shake and tell the owner (the hint says why)
 	const blocker = create("TextButton")({
@@ -727,7 +824,9 @@ return function(props: Props): Frame
 			return l.Trash
 		end),
 		Padding = 0,
-		Visible = props.Trash.Visible,
+		Visible = function(): boolean
+			return props.Trash.Visible() and not minimal()
+		end,
 		Children = {
 			-- the Green fill that rises while the hold runs
 			create("Frame")({
@@ -850,6 +949,225 @@ return function(props: Props): Frame
 		},
 	})
 
+	-- tap mode ("tap and tap"): a chip next to Assist, only when the owner offers it (minimal mode)
+	const tapProps = props.TapMode
+	const tapChip = if tapProps ~= nil
+		then CartoonButton({
+			Name = "TapMode",
+			Tone = function()
+				return if tapProps.On() then Theme.Tone.Teal else Theme.Tone.Cream
+			end,
+			Outline = function()
+				return if tapProps.On() then Theme.Outline.Thick else Theme.Outline.Normal
+			end,
+			Radius = Theme.Radius.Chip,
+			Position = atMini(function(m)
+				return m.Tap
+			end),
+			Size = sizedMini(function(m)
+				return m.Tap
+			end),
+			Padding = 0,
+			Visible = minimal,
+			OnActivated = tapProps.OnToggle,
+			Children = {
+				CartoonLabel({
+					Text = tapProps.Label,
+					TextSize = Theme.MinTextSize,
+					Color = Theme.Color.Ink,
+					Stroke = 0,
+					Box = UDim2.fromScale(1, 1),
+					XAlignment = Enum.TextXAlignment.Center,
+					YAlignment = Enum.TextYAlignment.Center,
+				}),
+				create("Frame")({
+					Name = "On",
+					AnchorPoint = Vector2.new(1, 0),
+					Position = UDim2.new(1, 0, 0, -2),
+					Size = UDim2.fromOffset(12, 12),
+					BackgroundColor3 = Theme.Tone.Green.Bottom,
+					ZIndex = 5,
+					Visible = tapProps.On,
+					create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+					createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
+				}),
+			},
+		})
+		else nil
+
+	-- progress card (minimal mode, top centre): the verb of the section, the three grade pips, a 10 px bar with one division per
+	-- section. It is a level, read by shape (the divisions) and by the label, not by colour.
+	const progressProps = props.Progress
+	const divisions: { Frame } = {}
+	for index = 1, #tabs - 1 do
+		table.insert(
+			divisions,
+			create("Frame")({
+				Name = `Division{index}`,
+				AnchorPoint = Vector2.new(0.5, 0),
+				Position = UDim2.fromScale(index / #tabs, 0),
+				Size = UDim2.new(0, 2, 1, 0),
+				BackgroundColor3 = Theme.Color.Ink,
+				BorderSizePixel = 0,
+			})
+		)
+	end
+	const progressCard = if progressProps ~= nil
+		then CartoonPanel({
+			Name = "Progress",
+			Tone = Theme.Tone.Cream,
+			Radius = Theme.Radius.Card,
+			Lip = 3,
+			Visible = minimal,
+			Position = atMini(function(m)
+				return m.Progress
+			end),
+			Size = sizedMini(function(m)
+				return m.Progress
+			end),
+			Padding = { Left = 10, Right = 10, Top = 2, Bottom = 2 },
+			Children = {
+				create("Frame")({
+					Name = "Row",
+					Size = UDim2.new(1, 0, 0, 16),
+					BackgroundTransparency = 1,
+					CartoonLabel({
+						Name = "Verb",
+						Text = progressProps.Label,
+						TextSize = Theme.MinTextSize,
+						Color = Theme.Color.Ink,
+						Stroke = 0,
+						Truncate = true,
+						Box = UDim2.new(0.6, 0, 1, 0),
+						XAlignment = Enum.TextXAlignment.Left,
+						YAlignment = Enum.TextYAlignment.Center,
+					}),
+					create("Frame")({
+						Name = "Pips",
+						AnchorPoint = Vector2.new(1, 0),
+						Position = UDim2.fromScale(1, 0),
+						Size = UDim2.fromOffset(0, 16),
+						AutomaticSize = Enum.AutomaticSize.X,
+						BackgroundTransparency = 1,
+						create("UIListLayout")({
+							FillDirection = Enum.FillDirection.Horizontal,
+							HorizontalAlignment = Enum.HorizontalAlignment.Right,
+							VerticalAlignment = Enum.VerticalAlignment.Center,
+							SortOrder = Enum.SortOrder.LayoutOrder,
+							Padding = UDim.new(0, 6),
+						}),
+						Vide.values(function(): { Pip }
+							return if props.Pips ~= nil then props.Pips() else {}
+						end, function(pip: Pip): Frame
+							return create("Frame")({
+								Name = `Pip_{pip.Label}`,
+								Size = UDim2.fromOffset(0, 16),
+								AutomaticSize = Enum.AutomaticSize.X,
+								BackgroundTransparency = 1,
+								create("UIListLayout")({
+									FillDirection = Enum.FillDirection.Horizontal,
+									VerticalAlignment = Enum.VerticalAlignment.Center,
+									SortOrder = Enum.SortOrder.LayoutOrder,
+									Padding = UDim.new(0, 2),
+								}),
+								Seal({
+									LayoutOrder = 1,
+									Size = 16,
+									Grade = function()
+										return pip.Grade
+									end,
+								}),
+								CartoonLabel({
+									LayoutOrder = 2,
+									Text = pip.Label,
+									TextSize = Theme.MinTextSize,
+									Color = Theme.Color.Ink,
+									Stroke = 0,
+								}),
+							}) :: Frame
+						end),
+					}),
+				}),
+				create("Frame")({
+					Name = "Bar",
+					Position = UDim2.fromOffset(0, 19),
+					Size = UDim2.new(1, 0, 0, 10),
+					BackgroundColor3 = Theme.Tone.Cream.Bottom,
+					create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+					createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
+					create("Frame")({
+						Name = "Fill",
+						Size = function(): UDim2
+							return UDim2.fromScale(math.clamp(progressProps.Value(), 0, 1), 1)
+						end,
+						BackgroundColor3 = Theme.Tone.Mustard.Bottom,
+						BorderSizePixel = 0,
+						create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+					}),
+					-- one division per section
+					divisions,
+				}),
+			},
+		})
+		else nil
+
+	-- one line of hint above the tabs (minimal mode)
+	const hintPill = CartoonPanel({
+		Name = "Hint",
+		Tone = Theme.Tone.Cream,
+		Radius = Theme.Radius.Pill,
+		Lip = 3,
+		Visible = function(): boolean
+			return minimal() and props.Hint() ~= ""
+		end,
+		Position = atMini(function(m)
+			return m.Hint
+		end),
+		Size = sizedMini(function(m)
+			return m.Hint
+		end),
+		Padding = { Left = 10, Right = 10 },
+		Children = {
+			CartoonLabel({
+				Name = "Text",
+				Text = props.Hint,
+				TextSize = 16,
+				Color = Theme.Color.Ink,
+				Stroke = 0,
+				Truncate = true,
+				Box = UDim2.fromScale(1, 1),
+				XAlignment = Enum.TextXAlignment.Center,
+				YAlignment = Enum.TextYAlignment.Center,
+			}),
+		},
+	})
+
+	-- the seal of the finished plate (transient, minimal mode): shape + colour + word
+	const sealGrade = props.Seal
+	const sealHolder = if sealGrade ~= nil
+		then create("Frame")({
+			Name = "Seal",
+			Position = atMini(function(m)
+				return m.Seal
+			end),
+			Size = sizedMini(function(m)
+				return m.Seal
+			end),
+			BackgroundTransparency = 1,
+			Visible = function(): boolean
+				return minimal() and sealGrade() ~= nil
+			end,
+			Seal({
+				Name = "PlateSeal",
+				Size = 96,
+				Position = UDim2.fromScale(0.5, 0.5),
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Grade = sealGrade,
+				Label = props.SealLabel,
+			}),
+		})
+		else nil
+
 	-- toast: one at a time, bottom centre
 	const toastShown = function(): boolean
 		return props.Toast() ~= nil
@@ -969,6 +1287,10 @@ return function(props: Props): Frame
 			nextHolder,
 			trash,
 			assist,
+			tapChip,
+			progressCard,
+			hintPill,
+			sealHolder,
 			toast,
 		}),
 	})

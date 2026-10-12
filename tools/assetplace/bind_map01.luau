@@ -1861,6 +1861,28 @@ local function bindPrepStations(trl: Instance, padPose: CFrame)
 	end
 end
 
+-- TASK-200 (3D-6, prep-3d.md §2.2, §4.1; MAP-01 §19.2; Provisional): the PrepTarget hitboxes and the Board / Toppings / Window
+-- view anchors of Station_1..4. The numbers and the derivation live in ONE place, tools/assetplace/prep_targets.luau (every
+-- position is derived from the live objects of the trailer, so there is nothing to mirror in MAP-01 axes); this loads it from
+-- the repo HTTP server (tools/studio/README.md) and runs it. Without the server (or when it reports a problem) the bind goes on
+-- and says so: run `run("prep_targets")` by hand, check_map01 rule 18 catches a missing hitbox. Must run AFTER bindPrepStations
+-- (it re-aims CamAnchor / Focus of the Grill view).
+local PREP_TARGETS_URL = "http://127.0.0.1:8772/tools/assetplace/prep_targets.luau"
+local function bindPrepTargets(trl: Instance)
+	local ok, res = pcall(function()
+		local source = game:GetService("HttpService"):GetAsync(PREP_TARGETS_URL, true)
+		local fn, perr = loadstring(source, "=assetplace/prep_targets")
+		assert(fn, perr)
+		return (fn :: any)("apply")
+	end)
+	if not ok then
+		log("warn", "PrepTarget hitboxes not authored (repo HTTP server off? run('prep_targets') by hand): " .. tostring(res))
+		return
+	end
+	local text = tostring(res)
+	log(if string.find(text, "[err]", 1, true) then "warn" else "ok", "PrepTarget (TASK-200): " .. (string.match(text, "plan: [^\n]*") or string.sub(text, 1, 200)))
+end
+
 local function bindOpenSign(assets: Instance, opts: AnchorOpts)
 	local m = byMapId(assets, "OPEN", "AST-024_SignStand")
 	if not m then
@@ -3571,6 +3593,7 @@ function Bind.run(opts: AnchorOpts?): string
 		bindShutterButton(trl, padPose, o)
 		bindShutterPiece(trl, padPose)
 		bindPrepStations(trl, padPose)
+		bindPrepTargets(trl)
 	end
 	bindOpenSign(assets, o)
 	bindMart(assets, o)

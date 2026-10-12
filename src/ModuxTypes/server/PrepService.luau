@@ -7,7 +7,7 @@ local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 local Session = require(ServerScriptService.server.Prep.PrepService.Session)
 local Validate = require(ServerScriptService.server.Prep.PrepService.Validate)
 
-export type SeatRecord = { User: number, Step: string, Ticket: number, Since: number }
+export type SeatRecord = { User: number, Step: string, Ticket: number, Since: number, Plate: number }
 
 export type Public = {
 	Active: boolean,
@@ -28,6 +28,8 @@ export type Public = {
 	StationCount: (self: Public) -> number,
 	WantedCount: (self: Public) -> number,
 	WriteSeat: (self: Public, station: number, record: SeatRecord?) -> (),
+	PublishSeat: (self: Public, seat: Session.Seat) -> (),
+	ClearMask: (self: Public, seat: Session.Seat) -> (),
 	Grow: (self: Public) -> (),
 	Recount: (self: Public) -> (),
 	PushSeats: (self: Public) -> (),
@@ -49,7 +51,8 @@ export type Public = {
 	Finish: (self: Public, player: Player, seat: Session.Seat, summary: Validate.Summary) -> (boolean, string, string, number),
 	DropPlate: (self: Public, player: Player, seat: Session.Seat) -> (),
 	Trash: (self: Public, player: Player, seat: Session.Seat) -> (boolean, string),
-	OnTab: (self: Public, player: Player, step: string, ticket: number) -> (),
+	AcceptMask: (self: Public, seat: Session.Seat, mask: number) -> (),
+	OnTab: (self: Public, player: Player, step: string, ticket: number, plate: number?) -> (),
 	OnGrill: (self: Public, player: Player, act: string, slot: number) -> (),
 	OnFinish: (self: Public, player: Player, summary: Validate.Summary) -> (),
 	OnOrder: (self: Public, player: Player, act: string, npc: number) -> (),
@@ -60,6 +63,7 @@ export type Public = {
 	DevSeats: (self: Public) -> string,
 	DevEnter: (self: Public, player: Player, station: number, step: string?) -> string,
 	DevWhy: (self: Public, player: Player, station: number, reason: string) -> string,
+	DevPlate: (self: Public, player: Player) -> string,
 	DevLeave: (self: Public, player: Player) -> string,
 	DevFinish: (self: Public, player: Player, keys: { string }, force: boolean) -> string,
 }

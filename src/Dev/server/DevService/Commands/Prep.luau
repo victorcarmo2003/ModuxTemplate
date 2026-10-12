@@ -6,6 +6,9 @@
 --                sit / leave as the caller (first player from the Command Bar), perfect summary through the real path
 --                ("force" ages the plate past the Perfect floor; without it the server clock answers TooFast)
 --   prep ui [n]  opens / closes the focused UI on the caller's client with mock data (PrepController, TASK-173; no seat)
+--   prep ray     toggles the PrepRay attribute of the caller: while on, every press in the focused mode prints what the pointer ray
+--                hits (target, part, distance, world point, bun uv) in the CLIENT output (World/Aim, TASK-196); works with
+--                Rules.ThreeD off too, enter the mode after turning it on
 --   prep kitchen runs the KitchenService scenarios of the prep mode (TASK-169): BeginPlate / FinishPlate / RefundPlate /
 --                TrashPlate (refusals change nothing), GrillAct Place / Flip / Collect, TakeStock race and the
 --                WorldKitchenPrompts flag; prints ok / FAIL per check, restores stock and rail, errors on any failure
@@ -173,14 +176,14 @@ const Prep: Api.Module = function(ctx: Api.Context): { Api.Command }
 	return {
 		{
 			Name = "prep",
-			Usage = "prep grade | kitchen | seats | ui [n] [tab] | enter <n> [Grill|Build] | leave | finish [force] [topping...]",
-			Help = "prep grade: Prep.Grade cases; kitchen: KitchenService plate/grill/flag scenarios (TASK-169); seats / enter / leave / finish: PrepService without the UI (TASK-170)",
+			Usage = "prep grade | ray | kitchen | plate | seats | ui [n] [tab] | enter <n> [Grill|Build] | leave | finish [force] [topping...]",
+			Help = "prep grade: Prep.Grade cases; ray: print the target under every click of the focused mode (client Output); kitchen: KitchenService plate/grill/flag scenarios (TASK-169); seats / enter / leave / finish: PrepService without the UI (TASK-170)",
 			Run = function(args: { string }, caller: Player?): string?
 				const verb = args[1]
 				if verb == "kitchen" then
 					return PrepKitchen(ctx, caller)
 				end
-				if verb == "seats" or verb == "enter" or verb == "leave" or verb == "finish" then
+				if verb == "seats" or verb == "enter" or verb == "leave" or verb == "finish" or verb == "plate" then
 					const service = ctx.Get("PrepService") :: any
 					if verb == "seats" then
 						return service:DevSeats()
@@ -193,6 +196,9 @@ const Prep: Api.Module = function(ctx: Api.Context): { Api.Command }
 						return service:DevEnter(player, tonumber(args[2]) or 1, args[3])
 					elseif verb == "leave" then
 						return service:DevLeave(player)
+					elseif verb == "plate" then
+						-- the PrepTab.Plate mask rules (TASK-195); seated, no open plate
+						return service:DevPlate(player)
 					end
 					const keys: { string } = {}
 					local force = false
@@ -218,7 +224,7 @@ const Prep: Api.Module = function(ctx: Api.Context): { Api.Command }
 					return `prep ui sent to {player.Name} (run it again to leave)`
 				end
 				if verb ~= "grade" then
-					error("usage: prep grade | kitchen | seats | enter <n> [Grill|Build] | leave | finish [force] [topping...]", 0)
+					error("usage: prep grade | kitchen | plate | seats | enter <n> [Grill|Build] | leave | finish [force] [topping...]", 0)
 				end
 				const all: { Case } = table.clone(cases)
 				for _, case in sweepRows() do

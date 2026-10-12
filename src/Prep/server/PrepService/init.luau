@@ -24,6 +24,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local Charm = require(ReplicatedStorage.Packages.Charm)
 local Content = require(ReplicatedStorage.shared.Content)
 local Grade = require(ReplicatedStorage.shared.Prep.Grade)
+local PlateMask = require(ReplicatedStorage.shared.Prep.PlateMask)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 local Bridge = require(script.Bridge)
@@ -31,7 +32,7 @@ local Session = require(script.Session)
 local Validate = require(script.Validate)
 local Modux = require(ServerScriptService.server.Modux)
 
-export type SeatRecord = { User: number, Step: string, Ticket: number, Since: number }
+export type SeatRecord = { User: number, Step: string, Ticket: number, Since: number, Plate: number }
 
 const STATION_TAG = "Station"
 const PREP_KIND = "prep"
@@ -41,7 +42,7 @@ const STAND_ATTACHMENT = "Att_Stand"
 -- says where the player starts (attribute PromptStep on the Prompt_Work attachment) and which stand the rig takes
 -- (Att_Stand = grill, Att_Stand_Build = board); the seat itself is the next free one.
 const STEP_ATTRIBUTE = "PromptStep"
-const VIEW_STAND: { [string]: string } = { Grill = "Att_Stand", Build = "Att_Stand_Build" }
+const VIEW_STAND: { [string]: string } = { Grill = "Att_Stand", Build = "Att_Stand_Build", Board = "Att_Stand_Build" }
 const DEFAULT_STEP = "Grill"
 const WORKING_ATTRIBUTE = "Working"
 const FREEZE_REASON = "Prep"
@@ -73,12 +74,24 @@ local function stationNumber(instance: Instance): number?
 	return nil
 end
 
+-- A wire tab key as a key of the ACTIVE tab set (prep-3d.md §15: `Tabs.ByKey[k] and k or TabAlias[k]`); nil = unknown
+local function resolveTab(key: string): string?
+	if cfg.Tabs.ByKey[key] ~= nil then
+		return key
+	end
+	const alias = cfg.TabAlias[key]
+	if alias ~= nil and cfg.Tabs.ByKey[alias] ~= nil then
+		return alias
+	end
+	return nil
+end
+
 local function isPrepStation(instance: Instance): boolean
 	return CollectionService:HasTag(instance, STATION_TAG) and instance:GetAttribute("StationKind") == PREP_KIND
 end
 
 local function freeRecord(): SeatRecord
-	return { User = 0, Step = "Order", Ticket = 0, Since = 0 }
+	return { User = 0, Step = "Order", Ticket = 0, Since = 0, Plate = 0 }
 end
 
 const PrepService = Modux.Service("PrepService", {
@@ -156,6 +169,27 @@ function PrepService:WriteSeat(station: number, record: SeatRecord?)
 	self.Seats(table.freeze(nextSeats))
 end
 
+-- Writes the seat record of `seat` (step, ticket, plate mask) into the seats atom
+function PrepService:PublishSeat(seat: Session.Seat)
+	self:WriteSeat(seat.Station, {
+		User = seat.Player.UserId,
+		Step = seat.Step,
+		Ticket = seat.Ticket,
+		Since = seat.Since,
+		Plate = seat.Mask,
+	})
+end
+
+-- Zeroes the cosmetic plate mask (Begin, Finish, Trash, plate dropped) and tells the colleagues
+function PrepService:ClearMask(seat: Session.Seat)
+	if seat.Mask ~= 0 then
+		seat.Mask = 0
+		if self.BySeat[seat.Station] == seat then
+			self:PublishSeat(seat)
+		end
+	end
+end
+
 -- Records only grow with the party during a turn (DT-9)
 function PrepService:Grow()
 	const wanted = self:WantedCount()
@@ -192,6 +226,7 @@ function PrepService:PushSeats()
 			Step = record.Step,
 			Ticket = record.Ticket,
 			Since = record.Since,
+			Plate = record.Plate,
 		}
 		if self.Published[station] then
 			set:update(station, value)
@@ -282,10 +317,9 @@ end
 -- Step a Work prompt opens on (attribute PromptStep of the anchor, a Content.Prep.Tabs key)
 function PrepService:StepOfAnchor(anchor: Instance): string
 	const value = anchor:GetAttribute(STEP_ATTRIBUTE)
-	if type(value) == "string" and VIEW_STAND[value] ~= nil then
-		return value
-	end
-	return DEFAULT_STEP
+	-- Build (2D) and Board (3D) are the same prompt: it resolves to the key of the active tab set
+	const resolved = if type(value) == "string" and VIEW_STAND[value] ~= nil then resolveTab(value) else nil
+	return resolved or DEFAULT_STEP
 end
 
 -- Network ---------------------------------------------------------------------------------------------------------------
@@ -402,7 +436,7 @@ function PrepService:Enter(player: Player, station: number, skipReach: boolean?,
 	const seat = Session.new(player, station, serverTime, now, step or DEFAULT_STEP)
 	self.Sessions[player] = seat
 	self.BySeat[station] = seat
-	self:WriteSeat(station, { User = player.UserId, Step = seat.Step, Ticket = 0, Since = serverTime })
+	self:PublishSeat(seat)
 
 	const characters = self.Dependencies.CharacterService
 	characters:Freeze(player, FREEZE_REASON, true)
@@ -490,7 +524,8 @@ function PrepService:Begin(player: Player, seat: Session.Seat): (boolean, string
 	if not ok then
 		return false, reason, 0
 	end
-	seat.Plate = { StartedAt = os.clock(), Reserved = true }
+	seat.Plate = { StartedAt = os.clock(), Reserved = true, PreCut = preCut }
+	self:ClearMask(seat)
 	-- Value 1 = the bun came already sliced (ANM-002 altered bun): the client skips the cut
 	return true, "None", if preCut then 1 else 0
 end
@@ -529,6 +564,7 @@ function PrepService:Finish(player: Player, seat: Session.Seat, summary: Validat
 		return false, refusal, "None", refusalValue
 	end
 	seat.Plate = nil
+	self:ClearMask(seat)
 	local band = verdict.Band
 	const sausage = made.SausageScore
 	if sausage ~= nil then
@@ -547,6 +583,7 @@ end
 function PrepService:DropPlate(player: Player, seat: Session.Seat)
 	const plate = seat.Plate
 	seat.Plate = nil
+	self:ClearMask(seat)
 	if plate ~= nil and plate.Reserved then
 		Bridge.Refund(self.Dependencies.KitchenService, player)
 	end
@@ -556,6 +593,7 @@ end
 function PrepService:Trash(player: Player, seat: Session.Seat): (boolean, string)
 	const plate = seat.Plate
 	seat.Plate = nil
+	self:ClearMask(seat)
 	const bridge = Bridge.Trash(self.Dependencies.KitchenService, self.Dependencies.ItemService, player, plate ~= nil)
 	if plate == nil and not bridge then
 		return false, "NoSession"
@@ -565,19 +603,52 @@ end
 
 -- Packets ---------------------------------------------------------------------------------------------------------------
 
-function PrepService:OnTab(player: Player, step: string, ticket: number)
+-- Plate mask of PrepTab (prep-3d.md §7.2 N3). Cosmetic, never authority (PrepFinish revalidates everything), so a mask that
+-- does not fit is IGNORED without an answer. It must: come with an open plate, only grow, carry no bit without a key and at
+-- most MaxToppings topping bits (PlateMask.Valid), keep the order of the work (a sausage needs the cut unless the bun came
+-- sliced, toppings need the sausage) and not outrun the clock (nothing before Rules.MinPlate on the server clock).
+function PrepService:AcceptMask(seat: Session.Seat, mask: number)
+	if mask == seat.Mask then
+		return
+	end
+	const plate = seat.Plate
+	if plate == nil then
+		return
+	end
+	if not PlateMask.Valid(seat.Mask, mask, Content.OrderRules.MaxToppings) then
+		return
+	end
+	const unpacked = PlateMask.Unpack(mask)
+	if unpacked.Sausage and not (unpacked.Cut or plate.PreCut == true) then
+		return
+	end
+	if #unpacked.Toppings > 0 and not unpacked.Sausage then
+		return
+	end
+	if not (Grade.Plausible(cfg, 0, os.clock() - plate.StartedAt, 0)) then
+		return
+	end
+	seat.Mask = mask
+	self:PublishSeat(seat)
+end
+
+function PrepService:OnTab(player: Player, step: string, ticket: number, plate: number?)
 	const seat = self:Seated(player, "Tab")
 	if seat == nil then
 		return
 	end
-	if ticket < 0 or ticket > MAX_TICKET or cfg.Tabs.ByKey[step] == nil then
+	const key = resolveTab(step)
+	if ticket < 0 or ticket > MAX_TICKET or key == nil then
 		self:Reply(player, "Tab", false, "Invalid", nil, nil)
 		return
 	end
-	if seat.Step ~= step or seat.Ticket ~= ticket then
-		seat.Step = step
+	if seat.Step ~= key or seat.Ticket ~= ticket then
+		seat.Step = key
 		seat.Ticket = ticket
-		self:WriteSeat(seat.Station, { User = player.UserId, Step = step, Ticket = ticket, Since = seat.Since })
+		self:PublishSeat(seat)
+	end
+	if plate ~= nil then
+		self:AcceptMask(seat, plate)
 	end
 end
 
@@ -639,7 +710,7 @@ function PrepService:ConnectPackets()
 		if not self:Allow(player, "Tab") then
 			return
 		end
-		self:OnTab(player, value.Step, value.Ticket)
+		self:OnTab(player, value.Step, value.Ticket, value.Plate)
 	end)
 	net.PrepGrill:onServer(function(value, player: Player)
 		if not self:Allow(player, "Grill") then
@@ -869,6 +940,88 @@ function PrepService:DevWhy(player: Player, station: number, reason: string): st
 		return "re-entry lock after a forced exit (Rules.CueLock)"
 	end
 	return "see Content.Prep.Reasons"
+end
+
+-- `prep plate`: the PrepTab.Plate mask rules through the real OnTab path (TASK-195). Needs a seat, no open plate and a shift
+-- that sells; opens one plate, checks, and refunds it. Errors on any failure.
+function PrepService:DevPlate(player: Player): string
+	self:DevGuard()
+	const seat = self.Sessions[player]
+	if seat == nil then
+		return `{player.Name} is not seated: /dev prep enter <n> first`
+	end
+	if seat.Plate ~= nil then
+		return "a plate is open: finish or leave it first"
+	end
+	local total = 0
+	local failed = 0
+	local function check(name: string, ok: boolean)
+		total += 1
+		if not ok then
+			failed += 1
+			warn(`[prep plate] FAIL {name}`)
+		end
+	end
+	local function send(mask: number?)
+		self:OnTab(player, seat.Step, seat.Ticket, mask)
+	end
+	local function wire(): number
+		const record = self.Seats()[seat.Station]
+		return if record ~= nil then record.Plate else -1
+	end
+	const maxToppings = Content.OrderRules.MaxToppings
+	const keys = Content.Ingredients.ToppingKeys
+	const cut = PlateMask.Pack({ Cut = true })
+	const sausage = PlateMask.Pack({ Cut = true, Sausage = true })
+	local topped = 0
+	local ok, reason = self:Begin(player, seat)
+	check(`begin ({reason})`, ok)
+	if ok then
+		const opened: any = self.Sessions[player]
+		const plate: Session.Plate = opened.Plate
+		plate.StartedAt = os.clock()
+		send(cut)
+		check("a mask before Rules.MinPlate is ignored", seat.Mask == 0 and wire() == 0)
+		plate.StartedAt = os.clock() - (rules.MinPlate + 0.5)
+		send(nil)
+		check("nil keeps the mask", seat.Mask == 0)
+		send(PlateMask.Pack({ Cut = true, Toppings = { keys[1] } }))
+		check("a topping without the sausage is ignored", seat.Mask == 0)
+		send(PlateMask.Pack({ Sausage = true }))
+		check("a sausage without the cut is ignored", seat.Mask == 0)
+		send(cut)
+		check("the cut is accepted and replicated", seat.Mask == cut and wire() == cut)
+		send(0)
+		check("a mask that shrinks is ignored", seat.Mask == cut)
+		send(sausage)
+		check("the sausage is accepted", seat.Mask == sausage and wire() == sausage)
+		local list: { string } = {}
+		for index = 1, math.min(maxToppings, #keys) do
+			table.insert(list, keys[index])
+			topped = PlateMask.Pack({ Cut = true, Sausage = true, Toppings = list })
+			send(topped)
+		end
+		check("up to MaxToppings toppings are accepted", seat.Mask == topped and PlateMask.Count(seat.Mask) == #list)
+		if #keys > maxToppings then
+			list = table.clone(list)
+			table.insert(list, keys[maxToppings + 1])
+			send(PlateMask.Pack({ Cut = true, Sausage = true, Toppings = list }))
+			check("a topping past MaxToppings is ignored", seat.Mask == topped)
+		end
+		send(256)
+		check("a value past 8 bits is ignored", seat.Mask == topped)
+		send(topped - 1 + 0.5)
+		check("a fraction is ignored", seat.Mask == topped)
+		self:DropPlate(player, seat)
+		check("the plate drop zeroes the mask", seat.Mask == 0 and wire() == 0)
+		send(cut)
+		check("a mask without an open plate is ignored", seat.Mask == 0)
+	end
+	const summary = `prep plate: {total - failed}/{total} ok, {failed} failed`
+	if failed > 0 then
+		error(summary, 0)
+	end
+	return summary
 end
 
 function PrepService:DevLeave(player: Player): string

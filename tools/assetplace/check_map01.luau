@@ -2643,6 +2643,230 @@ local function checkPrepStations(vehicles: { [string]: Instance })
 	info(("17: prep seats %d/4"):format(found))
 end
 
+-- 18. (TASK-200, 3D-6; prep-3d.md §2.2, §4.1, §4.3; MAP-01 §19.2; Provisional) PrepTarget hitboxes and the views of the 3D prep.
+-- Mirrors tools/assetplace/prep_targets.luau (the snippet that authors them). Errors: a tagged part without a valid TargetKind /
+-- Id / Slot / Key (Topping = Ingredients key), not invisible (Transparency 1) / CanCollide false / CanQuery true, a duplicate Id,
+-- a hitbox under the minimum (second largest side < 0.31 stud), a missing hitbox (expected count per kind), two hitboxes that
+-- overlap by more than 25% of the smaller, Station_n without CamAnchor_Board / Toppings / Window (+ Focus_ + Att_Stand_) or with a
+-- Fov outside 20..100, a target of a view that is off the 667x375 frame, under 44 px (667x375 and 844x390) or not seen by raycast
+-- from the camera (>= 3 of 5 points). A hitbox with the attribute ViewGap (the trash can on the floor: no model on the bench yet)
+-- is a warning in those two tests.
+local PREP_TARGET_COUNT = { GrillSlot = 4, SausageStock = 1, Rail = 1, BunCrate = 1, Board = 4, Knife = 1, Topping = 6, Bin = 1, Hatch = 1 }
+local PREP_TOPPINGS = { "ketchup", "mustard", "cheese", "bacon", "potato_sticks", "cream_cheese" }
+local PREP_KIND_VIEWS = {
+	GrillSlot = { "Grill" },
+	SausageStock = { "Grill" },
+	Rail = { "Grill", "Board" },
+	BunCrate = { "Board" },
+	Board = { "Board", "Toppings" },
+	Knife = { "Board" },
+	Topping = { "Toppings" },
+	Bin = { "Board", "Toppings" },
+	Hatch = { "Window" },
+}
+local PREP_VIEW_ANCHORS = {
+	{ view = "Grill", cam = "CamAnchor", focus = "Focus", stand = nil },
+	{ view = "Board", cam = "CamAnchor_Board", focus = "Focus_Board", stand = "Att_Stand_Board" },
+	{ view = "Toppings", cam = "CamAnchor_Toppings", focus = "Focus_Toppings", stand = "Att_Stand_Toppings" },
+	{ view = "Window", cam = "CamAnchor_Window", focus = "Focus_Window", stand = "Att_Stand_Window" },
+}
+local function checkPrepTargets(vehicles: { [string]: Instance })
+	local v = vehicles.trailer
+	if not v then
+		return
+	end
+	local base = v:GetPivot() * CFrame.Angles(0, math.pi, 0)
+	local parts: { BasePart } = {}
+	local ids: { [string]: BasePart } = {}
+	local counts: { [string]: number } = {}
+	local boxes: { { id: string, c: Vector3, s: Vector3, part: BasePart } } = {}
+	for _, i in tagged("PrepTarget") do
+		if not i:IsA("BasePart") then
+			err(("18: %s has the PrepTarget tag but is not a BasePart"):format(name(i)))
+			continue
+		end
+		if not i:IsDescendantOf(v) then
+			warn_(("18: PrepTarget %s is outside the trailer (only the trailer is authored)"):format(name(i)))
+			continue
+		end
+		local kind = i:GetAttribute("TargetKind")
+		local slot = i:GetAttribute("Slot")
+		local key = i:GetAttribute("Key")
+		if typeof(slot) == "number" and ancestorWithTag(i, "Station") then
+			err(("18: %s: a hitbox with a Slot attribute inside a Station model counts as a slot anchor (MapIndex, KitchenController); move it to trailer.PrepTargets"):format(name(i)))
+		end
+		if typeof(kind) ~= "string" or PREP_TARGET_COUNT[kind] == nil then
+			err(("18: %s: TargetKind %s is not one of the kinds"):format(name(i), tostring(kind)))
+			continue
+		end
+		local id = kind
+		if kind == "GrillSlot" or kind == "Rail" or kind == "Board" then
+			if typeof(slot) ~= "number" or slot < 1 or slot ~= math.floor(slot) then
+				err(("18: %s: %s needs an integer Slot >= 1 (is %s)"):format(name(i), kind, tostring(slot)))
+				continue
+			end
+			id = kind .. ":" .. slot
+		elseif kind == "Topping" then
+			if typeof(key) ~= "string" or not table.find(PREP_TOPPINGS, key) then
+				err(("18: %s: Topping needs a Key of the Ingredients toppings (is %s)"):format(name(i), tostring(key)))
+				continue
+			end
+			id = "Topping:" .. key
+		end
+		if i:GetAttribute("Id") ~= id then
+			err(("18: %s: Id attribute %s must be %s"):format(name(i), tostring(i:GetAttribute("Id")), id))
+		end
+		if ids[id] then
+			err(("18: Id %s is on two hitboxes (%s, %s)"):format(id, name(ids[id]), name(i)))
+			continue
+		end
+		ids[id] = i
+		counts[kind] = (counts[kind] or 0) + 1
+		table.insert(parts, i)
+		if i.Transparency ~= 1 or i.CanCollide or not i.CanQuery then
+			err(("18: %s: a hitbox must have Transparency 1, CanCollide false, CanQuery true"):format(name(i)))
+		end
+		local d = { i.Size.X, i.Size.Y, i.Size.Z }
+		table.sort(d, function(a, b)
+			return a > b
+		end)
+		if d[2] < 0.31 then
+			err(("18: %s: hitbox %s under the minimum (second largest side %.2f < 0.31 stud)"):format(name(i), fmtV(i.Size), d[2]))
+		end
+		table.insert(boxes, { id = id, c = base:PointToObjectSpace(i.Position), s = i.Size, part = i })
+	end
+	for kind, want in PREP_TARGET_COUNT do
+		if (counts[kind] or 0) ~= want then
+			err(("18: %d PrepTarget %s hitbox(es) (%d expected)"):format(counts[kind] or 0, kind, want))
+		end
+	end
+	for a = 1, #boxes do
+		for b = a + 1, #boxes do
+			local p, q = boxes[a], boxes[b]
+			local ox = math.min(p.c.X + p.s.X / 2, q.c.X + q.s.X / 2) - math.max(p.c.X - p.s.X / 2, q.c.X - q.s.X / 2)
+			local oy = math.min(p.c.Y + p.s.Y / 2, q.c.Y + q.s.Y / 2) - math.max(p.c.Y - p.s.Y / 2, q.c.Y - q.s.Y / 2)
+			local oz = math.min(p.c.Z + p.s.Z / 2, q.c.Z + q.s.Z / 2) - math.max(p.c.Z - p.s.Z / 2, q.c.Z - q.s.Z / 2)
+			if ox > 0 and oy > 0 and oz > 0 then
+				local ratio = ox * oy * oz / math.min(p.s.X * p.s.Y * p.s.Z, q.s.X * q.s.Y * q.s.Z)
+				if ratio > 0.25 then
+					err(("18: hitboxes %s and %s overlap by %.0f%% of the smaller (max 25%%)"):format(p.id, q.id, ratio * 100))
+				end
+			end
+		end
+	end
+	if #parts == 0 then
+		return
+	end
+
+	-- views: anchors, then every target of the view in the frame, >= 44 px and seen by raycast
+	local rp = RaycastParams.new()
+	rp.FilterType = Enum.RaycastFilterType.Exclude
+	rp.FilterDescendantsInstances = parts
+	local resolutions = { { 667, 375 }, { 844, 390 } }
+	local gaps, tested = 0, 0
+	for seat = 1, 4 do
+		local st = v:FindFirstChild("Station_" .. seat)
+		if not st then
+			continue -- rule 17 reports it
+		end
+		for _, row in PREP_VIEW_ANCHORS do
+			local cam = st:FindFirstChild(row.cam, true)
+			local focus = st:FindFirstChild(row.focus, true)
+			if not (cam and cam:IsA("Attachment") and focus) then
+				err(("18: %s: %s / %s missing (view %s)"):format(st.Name, row.cam, row.focus, row.view))
+				continue
+			end
+			if row.stand and not st:FindFirstChild(row.stand, true) then
+				err(("18: %s: %s missing (view %s)"):format(st.Name, row.stand, row.view))
+			end
+			local fov = cam:GetAttribute("Fov")
+			if typeof(fov) ~= "number" or fov < 20 or fov > 100 then
+				err(("18: %s: %s needs a Fov attribute 20..100 (is %s)"):format(st.Name, row.cam, tostring(fov)))
+				continue
+			end
+			if seat ~= 1 then
+				continue -- the four seats share the same numbers (stands differ only by the stagger): one full test per view
+			end
+			local camCF = cam.WorldCFrame
+			local t = math.tan(math.rad(fov) / 2)
+			for kind, views in PREP_KIND_VIEWS do
+				if not table.find(views, row.view) then
+					continue
+				end
+				for _, bx in boxes do
+					if bx.part:GetAttribute("TargetKind") ~= kind then
+						continue
+					end
+					local gap = bx.part:GetAttribute("ViewGap") ~= nil
+					local worst, off = math.huge, false
+					for _, r in resolutions do
+						local x0, x1, y0, y1 = 1e9, -1e9, 1e9, -1e9
+						local h = bx.part.Size / 2
+						for sx = -1, 1, 2 do
+							for sy = -1, 1, 2 do
+								for sz = -1, 1, 2 do
+									local rel = camCF:PointToObjectSpace(bx.part.CFrame:PointToWorldSpace(Vector3.new(h.X * sx, h.Y * sy, h.Z * sz)))
+									if -rel.Z < 0.05 then
+										off = true
+										worst = 0
+									else
+										local nx, ny = rel.X / (-rel.Z * t * (r[1] / r[2])), rel.Y / (-rel.Z * t)
+										local px, py = (nx * 0.5 + 0.5) * r[1], (0.5 - ny * 0.5) * r[2]
+										x0, x1, y0, y1 = math.min(x0, px), math.max(x1, px), math.min(y0, py), math.max(y1, py)
+									end
+								end
+							end
+						end
+						if not off then
+							worst = math.min(worst, x1 - x0, y1 - y0)
+							if x0 < 0 or y0 < 0 or x1 > r[1] or y1 > r[2] then
+								off = true
+							end
+						end
+					end
+					local seen = 0
+					local top = bx.part.Position + Vector3.new(0, bx.part.Size.Y / 2 - 0.02, 0)
+					for _, o in { Vector3.zero, Vector3.new(-0.3, 0, -0.3), Vector3.new(0.3, 0, -0.3), Vector3.new(-0.3, 0, 0.3), Vector3.new(0.3, 0, 0.3) } do
+						local p = top + bx.part.CFrame:VectorToWorldSpace(Vector3.new(o.X * bx.part.Size.X, 0, o.Z * bx.part.Size.Z))
+						local hit = Workspace:Raycast(camCF.Position, p - camCF.Position, rp)
+						local owner: Instance? = nil
+						local objectId = bx.part:GetAttribute("Object")
+						if typeof(objectId) == "string" then
+							for _, c in v:GetChildren() do
+								if c:GetAttribute("MapId") == objectId then
+									owner = c
+									break
+								end
+							end
+						end
+						if not hit or (hit.Position - p).Magnitude < 0.15 or (owner and owner ~= v and hit.Instance:IsDescendantOf(owner)) then
+							seen += 1
+						end
+					end
+					local msg
+					if off then
+						msg = "outside the frame"
+					elseif worst < 44 then
+						msg = ("%.0f px (< 44)"):format(worst)
+					elseif seen < 3 then
+						msg = ("not seen by raycast (%d/5)"):format(seen)
+					end
+					tested += 1
+					if msg then
+						if gap then
+							gaps += 1
+							warn_(("18: %s in view %s: %s (ViewGap: %s)"):format(bx.id, row.view, msg, tostring(bx.part:GetAttribute("ViewGap"))))
+						else
+							err(("18: %s in view %s: %s"):format(bx.id, row.view, msg))
+						end
+					end
+				end
+			end
+		end
+	end
+	info(("18: PrepTarget %d hitbox(es), %d view checks (%d known gap(s))"):format(#parts, tested, gaps))
+end
+
 -- 15. Mart v2 Gear Stand (TASK-138; MAP-01 §18.3, §18.4, §18.10). Errors: pedestal / shutter count per Slot, shutter
 -- without Slat_* / Door_Panel, bench prompt of a slot outside its pedestal. Warnings: Slot_ / Price_Anchor_ missing,
 -- shutter without Roll, Att_Opal missing / off OP-1 / not facing the store, shelf heights, prompts out of reach of the
@@ -2824,6 +3048,7 @@ function Check.run(opts: { write: boolean?, wave: number? }?): (string, number)
 	checkMart(points)
 	checkTables()
 	checkPrepStations(vehicles)
+	checkPrepTargets(vehicles)
 	checkVehicleDistances(vehicles)
 	checkStreaming()
 	checkPivots(vehicles)

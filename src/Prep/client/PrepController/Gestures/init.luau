@@ -14,13 +14,21 @@
 -- The score of a gesture lives in the modules next to this file (slice, place, trace, slide, taps, hold, Score): they take
 -- the points of an Event and answer a raw error that Prep/shared/Grade turns into 0..100.
 -- Every point is normalised to the `Region` GuiObject: (0, 0) its top left, (1, 1) its bottom right (it can leave 0..1 while
--- dragging past the edge; `Inside` says whether it is in). The score of a gesture is NOT computed here: a stage reads the
+-- dragging past the edge; `Inside` says whether it is in). In the 3D mode (prep-3d.md §2.3, TASK-197) the region can also be a
+-- PlaneRegion, the top of the bun seen through the camera (World/Plane): the same 0..1 bun space, the same events, so the
+-- measures, Score and Grade do not change. The score of a gesture is NOT computed here: a stage reads the
 -- event, measures its error and asks Prep/shared/Grade (TASK-176). The mode (`Assist`, hold) is the controller's business.
 -- No Modux, no Vide.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Content = require(ReplicatedStorage.shared.Content)
 local Pointer = require(script.Parent.Pointer)
+local Types = require(script.Parent.World.Types)
+
+export type PlaneRegion = Types.PlaneRegion
+
+-- What a gesture is armed on: a GuiObject (2D) or a plane of the 3D world.
+export type Region = GuiObject | PlaneRegion
 
 export type Kind = "Drag" | "Trace" | "Tap" | "Hold"
 
@@ -48,7 +56,7 @@ export type Event = {
 
 export type Options = {
 	-- Where the press must land (default: the region itself).
-	Start: GuiObject?,
+	Start: Region?,
 	-- Hold: seconds to reach Done.
 	Hold: number?,
 	-- Press only counts when this returns true for the pressed point (normalised); nil = always.
@@ -63,7 +71,7 @@ export type Arm = { Cancel: (self: Arm) -> () }
 
 export type Recogniser = {
 	-- Starts listening; the handler runs on the main thread of the pointer events. One arm = one gesture at a time.
-	Arm: (self: Recogniser, kind: Kind, region: GuiObject, options: Options?, handler: (Event) -> ()) -> Arm,
+	Arm: (self: Recogniser, kind: Kind, region: Region, options: Options?, handler: (Event) -> ()) -> Arm,
 	-- Cancels everything in progress (a tab change, leaving the mode).
 	CancelAll: (self: Recogniser) -> (),
 	Destroy: (self: Recogniser) -> (),
@@ -74,17 +82,40 @@ const TAP_SLOP = 14
 
 const Gestures = {}
 
-local function inside(object: GuiObject, position: Vector2): boolean
+local function isPlane(region: Region): boolean
+	return typeof(region) ~= "Instance"
+end
+
+-- Is the screen point (px) inside the region? A plane answers by its own ray.
+local function inside(region: Region, position: Vector2): boolean
+	if isPlane(region) then
+		return (region :: PlaneRegion).Inside(position)
+	end
+	const object = region :: GuiObject
 	const origin, size = object.AbsolutePosition, object.AbsoluteSize
 	return position.X >= origin.X and position.X <= origin.X + size.X and position.Y >= origin.Y and position.Y <= origin.Y + size.Y
 end
 
-local function normalise(region: GuiObject, position: Vector2): Vector2
-	const size = region.AbsoluteSize
+-- The screen point (px) in the 0..1 space of the region.
+local function normalise(region: Region, position: Vector2): Vector2
+	if isPlane(region) then
+		return (region :: PlaneRegion).Normalise(position)
+	end
+	const size = (region :: GuiObject).AbsoluteSize
 	if size.X <= 0 or size.Y <= 0 then
 		return Vector2.zero
 	end
-	return (position - region.AbsolutePosition) / size
+	return (position - (region :: GuiObject).AbsolutePosition) / size
+end
+
+-- Region heights per region width: the factor that turns a step in normalised units into region widths (Event.Length).
+local function heightPerWidth(region: Region): number
+	if isPlane(region) then
+		const aspect = (region :: PlaneRegion).Aspect
+		return if aspect > 0 then 1 / aspect else 0
+	end
+	const size = (region :: GuiObject).AbsoluteSize
+	return if size.X > 0 then size.Y / size.X else 0
 end
 
 -- Halves the list in place (keeps every second point and the last one): the cap of a trace.
@@ -106,7 +137,7 @@ end
 function Gestures.new(pointer: Pointer.Pointer): Recogniser
 	type Active = {
 		Kind: Kind,
-		Region: GuiObject,
+		Region: Region,
 		Options: Options,
 		Config: Content.PrepGesture?,
 		Handler: (Event) -> (),
@@ -210,10 +241,7 @@ function Gestures.new(pointer: Pointer.Pointer): Recogniser
 				continue
 			end
 			const position = normalise(active.Region, px)
-			const size = active.Region.AbsoluteSize
-			if size.X > 0 then
-				active.Length += (position - active.Last).Magnitude * size.Y / size.X
-			end
+			active.Length += (position - active.Last).Magnitude * heightPerWidth(active.Region)
 			active.Last = position
 			if active.Config ~= nil and active.Kind ~= "Tap" then
 				sample(active, position, false)
@@ -266,7 +294,7 @@ function Gestures.new(pointer: Pointer.Pointer): Recogniser
 	end)
 
 	const self = {} :: any
-	function self.Arm(_: any, kind: Kind, region: GuiObject, options: Options?, handler: (Event) -> ()): Arm
+	function self.Arm(_: any, kind: Kind, region: Region, options: Options?, handler: (Event) -> ()): Arm
 		const opts: Options = options or {}
 		const row = if opts.Row ~= nil then opts.Row elseif kind == "Trace" then "trace" else nil
 		const active: Active = {

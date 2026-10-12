@@ -28,6 +28,7 @@ export type Record = {
 	Duration: number, -- seconds, level and class already applied (0..120)
 	Count: number, -- rail: sausages on it; others 0 (0..30)
 	Altered: number?, -- wave 3: nil/0 = nothing; grill/board 1 = this slot; rail position 1..Count (0..30)
+	Flip: number?, -- prep-3d N2 (TASK-195), grill slot: flip score + 1 (1..101), nil/0 = not flipped
 }
 
 export type Station = {

@@ -631,6 +631,10 @@ function KitchenService:Publish(station: StationApi.Station)
 				Altered = if type(record.Altered) == "number" and record.Altered >= 1
 					then wholeNumber(record.Altered, 0, COUNT_MAX)
 					else nil,
+				-- prep-3d N2: flip score + 1 of a grill slot, nil = not flipped
+				Flip = if type(record.Flip) == "number" and record.Flip >= 1
+					then wholeNumber(record.Flip, 0, 101)
+					else nil,
 			}
 			if self.Published[id] ~= nil then
 				set:update(id, value)
@@ -1245,6 +1249,11 @@ function KitchenService:DevAgeGrill(slot: number, seconds: number): number
 	const vehicle = self:GetVehicle()
 	Grill.DevAge(self.Context, vehicle, slot, seconds)
 	return Grill.DevDuration(vehicle, slot)
+end
+
+-- Stations.Flip of the grill `slot` as written to the set (flip score + 1), 0 = not flipped (TASK-195 dev check).
+function KitchenService:DevFlipWire(slot: number): number
+	return Grill.DevFlipWire(self:GetVehicle(), slot)
 end
 
 -- Sausages on the rail of the current vehicle.

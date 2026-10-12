@@ -56,6 +56,7 @@ local Pointer = require(script.Pointer)
 local Poses = require(script.Poses)
 local Rig = require(script.Rig)
 local Stage = require(script.Stage)
+local World = require(script.World)
 
 const create = Vide.create
 const source = Vide.source
@@ -116,6 +117,8 @@ const RENDER_STEP = "PrepController.Step"
 const RENDER_PRIORITY = Enum.RenderPriority.Camera.Value + 2
 const GUI_ORDER = 6
 const CURSOR_ORDER = 7
+-- the layer of the Hud ScreenGui that holds the order card (HudController:Layer("Order"))
+const HUD_ORDER_LAYER = "Order"
 const TOAST_TIME = 2.2
 const TOAST_ALERT_TIME = 3
 const CHROME_DELAY = 0.2 -- s after the camera starts to move: the chrome pops in
@@ -158,7 +161,7 @@ function PrepController:Setup()
 	self.Shown = source(false) :: Vide.Source<boolean>
 	self.Station = source(0) :: Vide.Source<number>
 	-- Content.Prep.Tabs key in front
-	self.Tab = source("Order") :: Vide.Source<string>
+	self.Tab = source(prep.Tabs.List[1].Key) :: Vide.Source<string>
 	-- Content.Prep.Steps key of the plate
 	self.Step = source("grill") :: Vide.Source<string>
 	-- what the corner button waits for: BunCut, PlateBuilt, TicketPicked
@@ -184,6 +187,11 @@ function PrepController:Setup()
 	self.NextBeat = 0 :: number
 	self.ToastId = 0 :: number
 	self.Stages = {} :: { [string]: Stage.Stage }
+	-- 3D stages (World/Stages/*.luau, Rules.ThreeD only): by tab, and once each in a list
+	self.Stages3D = {} :: { [string]: Stage.Stage3D }
+	self.List3D = {} :: { Stage.Stage3D }
+	-- the NPC at the counter that the Window view must not cut (Rig:SetSpared), re-judged at 4 Hz
+	self.SpareAt = 0 :: number
 	self.Pointer = nil :: Pointer.Pointer?
 	self.Gestures = nil :: Gestures.Recogniser?
 	self.Cursor = nil :: Cursor.Cursor?
@@ -269,38 +277,190 @@ function PrepController:LoadStages()
 			continue
 		end
 		const stage = value :: Stage.Stage
-		if prep.Tabs.ByKey[stage.Tab] == nil then
+		-- the 2D stages are written for the legacy tabs (Order, Grill, Build, Serve), whichever set Rules.ThreeD picked
+		if prep.TabsLegacy.ByKey[stage.Tab] == nil and prep.Tabs.ByKey[stage.Tab] == nil then
 			warn(`[PrepController] Stages/{child.Name}: unknown tab '{stage.Tab}'`)
 			continue
 		end
 		self.Stages[stage.Tab] = stage
 	end
 	for _, row in prep.Tabs.List do
-		if self.Stages[row.Key] == nil then
+		if self:StageOf(row.Key) == nil and self.Stages3D[row.Key] == nil then
 			warn(`[PrepController] no stage for the tab '{row.Key}'`)
 		end
 	end
 end
 
+-- World/Stages/*.luau (docs/tech/prep-3d.md §11.3): the 3D stages, found like the 2D ones. A module serves one or more tabs of
+-- Content.Prep.Tabs3D; it runs for a tab only when Stage.Armed (Rules.ThreeD and World.Stages.<tab>). Nothing loads while
+-- Rules.ThreeD is false.
+function PrepController:Load3DStages()
+	if not rules.ThreeD then
+		return
+	end
+	const folder = (script :: any).World:FindFirstChild("Stages")
+	if folder == nil then
+		return
+	end
+	for _, child in (folder :: Instance):GetChildren() do
+		if not child:IsA("ModuleScript") then
+			continue
+		end
+		const ok, value = pcall(require, child)
+		if not ok then
+			warn(`[PrepController] World/Stages/{child.Name} failed to load: {value}`)
+			continue
+		end
+		const problem = Stage.check3D(value, child.Name, prep.Tabs3D.ByKey)
+		if problem ~= nil then
+			warn(`[PrepController] World/Stages/{problem}`)
+			continue
+		end
+		const stage = value :: Stage.Stage3D
+		table.insert(self.List3D, stage)
+		for _, tab in stage.Tabs do
+			self.Stages3D[tab] = stage
+		end
+	end
+end
+
+-- The tab key of the current set for `tab` (a key of the other mode resolves through Content.Prep.TabAlias); nil = unknown.
+function PrepController:ResolveTab(tab: string?): string?
+	if tab == nil then
+		return nil
+	end
+	if prep.Tabs.ByKey[tab] ~= nil then
+		return tab
+	end
+	const alias = prep.TabAlias[tab]
+	if alias ~= nil and prep.Tabs.ByKey[alias] ~= nil then
+		return alias
+	end
+	return nil
+end
+
+-- The 2D stage of a tab (Stages/*.luau). In the 3D set Board and Toppings are served by the 2D Build stage (TabAlias) until
+-- their 3D stage is armed.
 function PrepController:StageOf(tab: string?): Stage.Stage?
-	return self.Stages[tab or untrack(self.Tab)]
+	const key = tab or untrack(self.Tab)
+	return self.Stages[key] or self.Stages[prep.TabAlias[key] or ""]
+end
+
+-- The 3D stage of a tab when it is armed (Rules.ThreeD + World.Stages.<tab> + the module exists), else nil.
+function PrepController:Stage3DOf(tab: string?): Stage.Stage3D?
+	const key = tab or untrack(self.Tab)
+	const stage = self.Stages3D[key]
+	if stage ~= nil and Stage.Armed(rules, key) then
+		return stage
+	end
+	return nil
+end
+
+-- The tab draws in the world (the shell goes minimal); reactive when read inside a binding.
+function PrepController:Armed(tab: string): boolean
+	return self:Stage3DOf(tab) ~= nil
+end
+
+-- One line of hint / the corner button of a tab, from its 3D stage when armed, else from the 2D one.
+function PrepController:HintOf(tab: string): string
+	const stage3D = self:Stage3DOf(tab)
+	if stage3D ~= nil then
+		return stage3D.Hint(self)
+	end
+	const stage = self:StageOf(tab)
+	return if stage ~= nil then stage.Hint(self) else ""
+end
+
+function PrepController:NextOf(tab: string): Stage.Next
+	const stage3D = self:Stage3DOf(tab)
+	if stage3D ~= nil then
+		return stage3D.Next(self)
+	end
+	const stage = self:StageOf(tab)
+	return if stage ~= nil then stage.Next(self) else { Label = prep.Texts.Next, Enabled = false }
+end
+
+-- The stage of `tab` comes to the front / goes to the back (3D: Enter / Leave + the current step; 2D: OnEnter / OnLeave).
+function PrepController:EnterStage(tab: string)
+	const stage3D = self:Stage3DOf(tab)
+	if stage3D ~= nil then
+		stage3D.Enter(self, tab)
+		stage3D.Step(self, untrack(self.Step))
+		return
+	end
+	const stage = self:StageOf(tab)
+	if stage ~= nil and stage.OnEnter ~= nil then
+		stage.OnEnter(self)
+	end
+end
+
+function PrepController:LeaveStage(tab: string)
+	const stage3D = self:Stage3DOf(tab)
+	if stage3D ~= nil then
+		stage3D.Leave(self, tab)
+		return
+	end
+	const stage = self:StageOf(tab)
+	if stage ~= nil and stage.OnLeave ~= nil then
+		stage.OnLeave(self)
+	end
+end
+
+-- A World aim message (Hover, Press, Move, Release, Drop, Tap, Cancel; TASK-196) to the 3D stage in front.
+function PrepController:OnAim(message: any)
+	const stage3D = self:Stage3DOf(nil)
+	if stage3D ~= nil and stage3D.OnAim ~= nil then
+		stage3D.OnAim(self, message)
+	end
+end
+
+-- Share of the plate done in a section, 0..1, for the progress card (Provisional, prep-3d.md §5: Grill = a sausage ready on the
+-- rail, Board = cut + placed, Toppings = toppings made over the ones of the ticket, Serve = the plate is sealed). Reactive.
+function PrepController:SectionProgress(tab: string): number
+	if tab == "Grill" then
+		return if (self.Badges().Grill or 0) > 0 then 1 else 0
+	elseif tab == "Board" or tab == "Build" then
+		const cut = if self.Needs().BunCut == true then 0.5 else 0
+		const placed = if self.View.Sausage() ~= false then 0.5 else 0
+		return cut + placed
+	elseif tab == "Toppings" then
+		const ticket = self.View.Ticket()
+		const wanted = if ticket ~= false then #ticket.Toppings else 0
+		return if wanted > 0 then math.clamp(#self.View.Toppings() / wanted, 0, 1) else 0
+	elseif tab == "Serve" then
+		return if self.View.Seal() ~= false then 1 else 0
+	end
+	return 0
+end
+
+-- 0..1 over the whole run: one division per tab of the set.
+function PrepController:RunProgress(): number
+	const tab = self.Tab()
+	const list = prep.Tabs.List
+	local index = 1
+	for position, row in list do
+		if row.Key == tab then
+			index = position
+		end
+	end
+	return ((index - 1) + self:SectionProgress(tab)) / #list
 end
 
 -- Public API of the stages ----------------------------------------------------------------------------------------------
 
 -- A tab to the front (the bar, 1 to 4, LB / RB, a stage that moves on). Sends PrepTab (also the keep-alive).
-function PrepController:SetTab(tab: string)
-	if prep.Tabs.ByKey[tab] == nil or untrack(self.Tab) == tab then
+function PrepController:SetTab(wanted: string)
+	-- a key of the other mode (a 2D stage asking for Order or Build in the 3D set) resolves through TabAlias
+	const tab = self:ResolveTab(wanted)
+	if tab == nil or untrack(self.Tab) == tab then
 		return
 	end
-	const previous = self:StageOf()
+	const previousTab = untrack(self.Tab)
 	self:CancelGestures()
-	if previous ~= nil and previous.OnLeave ~= nil then
-		previous.OnLeave(self)
-	end
-	const viewBefore = Poses.ViewOf(untrack(self.Tab))
+	self:LeaveStage(previousTab)
+	const viewBefore = Poses.ViewOf(previousTab)
 	self.Tab(tab)
-	-- Grill / Order look at the grill, Build / Serve at the cutting board: the camera glides when the view changes
+	-- the camera glides when the view changes (2D: the grill and the board; 3D: one view per section, Poses.luau)
 	if self.InMode and not self.Leaving and not self.Mock and Poses.ViewOf(tab) ~= viewBefore then
 		self:MoveTo(untrack(self.Station))
 	end
@@ -314,21 +474,29 @@ function PrepController:SetTab(tab: string)
 			end
 		end
 	end
-	const stage = self:StageOf(tab)
-	if stage ~= nil and stage.OnEnter ~= nil then
-		stage.OnEnter(self)
-	end
+	self:EnterStage(tab)
 	self:SendTab()
 end
 
--- A step of the plate (`grill`, `bun`, `build`, `serve`); brings its tab to the front.
+-- The same step in the other mode: the 2D `build` is the 3D `place` (a 2D stage asking for its own step in the 3D set)
+const STEP_ALIAS: { [string]: string } = { build = "place", place = "build" }
+
+-- A step of the plate (`grill`, `bun`, `build` / `place` + `toppings`, `serve`); brings its tab to the front.
 function PrepController:SetStage(stepKey: string)
-	const step = prep.Steps.ByKey[stepKey]
+	const step = prep.Steps.ByKey[stepKey] or prep.Steps.ByKey[STEP_ALIAS[stepKey] or ""]
 	if step == nil then
 		return
 	end
-	self.Step(stepKey)
+	self.Step(step.Key)
+	const tabBefore = untrack(self.Tab)
 	self:SetTab(step.Tab)
+	-- same tab: a 3D stage hears the step change here (SetTab tells it when the tab changes)
+	if tabBefore == step.Tab then
+		const stage3D = self:Stage3DOf(step.Tab)
+		if stage3D ~= nil then
+			stage3D.Step(self, step.Key)
+		end
+	end
 end
 
 function PrepController:Need(name: string, value: boolean)
@@ -388,10 +556,15 @@ end
 
 function PrepController:SetAssist(on: boolean)
 	self.Assist(on)
+	World.SetAssist(on)
 end
 
 -- What the stage in front receives: every gesture event, a "Pick" (tap on a topping box), a "Result" (PrepResult).
 function PrepController:OnGesture(event: any)
+	-- a 3D stage takes its input from the World (OnAim), not from the 2D gesture layer
+	if self:Stage3DOf(nil) ~= nil then
+		return
+	end
 	const stage = self:StageOf()
 	if stage ~= nil and stage.OnGesture ~= nil then
 		stage.OnGesture(self, event)
@@ -410,16 +583,22 @@ function PrepController:CancelGestures()
 end
 
 function PrepController:PressNext()
-	const stage = self:StageOf()
-	if stage == nil then
+	const tab = untrack(self.Tab)
+	const stage3D = self:Stage3DOf(tab)
+	const stage = self:StageOf(tab)
+	if stage3D == nil and stage == nil then
 		return
 	end
-	const state = stage.Next(self)
+	const state = self:NextOf(tab)
 	if not state.Enabled then
-		self:Toast(stage.Hint(self), "Alert")
+		self:Toast(self:HintOf(tab), "Alert")
 		return
 	end
-	if stage.OnNext ~= nil then
+	if stage3D ~= nil then
+		if stage3D.OnNext ~= nil then
+			stage3D.OnNext(self)
+		end
+	elseif stage ~= nil and stage.OnNext ~= nil then
 		stage.OnNext(self)
 	end
 end
@@ -445,6 +624,11 @@ end
 -- An event for every stage that listens (Stage.OnEvent), not only the one in front: PrepResult, Sale, Cycle.
 function PrepController:Broadcast(event: any)
 	for _, stage in self.Stages do
+		if stage.OnEvent ~= nil then
+			stage.OnEvent(self, event)
+		end
+	end
+	for _, stage in self.List3D do
 		if stage.OnEvent ~= nil then
 			stage.OnEvent(self, event)
 		end
@@ -475,6 +659,13 @@ function PrepController:OnResult(result: any)
 		self:Notice(result.Reason)
 	end
 	self:Broadcast({ Kind = "Result", Result = result })
+	const stage3D = self:Stage3DOf(nil)
+	if stage3D ~= nil then
+		if stage3D.OnResult ~= nil then
+			stage3D.OnResult(self, result)
+		end
+		return
+	end
 	const stage = self:StageOf()
 	if stage ~= nil and stage.OnResult ~= nil then
 		stage.OnResult(self, result)
@@ -502,11 +693,21 @@ function PrepController:Isolate(on: boolean)
 	const playerGui = Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
 	if on then
 		if playerGui ~= nil then
+			-- 3D (prep-3d.md §5, DT-23): the Hud (sanity, money, clock) stays on screen; only the order card (the ticket replaces
+			-- it) goes. The 2D mode hides the whole Hud as before.
 			for _, name in { "Hud", "TouchGui" } do
 				const gui = playerGui:FindFirstChild(name)
 				if gui ~= nil and gui:IsA("ScreenGui") then
-					saved[name] = gui.Enabled
-					gui.Enabled = false
+					if name == "Hud" and rules.ThreeD then
+						const card = gui:FindFirstChild(HUD_ORDER_LAYER)
+						if card ~= nil and card:IsA("GuiObject") then
+							saved.HudOrder = card.Visible
+							card.Visible = false
+						end
+					else
+						saved[name] = gui.Enabled
+						gui.Enabled = false
+					end
 				end
 			end
 		end
@@ -531,6 +732,11 @@ function PrepController:Isolate(on: boolean)
 			if gui ~= nil and gui:IsA("ScreenGui") and saved[name] ~= nil then
 				gui.Enabled = saved[name]
 			end
+		end
+		const hud = playerGui:FindFirstChild("Hud")
+		const card = if hud ~= nil then hud:FindFirstChild(HUD_ORDER_LAYER) else nil
+		if card ~= nil and card:IsA("GuiObject") and saved.HudOrder ~= nil then
+			card.Visible = saved.HudOrder :: boolean
 		end
 	end
 	if saved.Backpack ~= nil then
@@ -621,13 +827,17 @@ end
 -- The ScreenGui of the chrome (and the one of the cursor, in screen px).
 function PrepController:Mount()
 	const playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
-	const stages = self.Stages
 	const tabs: { PrepShell.Tab } = {}
 	for _, row in prep.Tabs.List do
 		table.insert(tabs, { Key = row.Key, Label = row.Label, Icon = row.Icon })
 	end
+	-- the 2D stage of a tab (Build serves Board and Toppings in the 3D set until their 3D stage is armed)
 	local function stageOr(tab: string): Stage.Stage?
-		return stages[tab]
+		return self:StageOf(tab)
+	end
+	-- the plate sections: the grade pips, the bin and the cut / place gauges belong to them
+	local function isPlateTab(tab: string): boolean
+		return tab == "Build" or tab == "Board" or tab == "Toppings"
 	end
 	const unmount, gui = Vide.root(function(): ScreenGui
 		return create("ScreenGui")({
@@ -649,28 +859,48 @@ function PrepController:Mount()
 				end,
 				LeaveText = prep.Texts.Leave,
 				Hint = function(): string
-					const stage = stageOr(self.Tab())
-					return if stage ~= nil then stage.Hint(self) else ""
+					return self:HintOf(self.Tab())
 				end,
 				Pips = function(): { Pip }
-					return if self.Tab() == "Build" then self.View.Pips() else {}
+					return if isPlateTab(self.Tab()) then self.View.Pips() else {}
 				end,
 				HasPanel = function(): boolean
-					const stage = stageOr(self.Tab())
-					return stage ~= nil and stage.HasPanel
+					const tab = self.Tab()
+					const stage = stageOr(tab)
+					return not self:Armed(tab) and stage ~= nil and stage.HasPanel
+				end,
+				-- the minimal 3D mode (TASK-199): only for a tab whose 3D stage is armed; the others keep the 2D chrome
+				Minimal = function(): boolean
+					return self:Armed(self.Tab())
+				end,
+				Progress = {
+					Label = function(): string
+						const row = prep.Tabs.ByKey[self.Tab()]
+						return if row ~= nil then row.Label else ""
+					end,
+					Value = function(): number
+						return self:RunProgress()
+					end,
+				},
+				Seal = function(): PlateView.Grade?
+					const value = self.View.Seal()
+					return if value ~= false then value else nil
+				end,
+				SealLabel = function(grade: PlateView.Grade): string
+					return prep.Grades.Labels[grade]
+				end,
+				Pad = function(): boolean
+					return self.Dependencies.InputController.Device() == "Gamepad"
 				end,
 				Next = {
 					Label = function(): string
-						const stage = stageOr(self.Tab())
-						return if stage ~= nil then stage.Next(self).Label else prep.Texts.Next
+						return self:NextOf(self.Tab()).Label
 					end,
 					Enabled = function(): boolean
-						const stage = stageOr(self.Tab())
-						return stage ~= nil and stage.Next(self).Enabled
+						return self:NextOf(self.Tab()).Enabled
 					end,
 					Pulse = function(): boolean
-						const stage = stageOr(self.Tab())
-						return stage ~= nil and stage.Next(self).Pulse == true
+						return self:NextOf(self.Tab()).Pulse == true
 					end,
 					OnPress = function()
 						self:PressNext()
@@ -681,7 +911,7 @@ function PrepController:Mount()
 				},
 				Trash = {
 					Visible = function(): boolean
-						return self.View.Bun() ~= "None" and self.View.Seal() == false and self.Tab() == "Build"
+						return self.View.Bun() ~= "None" and self.View.Seal() == false and isPlateTab(self.Tab())
 					end,
 					Hold = TRASH_HOLD,
 					HoldText = TRASH_TEXT,
@@ -727,8 +957,13 @@ function PrepController:Mount()
 					Board = function(_layout: () -> any): any
 						const map: { [string]: () -> any } = {}
 						for _, row in prep.Tabs.List do
-							const stage = stageOr(row.Key)
-							map[row.Key] = function(): any
+							const key = row.Key
+							map[key] = function(): any
+								-- a 3D stage draws in the world: the board slot of the minimal shell stays empty
+								if self:Armed(key) then
+									return create("Frame")({ Name = "World", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1 })
+								end
+								const stage = stageOr(key)
 								return if stage ~= nil then stage.Board(self) else Parts.Notice(function(): string
 									return "Stage missing"
 								end)
@@ -833,8 +1068,9 @@ function PrepController:Enter(station: number, mock: boolean?, tab: string?): bo
 		end
 		return false
 	end
-	-- the tab it opens on: the one of the prompt used (the seat record), Order when it is not known
-	const startTab = if tab ~= nil and prep.Tabs.ByKey[tab] ~= nil then tab else "Order"
+	-- the tab it opens on: the one of the prompt used (the seat record; a key of the other mode resolves through TabAlias), the
+	-- first of the set (Order in 2D, Grill in 3D) when it is not known
+	const startTab = self:ResolveTab(tab) or prep.Tabs.List[1].Key
 	local pose = Poses.Of(station, Poses.ViewOf(startTab))
 	if pose == nil and mock then
 		pose = Poses.Mock()
@@ -851,7 +1087,7 @@ function PrepController:Enter(station: number, mock: boolean?, tab: string?): bo
 	const dof = dofAllowed()
 	const travel = if reduced then 0 else rules.Camera.Travel
 	camera:Prep(true, pose.Frame, {
-		Fov = rules.Camera.Fov,
+		Fov = pose.Fov,
 		Travel = travel,
 		Dof = dof,
 		Focus = rules.Camera.Distance,
@@ -874,7 +1110,7 @@ function PrepController:Enter(station: number, mock: boolean?, tab: string?): bo
 	self.Vignette(not dof)
 	self.Shown(false)
 	self.Tab(startTab)
-	self.Step(if startTab == "Build" then "bun" elseif startTab == "Serve" then "serve" else "grill")
+	self.Step(self:FirstStepOf(startTab))
 	self.Needs({})
 	self.Assist(false)
 	self.Toasts(false)
@@ -907,16 +1143,21 @@ function PrepController:Enter(station: number, mock: boolean?, tab: string?): bo
 	-- back and warn (the Output has the cause)
 	const mounted, mountError = pcall(function()
 		self:Mount()
-		-- the Order stage starts the Feed (the shared picture of the line and the grill), whatever tab opens first
-		const order = self:StageOf("Order")
+		-- the 3D layer (raycast, targets, marker; inert while Rules.ThreeD is false, `/dev prep ray` aside) and the stage in front
+		-- listens to its aim messages
+		World.SetListener(function(message: any)
+			self:OnAim(message)
+		end)
+		World.SetAssist(untrack(self.Assist))
+		World.Enter(station, pointer)
+		-- the 2D Order stage starts the Feed (the shared picture of the line and the grill), whatever tab opens first; it is not a
+		-- tab of the 3D set, but its module stays loaded for that
+		const order = self.Stages.Order
 		if order ~= nil and order.OnEnter ~= nil then
 			order.OnEnter(self)
 		end
 		if startTab ~= "Order" then
-			const first = self:StageOf(startTab)
-			if first ~= nil and first.OnEnter ~= nil then
-				first.OnEnter(self)
-			end
+			self:EnterStage(startTab)
 		end
 	end)
 	if not mounted then
@@ -942,7 +1183,7 @@ function PrepController:MoveTo(station: number)
 	end
 	const camera = self.Dependencies.CameraController
 	camera:Prep(true, pose.Frame, {
-		Fov = rules.Camera.Fov,
+		Fov = pose.Fov,
 		Travel = if Motion.Reduced() then 0 else rules.Camera.Travel,
 		Dof = untrack(self.Vignette) == false,
 		Focus = rules.Camera.Distance,
@@ -984,6 +1225,16 @@ function PrepController:Finish(takeover: boolean)
 	end
 	self.InMode = false
 	self.Leaving = false
+	-- the 3D stage in front lets go of the world, then the world itself (pools, folder, listener)
+	const frontStage = self:Stage3DOf(untrack(self.Tab))
+	if frontStage ~= nil then
+		const ok, problem = pcall(frontStage.Leave, self, untrack(self.Tab))
+		if not ok then
+			warn(`[PrepController] 3D stage Leave failed: {problem}`)
+		end
+	end
+	World.SetListener(nil)
+	World.Leave()
 	self.Rig:Destroy()
 	for _, stop in self.PointerStops do
 		stop()
@@ -1045,6 +1296,36 @@ function PrepController:LoadPreview()
 	self.Needs({ TicketPicked = true })
 end
 
+-- The first step of a tab in Content.Prep.Steps ("grill" when it has none, like the 2D Order tab).
+function PrepController:FirstStepOf(tab: string): string
+	for _, row in prep.Steps.List do
+		if row.Tab == tab then
+			return row.Key
+		end
+	end
+	return "grill"
+end
+
+-- The customer at the counter (the Take target) is not cut or ghosted by the Rig in the Window view, and only there: he comes
+-- back to the cut / ghost zones with any other view (prep-3d.md §4.4). Re-judged at 4 Hz.
+function PrepController:SpareCustomer(now: number)
+	if now < self.SpareAt then
+		return
+	end
+	self.SpareAt = now + 0.25
+	local npc: number? = nil
+	if rules.ThreeD and Poses.ViewOf(untrack(self.Tab)) == "Window" and not self.Leaving then
+		for _, id in untrack(Feed.Ids) do
+			const card = untrack(Feed.CardOf(id))
+			if card.Status == "Ready" and card.Place == "Counter" then
+				npc = id
+				break
+			end
+		end
+	end
+	self.Rig:SetSpared(npc)
+end
+
 -- Per frame -------------------------------------------------------------------------------------------------------------
 
 function PrepController:Update(dt: number)
@@ -1052,6 +1333,7 @@ function PrepController:Update(dt: number)
 		return
 	end
 	self.Rig:Step(dt)
+	self:SpareCustomer(os.clock())
 	const camera = self.Dependencies.CameraController
 	const mode = untrack(camera.Mode)
 	const now = os.clock()
@@ -1101,6 +1383,7 @@ end
 
 PrepController:OnInit(function(self)
 	self:Setup()
+	self:Load3DStages()
 	self:LoadStages()
 
 	const net = self.Libs.Net

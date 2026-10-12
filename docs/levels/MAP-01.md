@@ -1543,3 +1543,41 @@ O preparo do hot dog é o modo focado (`docs/tech/prep-mode.md`): o jogador entr
 ### 19.1 Preparo V2: dois prompts naturais (2026-10-12, Provisorio, proposta DEC-224)
 
 O dono nao quis 4 spots separados. Os 4 assentos seguem logicos (co-op), mas existem so **dois** prompts `Work`: na **grelha** (Station_1, X -39,67, `PromptStep = Grill`, abre na aba Grill) e na **tabua** (Station_3, X -46,67, `PromptStep = Build`, abre na aba Build), ambos a Y 4,3 e Z 11,90. Quem aciona qualquer um recebe o proximo assento livre. Os `Prompt_Work` de Station_2 e Station_4 foram movidos para `ServerStorage.Trailer_Backup_20261012`. Cada Station_n tem a vista da grelha (`Att_Stand`, `CamAnchor`, `Focus`) e a da tabua (`Att_Stand_Build`, `CamAnchor_Build`, `Focus_Build`); a camera segue a aba (Order/Grill = grelha, Build/Serve = tabua). Os assentos ficam escalonados 1,0 stud em torno do centro da vista. A altura antiga do prompt (Y 2,2) saia do campo de visao; vale Y 4,3. Ver `tools/assetplace/stations_prep.luau`.
+
+### 19.2 Alvos 3D do preparo: hitboxes `PrepTarget` e vistas (TASK-200, 3D-6, 2026-10-12) — Provisório
+
+Autoria no trailer para o preparo 3D-first (`docs/tech/prep-3d.md` §2.2, §4.1, §4.3, §15). Snippet `tools/assetplace/prep_targets.luau` (`run("prep_targets", "dry" | nil | "undo")`), espelhado em `bind_map01` (`bindPrepTargets`, carrega o mesmo arquivo por HTTP, depois do `bindPrepStations`) e na regra 18 do `check_map01`. Tudo derivado dos **objetos reais** vivos (sem coordenada fixa; nada do que o dono arrumou foi movido; `Prompt_Work`, `Att_Bun`, `Att_Stand`, `CamAnchor_Build` e `Focus_Build` intactos).
+
+**Hitboxes (20).** Parts invisíveis (`Transparency 1`, `CanCollide false`, `CanQuery true`, `CanTouch false`, ancoradas), tag `PrepTarget`, num Model `trailer.PrepTargets` (**não** dentro de TRL-G / TRL-R / TRL-T: o atributo `Slot` do contrato também é contado pelo `MapIndex` e pelo `KitchenController` sob um Model de estação, e um hitbox ali viraria segundo anexo de slot). Atributos: `TargetKind`, `Slot` (GrillSlot, Rail, Board), `Key` (Topping), `Id` (documentação), `Object` (MapId do objeto real).
+
+| Kind | Quantos | Sobre | Tamanho (studs) |
+|---|---|---|---|
+| `GrillSlot` | 4 (`Slot` 1..4) | `Att_Slot1..4` da grelha (no L1 só 2 existem na malha; o código habilita pelo nível) | 0,86 x 0,5 x 1,9 |
+| `SausageStock` | 1 | cooler TRL-S, a metade que olha para a grelha | 1,4 x 1,6 x 2,5 |
+| `Rail` | 1 (`Slot` 1 = a da frente) | trilho TRL-R, uma caixa sobre os 8 slots (8 tiras de 0,34 nunca dariam 44 px) | 2,9 x 0,65 x 2,3 |
+| `BunCrate` | 1 | caixa de pães TRL-B | 2,0 x 1,0 x 2,0 |
+| `Board` | 4 (`Slot` = assento) | `Att_Bun1..4` da tábua (largura 0,76 = o passo 0,8: sem sobreposição) | 0,76 x 0,5 x 0,9 |
+| `Knife` | 1 | faca da tábua | 1,8 x 0,5 x 0,75 |
+| `Topping` | 6 (`Key`) | as 6 caixas com tampa de TRL-K | 1,6 x 0,95 x 1,46 |
+| `Bin` | 1 | lixeira TRL-BIN (no chão, atrás do cozinheiro) | 1,5 x 2,3 x 1,9 |
+| `Hatch` | 1 | sem objeto: o peitoril à frente da borda do balcão, na linha do `Q1` | 3,0 x 1,0 x 1,3 |
+
+**Vistas.** Por `Station_n.Mount`: `CamAnchor_Board`/`Focus_Board`, `CamAnchor_Toppings`/`Focus_Toppings`, `CamAnchor_Window`/`Focus_Window` (novos) e `Att_Stand_Board`/`_Toppings`/`_Window`; `CamAnchor`/`Focus` (Grill) foram **reapontados** (o CFrame antigo fica em `PTOrigCF` para o `undo`; o `stations_prep` os reescreve: rodar o `prep_targets` depois dele). Cada âncora de câmera tem `View` e `Fov`. A distância é a menor que enquadra todos os alvos da vista num quadro 667x375 com 5% de margem; o foco é o meio deles; as 4 estações usam os mesmos números (os `Att_Stand_*` escalonam 1,0 e ficam dentro do piso: o casco tem um abaulamento de caixa de roda a 3,1 studs das pontas).
+
+| Vista | Fov | Distância | Pitch | Alvos enquadrados | Menor alvo (667x375 / 844x390) |
+|---|---|---|---|---|---|
+| Grill | 70 | 5,8 | -55 | slots 1..4, estoque, trilho | slot 2: 45 px / 47 px |
+| Board | 62 | 5,2 | -55 | trilho, caixa de pães, 4 vagas, faca | vaga 1: 59 x 62 px |
+| Toppings | 62 | 5,5 | -55 | 4 vagas + 6 caixas de cobertura | vaga 4: 60 x 59 px |
+| Window | 62 | 4,1 | -40 | peitoril + o busto do cliente em `Q1` | peitoril: 321 x 144 px |
+
+Medição (snippet e regra 18): todos os alvos da vista na tela, >= 44 px nos dois quadros, visíveis por raycast da câmera (5/5 pontos); `check_map01`: **0 erros novos** (13 antigos: regras 4 e 6, não tocados). Capturas de Edit por vista conferidas (o Studio MCP não fixa 667x375; os pixels vêm da projeção dos 8 cantos).
+
+**O que falta modelar / lacunas (para o level-designer, o art-director e o dono):**
+- **Lixeira**: a real está no chão a Z 8,7, atrás da câmera em toda vista de bancada (`ViewGap`, aviso na regra 18). Precisa de uma lixeira **na bancada** (variante AST-025 ou ficha AST-120+) ao alcance das vistas Board e Toppings; o hitbox `Bin` passa para ela.
+- **Tigelas**: as 6 coberturas são caixas com tampa e cadeado numa grade 3 x 2 de **um lado** do pão (não "tigelas dos dois lados" da referência `papas-hotdoggeria-condiments.jpg`). Garrafas e concha são ferramentas dinâmicas (fichas AST-120+, TASK-201/202); a grade fica como o dono arrumou.
+- **Janela / Hatch**: não há objeto no peitoril; falta a bandeja ou o balcão de entrega (ficha). O cliente em `Q1` está na ponta oeste (X -56), junto ao caixa: Hatch e vista Window ficam ali.
+- **Grelha**: a malha tem 4 slots no máximo (`Upgrades.grill`, `Att_Slot1..4`; L1 só mostra dois); "grelha de 8" é o trilho (`RailSlots` 8).
+- **Tábua**: segue a 0,8 de passo (pão de 1,0 se encosta por 0,2). Justificativa: o raio só inclui o alvo do assento próprio (§4.2) e os hitboxes não se sobrepõem; espaçamento >= 1,1 exigiria tábua maior ou duas fileiras (mexe no que o dono arrumou): decisão pendente.
+- `Customer` não tem hitbox no mapa (é o rig do `NpcService`, lido em runtime); o `Q1` só entra no enquadramento da Window.
+- Nomes dos atributos seguem `Content.Prep.Rules.World.Attr` (`TargetKind`, `Slot`, `Key`); o cliente (TASK-196) lê esses nomes.

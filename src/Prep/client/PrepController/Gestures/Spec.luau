@@ -1,7 +1,7 @@
 --!strict
 -- Spec: the table test of the gestures (TASK-176 acceptance): for 10 synthetic inputs per gesture, the 0..100 the gesture
 -- module gives is the one Prep/shared/Grade gives for the raw error the input was built to have; plus Assist (x1.3) and the
--- sampling rows. Pure: `cfg` is Content.Prep. The PrepController runs it once when the dev preview opens (`/dev prep ui`,
+-- sampling rows, and the plane mapping of the 3D mode (ray -> top of the bun -> uv and back, TASK-197). Pure: `cfg` is Content.Prep. The PrepController runs it once when the dev preview opens (`/dev prep ui`,
 -- prints "gestures spec: N/N ok") and the same file runs in plain Luau (docs/AGENT-BRIEF.md §3b).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Grade = require(ReplicatedStorage.shared.Prep.Grade)
@@ -12,6 +12,7 @@ local slide = require(script.Parent.slide)
 local Score = require(script.Parent.Score)
 local taps = require(script.Parent.taps)
 local trace = require(script.Parent.trace)
+local Plane = require(script.Parent.Parent.World.Plane)
 
 export type Result = { Total: number, Failed: { string } }
 
@@ -138,6 +139,71 @@ function Spec.Run(cfg: Score.Config & { Build: any, Gestures: any }): Result
 	end
 	check("row trace keeps at most 64 points", cfg.Gestures.ByKey.trace.MaxPoints, 64)
 	check("row taps is discrete", cfg.Gestures.ByKey.taps.Hz, 0)
+
+	-- plane (3D mode): a pinhole camera over the top of the bun. The uv of the bun space must survive the trip uv -> world ->
+	-- pixel -> ray -> plane -> uv for a flat bun, a bun turned on the board, a tilted bun and a rolled camera, and a stroke
+	-- drawn on the plane must score what the same stroke scores in bun space.
+	const viewport = Vector2.new(844, 390)
+	const fov = 55
+	const bunLength = 1.0
+	const bunWidth = bunLength / ASPECT
+	local function lookDown(focus: Vector3, extra: Vector3, roll: number): CFrame
+		const eye = focus + Vector3.new(0, math.sin(math.rad(55)) * 2.5, math.cos(math.rad(55)) * 2.5) + extra
+		return CFrame.lookAt(eye, focus) * CFrame.Angles(0, 0, math.rad(roll))
+	end
+	const center = Vector3.new(10, 3, -4)
+	const poses = {
+		{ Name = "flat", Bun = CFrame.new(center), Camera = lookDown(center, Vector3.zero, 0) },
+		{ Name = "turned 35", Bun = CFrame.new(center) * CFrame.Angles(0, math.rad(35), 0), Camera = lookDown(center, Vector3.zero, 0) },
+		{ Name = "rolled camera", Bun = CFrame.new(center), Camera = lookDown(center + Vector3.new(0.1, 0, 0), Vector3.new(0.3, 0.1, 0.2), 10) },
+		{ Name = "tilted bun", Bun = CFrame.new(center) * CFrame.Angles(math.rad(8), math.rad(-20), math.rad(-5)), Camera = lookDown(center, Vector3.new(-0.2, 0, 0), -6) },
+	}
+	const grid = { Vector2.new(0.1, 0.2), Vector2.new(0.5, 0.2), Vector2.new(0.9, 0.2), Vector2.new(0.1, 0.5), Vector2.new(0.5, 0.5), Vector2.new(0.9, 0.5), Vector2.new(0.1, 0.8), Vector2.new(0.5, 0.8), Vector2.new(0.9, 0.8) }
+	local function near(a: Vector2, b: Vector2): boolean
+		return (a - b).Magnitude < 1e-3
+	end
+	local function rayOf(camera: CFrame): Plane.RayOf
+		return function(px: Vector2): (Vector3?, Vector3?)
+			return Plane.PinholeRay(camera, fov, viewport, px)
+		end
+	end
+	for _, pose in poses do
+		const plane = Plane.new(pose.Bun, bunLength, bunWidth)
+		const region = Plane.Region(plane, rayOf(pose.Camera))
+		for _, uv in grid do
+			const px = Plane.PinholeProject(pose.Camera, fov, viewport, Plane.ToWorld(plane, uv, 0))
+			check(`plane {pose.Name} uv {uv.X},{uv.Y} is on screen`, px ~= nil, true)
+			check(`plane {pose.Name} uv {uv.X},{uv.Y} round trip`, px ~= nil and near(region.Normalise(px), uv), true)
+		end
+		check(`plane {pose.Name} aspect`, math.abs(region.Aspect - ASPECT) < 1e-6, true)
+		-- a stroke built in bun space, drawn on the plane (uv -> pixel) and read back: same measure, same score
+		for _, error in { 0, 5.9, 10, 25 } do
+			const drawn: { any } = {}
+			for _, point in cutStroke(error) do
+				const px = Plane.PinholeProject(pose.Camera, fov, viewport, Plane.ToWorld(plane, Vector2.new(point.X, point.Y), 0))
+				table.insert(drawn, if px ~= nil then region.Normalise(px) else { X = 0, Y = 0 })
+			end
+			check(`plane {pose.Name} slice {error}`, Score.Value(cfg, "bun_cut", slice.Measure(drawn, sliceParams), nil, false), Grade.Score(cfg, row("bun_cut"), error, false))
+		end
+	end
+	const flat = Plane.new(CFrame.new(center), bunLength, bunWidth)
+	const flatRegion = Plane.Region(flat, rayOf(poses[1].Camera))
+	const middle = Plane.PinholeProject(poses[1].Camera, fov, viewport, center) :: Vector2
+	check("plane the bun centre is the middle of the screen", near(middle, viewport / 2), true)
+	check("plane the middle of the screen is uv 0.5 0.5", near(flatRegion.Normalise(middle), Vector2.new(0.5, 0.5)), true)
+	check("plane moving right grows u", flatRegion.Normalise(middle + Vector2.new(20, 0)).X > 0.5, true)
+	check("plane moving down grows v", flatRegion.Normalise(middle + Vector2.new(0, 20)).Y > 0.5, true)
+	check("plane the bun centre is inside", flatRegion.Inside(middle), true)
+	check("plane a screen corner is outside", flatRegion.Inside(Vector2.new(0, 0)), false)
+	check("plane past the bun edge u goes over 1", flatRegion.Normalise(middle + Vector2.new(400, 0)).X > 1, true)
+	check("plane a lifted point reads the uv under it", near(Plane.ToUV(flat, Plane.ToWorld(flat, Vector2.new(0.3, 0.7), 0.35)), Vector2.new(0.3, 0.7)), true)
+	check("plane lift goes along the normal", math.abs(Plane.ToWorld(flat, Vector2.new(0.5, 0.5), 0.35).Y - center.Y - 0.35) < 1e-6, true)
+	check("plane corner to corner is the bun diagonal", math.abs((Plane.ToWorld(flat, Vector2.zero, 0) - Plane.ToWorld(flat, Vector2.one, 0)).Magnitude - math.sqrt(bunLength * bunLength + bunWidth * bunWidth)) < 1e-6, true)
+	check("plane a parallel ray misses", Plane.FromRay(flat, center + Vector3.new(0, 1, 0), Vector3.new(1, 0, 0)), nil)
+	check("plane a ray looking away misses", Plane.FromRay(flat, center + Vector3.new(0, 1, 0), Vector3.new(0, 1, 0)), nil)
+	check("plane a ray with no camera reads (0, 0)", Plane.Region(flat, function(_: Vector2): (Vector3?, Vector3?) return nil, nil end).Normalise(middle), Vector2.zero)
+	check("plane a ray with no camera is outside", Plane.Region(flat, function(_: Vector2): (Vector3?, Vector3?) return nil, nil end).Inside(middle), false)
+	check("plane a point behind the camera has no pixel", Plane.PinholeProject(poses[1].Camera, fov, viewport, poses[1].Camera.Position - poses[1].Camera.LookVector * 3), nil)
 
 	return { Total = total, Failed = failed }
 end

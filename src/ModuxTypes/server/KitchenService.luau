@@ -90,6 +90,7 @@ export type Public = {
 	PlateOf: (self: Public, player: Player) -> Plate.Ticket?,
 	DevFeedRail: (self: Public, score: number?) -> boolean,
 	DevAgeGrill: (self: Public, slot: number, seconds: number) -> number,
+	DevFlipWire: (self: Public, slot: number) -> number,
 	RailCount: (self: Public) -> number,
 	BoardFree: (self: Public) -> number,
 	DevWorldPrompts: (self: Public, on: boolean?) -> (),

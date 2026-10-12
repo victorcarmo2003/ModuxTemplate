@@ -11,6 +11,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Context = require(script.Parent.Context)
 local Slots = require(script.Parent.Slots)
+local RailSlot = require(ReplicatedStorage.shared.Kitchen.RailSlot)
 
 const effect = Vide.effect
 const derive = Vide.derive
@@ -32,7 +33,10 @@ function Rail.Mount(station: Instance, context: Context.Context)
 		const record = read()
 		return if record then record.Altered else 0
 	end)
-	for slot, spot in Slots.Spots(station, false) do
+	-- pose of each sausage = Rail_<slot>/Part (owner request 2026-10-12; RailSlot), anchors only as fallback
+	const spots = Slots.Spots(station, false)
+	RailSlot.Spots(station, spots)
+	for slot, spot in spots do
 		const model = derive(function(): string?
 			if count() < slot then
 				return nil
