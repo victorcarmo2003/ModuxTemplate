@@ -133,4 +133,35 @@ Faixa: CW-4 continua a mais proxima (listras X -24..-12; CW-3 fica em X -60..-54
 
 `workspace.MAP01_Assets.TrafficLights` (criado pelo dono / outro agente direto no Studio): 4 modelos `Signal_WB` (x 16,5; z 50..58), `Signal_EB` (x -11; z 77..86), `Signal_NB` (x -11..-2; z 50), `Signal_SB` (x 1..11; z 85,5), cada um com 3 `SignalHead` (tag `TrafficSignal`, atributo `Axis` = EW | NS) e 2 `PedSignal` (tag `PedSignal`, `Axis`). Lentes: Parts separadas `Red` / `Yellow` / `Green` (head) e `Walk` / `Hand` (ped), Neon quando acesas.
 Logica: `TrafficLightCycle` (Script, `RunContext = Client`, dentro da pasta) com `workspace:GetServerTimeNow()`; `GREEN_TIME` 10, `YELLOW_TIME` 3, `ALL_RED_TIME` 1,5, `PED_FLASH_TIME` 4, `OFF_DIM` 0,18 (tabela `PHASES` no topo). Acende = Neon + `OnColor`; apaga = SmoothPlastic + cor x 0,18. Pedestre e visual (nada no servidor le isso).
-**Risco**: `Place.run` reconstroi `MAP01_Assets` e apaga esta pasta (junto com o script). Antes de qualquer `Place.run`, salvar o place e exportar `TrafficLights` (ou capturar nos placements). Nao ha snippet de rebuild ainda.
+**Risco**: `Place.run` reconstroi `MAP01_Assets` e apaga esta pasta (junto com o script). Antes de qualquer `Place.run`, salvar o place e exportar `TrafficLights` (ou capturar nos placements). **Atualizado 2026-10-12**: o ciclo agora e codigo (`Content.TrafficLights` + `TrafficLightController`, sobrevive a Place.run se a pasta existir); o snippet `traffic_lights_rebuild.luau` (modos `capture`, `dry`, `apply`, `disable-old`, `enable-old`, `undo`) recria a pasta a partir do espelho `data/traffic_lights.luau` (gerado por `capture`, ainda por gerar). Script antigo: so desligar (`disable-old`) depois de ver o Controller funcionando em Play.
+
+**Verificado no Studio (2026-10-12)**: `TrafficLightCycle` lido e igualado ao `Content.TrafficLights` (so o piscar mudou: 0,4 s por passo). Espelho `data/traffic_lights.luau` capturado (268 nos; `capture` aceita `from`, `n` para fatiar saida acima de 100 kB); `dry` = 0 mudancas. Controller testado em Play com o antigo junto e depois com `disable-old`: fase, Walk e Hand batem com `phaseAt`. `TrafficLightCycle` fica **Enabled = false** (`enable-old` reverte); o dono precisa salvar o place. `Signal_NB/SignalHead~2/Backplate` esta `Anchored = false` no Studio (edicao do dono, espelhada como lida).
+
+## Faixas movidas pelo dono: nos de NPC, caixa e linhas de CW-1 (2026-10-12, `crosswalk_paths.luau`, Provisorio)
+
+O dono moveu as listras de `MAP01_Blockout.Crosswalks.CW-1` da Juniper Sul para a boca da Ninth (centro Z 43,89; antes Z 29,89), copiou uma faixa igual na Juniper Norte (2o modelo tambem chamado "CW-1", Z 92,49, sem nos) e tirou o modelo `CW-3`. Snippet de Studio, idempotente, nunca mexe nas listras: `run("crosswalk_paths")` (relatorio), `"apply"`, `"undo"` (restaura pelos atributos `CwOrig*`; marca `CwPathsV1`). Nao e Place.run: so toca `MapBinding` (nos `N-Z08-04/05`, elos de `N-Z08-04`/`N-Z02-02`/`N-Z08-03`, `Traffic.Boxes.CW-1`, `Traffic.Lines.SL-1N/SL-1S`).
+
+| Peca | Antes | Depois |
+|---|---|---|
+| `N-Z08-04` / `N-Z08-05` | (-13 / 13; 29,89) | (-13 / 13; 42,49), 1,4 studs ao sul do centro das listras (poste do letreiro SW em X >= 12,2 Z 47,0..47,5; regra 6 do check exige >= 1,2 das caixas dos letreiros) |
+| elos | `N-Z08-03` <-> `N-Z08-04` | `N-Z02-02` <-> `N-Z08-04` (`N-Z08-03` fica ligado a `N-Z08-02` / `N-Z02-02`) |
+| `TrafficBox CW-1` | centro Z 29,89, comprimento 8 | centro Z 43,89, comprimento 8 |
+| `SL-1N` / `SL-1S` | Z 37,89 / 21,89 | Z 49,89 / 35,89 |
+
+Depois de um `Place.run` + `bind_map01`: o bind ja grava estes valores (nos z 25,4 MAP, caixa z 20..28, linhas z 18 / 32); rodar `crosswalk_paths` em seguida so confere (relatorio). Pendente do dono: CW-3 sem listras, faixa da Juniper Norte sem path, PARE `SL-S` / `SL-N` (ver `playtest-2026-10-12.md`).
+
+## Estações do preparo focado (2026-10-12, `stations_prep.luau`, TASK-172, Provisório)
+
+Snippet de Studio, idempotente, nada apagado: `run("stations_prep", "dry")` (relatório + validação por raycast), `run("stations_prep")` (aplica), `run("stations_prep", "undo")` (move `Station_1..4` para `ServerStorage.Trailer_Backup_20261012` sem tags, restaura `Att_Bun1..3` por `PrepOrigX` e manda `Att_Bun4` para o backup). Cria `Station_1..4` dentro do Model do trailer (segue `PivotTo` e `trailer_ground`) e põe a tábua em 4 vagas; números e desenho em `docs/levels/MAP-01.md` §19. Não está nos placements: depois de um `Place.run` rodar **`bind_map01`** (que agora recria as 4 estações por `bindPrepStations`) ou este snippet, antes do `check_map01`. O dono precisa salvar o place (Ctrl+S).
+
+## Xicara de cafe do dono (2026-10-12, `coffee_cup.luau`, Provisorio)
+
+O dono acrescentou `Workspace.ManFaceMug` (raiz do Workspace, fora de `MAP01_Assets` e dos placements: o `Place.run` nao a apaga nem a recria). Partes: `Part` (cilindro marrom = superficie do cafe, interno), `Intersection` (corpo bege com a cara), `Union` (alca, a direita). Fica ao lado da `TRL-COFFEE_AST-022_CoffeeMachine` (1,2 studs).
+
+`run("coffee_cup")` relata; `"apply"` grava; `"undo"` desfaz (tag, atributos, Anchored). Idempotente (marca `CoffeeCupV1`; a pose cheia lida na primeira vez nao e relida). Nada e movido nem apagado. Grava na xicara: tag `CoffeeCup`; `CupStation` (MapId da cafeteira mais proxima), `CupFillSurface` (`Part`), `CupBody` (`Intersection`), `CupFullCFrame` (pose da superficie no espaco do corpo, a que o dono deixou = cheia), `CupFullY` (so informativo), `CupEmptyOffset` (0,34). Ancora a `Intersection` (estava solta e cairia no Play; original em `CupOrigAnchored`).
+
+Ao mover a xicara com o corpo a pose acompanha (relativa ao corpo). Se o dono trocar o nome das partes, rodar `apply` de novo depois de ajustar `SURFACE` / `BODY` no topo do snippet. O visual vive em `CoffeeCupController` (`Content.CoffeeCup`); `/dev coffeecup fill|empty|auto`.
+
+## Caçambas do lixo da mesa (2026-10-12, `trash_bins.luau`, Provisorio)
+
+O dono acrescentou duas caçambas em `workspace.MAP01_Assets.Extra` (duas Parts `P2`, malha unica, sem tampa, frente +Z): fora dos placements, entao um `Place.run` as apaga (capturar antes). `run("trash_bins")` relata; `"apply"` grava; `"undo"` desfaz (idempotente, marca `TrashBinsV1`). Nada e movido nem apagado. Grava: tag `TrashBin`, `BinId` (BIN-1 oeste, BIN-2), Attachments `DropPoint` (topo + 0,4) e `ApproachPoint` (1,8 a frente, no chao), `MapDrop` / `MapApproach` (coordenadas MAP, so registro). Hoje: BIN-1 drop (-36,5; 5,0; -3,23) approach (-36,5; 0,45; 0,82); BIN-2 idem com x -29,4. O visual vive em `TrashController` (`Content.Trash`); `/dev trash [mesa]`. Tampa: se o dono modelar `Lid` (BasePart) e um Attachment `LidHinge` dentro da caçamba, o controller a abre sozinho; sem tampa ele faz um solavanco de escala na malha. `MapIndex/Required.luau` e `WalkPaths` nao mudaram (nenhum NPC limpa mesa).

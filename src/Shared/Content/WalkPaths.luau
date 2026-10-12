@@ -35,6 +35,8 @@ const rules: Rules = {
 
 -- Rows: MAP-01 §9.3 (TASK-098, level-designer; Provisional). Every node is an NpcNode of workspace.MapBinding
 -- written by tools/assetplace/bind_map01.luau; consecutive nodes are linked there (check_map01 rule 10).
+-- CW-1 moved with the stripes (2026-10-12, owner): its curbs now hang off the Ninth corner node N-Z02-02 (N-Z08-03 left the
+-- chain: it would send the walker 14 studs south and back).
 -- Crosswalk pairs: CW-4 N-Z02-01/N-Z06-01, CW-3 N-Z02-10/N-Z06-02, CW-1 N-Z08-04/N-Z08-05, CW-2 N-Z02-14/N-Z06-06.
 -- MAP-01 §9.8 (level-designer 2026-10-10, Provisional): a walker is born and vanishes only at a building door
 -- (DR-APT, SP-B laundry, DR-B3, MKT-DOOR) or at a street end beyond the player limits and out of sight of the Pad
@@ -58,12 +60,12 @@ const NORTH_EAST = {
 }
 -- EX-E alley -> LANE-W behind the queue -> Juniper South east sidewalk -> CW-1 -> plaza -> Mart door
 const EAST_MART = {
-	"EX-E", "N-Z02-09", "N-Z02-08", "N-Z02-06", "N-Z02-05", "N-Z02-04", "N-Z02-03", "N-Z02-02", "N-Z08-03",
+	"EX-E", "N-Z02-09", "N-Z02-08", "N-Z02-06", "N-Z02-05", "N-Z02-04", "N-Z02-03", "N-Z02-02",
 	"N-Z08-04", "N-Z08-05", "N-Z12-01", "N-Z12-02", "MKT-DOOR",
 }
 -- laundry door -> CW-2 -> Juniper South west sidewalk -> CW-1 -> LANE-W east -> EX-E alley
 const LAUNDRY_EAST = {
-	"SP-B", "N-Z06-07", "N-Z06-06", "N-Z02-14", "N-Z08-05", "N-Z08-04", "N-Z08-03", "N-Z02-02", "N-Z02-03",
+	"SP-B", "N-Z06-07", "N-Z06-06", "N-Z02-14", "N-Z08-05", "N-Z08-04", "N-Z02-02", "N-Z02-03",
 	"N-Z02-04", "N-Z02-05", "N-Z02-06", "N-Z02-08", "N-Z02-09", "EX-E",
 }
 -- B3b door (far west, north sidewalk) -> CW-2 -> south sidewalk west -> SS rim -> Mart door (the night walk)

@@ -32,6 +32,8 @@ type Walker = {
 	Dist: number,
 	Blend: number, -- studs added to Dist, decays to 0 in BLEND_TIME
 	BlendAt: number,
+	Yaw: number?, -- damped heading of the drawn rig (radians); nil = take the path heading at once
+	YawAt: number, -- os.clock of the last yaw step
 }
 
 export type Public = {

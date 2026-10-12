@@ -432,7 +432,10 @@ function NpcService:Spawn(request: SpawnRequest?): number?
 	model:SetAttribute(VARIANT_ATTRIBUTE, if role == "Actor" then r.Variant else nil)
 	model:SetAttribute(WALKER_ATTRIBUTE, r.Walker)
 	if not isThief then
+		-- +-Movement.Speed.Variation per NPC (PROVISIONAL, playtest 2026-10-12): a queue does not walk in lockstep
+		const variation = Content.Movement.Speed.Variation
 		rig.Humanoid.WalkSpeed = Content.CustomerTypes.ByKey[choice.CustomerType].WalkSpeed
+			* (1 + (math.random() * 2 - 1) * variation)
 	end
 	model:PivotTo(CFrame.new(floor + Vector3.new(0, LIFT, 0)) * rotation)
 	model.Parent = folder
@@ -591,7 +594,7 @@ function NpcService:WalkTo(id: number, target: string, options: WalkOptions?): b
 		end
 	const done = Walker.Follow(npc.Rig, points, alive, function(index: number)
 		npc.Node = path[index + 1]
-	end, self:Crossing(id, crossings), gate)
+	end, self:Crossing(id, crossings), gate, { Ease = npc.Role ~= "Thief" })
 	if not done or not alive() then
 		return false
 	end

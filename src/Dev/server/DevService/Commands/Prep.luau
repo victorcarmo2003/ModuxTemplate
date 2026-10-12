@@ -173,7 +173,7 @@ const Prep: Api.Module = function(ctx: Api.Context): { Api.Command }
 	return {
 		{
 			Name = "prep",
-			Usage = "prep grade | kitchen | seats | enter <n> | leave | finish [force] [topping...]",
+			Usage = "prep grade | kitchen | seats | ui [n] [tab] | enter <n> | leave | finish [force] [topping...]",
 			Help = "prep grade: Prep.Grade cases; kitchen: KitchenService plate/grill/flag scenarios (TASK-169); seats / enter / leave / finish: PrepService without the UI (TASK-170)",
 			Run = function(args: { string }, caller: Player?): string?
 				const verb = args[1]
@@ -212,7 +212,9 @@ const Prep: Api.Module = function(ctx: Api.Context): { Api.Command }
 						error("no player to act as", 0)
 					end
 					const tutorials = ctx.Get("TutorialService") :: any
-					tutorials:DevSend(player, "prep_ui", args[2] or "1")
+					-- text = "<station> <tab>": `prep ui 1 Grill` opens on the grill with the mock line and grill (Feed.luau),
+					-- `prep ui 1 Serve` on the Serve tab with a finished plate; the tabs are Order, Grill, Build, Serve
+					tutorials:DevSend(player, "prep_ui", `{args[2] or "1"} {args[3] or ""}`)
 					return `prep ui sent to {player.Name} (run it again to leave)`
 				end
 				if verb ~= "grade" then

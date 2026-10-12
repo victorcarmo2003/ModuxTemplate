@@ -1,0 +1,314 @@
+--!strict
+-- Session: the plate of the Build tab (docs/tech/prep-mode.md §2 Bun / Build / Finish, §3; TASK-178). One plate at a time:
+--   PrepBegin   opens it (the server reserves a bun and the board slot of the seat), PrepResult Begin answers; Value 1 = the
+--               bun came already sliced (ANM-002 altered bun)
+--   gestures    the Director measures every gesture, scores it with Gestures/Score (the same Grade as the server) and writes
+--               the scores here (Cut, Place, one per topping)
+--   PrepFinish  ONE summary per plate: Cut, Place, Toppings in the order added, Ms (client time of the plate). The server checks
+--               it by plausibility and answers PrepResult Finish with the plate grade. A refusal changes nothing: the plate
+--               stays here (Parked) and Next tries again
+-- The client predicts and presents; the server decides the band, the stock, the sausage and the hot dog. Nothing here touches
+-- money, stock or items. With `controller.Mock` (the dev preview) no packet leaves and the verdict is computed locally.
+-- State lives at module level (the board is rebuilt every time the tab comes to the front; the plate must survive that) and
+-- is reset whenever the view-model says the board is empty again (Sync).
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Vide = require(ReplicatedStorage.Packages.Vide)
+local Content = require(ReplicatedStorage.shared.Content)
+local Grade = require(ReplicatedStorage.shared.Prep.Grade)
+local Score = require(script.Parent.Parent.Parent.Gestures.Score)
+
+const source = Vide.source
+const untrack = Vide.untrack
+
+const cfg = Content.Prep
+const build = cfg.Build
+const MAX = Content.OrderRules.MaxToppings
+const PENDING_TIMEOUT = 3 -- s without an answer: the request is forgotten and may be sent again
+const PRE_CUT_SCORE = 100 -- the altered bun comes sliced: the cut counts as a clean one
+const PIP_CUT, PIP_PLACE, PIP_TOP = 1, 2, 3
+
+export type Topping = { Key: string, Score: number }
+
+type Data = {
+	StartedAt: number,
+	Cut: number?,
+	Place: number?,
+	Toppings: { Topping },
+	Stamp: number,
+	RefusalId: number,
+}
+
+const data: Data = { StartedAt = 0, Cut = nil, Place = nil, Toppings = {}, Stamp = 0, RefusalId = 0 }
+
+const Session = {}
+
+-- A plate is open (the server reserved the bun / the dev preview has one).
+Session.Open = source(false)
+-- "" or the request waiting for its PrepResult: "Begin" | "Finish".
+Session.Pending = source("")
+-- The sausage is in the bun.
+Session.Placed = source(false)
+-- The topping being worked on (a key of Content.Ingredients.ToppingKeys), "" = none picked.
+Session.Active = source("")
+-- Hold instead of drag (touch accessibility, docs/tech/prep-mode.md §5).
+Session.Hold = source(false)
+
+-- Current value of a source without tracking it. `untrack` of an `any` picks the overload that returns nothing, so a source
+-- of the controller (typed any here) is read through this.
+function Session.Peek(value: any): any
+	return untrack(function(): any
+		return value()
+	end)
+end
+
+local function toast(controller: any, text: string, kind: ("Info" | "Good" | "Alert")?)
+	controller:Toast(text, kind)
+end
+
+local function bandOf(score: number): Grade.Band
+	return Score.Band(cfg, score)
+end
+
+-- State ------------------------------------------------------------------------------------------------------------------
+
+function Session.Reset()
+	Vide.batch(function()
+		Session.Open(false)
+		Session.Pending("")
+		Session.Placed(false)
+		Session.Active("")
+	end)
+	data.Cut = nil
+	data.Place = nil
+	table.clear(data.Toppings)
+	data.StartedAt = 0
+	data.Stamp += 1
+end
+
+-- The board went empty (Trash, Leave, Serve reset it, an expired plate): forget the plate. A request on its way stays.
+function Session.Sync(controller: any)
+	const empty = Session.Peek(controller.View.Bun) == "None"
+	if empty and (untrack(Session.Open) or untrack(Session.Placed) or data.Cut ~= nil or #data.Toppings > 0) then
+		const pending = untrack(Session.Pending)
+		Session.Reset()
+		Session.Pending(pending)
+	end
+end
+
+function Session.Cut(): number?
+	return data.Cut
+end
+
+function Session.Place(): number?
+	return data.Place
+end
+
+function Session.Toppings(): { Topping }
+	return data.Toppings
+end
+
+-- Seconds since the plate opened.
+function Session.Elapsed(): number
+	return if data.StartedAt > 0 then os.clock() - data.StartedAt else 0
+end
+
+-- Pips of the header (Cut, Place, Top) --------------------------------------------------------------------------------
+
+function Session.SetCut(controller: any, score: number)
+	data.Cut = score
+	controller:SetPip(PIP_CUT, bandOf(score))
+	controller:Need("BunCut", true)
+end
+
+function Session.SetPlace(controller: any, score: number)
+	data.Place = score
+	Session.Placed(true)
+	controller:SetPip(PIP_PLACE, bandOf(score))
+	controller:Need("PlateBuilt", true)
+end
+
+-- A topping is on the plate (the gesture is over): the view-model, the box, the pip of the toppings (the mean of their scores).
+function Session.AddTopping(controller: any, key: string, score: number, amount: number)
+	if #data.Toppings >= MAX then
+		return
+	end
+	table.insert(data.Toppings, { Key = key, Score = score })
+	const view = controller.View
+	const list = table.clone(Session.Peek(view.Toppings) :: { any })
+	table.insert(list, { Key = key, Amount = amount })
+	const used = table.clone(Session.Peek(view.Used) :: { [string]: boolean })
+	used[key] = true
+	local sum = 0
+	for _, entry in data.Toppings do
+		sum += entry.Score
+	end
+	Vide.batch(function()
+		view.Toppings(list)
+		view.Used(used)
+		view.Focus(key)
+		view.Stroke({})
+		view.StrokeGuide({})
+		view.Meter(false)
+		Session.Active("")
+	end)
+	controller:SetPip(PIP_TOP, bandOf(sum / #data.Toppings))
+	if #data.Toppings >= MAX then
+		toast(controller, build.Texts.Full, "Info")
+	end
+end
+
+-- Network ----------------------------------------------------------------------------------------------------------------
+
+local function expect(kind: string)
+	Session.Pending(kind)
+	data.Stamp += 1
+	const stamp = data.Stamp
+	task.delay(PENDING_TIMEOUT, function()
+		if data.Stamp == stamp and untrack(Session.Pending) == kind then
+			Session.Pending("")
+		end
+	end)
+end
+
+-- The plate is open: a closed bun with the guide (or an open one when it came sliced).
+local function opened(controller: any, preCut: boolean)
+	const view = controller.View
+	data.StartedAt = os.clock()
+	Vide.batch(function()
+		Session.Open(true)
+		view.Message("")
+		view.Bun("Closed")
+		view.Guide(true)
+		view.Cut(0)
+	end)
+	if preCut then
+		Vide.batch(function()
+			view.Bun("Open")
+			view.Guide(false)
+		end)
+		Session.SetCut(controller, PRE_CUT_SCORE)
+		if Session.Peek(controller.Tab) == "Build" then
+			controller.Step("build")
+		end
+	end
+end
+
+-- Opens a plate when none is open (entering the tab, after a trash or a serve).
+function Session.Begin(controller: any)
+	if untrack(Session.Open) or untrack(Session.Pending) ~= "" then
+		return
+	end
+	if controller.Mock then
+		opened(controller, false)
+		return
+	end
+	expect("Begin")
+	controller.View.Message("")
+	controller.Libs.Net.PrepBegin:fireServer()
+end
+
+local function refusalLine(reason: string): string
+	if reason == "NoStock" then
+		return build.Texts.NoBun
+	elseif reason == "NotSelling" then
+		return build.Texts.Closed
+	end
+	return build.Texts.Retry
+end
+
+-- The server has no plate for us (expired, dropped): start clean and say so.
+local function lost(controller: any)
+	controller:ResetPlate()
+	Session.Reset()
+	toast(controller, build.Texts.Expired, "Alert")
+	controller.Step("bun")
+end
+
+-- Time rule of the server after a refusal: the plate is aged back to a plausible age (PrepService Finish), so the client
+-- clock does the same or its Ms would exceed the server's by more than MsSlack.
+local function parked()
+	const floor = cfg.Rules.PerfectMin + cfg.Rules.PerTopping * #data.Toppings
+	data.StartedAt = os.clock() - math.min(Session.Elapsed(), floor)
+end
+
+-- PrepResult of the acts this tab owns (Begin, Finish, Trash). Returns nothing; the PrepController already toasted the Notice
+-- of a refusal reason.
+function Session.OnResult(controller: any, result: any)
+	const view = controller.View
+	if result.Act == "Begin" then
+		Session.Pending("")
+		if result.Ok then
+			opened(controller, result.Value == 1)
+		elseif result.Reason == "Invalid" then
+			-- the server already has our plate (a lost answer): take it over
+			opened(controller, false)
+		else
+			view.Message(refusalLine(result.Reason))
+		end
+	elseif result.Act == "Finish" then
+		Session.Pending("")
+		if result.Ok then
+			const grade: string = result.Grade
+			const band: Grade.Band = if grade == "Perfect" then "Perfect" elseif grade == "Messy" then "Messy" else "Good"
+			Vide.batch(function()
+				Session.Open(false)
+				view.Seal(band)
+			end)
+			toast(controller, cfg.Grades.Labels[band], "Good")
+			controller:Need("PlateBuilt", false)
+			controller:SetTab("Serve")
+			controller:SetStage("serve")
+			return
+		end
+		if result.Reason == "NoSession" then
+			lost(controller)
+			return
+		end
+		parked()
+		if result.Reason == "NoStock" and result.Value > 0 then
+			const row = Content.Ingredients.List[result.Value]
+			if row ~= nil then
+				data.RefusalId += 1
+				view.Refused({ Key = row.Key, Id = data.RefusalId })
+			end
+		elseif cfg.Reasons.ByKey[result.Reason] ~= nil and cfg.Reasons.ByKey[result.Reason].Notice == nil then
+			toast(controller, build.Texts.Retry, "Alert")
+		end
+	elseif result.Act == "Trash" and not result.Ok and result.Reason == "NoSession" then
+		lost(controller)
+	end
+end
+
+-- Sends the summary (or, in the dev preview, grades it here). False = not ready or already sent.
+function Session.Finish(controller: any): boolean
+	const cut, place = data.Cut, data.Place
+	if untrack(Session.Pending) ~= "" or not untrack(Session.Open) or cut == nil or place == nil then
+		return false
+	end
+	const toppings: { { Key: string, Score: number } } = {}
+	const scores: { number } = {}
+	for _, entry in data.Toppings do
+		table.insert(toppings, { Key = entry.Key, Score = math.clamp(math.floor(entry.Score), 0, 100) })
+		table.insert(scores, entry.Score)
+	end
+	const elapsed = Session.Elapsed()
+	if controller.Mock then
+		const verdict = Grade.Plate(cfg, { Cut = cut, Place = place, Toppings = scores, Sausage = nil }, elapsed)
+		Session.OnResult(controller, { Act = "Finish", Ok = true, Reason = "None", Grade = verdict.Band, Value = Grade.Points(cfg, verdict.Band) })
+		return true
+	end
+	expect("Finish")
+	controller.Libs.Net.PrepFinish:fireServer({
+		Cut = math.clamp(math.floor(cut), 0, 100),
+		Place = math.clamp(math.floor(place), 0, 100),
+		Toppings = toppings,
+		Ms = math.clamp(math.floor(elapsed * 1000), 0, 120000),
+	})
+	return true
+end
+
+function Session.SetHold(on: boolean)
+	Session.Hold(on)
+end
+
+return Session

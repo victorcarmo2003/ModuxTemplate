@@ -94,7 +94,7 @@ type Spot = {
 
 const SeatingController = Modux.Controller(
 	"SeatingController",
-	{ Require = { "RoundController", "AudioController", "AnimController", "CustomerController" }, Priority = 680 }
+	{ Require = { "RoundController", "AudioController", "AnimController", "CustomerController", "TrashController" }, Priority = 680 }
 )
 
 function SeatingController:Setup()
@@ -190,8 +190,26 @@ function SeatingController:WriteRecord(index: number, record: Record?)
 		Npc2 = record.Npc2,
 		Tip = record.Tip,
 	}
+	-- Dirty -> Free: the tray on the table is not cleared, it is thrown away (TrashController) when this was a cleaning
+	local thrown: Model? = nil
+	if old ~= false and old.State == "Dirty" and copy.State == "Free" and spot.Tray ~= nil then
+		thrown = spot.Tray
+		spot.Tray = nil
+		spot.TrayTip = 0
+	end
 	spot.Record(copy)
 	self:Apply(spot)
+	if thrown ~= nil then
+		const tray = thrown
+		-- the Summary reset writes the same thing; the phase of the same flush is read one defer later
+		task.defer(function()
+			if OPEN_PHASES[Vide.untrack(self.Dependencies.RoundController.Phase)] then
+				self.Dependencies.TrashController:Toss(tray)
+			else
+				tray:Destroy()
+			end
+		end)
+	end
 	if old == false then
 		return -- first sight (late join, run start): no celebration
 	end

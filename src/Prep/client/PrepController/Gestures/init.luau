@@ -5,9 +5,14 @@
 --          slice, a grabbed topping box.
 --   Trace  a Drag that also keeps the path: sampled at Content.Prep.Gestures.trace.Hz (30), at most MaxPoints (64) kept (the
 --          list is thinned in place, so a long stroke never grows past it). The sauce zig-zag.
+--          Any Drag / Hold can keep its path too with `Options.Row` = a key of Content.Prep.Gestures (slice, place, slide...):
+--          Hz, MinPoints and MaxPoints of that row. `Options.Held` starts the gesture at once when the pointer is already
+--          down (a drag that began on an ingredient box and goes on over the board).
 --   Tap    press and release in place (< TAP_TIME s, < TAP_SLOP px). Bacon rings, a button of the board.
 --   Hold   press and keep; Progress 0..1 of `Hold` seconds, `Done` once. Potato sticks, the bin, the "hold instead of drag"
 --          accessibility mode.
+-- The score of a gesture lives in the modules next to this file (slice, place, trace, slide, taps, hold, Score): they take
+-- the points of an Event and answer a raw error that Prep/shared/Grade turns into 0..100.
 -- Every point is normalised to the `Region` GuiObject: (0, 0) its top left, (1, 1) its bottom right (it can leave 0..1 while
 -- dragging past the edge; `Inside` says whether it is in). The score of a gesture is NOT computed here: a stage reads the
 -- event, measures its error and asks Prep/shared/Grade (TASK-176). The mode (`Assist`, hold) is the controller's business.
@@ -27,7 +32,7 @@ export type Event = {
 	-- Now and at the press, normalised to the region.
 	Position: Vector2,
 	Origin: Vector2,
-	-- Trace: the path so far (a reused list; copy it to keep it). Other kinds: nil.
+	-- Trace / a gesture with a Row: the path so far (a reused list; copy it to keep it). Other kinds: nil.
 	Points: { Vector2 }?,
 	-- Path length in region widths.
 	Length: number,
@@ -36,7 +41,7 @@ export type Event = {
 	-- Hold: 0..1 and whether the time was reached.
 	Progress: number,
 	Done: boolean,
-	-- Trace: enough samples (Gestures.trace.MinPoints) to count.
+	-- Trace / a gesture with a Row: enough samples (the MinPoints of its row) to count.
 	Valid: boolean,
 	Inside: boolean,
 }
@@ -48,6 +53,10 @@ export type Options = {
 	Hold: number?,
 	-- Press only counts when this returns true for the pressed point (normalised); nil = always.
 	Accept: ((Vector2) -> boolean)?,
+	-- Key of Content.Prep.Gestures whose Hz / MinPoints / MaxPoints sample the path (Trace defaults to "trace").
+	Row: string?,
+	-- Start pressed at once (at the pointer) when the pointer is down already.
+	Held: boolean?,
 }
 
 export type Arm = { Cancel: (self: Arm) -> () }
@@ -99,6 +108,7 @@ function Gestures.new(pointer: Pointer.Pointer): Recogniser
 		Kind: Kind,
 		Region: GuiObject,
 		Options: Options,
+		Config: Content.PrepGesture?,
 		Handler: (Event) -> (),
 		Pressed: boolean,
 		Origin: Vector2,
@@ -115,24 +125,21 @@ function Gestures.new(pointer: Pointer.Pointer): Recogniser
 
 	const rows = Content.Prep.Gestures.ByKey
 
-	local function configOf(kind: Kind): Content.PrepGesture?
-		return rows[string.lower(kind)]
-	end
-
 	local function emit(active: Active, phase: Phase, position: Vector2, extra: { Progress: number?, Done: boolean?, Valid: boolean? }?)
-		const config = configOf(active.Kind)
+		const config = active.Config
 		const minimum = if config ~= nil then config.MinPoints else 0
+		const keeps = active.Config ~= nil and active.Kind ~= "Tap"
 		const event: Event = {
 			Kind = active.Kind,
 			Phase = phase,
 			Position = position,
 			Origin = active.Origin,
-			Points = if active.Kind == "Trace" then active.Points else nil,
+			Points = if keeps then active.Points else nil,
 			Length = active.Length,
 			Duration = os.clock() - active.StartedAt,
 			Progress = if extra ~= nil and extra.Progress ~= nil then extra.Progress elseif active.Kind == "Hold" then math.clamp((os.clock() - active.StartedAt) / math.max(active.Options.Hold or 0.5, 0.05), 0, 1) else 0,
 			Done = if extra ~= nil and extra.Done ~= nil then extra.Done else active.Done,
-			Valid = if active.Kind == "Trace" then #active.Points >= minimum else true,
+			Valid = if keeps then #active.Points >= minimum else true,
 			Inside = inside(active.Region, active.OriginPx) and (position.X >= 0 and position.X <= 1 and position.Y >= 0 and position.Y <= 1),
 		}
 		active.Handler(event)
@@ -147,7 +154,7 @@ function Gestures.new(pointer: Pointer.Pointer): Recogniser
 	end
 
 	local function sample(active: Active, position: Vector2, force: boolean)
-		const config = configOf("Trace")
+		const config = active.Config
 		const maxPoints = if config ~= nil then config.MaxPoints else 64
 		const hz = if config ~= nil and config.Hz > 0 then config.Hz else 30
 		const now = os.clock()
@@ -161,39 +168,44 @@ function Gestures.new(pointer: Pointer.Pointer): Recogniser
 		end
 	end
 
+	-- The press of an arm at `px` (screen px): called by a real press or by `Held` at arm time.
+	local function press(active: Active, px: Vector2)
+		const origin = normalise(active.Region, px)
+		active.Pressed = true
+		active.Origin = origin
+		active.OriginPx = px
+		active.Last = origin
+		active.StartedAt = os.clock()
+		active.LastSample = 0
+		active.Length = 0
+		active.Done = false
+		table.clear(active.Points)
+		if active.Config ~= nil and active.Kind ~= "Tap" then
+			sample(active, origin, true)
+		end
+		if active.Kind ~= "Tap" then
+			emit(active, "Begin", origin, nil)
+		end
+	end
+
 	local function down(px: Vector2)
-		for _, active in arms do
-			if active.Pressed then
+		for _, active in table.clone(arms) do
+			if active.Pressed or table.find(arms, active) == nil then
 				continue
 			end
 			const start = active.Options.Start or active.Region
 			if not inside(start, px) then
 				continue
 			end
-			const origin = normalise(active.Region, px)
-			if active.Options.Accept ~= nil and not active.Options.Accept(origin) then
+			if active.Options.Accept ~= nil and not active.Options.Accept(normalise(active.Region, px)) then
 				continue
 			end
-			active.Pressed = true
-			active.Origin = origin
-			active.OriginPx = px
-			active.Last = origin
-			active.StartedAt = os.clock()
-			active.LastSample = 0
-			active.Length = 0
-			active.Done = false
-			table.clear(active.Points)
-			if active.Kind == "Trace" then
-				sample(active, origin, true)
-			end
-			if active.Kind ~= "Tap" then
-				emit(active, "Begin", origin, nil)
-			end
+			press(active, px)
 		end
 	end
 
 	local function move(px: Vector2)
-		for _, active in arms do
+		for _, active in table.clone(arms) do
 			if not active.Pressed then
 				continue
 			end
@@ -203,7 +215,7 @@ function Gestures.new(pointer: Pointer.Pointer): Recogniser
 				active.Length += (position - active.Last).Magnitude * size.Y / size.X
 			end
 			active.Last = position
-			if active.Kind == "Trace" then
+			if active.Config ~= nil and active.Kind ~= "Tap" then
 				sample(active, position, false)
 			end
 			if active.Kind == "Drag" or active.Kind == "Trace" then
@@ -213,7 +225,7 @@ function Gestures.new(pointer: Pointer.Pointer): Recogniser
 	end
 
 	local function up(px: Vector2)
-		for _, active in arms do
+		for _, active in table.clone(arms) do
 			if not active.Pressed then
 				continue
 			end
@@ -226,7 +238,7 @@ function Gestures.new(pointer: Pointer.Pointer): Recogniser
 					emit(active, "End", position, nil)
 				end
 			else
-				if active.Kind == "Trace" then
+				if active.Config ~= nil then
 					sample(active, position, true)
 				end
 				finish(active, "End", position)
@@ -240,7 +252,7 @@ function Gestures.new(pointer: Pointer.Pointer): Recogniser
 
 	-- Hold clock: only runs the loop body while some hold is pressed
 	const heartbeat = RunService.Heartbeat:Connect(function()
-		for _, active in arms do
+		for _, active in table.clone(arms) do
 			if active.Pressed and active.Kind == "Hold" then
 				const wanted = math.max(active.Options.Hold or 0.5, 0.05)
 				const progress = math.clamp((os.clock() - active.StartedAt) / wanted, 0, 1)
@@ -255,10 +267,13 @@ function Gestures.new(pointer: Pointer.Pointer): Recogniser
 
 	const self = {} :: any
 	function self.Arm(_: any, kind: Kind, region: GuiObject, options: Options?, handler: (Event) -> ()): Arm
+		const opts: Options = options or {}
+		const row = if opts.Row ~= nil then opts.Row elseif kind == "Trace" then "trace" else nil
 		const active: Active = {
 			Kind = kind,
 			Region = region,
-			Options = options or {},
+			Options = opts,
+			Config = if row ~= nil then rows[row] else nil,
 			Handler = handler,
 			Pressed = false,
 			Origin = Vector2.zero,
@@ -271,6 +286,10 @@ function Gestures.new(pointer: Pointer.Pointer): Recogniser
 			Done = false,
 		}
 		table.insert(arms, active)
+		-- a drag that began on an ingredient box goes on over the board: the press is the one already down
+		if opts.Held == true and pointer.Down then
+			press(active, pointer.Position)
+		end
 		const handle = {} :: any
 		function handle.Cancel(_: any)
 			finish(active, "Cancel", active.Last)
@@ -282,7 +301,7 @@ function Gestures.new(pointer: Pointer.Pointer): Recogniser
 		return handle :: Arm
 	end
 	function self.CancelAll(_: any)
-		for _, active in arms do
+		for _, active in table.clone(arms) do
 			finish(active, "Cancel", active.Last)
 		end
 	end

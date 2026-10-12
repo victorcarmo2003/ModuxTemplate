@@ -9,6 +9,7 @@ local BossController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTy
 local CameraController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.CameraController)
 local CharacterController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.CharacterController)
 local ClassController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ClassController)
+local CoffeeCupController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.CoffeeCupController)
 local RigController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.RigController)
 local CustomerController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.CustomerController)
 local CutsceneController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.CutsceneController)
@@ -39,6 +40,8 @@ local ShowcaseController = require(StarterPlayer.StarterPlayerScripts.client.Mod
 local StageController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.StageController)
 local ThiefController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ThiefController)
 local TrafficController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.TrafficController)
+local TrafficLightController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.TrafficLightController)
+local TrashController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.TrashController)
 local TutorialController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.TutorialController)
 local SwitchLeverController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.SwitchLeverController)
 local VehicleController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.VehicleController)
@@ -53,6 +56,7 @@ export type AllControllers = {
 	CameraController: CameraController.Public,
 	CharacterController: CharacterController.Public,
 	ClassController: ClassController.Public,
+	CoffeeCupController: CoffeeCupController.Public,
 	RigController: RigController.Public,
 	CustomerController: CustomerController.Public,
 	CutsceneController: CutsceneController.Public,
@@ -83,6 +87,8 @@ export type AllControllers = {
 	StageController: StageController.Public,
 	ThiefController: ThiefController.Public,
 	TrafficController: TrafficController.Public,
+	TrafficLightController: TrafficLightController.Public,
+	TrashController: TrashController.Public,
 	TutorialController: TutorialController.Public,
 	SwitchLeverController: SwitchLeverController.Public,
 	VehicleController: VehicleController.Public,

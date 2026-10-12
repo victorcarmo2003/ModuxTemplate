@@ -225,7 +225,7 @@ local VEHICLE_SPEC = {
 		-- wave 3: service window button TRL-SHUTTER (DEC-221; Required.Wave3 of TASK-129); hide H1..H4 left
 		-- open_sign: the red wall switch TRL-SWITCH-OPEN (2026-10-12; replaces the serving-window panel TRL-OPEN and the Pad stand)
 		own = { [1] = { open_sign = 1 }, [2] = { answer_phone = 1, switch_light = 1 }, [3] = { shutter_toggle = 1 } },
-		slots = { RailSlots = 8, BoardSlots = 3 },
+		slots = { RailSlots = 8, BoardSlots = 4 }, -- 4 = the four prep seats (DEC-223, TASK-172)
 		counter = { ids = { "TRL-G", "TRL-R", "TRL-B", "TRL-T", "TRL-K", "TRL-DRAWER" }, relY = 4.6 },
 	},
 }
@@ -259,7 +259,7 @@ local ROADS = {
 	MapFrame.box({ name = "Juniper South", x0 = -12, x1 = 12, z0 = 16, z1 = 120 }),
 }
 local CROSSWALKS = {
-	["CW-1"] = MapFrame.box({ x0 = -12, x1 = 12, z0 = 34, z1 = 42 }),
+	["CW-1"] = MapFrame.box({ x0 = -12, x1 = 12, z0 = 20, z1 = 28 }), -- owner moved the stripes (was Z 34..42)
 	["CW-2"] = MapFrame.box({ x0 = -24, x1 = -12, z0 = -16, z1 = 16 }),
 	["CW-3"] = MapFrame.box({ x0 = 54, x1 = 60, z0 = -16, z1 = 16 }),
 	["CW-4"] = MapFrame.box({ x0 = 12, x1 = 24, z0 = -16, z1 = 16 }),
@@ -293,12 +293,12 @@ local SIGHT_SEE_THROUGH = 0.3 -- parts at least this transparent do not block (g
 -- Embedded Content keys (content-data.md v5 §3.3, §3.4, §3.6, §3.8, §3.18, §6.4, §6.9) for when Rojo has not
 -- synced Content. WAVE2 = keys that a synced Content may still lack until TASK-047 lands (warning, not error).
 local FALLBACK = {
-	Stations = { "sausage_stock", "grill", "rail", "bun_crate", "board", "toppings", "trash", "coffee_machine" },
+	Stations = { "sausage_stock", "grill", "rail", "bun_crate", "board", "toppings", "trash", "coffee_machine", "prep" },
 	Actions = {
 		"open_sign", "grill_place", "grill_collect", "bun_cut", "board_add_sausage", "topping_add", "discard",
 		"take_order", "serve", "refuse", "restock", "buy_package", "bench_buy_upgrade", "bench_buy_item",
 		"brew_coffee", "give_coffee", "switch_light", "safe_spot", "pick_up_item",
-		"answer_phone", "get_up", "shutter_toggle", -- "hide" left with DEC-221 (TASK-132)
+		"answer_phone", "get_up", "shutter_toggle", "prep_work", -- "hide" left with DEC-221 (TASK-132)
 	},
 	Ingredients = { "bun", "sausage", "ketchup", "mustard", "cheese", "bacon", "potato_sticks", "cream_cheese", "coffee" },
 	Packages = REQUIRED_PACKAGES,
@@ -894,7 +894,7 @@ local function checkVehicle(key: string, v: Instance)
 		end
 	end
 	for k, list in byKind do
-		if not table.find(kinds, k) then
+		if not table.find(kinds, k) and k ~= "prep" then -- the four prep seats: rule 17
 			warn_(("%s: %d unexpected Station '%s' in wave %d"):format(key, #list, k, WAVE))
 		end
 	end
@@ -2523,6 +2523,103 @@ local function checkTables()
 	info("16: SeatTable " .. table.concat(counts, ", "))
 end
 
+-- 17. (TASK-172, DEC-223, prep-mode.md §6 "Mapa") focused prep seats: Station_1..4 inside the trailer, each Model with tag Station,
+-- StationKind "prep", Seat = n, the five children Att_Stand / CamAnchor / Focus / Prompt_Work / Att_Bun (Slot = n) once each.
+-- Errors: wrong count, a missing Att_Stand / Prompt_Work (action prep_work, tag Interactable) / Att_Bun, Att_Stand without floor
+-- under it (raycast, +-0.15) or with a collider in the rig's radius (8 rays x 3 heights, 1.0). Warnings: CamAnchor / Focus missing,
+-- CamAnchor blocked from Focus or not looking at it.
+local function checkPrepStations(vehicles: { [string]: Instance })
+	local v = vehicles.trailer
+	if not v then
+		return
+	end
+	local list: { [number]: Instance } = {}
+	for _, s in tagged("Station") do
+		if s:GetAttribute("StationKind") == "prep" then
+			local seat = s:GetAttribute("Seat")
+			if typeof(seat) ~= "number" or seat < 1 or seat > 4 or seat ~= math.floor(seat) then
+				err(("17: prep Station %s without a valid Seat (1..4)"):format(name(s)))
+			elseif list[seat] then
+				err(("17: Seat %d is on two prep Stations (%s, %s)"):format(seat, name(list[seat]), name(s)))
+			else
+				list[seat] = s
+			end
+			if not s:IsDescendantOf(v) then
+				err(("17: prep Station %s is not inside the trailer Vehicle"):format(name(s)))
+			end
+		end
+	end
+	local found = 0
+	for seat = 1, 4 do
+		local st = list[seat]
+		if not st then
+			err(("17: Station_%d (StationKind prep, Seat %d) missing in the trailer"):format(seat, seat))
+			continue
+		end
+		found += 1
+		if st.Name ~= "Station_" .. seat then
+			warn_(("17: prep Station of Seat %d is named %s (Station_%d expected; Poses.luau looks it up by name)"):format(seat, st.Name, seat))
+		end
+		local stand = st:FindFirstChild("Att_Stand", true)
+		local cam = st:FindFirstChild("CamAnchor", true)
+		local focus = st:FindFirstChild("Focus", true)
+		local bun = st:FindFirstChild("Att_Bun", true)
+		local work = st:FindFirstChild("Prompt_Work", true)
+		if not stand then
+			err(("17: %s: Att_Stand missing"):format(st.Name))
+		end
+		if not bun or bun:GetAttribute("Slot") ~= seat then
+			err(("17: %s: Att_Bun missing or Slot ~= %d"):format(st.Name, seat))
+		end
+		if not work or work:GetAttribute("PromptAction") ~= "prep_work" or not CollectionService:HasTag(work, "Interactable") then
+			err(("17: %s: Prompt_Work missing, without PromptAction prep_work or without the Interactable tag"):format(st.Name))
+		end
+		if not cam then
+			warn_(("17: %s: CamAnchor missing (the camera falls back to the TRL pose)"):format(st.Name))
+		end
+		if not focus then
+			warn_(("17: %s: Focus missing (DOF target falls back to CamAnchor + 2.5)"):format(st.Name))
+		end
+		local rp = RaycastParams.new()
+		rp.FilterType = Enum.RaycastFilterType.Exclude
+		rp.FilterDescendantsInstances = { st }
+		if stand then
+			local p = pos(stand)
+			local down = Workspace:Raycast(p + Vector3.new(0, 3, 0), Vector3.new(0, -6, 0), rp)
+			if not down or math.abs(down.Position.Y - p.Y) > 0.15 then
+				err(("17: %s: no floor under Att_Stand %s (raycast %s)"):format(st.Name, fmtV(p), if down then ("%.2f"):format(down.Position.Y) else "none"))
+			elseif not down.Instance:IsDescendantOf(v) then
+				warn_(("17: %s: the floor under Att_Stand is %s, not the trailer"):format(st.Name, name(down.Instance)))
+			end
+			local blocked = 0
+			for _, h in { 1.2, 2.6, 4.0 } do
+				for k = 0, 7 do
+					local a = k * math.pi / 4
+					local hit = Workspace:Raycast(p + Vector3.new(0, h, 0), Vector3.new(math.cos(a), 0, math.sin(a)), rp)
+					if hit and hit.Instance.CanCollide then
+						blocked += 1
+					end
+				end
+			end
+			if blocked > 0 then
+				err(("17: %s: %d collider hit(s) within 1.0 stud of Att_Stand (rig box)"):format(st.Name, blocked))
+			end
+		end
+		if cam and focus then
+			local from, to = pos(cam), pos(focus)
+			local hit = Workspace:Raycast(from, to - from, rp)
+			if hit and (hit.Position - to).Magnitude > 1.2 then
+				warn_(("17: %s: CamAnchor -> Focus blocked by %s"):format(st.Name, name(hit.Instance)))
+			end
+			local look = if cam:IsA("Attachment") then cam.WorldCFrame.LookVector else (cam :: BasePart).CFrame.LookVector
+			if look:Dot((to - from).Unit) < 0.98 then
+				warn_(("17: %s: CamAnchor does not look at Focus"):format(st.Name))
+			end
+		end
+	end
+	info(("17: prep seats %d/4"):format(found))
+end
+
 -- 15. Mart v2 Gear Stand (TASK-138; MAP-01 §18.3, §18.4, §18.10). Errors: pedestal / shutter count per Slot, shutter
 -- without Slat_* / Door_Panel, bench prompt of a slot outside its pedestal. Warnings: Slot_ / Price_Anchor_ missing,
 -- shutter without Roll, Att_Opal missing / off OP-1 / not facing the store, shelf heights, prompts out of reach of the
@@ -2703,6 +2800,7 @@ function Check.run(opts: { write: boolean?, wave: number? }?): (string, number)
 	checkMapAnchors()
 	checkMart(points)
 	checkTables()
+	checkPrepStations(vehicles)
 	checkVehicleDistances(vehicles)
 	checkStreaming()
 	checkPivots(vehicles)

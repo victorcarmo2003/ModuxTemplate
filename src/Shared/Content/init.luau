@@ -19,9 +19,12 @@ local Ingredients = require(script.Ingredients)
 local Items = require(script.Items)
 local LightGroups = require(script.LightGroups)
 local LightPresets = require(script.LightPresets)
+local CoffeeCup = require(script.CoffeeCup)
+local Trash = require(script.Trash)
 local Lobby = require(script.Lobby)
 local Mart = require(script.Mart)
 local Moods = require(script.Moods)
+local Movement = require(script.Movement)
 local Neon = require(script.Neon)
 local Nights = require(script.Nights)
 local Notices = require(script.Notices)
@@ -43,6 +46,7 @@ local Stats = require(script.Stats)
 local Table = require(script.Table)
 local Thief = require(script.Thief)
 local Traffic = require(script.Traffic)
+local TrafficLights = require(script.TrafficLights)
 local Upgrades = require(script.Upgrades)
 local VoiceLines = require(script.VoiceLines)
 local Validate = require(script.Validate)
@@ -197,6 +201,9 @@ return table.freeze({
 	-- neon tube signs (user request 2026-10-11; NeonController)
 	Neon = Neon,
 
+	-- walking feel (playtest 2026-10-12; NpcService/Walker, PedestrianController). Numbers Provisional
+	Movement = Movement,
+
 	-- Mart v2 "Gear Stand" (TASK-135; FEAT-015 v2; MAP-01 §18). Numbers Provisional
 	Mart = Mart,
 
@@ -223,4 +230,14 @@ return table.freeze({
 
 	-- Focused prep mode: rules, tabs, steps, gestures, tolerances, grades (DEC-223; docs/tech/prep-mode.md §6). Provisional
 	Prep = Prep,
+
+	-- Street light cycle of MAP-01 (owner request 2026-10-12; TrafficLightController). Pure, Provisional
+	TrafficLights = TrafficLights,
+
+	-- Coffee cup on the trailer counter: surface rises / sinks with the coffee machine (owner request 2026-10-12;
+	-- CoffeeCupController). Provisional
+	CoffeeCup = CoffeeCup,
+
+	-- Table trash dumpsters: the cleaned tray flies to the nearest bin (owner request 2026-10-12; TrashController). Provisional
+	Trash = Trash,
 })

@@ -184,7 +184,7 @@ const ROADS: { Rect } = {
 }
 
 const CROSSWALKS: { [string]: Rect } = {
-	["CW-1"] = mapRect("CW-1", -12, 12, 34, 42),
+	["CW-1"] = mapRect("CW-1", -12, 12, 20, 28), -- owner moved the stripes 2026-10-12 (was Z 34..42)
 	["CW-2"] = mapRect("CW-2", -24, -12, -16, 16),
 	["CW-3"] = mapRect("CW-3", 54, 60, -16, 16),
 	["CW-4"] = mapRect("CW-4", 12, 24, -16, 16),

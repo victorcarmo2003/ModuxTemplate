@@ -71,6 +71,8 @@ type Walker = {
 	Dist: number,
 	Blend: number, -- studs added to Dist, decays to 0 in BLEND_TIME
 	BlendAt: number,
+	Yaw: number?, -- damped heading of the drawn rig (radians); nil = take the path heading at once
+	YawAt: number, -- os.clock of the last yaw step
 }
 
 const RULES = Content.WalkPaths.Rules
@@ -78,7 +80,9 @@ const LOD_DISTANCE = RULES.LodDistance
 const LOD_MARGIN = 10 -- studs of hysteresis past LOD_DISTANCE before the rig leaves
 const NPC_SET = "npc" -- Content.Animations.Locomotion
 const SPAWN_LIFT = Vector3.new(0, 3, 0) -- HumanoidRootPart above the floor (§18.5)
-const HEADING_HALF = 1 -- studs each side for the facing chord
+const PED = Content.Movement.Pedestrian -- walking feel (PROVISIONAL, playtest 2026-10-12): smoothing, look-ahead, yaw
+const TURN_CAP = math.rad(PED.TurnRate)
+const MAX_YAW_DT = 0.1 -- s: a longer gap (rig was hidden) restarts the yaw
 const MAP_WAIT = 60 -- seconds MapIndex.WaitReady may wait for streaming
 const PATH_RETRY = 2 -- seconds between lookups of a path whose nodes are not streamed in yet
 const POOL_CAP = 8 -- idle rigs kept across Species + Outfit
@@ -101,6 +105,49 @@ local function buildWalk(row: Content.WalkPath): (Walk?, string?)
 		return nil, problem or row.Key
 	end
 	return { Line = geo.Path, Loop = row.Loop, Geo = geo }, nil
+end
+
+-- Smoothing ----------------------------------------------------------------------------------------------------------
+
+-- Floor point of the walker in lane `lane` at distance `s`: the polyline averaged over +-Smooth studs rounds the
+-- corners (the distance and the server timing stay those of the polyline). The window closes to 0 near a crosswalk,
+-- so the zebra is walked on its exact line.
+local function drawnPoint(geo: WalkGeo.Geo, s: number, lane: number): Vector3
+	local window = PED.Smooth
+	if window > 0 and #geo.Crossings > 0 then
+		const folded = WalkGeo.Fold(geo, s)
+		local gap = math.huge
+		for _, crossing in geo.Crossings do
+			gap = math.min(gap, math.max(crossing.From - folded, folded - crossing.To, 0))
+		end
+		window *= math.clamp(gap / PED.CrosswalkRamp, 0, 1)
+	end
+	const offset = WalkGeo.LaneOffset(geo, s, lane)
+	if window < 0.05 then
+		return WalkGeo.PointAt(geo, s) + offset
+	end
+	return (WalkGeo.PointAt(geo, s - window) + WalkGeo.PointAt(geo, s + window)) * 0.5 + offset
+end
+
+local function angleDelta(from: number, to: number): number
+	return (to - from + math.pi) % (2 * math.pi) - math.pi
+end
+
+-- Damped yaw towards the look-ahead heading: eased, capped, and never spinning when the walker stands
+local function dampedYaw(walker: Walker, heading: Vector3, clock: number): number
+	const goal = math.atan2(-heading.X, -heading.Z)
+	const yaw = walker.Yaw
+	local result = goal
+	if yaw ~= nil then
+		const dt = clock - walker.YawAt
+		if dt <= MAX_YAW_DT then
+			const eased = angleDelta(yaw, goal) * (1 - math.exp(-PED.TurnEase * dt))
+			result = yaw + math.clamp(eased, -TURN_CAP * dt, TURN_CAP * dt)
+		end
+	end
+	walker.Yaw = result
+	walker.YawAt = clock
+	return result
 end
 
 -- Rig ------------------------------------------------------------------------------------------------------------
@@ -300,6 +347,8 @@ function PedestrianController:Apply(id: number, record: Record)
 			Dist = copy.AnchorDist,
 			Blend = 0,
 			BlendAt = 0,
+			Yaw = nil,
+			YawAt = 0,
 		}
 		self.Walkers[id] = fresh
 		self:Reanchor(fresh)
@@ -346,6 +395,7 @@ function PedestrianController:Hide(walker: Walker)
 		walker.Model.Parent = nil
 	end
 	walker.Shown = false
+	walker.Yaw = nil
 end
 
 -- Rig in the Workspace (dressed before it is parented: no Day frame on the low band)
@@ -410,7 +460,7 @@ function PedestrianController:Step()
 			self:Hide(walker)
 			continue
 		end
-		const ground = WalkGeo.LanePointAt(walk.Geo, s, WalkGeo.LaneOfSlot(walker.Id))
+		const ground = drawnPoint(walk.Geo, s, WalkGeo.LaneOfSlot(walker.Id))
 		const distance = (ground - eye).Magnitude
 		const limit = if walker.Shown then LOD_DISTANCE + LOD_MARGIN else LOD_DISTANCE
 		if distance > limit then
@@ -422,7 +472,8 @@ function PedestrianController:Step()
 			continue
 		end
 		const position = ground + SPAWN_LIFT
-		root.CFrame = CFrame.lookAt(position, position + Motion.Heading(walk.Line, s, HEADING_HALF))
+		const yaw = dampedYaw(walker, Motion.Heading(walk.Line, s, PED.HeadingHalf), clock)
+		root.CFrame = CFrame.new(position) * CFrame.fromOrientation(0, yaw, 0)
 	end
 end
 

@@ -240,7 +240,62 @@ const texts: Texts = {
 	Taken = "Taken",
 }
 
+-- Build tab (TASK-176 gestures, TASK-178 stages; Provisional, no DEC). Geometry in the space of the BUN: 0..1 on both axes,
+-- x to the right, y down (the bun is wider than tall, so lengths in % use the bun width / length). Times in seconds.
+--   Cut       knife line: Y (middle), From..To (where the line starts and ends), Done (the cut is complete past this x),
+--             Hold (seconds of the hold-instead-of-drag sweep)
+--   Groove    where the sausage and the cheese slice belong; Magnet = a drop closer than this (% of the bun length) snaps in
+--   Sauce     zig-zag Path to trace, Reach (a path point counts as covered when a stroke is this close, in bun heights),
+--             Spill (a stroke point farther than this from the path is excess), Meter (amount of sauce, 1 = the path length;
+--             the window is what the meter shows as the green zone), Fill (seconds of the hold-instead-of-trace pour)
+--   Bacon     Count rings, one every Gap s, each shrinking for Shrink s, the first shows Lead s after the pick; a ring
+--             not tapped Late s after it closed is a miss worth Miss ms of error
+--   Potato    hold fills the bar in Fill s; release at Target (0..1) of the bar
+--   MinHold   a press shorter than this is a stray touch, not a gesture
+const build = {
+	Cut = { Y = 0.5, From = 0.04, To = 0.96, Done = 0.94, Hold = 1.0 },
+	Groove = { X = 0.5, Y = 0.5 },
+	Magnet = 20,
+	HoldPlace = 0.35,
+	Sauce = {
+		Path = { { X = 0.10, Y = 0.20 }, { X = 0.30, Y = 0.80 }, { X = 0.50, Y = 0.20 }, { X = 0.70, Y = 0.80 }, { X = 0.90, Y = 0.20 } },
+		Reach = 0.15,
+		Spill = 0.4,
+		Meter = { Target = 0.77, Window = 0.31, Max = 1.3 },
+		Fill = 1.4,
+	},
+	Bacon = { Count = 3, Gap = 0.55, Shrink = 0.9, Lead = 0.5, Late = 0.45, Miss = 600, X = { 0.25, 0.5, 0.75 }, Y = 0.5 },
+	Potato = { Fill = 1.4, Target = 0.7, Window = 0.36 },
+	MinHold = 0.15,
+	-- short UI lines of the Build tab (English, DEC-022)
+	Texts = {
+		Sausage = "Sausage",
+		HoldMode = "Hold",
+		PlaceFirst = "Place the sausage first",
+		Ready = "Plate ready. Serve it",
+		NoBun = "Out of buns",
+		Closed = "We are closed",
+		Retry = "Pick the tab again to retry",
+		Expired = "Plate expired",
+		Full = "Plate is full. Press Next",
+		Hints = {
+			slice = "Drag the knife along the line",
+			slice_hold = "Hold on the line",
+			place = "Drag the sausage into the bun",
+			place_hold = "Hold where the sausage goes",
+			trace = "Trace the zig-zag",
+			trace_hold = "Hold to pour, release in the green",
+			slide = "Drag the slice onto the bun",
+			slide_hold = "Hold where the slice goes",
+			taps = "Tap each ring as it closes",
+			hold = "Hold, release in the green",
+			add = "Add a topping or press Next",
+		},
+	},
+}
+
 return Table.record({
+	Build = build,
 	Rules = rules,
 	Tabs = tabs,
 	Steps = steps,

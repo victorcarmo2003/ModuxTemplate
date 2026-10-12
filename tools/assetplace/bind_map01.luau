@@ -414,9 +414,10 @@ local NODES = {
 	-- N-Z06-04 now hangs off N-Z06-03 (the old N-Z06-02 link ran under the NL-04 / NL-03 arms); no walk path uses it
 	{ id = "N-Z06-04", x = 74, z = -24.6, floor = 0.4 }, -- passes the parking entrance (AN-12 is night only)
 	{ id = "N-Z06-05", x = 110, z = -24.6, floor = 0.4 }, -- east end (BAR-E), walkers despawn here
-	-- CW-1 (the Mart crossing) curb nodes
-	{ id = "N-Z08-04", x = 13, z = 38, floor = 0.24, crosswalk = "CW-1" },
-	{ id = "N-Z08-05", x = -13, z = 38, floor = 0.24, crosswalk = "CW-1" },
+	-- CW-1 (the Mart crossing) curb nodes. 2026-10-12 (owner moved the stripes to the mouth of the Ninth, MAP Z 20..28, centre 24):
+	-- walked on Z 25.4 (1.4 off the centre: off the corner sign boxes for check_map01 rule 6 and the +2.5 lane clear of the SW sign pole)
+	{ id = "N-Z08-04", x = 13, z = 25.4, floor = 0.24, crosswalk = "CW-1" },
+	{ id = "N-Z08-05", x = -13, z = 25.4, floor = 0.24, crosswalk = "CW-1" },
 	-- west: plaza, south sidewalk of the Ninth (west), CW-2, north sidewalk (west)
 	{ id = "N-Z12-01", x = -34, z = 40, floor = 0.4 },
 	{ id = "N-Z12-02", x = -54, z = 30, floor = 0.4 }, -- inside SS (day only for these paths)
@@ -482,7 +483,7 @@ local EDGES = {
 	{ "N-Z02-10", "N-Z02-05" },
 	{ "N-Z06-03", "N-Z06-04" }, -- 2026-10-11: was N-Z06-02 - N-Z06-04 (under the NL-04 / NL-03 arms)
 	{ "N-Z06-04", "N-Z06-05" },
-	{ "N-Z08-03", "N-Z08-04" },
+	{ "N-Z02-02", "N-Z08-04" }, -- was N-Z08-03 -> N-Z08-04 (CW-1 stood on Z 38, now Z 25 beside the Ninth corner)
 	{ "N-Z08-04", "N-Z08-05" }, -- CW-1 crosswalk edge
 	{ "N-Z08-05", "N-Z12-01" },
 	{ "N-Z12-01", "N-Z12-02" },
@@ -631,15 +632,15 @@ local TRAFFIC_LINES = {
 	{ id = "SL-S", x = 6, z = 20, width = 12, dir = NORTH }, -- PARE, Juniper NB
 	{ id = "SL-W", x = -28, z = 8, width = 16, dir = EAST }, -- CW-2 / CW-4, Ninth EB
 	{ id = "SL-E", x = 28, z = -8, width = 16, dir = WEST }, -- CW-2 / CW-4, Ninth WB
-	{ id = "SL-1N", x = -6, z = 30, width = 12, dir = SOUTH }, -- CW-1, Juniper South SB
-	{ id = "SL-1S", x = 6, z = 46, width = 12, dir = NORTH }, -- CW-1, Juniper South NB
+	{ id = "SL-1N", x = -6, z = 18, width = 12, dir = SOUTH }, -- CW-1, Juniper South SB (stripes Z 20..28: 2 before; was Z 30)
+	{ id = "SL-1S", x = 6, z = 32, width = 12, dir = NORTH }, -- CW-1, Juniper South NB (4 before the stripes; was Z 46)
 	{ id = "SL-3W", x = 50, z = 8, width = 16, dir = EAST }, -- CW-3, Ninth EB
 	{ id = "SL-3E", x = 64, z = -8, width = 16, dir = WEST }, -- CW-3, Ninth WB
 }
 -- Boxes: X0..X1, Z0..Z1 (MAP-01 §5.2 crosswalk stripes; X-T = the carriageway square of the crossing).
 local TRAFFIC_BOXES = {
 	{ id = "X-T", x0 = -12, x1 = 12, z0 = -16, z1 = 16 },
-	{ id = "CW-1", x0 = -12, x1 = 12, z0 = 34, z1 = 42 },
+	{ id = "CW-1", x0 = -12, x1 = 12, z0 = 20, z1 = 28 }, -- owner moved the stripes (was Z 34..42)
 	{ id = "CW-2", x0 = -24, x1 = -12, z0 = -16, z1 = 16 },
 	{ id = "CW-3", x0 = 54, x1 = 60, z0 = -16, z1 = 16 },
 	{ id = "CW-4", x0 = 12, x1 = 24, z0 = -16, z1 = 16 },
@@ -652,6 +653,7 @@ local ROAD_Y = 0 -- carriageway top (blockout Y_ROAD); the raycast result wins w
 local GRILL_SLOTS = 4
 local GRILL_FALLBACK_DX = { -1.35, -0.45, 0.45, 1.35 } -- 0.9 between centres (asset-list AST-012)
 local BUN_SLOT_STEP = 1.1 -- board slots along Att_Bun local X (cart 2: -/+0.55; trailer 3: -1.1, 0, +1.1)
+local BUN_SLOT_STEP_4 = 0.8 -- 4 slots (trailer, DEC-223 prep seats, TASK-172): 0.8 apart so they stay between the bun crate and the toppings grid
 local PHONE_GAP = 1.3 -- phone prompt >= this from anchors of other owners (user 2026-10-11: phone moved next to the sausage cooler, prompt must stay low; was 2.6)
 
 -- Tarp placeholder (AST-043: 26 x 4 x 4, Mint-gray #B7CFC6; DEC-199). Replaced when the model exists (TASK-088).
@@ -1226,7 +1228,7 @@ local function bindBoard(model: Instance, opts: AnchorOpts, n: number, label: st
 	local host = if base:IsA("Attachment") then base.Parent :: BasePart else hostPart(model)
 	local list: { Vector3 } = {}
 	for i = 1, n do
-		local off = (i - (n + 1) / 2) * BUN_SLOT_STEP
+		local off = (i - (n + 1) / 2) * (if n >= 4 then BUN_SLOT_STEP_4 else BUN_SLOT_STEP)
 		table.insert(list, (baseCF * CFrame.new(off, 0, 0)).Position)
 	end
 	table.sort(list, function(a, b)
@@ -1696,7 +1698,7 @@ local function bindTrailer(assets: Instance, cart: Instance?, opts: AnchorOpts):
 		label = "TRL",
 		ids = TRL_IDS,
 		rail = 8, -- Vehicles.trailer.RailSlots (Rail_8, §19.22)
-		board = 3, -- Vehicles.trailer.BoardSlots (DEC-215)
+		board = 4, -- Vehicles.trailer.BoardSlots (DEC-215 had 3; 4 = the prep seats, DEC-223, TASK-172)
 		railMode = "ideal",
 		counterY = padPose.Y + TRAILER_COUNTER_DY,
 		cart = cart,
@@ -1761,6 +1763,78 @@ local function bindTrailer(assets: Instance, cart: Instance?, opts: AnchorOpts):
 		end
 	end
 	return trl, padPose, salePose
+end
+
+-- Focused prep seats Station_1..4 (TASK-172, DEC-223, prep-mode.md §6 "Mapa"; Provisional). Same numbers as the Studio snippet
+-- tools/assetplace/stations_prep.luau, in MAP-01 axes from the trailer pivot (padPose, trailer on the Pad; north = -Z):
+-- station n at dx = 3.5 * (n - 2.5) (n = 1 west in MAP-01 = east in world, the order of the board slots), Att_Stand floor + 2.0,
+-- dz -0.85; Focus y + 5.12, dz -3.25; CamAnchor = Focus + (0, 2.05, -1.43 toward the cook); Prompt_Work y + 3.72, dz -0.20.
+-- Idempotent: an existing Station_n (the snippet's) is only re-tagged and its anchors re-derived. cleanSlate removes the tags
+-- before this runs, so everything is written again here.
+local PREP_SPACING = 3.5
+local PREP_STAND = { y = 2.0, z = -0.85 }
+local PREP_FOCUS = { y = 5.12, z = -3.25 }
+local PREP_CAM = { y = 2.5 * math.sin(math.rad(55)), z = 2.5 * math.cos(math.rad(55)) } -- Content.Prep.Rules.Camera
+local PREP_PROMPT = { y = 3.72, z = -0.20 }
+local function bindPrepStations(trl: Instance, padPose: CFrame)
+	local board = byMapId(trl, "TRL-T")
+	for n = 1, 4 do
+		local dx = PREP_SPACING * (n - 2.5)
+		local origin = padPose.Position
+		local function mapAt(y: number, z: number): Vector3
+			return origin + Vector3.new(dx, y, z)
+		end
+		local standW = FCF(CFrame.new(mapAt(PREP_STAND.y, PREP_STAND.z))).Position
+		local standCF = CFrame.lookAt(standW, standW + Vector3.new(0, 0, 1)) -- world +Z = toward the window
+		local focusW = FCF(CFrame.new(mapAt(PREP_FOCUS.y, PREP_FOCUS.z))).Position
+		-- the camera stands on the cook's side: MAP-01 +Z (south), 1.43 behind the focus
+		local camW = FCF(CFrame.new(mapAt(PREP_FOCUS.y + PREP_CAM.y, PREP_FOCUS.z + PREP_CAM.z))).Position
+		local promptW = FCF(CFrame.new(mapAt(PREP_PROMPT.y, PREP_PROMPT.z))).Position
+		local st = trl:FindFirstChild("Station_" .. n)
+		local created = false
+		if not st then
+			st = Instance.new("Model")
+			st.Name = "Station_" .. n
+			st.Parent = trl
+			created = true
+		end
+		local mount = st:FindFirstChild("Mount")
+		if not mount then
+			local m = Instance.new("Part")
+			m.Name = "Mount"
+			m.Size = Vector3.new(0.4, 0.2, 0.4)
+			m.Parent = st
+			mount = m
+		end
+		local mp = mount :: BasePart
+		makeInvisible(mp)
+		mp.CFrame = standCF
+		;(st :: Model).PrimaryPart = mp
+		st:SetAttribute("StationKind", "prep")
+		st:SetAttribute("Seat", n)
+		st:SetAttribute("MapId", "TRL-PREP-" .. n)
+		st:SetAttribute("PrepStationsV1", true)
+		CollectionService:AddTag(st, "Station")
+		setPersistent(st)
+		local function att(name: string, cf: CFrame): Attachment
+			local a = mp:FindFirstChild(name)
+			if not a or not a:IsA("Attachment") then
+				a = Instance.new("Attachment")
+				a.Name = name
+				a.Parent = mp
+			end
+			;(a :: Attachment).WorldCFrame = cf
+			return a :: Attachment
+		end
+		att("Att_Stand", standCF)
+		att("CamAnchor", CFrame.lookAt(camW, focusW))
+		att("Focus", CFrame.new(focusW))
+		interactable(att("Prompt_Work", CFrame.new(promptW)), "prep_work")
+		local slot = if board then findNamed(board, "Att_Bun" .. n) else nil
+		local bun = att("Att_Bun", CFrame.new(if slot then anchorPos(slot) else focusW))
+		bun:SetAttribute("Slot", n)
+		log(if created then "new" else "ok", ("Station_%d (prep seat): stand %s, camera %s -> focus %s, Prompt_Work %s"):format(n, fmtV(standW), fmtV(camW), fmtV(focusW), fmtV(promptW)))
+	end
 end
 
 local function bindOpenSign(assets: Instance, opts: AnchorOpts)
@@ -3385,6 +3459,7 @@ function Bind.run(opts: AnchorOpts?): string
 		removeHideLeftovers(trl)
 		bindShutterButton(trl, padPose, o)
 		bindShutterPiece(trl, padPose)
+		bindPrepStations(trl, padPose)
 	end
 	bindOpenSign(assets, o)
 	bindMart(assets, o)

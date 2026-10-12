@@ -94,6 +94,7 @@ export type Public = {
 	PressNext: (self: Public) -> (),
 	Trash: (self: Public) -> (),
 	CycleTicket: (self: Public) -> (),
+	Broadcast: (self: Public, event: any) -> (),
 	SendTab: (self: Public) -> (),
 	OnResult: (self: Public, result: any) -> (),
 	Notice: (self: Public, reason: string) -> (),

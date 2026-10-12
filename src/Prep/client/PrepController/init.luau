@@ -48,6 +48,7 @@ local PrepShell = require(StarterPlayer.StarterPlayerScripts.client.Interface.Co
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
 local TicketRail = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.TicketRail)
 local Cursor = require(script.Cursor)
+local Feed = require(script.Feed)
 local Gestures = require(script.Gestures)
 local Mock = require(script.Mock)
 local Parts = require(script.Parts)
@@ -100,6 +101,7 @@ const PrepController = Modux.Controller("PrepController", {
 		"CameraController",
 		"PromptController",
 		"KitchenController",
+		"CustomerController",
 		"RoundController",
 		"VitalController",
 		"EconomyController",
@@ -430,9 +432,18 @@ function PrepController:Trash()
 	end
 end
 
--- Cycle the pinned ticket (P7b brings the real line; today the mock ticket only).
+-- Cycle the pinned ticket (the ticket rail tap): every stage with OnEvent hears it, whatever tab is in front (Feed.luau).
 function PrepController:CycleTicket()
-	self:OnGesture({ Kind = "Cycle" })
+	self:Broadcast({ Kind = "Cycle" })
+end
+
+-- An event for every stage that listens (Stage.OnEvent), not only the one in front: PrepResult, Sale, Cycle.
+function PrepController:Broadcast(event: any)
+	for _, stage in self.Stages do
+		if stage.OnEvent ~= nil then
+			stage.OnEvent(self, event)
+		end
+	end
 end
 
 -- Network -------------------------------------------------------------------------------------------------------------------
@@ -458,6 +469,7 @@ function PrepController:OnResult(result: any)
 	if not result.Ok then
 		self:Notice(result.Reason)
 	end
+	self:Broadcast({ Kind = "Result", Result = result })
 	const stage = self:StageOf()
 	if stage ~= nil and stage.OnResult ~= nil then
 		stage.OnResult(self, result)
@@ -1081,8 +1093,14 @@ PrepController:OnInit(function(self)
 	net.PrepResult:onClient(function(result)
 		self:OnResult(result)
 	end)
+	-- the verdict of a Serve (Complete / Incomplete / Wrong, tip) comes with the Sale packet of the CustomerService
+	net.Sale:onClient(function(sale)
+		if self.InMode then
+			self:Broadcast({ Kind = "Sale", Npc = sale.Npc, Result = sale.Result, Amount = sale.Amount })
+		end
+	end)
 
-	-- dev: /dev prep ui (the server sends it through the DevClient packet; text = the station)
+	-- dev: /dev prep ui [station] [tab] (the server sends it through the DevClient packet; text = "<station> <tab>")
 	net.DevClient:onClient(function(data)
 		if data.Command ~= "prep_ui" or not self.Dependencies.PlaceController:IsDev() then
 			return
@@ -1091,9 +1109,20 @@ PrepController:OnInit(function(self)
 			self:Leave("Dev", false, true)
 			return
 		end
-		const station = math.clamp(tonumber(data.Text) or 1, 1, prep.Stations)
+		const text: string = data.Text
+		const station = math.clamp(tonumber(string.match(text, "%d+")) or 1, 1, prep.Stations)
 		if not self:Enter(station, true) then
 			warn("[PrepController] /dev prep ui: not now (the camera is not in first person or the player is not Active)")
+			return
+		end
+		-- `/dev prep ui 1 Serve` opens straight on a tab (Serve with a finished plate); the mock world is Feed.luau's
+		const tab = string.match(text, "%a+")
+		if tab ~= nil then
+			task.defer(function()
+				if self.InMode and self.Mock then
+					Feed.Preview(self, tab)
+				end
+			end)
 		end
 	end)
 end)

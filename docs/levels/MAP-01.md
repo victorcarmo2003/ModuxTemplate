@@ -5,6 +5,8 @@ Status: Rascunho
 Autor: level-designer. Versão 1: 2026-10-08. **Revisão 2 (2026-10-08): conciliação com DEC-086 a DEC-099, `story/anomalies.md` (Aprovado), `story/ending.md` (Aprovado), `story/world.md`, `story/characters.md` e `story/script.md` (Rascunho).**
 **Revisão 3 (2026-10-08): conciliação com DEC-100 a DEC-129 e `art/style-guide.md` (Aprovado, DEC-126); corrige os itens LD-1 a LD-21 de `consistency-report.md`.**
 **Revisão 3, ajuste final (2026-10-08): DEC-130 (sem semáforo no MVP, revoga DEC-120); rodada 17 (`Q-128`, opção B, secretário registrando); postes da Juniper a 8 studs com JL-09 a ~135 (LD-15 / P33); nota de P35.**
+
+> **Nota 2026-10-12 (Provisório, sem DEC): há 4 semáforos no mapa.** O dono montou à mão no Studio `MAP01_Assets/TrafficLights` (Signal_WB/EB/NB/SB, cabeça de carro + sinal de pedestre, ciclo EW/NS 10 s verde / 3 s amarelo / 1,5 s todo-vermelho). Isso **não altera nenhuma decisão**: DEC-130 continua registrada e as linhas "sem semáforo" abaixo ficam como histórico até o dono decidir (decisão do dono vale; secretário reconcilia no fim da rodada). Hoje é só visual (carros e NPC não obedecem); ciclo em `src/Shared/Content/TrafficLights.luau`, desenho em `src/Traffic/client/TrafficLightController.luau`, reconstrução em `tools/assetplace/traffic_lights_rebuild.luau` (`STUDIO_LAYER.md`).
 **Binding da onda 2 (2026-10-10, TASK-083): ponto novo `DROP-T` e `SIGN-T` como ponto (§5.1); poses `CART`/`TRL`/`TRL-SALE` = pivô do modelo; L1 e L3 ajustados para fora do poste e do banco (§5.3); grafo do ladrão (§9.1); §16 (binding no place); P40–P45. Provisório.**
 **Binding da onda 3 (2026-10-10, TASK-098): esconderijos H1..H4 com `Slot` e `Hide_Pose` (§7.2); passantes com 7 caminhos de calçada e 17 nós novos (§9.3, `Content.WalkPaths`); `CutsceneMark1..4` e `CS-5W`/`CS-5E` (§11.1); AN/AS/WALKER-10/SS como pontos (§10.3); trânsito com `TrafficPath`/`TrafficLine`/`TrafficBox` (§9.5); §16.5–§16.6; P46–P50. Provisório.**
 **Spawn e despawn (2026-10-10, level-designer, pedido do usuário; tudo Provisório):** regra "NPC nunca aparece nem some à vista" com pontos novos/movidos e contrato `Spawn`/`Despawn`/`SpawnKind`/`Door` (§9.8, `Content.Flow.Spawns`, `Content.WalkPaths`); **5 postes na Juniper** (JL-01..05 a cada 16, passos 0–4 + WALKER-10, §5.6); peças de balcão sem visual; ajudantes travados no Studio; `AutoDoor` nas portas; ângulo da aba recalculado (§16.8; P52–P59).
@@ -1516,3 +1518,24 @@ Licença de tudo que vier de fora: `art/credits.md` antes do import (CLAUDE.md).
 | P62 | MartDecor congelado: mover neon/fundo/spots à mão | level-designer pede ok ao usuário antes de mexer no `MartDecor` |
 | P63 | Gôndola de 6 de altura na ilha 2 tapa a vista do corredor 3 a partir do principal? | aceitável: as placas a h 9 e os eixos dos corredores dão a orientação; se o playtest reclamar, gôndola baixa (4) |
 | P64 | Nome da bancada ("Gear Stand" é placeholder; `world.md` §3.1 chamava o landmark de "GEAR WALL") | narrative-writer (TASK-142) |
+
+## 19. Estações do preparo focado (TASK-172, DEC-223, 2026-10-12) — Provisório
+
+O preparo do hot dog é o modo focado (`docs/tech/prep-mode.md`): o jogador entra num de **4 assentos** `Station_1..4` do trailer, a câmera vai para o `CamAnchor` e o rig fica parado no `Att_Stand`. O mapa não tinha as estações (o dono não achava o prompt para testar). Agora tem. Tudo **Provisório**, sem DEC.
+
+**Onde (WORLD, trailer no chão, pivô (-44,92; -1,52; 11,70) olhando para +Z, a janela; o piso interno é Y 0,48 e a bancada do balcão Y 3,08):** as 4 estações ficam lado a lado a 3,5 studs, `n = 1` a leste (a ordem das vagas da tábua: a vaga 1 é a de leste), todas de frente para a bancada da janela (Z 14,0). Em todas: `Att_Stand` Y 0,48 Z 12,55; `Focus` Y 3,60 Z 14,95; `CamAnchor` Y 5,65 Z 13,52; `Prompt_Work` Y 2,20 Z 11,90.
+
+| Estação | X (mundo) | Vê na câmera |
+|---|---|---|
+| 1 | -39,67 | grelha |
+| 2 | -43,17 | caixa de pães / trilho |
+| 3 | -46,67 | tábua de cortar |
+| 4 | -50,17 | grade de coberturas |
+
+- **Modelo:** `Model Station_n` dentro do Model do trailer (acompanha o trailer em `PivotTo`, `trailer_ground` e no TRL-SALE), tag `Station`, `StationKind = "prep"`, `Seat = n`, `MapId = TRL-PREP-n`, `Persistent`. Filho `Mount` (Part invisível, âncora do conjunto) com 5 `Attachment`: `Att_Stand` (o rig olha para +Z), `CamAnchor` (a 2,5 studs de `Focus`, pitch -55 graus, `Content.Prep.Rules.Camera`), `Focus` (alvo do DOF), `Prompt_Work` (tag `Interactable`, `PromptAction = prep_work`), `Att_Bun` (`Slot = n`, na posição da vaga `n` da tábua real).
+- **Vagas da tábua = 4:** `Content.Vehicles.trailer.BoardSlots` passa de 3 para **4** (Provisório; a vaga `n` é do assento `n`). `Att_Bun1..4` ficam 0,8 studs uma da outra em torno do `Att_Bun` (antes 3 a 1,1): os pães ficam entre a caixa de pães e a grade de coberturas (os 4 pães de 1,0 se encostam por 0,2; **o dono confere se incomoda**). Original de cada vaga guardado no atributo `PrepOrigX` (o `undo` volta).
+- **Âncoras antigas:** não foi preciso esconder nada no mapa. Os 6 prompts de cozinha do mundo (`grill_place`, `grill_collect`, `bun_cut`, `board_add_sausage`, `topping_add`, `discard`) já saem pelo `KitchenService` com `Prep.Rules.WorldKitchenPrompts = false` (voltam com `true`); nenhum conflita com os novos, porque `Prompt_Work` fica a **>= 2,67 studs** de qualquer prompt de outro dono (regra 4 do `check_map01`; folga pequena na estação 4, vizinha da grade de coberturas).
+- **Validação por raycast (a cada execução do snippet e na regra 17):** `Att_Stand` sobre o piso do trailer (Y 0,48), 8 raios x 3 alturas de 1,0 stud sem colisor, `CamAnchor` -> `Focus` livre. Câmera conferida em Play (estação 1) e por captura de Edit nas estações 3 e 4.
+- **Dependência do número de jogadores:** `PrepSeats` só ativa `clamp(membros, 1, 4)` assentos; sozinho só existe a estação 1 (`/dev prep enter 2` responde `NoStation`; é o esperado). Os 4 prompts existem no mapa mesmo assim.
+- **Ferramentas:** `tools/assetplace/stations_prep.luau` (`run("stations_prep", "dry")`, sem argumento = aplica, `"undo"` = move as estações para `ServerStorage.Trailer_Backup_20261012` e devolve a tábua), `bind_map01.luau` (`bindPrepStations`, mesmos números em eixos MAP-01; `board = 4`, passo de 0,8) e `check_map01.luau` (regra 17: 4 estações, 5 filhos, `Seat`, piso, colisor, câmera).
+- **Pendências:** `CamAnchor` enquadra a bancada, não a "tábua inteira" (o tabuleiro do modo é 2D por cima do mundo, `prep-mode.md` §5): o aceite de 667x375 e 844x390 só fecha com a UI do estágio pronta (P5/P6). Rigs lado a lado a 3,5 studs: ver em teste com 2+ jogadores.

@@ -41,6 +41,10 @@ export type Stage = {
 	OnGrab: ((controller: any, key: string, position: Vector2) -> ())?,
 	-- A PrepResult arrived while this stage is in front.
 	OnResult: ((controller: any, result: any) -> ())?,
+	-- Every stage with this field gets the events the controller broadcasts whatever tab is in front (:Broadcast): `{ Kind =
+	-- "Result", Result = PrepResult }`, `{ Kind = "Sale", Npc, Result, Amount }` (the Sale packet), `{ Kind = "Cycle" }` (the
+	-- ticket rail was tapped). Order uses it for the line and the grill (Feed.luau); others leave it nil.
+	OnEvent: ((controller: any, event: any) -> ())?,
 }
 
 const Stage = {}

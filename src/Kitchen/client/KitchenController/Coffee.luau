@@ -14,6 +14,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
+local Content = require(ReplicatedStorage.shared.Content)
 local Components = StarterPlayer.StarterPlayerScripts.client.Interface.Components
 local ProgressBar = require(Components.ProgressBar)
 local Context = require(script.Parent.Context)
@@ -302,6 +303,25 @@ function Coffee.Mount(station: Instance, context: Context.Context)
 	end)
 	cleanup(function()
 		Fx.Untrack(emitter)
+	end)
+
+	-- Cup on the counter (Content.CoffeeCup, CoffeeCupController): mirror the state on the station, client side only.
+	-- Seconds first, then the state, so the listener reads a consistent pair.
+	const cupState = Content.CoffeeCup.StationStateAttribute
+	const cupSeconds = Content.CoffeeCup.StationSecondsAttribute
+	effect(function()
+		const record = read()
+		const current = state()
+		local left = 0
+		if current == "Working" and record then
+			left = math.max(0, record.StartedAt + record.Duration - workspace:GetServerTimeNow())
+		end
+		station:SetAttribute(cupSeconds, left)
+		station:SetAttribute(cupState, current)
+	end)
+	cleanup(function()
+		station:SetAttribute(cupState, nil)
+		station:SetAttribute(cupSeconds, nil)
 	end)
 
 	-- Sound: brew loop while Working; bell on Working -> Ready (first record of a late joiner is silent)

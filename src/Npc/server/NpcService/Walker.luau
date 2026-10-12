@@ -16,6 +16,11 @@
 -- Spacing (same playtest: rigs walking inside each other): `Gate(direction)` (NpcService:Blocked) says another rig
 -- stands or walks the same way right ahead; the rig stops and waits (at most GATE_MAX s per waypoint, so two gates
 -- can never lock each other), then walks on.
+-- Natural gait (playtest 2026-10-12, PROVISIONAL, numbers in Content.Movement): the graph corners are rounded (entry /
+-- middle / exit points of a quadratic curve, only when a raycast says the chords are clear and never at crosswalk
+-- points); points that are only passed through count as reached inside a small radius, so the rig keeps walking (no
+-- stop per waypoint); WalkSpeed eases at the start and the end of a walk; the body turns with an AlignOrientation
+-- (capped angular speed) towards the point and a little ahead to the next one, never on the spot. No network.
 
 export type Mover = { Model: Model, Root: BasePart, Humanoid: Humanoid }
 
@@ -29,7 +34,7 @@ export type Crossing = {
 	MaxWait: number, -- seconds from the grant to the far curb (Content.Traffic.Crossing.MaxWait)
 }
 
-const POLL = 0.1 -- seconds between checks of arrival / cancellation
+const POLL = 0.05 -- seconds between checks of arrival / cancellation
 const STEP_TIMEOUT = 9 -- seconds; Humanoid:MoveTo gives up at 8 s and fires MoveToFinished(false)
 const RETRIES = 1 -- extra MoveTo per waypoint before snapping
 const LIFT = 3 -- HumanoidRootPart above the floor point (architecture.md §18.5)
@@ -48,11 +53,235 @@ const HIDDEN_RADIUS = 40 -- studs: no player character this close = nobody sees 
 const GATE_MAX = 3 -- seconds a rig waits behind another per waypoint before it walks on anyway
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Content = require(ReplicatedStorage.shared.Content)
+
+const MOVE = Content.Movement
+const CORNER = MOVE.Corner
+const ACCEPT = MOVE.Accept
+const EASE = MOVE.Speed
+const TURN = MOVE.Turn
+const SIDE_RAY = 0.9 -- studs: the safety raycast of a curve runs on the line and on both sides of it
+const MAX_RAY_RETRIES = 3 -- rigs hit by a ray are skipped this many times
+
+-- One point of a planned walk. Loose = only passed through (reached inside the accept radius, no stop).
+-- Index = waypoint of the caller it belongs to; Last = the last point of that waypoint (the caller's reached()).
+type Item = { Position: Vector3, Index: number, Loose: boolean, Last: boolean }
+
+-- Per-step motion: the point after this one (look-ahead), loose, WalkSpeed easing at the start / the end of a walk
+-- Base = the WalkSpeed the owner set (the walk writes it back at its end; nil = the step does)
+type Motion = { Loose: boolean, After: Vector3?, EaseIn: boolean, EaseOut: boolean, Base: number? }
+
+export type Options = { Ease: boolean } -- Ease false = the owner drives WalkSpeed (the thief)
+
+type Turner = { Align: AlignOrientation, AutoRotate: boolean, Token: number }
+
+local turners: { [BasePart]: Turner } = setmetatable({}, { __mode = "k" }) :: any
+local debugDraw = false
 
 const Walker = {}
 
 local function flat(vector: Vector3): Vector3
 	return Vector3.new(vector.X, 0, vector.Z)
+end
+
+-- Turning ---------------------------------------------------------------------------------------------------------
+
+-- Turner of the rig (AlignOrientation on the root: physics turns the body at a capped angular speed, so the heading
+-- never snaps). Disabled while idle; AutoRotate is off only while it is enabled.
+local function turnerOf(mover: Mover): Turner
+	const existing = turners[mover.Root]
+	if existing ~= nil and existing.Align.Parent ~= nil then
+		return existing
+	end
+	const attachment = Instance.new("Attachment")
+	attachment.Name = "WalkTurnAttachment"
+	attachment.Parent = mover.Root
+	const align = Instance.new("AlignOrientation")
+	align.Name = "WalkTurn"
+	align.Mode = Enum.OrientationAlignmentMode.OneAttachment
+	align.Attachment0 = attachment
+	align.RigidityEnabled = false
+	align.PrimaryAxisOnly = false
+	align.ReactionTorqueEnabled = false
+	align.MaxTorque = math.huge
+	align.MaxAngularVelocity = math.rad(TURN.Rate)
+	align.Responsiveness = TURN.Responsiveness
+	align.CFrame = mover.Root.CFrame.Rotation
+	align.Enabled = false
+	align.Parent = mover.Root
+	const created: Turner = { Align = align, AutoRotate = true, Token = 0 }
+	turners[mover.Root] = created
+	return created
+end
+
+-- Starts steering the body (the Humanoid stops turning it by itself meanwhile)
+local function beginTurn(mover: Mover, facing: Vector3?): Turner
+	const turner = turnerOf(mover)
+	turner.Token += 1
+	if not turner.Align.Enabled then
+		turner.AutoRotate = mover.Humanoid.AutoRotate
+		const position = mover.Root.Position
+		const look = if facing ~= nil then facing else mover.Root.CFrame.LookVector
+		turner.Align.CFrame = CFrame.lookAt(position, position + Vector3.new(look.X, 0, look.Z))
+		turner.Align.Enabled = true
+	end
+	mover.Humanoid.AutoRotate = false
+	return turner
+end
+
+-- Gives the body back to the Humanoid
+local function endTurn(mover: Mover)
+	const turner = turners[mover.Root]
+	if turner == nil or not turner.Align.Enabled then
+		return
+	end
+	turner.Token += 1
+	turner.Align.Enabled = false
+	if mover.Humanoid.Parent ~= nil then
+		mover.Humanoid.AutoRotate = turner.AutoRotate
+	end
+end
+
+-- Goal heading (flat direction), only while steering
+local function aim(mover: Mover, direction: Vector3)
+	const turner = turners[mover.Root]
+	if turner == nil or not turner.Align.Enabled or direction.Magnitude < 1e-3 then
+		return
+	end
+	const position = mover.Root.Position
+	turner.Align.CFrame = CFrame.lookAt(position, position + Vector3.new(direction.X, 0, direction.Z))
+end
+
+-- Heading towards `target`, leaning to `after` as the point comes close (look-ahead, no turn on the spot)
+local function headingTo(position: Vector3, target: Vector3, after: Vector3?): Vector3
+	const offset = Vector3.new(target.X - position.X, 0, target.Z - position.Z)
+	const distance = offset.Magnitude
+	if distance < 1e-3 then
+		return offset
+	end
+	local direction = offset / distance
+	if after ~= nil and distance < TURN.LookAhead then
+		const next = Vector3.new(after.X - target.X, 0, after.Z - target.Z)
+		if next.Magnitude > 1e-3 then
+			const weight = (1 - distance / TURN.LookAhead) * TURN.LookBlend
+			const mixed = direction * (1 - weight) + next.Unit * weight
+			if mixed.Magnitude > 1e-3 then
+				direction = mixed.Unit
+			end
+		end
+	end
+	return direction
+end
+
+-- Planning --------------------------------------------------------------------------------------------------------
+
+-- A thin ray (and two on its sides) from `a` to `b` hits nothing solid. Rigs with a Humanoid do not count.
+local function clear(a: Vector3, b: Vector3, params: RaycastParams, exclude: { Instance }): boolean
+	const delta = b - a
+	const side = Vector3.new(-delta.Z, 0, delta.X)
+	if side.Magnitude < 1e-3 then
+		return true
+	end
+	const offset = side.Unit * SIDE_RAY
+	const up = Vector3.new(0, CORNER.RayHeight, 0)
+	for _, shift in { Vector3.zero, offset, -offset } do
+		for _ = 1, MAX_RAY_RETRIES do
+			const hit = workspace:Raycast(a + up + shift, delta, params)
+			if hit == nil then
+				break
+			end
+			const model = hit.Instance:FindFirstAncestorOfClass("Model")
+			if model ~= nil and model:FindFirstChildOfClass("Humanoid") ~= nil then
+				table.insert(exclude, model)
+				params.FilterDescendantsInstances = exclude
+				continue
+			end
+			return false
+		end
+	end
+	return true
+end
+
+-- Walk of `points` with the corners rounded. Crosswalk points (the far curb and the near curb in front of it) and the
+-- last point stay as they are; a corner whose curve would touch something stays sharp.
+local function plan(mover: Mover, points: { Vector3 }, crossing: Crossing?): { Item }
+	const items: { Item } = {}
+	const count = #points
+	const exclude: { Instance } = { mover.Model }
+	const params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.RespectCanCollide = true
+	params.FilterDescendantsInstances = exclude
+	local previous = mover.Root.Position
+	for index, point in points do
+		local fixed = index == count
+		if crossing ~= nil and (crossing.At[index] ~= nil or crossing.At[index + 1] ~= nil) then
+			fixed = true
+		end
+		if fixed then
+			table.insert(items, { Position = point, Index = index, Loose = false, Last = true })
+			previous = point
+			continue
+		end
+		const incoming = flat(point - previous)
+		const outgoing = flat(points[index + 1] - point)
+		const lengthIn, lengthOut = incoming.Magnitude, outgoing.Magnitude
+		if lengthIn < 1e-3 or lengthOut < 1e-3 then
+			table.insert(items, { Position = point, Index = index, Loose = true, Last = true })
+			previous = point
+			continue
+		end
+		const din, dout = incoming / lengthIn, outgoing / lengthOut
+		const angle = math.deg(math.acos(math.clamp(din:Dot(dout), -1, 1)))
+		if angle < CORNER.MinAngle then
+			-- almost straight: pass through without a stop
+			table.insert(items, { Position = point, Index = index, Loose = true, Last = true })
+			previous = point
+			continue
+		end
+		const radius = math.min(CORNER.Radius, lengthIn * CORNER.EdgeShare, lengthOut * CORNER.EdgeShare)
+		local rounded = false
+		if radius >= CORNER.MinRadius then
+			const entry = Vector3.new(point.X - din.X * radius, point.Y, point.Z - din.Z * radius)
+			const exit = Vector3.new(point.X + dout.X * radius, point.Y, point.Z + dout.Z * radius)
+			const middle = entry * 0.25 + point * 0.5 + exit * 0.25
+			if clear(entry, middle, params, exclude) and clear(middle, exit, params, exclude) then
+				table.insert(items, { Position = entry, Index = index, Loose = true, Last = false })
+				table.insert(items, { Position = middle, Index = index, Loose = true, Last = false })
+				table.insert(items, { Position = exit, Index = index, Loose = true, Last = true })
+				rounded = true
+			end
+		end
+		if not rounded then
+			table.insert(items, { Position = point, Index = index, Loose = false, Last = true })
+		end
+		previous = point
+	end
+	return items
+end
+
+-- Dev: little balls on the planned curve (Walker.SetDebug)
+local function draw(items: { Item })
+	const folder = Instance.new("Folder")
+	folder.Name = "WalkDebug"
+	for _, item in items do
+		const ball = Instance.new("Part")
+		ball.Shape = Enum.PartType.Ball
+		ball.Size = Vector3.one * (if item.Loose then 0.6 else 1.2)
+		ball.Anchored = true
+		ball.CanCollide = false
+		ball.CanQuery = false
+		ball.CanTouch = false
+		ball.Material = Enum.Material.Neon
+		ball.Color = if item.Loose then Color3.fromRGB(255, 200, 60) else Color3.fromRGB(80, 160, 255)
+		ball.Position = item.Position + Vector3.new(0, 0.5, 0)
+		ball.Parent = folder
+	end
+	folder.Parent = workspace
+	task.delay(12, function()
+		folder:Destroy()
+	end)
 end
 
 -- Puts the rig on `target` (floor point), keeping its heading.
@@ -87,6 +316,7 @@ local function sideStep(mover: Mover, target: Vector3, side: number, alive: () -
 	direction = direction.Unit
 	const lateral = Vector3.new(-direction.Z, 0, direction.X) * side
 	const goal = position - direction * BACK_OFF + lateral * SIDE_STEP
+	aim(mover, flat(goal - position))
 	mover.Humanoid:MoveTo(goal)
 	const deadline = os.clock() + SIDE_TIME
 	while alive() and os.clock() < deadline and flat(goal - mover.Root.Position).Magnitude > 0.75 do
@@ -102,13 +332,46 @@ local function step(
 	alive: () -> boolean,
 	timeout: number?,
 	snap: boolean,
-	gate: Gate?
+	gate: Gate?,
+	motion: Motion?
 ): boolean
+	const humanoid = mover.Humanoid
 	local finished: boolean? = nil
-	const connection = mover.Humanoid.MoveToFinished:Connect(function(reached: boolean)
+	const connection = humanoid.MoveToFinished:Connect(function(reached: boolean)
 		finished = reached
 	end)
-	mover.Humanoid:MoveTo(target)
+	const loose = motion ~= nil and motion.Loose
+	const after = if motion ~= nil then motion.After else nil
+	const easeOut = motion ~= nil and motion.EaseOut
+	-- WalkSpeed easing: `base` is what the owner set; it is written back when the step ends
+	const applied0 = humanoid.WalkSpeed
+	const base = if motion ~= nil and motion.Base ~= nil then motion.Base else applied0
+	local ramp = motion ~= nil and motion.EaseIn
+	local rampAt = os.clock()
+	local applied = applied0
+	local function ease(distance: number, now: number)
+		local factor = 1
+		if ramp then
+			const t = math.clamp((now - rampAt) / EASE.StartTime, 0, 1)
+			factor = EASE.StartFactor + (1 - EASE.StartFactor) * t
+		end
+		if easeOut then
+			const t = math.clamp(distance / EASE.BrakeDistance, 0, 1)
+			factor = math.min(factor, EASE.EndFactor + (1 - EASE.EndFactor) * t)
+		end
+		const speed = base * factor
+		if math.abs(speed - applied) > 0.05 then
+			applied = speed
+			humanoid.WalkSpeed = speed
+		end
+	end
+	const accept = math.clamp(ACCEPT.PerSpeed * base, ACCEPT.Min, ACCEPT.Max)
+	beginTurn(mover)
+	aim(mover, headingTo(mover.Root.Position, target, after))
+	if ramp or easeOut then
+		ease(flat(target - mover.Root.Position).Magnitude, os.clock())
+	end
+	humanoid:MoveTo(target)
 	local deadline = os.clock() + (timeout or STEP_TIMEOUT)
 	local best = flat(target - mover.Root.Position).Magnitude
 	local progressAt = os.clock()
@@ -129,11 +392,17 @@ local function step(
 		if finished ~= nil then
 			break
 		end
+		-- a point that is only passed through: on to the next one without a stop
+		if loose and distance < accept then
+			finished = true
+			break
+		end
 		-- spacing gate: stop behind a rig right ahead (at most GATE_MAX s per waypoint)
 		if gate ~= nil and distance > ARRIVE and gated < GATE_MAX and gate(offset.Unit) then
 			if not waiting then
 				waiting = true
 				mover.Humanoid:MoveTo(mover.Root.Position)
+				ramp = motion ~= nil -- walks on from rest: ease in again
 			end
 			gated += POLL
 			deadline += POLL
@@ -142,8 +411,16 @@ local function step(
 		end
 		if waiting then
 			waiting = false
+			rampAt = now
+			aim(mover, headingTo(mover.Root.Position, target, after))
 			mover.Humanoid:MoveTo(target)
 			progressAt = now
+		end
+		if motion ~= nil then
+			aim(mover, headingTo(mover.Root.Position, target, after))
+			if ramp or easeOut then
+				ease(distance, now)
+			end
 		end
 		if distance < best - PROGRESS then
 			best = distance
@@ -164,21 +441,49 @@ local function step(
 		end
 	end
 	connection:Disconnect()
+	if (motion == nil or motion.Base == nil) and applied ~= base and humanoid.Parent ~= nil then
+		humanoid.WalkSpeed = base
+	end
+	endTurn(mover)
 	return finished == true
 end
 
--- Turns the rig to face `look` (horizontal part only).
+-- Turns the rig to face `look` (horizontal part only). A big turn is steered (capped angular speed, FaceTime s at
+-- most); a small one, an anchored or a hidden rig is set at once.
 function Walker.Face(mover: Mover, look: Vector3)
 	const horizontal = flat(look)
 	if horizontal.Magnitude < 1e-3 then
 		return
 	end
-	const position = mover.Root.Position
-	mover.Root.CFrame = CFrame.lookAt(position, position + horizontal.Unit)
+	const root = mover.Root
+	const position = root.Position
+	const goal = CFrame.lookAt(position, position + horizontal.Unit)
+	const current = flat(root.CFrame.LookVector)
+	const angle = if current.Magnitude < 1e-3 then 180 else math.deg(math.acos(math.clamp(current.Unit:Dot(horizontal.Unit), -1, 1)))
+	if root.Anchored or not root:IsDescendantOf(workspace) or angle < TURN.FaceMin then
+		endTurn(mover)
+		root.CFrame = goal
+		return
+	end
+	const turner = beginTurn(mover, current)
+	turner.Align.CFrame = goal
+	const token = turner.Token
+	task.delay(TURN.FaceTime, function()
+		if turner.Token == token and root.Parent ~= nil then
+			endTurn(mover)
+		end
+	end)
 end
 
 -- Crosses to the far curb `point` under a reservation of `cw`. true = arrived (or snapped), false = cancelled.
-local function cross(mover: Mover, point: Vector3, cw: string, crossing: Crossing, alive: () -> boolean): boolean
+local function cross(
+	mover: Mover,
+	point: Vector3,
+	cw: string,
+	crossing: Crossing,
+	alive: () -> boolean,
+	motion: Motion?
+): boolean
 	while not crossing.Reserve(cw) do
 		if not alive() then
 			return false
@@ -189,7 +494,7 @@ local function cross(mover: Mover, point: Vector3, cw: string, crossing: Crossin
 		crossing.Release(cw)
 		return false
 	end
-	const arrived = step(mover, point, alive, crossing.MaxWait, false, nil)
+	const arrived = step(mover, point, alive, crossing.MaxWait, false, nil, motion)
 	if not alive() then
 		crossing.Release(cw)
 		return false
@@ -205,42 +510,66 @@ end
 -- Walks through `points` in order. `reached(index)` runs after each waypoint. true = all reached (or snapped),
 -- false = cancelled (`alive` turned false). `crossing` (optional): crosswalk edges wait for a reservation.
 -- `gate` (optional): spacing behind other rigs (never on a crosswalk edge: the road is no place to wait).
+-- Corners are rounded and passed through without a stop (see the header); `options.Ease` (default true) eases WalkSpeed
+-- at the start of the walk, after every stop and before the points it stops at.
 function Walker.Follow(
 	mover: Mover,
 	points: { Vector3 },
 	alive: () -> boolean,
 	reached: (index: number) -> (),
 	crossing: Crossing?,
-	gate: Gate?
+	gate: Gate?,
+	options: Options?
 ): boolean
-	for index, point in points do
-		const cw = if crossing then crossing.At[index] else nil
+	const items = plan(mover, points, crossing)
+	if debugDraw then
+		draw(items)
+	end
+	const easing = options == nil or options.Ease
+	const base = mover.Humanoid.WalkSpeed
+	local done = true
+	for position, item in items do
+		const motion: Motion = {
+			Loose = item.Loose,
+			After = if items[position + 1] then items[position + 1].Position else nil,
+			EaseIn = easing and (position == 1 or not items[position - 1].Loose),
+			EaseOut = easing and not item.Loose,
+			Base = base,
+		}
+		const cw = if crossing and not item.Loose then crossing.At[item.Index] else nil
 		if crossing ~= nil and cw ~= nil then
-			if not cross(mover, point, cw, crossing, alive) then
-				return false
+			if not cross(mover, item.Position, cw, crossing, alive, motion) then
+				done = false
+				break
 			end
-			reached(index)
+			reached(item.Index)
 			continue
 		end
 		local arrived = false
 		for _ = 0, RETRIES do
 			if not alive() then
-				return false
+				break
 			end
-			arrived = step(mover, point, alive, nil, true, gate)
+			arrived = step(mover, item.Position, alive, nil, true, gate, motion)
 			if arrived then
 				break
 			end
 		end
 		if not alive() then
-			return false
+			done = false
+			break
 		end
 		if not arrived then
-			Walker.Snap(mover, point)
+			Walker.Snap(mover, item.Position)
 		end
-		reached(index)
+		if item.Last then
+			reached(item.Index)
+		end
 	end
-	return true
+	if mover.Humanoid.Parent ~= nil and mover.Humanoid.WalkSpeed ~= base then
+		mover.Humanoid.WalkSpeed = base
+	end
+	return done
 end
 
 -- One straight MoveTo to `target` (no graph: Pad tables, pair partners; TASK-145/146). YIELDS. true = reached, false =
@@ -249,14 +578,20 @@ function Walker.Direct(mover: Mover, target: Vector3, alive: () -> boolean, time
 	if not alive() then
 		return false
 	end
-	return step(mover, target, alive, timeout, false, nil)
+	return step(mover, target, alive, timeout, false, nil, { Loose = false, EaseIn = true, EaseOut = true })
 end
 
 -- Stops any MoveTo in progress.
 function Walker.Stop(mover: Mover)
+	endTurn(mover)
 	if mover.Root:IsDescendantOf(workspace) then
 		mover.Humanoid:MoveTo(mover.Root.Position)
 	end
+end
+
+-- Dev: draws the planned curve of every following walk for 12 s (yellow = passed through, blue = a stop)
+function Walker.SetDebug(on: boolean)
+	debugDraw = on
 end
 
 return table.freeze(Walker)

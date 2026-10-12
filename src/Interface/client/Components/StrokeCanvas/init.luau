@@ -34,6 +34,8 @@ export type Props = {
 	-- Stroke thickness in px (UI scale 1).
 	Thickness: number?,
 	Meter: (() -> Meter?)?,
+	-- Where the meter bar sits (anchored at its bottom centre). Default: 8 px above the bottom of the canvas.
+	MeterPosition: UDim2?,
 	Size: UDim2?,
 	Position: UDim2?,
 	AnchorPoint: Vector2?,
@@ -197,7 +199,7 @@ return function(props: Props): Frame
 		const bar = create("Frame")({
 			Name = "Meter",
 			AnchorPoint = Vector2.new(0.5, 1),
-			Position = UDim2.new(0.5, 0, 1, -8),
+			Position = props.MeterPosition or UDim2.new(0.5, 0, 1, -8),
 			Size = UDim2.fromOffset(METER_W, METER_H),
 			BackgroundColor3 = Theme.Tone.Cream.Bottom,
 			Visible = function()
