@@ -172,6 +172,8 @@ local filteredWatch = false
 -- QUOTA_FIRST -> QUOTA_MAX s per quota failure in a row (reset by a load that works); the lines stay subtitles and Fetch
 -- asks for them again only after the pause.
 const MAX_AHEAD = 12 -- loaded pieces not played yet: past it only a line somebody waits for loads (quota, 2026-10-12)
+-- one counter per Speech (intro, tutorial call...): the MAX_AHEAD cap is for the whole client, not per Speech
+const aheadCounters: { () -> number } = {}
 const QUOTA_FIRST = 10 -- s
 const QUOTA_MAX = 60 -- s
 local quotaUntil = 0 -- os.clock until which no text-to-speech request goes out
@@ -495,14 +497,26 @@ function Speech.new(volume: () -> number): Speech
 	end
 
 	-- Pieces loaded and not played yet (each is a live AudioTextToSpeech + Wire: 94 of them were alive in the playtest)
-	local function loadedAhead(): number
+	local function ownAhead(): number
 		local count = 0
+		if not alive then
+			return 0
+		end
 		for _, entry in entries do
 			for _, piece in entry.Pieces do
 				if piece.State == "Loaded" then
 					count += 1
 				end
 			end
+		end
+		return count
+	end
+	table.insert(aheadCounters, ownAhead)
+
+	local function loadedAhead(): number
+		local count = 0
+		for _, counter in aheadCounters do
+			count += counter()
 		end
 		return count
 	end
@@ -545,6 +559,7 @@ function Speech.new(volume: () -> number): Speech
 				if next ~= nil and not next.Cancelled then
 					const result = playEntry(next, mine)
 					if result == "Cut" then
+						release(next.Entry, next.Line) -- a cut line gives its voices back too
 						break
 					end
 					-- "Done" or "Failed": started lines end, lines with nothing to play are missed
@@ -693,6 +708,10 @@ function Speech.new(volume: () -> number): Speech
 		end
 		piece.State = "Failed"
 		owner.FailedAt = os.clock()
+		if piece.Voice ~= nil then
+			piece.Voice:Destroy()
+			piece.Voice = nil
+		end
 		dropWanted(owner)
 		const id = piece.VoiceId
 		if goodVoices[id] then
@@ -793,6 +812,11 @@ function Speech.new(volume: () -> number): Speech
 			quotaUntil = os.clock() + wait
 			piece.State = "Failed"
 			piece.BadVoice = false
+			-- the failed piece gives its instance back (a quota-limited client held 70+ AudioTextToSpeech + Wire)
+			if piece.Voice ~= nil then
+				piece.Voice:Destroy()
+				piece.Voice = nil
+			end
 			const owner = piece.Owner
 			owner.FailedAt = os.clock() + wait - RETRY_AFTER
 			owner.Reason = "text-to-speech quota"

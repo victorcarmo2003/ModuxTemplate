@@ -110,7 +110,7 @@ const UNKNOWN_LEVEL = -1
 type Availability = "Unknown" | "Open" | "Blocked"
 
 const MarketController =
-	Modux.Controller("MarketController", { Require = { "RoundController", "AudioController" }, Priority = 680 })
+	Modux.Controller("MarketController", { Require = { "RoundController", "AudioController", "TutorialController" }, Priority = 680 })
 
 function MarketController:Setup()
 	-- Party cash (Economy.Cash). Until the first record arrives nothing is drawn red.
@@ -690,6 +690,14 @@ function MarketController:StepHint()
 	const phase = Vide.untrack(self.Dependencies.RoundController.Phase)
 	if not HINT_PHASES[phase] then
 		self.HintDismissed = false -- a new window (next closing) may raise the hint again
+		hint:Set(false)
+		return
+	end
+	-- the tutorial owns the guidance on Day 1 (one arrow at a time): no gear-stand hint until it ends or is skipped
+	const tutorial = self.Dependencies.TutorialController
+	if Vide.untrack(function(): boolean
+		return tutorial:FirstRun()
+	end) then
 		hint:Set(false)
 		return
 	end

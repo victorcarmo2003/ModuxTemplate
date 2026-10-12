@@ -51,6 +51,7 @@ local requestedCount = 0
 local inFlight = 0
 local peakInFlight = 0
 local quotaMessages = 0 -- "NotEnoughQuota" lines seen in the log (sounds, text-to-speech)
+local rateMessages = 0 -- "Rate limited by the client" lines (same family: back off, never retry at once)
 local warnedQuota = false
 
 local pump: () -> ()
@@ -101,6 +102,8 @@ pcall(function()
 	LogService.MessageOut:Connect(function(message: string)
 		if string.find(message, "NotEnoughQuota", 1, true) then
 			quotaMessages += 1
+		elseif string.find(message, "Rate limited by the client", 1, true) then
+			rateMessages += 1
 		end
 	end)
 end)
@@ -204,6 +207,7 @@ function LoadQueue.Stats(): {
 	PeakInFlight: number,
 	Cooldown: number,
 	QuotaMessages: number,
+	RateMessages: number,
 }
 	const now = os.clock()
 	while #starts > 0 and now - starts[1] > STATS_WINDOW do
@@ -223,12 +227,14 @@ function LoadQueue.Stats(): {
 		PeakInFlight = peakInFlight,
 		Cooldown = failedCount(),
 		QuotaMessages = quotaMessages,
+		RateMessages = rateMessages,
 	}
 end
 
 -- Total "NotEnoughQuota" log lines seen by this client (Speech compares before/after one LoadAsync)
+-- plus "Rate limited by the client" ones: both mean "stop asking for a while"
 function LoadQueue.QuotaMessages(): number
-	return quotaMessages
+	return quotaMessages + rateMessages
 end
 
 function LoadQueue.State(id: string): string
@@ -287,7 +293,21 @@ function LoadQueue.Preload(items: { any }, progress: ((done: number, total: numb
 			inFlight = #batch
 			peakInFlight = math.max(peakInFlight, inFlight)
 			local failed = false
-			ContentProvider:PreloadAsync(batch, function(contentId: string, status: Enum.AssetFetchStatus)
+			-- PreloadAsync of a plain audio id string always reports Failure (checked in Studio 2026-10-12): ids go as
+			-- temporary Sound instances, destroyed right after
+			const made: { Sound } = {}
+			const items: { any } = {}
+			for _, item in batch do
+				if typeof(item) == "string" then
+					const sound = Instance.new("Sound")
+					sound.SoundId = item
+					table.insert(made, sound)
+					table.insert(items, sound)
+				else
+					table.insert(items, item)
+				end
+			end
+			ContentProvider:PreloadAsync(items, function(contentId: string, status: Enum.AssetFetchStatus)
 				if status == Enum.AssetFetchStatus.Success then
 					markLoaded(contentId)
 				elseif status == Enum.AssetFetchStatus.Failure then
@@ -295,6 +315,9 @@ function LoadQueue.Preload(items: { any }, progress: ((done: number, total: numb
 					markFailed(contentId)
 				end
 			end)
+			for _, sound in made do
+				sound:Destroy()
+			end
 			inFlight = 0
 			done += #batch
 			if progress ~= nil then
