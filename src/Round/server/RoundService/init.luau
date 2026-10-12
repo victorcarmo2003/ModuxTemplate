@@ -69,6 +69,7 @@ export type Record = {
 	Chances: number,
 	WipeEndsAt: number,
 	WipeFrozen: boolean,
+	Paused: boolean,
 }
 
 -- EconomyService seen through a runtime lookup (no Require: Economy requires Round, T42)
@@ -79,6 +80,9 @@ type EconomyHook = {
 const RECORD = 1 -- single record (network.md §1, rule 5)
 const TAG = "Interactable" -- anchor tag (architecture.md §18.2)
 const OPEN_ACTION = "open_sign"
+const OPEN_TEXT = "Open Shop"
+const CLOSE_TEXT = "Close Shop"
+const TOGGLE_COOLDOWN = 1 -- s between two Open / Closed toggles of the switch (Provisional)
 const MAX_DAY = 10000 -- Shift.Day wire range
 const MAX_ATTEMPT = 9 -- Shift.Attempt wire range
 const MAX_DURATION = 3600 -- Shift.PhaseDuration wire range
@@ -120,6 +124,10 @@ function RoundService:Setup()
 	self.Held = self.Libs.Charm.atom(0) :: Charm.Atom<number>
 	self.WipeEndsAt = self.Libs.Charm.atom(0) :: Charm.Atom<number>
 	self.WipeFrozen = self.Libs.Charm.atom(false) :: Charm.Atom<boolean>
+	-- "Closed" during the Open phase (user request 2026-10-12, Provisional): the switch pauses the arrival of new customers
+	-- (the ones already in the queue are still served); any phase change reopens it
+	self.Paused = self.Libs.Charm.atom(false) :: Charm.Atom<boolean>
+	self.ToggledAt = 0 :: number
 	-- Server time the Night phase of this shift ended (0 = not yet)
 	self.NightEndedAt = 0 :: number
 	self.LostReason = "wipe" :: LoseReason
@@ -170,6 +178,24 @@ end
 -- Customers spawn and the drawer counts (Content.Shift.Selling: Open, Night)
 function RoundService:IsSelling(): boolean
 	return Content.Shift.ByKey[self.Phase()].Selling
+end
+
+-- The shop switch is on "Closed" (Open phase only): no new customer arrives while true
+function RoundService:IsPaused(): boolean
+	return self.Paused()
+end
+
+-- Shop switch: Open <-> Closed during the Open phase. false = not toggled (wrong phase, not started).
+function RoundService:SetPaused(paused: boolean): boolean
+	if not self.Started or self.Busy or self.Phase() ~= "Open" then
+		return false
+	end
+	if self.Paused() == paused then
+		return true
+	end
+	self.Paused(paused)
+	self:RefreshSigns()
+	return true
 end
 
 -- Length of the Night phase of night k (DEC-127)
@@ -267,6 +293,7 @@ function RoundService:Record(): Record
 		Chances = wireInt(self.Dependencies.RunStateService.Chances(), 0, MAX_CHANCES),
 		WipeEndsAt = self.WipeEndsAt(),
 		WipeFrozen = self.WipeFrozen(),
+		Paused = self.Paused(),
 	}
 end
 
@@ -377,11 +404,14 @@ function RoundService:IsSign(anchor: Instance): boolean
 	return anchor:GetAttribute("PromptAction") == OPEN_ACTION
 end
 
--- "Open Shop" exists for the party only in the phases of Content.Actions.open_sign.Requires.Phase (Prep)
+-- The trailer switch exists for the party in the phases of Content.Actions.open_sign.Requires.Phase (Prep, Open): "Open Shop"
+-- in Prep (starts the Open phase), "Close Shop" while open, "Open Shop" again while the shop is on Closed
 function RoundService:RefreshSign(anchor: Instance)
 	const phases = Content.Actions.ByKey[OPEN_ACTION].Requires.Phase
-	const enabled = self.Started and not self.Busy and phases ~= nil and table.find(phases, self.Phase()) ~= nil
-	self.Dependencies.InteractionService:SetPrompt(anchor, enabled)
+	const phase = self.Phase()
+	const enabled = self.Started and not self.Busy and phases ~= nil and table.find(phases, phase) ~= nil
+	const text = if phase == "Open" and not self.Paused() then CLOSE_TEXT else OPEN_TEXT
+	self.Dependencies.InteractionService:SetPrompt(anchor, enabled, text)
 end
 
 function RoundService:RefreshSigns()
@@ -407,6 +437,7 @@ function RoundService:Enter(phase: Phase, startedAt: number, info: ShiftInfo?, h
 			self.WipeEndsAt(0)
 			self.WipeFrozen(false)
 		end
+		self.Paused(false)
 		self.Held(clock)
 		self.Phase(phase)
 		self.PhaseStartedAt(startedAt)
@@ -807,11 +838,21 @@ RoundService:OnStart(function(self)
 	const runState = self.Dependencies.RunStateService
 	self.Dependencies.InteractionService:RegisterAction(OPEN_ACTION, {
 		Validate = function(player: Player, _anchor: Instance, _id: number): boolean
-			return self.Started and not self.Busy and self.Phase() == "Prep" and runState:IsActive(player)
+				const phase = self.Phase()
+			return self.Started
+				and not self.Busy
+				and (phase == "Prep" or phase == "Open")
+				and runState:IsActive(player)
+				and os.clock() - self.ToggledAt >= TOGGLE_COOLDOWN
 		end,
 		Run = function(_player: Player, _anchor: Instance, _id: number)
-			if self.Phase() == "Prep" then
+			self.ToggledAt = os.clock()
+			const phase = self.Phase()
+			if phase == "Prep" then
+				-- opening the trailer opens the shop: the Open phase starts at once
 				self:Advance(workspace:GetServerTimeNow())
+			elseif phase == "Open" then
+				self:SetPaused(not self.Paused())
 			end
 		end,
 	})

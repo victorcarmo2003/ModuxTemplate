@@ -299,6 +299,12 @@
 						"optional": "src/Player/server"
 					}
 				},
+				"Prep": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Prep/server"
+					}
+				},
 				"Profile": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
@@ -584,6 +590,12 @@
 						"$ignoreUnknownInstances": false,
 						"$path": {
 							"optional": "src/Place/client"
+						}
+					},
+					"Prep": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Prep/client"
 						}
 					},
 					"Profile": {

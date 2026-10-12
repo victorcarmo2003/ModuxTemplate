@@ -25,7 +25,7 @@ export type Action = {
 
 return Table.new({
 	-- wave 1
-	{ Key = "open_sign", Text = "Open Shop", Hold = 0, Radius = 10, Requires = { Phase = { "Prep" } }, Night = "Any", Wave = 1 },
+	{ Key = "open_sign", Text = "Open Shop", Hold = 0.3, Radius = 6, Requires = { Phase = { "Prep", "Open" } }, Night = "Any", Wave = 1 },
 	{ Key = "grill_place", Text = "Grill", Hold = 0, Radius = 7, Requires = {}, Night = "Any", Wave = 1 },
 	{ Key = "grill_collect", Text = "Collect", Hold = 0, Radius = 7, Requires = {}, Night = "Any", Wave = 1 },
 	{ Key = "bun_cut", Text = "Slice Bun", Hold = 0.5, Radius = 7, Requires = {}, Night = "Any", Wave = 1 },

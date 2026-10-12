@@ -5,15 +5,17 @@
 -- (BossCalls Trigger Tutorial); from then on each step's Say lines go on the call subtitle and the text-to-speech voice
 -- of Walt when the step starts, and Done is his short praise when the player moves past it. The panel keeps the
 -- current objective (Text, starting with the verb + Hint) as a short support, under "Step N of M".
--- Tutorial customer (user request 2026-10-11): right after the call is answered one customer comes (shared.Tutorial
+-- Owner request 2026-10-12: after the call the player OPENS THE TRAILER (red switch on its wall; opening the trailer
+-- opens the shop, there is no sign to flip) and only then does the tutorial customer come.
+-- Tutorial customer (user request 2026-10-11): once the shop is open one customer comes (shared.Tutorial
 -- .Rules: fixed order, no time limit) and the steps follow its order: take the order -> grill -> slice -> collect ->
--- assemble -> toppings -> (open the shop, only if still in Prep) -> serve -> money -> shopping.
+-- assemble -> toppings -> serve -> money -> shopping.
 -- Shopping (user request 2026-10-11, Provisional): the tutorial run starts with ONE bun (server, TutorialService), so
 -- the first sale empties the crate; Walt sends the rookie to the Mart: mart_go (arrow to the Mart door) -> mart_buy
 -- (the BAKERY shelf, "Buy Buns") -> mart_back (the pack in hand, back to the cart) -> restock (hold "Restock" at the
 -- bun crate) -> goodbye. When the buns did not run out (a party with a veteran: no tutorial stock), the old talk step
 -- "mart" stands in for the four.
--- Number = the step shown in the panel ("3/13"); waiting rows share the number of the step they wait for.
+-- Number = the step shown in the panel ("3/14"); waiting rows share the number of the step they wait for.
 -- Action = the prompt the arrow points at (nil = no prompt: waiting, or a talk step).
 -- Remind = the short nudge after IDLE s without progress (TutorialController), voiced like Say (generated ahead).
 -- Talk = no world action: the step moves on once Walt has said it (or after TALK_TIME without the call; "Got it").
@@ -36,12 +38,12 @@ export type Step = {
 	-- (waiting rows, talk steps)
 	Remind: string?,
 	Talk: boolean?,
-	-- the screen-sized arrow over the target shows at any distance (not only from far away); the OPEN sign (playtest
+	-- the screen-sized arrow over the target shows at any distance (not only from far away); the open switch (playtest
 	-- 2026-10-11: up close the player did not see which piece to press)
 	AlwaysArrow: boolean?,
 }
 
-const TOTAL = 13
+const TOTAL = 14
 
 const LIST: { Step } = {
 	{
@@ -50,7 +52,7 @@ const LIST: { Step } = {
 		Text = "Answer the phone",
 		Hint = 'Your boss is calling. Press "Answer" on the trailer phone.',
 		Action = "answer_phone",
-		Remind = "The phone's ringing! Press Answer.",
+		Remind = "Pick up the phone.",
 	},
 	{
 		Key = "wait_call",
@@ -59,170 +61,159 @@ const LIST: { Step } = {
 		Hint = "Your boss is about to call. Stay near the trailer.",
 		Action = nil,
 	},
+	-- Owner request 2026-10-12: phone -> open the trailer (the red switch on its wall; there is no OPEN sign any more
+	-- and opening the trailer opens the shop at once) -> the customer comes. Same step in Prep whatever the hand holds.
+	{
+		Key = "open",
+		Number = 2,
+		Text = "Open the trailer",
+		Hint = "Press the red switch on the trailer wall.",
+		Action = "open_sign",
+		Say = { "Open the trailer.", "Red switch, on the wall." },
+		Done = "We're open.",
+		AlwaysArrow = true,
+		Remind = "Hit the red switch.",
+	},
 	{
 		Key = "wait_customer",
-		Number = 2,
+		Number = 3,
 		Text = "Wait for your first customer",
 		Hint = "They're walking up to the counter.",
 		Action = nil,
-		Say = { "Here comes your first customer.", "Let 'em walk up to the counter." },
+		Say = { "Your first customer's coming." },
 	},
 	{
 		Key = "order",
-		Number = 2,
+		Number = 3,
 		Text = "Take the order",
 		Hint = 'Press "Take Order" on the customer.',
 		Action = "take_order",
-		Say = { "Go on... take their order." },
-		Done = "Hot dog with ketchup... Easy.",
-		Remind = "They're waiting. Take the order!",
-	},
-	-- Playtest 2026-10-11: the shop was only asked to open at the counter, after the whole hot dog was made. Now it is
-	-- asked right after the order (still Prep), so serving never stops for it. Same number as "order".
-	{
-		Key = "open_first",
-		Number = 2,
-		Text = "Open the shop",
-		Hint = 'Before cooking, press "Open Shop" at the sign.',
-		Action = "open_sign",
-		Say = { "First, flip the sign to open the shop." },
-		Done = "We're open.",
-		AlwaysArrow = true,
-		Remind = "Shop's closed! Press Open Shop at the sign.",
+		Say = { "Take their order." },
+		Done = "A ketchup dog. Easy.",
+		Remind = "Take the order, Rookie.",
 	},
 	{
 		Key = "grill",
-		Number = 3,
+		Number = 4,
 		Text = "Grill a sausage",
 		Hint = 'Grab one at the cooler: press "Grill".',
 		Action = "grill_place",
-		Say = { "Grab a frank from the cooler.", "It goes right on the grill." },
+		Say = { "Frank from the cooler.", "Onto the grill." },
 		Done = "Nice.",
-		Remind = "Frank on the grill. Follow the arrow.",
+		Remind = "Frank on the grill.",
 	},
 	{
 		Key = "slice",
-		Number = 4,
+		Number = 5,
 		Text = "Slice a bun",
 		Hint = 'Hold "Slice Bun" at the bun crate.',
 		Action = "bun_cut",
 		Say = { "Slice a bun while it cooks." },
 		Done = "Good.",
-		Remind = "Hold Slice Bun at the bun crate.",
+		Remind = "Hold to slice the bun.",
 	},
-	{ Key = "slicing", Number = 4, Text = "Slicing the bun...", Hint = "Keep holding!", Action = nil },
+	{ Key = "slicing", Number = 5, Text = "Slicing the bun...", Hint = "Keep holding!", Action = nil },
 	{
 		Key = "cooking",
-		Number = 5,
+		Number = 6,
 		Text = "Wait for the sausage",
 		Hint = 'It gets a "Collect" button when ready.',
 		Action = "grill_collect",
-		Say = { "Watch the grill. When the bar fills up... it's ready." },
+		Say = { "Wait for the bar." },
 	},
 	{
 		Key = "collect",
-		Number = 5,
+		Number = 6,
 		Text = "Collect the sausage",
 		Hint = 'Press "Collect" on the grill.',
 		Action = "grill_collect",
-		Say = { "It's ready. Grab it off the grill." },
+		Say = { "Ready. Grab it." },
 		Done = "Got it.",
-		Remind = "It's ready! Collect it off the grill.",
+		Remind = "Grab it off the grill.",
 	},
 	{
 		Key = "assemble",
-		Number = 6,
+		Number = 7,
 		Text = "Put the sausage in the bun",
 		Hint = 'Press "Add Sausage" at the board.',
 		Action = "board_add_sausage",
-		Say = { "Now put the hot dog in the bun, on the board." },
+		Say = { "Frank in the bun." },
 		Done = "Beautiful.",
-		Remind = "Frank in the bun, at the board.",
+		Remind = "Put it in the bun.",
 	},
 	{
 		Key = "toppings",
-		Number = 7,
+		Number = 8,
 		Text = "Add {item}",
 		Hint = 'Hold "Add" at the topping. The order is on the card, top left.',
 		Action = "topping_add",
-		Say = { "They want ketchup. Go add some.", "Only what they asked... nothing extra." },
+		Say = { "They want ketchup.", "Nothing extra." },
 		Done = "Perfect.",
-		Remind = "Ketchup! Hold Add at the ketchup.",
+		Remind = "Ketchup. Hold to add.",
 	},
 	{
 		Key = "discard",
-		Number = 7,
+		Number = 8,
 		Text = "Throw it away",
 		Hint = "That's not what they asked. Hold \"Throw Away\" at the bin, then make a new one.",
 		Action = "discard",
-		Say = { "Whoa... that's not what they ordered.", "Toss it in the bin and make a new one." },
-		Remind = "Toss it. Hold Throw Away at the bin.",
-	},
-	{
-		Key = "open",
-		Number = 8,
-		Text = "Open the shop",
-		Hint = 'You can\'t sell yet. Press "Open Shop" at the sign.',
-		Action = "open_sign",
-		Say = { "Flip the sign to open the shop first." },
-		Done = "We're open.",
-		AlwaysArrow = true,
-		Remind = "Shop's closed! Press Open Shop at the sign.",
+		Say = { "Not what they asked. Toss it." },
+		Remind = "Toss it in the bin.",
 	},
 	{
 		Key = "serve",
-		Number = 8,
+		Number = 9,
 		Text = "Serve the hot dog",
 		Hint = 'Press "Serve" on the customer.',
 		Action = "serve",
-		Say = { "That's what they wanted. Now serve it." },
-		Remind = "Hand it over. Press Serve on them.",
+		Say = { "Now serve it." },
+		Remind = "Hand it over.",
 	},
 	{
 		Key = "money",
-		Number = 9,
+		Number = 10,
 		Text = "First sale! Nice work!",
 		Hint = "Sales fill the drawer. It's banked into your money at closing.",
 		Action = nil,
-		Say = { "Ka-ching! Your first sale.", "Money goes in the drawer. It's banked when you close." },
+		Say = { "Ka-ching! First sale.", "Cash goes in the drawer." },
 		Talk = true,
 	},
 	{
 		Key = "mart_go",
-		Number = 10,
+		Number = 11,
 		Text = "Go to the Mart",
 		Hint = "Ninth Street Mart, across the street. Look both ways!",
 		Action = nil,
 		Say = {
-			"Uh-oh... that was your last bun.",
-			"Head to the Mart, across the street.",
-			"Look both ways... These drivers don't brake.",
+			"That was your last bun.",
+			"Mart's across the street.",
+			"Look both ways.",
 		},
 		Done = "That's the place.",
-		Remind = "Mart's across the street. Follow the arrow.",
+		Remind = "Follow the arrow to the Mart.",
 	},
 	{
 		Key = "mart_buy",
-		Number = 11,
+		Number = 12,
 		Text = "Buy a pack of buns",
 		Hint = 'Hold "Buy Buns" at the BAKERY shelf.',
 		Action = "buy_package",
-		Say = { "Bakery shelf. Grab a pack of buns." },
+		Say = { "Grab buns at the bakery." },
 		Done = "Eight buns. That'll do.",
 		Remind = "Bakery shelf. Hold Buy Buns.",
 	},
 	{
 		Key = "mart_back",
-		Number = 12,
+		Number = 13,
 		Text = "Bring it back",
 		Hint = "Carry the pack back to your trailer.",
 		Action = nil,
-		Say = { "Now bring 'em back to the trailer." },
-		Remind = "Bring the buns back to the trailer.",
+		Say = { "Bring them to the trailer." },
+		Remind = "Back to the trailer.",
 	},
 	{
 		Key = "restock",
-		Number = 13,
+		Number = 14,
 		Text = "Restock the buns",
 		Hint = 'Hold "Restock" at the bun crate.',
 		Action = "restock",
@@ -233,14 +224,13 @@ const LIST: { Step } = {
 	-- stands in for the four shopping steps when the buns did not run out (no tutorial stock)
 	{
 		Key = "mart",
-		Number = 10,
+		Number = 11,
 		Text = "Restock at the Mart",
 		Hint = "Ninth Street Mart, across the street: buy a package, bring it back.",
 		Action = nil,
 		Say = {
-			"Running low on stuff? The Mart's across the street.",
-			"Buy a package, bring it back and restock.",
-			"Look both ways... These drivers don't brake.",
+			"Low on stuff? Try the Mart.",
+			"Look both ways.",
 		},
 		Talk = true,
 	},
@@ -257,19 +247,18 @@ const SHOPPING: { string } = { "mart_go", "mart_buy", "mart_back", "restock" }
 -- release nothing extra. Server stays authoritative.
 const ALWAYS: { string } = { "answer_phone" }
 const NEXT_ACTIONS: { [string]: { string } } = {
-	phone = { "take_order" },
+	phone = { "open_sign" },
+	open = { "take_order" },
 	wait_customer = { "take_order" },
-	order = { "open_sign", "grill_place" },
-	open_first = { "grill_place" },
+	order = { "grill_place" },
 	grill = { "bun_cut", "grill_collect" },
 	slice = { "grill_collect", "grill_place" },
 	slicing = { "grill_collect" },
 	cooking = { "board_add_sausage" },
 	collect = { "board_add_sausage", "bun_cut" },
 	assemble = { "topping_add" },
-	toppings = { "open_sign", "serve" },
+	toppings = { "serve" },
 	discard = { "grill_place", "board_add_sausage" },
-	open = { "serve" },
 	serve = {},
 	money = { "buy_package" },
 	mart_go = { "buy_package" },
@@ -280,11 +269,11 @@ const NEXT_ACTIONS: { [string]: { string } } = {
 }
 
 -- Walt when the call is answered (before the first step line)
-const GREETING: { string } = { "Morning, Rookie. Walt here.", "I'll stay on the line... and walk you through it." }
+const GREETING: { string } = { "Morning, Rookie. Walt here.", "I'll walk you through it." }
 -- after the last talk step; the server hangs up after BossCallRules.Tutorial.Goodbye s (the click)
-const GOODBYE: { string } = { "That's the whole job... You got this, Rookie.", "Call me if..." }
+const GOODBYE: { string } = { "That's the job. You got this.", "Call me if..." }
 -- the player skipped the tutorial during the call
-const SKIP_GOODBYE: { string } = { "Alright... you know your way around.", "I'll let you work. Call me if you need me." }
+const SKIP_GOODBYE: { string } = { "Alright. You know the drill.", "Call me if you need me." }
 
 const ByKey: { [string]: Step } = {}
 const IndexOf: { [string]: number } = {}

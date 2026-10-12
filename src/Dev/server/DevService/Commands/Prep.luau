@@ -2,8 +2,16 @@
 -- Focused prep mode dev commands (docs/tech/prep-mode.md; TASK P0).
 --   prep grade   runs the table of Prep.Grade cases (pure math, no service needed) and prints ok / FAIL per case plus
 --                the totals; any failure makes the command error so the Command Bar shows it as a warning
+--   prep seats | enter <n> | leave | finish [force] [topping...]   PrepService without the UI (TASK-170): seat table,
+--                sit / leave as the caller (first player from the Command Bar), perfect summary through the real path
+--                ("force" ages the plate past the Perfect floor; without it the server clock answers TooFast)
+--   prep ui [n]  opens / closes the focused UI on the caller's client with mock data (PrepController, TASK-173; no seat)
+--   prep kitchen runs the KitchenService scenarios of the prep mode (TASK-169): BeginPlate / FinishPlate / RefundPlate /
+--                TrashPlate (refusals change nothing), GrillAct Place / Flip / Collect, TakeStock race and the
+--                WorldKitchenPrompts flag; prints ok / FAIL per check, restores stock and rail, errors on any failure
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Api = require(script.Parent.Parent.Api)
+local PrepKitchen = require(script.Parent.Parent.Scenarios.PrepKitchen)
 local Content = require(ReplicatedStorage.shared.Content)
 local Grade = require(ReplicatedStorage.shared.Prep.Grade)
 
@@ -165,11 +173,50 @@ const Prep: Api.Module = function(ctx: Api.Context): { Api.Command }
 	return {
 		{
 			Name = "prep",
-			Usage = "prep grade",
-			Help = "prep grade: runs the Prep.Grade table of cases and prints ok / FAIL per case",
-			Run = function(args: { string }, _caller: Player?): string?
-				if args[1] ~= "grade" then
-					error("usage: prep grade", 0)
+			Usage = "prep grade | kitchen | seats | enter <n> | leave | finish [force] [topping...]",
+			Help = "prep grade: Prep.Grade cases; kitchen: KitchenService plate/grill/flag scenarios (TASK-169); seats / enter / leave / finish: PrepService without the UI (TASK-170)",
+			Run = function(args: { string }, caller: Player?): string?
+				const verb = args[1]
+				if verb == "kitchen" then
+					return PrepKitchen(ctx, caller)
+				end
+				if verb == "seats" or verb == "enter" or verb == "leave" or verb == "finish" then
+					const service = ctx.Get("PrepService") :: any
+					if verb == "seats" then
+						return service:DevSeats()
+					end
+					const player = caller or game:GetService("Players"):GetPlayers()[1]
+					if player == nil then
+						error("no player to act as", 0)
+					end
+					if verb == "enter" then
+						return service:DevEnter(player, tonumber(args[2]) or 1)
+					elseif verb == "leave" then
+						return service:DevLeave(player)
+					end
+					const keys: { string } = {}
+					local force = false
+					for index = 2, #args do
+						if args[index] == "force" then
+							force = true
+						else
+							table.insert(keys, args[index])
+						end
+					end
+					return service:DevFinish(player, keys, force)
+				end
+				if verb == "ui" then
+					-- the client preview of the focused UI (PrepController, TASK-173): mock data, no seat, no packet back
+					const player = caller or game:GetService("Players"):GetPlayers()[1]
+					if player == nil then
+						error("no player to act as", 0)
+					end
+					const tutorials = ctx.Get("TutorialService") :: any
+					tutorials:DevSend(player, "prep_ui", args[2] or "1")
+					return `prep ui sent to {player.Name} (run it again to leave)`
+				end
+				if verb ~= "grade" then
+					error("usage: prep grade | kitchen | seats | enter <n> | leave | finish [force] [topping...]", 0)
 				end
 				const all: { Case } = table.clone(cases)
 				for _, case in sweepRows() do

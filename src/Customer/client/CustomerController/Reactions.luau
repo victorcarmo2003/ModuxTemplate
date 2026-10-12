@@ -20,11 +20,11 @@ const LINES: { [string]: { string } } = {
 	Perfect = { "Perfect, thanks!", "Yum!", "See you tomorrow!" },
 	Complete = { "Perfect, thanks!", "Yum!", "See you tomorrow!" },
 	Incomplete = { "Something's missing..." },
-	Wrong = { "That's not what I asked for." },
+	Wrong = { "Not what I asked." },
 	-- Left = the Queue clock ran out: nobody attended them (Q-192, Provisional texts)
-	Left = { "Nobody's serving?! Bye.", "I'll eat somewhere else." },
+	Left = { "Nobody's serving? Bye.", "Eating elsewhere." },
 	-- Slow = the Order clock ran out: the food took too long (Q-192, Provisional texts)
-	Slow = { "My food never came...", "Too slow... bye.", "Forget the order, I'm late!" },
+	Slow = { "My food never came...", "Too slow. Bye.", "Forget it, I'm late!" },
 	Refused = {},
 }
 

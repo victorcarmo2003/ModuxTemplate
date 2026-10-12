@@ -19,6 +19,10 @@
 	(placeholder: no key in Content.Sounds = silence). It also gives PromptController the `Shutter` probe of the
 	vehicle in use (Rules.SetShutterProbe: no counter prompt with the window closed). The server decides; nothing
 	here changes the state.
+	Serving-window panel (user request 2026-10-12, Provisional): the same flap is also the shop panel. It hangs closed
+	while the shop is not selling (Content.Shift row Selling = false: Prep, Summary, ...), so "Open Shop" (open_sign,
+	Prompt_Open on its inner face) is pressed on the panel and the flap rises when the Open phase starts; at night the
+	`Shutter` attribute still closes it as before. Local only: a 4 Hz tick compares the wanted pose with the flap.
 	Provisional (TASK-131): the "hang down" default, the quad ease and the flap needing to be Anchored and unwelded.
 ]]
 local CollectionService = game:GetService("CollectionService")
@@ -57,6 +61,7 @@ const MIN_SWING = math.rad(5) -- a smaller computed swing means the flap already
 const SOUND_CLOSE = "shutter_close"
 const SOUND_OPEN = "shutter_open"
 const SOUND_BUTTON = "switch_click" -- the window button, with the flap sound (not on the late-join pose)
+const PANEL_TICK = 4 -- Hz: shop open / closed against the flap pose
 
 type Shutter = {
 	Model: Model,
@@ -222,7 +227,7 @@ function VehicleController:WatchShutter(model: Model, retry: boolean)
 		return
 	end
 
-	const isClosed = model:GetAttribute(SHUTTER_ATTRIBUTE) == true
+	const isClosed = self:WantClosed(model)
 	const angle = if isClosed then closed else 0
 	const shutter: Shutter = {
 		Model = model,
@@ -262,6 +267,16 @@ function VehicleController:WatchShutter(model: Model, retry: boolean)
 	self:PoseShutter(shutter)
 end
 
+-- The flap is down when the window is closed (server attribute) or the shop is not selling (panel). A phase this client
+-- does not know yet counts as selling: the flap never closes on a guess.
+function VehicleController:WantClosed(model: Model): boolean
+	if model:GetAttribute(SHUTTER_ATTRIBUTE) == true then
+		return true
+	end
+	const row = Content.Shift.ByKey[self.Dependencies.RoundController.Phase()]
+	return row ~= nil and (not row.Selling or self.Dependencies.RoundController.Paused())
+end
+
 function VehicleController:PoseShutter(shutter: Shutter)
 	const pose = shutterPose(shutter, shutter.Angle)
 	if not samePose(shutter.Part.CFrame, pose) then
@@ -271,7 +286,7 @@ end
 
 -- `Shutter` attribute changed: tween from where the flap is now to the new end pose and play the placeholder sound
 function VehicleController:SwingShutter(shutter: Shutter)
-	const isClosed = shutter.Model:GetAttribute(SHUTTER_ATTRIBUTE) == true
+	const isClosed = self:WantClosed(shutter.Model)
 	const target = if isClosed then shutter.Closed else 0
 	if shutter.To == target and (shutter.StartedAt ~= nil or shutter.Angle == target) then
 		return
@@ -318,6 +333,13 @@ function VehicleController:StepShutters()
 			self.ShutterStep = nil
 			step:Disconnect()
 		end
+	end
+end
+
+-- Shop phase changes move the flap even though no attribute changed
+function VehicleController:RefreshPanels()
+	for _, shutter in self.Shutters do
+		self:SwingShutter(shutter)
 	end
 end
 
@@ -420,5 +442,9 @@ VehicleController:OnStart(function(self)
 		self:MountFade(playerGui)
 	end)
 end)
+
+VehicleController:OnTick(function(self)
+	self:RefreshPanels()
+end, PANEL_TICK)
 
 return VehicleController

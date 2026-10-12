@@ -31,6 +31,7 @@ local ObjectiveController = require(StarterPlayer.StarterPlayerScripts.client.Mo
 local OpalController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.OpalController)
 local PedestrianController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PedestrianController)
 local PlaceController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PlaceController)
+local PrepController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PrepController)
 local ProfileController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ProfileController)
 local RoundController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.RoundController)
 local SeatingController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.SeatingController)
@@ -39,6 +40,7 @@ local StageController = require(StarterPlayer.StarterPlayerScripts.client.ModuxT
 local ThiefController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ThiefController)
 local TrafficController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.TrafficController)
 local TutorialController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.TutorialController)
+local SwitchLeverController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.SwitchLeverController)
 local VehicleController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.VehicleController)
 local VitalController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.VitalController)
 
@@ -73,6 +75,7 @@ export type AllControllers = {
 	OpalController: OpalController.Public,
 	PedestrianController: PedestrianController.Public,
 	PlaceController: PlaceController.Public,
+	PrepController: PrepController.Public,
 	ProfileController: ProfileController.Public,
 	RoundController: RoundController.Public,
 	SeatingController: SeatingController.Public,
@@ -81,6 +84,7 @@ export type AllControllers = {
 	ThiefController: ThiefController.Public,
 	TrafficController: TrafficController.Public,
 	TutorialController: TutorialController.Public,
+	SwitchLeverController: SwitchLeverController.Public,
 	VehicleController: VehicleController.Public,
 	VitalController: VitalController.Public,
 }

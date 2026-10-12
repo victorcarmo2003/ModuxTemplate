@@ -11,14 +11,22 @@
 -- slot with room on the rail. Snapshot: nothing kept (data.md §2.2: the shift restarts with an empty grill).
 -- Refusal toasts (D-04, TASK-080, via Refusal.luau): "Grill" with no stock -> out_of_stock {item}, with no free slot ->
 -- grill_full; "Collect" with the rail full -> rail_full. A wrong kind or a slot that is not Ready stays silent.
+-- Prep mode (TASK-169; prep-mode.md §2): Grill.PlaceFor / Flip / CollectSlot are the same moves without a prompt. Flip
+-- stamps the sausage with the SERVER clock and scores it with Prep.Grade.FlipScore (distance to 50% of the Duration,
+-- window 40%..60%, no burning); the score travels with the sausage on the rail (Entry.Score). Never flipped = Messy
+-- (Grades.Unflipped, Q-222) when collected through the prep mode; the world "Collect" carries no grade.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
+local Grade = require(ReplicatedStorage.shared.Prep.Grade)
 local StationApi = require(script.Parent.Parent.StationApi)
 local Rail = require(script.Parent.Rail)
 local Refusal = require(script.Parent.Parent.Refusal)
 
 type Context = StationApi.Context
 type Station = StationApi.Station
+
+-- Private state of a grill: flip score by slot (set when the sausage is flipped, cleared when it leaves the slot).
+type GrillState = { Flipped: { [number]: number } }
 
 const GRILL = "grill"
 const STOCK = "sausage_stock"
@@ -51,6 +59,16 @@ local function grillsOf(vehicle: string): { Station }
 		return a.Id < b.Id
 	end)
 	return out
+end
+
+local function flippedOf(station: Station): { [number]: number }
+	const state = station.State
+	if type(state) == "table" and type(state.Flipped) == "table" then
+		return (state :: GrillState).Flipped
+	end
+	const fresh: GrillState = { Flipped = {} }
+	station.State = fresh
+	return fresh.Flipped
 end
 
 local function slotOf(anchor: Instance): number?
@@ -178,6 +196,70 @@ local function refreshPlace(ctx: Context, station: Station)
 	end)
 end
 
+-- Shared moves (prompt actions and prep mode) --------------------------------------------------------------------------
+
+-- Moves one sausage from the stock station to the lowest free grill slot. Synchronous, all or nothing: the unit
+-- leaves the stock only together with a free slot. Returns (slot, grill) or (nil, nil, reason): "NoStock" | "Full".
+local function placeSausage(ctx: Context, stock: Station, player: Player): (number?, Station?, string?)
+	const grill, slot = freeSlot(ctx, stock.Vehicle)
+	if grill == nil or slot == nil then
+		return nil, nil, "Full"
+	end
+	if not ctx.TakeStock(ingredientOf(stock), 1) then
+		return nil, nil, "NoStock"
+	end
+	grill.Records[slot] = {
+		Kind = GRILL,
+		State = "Working",
+		StartedAt = ctx.Now(),
+		Duration = cookTime(ctx, player),
+		Count = 0,
+	}
+	flippedOf(grill)[slot] = nil
+	sync(ctx, grill)
+	ctx.Publish(grill)
+	refreshCollect(ctx, grill)
+	refreshPlace(ctx, stock)
+	return slot, grill, nil
+end
+
+-- Slot of the vehicle's grills (lowest StationId first): (grill, record) or nil.
+local function findSlot(vehicle: string, slot: number): (Station?, StationApi.Record?)
+	for _, grill in grillsOf(vehicle) do
+		const record = grill.Records[slot]
+		if record ~= nil then
+			return grill, record
+		end
+	end
+	return nil, nil
+end
+
+-- Moves the Ready sausage of `slot` to the rail with its flip score (Unflipped when it never was). Returns (ok, reason?)
+-- with reason "NotReady" | "RailFull".
+local function collectSlot(ctx: Context, grill: Station, slot: number, graded: boolean): (boolean, string?)
+	const record = grill.Records[slot]
+	if record == nil or record.State ~= "Ready" then
+		return false, "NotReady"
+	end
+	if Rail.Room(grill.Vehicle) <= 0 then
+		return false, "RailFull"
+	end
+	const flipped = flippedOf(grill)[slot]
+	local score: number? = flipped
+	if score == nil and graded then
+		score = Content.Prep.Grades.Unflipped
+	end
+	if not Rail.Push(ctx, grill.Vehicle, score) then
+		return false, "RailFull"
+	end
+	flippedOf(grill)[slot] = nil
+	grill.Records[slot] = StationApi.empty(GRILL)
+	sync(ctx, grill)
+	ctx.Publish(grill)
+	refreshCollect(ctx, grill)
+	return true, nil
+end
+
 -- Actions -------------------------------------------------------------------------------------------------------------
 
 const place: StationApi.Action = {
@@ -194,25 +276,7 @@ const place: StationApi.Action = {
 		return ok, nil
 	end,
 	Run = function(ctx: Context, station: Station, player: Player, _anchor: Instance)
-		const grill, slot = freeSlot(ctx, station.Vehicle)
-		if grill == nil or slot == nil then
-			return
-		end
-		-- the unit leaves the stock only together with a free slot (never one without the other)
-		if not ctx.TakeStock(ingredientOf(station), 1) then
-			return
-		end
-		grill.Records[slot] = {
-			Kind = GRILL,
-			State = "Working",
-			StartedAt = ctx.Now(),
-			Duration = cookTime(ctx, player),
-			Count = 0,
-		}
-		sync(ctx, grill)
-		ctx.Publish(grill)
-		refreshCollect(ctx, grill)
-		refreshPlace(ctx, station)
+		placeSausage(ctx, station, player)
 	end,
 }
 
@@ -229,13 +293,10 @@ const collect: StationApi.Action = {
 	end,
 	Run = function(ctx: Context, station: Station, _player: Player, anchor: Instance)
 		const slot = readySlot(station, anchor)
-		if slot == nil or not Rail.Push(ctx, station.Vehicle) then
+		if slot == nil then
 			return
 		end
-		station.Records[slot] = StationApi.empty(GRILL)
-		sync(ctx, station)
-		ctx.Publish(station)
-		refreshCollect(ctx, station)
+		collectSlot(ctx, station, slot, false)
 	end,
 }
 
@@ -249,8 +310,72 @@ const Grill = {
 	} :: { [string]: StationApi.Action },
 }
 
+-- Public API for the prep mode (KitchenService/Plate.luau; every call is synchronous) ------------------------------------
+
+-- Sausage from `stock` (a sausage_stock station) to the lowest free grill slot. (slot, nil) or (nil, reason): "NoStock" | "Full".
+function Grill.PlaceFor(ctx: Context, stock: Station, player: Player): (number?, string?)
+	if stock.Kind ~= STOCK then
+		return nil, "Full"
+	end
+	const slot, _, reason = placeSausage(ctx, stock, player)
+	return slot, reason
+end
+
+-- Flips the sausage of `slot` once (Working, or Ready = late). The score comes from the SERVER clock: how far from 50% of
+-- the Duration (Rules.Grill.Target) the flip happened. Returns (score, nil) or (nil, reason): "Empty" | "Flipped".
+function Grill.Flip(ctx: Context, vehicle: string, slot: number): (number?, string?)
+	const grill, record = findSlot(vehicle, slot)
+	if grill == nil or record == nil or record.State == "Empty" then
+		return nil, "Empty"
+	end
+	const flipped = flippedOf(grill)
+	if flipped[slot] ~= nil then
+		return nil, "Flipped"
+	end
+	const tolerance = Content.Prep.Tolerances.ByKey["grill_flip"]
+	const score = Grade.FlipScore(Content.Prep, tolerance, record.StartedAt, ctx.Now(), record.Duration)
+	flipped[slot] = score
+	return score, nil
+end
+
+-- Ready sausage of `slot` to the rail, graded (never flipped = Grades.Unflipped). (true, nil) or (false, reason): "Empty" | "NotReady" | "RailFull".
+function Grill.CollectSlot(ctx: Context, vehicle: string, slot: number): (boolean, string?)
+	const grill = findSlot(vehicle, slot)
+	if grill == nil then
+		return false, "Empty"
+	end
+	return collectSlot(ctx, grill, slot, true)
+end
+
+-- Flip score of the sausage in `slot`, nil = not flipped (or no sausage).
+function Grill.FlipScoreOf(vehicle: string, slot: number): number?
+	const grill = findSlot(vehicle, slot)
+	return if grill then flippedOf(grill)[slot] else nil
+end
+
+-- Dev (`prep kitchen`): pretends `seconds` have passed for the sausage of `slot` (no waiting for the 10 Hz Tick).
+function Grill.DevAge(ctx: Context, vehicle: string, slot: number, seconds: number): boolean
+	const grill, record = findSlot(vehicle, slot)
+	if grill == nil or record == nil or record.State == "Empty" then
+		return false
+	end
+	record.StartedAt -= seconds
+	if record.State == "Working" and ctx.Now() >= record.StartedAt + record.Duration then
+		record.State = "Ready"
+	end
+	ctx.Publish(grill)
+	refreshCollect(ctx, grill)
+	return true
+end
+
+-- Dev: Duration of the sausage in `slot`, 0 = none.
+function Grill.DevDuration(vehicle: string, slot: number): number
+	const _, record = findSlot(vehicle, slot)
+	return if record and record.State ~= "Empty" then record.Duration else 0
+end
+
 function Grill.Bind(ctx: Context, station: Station)
-	station.State = nil
+	station.State = if station.Kind == GRILL then { Flipped = {} } :: GrillState else nil
 	if station.Kind == GRILL then
 		for index = #grills, 1, -1 do
 			const other = grills[index]
@@ -303,6 +428,7 @@ function Grill.Restore(ctx: Context, station: Station, _data: any)
 		return
 	end
 	table.clear(station.Records)
+	table.clear(flippedOf(station))
 	sync(ctx, station)
 	ctx.Publish(station)
 	refreshCollect(ctx, station)

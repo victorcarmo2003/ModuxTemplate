@@ -5,6 +5,8 @@
 --   hot_dog -> Toppings ("ketchup,cheese", DEC-190); coffee -> Restore (tostring of the sanity it restores, §19.8).
 --   An altered hot dog (ITM-020, wave 3, TASK-109) prefixes its Extra with ALTERED_MARK ("!ketchup,cheese", or just
 --   "!" with no topping): the stash entry shape (data.md §5.2) and the snapshot "T" stay the same.
+--   Prep quality (TASK-171; prep-mode.md §2): a hot dog made in the prep mode carries "|Perfect" / "|Good" / "|Messy" at the
+--   end of its Extra ("ketchup|Perfect", "!ketchup|Messy", "|Good" with no topping); no suffix = quick mode (no quality).
 -- Snapshot "T" item = { item, count, extra? } (data.md §5.3).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
@@ -12,19 +14,37 @@ local Content = require(ReplicatedStorage.shared.Content)
 export type Entry = { Kind: string, Count: number, Extra: string? }
 
 -- What Give needs to rebuild one entry (subset of ItemService.GiveOptions).
-export type Rebuild = { Count: number?, Toppings: string?, Restore: number?, Altered: boolean? }
+export type Rebuild = { Count: number?, Toppings: string?, Restore: number?, Altered: boolean?, Quality: string? }
 
 const HOT_DOG = "hot_dog"
 const COFFEE = "coffee"
 const ALTERED_MARK = "!" -- never part of a topping key
+const QUALITY_MARK = "|" -- never part of a topping key
 const MAX_COUNT = 999 -- RunStateService stash cap per entry
 const MAX_ENTRIES = 32 -- RunStateService stash cap per member
 
 const Stash = {}
 
+-- Quality key (Content.Prep.Grades band) or nil for anything else (nil, quick mode, unknown text).
+function Stash.quality(value: any): string?
+	if type(value) ~= "string" then
+		return nil
+	end
+	return if (Content.Prep.Grades.Labels :: any)[value] ~= nil then value else nil
+end
+
+-- Splits a hot dog Extra into (body without the quality suffix, quality or nil).
+local function splitQuality(extra: string): (string, string?)
+	const at = string.find(extra, QUALITY_MARK, 1, true)
+	if at == nil then
+		return extra, nil
+	end
+	return string.sub(extra, 1, at - 1), Stash.quality(string.sub(extra, at + 1))
+end
+
 -- Entry of one Tool from its attributes; nil for a key that is not in Content.Items.
--- `altered` only counts for a hot dog.
-function Stash.entry(kind: string, count: any, toppings: any, restore: any, altered: any): Entry?
+-- `altered` and `quality` only count for a hot dog.
+function Stash.entry(kind: string, count: any, toppings: any, restore: any, altered: any, quality: any): Entry?
 	const item = Content.Items.ByKey[kind]
 	if item == nil then
 		return nil
@@ -37,6 +57,10 @@ function Stash.entry(kind: string, count: any, toppings: any, restore: any, alte
 			extra = ALTERED_MARK .. list
 		elseif list ~= "" then
 			extra = list
+		end
+		const grade = Stash.quality(quality)
+		if grade ~= nil then
+			extra = (extra or "") .. QUALITY_MARK .. grade
 		end
 	elseif kind == COFFEE and type(restore) == "number" then
 		extra = tostring(math.floor(restore))
@@ -52,12 +76,15 @@ function Stash.rebuild(entry: Entry): Rebuild
 		out.Count = entry.Count
 	end
 	if entry.Kind == HOT_DOG then
-		const extra = entry.Extra
+		local extra = entry.Extra
+		if extra ~= nil then
+			extra, out.Quality = splitQuality(extra)
+		end
 		if extra ~= nil and string.sub(extra, 1, #ALTERED_MARK) == ALTERED_MARK then
 			out.Altered = true
 			out.Toppings = string.sub(extra, #ALTERED_MARK + 1)
 		else
-			out.Toppings = extra
+			out.Toppings = if extra == "" then nil else extra
 		end
 	elseif entry.Kind == COFFEE and entry.Extra ~= nil then
 		out.Restore = tonumber(entry.Extra)
@@ -111,7 +138,7 @@ function Stash.decode(list: any): { Entry }
 		if type(raw) ~= "table" or type(raw[1]) ~= "string" then
 			continue
 		end
-		const extra = raw[3]
+		local extra = raw[3]
 		if extra ~= nil and type(extra) ~= "string" then
 			continue
 		end
@@ -122,11 +149,13 @@ function Stash.decode(list: any): { Entry }
 		end
 		local toppings: string? = nil
 		local altered = false
+		local quality: string? = nil
 		if kind == HOT_DOG and extra ~= nil then
+			extra, quality = splitQuality(extra)
 			altered = string.sub(extra, 1, #ALTERED_MARK) == ALTERED_MARK
 			toppings = if altered then string.sub(extra, #ALTERED_MARK + 1) else extra
 		end
-		const entry = Stash.entry(kind, count, toppings, nil, altered)
+		const entry = Stash.entry(kind, count, toppings, nil, altered, quality)
 		if entry == nil then
 			continue
 		end

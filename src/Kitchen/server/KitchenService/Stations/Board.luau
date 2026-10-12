@@ -26,8 +26,22 @@ const KIND = "board"
 const ADD = "board_add_sausage"
 const HOT_DOG = "hot_dog"
 
+-- Private state: slots held by an open prep plate (TASK-169). A reserved slot is never finished by Tick nor taken by
+-- "Add Sausage"; Board.Reserve / ClaimAltered / Release are the only writers.
+type BoardState = { Reserved: { [number]: boolean } }
+
 -- Bound boards (one per vehicle expected). Stale entries (station removed/re-added) are skipped by alive().
 const bound: { Station } = {}
+
+local function reservedOf(station: Station): { [number]: boolean }
+	const state = station.State
+	if type(state) == "table" and type(state.Reserved) == "table" then
+		return (state :: BoardState).Reserved
+	end
+	const fresh: BoardState = { Reserved = {} }
+	station.State = fresh
+	return fresh.Reserved
+end
 
 local function alive(station: Station): boolean
 	const instance = station.Instance
@@ -74,8 +88,9 @@ end
 local function oldestReady(station: Station): number?
 	local best: number? = nil
 	local bestAt = math.huge
+	const reserved = reservedOf(station)
 	for slot, record in station.Records do
-		if record.State ~= "Ready" then
+		if record.State ~= "Ready" or reserved[slot] then
 			continue
 		end
 		const at = record.StartedAt + record.Duration
@@ -190,6 +205,92 @@ function Board.Place(ctx: Context, vehicle: string, slot: number, duration: numb
 	return true
 end
 
+-- Prep mode (TASK-169) -----------------------------------------------------------------------------------------------
+
+-- Holds a free slot for a plate: `slot` if it is free and active, else the lowest free one. The record reads Working
+-- for `duration` seconds (the plate's lifetime) and Tick leaves it alone. Returns the slot, nil = no free slot.
+function Board.Reserve(ctx: Context, vehicle: string, slot: number?, duration: number): number?
+	const station = Board.Find(vehicle)
+	if station == nil then
+		return nil
+	end
+	local target: number? = nil
+	if slot ~= nil then
+		const record = station.Records[slot]
+		if station.Slots[slot] ~= nil and (record == nil or record.State == "Empty") then
+			for _, active in activeSlots(station) do
+				if active == slot then
+					target = slot
+					break
+				end
+			end
+		end
+	end
+	if target == nil then
+		target = Board.Free(vehicle)
+	end
+	if target == nil then
+		return nil
+	end
+	station.Records[target] = {
+		Kind = KIND,
+		State = "Working",
+		StartedAt = ctx.Now(),
+		Duration = math.clamp(duration, 0, 120),
+		Count = 0,
+	}
+	reservedOf(station)[target] = true
+	sync(station)
+	ctx.Publish(station)
+	return target
+end
+
+-- Takes the sliced altered bun (ANM-002) that sits free on the board for a plate. Returns its slot, nil = none.
+function Board.ClaimAltered(ctx: Context, vehicle: string): number?
+	const station = Board.Find(vehicle)
+	if station == nil then
+		return nil
+	end
+	const reserved = reservedOf(station)
+	for slot, record in station.Records do
+		if record.State == "Ready" and (record.Altered or 0) > 0 and not reserved[slot] then
+			reserved[slot] = true
+			refreshAdd(ctx, station)
+			return slot
+		end
+	end
+	return nil
+end
+
+-- True while the plate still holds this slot (an altered bun may be cleared at 6:00 AM under it).
+function Board.Holds(vehicle: string, slot: number): boolean
+	const station = Board.Find(vehicle)
+	if station == nil then
+		return false
+	end
+	const record = station.Records[slot]
+	return reservedOf(station)[slot] == true and record ~= nil and record.State ~= "Empty"
+end
+
+-- Ends a plate's hold. keep = the altered bun goes back to the board as it was (Ready, free); otherwise the slot empties.
+function Board.Release(ctx: Context, vehicle: string, slot: number, keep: boolean)
+	const station = Board.Find(vehicle)
+	if station == nil then
+		return
+	end
+	const reserved = reservedOf(station)
+	if not reserved[slot] then
+		return
+	end
+	reserved[slot] = nil
+	if not keep then
+		station.Records[slot] = StationApi.empty(KIND)
+	end
+	sync(station)
+	ctx.Publish(station)
+	refreshAdd(ctx, station)
+end
+
 -- Wave 3 (TASK-109): a bitten bun, already sliced, on `slot` (nil = lowest free active slot). One per board.
 function Board.Alter(ctx: Context, station: Station, slot: number?): boolean
 	for _, record in station.Records do
@@ -225,9 +326,11 @@ end
 -- Removes the bitten bun (its slot frees up). True when there was one.
 function Board.ClearAltered(ctx: Context, station: Station): boolean
 	local removed = false
+	const reserved = reservedOf(station)
 	for slot, record in station.Records do
 		if (record.Altered or 0) > 0 then
 			station.Records[slot] = StationApi.empty(KIND)
+			reserved[slot] = nil -- a plate holding it finds the slot gone (Board.Holds = false)
 			removed = true
 		end
 	end
@@ -247,7 +350,7 @@ function Board.Bind(ctx: Context, station: Station)
 		end
 	end
 	table.insert(bound, station)
-	station.State = nil
+	station.State = { Reserved = {} } :: BoardState
 	table.clear(station.Records)
 	sync(station)
 	ctx.Publish(station)
@@ -257,8 +360,9 @@ end
 -- 10 Hz, current vehicle only: finish slicing, keep "Add Sausage" in step with the rail.
 function Board.Tick(ctx: Context, station: Station, now: number)
 	local changed = sync(station)
-	for _, record in station.Records do
-		if record.State == "Working" and now >= record.StartedAt + record.Duration then
+	const reserved = reservedOf(station)
+	for slot, record in station.Records do
+		if record.State == "Working" and not reserved[slot] and now >= record.StartedAt + record.Duration then
 			record.State = "Ready"
 			changed = true
 		end
@@ -275,6 +379,7 @@ end
 
 function Board.Restore(ctx: Context, station: Station, _data: any)
 	table.clear(station.Records)
+	table.clear(reservedOf(station))
 	sync(station)
 	ctx.Publish(station)
 	refreshAdd(ctx, station)

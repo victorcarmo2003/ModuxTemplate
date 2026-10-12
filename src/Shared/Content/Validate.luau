@@ -1206,9 +1206,16 @@ local function checkCutscenes()
 			`Cap {intro.Cap} + ReadyTimeout {Cutscenes.Rules.ReadyTimeout} above the Intro phase cap ({Shift.ByKey.Intro.Duration} s)`
 		)
 	end
-	-- owner D3 2026-10-12: short, clean intro (no street cars, no crossing); Cap = Duration + a few s, never past 52 s
-	if intro.Cap > 52 then
-		fail("Cutscenes", nil, "intro", `Cap {intro.Cap} s above 52 s: the intro must stay short (owner D3 2026-10-12)`)
+	-- owner D3 2026-10-12 rev. 2: short, clean intro (no street cars; it crosses on the crosswalk); at most 35 s, Cap =
+	-- Duration + a few s
+	if intro.Duration > 35 then
+		fail("Cutscenes", nil, "intro", `Duration {intro.Duration} s above 35 s: the intro must stay short (owner D3 2026-10-12)`)
+	end
+	if intro.Cap > intro.Duration + 4 then
+		fail("Cutscenes", nil, "intro", `Cap {intro.Cap} s more than 4 s above Duration {intro.Duration} s`)
+	end
+	if introNeeds + 2 ~= Shift.ByKey.Intro.Duration then
+		fail("Cutscenes", nil, "intro", `Intro phase cap {Shift.ByKey.Intro.Duration} s must be ReadyTimeout + Cap + 2 = {introNeeds + 2} s`)
 	end
 	for _, beat in intro.Beats do
 		if beat.Kind == "Actor" and Cutscenes.Rules.Cars[beat.Target] ~= nil then

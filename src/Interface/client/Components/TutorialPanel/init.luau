@@ -55,6 +55,7 @@ const HINT_SIZE = 14
 const CHIP = 36 -- round step chip (not touchable)
 const CHIP_WIDE = 52 -- chip width for a two-digit count ("10/13" at 14 px)
 const WIDTH_SCALE = 0.5
+const HEAD_TAG = 92 -- px reserved on the right of the title row for the "STEP n OF N" tag
 const MIN_WIDTH = 260
 const MAX_WIDTH = 440
 const GAP = 8
@@ -207,35 +208,42 @@ return function(props: Props): Frame
 						SortOrder = Enum.SortOrder.LayoutOrder,
 						Padding = UDim.new(0, 2),
 					}),
-					CartoonLabel({
-						Name = "Label",
+					-- Head row: title on the left, the small "STEP n OF N" tag on the right of the same line (two lines in total)
+					create("Frame")({
+						Name = "Head",
 						LayoutOrder = 0,
-						Box = UDim2.fromScale(1, 0),
+						Size = UDim2.fromScale(1, 0),
 						AutomaticSize = Enum.AutomaticSize.Y,
-						TextSize = LABEL_SIZE,
-						Color = Theme.Tone.Ink.Top,
-						Stroke = 0,
-						XAlignment = Enum.TextXAlignment.Left,
-						Text = label,
-						Visible = function()
-							return label() ~= ""
-						end,
-					}),
-					CartoonLabel({
-						Name = "Text",
-						LayoutOrder = 1,
-						Box = UDim2.fromScale(1, 0),
-						AutomaticSize = Enum.AutomaticSize.Y,
-						TextSize = TEXT_SIZE,
-						Color = Theme.Color.Dark,
-						Stroke = 0,
-						Wrapped = true,
-						XAlignment = Enum.TextXAlignment.Left,
-						Text = props.Text,
+						BackgroundTransparency = 1,
+						CartoonLabel({
+							Name = "Text",
+							Box = UDim2.new(1, -HEAD_TAG, 0, 0),
+							AutomaticSize = Enum.AutomaticSize.Y,
+							TextSize = TEXT_SIZE,
+							Color = Theme.Color.Dark,
+							Stroke = 0,
+							Wrapped = true,
+							XAlignment = Enum.TextXAlignment.Left,
+							Text = props.Text,
+						}),
+						CartoonLabel({
+							Name = "Label",
+							AnchorPoint = Vector2.new(1, 0),
+							Position = UDim2.fromScale(1, 0),
+							Box = UDim2.fromOffset(HEAD_TAG, LABEL_SIZE + 4),
+							TextSize = LABEL_SIZE,
+							Color = Theme.Tone.Ink.Top,
+							Stroke = 0,
+							XAlignment = Enum.TextXAlignment.Right,
+							Text = label,
+							Visible = function()
+								return label() ~= ""
+							end,
+						}),
 					}),
 					CartoonLabel({
 						Name = "Hint",
-						LayoutOrder = 2,
+						LayoutOrder = 1,
 						Box = UDim2.fromScale(1, 0),
 						AutomaticSize = Enum.AutomaticSize.Y,
 						TextSize = HINT_SIZE,

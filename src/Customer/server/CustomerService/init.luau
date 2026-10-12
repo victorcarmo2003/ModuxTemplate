@@ -69,11 +69,18 @@
 -- be refused and never sits. "Take Order" works on it even in Prep (the drawer is closed there); "Serve" still needs
 -- the drawer open (the rookie opens the shop first). The regular flow waits while it is at the counter.
 -- EndTutorial() (nobody has the tutorial pending any more) sends an unserved one away with no outcome.
+--
+-- Prep quality (TASK-171; prep-mode.md §2; Q-219 B, Provisional): SellLine reads ItemService:QualityOf(tool) (Tool
+-- attribute Quality, nil = quick mode) and applies Grade.Effect(Content.Prep, band): Perfect = tip $2 and a tip window
+-- +4 s, Messy = no tip and the mood one band worse (Conclude), Good = as before. The price and the verdicts of
+-- DEC-072 are untouched. TakeOrderFor / ServeFor / RefuseFor are the same paths as the three world prompts (same
+-- checks, same pay) for the prep mode tabs (PrepService), which have no customer anchor.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 local Content = require(ReplicatedStorage.shared.Content)
 local Lync = require(ReplicatedStorage.Packages.Lync)
+local Grade = require(ReplicatedStorage.shared.Prep.Grade)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 local TutorialRules = require(ReplicatedStorage.shared.Tutorial.Rules)
@@ -210,6 +217,8 @@ const ANNOYED = "Annoyed"
 const COMPLAINING = "Complaining"
 const LEAVE_TIMEOUT = 45 -- s; a leaving customer that never reaches its exit is despawned anyway
 const NEUTRAL = "Neutral" -- arrival mood (Content.Moods)
+-- Mood ladder, best first (Q-219 B: Messy = one band down; Content.Moods has no order of its own yet)
+const MOOD_LADDER = { HAPPY, NEUTRAL, ANNOYED, COMPLAINING }
 -- day phases where the tutorial customer may spawn (the tutorial runs in Prep and Open)
 const TUTORIAL_PHASES: { [string]: boolean } = { Prep = true, Open = true }
 -- Exit split by shift: Content.Flow.Spawns.Exits (MAP-01 §9.8, Provisional; EX-E 60 / D1 40).
@@ -411,6 +420,12 @@ function CustomerService:IsSelling(): boolean
 	const round = self.Dependencies.RoundService
 	const row = self:PhaseRow()
 	return round:IsStarted() and row ~= nil and row.Selling
+end
+
+-- The trailer switch is on "Closed" (user request 2026-10-12, Provisional): no new customer arrives, the ones already
+-- in the queue are served.
+function CustomerService:IsPaused(): boolean
+	return self.Dependencies.RoundService:IsPaused()
 end
 
 -- Night shift (or a night-only phase while RoundService still reports days, wave 1).
@@ -750,7 +765,7 @@ end
 -- Customer anomaly (TASK-108; architecture.md §19.13). Spawns now and walks to the queue like a customer. Needs a
 -- selling phase, a free counter slot and room in the NPC cap; nil otherwise (the anomaly schedule retries later).
 function CustomerService:SpawnActor(spec: CustomerActorSpec): number?
-	if not self.Enabled or not self:IsSelling() then
+	if not self.Enabled or not self:IsSelling() or self:IsPaused() then
 		return nil
 	end
 	const npc = self.Dependencies.NpcService
@@ -1197,11 +1212,20 @@ end
 -- Common gate of the three actions: active member, drawer open (selling phase or Closing: the queue is still
 -- served, EconomyService:IsDrawerOpen), customer on Q1.
 function CustomerService:CanAct(player: Player, anchor: Instance, state: State?): boolean
-	if not self.Dependencies.RunStateService:IsActive(player) then
+	const id = self:TicketAt(anchor)
+	return self:CanActOn(player, id, state)
+end
+
+-- Same gate by NpcId (the prep mode tabs have no anchor): ticket open, customer not leaving and on Q1.
+function CustomerService:CanActOn(player: Player, id: number?, state: State?): boolean
+	if id == nil or not self.Dependencies.RunStateService:IsActive(player) then
 		return false
 	end
-	const id, customer = self:TicketAt(anchor)
-	if id == nil or customer == nil or self:Front() ~= id or customer.Slot ~= 1 then
+	const customer = self.Customers[id]
+	if customer == nil or self.Tickets[id] == nil or customer.State == "Leaving" then
+		return false
+	end
+	if self:Front() ~= id or customer.Slot ~= 1 then
 		return false
 	end
 	-- the tutorial customer's order can be taken before the shop opens (Prep); serving it still needs the drawer
@@ -1269,6 +1293,26 @@ function CustomerService:TakeOrder(player: Player, anchor: Instance)
 	if id == nil or customer == nil or ticket == nil then
 		return
 	end
+	self:OpenOrder(player, id, customer, ticket)
+end
+
+-- "Take Order" from the prep mode Order tab (PrepService; prep-mode.md §2): the customer at the counter in Ordering
+-- (`id` nil = the one on Q1), same gate and same write as the world prompt. Returns true when the order was taken.
+function CustomerService:TakeOrderFor(player: Player, id: number?): boolean
+	const target = if id ~= nil then id else self:Front()
+	if target == nil or not self:CanActOn(player, target, "Ordering") then
+		return false
+	end
+	const customer = self.Customers[target]
+	const ticket = self.Tickets[target]
+	if customer == nil or ticket == nil then
+		return false
+	end
+	self:OpenOrder(player, target, customer, ticket)
+	return customer.State == "Waiting"
+end
+
+function CustomerService:OpenOrder(player: Player, id: number, customer: Customer, ticket: Orders.Ticket)
 	const class = self.Dependencies.ClassService
 	const at = now()
 	ticket.Taker = player
@@ -1293,7 +1337,10 @@ function CustomerService:TakeOrder(player: Player, anchor: Instance)
 	if not written then
 		return
 	end
-	anchor:SetAttribute("PromptAction", SERVE)
+	const customerAnchor = self.Dependencies.NpcService:Anchors(id)
+	if customerAnchor ~= nil then
+		customerAnchor:SetAttribute("PromptAction", SERVE)
+	end
 	if not customer.Tutorial then
 		self.Acted:Fire(id, TAKE_ORDER, player, nil)
 	end
@@ -1381,23 +1428,62 @@ function CustomerService:ServeTable(player: Player, id: number)
 	if customer == nil or ticket == nil or not self:IsWaitingAtTable(id) then
 		return
 	end
-	self:ServeCustomer(player, id, customer, ticket)
+	self:ServeCustomer(player, id, customer, ticket, nil)
 end
 
-function CustomerService:ServeCustomer(player: Player, id: number, customer: Customer, ticket: Orders.Ticket)
-	const tool = self:PickServeTool(player, ticket)
+-- "Serve" from the prep mode Serve tab (PrepService; prep-mode.md §2): `target` = NpcId of the customer at the counter
+-- (Waiting, on Q1) or at a table (its leader's id; a partner id is mapped to its leader). `tool` = the hot dog the player
+-- picked (must be a hot dog of theirs in play); nil = ServeCustomer picks the exact one of the hotbar (PickServeTool).
+-- Same verdict, pay, tip, quality effect and Sale as the world "Serve" / "Serve Table". Returns the SaleResult of the
+-- first line served, nil = nothing served.
+function CustomerService:ServeFor(player: Player, tool: Tool?, target: number): SaleResult?
+	local id = target
+	const named = self.Customers[id]
+	if named ~= nil and named.Leader ~= nil and self.Customers[named.Leader] ~= nil then
+		id = named.Leader
+	end
+	const customer = self.Customers[id]
+	const ticket = self.Tickets[id]
+	if customer == nil or ticket == nil then
+		return nil
+	end
+	if customer.AtTable then
+		if not self:CanServeTable(player, id) then
+			return nil
+		end
+	elseif not self:CanActOn(player, id, "Waiting") or ticket.TakenAt <= 0 then
+		return nil
+	end
+	if tool ~= nil then
+		const items = self.Dependencies.ItemService
+		if items:ItemOf(tool) ~= HOT_DOG or not table.find(items:Tools(player), tool) then
+			return nil
+		end
+	end
+	return self:ServeCustomer(player, id, customer, ticket, tool)
+end
+
+-- `picked` = the hot dog chosen by the caller (ServeFor), nil = the one PickServeTool finds. Returns the first line's result.
+function CustomerService:ServeCustomer(
+	player: Player,
+	id: number,
+	customer: Customer,
+	ticket: Orders.Ticket,
+	picked: Tool?
+): SaleResult?
+	const tool = if picked ~= nil then picked else self:PickServeTool(player, ticket)
 	if tool == nil then
-		return
+		return nil
 	end
 	const at = now()
 	-- AddServeRule (TASK-108): an override replaces the order check (on the first pending line)
 	const override = self:ServeOverride(customer, tool, player)
 	if self.Customers[id] ~= customer or customer.State == "Leaving" then
-		return -- a rule sent the customer away
+		return nil -- a rule sent the customer away
 	end
 	const index, verdict = self:Judge(ticket, tool, override)
 	if index == nil then
-		return
+		return nil
 	end
 	const first = self:SellLine(id, customer, ticket, player, tool, index, verdict, at)
 	if override == nil and (first == "Complete" or first == "Perfect") then
@@ -1411,9 +1497,10 @@ function CustomerService:ServeCustomer(player: Player, id: number, customer: Cus
 	if #Orders.Pending(ticket) > 0 then
 		self:ShowPending(customer, ticket) -- pair: the other hot dog is still on the balloon
 		self:Publish(customer, false)
-		return
+		return first
 	end
 	self:Conclude(customer, ticket)
+	return first
 end
 
 -- Another hot dog Tool of the player's inventory (not `except`) that is EXACT (Complete) for `order`, nil when none.
@@ -1496,11 +1583,15 @@ function CustomerService:SellLine(
 	local result: SaleResult = verdict
 	local amount = 0
 	if verdict ~= "Wrong" then
+		-- Prep quality (TASK-171): read before the Tool goes away. Only tip and mood, never the price (Q-219 B)
+		const quality = items:QualityOf(tool)
+		const effect = if quality ~= nil then Grade.Effect(Content.Prep, quality :: any) else nil
+		line.Mood = if effect ~= nil then effect.Mood else nil
 		-- Wrong: $0; the hot dog stays in the server's hand (FEAT-011 "Errado devolvido")
 		items:Consume(player, tool)
 		amount += economy:AddToDrawer(Orders.Pay(verdict, line.Price), "Sale")
 		if verdict == "Complete" then
-			const tip = Orders.Tip(ticket, at)
+			const tip = Orders.TipFor(ticket, at, effect)
 			if tip > 0 then
 				amount += economy:AddToDrawer(tip, "Tip")
 				result = "Perfect"
@@ -1542,7 +1633,18 @@ function CustomerService:Conclude(customer: Customer, ticket: Orders.Ticket)
 			bad = true
 		end
 	end
-	const mood: string? = if bad then COMPLAINING elseif complete == #ticket.Lines then HAPPY else nil
+	local mood: string? = if bad then COMPLAINING elseif complete == #ticket.Lines then HAPPY else nil
+	-- prep quality (Q-219 B): the mood moves by the sum of the served hot dogs' bands (Messy = -1 = one band worse)
+	local shift = 0
+	for _, line in ticket.Lines do
+		shift += line.Mood or 0
+	end
+	if shift ~= 0 and not bad then
+		const from = table.find(MOOD_LADDER, mood or customer.Mood)
+		if from ~= nil then
+			mood = MOOD_LADDER[math.clamp(from - shift, 1, #MOOD_LADDER)]
+		end
+	end
 	-- at a table (Q-209): a good result = it eats there first; the others stand up and go
 	const eats = customer.AtTable and complete >= 1 and not bad
 	self:Leave(customer.Id, mood, "service", eats)
@@ -1583,6 +1685,23 @@ function CustomerService:Refuse(player: Player, anchor: Instance)
 	if id == nil or customer == nil or ticket == nil then
 		return
 	end
+	self:RefuseCustomer(player, id, customer, ticket)
+end
+
+-- "Refuse" from the prep mode Order tab: the customer on Q1 (Ordering or Waiting), same gate as the world prompt (the
+-- tutorial customer cannot be turned away). Returns true when it was refused.
+function CustomerService:RefuseFor(player: Player, id: number?): boolean
+	const target = if id ~= nil then id else self:Front()
+	const customer = if target ~= nil then self.Customers[target] else nil
+	const ticket = if target ~= nil then self.Tickets[target] else nil
+	if target == nil or customer == nil or ticket == nil or customer.Tutorial or not self:CanActOn(player, target, nil) then
+		return false
+	end
+	self:RefuseCustomer(player, target, customer, ticket)
+	return true
+end
+
+function CustomerService:RefuseCustomer(player: Player, id: number, customer: Customer, ticket: Orders.Ticket)
 	self:SettlePending(customer, ticket, "Refused")
 	self.Acted:Fire(id, REFUSE, player, "Refused")
 	self:Leave(id, COMPLAINING)
@@ -1712,6 +1831,7 @@ function CustomerService:StepGuarantee(t: number)
 	if
 		self.NextSpawnAt <= 0
 		or not self:IsSelling()
+		or self:IsPaused()
 		or self:IsNightShift()
 		or self.TutorialWanted
 		or self:HasTutorial()
@@ -1741,7 +1861,7 @@ function CustomerService:Step()
 	self:StepGuarantee(t)
 	-- the regular flow waits while the tutorial customer is at (or walking to) the counter: the next attempt comes
 	-- right after it was served
-	if self.NextSpawnAt > 0 and t >= self.NextSpawnAt and self:IsSelling() and not self:HasTutorial() then
+	if self.NextSpawnAt > 0 and t >= self.NextSpawnAt and self:IsSelling() and not self:IsPaused() and not self:HasTutorial() then
 		self:Attempt()
 		local interval = self:NextInterval()
 		if interval ~= nil and self.LastWasPair then

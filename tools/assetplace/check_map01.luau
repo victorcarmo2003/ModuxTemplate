@@ -223,7 +223,8 @@ local VEHICLE_SPEC = {
 		wave = 2,
 		kinds = { "sausage_stock", "grill", "rail", "bun_crate", "board", "toppings", "trash", "coffee_machine" },
 		-- wave 3: service window button TRL-SHUTTER (DEC-221; Required.Wave3 of TASK-129); hide H1..H4 left
-		own = { [2] = { answer_phone = 1, switch_light = 1 }, [3] = { shutter_toggle = 1 } },
+		-- open_sign: the red wall switch TRL-SWITCH-OPEN (2026-10-12; replaces the serving-window panel TRL-OPEN and the Pad stand)
+		own = { [1] = { open_sign = 1 }, [2] = { answer_phone = 1, switch_light = 1 }, [3] = { shutter_toggle = 1 } },
 		slots = { RailSlots = 8, BoardSlots = 3 },
 		counter = { ids = { "TRL-G", "TRL-R", "TRL-B", "TRL-T", "TRL-K", "TRL-DRAWER" }, relY = 4.6 },
 	},
@@ -982,8 +983,9 @@ local function checkMapAnchors()
 		local a = i:GetAttribute("PromptAction")
 		if a == "open_sign" then
 			table.insert(opens, i)
-			if ancestorWithTag(i, "Vehicle") then
-				err(("2: open_sign %s is inside a Vehicle (it stays on the map, MAP-01 §7.3)"):format(name(i)))
+			-- 2026-10-12: the sign stand left the Pad; open_sign is the red wall switch INSIDE the trailer
+			if not ancestorWithTag(i, "Vehicle") then
+				err(("2: open_sign %s is outside the trailer (it is the red wall switch TRL-SWITCH-OPEN since 2026-10-12)"):format(name(i)))
 			end
 		elseif a == "buy_package" then
 			local p = i:GetAttribute("Package")

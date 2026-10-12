@@ -24,13 +24,21 @@
 	     MapId TTBL-n, TableGroup "Trailer". The copies in the backups lose their tags.
 	  5. Queue marks Qn_AST-019_QueueMark move to the Q points.
 	Run order: after a Place.run + Bind.run (see STUDIO_LAYER.md), or any time (idempotent). Returns a log.
+
+	2026-10-12 (trailer on the ground, trailer_ground.luau): the heights that sit INSIDE the trailer (PS-1..4, PS-N1..4,
+	DROP-T, AN-05) follow the model: with the attribute TrailerGroundV1 on the trailer (set by trailer_ground) they are written
+	TRAILER_DROP lower; without it the old heights are written and trailer_ground lowers them with the model. Order after a
+	Place.run: trailer_only_map -> trailer_ground -> trailer_only_lights. The points on the Pad (Q, CART, TRL-OUT, L3, nodes) are
+	ground level and do not change.
 ]]
 
 local CS = game:GetService("CollectionService")
 local ST = game:GetService("ServerStorage")
 local CHS = game:GetService("ChangeHistoryService")
 local BK_NAME = "CART_Backup_20261012"
+-- pose of the AST-027 as the placements build it (chassis and wheels on, floor 2.56); trailer_ground lowers it by TRAILER_DROP
 local DEFAULT_POSE = CFrame.new(-44.9233, 0.56, 9.0997) * CFrame.Angles(0, math.pi, 0)
+local TRAILER_DROP = 2.08 -- must match trailer_ground.luau DROP (floor 2.56 -> 0.48, Pad top 0.45)
 local TAGS_OFF = {
 	"Vehicle", "VehicleCover", "Station", "Interactable", "SeatTable", "NpcNode", "MapPoint", "UpgradePiece",
 	"LightZone", "AnomalyAnchor", "OpenSignBoard",
@@ -124,7 +132,8 @@ end
 local function face(pos, dir)
 	return CFrame.lookAt(pos, pos + dir)
 end
-local FLOOR = 2.6 -- trailer floor (Body.Floor top)
+local LOWERED = trailer:GetAttribute("TrailerGroundV1") == true
+local FLOOR = if LOWERED then 2.6 - TRAILER_DROP else 2.6 -- spawn height over the trailer floor (Body.Floor top 2.56 / 0.48)
 local GROUND = 0.45
 
 -- 1. backups -----------------------------------------------------------------------------------------------------------
@@ -248,7 +257,7 @@ for i = 1, 4 do
 	setPoint("PS-N" .. i, cf)
 end
 setPoint("DROP-T", face(W(11.5, FLOOR, 3.5), FRONT))
-setPoint("AN-05", face(W(9.0, 7.45, 5.5), FRONT))
+setPoint("AN-05", face(W(9.0, if LOWERED then 7.45 - TRAILER_DROP else 7.45, 5.5), FRONT))
 -- thief lurk out of the trailer: east of the chassis (ends 18 studs east of the pivot), 23 studs from the zone centre
 setPoint("L3", face(W(-18.9, GROUND, -13.3), FRONT))
 local ptOut = point("TRL-OUT")

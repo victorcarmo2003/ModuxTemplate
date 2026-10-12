@@ -1,0 +1,708 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sell Hotdogs - mockup da UI do modo de preparo focado (Rascunho)</title>
+<!-- Fredoka vem do Google Fonts se houver rede; sem rede cai nas fontes arredondadas do sistema. Nenhum outro recurso externo. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#2B2233; --ink-top:#4A3D57; --ink-lip:#17111C;
+  --font:"Fredoka","Fredoka One","Baloo 2","Arial Rounded MT Bold","Trebuchet MS",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:#efe7d6;color:var(--ink);font-family:var(--font);font-weight:600}
+button{font:inherit;color:inherit;cursor:pointer;margin:0}
+
+/* ---------- controles da pagina (fora do mock) ---------- */
+.ctl{position:sticky;top:0;z-index:50;background:#2B2233;color:#FFF1D6;padding:10px 16px;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;font-size:14px}
+.ctl h1{font-size:15px;margin:0 8px 0 0;font-weight:700;color:#FFDA5C}
+.ctl fieldset{border:0;margin:0;padding:0;display:flex;gap:4px;align-items:center}
+.ctl .lbl{margin-right:6px;opacity:.75;font-size:12px}
+.ctl label{display:inline-flex;align-items:center;gap:5px;background:#4A3D57;border-radius:999px;padding:5px 11px;cursor:pointer;user-select:none}
+.ctl input{accent-color:#F6C12B}
+.ctl label:has(input:checked){background:#F6C12B;color:#2B2233}
+.note{max-width:1100px;margin:14px auto 0;padding:0 16px;font-size:14px;line-height:1.45;font-weight:500}
+.note b{font-weight:700}
+.wrap{display:flex;flex-direction:column;align-items:center;padding:16px}
+.fit{position:relative}
+.cap{text-align:center;font-size:13px;opacity:.7;margin:6px 0 0;font-weight:500}
+
+/* ---------- superficie do kit (CartoonPanel em CSS) ---------- */
+.pan{position:relative;border:3px solid var(--ink);border-radius:14px;
+  background:linear-gradient(var(--t),var(--b));
+  box-shadow:0 4px 0 0 var(--l),0 4px 0 3px var(--ink),inset 0 0 0 2px rgba(255,255,255,.5);color:var(--ink)}
+.pan::before{content:"";position:absolute;left:7px;right:7px;top:3px;height:36%;border-radius:inherit;background:rgba(255,255,255,.26);pointer-events:none}
+.pan>*{position:relative}
+.pill{border-radius:999px}
+.cream{--t:#FFF8EA;--b:#FBE3B8;--l:#D9B57A}
+.mustard{--t:#FFDA5C;--b:#F6B71B;--l:#B97F0A}
+.teal{--t:#63C8D4;--b:#3FA7B5;--l:#256E7A}
+.green{--t:#86CF8F;--b:#5FA36A;--l:#3B6E44}
+.slate{--t:#A9AEBF;--b:#8A8FA3;--l:#5D6173}
+.ink{--t:#4A3D57;--b:#2B2233;--l:#17111C;color:#fff}
+:where(button){padding:0}
+button.pan{transition:transform .12s ease-out}
+button.pan:active{transform:translateY(3px) scale(.96)}
+.dashed{border-style:dashed}
+.ic{width:1em;height:1em;flex:none;display:block}
+
+/* ---------- palco: canvas em px de UI ---------- */
+.stage{position:relative;overflow:hidden;border-radius:18px;border:3px solid var(--ink);background:#888;transform-origin:0 0;font-size:16px;
+  --sz-tab-h:44px;--sz-tab-w:104px;--sz-box:64px;--sz-card-w:116px;--sz-slot-h:64px;--fs-hint:16px;--fs-next:20px}
+.stage[data-vp=desktop]{width:1372px;height:772px;--sz-tab-h:48px;--sz-tab-w:128px;--sz-box:72px;--sz-card-w:150px;--sz-slot-h:84px;--fs-hint:17px;--fs-next:22px}
+.stage[data-vp=phone]{width:844px;height:390px}
+.stage[data-vp=portrait]{width:358px;height:774px;--sz-slot-h:48px}
+.stage>*{position:absolute}
+.stage.gray{filter:grayscale(1)}
+.stage.reduced *,.stage.reduced *::before{animation:none!important;transition-duration:.12s!important}
+
+/* mundo 3D desfocado */
+.world{inset:0;overflow:hidden;background:#cfd8de}
+.world .sc{position:absolute;inset:-4%;filter:blur(9px)}
+.stage[data-dof=off] .world .sc{filter:none}
+.world i{position:absolute;display:block}
+.w-wall{inset:0 0 38% 0;background:linear-gradient(#e9eef2,#cfd8de)}
+.w-stripe{left:0;right:0;top:34%;height:7%;background:#3FA7B5}
+.w-win{left:56%;top:8%;width:30%;height:26%;background:#8FD3F4;border:10px solid #FFF1D6;border-radius:8px}
+.w-shelf{left:6%;top:14%;width:34%;height:6%;background:#D9A35E}
+.w-jar1{left:9%;top:6%;width:6%;height:8%;background:#F6C12B;border-radius:6px}
+.w-jar2{left:18%;top:7%;width:5%;height:7%;background:#E2402E;border-radius:6px}
+.w-counter{left:0;right:0;bottom:0;height:40%;background:linear-gradient(#E8C98F,#D9A35E)}
+.w-edge{left:0;right:0;bottom:38%;height:3%;background:#FFF1D6}
+.w-grill{left:60%;bottom:30%;width:26%;height:14%;background:#C9D1D8;border-radius:10px}
+.w-bun{left:24%;bottom:20%;width:18%;height:9%;background:#F4D9A0;border-radius:30px}
+.stage[data-theme=night] .w-wall{background:linear-gradient(#2a3157,#1B2140)}
+.stage[data-theme=night] .w-win{background:#10142b;border-color:#6b6e8a}
+.stage[data-theme=night] .w-counter{background:linear-gradient(#7a5e47,#4f3a2c)}
+.stage[data-theme=night] .w-edge{background:#9c8f78}
+.stage[data-theme=night] .w-grill{background:#5f6b80}
+.stage[data-theme=night] .w-stripe{background:#256E7A}
+.stage[data-theme=night] .world::after{content:"";position:absolute;left:30%;top:20%;width:46%;height:60%;background:radial-gradient(closest-side,rgba(255,231,194,.55),rgba(255,231,194,0));}
+.vig{inset:0;pointer-events:none;background:radial-gradient(ellipse at center,rgba(43,34,51,0) 55%,rgba(43,34,51,.35) 100%);display:none}
+.stage[data-dof=off] .vig{display:block}
+
+/* zonas medidas */
+.zones{inset:0;pointer-events:none;display:none;z-index:40}
+.stage[data-measures=on] .zones{display:block}
+.zones b{position:absolute;display:block;border:2px dashed #1b7f3b;background:rgba(27,127,59,.10);color:#0d5a26;font-size:11px;line-height:1.1;padding:2px 4px;font-weight:700}
+.zones .rb{border-color:#7a2be0;background:rgba(122,43,224,.12);color:#4c1a93}
+.stage[data-measures=on] .topbar,.stage[data-measures=on] .status,.stage[data-measures=on] .ticket,.stage[data-measures=on] .board,
+.stage[data-measures=on] .tray,.stage[data-measures=on] .next,.stage[data-measures=on] .trash,.stage[data-measures=on] .toast,.stage[data-measures=on] .crew{outline:2px dashed #e0562b;outline-offset:3px}
+
+/* ---------- barra superior ---------- */
+.topbar{display:flex;gap:6px;align-items:flex-start;z-index:5}
+.leave{height:var(--sz-tab-h);width:44px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:16px;padding:0 10px;flex:none}
+.leave .ic{font-size:26px}
+.leave .lt{display:none}
+.tab{height:var(--sz-tab-h);width:var(--sz-tab-w);display:flex;align-items:center;justify-content:center;gap:6px;font-size:16px;flex:none}
+.tab .ic{font-size:28px}
+.tab .badge{position:absolute;right:-6px;top:-9px;min-width:22px;height:22px;border-radius:11px;border:3px solid var(--ink);font-size:14px;line-height:16px;font-style:normal;text-align:center;padding:0 3px;background:#63C8D4;color:var(--ink);z-index:2}
+.tab .badge.g{background:#86CF8F}
+.tab .badge.m{background:#FFDA5C}
+.tab::after{content:"";position:absolute;left:50%;bottom:-10px;margin-left:-7px;width:0;height:0;border:7px solid transparent;border-top-color:var(--ink);border-bottom:0;display:none}
+.stage[data-tab=order] .tab[data-go=order],.stage[data-tab=grill] .tab[data-go=grill],.stage[data-tab=build] .tab[data-go=build],.stage[data-tab=serve] .tab[data-go=serve]{
+  --t:#FFDA5C;--b:#F6B71B;--l:#B97F0A;transform:translateY(-3px);border-width:4px}
+.stage[data-tab=order] .tab[data-go=order]::after,.stage[data-tab=grill] .tab[data-go=grill]::after,.stage[data-tab=build] .tab[data-go=build]::after,.stage[data-tab=serve] .tab[data-go=serve]::after{display:block}
+.stage[data-vp=desktop] .leave{width:96px}
+.stage[data-vp=desktop] .leave .lt{display:inline}
+.stage[data-vp=desktop] .topbar{gap:8px}
+.stage[data-vp=desktop] .tab{font-size:18px}
+.stage[data-vp=portrait] .tab{width:48px}
+.stage[data-vp=portrait] .tab .tl{display:none}
+.stage[data-vp=portrait] .tab .badge{right:-8px}
+.stage[data-vp=portrait][data-tab=order] .tab[data-go=order],.stage[data-vp=portrait][data-tab=grill] .tab[data-go=grill],
+.stage[data-vp=portrait][data-tab=build] .tab[data-go=build],.stage[data-vp=portrait][data-tab=serve] .tab[data-go=serve]{width:100px}
+.stage[data-vp=portrait][data-tab=order] .tab[data-go=order] .tl,.stage[data-vp=portrait][data-tab=grill] .tab[data-go=grill] .tl,
+.stage[data-vp=portrait][data-tab=build] .tab[data-go=build] .tl,.stage[data-vp=portrait][data-tab=serve] .tab[data-go=serve] .tl{display:inline}
+.stage[data-vp=portrait] .topbar{gap:4px}
+
+/* ---------- status ---------- */
+.status{z-index:5;width:max-content;min-width:148px}
+.stat{height:32px;display:flex;align-items:center;gap:7px;padding:0 12px;font-size:16px;white-space:nowrap}
+.stat .ic{font-size:20px}
+.stat b{font-weight:700}
+.stat .sep{width:2px;height:16px;background:rgba(255,255,255,.35);border-radius:2px}
+.stage[data-vp=desktop] .stat{height:36px;font-size:17px}
+.sanity{display:none;margin-top:6px;height:10px;border:2px solid var(--ink);border-radius:6px;background:#2B2233;overflow:hidden;position:relative}
+.sanity i{display:block;height:100%;width:62%;background:linear-gradient(90deg,#6A5ACD,#FFD45A)}
+.sanity::after{content:"";position:absolute;left:50%;top:0;bottom:0;width:2px;background:rgba(255,255,255,.7)}
+.stage[data-theme=night] .sanity{display:block}
+.sanity u{position:absolute;left:25%;top:0;bottom:0;width:2px;background:rgba(255,255,255,.7)}
+
+/* ---------- ticket ---------- */
+.ticket{z-index:4;filter:drop-shadow(3px 0 0 var(--ink)) drop-shadow(-3px 0 0 var(--ink)) drop-shadow(0 3px 0 var(--ink)) drop-shadow(0 -3px 0 var(--ink))}
+.paper{background:linear-gradient(#FFF8EA,#FBE3B8);border-radius:10px 10px 0 0;padding:10px 10px 12px;position:relative}
+.paper::after{content:"";position:absolute;left:0;right:0;bottom:-9px;height:9px;
+  background:linear-gradient(135deg,#FBE3B8 50%,transparent 50%) 0 0/12px 9px,linear-gradient(225deg,#FBE3B8 50%,transparent 50%) 0 0/12px 9px}
+.pin{position:absolute;left:50%;top:-7px;width:16px;height:16px;margin-left:-8px;border-radius:50%;background:#3FA7B5;border:3px solid var(--ink)}
+.th{display:flex;align-items:center;gap:6px;margin-top:2px}
+.th .face{font-size:30px;color:#C98E5A}
+.th b{font-size:16px;font-weight:700}
+.th .more{margin-left:auto;font-size:14px;background:#FFDA5C;border:2px solid var(--ink);border-radius:10px;padding:0 6px}
+.ring{width:28px;height:28px;flex:none}
+.ti{display:flex;gap:6px;margin:6px 0 4px}
+.ti .ic{font-size:32px}
+.tq{margin:0;font-size:15px;line-height:1.25;font-weight:500}
+.stage[data-vp=desktop] .ticket{width:184px}
+.stage[data-vp=portrait] .paper{padding:8px 10px 12px}
+.stage[data-vp=portrait] .th{gap:8px}
+.stage[data-vp=portrait] .th .ti{margin:0}
+.stage[data-vp=portrait] .ti{margin:0 0 0 4px}
+.stage[data-vp=portrait] .ti .ic{font-size:34px}
+.stage[data-vp=portrait] .tq{margin-top:4px}
+.tinline{display:none}
+.stage[data-vp=portrait] .tinline{display:flex}
+.stage[data-vp=portrait] .tstack{display:none}
+
+/* ---------- colegas (co-op) ---------- */
+.crew{display:none;gap:6px;z-index:4}
+.stage[data-coop=on] .crew{display:flex}
+.chip{width:36px;height:36px;border-radius:50%;position:relative;display:flex;align-items:center;justify-content:center}
+.chip .ic{font-size:26px}
+.chip em{position:absolute;right:-5px;bottom:-5px;font-style:normal;font-size:14px;width:20px;height:20px;line-height:15px;text-align:center;background:#FFDA5C;border:2px solid var(--ink);border-radius:50%;z-index:2}
+.chip small{position:absolute;left:-6px;top:-6px;width:18px;height:18px;background:#fff;border:2px solid var(--ink);border-radius:50%;display:flex;align-items:center;justify-content:center;z-index:2}
+.chip small .ic{font-size:11px}
+
+/* ---------- tabua ---------- */
+.board{z-index:3;display:flex;flex-direction:column;padding:0;overflow:hidden;transition:left .22s ease-out,height .22s ease-out}
+.bh{display:flex;align-items:center;gap:12px;height:30px;padding:0 12px;margin-top:3px;flex:none}
+.hint{font-size:var(--fs-hint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.pips{display:none;gap:10px;font-size:14px;align-items:center}
+.stage[data-tab=build] .pips{display:flex}
+.pip{display:flex;align-items:center;gap:4px;white-space:nowrap}
+.pip svg{width:16px;height:16px;flex:none}
+.pip.todo svg circle{fill:none;stroke:var(--ink);stroke-width:3}
+.stage[data-vp=portrait] .pip{font-size:0;gap:0}
+.stage[data-vp=portrait] .pips{gap:6px}
+.qcount{margin-left:auto;font-size:14px;display:flex;align-items:center;gap:4px;white-space:nowrap}
+.screens{flex:1;min-height:0;padding:4px 10px 10px;position:relative}
+.screen{display:none;height:100%}
+.stage[data-tab=order] .s-order,.stage[data-tab=grill] .s-grill,.stage[data-tab=build] .s-build,.stage[data-tab=serve] .s-serve{display:block;animation:fadein .22s ease-out}
+@keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* Order */
+.cards{display:flex;gap:8px;height:100%;overflow-x:auto;padding:4px 2px 8px}
+.card{flex:0 0 var(--sz-card-w);display:flex;flex-direction:column;gap:6px;padding:10px 8px 10px;height:max-content;min-height:0;text-align:left}
+.card .row{display:flex;align-items:center;gap:6px}
+.card .face{font-size:32px}
+.card .ring{margin-left:auto}
+.card .ti{margin:0}
+.card .ti .ic{font-size:30px}
+.card .tq{font-size:14px;min-height:36px}
+.act{height:44px;width:100%;display:flex;align-items:center;justify-content:center;gap:6px;font-size:16px}
+.act .ic{font-size:20px}
+.tag{height:44px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:15px;border:3px solid var(--ink);border-radius:999px}
+.card.mine{outline:4px solid #F6B71B;outline-offset:1px}
+.dlg{display:none;position:absolute;inset:0;background:linear-gradient(#FFF8EA,#FBE3B8);padding:12px 16px;z-index:3}
+.stage[data-dialog=on][data-tab=order] .dlg{display:flex;flex-direction:column;gap:12px;align-items:stretch;justify-content:center}
+.dlg .who{display:flex;gap:12px;align-items:center}
+.dlg .who .face{font-size:64px;color:#C98E5A}
+.bubble{background:#fff;border:3px solid var(--ink);border-radius:16px;padding:10px 14px;font-size:18px;line-height:1.25;font-weight:500}
+.dlg .btns{display:flex;gap:12px;justify-content:center}
+.dlg .btns .act{width:190px}
+.stage[data-vp=portrait] .dlg .btns{flex-direction:column;align-items:center}
+.stage[data-vp=portrait] .cards{flex-wrap:wrap;overflow:auto;align-content:flex-start}
+.stage[data-vp=portrait] .card{flex:0 0 calc(50% - 4px)}
+
+/* Grill */
+.slots{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:4px 2px}
+.stage[data-vp=portrait] .slots{grid-template-columns:repeat(2,1fr);gap:6px}
+.slot{height:var(--sz-slot-h);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:14px;padding:4px 6px}
+.slot .ic{font-size:30px;width:70px;height:26px}
+.slot.empty{--t:#FFF8EA;--b:#FFF8EA;--l:#EAD6B0;border-style:dashed;box-shadow:none;opacity:.95}
+.slot.empty::before{display:none}
+.slot.empty .plus{font-size:30px;line-height:1;font-weight:700}
+.bar{position:relative;width:92%;height:10px;background:#EAD6B0;border:2px solid var(--ink);border-radius:6px;overflow:visible}
+.bar .fill{position:absolute;left:0;top:0;bottom:0;background:#F6B71B;border-radius:4px 0 0 4px}
+.bar .win{position:absolute;top:-5px;bottom:-5px;border:3px solid var(--ink);border-radius:3px;background:rgba(246,193,43,.45)}
+.bar .win::before,.bar .win::after{content:"";position:absolute;top:-5px;width:2px;height:5px;background:var(--ink)}
+.bar .win::before{left:2px}.bar .win::after{right:2px}
+.bar .mark{position:absolute;top:-6px;width:4px;height:18px;background:var(--ink);border-radius:2px;margin-left:-2px}
+.slot.flip{animation:pulse 1.2s ease-in-out infinite;outline:4px solid #F6B71B;outline-offset:1px}
+@keyframes pulse{50%{transform:scale(1.05)}}
+.rail{margin:8px 2px 0;display:flex;align-items:center;gap:8px;font-size:14px}
+.rail .ic{font-size:22px;width:44px}
+
+/* Build */
+.mat{height:100%;display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center;position:relative}
+.chipS{width:96px;padding:6px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:14px;text-align:center;transform:rotate(-2deg)}
+.chipS .ic{width:76px;height:26px}
+.stage[data-vp=desktop] .chipS{width:120px}
+.matTop{position:relative;display:flex;align-items:center;justify-content:center;height:100%}
+.matBoard{width:100%;max-width:560px;height:78%;max-height:300px;border-radius:18px;background:repeating-linear-gradient(90deg,#E8C98F 0 22px,#E1BF82 22px 44px);border:3px solid var(--ink);box-shadow:0 4px 0 #B8905A,0 4px 0 3px var(--ink);display:flex;align-items:center;justify-content:center;position:relative}
+.bunsvg{width:84%;max-width:380px;overflow:visible}
+.knife{position:absolute;right:12%;top:18%;font-size:44px;transform:translate(0,-6px) rotate(8deg);filter:drop-shadow(0 3px 0 rgba(43,34,51,.35))}
+.meter{position:absolute;left:50%;bottom:6px;width:56%;max-width:240px;transform:translateX(-50%);height:12px}
+.stage[data-vp=portrait] .mat{grid-template-columns:1fr;grid-template-rows:auto 1fr;gap:8px}
+.stage[data-vp=portrait] .chipS{flex-direction:row;width:auto;justify-content:center;gap:10px}
+.guide{stroke:#2B2233;stroke-width:3;stroke-dasharray:9 7;fill:none}
+
+/* Serve */
+.serve{display:flex;gap:12px;height:100%;align-items:flex-start;padding-top:4px}
+.plateC{flex:0 0 130px;padding:10px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:14px;text-align:center;position:relative}
+.plateC .ic{width:100px;height:40px}
+.plateC .row{display:flex;gap:4px}
+.plateC .row .ic{width:28px;height:28px}
+.stampMini{position:absolute;right:-16px;top:-16px;width:70px;height:70px;transform:rotate(-8deg);filter:drop-shadow(0 3px 0 rgba(43,34,51,.35))}
+.custs{display:flex;gap:10px;flex:1;min-width:0;overflow-x:auto;padding:14px 4px 8px}
+.cust{flex:0 0 100px;padding:8px 6px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:14px;text-align:center;transition:transform .22s ease-out}
+.stage[data-vp=desktop] .cust{flex-basis:128px}
+.cust .face{font-size:34px}
+.cust .ti{margin:0;justify-content:center}
+.cust .ti .ic{font-size:28px}
+.cust.match{--t:#FFF8EA;--b:#FBE3B8;outline:4px solid #F6B71B;outline-offset:1px;transform:translateY(-6px)}
+.cust .mtag{position:absolute;right:-8px;top:-10px;width:26px;height:26px;border-radius:50%;background:#86CF8F;border:3px solid var(--ink);display:flex;align-items:center;justify-content:center;z-index:2}
+.cust .mtag .ic{font-size:14px}
+.cust .where{font-size:12px;opacity:.75;font-weight:600}
+.stage[data-vp=portrait] .serve{flex-direction:column}
+.stage[data-vp=portrait] .plateC{flex:none;width:100%;flex-direction:row;justify-content:center;gap:14px}
+.stage[data-vp=portrait] .custs{width:100%;flex-wrap:wrap;overflow:auto;align-content:flex-start}
+.stage[data-vp=portrait] .cust{flex:0 0 calc(50% - 6px)}
+
+/* ---------- painel de ingredientes (so Build) ---------- */
+.tray{z-index:3;padding:6px 5px 8px;display:none}
+.stage[data-tab=build] .tray{display:block;animation:fadein .22s ease-out}
+.th2{font-size:14px;height:22px;display:flex;align-items:center;padding-left:2px}
+.grid{display:grid;grid-template-columns:repeat(2,var(--sz-box));gap:6px}
+.stage[data-vp=desktop] .grid{gap:8px}
+.stage[data-vp=portrait] .grid{grid-template-columns:repeat(3,var(--sz-box));gap:8px}
+.box{width:var(--sz-box);height:var(--sz-box);border-radius:10px;display:flex;align-items:center;justify-content:center}
+.box .ic{font-size:40px}
+.stage[data-vp=desktop] .box .ic{font-size:46px}
+.box .cnt{position:absolute;right:-3px;top:-6px;min-width:24px;height:20px;padding:0 4px;background:#fff;border:2px solid var(--ink);border-radius:10px;font-size:14px;line-height:16px;text-align:center;z-index:2}
+.box.used{--t:#EAD6B0;--b:#EAD6B0;--l:#EAD6B0;box-shadow:inset 0 3px 0 rgba(43,34,51,.25)}
+.box.used::before{display:none}
+.box.used .cnt{background:#86CF8F}
+.box.used .ic{opacity:.55}
+.box.locked{--t:#A9AEBF;--b:#8A8FA3;--l:#5D6173;border-style:dashed}
+.box.locked .ic.main{opacity:.4}
+.box.locked .lock{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:30px;z-index:2}
+.box.low .cnt{background:#FFDA5C;display:flex;align-items:center;gap:2px;padding:0 5px}
+.box.low .cnt .ic{font-size:12px}
+.box.sel{outline:4px solid #F6B71B;outline-offset:1px;transform:scale(1.05)}
+
+/* ---------- Next / Trash / Toast ---------- */
+.next{z-index:5;display:flex;align-items:center;justify-content:center;gap:8px;font-size:var(--fs-next)}
+.next .ic{font-size:26px}
+.next.pulse{animation:pulse 1.2s ease-in-out 3}
+.next[disabled]{--t:#A9AEBF;--b:#8A8FA3;--l:#5D6173;border-style:dashed;opacity:.9}
+.trash{z-index:5;border-radius:50%;display:none;align-items:center;justify-content:center}
+.trash .ic{font-size:30px}
+.stage[data-tab=build] .trash{display:flex;animation:fadein .22s ease-out}
+.toast{z-index:8;height:36px;display:none;align-items:center;gap:8px;padding:0 16px 0 10px;font-size:16px;white-space:nowrap;justify-content:center}
+.toast.show{display:flex;animation:fadein .22s ease-out}
+.toast .ic{font-size:22px}
+
+/* ---------- posicoes por dispositivo (px de UI) ---------- */
+/* celular paisagem 844 x 390 */
+.stage[data-vp=phone] .topbar{left:150px;top:8px;width:486px}
+.stage[data-vp=phone] .status{right:12px;top:10px}
+.stage[data-vp=phone] .ticket{left:12px;top:60px;width:152px}
+.stage[data-vp=phone] .crew{left:12px;top:210px}
+.stage[data-vp=phone] .board{left:252px;top:60px;width:492px;height:256px}
+.stage[data-vp=phone][data-tab=build] .board{left:176px}
+.stage[data-vp=phone] .tray{left:682px;top:60px;width:150px;height:246px}
+.stage[data-vp=phone] .next{left:700px;top:326px;width:132px;height:52px}
+.stage[data-vp=phone] .trash{left:12px;top:322px;width:56px;height:56px}
+.stage[data-vp=phone] .toast{left:262px;top:336px;width:320px}
+/* desktop 16:9, canvas ~1372 x 772 */
+.stage[data-vp=desktop] .topbar{left:366px;top:12px;width:640px}
+.stage[data-vp=desktop] .status{right:16px;top:14px}
+.stage[data-vp=desktop] .ticket{left:16px;top:84px}
+.stage[data-vp=desktop] .crew{left:16px;top:254px}
+.stage[data-vp=desktop] .board{left:388px;top:84px;width:780px;height:480px}
+.stage[data-vp=desktop][data-tab=build] .board{left:304px}
+.stage[data-vp=desktop] .tray{left:1188px;top:84px;width:168px;height:260px}
+.stage[data-vp=desktop] .next{left:1204px;top:696px;width:152px;height:56px}
+.stage[data-vp=desktop] .trash{left:16px;top:692px;width:60px;height:60px}
+.stage[data-vp=desktop] .toast{left:506px;top:704px;width:360px}
+/* retrato 358 x 774 */
+.stage[data-vp=portrait] .topbar{left:12px;top:64px;width:334px}
+.stage[data-vp=portrait] .status{right:12px;top:14px}
+.stage[data-vp=portrait] .ticket{left:12px;top:120px;width:334px}
+.stage[data-vp=portrait] .crew{left:80px;top:684px}
+.stage[data-vp=portrait] .board{left:12px;top:210px;width:334px;height:452px}
+.stage[data-vp=portrait][data-tab=build] .board{height:268px}
+.stage[data-vp=portrait] .tray{left:67px;top:486px;width:224px;height:176px}
+.stage[data-vp=portrait] .next{left:214px;top:676px;width:132px;height:54px}
+.stage[data-vp=portrait] .trash{left:12px;top:676px;width:54px;height:54px}
+.stage[data-vp=portrait] .toast{left:39px;top:684px;width:280px}
+.stage[data-vp=portrait].toasting .crew{display:none}
+
+/* zonas medidas por dispositivo */
+.stage[data-vp=phone] .z-rb{left:0;top:0;width:110px;height:52px}
+.stage[data-vp=desktop] .z-rb{left:0;top:0;width:290px;height:64px}
+.stage[data-vp=portrait] .z-rb{left:0;top:0;width:120px;height:56px}
+.stage[data-vp=phone] .z-bot{left:0;right:0;bottom:0;height:12px}
+.stage[data-vp=desktop] .z-bot{left:0;right:0;bottom:0;height:16px}
+.stage[data-vp=portrait] .z-bot{left:0;right:0;bottom:0;height:24px}
+.ghostnpc{display:none}
+.stage[data-measures=on] .ghostnpc{display:block;left:46%;top:-30px;width:90px;height:150px;border:2px dashed #7a2be0;border-radius:45px;background:rgba(122,43,224,.10);color:#4c1a93;font-size:11px;padding-top:70px;text-align:center;z-index:1;line-height:1.1}
+.stage[data-vp=portrait] .ghostnpc{display:none!important}
+
+/* ---------- legenda ---------- */
+.legend{max-width:1100px;margin:6px auto 40px;padding:0 16px}
+.legend h2{font-size:18px;margin:18px 0 8px}
+.lg{display:flex;flex-wrap:wrap;gap:22px 28px;align-items:flex-end}
+.lg figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:10px;font-size:13px;font-weight:500;text-align:center;max-width:150px}
+.lg .demo{display:flex;gap:10px;align-items:center;min-height:70px;padding:10px}
+.sw{display:flex;gap:6px}
+.sw i{width:34px;height:34px;border:3px solid var(--ink);border-radius:8px;display:block}
+@media (prefers-reduced-motion:reduce){*,*::before{animation:none!important}}
+</style>
+</head>
+<body>
+
+<!-- ============ simbolos SVG (icones simples, nao e a arte final) ============ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+<defs>
+  <symbol id="i-exit" viewBox="0 0 64 64"><path d="M10 8h24v48H10z" fill="#FFF1D6" stroke="#2B2233" stroke-width="4" stroke-linejoin="round"/><circle cx="26" cy="32" r="3" fill="#2B2233"/><path d="M36 32h22M49 22l10 10-10 10" fill="none" stroke="#2B2233" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-ticket" viewBox="0 0 64 64"><path d="M10 8h44v48l-7-5-7 5-7-5-7 5-7-5-9 5z" fill="#FFF8EA" stroke="#2B2233" stroke-width="4" stroke-linejoin="round"/><path d="M20 20h24M20 30h24M20 40h14" stroke="#3FA7B5" stroke-width="5" stroke-linecap="round"/></symbol>
+  <symbol id="i-grill" viewBox="0 0 64 64"><rect x="5" y="30" width="54" height="22" rx="6" fill="#C9D1D8" stroke="#2B2233" stroke-width="4"/><rect x="11" y="16" width="42" height="12" rx="6" fill="#C2602F" stroke="#2B2233" stroke-width="4"/><path d="M20 16v12M30 16v12M40 16v12" stroke="#7E3519" stroke-width="3"/><path d="M14 40h36" stroke="#2B2233" stroke-width="4" stroke-linecap="round" stroke-dasharray="2 8"/></symbol>
+  <symbol id="i-build" viewBox="0 0 64 64"><path d="M6 36c0-14 11-22 26-22s26 8 26 22v6c0 4-3 8-8 8H14c-5 0-8-4-8-8z" fill="#F4D9A0" stroke="#2B2233" stroke-width="4" stroke-linejoin="round"/><path d="M8 40h48" stroke="#D9A35E" stroke-width="5" stroke-linecap="round"/><rect x="14" y="30" width="36" height="9" rx="4.5" fill="#C2602F" stroke="#2B2233" stroke-width="3"/></symbol>
+  <symbol id="i-serve" viewBox="0 0 64 64"><path d="M8 42c0-14 10-24 24-24s24 10 24 24z" fill="#E3E7EB" stroke="#2B2233" stroke-width="4" stroke-linejoin="round"/><rect x="4" y="42" width="56" height="9" rx="4.5" fill="#F6C12B" stroke="#2B2233" stroke-width="4"/><circle cx="32" cy="14" r="5" fill="#F6C12B" stroke="#2B2233" stroke-width="4"/><path d="M18 34c2-6 6-9 10-10" stroke="#fff" stroke-width="4" stroke-linecap="round" fill="none"/></symbol>
+  <symbol id="i-next" viewBox="0 0 64 64"><path d="M20 10l24 22-24 22" fill="none" stroke="#2B2233" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 64 64"><path d="M14 20h36l-3 36H17z" fill="#C9D1D8" stroke="#2B2233" stroke-width="4" stroke-linejoin="round"/><rect x="10" y="12" width="44" height="8" rx="4" fill="#3FA7B5" stroke="#2B2233" stroke-width="4"/><path d="M26 8h12v4H26zM25 28v20M32 28v20M39 28v20" stroke="#2B2233" stroke-width="4" stroke-linecap="round" fill="#3FA7B5"/></symbol>
+  <symbol id="i-flip" viewBox="0 0 64 64"><path d="M12 36a20 20 0 0 1 34-14" fill="none" stroke="#2B2233" stroke-width="7" stroke-linecap="round"/><path d="M48 10v16H32" fill="none" stroke="#2B2233" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><path d="M52 28a20 20 0 0 1-34 14" fill="none" stroke="#2B2233" stroke-width="7" stroke-linecap="round" opacity=".35"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 64 64"><path d="M32 6l27 48H5z" fill="#FFDA5C" stroke="#2B2233" stroke-width="5" stroke-linejoin="round"/><path d="M32 22v16" stroke="#2B2233" stroke-width="6" stroke-linecap="round"/><circle cx="32" cy="46" r="3.5" fill="#2B2233"/></symbol>
+  <symbol id="i-check" viewBox="0 0 64 64"><path d="M12 34l14 14 26-30" fill="none" stroke="#2B2233" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-x" viewBox="0 0 64 64"><path d="M14 14l36 36M50 14L14 50" stroke="#2B2233" stroke-width="9" stroke-linecap="round"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 64 64"><path d="M20 28v-8a12 12 0 0 1 24 0v8" fill="none" stroke="#2B2233" stroke-width="6"/><rect x="12" y="28" width="40" height="28" rx="7" fill="#FFDA5C" stroke="#2B2233" stroke-width="5"/><circle cx="32" cy="42" r="4" fill="#2B2233"/></symbol>
+  <symbol id="i-hourglass" viewBox="0 0 64 64"><path d="M16 8h32M16 56h32M18 8c0 16 14 18 14 24S18 40 18 56M46 8c0 16-14 18-14 24s14 8 14 24" fill="#FFF1D6" stroke="#2B2233" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-star" viewBox="0 0 64 64"><path d="M32 6l7.6 16.4 17.9 2.1-13.3 12.1 3.7 17.7L32 45.2 16.1 54.3l3.7-17.7L6.5 24.5l17.9-2.1z" fill="#FFDA5C" stroke="#2B2233" stroke-width="4.5" stroke-linejoin="round"/></symbol>
+  <symbol id="i-coin" viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="#F6C12B" stroke="#2B2233" stroke-width="5"/><rect x="18" y="26" width="28" height="12" rx="6" fill="#FFF1D6" stroke="#2B2233" stroke-width="3"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 64 64"><g stroke="#FFDA5C" stroke-width="6" stroke-linecap="round"><path d="M32 4v8M32 52v8M4 32h8M52 32h8M12 12l6 6M46 46l6 6M12 52l6-6M46 18l6-6"/></g><circle cx="32" cy="32" r="14" fill="#FFDA5C" stroke="#2B2233" stroke-width="4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 64 64"><path d="M42 8a24 24 0 1 0 14 40A20 20 0 0 1 42 8z" fill="#FFF1D6" stroke="#2B2233" stroke-width="4" stroke-linejoin="round"/></symbol>
+  <!-- comida -->
+  <symbol id="f-bun" viewBox="0 0 64 64"><path d="M6 36c0-14 11-22 26-22s26 8 26 22v6c0 4-3 8-8 8H14c-5 0-8-4-8-8z" fill="#F4D9A0" stroke="#2B2233" stroke-width="4" stroke-linejoin="round"/><path d="M8 42h48" stroke="#D9A35E" stroke-width="5" stroke-linecap="round"/></symbol>
+  <symbol id="f-saus" viewBox="0 0 64 32"><rect x="3" y="4" width="58" height="24" rx="12" fill="#C2602F" stroke="#2B2233" stroke-width="3.5"/><path d="M18 6v20M30 6v20M42 6v20" stroke="#7E3519" stroke-width="3"/></symbol>
+  <symbol id="f-saus-raw" viewBox="0 0 64 32"><rect x="3" y="4" width="58" height="24" rx="12" fill="#E9A08F" stroke="#2B2233" stroke-width="3.5"/><path d="M12 12h40" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".5"/></symbol>
+  <symbol id="f-saus-half" viewBox="0 0 64 32"><rect x="3" y="4" width="58" height="24" rx="12" fill="#E9A08F" stroke="#2B2233" stroke-width="3.5"/><path d="M3 16a12 12 0 0 1 12-12h20v24H15A12 12 0 0 1 3 16z" fill="#C2602F" stroke="#2B2233" stroke-width="3.5"/><path d="M14 6v20M26 6v20" stroke="#7E3519" stroke-width="3"/></symbol>
+  <symbol id="f-ket" viewBox="0 0 64 64"><path d="M26 6h12l2 8h-16z" fill="#FFF1D6" stroke="#2B2233" stroke-width="4" stroke-linejoin="round"/><path d="M22 14h20c6 6 8 14 8 24v14c0 4-3 6-6 6H20c-3 0-6-2-6-6V38c0-10 2-18 8-24z" fill="#E2402E" stroke="#2B2233" stroke-width="4" stroke-linejoin="round"/><rect x="20" y="30" width="24" height="14" rx="4" fill="#FFF1D6" opacity=".9"/></symbol>
+  <symbol id="f-mus" viewBox="0 0 64 64"><path d="M26 6h12l2 8h-16z" fill="#FFF1D6" stroke="#2B2233" stroke-width="4" stroke-linejoin="round"/><path d="M22 14h20c6 6 8 14 8 24v14c0 4-3 6-6 6H20c-3 0-6-2-6-6V38c0-10 2-18 8-24z" fill="#F6C12B" stroke="#2B2233" stroke-width="4" stroke-linejoin="round"/><rect x="20" y="30" width="24" height="14" rx="4" fill="#FFF1D6" opacity=".9"/></symbol>
+  <symbol id="f-crm" viewBox="0 0 64 64"><path d="M12 24h40v28c0 4-3 6-6 6H18c-3 0-6-2-6-6z" fill="#E8DCC8" stroke="#2B2233" stroke-width="4" stroke-linejoin="round"/><rect x="8" y="12" width="48" height="14" rx="7" fill="#3FA7B5" stroke="#2B2233" stroke-width="4"/><path d="M22 36h20" stroke="#fff" stroke-width="4" stroke-linecap="round"/></symbol>
+  <symbol id="f-che" viewBox="0 0 64 64"><path d="M6 20l52-8v32L6 52z" fill="#FFD45A" stroke="#2B2233" stroke-width="4" stroke-linejoin="round"/><circle cx="20" cy="32" r="4" fill="#E8A92A" stroke="#2B2233" stroke-width="2.5"/><circle cx="40" cy="26" r="5" fill="#E8A92A" stroke="#2B2233" stroke-width="2.5"/><circle cx="36" cy="40" r="3.5" fill="#E8A92A" stroke="#2B2233" stroke-width="2.5"/></symbol>
+  <symbol id="f-bac" viewBox="0 0 64 64"><path d="M6 24c8-8 14 8 22 0s14 8 22 0l8 8c-8 8-14-8-22 0s-14-8-22 0z" fill="#C9533E" stroke="#2B2233" stroke-width="4" stroke-linejoin="round"/><path d="M10 36c8-8 14 8 22 0s14 8 22 0l-2 8c-8 8-14-8-22 0s-14-8-22 0z" fill="#F3B7A0" stroke="#2B2233" stroke-width="4" stroke-linejoin="round" opacity=".95"/></symbol>
+  <symbol id="f-pot" viewBox="0 0 64 64"><g stroke="#2B2233" stroke-width="3.5" stroke-linecap="round" fill="none"><path d="M10 52L22 14" stroke="#D9A440" stroke-width="8"/><path d="M22 54L30 10" stroke="#F7D27A" stroke-width="8"/><path d="M34 54L40 12" stroke="#D9A440" stroke-width="8"/><path d="M46 52L54 20" stroke="#F7D27A" stroke-width="8"/></g></symbol>
+  <symbol id="f-dog" viewBox="0 0 64 64"><path d="M4 28c0-8 6-12 14-12h28c8 0 14 4 14 12v8c0 8-6 12-14 12H18c-8 0-14-4-14-12z" fill="#F4D9A0" stroke="#2B2233" stroke-width="4"/><rect x="6" y="24" width="52" height="14" rx="7" fill="#C2602F" stroke="#2B2233" stroke-width="3.5"/><path d="M10 28c8 6 12-6 20 0s12-6 20 0" fill="none" stroke="#E2402E" stroke-width="4" stroke-linecap="round"/></symbol>
+  <!-- rosto de animal generico (cor via currentColor) -->
+  <symbol id="a-face" viewBox="0 0 64 64"><circle cx="14" cy="16" r="9" fill="currentColor" stroke="#2B2233" stroke-width="4"/><circle cx="50" cy="16" r="9" fill="currentColor" stroke="#2B2233" stroke-width="4"/><ellipse cx="32" cy="36" rx="24" ry="22" fill="currentColor" stroke="#2B2233" stroke-width="4"/><circle cx="23" cy="32" r="3.5" fill="#2B2233"/><circle cx="41" cy="32" r="3.5" fill="#2B2233"/><ellipse cx="32" cy="42" rx="5" ry="3.5" fill="#2B2233"/><ellipse cx="32" cy="44" rx="14" ry="9" fill="#FFF1D6" opacity=".35"/></symbol>
+  <!-- selos de nota -->
+  <symbol id="s-perfect" viewBox="0 0 100 100"><polygon points="50,4 59.3,15.2 73,10.2 75.5,24.5 89.8,27 84.8,40.7 96,50 84.8,59.3 89.8,73 75.5,75.5 73,89.8 59.3,84.8 50,96 40.7,84.8 27,89.8 24.5,75.5 10.2,73 15.2,59.3 4,50 15.2,40.7 10.2,27 24.5,24.5 27,10.2 40.7,15.2" fill="#F6C12B" stroke="#2B2233" stroke-width="5" stroke-linejoin="round"/><circle cx="50" cy="50" r="31" fill="#FFDA5C" stroke="#2B2233" stroke-width="3"/><use href="#i-star" x="31" y="14" width="38" height="38"/><text x="50" y="72" text-anchor="middle" font-family="Fredoka,'Fredoka One','Arial Rounded MT Bold',sans-serif" font-weight="700" font-size="14" fill="#2B2233">Perfect!</text></symbol>
+  <symbol id="s-good" viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="#63C8D4" stroke="#2B2233" stroke-width="5"/><circle cx="50" cy="50" r="35" fill="none" stroke="#fff" stroke-width="3" opacity=".6"/><use href="#i-check" x="31" y="16" width="38" height="38"/><text x="50" y="74" text-anchor="middle" font-family="Fredoka,'Fredoka One','Arial Rounded MT Bold',sans-serif" font-weight="700" font-size="17" fill="#2B2233">Good</text></symbol>
+  <symbol id="s-messy" viewBox="0 0 100 100"><path d="M50 6Q70 0 80 16Q98 26 92 46Q100 68 82 80Q70 100 50 92Q30 100 20 82Q0 70 8 50Q0 30 18 20Q30 0 50 6Z" fill="#A9AEBF" stroke="#2B2233" stroke-width="5" stroke-linejoin="round"/><path d="M28 38q7-9 14 0t14 0 14 0" fill="none" stroke="#2B2233" stroke-width="5" stroke-linecap="round"/><text x="50" y="72" text-anchor="middle" font-family="Fredoka,'Fredoka One','Arial Rounded MT Bold',sans-serif" font-weight="700" font-size="17" fill="#2B2233">Messy</text></symbol>
+</defs>
+</svg>
+
+<!-- ============ controles ============ -->
+<form class="ctl" id="ctl" onsubmit="return false">
+  <h1>Prep UI &middot; mockup (Rascunho)</h1>
+  <fieldset><span class="lbl">Aba</span>
+    <label><input type="radio" name="tab" value="order">1 Order</label>
+    <label><input type="radio" name="tab" value="grill">2 Grill</label>
+    <label><input type="radio" name="tab" value="build" checked>3 Build</label>
+    <label><input type="radio" name="tab" value="serve">4 Serve</label>
+  </fieldset>
+  <fieldset><span class="lbl">Tela</span>
+    <label><input type="radio" name="vp" value="desktop" checked>Desktop 1280&times;720</label>
+    <label><input type="radio" name="vp" value="phone">Celular paisagem 844&times;390</label>
+    <label><input type="radio" name="vp" value="portrait">Retrato 390&times;844</label>
+  </fieldset>
+  <fieldset><span class="lbl">Fundo</span>
+    <label><input type="radio" name="theme" value="day" checked>Dia</label>
+    <label><input type="radio" name="theme" value="night">Noite (tira de sanidade)</label>
+  </fieldset>
+  <fieldset><span class="lbl">Opções</span>
+    <label><input type="checkbox" name="dialog">Diálogo do cliente (flag)</label>
+    <label><input type="checkbox" name="coop" checked>Co-op (chips)</label>
+    <label><input type="checkbox" name="dof" checked>DOF ligado</label>
+    <label><input type="checkbox" name="measures">Medidas e zonas</label>
+    <label><input type="checkbox" name="gray">Escala de cinza</label>
+    <label><input type="checkbox" name="reduced">Movimento reduzido</label>
+  </fieldset>
+</form>
+
+<p class="note"><b>Mock estático do modo de preparo focado</b> (spec em <code>docs/art/prep-ui-spec.md</code>). Cores e formas vêm do kit (<code>Theme.Tone</code>: Cream, Mustard, Teal, Green, Slate, Ink; Fredoka). Os ícones são SVG simples, <b>não</b> a arte final (AST-108 a AST-119). Toque nas abas, nas caixas de ingrediente, no Next e na lixeira para ver os avisos (1 por vez, centro-inferior). A tela é desenhada em <b>px de UI</b> e reduzida para caber na janela.</p>
+
+<div class="wrap"><div class="fit" id="fit">
+<div class="stage" id="stage" data-vp="desktop" data-tab="build" data-theme="day" data-coop="on" data-dof="on" data-measures="off" data-dialog="off">
+
+  <div class="world" aria-hidden="true"><div class="sc">
+    <i class="w-wall"></i><i class="w-stripe"></i><i class="w-win"></i><i class="w-shelf"></i><i class="w-jar1"></i><i class="w-jar2"></i>
+    <i class="w-counter"></i><i class="w-edge"></i><i class="w-grill"></i><i class="w-bun"></i>
+  </div></div>
+  <div class="vig" aria-hidden="true"></div>
+
+  <div class="zones" aria-hidden="true">
+    <b class="rb z-rb">Roblox menu/chat (reservado)</b>
+    <b class="z-bot">safe area (base)</b>
+    <b class="rb ghostnpc">NPC na zona de corte: oculto</b>
+  </div>
+
+  <!-- 1. barra superior: Leave + abas -->
+  <nav class="topbar" aria-label="Stations">
+    <button class="pan cream pill leave" aria-label="Leave" data-toast="Plate saved for 20 s"><svg class="ic"><use href="#i-exit"/></svg><span class="lt">Leave</span></button>
+    <button class="pan cream pill tab" data-go="order"><svg class="ic"><use href="#i-ticket"/></svg><span class="tl">Order</span><i class="badge">2</i></button>
+    <button class="pan cream pill tab" data-go="grill"><svg class="ic"><use href="#i-grill"/></svg><span class="tl">Grill</span><i class="badge g">3</i></button>
+    <button class="pan cream pill tab" data-go="build"><svg class="ic"><use href="#i-build"/></svg><span class="tl">Build</span></button>
+    <button class="pan cream pill tab" data-go="serve"><svg class="ic"><use href="#i-serve"/></svg><span class="tl">Serve</span><i class="badge m">1</i></button>
+  </nav>
+
+  <!-- 5. status -->
+  <div class="status">
+    <div class="pan ink pill stat"><svg class="ic"><use href="#i-coin"/></svg><b>$128</b><span class="sep"></span><svg class="ic" id="sunmoon"><use href="#i-sun"/></svg><b>9:41 AM</b></div>
+    <div class="sanity"><i></i><u></u></div>
+  </div>
+
+  <!-- 2. ticket -->
+  <div class="ticket">
+    <div class="paper">
+      <span class="pin"></span>
+      <div class="th">
+        <svg class="ic face" style="font-size:34px;color:#C98E5A"><use href="#a-face"/></svg><b>#12</b>
+        <svg class="ring" viewBox="0 0 28 28"><circle cx="14" cy="14" r="11" fill="none" stroke="#EAD6B0" stroke-width="5"/><circle cx="14" cy="14" r="11" fill="none" stroke="#3FA7B5" stroke-width="5" stroke-dasharray="48 70" transform="rotate(-90 14 14)" stroke-linecap="round"/><circle cx="14" cy="14" r="13" fill="none" stroke="#2B2233" stroke-width="1.5"/></svg>
+        <span class="tinline ti" style="margin:0"><svg class="ic"><use href="#f-ket"/></svg><svg class="ic"><use href="#f-mus"/></svg><svg class="ic"><use href="#f-che"/></svg></span>
+        <span class="more">+3</span>
+      </div>
+      <div class="ti tstack"><svg class="ic"><use href="#f-ket"/></svg><svg class="ic"><use href="#f-mus"/></svg><svg class="ic"><use href="#f-che"/></svg></div>
+      <p class="tq">&ldquo;The usual, please.&rdquo;</p>
+    </div>
+  </div>
+
+  <!-- colegas (so co-op) -->
+  <div class="crew" aria-label="Crew">
+    <div class="pan cream chip"><svg class="ic" style="color:#C98E5A"><use href="#a-face"/></svg><em>2</em><small class="pan cream"><svg class="ic"><use href="#i-grill"/></svg></small></div>
+    <div class="pan cream chip"><svg class="ic" style="color:#E7E2D8"><use href="#a-face"/></svg><em>3</em><small class="pan cream"><svg class="ic"><use href="#i-serve"/></svg></small></div>
+    <div class="pan cream chip"><svg class="ic" style="color:#E0883F"><use href="#a-face"/></svg><em>4</em><small class="pan cream"><svg class="ic"><use href="#i-build"/></svg></small></div>
+  </div>
+
+  <!-- 3. tabua (conteudo da aba) -->
+  <section class="board pan cream" aria-live="polite">
+    <div class="bh">
+      <div class="pips">
+        <span class="pip"><svg viewBox="0 0 20 20"><use href="#i-star" width="20" height="20"/></svg>Cut</span>
+        <span class="pip"><svg viewBox="0 0 20 20"><use href="#i-check" width="20" height="20"/></svg>Place</span>
+        <span class="pip todo"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"/></svg>Top</span>
+      </div>
+      <span class="hint" id="hint">Drag the knife along the line</span>
+      <span class="qcount" id="qcount"></span>
+    </div>
+    <div class="screens">
+
+      <!-- ORDER -->
+      <div class="screen s-order">
+        <div class="cards">
+          <div class="pan cream card mine">
+            <div class="row"><svg class="ic face" style="color:#C98E5A"><use href="#a-face"/></svg>
+              <svg class="ring" viewBox="0 0 28 28"><circle cx="14" cy="14" r="11" fill="none" stroke="#EAD6B0" stroke-width="5"/><circle cx="14" cy="14" r="11" fill="none" stroke="#3FA7B5" stroke-width="5" stroke-dasharray="52 70" transform="rotate(-90 14 14)" stroke-linecap="round"/></svg></div>
+            <div class="ti"><svg class="ic"><use href="#f-ket"/></svg><svg class="ic"><use href="#f-mus"/></svg><svg class="ic"><use href="#f-che"/></svg></div>
+            <p class="tq">&ldquo;The usual, please.&rdquo;</p>
+            <div class="tag mustard" style="--t:#FFDA5C;--b:#F6B71B;background:linear-gradient(#FFDA5C,#F6B71B)"><svg class="ic" style="font-size:20px"><use href="#i-check"/></svg>Mine</div>
+          </div>
+          <div class="pan cream card">
+            <div class="row"><svg class="ic face" style="color:#E7E2D8"><use href="#a-face"/></svg>
+              <svg class="ring" viewBox="0 0 28 28"><circle cx="14" cy="14" r="11" fill="none" stroke="#EAD6B0" stroke-width="5"/><circle cx="14" cy="14" r="11" fill="none" stroke="#F6B71B" stroke-width="5" stroke-dasharray="22 70" transform="rotate(-90 14 14)" stroke-linecap="round"/></svg>
+              <svg class="ic" style="font-size:16px;margin-left:-2px"><use href="#i-hourglass"/></svg></div>
+            <div class="ti"><svg class="ic"><use href="#f-ket"/></svg><svg class="ic"><use href="#f-bac"/></svg></div>
+            <p class="tq">&ldquo;Two toppings, please.&rdquo;</p>
+            <button class="pan mustard pill act" data-toast="Ticket taken"><svg class="ic"><use href="#i-check"/></svg>Take</button>
+          </div>
+          <div class="pan cream card">
+            <div class="row"><svg class="ic face" style="color:#E0883F"><use href="#a-face"/></svg>
+              <svg class="ring" viewBox="0 0 28 28"><circle cx="14" cy="14" r="11" fill="none" stroke="#EAD6B0" stroke-width="5"/><circle cx="14" cy="14" r="11" fill="none" stroke="#3FA7B5" stroke-width="5" stroke-dasharray="64 70" transform="rotate(-90 14 14)" stroke-linecap="round"/></svg></div>
+            <div class="ti"><svg class="ic"><use href="#f-crm"/></svg></div>
+            <p class="tq">&ldquo;Plain. And no peeking.&rdquo;</p>
+            <div class="tag slate" style="background:linear-gradient(#A9AEBF,#8A8FA3);border-style:dashed">Waiting</div>
+          </div>
+          <div class="pan cream card">
+            <div class="row"><svg class="ic face" style="color:#9B7BB8"><use href="#a-face"/></svg>
+              <svg class="ring" viewBox="0 0 28 28"><circle cx="14" cy="14" r="11" fill="none" stroke="#EAD6B0" stroke-width="5"/><circle cx="14" cy="14" r="11" fill="none" stroke="#3FA7B5" stroke-width="5" stroke-dasharray="60 70" transform="rotate(-90 14 14)" stroke-linecap="round"/></svg></div>
+            <div class="ti"><svg class="ic"><use href="#f-pot"/></svg><svg class="ic"><use href="#f-che"/></svg></div>
+            <p class="tq">&ldquo;Crunchy, with cheese.&rdquo;</p>
+            <div class="tag" style="background:#86CF8F"><svg class="ic" style="font-size:18px"><use href="#i-check"/></svg>Taken</div>
+          </div>
+        </div>
+        <div class="dlg">
+          <div class="who"><svg class="ic face" style="color:#C98E5A"><use href="#a-face"/></svg>
+            <div class="bubble">&ldquo;Whatever she&rsquo;s having. She&rsquo;s right behind me.&rdquo;</div></div>
+          <div class="btns">
+            <button class="pan mustard pill act" data-toast="Order confirmed"><svg class="ic"><use href="#i-check"/></svg>Got it</button>
+            <button class="pan cream pill act" data-toast="Patience -1 band"><svg class="ic"><use href="#i-hourglass"/></svg>Come again?</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- GRILL -->
+      <div class="screen s-grill">
+        <div class="slots">
+          <button class="pan cream slot" data-toast="Flip window: 40% to 60%"><svg class="ic"><use href="#f-saus-raw"/></svg><div class="bar"><div class="fill" style="width:22%"></div><div class="win" style="left:40%;width:20%"></div><div class="mark" style="left:22%"></div></div></button>
+          <button class="pan cream slot" data-toast="Flip window: 40% to 60%"><svg class="ic"><use href="#f-saus-raw"/></svg><div class="bar"><div class="fill" style="width:38%"></div><div class="win" style="left:40%;width:20%"></div><div class="mark" style="left:38%"></div></div></button>
+          <button class="pan cream slot flip" data-toast="Flipped: Perfect!"><svg class="ic"><use href="#f-saus-half"/></svg><div class="bar"><div class="fill" style="width:50%"></div><div class="win" style="left:40%;width:20%"></div><div class="mark" style="left:50%"></div></div><span style="display:flex;align-items:center;gap:4px"><svg class="ic" style="width:18px;height:18px"><use href="#i-flip"/></svg>Flip</span></button>
+          <button class="pan cream dashed slot empty" data-toast="Sausage added"><span class="plus">+</span></button>
+          <button class="pan green slot" data-toast="Collected: 4 ready"><svg class="ic"><use href="#f-saus"/></svg><span style="display:flex;align-items:center;gap:4px"><svg class="ic" style="width:18px;height:18px"><use href="#i-check"/></svg>Collect</span></button>
+          <button class="pan cream dashed slot empty" data-toast="Sausage added"><span class="plus">+</span></button>
+          <button class="pan cream dashed slot empty" data-toast="Sausage added"><span class="plus">+</span></button>
+          <button class="pan slate dashed slot" data-toast="Out of sausages"><span class="plus" style="font-size:22px">0</span></button>
+        </div>
+        <div class="rail"><b>Ready</b> <svg class="ic"><use href="#f-saus"/></svg><svg class="ic"><use href="#f-saus"/></svg><svg class="ic"><use href="#f-saus"/></svg> <span>x3</span></div>
+      </div>
+
+      <!-- BUILD -->
+      <div class="screen s-build">
+        <div class="mat">
+          <button class="pan cream chipS" data-toast="Drag it onto the bun"><svg class="ic"><use href="#f-saus"/></svg><span>Ready</span><svg class="ic" style="width:20px;height:20px"><use href="#i-star"/></svg></button>
+          <div class="matTop"><div class="matBoard">
+            <svg class="bunsvg" viewBox="0 0 300 110">
+              <path d="M10 62c0-30 30-48 140-48s140 18 140 48v10c0 14-10 24-24 24H34c-14 0-24-10-24-24z" fill="#F4D9A0" stroke="#2B2233" stroke-width="5" stroke-linejoin="round"/>
+              <path d="M16 76h268" stroke="#D9A35E" stroke-width="8" stroke-linecap="round"/>
+              <path class="guide" d="M22 64H278"/>
+              <g transform="translate(70 18)"><rect width="170" height="26" rx="13" fill="#C2602F" stroke="#2B2233" stroke-width="4" opacity=".0"/></g>
+            </svg>
+            <svg class="ic knife" viewBox="0 0 64 64"><path d="M10 44L44 10l10 10-34 34z" fill="#E3E7EB" stroke="#2B2233" stroke-width="4" stroke-linejoin="round"/><path d="M8 56l8-12 4 4z" fill="#3FA7B5" stroke="#2B2233" stroke-width="4" stroke-linejoin="round"/></svg>
+            <div class="bar meter" title="sauce meter"><div class="fill" style="width:58%;background:#63C8D4"></div><div class="win" style="left:60%;width:28%"></div></div>
+          </div></div>
+        </div>
+      </div>
+
+      <!-- SERVE -->
+      <div class="screen s-serve">
+        <div class="serve">
+          <div class="pan cream plateC">
+            <b>Your plate</b>
+            <svg class="ic"><use href="#f-dog"/></svg>
+            <div class="row"><svg class="ic"><use href="#f-ket"/></svg><svg class="ic"><use href="#f-mus"/></svg><svg class="ic"><use href="#f-che"/></svg></div>
+            <svg class="stampMini" viewBox="0 0 100 100"><use href="#s-perfect"/></svg>
+          </div>
+          <div class="custs">
+            <button class="pan cream cust" data-toast="Wrong order">
+              <svg class="ic face" style="color:#E7E2D8"><use href="#a-face"/></svg>
+              <div class="ti"><svg class="ic"><use href="#f-ket"/></svg><svg class="ic"><use href="#f-bac"/></svg></div>
+              <span class="where">Counter</span></button>
+            <button class="pan cream cust match" data-toast="Complete! +$2 tip">
+              <span class="mtag"><svg class="ic"><use href="#i-check"/></svg></span>
+              <svg class="ic face" style="color:#C98E5A"><use href="#a-face"/></svg>
+              <div class="ti"><svg class="ic"><use href="#f-ket"/></svg><svg class="ic"><use href="#f-mus"/></svg><svg class="ic"><use href="#f-che"/></svg></div>
+              <span class="where">Table 2</span></button>
+            <button class="pan cream cust" data-toast="Wrong order">
+              <svg class="ic face" style="color:#9B7BB8"><use href="#a-face"/></svg>
+              <div class="ti"><svg class="ic"><use href="#f-pot"/></svg></div>
+              <span class="where">Table 4</span></button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- painel de ingredientes (so Build) -->
+  <aside class="tray pan cream" aria-label="Toppings">
+    <div class="th2">Toppings</div>
+    <div class="grid">
+      <button class="pan cream box" data-toast="Ketchup  &middot;  12 left"><svg class="ic main"><use href="#f-ket"/></svg><span class="cnt">12</span></button>
+      <button class="pan cream box used" data-toast="Mustard is on the plate"><svg class="ic main"><use href="#f-mus"/></svg><span class="cnt"><svg class="ic" style="font-size:14px"><use href="#i-check"/></svg></span></button>
+      <button class="pan cream box low" data-toast="Cream cheese: only 2 left"><svg class="ic main"><use href="#f-crm"/></svg><span class="cnt"><svg class="ic"><use href="#i-warn"/></svg>2</span></button>
+      <button class="pan cream box" data-toast="Cheese  &middot;  8 left"><svg class="ic main"><use href="#f-che"/></svg><span class="cnt">8</span></button>
+      <button class="pan cream box" data-toast="Bacon  &middot;  7 left"><svg class="ic main"><use href="#f-bac"/></svg><span class="cnt">7</span></button>
+      <button class="pan slate box locked" data-toast="Potato sticks unlock on Day 3"><svg class="ic main"><use href="#f-pot"/></svg><span class="lock"><svg class="ic"><use href="#i-lock"/></svg></span></button>
+    </div>
+  </aside>
+
+  <button class="pan mustard pill next pulse" id="next"><span id="nextlbl">Next</span><svg class="ic"><use href="#i-next"/></svg></button>
+  <button class="pan cream trash" aria-label="Trash (hold)" data-toast="Hold to trash the plate"><svg class="ic"><use href="#i-trash"/></svg></button>
+  <div class="pan cream pill toast" id="toast" role="status"><svg class="ic"><use href="#i-check"/></svg><span id="toasttxt"></span></div>
+</div>
+</div><p class="cap" id="cap"></p></div>
+
+<!-- ============ legenda de estados ============ -->
+<div class="legend">
+  <h2>Selos de nota: forma + cor + texto + ícone (sem vermelho)</h2>
+  <div class="lg">
+    <figure><svg width="120" height="120" viewBox="0 0 100 100"><use href="#s-perfect"/></svg>Perfect: estrela-explosão Mustard. Gorjeta $2.</figure>
+    <figure><svg width="120" height="120" viewBox="0 0 100 100"><use href="#s-good"/></svg>Good: círculo Teal claro com check.</figure>
+    <figure><svg width="120" height="120" viewBox="0 0 100 100"><use href="#s-messy"/></svg>Messy: mancha Slate com rabisco. Sem gorjeta.</figure>
+  </div>
+  <h2>Estados dos componentes</h2>
+  <div class="lg">
+    <figure><div class="demo"><button class="pan cream pill" style="width:104px;height:44px;font-size:16px">Normal</button></div>Normal: Cream, contorno Ink 3 px, lip 4 px</figure>
+    <figure><div class="demo"><button class="pan mustard pill" style="width:104px;height:44px;font-size:16px;transform:translateY(-3px);border-width:4px">Ativo</button></div>Ativo / selecionado: Mustard, sobe 3 px, entalhe</figure>
+    <figure><div class="demo"><button class="pan cream pill" style="width:104px;height:44px;font-size:16px;outline:4px solid #F6B71B;outline-offset:1px;transform:scale(1.05)">Foco</button></div>Foco (teclado/gamepad): anel Mustard 4 px</figure>
+    <figure><div class="demo"><button class="pan slate pill dashed" style="width:104px;height:44px;font-size:16px;border-style:dashed">Off</button></div>Desabilitado: Slate, contorno tracejado</figure>
+    <figure><div class="demo"><button class="pan slate box locked" style="width:64px;height:64px"><svg class="ic main" style="font-size:40px;opacity:.4"><use href="#f-pot"/></svg><span class="lock"><svg class="ic"><use href="#i-lock"/></svg></span></button></div>Bloqueado: cadeado (dia futuro)</figure>
+    <figure><div class="demo"><button class="pan cream box low" style="width:64px;height:64px"><svg class="ic main" style="font-size:40px"><use href="#f-crm"/></svg><span class="cnt"><svg class="ic"><use href="#i-warn"/></svg>2</span></button></div>Estoque baixo: triângulo "!" Mustard (nunca vermelho)</figure>
+    <figure><div class="demo"><button class="pan cream box used" style="width:64px;height:64px"><svg class="ic main" style="font-size:40px"><use href="#f-mus"/></svg><span class="cnt"><svg class="ic" style="font-size:14px"><use href="#i-check"/></svg></span></button></div>Já usado no prato: afundado + check</figure>
+  </div>
+  <h2>Paleta e contraste (texto Ink sobre cada superfície)</h2>
+  <div class="lg">
+    <figure><div class="sw"><i style="background:#FFF8EA"></i><i style="background:#FBE3B8"></i></div>Cream: 13,6:1</figure>
+    <figure><div class="sw"><i style="background:#FFDA5C"></i><i style="background:#F6B71B"></i></div>Mustard: 9,1:1</figure>
+    <figure><div class="sw"><i style="background:#63C8D4"></i><i style="background:#3FA7B5"></i></div>Teal: 5,4:1 (texto Ink; branco reprova, 2,8:1)</figure>
+    <figure><div class="sw"><i style="background:#86CF8F"></i><i style="background:#5FA36A"></i></div>Green: 5,0:1</figure>
+    <figure><div class="sw"><i style="background:#A9AEBF"></i><i style="background:#8A8FA3"></i></div>Slate: 4,7:1</figure>
+    <figure><div class="sw"><i style="background:#4A3D57"></i><i style="background:#2B2233"></i></div>Ink: contorno, texto, status</figure>
+  </div>
+</div>
+
+<script>
+(function(){
+  var stage=document.getElementById('stage'), fit=document.getElementById('fit'), cap=document.getElementById('cap');
+  var SIZE={desktop:[1372,772,'Desktop 1280x720 (escala 0,93: canvas ~1372x772 px de UI)'],phone:[844,390,'Celular paisagem 844x390 (escala 1,00)'],portrait:[358,774,'Retrato 390x844 (escala ~1,09: canvas ~358x774 px de UI)']};
+  var HINT={order:'Take a ticket',grill:'Flip when the ring glows',build:'Drag the knife along the line',serve:'Pick the matching customer'};
+  var QC={order:'<svg class="ic" style="font-size:18px"><use href="#i-ticket"/></svg>3 waiting',grill:'Ready x3',build:'',serve:''};
+  var NEXT={order:'Next',grill:'Next',build:'Next',serve:'Serve'};
+  var toastTimer=null;
+
+  function layout(){
+    var s=SIZE[stage.dataset.vp], w=s[0], h=s[1];
+    var maxW=Math.max(240,document.documentElement.clientWidth-32);
+    var maxH=Math.max(300,window.innerHeight-150);
+    var k=Math.min(maxW/w,maxH/h,stage.dataset.vp==='phone'?1.5:1.25);
+    stage.style.transform='scale('+k+')';
+    fit.style.width=Math.round(w*k)+'px'; fit.style.height=Math.round(h*k)+'px';
+    cap.textContent=s[2]+' - exibido a '+Math.round(k*100)+'%';
+  }
+  function setTab(t){
+    stage.dataset.tab=t;
+    document.getElementById('hint').textContent=HINT[t];
+    document.getElementById('qcount').innerHTML=QC[t];
+    document.getElementById('nextlbl').textContent=NEXT[t];
+    var r=document.querySelector('input[name=tab][value='+t+']'); if(r) r.checked=true;
+    var nx=document.getElementById('next'); nx.classList.remove('pulse'); void nx.offsetWidth; nx.classList.add('pulse');
+  }
+  function toast(msg){
+    var el=document.getElementById('toast'); document.getElementById('toasttxt').textContent=msg;
+    el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); stage.classList.add('toasting');
+    clearTimeout(toastTimer); toastTimer=setTimeout(function(){el.classList.remove('show'); stage.classList.remove('toasting');},2200);
+  }
+  document.getElementById('ctl').addEventListener('change',function(e){
+    var n=e.target.name, v=e.target.value, c=e.target.checked;
+    if(n==='tab') setTab(v);
+    else if(n==='vp'){stage.dataset.vp=v; layout();}
+    else if(n==='theme'){stage.dataset.theme=v; document.querySelector('#sunmoon use').setAttribute('href', v==='night'?'#i-moon':'#i-sun');}
+    else if(n==='dialog') stage.dataset.dialog=c?'on':'off';
+    else if(n==='coop') stage.dataset.coop=c?'on':'off';
+    else if(n==='dof') stage.dataset.dof=c?'on':'off';
+    else if(n==='measures') stage.dataset.measures=c?'on':'off';
+    else if(n==='gray') stage.classList.toggle('gray',c);
+    else if(n==='reduced') stage.classList.toggle('reduced',c);
+  });
+  stage.addEventListener('click',function(e){
+    var t=e.target.closest('[data-go]'); if(t){setTab(t.dataset.go); return;}
+    var d=e.target.closest('[data-toast]'); if(d){toast(d.dataset.toast); return;}
+    if(e.target.closest('#next')){
+      var tab=stage.dataset.tab, order=['order','grill','build','serve'], i=order.indexOf(tab);
+      if(tab==='serve') toast('Served. Complete!'); else {toast(tab==='build'?'Plate sealed: Perfect!':'Next: '+order[i+1]); setTab(order[i+1]);}
+    }
+  });
+  window.addEventListener('keydown',function(e){
+    var m={'1':'order','2':'grill','3':'build','4':'serve'}; if(m[e.key]&&!e.target.matches('input')) setTab(m[e.key]);
+  });
+  window.addEventListener('resize',layout);
+  setTab('build'); layout();
+})();
+</script>
+</body>
+</html>

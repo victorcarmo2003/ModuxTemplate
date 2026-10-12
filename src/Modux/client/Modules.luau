@@ -33,6 +33,7 @@ return {
 	StarterPlayer.StarterPlayerScripts.client.Opal.OpalController,
 	StarterPlayer.StarterPlayerScripts.client.Pedestrian.PedestrianController,
 	StarterPlayer.StarterPlayerScripts.client.Place.PlaceController,
+	StarterPlayer.StarterPlayerScripts.client.Prep.PrepController,
 	StarterPlayer.StarterPlayerScripts.client.Profile.ProfileController,
 	StarterPlayer.StarterPlayerScripts.client.Round.RoundController,
 	StarterPlayer.StarterPlayerScripts.client.Seating.SeatingController,
@@ -41,6 +42,7 @@ return {
 	StarterPlayer.StarterPlayerScripts.client.Thief.ThiefController,
 	StarterPlayer.StarterPlayerScripts.client.Traffic.TrafficController,
 	StarterPlayer.StarterPlayerScripts.client.Tutorial.TutorialController,
+	StarterPlayer.StarterPlayerScripts.client.Vehicle.SwitchLeverController,
 	StarterPlayer.StarterPlayerScripts.client.Vehicle.VehicleController,
 	StarterPlayer.StarterPlayerScripts.client.Vital.VitalController,
 } :: { ModuleScript }

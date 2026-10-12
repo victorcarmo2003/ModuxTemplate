@@ -15,6 +15,7 @@ type Fixture = {
 }
 type Preset = {
 	Brightness: number,
+	Exposure: number,
 	Ambient: Color3,
 	OutdoorAmbient: Color3,
 	ColorShiftTop: Color3,

@@ -1,1733 +1,1249 @@
 {
- "v_878396f55d": {
+ "v_5890a8d024": {
   "speaker": "crew",
-  "text": "\"No help wanted.\" Of course.",
+  "text": "Help wanted?",
   "sources": [
-   "Cutscenes.luau:258"
+   "Cutscenes.luau:414 [intro]"
   ]
  },
- "v_390bc593f3": {
+ "v_39e7f54e88": {
   "speaker": "crew",
-  "text": "At least it's a job opportunity...",
+  "text": "I really need a job.",
   "sources": [
-   "Cutscenes.luau:287"
+   "Cutscenes.luau:411 [intro]"
   ]
  },
- "v_5a7022696c": {
+ "v_423f2c0d54": {
   "speaker": "crew",
-  "text": "Empty. Again.",
+  "text": "I'll call them.",
   "sources": [
-   "Cutscenes.luau:253"
+   "Cutscenes.luau:416 [intro] (Solo)"
   ]
  },
- "v_25103c39f5": {
+ "v_2a69dc807e": {
   "speaker": "crew",
-  "text": "Hm, a job?",
+  "text": "Let's call them.",
   "sources": [
-   "Cutscenes.luau:257"
+   "Cutscenes.luau:417 [intro] (Party)"
   ]
  },
- "v_43c6981888": {
-  "speaker": "crew",
-  "text": "I really need a job right now... but nobody's hiring.",
-  "sources": [
-   "Cutscenes.luau:255"
-  ]
- },
- "v_aa31376fb8": {
-  "speaker": "crew",
-  "text": "I think I'll give them a call.",
-  "sources": [
-   "Cutscenes.luau:288 (Solo)"
-  ]
- },
- "v_4eb32a6321": {
-  "speaker": "crew",
-  "text": "Let's give them a call.",
-  "sources": [
-   "Cutscenes.luau:289 (Party)"
-  ]
- },
- "v_3b67122e9b": {
-  "speaker": "crew",
-  "text": "What's that?",
-  "sources": [
-   "Cutscenes.luau:284"
-  ]
- },
- "v_8e36541905": {
-  "speaker": "crew",
-  "text": "Whoa!",
-  "sources": [
-   "Cutscenes.luau:267"
-  ]
- },
- "v_47ba4ec337": {
+ "v_226fd7630d": {
   "speaker": "walt",
-  "text": "A gray frank, or a bun with a bite",
+  "text": "A ketchup dog. Easy.",
   "sources": [
-   "BossCalls.luau:335"
+   "Steps.luau:92 (Done)"
   ]
  },
- "v_c1cf019c10": {
+ "v_9ac422dfab": {
   "speaker": "walt",
-  "text": "Add only what they asked for. Nothing extra.",
+  "text": "A lady in a yellow raincoat.",
   "sources": [
-   "BossCalls.luau:522"
+   "BossCalls.luau:255"
+  ]
+ },
+ "v_44fcde56d9": {
+  "speaker": "walt",
+  "text": "A long car may park across.",
+  "sources": [
+   "BossCalls.luau:285"
+  ]
+ },
+ "v_04ff36900d": {
+  "speaker": "walt",
+  "text": "Alright. You know the drill.",
+  "sources": [
+   "Steps.luau:276 (SKIP_GOODBYE)"
   ]
  },
  "v_8e7f75aab7": {
   "speaker": "walt",
   "text": "And never watch the Walker.",
   "sources": [
-   "BossCalls.luau:164"
-  ]
- },
- "v_3e0ee35e67": {
-  "speaker": "walt",
-  "text": "And still no faces. Remember faces.",
-  "sources": [
-   "BossCalls.luau:338"
-  ]
- },
- "v_49ea459c4e": {
-  "speaker": "walt",
-  "text": "And the Mart's sign never goes out. Remember that.",
-  "sources": [
-   "BossCalls.luau:275"
-  ]
- },
- "v_453481aeab": {
-  "speaker": "walt",
-  "text": "And tonight? You work late. Same cart.",
-  "sources": [
-   "BossCalls.luau:191"
+   "BossCalls.luau:153"
   ]
  },
  "v_67ee73c3b4": {
   "speaker": "walt",
   "text": "Another day, another dog.",
   "sources": [
-   "BossCalls.luau:255"
+   "BossCalls.luau:191"
   ]
  },
- "v_d38c5bb8b3": {
+ "v_2990698958": {
   "speaker": "walt",
-  "text": "Bacon's in today. Smell that?",
+  "text": "Back to the trailer.",
   "sources": [
-   "BossCalls.luau:202",
-   "BossCalls.luau:212"
+   "Steps.luau:212 (Remind)"
   ]
  },
- "v_e2bb909676": {
+ "v_c53052d1dc": {
   "speaker": "walt",
-  "text": "Bakery shelf. Grab a pack of buns.",
+  "text": "Bacon's in. Go sell some dogs.",
   "sources": [
-   "Steps.luau:210 (Say)"
+   "BossCalls.luau:179"
+  ]
+ },
+ "v_e7276368d3": {
+  "speaker": "walt",
+  "text": "Bacon's in. Smell that?",
+  "sources": [
+   "BossCalls.luau:178"
   ]
  },
  "v_b47071f788": {
   "speaker": "walt",
   "text": "Bakery shelf. Hold Buy Buns.",
   "sources": [
-   "Steps.luau:212 (Remind)"
+   "Steps.luau:203 (Remind)"
   ]
  },
- "v_2aff5aba97": {
+ "v_444b37b9a8": {
   "speaker": "walt",
-  "text": "Bank clock's ticking fine today. See?",
+  "text": "Bank clock's ticking fine. See?",
+  "sources": [
+   "BossCalls.luau:182"
+  ]
+ },
+ "v_660807b44d": {
+  "speaker": "walt",
+  "text": "Bar full? Grab it.",
+  "sources": [
+   "BossCalls.luau:356"
+  ]
+ },
+ "v_04d9c9b305": {
+  "speaker": "walt",
+  "text": "Beautiful.",
+  "sources": [
+   "Steps.luau:141 (Done)"
+  ]
+ },
+ "v_b6e143965a": {
+  "speaker": "walt",
+  "text": "Bramble's Corner Dogs. Walt here.",
+  "sources": [
+   "Cutscenes.luau:424 [intro]"
+  ]
+ },
+ "v_9ac90c1e2d": {
+  "speaker": "walt",
+  "text": "Bring them to the trailer.",
+  "sources": [
+   "Steps.luau:211 (Say)"
+  ]
+ },
+ "v_60345d932a": {
+  "speaker": "walt",
+  "text": "Call me if you need me.",
+  "sources": [
+   "Steps.luau:276 (SKIP_GOODBYE)"
+  ]
+ },
+ "v_b7e3644ee5": {
+  "speaker": "walt",
+  "text": "Call me if...",
+  "sources": [
+   "Steps.luau:274 (GOODBYE)"
+  ]
+ },
+ "v_37816c7365": {
+  "speaker": "walt",
+  "text": "Careful crossing. Get hit, drop it.",
+  "sources": [
+   "BossCalls.luau:374"
+  ]
+ },
+ "v_ca3dfc8d65": {
+  "speaker": "walt",
+  "text": "Cash goes in the drawer.",
+  "sources": [
+   "Steps.luau:178 (Say)"
+  ]
+ },
+ "v_2022c4e32e": {
+  "speaker": "walt",
+  "text": "Cheese is in. Folks love cheese.",
+  "sources": [
+   "BossCalls.luau:174"
+  ]
+ },
+ "v_e90adf9284": {
+  "speaker": "walt",
+  "text": "Clock stops? Lights off, count five.",
+  "sources": [
+   "BossCalls.luau:238",
+   "BossCalls.luau:240"
+  ]
+ },
+ "v_d601ce4350": {
+  "speaker": "walt",
+  "text": "Corner's quiet. Too quiet. Heh.",
+  "sources": [
+   "BossCalls.luau:194"
+  ]
+ },
+ "v_7c126684d4": {
+  "speaker": "walt",
+  "text": "Count to five. Then lights on.",
   "sources": [
    "BossCalls.luau:237"
   ]
  },
- "v_75dae21ff7": {
+ "v_2905ce78c7": {
   "speaker": "walt",
-  "text": "Be careful out there.",
+  "text": "Don't wave back. Eyes down.",
   "sources": [
-   "BossCalls.luau:488"
+   "BossCalls.luau:266"
   ]
  },
- "v_aa8a792ef8": {
+ "v_8b95061e40": {
   "speaker": "walt",
-  "text": "Bigger grill on the Mart's back wall.",
+  "text": "Down Juniper, someone walks toward you.",
   "sources": [
-   "BossCalls.luau:223",
-   "BossCalls.luau:233"
+   "BossCalls.luau:275"
   ]
  },
- "v_79975d4a51": {
+ "v_c25f186944": {
   "speaker": "walt",
-  "text": "Bramble's Corner Dogs. Walt speaking.",
+  "text": "Each look brings them closer.",
   "sources": [
-   "Cutscenes.luau:298"
-  ]
- },
- "v_4c08a77b08": {
-  "speaker": "walt",
-  "text": "Bring the buns back to the cart.",
-  "sources": [
-   "Steps.luau:221 (Remind)"
-  ]
- },
- "v_b4488d3e3a": {
-  "speaker": "walt",
-  "text": "But listen. This is the only time",
-  "sources": [
-   "BossCalls.luau:486"
-  ]
- },
- "v_5f21741fe7": {
-  "speaker": "walt",
-  "text": "But you noticed it. That counts for a lot.",
-  "sources": [
-   "Cutscenes.luau:301 (Solo)"
-  ]
- },
- "v_05a4971c0f": {
-  "speaker": "walt",
-  "text": "Buy a package, bring it back and restock.",
-  "sources": [
-   "Steps.luau:242 (Say)"
-  ]
- },
- "v_2565e8b72b": {
-  "speaker": "walt",
-  "text": "Can you start today? ... Great.",
-  "sources": [
-   "Cutscenes.luau:303"
-  ]
- },
- "v_5c6b1d82f7": {
-  "speaker": "walt",
-  "text": "Careful crossing. Get hit, and you drop it.",
-  "sources": [
-   "BossCalls.luau:536"
-  ]
- },
- "v_777f3a31f8": {
-  "speaker": "walt",
-  "text": "Check your food before it goes out.",
-  "sources": [
-   "BossCalls.luau:334"
-  ]
- },
- "v_5a291cac97": {
-  "speaker": "walt",
-  "text": "Clock stops? Trailer lights off, count five, on.",
-  "sources": [
-   "BossCalls.luau:352",
-   "BossCalls.luau:354"
-  ]
- },
- "v_5e6ad5ccea": {
-  "speaker": "walt",
-  "text": "Close her window when things get strange.",
-  "sources": [
-   "BossCalls.luau:293"
-  ]
- },
- "v_933d4e8f5a": {
-  "speaker": "walt",
-  "text": "Come back when the lamps come back.",
-  "sources": [
-   "BossCalls.luau:457"
-  ]
- },
- "v_b4d0d15b59": {
-  "speaker": "walt",
-  "text": "Don't come back till it drives away.",
-  "sources": [
-   "BossCalls.luau:423"
-  ]
- },
- "v_207b69886d": {
-  "speaker": "walt",
-  "text": "Don't refuse her. Don't make her wait.",
-  "sources": [
-   "BossCalls.luau:379"
-  ]
- },
- "v_b810c25424": {
-  "speaker": "walt",
-  "text": "Don't watch the Walker. Not for a second.",
-  "sources": [
-   "BossCalls.luau:407"
-  ]
- },
- "v_c51033ba49": {
-  "speaker": "walt",
-  "text": "Don't wave back. Don't even look up.",
-  "sources": [
-   "BossCalls.luau:389"
-  ]
- },
- "v_4fb084f49b": {
-  "speaker": "walt",
-  "text": "Down Juniper Street, someone walks",
-  "sources": [
-   "BossCalls.luau:401"
+   "BossCalls.luau:276"
   ]
  },
  "v_9426ce2cf4": {
   "speaker": "walt",
   "text": "Eight buns. That'll do.",
   "sources": [
-   "Steps.luau:211 (Done)"
+   "Steps.luau:202 (Done)"
   ]
  },
- "v_2bace8f043": {
+ "v_6ea4e48840": {
   "speaker": "walt",
-  "text": "Evening, Rookie. Your first night shift.",
+  "text": "Evening, Rookie. Some customers look off.",
   "sources": [
-   "BossCalls.luau:319"
+   "BossCalls.luau:215"
   ]
  },
- "v_fdecec3844": {
+ "v_d4b4106930": {
   "speaker": "walt",
-  "text": "Evening. Can you see the bank clock?",
+  "text": "Evening. Watch the bank clock.",
   "sources": [
-   "BossCalls.luau:346"
-  ]
- },
- "v_8dfa5ac79a": {
-  "speaker": "walt",
-  "text": "Evening. Folks upstairs might wave tonight.",
-  "sources": [
-   "BossCalls.luau:388"
-  ]
- },
- "v_bb244b4d5d": {
-  "speaker": "walt",
-  "text": "Evening. You're doing better than I ever did.",
-  "sources": [
-   "BossCalls.luau:417"
+   "BossCalls.luau:235"
   ]
  },
  "v_ec32a5c044": {
   "speaker": "walt",
   "text": "Ever notice nobody lives upstairs?",
   "sources": [
-   "BossCalls.luau:240"
-  ]
- },
- "v_1d61b96fc0": {
-  "speaker": "walt",
-  "text": "Every time you look at them,",
-  "sources": [
-   "BossCalls.luau:403"
+   "BossCalls.luau:185"
   ]
  },
  "v_8d823b58bf": {
   "speaker": "walt",
   "text": "Everyone's back on their feet.",
   "sources": [
-   "BossCalls.luau:485"
+   "BossCalls.luau:331"
   ]
  },
- "v_2a60a01908": {
+ "v_f7af631300": {
   "speaker": "walt",
-  "text": "Eyes on your grill. They'll get bored.",
+  "text": "Folks upstairs might wave tonight.",
   "sources": [
-   "BossCalls.luau:391"
+   "BossCalls.luau:265"
   ]
  },
- "v_bec5a77758": {
+ "v_0d5df0bc3f": {
   "speaker": "walt",
-  "text": "First, flip the sign to open the shop.",
+  "text": "Follow the arrow to the Mart.",
   "sources": [
-   "Steps.luau:88 (Say)"
+   "Steps.luau:193 (Remind)"
   ]
  },
- "v_c7cc517b76": {
+ "v_2825918158": {
   "speaker": "walt",
-  "text": "Flip the sign to OPEN when you're ready.",
+  "text": "Forget I said that.",
   "sources": [
-   "BossCalls.luau:177"
+   "BossCalls.luau:184"
   ]
  },
- "v_59de9131d7": {
+ "v_7ec1653677": {
   "speaker": "walt",
-  "text": "Flip the sign to open the shop first.",
+  "text": "Frank from the cooler.",
   "sources": [
-   "Steps.luau:167 (Say)"
+   "Steps.luau:101 (Say)"
   ]
  },
- "v_1a5ba95b8a": {
+ "v_df06ad1d56": {
   "speaker": "walt",
-  "text": "Forget I said that. Grill's waiting.",
+  "text": "Frank in the bun.",
   "sources": [
-   "BossCalls.luau:239"
+   "Steps.luau:140 (Say)"
   ]
  },
- "v_77d7d5ddd5": {
+ "v_d669a97484": {
   "speaker": "walt",
-  "text": "Frank in the bun, at the board.",
+  "text": "Frank on the grill.",
   "sources": [
-   "Steps.luau:140 (Remind)"
-  ]
- },
- "v_0e89f34ad8": {
-  "speaker": "walt",
-  "text": "Frank on the grill. Follow the arrow.",
-  "sources": [
-   "Steps.luau:101 (Remind)"
+   "Steps.luau:103 (Remind)"
   ]
  },
  "v_109460d39d": {
   "speaker": "walt",
   "text": "Gear's on the back wall.",
   "sources": [
-   "BossCalls.luau:536"
+   "BossCalls.luau:374"
   ]
  },
- "v_43d577d49f": {
+ "v_fe4055ecce": {
   "speaker": "walt",
-  "text": "Go home. Rest. You did more than most.",
+  "text": "Go home. You did well.",
   "sources": [
-   "BossCalls.luau:497"
+   "BossCalls.luau:339"
   ]
  },
- "v_0ff9eb25f4": {
+ "v_1acf3e207e": {
   "speaker": "walt",
-  "text": "Go on... take their order.",
+  "text": "Go stand beneath the Mart's sign.",
   "sources": [
-   "Steps.luau:76 (Say)"
+   "BossCalls.luau:306"
   ]
  },
- "v_018df6ea49": {
+ "v_1af4e68b2e": {
   "speaker": "walt",
-  "text": "Go to the Mart. Stand under the OPEN sign.",
+  "text": "Good.",
   "sources": [
-   "BossCalls.luau:455"
+   "Steps.luau:112 (Done)"
   ]
  },
- "v_82b173e4a0": {
+ "v_9f14feee91": {
   "speaker": "walt",
-  "text": "Good. Don't think about it too hard.",
+  "text": "Good. Don't think about it.",
   "sources": [
-   "BossCalls.luau:221",
-   "BossCalls.luau:231"
+   "BossCalls.luau:180"
   ]
  },
- "v_f5786934d1": {
+ "v_0fa0be155e": {
   "speaker": "walt",
-  "text": "Got a rookie on the cart today!",
+  "text": "Got a rookie today!",
   "sources": [
-   "BossCalls.luau:507"
+   "BossCalls.luau:349"
   ]
  },
  "v_28115e186d": {
   "speaker": "walt",
   "text": "Got it.",
   "sources": [
-   "Steps.luau:129 (Done)"
+   "Steps.luau:131 (Done)"
   ]
  },
- "v_fe98fbb9c0": {
+ "v_510565a334": {
   "speaker": "walt",
-  "text": "Grab a frank from the cooler.",
+  "text": "Grab buns at the bakery.",
   "sources": [
-   "Steps.luau:99 (Say)"
+   "Steps.luau:201 (Say)"
   ]
  },
- "v_f18ad4c49f": {
+ "v_7047da1e5a": {
   "speaker": "walt",
-  "text": "Grill's hot. Go sell some dogs.",
+  "text": "Grab it off the grill.",
   "sources": [
-   "BossCalls.luau:203",
-   "BossCalls.luau:213"
+   "Steps.luau:132 (Remind)"
+  ]
+ },
+ "v_bdcf20bd01": {
+  "speaker": "walt",
+  "text": "Gray frank, bitten bun? Trash it.",
+  "sources": [
+   "BossCalls.luau:226"
   ]
  },
  "v_4585eb246b": {
   "speaker": "walt",
   "text": "Grill's hot. Let's go.",
   "sources": [
-   "BossCalls.luau:257"
+   "BossCalls.luau:193"
   ]
  },
- "v_62b7c1f198": {
+ "v_3b40e44d74": {
   "speaker": "walt",
-  "text": "Hand it over. Press Serve on them.",
+  "text": "Grill's hot. Sell some dogs.",
   "sources": [
-   "Steps.luau:179 (Remind)"
+   "BossCalls.luau:178"
+  ]
+ },
+ "v_2ab9e0108a": {
+  "speaker": "walt",
+  "text": "Hand it over.",
+  "sources": [
+   "Steps.luau:170 (Remind)"
   ]
  },
  "v_52d1defbaf": {
   "speaker": "walt",
   "text": "Have some coffee.",
   "sources": [
-   "BossCalls.luau:307"
+   "BossCalls.luau:203"
   ]
  },
- "v_c4b4199e89": {
+ "v_3809a87c73": {
   "speaker": "walt",
-  "text": "Head to the Mart, across the street.",
+  "text": "Hit the red switch.",
   "sources": [
-   "Steps.luau:198 (Say)"
-  ]
- },
- "v_01e9cb0131": {
-  "speaker": "walt",
-  "text": "Heard you caught Quentin in the act. Nice.",
-  "sources": [
-   "BossCalls.luau:101"
-  ]
- },
- "v_bdd60a41bd": {
-  "speaker": "walt",
-  "text": "Her lights reach far. Folks respect a light.",
-  "sources": [
-   "BossCalls.luau:274"
-  ]
- },
- "v_5cf3840fdb": {
-  "speaker": "walt",
-  "text": "Here comes your first customer.",
-  "sources": [
-   "Steps.luau:68 (Say)"
-  ]
- },
- "v_a90d44024d": {
-  "speaker": "walt",
-  "text": "Here. The money's from Walt's own till.",
-  "sources": [
-   "BossCalls.luau:272"
+   "Steps.luau:75 (Remind)"
   ]
  },
  "v_811b01e885": {
   "speaker": "walt",
   "text": "Hold Restock at the bun crate.",
   "sources": [
-   "Steps.luau:231 (Remind)"
+   "Steps.luau:222 (Remind)"
   ]
  },
  "v_d6c0f7b3d1": {
   "speaker": "walt",
   "text": "Hold Restock on the bun crate.",
   "sources": [
-   "Steps.luau:229 (Say)"
+   "Steps.luau:220 (Say)"
   ]
  },
- "v_44cc648b89": {
+ "v_360d3e4019": {
   "speaker": "walt",
-  "text": "Hold Slice Bun at the bun crate.",
+  "text": "Hold to slice the bun.",
   "sources": [
-   "Steps.luau:111 (Remind)"
+   "Steps.luau:113 (Remind)"
   ]
  },
- "v_1670c3ffe4": {
+ "v_4d28b6c67f": {
   "speaker": "walt",
-  "text": "Hot dog with ketchup... Easy.",
+  "text": "Hot dog's ready. Wait for orders.",
   "sources": [
-   "Steps.luau:77 (Done)"
+   "BossCalls.luau:359"
   ]
  },
  "v_e07ecc1b65": {
   "speaker": "walt",
   "text": "Huh. Next question.",
   "sources": [
-   "BossCalls.luau:240"
+   "BossCalls.luau:185"
   ]
  },
- "v_22b98bb863": {
+ "v_b938f43cf2": {
   "speaker": "walt",
-  "text": "I can do this, Rookie.",
+  "text": "I counted the lamps. It helps.",
   "sources": [
-   "BossCalls.luau:487"
+   "BossCalls.luau:186"
   ]
  },
- "v_284e1fe6b6": {
+ "v_94162e7b2a": {
   "speaker": "walt",
-  "text": "I can't put you on nights anymore.",
+  "text": "I never visit at night. Never.",
   "sources": [
-   "BossCalls.luau:497"
-  ]
- },
- "v_29efab1ee5": {
-  "speaker": "walt",
-  "text": "I know. I know. I'll explain someday.",
-  "sources": [
-   "BossCalls.luau:392"
-  ]
- },
- "v_332f5e2477": {
-  "speaker": "walt",
-  "text": "I need you to believe that.",
-  "sources": [
-   "BossCalls.luau:248"
-  ]
- },
- "v_a2820c8e6c": {
-  "speaker": "walt",
-  "text": "I never come to your corner at night. Never.",
-  "sources": [
-   "BossCalls.luau:434"
-  ]
- },
- "v_38638ffe24": {
-  "speaker": "walt",
-  "text": "I used to count the lamps. It helps.",
-  "sources": [
-   "BossCalls.luau:241"
+   "BossCalls.luau:295"
   ]
  },
  "v_b85c836266": {
   "speaker": "walt",
   "text": "I watched every one. From in here. Best seat in town.",
   "sources": [
-   "Cutscenes.luau:330"
+   "Cutscenes.luau:449 [finale]"
   ]
  },
  "v_0520e8b100": {
   "speaker": "walt",
   "text": "I worked that corner forty years. Since '.",
   "sources": [
-   "Cutscenes.luau:331"
+   "Cutscenes.luau:450 [finale]"
   ]
  },
- "v_8c6e2a6e3e": {
+ "v_d5be557bf8": {
   "speaker": "walt",
-  "text": "I'll ring when the sun goes down.",
+  "text": "I'll walk you through it.",
   "sources": [
-   "BossCalls.luau:192"
+   "Steps.luau:272 (GREETING)"
   ]
  },
- "v_ad5ef21bc4": {
+ "v_5874c73b55": {
   "speaker": "walt",
-  "text": "I'll walk 'em through it. Help 'em out.",
+  "text": "I'm walking them through it.",
   "sources": [
-   "BossCalls.luau:507"
+   "BossCalls.luau:349"
   ]
  },
- "v_054a31ca2c": {
+ "v_309041c66c": {
   "speaker": "walt",
-  "text": "I'm sorry I didn't tell you sooner.",
+  "text": "If it stops, trailer lights off.",
   "sources": [
-   "BossCalls.luau:440"
-  ]
- },
- "v_753e1a5dc5": {
-  "speaker": "walt",
-  "text": "If a long car parks across the street",
-  "sources": [
-   "BossCalls.luau:418"
-  ]
- },
- "v_8d5ba32f12": {
-  "speaker": "walt",
-  "text": "If it stops, the trailer's lights fix it.",
-  "sources": [
-   "BossCalls.luau:348"
-  ]
- },
- "v_fc6687f0d7": {
-  "speaker": "walt",
-  "text": "If someone knocks and says it's me —",
-  "sources": [
-   "BossCalls.luau:435"
-  ]
- },
- "v_274f2ca8ca": {
-  "speaker": "walt",
-  "text": "If someone walks up with no face —",
-  "sources": [
-   "BossCalls.luau:322"
+   "BossCalls.luau:236"
   ]
  },
  "v_accbaddd4a": {
   "speaker": "walt",
   "text": "In the daytime, I mean.",
   "sources": [
-   "BossCalls.luau:240"
+   "BossCalls.luau:185"
   ]
  },
- "v_b482d41d3e": {
+ "v_fad4ea3ff7": {
   "speaker": "walt",
-  "text": "In the trailer? Close the window. Stay inside.",
+  "text": "It never goes out. I promise.",
   "sources": [
-   "BossCalls.luau:421",
-   "BossCalls.luau:437"
+   "BossCalls.luau:307"
   ]
  },
- "v_ea7a8ff8ec": {
+ "v_698b34b2da": {
   "speaker": "walt",
-  "text": "It goes right on the grill.",
+  "text": "It won't rain. She'll drip anyway.",
   "sources": [
-   "Steps.luau:99 (Say)"
-  ]
- },
- "v_dc499428d9": {
-  "speaker": "walt",
-  "text": "It never goes out.",
-  "sources": [
-   "BossCalls.luau:456"
-  ]
- },
- "v_a8a7e4d43c": {
-  "speaker": "walt",
-  "text": "It waits on the warmer. Now slice a bun.",
-  "sources": [
-   "BossCalls.luau:515"
-  ]
- },
- "v_ac63a96565": {
-  "speaker": "walt",
-  "text": "It won't be raining.",
-  "sources": [
-   "BossCalls.luau:376"
+   "BossCalls.luau:256"
   ]
  },
  "v_71c594aea2": {
   "speaker": "walt",
   "text": "It'll keep your head on straight.",
   "sources": [
-   "BossCalls.luau:307"
+   "BossCalls.luau:203"
   ]
  },
  "v_32b25cfd5c": {
   "speaker": "walt",
   "text": "It's okay. Breathe.",
   "sources": [
-   "BossCalls.luau:476"
-  ]
- },
- "v_95c173356c": {
-  "speaker": "walt",
-  "text": "It's ready! Collect it off the grill.",
-  "sources": [
-   "Steps.luau:130 (Remind)"
-  ]
- },
- "v_fe3359bf17": {
-  "speaker": "walt",
-  "text": "It's ready. Grab it off the grill.",
-  "sources": [
-   "Steps.luau:128 (Say)"
-  ]
- },
- "v_5a21ee812c": {
-  "speaker": "walt",
-  "text": "Just one Mr. Pickett today, I hope. Heh.",
-  "sources": [
-   "BossCalls.luau:238"
-  ]
- },
- "v_a99b25f7eb": {
-  "speaker": "walt",
-  "text": "Just refuse. They'll wander off.",
-  "sources": [
    "BossCalls.luau:324"
   ]
  },
- "v_6e701515a2": {
+ "v_0b51420d50": {
   "speaker": "walt",
-  "text": "Ka-ching! Your first sale.",
+  "text": "Ka-ching! First sale.",
   "sources": [
-   "Steps.luau:187 (Say)"
-  ]
- },
- "v_ec926ce7f3": {
-  "speaker": "walt",
-  "text": "Keep an eye on it. And an ear. It ticks.",
-  "sources": [
-   "BossCalls.luau:347"
-  ]
- },
- "v_1d08673bd5": {
-  "speaker": "walt",
-  "text": "Keep away till the knocking stops.",
-  "sources": [
-   "BossCalls.luau:439"
-  ]
- },
- "v_687c3ecc5a": {
-  "speaker": "walt",
-  "text": "Keep her light on. That's half the job.",
-  "sources": [
-   "BossCalls.luau:294"
-  ]
- },
- "v_df7e666039": {
-  "speaker": "walt",
-  "text": "Keep the grill hot. See you at six.",
-  "sources": [
-   "BossCalls.luau:325"
+   "Steps.luau:178 (Say)"
   ]
  },
  "v_a2fdcbe997": {
   "speaker": "walt",
   "text": "Keep the rules, and they stay polite. That's the deal.",
   "sources": [
-   "Cutscenes.luau:334"
+   "Cutscenes.luau:453 [finale]"
   ]
  },
- "v_55c8992c1e": {
+ "v_67ad984e40": {
   "speaker": "walt",
-  "text": "Ketchup! Hold Add at the ketchup.",
+  "text": "Ketchup, mustard, smile. That's the job.",
   "sources": [
-   "Steps.luau:150 (Remind)"
+   "BossCalls.luau:196"
   ]
  },
- "v_a4c9b50ca9": {
+ "v_b9194ce699": {
   "speaker": "walt",
-  "text": "Ketchup, mustard, a smile. That's the job.",
+  "text": "Ketchup. Hold to add.",
   "sources": [
-   "BossCalls.luau:260"
+   "Steps.luau:152 (Remind)"
   ]
  },
- "v_edddd48333": {
+ "v_aba852ef7a": {
   "speaker": "walt",
-  "text": "Keys are under the mustard. See you around, Rookie.",
+  "text": "Knocking? It isn't me. I'm sorry.",
   "sources": [
-   "Cutscenes.luau:306"
+   "BossCalls.luau:296"
   ]
  },
- "v_c81a42e8ee": {
+ "v_6c79c2dc88": {
   "speaker": "walt",
-  "text": "Knocking? It's not me. Window shut, or off to the Mart.",
+  "text": "Knocking? Not me. Window, or Mart.",
   "sources": [
-   "BossCalls.luau:442",
-   "BossCalls.luau:444"
+   "BossCalls.luau:298",
+   "BossCalls.luau:300"
   ]
  },
- "v_c129a655d7": {
+ "v_dc17216a68": {
   "speaker": "walt",
-  "text": "Lamp by lamp.",
+  "text": "Lamps out? To the Mart sign.",
   "sources": [
-   "BossCalls.luau:452"
+   "BossCalls.luau:308",
+   "BossCalls.luau:310"
   ]
  },
- "v_a1ea9ee63f": {
+ "v_1a40eaf445": {
   "speaker": "walt",
-  "text": "Lamps going out? Go to the Mart sign.",
+  "text": "Last night. The lamps may die.",
   "sources": [
-   "BossCalls.luau:460",
-   "BossCalls.luau:462"
+   "BossCalls.luau:305"
   ]
  },
- "v_02c4867060": {
+ "v_ea111e9eaa": {
   "speaker": "walt",
-  "text": "Last night, Rookie. Ten.",
+  "text": "Lights on you? Out of sight.",
   "sources": [
-   "BossCalls.luau:449"
+   "BossCalls.luau:286"
   ]
  },
- "v_e19decc557": {
+ "v_abc060cca7": {
   "speaker": "walt",
-  "text": "Let 'em walk up to the counter.",
+  "text": "Long car? Window shut, or Mart.",
   "sources": [
-   "Steps.luau:68 (Say)"
-  ]
- },
- "v_86fc6d358d": {
-  "speaker": "walt",
-  "text": "Lights off. Count to five. Then back on.",
-  "sources": [
-   "BossCalls.luau:349"
-  ]
- },
- "v_5d5f113c26": {
-  "speaker": "walt",
-  "text": "Long car? Window shut, or off to the Mart.",
-  "sources": [
-   "BossCalls.luau:426",
-   "BossCalls.luau:428"
+   "BossCalls.luau:288",
+   "BossCalls.luau:290"
   ]
  },
  "v_0eec32dec6": {
   "speaker": "walt",
   "text": "Long night, huh? Coffee's on me.",
   "sources": [
-   "BossCalls.luau:242"
+   "BossCalls.luau:187"
   ]
  },
- "v_34bbe03ebc": {
+ "v_5b0f13d4af": {
   "speaker": "walt",
-  "text": "Look at their shirt. Their watch. Backwards.",
+  "text": "Look at shirts and watches.",
   "sources": [
-   "BossCalls.luau:364"
+   "BossCalls.luau:247"
   ]
  },
- "v_88e28aaf0d": {
+ "v_dbf37e1260": {
   "speaker": "walt",
-  "text": "Look both ways! These drivers don't brake.",
+  "text": "Look both ways.",
   "sources": [
-   "BossCalls.luau:530"
+   "BossCalls.luau:369",
+   "Steps.luau:190 (Say)",
+   "Steps.luau:233 (Say)"
   ]
  },
- "v_d1bcd03c81": {
+ "v_79b511466d": {
   "speaker": "walt",
-  "text": "Look both ways... These drivers don't brake.",
+  "text": "Low on stock? Try the Mart.",
   "sources": [
-   "Steps.luau:199 (Say)",
-   "Steps.luau:243 (Say)"
+   "BossCalls.luau:369"
   ]
  },
- "v_108eef5f14": {
+ "v_7a64804dde": {
   "speaker": "walt",
-  "text": "Mart's across the street. Follow the arrow.",
+  "text": "Low on stuff? Try the Mart.",
   "sources": [
-   "Steps.luau:202 (Remind)"
+   "Steps.luau:232 (Say)"
   ]
  },
- "v_43762f0ece": {
+ "v_2585223d7c": {
   "speaker": "walt",
-  "text": "Messed one up? Toss it. No harm done.",
+  "text": "Mart's across the street.",
   "sources": [
-   "BossCalls.luau:539"
+   "Steps.luau:189 (Say)"
   ]
  },
- "v_1f825b36ad": {
+ "v_922fb14183": {
   "speaker": "walt",
-  "text": "Money goes in the drawer. It's banked when you close.",
+  "text": "Messed up? Toss it. No harm.",
   "sources": [
-   "Steps.luau:187 (Say)"
+   "BossCalls.luau:377"
   ]
  },
- "v_501d4e992e": {
+ "v_146c67bf64": {
   "speaker": "walt",
-  "text": "Morning! Cheese came in. Folks love cheese.",
+  "text": "Morning! Told you nights were quiet.",
   "sources": [
-   "BossCalls.luau:188"
+   "BossCalls.luau:178"
   ]
  },
  "v_86f15e659d": {
   "speaker": "walt",
   "text": "Morning! You made it.",
   "sources": [
-   "BossCalls.luau:200",
-   "BossCalls.luau:209"
+   "BossCalls.luau:179"
   ]
  },
  "v_4e6cef12f6": {
   "speaker": "walt",
   "text": "Morning, Marigold.",
   "sources": [
-   "Cutscenes.luau:341"
+   "Cutscenes.luau:460 [finale]"
   ]
  },
- "v_834b65a6d0": {
+ "v_6a998d7bee": {
   "speaker": "walt",
-  "text": "Morning, Rookie! I'll stay on the line.",
+  "text": "Morning, Rookie! I'm on the line.",
   "sources": [
-   "BossCalls.luau:175"
+   "BossCalls.luau:165"
   ]
  },
  "v_3153f74405": {
   "speaker": "walt",
   "text": "Morning, Rookie. Sleep okay?",
   "sources": [
-   "BossCalls.luau:220",
-   "BossCalls.luau:229"
+   "BossCalls.luau:180",
+   "BossCalls.luau:181"
+  ]
+ },
+ "v_74ca7ecbb8": {
+  "speaker": "walt",
+  "text": "Morning, Rookie. Walt here.",
+  "sources": [
+   "Steps.luau:272 (GREETING)"
   ]
  },
  "v_5e55db4a7b": {
   "speaker": "walt",
   "text": "My knees are done. But you... you notice things.",
   "sources": [
-   "Cutscenes.luau:336"
+   "Cutscenes.luau:455 [finale]"
   ]
  },
- "v_88915625ed": {
+ "v_fd74aa9897": {
   "speaker": "walt",
-  "text": "New gear's already on the cart. Heh.",
+  "text": "Never let them reach your light.",
   "sources": [
-   "BossCalls.luau:540"
+   "BossCalls.luau:277"
   ]
  },
- "v_f8e3b504fd": {
+ "v_6fa5c342a5": {
   "speaker": "walt",
-  "text": "New stuff: potato sticks. Kids love 'em.",
+  "text": "Never watch the Walker.",
   "sources": [
-   "BossCalls.luau:222",
-   "BossCalls.luau:232"
+   "BossCalls.luau:278",
+   "BossCalls.luau:280"
   ]
  },
- "v_25a246467d": {
+ "v_f8d53173e0": {
   "speaker": "walt",
-  "text": "Nice and normal. Just how I like it.",
+  "text": "New gear's on the trailer. Heh.",
   "sources": [
-   "BossCalls.luau:259"
+   "BossCalls.luau:378"
+  ]
+ },
+ "v_edd36e4c4d": {
+  "speaker": "walt",
+  "text": "Nice and normal. Just right.",
+  "sources": [
+   "BossCalls.luau:195"
   ]
  },
  "v_b826ff9af4": {
   "speaker": "walt",
   "text": "Nice and normal. Sell some dogs.",
   "sources": [
-   "BossCalls.luau:237"
+   "BossCalls.luau:182"
   ]
  },
- "v_f11a4878f9": {
+ "v_ee709edf63": {
   "speaker": "walt",
-  "text": "Nice! Money goes in the drawer.",
+  "text": "Nice! Cash goes in the drawer.",
   "sources": [
-   "BossCalls.luau:528"
+   "BossCalls.luau:369"
   ]
  },
- "v_4625f58fd1": {
+ "v_213276c0ca": {
   "speaker": "walt",
-  "text": "Night two. You did fine last night.",
+  "text": "Nice.",
   "sources": [
-   "BossCalls.luau:333"
+   "Steps.luau:102 (Done)"
+  ]
+ },
+ "v_e983e4832e": {
+  "speaker": "walt",
+  "text": "Night two. Check your food first.",
+  "sources": [
+   "BossCalls.luau:225"
+  ]
+ },
+ "v_6974dcd999": {
+  "speaker": "walt",
+  "text": "No face at all? Just refuse.",
+  "sources": [
+   "BossCalls.luau:216"
   ]
  },
  "v_a986c29d04": {
   "speaker": "walt",
   "text": "No face? Refuse them.",
   "sources": [
-   "BossCalls.luau:326",
-   "BossCalls.luau:328"
+   "BossCalls.luau:218",
+   "BossCalls.luau:220"
   ]
  },
- "v_2a2a48314d": {
+ "v_d30128cf6d": {
   "speaker": "walt",
-  "text": "No trailer yet? Then the clock behaves. Heh.",
+  "text": "No more nights for you.",
   "sources": [
-   "BossCalls.luau:351"
+   "BossCalls.luau:339"
   ]
  },
- "v_15b35dc656": {
+ "v_28189fdbed": {
   "speaker": "walt",
-  "text": "Nobody's made it to ten since... well.",
+  "text": "Not what they asked. Toss it.",
   "sources": [
-   "BossCalls.luau:450"
+   "Steps.luau:160 (Say)"
   ]
  },
- "v_41c88ed0c0": {
+ "v_5e48b92aca": {
   "speaker": "walt",
-  "text": "Now bring 'em back to the cart.",
+  "text": "Nothing extra.",
   "sources": [
-   "Steps.luau:220 (Say)"
+   "BossCalls.luau:364",
+   "Steps.luau:150 (Say)"
   ]
  },
- "v_c3656c8b1f": {
+ "v_f4e083c4a2": {
   "speaker": "walt",
-  "text": "Now put the hot dog in the bun, on the board.",
+  "text": "Now serve it.",
   "sources": [
-   "Steps.luau:138 (Say)"
+   "Steps.luau:169 (Say)"
   ]
  },
- "v_ed7b6fe884": {
+ "v_0aca9b5c3e": {
   "speaker": "walt",
-  "text": "Oh — keep an eye on your cash drawer.",
+  "text": "Now slice a bun.",
   "sources": [
-   "BossCalls.luau:189"
+   "BossCalls.luau:357"
   ]
  },
- "v_3c184b0aa2": {
+ "v_1ae72da760": {
   "speaker": "walt",
-  "text": "On the cart? Walk to the Mart. Wait there.",
+  "text": "One Mr. Pickett today, I hope.",
   "sources": [
-   "BossCalls.luau:422",
-   "BossCalls.luau:438"
+   "BossCalls.luau:183"
   ]
  },
- "v_612160108c": {
+ "v_9e64894aac": {
   "speaker": "walt",
-  "text": "One more thing, Rookie. The old trailer.",
+  "text": "One's a copy. Everything's backwards.",
   "sources": [
-   "BossCalls.luau:270"
+   "BossCalls.luau:246"
   ]
  },
- "v_f4ff4d0a44": {
+ "v_089cce41c0": {
   "speaker": "walt",
-  "text": "One more thing. This is important.",
+  "text": "Only chance I get. Be careful.",
   "sources": [
-   "BossCalls.luau:433"
+   "BossCalls.luau:331"
   ]
  },
- "v_483120d4a5": {
+ "v_082de8f3e6": {
   "speaker": "walt",
-  "text": "One of them is a copy.",
+  "text": "Onto the grill.",
   "sources": [
-   "BossCalls.luau:362"
+   "Steps.luau:101 (Say)"
   ]
  },
- "v_7a6c86186b": {
+ "v_409146fe32": {
   "speaker": "walt",
-  "text": "Only what they asked... nothing extra.",
+  "text": "Open the trailer.",
   "sources": [
-   "Steps.luau:148 (Say)"
+   "Steps.luau:72 (Say)"
+  ]
+ },
+ "v_f2bed86855": {
+  "speaker": "walt",
+  "text": "Open up when ready.",
+  "sources": [
+   "BossCalls.luau:165"
+  ]
+ },
+ "v_33b29ecd0d": {
+  "speaker": "walt",
+  "text": "Perfect.",
+  "sources": [
+   "Steps.luau:151 (Done)"
+  ]
+ },
+ "v_398e154586": {
+  "speaker": "walt",
+  "text": "Pick up the phone.",
+  "sources": [
+   "Steps.luau:55 (Remind)"
   ]
  },
  "v_d8753a68f3": {
   "speaker": "walt",
   "text": "Pop a frank in the bun.",
   "sources": [
-   "BossCalls.luau:516"
+   "BossCalls.luau:358"
+  ]
+ },
+ "v_58bc970fcf": {
+  "speaker": "walt",
+  "text": "Potato sticks and a bigger grill.",
+  "sources": [
+   "BossCalls.luau:181"
+  ]
+ },
+ "v_e245baf6a4": {
+  "speaker": "walt",
+  "text": "Potato sticks today. Bigger grill, too.",
+  "sources": [
+   "BossCalls.luau:180"
   ]
  },
  "v_d559c7aa79": {
   "speaker": "walt",
   "text": "Proud of you, Rookie. Really.",
   "sources": [
-   "BossCalls.luau:256"
+   "BossCalls.luau:192"
   ]
  },
- "v_3d7389670d": {
+ "v_3d658be667": {
   "speaker": "walt",
-  "text": "Refuse the backwards one. Serve the real one.",
+  "text": "Put it in the bun.",
   "sources": [
-   "BossCalls.luau:365"
+   "Steps.luau:142 (Remind)"
   ]
  },
- "v_4011b47cdd": {
+ "v_631771189b": {
   "speaker": "walt",
-  "text": "Regular cars never stop there. That one does.",
+  "text": "Ready. Grab it.",
   "sources": [
-   "BossCalls.luau:424"
+   "Steps.luau:130 (Say)"
+  ]
+ },
+ "v_e598a725da": {
+  "speaker": "walt",
+  "text": "Red switch, on the wall.",
+  "sources": [
+   "Steps.luau:72 (Say)"
   ]
  },
  "v_9a2f7f9949": {
   "speaker": "walt",
   "text": "Rookie. About the knocking.",
   "sources": [
-   "BossCalls.luau:246"
+   "BossCalls.luau:188"
   ]
  },
- "v_2cc4800ac3": {
+ "v_e2948c76ce": {
   "speaker": "walt",
-  "text": "Rookie. Listen close. This one matters most.",
+  "text": "Rough night. Let's try again.",
   "sources": [
-   "BossCalls.luau:400"
-  ]
- },
- "v_ddb13fb986": {
-  "speaker": "walt",
-  "text": "Rookie... there's something you should know.",
-  "sources": [
-   "BossCalls.luau:359"
-  ]
- },
- "v_f4abef1c3a": {
-  "speaker": "walt",
-  "text": "Rough night. Let's try that again.",
-  "sources": [
-   "BossCalls.luau:484"
-  ]
- },
- "v_86f1064bd1": {
-  "speaker": "walt",
-  "text": "Running low on stuff? The Mart's across the street.",
-  "sources": [
-   "Steps.luau:241 (Say)"
-  ]
- },
- "v_8ed1c15f7e": {
-  "speaker": "walt",
-  "text": "Running low? The Mart's across the street.",
-  "sources": [
-   "BossCalls.luau:529"
-  ]
- },
- "v_8efe822ecf": {
-  "speaker": "walt",
-  "text": "Same cart. Same grill. Different customers.",
-  "sources": [
-   "BossCalls.luau:320"
-  ]
- },
- "v_3bca46f65f": {
-  "speaker": "walt",
-  "text": "Same face, same clothes.",
-  "sources": [
-   "BossCalls.luau:361"
+   "BossCalls.luau:331"
   ]
  },
  "v_cea0c2176a": {
   "speaker": "walt",
   "text": "Same night, Rookie. Same rules.",
   "sources": [
-   "BossCalls.luau:466"
-  ]
- },
- "v_7c3b2950e5": {
-  "speaker": "walt",
-  "text": "See that sign? FOR SALE. Go take a look.",
-  "sources": [
-   "BossCalls.luau:271"
+   "BossCalls.luau:314"
   ]
  },
  "v_9b6108722e": {
   "speaker": "walt",
   "text": "See the bubble? That's the order.",
   "sources": [
-   "BossCalls.luau:522"
+   "BossCalls.luau:364"
   ]
  },
- "v_a8df473b9a": {
+ "v_8cc7c08063": {
   "speaker": "walt",
-  "text": "See you at sunrise. I promise.",
+  "text": "Serve her, whatever she asks.",
   "sources": [
-   "BossCalls.luau:459"
+   "BossCalls.luau:257"
   ]
  },
- "v_a7784c977a": {
+ "v_f36e086018": {
   "speaker": "walt",
-  "text": "Serve her. Always. Whatever she asks for.",
+  "text": "She liked you. The lady.",
   "sources": [
-   "BossCalls.luau:378"
-  ]
- },
- "v_88d475f302": {
-  "speaker": "walt",
-  "text": "She liked you. The lady. I can tell.",
-  "sources": [
-   "BossCalls.luau:239"
-  ]
- },
- "v_be8b5aef49": {
-  "speaker": "walt",
-  "text": "She'll be dripping anyway.",
-  "sources": [
-   "BossCalls.luau:377"
-  ]
- },
- "v_0c9378db1f": {
-  "speaker": "walt",
-  "text": "She's a... very old customer. Be nice.",
-  "sources": [
-   "BossCalls.luau:380"
-  ]
- },
- "v_9937d97b5a": {
-  "speaker": "walt",
-  "text": "She's got a service window. It shuts tight.",
-  "sources": [
-   "BossCalls.luau:273"
-  ]
- },
- "v_01c5645e5f": {
-  "speaker": "walt",
-  "text": "Shop's closed! Press Open Shop at the sign.",
-  "sources": [
-   "Steps.luau:91 (Remind)",
-   "Steps.luau:170 (Remind)"
+   "BossCalls.luau:184"
   ]
  },
  "v_a9764de43f": {
   "speaker": "walt",
   "text": "Slice a bun while it cooks.",
   "sources": [
-   "Steps.luau:109 (Say)"
-  ]
- },
- "v_642fd64462": {
-  "speaker": "walt",
-  "text": "Some folks have quick hands.",
-  "sources": [
-   "BossCalls.luau:190"
-  ]
- },
- "v_5b929e3129": {
-  "speaker": "walt",
-  "text": "Some of them might look a little off.",
-  "sources": [
-   "BossCalls.luau:321"
+   "Steps.luau:111 (Say)"
   ]
  },
  "v_2bd5e253a0": {
   "speaker": "walt",
   "text": "Somebody has to keep the light on. Every night.",
   "sources": [
-   "Cutscenes.luau:335"
+   "Cutscenes.luau:454 [finale]"
   ]
  },
  "v_e69f4b8e6a": {
   "speaker": "walt",
   "text": "Someone waving upstairs? Don't look up.",
   "sources": [
-   "BossCalls.luau:393",
-   "BossCalls.luau:395"
+   "BossCalls.luau:268",
+   "BossCalls.luau:270"
   ]
  },
  "v_6acfda534a": {
   "speaker": "walt",
   "text": "Sometimes a customer shows up twice.",
   "sources": [
-   "BossCalls.luau:360"
+   "BossCalls.luau:245"
   ]
  },
  "v_08830d725e": {
   "speaker": "walt",
   "text": "Sometimes there's something special.",
   "sources": [
-   "BossCalls.luau:536"
+   "BossCalls.luau:374"
+  ]
+ },
+ "v_0d3f6109b7": {
+  "speaker": "walt",
+  "text": "Start today. Keys under the mustard.",
+  "sources": [
+   "Cutscenes.luau:426 [intro]"
+  ]
+ },
+ "v_6f8e1e31d2": {
+  "speaker": "walt",
+  "text": "Still refuse the faceless ones.",
+  "sources": [
+   "BossCalls.luau:227"
   ]
  },
  "v_de8484defd": {
   "speaker": "walt",
   "text": "Stocked up!",
   "sources": [
-   "Steps.luau:230 (Done)"
+   "Steps.luau:221 (Done)"
   ]
  },
- "v_0f66a48c9a": {
+ "v_2ed2add83d": {
   "speaker": "walt",
-  "text": "Tap the frank box. It goes on the grill.",
+  "text": "Take the order, Rookie.",
   "sources": [
-   "BossCalls.luau:176"
+   "Steps.luau:93 (Remind)"
   ]
  },
- "v_c47fe05658": {
+ "v_70561a888f": {
   "speaker": "walt",
-  "text": "Tell Opal it's for Walt. She knows.",
+  "text": "Take their order.",
   "sources": [
-   "BossCalls.luau:242"
+   "Steps.luau:91 (Say)"
   ]
  },
- "v_9befec0ba1": {
+ "v_e06f57adaa": {
   "speaker": "walt",
-  "text": "Tell your crew.",
+  "text": "Tap the frank box. Grill it.",
   "sources": [
-   "BossCalls.luau:409"
+   "BossCalls.luau:165"
+  ]
+ },
+ "v_4550eb2216": {
+  "speaker": "walt",
+  "text": "Tell Opal it's for Walt.",
+  "sources": [
+   "BossCalls.luau:187"
   ]
  },
  "v_f271c54c14": {
   "speaker": "walt",
   "text": "Ten nights. You kept the light on.",
   "sources": [
-   "Cutscenes.luau:329"
-  ]
- },
- "v_2170fc3644": {
-  "speaker": "walt",
-  "text": "That gets it going again.",
-  "sources": [
-   "BossCalls.luau:350"
+   "Cutscenes.luau:448 [finale]"
   ]
  },
  "v_6643e2a67d": {
   "speaker": "walt",
   "text": "That was a joke. Mostly.",
   "sources": [
-   "BossCalls.luau:238"
+   "BossCalls.luau:183"
   ]
  },
- "v_6701605cf8": {
+ "v_15993e64ca": {
   "speaker": "walt",
-  "text": "That wasn't me.",
+  "text": "That was your last bun.",
   "sources": [
-   "BossCalls.luau:247"
+   "Steps.luau:188 (Say)"
+  ]
+ },
+ "v_319d2c7703": {
+  "speaker": "walt",
+  "text": "That wasn't me. Believe that.",
+  "sources": [
+   "BossCalls.luau:188"
   ]
  },
  "v_6beee3781c": {
   "speaker": "walt",
   "text": "That's how you restock. Easy.",
   "sources": [
-   "BossCalls.luau:538"
+   "BossCalls.luau:376"
+  ]
+ },
+ "v_3e91827b5e": {
+  "speaker": "walt",
+  "text": "That's the job. You got this.",
+  "sources": [
+   "Steps.luau:274 (GOODBYE)"
   ]
  },
  "v_0236fd070b": {
   "speaker": "walt",
   "text": "That's the place.",
   "sources": [
-   "Steps.luau:201 (Done)"
+   "Steps.luau:192 (Done)"
   ]
  },
  "v_d91e854ce1": {
   "speaker": "walt",
   "text": "That's two, Rookie.",
   "sources": [
-   "BossCalls.luau:497"
-  ]
- },
- "v_bf2f8e08a4": {
-  "speaker": "walt",
-  "text": "That's what they wanted. Now serve it.",
-  "sources": [
-   "Steps.luau:178 (Say)"
-  ]
- },
- "v_7664596356": {
-  "speaker": "walt",
-  "text": "The cart gets a rest. She takes the corner.",
-  "sources": [
-   "BossCalls.luau:292"
-  ]
- },
- "v_6d7b4f4a2e": {
-  "speaker": "walt",
-  "text": "The cart's right on the corner. Ninth and Juniper.",
-  "sources": [
-   "Cutscenes.luau:304"
-  ]
- },
- "v_4c28e9a75a": {
-  "speaker": "walt",
-  "text": "The copy is backwards.",
-  "sources": [
-   "BossCalls.luau:363"
+   "BossCalls.luau:339"
   ]
  },
  "v_83d0e946e7": {
   "speaker": "walt",
   "text": "The corner's a crossing, Rookie. At night, the late crowd comes through.",
   "sources": [
-   "Cutscenes.luau:332"
-  ]
- },
- "v_45ac098168": {
-  "speaker": "walt",
-  "text": "The flyer? All of you? Huh. Nobody's called in years.",
-  "sources": [
-   "Cutscenes.luau:300 (Party)"
-  ]
- },
- "v_3fd580d157": {
-  "speaker": "walt",
-  "text": "The flyer? Huh. Nobody's called about that one in years.",
-  "sources": [
-   "Cutscenes.luau:299 (Solo)"
+   "Cutscenes.luau:451 [finale]"
   ]
  },
  "v_f3e7afb49b": {
   "speaker": "walt",
   "text": "The night shift is yours. If you want it.",
   "sources": [
-   "Cutscenes.luau:338"
+   "Cutscenes.luau:457 [finale]"
   ]
  },
- "v_b3ddf8fd7e": {
+ "v_9b07624221": {
   "speaker": "walt",
-  "text": "The phone's ringing! Press Answer.",
+  "text": "They just want to be noticed.",
   "sources": [
-   "Steps.luau:53 (Remind)"
-  ]
- },
- "v_cbd6fbb50d": {
-  "speaker": "walt",
-  "text": "The trailer's still there. Just saying.",
-  "sources": [
-   "BossCalls.luau:258"
-  ]
- },
- "v_b012f94f6d": {
-  "speaker": "walt",
-  "text": "Then you get answers. I promise.",
-  "sources": [
-   "BossCalls.luau:250"
-  ]
- },
- "v_b13c545da3": {
-  "speaker": "walt",
-  "text": "There's your hot dog. Wait for an order.",
-  "sources": [
-   "BossCalls.luau:517"
-  ]
- },
- "v_7a14942b70": {
-  "speaker": "walt",
-  "text": "They just want someone to notice them.",
-  "sources": [
-   "BossCalls.luau:390"
+   "BossCalls.luau:267"
   ]
  },
  "v_a407bfc9ae": {
   "speaker": "walt",
   "text": "They like the light. And the smell of food. Heh.",
   "sources": [
-   "Cutscenes.luau:333"
+   "Cutscenes.luau:452 [finale]"
   ]
  },
- "v_0a6e58556b": {
+ "v_9952411d1d": {
   "speaker": "walt",
-  "text": "They want ketchup. Go add some.",
+  "text": "They want ketchup.",
   "sources": [
-   "Steps.luau:148 (Say)"
+   "Steps.luau:150 (Say)"
   ]
  },
- "v_e4d494ed5c": {
+ "v_deff9f6cab": {
   "speaker": "walt",
-  "text": "They're waiting. Take the order!",
+  "text": "They'll wander off. Grill stays hot.",
   "sources": [
-   "Steps.luau:78 (Remind)"
+   "BossCalls.luau:217"
   ]
  },
- "v_d922ad4ab1": {
+ "v_909f41e668": {
   "speaker": "walt",
-  "text": "Told you nights were quiet.",
+  "text": "Tonight's the last. I promise.",
   "sources": [
-   "BossCalls.luau:201",
-   "BossCalls.luau:211"
+   "BossCalls.luau:188"
   ]
  },
- "v_7c71c93a17": {
+ "v_7b2ac165bc": {
   "speaker": "walt",
-  "text": "Tonight the street might go dark.",
+  "text": "Toss it in the bin.",
   "sources": [
-   "BossCalls.luau:451"
+   "Steps.luau:161 (Remind)"
   ]
  },
- "v_7471c0f925": {
+ "v_d8b930d7cb": {
   "speaker": "walt",
-  "text": "Tonight's the last one.",
+  "text": "Two? Refuse the backwards one.",
   "sources": [
-   "BossCalls.luau:249"
+   "BossCalls.luau:248",
+   "BossCalls.luau:250"
   ]
  },
- "v_5d3728787b": {
+ "v_7c172f2d01": {
   "speaker": "walt",
-  "text": "Tonight, a lady in a yellow raincoat",
+  "text": "Wait for the bar.",
   "sources": [
-   "BossCalls.luau:374"
+   "Steps.luau:122 (Say)"
   ]
  },
- "v_c46d81aa1f": {
+ "v_242db04f33": {
   "speaker": "walt",
-  "text": "Toss it in the bin and make a new one.",
+  "text": "Watch your drawer. Quick hands.",
   "sources": [
-   "Steps.luau:158 (Say)"
+   "BossCalls.luau:174"
   ]
  },
- "v_a2963d550f": {
+ "v_455323adaa": {
   "speaker": "walt",
-  "text": "Toss it. Hold Throw Away at the bin.",
+  "text": "We're open! Folks are lining up.",
   "sources": [
-   "Steps.luau:159 (Remind)"
-  ]
- },
- "v_8d39fbe9f0": {
-  "speaker": "walt",
-  "text": "Trash can. Don't serve it.",
-  "sources": [
-   "BossCalls.luau:337"
-  ]
- },
- "v_d4f7ac67eb": {
-  "speaker": "walt",
-  "text": "Two of them? Refuse the backwards one.",
-  "sources": [
-   "BossCalls.luau:367",
-   "BossCalls.luau:369"
-  ]
- },
- "v_ef0bf5ade0": {
-  "speaker": "walt",
-  "text": "Uh-oh... that was your last bun.",
-  "sources": [
-   "Steps.luau:197 (Say)"
-  ]
- },
- "v_8f2cc7cc50": {
-  "speaker": "walt",
-  "text": "Walk up to the sign. Buy her.",
-  "sources": [
-   "BossCalls.luau:277"
-  ]
- },
- "v_cfe1f59520": {
-  "speaker": "walt",
-  "text": "Watch the grill. When the bar fills up... it's ready.",
-  "sources": [
-   "Steps.luau:120 (Say)"
-  ]
- },
- "v_89bccc2718": {
-  "speaker": "walt",
-  "text": "We're open! Folks line up at the counter.",
-  "sources": [
-   "BossCalls.luau:518"
+   "BossCalls.luau:360"
   ]
  },
  "v_ee99a20f74": {
   "speaker": "walt",
   "text": "We're open.",
   "sources": [
-   "Steps.luau:89 (Done)",
-   "Steps.luau:168 (Done)"
+   "Steps.luau:73 (Done)"
   ]
  },
- "v_e5b27b2f09": {
+ "v_6afaa1306f": {
   "speaker": "walt",
-  "text": "Welcome to the real shop, Rookie.",
+  "text": "Window shut. Or the Mart.",
   "sources": [
-   "BossCalls.luau:295"
-  ]
- },
- "v_96240ba57c": {
-  "speaker": "walt",
-  "text": "Whatever you do,",
-  "sources": [
-   "BossCalls.luau:405"
-  ]
- },
- "v_ed8fc1a4c9": {
-  "speaker": "walt",
-  "text": "Whatever you do, never watch the Walker.",
-  "sources": [
-   "BossCalls.luau:410",
-   "BossCalls.luau:412"
-  ]
- },
- "v_881d509ecc": {
-  "speaker": "walt",
-  "text": "When the bar fills up, grab it.",
-  "sources": [
-   "BossCalls.luau:514"
-  ]
- },
- "v_f0e1eb4f5c": {
-  "speaker": "walt",
-  "text": "When the far lamp buzzes, they're there.",
-  "sources": [
-   "BossCalls.luau:408"
-  ]
- },
- "v_2e4cd0ecb8": {
-  "speaker": "walt",
-  "text": "When the lamps start going out,",
-  "sources": [
-   "BossCalls.luau:453"
-  ]
- },
- "v_4de9dece65": {
-  "speaker": "walt",
-  "text": "Who are they? ...Next question.",
-  "sources": [
-   "BossCalls.luau:366"
-  ]
- },
- "v_32047383d1": {
-  "speaker": "walt",
-  "text": "Whoa... that's not what they ordered.",
-  "sources": [
-   "Steps.luau:158 (Say)"
+   "BossCalls.luau:287",
+   "BossCalls.luau:297"
   ]
  },
  "v_48e68a3deb": {
   "speaker": "walt",
   "text": "Wrong food? Throw it away.",
   "sources": [
-   "BossCalls.luau:339",
-   "BossCalls.luau:341"
+   "BossCalls.luau:228",
+   "BossCalls.luau:230"
   ]
  },
  "v_825f76d725": {
   "speaker": "walt",
   "text": "Yellow raincoat? Always serve her.",
   "sources": [
-   "BossCalls.luau:381",
-   "BossCalls.luau:383"
+   "BossCalls.luau:258",
+   "BossCalls.luau:260"
   ]
  },
- "v_2ce5b99dc4": {
+ "v_644d0f3f8e": {
   "speaker": "walt",
-  "text": "You all noticed it. That counts for a lot. Heh.",
+  "text": "You caught Quentin. Nice work.",
   "sources": [
-   "Cutscenes.luau:302 (Party)"
-  ]
- },
- "v_800c90c4bc": {
-  "speaker": "walt",
-  "text": "You bought the old girl! Heh.",
-  "sources": [
-   "BossCalls.luau:291"
+   "BossCalls.luau:90"
   ]
  },
  "v_79fe1b45ba": {
   "speaker": "walt",
   "text": "You kept your eyes down. Good.",
   "sources": [
-   "BossCalls.luau:241"
+   "BossCalls.luau:186"
   ]
  },
- "v_9ea0b704dd": {
+ "v_197159850e": {
   "speaker": "walt",
-  "text": "You know them.",
+  "text": "You noticed the flyer. Good.",
   "sources": [
-   "BossCalls.luau:466"
+   "Cutscenes.luau:425 [intro]"
   ]
  },
  "v_7a552ce2a2": {
   "speaker": "walt",
   "text": "You sound tired, Rookie...",
   "sources": [
-   "BossCalls.luau:307"
+   "BossCalls.luau:203"
   ]
  },
  "v_80f4cae4c8": {
   "speaker": "walt",
   "text": "You watched it, didn't you?",
   "sources": [
-   "BossCalls.luau:476"
+   "BossCalls.luau:324"
   ]
  },
- "v_cb6b890ca6": {
+ "v_7150b19925": {
   "speaker": "walt",
-  "text": "You'll be safer in there... mostly.",
+  "text": "You work late tonight. I'll ring.",
   "sources": [
-   "BossCalls.luau:276"
+   "BossCalls.luau:174"
   ]
  },
- "v_bd36196a86": {
+ "v_4d0c151fb2": {
   "speaker": "walt",
-  "text": "get out of its sight.",
+  "text": "Your first customer's coming.",
   "sources": [
-   "BossCalls.luau:420"
-  ]
- },
- "v_18bf1b4d18": {
-  "speaker": "walt",
-  "text": "in it you didn't take — toss it.",
-  "sources": [
-   "BossCalls.luau:336"
-  ]
- },
- "v_9a20d049f5": {
-  "speaker": "walt",
-  "text": "it isn't.",
-  "sources": [
-   "BossCalls.luau:436"
-  ]
- },
- "v_13aa0d603d": {
-  "speaker": "walt",
-  "text": "leave your post.",
-  "sources": [
-   "BossCalls.luau:454"
-  ]
- },
- "v_0637ca556a": {
-  "speaker": "walt",
-  "text": "might come by.",
-  "sources": [
-   "BossCalls.luau:375"
-  ]
- },
- "v_2df5bfcdb9": {
-  "speaker": "walt",
-  "text": "never let them reach your light.",
-  "sources": [
-   "BossCalls.luau:406"
-  ]
- },
- "v_239299a132": {
-  "speaker": "walt",
-  "text": "no eyes, no mouth — don't serve them.",
-  "sources": [
-   "BossCalls.luau:323"
-  ]
- },
- "v_c32afe1f22": {
-  "speaker": "walt",
-  "text": "they get closer.",
-  "sources": [
-   "BossCalls.luau:404"
-  ]
- },
- "v_d798ca3e14": {
-  "speaker": "walt",
-  "text": "toward your stand.",
-  "sources": [
-   "BossCalls.luau:402"
-  ]
- },
- "v_6760eb5ade": {
-  "speaker": "walt",
-  "text": "with its lights on you —",
-  "sources": [
-   "BossCalls.luau:419"
+   "Steps.luau:83 (Say)"
   ]
  }
 }

@@ -8,8 +8,8 @@ filters fixed text). Credits and licence: `docs/art/credits.md`, section Voz.
 
 | Step | Command (from `tools/voice`) | Output |
 |---|---|---|
-| Collect the lines | `python collect_lines.py` | `lines.json` (244 lines: walt 235, crew 9). Key = `v_<sha1(speaker NUL spoken)[:10]>`, spoken = `Speech.Spoken(text)` |
-| Generate | `.venv/Scripts/python generate.py all [--only KEY]` | `Assets/audio/voice/<speaker>/<key>.ogg` (ogg vorbis q4, mono 24 kHz), `assets.json` (length, gen_text) |
+| Collect the lines | `python collect_lines.py` | `lines.json` (175 active lines: walt 171, crew 4; lines removed from the game stay in `assets.json`). Key = `v_<sha1(speaker NUL spoken)[:10]>`, spoken = `Speech.Spoken(text)` |
+| Generate | `.venv/Scripts/python generate.py all [--new] [--only KEY]` (`--new` = only keys without an ogg yet) | `Assets/audio/voice/<speaker>/<key>.ogg` (ogg vorbis q4, mono 24 kHz), `assets.json` (length, gen_text) |
 | Upload | `python upload.py [--only KEY]` (needs env `ROBLOX_API_KEY`, never printed) | `assets.json` (assetId, status ok / rejected / error); resumable; ~1 req/s, backoff on 429 |
 | Catalog | `python build_content.py` | `src/Shared/Content/VoiceLines.luau` (`Lines[key] = { Id, Length, Speaker }`, `Index[speaker NUL spoken] = key`) |
 | Compare voices | `.venv/Scripts/python generate.py samples` then `.venv/Scripts/python evaluate.py "samples/*.wav"` | `samples/` (git-ignored, never uploaded) |
@@ -24,7 +24,7 @@ The first run downloads the model (~330 MB) and a spaCy model into the venv.
 - `post.<profile>`: `pitch_semitones` (asetrate + atempo, duration kept), `highpass`/`lowpass`, `compress`,
   `saturate` (soft tanh clip = hoarseness), `reverb`.
 - `phone`: band-pass 300-3400 Hz + gain. Applied to Walt's phone lines: BossCalls, tutorial steps, and the intro call
-  (Cutscenes.luau line <= 310); his in-person cutscene lines stay clean.
+  (Cutscenes.luau, scene `[intro]`, tagged by `collect_lines.py`); his in-person cutscene lines stay clean.
 - `pauses`: seconds after `.` / `? !` / `...` (same as `Speech.Pieces`; the sentences are synthesized one by one and
   joined with that silence). `gen_text_overrides[key]`: text Kokoro reads when the spoken text loses meaning
   (e.g. `Since '.` -> `Since nineteen seventy-nine.`). `gen_text()` in `generate.py` also fixes `Mr.`, `OPEN`, `Heh`, dashes.

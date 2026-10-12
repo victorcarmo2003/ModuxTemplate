@@ -150,6 +150,7 @@ return Lync.define("game", {
 		Chances = Lync.int(0, 9), -- DEC-110, DEC-112; not shown on the HUD (DEC-053)
 		WipeEndsAt = Lync.f64(), -- 0 = no wipe window (DEC-094)
 		WipeFrozen = Lync.bool(), -- DEC-118
+		Paused = Lync.bool(), -- shop switch on Closed during Open: no new customers (2026-10-12)
 	})),
 
 	-- §3.2, record 1. Writer: RunStateService

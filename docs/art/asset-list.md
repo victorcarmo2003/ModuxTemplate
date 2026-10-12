@@ -135,12 +135,25 @@ Caminhos dos packs (abreviados nas fichas):
 | AST-105 | Pedestal de vitrine do Gear Stand (B1–B5 e S1) | market | P1 | Pack + edição (Poly Pizza) | "Column Round" by Quaternius (CC0), recolor no atlas KitchenPack | Rascunho (modelo entregue 2026-10-11) |
 | AST-106 | Placas de seção do Mart (5: penduradas e de parede, sem texto) | market | P1 | Modelar | — (`asset-sourcing-2026-10-11.md` §5) | Rascunho (modelo entregue 2026-10-11) |
 | AST-107 | Expositor refrigerado aberto de carnes (MEAT & DELI) | market | P1 | Modelar + pack | `KP/food_ingredient_steak.fbx`, `KP/food_ingredient_ham.fbx` dentro; `MM/freezer.fbx` recusado | Rascunho (modelo entregue 2026-10-11) |
+| AST-108 | Modo de preparo: glifos de comando (4 abas, Leave, Next, Serve, lixeira, virar, aviso) | ui | P0 | 2D (desenho no estilo do AST-071) | — | Rascunho (TASK-187) |
+| AST-109 | Modo de preparo: salsicha em 4 estados (crua, a meio, pronta, fantasma) | ui | P0 | Render dos modelos (AST-002) | `Assets/models/food/AST-002_Sausage.fbx` | Rascunho (TASK-187) |
+| AST-110 | Modo de preparo: pão fechado, aberto, guia de corte, mat | ui | P0 | Render dos modelos (AST-001) | `Assets/models/food/AST-001_Bun.fbx` | Rascunho (TASK-187) |
+| AST-111 | Modo de preparo: complementos vistos de cima (3 molhos tintáveis, queijo, bacon, batata) | ui | P0 | Render + 2D (AST-004/005/006/007/008/009) | `Assets/models/food/AST-004_KetchupTopping`, `AST-005_MustardTopping`, `AST-006_Cheese`, `AST-007_Bacon`, `AST-008_PotatoSticks`, `AST-009_CreamCheese` (`.fbx`) | Rascunho (TASK-187) |
+| AST-112 | Modo de preparo: ticket (papel 9-slice, pino, anel de paciência, pilha) | ui | P0 | 2D | — | Rascunho (TASK-187) |
+| AST-113 | Modo de preparo: selos de nota Perfect / Good / Messy (+ mini e pips) | ui | P0 | 2D | — | Rascunho (TASK-187) |
+| AST-114 | Modo de preparo: cursores de gesto (faca, garrafa, mão, pitada, marcador do dedo) | ui | P1 | 2D | — | Rascunho (TASK-187) |
+| AST-115 | Modo de preparo: partículas 2D de UI (migalha, gota, estrela, poeira, brilho, ponto) | vfx | P1 | 2D (máscaras brancas) | reaproveita o conjunto do AST-070/092 onde servir | Rascunho (TASK-187) |
+| AST-116 | Modo de preparo: tábua e grelha em vista de cima (mat 9-slice, rolos 4x2, trilho) | ui | P1 | Render (AST-012 roller grill) + 2D | `Assets/models/equipment/AST-012_*` | Rascunho (TASK-187) |
+| AST-117 | Modo de preparo: retratos de cliente (cabeça de animal) para ticket e Serve | ui | P1 | Render das cabeças (AST-053/AST-086) | `Assets/models/character/AST-053_Animal_*.fbx` (18 espécies) | Rascunho (TASK-187; quais espécies são clientes: `Q-149`) |
+| AST-118 | Modo de preparo: selos de entrega (Complete, Incomplete, Wrong) e "+$" | ui | P1 | 2D | `Hud/coin` do AST-071 | Rascunho (TASK-187) |
+| AST-119 | Modo de preparo: vinheta do foco e entalhe de aba | ui | P2 | 2D | — | Rascunho (TASK-187) |
 
 Totais: **77 IDs**, **76 fichas ativas** (AST-001 a AST-038 existentes, revistas; AST-039 a AST-075 da 1ª conciliação; AST-076 e AST-077 da 2ª revisão; **AST-077 Obsoleto** por DEC-130).
 Usam pack: **25** (4 direto, 21 com edição). Plataforma R6 + acessórios: **9**. Modelar / 2D / animação do zero: **43**. (DEC-138: AST-017, 018, 019, 024 passaram de Modelar para Pack + edição; antes 21 / 47.) DEC-140: AST-025 passou de Modelar para Pack + edição ("Trashcan" by Kenney via Poly Pizza, fora dos packs de `Assets/`) — usam pack **26** (4 / 22); Modelar **42**.
 **Levantamento pós-onda 1 (art-director, 2026-10-10):** fichas novas **AST-078 a AST-097** (20, todas **Rascunho**) e complementos de onda/dono/orçamento nas fichas antigas ainda abertas. Seção "Levantamento pós-onda 1" no fim do documento. Totais: **97 IDs**, **96 fichas ativas** (AST-077 Obsoleto).
 **2026-10-10 (pedido do usuário):** ficha nova **AST-098** (bancada de feira do Mart, Rascunho) e modelo novo do **AST-042** (telefone de mesa de disco), ambos de Poly Pizza; licenças em `credits.md`. Totais: **98 IDs**, **97 fichas ativas**.
 **2026-10-11 (Mart v2, MAP-01 §18.9):** fichas novas **AST-103 a AST-107** (Rascunho), modelos entregues pelo modeler-3d (Blender headless). Os FBX `AST-099` a `AST-102` em `Assets/import/` (rodada de sourcing do mesmo dia) ainda não têm ficha aqui.
+**2026-10-12 (modo de preparo focado, TASK-187, DEC-223):** fichas novas **AST-108 a AST-119** (12 sprites 2D de UI, todas **Rascunho**; seção "Modo de preparo: sprites 2D" antes de "Fora desta lista"; spec em `prep-ui-spec.md` §15). Próximo ID livre: **AST-120**.
 Mapeamento Kenney/KayKit por ficha (DEC-136, Rascunho): `asset-sourcing.md`. As entradas "→ sourcing:" na coluna "Arquivo de pack" vêm de lá; Origem e Status não mudaram.
 **DEC-137 (2026-10-09):** comida aprovada — AST-001 a AST-011 e AST-061 em **Aprovado**, com o candidato do sourcing como arquivo de origem (fila do `modeler-3d`). Demais fichas seguem Rascunho. `Q-133` (limite de atlases) segue aberta.
 **DEC-138 (2026-10-10):** equipamentos aprovados após o teste em `workspace.__ImportTest_Equip` — AST-014, 015, 017, 018, 019, 024, 040, 041, 049 em **Aprovado** com o candidato KP/MM como origem (partes sem candidato seguem para modelar no estilo). Banqueta `KP/chair_stool` com **assento plano** em todo uso. **AST-012**: candidato fogão KayKit **recusado**; vira **roller grill** modelada (Steel + painel Ketchup, sem marca), Aprovado na direção; silhueta em reescrita pelo art-director; níveis em `Q-134`.
@@ -1540,6 +1553,110 @@ Total **54** de 64 células (sobra para a 1ª atualização). Robux usa o ícone
 | **4 — Queda, monetização, cutscenes, final** | AST-097 | AST-058, 059 (final), 069 (clipes onda 4), 070 (desmaio, embarque, reviver), 074, 075, 076 | 097 (render), 058, 074, 075, 076 (+ máscaras) | 070 | 097, botão Robux e telas do 091 |
 
 Contagem: **20 fichas novas** (AST-078 a AST-097) + **25 complementos** em fichas existentes.
+
+## Modo de preparo: sprites 2D (`ui`, `vfx`) — AST-108 a AST-119 (TASK-187, 2026-10-12)
+
+Origem: `docs/art/prep-ui-spec.md` §15 (spec visual do modo focado, DEC-223). **Todas Rascunho**: só vão ao `modeler-3d` (TASK-188) com status **Aprovado** pelo dono. Produção em `Assets/blender/ui/` e `Assets/textures/prep/`; integração (ids em `Content.Prep.Art`, troca dos placeholders de Frame) na TASK-189. **O jogo roda inteiro com placeholders**: 188 e 189 nunca bloqueiam as ondas de código.
+
+Regras comuns:
+- **Reaproveitar antes de produzir:** `Ingredient/*` (8), `Item/hot_dog`, `Hud/coin|sun|moon`, `Reaction/star`, `Notice/lock`, `Class/*` já estão no AST-071 (54 ícones, DEC-217) e **não** entram de novo.
+- **Estilo:** o do AST-071 (render EEVEE do modelo 3D, câmera ortográfica 3/4, luz Cream `#FFF1D6` + contraluz fria, contorno Ink `#2B2233` de 4 px por dilatação, fundo transparente, reduzido de 512). Onde não há modelo (glifos, selos, ticket), desenho 2D chapado com a mesma paleta e o mesmo contorno. **Sem vermelho de alerta** (o vermelho do ketchup existe só como cor de comida).
+- **Folhas:** `Prep_Icons` 1024², células de 128 (até 64 ícones) e `Prep_Board` 1024 x 512 (peças maiores e 9-slice). **Orçamento: <= 6 MB decodificados somando as duas** (style guide §9.2). Nomes de ícone `Prep/<grupo>/<nome>`; JSON de recortes ao lado, como o do AST-071. Pipeline: `tools/icons/` (`make_jobs.py` > `render_icons.py` > `build_sheet.py`).
+- **Texto:** nenhum texto desenhado nas peças (rótulos são `CartoonLabel`, inglês, DEC-022), **exceto** os 3 selos do AST-113 e os 3 do AST-118, onde a palavra faz parte da forma (acessibilidade); a fonte é a do kit.
+- Cada ficha: tamanho nativo, estados, ancoragem de uso (onde aparece em `PrepShell`, `TicketRail`, `IngredientPanel`, `PlateView`, `StrokeCanvas`) e fallback por Frame.
+
+### AST-108 — Glifos de comando (abas e botões)
+
+- **Status:** Rascunho · **Prioridade:** P0 · **Origem:** 2D (estilo do AST-071) · **Tamanho:** 128² por célula (exibido a 28–40 px) · **TASK:** 187 > 188 > 189
+- **Peças (`Prep/Glyph/*`):** `tab_order` (ticket com picote e 3 linhas Teal), `tab_grill` (roller grill vista de frente, 2 rolos), `tab_build` (pão aberto com salsicha), `tab_serve` (cloche/sino com botão Mustard), `leave` (porta Cream + seta), `next` (chevron grosso), `trash_closed` e `trash_open` (lixeira de rua Mustard/Teal do AST-034, versão chapada), `flip` (seta curva dupla), `warn` (triângulo Mustard com "!"), `hourglass` ("Come again?" e paciência baixa), `check` e `x` se o `Icons` atual não os tiver (`Ui/check` já existe).
+- **Estados:** cada glifo tem **uma** versão (cor fixa); desabilitado = 50% de opacidade por código; ativo = o botão muda para Mustard, não o glifo.
+- **Contorno:** Ink 4 px; sem sombra interna; legível a 28 px em fundo Cream **e** Mustard.
+- **Uso:** `PrepShell` (barra superior, Next/Serve, Leave, lixeira), slots do Grill (`flip`), toasts e caixas de ingrediente (`warn`).
+- **Fallback:** forma em Frame (Cream com Ink) + texto curto.
+
+### AST-109 — Salsicha em 4 estados
+
+- **Status:** Rascunho · **Prioridade:** P0 · **Origem:** render dos modelos do AST-002 (`Sausage_Raw` 92 tris, `Sausage_Grilled` 164 tris)
+- **Peças (`Prep/Sausage/*`):** `raw` (rosa `#E9A08F`), `half` (um lado marcado, outro cru: **forma da meia-virada**), `done` (`#C2602F` > `#7E3519` com marcas), `ghost` (contorno tracejado Ink 20%, para "esperando a grelha" e slot vazio).
+- **Tamanhos:** ícone 128² (chip do trilho, slot) e **horizontal 256 x 96** (slot do Grill e chip arrastável no Build), dois lados do mesmo render.
+- **Leitura:** a diferença entre os 4 estados tem de aparecer **em escala de cinza** (marcas de grelha e meia-divisão, não só o matiz).
+- **Uso:** `Grill` (slots 112 x 64), `PlateView` (chip 96 x 44), trilho "Ready xN".
+
+### AST-110 — Pão, guia de corte e mat
+
+- **Status:** Rascunho · **Prioridade:** P0 · **Origem:** render do AST-001 (`Bun_Closed` 128 tris, `Bun_Open` 152 tris)
+- **Peças (`Prep/Bun/*`):** `closed` (vista de cima, 256 x 96), `open` (aberto, vão visível), `cut_guide` (linha tracejada Ink, **máscara** tintável, 256 x 16), `half_l`/`half_r` (metades para a animação de abrir, 128 x 96 cada), `icon` (128²).
+- **Mat:** textura de tábua de madeira clara (`Prep_Board`), 9-slice 128², borda Ink 4 px, **sem** textura pintada de foto/ruído (style guide §6): faixas planas alternando 2 tons do atlas.
+- **Uso:** `PlateView` (Build) e cartão "Your plate" (Serve).
+
+### AST-111 — Complementos vistos de cima
+
+- **Status:** Rascunho · **Prioridade:** P0 · **Origem:** render/redesenho dos modelos de cobertura (AST-004 `KetchupTopping` 66 tris, AST-005 `MustardTopping` 86, AST-006 `Cheese`, AST-007 `Bacon`, AST-008 `PotatoSticks`, AST-009 `CreamCheese`)
+- **Peças (`Prep/Topping/*`, 256 x 96, vista de cima sobre o pão):** `sauce_zigzag` (**uma** máscara branca tintável: ketchup `#E2402E`, mustard `#F6C12B`, cream cheese `#FFF8EC` por `ImageColor3`), `cheese_slice`, `bacon_strip`, `potato_pile`; mais `sauce_guide` (traço-guia do zigue-zague, tracejado, 256 x 96) e `ring_target` (anel de alvo do bacon, 64 x 64, 2 estados: aberto/fechando).
+- **Regra:** a ordem de empilhar é livre (spec §5.3), então cada peça é **independente** e com sombra mínima, para qualquer combinação ficar boa.
+- **Uso:** `PlateView`, `StrokeCanvas` (traço), e o ícone 2D do hot dog pronto no Serve (composição por código).
+
+### AST-112 — Ticket
+
+- **Status:** Rascunho · **Prioridade:** P0 · **Origem:** 2D
+- **Peças (`Prep/Ticket/*`):** `paper` (9-slice 96² Cream `#FFF8EA` > `#FBE3B8`, contorno Ink 3 px, **borda inferior rasgada** em serrilha de 8 px), `pin` (pino Teal 32²), `ring_track` e `ring_fill` (anel de paciência, 64²: máscara + preenchimento tintável Teal > Mustard; 3 entalhes fixos), `stack_edge` (bordas de tickets atrás, 9-slice), `stamp_served` (carimbo "pago", Green com check, 96²).
+- **Estados por código:** anel Teal (> 40%), Mustard (< 40%), Mustard pulsando com `hourglass` (< 15%). **Nunca vermelho.**
+- **Uso:** `TicketRail` (paisagem e retrato) e cartões do Order.
+
+### AST-113 — Selos de nota (Perfect / Good / Messy)
+
+- **Status:** Rascunho · **Prioridade:** P0 · **Origem:** 2D
+- **Peças (`Prep/Grade/*`):** `perfect` (estrela-explosão de 12 pontas Mustard + estrela, texto "Perfect!"), `good` (círculo Teal claro `#63C8D4` + check, "Good"), `messy` (mancha ondulada Slate `#A9AEBF` + rabisco, "Messy"). Cada um em **3 tamanhos**: selo 256², mini 64² (sem texto, só forma e ícone) e pip 32² (só a forma, vazio/preenchido).
+- **Texto:** Fredoka (kit), Ink com contorno Cream 3 px; **o texto é parte do selo** (acessibilidade). Contraste Ink sobre cada cor >= 4,5:1 (Teal claro 7,7:1).
+- **Leitura em escala de cinza:** as 3 silhuetas são distintas sem cor (estrela x círculo x mancha).
+- **Uso:** pips do cabeçalho do Build, mini-selo ao fim de cada gesto, selo do prato no Serve.
+
+### AST-114 — Cursores de gesto
+
+- **Status:** Rascunho · **Prioridade:** P1 · **Origem:** 2D (ícones de Tool simplificados, no estilo do AST-071)
+- **Peças (`Prep/Cursor/*`, 64²):** `knife`, `bottle` (garrafa inclinada com bico; versão tintável da cor do molho), `hand_open`, `hand_grab`, `sprinkle` (pitada), `finger_dot` (marcador do ponto de toque, anel Mustard 4 px com centro vazio).
+- **Regra:** o ponto ativo de cada cursor é a **ponta** (faca, bico, dedo) e fica registrado no JSON (`HotSpot`); o cursor é **deslocado 28 px acima do dedo** no toque (`Rules.TouchOffset`).
+- **Uso:** `Cursor` do `PrepController`, `StrokeCanvas`.
+
+### AST-115 — Partículas 2D de UI
+
+- **Status:** Rascunho · **Prioridade:** P1 · **Origem:** 2D, máscaras brancas tintáveis (reaproveita o que servir do AST-070/092)
+- **Peças (`Prep/Fx/*`, 64²):** `crumb`, `drop`, `star4` (estrela de 4 pontas), `dust`, `glow`, `dot`. Brancas com borda suave; a cor vem de `ImageColor3`.
+- **Orçamento:** <= 24 partículas simultâneas na tela (spec §8); nenhuma textura própria por cor.
+- **Uso:** feedback por gesto e selos.
+
+### AST-116 — Tábua e grelha em vista de cima
+
+- **Status:** Rascunho · **Prioridade:** P1 · **Origem:** render da `AST-012_RollerGrill` + 2D
+- **Peças (`Prep/Board/*`):** `grill_rollers` (4 rolos horizontais, 9-slice horizontal, 512 x 192), `slot_empty` (célula tracejada com "+", 9-slice 64²), `rail_strip` (trilho de descanso, 256 x 48), `bar_track` e `bar_window` (barra de cozimento e colchete da janela de virar com 2 entalhes; **forma**, não só cor).
+- **Uso:** aba Grill (slots 112 x 64) e chip "Ready xN".
+
+### AST-117 — Retratos de cliente
+
+- **Status:** Rascunho · **Prioridade:** P1 · **Origem:** render das cabeças `AST-053_Animal_*.fbx` (18 espécies: Dog, Cat, Rabbit, Fox, Bear, Panda, Turtle, Owl, Frog, Penguin, Hamster, Monkey, Pig, Koala, Sheep, Mouse, Raccoon, Lion); expressão `Normal`
+- **Tamanho:** 64² por espécie em círculo recortado (sem boné da crew: cliente civil), contorno Ink 3 px. **Quais espécies são clientes** depende de `Q-149`; começar pelas 6 mais usadas.
+- **Fallback (já no jogo):** círculo na cor da pelagem + inicial (como `SquadStatus/Avatar`).
+- **Uso:** ticket, cartões do Order e do Serve.
+
+### AST-118 — Selos de entrega
+
+- **Status:** Rascunho · **Prioridade:** P1 · **Origem:** 2D
+- **Peças (`Prep/Result/*`, 128²):** `complete` (círculo Green + check, "Complete"), `incomplete` (meio-círculo Mustard + metade preenchida, "Incomplete"), `wrong` (**quadrado** Slate com X, "Wrong"), `tip` (moeda `Hud/coin` com "+$" por código).
+- **Regra:** silhuetas **diferentes** das do AST-113 (círculo+check x estrela x mancha), para não confundir nota do prato com resultado da entrega. Sem vermelho (Wrong = Slate).
+- **Uso:** cartão do cliente no Serve após a resposta do servidor (`PrepResult`).
+
+### AST-119 — Vinheta do foco e entalhe de aba
+
+- **Status:** Rascunho · **Prioridade:** P2 · **Origem:** 2D
+- **Peças (`Prep/Frame/*`):** `vignette` (gradiente Ink 35% nas 4 bordas, 9-slice 512 x 128, **fallback sem DOF** em qualidade <= 3, spec §13.7), `tab_notch` (triângulo de 14 x 8 que aponta da aba ativa para a tábua).
+- **Uso:** `PrepShell`.
+
+### Lote e ordem sugerida (TASK-188)
+
+1. **P0 (aprovar primeiro):** AST-108 a AST-113 (6 fichas): cobrem abas, Grill, Build e o selo; entregam um modo focado **bonito** mesmo sem o resto.
+2. **P1:** AST-114 a AST-118 (cursores, partículas, tábua, retratos, selos de entrega).
+3. **P2:** AST-119.
+Aceite de revisão (art-director): escala de cinza legível, contraste de texto, contorno e paleta do AST-071, nomes `Prep/<grupo>/<nome>`, tamanho dentro do orçamento da folha, nenhum vermelho de alerta, nenhuma marca ou arte de outro jogo.
 
 ## Fora desta lista (próxima rodada)
 

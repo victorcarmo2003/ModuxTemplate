@@ -1,8 +1,12 @@
 --!strict
 -- Hotbar Tools (FEAT-005, FEAT-007; DEC-040, DEC-049, DEC-174, DEC-190; architecture.md §3.1, §18.9.5;
 -- network.md §7, §7.1; TASK-022). Run place only.
--- Single writer of the Tool attributes Item, Count, Toppings, Restore and Altered. Tools are cloned from the kit
+-- Single writer of the Tool attributes Item, Count, Toppings, Restore, Altered and Quality. Tools are cloned from the kit
 -- ReplicatedStorage.Assets.Items.Tools/<Content.Items key> and replicate through the native Backpack (no Lync).
+-- Quality (TASK-171; prep-mode.md §2): a hot dog made in the prep mode carries the plate band (Perfect / Good / Messy,
+-- Content.Prep.Grades) in the Tool attribute Quality; nil = quick mode (no quality). It travels with the Tool through
+-- the stash, snapshot "T" and drops (Stash.luau, Extra suffix "|Quality") and goes away when the hot dog is served.
+-- CustomerService:SellLine reads it with QualityOf (tip and mood only, never the price, Q-219 B).
 -- Limits come from Content.ItemRules: HotbarSlots total Tools (4) and CategoryLimits per category; the package limit
 -- goes through ClassService (PackageLimit, bear = 3). Only Tools created here count and are trusted: anything else in
 -- a Backpack is ignored by every read below.
@@ -48,6 +52,7 @@ export type GiveOptions = {
 	Silent: boolean?,
 	Restore: number?,
 	Altered: boolean?,
+	Quality: string?, -- hot dog only: Content.Prep.Grades band ("Perfect" | "Good" | "Messy"); nil = no quality
 }
 
 export type UseHandler = Uses.Handler
@@ -57,6 +62,7 @@ const COFFEE = "coffee"
 const GIVE_COFFEE = "give_coffee"
 const RESTORE = "Restore"
 const ALTERED = "Altered"
+const QUALITY = "Quality"
 const ALTER_PHASE = "Night" -- altered items exist only in this phase (ITM-020; same rule as KitchenService)
 const MAX_RESTORE = 200
 const PACKAGE = "Package"
@@ -154,6 +160,7 @@ function ItemService:Setup()
 				Toppings = rebuild.Toppings,
 				Restore = rebuild.Restore,
 				Altered = rebuild.Altered,
+				Quality = rebuild.Quality,
 			})
 		end,
 		Return = function(userId: number, key: string, count: number, extra: string?)
@@ -385,6 +392,14 @@ function ItemService:IsAltered(tool: Tool): boolean
 	return self:ItemOf(tool) == HOT_DOG and tool:GetAttribute(ALTERED) == true
 end
 
+-- Prep quality of a hot dog (Content.Prep.Grades band), nil = quick mode or not a hot dog.
+function ItemService:QualityOf(tool: Tool): string?
+	if self:ItemOf(tool) ~= HOT_DOG then
+		return nil
+	end
+	return Stash.quality(tool:GetAttribute(QUALITY))
+end
+
 -- Units left in a stackable Tool (package leftover, DEC-049). 0 for anything else.
 function ItemService:Count(tool: Tool): number
 	if self.Owners[tool] == nil then
@@ -506,6 +521,7 @@ function ItemService:Give(player: Player, key: string, options: GiveOptions?): T
 		tool:SetAttribute(RESTORE, nil)
 	end
 	tool:SetAttribute(ALTERED, if key == HOT_DOG and options and options.Altered == true then true else nil)
+	tool:SetAttribute(QUALITY, if key == HOT_DOG and options then Stash.quality(options.Quality) else nil)
 
 	tool.Parent = backpack
 	self:Track(player, tool)
@@ -567,6 +583,20 @@ function ItemService:AddTopping(tool: Tool, ingredient: string): boolean
 	table.insert(toppings, ingredient)
 	tool:SetAttribute("Toppings", table.concat(toppings, ","))
 	self:Paint(tool)
+	self.Changed:Fire(player)
+	return true
+end
+
+-- Sets (or clears, nil) the prep quality of a hot dog in play. False = not a hot dog of this server or unknown quality.
+function ItemService:SetQuality(tool: Tool, quality: string?): boolean
+	const player = self.Owners[tool]
+	if player == nil or self:ItemOf(tool) ~= HOT_DOG then
+		return false
+	end
+	if quality ~= nil and Stash.quality(quality) == nil then
+		return false
+	end
+	tool:SetAttribute(QUALITY, quality)
 	self.Changed:Fire(player)
 	return true
 end
@@ -668,7 +698,8 @@ function ItemService:EntriesOf(player: Player): { Stash.Entry }
 				tool:GetAttribute("Count"),
 				tool:GetAttribute("Toppings"),
 				tool:GetAttribute(RESTORE),
-				tool:GetAttribute(ALTERED)
+				tool:GetAttribute(ALTERED),
+				tool:GetAttribute(QUALITY)
 			)
 		if entry then
 			table.insert(out, entry)
@@ -727,6 +758,7 @@ function ItemService:Unstash(player: Player): boolean
 			Toppings = rebuild.Toppings,
 			Restore = rebuild.Restore,
 			Altered = rebuild.Altered,
+			Quality = rebuild.Quality,
 			Equip = false,
 			Silent = true,
 		})
@@ -844,7 +876,8 @@ function ItemService:DropHeld(player: Player, _reason: string): boolean
 		tool:GetAttribute("Count"),
 		tool:GetAttribute("Toppings"),
 		tool:GetAttribute(RESTORE),
-		tool:GetAttribute(ALTERED)
+		tool:GetAttribute(ALTERED),
+		tool:GetAttribute(QUALITY)
 	)
 	self:Consume(player, tool)
 	if position == nil or item.DropOnHit == "Vanish" then
@@ -876,6 +909,7 @@ function ItemService:ReturnDrop(userId: number, entry: Stash.Entry)
 			Toppings = rebuild.Toppings,
 			Restore = rebuild.Restore,
 			Altered = rebuild.Altered,
+			Quality = rebuild.Quality,
 			Equip = false,
 			Silent = true,
 		})

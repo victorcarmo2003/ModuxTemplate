@@ -33,6 +33,9 @@
 	               gain back towards it) and a critically damped spring brings the view back after Rules.Look.Recenter
 	               s without input. Fov narrows the view while that focus holds; a light depth of field keeps the
 	               focus sharp (Content.Cutscenes.Rules.Look; 2026-10-11 user feedback).
+	  Prep         focused prep mode (DEC-223, PrepController): scripted camera on a station pose, tweened in and out
+	               (`Prep(on, frame, options)`); the own rig is hidden by the PrepController (no first person groups);
+	               the driver leaves it alone and the mode returns to FirstPerson when the way out is done
 	  External     someone else owns the camera: nothing is driven, every part is restored
 
 	Free look (Spectate, Cutscene): mouse (cursor locked to the centre), touch drag on the free screen, gamepad right
@@ -60,13 +63,14 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local StarterPlayer = game:GetService("StarterPlayer")
+local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 
-export type Mode = "FirstPerson" | "Spectate" | "Fixed" | "Cutscene" | "External"
+export type Mode = "FirstPerson" | "Spectate" | "Fixed" | "Cutscene" | "Prep" | "External"
 
 -- Camera rig of a cutscene shot (CutsceneController/Director.luau; owner request 2026-10-12), all optional
 export type Rig = {
@@ -80,6 +84,29 @@ export type Rig = {
 	Rack: number?, -- 1/s the depth of field follows the focus
 	Shake: Vector3, -- hand-held, camera space studs
 	Tilt: Vector3, -- hand-held, radians (pitch, yaw, roll)
+}
+
+-- Focused prep mode (PrepController; Content.Prep.Rules.Camera): pose tween and optional depth of field
+export type PrepOptions = {
+	Fov: number?, -- field of view at the station
+	Travel: number?, -- s of the tween (0 = a cut)
+	Dof: boolean?, -- depth of field behind the work surface (quality > 3 only; the caller decides)
+	Focus: number?, -- studs of the DOF focus distance
+	Radius: number?, -- studs in focus around it
+	Far: number?, -- far blur intensity
+}
+
+type PrepState = {
+	From: CFrame,
+	To: CFrame,
+	FromFov: number,
+	Fov: number,
+	BaseFov: number,
+	Start: number,
+	Travel: number,
+	Leaving: boolean,
+	Dof: DepthOfFieldEffect?,
+	Far: number,
 }
 
 type Group = "Head" | "Arm" | "Body"
@@ -354,6 +381,8 @@ function CameraController:Setup()
 	self.WasBoom = false :: boolean
 	self.BaseFov = nil :: number?
 	self.Dof = nil :: DepthOfFieldEffect?
+	-- Prep mode: the pose tween, nil outside the mode
+	self.PrepState = nil :: PrepState?
 	-- kept for ResetLook (older cutscene base)
 	self.HoldYaw = nil :: number?
 	self.LastLookInput = 0 :: number
@@ -366,6 +395,10 @@ function CameraController:Setup()
 end
 
 function CameraController:SetMode(mode: Mode)
+	if mode ~= "Prep" and Vide.untrack(self.Mode) == "Prep" then
+		-- someone took the camera while the prep mode was up: drop its effect and field of view
+		self:PrepClear()
+	end
 	if mode ~= "Spectate" and mode ~= "Fixed" then
 		self.Target = nil
 		self.PointId = nil
@@ -380,6 +413,132 @@ function CameraController:SetMode(mode: Mode)
 	end
 	if mode == "FirstPerson" then
 		Players.LocalPlayer.CameraMode = Enum.CameraMode.LockFirstPerson
+	end
+end
+
+-- Forgets the prep tween: effect destroyed, field of view back.
+function CameraController:PrepClear()
+	const state = self.PrepState
+	self.PrepState = nil
+	if state == nil then
+		return
+	end
+	if state.Dof ~= nil then
+		state.Dof:Destroy()
+	end
+	const camera = workspace.CurrentCamera
+	if camera ~= nil then
+		camera.FieldOfView = state.BaseFov
+	end
+end
+
+-- Focused prep mode (PrepController). on = true: tween from the current view to `frame` (a station pose); calling it
+-- again while the mode is up retargets (another station). on = false: tween back to the own head and, when done, the
+-- mode becomes FirstPerson again (the driver takes over). Entering is only accepted from FirstPerson (or Prep itself):
+-- a cutscene, a spectate or an external owner is never overridden. Travel 0 = a cut.
+function CameraController:Prep(on: boolean, frame: CFrame?, options: PrepOptions?)
+	const camera = workspace.CurrentCamera
+	if camera == nil then
+		return
+	end
+	const opts: PrepOptions = options or {}
+	const now = os.clock()
+	const existing = self.PrepState
+	if on then
+		const mode = Vide.untrack(self.Mode)
+		if frame == nil or (mode ~= "FirstPerson" and mode ~= "Prep") then
+			return
+		end
+		const baseFov = if existing ~= nil then existing.BaseFov else camera.FieldOfView
+		local dof = if existing ~= nil then existing.Dof else nil
+		if opts.Dof and dof == nil then
+			const effect = Instance.new("DepthOfFieldEffect")
+			effect.Name = "PrepFocus"
+			effect.FarIntensity = 0
+			effect.NearIntensity = 0
+			effect.FocusDistance = opts.Focus or 2.5
+			effect.InFocusRadius = opts.Radius or 0.4
+			effect.Parent = camera
+			dof = effect
+		elseif not opts.Dof and dof ~= nil then
+			dof:Destroy()
+			dof = nil
+		end
+		self.PrepState = {
+			From = camera.CFrame,
+			To = frame,
+			FromFov = camera.FieldOfView,
+			Fov = opts.Fov or camera.FieldOfView,
+			BaseFov = baseFov,
+			Start = now,
+			Travel = opts.Travel or 0,
+			Leaving = false,
+			Dof = dof,
+			Far = opts.Far or 0.7,
+		}
+		self:SetMode("Prep")
+		self:SetSwitchBind(false)
+		return
+	end
+	if Vide.untrack(self.Mode) ~= "Prep" or existing == nil then
+		return
+	end
+	self.PrepState = {
+		From = camera.CFrame,
+		To = camera.CFrame,
+		FromFov = camera.FieldOfView,
+		Fov = existing.BaseFov,
+		BaseFov = existing.BaseFov,
+		Start = now,
+		Travel = opts.Travel or 0,
+		Leaving = true,
+		Dof = existing.Dof,
+		Far = existing.Far,
+	}
+end
+
+-- Where the view returns to when the prep mode ends: the own head, facing the way the body faces.
+function CameraController:PrepExitFrame(): CFrame?
+	const character = Players.LocalPlayer.Character
+	const head = if character ~= nil then character:FindFirstChild("Head") else nil
+	const root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
+	if head == nil or root == nil or not head:IsA("BasePart") or not root:IsA("BasePart") then
+		return nil
+	end
+	return CFrame.new(head.Position) * CFrame.fromOrientation(0, yawOf(root.CFrame.LookVector), 0)
+end
+
+-- One frame of the prep tween (Quad out going in, Quad in going out); see Prep().
+function CameraController:ApplyPrep(camera: Camera)
+	const state = self.PrepState
+	if state == nil then
+		self:SetMode("FirstPerson")
+		return
+	end
+	const player = Players.LocalPlayer
+	if player.CameraMode ~= Enum.CameraMode.Classic then
+		player.CameraMode = Enum.CameraMode.Classic
+	end
+	if camera.CameraType ~= Enum.CameraType.Scriptable then
+		camera.CameraType = Enum.CameraType.Scriptable
+	end
+	const alpha = if state.Travel <= 0 then 1 else math.clamp((os.clock() - state.Start) / state.Travel, 0, 1)
+	const eased = TweenService:GetValue(
+		alpha,
+		Enum.EasingStyle.Quad,
+		if state.Leaving then Enum.EasingDirection.In else Enum.EasingDirection.Out
+	)
+	const target = if state.Leaving then (self:PrepExitFrame() or state.To) else state.To
+	camera.CFrame = state.From:Lerp(target, eased)
+	camera.FieldOfView = state.FromFov + (state.Fov - state.FromFov) * eased
+	const dof = state.Dof
+	if dof ~= nil then
+		dof.FarIntensity = state.Far * (if state.Leaving then 1 - eased else eased)
+	end
+	if state.Leaving and alpha >= 1 then
+		self:PrepClear()
+		self:SetMode("FirstPerson")
+		self.NextDrive = 0
 	end
 end
 
@@ -626,7 +785,7 @@ end
 -- Picks the mode from the own life state (see header). Never decides a state.
 function CameraController:Drive()
 	const mode = Vide.untrack(self.Mode)
-	if mode == "External" or mode == "Cutscene" then
+	if mode == "External" or mode == "Cutscene" or mode == "Prep" then
 		self:SetSwitchBind(false)
 		return
 	end
@@ -1012,6 +1171,10 @@ function CameraController:ApplyCamera(dt: number)
 		return
 	end
 	self:UnlockMouse()
+	if mode == "Prep" then
+		self:ApplyPrep(camera)
+		return
+	end
 	const player = Players.LocalPlayer
 
 	if mode == "Fixed" then
@@ -1043,7 +1206,7 @@ end
 
 function CameraController:IsFirstPerson(): boolean
 	const mode = self.Mode()
-	if mode == "Fixed" or mode == "External" then
+	if mode == "Fixed" or mode == "External" or mode == "Prep" then
 		return false
 	end
 	const character = self.Character

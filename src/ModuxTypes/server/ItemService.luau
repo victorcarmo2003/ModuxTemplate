@@ -2,6 +2,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
+local Content = require(ReplicatedStorage.shared.Content)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 local Drops = require(ServerScriptService.server.Item.ItemService.Drops)
 local Pickup = require(ServerScriptService.server.Item.ItemService.Pickup)
@@ -15,6 +16,7 @@ export type GiveOptions = {
 	Silent: boolean?,
 	Restore: number?,
 	Altered: boolean?,
+	Quality: string?, -- hot dog only: Content.Prep.Grades band ("Perfect" | "Good" | "Messy"); nil = no quality
 }
 export type UseHandler = Uses.Handler
 
@@ -41,6 +43,7 @@ export type Public = {
 	GetHeld: (self: Public, player: Player) -> Tool?,
 	Holding: (self: Public, player: Player, spec: string) -> Tool?,
 	IsAltered: (self: Public, tool: Tool) -> boolean,
+	QualityOf: (self: Public, tool: Tool) -> string?,
 	Count: (self: Public, tool: Tool) -> number,
 	Toppings: (self: Public, tool: Tool) -> { string },
 	CountCategory: (self: Public, player: Player, category: string) -> number,
@@ -53,6 +56,7 @@ export type Public = {
 	Consume: (self: Public, player: Player, tool: Tool) -> (),
 	SetCount: (self: Public, tool: Tool, count: number) -> number,
 	AddTopping: (self: Public, tool: Tool, ingredient: string) -> boolean,
+	SetQuality: (self: Public, tool: Tool, quality: string?) -> boolean,
 	Transfer: (self: Public, tool: Tool, target: Player) -> boolean,
 	TargetOf: (self: Public, anchor: Instance) -> Player?,
 	CanGiveCoffee: (self: Public, player: Player, anchor: Instance) -> boolean,

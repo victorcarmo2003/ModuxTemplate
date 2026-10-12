@@ -16,8 +16,9 @@ local StationApi = require(script.Parent.Parent.StationApi)
 type Context = StationApi.Context
 type Station = StationApi.Station
 
--- One sausage on the rail: server time it arrived; Altered = the anomaly's gray sausage (ITM-020).
-type Entry = { At: number, Altered: boolean }
+-- One sausage on the rail: server time it arrived; Altered = the anomaly's gray sausage (ITM-020); Score = grill flip
+-- score 0..100 stamped by the server (prep mode, TASK-169; nil = not graded: world "Collect", altered sausage).
+type Entry = { At: number, Altered: boolean, Score: number? }
 
 -- Private state of a rail station: sausages in take order (front = next "Add Sausage").
 type RailState = { Queue: { Entry } }
@@ -110,8 +111,9 @@ function Rail.Room(vehicle: string): number
 	return math.max(capacityOf(station) - #stateOf(station).Queue, 0)
 end
 
--- Adds one grilled sausage at the end of the queue. False when there is no rail or it is full.
-function Rail.Push(ctx: Context, vehicle: string): boolean
+-- Adds one grilled sausage at the end of the queue. False when there is no rail or it is full. `score` = the flip score
+-- of the prep mode grill (nil = the sausage carries no grade).
+function Rail.Push(ctx: Context, vehicle: string, score: number?): boolean
 	const station = Rail.Find(vehicle)
 	if station == nil then
 		return false
@@ -120,10 +122,20 @@ function Rail.Push(ctx: Context, vehicle: string): boolean
 	if #queue >= capacityOf(station) then
 		return false
 	end
-	const entry: Entry = { At = ctx.Now(), Altered = false }
+	const entry: Entry = { At = ctx.Now(), Altered = false, Score = score }
 	table.insert(queue, entry)
 	write(ctx, station)
 	return true
+end
+
+-- Front sausage without taking it: (exists, altered, score). Read only.
+function Rail.Front(vehicle: string): (boolean, boolean, number?)
+	const station = Rail.Find(vehicle)
+	const front = if station then stateOf(station).Queue[1] else nil
+	if front == nil then
+		return false, false, nil
+	end
+	return true, front.Altered, front.Score
 end
 
 -- True when the next sausage "Add Sausage" would take is the altered one (read only).
@@ -136,19 +148,20 @@ function Rail.FrontAltered(vehicle: string): boolean
 	return front ~= nil and front.Altered
 end
 
--- Takes the front sausage (FIFO; an altered one sits at the front). Returns (taken, it was the altered one).
-function Rail.Pop(ctx: Context, vehicle: string): (boolean, boolean)
+-- Takes the front sausage (FIFO; an altered one sits at the front). Returns (taken, it was the altered one, its grill
+-- flip score or nil).
+function Rail.Pop(ctx: Context, vehicle: string): (boolean, boolean, number?)
 	const station = Rail.Find(vehicle)
 	if station == nil then
-		return false, false
+		return false, false, nil
 	end
 	const queue = stateOf(station).Queue
 	if #queue == 0 then
-		return false, false
+		return false, false, nil
 	end
 	const entry = table.remove(queue, 1)
 	write(ctx, station)
-	return true, entry ~= nil and entry.Altered
+	return true, entry ~= nil and entry.Altered, if entry ~= nil then entry.Score else nil
 end
 
 -- StationApi.Module ---------------------------------------------------------------------------------------------------

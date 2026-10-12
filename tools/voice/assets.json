@@ -2194,5 +2194,1029 @@
   "reason": "",
   "assetId": "135392696118069",
   "moderation": "Approved"
+ },
+ "v_5890a8d024": {
+  "speaker": "crew",
+  "length": 1.7,
+  "gen_text": "Help wanted?",
+  "status": "ok",
+  "reason": "",
+  "assetId": "108538088561347"
+ },
+ "v_39e7f54e88": {
+  "speaker": "crew",
+  "length": 1.85,
+  "gen_text": "I really need a job.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "75487892759331"
+ },
+ "v_423f2c0d54": {
+  "speaker": "crew",
+  "length": 1.5,
+  "gen_text": "I'll call them.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "92567263281370"
+ },
+ "v_2a69dc807e": {
+  "speaker": "crew",
+  "length": 1.625,
+  "gen_text": "Let's call them.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "111773206238085"
+ },
+ "v_226fd7630d": {
+  "speaker": "walt",
+  "length": 3.309,
+  "gen_text": "A ketchup dog. Easy.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "127132252152199"
+ },
+ "v_9ac422dfab": {
+  "speaker": "walt",
+  "length": 2.31,
+  "gen_text": "A lady in a yellow raincoat.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "99644788625722"
+ },
+ "v_44fcde56d9": {
+  "speaker": "walt",
+  "length": 2.312,
+  "gen_text": "A long car may park across.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "72043550989887"
+ },
+ "v_2990698958": {
+  "speaker": "walt",
+  "length": 1.76,
+  "gen_text": "Back to the trailer.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "84047640026277"
+ },
+ "v_c53052d1dc": {
+  "speaker": "walt",
+  "length": 3.685,
+  "gen_text": "Bacon's in. Go sell some dogs.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "109565234288093"
+ },
+ "v_e7276368d3": {
+  "speaker": "walt",
+  "length": 3.31,
+  "gen_text": "Bacon's in. Smell that?",
+  "status": "ok",
+  "reason": "",
+  "assetId": "101908333407297"
+ },
+ "v_444b37b9a8": {
+  "speaker": "walt",
+  "length": 3.561,
+  "gen_text": "Bank clock's ticking fine. See?",
+  "status": "ok",
+  "reason": "",
+  "assetId": "104204462400405"
+ },
+ "v_660807b44d": {
+  "speaker": "walt",
+  "length": 3.209,
+  "gen_text": "Bar full? Grab it.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "126142732059932"
+ },
+ "v_b6e143965a": {
+  "speaker": "walt",
+  "length": 3.785,
+  "gen_text": "Bramble's Corner Dogs. Walt here.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "73542541371725"
+ },
+ "v_9ac90c1e2d": {
+  "speaker": "walt",
+  "length": 1.907,
+  "gen_text": "Bring them to the trailer.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "81792882412252"
+ },
+ "v_37816c7365": {
+  "speaker": "walt",
+  "length": 3.836,
+  "gen_text": "Careful crossing. Get hit, drop it.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "105074158525744"
+ },
+ "v_ca3dfc8d65": {
+  "speaker": "walt",
+  "length": 1.908,
+  "gen_text": "Cash goes in the drawer.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "72447414564109"
+ },
+ "v_2022c4e32e": {
+  "speaker": "walt",
+  "length": 3.714,
+  "gen_text": "Cheese is in. Folks love cheese.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "103022511465914"
+ },
+ "v_e90adf9284": {
+  "speaker": "walt",
+  "length": 4.0,
+  "gen_text": "Clock stops? Lights off, count five.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "82028732157397"
+ },
+ "v_d601ce4350": {
+  "speaker": "walt",
+  "length": 5.1,
+  "gen_text": "Corner's quiet. Too quiet. Heh heh.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "98442435824862"
+ },
+ "v_7c126684d4": {
+  "speaker": "walt",
+  "length": 3.585,
+  "gen_text": "Count to five. Then lights on.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "129722767481856"
+ },
+ "v_2905ce78c7": {
+  "speaker": "walt",
+  "length": 3.438,
+  "gen_text": "Don't wave back. Eyes down.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "77552522990476"
+ },
+ "v_8b95061e40": {
+  "speaker": "walt",
+  "length": 2.582,
+  "gen_text": "Down Juniper, someone walks toward you.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "118402816200199"
+ },
+ "v_c25f186944": {
+  "speaker": "walt",
+  "length": 2.237,
+  "gen_text": "Each look brings them closer.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "91070589767850"
+ },
+ "v_6ea4e48840": {
+  "speaker": "walt",
+  "length": 4.2,
+  "gen_text": "Evening, Rookie. Some customers look off.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "94707349590836"
+ },
+ "v_d4b4106930": {
+  "speaker": "walt",
+  "length": 3.563,
+  "gen_text": "Evening. Watch the bank clock.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "127970392028626"
+ },
+ "v_4795193c63": {
+  "speaker": "walt",
+  "length": 1.935,
+  "gen_text": "Flip the sign to open.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "92385491022633"
+ },
+ "v_f5f4a4ed47": {
+  "speaker": "walt",
+  "length": 1.963,
+  "gen_text": "Flip the sign when ready.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "96708046696986"
+ },
+ "v_93e30948c9": {
+  "speaker": "walt",
+  "length": 3.336,
+  "gen_text": "Flip the sign. Open up.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "123354265778187"
+ },
+ "v_f7af631300": {
+  "speaker": "walt",
+  "length": 2.413,
+  "gen_text": "Folks upstairs might wave tonight.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "119254166750620"
+ },
+ "v_0d5df0bc3f": {
+  "speaker": "walt",
+  "length": 2.09,
+  "gen_text": "Follow the arrow to the Mart.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "73551281877611"
+ },
+ "v_2825918158": {
+  "speaker": "walt",
+  "length": 1.788,
+  "gen_text": "Forget I said that.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "135670216792963"
+ },
+ "v_7ec1653677": {
+  "speaker": "walt",
+  "length": 1.74,
+  "gen_text": "Frank from the cooler.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "98964114713351"
+ },
+ "v_df06ad1d56": {
+  "speaker": "walt",
+  "length": 1.636,
+  "gen_text": "Frank in the bun.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "121510928849228"
+ },
+ "v_d669a97484": {
+  "speaker": "walt",
+  "length": 1.738,
+  "gen_text": "Frank on the grill.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "132434520973392"
+ },
+ "v_fe4055ecce": {
+  "speaker": "walt",
+  "length": 3.234,
+  "gen_text": "Go home. You did well.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "125049926253480"
+ },
+ "v_1acf3e207e": {
+  "speaker": "walt",
+  "length": 2.439,
+  "gen_text": "Go stand beneath the Mart's sign.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "82646366543710"
+ },
+ "v_9f14feee91": {
+  "speaker": "walt",
+  "length": 3.19,
+  "gen_text": "Good. Don't think about it.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "91404735383875"
+ },
+ "v_0fa0be155e": {
+  "speaker": "walt",
+  "length": 1.759,
+  "gen_text": "Got a rookie today!",
+  "status": "ok",
+  "reason": "",
+  "assetId": "84769109680589"
+ },
+ "v_510565a334": {
+  "speaker": "walt",
+  "length": 2.113,
+  "gen_text": "Grab buns at the bakery.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "129868200986850"
+ },
+ "v_7047da1e5a": {
+  "speaker": "walt",
+  "length": 1.865,
+  "gen_text": "Grab it off the grill.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "78214436750512"
+ },
+ "v_bdcf20bd01": {
+  "speaker": "walt",
+  "length": 3.736,
+  "gen_text": "Gray frank, bitten bun? Trash it.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "92162801547926"
+ },
+ "v_3b40e44d74": {
+  "speaker": "walt",
+  "length": 3.534,
+  "gen_text": "Grill's hot. Sell some dogs.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "75822557946926"
+ },
+ "v_2ab9e0108a": {
+  "speaker": "walt",
+  "length": 1.511,
+  "gen_text": "Hand it over.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "138953745420422"
+ },
+ "v_360d3e4019": {
+  "speaker": "walt",
+  "length": 1.938,
+  "gen_text": "Hold to slice the bun.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "118640397543226"
+ },
+ "v_4d28b6c67f": {
+  "speaker": "walt",
+  "length": 3.811,
+  "gen_text": "Hot dog's ready. Wait for orders.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "81772437000380"
+ },
+ "v_b938f43cf2": {
+  "speaker": "walt",
+  "length": 3.381,
+  "gen_text": "I counted the lamps. It helps.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "118684741792076"
+ },
+ "v_94162e7b2a": {
+  "speaker": "walt",
+  "length": 3.607,
+  "gen_text": "I never visit at night. Never.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "78691814937886"
+ },
+ "v_5874c73b55": {
+  "speaker": "walt",
+  "length": 1.984,
+  "gen_text": "I'm walking them through it.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "132099774255387"
+ },
+ "v_309041c66c": {
+  "speaker": "walt",
+  "length": 2.357,
+  "gen_text": "If it stops, trailer lights off.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "94846459817915"
+ },
+ "v_fad4ea3ff7": {
+  "speaker": "walt",
+  "length": 3.624,
+  "gen_text": "It never goes out. I promise.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "117813301339143"
+ },
+ "v_698b34b2da": {
+  "speaker": "walt",
+  "length": 3.59,
+  "gen_text": "It won't rain. She'll drip anyway.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "135440050196598"
+ },
+ "v_0b51420d50": {
+  "speaker": "walt",
+  "length": 3.314,
+  "gen_text": "Ka-ching! First sale.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "98392381666242"
+ },
+ "v_67ad984e40": {
+  "speaker": "walt",
+  "length": 4.1,
+  "gen_text": "Ketchup, mustard, smile. That's the job.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "102782758592971"
+ },
+ "v_b9194ce699": {
+  "speaker": "walt",
+  "length": 3.208,
+  "gen_text": "Ketchup. Hold to add.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "125882114016635"
+ },
+ "v_aba852ef7a": {
+  "speaker": "walt",
+  "length": 5.2,
+  "gen_text": "Knocking? It isn't me. I'm sorry.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "82898300186967"
+ },
+ "v_6c79c2dc88": {
+  "speaker": "walt",
+  "length": 5.3,
+  "gen_text": "Knocking? Not me. Window, or Mart.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "124410365317618"
+ },
+ "v_dc17216a68": {
+  "speaker": "walt",
+  "length": 3.636,
+  "gen_text": "Lamps out? To the Mart sign.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "104984598577585"
+ },
+ "v_1a40eaf445": {
+  "speaker": "walt",
+  "length": 3.582,
+  "gen_text": "Last night. The lamps may die.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "134601576148748"
+ },
+ "v_ea111e9eaa": {
+  "speaker": "walt",
+  "length": 3.485,
+  "gen_text": "Lights on you? Out of sight.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "72823382579644"
+ },
+ "v_abc060cca7": {
+  "speaker": "walt",
+  "length": 3.789,
+  "gen_text": "Long car? Window shut, or Mart.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "91378507706288"
+ },
+ "v_5b0f13d4af": {
+  "speaker": "walt",
+  "length": 2.085,
+  "gen_text": "Look at shirts and watches.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "70669605761454"
+ },
+ "v_dbf37e1260": {
+  "speaker": "walt",
+  "length": 1.739,
+  "gen_text": "Look both ways.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "116458746306701"
+ },
+ "v_79b511466d": {
+  "speaker": "walt",
+  "length": 3.537,
+  "gen_text": "Low on stock? Try the Mart.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "74782438513734"
+ },
+ "v_7a64804dde": {
+  "speaker": "walt",
+  "length": 3.531,
+  "gen_text": "Low on stuff? Try the Mart.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "92111396026176"
+ },
+ "v_2585223d7c": {
+  "speaker": "walt",
+  "length": 1.985,
+  "gen_text": "Mart's across the street.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "133836899256785"
+ },
+ "v_922fb14183": {
+  "speaker": "walt",
+  "length": 5.0,
+  "gen_text": "Messed up? Toss it. No harm.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "75198931323595"
+ },
+ "v_146c67bf64": {
+  "speaker": "walt",
+  "length": 3.762,
+  "gen_text": "Morning! Told you nights were quiet.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "97408027122210"
+ },
+ "v_6a998d7bee": {
+  "speaker": "walt",
+  "length": 3.688,
+  "gen_text": "Morning, Rookie! I'm on the line.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "86449024704970"
+ },
+ "v_fd74aa9897": {
+  "speaker": "walt",
+  "length": 2.207,
+  "gen_text": "Never let them reach your light.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "70374387277072"
+ },
+ "v_6fa5c342a5": {
+  "speaker": "walt",
+  "length": 1.987,
+  "gen_text": "Never watch the Walker.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "85559836938945"
+ },
+ "v_f8d53173e0": {
+  "speaker": "walt",
+  "length": 3.658,
+  "gen_text": "New gear's on the trailer. Heh heh.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "118052022218356"
+ },
+ "v_edd36e4c4d": {
+  "speaker": "walt",
+  "length": 3.455,
+  "gen_text": "Nice and normal. Just right.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "74454613447178"
+ },
+ "v_ee709edf63": {
+  "speaker": "walt",
+  "length": 3.584,
+  "gen_text": "Nice! Cash goes in the drawer.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "139555380432214"
+ },
+ "v_e983e4832e": {
+  "speaker": "walt",
+  "length": 3.486,
+  "gen_text": "Night two. Check your food first.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "74295472809660"
+ },
+ "v_6974dcd999": {
+  "speaker": "walt",
+  "length": 3.805,
+  "gen_text": "No face at all? Just refuse.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "83866935929717"
+ },
+ "v_d30128cf6d": {
+  "speaker": "walt",
+  "length": 1.833,
+  "gen_text": "No more nights for you.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "90146009252959"
+ },
+ "v_28189fdbed": {
+  "speaker": "walt",
+  "length": 3.414,
+  "gen_text": "Not what they asked. Toss it.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "123741422540064"
+ },
+ "v_5e48b92aca": {
+  "speaker": "walt",
+  "length": 1.73,
+  "gen_text": "Nothing extra.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "112497818663461"
+ },
+ "v_f4e083c4a2": {
+  "speaker": "walt",
+  "length": 1.56,
+  "gen_text": "Now serve it.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "75951709014841"
+ },
+ "v_0aca9b5c3e": {
+  "speaker": "walt",
+  "length": 1.735,
+  "gen_text": "Now slice a bun.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "119347099039359"
+ },
+ "v_1ae72da760": {
+  "speaker": "walt",
+  "length": 2.489,
+  "gen_text": "One Mister Pickett today, I hope.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "77488849418214"
+ },
+ "v_9e64894aac": {
+  "speaker": "walt",
+  "length": 4.1,
+  "gen_text": "One's a copy. Everything's backwards.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "140201676204032"
+ },
+ "v_089cce41c0": {
+  "speaker": "walt",
+  "length": 3.64,
+  "gen_text": "Only chance I get. Be careful.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "125881283533737"
+ },
+ "v_082de8f3e6": {
+  "speaker": "walt",
+  "length": 1.688,
+  "gen_text": "Onto the grill.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "127294216845277"
+ },
+ "v_398e154586": {
+  "speaker": "walt",
+  "length": 1.787,
+  "gen_text": "Pick up the phone.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "99237879286529"
+ },
+ "v_58bc970fcf": {
+  "speaker": "walt",
+  "length": 2.561,
+  "gen_text": "Potato sticks and a bigger grill.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "91760084402071"
+ },
+ "v_e245baf6a4": {
+  "speaker": "walt",
+  "length": 4.2,
+  "gen_text": "Potato sticks today. Bigger grill, too.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "115724103666953"
+ },
+ "v_3d658be667": {
+  "speaker": "walt",
+  "length": 1.588,
+  "gen_text": "Put it in the bun.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "126787308710008"
+ },
+ "v_631771189b": {
+  "speaker": "walt",
+  "length": 2.89,
+  "gen_text": "Ready. Grab it.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "95928422508635"
+ },
+ "v_e2948c76ce": {
+  "speaker": "walt",
+  "length": 3.486,
+  "gen_text": "Rough night. Let's try again.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "88530726644041"
+ },
+ "v_8cc7c08063": {
+  "speaker": "walt",
+  "length": 2.211,
+  "gen_text": "Serve her, whatever she asks.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "137520331825416"
+ },
+ "v_f36e086018": {
+  "speaker": "walt",
+  "length": 3.182,
+  "gen_text": "She liked you. The lady.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "82704956018174"
+ },
+ "v_0d3f6109b7": {
+  "speaker": "walt",
+  "length": 3.688,
+  "gen_text": "Start today. Keys under the mustard.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "129687226785166"
+ },
+ "v_6f8e1e31d2": {
+  "speaker": "walt",
+  "length": 2.426,
+  "gen_text": "Still refuse the faceless ones.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "85413688164199"
+ },
+ "v_2ed2add83d": {
+  "speaker": "walt",
+  "length": 2.012,
+  "gen_text": "Take the order, Rookie.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "133485613303536"
+ },
+ "v_70561a888f": {
+  "speaker": "walt",
+  "length": 1.614,
+  "gen_text": "Take their order.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "119134541282409"
+ },
+ "v_e06f57adaa": {
+  "speaker": "walt",
+  "length": 3.487,
+  "gen_text": "Tap the frank box. Grill it.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "127325702928267"
+ },
+ "v_4550eb2216": {
+  "speaker": "walt",
+  "length": 2.009,
+  "gen_text": "Tell Opal it's for Walt.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "133190095469238"
+ },
+ "v_15993e64ca": {
+  "speaker": "walt",
+  "length": 1.865,
+  "gen_text": "That was your last bun.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "80244067711086"
+ },
+ "v_319d2c7703": {
+  "speaker": "walt",
+  "length": 3.488,
+  "gen_text": "That wasn't me. Believe that.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "128968319612266"
+ },
+ "v_9b07624221": {
+  "speaker": "walt",
+  "length": 2.061,
+  "gen_text": "They just want to be noticed.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "104588388501667"
+ },
+ "v_9952411d1d": {
+  "speaker": "walt",
+  "length": 1.687,
+  "gen_text": "They want ketchup.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "82092607989829"
+ },
+ "v_deff9f6cab": {
+  "speaker": "walt",
+  "length": 3.812,
+  "gen_text": "They'll wander off. Grill stays hot.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "118768890664542"
+ },
+ "v_909f41e668": {
+  "speaker": "walt",
+  "length": 3.535,
+  "gen_text": "Tonight's the last. I promise.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "91100975475332"
+ },
+ "v_7b2ac165bc": {
+  "speaker": "walt",
+  "length": 1.683,
+  "gen_text": "Toss it in the bin.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "135374218507231"
+ },
+ "v_d8b930d7cb": {
+  "speaker": "walt",
+  "length": 3.786,
+  "gen_text": "Two? Refuse the backwards one.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "79326857419541"
+ },
+ "v_7c172f2d01": {
+  "speaker": "walt",
+  "length": 1.585,
+  "gen_text": "Wait for the bar.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "76912408208294"
+ },
+ "v_242db04f33": {
+  "speaker": "walt",
+  "length": 3.36,
+  "gen_text": "Watch your drawer. Quick hands.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "134125199300624"
+ },
+ "v_455323adaa": {
+  "speaker": "walt",
+  "length": 3.613,
+  "gen_text": "We're open! Folks are lining up.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "100778367383771"
+ },
+ "v_6afaa1306f": {
+  "speaker": "walt",
+  "length": 3.257,
+  "gen_text": "Window shut. Or the Mart.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "87988984929187"
+ },
+ "v_644d0f3f8e": {
+  "speaker": "walt",
+  "length": 3.526,
+  "gen_text": "You caught Quentin. Nice work.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "104375819696437"
+ },
+ "v_197159850e": {
+  "speaker": "walt",
+  "length": 3.263,
+  "gen_text": "You noticed the flyer. Good.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "91919343186817"
+ },
+ "v_7150b19925": {
+  "speaker": "walt",
+  "length": 3.488,
+  "gen_text": "You work late tonight. I'll ring.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "119819330589231"
+ },
+ "v_4d0c151fb2": {
+  "speaker": "walt",
+  "length": 2.209,
+  "gen_text": "Your first customer's coming.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "71722587237323"
+ },
+ "v_04ff36900d": {
+  "speaker": "walt",
+  "length": 3.182,
+  "gen_text": "Alright. You know the drill.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "73858819954163"
+ },
+ "v_04d9c9b305": {
+  "speaker": "walt",
+  "length": 1.411,
+  "gen_text": "Beautiful.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "89425207751845"
+ },
+ "v_60345d932a": {
+  "speaker": "walt",
+  "length": 1.836,
+  "gen_text": "Call me if you need me.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "126298445230020"
+ },
+ "v_b7e3644ee5": {
+  "speaker": "walt",
+  "length": 1.507,
+  "gen_text": "Call me if...",
+  "status": "ok",
+  "reason": "",
+  "assetId": "116250502600042"
+ },
+ "v_1af4e68b2e": {
+  "speaker": "walt",
+  "length": 1.213,
+  "gen_text": "Good.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "85842851908383"
+ },
+ "v_d5be557bf8": {
+  "speaker": "walt",
+  "length": 1.934,
+  "gen_text": "I'll walk you through it.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "95103316583386"
+ },
+ "v_74ca7ecbb8": {
+  "speaker": "walt",
+  "length": 3.384,
+  "gen_text": "Morning, Rookie. Walt here.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "103569604412690"
+ },
+ "v_213276c0ca": {
+  "speaker": "walt",
+  "length": 1.26,
+  "gen_text": "Nice.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "106624304261331"
+ },
+ "v_33b29ecd0d": {
+  "speaker": "walt",
+  "length": 1.361,
+  "gen_text": "Perfect.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "105443219406914"
+ },
+ "v_3e91827b5e": {
+  "speaker": "walt",
+  "length": 3.457,
+  "gen_text": "That's the job. You got this.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "125198913588683"
+ },
+ "v_3809a87c73": {
+  "speaker": "walt",
+  "length": 1.708,
+  "gen_text": "Hit the red switch.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "108564021102011"
+ },
+ "v_409146fe32": {
+  "speaker": "walt",
+  "length": 1.686,
+  "gen_text": "Open the trailer.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "101023441372101"
+ },
+ "v_f2bed86855": {
+  "speaker": "walt",
+  "length": 1.813,
+  "gen_text": "Open up when ready.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "103212058828597"
+ },
+ "v_e598a725da": {
+  "speaker": "walt",
+  "length": 1.987,
+  "gen_text": "Red switch, on the wall.",
+  "status": "ok",
+  "reason": "",
+  "assetId": "135017183708798"
  }
 }

@@ -115,7 +115,8 @@ def is_phone(entry):
         return False
     for s in entry["sources"]:
         f, _, rest = s.partition(":")
-        if f != "Cutscenes.luau" or int(re.match(r"\d+", rest).group(0)) <= 310:
+        # the intro call is Walt on the phone; the finale lines are in person (tagged [finale] by collect_lines.py)
+        if f != "Cutscenes.luau" or "[intro]" in rest:
             return True
     return False
 
@@ -144,12 +145,14 @@ def samples():
     os.remove(tmp)
 
 
-def allv(only=None):
+def allv(only=None, new_only=False):
     meta_path = os.path.join(HERE, "assets.json")
     meta = json.load(open(meta_path)) if os.path.exists(meta_path) else {}
     tmp = os.path.join(HERE, "_t.wav")
     for n, (k, e) in enumerate(LINES.items()):
         if only and k != only:
+            continue
+        if new_only and k in meta and meta[k].get("length") and os.path.exists(os.path.join(OUT, e["speaker"], k + ".ogg")):
             continue
         sp = e["speaker"]
         v = CFG["voices"][sp]
@@ -170,4 +173,4 @@ if __name__ == "__main__":
     if sys.argv[1] == "samples":
         samples()
     else:
-        allv(sys.argv[3] if len(sys.argv) > 3 and sys.argv[2] == "--only" else None)
+        allv(sys.argv[3] if len(sys.argv) > 3 and sys.argv[2] == "--only" else None, "--new" in sys.argv)

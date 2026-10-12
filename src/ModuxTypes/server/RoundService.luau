@@ -40,6 +40,7 @@ export type Record = {
 	Chances: number,
 	WipeEndsAt: number,
 	WipeFrozen: boolean,
+	Paused: boolean,
 }
 export type RunReport = { Result: RunResult, Day: number, Night: number, Gems: number }
 
@@ -54,6 +55,7 @@ export type Public = {
 	NightEndedAt: number,
 	NightResolved: SignalLib.Signal<ShiftInfo, NightResult, LoseReason?>,
 	NightShift: Charm.Atom<boolean>,
+	Paused: Charm.Atom<boolean>,
 	Phase: Charm.Atom<Phase>,
 	PhaseChanged: SignalLib.Signal<Phase, number, number>,
 	PhaseStartedAt: Charm.Atom<number>,
@@ -65,6 +67,7 @@ export type Public = {
 	ShiftStarted: SignalLib.Signal<ShiftInfo>,
 	StartGate: (() -> boolean)?,
 	Started: boolean,
+	ToggledAt: number,
 	VehicleProbe: (() -> string)?,
 	VerdictProbe: (() -> boolean)?,
 	WipeEndsAt: Charm.Atom<number>,
@@ -77,6 +80,8 @@ export type Public = {
 	IsStarted: (self: Public) -> boolean,
 	Info: (self: Public) -> ShiftInfo,
 	IsSelling: (self: Public) -> boolean,
+	IsPaused: (self: Public) -> boolean,
+	SetPaused: (self: Public, paused: boolean) -> boolean,
 	NightDuration: (self: Public, night: number) -> number,
 	Timing: (self: Public, phase: Phase) -> Flow.Timing,
 	Deadline: (self: Public) -> number,

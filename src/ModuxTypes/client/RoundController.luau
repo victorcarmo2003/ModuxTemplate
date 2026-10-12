@@ -21,6 +21,7 @@ export type Record = {
 	PhaseDuration: number,
 	ClockFrom: number,
 	ClockTo: number,
+	Paused: boolean,
 }
 
 export type Public = {
@@ -33,6 +34,7 @@ export type Public = {
 	Minutes: number,
 	Night: Vide.Source<number>,
 	NightWindow: Vide.Source<Window?>,
+	Paused: Vide.Source<boolean>,
 	Phase: Vide.Source<string>,
 	Ready: Vide.Source<boolean>,
 	Vehicle: Vide.Source<string>,

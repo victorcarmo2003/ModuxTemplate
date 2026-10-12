@@ -266,7 +266,7 @@ const rules: Rules = {
 	},
 	Sign = {
 		Tag = "NoHelpWantedSign",
-		Line = { "CS-1", "CS-3" }, -- Ninth south sidewalk in front of the Pad (owner D3 2026-10-12); the intro no longer stops at a sign
+		Line = { "CS-2", "CS-3" }, -- the trailer's sidewalk after the crossing (owner D3 2026-10-12); the intro does not stop at a sign any more
 		Distance = 3.5, -- user feedback 2026-10-11: stop close, right in front of the sign (~3-4 studs)
 		MinWidth = 3, -- the big AST-033 card (3.96 studs wide); the window cards are smaller
 		Range = 30,
@@ -312,18 +312,19 @@ const scenes = Table.new({
 		Marks = {},
 		Beats = {},
 	},
-	-- Opening, ~44 s (FEAT-004; owner decision D3 2026-10-12, PROVISIONAL: short and objective, was 73 s / cap 76).
-	-- It starts on the sidewalk of the Ninth in front of the trailer's Pad (MapPoints CS-1..CS-3, CutsceneMark1..4;
-	-- tools/assetplace/cutscene_points.luau), walks LEFT (east of the map frame, +X of the world) along it to the
-	-- P-01 post with the Help Wanted flyer (no street crossing, no cars), reads it, calls Walt and ends looking at the
-	-- trailer (MapPoint TRL). Lines keep their text and their order (the voices are pre-generated); only the times
-	-- moved. The Walt block is 15.4 s of voice + pauses (as tuned in the 2026-10-11 playtest), so the scene cannot be
-	-- shorter than ~44 s: Cap 48 = Duration + 3.8. Starts once every participant's client is ready
+	-- Opening, ~35 s (FEAT-004; owner D3 2026-10-12 rev. 2, PROVISIONAL: short and objective; was 44 s, before 73 s).
+	-- It starts on the NORTH sidewalk of the Ninth, across from the trailer's Pad (MapPoints CutsceneMark1..4;
+	-- tools/assetplace/cutscene_points.luau), walks east to the crosswalk CW-4 (CS-1, the nearest one to the flyer and the
+	-- widest: 12 studs), CROSSES the empty street on its stripes (CS-1 -> CS-3; traffic is held for the whole scene and no
+	-- car or passer-by is in it) and arrives at the P-01 post with the Help Wanted flyer (it stands on the trailer's side
+	-- of the Ninth, at the south end of CW-4), reads it, calls Walt and ends looking at the trailer (MapPoint TRL).
+	-- Lines are short (<= 6 words; Walt on the phone: 3 lines). The call is ~12 s of voice + pauses, so the scene cannot
+	-- be much shorter than 35 s: Cap 38 = Duration + 3. Starts once every participant's client is ready
 	-- (Rules.ReadyTimeout), so the Intro phase cap (Shift.luau) covers that wait + Cap.
 	{
 		Key = "intro",
-		Duration = 44.2,
-		Cap = 48,
+		Duration = 35,
+		Cap = 38,
 		Skippable = true,
 		Participants = "ConnectedAtStart",
 		Music = "lobby", -- PROVISIONAL stand-in for MUS-005 (Abertura); the shift track waits for the end of the chain
@@ -332,7 +333,7 @@ const scenes = Table.new({
 		Look = "Cinematic",
 		-- Shots (owner request 2026-10-12, PROVISIONAL): the cuts follow the beats below.
 		Shots = {
-			-- 1 establishing: a detached camera behind and above the walker, craning down along the sidewalk, over the title
+			-- 1 establishing: a detached camera behind and above the walker, craning down, over the title
 			{
 				At = 0,
 				Name = "Establish",
@@ -342,11 +343,11 @@ const scenes = Table.new({
 				Far = 0.5,
 				Rack = 3,
 			},
-			-- 2 the walk: back to the head through a dip, hand-held, along the sidewalk
+			-- 2 the walk and the crossing: back to the head through a dip, hand-held
 			{ At = 3.8, Name = "Walk", Cut = "Dip", Fov = { 54, 56 }, Sway = 0.6, Far = 0 },
 			-- 3 the poster: lazy orbit, then the push-in while it reads
 			{
-				At = 11.8,
+				At = 12,
 				Name = "Poster",
 				Fov = { 58, 48 },
 				Orbit = { -10, 3 },
@@ -356,7 +357,7 @@ const scenes = Table.new({
 				Rack = 3,
 			},
 			{
-				At = 15,
+				At = 14.4,
 				Name = "Read",
 				Fov = { 46, 34 },
 				Orbit = { 3, 9 },
@@ -366,7 +367,7 @@ const scenes = Table.new({
 			},
 			-- 4 the call: match cut through black on the number, slow push-in while it rings
 			{
-				At = 20,
+				At = 17,
 				Name = "Phone",
 				Cut = "Dip",
 				Fov = { 50, 36 },
@@ -376,7 +377,7 @@ const scenes = Table.new({
 				Rack = 2.5,
 			},
 			{
-				At = 30.5,
+				At = 26,
 				Name = "Drift",
 				Fov = { 36, 40 },
 				Orbit = { -7, 4 },
@@ -387,7 +388,7 @@ const scenes = Table.new({
 			},
 			-- 5 the trailer: crane up to reveal it in the sun
 			{
-				At = 41.2,
+				At = 31.8,
 				Name = "Reveal",
 				Fov = { 44, 54 },
 				Dolly = { Vector3.new(0, -0.8, 0), Vector3.new(0, 1.2, 0) },
@@ -399,44 +400,34 @@ const scenes = Table.new({
 		Beats = {
 			{ At = 0, Kind = "Fade", Target = "In" },
 			{ At = 0.6, Kind = "Text", Target = "Title", Text = "Sell Hotdogs!", Sub = "Ninth & Juniper", Hold = 3.2 },
-			-- Beat 1, the walk: from CutsceneMark (CS-1, right end of the sidewalk) straight along it (one gentle turn at
-			-- CS-3) to the stand in front of the P-01 flyer (Rules.Stand), eased to a stop by 13 s
-			crew(1.8, "Empty. Again."),
-			-- user request 2026-10-11: the rookie says why the flyer matters before reading it
-			crew(3.3, "I really need a job right now... but nobody's hiring."),
+			-- Beat 1, the walk: one run from CutsceneMark (north sidewalk, across from the trailer) east to CS-1 (curb, in line
+			-- with the crosswalk), straight across the stripes (CS-2, then a bend east) to CS-3 (their south end, east of the P-01 pole) and
+			-- to the stand in front of the P-01 flyer (Rules.Stand), eased to a stop by 14 s
 			focus(3.8, "Walk"),
-			{ At = 3.8, Kind = "MoveTo", Target = "CS-3" },
-			{ At = 4, Kind = "MoveTo", Target = "CS-P{slot}", Arrive = 13 },
-			crew(7.6, "Hm, a job?"),
-			crew(9.2, '..."No help wanted." Of course.'),
-			-- Beat 2, the poster: seen from the sidewalk, "What's that?", read it
-			focus(11.8, "Poster", 55),
-			crew(13.2, "What's that?"),
-			focus(15, "Poster", 45), -- reading the flyer and its number
-			crew(15.4, "At least it's a job opportunity..."),
-			crew(17.8, "I think I'll give them a call.", "Solo"),
-			crew(17.8, "Let's give them a call.", "Party"),
-			-- Beat 3, the call
-			focus(20, "Phone", 55),
-			crew(20.2, `{PHONE}...`),
-			{ At = 20.3, Kind = "Prompt", Target = "Phone", Text = `Call {PHONE}` },
-			{ At = 21.6, Kind = "Actor", Target = "FlipPhone" }, -- slot 1 only, already open (AST-038)
-			-- user feedback 2026-10-11 (pauses, calmer tone): the voice speaks sentence by sentence with a pause after
-			-- . ? ! and a longer one after "..." (Speech.Pieces), so the lines are spaced for those pauses and the
-			-- hang-up (Actors FLIP_TIME, 19 s after the flip) waits for the last one
-			walt(22.1, "Bramble's Corner Dogs. Walt speaking."),
-			walt(24.5, "The flyer? Huh. Nobody's called about that one in years.", "Solo"),
-			walt(24.5, "The flyer? All of you? Huh. Nobody's called in years.", "Party"),
-			walt(28.5, "But you noticed it. That counts for a lot.", "Solo"),
-			walt(28.5, "You all noticed it. That counts for a lot. Heh.", "Party"),
-			walt(31.9, "Can you start today? ... Great."),
-			walt(34.5, "The cart's right on the corner. Ninth and Juniper."),
-			walt(37.5, "Keys are under the mustard. See you around, Rookie."),
-			-- Beat 4: the focus stays on the phone/poster through the whole call; the flip closes at 40.6 (hang-up click),
-			-- a breath, then everyone turns to the trailer (MapPoint TRL, eased) and holds on it; fade out; the game
-			-- fades in after
-			focus(41.2, "TRL", 55),
-			{ At = 42.8, Kind = "Fade", Target = "Out" },
+			{ At = 3.8, Kind = "MoveTo", Target = "CS-1" },
+			{ At = 3.9, Kind = "MoveTo", Target = "CS-2" },
+			{ At = 4, Kind = "MoveTo", Target = "CS-3" },
+			{ At = 4.1, Kind = "MoveTo", Target = "CS-P{slot}", Arrive = 14 },
+			crew(4.4, "I really need a job."),
+			-- Beat 2, the poster: seen from the sidewalk, read it
+			focus(12, "Poster", 55),
+			crew(13.4, "Help wanted?"),
+			focus(14.4, "Poster", 45), -- reading the flyer and its number
+			crew(15.4, "I'll call them.", "Solo"),
+			crew(15.4, "Let's call them.", "Party"),
+			-- Beat 3, the call (the number is only on the prompt and the flyer: nobody says digits)
+			focus(17, "Phone", 55),
+			{ At = 17.2, Kind = "Prompt", Target = "Phone", Text = `Call {PHONE}` },
+			{ At = 18.4, Kind = "Actor", Target = "FlipPhone" }, -- slot 1 only, already open (AST-038)
+			-- the voice speaks sentence by sentence with a pause after . ? ! (Speech.Pieces); the hang-up (Actors
+			-- FLIP_TIME, after the flip beat) waits for the last line
+			walt(19, "Bramble's Corner Dogs. Walt here."),
+			walt(23.3, "You noticed the flyer. Good."),
+			walt(27.1, "Start today. Keys under the mustard."),
+			-- Beat 4: the focus stays on the phone/poster through the call; the flip closes (hang-up click), a breath,
+			-- then everyone turns to the trailer (MapPoint TRL, eased) and holds on it; fade out; the game fades in after
+			focus(31.8, "TRL", 55),
+			{ At = 33.4, Kind = "Fade", Target = "Out" },
 		},
 	},
 	-- Dawn of Night 10, variant A1 (DEC-075, DEC-076); <= 60 s; MAP-01 §11.3 SS-1..4, WALT-1, RL-1 -> RL-END

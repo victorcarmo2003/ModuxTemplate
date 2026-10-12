@@ -135,6 +135,8 @@ function PromptController:Setup()
 	-- Presentation filter (TutorialPromptGate): false = the anchor shows no prompt. nil = no filter. Never decides
 	-- anything: the server revalidates every Interact.
 	self.Gate = nil :: ((Instance) -> boolean)?
+	-- Named gates (AddGate), all of them must allow; independent of the legacy SetGate slot above
+	self.Gates = {} :: { [string]: (Instance) -> boolean }
 	-- InteractionMenu state: Menu.State is the order / selection, the sources feed the component
 	self.MenuState = Menu.new() :: Menu.State
 	self.MenuActive = false :: boolean
@@ -155,18 +157,37 @@ function PromptController:Setup()
 	self.AltHoldingSource = Vide.source(false) :: Vide.Source<boolean>
 end
 
+-- The single legacy gate (TutorialPromptGate). Named gates (AddGate) stack with it: every gate must allow.
 function PromptController:SetGate(gate: ((Instance) -> boolean)?)
 	self.Gate = gate
+end
+
+-- Named presentation gate (focused prep mode, DEC-223): several owners can filter at the same time without knowing each
+-- other. Same contract as SetGate; the same name again replaces the gate, RemoveGate drops it.
+function PromptController:AddGate(name: string, gate: (Instance) -> boolean)
+	self.Gates[name] = gate
+end
+
+function PromptController:RemoveGate(name: string)
+	self.Gates[name] = nil
 end
 
 -- A failing gate never hides prompts (fails open)
 function PromptController:Gated(anchor: Instance): boolean
 	const gate = self.Gate
-	if gate == nil then
-		return true
+	if gate ~= nil then
+		const ok, allowed = pcall(gate, anchor)
+		if ok and allowed == false then
+			return false
+		end
 	end
-	const ok, allowed = pcall(gate, anchor)
-	return not ok or allowed ~= false
+	for _, named in self.Gates do
+		const ok, allowed = pcall(named, anchor)
+		if ok and allowed == false then
+			return false
+		end
+	end
+	return true
 end
 
 function PromptController:Add(anchor: Instance)

@@ -412,6 +412,10 @@ Selecionada = Mustard, demais Cream; fora de alcance (ainda na carência) = esma
 - **Noite perdida (DEC-053, emendada por DEC-122: todos acordam em pé ao lado do trailer, sem banco):** luzes do trailer piscam e apagam (no mundo) → fade preto → amanhecer.
 - **Fim de run / final:** "You Kept the Light On" (FEAT-027), mesma linguagem do fim de turno, fundo do amanhecer.
 
+### 7.5 UI do modo de preparo focado (nota **Provisória**, 2026-10-12, DEC-223)
+
+Exceção à regra "interação toda no mundo" (§7): em foco, a tela de preparo é 2D. Spec completo (5 persistentes, layout por dispositivo, nota por forma+cor, câmera sem sobreposição) em `docs/art/prep-ui-spec.md`; mockup em `docs/art/mockups/prep-ui.html`; sprites AST-108 a AST-119. Regras que valem sobre este guia: **sem vermelho de estado** (Mustard + triângulo "!" para aviso), **texto Ink sobre Teal** (branco sobre Teal = 2,8:1), texto >= 14 px, alvos >= 44 px, chrome em Cream/Mustard opacos (Ink só no status).
+
 ---
 
 ## 8. Convenções técnicas para o modeler-3d

@@ -87,7 +87,7 @@ export type Rules = {
 	Tutorial: TutorialRules,
 }
 
-const QUENTIN = "Heard you caught Quentin in the act. Nice."
+const QUENTIN = "You caught Quentin. Nice work."
 
 local function lines(...: string): { Line }
 	const out: { Line } = {}
@@ -156,15 +156,13 @@ const base = Table.new({
 	{ Key = "none", Lines = {}, Trigger = { Kind = "None" }, Priority = 1, Once = false },
 
 	-- Day 1 opens the tutorial; the rest of it are the Hint rows at the end (ui-text.md §11.1)
+	-- Owner D3 2026-10-12 (PROVISIONAL): every call is short: <= 6 words per line, <= 3 lines (nights <= 4, the last
+	-- one is the short form of the rule; a repeated night plays the opener + Short)
 	day(
 		"call_day_1",
 		1,
 		nil,
-		lines(
-			"Morning, Rookie! I'll stay on the line.",
-			"Tap the frank box. It goes on the grill.",
-			"Flip the sign to OPEN when you're ready."
-		)
+		lines("Morning, Rookie! I'm on the line.", "Tap the frank box. Grill it.", "Open up when ready.")
 	),
 
 	-- Day 2 (ui-text.md §11.2; user request 2026-10-12): the first day shift that is followed by a night in the trailer, so
@@ -173,80 +171,29 @@ const base = Table.new({
 		"call_day_2",
 		2,
 		nil,
-		lines(
-			"Morning! Cheese came in. Folks love cheese.",
-			"Oh — keep an eye on your cash drawer.",
-			"Some folks have quick hands.",
-			"And tonight? You work late. Same trailer.",
-			"I'll ring when the sun goes down."
-		)
+		lines("Cheese is in. Folks love cheese.", "Watch your drawer. Quick hands.", "You work late tonight. I'll ring.")
 	),
 	-- the day after night k (ui-text.md §11.3). Day 3 (after N1) carries the old "bacon" call and Day 4 (after N2) the
 	-- "potato sticks" one, each with its quentin variant (the old call_day_3/call_day_4, which could never ring any more).
-	dayAfter(
-		1,
-		lines(
-			"Morning! You made it.",
-			"Told you nights were quiet.",
-			"Bacon's in today. Smell that?",
-			"Grill's hot. Go sell some dogs."
-		)
-	),
-	dayAfter(
-		1,
-		lines(
-			"Morning! You made it.",
-			QUENTIN,
-			"Told you nights were quiet.",
-			"Bacon's in today. Smell that?",
-			"Grill's hot. Go sell some dogs."
-		),
-		"quentin"
-	),
-	dayAfter(
-		2,
-		lines(
-			"Morning, Rookie. Sleep okay?",
-			"Good. Don't think about it too hard.",
-			"New stuff: potato sticks. Kids love 'em.",
-			"Bigger grill on the Mart's back wall."
-		)
-	),
-	dayAfter(
-		2,
-		lines(
-			"Morning, Rookie. Sleep okay?",
-			QUENTIN,
-			"Good. Don't think about it too hard.",
-			"New stuff: potato sticks. Kids love 'em.",
-			"Bigger grill on the Mart's back wall."
-		),
-		"quentin"
-	),
-	dayAfter(3, lines("Bank clock's ticking fine today. See?", "Nice and normal. Sell some dogs.")),
-	dayAfter(4, lines("Just one Mr. Pickett today, I hope. Heh.", "...That was a joke. Mostly.")),
-	dayAfter(5, lines("She liked you. The lady. I can tell.", "Forget I said that. Grill's waiting.")),
+	dayAfter(1, lines("Morning! Told you nights were quiet.", "Bacon's in. Smell that?", "Grill's hot. Sell some dogs.")),
+	dayAfter(1, lines("Morning! You made it.", QUENTIN, "Bacon's in. Go sell some dogs."), "quentin"),
+	dayAfter(2, lines("Morning, Rookie. Sleep okay?", "Good. Don't think about it.", "Potato sticks today. Bigger grill, too.")),
+	dayAfter(2, lines("Morning, Rookie. Sleep okay?", QUENTIN, "Potato sticks and a bigger grill."), "quentin"),
+	dayAfter(3, lines("Bank clock's ticking fine. See?", "Nice and normal. Sell some dogs.")),
+	dayAfter(4, lines("One Mr. Pickett today, I hope.", "...That was a joke. Mostly.")),
+	dayAfter(5, lines("She liked you. The lady.", "Forget I said that.")),
 	dayAfter(6, lines("Ever notice nobody lives upstairs?", "In the daytime, I mean.", "Huh. Next question.")),
-	dayAfter(7, lines("You kept your eyes down. Good.", "I used to count the lamps. It helps.")),
-	dayAfter(8, lines("Long night, huh? Coffee's on me.", "Tell Opal it's for Walt. She knows.")),
-	dayAfter(
-		9,
-		lines(
-			"Rookie. About the knocking.",
-			"That wasn't me.",
-			"I need you to believe that.",
-			"Tonight's the last one.",
-			"Then you get answers. I promise."
-		)
-	),
+	dayAfter(7, lines("You kept your eyes down. Good.", "I counted the lamps. It helps.")),
+	dayAfter(8, lines("Long night, huh? Coffee's on me.", "Tell Opal it's for Walt.")),
+	dayAfter(9, lines("Rookie. About the knocking.", "That wasn't me. Believe that.", "Tonight's the last. I promise.")),
 
 	-- endless days (ui-text.md §11.4)
 	infinite(1, "Another day, another dog."),
 	infinite(2, "Proud of you, Rookie. Really."),
 	infinite(3, "Grill's hot. Let's go."),
 	infinite(4, "Corner's quiet. Too quiet. Heh."),
-	infinite(5, "Nice and normal. Just how I like it."),
-	infinite(6, "Ketchup, mustard, a smile. That's the job."),
+	infinite(5, "Nice and normal. Just right."),
+	infinite(6, "Ketchup, mustard, smile. That's the job."),
 
 	-- Night 1 coffee (user request 2026-10-11, Provisional): the night starts at 50 sanity (Sanity.FirstNightStart) and Walt
 	-- sends the rookie to the coffee machine right after the rules call. Short, TTS-friendly ("..." for the pauses, no
@@ -265,13 +212,9 @@ const base = Table.new({
 	nightCall(
 		1,
 		lines(
-			"Evening, Rookie. Your first night shift.",
-			"Same trailer. Same grill. Different customers.",
-			"Some of them might look a little off.",
-			"If someone walks up with no face —",
-			"no eyes, no mouth — don't serve them.",
-			"Just refuse. They'll wander off.",
-			"Keep the grill hot. See you at six.",
+			"Evening, Rookie. Some customers look off.",
+			"No face at all? Just refuse.",
+			"They'll wander off. Grill stays hot.",
 			"No face? Refuse them."
 		),
 		lines("No face? Refuse them.")
@@ -279,12 +222,9 @@ const base = Table.new({
 	nightCall(
 		2,
 		lines(
-			"Night two. You did fine last night.",
-			"Check your food before it goes out.",
-			"A gray frank, or a bun with a bite",
-			"in it you didn't take — toss it.",
-			"Trash can. Don't serve it.",
-			"And still no faces. Remember faces.",
+			"Night two. Check your food first.",
+			"Gray frank, bitten bun? Trash it.",
+			"Still refuse the faceless ones.",
 			"Wrong food? Throw it away."
 		),
 		lines("Wrong food? Throw it away.")
@@ -292,41 +232,29 @@ const base = Table.new({
 	nightCall(
 		3,
 		lines(
-			"Evening. Can you see the bank clock?",
-			"Keep an eye on it. And an ear. It ticks.",
-			"If it stops, the trailer's lights fix it.",
-			"Lights off. Count to five. Then back on.",
-			"That gets it going again.",
-			"Do it right and the clock behaves. Heh.",
-			"Clock stops? Trailer lights off, count five, on."
+			"Evening. Watch the bank clock.",
+			"If it stops, trailer lights off.",
+			"Count to five. Then lights on.",
+			"Clock stops? Lights off, count five."
 		),
-		lines("Clock stops? Trailer lights off, count five, on.")
+		lines("Clock stops? Lights off, count five.")
 	),
 	nightCall(
 		4,
 		lines(
-			"Rookie... there's something you should know.",
 			"Sometimes a customer shows up twice.",
-			"Same face, same clothes.",
-			"One of them is a copy.",
-			"The copy is backwards.",
-			"Look at their shirt. Their watch. Backwards.",
-			"Refuse the backwards one. Serve the real one.",
-			"Who are they? ...Next question.",
-			"Two of them? Refuse the backwards one."
+			"One's a copy. Everything's backwards.",
+			"Look at shirts and watches.",
+			"Two? Refuse the backwards one."
 		),
-		lines("Two of them? Refuse the backwards one.")
+		lines("Two? Refuse the backwards one.")
 	),
 	nightCall(
 		5,
 		lines(
-			"Tonight, a lady in a yellow raincoat",
-			"might come by.",
-			"It won't be raining.",
-			"She'll be dripping anyway.",
-			"Serve her. Always. Whatever she asks for.",
-			"Don't refuse her. Don't make her wait.",
-			"She's a... very old customer. Be nice.",
+			"A lady in a yellow raincoat.",
+			"It won't rain. She'll drip anyway.",
+			"Serve her, whatever she asks.",
 			"Yellow raincoat? Always serve her."
 		),
 		lines("Yellow raincoat? Always serve her.")
@@ -334,11 +262,9 @@ const base = Table.new({
 	nightCall(
 		6,
 		lines(
-			"Evening. Folks upstairs might wave tonight.",
-			"Don't wave back. Don't even look up.",
-			"They just want someone to notice them.",
-			"Eyes on your grill. They'll get bored.",
-			"I know. I know. I'll explain someday.",
+			"Folks upstairs might wave tonight.",
+			"Don't wave back. Eyes down.",
+			"They just want to be noticed.",
 			"Someone waving upstairs? Don't look up."
 		),
 		lines("Someone waving upstairs? Don't look up.")
@@ -346,73 +272,46 @@ const base = Table.new({
 	nightCall(
 		7,
 		lines(
-			"Rookie. Listen close. This one matters most.",
-			"Down Juniper Street, someone walks",
-			"toward your stand.",
-			"Every time you look at them,",
-			"they get closer.",
-			"Whatever you do,",
-			"never let them reach your light.",
-			"Don't watch the Walker. Not for a second.",
-			"When the far lamp buzzes, they're there.",
-			"Tell your crew.",
-			"Whatever you do, never watch the Walker."
+			"Down Juniper, someone walks toward you.",
+			"Each look brings them closer.",
+			"Never let them reach your light.",
+			"Never watch the Walker."
 		),
-		lines("Whatever you do, never watch the Walker.")
+		lines("Never watch the Walker.")
 	),
 	nightCall(
 		8,
 		lines(
-			"Evening. You're doing better than I ever did.",
-			"If a long car parks across the street",
-			"with its lights on you —",
-			"get out of its sight.",
-			"In the trailer? Close the window. Stay inside.",
-			"Window won't help? Walk to the Mart. Wait there.",
-			"Don't come back till it drives away.",
-			"Regular cars never stop there. That one does.",
-			WALKER,
-			"Long car? Window shut, or off to the Mart."
+			"A long car may park across.",
+			"Lights on you? Out of sight.",
+			"Window shut. Or the Mart.",
+			"Long car? Window shut, or Mart."
 		),
-		lines("Long car? Window shut, or off to the Mart.", WALKER)
+		lines("Long car? Window shut, or Mart.", WALKER)
 	),
 	nightCall(
 		9,
 		lines(
-			"One more thing. This is important.",
-			"I never come to your corner at night. Never.",
-			"If someone knocks and says it's me —",
-			"it isn't.",
-			"In the trailer? Close the window. Stay inside.",
-			"Window won't help? Walk to the Mart. Wait there.",
-			"Keep away till the knocking stops.",
-			"...I'm sorry I didn't tell you sooner.",
-			WALKER,
-			"Knocking? It's not me. Window shut, or off to the Mart."
+			"I never visit at night. Never.",
+			"Knocking? It isn't me. I'm sorry.",
+			"Window shut. Or the Mart.",
+			"Knocking? Not me. Window, or Mart."
 		),
-		lines("Knocking? It's not me. Window shut, or off to the Mart.", WALKER)
+		lines("Knocking? Not me. Window, or Mart.", WALKER)
 	),
 	nightCall(
 		10,
 		lines(
-			"Last night, Rookie. Ten.",
-			"Nobody's made it to ten since... well.",
-			"Tonight the street might go dark.",
-			"Lamp by lamp.",
-			"When the lamps start going out,",
-			"leave your post.",
-			"Go to the Mart. Stand under the OPEN sign.",
-			"It never goes out.",
-			"Come back when the lamps come back.",
-			WALKER,
-			"See you at sunrise. I promise.",
-			"Lamps going out? Go to the Mart sign."
+			"Last night. The lamps may die.",
+			"Go stand beneath the Mart's sign.",
+			"It never goes out. I promise.",
+			"Lamps out? To the Mart sign."
 		),
-		lines("Lamps going out? Go to the Mart sign.", WALKER)
+		lines("Lamps out? To the Mart sign.", WALKER)
 	),
 	{
 		Key = "call_night_short",
-		Lines = lines("Same night, Rookie. Same rules.", "You know them."),
+		Lines = lines("Same night, Rookie. Same rules."),
 		Trigger = { Kind = "NightRepeat" },
 		Priority = 2,
 		Once = false,
@@ -429,13 +328,7 @@ const base = Table.new({
 	},
 	{
 		Key = "call_lost_last_chance",
-		Lines = lines(
-			"Rough night. Let's try that again.",
-			"Everyone's back on their feet.",
-			"But listen. This is the only time",
-			"I can do this, Rookie.",
-			"Be careful out there."
-		),
+		Lines = lines("Rough night. Let's try again.", "Everyone's back on their feet.", "Only chance I get. Be careful."),
 		Trigger = { Kind = "LostLastChance" },
 		Priority = 3,
 		Once = false,
@@ -443,7 +336,7 @@ const base = Table.new({
 	-- never rung: quoted as "Walt: ..." on the run end screen (ui-text.md §14). Provisional.
 	{
 		Key = "call_run_over",
-		Lines = lines("That's two, Rookie.", "I can't put you on nights anymore.", "Go home. Rest. You did more than most."),
+		Lines = lines("That's two, Rookie.", "No more nights for you.", "Go home. You did well."),
 		Trigger = { Kind = "RunOver" },
 		Priority = 4,
 		Once = false,
@@ -453,40 +346,36 @@ const base = Table.new({
 	-- lines are only for whoever is not doing the tutorial (the rookie hears TutorialController's step lines)
 	{
 		Key = "call_tutorial",
-		Lines = lines("Got a rookie at the trailer today!", "I'll walk 'em through it. Help 'em out."),
+		Lines = lines("Got a rookie today!", "I'm walking them through it."),
 		Trigger = { Kind = "Tutorial" },
 		Priority = 4,
 		Once = false,
 	},
 
 	-- Day 1 tutorial hints (ui-text.md §11.1): each plays once, after the first time the party performs the action
-	hint("hint_grill_place", "grill_place", lines("When the bar fills up, grab it.")),
-	hint("hint_grill_collect", "grill_collect", lines("It waits on the warmer. Now slice a bun.")),
+	hint("hint_grill_place", "grill_place", lines("Bar full? Grab it.")),
+	hint("hint_grill_collect", "grill_collect", lines("Now slice a bun.")),
 	hint("hint_bun_cut", "bun_cut", lines("Pop a frank in the bun.")),
-	hint("hint_board_add_sausage", "board_add_sausage", lines("There's your hot dog. Wait for an order.")),
-	hint("hint_open_sign", "open_sign", lines("We're open! Folks line up at the counter.")),
+	hint("hint_board_add_sausage", "board_add_sausage", lines("Hot dog's ready. Wait for orders.")),
+	hint("hint_open_sign", "open_sign", lines("We're open! Folks are lining up.")),
 	hint(
 		"hint_take_order",
 		"take_order",
-		lines("See the bubble? That's the order.", "Add only what they asked for. Nothing extra.")
+		lines("See the bubble? That's the order.", "Nothing extra.")
 	),
 	hint(
 		"hint_serve",
 		"serve",
-		lines(
-			"Nice! Money goes in the drawer.",
-			"Running low? The Mart's across the street.",
-			"Look both ways! These drivers don't brake."
-		)
+		lines("Nice! Cash goes in the drawer.", "Low on stock? Try the Mart.", "Look both ways.")
 	),
 	hint(
 		"hint_buy_package",
 		"buy_package",
-		lines("Careful crossing. Get hit, and you drop it.", "Gear's on the back wall.", "Sometimes there's something special.")
+		lines("Careful crossing. Get hit, drop it.", "Gear's on the back wall.", "Sometimes there's something special.")
 	),
 	hint("hint_restock", "restock", lines("That's how you restock. Easy.")),
-	hint("hint_discard", "discard", lines("Messed one up? Toss it. No harm done.")),
-	hint("hint_bench_buy_upgrade", "bench_buy_upgrade", lines("New gear's already on the trailer. Heh.")),
+	hint("hint_discard", "discard", lines("Messed up? Toss it. No harm.")),
+	hint("hint_bench_buy_upgrade", "bench_buy_upgrade", lines("New gear's on the trailer. Heh.")),
 } :: { BossCall })
 
 const rules: Rules = {

@@ -7,35 +7,35 @@
 	LightController stays the only runtime writer of Lighting (no script is added by this snippet).
 
 	Source of the numbers: Content.LightPresets.Day (src/Shared/Content/LightPresets.luau). Keep DAY below in sync with it.
-	Backup of the previous state: Folder ServerStorage.Lighting_Backup_<yyyymmdd> (attributes). UNDO = true restores it.
+	Pass 2 (2026-10-12, still blown out): Brightness 1.3, Exposure -0.5, EnvDiffuse 0.6, Bloom 0.22. Backup of the previous state: Folder ServerStorage.Lighting_Backup_<yyyymmdd> (attributes). UNDO = true restores it.
 	Nothing else is touched (Sky, DepthOfField, VitalColor / VitalBlur are left alone).
 ]]
 local UNDO = false
 
 local Lighting = game:GetService("Lighting")
 local ServerStorage = game:GetService("ServerStorage")
-local BACKUP = "Lighting_Backup_20261012"
+local BACKUP = "Lighting_Backup_20261012b"
 
 -- Day preset (PROVISIONAL, mirrors Content.LightPresets.Day) + Edit-only fields the preset has no key for
 local DAY = {
-	Brightness = 2.0,
-	ExposureCompensation = -0.15, -- Edit only; LightController does not write it
-	Ambient = Color3.fromRGB(104, 90, 78),
-	OutdoorAmbient = Color3.fromRGB(132, 112, 94),
+	Brightness = 1.3,
+	ExposureCompensation = -0.5, -- LightController writes it too (preset.Exposure)
+	Ambient = Color3.fromRGB(86, 74, 64),
+	OutdoorAmbient = Color3.fromRGB(110, 94, 80),
 	ColorShift_Top = Color3.fromRGB(255, 226, 186),
 	ColorShift_Bottom = Color3.fromRGB(0, 0, 0),
-	EnvironmentDiffuseScale = 1,
-	EnvironmentSpecularScale = 0.8,
+	EnvironmentDiffuseScale = 0.6,
+	EnvironmentSpecularScale = 0.6,
 	ShadowSoftness = 0.25,
 	ClockTime = 9.4, -- unchanged by the preset in Edit; game clock overrides it
 }
 local ATMOSPHERE = {
-	Density = 0.4, Offset = 1, Glare = 1.6, Haze = 0.6,
+	Density = 0.35, Offset = 1, Glare = 1.2, Haze = 0.35,
 	Color = Color3.fromRGB(214, 190, 168), Decay = Color3.fromRGB(232, 170, 118),
 }
-local CORRECTION = { Brightness = 0.03, Saturation = 0.2, Contrast = 0.05, TintColor = Color3.fromRGB(255, 244, 228) }
-local BLOOM = { Intensity = 0.5, Size = 24, Threshold = 2 }
-local RAYS = { Intensity = 0.04, Spread = 0.1 }
+local CORRECTION = { Brightness = 0, Saturation = 0.1, Contrast = 0.1, TintColor = Color3.fromRGB(255, 244, 228) }
+local BLOOM = { Intensity = 0.22, Size = 24, Threshold = 2 }
+local RAYS = { Intensity = 0.03, Spread = 0.1 }
 
 local function child(className: string): Instance
 	for _, c in Lighting:GetChildren() do

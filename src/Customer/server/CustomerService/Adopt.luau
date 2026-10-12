@@ -152,7 +152,7 @@ end
 
 -- A customer could spawn right now (the same gates as Attempt, plus no tutorial customer and no tension)
 local function canSpawn(service: any): boolean
-	if not service.Enabled or not service:IsSelling() or service:HasTutorial() then
+	if not service.Enabled or not service:IsSelling() or service:IsPaused() or service:HasTutorial() then
 		return false
 	end
 	const npc = service.Dependencies.NpcService

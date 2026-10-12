@@ -21,12 +21,12 @@ return Table.new({
 		FromNight = 0,
 		ToNight = 0,
 		Lines = {
-			"Mustard again? You're a mustard family.",
-			"Walt's cart, huh? Good cart.",
-			"Ketchup's on aisle two. Always has been.",
-			"Back wall's got gear. Who stocks it? I don't ask.",
+			"Mustard again? Mustard family, huh.",
+			"Walt's trailer, huh? Good trailer.",
+			"Ketchup's on aisle two.",
+			"Back wall's got gear. Don't ask.",
 			"Look both ways out there. Twice.",
-			"Cars won't wait for you, hon. Look first.",
+			"Cars won't wait, hon. Look first.",
 		},
 	},
 	{
@@ -43,7 +43,7 @@ return Table.new({
 		FromNight = 4,
 		ToNight = 6,
 		Lines = {
-			"Two coffees tonight? Oh — never mind. Habit.",
+			"Two coffees? Oh, never mind. Habit.",
 			"Don't mind the windows upstairs.",
 		},
 	},
@@ -53,7 +53,7 @@ return Table.new({
 		ToNight = 10,
 		Lines = {
 			"Sign's on. Sign's always on.",
-			"If the lamps go out, you come here. Got it?",
+			"Lamps go out? Come here.",
 		},
 	},
 } :: { OpalPool })

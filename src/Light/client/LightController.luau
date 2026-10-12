@@ -66,6 +66,7 @@ type Fixture = {
 
 type Preset = {
 	Brightness: number,
+	Exposure: number,
 	Ambient: Color3,
 	OutdoorAmbient: Color3,
 	ColorShiftTop: Color3,
@@ -153,6 +154,7 @@ local function blend(a: Preset, b: Preset, t: number): Preset
 	end
 	return {
 		Brightness = lerp(a.Brightness, b.Brightness, t),
+		Exposure = lerp(a.Exposure, b.Exposure, t),
 		Ambient = a.Ambient:Lerp(b.Ambient, t),
 		OutdoorAmbient = a.OutdoorAmbient:Lerp(b.OutdoorAmbient, t),
 		ColorShiftTop = a.ColorShiftTop:Lerp(b.ColorShiftTop, t),
@@ -605,6 +607,7 @@ end
 
 function LightController:Write(preset: Preset, clock: number)
 	Lighting.Brightness = preset.Brightness
+	Lighting.ExposureCompensation = preset.Exposure
 	Lighting.Ambient = preset.Ambient
 	Lighting.OutdoorAmbient = preset.OutdoorAmbient
 	Lighting.ColorShift_Top = preset.ColorShiftTop

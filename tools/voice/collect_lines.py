@@ -87,11 +87,14 @@ def main():
 
     # cutscenes: walt(at, "text", variant?) / crew(...)
     t = toks["cutscenes"]
+    scene = ""
     for i in range(len(t) - 4):
+        if t[i][0] == "id" and t[i][1] == "Key" and t[i + 1][1] == "=" and t[i + 2][0] == "str":
+            scene = t[i + 2][1]
         if t[i][0] == "id" and t[i][1] in ("walt", "crew") and t[i + 1][1] == "(" and t[i + 2][0] == "num" \
                 and t[i + 3][1] == "," and t[i + 4][0] == "str":
             variant = t[i + 6][1] if i + 6 < len(t) and t[i + 5][1] == "," and t[i + 6][0] == "str" else ""
-            add(t[i][1], t[i + 4][1], f"Cutscenes.luau:{t[i + 4][2]}" + (f" ({variant})" if variant else ""))
+            add(t[i][1], t[i + 4][1], f"Cutscenes.luau:{t[i + 4][2]} [{scene}]" + (f" ({variant})" if variant else ""))
 
     # boss calls: every sentence-like string literal (keys/enums have no spaces); Speaker nil = walt
     for kind, val, line in toks["bosscalls"]:
@@ -102,9 +105,18 @@ def main():
     t = toks["steps"]
     field = None
     depth_field = 0
+    skip_to = -1
     for i, (kind, val, line) in enumerate(t):
+        if i < skip_to:
+            continue
         if kind == "id" and val in ("Say", "Done", "Remind", "GREETING", "GOODBYE", "SKIP_GOODBYE"):
             field = val; depth_field = 0
+            if val in ("GREETING", "GOODBYE", "SKIP_GOODBYE"):
+                # `const X: { string } = { ... }`: skip the type annotation, start at the "=" (before, its braces closed the field)
+                j = i
+                while j < len(t) and not (t[j][0] == "sym" and t[j][1] == "="):
+                    j += 1
+                skip_to = j
         elif kind == "id" and val in ("Text", "Hint", "Key", "Action"):
             field = None
         elif kind == "sym" and val == "{" and field in ("Say", "GREETING", "GOODBYE", "SKIP_GOODBYE"):
@@ -113,7 +125,7 @@ def main():
             depth_field -= 1
             if depth_field == 0:
                 field = None
-        elif kind == "str" and field and sentence_like(val):
+        elif kind == "str" and field and (sentence_like(val) or (field in ("Done", "Remind", "Say") and re.search(r"[A-Za-z]", val))):
             add("walt", val, f"Steps.luau:{line} ({field})")
             if field in ("Done", "Remind"):
                 field = None

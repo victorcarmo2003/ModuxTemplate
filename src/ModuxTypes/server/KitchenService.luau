@@ -5,6 +5,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local Charm = require(ReplicatedStorage.Packages.Charm)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 local StationApi = require(ServerScriptService.server.Kitchen.KitchenService.StationApi)
+local Plate = require(ServerScriptService.server.Kitchen.KitchenService.Plate)
 
 export type Amounts = { [string]: number }
 export type StockRecord = { Amount: number, Capacity: number, Blocked: boolean }
@@ -22,15 +23,18 @@ export type Public = {
 	Discarded: SignalLib.Signal<Player, string, boolean, DiscardWhere>,
 	Emitted: SignalLib.Signal<string, Player?, { [string]: any }?>,
 	Gated: { [Instance]: boolean },
+	Hidden: { [Instance]: boolean },
 	Locks: { [number]: { thread } },
 	ModuleNames: { [string]: string },
 	Modules: { [string]: StationApi.Module },
+	Plates: Plate.PlateApi,
 	Published: { [number]: number },
 	Stations: { [number]: StationApi.Station },
 	StockChanged: SignalLib.Signal<string, number>,
 	Wanted: { [Instance]: Wanted },
 	Warned: { [string]: boolean },
 	WasBlocked: { [string]: boolean },
+	WorldOverride: boolean?,
 	Setup: (self: Public) -> (),
 	GetVehicle: (self: Public) -> string,
 	GetCapacity: (self: Public, ingredient: string) -> number,
@@ -57,6 +61,7 @@ export type Public = {
 	PushStock: (self: Public) -> (),
 	AddBin: (self: Public, instance: Instance) -> (),
 	RefreshPrompts: (self: Public, station: StationApi.Station) -> (),
+	HiddenByPrep: (self: Public, anchor: Instance) -> boolean,
 	RefreshAllPrompts: (self: Public) -> (),
 	IngredientOf: (self: Public, station: StationApi.Station, anchor: Instance) -> string?,
 	Notify: (self: Public, player: Player, notice: string, value: number?) -> (),
@@ -76,6 +81,18 @@ export type Public = {
 	HasAltered: (self: Public, kind: AlterKind?) -> boolean,
 	DiscardTarget: (self: Public, player: Player) -> (Tool?, string, boolean),
 	ReportDiscard: (self: Public, player: Player, tool: Tool?, item: string, altered: boolean, where: DiscardWhere) -> (),
+	BuildPlateDeps: (self: Public) -> Plate.Deps,
+	BeginPlate: (self: Public, player: Player, slot: number?) -> (Plate.Ticket?, string?),
+	FinishPlate: (self: Public, player: Player, spec: Plate.Spec) -> (Plate.Result?, string?),
+	RefundPlate: (self: Public, player: Player) -> boolean,
+	TrashPlate: (self: Public, player: Player, options: Plate.TrashOptions?) -> Plate.TrashResult,
+	GrillAct: (self: Public, player: Player, act: Plate.GrillAction, slot: number?) -> (Plate.GrillResult?, string?),
+	PlateOf: (self: Public, player: Player) -> Plate.Ticket?,
+	DevFeedRail: (self: Public, score: number?) -> boolean,
+	DevAgeGrill: (self: Public, slot: number, seconds: number) -> number,
+	RailCount: (self: Public) -> number,
+	BoardFree: (self: Public) -> number,
+	DevWorldPrompts: (self: Public, on: boolean?) -> (),
 	CaptureStock: (self: Public) -> { [string]: number },
 	RestoreStock: (self: Public, data: any) -> (),
 	CaptureStations: (self: Public) -> { [string]: any },

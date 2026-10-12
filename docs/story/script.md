@@ -22,22 +22,24 @@ Formato das ligações (alinhado a FEAT-018, `design/features.md`):
 
 ## 1. Cutscene de abertura (DEC-021, DEC-088, **DEC-225**) — party de 1–4
 
-### 1.0 Abertura curta (DEC-225, 2026-10-12, Provisório; VALE no lugar da tabela de 10 planos abaixo)
+### 1.0 Abertura curta (DEC-225, 2026-10-12; revisão D3 rev. 2 do dono, 2026-10-12, Provisório; VALE no lugar da tabela de 10 planos abaixo)
 
-Duração alvo: **≤ 35 s**. Começa na linha da rua do trailer; sem carros. POV 1ª pessoa compartilhado segue (dúvida em `Q-226`).
+Duração: **35 s** (teto 38 s). Sem carros, sem figurantes, trânsito parado durante a cena. POV 1ª pessoa compartilhado segue (dúvida em `Q-226`).
+Falas curtas: **≤ 6 palavras**; Walt ao telefone: **3 falas**. O número do telefone aparece só no prompt e no panfleto (ninguém fala dígitos).
 
-| # | Ponto | O que acontece | Texto |
+| Tempo | Plano | O que acontece | Texto |
 |---|---|---|---|
-| 1 | calçada em frente ao Pad, ponta **direita**, perto da planta | Fade in; manhã; título "Sell Hotdogs!" curto. O olhar levanta e baixa; a party começa a andar | título |
-| 2 | calçada → poste `P-01` | Caminha **para a esquerda** até o poste do cartaz HELP WANTED; colegas lado a lado (fila de até 4) | — |
-| 3 | `P-01` (CS-P1..P4) | Para; o olhar vai ao panfleto; close (FOV fecha); prompt **"Call"** se completa sozinho | prompt "Call" |
-| 4 | `P-01` | Flip aberto no trilho 1; ligação de Walt em viva-voz (ligação abaixo, com "trailer" no lugar de "cart") | legenda |
-| 5 | `P-01` → trailer | O flip some; todos viram a cabeça para o **trailer** no Pad, sob o sol (sem carro passando) | — |
-| 6 | FIM | Fade → controle liberado, 7:00 AM; o telefone fixo do trailer toca (§3) | "Day 1" |
+| 0–3,8 s | céu / estabelecimento | Fade in; câmera solta alta atrás do avatar, descendo; título "Sell Hotdogs!" | título |
+| 3,8–14 s | calçada norte → faixa **CW-4** → poste `P-01` | Parte da calçada norte da Ninth, **em frente ao trailer**; anda até a faixa de pedestres mais próxima do cartaz, **atravessa pela faixa** (rua vazia, sem carros) e chega ao poste do cartaz HELP WANTED, do lado do trailer; colegas lado a lado | "I really need a job." |
+| 12–17 s | `P-01` (CS-P1..P4) | O olhar vai ao panfleto, close (FOV fecha), leitura | "Help wanted?" · "I'll call them." / "Let's call them." |
+| 17–31,4 s | `P-01` | Prompt "Call"; flip aberto; Walt em viva-voz (3 falas abaixo); o flip some no clique | prompt "Call 555-0179" |
+| 31,8–35 s | `P-01` → trailer | Todos viram a cabeça para o **trailer** no Pad, sob o sol; fade out; controle liberado, 7:00 AM ("Day 1") | — |
 
-Cortados em relação ao roteiro antigo: ônibus, pombos, mariposa, vitrines "NO HELP WANTED", travessia da Ninth com o carro roteirizado, carro de brinquedo do plano 9 e o "Empty. Again.". O "olhe antes" fica só no tutorial (§3: "Look both ways! These drivers don't brake. Heh.").
+Ligação (voz de telefone, Walt): 1. "Bramble's Corner Dogs. Walt here." 2. "You noticed the flyer. Good." 3. "Start today. Keys under the mustard."
 
-Panfleto (texto de jogo, Provisório, narrative-writer confirma): "HELP WANTED! Run a hot dog **trailer**. No experience needed. Must notice things. Call Bramble's Corner Dogs — 555-0179". Ligação: linha 5 "The **trailer's** right on the corner. Ninth and Juniper."
+Cortados em relação ao roteiro antigo: ônibus, pombos, mariposa, vitrines "NO HELP WANTED", carro de brinquedo, **"Empty. Again."** (o dono não entendia por que ele falava isso), "I really need a job right now... but nobody's hiring.", o número falado e as variantes longas do Walt. O "olhe antes" fica só no tutorial (§3: "Look both ways.").
+
+Panfleto (texto de jogo, Provisório, narrative-writer confirma): "HELP WANTED! Run a hot dog **trailer**. No experience needed. Must notice things. Call Bramble's Corner Dogs — 555-0179".
 
 ### 1.1 Roteiro antigo (HISTÓRICO, superado por DEC-225 onde conflita)
 
@@ -113,25 +115,32 @@ Provisório (Q-193, 2026-10-11): o tutorial roda **sempre no dia 1 de toda run**
 O dia 1 começa com o telefone do carrinho tocando (plano 10 do §1). Isso ensina o prompt **"Answer"** logo de cara.
 Walt atende e **fica na linha em viva-voz** durante o dia 1: cada dica sai pelo alto-falante do telefone, uma vez, quando a party chega àquele passo pela primeira vez. Sem painel, sem botão: a ação é sempre o prompt no mundo (DEC-015, DEC-066).
 
-| Gatilho | Fala |
+Revisão D3 rev. 2 (2026-10-12, Provisório): **≤ 6 palavras por fala, ≤ 3 falas por passo.** Texto de jogo em `src/Tutorial/client/TutorialController/Steps.luau` (a lista é a fonte; abaixo, o resumo).
+
+| Passo | Fala (Say) · elogio (Done) · lembrete (Remind) |
 |---|---|
-| "Answer" no telefone do carrinho | "Morning, Rookie! I'll stay on the line. Speaker's on." |
-| perto da placa | "Flip the sign to OPEN when you're ready." |
-| perto do estoque de salsicha | "Tap the sausage box. It goes right on the grill." |
-| barra da grelha cheia | "Ready! Grab it. It goes on the warmer." |
-| perto do pão | "Tap the buns. One gets sliced for you." |
-| pão cortado | "Now pop a sausage in the bun." |
-| primeiro cliente no balcão | "See the bubble? That's the order." |
-| montando | "Add only what they asked for. Nothing extra." (DEC-072) |
-| hot dog pronto | "Hand it over. Money goes in the drawer." |
-| primeiro estoque abaixo de 25% | "Running low? The Mart's across the street." |
-| primeira vez que alguém pisa na rua | "Look both ways! These drivers don't brake. Heh." |
-| primeira volta do Mart com item na mão | "Careful crossing. Get hit, and you drop it." (DEC-103) |
-| primeira entrada no Mart | "Gear's on the back wall. Sometimes there's something special." (DEC-106) |
-| primeira saída da zona do carrinho | "Don't leave the cart alone too long." |
-| primeiro atropelamento (qualquer jogador) | "Ooh. You okay? Dust off. Grab your stuff." |
-| 6:00 PM | "Flip the sign to CLOSED. Finish the line." |
-| resumo do dia 1 | "Good job today! See you at seven." |
+| saudação (ao atender) | "Morning, Rookie. Walt here." · "I'll walk you through it." |
+| primeiro cliente | "Your first customer's coming." |
+| pedido | "Take their order." · "A ketchup dog. Easy." · "Take the order, Rookie." |
+| abrir a loja | "Flip the sign to open." · "We're open." · "Flip the sign. Open up." |
+| grelha | "Frank from the cooler." "Onto the grill." · "Nice." · "Frank on the grill." |
+| pão | "Slice a bun while it cooks." · "Good." · "Hold to slice the bun." |
+| esperar a salsicha | "Wait for the bar." |
+| coletar | "Ready. Grab it." · "Got it." · "Grab it off the grill." |
+| montar | "Frank in the bun." · "Beautiful." · "Put it in the bun." |
+| toppings | "They want ketchup." "Nothing extra." (DEC-072) · "Perfect." · "Ketchup. Hold to add." |
+| descartar | "Not what they asked. Toss it." · "Toss it in the bin." |
+| servir | "Now serve it." · "Hand it over." |
+| primeira venda | "Ka-ching! First sale." "Cash goes in the drawer." |
+| ir ao Mart | "That was your last bun." "Mart's across the street." "Look both ways." · "That's the place." · "Follow the arrow to the Mart." |
+| comprar | "Grab buns at the bakery." · "Eight buns. That'll do." · "Bakery shelf. Hold Buy Buns." |
+| voltar | "Bring them to the trailer." · "Back to the trailer." |
+| reabastecer | "Hold Restock on the bun crate." · "Stocked up!" · "Hold Restock at the bun crate." |
+| despedida | "That's the job. You got this." "Call me if..." · pulou: "Alright. You know the drill." "Call me if you need me." |
+
+Dicas depois da ação (`hint_*`, uma vez): "Bar full? Grab it." · "Now slice a bun." · "Pop a frank in the bun." · "Hot dog's ready. Wait for orders." · "We're open! Folks are lining up." · "See the bubble? That's the order." + "Nothing extra." · "Nice! Cash goes in the drawer." + "Low on stock? Try the Mart." + "Look both ways." · "Careful crossing. Get hit, drop it." (DEC-103) + "Gear's on the back wall." + "Sometimes there's something special." (DEC-106) · "That's how you restock. Easy." · "Messed up? Toss it. No harm." · "New gear's on the trailer. Heh."
+
+Não existem mais (cortadas em 2026-10-12): "Don't leave the cart alone too long.", "Ooh. You okay? Dust off. Grab your stuff.", "Flip the sign to CLOSED. Finish the line." e "Good job today! See you at seven." como falas de tutorial (ficam como texto de UI do resumo, §4.5/`ui-text.md`).
 
 ## 4. Ligações de dia (7:00 AM)
 
@@ -140,12 +149,12 @@ Walt atende e **fica na linha em viva-voz** durante o dia 1: cada dica sai pelo 
 | Dia | Abertura | Fim do turno (resumo) |
 |---|---|---|
 | 1 | tutorial (§3) | "Good job today! See you at seven." |
-| 2 | "Morning! Cheese came in. Folks love cheese." / "Oh — keep an eye on your cash drawer." / "Some folks have quick hands." / "And tonight? You work late. Same cart." / "I'll ring when the sun goes down." | "Good job today! Two for two." (segue direto para a noite 1) |
+| 2 | "Cheese is in. Folks love cheese." / "Watch your drawer. Quick hands." / "You work late tonight. I'll ring." | "Good job today! Two for two." (segue direto para a noite 1) |
 | 3 | (SUPERADO: o dia 3 vem depois da noite 1; "Bacon's in today. Smell that?" entrou em `call_day_after_1`) | — |
 | 4 | (SUPERADO: o dia 4 vem depois da noite 2; "potato sticks / bigger grill" entrou em `call_day_after_2`, seguida da oferta do trailer) | — |
 | 5 | (SUPERADO por 4.1b: o trailer não é mais comprado no dia 5) | — |
 
-Pista leve, a partir do dia 3, só se o ladrão foi pego no dia anterior (substitui a 2ª linha): "Heard you caught Quentin in the act. Nice." (Walt não estava lá.)
+Pista leve, a partir do dia 3, só se o ladrão foi pego no dia anterior (substitui a 2ª linha): "You caught Quentin. Nice work." (Walt não estava lá.)
 
 ### 4.1b Oferta do trailer — **OBSOLETA (DEC-224, 2026-10-12): o trailer é o veículo único desde o Day 1; não há oferta, repasse, placa nem `call_trailer_bought`.** Histórico:
 Manhã depois da noite `Content.Trailer.OfferAfterNight` (= 2) — Provisório (pedido do dono, 2026-10-12)
@@ -199,15 +208,17 @@ tem variante nas ligações dos dias 3 e 4 (`call_day_after_1_quentin`, `call_da
 
 | Dia (antigo) | Depois da | Abertura |
 |---|---|---|
-| 6 | noite 1 | "Morning! You made it. Told you nights were quiet." / "Cream cheese came in. Fancy." |
-| 7 | noite 2 | "Morning, Rookie. Sleep okay?" / "Good. Don't think about it too hard." |
-| 8 | noite 3 | "Bank clock's ticking fine today. See?" / "Nice and normal. Sell some dogs." |
-| 9 | noite 4 | "Just one Mr. Pickett today, I hope. Heh." / "...That was a joke. Mostly." |
-| 10 | noite 5 | "She liked you. The lady. I can tell." / "Forget I said that. Grill's waiting." |
-| 11 | noite 6 | "Ever notice nobody lives upstairs? In the daytime, I mean." / "Huh. Next question." |
-| 12 | noite 7 | "You kept your eyes down. Good." / "I used to count the lamps. It helps." |
-| 13 | noite 8 | "Long night, huh? Coffee's on me." / "Tell Opal it's for Walt. She knows." |
-| 14 | noite 9 | "Rookie. About the knocking." / "That wasn't me. I need you to believe that." / "Tonight's the last one. Then you get answers. I promise." |
+| 6 | noite 1 | "Morning! Told you nights were quiet." / "Bacon's in. Smell that?" / "Grill's hot. Sell some dogs." |
+| 7 | noite 2 | "Morning, Rookie. Sleep okay?" / "Good. Don't think about it." / "Potato sticks today. Bigger grill, too." |
+| 8 | noite 3 | "Bank clock's ticking fine. See?" / "Nice and normal. Sell some dogs." |
+| 9 | noite 4 | "One Mr. Pickett today, I hope." / "...That was a joke. Mostly." |
+| 10 | noite 5 | "She liked you. The lady." / "Forget I said that." |
+| 11 | noite 6 | "Ever notice nobody lives upstairs?" / "In the daytime, I mean." / "Huh. Next question." |
+| 12 | noite 7 | "You kept your eyes down. Good." / "I counted the lamps. It helps." |
+| 13 | noite 8 | "Long night, huh? Coffee's on me." / "Tell Opal it's for Walt." |
+| 14 | noite 9 | "Rookie. About the knocking." / "That wasn't me. Believe that." / "Tonight's the last. I promise." |
+
+Variante Quentin (dias 3 e 4): "Morning! You made it." / "You caught Quentin. Nice work." / "Bacon's in. Go sell some dogs." e "Morning, Rookie. Sleep okay?" / "You caught Quentin. Nice work." / "Potato sticks and a bigger grill."
 
 Variante (qualquer dia 6–14), se alguém da party está em spectate (DEC-093; só volta se a party perder uma noite e ela for repetida, DEC-111, DEC-113), substitui a 1ª linha: "Short a hand today? Your friend's resting. You'll manage."
 
@@ -226,128 +237,91 @@ Cada noite: abertura → regra nova → (a partir da noite 7) lembrete da críti
 Na repetição de uma noite perdida (DEC-053), toca a **versão curta** (§5.11), não a ligação inteira. É ligação nova, disparada pelo sistema; não é replay (leitura de DEC-077, `Q-077` d).
 Linhas marcadas com † são **novas** desta revisão e não mudam a regra aprovada em `anomalies.md`.
 
+Revisão D3 rev. 2 (2026-10-12, Provisório): **≤ 4 falas por noite, ≤ 6 palavras cada**; a última é a **forma curta** da regra. A lore essencial fica (a regra e a pista); o resto (aberturas longas, explicações, "Tell your crew") saiu. Texto de jogo em `BossCalls.luau`.
+
 ### Noite 1 — ANM-001 The blank folks (estágio 3)
 
-Nova (2026-10-12): a noite 1 acontece no **trailer** (DEC-224; antes "carrinho"); a ligação abre as regras do Walt e é **a primeira chamada de noite**, onde a explicação das regras vive (DEC-224). Texto da fala 1 e do resto: "Same cart" → "Same trailer" (narrative-writer). Depois dela toca `call_night_1_coffee` (café, sanidade 50).
+A noite 1 acontece no **trailer** (DEC-224); a ligação é **a primeira chamada de noite** e abre as regras (DEC-224). Depois dela toca `call_night_1_coffee` ("You sound tired, Rookie..." / "Have some coffee." / "It'll keep your head on straight.").
 
-1. "Evening, Rookie. Your first night shift. Same cart. Same grill. Different customers."
-2. "Some of them might look a little off."
-3. "If someone walks up with no face — no eyes, no mouth — don't serve them."
-4. "Just refuse. They'll wander off."
-5. "That's it. Keep the grill hot. See you at six."
-6. **"No face? Refuse them."**
+1. "Evening, Rookie. Some customers look off."
+2. "No face at all? Just refuse."
+3. "They'll wander off. Grill stays hot."
+4. **"No face? Refuse them."**
 
 ### Noite 2 — ANM-002 The wrong food
 
-1. "Night two. You did fine last night."
-2. "Check your food before it goes out."
-3. "A gray sausage, or a bun with a bite in it you didn't take —"
-4. "toss it. Trash can. Don't serve it."
-5. "And still no faces. Remember faces."
-6. **"Wrong food? Throw it away."**
+1. "Night two. Check your food first."
+2. "Gray frank, bitten bun? Trash it."
+3. "Still refuse the faceless ones."
+4. **"Wrong food? Throw it away."**
 
 ### Noite 3 — ANM-003 The stopped clock
 
-1. "Evening. Can you see the bank clock from there?"
-2. "Keep an eye on it. And an ear. It ticks."
-3. "If it stops, the trailer's lights fix it. Lights off. Count to five. Then back on."
-4. "That gets it going again."
-5. "No trailer yet? Then the clock behaves. Heh."
-6. **"Clock stops? Trailer lights off, count five, on."**
+1. "Evening. Watch the bank clock."
+2. "If it stops, trailer lights off."
+3. "Count to five. Then lights on."
+4. **"Clock stops? Lights off, count five."**
 
-(Novo fluxo: a anomalia exige o interruptor do trailer — `Trailer = "Needs"`. No carrinho a noite 3 joga a anomalia reserva ANM-002 no lugar dela.)
+(Fluxo atual: a anomalia exige o interruptor do trailer — `Trailer = "Needs"`.)
 
 ### Noite 4 — ANM-004 The copies (estágio 4)
 
-1. "Rookie... there's something you should know."
-2. "Sometimes a customer shows up twice. Same face, same clothes."
-3. "One of them is a copy. The copy is backwards."
-4. "Look at their shirt. Their watch. Backwards."
-5. "Refuse the backwards one. Serve the real one."
-6. "Who are they? ...Next question."
-7. **"Two of them? Refuse the backwards one."**
+1. "Sometimes a customer shows up twice."
+2. "One's a copy. Everything's backwards."
+3. "Look at shirts and watches."
+4. **"Two? Refuse the backwards one."**
 
 ### Noite 5 — ANM-005 The Raincoat Lady
 
-1. "Tonight, a lady in a yellow raincoat might come by."
-2. "It won't be raining. She'll be dripping anyway."
-3. "Serve her. Always. Whatever she asks for."
-4. "Don't refuse her. Don't make her wait."
-5. "She's a... very old customer. Be nice."
-6. **"Yellow raincoat? Always serve her."**
+1. "A lady in a yellow raincoat."
+2. "It won't rain. She'll drip anyway."
+3. "Serve her, whatever she asks."
+4. **"Yellow raincoat? Always serve her."**
 
 ### Noite 6 — ANM-006 The wavers
 
-1. "Evening. Folks upstairs might wave at you tonight."
-2. "Don't wave back. Don't even look up."
-3. "They just want someone to notice them."
-4. "Eyes on your grill. They'll get bored."
-5. "I know. I know. I'll explain someday."
-6. **"Someone waving upstairs? Don't look up."**
+1. "Folks upstairs might wave tonight."
+2. "Don't wave back. Eyes down."
+3. "They just want to be noticed."
+4. **"Someone waving upstairs? Don't look up."**
 
 ### Noite 7 — ANM-007 The Walker (estágio 5, regra crítica)
 
-1. "Rookie. Listen close. This one matters most."
-2. "Down Juniper Street, someone walks toward your stand."
-3. "Every time you look at them, they get closer."
-4. "Whatever you do, never let them reach your light."
-5. "Don't watch the Walker. Not for a second."
-6. † "When the far lamp buzzes, they're there. Tell your crew."
-7. **"Whatever you do, never watch the Walker."**
+1. "Down Juniper, someone walks toward you."
+2. "Each look brings them closer."
+3. "Never let them reach your light."
+4. **"Never watch the Walker."**
 
-A linha 6 apoia o sinal de início decidido em DEC-123 (§5.12).
+O sinal de início (DEC-123, §5.12) e o aviso "quando o poste distante zumbe, eles chegaram" saíram da fala; o sinal continua sendo som/figura no mundo.
 
 ### Noite 8 — ANM-008 The long car
 
-1. "Evening. You're doing better than I ever did."
-2. "If a long car parks across the street with its lights on you —"
-3. "get out of its sight."
-4. "In the trailer? Close the window. Stay inside."
-5. "On the cart? Walk to the Mart. Wait there."
-6. "Don't come back till it drives away."
-7. † "Regular cars never stop there. That one does."
-8. "And never watch the Walker."
-9. **"Long car? Window shut, or off to the Mart."**
+1. "A long car may park across."
+2. "Lights on you? Out of sight."
+3. "Window shut. Or the Mart."
+4. **"Long car? Window shut, or Mart."**
 
-Novo fluxo (2026-10-12, Provisório): a noite 8 pode ser jogada no carrinho (trailer opcional). A ligação cobre os dois: trailer = fechar a janela (DEC-221);
-carrinho = sair da zona do carrinho e ir ao Mart (só quem está na zona é testado). A forma curta é a nova.
-
-DEC-221 (Provisório): linhas 3–5 e a forma curta trocadas (era "get down behind the counter. Stay down." / "Wait till
-you hear it drive away." / "Long car's lights on you? Hide."). "Close the window" repete o prompt "Close Window".
-A linha 6 apoia a proposta para `Q-103` (`world.md` §3.2: red curb "NO PARKING", rua esvazia).
+A janela do trailer (DEC-221) e o Mart (quem está sem trailer) seguem; "Regular cars never stop there" e "Don't come back till it drives away" saíram. Na repetição entra também "And never watch the Walker.".
 
 ### Noite 9 — ANM-009 The knock
 
-1. "One more thing. This is important."
-2. "I never come to your corner at night. Never."
-3. "If someone knocks and says it's me — it isn't."
-4. "In the trailer? Close the window. Stay inside."
-5. "On the cart? Walk to the Mart. Wait there."
-6. "Keep away till the knocking stops."
-7. "...I'm sorry I didn't tell you sooner."
-8. "And never watch the Walker."
-9. **"Knocking? It's not me. Window shut, or off to the Mart."**
-
-DEC-221 (Provisório): linhas 4–5 e a forma curta trocadas (era "it isn't. Get down. Stay quiet till it stops." /
-"Knock at the back? It's not me. Hide.").
+1. "I never visit at night. Never."
+2. "Knocking? It isn't me. I'm sorry."
+3. "Window shut. Or the Mart."
+4. **"Knocking? Not me. Window, or Mart."**
 
 ### Noite 10 — ANM-010 The Hush (final)
 
-1. "Last night, Rookie. Ten. Nobody's made it to ten since... well."
-2. "Tonight the street might go dark. Lamp by lamp."
-3. "When the lamps start going out, leave your post."
-4. "Go to the Mart. Stand under the OPEN sign. It never goes out."
-5. "Come back when the lamps come back."
-6. "And never watch the Walker. See you at sunrise. I promise."
-7. **"Lamps going out? Go to the Mart sign."**
-
-(Linha 1 encurtada para caber no mobile; o "A long time." saiu.)
+1. "Last night. The lamps may die."
+2. "Go stand beneath the Mart's sign."
+3. "It never goes out. I promise."
+4. **"Lamps out? To the Mart sign."**
 
 ### 5.11 Versão curta (noite repetida)
 
-1. "Same night, Rookie. Same rules. You know them."
+1. "Same night, Rookie. Same rules."
 2. (forma curta da regra nova da noite)
-3. (noites 7–10) "And never watch the Walker."
+3. (noites 8–10) "And never watch the Walker."
 
 ### 5.12 Som de início do Walker (ANM-007) — **decidido, DEC-123**
 

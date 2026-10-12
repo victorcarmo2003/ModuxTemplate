@@ -1,34 +1,39 @@
 --!nocheck
 --[[
-	cutscene_points.luau - SURGICAL and IDEMPOTENT Studio patch (2026-10-12, owner decision D3: short intro that starts on
-	the sidewalk in front of the trailer's Pad). NOT a Place.run: it only creates or moves MapPoint Parts in
-	workspace.MapBinding.Points. Paste it in the Studio command bar / execute_luau (Edit mode, not Play). Safe to run twice:
-	a point already within 0.01 studs of its target is skipped. Set DRY_RUN = true to only print what it would do.
+	cutscene_points.luau - SURGICAL and IDEMPOTENT Studio patch (2026-10-12, owner decision D3 rev. 2: the intro starts on the
+	sidewalk across from the trailer and CROSSES the Ninth on a crosswalk). NOT a Place.run: it only creates or moves MapPoint
+	Parts in workspace.MapBinding.Points. Paste it in the Studio command bar / execute_luau (Edit mode, not Play), or load it with
+	tools/studio/README.md (run_snippet("assetplace/cutscene_points")). Safe to run twice: a point already within 0.01 studs
+	of its target is skipped. Set DRY_RUN = true to only print what it would do.
 
-	Content.Cutscenes "intro" (src/Shared/Content/Cutscenes.luau) now walks LEFT (world +X) along the Ninth's south
-	sidewalk, in front of the Pad (Pad edge Z 36, sidewalk Z 36..47.5, curb at 47.5), from the planter at its right end
-	(world -X, the Planter at (-76, 37)) to the P-01 post with the Help Wanted flyer at (-17.2, 50.2), then calls Walt and ends
-	looking at the trailer (MapPoint TRL, read from the map: not touched here). Coordinates are WORLD coordinates (the
-	MAP-01 frame is world = (-x, y, K - z); these are measured in the place, not derived).
+	Content.Cutscenes "intro" (src/Shared/Content/Cutscenes.luau) walks: start marks (north sidewalk of the Ninth, across from
+	the trailer's Pad) -> CS-1 (north curb, at the crosswalk CW-4) -> straight across the stripes (CS-2 mid street, then a bend east) -> CS-3
+	(south end of the stripes) -> the stand in front of the P-01 flyer (CS-P*, computed at runtime from the flyer face). CW-4 is
+	the nearest crosswalk to the flyer and the widest one (stripes X -24..-12, Z 54.6..83.1: four avatars side by side fit; CW-3 is
+	6 studs wide and has a street light pole at its north end). Measured in the place on 2026-10-12 (world coordinates):
+	  north sidewalk Z 87.9..99.9 (top 0.4), south sidewalk Z 35.9..47.9 (top 0.4), road between (Ninth, 40 studs with the
+	  parking lanes), CW-4 stripes X -24..-12 / Z 54.6..83.1, P-01 post (-18.7, 49.2) with the flyer at (-17.2, 4.5, 50.2) facing
+	  (+0.71, -0.71): the stand is ~3 studs out of its face = (-15.1, 48.1). Obstacles measured (collidable parts in a 2.5 x 4 corridor
+	  along every leg): the NE corner street sign at (-15, 87.7) and the P-01 pole at (-18.7, 51.2), so the walk crosses at X -21
+	  on the north half and bends to X -15.5 before the south end (east of the pole), then goes straight to the stand.
 
 	  point            world (x, y, z)        facing          use
-	  CS-1             (-68, 0.4, 43)         +X (east walk)  start of the walk, right end of the sidewalk
-	  CS-2             (-42, 0.4, 43)         +X              middle of the walk, in front of the Pad (papers on the wind)
-	  CS-3             (-24, 0.4, 43)         +X              only waypoint of the route: the walk bends 25 degrees to the stand
-	  CutsceneMark1    (-68, 0.4, 45)         +X              party start slots, 2 x 2 (slot 1 = the player that made the party)
-	  CutsceneMark2    (-68, 0.4, 41)         +X
-	  CutsceneMark3    (-71, 0.4, 45)         +X
-	  CutsceneMark4    (-71, 0.4, 41)         +X
+	  CutsceneMark1    (-33, 0.4, 93.5)       +X (east)       party start slots, 2 x 2 (slot 1 = the player that made the party)
+	  CutsceneMark2    (-33, 0.4, 90.5)       +X
+	  CutsceneMark3    (-36, 0.4, 93.5)       +X
+	  CutsceneMark4    (-36, 0.4, 90.5)       +X
+	  CS-1             (-21, 0.4, 90)         -Z (south)      north curb, in line with the crosswalk (the walk turns here)
+	  CS-2             (-21, 0.25, 66)        -Z              middle of the street (papers on the wind); the walk bends east here
+	  CS-3             (-15.5, 0.3, 53.5)     -Z              south end of the stripes, east of the P-01 pole (then 5 studs to the stand)
 
-	The stand in front of the flyer (CS-P1..4) is computed at runtime from the flyer's face (Rules.Stand); the old
-	CS-P*, CS-4, CS-5, CS-5W, CS-5E, CS-6, CS-7 stay where they are (unused by the intro, harmless, delete when the finale is
-	redone). CS-1, CS-2, CS-3 and CutsceneMark1..4 EXIST today on the north sidewalk: they are MOVED here (same Part, same
-	tags and attributes); a missing one is created (invisible, anchored, no collision/query/touch, tag MapPoint, attribute
-	PointId). CS-1..3 and the marks are not read by anything else (checked: grep src/ 2026-10-12).
+	The old CS-P*, CS-4, CS-5, CS-5W, CS-5E, CS-6, CS-7 stay where they are (unused by the intro, harmless, delete when the finale
+	is redone). CS-1..3 and the marks EXIST today (old positions): they are MOVED (same Part, same tags and attributes); a missing
+	one is created (invisible, anchored, no collision/query/touch, tag MapPoint, attribute PointId). CS-1..3 and the marks are
+	read only by the intro and by Ambience (PAPERS), checked with grep src/ 2026-10-12.
 
 	The MapIndex caches positions at start: stop Play and start again after running. Undo: Ctrl+Z (waypoints
 	"cutscene_points: before/after") or put the BEFORE values in TARGET and run again.
-	Ordering: run it once the Pad's trailer is in place or not, it does not depend on it (the end looks at TRL).
+	Ordering: does not depend on the Pad's trailer (the end looks at TRL, not touched here).
 ]]
 
 local ChangeHistoryService = game:GetService("ChangeHistoryService")
@@ -36,18 +41,18 @@ local CollectionService = game:GetService("CollectionService")
 local Workspace = game:GetService("Workspace")
 
 local DRY_RUN = false
-local DONE = "CutsceneIntroD3"
-local EAST = Vector3.new(1, 0, 0) -- the walk direction (world +X = the party's left looking at the street)
-local Y = 0.4 -- sidewalk top (measured: raycast at X -68..-15, Z 36..47)
+local DONE = "CutsceneIntroD3b"
+local EAST = Vector3.new(1, 0, 0) -- the walk direction along the north sidewalk (world +X)
+local SOUTH = Vector3.new(0, 0, -1) -- the crossing direction (world -Z, towards the trailer's side)
 
 local TARGET = {
-	{ id = "CS-1", x = -68, z = 43 },
-	{ id = "CS-2", x = -42, z = 43 },
-	{ id = "CS-3", x = -24, z = 43 },
-	{ id = "CutsceneMark1", x = -68, z = 45 },
-	{ id = "CutsceneMark2", x = -68, z = 41 },
-	{ id = "CutsceneMark3", x = -71, z = 45 },
-	{ id = "CutsceneMark4", x = -71, z = 41 },
+	{ id = "CutsceneMark1", x = -33, y = 0.4, z = 93.5, dir = EAST },
+	{ id = "CutsceneMark2", x = -33, y = 0.4, z = 90.5, dir = EAST },
+	{ id = "CutsceneMark3", x = -36, y = 0.4, z = 93.5, dir = EAST },
+	{ id = "CutsceneMark4", x = -36, y = 0.4, z = 90.5, dir = EAST },
+	{ id = "CS-1", x = -21, y = 0.4, z = 90, dir = SOUTH },
+	{ id = "CS-2", x = -21, y = 0.25, z = 66, dir = SOUTH },
+	{ id = "CS-3", x = -15.5, y = 0.3, z = 53.5, dir = SOUTH },
 }
 
 local binding = Workspace:FindFirstChild("MapBinding")
@@ -70,11 +75,11 @@ end
 
 local moved, created, skipped = 0, 0, 0
 for _, row in TARGET do
-	local want = Vector3.new(row.x, Y, row.z)
-	local cf = CFrame.lookAt(want, want + EAST)
+	local want = Vector3.new(row.x, row.y, row.z)
+	local cf = CFrame.lookAt(want, want + row.dir)
 	local part = existing[row.id]
 	if part then
-		if (part.Position - want).Magnitude < 0.01 and part.CFrame.LookVector:Dot(EAST) > 0.999 then
+		if (part.Position - want).Magnitude < 0.01 and part.CFrame.LookVector:Dot(row.dir) > 0.999 then
 			skipped += 1
 			print(string.format("%s already at (%.2f, %.2f, %.2f)", row.id, want.X, want.Y, want.Z))
 		else
@@ -111,7 +116,7 @@ if not DRY_RUN then
 	ChangeHistoryService:SetWaypoint("cutscene_points: after")
 end
 
--- Sanity: the three waypoints and the flyer must be reachable on the sidewalk; TRL must exist (the end looks at it)
+-- Sanity: TRL must exist (the end looks at it) and the flyer is the one measured above
 local function exists(id: string): boolean
 	local part = existing[id]
 	return part ~= nil and part:IsDescendantOf(Workspace)
@@ -121,7 +126,8 @@ if not exists("TRL") then
 end
 local flyer = Workspace:FindFirstChild("P-01_Flyer", true)
 if flyer and flyer:IsA("BasePart") then
-	print(string.format("flyer P-01 at (%.1f, %.1f, %.1f); CS-3 -> flyer: %.1f studs", flyer.Position.X, flyer.Position.Y, flyer.Position.Z, (Vector3.new(-24, Y, 43) - flyer.Position).Magnitude))
+	local stand = flyer.Position + flyer.CFrame.LookVector * 3
+	print(string.format("flyer P-01 at (%.1f, %.1f, %.1f); stand ~(%.1f, %.1f); CS-3 -> stand: %.1f studs", flyer.Position.X, flyer.Position.Y, flyer.Position.Z, stand.X, stand.Z, (Vector3.new(-15.5, 0, 53.5) - Vector3.new(stand.X, 0, stand.Z)).Magnitude))
 else
 	warn("cutscene_points: P-01_Flyer not found (the stand falls back to the P-01 post)")
 end

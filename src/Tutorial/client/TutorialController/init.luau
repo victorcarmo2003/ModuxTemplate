@@ -778,7 +778,12 @@ function TutorialController:DecideLive(): (string, Instance?, string)
 		return self:DecideShop()
 	end
 
-	-- Walt is on the line (or never called): the tutorial customer comes
+	-- Walt is on the line (or never called): the trailer is opened first (Prep: the red switch; opening it opens the shop),
+	-- then the tutorial customer comes
+	if Vide.untrack(self.Dependencies.RoundController.Phase) == "Prep" then
+		return "open", self:Anchor("open_sign", false), ""
+	end
+
 	const guestId, guest, rig = self:Guest()
 	if guestId == nil or guest == nil or guest.State == "Leaving" then
 		self:AskGuest()
@@ -814,16 +819,8 @@ function TutorialController:DecideLive(): (string, Instance?, string)
 					if row then row.Name else key
 			end
 		end
-		-- the hot dog is right: the drawer must be open to sell (Prep: open the shop first)
-		if Vide.untrack(self.Dependencies.RoundController.Phase) == "Prep" then
-			return "open", self:Anchor("open_sign", false), ""
-		end
+		-- the hot dog is right: serve it (the trailer was opened before the customer came)
 		return "serve", self:Anchor("serve", false, onGuest) or rig, ""
-	end
-
-	-- the shop opens right after the order (never in the middle of serving); `open` below covers a hot dog already in hand
-	if Vide.untrack(self.Dependencies.RoundController.Phase) == "Prep" then
-		return "open_first", self:Anchor("open_sign", false), ""
 	end
 
 	const kitchen = self:Kitchen()
@@ -1450,7 +1447,7 @@ function TutorialController:DecideForced(live: string): (string?, Instance?, str
 	end
 	const step = Steps.ByKey[key]
 	const passed = (Steps.IndexOf[live] or 0) > (Steps.IndexOf[key] or 0)
-	const opened = (key == "open" or key == "open_first") and Vide.untrack(self.Dependencies.RoundController.Phase) ~= "Prep"
+	const opened = key == "open" and Vide.untrack(self.Dependencies.RoundController.Phase) ~= "Prep"
 	if step == nil or passed or opened then
 		self.Forced = nil
 		print(`{DEV_PREFIX} forced step {key} done: back to the live flow ({live})`)

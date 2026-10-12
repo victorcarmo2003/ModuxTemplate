@@ -3,7 +3,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 
-export type Mode = "FirstPerson" | "Spectate" | "Fixed" | "Cutscene" | "External"
+export type Mode = "FirstPerson" | "Spectate" | "Fixed" | "Cutscene" | "Prep" | "External"
 export type Rig = {
 	Dolly: Vector3, -- eye offset, camera space (X right, Y up, Z forward)
 	Boom: Vector3?, -- detached eye in walker space (X right, Y up, Z forward of the own body): the establishing shot
@@ -15,6 +15,26 @@ export type Rig = {
 	Rack: number?, -- 1/s the depth of field follows the focus
 	Shake: Vector3, -- hand-held, camera space studs
 	Tilt: Vector3, -- hand-held, radians (pitch, yaw, roll)
+}
+export type PrepOptions = {
+	Fov: number?, -- field of view at the station
+	Travel: number?, -- s of the tween (0 = a cut)
+	Dof: boolean?, -- depth of field behind the work surface (quality > 3 only; the caller decides)
+	Focus: number?, -- studs of the DOF focus distance
+	Radius: number?, -- studs in focus around it
+	Far: number?, -- far blur intensity
+}
+type PrepState = {
+	From: CFrame,
+	To: CFrame,
+	FromFov: number,
+	Fov: number,
+	BaseFov: number,
+	Start: number,
+	Travel: number,
+	Leaving: boolean,
+	Dof: DepthOfFieldEffect?,
+	Far: number,
 }
 type Group = "Head" | "Arm" | "Body"
 
@@ -55,6 +75,7 @@ export type Public = {
 	NextPointRetry: number,
 	NextStream: number,
 	PointId: string?,
+	PrepState: PrepState?,
 	Retarget: boolean,
 	Rig: Rig?,
 	Target: number?,
@@ -64,6 +85,10 @@ export type Public = {
 	Watching: Vide.Source<number?>,
 	Setup: (self: Public) -> (),
 	SetMode: (self: Public, mode: Mode) -> (),
+	PrepClear: (self: Public) -> (),
+	Prep: (self: Public, on: boolean, frame: CFrame?, options: PrepOptions?) -> (),
+	PrepExitFrame: (self: Public) -> CFrame?,
+	ApplyPrep: (self: Public, camera: Camera) -> (),
 	ResetLook: (self: Public) -> (),
 	Cutscene: (self: Public, on: boolean) -> (),
 	SetRig: (self: Public, rig: Rig?) -> (),

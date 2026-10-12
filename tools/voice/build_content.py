@@ -23,6 +23,8 @@ for k in sorted(meta):
     if not m.get("assetId") or m.get("status") != "ok":
         continue
     rows.append(f'\t{k} = {{ Id = "rbxassetid://{m["assetId"]}", Length = {m["length"]}, Speaker = "{m["speaker"]}" }},')
+    if k not in lines:
+        continue  # a line removed from the game stays uploaded (Lines) but is not indexed
     index.append(f'\t[{lstr(m["speaker"] + chr(0) + lines[k]["text"])}] = "{k}",')
 
 src = f"""--!strict
