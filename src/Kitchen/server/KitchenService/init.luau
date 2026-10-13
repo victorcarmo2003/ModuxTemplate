@@ -1233,6 +1233,14 @@ function KitchenService:GrillAct(player: Player, act: Plate.GrillAction, slot: n
 	return self.Plates.Grill(player, act, slot)
 end
 
+-- The bin by drag: throws away the sausage of a grill slot or of a rail position (1 = front). (ok, reason Content.Prep.Reasons key).
+function KitchenService:TrashSausage(player: Player, from: Plate.TrashFrom, slot: number): (boolean, string?)
+	if not self.Active then
+		return false, "NoStation"
+	end
+	return self.Plates.TrashSausage(player, from, slot)
+end
+
 function KitchenService:PlateOf(player: Player): Plate.Ticket?
 	return if self.Active then self.Plates.Of(player) else nil
 end

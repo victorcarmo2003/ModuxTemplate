@@ -91,8 +91,8 @@ return Table.new({
 
 	-- Trailer door (user request 2026-10-11, Provisional; owner TrailerDoorService): the back door only opens by prompt.
 	-- Exit Trailer inside by the door, Enter Trailer outside by the steps; both only while the trailer is the vehicle in use.
-	{ Key = "trailer_exit", Text = "Exit Trailer", Hold = 0.3, Radius = 4, Requires = {}, Night = "Any", Wave = 3 },
-	{ Key = "trailer_enter", Text = "Enter Trailer", Hold = 0.3, Radius = 4, Requires = {}, Night = "Any", Wave = 3 },
+	{ Key = "trailer_exit", Text = "Open door", Hold = 0, Radius = 1.4, Requires = {}, Night = "Any", Wave = 3 },
+	{ Key = "trailer_enter", Text = "Open door", Hold = 0, Radius = 1.4, Requires = {}, Night = "Any", Wave = 3 },
 
 	-- Pad tables (TASK-144; FEAT-037, UPG-008/009; Q-178 A, Q-181 A). Owner SeatingService; texts placeholder until
 	-- ui-text.md (TASK-150). buy_in_place: "{item}" = "Table" / the upgrade name, "{price}" filled by the owner

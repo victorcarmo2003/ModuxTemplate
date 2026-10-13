@@ -22,6 +22,7 @@ local Stage = require(script.Parent.Parent.Parent.Stage)
 local GrillView = require(script.Parent.Parent.GrillView)
 local Types = require(script.Parent.Parent.Types)
 local Targets = require(script.Parent.Parent.Targets)
+local StockLid = require(script.Parent.Parent.StockLid)
 local World = require(script.Parent.Parent)
 
 const untrack = Vide.untrack
@@ -40,7 +41,7 @@ const WORK_DROP = 0.1 -- studs: the work plane sits this far over the roller top
 
 type Phase = Types.SlotPhase
 
-type Pred = { Kind: string, At: number, Settled: boolean }
+type Pred = { Kind: string, At: number, Settled: boolean } -- Kind: Place | Flip | Collect | Trash
 
 type Session = {
 	Controller: any,
@@ -48,10 +49,15 @@ type Session = {
 	View: GrillView.View,
 	Pred: { [number]: Pred },
 	Inflight: { { Act: string, Slot: number } },
+	TrashQueue: { { From: string, Slot: number } }, -- PrepTrash on its way, in the order sent
+	LastTrash: number,
+	CoachTried: boolean,
 	Pulse: { [string]: boolean },
 	Drag: { Kind: string, Slot: number }?,
 	Phases: { [number]: Phase },
 	Stop: (() -> ())?,
+	-- the lid of the sausage container (opens while the pointer is over it)
+	Lid: StockLid.StockLid?,
 	Targets: { [string]: Types.Target },
 	Active: boolean,
 }
@@ -116,6 +122,13 @@ local function stockLeft(): number
 	return untrack(Feed.Stock)
 end
 
+-- The sausage of the slot has been flipped (the record, or a flip on its way): its marks show on the face that is up.
+local function isFlipped(current: Session, slot: number): boolean
+	const record = recordOf(current, slot)
+	const predicted = current.Pred[slot]
+	return (record ~= nil and record.Flip > 0) or (predicted ~= nil and predicted.Kind == "Flip")
+end
+
 -- The slot of the real rail the next collected sausage lands on (the ones already there and those on their way count).
 local function railCapacity(current: Session): number
 	local top = 0
@@ -177,6 +190,7 @@ local function place(current: Session, wanted: number)
 		return
 	end
 	note(`Place sent, slot {slot} (asked {wanted})`)
+	World.Coach():Done("Grill")
 	current.Pred[slot] = { Kind = "Place", At = os.clock(), Settled = false }
 	table.insert(current.Inflight, { Act = "Place", Slot = slot })
 end
@@ -209,6 +223,42 @@ local function collect(current: Session, slot: number, from: CFrame?)
 	table.insert(current.Inflight, { Act = "Collect", Slot = slot })
 	current.View:Hide(slot, true)
 	current.View:Fly(slot, count + 1, from)
+end
+
+-- The bin by drag: a sausage of the grill (any state) or the front of the rail. The thing in hand is swallowed by the bin at once
+-- (prediction); the server answers with PrepResult Act = Trash (Value 1 grill, 2 rail) and the records do the rest. A refusal gives it back.
+local function throw(current: Session, from: string, slot: number)
+	const clock = os.clock()
+	if clock - current.LastTrash < 0.25 then
+		current.View:Hide(slot, false)
+		return
+	end
+	current.LastTrash = clock
+	const controller = current.Controller
+	const model = current.View:TakeCarry()
+	if from == "Grill" then
+		current.Pred[slot] = { Kind = "Trash", At = clock, Settled = false }
+		current.View:Hide(slot, true)
+	end
+	table.insert(current.TrashQueue, { From = from, Slot = slot })
+	note(`Trash sent, {from} {slot}`)
+	controller:Trash(from, slot)
+	const bin = World.Bin()
+	if model ~= nil and bin ~= nil then
+		bin:Eat(model)
+	elseif model ~= nil then
+		model:Destroy()
+	end
+end
+
+-- Every sausage that was lifted and is not on its way anywhere goes back to its roller.
+local function restore(current: Session)
+	for slot, phase in current.Phases do
+		const predicted = current.Pred[slot]
+		if phase ~= "Free" and (predicted == nil or (predicted.Kind ~= "Collect" and predicted.Kind ~= "Trash")) then
+			current.View:Hide(slot, false)
+		end
+	end
 end
 
 -- A tap on a roller does what its phase invites.
@@ -253,6 +303,7 @@ local function frame(current: Session, dt: number, time: number)
 	const view = current.View
 	const stock = stockLeft()
 	local anyCooking = false
+	local cooking, occupied = 0, 0
 	for slot = 1, MAX_SLOTS do
 		const exists, phase, progress = phaseOf(current, slot, now)
 		const id = `GrillSlot:{slot}`
@@ -268,27 +319,60 @@ local function frame(current: Session, dt: number, time: number)
 			elseif predicted.Kind == "Collect" and (phase == "Free" or clock - predicted.At > PRED_TTL) then
 				current.Pred[slot] = nil
 				view:Hide(slot, false)
+			elseif predicted.Kind == "Trash" and (phase == "Free" or clock - predicted.At > PRED_TTL) then
+				current.Pred[slot] = nil
+				view:Hide(slot, false)
 			end
 		end
+		const trashing = current.Pred[slot] ~= nil and current.Pred[slot].Kind == "Trash"
 		const placing = current.Pred[slot] ~= nil and current.Pred[slot].Kind == "Place"
+		view:SetActive(slot, exists)
 		if phase ~= "Free" then
 			anyCooking = true
 		end
 		-- what is drawn
-		view:SetGhost(slot, if not exists or phase ~= "Free" then "None" elseif placing then "Predicted" elseif stock ~= 0 then "Ghost" else "None")
-		view:SetRing(slot, if phase == "FlipWindow" then "Converge" elseif phase == "Late" then "Late" else "None", progress)
-		view:SetCheck(slot, phase == "Ready" and (current.Pred[slot] == nil or current.Pred[slot].Kind ~= "Collect"))
+		view:SetGhost(slot, if not exists or phase ~= "Free" or trashing then "None" elseif placing then "Predicted" elseif stock ~= 0 then "Ghost" else "None")
+		view:SetRing(slot, if trashing then "None" elseif phase == "FlipWindow" then "Converge" elseif phase == "Late" then "Late" else "None", progress)
+		view:SetCheck(slot, phase == "Ready" and not trashing and (current.Pred[slot] == nil or current.Pred[slot].Kind ~= "Collect"))
+		-- the marks of the bars show on the face that is up after the flip and darken with the server clock until it is ready
+		view:SetMarks(slot, if exists and phase ~= "Free" and not trashing and isFlipped(current, slot) then 0.4 + 0.6 * progress else 0)
 		-- the target: its contour follows the sausage (or the ghost on a free roller) and pulses when it invites
 		if target ~= nil then
-			const model = view:ModelOf(slot)
+			const model = view:ModelOf(slot, phase == "Ready" or progress >= 1)
 			if target.Model ~= model then
 				target.Model = model
 			end
 			setPulse(current, id, phase == "FlipWindow" or phase == "Late" or phase == "Ready")
 		end
 		current.Phases[slot] = phase
+		if phase ~= "Free" and not trashing then
+			cooking += 1
+			occupied += 1
+		end
 	end
 	setPulse(current, "SausageStock", not anyCooking and stock ~= 0)
+	view:SetBusy(cooking, MAX_SLOTS)
+	-- the bin shows while there is a sausage to throw (a roller or the rail)
+	const bin = World.Bin()
+	if bin ~= nil then
+		bin:SetWanted(occupied > 0 or untrack(Feed.Rail) > 0)
+	end
+	-- the hand of the tutorial: from the box to the first free roller, once per station and session
+	if not current.CoachTried and stock ~= 0 and not anyCooking and not World.Coach():Active() then
+		current.CoachTried = true
+		const stockTarget = World.Targets()
+		const box = if stockTarget ~= nil then stockTarget:Get("SausageStock") else nil
+		const free = firstFree(current, now)
+		const pose = if free ~= nil then current.View:PoseOf(free) else nil
+		if box ~= nil and box.Parts[1] ~= nil and pose ~= nil then
+			const lift = Vector3.new(0, WORK_DROP, 0)
+			const from = Vector3.new(box.Parts[1].Position.X, pose.Position.Y, box.Parts[1].Position.Z) + lift
+			World.Coach():Show("Grill", { from, pose.Position + lift })
+		end
+	end
+	if current.Lid ~= nil then
+		current.Lid:Step(dt)
+	end
 	view:Step(dt, time)
 end
 
@@ -300,6 +384,7 @@ local function register(current: Session, registry: Targets.Registry): number
 	for _, scanned in table.clone(registry:List()) do
 		const kind = scanned.Target.Kind
 		local enabled: (() -> boolean)? = nil
+		local handlers: Targets.Handlers? = nil
 		if kind == "GrillSlot" then
 			const slot = scanned.Target.Slot
 			enabled = function(): boolean
@@ -314,12 +399,27 @@ local function register(current: Session, registry: Targets.Registry): number
 				const open = session
 				return open ~= nil and open.Active
 			end
+			const lidFolder = if workspace.CurrentCamera ~= nil then workspace.CurrentCamera:FindFirstChild(Types.FolderName) else nil
+			if current.Lid == nil and scanned.Parts[1] ~= nil and lidFolder ~= nil then
+				current.Lid = StockLid.new(lidFolder :: Folder, scanned.Parts[1])
+			end
+			const lidHandlers: Targets.Handlers = {
+				Hover = function(entered: boolean)
+					if current.Lid ~= nil then
+						current.Lid:SetOpen(entered)
+					end
+				end,
+			}
+			handlers = lidHandlers
 		elseif kind == "Rail" then
-			-- the drop target of a ready sausage: only while one waits
+			-- the drop target of a ready sausage while one waits, and the source of the front one (to the bin) while the rail has any
 			enabled = function(): boolean
 				const open = session
 				if open == nil or not open.Active then
 					return false
+				end
+				if untrack(Feed.Rail) > 0 then
+					return true
 				end
 				for _, phase in open.Phases do
 					if phase == "Ready" then
@@ -335,6 +435,7 @@ local function register(current: Session, registry: Targets.Registry): number
 				Parts = scanned.Parts,
 				Model = scanned.Model,
 				Enabled = enabled,
+				Handlers = handlers,
 			})
 			current.Targets[added.Target.Id] = added
 			if kind == "GrillSlot" then
@@ -371,6 +472,7 @@ local function build(controller: any)
 			return kitchen:SlotView(kind, slot)
 		end,
 		Slots = MAX_SLOTS,
+		Juice = World.Juice,
 	})
 	const current: Session = {
 		Controller = controller,
@@ -378,10 +480,14 @@ local function build(controller: any)
 		View = view,
 		Pred = {},
 		Inflight = {},
+		TrashQueue = {},
+		LastTrash = 0,
+		CoachTried = false,
 		Pulse = {},
 		Drag = nil,
 		Phases = {},
 		Stop = nil,
+		Lid = nil,
 		Targets = {},
 		Active = true,
 	}
@@ -410,6 +516,14 @@ local function teardown()
 	current.Active = false
 	if current.Stop ~= nil then
 		current.Stop()
+	end
+	if current.Lid ~= nil then
+		current.Lid:Destroy()
+		current.Lid = nil
+	end
+	const bin = World.Bin()
+	if bin ~= nil then
+		bin:SetWanted(false)
 	end
 	for slot in current.Pred do
 		current.View:Hide(slot, false)
@@ -521,27 +635,36 @@ const Grill: Stage.Stage3D = {
 				end
 				current.View:SetCarry(message.Point, snap, false)
 			elseif source.Target.Kind == "GrillSlot" then
-				const _, phase = phaseOf(current, source.Target.Slot, now)
-				if phase == "Ready" then
-					current.View:SetCarry(message.Point, nil, true)
+				-- any sausage can be lifted: to the rail when it is ready, to the bin whatever it is
+				const _, phase, share = phaseOf(current, source.Target.Slot, now)
+				if phase ~= "Free" then
+					current.View:SetCarry(message.Point, nil, phase == "Ready" or share >= 0.5)
 					current.View:Hide(source.Target.Slot, true)
 				end
+			elseif source.Target.Kind == "Rail" then
+				current.View:SetCarry(message.Point, nil, true)
 			end
 		elseif kind == "Release" or kind == "Cancel" then
 			current.View:SetCarry(nil, nil, false)
 			current.Drag = nil
-			-- a ready sausage that was lifted and not dropped on the rail goes back
-			for slot, phase in current.Phases do
-				if phase == "Ready" and (current.Pred[slot] == nil or current.Pred[slot].Kind ~= "Collect") then
-					current.View:Hide(slot, false)
-				end
-			end
+			-- a sausage that was lifted and not dropped anywhere goes back
+			restore(current)
 		elseif kind == "Drop" then
 			const source = message.Source :: Types.Target
 			const over = message.Over :: Types.Target
 			const from = if current.View:PoseOf(source.Target.Slot) ~= nil then current.View:PoseOf(source.Target.Slot) else nil
-			current.View:SetCarry(nil, nil, false)
 			current.Drag = nil
+			if over.Target.Kind == "Bin" and (source.Target.Kind == "GrillSlot" or source.Target.Kind == "Rail") then
+				-- the carried model goes into the bin (throw takes it)
+				if source.Target.Kind == "GrillSlot" then
+					throw(current, "Grill", source.Target.Slot)
+				else
+					throw(current, "Rail", 1)
+				end
+				restore(current)
+				return
+			end
+			current.View:SetCarry(nil, nil, false)
 			if source.Target.Kind == "SausageStock" and over.Target.Kind == "GrillSlot" then
 				place(current, over.Target.Slot)
 			elseif source.Target.Kind == "GrillSlot" and over.Target.Kind == "Rail" then
@@ -549,14 +672,11 @@ const Grill: Stage.Stage3D = {
 				if phase == "Ready" then
 					collect(current, source.Target.Slot, from)
 				else
+					current.View:Hide(source.Target.Slot, false)
 					current.View:Shake(source.Target.Slot)
 				end
 			end
-			for slot, phase in current.Phases do
-				if phase == "Ready" and (current.Pred[slot] == nil or current.Pred[slot].Kind ~= "Collect") then
-					current.View:Hide(slot, false)
-				end
-			end
+			restore(current)
 		elseif kind == "Tap" then
 			const target = message.Target :: Types.Target
 			current.Drag = nil
@@ -571,6 +691,19 @@ const Grill: Stage.Stage3D = {
 		const current = session
 		if result.Act ~= "Grill" then
 			note(`{result.Act}: ok {tostring(result.Ok)} reason {result.Reason}`)
+		end
+		if current ~= nil and result.Act == "Trash" and result.Value ~= 0 then
+			-- the answer of a sausage thrown by drag (Value 1 = grill, 2 = rail); the records move the sausage, a refusal gives it back
+			const sent = table.remove(current.TrashQueue, 1)
+			if sent ~= nil and not result.Ok then
+				if sent.From == "Grill" then
+					current.Pred[sent.Slot] = nil
+					current.View:Hide(sent.Slot, false)
+					current.View:Shake(sent.Slot)
+				end
+				controller:Toast(if result.Reason == "Busy" then prep.Texts.TrashBusy else prep.Texts.TrashEmpty, "Alert")
+			end
+			return
 		end
 		if current == nil or result.Act ~= "Grill" then
 			return

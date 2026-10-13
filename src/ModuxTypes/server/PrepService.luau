@@ -51,6 +51,7 @@ export type Public = {
 	Finish: (self: Public, player: Player, seat: Session.Seat, summary: Validate.Summary) -> (boolean, string, string, number),
 	DropPlate: (self: Public, player: Player, seat: Session.Seat) -> (),
 	Trash: (self: Public, player: Player, seat: Session.Seat) -> (boolean, string),
+	TrashSausage: (self: Public, player: Player, seat: Session.Seat, from: string, slot: number) -> (boolean, string),
 	AcceptMask: (self: Public, seat: Session.Seat, mask: number) -> (),
 	OnTab: (self: Public, player: Player, step: string, ticket: number, plate: number?) -> (),
 	OnGrill: (self: Public, player: Player, act: string, slot: number) -> (),

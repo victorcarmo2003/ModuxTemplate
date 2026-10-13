@@ -18,21 +18,37 @@ export type Rig = {
 }
 export type PrepOptions = {
 	Fov: number?, -- field of view at the station
-	Travel: number?, -- s of the tween (0 = a cut)
+	Travel: number?, -- s the glide takes at most (0 = a cut); the real time follows the distance, between Min and Travel
+	Min: number?, -- s: the shortest glide (a short hop between two views)
+	Look: Vector3?, -- the point the camera looks at (the Focus of the view); nil = along the frame
 	Dof: boolean?, -- depth of field behind the work surface (quality > 3 only; the caller decides)
-	Focus: number?, -- studs of the DOF focus distance
+	Focus: number?, -- studs of the DOF focus distance (camera to the point looked at); it glides with the view
 	Radius: number?, -- studs in focus around it
 	Far: number?, -- far blur intensity
 }
 type PrepState = {
-	From: CFrame,
+	Pos: Vector3,
+	PosVel: Vector3,
+	Look: Vector3,
+	LookVel: Vector3,
+	Fov: number, -- now
+	FovVel: number,
+	FocusDist: number,
+	FocusVel: number,
+	RadiusNow: number,
+	RadiusVel: number,
+	-- where it is going
 	To: CFrame,
-	FromFov: number,
-	Fov: number,
+	ToLook: Vector3,
+	ToFov: number,
+	ToFocus: number,
+	ToRadius: number,
+	Omega: number, -- 1/s of the springs
 	BaseFov: number,
 	Start: number,
 	Travel: number,
 	Leaving: boolean,
+	Last: number, -- os.clock of the last frame
 	Dof: DepthOfFieldEffect?,
 	Far: number,
 }
@@ -87,6 +103,7 @@ export type Public = {
 	SetMode: (self: Public, mode: Mode) -> (),
 	PrepClear: (self: Public) -> (),
 	Prep: (self: Public, on: boolean, frame: CFrame?, options: PrepOptions?) -> (),
+	PrepGoal: (self: Public, eye: Vector3, look: Vector3, fov: number, omega: number?, focus: number?, radius: number?) -> (),
 	PrepExitFrame: (self: Public) -> CFrame?,
 	ApplyPrep: (self: Public, camera: Camera) -> (),
 	ResetLook: (self: Public) -> (),

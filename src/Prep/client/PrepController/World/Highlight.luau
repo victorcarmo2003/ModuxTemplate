@@ -30,12 +30,14 @@ type Slot = {
 	Base: Vector3, -- ring size at rest
 	Target: Types.Target?,
 	Mode: Mode,
+	Top: number, -- os.clock until which the contour shows through everything (a new state must be seen)
 }
 
 const FILL_HOVER = 0.55 -- FillTransparency while hovering
 const FILL_FROM, FILL_TO = 0.62, 0.86 -- the pulse breathes between them
 const PULSE_HZ = 1.4
 const RING_THICKNESS = 0.03
+const TOP_TIME = 0.3 -- s: a contour that just appeared (a state change) is drawn over everything, then it is occluded again
 
 const Highlight = {}
 
@@ -53,14 +55,15 @@ end
 
 function Highlight.new(folder: Folder, rules: Content.PrepWorldRules, reduced: (() -> boolean)?): Outline
 	const fallback = lowQuality(rules.Budget.LowQuality)
-	const count = if fallback then rules.Budget.Rings else rules.Budget.Highlights
+	-- the Juice keeps Juice.Flashes of the Highlight budget for its flashes; the outline gets the rest
+	const count = if fallback then rules.Budget.Rings else math.max(rules.Budget.Highlights - rules.Juice.Flashes, 2)
 	const slots: { Slot } = {}
 	const free: { Slot } = {}
 	const byId: { [string]: Slot } = {}
 	local hover: Slot? = nil
 
 	for _ = 1, count do
-		const slot: Slot = { Light = nil, Ring = nil, Base = Vector3.zero, Target = nil, Mode = "Pulse" }
+		const slot: Slot = { Light = nil, Ring = nil, Base = Vector3.zero, Target = nil, Mode = "Pulse", Top = 0 }
 		if fallback then
 			const ring = Instance.new("Part")
 			ring.Name = "HighlightRing"
@@ -105,6 +108,9 @@ function Highlight.new(folder: Folder, rules: Content.PrepWorldRules, reduced: (
 			slot.Light.Adornee = adornee
 			slot.Light.FillTransparency = if mode == "Hover" then FILL_HOVER else FILL_TO
 			slot.Light.Enabled = adornee ~= nil
+			-- a state that changed must be seen even behind the steam or the tool: AlwaysOnTop for a moment
+			slot.Top = os.clock() + TOP_TIME
+			slot.Light.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
 		elseif slot.Ring ~= nil and adornee ~= nil then
 			-- the floor ring under the object: its footprint, the lowest point of its box
 			local cframe = CFrame.identity
@@ -185,10 +191,13 @@ function Highlight.new(folder: Folder, rules: Content.PrepWorldRules, reduced: (
 				release(slot)
 			end
 		end
-		-- the hover keeps one slot; the rest of the budget is for pulses
+		-- the hover keeps one slot (reserved: the pointer must always get a contour); the rest of the budget is for pulses
 		for _, target in targets do
 			if not target.Pulse or not enabled(target) or byId[target.Target.Id] ~= nil then
 				continue
+			end
+			if #free <= (if hover == nil then 1 else 0) then
+				break
 			end
 			const slot = take()
 			if slot == nil then
@@ -200,6 +209,12 @@ function Highlight.new(folder: Folder, rules: Content.PrepWorldRules, reduced: (
 	end
 
 	function self.Step(_: any, time: number)
+		const clock = os.clock()
+		for _, slot in slots do
+			if slot.Light ~= nil and slot.Target ~= nil and slot.Light.DepthMode == Enum.HighlightDepthMode.AlwaysOnTop and clock >= slot.Top then
+				slot.Light.DepthMode = Enum.HighlightDepthMode.Occluded
+			end
+		end
 		const still = reduced ~= nil and reduced()
 		const breath = if still then 0 else (math.sin(time * math.pi * 2 * PULSE_HZ) + 1) / 2
 		for _, slot in slots do

@@ -262,7 +262,8 @@ const SHOPPING: { string } = { "mart_go", "mart_buy", "mart_back", "restock" }
 -- release nothing extra. Server stays authoritative.
 -- prep_work (Prompt_Work of Station_n, focused prep mode): the kitchen steps are done at a station, so the prompt is
 -- never gated (it only exists in the selling phases anyway: Content.Actions Requires.Phase).
-const ALWAYS: { string } = { "answer_phone", "prep_work" }
+-- trailer_exit / trailer_enter: the back door is never gated (the tutorial must not lock the player in or out of the trailer)
+const ALWAYS: { string } = { "answer_phone", "prep_work", "trailer_exit", "trailer_enter" }
 const NEXT_ACTIONS: { [string]: { string } } = {
 	phone = { "open_sign" },
 	open = { "take_order" },

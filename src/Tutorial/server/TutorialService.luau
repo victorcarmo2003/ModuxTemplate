@@ -17,6 +17,13 @@
 -- customer still waits, a hot dog thrown away gives the bun back (never stuck without a bun for the first sale). When
 -- the buns run out with a rookie pending, Cash is topped up to the package price (EconomyService:TopUp) so the
 -- purchase never stalls on money. Server decides: the client only reads the Stock set.
+-- Day 1 stands still for the tutorial (user decision 2026-10-12, Provisional): ShouldHold is the single answer to "the
+-- tutorial holds Day 1" and feeds two hooks registered in OnInit: RoundService:SetClockHold (the clock of Prep and Open
+-- freezes, so the 30 s Prep cap and the 216 s Open cap cannot run out under the lesson) and
+-- CustomerService:SetSpawnHold (no regular customer, adoption or guarantee until it ends). It ends when nobody has the
+-- tutorial pending any more (finished, skipped, left) or after Content.Shift.TutorialHoldMax seconds of holding (safety:
+-- an AFK rookie never freezes the server for good; latched until DevReset). Co-op: held for everyone while any rookie is
+-- still in the tutorial (default; a veteran waits for the rookie).
 -- Dev tools (Provisional, user request 2026-10-11; DevService/Commands/Tutorial.luau): DevReset reopens the tutorial for
 -- the player in this run, at any day, without touching the profile (the client restarts the tutorial without the intro), DevSend forwards a client-side dev command (voice
 -- test, debug panel, step jump) to one player through the dev-only `DevClient` packet. Both refuse outside dev mode.
@@ -52,6 +59,9 @@ function TutorialService:Setup()
 	self.Revived = {} :: { [number]: boolean }
 	-- the run went past Day 1 (latched)
 	self.Past = false :: boolean
+	-- os.clock() when the current hold began (0 = not holding); HoldExpired = the safety timeout ran out (latched)
+	self.HoldSince = 0 :: number
+	self.HoldExpired = false :: boolean
 end
 
 -- The player finished or skipped the tutorial: over for this run (idempotent, not saved)
@@ -159,6 +169,29 @@ function TutorialService:Begin(player: Player)
 	end
 end
 
+-- Day 1 stands still for the tutorial: a day shift in Prep or Open with someone still in the tutorial
+function TutorialService:ShouldHold(): boolean
+	if not self.Enabled or self.HoldExpired then
+		return false
+	end
+	const round = self.Dependencies.RoundService
+	const phase = round:GetPhase()
+	if round:IsNight() or (phase ~= "Prep" and phase ~= "Open") or not self:AnyPending() then
+		self.HoldSince = 0
+		return false
+	end
+	const t = os.clock()
+	if self.HoldSince <= 0 then
+		self.HoldSince = t
+	elseif t - self.HoldSince > Content.Shift.TutorialHoldMax then
+		self.HoldExpired = true
+		self.HoldSince = 0
+		warn(`[TutorialService] Day 1 held {Content.Shift.TutorialHoldMax} s: released (safety timeout)`)
+		return false
+	end
+	return true
+end
+
 -- Dev hooks ---------------------------------------------------------------------------------------------------------
 
 function TutorialService:DevCheck(name: string)
@@ -187,6 +220,8 @@ function TutorialService:DevReset(player: Player)
 	self.Revived[player.UserId] = true
 	self.Asked = false
 	self.Seeded = false
+	self.HoldSince = 0
+	self.HoldExpired = false
 	self.Dependencies.CustomerService:EndTutorial()
 	self:DevSend(player, "tutorial_reset", "")
 end
@@ -198,7 +233,7 @@ function TutorialService:DevStatus(): string
 		const state = self:Reason(player) or "pending"
 		table.insert(pending, `{player.Name}={state}`)
 	end
-	return `tutorial [{table.concat(pending, ", ")}]; customer asked {self.Asked}, around {self.Dependencies.CustomerService:HasTutorial()}; seeded {self.Seeded}; buns {self.Dependencies.KitchenService:GetStock(BUN)}`
+	return `tutorial [{table.concat(pending, ", ")}]; held {self.Dependencies.RoundService:IsClockHeld()}{if self.HoldExpired then " (timeout)" else ""}; customer asked {self.Asked}, around {self.Dependencies.CustomerService:HasTutorial()}; seeded {self.Seeded}; buns {self.Dependencies.KitchenService:GetStock(BUN)}`
 end
 
 function TutorialService:Step()
@@ -214,6 +249,12 @@ TutorialService:OnInit(function(self)
 		return
 	end
 	self.Enabled = true
+	self.Dependencies.RoundService:SetClockHold(function(): boolean
+		return self:ShouldHold()
+	end)
+	self.Dependencies.CustomerService:SetSpawnHold(function(): boolean
+		return self:ShouldHold()
+	end)
 	Players.PlayerRemoving:Connect(function(player: Player)
 		-- a player who comes back starts over (the client lost its session state too)
 		self.Closed[player.UserId] = nil

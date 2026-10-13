@@ -480,6 +480,14 @@ function PrepService:Release(player: Player, reason: string, silent: boolean?): 
 		if character ~= nil then
 			character:SetAttribute(WORKING_ATTRIBUTE, nil)
 		end
+		-- Delivery = "Prompt": the hot dog just made is in the hand when the mode ends; the customer's `serve` prompt delivers it
+		const made = seat.Made
+		if reason == "None" and made ~= nil and rules.Delivery == "Prompt" then
+			const humanoid = if character ~= nil then character:FindFirstChildOfClass("Humanoid") else nil
+			if humanoid ~= nil and humanoid.Health > 0 and made.Parent ~= nil and made:IsDescendantOf(player) then
+				humanoid:EquipTool(made)
+			end
+		end
 		if reason == "None" then
 			self:Reply(player, "Leave", true, "None", nil, seat.Station)
 		else
@@ -564,6 +572,7 @@ function PrepService:Finish(player: Player, seat: Session.Seat, summary: Validat
 		return false, refusal, "None", refusalValue
 	end
 	seat.Plate = nil
+	seat.Made = made.Tool
 	self:ClearMask(seat)
 	local band = verdict.Band
 	const sausage = made.SausageScore
@@ -599,6 +608,18 @@ function PrepService:Trash(player: Player, seat: Session.Seat): (boolean, string
 		return false, "NoSession"
 	end
 	return true, "None"
+end
+
+-- The bin by drag, for a sausage: Grill = the sausage of that grill slot, Rail = the one at that rail position. A rail sausage the
+-- open plate still needs (it is taken at Finish) is not thrown: the last one stays while a plate is open.
+function PrepService:TrashSausage(player: Player, seat: Session.Seat, from: string, slot: number): (boolean, string)
+	if slot < 1 or slot > 8 then
+		return false, "Invalid"
+	end
+	if from == "Rail" and seat.Plate ~= nil and self.Dependencies.KitchenService:RailCount() <= 1 then
+		return false, "Busy"
+	end
+	return Bridge.TrashSausage(self.Dependencies.KitchenService, player, from, slot)
 end
 
 -- Packets ---------------------------------------------------------------------------------------------------------------
@@ -735,7 +756,7 @@ function PrepService:ConnectPackets()
 		end
 		self:OnFinish(player, value :: any)
 	end)
-	net.PrepTrash:onServer(function(_value, player: Player)
+	net.PrepTrash:onServer(function(value, player: Player)
 		if not self:Allow(player, "Trash") then
 			return
 		end
@@ -743,8 +764,15 @@ function PrepService:ConnectPackets()
 		if seat == nil then
 			return
 		end
-		const ok, reason = self:Trash(player, seat)
-		self:Reply(player, "Trash", ok, reason, nil, nil)
+		const from: string = value.From
+		const index = table.find(cfg.TrashFrom, from) or 1
+		if from == "Plate" then
+			const ok, reason = self:Trash(player, seat)
+			self:Reply(player, "Trash", ok, reason, nil, 0)
+		else
+			const ok, reason = self:TrashSausage(player, seat, from, value.Slot)
+			self:Reply(player, "Trash", ok, reason, nil, index - 1)
+		end
 	end)
 	net.PrepOrder:onServer(function(value, player: Player)
 		if not self:Allow(player, "Order") then

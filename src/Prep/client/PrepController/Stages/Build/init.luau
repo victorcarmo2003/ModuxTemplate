@@ -89,7 +89,8 @@ const Build: Stage.Stage = {
 		end
 		const needs = controller.Needs()
 		const ready = if controller.Step() == "bun" then needs.BunCut == true else needs.PlateBuilt == true and Session.Pending() == ""
-		return { Label = prep.Texts.Next, Enabled = ready, Pulse = ready }
+		const last = controller.Step() ~= "bun" and prep.Rules.Delivery == "Prompt"
+		return { Label = if last then prep.Texts.Done else prep.Texts.Next, Enabled = ready, Pulse = ready }
 	end,
 	OnEnter = function(controller: any)
 		if controller.Mock then

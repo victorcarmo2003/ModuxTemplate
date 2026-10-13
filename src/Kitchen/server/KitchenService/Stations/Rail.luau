@@ -164,6 +164,26 @@ function Rail.Pop(ctx: Context, vehicle: string): (boolean, boolean, number?)
 	return true, entry ~= nil and entry.Altered, if entry ~= nil then entry.Score else nil
 end
 
+-- The bin by drag (prep mode, 2026-10-12): removes the sausage at position `index` (1 = the front) of the vehicle's rail. The altered
+-- sausage is never thrown away from here (only a hot dog resolves ANM-002). (true, nil) or (false, "Empty" | "Altered").
+function Rail.DiscardAt(ctx: Context, vehicle: string, index: number): (boolean, string?)
+	const station = Rail.Find(vehicle)
+	if station == nil then
+		return false, "Empty"
+	end
+	const queue = stateOf(station).Queue
+	const entry = queue[index]
+	if entry == nil then
+		return false, "Empty"
+	end
+	if entry.Altered then
+		return false, "Altered"
+	end
+	table.remove(queue, index)
+	write(ctx, station)
+	return true, nil
+end
+
 -- StationApi.Module ---------------------------------------------------------------------------------------------------
 
 function Rail.Bind(ctx: Context, station: Station)

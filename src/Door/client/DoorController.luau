@@ -21,6 +21,13 @@
 	  * Sound (user request 2026-10-10): `door_creak` when it starts to open, `door_close` when it starts to close,
 	    from the closed leaf centre (AudioController, spatial).
 
+	Scripted doors (user request 2026-10-12, Provisional): a BasePart tagged `ScriptedDoor` is a door driven by the server
+	instead of by proximity: its leaf is that part plus every BasePart under it (the glass hatch), and it is open while
+	the nearest ancestor Model with the attribute `DoorOpen` has it true (TrailerDoorService sets it on the trailer for
+	the Exit / Enter Trailer use). Same motion and sounds as above (`DoorHinge`, `DoorAngle`, `DoorSlide`); the swing goes
+	away from the middle of that ancestor Model (the trailer interior), i.e. outward. The Door_Back of the trailer has
+	DoorHinge = "Right", DoorAngle = 80 (tools/assetplace/trailer_door_switches.luau).
+
 	No input, no packet, never writes a set.
 ]]
 local CollectionService = game:GetService("CollectionService")
@@ -29,6 +36,8 @@ local TweenService = game:GetService("TweenService")
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 
 const TAG = "AutoDoor"
+const SCRIPTED_TAG = "ScriptedDoor" -- door driven by the DoorOpen attribute of an ancestor Model
+const STATE_ATTRIBUTE = "DoorOpen"
 const RADIUS = 8 -- studs
 const MARGIN = 1 -- hysteresis: closes beyond RADIUS + MARGIN
 const CLOSE_DELAY = 1 -- s with nobody near before closing
@@ -60,6 +69,7 @@ type Door = {
 	Tween: Tween?,
 	Connection: RBXScriptConnection,
 	Overlap: OverlapParams,
+	Scripted: boolean,
 }
 
 const DoorController = Modux.Controller("DoorController", { Require = { "AudioController" }, Priority = 300 })
@@ -76,9 +86,17 @@ local function isLeafName(part: BasePart): boolean
 	return name == "door" or string.find(name, LEAF_PATTERN, 1, true) ~= nil
 end
 
-local function leafParts(instance: Instance): { BasePart }
+local function leafParts(instance: Instance, scripted: boolean): { BasePart }
 	if instance:IsA("BasePart") then
-		return { instance }
+		const parts: { BasePart } = { instance }
+		if scripted then
+			for _, descendant in instance:GetDescendants() do
+				if descendant:IsA("BasePart") then
+					table.insert(parts, descendant)
+				end
+			end
+		end
+		return parts
 	end
 	const named: { BasePart } = {}
 	const all: { BasePart } = {}
@@ -119,11 +137,11 @@ local function numberAttribute(instance: Instance, name: string): number?
 	return if typeof(value) == "number" then value else nil
 end
 
-function DoorController:Add(instance: Instance)
+function DoorController:Add(instance: Instance, scripted: boolean)
 	if self.Doors[instance] ~= nil or not instance:IsDescendantOf(workspace) then
 		return
 	end
-	const parts = leafParts(instance)
+	const parts = leafParts(instance, scripted)
 	if #parts == 0 then
 		return
 	end
@@ -168,6 +186,7 @@ function DoorController:Add(instance: Instance)
 			end
 		end),
 		Overlap = OverlapParams.new(),
+		Scripted = scripted,
 	}
 	door.Overlap.FilterType = Enum.RaycastFilterType.Exclude
 	const exclude: { Instance } = {}
@@ -269,9 +288,41 @@ function DoorController:Animate(door: Door, open: boolean, from: Vector3?)
 	tween:Play()
 end
 
+-- Scripted door: nearest ancestor Model that carries the DoorOpen attribute (nil = none yet) and its middle
+local function stateOwner(instance: Instance): Model?
+	local current: Instance? = instance.Parent
+	while current ~= nil and current ~= workspace do
+		if current:IsA("Model") and current:GetAttribute(STATE_ATTRIBUTE) ~= nil then
+			return current
+		end
+		current = current.Parent
+	end
+	return nil
+end
+
+-- A scripted door follows the DoorOpen attribute of its owner Model (absent = closed)
+function DoorController:TickScripted(door: Door)
+	const owner = stateOwner(door.Instance)
+	const wanted = owner ~= nil and owner:GetAttribute(STATE_ATTRIBUTE) == true
+	if wanted == door.Open then
+		return
+	end
+	if wanted then
+		-- swing away from the middle of the owner (the trailer interior)
+		const middle = if owner ~= nil then owner:GetPivot().Position else door.Closed.Position
+		self:Animate(door, true, Vector3.new(middle.X, door.Closed.Position.Y, middle.Z))
+	else
+		self:Animate(door, false, nil)
+	end
+end
+
 function DoorController:Tick()
 	const now = os.clock()
 	for _, door in self.Doors do
+		if door.Scripted then
+			self:TickScripted(door)
+			continue
+		end
 		const from = nearest(door, if door.Open then door.Radius + MARGIN else door.Radius)
 		if from then
 			door.LastNear = now
@@ -289,14 +340,17 @@ DoorController:OnInit(function(self)
 end)
 
 DoorController:OnStart(function(self)
-	CollectionService:GetInstanceAddedSignal(TAG):Connect(function(instance)
-		self:Add(instance)
-	end)
-	CollectionService:GetInstanceRemovedSignal(TAG):Connect(function(instance)
-		self:Remove(instance)
-	end)
-	for _, instance in CollectionService:GetTagged(TAG) do
-		self:Add(instance)
+	for _, tag in { TAG, SCRIPTED_TAG } do
+		const scripted = tag == SCRIPTED_TAG
+		CollectionService:GetInstanceAddedSignal(tag):Connect(function(instance)
+			self:Add(instance, scripted)
+		end)
+		CollectionService:GetInstanceRemovedSignal(tag):Connect(function(instance)
+			self:Remove(instance)
+		end)
+		for _, instance in CollectionService:GetTagged(tag) do
+			self:Add(instance, scripted)
+		end
 	end
 end)
 

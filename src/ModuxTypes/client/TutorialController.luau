@@ -71,6 +71,7 @@ export type Public = {
 	Step: (self: Public) -> Steps.Step?,
 	PanelText: (self: Public) -> string,
 	StepLabel: (self: Public) -> string,
+	PanelHint: (self: Public) -> string,
 	SkipText: (self: Public) -> string,
 	Root: (self: Public) -> BasePart?,
 	Held: (self: Public) -> Held?,

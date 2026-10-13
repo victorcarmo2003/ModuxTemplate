@@ -503,7 +503,6 @@ local function checkRecords()
 	if not Vehicles.ByKey[RunParams.StartVehicle] then
 		fail("RunParams", nil, nil, `StartVehicle '{RunParams.StartVehicle}' not in Vehicles`)
 	end
-	inRange("RunParams", nil, nil, "NightsFromDay", RunParams.NightsFromDay, 2, 50)
 	if #RunParams.PartyPriceMult ~= 4 then
 		fail("RunParams", nil, nil, "PartyPriceMult needs 4 entries (party 1..4)")
 	end
@@ -1819,7 +1818,8 @@ local function checkPrep()
 	checkPrepTabSet("Prep.TabsLegacy", Prep.TabsLegacy, wire, 40)
 	checkPrepTabSet("Prep.Tabs3D", Prep.Tabs3D, wire, 36)
 	for key in wire do
-		if not Prep.TabsLegacy.ByKey[key] and not Prep.Tabs3D.ByKey[key] then
+		-- Serve leaves both sets while Rules.Delivery = "Prompt" but stays on the wire (enum order, rollback to "Window")
+		if key ~= "Serve" and not Prep.TabsLegacy.ByKey[key] and not Prep.Tabs3D.ByKey[key] then
 			fail("Prep.WireTabs", nil, key, "not a tab of either set")
 		end
 	end
@@ -1857,6 +1857,13 @@ local function checkPrep()
 		if row.Fov ~= 0 then
 			inRange("Prep.Views", index, row.Key, "Fov", row.Fov, 20, 100)
 		end
+		-- Pitch / Distance 0 = the anchor frame is used as authored (Poses.luau); either one set = the derived pose
+		if row.Pitch ~= 0 or row.Distance ~= 0 then
+			inRange("Prep.Views", index, row.Key, "Pitch", row.Pitch, -89, -20)
+			inRange("Prep.Views", index, row.Key, "Distance", row.Distance, 1, 20)
+		end
+		inRange("Prep.Views", index, row.Key, "Dolly", row.Dolly, -10, 10)
+		inRange("Prep.Views", index, row.Key, "Side", row.Side, -10, 10)
 		if row.Fallback ~= "" and row.Fallback ~= Prep.LegacyView.Key and not Prep.Views.ByKey[row.Fallback] then
 			fail("Prep.Views", index, row.Key, `Fallback '{row.Fallback}' is neither a view nor the legacy Build pair`)
 		end
@@ -1919,6 +1926,12 @@ local function checkPrep()
 	inRange("Prep.Rules", nil, nil, "Camera.Leave", camera.Leave, 0, 3)
 	inRange("Prep.Rules", nil, nil, "Camera.Pitch", camera.Pitch, -89, 0)
 	inRange("Prep.Rules", nil, nil, "Camera.Distance", camera.Distance, 0.5, 20)
+	inRange("Prep.Rules", nil, nil, "Camera.Pan.Omega", camera.Pan.Omega, 2, 40)
+	inRange("Prep.Rules", nil, nil, "Camera.Pan.Slop", camera.Pan.Slop, 2, 80)
+	inRange("Prep.Rules", nil, nil, "Camera.Pan.Inertia", camera.Pan.Inertia, 0, 1)
+	inRange("Prep.Rules", nil, nil, "Camera.Pan.Hold", camera.Pan.Hold, 0, 0.9)
+	inRange("Prep.Rules", nil, nil, "Camera.Pan.Edge", camera.Pan.Edge, 0.02, 0.2)
+	inRange("Prep.Rules", nil, nil, "Camera.Pan.EdgeSpeed", camera.Pan.EdgeSpeed, 1, 40)
 	inRange("Prep.Rules", nil, nil, "ForcedExit.Signal", rules.ForcedExit.Signal, 0, 5)
 	inRange("Prep.Rules", nil, nil, "ForcedExit.NoInput", rules.ForcedExit.NoInput, 0, 5)
 	inRange("Prep.Rules", nil, nil, "CueLock", rules.CueLock, 0, 60)

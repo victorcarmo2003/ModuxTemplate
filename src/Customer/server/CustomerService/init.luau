@@ -319,6 +319,8 @@ function CustomerService:Setup()
 	self.ForcedPair = nil :: Group.Pair?
 	-- Dev: topping lists of the next pair's two hot dogs (DevSpawnPair `orders`), consumed by its OpenTicket
 	self.ForcedOrders = nil :: { { string } }?
+	-- TutorialService hook (SetSpawnHold): the regular flow waits while it answers true
+	self.SpawnHold = nil :: (() -> boolean)?
 	-- Tutorial customer asked (RequestTutorial) and not spawned yet; server time of the next try
 	self.TutorialWanted = false :: boolean
 	self.TutorialTryAt = 0 :: number
@@ -425,7 +427,30 @@ end
 -- The trailer switch is on "Closed" (user request 2026-10-12, Provisional): no new customer arrives, the ones already
 -- in the queue are served.
 function CustomerService:IsPaused(): boolean
-	return self.Dependencies.RoundService:IsPaused()
+	return self.Dependencies.RoundService:IsPaused() or self:SpawnHeld()
+end
+
+-- TutorialService: "no regular customer arrives now" (user decision 2026-10-12, Provisional: Day 1 customers wait until
+-- the tutorial is over, so the bun purchase and the restock never race a queue). Only the regular flow, the adoptions,
+-- the guarantee and anomaly actors wait; the tutorial customer is not held. Last registration wins.
+function CustomerService:SetSpawnHold(hold: () -> boolean)
+	if type(hold) ~= "function" then
+		error("[CustomerService] SetSpawnHold needs a function", 2)
+	end
+	self.SpawnHold = hold
+end
+
+function CustomerService:SpawnHeld(): boolean
+	const hold = self.SpawnHold
+	if hold == nil then
+		return false
+	end
+	const ok, result = pcall(hold)
+	if not ok then
+		warn(`[CustomerService] spawn hold errored: {result}`)
+		return false
+	end
+	return result == true
 end
 
 -- Night shift (or a night-only phase while RoundService still reports days, wave 1).

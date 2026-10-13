@@ -19,15 +19,27 @@ export type Kind = "Phone" | "Desktop" | "Portrait"
 -- `Center` is the world: nothing of ours but the transient hint / toast / seal may enter it.
 export type Mini = {
 	Progress: Rect,
+	-- the Skip pill of the tutorial step beside the progress card (zero without a step)
+	Skip: Rect,
 	Hint: Rect,
 	Seal: Rect,
 	Tap: Rect,
+	-- the one pill that holds Leave, Assist (and Tap when it is offered), bottom left (polish 2026-10-12, U-2)
+	Pill: Rect,
+	-- px of Ink between the pill edge and its chips
+	PillPad: number,
+	-- the bin zone: the 2D drop target of a dragged item (shown only while something can be dragged), above Next
+	Bin: Rect,
 	HudStatus: Rect,
 	HudClock: Rect,
 	HudSanity: Rect,
 	RobloxMenu: Rect,
 	Center: Rect,
 }
+
+-- What the owner knows about the screen: `Taps` = the Tap chip is offered, `Objective` = the card carries a tutorial step (and the Skip
+-- pill), `Reserved` = rectangles (canvas px) of transient overlays that the hint and the toast keep off.
+export type Options = { Taps: boolean?, Objective: boolean?, Reserved: { Rect }? }
 
 export type Result = {
 	Kind: Kind,
@@ -59,14 +71,22 @@ export type Result = {
 	Header: number,
 	-- the minimal 3D mode; nil = the 2D chrome (board, panel, trash)
 	Mini: Mini?,
+	-- the tab of each index shows its label (the active one) or only its icon (the others)
+	TabsIconOnly: boolean,
 }
 
 const MARGIN = 12
 const TAB_GAP = 6
 const TOUCH = 44
+-- Ink border of the pill that holds Leave / Assist / Tap; the round chips inside have radius height / 2 - PILL_PAD
+const PILL_PAD = 5
 
 local function rect(x: number, y: number, w: number, h: number): Rect
 	return { X = math.floor(x + 0.5), Y = math.floor(y + 0.5), W = math.floor(w + 0.5), H = math.floor(h + 0.5) }
+end
+
+local function overlaps(a: Rect, b: Rect): boolean
+	return a.X < b.X + b.W and b.X < a.X + a.W and a.Y < b.Y + b.H and b.Y < a.Y + a.H
 end
 
 -- Tab rectangles of a bar: `first` = x of the first tab, equal widths.
@@ -106,6 +126,7 @@ local function phone(canvas: Vector2, hasPanel: boolean, count: number): Result
 		TicketStrip = false,
 		LeaveWide = false,
 		TabsCompact = false,
+		TabsIconOnly = false,
 		Bar = rect(barX, 8, barW, 48),
 		Leave = rect(barX, 10, TOUCH, TOUCH),
 		Tabs = equalTabs(count, barX + TOUCH + TAB_GAP, 10, tabW, TOUCH, TAB_GAP),
@@ -148,6 +169,7 @@ local function desktop(canvas: Vector2, hasPanel: boolean, count: number): Resul
 		TicketStrip = false,
 		LeaveWide = true,
 		TabsCompact = false,
+		TabsIconOnly = false,
 		Bar = rect(barX, 12, barW, 52),
 		Leave = rect(barX, 14, leaveW, 48),
 		Tabs = equalTabs(count, barX + leaveW + gap, 14, tabW, 48, gap),
@@ -188,6 +210,7 @@ local function portrait(canvas: Vector2, hasPanel: boolean, count: number): Resu
 		TicketStrip = true,
 		LeaveWide = false,
 		TabsCompact = true,
+		TabsIconOnly = false,
 		Bar = rect(MARGIN, 64, w - 2 * MARGIN, 48),
 		Leave = rect(MARGIN, 66, TOUCH, TOUCH),
 		Tabs = tabs,
@@ -209,9 +232,47 @@ local function portrait(canvas: Vector2, hasPanel: boolean, count: number): Resu
 	}
 end
 
--- Minimal 3D layout (prep-3d.md §5 table, rev. 2). The bottom row (Leave, Assist, Tap | tabs | Next) is anchored to the edges
--- and the section tabs are centred; the top stays free for the Hud (money, clock, sanity) and the Roblox menu. Provisional.
-local function mini(canvas: Vector2, count: number, activeIndex: number): Result
+-- Variable tabs of the minimal bar: the active one wide (icon + label), the others a square with the icon only. `x` = the first.
+local function variableTabs(count: number, activeIndex: number, x: number, y: number, small: number, wide: number, gap: number, height: number): { Rect }
+	const tabs: { Rect } = {}
+	local at = x
+	for index = 1, count do
+		const width = if index == activeIndex then wide else small
+		table.insert(tabs, rect(at, y, width, height))
+		at += width + gap
+	end
+	return tabs
+end
+
+-- Moves `block` up until it clears every reserved rectangle (the call subtitle of Walt, a banner): the transient hint and toast
+-- never sit on them (user request 2026-10-12). Bounded: a rectangle that cannot be cleared is left where the last move put it.
+local function clearOf(block: Rect, reserved: { Rect }?): Rect
+	if reserved == nil then
+		return block
+	end
+	local current = block
+	for _ = 1, #reserved + 1 do
+		local moved = false
+		for _, zone in reserved do
+			if zone.W > 0 and zone.H > 0 and overlaps(current, zone) then
+				current = rect(current.X, zone.Y - 6 - current.H, current.W, current.H)
+				moved = true
+			end
+		end
+		if not moved then
+			break
+		end
+	end
+	return current
+end
+
+-- Minimal 3D layout (prep-3d.md §5 table, rev. 2; polish 2026-10-12). The bottom row is ONE pill on the left (Leave, Assist, Tap), the
+-- section tabs centred (only the active one has its word, the others are icons) and Next on the right, all anchored to the edges; the
+-- top stays free for the Hud (money, clock, sanity) and the Roblox menu. The progress card is 44 high: the verb on the left, the
+-- live grade of the plate (a seal and a number) on the right, a 10 px bar below. With a tutorial step (`Objective`) it is ONE card 64
+-- high (step chip, the objective, its hint, the live note, the bar) with the Skip pill beside it. The ticket is a tall paper on the left
+-- (the OrderStack), the bin zone sits above Next. `Reserved` = rectangles of transient overlays that the hint and the toast avoid. Provisional.
+local function mini(canvas: Vector2, count: number, activeIndex: number, options: Options): Result
 	const w, h = canvas.X, canvas.Y
 	const zero = rect(-100, -100, 0, 0)
 	const portraitShape = w < h
@@ -219,60 +280,54 @@ local function mini(canvas: Vector2, count: number, activeIndex: number): Result
 	const margin = if desktopShape then 16 else MARGIN
 	const rowH = if desktopShape then 48 else TOUCH
 	const rowY = h - margin - rowH
-	const chipY = if desktopShape then rowY + 2 else rowY
 	const nextW = if desktopShape then 152 elseif w < 760 then 128 else 132
 	const nextH = if desktopShape then 56 elseif portraitShape then 54 else 52
 	const next = rect(w - margin - nextW, h - margin - nextH, nextW, nextH)
-	local leave: Rect
-	local assist: Rect
-	local tap: Rect
-	if desktopShape then
-		leave = rect(margin, rowY, 96, rowH)
-		assist = rect(margin + 96 + 8, chipY, TOUCH, TOUCH)
-		tap = rect(assist.X + TOUCH + 8, chipY, TOUCH, TOUCH)
-	else
-		leave = rect(margin, rowY, TOUCH, TOUCH)
-		assist = rect(leave.X + TOUCH + 4, rowY, TOUCH, TOUCH)
-		tap = rect(assist.X + TOUCH + 4, rowY, TOUCH, TOUCH)
-	end
+	-- the pill: PILL_PAD px of Ink all round, round chips of 44 (their corners follow the pill: radius = height / 2 - pad). Leave is 96
+	-- wide with its word on a desktop
+	const pad = PILL_PAD
+	const leaveW = if desktopShape then 96 else TOUCH
+	const chips = if options.Taps == true then 2 else 1 -- Assist (+ Tap)
+	const pillW = pad + leaveW + chips * (pad + TOUCH) + pad
+	const pillH = pad + TOUCH + pad
+	const pillY = rowY + (rowH - TOUCH) / 2 - pad
+	const pill = rect(margin, pillY, pillW, pillH)
+	const leave = rect(pill.X + pad, pill.Y + pad, leaveW, TOUCH)
+	const assist = rect(leave.X + leaveW + pad, leave.Y, TOUCH, TOUCH)
+	const tap = if options.Taps == true then rect(assist.X + TOUCH + pad, leave.Y, TOUCH, TOUCH) else zero
 
-	-- the section tabs: centred, four equal buttons (phone, desktop); portrait: the active one wide, the others a mark, above Next
-	local tabs: { Rect } = {}
+	-- the section tabs: centred; portrait: above Next
 	local tabsY = rowY
-	local bar: Rect
+	const gap = if desktopShape then 8 elseif w < 760 then 5 else 6
+	const small = if desktopShape then 48 else TOUCH
+	local wide = if desktopShape then 136 elseif portraitShape then 100 elseif w < 760 then 108 else 116
 	if portraitShape then
 		tabsY = next.Y - 8 - TOUCH
-		const gap = 6
-		local total = (count - 1) * gap
-		for index = 1, count do
-			total += if index == activeIndex then 100 else 48
-		end
-		local x = (w - total) / 2
-		for index = 1, count do
-			const width = if index == activeIndex then 100 else 48
-			table.insert(tabs, rect(x, tabsY, width, TOUCH))
-			x += width + gap
-		end
-		bar = rect((w - total) / 2, tabsY, total, TOUCH)
 	else
-		const gap = if desktopShape then 8 elseif w < 760 then 4 else 6
-		-- the room between the chips and Next, taken symmetrically around the centre
-		const left = tap.X + tap.W + 8
-		const half = math.ceil(math.min(w / 2 - left, next.X - 8 - w / 2))
-		const wanted = if desktopShape then 128 elseif w < 760 then 84 else 104
-		const tabW = math.min(wanted, math.floor((2 * half - (count - 1) * gap) / count))
-		const total = count * tabW + (count - 1) * gap
-		const x = (w - total) / 2
-		tabs = equalTabs(count, x, tabsY, tabW, rowH, gap)
-		bar = rect(x, tabsY, total, rowH)
+		-- the room between the pill and Next, taken symmetrically around the centre: the active tab shrinks before it collides
+		const left = pill.X + pill.W + 8
+		const half = math.floor(math.min(w / 2 - left, next.X - 8 - w / 2))
+		wide = math.min(wide, 2 * half - (count - 1) * small - (count - 1) * gap)
+		wide = math.max(wide, small)
 	end
+	-- the sections are indicator dots now (feedback 2026-10-12, H): every rectangle is a same-size hit area (>= 44 px), the lit dot
+	-- is drawn longer INSIDE its own rectangle by the shell, so the row never changes size and the camera pan can light any of them
+	wide = small
+	const total = (count - 1) * small + wide + (count - 1) * gap
+	const x = (w - total) / 2
+	const tabs = variableTabs(count, activeIndex, x, tabsY, small, wide, gap, if portraitShape then TOUCH else rowH)
+	const bar = rect(x, tabsY, total, if portraitShape then TOUCH else rowH)
 
 	const hintW = if portraitShape then w - 2 * margin elseif desktopShape then 400 elseif w < 760 then 332 else 400
 	const hintX = (w - hintW) / 2
-	const hint = rect(hintX, tabsY - 6 - 32, hintW, 32)
-	const toast = rect(hintX, hint.Y - 6 - 32, hintW, 32)
+	const baseHint = rect(hintX, tabsY - 6 - 32, hintW, 32)
+	const baseToast = rect(hintX, baseHint.Y - 6 - 32, hintW, 32)
+	-- the transient pair moves above the overlays that are up (Walt's subtitle)
+	const hint = clearOf(baseHint, options.Reserved)
+	const toast = clearOf(rect(hintX, math.min(baseToast.Y, hint.Y - 6 - 32), hintW, 32), options.Reserved)
 
 	local progress: Rect
+	local skip: Rect = zero
 	local ticket: Rect
 	local seal: Rect
 	local hudStatus: Rect
@@ -280,37 +335,62 @@ local function mini(canvas: Vector2, count: number, activeIndex: number): Result
 	local menu: Rect
 	-- The Hud as it is built (HudScreen / HudSanity): the clock pill 112 x 38 at the top centre (y 6), day + money 96 + 6 + 96 on the
 	-- top right (a column under 560 px), the sanity meter under the 60 px Roblox bar (180 x 38 on touch, 274 x 50 otherwise).
-	-- The spec put the clock top right; it is at the top centre, so the progress card goes right under it (y 50), not at y 8.
+	-- The progress card goes right under the clock (y 50). The seal of the plate sits on the right under the money pills (it stays while the
+	-- plate waits to be served, so it must not cover the customer in the middle of the Window view).
 	const hudClock = rect((w - 112) / 2, 6, 112, 38)
+	const objective = options.Objective == true
+	const skipW = 76
+	-- the card (and the Skip pill when there is a step): centred as one group
+	local function group(cardW: number, y: number, height: number): (Rect, Rect)
+		const full = if objective then cardW + 8 + skipW else cardW
+		-- centred, unless the sanity meter (night, under the clock row) is in the way: then the group sits right of it
+		local x0 = (w - full) / 2
+		if sanity.W > 0 and y < sanity.Y + sanity.H and y + height > sanity.Y and x0 < sanity.X + sanity.W + 8 then
+			x0 = math.min(sanity.X + sanity.W + 8, w - margin - full)
+		end
+		const card = rect(x0, y, cardW, height)
+		const pillRect = if objective then rect(x0 + cardW + 8, y, skipW, TOUCH) else zero
+		return card, pillRect
+	end
 	if portraitShape then
 		hudStatus = rect(w - 10 - 110, 6, 110, 82)
 		sanity = rect(8, 68, 180, 38)
 		menu = rect(0, 0, 112, 60)
-		progress = rect(margin, 114, w - 2 * margin, 36)
-		ticket = rect(margin, 158, w - 2 * margin, 82)
-		seal = rect(w - margin - 96, 248, 96, 96)
+		progress = rect(margin, 114, w - 2 * margin - (if objective then 8 + skipW else 0), if objective then 64 else 44)
+		if objective then
+			skip = rect(progress.X + progress.W + 8, 114, skipW, TOUCH)
+		end
+		ticket = rect(margin, progress.Y + progress.H + 8, w - 2 * margin, 82)
+		seal = rect(w - margin - 96, ticket.Y + ticket.H + 8, 96, 122)
 	elseif desktopShape then
 		hudStatus = rect(w - 10 - 198, 6, 198, 38)
 		sanity = rect(8, 52, 274, 50)
 		menu = rect(0, 0, 112, 52)
-		progress = rect((w - 280) / 2, 52, 280, 40)
-		ticket = rect(margin, 130, 184, 152)
-		seal = rect(w * 0.66, 140, 120, 120)
+		progress, skip = group(if objective then 360 else 300, 52, if objective then 68 else 48)
+		const top = 130
+		ticket = rect(margin, top, 150, math.clamp(pill.Y - 8 - top, 200, 250))
+		seal = rect(w - margin - 120, hudStatus.Y + hudStatus.H + 10, 120, 150)
 	else
 		hudStatus = rect(w - 10 - 198, 6, 198, 38)
 		sanity = rect(8, 68, 180, 38)
 		menu = rect(0, 0, 112, 60)
-		const progressW = if w < 760 then 267 else 264
-		progress = rect((w - progressW) / 2, 50, progressW, 36)
-		-- 134 / 140 px tall (the spec has 120): the TicketRail card needs 134 for its 3 chips and the two lines of what was said;
-		-- it starts under the sanity meter (68 + 38 + 8)
-		ticket = if w < 760 then rect(margin, 114, 140, 134) else rect(margin, 114, 152, 140)
-		seal = rect(w * 0.66, 110, 96, 96)
+		const progressW = if objective then (if w < 760 then 330 else 360) elseif w < 760 then 267 else 280
+		progress, skip = group(progressW, 50, if objective then 64 else 44)
+		-- the tall paper starts under the sanity meter (68 + 38 + 6) and ends 8 px over the pill: 195 px at 667 x 375, 210 at 844 x 390
+		const top = 112
+		ticket = rect(margin, top, 108, math.clamp(pill.Y - 8 - top, 150, 230))
+		-- the Skip pill may reach under the money pills on a narrow phone: the seal goes under it
+		seal = rect(w - margin - 96, math.max(hudStatus.Y + hudStatus.H + 8, if skip.W > 0 then skip.Y + skip.H + 8 else 0), 96, 122)
 	end
+	-- the bin zone: above Next on the right (portrait: the left, over the hint row)
+	const binSide = if desktopShape then 88 else 72
+	const bin = if portraitShape
+		then rect(margin, baseToast.Y - 8 - binSide, binSide, binSide)
+		else rect(w - margin - binSide, next.Y - 8 - binSide, binSide, binSide)
 	const centerTop = progress.Y + progress.H + 8
 	const center = if portraitShape
 		then zero
-		else rect(hint.X, centerTop, hint.W, math.max(toast.Y - centerTop, 0))
+		else rect(hintX, centerTop, hintW, math.max(baseToast.Y - centerTop, 0))
 
 	return {
 		Kind = if portraitShape then "Portrait" elseif desktopShape then "Desktop" else "Phone",
@@ -318,6 +398,7 @@ local function mini(canvas: Vector2, count: number, activeIndex: number): Result
 		TicketStrip = portraitShape,
 		LeaveWide = desktopShape,
 		TabsCompact = portraitShape,
+		TabsIconOnly = true,
 		Bar = bar,
 		Leave = leave,
 		Tabs = tabs,
@@ -337,9 +418,13 @@ local function mini(canvas: Vector2, count: number, activeIndex: number): Result
 		Header = 0,
 		Mini = {
 			Progress = progress,
+			Skip = skip,
 			Hint = hint,
 			Seal = seal,
 			Tap = tap,
+			Pill = pill,
+			PillPad = pad,
+			Bin = bin,
 			HudStatus = hudStatus,
 			HudClock = hudClock,
 			HudSanity = sanity,
@@ -350,9 +435,10 @@ local function mini(canvas: Vector2, count: number, activeIndex: number): Result
 end
 
 -- `activeIndex` only matters in portrait, where the active tab is wider than the others. `minimal` = the 3D mode (mini above).
-local function compute(canvas: Vector2, hasPanel: boolean, count: number, activeIndex: number, minimal: boolean?): Result
+local function compute(canvas: Vector2, hasPanel: boolean, count: number, activeIndex: number, minimal: boolean?, extra: (boolean | Options)?): Result
 	if minimal == true then
-		return mini(canvas, count, activeIndex)
+		const options: Options = if type(extra) == "table" then extra elseif extra == true then { Taps = true } else {}
+		return mini(canvas, count, activeIndex, options)
 	end
 	local result: Result
 	if canvas.X < canvas.Y then
@@ -382,9 +468,9 @@ local function blocks(layout: Result, hasPanel: boolean): { [string]: Rect }
 		const own: { [string]: Rect } = {
 			Progress = extra.Progress,
 			Ticket = layout.Ticket,
-			Leave = layout.Leave,
-			Assist = layout.Assist,
-			Tap = extra.Tap,
+			Pill = extra.Pill,
+			Skip = extra.Skip,
+			Bin = extra.Bin,
 			Tabs = layout.Bar,
 			Next = layout.Next,
 			Hint = extra.Hint,
@@ -414,10 +500,6 @@ end
 
 -- the zones of the minimal mode that belong to the Hud and Roblox
 const FOREIGN: { [string]: boolean } = { HudStatus = true, HudClock = true, HudSanity = true, RobloxMenu = true }
-
-local function overlaps(a: Rect, b: Rect): boolean
-	return a.X < b.X + b.W and b.X < a.X + a.W and a.Y < b.Y + b.H and b.Y < a.Y + a.H
-end
 
 -- Names of the pairs that overlap ("Bar/Status"); empty = the layout is clean.
 local function conflicts(layout: Result, hasPanel: boolean): { string }

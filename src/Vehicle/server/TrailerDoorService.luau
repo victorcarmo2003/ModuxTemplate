@@ -4,7 +4,13 @@
 -- about the player), so a player at night could not leave the trailer to walk to the Mart. Two actions, both ours:
 --   trailer_exit    "Exit Trailer", anchor just inside the door; the caller must be inside (VehicleService:IsInside)
 --   trailer_enter   "Enter Trailer", anchor outside the steps; the caller must be outside
--- (The trailer is the only vehicle since 2026-10-12, so both are always on.) The move is server-side: a 0.6 s fade (Transition
+-- 2026-10-12 (second request): the prompts now only OPEN / CLOSE the door ("Open door" / "Close door"): no fade, no
+-- teleport, the player walks through the open leaf (DoorController frees its collision while open). The door closes by
+-- itself AUTO_CLOSE s after nobody is near. The old fade + teleport path stays behind Content.Shift.TrailerDoorTeleport
+-- (default false). The notes below describe that legacy path.
+-- (The trailer is the only vehicle since 2026-10-12, so both are always on.) The door opens by the prompt (user request
+-- 2026-10-12): the trailer Model gets DoorOpen = true and DoorController swings Door_Back (tag ScriptedDoor, hinge on its
+-- west edge) open, the cover follows, then the leaf closes. The move is server-side: a 0.6 s fade (Transition
 -- "TrailerDoor", only to who used the door), the body held still (Freeze "TrailerDoor") and PivotTo under the black.
 -- Refused (the prompt stays, nothing happens): not Active, frozen (cutscene, focus, another door use), knocked or
 -- fainted (ragdoll), phases Intro / Resume / NightLost / Finale / RunEnd, cooldown COOLDOWN s per player.
@@ -31,7 +37,7 @@ const TRL_POINT = "TRL" -- MapPoint of the trailer's pose at the Pad (VehicleSer
 const OUT_POINT = "TRL-OUT" -- optional MapPoint: where Exit Trailer drops the player (floor level)
 const IN_POINT = "TRL-IN" -- optional MapPoint: where Enter Trailer drops the player (floor level)
 const FREEZE = "TrailerDoor"
-const DOOR_ATTRIBUTE = "DoorOpen" -- on the trailer Model while a use runs (art hook; nothing reads it today)
+const DOOR_ATTRIBUTE = "DoorOpen" -- on the trailer Model while the leaf is open (DoorController animates Door_Back, tag ScriptedDoor)
 const ANCHOR_IN_NAME = "Prompt_ExitTrailer"
 const ANCHOR_OUT_NAME = "Prompt_EnterTrailer"
 -- Door of MAP-01 §5.5 in the FRAME OF THE TRL POINT (object space of the trailer pose: local +Z = the back wall, local
@@ -40,6 +46,10 @@ const ANCHOR_OUT_NAME = "Prompt_EnterTrailer"
 -- on the free strip along the west wall (MapPoint TRL-OUT when authored) and Enter Trailer is a prompt there.
 const DOOR_X = 9 -- local X of the door (MAP X 47..51 minus the pivot 40)
 const WALL_Z = 6 -- local Z of the back wall
+const AUTO_CLOSE = 4 -- s without anybody within NEAR studs of the leaf before it closes by itself
+const NEAR = 7
+const OPEN_TEXT = "Open door"
+const CLOSE_TEXT = "Close door"
 const ANCHOR_IN = Vector3.new(DOOR_X, 5.2, 2.5) -- y over the TRL point (trailer floor +2, chest height); inside the door
 const ANCHOR_OUT = Vector3.new(16.3, 3.2, 3.6) -- outside, on the west strip; 4 studs radius keeps the two prompts apart
 const LAND_IN = Vector3.new(8.5, 0, 1.5) -- inside, a step in front of the door, clear of the bin
@@ -57,7 +67,9 @@ const OUT_CANDIDATES: { Vector2 } = {
 const COOLDOWN = 1 -- s per player
 const SWAP_DELAY = 0.2 -- s after the packet: the cover is black from 0.15 s (VehicleController DOOR_IN)
 const RELEASE_DELAY = 0.55 -- s after the packet the body is released
-const DOOR_OPEN_TIME = 0.8
+const DOOR_LEAD = 0.5 -- s Exit Trailer waits for the leaf to swing open before the cover starts (Door DoorController OPEN_TIME 0.45)
+const DOOR_OPEN_AFTER = 0.4 -- s the leaf stays open after the body moved, then it closes
+const DOOR_ENTER_OPEN = 0.9 -- s the leaf is open when somebody walks in (Enter Trailer)
 const BODY_LIFT = Vector3.new(0, 3, 0) -- floor point -> character pivot (CharacterService SPAWN_LIFT)
 const RAY_UP = 14
 const RAY_LENGTH = 40
@@ -113,7 +125,10 @@ function TrailerDoorService:Setup()
 	self.EnterAnchors = {} :: { [Instance]: boolean }
 	self.LastUse = {} :: { [Player]: number }
 	self.Busy = {} :: { [Player]: boolean }
+	-- uses holding the leaf open right now (the attribute is on while > 0)
+	self.DoorHolds = 0 :: number
 	self.Tries = 0 :: number
+	self.NearAt = 0 :: number
 	self.Warned = {} :: { [string]: boolean }
 end
 
@@ -227,19 +242,22 @@ function TrailerDoorService:EnsureAnchors(): boolean
 	return true
 end
 
+function TrailerDoorService:RefreshAnchor(interaction: any, anchor: Instance, on: boolean)
+	const text = if Content.Shift.TrailerDoorTeleport then nil elseif self:IsOpen() then CLOSE_TEXT else OPEN_TEXT
+	if anchor:GetAttribute("PromptEnabled") ~= on or anchor:GetAttribute("PromptText") ~= text then
+		interaction:SetPrompt(anchor, on, text)
+	end
+end
+
 -- Prompts on only while the trailer is the vehicle in use
 function TrailerDoorService:Refresh()
 	const interaction = self.Dependencies.InteractionService
 	const on = self:IsPadded()
 	for anchor in self.ExitAnchors do
-		if anchor:GetAttribute("PromptEnabled") ~= on then
-			interaction:SetPrompt(anchor, on, nil)
-		end
+		self:RefreshAnchor(interaction, anchor, on)
 	end
 	for anchor in self.EnterAnchors do
-		if anchor:GetAttribute("PromptEnabled") ~= on then
-			interaction:SetPrompt(anchor, on, nil)
-		end
+		self:RefreshAnchor(interaction, anchor, on)
 	end
 end
 
@@ -379,32 +397,82 @@ function TrailerDoorService:CanUse(player: Player, anchor: Instance, action: str
 	if last ~= nil and os.clock() - last < COOLDOWN then
 		return false
 	end
+	if not Content.Shift.TrailerDoorTeleport then
+		return true
+	end
 	const inside = self.Dependencies.VehicleService:IsInside(player)
 	return if action == EXIT then inside else not inside
 end
 
--- Run: fade + freeze now, the body moves under the cover. Never yields (the interaction queue waits for it).
+function TrailerDoorService:IsOpen(): boolean
+	const model = self:Model()
+	return model ~= nil and model:GetAttribute(DOOR_ATTRIBUTE) == true
+end
+
+function TrailerDoorService:DoorPosition(): Vector3?
+	for anchor in self.ExitAnchors do
+		if anchor:IsA("Attachment") then
+			return anchor.WorldPosition
+		end
+	end
+	return nil
+end
+
+-- Open <-> closed (DoorOpen on the trailer Model; DoorController swings the leaf) and the prompt texts follow
+function TrailerDoorService:SetOpen(open: boolean)
+	const model = self:Model()
+	if model == nil then
+		return
+	end
+	model:SetAttribute(DOOR_ATTRIBUTE, if open then true else nil)
+	self.NearAt = os.clock()
+	self:Refresh()
+end
+
+-- The leaf of Door_Back stays open for `seconds` (DoorOpen on the trailer Model, animated by DoorController)
+function TrailerDoorService:HoldDoor(seconds: number)
+	const model = self:Model()
+	if model == nil then
+		return
+	end
+	self.DoorHolds += 1
+	model:SetAttribute(DOOR_ATTRIBUTE, true)
+	task.delay(seconds, function()
+		self.DoorHolds = math.max(0, self.DoorHolds - 1)
+		if self.DoorHolds == 0 and model.Parent ~= nil then
+			model:SetAttribute(DOOR_ATTRIBUTE, nil)
+		end
+	end)
+end
+
+-- Run: freeze now, never yields (the interaction queue waits for it). Exit Trailer: the leaf swings open (DOOR_LEAD),
+-- then the cover, the body moves under it, the leaf closes. Enter Trailer: cover, move, the leaf swings open and shut
+-- behind the player.
 function TrailerDoorService:Use(player: Player, action: string)
 	self.LastUse[player] = os.clock()
+	if not Content.Shift.TrailerDoorTeleport then
+		self:SetOpen(not self:IsOpen())
+		return
+	end
 	self.Busy[player] = true
 	const characters = self.Dependencies.CharacterService
 	characters:Freeze(player, FREEZE, true)
-	if self.Dependencies.NetService:IsRunning() then
-		self.Libs.Net.Transition:fireClient(player, { Kind = "TrailerDoor", StartedAt = workspace:GetServerTimeNow() })
+	const lead = if action == EXIT then DOOR_LEAD else 0
+	if action == EXIT then
+		self:HoldDoor(lead + SWAP_DELAY + DOOR_OPEN_AFTER)
 	end
-	const model = self:Model()
-	if model ~= nil then
-		model:SetAttribute(DOOR_ATTRIBUTE, true)
-		task.delay(DOOR_OPEN_TIME, function()
-			if model.Parent ~= nil then
-				model:SetAttribute(DOOR_ATTRIBUTE, nil)
-			end
-		end)
-	end
-	task.delay(SWAP_DELAY, function()
-		self:Move(player, action)
+	task.delay(lead, function()
+		if player.Parent ~= nil and self.Dependencies.NetService:IsRunning() then
+			self.Libs.Net.Transition:fireClient(player, { Kind = "TrailerDoor", StartedAt = workspace:GetServerTimeNow() })
+		end
 	end)
-	task.delay(RELEASE_DELAY, function()
+	task.delay(lead + SWAP_DELAY, function()
+		self:Move(player, action)
+		if action == ENTER then
+			self:HoldDoor(DOOR_ENTER_OPEN)
+		end
+	end)
+	task.delay(lead + RELEASE_DELAY, function()
 		self.Busy[player] = nil
 		if player.Parent ~= nil then
 			characters:Freeze(player, FREEZE, false)
@@ -499,5 +567,27 @@ TrailerDoorService:OnStart(function(self)
 	end)
 	self:Refresh()
 end)
+
+-- Auto close: nobody near the leaf for AUTO_CLOSE s
+TrailerDoorService:OnTick(function(self)
+	if not self.Enabled or Content.Shift.TrailerDoorTeleport or not self:IsOpen() or self.DoorHolds > 0 then
+		return
+	end
+	const center = self:DoorPosition()
+	if center == nil then
+		return
+	end
+	for _, player in Players:GetPlayers() do
+		const character = player.Character
+		const root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
+		if root ~= nil and root:IsA("BasePart") and (root.Position - center).Magnitude <= NEAR then
+			self.NearAt = os.clock()
+			return
+		end
+	end
+	if os.clock() - self.NearAt >= AUTO_CLOSE then
+		self:SetOpen(false)
+	end
+end, 2)
 
 return TrailerDoorService

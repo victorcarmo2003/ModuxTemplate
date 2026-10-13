@@ -9,7 +9,7 @@
 --   Toppings  the six bowls of the trailer: press one (or tap it) and its tool follows the pointer: a bottle that leans and pours
 --             a sauce as 3D segments over guide dots, a cheese slice that slides on, bacon rings that close, a potato sticks mound
 --             that grows to its ring. Up to 3, never twice; Next sends the ONE summary (PrepFinish), the bun closes over the plate and
---             the seal shows. The bin (a PLACEHOLDER on the bench) takes the plate if you drag it there (PrepTrash).
+--             the seal shows. The virtual bin of the view (World/Bin, lower left) takes the plate if you drag it there (PrepTrash).
 -- Everything the player does is measured by Director3D with the gesture modules and `Prep/shared/Grade` (never here), kept in the
 -- 2D `Stages/Build/Session` (plate, scores, pips, PrepBegin / PrepFinish / PrepTrash and their PrepResult) and sent only through it.
 -- The server decides stock, band and the hot dog; this module predicts what it shows (the bun on the board) and undoes it when the
@@ -66,7 +66,7 @@ const TEXT = {
 	Trashed = "Plate trashed", -- PREP3D_REF_TRASHED
 	NoBun = "Out of buns! Restock it.", -- PREP3D_REF_NOBUNS
 	Miss = "Drop it on the bun", -- Provisional
-	Trace = "Trace the zig-zag", -- PREP3D_GST_TRACE
+	Trace = "Press and drag over the dashes", -- PREP3D_GST_TRACE
 	TraceHold = "Hold to pour, let go at the mark", -- PREP3D_GST_TRACE_HOLD
 	Slide = "Drag the slice onto the bun", -- PREP3D_GST_SLIDE
 	SlideHold = "Hold where the slice goes", -- PREP3D_GST_SLIDE_HOLD
@@ -76,9 +76,9 @@ const TEXT = {
 
 -- The tip of a bowl on hover (PREP3D_TIP_BOWL_*)
 const BOWL_TIPS: { [string]: string } = {
-	ketchup = "Ketchup: trace the zig-zag",
-	mustard = "Mustard: trace the zig-zag",
-	cream_cheese = "Cream cheese: trace the zig-zag",
+	ketchup = "Ketchup: tap it, then drag on the bun",
+	mustard = "Mustard: tap it, then drag on the bun",
+	cream_cheese = "Cream cheese: tap it, then drag",
 	cheese = "Cheese: drag the slice on",
 	bacon = "Bacon: tap each ring as it closes",
 	potato_sticks = "Potato sticks: hold, then let go",
@@ -123,6 +123,8 @@ type Sess = {
 	MaskTries: number,
 	Home: Vector3, -- where the plate sits in the Board view (the middle of the board)
 	Placed: boolean, -- the plate has been placed at least once (the first Enter does not slide)
+	CoachBoard: boolean, -- the tutorial hand was tried for the cut
+	CoachTop: boolean, -- ... and for the toppings
 }
 
 local session: Sess? = nil
@@ -275,24 +277,14 @@ local function register(current: Sess, registry: Targets.Registry)
 			if open == nil or not plateOpen() or open.Closing then
 				return false
 			end
+			-- the drop target of the sausage and, once the bun is open, the handle of the plate (to the virtual bin) in both sections
 			if open.Tab == "Board" then
-				return open.View:Bun() == "Open" and not placed()
+				return open.View:Bun() == "Open"
 			end
-			return placed() and toolKey() == "" and untrack(Session.Pending) ~= "Finish"
+			return open.View:Bun() == "Open" and toolKey() == "" and untrack(Session.Pending) ~= "Finish"
 		end,
 	})
 	current.Targets[board.Target.Id] = board
-	-- the placeholder bin on the bench (the real one is on the floor behind the camera)
-	const bin = registry:Add({
-		Target = Types.Target("Bin"),
-		Parts = { current.View.BinPart },
-		Model = current.View.BinModel,
-		Enabled = function(): boolean
-			const open = live()
-			return open ~= nil and plateOpen() and not open.Closing and open.Tab == "Toppings"
-		end,
-	})
-	current.Targets[bin.Target.Id] = bin
 end
 
 -- Acts -------------------------------------------------------------------------------------------------------------------------
@@ -324,6 +316,8 @@ local function pickTool(current: Sess, key: string, held: boolean)
 	if not plateOpen() or untrack(Session.Pending) == "Finish" then
 		return
 	end
+	-- another sauce still selected with its stroke on the bun: it lands first (and frees its slot)
+	current.Director:Commit()
 	if not placed() then
 		controller:Toast(TEXT.PlaceFirst, "Alert")
 		sfx(current, "error", nil)
@@ -361,6 +355,7 @@ local function onCut(current: Sess, score: number)
 	end)
 	current.View:SetBun("Open", true)
 	Session.SetCut(controller, score)
+	World.Coach():Done("Board")
 	controller.Step("place")
 	current.Step = "place"
 	current.View:Burst(bandOf(score))
@@ -384,6 +379,7 @@ local function onTopping(current: Sess, key: string, score: number, amount: numb
 	const controller = current.Controller
 	current.Drawn[key] = true
 	Session.AddTopping(controller, key, score, amount)
+	World.Coach():Done("Toppings")
 	current.View:Burst(bandOf(score))
 	note(`topping {key} {score}`)
 end
@@ -475,6 +471,36 @@ local function syncMask(current: Sess)
 	end
 end
 
+-- The hand of the drag tutorial: the knife along the dashes (Board, once the bun waits), a bowl to the bun (Toppings, once the sausage
+-- is in). Each is tried once per visit of the mode; the Coach keeps what was shown in this session.
+local function coach(current: Sess)
+	const hand = World.Coach()
+	if hand:Active() then
+		return
+	end
+	if current.Tab == "Board" and not current.CoachBoard and plateOpen() and (bunState(current) == "Closed" or bunState(current) == "Cut") then
+		current.CoachBoard = true
+		const cut = build.Cut
+		const plane = current.View.Plane
+		hand:Show("Board", {
+			Plane.ToWorld(plane, Vector2.new(cut.From, cut.Y), boardRules.Guide.Lift),
+			Plane.ToWorld(plane, Vector2.new(cut.To, cut.Y), boardRules.Guide.Lift),
+		})
+	elseif current.Tab == "Toppings" and not current.CoachTop and plateOpen() and placed() and #Session.Toppings() == 0 and toolKey() == "" then
+		current.CoachTop = true
+		-- from the first bowl with stock to the middle of the bun
+		for key in BOWL_TIPS do
+			const target = current.Targets[`Topping:{key}`]
+			if target ~= nil and target.Parts[1] ~= nil and current.Controller:InfoOf(key).Stock > 0 then
+				const plane = current.View.Plane
+				const from = Vector3.new(target.Parts[1].Position.X, plane.Frame.Position.Y, target.Parts[1].Position.Z)
+				hand:Show("Toppings", { from, Plane.ToWorld(plane, GROOVE, 0.1) })
+				break
+			end
+		end
+	end
+end
+
 -- The gesture the plate wants now (Director3D mode), "none" when nothing is armed.
 local function wantedMode(current: Sess): string
 	if current.Closing or not plateOpen() or untrack(Session.Pending) == "Finish" or current.Drag ~= nil then
@@ -513,6 +539,12 @@ local function frame(current: Sess, dt: number, time: number)
 		if current.Active then
 			syncPlate(current)
 			syncMask(current)
+			-- the virtual bin shows while the plate can be thrown (an open bun, no finish on its way)
+			const bin = World.Bin()
+			if bin ~= nil then
+				bin:SetWanted(plateOpen() and current.View:Bun() == "Open" and not current.Closing and untrack(Session.Pending) ~= "Finish")
+			end
+			coach(current)
 			if registry ~= nil then
 				-- pulses: the invitation of the moment (touch has no hover)
 				const open = plateOpen()
@@ -586,11 +618,14 @@ local function teardown()
 	current.Hitbox:Destroy()
 	hover("")
 	World.SetWorkPlane(nil)
+	const bin = World.Bin()
+	if bin ~= nil then
+		bin:SetWanted(false)
+	end
 	const registry = World.Targets()
 	if registry ~= nil then
-		-- the two targets made of this session's own parts go with it
+		-- the target made of this session's own parts goes with it
 		registry:Remove(`Board:{current.Seat}`)
-		registry:Remove("Bin")
 		registry:Touch()
 	end
 end
@@ -645,9 +680,12 @@ local function build3D(controller: any)
 		end,
 		Knife = if knifeInstance ~= nil and knifeInstance:IsA("BasePart") then knifeInstance else nil,
 		RailFront = 1,
+		Juice = World.Juice,
 	})
 	const tool = ToolView.new(folder :: Folder, world, view.Orient)
-	const strokes = Strokes.new(folder :: Folder, world, view.Plane)
+	const strokes = Strokes.new(folder :: Folder, world, view.Plane, function(uv: Vector2): number
+	return view:SurfaceHeight(uv)
+end)
 	-- the hitbox of the board: the bun as it is drawn, a little generous
 	const hitbox = Instance.new("Part")
 	hitbox.Name = "Prep_BunHitbox"
@@ -690,6 +728,8 @@ local function build3D(controller: any)
 		MaskTries = 0,
 		Home = centre,
 		Placed = false,
+		CoachBoard = false,
+		CoachTop = false,
 	}
 	current.Director = Director3D.new({
 		Folder = folder :: Folder,
@@ -709,6 +749,20 @@ local function build3D(controller: any)
 		end,
 		OnTopping = function(key: string, score: number, amount: number)
 			onTopping(current, key, score, amount)
+		end,
+		Deselect = function()
+			if toolKey() ~= "" then
+				note("tool put down")
+				Session.Active("")
+			end
+		end,
+		OverTarget = function(): boolean
+			const aim = World.Aim()
+			return aim ~= nil and aim.Source ~= nil
+		end,
+		CanLand = function(): boolean
+			return not current.Dead and not current.Closing and plateOpen() and placed() and untrack(Session.Pending) ~= "Finish"
+				and bunState(current) == "Open"
 		end,
 	})
 	-- the plate follows the section: the sauce segments and the hitbox slide with it
@@ -746,7 +800,7 @@ local function setHover(current: Sess, target: Types.Target?)
 	elseif kind == "Rail" then
 		hover(TEXT.Rail)
 	elseif kind == "Board" then
-		hover(if current.Tab == "Board" then (if current.View:Bun() == "Open" then TEXT.Place else TEXT.Knife) else TEXT.Bin)
+		hover(if current.Tab == "Board" and not placed() then (if current.View:Bun() == "Open" then TEXT.Place else TEXT.Knife) else TEXT.Bin)
 	elseif kind == "Topping" then
 		hover(BOWL_TIPS[target.Target.Topping] or "")
 	elseif kind == "Bin" then
@@ -756,13 +810,30 @@ local function setHover(current: Sess, target: Types.Target?)
 	end
 end
 
+-- The bun-space point UNDER the pointer: the camera ray through the (lifted) point of the aim, cut by the bun plane. What the finger
+-- covers is where it lands; the lifted point itself would read a quarter of a bun width off (it floats over the bun).
+local function underPointer(current: Sess, point: Vector3): Vector2
+	const camera = workspace.CurrentCamera
+	if camera ~= nil then
+		const origin = camera.CFrame.Position
+		const offset = point - origin
+		if offset.Magnitude > 1e-3 then
+			const uv = Plane.FromRay(current.View.Plane, origin, offset.Unit)
+			if uv ~= nil then
+				return uv
+			end
+		end
+	end
+	return Plane.ToUV(current.View.Plane, point)
+end
+
 -- The sausage under the pointer: samples in the bun space, the snap to the groove inside the magnet.
 local function dragSausage(current: Sess, point: Vector3)
 	const drag = current.Drag
 	if drag == nil then
 		return
 	end
-	const uv = Plane.ToUV(current.View.Plane, point)
+	const uv = underPointer(current, point)
 	table.insert(drag.Points, uv)
 	if #drag.Points > 90 then
 		table.remove(drag.Points, 1)
@@ -820,8 +891,7 @@ const Build: Stage.Stage3D = {
 			if tab == "Toppings" then centre + current.View.Orient.XVector * shift.Right + current.View.Orient.ZVector * shift.Back else centre,
 			if first then 0 else boardRules.Slide
 		)
-		current.View:SetBinVisible(tab == "Toppings")
-		current.Placed = true
+			current.Placed = true
 		Session.Sync(controller)
 		-- coming back to the Board with the bun already cut: the step follows the plate
 		if tab == "Board" and Session.Cut() ~= nil and Session.Peek(controller.Step) == "bun" then
@@ -923,7 +993,7 @@ const Build: Stage.Stage3D = {
 			return { Label = prep.Texts.Next, Enabled = ready, Pulse = ready }
 		end
 		const ready = open and isPlaced
-		return { Label = prep.Texts.Next, Enabled = ready, Pulse = ready and toppings > 0 }
+		return { Label = if prep.Rules.Delivery == "Prompt" then prep.Texts.Done else prep.Texts.Next, Enabled = ready, Pulse = ready and toppings > 0 }
 	end,
 	OnNext = function(controller: any)
 		if Session.Peek(controller.Tab) == "Board" then
@@ -934,6 +1004,10 @@ const Build: Stage.Stage3D = {
 		const current = session
 		if current ~= nil and current.Closing then
 			return
+		end
+		-- a sauce still selected lands first: its score goes into the summary
+		if current ~= nil then
+			current.Director:Commit()
 		end
 		note("Next: PrepFinish")
 		Session.Finish(controller)
@@ -957,8 +1031,11 @@ const Build: Stage.Stage3D = {
 				current.Director:SetMode("none", false)
 				current.WantMode = "none"
 			elseif targetKind == "Topping" then
-				pickTool(current, target.Target.Topping, true)
-			elseif targetKind == "Board" and current.Tab == "Toppings" then
+				-- a sauce is SELECTED by the press (it floats over the bun, nothing flows); the others are dragged from the bowl
+				const picked: string = target.Target.Topping
+				const tolerance = prep.Tolerances.ByKey[picked]
+				pickTool(current, picked, not (tolerance ~= nil and tolerance.Gesture == "trace"))
+			elseif targetKind == "Board" then
 				current.Drag = { Kind = "Plate", Points = {} }
 				current.View:SetCarry("Plate", message.Point, nil)
 			end
@@ -975,6 +1052,7 @@ const Build: Stage.Stage3D = {
 		elseif kind == "Release" or kind == "Cancel" then
 			const drag = current.Drag
 			if drag ~= nil and drag.Kind == "Sausage" and kind == "Release" then
+				note("sausage released over nothing")
 				sfx(current, "error", nil)
 				controller:Toast(TEXT.Miss, "Info")
 			end
@@ -986,9 +1064,10 @@ const Build: Stage.Stage3D = {
 				return
 			end
 			if drag.Kind == "Sausage" and over.Target.Kind == "Board" then
-				const uv = Plane.ToUV(current.View.Plane, message.Point)
+				const uv = underPointer(current, message.Point)
 				table.insert(drag.Points, uv)
 				const score, near = current.Director:MeasurePlace(drag.Points)
+				note(`sausage drop: uv ({string.format("%.2f", uv.X)}, {string.format("%.2f", uv.Y)}), {#drag.Points} samples, score {tostring(score)}, inside the magnet {tostring(near)}`)
 				endDrag(current)
 				if score ~= nil and near then
 					onPlaced(current, score)
@@ -997,11 +1076,17 @@ const Build: Stage.Stage3D = {
 					controller:Toast(TEXT.Miss, "Info")
 				end
 			elseif drag.Kind == "Plate" and over.Target.Kind == "Bin" then
+				-- the plate ghost in the hand is swallowed by the bin (it keeps its pose, shrinks and falls in)
+				const thrown = current.View:TakeCarry()
 				endDrag(current)
-				sfx(current, "error", nil)
-				current.View:Dust()
 				note("plate to the bin")
-				controller:Trash()
+				const bin = World.Bin()
+				if thrown ~= nil and bin ~= nil then
+					bin:Eat(thrown)
+				elseif thrown ~= nil then
+					thrown:Destroy()
+				end
+				controller:Trash("Plate")
 			else
 				endDrag(current)
 			end
@@ -1017,6 +1102,10 @@ const Build: Stage.Stage3D = {
 		const result = event.Result
 		const act: string = result.Act
 		if act ~= "Begin" and act ~= "Finish" and act ~= "Trash" then
+			return
+		end
+		-- a sausage thrown from the grill or the rail (Trash with a Value) is the business of the Grill stage
+		if act == "Trash" and result.Value ~= 0 then
 			return
 		end
 		note(`{act}: ok {tostring(result.Ok)} reason {result.Reason} grade {result.Grade}`)
@@ -1040,6 +1129,7 @@ const Build: Stage.Stage3D = {
 			end
 			sfx(current, "hotdog_assemble", current.View.Plane.Frame.Position)
 			current.View:Burst(result.Grade)
+			current.View:Celebrate(result.Grade)
 			current.View:Close(run)
 			task.delay(boardRules.Close + 0.5, run)
 			return

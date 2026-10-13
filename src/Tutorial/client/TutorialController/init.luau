@@ -91,6 +91,7 @@ local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Cinematic = require(StarterPlayer.StarterPlayerScripts.client.Interface.Cinematic)
+local Objective = require(StarterPlayer.StarterPlayerScripts.client.Interface.Objective)
 local Spotlight = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Spotlight)
 local TutorialPanel = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.TutorialPanel)
 local TutorialArrow = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.TutorialArrow)
@@ -319,6 +320,18 @@ end
 function TutorialController:StepLabel(): string
 	const step = self:Step()
 	return if step then `STEP {step.Number} OF {Steps.Total}` else ""
+end
+
+-- The line under the instruction: the short reminder while the player makes no progress, the prep wording while seated at a station
+function TutorialController:PanelHint(): string
+	const step = self:Step()
+	if step == nil then
+		return ""
+	end
+	if self.Urgent() and step.Remind then
+		return step.Remind
+	end
+	return if self:Focused() and step.PrepHint then step.PrepHint else step.Hint
 end
 
 function TutorialController:SkipText(): string
@@ -875,7 +888,9 @@ function TutorialController:KitchenAnchor(action: string, enabled: boolean): Ins
 	-- DEC-224: two natural Work prompts; the grill steps point at the grill one, the bun and board steps at the board one
 	const step = if action == "grill_place" or action == "grill_collect" then "Grill" else "Build"
 	return self:Anchor("prep_work", false, function(anchor: Instance): boolean
-		return anchor:GetAttribute("PromptStep") == step
+		const value = anchor:GetAttribute("PromptStep")
+		-- the board prompt is "Board" in the 3D set (it was "Build" before the sections were split)
+		return value == step or (step == "Build" and value == "Board")
 	end) or self:Anchor("prep_work", false)
 end
 
@@ -1855,6 +1870,33 @@ function TutorialController:Mount(playerGui: Instance)
 	end
 
 	const unmount = Vide.root(function()
+		-- the step as data for the prep shell (Objective); Skip goes through the same method as the key
+		Objective.SetSkip(function()
+			self:Skip()
+		end)
+		Vide.effect(function()
+			const step = self:Step()
+			const card: Objective.Card | false = if shown() and step ~= nil
+				then {
+					Step = step.Number,
+					Total = Steps.Total,
+					Text = self:PanelText(),
+					Hint = self:PanelHint(),
+					Label = self:StepLabel(),
+					Done = self.Checked(),
+					Urgent = self.Urgent(),
+					SkipText = self:SkipText(),
+				}
+				else false
+			Vide.untrack(function()
+				Objective.SetCard(card)
+				return nil
+			end)
+		end)
+		Vide.cleanup(function()
+			Objective.SetCard(false)
+			Objective.SetSkip(nil)
+		end)
 		Vide.effect(function()
 			const on = self.Running()
 			Vide.untrack(function()
@@ -1873,7 +1915,10 @@ function TutorialController:Mount(playerGui: Instance)
 				return not Cinematic.Active()
 			end,
 			TutorialPanel({
-				Shown = shown,
+				-- the focused prep mode shows the step in its own progress card (Objective): one card on top, not two
+				Shown = function()
+					return shown() and not Objective.Hosted()
+				end,
 				Step = function()
 					const step = self:Step()
 					return if step then step.Number else 1
@@ -1890,14 +1935,7 @@ function TutorialController:Mount(playerGui: Instance)
 				Done = self.Checked,
 				-- no progress for a while: the short reminder in place of the hint
 				Hint = function()
-					const step = self:Step()
-					if step == nil then
-						return ""
-					end
-					if self.Urgent() and step.Remind then
-						return step.Remind
-					end
-					return if self:Focused() and step.PrepHint then step.PrepHint else step.Hint
+					return self:PanelHint()
 				end,
 				Urgent = self.Urgent,
 				SkipText = function()
@@ -1913,7 +1951,7 @@ function TutorialController:Mount(playerGui: Instance)
 					const s = scale()
 					const camera = workspace.CurrentCamera
 					const width = if camera ~= nil then camera.ViewportSize.X else 1280
-					const panelWidth = math.clamp(width * 0.5, 260, 440) -- the panel's own constraint (TutorialPanel)
+					const panelWidth = math.clamp(width * 0.5, 300, 460) -- the panel's own constraint (TutorialPanel)
 					const centre = math.max(width / 2, ROBLOX_BAR + panelWidth / 2 + 8)
 					return UDim2.new(0, centre, 0, PANEL_TOP_EDGE * s)
 				end,

@@ -16,6 +16,7 @@ local Table = require(script.Parent.Table)
 -- Every tab key that exists on the wire. Order and Build are the 2D set (Rules.ThreeD = false, the one that runs today);
 -- Board and Toppings are the 3D set (prep-3d.md §3.0). Grill and Serve are in both.
 export type Tab = "Order" | "Grill" | "Build" | "Board" | "Toppings" | "Serve"
+export type Delivery = "Prompt" | "Window"
 export type Band = "Perfect" | "Good" | "Messy"
 -- SausagePlaced = the 3D Board section: bun cut AND sausage in the groove (prep-3d.md §3.0)
 export type Need = "Nothing" | "BunCut" | "PlateBuilt" | "SausagePlaced" | "TicketPicked"
@@ -85,9 +86,31 @@ export type View = {
 	Focus: string,
 	Fallback: string,
 	Fov: number,
+	-- Procedural pose (feedback 2026-10-12, G): when Pitch or Distance is not 0 the frame is DERIVED from the Focus attachment
+	-- (Poses.luau) instead of read from the Anchor: Pitch in degrees (negative looks down), Distance in studs from the eye to the
+	-- point looked at, Dolly = studs the point slides along the way the anchor faces (+ = away from the player), Side = studs it
+	-- slides toward the screen right (+ = right). The anchor then only gives the yaw (and the fallback when the Focus is missing).
+	Pitch: number,
+	Distance: number,
+	Dolly: number,
+	Side: number,
 }
 
 export type LegacyViewRow = { Key: string, Anchor: string, Focus: string }
+
+-- Continuous pan along the trail of stations (feedback 2026-10-12, H; Provisional). The camera follows a point `u` of the trail
+-- (Grill -> Board -> Toppings, one station per tab); a finger dragged on empty space, the mouse at the edge of the screen and LB / RB
+-- move it; on release it snaps to the nearest station and only then does the stage change.
+export type PanRules = {
+	Omega: number, -- 1/s of the camera springs while panning (the glide of a station change keeps Travel / Min / Max)
+	Slop: number, -- px: a press on empty space that moves more than this is a pan
+	Inertia: number, -- s of the release velocity that carry the landing point
+	Hold: number, -- 0..1: stickiness of the station the pan started on (0 = nearest, 0.3 needs about 60 % of the way)
+	Edge: number, -- fraction of the screen width / height at the border where the mouse scrolls
+	EdgeSpeed: number, -- studs per second at the very border (linear from 0 at the inner line)
+	FlingMin: number, -- studs per second: a release faster than this goes to the next station in its direction
+	Dots: { Size: number, Active: number, Gap: number }, -- px of the indicator dots (the hit area stays 44)
+}
 
 -- The 3D Board section (TASK-204): the working bun is drawn Scale times the kit bun so a finger can cut it; every number Provisional
 export type BoardRules = {
@@ -99,19 +122,85 @@ export type BoardRules = {
 	Knife: { Height: number, Tilt: number, Spring: number }, -- the tool: studs over the bun, degrees of lean, 1/s catch-up
 	Carry: { Spring: number, Alpha: number }, -- a carried sausage / plate: catch-up and ghost Transparency
 	Bin: { Right: number, Back: number, Size: number }, -- PLACEHOLDER bin on the bench: studs to the right / toward the player of the plate
-	Shift: { Right: number, Back: number }, -- the plate slides this far (studs) when the Toppings view takes over (the bowls fill the right)
+	Shift: { Right: number, Back: number }, -- the plate slides this far (studs, from the middle of the board) when the Toppings view takes over: to the middle of the bowls (Right) and in front of them, between them and the player (Back)
 	Slide: number, -- s: that slide
 	Crumbs: number, -- particles of the cut
 }
 
 -- The 3D Toppings section (TASK-205): tools in hand and the sauce stroke; every number Provisional
 export type ToppingRules = {
-	Stroke: { Width: number, Height: number }, -- a sauce segment (cylinder lying on the bun)
+	Stroke: {
+		Width: number, -- studs (x the bun scale): the sauce tube diameter
+		Height: number,
+		Smooth: number, -- cylinders per Catmull-Rom piece
+		Joint: number, -- joint ball diameter x the tube diameter (1 = no bulge)
+		Taper: number, -- share of the width lost at the tip
+		Shine: number, -- Reflectance (wet shine)
+		Variance: number, -- share of the width that breathes along the stroke (slow, smooth)
+		Threshold: number, -- studs the pointer must move over the bun after the press before the sauce flows (select, then drag)
+		Done: number, -- share of the guide covered that lands the topping on release (1 = never early)
+		MinAmount: number, -- path lengths of sauce below which a deselect drops the stroke instead of landing it
+		Margin: { X: number, Y: number }, -- bun lengths / widths past the bun edge where the sauce still records (the plane of the bun)
+	},
 	Bottle: { Length: number, Radius: number, Tilt: number, Rise: number, Spring: number }, -- placeholder bottle (degrees, studs)
 	Dot: { Size: number, Step: number }, -- guide dots of the zig-zag
 	Ring: { Radius: number, Thick: number }, -- bacon rings and the potato target ring (x the bun scale)
 	Potato: { From: number }, -- share of the mound at the start of the hold
 	Hand: { Spring: number, Rise: number }, -- cheese slice / strip / pinch following the pointer
+}
+
+-- The juice of the 3D prep (World/Juice, 2026-10-12 polish): pops, bursts, floating words, flashes. Its OWN particle budget, apart
+-- from the 150 of KitchenController/Fx, and the Highlights it keeps out of Budget.Highlights. Reduced motion and LowQuality skip bursts.
+export type JuiceRules = {
+	Particles: number, -- live particles of the prep (own budget)
+	Emitters: number, -- live emitters of the prep
+	Flashes: number, -- Highlight instances reserved to Flash (taken from Budget.Highlights)
+	Floats: number, -- floating words alive at once
+	Pop: { Time: number, Amount: number }, -- squash and stretch of a landing: seconds, share of the size
+	Float: { Rise: number, Time: number, Size: number }, -- a floating word: studs it rises, seconds, TextSize
+	Flash: { Time: number, Fill: number }, -- a flash: seconds, starting FillTransparency
+	Combo: { Show: number, Pitch: number, Cap: number }, -- Perfects in a row before the chip shows; PlaybackSpeed per step; steps counted
+	Count: number, -- s: the grade counter of the seal rolls 0 -> N
+	Confetti: { Perfect: number, Good: number, Messy: number }, -- pieces by band
+}
+
+-- The drag tutorial (World/Coach, 2026-10-12): a 3D ghost hand loops the gesture of the section once per station per session.
+export type CoachRules = {
+	Loop: number, -- s: one pass of the gesture
+	Rest: number, -- s: pause between two passes
+	Hand: { Palm: number, Lift: number, Alpha: number }, -- studs of the palm, studs over the work plane, Transparency
+	Dashes: number, -- the trail of the gesture
+	Max: number, -- passes before it stops by itself
+}
+
+-- The virtual bin of each view (World/Bin, 2026-10-12): a local clone of the bin anchored to the camera frame of the view, lower
+-- left of the screen, so a sausage or a plate can be dragged to it from any section.
+export type BinRules = {
+	Screen: { X: number, Y: number }, -- share of the viewport (0,0 = top left) where its centre sits
+	Depth: number, -- share of the distance from the camera to the plate (the focus of the view) the bin stands at: it is as big as what it takes
+	Size: number, -- studs of the lid
+	Hit: number, -- studs of the (invisible) hitbox, a finger needs 44 px
+	Lid: number, -- degrees the lid opens on hover
+	Eat: number, -- s: the item shrinks and falls in
+}
+
+-- The placeholder bar grill (World/GrillRig, decision of 2026-10-12): Parts only until AST-120 exists. Bars run across the slots,
+-- the sausage lies across them and is FLIPPED (not rolled). Numbers in studs of the slot pose (X = along the sausage).
+export type GrillRigRules = {
+	Placeholder: boolean, -- false = the roller grill of the trailer stays visible and nothing here is drawn
+	-- AST-120 (the final model, another task): 4.6 x 2.6 studs, 0.62 high to the top of the bars, pivot at the centre of the base,
+	-- Bar_1..Bar_14 along the depth, 8 slots (2 columns x 4 rows), the sausage lies along X with its centre 0.12 over the bars.
+	-- The placeholder names its Parts like the model (Base, Frame, Bar_n, Tray, Burner, Flame) so the swap is a model swap.
+	Bars: number, -- Bar_1..Bar_n
+	BarRadius: number,
+	BarGap: number, -- studs between two bars (along the depth)
+	Margin: number, -- studs of plate around the outer slots
+	Height: number, -- studs from the base to the top of the bars
+	Tray: { Depth: number, Drop: number }, -- the drip tray in front
+	Heat: { Cold: number, Warm: number, Hot: number }, -- cooking share where the bars are grey, orange, bright
+	Marks: { Count: number, Width: number, Length: number }, -- grill marks on the face that was down
+	-- AST-120 slot grid for the day the map is re-authored: Slot n at (X, depth) in studs of the model, depth + toward the player
+	Slots: { { X: number, Depth: number } },
 }
 
 -- Numbers of the 3D world (prep-3d.md §2, §8, §9; all Provisional, TASK-212 retouches them)
@@ -182,6 +271,10 @@ export type WorldRules = {
 	Toppings: ToppingRules,
 	Editable: boolean, -- EditableMesh layer (prep-3d.md §6A); false until the S1b spike passes
 	GhostHand: boolean, -- colleague's ghost hand (Q-233)
+	Juice: JuiceRules,
+	Coach: CoachRules,
+	Bin: BinRules,
+	Rig: GrillRigRules,
 }
 
 -- Cosmetic plate mask on PrepTab.Plate / PrepSeats.Plate (prep-3d.md §7.2 N3), see Prep/shared/PlateMask.luau
@@ -225,8 +318,23 @@ export type Rules = {
 	-- legacy sets (Order, Grill, Build, Serve). true = the 3D sets (Grill, Board, Toppings, Serve) and World.Stages decides per
 	-- stage. Rollback without code: Stages.<X> = false, or ThreeD = false.
 	ThreeD: boolean,
+	-- how the finished hot dog reaches the customer (owner decision 2026-10-12). "Prompt" = the prep mode ends after the seal and
+	-- the hot dog is in the hand; the customer's world `serve` prompt delivers it (no Serve tab, step or view). "Window" = the old
+	-- Serve tab (rollback without code; the legacy and 3D Serve stages come back with it).
+	Delivery: Delivery,
+	DoneHold: number, -- s: the seal and the confetti stay after an accepted Finish before the mode ends by itself (Delivery = "Prompt")
 	World: WorldRules,
-	Camera: { Fov: number, Travel: number, Leave: number, Pitch: number, Distance: number },
+	Camera: {
+		Fov: number,
+		Travel: number,
+		Min: number,
+		Max: number,
+		Leave: number,
+		Pitch: number,
+		Distance: number,
+		Fade: number,
+		Pan: PanRules,
+	},
 	ForcedExit: { Signal: number, NoInput: number }, -- s: leave animation on an anomaly signal, input block after it
 	CueLock: number, -- s: re-entry locked after a forced exit by anomaly signal (Provisional, Q-221)
 	ClientIdle: number, -- s without input before the client leaves (Parked)
@@ -265,6 +373,7 @@ export type Grades = {
 
 export type Texts = {
 	Next: string,
+	Done: string, -- the corner button of the last step when Rules.Delivery = "Prompt"
 	Serve: string,
 	Take: string,
 	Leave: string,
@@ -272,27 +381,59 @@ export type Texts = {
 	Assist: string,
 	Waiting: string,
 	Taken: string,
+	Perfect: string,
+	Combo: string,
+	BinTip: string,
+	TrashBusy: string,
+	TrashEmpty: string,
+	Trashed: string,
+	Coach: { Grill: string, Board: string, Toppings: string, Serve: string },
 }
 
+-- Delivery (Rules.Delivery). "Prompt": the Serve tab, its steps and the Window view leave every set; the last step of the plate is
+-- Done (Next = Done) and the mode ends. The raw lists below keep the Serve rows for "Window" (rollback without code).
+const DELIVERY: Delivery = "Prompt"
+
+local function withoutServe<T>(list: { T }, doneLabel: boolean): { T }
+	if DELIVERY ~= "Prompt" then
+		return list
+	end
+	const kept: { T } = {}
+	for _, row in list do
+		const key = (row :: any).Key
+		if key ~= "serve" and key ~= "Serve" and key ~= "Window" then
+			table.insert(kept, row)
+		end
+	end
+	if doneLabel and #kept > 0 then
+		const last = table.clone(kept[#kept] :: any)
+		last.NextLabel = "Done"
+		kept[#kept] = last
+	end
+	return kept
+end
+
 -- Tabs, 2D set (top bar, Rules.ThreeD = false). Order is the bar order.
-const tabsLegacy = Table.new({
+const tabsLegacyRaw = {
 	{ Key = "Order", Label = "Order", Hint = "Take a ticket", Icon = "" },
 	{ Key = "Grill", Label = "Grill", Hint = "Add sausages, flip near the middle", Icon = "" },
 	{ Key = "Build", Label = "Build", Hint = "Slice, place, add toppings", Icon = "" },
 	{ Key = "Serve", Label = "Serve", Hint = "Pick the matching customer", Icon = "" },
-} :: { TabRow })
+} :: { TabRow }
+const tabsLegacy = Table.new(withoutServe(tabsLegacyRaw, false))
 
 -- Tabs, 3D set (bottom bar, sections in sequence; prep-3d.md §3.0, DT-22). Order left the bar (Take is on the ticket and on
 -- the customer in the Window view); Build split into Board and Toppings. Hints are one line, 36 characters at most.
-const tabs3D = Table.new({
+const tabs3DRaw = {
 	{ Key = "Grill", Label = "Grill", Hint = "Flip when the ring closes", Icon = "" },
 	{ Key = "Board", Label = "Board", Hint = "Cut the bun, place the sausage", Icon = "" },
 	{ Key = "Toppings", Label = "Toppings", Hint = "Pick a topping, or press Next", Icon = "" },
 	{ Key = "Serve", Label = "Serve", Hint = "Drag the plate to the window", Icon = "" },
-} :: { TabRow })
+} :: { TabRow }
+const tabs3D = Table.new(withoutServe(tabs3DRaw, false))
 
 -- Steps, 2D set: ordered flow of one plate; Bun and Build share the Build tab. View = the section it belongs to in 3D.
-const stepsLegacy = Table.new({
+const stepsLegacyRaw = {
 	{
 		Key = "grill",
 		Tab = "Grill",
@@ -333,10 +474,11 @@ const stepsLegacy = Table.new({
 		Needs = "TicketPicked",
 		Icon = "",
 	},
-} :: { Step })
+} :: { Step }
+const stepsLegacy = Table.new(withoutServe(stepsLegacyRaw, true))
 
 -- Steps, 3D set: the old `build` splits into `place` (Board section) and `toppings` (Toppings section).
-const steps3D = Table.new({
+const steps3DRaw = {
 	{
 		Key = "grill",
 		Tab = "Grill",
@@ -387,13 +529,42 @@ const steps3D = Table.new({
 		Needs = "TicketPicked",
 		Icon = "",
 	},
-} :: { Step })
+} :: { Step }
+const steps3D = Table.new(withoutServe(steps3DRaw, true))
 
 -- Camera views, one per 3D section (prep-3d.md §4.1, DT-14). The anchors live in each Station_n model; a missing anchor falls
 -- back through Fallback (Poses, TASK-198). Toppings is the wide one: the bun in the middle and the bowls on both sides.
-const views = Table.new({
-	{ Key = "Grill", Tab = "Grill", Label = "Grill", Anchor = "CamAnchor", Focus = "Focus", Fallback = "", Fov = 0 },
-	{ Key = "Board", Tab = "Board", Label = "Board", Anchor = "CamAnchor_Board", Focus = "Focus_Board", Fallback = "Build", Fov = 0 },
+const viewsRaw = {
+	-- Grill: the sausage container (SausageStock, +X of the grill) and the roller grill in one frame, seen from above. Pitch /
+	-- Distance / Dolly / Side derive the frame from the Focus (Poses.luau); Side moves the middle of the frame toward the container.
+	{
+		Key = "Grill",
+		Tab = "Grill",
+		Label = "Grill",
+		Anchor = "CamAnchor",
+		Focus = "Focus",
+		Fallback = "",
+		Fov = 0,
+		Pitch = -65,
+		Distance = 5.9,
+		Dolly = 0,
+		Side = -2.4,
+	},
+	-- Board and Toppings share Pitch, Distance and Fov, so going from one to the other is a plain slide of the frame: the bun keeps
+	-- its size on screen (before, the two views had different distances and the bun "grew").
+	{
+		Key = "Board",
+		Tab = "Board",
+		Label = "Board",
+		Anchor = "CamAnchor_Board",
+		Focus = "Focus_Board",
+		Fallback = "Build",
+		Fov = 0,
+		Pitch = -65,
+		Distance = 5.9,
+		Dolly = 0,
+		Side = -0.9,
+	},
 	{
 		Key = "Toppings",
 		Tab = "Toppings",
@@ -401,19 +572,44 @@ const views = Table.new({
 		Anchor = "CamAnchor_Toppings",
 		Focus = "Focus_Toppings",
 		Fallback = "Board",
-		Fov = 62,
+		Fov = 0,
+		Pitch = -65,
+		Distance = 5.9,
+		Dolly = -0.9,
+		Side = 1.6,
 	},
-	{ Key = "Window", Tab = "Serve", Label = "Window", Anchor = "CamAnchor_Window", Focus = "Focus_Window", Fallback = "Board", Fov = 0 },
-} :: { View })
+	{
+		Key = "Window",
+		Tab = "Serve",
+		Label = "Window",
+		Anchor = "CamAnchor_Window",
+		Focus = "Focus_Window",
+		Fallback = "Board",
+		Fov = 0,
+		Pitch = 0,
+		Distance = 0,
+		Dolly = 0,
+		Side = 0,
+	},
+} :: { View }
+const views = Table.new(withoutServe(viewsRaw, false))
 
 -- The pair of the 2D mode, the Fallback "Build" of the Board view
 const legacyView: LegacyViewRow = { Key = "Build", Anchor = "CamAnchor_Build", Focus = "Focus_Build" }
 
 -- Every tab key that can cross the wire (PrepTab.Step, PrepSeats.Step enum), in first-seen order. Lync sorts enum names.
 local wireTabs: { string } = {}
+const tabsLegacyKeys: { string } = {}
+const tabs3DKeys: { string } = {}
+for _, row in tabsLegacyRaw do
+	table.insert(tabsLegacyKeys, row.Key)
+end
+for _, row in tabs3DRaw do
+	table.insert(tabs3DKeys, row.Key)
+end
 do
 	const seen: { [string]: boolean } = {}
-	for _, set in { tabsLegacy.Keys, tabs3D.Keys } do
+	for _, set in { tabsLegacyKeys, tabs3DKeys } do
 		for _, key in set do
 			if not seen[key] then
 				seen[key] = true
@@ -502,6 +698,8 @@ const reasons = Table.new({
 const rules: Rules = {
 	Enabled = true,
 	WorldKitchenPrompts = false, -- DEC-223: the world prompts of the kitchen are hidden; true = rollback without code
+	Delivery = DELIVERY,
+	DoneHold = 0.8,
 	ThreeD = true, -- prep-3d.md §11.3: flips Tabs / Steps to the 3D sets and arms World.Stages (the 2D mode runs while false). On since TASK-203 (the owner plays the 3D grill); Board, Toppings and Serve still use the 2D stages through TabAlias
 	World = {
 		Tag = "PrepTarget",
@@ -524,7 +722,7 @@ const rules: Rules = {
 			Shake = 0.3,
 			ShakeAmount = 0.06,
 			Early = 0.25,
-			CheckSize = 0.34,
+			CheckSize = 0.5,
 			Drag = 14,
 		},
 		Serve = {
@@ -542,10 +740,10 @@ const rules: Rules = {
 			RaysPerFrame = 1,
 			Highlights = 12,
 			Rings = 10,
-			SauceSegmentsPerStroke = 24,
-			SauceSegmentsPerPlate = 72,
-			SaucePool = 80,
-			SauceMinStep = 0.08,
+			SauceSegmentsPerStroke = 80,
+			SauceSegmentsPerPlate = 200,
+			SaucePool = 200,
+			SauceMinStep = 0.03,
 			Tools = 1,
 			Ghosts = 3,
 			Sausages = 8,
@@ -558,30 +756,90 @@ const rules: Rules = {
 		},
 		Stages = { Grill = true, Board = true, Toppings = true, Order = true, Serve = true },
 		Board = {
-			Scale = 2.1,
-			Lift = 0.04,
+			Scale = 2.5,
+			Lift = 0.01,
 			Guide = { Dashes = 14, Width = 0.05, Lift = 0.03 },
 			Open = { Time = 0.28, Hop = 0.22 },
 			Close = 0.4,
 			Knife = { Height = 0.3, Tilt = 26, Spring = 20 },
 			Carry = { Spring = 22, Alpha = 0.4 },
 			Bin = { Right = -0.9, Back = 1.3, Size = 0.8 },
-			Shift = { Right = 0.9, Back = 0 },
+			Shift = { Right = 4.5, Back = 1.6 },
 			Slide = 0.35,
 			Crumbs = 8,
 		},
 		Toppings = {
-			Stroke = { Width = 0.09, Height = 0.07 },
+			Stroke = {
+				Width = 0.09,
+				Height = 0.07,
+				Smooth = 2,
+				Joint = 1.0,
+				Taper = 0.4,
+				Shine = 0.18,
+				Variance = 0.035,
+				Threshold = 0.15,
+				Done = 0.97,
+				MinAmount = 0.1,
+				Margin = { X = 0.15, Y = 0.45 },
+			},
 			Bottle = { Length = 1.5, Radius = 0.24, Tilt = 105, Rise = 0.6, Spring = 18 },
-			Dot = { Size = 0.07, Step = 0.11 },
+			Dot = { Size = 0.05, Step = 0.11 },
 			Ring = { Radius = 0.34, Thick = 0.05 },
 			Potato = { From = 0.15 },
 			Hand = { Spring = 16, Rise = 0.5 },
 		},
 		Editable = false,
 		GhostHand = false,
+		Juice = {
+			Particles = 120,
+			Emitters = 6,
+			Flashes = 3,
+			Floats = 3,
+			Pop = { Time = 0.28, Amount = 0.14 },
+			Float = { Rise = 0.9, Time = 0.9, Size = 28 },
+			Flash = { Time = 0.28, Fill = 0.1 },
+			Combo = { Show = 2, Pitch = 0.06, Cap = 8 },
+			Count = 0.6,
+			Confetti = { Perfect = 22, Good = 10, Messy = 0 },
+		},
+		Coach = {
+			Loop = 1.7,
+			Rest = 0.9,
+			Hand = { Palm = 0.85, Lift = 0.3, Alpha = 0.1 },
+			Dashes = 7,
+			Max = 10,
+		},
+		Bin = {
+			Screen = { X = 0.1, Y = 0.74 },
+			Depth = 0.92,
+			Size = 0.5,
+			Hit = 0.8,
+			Lid = 70,
+			Eat = 0.32,
+		},
+		Rig = {
+			Placeholder = true,
+			Bars = 14,
+			BarRadius = 0.035,
+			BarGap = 0.25,
+			Margin = 0.3,
+			Height = 0.62,
+			Tray = { Depth = 0.34, Drop = 0.1 },
+			Heat = { Cold = 0.0, Warm = 0.45, Hot = 0.9 },
+			Marks = { Count = 3, Width = 0.035, Length = 0.17 },
+			Slots = {
+				{ X = -1, Depth = -0.9 },
+				{ X = 1, Depth = -0.9 },
+				{ X = -1, Depth = -0.3 },
+				{ X = 1, Depth = -0.3 },
+				{ X = -1, Depth = 0.3 },
+				{ X = 1, Depth = 0.3 },
+				{ X = -1, Depth = 0.9 },
+				{ X = 1, Depth = 0.9 },
+			},
+		},
 	},
-	Camera = { Fov = 55, Travel = 0.35, Leave = 0.30, Pitch = -55, Distance = 2.5 }, -- FEAT-039
+	Camera = { Fov = 70, Travel = 0.35, Min = 0.25, Max = 0.45, Leave = 0.30, Pitch = -55, Distance = 2.5, Fade = 0.15, Pan = { Omega = 13, Slop = 12, Inertia = 0.22, Hold = 0.15, Edge = 0.07, EdgeSpeed = 9, FlingMin = 4, Dots = { Size = 14, Active = 34, Gap = 4 } } }, -- FEAT-039; Fov 62 in every view (polish 2026-10-12, C-3): no zoom pop between sections; Travel/Min/Max in s by distance
 	ForcedExit = { Signal = 0.4, NoInput = 0.5 }, -- Q-221 A
 	CueLock = 6,
 	ClientIdle = 20, -- FEAT-039: 20 s without input = Parked
@@ -597,7 +855,7 @@ const rules: Rules = {
 	Assist = 1.3,
 	TouchOffset = 28,
 	Grill = { Target = 0.5, From = 0.4, To = 0.6 }, -- FEAT-039 / Q-222: flip near the middle, no burning
-	Rates = { Enter = 2, Leave = 2, Tab = 4, Grill = 6, Begin = 1, Finish = 1, Trash = 2, Order = 4 },
+	Rates = { Enter = 2, Leave = 2, Tab = 4, Grill = 6, Begin = 1, Finish = 1, Trash = 4, Order = 4 },
 }
 
 -- What the code sees as `Tabs` / `Steps`: the set of the current mode. All 2D code keeps reading these and gets the legacy
@@ -625,6 +883,7 @@ const grades: Grades = {
 
 const texts: Texts = {
 	Next = "Next",
+	Done = "Done",
 	Serve = "Serve",
 	Take = "Take",
 	Leave = "Leave",
@@ -632,6 +891,19 @@ const texts: Texts = {
 	Assist = "Assist",
 	Waiting = "Waiting for the grill",
 	Taken = "Taken",
+	Perfect = "PERFECT",
+	Combo = "x%d",
+	BinTip = "Drag it to the bin",
+	TrashBusy = "Keep one frank for the plate",
+	TrashEmpty = "Nothing to throw",
+	Trashed = "Thrown away",
+	-- the drag tutorial lines (World/Coach): short, and they say DRAG
+	Coach = {
+		Grill = "Drag a sausage from the box onto the grill",
+		Board = "Drag the knife along the dashes",
+		Toppings = "Drag a bowl onto the bun",
+		Serve = "Drag the plate to the window",
+	},
 }
 
 -- Build tab (TASK-176 gestures, TASK-178 stages; Provisional, no DEC). Geometry in the space of the BUN: 0..1 on both axes,
@@ -666,7 +938,7 @@ const build = {
 		Sausage = "Sausage",
 		HoldMode = "Hold",
 		PlaceFirst = "Place the sausage first",
-		Ready = "Plate ready. Serve it",
+		Ready = "Hot dog in hand. Serve it",
 		NoBun = "Out of buns",
 		Closed = "We are closed",
 		Retry = "Pick the tab again to retry",
@@ -729,6 +1001,7 @@ return Table.record({
 	-- PrepResult.Grade (wire enum); None = the act has no grade
 	GradeKeys = { "None", "Messy", "Good", "Perfect" },
 	GrillActs = { "Place", "Flip", "Collect" }, -- PrepGrill.Act
+	TrashFrom = { "Plate", "Grill", "Rail" }, -- PrepTrash.From (the bin takes the plate, a sausage of the grill, the front of the rail); PrepResult.Value of a Trash = index - 1
 	OrderActs = { "Take", "Serve", "Refuse" }, -- PrepOrder.Act
 	Stations = 4, -- PrepEnter.Station 1..4, PrepSeats records (BoardSlots of the trailer)
 })

@@ -13,6 +13,7 @@ type Door = {
 	Tween: Tween?,
 	Connection: RBXScriptConnection,
 	Overlap: OverlapParams,
+	Scripted: boolean,
 }
 type Leaf = {
 	Part: BasePart,
@@ -23,11 +24,12 @@ type Leaf = {
 export type Public = {
 	Doors: { [Instance]: Door },
 	Setup: (self: Public) -> (),
-	Add: (self: Public, instance: Instance) -> (),
+	Add: (self: Public, instance: Instance, scripted: boolean) -> (),
 	Remove: (self: Public, instance: Instance) -> (),
 	OpenPivot: (self: Public, door: Door, from: Vector3) -> CFrame,
 	SetCollide: (self: Public, door: Door, closed: boolean) -> (),
 	Animate: (self: Public, door: Door, open: boolean, from: Vector3?) -> (),
+	TickScripted: (self: Public, door: Door) -> (),
 	Tick: (self: Public) -> (),
 }
 

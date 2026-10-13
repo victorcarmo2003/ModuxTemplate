@@ -16,6 +16,7 @@ type Kitchen = {
 	RefundPlate: (self: any, player: Player) -> boolean,
 	TrashPlate: (self: any, player: Player, options: any?) -> any,
 	GrillAct: (self: any, player: Player, act: string, slot: number?) -> (any?, string?),
+	TrashSausage: (self: any, player: Player, from: string, slot: number) -> (boolean, string?),
 	PlateOf: (self: any, player: Player) -> any?,
 	DevFeedRail: (self: any, score: number?) -> boolean,
 	DevAgeGrill: (self: any, slot: number, seconds: number) -> number,
@@ -171,6 +172,11 @@ local function run(api: Api.Context, caller: Player?): string
 			check("hot dog carries the topping", tool:GetAttribute("Toppings") == top, tostring(tool:GetAttribute("Toppings")))
 			check("hot dog carries the quality", tool:GetAttribute("Quality") == "Perfect")
 			check("an ungraded sausage gives no score", made.SausageScore == nil)
+			-- Delivery = "Prompt": the finished hot dog is already in the hand (the customer's `serve` prompt delivers it)
+			const character = player.Character
+			if Content.Prep.Rules.Delivery == "Prompt" and character ~= nil then
+				check("finish puts the hot dog in the hand", tool.Parent == character, tostring(tool.Parent))
+			end
 		end
 		check("finish took the sausage", kitchen:RailCount() == 0)
 		check("finish took 1 topping", stock(top) == topStock - 1, `{stock(top)} vs {topStock - 1}`)
@@ -179,6 +185,19 @@ local function run(api: Api.Context, caller: Player?): string
 		throwTools()
 		const noPlate, noPlateReason = kitchen:FinishPlate(player, { Toppings = {} })
 		check("finish with no plate = NoSession", noPlate == nil and noPlateReason == "NoSession", tostring(noPlateReason))
+
+		-- 5b. the delivery contract (Rules.Delivery = "Prompt"): no Serve tab, step or view in any set; Done on the last step
+		if Content.Prep.Rules.Delivery == "Prompt" then
+			const prep = Content.Prep
+			check(
+				"no Serve tab in the sets",
+				prep.Tabs.ByKey.Serve == nil and prep.Tabs3D.ByKey.Serve == nil and prep.TabsLegacy.ByKey.Serve == nil
+			)
+			check("no serve step", prep.Steps.ByKey.serve == nil and prep.Steps3D.ByKey.serve == nil)
+			check("no Window view", prep.Views.ByKey.Window == nil)
+			const lastStep = prep.Steps3D.List[#prep.Steps3D.List]
+			check("the last step is Done", lastStep.NextLabel == "Done", lastStep.Key)
+		end
 
 		-- 6. bad summaries are refused before anything moves
 		kitchen:BeginPlate(player, 1)
@@ -307,6 +326,36 @@ local function run(api: Api.Context, caller: Player?): string
 			kitchen:DevAgeGrill(farSlot.Slot :: number, 1000)
 			kitchen:GrillAct(player, "Collect", farSlot.Slot :: number)
 		end
+		drain()
+
+		-- 9c. the bin by drag (polish 2026-10-12): a sausage of a grill slot (any state) and the rail, validated and graded nowhere
+		kitchen:SetAmount("sausage", math.max(saved.sausage, 8))
+		const binned = kitchen:GrillAct(player, "Place")
+		check("bin: a sausage on the grill to throw", binned ~= nil)
+		if binned ~= nil then
+			const slot = binned.Slot :: number
+			const sausageBefore = stock("sausage")
+			const ok, reason = kitchen:TrashSausage(player, "Grill", slot)
+			check("bin: a cooking sausage of the grill goes", ok == true, tostring(reason))
+			check("bin: the unit is lost (no refund)", stock("sausage") == sausageBefore)
+			const again, againReason = kitchen:TrashSausage(player, "Grill", slot)
+			check("bin: the same slot again is refused (NoSausage)", again ~= true and againReason == "NoSausage", tostring(againReason))
+			const free = kitchen:GrillAct(player, "Place", slot)
+			check("bin: the slot is free for the next one", free ~= nil and free.Slot == slot)
+			if free ~= nil then
+				kitchen:DevAgeGrill(slot, 1000)
+				kitchen:GrillAct(player, "Collect", slot)
+			end
+		end
+		kitchen:DevFeedRail(nil)
+		const railBefore = kitchen:RailCount()
+		const gone, goneReason = kitchen:TrashSausage(player, "Rail", 1)
+		check("bin: the front of the rail goes", gone == true and kitchen:RailCount() == railBefore - 1, tostring(goneReason))
+		drain()
+		const empty, emptyReason = kitchen:TrashSausage(player, "Rail", 1)
+		check("bin: an empty rail is refused (NoSausage)", empty ~= true and emptyReason == "NoSausage", tostring(emptyReason))
+		const bad, badReason = kitchen:TrashSausage(player, "Grill", 0)
+		check("bin: slot 0 is Invalid", bad ~= true and badReason == "Invalid", tostring(badReason))
 		drain()
 
 		-- 10. flag WorldKitchenPrompts: false hides the six world prompts, true gives the flow back

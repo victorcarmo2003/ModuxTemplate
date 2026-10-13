@@ -17,7 +17,6 @@ local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
-local Fx = require(StarterPlayer.StarterPlayerScripts.client.Kitchen.KitchenController.Fx)
 local Feed = require(script.Parent.Parent.Parent.Feed)
 local Stage = require(script.Parent.Parent.Parent.Stage)
 local Order = require(script.Parent.Order)
@@ -74,6 +73,7 @@ type Session = {
 	Verdict: BillboardGui?,
 	VerdictUntil: number,
 	Active: boolean,
+	CoachTried: boolean,
 }
 
 local session: Session? = nil
@@ -304,6 +304,7 @@ local function serve(current: Session): boolean
 		return false
 	end
 	note(`Serve sent, customer {pinned}`)
+World.Coach():Done("Serve")
 	current.Serving = true
 	current.Carry = false
 	-- the plate flies to the hand of the customer who ordered (or to the middle of the tray when he is not at the window)
@@ -334,12 +335,19 @@ local function onServed(controller: any, stamp: Feed.Stamp, npc: number)
 		return controller.View.Seal()
 	end)
 	showVerdict(current, at, Feed.ServeText(stamp.Result, stamp.Amount), if grade ~= false then prep.Grades.Labels[grade] or "" else "")
+	const juice = World.Juice()
 	if stamp.Result == "Perfect" then
-		Fx.Burst(at, "Confetti", 16, Theme.Color.Mustard)
+		juice:Burst("Confetti", at, world.Juice.Confetti.Perfect, nil)
+		juice:Burst("Coins", at, 8)
+		juice:Float(`+${stamp.Amount}`, at + Vector3.new(0, 0.6, 0), Theme.Color.Mustard, nil)
+		juice:Tone("coin", at, 4)
 	elseif stamp.Result == "Complete" then
-		Fx.Burst(at, "Ready", 10, Theme.Color.Mustard)
+		juice:Burst("Sparks", at, 10, Theme.Color.Mustard)
+		juice:Burst("Coins", at, 5)
+		juice:Float(`+${stamp.Amount}`, at + Vector3.new(0, 0.6, 0), Theme.Color.Mustard, nil)
+		juice:Tone("coin", at, 0)
 	else
-		Fx.Burst(at, "Dust", 6)
+		juice:Burst("Dust", at, 6)
 	end
 	if stamp.Result == "Wrong" then
 		-- the hot dog stayed in hand: the plate comes back to the rest pose
@@ -411,6 +419,16 @@ local function frame(current: Session, dt: number)
 	const canServe = show and not current.Serving and untrack(Feed.Pinned) ~= 0
 	setPulse(current, "Plate", canServe and not current.Carry)
 	setPulse(current, "Hatch", canServe and current.Carry)
+	-- the virtual bin shows while the finished plate is on the sill
+	const bin = World.Bin()
+	if bin ~= nil then
+		bin:SetWanted(show and not current.Serving and current.Plate ~= nil)
+	end
+	-- the hand of the tutorial: the plate to the window, once
+	if show and not current.CoachTried and current.Plate ~= nil and not World.Coach():Active() then
+		current.CoachTried = true
+		World.Coach():Show("Serve", { current.Rest.Position + Vector3.new(0, 0.15, 0), Vector3.new(current.Hatch.X, current.Surface + 0.25, current.Hatch.Z) })
+	end
 end
 
 -- Targets ----------------------------------------------------------------------------------------------------------------------
@@ -501,6 +519,7 @@ local function build(controller: any)
 		Verdict = nil,
 		VerdictUntil = 0,
 		Active = true,
+		CoachTried = false,
 	}
 	holder[1] = current
 	session = current
@@ -541,6 +560,10 @@ local function teardown()
 	current.Active = false
 	if current.Stop ~= nil then
 		current.Stop()
+	end
+	const bin = World.Bin()
+	if bin ~= nil then
+		bin:SetWanted(false)
 	end
 	clearVerdict(current)
 	if current.Plate ~= nil then
@@ -675,6 +698,23 @@ const Serve: Stage.Stage3D = {
 			note(`Drop {source.Target.Id} over {over.Target.Id}`)
 			if source.Target.Kind == "Plate" and (over.Target.Kind == "Hatch" or over.Target.Kind == "Customer") then
 				serve(current)
+			elseif source.Target.Kind == "Plate" and over.Target.Kind == "Bin" and current.Plate ~= nil and not current.Serving then
+				-- the finished plate goes to the virtual bin: a copy is swallowed, the hot dog in hand is thrown by the server (PrepTrash)
+				const bin = World.Bin()
+				const copy = current.Plate:Clone()
+				copy.Parent = current.Folder
+				if bin ~= nil then
+					bin:Eat(copy)
+				else
+					copy:Destroy()
+				end
+				current.Carry = false
+				current.Gone = true
+				current.Plate:Destroy()
+				current.Plate = nil
+				current.Signature = ""
+				note("plate to the bin")
+				current.Controller:Trash("Plate")
 			elseif current.Carry then
 				giveBack(current)
 			end

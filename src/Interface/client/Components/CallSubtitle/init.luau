@@ -16,6 +16,7 @@ local Icons = require(script.Parent.Icons)
 local Motion = require(script.Parent.Motion)
 local CartoonPanel = require(script.Parent.CartoonPanel)
 local CartoonLabel = require(script.Parent.CartoonLabel)
+local Zones = require(script.Parent.Parent.Zones)
 
 const create = Vide.create
 const spring = Vide.spring
@@ -105,7 +106,7 @@ return function(props: Props): Frame
 	const hasIcon = props.Icon ~= nil and props.Icon ~= ""
 	const sheet = Icons.Rect("Hud/phone")
 
-	return create("Frame")({
+	const root = create("Frame")({
 		Name = props.Name or "CallSubtitle",
 		AnchorPoint = Vector2.new(0.5, 1),
 		Position = UDim2.new(0.5, 0, 1, -BOTTOM_GAP),
@@ -206,5 +207,36 @@ return function(props: Props): Frame
 				}),
 			},
 		}),
-	})
+	}) :: Frame
+
+	-- the screen rectangle it takes while it is up: the prep shell keeps its hint and toast off it (Zones)
+	const zoneName = `Call:{props.Name or "CallSubtitle"}`
+	local function report()
+		if Vide.untrack(props.Visible) and root.AbsoluteSize.X > 0 then
+			Zones.Set(zoneName, {
+				X = root.AbsolutePosition.X,
+				Y = root.AbsolutePosition.Y,
+				W = root.AbsoluteSize.X,
+				H = root.AbsoluteSize.Y,
+			})
+		else
+			Zones.Set(zoneName, nil)
+		end
+	end
+	const moved = root:GetPropertyChangedSignal("AbsolutePosition"):Connect(report)
+	const resized = root:GetPropertyChangedSignal("AbsoluteSize"):Connect(report)
+	Vide.effect(function()
+		props.Visible()
+		Vide.untrack(function()
+			report()
+			return nil
+		end)
+	end)
+	Vide.cleanup(function()
+		moved:Disconnect()
+		resized:Disconnect()
+		Zones.Set(zoneName, nil)
+	end)
+	return root
 end
+

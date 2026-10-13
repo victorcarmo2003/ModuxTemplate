@@ -8,15 +8,16 @@
 --   knife      a clone of the REAL knife of the board that follows the pointer (the original is hidden locally meanwhile)
 --   sausage    the grilled kit sausage in the groove, a ghost where it will land, a carried one that follows the pointer
 --   plate      the plate ghost carried to the bin; the toppings that are models (cheese, bacon, potato sticks)
---   bin        a PLACEHOLDER bin on the bench (Provisional: the real one is on the floor behind the camera, MAP-01 §19.2)
+--   (the bin is World/Bin now: one virtual bin per view, lower left of the screen)
 -- The world draws its own board bun from the `Stations` record (KitchenController Board part); it is hidden LOCALLY (LocalTransparency
 -- Modifier) while this view lives and given back on Destroy. Everything made here lives under the PrepWorld folder and dies with it.
 -- No Modux, no Vide, no network.
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Content = require(ReplicatedStorage.shared.Content)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
-local Fx = require(StarterPlayer.StarterPlayerScripts.client.Kitchen.KitchenController.Fx)
+local Juice = require(script.Parent.Juice)
 local Plane = require(script.Parent.Plane)
 
 export type BunState = "None" | "Closed" | "Open"
@@ -32,11 +33,10 @@ export type View = {
 	Bun: (self: View) -> BunState,
 	-- The model of the bun shown now (the highlight adornee), nil when none.
 	BunModel: (self: View) -> Model?,
-	-- Slides the plate to a new place (the Toppings view looks at another part of the board); the bin shows only there.
+	-- Slides the plate to a new place (the Toppings view looks at another part of the board).
 	MoveTo: (self: View, position: Vector3, time: number) -> (),
 	Anchor: (self: View) -> Vector3,
 	SetMoved: (self: View, fn: ((delta: Vector3) -> ())?) -> (),
-	SetBinVisible: (self: View, on: boolean) -> (),
 	-- Dashed cut line: visible, progress 0..1 of the line done.
 	SetGuide: (self: View, visible: boolean, progress: number) -> (),
 	-- The knife follows `point` (world, on the bun plane); nil hides it. `pressed` = cutting (lower), `lean` -1..1 = side of travel.
@@ -49,10 +49,17 @@ export type View = {
 	SetTopping: (self: View, key: string, uv: Vector2?, grow: number) -> (),
 	-- The bun closes over the plate (Rules.World.Board.Close), then `done` runs.
 	Close: (self: View, done: () -> ()) -> (),
-	-- The placeholder bin: its hitbox part and where it sits.
-	BinPart: BasePart,
-	BinModel: Model,
+	-- Height (studs) over the plane of the bun top of whatever is under a bun-space point: the round back of the sausage when it
+	-- lies in the groove, the bun beside it. The sauce and the guide track lie on this.
+	SurfaceHeight: (self: View, uv: Vector2) -> number,
+	-- The live progress ring around the plate: 0..1 of the gesture in progress (the cut, the sauce covered, the mound); nil hides it.
+	SetProgress: (self: View, fraction: number?) -> (),
+	-- The carried model, handed over (the bin swallows it); nil when nothing is carried.
+	TakeCarry: (self: View) -> Model?,
+	-- The grade burst of a gesture (sparks, flash, word by band) over the bun.
 	Burst: (self: View, band: string) -> (),
+	-- The seal of the finished plate: confetti by band and a word, over the bun.
+	Celebrate: (self: View, band: string) -> (),
 	Dust: (self: View) -> (),
 	Step: (self: View, dt: number, time: number) -> (),
 	Destroy: (self: View) -> (),
@@ -71,6 +78,8 @@ export type Options = {
 	Knife: BasePart?,
 	-- the rail slot whose sausage is hidden while it is on the bun / in the hand (1 = the front)
 	RailFront: number,
+	-- the juice of the world (World.Juice)
+	Juice: () -> Juice.Juice,
 }
 
 const BoardView = {}
@@ -139,7 +148,64 @@ function BoardView.new(options: Options): View
 	const up = Vector3.yAxis
 	const right = options.Right.Unit
 	const orient = CFrame.fromMatrix(Vector3.zero, right, up) -- local Z = toward the player
-	local anchorPos = options.Anchor
+
+	-- the mat the plate lies on (feedback 2026-10-12, G: the bun floated over the board and, in the Toppings view, hung over the
+	-- bench). The real cutting board is the parent of the knife; its clone (the mat) always lies under the plate and slides with it,
+	-- its top over the bench found by a ray, and the real board is hidden locally while the mat lives. Without a board in the
+	-- trailer the plate stays at the Y it was given.
+	const boardInstance = if options.Knife ~= nil then options.Knife.Parent else nil
+	const boardPart: BasePart? = if boardInstance ~= nil and boardInstance:IsA("BasePart") and boardInstance.Name == "Board" then boardInstance else nil
+	local mat: BasePart? = nil
+	local matRotation = CFrame.identity
+	local matThickness = 0
+	-- the bench top that the board lay on (its bottom): the Y the ray is expected to find, and the fallback
+	local benchFallback = if boardPart ~= nil then boardPart.Position.Y - boardPart.Size.Y / 2 else options.Anchor.Y - 0.25
+	const rayParams = RaycastParams.new()
+	rayParams.FilterType = Enum.RaycastFilterType.Exclude
+	if boardPart ~= nil then
+		const clone = boardPart:Clone()
+		for _, child in clone:GetChildren() do
+			if not (child:IsA("SurfaceAppearance") or child:IsA("SpecialMesh") or child:IsA("Texture") or child:IsA("Decal")) then
+				child:Destroy()
+			end
+		end
+		clone.Name = "Prep_Mat"
+		clone.Anchored = true
+		clone.CanCollide = false
+		clone.CanQuery = false
+		clone.CanTouch = false
+		clone.CastShadow = true
+		clone.Massless = true
+		clone.Transparency = 0
+		clone.LocalTransparencyModifier = 0
+		clone.Parent = folder
+		mat = clone
+		matRotation = boardPart.CFrame.Rotation
+		matThickness = boardPart.Size.Y
+		const ignore: { Instance } = { folder, boardPart }
+		const character = Players.LocalPlayer.Character
+		if character ~= nil then
+			table.insert(ignore, character)
+		end
+		rayParams.FilterDescendantsInstances = ignore
+	end
+
+	-- Puts the mat under (x, z) and returns the Y of its top, where the bun base goes; `position` unchanged without a mat.
+	local function seat(position: Vector3): Vector3
+		const matPart = mat
+		if matPart == nil then
+			return position
+		end
+		local bench = benchFallback
+		const hit = workspace:Raycast(Vector3.new(position.X, benchFallback + 1.2, position.Z), Vector3.new(0, -2.4, 0), rayParams)
+		if hit ~= nil and math.abs(hit.Position.Y - benchFallback) <= 0.6 then
+			bench = hit.Position.Y
+		end
+		matPart.CFrame = CFrame.new(position.X, bench + matThickness / 2, position.Z) * matRotation
+		return Vector3.new(position.X, bench + matThickness, position.Z)
+	end
+
+	local anchorPos = seat(options.Anchor)
 	local baseCf = CFrame.new(anchorPos + up * rules.Lift) * orient
 	const closedHeight = BUN_HEIGHT * scale
 	const openHeight = 0.345 * scale
@@ -239,6 +305,58 @@ function BoardView.new(options: Options): View
 		end
 	end
 
+	-- the live progress ring around the bun: a ring of little beads that fill (Mustard) as the gesture goes on --------------------
+	const RING_BEADS = 40
+	const beads: { Part } = {}
+	local progress: number? = nil
+	local shownBeads = -1
+	for index = 1, RING_BEADS do
+		const bead = Instance.new("Part")
+		bead.Name = "ProgressBead"
+		bead.Shape = Enum.PartType.Ball
+		bead.Material = Enum.Material.Neon
+		bead.Anchored = true
+		bead.CanCollide = false
+		bead.CanQuery = false
+		bead.CanTouch = false
+		bead.CastShadow = false
+		bead.Transparency = 1
+		bead.Size = Vector3.one * 0.045 * scale
+		bead.Parent = folder
+		beads[index] = bead
+	end
+
+	local function placeBeads()
+		for index, bead in beads do
+			const angle = (index - 1) / RING_BEADS * math.pi * 2 - math.pi / 2
+			-- an ellipse a hand off the bun: wider than long
+			const local_ = Vector3.new(math.cos(angle) * BUN_LENGTH * scale * 0.62, 0.06, math.sin(angle) * BUN_WIDTH * scale * 0.95)
+			bead.Position = topFrame:PointToWorldSpace(local_)
+		end
+	end
+
+	local function paintBeads()
+		if progress == nil then
+			if shownBeads ~= -2 then
+				shownBeads = -2
+				for _, bead in beads do
+					bead.Transparency = 1
+				end
+			end
+			return
+		end
+		const lit = math.floor(math.clamp(progress, 0, 1) * RING_BEADS + 0.5)
+		if lit == shownBeads then
+			return
+		end
+		shownBeads = lit
+		for index, bead in beads do
+			const on = index <= lit
+			bead.Color = if on then Theme.Color.Mustard else Theme.Color.Cream
+			bead.Transparency = if on then 0.05 else 0.72
+		end
+	end
+
 	-- the knife -------------------------------------------------------------------------------------------------------------------
 	local knife: BasePart? = nil
 	local knifePose: CFrame? = nil
@@ -263,47 +381,6 @@ function BoardView.new(options: Options): View
 		clone.Parent = folder
 		knife = clone
 	end
-
-	-- the placeholder bin ----------------------------------------------------------------------------------------------------------
-	const binModel = Instance.new("Model")
-	binModel.Name = "Prep_PlaceholderBin"
-	const binSize = rules.Bin.Size
-	local binCf = CFrame.new(anchorPos + right * rules.Bin.Right + orient.ZVector * rules.Bin.Back) * orient
-	const binBody = Instance.new("Part")
-	binBody.Name = "Body"
-	binBody.Shape = Enum.PartType.Cylinder
-	binBody.Material = Enum.Material.SmoothPlastic
-	binBody.Color = Theme.Tone.Slate.Bottom
-	binBody.Size = Vector3.new(binSize * 1.1, binSize * 0.9, binSize * 0.9)
-	binBody.Anchored = true
-	binBody.CanCollide = false
-	binBody.CanQuery = true
-	binBody.CanTouch = false
-	binBody.CastShadow = false
-	binBody.Parent = binModel
-	const binLid = Instance.new("Part")
-	binLid.Name = "Lid"
-	binLid.Shape = Enum.PartType.Cylinder
-	binLid.Material = Enum.Material.SmoothPlastic
-	binLid.Color = Theme.Color.Mustard
-	binLid.Size = Vector3.new(binSize * 0.1, binSize * 1.0, binSize * 1.0)
-	binLid.Anchored = true
-	binLid.CanCollide = false
-	binLid.CanQuery = false
-	binLid.CanTouch = false
-	binLid.CastShadow = false
-	binLid.Parent = binModel
-	binModel.Parent = folder
-	local binShown = false
-
-	local function placeBin()
-		binCf = CFrame.new(anchorPos + right * rules.Bin.Right + orient.ZVector * rules.Bin.Back) * orient
-		binBody.CFrame = binCf * CFrame.new(0, binSize * 0.55, 0) * CFrame.Angles(0, 0, math.pi / 2)
-		binLid.CFrame = binCf * CFrame.new(0, binSize * 1.15, 0) * CFrame.Angles(0, 0, math.pi / 2)
-		binBody.Transparency = if binShown then 0 else 1
-		binLid.Transparency = if binShown then 0 else 1
-	end
-	placeBin()
 
 	-- the world's own objects, hidden locally -----------------------------------------------------------------------------------
 	const hidden: { Instance } = {}
@@ -339,6 +416,9 @@ function BoardView.new(options: Options): View
 		if options.Knife ~= nil and knife ~= nil then
 			hide(options.Knife)
 		end
+		if boardPart ~= nil and mat ~= nil then
+			hide(boardPart)
+		end
 		if hideRail then
 			const rail = options.SlotView("rail", options.RailFront)
 			if rail ~= nil and rail.Station ~= nil then
@@ -373,8 +453,6 @@ function BoardView.new(options: Options): View
 		Base = baseCf,
 		Scale = scale,
 		Orient = orient,
-		BinPart = binBody,
-		BinModel = binModel,
 	} :: any
 
 	-- Where the plate sits: the bun, the sausage, the toppings, the guide and the bin follow (the sauce segments are moved by the
@@ -383,14 +461,15 @@ function BoardView.new(options: Options): View
 	local goal: Vector3? = nil
 	local slideSpeed = 0
 
-	local function place(position: Vector3)
+	local function place(requested: Vector3)
+		const position = seat(requested)
 		const delta = position - anchorPos
 		anchorPos = position
 		baseCf = CFrame.new(anchorPos + up * rules.Lift) * orient
 		topFrame = CFrame.new(anchorPos + up * (rules.Lift + closedHeight)) * orient
 		plane.Frame = topFrame
 		placeDashes()
-		placeBin()
+		placeBeads()
 		if sausage ~= nil and sausageMode ~= "None" then
 			sausage:PivotTo(sausageCf(sausageUv))
 		end
@@ -409,8 +488,9 @@ function BoardView.new(options: Options): View
 			place(position)
 			return
 		end
-		goal = position
-		slideSpeed = (position - anchorPos).Magnitude / time
+		-- the slide runs flat: the Y follows the bench under the mat (`place`)
+		goal = Vector3.new(position.X, anchorPos.Y, position.Z)
+		slideSpeed = (goal - anchorPos).Magnitude / time
 	end
 
 	function self.Anchor(_: any): Vector3
@@ -419,12 +499,6 @@ function BoardView.new(options: Options): View
 
 	function self.SetMoved(_: any, fn: ((delta: Vector3) -> ())?)
 		moved = fn
-	end
-
-	function self.SetBinVisible(_: any, on: boolean)
-		binShown = on
-		placeBin()
-		binBody.CanQuery = on
 	end
 
 	function self.Bun(_: any): BunState
@@ -471,7 +545,8 @@ function BoardView.new(options: Options): View
 		else
 			swapBun(closed, open, animate and previous == "Closed")
 			if animate and previous == "Closed" then
-				Fx.Burst(topFrame.Position, "Dust", rules.Crumbs, Theme.Color.Cream)
+				options.Juice():Burst("Crumbs", topFrame.Position + up * 0.1, rules.Crumbs + 4)
+				options.Juice():Burst("Dust", topFrame.Position, 4, Theme.Color.Cream)
 			end
 		end
 	end
@@ -503,6 +578,7 @@ function BoardView.new(options: Options): View
 	end
 
 	function self.SetSausage(_: any, mode: "None" | "Ghost" | "Placed", uv: Vector2?)
+		const previousMode = sausageMode
 		sausageMode = mode
 		if uv ~= nil then
 			sausageUv = uv
@@ -521,6 +597,11 @@ function BoardView.new(options: Options): View
 		end
 		model:PivotTo(sausageCf(sausageUv))
 		setAlpha(model, if mode == "Ghost" then 0.6 else 0)
+		-- it snaps into the groove: a squash and stretch (spring) and a puff, once
+		if mode == "Placed" and previousMode ~= "Placed" then
+			options.Juice():Pop(model, 1.4)
+			options.Juice():Burst("Dust", model:GetPivot().Position, 4, Theme.Color.Cream)
+		end
 	end
 
 	function self.SetCarry(_: any, kind: "Sausage" | "Plate" | nil, point: Vector3?, snap: Vector2?)
@@ -553,7 +634,8 @@ function BoardView.new(options: Options): View
 		if snap ~= nil then
 			carryTarget = sausageCf(snap)
 		elseif point ~= nil then
-			carryTarget = CFrame.new(point + up * Content.Prep.Rules.World.Lift) * orient
+			-- the aim already lifted the point over the plane (Rules.World.Lift): the thing hangs ON the pointer ray, under the cursor
+			carryTarget = CFrame.new(point) * orient
 		end
 	end
 
@@ -586,25 +668,69 @@ function BoardView.new(options: Options): View
 			item.Model:ScaleTo(wanted)
 		end
 		poseTopping(key, item)
+		if grow >= 1 and (item :: any).Popped ~= true then
+			-- a topping that lands: it springs
+			(item :: any).Popped = true
+			options.Juice():Pop(item.Model, 1.2)
+			options.Juice():Burst("Sparks", item.Model:GetPivot().Position + up * 0.15, 4, Theme.Color.Cream)
+		end
 	end
 
 	function self.Close(_: any, done: () -> ())
 		closing = { T = 0, Done = done }
 	end
 
+	function self.SurfaceHeight(_: any, uv: Vector2): number
+		-- the sausage in the groove is a cylinder along the bun (X): its round back over the bun top, smoothly joined to the bun
+		const radius = SAUSAGE_THICK * 0.5 * scale
+		const axis = SAUSAGE_BASE * scale + radius - closedHeight
+		const across = (uv.Y - 0.5) * plane.Width
+		local sausageTop = -1
+		if sausageMode ~= "None" and math.abs(across) < radius then
+			sausageTop = axis + math.sqrt(radius * radius - across * across)
+		end
+		-- smooth max of the sausage and the bun top (0): no kink where the sauce leaves the sausage
+		const k = 0.04
+		return 0.5 * (sausageTop + math.sqrt(sausageTop * sausageTop + k * k))
+	end
+
+	function self.SetProgress(_: any, fraction: number?)
+		progress = fraction
+		if fraction == nil then
+			shownBeads = -1
+		end
+		if fraction ~= nil and shownBeads == -2 then
+			shownBeads = -1
+		end
+		paintBeads()
+	end
+
+	function self.TakeCarry(_: any): Model?
+		const model = carry
+		carry = nil
+		carryTarget = nil
+		carryPose = nil
+		carryKind = ""
+		hideRail = sausageMode == "Placed"
+		return model
+	end
+
 	function self.Burst(_: any, band: string)
 		const at = topFrame.Position + up * 0.4
+		options.Juice():Grade(band, at, self:BunModel(), nil)
+	end
+
+	function self.Celebrate(_: any, band: string)
+		const at = topFrame.Position + up * 0.5
+		const confetti = Content.Prep.Rules.World.Juice.Confetti
+		options.Juice():Burst("Confetti", at, (confetti :: any)[band] or 0)
 		if band == "Perfect" then
-			Fx.Burst(at, "Ready", 12, Theme.Color.Mustard)
-		elseif band == "Good" then
-			Fx.Burst(at, "Ready", 6, Theme.Color.Cream)
-		else
-			Fx.Burst(at, "Dust", 6)
+			options.Juice():Burst("Coins", at, 4)
 		end
 	end
 
 	function self.Dust(_: any)
-		Fx.Burst(topFrame.Position, "Dust", rules.Crumbs, Theme.Color.Cream)
+		options.Juice():Burst("Dust", topFrame.Position, rules.Crumbs, Theme.Color.Cream)
 	end
 
 	function self.Step(_: any, dt: number, _time: number)
@@ -708,11 +834,19 @@ function BoardView.new(options: Options): View
 			knife:Destroy()
 			knife = nil
 		end
-		binModel:Destroy()
 		closing = nil
 		swap = nil
+		for _, bead in beads do
+			bead:Destroy()
+		end
+		table.clear(beads)
+		if mat ~= nil then
+			mat:Destroy()
+			mat = nil
+		end
 	end
 
+	placeBeads()
 	return self :: View
 end
 

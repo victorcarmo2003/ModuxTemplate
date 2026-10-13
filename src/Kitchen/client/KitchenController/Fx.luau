@@ -198,6 +198,17 @@ end
 -- and drives it with Fx.SetSmoke.
 const SMOKE_RATE = 3
 const SMOKE_LIFETIME = 1.2
+-- Near camera (the focused prep mode looks at the grill from ~2.5 studs, 2026-10-12): the same puffs read as ONE dot there, so they
+-- grow, rise and come more often. Fx.SetNear flips every smoke emitter of the grill.
+const SMOKE_SIZE_FAR = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.2), NumberSequenceKeypoint.new(1, 0.7) })
+const SMOKE_SIZE_NEAR = NumberSequence.new({
+	NumberSequenceKeypoint.new(0, 0.35),
+	NumberSequenceKeypoint.new(0.4, 0.9),
+	NumberSequenceKeypoint.new(1, 1.6),
+})
+const SMOKE_NEAR_RATE = 2.2 -- x the rate
+const smokes: { [ParticleEmitter]: boolean } = {}
+local nearSmoke = false
 
 function Fx.Smoke(parent: Attachment): ParticleEmitter
 	const emitter = Instance.new("ParticleEmitter")
@@ -209,23 +220,42 @@ function Fx.Smoke(parent: Attachment): ParticleEmitter
 		NumberSequenceKeypoint.new(0.2, 0.7),
 		NumberSequenceKeypoint.new(1, 1),
 	})
-	emitter.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.2), NumberSequenceKeypoint.new(1, 0.7) })
+	emitter.Size = if nearSmoke then SMOKE_SIZE_NEAR else SMOKE_SIZE_FAR
 	emitter.Lifetime = NumberRange.new(SMOKE_LIFETIME, SMOKE_LIFETIME)
-	emitter.Speed = NumberRange.new(0.8, 1.2)
-	emitter.SpreadAngle = Vector2.new(10, 10)
+	emitter.Speed = if nearSmoke then NumberRange.new(1.0, 1.6) else NumberRange.new(0.8, 1.2)
+	emitter.SpreadAngle = if nearSmoke then Vector2.new(18, 18) else Vector2.new(10, 10)
 	emitter.EmissionDirection = Enum.NormalId.Top
 	emitter.Rotation = NumberRange.new(0, 360)
 	emitter.RotSpeed = NumberRange.new(-20, 20)
 	emitter.Enabled = false
 	emitter.Parent = parent
 	live[emitter] = 0
+	smokes[emitter] = true
 	return emitter
+end
+
+-- The camera is close to the grill (true: the prep mode is up) or far again: size, speed and spread of every smoke emitter.
+function Fx.SetNear(on: boolean)
+	if nearSmoke == on then
+		return
+	end
+	nearSmoke = on
+	for emitter in smokes do
+		if emitter.Parent == nil then
+			smokes[emitter] = nil
+			continue
+		end
+		emitter.Size = if on then SMOKE_SIZE_NEAR else SMOKE_SIZE_FAR
+		emitter.Speed = if on then NumberRange.new(1.0, 1.6) else NumberRange.new(0.8, 1.2)
+		emitter.SpreadAngle = if on then Vector2.new(18, 18) else Vector2.new(10, 10)
+		emitter.Rate *= if on then SMOKE_NEAR_RATE else 1 / SMOKE_NEAR_RATE
+	end
 end
 
 -- busy = slots with a sausage on the rollers
 function Fx.SetSmoke(emitter: ParticleEmitter, busy: number)
 	const on = busy > 0 and not Fx.Low()
-	emitter.Rate = SMOKE_RATE * busy
+	emitter.Rate = SMOKE_RATE * busy * (if nearSmoke then SMOKE_NEAR_RATE else 1)
 	emitter.Enabled = on
 	live[emitter] = if on then math.ceil(SMOKE_RATE * busy * SMOKE_LIFETIME) else 0
 end

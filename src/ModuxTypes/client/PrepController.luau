@@ -5,9 +5,11 @@ local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local PlateView = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.PlateView)
 local PrepShell = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.PrepShell)
+local Beacon = require(StarterPlayer.StarterPlayerScripts.client.Prep.PrepController.Beacon)
 local Cursor = require(StarterPlayer.StarterPlayerScripts.client.Prep.PrepController.Cursor)
 local Gestures = require(StarterPlayer.StarterPlayerScripts.client.Prep.PrepController.Gestures)
 local Mock = require(StarterPlayer.StarterPlayerScripts.client.Prep.PrepController.Mock)
+local Pan = require(StarterPlayer.StarterPlayerScripts.client.Prep.PrepController.Pan)
 local Pointer = require(StarterPlayer.StarterPlayerScripts.client.Prep.PrepController.Pointer)
 local Poses = require(StarterPlayer.StarterPlayerScripts.client.Prep.PrepController.Poses)
 local Rig = require(StarterPlayer.StarterPlayerScripts.client.Prep.PrepController.Rig)
@@ -44,6 +46,7 @@ export type Public = {
 	Active: Vide.Source<boolean>,
 	Assist: Vide.Source<boolean>,
 	Badges: Vide.Source<{ [string]: number }>,
+	Beacon: Beacon.Beacon,
 	BoundNames: { string },
 	Cursor: Cursor.Cursor?,
 	CursorGui: ScreenGui?,
@@ -59,6 +62,8 @@ export type Public = {
 	Mock: boolean,
 	Needs: Vide.Source<{ [string]: boolean }>,
 	NextBeat: number,
+	Pan: Pan.Pan?,
+	PanNear: Vide.Source<number>,
 	PlateMask: number,
 	Pointer: Pointer.Pointer?,
 	PointerStops: { () -> () },
@@ -66,6 +71,7 @@ export type Public = {
 	PreviousContext: string,
 	Rig: Rig.Rig,
 	RigReleased: boolean,
+	RoofBody: BasePart?,
 	Saved: { [string]: any },
 	Shown: Vide.Source<boolean>,
 	SpareAt: number,
@@ -76,8 +82,11 @@ export type Public = {
 	Tab: Vide.Source<string>,
 	ToastId: number,
 	Toasts: Vide.Source<Toast | false>,
+	Trail: Poses.Trail?,
+	TrailStation: number,
 	Unmount: (() -> ())?,
 	UnmountCursor: (() -> ())?,
+	Veil: ScreenGui?,
 	View: View,
 	Vignette: Vide.Source<boolean>,
 	Setup: (self: Public) -> (),
@@ -89,6 +98,7 @@ export type Public = {
 	StageOf: (self: Public, tab: string?) -> Stage.Stage?,
 	Stage3DOf: (self: Public, tab: string?) -> Stage.Stage3D?,
 	Armed: (self: Public, tab: string) -> boolean,
+	CoachKeyOf: (self: Public, tab: string) -> string,
 	HintOf: (self: Public, tab: string) -> string,
 	NextOf: (self: Public, tab: string) -> Stage.Next,
 	EnterStage: (self: Public, tab: string) -> (),
@@ -107,17 +117,25 @@ export type Public = {
 	OnPick: (self: Public, key: string) -> (),
 	CancelGestures: (self: Public) -> (),
 	PressNext: (self: Public) -> (),
-	Trash: (self: Public) -> (),
+	Trash: (self: Public, from: string?, slot: number?) -> (),
 	CycleTicket: (self: Public) -> (),
 	Broadcast: (self: Public, event: any) -> (),
 	SendTab: (self: Public) -> (),
 	OnResult: (self: Public, result: any) -> (),
 	Notice: (self: Public, reason: string) -> (),
+	HideRoof: (self: Public, on: boolean) -> (),
 	Isolate: (self: Public, on: boolean) -> (),
 	Bind: (self: Public, on: boolean) -> (),
 	Mount: (self: Public) -> (),
 	Unmounted: (self: Public) -> (),
 	Enter: (self: Public, station: number, mock: boolean?, tab: string?) -> boolean,
+	CameraOptions: (self: Public, pose: Poses.Pose, dof: boolean, reduced: boolean) -> any,
+	Blink: (self: Public, cut: () -> ()) -> (),
+	BuildTrail: (self: Public, station: number) -> (),
+	StopOf: (self: Public, tab: string?) -> number,
+	PanSync: (self: Public) -> (),
+	PanCommit: (self: Public, index: number) -> (),
+	BuildPan: (self: Public, pointer: Pointer.Pointer) -> (),
 	MoveTo: (self: Public, station: number) -> (),
 	Leave: (self: Public, reason: string, forced: boolean?, fromServer: boolean?) -> (),
 	Finish: (self: Public, takeover: boolean) -> (),

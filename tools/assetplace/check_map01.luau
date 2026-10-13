@@ -1410,8 +1410,10 @@ local function checkWave3(points: { [string]: Instance }, vehicles: { [string]: 
 				if switch then
 					local d = (pos(i) - pos(switch)).Magnitude
 					local dy = math.abs(pos(i).Y - pos(switch).Y)
+					-- 2026-10-12 (user decision): the shutter control moved next to the service window (east wall, trailer_door_switches);
+					-- the light switch keeps the open/close shop switch beside it. Only report a shutter that is far from the window.
 					if d > 4 or dy > 1 then
-						warn_(("Prompt_Shutter %.2f from Prompt_Switch (dy %.2f): MAP-01 §7.2 wants it next to the switch (~2.6, same height)"):format(d, dy))
+						info(("11: Prompt_Shutter %.2f from Prompt_Switch (dy %.2f): by design next to the service window since 2026-10-12"):format(d, dy))
 					end
 					info(("11: Prompt_Shutter at %s, %.2f from Prompt_Switch"):format(fmtV(pos(i)), d))
 				end

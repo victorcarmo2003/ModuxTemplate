@@ -3206,3 +3206,94 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
   - Texto da ligação e do panfleto troca "cart" por "trailer" (DEC-224).
   - A direção "direita/esquerda" é a da câmera de quem caminha; o level-designer fixa os pontos no place (calçada em frente ao Pad: borda Z ~31,5, poste `P-01` em torno de X 13–23, Z 22–27).
 - Impacto: **level-designer** (MAP-01 §11.1: `CutsceneMark1..4`, novo ponto de partida), **frontend-coder** (`Content.Cutscenes`, `Director`, `Ambience`: tirar planos de rua e carro; duração), **narrative-writer** (`script.md` §1, panfleto), **qa-tester** (intro sem carro, ≤ 35 s, pulável).
+
+### DEC-226 — 2026-10-12 — Grelha de BARRAS no lugar do roller grill (8 vagas mantidas; a salsicha vira, não rola)
+
+- Origem: decisão do dono (2026-10-12), no pedido de polimento do fluxo do hot dog; registrada a pedido do orquestrador (o secretário confere).
+- Decidido pelo dono: trocar o **roller grill** por uma grelha de **barras**; as **8 vagas** ficam; a salsicha fica **deitada sobre as barras** e **VIRA** (giro de 180 graus com salto), não rola.
+- **Emendas (append-only):** `tech/prep-3d.md` §3.2 ("as 8 posições reais dos roletes", "rolete") e `art/asset-list.md` (AST-012 deixa de ser a grelha do preparo; o modelo novo é **AST-120**, outra tarefa).
+- **Provisório** (inferido; art-director e level-designer validam): enquanto AST-120 não entra, a grelha é um **placeholder de Parts** (`World/GrillRig`: chapa escura, barras Neon do cinza ao laranja com o calor, bandeira de pingos, `Base`/`Frame`/`Bar_n`/`Tray`/`Burner`/`Flame` com os nomes do modelo), `Rules.World.Rig.Placeholder = false` devolve o roller; o rolete do trailer fica escondido só no cliente enquanto o modo roda. A troca final é só de modelo (pivô do virar `Slots.FlipCenter`, hitboxes `GrillSlot:n`, âncora de câmera `CamAnchor`/`Focus` não mudam); as vagas seguem as `Att_Slot` do mapa até o mapa ser refeito com a grade 2x4 do AST-120.
+- Impacto: **level-designer** (mapa com o AST-120 e `Slot_n`), **modeler-3d** (AST-120), **frontend-coder** (`GrillRig`, `GrillView`).
+
+### DEC-227 — 2026-10-12 — Lixeira por ARRASTO: aceita o prato e a salsicha (grelha e trilho); visível em toda vista com algo para arrastar
+
+- Origem: decisão do dono (2026-10-12); registrada a pedido do orquestrador.
+- Decidido pelo dono: a lixeira é **alvo de arrasto** e aceita o **prato** E a **salsicha** (da grelha ou do trilho); fica **visível em toda vista** com item arrastável, no **canto inferior esquerdo** do quadro, alvo >= 44 px; ao passar o item a **tampa abre**, o item **encolhe e cai**, com som e poeira.
+- **Emendas:** `tech/prep-3d.md` §3.4 (a lixeira só na vista Toppings e o botão 2D como reserva) e `prep-mode.md` (`PrepTrash` sem campos). `PrepTrash` ganha `From` (`Plate`, `Grill`, `Rail`) e `Slot` (1..8); `PrepResult` Act = Trash devolve `Value` = índice de `From` - 1.
+- **Provisório:** "bin virtual por vista" (`World/Bin`): clone local ancorado ao quadro da vista (a lixeira real do trailer fica atrás da câmera), hitbox 0,8 stud (o `Targets` garante 44 px). O servidor valida e limita (`Rates.Trash = 4/s`): uma salsicha do trilho que o prato aberto ainda precisa (a última) não é jogada (`Busy`); a salsicha alterada (ANM-002) nunca. A unidade que saiu do estoque se perde (sem reembolso). Teste: `/dev prep kitchen` 9c (62/62).
+- Impacto: **backend-coder** (`Grill.Discard`, `Rail.DiscardAt`, `Plate.TrashSausage`, `PrepService:TrashSausage`), **frontend-coder** (`World/Bin`, estágios Grill, Build e Serve).
+
+### DEC-228 — 2026-10-12 — Tutorial de ARRASTO: mão fantasma 3D, uma vez por estação por sessão
+
+- Origem: decisão do dono (2026-10-12); registrada a pedido do orquestrador.
+- Decidido pelo dono: uma **mão fantasma 3D** (Parts, sem malha nova) repete em laço curto o gesto da seção (Grill: caixa -> vaga livre; Board: faca no traço; Toppings: tigela -> pão; Serve: prato -> janela) com **uma linha de dica** em inglês que deixa claro que é preciso **ARRASTAR**; some na **primeira ação correta** ou no **primeiro PointerDown**; aparece **1x por estação POR SESSÃO** (flag só no client, sem persistência, sem mexer no Profile).
+- **Provisório:** `World/Coach` (encaixe da TASK-209); textos em `Content.Prep.Texts.Coach`; números em `Rules.World.Coach`. Responde `Q-229` (arrastar).
+- Impacto: **frontend-coder**, **narrative-writer** (revisa os textos).
+
+### DEC-229 — 2026-10-12 — Dopamina ALTA no preparo e molho/guias naturais com progresso ao vivo
+
+- Origem: decisão do dono (2026-10-12); registrada a pedido do orquestrador.
+- Decidido pelo dono: (a) **dopamina alta**: pousar a salsicha (pop + poeira), virar Perfect (faíscas Mustard, flash, "PERFECT" flutuante, tom subindo; Good mais leve), salsicha pronta ao trilho (arco + vapor), corte do pão (migalhas), snap da salsicha no pão (mola), topping completo (brilho por precisão), selo final (confete por faixa + contador de nota 0 -> N em 0,6 s), serve (moedas) e contador de Perfects seguidos (chip pequeno); respeitando movimento reduzido e o orçamento (150 partículas globais, 12 Highlights) com **orçamento próprio do preparo**; (b) **molho e linhas-guia naturais**: linha contínua suave (pontos suavizados, tubos com juntas, espessura variável, brilho), alinhada à superfície do pão, guias suaves com tracejado animado discreto, e **progresso em tempo real** (anel que enche enquanto se arrasta, não só ao fim).
+- **Provisório:** módulo `World/Juice` (`Rules.World.Juice`: 120 partículas, 6 emissores, 3 Highlights reservados), `Strokes` com Catmull-Rom + juntas esféricas + curva da salsicha (`BoardView:SurfaceHeight`), anel de progresso (`BoardView:SetProgress`). Sem `EditableMesh` (TASK-218 continua opcional). Não muda `Grade`.
+- Impacto: **frontend-coder**, **modeler-3d** (efeitos finais), **audio** (tons em `grill_ready`/`coin`).
+
+### DEC-230 — 2026-10-12 — Entrega do hot dog por Tool + ProximityPrompt, sem a aba Serve
+
+- Origem: decisão do dono (2026-10-12); registrada a pedido do orquestrador (o secretário confere).
+- Decidido pelo dono: o prato pronto vira uma **Tool** na mão e a entrega ao cliente é pelo **ProximityPrompt** do balcão (`serve`), como no fluxo normal; a **aba Serve** do modo de preparo **sai**.
+- **Emenda (append-only):** `tech/prep-mode.md` e `tech/prep-3d.md` (aba Serve e "prato até a janela") e a DEC-223 no ponto da entrega.
+- **Provisório:** número de abas, `Tabs` e o prompt de entrega ficam com o agente de client do preparo (TASK-232); o servidor segue validando a entrega.
+- Impacto: **frontend-coder**, **backend-coder** (`PrepService`), **narrative-writer** (textos do tutorial).
+
+### DEC-231 — 2026-10-12 — Lixeira do preparo como ZONA de UI 2D
+
+- Origem: decisão do dono (2026-10-12); registrada a pedido do orquestrador.
+- Decidido pelo dono: a lixeira do preparo é uma **zona de UI 2D** (alvo de arrasto na tela, alvo >= 44 px), não um objeto 3D por vista.
+- **Emenda:** DEC-227 no ponto "bin virtual por vista" (`World/Bin`): fica a regra de aceitar prato e salsicha (grelha e trilho); muda onde mora (UI 2D) e como é desenhada.
+- **Provisório:** posição, animação e som da zona (TASK-233).
+- Impacto: **frontend-coder**.
+
+### DEC-232 — 2026-10-12 — Navegação do preparo por PAN contínuo + pontinhos
+
+- Origem: decisão do dono (2026-10-12); registrada a pedido do orquestrador.
+- Decidido pelo dono: a navegação entre seções do preparo é por **pan contínuo** (arrastar o mundo) com **pontinhos** indicando a seção; as abas de rodapé saem.
+- **Emenda:** `tech/prep-3d.md` (abas inferiores) e `Content.Prep.Tabs`.
+- **Provisório:** sensibilidade, inércia e encaixe (TASK-234).
+- Impacto: **frontend-coder**, **level-designer** (alinhamento das seções).
+
+### DEC-233 — 2026-10-12 — Condimento: SELECIONAR, depois ARRASTAR
+
+- Origem: decisão do dono (2026-10-12); registrada a pedido do orquestrador.
+- Decidido pelo dono: o condimento (ketchup, mostarda e afins) é **selecionado primeiro** (toque no frasco) e **depois arrastado** sobre o pão; o arrasto já começando no frasco deixa de ser o gesto.
+- **Emenda:** DEC-228 (texto da mão fantasma do molho) e `Content.Prep.Gestures` do molho.
+- **Provisório:** estado "selecionado" e seu destaque (TASK-235). Não muda `Grade` nem as tolerâncias.
+- Impacto: **frontend-coder**.
+
+### DEC-234 — 2026-10-12 — Ticket em CAMADAS com arte 2D nova
+
+- Origem: decisão do dono (2026-10-12); registrada a pedido do orquestrador.
+- Decidido pelo dono: o ticket do preparo é montado em **camadas** (papel, cabeçalho, linhas, carimbo) com **arte 2D nova**, original do projeto; o ticket atual de Frames sai.
+- **Provisório:** as camadas e a arte (TASK-236); a arte segue o `style-guide.md` (Cream, Mustard, Ink) e entra com crédito em `art/credits.md` se houver terceiros.
+- Impacto: **frontend-coder**, **art-director**.
+
+### DEC-235 — 2026-10-12 — Calendário: Dia 1 de dia (tutorial + dia real); do Dia 2 em diante SÓ NOITE
+
+- Origem: decisão do dono (2026-10-12); registrada a pedido do orquestrador.
+- Decidido pelo dono: o **Dia 1** é um turno de **dia de verdade** (tutorial e o resto do dia) e, **a partir do Dia 2, só há noites, para sempre**; não existem mais turnos de dia depois do Dia 1.
+- **Emenda (append-only):** a sequência "D1, D2, N1, D3, N2 ... D11, N10" do Q-207 (`RunParams`, `data.md` §3.3) vira **D1, N1 (Dia 2), N2 (Dia 3) ... N10 (Dia 11), Finale**. O contador `Day` segue subindo 1 por turno (desbloqueios, fases de pedido e crescimento leem `Day`), então a noite k é sempre o Dia k + 1. `RunParams.NightsFromDay` sai; `Flow.Next` e `Flow.OfDay` (RoundService) são a fonte.
+- **Efeitos colaterais conhecidos (Provisório):** ligações do chefe `DayPrep` (Dia 2 e `call_day_after_k`) nunca tocam; a variante Quentin do dia seguinte e o ladrão diurno só valem no Dia 1; as fases de pedido `day_2_3`..`day_6_plus` ficam sem uso (a fase `night` vale); a oferta do trailer e o pad de mesas dependem do `Day`, não de um turno de dia; `/dev day n` (n >= 2) entra na Noite n - 1.
+- Impacto: **backend-coder** (`RoundService`, `Flow`), **game-designer** (revisar chamadas, pedidos e economia por noite).
+
+### DEC-236 — 2026-10-12 — Relógio e clientes CONGELADOS durante o tutorial do Dia 1
+
+- Origem: decisão do dono (2026-10-12); registrada a pedido do orquestrador.
+- Decidido pelo dono: enquanto o tutorial do Dia 1 está em andamento, o **relógio do turno fica parado** (Prep e Open) e **nenhum cliente comum chega**; ao terminar (ou pular) o tutorial, o dia segue de onde parou.
+- **Provisório:** `RoundService:SetClockHold` e `CustomerService:SetSpawnHold`, registrados pelo `TutorialService` (`ShouldHold`): vale para todos no co-op enquanto algum novato ainda estiver no tutorial; teto de segurança `Content.Shift.TutorialHoldMax` = 600 s (jogador parado não trava o servidor); solta ao concluir, pular ou sair.
+- Impacto: **backend-coder**; teste: Dia 1 no Studio (relógio parado, depois andando).
+
+### DEC-237 — 2026-10-12 — Interruptor do shutter movido e redesenhado
+
+- Origem: decisão do dono (2026-10-12); registrada a pedido do orquestrador.
+- Decidido pelo dono: o controle da **janela de serviço** (`shutter_toggle`, DEC-221) sai do bloco amarelo ao lado do interruptor de luz e vai para **perto da janela de serviço**, com **design melhor**: caixa de comando de parede coerente com os outros interruptores (Steel, ícone Cream com três frestas Mustard, alavanca Mustard, lâmpada Teal), peças simples; o interruptor de **abrir/fechar a loja** (`open_sign`) ocupa o lugar do bloco amarelo, ao lado do da luz.
+- **Provisório:** posição na parede leste do trailer (x -32,5; y 4,9; z 12,6), feita por `tools/assetplace/trailer_door_switches.luau` (idempotente, atributo `MovedBy`). A porta dos fundos abre pelo prompt (Door_Back com `ScriptedDoor`, dobradiça a oeste, 80 graus; `Prompt_ExitTrailer` autoral).
+- Impacto: **level-designer**, **modeler-3d** (se a caixa virar malha).

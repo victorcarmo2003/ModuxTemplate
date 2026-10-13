@@ -37,26 +37,39 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local StarterGui = game:GetService("StarterGui")
+local TweenService = game:GetService("TweenService")
+local CollectionService = game:GetService("CollectionService")
 local StarterPlayer = game:GetService("StarterPlayer")
 local TextChatService = game:GetService("TextChatService")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
+local Objective = require(StarterPlayer.StarterPlayerScripts.client.Interface.Objective)
+local Zones = require(StarterPlayer.StarterPlayerScripts.client.Interface.Zones)
 local Motion = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Motion)
 local PlateView = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.PlateView)
 local PrepShell = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.PrepShell)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
 local TicketRail = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.TicketRail)
+local KitchenFx = require(StarterPlayer.StarterPlayerScripts.client.Kitchen.KitchenController.Fx)
+local KitchenSlots = require(StarterPlayer.StarterPlayerScripts.client.Kitchen.KitchenController.Slots)
+local Beacon = require(script.Beacon)
 local Cursor = require(script.Cursor)
 local Feed = require(script.Feed)
+local Grade = require(ReplicatedStorage.shared.Prep.Grade)
+local Session = require(script.Stages.Build.Session)
 local Gestures = require(script.Gestures)
 local Mock = require(script.Mock)
+local Pan = require(script.Pan)
 local Parts = require(script.Parts)
 local Pointer = require(script.Pointer)
 local Poses = require(script.Poses)
 local Rig = require(script.Rig)
 local Stage = require(script.Stage)
 local World = require(script.World)
+local BinZone = require(script.World.BinZone)
+local Director3D = require(script.World.Director3D)
+local Zones = require(StarterPlayer.StarterPlayerScripts.client.Interface.Zones)
 
 const create = Vide.create
 const source = Vide.source
@@ -194,11 +207,22 @@ function PrepController:Setup()
 	self.List3D = {} :: { Stage.Stage3D }
 	-- the NPC at the counter that the Window view must not cut (Rig:SetSpared), re-judged at 4 Hz
 	self.SpareAt = 0 :: number
+	-- the Ink veil of a blink (PrepController:Blink), nil when none
+	self.Veil = nil :: ScreenGui?
+	-- the pulsing marker over the Work prompts for a player who has not entered yet (P-3)
+	self.Beacon = Beacon.new() :: Beacon.Beacon
 	self.Pointer = nil :: Pointer.Pointer?
 	self.Gestures = nil :: Gestures.Recogniser?
 	self.Cursor = nil :: Cursor.Cursor?
 	self.Rig = Rig.new() :: Rig.Rig
 	self.Pose = nil :: Poses.Pose?
+	-- the pan along the stations (Pan.luau; Rules.ThreeD only): the trail of the seat, the pan, and the dot it lights while it moves
+	-- (0 = the dot of the current tab)
+	self.Trail = nil :: Poses.Trail?
+	self.TrailStation = 0 :: number
+	self.Pan = nil :: Pan.Pan?
+	self.RoofBody = nil :: BasePart?
+	self.PanNear = source(0) :: Vide.Source<number>
 	self.Unmount = nil :: (() -> ())?
 	self.Gui = nil :: ScreenGui?
 	self.CursorGui = nil :: ScreenGui?
@@ -268,6 +292,10 @@ function PrepController:LoadStages()
 		if not child:IsA("ModuleScript") then
 			continue
 		end
+		-- Rules.Delivery = "Prompt": the delivery is the customer's world prompt, the Serve stage stays unloaded (rollback: "Window")
+		if rules.Delivery == "Prompt" and child.Name == "Serve" then
+			continue
+		end
 		const ok, value = pcall(require, child)
 		if not ok then
 			warn(`[PrepController] Stages/{child.Name} failed to load: {value}`)
@@ -306,6 +334,9 @@ function PrepController:Load3DStages()
 	end
 	for _, child in (folder :: Instance):GetChildren() do
 		if not child:IsA("ModuleScript") then
+			continue
+		end
+		if rules.Delivery == "Prompt" and child.Name == "Serve" then
 			continue
 		end
 		const ok, value = pcall(require, child)
@@ -363,8 +394,18 @@ function PrepController:Armed(tab: string): boolean
 	return self:Stage3DOf(tab) ~= nil
 end
 
+-- The section a tab teaches in the drag tutorial (Texts.Coach key).
+function PrepController:CoachKeyOf(tab: string): string
+	return if tab == "Build" then "Board" else tab
+end
+
 -- One line of hint / the corner button of a tab, from its 3D stage when armed, else from the 2D one.
 function PrepController:HintOf(tab: string): string
+	-- the drag tutorial speaks first while its hand is on screen (both sources are read: the binding depends on both)
+	const coachLine, coachTab = World.CoachLine(), World.CoachTab()
+	if coachLine ~= "" and coachTab == self:CoachKeyOf(tab) then
+		return coachLine
+	end
 	const stage3D = self:Stage3DOf(tab)
 	if stage3D ~= nil then
 		return stage3D.Hint(self)
@@ -476,6 +517,7 @@ function PrepController:SetTab(wanted: string)
 			end
 		end
 	end
+	self:PanSync()
 	self:EnterStage(tab)
 	self:SendTab()
 end
@@ -607,15 +649,24 @@ function PrepController:PressNext()
 	end
 end
 
--- The bin: the plate goes (the server drops its bun and sausage on PrepTrash).
-function PrepController:Trash()
+-- The bin by drag. From = "Plate" (default): the plate goes (the server drops its bun and sausage on PrepTrash). "Grill" / "Rail": a
+-- sausage of that roller / the front of the rail is thrown (Slot 1..8); the stage predicts it and listens to PrepResult Act = Trash
+-- with Value 1 (grill) or 2 (rail).
+function PrepController:Trash(from: string?, slot: number?)
+	const origin = from or "Plate"
+	if origin ~= "Plate" then
+		if not self.Mock then
+			self.Libs.Net.PrepTrash:fireServer({ From = origin, Slot = math.clamp(math.floor(slot or 1), 1, 8) })
+		end
+		return
+	end
 	const had = untrack(self.View.Bun) ~= "None"
 	self:ResetPlate()
 	self:SetStage("grill")
 	if had then
-		self:Toast("Plate trashed", "Info")
+		self:Toast(prep.Texts.Trashed, "Info")
 		if not self.Mock then
-			self.Libs.Net.PrepTrash:fireServer()
+			self.Libs.Net.PrepTrash:fireServer({ From = "Plate", Slot = 0 })
 		end
 	end
 end
@@ -660,7 +711,9 @@ function PrepController:OnResult(result: any)
 		self:Notice(result.Reason)
 		return
 	end
-	if not result.Ok then
+	-- a sausage thrown by drag (Trash with a Value) is answered by its stage, with its own words
+	const sausageTrash = result.Act == "Trash" and result.Value ~= 0
+	if not result.Ok and not sausageTrash then
 		self:Notice(result.Reason)
 	end
 	self:Broadcast({ Kind = "Result", Result = result })
@@ -693,6 +746,21 @@ end
 
 -- Isolation: what is hidden while the mode is up, and what must come back (nothing is left hidden by an error: Finish runs
 -- in every way out).
+-- The roof of the trailer (the `Body` mesh) is above the camera of the overhead views (about 11 studs, the roof is at 9.7): it is
+-- hidden LOCALLY while the mode is up (LocalTransparencyModifier, never Transparency) and given back on the way out. The walls go
+-- with it: seen from above the room is a cutaway, the counters, floor and fixtures are their own parts and stay.
+function PrepController:HideRoof(on: boolean)
+	const previous = self.RoofBody
+	if not on then
+		if previous ~= nil and previous.Parent ~= nil then
+			previous.LocalTransparencyModifier = 0
+		end
+		self.RoofBody = nil
+		return
+	end
+	-- (the walls give the room its ambience: the Body stays visible, the camera of the views sits under the roof instead)
+end
+
 function PrepController:Isolate(on: boolean)
 	const saved = self.Saved
 	const playerGui = Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
@@ -845,6 +913,29 @@ function PrepController:Mount()
 		return tab == "Build" or tab == "Board" or tab == "Toppings"
 	end
 	const unmount, gui = Vide.root(function(): ScreenGui
+		-- the tutorial step lives in the progress card of the minimal shell while it is on screen (Objective): one card, not two
+		Vide.effect(function()
+			Objective.SetHosted(self.Active() and self.Shown() and self:Armed(self.Tab()))
+		end)
+		-- the world cooking bars of the slots would be a dark copy of what the 3D grill already shows
+		Vide.effect(function()
+			KitchenSlots.SetBarsHidden(self.Active())
+		end)
+		-- the 2D bin zone of the shell reads the state the world keeps (BinZone); the shell tells it where the zone is
+		const binWanted = Vide.source(BinZone.Wanted())
+		const binOver = Vide.source(BinZone.Over())
+		const binChomp = Vide.source(BinZone.Chomp())
+		const stopBin = BinZone.Subscribe(function()
+			binWanted(BinZone.Wanted())
+			binOver(BinZone.Over())
+			binChomp(BinZone.Chomp())
+		end)
+		Vide.cleanup(function()
+			stopBin()
+			BinZone.Bind(nil, nil)
+			Objective.SetHosted(false)
+			KitchenSlots.SetBarsHidden(false)
+		end)
 		return create("ScreenGui")({
 			Name = "Prep",
 			ResetOnSpawn = false,
@@ -878,6 +969,10 @@ function PrepController:Mount()
 				Minimal = function(): boolean
 					return self:Armed(self.Tab())
 				end,
+				-- the dots light the section the camera is nearest to while it pans
+				Near = self.PanNear,
+				DotSize = rules.Camera.Pan.Dots.Size,
+				DotActive = rules.Camera.Pan.Dots.Active,
 				Progress = {
 					Label = function(): string
 						const row = prep.Tabs.ByKey[self.Tab()]
@@ -894,6 +989,19 @@ function PrepController:Mount()
 				SealLabel = function(grade: PlateView.Grade): string
 					return prep.Grades.Labels[grade]
 				end,
+				-- the number that rolls 0 -> N under the seal: the mean of the stage scores of this plate (a preview)
+				SealScore = function(): number
+					return Session.Note()
+				end,
+				-- the live grade of the plate on the progress card, and the Perfects in a row
+				Note = function(): PrepShell.Note?
+					if Session.Counted() == 0 then
+						return nil
+					end
+					const mean = Session.Note()
+					return { Score = mean, Grade = Grade.Band(prep, mean) }
+				end,
+				Streak = World.Streak,
 				Pad = function(): boolean
 					return self.Dependencies.InputController.Device() == "Gamepad"
 				end,
@@ -924,6 +1032,13 @@ function PrepController:Mount()
 						self:Trash()
 					end,
 				},
+				Bin = {
+					Wanted = binWanted,
+					Over = binOver,
+					Chomp = binChomp,
+					Label = "Bin",
+					Bind = BinZone.Bind,
+				},
 				Assist = {
 					Label = prep.Texts.Assist,
 					On = self.Assist,
@@ -953,6 +1068,9 @@ function PrepController:Mount()
 							Queue = self.View.Queue,
 							Strip = function(): boolean
 								return layout().TicketStrip
+							end,
+							Roomy = function(): boolean
+								return layout().Kind == "Desktop"
 							end,
 							-- the customer at the counter waits to be taken (TASK-206): the Take of the ticket rail
 							Take = {
@@ -999,6 +1117,15 @@ function PrepController:Mount()
 				},
 				Shown = self.Shown,
 				Vignette = self.Vignette,
+				Objective = Objective.Card,
+				OnSkip = Objective.Skip,
+				Reserved = function(): { Zones.Zone }
+					const list: { Zones.Zone } = {}
+					for _, zone in Zones.All() do
+						table.insert(list, zone)
+					end
+					return list
+				end,
 			}),
 		}) :: ScreenGui
 	end)
@@ -1106,15 +1233,7 @@ function PrepController:Enter(station: number, mock: boolean?, tab: string?): bo
 
 	const reduced = Motion.Reduced()
 	const dof = dofAllowed()
-	const travel = if reduced then 0 else rules.Camera.Travel
-	camera:Prep(true, pose.Frame, {
-		Fov = pose.Fov,
-		Travel = travel,
-		Dof = dof,
-		Focus = rules.Camera.Distance,
-		Radius = 0.4,
-		Far = 0.7,
-	})
+	camera:Prep(true, pose.Frame, self:CameraOptions(pose, dof, reduced))
 	if untrack(camera.Mode) ~= "Prep" then
 		if not mock then
 			self.Libs.Net.PrepLeave:fireServer()
@@ -1128,6 +1247,8 @@ function PrepController:Enter(station: number, mock: boolean?, tab: string?): bo
 	self.RigReleased = false
 	self.Forced = false
 	self.Pose = pose
+	self.TrailStation = 0
+	self:BuildTrail(station)
 	self.Vignette(not dof)
 	self.Shown(false)
 	self.Tab(startTab)
@@ -1140,6 +1261,7 @@ function PrepController:Enter(station: number, mock: boolean?, tab: string?): bo
 	self.Station(station)
 	self.Active(true)
 
+	self:HideRoof(true)
 	self:Isolate(true)
 	const input = self.Dependencies.InputController
 	self.PreviousContext = input.Context
@@ -1160,8 +1282,10 @@ function PrepController:Enter(station: number, mock: boolean?, tab: string?): bo
 		end
 	end))
 	self:Bind(true)
+	self:BuildPan(pointer)
 	-- a stage that errors while the UI is built must never leave the player seated and frozen without a UI: give the seat
 	-- back and warn (the Output has the cause)
+	const viewFrame, viewFov, viewDistance = pose.Frame, pose.Fov, (pose.Frame.Position - pose.Focus).Magnitude
 	const mounted, mountError = pcall(function()
 		self:Mount()
 		-- the 3D layer (raycast, targets, marker; inert while Rules.ThreeD is false, `/dev prep ray` aside) and the stage in front
@@ -1170,6 +1294,16 @@ function PrepController:Enter(station: number, mock: boolean?, tab: string?): bo
 			self:OnAim(message)
 		end)
 		World.SetAssist(untrack(self.Assist))
+		World.SetAudio(function(key: string, at: Vector3?, speed: number?)
+			if Content.Sounds.ByKey[key] == nil then
+				return
+			end
+			pcall(function()
+				((self.Dependencies.KitchenController :: any).Dependencies.AudioController):Play(key, at, if speed ~= nil then { Speed = speed } else nil)
+			end)
+		end)
+		World.SetView(viewFrame, viewFov, viewDistance)
+		KitchenFx.SetNear(true)
 		World.Enter(station, pointer)
 		-- the 2D Order stage starts the Feed (the shared picture of the line and the grill), whatever tab opens first; it is not a
 		-- tab of the 3D set, but its module stays loaded for that
@@ -1196,22 +1330,201 @@ function PrepController:Enter(station: number, mock: boolean?, tab: string?): bo
 	return true
 end
 
+-- What the camera glides to for a pose: the point looked at, the field of view and the depth of field of THAT view (the focus
+-- distance and the radius follow the distance to the plate, they are not one number for every view). The glide lasts between
+-- Rules.Camera.Min and Max by distance; reduced motion cuts.
+function PrepController:CameraOptions(pose: Poses.Pose, dof: boolean, reduced: boolean): any
+	const focus = (pose.Frame.Position - pose.Focus).Magnitude
+	return {
+		Fov = pose.Fov,
+		Travel = if reduced then 0 else rules.Camera.Max,
+		Min = rules.Camera.Min,
+		Look = pose.Focus,
+		Dof = dof,
+		Focus = focus,
+		Radius = math.max(0.4, focus * 0.28),
+		Far = 0.7,
+	}
+end
+
+-- A cut with a blink (reduced motion, forced exits): an Ink veil comes over the screen in Rules.Camera.Fade s, `cut` runs behind it,
+-- the veil goes in the same time. Never two at once.
+function PrepController:Blink(cut: () -> ())
+	if self.Veil ~= nil then
+		cut()
+		return
+	end
+	const playerGui = Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+	if playerGui == nil then
+		cut()
+		return
+	end
+	const gui = Instance.new("ScreenGui")
+	gui.Name = "PrepVeil"
+	gui.ResetOnSpawn = false
+	gui.IgnoreGuiInset = true
+	gui.DisplayOrder = 60
+	const veil = Instance.new("Frame")
+	veil.Size = UDim2.fromScale(1, 1)
+	veil.BackgroundColor3 = Theme.Color.Ink
+	veil.BackgroundTransparency = 1
+	veil.BorderSizePixel = 0
+	veil.Parent = gui
+	gui.Parent = playerGui
+	self.Veil = gui
+	const fade = rules.Camera.Fade
+	const info = TweenInfo.new(fade, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+	const inTween = TweenService:Create(veil, info, { BackgroundTransparency = 0 })
+	inTween.Completed:Once(function()
+		cut()
+		const outTween = TweenService:Create(veil, info, { BackgroundTransparency = 1 })
+		outTween.Completed:Once(function()
+			gui:Destroy()
+			if self.Veil == gui then
+				self.Veil = nil
+			end
+		end)
+		outTween:Play()
+	end)
+	inTween:Play()
+end
+
+-- The pan trail of a seat (Poses.Trail), rebuilt when the seat changes; nil in the 2D mode (no pan).
+function PrepController:BuildTrail(station: number)
+	if self.TrailStation == station and self.Trail ~= nil then
+		return
+	end
+	self.TrailStation = station
+	self.Trail = if rules.ThreeD then Poses.Trail(station) else nil
+end
+
+-- The index of the trail stop a tab stands on (1 when there is no trail).
+function PrepController:StopOf(tab: string?): number
+	const trail = self.Trail
+	if trail == nil then
+		return 1
+	end
+	const view = Poses.ViewOf(tab or untrack(self.Tab))
+	for index, stop in trail.Stops do
+		if stop.View == view then
+			return index
+		end
+	end
+	return 1
+end
+
+-- The camera went to the stop of the front tab on its own (a tab, LB / RB, a station change): the pan follows.
+function PrepController:PanSync()
+	const pan = self.Pan
+	if pan ~= nil then
+		pan:Sync(self:StopOf(nil))
+	end
+end
+
+-- The pan settled on stop `index`: that is the only moment the stage changes (Enter / Leave of the stages, the step and PrepTab
+-- follow SetTab); on the stop it already stood on, the camera just glides back onto it.
+function PrepController:PanCommit(index: number)
+	const trail = self.Trail
+	const stop = if trail ~= nil then trail.Stops[index] else nil
+	if stop == nil or not self.InMode or self.Leaving then
+		return
+	end
+	if stop.Tab == untrack(self.Tab) then
+		self:MoveTo(untrack(self.Station))
+	else
+		self:SetTab(stop.Tab)
+	end
+end
+
+-- The pan of the seat, wired to the pointer, the camera and the guards of the precision gestures. Called once per Enter.
+function PrepController:BuildPan(pointer: Pointer.Pointer)
+	if self.Pan ~= nil then
+		self.Pan:Destroy()
+		self.Pan = nil
+	end
+	if not rules.ThreeD or self.Trail == nil then
+		return
+	end
+	const camera = self.Dependencies.CameraController
+	const panRules = rules.Camera.Pan
+	const pan = Pan.new({
+		Pointer = pointer,
+		Rules = panRules,
+		Trail = function(): Poses.Trail?
+			return self.Trail
+		end,
+		Stop = function(): number
+			return self:StopOf(nil)
+		end,
+		Goal = function(eye: Vector3, look: Vector3, fov: number, omega: number)
+			const focus = (eye - look).Magnitude
+			camera:PrepGoal(eye, look, fov, omega, focus, math.max(0.4, focus * 0.28))
+		end,
+		Commit = function(index: number)
+			self:PanCommit(index)
+		end,
+		Near = function(index: number?)
+			-- the stop index of the trail -> the index of its tab in the bar (the dots are drawn per tab)
+			const trail = self.Trail
+			const stop = if trail ~= nil and index ~= nil then trail.Stops[index] else nil
+			local lit = 0
+			if stop ~= nil then
+				for position, row in prep.Tabs.List do
+					if row.Key == stop.Tab then
+						lit = position
+						break
+					end
+				end
+			end
+			self.PanNear(lit)
+		end,
+		Gate = function(): boolean
+			return self.InMode and not self.Leaving and not self.Mock and untrack(self.Shown)
+		end,
+		Armed = function(): boolean
+			return Director3D.IsArmed()
+		end,
+		Precision = function(): boolean
+			return Director3D.IsPrecisionActive()
+		end,
+		Holding = function(): boolean
+			const aim = World.Aim()
+			return aim ~= nil and aim.Source ~= nil
+		end,
+		Reserved = function(): { Pan.Zone }
+			const list: { Pan.Zone } = {}
+			for _, zone in Zones.All() do
+				table.insert(list, zone)
+			end
+			return list
+		end,
+		Reduced = Motion.Reduced,
+	})
+	self.Pan = pan
+	pan:Sync(self:StopOf(nil))
+end
+
 -- Another station while seated (the server moved the seat): new pose, same session.
 function PrepController:MoveTo(station: number)
 	const pose = Poses.Of(station, Poses.ViewOf(untrack(self.Tab)))
 	if pose == nil then
 		return
 	end
+	self:BuildTrail(station)
+	self:PanSync()
 	const camera = self.Dependencies.CameraController
-	camera:Prep(true, pose.Frame, {
-		Fov = pose.Fov,
-		Travel = if Motion.Reduced() then 0 else rules.Camera.Travel,
-		Dof = untrack(self.Vignette) == false,
-		Focus = rules.Camera.Distance,
-		Radius = 0.4,
-		Far = 0.7,
-	})
+	const reduced = Motion.Reduced()
+	const options = self:CameraOptions(pose, untrack(self.Vignette) == false, reduced)
+	if reduced then
+		-- a cut is a blink, not a jump: the screen dips to Ink for 0.15 s around it
+		self:Blink(function()
+			camera:Prep(true, pose.Frame, options)
+		end)
+	else
+		camera:Prep(true, pose.Frame, options)
+	end
 	self.Pose = pose
+	World.SetView(pose.Frame, pose.Fov, (pose.Frame.Position - pose.Focus).Magnitude)
 	self.Rig:SetPose(pose.Frame.Position, pose.Focus)
 	self.Station(station)
 end
@@ -1234,7 +1547,14 @@ function PrepController:Leave(reason: string, forced: boolean?, fromServer: bool
 	const camera = self.Dependencies.CameraController
 	const travel = if Motion.Reduced() then 0 elseif forced then rules.ForcedExit.Signal else rules.Camera.Leave
 	self.LeaveTravel = travel
-	camera:Prep(false, nil, { Travel = travel })
+	if travel <= 0 then
+		-- no glide (reduced motion): the cut hides behind a 0.15 s blink instead of jumping
+		self:Blink(function()
+			camera:Prep(false, nil, { Travel = 0 })
+		end)
+	else
+		camera:Prep(false, nil, { Travel = travel })
+	end
 	-- (a plate that was open stays parked on the server for Rules.ClientIdle s; P7c brings the toast)
 	self.LeaveReason = reason
 end
@@ -1254,7 +1574,13 @@ function PrepController:Finish(takeover: boolean)
 			warn(`[PrepController] 3D stage Leave failed: {problem}`)
 		end
 	end
+	if self.Veil ~= nil then
+		self.Veil:Destroy()
+		self.Veil = nil
+	end
 	World.SetListener(nil)
+	World.SetAudio(nil)
+	KitchenFx.SetNear(false)
 	World.Leave()
 	self.Rig:Destroy()
 	for _, stop in self.PointerStops do
@@ -1276,6 +1602,14 @@ function PrepController:Finish(takeover: boolean)
 		pointer:Destroy()
 	end
 	self.Pointer = nil
+	self:HideRoof(false)
+	if self.Pan ~= nil then
+		self.Pan:Destroy()
+		self.Pan = nil
+	end
+	self.Trail = nil
+	self.TrailStation = 0
+	self.PanNear(0)
 	self:Bind(false)
 	self:Unmounted()
 	self:Isolate(false)
@@ -1350,11 +1684,20 @@ end
 -- Per frame -------------------------------------------------------------------------------------------------------------
 
 function PrepController:Update(dt: number)
+	-- the beacon over the Work prompts: while the shop sells and the player is free
+	const phase = self.Dependencies.RoundController.Phase()
+	self.Beacon:Step(
+		dt,
+		not self.InMode and (phase == "Open" or phase == "Night") and untrack(self.Dependencies.VitalController.LocalState) == "Active"
+	)
 	if not self.InMode then
 		return
 	end
 	self.Rig:Step(dt)
 	self:SpareCustomer(os.clock())
+	if self.Pan ~= nil then
+		self.Pan:Step(dt)
+	end
 	const camera = self.Dependencies.CameraController
 	const mode = untrack(camera.Mode)
 	const now = os.clock()

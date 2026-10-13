@@ -6,7 +6,8 @@
 --   Mustard step chip "2/7" on the left; it turns Green with a check while `Done` is true (step just completed)
 --   optional "STEP 2 OF 7" label (14 px), the instruction (17 px Ink, starts with the verb) and an optional hint line
 --   (14 px, Ink top tone) that wraps instead of shrinking
---   Cream "Skip" tag hanging off the bottom-right corner (>= 44 px tall touch target), with the key of the device
+--   Cream "Skip" pill in its own column on the right of the card (44 px tall touch target), with the key of the device: it never
+--   covers the text (playtest 2026-10-12: the tag hung over the hint). The hint takes two lines at most, then an ellipsis.
 -- Urgent (the player made no progress for a while): the card turns Mustard and pulses until the step changes; the owner
 -- swaps the hint for the short reminder.
 -- Pops in/out (Motion.Pop) and jumps each time the step number goes up (Motion.Bump).
@@ -56,8 +57,11 @@ const CHIP = 36 -- round step chip (not touchable)
 const CHIP_WIDE = 52 -- chip width for a two-digit count ("10/13" at 14 px)
 const WIDTH_SCALE = 0.5
 const HEAD_TAG = 92 -- px reserved on the right of the title row for the "STEP n OF N" tag
-const MIN_WIDTH = 260
-const MAX_WIDTH = 440
+const MIN_WIDTH = 300
+const MAX_WIDTH = 460
+const SKIP_W = 76 -- own column of the Skip pill
+const HINT_LINE = 17
+const HINT_CHARS = 30 -- rough characters per line at the narrow width (decides one or two lines of the hint box)
 const GAP = 8
 const SKIP_SIZE = 15
 const LABEL_SIZE = 14
@@ -78,6 +82,10 @@ return function(props: Props): Frame
 	-- "10/13" does not fit the round chip: it stretches into a pill
 	local function chipWidth(): number
 		return if props.Total() >= 10 then CHIP_WIDE else CHIP
+	end
+
+	local function hasSkip(): boolean
+		return props.SkipText() ~= ""
 	end
 
 	local function done(): boolean
@@ -199,7 +207,9 @@ return function(props: Props): Frame
 					Name = "Lines",
 					LayoutOrder = 2,
 					Size = function()
-						return UDim2.new(1, if hasChip() then -(chipWidth() + GAP) else 0, 0, 0)
+						const chip = if hasChip() then chipWidth() + GAP else 0
+						const skip = if hasSkip() then SKIP_W + GAP else 0
+						return UDim2.new(1, -(chip + skip), 0, 0)
 					end,
 					AutomaticSize = Enum.AutomaticSize.Y,
 					BackgroundTransparency = 1,
@@ -244,12 +254,15 @@ return function(props: Props): Frame
 					CartoonLabel({
 						Name = "Hint",
 						LayoutOrder = 1,
-						Box = UDim2.fromScale(1, 0),
-						AutomaticSize = Enum.AutomaticSize.Y,
+						Box = function(): UDim2
+							-- one line or two (an ellipsis after that): the card never grows past two lines of hint
+							return UDim2.new(1, 0, 0, if #props.Hint() > HINT_CHARS then HINT_LINE * 2 else HINT_LINE)
+						end,
 						TextSize = HINT_SIZE,
 						Color = Theme.Tone.Ink.Top,
 						Stroke = 0,
 						Wrapped = true,
+						Truncate = true,
 						XAlignment = Enum.TextXAlignment.Left,
 						Text = props.Hint,
 						Visible = function()
@@ -257,27 +270,26 @@ return function(props: Props): Frame
 						end,
 					}),
 				}),
-			},
-		}),
 
-		-- Skip tag hanging off the bottom-right corner (outside the measured card)
-		CartoonButton({
-			Name = "Skip",
-			AnchorPoint = Vector2.new(1, 0.5),
-			Position = UDim2.new(1, -12, 1, -2),
-			Text = props.SkipText,
-			TextSize = SKIP_SIZE,
-			Tone = Theme.Tone.White,
-			Padding = 10,
-			Selectable = false,
-			Visible = function()
-				return props.SkipText() ~= ""
-			end,
-			OnActivated = function()
-				if props.OnSkip then
-					props.OnSkip()
-				end
-			end,
+				-- Skip: its own column on the right (the text never goes under it), a 44 px touch target
+				CartoonButton({
+					Name = "Skip",
+					LayoutOrder = 3,
+					Size = UDim2.fromOffset(SKIP_W, Theme.MinTouch),
+					Text = props.SkipText,
+					TextSize = SKIP_SIZE,
+					Tone = Theme.Tone.White,
+					Radius = Theme.Radius.Pill,
+					Padding = 0,
+					Selectable = false,
+					Visible = hasSkip,
+					OnActivated = function()
+						if props.OnSkip then
+							props.OnSkip()
+						end
+					end,
+				}),
+			},
 		}),
 	})
 end

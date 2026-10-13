@@ -2,10 +2,12 @@
 
 export type Public = {
 	Busy: { [Player]: boolean },
+	DoorHolds: number,
 	Enabled: boolean,
 	EnterAnchors: { [Instance]: boolean },
 	ExitAnchors: { [Instance]: boolean },
 	LastUse: { [Player]: number },
+	NearAt: number,
 	Tries: number,
 	Warned: { [string]: boolean },
 	Setup: (self: Public) -> (),
@@ -16,6 +18,7 @@ export type Public = {
 	Host: (self: Public, model: Model) -> BasePart?,
 	Create: (self: Public, model: Model, host: BasePart, pad: CFrame, name: string, action: string, offset: Vector3) -> (),
 	EnsureAnchors: (self: Public) -> boolean,
+	RefreshAnchor: (self: Public, interaction: any, anchor: Instance, on: boolean) -> (),
 	Refresh: (self: Public) -> (),
 	CastParams: (self: Public) -> RaycastParams,
 	Ground: (self: Public, x: number, z: number, fromY: number, params: RaycastParams) -> Vector3?,
@@ -23,6 +26,10 @@ export type Public = {
 	OutsideFor: (self: Public, player: Player) -> Vector3?,
 	InsideFor: (self: Public, player: Player) -> Vector3?,
 	CanUse: (self: Public, player: Player, anchor: Instance, action: string) -> boolean,
+	IsOpen: (self: Public) -> boolean,
+	DoorPosition: (self: Public) -> Vector3?,
+	SetOpen: (self: Public, open: boolean) -> (),
+	HoldDoor: (self: Public, seconds: number) -> (),
 	Use: (self: Public, player: Player, action: string) -> (),
 	Move: (self: Public, player: Player, action: string) -> (),
 }

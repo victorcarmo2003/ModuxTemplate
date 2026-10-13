@@ -86,31 +86,51 @@ export type Rig = {
 	Tilt: Vector3, -- hand-held, radians (pitch, yaw, roll)
 }
 
--- Focused prep mode (PrepController; Content.Prep.Rules.Camera): pose tween and optional depth of field
+-- Focused prep mode (PrepController; Content.Prep.Rules.Camera): a critically damped glide to the pose of the view (position, the
+-- point looked at and the field of view each have their own spring, so a new view in the middle of a glide takes over without a
+-- jump of speed) and optional depth of field that follows the focus distance of every view
 export type PrepOptions = {
 	Fov: number?, -- field of view at the station
-	Travel: number?, -- s of the tween (0 = a cut)
+	Travel: number?, -- s the glide takes at most (0 = a cut); the real time follows the distance, between Min and Travel
+	Min: number?, -- s: the shortest glide (a short hop between two views)
+	Look: Vector3?, -- the point the camera looks at (the Focus of the view); nil = along the frame
 	Dof: boolean?, -- depth of field behind the work surface (quality > 3 only; the caller decides)
-	Focus: number?, -- studs of the DOF focus distance
+	Focus: number?, -- studs of the DOF focus distance (camera to the point looked at); it glides with the view
 	Radius: number?, -- studs in focus around it
 	Far: number?, -- far blur intensity
 }
 
 type PrepState = {
-	From: CFrame,
+	Pos: Vector3,
+	PosVel: Vector3,
+	Look: Vector3,
+	LookVel: Vector3,
+	Fov: number, -- now
+	FovVel: number,
+	FocusDist: number,
+	FocusVel: number,
+	RadiusNow: number,
+	RadiusVel: number,
+	-- where it is going
 	To: CFrame,
-	FromFov: number,
-	Fov: number,
+	ToLook: Vector3,
+	ToFov: number,
+	ToFocus: number,
+	ToRadius: number,
+	Omega: number, -- 1/s of the springs
 	BaseFov: number,
 	Start: number,
 	Travel: number,
 	Leaving: boolean,
+	Last: number, -- os.clock of the last frame
 	Dof: DepthOfFieldEffect?,
 	Far: number,
 }
 
 type Group = "Head" | "Arm" | "Body"
 
+-- the springs of the prep glide settle (98 %) in about PREP_SETTLE / Omega seconds: Omega = PREP_SETTLE / Travel
+const PREP_SETTLE = 5.6
 const RENDER_STEP = "CameraController.BodyVisibility"
 -- Right after the stock CameraModule (which updates its TransparencyController at Camera).
 const RENDER_PRIORITY = Enum.RenderPriority.Camera.Value + 1
@@ -451,12 +471,13 @@ function CameraController:Prep(on: boolean, frame: CFrame?, options: PrepOptions
 		end
 		const baseFov = if existing ~= nil then existing.BaseFov else camera.FieldOfView
 		local dof = if existing ~= nil then existing.Dof else nil
+		const wantedFocus = opts.Focus or 2.5
 		if opts.Dof and dof == nil then
 			const effect = Instance.new("DepthOfFieldEffect")
 			effect.Name = "PrepFocus"
 			effect.FarIntensity = 0
 			effect.NearIntensity = 0
-			effect.FocusDistance = opts.Focus or 2.5
+			effect.FocusDistance = wantedFocus
 			effect.InFocusRadius = opts.Radius or 0.4
 			effect.Parent = camera
 			dof = effect
@@ -464,15 +485,40 @@ function CameraController:Prep(on: boolean, frame: CFrame?, options: PrepOptions
 			dof:Destroy()
 			dof = nil
 		end
+		const look = opts.Look or (frame.Position + frame.LookVector * wantedFocus)
+		-- where the glide starts: a retarget keeps the position, the point looked at and their speeds (no jump of velocity)
+		local pos, posVel, lookNow, lookVel, fovNow, fovVel = camera.CFrame.Position, Vector3.zero, camera.CFrame.Position + camera.CFrame.LookVector * wantedFocus, Vector3.zero, camera.FieldOfView, 0
+		local focusNow, focusVel, radiusNow, radiusVel = wantedFocus, 0, opts.Radius or 0.4, 0
+		if existing ~= nil and not existing.Leaving then
+			pos, posVel, lookNow, lookVel, fovNow, fovVel = existing.Pos, existing.PosVel, existing.Look, existing.LookVel, existing.Fov, existing.FovVel
+			focusNow, focusVel, radiusNow, radiusVel = existing.FocusDist, existing.FocusVel, existing.RadiusNow, existing.RadiusVel
+		end
+		-- the time it takes grows with the distance, between Min and Travel (a cut when Travel is 0)
+		const longest = opts.Travel or 0
+		const distance = (frame.Position - pos).Magnitude
+		const travel = if longest <= 0 then 0 else math.clamp((opts.Min or longest) + (longest - (opts.Min or longest)) * math.clamp(distance / 8, 0, 1), opts.Min or longest, longest)
 		self.PrepState = {
-			From = camera.CFrame,
+			Pos = pos,
+			PosVel = posVel,
+			Look = lookNow,
+			LookVel = lookVel,
+			Fov = fovNow,
+			FovVel = fovVel,
+			FocusDist = focusNow,
+			FocusVel = focusVel,
+			RadiusNow = radiusNow,
+			RadiusVel = radiusVel,
 			To = frame,
-			FromFov = camera.FieldOfView,
-			Fov = opts.Fov or camera.FieldOfView,
+			ToLook = look,
+			ToFov = opts.Fov or camera.FieldOfView,
+			ToFocus = wantedFocus,
+			ToRadius = opts.Radius or 0.4,
+			Omega = if travel <= 0 then 0 else PREP_SETTLE / travel,
 			BaseFov = baseFov,
 			Start = now,
-			Travel = opts.Travel or 0,
+			Travel = travel,
 			Leaving = false,
+			Last = now,
 			Dof = dof,
 			Far = opts.Far or 0.7,
 		}
@@ -483,18 +529,54 @@ function CameraController:Prep(on: boolean, frame: CFrame?, options: PrepOptions
 	if Vide.untrack(self.Mode) ~= "Prep" or existing == nil then
 		return
 	end
+	const leaveTravel = opts.Travel or 0
 	self.PrepState = {
-		From = camera.CFrame,
+		Pos = existing.Pos,
+		PosVel = existing.PosVel,
+		Look = existing.Look,
+		LookVel = existing.LookVel,
+		Fov = existing.Fov,
+		FovVel = existing.FovVel,
+		FocusDist = existing.FocusDist,
+		FocusVel = existing.FocusVel,
+		RadiusNow = existing.RadiusNow,
+		RadiusVel = existing.RadiusVel,
 		To = camera.CFrame,
-		FromFov = camera.FieldOfView,
-		Fov = existing.BaseFov,
+		ToLook = existing.Look,
+		ToFov = existing.BaseFov,
+		ToFocus = existing.ToFocus,
+		ToRadius = existing.ToRadius,
+		Omega = if leaveTravel <= 0 then 0 else PREP_SETTLE / leaveTravel,
 		BaseFov = existing.BaseFov,
 		Start = now,
-		Travel = opts.Travel or 0,
+		Travel = leaveTravel,
 		Leaving = true,
+		Last = now,
 		Dof = existing.Dof,
 		Far = existing.Far,
 	}
+end
+
+-- A light retarget of the prep camera, meant to be called every frame while the player pans along the trail of stations (feedback
+-- 2026-10-12, H): the eye, the point looked at, the field of view and the depth of field take the new goal and the springs that
+-- already run (critically damped, the speed carries over) do the smoothing. `omega` = 1/s of the springs while it lasts (nil keeps
+-- the ones of the last glide); 0 or less is a cut. Does nothing outside the prep mode or while the way out runs.
+function CameraController:PrepGoal(eye: Vector3, look: Vector3, fov: number, omega: number?, focus: number?, radius: number?)
+	const state = self.PrepState
+	if state == nil or state.Leaving or Vide.untrack(self.Mode) ~= "Prep" then
+		return
+	end
+	const forward = look - eye
+	state.To = CFrame.lookAt(eye, look)
+	state.ToLook = look
+	state.ToFov = fov
+	state.ToFocus = focus or forward.Magnitude
+	state.ToRadius = radius or state.ToRadius
+	if omega ~= nil then
+		state.Omega = if omega <= 0 then 0 else omega
+	end
+	-- the far blur is already up: do not ramp it again
+	state.Start = math.min(state.Start, os.clock() - state.Travel)
 end
 
 -- Where the view returns to when the prep mode ends: the own head, facing the way the body faces.
@@ -508,7 +590,18 @@ function CameraController:PrepExitFrame(): CFrame?
 	return CFrame.new(head.Position) * CFrame.fromOrientation(0, yawOf(root.CFrame.LookVector), 0)
 end
 
--- One frame of the prep tween (Quad out going in, Quad in going out); see Prep().
+-- One step of a critically damped spring (no overshoot; the speed carries over a retarget).
+local function damp<T>(value: T, velocity: T, target: T, omega: number, dt: number): (T, T)
+	const exp = math.exp(-omega * dt)
+	const delta = (value :: any) - (target :: any)
+	const temp = ((velocity :: any) + delta * omega) * dt
+	const newVelocity = ((velocity :: any) - temp * omega) * exp
+	const newValue = (target :: any) + (delta + temp) * exp
+	return newValue, newVelocity
+end
+
+-- One frame of the prep glide: springs for the position, the point looked at, the field of view and the depth of field; the camera
+-- looks AT the point (so the rotation follows the focus of the view). A cut (Travel 0) jumps; leaving ends on the head of the player.
 function CameraController:ApplyPrep(camera: Camera)
 	const state = self.PrepState
 	if state == nil then
@@ -522,23 +615,45 @@ function CameraController:ApplyPrep(camera: Camera)
 	if camera.CameraType ~= Enum.CameraType.Scriptable then
 		camera.CameraType = Enum.CameraType.Scriptable
 	end
-	const alpha = if state.Travel <= 0 then 1 else math.clamp((os.clock() - state.Start) / state.Travel, 0, 1)
-	const eased = TweenService:GetValue(
-		alpha,
-		Enum.EasingStyle.Quad,
-		if state.Leaving then Enum.EasingDirection.In else Enum.EasingDirection.Out
-	)
-	const target = if state.Leaving then (self:PrepExitFrame() or state.To) else state.To
-	camera.CFrame = state.From:Lerp(target, eased)
-	camera.FieldOfView = state.FromFov + (state.Fov - state.FromFov) * eased
-	const dof = state.Dof
-	if dof ~= nil then
-		dof.FarIntensity = state.Far * (if state.Leaving then 1 - eased else eased)
+	const now = os.clock()
+	const dt = math.clamp(now - state.Last, 0, 0.1)
+	state.Last = now
+	local goal = state.To
+	local goalLook = state.ToLook
+	if state.Leaving then
+		goal = self:PrepExitFrame() or state.To
+		goalLook = goal.Position + goal.LookVector * 4
 	end
+	if state.Omega <= 0 then
+		state.Pos, state.Look, state.Fov = goal.Position, goalLook, state.ToFov
+		state.PosVel, state.LookVel, state.FovVel = Vector3.zero, Vector3.zero, 0
+		state.FocusDist, state.RadiusNow = state.ToFocus, state.ToRadius
+	else
+		state.Pos, state.PosVel = damp(state.Pos, state.PosVel, goal.Position, state.Omega, dt)
+		state.Look, state.LookVel = damp(state.Look, state.LookVel, goalLook, state.Omega, dt)
+		state.Fov, state.FovVel = damp(state.Fov, state.FovVel, state.ToFov, state.Omega, dt)
+		state.FocusDist, state.FocusVel = damp(state.FocusDist, state.FocusVel, state.ToFocus, state.Omega, dt)
+		state.RadiusNow, state.RadiusVel = damp(state.RadiusNow, state.RadiusVel, state.ToRadius, state.Omega, dt)
+	end
+	const alpha = if state.Travel <= 0 then 1 else math.clamp((now - state.Start) / state.Travel, 0, 1)
+	-- the end of the way out: the head of the player exactly, then the driver takes over
 	if state.Leaving and alpha >= 1 then
+		camera.CFrame = goal
+		camera.FieldOfView = state.BaseFov
 		self:PrepClear()
 		self:SetMode("FirstPerson")
 		self.NextDrive = 0
+		return
+	end
+	const eye = state.Pos
+	const target = state.Look
+	camera.CFrame = if (target - eye).Magnitude > 1e-3 then CFrame.lookAt(eye, target) else CFrame.new(eye) * goal.Rotation
+	camera.FieldOfView = state.Fov
+	const dof = state.Dof
+	if dof ~= nil then
+		dof.FarIntensity = state.Far * (if state.Leaving then 1 - alpha else alpha)
+		dof.FocusDistance = math.max(state.FocusDist, 0.5)
+		dof.InFocusRadius = math.max(state.RadiusNow, 0.1)
 	end
 end
 

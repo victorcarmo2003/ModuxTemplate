@@ -87,6 +87,7 @@ export type Public = {
 	RefundPlate: (self: Public, player: Player) -> boolean,
 	TrashPlate: (self: Public, player: Player, options: Plate.TrashOptions?) -> Plate.TrashResult,
 	GrillAct: (self: Public, player: Player, act: Plate.GrillAction, slot: number?) -> (Plate.GrillResult?, string?),
+	TrashSausage: (self: Public, player: Player, from: Plate.TrashFrom, slot: number) -> (boolean, string?),
 	PlateOf: (self: Public, player: Player) -> Plate.Ticket?,
 	DevFeedRail: (self: Public, score: number?) -> boolean,
 	DevAgeGrill: (self: Public, slot: number, seconds: number) -> number,

@@ -17,6 +17,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 local Pointer = require(script.Parent.Parent.Pointer)
 local Highlight = require(script.Parent.Highlight)
+local BinZone = require(script.Parent.BinZone)
 local Marker = require(script.Parent.Marker)
 local Plane = require(script.Parent.Plane)
 local Ray = require(script.Parent.Ray)
@@ -182,6 +183,14 @@ function Aim.new(options: Options): Aim
 			end
 		end
 		hit.Position = position or workPoint or rayOrigin + rayDirection * FALLBACK_DISTANCE
+		-- the 2D bin of the chrome answers over everything under it, but only for a thing that is being dragged
+		if source ~= nil then
+			const bin = registry:Get("Bin")
+			if bin ~= nil and bin.Target.Id ~= source.Target.Id and isEnabled(bin) and BinZone.Hit(Ray.ToViewport(px, device)) then
+				hit.Target = bin
+				hit.Position = workPoint or hit.Position
+			end
+		end
 	end
 
 	local function setHover(target: Types.Target?, device: Pointer.Device)

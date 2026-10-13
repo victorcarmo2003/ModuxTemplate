@@ -5,7 +5,12 @@
 -- slice, place, trace, slide, taps, hold and Score never learn that the board became 3D. One MODE at a time (a string, so the arms
 -- are rebuilt only when it changes, never in the middle of a gesture):
 --   slice / slice_hold       the knife along the dashed line (hold: the knife runs by itself, the pointer only chooses the height)
---   trace:K / trace_hold:K   a sauce bottle over the zig-zag (hold: pour along the path, let go at the mark)
+--   trace:K / trace_hold:K   a sauce bottle over the zig-zag (hold: pour along the path, let go at the mark). trace:K is SELECT, THEN DRAG:
+--                            Selected (the bottle floats over the bun following the pointer, nothing flows) -> press over the plane
+--                            of the bun and move past Stroke.Threshold = Pouring (the points go to Strokes) -> release stops the flow
+--                            and KEEPS the selection for new strokes -> the topping lands when the guide is covered / the meter is
+--                            full on release, or when it is deselected with enough sauce (tap the bowl again, Esc, press on empty
+--                            space, Next). `IsPrecisionActive` tells the camera the player is in a precision gesture.
 --   slide:K / slide_hold:K   the cheese slice onto the groove
 --   taps:K                   the bacon rings, one tap each as they close
 --   hold:K                   the potato sticks mound, let go at the ring
@@ -14,6 +19,7 @@
 -- No Modux, no Vide, no network.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Content = require(ReplicatedStorage.shared.Content)
 local Gestures = require(script.Parent.Parent.Gestures)
@@ -50,6 +56,12 @@ export type Options = {
 	-- the results
 	OnCut: (score: number) -> (),
 	OnTopping: (key: string, score: number, amount: number) -> (),
+	-- The selected sauce asks to be put down (Esc, a press on empty space): the stage clears the active tool.
+	Deselect: () -> (),
+	-- The pointer went down on a world target (a bowl, the board...): not an empty press.
+	OverTarget: () -> boolean,
+	-- The plate can still take the topping (open, placed, no Finish on its way): a selection left behind lands only then.
+	CanLand: () -> boolean,
 }
 
 export type Director = {
@@ -58,6 +70,13 @@ export type Director = {
 	Mode: (self: Director) -> string,
 	-- A gesture is in progress (the stage keeps the tool in the hand).
 	Busy: (self: Director) -> boolean,
+	-- The player is in a precision gesture (a sauce selected or pouring, the knife armed or cutting, a drag in progress): the pan and
+	-- the edge scroll of the camera must stand still.
+	IsPrecisionActive: (self: Director) -> boolean,
+	-- "Idle" | "Selected" | "Pouring" | "Cutting" (the sauce flow state machine, for the HUD and the tests).
+	State: (self: Director) -> string,
+	-- Lands the selected sauce now if it has enough on the plate (true when it landed). Next calls it before PrepFinish.
+	Commit: (self: Director) -> boolean,
 	-- The measure of a sausage drop (bun-space samples): the score 0..100 and whether it is inside the magnet, nil = not a drop.
 	MeasurePlace: (self: Director, points: { Vector2 }) -> (number?, boolean),
 	-- Is a screen point (px) over the mat (the bun and a margin)? Where a gesture may begin.
@@ -87,6 +106,29 @@ end
 
 const Director3D = {}
 
+-- Every live director (one per Build session): the camera pan (PrepController/Pan.luau) asks the module, not a session.
+const live: { [any]: boolean } = {}
+
+-- A precision gesture is on in any live director (the pan and the edge scroll stand still).
+function Director3D.IsPrecisionActive(): boolean
+	for director in live do
+		if (director :: Director):IsPrecisionActive() then
+			return true
+		end
+	end
+	return false
+end
+
+-- A tool is armed in any live director (a mode other than "none"): a press on empty space must not start a pan.
+function Director3D.IsArmed(): boolean
+	for director in live do
+		if (director :: Director):Mode() ~= "none" or (director :: Director):IsPrecisionActive() then
+			return true
+		end
+	end
+	return false
+end
+
 function Director3D.new(options: Options): Director
 	const gestures = options.Gestures
 	const pointer = options.Pointer
@@ -103,6 +145,8 @@ function Director3D.new(options: Options): Director
 	local undo: { () -> () } = {}
 	local pressed = false -- a gesture is in progress
 	local pouring = false
+	-- the selected sauce (trace:K, drag mode): what to do with it when the mode ends
+	local selection: { Commit: () -> boolean, Leave: (canLand: boolean) -> (), Active: () -> boolean }? = nil
 	local lastX = 0
 	local lean = 0
 	local lastSquirt = 0
@@ -173,6 +217,19 @@ function Director3D.new(options: Options): Director
 		Aspect = bunRegion.Aspect,
 	}
 
+	-- where the sauce records: the plane of the bun and a thin margin (never the tray or the menu)
+	const margin = rules.Toppings.Stroke.Margin
+	local function inRecord(uv: Vector2): boolean
+		return (uv.X ~= 0 or uv.Y ~= 0) and uv.X >= -margin.X and uv.X <= 1 + margin.X and uv.Y >= -margin.Y and uv.Y <= 1 + margin.Y
+	end
+	const recordRegion: Types.PlaneRegion = {
+		Inside = function(px: Vector2): boolean
+			return rayOf(px) ~= nil and inRecord(bunRegion.Normalise(px))
+		end,
+		Normalise = bunRegion.Normalise,
+		Aspect = bunRegion.Aspect,
+	}
+
 	local function disarm()
 		for _, arm in arms do
 			arm:Cancel()
@@ -184,10 +241,12 @@ function Director3D.new(options: Options): Director
 		table.clear(undo)
 		pressed = false
 		pouring = false
+		selection = nil
 		strokes:Drop()
 		strokes:SetDots(nil)
 		clearRings()
 		view:SetGuide(false, 0)
+		view:SetProgress(nil)
 		view:SetKnife(nil, false, 0)
 		tool:Move(nil, false, 0)
 	end
@@ -211,12 +270,14 @@ function Director3D.new(options: Options): Director
 		local function reset()
 			pressed = false
 			view:SetGuide(true, 0)
+			view:SetProgress(nil)
 		end
 		local function complete(points: { any })
 			done = true
 			pressed = false
 			const score = Score.Value(cfg, "bun_cut", slice.Measure(points, sliceParams()), nil, options.Assist())
 			view:SetGuide(false, 1)
+			view:SetProgress(1)
 			options.Sfx("bun_slice", plane.Frame.Position)
 			options.OnCut(score)
 		end
@@ -242,6 +303,7 @@ function Director3D.new(options: Options): Director
 					if progress > reached then
 						reached = progress
 						view:SetGuide(true, progress)
+						view:SetProgress(progress)
 					end
 					if event.Position.X >= cut.Done and event.Points ~= nil then
 						const points = table.clone(event.Points) :: { any }
@@ -267,6 +329,7 @@ function Director3D.new(options: Options): Director
 				if reached < event.Progress then
 					reached = event.Progress
 					view:SetGuide(true, event.Progress)
+					view:SetProgress(event.Progress)
 				end
 				if now - lastSample >= SAMPLE_GAP then
 					lastSample = now
@@ -328,6 +391,200 @@ function Director3D.new(options: Options): Director
 		end
 	end
 
+	-- select, then drag (owner decision 2026-10-12) ----------------------------------------------------------------------------------
+	local function armPour(key: string)
+		const stroke = rules.Toppings.Stroke
+		const meter = build.Sauce.Meter
+		const params = traceParams()
+		const minStep = 0.012 -- bun heights between two recorded points
+		strokes:SetDots(guideDots())
+		tool:SetFill(1)
+		view:SetProgress(0)
+		const segments: { { Vector2 } } = {} -- the strokes already lifted
+		local points: { Vector2 }? = nil -- the stroke being poured
+		local down = false
+		local flowing = false -- the threshold was passed in this press
+		local ended = false
+		local alive = true
+		local pressUv = Vector2.zero
+		local pressWorld = Vector3.zero
+
+		local function amount(): number
+			local total = trace.AmountAll(segments :: { { any } }, params)
+			if points ~= nil and #points >= 2 then
+				total += trace.Amount(points, params)
+			end
+			return total
+		end
+		local function closeSegment()
+			if points ~= nil then
+				strokes:Keep()
+				if #points >= 2 then
+					table.insert(segments, points)
+				end
+				points = nil
+			end
+			pouring = false
+		end
+		local function land()
+			ended = true
+			alive = false
+			pressed = false
+			pouring = false
+			down = false
+			const coverage, excess = trace.MeasureAll(segments :: { { any } }, params)
+			strokes:SetDots(nil)
+			view:SetProgress(1)
+			tool:SetFill(0)
+			options.OnTopping(key, Score.Value(cfg, key, coverage, excess, options.Assist()), math.clamp(coverage / 100, 0.25, 1))
+		end
+		local function commit(): boolean
+			if ended then
+				return false
+			end
+			closeSegment()
+			if #segments > 0 and amount() >= stroke.MinAmount then
+				land()
+				return true
+			end
+			-- too little to count: the stroke is taken back, the tool goes
+			strokes:Remove(key)
+			strokes:SetDots(nil)
+			view:SetProgress(nil)
+			ended = true
+			alive = false
+			return false
+		end
+		selection = {
+			Commit = commit,
+			Active = function(): boolean
+				return not ended
+			end,
+			Leave = function(canLand: boolean)
+				if ended then
+					return
+				end
+				if canLand then
+					commit()
+				else
+					closeSegment()
+					strokes:Remove(key)
+					ended = true
+					alive = false
+				end
+			end,
+		}
+
+		-- one more point of the stroke: the points between it and the last are fed so a fast hand covers the guide and shapes the curve
+		local function extend(uv: Vector2)
+			const list = points :: { Vector2 }
+			const last = list[#list]
+			const dx, dy = (uv.X - last.X) * aspect, uv.Y - last.Y
+			const distance = math.sqrt(dx * dx + dy * dy)
+			if distance < minStep then
+				return
+			end
+			const pieces = math.max(1, math.ceil(distance / 0.02))
+			for piece = 1, pieces do
+				const point = last:Lerp(uv, piece / pieces)
+				strokes:Add(point)
+				strokes:Cover({ point }, build.Sauce.Reach, aspect)
+			end
+			table.insert(list, uv)
+		end
+		local function openSegment(from: Vector2)
+			strokes:Begin(Strokes.ColorOf(key), key)
+			points = { from }
+			strokes:Add(from)
+			pouring = true
+			squirt()
+		end
+		local function refresh()
+			tool:SetFill(1 - math.clamp(amount() / meter.Max, 0, 1))
+			view:SetProgress(strokes:Progress())
+		end
+
+		add(gestures:Arm("Drag", bunRegion, { Start = recordRegion }, function(event: Event)
+			if ended then
+				return
+			end
+			const uv = event.Position
+			if event.Phase == "Begin" then
+				down = true
+				flowing = false
+				pressed = true
+				pressUv = uv
+				pressWorld = Plane.ToWorld(plane, uv, 0)
+				note(`pour press x {string.format("%.3f", uv.X)} y {string.format("%.3f", uv.Y)}`)
+			elseif event.Phase == "Move" then
+				if not down then
+					return
+				end
+				const inside = inRecord(uv)
+				const room = amount() < meter.Max
+				if not flowing then
+					if inside and room and (Plane.ToWorld(plane, uv, 0) - pressWorld).Magnitude >= stroke.Threshold then
+						flowing = true
+						openSegment(pressUv)
+						note("pouring")
+					else
+						return
+					end
+				end
+				if inside and room then
+					if points == nil then
+						-- came back over the bun in the same press: a new stroke from here
+						openSegment(uv)
+					end
+					extend(uv)
+					squirt()
+					refresh()
+				elseif points ~= nil then
+					closeSegment()
+					refresh()
+				end
+			else
+				-- End / Cancel: the flow stops, the selection stays
+				const was = flowing
+				down = false
+				flowing = false
+				pressed = false
+				closeSegment()
+				if event.Phase == "End" and was then
+					refresh()
+					note(`pour end amount {string.format("%.2f", amount())} progress {string.format("%.2f", strokes:Progress())}`)
+					if amount() >= meter.Max - 0.01 or strokes:Progress() >= stroke.Done then
+						land()
+					end
+				end
+			end
+		end))
+
+		-- put the sauce down: a press on empty space (not on a bowl or the bun plane) or Escape
+		table.insert(undo, pointer:OnDown(function(px: Vector2)
+			task.defer(function()
+				if not alive or ended then
+					return
+				end
+				if recordRegion.Inside(px) or options.OverTarget() then
+					return
+				end
+				note("deselect: empty press")
+				options.Deselect()
+			end)
+		end))
+		const keys = UserInputService.InputBegan:Connect(function(input: InputObject)
+			if input.KeyCode == Enum.KeyCode.Escape and alive and not ended then
+				note("deselect: escape")
+				options.Deselect()
+			end
+		end)
+		table.insert(undo, function()
+			alive = false
+			keys:Disconnect()
+		end)
+	end
+
 	local function armTrace(key: string, holdMode: boolean, held: boolean)
 		strokes:SetDots(guideDots())
 		const meter = build.Sauce.Meter
@@ -339,6 +596,7 @@ function Director3D.new(options: Options): Director
 			pouring = false
 			strokes:Keep()
 			strokes:SetDots(nil)
+			view:SetProgress(1)
 			tool:SetFill(0)
 			options.OnTopping(key, Score.Value(cfg, key, coverage, excess, options.Assist()), math.clamp(coverage / 100, 0.25, 1))
 		end
@@ -347,44 +605,12 @@ function Director3D.new(options: Options): Director
 			pouring = false
 			strokes:Drop()
 			strokes:SetDots(guideDots())
+			view:SetProgress(nil)
 			tool:SetFill(1)
 			drawn = 0
 		end
 		if not holdMode then
-			add(gestures:Arm("Trace", bunRegion, { Start = matRegion, Held = held }, function(event: Event)
-				if event.Phase ~= "Move" then
-					note(`trace {event.Phase} valid {tostring(event.Valid)} points {if event.Points ~= nil then #event.Points else 0}`)
-				end
-				if ended then
-					return
-				end
-				if event.Phase == "Begin" then
-					pressed = true
-					pouring = true
-					drawn = 0
-					strokes:Begin(Strokes.ColorOf(key))
-					tool:SetFill(1)
-					squirt()
-				elseif event.Phase == "Move" and event.Points ~= nil then
-					const points = event.Points
-					const amount = trace.Amount(points, traceParams())
-					tool:SetFill(1 - math.clamp(amount / meter.Max, 0, 1))
-					pouring = amount < meter.Max
-					if pouring then
-						for index = math.max(drawn, 1), #points do
-							strokes:Add(points[index])
-						end
-						drawn = #points
-						strokes:Cover({ event.Position }, build.Sauce.Reach, aspect)
-						squirt()
-					end
-				elseif event.Phase == "End" and event.Valid and event.Points ~= nil then
-					const coverage, excess = trace.Measure(event.Points, traceParams())
-					land(coverage, excess, trace.Amount(event.Points, traceParams()))
-				else
-					clear()
-				end
-			end))
+			armPour(key)
 			return
 		end
 		-- hold: the sauce pours along the path (amount = progress x Meter.Max); let go at the mark
@@ -402,6 +628,7 @@ function Director3D.new(options: Options): Director
 					strokes:Add(point)
 				end
 				strokes:Cover(pathUpTo(amount), build.Sauce.Reach, aspect)
+				view:SetProgress(strokes:Progress())
 				tool:SetFill(1 - math.clamp(amount / meter.Max, 0, 1))
 				squirt()
 				if event.Done then
@@ -550,6 +777,7 @@ function Director3D.new(options: Options): Director
 			tapped[index] = pressedAt
 			Fx.Burst(Plane.ToWorld(plane, Vector2.new(bacon.X[index] or 0.5, bacon.Y), 0.3), "Ready", 3, Theme.Color.Cream)
 			index += 1
+			view:SetProgress(math.clamp((index - 1) / bacon.Count, 0, 1))
 		end))
 	end
 
@@ -560,6 +788,7 @@ function Director3D.new(options: Options): Director
 		local function show(progress: number)
 			const grow = rules.Toppings.Potato.From + (1 - rules.Toppings.Potato.From) * progress
 			view:SetTopping(key, GROOVE, grow)
+			view:SetProgress(progress)
 		end
 		local function land(progress: number)
 			ended = true
@@ -596,6 +825,12 @@ function Director3D.new(options: Options): Director
 		if wanted == mode then
 			return
 		end
+		-- a sauce selected and left behind lands (or is taken back) before the arms go
+		if selection ~= nil then
+			const leaving = selection
+			selection = nil
+			leaving.Leave(options.CanLand())
+		end
 		disarm()
 		mode = wanted
 		note(`mode {wanted} held {tostring(held)}`)
@@ -622,6 +857,26 @@ function Director3D.new(options: Options): Director
 		return pressed
 	end
 
+	function self.IsPrecisionActive(_: any): boolean
+		return pressed or (selection ~= nil and selection.Active()) or string.sub(mode, 1, 5) == "slice"
+	end
+
+	function self.State(_: any): string
+		if string.sub(mode, 1, 5) == "slice" then
+			return "Cutting"
+		elseif selection ~= nil and selection.Active() then
+			return if pouring then "Pouring" else "Selected"
+		end
+		return "Idle"
+	end
+
+	function self.Commit(_: any): boolean
+		if selection ~= nil then
+			return selection.Commit()
+		end
+		return false
+	end
+
 	function self.MeasurePlace(_: any, points: { Vector2 }): (number?, boolean)
 		const error = place.Measure(points :: { any }, placeParams)
 		if error == math.huge then
@@ -646,6 +901,7 @@ function Director3D.new(options: Options): Director
 
 	function self.Frame(_: any, _dt: number)
 		anchor.CFrame = plane.Frame
+		strokes:Tick(os.clock())
 		const uv, world = self:Aim()
 		-- touch has no hover: with the finger up the tool waits over the middle of the bun
 		const visible = world ~= nil and (pointer.Device ~= "Touch" or pointer.Down)
@@ -672,8 +928,10 @@ function Director3D.new(options: Options): Director
 		end
 		table.clear(rings)
 		anchor:Destroy()
+		live[self] = nil
 	end
 
+	live[self] = true
 	return self :: Director
 end
 

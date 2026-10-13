@@ -21,3 +21,8 @@ Regras: só snippets idempotentes (ver `STUDIO_LAYER.md`); nunca `Place.run` sem
 ## Teste de fumaça
 
 `smoke.md`: `/dev smoke` roda boot, intro, tutorial, dia, mesas, noite 1, anomalia, troca de trailer e imprime `SMOKE: N ok, M falhas, K avisos`.
+
+## Teste de sobreposição do chrome do preparo (puro, sem Studio)
+
+`tools/studio/prep_layout_check.luau` roda o `Layout.luau` real do `PrepShell` em 7 telas (667x375, 844x390, 932x430, desktop, retrato) e confere sobreposição entre nossos blocos, a zona do Hud (relógio, dinheiro, sanidade), o menu do Roblox, o centro livre do mundo, alvos >= 44 px e tudo dentro do canvas. O `lune` não está no `rokit.toml`: rode o binário do `rokit` direto, da raiz do repo:
+`"~/.rokit/tool-storage/lune-org/lune/<versão>/lune.exe" run tools/studio/prep_layout_check` (esperado `LAYOUT: 7 ok, 0 failures`).

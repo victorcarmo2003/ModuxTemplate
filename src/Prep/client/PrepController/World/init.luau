@@ -12,12 +12,17 @@
 -- (TASK-198) calls Enter and Leave; no one else does. While it runs there is ONE frame loop (Aim's RenderStepped) and one folder
 -- (`Types.FolderName`) under the camera; Leave destroys all of it.
 local Players = game:GetService("Players")
+local StarterPlayer = game:GetService("StarterPlayer")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 local Aim = require(script.Aim)
+local Bin = require(script.Bin)
+local Coach = require(script.Coach)
 local Highlight = require(script.Highlight)
+local Juice = require(script.Juice)
 local Marker = require(script.Marker)
 local Plane = require(script.Plane)
+local Motion = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Motion)
 local Pointer = require(script.Parent.Pointer)
 local Targets = require(script.Targets)
 local Types = require(script.Types)
@@ -30,6 +35,9 @@ const DEBUG_ATTRIBUTE = "PrepRay"
 const World = {}
 
 World.Types = Types
+World.CoachLine = Coach.Line
+World.CoachTab = Coach.Tab
+World.Streak = Juice.Streak
 World.Plane = Plane
 
 local running: {
@@ -38,7 +46,17 @@ local running: {
 	Outline: Highlight.Outline,
 	Marker: Marker.Marker,
 	Aim: Aim.Aim?,
+	Juice: Juice.Juice,
+	Bin: Bin.Bin,
+	Coach: Coach.Coach,
+	StopFrame: (() -> ())?,
 }? = nil
+-- the sound player of the controller (key, world point, playback speed); the juice and the bin use it
+local audio: Juice.Audio? = nil
+-- the camera frame and field of view of the view that is in front, for the bin
+local view: { Frame: CFrame, Fov: number, Distance: number }? = nil
+-- the one no-op Juice a stage gets while the world is not running
+local nothing: Juice.Juice? = nil
 local listener: ((Types.AimMsg) -> ())? = nil
 local assist = false
 local workPlane: Aim.WorkPlane? = nil
@@ -69,8 +87,15 @@ function World.Enter(station: number, pointer: Pointer.Pointer?)
 	folder.Parent = camera
 	const registry = Targets.new(rules, folder)
 	registry:Scan(workspace, station, not World.Active())
-	const outline = Highlight.new(folder, rules, nil)
+	const outline = Highlight.new(folder, rules, Motion.Reduced)
 	const marker = Marker.new(folder, rules)
+	const juice = Juice.new(folder, rules, audio)
+	const binView = Bin.new(folder, rules, registry, function(): Juice.Juice
+		return juice
+	end, audio)
+	if view ~= nil then
+		binView:SetView(view.Frame, view.Fov, view.Distance)
+	end
 	local aim: Aim.Aim? = nil
 	if pointer ~= nil then
 		aim = Aim.new({
@@ -89,7 +114,26 @@ function World.Enter(station: number, pointer: Pointer.Pointer?)
 			aim:SetWorkPlane(workPlane)
 		end
 	end
-	running = { Folder = folder, Registry = registry, Outline = outline, Marker = marker, Aim = aim }
+	const coach = Coach.new(folder, rules, pointer, station)
+	local stop: (() -> ())? = nil
+	if aim ~= nil then
+		stop = aim:OnFrame(function(dt: number)
+			juice:Step(dt)
+			binView:Step(dt)
+			coach:Step(dt)
+		end)
+	end
+	running = {
+		Folder = folder,
+		Registry = registry,
+		Outline = outline,
+		Marker = marker,
+		Aim = aim,
+		Juice = juice,
+		Bin = binView,
+		Coach = coach,
+		StopFrame = stop,
+	}
 end
 
 -- The mode was left (every pool destroyed; no leak after 20 entries, prep-3d.md §8).
@@ -101,6 +145,14 @@ function World.Leave()
 	running = nil
 	if current.Aim ~= nil then
 		current.Aim:Cancel("Leave")
+	end
+	if current.StopFrame ~= nil then
+		current.StopFrame()
+	end
+	current.Coach:Destroy()
+	current.Bin:Destroy()
+	current.Juice:Destroy()
+	if current.Aim ~= nil then
 		current.Aim:Destroy()
 	end
 	current.Outline:Destroy()
@@ -147,6 +199,43 @@ end
 -- The `X` button: moves the gamepad cursor to the next enabled target of the stage.
 function World.Next(): Types.Target?
 	return if running ~= nil and running.Aim ~= nil then running.Aim:Next() else nil
+end
+
+-- The juice of the world (pops, bursts, floating words, flashes); a no-op while the world is not running, so a stage never checks.
+function World.Juice(): Juice.Juice
+	if running ~= nil then
+		return running.Juice
+	end
+	if nothing == nil then
+		nothing = Juice.None()
+	end
+	return nothing :: Juice.Juice
+end
+
+-- The drag tutorial (ghost hand); a no-op while the world is not running.
+function World.Coach(): Coach.Coach
+	if running ~= nil then
+		return running.Coach
+	end
+	return Coach.None()
+end
+
+-- The virtual bin of the view (nil while the world is not running).
+function World.Bin(): Bin.Bin?
+	return if running ~= nil then running.Bin else nil
+end
+
+-- The sound player (key, world point, playback speed); set by the controller on Enter.
+function World.SetAudio(fn: Juice.Audio?)
+	audio = fn
+end
+
+-- The camera frame and Fov the view in front ends on: the bin goes to its place on that screen.
+function World.SetView(frame: CFrame, fov: number, distance: number)
+	view = { Frame = frame, Fov = fov, Distance = distance }
+	if running ~= nil then
+		running.Bin:SetView(frame, fov, distance)
+	end
 end
 
 -- A presentation message from a stage to the world (TASK-203+).

@@ -52,6 +52,11 @@ Session.Placed = source(false)
 Session.Active = source("")
 -- Hold instead of drag (touch accessibility, docs/tech/prep-mode.md §5).
 Session.Hold = source(false)
+-- The live grade of the plate (polish 2026-10-12, U-3): the mean of the scores 0..100 of the stages done so far and how many they
+-- are (0 = nothing scored yet). A PREVIEW for the progress card and the seal (the server's verdict, with the sausage and the time
+-- floor, is the one that counts); it uses the same Score the gestures use and writes nothing to the wire.
+Session.Note = source(0)
+Session.Counted = source(0)
 
 -- Current value of a source without tracking it. `untrack` of an `any` picks the overload that returns nothing, so a source
 -- of the controller (typed any here) is read through this.
@@ -71,6 +76,27 @@ end
 
 -- State ------------------------------------------------------------------------------------------------------------------
 
+-- Recomputes the live note from the stage scores.
+local function refreshNote()
+	local sum, count = 0, 0
+	if data.Cut ~= nil then
+		sum += data.Cut
+		count += 1
+	end
+	if data.Place ~= nil then
+		sum += data.Place
+		count += 1
+	end
+	for _, entry in data.Toppings do
+		sum += entry.Score
+		count += 1
+	end
+	Vide.batch(function()
+		Session.Counted(count)
+		Session.Note(if count > 0 then sum / count else 0)
+	end)
+end
+
 function Session.Reset()
 	Vide.batch(function()
 		Session.Open(false)
@@ -83,6 +109,7 @@ function Session.Reset()
 	table.clear(data.Toppings)
 	data.StartedAt = 0
 	data.Stamp += 1
+	refreshNote()
 end
 
 -- The board went empty (Trash, Leave, Serve reset it, an expired plate): forget the plate. A request on its way stays.
@@ -116,12 +143,14 @@ end
 
 function Session.SetCut(controller: any, score: number)
 	data.Cut = score
+	refreshNote()
 	controller:SetPip(PIP_CUT, bandOf(score))
 	controller:Need("BunCut", true)
 end
 
 function Session.SetPlace(controller: any, score: number)
 	data.Place = score
+	refreshNote()
 	Session.Placed(true)
 	controller:SetPip(PIP_PLACE, bandOf(score))
 	controller:Need("PlateBuilt", true)
@@ -133,6 +162,7 @@ function Session.AddTopping(controller: any, key: string, score: number, amount:
 		return
 	end
 	table.insert(data.Toppings, { Key = key, Score = score })
+	refreshNote()
 	const view = controller.View
 	const list = table.clone(Session.Peek(view.Toppings) :: { any })
 	table.insert(list, { Key = key, Amount = amount })
@@ -256,6 +286,16 @@ function Session.OnResult(controller: any, result: any)
 			end)
 			toast(controller, cfg.Grades.Labels[band], "Good")
 			controller:Need("PlateBuilt", false)
+			if cfg.Rules.Delivery == "Prompt" then
+				-- the hot dog is in the hand (the server equips it when the seat ends): the seal and the confetti stay a moment,
+				-- then the mode ends by itself and the customer's `serve` prompt delivers it
+				task.delay(cfg.Rules.DoneHold, function()
+					if controller.InMode and not controller.Leaving then
+						controller:Leave("done", false, false)
+					end
+				end)
+				return
+			end
 			controller:SetTab("Serve")
 			controller:SetStage("serve")
 			return
@@ -274,7 +314,7 @@ function Session.OnResult(controller: any, result: any)
 		elseif cfg.Reasons.ByKey[result.Reason] ~= nil and cfg.Reasons.ByKey[result.Reason].Notice == nil then
 			toast(controller, build.Texts.Retry, "Alert")
 		end
-	elseif result.Act == "Trash" and not result.Ok and result.Reason == "NoSession" then
+	elseif result.Act == "Trash" and result.Value == 0 and not result.Ok and result.Reason == "NoSession" then
 		lost(controller)
 	end
 end

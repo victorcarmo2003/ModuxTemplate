@@ -4,7 +4,6 @@
 local Table = require(script.Parent.Table)
 
 export type RunParams = {
-	NightsFromDay: number,
 	PartyPriceMult: { number }, -- by party size 1..4 (Revive Kit; DEC-047, DEC-121, DEC-129)
 	PricePartyFrom: "JoinedByDay1End", -- rule (DEC-121); changing it needs a DEC
 	Nights: number,
@@ -24,10 +23,9 @@ export type RunParams = {
 }
 
 const params: RunParams = {
-	-- Run flow (user request 2026-10-12, PROVISIONAL Q-207): Day 1 is the tutorial day shift only; from this day on
-	-- every day shift is followed by a night shift in the trailer: D1, D2, N1, D3, N2 ... D11, N10 (night k is played on
-	-- day k + NightsFromDay - 1). The Food Trailer is the only vehicle from Day 1 (user decision 2026-10-12, Provisional).
-	NightsFromDay = 2,
+	-- Run flow (user decision 2026-10-12, Provisional): Day 1 is the tutorial day shift (a real day); from Day 2 on there
+	-- are only night shifts, forever: D1, N1 (Day 2) ... N10 (Day 11) (RoundService/Flow.luau). The Food Trailer is the
+	-- only vehicle from Day 1 (user decision 2026-10-12, Provisional).
 	PartyPriceMult = { 1.0, 1.5, 1.9, 2.2 }, -- 1p..4p price multiplier (DEC-047); Revive Kit (DEC-129)
 	PricePartyFrom = "JoinedByDay1End", -- party size fixed at the end of Day 1 (DEC-121)
 	Nights = 10, -- DEC-060

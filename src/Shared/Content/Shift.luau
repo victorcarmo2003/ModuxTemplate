@@ -126,5 +126,11 @@ const base = Table.new({
 
 return Table.with(base, {
 	PhaseKeys = base.Keys,
+	-- Safety cap on the Day 1 hold (user decision 2026-10-12, PROVISIONAL): TutorialService freezes the clock and holds the
+	-- regular customers while a rookie is in the tutorial; after this many seconds of holding it lets go (AFK rookie).
+	TutorialHoldMax = 600,
+	-- Back door of the trailer (user request 2026-10-12, Provisional): false = the prompt opens / closes the leaf and the
+	-- player walks through; true = the old fade + teleport (Exit / Enter Trailer).
+	TrailerDoorTeleport = false,
 	ClockStepMinutes = 5, -- HUD updates every 5 game minutes (1.8 s real on day) (DEC-048; user request 2026-10-11, was 10)
 })

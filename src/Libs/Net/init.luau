@@ -576,8 +576,13 @@ return Lync.define("game", {
 		),
 		Ms = Lync.int(0, 120000),
 	})),
-	-- c -> s. Bin: drops the open plate (bun and sausage are lost, like the street bin)
-	PrepTrash = Lync.packet(Lync.empty()),
+	-- c -> s. Bin, by DRAG (polish 2026-10-12): From = what is thrown (Content.Prep.TrashFrom): Plate = the open plate (bun and
+	-- sausage are lost, like the street bin; Slot ignored), Grill = the sausage of grill Slot 1..8 (any state), Rail = the sausage
+	-- at rail Slot 1..8 (1 = the front). The answer PrepResult Act = Trash carries Value = index of From - 1
+	PrepTrash = Lync.packet(Lync.struct({
+		From = Lync.enum(Content.Prep.TrashFrom),
+		Slot = Lync.int(0, 8),
+	})),
 	-- c -> s. Order / Serve tabs: same path as the world prompts of the CustomerService (Npc = NpcId)
 	PrepOrder = Lync.packet(Lync.struct({
 		Act = Lync.enum(Content.Prep.OrderActs),

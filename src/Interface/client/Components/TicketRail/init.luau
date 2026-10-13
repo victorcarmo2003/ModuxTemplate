@@ -1,25 +1,28 @@
 --!strict
 -- TicketRail: the ticket that is always at hand in the focused prep mode (docs/art/prep-ui-spec.md §6.2): the order the
 -- player works on, with the line of tickets behind it ("+N" is the queue; no bubbles in the world while focused).
---   Card (phone / desktop, left column)   paper Cream with a pin, the customer's face + "#12" + the patience level ring,
---                                         the toppings that leave the default (bun and sausage are implicit), the line the
---                                         customer said (15 px, two lines at most)
---   Strip (portrait)                      the same in two rows, one wide band
---   Empty                                 "No ticket yet" in a dashed card
+--   Card (phone / desktop, left column)   a tall paper (Cream, a Teal pin): the customer's face and "#12" on top (fixed widths, nothing
+--                                         invades another), the order as an OrderStack (bun, sausage and the toppings as layers that
+--                                         alternate Cream / light Mustard), the line the customer said (one line, two on a desktop), and
+--                                         a thin patience bar at the bottom (hidden when Patience is 0)
+--   Strip (portrait)                      the same in two rows, one wide band, the layers side by side
+--   Empty                                 "No ticket yet" in a slim pill
 --   Served                                a Green "Done" stamp over the paper
---   Urgent                                Mustard outline and a diamond "!" next to the ring (shape, never red)
--- Tap = OnCycle (next ticket). The patience ring is a level (a circle that drains), Teal, Mustard under 40 %, and the
--- diamond under 15 %. The face is a round placeholder with the first letter until the animal portraits exist (AST-117).
+--   Urgent                                Mustard outline and a diamond "!" by the pin (shape, never red)
+-- Tap = OnCycle (next ticket). The patience bar is a level, Teal, Mustard under 40 %. The face is a round placeholder with the
+-- first letter until the animal portraits exist (AST-117).
 -- Pure: only props. Build it inside a Vide root.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Theme)
 local CartoonPanel = require(script.Parent.CartoonPanel)
 local CartoonLabel = require(script.Parent.CartoonLabel)
-local Chip = require(script.Parent.IngredientPanel.Chip)
+local OrderStack = require(script.Parent.OrderStack)
+local Sprites = require(script.Parent.OrderStack.Sprites)
 local CartoonButton = require(script.Parent.CartoonButton)
 
 const create = Vide.create
+const untrack = Vide.untrack
 -- Vide 0.4.1 types `create` for 19 classes only; UIStroke and UIListLayout children are fine, UIPadding is not.
 const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }) -> Instance
 
@@ -52,6 +55,8 @@ export type Props = {
 	Queue: () -> number,
 	-- One wide row (portrait) instead of the card.
 	Strip: () -> boolean,
+	-- A desktop-sized paper: bigger layers, the line in two rows (nil = false).
+	Roomy: (() -> boolean)?,
 	OnCycle: (() -> ())?,
 	-- Text of the empty card (Content.Prep text).
 	EmptyText: string?,
@@ -63,7 +68,6 @@ export type Props = {
 
 const LOW = 0.4
 const CRITICAL = 0.15
-const MAX_TOPPINGS = 3
 
 -- Sets the LayoutOrder of a piece built by a helper (a UIListLayout row keeps them in this order).
 local function ordered(instance: any, order: number): any
@@ -75,30 +79,34 @@ local function initial(name: string): string
 	return if name == "" then "?" else string.upper(string.sub(name, 1, 1))
 end
 
--- The ring: a circle that drains from the top, colour by level.
-local function ring(size: number, patience: () -> number): Frame
+-- The patience bar: a thin level, Teal, Mustard under 40 %; nothing at all when there is no patience to show (Patience 0).
+local function patienceBar(patience: () -> number, position: UDim2, width: UDim2): Frame
 	return create("Frame")({
-		Name = "Ring",
-		Size = UDim2.fromOffset(size, size),
-		BackgroundColor3 = Theme.Tone.Cream.Top,
+		Name = "Patience",
+		AnchorPoint = Vector2.new(0, 1),
+		Position = position,
+		Size = width + UDim2.fromOffset(0, 8),
+		BackgroundColor3 = Theme.Tone.Cream.Bottom,
 		ClipsDescendants = true,
+		Visible = function(): boolean
+			return patience() > 0
+		end,
 		create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
 		createRaw("UIStroke")({
 			Color = Theme.Color.Ink,
-			Thickness = 3,
+			Thickness = 2,
 			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 		}),
 		create("Frame")({
 			Name = "Level",
-			AnchorPoint = Vector2.new(0, 1),
-			Position = UDim2.fromScale(0, 1),
-			Size = function()
-				return UDim2.fromScale(1, math.clamp(patience(), 0, 1))
+			Size = function(): UDim2
+				return UDim2.fromScale(math.clamp(patience(), 0, 1), 1)
 			end,
-			BackgroundColor3 = function()
+			BackgroundColor3 = function(): Color3
 				return if patience() > LOW then Theme.Tone.Teal.Bottom else Theme.Tone.Mustard.Bottom
 			end,
 			BorderSizePixel = 0,
+			create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
 		}),
 	})
 end
@@ -158,12 +166,15 @@ end
 local function queueChip(queue: () -> number): Frame
 	return CartoonPanel({
 		Name = "Queue",
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.fromScale(1, 0.5),
 		Tone = Theme.Tone.White,
 		Radius = Theme.Radius.Small,
 		Lip = 2,
 		Outline = 2,
 		Gloss = false,
 		Size = UDim2.fromOffset(30, 22),
+		ZIndex = 3,
 		Visible = function()
 			return queue() > 0
 		end,
@@ -183,68 +194,6 @@ local function queueChip(queue: () -> number): Frame
 	})
 end
 
--- Row of up to three topping chips.
-local function toppings(props: Props, side: number): Frame
-	const row: { any } = {
-		create("UIListLayout")({
-			FillDirection = Enum.FillDirection.Horizontal,
-			SortOrder = Enum.SortOrder.LayoutOrder,
-			Padding = UDim.new(0, 4),
-		}),
-	}
-	for index = 1, MAX_TOPPINGS do
-		const slot = index
-		-- a chip per slot, rebuilt by key: Chip is static, so a holder swaps it
-		const holder = create("Frame")({
-			Name = `Slot{index}`,
-			LayoutOrder = index,
-			Size = UDim2.fromOffset(side, side),
-			BackgroundTransparency = 1,
-			Visible = function()
-				const ticket = props.Ticket()
-				return ticket ~= nil and ticket.Toppings[slot] ~= nil
-			end,
-		})
-		const shown = Vide.source("")
-		local destroyChip: (() -> ())? = nil
-		Vide.effect(function()
-			const ticket = props.Ticket()
-			const key = if ticket ~= nil then ticket.Toppings[slot] or "" else ""
-			if key == Vide.untrack(shown) then
-				return
-			end
-			Vide.untrack(function()
-				shown(key)
-				if destroyChip ~= nil then
-					destroyChip()
-					destroyChip = nil
-				end
-				holder:ClearAllChildren()
-				if key ~= "" then
-					const destroy, view = Vide.root(function(): Frame
-						return Chip({ Key = key, Size = side })
-					end)
-					destroyChip = destroy
-					view.Parent = holder
-				end
-				return nil
-			end)
-		end)
-		Vide.cleanup(function()
-			if destroyChip ~= nil then
-				destroyChip()
-			end
-		end)
-		table.insert(row, holder)
-	end
-	return create("Frame")({
-		Name = "Toppings",
-		Size = UDim2.new(1, 0, 0, side),
-		BackgroundTransparency = 1,
-		row,
-	})
-end
-
 return function(props: Props): Frame
 	const name = function(): string
 		const ticket = props.Ticket()
@@ -260,7 +209,7 @@ return function(props: Props): Frame
 	end
 	const urgent = function(): boolean
 		const ticket = props.Ticket()
-		return ticket ~= nil and (ticket.State == "Urgent" or ticket.Patience <= CRITICAL)
+		return ticket ~= nil and (ticket.State == "Urgent" or (ticket.Patience > 0 and ticket.Patience <= CRITICAL))
 	end
 	const has = function(): boolean
 		return props.Ticket() ~= nil
@@ -282,14 +231,15 @@ return function(props: Props): Frame
 		Name = "Empty",
 		Tone = Theme.Tone.Cream,
 		Radius = Theme.Radius.Card,
-		Size = UDim2.fromScale(1, 1),
+		-- nothing to read: a slim pill, not a blank card (the Take bar comes right under it)
+		Size = UDim2.new(1, 0, 0, 40),
 		Visible = function()
 			return not has()
 		end,
 		Children = {
 			CartoonLabel({
 				Text = props.EmptyText or "No ticket yet",
-				TextSize = 16,
+				TextSize = Theme.MinTextSize,
 				Color = Theme.Color.Ink,
 				Stroke = 0,
 				Box = UDim2.fromScale(1, 1),
@@ -345,9 +295,63 @@ return function(props: Props): Frame
 			Thickness = 2,
 			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 		}),
+		-- the sprite of the pin over the flat disc (the disc is what shows until the image is through moderation)
+		create("ImageLabel")({
+			Name = "Sprite",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromOffset(28, 28),
+			BackgroundTransparency = 1,
+			Image = Sprites.Pin,
+			ScaleType = Enum.ScaleType.Fit,
+		}),
 	})
 
-	-- card (left column): header, toppings, the line
+	const roomy = props.Roomy
+	const isRoomy = function(): boolean
+		return roomy ~= nil and roomy()
+	end
+	-- the layers of the order: the same stack for both shapes (the band is fixed when the ticket is built)
+	const toppingsOf = function(): { string }
+		const ticket = props.Ticket()
+		return if ticket ~= nil then ticket.Toppings else {}
+	end
+
+	-- face and number: fixed widths (nothing grows into its neighbour); the queue chip is pinned to the right edge
+	local function who(faceSize: number, numberW: number, numberSize: number): Frame
+		return create("Frame")({
+			Name = "Who",
+			Size = UDim2.new(0, faceSize + 3 + numberW, 1, 0),
+			BackgroundTransparency = 1,
+			create("UIListLayout")({
+				FillDirection = Enum.FillDirection.Horizontal,
+				VerticalAlignment = Enum.VerticalAlignment.Center,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 3),
+			}),
+			ordered(face(faceSize, name), 1),
+			CartoonLabel({
+				LayoutOrder = 2,
+				Name = "Number",
+				Text = number,
+				TextSize = numberSize,
+				Color = Theme.Color.Ink,
+				Stroke = 0,
+				Truncate = true,
+				Box = UDim2.fromOffset(numberW, faceSize),
+				XAlignment = Enum.TextXAlignment.Left,
+				YAlignment = Enum.TextYAlignment.Center,
+			}),
+		})
+	end
+
+	-- the diamond "!" of an urgent ticket, by the pin
+	const warn = alert(urgent)
+	warn.AnchorPoint = Vector2.new(0.5, 0.5)
+	warn.Position = UDim2.new(0.5, 24, 0, 6)
+	warn.ZIndex = 5
+
+	-- card (left column): header, the stack, the line, the patience bar
 	const card = CartoonPanel({
 		Name = "Card",
 		Tone = Theme.Tone.Cream,
@@ -358,40 +362,30 @@ return function(props: Props): Frame
 		Visible = function()
 			return has() and not strip()
 		end,
-		Padding = { Left = 8, Right = 8, Top = 12, Bottom = 4 },
+		Padding = { Left = 6, Right = 6, Top = 10, Bottom = 2 },
 		Children = {
 			create("Frame")({
 				Name = "Header",
-				Size = UDim2.new(1, 0, 0, 32),
+				Size = UDim2.new(1, 0, 0, 28),
 				BackgroundTransparency = 1,
-				create("UIListLayout")({
-					FillDirection = Enum.FillDirection.Horizontal,
-					VerticalAlignment = Enum.VerticalAlignment.Center,
-					SortOrder = Enum.SortOrder.LayoutOrder,
-					Padding = UDim.new(0, 4),
-				}),
-				ordered(face(32, name), 1),
-				CartoonLabel({
-					LayoutOrder = 2,
-					Text = number,
-					TextSize = 16,
-					Color = Theme.Color.Ink,
-					Stroke = 0,
-				}),
-				ordered(ring(26, patience), 3),
-				ordered(alert(urgent), 4),
-				ordered(queueChip(props.Queue), 9),
+				who(28, 32, 15),
+				queueChip(props.Queue),
 			}),
 			create("Frame")({
 				Name = "Body",
-				Position = UDim2.fromOffset(0, 38),
-				Size = UDim2.new(1, 0, 1, -38),
+				Position = UDim2.fromOffset(0, 32),
+				Size = UDim2.new(1, 0, 1, -32 - 12),
 				BackgroundTransparency = 1,
 				create("UIListLayout")({
 					SortOrder = Enum.SortOrder.LayoutOrder,
 					Padding = UDim.new(0, 4),
 				}),
-				toppings(props, 36),
+				OrderStack({
+					Name = "Stack",
+					Toppings = toppingsOf,
+					Direction = "Vertical",
+					Band = if untrack(isRoomy) then 26 else 22,
+				}),
 				CartoonLabel({
 					LayoutOrder = 2,
 					Name = "Say",
@@ -399,17 +393,20 @@ return function(props: Props): Frame
 					TextSize = 15,
 					Color = Theme.Color.Ink,
 					Stroke = 0,
-					Box = UDim2.new(1, 0, 0, 40),
+					Box = function(): UDim2
+						return UDim2.new(1, 0, 0, if isRoomy() then 36 else 18)
+					end,
 					Wrapped = true,
 					Truncate = true,
 					XAlignment = Enum.TextXAlignment.Left,
 					YAlignment = Enum.TextYAlignment.Top,
 				}),
 			}),
+			patienceBar(patience, UDim2.new(0, 0, 1, -2), UDim2.fromScale(1, 0)),
 		},
 	})
 
-	-- strip (portrait): row 1 face, number, ring, toppings, +N; row 2 the line
+	-- strip (portrait): row 1 face, number, the layers side by side, +N; row 2 the line; the patience bar under it
 	const band = CartoonPanel({
 		Name = "Strip",
 		Tone = Theme.Tone.Cream,
@@ -420,29 +417,37 @@ return function(props: Props): Frame
 		Visible = function()
 			return has() and strip()
 		end,
-		Padding = { Left = 8, Right = 8, Top = 6, Bottom = 2 },
+		Padding = { Left = 8, Right = 8, Top = 8, Bottom = 2 },
 		Children = {
 			create("Frame")({
 				Name = "Row1",
-				Size = UDim2.new(1, 0, 0, 40),
+				Size = UDim2.new(1, 0, 0, 38),
 				BackgroundTransparency = 1,
 				create("UIListLayout")({
 					FillDirection = Enum.FillDirection.Horizontal,
 					VerticalAlignment = Enum.VerticalAlignment.Center,
 					SortOrder = Enum.SortOrder.LayoutOrder,
-					Padding = UDim.new(0, 6),
+					Padding = UDim.new(0, 8),
 				}),
-				ordered(face(36, name), 1),
-				CartoonLabel({ LayoutOrder = 2, Text = number, TextSize = 16, Color = Theme.Color.Ink, Stroke = 0 }),
-				ordered(ring(30, patience), 3),
-				ordered(alert(urgent), 4),
-				ordered(toppings(props, 32), 5),
-				ordered(queueChip(props.Queue), 9),
+				ordered(who(34, 40, 16), 1),
+				OrderStack({
+					Name = "Stack",
+					LayoutOrder = 2,
+					Toppings = toppingsOf,
+					Direction = "Horizontal",
+					Band = 36,
+				}),
+			}),
+			create("Frame")({
+				Name = "QueueRow",
+				Size = UDim2.new(1, 0, 0, 38),
+				BackgroundTransparency = 1,
+				queueChip(props.Queue),
 			}),
 			CartoonLabel({
 				Name = "Say",
-				Position = UDim2.fromOffset(0, 42),
-				Box = UDim2.new(1, 0, 0, 22),
+				Position = UDim2.fromOffset(0, 40),
+				Box = UDim2.new(1, 0, 0, 20),
 				Text = say,
 				TextSize = 15,
 				Color = Theme.Color.Ink,
@@ -451,6 +456,7 @@ return function(props: Props): Frame
 				XAlignment = Enum.TextXAlignment.Left,
 				YAlignment = Enum.TextYAlignment.Center,
 			}),
+			patienceBar(patience, UDim2.new(0, 0, 1, -2), UDim2.fromScale(1, 0)),
 		},
 	})
 
@@ -463,8 +469,11 @@ return function(props: Props): Frame
 			Text = takeProps.Text,
 			TextSize = 16,
 			Visible = takeProps.Visible,
-			AnchorPoint = Vector2.new(0.5, 1),
-			Position = UDim2.fromScale(0.5, 1),
+			AnchorPoint = Vector2.new(0.5, 0),
+			-- under the card (bottom edge) with a ticket, right under the slim pill without one
+			Position = function(): UDim2
+				return if has() then UDim2.new(0.5, 0, 1, -48) else UDim2.new(0.5, 0, 0, 46)
+			end,
 			Size = UDim2.new(1, 0, 0, 48),
 			OnActivated = takeProps.OnPress,
 		})
@@ -489,6 +498,7 @@ return function(props: Props): Frame
 		card,
 		band,
 		pin,
+		warn,
 		stamp,
 		take,
 	}) :: any

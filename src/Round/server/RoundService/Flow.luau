@@ -30,25 +30,30 @@ const MAX_SKIPS = 8 -- guard against a skip loop on a broken table
 
 const Flow = {}
 
--- Next shift at the boundary (end of Summary). A night is followed by the next day; a day shift of Day >= firstNightDay
--- is followed by a night while nights are left, in whatever vehicle (Day D -> Night N + 1 keeps D, data.md §3.3).
--- Sequence with firstNightDay = 2: D1, D2, N1, D3, N2, ... D11, N10 (user request 2026-10-12, Q-207; was: nights only
--- with the trailer, bought on Day 5). Day 1 is the tutorial day: no night after it.
-function Flow.Next(prev: Info, lastNight: number, maxDay: number, firstNightDay: number): Info
-	if not prev.IsNight and prev.Day >= firstNightDay and prev.Night < lastNight then
-		return { Day = prev.Day, Night = prev.Night + 1, IsNight = true, Attempt = 0 }
-	end
-	return { Day = math.min(prev.Day + 1, maxDay), Night = prev.Night, IsNight = false, Attempt = 0 }
+-- Next shift at the boundary (end of Summary). Calendar (user decision 2026-10-12): Day 1 is the tutorial day shift (a
+-- real day, tutorial + the rest of the day); from Day 2 on there are ONLY night shifts, forever: D1, N1 (Day 2), N2
+-- (Day 3) ... N10 (Day 11), Finale. Day keeps counting one per shift (unlocks, order phases and growth read it), so
+-- night k is always played on Day k + 1. Past the last night (never reached: it ends in the Finale) the last night repeats.
+function Flow.Next(prev: Info, lastNight: number, maxDay: number): Info
+	return {
+		Day = math.min(prev.Day + 1, maxDay),
+		Night = math.min(prev.Night + 1, lastNight),
+		IsNight = true,
+		Attempt = 0,
+	}
 end
 
--- Nights played before the day shift of `day` (clamped): Day d >= firstNightDay + 1 comes after Night d - firstNightDay
-function Flow.NightsBefore(day: number, lastNight: number, firstNightDay: number): number
-	return math.clamp(day - firstNightDay, 0, lastNight)
+-- Shift played on `day` (clamped): Day 1 is the day shift, Day d >= 2 is Night d - 1
+function Flow.OfDay(day: number, lastNight: number): Info
+	if day <= 1 then
+		return { Day = 1, Night = 0, IsNight = false, Attempt = 0 }
+	end
+	return { Day = day, Night = math.clamp(day - 1, 1, lastNight), IsNight = true, Attempt = 0 }
 end
 
 -- Day on which night k is played
-function Flow.DayOfNight(night: number, firstNightDay: number): number
-	return night + firstNightDay - 1
+function Flow.DayOfNight(night: number): number
+	return night + 1
 end
 
 -- First phase of a shift: Intro only on the first shift of a new run; a night opens with the boss call

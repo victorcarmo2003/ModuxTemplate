@@ -357,6 +357,16 @@ end
 
 -- Bar -----------------------------------------------------------------------------------------------------------------
 
+-- The focused prep mode draws the cooking itself (the ring, the colour of the sausage, the light arc of HintMark): the dark world bars of the
+-- slots would be a second, ugly copy of it (playtest 2026-10-12). PrepController flips this while the mode is on screen.
+const barsHidden = Vide.source(false)
+
+function Slots.SetBarsHidden(hidden: boolean)
+	if Vide.untrack(barsHidden) ~= hidden then
+		barsHidden(hidden)
+	end
+end
+
 function Slots.Bar(spot: Spot, height: number, progress: () -> number, visible: () -> boolean)
 	const anchor = Instance.new("Attachment")
 	anchor.Name = `Bar_Slot{spot.Slot}`
@@ -368,7 +378,9 @@ function Slots.Bar(spot: Spot, height: number, progress: () -> number, visible: 
 		Name = `ProgressBar_Slot{spot.Slot}`,
 		Adornee = anchor,
 		Progress = progress,
-		Visible = visible,
+		Visible = function(): boolean
+			return visible() and not barsHidden()
+		end,
 		StudsOffset = Vector3.zero,
 		MaxDistance = BAR_MAX_DISTANCE,
 	})

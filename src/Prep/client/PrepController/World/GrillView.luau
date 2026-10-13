@@ -5,7 +5,7 @@
 --   predicted   the same, steadier, on the roller of a Place that waits for the server
 --   carry       the sausage that follows the pointer while it is dragged (snaps to the roller under it)
 --   ring        the flip ring: CylinderHandleAdornment (a real ring, InnerRadius) on the grill part, scale From -> To in the window
---   check       a Green check mark above a ready sausage (a shape, not only a colour)
+--   check       a HintMark Check (Green disc, check glyph, in studs over the sausage) on a ready sausage (a shape, not only a colour)
 --   turn        the flip: a 180 degree turn about the long axis with a hop, on the REAL sausage of the world (both of its models)
 --   shake       a refusal / an early tap: a short side to side shiver of the real sausage
 --   fly         a collected sausage in an arc to its slot on the rail
@@ -20,6 +20,9 @@ local Content = require(ReplicatedStorage.shared.Content)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
 local Fx = require(StarterPlayer.StarterPlayerScripts.client.Kitchen.KitchenController.Fx)
 local Slots = require(StarterPlayer.StarterPlayerScripts.client.Kitchen.KitchenController.Slots)
+local GrillRig = require(script.Parent.GrillRig)
+local Juice = require(script.Parent.Juice)
+local HintMark = require(StarterPlayer.StarterPlayerScripts.client.Interface.HintMark)
 
 export type Ring = "None" | "Converge" | "Late"
 
@@ -32,6 +35,8 @@ export type View = {
 	SetCheck: (self: View, slot: number, on: boolean) -> (),
 	-- The sausage under the pointer: nil hides it. `snap` = the roller it will land on, `grilled` = the cooked model.
 	SetCarry: (self: View, point: Vector3?, snap: number?, grilled: boolean) -> (),
+	-- The carried model, handed over (the bin swallows it); nil when nothing is carried.
+	TakeCarry: (self: View) -> Model?,
 	-- The real sausage of the slot: turned (sign +1 forward, -1 back), shivered, hidden, flown to the rail.
 	Turn: (self: View, slot: number, sign: number) -> (),
 	Shake: (self: View, slot: number, amount: number?) -> (),
@@ -41,7 +46,15 @@ export type View = {
 	Reject: (self: View, slot: number) -> (),
 	Burst: (self: View, slot: number, band: string) -> (),
 	PoseOf: (self: View, slot: number) -> CFrame?,
-	ModelOf: (self: View, slot: number) -> Instance?,
+	-- The ONE model a contour is drawn around: the raw sausage while it cooks, the grilled one once it is done (the two are
+	-- cross-faded, and an outline on the pair is drawn twice). `done` = the cooking is over.
+	ModelOf: (self: View, slot: number, done: boolean?) -> Instance?,
+	-- Grill marks on the face that was down, shown after the flip: strength 0 (none) .. 1 (dark), by the server clock.
+	SetMarks: (self: View, slot: number, strength: number) -> (),
+	-- The slot is in use at this level of the grill (the placeholder plate covers these only).
+	SetActive: (self: View, slot: number, active: boolean) -> (),
+	-- How many rollers cook (the heat of the placeholder bars follows).
+	SetBusy: (self: View, busy: number, total: number) -> (),
 	Step: (self: View, dt: number, time: number) -> (),
 	Destroy: (self: View) -> (),
 }
@@ -52,10 +65,13 @@ export type Options = {
 	-- the live slot of the grill / rail (KitchenController:SlotView)
 	SlotView: (kind: string, slot: number) -> Slots.Live?,
 	Slots: number, -- how many rollers to look for (8)
+	-- the juice of the world (pops, bursts, floating words); World.Juice
+	Juice: () -> Juice.Juice,
 }
 
 type Anim = {
-	Kind: string, -- Turn | Shake
+	Kind: string, -- Turn | Shake | Land
+	Scales: { number },
 	T: number,
 	Duration: number,
 	Sign: number,
@@ -75,12 +91,15 @@ type Face = {
 	GhostMode: string,
 	Ring: CylinderHandleAdornment?,
 	RingKind: Ring,
-	Check: { BoxHandleAdornment },
+	Check: HintMark.Mark?,
 	CheckOn: boolean,
 	Anim: Anim?,
 	Hidden: boolean,
 	HiddenContainer: Model?,
 	Reject: Reject?,
+	Known: Model?, -- the container seen last frame (a new one = a sausage landed)
+	Marks: { Part },
+	MarkStrength: number,
 }
 
 const GrillView = {}
@@ -88,8 +107,13 @@ const GrillView = {}
 const GHOST_PART_ALPHA = 0.85 -- Transparency of the ghost while carried (more solid than the invitation)
 const CARRY_SMOOTH = 22 -- 1/s: how fast the carried sausage catches the pointer
 const LATE_ALPHA = 0.15
-const RING_LIFT = 0.28 -- studs over the roller
+const RING_LIFT = 0.36 -- studs over the roller (clear of the 0.24 sausage: the ring never shares a plane with it)
 const CHECK_LIFT = 0.62
+const LAND_HEIGHT = 0.4 -- studs a placed sausage falls from
+const LAND_TIME = 0.3 -- s
+const MARK_X = { -0.25, 0, 0.25, 0.1, -0.1 } -- studs along the sausage where the bars touched it
+const MARK_TOP = 0.236 -- studs over the foot of the sausage (its top is 0.24)
+const MARK_COLOR = Color3.fromHex("#3A2418")
 
 -- The raw / grilled sausage model of the kit (ReplicatedStorage.Assets.Items.Food), nil when it is missing.
 local function template(name: string): Model?
@@ -151,6 +175,9 @@ function GrillView.new(options: Options): View
 	const perfect = (if tolerance ~= nil then tolerance.Perfect else 5) / 100
 	const good = (if tolerance ~= nil then tolerance.Good else 10) / 100
 	local lastRotation = CFrame.identity
+	local busy, busyTotal = 0, 1
+	const activeSlots: { [number]: boolean } = {}
+	local seeded = false
 
 	local function faceOf(slot: number): Face
 		const known = faces[slot]
@@ -163,12 +190,15 @@ function GrillView.new(options: Options): View
 				GhostMode = "None",
 				Ring = nil,
 				RingKind = "None",
-				Check = {},
+				Check = nil,
 				CheckOn = false,
 				Anim = nil,
 				Hidden = false,
 				HiddenContainer = nil,
 				Reject = nil,
+				Known = nil,
+				Marks = {},
+				MarkStrength = 0,
 			}
 			faces[slot] = face
 			return face
@@ -188,6 +218,53 @@ function GrillView.new(options: Options): View
 		const pose = spot.Host.CFrame * spot.Offset
 		lastRotation = pose.Rotation
 		return pose
+	end
+
+	-- the placeholder bar grill (Parts, named like AST-120); the roller grill of the trailer is hidden meanwhile
+	const rig = GrillRig.new({
+		Folder = folder,
+		Rules = options.Rules,
+		PoseOf = poseOf,
+		Active = function(slot: number): boolean
+			return activeSlots[slot] == true
+		end,
+		Roller = function(): Model?
+			for slot = 1, options.Slots do
+				const entry = options.SlotView("grill", slot)
+				if entry ~= nil and entry.Spot.Host.Parent ~= nil then
+					return entry.Spot.Host:FindFirstAncestorOfClass("Model")
+				end
+			end
+			return nil
+		end,
+		Slots = options.Slots,
+	})
+
+	-- the marks the bars left on the face that was down: a few dark strips across the top of the sausage once it has been flipped
+	local function ensureMarks(face: Face): { Part }
+		if #face.Marks == 0 or face.Marks[1].Parent == nil then
+			for _, mark in face.Marks do
+				mark:Destroy()
+			end
+			table.clear(face.Marks)
+			for index = 1, rules.Rig.Marks.Count do
+				const mark = Instance.new("Part")
+				mark.Name = "GrillMark"
+				mark.Anchored = true
+				mark.CanCollide = false
+				mark.CanQuery = false
+				mark.CanTouch = false
+				mark.CastShadow = false
+				mark.Massless = true
+				mark.Material = Enum.Material.SmoothPlastic
+				mark.Color = MARK_COLOR
+				mark.Size = Vector3.new(rules.Rig.Marks.Width, 0.012, rules.Rig.Marks.Length)
+				mark.Transparency = 1
+				mark.Parent = folder
+				face.Marks[index] = mark
+			end
+		end
+		return face.Marks
 	end
 
 	-- Ghost ----------------------------------------------------------------------------------------------------------------
@@ -220,36 +297,15 @@ function GrillView.new(options: Options): View
 			ring.Name = "FlipRing"
 			ring.Adornee = host
 			ring.Color3 = Theme.Color.Mustard
-			ring.AlwaysOnTop = false
+			-- on top of everything: a flat ring a hair over the sausage shared its plane with it and flickered
+			ring.AlwaysOnTop = true
 			ring.ZIndex = 2
-			ring.Height = 0.02
+			ring.Height = 0.012
 			ring.Transparency = 1
 			ring.Parent = folder
 			face.Ring = ring
 		end
 		return ring :: CylinderHandleAdornment
-	end
-
-	local function ensureCheck(face: Face, host: BasePart): { BoxHandleAdornment }
-		const bars = face.Check
-		if #bars == 0 or bars[1].Parent == nil or bars[1].Adornee ~= host then
-			for _, bar in bars do
-				bar:Destroy()
-			end
-			table.clear(bars)
-			for index = 1, 2 do
-				const bar = Instance.new("BoxHandleAdornment")
-				bar.Name = `Check{index}`
-				bar.Adornee = host
-				bar.Color3 = Theme.Color.Green
-				bar.AlwaysOnTop = false
-				bar.ZIndex = 3
-				bar.Transparency = 1
-				bar.Parent = folder
-				table.insert(bars, bar)
-			end
-		end
-		return bars
 	end
 
 	-- Moving the real models -------------------------------------------------------------------------------------------------
@@ -280,8 +336,10 @@ function GrillView.new(options: Options): View
 			return
 		end
 		const bases: { CFrame } = {}
+		const scales: { number } = {}
 		for _, model in models do
 			table.insert(bases, model:GetPivot())
+			table.insert(scales, model:GetScale())
 		end
 		if face.Anim == nil then
 			for _, model in models do
@@ -294,6 +352,7 @@ function GrillView.new(options: Options): View
 			Duration = duration,
 			Sign = sign,
 			Amount = amount,
+			Scales = scales,
 			Models = models,
 			Bases = bases,
 			Container = entry.Container,
@@ -308,14 +367,34 @@ function GrillView.new(options: Options): View
 			const centre = Slots.FlipCenter
 		return CFrame.new(0, rules.Ring.Hop * math.sin(math.pi * t) + centre, 0) * CFrame.Angles(angle, 0, 0) * CFrame.new(0, -centre, 0)
 		end
+		if anim.Kind == "Land" then
+			-- falls from LAND_HEIGHT, a small rebound at the end
+			const fall = 1 - math.min(t / 0.72, 1)
+			const rebound = if t > 0.72 then math.sin((t - 0.72) / 0.28 * math.pi) * 0.06 else 0
+			return CFrame.new(0, LAND_HEIGHT * fall * fall + rebound, 0)
+		end
 		-- Shake: side to side along the roller, dying out
 		return CFrame.new(0, 0, math.sin(t * math.pi * 7) * anim.Amount * (1 - t))
+	end
+
+	-- the squash of a landing: stretched while it falls, flat at the touch, then settling (1 for the other animations)
+	local function scaleOf(anim: Anim, t: number): number
+		if anim.Kind ~= "Land" then
+			return 1
+		end
+		if t < 0.72 then
+			return 1 + 0.06 * (t / 0.72)
+		end
+		return 1 + 0.12 * math.sin((t - 0.72) / 0.28 * math.pi * 2) * (1 - (t - 0.72) / 0.28)
 	end
 
 	local function finishAnim(face: Face, anim: Anim)
 		face.Anim = nil
 		for index, model in anim.Models do
 			if model.Parent ~= nil then
+				if anim.Kind == "Land" then
+					model:ScaleTo(anim.Scales[index])
+				end
 				model:PivotTo(anim.Bases[index] * offsetOf(anim, 1))
 				if anim.Host.Parent ~= nil then
 					Slots.Attach(model, anim.Host)
@@ -332,13 +411,32 @@ function GrillView.new(options: Options): View
 		return poseOf(slot)
 	end
 
-	function self.ModelOf(_: any, slot: number): Instance?
+	function self.ModelOf(_: any, slot: number, done: boolean?): Instance?
 		const face = faces[slot]
 		const entry = options.SlotView("grill", slot)
 		if entry ~= nil and entry.Container ~= nil then
+			-- ONE of the two cross-faded models, never the pair: an outline on both is doubled
+			const raw, over = entry.Raw, entry.Over
+			if done == true and over ~= nil and over.Parent ~= nil then
+				return over
+			elseif raw ~= nil and raw.Parent ~= nil then
+				return raw
+			end
 			return entry.Container
 		end
 		return if face ~= nil then face.Ghost else nil
+	end
+
+	function self.SetBusy(_: any, count: number, total: number)
+		busy, busyTotal = count, total
+	end
+
+	function self.SetActive(_: any, slot: number, active: boolean)
+		activeSlots[slot] = active
+	end
+
+	function self.SetMarks(_: any, slot: number, strength: number)
+		faceOf(slot).MarkStrength = strength
 	end
 
 	function self.SetGhost(_: any, slot: number, mode: string)
@@ -387,27 +485,17 @@ function GrillView.new(options: Options): View
 	function self.SetCheck(_: any, slot: number, on: boolean)
 		const face = faceOf(slot)
 		face.CheckOn = on
-		const entry = options.SlotView("grill", slot)
 		const pose = poseOf(slot)
-		if not on or entry == nil or pose == nil then
-			for _, bar in face.Check do
-				bar.Transparency = 1
+		if not on or pose == nil then
+			if face.Check ~= nil then
+				face.Check:Hide()
 			end
 			return
 		end
-		const host = entry.Spot.Host
-		const bars = ensureCheck(face, host)
-		const size = grill.CheckSize
-		-- a check lying over the roller, readable from the camera above: a short stroke and a long one
-		const base = pose * CFrame.new(0, CHECK_LIFT, 0)
-		const short = base * CFrame.new(-size * 0.45, 0, size * 0.1) * CFrame.Angles(0, math.rad(45), 0)
-		const long = base * CFrame.new(size * 0.35, 0, -size * 0.1) * CFrame.Angles(0, math.rad(-50), 0)
-		bars[1].Size = Vector3.new(size * 0.55, 0.03, size * 0.16)
-		bars[2].Size = Vector3.new(size * 1.1, 0.03, size * 0.16)
-		bars[1].CFrame = host.CFrame:ToObjectSpace(short)
-		bars[2].CFrame = host.CFrame:ToObjectSpace(long)
-		bars[1].Transparency = 0
-		bars[2].Transparency = 0
+		-- one HintMark per roller, made on first use: a Green disc with a check, in studs, over the sausage (no bars of its own)
+		const mark = face.Check or HintMark.new()
+		face.Check = mark
+		mark:Show("Check", (pose * CFrame.new(0, CHECK_LIFT, 0)).Position, grill.CheckSize)
 	end
 
 	function self.SetCarry(_: any, point: Vector3?, snap: number?, grilled: boolean)
@@ -436,6 +524,14 @@ function GrillView.new(options: Options): View
 			pose = CFrame.new(point) * lastRotation.Rotation
 		end
 		carryTarget = pose
+	end
+
+	function self.TakeCarry(_: any): Model?
+		const model = carry
+		carry = nil
+		carryTarget = nil
+		carryPose = nil
+		return model
 	end
 
 	function self.Turn(_: any, slot: number, sign: number)
@@ -477,6 +573,7 @@ function GrillView.new(options: Options): View
 			return false
 		end
 		table.insert(flights, { Model = model, From = start, To = spot.Host.CFrame * spot.Offset, T = 0, Slot = slot })
+		options.Juice():Burst("Steam", start.Position + Vector3.new(0, 0.3, 0), 4)
 		return true
 	end
 
@@ -496,17 +593,42 @@ function GrillView.new(options: Options): View
 			return
 		end
 		const at = pose.Position + Vector3.new(0, 0.3, 0)
-		if band == "Perfect" then
-			Fx.Burst(at, "Ready", 12, Theme.Color.Mustard)
-		elseif band == "Good" then
-			Fx.Burst(at, "Ready", 6, Theme.Color.Cream)
-		else
-			Fx.Burst(at, "Dust", 6)
-		end
+		const entry = options.SlotView("grill", slot)
+		options.Juice():Grade(band, at, if entry ~= nil then entry.Container else nil, nil)
 	end
 
 	function self.Step(_: any, dt: number, time: number)
+		rig:Step(dt, busy, busyTotal)
 		for slot, face in faces do
+			-- a new real sausage on the roller = it landed (the first frame only learns what is already there)
+			const live = options.SlotView("grill", slot)
+			const container = if live ~= nil then live.Container else nil
+			if container ~= face.Known then
+				if container ~= nil and seeded and face.Anim == nil and not face.Hidden then
+					startAnim(slot, "Land", LAND_TIME, 1, 0)
+					const pose = poseOf(slot)
+					if pose ~= nil then
+						options.Juice():Burst("Dust", pose.Position + Vector3.new(0, 0.05, 0), 6)
+						options.Juice():Burst("Steam", pose.Position + Vector3.new(0, 0.15, 0), 3)
+					end
+				end
+				face.Known = container
+			end
+			-- the grill marks of the flipped face
+			if face.MarkStrength > 0 and face.Anim == nil and container ~= nil then
+				const pose = poseOf(slot)
+				if pose ~= nil then
+					const marks = ensureMarks(face)
+					for index, mark in marks do
+						mark.CFrame = pose * CFrame.new(MARK_X[index] or 0, MARK_TOP, 0)
+						mark.Transparency = 1 - 0.82 * math.clamp(face.MarkStrength, 0, 1)
+					end
+				end
+			else
+				for _, mark in face.Marks do
+					mark.Transparency = 1
+				end
+			end
 			-- ghost: invitation breathes, a prediction is steady
 			const ghostModel = face.Ghost
 			if face.GhostMode ~= "None" then
@@ -547,6 +669,9 @@ function GrillView.new(options: Options): View
 					const t = math.clamp(anim.T / anim.Duration, 0, 1)
 					for index, model in anim.Models do
 						if model.Parent ~= nil then
+							if anim.Kind == "Land" then
+								model:ScaleTo(anim.Scales[index] * scaleOf(anim, t))
+							end
 							model:PivotTo(anim.Bases[index] * offsetOf(anim, t))
 						end
 					end
@@ -568,6 +693,7 @@ function GrillView.new(options: Options): View
 				end
 			end
 		end
+		seeded = true
 		-- flights to the rail
 		for index = #flights, 1, -1 do
 			const flight = flights[index]
@@ -576,6 +702,8 @@ function GrillView.new(options: Options): View
 			const position = flight.From.Position:Lerp(flight.To.Position, easeInOut(t)) + Vector3.new(0, grill.CollectArc * math.sin(math.pi * t), 0)
 			flight.Model:PivotTo(CFrame.new(position) * flight.To.Rotation)
 			if t >= 1 then
+				options.Juice():Burst("Sparks", flight.To.Position + Vector3.new(0, 0.25, 0), 5, Theme.Color.Cream)
+				options.Juice():Burst("Steam", flight.To.Position + Vector3.new(0, 0.2, 0), 3)
 				flight.Model:Destroy()
 				table.remove(flights, index)
 			end
@@ -592,7 +720,11 @@ function GrillView.new(options: Options): View
 	end
 
 	function self.Destroy(_: any)
+		rig:Destroy()
 		for _, face in faces do
+			for _, mark in face.Marks do
+				mark:Destroy()
+			end
 			const anim = face.Anim
 			if anim ~= nil then
 				finishAnim(face, anim)
@@ -603,8 +735,8 @@ function GrillView.new(options: Options): View
 			if face.Ring ~= nil then
 				face.Ring:Destroy()
 			end
-			for _, bar in face.Check do
-				bar:Destroy()
+			if face.Check ~= nil then
+				face.Check:Destroy()
 			end
 		end
 		for slot in faces do

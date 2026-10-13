@@ -361,6 +361,21 @@ function Grill.CollectSlot(ctx: Context, vehicle: string, slot: number): (boolea
 	return collectSlot(ctx, grill, slot, true)
 end
 
+-- The bin by drag (prep mode, 2026-10-12): the sausage of `slot` (raw, cooking or ready, flipped or not) is thrown away. The unit
+-- that left the stock is lost. (true, nil) or (false, "Empty").
+function Grill.Discard(ctx: Context, vehicle: string, slot: number): (boolean, string?)
+	const grill, record = findSlot(vehicle, slot)
+	if grill == nil or record == nil or record.State == "Empty" then
+		return false, "Empty"
+	end
+	flippedOf(grill)[slot] = nil
+	grill.Records[slot] = StationApi.empty(GRILL)
+	sync(ctx, grill)
+	ctx.Publish(grill)
+	refreshCollect(ctx, grill)
+	return true, nil
+end
+
 -- Flip score of the sausage in `slot`, nil = not flipped (or no sausage).
 function Grill.FlipScoreOf(vehicle: string, slot: number): number?
 	const grill = findSlot(vehicle, slot)

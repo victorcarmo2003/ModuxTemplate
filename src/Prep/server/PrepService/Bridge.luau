@@ -84,6 +84,15 @@ function Bridge.Trash(kitchen: any, items: any, player: Player, plateOpen: boole
 	return result.Hand
 end
 
+-- The bin by drag: a sausage of the grill slot / rail position. (ok, reason)
+function Bridge.TrashSausage(kitchen: any, player: Player, from: string, slot: number): (boolean, string)
+	const ok, reason = kitchen:TrashSausage(player, from, slot)
+	if ok == true then
+		return true, "None"
+	end
+	return false, Bridge.Reason(reason)
+end
+
 -- slot 0 = the server picks (Place)
 function Bridge.Grill(kitchen: any, player: Player, act: string, slot: number): Outcome
 	const result, reason = kitchen:GrillAct(player, act, if slot > 0 then slot else nil)

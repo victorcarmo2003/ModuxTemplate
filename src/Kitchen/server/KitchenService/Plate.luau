@@ -15,6 +15,7 @@
 --                 through the BIN-C "discard" path so the Discarded signal of ANM-002 still fires. Altered bun / sausage
 --                 are never thrown away from here: only a hot dog can resolve the anomaly.
 --   GrillAct      Place / Flip / Collect, the grill moves without a prompt (Stations/Grill.luau).
+--   TrashSausage  the bin by drag: a sausage of a grill slot or of the rail is thrown away (2026-10-12).
 -- Results are (value?, reason?): reason is a Content.Prep.Reasons key (NoSession, NoStock, NoSausage, HandsFull, Busy,
 -- NoStation, Invalid). The plate band travels in ItemService:Give options (Quality, TASK-171).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -76,7 +77,10 @@ export type Deps = {
 	Discard: (player: Player) -> boolean, -- BIN-C "discard" of the hot dog in hand
 }
 
+export type TrashFrom = "Grill" | "Rail"
+
 export type PlateApi = {
+	TrashSausage: (player: Player, from: TrashFrom, slot: number) -> (boolean, string?),
 	Begin: (player: Player, slot: number?) -> (Ticket?, string?),
 	Finish: (player: Player, spec: Spec) -> (Result?, string?),
 	Refund: (player: Player) -> boolean,
@@ -245,6 +249,22 @@ function Plate.new(deps: Deps): PlateApi
 		return out
 	end
 
+	-- The bin by drag: a sausage of the grill slot or of the rail position (1 = front). (ok, reason): Invalid, NoSausage.
+	local function trashSausage(player: Player, from: TrashFrom, slot: number): (boolean, string?)
+		if not deps.IsMember(player) or not isSlot(slot) then
+			return false, "Invalid"
+		end
+		const vehicle = deps.Vehicle()
+		if from == "Grill" then
+			const ok = Grill.Discard(ctx, vehicle, slot)
+			return ok, if ok then nil else "NoSausage"
+		elseif from == "Rail" then
+			const ok = Rail.DiscardAt(ctx, vehicle, slot)
+			return ok, if ok then nil else "NoSausage"
+		end
+		return false, "Invalid"
+	end
+
 	local function grill(player: Player, act: GrillAction, slot: number?): (GrillResult?, string?)
 		if not deps.IsMember(player) then
 			return nil, "Invalid"
@@ -296,6 +316,7 @@ function Plate.new(deps: Deps): PlateApi
 		Refund = refund,
 		Trash = trash,
 		Grill = grill,
+		TrashSausage = trashSausage,
 		Of = function(player: Player): Ticket?
 			const ticket = plates[player]
 			return if ticket then copy(ticket) else nil

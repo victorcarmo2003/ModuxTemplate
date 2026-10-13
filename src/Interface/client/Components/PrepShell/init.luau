@@ -20,6 +20,7 @@
 -- inside the safe area). Tabs and buttons are CartoonButtons: touch targets >= 44 px, Selectable for the gamepad. No red.
 -- Pure: only props, no network, no input binding (the PrepController binds keys and the gamepad). Build it inside a Vide root.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local GuiService = game:GetService("GuiService")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Theme)
 local Icons = require(script.Parent.Icons)
@@ -30,6 +31,8 @@ local CartoonLabel = require(script.Parent.CartoonLabel)
 local Vignette = require(script.Parent.Vignette)
 local Seal = require(script.Parent.PlateView.Seal)
 local Layout = require(script.Layout)
+local Objective = require(script.Parent.Parent.Objective)
+local Zones = require(script.Parent.Parent.Zones)
 
 const create = Vide.create
 const source = Vide.source
@@ -42,6 +45,9 @@ const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }
 export type Tab = { Key: string, Label: string, Icon: string }
 
 export type Pip = { Label: string, Grade: Seal.Grade? }
+
+-- The live grade of the plate (polish 2026-10-12): the mean score 0..100 of the stages done and the shape of its band.
+export type Note = { Score: number, Grade: Seal.Grade }
 
 export type NextButton = {
 	Label: () -> string,
@@ -77,6 +83,19 @@ export type ProgressCard = {
 	Value: () -> number,
 }
 
+-- The bin zone of the minimal mode (2D, at Layout.Mini.Bin): shown while there is something to drag, the lid opens and the zone lights
+-- while a dragged item is inside it. The drop is tested in px by the world (`Bind` hands it the hit function and the centre).
+export type BinZone = {
+	Wanted: () -> boolean,
+	-- a dragged item is inside the zone
+	Over: () -> boolean,
+	-- changes on every item swallowed (the zone bounces)
+	Chomp: () -> number,
+	Label: string,
+	-- Called with the functions of the zone while it is mounted ((viewport px) -> inside, () -> centre in viewport px) and with nil on unmount.
+	Bind: (hit: ((Vector2) -> boolean)?, centre: (() -> Vector2?)?) -> (),
+}
+
 export type Slots = {
 	Ticket: (layout: () -> Layout.Result) -> any,
 	Board: (layout: () -> Layout.Result) -> any,
@@ -96,6 +115,8 @@ export type Props = {
 	HasPanel: () -> boolean,
 	Next: NextButton,
 	Trash: TrashButton,
+	-- The 2D bin zone of the minimal mode (nil = none).
+	Bin: BinZone?,
 	Assist: AssistButton,
 	Cash: () -> number,
 	Clock: () -> string,
@@ -114,14 +135,30 @@ export type Props = {
 	-- clock and sanity); the section tabs and the buttons go to the bottom, a thin progress card to the top centre. nil / false =
 	-- the 2D chrome above, unchanged.
 	Minimal: (() -> boolean)?,
+	-- The minimal mode shows the sections as a row of indicator dots (the active one a longer pill), each a button. `Near` = the index
+	-- of the tab the camera is closest to while it pans along the trail (0 / nil = the tab in front); `DotSize` / `DotActive` = px of
+	-- the dot and of the active pill (Rules.Camera.Pan.Dots). The hit area stays the tab rectangle (>= 44 px).
+	Near: (() -> number)?,
+	DotSize: number?,
+	DotActive: number?,
 	Progress: ProgressCard?,
-	-- The seal of the finished plate (transient, 96 px) and the word under it.
+	-- The seal of the finished plate (transient, 96 px) and the word under it; `SealScore` is the number that rolls 0 -> N under it.
 	Seal: (() -> Seal.Grade?)?,
 	SealLabel: ((grade: Seal.Grade) -> string)?,
+	SealScore: (() -> number)?,
+	-- The live note of the progress card (replaces the three 18 px pips) and the Perfects in a row (a chip from two).
+	Note: (() -> Note?)?,
+	Streak: (() -> number)?,
 	-- "Tap and tap" accessibility chip, next to Assist (nil = no chip).
 	TapMode: AssistButton?,
 	-- The gamepad is the device: the buttons wear their button glyph (B Leave, Y Next, LB / RB the first / last tab).
 	Pad: (() -> boolean)?,
+	-- The tutorial step of the moment (Objective module): when there is one, the progress card IS the tutorial card (chip, objective,
+	-- hint, live note, bar) and the Skip pill sits beside it; false / nil = the plain progress card.
+	Objective: (() -> Objective.Card | false)?,
+	OnSkip: (() -> ())?,
+	-- Overlays that are up (Zones module, screen px): the hint and the toast keep off them. nil = none.
+	Reserved: (() -> { Zones.Zone })?,
 	Name: string?,
 }
 
@@ -257,6 +294,92 @@ local function binGlyph(): Frame
 	})
 end
 
+-- The Assist chip's picture: a target (ring, dot, four ticks), 24 px, Ink: "the aim is easier". Frames only.
+local function assistGlyph(): Frame
+	local function tick(x: number, y: number, w: number, h: number): Frame
+		return create("Frame")({
+			Position = UDim2.fromOffset(x, y),
+			Size = UDim2.fromOffset(w, h),
+			BackgroundColor3 = Theme.Color.Ink,
+			BorderSizePixel = 0,
+			create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+		})
+	end
+	return create("Frame")({
+		Name = "AssistGlyph",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(24, 24),
+		BackgroundTransparency = 1,
+		ZIndex = 3,
+		create("Frame")({
+			Position = UDim2.fromOffset(4, 4),
+			Size = UDim2.fromOffset(16, 16),
+			BackgroundTransparency = 1,
+			create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+			createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
+		}),
+		tick(9, 9, 6, 6),
+		tick(10.5, 0, 3, 4),
+		tick(10.5, 20, 3, 4),
+		tick(0, 10.5, 4, 3),
+		tick(20, 10.5, 4, 3),
+	})
+end
+
+-- A little Frame icon for a section (24 px box, Ink on the tab): the grate, the board with its cut, the bottle, the plate.
+local function tabIcon(key: string, visible: () -> boolean, position: () -> UDim2): Frame
+	local function piece(x: number, y: number, w: number, h: number, color: Color3, corner: number): Frame
+		return create("Frame")({
+			Position = UDim2.fromOffset(x, y),
+			Size = UDim2.fromOffset(w, h),
+			BackgroundColor3 = color,
+			BorderSizePixel = 0,
+			create("UICorner")({ CornerRadius = UDim.new(corner, 0) }),
+		})
+	end
+	const ink, cream = Theme.Color.Ink, Theme.Color.Cream
+	local parts: { Frame }
+	if key == "Grill" then
+		parts = {
+			piece(3, 3, 3, 15, ink, 0.5),
+			piece(8, 3, 3, 15, ink, 0.5),
+			piece(13, 3, 3, 15, ink, 0.5),
+			piece(18, 3, 3, 15, ink, 0.5),
+			piece(1, 19, 22, 4, ink, 0.5),
+		}
+	elseif key == "Board" or key == "Build" then
+		parts = {
+			piece(1, 5, 22, 15, ink, 0.25),
+			piece(5, 11, 14, 3, cream, 0.5),
+			piece(17, 7, 4, 4, cream, 0.5),
+		}
+	elseif key == "Toppings" then
+		parts = {
+			piece(9, 1, 6, 6, ink, 0.3),
+			piece(5, 6, 14, 17, ink, 0.3),
+			piece(9, 12, 6, 6, cream, 0.5),
+		}
+	else
+		-- Serve (the plate) and anything else: a plate seen from above
+		parts = {
+			piece(1, 1, 22, 22, ink, 0.5),
+			piece(5, 5, 14, 14, cream, 0.5),
+			piece(9, 9, 6, 6, ink, 0.5),
+		}
+	end
+	return create("Frame")({
+		Name = "Icon",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = position,
+		Size = UDim2.fromOffset(24, 24),
+		BackgroundTransparency = 1,
+		Visible = visible,
+		ZIndex = 3,
+		parts,
+	}) :: Frame
+end
+
 return function(props: Props): Frame
 	const area = source(Vector2.new(667, 375))
 	const root = create("Frame")({
@@ -304,8 +427,29 @@ return function(props: Props): Frame
 	const pad = function(): boolean
 		return props.Pad ~= nil and props.Pad()
 	end
+	const objectiveCard = function(): Objective.Card | false
+		return if props.Objective ~= nil then props.Objective() else false
+	end
 	const layout = Vide.derive(function(): Layout.Result
-		return Layout.Compute(canvas(), props.HasPanel(), #tabs, activeIndex(), minimal())
+		-- the zones of the overlays are screen px of the viewport; the canvas is in UI px from the top left of this gui
+		const reserved: { Layout.Rect } = {}
+		if props.Reserved ~= nil then
+			const k = scale()
+			const origin = root.AbsolutePosition
+			for _, zone in props.Reserved() do
+				table.insert(reserved, {
+					X = (zone.X - origin.X) / k,
+					Y = (zone.Y - origin.Y) / k,
+					W = zone.W / k,
+					H = zone.H / k,
+				})
+			end
+		end
+		return Layout.Compute(canvas(), props.HasPanel(), #tabs, activeIndex(), minimal(), {
+			Taps = props.TapMode ~= nil,
+			Objective = objectiveCard() ~= false,
+			Reserved = reserved,
+		})
 	end)
 	-- position / size of a block of the minimal mode (zero in the 2D chrome: those blocks are hidden there)
 	local function miniRect(pick: (Layout.Mini) -> Layout.Rect): () -> Layout.Rect
@@ -342,6 +486,21 @@ return function(props: Props): Frame
 			return UDim2.fromOffset(r.W, r.H)
 		end
 	end
+
+	-- the pill that holds Leave, Assist and Tap in the 3D chrome (U-2): one Ink shape instead of three loose buttons
+	const pill = CartoonPanel({
+		Name = "Pill",
+		Tone = Theme.Tone.Ink,
+		Radius = Theme.Radius.Pill,
+		Lip = 3,
+		Visible = minimal,
+		Position = atMini(function(m)
+			return m.Pill
+		end),
+		Size = sizedMini(function(m)
+			return m.Pill
+		end),
+	})
 
 	-- Leave: on screen whenever the chrome is
 	const leave = CartoonButton({
@@ -386,6 +545,10 @@ return function(props: Props): Frame
 			tabButtons,
 			CartoonButton({
 				Name = `Tab_{tab.Key}`,
+				-- the minimal mode has the dots below instead
+				Visible = function(): boolean
+					return not minimal()
+				end,
 				Tone = function()
 					return if isActive() then Theme.Tone.Mustard else Theme.Tone.Cream
 				end,
@@ -405,15 +568,27 @@ return function(props: Props): Frame
 					props.OnTab(tab.Key)
 				end,
 				Children = {
+					-- the icon: centred on an inactive tab (3D chrome: only the icon), at the left of the word on the active one
+					tabIcon(tab.Key, minimal, function(): UDim2
+						return if isActive() then UDim2.new(0, 22, 0.5, 0) else UDim2.fromScale(0.5, 0.5)
+					end),
 					CartoonLabel({
 						Text = function()
 							const l = layout()
-							return if l.TabsCompact and not isActive() then string.sub(tab.Label, 1, 1) else tab.Label
+							return if l.TabsCompact and not isActive() and not l.TabsIconOnly then string.sub(tab.Label, 1, 1) else tab.Label
 						end,
 						TextSize = 16,
 						Color = Theme.Color.Ink,
 						Stroke = 0,
-						Box = UDim2.fromScale(1, 1),
+						Visible = function(): boolean
+							return isActive() or not layout().TabsIconOnly
+						end,
+						Position = function(): UDim2
+							return if minimal() and isActive() then UDim2.fromOffset(34, 0) else UDim2.fromOffset(0, 0)
+						end,
+						Box = function(): UDim2
+							return if minimal() and isActive() then UDim2.new(1, -38, 1, 0) else UDim2.fromScale(1, 1)
+						end,
 						XAlignment = Enum.TextXAlignment.Center,
 						YAlignment = Enum.TextYAlignment.Center,
 					}),
@@ -454,6 +629,103 @@ return function(props: Props): Frame
 						}),
 					}),
 				},
+			})
+		)
+	end
+
+	-- the dots of the minimal mode: one round indicator per section, the lit one (the tab in front, or the nearest one while the
+	-- camera pans) a longer mustard pill; each is a button with the full tab rectangle as its hit area
+	const dotSize = props.DotSize or 14
+	const dotActive = props.DotActive or 34
+	const litIndex = function(): number
+		const near = if props.Near ~= nil then props.Near() else 0
+		return if near > 0 then near else activeIndex()
+	end
+	const dotButtons: { any } = {}
+	for index, tab in tabs do
+		const lit = function(): boolean
+			return litIndex() == index
+		end
+		const badge = function(): number
+			const counts = if props.Badges ~= nil then props.Badges() else nil
+			return if counts ~= nil then counts[tab.Key] or 0 else 0
+		end
+		const tone = BADGE_TONE[tab.Key] or Theme.Tone.Teal
+		table.insert(
+			dotButtons,
+			create("TextButton")({
+				Name = `Dot_{tab.Key}`,
+				Position = function(): UDim2
+					const r = layout().Tabs[index]
+					return UDim2.fromOffset(r.X, r.Y)
+				end,
+				Size = function(): UDim2
+					const r = layout().Tabs[index]
+					return UDim2.fromOffset(r.W, r.H)
+				end,
+				BackgroundTransparency = 1,
+				AutoButtonColor = false,
+				Text = "",
+				Visible = minimal,
+				Selectable = true,
+				Activated = function()
+					props.OnTab(tab.Key)
+				end,
+				create("Frame")({
+					Name = "Dot",
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Position = UDim2.fromScale(0.5, 0.5),
+					Size = function(): UDim2
+						return if lit() then UDim2.fromOffset(dotActive, dotSize) else UDim2.fromOffset(dotSize, dotSize)
+					end,
+					BackgroundColor3 = function(): Color3
+						return if lit() then Theme.Color.Mustard else Theme.Color.Cream
+					end,
+					create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+					createRaw("UIStroke")({
+						Color = Theme.Color.Ink,
+						Thickness = function(): number
+							return if lit() then 3 else 2
+						end,
+						ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+					}),
+				}),
+				-- the count of what waits on this section
+				create("Frame")({
+					Name = "Badge",
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Position = UDim2.new(0.5, 0, 0.5, -17),
+					Size = UDim2.fromOffset(20, 20),
+					BackgroundColor3 = tone.Bottom,
+					ZIndex = 5,
+					Visible = function()
+						return badge() > 0
+					end,
+					create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+					createRaw("UIStroke")({
+						Color = Theme.Color.Ink,
+						Thickness = 2,
+						ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+					}),
+					CartoonLabel({
+						Text = function()
+							return tostring(math.min(badge(), 99))
+						end,
+						TextSize = Theme.MinTextSize,
+						Color = Theme.Color.Ink,
+						Stroke = 0,
+						Box = UDim2.fromScale(1, 1),
+						XAlignment = Enum.TextXAlignment.Center,
+						YAlignment = Enum.TextYAlignment.Center,
+						ZIndex = 6,
+					}),
+				}),
+				-- LB / RB walk the sections: the glyph sits on the first and the last dot (gamepad)
+				if index == 1 or index == #tabs
+					then padGlyph(if index == 1 then "LB" else "RB", function(): boolean
+						return pad() and minimal()
+					end)
+					else nil,
 			})
 		)
 	end
@@ -906,7 +1178,7 @@ return function(props: Props): Frame
 		end
 	end)
 
-	-- assist toggle
+	-- assist toggle: a round chip inside the pill (radius = pill height / 2 - pad, so its corners follow the pill), a target glyph
 	const assist = CartoonButton({
 		Name = "Assist",
 		Tone = function()
@@ -915,7 +1187,7 @@ return function(props: Props): Frame
 		Outline = function()
 			return if props.Assist.On() then Theme.Outline.Thick else Theme.Outline.Normal
 		end,
-		Radius = Theme.Radius.Chip,
+		Radius = Theme.Radius.Pill,
 		Position = at(function(l)
 			return l.Assist
 		end),
@@ -925,20 +1197,12 @@ return function(props: Props): Frame
 		Padding = 0,
 		OnActivated = props.Assist.OnToggle,
 		Children = {
-			CartoonLabel({
-				Text = props.Assist.Label,
-				TextSize = Theme.MinTextSize,
-				Color = Theme.Color.Ink,
-				Stroke = 0,
-				Box = UDim2.fromScale(1, 1),
-				XAlignment = Enum.TextXAlignment.Center,
-				YAlignment = Enum.TextYAlignment.Center,
-			}),
-			-- on: a Green dot in the corner (a mark, not just a tone)
+			assistGlyph(),
+			-- on: a Green dot on the rim (a mark, not just a tone)
 			create("Frame")({
 				Name = "On",
-				AnchorPoint = Vector2.new(1, 0),
-				Position = UDim2.new(1, 0, 0, -2),
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.85, 0.15),
 				Size = UDim2.fromOffset(12, 12),
 				BackgroundColor3 = Theme.Tone.Green.Bottom,
 				ZIndex = 5,
@@ -960,7 +1224,7 @@ return function(props: Props): Frame
 			Outline = function()
 				return if tapProps.On() then Theme.Outline.Thick else Theme.Outline.Normal
 			end,
-			Radius = Theme.Radius.Chip,
+			Radius = Theme.Radius.Pill,
 			Position = atMini(function(m)
 				return m.Tap
 			end),
@@ -1012,10 +1276,101 @@ return function(props: Props): Frame
 			})
 		)
 	end
+	-- the live note (U-3): a seal of the band of the mean and the number that rolls to it, the Perfects in a row beside it
+	const noteOf = function(): Note?
+		return if props.Note ~= nil then props.Note() else nil
+	end
+	const shownNote = Motion.Count(function(): number
+		const value = noteOf()
+		return if value ~= nil then value.Score else 0
+	end, 0.35)
+	const streakOf = function(): number
+		return if props.Streak ~= nil then props.Streak() else 0
+	end
+	const stepOf = function(): Objective.Card?
+		const value = objectiveCard()
+		return if value ~= false then value else nil
+	end
+	local function stepText(pick: (Objective.Card) -> string): () -> string
+		return function(): string
+			const value = stepOf()
+			return if value ~= nil then pick(value) else ""
+		end
+	end
+	const hasStep = function(): boolean
+		return stepOf() ~= nil
+	end
+	-- the live note (seal, number, streak): one block, used by both shapes of the card
+	local function noteBlock(): Frame
+		return create("Frame")({
+			Name = "Note",
+			AnchorPoint = Vector2.new(1, 0),
+			Position = UDim2.fromScale(1, 0),
+			Size = UDim2.fromOffset(0, 24),
+			AutomaticSize = Enum.AutomaticSize.X,
+			BackgroundTransparency = 1,
+			create("UIListLayout")({
+				FillDirection = Enum.FillDirection.Horizontal,
+				HorizontalAlignment = Enum.HorizontalAlignment.Right,
+				VerticalAlignment = Enum.VerticalAlignment.Center,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 6),
+			}),
+			-- Perfects in a row: a small Mustard chip from two
+			create("Frame")({
+				Name = "Streak",
+				LayoutOrder = 1,
+				Size = UDim2.fromOffset(0, 20),
+				AutomaticSize = Enum.AutomaticSize.X,
+				BackgroundColor3 = Theme.Color.Mustard,
+				Visible = function(): boolean
+					return streakOf() >= 2
+				end,
+				create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+				createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
+				createRaw("UIPadding")({ PaddingLeft = UDim.new(0, 7), PaddingRight = UDim.new(0, 7) }),
+				CartoonLabel({
+					Text = function(): string
+						return `x{streakOf()}`
+					end,
+					TextSize = Theme.MinTextSize,
+					Color = Theme.Color.Ink,
+					Stroke = 0,
+					YAlignment = Enum.TextYAlignment.Center,
+					Box = UDim2.fromOffset(0, 20),
+					AutomaticSize = Enum.AutomaticSize.X,
+				}),
+			}),
+			Seal({
+				LayoutOrder = 2,
+				Size = 22,
+				Grade = function(): Seal.Grade?
+					const value = noteOf()
+					return if value ~= nil then value.Grade else nil
+				end,
+			}),
+			CartoonLabel({
+				LayoutOrder = 3,
+				Name = "Score",
+				Text = function(): string
+					return if noteOf() ~= nil then tostring(math.floor(shownNote() + 0.5)) else "--"
+				end,
+				TextSize = 20,
+				Color = Theme.Color.Ink,
+				Stroke = 0,
+				YAlignment = Enum.TextYAlignment.Center,
+				Box = UDim2.fromOffset(28, 24),
+				XAlignment = Enum.TextXAlignment.Right,
+			}),
+		}) :: Frame
+	end
 	const progressCard = if progressProps ~= nil
 		then CartoonPanel({
 			Name = "Progress",
-			Tone = Theme.Tone.Cream,
+			Tone = function(): Theme.Tone
+				const value = stepOf()
+				return if value ~= nil and value.Urgent then Theme.Tone.Mustard else Theme.Tone.Cream
+			end,
 			Radius = Theme.Radius.Card,
 			Lip = 3,
 			Visible = minimal,
@@ -1027,70 +1382,100 @@ return function(props: Props): Frame
 			end),
 			Padding = { Left = 10, Right = 10, Top = 2, Bottom = 2 },
 			Children = {
+				-- plain card: the verb of the section on the left, the note on the right
 				create("Frame")({
 					Name = "Row",
-					Size = UDim2.new(1, 0, 0, 16),
+					Size = UDim2.new(1, 0, 0, 24),
 					BackgroundTransparency = 1,
+					Visible = function(): boolean
+						return not hasStep()
+					end,
 					CartoonLabel({
 						Name = "Verb",
 						Text = progressProps.Label,
-						TextSize = Theme.MinTextSize,
+						TextSize = 16,
 						Color = Theme.Color.Ink,
 						Stroke = 0,
 						Truncate = true,
-						Box = UDim2.new(0.6, 0, 1, 0),
+						Box = UDim2.new(0.5, 0, 1, 0),
 						XAlignment = Enum.TextXAlignment.Left,
 						YAlignment = Enum.TextYAlignment.Center,
 					}),
-					create("Frame")({
-						Name = "Pips",
-						AnchorPoint = Vector2.new(1, 0),
-						Position = UDim2.fromScale(1, 0),
-						Size = UDim2.fromOffset(0, 16),
-						AutomaticSize = Enum.AutomaticSize.X,
-						BackgroundTransparency = 1,
-						create("UIListLayout")({
-							FillDirection = Enum.FillDirection.Horizontal,
-							HorizontalAlignment = Enum.HorizontalAlignment.Right,
-							VerticalAlignment = Enum.VerticalAlignment.Center,
-							SortOrder = Enum.SortOrder.LayoutOrder,
-							Padding = UDim.new(0, 6),
-						}),
-						Vide.values(function(): { Pip }
-							return if props.Pips ~= nil then props.Pips() else {}
-						end, function(pip: Pip): Frame
-							return create("Frame")({
-								Name = `Pip_{pip.Label}`,
-								Size = UDim2.fromOffset(0, 16),
-								AutomaticSize = Enum.AutomaticSize.X,
-								BackgroundTransparency = 1,
-								create("UIListLayout")({
-									FillDirection = Enum.FillDirection.Horizontal,
-									VerticalAlignment = Enum.VerticalAlignment.Center,
-									SortOrder = Enum.SortOrder.LayoutOrder,
-									Padding = UDim.new(0, 2),
-								}),
-								Seal({
-									LayoutOrder = 1,
-									Size = 16,
-									Grade = function()
-										return pip.Grade
-									end,
-								}),
-								CartoonLabel({
-									LayoutOrder = 2,
-									Text = pip.Label,
-									TextSize = Theme.MinTextSize,
-									Color = Theme.Color.Ink,
-									Stroke = 0,
-								}),
-							}) :: Frame
-						end),
+					noteBlock(),
+				}),
+				-- tutorial card: step chip, the objective, its hint, the note (the tutorial banner is hidden meanwhile)
+				create("Frame")({
+					Name = "Step",
+					Size = UDim2.new(1, 0, 0, 40),
+					BackgroundTransparency = 1,
+					Visible = hasStep,
+					CartoonPanel({
+						Name = "Chip",
+						Position = UDim2.fromOffset(0, 1),
+						Size = function(): UDim2
+							const value = stepOf()
+							return UDim2.fromOffset(if value ~= nil and value.Total >= 10 then 46 else 38, 30)
+						end,
+						Tone = function(): Theme.Tone
+							const value = stepOf()
+							return if value ~= nil and value.Done then Theme.Tone.Green else Theme.Tone.Mustard
+						end,
+						Outline = Theme.Outline.Normal,
+						Lip = 3,
+						Gloss = false,
+						Children = {
+							CartoonLabel({
+								Box = UDim2.fromScale(1, 1),
+								TextSize = Theme.MinTextSize,
+								Color = Theme.Color.Dark,
+								Stroke = 0,
+								XAlignment = Enum.TextXAlignment.Center,
+								YAlignment = Enum.TextYAlignment.Center,
+								Text = function(): string
+									const value = stepOf()
+									return if value ~= nil then (if value.Done then "OK" else `{value.Step}/{value.Total}`) else ""
+								end,
+							}),
+						},
 					}),
+					CartoonLabel({
+						Name = "Title",
+						Position = UDim2.fromOffset(52, 0),
+						Box = function(): UDim2
+							-- leaves the room of the note on the right once the first stage was graded
+							return UDim2.new(1, -52 - (if noteOf() ~= nil then 70 else 0), 0, 20)
+						end,
+						Text = stepText(function(value)
+							return value.Text
+						end),
+						TextSize = 16,
+						Color = Theme.Color.Ink,
+						Stroke = 0,
+						Truncate = true,
+						XAlignment = Enum.TextXAlignment.Left,
+						YAlignment = Enum.TextYAlignment.Center,
+					}),
+					CartoonLabel({
+						Name = "Hint",
+						Position = UDim2.fromOffset(52, 23),
+						Box = UDim2.new(1, -52, 0, 16),
+						Text = stepText(function(value)
+							return value.Hint
+						end),
+						TextSize = Theme.MinTextSize,
+						Color = Theme.Tone.Ink.Top,
+						Stroke = 0,
+						Truncate = true,
+						XAlignment = Enum.TextXAlignment.Left,
+						YAlignment = Enum.TextYAlignment.Center,
+					}),
+					noteBlock(),
 				}),
 				create("Frame")({
 					Name = "Bar",
-					Position = UDim2.fromOffset(0, 19),
+					Position = function(): UDim2
+						return UDim2.fromOffset(0, if hasStep() then 42 else 27)
+					end,
 					Size = UDim2.new(1, 0, 0, 10),
 					BackgroundColor3 = Theme.Tone.Cream.Bottom,
 					create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
@@ -1110,6 +1495,43 @@ return function(props: Props): Frame
 			},
 		})
 		else nil
+
+	-- Skip of the tutorial step: a pill beside the card (44 px tall touch target, with the key of the device)
+	const skipPill = CartoonButton({
+		Name = "Skip",
+		Tone = Theme.Tone.White,
+		Radius = Theme.Radius.Pill,
+		Position = atMini(function(m)
+			return m.Skip
+		end),
+		Size = sizedMini(function(m)
+			return m.Skip
+		end),
+		Padding = 0,
+		Selectable = false,
+		Visible = function(): boolean
+			const value = stepOf()
+			return minimal() and value ~= nil and value.SkipText ~= ""
+		end,
+		OnActivated = function()
+			if props.OnSkip ~= nil then
+				props.OnSkip()
+			end
+		end,
+		Children = {
+			CartoonLabel({
+				Text = stepText(function(value)
+					return value.SkipText
+				end),
+				TextSize = Theme.MinTextSize,
+				Color = Theme.Color.Ink,
+				Stroke = 0,
+				Box = UDim2.fromScale(1, 1),
+				XAlignment = Enum.TextXAlignment.Center,
+				YAlignment = Enum.TextYAlignment.Center,
+			}),
+		},
+	})
 
 	-- one line of hint above the tabs (minimal mode)
 	const hintPill = CartoonPanel({
@@ -1144,6 +1566,9 @@ return function(props: Props): Frame
 
 	-- the seal of the finished plate (transient, minimal mode): shape + colour + word
 	const sealGrade = props.Seal
+	const sealCount = Motion.Count(function(): number
+		return if sealGrade ~= nil and sealGrade() ~= nil and props.SealScore ~= nil then props.SealScore() else 0
+	end, 0.6)
 	const sealHolder = if sealGrade ~= nil
 		then create("Frame")({
 			Name = "Seal",
@@ -1160,13 +1585,155 @@ return function(props: Props): Frame
 			Seal({
 				Name = "PlateSeal",
 				Size = 96,
-				Position = UDim2.fromScale(0.5, 0.5),
-				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, 0),
+				AnchorPoint = Vector2.new(0.5, 0),
 				Grade = sealGrade,
 				Label = props.SealLabel,
 			}),
+			-- the grade counter: rolls from 0 to the mean of the stages in 0.6 s
+			CartoonLabel({
+				Name = "SealScore",
+				Text = function(): string
+					return tostring(math.floor(sealCount() + 0.5))
+				end,
+				TextSize = 28,
+				Color = Theme.Color.Cream,
+				AnchorPoint = Vector2.new(0.5, 0),
+				Position = UDim2.new(0.5, 0, 0, 98),
+				Box = UDim2.fromOffset(96, 26),
+				XAlignment = Enum.TextXAlignment.Center,
+				YAlignment = Enum.TextYAlignment.Center,
+			}),
 		})
 		else nil
+
+	-- the bin zone (minimal mode): a toy bin in a card, only while something can be dragged. Closed lid at rest, open lid and a Mustard
+	-- card while a dragged item is inside, a bounce when it swallows. Native Frames (a rounded body, a stripe, a hinged lid).
+	const binProps = props.Bin
+	local binZone: Frame? = nil
+	if binProps ~= nil then
+		const binWanted = binProps.Wanted
+		const binOver = binProps.Over
+		const binPop = Motion.Pop(function(): boolean
+			return minimal() and binWanted()
+		end)
+		const lidOpen = Vide.spring(function(): number
+			return if binOver() then 1 else 0
+		end, 0.16, 0.6)
+		const bounce = Motion.Bump(binProps.Chomp, 1.12, 0.18)
+		const lid = create("Frame")({
+			Name = "Lid",
+			AnchorPoint = Vector2.new(0, 1),
+			Position = UDim2.fromOffset(0, 12),
+			Size = UDim2.fromOffset(40, 9),
+			BackgroundColor3 = Theme.Tone.Mustard.Bottom,
+			Rotation = function(): number
+				return if reduced then (if binOver() then -38 else 0) else -38 * math.clamp(lidOpen(), 0, 1.2)
+			end,
+			ZIndex = 3,
+			create("UICorner")({ CornerRadius = UDim.new(0, 4) }),
+			createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
+			create("Frame")({
+				Name = "Handle",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = UDim2.fromOffset(14, 4),
+				BackgroundColor3 = Theme.Color.Ink,
+				BorderSizePixel = 0,
+				create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+			}),
+		})
+		const icon = create("Frame")({
+			Name = "Icon",
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = UDim2.new(0.5, 0, 0, 6),
+			Size = UDim2.fromOffset(40, 42),
+			BackgroundTransparency = 1,
+			-- the body: Teal, a Cream stripe
+			create("Frame")({
+				Name = "Body",
+				Position = UDim2.fromOffset(3, 13),
+				Size = UDim2.fromOffset(34, 28),
+				BackgroundColor3 = Theme.Tone.Teal.Bottom,
+				create("UICorner")({ CornerRadius = UDim.new(0, 7) }),
+				createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
+				create("Frame")({
+					Name = "Stripe",
+					Position = UDim2.fromOffset(0, 9),
+					Size = UDim2.new(1, 0, 0, 7),
+					BackgroundColor3 = Theme.Color.Cream,
+					BorderSizePixel = 0,
+				}),
+			}),
+			lid,
+		})
+		binZone = CartoonPanel({
+			Name = "Bin",
+			Tone = function(): Theme.Tone
+				return if binOver() then Theme.Tone.Mustard else Theme.Tone.Cream
+			end,
+			Radius = Theme.Radius.Card,
+			Lip = 3,
+			Outline = function(): number
+				return if binOver() then Theme.Outline.Thick else Theme.Outline.Normal
+			end,
+			Visible = function(): boolean
+				return minimal() and (binWanted() or binPop() > 0.02)
+			end,
+			Position = atMini(function(m)
+				return m.Bin
+			end),
+			Size = sizedMini(function(m)
+				return m.Bin
+			end),
+			Decor = {
+				createRaw("UIScale")({
+					Scale = function(): number
+						const grow = if binOver() then 1.08 else 1
+						return if reduced then 1 else math.max(binPop(), 0) * grow * bounce()
+					end,
+				}),
+			},
+			Children = {
+				icon,
+				CartoonLabel({
+					Name = "Label",
+					Text = binProps.Label,
+					TextSize = Theme.MinTextSize,
+					Color = Theme.Color.Ink,
+					Stroke = 0,
+					AnchorPoint = Vector2.new(0.5, 1),
+					Position = UDim2.new(0.5, 0, 1, -2),
+					Box = UDim2.new(1, 0, 0, 18),
+					XAlignment = Enum.TextXAlignment.Center,
+					YAlignment = Enum.TextYAlignment.Center,
+				}),
+			},
+		})
+		-- hand the world the way to test a point (raw viewport px: the gui origin plus the inset) and the centre of the zone
+		const zoneFrame: Frame = binZone :: Frame
+		local function viewportRect(): (Vector2, Vector2)
+			const inset = GuiService:GetGuiInset()
+			return zoneFrame.AbsolutePosition + inset, zoneFrame.AbsoluteSize
+		end
+		binProps.Bind(function(point: Vector2): boolean
+			if not zoneFrame.Visible or zoneFrame.AbsoluteSize.X <= 0 then
+				return false
+			end
+			const origin, size = viewportRect()
+			-- a forgiving edge: 10 px all round (the zone is 72 px, the thumb is not)
+			return point.X >= origin.X - 10 and point.X <= origin.X + size.X + 10 and point.Y >= origin.Y - 10 and point.Y <= origin.Y + size.Y + 10
+		end, function(): Vector2?
+			if zoneFrame.AbsoluteSize.X <= 0 then
+				return nil
+			end
+			const origin, size = viewportRect()
+			return origin + size / 2
+		end)
+		cleanup(function()
+			binProps.Bind(nil, nil)
+		end)
+	end
 
 	-- toast: one at a time, bottom centre
 	const toastShown = function(): boolean
@@ -1280,15 +1847,19 @@ return function(props: Props): Frame
 			board,
 			panel,
 			notch,
+			pill,
 			leave,
 			tabButtons,
+			dotButtons,
 			status,
 			strip,
 			nextHolder,
 			trash,
+			binZone,
 			assist,
 			tapChip,
 			progressCard,
+			skipPill,
 			hintPill,
 			sealHolder,
 			toast,

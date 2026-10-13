@@ -2,6 +2,11 @@
 --[[
 	stations_prep.luau (TASK-172, P4 of docs/tech/prep-mode.md §6 "Mapa"; DEC-223; Provisional). Edit-mode Studio snippet, NOT
 	gameplay code. Idempotent, NO Place.run, nothing is deleted (what leaves goes to ServerStorage.Trailer_Backup_20261012).
+	Prompts (polish 2026-10-12, P-1 / P-2): run("stations_prep", "prompts") ONLY moves the two Prompt_Work attachments to the front of the
+	equipment they stand for, at bench height (Station_1: the grill, PromptStep = Grill; Station_3: the cutting board, PromptStep = Board;
+	the old value "Build" is still understood) and nothing else: no camera anchor, no board slot, no hitbox is touched, so it is safe on a
+	place with hand edits. "prompts_dry" only reports. Idempotent (the target is computed from the real models every time) and it checks
+	MIN_GAP to every other prompt.
 	Run: run("stations_prep", "dry") report only | run("stations_prep") apply (V2) | run("stations_prep", "undo") back to the V1
 	layout (4 prompts, one per station; the two extra prompts come back from the backup) | run("stations_prep", "remove") the old
 	undo: Stations and the 4th board slot go to the backup.
@@ -43,6 +48,9 @@ local MODE = (...) or "apply"
 local DRY = MODE == "dry"
 local REMOVE = MODE == "remove"
 local V1 = MODE == "undo" -- the layout before DEC-224: station n owns its place and its prompt
+local PROMPTS = MODE == "prompts" or MODE == "prompts_dry" -- only the front-of-equipment move of the two Work prompts
+local PROMPTS_DRY = MODE == "prompts_dry"
+local HIDDEN_ACTIONS = { grill_place = true, grill_collect = true, bun_cut = true, board_add_sausage = true, topping_add = true, discard = true }
 local EXTRA_PROMPT_WHY = "stations_prep: v2 extra prompt"
 local V2_EXTRA = { [2] = true, [4] = true } -- stations whose Prompt_Work leaves in V2
 
@@ -51,7 +59,7 @@ local STAND = { y = 2.0, z = 0.85 }
 local FOCUS = { y = 5.12, z = 3.25 }
 local PITCH = math.rad(55)
 local DIST = 2.5 -- Content.Prep.Rules.Camera.Distance
-local PROMPT = { y = 5.82, z = 0.20 } -- V2: world Y 4.3 (eye height 5.5 minus a bit: a prompt at the hip, Y 2.2, fell out of the view; V1 was y 3.72)
+local PROMPT = { y = 5.72, z = 2.30 } -- V2 apply: in front of the equipment at bench height (world Y 4.2, Z 14.0 at the default pose); the "prompts" mode computes it from the real models and is the authority
 local STAGGER = 1.0 -- V2: seats 1.0 apart around the view centre
 local GRILL_N, BOARD_N = 1, 3 -- V2: the station whose old place is the grill / the cutting board (prompts live there)
 local BUN_STEP = 0.8
@@ -123,6 +131,61 @@ local function slotAttachment(i)
 end
 
 CHS:SetWaypoint("stations_prep: before")
+
+-- PROMPTS (front of the equipment) -------------------------------------------------------------------------------------
+if PROMPTS then
+	local PROMPT_LIFT = 0.5 -- studs over the top of the equipment: bench height (the topping prompts sit 0.25 to 0.55 over the counter)
+	local PROMPT_OUT = 0.2 -- studs in front of its edge
+	-- (station, equipment model, PromptStep)
+	local equipment = {
+		{ n = GRILL_N, model = trl:FindFirstChild("TRL-G_AST-012_RollerGrill", true), step = "Grill" },
+		{ n = BOARD_N, model = board, step = "Board" },
+	}
+	for _, item in equipment do
+		local station = trl:FindFirstChild("Station_" .. item.n)
+		local mount = station and station:FindFirstChild("Mount")
+		local prompt = mount and mount:FindFirstChild("Prompt_Work")
+		local stand = mount and mount:FindFirstChild("Att_Stand")
+		if not (prompt and stand and item.model) then
+			log(string.format("[err] Station_%d: Prompt_Work / Att_Stand / %s missing", item.n, item.step))
+			continue
+		end
+		local cf, size = item.model:GetBoundingBox()
+		-- the counter faces the player along Z (the stand is on the Z side of the equipment): the middle of that edge
+		local toStand = stand.WorldPosition - cf.Position
+		local dir = Vector3.new(0, 0, toStand.Z >= 0 and 1 or -1)
+		local half = size.Z / 2
+		local edge = cf.Position + dir * (half + PROMPT_OUT)
+		local target = Vector3.new(edge.X, cf.Position.Y + size.Y / 2 + PROMPT_LIFT, edge.Z)
+		local minGap, minWith = math.huge, ""
+		for _, i in CS:GetTagged("Interactable") do
+			-- the world kitchen prompts are hidden in the prep mode (WorldKitchenPrompts = false): they do not compete for the finger
+			if i ~= prompt and not HIDDEN_ACTIONS[i:GetAttribute("PromptAction")] then
+				local ip = i:IsA("Attachment") and i.WorldPosition or (i:IsA("BasePart") and i.Position)
+				if ip and (ip - target).Magnitude < minGap then
+					minGap, minWith = (ip - target).Magnitude, i.Name
+				end
+			end
+		end
+		log(string.format(
+			"[%s] Station_%d Prompt_Work %s -> %s | PromptStep %s | gap %.2f (%s)",
+			minGap >= MIN_GAP and "ok" or "WARN",
+			item.n,
+			fv(prompt.WorldPosition),
+			fv(target),
+			item.step,
+			minGap,
+			minWith
+		))
+		if not PROMPTS_DRY then
+			prompt.WorldPosition = target
+			prompt:SetAttribute("PromptStep", item.step)
+			prompt:SetAttribute("PromptFront", true)
+		end
+	end
+	CHS:SetWaypoint("stations_prep: prompts")
+	return table.concat(out, "\n")
+end
 
 -- UNDO ------------------------------------------------------------------------------------------------------------
 if REMOVE then
@@ -297,7 +360,7 @@ for n = 1, 4 do
 	if not V1 then
 		hasPrompt = n == GRILL_N or n == BOARD_N
 		promptDx = viewDx(n, n == BOARD_N and "Build" or "Grill")
-		promptStep = n == BOARD_N and "Build" or "Grill"
+		promptStep = n == BOARD_N and "Board" or "Grill"
 	end
 	local promptPos = at(promptDx, PROMPT.y, PROMPT.z).Position
 	local bunPos = slotPos[n] or g.focusPos

@@ -17,6 +17,7 @@ export type Seat = {
 	Since: number, -- workspace:GetServerTimeNow() of the seat
 	LastSeen: number, -- os.clock() of the last accepted packet (keep-alive, Rules.SeatIdle)
 	Plate: Plate?,
+	Made: Tool?, -- the hot dog of the last accepted Finish: put in the hand when the seat ends (Rules.Delivery = "Prompt")
 	Mask: number, -- accepted cosmetic plate mask (PlateMask, prep-3d.md §7.2 N3); 0 = none; zeroed with the plate
 }
 
@@ -35,6 +36,7 @@ function Session.new(player: Player, station: number, serverTime: number, now: n
 		Since = serverTime,
 		LastSeen = now,
 		Plate = nil,
+		Made = nil,
 		Mask = 0,
 	}
 end
