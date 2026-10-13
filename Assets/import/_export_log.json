@@ -1,51 +1,7 @@
 [
  [
-  "pack",
-  "props/AST-100_PicnicTable",
-  5.38,
-  2.9,
-  4.34
- ],
- [
-  "pack",
-  "props/AST-100_PlanterBushes",
-  4.0,
-  1.89,
-  1.29
- ],
- [
-  "pack",
-  "equipment/AST-101_CoffeeEspresso",
-  1.89,
-  1.7,
-  1.52
- ],
- [
-  "pack",
-  "props/AST-102_Bush",
-  3.56,
-  2.2,
-  3.56
- ],
- [
-  "pack",
-  "props/AST-102_BushLarge",
-  4.62,
-  3.0,
-  4.15
- ],
- [
-  "pack",
-  "props/AST-102_BushDetailed",
-  4.35,
-  2.6,
-  4.35
- ],
- [
-  "pack",
-  "props/AST-102_PottedPlant",
-  1.17,
-  3.6,
-  1.33
+  "ours",
+  "equipment/AST-120_Grill.blend",
+  113884
  ]
 ]

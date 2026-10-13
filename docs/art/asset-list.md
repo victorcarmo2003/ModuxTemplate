@@ -43,7 +43,7 @@ Caminhos dos packs (abreviados nas fichas):
 | AST-009 | Cream Cheese (pote + cobertura) | food | P1 | Pack + edição | `KP/jar_B_medium.fbx` + `FP/whipped-cream.fbx` (cobertura) (DEC-137); modelo `Assets/models/food/AST-009_CreamCheese.fbx` (Topping 126 / Jar 188; DEC-141) | Aprovado (DEC-137; modelo DEC-141) |
 | AST-010 | Coffee (copo, Tool) + par de cafés do Walt | food | P1 | Pack + edição | `FP/soda.fbx` sem canudo, recolor (DEC-137); modelo `Assets/models/food/AST-010_Coffee.fbx` (~~236~~ **260** por copo, malha refeita 2026-10-10; `Coffee_Pair` L/R; DEC-141) | Aprovado (DEC-137; modelo DEC-141) · correção de malha Em revisão (modeler-3d, 2026-10-10) |
 | AST-011 | Pacotes do mercado (9, Tool) | food | P0 | Pack + edição | `FP/bag.fbx`, `FP/bag-flat.fbx`, `FP/carton.fbx`, `FP/carton-small.fbx`, `FP/can.fbx`, `FP/can-small.fbx` (DEC-137); modelados `Assets/models/food/AST-011_Pack<Nome>.fbx` (9; 44–156 tris) + textura `Assets/textures/props/T_PackLabels.png` | Aprovado (DEC-137) · modelo Em revisão (modeler-3d, 2026-10-10) |
-| AST-012 | Grill (3 níveis) — **roller grill** (DEC-138) | equipment | P0 | Modelar | ref. de forma `Assets/reference/AST-012_roller_grill_ref.png` (sem marca); ~~`KP/stove_*_countertop.fbx`~~ recusado (DEC-138) | Em revisão (modelo L1–L3, DEC-201) |
+| AST-012 | Grill (3 níveis) — **roller grill** (DEC-138) | equipment | P0 | Modelar | ref. de forma `Assets/reference/AST-012_roller_grill_ref.png` (sem marca); ~~`KP/stove_*_countertop.fbx`~~ recusado (DEC-138) **Superado por AST-120 (grelha de barras, 2026-10-12, decisão do usuário)**; ID mantido, modelo roller grill deixa de ser usado no preparo |
 | AST-013 | Trilho de descanso | equipment | P0 | Modelar | modelado: `Assets/models/equipment/AST-013_RestRail.fbx` (`Rail_6` 384 / `Rail_8` 440 tris; DEC-140) | Aprovado (DEC-140) |
 | AST-014 | Tábua + faca | equipment | P0 | Pack | `KP/cuttingboard.fbx`, `KP/knife.fbx` (faca deitada; DEC-138); modelo `Assets/models/equipment/AST-014_CuttingBoard.fbx` (tábua 38 + faca 104; DEC-141) | Aprovado (DEC-138; modelo DEC-141) |
 | AST-015 | Caixa de pães (estoque de pão) | equipment | P0 | Pack + edição | `KP/crate_buns.fbx`, `KP/crate_lid.fbx` (pães de hot dog do AST-001 no lugar dos de hambúrguer; tris ≤ 800; DEC-138) | Aprovado (DEC-138) |
@@ -136,10 +136,10 @@ Caminhos dos packs (abreviados nas fichas):
 | AST-106 | Placas de seção do Mart (5: penduradas e de parede, sem texto) | market | P1 | Modelar | — (`asset-sourcing-2026-10-11.md` §5) | Rascunho (modelo entregue 2026-10-11) |
 | AST-107 | Expositor refrigerado aberto de carnes (MEAT & DELI) | market | P1 | Modelar + pack | `KP/food_ingredient_steak.fbx`, `KP/food_ingredient_ham.fbx` dentro; `MM/freezer.fbx` recusado | Rascunho (modelo entregue 2026-10-11) |
 | AST-108 | Modo de preparo: glifos de comando (4 abas, Leave, Next, Serve, lixeira, virar, aviso) | ui | P0 | 2D (desenho no estilo do AST-071) | — | Rascunho (TASK-187) |
-| AST-109 | Modo de preparo: salsicha em 4 estados (crua, a meio, pronta, fantasma) | ui | P0 | Render dos modelos (AST-002) | `Assets/models/food/AST-002_Sausage.fbx` | Rascunho (TASK-187) |
-| AST-110 | Modo de preparo: pão fechado, aberto, guia de corte, mat | ui | P0 | Render dos modelos (AST-001) | `Assets/models/food/AST-001_Bun.fbx` | Rascunho (TASK-187) |
-| AST-111 | Modo de preparo: complementos vistos de cima (3 molhos tintáveis, queijo, bacon, batata) | ui | P0 | Render + 2D (AST-004/005/006/007/008/009) | `Assets/models/food/AST-004_KetchupTopping`, `AST-005_MustardTopping`, `AST-006_Cheese`, `AST-007_Bacon`, `AST-008_PotatoSticks`, `AST-009_CreamCheese` (`.fbx`) | Rascunho (TASK-187) |
-| AST-112 | Modo de preparo: ticket (papel 9-slice, pino, anel de paciência, pilha) | ui | P0 | 2D | — | Rascunho (TASK-187) |
+| AST-109 | Modo de preparo: salsicha em 4 estados (crua, a meio, pronta, fantasma) | ui | P0 | Render dos modelos (AST-002) | `Assets/models/food/AST-002_Sausage.fbx` | Em revisão (arte do ticket vertical em camadas, 2026-10-12: `ticket-sprites.md`) |
+| AST-110 | Modo de preparo: pão fechado, aberto, guia de corte, mat | ui | P0 | Render dos modelos (AST-001) | `Assets/models/food/AST-001_Bun.fbx` | Em revisão (arte do ticket vertical em camadas, 2026-10-12: `ticket-sprites.md`) |
+| AST-111 | Modo de preparo: complementos vistos de cima (3 molhos tintáveis, queijo, bacon, batata) | ui | P0 | Render + 2D (AST-004/005/006/007/008/009) | `Assets/models/food/AST-004_KetchupTopping`, `AST-005_MustardTopping`, `AST-006_Cheese`, `AST-007_Bacon`, `AST-008_PotatoSticks`, `AST-009_CreamCheese` (`.fbx`) | Em revisão (arte do ticket vertical em camadas, 2026-10-12: `ticket-sprites.md`) |
+| AST-112 | Modo de preparo: ticket (papel 9-slice, pino, anel de paciência, pilha) | ui | P0 | 2D | — | Em revisão (arte do ticket vertical em camadas, 2026-10-12: `ticket-sprites.md`) |
 | AST-113 | Modo de preparo: selos de nota Perfect / Good / Messy (+ mini e pips) | ui | P0 | 2D | — | Rascunho (TASK-187) |
 | AST-114 | Modo de preparo: cursores de gesto (faca, garrafa, mão, pitada, marcador do dedo) | ui | P1 | 2D | — | Rascunho (TASK-187) |
 | AST-115 | Modo de preparo: partículas 2D de UI (migalha, gota, estrela, poeira, brilho, ponto) | vfx | P1 | 2D (máscaras brancas) | reaproveita o conjunto do AST-070/092 onde servir | Rascunho (TASK-187) |
@@ -147,13 +147,14 @@ Caminhos dos packs (abreviados nas fichas):
 | AST-117 | Modo de preparo: retratos de cliente (cabeça de animal) para ticket e Serve | ui | P1 | Render das cabeças (AST-053/AST-086) | `Assets/models/character/AST-053_Animal_*.fbx` (18 espécies) | Rascunho (TASK-187; quais espécies são clientes: `Q-149`) |
 | AST-118 | Modo de preparo: selos de entrega (Complete, Incomplete, Wrong) e "+$" | ui | P1 | 2D | `Hud/coin` do AST-071 | Rascunho (TASK-187) |
 | AST-119 | Modo de preparo: vinheta do foco e entalhe de aba | ui | P2 | 2D | — | Rascunho (TASK-187) |
+| AST-120 | Grill plate (bar grill, 8 slots) — grelha de barras que substitui o AST-012 | equipment | P0 | Modelar | inspiração de forma só (sem cópia): `user/references/`; original, atlas KayKit `restaurantbits_texture` | Rascunho (modelo entregue, não enviado) |
 
 Totais: **77 IDs**, **76 fichas ativas** (AST-001 a AST-038 existentes, revistas; AST-039 a AST-075 da 1ª conciliação; AST-076 e AST-077 da 2ª revisão; **AST-077 Obsoleto** por DEC-130).
 Usam pack: **25** (4 direto, 21 com edição). Plataforma R6 + acessórios: **9**. Modelar / 2D / animação do zero: **43**. (DEC-138: AST-017, 018, 019, 024 passaram de Modelar para Pack + edição; antes 21 / 47.) DEC-140: AST-025 passou de Modelar para Pack + edição ("Trashcan" by Kenney via Poly Pizza, fora dos packs de `Assets/`) — usam pack **26** (4 / 22); Modelar **42**.
 **Levantamento pós-onda 1 (art-director, 2026-10-10):** fichas novas **AST-078 a AST-097** (20, todas **Rascunho**) e complementos de onda/dono/orçamento nas fichas antigas ainda abertas. Seção "Levantamento pós-onda 1" no fim do documento. Totais: **97 IDs**, **96 fichas ativas** (AST-077 Obsoleto).
 **2026-10-10 (pedido do usuário):** ficha nova **AST-098** (bancada de feira do Mart, Rascunho) e modelo novo do **AST-042** (telefone de mesa de disco), ambos de Poly Pizza; licenças em `credits.md`. Totais: **98 IDs**, **97 fichas ativas**.
 **2026-10-11 (Mart v2, MAP-01 §18.9):** fichas novas **AST-103 a AST-107** (Rascunho), modelos entregues pelo modeler-3d (Blender headless). Os FBX `AST-099` a `AST-102` em `Assets/import/` (rodada de sourcing do mesmo dia) ainda não têm ficha aqui.
-**2026-10-12 (modo de preparo focado, TASK-187, DEC-223):** fichas novas **AST-108 a AST-119** (12 sprites 2D de UI, todas **Rascunho**; seção "Modo de preparo: sprites 2D" antes de "Fora desta lista"; spec em `prep-ui-spec.md` §15). Próximo ID livre: **AST-120**.
+**2026-10-12 (modo de preparo focado, TASK-187, DEC-223):** fichas novas **AST-108 a AST-119** (12 sprites 2D de UI, todas **Rascunho**; seção "Modo de preparo: sprites 2D" antes de "Fora desta lista"; spec em `prep-ui-spec.md` §15). Próximo ID livre: **AST-121** (AST-120 usado em 2026-10-12, ver ficha).
 Mapeamento Kenney/KayKit por ficha (DEC-136, Rascunho): `asset-sourcing.md`. As entradas "→ sourcing:" na coluna "Arquivo de pack" vêm de lá; Origem e Status não mudaram.
 **DEC-137 (2026-10-09):** comida aprovada — AST-001 a AST-011 e AST-061 em **Aprovado**, com o candidato do sourcing como arquivo de origem (fila do `modeler-3d`). Demais fichas seguem Rascunho. `Q-133` (limite de atlases) segue aberta.
 **DEC-138 (2026-10-10):** equipamentos aprovados após o teste em `workspace.__ImportTest_Equip` — AST-014, 015, 017, 018, 019, 024, 040, 041, 049 em **Aprovado** com o candidato KP/MM como origem (partes sem candidato seguem para modelar no estilo). Banqueta `KP/chair_stool` com **assento plano** em todo uso. **AST-012**: candidato fogão KayKit **recusado**; vira **roller grill** modelada (Steel + painel Ketchup, sem marca), Aprovado na direção; silhueta em reescrita pelo art-director; níveis em `Q-134`.
@@ -380,6 +381,8 @@ Compra de upgrade: bancada do Mart (AST-049, DEC-101); a peça visível troca no
 
 ### AST-012 — Grill (3 níveis)
 
+> **SUPERADO (2026-10-12, decisão do usuário):** o roller grill foi trocado por uma grelha de barras de verdade, **AST-120** (abaixo). Esta ficha fica como histórico; o ID não é reaproveitado. As variantes `Grill_L1`–`L3` e as 4 vagas deixam de valer para o preparo.
+
 - **Status:** Em revisão (modeler-3d, 2026-10-10; direção Aprovada DEC-138, níveis DEC-201) · **Prioridade:** P0 · **Origem:** Modelar — **roller grill** (máquina de rolos de salsicha), ref. de forma `Assets/reference/AST-012_roller_grill_ref.png` (foto com marca: **sem logo, nome ou marca** no modelo). ~~`KP/stove_single_countertop.fbx` / `KP/stove_multi_countertop.fbx`~~ **recusados** (lê "fogão", DEC-138)
 - **Uso:** UPG-001: 2 vagas/12 s → 3/10 s → 4/8 s. Barra de progresso sobre cada salsicha.
 - **Dimensões:** pegada 5 L × 3 P no carrinho (X 31–36), 6 L no trailer (folga para o nível 3); altura da chapa 0,4 sobre a bancada.
@@ -389,6 +392,33 @@ Compra de upgrade: bancada do Mart (AST-049, DEC-101); a peça visível troca no
 - **Encaixes:** `Slot1`…`Slot4` (0,9 entre centros), `Prompt_Grill`, `VFX_Steam1`…`4`.
 - **Pivô:** base-centro. **Tris:** 600–1.200 por nível.
 - **Modelo (modeler-3d, 2026-10-10, Em revisão; não enviado):** `Assets/blender/equipment/AST-012_RollerGrill.blend` → `Assets/models/equipment/AST-012_RollerGrill.fbx` (substitui o modelo de 6 vagas). Modelado do zero (nenhuma peça de KP/FP servia), atlas KayKit `restaurantbits_texture`. Um objeto por nível, todos na mesma origem (variantes sobrepostas, como `Rail_6`/`Rail_8`): `Grill_L1` 3 rolos **688 tris** (2,71 L) · `Grill_L2` 4 rolos **824** (3,61 L) · `Grill_L3` 5 rolos **960** (4,51 L, cabe nos 5 L). Profundidade 2,36, altura 0,78 (topo a ~4,23 no carrinho, abaixo do olho 4,5). Rolos finos cromados (Ø 0,28, 0,9 entre centros) sobre chapa escura; a salsicha fica deitada na chapa entre o par de rolos (rolo grosso o bastante para a salsicha de 0,24 apoiar no sulco tapava a salsicha em 1ª pessoa). Gaveta aquecedora (cenário), painel Ketchup com 1 botão por vaga + lâmpada Mustard, venezianas nas laterais. **Provisório:** a vaga N fica no mesmo lugar em todo nível (`Slot1`…`Slot4` em X −1,35/−0,45/0,45/1,35, Z 0,52; origem = centro da pegada de 5 L); L1/L2 alinham pela esquerda (−X) e a máquina cresce para +X. Isso casa com o `bind_map01.luau` (4 vagas fixas, sem `Level`). Âncoras (`Slot1`…`4`, `VFX_Steam1`…`4`, `Prompt_Grill`) ficam filhas de `Grill_L1`: o placement precisa manter o `Grill_L1` (com `part = { "Grill_L1" }` as 4 vagas continuam lá). zfight 0 em cada nível; os 2 pares entre níveis são da sobreposição das variantes. Renders: `Assets/reference/AST-012_RollerGrill_L1.png`, `_L2.png`, `_L3.png`, `_L3_firstperson.png`, `_lineup.png`.
+
+### AST-120 — Grill plate (bar grill, 8 slots)
+
+- **Status:** Rascunho (modeler-3d, 2026-10-12; modelo entregue, **não enviado ao Roblox**) · **Prioridade:** P0 · **Origem:** Modelar do zero (nada em KitchenPack/FoodPack servia: nenhuma grelha de barras com barras soltas). Forma inspirada em grelha real de barras; imagem em `user/references/` é só referência de ideia, nada copiado. Atlas KayKit `restaurantbits_texture` (`Assets/KitchenPack/Assets/textures/`, licença em `credits.md`).
+- **Substitui:** AST-012 (roller grill). Uso: UPG-001 / preparo em 3D (`prep-3d.md`): 8 salsichas **deitadas sobre as barras**, o virar gira (não rola).
+- **Arquivos:** `Assets/blender/equipment/AST-120_Grill.blend` → `Assets/models/equipment/AST-120_Grill.fbx` (cópia idêntica em `Assets/import/equipment/`). Renders: `Assets/reference/AST-120_three.png`, `_front.png`, `_low.png`.
+- **Tris:** **1.060** (Base 188, Frame 176, Tray 128, Burner 88, Flame 144, 14 barras x 20, 2 botões x 28). zfight 0.
+- **Dimensões (studs; 1 unidade Blender = 1 stud):** pegada **4,6 L x 2,6 P** (a alça da bandeja sai mais 0,19 na frente: P total 2,79), altura **0,62** (topo das barras). Cabe nos 5 L do carrinho; no trailer sobra folga. Pivô: **base-centro** (X 0, Y 0, Z 0 = base da caixa), frente = +Y no Blender / **-Z (LookVector) no Roblox**.
+- **Peças (cada uma um objeto/MeshPart):** `Base` (caixa aberta em cima: piso + 4 paredes, aço escuro) · `Frame` (moldura Steel sobre a borda, z 0,45–0,60) · `Bar_1`…`Bar_14` (barras de Ø 0,12, comprimento 2,34 ao longo de Y, passo 0,30 em X, centros X = -1,95 + 0,30·(n-1), Z 0,56, **topo Z 0,62**; cor clara (quase branca) de propósito para o Roblox tingir/`Neon` e brilhar; cada barra aquece por conta própria) · `Tray` (bandeja de gordura em Z 0,06–0,18, 4,0 x 1,9, com alça que sai pela frente) · `Burner` (2 canos em Y -0,5 e +0,5, Z 0,24, mais pernas) · `Flame` (24 chamas piramidais, Z 0,30–0,50, Orange do atlas; uma peça só, para `Transparency`/`Neon`) · `Knob_1`, `Knob_2` (Mustard, X -1,5 e +1,5, frente).
+- **Vagas (relativas ao pivô, X direita, Y frente, Z cima; salsicha de 1,2 x 0,24 deitada ao longo de X, centro 0,12 acima do topo das barras, `FlipCenter` 0,12 vale):** 2 colunas (X -1,0 e +1,0; a salsicha ocupa -1,6…-0,4 e 0,4…1,6) x 4 linhas (Y -0,9 / -0,3 / +0,3 / +0,9). Z = **0,74**. Empties `Slot_n` com n = linha·2 + coluna + 1, **linha 0 = fundo**, coluna 0 = esquerda (do ponto de vista do jogador, de frente):
+
+| Slot (`GrillSlot:n`) | X | Y | Z |
+|---|---|---|---|
+| 1 | -1,0 | -0,9 | 0,74 |
+| 2 | +1,0 | -0,9 | 0,74 |
+| 3 | -1,0 | -0,3 | 0,74 |
+| 4 | +1,0 | -0,3 | 0,74 |
+| 5 | -1,0 | +0,3 | 0,74 |
+| 6 | +1,0 | +0,3 | 0,74 |
+| 7 | -1,0 | +0,9 | 0,74 |
+| 8 | +1,0 | +0,9 | 0,74 |
+
+  No Roblox o frame local de um import é (x, z - h/2, -y) em torno do centro da caixa (lição 35 do `lessons.md`); o coder deve alinhar os hitboxes **pelos empties** (`Slot_1`…`Slot_8` filhos da `Base`), não por esta tabela cega. A ordem/numeração é decisão do coder: renumerar é só renomear.
+- **Outros encaixes:** `Prompt_Grill` (X 0, Y +1,5, Z 0,9), `VFX_Heat` (X 0, Y 0, Z 0,67).
+- **Sinais para o código:** barra = `Bar_n` (14 peças, `Material = Neon` + `Color` laranja quando a vaga acima esquenta; sugestão: uma salsicha em `Slot_k` aquece as barras sob o corpo, X -1,6…-0,4 ou 0,4…1,6); `Flame` liga/desliga por `Transparency`.
+- **Cores:** Steel (moldura, alça), aço escuro (base, bandeja), Mustard (botões), Orange (chamas). Sem marca, sem texto.
+- **Pendente:** upload Open Cloud e substituição do roller grill no trailer (não feitos); colocação com `Place.run` fica para quando o outro agente liberar `src/`; confirmar com o coder as 2 colunas x 4 linhas (alternativa: 1 linha de 8 com salsicha ao longo de Y).
 
 ### AST-013 — Trilho de descanso
 
@@ -1576,7 +1606,7 @@ Regras comuns:
 
 ### AST-109 — Salsicha em 4 estados
 
-- **Status:** Rascunho · **Prioridade:** P0 · **Origem:** render dos modelos do AST-002 (`Sausage_Raw` 92 tris, `Sausage_Grilled` 164 tris)
+- **Status:** Em revisão (ticket vertical em camadas, 2026-10-12; sprites e ids em `docs/art/ticket-sprites.md`) · **Prioridade:** P0 · **Origem:** render dos modelos do AST-002 (`Sausage_Raw` 92 tris, `Sausage_Grilled` 164 tris)
 - **Peças (`Prep/Sausage/*`):** `raw` (rosa `#E9A08F`), `half` (um lado marcado, outro cru: **forma da meia-virada**), `done` (`#C2602F` > `#7E3519` com marcas), `ghost` (contorno tracejado Ink 20%, para "esperando a grelha" e slot vazio).
 - **Tamanhos:** ícone 128² (chip do trilho, slot) e **horizontal 256 x 96** (slot do Grill e chip arrastável no Build), dois lados do mesmo render.
 - **Leitura:** a diferença entre os 4 estados tem de aparecer **em escala de cinza** (marcas de grelha e meia-divisão, não só o matiz).
@@ -1584,21 +1614,21 @@ Regras comuns:
 
 ### AST-110 — Pão, guia de corte e mat
 
-- **Status:** Rascunho · **Prioridade:** P0 · **Origem:** render do AST-001 (`Bun_Closed` 128 tris, `Bun_Open` 152 tris)
+- **Status:** Em revisão (ticket vertical em camadas, 2026-10-12; sprites e ids em `docs/art/ticket-sprites.md`) · **Prioridade:** P0 · **Origem:** render do AST-001 (`Bun_Closed` 128 tris, `Bun_Open` 152 tris)
 - **Peças (`Prep/Bun/*`):** `closed` (vista de cima, 256 x 96), `open` (aberto, vão visível), `cut_guide` (linha tracejada Ink, **máscara** tintável, 256 x 16), `half_l`/`half_r` (metades para a animação de abrir, 128 x 96 cada), `icon` (128²).
 - **Mat:** textura de tábua de madeira clara (`Prep_Board`), 9-slice 128², borda Ink 4 px, **sem** textura pintada de foto/ruído (style guide §6): faixas planas alternando 2 tons do atlas.
 - **Uso:** `PlateView` (Build) e cartão "Your plate" (Serve).
 
 ### AST-111 — Complementos vistos de cima
 
-- **Status:** Rascunho · **Prioridade:** P0 · **Origem:** render/redesenho dos modelos de cobertura (AST-004 `KetchupTopping` 66 tris, AST-005 `MustardTopping` 86, AST-006 `Cheese`, AST-007 `Bacon`, AST-008 `PotatoSticks`, AST-009 `CreamCheese`)
+- **Status:** Em revisão (ticket vertical em camadas, 2026-10-12; sprites e ids em `docs/art/ticket-sprites.md`) · **Prioridade:** P0 · **Origem:** render/redesenho dos modelos de cobertura (AST-004 `KetchupTopping` 66 tris, AST-005 `MustardTopping` 86, AST-006 `Cheese`, AST-007 `Bacon`, AST-008 `PotatoSticks`, AST-009 `CreamCheese`)
 - **Peças (`Prep/Topping/*`, 256 x 96, vista de cima sobre o pão):** `sauce_zigzag` (**uma** máscara branca tintável: ketchup `#E2402E`, mustard `#F6C12B`, cream cheese `#FFF8EC` por `ImageColor3`), `cheese_slice`, `bacon_strip`, `potato_pile`; mais `sauce_guide` (traço-guia do zigue-zague, tracejado, 256 x 96) e `ring_target` (anel de alvo do bacon, 64 x 64, 2 estados: aberto/fechando).
 - **Regra:** a ordem de empilhar é livre (spec §5.3), então cada peça é **independente** e com sombra mínima, para qualquer combinação ficar boa.
 - **Uso:** `PlateView`, `StrokeCanvas` (traço), e o ícone 2D do hot dog pronto no Serve (composição por código).
 
 ### AST-112 — Ticket
 
-- **Status:** Rascunho · **Prioridade:** P0 · **Origem:** 2D
+- **Status:** Em revisão (ticket vertical em camadas, 2026-10-12; sprites e ids em `docs/art/ticket-sprites.md`) · **Prioridade:** P0 · **Origem:** 2D
 - **Peças (`Prep/Ticket/*`):** `paper` (9-slice 96² Cream `#FFF8EA` > `#FBE3B8`, contorno Ink 3 px, **borda inferior rasgada** em serrilha de 8 px), `pin` (pino Teal 32²), `ring_track` e `ring_fill` (anel de paciência, 64²: máscara + preenchimento tintável Teal > Mustard; 3 entalhes fixos), `stack_edge` (bordas de tickets atrás, 9-slice), `stamp_served` (carimbo "pago", Green com check, 96²).
 - **Estados por código:** anel Teal (> 40%), Mustard (< 40%), Mustard pulsando com `hourglass` (< 15%). **Nunca vermelho.**
 - **Uso:** `TicketRail` (paisagem e retrato) e cartões do Order.
