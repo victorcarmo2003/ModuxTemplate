@@ -5,8 +5,9 @@
 --
 --   Day     the shift's day, locked until GoldenFrom (soft golden hour: cream tint, warm ambient, less blue air)
 --   Golden  GoldenFrom -> GoldenTo, blended from Day by the shift clock
---   Night1  first night; Night10 last night; nights in between are interpolated. Dark and tense (light horror)
---           with a faint sodium-amber ambient; ambient luminance never below #1B2140 (§5.3 reading minimum)
+--   Night1  first night; Night10 last night; nights in between are interpolated. Dark, cold and tense (light horror,
+--           TASK-293): blue-grey ambient, the warm light comes from posts, signs and the trailer; ambient
+--           luminance never below #1B2140 (§5.3 reading minimum)
 --   Lobby   lobby servers (ServerRole Lobby / PrivateLobby): warm, cosy night, ClockTime fixed at LobbyClock
 --
 -- Never coral (#FF8A65) in any of these: reserved for the Mart's safe-spot neon (§2.4).
@@ -112,55 +113,60 @@ const presets: LightPresets = {
 		SunRays = 0.04,
 		SunRaysSpread = 0.12,
 	},
+	-- TASK-293 (owner print 2026-10-15: "night looks like late afternoon"). Darker and cold: low Brightness and
+	-- exposure, blue-grey ambient just above the §5.3 reading minimum (#1B2140, luminance ~34), dark blue air, cold
+	-- tint, lower bloom threshold so the warm posts / signs / string lights / trailer read as the light sources.
+	-- Before: Night1 Brightness 0.6, Exposure 0, Ambient (60,48,52), Outdoor (72,56,56), Atm (58,42,64) purple-amber,
+	-- Sat -0.15, Tint (244,224,206); Night10 0.4, Ambient (50,40,56), Outdoor (58,46,58), Atm (46,34,56). PROVISIONAL.
 	Night1 = {
-		Brightness = 0.6,
-		Exposure = 0,
-		Ambient = Color3.fromRGB(60, 48, 52), -- luminance ~50 (>= #1B2140 ~34)
-		OutdoorAmbient = Color3.fromRGB(72, 56, 56),
-		ColorShiftTop = Color3.fromRGB(92, 64, 42), -- faint sodium from above
+		Brightness = 0.25,
+		Exposure = -0.3,
+		Ambient = Color3.fromRGB(36, 40, 60), -- luminance ~40 (>= #1B2140 ~34)
+		OutdoorAmbient = Color3.fromRGB(32, 38, 62),
+		ColorShiftTop = Color3.fromRGB(70, 84, 120), -- faint cold moonlight from above
 		ColorShiftBottom = Color3.fromRGB(0, 0, 0),
-		EnvDiffuse = 1,
-		EnvSpecular = 1,
+		EnvDiffuse = 0.6,
+		EnvSpecular = 0.8,
 		ShadowSoftness = 0.2,
-		AtmDensity = 0.35,
+		AtmDensity = 0.38,
 		AtmOffset = 1,
 		AtmGlare = 0,
-		AtmHaze = 1.5,
-		AtmColor = Color3.fromRGB(58, 42, 64), -- purple-amber night air
-		AtmDecay = Color3.fromRGB(72, 42, 26),
-		CCBrightness = 0,
-		Saturation = -0.15,
-		Contrast = 0.1,
-		Tint = Color3.fromRGB(244, 224, 206),
-		BloomIntensity = 0.8,
+		AtmHaze = 1.2,
+		AtmColor = Color3.fromRGB(24, 28, 46), -- dark blue night air
+		AtmDecay = Color3.fromRGB(18, 20, 36),
+		CCBrightness = -0.02,
+		Saturation = -0.2,
+		Contrast = 0.16,
+		Tint = Color3.fromRGB(228, 234, 255), -- mild cold tint (warm lamps still read warm)
+		BloomIntensity = 0.9,
 		BloomSize = 24,
-		BloomThreshold = 1.2,
+		BloomThreshold = 1,
 		SunRays = 0,
 		SunRaysSpread = 0.1,
 	},
 	Night10 = {
-		Brightness = 0.4,
-		Exposure = 0,
-		Ambient = Color3.fromRGB(50, 40, 56), -- luminance ~43 (>= #1B2140 ~34)
-		OutdoorAmbient = Color3.fromRGB(58, 46, 58),
-		ColorShiftTop = Color3.fromRGB(72, 50, 36),
+		Brightness = 0.18,
+		Exposure = -0.4,
+		Ambient = Color3.fromRGB(32, 35, 54), -- luminance ~35 (>= #1B2140 ~34)
+		OutdoorAmbient = Color3.fromRGB(28, 32, 54),
+		ColorShiftTop = Color3.fromRGB(56, 66, 100),
 		ColorShiftBottom = Color3.fromRGB(0, 0, 0),
-		EnvDiffuse = 1,
-		EnvSpecular = 1,
+		EnvDiffuse = 0.6,
+		EnvSpecular = 0.8,
 		ShadowSoftness = 0.2,
 		AtmDensity = 0.45,
 		AtmOffset = 1,
 		AtmGlare = 0,
-		AtmHaze = 2.2,
-		AtmColor = Color3.fromRGB(46, 34, 56),
-		AtmDecay = Color3.fromRGB(48, 26, 18),
-		CCBrightness = 0,
-		Saturation = -0.25,
-		Contrast = 0.1,
-		Tint = Color3.fromRGB(232, 210, 198),
-		BloomIntensity = 0.8,
+		AtmHaze = 1.8,
+		AtmColor = Color3.fromRGB(20, 22, 40),
+		AtmDecay = Color3.fromRGB(14, 14, 28),
+		CCBrightness = -0.03,
+		Saturation = -0.28,
+		Contrast = 0.18,
+		Tint = Color3.fromRGB(220, 226, 252),
+		BloomIntensity = 0.95,
 		BloomSize = 24,
-		BloomThreshold = 1.2,
+		BloomThreshold = 1,
 		SunRays = 0,
 		SunRaysSpread = 0.1,
 	},

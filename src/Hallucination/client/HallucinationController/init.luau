@@ -15,7 +15,14 @@
 	  * nothing to play -> retry in RETRY seconds; one effect at a time; leaving the eligible state cancels it and the
 	    run's cleanups undo every local write (lamps, rigs, cards, subtitle).
 
-	Effects/<Effect>.luau are discovered (module name = Hallucinations.Effect). Contract in Context.luau.
+	Family D, "sustos sem verbo" (TASK-274; anomalies-v2-proposal.md §3 D; DEC-254, DEC-256): the night scheduler calls
+	HallucinationService:Scare on the server; the packet HallucinationScare lands in PlayScare, which plays ONE row with
+	FamilyD among the allowed keys that this client can show now (CanRun), ignoring sanity and the roll timer, out of
+	cooldown first (cooldown ignored only when nothing else can play). Never interrupts an effect already playing;
+	needs the own life state Active. After it the sanity roll waits at least Rules.ScareGap. No damage, no jumpscare.
+
+	Effects/<Effect>.luau are discovered (module name = Hallucinations.Effect). Contract in Context.luau; shared local
+	figures in Actors.luau.
 	Sound keys that Content.Sounds does not have yet (SFX-130/131/133/134) are skipped silently (Q-168).
 ]]
 local Players = game:GetService("Players")
@@ -162,24 +169,81 @@ function HallucinationController:Schedule(now: number, seconds: number?)
 	self.NextRollAt = now + (seconds or self.Random:NextNumber(interval[1], interval[2]))
 end
 
+function HallucinationController:CanRun(row: Content.Hallucination, env: Context.Env): boolean
+	const effect = self.Effects[row.Effect]
+	if effect == nil then
+		return false
+	end
+	if effect.CanRun then
+		const ok, result = pcall(effect.CanRun, env)
+		return ok and result == true
+	end
+	return true
+end
+
 -- Rows that may play now, in table order.
 function HallucinationController:Candidates(now: number, env: Context.Env): { Content.Hallucination }
 	const sanity = Vide.untrack(self.Dependencies.VitalController.Sanity)
 	const out: { Content.Hallucination } = {}
 	for _, row in ROWS do
-		const effect = self.Effects[row.Effect]
-		if effect and sanity < row.MaxSanity and now >= (self.CooldownUntil[row.Key] or 0) then
-			local can = true
-			if effect.CanRun then
-				const ok, result = pcall(effect.CanRun, env)
-				can = ok and result == true
-			end
-			if can then
-				table.insert(out, row)
-			end
+		if sanity < row.MaxSanity and now >= (self.CooldownUntil[row.Key] or 0) and self:CanRun(row, env) then
+			table.insert(out, row)
 		end
 	end
 	return out
+end
+
+-- Family D rows among `keys` (empty = every FamilyD row) that may play now; `cooled` = only those out of cooldown.
+function HallucinationController:ScareCandidates(
+	now: number,
+	env: Context.Env,
+	keys: { string },
+	cooled: boolean
+): { Content.Hallucination }
+	const out: { Content.Hallucination } = {}
+	for _, row in ROWS do
+		if
+			row.FamilyD
+			and (#keys == 0 or table.find(keys, row.Key) ~= nil)
+			and (not cooled or now >= (self.CooldownUntil[row.Key] or 0))
+			and self:CanRun(row, env)
+		then
+			table.insert(out, row)
+		end
+	end
+	return out
+end
+
+-- Family D entry point (packet HallucinationScare, or any client code): plays one FamilyD row among `keys`
+-- (nil / empty = any) that this client can show now. Returns the key played, nil when nothing could play (an effect
+-- already playing, not Active, nothing runnable). Sanity, the night phase and the roll timer are not checked: the
+-- caller (the night scheduler) decides when.
+function HallucinationController:PlayScare(keys: { string }?): string?
+	const env = self.Env
+	if env == nil or self.Active ~= nil then
+		return nil
+	end
+	if Vide.untrack(self.Dependencies.VitalController.LocalState) ~= "Active" then
+		return nil
+	end
+	const now = os.clock()
+	const allowed = keys or {}
+	local list = self:ScareCandidates(now, env, allowed, true)
+	if #list == 0 then
+		list = self:ScareCandidates(now, env, allowed, false)
+	end
+	const row = Context.Pick(self.Random, list, function(candidate: Content.Hallucination): number
+		return candidate.Weight
+	end)
+	if row == nil then
+		return nil
+	end
+	self:Start(row, env, now)
+	-- keep the sanity roll from landing right on top of it
+	if self.NextRollAt ~= 0 and self.NextRollAt < now + RULES.ScareGap then
+		self.NextRollAt = now + RULES.ScareGap
+	end
+	return row.Key
 end
 
 function HallucinationController:Start(row: Content.Hallucination, env: Context.Env, now: number)
@@ -306,6 +370,9 @@ end
 HallucinationController:OnInit(function(self)
 	self:Setup()
 	self:LoadEffects()
+	self.Libs.Net.HallucinationScare:onClient(function(data)
+		self:PlayScare(data.Keys)
+	end)
 end)
 
 HallucinationController:OnStart(function(self)

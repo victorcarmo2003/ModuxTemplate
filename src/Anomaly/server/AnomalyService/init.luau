@@ -152,6 +152,8 @@ local function candidate(row: Content.Anomaly): Scheduler.Candidate
 		NpcCost = row.NpcCost,
 		ExclusiveWith = row.ExclusiveWith,
 		Scripted = if scripted then { Night = scripted.Night, Clock = scripted.Clock } else nil,
+		Family = row.Family,
+		SkipAtmospheres = row.SkipAtmospheres,
 	}
 end
 
@@ -170,6 +172,7 @@ const AnomalyService = Modux.Service("AnomalyService", {
 		"EconomyService",
 		"InteractionService",
 		"VehicleService",
+		"HallucinationService",
 	},
 	Priority = 570,
 })
@@ -184,6 +187,8 @@ function AnomalyService:Setup()
 	self.Context = nil :: Api.Context?
 	-- agenda of the current night shift, in At order
 	self.Queue = {} :: { Due }
+	-- family D scares of the night (TASK-274): game minutes still to fire, ascending (V2, DEC-254)
+	self.Scares = {} :: { number }
 	self.Running = {} :: { [number]: Run }
 	-- finished record id -> server time it leaves the set
 	self.Removing = {} :: { [number]: number }
@@ -521,7 +526,8 @@ function AnomalyService:Fail(occ: Api.Occurrence, who: { Player } | "active")
 		end
 	end
 	if critical and not run.CriticalSent then
-		-- DEC-074, DEC-094: the night is lost at once, no 10 s window. False (not losable now) is not retried.
+		-- DEC-074, DEC-094: the night is lost at once, no 10 s window. False (not losable now) is not retried. No rule is
+		-- critical since DEC-255 (Rules refuses IsCritical); kept for a future decision.
 		run.CriticalSent = true
 		self.Dependencies.RoundService:LoseNight("critical")
 	end
@@ -872,6 +878,7 @@ end
 
 function AnomalyService:BuildAgenda(info: { Day: number, Night: number, IsNight: boolean, Attempt: number })
 	self.Queue = {}
+	self.Scares = {}
 	if not info.IsNight or info.Night < 1 then
 		return
 	end
@@ -880,11 +887,16 @@ function AnomalyService:BuildAgenda(info: { Day: number, Night: number, IsNight:
 	const phase = Content.Shift.ByKey[NIGHT_PHASE]
 	const candidates: { Scheduler.Candidate } = {}
 	-- Cart nights (user request 2026-10-12): an anomaly whose only answer is a trailer object (Trailer "Needs": the light
-	-- switch) is replaced, slot by slot and with the same age (3/2/1 occurrences), by its stand-in, an earlier anomaly
+	-- switch) is replaced, with the same age weight (3/2/1), by its stand-in, an earlier anomaly
 	-- the cart can handle. The trailer brings the anomaly back; without it the night just repeats older ones.
 	const vehicle: Content.Vehicle? = Content.Vehicles.ByKey[self.Dependencies.VehicleService:Current()]
 	const hasSwitch: boolean = vehicle ~= nil and vehicle.HasSwitch
+	-- V2 (TASK-271): the scheduler filters by family and atmosphere; here only rows with a module enter, so an
+	-- anomaly still being built (TASK-272..274) never spends an event of the night
 	for _, row in Content.Anomalies.ActiveOn(info.Night) do
+		if self.Modules[row.Key] == nil then
+			continue
+		end
 		local stand: Content.Anomaly? = nil
 		if row.Trailer == "Needs" and not hasSwitch then
 			stand = Content.Anomalies.StandIn(row)
@@ -892,6 +904,8 @@ function AnomalyService:BuildAgenda(info: { Day: number, Night: number, IsNight:
 		if stand ~= nil then
 			const swapped = candidate(stand)
 			swapped.Night = row.Night
+			swapped.Family = row.Family
+			swapped.SkipAtmospheres = row.SkipAtmospheres
 			table.insert(candidates, swapped)
 		else
 			table.insert(candidates, candidate(row))
@@ -904,6 +918,10 @@ function AnomalyService:BuildAgenda(info: { Day: number, Night: number, IsNight:
 		Night = info.Night,
 		Anomalies = candidates,
 		Occurrences = Content.Nights.Occurrences,
+		Families = night.Families,
+		Atmosphere = night.Atmosphere,
+		Events = night.Events,
+		Premiere = night.NewAnomaly,
 		Window = Content.Nights.Windows.Shift,
 		MinGap = night.MinGap,
 		MinutesPerSecond = if night.Duration > 0 then (phase.ClockTo - phase.ClockFrom) / night.Duration else 0,
@@ -912,6 +930,17 @@ function AnomalyService:BuildAgenda(info: { Day: number, Night: number, IsNight:
 	end)
 	for _, entry in entries do
 		table.insert(self.Queue, { Entry = entry, RetryAt = 0, Done = false })
+	end
+	-- family D (TASK-274): night.Scares scares without a verb, one per equal slice of the window, jittered inside it.
+	-- Drawn after the agenda so the agenda's draws never change.
+	const window = Content.Nights.Windows.Shift
+	const count = if table.find(night.Families, "D") ~= nil then night.Scares else 0
+	if count > 0 then
+		const slice = (window[2] - window[1]) / count
+		for index = 1, count do
+			table.insert(self.Scares, window[1] + slice * (index - 1) + slice * (0.2 + 0.6 * rng:NextNumber()))
+		end
+		table.sort(self.Scares)
 	end
 end
 
@@ -939,6 +968,13 @@ function AnomalyService:StepAgenda(t: number)
 	const minutes = self.Dependencies.RoundService:Minutes()
 	const windowEnd = Content.Nights.Windows.Shift[2]
 	const limits = self:Limits()
+	-- family D: every scare due now plays for everyone (any key of the D catalogue); none past the window
+	while #self.Scares > 0 and self.Scares[1] <= minutes do
+		table.remove(self.Scares, 1)
+		if minutes < windowEnd then
+			self.Dependencies.HallucinationService:Scare(nil, nil)
+		end
+	end
 	for _, due in self.Queue do
 		const entry = due.Entry
 		if due.Done or entry.At > minutes or t < due.RetryAt then
@@ -1047,6 +1083,7 @@ function AnomalyService:OnPhase(phase: string)
 	if self.InNight then
 		self.InNight = false
 		self.Queue = {}
+		self.Scares = {}
 	end
 	if next(self.Running) ~= nil or next(self.Removing) ~= nil then
 		self:StopAll(if phase == "NightEnd" then "NightOver" else "Restore")

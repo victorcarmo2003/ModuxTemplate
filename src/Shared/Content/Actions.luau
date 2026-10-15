@@ -85,6 +85,9 @@ return Table.new({
 		Wave = 2,
 	},
 	{ Key = "switch_light", Text = "Lights", Hold = 0, Radius = 7, Requires = {}, Night = "Any", Wave = 2 },
+	-- ANM-020 blackout (TASK-273, DEC-254 family C; Provisional): Prompt_Breaker at the back of the trailer, owner LightService;
+	-- enabled only while the power is out. Hold 3 s turns everything back on.
+	{ Key = "breaker_reset", Text = "Reset Breaker", Hold = 3, Radius = 6, Requires = {}, Night = "Any", Wave = 3 },
 	-- Prompt_Answer on the trailer phone (FEAT-018, DEC-124)
 	{ Key = "answer_phone", Text = "Answer", Hold = 0, Radius = 7, Requires = {}, Night = "Any", Wave = 2 },
 	-- the safe spot is a zone, not a prompt: the key exists for the enum only (content-data.md §6.9)

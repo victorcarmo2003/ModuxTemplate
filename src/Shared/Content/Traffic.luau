@@ -218,7 +218,7 @@ const traffic: Traffic = {
 		JuniperSouthInterval = { 12, 20 }, -- per direction, day only (DEC-133)
 		BrakeDecel = 22, -- Provisional (architect)
 		PullAway = 22, -- Provisional (architect)
-		CarGap = 14, -- Provisional (architect)
+		CarGap = 17, -- Provisional (architect); 14 -> 17 (TASK-294): kit cars are up to 14 long, 3 studs between bumpers
 		FollowDelay = 0.5, -- Provisional (architect)
 	},
 }

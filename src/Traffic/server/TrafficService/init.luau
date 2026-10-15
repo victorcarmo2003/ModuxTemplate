@@ -21,7 +21,8 @@
 	    given only if no Ninth car can reach it in that window (earliest arrival = its record without stops); a Ninth
 	    car does not spawn if it could reach the box inside a reservation. One Juniper car at a time in the box.
 	  * crosswalk line: only while an NPC holds the reservation of that crosswalk (or of its Linked one).
-	  * queue: cars heading to the same line stop Crossing.CarGap apart; a parked follower moves up
+	  * queue: a car stops Crossing.CarGap (centre to centre) behind the rest point of the car ahead in its lane, any
+	    route or line (TASK-294); a parked follower moves up
 	    Crossing.FollowDelay after its slot moves. No stop with the body inside a crosswalk or the X-T box
 	    (anti-bloqueio): such a stop moves back before the box.
 	  * never for a player (DEC-133, DEC-095): no player position enters any decision.
@@ -116,6 +117,8 @@ const HIT_BELOW = 4 -- HRP this far under the road point still counts
 const HIT_ABOVE = 14 -- HRP this far above it still counts (the client already threw the body)
 const HIT_RATE = 0.25 -- seconds between CarHit packets of one player
 const HEADING_HALF = 4 -- studs each side for the car heading
+const LANE_HALF = 3 -- studs off a path still in its lane (lanes are 12 apart; TASK-294)
+const SAME_WAY = 0.5 -- heading dot: same direction of travel (TASK-294)
 const HORIZON = 60 -- seconds Motion.TimeAt may look ahead
 const MATCH = 1e-3 -- studs / studs per second: same motion up to now
 const PATH_RETRY = 5 -- seconds between lookups of a route path missing in the map
@@ -371,31 +374,48 @@ local function clearOfZones(car: Car, at: number): number
 	return stop
 end
 
--- Where the car must stop now (0 = nowhere): nearest stop, queued CarGap behind the cars ahead heading to the same
--- line, kept out of the boxes, never behind the car.
+-- Where the car must stop now (0 = nowhere): nearest stop, or CarGap behind the rest point of the car physically ahead
+-- in its lane (TASK-294), kept out of the boxes, never behind the car. The queue used to count only cars heading to
+-- the SAME line, so on Juniper South a car held at SL-1S (hold 84) stood inside the one parked at the PARE of SL-S
+-- (hold 87.5, 3.5 studs on): the leader is now found by position (any route, any line) and followed by its StopDist.
 function TrafficService:DesiredStop(car: Car): number
-	const raw, line = self:RawStop(car)
-	if raw == nil or line == nil then
+	const raw = self:RawStop(car)
+	local stop = raw or math.huge
+	local followed = false
+	const path = car.Geo.Path
+	for _, other in self.Cars do
+		if other == car or other.Record.StopDist <= 0 then
+			continue -- a car running free (no stop ahead) never slows a follower down: same profile, spawned apart
+		end
+		-- the other car is ahead of this one, in its lane, going the same way
+		const here = Motion.PointAt(other.Geo.Path, other.Dist)
+		const ahead, offset = Motion.Project(path, here)
+		if offset > LANE_HALF or ahead <= car.Dist + EPSILON then
+			continue
+		end
+		const mine = Motion.Heading(path, ahead, HEADING_HALF)
+		const theirs = Motion.Heading(other.Geo.Path, other.Dist, HEADING_HALF)
+		if mine:Dot(theirs) < SAME_WAY then
+			continue
+		end
+		-- where it will be at rest, seen from this path (it may leave the lane before: then it does not count)
+		const rest, restOffset = Motion.Project(path, Motion.PointAt(other.Geo.Path, other.Record.StopDist))
+		if restOffset > LANE_HALF or rest < ahead - EPSILON then
+			continue
+		end
+		const slot = rest - CROSSING.CarGap
+		if slot < stop then
+			stop = slot
+			followed = true
+		end
+	end
+	if stop == math.huge then
 		return 0
 	end
-	const mine = (car.Geo.StopAt[line] :: number) - car.Dist
-	local ahead = 0
-	for _, other in self.Cars do
-		if other == car then
-			continue
-		end
-		const _, otherLine = self:RawStop(other)
-		const otherAt = if otherLine == line then other.Geo.StopAt[line] else nil
-		if otherAt == nil then
-			continue
-		end
-		const theirs = otherAt - other.Dist
-		if theirs < mine or (theirs == mine and other.Id < car.Id) then
-			ahead += 1
-		end
-	end
 	-- a line stop is legal by itself (the map puts it before its box); a queue slot may fall inside a box
-	local stop = if ahead > 0 then clearOfZones(car, raw - ahead * CROSSING.CarGap) else raw
+	if followed then
+		stop = clearOfZones(car, stop)
+	end
 	if stop < car.Dist then
 		stop = car.Dist
 	end

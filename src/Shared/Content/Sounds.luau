@@ -186,6 +186,7 @@ const UPLOADED: { [string]: string } = {
 	phone_glitch = "rbxassetid://140367728848843",
 	horror_chase_stop = "rbxassetid://123355946453444",
 	ui_click = "rbxassetid://127105730240202",
+	thunder = "rbxassetid://9113169432", -- ATM-5 (TASK-275): "Artillery Distant 2 (SFX)", ProSoundEffects
 	locked_door = "rbxassetid://136518625715192", -- SFX-232 ReplicatedStorage.Assets.SFX["Locked door"] (user, ANM-004)
 }
 
@@ -243,6 +244,8 @@ const base = Table.new({
 	ambient("amb_fog", false, "rbxassetid://9118748093", "Ambient Fog (user upload)"), -- N10
 	-- horror layer over the street bed in the tense window (Rules.Tension)
 	ambient("amb_horror", false, "rbxassetid://88784462446827", "HorrorAmbient (user upload)"),
+	-- atmospheres ATM-4 / ATM-5 (TASK-275; AtmosphereController plays it on screen, fades it with the look)
+	ambient("amb_rain", false, "rbxassetid://9112853286", "Rain Heavy 2 (SFX), ProSoundEffects"),
 	-- Sfx
 	sfx("grill_sizzle", true),
 	sfx("bun_slice"),
@@ -308,6 +311,7 @@ const base = Table.new({
 	sfx("scary_violins", false, { Spatial = false, Volume = 0.4 }),
 	sfx("phone_glitch"),
 	sfx("horror_chase_stop", false, { Spatial = false, Volume = 0.4 }),
+	sfx("thunder", false, { Spatial = false, Volume = 0.6 }), -- ATM-5 storm (TASK-275)
 	-- Ui
 	ui("toast"),
 	ui("summary"),

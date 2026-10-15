@@ -26,3 +26,8 @@ Regras: só snippets idempotentes (ver `STUDIO_LAYER.md`); nunca `Place.run` sem
 
 `tools/studio/prep_layout_check.luau` roda o `Layout.luau` real do `PrepShell` em 7 telas (667x375, 844x390, 932x430, desktop, retrato) e confere sobreposição entre nossos blocos, a zona do Hud (relógio, dinheiro, sanidade), o menu do Roblox, o centro livre do mundo, alvos >= 44 px e tudo dentro do canvas. O `lune` não está no `rokit.toml`: rode o binário do `rokit` direto, da raiz do repo:
 `"~/.rokit/tool-storage/lune-org/lune/<versão>/lune.exe" run tools/studio/prep_layout_check` (esperado `LAYOUT: 7 ok, 0 failures`).
+
+## Teste da agenda de anomalias V2 (puro, sem Studio)
+
+`tools/studio/scheduler_check.luau` roda o `AnomalyService/Scheduler.luau` real sobre `Content.Nights` e `Content.Anomalies` nas 10 noites, 200 sementes cada (TASK-271): mesma semente = mesma agenda, `Events` entradas dentro da janela e separadas por `MinGap`, só famílias abertas, nunca atmosfera pulada nem linha cortada (ANM-006/008), nunca a mesma anomalia duas vezes seguidas, a novidade da noite no 1º terço e as roteirizadas da noite 10. Da raiz do repo:
+`"~/.rokit/tool-storage/lune-org/lune/<versão>/lune.exe" run tools/studio/scheduler_check` (esperado `SCHEDULER: 10 ok, 0 failures`).

@@ -59,6 +59,11 @@ Sugestão de crédito no jogo: "UI icons by RhosGFX".
 
 `Assets/textures/lobby/T_Lobby{Pave,PaveLight,Stain,Wood,Brick}.png`, geradas proceduralmente por `tools/assetplace/gen_lobby_textures.py` (numpy/scipy/PIL, ruído sintético). **Sem fonte de terceiros, sem licença a verificar.** Ids de upload em `tools/assetplace/texture_lobby.luau`.
 
+## Atmosferas ATM-# (2026-10-15, TASK-275)
+
+- `Assets/textures/vfx/T_VFX_RainStreak.png` (`rbxassetid://133719420594904`) e `T_VFX_RainSplash.png` (`rbxassetid://140140944653214`): **obra original**, geradas por script (PIL, gradiente/anel sintético). Sem fonte de terceiros. Ids também em `Assets/import/_texture_ids.json`.
+- Áudio da Creator Store, biblioteca **Pro Sound Effects** (conta oficial `ProSoundEffects`, parceria licenciada com o Roblox para uso livre dentro de experiências Roblox; não sai da plataforma): `9112853286` "Rain Heavy 2 (SFX)" = `amb_rain`; `9113169432` "Artillery Distant 2 (SFX)" (descrição: "Possible Use: Thunder") = `thunder`. Provisório até o dono ouvir.
+
 ## Recursos da plataforma (não são asset de terceiros no repositório)
 
 | Recurso | Origem | Nota |

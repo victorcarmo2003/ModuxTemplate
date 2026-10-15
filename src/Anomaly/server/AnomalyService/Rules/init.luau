@@ -1,20 +1,19 @@
 --!strict
 -- AnomalyRules, server only (content-data.md §3.17, §6.10; architecture.md §19.13, T10; FEAT-023, FEAT-024; DEC-054,
--- DEC-073, DEC-074; TASK-106). The correct verb, deadlines and steps never reach ReplicatedStorage.
+-- DEC-073, DEC-074, DEC-255; TASK-106). The correct verb, deadlines and steps never reach ReplicatedStorage.
 --
 -- One file per anomaly next to this one, named by its Ref (Rules/ANM-007.luau), returning an Api.Rule. Added by the
 -- task that writes the anomaly (TASK-111/113/115/117); files starting with "_" are skipped. Loaded once on the first
 -- require. Validate (DEC-054, DEC-074):
 --   Anomaly is a key of Content.Anomalies and the file name is its Ref
 --   Verb is one of the 7 (Api.Verbs); Window >= 0; Params is a table
---   IsCritical only on ANM-007 (any other critical rule is loaded with IsCritical = false and a warning)
+--   IsCritical is never allowed (DEC-255: no critical rule; a night is lost only when every active player is down,
+--   VitalService wipe). A rule with IsCritical = true is loaded with false and a warning
 -- A broken file is warned and skipped: the anomaly then runs without a rule (its module decides what that means).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 local Api = require(script.Parent.Api)
 
--- DEC-074: the critical rule is fixed on The Walker. Not a tuning number: a decision Validate enforces.
-const CRITICAL_REF = "ANM-007"
 
 const Rules = {}
 
@@ -49,10 +48,9 @@ function Rules.Validate(name: string, value: any): (Api.Rule?, string?)
 	if value.Params ~= nil and type(value.Params) ~= "table" then
 		return nil, `{name}: Params must be a table`
 	end
-	local critical = value.IsCritical == true
-	if critical and row.Ref ~= CRITICAL_REF then
-		warn(`[AnomalyService] Rules/{name}: IsCritical is only allowed on {CRITICAL_REF} (DEC-074); ignored`)
-		critical = false
+	-- DEC-255 (replaces DEC-074): no critical rule
+	if value.IsCritical == true then
+		warn(`[AnomalyService] Rules/{name}: IsCritical is not allowed (DEC-255: no critical rule); ignored`)
 	end
 	const params: { [string]: any } = table.clone((value.Params or {}) :: { [string]: any })
 	table.freeze(params)
@@ -61,7 +59,7 @@ function Rules.Validate(name: string, value: any): (Api.Rule?, string?)
 		Verb = value.Verb :: Api.Verb,
 		LikelyWrongVerb = value.LikelyWrongVerb :: string?,
 		Window = value.Window :: number,
-		IsCritical = critical,
+		IsCritical = false,
 		Params = params,
 	}
 	table.freeze(rule :: any)
@@ -114,7 +112,7 @@ function Rules.Get(anomaly: string): Api.Rule?
 	return nil
 end
 
--- DEC-074: true only for ANM-007 with its rule file loaded.
+-- Always false since DEC-255 (kept so the core and dev tools keep one call site).
 function Rules.IsCritical(anomaly: string): boolean
 	const rule = Rules.Get(anomaly)
 	return rule ~= nil and rule.IsCritical

@@ -3,6 +3,7 @@
 local ServerScriptService = game:GetService("ServerScriptService")
 local AdminService = require(ServerScriptService.server.ModuxTypes.AdminService)
 local AnomalyService = require(ServerScriptService.server.ModuxTypes.AnomalyService)
+local AtmosphereService = require(ServerScriptService.server.ModuxTypes.AtmosphereService)
 local BossService = require(ServerScriptService.server.ModuxTypes.BossService)
 local CharacterService = require(ServerScriptService.server.ModuxTypes.CharacterService)
 local ClassService = require(ServerScriptService.server.ModuxTypes.ClassService)
@@ -13,6 +14,7 @@ local CutsceneService = require(ServerScriptService.server.ModuxTypes.CutsceneSe
 local DevService = require(ServerScriptService.server.ModuxTypes.DevService)
 local EconomyService = require(ServerScriptService.server.ModuxTypes.EconomyService)
 local TipJarService = require(ServerScriptService.server.ModuxTypes.TipJarService)
+local HallucinationService = require(ServerScriptService.server.ModuxTypes.HallucinationService)
 local InteractionService = require(ServerScriptService.server.ModuxTypes.InteractionService)
 local ItemService = require(ServerScriptService.server.ModuxTypes.ItemService)
 local KitchenService = require(ServerScriptService.server.ModuxTypes.KitchenService)
@@ -49,6 +51,7 @@ local VitalService = require(ServerScriptService.server.ModuxTypes.VitalService)
 export type AllServices = {
 	AdminService: AdminService.Public,
 	AnomalyService: AnomalyService.Public,
+	AtmosphereService: AtmosphereService.Public,
 	BossService: BossService.Public,
 	CharacterService: CharacterService.Public,
 	ClassService: ClassService.Public,
@@ -59,6 +62,7 @@ export type AllServices = {
 	DevService: DevService.Public,
 	EconomyService: EconomyService.Public,
 	TipJarService: TipJarService.Public,
+	HallucinationService: HallucinationService.Public,
 	InteractionService: InteractionService.Public,
 	ItemService: ItemService.Public,
 	KitchenService: KitchenService.Public,

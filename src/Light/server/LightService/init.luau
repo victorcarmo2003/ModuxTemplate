@@ -14,8 +14,16 @@
 -- At = startedAt, the client goes post by post by Order x Step); the trailer zones go dark when the last post is out
 -- and come back with the posts at EndHush() or at holdUntil (> startedAt). A new shift or a restore ends it.
 --
+-- Blackout (ANM-020, family C; DEC-254; TASK-273; AnomalyService only): BeginBlackout() puts every HushOff group out at
+-- once (posts with At = 0, so the client drops them all in the same frame) and turns on the breaker prompt
+-- (breaker_reset, hold 3 s). The breaker sits at the back of the trailer: an Interactable anchor with PromptAction
+-- breaker_reset inside the trailer Model (tools/assetplace/breaker.luau builds the panel); without one an Attachment is
+-- made on the trailer at BREAKER_OFFSET (never edits the place). Holding it (server checks: blackout on, anchor on the
+-- current vehicle, range) ends the blackout; AnomalyService sees it as the Action event. The switch does nothing while
+-- the power is out. A new shift or a restore ends it.
+--
 -- API: IsLit(pos), IsSwitchOn(), SetSwitch(on, player?) -> boolean, BeginHush(startedAt, holdUntil), EndHush(),
--- IsHush(), GroupOn(key); signal SwitchChanged(on, player?).
+-- IsHush(), BeginBlackout(), EndBlackout(), IsBlackout(), GroupOn(key); signal SwitchChanged(on, player?).
 --
 -- Current vehicle: VehicleService:Current() and its Swapped signal (architecture.md §19.2; VehicleService 620 does not
 -- require LightService, so no cycle, T42). PROVISIONAL: Hush auto-end at holdUntil and "trailer dark at the last
@@ -34,6 +42,13 @@ export type Record = { On: boolean, At: number }
 export type Hush = Rules.Hush
 
 const ACTION = "switch_light"
+const BREAKER_ACTION = "breaker_reset"
+const BREAKER_NAME = "Prompt_Breaker"
+const TRAILER = "trailer"
+-- Runtime breaker anchor when the place has none: in the frame of the trailer pivot (local +X = the west strip, local
+-- +Z = the back wall; TrailerDoorService ANCHOR_OUT is (16.3, 3.2, 3.6)), on the outer west wall toward the back,
+-- ~8 studs from the Enter Trailer prompt so the two prompt spheres never overlap. PROVISIONAL (TASK-273)
+const BREAKER_OFFSET = Vector3.new(15.6, 4.4, -4.6)
 const ANCHOR_TAG = "Interactable"
 const POST_TAG = "StreetLight"
 const VEHICLE_TAG = "Vehicle"
@@ -97,6 +112,9 @@ function LightService:Setup()
 	-- os.clock() of the last switch_light (cooldown)
 	self.LastToggle = 0 :: number
 	self.Hush = nil :: Hush?
+	-- server time the power went out (ANM-020); nil = power on
+	self.Blackout = nil :: number?
+	self.Breakers = {} :: { [Instance]: boolean }
 	self.Zones = {} :: { [Instance]: Zones.Zone }
 	self.ZonesDirty = true :: boolean
 	-- Posts group -> largest StreetLight Order (Hush corner delay)
@@ -138,6 +156,10 @@ function LightService:IsHush(): boolean
 	return self.Hush ~= nil
 end
 
+function LightService:IsBlackout(): boolean
+	return self.Blackout ~= nil
+end
+
 function LightService:GroupOn(key: string): boolean
 	const record = self.Records[key]
 	return record ~= nil and record.On
@@ -162,6 +184,7 @@ function LightService:Input(): Rules.Input
 		Vehicle = self:Vehicle(),
 		Now = now(),
 		Hush = self.Hush,
+		Blackout = self.Blackout ~= nil,
 		Level = function(upgrade: string, vehicle: string): number
 			return upgrades:GetLevel(upgrade, vehicle) or 0
 		end,
@@ -196,8 +219,16 @@ function LightService:Refresh()
 		const record = self.Records[group.Key]
 		if record.On ~= on then
 			const hush = self.Hush
-			-- Hush: the posts go out from its start, post by post on the client (network.md §13.2)
-			const at = if not on and group.Kind == "Posts" and hush ~= nil then hush.StartedAt else input.Now
+			-- Hush: the posts go out from its start, post by post on the client (network.md §13.2). Blackout: At = 0,
+			-- every post is already past its Order x Step on the client, so they all drop in the same frame
+			local at = input.Now
+			if not on and group.Kind == "Posts" then
+				if self.Blackout ~= nil and group.HushOff then
+					at = 0
+				elseif hush ~= nil then
+					at = hush.StartedAt
+				end
+			end
 			self:Write(group.Key, { On = on, At = at })
 			dirty = true
 		end
@@ -230,7 +261,7 @@ function LightService:SetSwitch(on: boolean, player: Player?, force: boolean?): 
 	if type(on) ~= "boolean" then
 		error("[LightService] SetSwitch needs a boolean", 2)
 	end
-	if self.Hush ~= nil and force ~= true then
+	if (self.Hush ~= nil or self.Blackout ~= nil) and force ~= true then
 		return false
 	end
 	if self.Switch == on then
@@ -270,6 +301,27 @@ function LightService:EndHush()
 	self:Refresh()
 end
 
+-- AnomalyService (ANM-020). Power out at once; the breaker prompt turns on. A second call while out is a no-op.
+function LightService:BeginBlackout()
+	if self.Blackout ~= nil then
+		return
+	end
+	self.Blackout = now()
+	self:EnsureBreaker()
+	self:Refresh()
+	self:RefreshBreakers()
+end
+
+-- Power back (breaker reset, the occurrence ended, new shift, restore).
+function LightService:EndBlackout()
+	if self.Blackout == nil then
+		return
+	end
+	self.Blackout = nil
+	self:Refresh()
+	self:RefreshBreakers()
+end
+
 -- Snapshot "Lt" (data.md §3.3): { S = switch }
 function LightService:Capture(): { S: boolean }
 	return { S = self.Switch }
@@ -277,6 +329,7 @@ end
 
 function LightService:Restore(data: any)
 	self.Hush = nil
+	self:EndBlackout()
 	const saved = if type(data) == "table" then data.S else nil
 	self:SetSwitch(if type(saved) == "boolean" then saved else true, nil, true)
 	self:Refresh()
@@ -365,11 +418,101 @@ function LightService:AddSwitch(anchor: Instance)
 	self:RefreshSwitches()
 end
 
+-- Breaker (ANM-020) -------------------------------------------------------------------------------------------------
+
+-- Trailer Model (Vehicle tag, Vehicle = "trailer")
+function LightService:TrailerModel(): Model?
+	for _, instance in CollectionService:GetTagged(VEHICLE_TAG) do
+		if instance:IsA("Model") and instance:GetAttribute(VEHICLE_ATTRIBUTE) == TRAILER and instance:IsDescendantOf(workspace) then
+			return instance
+		end
+	end
+	return nil
+end
+
+function LightService:AddBreaker(anchor: Instance)
+	if anchor:GetAttribute("PromptAction") ~= BREAKER_ACTION or self.Breakers[anchor] then
+		return
+	end
+	self.Breakers[anchor] = true
+	self:RefreshBreakers()
+end
+
+-- Prompt on while the power is out, only on the current vehicle's breaker
+function LightService:RefreshBreakers()
+	const vehicle = self:Vehicle()
+	const out = self.Blackout ~= nil
+	const interaction = self.Dependencies.InteractionService
+	for anchor in self.Breakers do
+		if anchor.Parent == nil then
+			self.Breakers[anchor] = nil
+			continue
+		end
+		const owner = vehicleOf(anchor)
+		const on = out and (owner == nil or owner == vehicle)
+		if anchor:GetAttribute("PromptEnabled") ~= on then
+			interaction:SetPrompt(anchor, on)
+		end
+	end
+end
+
+-- No breaker anchor in the place: an Attachment on the trailer's biggest part at BREAKER_OFFSET (PROVISIONAL until
+-- tools/assetplace/breaker.luau runs). False when the trailer is not there.
+function LightService:EnsureBreaker(): boolean
+	for anchor in self.Breakers do
+		if anchor:IsDescendantOf(workspace) then
+			return true
+		end
+	end
+	const model = self:TrailerModel()
+	if model == nil then
+		self:WarnOnce("breaker", "no trailer Model: ANM-020 has no breaker to reset")
+		return false
+	end
+	local host: BasePart? = model.PrimaryPart
+	if host == nil then
+		local best = 0
+		for _, d in model:GetDescendants() do
+			if d:IsA("BasePart") then
+				const volume = d.Size.X * d.Size.Y * d.Size.Z
+				if volume > best then
+					best = volume
+					host = d
+				end
+			end
+		end
+	end
+	if host == nil then
+		return false
+	end
+	const anchor = Instance.new("Attachment")
+	anchor.Name = BREAKER_NAME
+	anchor:SetAttribute("PromptAction", BREAKER_ACTION)
+	anchor:SetAttribute("PromptEnabled", false)
+	anchor.Parent = host
+	anchor.WorldPosition = model:GetPivot():PointToWorldSpace(BREAKER_OFFSET)
+	self.Breakers[anchor] = true
+	CollectionService:AddTag(anchor, ANCHOR_TAG)
+	self:WarnOnce(
+		"breakerfallback",
+		`no {BREAKER_ACTION} anchor in the place: runtime Attachment on the trailer (run tools/assetplace/breaker.luau)`
+	)
+	return true
+end
+
+function LightService:CanReset(anchor: Instance): boolean
+	if self.Blackout == nil then
+		return false
+	end
+	const owner = vehicleOf(anchor)
+	return owner == nil or owner == self:Vehicle()
+end
+
 -- Interaction -------------------------------------------------------------------------------------------------------
 
 function LightService:CanToggle(anchor: Instance): boolean
-	if self.Hush ~= nil then
-		return false -- FEAT-020: no effect during the Hush
+	if self.Hush ~= nil or self.Blackout ~= nil then
+		return false -- FEAT-020: no effect during the Hush; ANM-020: no power, only the breaker
 	end
 	if os.clock() - self.LastToggle < COOLDOWN then
 		return false
@@ -396,11 +539,22 @@ LightService:OnInit(function(self)
 			self:SetSwitch(not self.Switch, player)
 		end,
 	})
+	-- ANM-020 breaker (hold Content.Actions.breaker_reset.Hold on the client; the server checks the power is out).
+	-- AnomalyService gets the reset through InteractionService.Performed (Action event).
+	self.Dependencies.InteractionService:RegisterAction(BREAKER_ACTION, {
+		Validate = function(_player: Player, anchor: Instance, _id: number): boolean
+			return self:CanReset(anchor)
+		end,
+		Run = function(_player: Player, _anchor: Instance, _id: number)
+			self:EndBlackout()
+		end,
+	})
 
 	-- RoundService (750) created its signals in its own Setup, before ours
 	const round = self.Dependencies.RoundService
 	round.ShiftStarted:Connect(function(info)
 		self.Hush = nil
+		self:EndBlackout()
 		if info.IsNight then
 			self:SetSwitch(true, nil, true) -- every night starts lit (FEAT-020)
 		end
@@ -442,15 +596,18 @@ LightService:OnStart(function(self)
 
 	for _, anchor in CollectionService:GetTagged(ANCHOR_TAG) do
 		self:AddSwitch(anchor)
+		self:AddBreaker(anchor)
 	end
 	CollectionService:GetInstanceAddedSignal(ANCHOR_TAG):Connect(function(anchor)
 		self:AddSwitch(anchor)
+		self:AddBreaker(anchor)
 	end)
 
 	-- Vehicle swap (§19.2: LightService connects to VehicleService.Swapped in OnStart). Also fires on a
 	-- restore that changes the vehicle.
 	self.Dependencies.VehicleService.Swapped:Connect(function(_from, _to)
 		self:RefreshSwitches()
+		self:RefreshBreakers()
 		self:Refresh()
 	end)
 	self.Dependencies.UpgradeService.Changed:Connect(function()

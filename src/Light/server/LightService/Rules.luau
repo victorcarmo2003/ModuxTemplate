@@ -8,6 +8,8 @@
 --   Posts   -> on every night; the Hush puts them out from its start (client: post by post, Order x Step).
 -- Hush on the other HushOff groups (the trailer): dark from the moment the last post goes out (FEAT-020 "do poste
 -- da esquina apagar até os postes voltarem") until the Hush ends.
+-- Blackout (ANM-020, family C; DEC-254; TASK-273): every HushOff group (trailer interior, Trailer Lights, posts) is out
+-- at once until the breaker is reset or the occurrence ends. The Mart (HushOff false) keeps its light.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 
@@ -23,6 +25,7 @@ export type Input = {
 	Vehicle: string, -- current vehicle key
 	Now: number,
 	Hush: Hush?,
+	Blackout: boolean, -- ANM-020: the power is out (every HushOff group dark at once)
 	Level: (upgrade: string, vehicle: string) -> number, -- 0 when the upgrade is not on that vehicle
 	Radius: (group: Content.LightGroup) -> number, -- LightRadius effect for Upgrade groups
 }
@@ -42,7 +45,7 @@ function Rules.hushed(group: Content.LightGroup, input: Input): boolean
 end
 
 function Rules.groupOn(group: Content.LightGroup, input: Input): boolean
-	if not input.Night or Rules.hushed(group, input) then
+	if not input.Night or Rules.hushed(group, input) or (input.Blackout and group.HushOff) then
 		return false
 	end
 	const kind = group.Kind

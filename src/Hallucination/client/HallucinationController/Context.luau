@@ -8,8 +8,10 @@
 --   Effect module contract: { CanRun: ((env) -> boolean)?, Play: (env, run) -> () }
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
+local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
 
 export type PlayOptions = { Volume: number?, Speed: number?, Vary: number?, Scare: boolean? }
 
@@ -291,6 +293,107 @@ function Context.NeonSync(parts: { BasePart }, lights: { Light }, sound: Sound, 
 		RunService.RenderStepped:Wait()
 	end
 	restore()
+end
+
+-- Far spots (family D: street watcher, monster glimpse) -----------------------------------------------------------
+
+export type SpotQuery = {
+	MinDistance: number, -- studs from the camera
+	MaxDistance: number,
+	MinAngle: number, -- degrees from the look
+	MaxAngle: number,
+	Height: number, -- studs above the point that must be in clear line (the figure's head)
+	MaxRise: number?, -- studs the point may sit above / below the local character's feet (default 12)
+}
+
+-- Every MapPoint (any id) on the ground around the player that fits the query, with a clear line from the camera to
+-- `Height` above it. The map's own points keep the figures on sidewalks, curbs and lots, never inside a building.
+function Context.FarSpots(query: SpotQuery): { CFrame }
+	const out: { CFrame } = {}
+	const root = Context.Root()
+	if root == nil or not MapIndex.HasBinding() then
+		return out
+	end
+	const feet = root.Position.Y - 3
+	const rise = query.MaxRise or 12
+	const ok, points = pcall(MapIndex.Points, "")
+	if not ok then
+		return out
+	end
+	for _, point in points do
+		const at = point.Position
+		if math.abs(at.Y - feet) <= rise then
+			const head = at + Vector3.new(0, query.Height, 0)
+			const angle, distance = Context.ViewAngle(head)
+			if
+				angle ~= nil
+				and angle >= query.MinAngle
+				and angle <= query.MaxAngle
+				and distance >= query.MinDistance
+				and distance <= query.MaxDistance
+				and Context.Sees(head, 180, query.MaxDistance)
+			then
+				table.insert(out, point)
+			end
+		end
+	end
+	return out
+end
+
+-- Flat CFrame at `at` facing the camera (yaw only).
+function Context.FacingCamera(at: Vector3): CFrame
+	const camera = Context.Camera()
+	if camera then
+		const eye = camera.CFrame.Position
+		const flat = Vector3.new(eye.X, at.Y, eye.Z)
+		if (flat - at).Magnitude > 0.5 then
+			return CFrame.lookAt(at, flat)
+		end
+	end
+	return CFrame.new(at)
+end
+
+-- Local props ------------------------------------------------------------------------------------------------------
+
+-- Anchored, ghost-like part (no collision, no query, no touch, no shadow).
+function Context.Prop(name: string, size: Vector3, color: Color3, shape: Enum.PartType?): Part
+	const made = Instance.new("Part")
+	made.Name = name
+	made.Size = size
+	if shape then
+		made.Shape = shape
+	end
+	made.Anchored = true
+	made.CanCollide = false
+	made.CanQuery = false
+	made.CanTouch = false
+	made.CastShadow = false
+	made.Material = Enum.Material.SmoothPlastic
+	made.TopSurface = Enum.SurfaceType.Smooth
+	made.BottomSurface = Enum.SurfaceType.Smooth
+	made.Color = color
+	return made
+end
+
+-- A clone of ReplicatedStorage.Assets...<name> (art replaces the placeholder by dropping a Model with that name, pivot
+-- at the feet facing -Z) made ghost-like, or `placeholder()` while it does not exist.
+function Context.Asset(name: string, placeholder: () -> Model): Model
+	const assets = ReplicatedStorage:FindFirstChild("Assets")
+	const found = if assets then assets:FindFirstChild(name, true) else nil
+	if found and found:IsA("Model") then
+		const model = found:Clone()
+		for _, descendant in model:GetDescendants() do
+			if descendant:IsA("BasePart") then
+				descendant.Anchored = true
+				descendant.CanCollide = false
+				descendant.CanQuery = false
+				descendant.CanTouch = false
+				descendant.CastShadow = false
+			end
+		end
+		return model
+	end
+	return placeholder()
 end
 
 -- Weighted pick ---------------------------------------------------------------------------------------------------

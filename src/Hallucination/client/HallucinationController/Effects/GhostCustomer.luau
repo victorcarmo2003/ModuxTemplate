@@ -1,22 +1,18 @@
 --!strict
 -- ghost_customer (< 40; script.md §8, AST-085): a customer waits in the queue and is gone when the player looks again.
--- Local rig (CrewRig.Build with Tag = false: RigController and the server never see it), Night pack + Normal_Night
--- (kept on purpose, Provisional 2026-10-14: it highlights the hallucination; the low band no longer dresses
--- real NPCs Night), anchored, no collision, no prompt, never in the Customers set. No sound.
+-- Local rig (Actors.Customer: CrewRig with Tag = false, Night pack), never in the Customers set. No sound.
+-- Family D too (TASK-274).
 --   1. spawns on a free queue slot Q1..Q5 the player is NOT looking at;
 --   2. once seen (in the view cone, clear line) and then out of view, it is removed -> "gone on the 2nd look";
 --   3. never seen within LIFETIME: removed quietly.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
-local Content = require(ReplicatedStorage.shared.Content)
-local CrewRig = require(ReplicatedStorage.shared.Crew.CrewRig)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
+local Actors = require(script.Parent.Parent.Actors)
 local Context = require(script.Parent.Parent.Context)
 
 const QUEUE = { "Q1", "Q2", "Q3", "Q4", "Q5" }
 const RIG_TAG = "AnimalRig"
-const PACK: CrewRig.Pack = "Night"
-const FACE = Content.Looks.PackFace.Night
 const FREE_RADIUS = 2.5 -- studs: a real customer (or anyone) closer than this takes the slot
 const RANGE = 70 -- studs from the camera
 const HIDDEN_CONE = 50 -- degrees: spawn only outside this cone
@@ -25,7 +21,6 @@ const SEEN_TIME = 0.4 -- s in view to count as seen
 const AWAY_TIME = 0.5 -- s out of view after being seen
 const LIFETIME = 25 -- s
 const STEP = 0.1
-const HIP = Vector3.new(0, 3, 0) -- HRP = ground point + 3 studs (architecture.md §18.5)
 
 local function point(id: string): CFrame?
 	const ok, result = pcall(MapIndex.FindPoint, id)
@@ -57,25 +52,6 @@ local function freeSlots(): { CFrame }
 	return out
 end
 
-local function pickLook(random: Random): (string?, string?)
-	const species: { string } = {}
-	for _, row in Content.Species.List do
-		if row.Customer and row.ReservedFor == nil then
-			table.insert(species, row.Key)
-		end
-	end
-	const outfits: { string } = {}
-	for _, row in Content.Outfits.List do
-		if row.Use == "Civil" then
-			table.insert(outfits, row.Key)
-		end
-	end
-	if #species == 0 or #outfits == 0 then
-		return nil, nil
-	end
-	return species[random:NextInteger(1, #species)], outfits[random:NextInteger(1, #outfits)]
-end
-
 local function facing(env: Context.Env, at: Vector3): CFrame
 	-- toward the counter: the current vehicle; flat
 	const vehicle = env.Vehicle()
@@ -90,34 +66,7 @@ local function facing(env: Context.Env, at: Vector3): CFrame
 end
 
 local function build(env: Context.Env, frame: CFrame): Model?
-	const species, outfit = pickLook(env.Random)
-	if species == nil or outfit == nil then
-		return nil
-	end
-	const ok, result = pcall(function(): Model
-		const model = CrewRig.Build(species, outfit, {
-			Tag = false,
-			Anchored = true,
-			LookPack = PACK,
-			Name = "Hallucination_Customer",
-			CFrame = facing(env, frame.Position + HIP),
-		})
-		CrewRig.Dress(model, PACK, FACE)
-		return model
-	end)
-	if not ok then
-		return nil
-	end
-	const model = result
-	for _, descendant in model:GetDescendants() do
-		if descendant:IsA("BasePart") then
-			descendant.CanCollide = false
-			descendant.CanQuery = false
-			descendant.CanTouch = false
-			descendant.CastShadow = false
-		end
-	end
-	return model
+	return Actors.Customer(env.Random, "Hallucination_Customer", facing(env, frame.Position + Actors.HIP))
 end
 
 const GhostCustomer: Context.Effect = {
@@ -151,8 +100,7 @@ const GhostCustomer: Context.Effect = {
 			const now = os.clock()
 			const dt = now - last
 			last = now
-			const head = model:FindFirstChild("Head")
-			const at = if head and head:IsA("BasePart") then head.Position else model:GetPivot().Position
+			const at = Actors.HeadOf(model)
 			const inView = Context.Sees(at, SEEN_CONE, RANGE, { model })
 			if not seen then
 				seenFor = if inView then seenFor + dt else 0

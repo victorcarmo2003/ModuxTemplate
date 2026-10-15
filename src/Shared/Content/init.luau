@@ -7,6 +7,7 @@ local Achievements = require(script.Achievements)
 local Actions = require(script.Actions)
 local Animations = require(script.Animations)
 local Anomalies = require(script.Anomalies)
+local Atmospheres = require(script.Atmospheres)
 local BossCalls = require(script.BossCalls)
 local Classes = require(script.Classes)
 local CustomerTypes = require(script.CustomerTypes)
@@ -65,6 +66,10 @@ export type Action = Actions.Action
 export type Animation = Animations.Animation
 export type Anomaly = Anomalies.Anomaly
 export type AnomalyCue = Anomalies.Cue
+export type Atmosphere = Atmospheres.Atmosphere
+export type AtmosphereLight = Atmospheres.LightOverride
+export type AtmosphereRain = Atmospheres.Rain
+export type AtmosphereLightning = Atmospheres.Lightning
 export type BossCall = BossCalls.BossCall
 export type BossCallLine = BossCalls.Line
 export type BossCallRules = BossCalls.Rules
@@ -215,6 +220,7 @@ return table.freeze({
 	-- wave 3 (TASK-096; content-data.md §6.10, §6.11, §3.14). Numbers and texts Provisional; WalkPaths rows in TASK-098
 	Anomalies = Anomalies,
 	AnomalyCues = Anomalies.Cues,
+	Atmospheres = Atmospheres,
 	Cutscenes = Cutscenes,
 	HallucinationRules = Hallucinations.Rules,
 	Hallucinations = Hallucinations,

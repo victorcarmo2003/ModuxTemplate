@@ -24,8 +24,9 @@
 -- accumulated in the gaze cone), ctx.See for AudioZone (N9: in the zone when the sound starts).
 
 -- Verbs (FEAT-023, DEC-054): exactly one per anomaly, in Rules/ only (T10: never on the client). "shutter" = close the
--- trailer service window (was "hide", DEC-221).
-export type Verb = "refuse" | "serve" | "dont_look" | "light" | "shutter" | "discard" | "safe_spot"
+-- trailer service window (was "hide", DEC-221). "hide" (V2 family B, DEC-254; TASK-272) = leave the trailer by the back
+-- door and stand in a HideZone behind it before the monster looks in (Anomalies/Kit/Hide.luau).
+export type Verb = "refuse" | "serve" | "dont_look" | "light" | "shutter" | "discard" | "safe_spot" | "hide"
 
 -- Anomalies set record phase (network.md §13.5)
 export type Phase = "Signal" | "Active" | "Resolved" | "Failed"
@@ -139,6 +140,7 @@ const VERBS: { [string]: boolean } = {
 	shutter = true,
 	discard = true,
 	safe_spot = true,
+	hide = true,
 }
 
 const Api = {}

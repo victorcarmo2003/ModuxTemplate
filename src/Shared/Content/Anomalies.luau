@@ -30,9 +30,13 @@
 --          anomaly (the newest earlier anomaly with Trailer None) in its slots (AnomalyService:BuildAgenda)
 -- Validate: the anomalies debuting on a night up to Content.Trailer.OfferAfterNight must be None (those nights are
 -- always in the cart).
--- Anomalies V2 (DEC-254 a DEC-257; design/anomalies-v2-proposal.md; TASK-292): Family A (odd customer: refuse),
--- B (hide), C (blackout), D (scare, no verb); nil = legacy V1 row not yet moved to a family. A V2 row has its own
--- Ref (ANM-011+) and may debut on a night that already has one; Nights[k].NewAnomaly stays the one the boss presents.
+-- Anomalies V2 (DEC-254 a DEC-257; design/anomalies-v2-proposal.md; TASK-292, TASK-271): Family A (odd customer:
+-- refuse), B (hide), C (blackout), D (scare, no verb); nil = cut from the agenda (DEC-254: ANM-006, ANM-008; the ID
+-- and the module stay, dev can still force them). Night = the first night the row may be drawn; several rows may
+-- debut on one night and Nights[k].NewAnomaly is the one the boss presents. The scheduler draws only rows whose
+-- Family is open on the night (Nights[k].Families) and whose SkipAtmospheres does not hold the night's Atmosphere.
+-- SkipAtmospheres: ATM-# keys (Content.Atmospheres, TASK-275) where the row never plays (DEC-257 note: the Raincoat
+-- Lady is not drawn on rain nights).
 local Table = require(script.Parent.Table)
 
 export type Actor = "Customer" | "Street" | "Vehicle" | "World" | "Audio" | "Item"
@@ -61,7 +65,8 @@ export type Anomaly = {
 	Tension: boolean,
 	Cues: { string },
 	Trailer: TrailerUse,
-	Family: Family?, -- V2 (DEC-254); nil = legacy row
+	Family: Family?, -- V2 (DEC-254); nil = out of the agenda
+	SkipAtmospheres: { string }?, -- ATM-# keys where the scheduler never draws it (DEC-257)
 }
 
 export type CueKind = "Visual" | "Audio" | "Both"
@@ -99,6 +104,12 @@ const cues = Table.new({
 	-- V2 (DEC-255, DEC-256): the wrong verb on a family A actor. Entity = actor NpcId; players near it see the cartoon
 	-- monster face full screen (~0.6 s, Scare cap) and the one who erred faints right after (server)
 	{ Key = "jumpscare", Kind = "Both", Duration = 1 },
+	-- V2 family B (DEC-254, TASK-272; Kit/Hide). Entity = 0 (party). Numbers Provisional (proposal §3 B)
+	{ Key = "hide_warn", Kind = "Both", Duration = 9 }, -- trailer lights flicker + low drone + boss on the radio: HIDE (8-10 s)
+	{ Key = "monster_pass", Kind = "Both", Duration = 10 }, -- the monster crosses the street, leans on the window, leaves
+	-- V2 family C (DEC-254, TASK-273; ANM-020). Entity = 0
+	{ Key = "blackout_start", Kind = "Both", Duration = 0 }, -- snap, everything goes dark (trailer, posts, sign)
+	{ Key = "blackout_restore", Kind = "Both", Duration = 0 }, -- the breaker is back: lights return
 } :: { Cue })
 
 local function anomaly(
@@ -140,11 +151,42 @@ local function odd(night: number, number: number, key: string, name: string): An
 	return row
 end
 
+-- V2 family B (DEC-254, TASK-272): a monster comes; hide in the HideZone behind the trailer (Kit/Hide). Street actor,
+-- client-only figure on its Path. ViewRange 300 like the Walker (Provisional).
+local function monster(night: number, number: number, key: string, name: string): Anomaly
+	const row = anomaly(night, key, name, "Street", 1, "Party", 300, true, {}, { "hide_warn", "monster_pass", "jumpscare" })
+	row.Ref = string.format("ANM-%03d", number)
+	row.Family = "B"
+	return row
+end
+
+-- Debut nights below follow the V2 night table (anomalies-v2-proposal.md §5, TASK-271): the boss presents
+-- Nights[k].NewAnomaly; the other rows of a family join the draw silently once their family is open.
 const blankFolks = anomaly(1, "anm_001_blank_folks", "The blank folks", "Customer", 1, "Party", 60, false, {}, {
 	"blank_coin",
 	"jumpscare",
 })
 blankFolks.Family = "A" -- V2 family A (DEC-254)
+
+const wrongFood = anomaly(2, "anm_002_wrong_food", "The wrong food", "Item", 0, "Party", 60, false, {}, { "smoke" })
+wrongFood.Family = "A" -- DEC-254: ANM-002 joins family A
+
+const copies = anomaly(4, "anm_004_copies", "The copies", "Customer", 1, "Party", 60, false, {}, {
+	"mirror_smile",
+	"copy_knock",
+	"copy_grab",
+	"copy_vanish",
+})
+copies.Night = 5 -- §5: presented with the white eyes on Night 5 (Ref keeps ANM-004)
+copies.Family = "A"
+
+const raincoat = anomaly(5, "anm_005_raincoat_lady", "The Raincoat Lady", "Customer", 1, "Party", 60, false, {
+	"anm_008_long_car",
+	"anm_009_knock",
+	"anm_010_hush",
+}, { "raincoat_drip" })
+raincoat.Family = "A"
+raincoat.SkipAtmospheres = { "ATM-4", "ATM-5" } -- DEC-251, DEC-257 note: dry nights only (no rain, no storm)
 
 const knock = anomaly(9, "anm_009_knock", "The knock", "Audio", 0, "PerPlayer", 0, true, {
 	"anm_005_raincoat_lady",
@@ -152,12 +194,18 @@ const knock = anomaly(9, "anm_009_knock", "The knock", "Audio", 0, "PerPlayer", 
 }, { "knock", "door_crack" })
 knock.SeeMode = "AudioZone" -- FEAT-019: seen = in the trailer zone when the first knock sounds
 knock.Trailer = "Helps" -- window in the trailer; in the cart: leave the zone
+knock.Family = "D" -- DEC-254: ANM-009 becomes a scare
 
 const walker = anomaly(7, "anm_007_walker", "The Walker", "Street", 1, "Party", 300, true, {}, {
 	"post_buzz",
 	"post_flicker",
 	"walker_step",
+	"hide_warn",
+	"monster_pass",
+	"jumpscare",
 })
+walker.Night = 6 -- §5: the first family B monster, Night 6 (Ref keeps ANM-007)
+walker.Family = "B" -- DEC-254: ANM-007 is the first hide monster (TASK-272)
 walker.Scripted = { Night = 10, Clock = 1785 } -- FEAT-027: stands under the last post during the scripted Hush
 
 const hush = anomaly(10, "anm_010_hush", "The Hush", "World", 0, "PerPlayer", 200, true, {
@@ -166,12 +214,15 @@ const hush = anomaly(10, "anm_010_hush", "The Hush", "World", 0, "PerPlayer", 20
 	"anm_008_long_car",
 	"anm_009_knock",
 }, { "hush_fog" })
+hush.Family = "C" -- DEC-254: ANM-003/010 in family C
 hush.Scripted = { Night = 10, Clock = 1785 } -- FEAT-027: 3rd occurrence of Night 10 at 5:45 AM, leads to the Final
 
 const stoppedClock = anomaly(3, "anm_003_stopped_clock", "The stopped clock", "World", 0, "Party", 100, false, {
 	"anm_010_hush",
 }, { "clock_stop", "clock_resume" })
 stoppedClock.Trailer = "Needs" -- the verb is the trailer's light switch
+stoppedClock.Night = 5 -- family C opens on Night 4 with the blackout; the clock joins one night later
+stoppedClock.Family = "C"
 
 const longCar = anomaly(8, "anm_008_long_car", "The long car", "Vehicle", 1, "PerPlayer", 100, true, {
 	"anm_005_raincoat_lady",
@@ -179,18 +230,24 @@ const longCar = anomaly(8, "anm_008_long_car", "The long car", "Vehicle", 1, "Pe
 }, { "car_highbeam", "car_flash", "car_honk", "trailer_blackout" })
 longCar.Trailer = "Helps" -- window in the trailer; in the cart: leave the zone
 
+-- V2 family C (DEC-254, TASK-273): everything goes dark, the breaker at the back (hold 3 s), the shade attacks in 30 s
+const blackout = anomaly(4, "anm_020_blackout", "The blackout", "World", 0, "Party", 100, true, {}, {
+	"blackout_start",
+	"blackout_restore",
+	"jumpscare",
+})
+blackout.Ref = "ANM-020"
+blackout.Family = "C"
+
 const base = Table.new({
 	-- ViewRange: 60 default, 80 N6, 300 N7 (FEAT-019); 100 N3/N8 and 200 N10 Provisional (C-01 ~73 studs,
 	-- AN-12 ~63, Juniper posts 82-135 from the counter; MAP-01 §6, §10.3)
 	blankFolks,
-	anomaly(2, "anm_002_wrong_food", "The wrong food", "Item", 0, "Party", 60, false, {}, { "smoke" }),
+	wrongFood,
 	stoppedClock,
-	anomaly(4, "anm_004_copies", "The copies", "Customer", 1, "Party", 60, false, {}, { "mirror_smile", "copy_knock", "copy_grab", "copy_vanish" }),
-	anomaly(5, "anm_005_raincoat_lady", "The Raincoat Lady", "Customer", 1, "Party", 60, false, {
-		"anm_008_long_car",
-		"anm_009_knock",
-		"anm_010_hush",
-	}, { "raincoat_drip" }),
+	copies,
+	raincoat,
+	-- ANM-006 and ANM-008 are cut from the agenda (DEC-254): Family nil, the ID and the module stay
 	anomaly(6, "anm_006_wavers", "The wavers", "World", 0, "PerPlayer", 80, false, {}, { "curtain", "waver_more" }),
 	walker,
 	longCar,
@@ -202,6 +259,10 @@ const base = Table.new({
 	odd(6, 14, "anm_014_big_head", "The big head"),
 	odd(7, 15, "anm_015_floater", "The floater"),
 	odd(8, 16, "anm_016_starer", "The starer"),
+	monster(7, 17, "anm_017_crawler", "The crawler"),
+	monster(8, 18, "anm_018_grin", "The grin"),
+	monster(9, 19, "anm_019_roof_walker", "The roof walker"),
+	blackout,
 } :: { Anomaly })
 
 -- Anomaly that plays in the slots of a "Needs" anomaly when the vehicle has no switch: the newest anomaly debuting

@@ -48,6 +48,7 @@ export type Public = {
 	Queue: { Due },
 	Removing: { [number]: number },
 	Running: { [number]: Run },
+	Scares: { number },
 	Shift: { Day: number, Night: number, IsNight: boolean, Attempt: number },
 	Tension: SignalLib.Signal<boolean>,
 	TensionOn: boolean,

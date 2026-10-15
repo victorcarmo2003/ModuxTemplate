@@ -11,6 +11,8 @@ export type Record = { On: boolean, At: number }
 export type Hush = Rules.Hush
 
 export type Public = {
+	Blackout: number?,
+	Breakers: { [Instance]: boolean },
 	Cache: Zones.Cache,
 	Enabled: boolean,
 	Hush: Hush?,
@@ -31,6 +33,7 @@ export type Public = {
 	IsLit: (self: Public, position: Vector3) -> boolean,
 	IsSwitchOn: (self: Public) -> boolean,
 	IsHush: (self: Public) -> boolean,
+	IsBlackout: (self: Public) -> boolean,
 	GroupOn: (self: Public, key: string) -> boolean,
 	Vehicle: (self: Public) -> string,
 	Radius: (self: Public, group: Content.LightGroup) -> number,
@@ -40,6 +43,8 @@ export type Public = {
 	SetSwitch: (self: Public, on: boolean, player: Player?, force: boolean?) -> boolean,
 	BeginHush: (self: Public, startedAt: number, holdUntil: number) -> (),
 	EndHush: (self: Public) -> (),
+	BeginBlackout: (self: Public) -> (),
+	EndBlackout: (self: Public) -> (),
 	Capture: (self: Public) -> { S: boolean },
 	Restore: (self: Public, data: any) -> (),
 	AddZone: (self: Public, instance: Instance) -> (),
@@ -49,6 +54,11 @@ export type Public = {
 	IsSwitchAnchor: (self: Public, anchor: Instance) -> boolean,
 	RefreshSwitches: (self: Public) -> (),
 	AddSwitch: (self: Public, anchor: Instance) -> (),
+	TrailerModel: (self: Public) -> Model?,
+	AddBreaker: (self: Public, anchor: Instance) -> (),
+	RefreshBreakers: (self: Public) -> (),
+	EnsureBreaker: (self: Public) -> boolean,
+	CanReset: (self: Public, anchor: Instance) -> boolean,
 	CanToggle: (self: Public, anchor: Instance) -> boolean,
 }
 

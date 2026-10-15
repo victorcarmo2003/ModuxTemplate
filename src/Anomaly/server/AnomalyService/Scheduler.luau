@@ -5,16 +5,19 @@
 -- function returning [0, 1), so it runs as is in lune: the same input and the same random stream give the same
 -- agenda.
 --
--- Build (once per night shift, recomputed at every ShiftStarted; not in the snapshot, data.md §2.2):
---   active      anomalies with debut Night <= N, in Content order (DEC-025); which ones is never drawn (DEC-060)
---   count       debut night Occurrences.Premiere (3), 1-2 nights later Recent (2), older Old (1)
---   scripted    an anomaly whose Scripted.Night is N gets one fixed entry at Scripted.Clock (outside the window) in
---               place of one of its regular ones (N10: 2 regular + 5:45 AM; N7 on Night 10: only the 5:45 AM one,
---               FEAT-024, progression.md §4.2 = 14 on Night 10)
---   times       window Nights.Windows.Shift (9 PM-5 AM, game minutes) cut in n equal slots, one start per slot,
+-- Build (once per night shift, recomputed at every ShiftStarted; not in the snapshot, data.md §2.2). V2 night table
+-- (DEC-254, DEC-257; anomalies-v2-proposal.md §5; TASK-271):
+--   pool        anomalies with debut Night <= N whose Family is open on the night (Input.Families) and whose
+--               SkipAtmospheres does not hold the night's Atmosphere; Family nil = cut from the agenda (DEC-254)
+--   draws       Input.Events regular entries, each one a weighted draw from the pool by age (Weight: debut night
+--               Occurrences.Premiere, 1-2 nights later Recent, older Old); never the same anomaly in two neighbouring
+--               slots when the pool has another one
+--   premiere    Input.Premiere (Nights[k].NewAnomaly, the boss call) gets one entry in a slot inside the first third of
+--               the window (FEAT-022: the player has just heard about it), when it is in the pool
+--   scripted    an anomaly whose Scripted.Night is N gets one fixed entry at Scripted.Clock (outside the window) on top
+--               of the draws (N10: the Hush and the Walker at 5:45 AM, FEAT-024/027), whatever its family
+--   times       window Nights.Windows.Shift (9 PM-5 AM, game minutes) cut in Events equal slots, one start per slot,
 --               jittered so two starts are always >= MinGap real seconds apart (MinGap x minutes per second)
---   order       entries shuffled over the slots; the debut's first entry goes to a slot inside the first third of
---               the window (FEAT-022: the player has just heard the rule)
 -- Admit (every time an entry is due, at runtime): MaxSimultaneous of the night, actor cap Flow.MaxActorsNight by
 -- NpcCost (DEC-045), ExclusiveWith both ways, the same anomaly never twice at once, MinGap since the last start.
 -- A due entry that is not admitted waits; past the end of the window it is dropped (FEAT-022: no unscripted start
@@ -29,15 +32,26 @@ export type Candidate = {
 	NpcCost: number,
 	ExclusiveWith: { string },
 	Scripted: Scripted?,
+	Family: string?, -- nil = cut from the agenda (DEC-254)
+	SkipAtmospheres: { string }?,
 }
 
 export type Counts = { Premiere: number, Recent: number, Old: number }
 
 export type Input = {
 	Night: number,
-	-- active anomalies of this night, Content order
+	-- anomalies of the content (any debut night), Content order
 	Anomalies: { Candidate },
+	-- draw weights by age (Nights.Occurrences)
 	Occurrences: Counts,
+	-- open families of the night (Nights[k].Families)
+	Families: { string },
+	-- ATM-# of the night (Nights[k].Atmosphere)
+	Atmosphere: string,
+	-- regular entries to draw (Nights[k].Events)
+	Events: number,
+	-- key the boss presents (Nights[k].NewAnomaly); nil = none
+	Premiere: string?,
 	-- { from, to } game minutes (Nights.Windows.Shift)
 	Window: { number },
 	-- real seconds between two starts (Nights[k].MinGap)
@@ -54,8 +68,8 @@ export type Limits = { MaxSimultaneous: number, MaxActors: number, MinGap: numbe
 
 const Scheduler = {}
 
--- Occurrences of an anomaly on night `night` (progression.md §4.2).
-function Scheduler.Count(debut: number, night: number, counts: Counts): number
+-- Draw weight of an anomaly on night `night` by its age (progression.md §4.2); 0 before its debut.
+function Scheduler.Weight(debut: number, night: number, counts: Counts): number
 	const age = night - debut
 	if age < 0 then
 		return 0
@@ -67,39 +81,72 @@ function Scheduler.Count(debut: number, night: number, counts: Counts): number
 	return counts.Old
 end
 
-local function shuffle(list: { string }, random: () -> number)
-	for index = #list, 2, -1 do
-		const other = math.floor(random() * index) + 1
-		list[index], list[other] = list[other], list[index]
+-- Can `row` be drawn on the night of `input`? (debut reached, family open, atmosphere not skipped)
+function Scheduler.Eligible(row: Candidate, input: Input): boolean
+	if row.Night > input.Night or row.Family == nil or table.find(input.Families, row.Family) == nil then
+		return false
 	end
+	const skip = row.SkipAtmospheres
+	return skip == nil or table.find(skip, input.Atmosphere) == nil
+end
+
+-- Weighted draw among `pool` (parallel `weights`), leaving out `avoid` keys while anything else has weight.
+local function draw(pool: { string }, weights: { number }, avoid: { string }, random: () -> number): string
+	local total = 0
+	for index, key in pool do
+		if table.find(avoid, key) == nil then
+			total += weights[index]
+		end
+	end
+	if total <= 0 then
+		-- only avoided keys left: the rule gives way (a pool of one)
+		avoid = {}
+		for index in pool do
+			total += weights[index]
+		end
+	end
+	local pick = random() * total
+	local last = pool[1]
+	for index, key in pool do
+		if table.find(avoid, key) ~= nil then
+			continue
+		end
+		last = key
+		pick -= weights[index]
+		if pick < 0 then
+			return key
+		end
+	end
+	return last
 end
 
 -- Agenda of the night, sorted by At (scripted entries last at equal minute).
 function Scheduler.Build(input: Input, random: () -> number): { Entry }
 	const out: { Entry } = {}
-	const regular: { string } = {}
+	const pool: { string } = {}
+	const weights: { number } = {}
 	local premiere: string? = nil
 	for _, row in input.Anomalies do
-		if row.Night > input.Night then
+		const scripted = row.Scripted
+		if scripted ~= nil and scripted.Night == input.Night and row.Night <= input.Night then
+			table.insert(out, { Key = row.Key, At = scripted.Clock, Scripted = true, Slot = 0 })
+		end
+		if not Scheduler.Eligible(row, input) then
 			continue
 		end
-		local count = Scheduler.Count(row.Night, input.Night, input.Occurrences)
-		const scripted = row.Scripted
-		if scripted ~= nil and scripted.Night == input.Night then
-			table.insert(out, { Key = row.Key, At = scripted.Clock, Scripted = true, Slot = 0 })
-			count -= 1
+		const weight = Scheduler.Weight(row.Night, input.Night, input.Occurrences)
+		if weight <= 0 then
+			continue
 		end
-		for _ = 1, count do
-			table.insert(regular, row.Key)
-		end
-		if row.Night == input.Night and count > 0 then
+		table.insert(pool, row.Key)
+		table.insert(weights, weight)
+		if row.Key == input.Premiere then
 			premiere = row.Key
 		end
 	end
 
-	const n = #regular
+	const n = if #pool > 0 then math.max(math.floor(input.Events), 0) else 0
 	if n > 0 then
-		shuffle(regular, random)
 		const from, to = input.Window[1], input.Window[2]
 		const length = math.max(to - from, 0)
 		const slot = length / n
@@ -108,7 +155,8 @@ function Scheduler.Build(input: Input, random: () -> number): { Entry }
 		for index = 1, n do
 			times[index] = from + (index - 1) * slot + random() * (slot - gap)
 		end
-		-- the debut's first entry inside the first third of the window
+		const order: { string? } = {}
+		-- the presented anomaly first, in a slot inside the first third of the window
 		if premiere ~= nil then
 			const third = from + length / 3
 			const eligible: { number } = {}
@@ -118,19 +166,24 @@ function Scheduler.Build(input: Input, random: () -> number): { Entry }
 				end
 			end
 			const target = if #eligible > 0 then eligible[math.floor(random() * #eligible) + 1] else 1
-			local first = 0
-			for index = 1, n do
-				if regular[index] == premiere then
-					first = index
-					break
-				end
-			end
-			if first > target then
-				regular[first], regular[target] = regular[target], regular[first]
-			end
+			order[target] = premiere
 		end
 		for index = 1, n do
-			table.insert(out, { Key = regular[index], At = times[index], Scripted = false, Slot = index })
+			if order[index] ~= nil then
+				continue
+			end
+			const avoid: { string } = {}
+			const before, after = order[index - 1], order[index + 1]
+			if before ~= nil then
+				table.insert(avoid, before)
+			end
+			if after ~= nil then
+				table.insert(avoid, after)
+			end
+			order[index] = draw(pool, weights, avoid, random)
+		end
+		for index = 1, n do
+			table.insert(out, { Key = order[index] :: string, At = times[index], Scripted = false, Slot = index })
 		end
 	end
 

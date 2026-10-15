@@ -718,6 +718,36 @@ local function checkNights()
 		if not string.match(row.NewAnomaly, "^anm_%d%d%d_[a-z0-9_]+$") then
 			fail("Nights", index, row.Key, `NewAnomaly '{row.NewAnomaly}' is not an anomaly key (anm_###_name)`)
 		end
+		-- V2 night table (DEC-254, DEC-257; TASK-271). NewAnomaly vs its row: checkAnomalies
+		const open: { [string]: boolean } = {}
+		for _, family in row.Families do
+			if family ~= "A" and family ~= "B" and family ~= "C" and family ~= "D" then
+				fail("Nights", index, row.Key, `Families '{family}' is not A, B, C or D (DEC-254)`)
+			elseif open[family] then
+				fail("Nights", index, row.Key, `Families repeats '{family}'`)
+			end
+			open[family] = true
+		end
+		if #row.Families == 0 then
+			fail("Nights", index, row.Key, "Families is empty")
+		end
+		const before = Nights.List[index - 1]
+		if before ~= nil then
+			for _, family in before.Families do
+				if not open[family] then
+					fail("Nights", index, row.Key, `family {family} was open on night {index - 1} and closes (families only grow)`)
+				end
+			end
+		end
+		-- Content.Atmospheres (TASK-275) is matched by key name only (ATM-1..ATM-7, DEC-257)
+		if not string.match(row.Atmosphere, "^ATM%-%d+$") then
+			fail("Nights", index, row.Key, `Atmosphere '{row.Atmosphere}' is not an ATM-# key (DEC-257)`)
+		end
+		inRange("Nights", index, row.Key, "Events", row.Events, 1, 40)
+		inRange("Nights", index, row.Key, "Scares", row.Scares, 0, 40)
+		if open.D ~= true and row.Scares ~= 0 then
+			fail("Nights", index, row.Key, "Scares > 0 with family D closed")
+		end
 		const call = BossCalls.ByKey[row.Call]
 		if call == nil or call.Trigger.Kind ~= "NightCall" or call.Trigger.Night ~= index then
 			fail("Nights", index, row.Key, `Call '{row.Call}' is not the NightCall of night {index}`)
@@ -742,6 +772,14 @@ local function checkNights()
 	end
 	if cursor ~= nightPhase.ClockTo then
 		fail("Nights", nil, nil, `Windows end at {cursor}, the Night phase ends at {nightPhase.ClockTo}`)
+	end
+	-- the drawn events fit the Shift window with MinGap between two starts (real seconds)
+	const shift = Nights.Windows.Shift
+	for index, row in Nights.List do
+		const seconds = (shift[2] - shift[1]) * row.Duration / math.max(nightPhase.ClockTo - nightPhase.ClockFrom, 1)
+		if row.Events * row.MinGap > seconds then
+			fail("Nights", index, row.Key, `Events {row.Events} x MinGap {row.MinGap} s exceed the Shift window ({math.floor(seconds)} s)`)
+		end
 	end
 	inRange("Flow", nil, nil, "NightInterval", Flow.NightInterval, 1, 600)
 end
@@ -1017,11 +1055,25 @@ local function checkAnomalies()
 		elseif row.Trailer == "Needs" and Anomalies.StandIn(row) == nil then
 			fail("Anomalies", index, key, "Trailer Needs without an earlier anomaly with Trailer None to stand in")
 		end
+		-- V2 (DEC-254, TASK-271): Family nil = cut from the agenda (no debut); a row in the agenda debuts on a night that
+		-- opens its family, and Nights[k].NewAnomaly is one of the rows debuting on night k
 		const night = Nights.List[row.Night]
 		if night and night.NewAnomaly == key then
 			debut[row.Night] = key
-		elseif night and row.Family == nil then
-			fail("Anomalies", index, key, `Nights[{row.Night}].NewAnomaly is '{night.NewAnomaly}'`)
+		end
+		if night and row.Family ~= nil and not table.find(night.Families, row.Family) then
+			fail("Anomalies", index, key, `debuts on night {row.Night}, where family {row.Family} is closed`)
+		end
+		if night and night.NewAnomaly == key and row.Family == nil then
+			fail("Anomalies", index, key, `Nights[{row.Night}].NewAnomaly is cut from the agenda (Family nil)`)
+		end
+		for _, atmosphere in row.SkipAtmospheres or {} do
+			if not string.match(atmosphere, "^ATM%-%d+$") then
+				fail("Anomalies", index, key, `SkipAtmospheres '{atmosphere}' is not an ATM-# key (DEC-257)`)
+			end
+		end
+		if night and row.SkipAtmospheres ~= nil and table.find(row.SkipAtmospheres, night.Atmosphere) then
+			fail("Anomalies", index, key, `debuts on night {row.Night} whose Atmosphere {night.Atmosphere} it skips`)
 		end
 		if not ANOMALY_ACTORS[row.Actor] then
 			fail("Anomalies", index, key, `Actor '{row.Actor}' unknown`)
@@ -1052,6 +1104,9 @@ local function checkAnomalies()
 		end
 		const scripted = row.Scripted
 		if scripted then
+			if row.Family == nil then
+				fail("Anomalies", index, key, "Scripted on a row cut from the agenda (Family nil)")
+			end
 			if scripted.Night ~= RunParams.Nights then
 				fail("Anomalies", index, key, `Scripted only on the last night ({RunParams.Nights}, FEAT-027)`)
 			end

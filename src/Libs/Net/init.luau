@@ -149,6 +149,11 @@ return Lync.define("game", {
 		Id = Lync.str(0, 40),
 		Stop = Lync.bool(),
 	})),
+	-- s -> player(s). Family D scare (DEC-254, TASK-274; writer HallucinationService:Scare): the client plays ONE
+	-- Content.Hallucinations row with FamilyD among `Keys` (empty = any) that it can show right now. Client-only effect.
+	HallucinationScare = Lync.packet(Lync.struct({
+		Keys = Lync.array(Lync.str(1, 40), 0, 32),
+	})),
 
 	-- Run sets, wave 1 ---------------------------------------------------------------------------------------------
 
