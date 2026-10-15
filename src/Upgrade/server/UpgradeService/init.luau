@@ -20,7 +20,8 @@
 -- shift T, it comes back when shift T + Turns starts, so one whole shift (T + 1) passes in between. Other lines stay
 -- free. State: Turn (shift counter, +1 per new shift identity, so a repeated night does not count) and Cooldown
 -- ["vehicle/key"] = Turn when the line returns. Both ride in the snapshot "UpgCd" (a lost night undoes the purchase and
--- its cooldown). The set carries the shifts left (Upgrades.Wait, 0 = on sale). InPlace upgrades (Patio) are exempt.
+-- its cooldown). The set carries the shifts left (Upgrades.Wait, 0 = on sale). InPlace upgrades (Patio) are exempt, and
+-- so is a Bench line with Cooldown = false (Counter, DEC-241).
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -158,6 +159,13 @@ function UpgradeService:GetEffect(stat: string, vehicle: string?): number
 	local fallback: number? = nil
 	for _, upgrade in Content.Upgrades.List do
 		const level = levels[upgrade.Key]
+		-- Content.Mode (owner request 2026-10-14): a day-only upgrade switched off reads its Fixed value when listed
+		if level ~= nil and Content.Mode.IsOff(upgrade.Key) and Content.Mode.Fixed[key] ~= nil then
+			const row = rowOf(upgrade, target, level)
+			if row and row.Effects[key] ~= nil then
+				return Content.Mode.Fixed[key]
+			end
+		end
 		if level ~= nil then
 			const row = rowOf(upgrade, target, level)
 			const value = if row then row.Effects[key] else nil
@@ -189,7 +197,7 @@ end
 -- Shifts left before the line is on sale again on `vehicle` (default: current); 0 = on sale. Bench upgrades only.
 function UpgradeService:GetWait(key: string, vehicle: string?): number
 	const upgrade = Content.Upgrades.ByKey[key]
-	if upgrade == nil or upgrade.SoldAt ~= "Bench" then
+	if upgrade == nil or upgrade.SoldAt ~= "Bench" or upgrade.Cooldown == false then
 		return 0
 	end
 	const back = self.Cooldown()[`{vehicle or self.Vehicle()}/{key}`]
@@ -209,6 +217,14 @@ function UpgradeService:CanBuy(key: string): (boolean, Reason?)
 		return false, "maxed"
 	end
 	if self.Dependencies.RoundService:GetDay() < upgrade.UnlockDay then
+		return false, "locked"
+	end
+	-- anomaly mode (Content.Mode, owner request 2026-10-14): tables, Drawer Lock and Wide Counter are not sold
+	if Content.Mode.IsOff(key) then
+		return false, "locked"
+	end
+	-- the Gear Stand is closed until the first shift ends (Content.Mart.FirstShiftClosed, owner request 2026-10-14)
+	if upgrade.SoldAt == "Bench" and Content.Mart.FirstShiftClosed(self.Dependencies.RoundService:Info(), self.Dependencies.RoundService:GetPhase()) then
 		return false, "locked"
 	end
 	const requires = upgrade.Requires
@@ -239,7 +255,8 @@ function UpgradeService:Buy(key: string, player: Player?, quiet: boolean?): (boo
 		return false, "not_enough_cash"
 	end
 	self.BoughtAt[self:GuardKey(key)] = os.clock()
-	if Content.Upgrades.ByKey[key].SoldAt == "Bench" then
+	-- Cooldown = false (Counter, DEC-241): bought shift after shift, no rest
+	if Content.Upgrades.ByKey[key].SoldAt == "Bench" and Content.Upgrades.ByKey[key].Cooldown ~= false then
 		const cooldown = table.clone(self.Cooldown())
 		cooldown[self:GuardKey(key)] = self.Turn() + COOLDOWN_TURNS
 		self.Cooldown(cooldown)
@@ -434,8 +451,17 @@ function UpgradeService:RefreshPiece(instance: Instance)
 		warn(`[UpgradeService] UpgradePiece {instance:GetFullName()}: unknown Upgrade "{piece.Upgrade}"`)
 		return
 	end
-	const level = self:GetLevel(piece.Upgrade, piece.Vehicle or self.Vehicle())
-	Pieces.setVisible(instance, level ~= nil and level == piece.Level)
+	const vehicle = piece.Vehicle or self.Vehicle()
+	const level = self:GetLevel(piece.Upgrade, vehicle)
+	local visible = level ~= nil and level == piece.Level
+	if level ~= nil and not visible then
+		-- Levels that share a Part show the same piece (Counter 4 and 5 reuse Counter_L3, DEC-241)
+		const upgrade = Content.Upgrades.ByKey[piece.Upgrade]
+		const mine = rowOf(upgrade, vehicle, piece.Level)
+		const current = rowOf(upgrade, vehicle, level)
+		visible = mine ~= nil and current ~= nil and mine.Part ~= "" and mine.Part == current.Part
+	end
+	Pieces.setVisible(instance, visible)
 end
 
 function UpgradeService:RefreshPieces()

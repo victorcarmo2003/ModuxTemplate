@@ -3,6 +3,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
+local EdgePointer = require(StarterPlayer.StarterPlayerScripts.client.Interface.EdgePointer)
 local Beacon = require(StarterPlayer.StarterPlayerScripts.client.Tutorial.TutorialController.Beacon)
 local Call = require(StarterPlayer.StarterPlayerScripts.client.Tutorial.TutorialController.Call)
 local Steps = require(StarterPlayer.StarterPlayerScripts.client.Tutorial.TutorialController.Steps)
@@ -19,7 +20,6 @@ type Kitchen = {
 
 export type Public = {
 	Answered: boolean,
-	ArrowFar: Vide.Source<boolean>,
 	AskedAt: number,
 	Beacon: Beacon.Beacon,
 	Call: Call.Call,
@@ -32,6 +32,7 @@ export type Public = {
 	DebugText: Vide.Source<string>,
 	DevHandlers: { [string]: (text: string) -> () },
 	DevNoted: boolean,
+	Edge: EdgePointer.EdgePointer,
 	Finished: Vide.Source<boolean>,
 	Folder: Folder?,
 	Forced: string?,
@@ -43,6 +44,10 @@ export type Public = {
 	IdleDistance: number,
 	InMart: boolean,
 	Item: Vide.Source<string>,
+	LessonHeard: boolean,
+	LessonNear: boolean,
+	LessonOn: boolean,
+	LessonSkipped: boolean,
 	Markers: { [Attachment]: BasePart },
 	Mounted: boolean,
 	PastDay1: Vide.Source<boolean>,
@@ -51,6 +56,7 @@ export type Public = {
 	PointerShown: Vide.Source<boolean>,
 	Prepared: boolean,
 	Revived: Vide.Source<boolean>,
+	Rookie: boolean,
 	Running: Vide.Source<boolean>,
 	Scale: Vide.Source<number>,
 	Sent: boolean,
@@ -93,6 +99,7 @@ export type Public = {
 	Decide: (self: Public) -> (string, Instance?, string),
 	DecideLive: (self: Public) -> (string, Instance?, string),
 	Focused: (self: Public) -> boolean,
+	MissingTopping: (self: Public, order: { [string]: boolean }) -> string?,
 	Seated: (self: Public) -> boolean,
 	KitchenAnchor: (self: Public, action: string, enabled: boolean) -> Instance?,
 	WorkMarker: (self: Public, anchor: Attachment) -> BasePart,
@@ -101,7 +108,6 @@ export type Public = {
 	Focuses: (self: Public, anchor: Instance) -> boolean,
 	PromptAllowed: (self: Public, anchor: Instance) -> boolean,
 	ClearGuidance: (self: Public) -> (),
-	SetFar: (self: Public, far: boolean) -> (),
 	UpdatePointer: (self: Public) -> (),
 	Rescale: (self: Public) -> (),
 	SetStep: (self: Public, key: string, target: Instance?, item: string) -> (),
@@ -113,6 +119,11 @@ export type Public = {
 	Skip: (self: Public) -> (),
 	Finish: (self: Public, reason: string) -> (),
 	Tick: (self: Public) -> (),
+	UpgradeLevel: (self: Public, key: string) -> number?,
+	BoughtGear: (self: Public) -> boolean?,
+	UpgradeLesson: (self: Public) -> string?,
+	LessonStand: (self: Public, key: string) -> Instance?,
+	TickLesson: (self: Public) -> boolean,
 	PreloadVoices: (self: Public, timeout: number, progress: ((number) -> ())?) -> boolean,
 	IsDev: (self: Public) -> boolean,
 	Trace: (self: Public, message: string) -> (),

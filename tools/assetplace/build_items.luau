@@ -16,6 +16,7 @@
 	                                Variant = V: Sausage (Sausage_Wrong), Bun (Bun_Bitten; Att_Sausage)
 	    Toppings/<ingredient key>   Model, pivot = Att_Topping of the .fbx, attribute TopHeight (measured here)
 	    Food/SausageRaw, SausageGrilled (AST-002), BunClosed, BunOpen (AST-001)   Model, pivot = base centre
+	    WrongToppings/Wrong_Roach|Beetle|Worms|SlimeGreen|SlimeRed   Model, pivot = piece origin (AST-061 rev. 2026-10-14)
 	    Food/SausageWrong, BunBitten (AST-061)   rail / board visual of the altered item (TASK-110) and the part a
 	                                hot dog with Altered = true shows instead of its sausage / bun (same boxes)
 
@@ -82,7 +83,7 @@ export type Options = {
 
 local Items = {}
 
-const ITEMS_VERSION = 2 -- 2: altered_item, Variants, Food SausageWrong / BunBitten (TASK-099)
+const ITEMS_VERSION = 3 -- 2: altered_item, Variants, Food SausageWrong / BunBitten (TASK-099); 3: AST-061 revision 2026-10-14 (bitten bun 245 tris, WrongToppings)
 const CACHE_NAME = "__AssetCache" -- shared with place_assets.luau / build_kits.luau
 const DEMO_NAME = "ItemsDemo"
 const SIZE_TOL = 0.05
@@ -173,7 +174,8 @@ const DEFERRED: { [string]: string } = {}
 -- variant is a Tool under Variants/altered_item/<V>; Tools/altered_item is a copy of ALTERED_DEFAULT so that every
 -- Content.Items key still has a Tool. Provisional (TASK-099): ItemService picks the variant (Tool attribute Variant).
 const WRONG_SAUSAGE_BOX = box(-0.6, 0, -0.82, 0.6, 0.24, -0.58)
-const BITTEN_BUN_BOX = box(-0.5, 0, -0.225, 0.5, 0.345, 0.225)
+-- measured in Studio on the 2026-10-14 upload (AST-061_WrongFood 92999301453162, normals fixed): bite widens the bun to 1.02 x 0.365 x 0.472
+const BITTEN_BUN_BOX = box(-0.52, 0, -0.225, 0.5, 0.365, 0.247)
 const ALTERED_DEFAULT = "Sausage"
 const ALTERED_ORDER = { "Sausage", "Bun" }
 const ALTERED: { [string]: ToolSpec } = {
@@ -187,7 +189,7 @@ const ALTERED: { [string]: ToolSpec } = {
 	Bun = {
 		-- Bun_Bitten is the asset root (origin = base centre of the bun, like AST-001 Bun_Open)
 		asset = "AST-061_WrongFood",
-		parts = { { name = "Bun_Bitten", box = BITTEN_BUN_BOX, tris = 208 } },
+		parts = { { name = "Bun_Bitten", box = BITTEN_BUN_BOX, tris = 245 } },
 		atts = { Att_Hand = Vector3.zero, Att_Sausage = Vector3.new(0, 0.33, 0) },
 		hand = Vector3.zero,
 		budget = 250, -- AST-061
@@ -262,11 +264,35 @@ const FOOD: { [string]: PivotSpec } = {
 	},
 	BunBitten = {
 		asset = "AST-061_WrongFood",
-		parts = { { name = "Bun_Bitten", box = BITTEN_BUN_BOX, tris = 208 } },
+		parts = { { name = "Bun_Bitten", box = BITTEN_BUN_BOX, tris = 245 } },
 		atts = { Att_Hand = Vector3.zero, Att_Sausage = Vector3.new(0, 0.33, 0) },
 		pivot = Vector3.zero,
 		budget = 250,
 	},
+}
+
+-- AST-061 "wrong" toppings (revision 2026-10-14, Provisional): one Model per piece in Items/WrongToppings, pivot = the
+-- piece's own origin (base centre in the .blend; Att_Topping_<Name>), no TopHeight-stack rules touched. The five pieces
+-- sit 1.4 stud apart in the file; extract() recovers each origin from the part's bbox centre, so the box centres below
+-- are the part centre relative to that origin, measured in Studio on upload 118293514249309 (AST-061_WrongToppings, normals fixed).
+-- Provisional map normal -> wrong: ketchup=SlimeRed, mustard=SlimeGreen, cheese=Worms, bacon=Roach, potato_sticks=Beetle,
+-- cream_cheese=SlimeGreen (asset-list.md AST-061). Not wired to gameplay here.
+local function wrongTopping(name: string, c: Vector3, s: Vector3, tris: number): PivotSpec
+	return {
+		asset = "AST-061_WrongToppings",
+		parts = { { name = "Wrong_" .. name, box = { min = c - s / 2, max = c + s / 2 }, tris = tris } },
+		atts = { ["Att_Topping_" .. name] = Vector3.zero },
+		pivot = Vector3.zero,
+		budget = 180,
+	}
+end
+
+const WRONG_TOPPINGS: { [string]: PivotSpec } = {
+	Wrong_Roach = wrongTopping("Roach", Vector3.new(0.181, 0.056, 0), Vector3.new(0.829, 0.149, 0.588), 156),
+	Wrong_Beetle = wrongTopping("Beetle", Vector3.new(0.12, 0.085, 0), Vector3.new(0.621, 0.21, 0.651), 144),
+	Wrong_Worms = wrongTopping("Worms", Vector3.new(0.001, 0.097, 0), Vector3.new(0.824, 0.166, 0.566), 144),
+	Wrong_SlimeGreen = wrongTopping("SlimeGreen", Vector3.new(0.032, 0.025, 0), Vector3.new(0.756, 0.45, 0.33), 88),
+	Wrong_SlimeRed = wrongTopping("SlimeRed", Vector3.new(0.032, 0.025, 0), Vector3.new(0.756, 0.45, 0.33), 88),
 }
 
 -- HTTP / Content ------------------------------------------------------------------------------------------------
@@ -593,6 +619,28 @@ function Items.buildPivoted(
 	return m
 end
 
+-- AST-061 revision only (non-destructive): replaces Food/SausageWrong + Food/BunBitten and (re)creates
+-- Items/WrongToppings. Leaves Tools / Variants / Toppings and the other Food untouched (hand edits survive).
+function Items.buildWrong(ids: Ids, reload: boolean?, problems: { string })
+	local items = (ReplicatedStorage :: any).Assets.Items :: Folder
+	local food = items:FindFirstChild("Food") :: Folder
+	for _, n in { "SausageWrong", "BunBitten" } do
+		local old = food:FindFirstChild(n)
+		if old then
+			old:Destroy()
+		end
+		Items.buildPivoted(n, FOOD[n], ids, reload, food, problems)
+	end
+	local oldW = items:FindFirstChild("WrongToppings")
+	if oldW then
+		oldW:Destroy()
+	end
+	local wt = folder(items, "WrongToppings")
+	for name, spec in WRONG_TOPPINGS do
+		Items.buildPivoted(name, spec, ids, reload, wt, problems)
+	end
+end
+
 function Items.build(ids: Ids, reload: boolean?, problems: { string }): Folder
 	local assets = ReplicatedStorage:FindFirstChild("Assets")
 	if not assets then
@@ -661,6 +709,12 @@ function Items.build(ids: Ids, reload: boolean?, problems: { string }): Folder
 			Items.buildPivoted(name, spec, ids, reload, food, problems)
 		end)
 	end
+	local wrongToppings = folder(items, "WrongToppings")
+	for name, spec in WRONG_TOPPINGS do
+		guarded("WrongToppings." .. name, function()
+			Items.buildPivoted(name, spec, ids, reload, wrongToppings, problems)
+		end)
+	end
 	items.Parent = assets
 	return items
 end
@@ -691,6 +745,9 @@ function Items.check(ids: Ids?, content: any?): { string }
 			need(s.asset)
 		end
 		for _, s in FOOD do
+			need(s.asset)
+		end
+		for _, s in WRONG_TOPPINGS do
 			need(s.asset)
 		end
 		for _, s in ALTERED do
@@ -863,6 +920,22 @@ function Items.check(ids: Ids?, content: any?): { string }
 			table.insert(problems, "PackageLink left in " .. d:GetFullName())
 		elseif d:IsA("BasePart") and d:GetAttribute("Asset") == nil then
 			table.insert(problems, "no Asset attribute: " .. d:GetFullName())
+		end
+	end
+	-- AST-061 WrongToppings: every piece is a Model with PrimaryPart, its Att_Topping_<Name> and a size matching the box
+	local wt = items:FindFirstChild("WrongToppings")
+	for name, spec in WRONG_TOPPINGS do
+		local m = wt and wt:FindFirstChild(name)
+		if not (m and m:IsA("Model") and m.PrimaryPart) then
+			table.insert(problems, "WrongToppings." .. name .. " missing")
+			continue
+		end
+		local want = spec.parts[1].box.max - spec.parts[1].box.min
+		if not near(m.PrimaryPart.Size, want, SIZE_TOL) then
+			table.insert(problems, string.format("WrongToppings.%s: size %s, want %s", name, fmt(m.PrimaryPart.Size), fmt(want)))
+		end
+		if not m.PrimaryPart:FindFirstChildWhichIsA("Attachment") then
+			table.insert(problems, "WrongToppings." .. name .. ": no Att_Topping")
 		end
 	end
 	return problems

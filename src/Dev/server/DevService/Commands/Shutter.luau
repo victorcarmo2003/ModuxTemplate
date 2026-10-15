@@ -28,7 +28,7 @@ const Shutter: Api.Module = function(ctx: Api.Context): { Api.Command }
 		{
 			Name = "shutter",
 			Usage = USAGE,
-			Help = "trailer service window: state; 'open'/'close' (close only at night); 'in' = inside/protected check",
+			Help = "trailer service window: state; 'open'/'close' (close in Prep/Open/Closing/Night; dev open in Prep does not start the shop); 'in' = inside/protected check",
 			Run = function(args: { string }, caller: Player?): string?
 				const sub = if args[1] then string.lower(args[1]) else nil
 				if sub == nil then

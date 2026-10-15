@@ -30,8 +30,8 @@
 
 	Client presents, server decides: gems, owned classes and the selection come from the Profile packet
 	(ProfileController); a class is bought with ClassBuy (Gems: the server debits; Robux: the server pre-checks and
-	answers "Prompt", then this client prompts Content.Shop.ClassProducts[key].ProductId and ShopService grants on the
-	receipt); Equip is the existing ClassAction "Select". Squad state is only what the Party set says.
+	answers "Prompt", then this client prompts the Game Pass Content.Shop.GamePasses[key].PassId (TASK-291) and
+	ShopService grants on PromptGamePassPurchaseFinished); Equip is the existing ClassAction "Select". Squad state is only what the Party set says.
 
 	Play (user request 2026-10-11, Provisional; network.md §16.7): outside a squad it opens PlayChoice:
 	  Play Solo     PartyQuickPlay { Mode = "Solo" }: the server creates a squad of one and starts it at once (normal
@@ -309,13 +309,14 @@ function LobbyController:StateOf(key: string): ClassSelect.State
 	return if class and class.InMvp then "Locked" else "Soon"
 end
 
--- Robux price shown for a class (live Creator Hub price when known); nil = no product yet.
+-- Robux price shown for a class (live Creator Hub price of its Game Pass when known); nil = no pass yet. Pass prices
+-- live under -PassId in Prices (product and pass ids are separate number spaces).
 function LobbyController:RobuxOf(key: string): number?
-	const suggested, productId = ClassEntries.Robux(key)
+	const suggested, passId = ClassEntries.Robux(key)
 	if suggested == nil then
 		return nil
 	end
-	return self.Prices()[productId] or suggested
+	return self.Prices()[-passId] or suggested
 end
 
 function LobbyController:Busy(): boolean
@@ -360,17 +361,17 @@ end
 
 function LobbyController:OnClassBuyResult(class: string, reason: string)
 	if reason == "Prompt" then
-		-- Robux pre-check passed: prompt the class product; the receipt answers "Granted" / "Converted" later.
-		const product = Content.Shop.ClassProducts.ByKey[class]
-		if product and product.ProductId > 0 then
+		-- Robux pre-check passed: prompt the class Game Pass; the server answers "Granted" after the purchase.
+		const pass = Content.Shop.GamePasses.ByKey[class]
+		if pass and pass.PassId > 0 then
 			self.PromptClass = class
 			const ok, err = pcall(function()
-				MarketplaceService:PromptProductPurchase(Players.LocalPlayer, product.ProductId)
+				MarketplaceService:PromptGamePassPurchase(Players.LocalPlayer, pass.PassId)
 			end)
 			if ok then
-				return -- pending until PromptProductPurchaseFinished
+				return -- pending until PromptGamePassPurchaseFinished
 			end
-			warn(`[LobbyController] PromptProductPurchase failed: {err}`)
+			warn(`[LobbyController] PromptGamePassPurchase failed: {err}`)
 			self.PromptClass = ""
 		end
 		self:ClearPending()
@@ -573,9 +574,20 @@ function LobbyController:LoadPrices()
 			table.insert(ids, pack.ProductId)
 		end
 	end
-	for _, product in Content.Shop.ClassProducts.List do
-		if product.ProductId > 0 then
-			table.insert(ids, product.ProductId)
+	-- class Game Passes: stored under -PassId (RobuxOf)
+	for _, pass in Content.Shop.GamePasses.List do
+		if pass.PassId > 0 then
+			task.spawn(function()
+				const ok, info = pcall(function()
+					return MarketplaceService:GetProductInfo(pass.PassId, Enum.InfoType.GamePass)
+				end)
+				const price = if ok and type(info) == "table" then (info :: any).PriceInRobux else nil
+				if type(price) == "number" then
+					const copy = table.clone(Vide.untrack(self.Prices))
+					copy[-pass.PassId] = price
+					self.Prices(copy)
+				end
+			end)
 		end
 	end
 	for _, id in ids do
@@ -1956,7 +1968,17 @@ LobbyController:OnStart(function(self)
 		end
 		self.Prompting(false)
 		if self.PromptClass ~= "" then
-			-- a bought class arrives with the receipt (ClassBuyResult "Granted" + Profile); a closed prompt ends here
+			self.PromptClass = ""
+			self:ClearPending()
+		end
+	end)
+	-- class Game Pass (TASK-291): a bought class arrives as ClassBuyResult "Granted" + Profile; a closed prompt ends here
+	MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player: Player, _passId: number, _bought: boolean)
+		if player ~= Players.LocalPlayer then
+			return
+		end
+		self.Prompting(false)
+		if self.PromptClass ~= "" then
 			self.PromptClass = ""
 			self:ClearPending()
 		end

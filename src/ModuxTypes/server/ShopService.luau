@@ -17,18 +17,25 @@ export type Receipt = {
 export type Grant = {
 	Patch: Patch,
 	After: (() -> ())?,
+	Wait: boolean?,
 }
 export type Patch = Struct.Partial<Template.Data>
 
 export type Public = {
+	ByKey: { [string]: Handler },
 	Handlers: { [number]: Handler },
 	Names: { [number]: string },
+	Passes: { [Player]: { [number]: boolean } },
 	Setup: (self: Public) -> (),
 	RegisterProduct: (self: Public, productId: number, name: string, handler: Handler) -> (),
 	Notify: (self: Public, player: Player, kind: string, value: number) -> (),
-	ReplyClass: (self: Public, player: Player, key: string, reason: "Granted" | "Converted") -> (),
+	ReplyClass: (self: Public, player: Player, key: string, reason: "Granted") -> (),
 	GemPackHandler: (self: Public, pack: Content.ShopGemPack) -> Handler,
-	ClassHandler: (self: Public, key: string) -> Handler,
+	OwnsPass: (self: Public, player: Player, passId: number) -> boolean?,
+	OwnsClassPass: (self: Public, player: Player, key: string) -> boolean,
+	GrantPass: (self: Public, player: Player, key: string, notify: boolean) -> boolean,
+	CheckPasses: (self: Public, player: Player) -> (),
+	OnPassFinished: (self: Public, player: Player, passId: number, purchased: boolean) -> (),
 	RegisterContent: (self: Public) -> (),
 	WaitProfile: (self: Public, player: Player) -> Profile?,
 	ProcessReceipt: (self: Public, receipt: Receipt) -> Enum.ProductPurchaseDecision,

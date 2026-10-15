@@ -13,15 +13,19 @@
 -- first letter until the animal portraits exist (AST-117).
 -- Pure: only props. Build it inside a Vide root.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Theme)
+local Motion = require(script.Parent.Motion)
 local CartoonPanel = require(script.Parent.CartoonPanel)
 local CartoonLabel = require(script.Parent.CartoonLabel)
 local OrderStack = require(script.Parent.OrderStack)
 local Sprites = require(script.Parent.OrderStack.Sprites)
-local CartoonButton = require(script.Parent.CartoonButton)
 
 const create = Vide.create
+const source = Vide.source
+const effect = Vide.effect
+const cleanup = Vide.cleanup
 const untrack = Vide.untrack
 -- Vide 0.4.1 types `create` for 19 classes only; UIStroke and UIListLayout children are fine, UIPadding is not.
 const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }) -> Instance
@@ -40,17 +44,8 @@ export type Ticket = {
 	State: State,
 }
 
--- The Take button of the customer at the counter (TASK-206): shown while someone waits to be taken; a bar at the bottom of the
--- card. Its tap never cycles the ticket.
-export type Take = {
-	Visible: () -> boolean,
-	Text: () -> string,
-	OnPress: () -> (),
-}
-
 export type Props = {
 	Ticket: () -> Ticket?,
-	Take: Take?,
 	-- Tickets waiting behind this one.
 	Queue: () -> number,
 	-- One wide row (portrait) instead of the card.
@@ -68,70 +63,111 @@ export type Props = {
 
 const LOW = 0.4
 const CRITICAL = 0.15
-
--- Sets the LayoutOrder of a piece built by a helper (a UIListLayout row keeps them in this order).
-local function ordered(instance: any, order: number): any
-	instance.LayoutOrder = order
-	return instance
-end
+-- Patience colour: Teal from half up, Mustard from a quarter down, a blend between (never red)
+const CALM = 0.5
+const ALERT = 0.25
+-- Tilt of the paper (degrees): a ticket pinned by hand is never quite straight
+const TILT_CARD = -1.2
+const TILT_STRIP = 0.6
 
 local function initial(name: string): string
 	return if name == "" then "?" else string.upper(string.sub(name, 1, 1))
 end
 
--- The patience bar: a thin level, Teal, Mustard under 40 %; nothing at all when there is no patience to show (Patience 0).
-local function patienceBar(patience: () -> number, position: UDim2, width: UDim2): Frame
+local function patienceColor(value: number): Color3
+	const t = math.clamp((value - ALERT) / (CALM - ALERT), 0, 1)
+	return Theme.Tone.Mustard.Bottom:Lerp(Theme.Tone.Teal.Bottom, t)
+end
+
+-- The patience bar: a thin rounded level with a knob on its tip, Teal turning Mustard as it runs out; it pulses when it is almost
+-- gone. Nothing at all when there is no patience to show (Patience 0).
+local function patienceBar(patience: () -> number, pulse: () -> number, height: number): Frame
 	return create("Frame")({
 		Name = "Patience",
 		AnchorPoint = Vector2.new(0, 1),
-		Position = position,
-		Size = width + UDim2.fromOffset(0, 8),
-		BackgroundColor3 = Theme.Tone.Cream.Bottom,
-		ClipsDescendants = true,
+		Position = UDim2.new(0, 8, 1, -3),
+		Size = UDim2.new(1, -16, 0, height + 6),
+		BackgroundTransparency = 1,
 		Visible = function(): boolean
 			return patience() > 0
 		end,
-		create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
-		createRaw("UIStroke")({
-			Color = Theme.Color.Ink,
-			Thickness = 2,
-			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-		}),
 		create("Frame")({
-			Name = "Level",
+			Name = "Track",
+			AnchorPoint = Vector2.new(0, 0.5),
+			Position = UDim2.fromScale(0, 0.5),
+			Size = UDim2.new(1, 0, 0, height),
+			BackgroundColor3 = Theme.Tone.Cream.Bottom,
+			ClipsDescendants = true,
+			create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+			createRaw("UIStroke")({
+				Color = Theme.Color.Ink,
+				Thickness = 2,
+				ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+			}),
+			create("Frame")({
+				Name = "Level",
+				Size = function(): UDim2
+					return UDim2.fromScale(math.clamp(patience(), 0, 1), 1)
+				end,
+				BackgroundColor3 = function(): Color3
+					return patienceColor(patience()):Lerp(Color3.new(1, 1, 1), pulse() * 0.4)
+				end,
+				BorderSizePixel = 0,
+				create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+			}),
+		}),
+		-- the knob on the tip of the level (a drop of the same colour in a Cream ring)
+		create("Frame")({
+			Name = "Knob",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = function(): UDim2
+				return UDim2.new(math.clamp(patience(), 0.04, 0.98), 0, 0.5, 0)
+			end,
 			Size = function(): UDim2
-				return UDim2.fromScale(math.clamp(patience(), 0, 1), 1)
+				const side = (height + 5) * (1 + 0.3 * pulse())
+				return UDim2.fromOffset(side, side)
 			end,
 			BackgroundColor3 = function(): Color3
-				return if patience() > LOW then Theme.Tone.Teal.Bottom else Theme.Tone.Mustard.Bottom
+				return patienceColor(patience())
 			end,
-			BorderSizePixel = 0,
+			ZIndex = 3,
 			create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+			createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
 		}),
 	})
 end
 
-local function face(size: number, name: () -> string): Frame
+-- The portrait of the customer: a Cream frame with an Ink edge around a Teal disc with the first letter (a round placeholder until
+-- the animal portraits exist, AST-117).
+local function portrait(side: number, name: () -> string): Frame
 	return create("Frame")({
-		Name = "Face",
-		Size = UDim2.fromOffset(size, size),
-		BackgroundColor3 = Theme.Tone.Teal.Bottom,
+		Name = "Portrait",
+		Size = UDim2.fromOffset(side, side),
+		BackgroundColor3 = Theme.Tone.White.Top,
 		create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
 		createRaw("UIStroke")({
 			Color = Theme.Color.Ink,
 			Thickness = 3,
 			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 		}),
-		CartoonLabel({
-			Text = function()
-				return initial(name())
-			end,
-			TextSize = 16,
-			Color = Theme.Color.Ink,
-			Stroke = 0,
-			Box = UDim2.fromScale(1, 1),
-			XAlignment = Enum.TextXAlignment.Center,
-			YAlignment = Enum.TextYAlignment.Center,
+		create("Frame")({
+			Name = "Disc",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.new(1, -7, 1, -7),
+			BackgroundColor3 = Theme.Tone.Teal.Bottom,
+			create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+			CartoonLabel({
+				Text = function()
+					return initial(name())
+				end,
+				TextSize = if side >= 34 then 18 else 16,
+				Color = Theme.Color.Cream,
+				Stroke = 2,
+				Box = UDim2.fromScale(1, 1),
+				XAlignment = Enum.TextXAlignment.Center,
+				YAlignment = Enum.TextYAlignment.Center,
+			}),
 		}),
 	})
 end
@@ -163,17 +199,17 @@ local function alert(visible: () -> boolean): Frame
 	})
 end
 
-local function queueChip(queue: () -> number): Frame
+local function queueChip(queue: () -> number, position: UDim2): Frame
 	return CartoonPanel({
 		Name = "Queue",
 		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.fromScale(1, 0.5),
+		Position = position,
 		Tone = Theme.Tone.White,
 		Radius = Theme.Radius.Small,
 		Lip = 2,
 		Outline = 2,
 		Gloss = false,
-		Size = UDim2.fromOffset(30, 22),
+		Size = UDim2.fromOffset(32, 22),
 		ZIndex = 3,
 		Visible = function()
 			return queue() > 0
@@ -186,6 +222,37 @@ local function queueChip(queue: () -> number): Frame
 				TextSize = Theme.MinTextSize,
 				Color = Theme.Color.Ink,
 				Stroke = 0,
+				Box = UDim2.fromScale(1, 1),
+				XAlignment = Enum.TextXAlignment.Center,
+				YAlignment = Enum.TextYAlignment.Center,
+			}),
+		},
+	})
+end
+
+-- What the customer said: a small label with quotes, on its own bubble.
+local function bubble(text: () -> string, wrapped: boolean, position: UDim2, size: any, anchor: Vector2): Frame
+	return CartoonPanel({
+		Name = "Say",
+		AnchorPoint = anchor,
+		Position = position,
+		Size = size,
+		Tone = Theme.Tone.White,
+		Radius = UDim.new(0, 9),
+		Lip = 0,
+		Outline = 2,
+		Gloss = false,
+		Rim = false,
+		Padding = { Left = 6, Right = 6 },
+		Children = {
+			CartoonLabel({
+				Name = "Text",
+				Text = text,
+				TextSize = Theme.MinTextSize,
+				Color = Theme.Color.Ink,
+				Stroke = 0,
+				Wrapped = wrapped,
+				Truncate = true,
 				Box = UDim2.fromScale(1, 1),
 				XAlignment = Enum.TextXAlignment.Center,
 				YAlignment = Enum.TextYAlignment.Center,
@@ -225,13 +292,76 @@ return function(props: Props): Frame
 		return if urgent() then Theme.Outline.Thick else Theme.Outline.Normal
 	end
 	const strip = props.Strip
+	const roomy = props.Roomy
+	const isRoomy = function(): boolean
+		return roomy ~= nil and roomy()
+	end
+	const toppingsOf = function(): { string }
+		const ticket = props.Ticket()
+		return if ticket ~= nil then ticket.Toppings else {}
+	end
+
+	-- the little motions of the paper: it slides in with a spring when a ticket comes, the pin swings, the bar pulses when the
+	-- customer is about to leave. One Heartbeat that does nothing while everything is at rest (and nothing at all with reduced motion).
+	const reduced = Motion.Reduced()
+	const slide = source(0)
+	const sway = source(0)
+	const pulse = source(0)
+	local lastId = 0
+	local slideX, slideV, swayA, swayV = 0, 0, 0, 0
+	effect(function()
+		const ticket = props.Ticket()
+		const id = if ticket ~= nil then ticket.Id else 0
+		untrack(function()
+			if id ~= lastId then
+				lastId = id
+				if id ~= 0 and not reduced then
+					slideX, slideV, swayV = 1, 0, 300
+				end
+			end
+			return nil
+		end)
+	end)
+	const beat = RunService.Heartbeat:Connect(function(dt: number)
+		const step = math.min(dt, 0.05)
+		if slideX ~= 0 or slideV ~= 0 then
+			slideV += (-slideX * 230 - slideV * 17) * step
+			slideX += slideV * step
+			if math.abs(slideX) < 0.002 and math.abs(slideV) < 0.02 then
+				slideX, slideV = 0, 0
+			end
+			slide(slideX)
+		end
+		if swayA ~= 0 or swayV ~= 0 then
+			swayV += (-swayA * 150 - swayV * 3.4) * step
+			swayA += swayV * step
+			if math.abs(swayA) < 0.05 and math.abs(swayV) < 0.5 then
+				swayA, swayV = 0, 0
+			end
+			sway(swayA)
+		end
+		const ticket = props.Ticket()
+		const alarm = ticket ~= nil and ticket.Patience > 0 and ticket.Patience <= ALERT and not reduced
+		if alarm then
+			pulse(0.5 + 0.5 * math.sin(os.clock() * 7))
+		elseif untrack(pulse) ~= 0 then
+			pulse(0)
+		end
+	end)
+	cleanup(function()
+		beat:Disconnect()
+	end)
+	-- the paper comes from the left (px), the pin swings (degrees)
+	const slidePosition = function(): UDim2
+		return UDim2.fromOffset(-60 * slide(), 0)
+	end
 
 	-- empty state, shared by both shapes
 	const empty = CartoonPanel({
 		Name = "Empty",
 		Tone = Theme.Tone.Cream,
 		Radius = Theme.Radius.Card,
-		-- nothing to read: a slim pill, not a blank card (the Take bar comes right under it)
+		-- nothing to read: a slim pill, not a blank card
 		Size = UDim2.new(1, 0, 0, 40),
 		Visible = function()
 			return not has()
@@ -258,7 +388,7 @@ return function(props: Props): Frame
 		Size = UDim2.fromOffset(86, 34),
 		Rotation = -10,
 		BackgroundColor3 = Theme.Tone.Green.Bottom,
-		ZIndex = 5,
+		ZIndex = 12,
 		Visible = function()
 			const ticket = props.Ticket()
 			return ticket ~= nil and ticket.State == "Served"
@@ -280,67 +410,35 @@ return function(props: Props): Frame
 		}),
 	})
 
-	-- the pin: Teal, the sign of "fixed"
-	const pin = create("Frame")({
-		Name = "Pin",
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0),
-		Size = UDim2.fromOffset(14, 14),
-		BackgroundColor3 = Theme.Tone.Teal.Bottom,
-		ZIndex = 4,
-		Visible = has,
-		create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
-		createRaw("UIStroke")({
-			Color = Theme.Color.Ink,
-			Thickness = 2,
-			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-		}),
-		-- the sprite of the pin over the flat disc (the disc is what shows until the image is through moderation)
-		create("ImageLabel")({
-			Name = "Sprite",
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.fromOffset(28, 28),
-			BackgroundTransparency = 1,
-			Image = Sprites.Pin,
-			ScaleType = Enum.ScaleType.Fit,
-		}),
-	})
-
-	const roomy = props.Roomy
-	const isRoomy = function(): boolean
-		return roomy ~= nil and roomy()
-	end
-	-- the layers of the order: the same stack for both shapes (the band is fixed when the ticket is built)
-	const toppingsOf = function(): { string }
-		const ticket = props.Ticket()
-		return if ticket ~= nil then ticket.Toppings else {}
-	end
-
-	-- face and number: fixed widths (nothing grows into its neighbour); the queue chip is pinned to the right edge
-	local function who(faceSize: number, numberW: number, numberSize: number): Frame
+	-- the pin: a big Teal head on the top edge of the paper, it swings when the ticket comes
+	local function pin(): Frame
 		return create("Frame")({
-			Name = "Who",
-			Size = UDim2.new(0, faceSize + 3 + numberW, 1, 0),
+			Name = "Pin",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new(0.5, 0, 0, 3),
+			Size = UDim2.fromOffset(30, 30),
 			BackgroundTransparency = 1,
-			create("UIListLayout")({
-				FillDirection = Enum.FillDirection.Horizontal,
-				VerticalAlignment = Enum.VerticalAlignment.Center,
-				SortOrder = Enum.SortOrder.LayoutOrder,
-				Padding = UDim.new(0, 3),
+			ZIndex = 10,
+			Rotation = function(): number
+				return sway()
+			end,
+			-- the flat disc is what shows until the sprite is through moderation
+			create("Frame")({
+				Name = "Disc",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = UDim2.fromOffset(20, 20),
+				BackgroundColor3 = Theme.Tone.Teal.Bottom,
+				create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+				createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
 			}),
-			ordered(face(faceSize, name), 1),
-			CartoonLabel({
-				LayoutOrder = 2,
-				Name = "Number",
-				Text = number,
-				TextSize = numberSize,
-				Color = Theme.Color.Ink,
-				Stroke = 0,
-				Truncate = true,
-				Box = UDim2.fromOffset(numberW, faceSize),
-				XAlignment = Enum.TextXAlignment.Left,
-				YAlignment = Enum.TextYAlignment.Center,
+			create("ImageLabel")({
+				Name = "Sprite",
+				Size = UDim2.fromScale(1, 1),
+				BackgroundTransparency = 1,
+				Image = Sprites.Pin,
+				ScaleType = Enum.ScaleType.Fit,
+				ZIndex = 11,
 			}),
 		})
 	end
@@ -348,137 +446,171 @@ return function(props: Props): Frame
 	-- the diamond "!" of an urgent ticket, by the pin
 	const warn = alert(urgent)
 	warn.AnchorPoint = Vector2.new(0.5, 0.5)
-	warn.Position = UDim2.new(0.5, 24, 0, 6)
-	warn.ZIndex = 5
+	warn.Position = UDim2.new(0.5, 26, 0, 8)
+	warn.ZIndex = 10
 
-	-- card (left column): header, the stack, the line, the patience bar
+	-- soft shadow under a paper (a flat Ink shape, offset, see-through)
+	local function shadow(visible: () -> boolean, tilt: number): Frame
+		return create("Frame")({
+			Name = "Shadow",
+			Position = function(): UDim2
+				const slideOffset = slidePosition()
+				return UDim2.new(0, slideOffset.X.Offset + 2, 0, 5)
+			end,
+			Size = UDim2.fromScale(1, 1),
+			BackgroundColor3 = Theme.Color.Ink,
+			BackgroundTransparency = 0.72,
+			Rotation = tilt,
+			Visible = visible,
+			create("UICorner")({ CornerRadius = Theme.Radius.Card }),
+		})
+	end
+	const cardVisible = function(): boolean
+		return has() and not strip()
+	end
+	const stripVisible = function(): boolean
+		return has() and strip()
+	end
+
+	-- card (left column): pin, the customer, the layers, what was said, the patience
+	const cardPitch = if untrack(isRoomy) then 24 else 18
+	const cardSprite = if untrack(isRoomy) then 34 else 26
+	const cardMedal = if untrack(isRoomy) then 28 else 22
 	const card = CartoonPanel({
 		Name = "Card",
 		Tone = Theme.Tone.Cream,
 		Radius = Theme.Radius.Card,
+		Lip = 3,
 		Outline = outline,
 		OutlineColor = outlineColor,
 		Size = UDim2.fromScale(1, 1),
-		Visible = function()
-			return has() and not strip()
-		end,
-		Padding = { Left = 6, Right = 6, Top = 10, Bottom = 2 },
+		Position = slidePosition,
+		Rotation = TILT_CARD,
+		Visible = cardVisible,
 		Children = {
 			create("Frame")({
-				Name = "Header",
-				Size = UDim2.new(1, 0, 0, 28),
+				Name = "Portrait",
+				Position = UDim2.fromOffset(8, 13),
+				Size = UDim2.fromOffset(32, 32),
 				BackgroundTransparency = 1,
-				who(28, 32, 15),
-				queueChip(props.Queue),
+				portrait(32, name),
 			}),
+			CartoonLabel({
+				Name = "Name",
+				Text = name,
+				TextSize = 17,
+				Color = Theme.Color.Ink,
+				Stroke = 0,
+				Truncate = true,
+				Position = UDim2.fromOffset(46, 12),
+				Box = UDim2.new(1, -46 - 40, 0, 20),
+				XAlignment = Enum.TextXAlignment.Left,
+				YAlignment = Enum.TextYAlignment.Center,
+			}),
+			CartoonLabel({
+				Name = "Number",
+				Text = number,
+				TextSize = Theme.MinTextSize,
+				Color = Theme.Tone.Ink.Top,
+				Stroke = 0,
+				Truncate = true,
+				Position = UDim2.fromOffset(46, 30),
+				Box = UDim2.new(1, -46 - 40, 0, 16),
+				XAlignment = Enum.TextXAlignment.Left,
+				YAlignment = Enum.TextYAlignment.Center,
+			}),
+			queueChip(props.Queue, UDim2.new(1, -6, 0, 29)),
 			create("Frame")({
-				Name = "Body",
-				Position = UDim2.fromOffset(0, 32),
-				Size = UDim2.new(1, 0, 1, -32 - 12),
+				Name = "StackHolder",
+				Position = UDim2.fromOffset(6, 50),
+				Size = UDim2.new(1, -12, 0, 140),
 				BackgroundTransparency = 1,
-				create("UIListLayout")({
-					SortOrder = Enum.SortOrder.LayoutOrder,
-					Padding = UDim.new(0, 4),
-				}),
 				OrderStack({
 					Name = "Stack",
 					Toppings = toppingsOf,
 					Direction = "Vertical",
-					Band = if untrack(isRoomy) then 26 else 22,
-				}),
-				CartoonLabel({
-					LayoutOrder = 2,
-					Name = "Say",
-					Text = say,
-					TextSize = 15,
-					Color = Theme.Color.Ink,
-					Stroke = 0,
-					Box = function(): UDim2
-						return UDim2.new(1, 0, 0, if isRoomy() then 36 else 18)
-					end,
-					Wrapped = true,
-					Truncate = true,
-					XAlignment = Enum.TextXAlignment.Left,
-					YAlignment = Enum.TextYAlignment.Top,
+					Pitch = cardPitch,
+					Sprite = cardSprite,
+					Medallion = cardMedal,
 				}),
 			}),
-			patienceBar(patience, UDim2.new(0, 0, 1, -2), UDim2.fromScale(1, 0)),
+			bubble(
+				say,
+				true,
+				UDim2.new(0, 6, 1, if untrack(isRoomy) then -18 else -17),
+				function(): UDim2
+					return UDim2.new(1, -12, 0, if isRoomy() then 38 else 22)
+				end,
+				Vector2.new(0, 1)
+			),
+			patienceBar(patience, pulse, 8),
+			pin(),
 		},
 	})
 
-	-- strip (portrait): row 1 face, number, the layers side by side, +N; row 2 the line; the patience bar under it
+	-- strip (portrait): the customer, the layers side by side, what was said and the patience under them
 	const band = CartoonPanel({
 		Name = "Strip",
 		Tone = Theme.Tone.Cream,
 		Radius = Theme.Radius.Card,
+		Lip = 3,
 		Outline = outline,
 		OutlineColor = outlineColor,
 		Size = UDim2.fromScale(1, 1),
-		Visible = function()
-			return has() and strip()
-		end,
-		Padding = { Left = 8, Right = 8, Top = 8, Bottom = 2 },
+		Position = slidePosition,
+		Rotation = TILT_STRIP,
+		Visible = stripVisible,
 		Children = {
 			create("Frame")({
-				Name = "Row1",
-				Size = UDim2.new(1, 0, 0, 38),
+				Name = "Portrait",
+				Position = UDim2.fromOffset(10, 14),
+				Size = UDim2.fromOffset(34, 34),
 				BackgroundTransparency = 1,
-				create("UIListLayout")({
-					FillDirection = Enum.FillDirection.Horizontal,
-					VerticalAlignment = Enum.VerticalAlignment.Center,
-					SortOrder = Enum.SortOrder.LayoutOrder,
-					Padding = UDim.new(0, 8),
-				}),
-				ordered(who(34, 40, 16), 1),
-				OrderStack({
-					Name = "Stack",
-					LayoutOrder = 2,
-					Toppings = toppingsOf,
-					Direction = "Horizontal",
-					Band = 36,
-				}),
-			}),
-			create("Frame")({
-				Name = "QueueRow",
-				Size = UDim2.new(1, 0, 0, 38),
-				BackgroundTransparency = 1,
-				queueChip(props.Queue),
+				portrait(34, name),
 			}),
 			CartoonLabel({
-				Name = "Say",
-				Position = UDim2.fromOffset(0, 40),
-				Box = UDim2.new(1, 0, 0, 20),
-				Text = say,
-				TextSize = 15,
+				Name = "Name",
+				Text = name,
+				TextSize = 17,
 				Color = Theme.Color.Ink,
 				Stroke = 0,
 				Truncate = true,
+				Position = UDim2.fromOffset(50, 12),
+				Box = UDim2.fromOffset(86, 20),
 				XAlignment = Enum.TextXAlignment.Left,
 				YAlignment = Enum.TextYAlignment.Center,
 			}),
-			patienceBar(patience, UDim2.new(0, 0, 1, -2), UDim2.fromScale(1, 0)),
+			CartoonLabel({
+				Name = "Number",
+				Text = number,
+				TextSize = Theme.MinTextSize,
+				Color = Theme.Tone.Ink.Top,
+				Stroke = 0,
+				Truncate = true,
+				Position = UDim2.fromOffset(50, 31),
+				Box = UDim2.fromOffset(40, 16),
+				XAlignment = Enum.TextXAlignment.Left,
+				YAlignment = Enum.TextYAlignment.Center,
+			}),
+			queueChip(props.Queue, UDim2.fromOffset(138, 40)),
+			create("Frame")({
+				Name = "StackHolder",
+				Position = UDim2.fromOffset(146, 8),
+				Size = UDim2.new(1, -152, 0, 44),
+				BackgroundTransparency = 1,
+				OrderStack({
+					Name = "Stack",
+					Toppings = toppingsOf,
+					Direction = "Horizontal",
+					Pitch = 34,
+					Sprite = 30,
+				}),
+			}),
+			bubble(say, false, UDim2.new(0, 8, 1, -16), UDim2.new(1, -16, 0, 22), Vector2.new(0, 1)),
+			patienceBar(patience, pulse, 6),
+			pin(),
 		},
 	})
-
-	-- Take (the customer at the counter): a bar over the bottom of the card
-	local take: any = nil
-	const takeProps = props.Take
-	if takeProps ~= nil then
-		take = CartoonButton({
-			Name = "Take",
-			Text = takeProps.Text,
-			TextSize = 16,
-			Visible = takeProps.Visible,
-			AnchorPoint = Vector2.new(0.5, 0),
-			-- under the card (bottom edge) with a ticket, right under the slim pill without one
-			Position = function(): UDim2
-				return if has() then UDim2.new(0.5, 0, 1, -48) else UDim2.new(0.5, 0, 0, 46)
-			end,
-			Size = UDim2.new(1, 0, 0, 48),
-			OnActivated = takeProps.OnPress,
-		})
-		take.ZIndex = 6
-	end
 
 	-- the whole thing is one touch target (cycle to the next ticket)
 	return create("TextButton")({
@@ -495,11 +627,11 @@ return function(props: Props): Frame
 			end
 		end,
 		empty,
+		shadow(cardVisible, TILT_CARD),
+		shadow(stripVisible, TILT_STRIP),
 		card,
 		band,
-		pin,
 		warn,
 		stamp,
-		take,
 	}) :: any
 end

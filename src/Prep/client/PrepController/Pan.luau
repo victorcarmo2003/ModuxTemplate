@@ -1,16 +1,17 @@
 --!strict
--- Pan: continuous navigation along the trail of stations of the 3D prep mode (feedback 2026-10-12, H). The trail is the list of poses
--- of the tabs of the current set (Poses.Trail: Grill -> Board -> Toppings, it follows Content.Prep.Tabs), `u` 0..1 is a point on it
--- and the camera is retargeted every frame to the blend of the two poses around `u` (CameraController:PrepGoal, the springs of the
--- camera do the smoothing). Three inputs move `u`:
---   * a press on EMPTY space dragged sideways (touch and mouse): the world follows the finger; on release the landing point (with a
---     little inertia, or a fling) snaps to the nearest station, which is the only moment the stage changes (Commit)
---   * the mouse at the left / right border of the screen (Rules.Camera.Pan.Edge of the width, speed grows toward the border), also
---     while a sausage or a plate is dragged; never over the chrome (a GUI that draws, a Zones overlay)
---   * LB / RB and the dots are plain tab changes (the controller): they only tell this module where the camera went (Sync)
--- NEVER while the player positions or pours a topping or makes a precision gesture (cut, sauce): the touch pan needs that no tool is
--- armed and nothing is in the hand, the edge scroll stops while a gesture runs or the pointer is over the mat (`Precision`).
--- Reduced motion: no live movement and no inertia; a sideways swipe is one station, applied as a blink by the controller.
+-- Pan: free navigation along the trail of stations of the 3D prep mode (feedback 2026-10-12, H; made free the same day). The trail is the
+-- list of poses of the tabs of the current set (Poses.Trail: Grill -> Board -> Toppings, it follows Content.Prep.Tabs), `u` 0..1 is ANY
+-- point on it (no magnet, it stops where the hand stops) and the camera is cut to the blend of the poses around `u` every frame
+-- (CameraController:PrepGoal with no spring, so the drag is 1:1 with the finger; the smoothness is in `u`). Inputs that move `u`:
+--   * a press on EMPTY space dragged sideways (touch and mouse): the world follows the pointer; on release the speed only decays
+--     (`Decay`), nothing snaps
+--   * the mouse at the left / right border of the screen (Rules.Camera.Pan.Edge of the width, speed rising smoothly toward the border),
+--     also while a sausage or a plate is dragged; never over the chrome (a GUI that draws, a Zones overlay)
+--   * LB / RB and the dots are plain tab changes (the controller glides the camera there): they only tell this module (Sync)
+-- The ACTIVE station (stage, targets, hint) is the nearest one to `u` with a little hysteresis (`Hyst`) and changes while you move; while
+-- something is in the hand it waits for the drop so the drag is not cancelled. NEVER while the player positions or pours a topping or
+-- makes a precision gesture (cut, sauce): the touch pan needs that no tool is armed, and everything stops while `Precision` is true.
+-- Reduced motion: no live movement; a sideways swipe is one station, applied by the controller as a blink.
 -- No Modux, no Vide: plain callbacks; the controller owns one and destroys it with the mode.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -25,14 +26,15 @@ export type Zone = { X: number, Y: number, W: number, H: number }
 export type Options = {
 	Pointer: Pointer.Pointer,
 	Rules: Rules,
-	-- the trail of the seat (nil: the pan is off) and the index of the stop the controller stands on
+	-- the trail of the seat (nil: the pan is off) and the index of the stop that is the active station now
 	Trail: () -> Poses.Trail?,
 	Stop: () -> number,
-	-- camera retarget (eye, point looked at, field of view, spring omega)
-	Goal: (eye: Vector3, look: Vector3, fov: number, omega: number) -> (),
-	-- the pan settled on a stop: the controller changes the tab (or re-glides) there
-	Commit: (index: number) -> (),
-	-- the stop nearest to `u` right now, nil when none (the dots follow it); called when it changes
+	-- camera retarget, a cut (eye, point looked at, field of view)
+	Goal: (eye: Vector3, look: Vector3, fov: number) -> (),
+	-- the active station changes to stop `index`. `live` = the camera is where the pan put it (do not glide it); false = a swipe of
+	-- reduced motion, the controller glides / blinks there
+	Commit: (index: number, live: boolean) -> (),
+	-- the stop nearest to `u`, nil when none (the dots follow it); called when it changes
 	Near: (index: number?) -> (),
 	-- the mode is up and the chrome is on (not leaving, not forced out)
 	Gate: () -> boolean,
@@ -40,7 +42,7 @@ export type Options = {
 	Armed: () -> boolean,
 	-- a precision gesture runs, or the pointer positions a tool over the mat: no pan of any kind
 	Precision: () -> boolean,
-	-- something is in the hand (the Aim has a source): the edge scroll works, the stage does not change until it is let go
+	-- something is in the hand (the Aim has a source): the edge scroll works, the active station waits for the drop
 	Holding: () -> boolean,
 	-- overlays that must not be scrolled under (Zones)
 	Reserved: () -> { Zone },
@@ -48,9 +50,9 @@ export type Options = {
 }
 
 export type Pan = {
-	-- A pan, an edge scroll or a pending settle is going on.
+	-- A pan, an edge scroll or a coast is going on.
 	Active: (self: Pan) -> boolean,
-	-- The controller moved the camera to stop `index` on its own (a tab, LB / RB, a station change): follow it.
+	-- The controller moved the camera to stop `index` on its own (a tab, LB / RB, a dot): follow it.
 	Sync: (self: Pan, index: number) -> (),
 	Step: (self: Pan, dt: number) -> (),
 	-- The current point of the trail, 0..1.
@@ -63,7 +65,8 @@ type Mode = "Idle" | "Press" | "Drag" | "Edge"
 -- GUIs that draw over the whole screen without being interface (their name or an ancestor's)
 const PASS_THROUGH: { [string]: boolean } = { Vignette = true, PrepCursor = true, PrepVeil = true, Blackout = true, PanThrough = true }
 const MAX_DT = 0.1
-const VELOCITY_MIX = 0.35 -- share of the new sample in the smoothed release velocity
+const VELOCITY_MIX = 0.4 -- share of the new sample in the smoothed release velocity
+const STALE = 0.08 -- s: a pointer that stood still this long before the release does not throw the camera
 
 local function isPassThrough(object: Instance): boolean
 	local node: Instance? = object
@@ -121,9 +124,12 @@ function Pan.new(options: Options): Pan
 	local u = 0
 	local pressPx = Vector2.zero
 	local pressU = 0
-	local lastU = 0
+	local perPixel = 0.01 -- studs of the work plane under one pixel, fixed at the start of a drag (1:1 with the pointer)
 	local velocity = 0 -- u per second, smoothed
-	local pending = false -- a settle waits for the hand to be empty
+	local lastMove = 0
+	local lastPx = Vector2.zero
+	local coasting = false
+	local dirty = false -- the active station may need to change
 	local near = 0
 
 	const self = {} :: any
@@ -132,8 +138,22 @@ function Pan.new(options: Options): Pan
 		return options.Trail()
 	end
 
+	-- the stop nearest to u, the active one counting `Hyst` closer
+	local function nearest(trailNow: Poses.Trail, active: number): number
+		local best, bestDistance = active, math.huge
+		for index, stop in trailNow.Stops do
+			local distance = math.abs(stop.U - u)
+			if index ~= active then
+				distance += rules.Hyst
+			end
+			if distance < bestDistance then
+				best, bestDistance = index, distance
+			end
+		end
+		return best
+	end
+
 	local function report(trailNow: Poses.Trail)
-		-- the stop nearest to u, for the dots
 		local best, bestDistance = 1, math.huge
 		for index, stop in trailNow.Stops do
 			const distance = math.abs(stop.U - u)
@@ -147,14 +167,28 @@ function Pan.new(options: Options): Pan
 		end
 	end
 
-	-- Camera goal at the current u.
+	-- Camera cut to the blend at the current u.
 	local function aim(trailNow: Poses.Trail)
 		const eye, look, fov = Poses.Sample(trailNow, u)
-		options.Goal(eye, look, fov, rules.Omega)
+		options.Goal(eye, look, fov)
 		report(trailNow)
+		dirty = true
 	end
 
-	-- studs of the work plane under one screen pixel, at the current camera
+	-- The active station follows u (never while something is in the hand: the drag must not be cancelled).
+	local function follow(trailNow: Poses.Trail)
+		if not dirty or options.Holding() then
+			return
+		end
+		dirty = false
+		const current = math.clamp(options.Stop(), 1, #trailNow.Stops)
+		const pick = nearest(trailNow, current)
+		if pick ~= current then
+			options.Commit(pick, true)
+		end
+	end
+
+	-- studs of the work plane under one screen pixel, at the current point of the trail
 	local function studsPerPixel(trailNow: Poses.Trail): number
 		const camera = workspace.CurrentCamera
 		if camera == nil then
@@ -166,53 +200,30 @@ function Pan.new(options: Options): Pan
 		return 2 * halfHeight * (size.X / math.max(size.Y, 1)) / math.max(size.X, 1)
 	end
 
-	-- Where the pan settles: the stop nearest to the landing point (the one it started on counts `Hold` closer), or the next one in
-	-- the direction of a fling.
-	local function settle(trailNow: Poses.Trail, fromSwipe: number?)
-		pending = false
+	-- Reduced motion: a sideways swipe is one station.
+	local function swipe(trailNow: Poses.Trail, moved: number)
 		mode = "Idle"
-		const stops = trailNow.Stops
-		const current = math.clamp(options.Stop(), 1, #stops)
-		local pick = current
-		if options.Reduced() then
-			const size = if workspace.CurrentCamera ~= nil then workspace.CurrentCamera.ViewportSize.X else 800
-			const moved = fromSwipe or 0
-			if math.abs(moved) > size * 0.12 then
-				pick = math.clamp(current + (if moved < 0 then 1 else -1), 1, #stops)
-			end
-		else
-			const landing = u + velocity * rules.Inertia
-			local bestDistance = math.huge
-			for index, stop in stops do
-				local distance = math.abs(landing - stop.U)
-				if index == current then
-					distance *= 1 - rules.Hold
-				end
-				if distance < bestDistance then
-					pick, bestDistance = index, distance
-				end
-			end
-			if pick == current and math.abs(velocity) * trailNow.Length >= rules.FlingMin then
-				pick = math.clamp(current + (if velocity > 0 then 1 else -1), 1, #stops)
-			end
+		const size = if workspace.CurrentCamera ~= nil then workspace.CurrentCamera.ViewportSize.X else 800
+		const current = math.clamp(options.Stop(), 1, #trailNow.Stops)
+		if math.abs(moved) > size * 0.12 then
+			options.Commit(math.clamp(current + (if moved < 0 then 1 else -1), 1, #trailNow.Stops), false)
 		end
-		velocity = 0
-		u = stops[pick].U
-		if pick ~= near then
-			near = pick
-			options.Near(pick)
-		end
-		options.Commit(pick)
 	end
 
-	local function release(trailNow: Poses.Trail, fromSwipe: number?)
-		if options.Holding() then
-			-- the sausage / plate in the hand: the camera stays where it is, the stage changes after the drop
-			mode = "Idle"
-			pending = true
+	-- Release: the speed only decays (coast); nothing is pulled to a station.
+	local function release(trailNow: Poses.Trail, px: Vector2?)
+		if options.Reduced() then
+			swipe(trailNow, if px ~= nil then px.X - pressPx.X else 0)
 			return
 		end
-		settle(trailNow, fromSwipe)
+		mode = "Idle"
+		if os.clock() - lastMove > STALE then
+			velocity = 0
+		end
+		coasting = math.abs(velocity) * trailNow.Length > rules.StopSpeed
+		if not coasting then
+			velocity = 0
+		end
 	end
 
 	-- Down: only a press on empty space with nothing armed and nothing in the hand can begin a pan. The Aim hears the same press in
@@ -228,11 +239,12 @@ function Pan.new(options: Options): Pan
 					return
 				end
 				mode = "Press"
+				coasting = false
 				pressPx = px
 				pressU = u
-				lastU = u
+				lastPx = px
 				velocity = 0
-				pending = false
+				lastMove = os.clock()
 			end)
 		end)
 	)
@@ -244,7 +256,7 @@ function Pan.new(options: Options): Pan
 			elseif mode == "Drag" then
 				const trailNow = trail()
 				if trailNow ~= nil then
-					release(trailNow, px.X - pressPx.X)
+					release(trailNow, px)
 				else
 					mode = "Idle"
 				end
@@ -280,7 +292,7 @@ function Pan.new(options: Options): Pan
 	end
 
 	function self.Active(_: any): boolean
-		return mode ~= "Idle" or pending
+		return mode ~= "Idle" or coasting
 	end
 
 	function self.U(_: any): number
@@ -295,8 +307,9 @@ function Pan.new(options: Options): Pan
 		const stop = trailNow.Stops[math.clamp(index, 1, #trailNow.Stops)]
 		u = stop.U
 		velocity = 0
+		coasting = false
 		mode = "Idle"
-		pending = false
+		dirty = false
 		if near ~= index then
 			near = index
 			options.Near(index)
@@ -306,26 +319,25 @@ function Pan.new(options: Options): Pan
 	function self.Step(_: any, dt: number)
 		const trailNow = trail()
 		if trailNow == nil or not options.Gate() then
-			if mode ~= "Idle" then
-				mode = "Idle"
-			end
+			mode = "Idle"
+			coasting = false
 			return
 		end
 		const step = math.min(dt, MAX_DT)
 		-- a precision gesture (or a tool positioned over the mat) stops everything that moves the camera
-		if (mode == "Drag" or mode == "Edge" or mode == "Press") and options.Precision() then
+		if (mode ~= "Idle" or coasting) and options.Precision() then
 			mode = "Idle"
-			pending = false
-			self:Sync(options.Stop())
-			options.Commit(math.clamp(options.Stop(), 1, #trailNow.Stops))
+			coasting = false
+			velocity = 0
+			follow(trailNow)
 			return
 		end
 		if mode == "Press" then
 			if (pointer.Position - pressPx).Magnitude > rules.Slop then
 				mode = "Drag"
-				-- the world is held from where the finger is NOW, so the slop does not jump the view
-				pressPx = pointer.Position
-				pressU = u
+				-- the world is held from where the press was: every pixel moved counts (the slop is not lost)
+				lastPx = pointer.Position
+				perPixel = studsPerPixel(trailNow)
 			end
 			return
 		end
@@ -333,13 +345,16 @@ function Pan.new(options: Options): Pan
 			if options.Reduced() then
 				return
 			end
-			const perPixel = studsPerPixel(trailNow)
-			const moved = (pointer.Position.X - pressPx.X) * perPixel
-			u = math.clamp(pressU - moved / trailNow.Length, 0, 1)
-			const sample = (u - lastU) / math.max(step, 1e-3)
+			const before = u
+			u = math.clamp(pressU - (pointer.Position.X - pressPx.X) * perPixel / trailNow.Length, 0, 1)
+			if pointer.Position ~= lastPx then
+				lastPx = pointer.Position
+				lastMove = os.clock()
+			end
+			const sample = (u - before) / math.max(step, 1e-3)
 			velocity = velocity * (1 - VELOCITY_MIX) + sample * VELOCITY_MIX
-			lastU = u
 			aim(trailNow)
+			follow(trailNow)
 			return
 		end
 		-- no press: the mouse at the border scrolls (also with something in the hand, never while a gesture runs)
@@ -347,26 +362,42 @@ function Pan.new(options: Options): Pan
 			const direction, depth = edge()
 			if direction ~= 0 and not (pointer.Down and not options.Holding()) then
 				mode = "Edge"
-				pending = false
+				coasting = false
 				const speed = rules.EdgeSpeed * depth * depth * (3 - 2 * depth)
 				const before = u
 				u = math.clamp(u + direction * speed * step / trailNow.Length, 0, 1)
 				velocity = (u - before) / math.max(step, 1e-3)
-				lastU = u
 				aim(trailNow)
+				follow(trailNow)
 				return
 			elseif mode == "Edge" then
-				release(trailNow, nil)
-				return
+				-- out of the zone: the scroll coasts to a stop like a release
+				mode = "Idle"
+				coasting = math.abs(velocity) * trailNow.Length > rules.StopSpeed
+				if not coasting then
+					velocity = 0
+				end
 			end
 		elseif mode == "Edge" then
-			release(trailNow, nil)
-			return
+			mode = "Idle"
+			coasting = false
+			velocity = 0
 		end
-		-- a settle that waited for the hand to be empty
-		if pending and not options.Holding() then
-			settle(trailNow, nil)
+		-- coasting: the speed decays, the camera goes on with it and stops anywhere
+		if coasting then
+			velocity *= math.exp(-rules.Decay * step)
+			u += velocity * step
+			if u <= 0 or u >= 1 then
+				u = math.clamp(u, 0, 1)
+				velocity = 0
+			end
+			if math.abs(velocity) * trailNow.Length <= rules.StopSpeed then
+				coasting = false
+				velocity = 0
+			end
+			aim(trailNow)
 		end
+		follow(trailNow)
 	end
 
 	function self.Destroy(_: any)

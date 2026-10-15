@@ -50,6 +50,8 @@ export type Context = {
 	TakeStock: (ingredient: string, n: number) -> boolean,
 	GetStock: (ingredient: string) -> (number, number), -- current (may exceed capacity after a swap, Q-169), capacity
 	IsBlocked: (ingredient: string) -> boolean, -- not unlocked yet or tied to another vehicle (TASK-057)
+	IsWrapped: (ingredient: string) -> boolean, -- gift bowl not opened yet (owner request 2026-10-14)
+	Unwrap: (ingredient: string) -> boolean, -- opens the gift bowl and fills it to capacity; false = was not wrapped
 	Give: (player: Player, item: string, attrs: { [string]: any }?) -> boolean, -- attrs: Toppings, Count, Restore
 	Held: (player: Player) -> Tool?,
 	Consume: (player: Player, tool: Tool) -> (),

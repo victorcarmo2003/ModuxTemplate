@@ -12,6 +12,7 @@ const Sprites = {
 	Pin = "rbxassetid://84992795924518",
 	Layers = {
 		bun = { Id = "rbxassetid://123150128305850" },
+		bun_lid = { Id = "rbxassetid://104749590229546" },
 		sausage = { Id = "rbxassetid://112402250741884" },
 		cheese = { Id = "rbxassetid://139927057417790" },
 		bacon = { Id = "rbxassetid://122238322479758" },

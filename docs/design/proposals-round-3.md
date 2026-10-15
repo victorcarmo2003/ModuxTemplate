@@ -162,7 +162,7 @@ Reações (valem dia e noite, opções A e B):
 Regras:
 - À noite: todo cliente chega **Normal**; só as reações mudam o rosto. NPC-006 (Night Shift Worker) sempre Normal na chegada.
 - Desmaiado (X) **nunca** é usado por NPC. Pack Mid **nunca** em NPC (DEC-167, Provisório).
-- Jogador na faixa baixa de sanidade vê o cliente em Night + `Normal_Night` (DEC-168): esse rosto **vence** o humor no client dele.
+- Jogador na faixa baixa de sanidade vê o cliente em Night + `Normal_Night` (DEC-168): esse rosto **vence** o humor no client dele. **Provisório (2026-10-14):** substituído; a faixa baixa não veste mais NPC e o humor vale também nela.
 - Ator de anomalia não sorteia humor (rosto vem da ficha da anomalia).
 - Efeito na economia: média ±2% de lucro/min de dia (gorjeta +$0,2 por pedido com gorjeta; Stressed com paciência menor). Fica dentro do ruído do playtest.
 - Emenda de texto em `npcs.md` (Rascunho, sem DEC): invariante 2 passa a "de dia o rosto mostra o humor de chegada; à noite chega Normal; muda só na reação".
@@ -173,7 +173,7 @@ Critérios de aceite (B):
 - Paciência e janela de gorjeta do pedido refletem o multiplicador do humor (servidor).
 - Gorjeta Happy = $2; nenhuma gorjeta fora da janela.
 - Nenhum NPC normal mostra Desmaiado ou pack Mid.
-- Com sanidade < 40, o client do jogador mostra `Normal_Night` em todo cliente, qualquer que seja o humor; os outros jogadores da party continuam vendo o humor.
+- Com sanidade < 40, o client do jogador mostra `Normal_Night` em todo cliente, qualquer que seja o humor; os outros jogadores da party continuam vendo o humor. **Provisório (2026-10-14):** critério obsoleto; todos veem o humor, inclusive na faixa baixa.
 
 ---
 

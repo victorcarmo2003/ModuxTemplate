@@ -41,7 +41,9 @@
 	server is not involved). A player who skips the tutorial, a run past Day 1 and every night shift see everything. Dev:
 	`/dev hud reveal all|reset|status` (DevClient command "hud_reveal").
 
-	Status only: no button, no input binding (FEAT-032: nothing clickable for an Active player). No reputation, no boss
+	Status only: no input binding and two buttons top right, the settings gear (TASK-279, SettingsController) and the
+	shop cart (TASK-290, ShopController), with their key labels, plus the shop's quick note under them; FEAT-032
+	otherwise holds, nothing else clickable for an Active player. No reputation, no boss
 	chances (Shift.Chances is never read, DEC-053), no XP. The client never writes money, sanity or life state: the
 	numbers come from the server's sets and packets. Texts from ui-text.md (Provisional, TASK-082).
 ]]
@@ -173,6 +175,7 @@ export type Report = {
 	Arrived: number,
 	Completed: number,
 	Drawer: number,
+	Tips: number,
 	Stolen: number,
 	Grade: string,
 	Bonus: number,
@@ -218,6 +221,8 @@ const HudController = Modux.Controller("HudController", {
 		"AudioController",
 		"TutorialController",
 		"PlaceController",
+		"SettingsController",
+		"ShopController",
 	},
 	Priority = 500,
 })
@@ -369,7 +374,9 @@ function HudController:ShowReport(report: Report)
 		Title = if report.IsNight then `Night {report.Night}` else `Day {report.Day}`,
 		Arrived = report.Arrived,
 		Completed = report.Completed,
-		Drawer = report.Drawer,
+		-- report.Drawer = the day take; the tips are the jar part of it (sales go straight to the shared money)
+		Sales = math.max(0, report.Drawer - report.Tips),
+		Tips = report.Tips,
 		Stolen = report.Stolen,
 		Grade = grade,
 		Bonus = report.Bonus,
@@ -929,6 +936,24 @@ function HudController:Mount(playerGui: Instance)
 				-- progressive reveal (Content.HudReveal): clock, shift, money, toasts
 				Reveal = function(key: string)
 					return self:IsOpen(key)
+				end,
+				-- settings gear (TASK-279)
+				OnSettings = function()
+					self.Dependencies.SettingsController:Toggle()
+				end,
+				SettingsOpen = self.Dependencies.SettingsController.Open,
+				-- shop cart, key labels and the quick note (TASK-290)
+				OnShop = function()
+					self.Dependencies.ShopController:Toggle()
+				end,
+				ShopOpen = self.Dependencies.ShopController.Open,
+				ShopGlow = self.Dependencies.ShopController.Glow,
+				Device = self.Dependencies.InputController.Device,
+				Nudge = function()
+					return self.Dependencies.ShopController:NudgeLine()
+				end,
+				OnNudge = function()
+					self.Dependencies.ShopController:OnNudge()
 				end,
 			}),
 

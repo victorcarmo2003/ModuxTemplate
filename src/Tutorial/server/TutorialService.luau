@@ -27,6 +27,14 @@
 -- Dev tools (Provisional, user request 2026-10-11; DevService/Commands/Tutorial.luau): DevReset reopens the tutorial for
 -- the player in this run, at any day, without touching the profile (the client restarts the tutorial without the intro), DevSend forwards a client-side dev command (voice
 -- test, debug panel, step jump) to one player through the dev-only `DevClient` packet. Both refuse outside dev mode.
+-- Day 1 upgrade lesson (owner request 2026-10-14, Provisional; shared.Tutorial.Rules.Upgrade): a player who answered
+-- the tutorial call on Day 1 is a rookie of this run (Rookies, memory only). When the first shift ends (the day Closing
+-- at 6 PM) with a rookie in the server and no Gear Stand line bought yet, ShouldHold also holds the Closing (clock frozen
+-- at 6 PM, no probe end), and once the last-call line is empty (the Closing probe) the lesson is "due": Cash is topped up
+-- to Rules.Upgrade.Cash (at least the Storage price) and BossService rings Rules.Upgrade.Call once (LessonCallDue). It
+-- ends for good (LessonOver, latched) when any Gear Stand line is bought, the run leaves Day 1 / the day shift, no rookie
+-- is left, or after Content.Shift.TutorialHoldMax s of holding the Closing (AFK rookie). TutorialController shows the
+-- steps and MarketController the arrow (client side reads the Upgrades set and the Boss call).
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -42,7 +50,14 @@ const BUN = if PACKAGE then PACKAGE.Ingredient else "bun"
 const TutorialService = Modux.Service(
 	"TutorialService",
 	{
-		Require = { "PlaceService", "CustomerService", "KitchenService", "EconomyService", "RoundService" },
+		Require = {
+			"PlaceService",
+			"CustomerService",
+			"KitchenService",
+			"EconomyService",
+			"RoundService",
+			"UpgradeService",
+		},
 		Priority = 500,
 	}
 )
@@ -62,6 +77,12 @@ function TutorialService:Setup()
 	-- os.clock() when the current hold began (0 = not holding); HoldExpired = the safety timeout ran out (latched)
 	self.HoldSince = 0 :: number
 	self.HoldExpired = false :: boolean
+	-- Day 1 upgrade lesson: UserId -> answered the tutorial call this run; lesson over (latched); the call / cash went
+	-- out; os.clock() the Closing hold began (0 = not holding)
+	self.Rookies = {} :: { [number]: boolean }
+	self.LessonOver = false :: boolean
+	self.LessonRung = false :: boolean
+	self.LessonSince = 0 :: number
 end
 
 -- The player finished or skipped the tutorial: over for this run (idempotent, not saved)
@@ -163,15 +184,109 @@ function TutorialService:Begin(player: Player)
 	if not self:IsPending(player) then
 		return
 	end
+	self.Rookies[player.UserId] = true
 	self:Seed()
 	if self.Dependencies.CustomerService:RequestTutorial() then
 		self.Asked = true
 	end
 end
 
--- Day 1 stands still for the tutorial: a day shift in Prep or Open with someone still in the tutorial
+-- Upgrade lesson ------------------------------------------------------------------------------------------------
+
+-- Any Gear Stand line above its start level on the current vehicle (the first upgrade was bought)
+function TutorialService:BoughtGear(): boolean
+	const upgrades = self.Dependencies.UpgradeService
+	for _, upgrade in Content.Upgrades.List do
+		const level = if upgrade.SoldAt == "Bench" then upgrades:GetLevel(upgrade.Key) else nil
+		if level ~= nil and level > upgrade.StartLevel then
+			return true
+		end
+	end
+	return false
+end
+
+-- A rookie of this run is in the server
+function TutorialService:AnyRookie(): boolean
+	for _, player in Players:GetPlayers() do
+		if self.Rookies[player.UserId] then
+			return true
+		end
+	end
+	return false
+end
+
+-- The upgrade lesson runs now: the day Closing of Day 1, a rookie around, nothing bought yet (latches off for good)
+function TutorialService:LessonActive(): boolean
+	if not self.Enabled or self.LessonOver then
+		return false
+	end
+	const round = self.Dependencies.RoundService
+	if round:GetDay() > 1 or round:IsNight() then
+		self.LessonOver = true
+		return false
+	end
+	if round:GetPhase() ~= "Closing" or not self:AnyRookie() then
+		return false
+	end
+	if self:BoughtGear() then
+		self.LessonOver = true
+		return false
+	end
+	return true
+end
+
+-- The last-call line is empty: Walt may call (BossService polls this; the call is Once)
+function TutorialService:LessonCallDue(): boolean
+	return self:LessonActive() and self.Dependencies.RoundService:ProbeSaysEnd("Closing")
+end
+
+-- Cash up to Rules.Upgrade.Cash (never below the price of the lesson's level) once the call goes out
+function TutorialService:LessonCash()
+	const row = self.Dependencies.UpgradeService:NextLevel(TutorialRules.Upgrade.Key)
+	if row == nil then
+		return
+	end
+	if self.Dependencies.EconomyService:GetCash() < row.Price then
+		self.Dependencies.EconomyService:TopUp(math.max(TutorialRules.Upgrade.Cash, row.Price))
+	end
+end
+
+function TutorialService:StepLesson()
+	if self.LessonRung or not self:LessonCallDue() then
+		return
+	end
+	self.LessonRung = true
+	self:LessonCash()
+end
+
+-- The Closing of Day 1 stands still for the lesson (own safety timer: an AFK rookie never freezes the server)
+function TutorialService:LessonHold(): boolean
+	if not self:LessonActive() then
+		self.LessonSince = 0
+		return false
+	end
+	const t = os.clock()
+	if self.LessonSince <= 0 then
+		self.LessonSince = t
+	elseif t - self.LessonSince > Content.Shift.TutorialHoldMax then
+		self.LessonOver = true
+		self.LessonSince = 0
+		warn(`[TutorialService] Day 1 upgrade lesson held {Content.Shift.TutorialHoldMax} s: released (safety timeout)`)
+		return false
+	end
+	return true
+end
+
+-- Day 1 stands still for the tutorial: a day shift in Prep or Open with someone still in the tutorial, or the day
+-- Closing of the upgrade lesson
 function TutorialService:ShouldHold(): boolean
-	if not self.Enabled or self.HoldExpired then
+	if not self.Enabled then
+		return false
+	end
+	if self:LessonHold() then
+		return true
+	end
+	if self.HoldExpired then
 		return false
 	end
 	const round = self.Dependencies.RoundService
@@ -222,6 +337,10 @@ function TutorialService:DevReset(player: Player)
 	self.Seeded = false
 	self.HoldSince = 0
 	self.HoldExpired = false
+	self.Rookies[player.UserId] = true
+	self.LessonOver = false
+	self.LessonRung = false
+	self.LessonSince = 0
 	self.Dependencies.CustomerService:EndTutorial()
 	self:DevSend(player, "tutorial_reset", "")
 end
@@ -233,10 +352,11 @@ function TutorialService:DevStatus(): string
 		const state = self:Reason(player) or "pending"
 		table.insert(pending, `{player.Name}={state}`)
 	end
-	return `tutorial [{table.concat(pending, ", ")}]; held {self.Dependencies.RoundService:IsClockHeld()}{if self.HoldExpired then " (timeout)" else ""}; customer asked {self.Asked}, around {self.Dependencies.CustomerService:HasTutorial()}; seeded {self.Seeded}; buns {self.Dependencies.KitchenService:GetStock(BUN)}`
+	return `tutorial [{table.concat(pending, ", ")}]; held {self.Dependencies.RoundService:IsClockHeld()}{if self.HoldExpired then " (timeout)" else ""}; customer asked {self.Asked}, around {self.Dependencies.CustomerService:HasTutorial()}; seeded {self.Seeded}; buns {self.Dependencies.KitchenService:GetStock(BUN)}; upgrade lesson active {self:LessonActive()}, rung {self.LessonRung}, over {self.LessonOver}`
 end
 
 function TutorialService:Step()
+	self:StepLesson()
 	if self.Asked and not self:AnyPending() then
 		self.Asked = false
 		self.Dependencies.CustomerService:EndTutorial()
@@ -259,12 +379,16 @@ TutorialService:OnInit(function(self)
 		-- a player who comes back starts over (the client lost its session state too)
 		self.Closed[player.UserId] = nil
 		self.Revived[player.UserId] = nil
+		self.Rookies[player.UserId] = nil
 	end)
 	self.Libs.Net.TutorialComplete:onServer(function(_, player: Player)
 		self:Complete(player)
 	end)
 	self.Libs.Net.TutorialBegin:onServer(function(_, player: Player)
 		self:Begin(player)
+	end)
+	self.Libs.Net.TutorialLessonSkip:onServer(function(_, player: Player)
+		self.Rookies[player.UserId] = nil
 	end)
 	-- KitchenService (650) created its signals in its own OnInit, before this one (500)
 	const kitchen = self.Dependencies.KitchenService

@@ -286,6 +286,7 @@ function Aim.new(options: Options): Aim
 		dirty = false
 		pressedPx = px
 		dragged = false
+		BinZone.SetDragging(false)
 		if options.Debug ~= nil and options.Debug() then
 			describe(px, device)
 		end
@@ -314,6 +315,8 @@ function Aim.new(options: Options): Aim
 		dirty = true
 		if source ~= nil and not dragged and (px - pressedPx).Magnitude > SLOP then
 			dragged = true
+			-- the bin shows while something is dragged
+			BinZone.SetDragging(true)
 		end
 	end
 
@@ -349,6 +352,7 @@ function Aim.new(options: Options): Aim
 			end
 		end
 		dragged = false
+		BinZone.SetDragging(false)
 		setHover(if hoverWanted(device) then hit.Target else nil, device)
 		showMarker(device)
 	end
@@ -458,6 +462,7 @@ function Aim.new(options: Options): Aim
 		source = nil
 		self.Source = nil
 		dragged = false
+		BinZone.SetDragging(false)
 		if held ~= nil then
 			send({ Kind = "Cancel", Source = held, Reason = reason })
 		end

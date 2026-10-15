@@ -5,7 +5,10 @@
 -- a real progress bar (Ink pill track, Mustard fill, percentage), the current step and a rotating tip card.
 --   Shown = false lifts the whole curtain off the top of the screen (spring); the owner destroys it after.
 -- Phone: the column is laid out at 560 x 400 and scaled to the screen (UIScale, never below MIN_SCALE, so the
--- smallest text stays >= Theme.MinTextSize on a 667 x 375 phone). Nothing here is touchable.
+-- smallest text stays >= Theme.MinTextSize on a 667 x 375 phone).
+--   Skip (optional, playtest 2026-10-14): a CartoonButton "Skip loading" in the bottom right corner, above the ribbon,
+--   while Skip.Visible() (the owner turns it on after a long load). Mouse click and touch tap go to OnSkip; the gamepad
+--   key is bound by the owner (KeyLabel shows its chip, "" = none). The only touchable thing on the curtain.
 -- Pure: only props.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -15,6 +18,8 @@ local Icons = require(script.Parent.Icons)
 local Motion = require(script.Parent.Motion)
 local CartoonPanel = require(script.Parent.CartoonPanel)
 local CartoonLabel = require(script.Parent.CartoonLabel)
+local CartoonButton = require(script.Parent.CartoonButton)
+local KeyChip = require(script.Parent.KeyChip)
 
 const create = Vide.create
 const source = Vide.source
@@ -24,6 +29,14 @@ const effect = Vide.effect
 const untrack = Vide.untrack
 -- Vide 0.4.1 types `create` for 19 classes only; UIScale, UIGradient and UISizeConstraint are not among them.
 const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }) -> Instance
+
+export type Skip = {
+	Visible: () -> boolean,
+	OnSkip: () -> (),
+	-- key chip of the owner's binding ("X" on a gamepad); "" or nil hides it
+	KeyLabel: (() -> string)?,
+	Text: string?,
+}
 
 export type Props = {
 	-- 0..1 real progress (eased here)
@@ -37,6 +50,8 @@ export type Props = {
 	-- false = the curtain lifts away
 	Shown: () -> boolean,
 	TipTime: number?,
+	-- "Skip loading" button (bottom right); nil = no button
+	Skip: Skip?,
 	Name: string?,
 }
 
@@ -51,6 +66,9 @@ const BUN = Theme.ToneOf(Color3.fromHex("#E8A456"))
 const SAUSAGE = Theme.Tone.Ketchup
 const BACK_TOP = Color3.fromHex("#FFD24D")
 const BACK_BOTTOM = Color3.fromHex("#F59A23")
+const SKIP_TEXT = "Skip loading"
+const SKIP_SIZE = Vector2.new(184, 48) -- px at UI scale 1 (>= Theme.MinTouch tall)
+const SKIP_MARGIN = Vector2.new(24, 34) -- px from the right edge / the bottom edge (above the 18 px ribbon)
 
 -- Drawn hot dog: bun halves, sausage, mustard squiggle (CartoonPanels only)
 local function hotDog(clock: () -> number): Frame
@@ -107,6 +125,47 @@ local function hotDog(clock: () -> number): Frame
 			ZIndex = 3,
 		}),
 	})
+end
+
+-- Bottom right "Skip loading": CartoonButton (Cream, secondary) with the key chip of the gamepad on its corner
+local function skipButton(skip: Skip?, scale: () -> number): Frame?
+	if skip == nil then
+		return nil
+	end
+	const keyLabel = skip.KeyLabel or function(): string
+		return ""
+	end
+	return create("Frame")({
+		Name = "Skip",
+		AnchorPoint = Vector2.new(1, 1),
+		Position = UDim2.new(1, -SKIP_MARGIN.X, 1, -SKIP_MARGIN.Y),
+		Size = UDim2.fromOffset(SKIP_SIZE.X, SKIP_SIZE.Y),
+		BackgroundTransparency = 1,
+		Visible = skip.Visible,
+		ZIndex = 3,
+
+		createRaw("UIScale")({
+			Scale = function(): number
+				return math.min(scale(), 1.2)
+			end,
+		}),
+
+		CartoonButton({
+			Name = "SkipButton",
+			Text = skip.Text or SKIP_TEXT,
+			TextSize = 18,
+			Tone = Theme.Tone.Cream,
+			Size = UDim2.fromScale(1, 1),
+			OnActivated = skip.OnSkip,
+		}),
+		KeyChip({
+			Name = "Key",
+			Text = keyLabel,
+			AnchorPoint = Vector2.new(0.35, 0.4),
+			Position = UDim2.fromOffset(0, 0),
+			ZIndex = 5,
+		}),
+	}) :: Frame
 end
 
 return function(props: Props): Frame
@@ -219,6 +278,8 @@ return function(props: Props): Frame
 				BorderSizePixel = 0,
 			}),
 		}),
+
+		skipButton(props.Skip, scale),
 
 		create("Frame")({
 			Name = "Column",

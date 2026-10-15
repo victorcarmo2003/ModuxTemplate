@@ -23,6 +23,8 @@ export type Props = {
 	Text: () -> string, -- "7/12"
 	Low: () -> boolean,
 	ShowCount: () -> boolean,
+	-- false = the whole plate is off (a locked bowl is invisible). nil = on.
+	Visible: (() -> boolean)?,
 	-- Icon above the count (tall plate) instead of beside it (wide plate). Default: beside.
 	Vertical: boolean?,
 	PixelsPerStud: number?,
@@ -57,7 +59,7 @@ return function(props: Props): SurfaceGui
 		ResetOnSpawn = false,
 		-- Off while a cinematic owns the screen (Interface/Cinematic).
 		Enabled = function()
-			return not Cinematic.Active()
+			return not Cinematic.Active() and (props.Visible == nil or props.Visible())
 		end,
 		ClipsDescendants = true,
 

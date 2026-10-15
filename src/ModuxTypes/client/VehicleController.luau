@@ -38,6 +38,7 @@ export type Public = {
 	StepShutters: (self: Public) -> (),
 	RefreshPanels: (self: Public) -> (),
 	IsShutterClosed: (self: Public) -> boolean,
+	PlayLocked: (self: Public) -> (),
 	PlayFade: (self: Public, startedAt: number, door: boolean?) -> (),
 	StepFade: (self: Public) -> (),
 	MountFade: (self: Public, playerGui: Instance) -> (),

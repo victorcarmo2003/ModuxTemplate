@@ -5,10 +5,17 @@
 -- sources with `Subscribe`. Everything is reset when the world leaves (`Reset`).
 local BinZone = {}
 
+-- Owner decision 2026-10-14 (second word): the bin is back, but it is NOT a button: a small bin at the bottom left (right after
+-- Leave) that only shows WHILE something is being dragged (the Aim says so with `SetDragging`); drop on it to throw it away, or keep
+-- dragging toward the next section. (A hot dog in hand is still thrown away in the trailer's own trash can, Prompt_Discard.)
+const ENABLED = true
+
 -- Is there something that can be thrown right now (the zone shows only then)?
 local wanted = false
 -- A dragged item is over the zone (the lid opens and lights).
 local over = false
+-- Something is being dragged right now (set by the Aim): the zone shows only then.
+local dragging = false
 -- Counts the swallows (the zone bounces on a change).
 local chomp = 0
 -- Where the zone is, in raw viewport px: set by the shell. `Hit` tests a viewport point, `Center` is the middle of the zone.
@@ -23,7 +30,18 @@ local function notify()
 end
 
 function BinZone.Wanted(): boolean
-	return wanted
+	return wanted and dragging
+end
+
+-- The Aim: a drag started (true) or ended / was cancelled (false).
+function BinZone.SetDragging(value: boolean)
+	if dragging ~= value then
+		dragging = value
+		if not value then
+			over = false
+		end
+		notify()
+	end
 end
 
 function BinZone.Over(): boolean
@@ -35,6 +53,9 @@ function BinZone.Chomp(): number
 end
 
 function BinZone.SetWanted(value: boolean)
+	if not ENABLED then
+		value = false
+	end
 	if wanted ~= value then
 		wanted = value
 		if not value then
@@ -64,7 +85,7 @@ end
 
 -- Is the raw viewport point inside the zone? False when the zone is not on screen.
 function BinZone.Hit(viewportPx: Vector2): boolean
-	return wanted and hit ~= nil and hit(viewportPx)
+	return wanted and dragging and hit ~= nil and hit(viewportPx)
 end
 
 function BinZone.Center(): Vector2?
@@ -84,6 +105,7 @@ end
 
 function BinZone.Reset()
 	wanted = false
+	dragging = false
 	over = false
 	notify()
 end

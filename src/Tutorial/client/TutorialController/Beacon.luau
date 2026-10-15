@@ -4,17 +4,23 @@
 
 	  - Highlight on the target (the pot, the grill, the bun crate, the board, the customer): Mustard outline that pulses,
 	    light Mustard fill (FillTransparency ~0.8), always on top so it reads through the counter and the awning.
-	  - 3D arrow over it: a Mustard arrow built from three parts (shaft + a two-wedge head pointing down) that bobs and
-	    spins slowly, with an Ink outline; its own Highlight draws it through walls too (AlwaysOnTop, half fill).
-	  - Tip: an invisible anchored part kept at the arrow tip (no bob) where the owner hangs the screen-sized billboard
-    arrow (TutorialArrow) that stays readable from far away.
-  - Urge(true) (no progress on the step for a while, TutorialController IDLE): faster, wider bob, faster pulse and a
-    stronger fill until the owner turns it off (the step changed).
+	  - Frame: a HintMark Rect (rounded rectangle, Ink rim) fitted to the bounding box of the target seen from the camera; it
+	    pops in with a spring, breathes and pops out.
+	  - 3D arrow over it (Arrow3D, shared with the Market hint and the prep flip focus): the Mustard arrow that bobs and spins,
+	    pops in and shrinks away. Owner request 2026-10-14: this is the ONLY arrow over the target; from far away it grows with
+	    the distance (GROW_PX) so it keeps a readable size on screen. The 2D one is the edge pointer (EdgePointer), the owner's
+	    job, only when the target AND the tip are off screen: TipPosition() gives it the tip.
+	  - Urge(true) (no progress on the step for a while, TutorialController IDLE): faster, wider bob, faster pulse and a
+	    stronger fill until the owner turns it off (the step changed).
+	  - Under a cinematic (Cinematic.Active) everything is taken out of the world and comes back when it ends.
 Local only (client parts in a Workspace folder, no collision, no query, no touch, no shadow). Pure presentation:
 	the owner (TutorialController) says what to mark (Set) and calls Step every frame.
 ]]
 local StarterPlayer = game:GetService("StarterPlayer")
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
+local HintMark = require(StarterPlayer.StarterPlayerScripts.client.Interface.HintMark)
+local Arrow3D = require(StarterPlayer.StarterPlayerScripts.client.Interface.Arrow3D)
+local Cinematic = require(StarterPlayer.StarterPlayerScripts.client.Interface.Cinematic)
 
 export type Beacon = {
 	-- adornee to mark (nil = nothing); lift = studs between its top and the arrow tip
@@ -22,8 +28,8 @@ export type Beacon = {
 	Step: () -> (),
 	-- stronger pulse while the player made no progress (false = normal)
 	Urge: (on: boolean) -> (),
-	-- invisible part at the arrow tip (parented to the folder while something is marked)
-	Tip: BasePart,
+	-- world point of the arrow tip (no bob) while something is marked, else nil (for the edge pointer)
+	TipPosition: () -> Vector3?,
 	-- what is marked now (nil = nothing) and whether the Highlight + 3D arrow are in the Workspace (debug panel)
 	Marked: () -> Instance?,
 	Mounted: () -> boolean,
@@ -31,41 +37,31 @@ export type Beacon = {
 }
 
 -- PROVISIONAL sizes and timings (tune in play)
-const HEAD_WIDTH = 1.7
-const HEAD_HEIGHT = 1.3
-const THICKNESS = 0.55
-const SHAFT_WIDTH = 0.6
-const SHAFT_HEIGHT = 1.2
-const BOB = 0.35 -- studs up and down
-const BOB_SPEED = 4.5 -- rad/s
-const SPIN_SPEED = 1.6 -- rad/s around the vertical
 const PULSE_SPEED = 5 -- rad/s of the target outline pulse
 const FILL_MIN = 0.72 -- target fill transparency range (~0.8)
 const FILL_MAX = 0.88
 const OUTLINE_MAX = 0.55 -- target outline fades this far at the low of the pulse
-const ARROW_FILL = 0.35 -- the arrow's own highlight: half fill, solid when seen through a wall
 -- Urge (no progress): PROVISIONAL
-const URGE_BOB = 0.8
-const URGE_BOB_SPEED = 8
 const URGE_PULSE_SPEED = 10
 const URGE_FILL_MIN = 0.45
+const FRAME_PAD = 0.15 -- studs around the target box
+-- Distance growth (owner request 2026-10-14, Provisional): the arrow keeps ~GROW_PX px of apparent height (x UI scale) from
+-- far away, up to GROW_MAX times its size; up close it stays at its own size (never smaller)
+const GROW_PX = 70
+const GROW_MAX = 10
 
 const Beacon = {}
 
-local function part(className: string, name: string, size: Vector3, parent: Instance): BasePart
-	const created = Instance.new(className) :: BasePart
-	created.Name = name
-	created.Size = size
-	created.Anchored = true
-	created.CanCollide = false
-	created.CanQuery = false
-	created.CanTouch = false
-	created.CastShadow = false
-	created.Massless = true
-	created.Material = Enum.Material.SmoothPlastic
-	created.Color = Theme.Color.Mustard
-	created.Parent = parent
-	return created
+-- How many times bigger than its own size the arrow must be so it reads ~GROW_PX px tall at `top`
+local function growth(top: Vector3): number
+	const camera = workspace.CurrentCamera
+	if camera == nil or camera.ViewportSize.Y < 1 then
+		return 1
+	end
+	const distance = (top - camera.CFrame.Position).Magnitude
+	const studsPerPx = 2 * distance * math.tan(math.rad(camera.FieldOfView) / 2) / camera.ViewportSize.Y
+	const want = GROW_PX * Theme.ScaleOf(camera.ViewportSize) * studsPerPx / Arrow3D.HEIGHT
+	return math.clamp(want, 1, GROW_MAX)
 end
 
 -- Top centre of what is marked (world), or nil when it is gone
@@ -86,27 +82,12 @@ function Beacon.new(container: () -> Instance): Beacon
 	local adornee: Instance? = nil
 	local lift = 1
 	local urged = false
+	local rest = Vector3.zero
+	local hasRest = false
+	local hidden = false -- a cinematic owns the screen: nothing is drawn, the mark is kept
+	local frameMark: HintMark.Mark? = nil
 
-	const model = Instance.new("Model")
-	model.Name = "TutorialArrow3D"
-	const shaft = part("Part", "Shaft", Vector3.new(THICKNESS, SHAFT_HEIGHT, SHAFT_WIDTH), model)
-	-- head: two wedges upside down, back to back, their vertical edges meeting under the shaft (a down triangle)
-	const left = part("WedgePart", "HeadLeft", Vector3.new(THICKNESS, HEAD_HEIGHT, HEAD_WIDTH / 2), model)
-	const right = part("WedgePart", "HeadRight", Vector3.new(THICKNESS, HEAD_HEIGHT, HEAD_WIDTH / 2), model)
-	model.PrimaryPart = shaft
-	const tip = part("Part", "TutorialTip", Vector3.new(0.2, 0.2, 0.2), model)
-	tip.Transparency = 1
-	tip.Parent = nil
-
-	const outline = Instance.new("Highlight")
-	outline.Name = "Outline"
-	outline.FillColor = Theme.Color.Mustard
-	outline.FillTransparency = ARROW_FILL
-	outline.OutlineColor = Theme.Color.Ink
-	outline.OutlineTransparency = 0
-	outline.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-	outline.Adornee = model
-	outline.Parent = model
+	const arrow = Arrow3D.new()
 
 	const glow = Instance.new("Highlight")
 	glow.Name = "TutorialHighlight"
@@ -117,30 +98,24 @@ function Beacon.new(container: () -> Instance): Beacon
 	glow.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
 	glow.Enabled = false
 
-	-- local frames of the pieces around the arrow tip (origin, y up), the head spread along Z before the spin.
-	-- A WedgePart is full at its back (local +Z) and its bottom; upside down (local Y = world down) with its back
-	-- turned to the centre, each half has its vertical edge on z = 0, its flat top up and its slope down to the tip.
-	const quarter = HEAD_WIDTH / 4
-	const headY = HEAD_HEIGHT / 2
-	const leftFrame = CFrame.fromMatrix(
-		Vector3.new(0, headY, -quarter),
-		Vector3.new(-1, 0, 0),
-		Vector3.new(0, -1, 0),
-		Vector3.new(0, 0, 1)
-	)
-	const rightFrame = CFrame.fromMatrix(
-		Vector3.new(0, headY, quarter),
-		Vector3.new(1, 0, 0),
-		Vector3.new(0, -1, 0),
-		Vector3.new(0, 0, -1)
-	)
-	const shaftFrame = CFrame.new(0, HEAD_HEIGHT + SHAFT_HEIGHT / 2 - 0.05, 0)
-
+	-- everything out of the world at once (no animation)
 	local function hide()
+		hasRest = false
+		if frameMark ~= nil then
+			frameMark:Hide()
+		end
 		glow.Enabled = false
 		glow.Adornee = nil
-		model.Parent = nil
-		tip.Parent = nil
+		arrow.Detach()
+	end
+
+	-- the mark is on again (after a cinematic)
+	local function restore(target: Instance)
+		const folder = container()
+		glow.Parent = folder
+		glow.Adornee = target
+		glow.Enabled = true
+		arrow.Show(folder)
 	end
 
 	return {
@@ -151,29 +126,50 @@ function Beacon.new(container: () -> Instance): Beacon
 			end
 			adornee = target
 			if target == nil then
-				hide()
+				-- pop out: the contour goes at once, the arrow and the frame shrink away (Step finishes it)
+				glow.Enabled = false
+				glow.Adornee = nil
+				hasRest = false
+				if frameMark ~= nil then
+					frameMark:Hide()
+				end
+				arrow.Hide()
 				return
 			end
-			const folder = container()
-			glow.Parent = folder
-			glow.Adornee = target
-			glow.Enabled = true
-			model.Parent = folder
-			tip.Parent = folder
+			if hidden then
+				return -- Step puts it up when the cinematic ends
+			end
+			restore(target)
 		end,
 		Urge = function(on: boolean)
 			urged = on
 		end,
-		Tip = tip,
+		TipPosition = function(): Vector3?
+			return if adornee ~= nil and hasRest then rest else nil
+		end,
 		Marked = function(): Instance?
 			return adornee
 		end,
 		Mounted = function(): boolean
-			return model.Parent ~= nil and glow.Enabled and glow.Parent ~= nil
+			return arrow.Mounted() and glow.Enabled and glow.Parent ~= nil
 		end,
 		Step = function()
 			const target = adornee
+			if Cinematic.Active() then
+				-- the intro / finale / credits own the screen: draw nothing, keep what is marked
+				if not hidden then
+					hidden = true
+					hide()
+				end
+				return
+			elseif hidden then
+				hidden = false
+				if target ~= nil then
+					restore(target)
+				end
+			end
 			if target == nil then
+				arrow.Step(rest, 1, urged) -- finishes the pop out
 				return
 			end
 			if not target:IsDescendantOf(workspace) then
@@ -191,20 +187,36 @@ function Beacon.new(container: () -> Instance): Beacon
 			if top == nil then
 				return
 			end
-			const rest = top + Vector3.new(0, lift, 0)
-			tip.CFrame = CFrame.new(rest)
-			const bob = if urged then URGE_BOB else BOB
-			const at = rest + Vector3.new(0, bob * (1 + math.sin(clock * (if urged then URGE_BOB_SPEED else BOB_SPEED))), 0)
-			const base = CFrame.new(at) * CFrame.Angles(0, clock * SPIN_SPEED, 0)
-			left.CFrame = base * leftFrame
-			right.CFrame = base * rightFrame
-			shaft.CFrame = base * shaftFrame
+			-- the arrow grows with the distance, and so does its lift (it stays clear of the target)
+			const grow = growth(top)
+			rest = top + Vector3.new(0, lift * grow, 0)
+			hasRest = true
+			-- the frame: the box of the target, as the camera sees it
+			if not target:IsA("Attachment") then
+				local boxFrame = CFrame.identity
+				local boxSize = Vector3.zero
+				if target:IsA("Model") then
+					boxFrame, boxSize = target:GetBoundingBox()
+				elseif target:IsA("BasePart") then
+					boxFrame, boxSize = target.CFrame, target.Size
+				end
+				if boxSize.Magnitude > 0 then
+					const frameOwn = frameMark or HintMark.new()
+					frameMark = frameOwn
+					frameOwn:Fit(boxFrame, boxSize, FRAME_PAD)
+				end
+			end
+			arrow.Step(rest, grow, urged)
 		end,
 		Destroy = function()
 			adornee = nil
-			tip:Destroy()
+			hasRest = false
 			glow:Destroy()
-			model:Destroy()
+			arrow.Destroy()
+			if frameMark ~= nil then
+				frameMark:Destroy()
+				frameMark = nil
+			end
 		end,
 	}
 end

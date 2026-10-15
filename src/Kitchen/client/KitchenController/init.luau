@@ -102,6 +102,7 @@ function KitchenController:WriteStock(id: number, record: StockRecord?)
 		Amount = record.Amount,
 		Capacity = record.Capacity,
 		Blocked = record.Blocked,
+		Wrapped = record.Wrapped == true,
 	})
 end
 

@@ -209,6 +209,19 @@ end
 
 -- Holds a free slot for a plate: `slot` if it is free and active, else the lowest free one. The record reads Working
 -- for `duration` seconds (the plate's lifetime) and Tick leaves it alone. Returns the slot, nil = no free slot.
+-- TASK-260 (owner request 2026-10-14): the plate of a slot is seen by EVERY player in the world. The board model carries the
+-- attribute `Plate<slot>` (replicated): nil = no plate, else the cosmetic PlateMask of the plate (0 = the bun only). Written
+-- here at Reserve / Claim (0) and Release (nil), and by KitchenService:SetPlateMask as the plate grows.
+const PLATE_ATTRIBUTE = "Plate"
+
+function Board.SetPlate(vehicle: string, slot: number, mask: number?)
+	const station = Board.Find(vehicle)
+	if station == nil or station.Instance.Parent == nil then
+		return
+	end
+	station.Instance:SetAttribute(`{PLATE_ATTRIBUTE}{slot}`, mask)
+end
+
 function Board.Reserve(ctx: Context, vehicle: string, slot: number?, duration: number): number?
 	const station = Board.Find(vehicle)
 	if station == nil then
@@ -242,6 +255,7 @@ function Board.Reserve(ctx: Context, vehicle: string, slot: number?, duration: n
 	reservedOf(station)[target] = true
 	sync(station)
 	ctx.Publish(station)
+	Board.SetPlate(vehicle, target, 0)
 	return target
 end
 
@@ -256,6 +270,7 @@ function Board.ClaimAltered(ctx: Context, vehicle: string): number?
 		if record.State == "Ready" and (record.Altered or 0) > 0 and not reserved[slot] then
 			reserved[slot] = true
 			refreshAdd(ctx, station)
+			Board.SetPlate(vehicle, slot, 0)
 			return slot
 		end
 	end
@@ -283,6 +298,7 @@ function Board.Release(ctx: Context, vehicle: string, slot: number, keep: boolea
 		return
 	end
 	reserved[slot] = nil
+	Board.SetPlate(vehicle, slot, nil)
 	if not keep then
 		station.Records[slot] = StationApi.empty(KIND)
 	end

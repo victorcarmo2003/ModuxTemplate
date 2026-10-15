@@ -23,6 +23,19 @@ local function cutsceneRecord()
 	})
 end
 
+-- Player settings record (Settings and SettingsSave packets; TASK-279). Volumes are percents (SettingsRules)
+local function settingsRecord()
+	return Lync.struct({
+		Music = Lync.int(0, 100),
+		Sfx = Lync.int(0, 100),
+		Voice = Lync.int(0, 100),
+		Scare = Lync.int(0, 100),
+		PromptMode = Lync.enum({ "Single", "Multi" }),
+		PrepAssist = Lync.bool(),
+		ReducedMotion = Lync.bool(),
+	})
+end
+
 return Lync.define("game", {
 	-- c -> s handshake (NetService.Audience)
 	Ready = Lync.packet(Lync.empty()),
@@ -44,6 +57,10 @@ return Lync.define("game", {
 	-- call (or it never came): the server spawns the tutorial customer (CustomerService:RequestTutorial) when this
 	-- player has the tutorial pending (Day 1 of the run, not finished or skipped). Idempotent while one is around.
 	TutorialBegin = Lync.packet(Lync.empty()),
+	-- c -> s (owner request 2026-10-14, Provisional). Responder: TutorialService. The rookie skipped the Day 1 upgrade
+	-- lesson (Gear Stand at 6 PM): no longer a rookie for the lesson, so the Closing hold lets go once nobody is left.
+	-- Cosmetic, idempotent.
+	TutorialLessonSkip = Lync.packet(Lync.empty()),
 	-- s -> owner, dev mode only (Studio Run place; user request 2026-10-11, Provisional). Writer: TutorialService
 	-- (DevSend, from the DevService chat commands tutorial / voice / tutdebug). Responder: TutorialController (OnInit).
 	-- Client-side dev tools: Command = what to run on the client, Text = its arguments (free text, trimmed).
@@ -163,7 +180,7 @@ return Lync.define("game", {
 	-- §3.3, record 1. Writer: EconomyService
 	Economy = Lync.replicate(Lync.struct({
 		Cash = Lync.int(0, 2147483647),
-		Drawer = Lync.int(0, 1000000),
+		Drawer = Lync.int(0, 1000000), -- tips in the TIP JAR since DEC-239 (name kept for the wire)
 	})),
 
 	-- §3.4, record = Content.Ingredients.IndexOf[key] (all 9 always). Writer: KitchenService
@@ -171,6 +188,10 @@ return Lync.define("game", {
 		Amount = Lync.int(0, 999),
 		Capacity = Lync.int(0, 999), -- Cooler level of the current vehicle (DEC-184)
 		Blocked = Lync.bool(), -- not unlocked yet: bowl lid, Mart "Out of stock", order draw (DEC-156, DEC-180)
+		-- Gift bowl (owner request 2026-10-14, Provisional): unlocked but still closed (Ingredients.GiftKeys, not opened this
+		-- run). nil = false. Optional so a record that never had it reads as an open bowl; 9 records with Amount 10 bits wide,
+		-- so the drop.section floor of README does not apply
+		Wrapped = Lync.optional(Lync.bool()),
 	})),
 
 	-- §3.5, record = StationId * 100 + Slot (Slot 0 = single-record station). Writer: KitchenService
@@ -252,10 +273,10 @@ return Lync.define("game", {
 	Sale = Lync.packet(Lync.struct({
 		Npc = Lync.int(1, 65535), -- NpcId
 		Result = Lync.enum({ "Perfect", "Complete", "Incomplete", "Wrong", "Left", "Refused", "Slow" }), -- Left = never attended (queue clock), Slow = food took too long (order clock, Q-192)
-		Amount = Lync.int(0, 1000), -- what went into the drawer (tip included)
+		Amount = Lync.int(0, 1000), -- what was paid (price into Cash, tip into the jar)
 	})),
 
-	-- §4.3b s -> group. Writer: CashDeskService ("Collect Cash", Q-201): the drawer went to Cash. Presentation only
+	-- §4.3b s -> group. Writer: TipJarService ("Collect Tips", DEC-239): the tip jar went to Cash. Presentation only
 	CashCollected = Lync.packet(Lync.struct({
 		Amount = Lync.int(1, 1000000),
 	})),
@@ -267,7 +288,7 @@ return Lync.define("game", {
 		IsNight = Lync.bool(),
 		Arrived = Lync.int(0, 999),
 		Completed = Lync.int(0, 999),
-		Drawer = Lync.int(0, 1000000),
+		Drawer = Lync.int(0, 1000000), -- the day take (Sales + Tips + Catches - Stolen); name kept for the wire
 		Tips = Lync.int(0, 100000),
 		Stolen = Lync.int(0, 1000000), -- wave 1: 0
 		Grade = Lync.enum({ "A", "B", "C", "D" }), -- no customer = C (DEC-051)
@@ -317,7 +338,9 @@ return Lync.define("game", {
 
 	-- §13.1 s -> group. Writer: TrailerDoorService (VehicleSwap / TrailerFocus are legacy values, nobody sends them since 2026-10-12)
 	Transition = Lync.packet(Lync.struct({
-		Kind = Lync.enum({ "VehicleSwap", "TrailerFocus", "TrailerDoor" }), -- TrailerDoor: 0.6 s fade of Exit/Enter Trailer (only to who used the door)
+		-- TrailerDoor: 0.6 s fade of Exit/Enter Trailer (only to who used the door). DoorLocked (ANM-004, DEC-247): the
+		-- back door is locked by the anomaly and the player tried it; only the "Locked door" sound plays (StartedAt unused)
+		Kind = Lync.enum({ "VehicleSwap", "TrailerFocus", "TrailerDoor", "DoorLocked" }),
 		StartedAt = Lync.f64(),
 	})),
 
@@ -428,7 +451,7 @@ return Lync.define("game", {
 	-- Balance and owned classes ride the existing private Profile packet (Gems, Classes): no Wallet set.
 
 	-- §15.1 c -> s, <= 2/s (shared with ClassAction). Responder: ClassService. "Gems" buys; "Robux" is a pre-check
-	-- (answer "Prompt" = the client may PromptProductPurchase Content.Shop.ClassProducts[Class].ProductId)
+	-- (answer "Prompt" = the client may PromptGamePassPurchase Content.Shop.GamePasses[Class].PassId; TASK-291)
 	ClassBuy = Lync.packet(Lync.struct({
 		Class = Lync.enum(Content.Classes.Keys),
 		Currency = Lync.enum({ "Gems", "Robux" }),
@@ -462,6 +485,30 @@ return Lync.define("game", {
 			Gems = Lync.int(0, 1000000),
 			Class = Lync.optional(Lync.enum(Content.Classes.Keys)),
 		}),
+	})),
+
+	-- Player settings (TASK-279; owner request 2026-10-14, Provisional). Shape and clamp: Settings/shared/SettingsRules.
+	-- s -> owner, once per session when the profile is loaded and the client is ready. Writer: SettingsService.
+	-- Responder: SettingsController (OnInit). Private by construction (fireClient).
+	Settings = Lync.packet(settingsRecord()),
+	-- c -> s. Responder: SettingsService (sanitizes, own rate limit, saves to the profile). The client sends the whole
+	-- record a moment after the last change (debounced), never per slider frame.
+	SettingsSave = Lync.packet(settingsRecord()),
+
+	-- HUD cart utilities (TASK-290; owner request 2026-10-14, Provisional; Content.Shop.Utilities).
+	-- c -> s, right before PromptProductPurchase. Responder: ShopUtilityService (own rate limit). The target of the next
+	-- receipt of that product: Mate = UserId, Ingredient = Content.Ingredients index; 0 = none (the server picks).
+	ShopPick = Lync.packet(Lync.struct({
+		Product = Lync.enum(Content.Shop.Utilities.Keys),
+		Target = Lync.f64(),
+	})),
+	-- s -> one player. Writer: ShopUtilityService, after a receipt was granted. Responder: ShopController.
+	-- To the buyer (Value = Cash dollars / Radar seconds / ingredient index; util_scare: Value 0, From = the mate, 0 = none),
+	-- or to the scared mate (util_scare, Value 1, From = buyer UserId)
+	ShopGrant = Lync.packet(Lync.struct({
+		Product = Lync.enum(Content.Shop.Utilities.Keys),
+		Value = Lync.int(0, 100000),
+		From = Lync.f64(),
 	})),
 
 	-- Squad (party) in the lobby and the way back (network.md §16; architecture.md §20; user request 2026-10-11,
@@ -575,6 +622,17 @@ return Lync.define("game", {
 			Content.OrderRules.MaxToppings
 		),
 		Ms = Lync.int(0, 120000),
+		-- the sauce lines the player drew (owner request 2026-10-14, Provisional; Item/shared/HotDogVisual/Sauce): per trace topping
+		-- at most Sauce.Max ints (a bun-space point X * 64 + Y, 4095 = pen up). nil = none (2D mode, hold-less clients). The server
+		-- cleans them (Sauce.Clean, only toppings of this plate drawn with the trace gesture) and writes the Tool attribute Sauce
+		Sauces = Lync.optional(Lync.array(
+			Lync.struct({
+				Key = Lync.enum(Content.Ingredients.ToppingKeys),
+				Points = Lync.array(Lync.int(0, 4095), 0, 24),
+			}),
+			0,
+			Content.OrderRules.MaxToppings
+		)),
 	})),
 	-- c -> s. Bin, by DRAG (polish 2026-10-12): From = what is thrown (Content.Prep.TrashFrom): Plate = the open plate (bun and
 	-- sausage are lost, like the street bin; Slot ignored), Grill = the sausage of grill Slot 1..8 (any state), Rail = the sausage
@@ -609,4 +667,10 @@ return Lync.define("game", {
 		-- Not authority: PrepFinish revalidates everything. At most 4 records, so no drop.section floor
 		Plate = Lync.optional(Lync.int(0, 255)),
 	})),
+
+	-- Security cameras (FEAT-040, TASK-285; owner request 2026-10-14). s -> owner (fireClient, private): the watch_cameras
+	-- prompt went through, open the camera view (the body is frozen meanwhile). Writer: SecurityService
+	SecurityOpen = Lync.packet(Lync.empty()),
+	-- c -> s: the client left the camera view (any way out); the server releases the freeze. Idempotent
+	SecurityLeave = Lync.packet(Lync.empty()),
 })

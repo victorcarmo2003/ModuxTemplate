@@ -1,7 +1,8 @@
 --!strict
 -- LoadingScreen on a phone-sized frame (iPhone SE landscape, 667 x 375) or the whole viewport. "Auto" fills the bar
 -- by itself like a real join (steps with pauses); otherwise the Progress slider drives it. "Shown" off lifts the
--- curtain. Tips and texts are the real ones (ReplicatedFirst Loading/Tips), with a fallback list outside a place.
+-- curtain. "Skip" shows the "Skip loading" button (bottom right; the game shows it after 10 s), "Gamepad" its key
+-- chip; a click prints and lifts the curtain like the boot does. Tips and texts are the real ones (ReplicatedFirst Loading/Tips), with a fallback list outside a place.
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -21,6 +22,8 @@ type Controls = {
 	Shown: () -> boolean,
 	Auto: () -> boolean,
 	Progress: () -> number,
+	Skip: () -> boolean,
+	Gamepad: () -> boolean,
 }
 
 type Texts = { Title: string, Tagline: string, Tips: { string }, Status: { [string]: string } }
@@ -53,6 +56,8 @@ return UILabs.CreateVideStory({
 		Shown = true,
 		Auto = true,
 		Progress = UILabs.Slider(0.35, 0, 1, 0.01),
+		Skip = true,
+		Gamepad = false,
 	},
 }, function(props)
 	-- UI Labs types the control sources loosely; pin them to what the story reads.
@@ -69,6 +74,11 @@ return UILabs.CreateVideStory({
 	cleanup(function()
 		connection:Disconnect()
 	end)
+
+	const skipped = source(false)
+	const shown = function(): boolean
+		return controls.Shown() and not skipped()
+	end
 
 	const progress = function(): number
 		return if controls.Auto() then auto() else controls.Progress()
@@ -99,8 +109,21 @@ return UILabs.CreateVideStory({
 				Tips = copy.Tips,
 				Title = copy.Title,
 				Tagline = copy.Tagline,
-				Shown = controls.Shown,
+				Shown = shown,
 				TipTime = 3,
+				Skip = {
+					Visible = controls.Skip,
+					KeyLabel = function(): string
+						return if controls.Gamepad() then "X" else ""
+					end,
+					OnSkip = function()
+						print("[LoadingScreen story] Skip loading")
+						skipped(true)
+						task.delay(2, function()
+							skipped(false)
+						end)
+					end,
+				},
 			}),
 		}),
 	})

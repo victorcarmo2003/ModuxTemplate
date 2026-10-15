@@ -12,6 +12,7 @@
 -- The world draws its own board bun from the `Stations` record (KitchenController Board part); it is hidden LOCALLY (LocalTransparency
 -- Modifier) while this view lives and given back on Destroy. Everything made here lives under the PrepWorld folder and dies with it.
 -- No Modux, no Vide, no network.
+local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
@@ -35,6 +36,20 @@ export type View = {
 	BunModel: (self: View) -> Model?,
 	-- Slides the plate to a new place (the Toppings view looks at another part of the board).
 	MoveTo: (self: View, position: Vector3, time: number) -> (),
+	-- The plate under the hot dog (a Cream disc with a rim): shown once the sausage is in the bun; the bun, the sausage and the
+	-- toppings ride on it (the cutting board mat stays where it was). `HasPlate` = it is shown. `PlateRadius` in studs.
+	SetPlate: (self: View, on: boolean) -> (),
+	HasPlate: (self: View) -> boolean,
+	PlateRadius: number,
+	-- Where the plate can sit near `centre` (x, z): the spot closest to it that lies on the bench (the rim has bench under it) and
+	-- clear of the `obstacles` (the bowl hitboxes), a little toward `toward` (flat, to the player). nil = no such spot.
+	FindSpot: (self: View, centre: Vector3, obstacles: { BasePart }, toward: Vector3) -> Vector3?,
+	-- A prop of the world that stands where the plate sits (the bun crate): hidden locally and let through by the bench rays, until
+	-- `ShowWorld` (the plate goes back) or the view dies.
+	HideWorld: (self: View, instance: Instance) -> (),
+	ShowWorld: (self: View, instance: Instance) -> (),
+	-- The carried sausage flies to the groove in an arc with a spring, then `done` runs (a tap on the rail sausage).
+	Fly: (self: View, done: () -> ()) -> (),
 	Anchor: (self: View) -> Vector3,
 	SetMoved: (self: View, fn: ((delta: Vector3) -> ())?) -> (),
 	-- Dashed cut line: visible, progress 0..1 of the line done.
@@ -49,13 +64,18 @@ export type View = {
 	SetTopping: (self: View, key: string, uv: Vector2?, grow: number) -> (),
 	-- The bun closes over the plate (Rules.World.Board.Close), then `done` runs.
 	Close: (self: View, done: () -> ()) -> (),
+	-- The finished plate (plate, closed bun, sausage, toppings) leaves with the hot dog: the real pieces vanish and a copy of the whole
+	-- stack flies to the hand of the camera, shrinking, then `done` runs. Nothing is left on the table.
+	TakeAway: (self: View, done: (() -> ())?) -> (),
 	-- Height (studs) over the plane of the bun top of whatever is under a bun-space point: the round back of the sausage when it
 	-- lies in the groove, the bun beside it. The sauce and the guide track lie on this.
 	SurfaceHeight: (self: View, uv: Vector2) -> number,
 	-- The live progress ring around the plate: 0..1 of the gesture in progress (the cut, the sauce covered, the mound); nil hides it.
 	SetProgress: (self: View, fraction: number?) -> (),
-	-- The carried model, handed over (the bin swallows it); nil when nothing is carried.
+	-- The carried model, handed over (the bin swallows it); nil when nothing is carried. A lifted plate hands over a copy of the bun and
+	-- the real stack vanishes (`Restore` brings it back if the server refuses the trash).
 	TakeCarry: (self: View) -> Model?,
+	Restore: (self: View) -> (),
 	-- The grade burst of a gesture (sparks, flash, word by band) over the bun.
 	Burst: (self: View, band: string) -> (),
 	-- The seal of the finished plate: confetti by band and a word, over the bun.
@@ -89,6 +109,13 @@ const SAUSAGE_BASE = 0.2 -- of the bun height x scale: the groove
 const SAUSAGE_THICK = 0.24
 const KNIFE_SCALE = 0.5 -- of the board scale
 const HIDE_EVERY = 0.25 -- s: the world re-makes its models, so the hiding is re-applied at 4 Hz
+const PLATE_H = 0.08 -- studs: the thickness of the plate disc
+const PLATE_REACH = 0.62 -- of the bun length x scale: the radius of the plate
+const PLATE_RIM = 28 -- Parts of the rim
+const FLY_TIME = 0.42 -- s: the sausage flies from the rail to the bun
+const TAKEAWAY_TIME = 0.45 -- s: the finished plate leaves with the hot dog (Done)
+const FLY_ARC = 0.9 -- studs: height of that arc
+const GROOVE_UV = Vector2.new(Content.Prep.Build.Groove.X, Content.Prep.Build.Groove.Y)
 
 local function easeInOut(t: number): number
 	return t * t * (3 - 2 * t)
@@ -162,6 +189,28 @@ function BoardView.new(options: Options): View
 	local benchFallback = if boardPart ~= nil then boardPart.Position.Y - boardPart.Size.Y / 2 else options.Anchor.Y - 0.25
 	const rayParams = RaycastParams.new()
 	rayParams.FilterType = Enum.RaycastFilterType.Exclude
+	do
+		const ignore: { Instance } = { folder }
+		-- the invisible hitboxes of the targets are not bench
+		for _, tagged in CollectionService:GetTagged(options.Rules.Tag) do
+			table.insert(ignore, tagged)
+		end
+		if boardPart ~= nil then
+			table.insert(ignore, boardPart)
+		end
+		const character = Players.LocalPlayer.Character
+		if character ~= nil then
+			table.insert(ignore, character)
+		end
+		rayParams.FilterDescendantsInstances = ignore
+	end
+	-- the plate under the hot dog (built on first use); while it is on, the mat stays and the plate follows `seat`
+	const plateRadius = BUN_LENGTH * scale * PLATE_REACH
+	local plate: Model? = nil
+	local plateOn = false
+	local plateGrow = 1
+	local bias = 0 -- studs: the plate starts on top of the mat and comes down to the bench as it slides
+	local hopLift = 0
 	if boardPart ~= nil then
 		const clone = boardPart:Clone()
 		for _, child in clone:GetChildren() do
@@ -182,24 +231,27 @@ function BoardView.new(options: Options): View
 		mat = clone
 		matRotation = boardPart.CFrame.Rotation
 		matThickness = boardPart.Size.Y
-		const ignore: { Instance } = { folder, boardPart }
-		const character = Players.LocalPlayer.Character
-		if character ~= nil then
-			table.insert(ignore, character)
-		end
-		rayParams.FilterDescendantsInstances = ignore
 	end
 
 	-- Puts the mat under (x, z) and returns the Y of its top, where the bun base goes; `position` unchanged without a mat.
 	local function seat(position: Vector3): Vector3
 		const matPart = mat
-		if matPart == nil then
+		const plateModel = plate
+		if matPart == nil and not (plateOn and plateModel ~= nil) then
 			return position
 		end
 		local bench = benchFallback
 		const hit = workspace:Raycast(Vector3.new(position.X, benchFallback + 1.2, position.Z), Vector3.new(0, -2.4, 0), rayParams)
 		if hit ~= nil and math.abs(hit.Position.Y - benchFallback) <= 0.6 then
 			bench = hit.Position.Y
+		end
+		if plateOn and plateModel ~= nil then
+			const base = bench + bias + hopLift
+			plateModel:PivotTo(CFrame.new(position.X, base + PLATE_H / 2, position.Z))
+			return Vector3.new(position.X, base + PLATE_H, position.Z)
+		end
+		if matPart == nil then
+			return position
 		end
 		matPart.CFrame = CFrame.new(position.X, bench + matThickness / 2, position.Z) * matRotation
 		return Vector3.new(position.X, bench + matThickness, position.Z)
@@ -212,12 +264,51 @@ function BoardView.new(options: Options): View
 	local topFrame = CFrame.new(anchorPos + up * (rules.Lift + closedHeight)) * orient
 	const plane = Plane.new(topFrame, BUN_LENGTH * scale, BUN_WIDTH * scale)
 
+	-- the plate: a Cream disc with a rim of little bars, pivot at the middle of the disc --------------------------------------
+	local function makePlate(): Model
+		const model = Instance.new("Model")
+		model.Name = "Prep_Plate"
+		local function part(name: string, size: Vector3, cf: CFrame): Part
+			const made = Instance.new("Part")
+			made.Name = name
+			made.Anchored = true
+			made.CanCollide = false
+			made.CanQuery = false
+			made.CanTouch = false
+			made.CastShadow = true
+			made.Massless = true
+			made.Material = Enum.Material.SmoothPlastic
+			made.Color = Theme.Color.Cream
+			made.Size = size
+			made.CFrame = cf
+			made.Parent = model
+			return made
+		end
+		-- the disc (a cylinder along its X): the pivot offset stands it up, as in the Serve plate
+		const disc = part("Plate_Disc", Vector3.new(PLATE_H, plateRadius * 2, plateRadius * 2), CFrame.Angles(0, 0, math.pi / 2))
+		disc.Shape = Enum.PartType.Cylinder
+		disc.PivotOffset = CFrame.Angles(0, 0, -math.pi / 2)
+		model.PrimaryPart = disc
+		const segment = 2 * math.pi * plateRadius / PLATE_RIM * 1.15
+		for index = 1, PLATE_RIM do
+			const angle = (index - 1) / PLATE_RIM * math.pi * 2
+			const at = Vector3.new(math.cos(angle) * (plateRadius - 0.05), PLATE_H / 2 + 0.035, math.sin(angle) * (plateRadius - 0.05))
+			part("Plate_Rim", Vector3.new(segment, 0.07, 0.1), CFrame.new(at) * CFrame.Angles(0, -(angle + math.pi / 2), 0))
+		end
+		model.Parent = folder
+		return model
+	end
+
+	-- the sausage in flight (a tap on the rail sausage): from where the carry is to the groove, an arc with a spring
+	local flight: { T: number, From: Vector3, Done: () -> () }? = nil
+
 	-- the bun: both kit models, one shown ------------------------------------------------------------------------------------
 	local closed: Model? = nil
 	local open: Model? = nil
 	local state: BunState = "None"
 	local swap: { T: number, Time: number }? = nil
 	local closing: { T: number, Done: () -> () }? = nil
+	local takeaway: { Model: Model, From: CFrame, Start: number, T: number, Done: (() -> ())? }? = nil
 
 	local function makeBun(name: string): Model?
 		const source = kitModel("Food", name)
@@ -239,6 +330,10 @@ function BoardView.new(options: Options): View
 	local carryKind = ""
 	local carryTarget: CFrame? = nil
 	local carryPose: CFrame? = nil
+	-- the plate dragged to the bin: the REAL stack (bun, sausage, toppings, plate) follows the pointer, no copy of the bun is made
+	local lifted = false
+	local liftTarget: Vector3? = nil
+	local liftRest = Vector3.zero
 	const toppings: { [string]: { Model: Model, Uv: Vector2, Grow: number, Scaled: number } } = {}
 
 	local function poseTopping(key: string, item: { Model: Model, Uv: Vector2, Grow: number, Scaled: number })
@@ -386,6 +481,8 @@ function BoardView.new(options: Options): View
 	const hidden: { Instance } = {}
 	local hideAt = 0
 	local hideRail = false
+	-- the rail sausage hidden while one is carried to the bun: given back as soon as it is not (a drop that missed used to leave it gone)
+	const railHidden: { Instance } = {}
 	local hideBar: { BillboardGui } = {}
 
 	local function hide(instance: Instance)
@@ -395,9 +492,15 @@ function BoardView.new(options: Options): View
 		setLocal(instance, 1)
 	end
 
+	-- TASK-283: the world's copy of the plate (KitchenController Board, `BunPlate_Slot<n>`) steps aside while this view draws it
+	local viewStation: Instance? = nil
 	local function refreshHidden()
 		const entry = options.SlotView("board", options.Seat)
 		if entry ~= nil and entry.Station ~= nil then
+			if viewStation ~= entry.Station then
+				viewStation = entry.Station
+				entry.Station:SetAttribute(`PrepView{options.Seat}`, true)
+			end
 			for _, child in entry.Station:GetChildren() do
 				if child:IsA("Model") and string.find(child.Name, `^Bun%a*_Slot{options.Seat}$`) ~= nil then
 					hide(child)
@@ -425,13 +528,33 @@ function BoardView.new(options: Options): View
 				for _, child in rail.Station:GetChildren() do
 					if child:IsA("Model") and string.find(child.Name, `^Sausage%a*_Slot{options.RailFront}$`) ~= nil then
 						hide(child)
+						if table.find(railHidden, child) == nil then
+							table.insert(railHidden, child)
+						end
 					end
 				end
 			end
+		elseif #railHidden > 0 then
+			for _, instance in railHidden do
+				const at = table.find(hidden, instance)
+				if at ~= nil then
+					table.remove(hidden, at)
+				end
+				if instance.Parent ~= nil then
+					setLocal(instance, 0)
+				end
+			end
+			table.clear(railHidden)
 		end
 	end
 
 	local function unhide()
+		if viewStation ~= nil then
+			if viewStation.Parent ~= nil then
+				viewStation:SetAttribute(`PrepView{options.Seat}`, nil)
+			end
+			viewStation = nil
+		end
 		for _, instance in hidden do
 			if instance.Parent ~= nil then
 				setLocal(instance, 0)
@@ -453,13 +576,13 @@ function BoardView.new(options: Options): View
 		Base = baseCf,
 		Scale = scale,
 		Orient = orient,
+		PlateRadius = plateRadius,
 	} :: any
 
 	-- Where the plate sits: the bun, the sausage, the toppings, the guide and the bin follow (the sauce segments are moved by the
 	-- listener of `SetMoved`, they are not ours).
 	local moved: ((delta: Vector3) -> ())? = nil
-	local goal: Vector3? = nil
-	local slideSpeed = 0
+	local slide: { From: Vector3, To: Vector3, T: number, Time: number, Bias0: number }? = nil
 
 	local function place(requested: Vector3)
 		const position = seat(requested)
@@ -481,16 +604,143 @@ function BoardView.new(options: Options): View
 		end
 	end
 
-	-- Slides the plate to `position` in `time` seconds (0 = at once).
+	-- Slides the plate to `position` in `time` seconds (0 = at once): ease-out with a small overshoot (a spring) and a little hop.
 	function self.MoveTo(_: any, position: Vector3, time: number)
 		if time <= 0 then
-			goal = nil
+			slide = nil
+			bias = 0
+			hopLift = 0
 			place(position)
 			return
 		end
-		-- the slide runs flat: the Y follows the bench under the mat (`place`)
-		goal = Vector3.new(position.X, anchorPos.Y, position.Z)
-		slideSpeed = (goal - anchorPos).Magnitude / time
+		-- the slide runs flat: the Y follows the bench under the plate (`place`)
+		slide = { From = anchorPos, To = Vector3.new(position.X, anchorPos.Y, position.Z), T = 0, Time = time, Bias0 = bias }
+	end
+
+	function self.SetPlate(_: any, on: boolean)
+		if on == plateOn then
+			return
+		end
+		plateOn = on
+		if on then
+			if plate == nil then
+				plate = makePlate()
+			end
+			plateGrow = 0.6
+			bias = matThickness
+			hopLift = 0
+			;(plate :: Model):ScaleTo(plateGrow)
+			place(anchorPos)
+		else
+			if plate ~= nil then
+				plate:Destroy()
+				plate = nil
+			end
+			slide = nil
+			bias = 0
+			hopLift = 0
+		end
+	end
+
+	function self.HasPlate(_: any): boolean
+		return plateOn
+	end
+
+	function self.FindSpot(_: any, centre: Vector3, obstacles: { BasePart }, toward: Vector3): Vector3?
+		const radius = plateRadius
+		const flat = Vector3.new(toward.X, 0, toward.Z)
+		const dir = if flat.Magnitude > 1e-3 then flat.Unit else Vector3.zero
+		local best: Vector3? = nil
+		local bestCost = math.huge
+		local function supported(x: number, z: number): boolean
+			const hit = workspace:Raycast(Vector3.new(x, benchFallback + 1.2, z), Vector3.new(0, -2.4, 0), rayParams)
+			return hit ~= nil and math.abs(hit.Position.Y - benchFallback) <= 0.3
+		end
+		for ix = -28, 28 do
+			for iz = -20, 20 do
+				const dx, dz = ix * 0.25, iz * 0.25
+				const cost = dx * dx + dz * dz - (dir.X * dx + dir.Z * dz) * 0.6
+				if cost < bestCost then
+					const x, z = centre.X + dx, centre.Z + dz
+					local clear = true
+					for _, obstacle in obstacles do
+						const local_ = obstacle.CFrame:PointToObjectSpace(Vector3.new(x, obstacle.Position.Y, z))
+						const outX = math.max(math.abs(local_.X) - obstacle.Size.X / 2, 0)
+						const outZ = math.max(math.abs(local_.Z) - obstacle.Size.Z / 2, 0)
+						if math.sqrt(outX * outX + outZ * outZ) < radius * 0.9 then
+							clear = false
+							break
+						end
+					end
+					if clear and supported(x, z) then
+						-- the whole rim has bench under it
+						for step = 0, 11 do
+							const angle = step / 12 * math.pi * 2
+							if not supported(x + math.cos(angle) * radius * 0.97, z + math.sin(angle) * radius * 0.97) then
+								clear = false
+								break
+							end
+						end
+						if clear then
+							best = Vector3.new(x, anchorPos.Y, z)
+							bestCost = cost
+						end
+					end
+				end
+			end
+		end
+		return best
+	end
+
+	function self.HideWorld(_: any, instance: Instance)
+		hide(instance)
+		const list = rayParams.FilterDescendantsInstances
+		if table.find(list, instance) == nil then
+			table.insert(list, instance)
+			rayParams.FilterDescendantsInstances = list
+		end
+	end
+
+	function self.ShowWorld(_: any, instance: Instance)
+		const at = table.find(hidden, instance)
+		if at ~= nil then
+			table.remove(hidden, at)
+		end
+		if instance.Parent ~= nil then
+			setLocal(instance, 0)
+		end
+		const list = rayParams.FilterDescendantsInstances
+		const index = table.find(list, instance)
+		if index ~= nil then
+			table.remove(list, index)
+			rayParams.FilterDescendantsInstances = list
+		end
+	end
+
+	function self.Restore(_: any)
+		const bun = if state == "Open" then open elseif state == "Closed" then closed else nil
+		if bun ~= nil then
+			setAlpha(bun, 0)
+		end
+		if sausage ~= nil and sausageMode == "Placed" then
+			setAlpha(sausage, 0)
+		end
+		for _, entry in toppings do
+			setAlpha(entry.Model, 0)
+		end
+		if plate ~= nil and plateOn then
+			setAlpha(plate, 0)
+		end
+		self:MoveTo(liftRest, 0.25)
+	end
+
+	function self.Fly(_: any, done: () -> ())
+		if carry == nil then
+			done()
+			return
+		end
+		const from = if carryPose ~= nil then carryPose.Position elseif carryTarget ~= nil then carryTarget.Position else topFrame.Position
+		flight = { T = 0, From = from, Done = done }
 	end
 
 	function self.Anchor(_: any): Vector3
@@ -605,10 +855,34 @@ function BoardView.new(options: Options): View
 	end
 
 	function self.SetCarry(_: any, kind: "Sausage" | "Plate" | nil, point: Vector3?, snap: Vector2?)
+		if kind == "Plate" then
+			if point ~= nil then
+				if not lifted then
+					lifted = true
+					liftRest = anchorPos
+					slide = nil
+					bias = 0
+				end
+				liftTarget = Vector3.new(point.X, anchorPos.Y, point.Z)
+			end
+			return
+		end
+		if kind == nil and lifted then
+			-- let go: the stack goes back where it was
+			lifted = false
+			liftTarget = nil
+			self:MoveTo(liftRest, 0.25)
+		end
 		if kind == nil or (point == nil and snap == nil) then
+			flight = nil
 			carryTarget = nil
 			carryKind = ""
+			const wasHidden = hideRail
 			hideRail = sausageMode == "Placed"
+			if wasHidden and not hideRail then
+				-- a carried sausage that did not land: the one on the rail comes back at once
+				refreshHidden()
+			end
 			if carry ~= nil then
 				carry:Destroy()
 				carry = nil
@@ -680,6 +954,39 @@ function BoardView.new(options: Options): View
 		closing = { T = 0, Done = done }
 	end
 
+	function self.TakeAway(_: any, done: (() -> ())?)
+		if takeaway ~= nil then
+			if done ~= nil then
+				done()
+			end
+			return
+		end
+		const stack = Instance.new("Model")
+		stack.Name = "Prep_TakeAway"
+		const parts: { Model } = {}
+		for _, model in { plate, closed, open, sausage } do
+			if model ~= nil and model.Parent ~= nil and model:FindFirstChildWhichIsA("BasePart", true) ~= nil then
+				table.insert(parts, model)
+			end
+		end
+		for _, entry in toppings do
+			table.insert(parts, entry.Model)
+		end
+		for _, model in parts do
+			-- only what is drawn goes with it (a hidden bun state is fully transparent)
+			const probe = model:FindFirstChildWhichIsA("BasePart", true)
+			if probe ~= nil and probe.Transparency < 1 then
+				inert(model, stack, 0)
+				setAlpha(model, 1)
+			end
+		end
+		if plate ~= nil then
+			setAlpha(plate, 1)
+		end
+		stack.Parent = folder
+		takeaway = { Model = stack, From = stack:GetPivot(), Start = stack:GetScale(), T = 0, Done = done }
+	end
+
 	function self.SurfaceHeight(_: any, uv: Vector2): number
 		-- the sausage in the groove is a cylinder along the bun (X): its round back over the bun top, smoothly joined to the bun
 		const radius = SAUSAGE_THICK * 0.5 * scale
@@ -706,6 +1013,28 @@ function BoardView.new(options: Options): View
 	end
 
 	function self.TakeCarry(_: any): Model?
+		flight = nil
+		if lifted then
+			lifted = false
+			liftTarget = nil
+			const source = if state == "Open" then open elseif state == "Closed" then closed else nil
+			local thrown: Model? = nil
+			if source ~= nil then
+				thrown = inert(source, folder, 0)
+				;(thrown :: Model).Name = "Prep_Carry"
+				;(thrown :: Model):PivotTo(source:GetPivot())
+			end
+			-- the real stack is gone with it (the bin eats the copy)
+			for _, model in { closed, open, sausage, plate } do
+				if model ~= nil then
+					setAlpha(model, 1)
+				end
+			end
+			for _, entry in toppings do
+				setAlpha(entry.Model, 1)
+			end
+			return thrown
+		end
 		const model = carry
 		carry = nil
 		carryTarget = nil
@@ -735,16 +1064,34 @@ function BoardView.new(options: Options): View
 
 	function self.Step(_: any, dt: number, _time: number)
 		-- the slide of the plate between sections
-		if goal ~= nil then
-			const toGoal = goal - anchorPos
-			const step = slideSpeed * dt
-			if toGoal.Magnitude <= step then
-				const target = goal
-				goal = nil
+		if slide ~= nil then
+			slide.T += dt
+			const t = math.clamp(slide.T / slide.Time, 0, 1)
+			const c1 = 1.2
+			const u = t - 1
+			const alpha = 1 + (c1 + 1) * u * u * u + c1 * u * u
+			bias = slide.Bias0 * (1 - t)
+			hopLift = math.sin(math.pi * t) * 0.18
+			if t >= 1 then
+				const target = slide.To
+				slide = nil
+				bias = 0
+				hopLift = 0
 				place(target)
 			else
-				place(anchorPos + toGoal.Unit * step)
+				place(slide.From:Lerp(slide.To, alpha))
 			end
+		end
+		-- a plate dragged to the bin: the stack follows the pointer (a spring)
+		if lifted and liftTarget ~= nil then
+			slide = nil
+			hopLift = 0.25
+			place(anchorPos:Lerp(liftTarget, 1 - math.exp(-rules.Carry.Spring * dt)))
+		end
+		-- the plate grows into place when it appears
+		if plate ~= nil and plateGrow < 1 then
+			plateGrow = math.min(1, plateGrow + dt * 4)
+			plate:ScaleTo(plateGrow)
 		end
 		-- the world's own objects stay hidden
 		hideAt -= dt
@@ -791,6 +1138,28 @@ function BoardView.new(options: Options): View
 				bun:PivotTo(baseCf * CFrame.new(0, hop - (1 - squash) * closedHeight * 0.5, 0))
 			end
 		end
+		-- the finished plate leaving with the hot dog: it rises, goes to the hand of the camera and shrinks away
+		if takeaway ~= nil then
+			const leaving = takeaway
+			leaving.T += dt
+			const t = math.clamp(leaving.T / TAKEAWAY_TIME, 0, 1)
+			const camera = workspace.CurrentCamera
+			if camera ~= nil then
+				const frame = camera.CFrame
+				const hand = frame.Position + frame.LookVector * 0.9 - frame.UpVector * 0.45 + frame.RightVector * 0.35
+				const eased = t * t * (3 - 2 * t)
+				const arc = math.sin(math.pi * math.min(t * 1.4, 1)) * 0.3
+				leaving.Model:PivotTo(CFrame.new(leaving.From.Position:Lerp(hand, eased) + up * arc) * leaving.From.Rotation)
+				leaving.Model:ScaleTo(math.max(leaving.Start * (1 - 0.85 * eased), 0.02))
+			end
+			if t >= 1 then
+				takeaway = nil
+				leaving.Model:Destroy()
+				if leaving.Done ~= nil then
+					leaving.Done()
+				end
+			end
+		end
 		-- the knife
 		if knife ~= nil and knifeTarget ~= nil then
 			if knifePose == nil then
@@ -800,8 +1169,22 @@ function BoardView.new(options: Options): View
 			end
 			knife.CFrame = knifePose :: CFrame
 		end
-		-- the carried sausage / plate ghost
-		if carry ~= nil and carryTarget ~= nil then
+		-- the carried sausage in flight to the groove
+		if carry ~= nil and flight ~= nil then
+			flight.T += dt
+			const t = math.clamp(flight.T / FLY_TIME, 0, 1)
+			const c1 = 1.2
+			const u = t - 1
+			const alpha = 1 + (c1 + 1) * u * u * u + c1 * u * u
+			const goalCf = sausageCf(GROOVE_UV)
+			const at = flight.From:Lerp(goalCf.Position, alpha) + up * (math.sin(math.pi * t) * FLY_ARC)
+			carry:PivotTo(CFrame.new(at) * orient)
+			if t >= 1 then
+				const finished = flight.Done
+				flight = nil
+				finished()
+			end
+		elseif carry ~= nil and carryTarget ~= nil then
 			if carryPose == nil then
 				carryPose = carryTarget
 			else
@@ -817,6 +1200,11 @@ function BoardView.new(options: Options): View
 
 	function self.Destroy(_: any)
 		unhide()
+		flight = nil
+		if plate ~= nil then
+			plate:Destroy()
+			plate = nil
+		end
 		for _, dash in dashes do
 			dash:Destroy()
 		end
@@ -836,6 +1224,10 @@ function BoardView.new(options: Options): View
 		end
 		closing = nil
 		swap = nil
+		if takeaway ~= nil then
+			takeaway.Model:Destroy()
+			takeaway = nil
+		end
 		for _, bead in beads do
 			bead:Destroy()
 		end

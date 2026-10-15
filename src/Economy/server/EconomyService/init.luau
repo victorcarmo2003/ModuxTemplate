@@ -1,18 +1,22 @@
 --!strict
--- Party money, cash drawer, shift ledger, grade and summary (FEAT-012, FEAT-014; DEC-045, DEC-050, DEC-051, DEC-072,
--- DEC-083; architecture.md §2.3, §3.1, §4, §19.3, §19.26 A1, T48; network.md §3.3, §4.4; data.md §2.2;
--- TASK-021, TASK-050). Run place only.
--- Single writer of Cash and Drawer (Economy set, record 1). Others call:
+-- Party money, tip jar, shift ledger, grade and summary (FEAT-012, FEAT-014; DEC-045, DEC-050, DEC-051, DEC-072,
+-- DEC-083, DEC-238, DEC-239; architecture.md §2.3, §3.1, §4, §19.3, §19.26 A1, T48; network.md §3.3, §4.4; data.md §2.2;
+-- TASK-021, TASK-050, TASK-242). Run place only.
+-- Single writer of Cash and Drawer (Economy set, record 1). Since 2026-10-13 (DEC-238, DEC-239) SALES go straight to the
+-- shared Cash and the cash drawer became a TIP JAR: the set field `Drawer` is kept for the wire and now means "tips in the
+-- jar" (renaming it would break the client and Net; TipJarService and EconomyController read it as the jar). Others call:
 --   Spend(amount, player?)        purchases (Mart, bench, trailer); atomic check-and-debit, never below 0
---   AddToDrawer(amount, kind)     order price / tip / thief caught ("Catch"); while the drawer is open
---   Steal(amount)                 thief (FEAT-013): takes up to the drawer, counted in the ledger's Stolen
+--   AddSale(amount, kind)         order price ("Sale") or thief caught ("Catch"): straight into Cash; while the shop takes entries
+--   AddTip(amount)                customer tip or table tip: into the tip jar (AddToDrawer(amount, "Tip") is the same call)
+--   Steal(amount)                 thief (FEAT-013): takes up to the jar, counted in the ledger's Stolen
 --   CountArrival(), CountResult() ledger for the grade (CustomerService, TASK-032/033)
 --   AddReportStep(name, fn)       fills ShiftReport fields of other features before it is sent (T48)
---   Collect()                     "Collect Cash" (Q-201): drawer -> Cash now; the ledger remembers it for the report
+--   CollectTips()                 prompt on the jar (collect_tips): jar -> Cash now; the ledger remembers it for the report
 --   TopUp(amount)                 first-run tutorial: Cash up to at least amount (TutorialService, Provisional)
--- Payments go to the drawer, never to Cash (DEC-050): Cash only changes by Spend, Collect, the deposit, TopUp and DevAddCash.
--- Deposit on RoundService.ShiftEnded (start of Summary): grade A-D, bonus floor(day take x %), Cash += drawer left + bonus,
--- Drawer = 0, report steps, ShiftReport to the group, Reported(info, report).
+-- Cash changes by Spend, AddSale, CollectTips, the deposit, TopUp and DevAddCash.
+-- Deposit on RoundService.ShiftEnded (start of Summary): grade A-D, bonus floor(day take x %) where the day take = Sales +
+-- Tips + Catches - Stolen (DEC-051 parity), Cash += tips left in the jar + bonus, Drawer = 0, report steps, ShiftReport to
+-- the group (Drawer = the day take), Reported(info, report).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -25,6 +29,7 @@ local Modux = require(ServerScriptService.server.Modux)
 export type Grade = Ledger.Grade
 export type SaleResult = Ledger.SaleResult
 export type DrawerKind = Ledger.DrawerKind
+export type SaleKind = Ledger.SaleKind
 
 -- ShiftReport packet (network.md §4.4), also handed to Reported listeners
 export type Report = Ledger.Report
@@ -37,14 +42,14 @@ type Step = { Name: string, Run: ReportStep }
 
 const RECORD = 1 -- Economy is a single record (network.md §3.3)
 const CASH_MAX = 2147483647 -- Economy.Cash wire range
-const DRAWER_MAX = 1000000 -- Economy.Drawer / ShiftReport.Drawer wire range
+const DRAWER_MAX = 1000000 -- Economy.Drawer (the tip jar) / ShiftReport.Drawer (the day take) wire range
 const COUNT_MAX = 999 -- ShiftReport.Arrived/Completed wire range
 const TIPS_MAX = 100000 -- ShiftReport.Tips wire range
 const GEMS_MAX = 1000 -- ShiftReport.Gems wire range
 const BOSS_STAT = "BossBonusPP" -- Content.Stats (Shift Lead, Party scope, not stacking; DEC-069)
--- Closing: sign CLOSED but the queue is still served, so the drawer and the ledger still take entries (DEC-048)
+-- Closing: no new customer but the queue is still served (day: Last call, DEC-240), so sales, jar and ledger still take entries
 const CLOSING = "Closing"
-const KINDS: { [string]: boolean } = { Sale = true, Tip = true, Catch = true }
+const SALE_KINDS: { [string]: boolean } = { Sale = true, Catch = true }
 -- Sale.Result enum (network.md §4.3)
 const RESULTS: { [string]: boolean } =
 	{ Perfect = true, Complete = true, Incomplete = true, Wrong = true, Left = true, Refused = true, Slow = true }
@@ -96,6 +101,7 @@ function EconomyService:GetCash(): number
 	return self.Cash()
 end
 
+-- Tips in the jar (the wire field is still called Drawer, DEC-239)
 function EconomyService:GetDrawer(): number
 	return self.Drawer()
 end
@@ -125,7 +131,7 @@ function EconomyService:IsShopOpen(): boolean
 	return phase ~= nil and phase.Selling
 end
 
--- Drawer and ledger take entries: a selling phase or Closing (queue still served)
+-- Sales, jar and ledger take entries: a selling phase or Closing (queue still served)
 function EconomyService:IsDrawerOpen(): boolean
 	const round = self.Dependencies.RoundService
 	return self:IsShopOpen() or (round:IsStarted() and round:GetPhase() == CLOSING)
@@ -153,33 +159,66 @@ function EconomyService:Spend(amount: number, player: Player?): boolean
 	return true
 end
 
--- Money into the drawer (DEC-050). Only while the shop runs; returns what actually went in (0 when refused).
-function EconomyService:AddToDrawer(amount: number, kind: DrawerKind): number
+-- Order price or thief reward straight into the shared Cash (DEC-238; it used to fall in the drawer, DEC-050). Only while
+-- the shop takes entries; returns what actually went in (0 when refused or Cash is at its cap).
+function EconomyService:AddSale(amount: number, kind: SaleKind): number
 	const value = amountOf(amount)
 	if value == nil then
-		fail(`[EconomyService] AddToDrawer: amount must be a non-negative integer, got {amount}`)
+		fail(`[EconomyService] AddSale: amount must be a non-negative integer, got {amount}`)
 		return 0
 	end
-	if not KINDS[kind] then
-		fail(`[EconomyService] AddToDrawer: unknown kind {kind}`)
+	if not SALE_KINDS[kind] then
+		fail(`[EconomyService] AddSale: unknown kind {kind} (Sale or Catch; tips go through AddTip)`)
 		return 0
 	end
 	if not self:IsDrawerOpen() then
-		warn(`[EconomyService] AddToDrawer({value}, {kind}) outside a selling phase or Closing ignored`)
+		warn(`[EconomyService] AddSale({value}, {kind}) outside a selling phase or Closing ignored`)
 		return 0
 	end
-	const drawer = self.Drawer()
-	const added = math.min(value, DRAWER_MAX - drawer)
+	const cash = self.Cash()
+	const added = math.min(value, CASH_MAX - cash)
 	if added <= 0 then
 		return 0
 	end
-	self.Drawer(drawer + added)
+	self.Cash(cash + added)
 	Ledger.credit(self.Shift, kind, added)
 	return added
 end
 
--- Thief (FEAT-013): takes up to the drawer, adds it to the ledger's Stolen, returns what was taken. The amount
--- (floor(Drawer x StealPct / 100) when Drawer >= MinDrawer) is ThiefService's call, from Content.
+-- A tip into the tip jar (DEC-239): customer tip (DEC-072) or the tip left on a table (SeatingService). The crew moves it
+-- to Cash with CollectTips; what stays in the jar is deposited at the Summary. Returns what went in.
+function EconomyService:AddTip(amount: number): number
+	const value = amountOf(amount)
+	if value == nil then
+		fail(`[EconomyService] AddTip: amount must be a non-negative integer, got {amount}`)
+		return 0
+	end
+	if not self:IsDrawerOpen() then
+		warn(`[EconomyService] AddTip({value}) outside a selling phase or Closing ignored`)
+		return 0
+	end
+	const jar = self.Drawer()
+	const added = math.min(value, DRAWER_MAX - jar)
+	if added <= 0 then
+		return 0
+	end
+	self.Drawer(jar + added)
+	Ledger.credit(self.Shift, "Tip", added)
+	return added
+end
+
+-- For callers written against the drawer: only "Tip" goes to the jar (DEC-239); prices and rewards use AddSale.
+function EconomyService:AddToDrawer(amount: number, kind: DrawerKind): number
+	if kind ~= "Tip" then
+		fail(`[EconomyService] AddToDrawer only takes "Tip" now (DEC-238); use AddSale for {kind}`)
+		return 0
+	end
+	return self:AddTip(amount)
+end
+
+-- Thief (FEAT-013): takes up to the tip jar, adds it to the ledger's Stolen, returns what was taken. The amount
+-- (floor(Drawer x StealPct / 100) when Drawer >= MinDrawer) is ThiefService's call, from Content. Dormant while the jar
+-- stays small (DEC-239).
 function EconomyService:Steal(amount: number): number
 	const value = amountOf(amount)
 	if value == nil then
@@ -196,23 +235,22 @@ function EconomyService:Steal(amount: number): number
 	return taken
 end
 
--- "Collect Cash" (user playtest 2026-10-11, Provisional Q-201): everything in the drawer goes to Cash right now, so the
--- crew can buy ingredients mid-shift. Same drawer rules as AddToDrawer (selling phase or Closing). The ledger keeps
--- the amount (Collected), so the report and the grade bonus still count the whole day take. Returns what moved (0 =
--- nothing: empty drawer, drawer closed, Cash at its cap).
-function EconomyService:Collect(): number
+-- "Collect Tips" (DEC-239; it was "Collect Cash", Q-201): everything in the tip jar goes to Cash right now. Same rules
+-- as AddTip (selling phase or Closing). The ledger keeps the amount (Collected). Returns what moved (0 = nothing: empty
+-- jar, shop closed, Cash at its cap).
+function EconomyService:CollectTips(): number
 	if not self:IsDrawerOpen() then
 		return 0
 	end
-	const drawer = self.Drawer()
+	const jar = self.Drawer()
 	const cash = self.Cash()
-	const moved = math.min(drawer, CASH_MAX - cash)
+	const moved = math.min(jar, CASH_MAX - cash)
 	if moved <= 0 then
 		return 0
 	end
 	self.Libs.Charm.batch(function()
 		self.Cash(cash + moved)
-		self.Drawer(drawer - moved)
+		self.Drawer(jar - moved)
 	end)
 	self.Shift.Collected += moved
 	return moved
@@ -226,7 +264,7 @@ function EconomyService:CountArrival()
 	self.Shift.Arrived += 1
 end
 
--- Outcome of a customer that arrived (Perfect/Complete = satisfied, DEC-051). Money goes through AddToDrawer.
+-- Outcome of a customer that arrived (Perfect/Complete = satisfied, DEC-051). Money goes through AddSale / AddTip.
 function EconomyService:CountResult(result: SaleResult)
 	if not RESULTS[result] then
 		fail(`[EconomyService] CountResult: unknown result {result}`)
@@ -293,15 +331,16 @@ function EconomyService:BossPoints(): number
 	return best
 end
 
--- Start of Summary (RoundService.ShiftEnded): grade, bonus, deposit, report. Drawer and ledger end at zero.
+-- Start of Summary (RoundService.ShiftEnded): grade, bonus, deposit, report. Jar and ledger end at zero. Sales are in
+-- Cash already (DEC-238) and so are the tips collected during the shift: the deposit adds the grade bonus and the tips
+-- nobody collected (DEC-239, auto-deposit).
 function EconomyService:Deposit(info: ShiftInfo): Report
 	const ledger = self.Shift
-	const drawer = self.Drawer()
-	const settlement = Ledger.settle(ledger, drawer, self:BossPoints())
+	const jar = self.Drawer()
+	const settlement = Ledger.settle(ledger, self:BossPoints())
 
 	self.Libs.Charm.batch(function()
-		-- what was collected during the shift is already in Cash (Collect)
-		self.Cash(math.min(self.Cash() + settlement.Deposited - ledger.Collected, CASH_MAX))
+		self.Cash(math.min(self.Cash() + jar + settlement.Bonus, CASH_MAX))
 		self.Drawer(0)
 	end)
 
@@ -311,7 +350,7 @@ function EconomyService:Deposit(info: ShiftInfo): Report
 		IsNight = info.IsNight,
 		Arrived = math.min(ledger.Arrived, COUNT_MAX),
 		Completed = math.min(ledger.Completed, COUNT_MAX),
-		Drawer = math.min(drawer + ledger.Collected, DRAWER_MAX), -- day take: collected + still in the drawer
+		Drawer = math.min(settlement.Take, DRAWER_MAX), -- the day take: Sales + Tips + Catches - Stolen (field name kept)
 		Tips = math.min(ledger.Tips, TIPS_MAX),
 		Stolen = math.min(ledger.Stolen, DRAWER_MAX),
 		Grade = settlement.Grade,
@@ -333,11 +372,11 @@ function EconomyService:Deposit(info: ShiftInfo): Report
 	return report
 end
 
--- New shift: ledger and drawer start empty (data.md §2.2). A drawer that is not empty here skipped its Summary
--- (DevSetDay mid-shift): discarded like a lost night's drawer (FEAT-012), with a warning.
+-- New shift: ledger and jar start empty (data.md §2.2). A jar that is not empty here skipped its Summary
+-- (DevSetDay mid-shift): discarded like a lost night's jar (FEAT-012), with a warning.
 function EconomyService:BeginShift()
 	if self.Drawer() > 0 then
-		warn(`[EconomyService] shift started with ${self.Drawer()} in the drawer (no Summary): discarded`)
+		warn(`[EconomyService] shift started with ${self.Drawer()} in the tip jar (no Summary): discarded`)
 		self.Drawer(0)
 	end
 	self.Shift = Ledger.new()

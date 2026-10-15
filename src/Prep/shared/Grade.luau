@@ -154,14 +154,56 @@ function Grade.Plausible(cfg: Config, toppings: number, elapsed: number, clientM
 	return true, nil
 end
 
--- Sausage flip score from the server clock: flippedAt nil = never flipped (Q-222: Messy). The error is how far from the
--- target (half of the Duration) the flip happened, in % of the Duration.
+-- Seconds of the first side of a sausage of this Duration (the whole cook minus the second side after the flip).
+function Grade.FirstSide(cfg: Config, duration: number): number
+	return math.max(duration - cfg.Rules.Grill.PostFlip, 0.05)
+end
+
+-- Progress 0..1 the world draws for a sausage on the grill, from the record (server clock `now`, StartedAt, Duration, flipped).
+-- The first side runs 0 -> Target; the sausage then WAITS there (the flip window is open) until the flip; the second side runs
+-- Target -> 1 over PostFlip s. Flipping re-bases StartedAt (the server writes now - FirstSide), so this one formula serves both.
+function Grade.CookProgress(cfg: Config, startedAt: number, duration: number, now: number, flipped: boolean): number
+	if duration <= 0 then
+		return 0
+	end
+	const first = Grade.FirstSide(cfg, duration)
+	const elapsed = math.max(now - startedAt, 0)
+	const target = cfg.Rules.Grill.Target
+	if elapsed < first then
+		return target * elapsed / first
+	elseif not flipped then
+		return target
+	end
+	return clamp(target + (1 - target) * (elapsed - first) / cfg.Rules.Grill.PostFlip, target, 1)
+end
+
+-- Where the flip cursor is, 0..1 of the bar, at server time `now` (TASK-257): in the pause it goes from the LEFT end to the right
+-- end in Rules.Grill.Swing s and back, forever (a triangle wave that starts at 0 the moment the first side is done). Before the
+-- pause: 0. The client draws it with this and the server grades with it: one source.
+function Grade.SwingAt(cfg: Config, startedAt: number, duration: number, now: number): number
+	const reachedAt = startedAt + Grade.FirstSide(cfg, duration)
+	const swing = math.max(cfg.Rules.Grill.Swing, 0.05)
+	const t = now - reachedAt
+	if t <= 0 then
+		return 0
+	end
+	const phase = (t / swing) % 2
+	return if phase <= 1 then phase else 2 - phase
+end
+
+-- Sausage flip score from the server clock: flippedAt nil = never flipped (Q-222: Messy). In the pause the error is how far the
+-- swinging cursor is from the middle when the flip lands, in % of the bar (0 = dead centre, 50 = an end). A flip BEFORE the pause
+-- is accepted (TASK-257) with the worst error of the tolerance.
 function Grade.FlipScore(cfg: Config, tolerance: Tolerance, startedAt: number, flippedAt: number?, duration: number): number
 	if flippedAt == nil or duration <= 0 then
 		return cfg.Grades.Unflipped
 	end
-	const fraction = (flippedAt - startedAt) / duration
-	return Grade.Score(cfg, tolerance, math.abs(fraction - cfg.Rules.Grill.Target) * 100, false)
+	const reachedAt = startedAt + Grade.FirstSide(cfg, duration)
+	if flippedAt < reachedAt then
+		return Grade.Score(cfg, tolerance, tolerance.Worst, false)
+	end
+	const position = Grade.SwingAt(cfg, startedAt, duration, flippedAt)
+	return Grade.Score(cfg, tolerance, math.abs(position - 0.5) * 100, false)
 end
 
 -- Effect of a plate band on the sale (Q-219 B): tip in $ (nil = base tip), extra tip window seconds, mood bands.

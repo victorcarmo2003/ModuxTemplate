@@ -542,8 +542,8 @@ classe (DEC-186).
 | Campo | Valor | Origem |
 |---|---|---|
 | `Packs` | `{ "Day", "Mid", "Night" }` (valores do atributo `LookPack`, `network.md` §5.2) | DEC-166 |
-| `PackFace` | `Day → Normal`, `Mid → Exhausted`, `Night → Normal_Night` (rosto da crew pela faixa) | DEC-166, DEC-167 |
-| `Expressions` (lista fechada) | `Normal`, `Happy`, `Smile`, `Sad`, `Fainted`, `Skeptical`, `Exhausted`, `Stressed`, `Normal_Night` (+ `Thief`, só NPC-007). Nome = `SurfaceAppearance` em `ReplicatedStorage.CrewExpressions` (TASK-006) | DEC-152, DEC-162, DEC-166 |
+| `PackFace` | `Day → Normal`, `Mid → Exhausted`, `Night → Normal_Night` (rosto da crew pela faixa; **Provisório (2026-10-14):** não vale mais para NPC na faixa baixa local) | DEC-166, DEC-167 |
+| `Expressions` (lista fechada) | `Normal`, `Happy`, `Smile`, `Sad`, `Fainted`, `Skeptical`, `Exhausted`, `Stressed`, `Normal_Night` (+ `Thief`, só NPC-007; variantes de anomalia: `Blank`, `EyesClosed`, `EyesWhite`, `Blank` e `EyesWhite` são criados por `tools/assetplace/build_kits.luau` (`VARIANT_EXPRESSIONS`, ids de `_blank_texture_ids.json`) e ficam **fora** da lista fechada `Content.Looks.Expressions`, **Provisório (2026-10-14)**; `CrewLooks.Species[k].Blank = { Head, Atlas }` vem de `gen_crew_looks.py`). Nome = `SurfaceAppearance` em `ReplicatedStorage.CrewExpressions` (TASK-006) | DEC-152, DEC-162, DEC-166 |
 | `NpcNeverUses` | `Fainted` em NPC (Provisório, DEC-187); `crew` em NPC | DEC-187, DEC-188 |
 
 ### 3.11 GemRewards e Achievements
@@ -664,7 +664,7 @@ não fixou):
 
 | Tabela | Campos |
 |---|---|
-| Flow | `BaseInterval` 22 · `GrowthPerDay` 0.08 · `GrowthCap` 0.40 · `PartyMult` {1.0, 1.6, 2.1, 2.5} · **`PartySource = "Connected"`** (jogadores conectados, DEC-185; substitui `ActiveAtShiftStart`) · `RecalcOn = "ShiftStarted"` (**Provisório**, DEC-185) · `Jitter` 0.25 · `MaxCustomersDay` 8 · `MaxCustomersNight` 6 · `MaxActorsNight` 3 · `MaxNpc` 12 (DEC-045; passantes fora ou dentro do teto: `Q-162`) · `DayWalkers` {6, 8} e `NightWalkers` {1, 2} (DEC-183, onda 2) · **`Adopt`** (passante vira cliente, TASK-163, **Provisório**, pedido do usuário 2026-10-11): `ChanceDay` 0,5 · `ChanceNight` 0,15 · `FromDay` 1 · `FromNight` 1 (0 = nunca à noite) · `MaxDistance` 60 (studs de Q5, plano XZ) · `MinGapSeconds` 8 · `NoticeLead` 0,8 s (o passante freia antes da tentativa) · `Beat` 0,6 s (de frente para o carrinho antes de andar) · `FirstDelay` {3, 5} s (1ª tentativa da fase de venda; antes era um intervalo inteiro). `Validate`: chances 0..1, `FromNight` 0..10, `MaxDistance` 0..200, `FirstDelay` = {min ≤ max} |
+| Flow | `BaseInterval` 22 · `GrowthPerDay` 0.08 · `GrowthCap` 0.40 · `PartyMult` {1.0, 1.6, 2.1, 2.5} · **`PartySource = "Connected"`** (jogadores conectados, DEC-185; substitui `ActiveAtShiftStart`) · `RecalcOn = "ShiftStarted"` (**Provisório**, DEC-185) · `Jitter` 0.25 · `MaxCustomersDay` 8 · `MaxCustomersNight` 6 · `MaxActorsNight` 3 · **`NightQueueSize` 1** (TASK-287, **Provisório**: à noite uma vaga só no balcão, cliente ou ator de anomalia, qualquer que seja o Counter) · `MaxNpc` 12 (DEC-045; passantes fora ou dentro do teto: `Q-162`) · `DayWalkers` {6, 8} e `NightWalkers` {1, 2} (DEC-183, onda 2) · **`Adopt`** (passante vira cliente, TASK-163, **Provisório**, pedido do usuário 2026-10-11): `ChanceDay` 0,5 · `ChanceNight` 0,15 · `FromDay` 1 · `FromNight` 1 (0 = nunca à noite) · `MaxDistance` 60 (studs de Q5, plano XZ) · `MinGapSeconds` 8 · `NoticeLead` 0,8 s (o passante freia antes da tentativa) · `Beat` 0,6 s (de frente para o carrinho antes de andar) · `FirstDelay` {3, 5} s (1ª tentativa da fase de venda; antes era um intervalo inteiro). `Validate`: chances 0..1, `FromNight` 0..10, `MaxDistance` 0..200, `FirstDelay` = {min ≤ max} |
 | OrderPhases | `{ FromDay, ToDay, IsNight, KWeights }` (FEAT-010) |
 | OrderRules | `BasePrice` 4 · `MaxToppings` 3 · `NewIngredientBoost` 1.5 · `TipAmount` 1 · `TipWindowBase` 16 · `TipWindowPerK` 4 · `QueuePatience` 45 · `OrderPatienceBase` 75 · `OrderPatiencePerK` 5 · `WireSpanMax` 255 (Q-192, Provisório; substituem `PatienceBase` 40 e `PatiencePerK` 5 da DEC-072) · `IncompletePct` 50 (floor) · `GradeThresholds` {A 0.90, B 0.75, C 0.50} · `GradeBonusPct` {A 20, B 10, C 0, D 0} · `NoCustomerGrade = "C"` (DEC-051) |
 | Thief | `ChanceByDay`, `MaxPerDay`, `WindowClock`, `LurkMax`, `ZoneRadius`, `ZoneEmptyTime`, **`ApproachTime` 4** (fixo; velocidade = distância ÷ 4, DEC-182), `OpenTime`, `StealPct`, `MinDrawer`, `CatchReward` (onda 2) |
@@ -1089,7 +1089,7 @@ Pair {1, 3}, Couple {1, 2} } · `Binding` { Tag `SeatTable`, IndexAttribute `Tab
 `Prompt_PatioLights` }. Só `TipLostAtSummary = true` e `SeatedOutsideCap = false` estão implementados (o outro valor
 avisa no boot).
 
-**`Flow.Groups`**: `ChanceDay` 0,20 · `ChanceNight` 0,10 · `FromDay` 2 · `FromNight` 2 · `IntervalMult` 1,6 ·
+**`Flow.Groups`**: `ChanceDay` 0,20 · `ChanceNight` 0 (era 0,10; TASK-287: um NPC por vez no balcão à noite, sem par) · `FromDay` 2 · `FromNight` 2 · `IntervalMult` 1,6 ·
 `PatienceBonus` 10 · `FollowGap` 2 · `SideGap` 2 · `QueueGap` 1,8 · `Leash` 8 · `PartnerSpeedMult` 1,2 · `Pairs`
 { `Shift`, `Leader`, `Partner`, `Weight`, `Couple` } com as 9 linhas da FEAT-038. Validate: tipos existem e são
 `Customer`, aparecem no turno do par, e todo líder deixa ao parceiro outra espécie (noite) ou outra roupa (dia).

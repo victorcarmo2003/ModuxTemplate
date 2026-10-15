@@ -16,6 +16,9 @@
 -- With room in the hand the current behaviour stays: the package Tool goes to the hand (stock is filled later by
 -- the usual Restock on the station).
 -- Restock of the taken package is KitchenService's (TASK-025): the Tool is a regular pack_* Tool from Give.
+-- TASK-288 (owner request 2026-10-14, Provisional): no free package for a gift bowl topping (Content.Ingredients.GiftKeys): the
+-- bowl itself is the present and comes full (KitchenService). The package used to stand on top of the closed bowl's lid. Those
+-- keys count as given, so a snapshot or a day jump never brings one back.
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -56,6 +59,11 @@ const LIFT = 0.75 -- studs between the station top (or the bowl anchor) and the 
 const PROMPT_LIFT = 0.5 -- studs above the package top for the prompt anchor
 const FIRST_DAY = 1 -- start-kit day: no free package
 const STRIP = { "Script", "LocalScript", "ModuleScript", "TouchTransmitter", "Sound" }
+
+const GIFT: { [string]: boolean } = {}
+for _, key in Content.Ingredients.GiftKeys do
+	GIFT[key] = true
+end
 
 local function packageOf(ingredient: string): string?
 	for _, row in Content.Packages.List do
@@ -202,8 +210,8 @@ end
 
 -- Places the package of `ingredient` over its station. False when the binding has no such station (warned).
 function Pickup.place(pickup: Pickup, ingredient: string, vehicle: string): boolean
-	if pickup.Live[ingredient] ~= nil then
-		return true
+	if pickup.Live[ingredient] ~= nil or GIFT[ingredient] then
+		return true -- a gift bowl has no package: "placed" so it counts as given
 	end
 	const item = packageOf(ingredient)
 	if item == nil then

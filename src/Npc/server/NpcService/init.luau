@@ -9,8 +9,9 @@
 --   - never more than Content.Flow.MaxNpc rigs (12, DEC-045); Opal is not one of them (DEC-191);
 --   - customers (Role "Customer") never wear the crew uniform nor the raccoon; the raccoon in the thief outfit and
 --     ThiefHat is Role "Thief" only (Quick Quentin, NPC-007; DEC-159, DEC-186; TASK-072). Pedestrians: DEC-183, Q-162;
---   - LookPack Day by day, Mid at night (DEC-181), refreshed at every ShiftStarted. Night is tension only (local
---     low-sanity swap on the client, DEC-168/169; anomaly mood, Q-159): SetTension(on) (AnomalyService, wave 3)
+--   - LookPack Day by day, Mid at night (DEC-181), refreshed at every ShiftStarted. Night is tension only (the client
+--     no longer swaps NPCs Night at low sanity, Provisional 2026-10-14; the client dresses blank / raincoat
+--     variants Night itself; anomaly mood, Q-159): SetTension(on) (AnomalyService, wave 3)
 --     writes Night on Role "Customer" rigs whose outfit has the Night pack; actors and the thief keep the shift pack
 --     so the anomaly sign never changes (Q-147 c). Tension drops at every ShiftStarted (PROVISIONAL, Q-159);
 --   - Role "Actor" (wave 3, TASK-108): a customer-anomaly look (same draw as a customer, or forced) + the Variant
@@ -50,7 +51,8 @@ export type Role = "Customer" | "Thief" | "Actor"
 export type Rig = Pool.Rig
 
 -- Customer-anomaly variant (architecture.md §19.13; ANM-001 blank, ANM-004 mirror, ANM-005 raincoat). Rig attribute.
-export type Variant = "blank" | "mirror" | "raincoat"
+-- shake..stare: V2 family A odd customers (DEC-254, TASK-292)
+export type Variant = "blank" | "mirror" | "raincoat" | "shake" | "neck" | "eyes" | "bighead" | "float" | "stare"
 
 export type Npc = {
 	Id: number,
@@ -116,7 +118,18 @@ const THIEF_KEY = "Thief" -- pool geometry key suffix (no customer type, no acce
 const VARIANT_ATTRIBUTE = "Variant" -- rig attribute read by the client (TASK-110)
 const WALKER_ATTRIBUTE = "FromWalker" -- adopted passer-by: its Pedestrians slot (TASK-163/164)
 const PLAIN_KEY = "Plain" -- pool geometry key suffix of a rig without type accessories
-const VARIANTS: { [string]: true } = { blank = true, mirror = true, raincoat = true }
+const VARIANTS: { [string]: true } = {
+	blank = true,
+	mirror = true,
+	raincoat = true,
+	-- V2 family A (DEC-254, TASK-292)
+	shake = true,
+	neck = true,
+	eyes = true,
+	bighead = true,
+	float = true,
+	stare = true,
+}
 const NIGHT_PACK = "Night"
 const MAX_ID = 65535 -- NpcId wire range (Customers id, Sale.Npc)
 const ROUTES_PER_FRAME = 2 -- architecture.md §12.3
@@ -347,7 +360,7 @@ function NpcService:Choose(r: SpawnRequest, rng: Random): (Look.Choice?, string?
 	end
 	if role == "Actor" then
 		if r.Variant == nil or not VARIANTS[r.Variant] then
-			return nil, `Role Actor needs a Variant (blank, mirror, raincoat), got '{tostring(r.Variant)}'`, nil
+			return nil, `Role Actor needs a known Variant (blank, mirror, raincoat, shake, neck, eyes, bighead, float, stare), got '{tostring(r.Variant)}'`, nil
 		end
 	elseif r.Variant ~= nil then
 		return nil, `Variant is for Role Actor only (Role '{role}')`, nil

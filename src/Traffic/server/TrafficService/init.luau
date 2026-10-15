@@ -14,7 +14,8 @@
 	    while it does not change the motion up to now (checked with Motion); it never can be farther than braking
 	    distance thanks to the reservation rule (15 studs, DEC-133).
 	  * a PARKED car pulls away with a new record anchored where it stands (now), StopDist = its next stop.
-	Stops (all at the stop line minus HALF_CAR: the front bumper stops on the line):
+	Stops (all at the stop point minus HALF_CAR: the front bumper stops on the line, or before it when the line would
+	leave the body on crosswalk stripes; Paths.build, TASK-281):
 	  * PARE (route stop Kind Pare, DEC-133): always; after Crossing.PareStop parked, the car leaves only with the X-T
 	    box reserved for [entry, exit + ConflictGap]. Ninth cars (routes without PARE) are preferential: the box is
 	    given only if no Ninth car can reach it in that window (earliest arrival = its record without stops); a Ninth
@@ -124,7 +125,69 @@ const NO_TRAFFIC_PHASES = { "Resume", "NightEnd", "NightLost", "Finale", "RunEnd
 
 const TRAFFIC = Content.Traffic
 const CROSSING = TRAFFIC.Crossing
+-- TASK-263 (owner request 2026-10-14, Provisional): the lamps of Content.TrafficLights rule the street too. Axis of each stop line:
+-- a crosswalk line by the direction it serves (EB/WB = EW, NB/SB = NS), a PARE line (Juniper arms) NS
+const LIGHTS = Content.TrafficLights
+const DIRECTION_AXIS: { [string]: "EW" | "NS" } = { EB = "EW", WB = "EW", NB = "NS", SB = "NS" }
+const LINE_AXIS: { [string]: "EW" | "NS" } = {}
+for _, crosswalk in TRAFFIC.Crosswalks.List do
+	-- TASK-281: a crosswalk with no Axis has no lamp (CW-3, mid-block): its lines follow only the reservation
+	if crosswalk.Axis == nil then
+		continue
+	end
+	for direction, line in crosswalk.Lines do
+		LINE_AXIS[line] = DIRECTION_AXIS[direction]
+	end
+end
+for _, routeRow in TRAFFIC.Routes.List do
+	for _, stopRow in routeRow.Stops do
+		if stopRow.Kind == "Pare" then
+			LINE_AXIS[stopRow.Line] = "NS"
+		end
+	end
+end
+
+-- The light of a stop's axis is not green at server time t (TASK-263): the car must stop at that line
+local function redFor(kind: string, key: string, ref: string, t: number): boolean
+	if not TRAFFIC.Lights then
+		return false
+	end
+	local axis: ("EW" | "NS")? = LINE_AXIS[key]
+	if axis == nil and kind == "Crosswalk" then
+		const row = TRAFFIC.Crosswalks.ByKey[ref]
+		axis = if row ~= nil then row.Axis else nil
+	end
+	if axis == nil then
+		return false
+	end
+	const phase = LIGHTS.sample(axis :: "EW" | "NS", t)
+	return phase ~= LIGHTS.PHASE_GREEN
+end
+
+-- The walk sign of a crosswalk says Walk (TASK-263): its walkers go along the OTHER axis than its street
+local function walkFor(cw: string, t: number): boolean
+	if not TRAFFIC.Lights then
+		return true
+	end
+	const row = TRAFFIC.Crosswalks.ByKey[cw]
+	if row == nil or row.Axis == nil then
+		return true
+	end
+	const walkAxis: "EW" | "NS" = if row.Axis == "EW" then "NS" else "EW"
+	return LIGHTS.pedAllowedToCross(walkAxis, t)
+end
 const EPSILON = Motion.Epsilon
+
+-- The light binds this stop of this car (TASK-281): only an approach line, at or before the route's X-T entry. A line
+-- past the box (a turn's exit crosswalk, SL-1N after a southbound pass) follows only the reservation, else a red there
+-- would park the car inside the junction.
+local function lightRed(geo: Paths.Geo, stop: Paths.StopPoint, t: number): boolean
+	const cross = geo.Cross
+	if cross == nil or stop.At > cross[1] + EPSILON then
+		return false
+	end
+	return redFor(stop.Kind, stop.Key, stop.Ref, t)
+end
 
 local function now(): number
 	return workspace:GetServerTimeNow()
@@ -253,7 +316,7 @@ function TrafficService:GeoOf(route: Route): Paths.Geo?
 	if retry and t < retry then
 		return nil
 	end
-	const geo, problem, warnings = Paths.build(route)
+	const geo, problem, warnings = Paths.build(route, HALF_CAR)
 	for _, message in warnings do
 		self:WarnOnce(`geo:{message}`, message)
 	end
@@ -270,13 +333,17 @@ end
 
 -- Nearest stop ahead before queueing: (position, stop key) or nil. A stop where the car stands counts (it holds it).
 function TrafficService:RawStop(car: Car): (number?, string?)
+	const t = now()
 	for _, stop in car.Geo.Stops do
 		local binds = false
+		-- TASK-263: a light that is not green for the stop's axis binds it too
+		const red = lightRed(car.Geo, stop, t)
 		if stop.Kind == "Pare" then
-			binds = not car.PareDone[stop.Key]
+			binds = not car.PareDone[stop.Key] or red
 		else
-			binds = self:IsReserved(stop.Ref)
+			binds = self:IsReserved(stop.Ref) or red
 		end
+		-- TASK-281: stop.At is already the hold point off the stripes (Paths.build), for every kind of stop
 		const at = stop.At - HALF_CAR
 		if binds and at >= car.Dist - EPSILON then
 			return at, stop.Key
@@ -509,6 +576,10 @@ function TrafficService:ReserveCrossing(cw: string, npcId: number, duration: num
 			return false
 		end
 	end
+	-- TASK-263: walkers start across only on Walk (a refusal makes them wait on the curb and ask again)
+	if not walkFor(cw, t) then
+		return false
+	end
 	if not self.Enabled then
 		return true
 	end
@@ -519,6 +590,13 @@ function TrafficService:ReserveCrossing(cw: string, npcId: number, duration: num
 				continue
 			end
 			const line = stop.At
+			-- TASK-263: a car held by its red light, at rest behind the line or able to brake before it, does not block the walk
+			if lightRed(car.Geo, stop, t) and car.Dist + HALF_CAR <= line + EPSILON then
+				const braking = car.Speed * car.Speed / (2 * CROSSING.BrakeDecel) + car.Speed * Motion.DT
+				if car.Speed == 0 or line - (car.Dist + HALF_CAR) >= braking then
+					continue
+				end
+			end
 			local out = line + radius
 			for _, zone in car.Geo.Zones do
 				if table.find(group, zone.Key) ~= nil then

@@ -23,8 +23,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
+local GradeMath = require(ReplicatedStorage.shared.Prep.Grade)
 local Motion = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Motion)
 local FeedMock = require(script.Parent.FeedMock)
+local Flips = require(script.Parent.Flips)
 
 const source = Vide.source
 const untrack = Vide.untrack
@@ -235,7 +237,9 @@ local function readReal(controller: any, current: Session, now: number): FeedMoc
 	for index = 1, MAX_SLOTS do
 		const record: any = if grillId ~= nil then kitchen:SlotOf(grillId * 100 + index) else nil
 		if record ~= nil and record.Kind == "grill" then
-			table.insert(slots, { Exists = true, State = record.State, StartedAt = record.StartedAt, Duration = record.Duration })
+			-- the flip stamp of THIS sausage only (a leftover of the previous one on the slot reads 0; see Flips)
+			const flip = Flips.Stamp((grillId :: number) * 100 + index, record, now)
+			table.insert(slots, { Exists = true, State = record.State, StartedAt = record.StartedAt, Duration = record.Duration, Flip = flip })
 		else
 			table.insert(slots, { Exists = false, State = "Empty", StartedAt = 0, Duration = 0 })
 		end
@@ -338,15 +342,18 @@ local function applyGrill(current: Session, snapshot: FeedMock.Snapshot, now: nu
 			elseif raw.State == "Ready" then
 				slot = { Exists = true, State = "Ready", Progress = 1, Flipped = current.Flipped[index] or false }
 			else
-				const progress = if raw.Duration > 0 then math.clamp((now - raw.StartedAt) / raw.Duration, 0, 1) else 0
+				-- a grade kept from the sausage that was here before (it left while the feed did not look) is not this one's
+				if current.Flipped[index] ~= nil and (raw.Flip or 0) <= 0 and now - raw.StartedAt < GradeMath.FirstSide(prep, raw.Duration) - 0.25 then
+					current.Flipped[index] = nil
+				end
 				const flipped = current.Flipped[index]
+				-- the first side runs, the sausage WAITS in the window for the flip, the second side runs (Grade.CookProgress)
+				const progress = GradeMath.CookProgress(prep, raw.StartedAt, raw.Duration, now, flipped ~= nil or (raw.Flip or 0) > 0)
 				local state: SlotState = "Cooking"
-				if flipped ~= nil then
+				if flipped ~= nil or (raw.Flip or 0) > 0 then
 					state = "Flipped"
-				elseif progress >= window.From and progress <= window.To then
+				elseif progress >= window.Target - 1e-4 then
 					state = "Window"
-				elseif progress > window.To then
-					state = "Late"
 				end
 				slot = { Exists = true, State = state, Progress = progress, Flipped = flipped or false }
 			end

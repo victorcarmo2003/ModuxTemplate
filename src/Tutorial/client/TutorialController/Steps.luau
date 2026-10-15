@@ -41,12 +41,15 @@ export type Step = {
 	-- (waiting rows, talk steps)
 	Remind: string?,
 	Talk: boolean?,
-	-- the screen-sized arrow over the target shows at any distance (not only from far away); the open switch (playtest
-	-- 2026-10-11: up close the player did not see which piece to press)
-	AlwaysArrow: boolean?,
+	-- Day 1 upgrade lesson step (owner request 2026-10-14): numbered on its own ("STEP 1 OF 2", LessonTotal)
+	Lesson: boolean?,
 }
 
 const TOTAL = 14
+-- Day 1 upgrade lesson (owner request 2026-10-14, Provisional): when the first shift ends Walt calls (BossCalls
+-- call_tutorial_upgrade, his lines are the call's own) and these two steps lead the rookie to the Gear Stand to buy
+-- Storage (shared.Tutorial.Rules.Upgrade); the Gear Stand was closed until then (Content.Mart.FirstShiftClosed)
+const LESSON_TOTAL = 2
 
 const LIST: { Step } = {
 	{
@@ -64,18 +67,18 @@ const LIST: { Step } = {
 		Hint = "Your boss is about to call. Stay near the trailer.",
 		Action = nil,
 	},
-	-- Owner request 2026-10-12: phone -> open the trailer (the red switch on its wall; there is no OPEN sign any more
-	-- and opening the trailer opens the shop at once) -> the customer comes. Same step in Prep whatever the hand holds.
+	-- Owner request 2026-10-12: phone -> open the trailer -> the customer comes. TASK-284 (2026-10-14): the red switch is
+	-- gone; the service window lever next to the phone opens the window and the shop at once. Same step in Prep whatever
+	-- the hand holds.
 	{
 		Key = "open",
 		Number = 2,
-		Text = "Open the trailer",
-		Hint = "Press the red switch on the trailer wall.",
-		Action = "open_sign",
-		Say = { "Open the trailer.", "Red switch, on the wall." },
+		Text = "Open the window",
+		Hint = "Pull the window lever next to the phone.",
+		Action = "shutter_toggle",
+		Say = { "Open the window.", "Lever by the phone." },
 		Done = "We're open.",
-		AlwaysArrow = true,
-		Remind = "Hit the red switch.",
+		Remind = "Pull the window lever.",
 	},
 	{
 		Key = "wait_customer",
@@ -130,7 +133,7 @@ const LIST: { Step } = {
 		Number = 6,
 		Text = "Wait for the sausage",
 		Hint = 'It gets a "Collect" button when ready.',
-		PrepHint = "Flip the sausage when the ring glows, then wait for it to finish.",
+		PrepHint = "The bar stops when one side is done: tap the sausage to flip it, then it is ready in a couple of seconds.",
 		Action = "grill_collect",
 		Say = { "Wait for the bar." },
 	},
@@ -161,10 +164,12 @@ const LIST: { Step } = {
 		Number = 8,
 		Text = "Add {item}",
 		Hint = 'Hold "Add" at the topping. The order is on the card, top left.',
+		-- TASK-258: seated with the bun and sausage on the plate, the order's topping goes on in the Toppings view
+		PrepHint = "On the Toppings view, put it on the hot dog.",
 		Action = "topping_add",
 		Say = { "They want ketchup.", "Nothing extra." },
 		Done = "Perfect.",
-		Remind = "Ketchup. Hold to add.",
+		Remind = "Ketchup on the dog, Rookie.",
 	},
 	{
 		Key = "discard",
@@ -174,6 +179,17 @@ const LIST: { Step } = {
 		Action = "discard",
 		Say = { "Not what they asked. Toss it." },
 		Remind = "Toss it in the bin.",
+	},
+	-- TASK-254 (owner request 2026-10-14): the 3D prep delivery by drag, the plate onto the green DELIVER area of the customer
+	{
+		Key = "deliver",
+		Number = 9,
+		Text = "Serve the hot dog",
+		-- TASK-258: only once the order's toppings are on the plate (TutorialController:MissingTopping)
+		Hint = "Drag the plate onto the customer.",
+		Action = nil,
+		Say = { "Looks right.", "Drag the plate to them." },
+		Remind = "Drag the plate to the customer.",
 	},
 	{
 		Key = "serve",
@@ -188,7 +204,7 @@ const LIST: { Step } = {
 		Key = "money",
 		Number = 10,
 		Text = "First sale! Nice work!",
-		Hint = "Sales fill the drawer. It's banked into your money at closing.",
+		Hint = "Sales go straight to the shared money. Tips pile up in the jar.",
 		Action = nil,
 		Say = { "Ka-ching! First sale.", "Cash goes in the drawer." },
 		Talk = true,
@@ -251,6 +267,30 @@ const LIST: { Step } = {
 	},
 }
 
+const LESSON: { Step } = {
+	{
+		Key = "upg_go",
+		Number = 1,
+		Lesson = true,
+		Text = "Go to the Gear Stand",
+		Hint = "At the Mart, across the street. Look both ways!",
+		Action = nil,
+		Remind = "Follow the arrow to the Mart.",
+	},
+	{
+		Key = "upg_buy",
+		Number = 2,
+		Lesson = true,
+		Text = "Buy Storage",
+		Hint = 'Hold "Buy" at the Storage stand: more buns, more sauce.',
+		Action = "bench_buy_upgrade",
+		Remind = "Hold Buy at Storage.",
+	},
+}
+for _, step in LESSON do
+	table.insert(LIST, step)
+end
+
 -- Talk steps in order after the first sale; the last one ends the tutorial. After "money" the controller goes to the
 -- shopping steps instead of "mart" when the buns ran out (TutorialController:NextTalk).
 const TALKS: { string } = { "money", "mart" }
@@ -265,7 +305,7 @@ const SHOPPING: { string } = { "mart_go", "mart_buy", "mart_back", "restock" }
 -- trailer_exit / trailer_enter: the back door is never gated (the tutorial must not lock the player in or out of the trailer)
 const ALWAYS: { string } = { "answer_phone", "prep_work", "trailer_exit", "trailer_enter" }
 const NEXT_ACTIONS: { [string]: { string } } = {
-	phone = { "open_sign" },
+	phone = { "shutter_toggle" },
 	open = { "take_order" },
 	wait_customer = { "take_order" },
 	order = { "grill_place" },
@@ -278,12 +318,15 @@ const NEXT_ACTIONS: { [string]: { string } } = {
 	toppings = { "serve" },
 	discard = { "grill_place", "board_add_sausage" },
 	serve = {},
+	deliver = { "serve" },
 	money = { "buy_package" },
 	mart_go = { "buy_package" },
 	mart_buy = { "restock" },
 	mart_back = { "restock" },
 	restock = {},
 	mart = { "buy_package", "restock" },
+	upg_go = { "bench_buy_upgrade" },
+	upg_buy = {},
 }
 
 -- Walt when the call is answered (before the first step line)
@@ -339,6 +382,7 @@ end
 
 return table.freeze({
 	Total = TOTAL,
+	LessonTotal = LESSON_TOTAL,
 	List = table.freeze(LIST),
 	ByKey = table.freeze(ByKey),
 	IndexOf = table.freeze(IndexOf),

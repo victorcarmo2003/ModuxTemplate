@@ -27,6 +27,7 @@ export type Public = {
 	ApplyShutter: (self: Public) -> (),
 	AddShutterAnchor: (self: Public, anchor: Instance) -> (),
 	SetShutter: (self: Public, closed: boolean, player: Player?, force: boolean?) -> boolean,
+	SyncShop: (self: Public, byPlayer: boolean) -> (),
 	ShutterPhase: (self: Public) -> boolean,
 	CanToggleShutter: (self: Public, player: Player, anchor: Instance) -> boolean,
 	NotifyClosed: (self: Public, player: Player) -> (),

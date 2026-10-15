@@ -9,26 +9,30 @@
 	Local layer (network.md §5.3):
 	  - crew rig (Outfits.Use = "Crew"): its own LookPack, face = Content.Looks.PackFace (everyone sees the same);
 	  - NPC: its LookPack, face = local override (SetExpression: mood from CustomerController, TASK-034) or the
-	    neutral face;
-	  - when the local character has LookPack = "Night" (low band, DEC-168/169), every NPC except reserved outfits
-	    (Quick Quentin, DEC-159) is dressed Night + Normal_Night on this client only; Normal_Night beats the mood
-	    (Provisional, proposals-round-3.md §2). Since the crew is never Night by day (DEC-167), this only happens
-	    at night. A server write of LookPack re-dresses through the same rule, so the local Night is never undone.
+	    neutral face. The local sanity band no longer dresses NPCs (Provisional, 2026-10-14): the mood holds in the
+	    low band too;
+	  - Night on an NPC only comes from an anomaly variant with an animal rig (NIGHT_VARIANTS: blank, raincoat),
+	    always Night even with high sanity, except reserved outfits (Quick Quentin, DEC-159). The player's own
+	    character is Night in the low band through the server (VitalService -> CharacterService:SetLookPack ->
+	    LookPack attribute, crew branch above); nothing to do on this client.
 	Local-only rigs (Opal, previews) are built with `Tag = false` and dressed by their owner with CrewRig.Dress.
 
 	Wave 3 (TASK-110; architecture.md §19.3, §19.17; anomalies.md N1/N4/N5):
 	  - Customer-anomaly `Variant` (rig attribute written by NpcService, TASK-108: blank / mirror / raincoat; nil =
 	    ordinary). Re-dressed when it changes (a pooled rig loses it on release). Applied on this client only:
-	      blank     face = CrewExpressions.Blank (AST-060 `T_Expr_Blank`, empty shell); while the kit lacks it the face
-	                shell is hidden locally (LocalTransparencyModifier 1), same reading: no eyes, mouth or brows.
-	      raincoat  face = CrewExpressions.EyesClosed (AST-059); while missing, the ordinary resolution.
-	      mirror    ordinary face (the copy reacts like a customer); outfit sheet = CrewLooks.Outfits["<outfit>_mirror"]
-	                for the worn pack when that row exists (AST-062, only Mid), else the ordinary sheet.
-	    The variant face beats the mood and the low-band Normal_Night (the sign must stay readable: Provisional,
-	    frontend-coder); the pack still follows the low band. Mirrored accessories are the ANM-004 effect's (TASK-112).
+	      blank     face = CrewExpressions.Blank (AST-060 `T_Expr_Blank`, fully transparent) and Dress(..., blank = true):
+	                smooth skin-colour head + repainted ears / tail / nose (CrewLooks.Species[k].Blank, AST-060). A
+	                species without Blank row, or a kit without the expression, silently shows the ordinary look.
+	      raincoat  face = CrewExpressions.EyesClosed (AST-059); while missing, the mood / neutral face.
+	      mirror    pack = the server's (Day/Mid, like the original), never Night; face = CrewExpressions.EyesWhite
+	                (all-white eyes; another agent creates it, until then the mood / neutral face); outfit sheet =
+	                CrewLooks.Outfits["<outfit>_mirror"] for the worn pack when that row exists (AST-062, only Mid),
+	                else the ordinary sheet.
+	    blank and raincoat are always Night (NIGHT_VARIANTS), whatever the sanity (Provisional, 2026-10-14). The
+	    variant face beats the mood (the sign must stay readable: Provisional, frontend-coder). Mirrored accessories
+	    are the ANM-004 effect's (TASK-112).
 	  - Local rigs built on the client with `Tag = true` (passers-by, TASK-123) are tracked like any `AnimalRig` once
-	    they enter the DataModel (CollectionService only signals tagged instances inside it), including the local
-	    Night of the low band. `Prepare(model)` dresses one synchronously before it is parented, so a pooled rig never
+	    they enter the DataModel (CollectionService only signals tagged instances inside it), as any other rig. `Prepare(model)` dresses one synchronously before it is parented, so a pooled rig never
 	    shows the Day pack for a frame.
 
 	Warm-up (playtest fix, Day 1 morning): at start the whole character kit (ReplicatedStorage.Assets.Crew meshes,
@@ -50,19 +54,27 @@ type Pack = CrewRig.Pack
 type Rig = { Connections: { RBXScriptConnection }, Pending: boolean }
 
 const NIGHT: Pack = "Night"
-const NIGHT_FACE = Content.Looks.PackFace.Night -- Normal_Night (DEC-168, DEC-207)
 const NEUTRAL_FACE = Content.Looks.PackFace.Day -- Normal: NPC face without a mood
 
 -- Wave 3 (TASK-110): customer-anomaly look (rig attribute, NpcService TASK-108).
 const VARIANT_ATTRIBUTE = "Variant"
 const BLANK = "blank"
 const MIRROR = "mirror"
--- Fixed face by variant (name in ReplicatedStorage.CrewExpressions; outside Content.Looks.Expressions until the
--- AST-059/060 textures land, so they are looked up here and never handed to Dress while missing).
+-- Fixed face by variant (name in ReplicatedStorage.CrewExpressions; kept outside the closed
+-- Content.Looks.Expressions, so they are looked up here and never handed to Dress while missing).
 const VARIANT_FACE = table.freeze({
 	blank = "Blank", -- AST-060 T_Expr_Blank
 	raincoat = "EyesClosed", -- AST-059 T_Expr_EyesClosed
+	mirror = "EyesWhite", -- AST-062 `T_Expr_EyesWhite`, all-white eyes (Provisional 2026-10-14)
+	eyes = "EyesWhite", -- V2 family A ANM-013 (DEC-254, TASK-292): same all-white eyes as the copy
+	shake = "Angry", -- V2 family A ANM-011 (TASK-276, owner 2026-10-14): angry face while it shakes (T_Expr_Angry)
 }) :: { [string]: string }
+-- Face used while a variant's own expression is not in CrewExpressions yet (TASK-276: Angry not uploaded yet)
+const VARIANT_FALLBACK = table.freeze({
+	shake = "Stressed",
+}) :: { [string]: string }
+-- Variants always dressed Night on a rig, whatever the local sanity (Provisional 2026-10-14). Add future ones here.
+const NIGHT_VARIANTS = table.freeze({ blank = true, raincoat = true }) :: { [string]: boolean }
 const MIRROR_SUFFIX = "_mirror" -- CrewLooks.Outfits key of the mirrored sheet (AST-062), Provisional
 -- s: NPC rigs are revealed after this even if the kit preload has not finished (Provisional).
 const WARMUP_TIMEOUT = 12
@@ -73,12 +85,7 @@ function RigController:Setup()
 	self.Rigs = {} :: { [Model]: Rig }
 	-- Local face overrides by rig (weak keys: a forgotten override never keeps a rig alive).
 	self.Expressions = setmetatable({}, { __mode = "k" }) :: { [Model]: string }
-	-- The local character is in the low sanity band (LookPack = "Night").
-	self.LowBand = false :: boolean
-	self.CharacterConnection = nil :: RBXScriptConnection?
 	self.Preloaded = {} :: { [string]: boolean }
-	-- Rigs whose face shell this controller hid (blank without its expression); weak keys.
-	self.HiddenFaces = setmetatable({}, { __mode = "k" }) :: { [Model]: boolean }
 	-- Kit warm-up done (or timed out): NPC rigs are shown as they arrive.
 	self.Warm = false :: boolean
 	-- NPC rigs hidden while the kit warms up -> their DescendantAdded connection.
@@ -125,8 +132,7 @@ function RigController:Reveal(model: Model)
 	connection:Disconnect()
 	self.Concealed[model] = nil
 	setHidden(model, false)
-	self.HiddenFaces[model] = nil
-	self:Schedule(model) -- re-applies a variant's hidden face (ApplyVariant)
+	self:Schedule(model)
 end
 
 function RigController:EndWarmup()
@@ -159,6 +165,9 @@ function RigController:Warmup()
 			for _, id in look.Head do
 				table.insert(list, id)
 			end
+			if look.Blank ~= nil then
+				table.insert(list, look.Blank.Head)
+			end
 		end
 		for _, sheets in CrewLooks.Outfits do
 			for _, id in sheets do
@@ -187,27 +196,31 @@ local function hasExpression(name: string): boolean
 	return found ~= nil and found:IsA("SurfaceAppearance")
 end
 
--- Pack and face this client shows for `model` (nil face = PackFace of the worn pack, inside Dress).
-function RigController:Resolve(model: Model): (Pack, string?)
+-- Pack, face and blank flag this client shows for `model` (nil face = PackFace of the worn pack, inside Dress;
+-- blank = dress the species' Blank head / atlas, AST-060).
+function RigController:Resolve(model: Model): (Pack, string?, boolean)
 	const outfit = model:GetAttribute("Outfit")
 	const row = if typeof(outfit) == "string" then Content.Outfits.ByKey[outfit] else nil
 	const pack = CrewRig.AsPack(model:GetAttribute("LookPack")) or "Day"
 	const override = self.Expressions[model]
 	if row ~= nil and row.Use == "Crew" then
-		return pack, override
+		return pack, override, false
 	end
 	const variant = self:VariantOf(model)
-	const fixed = if variant then VARIANT_FACE[variant] else nil
-	if fixed ~= nil and hasExpression(fixed) then
-		return if self.LowBand and (row == nil or row.Use ~= "Reserved") then NIGHT else pack, fixed
+	const reserved = row ~= nil and row.Use == "Reserved"
+	const shown: Pack = if variant ~= nil and NIGHT_VARIANTS[variant] and not reserved then NIGHT else pack
+	local fixed = if variant then VARIANT_FACE[variant] else nil
+	if fixed ~= nil and not hasExpression(fixed) and variant ~= nil then
+		fixed = VARIANT_FALLBACK[variant]
 	end
-	if self.LowBand and (row == nil or row.Use ~= "Reserved") then
-		return NIGHT, NIGHT_FACE
+	if fixed ~= nil and hasExpression(fixed) then
+		-- Blank head / atlas only together with the empty face (otherwise the ordinary look, never a bald face).
+		return shown, fixed, variant == BLANK and not reserved
 	end
 	if override == nil and outfit == "thief" then
-		return pack, "Thief" -- Quick Quentin's own face (T_Expr_Thief, NPC-007)
+		return shown, "Thief", false -- Quick Quentin's own face (T_Expr_Thief, NPC-007)
 	end
-	return pack, override or NEUTRAL_FACE
+	return shown, override or NEUTRAL_FACE, false
 end
 
 -- Local face for one rig (e.g. the customer's mood); nil clears it. Purely local, never replicated.
@@ -255,26 +268,17 @@ function RigController:Prepare(model: Model)
 end
 
 function RigController:Dress(model: Model)
-	const pack, face = self:Resolve(model)
-	if not CrewRig.Dress(model, pack, face) then
+	const pack, face, blank = self:Resolve(model)
+	if not CrewRig.Dress(model, pack, face, blank) then
 		return
 	end
 	self:ApplyVariant(model, pack)
 	self:Preload(model)
 end
 
--- What Dress cannot do for a variant (TASK-110): the mirrored sheet and the blank face without its texture.
+-- What Dress cannot do for a variant (TASK-110): the mirrored outfit sheet.
 function RigController:ApplyVariant(model: Model, pack: Pack)
 	const variant = self:VariantOf(model)
-
-	const hide = variant == BLANK and not hasExpression(VARIANT_FACE[BLANK])
-	if hide or self.HiddenFaces[model] then
-		const face = model:FindFirstChild("Face")
-		if face ~= nil and face:IsA("BasePart") then
-			face.LocalTransparencyModifier = if hide then 1 else 0
-		end
-		self.HiddenFaces[model] = if hide then true else nil
-	end
 
 	if variant == MIRROR then
 		const outfit = model:GetAttribute("Outfit")
@@ -309,6 +313,9 @@ function RigController:Preload(model: Model)
 	const sheets = if typeof(outfit) == "string" then CrewLooks.Outfits[outfit] else nil
 	if look ~= nil then
 		add("Species:" .. (species :: string), look.Head)
+		if look.Blank ~= nil and self:VariantOf(model) == BLANK then
+			add("Blank:" .. (species :: string), { Day = look.Blank.Head, Mid = look.Blank.Atlas.Mid, Night = look.Blank.Atlas.Night })
+		end
 	end
 	if sheets ~= nil then
 		add("Outfit:" .. (outfit :: string), sheets)
@@ -365,7 +372,6 @@ function RigController:Add(instance: Instance)
 		rig.Connections,
 		model.Destroying:Connect(function()
 			self.Expressions[model] = nil
-			self.HiddenFaces[model] = nil
 			const concealed = self.Concealed[model]
 			if concealed ~= nil then
 				concealed:Disconnect()
@@ -391,41 +397,12 @@ function RigController:Remove(instance: Instance)
 	self.Rigs[instance] = nil
 end
 
--- Low band of the local character (its LookPack attribute, written by the server).
-function RigController:WatchCharacter(character: Model?)
-	const previous = self.CharacterConnection
-	if previous ~= nil then
-		previous:Disconnect()
-		self.CharacterConnection = nil
-	end
-	local function update()
-		const low = character ~= nil and character:GetAttribute("LookPack") == NIGHT
-		if low ~= self.LowBand then
-			self.LowBand = low
-			self:Refresh()
-		end
-	end
-	if character ~= nil then
-		self.CharacterConnection = character:GetAttributeChangedSignal("LookPack"):Connect(update)
-	end
-	update()
-end
-
 RigController:OnInit(function(self)
 	self:Setup()
 end)
 
 RigController:OnStart(function(self)
 	self:Warmup()
-	const player = Players.LocalPlayer
-	player.CharacterAdded:Connect(function(character: Model)
-		self:WatchCharacter(character)
-	end)
-	player.CharacterRemoving:Connect(function()
-		self:WatchCharacter(nil)
-	end)
-	self:WatchCharacter(player.Character)
-
 	CollectionService:GetInstanceAddedSignal(CrewRig.Tag):Connect(function(instance: Instance)
 		self:Add(instance)
 	end)

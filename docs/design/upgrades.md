@@ -16,6 +16,8 @@ Tabela `Upgrades` (id, nível, preço, efeitos tipados, peça visível, pré-req
 
 O único item rotativo da bancada é especial, não upgrade: Rescue Whistle (ITM-021, FEAT-035; "Revive Kit" em DEC-129).
 
+> **Modo anomalia (pedidos do dono 2026-10-14, Provisório, sem DEC; `open-questions.md` "Pedidos do dono 2026-10-14"):** o jogo é de anomalia, quase tudo à noite: os upgrades de dia saem de venda **sem serem apagados** (`Content.Mode.DayOnly = false`; `true` = o futuro "modo só de dia" os traz de volta). **Fora de venda:** UPG-003 Counter (Wide Counter; a fila fica fixa em 2, `Q-261`), UPG-004 Cash Drawer Lock (sem ladrão), UPG-008 a UPG-011 (mesas). **Seguem:** UPG-001 Grill (grelha dupla), UPG-002 **Storage** (o 1º upgrade, lição das 18h do Dia 1), UPG-005 Trailer Lights. **Novo (só desenho):** UPG-012 Security Camera. O Gear Stand fica **fechado** no Dia 1 até o fim do turno (`Content.Mart.FirstShiftClosed`).
+
 ## Template de ficha
 
 ```
@@ -31,9 +33,9 @@ Critérios de aceite
 | ID | Upgrade | Níveis | Custo total | Veículo | Onde se compra | Rotaciona? |
 |---|---|---|---|---|---|---|
 | UPG-001 | Grill | 1–3 | $210 | ambos | bancada B1 | não |
-| UPG-002 | Cooler | 1–3 | $170 | ambos | bancada B2 | não |
-| UPG-003 | Counter | 1–3 | $230 | ambos | bancada B3 | não |
-| UPG-004 | Cash Drawer Lock | 0–1 | $80 | ambos | bancada B4 | não |
+| UPG-002 | **Storage** (era Cooler; 2026-10-14, Provisório, `Q-260`) | 1–4 | $220 ($40 / $70 / $110) | trailer | bancada B2 | não |
+| UPG-003 | Counter — **fora de venda no modo anomalia** (2026-10-14) | 1–5 (DEC-241) | $340 | trailer | bancada B3 | não |
+| UPG-004 | Cash Drawer Lock — **fora de venda no modo anomalia** (2026-10-14) | 0–1 | $80 | trailer | bancada B4 | não |
 | UPG-005 | Trailer Lights | 0–1 | $100 | só trailer | bancada B5 (após a compra do trailer) | não |
 | ~~UPG-006~~ | ~~Food Trailer (veículo)~~ **OBSOLETO (DEC-224): veículo único desde o Day 1, sem compra** | — | ~~$300 × party~~ (sai) | — | — | — |
 | UPG-007 | Coffee Maker | incluída | $0 (vem com o trailer) | só trailer | — | — |
@@ -41,6 +43,9 @@ Critérios de aceite
 | UPG-009 | Patio Lights — Provisório | 0–1 | $120 | Pad | na mesa `TBL-1` (placa) no Pad (`Q-178`) | não |
 | UPG-011 | Trailer Table (4 mesas do trailer, `TBL-6..9`) — Provisório (`Q-209`) | 0–4 (1 mesa por nível) | $330 ($50 / $70 / $90 / $120) | **só trailer** (`Scope = "Vehicle"`) | na própria mesa fantasma, só depois de comprar o trailer (`Q-209`) | não |
 | UPG-010 | Back Bar (bancada externa do trailer) — Provisório, cortável | 0–1 | $90 | só trailer | na própria bancada dobrada, no trailer (`Q-178`, `Q-179`) | não |
+| UPG-012 | Security Camera — **Rascunho, só desenho** (2026-10-14, FEAT-040, `Q-267`) | 0–2 | $320 ($120 / $200, proposta) | trailer | bancada (pedestal a definir: B3/B4 ficam livres no modo anomalia) | não |
+
+> UPG-008 a UPG-011 (mesas) e o Patio Lights também ficam **fora de venda no modo anomalia** (2026-10-14). Soma do que se compra no modo anomalia, Provisório: Grill $210 + Storage $220 + Trailer Lights $100 = **$530** (+ UPG-012 quando existir).
 
 Soma de tudo que se compra com dinheiro (solo): $210 + $170 + $230 + $80 + $100 = **$790** (DEC-224: o trailer, $300, **não se compra mais**; era $1.090).
 Com as mesas do trailer (UPG-011 $330) e o Back Bar (UPG-010 $90), Provisório: **$1.210**. Se as mesas do Pad (UPG-008 $315, UPG-009 $120) voltarem (`Q-225`): $1.645. Antes (2026-10-11): $1.615. Os ~$2.860 ganhos por run solo vêm do fluxo antigo (DEC-057); a simulação de `economy.md` §7 deve ser refeita com o fluxo da `Q-207`.
@@ -78,6 +83,17 @@ veículo, então o critério da FEAT-015 "nenhum prompt de compra em equipamento
 | 3 | $120 | 30 / 20 / 75* / 35 / 30* | ~2 idas a menos | idem, forte | geladeira de inox |
 
 `*` proposto (`items.md`, Q-062). Café não muda com o Cooler.
+
+- **Emenda 2026-10-14 (pedido do dono, Provisório, `Q-260`): vira STORAGE, o 1º upgrade da run.** A tabela acima está superada. 4 níveis (base + 3 compras), chave `cooler` mantida (snapshots e ids):
+
+| Nível | Preço | Pão | Salsicha | Ketchup / Mostarda | Queijo / Bacon | Batata palha | Cream Cheese | Café |
+|---|---|---|---|---|---|---|---|---|
+| 1 | inicial | 12 | 12 | 15 | 5 | 6 | 6 | 20 |
+| 2 | $40 | 16 | 16 | 20 | 6 | 9 | 8 | 20 |
+| 3 | $70 | 20 | 20 | 25 | 7 | 12 | 10 | 20 |
+| 4 | $110 | 24 | 24 | 30 | 8 | 15 | 12 | 20 |
+
+  Regra do dono: pão +4 por nível; molhos começam em 15 e +5 por nível (3 compras = os 30 de antes); "a mesma lógica" nas outras coberturas = metade no nível 1 e o antigo nível 1 no topo. O nível 4 reusa a peça `Cooler_L3`. Placa do Gear Stand: "16 buns · 20 sauce". Comprado pela 1ª vez na lição das 18h do Dia 1 (FEAT-004, `Q-262`).
 - Conservação/validade (§11 do GDD V1): fora do MVP **[DEC-128]**; o Cooler só aumenta capacidade.
 - Critérios de aceite: capacidade sobe na hora; o estoque atual não muda.
 
@@ -90,6 +106,8 @@ veículo, então o critério da FEAT-015 "nenhum prompt de compra em equipamento
 | 1 | inicial | 3 | +0 s | base | base | balcão curto |
 | 2 | $70 | 4 | +10 s | mais clientes simultâneos; menos spawns pulados (forte em party) | dá tempo de resolver uma anomalia sem perder clientes | balcão estendido + banquinhos |
 | 3 | $160 | 5 | +20 s | idem | idem | balcão em L com toldo |
+
+- **Emenda 2026-10-13 [DEC-241, Provisório]:** a tabela acima está superada. Counter vai a **5 níveis**: vagas **1/2/3/4/5**, paciência extra **0/+5/+10/+15/+20 s**, preços **$0/$30/$60/$100/$150**, **sem cooldown** de 1 turno por compra. Os níveis 4 e 5 reusam a peça `Counter_L3`. ANM-004 só começa com 2 vagas (nível 2 ou mais).
 
 - Paciência final = 40 + 5 × K + extra **[DEC-072]**.
 - Critérios de aceite: cliente já no balcão recebe a paciência extra na hora da compra.
@@ -117,6 +135,19 @@ veículo, então o critério da FEAT-015 "nenhum prompt de compra em equipamento
 - A ANM-003 (The stopped clock, verbo luz) **não depende** deste upgrade: a sequência "lights off, count five, lights on" funciona com o interruptor do trailer em qualquer nível (FEAT-020).
 - O Walker (ANM-007) mira um ponto fixo (passo 10, borda da luz do trailer); comprar Trailer Lights **não** encurta o caminho dele.
 - Critérios de aceite: os de `proposals-round-1.md` Q-014; desligar o interruptor apaga também o raio externo.
+- **2026-10-14 (dono):** a luz do trailer "é interessante": segue **à venda** no modo anomalia; ideia de ligá-la à câmera de segurança (UPG-012) em `Q-266`.
+
+### UPG-012 — Security Camera (Rascunho, só desenho)
+
+- Origem: **pedido do dono, 2026-10-14** (FEAT-040) · Veículo: trailer · Compra: Gear Stand (pedestal a definir) · **Sem código ainda.**
+
+| Nível | Preço (proposta) | Efeito de dia | Efeito de noite | Peça visível |
+|---|---|---|---|---|
+| 0 | — | — | — | — |
+| 1 | $120 | nenhum (jogo de noite; exceção consciente a DEC-006, como UPG-004) | monitor no trailer com 1 câmera da rua | monitor CRT no balcão + 1 câmera na parede |
+| 2 | $200 | nenhum | 3 câmeras (rua, Mart, porta dos fundos) + aviso de movimento | + 2 câmeras |
+
+- Critérios de aceite: os de FEAT-040. Perguntas em `Q-267`.
 
 ### UPG-006 — Food Trailer (veículo) — **OBSOLETO (DEC-224, 2026-10-12)**
 

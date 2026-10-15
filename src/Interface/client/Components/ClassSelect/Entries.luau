@@ -1,5 +1,5 @@
 --!strict
--- Rows of the class screen from Content (Classes, Species, Shop.ClassProducts). Pure: no Vide, no network.
+-- Rows of the class screen from Content (Classes, Species, Shop.GamePasses). Pure: no Vide, no network.
 -- Description (narrative-writer placeholder) is "perk. drawback." (Content.Classes header): a class with effects shows
 -- its first sentence as the perk and the rest as drawbacks; a class without effects (the dog) shows neutral notes.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -69,13 +69,13 @@ local function build(): { Entry }
 	return list
 end
 
--- Suggested Robux price of a class product (display fallback); nil = no product (ProductId 0 or not sold).
+-- Suggested Robux price of a class Game Pass (display fallback) and its PassId; nil = no pass (PassId 0 or not sold).
 local function robux(key: string): (number?, number)
-	const product = Content.Shop.ClassProducts.ByKey[key]
-	if product == nil or product.ProductId <= 0 then
+	const pass = Content.Shop.GamePasses.ByKey[key]
+	if pass == nil or pass.PassId <= 0 then
 		return nil, 0
 	end
-	return product.Robux, product.ProductId
+	return pass.Robux, pass.PassId
 end
 
 return table.freeze({

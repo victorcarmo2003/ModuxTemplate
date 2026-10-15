@@ -16,6 +16,14 @@
 --                         `topping_sprinkle` (solids) at the bowl + 6 droplets in the swatch colour
 --   any Amount up         SFX-062 `restock` at the station + dust puff (5)
 -- Sausage, bun and coffee going down are heard on the grill, the board and the machine instead.
+-- Gift bowls (owner request 2026-10-14, Provisional): a bowl with Wrapped = true (unlocked, not opened yet) shows CLOSED: the body,
+-- the plate and its lid `Lid_<Suf>`, no food, no count, no padlock. When the record turns open (the server unwrapped it and filled it)
+-- the lid flies off (a local copy leaps, spins and fades; the authored lid hides) and a confetti burst in Cream / Mustard / Teal
+-- pops out of the bowl; the restock sound comes from the Amount going up. Motion.Reduced: the lid just goes, no confetti.
+-- TASK-277 (owner request 2026-10-14, Provisional): the closed gift bowl is a "present": a local Highlight on the bowl with a BLACK
+-- fill and a WHITE outline (the lid on). Holding "Open" (E) unwraps it on the server; here the lid flies, the Highlight goes (the
+-- bowl back to normal), confetti + the green sausage-ready burst (Fx "Ready" preset, tinted Green) and `upgrade_done` play once.
+-- Every part of the bowl named "Lid..." (Lid_<Suf>, LidKnob_<Suf>, LidClosed_<Suf>, a copied lid that kept another suffix) is the lid.
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
@@ -27,6 +35,8 @@ local StockCounter = require(Components.StockCounter)
 local StockPlate = require(Components.StockPlate)
 local Context = require(script.Parent.Context)
 local Fx = require(script.Parent.Fx)
+local Motion = require(Components.Motion)
+local Theme = require(Components.Theme)
 
 const effect = Vide.effect
 const cleanup = Vide.cleanup
@@ -62,6 +72,20 @@ const SAUCE_SPEED: { [string]: number } = {
 }
 const DROPS = 6 -- AST-092 sauce Emit(6)
 const DUST = 5 -- AST-092 restock Emit(5)
+-- the unwrap of a gift bowl (owner request 2026-10-14, Provisional numbers)
+const UNWRAP_CONFETTI = { Color3.fromHex("#FFF8EC"), Color3.fromHex("#F6C12B"), Color3.fromHex("#3FA7B5") } -- Cream, Mustard, Teal
+const UNWRAP_EACH = 6 -- confetti per colour
+const LID_FLIGHT = 0.55 -- s
+const LID_RISE = 2.2 -- studs up
+const LID_SIDE = 1.2 -- studs away from the bowl
+const LID_TURN = math.rad(160)
+const LID_TWEEN = TweenInfo.new(LID_FLIGHT, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+-- the gift-wrapped look and the unwrap extras (TASK-277, Provisional)
+const GIFT_FILL = Color3.new(0, 0, 0)
+const GIFT_OUTLINE = Color3.new(1, 1, 1)
+const GIFT_FILL_TRANSPARENCY = 0
+const UNWRAP_READY = 10 -- the sausage-ready burst (Grill.luau: Fx "Ready", 10), tinted Green
+const UNWRAP_SOUND = "upgrade_done"
 
 -- Fill --------------------------------------------------------------------------------------------------------------
 
@@ -164,7 +188,7 @@ local function bindFill(part: BasePart, ref: BasePart, read: () -> Context.Stock
 			return -- as authored
 		end
 		local ratio = if record.Capacity > 0 then record.Amount / record.Capacity else 0
-		if hideWhenBlocked and record.Blocked then
+		if hideWhenBlocked and (record.Blocked or record.Wrapped == true) then
 			ratio = 0
 		end
 		if fill then
@@ -254,6 +278,55 @@ local function frontFace(plate: BasePart, from: Vector3, fallback: Vector3): (En
 	return face, dims
 end
 
+-- The bowl's own `<prefix>_...` part: first by the exact name inside the bin, then ANY child of the bin that starts with the prefix
+-- (a duplicated lid keeps its old name when the owner copies it into another bowl), then by name anywhere in the station.
+local function ownPart(station: Instance, bin: BasePart?, prefix: string, suffix: string): Instance?
+	if bin ~= nil then
+		const exact = bin:FindFirstChild(`{prefix}_{suffix}`)
+		if exact ~= nil then
+			return exact
+		end
+		for _, child in bin:GetChildren() do
+			if child:IsA("BasePart") and string.sub(child.Name, 1, #prefix + 1) == `{prefix}_` then
+				return child
+			end
+		end
+	end
+	return Context.Find(station, `{prefix}_{suffix}`)
+end
+
+-- Every lid piece of one bowl (TASK-277): the parts inside the bin whose name starts with "Lid" (Lid_<Suf>, LidKnob_<Suf>,
+-- LidClosed_<Suf>, or a copied lid with another suffix), plus the station's own `Lid*_<Suf>` parts outside the bin.
+local function lidParts(station: Instance, bin: BasePart?, suffix: string): { BasePart }
+	const found: { BasePart } = {}
+	const seen: { [BasePart]: boolean } = {}
+	local function add(part: BasePart)
+		if not seen[part] then
+			seen[part] = true
+			table.insert(found, part)
+		end
+	end
+	if bin ~= nil then
+		for _, descendant in bin:GetDescendants() do
+			if descendant:IsA("BasePart") and string.lower(string.sub(descendant.Name, 1, 3)) == "lid" then
+				add(descendant)
+			end
+		end
+	end
+	const tail = `_{suffix}`
+	for _, descendant in station:GetDescendants() do
+		if
+			descendant:IsA("BasePart")
+			and string.lower(string.sub(descendant.Name, 1, 3)) == "lid"
+			and string.sub(descendant.Name, -#tail) == tail
+		then
+			add(descendant)
+		end
+	end
+	return found
+end
+
+-- UNUSED since 2026-10-14 (no padlock any more: a locked bowl is invisible, see mountBowl). Kept for a rollback.
 -- Lock_<Suf> of the bowl model; without it, a local copy of the kit padlock at Att_Lock_<Suf> or on top of the
 -- lid (architecture.md §18.4 / §18.9.1: ReplicatedStorage.Assets.Equipment.Padlock, Att_Hang).
 local function padlock(station: Instance, suffix: string, lid: Instance?): Instance?
@@ -351,6 +424,70 @@ local function bindSounds(
 	end)
 end
 
+-- Unwrap ------------------------------------------------------------------------------------------------------------
+
+-- The lid of an opened gift bowl leaps off: a local inert copy flies up and away, spins and fades (the authored lid is
+-- already hidden by the caller). Without motion (Motion.Reduced) nothing flies.
+local function flyLid(lid: Instance, away: Vector3)
+	if Motion.Reduced() or not lid:IsA("BasePart") then
+		return
+	end
+	const copy = lid:Clone()
+	for _, descendant in copy:GetDescendants() do
+		if not descendant:IsA("BasePart") and not descendant:IsA("DataModelMesh") and not descendant:IsA("SurfaceAppearance") then
+			descendant:Destroy()
+		end
+	end
+	for _, tag in CollectionService:GetTags(copy) do
+		CollectionService:RemoveTag(copy, tag)
+	end
+	copy.Name = `{lid.Name}_Flying`
+	copy.Anchored = true
+	copy.CanCollide = false
+	copy.CanQuery = false
+	copy.CanTouch = false
+	copy.LocalTransparencyModifier = 0
+	copy.Parent = workspace.CurrentCamera or workspace
+	const flat = Vector3.new(away.X, 0, away.Z)
+	const side = if flat.Magnitude > 1e-3 then flat.Unit else Vector3.xAxis
+	const goal = (copy.CFrame + Vector3.new(0, LID_RISE, 0) + side * LID_SIDE) * CFrame.Angles(LID_TURN, LID_TURN * 0.5, 0)
+	TweenService:Create(copy, LID_TWEEN, { CFrame = goal, Transparency = 1 }):Play()
+	task.delay(LID_FLIGHT + 0.1, function()
+		copy:Destroy()
+	end)
+end
+
+local function confetti(at: Vector3)
+	if Motion.Reduced() then
+		return
+	end
+	for _, color in UNWRAP_CONFETTI do
+		Fx.Burst(at, "Confetti", UNWRAP_EACH, color)
+	end
+	-- the same burst as a sausage turning ready on the grill, in Green (TASK-277)
+	Fx.Burst(at, "Ready", UNWRAP_READY, Theme.Color.Green)
+end
+
+-- The "present" look of a closed gift bowl (TASK-277): local, never replicated, gone with the view. TASK-288: the bowl has no Model
+-- of its own (Bin_<Suf> is a MeshPart holding the lid, label, food and padlock as children) and a Highlight on a BasePart covers that
+-- part only, so each piece of the closed bowl gets its own (body, lid pieces, label; the food and the padlock are hidden then).
+local function giftHighlights(parts: { BasePart }): { Highlight }
+	const made: { Highlight } = {}
+	for _, part in parts do
+		const highlight = Instance.new("Highlight")
+		highlight.Name = "GiftHighlight"
+		highlight.Adornee = part
+		highlight.FillColor = GIFT_FILL
+		highlight.FillTransparency = GIFT_FILL_TRANSPARENCY
+		highlight.OutlineColor = GIFT_OUTLINE
+		highlight.OutlineTransparency = 0
+		highlight.DepthMode = Enum.HighlightDepthMode.Occluded
+		highlight.Parent = part
+		table.insert(made, highlight)
+	end
+	return made
+end
+
 -- Views -------------------------------------------------------------------------------------------------------------
 
 local function mountBowl(station: Instance, ingredient: string, context: Context.Context)
@@ -359,15 +496,15 @@ local function mountBowl(station: Instance, ingredient: string, context: Context
 	const bin = Context.FindPart(station, "Bin_" .. suffix)
 	const fillPart = Context.FindPart(station, "Fill_" .. suffix)
 	const label = Context.FindPart(station, "Label_" .. suffix)
-	const lid = Context.Find(station, "Lid_" .. suffix)
-	const lock = padlock(station, suffix, lid)
+	const lids = lidParts(station, bin, suffix)
+	const lock = ownPart(station, bin, "Lock", suffix)
 
 	local function read(): Context.StockRecord?
 		return context.Stock(ingredient)
 	end
 	local function showCount(): boolean
 		const record = read()
-		return record ~= nil and not record.Blocked
+		return record ~= nil and not record.Blocked and record.Wrapped ~= true
 	end
 
 	if fillPart then
@@ -382,27 +519,97 @@ local function mountBowl(station: Instance, ingredient: string, context: Context
 		bindSounds(station, ingredient, read, soundAt, true, context.Audio)
 	end
 
-	-- DEC-156: lid + padlock only while Blocked. No record yet = closed (rule of doubt, as authored).
-	if lid or lock then
-		effect(function()
-			const record = read()
-			const closed = record == nil or record.Blocked
-			if lid then
-				setShown(lid, closed)
-			end
-			if lock then
-				setShown(lock, closed)
-			end
-		end)
-		cleanup(function()
-			if lid then
-				setShown(lid, true)
-			end
-			if lock then
-				setShown(lock, true)
-			end
-		end)
+	-- Owner decision 2026-10-14 (replaces DEC-156's lid + padlock): a LOCKED bowl is not there at all. The whole bowl (body, plate,
+	-- food, lid, padlock, and the plate's interface) is fully transparent until the ingredient is unlocked; then the bowl shows with
+	-- its lid and padlock OFF. No record yet = hidden (rule of doubt: nothing to show before the server says it is unlocked).
+	const locked = function(): boolean
+		const record = read()
+		return record == nil or record.Blocked
 	end
+	-- the Fill is driven by bindFill (it hides itself while the bowl is locked); everything else of the bowl is driven here
+	const bowlParts: { BasePart } = {}
+	if bin then
+		table.insert(bowlParts, bin)
+	end
+	if label then
+		table.insert(bowlParts, label)
+	end
+	-- gift bowl (owner request 2026-10-14): closed with its lid until the server opens it; the open is celebrated once
+	local wasWrapped: boolean? = nil
+	local gift: { Highlight }? = nil
+	local function dropGift()
+		if gift ~= nil then
+			for _, highlight in gift do
+				highlight:Destroy()
+			end
+			gift = nil
+		end
+	end
+	-- the pieces the present look covers (TASK-288): the whole closed bowl, whatever is visible of it
+	const wrapParts: { BasePart } = table.clone(bowlParts)
+	for _, part in lids do
+		table.insert(wrapParts, part)
+	end
+	effect(function()
+		const hide = locked()
+		const record = read()
+		const wrapped = record ~= nil and not record.Blocked and record.Wrapped == true
+		for _, part in bowlParts do
+			showPart(part, not hide)
+		end
+		if fillPart and hide then
+			showPart(fillPart, false)
+		end
+		-- the lid only shows on a closed gift bowl; the padlock never shows
+		for _, part in lids do
+			setShown(part, wrapped)
+		end
+		if lock then
+			setShown(lock, false)
+		end
+		-- the gift-wrapped look (TASK-277) follows Wrapped
+		if wrapped and gift == nil then
+			gift = giftHighlights(wrapParts)
+		elseif not wrapped then
+			dropGift()
+		end
+		const opened = wasWrapped == true and not wrapped and record ~= nil and not record.Blocked
+		wasWrapped = if record ~= nil then wrapped else wasWrapped
+		if opened then
+			untrack(function()
+				const at = if bin then bin.Position elseif fillPart then fillPart.Position else nil
+				const camera = workspace.CurrentCamera
+				if at then
+					const away = if camera then at - camera.CFrame.Position else Vector3.xAxis
+					const flying: { [Instance]: boolean } = {}
+					for _, part in lids do
+						-- a knob parented to its lid flies with the lid's copy
+						if not flying[part.Parent :: Instance] then
+							flying[part] = true
+							flyLid(part, away)
+						end
+					end
+					confetti(at + Vector3.new(0, 0.4, 0))
+					if context.Audio.Current(station) then
+						context.Audio.Play(station, UNWRAP_SOUND, bin or fillPart)
+					end
+				end
+				return nil
+			end)
+		end
+	end)
+	cleanup(function()
+		dropGift()
+		for _, part in bowlParts do
+			showPart(part, true)
+		end
+		for _, part in lids do
+			setShown(part, true)
+		end
+		if lock then
+			setShown(lock, true)
+		end
+	end)
 
 	if label then
 		const pivot = if station:IsA("PVInstance") then station:GetPivot() else label.CFrame
@@ -423,6 +630,10 @@ local function mountBowl(station: Instance, ingredient: string, context: Context
 				return Context.IsLow(read())
 			end,
 			ShowCount = showCount,
+			-- a locked bowl has no plate either (the SurfaceGui draws even on a transparent part)
+			Visible = function()
+				return not locked()
+			end,
 			Vertical = dims.Y > dims.X * 1.2,
 		})
 		gui.Parent = label

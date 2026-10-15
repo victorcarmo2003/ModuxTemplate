@@ -13,6 +13,10 @@
 -- not in the snapshot. Gate "Shutter": take_order/serve/refuse refused while closed (reason Shutter:Closed) + Notice
 -- shutter_closed to who acted (one per NOTICE_EVERY s). API IsShutterClosed, IsInside, IsInsidePoint, IsProtected,
 -- SetShutter; signal ShutterChanged.
+-- TASK-284 (owner request 2026-10-14, Provisional Q-270): the window IS the shop, day and night (the red "Open Shop"
+-- switch left). It shuts by itself when Prep starts; opening it in Prep starts the selling phase (RoundService:OpenShop);
+-- in a selling phase closed = RoundService Paused (no new customer, sign CLOSED). A selling phase opens it by itself
+-- (the Prep ran out). The line leaving angry is CustomerService's (ShutterChanged); anomalies: AnomalyService.
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -29,8 +33,9 @@ const VEHICLE = Content.RunParams.StartVehicle
 -- MapPoint of the trailer pose at the Pad (MAP-01 §16.3: point = model pivot). Checked, never used to move it.
 const TRL_POINT = "TRL"
 const POSE_TOLERANCE = 1.5 -- studs between the model pivot and the TRL point before a warning
--- Phases where the window cannot be closed (waiting for the roster / opening cutscene / run end)
-const CLOSED_PHASES = { "Resume", "Intro", "RunEnd", "NightLost" }
+-- Phases where the lever works (Content.Actions.shutter_toggle.Requires.Phase: Prep, Open, Closing, Night; TASK-284)
+const SHUTTER_PHASES: { string } = Content.Actions.ByKey.shutter_toggle.Requires.Phase or {}
+const PREP = "Prep"
 -- Service window (§19.14)
 const SHUTTER_ACTION = "shutter_toggle"
 const SHUTTER_ATTRIBUTE = "Shutter"
@@ -210,9 +215,8 @@ function VehicleService:AddShutterAnchor(anchor: Instance)
 	self:ApplyShutter()
 end
 
--- Party window state. Closing needs a night shift outside the closed phases and a vehicle with a window (dev goes
--- through here too: "shutter close" by day does nothing); force = automatic opening paths. Opening always works.
--- Returns the state now matches `closed`.
+-- Party window state. Closing needs a lever phase (SHUTTER_PHASES) and a vehicle with a window (dev goes through here
+-- too); force = automatic paths. Opening always works. Returns the state now matches `closed`.
 function VehicleService:SetShutter(closed: boolean, player: Player?, force: boolean?): boolean
 	if type(closed) ~= "boolean" then
 		error("[VehicleService] SetShutter needs a boolean", 2)
@@ -228,14 +232,26 @@ function VehicleService:SetShutter(closed: boolean, player: Player?, force: bool
 	self.ShutterClosed = closed
 	self:ApplyShutter()
 	self.ShutterChanged:Fire(closed, player)
+	self:SyncShop(player ~= nil)
 	return true
 end
 
--- Night shift, outside Resume/Intro/RunEnd/NightLost. Follows Actions.shutter_toggle.Night = NightOnly, i.e. the
--- night shift as a whole (its Prep included, same as KitchenService/ItemService read Night; L3-18, PROVISIONAL)
+-- The shop follows the window (TASK-284): opened by a player in Prep = the selling phase starts (automatic openings,
+-- ShiftStarted / restore, never skip a Prep); in a selling phase closed = Paused
+function VehicleService:SyncShop(byPlayer: boolean)
+	const round = self.Dependencies.RoundService
+	const closed = self:IsShutterClosed()
+	if not closed and byPlayer and round:GetPhase() == PREP then
+		round:OpenShop()
+	elseif round:IsSelling() then
+		round:SetPaused(closed)
+	end
+end
+
+-- Any shift, in the lever phases (Actions.shutter_toggle: Night = Any, Requires.Phase; TASK-284)
 function VehicleService:ShutterPhase(): boolean
 	const round = self.Dependencies.RoundService
-	return round:IsStarted() and round:IsNight() and table.find(CLOSED_PHASES, round:GetPhase()) == nil
+	return round:IsStarted() and table.find(SHUTTER_PHASES, round:GetPhase()) ~= nil
 end
 
 -- shutter_toggle Validate: Active member, anchor of the trailer, caller inside it, phase, party cooldown
@@ -338,7 +354,12 @@ VehicleService:OnInit(function(self)
 		self:SetShutter(false, nil, true)
 	end)
 	round.PhaseChanged:Connect(function(phase)
-		if table.find(OPEN_PHASES, phase) ~= nil then
+		const row = Content.Shift.ByKey[phase]
+		if phase == PREP then
+			-- shop closed until someone opens the window (TASK-284)
+			self:SetShutter(true, nil, true)
+		elseif table.find(OPEN_PHASES, phase) ~= nil or (row ~= nil and row.Selling) then
+			-- a selling phase opens the shop (the Prep ran out, or the window just opened it)
 			self:SetShutter(false, nil, true)
 		end
 	end)

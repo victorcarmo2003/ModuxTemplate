@@ -306,8 +306,20 @@ function Targets.new(rules: Content.PrepWorldRules, folder: Folder?): Registry
 		const hitbox = rules.Hitbox
 		const scale = if assist then hitbox.AssistScale else 1
 		local changed = false
+		const viewport = camera.ViewportSize
 		for _, entry in entries do
-			const enabled = entry.Target.Enabled()
+			local enabled = entry.Target.Enabled()
+			-- the camera pans freely between the stations: a target that is out of the screen answers nothing (no ghost target far
+			-- away); a margin of 40 px keeps one that is half in
+			if enabled then
+				const anchor = entry.Target.Parts[1]
+				if anchor ~= nil then
+					const point, onScreen = camera:WorldToViewportPoint(anchor.Position)
+					if not onScreen and (point.Z <= 0 or point.X < -40 or point.Y < -40 or point.X > viewport.X + 40 or point.Y > viewport.Y + 40) then
+						enabled = false
+					end
+				end
+			end
 			if enabled ~= entry.Enabled then
 				entry.Enabled = enabled
 				changed = true

@@ -6,6 +6,11 @@
 --     at its bottom face (road surface).
 --   TrafficLine / LineId = SL-*: stop line piece; its distance along a route = projection of its centre (XZ).
 --   TrafficBox / BoxId = X-T, CW-1..4: volume; its range along a route = stretches whose XZ falls in the footprint.
+--   Painted crosswalks (MAP01_Blockout.Crosswalks, one Model per crosswalk, bound or not): stripes no stop may cover.
+-- Holds (TASK-281, owner print 2026-10-14: a car waited on the Juniper South stripes): every stop point is moved back
+-- until the whole body (front bumper at the point, 2 * halfCar behind it) is off the stripes of every crosswalk the
+-- route crosses, painted or boxed. SL-S / SL-N sit on the X-T edge, right past the CW-1 / north stripes, so the map
+-- line alone put the waiting car on them.
 -- Profile: SpeedStraight, SpeedCrossing inside the X-T footprint, Crossing.PullAway / Crossing.BrakeDecel.
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -52,6 +57,10 @@ const LINE_ATTRIBUTE = "LineId"
 const BOX_TAG = "TrafficBox"
 const BOX_ATTRIBUTE = "BoxId"
 const LINE_OFFSET_MAX = 20 -- studs between a stop line and its route before the binding is suspicious
+const STRIPES_FOLDER = { "MAP01_Blockout", "Crosswalks" } -- painted crosswalks (TASK-281)
+const STRIPES_KEY = "Stripes" -- zone key of a painted crosswalk with no TrafficBox
+const STRIPE_CLEARANCE = 1 -- studs between the front bumper and the first stripe (TASK-281)
+const EPSILON = 1e-3
 
 const Paths = {}
 
@@ -131,9 +140,56 @@ function Paths.polyline(pathId: string): (Motion.Path?, string?)
 	return path, nil
 end
 
+-- Ranges along the path of every painted crosswalk it crosses (TASK-281)
+local function paintedRanges(path: Motion.Path): { { number } }
+	local folder: Instance? = workspace
+	for _, name in STRIPES_FOLDER do
+		folder = if folder then folder:FindFirstChild(name) else nil
+	end
+	const ranges: { { number } } = {}
+	if folder == nil then
+		return ranges
+	end
+	for _, crosswalk in folder:GetChildren() do
+		local cframe: CFrame, size: Vector3
+		if crosswalk:IsA("Model") then
+			cframe, size = crosswalk:GetBoundingBox()
+		elseif crosswalk:IsA("BasePart") then
+			cframe, size = crosswalk.CFrame, crosswalk.Size
+		else
+			continue
+		end
+		-- flat paint: give the footprint height so the bottom-face nodes fall inside it
+		const stretches = Motion.Stretches(path, cframe, Vector3.new(size.X, math.max(size.Y, 10), size.Z))
+		if #stretches > 0 then
+			table.insert(ranges, { stretches[1][1], stretches[#stretches][2] })
+		end
+	end
+	return ranges
+end
+
+-- Front-bumper point at or before `at` where the body [front - 2 * halfCar, front] covers no stripes (TASK-281)
+local function clearOfStripes(at: number, stripes: { { number } }, halfCar: number): number
+	local front = at
+	for _ = 1, #stripes + 1 do
+		local moved = false
+		for _, range in stripes do
+			if range[1] < front - EPSILON and range[2] > front - 2 * halfCar + EPSILON then
+				front = range[1] - STRIPE_CLEARANCE
+				moved = true
+			end
+		end
+		if not moved then
+			break
+		end
+	end
+	return front
+end
+
 -- Geometry of one route. Returns nil + problem when the path is missing; missing lines/boxes are listed in
--- `warnings` (the route still runs: a missing line = that stop is skipped).
-function Paths.build(route: Route): (Geo?, string?, { string })
+-- `warnings` (the route still runs: a missing line = that stop is skipped). `halfCar` = half a car length: the stop
+-- points are front-bumper positions kept off the crosswalk stripes (TASK-281).
+function Paths.build(route: Route, halfCar: number): (Geo?, string?, { string })
 	const warnings: { string } = {}
 	const path, problem = Paths.polyline(route.Path)
 	if path == nil then
@@ -185,15 +241,9 @@ function Paths.build(route: Route): (Geo?, string?, { string })
 		end
 	end
 
-	const stops: { StopPoint } = {}
-	for _, stop in route.Stops do
-		const at = lines[stop.Line]
-		if at ~= nil then
-			table.insert(stops, { Key = stop.Line, Kind = stop.Kind, Ref = stop.Ref, At = at })
-		end
-	end
-
-	-- crosswalk boxes the path crosses (entry = the route's line for it when it has one)
+	-- stripes: the crosswalk boxes and the painted crosswalks this path crosses (TASK-281)
+	const boxed: { [string]: { number } } = {}
+	const stripes: { { number } } = {}
 	for _, crosswalk in traffic.Crosswalks.List do
 		const box = boxPart(crosswalk.Box)
 		if box == nil then
@@ -201,6 +251,49 @@ function Paths.build(route: Route): (Geo?, string?, { string })
 			continue
 		end
 		const range = rangeOf(path, box)
+		if range ~= nil then
+			boxed[crosswalk.Key] = range
+			table.insert(stripes, range)
+		end
+	end
+	for _, range in paintedRanges(path) do
+		table.insert(stripes, range)
+		local covered = false
+		for _, other in boxed do
+			if range[1] < other[2] and range[2] > other[1] then
+				covered = true
+			end
+		end
+		-- a painted crosswalk with no box: queue slots keep off it too (clearOfZones)
+		if not covered then
+			table.insert(zones, { Key = STRIPES_KEY, Entry = range[1], From = range[1], To = range[2] })
+		end
+	end
+
+	-- hold point of each line on this route: the line, moved back off any stripes
+	const holds: { [string]: number } = {}
+	for name, at in lines do
+		const hold = clearOfStripes(at, stripes, halfCar)
+		holds[name] = hold
+		if hold < at - EPSILON then
+			table.insert(
+				warnings,
+				`{route.Key}: {name} is on crosswalk stripes, the car holds {math.floor(at - hold + 0.5)} studs before it`
+			)
+		end
+	end
+
+	const stops: { StopPoint } = {}
+	for _, stop in route.Stops do
+		const at = holds[stop.Line]
+		if at ~= nil then
+			table.insert(stops, { Key = stop.Line, Kind = stop.Kind, Ref = stop.Ref, At = at })
+		end
+	end
+
+	-- crosswalk boxes the path crosses (entry = the route's hold for it when it has one)
+	for _, crosswalk in traffic.Crosswalks.List do
+		const range = boxed[crosswalk.Key]
 		if range == nil then
 			continue
 		end
@@ -209,7 +302,7 @@ function Paths.build(route: Route): (Geo?, string?, { string })
 		for _, stop in route.Stops do
 			if stop.Kind == "Crosswalk" and (stop.Ref == crosswalk.Key or stop.Ref == crosswalk.Linked) then
 				listed = true
-				const at = lines[stop.Line]
+				const at = holds[stop.Line]
 				if at ~= nil and at <= range[1] + 1 then
 					entry = at
 				end
@@ -218,7 +311,12 @@ function Paths.build(route: Route): (Geo?, string?, { string })
 		table.insert(zones, { Key = crosswalk.Key, Entry = entry, From = range[1], To = range[2] })
 		if not listed then
 			table.insert(warnings, `{route.Key} crosses {crosswalk.Box} without a stop for it: stops at the box edge`)
-			const point: StopPoint = { Key = `{crosswalk.Key}@{route.Key}`, Kind = "Crosswalk", Ref = crosswalk.Key, At = entry }
+			const point: StopPoint = {
+				Key = `{crosswalk.Key}@{route.Key}`,
+				Kind = "Crosswalk",
+				Ref = crosswalk.Key,
+				At = clearOfStripes(entry, stripes, halfCar),
+			}
 			table.insert(stops, point)
 		end
 	end

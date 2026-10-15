@@ -112,8 +112,11 @@ function MarketService:UpgradeOf(anchor: Instance): Content.Upgrade?
 end
 
 -- Gear Stand shutter up: the current Shift phase is not in Content.Mart.KioskClosedPhases (reactive inside an effect).
+-- Also down on Day 1 until the first shift ends (Content.Mart.FirstShiftClosed, owner request 2026-10-14).
 function MarketService:IsKioskOpen(): boolean
-	return not KIOSK_CLOSED[self.Dependencies.RoundService:GetPhase()]
+	const round = self.Dependencies.RoundService
+	const phase = round:GetPhase()
+	return not KIOSK_CLOSED[phase] and not Content.Mart.FirstShiftClosed(round:Info(), phase)
 end
 
 -- Bench slot sells now: upgrade exists on the current vehicle, not maxed, unlocked today, not resting after a
@@ -122,6 +125,7 @@ end
 function MarketService:OnSale(upgrade: Content.Upgrade): boolean
 	const upgrades = self.Dependencies.UpgradeService
 	return upgrades:GetLevel(upgrade.Key) ~= nil
+		and not Content.Mode.IsOff(upgrade.Key) -- anomaly mode: Wide Counter, Drawer Lock off the stand
 		and upgrades:NextLevel(upgrade.Key) ~= nil
 		and self.Dependencies.RoundService:GetDay() >= upgrade.UnlockDay
 		and upgrades:GetWait(upgrade.Key) == 0
@@ -176,9 +180,13 @@ function MarketService:HintDue(): boolean
 	return economy:GetCash() + economy:GetDrawer() >= cheapest or self:NeverBought()
 end
 
--- Closing starts: one toast per shift to the party. Never blocks a purchase (the stand is open all day).
+-- Closing starts: one toast per shift to the party. Never blocks a purchase (the stand is open all day). The day Closing
+-- is the Last call (DEC-240, the crew is still serving and has its own toast), so the hint waits for the Summary.
 function MarketService:OnPhase(phase: string, info: { Day: number, Night: number, IsNight: boolean })
-	if phase ~= "Closing" then
+	if phase ~= "Closing" and phase ~= "Summary" then
+		return
+	end
+	if phase == "Closing" and self.Dependencies.RoundService:IsLastCall() then
 		return
 	end
 	const key = `{info.Day}/{info.Night}/{if info.IsNight then 1 else 0}`
@@ -359,6 +367,7 @@ MarketService:OnStart(function(self)
 	self.Libs.Charm.effect(function()
 		round:GetDay()
 		round:GetPhase()
+		round:IsNight()
 		upgrades:GetVehicle()
 		upgrades:Capture()
 		upgrades.Cooldown()

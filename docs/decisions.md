@@ -3297,3 +3297,149 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
 - Decidido pelo dono: o controle da **janela de serviço** (`shutter_toggle`, DEC-221) sai do bloco amarelo ao lado do interruptor de luz e vai para **perto da janela de serviço**, com **design melhor**: caixa de comando de parede coerente com os outros interruptores (Steel, ícone Cream com três frestas Mustard, alavanca Mustard, lâmpada Teal), peças simples; o interruptor de **abrir/fechar a loja** (`open_sign`) ocupa o lugar do bloco amarelo, ao lado do da luz.
 - **Provisório:** posição na parede leste do trailer (x -32,5; y 4,9; z 12,6), feita por `tools/assetplace/trailer_door_switches.luau` (idempotente, atributo `MovedBy`). A porta dos fundos abre pelo prompt (Door_Back com `ScriptedDoor`, dobradiça a oeste, 80 graus; `Prompt_ExitTrailer` autoral).
 - Impacto: **level-designer**, **modeler-3d** (se a caixa virar malha).
+
+### DEC-238 — 2026-10-13 — Vendas vão DIRETO para a conta compartilhada
+
+- Origem: decisão do dono (2026-10-13); registrada a pedido do orquestrador.
+- Decidido pelo dono: todo dinheiro de **venda** (preço do pedido, recompensa do ladrão pego) entra **na hora** no `Cash` compartilhado da party; não passa mais por gaveta.
+- **Emenda:** DEC-050 (pagamento na gaveta) e a regra "o HUD só muda no depósito" de FEAT-012. **Não muda:** a nota do turno e o bônus de DEC-051 (base = vendas + gorjetas + recompensas − roubado, igual ao que a gaveta somava).
+- **Provisório:** `EconomyService:AddSale(amount, kind)` ("Sale" | "Catch"); `Ledger.settle(ledger, bossPoints)` com `Take`.
+- Impacto: **backend-coder** (`EconomyService`, `CustomerService:SellLine`, `ThiefService`), **frontend-coder** (rótulos do resumo).
+
+### DEC-239 — 2026-10-13 — Pote de gorjetas substitui o caixa; gorjeta de mesa passa pelo pote
+
+- Origem: decisão do dono (2026-10-13); registrada a pedido do orquestrador.
+- Decidido pelo dono: a **gaveta/caixa sai** e entra um **pote de gorjetas** (`TipJar`). Só gorjeta cai nele (a de balcão, DEC-072, e a de mesa, "Clean Table"). O prompt no pote ("Collect Tips") manda o que há nele para o `Cash` da party. Gorjeta **não coletada** no fim do turno é **auto-depositada** no Resumo.
+- **Emenda:** DEC-050 (gaveta, Collect Cash do Q-201). O ladrão e o Cash Drawer Lock seguem sobre o pote (dormentes: o pote fica abaixo de `MinDrawer`).
+- **Provisório:** `Content.TipJar` (`FullAt` 20, `MaxBills` 14, `MapId` "TRL-TIPJAR", `LegacyMapIds` DRAWER / TRL-DRAWER), ação `collect_tips` (hold 0,4, raio 5), `TipJarService` no lugar do `CashDeskService`; o campo de rede `Drawer` do set `Economy` guarda as gorjetas do pote (nome mantido para não quebrar o client).
+- Impacto: **backend-coder**, **frontend-coder** (`EconomyController`), **level-designer** (modelo `TRL-TIPJAR` no trailer).
+
+### DEC-240 — 2026-10-13 — Última chamada às 18h: sem fechamento automático no Dia 1
+
+- Origem: decisão do dono (2026-10-13); registrada a pedido do orquestrador.
+- Decidido pelo dono: às 18:00 do Dia 1 o relógio chega normalmente; depois **ninguém novo chega**, mas o trailer segue **ABERTO** (placa OPEN), a fila e as mesas são atendidas **sem pressa** e o dia **fecha sozinho** quando fila e mesas esvaziam. A paciência dos clientes segue valendo. A noite (6:00 AM) não muda; o interruptor `open_sign` pausa/encerra como antes.
+- **Emenda:** DEC-048 (Closing de 20 s com placa CLOSED), só no turno de dia.
+- **Provisório:** a fase `Closing` de dia é a "Última chamada" (`Content.Shift` `Closing.LastCall = true`, `Duration` 120 s = teto de segurança para AFK); `RoundService:IsLastCall()` / `IsServing()`; Preparo focado, mesas e tutorial seguem funcionando nela; notice `last_call`; o toast "Closing time..." virou texto neutro.
+- Impacto: **backend-coder**, **frontend-coder** (placa OPEN em `OpenSignController`, rótulo "Last call").
+
+### DEC-241 — 2026-10-13 — Fila padrão de 1 cliente; Counter L1 a L5 sem cooldown
+
+- Origem: decisão do dono (2026-10-13); registrada a pedido do orquestrador.
+- Decidido pelo dono: o balcão começa com **1 cliente** (só o do balcão). O upgrade UPG-003 Counter vai a **5 níveis**: vagas 1/2/3/4/5, paciência extra 0/+5/+10/+15/+20 s, preços $0/$30/$60/$100/$150, **sem** cooldown de 1 turno por compra (campo `Cooldown = false` na linha). Spawn pulado por balcão cheio tenta de novo em ~3,5 s. ANM-004 exige 2 vagas livres e não começa com `QueueSize() < 2`.
+- **Emenda:** DEC-046/DEC-072 (Counter 3/4/5 vagas, $70/$160), Q-203 (cooldown da bancada).
+- **Provisório:** preços e paciência (acima), `Content.Flow.FullRetry` = 3,5 s; `Counter_L4` e `Counter_L5` usam a peça `Counter_L3` (o mapa só tem L1 a L3).
+- Impacto: **backend-coder**, **game-designer** (revisar fluxo de clientes com fila 1), **level-designer** (peças L4/L5 se quiser).
+
+### DEC-242 — 2026-10-14 — ANM-002: sem faca; o cliente AGARRA o jogador (Mild, não gráfico)
+
+- Origem: decisão do dono, conversa de 2026-10-14 (registrada pelo secretário). Responde `Q-241`.
+- Decidido pelo dono: a ANM-002 fica **sem faca** ("melhor agarrando"). O cliente **agarra** o jogador (agarrar/estrangular, **Mild, não gráfico**): a câmera corta, tela de desmaio, **sem sangue**. A **contagem de 10 s com voz sinistra continua** (áudio que o dono grava, ver SFX-230). Se a janela **não for fechada em 10 s**, o cliente **sobe pela janela e agarra quem serviu** o pedido.
+- **Emenda (proposta de `Q-240`, Provisória):** troca a "faca" por "agarrar". **Não aprova** o resto da proposta de `Q-240` (mofo, bichos, gosma, descarte com desaparecimento): segue Provisório. O texto Aprovado de N2 em `story/anomalies.md` só muda quando o dono aprovar o conjunto (sinal + consequência); esta DEC fixa o **método** do ataque e o **tom**.
+- Impacto: **game-designer** (ficha N2), **narrative-writer**, **art-director** (animação de agarrar sem contato explícito), **audio** (SFX-230).
+
+### DEC-243 — 2026-10-14 — ANM-002 pode ser letal (desmaio); segue na N2
+
+- Origem: decisão do dono, conversa de 2026-10-14. Responde `Q-242` (letal) e `Q-243` (noite). Palavras do dono: "é jogo de terror, é para ser difícil; quero que crianças joguem mais de uma vez para aumentar a retenção".
+- Decidido pelo dono: a ANM-002 **pode ser letal**. **Letal = desmaio do jogador** (`Fainted`). O dono **não pediu para mudar a noite**: a ANM-002 **segue na N2** (DEC-096 intacta; sem "primeiro erro perdoado" nem aviso extra impostos por esta DEC).
+- Não decidido (fica em `Q-252`): se o desmaio é revivível e se conta como noite perdida; e se isto emenda DEC-074 ("só a N7 é crítica").
+- Impacto: **game-designer** (curva N2, DEC-010), **qa-tester**.
+
+### DEC-244 — 2026-10-14 — ANM-002: o primeiro alvo é quem serviu; depois o cliente "apenas vai embora sorrindo"
+
+- Origem: decisão do dono, conversa de 2026-10-14. Responde `Q-245` (alvo) em parte.
+- Decidido pelo dono: (1) perseguido primeiro é **quem serviu** o pedido; (2) depois de atacar quem serviu, o cliente **"apenas vai embora sorrindo"**, com **áudio de risada** que o dono vai separar (SFX-231). Em **outra fala** o dono disse que, depois, ele **persegue os outros jogadores vivos** (proposta `Q-240`). As **duas falas ficam registradas**; o conflito aparente (some após atacar ou continua?) está em `Q-248`. Até a resposta, vale a mais **recente e literal**: ele vai embora sorrindo (Provisório).
+- Impacto: **game-designer**, **backend-coder** (só depois de `Q-248`).
+
+### DEC-245 — 2026-10-14 — ANM-004: a cópia mantém a roupa espelhada; olhos totalmente brancos; skin normal
+
+- Origem: decisão do dono, conversa de 2026-10-14. Responde `Q-239` (parte da ANM-004).
+- Decidido pelo dono: a cópia da ANM-004 **mantém a roupa espelhada** (DEC-149/152 intactas); **só os olhos ficam totalmente brancos** (cartunesco) e a **skin é a normal** (sem Night).
+- **Não decidido:** a parte da ANM-001 de `Q-239` (rosto sem traços, cabeça/orelhas/cauda na cor de pele) segue **Provisória**.
+- Impacto: **art-director**, **frontend-coder** (olhos brancos na cópia; skin normal).
+
+### DEC-246 — 2026-10-14 — ANM-002: depois de atacar quem serviu, o cliente SOME sorrindo (fade de 2 s em todo o modelo)
+
+- Origem: decisão do dono, conversa de 2026-10-14. Responde `Q-248` (opção A).
+- Decidido pelo dono: depois de atacar/agarrar **quem serviu**, o cliente **não persegue** os outros vivos: ele **some sorrindo**.
+  - Efeito: **lerp de transparência de 0 a 1 em 2 s**, aplicado a **TODOS os descendentes do modelo**: BaseParts, Decals/Textures, SurfaceAppearance/partes e **toda UI** (SurfaceGui, BillboardGui, Frames, Labels, Images, UIStroke etc.). **Sem nenhum resquício** de parte ou frame ao final (depois do fade o modelo é destruído).
+  - Áudio: risada (**SFX-231**) toca **enquanto some**.
+- Fecha também `Q-245` (alvo) e a perseguição da proposta `Q-240` (item (4)): **sem perseguição**.
+- Impacto: **game-designer** (ficha N2), **backend-coder** (ciclo de vida do ator), **frontend-coder** (fade em todos os descendentes), **audio**.
+
+### DEC-247 — 2026-10-14 — ANM-004: fluxo "a cópia bate na porta dos fundos do trailer" (Provisório sobre o verbo aprovado)
+
+- Origem: decisão do dono, conversa de 2026-10-14. Responde `Q-249`, `Q-250`, `Q-251`, `Q-252`, `Q-253`. **O verbo aprovado "Recusar a cópia" NÃO muda**; isto é só o custo de errar (servir a cópia). Registrado como **Provisório** pelo dono (fluxo novo).
+- Decidido pelo dono:
+  1. **Servir a cópia:** o jogador perde **−35 de sanidade** e a **porta dos fundos do trailer FECHA NA HORA e TRANCA** (se estava aberta, fecha imediatamente). A tranca é **exclusiva desta anomalia** (o jogo não tem tranca de porta em geral). Com a porta trancada o prompt **continua existindo**, mas ao tentar abrir toca **só o SFX "Locked door"** (`ReplicatedStorage.Assets.SFX["Locked door"]`, já inserido pelo dono no Studio). A **janela de serviço continua normal**.
+  2. **8 a 12 s depois** (sorteado; sem ninguém na fila, clima de tensão) a cópia **SPAWNA na porta** e **bate 3 vezes**, com intervalo de **2 a 3 s** entre batidas. **Só quem está DENTRO do trailer vê a cópia** (jogadores de fora não a veem). **Ninguém além da cópia bate** nessa porta (jogadores não conseguem bater): o jogador sabe na hora que é a anomalia.
+  3. Se o jogador **ABRIR** a porta durante as batidas, a cópia **entra e o agarra**: ele **desmaia** (`Fainted`), **revivível com Revive Kit por um colega**; **não é noite perdida**.
+  4. Se **não abrir**, **2 s depois da 3ª batida** a cópia **desaparece** e a porta **destranca**.
+- Fecha: `Q-249` (porta = porta dos fundos do trailer), `Q-250` (escape = não abrir), `Q-251` (8 a 12 s), `Q-252` (desmaio revivível, Revive Kit, **sem emendar DEC-074**), `Q-253` (sobreposição com ANM-009 aceita: a cópia **só bate, sem voz**; "ninguém bate além da cópia" = jogadores não batem).
+- Pontos ambíguos levantados como Provisórios: `Q-255` (quando destranca), `Q-256` (carrinho sem porta dos fundos).
+- Impacto: **game-designer**, **backend-coder** (tranca exclusiva em `TrailerDoorService`, spawn visível só a quem está dentro, ciclo das batidas), **frontend-coder** (visibilidade local da cópia), **audio** (SFX "Locked door", `door_knock`).
+
+### DEC-248 — 2026-10-14 — "Agarra" passa no tom Mild
+
+- Origem: decisão do dono, conversa de 2026-10-14. Responde `Q-254`.
+- Decidido: "agarrar/estrangular" **passa no Mild**, sem problemas. Nos textos usar **"agarra"**.
+- Impacto: **narrative-writer**, **frontend-coder** (textos de UI).
+
+### DEC-249 — 2026-10-14 — ANM-004: a tranca é a PORTA DO TRAILER; sem clientes novos durante o evento
+
+- Origem: decisão do dono, conversa de 2026-10-14. Responde `Q-255`. Esclarece DEC-247.
+- Decidido:
+  1. A tranca é a **porta do trailer**: com ela trancada o jogador **não consegue abrir nem sair** do trailer.
+  2. **Não vêm novos clientes** pedindo hot dog enquanto o **evento da anomalia durar**.
+  3. **Confirma a interpretação aplicada:** trancada de servir a cópia até o início das batidas; **aberta durante as batidas**; a cópia some **2 s depois da 3ª batida**.
+- Impacto: **backend-coder** (`TrailerDoorService`, pausa do spawn de clientes durante o evento), **game-designer**.
+
+### DEC-250 — 2026-10-14 — Não existe mais carrinho; ANM-004 só no trailer
+
+- Origem: decisão do dono, conversa de 2026-10-14. Fecha `Q-256` como **obsoleta, sem objeto**.
+- Decidido: **só existe o trailer** (já em DEC-224). A **ANM-004 (cópia) é mantida** e só ocorre no trailer.
+- Impacto: **game-designer**, **backend-coder** (sem ramo de carrinho).
+
+### DEC-251 — 2026-10-14 — ANM-005 fica como aprovada: noite SECA, N5
+
+- Origem: decisão do dono, conversa de 2026-10-14. Responde `Q-257`.
+- Decidido: a ANM-005 fica **como aprovada**: noite **SECA**, **sem chuva de atmosfera**. Raincoat Lady **molhada e pingando numa noite seca**, deixando **poça** (sinais próprios). A noite continua **N5** (DEC-096). **Cancela** a proposta de "noite chuvosa com pingos em todos os NPCs".
+- Impacto: **game-designer**, **art-director**.
+
+### DEC-252 — 2026-10-14 — Raincoat Lady é uma OVELHA (Sheep)
+
+- Origem: decisão do dono, conversa de 2026-10-14. Responde `Q-258`.
+- Decidido: a Raincoat Lady (ANM-005) é uma **ovelha (Sheep)**. **Substitui o sapo (Frog) de DEC-203** para esta personagem; capa amarela `#F2C230`, botas verdes, guarda-chuva e olhos fechados mantidos.
+- Impacto: **art-director** (AST-059), **narrative-writer** (`characters.md`, CHR-006), **modeler-3d**.
+
+### DEC-253 — 2026-10-14 — Efeito visual da Raincoat Lady (pingos e poça) — Provisório
+
+- Origem: decisão do dono, conversa de 2026-10-14. **Provisório** (detalhes de VFX; ajustáveis na implementação).
+- Decidido:
+  1. **Pingos:** um `ParticleEmitter` em **TODAS as partes do corpo R6** dela (cabeça, tronco, braços, pernas): cor **azul**, textura simples de **QUADRADO** com **squash** (esticada na vertical) para parecer gota; a partícula **cai ao chão**.
+  2. **Poça:** **UM emitter extra na base do rig (pés)**: partículas em **arco/círculo se abrindo** com **aceleração bem suave para fora**, espalhando como água pelo chão, terminando com **fade-out de transparência**.
+- Impacto: **frontend-coder** (VFX), **art-director** (AST-059).
+
+### DEC-254 — 2026-10-14 — Anomalias V2: 4 famílias no lugar de uma regra por noite (fecha Q-269 a, e, g)
+
+- Origem: pedido falado do dono (2026-10-14: anomalias "mais simples", "rápidas de fazer", no espírito do jogo de shawarma de anomalias; inspiração, não cópia) + questionário (opção escolhida: "4 famílias").
+- Decidido: as anomalias passam a ser **4 famílias** (`design/anomalies-v2-proposal.md` §3): **A cliente errado** (recusar), **B algo vem vindo** (sair do trailer e **esconder nos fundos**), **C falha de energia** (religar o disjuntor nos fundos), **D sustos sem verbo**. Anomalias aprovadas que encaixam são reaproveitadas (ANM-001, ANM-004, ANM-003/010 em C, ANM-007 em B, ANM-002 em A, ANM-009 em D); **ANM-006 e ANM-008 saem** (IDs não são reaproveitados).
+- Emenda: DEC-025 (cumulativo por regra), DEC-054 (distribuição de verbos), DEC-073 (lista N1–N10), DEC-221 (verbo "fechar a janela" deixa de ser a resposta de esconder).
+- Impacto: **game-designer** (números, ritmo §5), **narrative-writer** (ligações que apresentam a novidade da noite; `story/anomalies.md` vira histórico), **architect** (4 módulos genéricos + tabela, §6), **task-planner** (TASK novas), **art-director** (monstros originais, rostos).
+
+### DEC-255 — 2026-10-14 — Erro de anomalia = jumpscare + desmaio (fecha Q-269 c, d)
+
+- Origem: questionário (opção escolhida: "Jumpscare + desmaio").
+- Decidido: errar qualquer anomalia = **jumpscare** e **desmaio** (`Fainted`), revivível por colega com Revive Kit. **Sem regra crítica** fixa; noite perdida só se **todos** desmaiarem.
+- Emenda: DEC-053 (−35 de sanidade por erro comum), DEC-074 (regra crítica na N7). A sanidade continua caindo pelos sustos (família D) e pelo escuro.
+
+### DEC-256 — 2026-10-14 — Jumpscare cartoon, dentro do Mild (fecha Q-269 b)
+
+- Origem: questionário (opção escolhida: "Cartoon, Mild").
+- Decidido: jumpscare passa a ser a **consequência normal do erro** (não mais "raro"), mas **cartoon**: rosto do monstro estilizado ~0,6 s, **sem gore**, **sem grito estridente**, câmera corta antes do contato (DEC-248). Classificação **Mild** mantida (DEC-172).
+- Emenda: DEC-173 ("raro").
+
+### DEC-257 — 2026-10-14 — Atmosfera fixa por noite (fecha Q-269 f)
+
+- Origem: questionário (opção escolhida: "Fixa por noite").
+- Decidido: cada noite tem **uma atmosfera fixa** (breu, névoa vermelha, chuva, tempestade, neblina branca, lua de sangue na noite 10), conforme a tabela de `design/anomalies-v2-proposal.md` §5 (game-designer ajusta a ordem). Só ambiente (`Lighting`, `Atmosphere`, partículas, som). Prefixo novo **`ATM-#`**.
+- Nota: com DEC-254 a Raincoat Lady (DEC-251, noite seca) só aparece em noite sem chuva.

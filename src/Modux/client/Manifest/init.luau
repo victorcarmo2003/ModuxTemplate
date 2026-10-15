@@ -14,6 +14,7 @@ local CoffeeHandController = require(StarterPlayer.StarterPlayerScripts.client.M
 local RigController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.RigController)
 local CustomerController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.CustomerController)
 local CutsceneController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.CutsceneController)
+local DeliveryController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.DeliveryController)
 local DoorController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.DoorController)
 local EconomyController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.EconomyController)
 local HallucinationController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.HallucinationController)
@@ -37,6 +38,9 @@ local PrepController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTy
 local ProfileController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ProfileController)
 local RoundController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.RoundController)
 local SeatingController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.SeatingController)
+local SecurityController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.SecurityController)
+local SettingsController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.SettingsController)
+local ShopController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ShopController)
 local ShowcaseController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ShowcaseController)
 local StageController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.StageController)
 local ThiefController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ThiefController)
@@ -62,6 +66,7 @@ export type AllControllers = {
 	RigController: RigController.Public,
 	CustomerController: CustomerController.Public,
 	CutsceneController: CutsceneController.Public,
+	DeliveryController: DeliveryController.Public,
 	DoorController: DoorController.Public,
 	EconomyController: EconomyController.Public,
 	HallucinationController: HallucinationController.Public,
@@ -85,6 +90,9 @@ export type AllControllers = {
 	ProfileController: ProfileController.Public,
 	RoundController: RoundController.Public,
 	SeatingController: SeatingController.Public,
+	SecurityController: SecurityController.Public,
+	SettingsController: SettingsController.Public,
+	ShopController: ShopController.Public,
 	ShowcaseController: ShowcaseController.Public,
 	StageController: StageController.Public,
 	ThiefController: ThiefController.Public,

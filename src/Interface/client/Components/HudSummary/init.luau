@@ -30,11 +30,12 @@ export type Report = {
 	Title: string, -- "Day 3" / "Night 2"
 	Arrived: number,
 	Completed: number,
-	Drawer: number,
+	Sales: number, -- paid straight into the shared money (2026-10-13)
+	Tips: number, -- piled in the tip jar
 	Stolen: number,
 	Grade: Grade,
 	Bonus: number,
-	Deposited: number,
+	Deposited: number, -- "Banked"
 	Gems: number, -- already credited this shift (DEC-104)
 	GemsTotal: number?, -- account total, when known
 	AfkLocked: boolean, -- DEC-083
@@ -161,24 +162,25 @@ end
 local function rows(report: Report): { Instance }
 	const list: { Instance } = {}
 	table.insert(list, row(1, "Ui/friends", "Customers", `{report.Completed} / {report.Arrived}`))
-	table.insert(list, row(2, "Ui/cash", "Drawer", Money(report.Drawer)))
+	table.insert(list, row(2, "Ui/cash", "Sales", Money(report.Sales)))
+	table.insert(list, row(3, "Hud/coin", "Tips", Money(report.Tips)))
 	if report.Stolen > 0 then
-		table.insert(list, row(3, "", "Stolen", Money(-report.Stolen)))
+		table.insert(list, row(4, "", "Stolen", Money(-report.Stolen)))
 	end
-	table.insert(list, row(4, "Ui/sparkle", `Grade {report.Grade} bonus`, "+" .. Money(report.Bonus)))
-	table.insert(list, row(5, "Hud/coin", "Deposited", Money(report.Deposited), Theme.Tone.Mustard))
+	table.insert(list, row(5, "Ui/sparkle", "Grade bonus", "+" .. Money(report.Bonus)))
+	table.insert(list, row(6, "Hud/coin", "Banked", Money(report.Deposited), Theme.Tone.Mustard))
 	if report.Gems > 0 then
 		const total = report.GemsTotal
 		table.insert(
 			list,
-			row(6, "Hud/gem", "Gems", if total then `+{report.Gems} / {total}` else `+{report.Gems}`, Theme.Tone.Teal)
+			row(7, "Hud/gem", "Gems", if total then `+{report.Gems} / {total}` else `+{report.Gems}`, Theme.Tone.Teal)
 		)
 	end
 	if report.AfkLocked then
-		table.insert(list, note(7, "No gems: away too long"))
+		table.insert(list, note(8, "No gems: away too long"))
 	end
 	if report.LastChanceUsed then
-		table.insert(list, note(8, "Last chance used"))
+		table.insert(list, note(9, "Last chance used"))
 	end
 	return list
 end

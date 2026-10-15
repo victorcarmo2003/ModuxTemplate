@@ -16,7 +16,7 @@ export type Ingredient = {
 	UnlockDay: number, -- 0 = depends on Vehicle
 	Vehicle: string?, -- key of Vehicles, or nil (any vehicle)
 	Weight: number, -- order draw weight (DEC-071); 0 when not an order topping
-	Capacity: { number }, -- one entry per Cooler level (Upgrades.cooler)
+	Capacity: { number }, -- one entry per Storage level (Upgrades.cooler, 4 levels)
 	Station: string, -- key of Stations
 	Stack: Stack?, -- only Sauce/Topping
 	Icon: string, -- rbxassetid; "" = placeholder until Q-152 (DEC-156)
@@ -31,7 +31,7 @@ const base = Table.new({
 		OrderPrice = 0,
 		UnlockDay = 1,
 		Weight = 0,
-		Capacity = { 12, 20, 30 },
+		Capacity = { 12, 16, 20, 24 }, -- +4 per Storage level (owner request 2026-10-14, Provisional)
 		Station = "bun_crate",
 		Icon = "",
 	},
@@ -43,7 +43,7 @@ const base = Table.new({
 		OrderPrice = 0,
 		UnlockDay = 1,
 		Weight = 0,
-		Capacity = { 12, 20, 30 },
+		Capacity = { 12, 16, 20, 24 }, -- follows the buns (one sausage per bun; Provisional)
 		Station = "sausage_stock",
 		Icon = "",
 	},
@@ -55,7 +55,7 @@ const base = Table.new({
 		OrderPrice = 1,
 		UnlockDay = 1,
 		Weight = 10,
-		Capacity = { 30, 50, 75 },
+		Capacity = { 15, 20, 25, 30 }, -- 15 +5 per level: three purchases reach the old 30 (owner request 2026-10-14)
 		Station = "toppings",
 		Stack = "Cord",
 		Icon = "",
@@ -68,7 +68,7 @@ const base = Table.new({
 		OrderPrice = 1,
 		UnlockDay = 1,
 		Weight = 10,
-		Capacity = { 30, 50, 75 },
+		Capacity = { 15, 20, 25, 30 }, -- same as ketchup
 		Station = "toppings",
 		Stack = "Cord",
 		Icon = "",
@@ -81,7 +81,7 @@ const base = Table.new({
 		OrderPrice = 2,
 		UnlockDay = 2,
 		Weight = 7,
-		Capacity = { 8, 14, 20 },
+		Capacity = { 5, 6, 7, 8 }, -- same rule for every topping: about half at level 1, the old level-1 cap at level 4 (Provisional)
 		Station = "toppings",
 		Stack = "BeforeCords",
 		Icon = "",
@@ -94,7 +94,7 @@ const base = Table.new({
 		OrderPrice = 3,
 		UnlockDay = 3,
 		Weight = 6,
-		Capacity = { 8, 14, 20 },
+		Capacity = { 5, 6, 7, 8 }, -- same rule (Provisional)
 		Station = "toppings",
 		Stack = "InOrder",
 		Icon = "",
@@ -107,7 +107,7 @@ const base = Table.new({
 		OrderPrice = 2,
 		UnlockDay = 4,
 		Weight = 6,
-		Capacity = { 15, 25, 35 },
+		Capacity = { 6, 9, 12, 15 }, -- same rule (Provisional)
 		Station = "toppings",
 		Stack = "InOrder",
 		Icon = "",
@@ -120,7 +120,7 @@ const base = Table.new({
 		OrderPrice = 2,
 		UnlockDay = 6,
 		Weight = 5,
-		Capacity = { 12, 20, 30 }, -- levels 2/3 Provisional (Q-062)
+		Capacity = { 6, 8, 10, 12 }, -- same rule (Provisional; Q-062)
 		Station = "toppings",
 		Stack = "Cord",
 		Icon = "",
@@ -134,7 +134,7 @@ const base = Table.new({
 		UnlockDay = 0,
 		Vehicle = "trailer",
 		Weight = 0,
-		Capacity = { 20, 20, 20 }, -- Cooler does not change coffee
+		Capacity = { 20, 20, 20, 20 }, -- Storage does not change coffee
 		Station = "coffee_machine",
 		Icon = "",
 	},
@@ -143,5 +143,10 @@ const base = Table.new({
 return Table.with(base, {
 	ToppingKeys = Table.keysWhere(base, function(row: Ingredient): boolean
 		return row.Kind == "Sauce" or row.Kind == "Topping"
+	end),
+	-- Gift bowls (owner request 2026-10-14, Provisional): the toppings that unlock after Day 1 arrive as a CLOSED bowl the
+	-- player opens once ("Open", topping_unwrap) and that comes full. The Day 1 bowls (ketchup, mustard) start open.
+	GiftKeys = Table.keysWhere(base, function(row: Ingredient): boolean
+		return (row.Kind == "Sauce" or row.Kind == "Topping") and row.UnlockDay > 1
 	end),
 })

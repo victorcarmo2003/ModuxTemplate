@@ -38,29 +38,41 @@ export type Upgrade = {
 	PlaceSpots: { string }, -- SoldAt "InPlace": spot of each purchasable level, in order; {} on the bench
 	Scope: Scope, -- "Vehicle" (DEC-184: the trailer starts over) or "Pad" (kept across the swap, Q-179 a)
 	Requires: Requires?, -- prerequisite on the current vehicle (UPG-009: trailer_tables >= 2)
+	Cooldown: boolean?, -- false = this Bench line has no Gear Stand cooldown (Counter, DEC-241); nil / true = Mart.Cooldown
 }
 
--- UPG-001 Grill: 2 slots/12 s -> 3/10 s $60 -> 4/8 s $150 (DEC-046). Roller grill, one sausage per roller pair,
--- each level = more rollers on the same machine (DEC-138, DEC-201).
+-- UPG-001 Grill: 2 slots/8 s -> 3/6 s $60 -> 4/4 s $150 (DEC-046; times reworked 2026-10-14, slowed the same day: too fast to follow).
+-- GrillTime is the whole cook: (GrillTime - Rules.Grill.PostFlip) s on the first side, then the sausage WAITS for the flip, then
+-- PostFlip s (2 s) and it is ready, so the first side takes 6 / 4 / 2 s by level. Bar grill, one sausage per roller; each level = more rollers (DEC-138, DEC-201).
 const grillTrailer: { Level } = {
-	{ Level = 1, Price = 0, Effects = { GrillSlots = 2, GrillTime = 12 }, Part = "Grill_L1" },
-	{ Level = 2, Price = 60, Effects = { GrillSlots = 3, GrillTime = 10 }, Part = "Grill_L2" }, -- Q-163 a
-	{ Level = 3, Price = 150, Effects = { GrillSlots = 4, GrillTime = 8 }, Part = "Grill_L3" }, -- Q-163 a
+	{ Level = 1, Price = 0, Effects = { GrillSlots = 2, GrillTime = 8 }, Part = "Grill_L1" },
+	{ Level = 2, Price = 60, Effects = { GrillSlots = 3, GrillTime = 6 }, Part = "Grill_L2" }, -- Q-163 a
+	{ Level = 3, Price = 150, Effects = { GrillSlots = 4, GrillTime = 4 }, Part = "Grill_L3" }, -- Q-163 a
 }
 
--- UPG-002 Cooler: capacity level 1 -> 2 $50 -> 3 $120 (DEC-046, DEC-049). Per-ingredient numbers live in
--- Ingredients.Capacity (one entry per level; Q-062 for cream cheese).
+-- UPG-002 Storage (was "Cooler"; owner request 2026-10-14, Provisional): the FIRST upgrade of the run (the Day 1 upgrade
+-- lesson, TutorialService). Level 1 + three purchases; each level raises every stock by the steps of
+-- Ingredients.Capacity (buns +4: 12/16/20/24; ketchup and mustard +5: 15/20/25/30, the old level-1 30 at the top; the
+-- other toppings the same shape). Prices $40 / $70 / $110 (Provisional, economy.md §2: was $50 / $120 for two levels).
+-- The key stays "cooler" (record id, run snapshots "Upg"); the old level numbers 1..3 still load (rows 1..4 exist).
 const coolerTrailer: { Level } = {
 	{ Level = 1, Price = 0, Effects = { StockCapacityLevel = 1 }, Part = "Cooler_L1" },
-	{ Level = 2, Price = 50, Effects = { StockCapacityLevel = 2 }, Part = "Cooler_L2" }, -- Q-163 a
-	{ Level = 3, Price = 120, Effects = { StockCapacityLevel = 3 }, Part = "Cooler_L3" }, -- Q-163 a
+	{ Level = 2, Price = 40, Effects = { StockCapacityLevel = 2 }, Part = "Cooler_L2" },
+	{ Level = 3, Price = 70, Effects = { StockCapacityLevel = 3 }, Part = "Cooler_L3" },
+	-- the map has Cooler_L1..L3: level 4 reuses Cooler_L3 (same Part = same piece, UpgradeService:RefreshPiece)
+	{ Level = 4, Price = 110, Effects = { StockCapacityLevel = 4 }, Part = "Cooler_L3" },
 }
 
--- UPG-003 Counter: queue 3 -> 4 +10 s patience $70 -> 5 +20 s $160 (DEC-046, DEC-072).
+-- UPG-003 Counter (DEC-241, user decision 2026-10-13; prices Provisional): the line starts with ONE customer (the one at
+-- the counter) and grows to 5: QueueSize 1/2/3/4/5, PatienceBonus 0/+5/+10/+15/+20 s, $0/$30/$60/$100/$150. No Gear
+-- Stand cooldown on this line (Cooldown = false). The map only has the pieces Counter_L1..L3: levels 4 and 5 reuse
+-- Counter_L3 (UpgradeService shows a piece while the current row has the same Part).
 const counterTrailer: { Level } = {
-	{ Level = 1, Price = 0, Effects = { QueueSize = 3, PatienceBonus = 0 }, Part = "Counter_L1" },
-	{ Level = 2, Price = 70, Effects = { QueueSize = 4, PatienceBonus = 10 }, Part = "Counter_L2" }, -- Q-163 a
-	{ Level = 3, Price = 160, Effects = { QueueSize = 5, PatienceBonus = 20 }, Part = "Counter_L3" }, -- Q-163 a
+	{ Level = 1, Price = 0, Effects = { QueueSize = 1, PatienceBonus = 0 }, Part = "Counter_L1" },
+	{ Level = 2, Price = 30, Effects = { QueueSize = 2, PatienceBonus = 5 }, Part = "Counter_L2" },
+	{ Level = 3, Price = 60, Effects = { QueueSize = 3, PatienceBonus = 10 }, Part = "Counter_L3" },
+	{ Level = 4, Price = 100, Effects = { QueueSize = 4, PatienceBonus = 15 }, Part = "Counter_L3" },
+	{ Level = 5, Price = 150, Effects = { QueueSize = 5, PatienceBonus = 20 }, Part = "Counter_L3" },
 }
 
 -- UPG-004 Cash Drawer Lock: thief opens in 8 s and steals 50% -> 16 s / 30% for $80 (DEC-046, DEC-050).
@@ -120,7 +132,7 @@ return Table.new({
 	{
 		Key = "cooler",
 		Ref = "UPG-002",
-		Name = "Cooler",
+		Name = "Storage",
 		Vehicles = { "trailer" },
 		StartLevel = 1,
 		Levels = { trailer = coolerTrailer },
@@ -142,6 +154,7 @@ return Table.new({
 		BenchSpot = "B3",
 		PlaceSpots = {},
 		Scope = "Vehicle",
+		Cooldown = false, -- DEC-241: the Counter can be bought shift after shift
 	},
 	{
 		Key = "cash_drawer_lock",

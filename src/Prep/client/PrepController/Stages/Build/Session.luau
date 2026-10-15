@@ -16,6 +16,7 @@ local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local Grade = require(ReplicatedStorage.shared.Prep.Grade)
 local Score = require(script.Parent.Parent.Parent.Gestures.Score)
+local Sauce = require(ReplicatedStorage.shared.Item.HotDogVisual.Sauce)
 
 const source = Vide.source
 const untrack = Vide.untrack
@@ -27,7 +28,8 @@ const PENDING_TIMEOUT = 3 -- s without an answer: the request is forgotten and m
 const PRE_CUT_SCORE = 100 -- the altered bun comes sliced: the cut counts as a clean one
 const PIP_CUT, PIP_PLACE, PIP_TOP = 1, 2, 3
 
-export type Topping = { Key: string, Score: number }
+-- Path = the drawn sauce strokes in bun space (3D trace only): sent packed in PrepFinish.Sauces (owner request 2026-10-14)
+export type Topping = { Key: string, Score: number, Path: { { Vector2 } }? }
 
 type Data = {
 	StartedAt: number,
@@ -157,11 +159,11 @@ function Session.SetPlace(controller: any, score: number)
 end
 
 -- A topping is on the plate (the gesture is over): the view-model, the box, the pip of the toppings (the mean of their scores).
-function Session.AddTopping(controller: any, key: string, score: number, amount: number)
+function Session.AddTopping(controller: any, key: string, score: number, amount: number, path: { { Vector2 } }?)
 	if #data.Toppings >= MAX then
 		return
 	end
-	table.insert(data.Toppings, { Key = key, Score = score })
+	table.insert(data.Toppings, { Key = key, Score = score, Path = path })
 	refreshNote()
 	const view = controller.View
 	const list = table.clone(Session.Peek(view.Toppings) :: { any })
@@ -327,9 +329,18 @@ function Session.Finish(controller: any): boolean
 	end
 	const toppings: { { Key: string, Score: number } } = {}
 	const scores: { number } = {}
+	-- the sauce lines as drawn (Sauce.Pack: <= Sauce.Max ints each); the server cleans them and the hot dog shows them
+	const sauces: { { Key: string, Points: { number } } } = {}
 	for _, entry in data.Toppings do
 		table.insert(toppings, { Key = entry.Key, Score = math.clamp(math.floor(entry.Score), 0, 100) })
 		table.insert(scores, entry.Score)
+		const path = entry.Path
+		if path ~= nil then
+			const points = Sauce.Pack(path)
+			if #points >= 2 then
+				table.insert(sauces, { Key = entry.Key, Points = points })
+			end
+		end
 	end
 	const elapsed = Session.Elapsed()
 	if controller.Mock then
@@ -342,8 +353,72 @@ function Session.Finish(controller: any): boolean
 		Cut = math.clamp(math.floor(cut), 0, 100),
 		Place = math.clamp(math.floor(place), 0, 100),
 		Toppings = toppings,
-		Ms = math.clamp(math.floor(elapsed * 1000), 0, 120000),
+		Sauces = if #sauces > 0 then sauces else nil,
+		-- capped at TutorialPlateAge: the server ages a rookie's plate to that (PrepService Sweep), never past it
+		Ms = math.clamp(math.floor(math.min(elapsed, cfg.Rules.TutorialPlateAge) * 1000), 0, 120000),
 	})
+	return true
+end
+
+-- TASK-260 (owner request 2026-10-14): the plate left by Leave / a forced exit stays on the board (the server parks it), so the
+-- client keeps its picture and scores and gives them back on the next Enter. The server is still the authority: if it dropped
+-- the plate meanwhile (shop closed, expired), the next PrepFinish answers NoSession and `lost` starts clean.
+type Parked = {
+	Data: { StartedAt: number, Cut: number?, Place: number?, Toppings: { Topping } },
+	Placed: boolean,
+	View: { [string]: any },
+}
+local parked: Parked? = nil
+const VIEW_KEYS = { "Bun", "Cut", "Guide", "Sausage", "Toppings", "Used", "Pips" }
+
+-- Mode ends with an open plate (nothing on its way): remember it
+function Session.Park(controller: any)
+	if not untrack(Session.Open) or untrack(Session.Pending) ~= "" or Session.Peek(controller.View.Seal) ~= false then
+		parked = nil
+		return
+	end
+	const view: { [string]: any } = {}
+	for _, key in VIEW_KEYS do
+		view[key] = Session.Peek(controller.View[key])
+	end
+	parked = {
+		Data = { StartedAt = data.StartedAt, Cut = data.Cut, Place = data.Place, Toppings = table.clone(data.Toppings) },
+		Placed = untrack(Session.Placed),
+		View = view,
+	}
+end
+
+-- Mode starts: the parked plate comes back (picture, pips, scores, clock). `held` = the server still holds it (the seat record
+-- carries its mask); false forgets the picture. true = there was one
+function Session.Unpark(controller: any, held: boolean): boolean
+	const saved = parked
+	parked = nil
+	if saved == nil or not held then
+		return false
+	end
+	Session.Reset()
+	data.StartedAt = saved.Data.StartedAt
+	data.Cut = saved.Data.Cut
+	data.Place = saved.Data.Place
+	for _, entry in saved.Data.Toppings do
+		table.insert(data.Toppings, entry)
+	end
+	refreshNote()
+	const view = controller.View
+	Vide.batch(function()
+		for key, value in saved.View do
+			view[key](value)
+		end
+		Session.Open(true)
+		Session.Placed(saved.Placed)
+	end)
+	if data.Cut ~= nil then
+		controller:Need("BunCut", true)
+	end
+	if saved.Placed then
+		controller:Need("SausagePlaced", true)
+		controller:Need("PlateBuilt", true)
+	end
 	return true
 end
 

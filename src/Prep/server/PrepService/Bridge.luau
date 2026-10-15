@@ -105,7 +105,9 @@ end
 -- Customer ---------------------------------------------------------------------------------------------------------------
 
 -- act = Content.Prep.OrderActs value (Take, Serve, Refuse). NoTicket = the customer is not there / not in that state.
-function Bridge.Order(customer: any, player: Player, act: string, npc: number): Outcome
+-- made = the hot dog this seat just made (Serve judges that one: the plate dropped on the customer, owner request 2026-10-14);
+-- nil = CustomerService picks the exact one of the hotbar.
+function Bridge.Order(customer: any, player: Player, act: string, npc: number, made: Tool?): Outcome
 	if act == "Take" then
 		const ok = customer:TakeOrderFor(player, npc)
 		return { Ok = ok == true, Reason = if ok == true then "None" else "NoTicket", Grade = "None", Value = 0 }
@@ -113,7 +115,7 @@ function Bridge.Order(customer: any, player: Player, act: string, npc: number): 
 		const ok = customer:RefuseFor(player, npc)
 		return { Ok = ok == true, Reason = if ok == true then "None" else "NoTicket", Grade = "None", Value = 0 }
 	end
-	const sale = customer:ServeFor(player, nil, npc)
+	const sale = customer:ServeFor(player, made, npc)
 	if sale == nil then
 		return { Ok = false, Reason = "NoTicket", Grade = "None", Value = 0 }
 	end

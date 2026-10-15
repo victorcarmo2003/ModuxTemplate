@@ -36,6 +36,7 @@ local Stations = require(script.Parent.Stations)
 local Stats = require(script.Parent.Stats)
 local Table = require(script.Parent.Table)
 local Thief = require(script.Parent.Thief)
+local TipJar = require(script.Parent.TipJar)
 local Traffic = require(script.Parent.Traffic)
 local Upgrades = require(script.Parent.Upgrades)
 local Vehicles = require(script.Parent.Vehicles)
@@ -523,6 +524,15 @@ local function checkRecords()
 			fail("Shift", nil, nil, `phase '{required}' is required`)
 		end
 	end
+	-- Last call (DEC-240): only the Closing row, which never sells (nobody new arrives) and has a cap for the AFK crew
+	for index, row in Shift.List do
+		if row.LastCall == true then
+			if row.Key ~= "Closing" or row.Selling then
+				fail("Shift", index, row.Key, "LastCall is only for the Closing row, and Closing never sells")
+			end
+			inRange("Shift", index, row.Key, "Duration (Last call safety cap)", row.Duration, 30, 600)
+		end
+	end
 	for index, row in OpalLines.List do
 		if row.ToNight < row.FromNight then
 			fail("OpalLines", index, row.Key, "ToNight < FromNight")
@@ -609,7 +619,7 @@ local function checkBossCalls()
 		if row.Short ~= nil and kind ~= "NightCall" then
 			fail("BossCalls", index, row.Key, "Short only on NightCall rows")
 		end
-		if kind == "DayPrep" or kind == "DayInfinite" or kind == "Hint" or kind == "Tutorial" then
+		if kind == "DayPrep" or kind == "DayInfinite" or kind == "Hint" or kind == "Tutorial" or kind == "UpgradeLesson" then
 			if #row.Lines > rules.DayMaxLines then
 				fail("BossCalls", index, row.Key, `{#row.Lines} lines, day calls have at most {rules.DayMaxLines}`)
 			end
@@ -959,7 +969,7 @@ const CUE_KINDS: { [string]: boolean } = { Visual = true, Audio = true, Both = t
 local function checkAnomalies()
 	checkKeys("Anomalies", Anomalies, "^anm_%d%d%d_[a-z0-9_]+$")
 	checkKeys("AnomalyCues", Anomalies.Cues, KEY_PATTERN)
-	if #Anomalies.List ~= RunParams.Nights then
+	if #Anomalies.List < RunParams.Nights then
 		fail("Anomalies", nil, nil, `{#Anomalies.List} rows, one debut per night needs {RunParams.Nights} (DEC-060)`)
 	end
 	for index, cue in Anomalies.Cues.List do
@@ -969,7 +979,9 @@ local function checkAnomalies()
 		inRange("AnomalyCues", index, cue.Key, "Duration", cue.Duration, 0, 30)
 	end
 
+	-- V2 (DEC-254): several rows may debut on one night; the night's debut is its Nights[k].NewAnomaly
 	const debut: { [number]: string } = {}
+	const refs: { [string]: string } = {}
 	const cueUsed: { [string]: boolean } = {}
 	const last = Nights.Windows.Last
 	local scriptedCost = 0
@@ -981,12 +993,17 @@ local function checkAnomalies()
 			end
 		end
 		inRange("Anomalies", index, key, "Night", row.Night, 1, RunParams.Nights)
-		if debut[row.Night] then
-			fail("Anomalies", index, key, `second debut on night {row.Night} (first '{debut[row.Night]}')`)
+		if row.Family == nil and row.Ref ~= string.format("ANM-%03d", row.Night) then
+			fail("Anomalies", index, key, `Ref '{row.Ref}' must be ANM-00k for debut night k (DEC-096; V1 row)`)
 		end
-		debut[row.Night] = key
-		if row.Ref ~= string.format("ANM-%03d", row.Night) then
-			fail("Anomalies", index, key, `Ref '{row.Ref}' must be ANM-00k for debut night k (DEC-096)`)
+		if not string.match(row.Ref, "^ANM%-%d%d%d$") then
+			fail("Anomalies", index, key, `Ref '{row.Ref}' is not ANM-###`)
+		elseif refs[row.Ref] ~= nil then
+			fail("Anomalies", index, key, `Ref '{row.Ref}' already used by '{refs[row.Ref]}'`)
+		end
+		refs[row.Ref] = key
+		if row.Family ~= nil and row.Family ~= "A" and row.Family ~= "B" and row.Family ~= "C" and row.Family ~= "D" then
+			fail("Anomalies", index, key, `Family '{tostring(row.Family)}' is not A, B, C or D (DEC-254)`)
 		end
 		if string.sub(key, 5, 7) ~= string.sub(row.Ref, 5, 7) then
 			fail("Anomalies", index, key, `key number differs from Ref '{row.Ref}'`)
@@ -1001,7 +1018,9 @@ local function checkAnomalies()
 			fail("Anomalies", index, key, "Trailer Needs without an earlier anomaly with Trailer None to stand in")
 		end
 		const night = Nights.List[row.Night]
-		if night and night.NewAnomaly ~= key then
+		if night and night.NewAnomaly == key then
+			debut[row.Night] = key
+		elseif night and row.Family == nil then
 			fail("Anomalies", index, key, `Nights[{row.Night}].NewAnomaly is '{night.NewAnomaly}'`)
 		end
 		if not ANOMALY_ACTORS[row.Actor] then
@@ -1056,7 +1075,7 @@ local function checkAnomalies()
 	end
 	for night = 1, RunParams.Nights do
 		if debut[night] == nil then
-			fail("Anomalies", nil, nil, `night {night} has no debut (one new anomaly per night, DEC-060)`)
+			fail("Anomalies", nil, nil, `night {night}: Nights[{night}].NewAnomaly does not debut on it (DEC-060)`)
 		end
 	end
 	if scriptedCost > Flow.MaxActorsNight then
@@ -1562,9 +1581,11 @@ local function checkSeating()
 	if Flow.BaseInterval > 0 and openRow.Duration / Flow.BaseInterval < 8 then
 		fail("Flow", nil, nil, `Open {openRow.Duration} s / BaseInterval {Flow.BaseInterval} s brings fewer than 8 customers on Day 1`)
 	end
+	-- The day Closing is the Last call (DEC-240): its Duration is only a safety cap, so the turn counts a typical 20 s
+	const closingRow = Shift.ByKey.Closing
 	const dayTurn = Shift.ByKey.Prep.Duration
 		+ openRow.Duration
-		+ Shift.ByKey.Closing.Duration
+		+ (if closingRow.LastCall == true then math.min(closingRow.Duration, 20) else closingRow.Duration)
 		+ Shift.ByKey.Summary.Duration
 	if dayTurn > 330 then
 		fail("Shift", nil, nil, `day turn is {dayTurn} s (Prep + Open + Closing + Summary): playtest target is ~270 s, cap 330`)
@@ -1926,10 +1947,10 @@ local function checkPrep()
 	inRange("Prep.Rules", nil, nil, "Camera.Leave", camera.Leave, 0, 3)
 	inRange("Prep.Rules", nil, nil, "Camera.Pitch", camera.Pitch, -89, 0)
 	inRange("Prep.Rules", nil, nil, "Camera.Distance", camera.Distance, 0.5, 20)
-	inRange("Prep.Rules", nil, nil, "Camera.Pan.Omega", camera.Pan.Omega, 2, 40)
-	inRange("Prep.Rules", nil, nil, "Camera.Pan.Slop", camera.Pan.Slop, 2, 80)
-	inRange("Prep.Rules", nil, nil, "Camera.Pan.Inertia", camera.Pan.Inertia, 0, 1)
-	inRange("Prep.Rules", nil, nil, "Camera.Pan.Hold", camera.Pan.Hold, 0, 0.9)
+	inRange("Prep.Rules", nil, nil, "Camera.Pan.Slop", camera.Pan.Slop, 1, 80)
+	inRange("Prep.Rules", nil, nil, "Camera.Pan.Decay", camera.Pan.Decay, 0.5, 20)
+	inRange("Prep.Rules", nil, nil, "Camera.Pan.StopSpeed", camera.Pan.StopSpeed, 0.05, 5)
+	inRange("Prep.Rules", nil, nil, "Camera.Pan.Hyst", camera.Pan.Hyst, 0, 0.3)
 	inRange("Prep.Rules", nil, nil, "Camera.Pan.Edge", camera.Pan.Edge, 0.02, 0.2)
 	inRange("Prep.Rules", nil, nil, "Camera.Pan.EdgeSpeed", camera.Pan.EdgeSpeed, 1, 40)
 	inRange("Prep.Rules", nil, nil, "ForcedExit.Signal", rules.ForcedExit.Signal, 0, 5)
@@ -1939,6 +1960,8 @@ local function checkPrep()
 	inRange("Prep.Rules", nil, nil, "ClientIdle", rules.ClientIdle, 1, 300)
 	inRange("Prep.Rules", nil, nil, "SeatIdle", rules.SeatIdle, rules.Heartbeat * 2, 600)
 	inRange("Prep.Rules", nil, nil, "PlateMax", rules.PlateMax, 10, 600)
+	-- the tutorial age must stay under PlateMax (the plate never expires) and over the biggest plate's floor
+	inRange("Prep.Rules", nil, nil, "TutorialPlateAge", rules.TutorialPlateAge, rules.PerfectMin + rules.PerTopping * Orders.Rules.MaxToppings + 1, rules.PlateMax - 1)
 	inRange("Prep.Rules", nil, nil, "Reach", rules.Reach, 1, 100)
 	inRange("Prep.Rules", nil, nil, "MinPlate", rules.MinPlate, 0, 60)
 	inRange("Prep.Rules", nil, nil, "PerTopping", rules.PerTopping, 0, 30)
@@ -2084,8 +2107,29 @@ local function checkPrep()
 	end
 end
 
+-- Tip jar (DEC-239): FullAt scales the jar pieces; MapIds are what TipJarService and EconomyController look for
+local function checkTipJar()
+	inRange("TipJar", nil, nil, "FullAt", TipJar.FullAt, 1, 100000)
+	inRange("TipJar", nil, nil, "MaxBills", TipJar.MaxBills, 1, 60)
+	if TipJar.MaxBills ~= math.floor(TipJar.MaxBills) then
+		fail("TipJar", nil, nil, "MaxBills must be a whole number")
+	end
+	if type(TipJar.MapId) ~= "string" or TipJar.MapId == "" then
+		fail("TipJar", nil, nil, "MapId must be a non-empty string")
+	end
+	for index, id in TipJar.LegacyMapIds do
+		if type(id) ~= "string" or id == "" or id == TipJar.MapId then
+			fail("TipJar", index, id, "LegacyMapIds must be non-empty strings other than MapId")
+		end
+	end
+	if Actions.ByKey.collect_tips == nil then
+		fail("TipJar", nil, nil, "Actions.collect_tips is required")
+	end
+end
+
 return function()
 	checkKeySets()
+	checkTipJar()
 	checkHudReveal()
 	checkUpgrades()
 	checkIngredients()

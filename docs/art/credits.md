@@ -151,6 +151,7 @@ conferir se o áudio está público/liberado para a experiência (senão não to
 | revive sound | 78076438768803 | `revive` |
 | Faint - Pizza Place | 1604497989 | `faint` |
 | Door Creak Open | 125209584906878 | `door_creak` |
+| Locked door (inserido pelo dono no Studio, `Assets.SFX`) | 136518625715192 | `locked_door` (SFX-232, ANM-004) |
 | door close | 140470748655921 | `door_close` |
 | chiikawa-car-honk | 81569612419754 | `car_honk_soft` (nome remete a personagem de terceiros: conferir origem/licença com atenção) |
 | Goofy car honk sound effect | 132205340213071 | `car_honk_goofy` |

@@ -4,8 +4,9 @@
 --   ghost       a see-through copy of the raw sausage on a free roller (the invitation), breathing slowly
 --   predicted   the same, steadier, on the roller of a Place that waits for the server
 --   carry       the sausage that follows the pointer while it is dragged (snaps to the roller under it)
---   ring        the flip ring: CylinderHandleAdornment (a real ring, InnerRadius) on the grill part, scale From -> To in the window
---   check       a HintMark Check (Green disc, check glyph, in studs over the sausage) on a ready sausage (a shape, not only a colour)
+--   ring        the bars over the roller (World/GrillBar, TASK-280: the cartoon kit of the settings panel): the cooking bar and the flip
+--               window (Good band Mustard, Perfect band Cream, a Cream knob that swings)
+--   check       a HintMark Check (Green rounded square, check glyph, in studs over the sausage) on a ready sausage (a shape, not only a colour)
 --   turn        the flip: a 180 degree turn about the long axis with a hop, on the REAL sausage of the world (both of its models)
 --   shake       a refusal / an early tap: a short side to side shiver of the real sausage
 --   fly         a collected sausage in an arc to its slot on the rail
@@ -23,15 +24,20 @@ local Slots = require(StarterPlayer.StarterPlayerScripts.client.Kitchen.KitchenC
 local GrillRig = require(script.Parent.GrillRig)
 local Juice = require(script.Parent.Juice)
 local HintMark = require(StarterPlayer.StarterPlayerScripts.client.Interface.HintMark)
+local GrillBar = require(script.Parent.GrillBar)
 
-export type Ring = "None" | "Converge" | "Late"
+-- TASK-257 (owner request 2026-10-14): "Progress" = the cooking bar (grey track, Green fill, a Mustard line at 50%); "Converge" =
+-- the flip timing bar (Good / Perfect bands in the middle, a cursor that swings end to end until the tap). One swaps for the other
+-- with springs (the leaving one pops out, the coming one pops in). TASK-280: both drawn by World/GrillBar
+export type Ring = "None" | "Converge" | "Late" | "Progress"
 
 export type View = {
 	-- Ghost on a roller: "None", "Ghost" (the invitation) or "Predicted" (a Place waiting for the server).
 	SetGhost: (self: View, slot: number, mode: string) -> (),
 	-- Ring on a roller. `progress` is the cooking share 0..1 (Converge uses it), `perfect` the Perfect half-window (share of the
 	-- Duration) around the target.
-	SetRing: (self: View, slot: number, ring: Ring, progress: number) -> (),
+	-- `swing` = where the flip cursor is (0..1 of the bar, Grade.SwingAt) for "Converge".
+	SetRing: (self: View, slot: number, ring: Ring, progress: number, swing: number?) -> (),
 	SetCheck: (self: View, slot: number, on: boolean) -> (),
 	-- The sausage under the pointer: nil hides it. `snap` = the roller it will land on, `grilled` = the cooked model.
 	SetCarry: (self: View, point: Vector3?, snap: number?, grilled: boolean) -> (),
@@ -45,6 +51,10 @@ export type View = {
 	-- A refused Place: the predicted ghost rises, shivers and goes.
 	Reject: (self: View, slot: number) -> (),
 	Burst: (self: View, slot: number, band: string) -> (),
+	-- TASK-261: the answer of a flip (the server's band): Perfect = sparks, flash, "Perfect!", a big kick of the bar; Good =
+	-- lighter, "Nice!"; Messy = a puff, the sausage shivers, "Oops!" and a dull sound. `word` = the text of the badge (TASK-280:
+	-- a cartoon pill of the kit, GrillBar.Badge, instead of a bare floating word).
+	FlipResult: (self: View, slot: number, band: string, word: string) -> (),
 	PoseOf: (self: View, slot: number) -> CFrame?,
 	-- The ONE model a contour is drawn around: the raw sausage while it cooks, the grilled one once it is done (the two are
 	-- cross-faded, and an outline on the pair is drawn twice). `done` = the cooking is over.
@@ -89,7 +99,8 @@ type Reject = { Model: Model, T: number, From: CFrame }
 type Face = {
 	Ghost: Model?,
 	GhostMode: string,
-	Ring: CylinderHandleAdornment?,
+	Ring: GrillBar.Bar?, -- the flip timing bar (TASK-257)
+	Bar: GrillBar.Bar?, -- the cooking progress bar (TASK-257)
 	RingKind: Ring,
 	Check: HintMark.Mark?,
 	CheckOn: boolean,
@@ -106,8 +117,9 @@ const GrillView = {}
 
 const GHOST_PART_ALPHA = 0.85 -- Transparency of the ghost while carried (more solid than the invitation)
 const CARRY_SMOOTH = 22 -- 1/s: how fast the carried sausage catches the pointer
-const LATE_ALPHA = 0.15
-const RING_LIFT = 0.36 -- studs over the roller (clear of the 0.24 sausage: the ring never shares a plane with it)
+const RING_LIFT = 0.7 -- studs over the roller (the flip bar floats clear of the 0.24 sausage)
+const BAR_HEIGHT = 0.32 -- studs: the bars (TASK-280: a little thicker, the Ink pill has a channel and a lip)
+const BADGE_LIFT = 0.55 -- studs over the sausage where the badge of a flip pops
 const CHECK_LIFT = 0.62
 const LAND_HEIGHT = 0.4 -- studs a placed sausage falls from
 const LAND_TIME = 0.3 -- s
@@ -189,6 +201,7 @@ function GrillView.new(options: Options): View
 				Ghost = nil,
 				GhostMode = "None",
 				Ring = nil,
+				Bar = nil,
 				RingKind = "None",
 				Check = nil,
 				CheckOn = false,
@@ -287,25 +300,13 @@ function GrillView.new(options: Options): View
 
 	-- Ring and check -----------------------------------------------------------------------------------------------------------
 
-	local function ensureRing(face: Face, host: BasePart): CylinderHandleAdornment
-		local ring = face.Ring
-		if ring == nil or ring.Parent == nil or ring.Adornee ~= host then
-			if ring ~= nil then
-				ring:Destroy()
-			end
-			ring = Instance.new("CylinderHandleAdornment")
-			ring.Name = "FlipRing"
-			ring.Adornee = host
-			ring.Color3 = Theme.Color.Mustard
-			-- on top of everything: a flat ring a hair over the sausage shared its plane with it and flickered
-			ring.AlwaysOnTop = true
-			ring.ZIndex = 2
-			ring.Height = 0.012
-			ring.Transparency = 1
-			ring.Parent = folder
-			face.Ring = ring
+	local function ensureRing(face: Face): GrillBar.Bar
+		local bar = face.Ring
+		if bar == nil then
+			bar = GrillBar.new()
+			face.Ring = bar
 		end
-		return ring :: CylinderHandleAdornment
+		return bar :: GrillBar.Bar
 	end
 
 	-- Moving the real models -------------------------------------------------------------------------------------------------
@@ -447,39 +448,42 @@ function GrillView.new(options: Options): View
 		end
 	end
 
-	function self.SetRing(_: any, slot: number, ring: Ring, progress: number)
+	function self.SetRing(_: any, slot: number, ring: Ring, progress: number, swing: number?)
 		const face = faceOf(slot)
 		face.RingKind = ring
 		const entry = options.SlotView("grill", slot)
 		const pose = poseOf(slot)
+		const timing = ring == "Converge" or ring == "Late"
+		-- the bar that is not wanted pops out (spring), so the swap reads as one bar leaving and the other arriving
+		if (ring ~= "Progress" or entry == nil or pose == nil) and face.Bar ~= nil then
+			face.Bar:Hide()
+		end
+		if (not timing or entry == nil or pose == nil) and face.Ring ~= nil then
+			face.Ring:Hide()
+		end
 		if ring == "None" or entry == nil or pose == nil then
-			if face.Ring ~= nil then
-				face.Ring.Transparency = 1
-			end
 			return
 		end
-		const host = entry.Spot.Host
-		const adornment = ensureRing(face, host)
-		local radius = grill.RingRadius
-		local thickness = rules.Ring.Good
-		if ring == "Converge" then
-			const window = Content.Prep.Rules.Grill
-			const span = math.max(window.Target - window.From, 1e-3)
-			const t = math.clamp((progress - window.From) / span, 0, 1)
-			radius *= rules.Ring.From + (rules.Ring.To - rules.Ring.From) * easeInOut(t)
-			const distance = math.abs(progress - window.Target)
-			thickness = if distance <= perfect then rules.Ring.Perfect elseif distance <= good then rules.Ring.Good else rules.Ring.Good * 0.6
-			adornment.Transparency = 0.25
-		else
-			-- Late: small, opaque, still worth a tap
-			radius *= rules.Ring.Late
-			thickness = rules.Ring.Good
-			adornment.Transparency = LATE_ALPHA
+		const at = (pose * CFrame.new(0, RING_LIFT, 0)).Position
+		if ring == "Progress" then
+			-- the cooking bar: Ink pill, Green fill from the left, a Mustard pip at 50% (where the flip comes)
+			local bar = face.Bar
+			if bar == nil then
+				bar = GrillBar.new()
+				face.Bar = bar
+			end
+			const mark = bar :: GrillBar.Bar
+			mark:SetProgress(math.clamp(progress, 0, 1))
+			mark:SetMark(0.5)
+			mark:Show("Cook", at, grill.RingRadius * 2, BAR_HEIGHT)
+			return
 		end
-		adornment.Radius = radius
-		adornment.InnerRadius = math.max(radius - thickness, 0.01)
-		-- the cylinder of an adornment runs along its Z: turn it to stand on the roller
-		adornment.CFrame = host.CFrame:ToObjectSpace(pose * CFrame.new(0, RING_LIFT, 0)) * CFrame.Angles(math.pi / 2, 0, 0)
+		-- the flip timing bar (TASK-257): the whole bar is the swing of the cursor, the Good / Perfect bands are the error tolerance
+		-- around the middle (tolerance in % of the bar, Grade.FlipScore), the cursor goes end to end until the tap
+		const bar = ensureRing(face)
+		bar:SetWindow(0.5, math.min(good * 2, 1), math.min(perfect * 2, 1))
+		bar:SetCursor(math.clamp(swing or 0, 0, 1))
+		bar:Show("Timing", at, grill.RingRadius * 2, BAR_HEIGHT)
 	end
 
 	function self.SetCheck(_: any, slot: number, on: boolean)
@@ -595,6 +599,46 @@ function GrillView.new(options: Options): View
 		const at = pose.Position + Vector3.new(0, 0.3, 0)
 		const entry = options.SlotView("grill", slot)
 		options.Juice():Grade(band, at, if entry ~= nil then entry.Container else nil, nil)
+	end
+
+	function self.FlipResult(_: any, slot: number, band: string, word: string)
+		const pose = poseOf(slot)
+		if pose == nil then
+			return
+		end
+		const at = pose.Position + Vector3.new(0, 0.3, 0)
+		const entry = options.SlotView("grill", slot)
+		const juice = options.Juice()
+		const face = faceOf(slot)
+		const target = if entry ~= nil then entry.Container else nil
+		const float = rules.Juice.Float
+		const badgeAt = at + Vector3.new(0, BADGE_LIFT, 0)
+		-- the pieces of Juice:Grade without its bare floating word: the word is the badge of the kit (TASK-280)
+		const run = juice:Note(band)
+		if band == "Perfect" then
+			juice:Burst("Sparks", at, 14, Theme.Color.Mustard)
+			juice:Burst("Ring", at, 10, Theme.Color.Cream)
+			juice:Flash(target, Theme.Color.Cream)
+			juice:Tone("grill_ready", at, run)
+			GrillBar.Badge(band, word, badgeAt, if run >= rules.Juice.Combo.Show then string.format(Content.Prep.Texts.Combo, run) else nil, float.Rise, float.Time + 0.2)
+			if face.Bar ~= nil then
+				face.Bar:Kick(9)
+			end
+		elseif band == "Good" then
+			juice:Burst("Sparks", at, 6, Theme.Color.Cream)
+			juice:Flash(target, Theme.Color.Cream)
+			juice:Tone("grill_collect", at, 0)
+			GrillBar.Badge(band, word, badgeAt, nil, float.Rise, float.Time + 0.2)
+			if face.Bar ~= nil then
+				face.Bar:Kick(5)
+			end
+		else
+			juice:Burst("Dust", at, 5)
+			juice:Burst("Steam", at, 4)
+			GrillBar.Badge(band, word, badgeAt, nil, float.Rise * 0.6, float.Time + 0.2)
+			self:Shake(slot, grill.ShakeAmount)
+			juice:Tone("error", at, 0)
+		end
 	end
 
 	function self.Step(_: any, dt: number, time: number)
@@ -735,6 +779,9 @@ function GrillView.new(options: Options): View
 			if face.Ring ~= nil then
 				face.Ring:Destroy()
 			end
+			if face.Bar ~= nil then
+				face.Bar:Destroy()
+			end
 			if face.Check ~= nil then
 				face.Check:Destroy()
 			end
@@ -751,6 +798,7 @@ function GrillView.new(options: Options): View
 			end
 		end
 		table.clear(faces)
+		GrillBar.Clear()
 		for _, flight in flights do
 			flight.Model:Destroy()
 		end

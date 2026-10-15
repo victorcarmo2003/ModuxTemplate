@@ -13,7 +13,7 @@
 	RoundController.Vehicle:
 	  1. `Bar_Thief` (Attachment or BasePart) - the fitting does not exist yet, so its absence is expected;
 	  2. `Value_Anchor`, raised above the drawer value (DrawerValue) so both stay readable;
-	  3. top part of the drawer model (`MapId` "DRAWER" on the cart, "TRL-DRAWER" on the trailer).
+	  3. top part of the jar model (`MapId` "TRL-TIPJAR"; legacy "DRAWER" on the cart, "TRL-DRAWER" on the trailer).
 	No fitting at all = no bar, no error. A late fitting (streaming, model swap) re-resolves.
 	Billboard size has a pixel floor so it reads from the Mart door (~114 studs; MaxDistance >= 130, MAP-01 §6).
 
@@ -37,7 +37,8 @@ const RECORD_ID = 1 -- single record (network.md §13.4)
 const VEHICLE_TAG = "Vehicle"
 const BAR_NAME = "Bar_Thief"
 const VALUE_NAME = "Value_Anchor"
-const DRAWER_IDS = { DRAWER = true, ["TRL-DRAWER"] = true }
+-- the tip jar (2026-10-13) replaced the register; the legacy ids stay for old places
+const DRAWER_IDS = { ["TRL-TIPJAR"] = true, DRAWER = true, ["TRL-DRAWER"] = true }
 const VISIBLE_STATE = "Opening"
 -- Studs over each kind of adornee (world up). Over Value_Anchor it clears the DrawerValue (0.6 + its height).
 const OFFSET_BAR = Vector3.new(0, 0.3, 0)

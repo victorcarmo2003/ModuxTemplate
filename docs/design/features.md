@@ -134,6 +134,8 @@ Pendências — Q-### / notas
 | FEAT-037 | Mesas do Pad / área de consumo (2026-10-11, Provisório) | VENDER, GERENCIAR, PROGREDIR | Dia/Noite |
 | FEAT-038 | Clientes em dupla (2026-10-11, Provisório) | VENDER | Dia/Noite |
 | FEAT-039 | Modo de preparo focado (estações de preparo) (2026-10-12, Rascunho; **V1 100% focado decidida pelo dono, DEC-223**; substitui o preparo por prompts de FEAT-006) | VENDER, OBSERVAR | Dia/Noite |
+| FEAT-040 | Câmera de segurança noturna (2026-10-14, Rascunho; **implementada Provisória na TASK-285**) | OBSERVAR, SOBREVIVER | Noite |
+| FEAT-041 | Entrega arrastando + indicador DELIVER (2026-10-14, Provisório) | VENDER | Dia/Noite |
 
 ---
 
@@ -635,9 +637,10 @@ Validação **[DEC-072]**:
   - Gorjeta nunca é paga fora da janela, nem em incompleto.
   - Toda validação acontece no servidor; o client não envia preço nem resultado.
 
-### FEAT-012 — Gaveta do caixa
+### FEAT-012 — Gaveta do caixa (hoje: pote de gorjetas)
 
 - Status: Rascunho · Pilares: GERENCIAR · Origem: **[DEC-050, DEC-051]**
+- **Emenda 2026-10-13 [DEC-238, DEC-239]:** a gaveta saiu. Todo dinheiro de **venda** vai direto ao dinheiro da party; só **gorjeta** (balcão e mesa) cai no **pote de gorjetas**. O prompt "Collect Tips" no pote manda o conteúdo ao dinheiro da party; o que não foi coletado é depositado no Resumo junto com o bônus da nota. A tabela abaixo vale para o pote; as linhas "Entra", "Uso" e "o dinheiro não muda com vendas" estão superadas.
 
 | Regra | Valor |
 |---|---|
@@ -944,7 +947,7 @@ Regra: alucinação que imita sinal de anomalia (poste do Walker, telefone) **n�
 | Skin do jogador | vista por **todos**; servidor replica só a **faixa**, nunca o número **[DEC-167, DEC-169]** |
 | 1ª pessoa | braços/mãos com a textura da faixa + **retrato do rosto** da faixa ao lado do medidor no HUD **[DEC-167]** |
 | Transição | instantânea, sem VFX **[DEC-167]** |
-| Faixa baixa → NPCs | o jogador vê **clientes e pedestres** com pack Night + `Normal_Night` **só no client dele**; os outros veem os NPCs normais; sai da faixa baixa → volta ao normal **[DEC-168, DEC-169]** |
+| Faixa baixa → NPCs | o jogador vê **clientes e pedestres** com pack Night + `Normal_Night` **só no client dele**; os outros veem os NPCs normais; sai da faixa baixa → volta ao normal **[DEC-168, DEC-169]**. **Provisório (2026-10-14):** substituído; a faixa baixa local não veste mais NPC. Night em NPC só nas variantes de anomalia com rig animal (`blank`, `raincoat`), sempre; a cópia `mirror` mantém o pack do servidor com rosto `EyesWhite` |
 
 - Duas regras diferentes: skin do **jogador** = replicada para todos; visual dos **NPCs** = troca local, sem replicar (técnica Provisória: `TextureID` + `SurfaceAppearance` clonada no client, como `Crew.applyTime` em `tools/assetplace/build_crew.luau`).
 - Efeito sobre NPC não é anomalia e não abre teste (como as alucinações; DEC-038).
@@ -1138,7 +1141,7 @@ Comportamento genérico de cada verbo; o que muda por anomalia está em `verbPar
 | Alvo shared | o verbo de um jogador vale para a party **[DEC-054]** |
 | Quem paga a falha | por ação: **quem agiu**; por omissão em alvo shared: **todo jogador ativo**; alvo personal: **cada jogador que falhou** |
 | Jogador ativo | conectado, de pé (não caído nem espectador) e já spawnado; desconectado, caído e espectador são ignorados. Jogador em ragdoll de atropelamento (FEAT-033) **é** ativo |
-| Consequência | regra comum: −35 em cada jogador que falhou; regra crítica: noite perdida (FEAT-024) |
+| Consequência | regra comum: −35 em cada jogador que falhou; regra crítica: noite perdida (FEAT-024). **Provisório (2026-10-14):** ANM-002 e ANM-004 têm consequência estendida (desmaio revivível, DEC-243/DEC-246/DEC-247; fluxos em `story/anomalies.md`) |
 | Verbo em cliente normal | Refuse em cliente normal = insatisfeito, sem perda de sanidade; fechar a janela/ponto seguro sem anomalia = só venda/tempo perdido |
 
 Distribuição das 10 anomalias (ordem de `anomalies.md`, aprovada na rodada 7; substitui o exemplo de DEC-054 e a proposta anterior deste arquivo):
@@ -1679,7 +1682,7 @@ Por que esse efeito (alternativas consideradas):
 | Ladrão (dia) | não mexe na mesa. A zona do ladrão continua o raio 14 de `CART`: limpar uma mesa fora dele deixa a gaveta exposta (escolha visível do jogador) |
 | Tensão (noite) | durante ANM-007 (do zumbido ao fim), ANM-008, ANM-009 e ANM-010, e enquanto houver ator de anomalia de cliente vivo: ninguém senta; quem está sentado **levanta e vai embora** (bandeja e gorjeta ficam). Mesma lógica de "rua deserta" (DEC-183) |
 | Escuro (noite) | mesa fora de `LightZone` ativa: quem limpa paga escuro normal (> 3 s → −1/s, FEAT-020). Trailer Lights (raio 18) cobre as mesas que estiverem no raio; Patio Lights (UPG-009) cobre todas |
-| Sanidade baixa | diners são clientes: o observador com sanidade < 40 os vê no pack Night (DEC-168), sem regra nova |
+| Sanidade baixa | diners são clientes: o observador com sanidade < 40 os vê no pack Night (DEC-168), sem regra nova (**Provisório (2026-10-14):** não vale mais, a faixa baixa não veste NPC) |
 | Janela fechada (DEC-221) | não afeta quem já está sentado; a janela só bloqueia o balcão |
 
 `SitChance` por tipo (campo novo em `CustomerTypes`; Provisório):
@@ -2074,6 +2077,43 @@ Grelha focada com "virar/ponto" (`Q-222`), queimar, bebidas e sobremesas, segund
 - Pendências: `Q-219` (nota × dinheiro), `Q-221` (noite), `Q-222` (grelha: "ponto"; a aba Grill já é V1), `Q-223` (exceções de UI e plataforma; **essencial**, sem modo rápido). Liga a `Q-164` (humor dinâmico).
 
 ---
+
+### Modo anomalia — pedidos do dono 2026-10-14 (Provisório, sem DEC)
+
+Registro e leitura em `open-questions.md` ("Pedidos do dono 2026-10-14", `Q-259` a `Q-268`). Resumo para as fichas:
+
+- **Uma flag de modo**: `Content.Mode.DayOnly = false` = **modo anomalia** (padrão). Desligados, **não apagados** (voltam com `DayOnly = true`, o futuro "modo só de dia"): **FEAT-037** (mesas: tudo `Locked`, ninguém senta, sem compra/servir/limpar mesa), **FEAT-013** (ladrão nunca sorteado) e, em `upgrades.md`, UPG-003 (Wide Counter), UPG-004 (Drawer Lock), UPG-008 a UPG-011. A fila fica fixa em 2 (`Q-261`). Grelha dupla (UPG-001) segue.
+- **FEAT-015**: o Gear Stand fica **fechado no começo da run** (Dia 1 até o fim do turno, `Content.Mart.FirstShiftClosed`); a 1ª ida ao Mart é só para o pão (lição do pacote).
+- **FEAT-004 / tutorial**: no fim do 1º turno o relógio para às **18h**, Walt liga (`call_tutorial_upgrade`) e o tutorial leva ao Gear Stand para o 1º upgrade, **Storage** (UPG-002); sem dinheiro, o caixa sobe a $100 (`Q-262`).
+- **FEAT-007 / potes**: sem cadeado; a cobertura que desbloqueia chega como **pote-presente fechado** ("Open"): abre com a tampa voando + confete e vem **cheio** (`Q-263`).
+- **FEAT-039**: o **molho desenhado** fica no hot dog entregue (atributo `Sauce`, `Q-264`); o prato aberto não expira durante o tutorial (`Q-268`); cobertura-modelo (queijo) solta em qualquer ponto do pão entra (clique sem arrastar = colocar no ponto), com aviso quando não entra.
+
+### FEAT-040 — Câmera de segurança noturna
+
+- Status: **Rascunho (Provisório), implementado na TASK-285** · Pilares: OBSERVAR, SOBREVIVER · Origem: **pedido do dono, 2026-10-14** ("um sistema de câmera de segurança para assistir às anomalias"). Toca FEAT-019 (anomalias), FEAT-020 (luz), FEAT-022 (sanidade), UPG-005, **UPG-012**.
+- Ideia: o trailer ganha um **monitor de segurança** (upgrade UPG-012, Gear Stand). Na noite, ao usar o monitor, a visão troca para **câmeras fixas** em volta do trailer (a rua, o Mart, a porta dos fundos); o jogador **vê de longe** sinais de anomalia antes de elas chegarem ao balcão. Sem combate: só observar e decidir (abrir/fechar, recusar, apagar a luz).
+- Proposta inicial (números do game-designer, a validar):
+
+| Nível | Preço | Câmeras | Efeito de noite | Efeito de dia |
+|---|---|---|---|---|
+| 0 | — | nenhuma | — | — |
+| 1 | $120 | 1 (a rua em frente) | monitor no trailer; trocar de câmera com as setas; a imagem tem chiado | nenhum (o jogo é de noite; exceção consciente a DEC-006, como UPG-004) |
+| 2 | $200 | 3 (rua, Mart, porta dos fundos) | idem + aviso discreto de "movimento" na câmera | nenhum |
+
+- Regras propostas: usar o monitor **prende a câmera do jogador** (como o modo de preparo, FEAT-039): o balcão fica sem atenção enquanto assiste; a sanidade **não** cai mais rápido por assistir (para crianças); nada no monitor é exclusivo do monitor no nível 1 (só outro ângulo), o nível 2 pode mostrar um sinal a mais (ver `Q-267`).
+- **Luz do trailer (UPG-005)**: o dono a achou interessante; fica **à venda** no modo anomalia. Ideia para a próxima rodada: a luz externa ilumina o que a câmera vê (a câmera "enxerga" mais no raio da luz). Ver `Q-266`.
+- Assets prováveis: monitor CRT no trailer, 1–3 câmeras de parede (AST novos, art-director), interface de chiado (Theme, sem vermelho).
+- Critérios de aceite (quando virar tarefa): entrar e sair do monitor em ≤ 0,4 s; trocar de câmera sem travar; nenhum prompt do mundo dispara enquanto assiste; o monitor some no dia.
+- **Implementado (TASK-285, 2026-10-14, Provisório)**, fora do upgrade UPG-012 por pedido do dono: o monitor `CCTV` do trailer (prompt E `watch_cameras`) abre 2 câmeras fixas (`Workspace.SecurityCams.CAM1/CAM2`, vista = pivô do modelo); 1/2 trocam, N alterna **Normal** (grão leve + carimbo) e **Visão noturna** (tinta verde, grão, scanlines, vinheta, faixa rolando, iluminador IR local), Q sai. Entrar e trocar são corte seco com chiado de 0,35 s. Corpo congelado e prompts do mundo calados enquanto assiste. Gancho para anomalias que só aparecem (ou aparecem melhor) na visão noturna: atributos `SecurityView` / `SecurityCam` do LocalPlayer. O monitor ainda não some no dia (o trailer só existe à noite) e não há nível de upgrade. Números em `Content/Security.luau`.
+
+### FEAT-041 — Entrega arrastando e indicador DELIVER
+
+- Status: **Provisório (implementado 2026-10-14)** · Pilar: VENDER · Origem: **pedido do dono, 2026-10-14**. Toca FEAT-011 (Serve), FEAT-039 (prep), FEAT-032 (UI).
+- O cliente espera na janela de serviço; o jogador **segura o hot dog pronto** e o **arrasta até o cliente**, soltando nele:
+  - **no mundo**: com o hot dog na mão, apertar e soltar sobre o cliente com o pedido tomado (no alcance de `serve`) dispara o próprio prompt `serve` dele (`DeliveryController`); em primeira pessoa o ponteiro é o centro da tela;
+  - **no modo de preparo 3D** (vista Toppings): arrastar o **prato** até o cliente = Done + Serve (o servidor julga o hot dog recém-feito).
+- **Indicador**: cartão verde arredondado com listras diagonais e a palavra **DELIVER** (`Interface/Components/DeliverMark`, molas do HintMark, respeita movimento reduzido), sobre a cabeça do cliente **só quando dá para entregar**; acende ao arrastar por cima.
+- O servidor decide tudo (pedido, alcance, fase, `CustomerService`). Gamepad e touch: o prompt `serve` e o botão Done continuam.
 
 # Propostas pendentes (Qs do game-designer)
 

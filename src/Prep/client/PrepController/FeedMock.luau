@@ -25,6 +25,7 @@ export type RawSlot = {
 	State: string, -- Empty | Working | Ready (Stations set)
 	StartedAt: number,
 	Duration: number,
+	Flip: number?, -- grill: flip score + 1 once flipped (Stations set), 0 / nil = not flipped
 }
 
 export type Snapshot = {

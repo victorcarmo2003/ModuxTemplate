@@ -4,15 +4,19 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Beacon = require(StarterPlayer.StarterPlayerScripts.client.Tutorial.TutorialController.Beacon)
+local EdgePointer = require(StarterPlayer.StarterPlayerScripts.client.Interface.EdgePointer)
 
 export type Public = {
-	ArrowFar: Vide.Source<boolean>,
 	Beacon: Beacon.Beacon,
+	Edge: EdgePointer.EdgePointer,
 	FocusToken: number,
 	Focusing: boolean,
 	Folder: Folder?,
 	Marked: Vide.Source<boolean>,
 	Mounted: boolean,
+	PointerAngle: Vide.Source<number>,
+	PointerAt: Vide.Source<Vector2>,
+	PointerShown: Vide.Source<boolean>,
 	Scale: Vide.Source<number>,
 	Unmounts: { () -> () },
 	Setup: (self: Public) -> (),

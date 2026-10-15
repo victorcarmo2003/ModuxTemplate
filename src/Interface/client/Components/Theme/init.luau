@@ -36,6 +36,7 @@ const Theme = {
 		Violet = Color3.fromHex("#6A5ACD"), -- thief bar (§7.3)
 		Slate = Color3.fromHex("#8A8FA3"), -- grade D on the shift summary (§7.4, never red)
 		Gold = Color3.fromHex("#FFD86B"), -- sanity full (§7.2 #FFD45A family)
+		Pink = Color3.fromHex("#F4A7B9"), -- the paw's pads and toe beans (TASK-265; soft, never the alert red)
 		-- Price the party cannot pay (FEAT-008 "preço em vermelho"); same Ketchup red as Low. Grades/sanity never red.
 		NoCash = Color3.fromHex("#E2402E"),
 		-- CookInterface colors from AnimalPlane (DEC-029): orange while cooking, green when ready.

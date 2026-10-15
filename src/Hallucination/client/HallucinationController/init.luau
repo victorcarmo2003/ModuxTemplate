@@ -5,7 +5,7 @@
 
 	Low-sanity hallucinations on THIS client only. Never a prompt, never a packet, never a set, never a server state;
 	never counts as an anomaly seen, never opens a test, never moves the Walker, never costs the -5 of "seeing".
-	The Night look of NPCs in the low band is RigController's (DEC-168/169), not this file's.
+	The low band no longer dresses NPCs Night (Provisional 2026-10-14); the player's own Night is the server's.
 
 	Rolls (Content.Hallucinations, local seed):
 	  * eligible while own sanity exists (VitalController.Max > 0), the shift is the Night phase (Rules.NightOnly,

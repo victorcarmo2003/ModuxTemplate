@@ -17,7 +17,10 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
+local Grade = require(ReplicatedStorage.shared.Prep.Grade)
+local FlipFocus = require(script.Parent.Parent.FlipFocus)
 local Feed = require(script.Parent.Parent.Parent.Feed)
+local Flips = require(script.Parent.Parent.Parent.Flips)
 local Stage = require(script.Parent.Parent.Parent.Stage)
 local GrillView = require(script.Parent.Parent.GrillView)
 local Types = require(script.Parent.Parent.Types)
@@ -36,7 +39,13 @@ const MAX_SLOTS = 8
 const PRED_TTL = 4 -- s a prediction waits for the records before it is dropped
 const OUT_TEXT = "Out of sausages" -- Provisional
 const FULL_TEXT = "The grill is full."
+const FLIP_TEXT = "Time to flip! Tap the sausage to turn it." -- the cooking bar waits for the flip (2026-10-14)
+-- the ring of the focus screen is centred between the sausage and its flip bar (0.7 studs over the roller) so it frames both
+const FOCUS_LIFT = 0.42
+const FLIP_HINT = "Tap the sausage to flip it now"
 const RAIL_TEXT = "The warmer is full."
+-- TASK-261: the word over the sausage after a flip, by the server's band (Provisional, ui-text §16)
+const FLIP_WORDS: { [string]: string } = { Perfect = "Perfect!", Good = "Nice!", Messy = "Oops!" }
 const WORK_DROP = 0.1 -- studs: the work plane sits this far over the roller top
 
 type Phase = Types.SlotPhase
@@ -48,7 +57,9 @@ type Session = {
 	Kitchen: any,
 	View: GrillView.View,
 	Pred: { [number]: Pred },
-	Inflight: { { Act: string, Slot: number } },
+	-- grill acts sent and not answered yet, oldest first (At = os.clock; stale ones are dropped so a lost answer never shifts the
+	-- rest for good, TASK-257)
+	Inflight: { { Act: string, Slot: number, At: number } },
 	TrashQueue: { { From: string, Slot: number } }, -- PrepTrash on its way, in the order sent
 	LastTrash: number,
 	CoachTried: boolean,
@@ -58,6 +69,8 @@ type Session = {
 	Stop: (() -> ())?,
 	-- the lid of the sausage container (opens while the pointer is over it)
 	Lid: StockLid.StockLid?,
+	-- the focus screen of the flip (dim + ring + arrow on the sausage that waits)
+	Focus: FlipFocus.FlipFocus?,
 	Targets: { [string]: Types.Target },
 	Active: boolean,
 }
@@ -90,6 +103,20 @@ local function recordOf(current: Session, slot: number): any?
 	return record
 end
 
+-- The record really carries a flip of ITS sausage (TASK-256): a stamp left by the previous sausage of the roller does not count
+-- (Flips.luau: the Stations set used to keep an old Flip when the server cleared it to nil)
+local function liveFlip(current: Session, slot: number, record: any?): boolean
+	if record == nil then
+		return false
+	end
+	const entry = current.Kitchen:SlotView("grill", slot)
+	const id = if entry ~= nil then entry.Station:GetAttribute("StationId") else nil
+	if type(id) ~= "number" then
+		return (record.Flip or 0) > 0
+	end
+	return Flips.Live(id * 100 + slot, record, workspace:GetServerTimeNow())
+end
+
 -- Phase and cooking share (0..1) of a roller. Exists = the roller has a record on this grill.
 local function phaseOf(current: Session, slot: number, now: number): (boolean, Phase, number)
 	const record = recordOf(current, slot)
@@ -100,22 +127,22 @@ local function phaseOf(current: Session, slot: number, now: number): (boolean, P
 		return true, "Free", 0
 	end
 	const predicted = current.Pred[slot]
-	const flipped = record.Flip > 0 or (predicted ~= nil and predicted.Kind == "Flip")
+	const flipped = liveFlip(current, slot, record) or (predicted ~= nil and predicted.Kind == "Flip")
 	if record.State == "Ready" then
 		return true, "Ready", 1
 	end
-	const progress = if record.Duration > 0 then math.clamp((now - record.StartedAt) / record.Duration, 0, 1) else 0
-	if progress >= 1 then
+	-- the first side runs, the sausage WAITS in the window for the flip, the second side runs (Grade.CookProgress)
+	const progress = Grade.CookProgress(Content.Prep, record.StartedAt, record.Duration, now, flipped)
+	if flipped and progress >= 1 then
 		return true, "Ready", 1
 	end
 	if flipped then
 		return true, "Flipped", progress
-	elseif progress < window.From then
+	elseif progress < window.Target - 1e-4 then
+		-- the first side is still cooking: the server refuses a flip before the pause
 		return true, "Cooking", progress
-	elseif progress <= window.To then
-		return true, "FlipWindow", progress
 	end
-	return true, "Late", progress
+	return true, "FlipWindow", progress
 end
 
 local function stockLeft(): number
@@ -126,7 +153,7 @@ end
 local function isFlipped(current: Session, slot: number): boolean
 	const record = recordOf(current, slot)
 	const predicted = current.Pred[slot]
-	return (record ~= nil and record.Flip > 0) or (predicted ~= nil and predicted.Kind == "Flip")
+	return liveFlip(current, slot, record) or (predicted ~= nil and predicted.Kind == "Flip")
 end
 
 -- The slot of the real rail the next collected sausage lands on (the ones already there and those on their way count).
@@ -192,7 +219,7 @@ local function place(current: Session, wanted: number)
 	note(`Place sent, slot {slot} (asked {wanted})`)
 	World.Coach():Done("Grill")
 	current.Pred[slot] = { Kind = "Place", At = os.clock(), Settled = false }
-	table.insert(current.Inflight, { Act = "Place", Slot = slot })
+	table.insert(current.Inflight, { Act = "Place", Slot = slot, At = os.clock() })
 end
 
 local function flip(current: Session, slot: number)
@@ -202,7 +229,7 @@ local function flip(current: Session, slot: number)
 	const _, _, share = phaseOf(current, slot, workspace:GetServerTimeNow())
 	note(`Flip sent, slot {slot} at {string.format("%.3f", share)} of the Duration`)
 	current.Pred[slot] = { Kind = "Flip", At = os.clock(), Settled = false }
-	table.insert(current.Inflight, { Act = "Flip", Slot = slot })
+	table.insert(current.Inflight, { Act = "Flip", Slot = slot, At = os.clock() })
 	current.View:Turn(slot, 1)
 end
 
@@ -220,7 +247,7 @@ local function collect(current: Session, slot: number, from: CFrame?)
 	end
 	note(`Collect sent, slot {slot}, rail {count} -> {count + 1}`)
 	current.Pred[slot] = { Kind = "Collect", At = os.clock(), Settled = false }
-	table.insert(current.Inflight, { Act = "Collect", Slot = slot })
+	table.insert(current.Inflight, { Act = "Collect", Slot = slot, At = os.clock() })
 	current.View:Hide(slot, true)
 	current.View:Fly(slot, count + 1, from)
 end
@@ -270,7 +297,8 @@ local function tapSlot(current: Session, slot: number)
 	end
 	if phase == "Free" then
 		place(current, slot)
-	elseif phase == "FlipWindow" or phase == "Late" then
+	elseif phase == "FlipWindow" or phase == "Late" or (phase == "Cooking" and current.Pred[slot] == nil) then
+		-- TASK-257: a flip before the pause is accepted too (the server grades it the lowest)
 		flip(current, slot)
 	elseif phase == "Ready" then
 		collect(current, slot, nil)
@@ -314,7 +342,7 @@ local function frame(current: Session, dt: number, time: number)
 			const record = recordOf(current, slot)
 			if predicted.Kind == "Place" and (phase ~= "Free" or clock - predicted.At > PRED_TTL) then
 				current.Pred[slot] = nil
-			elseif predicted.Kind == "Flip" and ((record ~= nil and record.Flip > 0) or clock - predicted.At > PRED_TTL) then
+			elseif predicted.Kind == "Flip" and (liveFlip(current, slot, record) or clock - predicted.At > PRED_TTL) then
 				current.Pred[slot] = nil
 			elseif predicted.Kind == "Collect" and (phase == "Free" or clock - predicted.At > PRED_TTL) then
 				current.Pred[slot] = nil
@@ -332,7 +360,18 @@ local function frame(current: Session, dt: number, time: number)
 		end
 		-- what is drawn
 		view:SetGhost(slot, if not exists or phase ~= "Free" or trashing then "None" elseif placing then "Predicted" elseif stock ~= 0 then "Ghost" else "None")
-		view:SetRing(slot, if trashing then "None" elseif phase == "FlipWindow" then "Converge" elseif phase == "Late" then "Late" else "None", progress)
+		-- TASK-257 (owner request 2026-10-14): the cooking bar from the moment the sausage lands (grey, Green fill, a line at 50%);
+		-- in the pause it swaps (springs) for the timing bar, whose cursor swings end to end until the tap (Grade.SwingAt, the same
+		-- clock the server grades with); after the flip the cooking bar comes back at 50% and fills to 100%; ready = gone (check)
+		if trashing or phase == "Free" or phase == "Ready" then
+			view:SetRing(slot, "None", progress, nil)
+		elseif phase == "FlipWindow" and current.Pred[slot] == nil then
+			const record = recordOf(current, slot)
+			const swing = if record ~= nil then Grade.SwingAt(prep, record.StartedAt, record.Duration, now) else 0
+			view:SetRing(slot, "Converge", progress, swing)
+		else
+			view:SetRing(slot, "Progress", progress, nil)
+		end
 		view:SetCheck(slot, phase == "Ready" and not trashing and (current.Pred[slot] == nil or current.Pred[slot].Kind ~= "Collect"))
 		-- the marks of the bars show on the face that is up after the flip and darken with the server clock until it is ready
 		view:SetMarks(slot, if exists and phase ~= "Free" and not trashing and isFlipped(current, slot) then 0.4 + 0.6 * progress else 0)
@@ -343,6 +382,10 @@ local function frame(current: Session, dt: number, time: number)
 				target.Model = model
 			end
 			setPulse(current, id, phase == "FlipWindow" or phase == "Late" or phase == "Ready")
+		end
+		-- the first side is done and the progress PAUSES: say it once per sausage (the ring, the pulse and the hint stay on)
+		if phase == "FlipWindow" and current.Phases[slot] ~= "FlipWindow" and current.Pred[slot] == nil then
+			current.Controller:Toast(FLIP_TEXT, "Alert")
 		end
 		current.Phases[slot] = phase
 		if phase ~= "Free" and not trashing then
@@ -372,6 +415,22 @@ local function frame(current: Session, dt: number, time: number)
 	end
 	if current.Lid ~= nil then
 		current.Lid:Step(dt)
+	end
+	-- the focus screen: on the first sausage that waits for its flip (a flip already sent or a throw on its way does not count)
+	local waiting: number? = nil
+	for slot = 1, MAX_SLOTS do
+		if current.Phases[slot] == "FlipWindow" and current.Pred[slot] == nil then
+			waiting = slot
+			break
+		end
+	end
+	const pose = if waiting ~= nil then view:PoseOf(waiting) else nil
+	if current.Focus == nil and pose ~= nil then
+		current.Focus = FlipFocus.new()
+	end
+	if current.Focus ~= nil then
+		current.Focus:Set(if pose ~= nil then pose.Position + Vector3.new(0, FOCUS_LIFT, 0) else nil, world.Grill.FocusRadius)
+		current.Focus:Step(dt)
 	end
 	view:Step(dt, time)
 end
@@ -488,6 +547,7 @@ local function build(controller: any)
 		Phases = {},
 		Stop = nil,
 		Lid = nil,
+		Focus = nil,
 		Targets = {},
 		Active = true,
 	}
@@ -517,6 +577,10 @@ local function teardown()
 	if current.Stop ~= nil then
 		current.Stop()
 	end
+	if current.Focus ~= nil then
+		current.Focus:Destroy()
+		current.Focus = nil
+	end
 	if current.Lid ~= nil then
 		current.Lid:Destroy()
 		current.Lid = nil
@@ -537,19 +601,6 @@ local function teardown()
 end
 
 -- The stage ---------------------------------------------------------------------------------------------------------------
-
--- The customer at the counter that has not been taken yet, 0 = none.
-local function toTake(): number
-	if untrack(Feed.Pinned) ~= 0 then
-		return 0
-	end
-	for _, id in untrack(Feed.Ids) do
-		if untrack(Feed.CardOf(id)).Status == "Ready" then
-			return id
-		end
-	end
-	return 0
-end
 
 const Grill: Stage.Stage3D = {
 	Tabs = { "Grill" },
@@ -586,7 +637,7 @@ const Grill: Stage.Stage3D = {
 			end
 		end
 		if windowOpen then
-			return "Tap the sausage as the ring closes"
+			return FLIP_HINT
 		elseif ready then
 			return "Tap it or drag it to the rail"
 		elseif Feed.Stock() == 0 then
@@ -596,19 +647,11 @@ const Grill: Stage.Stage3D = {
 		end
 		return "Drag a sausage onto the grill"
 	end,
+	-- Next never takes an order (playtest 2026-10-14): the order is taken only by facing the customer (Window view / world prompt)
 	Next = function(_controller: any): Stage.Next
-		if toTake() ~= 0 then
-			return { Label = prep.Texts.Take, Enabled = true, Pulse = true }
-		end
 		return { Label = prep.Steps3D.ByKey.grill.NextLabel, Enabled = true, Pulse = Feed.Rail() > 0 and Feed.Pinned() ~= 0 }
 	end,
 	OnNext = function(controller: any)
-		const id = toTake()
-		if id ~= 0 then
-			note(`Take sent, customer {id}`)
-			Feed.Take(controller, id)
-			return
-		end
 		note("Next: to the board")
 		controller:SetStage("bun")
 	end,
@@ -708,7 +751,23 @@ const Grill: Stage.Stage3D = {
 		if current == nil or result.Act ~= "Grill" then
 			return
 		end
-		const sent = table.remove(current.Inflight, 1)
+		-- TASK-257: stale entries go (their answer was lost); an accepted act names its roller (Value), so it is matched by slot
+		const clock = os.clock()
+		for index = #current.Inflight, 1, -1 do
+			if clock - current.Inflight[index].At > PRED_TTL + 1 then
+				table.remove(current.Inflight, index)
+			end
+		end
+		local at = 1
+		if result.Ok and type(result.Value) == "number" and result.Value > 0 then
+			for index, entry in current.Inflight do
+				if entry.Slot == result.Value then
+					at = index
+					break
+				end
+			end
+		end
+		const sent = table.remove(current.Inflight, at)
 		if sent == nil then
 			return
 		end
@@ -731,12 +790,9 @@ const Grill: Stage.Stage3D = {
 			predicted.Settled = true
 		end
 		if sent.Act == "Flip" then
+			-- TASK-261: hit / near / miss answered on the sausage itself (no toast: the word floats there)
 			const band: string = result.Grade
-			current.View:Burst(slot, band)
-			const label = prep.Grades.Labels[band :: any]
-			if label ~= nil then
-				controller:Toast(label, if band == "Messy" then "Info" else "Good")
-			end
+			current.View:FlipResult(slot, band, FLIP_WORDS[band] or FLIP_WORDS.Good)
 		end
 	end,
 }

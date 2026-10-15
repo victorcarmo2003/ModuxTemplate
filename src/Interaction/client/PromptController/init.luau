@@ -53,6 +53,16 @@
 	Completion pop (user request 2026-10-11): the moment an Interact is actually sent (hold completed or tap), the
 	pill pops (Prompt.Celebrate -> PromptBillboard bump/flash/check), a few sparkles burst at the anchor (Burst) and
 	`prompt_done` (Ui) plays. It confirms the input, not the result: the server still decides.
+
+	Single prompt (TASK-278, owner request 2026-10-14): in Single mode only ONE prompt shows (no menu, no dots for the others).
+	  Desktop        the candidate whose anchor projects closest to the mouse pointer; a tie (within SINGLE_TIE_PIXELS) or the
+	                 pointer outside the window = the one closest to the character
+	  Gamepad        closest to the screen centre (same tie rule)
+	  Touch          closest to the character, on the single action circle
+	Hysteresis on the same measure, never a switch during a hold. E / X / the circle fire the prompt shown.
+	Mode = attribute `PromptMode` of the LocalPlayer ("Single" | "Multi"; nil = Single on KeyboardMouse, Multi on Touch /
+	Gamepad), written by the settings screen (TASK-279), only read here. A change of the attribute or of the input device
+	re-runs the pick at once. Multi = the menu above (up to MENU_MAX).
 ]]
 local Players = game:GetService("Players")
 local CollectionService = game:GetService("CollectionService")
@@ -98,6 +108,11 @@ const MENU_PICK_PAD: { Enum.KeyCode } =
 const MENU_MAX = 4 -- rows / fan options shown at once (Refuse included on touch)
 const MENU_WHEEL_BIND = "InteractMenuWheel"
 const FOCUS_NAME = "Focus" -- name of the row button the component reports
+-- Single prompt (TASK-278): see the header
+const MODE_ATTRIBUTE = "PromptMode"
+const SINGLE_TIE_PIXELS = 4 -- pointer distances this close = a tie, the character distance decides
+const SINGLE_MARGIN_FRACTION = 0.02 -- of the viewport height: the pointer must be this much closer to switch
+const SINGLE_WORLD_MARGIN = 0.5 -- studs: same, when the character distance decides
 
 -- Console glyphs of the controller in use (Xbox / PlayStation); "" when the engine has no image for the key
 local function glyphOf(key: Enum.KeyCode): string
@@ -137,6 +152,8 @@ function PromptController:Setup()
 	self.Gate = nil :: ((Instance) -> boolean)?
 	-- Named gates (AddGate), all of them must allow; independent of the legacy SetGate slot above
 	self.Gates = {} :: { [string]: (Instance) -> boolean }
+	-- the two door anchors (trailer_exit / trailer_enter), found once (DoorSideAllows)
+	self.DoorPair = nil :: any
 	-- InteractionMenu state: Menu.State is the order / selection, the sources feed the component
 	self.MenuState = Menu.new() :: Menu.State
 	self.MenuActive = false :: boolean
@@ -155,6 +172,73 @@ function PromptController:Setup()
 	self.RefuseOwner = {} :: { [Prompt.Prompt]: Prompt.Prompt }
 	-- Mirror of AltHolding for the component (the touch fan fills the Refuse option, not the customer one)
 	self.AltHoldingSource = Vide.source(false) :: Vide.Source<boolean>
+	-- Single prompt (TASK-278): false while the game window has lost focus (the pointer counts as outside)
+	self.WindowFocused = true :: boolean
+end
+
+-- Single or Multi for the device in use (TASK-278): the `PromptMode` attribute wins, nil = Single only on KeyboardMouse
+function PromptController:IsSingle(device: string): boolean
+	const mode = Players.LocalPlayer:GetAttribute(MODE_ATTRIBUTE)
+	if mode == "Single" then
+		return true
+	elseif mode == "Multi" then
+		return false
+	end
+	return device == "KeyboardMouse"
+end
+
+-- Screen point the Single pick measures from: the mouse (desktop, inside the window), the screen centre (gamepad), nil =
+-- the character distance decides (touch, pointer outside the window)
+function PromptController:SinglePointer(device: string, viewport: Vector2): Vector2?
+	if device == "Gamepad" then
+		return viewport / 2
+	elseif device ~= "KeyboardMouse" or not self.WindowFocused then
+		return nil
+	end
+	const mouse = UserInputService:GetMouseLocation()
+	if mouse.X < 0 or mouse.Y < 0 or mouse.X > viewport.X or mouse.Y > viewport.Y then
+		return nil
+	end
+	return mouse
+end
+
+-- The one prompt Single mode shows among `candidates` (screen point and character distance of each), with hysteresis on
+-- the current target; never switches during a hold
+function PromptController:PickSingle(
+	candidates: { [Prompt.Prompt]: { Screen: Vector2, World: number } },
+	pointer: Vector2?,
+	margin: number
+): Prompt.Prompt?
+	-- true = `a` beats `b`; `slack` is the hysteresis `a` must clear
+	local function beats(a: Prompt.Prompt, b: Prompt.Prompt, slack: number): boolean
+		const ca, cb = candidates[a], candidates[b]
+		if pointer ~= nil then
+			const da, db = (ca.Screen - pointer).Magnitude, (cb.Screen - pointer).Magnitude
+			if math.abs(da - db) > math.max(SINGLE_TIE_PIXELS, slack) then
+				return da < db
+			elseif slack > 0 then
+				return false
+			end
+			return ca.World < cb.World
+		end
+		return ca.World < cb.World - (if slack > 0 then SINGLE_WORLD_MARGIN else 0)
+	end
+
+	local best: Prompt.Prompt? = nil
+	for prompt in candidates do
+		if best == nil or beats(prompt, best, 0) then
+			best = prompt
+		end
+	end
+	const current = self.Target
+	const pick: Prompt.Prompt? = best
+	if current == nil or candidates[current] == nil or pick == nil or pick == current then
+		return pick
+	end
+	if self.Holding ~= nil or not beats(pick, current, margin) then
+		return current
+	end
+	return pick
 end
 
 -- The single legacy gate (TutorialPromptGate). Named gates (AddGate) stack with it: every gate must allow.
@@ -187,7 +271,54 @@ function PromptController:Gated(anchor: Instance): boolean
 			return false
 		end
 	end
+	const action = anchor:GetAttribute("PromptAction")
+	if action == "trailer_exit" or action == "trailer_enter" then
+		return self:DoorSideAllows(anchor, action)
+	end
 	return true
+end
+
+-- The two door prompts sit a step apart (Exit just inside, Enter just outside) and their radius reaches both: only the one on the
+-- side the player is on shows (owner request 2026-10-14). The side is where the player stands relative to the middle of the pair, along
+-- the line from the outside anchor to the inside one. Presentation only (TrailerDoorService revalidates). Fails open.
+function PromptController:DoorSideAllows(anchor: Instance, action: string): boolean
+	local doors: any = self.DoorPair
+	if doors == nil or doors.Exit == nil or doors.Exit.Parent == nil or doors.Enter == nil or doors.Enter.Parent == nil then
+		doors = { Exit = nil, Enter = nil }
+		for candidate in self.Prompts do
+			const kind = candidate:GetAttribute("PromptAction")
+			if kind == "trailer_exit" then
+				doors.Exit = candidate
+			elseif kind == "trailer_enter" then
+				doors.Enter = candidate
+			end
+		end
+		self.DoorPair = doors
+	end
+	const exitAnchor: Instance?, enterAnchor: Instance? = doors.Exit, doors.Enter
+	const character = Players.LocalPlayer.Character
+	const root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
+	if exitAnchor == nil or enterAnchor == nil or root == nil or not root:IsA("BasePart") then
+		return true
+	end
+	local function at(instance: Instance): Vector3?
+		if instance:IsA("Attachment") then
+			return instance.WorldPosition
+		elseif instance:IsA("BasePart") then
+			return instance.Position
+		end
+		return nil
+	end
+	const inner, outer = at(exitAnchor), at(enterAnchor)
+	if inner == nil or outer == nil then
+		return true
+	end
+	const inward = inner - outer
+	if inward.Magnitude < 1e-3 then
+		return true
+	end
+	const inside = (root.Position - (inner + outer) / 2):Dot(inward) > 0
+	return if action == "trailer_exit" then inside else not inside
 end
 
 function PromptController:Add(anchor: Instance)
@@ -250,6 +381,19 @@ function PromptController:Fire(prompt: Prompt.Prompt)
 end
 
 -- Completion feedback, in the same frame as the fire.
+-- Fires the prompt of `anchor` as if it were pressed (drag-and-drop delivery, DeliveryController; owner request 2026-10-14).
+-- Same checks as a press: registered, enabled, not gated, the fire cadence. The server revalidates range and state.
+-- false = nothing was sent.
+function PromptController:FireAnchor(anchor: Instance): boolean
+	const prompt = self.Prompts[anchor]
+	if prompt == nil or prompt.Id == nil or not prompt.Enabled or not self:Gated(anchor) then
+		return false
+	end
+	const before = self.LastFire
+	self:Fire(prompt)
+	return self.LastFire ~= before
+end
+
 function PromptController:Celebrate(prompt: Prompt.Prompt)
 	Prompt.Celebrate(prompt)
 	const position = Prompt.Position(prompt)
@@ -879,6 +1023,8 @@ function PromptController:Tick()
 	const margin = viewport.Y * HYSTERESIS_MARGIN_FRACTION
 
 	const candidates: { [Prompt.Prompt]: number } = {}
+	-- Single mode (TASK-278) measures from the pointer / the character instead of the screen centre
+	const places: { [Prompt.Prompt]: { Screen: Vector2, World: number } } = {}
 
 	for _, prompt in self.Prompts do
 		if not Prompt.IsLive(prompt) or prompt.Anchor:IsDescendantOf(character) or not self:Gated(prompt.Anchor) then
@@ -895,7 +1041,9 @@ function PromptController:Tick()
 		if not onScreen then
 			continue
 		end
-		candidates[prompt] = (Vector2.new(point.X, point.Y) - center).Magnitude
+		const screen = Vector2.new(point.X, point.Y)
+		candidates[prompt] = (screen - center).Magnitude
+		places[prompt] = { Screen = screen, World = (position - root.Position).Magnitude }
 	end
 
 	-- One pill per customer: the Refuse anchor yields to the customer prompt of the same rig (see the header)
@@ -917,25 +1065,46 @@ function PromptController:Tick()
 	for owner, refuse in refuses do
 		self.RefuseOwner[refuse] = owner
 	end
+	for _, refuse in refuses do
+		places[refuse] = nil
+	end
+
+	-- Single mode (TASK-278): only the picked prompt stays a candidate, so no menu and no dots for the others
+	const device = self.Dependencies.InputController.Device()
+	local single: Prompt.Prompt? = nil
+	if self:IsSingle(device) then
+		single = self:PickSingle(
+			places,
+			self:SinglePointer(device, viewport),
+			viewport.Y * SINGLE_MARGIN_FRACTION
+		)
+		for prompt in candidates do
+			if prompt ~= single then
+				candidates[prompt] = nil
+			end
+		end
+	end
 
 	-- InteractionMenu: several candidates in view -> an ordered list of buttons instead of one pill (see Menu.luau).
 	-- A row the tutorial gate no longer allows goes at once; the others get a grace period.
 	const menu = self.MenuState
 	const inView: { [Prompt.Prompt]: number } = {}
 	for prompt, distance in candidates do
-		if distance <= maxScreenDistance then
+		-- the Single pick is in view wherever it sits on screen
+		if distance <= maxScreenDistance or prompt == single then
 			inView[prompt] = distance
 		end
 	end
 	for _, prompt in table.clone(menu.Order) do
-		if not self:Gated(prompt.Anchor) then
+		-- Single mode: rows of the old list leave at once (no grace), only the pick may stay
+		if not self:Gated(prompt.Anchor) or (single ~= nil and prompt ~= single) then
 			Menu.Forget(menu, prompt)
 		end
 	end
 	Menu.Update(menu, inView, os.clock(), self.Holding ~= nil, margin)
 	-- Enter with two live rows (desktop / gamepad) or one (touch: the action circle is the only button); stay while that
 	-- many rows remain (one may be in grace) so the list does not collapse under the selection.
-	const touch = self.Dependencies.InputController.Device() == "Touch"
+	const touch = device == "Touch"
 	const minRows = if touch then 1 else 2
 	const showMenu = Menu.CurrentCount(menu) >= minRows or (self.MenuActive and #menu.Order >= minRows)
 	self:SetMenuActive(showMenu)
@@ -946,6 +1115,10 @@ function PromptController:Tick()
 		self:PublishMenu()
 		self:BindMenuPicks(#menu.Order)
 		self:SyncFocus()
+	elseif single ~= nil then
+		-- Single mode: the pick already has its hysteresis
+		self:SetTarget(single)
+		self:SetAlt(refuses[single])
 	else
 		local best: Prompt.Prompt? = nil
 		local bestDistance = math.huge
@@ -1009,6 +1182,20 @@ PromptController:OnStart(function(self)
 			refreshGlyphs()
 		end
 		self:SyncFocus()
+		-- Single / Multi follow the device at once (TASK-278); deferred so InputController.Device is already updated
+		task.defer(function()
+			self:Retick()
+		end)
+	end)
+	-- `PromptMode` from the settings screen (TASK-279) applies at once
+	Players.LocalPlayer:GetAttributeChangedSignal(MODE_ATTRIBUTE):Connect(function()
+		self:Retick()
+	end)
+	UserInputService.WindowFocused:Connect(function()
+		self.WindowFocused = true
+	end)
+	UserInputService.WindowFocusReleased:Connect(function()
+		self.WindowFocused = false
 	end)
 
 	-- PlayerGui may arrive a frame late; do not hold up the other OnStart.
@@ -1031,10 +1218,15 @@ function PromptController:Watch(gui: Instance)
 	end
 end
 
-PromptController:OnTick(function(self)
+-- One pass outside the 10 Hz tick (mode or device just changed)
+function PromptController:Retick()
 	if self.Gui then
 		self:Tick()
 	end
+end
+
+PromptController:OnTick(function(self)
+	self:Retick()
 end, TICK_RATE)
 
 return PromptController

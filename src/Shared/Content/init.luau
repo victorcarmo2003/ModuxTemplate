@@ -24,6 +24,7 @@ local Trash = require(script.Trash)
 local RailSlot = require(script.RailSlot)
 local Lobby = require(script.Lobby)
 local Mart = require(script.Mart)
+local Mode = require(script.Mode)
 local Moods = require(script.Moods)
 local Movement = require(script.Movement)
 local Neon = require(script.Neon)
@@ -38,14 +39,17 @@ local Revive = require(script.Revive)
 local RunParams = require(script.RunParams)
 local Sanity = require(script.Sanity)
 local Seating = require(script.Seating)
+local Security = require(script.Security)
 local Shift = require(script.Shift)
 local Shop = require(script.Shop)
+local ShopWindow = require(script.ShopWindow)
 local Sounds = require(script.Sounds)
 local Species = require(script.Species)
 local Stations = require(script.Stations)
 local Stats = require(script.Stats)
 local Table = require(script.Table)
 local Thief = require(script.Thief)
+local TipJar = require(script.TipJar)
 local Traffic = require(script.Traffic)
 local TrafficLights = require(script.TrafficLights)
 local Upgrades = require(script.Upgrades)
@@ -98,6 +102,7 @@ export type MartPedestal = Mart.Pedestal
 export type Looks = Outfits.Looks
 export type MusicCue = Sounds.Cue
 export type Mood = Moods.Mood
+export type Mode = Mode.Mode
 export type Neon = Neon.Neon
 export type MoodRules = Moods.MoodRules
 export type Night = Nights.Night
@@ -126,6 +131,10 @@ export type Revive = Revive.Revive
 export type RunParams = RunParams.RunParams
 export type Sanity = Sanity.Sanity
 export type Seating = Seating.Seating
+export type Security = Security.Security
+export type SecurityCam = Security.Cam
+export type SecurityLook = Security.Look
+export type SecurityView = Security.View
 export type SeatingGroup = Seating.Group
 export type Shop = Shop.Shop
 export type ShopGemPack = Shop.GemPack
@@ -140,12 +149,15 @@ export type Species = Species.Species
 export type Stat = Stats.Stat
 export type Station = Stations.Station
 export type Thief = Thief.Thief
+export type TipJar = TipJar.TipJar
 export type Traffic = Traffic.Traffic
 export type TrafficDensity = Traffic.Density
 export type TrafficRoute = Traffic.Route
 export type Upgrade = Upgrades.Upgrade
 export type UpgradeLevel = Upgrades.Level
 export type Trailer = Trailer.Trailer
+export type ShopWindow = ShopWindow.ShopWindow
+export type AnomalyWindow = ShopWindow.AnomalyWindow
 export type Vehicle = Vehicles.Vehicle
 export type WalkPath = WalkPaths.WalkPath
 export type WalkPathRules = WalkPaths.Rules
@@ -179,6 +191,10 @@ return table.freeze({
 	Species = Species,
 	Upgrades = Upgrades,
 	Trailer = Trailer,
+	-- service window = shop (TASK-284, owner request 2026-10-14, Provisional Q-270): the line leaves, anomalies it avoids/closes
+	ShopWindow = ShopWindow,
+	-- anomaly mode / day-only mode switch (owner request 2026-10-14, Provisional; tables, thief, Wide Counter off)
+	Mode = Mode,
 	Vehicles = Vehicles,
 
 	-- wave 2 (TASK-047; content-data.md §6). Numbers and texts Provisional (TASK-081, TASK-082); ids empty (Q-167, Q-168)
@@ -249,6 +265,13 @@ return table.freeze({
 	-- Table trash dumpsters: the cleaned tray flies to the nearest bin (owner request 2026-10-12; TrashController). Provisional
 	Trash = Trash,
 
+	-- Tip jar that replaced the cash drawer (DEC-239, user decision 2026-10-13; TipJarService, EconomyController). Provisional
+	TipJar = TipJar,
+
 	-- Sausage pose on the RestRail Parts (owner request 2026-10-12; Kitchen/shared/RailSlot). Provisional
 	RailSlot = RailSlot,
+
+	-- Security cameras: CCTV monitor in the trailer, fixed views from the pivots of the camera models, Normal / Night looks
+	-- (FEAT-040, TASK-285; owner request 2026-10-14; SecurityService, SecurityController). Provisional
+	Security = Security,
 })

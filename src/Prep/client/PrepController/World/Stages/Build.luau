@@ -15,9 +15,16 @@
 -- The server decides stock, band and the hot dog; this module predicts what it shows (the bun on the board) and undoes it when the
 -- records or the PrepResult say no. The cosmetic plate mask goes up with PrepTab (controller.PlateMask).
 -- Rollback without code: Rules.World.Stages.Board / Toppings = false puts the 2D Build stage back. Provisional numbers and texts.
+-- Delivery from the Toppings view (owner request 2026-10-14, Provisional): the customer waiting for its food at the service window
+-- (a Taken card at the Counter, the pinned one first) gets a code-made hitbox (target Customer) and a DeliverMark (Green "DELIVER"
+-- card) while the plate is ready (bun open, sausage in, no Finish on its way). Dragging the PLATE onto him is Done + Serve: the one
+-- summary (PrepFinish) goes out and, once it is accepted, PrepOrder Serve for that customer (Feed.Serve); the SERVER judges the hot
+-- dog just made (PrepService passes seat.Made to CustomerService:ServeFor). The Done button and the world `serve` prompt stay.
 local CollectionService = game:GetService("CollectionService")
+local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local PlateMask = require(ReplicatedStorage.shared.Prep.PlateMask)
@@ -34,6 +41,7 @@ local Targets = require(script.Parent.Parent.Targets)
 local ToolView = require(script.Parent.Parent.ToolView)
 local Types = require(script.Parent.Parent.Types)
 local World = require(script.Parent.Parent)
+local DeliverMark = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.DeliverMark)
 
 const untrack = Vide.untrack
 const source = Vide.source
@@ -44,8 +52,12 @@ const boardRules = world.Board
 const build = prep.Build
 const MAX = Content.OrderRules.MaxToppings
 const GROOVE = Vector2.new(build.Groove.X, build.Groove.Y)
+const HAND_OVER = 0.25 -- s: the plate dropped on the customer flies to him and shrinks away (bug 2026-10-14: no slide back)
 const MASK_RETRY = 2.5 -- s: the server drops a mask that comes too early, so an unaccepted one is sent again (3 times at most)
 const FRAME_TICK = 0.1 -- s: the plate and the targets are re-judged at 10 Hz
+-- the customer drop target of the Toppings view (owner request 2026-10-14): the area is Content.Prep.Build.Deliver (TASK-253)
+const FIND_EVERY = 0.25 -- s between two searches for the rig
+const CUSTOMER_ID = Types.IdOf("Customer", 0, "")
 
 -- Short texts (Provisional; ui-text.md §16, PREP3D_*; English, DEC-022; <= 36 characters)
 const TEXT = {
@@ -53,7 +65,8 @@ const TEXT = {
 	Knife = "Cut the bun with the knife", -- PREP3D_TIP_BOARD
 	Slice = "Drag the knife along the line", -- PREP3D_GST_SLICE
 	SliceHold = "Hold the knife on the line", -- PREP3D_GST_SLICE_HOLD
-	Place = "Drag the frank into the bun", -- PREP3D_GST_PLACE
+	Place = "Tap the sausage, or drag it in", -- PREP3D_GST_PLACE
+	CutFirst = "Cut the bun first", -- Provisional
 	Rail = "Ready franks wait on the rail", -- PREP3D_TIP_RAIL
 	NextBoard = "Next: add toppings", -- PREP3D_TIP_NEXT_BOARD
 	NeedBoard = "Cut the bun and add the frank first", -- PREP3D_TIP_NEXT_BOARD_OFF
@@ -63,6 +76,8 @@ const TEXT = {
 	TopMax = "3 toppings max!", -- PREP3D_REF_TOP_MAX
 	PlaceFirst = "Place the frank first", -- PREP3D_REF_PLACE_FIRST
 	Bin = "Drag the plate to the bin", -- PREP3D_TIP_BIN
+	Deliver = "Drag the plate to the customer", -- Provisional (owner request 2026-10-14)
+	NoCustomer = "Nobody is waiting for it", -- Provisional
 	Trashed = "Plate trashed", -- PREP3D_REF_TRASHED
 	NoBun = "Out of buns! Restock it.", -- PREP3D_REF_NOBUNS
 	Miss = "Drop it on the bun", -- Provisional
@@ -123,8 +138,22 @@ type Sess = {
 	MaskTries: number,
 	Home: Vector3, -- where the plate sits in the Board view (the middle of the board)
 	Placed: boolean, -- the plate has been placed at least once (the first Enter does not slide)
+	Flying: boolean, -- a tapped sausage is flying to the bun
+	Assembly: Vector3?, -- where the plate sits beside the bowls (derived once from the bowl targets and the bench)
 	CoachBoard: boolean, -- the tutorial hand was tried for the cut
 	CoachTop: boolean, -- ... and for the toppings
+	CoachSausage: boolean, -- ... and for the sausage from the rail to the bun (owner request 2026-10-14)
+	CoachDeliver: boolean, -- ... and for the plate to the customer's delivery area (TASK-254)
+	-- delivery from the Toppings view: the hitbox / target / rig of the customer that can take the plate (0 = none), the next
+	-- rig search, the DELIVER card, the customer a Done-by-drop serves once the Finish is accepted, the plate carried over him
+	CustomerBox: Part,
+	CustomerTarget: Types.Target?,
+	CustomerId: number,
+	CustomerModel: Model?,
+	CustomerLook: number,
+	Mark: DeliverMark.Mark,
+	DeliverTo: number,
+	CarryOver: boolean,
 }
 
 local session: Sess? = nil
@@ -198,6 +227,158 @@ local function realObject(part: BasePart, kind: string, key: string): Instance?
 	return nil
 end
 
+-- Delivery (Toppings view) ---------------------------------------------------------------------------------------------------
+
+-- The rig of NPC `id` (attribute NpcId, tag AnimalRig), nil when it is not in the world.
+local function rigOf(id: number): Model?
+	for _, instance in CollectionService:GetTagged("AnimalRig") do
+		if instance:IsA("Model") and instance:GetAttribute("NpcId") == id then
+			return instance
+		end
+	end
+	return nil
+end
+
+-- The customer that waits for its food at the counter: the pinned ticket first, else the first taken one. 0 = none.
+local function deliverable(): number
+	const pinned = untrack(Feed.Pinned)
+	local first = 0
+	for _, id in untrack(Feed.Ids) do
+		const card = untrack(Feed.CardOf(id))
+		if card.Status == "Taken" and card.Place == "Counter" then
+			if id == pinned then
+				return id
+			end
+			if first == 0 then
+				first = id
+			end
+		end
+	end
+	return first
+end
+
+-- The plate can go to the customer now (the Done of the Toppings view, by drag)
+local function canDeliver(current: Sess): boolean
+	return current.Active
+		and not current.Dead
+		and not current.Closing
+		and current.Tab == "Toppings"
+		and plateOpen()
+		and placed()
+		and current.View:Bun() == "Open"
+		and untrack(Session.Pending) ~= "Finish"
+		and current.CustomerId ~= 0
+		and current.CustomerModel ~= nil
+end
+
+-- Every frame: the hitbox follows the rig of the deliverable customer, the DELIVER card shows while the plate can go to him.
+local function followCustomer(current: Sess)
+	const id = deliverable()
+	const clock = os.clock()
+	if id ~= current.CustomerId then
+		current.CustomerId = id
+		current.CustomerModel = nil
+		current.CustomerLook = 0
+	end
+	if id ~= 0 and current.CustomerModel == nil and clock >= current.CustomerLook then
+		current.CustomerLook = clock + FIND_EVERY
+		current.CustomerModel = rigOf(id)
+	end
+	local model = current.CustomerModel
+	local root: Instance? = if model ~= nil then (model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart) else nil
+	if model ~= nil and (model.Parent == nil or root == nil) then
+		current.CustomerModel = nil
+		model = nil
+		root = nil
+	end
+	const target = current.CustomerTarget
+	if target ~= nil and target.Model ~= model then
+		target.Model = model
+		const registry = World.Targets()
+		if registry ~= nil then
+			registry:Touch()
+		end
+	end
+	if root ~= nil and root:IsA("BasePart") then
+		-- TASK-253: the delivery AREA covers the customer's body (the drop target is the same box)
+		const area = build.Deliver
+		const centre = root.Position + Vector3.new(0, area.Lift, 0)
+		current.CustomerBox.CFrame = CFrame.new(centre)
+		if canDeliver(current) and toolKey() == "" then
+			current.Mark:Show(centre, area.Width, area.Height)
+			current.Mark:SetHot(current.Drag ~= nil and current.Drag.Kind == "Plate" and current.CarryOver)
+			return
+		end
+	else
+		current.CustomerBox.CFrame = CFrame.new(0, -500, 0)
+	end
+	current.Mark:Hide()
+end
+
+-- The plate dropped on the customer: the Done (one PrepFinish), then Serve for him once the Finish is accepted (OnEvent)
+local function deliver(current: Sess): boolean
+	const controller = current.Controller
+	const npc = current.CustomerId
+	if npc == 0 or not canDeliver(current) then
+		controller:Toast(TEXT.NoCustomer, "Info")
+		sfx(current, "error", nil)
+		return false
+	end
+	-- a sauce still selected lands first: its score goes into the summary
+	current.Director:Commit()
+	if not Session.Finish(controller) then
+		controller:Toast(TEXT.NeedPlate, "Alert")
+		sfx(current, "error", nil)
+		return false
+	end
+	current.DeliverTo = npc
+	current.Mark:Kick(8)
+	World.Coach():Done("Deliver")
+	note(`plate dropped on customer {npc}: Finish sent, Serve follows`)
+	return true
+end
+
+-- The copy of the plate dropped on the customer flies into his box and shrinks away (the originals are already hidden)
+local function handOver(current: Sess, thrown: Model)
+	const from = thrown:GetPivot()
+	const goal = current.CustomerBox.Position
+	const scale = thrown:GetScale()
+	local t = 0
+	local connection: RBXScriptConnection? = nil
+	connection = RunService.RenderStepped:Connect(function(dt: number)
+		t = math.min(1, t + dt / HAND_OVER)
+		if thrown.Parent == nil then
+			if connection ~= nil then
+				connection:Disconnect()
+			end
+			return
+		end
+		thrown:PivotTo(from:Lerp(CFrame.new(goal) * from.Rotation, t))
+		thrown:ScaleTo(math.max(0.05, scale * (1 - t)))
+		if t >= 1 then
+			if connection ~= nil then
+				connection:Disconnect()
+			end
+			thrown:Destroy()
+		end
+	end)
+end
+
+-- The Finish of a plate dropped on a customer was accepted: the hot dog just made goes to him (the server judges it)
+local function serveDelivered(current: Sess)
+	const npc = current.DeliverTo
+	current.DeliverTo = 0
+	if npc == 0 then
+		return
+	end
+	const controller = current.Controller
+	if not Feed.Serve(controller, npc) then
+		-- no Feed session (or one already on its way): the same packet straight
+		controller.Libs.Net.PrepOrder:fireServer({ Act = "Serve", Npc = math.clamp(math.floor(npc), 1, 65535) })
+	end
+	note(`Serve sent to customer {npc}`)
+end
+
 -- Targets -----------------------------------------------------------------------------------------------------------------------
 
 local function setPulse(current: Sess, id: string, on: boolean)
@@ -244,7 +425,7 @@ local function register(current: Sess, registry: Targets.Registry)
 				return open ~= nil
 					and open.Tab == "Board"
 					and plateOpen()
-					and open.View:Bun() == "Open"
+					and not open.Flying
 					and not placed()
 					and untrack(Feed.Rail) > 0
 			end
@@ -285,6 +466,17 @@ local function register(current: Sess, registry: Targets.Registry)
 		end,
 	})
 	current.Targets[board.Target.Id] = board
+	-- the customer at the service window: the drop target of the plate in the Toppings view (delivery by drag)
+	const customer = registry:Add({
+		Target = Types.Target("Customer", 0, ""),
+		Parts = { current.CustomerBox },
+		Model = nil,
+		Enabled = function(): boolean
+			const open = live()
+			return open ~= nil and canDeliver(open) and open.Drag ~= nil and open.Drag.Kind == "Plate"
+		end,
+	})
+	current.CustomerTarget = customer
 end
 
 -- Acts -------------------------------------------------------------------------------------------------------------------------
@@ -334,6 +526,12 @@ local function pickTool(current: Sess, key: string, held: boolean)
 		return
 	end
 	const info = controller:InfoOf(key)
+	-- a gift bowl still closed (owner request 2026-10-14): it is opened in the world ("Open"), never from here
+	if info.Wrapped then
+		controller:Toast(`Open the {nameOf(key)} bowl first!`, "Alert")
+		sfx(current, "error", nil)
+		return
+	end
 	-- (dev: `/dev prep ray` lets the gestures be tried with an empty bowl; the server still refuses the plate at Finish)
 	if (info.Locked or info.Stock <= 0) and Players.LocalPlayer:GetAttribute("PrepRay") ~= true then
 		controller:Toast(`Out of {nameOf(key)}! Restock it.`, "Alert")
@@ -368,17 +566,104 @@ local function onPlaced(current: Sess, score: number)
 	controller:Need("SausagePlaced", true)
 	controller.View.Sausage({ X = build.Groove.X, Y = build.Groove.Y, State = "Ready" })
 	current.SausageOn = true
+	World.Coach():Done("Sausage")
 	current.View:SetSausage("Placed", GROOVE)
 	current.View:SetCarry(nil, nil, nil)
 	sfx(current, "hotdog_assemble", current.View.Plane.Frame.Position)
 	current.View:Burst(bandOf(score))
 	note(`placed {score}`)
+	-- the bun crate stands where the plate will sit (between the board and the bowls): it steps aside while the plate is open
+	const crate = current.Targets["BunCrate"]
+	if crate ~= nil and crate.Model ~= nil then
+		current.View:HideWorld(crate.Model)
+	end
+	-- the hot dog goes onto a plate at once; the plate slides to the bowls with the camera (Enter of the Toppings tab)
+	current.View:SetPlate(true)
+	task.delay(0.35, function()
+		if session == current and current.Active and not current.Dead and current.Tab == "Board" and plateOpen() and placed() then
+			controller:SetStage("toppings")
+		end
+	end)
 end
 
-local function onTopping(current: Sess, key: string, score: number, amount: number)
+-- Where the plate sits to be dressed: next to the bowls, on the bench, derived from the real bowl targets (centre of the grid, the
+-- side of the player, never off the bench: View:FindSpot). Cached; the board itself is the fallback.
+local function assemblyOf(current: Sess): Vector3
+	if current.Assembly ~= nil then
+		return current.Assembly
+	end
+	const bowls: { BasePart } = {}
+	local sumX, sumZ = 0, 0
+	for id, target in current.Targets do
+		if string.sub(id, 1, 8) == "Topping:" then
+			for _, part in target.Parts do
+				table.insert(bowls, part)
+				sumX += part.Position.X
+				sumZ += part.Position.Z
+			end
+		end
+	end
+	local spot: Vector3? = nil
+	if #bowls > 0 then
+		-- the bowls go round the plate (map: arc of 2 + 4): the spot is the front centre, in the gap between the two front bowls
+		-- (middle of the row nearest to the camera); a map without that gap (a bowl in the way) falls back to the nearest free spot
+		const pose = Poses.Of(current.Seat, "Toppings")
+		if pose ~= nil then
+			const camera = pose.Frame.Position
+			const flat = Vector3.new(pose.Frame.LookVector.X, 0, pose.Frame.LookVector.Z)
+			const ahead = if flat.Magnitude > 1e-3 then flat.Unit else Vector3.zAxis
+			-- depth along the view: the front row is the one nearest to the player
+			local nearest = math.huge
+			for _, part in bowls do
+				nearest = math.min(nearest, (part.Position - camera):Dot(ahead))
+			end
+			local countFront = 0
+			local frontPoint = Vector3.zero
+			for _, part in bowls do
+				if (part.Position - camera):Dot(ahead) <= nearest + 0.5 then
+					frontPoint += part.Position
+					countFront += 1
+				end
+			end
+			if countFront >= 2 then
+				const middle = frontPoint / countFront
+				const candidate = Vector3.new(middle.X, current.Home.Y, middle.Z)
+				-- clear of the FRONT row only: the plate is wider than the gap to the back row on purpose (it sits on the white Board slab at
+				-- the front of the counter; the back bowls may sit a little over its rim), so only the two bowls that flank it are tested
+				local clear = true
+				for _, part in bowls do
+					if (part.Position - camera):Dot(ahead) > nearest + 0.5 then
+						continue
+					end
+					const local_ = part.CFrame:PointToObjectSpace(Vector3.new(candidate.X, part.Position.Y, candidate.Z))
+					const outX = math.max(math.abs(local_.X) - part.Size.X / 2, 0)
+					const outZ = math.max(math.abs(local_.Z) - part.Size.Z / 2, 0)
+					if math.sqrt(outX * outX + outZ * outZ) < current.View.PlateRadius * 0.9 then
+						clear = false
+						break
+					end
+				end
+				if clear then
+					spot = candidate
+				end
+			end
+		end
+	end
+	if spot == nil and #bowls > 0 then
+		const pose = Poses.Of(current.Seat, "Toppings")
+		const toward = if pose ~= nil then -pose.Frame.LookVector else Vector3.zero
+		spot = current.View:FindSpot(Vector3.new(sumX / #bowls, current.Home.Y, sumZ / #bowls), bowls, toward)
+	end
+	const chosen: Vector3 = spot or current.Home
+	current.Assembly = chosen
+	note(`assembly point {tostring(chosen)}`)
+	return chosen
+end
+
+local function onTopping(current: Sess, key: string, score: number, amount: number, path: { { Vector2 } }?)
 	const controller = current.Controller
 	current.Drawn[key] = true
-	Session.AddTopping(controller, key, score, amount)
+	Session.AddTopping(controller, key, score, amount, path)
 	World.Coach():Done("Toppings")
 	current.View:Burst(bandOf(score))
 	note(`topping {key} {score}`)
@@ -391,6 +676,12 @@ local function resetPlate(current: Sess, dust: boolean)
 		current.View:Dust()
 	end
 	current.View:SetBun("None", false)
+	const crate = current.Targets["BunCrate"]
+	if crate ~= nil and crate.Model ~= nil then
+		current.View:ShowWorld(crate.Model)
+	end
+	current.View:SetPlate(false)
+	current.View:MoveTo(current.Home, 0)
 	current.View:SetSausage("None", nil)
 	current.View:SetCarry(nil, nil, nil)
 	for key in current.Drawn do
@@ -435,11 +726,23 @@ local function syncPlate(current: Sess)
 			current.Drawn[entry.Key] = true
 			const tolerance = prep.Tolerances.ByKey[entry.Key]
 			if tolerance ~= nil and tolerance.Gesture == "trace" then
-				current.Strokes:Begin(Strokes.ColorOf(entry.Key))
-				for _, point in build.Sauce.Path do
-					current.Strokes:Add(Vector2.new(point.X, point.Y))
+				-- the line as it was drawn (Session keeps it), else the guide path
+				const path = entry.Path
+				if path ~= nil and #path > 0 then
+					for _, segment in path do
+						current.Strokes:Begin(Strokes.ColorOf(entry.Key), entry.Key)
+						for _, point in segment do
+							current.Strokes:Add(point)
+						end
+						current.Strokes:Keep()
+					end
+				else
+					current.Strokes:Begin(Strokes.ColorOf(entry.Key))
+					for _, point in build.Sauce.Path do
+						current.Strokes:Add(Vector2.new(point.X, point.Y))
+					end
+					current.Strokes:Keep()
 				end
-				current.Strokes:Keep()
 			else
 				current.View:SetTopping(entry.Key, GROOVE, 1)
 			end
@@ -486,6 +789,42 @@ local function coach(current: Sess)
 			Plane.ToWorld(plane, Vector2.new(cut.From, cut.Y), boardRules.Guide.Lift),
 			Plane.ToWorld(plane, Vector2.new(cut.To, cut.Y), boardRules.Guide.Lift),
 		})
+	elseif
+		current.Tab == "Board"
+		and not current.CoachSausage
+		and plateOpen()
+		and bunState(current) == "Open"
+		and not placed()
+		and not current.Flying
+		and current.Drag == nil
+		and untrack(Feed.Rail) > 0
+	then
+		-- the paw: the front sausage of the rail -> the groove of the bun (owner request 2026-10-14)
+		local rail: BasePart? = nil
+		for id, target in current.Targets do
+			if string.sub(id, 1, 5) == "Rail:" and target.Parts[1] ~= nil then
+				rail = target.Parts[1]
+				break
+			end
+		end
+		if rail ~= nil then
+			current.CoachSausage = true
+			const plane = current.View.Plane
+			const groove = Plane.ToWorld(plane, GROOVE, boardRules.Guide.Lift)
+			hand:Show("Sausage", { Vector3.new(rail.Position.X, groove.Y, rail.Position.Z), groove })
+		end
+	elseif
+		current.Tab == "Toppings"
+		and not current.CoachDeliver
+		and #Session.Toppings() > 0
+		and toolKey() == ""
+		and canDeliver(current)
+	then
+		-- the paw: the plate -> the customer's delivery area (TASK-254), once a topping is on
+		current.CoachDeliver = true
+		const plane = current.View.Plane
+		const from = plane.Frame.Position + Vector3.new(0, 0.1, 0)
+		hand:Show("Deliver", { from, current.CustomerBox.Position })
 	elseif current.Tab == "Toppings" and not current.CoachTop and plateOpen() and placed() and #Session.Toppings() == 0 and toolKey() == "" then
 		current.CoachTop = true
 		-- from the first bowl with stock to the middle of the bun
@@ -494,7 +833,10 @@ local function coach(current: Sess)
 			if target ~= nil and target.Parts[1] ~= nil and current.Controller:InfoOf(key).Stock > 0 then
 				const plane = current.View.Plane
 				const from = Vector3.new(target.Parts[1].Position.X, plane.Frame.Position.Y, target.Parts[1].Position.Z)
-				hand:Show("Toppings", { from, Plane.ToWorld(plane, GROOVE, 0.1) })
+				-- the plate may still be sliding to the topping table: the hand goes to where it will rest, not to where the plane is now
+				const rest = assemblyOf(current)
+				const goal = Vector3.new(rest.X, plane.Frame.Position.Y + 0.1, rest.Z)
+				hand:Show("Toppings", { from, goal })
 				break
 			end
 		end
@@ -503,7 +845,7 @@ end
 
 -- The gesture the plate wants now (Director3D mode), "none" when nothing is armed.
 local function wantedMode(current: Sess): string
-	if current.Closing or not plateOpen() or untrack(Session.Pending) == "Finish" or current.Drag ~= nil then
+	if current.Closing or current.Flying or not plateOpen() or untrack(Session.Pending) == "Finish" or current.Drag ~= nil then
 		return "none"
 	end
 	const holdMode = untrack(Session.Hold)
@@ -593,6 +935,9 @@ local function frame(current: Sess, dt: number, time: number)
 			end
 		end
 		current.Director:Frame(dt)
+		followCustomer(current)
+	else
+		current.Mark:Hide()
 	end
 	current.View:Step(dt, time)
 	current.Tool:Step(dt)
@@ -616,6 +961,8 @@ local function teardown()
 	current.Strokes:Destroy()
 	current.View:Destroy()
 	current.Hitbox:Destroy()
+	current.CustomerBox:Destroy()
+	current.Mark:Destroy()
 	hover("")
 	World.SetWorkPlane(nil)
 	const bin = World.Bin()
@@ -626,6 +973,9 @@ local function teardown()
 	if registry ~= nil then
 		-- the target made of this session's own parts goes with it
 		registry:Remove(`Board:{current.Seat}`)
+		if current.CustomerTarget ~= nil and registry:Get(CUSTOMER_ID) == current.CustomerTarget then
+			registry:Remove(CUSTOMER_ID)
+		end
 		registry:Touch()
 	end
 end
@@ -660,7 +1010,17 @@ local function build3D(controller: any)
 	const attachment = if trailer ~= nil then trailer:FindFirstChild(`Att_Bun{seat}`, true) else nil
 	const anchor = if attachment ~= nil and attachment:IsA("Attachment") then attachment.WorldPosition else part.Position - Vector3.new(0, 0.25, -0.2)
 	-- the working bun sits in the middle of the board mesh (the seat's slot would crowd the crate), at the height of the slot
-	const boardMesh = if trailer ~= nil then trailer:FindFirstChild("Board", true) else nil
+	-- (the CUTTING board of the trailer: the topping counter has a white slab named Board too, the plate's spot, not this one)
+	local boardMesh: Instance? = nil
+	if trailer ~= nil then
+		for _, child in trailer:GetChildren() do
+			if child:IsA("Model") and child:GetAttribute("StationKind") == "board" then
+				boardMesh = child:FindFirstChild("Board", true)
+				break
+			end
+		end
+		boardMesh = boardMesh or trailer:FindFirstChild("Board", true)
+	end
 	const centre = if boardMesh ~= nil and boardMesh:IsA("BasePart") then Vector3.new(boardMesh.Position.X, anchor.Y, anchor.Z) else anchor
 	const knifeInstance = if trailer ~= nil then trailer:FindFirstChild("Knife", true) else nil
 	-- the screen right of the Board view, flat: the bun lies along it
@@ -697,6 +1057,16 @@ end)
 	hitbox.CanCollide = false
 	hitbox.CanTouch = false
 	hitbox.Parent = folder
+	const customerBox = Instance.new("Part")
+	customerBox.Name = "Prep_CustomerHitbox"
+	customerBox.Size = Vector3.new(build.Deliver.Width, build.Deliver.Height, build.Deliver.Depth)
+	customerBox.CFrame = CFrame.new(0, -500, 0)
+	customerBox.Anchored = true
+	customerBox.Transparency = 1
+	customerBox.CanQuery = true
+	customerBox.CanCollide = false
+	customerBox.CanTouch = false
+	customerBox.Parent = folder
 	const current: Sess = {
 		Controller = controller,
 		Kitchen = kitchen,
@@ -728,8 +1098,20 @@ end)
 		MaskTries = 0,
 		Home = centre,
 		Placed = false,
+		Flying = false,
+		Assembly = nil,
 		CoachBoard = false,
 		CoachTop = false,
+		CoachSausage = false,
+		CoachDeliver = false,
+		CustomerBox = customerBox,
+		CustomerTarget = nil,
+		CustomerId = 0,
+		CustomerModel = nil,
+		CustomerLook = 0,
+		Mark = DeliverMark.new(),
+		DeliverTo = 0,
+		CarryOver = false,
 	}
 	current.Director = Director3D.new({
 		Folder = folder :: Folder,
@@ -747,8 +1129,8 @@ end)
 		OnCut = function(score: number)
 			onCut(current, score)
 		end,
-		OnTopping = function(key: string, score: number, amount: number)
-			onTopping(current, key, score, amount)
+		OnTopping = function(key: string, score: number, amount: number, path: { { Vector2 } }?)
+			onTopping(current, key, score, amount, path)
 		end,
 		Deselect = function()
 			if toolKey() ~= "" then
@@ -763,6 +1145,11 @@ end)
 		CanLand = function(): boolean
 			return not current.Dead and not current.Closing and plateOpen() and placed() and untrack(Session.Pending) ~= "Finish"
 				and bunState(current) == "Open"
+		end,
+		Refuse = function(text: string)
+			note(`refused: {text}`)
+			controller:Toast(text, "Info")
+			sfx(current, "error", nil)
 		end,
 	})
 	-- the plate follows the section: the sauce segments and the hitbox slide with it
@@ -798,13 +1185,15 @@ local function setHover(current: Sess, target: Types.Target?)
 	if kind == "BunCrate" then
 		hover(TEXT.Crate)
 	elseif kind == "Rail" then
-		hover(TEXT.Rail)
+		hover(if current.View:Bun() == "Open" then TEXT.Place else TEXT.CutFirst)
 	elseif kind == "Board" then
 		hover(if current.Tab == "Board" and not placed() then (if current.View:Bun() == "Open" then TEXT.Place else TEXT.Knife) else TEXT.Bin)
 	elseif kind == "Topping" then
 		hover(BOWL_TIPS[target.Target.Topping] or "")
 	elseif kind == "Bin" then
 		hover(TEXT.Bin)
+	elseif kind == "Customer" then
+		hover(TEXT.Deliver)
 	else
 		hover("")
 	end
@@ -846,6 +1235,7 @@ end
 local function endDrag(current: Sess)
 	const had = current.Drag ~= nil
 	current.Drag = nil
+	current.CarryOver = false
 	current.View:SetCarry(nil, nil, nil)
 	if not placed() then
 		current.View:SetSausage("None", nil)
@@ -884,14 +1274,19 @@ const Build: Stage.Stage3D = {
 		current.Active = true
 		current.Tab = tab
 		current.WantMode = "?"
-		-- the Toppings view looks at the bowls: the plate slides to the left part of it; the bin is only there
-		const shift = boardRules.Shift
-		const centre = current.Home
+		-- the hot dog is on a plate once the sausage is in: the plate sits beside the bowls (assemblyOf) in whichever tab, and slides
+		-- there with the camera (a spring); before that the bun stays on the board
+		-- Where the hot dog is, in ONE place: once the sausage is in (placed) the plate is on the topping table and never goes back to
+		-- the board. A stage that was torn down and built again (the pan crossed the Grill and came back) starts with no plate in its
+		-- view, so the plate is rebuilt from the Session here, before it is placed.
+		if placed() and plateOpen() and not current.View:HasPlate() then
+			current.View:SetPlate(true)
+		end
 		current.View:MoveTo(
-			if tab == "Toppings" then centre + current.View.Orient.XVector * shift.Right + current.View.Orient.ZVector * shift.Back else centre,
+			if current.View:HasPlate() then assemblyOf(current) else current.Home,
 			if first then 0 else boardRules.Slide
 		)
-			current.Placed = true
+		current.Placed = true
 		Session.Sync(controller)
 		-- coming back to the Board with the bun already cut: the step follows the plate
 		if tab == "Board" and Session.Cut() ~= nil and Session.Peek(controller.Step) == "bun" then
@@ -1026,6 +1421,11 @@ const Build: Stage.Stage3D = {
 			if targetKind == "BunCrate" then
 				beginPlate(current)
 			elseif targetKind == "Rail" then
+				if current.View:Bun() ~= "Open" then
+					controller:Toast(TEXT.CutFirst, "Alert")
+					sfx(current, "error", nil)
+					return
+				end
 				current.Drag = { Kind = "Sausage", Points = {} }
 				current.View:SetCarry("Sausage", message.Point, nil)
 				current.Director:SetMode("none", false)
@@ -1048,13 +1448,41 @@ const Build: Stage.Stage3D = {
 				dragSausage(current, message.Point)
 			else
 				current.View:SetCarry("Plate", message.Point, nil)
+				const over = message.Over :: Types.Target?
+				current.CarryOver = over ~= nil and over.Target.Kind == "Customer"
 			end
+		elseif kind == "Tap" then
+			-- a tap on the rail sausage sends it to the bun on its own: the same landing as a finished drag (onPlaced)
+			const drag = current.Drag
+			if drag ~= nil and drag.Kind == "Sausage" and not current.Flying then
+				current.Drag = nil
+				current.Flying = true
+				current.Director:SetMode("none", false)
+				current.WantMode = "none"
+				const score = current.Director:MeasurePlace({ GROOVE, GROOVE, GROOVE })
+				note(`sausage tapped: sent to the bun, score {tostring(score)}`)
+				current.View:Fly(function()
+					current.Flying = false
+					current.WantMode = "?"
+					if current.Dead or placed() then
+						current.View:SetCarry(nil, nil, nil)
+						return
+					end
+					onPlaced(current, score or 100)
+				end)
+			end
+		elseif current.Flying and (kind == "Release" or kind == "Cancel") then
+			return
 		elseif kind == "Release" or kind == "Cancel" then
 			const drag = current.Drag
 			if drag ~= nil and drag.Kind == "Sausage" and kind == "Release" then
 				note("sausage released over nothing")
 				sfx(current, "error", nil)
 				controller:Toast(TEXT.Miss, "Info")
+			elseif drag ~= nil and drag.Kind == "Plate" and kind == "Release" and canDeliver(current) then
+				-- TASK-253: the plate goes back; say where it goes
+				sfx(current, "error", nil)
+				controller:Toast(build.Texts.DropOnCustomer, "Info")
 			end
 			endDrag(current)
 		elseif kind == "Drop" then
@@ -1074,6 +1502,22 @@ const Build: Stage.Stage3D = {
 				else
 					sfx(current, "error", nil)
 					controller:Toast(TEXT.Miss, "Info")
+				end
+			elseif drag.Kind == "Plate" and over.Target.Kind == "Customer" then
+				-- bug 2026-10-14: the stack must not slide back to the board while the Finish travels. The lifted stack
+				-- becomes a copy that flies to the customer; the originals and the sauce lines go at once.
+				const thrown = current.View:TakeCarry()
+				endDrag(current)
+				if deliver(current) then
+					current.Strokes:Clear()
+					if thrown ~= nil then
+						handOver(current, thrown)
+					end
+				else
+					if thrown ~= nil then
+						thrown:Destroy()
+					end
+					current.View:Restore()
 				end
 			elseif drag.Kind == "Plate" and over.Target.Kind == "Bin" then
 				-- the plate ghost in the hand is swallowed by the bin (it keeps its pose, shrinks and falls in)
@@ -1114,6 +1558,22 @@ const Build: Stage.Stage3D = {
 			controller.PlateMask = 0
 		end
 		const current = session
+		if act == "Trash" and not result.Ok and current ~= nil then
+			-- the bin refused: the plate comes back from where the bin swallowed it
+			current.View:Restore()
+		end
+		const delivered = act == "Finish" and current ~= nil and current.DeliverTo ~= 0
+		if act == "Finish" and current ~= nil then
+			if result.Ok then
+				serveDelivered(current)
+			else
+				if current.DeliverTo ~= 0 then
+					-- refused after a drop: the plate comes back (the sauce lines were cleared at the drop)
+					current.View:Restore()
+				end
+				current.DeliverTo = 0
+			end
+		end
 		if act == "Finish" and result.Ok and current ~= nil and current.Active and not current.Closing and current.View:Bun() == "Open" then
 			current.Closing = true
 			current.Director:SetMode("none", false)
@@ -1125,11 +1585,24 @@ const Build: Stage.Stage3D = {
 				end
 				fired = true
 				current.Closing = false
+				if prep.Rules.Delivery == "Prompt" then
+					-- the hot dog is in the hand now: the plate goes with it, nothing stays on the table
+					current.View:TakeAway()
+					-- TASK-267: the originals go at once too (the sauce lines are not part of the take-away and the view stays up
+					-- during the camera's way out), and the plate picture is emptied so no frame draws it again
+					controller.View.Bun("None")
+					resetPlate(current, false)
+				end
 				Session.OnResult(controller, result)
 			end
 			sfx(current, "hotdog_assemble", current.View.Plane.Frame.Position)
 			current.View:Burst(result.Grade)
 			current.View:Celebrate(result.Grade)
+			if delivered then
+				-- dropped on the customer: the plate already left the board, no bun closing over an empty plate
+				run()
+				return
+			end
 			current.View:Close(run)
 			task.delay(boardRules.Close + 0.5, run)
 			return

@@ -782,3 +782,27 @@ Nenhuma bloqueia o início da onda; cada uma vira caso com esperado **a definir*
 | Rodada | Data | Build (commit) | Solo PC | Party 2 (PC + Mob) | Party 4 | Casos falhos | Tasks de correção |
 |---|---|---|---|---|---|---|---|
 | — | — | — | — | — | — | — | — |
+
+---
+
+## 12. ANM-004 "A cópia bate na porta dos fundos" (DEC-247, Provisório, 2026-10-14)
+
+Código: `Anomalies/ANM-004.luau`, `Rules/ANM-004.luau` (`Door*`, `Knock*`), `TrailerDoorService` (`SetLocked`), `CustomerService:HoldSpawns`, efeito cliente `Effects/ANM-004.luau` e `Effects/Kit/Fade.luau`. Não marca nada como Aprovado. Pré-requisito: Play descartável em Night 4+ com o trailer (`/dev` conforme `tools/studio/smoke.md`; `anomaly` para iniciar a ANM-004 e `customer`/`seating` para o balcão). Party de 2 para os casos com "dentro" e "fora".
+
+| ID | Caso | Passos | Esperado |
+|---|---|---|---|
+| T004-01 | Verbo certo não muda | A recusa a cópia ("Refuse") | ocorrência resolvida; porta nunca trava; nenhuma batida; fila normal |
+| T004-02 | Erro tranca a porta | A abre a porta (aberta), depois "Take Order" na cópia | −35 em A, cue `mirror_smile`, a porta fecha **na hora** e o prompt "Open door" continua visível |
+| T004-03 | Porta trancada | A e B tentam "Open door" na janela de 8 a 12 s | nada abre; só quem tentou ouve `Locked door` (0,96 s); sem toast, sem `error`, sem `prompt_done` extra; a janela de serviço (Window) abre/fecha normal |
+| T004-04 | Sem cliente novo | observar a fila durante a espera | nenhum cliente novo (nem passante adotado, nem garantia) entra até a 1ª batida; depois o fluxo volta |
+| T004-05 | Atraso sorteado | repetir 5 vezes (`/dev` seed diferente) | 1ª batida entre 8 e 12 s depois do "Take Order"; nunca fixo |
+| T004-06 | Batidas | A dentro do trailer | a cópia (rig animal, roupa espelhada, olhos brancos, pele normal) surge **fora** da porta, de frente para ela, e bate 3 vezes com 2 a 3 s entre batidas (`door_knock` no local da porta); sem voz |
+| T004-07 | Só quem está dentro vê | B fora do trailer durante as batidas | B não vê a cópia nem ouve a batida; se A sai do trailer a cópia some só para A e volta se A entra |
+| T004-08 | Porta destranca nas batidas | tentar abrir logo antes e logo depois da 1ª batida | antes: `Locked door`; depois: abre normal |
+| T004-09 | Abriu = agarrado | A abre a porta entre a 1ª batida e 2 s depois da 3ª | a cópia entra, avança até o corpo de A (sem sangue nem arma), A desmaia (ragdoll, mesmo caminho do `Faint`), a cópia some com fade de 2 s; −35 em A (uma vez por ocorrência) |
+| T004-10 | Revive | B usa o Revive Kit em A | A volta; não houve noite perdida (`LoseNight` não chamado; a "wipe" só vale se todos caírem, DEC-094) |
+| T004-11 | Ninguém abriu | não tocar na porta | 2 s depois da 3ª batida a cópia dá fade de 2 s e é destruída (nenhum resquício na pasta `AnomalyEffects`); a ocorrência fecha **Resolved** e a porta fica livre |
+| T004-12 | Quem abre fora | B (fora) usa "Enter" na janela das batidas | B abre a porta e é o agarrado (falha de quem abriu, DEC-204/DEC-247) |
+| T004-13 | Carrinho | sem trailer (ou `HasDoor` falso) | só o −35; nada tranca, nenhuma cópia na porta |
+| T004-14 | Fim da noite no meio | 6:00 AM / restore durante a tranca ou as batidas | `Stop` destranca a porta e solta o hold de clientes; cópia local some com a pasta de efeitos |
+| T004-15 | `Kit/Fade` | `Fade.Out(modelo)` em cliente com BasePart, Decal, SurfaceGui (Frame, Label, Image, UIStroke), partículas e luz; `Restore()` | tudo vai a transparência 1 em 2 s; luz a 0; partículas desligadas; `Restore` devolve os valores originais; reutilizável pela ANM-002 (DEC-246) |

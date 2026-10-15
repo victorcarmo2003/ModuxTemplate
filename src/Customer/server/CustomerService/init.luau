@@ -14,8 +14,13 @@
 -- The customer at Q1 keeps the slot until it leaves (Ordering and Waiting). PatienceEndsAt stays 0 until Q1 (Q-192):
 -- OnFronted starts the Queue clock, "Take Order" swaps it for the Order clock. Prompts stay disabled here (TASK-033).
 -- Shift end: Summary sends every customer still around away; a new shift (and a snapshot restore) starts empty
--- (data.md: customers are not in the snapshot). Closing ends as soon as nobody is at or walking to the counter
--- (RoundService:SetCounterProbe).
+-- (data.md: customers are not in the snapshot). Closing ends as soon as nobody is at or walking to the counter and
+-- nobody waits or eats at a table (RoundService:SetCounterProbe). On a day shift the Closing is the LAST CALL (DEC-240,
+-- 2026-10-13): nobody new arrives, the queue and the tables are served without a rush (the patience clocks still run) and
+-- the safety cap is Content.Shift Closing.Duration (120 s).
+-- Queue size (DEC-241, 2026-10-13): the counter holds ONE customer by default (Counter L1) and grows to 5 with the Counter
+-- upgrade (UpgradeService QueueSize). An attempt skipped by a full counter tries again after Flow.FullRetry (~3.5 s)
+-- instead of waiting the whole interval.
 --
 -- Orders (TASK-033; FEAT-010, FEAT-011; DEC-071, DEC-072; Orders.luau, OrderRoll.luau): the order is drawn when the
 -- customer reaches the queue (K hidden, server-only Ticket). Patience has two clocks (Q-192, Provisional): Queue (from
@@ -172,7 +177,7 @@ export type Wire = {
 export type SaleResult = "Perfect" | "Complete" | "Incomplete" | "Wrong" | "Left" | "Refused" | "Slow"
 
 -- Customer-anomaly variant (= NpcService.Variant; rig attribute "Variant", read by the client)
-export type Variant = "blank" | "mirror" | "raincoat"
+export type Variant = "blank" | "mirror" | "raincoat" | "shake" | "neck" | "eyes" | "bighead" | "float" | "stare"
 
 -- SpawnActor request (architecture.md §19.13 Context.Spawn). Look fields force the draw (must be valid for the type);
 -- CopyOf (mirror only) copies the type, species and outfit of a live, non-actor customer that is not leaving.
@@ -270,6 +275,7 @@ const CustomerService = Modux.Service("CustomerService", {
 		"NpcService",
 		"ItemService",
 		"ClassService",
+		"VehicleService",
 	},
 	Priority = 590,
 })
@@ -321,6 +327,8 @@ function CustomerService:Setup()
 	self.ForcedOrders = nil :: { { string } }?
 	-- TutorialService hook (SetSpawnHold): the regular flow waits while it answers true
 	self.SpawnHold = nil :: (() -> boolean)?
+	-- HoldSpawns reasons (anomalies): no new customer arrives while any is set
+	self.SpawnHolds = {} :: { [string]: boolean }
 	-- Tutorial customer asked (RequestTutorial) and not spawned yet; server time of the next try
 	self.TutorialWanted = false :: boolean
 	self.TutorialTryAt = 0 :: number
@@ -394,7 +402,8 @@ function CustomerService:SetSeater(seater: Seater?)
 	self.Seater = seater
 end
 
--- Nobody at the counter and nobody waiting at a table for the food (the day Closing waits for them, patience ends it).
+-- Nobody at the counter, nobody waiting at a table for the food and nobody still eating there (the day Last call waits
+-- for them, patience ends it, and the 120 s cap of the Closing row is the last resort).
 function CustomerService:IsCounterEmpty(): boolean
 	if self:Occupants() > 0 then
 		return false
@@ -403,12 +412,20 @@ function CustomerService:IsCounterEmpty(): boolean
 		if customer.AtTable and customer.State ~= "Leaving" then
 			return false
 		end
+		-- Last call only: at night the Closing sends everybody away, the diners included
+		if customer.Dining and customer.State == "Leaving" and not self:IsNightShift() then
+			return false
+		end
 	end
 	return true
 end
 
 -- Active queue slots now (Counter level, UPG-003). Read live: a Counter bought mid-shift opens Q4 at once.
+-- At night Flow.NightQueueSize (TASK-287): one NPC at the counter, customer or anomaly actor, never two.
 function CustomerService:QueueSize(): number
+	if self:IsNightShift() then
+		return Queue.size(Content.Flow.NightQueueSize)
+	end
 	return Queue.size(self.Dependencies.UpgradeService:GetEffect("QueueSize"))
 end
 
@@ -440,7 +457,16 @@ function CustomerService:SetSpawnHold(hold: () -> boolean)
 	self.SpawnHold = hold
 end
 
+-- Anomaly hold (ANM-004 "the copy knocks", DEC-247 Provisional): no regular customer, adoption, guarantee or actor
+-- arrives while any reason is held. Independent of the tutorial hook above (that one has a single owner).
+function CustomerService:HoldSpawns(reason: string, on: boolean)
+	self.SpawnHolds[reason] = if on then true else nil
+end
+
 function CustomerService:SpawnHeld(): boolean
+	if next(self.SpawnHolds) ~= nil then
+		return true
+	end
 	const hold = self.SpawnHold
 	if hold == nil then
 		return false
@@ -1070,6 +1096,40 @@ function CustomerService:SendAllAway()
 	end
 end
 
+-- The service window shut (TASK-284, owner request 2026-10-14; Content.ShopWindow, Provisional Q-270): everyone in line,
+-- ordering or waiting for food walks off angry (ShopWindow.LeaveMood). Each pending hot dog is settled as
+-- ShopWindow.LeaveResult (Refused: $0, same ledger and stats as a refusal; Acted "refuse" with the player who closed,
+-- nil = automatic). Still walking to the line (no ticket yet): leaves angry, no outcome. Stay: the tutorial customer,
+-- anomaly actors (their module decides) and diners whose food came.
+function CustomerService:SendLineAway(player: Player?)
+	const rules = Content.ShopWindow
+	const result = rules.LeaveResult :: SaleResult
+	const ids: { number } = {}
+	for id, customer in self.Customers do
+		if customer.State == "Leaving" or customer.Leader ~= nil or customer.Variant ~= nil or customer.Tutorial then
+			continue
+		end
+		const ticket = self.Tickets[id]
+		if ticket ~= nil and #Orders.Pending(ticket) == 0 then
+			continue
+		end
+		table.insert(ids, id)
+	end
+	table.sort(ids)
+	for _, id in ids do
+		const customer = self.Customers[id]
+		if customer == nil or customer.State == "Leaving" then
+			continue
+		end
+		const ticket = self.Tickets[id]
+		if ticket ~= nil then
+			self:SettlePending(customer, ticket, result)
+			self.Acted:Fire(id, REFUSE, player, result)
+		end
+		self:Leave(id, rules.LeaveMood)
+	end
+end
+
 -- Every customer gone at once (new shift, snapshot restore: the shift starts empty, data.md).
 function CustomerService:RemoveAll()
 	const ids: { number } = {}
@@ -1591,7 +1651,8 @@ function CustomerService:Equip(player: Player, tool: Tool)
 end
 
 -- Pays one served hot dog against line `index` of the ticket: consumes it (not on Wrong: it stays in the hand),
--- drawer + tip, line result, Sale packet and Acted. Returns the SaleResult of the line.
+-- price straight into Cash (DEC-238) + tip into the tip jar (DEC-239), line result, Sale packet and Acted. Returns the
+-- SaleResult of the line.
 function CustomerService:SellLine(
 	id: number,
 	customer: Customer,
@@ -1614,11 +1675,11 @@ function CustomerService:SellLine(
 		line.Mood = if effect ~= nil then effect.Mood else nil
 		-- Wrong: $0; the hot dog stays in the server's hand (FEAT-011 "Errado devolvido")
 		items:Consume(player, tool)
-		amount += economy:AddToDrawer(Orders.Pay(verdict, line.Price), "Sale")
+		amount += economy:AddSale(Orders.Pay(verdict, line.Price), "Sale")
 		if verdict == "Complete" then
 			const tip = Orders.TipFor(ticket, at, effect)
 			if tip > 0 then
-				amount += economy:AddToDrawer(tip, "Tip")
+				amount += economy:AddTip(tip)
 				result = "Perfect"
 			end
 		end
@@ -1833,6 +1894,8 @@ function CustomerService:OnPhase(phase: string)
 	-- The day Closing still serves the queue (DEC-048). Any other phase after selling (NightEnd, NightLost, the 6 AM
 	-- Closing, Summary, Finale, RunEnd) empties the counter: everyone still around walks off with no outcome.
 	if phase == CLOSING and not self:IsNightShift() then
+		-- Last call (DEC-240): the line stays; tell the crew nobody else is coming
+		self.Dependencies.RunStateService:Notify("all", "last_call", 0)
 		return
 	end
 	self:SendAllAway()
@@ -1886,14 +1949,24 @@ function CustomerService:Step()
 	self:StepGuarantee(t)
 	-- the regular flow waits while the tutorial customer is at (or walking to) the counter: the next attempt comes
 	-- right after it was served
-	if self.NextSpawnAt > 0 and t >= self.NextSpawnAt and self:IsSelling() and not self:IsPaused() and not self:HasTutorial() then
-		self:Attempt()
+	if
+		self.NextSpawnAt > 0
+		and t >= self.NextSpawnAt
+		and self:IsSelling()
+		and not self:IsPaused()
+		and not self:HasTutorial()
+		and not self.TutorialWanted
+	then
+		const outcome = self:Attempt()
 		local interval = self:NextInterval()
 		if interval ~= nil and self.LastWasPair then
 			interval *= Content.Flow.Groups.IntervalMult -- FEAT-038: the flow stays almost the same
 		end
 		if interval == nil then
 			self.NextSpawnAt = 0
+		elseif outcome == "skipped_queue_full" then
+			-- DEC-241: the counter holds few customers; do not wait a whole interval, ask again soon
+			self.NextSpawnAt = t + Content.Flow.FullRetry
 		else
 			-- From the scheduled time (no drift); a long stall does not burst several spawns at once
 			self.NextSpawnAt = math.max(self.NextSpawnAt + interval, t + interval * 0.5)
@@ -2086,6 +2159,12 @@ CustomerService:OnInit(function(self)
 	end)
 	round.PhaseChanged:Connect(function(phase)
 		self:OnPhase(phase)
+	end)
+	-- The window is the shop (TASK-284): closing it sends the line away. VehicleService (620) made the signal in its OnInit
+	self.Dependencies.VehicleService.ShutterChanged:Connect(function(closed: boolean, player: Player?)
+		if closed then
+			self:SendLineAway(player)
+		end
 	end)
 	-- Someone else despawned one of ours (dev parade, anomaly in wave 2): drop the record
 	self.Dependencies.NpcService.Despawned:Connect(function(id: number)

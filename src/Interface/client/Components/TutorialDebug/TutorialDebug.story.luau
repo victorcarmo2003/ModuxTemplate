@@ -19,7 +19,7 @@ const SAMPLE = table.concat({
 	"answered   true  voiced true  greeted true",
 	"target     Workspace.Cart.Grill.Anchor_Place",
 	"beacon     mounted true  marked Grill",
-	"arrow far  false  pointer true",
+	"arrow      pointer true",
 	"voice      q 12  loading 1  loaded 30  failed 0",
 	"volume     master 1.00 x voice 0.80 = 0.80  fader 0.80",
 }, "\n")

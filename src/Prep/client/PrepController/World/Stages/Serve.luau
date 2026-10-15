@@ -8,7 +8,8 @@
 --             (Feed.Pinned, the guide of who is served; the SERVER judges Complete / Incomplete / Wrong, DEC-072). The plate flies to
 --             the customer, who takes it; the verdict comes with the Sale packet and shows over the customer (text + a burst); a Wrong
 --             plate stays in hand and flies back. A refusal flies it back too (the server's records always win).
---   Take      Stages/Order (overlay): the customer at the counter pulses and a tap on him takes the order (PrepOrder Take).
+--   Take      Stages/Order (overlay): the customer at the counter pulses and a tap on him takes the order (PrepOrder Take); the
+--             only Take of the mode (no Take button, playtest 2026-10-14).
 -- Sends only through Feed (Serve, Take). No GuiObject but one short BillboardGui for the verdict (a Provisional exception to the
 -- "no BillboardGui per target" of §8: one, 1 s, destroyed with the stage). Numbers: Content.Prep.Rules.World.Serve.
 local Players = game:GetService("Players")
@@ -579,12 +580,11 @@ end
 
 -- The stage ---------------------------------------------------------------------------------------------------------------------
 
--- What the corner button does: serve a ready plate with a pinned ticket, else take the customer at the counter.
+-- What the corner button does: serve a ready plate with a pinned ticket. It never takes an order (playtest 2026-10-14): the
+-- order is taken only by tapping the customer himself (Stages/Order) or by the world prompt, so the player looks at him.
 local function cornerMode(controller: any): string
 	if ready(controller) and Feed.Pinned() ~= 0 then
 		return "Serve"
-	elseif Feed.Front() ~= 0 then
-		return "Take"
 	end
 	return "Idle"
 end
@@ -632,7 +632,7 @@ const Serve: Stage.Stage3D = {
 		const mode = cornerMode(controller)
 		if mode == "Serve" then
 			return prep.Tabs.ByKey.Serve.Hint
-		elseif mode == "Take" then
+		elseif Feed.Front() ~= 0 and not ready(controller) then
 			return Order.Hint(controller)
 		elseif ready(controller) then
 			return NO_TICKET_TEXT
@@ -643,8 +643,6 @@ const Serve: Stage.Stage3D = {
 		const mode = cornerMode(controller)
 		if mode == "Serve" then
 			return { Label = prep.Texts.Serve, Enabled = not Feed.Sending(), Pulse = not Feed.Sending() }
-		elseif mode == "Take" then
-			return { Label = prep.Texts.Take, Enabled = true, Pulse = true }
 		end
 		return { Label = prep.Texts.Serve, Enabled = false }
 	end,
@@ -653,12 +651,7 @@ const Serve: Stage.Stage3D = {
 		const mode = untrack(function(): string
 			return cornerMode(controller)
 		end)
-		if mode == "Take" then
-			const id = untrack(Feed.Front)
-			if id ~= 0 then
-				Feed.Take(controller, id)
-			end
-		elseif mode == "Serve" and current ~= nil then
+		if mode == "Serve" and current ~= nil then
 			serve(current)
 		end
 	end,

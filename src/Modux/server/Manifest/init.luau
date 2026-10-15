@@ -11,8 +11,8 @@ local CoffeeHandService = require(ServerScriptService.server.ModuxTypes.CoffeeHa
 local CustomerService = require(ServerScriptService.server.ModuxTypes.CustomerService)
 local CutsceneService = require(ServerScriptService.server.ModuxTypes.CutsceneService)
 local DevService = require(ServerScriptService.server.ModuxTypes.DevService)
-local CashDeskService = require(ServerScriptService.server.ModuxTypes.CashDeskService)
 local EconomyService = require(ServerScriptService.server.ModuxTypes.EconomyService)
+local TipJarService = require(ServerScriptService.server.ModuxTypes.TipJarService)
 local InteractionService = require(ServerScriptService.server.ModuxTypes.InteractionService)
 local ItemService = require(ServerScriptService.server.ModuxTypes.ItemService)
 local KitchenService = require(ServerScriptService.server.ModuxTypes.KitchenService)
@@ -32,8 +32,11 @@ local RewardService = require(ServerScriptService.server.ModuxTypes.RewardServic
 local RoundService = require(ServerScriptService.server.ModuxTypes.RoundService)
 local RunStateService = require(ServerScriptService.server.ModuxTypes.RunStateService)
 local SeatingService = require(ServerScriptService.server.ModuxTypes.SeatingService)
+local SecurityService = require(ServerScriptService.server.ModuxTypes.SecurityService)
 local RoleService = require(ServerScriptService.server.ModuxTypes.RoleService)
+local SettingsService = require(ServerScriptService.server.ModuxTypes.SettingsService)
 local ShopService = require(ServerScriptService.server.ModuxTypes.ShopService)
+local ShopUtilityService = require(ServerScriptService.server.ModuxTypes.ShopUtilityService)
 local ShowcaseService = require(ServerScriptService.server.ModuxTypes.ShowcaseService)
 local ThiefService = require(ServerScriptService.server.ModuxTypes.ThiefService)
 local TrafficService = require(ServerScriptService.server.ModuxTypes.TrafficService)
@@ -54,8 +57,8 @@ export type AllServices = {
 	CustomerService: CustomerService.Public,
 	CutsceneService: CutsceneService.Public,
 	DevService: DevService.Public,
-	CashDeskService: CashDeskService.Public,
 	EconomyService: EconomyService.Public,
+	TipJarService: TipJarService.Public,
 	InteractionService: InteractionService.Public,
 	ItemService: ItemService.Public,
 	KitchenService: KitchenService.Public,
@@ -75,8 +78,11 @@ export type AllServices = {
 	RoundService: RoundService.Public,
 	RunStateService: RunStateService.Public,
 	SeatingService: SeatingService.Public,
+	SecurityService: SecurityService.Public,
 	RoleService: RoleService.Public,
+	SettingsService: SettingsService.Public,
 	ShopService: ShopService.Public,
+	ShopUtilityService: ShopUtilityService.Public,
 	ShowcaseService: ShowcaseService.Public,
 	ThiefService: ThiefService.Public,
 	TrafficService: TrafficService.Public,

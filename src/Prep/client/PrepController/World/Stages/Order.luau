@@ -1,14 +1,14 @@
 --!strict
 -- World/Stages/Order: the Take of the 3D prep (docs/tech/prep-3d.md §3.1; TASK-206). The tab Order left the bar: a customer at the
--- counter (Q1) that waits to be taken is taken in two ways, both PrepOrder Take (the same path as the world prompt,
--- CustomerService:TakeOrderFor; the server only accepts the one on Q1):
---   * the Take button of the ticket rail (2D, PrepController Slots.Ticket + TicketRail `Take`), on every tab and also without 3D
---   * in the Window view this overlay: the customer pulses (Highlight, Mustard) and a tap on it takes the order
+-- counter (Q1) that waits to be taken is taken ONLY by facing him (playtest 2026-10-14: the player has to look at the customer to
+-- see anomalies; no Take button on the ticket rail, on Next or on the cards): the world prompt take_order before entering, or, in
+-- the Window view, this overlay: the customer pulses (Highlight, Mustard) and a tap on him is PrepOrder Take (the same path as the
+-- world prompt, CustomerService:TakeOrderFor; the server only accepts the one on Q1).
 -- It is an OVERLAY (Stage3D.Overlay, no tab): the Serve stage arms it (`Enter` / `Leave`) because the Window view is the Serve tab.
 -- The Feed (the line, the pin, the Take / Serve acts, the broadcast events) is still started and fed by the 2D Order stage of
 -- Stages/Order.luau, which has no board in the 3D set and stays as the Feed's host. The customer has no authored hitbox (it is a
 -- rig that comes and goes): a hitbox part is made in code and follows the rig of the customer in front (Rig.SetSpared keeps that
--- rig whole in this view, PrepController:SpareCustomer). Rollback: Rules.World.Stages.Order = false leaves only the 2D Take.
+-- rig whole in this view, PrepController:SpareCustomer). Rollback: Rules.World.Stages.Order = false leaves only the world prompt.
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -159,7 +159,8 @@ function Order.Hint(_controller: any): string
 end
 
 function Order.Next(_controller: any): Stage.Next
-	return { Label = prep.Texts.Take, Enabled = Feed.Front() ~= 0 }
+	-- an overlay: the Serve stage owns the corner button, which never takes an order
+	return { Label = prep.Texts.Take, Enabled = false }
 end
 
 -- Whether this overlay is armed in the front view and a customer waits to be taken (the Serve stage asks for its hint).

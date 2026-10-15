@@ -8,7 +8,7 @@ local StationApi = require(ServerScriptService.server.Kitchen.KitchenService.Sta
 local Plate = require(ServerScriptService.server.Kitchen.KitchenService.Plate)
 
 export type Amounts = { [string]: number }
-export type StockRecord = { Amount: number, Capacity: number, Blocked: boolean }
+export type StockRecord = { Amount: number, Capacity: number, Blocked: boolean, Wrapped: boolean? }
 type Wanted = { Enabled: boolean, Text: string? }
 export type AlterKind = "rail" | "board"
 export type DiscardWhere = "Vehicle" | "Street"
@@ -20,6 +20,7 @@ export type Public = {
 	ByInstance: { [Instance]: StationApi.Station },
 	CoffeeSeeded: boolean,
 	Context: StationApi.Context,
+	DevUnlocked: Charm.Atom<{ [string]: boolean }>,
 	Discarded: SignalLib.Signal<Player, string, boolean, DiscardWhere>,
 	Emitted: SignalLib.Signal<string, Player?, { [string]: any }?>,
 	Gated: { [Instance]: boolean },
@@ -27,6 +28,7 @@ export type Public = {
 	Locks: { [number]: { thread } },
 	ModuleNames: { [string]: string },
 	Modules: { [string]: StationApi.Module },
+	Opened: Charm.Atom<{ [string]: boolean }>,
 	Plates: Plate.PlateApi,
 	Published: { [number]: number },
 	Stations: { [number]: StationApi.Station },
@@ -39,6 +41,11 @@ export type Public = {
 	GetVehicle: (self: Public) -> string,
 	GetCapacity: (self: Public, ingredient: string) -> number,
 	IsBlocked: (self: Public, ingredient: string) -> boolean,
+	IsWrapped: (self: Public, ingredient: string) -> boolean,
+	Unwrap: (self: Public, ingredient: string) -> boolean,
+	DevWrap: (self: Public, ingredient: string) -> boolean,
+	CaptureOpened: (self: Public) -> { string },
+	RestoreOpened: (self: Public, data: any) -> (),
 	GetStock: (self: Public, ingredient: string) -> (number, number),
 	Stock: (self: Public, ingredient: string) -> StockRecord,
 	SetAmount: (self: Public, ingredient: string, amount: number) -> (),
@@ -55,6 +62,7 @@ export type Public = {
 	FreeId: (self: Public) -> number?,
 	StableKey: (self: Public, vehicle: string, kind: string) -> string,
 	AddStation: (self: Public, instance: Instance) -> (),
+	EnsureUnwrapAnchors: (self: Public, instance: Instance) -> (),
 	RemoveStation: (self: Public, instance: Instance) -> (),
 	RefreshSlots: (self: Public, upgradeKey: string, vehicle: string) -> (),
 	Publish: (self: Public, station: StationApi.Station) -> (),
@@ -84,6 +92,7 @@ export type Public = {
 	BuildPlateDeps: (self: Public) -> Plate.Deps,
 	BeginPlate: (self: Public, player: Player, slot: number?) -> (Plate.Ticket?, string?),
 	FinishPlate: (self: Public, player: Player, spec: Plate.Spec) -> (Plate.Result?, string?),
+	SetPlateMask: (self: Public, player: Player, mask: number) -> (),
 	RefundPlate: (self: Public, player: Player) -> boolean,
 	TrashPlate: (self: Public, player: Player, options: Plate.TrashOptions?) -> Plate.TrashResult,
 	GrillAct: (self: Public, player: Player, act: Plate.GrillAction, slot: number?) -> (Plate.GrillResult?, string?),
@@ -92,6 +101,7 @@ export type Public = {
 	DevFeedRail: (self: Public, score: number?) -> boolean,
 	DevAgeGrill: (self: Public, slot: number, seconds: number) -> number,
 	DevFlipWire: (self: Public, slot: number) -> number,
+	GrillBusy: (self: Public) -> number,
 	RailCount: (self: Public) -> number,
 	BoardFree: (self: Public) -> number,
 	DevWorldPrompts: (self: Public, on: boolean?) -> (),

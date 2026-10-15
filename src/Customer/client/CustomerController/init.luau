@@ -13,8 +13,8 @@
 	  - Patience ring only with PatienceEndsAt > 0 (T41: 0 until "Take Order", K stays hidden). The span of the
 	    ring is max(PatienceBase + PatiencePerK x K, time left when first seen): the Counter bonus is not on the wire
 	    for this controller, so the ring starts full at "Take Order" and drains to 0 at PatienceEndsAt. Provisional.
-	  - Face: Moods[Mood].Expression through RigController:SetExpression (local only; the low-band Normal_Night of
-	    RigController still wins). The face follows the server's Mood in every state; the client never derives a
+	  - Face: Moods[Mood].Expression through RigController:SetExpression (local only; the mood also holds in the
+	    low band, Provisional 2026-10-14). The face follows the server's Mood in every state; the client never derives a
 	    mood from the patience (Annoyed is written by the server, network.md §3.6). Cleared when the record goes.
 	  - Sale packet -> ReactionBubble over the rig for REACTION_TIME s (Reactions.luau); the order bubble of that
 	    customer hides meanwhile. The "+$N" on the drawer is EconomyController's.
@@ -419,7 +419,13 @@ function CustomerController:Mount(entry: Entry, model: Model)
 			end,
 			Visible = function()
 				const record = entry.Record()
-				return record ~= false and record.State == "Waiting" and record.Leader == nil and not entry.Reacting()
+				-- Slot 0 + Waiting = seated (or walking to its table): the table's own bubble (SeatingController) shows the
+				-- order there, so this one would be a duplicate
+				return record ~= false
+					and record.State == "Waiting"
+					and record.Slot ~= 0
+					and record.Leader == nil
+					and not entry.Reacting()
 			end,
 			Toppings = function()
 				if entry.Variant() == BLANK then
@@ -474,7 +480,7 @@ function CustomerController:Mount(entry: Entry, model: Model)
 			end,
 			Lift = function()
 				const record = entry.Record()
-				if record ~= false and record.State == "Waiting" then
+				if record ~= false and record.State == "Waiting" and record.Slot ~= 0 then
 					return BUBBLE_LIFT + BAR_GAP + (if record.Order2 ~= nil then BUBBLE_TWO_ROWS else BUBBLE_ONE_ROW)
 				end
 				return BUBBLE_LIFT

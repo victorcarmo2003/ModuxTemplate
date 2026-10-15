@@ -39,7 +39,8 @@ type Items = {
 	Tools: (self: any, player: Player) -> { Tool },
 }
 
-const WORLD_ACTIONS = { "grill_place", "grill_collect", "bun_cut", "board_add_sausage", "topping_add", "discard" }
+-- BIN-C discard is not one of them: it stays on in the focused mode (KitchenService WORLD_KITCHEN, playtest 2026-10-14)
+const WORLD_ACTIONS = { "grill_place", "grill_collect", "bun_cut", "board_add_sausage", "topping_add" }
 
 local function run(api: Api.Context, caller: Player?): string
 	const player = caller or Players:GetPlayers()[1]
@@ -358,7 +359,7 @@ local function run(api: Api.Context, caller: Player?): string
 		check("bin: slot 0 is Invalid", bad ~= true and badReason == "Invalid", tostring(badReason))
 		drain()
 
-		-- 10. flag WorldKitchenPrompts: false hides the six world prompts, true gives the flow back
+		-- 10. flag WorldKitchenPrompts: false hides the five world prompts, true gives the flow back
 		const vehicle = kitchen:GetVehicle()
 		const anchors: { Instance } = {}
 		for _, anchor in CollectionService:GetTagged("Interactable") do

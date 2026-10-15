@@ -3,10 +3,11 @@
 -- A faceless customer (actor Variant "blank": smooth face, empty order bubble, no breathing idle — client, TASK-112)
 -- walks to the counter. Refuse = resolved. "Take Order" on it = Fail of who took it, arrival + Wrong in the ledger,
 -- cue blank_coin (DEC-195 flavor: a coin with no design in the drawer, $0, visual only) and it walks off slowly.
--- Left waiting until patience runs out = no penalty. Verb and numbers: Rules/ANM-001.luau. Body: Kit/CustomerActor.
+-- Left waiting until patience runs out = no penalty. V2 (DEC-255): the error is jumpscare + faint, not -RuleBroken. Verb and numbers: Rules/ANM-001.luau. Body: Kit/CustomerActor.
 local Kit = require(script.Parent.Kit.CustomerActor)
 
 return Kit.Module({
 	Ref = "ANM-001",
 	FailCue = "blank_coin",
+	Scare = true, -- V2 error: jumpscare + faint (DEC-255, TASK-269)
 })

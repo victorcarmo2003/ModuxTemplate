@@ -36,9 +36,16 @@
 --   * GrillAct(player, "Place"|"Flip"|"Collect", slot?) -> GrillResult?, reason?   grill moves, flip stamped by the server
 --   * PlateOf(player) -> Ticket?                               copy of the open plate
 --   * TakeStock(ingredient, n) already exists and is synchronous (two callers never take the same unit).
---   * Prep.Rules.WorldKitchenPrompts = false keeps PromptEnabled = false on the six world kitchen prompts (grill_place,
---     grill_collect, bun_cut, board_add_sausage, topping_add, BIN-C discard) with their handlers still registered;
---     true gives the old flow back with no other change. The street bin is never touched.
+--   * Prep.Rules.WorldKitchenPrompts = false keeps PromptEnabled = false on the five world kitchen prompts (grill_place,
+--     grill_collect, bun_cut, board_add_sausage, topping_add) with their handlers still registered; true gives the old
+--     flow back with no other change. Throw Away stays on in both bins: the BIN-C one inside the trailer (playtest
+--     2026-10-14: a wrong hot dog in hand had only the street bin, outside) and the street bin.
+-- Gift bowls (owner request 2026-10-14, Provisional): a topping of Content.Ingredients.GiftKeys that unlocks comes as a CLOSED
+-- bowl. Wrapped = unlocked, a gift key and not in Opened (run state, atom, snapshot "Unw" like the amounts "Stk"). While wrapped
+-- TakeStock and Restock refuse (topping_wrapped notice) and the Stock record carries Wrapped = true; the action topping_unwrap
+-- (Stations/Toppings, anchor Prompt_Unwrap_<Suf>, created here next to Prompt_Use_<Suf> when the map has none) opens it and
+-- fills the stock to capacity. An old snapshot without "Unw" opens every bowl already unlocked (nothing to unwrap again).
+-- Dev: DevWrap(key) unlocks the bowl for this run, closes it again and empties it (/dev kitchen wrap <key>).
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -58,7 +65,7 @@ local Modux = require(ServerScriptService.server.Modux)
 
 -- [ingredient key] = units in stock. Frozen: the atom holds immutable tables.
 export type Amounts = { [string]: number }
-export type StockRecord = { Amount: number, Capacity: number, Blocked: boolean }
+export type StockRecord = { Amount: number, Capacity: number, Blocked: boolean, Wrapped: boolean? }
 
 -- What a module last asked for an anchor (restored when its vehicle becomes the current one again).
 type Wanted = { Enabled: boolean, Text: string? }
@@ -77,6 +84,13 @@ const STOCK_FULL = "stock_full"
 const PACKAGE = "Package"
 const COOLER_STAT = "StockCapacityLevel"
 const UNLOCK_NOTICE = "ingredient_unlocked"
+const WRAPPED_NOTICE = "topping_wrapped"
+const UNWRAP = "topping_unwrap"
+const USE = "topping_add"
+const GIFT: { [string]: boolean } = {}
+for _, key in Content.Ingredients.GiftKeys do
+	GIFT[key] = true
+end
 const MAX_STATION_ID = 99 -- network.md §1 rule 5
 const SLOT_FACTOR = 100 -- record id = StationId * 100 + Slot
 const MAX_SLOT = 99
@@ -90,15 +104,15 @@ const HOT_DOG = "hot_dog"
 -- StationKinds with no module in Stations/ on purpose (their state lives in another service)
 const EXTERNAL_KINDS: { [string]: boolean } = { prep = true }
 const COFFEE = "coffee"
--- Prompt actions of the kitchen that the prep mode replaces (prep-mode.md §7). Station anchors only: the street bin
--- (no Station) keeps working.
+-- Prompt actions of the kitchen that the prep mode replaces (prep-mode.md §7). Station anchors only. Not `discard`:
+-- the prep bin only takes the open plate, a hot dog already in hand (wrong order, altered ANM-002) is thrown away at
+-- the BIN-C of the trailer or at a street bin (playtest 2026-10-14; the client gate of PrepController leaves it too).
 const WORLD_KITCHEN: { [string]: boolean } = {
 	grill_place = true,
 	grill_collect = true,
 	bun_cut = true,
 	board_add_sausage = true,
 	topping_add = true,
-	[DISCARD] = true,
 }
 
 -- Package Tool item key -> package row (what a held package restocks).
@@ -193,6 +207,9 @@ function KitchenService:Setup()
 	self.Bins = {} :: { [Instance]: boolean }
 	-- Blocked at the last ShiftStarted (ingredient_unlocked)
 	self.WasBlocked = {} :: { [string]: boolean }
+	-- Gift bowls opened this run (snapshot "Unw"); dev: ingredients unlocked by /dev kitchen wrap
+	self.Opened = self.Libs.Charm.atom({} :: { [string]: boolean }) :: Charm.Atom<{ [string]: boolean }>
+	self.DevUnlocked = self.Libs.Charm.atom({} :: { [string]: boolean }) :: Charm.Atom<{ [string]: boolean }>
 	self.Warned = {} :: { [string]: boolean }
 	-- the machine got its first doses of the run (SeedCoffee)
 	self.CoffeeSeeded = false :: boolean
@@ -232,7 +249,80 @@ function KitchenService:IsBlocked(ingredient: string): boolean
 	if row == nil then
 		return true
 	end
+	if self.DevUnlocked()[ingredient] then
+		return false
+	end
 	return blockedOn(row, self.Dependencies.RoundService:GetDay(), self:GetVehicle())
+end
+
+-- Gift bowl unlocked but not opened yet (owner request 2026-10-14): use and restock wait for "Open"
+function KitchenService:IsWrapped(ingredient: string): boolean
+	return GIFT[ingredient] == true and not self.Opened()[ingredient] and not self:IsBlocked(ingredient)
+end
+
+-- "Open": the gift bowl opens and comes full (the player does not restock it the first time). false = it was not wrapped.
+function KitchenService:Unwrap(ingredient: string): boolean
+	if not self:IsWrapped(ingredient) then
+		return false
+	end
+	const opened = table.clone(self.Opened())
+	opened[ingredient] = true
+	self.Libs.Charm.batch(function()
+		self.Opened(table.freeze(opened))
+		const amount, capacity = self:GetStock(ingredient)
+		self:SetAmount(ingredient, math.max(amount, capacity))
+	end)
+	return true
+end
+
+-- Dev (/dev gift <key>): the bowl is unlocked for this run and closed again, full like a real unlock (TASK-288), so the unwrap
+-- can be tried
+function KitchenService:DevWrap(ingredient: string): boolean
+	if not self.Dependencies.PlaceService:IsDev() then
+		error("[KitchenService] DevWrap is dev mode only", 2)
+	end
+	if not GIFT[ingredient] then
+		return false
+	end
+	const unlocked = table.clone(self.DevUnlocked())
+	unlocked[ingredient] = true
+	const opened = table.clone(self.Opened())
+	opened[ingredient] = nil
+	self.Libs.Charm.batch(function()
+		self.DevUnlocked(table.freeze(unlocked))
+		self.Opened(table.freeze(opened))
+		const amount, capacity = self:GetStock(ingredient)
+		self:SetAmount(ingredient, math.max(amount, capacity))
+	end)
+	return true
+end
+
+-- Snapshot "Unw": the gift bowls opened (keys). An old snapshot without it: every bowl already unlocked counts as opened.
+function KitchenService:CaptureOpened(): { string }
+	const out: { string } = {}
+	for key in self.Opened() do
+		table.insert(out, key)
+	end
+	table.sort(out)
+	return out
+end
+
+function KitchenService:RestoreOpened(data: any)
+	const opened: { [string]: boolean } = {}
+	if type(data) == "table" then
+		for _, key in data do
+			if type(key) == "string" and GIFT[key] then
+				opened[key] = true
+			end
+		end
+	else
+		for key in GIFT do
+			if not self:IsBlocked(key) then
+				opened[key] = true
+			end
+		end
+	end
+	self.Opened(table.freeze(opened))
 end
 
 -- (current, capacity). Current can read above capacity after the swap to a vehicle with a smaller Cooler (Q-169 A,
@@ -245,7 +335,14 @@ end
 
 function KitchenService:Stock(ingredient: string): StockRecord
 	const amount, capacity = self:GetStock(ingredient)
-	return { Amount = amount, Capacity = capacity, Blocked = self:IsBlocked(ingredient) }
+	return {
+		Amount = amount,
+		Capacity = capacity,
+		Blocked = self:IsBlocked(ingredient),
+		-- always a boolean, never nil (TASK-277): Lync's set `update` skips a nil field instead of clearing it, so an opened
+		-- gift bowl kept Wrapped = true on every client and its lid never came off
+		Wrapped = self:IsWrapped(ingredient),
+	}
 end
 
 -- Stock writes --------------------------------------------------------------------------------------------------
@@ -310,7 +407,7 @@ function KitchenService:TakeStock(ingredient: string, n: number): boolean
 		return false
 	end
 	const count = math.floor(n)
-	if self:IsBlocked(ingredient) then
+	if self:IsBlocked(ingredient) or self:IsWrapped(ingredient) then
 		return false
 	end
 	const amount = self:GetStock(ingredient)
@@ -536,6 +633,9 @@ function KitchenService:AddStation(instance: Instance)
 		Records = {},
 		State = nil,
 	}
+	if row.Key == "toppings" then
+		self:EnsureUnwrapAnchors(instance)
+	end
 	self:CollectParts(station)
 	self.Stations[id] = station
 	self.ByInstance[instance] = station
@@ -554,6 +654,45 @@ function KitchenService:AddStation(instance: Instance)
 		warn(`[KitchenService] no module in Stations/ for StationKind "{row.Key}"`)
 	end
 	self:RefreshPrompts(station)
+end
+
+-- Gift bowls: one Prompt_Unwrap_<Suf> anchor per gift topping (PromptAction topping_unwrap, Ingredient), next to that bowl's
+-- Prompt_Use_<Suf>. Made here (server, replicated) when the map has none; an authored one is used as it is.
+function KitchenService:EnsureUnwrapAnchors(instance: Instance)
+	const have: { [string]: boolean } = {}
+	const uses: { [string]: Instance } = {}
+	for _, child in instance:GetDescendants() do
+		if not CollectionService:HasTag(child, ANCHOR_TAG) then
+			continue
+		end
+		const action = child:GetAttribute("PromptAction")
+		const ingredient = child:GetAttribute("Ingredient")
+		if type(ingredient) ~= "string" then
+			continue
+		end
+		if action == UNWRAP then
+			have[ingredient] = true
+		elseif action == USE then
+			uses[ingredient] = child
+		end
+	end
+	for key in GIFT do
+		const use = uses[key]
+		if have[key] or use == nil or not use:IsA("Attachment") then
+			continue
+		end
+		const suffix = string.gsub(string.gsub(key, "_(%a)", function(letter: string): string
+			return string.upper(letter)
+		end), "^%a", string.upper)
+		const anchor = Instance.new("Attachment")
+		anchor.Name = `Prompt_Unwrap_{suffix}`
+		anchor.CFrame = use.CFrame
+		anchor:SetAttribute("PromptAction", UNWRAP)
+		anchor:SetAttribute("Ingredient", key)
+		anchor:SetAttribute("PromptEnabled", false)
+		anchor.Parent = use.Parent
+		CollectionService:AddTag(anchor, ANCHOR_TAG)
+	end
 end
 
 function KitchenService:RemoveStation(instance: Instance)
@@ -627,14 +766,15 @@ function KitchenService:Publish(station: StationApi.Station)
 					then math.clamp(record.Duration, 0, DURATION_MAX)
 					else 0,
 				Count = wholeNumber(record.Count, 0, COUNT_MAX),
-				-- wave 3: nil = nothing altered (keeps wave 1-2 records as they were)
+				-- wave 3: 0 = nothing altered. Written as 0, never nil (TASK-256): a Lync set `update` skips a nil field instead of
+				-- clearing it, so a cleared Altered / Flip used to stay on the client with the previous item's value
 				Altered = if type(record.Altered) == "number" and record.Altered >= 1
 					then wholeNumber(record.Altered, 0, COUNT_MAX)
-					else nil,
-				-- prep-3d N2: flip score + 1 of a grill slot, nil = not flipped
+					else 0,
+				-- prep-3d N2: flip score + 1 of a grill slot, 0 = not flipped (never nil, same reason)
 				Flip = if type(record.Flip) == "number" and record.Flip >= 1
 					then wholeNumber(record.Flip, 0, 101)
-					else nil,
+					else 0,
 			}
 			if self.Published[id] ~= nil then
 				set:update(id, value)
@@ -726,10 +866,14 @@ function KitchenService:RefreshPrompts(station: StationApi.Station)
 			self.Gated[anchor] = nil
 			const wanted = self.Wanted[anchor]
 			interaction:SetPrompt(anchor, if wanted then wanted.Enabled else true, if wanted then wanted.Text else nil)
-		elseif action == RESTOCK then
+		elseif action == RESTOCK or action == UNWRAP then
+			-- restock waits for an open bowl; "Open" only exists on a closed gift bowl (owner request 2026-10-14)
 			self.Gated[anchor] = nil
 			const ingredient = self:IngredientOf(station, anchor)
-			const enabled = ingredient ~= nil and not self:IsBlocked(ingredient)
+			const wrapped = ingredient ~= nil and self:IsWrapped(ingredient)
+			const enabled = ingredient ~= nil
+				and not self:IsBlocked(ingredient)
+				and (if action == UNWRAP then wrapped else not wrapped)
 			if anchor:GetAttribute("PromptEnabled") ~= enabled then
 				interaction:SetPrompt(anchor, enabled, nil)
 			end
@@ -745,7 +889,7 @@ function KitchenService:RefreshPrompts(station: StationApi.Station)
 	end
 end
 
--- Station anchor of one of the six world kitchen prompts while Prep.Rules.WorldKitchenPrompts is false (never the street
+-- Station anchor of one of the five world kitchen prompts while Prep.Rules.WorldKitchenPrompts is false (never the street
 -- bin: it has no Station). Read from Content every time, so flipping the flag is a data change only.
 function KitchenService:HiddenByPrep(anchor: Instance): boolean
 	const override = self.WorldOverride
@@ -809,6 +953,9 @@ function KitchenService:CheckRestock(
 	const ingredient = self:IngredientOf(station, anchor)
 	if ingredient == nil or self:IsBlocked(ingredient) then
 		return false, nil, nil
+	end
+	if self:IsWrapped(ingredient) then
+		return false, WRAPPED_NOTICE, Content.Ingredients.IndexOf[ingredient]
 	end
 	const tool = self:PackageFor(player, ingredient)
 	if tool == nil then
@@ -990,6 +1137,12 @@ function KitchenService:BuildContext(): StationApi.Context
 		end,
 		IsBlocked = function(ingredient: string): boolean
 			return self:IsBlocked(ingredient)
+		end,
+		IsWrapped = function(ingredient: string): boolean
+			return self:IsWrapped(ingredient)
+		end,
+		Unwrap = function(ingredient: string): boolean
+			return self:Unwrap(ingredient)
 		end,
 		Give = function(player: Player, item: string, attrs: { [string]: any }?): boolean
 			const toppings = if attrs and type(attrs.Toppings) == "string" then attrs.Toppings else nil
@@ -1213,6 +1366,18 @@ function KitchenService:FinishPlate(player: Player, spec: Plate.Spec): (Plate.Re
 end
 
 -- Gives the reserved bun back (Leave, timeout, disconnect). False = no open plate.
+-- TASK-260: the cosmetic mask of the player's open plate (PlateMask, already checked by PrepService) on the board model, so every
+-- player sees the plate as it grows (KitchenController Board part)
+function KitchenService:SetPlateMask(player: Player, mask: number)
+	if not self.Active then
+		return
+	end
+	const ticket = self.Plates.Of(player)
+	if ticket ~= nil then
+		Board.SetPlate(self:GetVehicle(), ticket.Slot, mask)
+	end
+end
+
 function KitchenService:RefundPlate(player: Player): boolean
 	return self.Active and self.Plates.Refund(player)
 end
@@ -1262,6 +1427,11 @@ end
 -- Stations.Flip of the grill `slot` as written to the set (flip score + 1), 0 = not flipped (TASK-195 dev check).
 function KitchenService:DevFlipWire(slot: number): number
 	return Grill.DevFlipWire(self:GetVehicle(), slot)
+end
+
+-- Sausages on the grill of the current vehicle (any slot that is not empty).
+function KitchenService:GrillBusy(): number
+	return if self.Active then Grill.Busy(self:GetVehicle()) else 0
 end
 
 -- Sausages on the rail of the current vehicle.
@@ -1355,12 +1525,18 @@ function KitchenService:RememberBlocked()
 end
 
 -- ShiftStarted: "New: {item}!" to the party for every ingredient that opened since the last shift (network.md §4.2).
+-- TASK-288 (owner request 2026-10-14, Provisional): a newly unlocked ingredient comes with its stock FULL (capacity of the
+-- current Storage level); nothing above capacity is taken away. A gift bowl is full while still wrapped (use waits for "Open").
 function KitchenService:AnnounceUnlocks()
-	for _, row in Content.Ingredients.List do
-		if self.WasBlocked[row.Key] == true and not self:IsBlocked(row.Key) then
-			self.Dependencies.RunStateService:Notify("all", UNLOCK_NOTICE, Content.Ingredients.IndexOf[row.Key])
+	self.Libs.Charm.batch(function()
+		for _, row in Content.Ingredients.List do
+			if self.WasBlocked[row.Key] == true and not self:IsBlocked(row.Key) then
+				const amount, capacity = self:GetStock(row.Key)
+				self:SetAmount(row.Key, math.max(amount, capacity))
+				self.Dependencies.RunStateService:Notify("all", UNLOCK_NOTICE, Content.Ingredients.IndexOf[row.Key])
+			end
 		end
-	end
+	end)
 	self:RememberBlocked()
 end
 
@@ -1390,6 +1566,12 @@ KitchenService:OnInit(function(self)
 		return self:CaptureStations()
 	end, function(data, _mode)
 		self:RestoreStations(data)
+	end)
+	-- gift bowls opened this run (owner request 2026-10-14): same life as the amounts
+	runState:RegisterSnapshot("Unw", function()
+		return self:CaptureOpened()
+	end, function(data, _mode)
+		self:RestoreOpened(data)
 	end)
 
 	-- A player that leaves takes nothing with them: the reserved bun goes back (TASK-169)

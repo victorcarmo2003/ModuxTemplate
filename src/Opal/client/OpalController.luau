@@ -4,8 +4,8 @@
 
 	Opal, the Ninth Street Mart clerk, exists only on this client:
 	  * built once with CrewRig.Build at MapPoint OP-1 (architecture.md §18.5: HumanoidRootPart at point + 3 studs,
-	    facing the point's front), anchored, untagged (`Tag = false`), so RigController never dresses her and the
-	    local low-band Night swap (DEC-168) never reaches her. Dressed here once: Day pack, Normal face;
+	    facing the point's front), anchored, untagged (`Tag = false`), so RigController never dresses her (the low
+	    band no longer dresses NPCs Night anyway, Provisional 2026-10-14). Dressed here once: Day pack, Normal face;
 	  * no Humanoid: the Humanoid Build adds is removed (§2.3); AnimController (TASK-075) makes the local
 	    AnimationController + Animator and loops `opal_idle` of Content.Animations (AST-057 `Opal_Crossword`).
 	    Id "" -> the `npc` locomotion set binds her instead, which idles with the stock R6 idle while `npc_idle`
@@ -51,7 +51,7 @@ const SPECIES = "owl" -- DEC-203
 -- PROVISIONAL (AST-057 sheet is Draft): no Opal outfit in the kit yet (Mart vest, green cardigan, glasses on a
 -- chain); a civil outfit without the crew cap stands in until the art-director's sheet ships.
 const OUTFIT = "civil_a"
-const PACK: CrewRig.Pack = "Day" -- the Mart never goes dark (NPC-020); not affected by the local Night swap
+const PACK: CrewRig.Pack = "Day" -- the Mart never goes dark (NPC-020); never Night
 const FACE = "Normal"
 const SPAWN_LIFT = Vector3.new(0, 3, 0) -- architecture.md §18.5
 const IDLE_KEY = "opal_idle" -- Content.Animations (AST-057 Opal_Crossword)

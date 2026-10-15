@@ -91,11 +91,11 @@ for _, screen in screens do
 			end
 			-- the ticket is a tall paper (card) or one wide band (portrait strip): room for the head, 5 layers and the line
 			if layout.TicketStrip then
-				if layout.Ticket.H < 78 or layout.Ticket.W < 300 then
+				if layout.Ticket.H < 90 or layout.Ticket.W < 300 then
 					fail(tag, `Ticket strip too small ({layout.Ticket.W}x{layout.Ticket.H})`)
 				end
-			elseif layout.Ticket.H < 176 or layout.Ticket.W < 104 then
-				fail(tag, `Ticket card too small ({layout.Ticket.W}x{layout.Ticket.H}): needs 176 high, 104 wide`)
+			elseif layout.Ticket.H < 190 or layout.Ticket.W < 130 then
+				fail(tag, `Ticket card too small ({layout.Ticket.W}x{layout.Ticket.H}): needs 190 high, 130 wide`)
 			end
 			-- the bin zone is a drop target: at least 64 px (44 + a thumb on each side) and the hint stays off it
 			if mini.Bin.W < 64 or mini.Bin.H < 64 then

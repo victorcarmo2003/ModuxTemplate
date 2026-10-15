@@ -20,6 +20,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 local Plane = require(script.Parent.Plane)
+local Sauce = require(ReplicatedStorage.shared.Item.HotDogVisual.Sauce)
 local Theme = require(game:GetService("StarterPlayer").StarterPlayerScripts.client.Interface.Components.Theme)
 
 export type Strokes = {
@@ -51,27 +52,21 @@ export type Strokes = {
 
 const Strokes = {}
 
-const COLORS: { [string]: Color3 } = {
-	ketchup = Color3.fromHex("#E2402E"),
-	mustard = Color3.fromHex("#F6C12B"),
-	cream_cheese = Color3.fromHex("#FFF8EA"),
-}
-
 const LIFT = 0.42 -- share of its own width the bead sits over the surface (the rest sinks into it)
 const START = 0.72 -- share of the width at the very start of a stroke
 const SWELL = 2.5 -- widths over which it swells in
 const TAPER_LENGTH = 3 -- widths over which the tip thins
 
--- The colour of a sauce (food, not a UI state).
+-- The colour of a sauce (food, not a UI state): the same table the hot dog's drawn line uses (HotDogVisual.Sauce)
 function Strokes.ColorOf(key: string): Color3
-	return COLORS[key] or Color3.fromHex("#FFF8EA")
+	return Sauce.ColorOf(key)
 end
 
 local function newPart(folder: Folder, name: string, ball: boolean): Part
 	const part = Instance.new("Part")
 	part.Name = name
 	part.Shape = if ball then Enum.PartType.Ball else Enum.PartType.Cylinder
-	part.Material = Enum.Material.SmoothPlastic
+	part.Material = Enum.Material.Plastic -- matte and smooth (Fabric shows a weave at this size, SmoothPlastic a specular)
 	part.Anchored = true
 	part.CanCollide = false
 	part.CanQuery = false
@@ -118,13 +113,35 @@ function Strokes.new(
 		table.insert(all, piece)
 		table.insert(free, piece)
 	end
-	const dashes: { Part } = {}
+	-- the guide: one flat chevron (">" along the path) per dot, two cream arms over two slightly bigger Ink arms (the outline)
+	type Chevron = { Arms: { Part }, Outline: { Part } }
+	const DASHES = 48
+	const dashes: { Chevron } = {}
 	const dashUv: { Vector2 } = {}
 	const dashOn: { boolean } = {}
-	for _ = 1, 48 do
-		const dash = newPart(folder, "GuideDash", false)
-		dash.Material = Enum.Material.Neon
-		table.insert(dashes, dash)
+	local function flat(name: string, color: Color3): Part
+		const part = newPart(folder, name, false)
+		part.Shape = Enum.PartType.Block
+		part.Material = Enum.Material.SmoothPlastic
+		part.Color = color
+		return part
+	end
+	for _ = 1, DASHES do
+		table.insert(dashes, {
+			Arms = { flat("GuideArm", Theme.Color.Cream), flat("GuideArm", Theme.Color.Cream) },
+			Outline = { flat("GuideOutline", Theme.Color.Ink), flat("GuideOutline", Theme.Color.Ink) },
+		})
+	end
+	local function setChevron(chevron: Chevron, alpha: number, color: Color3?)
+		for _, part in chevron.Arms do
+			part.Transparency = alpha
+			if color ~= nil then
+				part.Color = color
+			end
+		end
+		for _, part in chevron.Outline do
+			part.Transparency = if alpha >= 1 then 1 else math.min(alpha + 0.15, 0.9)
+		end
 	end
 
 	-- the guide path in the world, to pick a step that lets the longest stroke (Meter.Max path lengths) fit the per-stroke budget
@@ -180,6 +197,12 @@ function Strokes.new(
 		return Plane.ToWorld(plane, clamped, surface(clamped))
 	end
 
+	-- the paste is not one flat tone: a slow, small variation of brightness along the stroke
+	local function toneAt(at: number): Color3
+		const shade = 1 + 0.06 * math.sin(at * 3.1 + 0.7) + 0.04 * math.sin(at * 7.3)
+		return Color3.new(math.clamp(color.R * shade, 0, 1), math.clamp(color.G * shade, 0, 1), math.clamp(color.B * shade, 0, 1))
+	end
+
 	-- width at an arc length: swells in, breathes slowly (a function of the arc, so two pieces side by side agree)
 	local function widthAt(at: number): number
 		const swell = smooth(at / (baseWidth * SWELL))
@@ -188,12 +211,13 @@ function Strokes.new(
 	end
 
 	-- puts a piece from `from` to `to` (both ON the surface): a cylinder and the ball at its end
-	local function setPiece(piece: Piece, from: Vector3, to: Vector3, width: number)
+	local function setPiece(piece: Piece, from: Vector3, to: Vector3, width: number, at: number)
 		const lift = plane.Frame.UpVector * (width * LIFT)
 		const a, b = from + lift, to + lift
 		piece.Width = width
 		piece.Tube.Size = Vector3.new(math.max((b - a).Magnitude, 0.001), width, width)
-		piece.Tube.Color = color
+		const tone = toneAt(at)
+		piece.Tube.Color = tone
 		if (b - a).Magnitude > 1e-4 then
 			piece.Tube.CFrame = CFrame.lookAt((a + b) / 2, b) * CFrame.Angles(0, math.pi / 2, 0)
 			piece.Tube.Transparency = 0
@@ -201,7 +225,7 @@ function Strokes.new(
 			piece.Tube.Transparency = 1
 		end
 		piece.Joint.Size = Vector3.one * width * look.Joint
-		piece.Joint.Color = color
+		piece.Joint.Color = tone
 		piece.Joint.Position = b
 		piece.Joint.Transparency = 0
 	end
@@ -218,7 +242,7 @@ function Strokes.new(
 		if piece == nil then
 			return false
 		end
-		setPiece(piece, from, to, widthAt(arc + length / 2))
+		setPiece(piece, from, to, widthAt(arc + length / 2), arc + length)
 		arc += length
 		piece.Arc = arc
 		table.insert(current, piece)
@@ -257,7 +281,7 @@ function Strokes.new(
 			piece.Joint.Transparency = 1
 			return
 		end
-		setPiece(piece, lastEnd, to, widthAt(arc + length / 2))
+		setPiece(piece, lastEnd, to, widthAt(arc + length / 2), arc + length)
 		piece.Arc = arc + length
 	end
 
@@ -297,7 +321,7 @@ function Strokes.new(
 			-- the rounded start: a ball (the tube of this piece stays hidden)
 			const cap = take()
 			if cap ~= nil then
-				setPiece(cap, world, world, widthAt(0))
+				setPiece(cap, world, world, widthAt(0), 0)
 				cap.Tube.Transparency = 1
 				cap.Arc = 0
 				table.insert(current, cap)
@@ -391,38 +415,49 @@ function Strokes.new(
 		table.clear(dashOn)
 		covered = 0
 		if list == nil then
-			for _, dash in dashes do
-				dash.Transparency = 1
+			for _, chevron in dashes do
+				setChevron(chevron, 1, nil)
 			end
 			self._dots = 0
 			return
 		end
-		const thick = dotRules.Size * scale * 0.5
-		const height = thick * 0.5
-		for index, dash in dashes do
+		-- sized by the hotdog: the arm is about 0.11 bun heights long, thin and flat; the Ink outline is a hair bigger
+		const arm = plane.Width * 0.10
+		const thick = plane.Width * 0.015
+		const height = thick * 0.5 + 0.015
+		const angle = math.rad(32)
+		for index, chevron in dashes do
 			const uv = list[index]
 			if uv == nil then
-				dash.Transparency = 1
+				setChevron(chevron, 1, nil)
 				continue
 			end
 			dashUv[index] = uv
 			dashOn[index] = true
-			-- along the path (from the previous to the next point): a thin dash of half the gap, Cream, a hair over the surface
 			const before = list[index - 1] or uv
 			const after = list[index + 1] or uv
+			-- the height of the surface under the dot, its slope along the path (the chevron lies on it)
 			const here = Plane.ToWorld(plane, uv, surface(uv) + height)
 			const ahead = Plane.ToWorld(plane, after, surface(after) + height)
 			const behind = Plane.ToWorld(plane, before, surface(before) + height)
 			const tangent = ahead - behind
-			const gap = if list[index + 1] ~= nil then (ahead - here).Magnitude else (here - behind).Magnitude
-			dash.Color = Theme.Color.Cream
-			dash.Size = Vector3.new(math.max(gap * 0.5, thick), thick, thick)
-			dash.CFrame = (if tangent.Magnitude > 1e-4 then CFrame.lookAt(here, here + tangent) else CFrame.new(here)) * CFrame.Angles(0, math.pi / 2, 0)
-			dash.Transparency = 0.45
+			const frame = if tangent.Magnitude > 1e-4 then CFrame.lookAt(here, here + tangent, plane.Frame.UpVector) else plane.Frame.Rotation + here
+			for side = 1, 2 do
+				const sign = if side == 1 then 1 else -1
+				-- an arm of the ">" : from the back corner to the tip (the tip is ahead, -Z of the frame)
+				const spin = math.atan2(-math.cos(angle), sign * math.sin(angle))
+				const offset = Vector3.new(sign * math.sin(angle) * arm / 2, 0, math.cos(angle) * arm / 2 - arm * 0.3)
+				chevron.Arms[side].Size = Vector3.new(arm, thick, thick)
+				chevron.Arms[side].CFrame = frame * CFrame.new(offset) * CFrame.Angles(0, spin, 0)
+				chevron.Outline[side].Size = Vector3.new(arm + thick * 0.8, thick * 0.6, thick * 1.7)
+				chevron.Outline[side].CFrame = frame * CFrame.new(offset - Vector3.new(0, thick * 0.1, 0)) * CFrame.Angles(0, spin, 0)
+			end
+			setChevron(chevron, 0.15, Theme.Color.Cream)
 		end
 		self._dots = #list
 	end
 
+	-- the dashes the stroke points cover light up (Mustard) and go quiet; the rest keep flowing
 	function self.Cover(_: any, points: { Vector2 }, reach: number, aspect: number)
 		for index, uv in dashUv do
 			if not dashOn[index] then
@@ -433,7 +468,7 @@ function Strokes.new(
 				const dy = p.Y - uv.Y
 				if dx * dx + dy * dy <= reach * reach then
 					dashOn[index] = false
-					dashes[index].Transparency = 1
+					setChevron(dashes[index], 0.55, Theme.Color.Mustard)
 					covered += 1
 					break
 				end
@@ -449,11 +484,14 @@ function Strokes.new(
 		return math.clamp(covered / math.min(total, #dashes), 0, 1)
 	end
 
-	-- a soft wave of light runs along the dashes (a hair of Transparency, never loud)
+	-- a discreet flow runs along the dashes still to cover, in the direction of the path
 	function self.Tick(_: any, time: number)
-		for index, dash in dashes do
+		for index, chevron in dashes do
 			if dashOn[index] then
-				dash.Transparency = 0.4 + 0.3 * (0.5 + 0.5 * math.sin(time * 3.6 - index * 0.5))
+				const alpha = 0.12 + 0.4 * (0.5 + 0.5 * math.sin(time * 3.2 - index * 0.6))
+				for _, part in chevron.Arms do
+					part.Transparency = alpha
+				end
 			end
 		end
 	end
@@ -465,9 +503,16 @@ function Strokes.new(
 				piece.Joint.Position += delta
 			end
 		end
-		for _, dash in dashes do
-			if dash.Transparency < 1 then
-				dash.Position += delta
+		for _, chevron in dashes do
+			for _, part in chevron.Arms do
+				if part.Transparency < 1 then
+					part.Position += delta
+				end
+			end
+			for _, part in chevron.Outline do
+				if part.Transparency < 1 then
+					part.Position += delta
+				end
 			end
 		end
 		for index, point in raw do
@@ -509,8 +554,13 @@ function Strokes.new(
 			piece.Tube:Destroy()
 			piece.Joint:Destroy()
 		end
-		for _, dash in dashes do
-			dash:Destroy()
+		for _, chevron in dashes do
+			for _, part in chevron.Arms do
+				part:Destroy()
+			end
+			for _, part in chevron.Outline do
+				part:Destroy()
+			end
 		end
 		table.clear(all)
 		table.clear(free)

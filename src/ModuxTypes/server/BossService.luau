@@ -46,6 +46,7 @@ export type Public = {
 	TutorialAllowed: (self: Public) -> boolean,
 	QueueTutorial: (self: Public) -> (),
 	StepTutorial: (self: Public, t: number) -> (),
+	StepLesson: (self: Public) -> (),
 	OnDayPrep: (self: Public, day: number, night: number) -> (),
 	OnNightCall: (self: Public, night: number, attempt: number) -> (),
 	OnPhase: (self: Public, phase: string, day: number, night: number) -> (),

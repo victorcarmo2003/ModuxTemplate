@@ -374,7 +374,7 @@ end
 function ThiefService:Caught(active: Active)
 	const economy = self.Dependencies.EconomyService
 	const runState = self.Dependencies.RunStateService
-	const added = economy:AddToDrawer(Content.Thief.CatchReward, "Catch")
+	const added = economy:AddSale(Content.Thief.CatchReward, "Catch")
 	runState:Notify("all", NOTICE_CAUGHT, added)
 	const counters = table.clone(runState.Counters())
 	counters[CAUGHT_COUNTER] = self.Dependencies.RoundService:GetDay()
@@ -410,6 +410,10 @@ function ThiefService:OnShiftStarted()
 		return
 	end
 	if Content.Thief.MaxPerDay < 1 then
+		return
+	end
+	-- anomaly mode (Content.Mode.DayOnly = false, owner request 2026-10-14): the trailer is closed, nobody robs it
+	if not Content.Mode.DayOnly then
 		return
 	end
 	self.Plan = Draw.roll(self.Dependencies.RunStateService.Seed(), round:GetDay())

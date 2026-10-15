@@ -290,7 +290,12 @@ function Plate.new(deps: Deps): PlateApi
 			return nil, "Invalid"
 		end
 		if act == "Flip" then
-			const score = Grill.Flip(ctx, vehicle, slot)
+			-- TASK-257: the swing is graded where the player saw it (one-way latency)
+			const okPing, ping = pcall(function(): number
+				return player:GetNetworkPing()
+			end)
+			const latency = if okPing and type(ping) == "number" then ping else 0
+			const score = Grill.Flip(ctx, vehicle, slot, latency)
 			if score == nil then
 				return nil, "Invalid"
 			end

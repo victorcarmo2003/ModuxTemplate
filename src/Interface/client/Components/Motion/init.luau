@@ -5,15 +5,17 @@
 --   Pop(shown)     scale 0 -> 1 with overshoot when shown, back to 0 when hidden (clamped >= 0)
 --   Reveal(shown)  progressive HUD reveal (Content.HudReveal): 0 -> 1 in Theme.Motion.Reveal s, no overshoot; with the
 --                  "reduced motion" setting of the player it jumps (0 or 1) instead of animating
---   Reduced()      whether the player asked for reduced motion (UserGameSettings.ReducedMotion; false when the engine
---                  has no such setting)
+--   Reduced()      whether the player asked for reduced motion (UserGameSettings.ReducedMotion, false when the engine
+--                  has no such setting; or the game's own Settings panel switch, Settings.Prefs, TASK-279)
 --   Press(pressed, hovered?)  squash on press, slight grow on hover
 -- Must be called inside a Vide scope (a component). Pure: no instances.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local StarterPlayer = game:GetService("StarterPlayer")
 local TweenService = game:GetService("TweenService")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Theme)
+local Prefs = require(StarterPlayer.StarterPlayerScripts.client.Settings.Prefs)
 
 const source = Vide.source
 const spring = Vide.spring
@@ -91,7 +93,11 @@ local function count(value: () -> number, duration: number?): () -> number
 end
 
 -- Read on every call: the setting can change while playing. A missing property is an error, caught: no setting = false.
+-- The game setting (Settings panel, TASK-279) turns it on too; it never turns the Roblox setting off.
 local function reduced(): boolean
+	if Prefs.ReducedMotion() then
+		return true
+	end
 	const ok, value = pcall(function(): any
 		return (UserSettings():GetService("UserGameSettings") :: any).ReducedMotion
 	end)

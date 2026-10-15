@@ -5,7 +5,16 @@
 -- Missing pack -> Day. Atlas.Day does not exist: the Day atlas is the piece's own texture (DayTextureID).
 
 export type Pack = "Day" | "Mid" | "Night"
-export type SpeciesLook = { Fur: Color3, EarsUp: boolean, CapRaise: number, Head: { [Pack]: string } }
+export type BlankLook = { Head: string, Atlas: { [Pack]: string } }
+-- Blank variant (ANM-001 / ANM-004, AST-060): smooth skin-colour head + atlas pieces (ears, tail, nose, snout, beak,
+-- eyes) repainted in the head colour. Absent (nil) for a species without it: Dress falls back to the ordinary look.
+export type SpeciesLook = {
+	Fur: Color3,
+	EarsUp: boolean,
+	CapRaise: number,
+	Head: { [Pack]: string },
+	Blank: BlankLook?,
+}
 export type OutfitLook = { [Pack]: string }
 export type CrewLooks = {
 	KitVersion: number,
@@ -22,108 +31,126 @@ const looks: CrewLooks = {
 			EarsUp = false,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://96664496563985", Mid = "rbxassetid://137640825798247", Night = "rbxassetid://91045360402610" },
+			Blank = { Head = "rbxassetid://103727460830373", Atlas = { Day = "rbxassetid://116367686246440", Mid = "rbxassetid://134698965035526", Night = "rbxassetid://119399469535424" } },
 		},
 		rabbit = { -- Rabbit: T_Head_Rabbit[_Mid|_Night]
 			Fur = Color3.fromHex("F3F5F6"),
 			EarsUp = true,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://106661940106219", Mid = "rbxassetid://131402457548867", Night = "rbxassetid://72480132631515" },
+			Blank = { Head = "rbxassetid://102387413179560", Atlas = { Day = "rbxassetid://86902644619156", Mid = "rbxassetid://110668739322859", Night = "rbxassetid://71520307249193" } },
 		},
 		cat = { -- Cat: T_Head_Cat[_Mid|_Night]
 			Fur = Color3.fromHex("757E83"),
 			EarsUp = true,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://134000758373740", Mid = "rbxassetid://139345902541326", Night = "rbxassetid://135381347313207" },
+			Blank = { Head = "rbxassetid://93791882041942", Atlas = { Day = "rbxassetid://96033108015496", Mid = "rbxassetid://89400181897997", Night = "rbxassetid://108424325206960" } },
 		},
 		bear = { -- Bear: T_Head_Bear[_Mid|_Night]
 			Fur = Color3.fromHex("955540"),
 			EarsUp = true,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://127139549332301", Mid = "rbxassetid://96132346145952", Night = "rbxassetid://119988262238474" },
+			Blank = { Head = "rbxassetid://124103919755582", Atlas = { Day = "rbxassetid://76694021261183", Mid = "rbxassetid://117681013219878", Night = "rbxassetid://98237150820953" } },
 		},
 		fox = { -- Fox: T_Head_Fox[_Mid|_Night]
 			Fur = Color3.fromHex("DE7234"),
 			EarsUp = true,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://72172708526560", Mid = "rbxassetid://97262074483378", Night = "rbxassetid://124157493386261" },
+			Blank = { Head = "rbxassetid://100042430402092", Atlas = { Day = "rbxassetid://89069909826671", Mid = "rbxassetid://77835300836028", Night = "rbxassetid://131041082027694" } },
 		},
 		owl = { -- Owl: T_Head_Owl[_Mid|_Night]
 			Fur = Color3.fromHex("79695D"),
 			EarsUp = true,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://131605294880831", Mid = "rbxassetid://81602993820484", Night = "rbxassetid://114733010859711" },
+			Blank = { Head = "rbxassetid://135179916484415", Atlas = { Day = "rbxassetid://107630112284645", Mid = "rbxassetid://135177590339264", Night = "rbxassetid://79167411400949" } },
 		},
 		panda = { -- Panda: T_Head_Panda[_Mid|_Night]
 			Fur = Color3.fromHex("F3F5F6"),
 			EarsUp = true,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://107035147420788", Mid = "rbxassetid://93082637985239", Night = "rbxassetid://94387454098552" },
+			Blank = { Head = "rbxassetid://102387413179560", Atlas = { Day = "rbxassetid://139796905645310", Mid = "rbxassetid://118563180730388", Night = "rbxassetid://104920586385415" } },
 		},
 		lion = { -- Lion: T_Head_Lion[_Mid|_Night]
 			Fur = Color3.fromHex("ECBE5A"),
 			EarsUp = true,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://117801935505340", Mid = "rbxassetid://119372495789660", Night = "rbxassetid://95986857233932" },
+			Blank = { Head = "rbxassetid://109766357241870", Atlas = { Day = "rbxassetid://115577477866257", Mid = "rbxassetid://132904872124964", Night = "rbxassetid://137210260517574" } },
 		},
 		penguin = { -- Penguin: T_Head_Penguin[_Mid|_Night]
 			Fur = Color3.fromHex("242F33"),
 			EarsUp = false,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://123931388358269", Mid = "rbxassetid://80736875394051", Night = "rbxassetid://89367599680359" },
+			Blank = { Head = "rbxassetid://93311673028344", Atlas = { Day = "rbxassetid://91367478728932", Mid = "rbxassetid://93560516209801", Night = "rbxassetid://107170081599735" } },
 		},
 		hamster = { -- Hamster: T_Head_Hamster[_Mid|_Night]
 			Fur = Color3.fromHex("F89F48"),
 			EarsUp = true,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://102340612754941", Mid = "rbxassetid://74060278626157", Night = "rbxassetid://132794630370165" },
+			Blank = { Head = "rbxassetid://81918618458536", Atlas = { Day = "rbxassetid://129676168005290", Mid = "rbxassetid://91871677953286", Night = "rbxassetid://128508765128731" } },
 		},
 		mouse = { -- Mouse: T_Head_Mouse[_Mid|_Night]
 			Fur = Color3.fromHex("A8A29C"),
 			EarsUp = true,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://129261489456841", Mid = "rbxassetid://107138783066765", Night = "rbxassetid://109138723724055" },
+			Blank = { Head = "rbxassetid://71341166954232", Atlas = { Day = "rbxassetid://125085553072104", Mid = "rbxassetid://115805083160215", Night = "rbxassetid://112695383408320" } },
 		},
 		frog = { -- Frog: T_Head_Frog[_Mid|_Night]
 			Fur = Color3.fromHex("00AB5C"),
 			EarsUp = false,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://135183718306005", Mid = "rbxassetid://73613673868262", Night = "rbxassetid://73115565618007" },
+			Blank = { Head = "rbxassetid://139947242595869", Atlas = { Day = "rbxassetid://140491853533852", Mid = "rbxassetid://102483394617482", Night = "rbxassetid://90894917171326" } },
 		},
 		monkey = { -- Monkey: T_Head_Monkey[_Mid|_Night]
 			Fur = Color3.fromHex("834231"),
 			EarsUp = false,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://101395404005070", Mid = "rbxassetid://87619323373695", Night = "rbxassetid://81425577486040" },
+			Blank = { Head = "rbxassetid://108062004409370", Atlas = { Day = "rbxassetid://85310393910209", Mid = "rbxassetid://140727566524947", Night = "rbxassetid://77454418464230" } },
 		},
 		turtle = { -- Turtle: T_Head_Turtle[_Mid|_Night]
 			Fur = Color3.fromHex("009758"),
 			EarsUp = false,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://116982946008275", Mid = "rbxassetid://111834225315051", Night = "rbxassetid://87183290884940" },
+			Blank = { Head = "rbxassetid://113629497688558", Atlas = { Day = "rbxassetid://78479342267277", Mid = "rbxassetid://101560729583855", Night = "rbxassetid://127193796815654" } },
 		},
 		sheep = { -- Sheep: T_Head_Sheep[_Mid|_Night]
 			Fur = Color3.fromHex("E9D0B8"),
 			EarsUp = false,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://117304578679749", Mid = "rbxassetid://127849777390802", Night = "rbxassetid://135462136928062" },
+			Blank = { Head = "rbxassetid://107583280734238", Atlas = { Day = "rbxassetid://70704450306197", Mid = "rbxassetid://132148256440573", Night = "rbxassetid://84184529877706" } },
 		},
 		koala = { -- Koala: T_Head_Koala[_Mid|_Night]
 			Fur = Color3.fromHex("9DAAB0"),
 			EarsUp = true,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://111551990621799", Mid = "rbxassetid://109821449697714", Night = "rbxassetid://73818844795337" },
+			Blank = { Head = "rbxassetid://116387313679810", Atlas = { Day = "rbxassetid://127993333362606", Mid = "rbxassetid://127275282426259", Night = "rbxassetid://114682876853635" } },
 		},
 		pig = { -- Pig: T_Head_Pig[_Mid|_Night]
 			Fur = Color3.fromHex("FAA39B"),
 			EarsUp = false,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://73376431637354", Mid = "rbxassetid://118497069683126", Night = "rbxassetid://129336666278943" },
+			Blank = { Head = "rbxassetid://121005204918199", Atlas = { Day = "rbxassetid://132782123787009", Mid = "rbxassetid://102973198276298", Night = "rbxassetid://117576079050361" } },
 		},
 		raccoon = { -- Raccoon: T_Head_Raccoon[_Mid|_Night]
 			Fur = Color3.fromHex("978F86"),
 			EarsUp = true,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://134072371174850", Mid = "rbxassetid://71458340748640", Night = "rbxassetid://81689947310165" },
+			Blank = { Head = "rbxassetid://89114990252557", Atlas = { Day = "rbxassetid://108016495835043", Mid = "rbxassetid://97527729316006", Night = "rbxassetid://138367455686387" } },
 		},
 	},
 	Outfits = { -- keys of Content.Outfits
@@ -143,6 +170,10 @@ const looks: CrewLooks = {
 
 for _, s in looks.Species do
 	table.freeze(s.Head)
+	if s.Blank then
+		table.freeze(s.Blank.Atlas)
+		table.freeze(s.Blank)
+	end
 	table.freeze(s)
 end
 for _, o in looks.Outfits do

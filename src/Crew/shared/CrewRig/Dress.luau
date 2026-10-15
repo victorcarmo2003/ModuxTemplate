@@ -7,6 +7,10 @@
 -- Pack: outfit sheet (CrewLooks.Outfits[outfit][pack]), head (CrewLooks.Species[species].Head[pack]) and the atlas
 -- pieces (CrewLooks.Atlas[pack]; Day = the piece's own DayTextureID). An outfit without that pack (thief: Day only,
 -- DEC-159) dresses the whole rig in Day, so head and coat never disagree.
+-- Blank (ANM-001 / ANM-004, AST-060): `blank = true` swaps the head and the atlas pieces for the species' Blank
+-- textures (CrewLooks.Species[k].Blank: smooth skin-colour head, ears / tail / nose repainted in that colour) of the
+-- worn pack. Silent fallback to the ordinary textures when the species has no Blank row. The face is the caller's
+-- (CrewExpressions.Blank): Dress does not pick it.
 -- Face: clone of ReplicatedStorage.CrewExpressions.<expression> on the face shell, shell TextureID = "" (the shell needs
 -- real transparency, SurfaceAppearance AlphaMode Transparency). Only Normal_Night has a night version (DEC-207): the
 -- caller passes the final name (Content.Looks.PackFace gives Normal_Night for the crew in Night).
@@ -75,8 +79,9 @@ local function setFace(model: Model, expression: string): boolean
 end
 
 -- Dress `model` in `pack` (default: its LookPack attribute) with `expression` (default: Content.Looks.PackFace of
--- the worn pack). Returns false when the model is not a dressable rig (missing attributes or unknown keys).
-local function dress(model: Model, pack: Pack?, expression: string?): boolean
+-- the worn pack). `blank` dresses the species' Blank head / atlas (see top). Returns false when the model is not a
+-- dressable rig (missing attributes or unknown keys).
+local function dress(model: Model, pack: Pack?, expression: string?, blank: boolean?): boolean
 	if RunService:IsRunning() and RunService:IsServer() and not RunService:IsClient() then
 		error("[CrewRig] Dress is client-only (T40, network.md §5.1): the server only writes attributes", 2)
 	end
@@ -95,8 +100,12 @@ local function dress(model: Model, pack: Pack?, expression: string?): boolean
 	const worn = effectivePack(outfit, wanted)
 
 	const sheet = sheets[worn] or sheets.Day
-	const headTexture = look.Head[worn] or look.Head.Day
-	const atlas = if worn == "Day" then nil else CrewLooks.Atlas[worn]
+	const blankLook = if blank == true then look.Blank else nil
+	const headTexture = if blankLook then blankLook.Head else look.Head[worn] or look.Head.Day
+	const atlas = if blankLook
+		then blankLook.Atlas[worn] or blankLook.Atlas.Day
+		elseif worn == "Day" then nil
+		else CrewLooks.Atlas[worn]
 
 	for _, child in model:GetChildren() do
 		if not child:IsA("MeshPart") then

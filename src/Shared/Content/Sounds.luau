@@ -186,6 +186,7 @@ const UPLOADED: { [string]: string } = {
 	phone_glitch = "rbxassetid://140367728848843",
 	horror_chase_stop = "rbxassetid://123355946453444",
 	ui_click = "rbxassetid://127105730240202",
+	locked_door = "rbxassetid://136518625715192", -- SFX-232 ReplicatedStorage.Assets.SFX["Locked door"] (user, ANM-004)
 }
 
 -- Per-row overrides of the sfx() defaults
@@ -265,6 +266,7 @@ const base = Table.new({
 	sfx("siren_soft", true),
 	sfx("door_knock"),
 	sfx("door_creak"),
+	sfx("locked_door"), -- ANM-004: back door locked by the anomaly (DEC-247)
 	sfx("curtain"),
 	sfx("post_buzz"), -- Walker start, DEC-123
 	sfx("post_tunk"),

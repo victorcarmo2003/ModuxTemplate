@@ -123,8 +123,8 @@ return UILabs.CreateVideStory({
 			if not controls.Robux() then
 				return nil
 			end
-			const product = Content.Shop.ClassProducts.ByKey[key]
-			return if product then product.Robux else nil
+			const pass = Content.Shop.GamePasses.ByKey[key]
+			return if pass then pass.Robux else nil
 		end,
 		Busy = pending,
 		OnFocus = function(key: string)
@@ -140,7 +140,7 @@ return UILabs.CreateVideStory({
 			end)
 		end,
 		OnBuyRobux = function(key: string)
-			print(`[ClassSelect story] PromptProductPurchase for {key}`)
+			print(`[ClassSelect story] PromptGamePassPurchase for {key}`)
 			later(function()
 				unlock(key)
 			end)

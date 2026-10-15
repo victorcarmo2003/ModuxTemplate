@@ -123,11 +123,13 @@ const cases: { Case } = {
 	{ Name = "perfect time K 2", Got = function() return Grade.PerfectTime(cfg, 2) end, Want = 3.0 + 0.8 * 2 },
 
 	-- Sausage flip (server clock; Duration 10 s, target 5 s)
-	{ Name = "flip at half", Got = function() return Grade.FlipScore(cfg, tolerance("grill_flip"), 100, 105, 10) end, Want = 100 },
-	{ Name = "flip near the middle is Perfect", Got = function() return Grade.Band(cfg, Grade.FlipScore(cfg, tolerance("grill_flip"), 100, 104.7, 10)) end, Want = "Perfect" },
-	{ Name = "flip inside the window is Good", Got = function() return Grade.Band(cfg, Grade.FlipScore(cfg, tolerance("grill_flip"), 100, 104.2, 10)) end, Want = "Good" },
-	{ Name = "flip too early is Messy", Got = function() return Grade.Band(cfg, Grade.FlipScore(cfg, tolerance("grill_flip"), 100, 103, 10)) end, Want = "Messy" },
-	{ Name = "flip too late is Messy", Got = function() return Grade.Band(cfg, Grade.FlipScore(cfg, tolerance("grill_flip"), 100, 108, 10)) end, Want = "Messy" },
+	-- TASK-257: the flip is graded by where the swinging cursor is (Grade.SwingAt; Duration 10, first side 8 s, Swing 1.1 s)
+	{ Name = "flip at the middle", Got = function() return Grade.FlipScore(cfg, tolerance("grill_flip"), 100, 108.55, 10) >= 99 end, Want = true },
+	{ Name = "flip near the middle is Perfect", Got = function() return Grade.Band(cfg, Grade.FlipScore(cfg, tolerance("grill_flip"), 100, 108.59, 10)) end, Want = "Perfect" },
+	{ Name = "flip inside the window is Good", Got = function() return Grade.Band(cfg, Grade.FlipScore(cfg, tolerance("grill_flip"), 100, 108.45, 10)) end, Want = "Good" },
+	{ Name = "flip too early is Messy", Got = function() return Grade.Band(cfg, Grade.FlipScore(cfg, tolerance("grill_flip"), 100, 107, 10)) end, Want = "Messy" },
+	{ Name = "flip at an end is Messy", Got = function() return Grade.Band(cfg, Grade.FlipScore(cfg, tolerance("grill_flip"), 100, 108, 10)) end, Want = "Messy" },
+	{ Name = "the swing back through the middle", Got = function() return Grade.FlipScore(cfg, tolerance("grill_flip"), 100, 109.65, 10) >= 99 end, Want = true },
 	{ Name = "never flipped is Messy", Got = function() return Grade.Band(cfg, Grade.FlipScore(cfg, tolerance("grill_flip"), 100, nil, 10)) end, Want = "Messy" },
 	{ Name = "flip with no duration", Got = function() return Grade.FlipScore(cfg, tolerance("grill_flip"), 100, 105, 0) end, Want = 0 },
 

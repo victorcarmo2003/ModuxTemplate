@@ -27,7 +27,7 @@ const base = Table.new({
 		Params = {},
 	},
 	{
-		-- slots and time: Upgrades.grill (GrillSlots 2/3/4, GrillTime 12/10/8; DEC-046, DEC-201)
+		-- slots and time: Upgrades.grill (GrillSlots 2/3/4, GrillTime 8/6/4 = first side 6/4/2 s + 2 s after the flip; DEC-046, DEC-201)
 		Key = "grill",
 		Letter = "G",
 		Record = "PerSlot",
@@ -63,7 +63,7 @@ const base = Table.new({
 		Key = "toppings",
 		Letter = "K",
 		Record = "None",
-		Actions = { "topping_add", "restock" },
+		Actions = { "topping_add", "restock", "topping_unwrap" },
 		Ingredient = PER_ANCHOR,
 		Params = {},
 	},

@@ -19,10 +19,10 @@
 	(placeholder: no key in Content.Sounds = silence). It also gives PromptController the `Shutter` probe of the
 	vehicle in use (Rules.SetShutterProbe: no counter prompt with the window closed). The server decides; nothing
 	here changes the state.
-	Serving-window panel (user request 2026-10-12, Provisional): the same flap is also the shop panel. It hangs closed
-	while the shop is not selling (Content.Shift row Selling = false: Prep, Summary, ...), so "Open Shop" (open_sign,
-	Prompt_Open on its inner face) is pressed on the panel and the flap rises when the Open phase starts; at night the
-	`Shutter` attribute still closes it as before. Local only: a 4 Hz tick compares the wanted pose with the flap.
+	Serving-window panel (TASK-284, owner request 2026-10-14, Provisional): the window IS the shop. In the lever phases
+	(Content.Actions.shutter_toggle Requires.Phase: Prep, Open, Closing, Night) only the `Shutter` attribute decides
+	(the server shuts it in Prep); outside them the flap hangs closed while the shop is not selling (Summary, Call, ...).
+	Local only: a 4 Hz tick compares the wanted pose with the flap.
 	Provisional (TASK-131): the "hang down" default, the quad ease and the flap needing to be Anchored and unwelded.
 ]]
 local CollectionService = game:GetService("CollectionService")
@@ -60,8 +60,12 @@ const HINGE_RETRY = 5 -- s: one more look for the hinge when the Model replicate
 const MIN_SWING = math.rad(5) -- a smaller computed swing means the flap already hangs down (needs ClosedAngle)
 const SOUND_CLOSE = "shutter_close"
 const SOUND_OPEN = "shutter_open"
+const SOUND_LOCKED = "locked_door" -- SFX-232: the anomaly (ANM-004, DEC-247) locked the back door and this player tried it
+const DOOR_NAME = "Door_Back"
 const SOUND_BUTTON = "switch_click" -- the window button, with the flap sound (not on the late-join pose)
 const PANEL_TICK = 4 -- Hz: shop open / closed against the flap pose
+-- phases where the window lever works: the `Shutter` attribute alone decides the flap (TASK-284)
+const LEVER_PHASES: { string } = Content.Actions.ByKey.shutter_toggle.Requires.Phase or {}
 
 type Shutter = {
 	Model: Model,
@@ -267,14 +271,18 @@ function VehicleController:WatchShutter(model: Model, retry: boolean)
 	self:PoseShutter(shutter)
 end
 
--- The flap is down when the window is closed (server attribute) or the shop is not selling (panel). A phase this client
--- does not know yet counts as selling: the flap never closes on a guess.
+-- The flap is down when the window is closed (server attribute) or, outside the lever phases, the shop is not selling
+-- (panel). A phase this client does not know yet counts as selling: the flap never closes on a guess.
 function VehicleController:WantClosed(model: Model): boolean
 	if model:GetAttribute(SHUTTER_ATTRIBUTE) == true then
 		return true
 	end
-	const row = Content.Shift.ByKey[self.Dependencies.RoundController.Phase()]
-	return row ~= nil and (not row.Selling or self.Dependencies.RoundController.Paused())
+	const phase = self.Dependencies.RoundController.Phase()
+	const row = Content.Shift.ByKey[phase]
+	if row == nil or table.find(LEVER_PHASES, phase) ~= nil then
+		return false
+	end
+	return not row.Selling
 end
 
 function VehicleController:PoseShutter(shutter: Shutter)
@@ -355,6 +363,19 @@ function VehicleController:IsShutterClosed(): boolean
 end
 
 -- Transition packet: start (or restart) the cover from the server time; a late packet only plays what is left
+-- "Locked door": the server refused Open door (TrailerDoorService lock). Only the sound, at the leaf when it is found.
+function VehicleController:PlayLocked()
+	local at: Vector3? = nil
+	for _, model in CollectionService:GetTagged(VEHICLE_TAG) do
+		const door = model:FindFirstChild(DOOR_NAME, true)
+		if door ~= nil and door:IsA("PVInstance") then
+			at = door:GetPivot().Position
+			break
+		end
+	end
+	self.Dependencies.AudioController:Play(SOUND_LOCKED, at)
+end
+
 function VehicleController:PlayFade(startedAt: number, door: boolean?)
 	const isDoor = door == true
 	const total = if isDoor then DOOR_IN + DOOR_HOLD + DOOR_OUT else FADE_TOTAL
@@ -421,6 +442,8 @@ VehicleController:OnInit(function(self)
 			self:PlayFade(transition.StartedAt)
 		elseif transition.Kind == "TrailerDoor" then
 			self:PlayFade(transition.StartedAt, true)
+		elseif transition.Kind == "DoorLocked" then
+			self:PlayLocked()
 		end
 	end)
 end)

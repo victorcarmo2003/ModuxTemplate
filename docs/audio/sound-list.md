@@ -439,6 +439,16 @@ Tom de cuidado e resgate. Nada de grito, nada de câmera tremendo, sirene nunca 
 
 Reusos nas cutscenes: buzina (SFX-112), motor (SFX-110), ônibus (SFX-111), celular flip (SFX-084), porta do Mart (SFX-060), telefone (SFX-080).
 
+### 5.18 ANM-002 wrong food: áudio fornecido pelo dono (DEC-242, DEC-244; Provisório)
+
+IDs 217 a 229 ficam reservados à TASK-185 (gestos do preparo). Gravações **a ser fornecidas pelo usuário** (em inglês); licença = própria do dono.
+
+| ID | Nome curto | Quando toca | Duração/loop | Tom/referência | Prioridade | Variações |
+|---|---|---|---|---|---|---|
+| SFX-230 | Contagem sinistra 1 a 10 | cliente da ANM-002 servido: contagem de 10 s, 1 número por segundo; a janela fecha antes de 10 = para | 10 s (10 arquivos "one" a "ten" ou 1 faixa) | voz sinistra, grave, sem grito; **a ser fornecido pelo usuário**; teto de susto +3 dB (§6) | P2 | 10 (ou 1 faixa) |
+| SFX-232 | Locked door (porta trancada) | ANM-004 (DEC-247): o jogador tenta abrir a porta dos fundos do trailer enquanto está trancada pela anomalia; **só este som toca**, nada mais | 0,5–1 s | **já existe no Studio**: `ReplicatedStorage.Assets.SFX["Locked door"]` (inserido pelo dono; licença própria dele) | P1 | 1 |
+| SFX-231 | Risada / sorriso | depois de agarrar quem serviu, **enquanto some** (fade de 2 s, DEC-246) | 1,5–3 s | risada do cliente, sinistra mas não gritada; **a ser fornecido pelo usuário** | P2 | 1 |
+
 ---
 
 ## 6. Mixagem e regras de terror (verificáveis)

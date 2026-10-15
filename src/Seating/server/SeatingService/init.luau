@@ -30,7 +30,7 @@
 --             false) / StandAll: up at once, no tray, no tip (the table is Free).
 --   Tension   while an anomaly of Seating.TensionAnomalies runs or a customer anomaly is alive: nobody sits, every
 --             diner stands within one tick (TICK_RATE).
---   Phases    Closing: nobody sits, diners finish. Any other non-selling phase: diners stand at once. Drawer closed
+--   Phases    Closing (night 6 AM): nobody sits, diners finish. Day Last call (DEC-240): sitting still works. Any other non-selling phase: diners stand at once. Drawer closed
 --             (Summary, night end...): every table clean, tips on them lost (TipLostAtSummary). ShiftStarted: clean.
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -201,7 +201,13 @@ function SeatingService:Owned(group: Content.SeatingGroup?): number
 end
 
 -- The group is shown and sold on the current vehicle (Trailer tables: only once the trailer is the vehicle).
+-- Anomaly mode (Content.Mode.DayOnly = false, owner request 2026-10-14, Provisional): no group is active, so every table
+-- is Locked (hidden, no collision, no prompt, never for sale), nobody sits and the Patio Lights sign stays off. The code
+-- stays: DayOnly = true brings the tables back as they were.
 function SeatingService:IsActive(group: Content.SeatingGroup): boolean
+	if not Content.Mode.DayOnly then
+		return false
+	end
 	return table.find(group.Vehicles, self.Dependencies.UpgradeService:GetVehicle()) ~= nil
 end
 
@@ -245,8 +251,10 @@ function SeatingService:IsTense(): boolean
 	return self.Dependencies.CustomerService:HasActor()
 end
 
+-- Open and Night, plus the day Last call (DEC-240): the line is still served and a customer who orders may sit
 function SeatingService:InSitPhase(): boolean
-	return table.find(SEATING.SitPhases, self.Dependencies.RoundService:GetPhase()) ~= nil
+	const round = self.Dependencies.RoundService
+	return table.find(SEATING.SitPhases, round:GetPhase()) ~= nil or round:IsLastCall()
 end
 
 -- Network ---------------------------------------------------------------------------------------------------------
@@ -668,7 +676,7 @@ end
 -- CustomerService seater (SetSeater.Offer): the party just had its order taken. Must not yield (runs inside the Take
 -- Order Run). true = reserved a table, the party is ours until Dismiss.
 function SeatingService:TrySeat(party: SeatParty): boolean
-	if not self.Enabled or not self.Live then
+	if not self.Enabled or not self.Live or not Content.Mode.DayOnly then
 		return false
 	end
 	if self.ByMember[party.Leader] ~= nil then
@@ -986,6 +994,9 @@ end
 -- buy_in_place: the anchor's Upgrade must be sold here; a table must be the next ghost (fixed order, FEAT-037).
 -- Cash is not checked here: Buy refuses with not_enough_cash (notice to the buyer).
 function SeatingService:CanBuyAt(anchor: Instance): boolean
+	if not Content.Mode.DayOnly then
+		return false
+	end
 	const key = anchor:GetAttribute(UPGRADE_ATTRIBUTE)
 	if typeof(key) ~= "string" or not SOLD[key] then
 		return false
@@ -1026,7 +1037,7 @@ function SeatingService:BuyAt(player: Player, anchor: Instance)
 	self:Refresh()
 end
 
--- clean_table: a Dirty table while the drawer is open (the tip goes into it, DEC-050).
+-- clean_table: a Dirty table while the shop takes entries (the tip goes into the tip jar, DEC-239).
 function SeatingService:CanClean(anchor: Instance): boolean
 	const index = indexOf(anchor)
 	const spot = if index then self.Spots[index] else nil
@@ -1045,7 +1056,7 @@ function SeatingService:Clean(anchor: Instance)
 	const tip = spot.Tip
 	spot.Tip = 0
 	if tip > 0 then
-		self.Dependencies.EconomyService:AddToDrawer(tip, "Tip")
+		self.Dependencies.EconomyService:AddTip(tip) -- into the tip jar (DEC-239)
 	end
 	self:SetState(spot, "Free")
 end

@@ -3,7 +3,9 @@
 -- §18.12; network.md §3.5; TASK-026). StationKinds "grill" and "sausage_stock" (§18.12).
 --   grill_place   (sausage_stock, tap "Grill")  1 sausage from stock -> lowest free slot of the vehicle's grill;
 --                 Duration = Effect GrillTime (12/10/8 s) x Modifier GrillTime of who placed it (Line Cook 0.85)
---   Tick 10 Hz    Working -> Ready when StartedAt + Duration is reached (no burning in the MVP)
+--   Tick 10 Hz    Working -> Ready when the sausage was FLIPPED and StartedAt + Duration is reached (no burning in the MVP). The
+--                 cook is two sides (2026-10-14): the first takes Duration - Rules.Grill.PostFlip s, then the sausage WAITS (Working,
+--                 progress paused, the flip window open) until the flip; Flip re-bases StartedAt so PostFlip s (1 s) later it is Ready.
 --   grill_collect (grill slot anchor Att_Slot<n>, tap "Collect")  Ready slot -> end of the rail queue (Rail.luau)
 -- Active slots = Slot attachments 1..GrillSlots of the current level (2/3/4); a slot added by an upgrade enters
 -- Empty, slots in progress never restart (network.md §3.5). One Stations record per active slot.
@@ -37,6 +39,7 @@ const SLOTS_STAT = "GrillSlots"
 const TIME_STAT = "GrillTime"
 const DURATION_STEP = 0.1 -- Stations.Duration is quant(0, 120, 0.1): the server uses the value the wire carries
 const DURATION_MAX = 120
+const FLIP_SLACK = 0.1 -- s: a flip this much before the pause still counts (network jitter)
 
 -- Bound grill stations (one per vehicle expected). Stale entries (station removed/re-added) are skipped by alive().
 const grills: { Station } = {}
@@ -332,9 +335,13 @@ function Grill.PlaceFor(ctx: Context, stock: Station, player: Player, preferred:
 	return slot, reason
 end
 
--- Flips the sausage of `slot` once (Working, or Ready = late). The score comes from the SERVER clock: how far from 50% of
--- the Duration (Rules.Grill.Target) the flip happened. Returns (score, nil) or (nil, reason): "Empty" | "Flipped".
-function Grill.Flip(ctx: Context, vehicle: string, slot: number): (number?, string?)
+-- Flips the sausage of `slot` once, only after the first side is done (the pause). The score comes from the SERVER clock: the
+-- delay between the pause and the flip. The flip re-bases StartedAt so the second side runs PostFlip s from now.
+-- Returns (score, nil) or (nil, reason): "Empty" | "Flipped" | "Early".
+-- TASK-257: `latency` = s the tap took to reach the server (Player:GetNetworkPing, clamped): the swing is graded where the player
+-- saw it. A flip before the pause is accepted with the worst grade and keeps the cooking schedule (no time is skipped); a flip
+-- in the pause re-bases StartedAt so the second side runs PostFlip s from now.
+function Grill.Flip(ctx: Context, vehicle: string, slot: number, latency: number?): (number?, string?)
 	const grill, record = findSlot(vehicle, slot)
 	if grill == nil or record == nil or record.State == "Empty" then
 		return nil, "Empty"
@@ -343,9 +350,15 @@ function Grill.Flip(ctx: Context, vehicle: string, slot: number): (number?, stri
 	if flipped[slot] ~= nil then
 		return nil, "Flipped"
 	end
+	const now = ctx.Now()
+	const first = Grade.FirstSide(Content.Prep, record.Duration)
+	const seen = now - math.clamp(latency or 0, 0, 0.3)
 	const tolerance = Content.Prep.Tolerances.ByKey["grill_flip"]
-	const score = Grade.FlipScore(Content.Prep, tolerance, record.StartedAt, ctx.Now(), record.Duration)
+	const score = Grade.FlipScore(Content.Prep, tolerance, record.StartedAt, seen, record.Duration)
 	flipped[slot] = score
+	if now >= record.StartedAt + first - FLIP_SLACK then
+		record.StartedAt = now - first
+	end
 	-- N2: the stamp goes on the wire as score + 1 (0 / nil = not flipped), cleared by Collect (empty record) and Place
 	record.Flip = math.clamp(math.floor(score + 0.5), 0, 100) + 1
 	ctx.Publish(grill)
@@ -389,7 +402,7 @@ function Grill.DevAge(ctx: Context, vehicle: string, slot: number, seconds: numb
 		return false
 	end
 	record.StartedAt -= seconds
-	if record.State == "Working" and ctx.Now() >= record.StartedAt + record.Duration then
+	if record.State == "Working" and record.Flip ~= nil and ctx.Now() >= record.StartedAt + record.Duration then
 		record.State = "Ready"
 	end
 	ctx.Publish(grill)
@@ -401,6 +414,19 @@ end
 function Grill.DevFlipWire(vehicle: string, slot: number): number
 	const _, record = findSlot(vehicle, slot)
 	return if record and record.Flip then record.Flip else 0
+end
+
+-- Sausages on the grills of the vehicle (any slot that is not Empty).
+function Grill.Busy(vehicle: string): number
+	local count = 0
+	for _, grill in grillsOf(vehicle) do
+		for _, record in grill.Records do
+			if record.State ~= "Empty" then
+				count += 1
+			end
+		end
+	end
+	return count
 end
 
 -- Dev: Duration of the sausage in `slot`, 0 = none.
@@ -436,7 +462,8 @@ function Grill.Tick(ctx: Context, station: Station, now: number)
 	end
 	local changed = sync(ctx, station)
 	for _, record in station.Records do
-		if record.State == "Working" and now >= record.StartedAt + record.Duration then
+		-- an unflipped sausage waits for the flip however long it takes (no burning)
+		if record.State == "Working" and record.Flip ~= nil and now >= record.StartedAt + record.Duration then
 			record.State = "Ready"
 			changed = true
 		end

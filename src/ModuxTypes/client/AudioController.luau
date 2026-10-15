@@ -9,7 +9,7 @@ export type AmbientBed = {
 	Key: string,
 	Stop: (fade: number?) -> (),
 }
-export type GroupName = "Music" | "Ambient" | "Sfx" | "Voice" | "Ui"
+export type GroupName = "Music" | "Ambient" | "Sfx" | "Voice" | "Ui" | "Scare"
 export type At = Vector3 | Instance
 export type PlayOptions = {
 	Volume: number?, -- multiplier over the row Volume

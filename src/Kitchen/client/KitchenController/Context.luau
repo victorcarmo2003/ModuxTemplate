@@ -11,6 +11,8 @@ export type StockRecord = {
 	Amount: number,
 	Capacity: number,
 	Blocked: boolean,
+	-- gift bowl unlocked but still closed (owner request 2026-10-14): nil / false = open
+	Wrapped: boolean?,
 }
 
 -- network.md §3.5, id = StationId * 100 + Slot

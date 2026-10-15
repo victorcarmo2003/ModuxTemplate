@@ -645,6 +645,10 @@ function AnomalyService:StartOccurrence(key: string, module: Api.Module, slot: n
 	end
 
 	self.LastStartAt = t
+	-- TASK-284 (Content.ShopWindow, Provisional Q-270): this anomaly slams the service window shut as it starts
+	if Content.ShopWindow.Anomalies[key] == "Closes" then
+		self.Dependencies.VehicleService:SetShutter(true, nil, true)
+	end
 	if self.Live and self.Dependencies.NetService:IsRunning() then
 		self.Libs.Net.Anomalies:add(id, run.Record)
 		run.Added = true
@@ -952,6 +956,11 @@ function AnomalyService:StepAgenda(t: number)
 				continue
 			end
 			const row = Content.Anomalies.ByKey[entry.Key]
+			-- TASK-284 (Content.ShopWindow, Provisional Q-270): a shut window at the scheduled start avoids it
+			if Content.ShopWindow.Anomalies[entry.Key] == "Blocks" and self.Dependencies.VehicleService:IsShutterClosed() then
+				due.Done = true
+				continue
+			end
 			const since = if self.LastStartAt > 0 then t - self.LastStartAt else math.huge
 			const admitted = Scheduler.Admit(candidate(row), self:RunningCandidates(), limits, since)
 			if not admitted then

@@ -45,6 +45,7 @@ const COLD = Color3.fromHex("#5A5F6B")
 const WARM = Color3.fromHex("#E2641C")
 const HOT = Color3.fromHex("#FF9A3C")
 const SLAB = Color3.fromHex("#2B2233")
+const STAND = 0.24 -- studs: the housing from the counter up to the slab (the trailer grill is the same model, see tools/assetplace/bar_grill_world.luau)
 const RISE, FALL = 0.9, 0.3 -- heat per second
 
 local function block(folder: Folder, name: string, size: Vector3, color: Color3, material: Enum.Material): Part
@@ -97,6 +98,7 @@ function GrillRig.new(options: Options): Rig
 	local flame: Part? = nil
 	local burner: Part? = nil
 	local tray: Part? = nil
+	local stand: Part? = nil
 
 	-- Builds the parts once the poses of the slots are known: the frame is the pose of the first slot, centred on all of them.
 	local function build(): boolean
@@ -138,6 +140,8 @@ function GrillRig.new(options: Options): Rig
 		const slabH = 0.12
 		base = block(options.Folder, "Base", Vector3.new(spanX, slabH, spanZ), SLAB, Enum.Material.SmoothPlastic)
 		base.CFrame = origin * CFrame.new(0, -0.16 - slabH / 2, 0)
+		stand = block(options.Folder, "Stand", Vector3.new(spanX - 0.1, STAND, spanZ - 0.1), SLAB, Enum.Material.SmoothPlastic)
+		stand.CFrame = origin * CFrame.new(0, -0.16 - slabH - STAND / 2, 0)
 		-- the edge: four Cream strips, the toy-plastic rim
 		const edge = 0.07
 		for index = 1, 4 do
@@ -201,12 +205,12 @@ function GrillRig.new(options: Options): Rig
 			strip:Destroy()
 		end
 		table.clear(frames)
-		for _, piece in { base, flame, burner, tray } do
+		for _, piece in { base, flame, burner, tray, stand } do
 			if piece ~= nil then
 				piece:Destroy()
 			end
 		end
-		base, flame, burner, tray = nil, nil, nil, nil
+		base, flame, burner, tray, stand = nil, nil, nil, nil, nil
 		frame = nil
 	end
 

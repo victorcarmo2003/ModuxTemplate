@@ -12,14 +12,15 @@ local Content = require(ReplicatedStorage.shared.Content)
 
 const LEVEL_NAMES: { [string]: { [number]: string } } = {
 	grill = { "Old Grill", "Double Grill", "Big Sizzle Grill" },
-	cooler = { "Small Cooler", "Big Cooler", "Deep Chill Cooler" },
+	cooler = { "Small Storage", "Storage 2", "Storage 3", "Big Storage" }, -- owner request 2026-10-14 (Provisional names)
 	counter = { "Little Counter", "Wide Counter", "Long Counter" },
 	cash_drawer_lock = { [1] = "Drawer Lock" },
 	trailer_lights = { [1] = "Trailer Lights" },
 }
 
--- The Cooler line quotes the sausage box (the first thing a new player restocks).
-const COOLER_SAMPLE = "sausage"
+-- The Storage line (UPG-002) quotes the buns and the sauce bowls.
+const COOLER_SAMPLE = "bun" -- Storage plate: buns + sauce (owner request 2026-10-14)
+const SAUCE_SAMPLE = "ketchup"
 
 const Labels = {
 	OutOfStock = "Out of stock",
@@ -63,9 +64,13 @@ function Labels.Effect(upgrade: Content.Upgrade, row: Content.UpgradeLevel): str
 	if key == "grill" then
 		return `{number(effects.GrillSlots or 0)} spots · {number(effects.GrillTime or 0)} s`
 	elseif key == "cooler" then
-		const sample = Content.Ingredients.ByKey[COOLER_SAMPLE]
-		const capacity = if sample then sample.Capacity[effects.StockCapacityLevel or 1] else nil
-		return if capacity then `Holds {number(capacity)} sausages` else "More stock"
+		-- Storage (owner request 2026-10-14): buns and sauce, the two stocks the first upgrade is about
+		const level = effects.StockCapacityLevel or 1
+		const bun = Content.Ingredients.ByKey[COOLER_SAMPLE]
+		const sauce = Content.Ingredients.ByKey[SAUCE_SAMPLE]
+		const buns = if bun then bun.Capacity[level] else nil
+		const sauces = if sauce then sauce.Capacity[level] else nil
+		return if buns and sauces then `{number(buns)} buns · {number(sauces)} sauce` else "More stock"
 	elseif key == "counter" then
 		return `{number(effects.QueueSize or 0)} in line · +{number(effects.PatienceBonus or 0)} s`
 	elseif key == "cash_drawer_lock" then

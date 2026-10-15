@@ -37,6 +37,31 @@ O Food Trailer e o veiculo unico; o carrinho saiu da run. Dois snippets de Studi
 
 Pos-`Place.run`: o run recria `MAP01_Assets.Cart`, o carrinho, `TRL-SALE` e o trailer no lote; os dois snippets acima o desfazem (rodar depois do `bind_map01` e do `bind_pieces`). `tools/studio/sync_src.luau` e so um substituto do botao Connect do Rojo (copia o Source dos scripts do `sourcemap.json`).
 
+## Toppings em arco (2026-10-14, Provisorio)
+
+`toppings_arc.luau` (idempotente): layout do dono, capturado do Studio. O prato com o pao fica no centro da frente da bancada de
+condimentos, sobre a placa branca `Board` (que substitui o mesh `Base`); Bacon e Cream Cheese (os ultimos a destravar) nos cantos da
+frente, fileira de tras com Potato Sticks, Ketchup, Mustard e Cheese. Move cada `Bin_*` (com Fill/Lid/Label/Lock e prompts) e o
+`PT_Topping_*` correspondente em `PrepTargets`. Um `Place.run` desfaz isto: rodar de novo depois do `bind_map01`. Se mexer nas posicoes
+a mao, atualize a tabela do snippet.
+
+## Grelha de barras no trailer (2026-10-14, Provisorio)
+
+`bar_grill_world.luau` (idempotente): a grelha do trailer passa a ser a grelha de barras do minigame (`GrillRig`): laje escura, borda
+Cream, 7 barras, bandeja Mustard e queimador, como Parts estaticas dentro das tres pecas de upgrade `Grill_L1/L2/L3` (2, 3 e 4 slots),
+entao a grelha fica mais larga a cada upgrade. O mesh de rolos de cada peca fica invisivel (`UpgOrigTransparency = 1`). No modo de
+preparo o `GrillRig` desenha a sua copia (com o calor) e esconde o `TRL-G_AST-012_RollerGrill` localmente: manter os numeros do snippet
+iguais aos do `GrillRig`. Rodar depois do `bind_pieces`.
+
+## Cameras de seguranca (2026-10-14, TASK-285, Provisorio)
+
+`security_cams.luau` (`run("assetplace/security_cams", "dry" | "undo" | nil)`, idempotente e reversivel): leva os modelos do dono
+`Workspace.CAM1`, `Workspace.CAM2` e o monitor `Workspace.CCTV` para `Workspace.SecurityCams` (FORA do `MAP01_Assets`, entao o
+`Place.run` nao os apaga) e poe `ModelStreamingMode = Persistent`. Nao mexe em pivo: o pivo de cada CAM e a vista exata da camera
+(o dono gravou o CFrame dele ali; `Content.Security`), e o snippet confere o pivo antes e depois. Marcas `_SEC_OrigParent` /
+`_SEC_OrigMode` para o `undo`. O prompt `Prompt_Cameras` do monitor e criado pelo `SecurityService` em runtime (nao fica no place).
+Se o trailer mudar de lugar, mova o `CCTV` junto (ele nao e filho do trailer).
+
 ## Snippets pos-run, um a um
 
 | Snippet | O que repoe | Por que nao esta nos placements | Estado apos Place.run |

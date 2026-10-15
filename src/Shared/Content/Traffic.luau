@@ -6,6 +6,9 @@
 --
 -- Rules that no number here can change (DEC-133): cars stop ONLY at the PARE lines of the Juniper arms (1 s) and at a
 -- crosswalk line while an NPC holds its reservation; never for a player. No traffic light (DEC-130).
+-- AMENDED, Provisional (TASK-263, owner request 2026-10-14; the owner placed traffic lights on the map): with `Lights = true`
+-- the cars ALSO obey Content.TrafficLights (the same cycle the lamps show): at every stop line of an axis that is not green they
+-- stop, before the stripes; NPCs only start across a crosswalk while its walk sign says Walk. `Lights = false` = the old rules.
 -- Names (Path, Line, Box, Stops.Ref) are names in the MAP-01 binding (TASK-098); PlaceService checks them, and the
 -- map checks spawn distance and stop order (Validate here only sees numbers).
 --
@@ -41,6 +44,9 @@ export type Route = {
 export type Crosswalk = {
 	Key: string, -- CW-<n>
 	Box: string, -- volume of the crosswalk in the map
+	-- axis of the STREET it crosses (TASK-263): its cars follow that axis' light; the walkers cross on the other axis' Walk.
+	-- nil = no lamp at this crosswalk (TASK-281): cars and walkers follow only the reservation, as before TASK-263
+	Axis: ("EW" | "NS")?,
 	Lines: { [string]: string }, -- direction -> stop line
 	Linked: string?, -- reserving this crosswalk also reserves the linked one (CW-2 <-> CW-4 share SL-W/SL-E)
 }
@@ -79,6 +85,7 @@ export type Looks = {
 }
 
 export type Traffic = {
+	Lights: boolean, -- TASK-263: cars and walkers follow Content.TrafficLights (false = DEC-130/133 as before)
 	Routes: Table.Table<Route>,
 	Crosswalks: Table.Table<Crosswalk>,
 	Conflicts: Table.Table<Conflict>,
@@ -152,11 +159,18 @@ const routes = Table.new({
 } :: { Route })
 
 const crosswalks = Table.new({
-	{ Key = "CW-1", Box = "CW-1", Lines = { NB = "SL-1S", SB = "SL-1N" } }, -- Juniper South, trailer <-> Mart
-	{ Key = "CW-2", Box = "CW-2", Lines = { EB = "SL-W", WB = "SL-E", SB = "SL-N" }, Linked = "CW-4" }, -- SB: TR-4
+	{ Key = "CW-1", Box = "CW-1", Axis = "NS", Lines = { NB = "SL-1S", SB = "SL-1N" } }, -- Juniper South, trailer <-> Mart
+	{ Key = "CW-2", Box = "CW-2", Axis = "EW", Lines = { EB = "SL-W", WB = "SL-E", SB = "SL-N" }, Linked = "CW-4" }, -- SB: TR-4
+	-- mid-block, no lamp on the map (TASK-281, Provisional): no Axis
 	{ Key = "CW-3", Box = "CW-3", Lines = { EB = "SL-3W", WB = "SL-3E" } },
 	-- SB: TR-3 (left from Juniper North), NB: TR-10 (right from Juniper South)
-	{ Key = "CW-4", Box = "CW-4", Lines = { EB = "SL-W", WB = "SL-E", SB = "SL-N", NB = "SL-S" }, Linked = "CW-2" },
+	{
+		Key = "CW-4",
+		Box = "CW-4",
+		Axis = "EW",
+		Lines = { EB = "SL-W", WB = "SL-E", SB = "SL-N", NB = "SL-S" },
+		Linked = "CW-2",
+	},
 } :: { Crosswalk })
 
 const conflicts = Table.new({
@@ -164,6 +178,7 @@ const conflicts = Table.new({
 } :: { Conflict })
 
 const traffic: Traffic = {
+	Lights = true, -- TASK-263, Provisional
 	Routes = routes,
 	Crosswalks = crosswalks,
 	Conflicts = conflicts,

@@ -21,6 +21,8 @@ local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Components = StarterPlayer.StarterPlayerScripts.client.Interface.Components
 local ProgressBar = require(Components.ProgressBar)
+local Content = require(ReplicatedStorage.shared.Content)
+local Grade = require(ReplicatedStorage.shared.Prep.Grade)
 local Context = require(script.Parent.Context)
 
 const source = Vide.source
@@ -207,6 +209,10 @@ function Slots.Progress(read: Reader, clock: () -> number): number
 		return 1
 	elseif record.State ~= "Working" or record.Duration <= 0 then
 		return 0
+	end
+	if record.Kind == "grill" then
+		-- the first side runs, the sausage waits for the flip, the second side runs (Grade.CookProgress)
+		return Grade.CookProgress(Content.Prep, record.StartedAt, record.Duration, clock(), record.Flip > 0)
 	end
 	return math.clamp((clock() - record.StartedAt) / record.Duration, 0, 1)
 end

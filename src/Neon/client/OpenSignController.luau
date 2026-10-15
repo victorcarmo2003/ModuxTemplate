@@ -4,7 +4,7 @@
 
 	The Pad sign stand (OPEN_AST-024_SignStand, tag OpenSignBoard) carries SurfaceGuis "Detail_OpenSign" with two
 	TextLabels, Open and Closed. This shows OPEN while the current phase sells (Content.Shift row Selling = true:
-	Open and Night) and CLOSED otherwise. Purely visual and local: the shop state itself is the server's (RoundService).
+	Open and Night) or is the day's Last call (row LastCall, DEC-240) and CLOSED otherwise. Purely visual and local: the shop state itself is the server's (RoundService).
 
 	Trailer side neon (user request 2026-10-12, Provisional): two tube signs on the right flank of the trailer, Models
 	tagged ShopNeon (and NeonSign, so the flicker of NeonController applies) with the attribute ShopState = "Open"
@@ -38,10 +38,15 @@ function OpenSignController:Setup()
 	self.Neons = {} :: { [Instance]: { Lit: boolean, Count: number } }
 end
 
--- true while the current phase sells
+-- true while the current phase sells (or is the day's Last call)
 function OpenSignController:IsOpen(): boolean
-	const phase = Content.Shift.ByKey[self.Dependencies.RoundController.Phase()]
-	return phase ~= nil and phase.Selling and not self.Dependencies.RoundController.Paused()
+	const round = self.Dependencies.RoundController
+	const phase = Content.Shift.ByKey[round.Phase()]
+	if phase == nil or round.Paused() then
+		return false
+	end
+	-- Last call (DEC-240): the day Closing keeps the sign OPEN until the line is served; the night Closing does not
+	return phase.Selling or (phase.LastCall == true and not round.IsNight())
 end
 
 -- The faces may sit on the tagged mesh or on a proxy part of the same stand model (user 2026-10-11: "Board" part,

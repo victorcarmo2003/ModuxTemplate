@@ -61,6 +61,12 @@
 						"optional": "src/Item/shared"
 					}
 				},
+				"Kitchen": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Kitchen/shared"
+					}
+				},
 				"Libs": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
@@ -121,6 +127,12 @@
 					"$ignoreUnknownInstances": false,
 					"$path": {
 						"optional": "src/ServerRole/shared"
+					}
+				},
+				"Settings": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Settings/shared"
 					}
 				},
 				"Traffic": {
@@ -190,6 +202,12 @@
 					"$ignoreUnknownInstances": false,
 					"$path": {
 						"optional": "src/Codes/server"
+					}
+				},
+				"Coffee": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Coffee/server"
 					}
 				},
 				"Customer": {
@@ -335,10 +353,22 @@
 						"optional": "src/Seating/server"
 					}
 				},
+				"Security": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Security/server"
+					}
+				},
 				"ServerRole": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
 						"optional": "src/ServerRole/server"
+					}
+				},
+				"Settings": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Settings/server"
 					}
 				},
 				"Shop": {
@@ -449,6 +479,12 @@
 							"optional": "src/Class/client"
 						}
 					},
+					"Coffee": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Coffee/client"
+						}
+					},
 					"Crew": {
 						"$ignoreUnknownInstances": false,
 						"$path": {
@@ -465,6 +501,12 @@
 						"$ignoreUnknownInstances": false,
 						"$path": {
 							"optional": "src/Cutscene/client"
+						}
+					},
+					"Delivery": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Delivery/client"
 						}
 					},
 					"Door": {
@@ -616,6 +658,24 @@
 							"optional": "src/Seating/client"
 						}
 					},
+					"Security": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Security/client"
+						}
+					},
+					"Settings": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Settings/client"
+						}
+					},
+					"Shop": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Shop/client"
+						}
+					},
 					"Showcase": {
 						"$ignoreUnknownInstances": false,
 						"$path": {
@@ -638,6 +698,12 @@
 						"$ignoreUnknownInstances": false,
 						"$path": {
 							"optional": "src/Traffic/client"
+						}
+					},
+					"Trash": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Trash/client"
 						}
 					},
 					"Tutorial": {

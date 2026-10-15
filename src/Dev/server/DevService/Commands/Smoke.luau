@@ -140,7 +140,8 @@ const Smoke: Api.Module = function(ctx: Api.Context): { Api.Command }
 					settle()
 				end
 				const outcome, id = customers:DevSpawn()
-				if id == nil then
+				-- the counter holds ONE customer by default (DEC-241): a full counter means somebody is already there
+				if id == nil and outcome ~= "skipped_queue_full" then
 					error(`no customer spawned ({outcome}, {where()})`, 0)
 				end
 				const npc = service("NpcService") :: Npc
@@ -234,6 +235,18 @@ const Smoke: Api.Module = function(ctx: Api.Context): { Api.Command }
 			Name = "trailer seating",
 			Run = function(): string?
 				return `{dev("seating", "trailer", "buy")}; {dev("seating", "trailer")}`
+			end,
+		},
+		{
+			Name = "tip jar + ledger",
+			Run = function(): string?
+				-- pure settlement test (DEC-238, DEC-239) and the jar state line
+				const report = dev("economy", "ledger")
+				const passed, total = string.match(report, "(%d+)/(%d+) ok")
+				if passed == nil or passed ~= total then
+					error(`economy ledger: {report}`, 0)
+				end
+				return `ledger {passed}/{total}; {dev("tips")}`
 			end,
 		},
 		{

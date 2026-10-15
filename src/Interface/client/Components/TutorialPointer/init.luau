@@ -1,5 +1,6 @@
 --!strict
--- TutorialPointer: screen-edge arrow toward the tutorial target when it is off screen or behind the camera (user
+-- TutorialPointer: screen-edge arrow toward the guide target ONLY when neither the 3D arrow tip nor the target is on screen
+-- (off screen or behind the camera; the owners decide with Interface/EdgePointer; owner request 2026-10-14) (user
 -- request 2026-10-11). Mustard round badge (CartoonPanel) with the AST-091 `Ui/arrow_right` icon turned to `Angle`
 -- (0 = right, 90 = down; one rotated image), a Mustard ">" glyph while the sheet is missing. 56 px (touch-sized look,
 -- not clickable). Pops in/out (Motion.Pop).

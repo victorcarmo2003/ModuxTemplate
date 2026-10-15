@@ -223,10 +223,10 @@ local VEHICLE_SPEC = {
 		wave = 2,
 		kinds = { "sausage_stock", "grill", "rail", "bun_crate", "board", "toppings", "trash", "coffee_machine" },
 		-- wave 3: service window button TRL-SHUTTER (DEC-221; Required.Wave3 of TASK-129); hide H1..H4 left
-		-- open_sign: the red wall switch TRL-SWITCH-OPEN (2026-10-12; replaces the serving-window panel TRL-OPEN and the Pad stand)
-		own = { [1] = { open_sign = 1 }, [2] = { answer_phone = 1, switch_light = 1 }, [3] = { shutter_toggle = 1 } },
+		-- TASK-284 (2026-10-14): the red switch TRL-SWITCH-OPEN (open_sign) left; the window lever TRL-SHUTTER is the shop
+		own = { [2] = { answer_phone = 1, switch_light = 1 }, [3] = { shutter_toggle = 1 } },
 		slots = { RailSlots = 8, BoardSlots = 4 }, -- 4 = the four prep seats (DEC-223, TASK-172)
-		counter = { ids = { "TRL-G", "TRL-R", "TRL-B", "TRL-T", "TRL-K", "TRL-DRAWER" }, relY = 4.6 },
+		counter = { ids = { "TRL-G", "TRL-R", "TRL-B", "TRL-T", "TRL-K", "TRL-TIPJAR" }, relY = 4.6 },
 	},
 }
 local REQUIRED_PACKAGES = {
@@ -295,7 +295,7 @@ local SIGHT_SEE_THROUGH = 0.3 -- parts at least this transparent do not block (g
 local FALLBACK = {
 	Stations = { "sausage_stock", "grill", "rail", "bun_crate", "board", "toppings", "trash", "coffee_machine", "prep" },
 	Actions = {
-		"open_sign", "grill_place", "grill_collect", "bun_cut", "board_add_sausage", "topping_add", "discard",
+		"grill_place", "grill_collect", "bun_cut", "board_add_sausage", "topping_add", "discard",
 		"take_order", "serve", "refuse", "restock", "buy_package", "bench_buy_upgrade", "bench_buy_item",
 		"brew_coffee", "give_coffee", "switch_light", "safe_spot", "pick_up_item",
 		"answer_phone", "get_up", "shutter_toggle", "prep_work", -- "hide" left with DEC-221 (TASK-132)
@@ -982,11 +982,8 @@ local function checkMapAnchors()
 	for _, i in tagged("Interactable") do
 		local a = i:GetAttribute("PromptAction")
 		if a == "open_sign" then
+			-- TASK-284 (2026-10-14): no open_sign any more (the service window lever is the shop)
 			table.insert(opens, i)
-			-- 2026-10-12: the sign stand left the Pad; open_sign is the red wall switch INSIDE the trailer
-			if not ancestorWithTag(i, "Vehicle") then
-				err(("2: open_sign %s is outside the trailer (it is the red wall switch TRL-SWITCH-OPEN since 2026-10-12)"):format(name(i)))
-			end
 		elseif a == "buy_package" then
 			local p = i:GetAttribute("Package")
 			if typeof(p) ~= "string" then
@@ -1015,8 +1012,8 @@ local function checkMapAnchors()
 			end
 		end
 	end
-	if #opens ~= 1 then
-		err(("2: %d open_sign anchors (need 1)"):format(#opens))
+	if #opens ~= 0 then
+		err(("2: %d open_sign anchors left (TASK-284: the red switch TRL-SWITCH-OPEN must leave the trailer)"):format(#opens))
 	end
 	for _, p in REQUIRED_PACKAGES do
 		if #(pk[p] or {}) ~= 1 then

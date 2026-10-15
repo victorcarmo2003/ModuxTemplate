@@ -1,7 +1,8 @@
 --!strict
 -- ghost_customer (< 40; script.md §8, AST-085): a customer waits in the queue and is gone when the player looks again.
 -- Local rig (CrewRig.Build with Tag = false: RigController and the server never see it), Night pack + Normal_Night
--- (the low band look, DEC-168), anchored, no collision, no prompt, never in the Customers set. No sound.
+-- (kept on purpose, Provisional 2026-10-14: it highlights the hallucination; the low band no longer dresses
+-- real NPCs Night), anchored, no collision, no prompt, never in the Customers set. No sound.
 --   1. spawns on a free queue slot Q1..Q5 the player is NOT looking at;
 --   2. once seen (in the view cone, clear line) and then out of view, it is removed -> "gone on the 2nd look";
 --   3. never seen within LIFETIME: removed quietly.

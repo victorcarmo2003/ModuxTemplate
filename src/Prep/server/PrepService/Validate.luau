@@ -12,6 +12,8 @@ export type Summary = {
 	Place: number,
 	Toppings: { { Key: string, Score: number } },
 	Ms: number,
+	-- the drawn sauce lines (cosmetic, never graded: the scores above are what counts); see PrepService:SauceOf
+	Sauces: { { Key: string, Points: { number } } }?,
 }
 
 -- Read-only view of the kitchen stock (KitchenService:GetStock / IsBlocked)

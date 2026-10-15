@@ -14,11 +14,18 @@
 	  Done      boolean       true = lift the curtain; this script then destroys the ScreenGui
 	Before the controller exists the bar shows the engine join (game:IsLoaded) only. Safety: HARD_CAP s without Done
 	lifts the curtain anyway (a broken boot never leaves the player behind a loading screen).
+	Skip (playtest 2026-10-14): after SKIP_AFTER s with the curtain still down, a "Skip loading" button shows in the bottom
+	right corner (LoadingScreen Skip; a plain one on the instant cover if the kit never mounted). Click, tap or gamepad
+	ButtonX lifts the curtain at once and sets the local attribute LoadingSkipped = true on the LocalPlayer (and
+	Skipped on the ScreenGui): LoadingController lets the player in (ClientReady, Ready) while its steps keep loading
+	in the background.
 ]]
 local Players = game:GetService("Players")
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
+local UserInputService = game:GetService("UserInputService")
+local GuiService = game:GetService("GuiService")
 -- texts: src/Loading/replicatedfirst/Tips.luau (ReplicatedFirst.client.Loading.Tips, replicated with this script).
 -- This file sits in src/Loading/boot, mapped by .rogen.json straight into ReplicatedFirst (rogen would route any
 -- *.client.luau to StarterPlayerScripts, too late for a loading screen).
@@ -37,7 +44,21 @@ const HARD_CAP = 120 -- s without Done before the curtain lifts anyway
 const LIFT_TIME = 0.9 -- s of the curtain lift before the gui is destroyed
 const BOOT_PROGRESS = 0.04 -- the bar before the engine join finishes
 const JOIN_PROGRESS = 0.1 -- the bar once game:IsLoaded() (until the controller writes its own)
-const COMPONENTS = { "LoadingScreen", "Theme", "Icons", "Motion", "CartoonPanel", "CartoonLabel" }
+const COMPONENTS = {
+	"LoadingScreen",
+	"Theme",
+	"Icons",
+	"Motion",
+	"CartoonPanel",
+	"CartoonLabel",
+	"CartoonButton",
+	"KeyChip",
+}
+const SKIP_AFTER = 10 -- s of curtain before "Skip loading" shows
+const SKIP_KEY = Enum.KeyCode.ButtonX -- gamepad key of the skip button (its chip reads SKIP_CHIP)
+const SKIP_CHIP = "X"
+const SKIP_TEXT = "Skip loading"
+const SKIPPED_ATTRIBUTE = "LoadingSkipped" -- on the LocalPlayer (local only), read by LoadingController
 const BACKDROP = Color3.fromHex("#F6B71B")
 const INK = Color3.fromHex("#2B2233")
 
@@ -104,12 +125,42 @@ cursor.Selectable = false
 cursor.Size = UDim2.fromScale(0, 0)
 cursor.Parent = gui
 
+-- plain skip on the instant cover (the cartoon one replaces it when the kit mounts)
+const coverSkip = Instance.new("TextButton")
+coverSkip.Name = "Skip"
+coverSkip.AnchorPoint = Vector2.new(1, 1)
+coverSkip.Position = UDim2.new(1, -24, 1, -34)
+coverSkip.Size = UDim2.fromOffset(184, 48)
+coverSkip.BackgroundColor3 = Color3.fromHex("#FFF4DC")
+coverSkip.AutoButtonColor = true
+coverSkip.FontFace = Font.fromEnum(Enum.Font.FredokaOne)
+coverSkip.Text = SKIP_TEXT
+coverSkip.TextSize = 18
+coverSkip.TextColor3 = INK
+coverSkip.Visible = false
+coverSkip.ZIndex = 3
+coverSkip.Parent = cover
+const coverSkipCorner = Instance.new("UICorner")
+coverSkipCorner.CornerRadius = UDim.new(0.5, 0)
+coverSkipCorner.Parent = coverSkip
+const coverSkipStroke = Instance.new("UIStroke")
+coverSkipStroke.Color = INK
+coverSkipStroke.Thickness = 3
+coverSkipStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+coverSkipStroke.Parent = coverSkip
+
 gui.Parent = playerGui
 
 local lifted = false
 local unmount: (() -> ())? = nil
 -- kit mounted: its Shown source (false = lift)
 local shown: ((boolean?) -> boolean)? = nil
+-- kit mounted: its skip Visible source and the key chip text
+local skipShown: ((boolean?) -> boolean)? = nil
+local skipKey: ((string?) -> string)? = nil
+local skippable = false
+local skipInput: RBXScriptConnection? = nil
+local lastInput: RBXScriptConnection? = nil
 
 local function finish()
 	if lifted then
@@ -117,6 +168,12 @@ local function finish()
 	end
 	lifted = true
 	cursor:Destroy()
+	if skipInput ~= nil then
+		skipInput:Disconnect()
+	end
+	if lastInput ~= nil then
+		lastInput:Disconnect()
+	end
 	const setShown = shown
 	if setShown ~= nil then
 		setShown(false)
@@ -144,6 +201,62 @@ task.delay(HARD_CAP, function()
 		finish()
 	end
 end)
+
+-- Skip loading ----------------------------------------------------------------------------------------------------
+local function isGamepad(inputType: Enum.UserInputType): boolean
+	return string.find(inputType.Name, "Gamepad", 1, true) ~= nil
+end
+
+-- the chip of the gamepad key while the last input was a gamepad; that button also takes the gamepad selection
+local function refreshSkipKey()
+	const gamepad = isGamepad(UserInputService:GetLastInputType())
+	const setKey = skipKey
+	if setKey ~= nil then
+		setKey(if gamepad then SKIP_CHIP else "")
+	end
+	if gamepad and skippable and not lifted then
+		const button = gui:FindFirstChild("SkipButton", true) or coverSkip
+		if button ~= nil and button:IsA("GuiObject") and button.Visible then
+			pcall(function()
+				GuiService.SelectedObject = button
+			end)
+		end
+	end
+end
+
+local function skip()
+	if lifted or not skippable then
+		return
+	end
+	player:SetAttribute(SKIPPED_ATTRIBUTE, true)
+	gui:SetAttribute("Skipped", true)
+	if GuiService.SelectedObject ~= nil and GuiService.SelectedObject:IsDescendantOf(gui) then
+		GuiService.SelectedObject = nil
+	end
+	finish()
+end
+
+local function showSkip()
+	if lifted then
+		return
+	end
+	skippable = true
+	coverSkip.Visible = true
+	const setShown = skipShown
+	if setShown ~= nil then
+		setShown(true)
+	end
+	skipInput = UserInputService.InputBegan:Connect(function(input: InputObject)
+		if input.KeyCode == SKIP_KEY then
+			skip()
+		end
+	end)
+	lastInput = UserInputService.LastInputTypeChanged:Connect(refreshSkipKey)
+	refreshSkipKey()
+end
+
+coverSkip.Activated:Connect(skip)
+task.delay(SKIP_AFTER, showSkip)
 
 -- 2. the cartoon kit, once it replicated ---------------------------------------------------------------------------
 local function waitPath(root: Instance, path: { string }): Instance?
@@ -178,6 +291,8 @@ task.spawn(function()
 		const progress = Vide.source(math.max(if type(start) == "number" then start else 0, BOOT_PROGRESS))
 		const status = Vide.source(gui:GetAttribute("Status") or Tips.Status.Boot)
 		const visible = Vide.source(true)
+		const skipVisible = Vide.source(skippable)
+		const skipLabel = Vide.source("")
 		const stop, frame = Vide.root(function()
 			return LoadingScreen({
 				Name = "Screen",
@@ -187,13 +302,22 @@ task.spawn(function()
 				Title = Tips.Title,
 				Tagline = Tips.Tagline,
 				Shown = visible,
+				Skip = {
+					Visible = skipVisible,
+					KeyLabel = skipLabel,
+					Text = SKIP_TEXT,
+					OnSkip = skip,
+				},
 			})
 		end)
 		frame.ZIndex = 2
 		frame.Parent = gui
 		unmount = stop
 		shown = visible
+		skipShown = skipVisible
+		skipKey = skipLabel
 		cover.Visible = false
+		refreshSkipKey()
 		gui:GetAttributeChangedSignal("Progress"):Connect(function()
 			const value = gui:GetAttribute("Progress")
 			if type(value) == "number" then

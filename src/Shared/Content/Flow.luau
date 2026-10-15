@@ -95,6 +95,8 @@ export type Flow = {
 	Groups: Groups, -- FEAT-038 (Provisional)
 	Adopt: Adopt, -- TASK-163 (Provisional)
 	Guarantee: Guarantee, -- Q-202 (Provisional)
+	FullRetry: number, -- s: a spawn attempt skipped by a full counter tries again after this (DEC-241, Provisional)
+	NightQueueSize: number, -- counter slots at night, whatever the Counter level (TASK-287, Provisional)
 }
 
 const flow: Flow = {
@@ -136,7 +138,7 @@ const flow: Flow = {
 	},
 	Groups = {
 		ChanceDay = 0.20,
-		ChanceNight = 0.10, -- Q-182 a (A)
+		ChanceNight = 0, -- TASK-287: one NPC at the counter at night, no pairs (was 0.10, Q-182 a)
 		FromDay = 2,
 		FromNight = 2,
 		IntervalMult = 1.6,
@@ -172,6 +174,12 @@ const flow: Flow = {
 		FirstDelay = { 3, 5 }, -- + walk (adopted ~5 s, door ~8 s) = first customer at Q5 in ~8-12 s
 	},
 	Guarantee = { MaxEmpty = 9, MaxEmptyDay1 = 5, Spread = 2 }, -- day 2+: 9-11 s (~10), Day 1: 5-7 s (~6)
+	-- DEC-241 (user decision 2026-10-13, Provisional): the counter holds 1 customer by default, so most attempts meet it
+	-- full; instead of waiting the whole interval, an attempt skipped for a full counter tries again after ~3.5 s.
+	FullRetry = 3.5,
+	-- TASK-287 (owner request 2026-10-14, Provisional): at night ONE NPC at the counter at a time. An anomaly actor
+	-- (CustomerService:SpawnActor) takes the ordinary customer's turn; the next one comes when the current one leaves.
+	NightQueueSize = 1,
 }
 
 return Table.record(flow)

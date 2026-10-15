@@ -2,7 +2,7 @@
 -- World/Highlight: the contour on a target (docs/tech/prep-3d.md §2.4, §2.6, §8; TASK-196). Two modes: Hover (the pointer is on
 -- it: steady contour + Mustard fill) and Pulse (the target invites by itself: the same, breathing; touch has no hover). A pool of
 -- Rules.World.Budget.Highlights Highlight instances made once; none is created or destroyed while the mode runs. At a low
--- graphics level (Budget.LowQuality) no Highlight exists at all: a flat Neon ring on the floor of the target stands in for it
+-- graphics level (Budget.LowQuality) no Highlight exists at all: a flat Neon rectangle (a plate) on the floor of the target stands in for it
 -- (pool of Budget.Rings). Never red; Mustard fill, Cream contour (Ink under the fill so it reads on Cream). No Modux, no Vide.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
@@ -55,8 +55,8 @@ end
 
 function Highlight.new(folder: Folder, rules: Content.PrepWorldRules, reduced: (() -> boolean)?): Outline
 	const fallback = lowQuality(rules.Budget.LowQuality)
-	-- the Juice keeps Juice.Flashes of the Highlight budget for its flashes; the outline gets the rest
-	const count = if fallback then rules.Budget.Rings else math.max(rules.Budget.Highlights - rules.Juice.Flashes, 2)
+	-- the Juice keeps Juice.Flashes of the Highlight budget for its flashes; the colleagues' arms (Rig/Mates) keep Presence.Highlights; the outline gets the rest
+	const count = if fallback then rules.Budget.Rings else math.max(rules.Budget.Highlights - rules.Juice.Flashes - rules.Presence.Highlights, 2)
 	const slots: { Slot } = {}
 	const free: { Slot } = {}
 	const byId: { [string]: Slot } = {}
@@ -67,7 +67,7 @@ function Highlight.new(folder: Folder, rules: Content.PrepWorldRules, reduced: (
 		if fallback then
 			const ring = Instance.new("Part")
 			ring.Name = "HighlightRing"
-			ring.Shape = Enum.PartType.Cylinder
+			ring.Shape = Enum.PartType.Block
 			ring.Material = Enum.Material.Neon
 			ring.Color = Theme.Color.Mustard
 			ring.Anchored = true
@@ -120,10 +120,10 @@ function Highlight.new(folder: Folder, rules: Content.PrepWorldRules, reduced: (
 			elseif adornee:IsA("BasePart") then
 				cframe, size = adornee.CFrame, adornee.Size
 			end
-			const diameter = math.max(size.X, size.Z) * 1.25
-			slot.Base = Vector3.new(RING_THICKNESS, diameter, diameter)
+			-- a rectangle, not a ring: the footprint of the box (turned with it on the floor) with a margin
+			slot.Base = Vector3.new(size.X * 1.2 + 0.2, RING_THICKNESS, size.Z * 1.2 + 0.2)
 			slot.Ring.Size = slot.Base
-			slot.Ring.CFrame = CFrame.new(cframe.Position - Vector3.new(0, size.Y / 2 - 0.02, 0)) * CFrame.Angles(0, 0, math.pi / 2)
+			slot.Ring.CFrame = CFrame.new(cframe.Position - Vector3.new(0, size.Y / 2 - 0.02, 0)) * (cframe - cframe.Position)
 			slot.Ring.Transparency = if mode == "Hover" then 0.2 else 0.5
 		end
 	end
@@ -225,7 +225,7 @@ function Highlight.new(folder: Folder, rules: Content.PrepWorldRules, reduced: (
 				slot.Light.FillTransparency = FILL_TO + (FILL_FROM - FILL_TO) * breath
 			elseif slot.Ring ~= nil then
 				const grow = 1 + 0.08 * breath
-				slot.Ring.Size = Vector3.new(slot.Base.X, slot.Base.Y * grow, slot.Base.Z * grow)
+				slot.Ring.Size = Vector3.new(slot.Base.X * grow, slot.Base.Y, slot.Base.Z * grow)
 			end
 		end
 	end

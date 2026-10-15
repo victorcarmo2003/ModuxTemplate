@@ -44,7 +44,8 @@ Tudo que é referenciado entre documentos tem ID estável. Nunca reaproveite um 
 | `UPG-###` | upgrade/equipamento | `docs/design/upgrades.md` |
 | `NPC-###` | NPC (cliente, vendedor) | `docs/design/npcs.md` |
 | `CLS-###` | classe jogável | `docs/design/classes.md` |
-| `ANM-###` | anomalia | `docs/story/anomalies.md` |
+| `ANM-###` | anomalia | `docs/design/anomalies-v2-proposal.md` (V2, DEC-254); histórico em `docs/story/anomalies.md` |
+| `ATM-#` | atmosfera da noite | `docs/design/anomalies-v2-proposal.md` §4 (DEC-257) |
 | `MAP-##` | mapa/área | `docs/levels/MAP-##.md` |
 | `CHR-###` | personagem da história | `docs/story/characters.md` |
 | `AST-###` | asset 3D/visual | `docs/art/asset-list.md` |

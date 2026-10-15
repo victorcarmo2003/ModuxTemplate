@@ -1,5 +1,5 @@
 --!strict
--- World/Marker: the 3D marker of the pointer (docs/tech/prep-3d.md §2.1, §2.6; TASK-196): a ring exactly on the point that counts
+-- World/Marker: the 3D marker of the pointer (docs/tech/prep-3d.md §2.1, §2.6; TASK-196): a square frame exactly on the point that counts
 -- (the one the raycast / plane gives), so a finger with its 28 px offset or a gamepad cursor always shows where the action lands.
 -- Two states: Open (Mustard, aiming) and Held (Cream, tight: a drag has begun). A HintMark (studs, always on top), no Part of its own.
 -- No Modux, no Vide.
@@ -12,7 +12,7 @@ local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Compon
 export type Marker = {
 	-- Moves the marker to a world point (`lift` studs above it along the plane normal, set by SetNormal).
 	Place: (self: Marker, point: Vector3) -> (),
-	-- Kept for the callers that lay the plane (the ring faces the camera now): the lift follows the normal.
+	-- Kept for the callers that lay the plane (the frame faces the camera): the lift follows the normal.
 	SetNormal: (self: Marker, normal: Vector3) -> (),
 	SetHeld: (self: Marker, held: boolean) -> (),
 	SetVisible: (self: Marker, visible: boolean) -> (),
@@ -24,7 +24,7 @@ const LIFT = 0.03 -- studs over the plane
 
 const Marker = {}
 
--- The aim marker is a HintMark Ring now (studs, always on top, exactly on the point): Open = Mustard and wide, Held = Cream and tight.
+-- The aim marker is a HintMark Rect now (studs, always on top, exactly on the point): Open = Mustard and wide, Held = Cream and tight.
 function Marker.new(_folder: Folder, rules: Content.PrepWorldRules): Marker
 	const mark = HintMark.new()
 	local held = false
@@ -38,7 +38,7 @@ function Marker.new(_folder: Folder, rules: Content.PrepWorldRules): Marker
 			return
 		end
 		mark:SetColor(if held then Theme.Color.Cream else Theme.Color.Mustard)
-		mark:Show("Ring", point + normal * LIFT, rules.Marker * (if held then HELD_SCALE else OPEN_SCALE))
+		mark:Show("Rect", point + normal * LIFT, rules.Marker * (if held then HELD_SCALE else OPEN_SCALE))
 	end
 
 	const self = {} :: any

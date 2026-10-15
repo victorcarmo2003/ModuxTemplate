@@ -7,11 +7,8 @@ type Pack = CrewRig.Pack
 type Rig = { Connections: { RBXScriptConnection }, Pending: boolean }
 
 export type Public = {
-	CharacterConnection: RBXScriptConnection?,
 	Concealed: { [Model]: RBXScriptConnection },
 	Expressions: { [Model]: string },
-	HiddenFaces: { [Model]: boolean },
-	LowBand: boolean,
 	Preloaded: { [string]: boolean },
 	Rigs: { [Model]: Rig },
 	Warm: boolean,
@@ -21,7 +18,7 @@ export type Public = {
 	EndWarmup: (self: Public) -> (),
 	Warmup: (self: Public) -> (),
 	VariantOf: (self: Public, model: Model) -> string?,
-	Resolve: (self: Public, model: Model) -> (Pack, string?),
+	Resolve: (self: Public, model: Model) -> (Pack, string?, boolean),
 	SetExpression: (self: Public, model: Model, expression: string?) -> (),
 	Refresh: (self: Public, model: Model?) -> (),
 	Schedule: (self: Public, model: Model) -> (),
@@ -32,7 +29,6 @@ export type Public = {
 	Preload: (self: Public, model: Model) -> (),
 	Add: (self: Public, instance: Instance) -> (),
 	Remove: (self: Public, instance: Instance) -> (),
-	WatchCharacter: (self: Public, character: Model?) -> (),
 }
 
 return {}

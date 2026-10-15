@@ -41,6 +41,7 @@ type Controls = {
 	Toast: () -> boolean,
 	Insets: () -> boolean,
 	Plate: () -> boolean,
+	FlipCall: () -> number,
 }
 
 type Device = { Size: Vector2, Scale: number }
@@ -139,6 +140,8 @@ return UILabs.CreateVideStory({
 		Toast = false,
 		Insets = false,
 		Plate = true,
+		-- 0 = no call back; > 0 = a flip window is open on the Grill (the share of the window) while another tab is in front
+		FlipCall = UILabs.Slider(0, 0, 1, 0.1),
 	},
 }, function(props)
 	-- UI Labs types the control sources loosely; pin them to what the story reads.
@@ -263,6 +266,10 @@ return UILabs.CreateVideStory({
 				end,
 			},
 			Pad = controls.Pad,
+			Alert = function(): PrepShell.Alert | false
+				const share = controls.FlipCall()
+				return if share > 0 then { Tab = "Grill", Share = share, Id = 1, Text = Content.Prep.Texts.FlipAlert } else false
+			end,
 			Next = {
 				Label = function(): string
 					return if shownTab() == "Serve" then Content.Prep.Texts.Serve else Content.Prep.Texts.Next

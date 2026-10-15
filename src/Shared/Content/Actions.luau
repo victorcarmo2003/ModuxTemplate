@@ -25,7 +25,7 @@ export type Action = {
 
 return Table.new({
 	-- wave 1
-	{ Key = "open_sign", Text = "Open Shop", Hold = 0.3, Radius = 6, Requires = { Phase = { "Prep", "Open" } }, Night = "Any", Wave = 1 },
+	-- open_sign (the red "Open Shop" wall switch) left with TASK-284: the service window below opens and closes the shop
 	{ Key = "grill_place", Text = "Grill", Hold = 0, Radius = 7, Requires = {}, Night = "Any", Wave = 1 },
 	{ Key = "grill_collect", Text = "Collect", Hold = 0, Radius = 7, Requires = {}, Night = "Any", Wave = 1 },
 	{ Key = "bun_cut", Text = "Slice Bun", Hold = 0.5, Radius = 7, Requires = {}, Night = "Any", Wave = 1 },
@@ -37,7 +37,7 @@ return Table.new({
 		Radius = 7,
 		Requires = { Held = "hot_dog", NotHasTopping = true },
 		Night = "Any",
-		Wave = 1,
+		Wave = 3,
 	},
 	{ Key = "discard", Text = "Throw Away", Hold = 0.5, Radius = 7, Requires = { Held = "hot_dog" }, Night = "Any", Wave = 1 },
 	-- Customer prompts: 10 (was 8; owner playtest 2026-10-12, customers too far). The anchor rides on the customer rig.
@@ -45,11 +45,15 @@ return Table.new({
 	-- no Requires.Held: the server picks the exact hot dog from the hotbar, or answers with a hint (2026-10-12)
 	{ Key = "serve", Text = "Serve", Hold = 0, Radius = 10, Requires = {}, Night = "Any", Wave = 1 },
 	{ Key = "refuse", Text = "Refuse", Hold = 1, Radius = 10, Requires = {}, Night = "Any", Wave = 1 },
-	-- Cash register (Q-201, Provisional): drawer -> party Cash now. Anchor Prompt_Collect on the DRAWER / TRL-DRAWER model
-	-- (CashDeskService); only enabled while the drawer is open and holds money. Short hold, smaller radius than the
-	-- counter prompts so it never fights the ketchup / customer pills.
-	{ Key = "collect_cash", Text = "Collect Cash", Hold = 0.4, Radius = 5, Requires = {}, Night = "Any", Wave = 1 },
+	-- Tip jar (DEC-239, user decision 2026-10-13; was "collect_cash" on the register, Q-201): tips in the jar -> party Cash
+	-- now. Anchor Prompt_Collect on the TRL-TIPJAR model (TipJarService); only enabled while the shop takes entries and the
+	-- jar holds money. Short hold, smaller radius than the counter prompts so it never fights the ketchup / customer pills.
+	{ Key = "collect_tips", Text = "Collect Tips", Hold = 0.4, Radius = 5, Requires = {}, Night = "Any", Wave = 1 },
 	{ Key = "restock", Text = "Restock", Hold = 1, Radius = 7, Requires = { Held = "Package" }, Night = "Any", Wave = 1 },
+	-- Gift bowl (owner request 2026-10-14, Provisional): a topping that just unlocked comes as a CLOSED bowl; "Open" unwraps it and
+	-- fills it to capacity (KitchenService, Stations/Toppings). Anchor Prompt_Unwrap_<Suf> (made at runtime when the map has none)
+	-- TASK-277: a real "hold E" (1 s, was 0.5) on the gift-wrapped bowl (black Highlight, white outline)
+	{ Key = "topping_unwrap", Text = "Open", Hold = 1, Radius = 7, Requires = {}, Night = "Any", Wave = 1 },
 	{ Key = "buy_package", Text = "Buy {item} — ${price}", Hold = 0.5, Radius = 7, Requires = {}, Night = "Any", Wave = 1 },
 	{
 		Key = "bench_buy_upgrade",
@@ -85,14 +89,26 @@ return Table.new({
 	{ Key = "answer_phone", Text = "Answer", Hold = 0, Radius = 7, Requires = {}, Night = "Any", Wave = 2 },
 	-- the safe spot is a zone, not a prompt: the key exists for the enum only (content-data.md §6.9)
 	{ Key = "safe_spot", Text = "Safe Spot", Hold = 0, Radius = 7, Requires = {}, Night = "NightOnly", Wave = 3 },
-	-- trailer service window (FEAT-023, DEC-221): Prompt_Shutter next to the light switch; owner VehicleService,
-	-- PromptText "Close Window"/"Open Window" by state, cooldown 1 s in Validate (Q-173, placeholder until ui-text.md)
-	{ Key = "shutter_toggle", Text = "Close Window", Hold = 0.5, Radius = 7, Requires = {}, Night = "NightOnly", Wave = 3 },
+	-- trailer service window (FEAT-023, DEC-221): Prompt_Shutter, the lever next to the phone; owner VehicleService,
+	-- PromptText "Close Window"/"Open Window" by state, cooldown 1 s in Validate (Q-173, placeholder until ui-text.md).
+	-- TASK-284 (owner request 2026-10-14, Provisional): the ONLY shop lever, day and night. Open window = shop open, closed =
+	-- shop closed (Content.ShopWindow); opening it in Prep starts the selling phase. Phase list = when the lever works.
+	{
+		Key = "shutter_toggle",
+		Text = "Close Window",
+		Hold = 0.5,
+		Radius = 7,
+		Requires = { Phase = { "Prep", "Open", "Closing", "Night" } },
+		Night = "Any",
+		Wave = 1,
+	},
 
 	-- Trailer door (user request 2026-10-11, Provisional; owner TrailerDoorService): the back door only opens by prompt.
 	-- Exit Trailer inside by the door, Enter Trailer outside by the steps; both only while the trailer is the vehicle in use.
-	{ Key = "trailer_exit", Text = "Open door", Hold = 0, Radius = 1.4, Requires = {}, Night = "Any", Wave = 3 },
-	{ Key = "trailer_enter", Text = "Open door", Hold = 0, Radius = 1.4, Requires = {}, Night = "Any", Wave = 3 },
+	-- Radius 3.6 x2 < ~7.65 studs between the two anchors (TrailerDoorService): the spheres must not overlap, or the
+	-- menu lists the same "Open door" twice (both actions have the same text since 2026-10-12).
+	{ Key = "trailer_exit", Text = "Open door", Hold = 0, Radius = 3.6, Requires = {}, Night = "Any", Wave = 3 },
+	{ Key = "trailer_enter", Text = "Open door", Hold = 0, Radius = 3.6, Requires = {}, Night = "Any", Wave = 3 },
 
 	-- Pad tables (TASK-144; FEAT-037, UPG-008/009; Q-178 A, Q-181 A). Owner SeatingService; texts placeholder until
 	-- ui-text.md (TASK-150). buy_in_place: "{item}" = "Table" / the upgrade name, "{price}" filled by the owner
@@ -104,6 +120,10 @@ return Table.new({
 	{ Key = "serve_table", Text = "Serve Table", Hold = 0, Radius = 8, Requires = {}, Night = "Any", Wave = 3 },
 
 	-- Focused prep mode (DEC-223; prep-mode.md §2): Prompt_Work on each Station_n of the trailer; owner PrepService.
-	-- Tap, selling phases only; the server revalidates seat, phase and the other station of the player.
-	{ Key = "prep_work", Text = "Work", Hold = 0, Radius = 5, Requires = { Phase = { "Open", "Night" } }, Night = "Any", Wave = 3 },
+	-- Tap, selling phases and the day Last call (Closing, DEC-240); the server revalidates seat, phase and the other station.
+	{ Key = "prep_work", Text = "Work", Hold = 0, Radius = 5, Requires = { Phase = { "Open", "Closing", "Night" } }, Night = "Any", Wave = 3 },
+
+	-- Security cameras (FEAT-040, TASK-285; owner request 2026-10-14, Provisional): Prompt_Cameras on the CCTV monitor of the
+	-- trailer (SecurityService makes it). Opens the camera view on this client (SecurityOpen) and freezes the body while watching.
+	{ Key = "watch_cameras", Text = "Cameras", Hold = 0, Radius = 6, Requires = {}, Night = "Any", Wave = 3 },
 } :: { Action })

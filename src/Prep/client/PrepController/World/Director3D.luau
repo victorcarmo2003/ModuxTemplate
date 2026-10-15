@@ -55,13 +55,16 @@ export type Options = {
 	Sfx: (key: string, at: Vector3?) -> (),
 	-- the results
 	OnCut: (score: number) -> (),
-	OnTopping: (key: string, score: number, amount: number) -> (),
+	-- path = the sauce strokes as drawn, in bun space (trace only; the hot dog keeps the line, owner request 2026-10-14)
+	OnTopping: (key: string, score: number, amount: number, path: { { Vector2 } }?) -> (),
 	-- The selected sauce asks to be put down (Esc, a press on empty space): the stage clears the active tool.
 	Deselect: () -> (),
 	-- The pointer went down on a world target (a bowl, the board...): not an empty press.
 	OverTarget: () -> boolean,
 	-- The plate can still take the topping (open, placed, no Finish on its way): a selection left behind lands only then.
 	CanLand: () -> boolean,
+	-- A gesture that did not land, said to the player (toast + error sound; owner report 2026-10-14: no silent refusal)
+	Refuse: (text: string) -> (),
 }
 
 export type Director = {
@@ -399,7 +402,6 @@ function Director3D.new(options: Options): Director
 		const minStep = 0.012 -- bun heights between two recorded points
 		strokes:SetDots(guideDots())
 		tool:SetFill(1)
-		view:SetProgress(0)
 		const segments: { { Vector2 } } = {} -- the strokes already lifted
 		local points: { Vector2 }? = nil -- the stroke being poured
 		local down = false
@@ -434,9 +436,13 @@ function Director3D.new(options: Options): Director
 			down = false
 			const coverage, excess = trace.MeasureAll(segments :: { { any } }, params)
 			strokes:SetDots(nil)
-			view:SetProgress(1)
 			tool:SetFill(0)
-			options.OnTopping(key, Score.Value(cfg, key, coverage, excess, options.Assist()), math.clamp(coverage / 100, 0.25, 1))
+			options.OnTopping(
+				key,
+				Score.Value(cfg, key, coverage, excess, options.Assist()),
+				math.clamp(coverage / 100, 0.25, 1),
+				table.clone(segments)
+			)
 		end
 		local function commit(): boolean
 			if ended then
@@ -450,7 +456,6 @@ function Director3D.new(options: Options): Director
 			-- too little to count: the stroke is taken back, the tool goes
 			strokes:Remove(key)
 			strokes:SetDots(nil)
-			view:SetProgress(nil)
 			ended = true
 			alive = false
 			return false
@@ -501,7 +506,6 @@ function Director3D.new(options: Options): Director
 		end
 		local function refresh()
 			tool:SetFill(1 - math.clamp(amount() / meter.Max, 0, 1))
-			view:SetProgress(strokes:Progress())
 		end
 
 		add(gestures:Arm("Drag", bunRegion, { Start = recordRegion }, function(event: Event)
@@ -598,7 +602,13 @@ function Director3D.new(options: Options): Director
 			strokes:SetDots(nil)
 			view:SetProgress(1)
 			tool:SetFill(0)
-			options.OnTopping(key, Score.Value(cfg, key, coverage, excess, options.Assist()), math.clamp(coverage / 100, 0.25, 1))
+			-- hold mode pours along the guide: the line is the path up to where it stopped
+			options.OnTopping(
+				key,
+				Score.Value(cfg, key, coverage, excess, options.Assist()),
+				math.clamp(coverage / 100, 0.25, 1),
+				{ pathUpTo(amount) }
+			)
 		end
 		local function clear()
 			pressed = false
@@ -648,19 +658,26 @@ function Director3D.new(options: Options): Director
 		return { Aspect = aspect, X = build.Groove.X, Y = build.Groove.Y, MinPoints = rows.slide.MinPoints, Settle = SETTLE }
 	end
 
+	-- The point of a model topping's release is on the bun (a little slack round the edge): it lands there, graded by distance
+	local function onBun(uv: Vector2): boolean
+		const slack = build.DropSlack
+		return uv.X >= -slack and uv.X <= 1 + slack and uv.Y >= -slack and uv.Y <= 1 + slack
+	end
+
 	local function armSlide(key: string, holdMode: boolean, held: boolean)
 		local ended = false
 		local function land(points: { any })
 			const error = slide.Measure(points, slideParams())
 			pressed = false
-			if error <= build.Magnet then
-				ended = true
-				const score = Score.Value(cfg, key, error, nil, options.Assist())
-				tool:Set("None", "")
-				view:SetTopping(key, GROOVE, 1)
-				options.Sfx("hotdog_assemble", plane.Frame.Position)
-				options.OnTopping(key, score, 1)
-			end
+			-- owner report 2026-10-14 (the cheese "does not go"): a drop anywhere on the bun lands, snapped to the groove; inside the
+			-- Magnet it is the precise one, farther out the distance only lowers the grade
+			ended = true
+			const score = Score.Value(cfg, key, error, nil, options.Assist())
+			note(`slide land error {string.format("%.1f", error)} magnet {build.Magnet} score {score}`)
+			tool:Set("None", "")
+			view:SetTopping(key, GROOVE, 1)
+			options.Sfx("hotdog_assemble", plane.Frame.Position)
+			options.OnTopping(key, score, 1)
 		end
 		if not holdMode then
 			add(gestures:Arm("Drag", bunRegion, { Row = "slide", Start = matRegion, Held = held }, function(event: Event)
@@ -669,8 +686,19 @@ function Director3D.new(options: Options): Director
 				end
 				if event.Phase == "Begin" then
 					pressed = true
-				elseif event.Phase == "End" and event.Valid and event.Points ~= nil then
-					land(table.clone(event.Points) :: { any })
+				elseif event.Phase == "End" then
+					pressed = false
+					const points = table.clone((event.Points or {}) :: { any })
+					if onBun(event.Position) then
+						-- a click without drag (too few samples for the slide row) lands at the click: tap-to-add
+						while #points < rows.slide.MinPoints do
+							table.insert(points, event.Position)
+						end
+						land(points)
+					elseif event.Length > build.DragMin then
+						-- dragged and let go off the bun: say so (a plain click on a bowl only selects, silently)
+						options.Refuse(build.Texts.DropOnBun)
+					end
 				elseif event.Phase ~= "Move" then
 					pressed = false
 				end
@@ -680,6 +708,10 @@ function Director3D.new(options: Options): Director
 		local settled = false
 		add(gestures:Arm("Hold", bunRegion, { Hold = build.HoldPlace, Start = matRegion, Held = held }, function(event: Event)
 			if event.Phase == "End" or event.Phase == "Cancel" then
+				if event.Phase == "End" and not ended and not settled and event.Inside then
+					-- let go before the slice settled: say how (no silent miss)
+					options.Refuse(build.Texts.HoldLonger)
+				end
 				settled = false
 				pressed = false
 				return
@@ -814,6 +846,10 @@ function Director3D.new(options: Options): Director
 			else
 				pressed = false
 				view:SetTopping(key, nil, 0)
+				if event.Phase == "End" and event.Inside then
+					-- a click on the bun: the potato sticks need a hold (no silent miss)
+					options.Refuse(build.Texts.HoldLonger)
+				end
 			end
 		end))
 	end

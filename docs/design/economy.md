@@ -11,7 +11,7 @@ Tudo é tabela de dados; mudar número não exige DEC, mudar regra exige.
 | Recurso | Escopo | Persistência | Origem |
 |---|---|---|---|
 | Money | party | só na run | DEC-033, DEC-059 |
-| Gaveta do caixa | party, por turno | só no turno; depositada no resumo | DEC-050 |
+| Pote de gorjetas (era a gaveta do caixa) | party, por turno | só no turno; o que sobra é depositado no resumo. **Vendas vão direto ao Money** | DEC-238, DEC-239 (emendam DEC-050) |
 | Stock | party | só na run; passa entre turnos | DEC-049 |
 | Gemas | por jogador | **entre runs** (DataStore) | DEC-035, DEC-070 |
 | Sanidade | por jogador | só na noite | DEC-056 |
@@ -36,7 +36,7 @@ Dinheiro é inteiro **[DEC-072]**. Sem reputação **[DEC-051]**.
 | Sumidouros | Valor |
 |---|---|
 | Pacotes do mercado (prateleiras do Mart, nunca rotacionam) | `items.md` ITM-011 a ITM-019 |
-| Upgrades (bancada do Mart, sempre à venda) | $790 (Grill $210, Cooler $170, Counter $230, Lock $80, Lights $100) **[DEC-101, DEC-106]** |
+| Upgrades (bancada do Mart, sempre à venda) | $790 (Grill $210, Cooler $170, Counter $230, Lock $80, Lights $100) **[DEC-101, DEC-106]**. **Modo anomalia (2026-10-14, Provisório):** $530 = Grill $210 + **Storage $220** ($40/$70/$110, era o Cooler) + Lights $100; Counter, Lock e mesas fora de venda; o Gear Stand abre só no fim do 1º turno e a lição das 18h completa o caixa até **$100** se faltar para o Storage (`Q-260`, `Q-262`) |
 | Trailer (compra fixa no trailer) | $300 × party **[DEC-047, DEC-107]** |
 | Rescue Whistle (ITM-021; slot especial, 15%/turno) | $200 × party **[DEC-100, DEC-108, DEC-129]** |
 | Ladrão | floor(50%/30% da gaveta) **[DEC-050]** |

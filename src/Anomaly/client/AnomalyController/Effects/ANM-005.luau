@@ -9,13 +9,15 @@
 	  - placeholder raincoat until AST-059 (TASK-125): yellow `#F2C230` coat over the torso, sleeves, green boots,
 	    local parts welded to the limbs. The face stays visible (full, kind face: not N1). Skipped when the rig
 	    already wears a raincoat piece of the kit (an `Accessory`/Outfit containing "raincoat");
-	  - drips: light blue drops from the coat hem, Rate 4 in total (style guide §10), on a dry night.
+	  - drips (owner request 2026-10-14, Provisional): water-blue square drops on every R6 body part falling with gravity,
+    plus a ground emitter at her feet that spreads flat puddle quads; both stop (and die out) when the Variant leaves.
 	  - cue `raincoat_drip` (she reaches Q1): a puddle under her that grows to Ø 2.5 while she stands there, and dries
 	    out a few seconds after she leaves. A late joiner (Mount long after the start) gets the puddle under her if she
 	    is standing still.
 	No rain over the trailer and no "Thank you, dear.": DEC-195 keeps them out (no cue for them in Content).
 	Nothing points at her (§4.4): the water is the sign.
 ]]
+local Debris = game:GetService("Debris")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Effect = require(script.Parent.Parent.Effect)
@@ -24,10 +26,21 @@ local Kit = require(script.Parent.Kit.CustomerActor)
 const VARIANT = "raincoat"
 const COAT = Color3.fromHex("#F2C230") -- reserved raincoat yellow (style guide §2.4)
 const BOOTS = Color3.fromHex("#5FA36A")
-const DROP = Color3.fromHex("#9FD3F0") -- light blue drops (§10)
+const DROP = Color3.fromHex("#6FB6EA") -- water blue drops (§10)
 const PUDDLE = Color3.fromHex("#4C6A8A") -- wet ground at night (same as the ending's puddle)
-const DROP_TEXTURE = "rbxasset://textures/particles/sparkles_main.dds" -- built-in until T_VFX_Anomaly (AST-095)
-const DROP_RATE = 4 -- total (§10), split over the hem emitters
+-- Assets/textures/vfx/T_VFX_Square.png (white 64x64 square), uploaded 2026-10-14.
+const SQUARE_TEXTURE = "rbxassetid://136202879109639"
+const DROP_NAME = "RaincoatDrips"
+const SPREAD_NAME = "RaincoatSpread"
+const BODY = { "Head", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg" }
+const DROP_RATE = 1.5 -- per body part (6 parts: a constant trickle, ~9/s in total)
+const DROP_GRAVITY = 30 -- studs/s^2 down
+const DROP_SQUASH = -0.6 -- ParticleEmitter.Squash: stretches the square into a drop (flip the sign if it reads wide)
+const PUDDLE_WATER = Color3.fromHex("#5C86B0") -- water spreading on the ground
+const SPREAD_RATE = 5
+const EMIT_NEAR = 80 -- studs from the camera: farther away the emitters are off
+const EMIT_STEP = 0.5
+const EMIT_LINGER = 2.5 -- s: longest particle life + margin before the emitters are destroyed
 const LOCAL_TAG = "RaincoatLocal" -- attribute on the local pieces
 
 const PUDDLE_NAME = "RaincoatPuddle"
@@ -96,44 +109,125 @@ local function dressCoat(model: Model): { BasePart }
 	return parts
 end
 
-local function dripper(host: BasePart, offset: Vector3, rate: number): Attachment
-	const attachment = Instance.new("Attachment")
-	attachment.Name = "RaincoatDrip"
-	attachment.Position = offset
+-- Water emitters (owner request 2026-10-14, Provisional): the Raincoat Lady is a wet sheep dripping on a dry night.
+-- Every R6 body part drips; one more emitter at her feet spreads a puddle on the ground. Presentation only.
+local function dripEmitter(host: BasePart): ParticleEmitter
 	const emitter = Instance.new("ParticleEmitter")
-	emitter.Name = "Drips"
-	emitter.Texture = DROP_TEXTURE
+	emitter.Name = DROP_NAME
+	emitter.Texture = SQUARE_TEXTURE
 	emitter.Color = ColorSequence.new(DROP)
-	emitter.LightEmission = 0.2
-	emitter.Transparency = NumberSequence.new(0.15)
-	emitter.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.12), NumberSequenceKeypoint.new(1, 0.08) })
-	emitter.Lifetime = NumberRange.new(0.45, 0.6)
-	emitter.Speed = NumberRange.new(0, 0.3)
-	emitter.SpreadAngle = Vector2.new(25, 25)
+	emitter.LightEmission = 0.1
+	emitter.LightInfluence = 1
+	emitter.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.1),
+		NumberSequenceKeypoint.new(0.6, 0.25),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	emitter.Size = NumberSequence.new(0.1)
+	emitter.Squash = NumberSequence.new(DROP_SQUASH)
+	emitter.Lifetime = NumberRange.new(0.5, 0.8)
+	emitter.Speed = NumberRange.new(0, 0.4)
+	emitter.SpreadAngle = Vector2.new(20, 20)
 	emitter.EmissionDirection = Enum.NormalId.Bottom
-	emitter.Acceleration = Vector3.new(0, -24, 0)
-	emitter.Rate = rate
-	emitter.Parent = attachment
-	attachment.Parent = host
-	return attachment
+	emitter.Acceleration = Vector3.new(0, -DROP_GRAVITY, 0)
+	emitter.Rate = DROP_RATE
+	emitter.Parent = host -- Box shape of the part: drops are born inside the body
+	return emitter
 end
 
--- Coat + drips while the rig is the Raincoat Lady.
+-- Puddle on the ground at her feet: flat quads that open outward and fade (continuous while she is the Lady).
+local function spreadEmitter(model: Model, root: BasePart): ParticleEmitter
+	-- feet height in root space (lowest leg bottom), so it follows the rig scale
+	local feet = -root.Size.Y / 2 - 2
+	for _, name in { "Left Leg", "Right Leg" } do
+		const leg = Kit.Limb(model, name)
+		if leg ~= nil then
+			feet = math.min(feet, root.CFrame:PointToObjectSpace(leg.Position - Vector3.new(0, leg.Size.Y / 2, 0)).Y)
+		end
+	end
+	const attachment = Instance.new("Attachment")
+	attachment.Name = "RaincoatSpread"
+	attachment.Position = Vector3.new(0, feet + 0.08, 0)
+	attachment.Parent = root
+
+	const emitter = Instance.new("ParticleEmitter")
+	emitter.Name = SPREAD_NAME
+	emitter.Texture = SQUARE_TEXTURE
+	emitter.Color = ColorSequence.new(PUDDLE_WATER)
+	emitter.LightEmission = 0
+	emitter.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(0.15, 0.55),
+		NumberSequenceKeypoint.new(0.6, 0.7),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	emitter.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 2.2) })
+	emitter.Orientation = Enum.ParticleOrientation.VelocityParallel -- plane follows the outward (horizontal) velocity
+	emitter.Shape = Enum.ParticleEmitterShape.Disc
+	emitter.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+	emitter.ShapeInOut = Enum.ParticleEmitterShapeInOut.Outward
+	emitter.EmissionDirection = Enum.NormalId.Top
+	emitter.Lifetime = NumberRange.new(1.6, 2.2)
+	emitter.Speed = NumberRange.new(0.5, 1)
+	emitter.Drag = 1.2 -- very soft slowdown: opens like water spreading
+	emitter.SpreadAngle = Vector2.new(0, 0)
+	emitter.RotSpeed = NumberRange.new(0)
+	emitter.Rate = SPREAD_RATE
+	emitter.Parent = attachment
+	return emitter
+end
+
+-- Drips on all 6 body parts + the ground puddle, while the rig is the Raincoat Lady.
 local function dress(model: Model): Kit.Undo
 	const made: { Instance } = {}
+	const emitters: { ParticleEmitter } = {}
 	for _, part in dressCoat(model) do
 		table.insert(made, part)
 	end
-	const torso = Kit.Limb(model, "Torso") or Kit.Root(model)
-	if torso ~= nil then
-		const hem = -torso.Size.Y * 0.95
-		const side = torso.Size.X * 0.4
-		table.insert(made, dripper(torso, Vector3.new(-side, hem, 0), DROP_RATE / 2))
-		table.insert(made, dripper(torso, Vector3.new(side, hem, 0), DROP_RATE / 2))
+	for _, name in BODY do
+		const limb = Kit.Limb(model, name)
+		if limb ~= nil then
+			const emitter = dripEmitter(limb)
+			table.insert(emitters, emitter)
+			table.insert(made, emitter)
+		end
 	end
+	const root = Kit.Root(model)
+	if root ~= nil then
+		const spread = spreadEmitter(model, root)
+		table.insert(emitters, spread)
+		table.insert(made, spread)
+		table.insert(made, spread.Parent :: Instance)
+	end
+
+	-- performance: emitters only run while the camera is near (re-checked twice a second)
+	local running = true
+	task.spawn(function()
+		while running do
+			const camera = workspace.CurrentCamera
+			const anchor = Kit.Root(model)
+			if camera ~= nil and anchor ~= nil then
+				const near = (camera.CFrame.Position - anchor.Position).Magnitude <= EMIT_NEAR
+				for _, emitter in emitters do
+					emitter.Enabled = near
+				end
+			end
+			task.wait(EMIT_STEP)
+		end
+	end)
+
 	return function()
+		running = false
+		-- stop emitting and let the live particles die, then clean up (Fade.Out would clear them at once)
+		for _, emitter in emitters do
+			emitter.Enabled = false
+		end
 		for _, instance in made do
-			instance:Destroy()
+			if instance:IsA("ParticleEmitter") or instance:IsA("Attachment") then
+				Debris:AddItem(instance, EMIT_LINGER)
+			else
+				instance:Destroy()
+			end
 		end
 	end
 end

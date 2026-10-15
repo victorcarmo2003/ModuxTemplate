@@ -1,7 +1,7 @@
 # Roteiro do agente: teste de fumaça no Studio
 
 Código: `src/Dev/server/DevService/Commands/Smoke.luau` (comando `/dev smoke`). Muda o estado da run (dia, noite, veículo, mesas, tutorial): só em Play descartável, o place não é salvo.
-Duração: cerca de 30 s no servidor. Passos: boot, intro skip, tutorial reset e `tutorial step` (phone, order, grill, assemble, serve, mart, auto), `day 2`, spawn + Take Order, `seating buy` + `customer sit`, `night 1`, café + sanidade, anomalia ANM-002 (trigger e stop pelo `ShowcaseService`), `trailer swap`, mesas do trailer, limpeza.
+Duração: cerca de 30 s no servidor. Passos: boot, intro skip, tutorial reset e `tutorial step` (phone, order, grill, assemble, serve, mart, auto), `day 2`, spawn + Take Order, `seating buy` + `customer sit`, `night 1`, café + sanidade, anomalia ANM-002 (trigger e stop pelo `ShowcaseService`), `trailer swap`, mesas do trailer, gorjetas + ledger (`economy ledger` precisa fechar `N/N ok`), limpeza.
 
 ## Passos
 
@@ -26,7 +26,7 @@ Resultado a anotar no registro do dia (seção Smoke): `SMOKE: N ok, M falhas, K
 ## Falhas conhecidas / dicas
 
 - `no player in the server`: o Play abriu sem cliente; pare e reinicie.
-- `customer take order`: precisa da fase Open; o passo faz `skip` sozinho. Falhar aqui costuma ser fila/NpcNodes.
+- `customer take order`: precisa da fase Open; o passo faz `skip` sozinho. Falhar aqui costuma ser fila/NpcNodes. A fila padrão tem 1 vaga (DEC-241): `skipped_queue_full` não é falha, o passo espera quem já está no balcão.
 - `day 2` depois de `tutorial reset` é de propósito: o smoke não testa o fluxo do tutorial até o fim, só os pulos.
 
 Última execução real (2026-10-12, Play no Studio): `SMOKE: 13 ok, 0 failures, 0 warnings`. No cliente: só `NotEnoughQuota` (áudio) e `LoadQueue ... still running after 8 s`.

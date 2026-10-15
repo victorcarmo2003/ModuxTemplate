@@ -21,7 +21,7 @@
     "editor.formatOnSave": true,
     "files.autoSave": "afterDelay",
     "files.autoSaveDelay": 300,
-    "syncteam.port": 1550,
+    "syncteam.port": 1400,
     "discord.enabled": true,
     "discord.idleTimeout": 0,
 }

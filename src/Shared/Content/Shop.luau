@@ -6,9 +6,13 @@
 -- not on this experience fails at the client's PromptProductPurchase, never on the server.
 -- Robux = SUGGESTED price for the Creator Hub and a display fallback only. The real price is the one set on the Creator
 -- Hub (architecture.md §10.1): the client reads it with MarketplaceService:GetProductInfo(id, Enum.InfoType.Product).
--- Classes: one Developer Product per class, not a Game Pass (data.md §1.7: ownership lives in profile.Classes for both
--- currencies; a product bought for a class already owned turns into its gem price, nothing is lost).
--- Keys are persisted nowhere (receipts store the PurchaseId) but ClassProducts.Key must be a Content.Classes key.
+-- Classes: one GAME PASS per class (TASK-291; owner request 2026-10-14, Provisional; was a Developer Product).
+-- PassId = Game Pass id from the Creator Hub, 0 = not created yet (ClassBuy answers "Unavailable"). ShopService unlocks
+-- the class in profile.Classes when the pass is bought (PromptGamePassPurchaseFinished) and on every join for an owner
+-- of the pass (UserOwnsGamePassAsync, cached); a class already in the profile (gems, code) is never written twice.
+-- The real pass price: GetProductInfo(id, Enum.InfoType.GamePass). GamePasses.Key must be a Content.Classes key.
+-- Shop icons (one per key, not uploaded yet): Assets/textures/ui/shop/<Key>.png (+ .svg source), e.g. util_scare.png,
+-- class_fox.png, gems_50.png, cash_100.png.
 local Table = require(script.Parent.Table)
 
 export type GemPack = {
@@ -19,39 +23,179 @@ export type GemPack = {
 	Name: string, -- placeholder (narrative-writer); also the suggested Creator Hub product name
 }
 
-export type ClassProduct = {
+export type GamePass = {
 	Key: string, -- Content.Classes key; only InMvp classes are sold
+	PassId: number, -- Game Pass id; 0 = not created on the Creator Hub yet
+	Robux: number, -- suggested price (Creator Hub), display fallback
+	Name: string, -- suggested Creator Hub pass name
+}
+
+-- Kept for the Content type export (Content.ShopClassProduct): a class is sold as a GamePass now.
+export type ClassProduct = GamePass
+
+-- In-run utilities (TASK-290; owner request 2026-10-14, Provisional): Developer Products bought from the HUD cart (key B).
+-- Granted by ShopUtilityService on the Roblox receipt (server authority); the client only picks a target first (ShopPick).
+--   Kind     what the grant does (ShopUtilityService):
+--            Radar    marks the anomalies of the night for the buyer for Amount s (customers get an outline)
+--            Scare    cartoon jumpscare (Mild, DEC-256) on one mate chosen by the buyer (Target = Mate)
+--            Cash     party Cash += Amount (EconomyService:TopUp)
+--            Restock  one ingredient to its capacity (Target = Ingredient; KitchenService:StockFree)
+--            Pantry   every open ingredient to its capacity
+--            Coffee   sanity to full at night; by day a coffee to keep (ItemService:Give)
+--            Revive   +1 profile.ReviveCredits (DEC-117; spent by the wave 4 ReviveService)
+--   Target   what the buyer picks before the prompt ("Mate" | "Ingredient"); nil = nothing to pick
+--   Night    only sold while a night shift runs (the client disables the card by day)
+export type UtilityKind = "Radar" | "Scare" | "Cash" | "Restock" | "Pantry" | "Coffee" | "Revive"
+export type UtilityTarget = "Mate" | "Ingredient"
+
+export type Utility = {
+	Key: string,
 	ProductId: number, -- 0 = not created on the Creator Hub yet
 	Robux: number, -- suggested price (Creator Hub), display fallback
+	Name: string, -- card title; also the suggested Creator Hub product name
+	Text: string, -- one line under the title
+	Icon: string, -- Icons name ("" = none)
+	Kind: UtilityKind,
+	Amount: number, -- Radar: seconds; Cash: dollars; others 0
+	Target: UtilityTarget?,
+	Night: boolean,
 }
 
 export type Shop = {
 	GemPacks: Table.Table<GemPack>,
-	ClassProducts: Table.Table<ClassProduct>,
+	GamePasses: Table.Table<GamePass>,
+	Utilities: Table.Table<Utility>,
 }
 
 -- Gem packs: bigger pack = cheaper gem (1.98 -> 1.28 R$/gem). Reference: a full solo run earns ~375 gems in ~6.4 h
 -- (economy.md §6); tier 1/2/3 classes cost 45/120/180 gems (DEC-070).
 const gemPacks: { GemPack } = {
-	{ Key = "gems_50", ProductId = 0, Gems = 50, Robux = 99, Name = "Handful of Gems" },
-	{ Key = "gems_130", ProductId = 0, Gems = 130, Robux = 229, Name = "Pouch of Gems" },
-	{ Key = "gems_300", ProductId = 0, Gems = 300, Robux = 449, Name = "Crate of Gems" },
-	{ Key = "gems_700", ProductId = 0, Gems = 700, Robux = 899, Name = "Truckload of Gems" },
+	{ Key = "gems_50", ProductId = 3718682061, Gems = 50, Robux = 99, Name = "Handful of Gems" },
+	{ Key = "gems_130", ProductId = 3718682070, Gems = 130, Robux = 229, Name = "Pouch of Gems" },
+	{ Key = "gems_300", ProductId = 3718682077, Gems = 300, Robux = 449, Name = "Crate of Gems" },
+	{ Key = "gems_700", ProductId = 3718682082, Gems = 700, Robux = 899, Name = "Truckload of Gems" },
 }
 
--- Direct class purchase: a bit cheaper than buying the same gems in the smallest pack (tier 1: 79 vs ~99 for 50 gems).
--- Panda and Lion are not InMvp (DEC-186): no product until the first update.
-const classProducts: { ClassProduct } = {
-	{ Key = "class_rabbit", ProductId = 0, Robux = 79 }, -- tier 1, 45 gems
-	{ Key = "class_cat", ProductId = 0, Robux = 79 }, -- tier 1, 45 gems
-	{ Key = "class_bear", ProductId = 0, Robux = 79 }, -- tier 1, 45 gems
-	{ Key = "class_fox", ProductId = 0, Robux = 199 }, -- tier 2, 120 gems
-	{ Key = "class_owl", ProductId = 0, Robux = 199 }, -- tier 2, 120 gems
+-- Class Game Passes (TASK-291): a bit cheaper than buying the same gems in the smallest pack (tier 1: 79 vs ~99 for 50
+-- gems). Panda and Lion are not InMvp (DEC-186): no pass until the first update.
+const gamePasses: { GamePass } = {
+	{ Key = "class_rabbit", PassId = 2036210519, Robux = 79, Name = "Rabbit Crew" }, -- tier 1, 45 gems
+	{ Key = "class_cat", PassId = 2037014530, Robux = 79, Name = "Cat Crew" }, -- tier 1, 45 gems
+	{ Key = "class_bear", PassId = 2037116542, Robux = 79, Name = "Bear Crew" }, -- tier 1, 45 gems
+	{ Key = "class_fox", PassId = 2040074273, Robux = 199, Name = "Fox Crew" }, -- tier 2, 120 gems
+	{ Key = "class_owl", PassId = 2037164541, Robux = 199, Name = "Owl Crew" }, -- tier 2, 120 gems
+}
+
+-- Utilities (TASK-290, Provisional; Q-271 to Q-273 in open-questions.md). Cheap impulse buys, 15..149 R$. Cash packs
+-- follow the run economy (a Storage level costs $40..$110, economy.md): $100 is a good night, never a whole run.
+const utilities: { Utility } = {
+	{
+		Key = "util_scare",
+		ProductId = 3718677086,
+		Robux = 50,
+		Name = "Scare a Friend",
+		Text = "Boo! A cartoon jumpscare on a mate",
+		Icon = "Ui/megaphone",
+		Kind = "Scare",
+		Amount = 0,
+		Target = "Mate",
+		Night = false,
+	},
+	{
+		Key = "util_radar",
+		ProductId = 3718677699,
+		Robux = 20,
+		Name = "Anomaly Radar",
+		Text = "Marks every anomaly for 90 s",
+		Icon = "Ui/spectate",
+		Kind = "Radar",
+		Amount = 90,
+		Night = true,
+	},
+	{
+		Key = "util_coffee",
+		ProductId = 3718677756,
+		Robux = 10,
+		Name = "Hot Coffee",
+		Text = "Sanity back to full",
+		Icon = "Item/coffee",
+		Kind = "Coffee",
+		Amount = 0,
+		Night = false,
+	},
+	{
+		Key = "util_restock",
+		ProductId = 3718682098,
+		Robux = 25,
+		Name = "Wild Restock",
+		Text = "Fills any ingredient you pick",
+		Icon = "Item/pack_sausages",
+		Kind = "Restock",
+		Amount = 0,
+		Target = "Ingredient",
+		Night = false,
+	},
+	{
+		Key = "util_pantry",
+		ProductId = 3718682101,
+		Robux = 59,
+		Name = "Full Pantry",
+		Text = "Fills every ingredient",
+		Icon = "Upgrade/cooler/3",
+		Kind = "Pantry",
+		Amount = 0,
+		Night = false,
+	},
+	{
+		Key = "util_revive",
+		ProductId = 0, -- created on the Creator Hub as 3718682106; kept at 0 until VitalService:Revive exists (Q-273)
+		Robux = 39,
+		Name = "Revive Kit",
+		Text = "Saved for when you go down",
+		Icon = "Item/revive_kit",
+		Kind = "Revive",
+		Amount = 0,
+		Night = false,
+	},
+	{
+		Key = "cash_100",
+		ProductId = 3718682111,
+		Robux = 29,
+		Name = "Tip Bag",
+		Text = "+$100 for the crew",
+		Icon = "Hud/coin",
+		Kind = "Cash",
+		Amount = 100,
+		Night = false,
+	},
+	{
+		Key = "cash_300",
+		ProductId = 3718682118,
+		Robux = 69,
+		Name = "Cash Stack",
+		Text = "+$300 for the crew",
+		Icon = "Ui/cash",
+		Kind = "Cash",
+		Amount = 300,
+		Night = false,
+	},
+	{
+		Key = "cash_800",
+		ProductId = 3718682122,
+		Robux = 149,
+		Name = "Money Truck",
+		Text = "+$800 for the crew",
+		Icon = "Ui/tip_jar",
+		Kind = "Cash",
+		Amount = 800,
+		Night = false,
+	},
 }
 
 const shop: Shop = {
 	GemPacks = Table.new(gemPacks),
-	ClassProducts = Table.new(classProducts),
+	GamePasses = Table.new(gamePasses),
+	Utilities = Table.new(utilities),
 }
 
 return Table.record(shop)

@@ -9,11 +9,18 @@
 --                 d <= 4.5   Ghost   75 % see-through (a faint silhouette that cannot cover the board)
 --                 else       Normal
 --               a 0.4 stud hysteresis keeps a rig on the border from flickering; every change fades in 0.15 s
---   other players in a neighbouring station: the same rule, plus: inside 5 studs of the camera they are Cut
+--   other players: not judged here, see Mates.luau (whole character hidden; a colleague seated in the trailer keeps one arm
+--                  visible with his name and colour)
+--   inside / outside the trailer: when the player (his root part, else the camera) sits inside the bounding box of the current `Vehicle` Model (CollectionService
+--                  tag "Vehicle", grown 1 stud) the customers (NPCs with attribute `NpcId` whose root is OUTSIDE that box: the
+--                  line at the window, the street) are never cut nor ghosted; crew rigs inside the box are still judged. With
+--                  the camera outside the box (or no Vehicle Model) every NPC is judged as before.
 -- Anomaly safe: hiding is local and only inside this frame; a hidden NPC is not "seen" (the gaze of the server is the camera
 -- look, which the Prep mode does not send). Nothing glows or points at an anomalous NPC. Everything is restored in Release.
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
+
+local Mates = require(script.Parent.Mates)
 
 export type Rig = {
 	-- Starts hiding the own rig and judging the NPCs against `camera` -> `focus`.
@@ -49,7 +56,9 @@ const FADE = 0.15
 const CUT_LIMIT = 2.5
 const GHOST_LIMIT = 4.5
 const HYSTERESIS = 0.4
-const NEIGHBOUR_REACH = 5
+const VEHICLE_TAG = "Vehicle"
+const VEHICLE_GROW = 1 -- studs
+const BOX_REFRESH = 2 -- s: the bounding boxes are re-read
 const WINDOW_DEPTH = 8
 const JUDGE_INTERVAL = 0.1
 const PARTS_REFRESH = 2
@@ -98,7 +107,20 @@ local function write(parts: { BasePart }, value: number)
 	end
 end
 
+-- Bounding boxes of the Vehicle Models (CFrame + size), cached.
+type Box = { Cframe: CFrame, Size: Vector3 }
+
+local function inside(box: Box, point: Vector3): boolean
+	const local_ = box.Cframe:PointToObjectSpace(point)
+	const half = box.Size / 2 + Vector3.one * VEHICLE_GROW
+	return math.abs(local_.X) <= half.X and math.abs(local_.Y) <= half.Y and math.abs(local_.Z) <= half.Z
+end
+
 function Rig.new(): Rig
+	const mates = Mates.new()
+	local boxes: { Box } = {}
+	local boxesAt = -math.huge
+	local insideTrailer = false
 	local camera = Vector3.zero
 	local focus = Vector3.zero
 	local entered = false
@@ -123,18 +145,36 @@ function Rig.new(): Rig
 		end
 	end
 
+	local function readBoxes(now: number)
+		if now - boxesAt < BOX_REFRESH then
+			return
+		end
+		boxesAt = now
+		table.clear(boxes)
+		for _, instance in CollectionService:GetTagged(VEHICLE_TAG) do
+			if instance:IsA("Model") then
+				const cframe, size = instance:GetBoundingBox()
+				table.insert(boxes, { Cframe = cframe, Size = size })
+			end
+		end
+	end
+
+	local function inAnyBox(point: Vector3): boolean
+		for _, box in boxes do
+			if inside(box, point) then
+				return true
+			end
+		end
+		return false
+	end
+
+	-- NPC rigs (customers and crew); the characters of players are Mates.luau's
 	local function candidates(): { Model }
 		const list: { Model } = {}
 		const own = Players.LocalPlayer.Character
 		for _, instance in CollectionService:GetTagged("AnimalRig") do
-			if instance:IsA("Model") and instance ~= own then
+			if instance:IsA("Model") and instance ~= own and Players:GetPlayerFromCharacter(instance) == nil then
 				table.insert(list, instance)
-			end
-		end
-		for _, player in Players:GetPlayers() do
-			const character = player.Character
-			if player ~= Players.LocalPlayer and character ~= nil and not table.find(list, character) then
-				table.insert(list, character)
 			end
 		end
 		return list
@@ -144,6 +184,11 @@ function Rig.new(): Rig
 		const flat = Vector3.new(focus.X - camera.X, 0, focus.Z - camera.Z)
 		const sightEnd = focus + (if flat.Magnitude > 1e-3 then flat.Unit else Vector3.zero) * WINDOW_DEPTH
 		const seen: { [Model]: boolean } = {}
+		readBoxes(now)
+		-- the body of the player (his seat is at Att_Stand), not the camera: the overhead views float above the roof
+		const character = Players.LocalPlayer.Character
+		const body = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
+		insideTrailer = inAnyBox(if body ~= nil and body:IsA("BasePart") then body.Position else camera)
 		for _, model in candidates() do
 			seen[model] = true
 			const root = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
@@ -172,14 +217,14 @@ function Rig.new(): Rig
 				end
 			end
 			local distance = distanceToSegment(root.Position, camera, sightEnd)
-			const isPlayer = Players:GetPlayerFromCharacter(model) ~= nil
 			if released then
 				found.Zone = "Normal"
 			else
-				if isPlayer and (root.Position - camera).Magnitude <= NEIGHBOUR_REACH then
-					distance = 0
-				end
 				found.Zone = zoneOf(distance, found.Zone)
+				-- inside the trailer the customers outside it are left alone
+				if insideTrailer and model:GetAttribute("NpcId") ~= nil and not inAnyBox(root.Position) then
+					found.Zone = "Normal"
+				end
 				if spared ~= nil and model:GetAttribute("NpcId") == spared then
 					found.Zone = "Normal"
 				end
@@ -215,6 +260,7 @@ function Rig.new(): Rig
 		released = false
 		ownTarget = 1
 		judgeIn = 0
+		mates:Enter()
 	end
 	function self.SetPose(_: any, cameraPosition: Vector3, focusPosition: Vector3)
 		camera = cameraPosition
@@ -231,6 +277,7 @@ function Rig.new(): Rig
 		released = true
 		ownTarget = 0
 		judgeIn = 0
+		mates:Release()
 	end
 	function self.Step(_: any, dt: number)
 		if not entered then
@@ -238,6 +285,7 @@ function Rig.new(): Rig
 		end
 		const now = os.clock()
 		const rate = dt / FADE
+		mates:Step(dt)
 		-- own rig
 		refreshOwn(now)
 		if ownAlpha ~= ownTarget then
@@ -275,7 +323,7 @@ function Rig.new(): Rig
 				tracked[model] = nil
 			end
 		end
-		if released and ownAlpha == 0 and not busy then
+		if released and ownAlpha == 0 and not busy and mates:Idle() then
 			write(ownParts, 0)
 			entered = false
 		end
@@ -284,6 +332,7 @@ function Rig.new(): Rig
 		return not entered
 	end
 	function self.Destroy(_: any)
+		mates:Destroy()
 		write(ownParts, 0)
 		for model, entry in tracked do
 			write(entry.Parts, 0)

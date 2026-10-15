@@ -1,5 +1,7 @@
 Status: Aprovado (DEC-073 — lista N1–N10; DEC-074 — regra crítica fixa só na N7; rodada 7, 2026-10-08). Anotações posteriores: DEC-096 (IDs `ANM-###` na visão geral), DEC-087 (nota N8 × trânsito em "Interações"), DEC-123 (sinal sonoro de início da N7, nota na ficha), DEC-122 (onde se acorda na noite perdida, nota na ficha N7), DEC-054 (interruptor da N3, nota na ficha). **2026-10-10, DEC-149:** clientes e pedestres passam a ser **animais** (emenda DEC-146); ANM-001, ANM-004, ANM-005 e ANM-007 descrevem humanos. **Regras, verbos e sinais aprovados não mudam** sem DEC; adaptação para clientes animais → `Q-147` (narrative-writer + game-designer propõem; usuário decide). **DEC-150:** clientes com variante noturna "um pouco assustadora" por textura; o normal da noite não pode parecer anomalia → `Q-147` (c). **DEC-177 (2026-10-10):** o **ponto seguro pode receber anomalia** (não existe a regra "nunca"; este documento não a continha). A N10 não muda: o verbo segue "estar no ponto seguro". O que pode acontecer lá → `Q-161`. **DEC-178:** personagens com nome são animais, incluindo Pickett (ANM-004), Raincoat Lady (ANM-005) e o Walker (ANM-007); espécies `Q-160`, leitura `Q-147`. **DEC-181:** NPC à noite usa o pack **Mid**; pack **Night** reservado à tensão, inclusive "clima de terror de anomalia" (gatilhos `Q-159`). **DEC-172/173:** classificação Mild; jumpscare só raro e leve. Regras, verbos e sinais aprovados **não mudam**. **DEC-221 (2026-10-10, usuário):** o verbo **"esconder"** da N8 e da N9 vira **"fechar a janela"** (botão ao lado do interruptor do trailer fecha a aba sobre a janela de serviço); sinal, conceito, tempos e consequência não mudam. Falas do chefe e formas curtas que diziam "Hide"/"get down" foram trocadas pelo narrative-writer em 2026-10-10 (Provisório, `Q-173` d; ver N8 e N9).
 
+> **2026-10-14, DEC-254 a DEC-257:** substituído pelas **Anomalias V2** (`design/anomalies-v2-proposal.md`): 4 famílias, erro = jumpscare + desmaio, atmosfera por noite. Este documento fica como histórico e fonte das anomalias reaproveitadas (ANM-001, 002, 003, 004, 005, 007, 009, 010).
+
 # As 10 anomalias (uma nova por noite)
 
 Autor: narrative-writer, 2026-10-08. Aprovado pelo usuário: conceito, sinal, regra do chefe, forma curta, verbo correto, erro, tipo e escopo de cada anomalia.
@@ -223,6 +225,59 @@ com o novo fluxo (D1, D2, N1, D3, N2 … N10; a noite começa no carrinho, o tra
 | N10 hush | ponto seguro | None | igual (Mart) |
 
 As noites 1 e 2 (sempre no carrinho) só têm anomalias `None`: recusar e descartar. A ordem não mudou porque DEC-096 liga `ANM-00k` à noite de estreia.
+
+## Anotação PROVISÓRIA (2026-10-14)
+
+Não altera o conteúdo Aprovado acima. São ideias do dono (conversa de 2026-10-14, definição das anomalias noite a noite), **sem DEC**; valem só como base Provisória e dependem das perguntas citadas. O texto Aprovado de N1, N2 e N4 continua sendo o que vale até haver DEC.
+
+| # | Ideia | Efeito proposto | Pergunta |
+|---|---|---|---|
+| 1 | Direção geral | N1 a ~N6: anomalias com **rigs animais padrão**. ~N7 a N10: **monstros aterrorizantes** com rigs customizados/desfigurados (Walker, wavers etc.), a definir | `Q-247` |
+| 2 | Skin Night | Deixa de valer para todos os NPCs em sanidade baixa; passa a ser usada **só por NPC de anomalia simples** (rig animal com `Variant`). O personagem do jogador mantém a Night em sanidade baixa. Emenda **proposta** a DEC-168/169/181 | `Q-238` |
+| 3 | N1 blank folks | Rosto **sem nenhum traço, nem focinho**; cabeça inteira, orelhas e cauda na cor de pele do animal. Regra/verbo/erro/consequência iguais | `Q-239` |
+| 4 | N4 copies | A cópia usa a **skin normal (sem Night)** e se distingue por **olhos totalmente brancos cartunescos**. O espelhamento aprovado: continua? | `Q-239` |
+| 5 | N2 wrong food (proposta nova) | Sinal: pão mordido de verdade com mofo verde; coberturas trocadas por baratas, besouros, minhocas, gosma verde e vermelha (cartoon). **Descartar** = o cliente desaparece. **Servir** = o cliente pega uma faca e conta até 10 (voz sinistra, áudio do dono); 10 s para **fechar a janela** (DEC-221); se não fechar, ele sobe e avança (sem imagem gráfica, tela de game over/desmaio) e depois persegue os outros vivos. **Substitui** a consequência aprovada (−35 sanidade, hot dog vira fumaça); erro passa de "comum" a "quase letal" | `Q-240` |
+
+### Atualização (2026-10-14, resposta do dono)
+
+| # | Registro | Fonte |
+|---|---|---|
+| 5a | N2: **sem faca**; o cliente **agarra** o jogador (Mild, não gráfico: câmera corta, tela de desmaio, sem sangue). Contagem de 10 s com voz sinistra (áudio do dono, SFX-230) mantida; se a janela não fechar, o cliente sobe e agarra **quem serviu** | DEC-242, DEC-244 |
+| 5b | N2 **pode ser letal** (= desmaio do jogador); **segue na N2** | DEC-243 |
+| 5c | Depois de agarrar quem serviu, o cliente "apenas vai embora sorrindo" (SFX-231). **Resolvido (2026-10-14): ele SOME sorrindo, fade de 2 s; não persegue** | DEC-244, DEC-246 |
+| 4a | N4: a cópia **mantém a roupa espelhada**; só os **olhos totalmente brancos** (cartunesco); skin normal | DEC-245 |
+| 4b | **PROPOSTA (Provisória) N4 "bate na porta":** servir a cópia = −35 de sanidade (como hoje) **e**, depois de alguns segundos sem cliente novo, a cópia volta e **bate na porta**; se o jogador **abrir**, a cópia o **agarra** (Mild, não gráfico) e o jogador desmaia/morre. O verbo aprovado **"Recusar a cópia" não muda**; é só o custo de errar. **Fluxo final (2026-10-14): porta dos fundos do trailer, tranca, batidas; ver a tabela abaixo.** Perguntas `Q-249` a `Q-253` fechadas por DEC-247; resta tom (`Q-254`) | DEC-247 |
+
+### Atualização (2026-10-14, 2ª resposta do dono: DEC-246, DEC-247)
+
+**ANM-002 (N2), fim da ocorrência (DEC-246, `Q-248` fechada):**
+
+| Passo | Comportamento |
+|---|---|
+| 1 | Janela não fechada em 10 s: o cliente sobe e agarra **quem serviu** (DEC-242, DEC-244); o jogador desmaia (`Fainted`) |
+| 2 | O cliente **não persegue ninguém**. Ele **some sorrindo** |
+| 3 | Fade: transparência de **0 a 1 em 2 s** em **todos os descendentes do modelo** (BaseParts, Decals/Textures, SurfaceAppearance/partes, SurfaceGui, BillboardGui, Frames, Labels, Images, UIStroke etc.). Ao final, o modelo é destruído: **nenhum resquício** |
+| 4 | **SFX-231** (risada) toca **durante** o fade |
+
+**ANM-004 (N4), fluxo "a cópia bate na porta dos fundos do trailer" (DEC-247; Provisório sobre o verbo aprovado "Recusar a cópia", que não muda):**
+
+| Passo | Quando | Comportamento |
+|---|---|---|
+| 1 | Jogador **serve** a cópia | −35 de sanidade. A **porta dos fundos fecha na hora** (se aberta, fecha) e **tranca**. Tranca **exclusiva da anomalia**. Prompt continua; ao tentar abrir toca só o SFX **"Locked door"** (SFX-232). Janela de serviço normal |
+| 2 | **8 a 12 s depois** (sorteado; fila vazia) | A cópia **spawna** na porta e **bate 3 vezes**, 2 a 3 s entre batidas. **Só quem está dentro do trailer a vê**. Só a cópia bate (jogadores não batem): é a anomalia, sem dúvida. Sem voz (não é o "it's me" da N9) |
+| 3a | Jogador **abre** a porta durante as batidas | A cópia entra e o **agarra** (Mild, não gráfico): **desmaio** (`Fainted`), **revivível com Revive Kit** por um colega. **Não** é noite perdida. DEC-074 intacta |
+| 3b | Jogador **não abre** | **2 s depois da 3ª batida** a cópia some e a porta **destranca** |
+| Obs. | Trancada desde o passo 1 até o início das batidas; **aberta durante as batidas** (confirmado, DEC-249). A tranca é a **porta do trailer**: o jogador não abre nem sai; **sem clientes novos** durante o evento. Não existe carrinho (DEC-250) |
+
+Resolve `Q-249` a `Q-253`; `Q-254` a `Q-256` fechadas por DEC-248 a DEC-250.
+
+**ANM-005 (Raincoat Lady), resolvida (DEC-251, DEC-252, DEC-253; `Q-257`, `Q-258` fechadas):** fica **como aprovada**: noite **SECA**, sem chuva de atmosfera, **N5** (DEC-096). A proposta de noite chuvosa foi **cancelada**. Ela é uma **ovelha (Sheep)**.
+
+**Efeito visual (DEC-253, Provisório):** `ParticleEmitter` de pingos em **todas as partes do corpo R6** (cabeça, tronco, braços, pernas): azul, textura de **quadrado** com squash vertical (gota), cai ao chão. **Um emitter extra nos pés** forma a **poça**: partículas em arco/círculo se abrindo, aceleração bem suave para fora, espalhando como água, fade-out de transparência.
+
+**Fechamento da ANM-004 (DEC-248 a DEC-250):** "agarra" passa no Mild (`Q-254`); a tranca é a **porta do trailer** (jogador não abre nem sai; sem clientes novos durante o evento; aberta durante as batidas; cópia some 2 s após a 3ª) (`Q-255`); **não existe carrinho**, a ANM-004 só ocorre no trailer (`Q-256` obsoleta).
+
+Conflitos levantados (nenhum decidido): faca × Mild/DEC-023/DEC-172/DEC-173 (`Q-241`); letal × regra crítica só na N7 (DEC-053/DEC-074) e noite perdida (DEC-110 a DEC-113, DEC-122) (`Q-242`); N2 mais letal logo na noite 2 × curva DEC-010 (`Q-243`); 10 s × modo focado e N8/N9 com o mesmo verbo (`Q-244`); alvo sem ninguém fechar a janela com party (`Q-245`); cliente-faca no teto de 3 atores (DEC-045) (`Q-246`). Se a proposta 5 for aprovada, a linha "N2 e N9 são objeto/som" em "Interações" abaixo deixa de valer.
 
 ## Interações que o game-designer deve checar
 

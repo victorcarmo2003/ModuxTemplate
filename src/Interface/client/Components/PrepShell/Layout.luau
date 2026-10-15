@@ -287,14 +287,15 @@ local function mini(canvas: Vector2, count: number, activeIndex: number, options
 	-- wide with its word on a desktop
 	const pad = PILL_PAD
 	const leaveW = if desktopShape then 96 else TOUCH
-	const chips = if options.Taps == true then 2 else 1 -- Assist (+ Tap)
+	-- the Assist chip is gone (owner decision 2026-10-14); only Tap can follow Leave
+	const chips = if options.Taps == true then 1 else 0
 	const pillW = pad + leaveW + chips * (pad + TOUCH) + pad
 	const pillH = pad + TOUCH + pad
 	const pillY = rowY + (rowH - TOUCH) / 2 - pad
 	const pill = rect(margin, pillY, pillW, pillH)
 	const leave = rect(pill.X + pad, pill.Y + pad, leaveW, TOUCH)
-	const assist = rect(leave.X + leaveW + pad, leave.Y, TOUCH, TOUCH)
-	const tap = if options.Taps == true then rect(assist.X + TOUCH + pad, leave.Y, TOUCH, TOUCH) else zero
+	const assist = zero
+	const tap = if options.Taps == true then rect(leave.X + leaveW + pad, leave.Y, TOUCH, TOUCH) else zero
 
 	-- the section tabs: centred; portrait: above Next
 	local tabsY = rowY
@@ -360,7 +361,7 @@ local function mini(canvas: Vector2, count: number, activeIndex: number, options
 		if objective then
 			skip = rect(progress.X + progress.W + 8, 114, skipW, TOUCH)
 		end
-		ticket = rect(margin, progress.Y + progress.H + 8, w - 2 * margin, 82)
+		ticket = rect(margin, progress.Y + progress.H + 8, w - 2 * margin, 92)
 		seal = rect(w - margin - 96, ticket.Y + ticket.H + 8, 96, 122)
 	elseif desktopShape then
 		hudStatus = rect(w - 10 - 198, 6, 198, 38)
@@ -368,7 +369,7 @@ local function mini(canvas: Vector2, count: number, activeIndex: number, options
 		menu = rect(0, 0, 112, 52)
 		progress, skip = group(if objective then 360 else 300, 52, if objective then 68 else 48)
 		const top = 130
-		ticket = rect(margin, top, 150, math.clamp(pill.Y - 8 - top, 200, 250))
+		ticket = rect(margin, top, 190, math.clamp(pill.Y - 8 - top, 200, 250))
 		seal = rect(w - margin - 120, hudStatus.Y + hudStatus.H + 10, 120, 150)
 	else
 		hudStatus = rect(w - 10 - 198, 6, 198, 38)
@@ -378,15 +379,16 @@ local function mini(canvas: Vector2, count: number, activeIndex: number, options
 		progress, skip = group(progressW, 50, if objective then 64 else 44)
 		-- the tall paper starts under the sanity meter (68 + 38 + 6) and ends 8 px over the pill: 195 px at 667 x 375, 210 at 844 x 390
 		const top = 112
-		ticket = rect(margin, top, 108, math.clamp(pill.Y - 8 - top, 150, 230))
+		ticket = rect(margin, top, 132, math.clamp(pill.Y - 8 - top, 150, 230))
 		-- the Skip pill may reach under the money pills on a narrow phone: the seal goes under it
 		seal = rect(w - margin - 96, math.max(hudStatus.Y + hudStatus.H + 8, if skip.W > 0 then skip.Y + skip.H + 8 else 0), 96, 122)
 	end
-	-- the bin zone: above Next on the right (portrait: the left, over the hint row)
+	-- the bin zone (owner request 2026-10-14): bottom left, right after the Leave pill, level with the row of the section dots; it only
+	-- shows while something is being dragged (BinZone). Portrait: the left, over the hint row.
 	const binSide = if desktopShape then 88 else 72
 	const bin = if portraitShape
 		then rect(margin, baseToast.Y - 8 - binSide, binSide, binSide)
-		else rect(w - margin - binSide, next.Y - 8 - binSide, binSide, binSide)
+		else rect(pill.X + pill.W + 24, rowY + rowH - binSide, binSide, binSide)
 	const centerTop = progress.Y + progress.H + 8
 	const center = if portraitShape
 		then zero

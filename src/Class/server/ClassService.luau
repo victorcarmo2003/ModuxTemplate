@@ -7,8 +7,8 @@
 -- PlaceService:IsDev() and only before the class is locked (Provisional, TASK-017; network.md §4.6).
 -- ClassBuy (TASK-162; network.md §15, user request 2026-10-11, Provisional): Currency "Gems" buys here, atomically
 -- (check and Update without yield); Currency "Robux" is a pre-check only: "Prompt" tells the client it may call
--- MarketplaceService:PromptProductPurchase with Content.Shop.ClassProducts[key].ProductId. The receipt itself is
--- ShopService's (it answers ClassBuyResult "Granted"/"Converted"). ClassAction "Buy" stays for the Crew screen.
+-- MarketplaceService:PromptGamePassPurchase with Content.Shop.GamePasses[key].PassId (TASK-291: classes are Game
+-- Passes). The grant is ShopService's (it answers ClassBuyResult "Granted"). ClassAction "Buy" stays for the Crew screen.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -56,7 +56,7 @@ const DEFAULT_BASE: { [string]: number } = {
 
 const ClassService = Modux.Service(
 	"ClassService",
-	{ Require = { "ProfileService", "PlaceService", "NetService" }, Priority = 690 }
+	{ Require = { "ProfileService", "PlaceService", "NetService", "ShopService" }, Priority = 690 }
 )
 
 function ClassService:Setup()
@@ -195,23 +195,23 @@ function ClassService:BuyWithGems(player: Player, key: string): BuyReason
 	return "Ok"
 end
 
--- Robux pre-check (no write): the class is on sale, has a Developer Product, is not owned. "Prompt" = the client may
--- prompt. The server never trusts this answer later: the receipt is checked again by ShopService.
+-- Robux pre-check (no write): the class is on sale, has a Game Pass, is not owned (profile or pass). "Prompt" = the
+-- client may prompt. The server never trusts this answer later: ShopService grants on PromptGamePassPurchaseFinished.
 function ClassService:CheckRobux(player: Player, key: string): BuyReason
 	const class = Content.Classes.ByKey[key]
 	if not class or not class.InMvp then
 		return "NotForSale"
 	end
-	const product = Content.Shop.ClassProducts.ByKey[key]
-	if not product or product.ProductId <= 0 or not self:CanWrite() then
-		return "Unavailable" -- product not created on the Creator Hub yet (Content.Shop), or not in this place
+	const pass = Content.Shop.GamePasses.ByKey[key]
+	if not pass or pass.PassId <= 0 or not self:CanWrite() then
+		return "Unavailable" -- pass not created on the Creator Hub yet (Content.Shop), or not in this place
 	end
 	const profiles = self.Dependencies.ProfileService
 	const profile = profiles:Get(player)
 	if not profile then
 		return "Busy"
 	end
-	if profiles:OwnedClasses(profile)[key] then
+	if profiles:OwnedClasses(profile)[key] or self.Dependencies.ShopService:OwnsClassPass(player, key) then
 		return "Owned"
 	end
 	return "Prompt"

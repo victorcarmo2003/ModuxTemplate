@@ -54,7 +54,7 @@ local STAGGER = 1.0 -- seats 1.0 apart around the view centre (stations_prep)
 local VIEWS = {
 	{ Key = "Grill", Fov = 70, Pitch = PITCH, Anchor = "CamAnchor", Focus = "Focus", Stand = nil },
 	{ Key = "Board", Fov = 62, Pitch = PITCH, Anchor = "CamAnchor_Board", Focus = "Focus_Board", Stand = "Att_Stand_Board" },
-	{ Key = "Toppings", Fov = 62, Pitch = PITCH, Anchor = "CamAnchor_Toppings", Focus = "Focus_Toppings", Stand = "Att_Stand_Toppings" },
+	{ Key = "Toppings", Fov = 76, Pitch = PITCH, Anchor = "CamAnchor_Toppings", Focus = "Focus_Toppings", Stand = "Att_Stand_Toppings" },
 	{ Key = "Window", Fov = 62, Pitch = 40, Anchor = "CamAnchor_Window", Focus = "Focus_Window", Stand = "Att_Stand_Window" },
 }
 -- which views a Kind has to be seen in (the "stage targets" of prep-3d.md §2.2; Frame = it also decides the framing)

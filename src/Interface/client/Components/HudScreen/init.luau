@@ -4,25 +4,35 @@
 --              the RIGHT, side by side, same height as the centred clock (one line). NOTHING else lives up there: the top is
 --              the clock, the day and the money only (owner request 2026-10-12). The top LEFT is free for the Roblox menu /
 --              chat buttons and, under them, the sanity meter and the order card (HudController).
---              Narrow screens (under 560 px at UI scale 1, portrait) stack the two pills in a column
+--              Narrow screens (under 560 px at UI scale 1, portrait) stack the two pills in a column.
+--              Right of them, a column of round buttons (owner request 2026-10-14), always on screen (no progressive
+--              reveal): the settings gear (GearButton, TASK-279) and under it the shop cart (CartButton, TASK-290), each
+--              with its key under it (KeyHint: "M" / "B", the pad button on a controller, nothing on touch). A button
+--              only shows when its callback (`OnSettings`, `OnShop`) is given.
+--              Under the column, the quick note (HudNudge, TASK-290): `Nudge` text, "" = hidden; click = `OnNudge`
 --   top centre clock "8:00 AM" (DEC-048)
 --   bottom     toasts (DEC-063): bottom centre, above the hotbar and the call subtitle, stacking up, with side margins that
 --              keep them off the joystick (left) and the jump button (right)
 --   centre     end-of-shift summary (FEAT-014), fades out by itself
 -- Progressive reveal (Content.HudReveal): `Reveal(key)` says whether the element of that row is on screen yet; the pills
 -- scale in (0.25 s) when it turns true. nil = everything shown.
--- Nothing here is clickable (FEAT-032 acceptance): Frames and TextLabels only. No reputation, boss chances, XP or
+-- Nothing here is clickable (FEAT-032 acceptance) except the settings gear (TASK-279): Frames and TextLabels only. No reputation, boss chances, XP or
 -- sanity (sanity is night only, wave 2). The bottom third stays free for the hotbar, joystick and interact button.
 -- Cartoon pass (AST-091): Ink pills with big icons; the money rolls up to the new value (Motion.Count) and the pill
 -- jumps (Motion.Bump) when it goes up.
 -- Pure: only props. Mount it inside a ScreenGui with `ScreenInsets = DeviceSafeInsets` (notch / rounded corners only).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Theme)
 local HudPill = require(script.Parent.HudPill)
 local Motion = require(script.Parent.Motion)
 local Money = require(script.Parent.HudPill.Money)
 local HudSummary = require(script.Parent.HudSummary)
+local GearButton = require(script.Parent.GearButton)
+local CartButton = require(script.Parent.CartButton)
+local KeyHint = require(script.Parent.KeyHint)
+local HudNudge = require(script.Parent.HudNudge)
 local ToastStack = require(script.Parent.Toast.Stack)
 
 const create = Vide.create
@@ -43,6 +53,18 @@ export type Props = {
 	Scale: (() -> number)?,
 	-- Progressive reveal (Content.HudReveal): keys "clock", "shift", "money", "toasts". nil = always shown.
 	Reveal: ((key: string) -> boolean)?,
+	-- Settings gear (TASK-279): pressed -> toggle the settings panel; nil = no gear. SettingsOpen turns it Mustard.
+	OnSettings: (() -> ())?,
+	SettingsOpen: (() -> boolean)?,
+	-- Shop cart (TASK-290): pressed -> toggle the shop; nil = no cart. ShopOpen turns it Mustard, ShopGlow rings it.
+	OnShop: (() -> ())?,
+	ShopOpen: (() -> boolean)?,
+	ShopGlow: (() -> boolean)?,
+	-- Input device for the key labels (InputController.Device); nil = keyboard
+	Device: (() -> KeyHint.Device)?,
+	-- Quick note under the buttons ("" = hidden) and its click
+	Nudge: (() -> string)?,
+	OnNudge: (() -> ())?,
 }
 
 const MARGIN = 10
@@ -57,6 +79,8 @@ const TOAST_BOTTOM = 140
 const TOAST_SIDE = 180 -- px at UI scale 1 kept free on each side (>= 180)
 const TOAST_WIDTH = 220
 const TOAST_MIN_WIDTH = 140 -- portrait phones cannot keep 180 px on both sides: the card shrinks to this
+const SHOP_PAD = Enum.KeyCode.DPadRight -- the controller button of the shop (ShopController)
+const NUDGE_TOP = 128 -- px under TOP: below the gear / cart column (2 x 38 + 2 key labels + gaps)
 const SHORT_SCREEN = 480 -- px at UI scale 1: under this height 2 toasts show at a time, not 3
 
 return function(props: Props): Frame
@@ -72,6 +96,19 @@ return function(props: Props): Frame
 	const sideBySide = function(): boolean
 		const real = area()
 		return real.X / scale() >= ROW_MIN_WIDTH
+	end
+	const shopPad = (function(): string
+		const ok, image = pcall(function()
+			return UserInputService:GetImageForKeyCode(SHOP_PAD)
+		end)
+		return if ok and type(image) == "string" then image else ""
+	end)()
+	const device = function(): KeyHint.Device
+		return if props.Device then props.Device() else "KeyboardMouse"
+	end
+	-- round buttons: pill height with a mouse / controller, a full touch target on a touch screen
+	const buttonSize = function(): number
+		return if device() == "Touch" then Theme.MinTouch else BIG
 	end
 	const revealed = function(key: string): boolean
 		return props.Reveal == nil or props.Reveal(key)
@@ -94,7 +131,7 @@ return function(props: Props): Frame
 
 		createRaw("UIScale")({ Scale = scale }),
 
-		-- Right column: day and money, nothing under them
+		-- Right column: day and money, then the settings gear on their right; nothing under them
 		create("Frame")({
 			Name = "Right",
 			AnchorPoint = Vector2.new(1, 0),
@@ -104,10 +141,71 @@ return function(props: Props): Frame
 			BackgroundTransparency = 1,
 
 			create("UIListLayout")({
-				FillDirection = Enum.FillDirection.Vertical,
+				FillDirection = Enum.FillDirection.Horizontal,
 				HorizontalAlignment = Enum.HorizontalAlignment.Right,
+				VerticalAlignment = Enum.VerticalAlignment.Top,
 				SortOrder = Enum.SortOrder.LayoutOrder,
 				Padding = UDim.new(0, ROW_GAP),
+			}),
+
+			create("Frame")({
+				Name = "Buttons",
+				LayoutOrder = 2,
+				Size = function()
+					return UDim2.fromOffset(buttonSize(), 0)
+				end,
+				AutomaticSize = Enum.AutomaticSize.Y,
+				BackgroundTransparency = 1,
+				Visible = props.OnSettings ~= nil or props.OnShop ~= nil,
+
+				create("UIListLayout")({
+					FillDirection = Enum.FillDirection.Vertical,
+					HorizontalAlignment = Enum.HorizontalAlignment.Center,
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					Padding = UDim.new(0, 2),
+				}),
+
+				if props.OnSettings
+					then GearButton({
+						Name = "Settings",
+						LayoutOrder = 1,
+						Size = buttonSize,
+						Open = props.SettingsOpen,
+						OnActivated = props.OnSettings,
+					})
+					else nil,
+				if props.OnSettings
+					then KeyHint({
+						Name = "SettingsKey",
+						LayoutOrder = 2,
+						Width = BIG,
+						Device = device,
+						Key = Enum.KeyCode.M,
+						Pad = Enum.KeyCode.ButtonSelect,
+						PadText = "Select",
+					})
+					else nil,
+				if props.OnShop
+					then CartButton({
+						Name = "Shop",
+						LayoutOrder = 3,
+						Size = buttonSize,
+						Open = props.ShopOpen,
+						Glow = props.ShopGlow,
+						OnActivated = props.OnShop,
+					})
+					else nil,
+				if props.OnShop
+					then KeyHint({
+						Name = "ShopKey",
+						LayoutOrder = 4,
+						Width = BIG,
+						Device = device,
+						Key = Enum.KeyCode.B,
+						Pad = SHOP_PAD,
+						PadText = "Right",
+					})
+					else nil,
 			}),
 
 			create("Frame")({
@@ -160,6 +258,30 @@ return function(props: Props): Frame
 					end,
 				}),
 			}),
+		}),
+
+		HudNudge({
+			Name = "Nudge",
+			AnchorPoint = Vector2.new(1, 0),
+			Position = function()
+				-- under the button column (taller on touch: no key labels, bigger buttons)
+				return UDim2.new(1, -MARGIN, 0, TOP + (if device() == "Touch" then Theme.MinTouch * 2 + 12 else NUDGE_TOP))
+			end,
+			Text = function()
+				return if props.Nudge then props.Nudge() else ""
+			end,
+			Pad = function()
+				return if device() == "Gamepad" then shopPad else ""
+			end,
+			PadText = "Right",
+			Touch = function()
+				return device() == "Touch"
+			end,
+			OnActivated = function()
+				if props.OnNudge then
+					props.OnNudge()
+				end
+			end,
 		}),
 
 		ToastStack({

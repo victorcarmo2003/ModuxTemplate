@@ -4,6 +4,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local DrawerValue = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.DrawerValue)
+local TipJar = require(StarterPlayer.StarterPlayerScripts.client.Economy.EconomyController.TipJar)
 
 type Mount = {
 	Vehicle: Instance,
@@ -13,6 +14,7 @@ type Mount = {
 	Connections: { RBXScriptConnection },
 	Fallback: thread?,
 	Warned: boolean,
+	Jar: TipJar.TipJar?,
 }
 export type Record = {
 	Cash: number,
@@ -22,9 +24,9 @@ export type Record = {
 export type Public = {
 	Cash: Vide.Source<number>,
 	Drawer: Vide.Source<number>,
-	DrawerClose: thread?,
 	FlyGui: ScreenGui?,
 	Gui: Instance?,
+	JarConfig: TipJar.Config,
 	Mounts: { [Instance]: Mount },
 	Pops: Vide.Source<{ DrawerValue.Pop }>,
 	Ready: Vide.Source<boolean>,
@@ -35,11 +37,15 @@ export type Public = {
 	Pop: (self: Public, amount: number) -> (),
 	PopDone: (self: Public, pop: DrawerValue.Pop) -> (),
 	DrawerAnchor: (self: Public) -> Instance?,
-	OpenDrawer: (self: Public, anchor: Instance) -> (),
-	Chime: (self: Public, amount: number, result: string) -> (),
+	Tipped: (self: Public, amount: number) -> (),
+	SalePosition: (self: Public, npc: number) -> Vector3?,
+	Chime: (self: Public, amount: number, npc: number) -> (),
 	Collected: (self: Public, amount: number) -> (),
+	FlyScreen: (self: Public) -> ScreenGui?,
+	FlyPiece: (self: Public, position: Vector3?, coin: boolean, delay: number) -> (),
 	Fly: (self: Public, amount: number, position: Vector3?) -> (),
 	Draw: (self: Public, mount: Mount, adornee: Instance, offset: number) -> (),
+	ResolveJar: (self: Public, mount: Mount) -> (),
 	Clear: (self: Public, mount: Mount) -> (),
 	Resolve: (self: Public, mount: Mount) -> (),
 	Track: (self: Public, vehicle: Instance) -> (),

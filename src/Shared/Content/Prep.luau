@@ -98,17 +98,16 @@ export type View = {
 
 export type LegacyViewRow = { Key: string, Anchor: string, Focus: string }
 
--- Continuous pan along the trail of stations (feedback 2026-10-12, H; Provisional). The camera follows a point `u` of the trail
--- (Grill -> Board -> Toppings, one station per tab); a finger dragged on empty space, the mouse at the edge of the screen and LB / RB
--- move it; on release it snaps to the nearest station and only then does the stage change.
+-- Free pan along the trail of stations (feedback 2026-10-12, H; Provisional). The camera follows a point `u` of the trail (Grill ->
+-- Board -> Toppings, one station per tab) that a finger on empty space or the mouse at the screen edge moves 1:1; it coasts and stops
+-- anywhere. The active station (stage, targets) is the nearest one, with hysteresis.
 export type PanRules = {
-	Omega: number, -- 1/s of the camera springs while panning (the glide of a station change keeps Travel / Min / Max)
-	Slop: number, -- px: a press on empty space that moves more than this is a pan
-	Inertia: number, -- s of the release velocity that carry the landing point
-	Hold: number, -- 0..1: stickiness of the station the pan started on (0 = nearest, 0.3 needs about 60 % of the way)
-	Edge: number, -- fraction of the screen width / height at the border where the mouse scrolls
-	EdgeSpeed: number, -- studs per second at the very border (linear from 0 at the inner line)
-	FlingMin: number, -- studs per second: a release faster than this goes to the next station in its direction
+	Slop: number, -- px: a press on empty space that moves more than this is a pan (small: the drag is 1:1 with the pointer)
+	Decay: number, -- 1/s: after a release (or leaving the screen edge) the speed fades as exp(-Decay t); nothing snaps to a station
+	StopSpeed: number, -- studs per second: below this the coast ends
+	Hyst: number, -- trail units (0..1): the active station changes when another is this much closer than the current one
+	Edge: number, -- fraction of the screen width at the border where the mouse scrolls
+	EdgeSpeed: number, -- studs per second at the very border (smooth ramp from 0 at the inner line)
 	Dots: { Size: number, Active: number, Gap: number }, -- px of the indicator dots (the hit area stays 44)
 }
 
@@ -151,6 +150,14 @@ export type ToppingRules = {
 
 -- The juice of the 3D prep (World/Juice, 2026-10-12 polish): pops, bursts, floating words, flashes. Its OWN particle budget, apart
 -- from the 150 of KitchenController/Fx, and the Highlights it keeps out of Budget.Highlights. Reduced motion and LowQuality skip bursts.
+export type PresenceRules = {
+	Palette: { Color3 },
+	Highlights: number,
+	Fill: number, -- Highlight.FillTransparency of the working arm
+	Range: number,
+	Tag: { Width: number, Height: number, Lift: number },
+}
+
 export type JuiceRules = {
 	Particles: number, -- live particles of the prep (own budget)
 	Emitters: number, -- live emitters of the prep
@@ -228,6 +235,7 @@ export type WorldRules = {
 		CollectArc: number, -- studs: height of that flight
 		Shake: number, -- s: refusal shake of a sausage / the box
 		ShakeAmount: number, -- studs
+		FocusRadius: number, -- studs: the ring of the flip focus screen around the sausage that waits (World/FlipFocus)
 		Early: number, -- s: the shiver of a tap before the window (nothing is sent)
 		CheckSize: number, -- studs: the check mark of a ready sausage
 		Drag: number, -- px: a press that moves further than this is a drag, not a tap
@@ -271,6 +279,7 @@ export type WorldRules = {
 	Toppings: ToppingRules,
 	Editable: boolean, -- EditableMesh layer (prep-3d.md §6A); false until the S1b spike passes
 	GhostHand: boolean, -- colleague's ghost hand (Q-233)
+	Presence: PresenceRules, -- co-op presence: the colleague's working arm, name and colour (Rig/Mates.luau)
 	Juice: JuiceRules,
 	Coach: CoachRules,
 	Bin: BinRules,
@@ -340,7 +349,11 @@ export type Rules = {
 	ClientIdle: number, -- s without input before the client leaves (Parked)
 	SeatIdle: number, -- s without a heartbeat before the server frees the seat
 	Heartbeat: number, -- s between PrepTab keep-alives
-	PlateMax: number, -- s: a plate open longer than this is dropped
+	PlateMax: number, -- s: ceiling of a plausible plate age (Grade.Plausible); no plate is dropped by time any more (TASK-289)
+	-- s: the open plate never ages past this on the server (it never expires: first a rookie's only, every plate since TASK-289,
+	-- owner request 2026-10-14); the client caps PrepFinish.Ms at it too, so the clocks stay plausible
+	-- (owner report 2026-10-14 "my bun disappeared", docs/tasks/playtest-2026-10-14.md)
+	TutorialPlateAge: number,
 	Reach: number, -- studs: a thief inside this radius of the trailer forces the exit (FEAT-039)
 	MinPlate: number, -- s: server floor for cut + place (bun, sausage), plus PerTopping x K
 	PerTopping: number, -- s per topping, floor of both the refusal and the Perfect cap
@@ -348,7 +361,12 @@ export type Rules = {
 	MsSlack: number, -- s: PrepFinish.Ms may exceed the server clock by this much
 	Assist: number, -- tolerance multiplier of the Assist option
 	TouchOffset: number, -- px: cursor drawn above the finger
-	Grill: { Target: number, From: number, To: number }, -- flip window as fractions of the Duration
+	-- Flip: the sausage cooks its first side (Duration - PostFlip s), WAITS for the flip (the progress is paused, the window is
+	-- open), and PostFlip s after the flip it is ready. Target / From / To = the window on the progress the client draws (the
+	-- pause sits on Target); Reaction = flip score error per second of delay after the pause (Tolerances grill_flip).
+	-- Swing (TASK-257, owner request 2026-10-14): s the flip cursor takes from one end of the bar to the other; in the pause it goes
+	-- back and forth until the tap, and the flip is graded by where it is (Grade.SwingAt / FlipScore). Reaction: unused since then
+	Grill: { Target: number, From: number, To: number, PostFlip: number, Reaction: number, Swing: number },
 	-- max packets per second per player (PrepService); Finish and Begin are 1/s on purpose
 	Rates: {
 		Enter: number,
@@ -387,7 +405,8 @@ export type Texts = {
 	TrashBusy: string,
 	TrashEmpty: string,
 	Trashed: string,
-	Coach: { Grill: string, Board: string, Toppings: string, Serve: string },
+	FlipAlert: string, -- the chip that calls the player back to the grill while a flip window is open on another tab
+	Coach: { Pan: string, Grill: string, Board: string, Sausage: string, Toppings: string, Deliver: string, Serve: string },
 }
 
 -- Delivery (Rules.Delivery). "Prompt": the Serve tab, its steps and the Window view leave every set; the last step of the plate is
@@ -425,7 +444,7 @@ const tabsLegacy = Table.new(withoutServe(tabsLegacyRaw, false))
 -- Tabs, 3D set (bottom bar, sections in sequence; prep-3d.md §3.0, DT-22). Order left the bar (Take is on the ticket and on
 -- the customer in the Window view); Build split into Board and Toppings. Hints are one line, 36 characters at most.
 const tabs3DRaw = {
-	{ Key = "Grill", Label = "Grill", Hint = "Flip when the ring closes", Icon = "" },
+	{ Key = "Grill", Label = "Grill", Hint = "Flip when the bar stops", Icon = "" },
 	{ Key = "Board", Label = "Board", Hint = "Cut the bun, place the sausage", Icon = "" },
 	{ Key = "Toppings", Label = "Toppings", Hint = "Pick a topping, or press Next", Icon = "" },
 	{ Key = "Serve", Label = "Serve", Hint = "Drag the plate to the window", Icon = "" },
@@ -439,7 +458,7 @@ const stepsLegacyRaw = {
 		Tab = "Grill",
 		View = "Grill",
 		Label = "Grill",
-		Hint = "Flip when the ring glows",
+		Hint = "Tap to flip when the bar stops",
 		NextLabel = "Next",
 		Needs = "Nothing",
 		Icon = "",
@@ -484,7 +503,7 @@ const steps3DRaw = {
 		Tab = "Grill",
 		View = "Grill",
 		Label = "Grill",
-		Hint = "Flip when the ring closes",
+		Hint = "Flip when the bar stops",
 		NextLabel = "Next",
 		Needs = "Nothing",
 		Icon = "",
@@ -548,7 +567,7 @@ const viewsRaw = {
 		Pitch = -65,
 		Distance = 5.9,
 		Dolly = 0,
-		Side = -2.4,
+		Side = -1.2, -- 2026-10-14: was -2.4; the owner could not centre the sausage container, the frame moves 1.2 studs to the screen right
 	},
 	-- Board and Toppings share Pitch, Distance and Fov, so going from one to the other is a plain slide of the frame: the bun keeps
 	-- its size on screen (before, the two views had different distances and the bun "grew").
@@ -563,7 +582,7 @@ const viewsRaw = {
 		Pitch = -65,
 		Distance = 5.9,
 		Dolly = 0,
-		Side = -0.9,
+		Side = 0,
 	},
 	{
 		Key = "Toppings",
@@ -572,11 +591,11 @@ const viewsRaw = {
 		Anchor = "CamAnchor_Toppings",
 		Focus = "Focus_Toppings",
 		Fallback = "Board",
-		Fov = 0,
+		Fov = 76, -- wider than the Board view (62): the real board AND the bowls in one frame, same eye height (the roof stops a farther eye)
 		Pitch = -65,
 		Distance = 5.9,
-		Dolly = -0.9,
-		Side = 1.6,
+		Dolly = 0,
+		Side = 3.0, -- 2026-10-14: was -0.5, which centred the bun crate; the bowls and the plate are ~3.4 studs to the screen right (x -51.9)
 	},
 	{
 		Key = "Window",
@@ -653,7 +672,7 @@ const gestures = Table.new({
 --   cheese          deviation of the slice from the target, % (<= 12, <= 25)
 --   bacon           mean timing error of the 3 taps, ms (<= 120, <= 250)
 --   potato_sticks   release distance from the green band, % of the bar (<= 8, <= 18)
---   grill_flip      |flip time - half of the Duration|, % of the Duration (window 40%..60%: Good <= 10, Perfect <= 5)
+--   grill_flip      seconds of delay between the pause (flip window open) and the flip x Rules.Grill.Reaction (Good <= 10, Perfect <= 5)
 -- A new topping is one row here (key = Ingredients key).
 const tolerances = Table.new({
 	{ Key = "bun_cut", Gesture = "slice", Unit = "PercentWidth", Perfect = 6, Good = 15, Worst = 40, ExcessWeight = 0, Icon = "" },
@@ -680,6 +699,7 @@ const reasons = Table.new({
 	{ Key = "NoSession" },
 	{ Key = "NoStock", Notice = "out_of_stock" },
 	{ Key = "NoSausage", Notice = "prep_no_sausage" },
+	{ Key = "OneSausage", Notice = "tutorial_one_sausage" },
 	{ Key = "HandsFull", Notice = "hands_full" },
 	{ Key = "Rate" },
 	{ Key = "NoTicket" },
@@ -721,6 +741,7 @@ const rules: Rules = {
 			CollectArc = 0.45,
 			Shake = 0.3,
 			ShakeAmount = 0.06,
+			FocusRadius = 0.95,
 			Early = 0.25,
 			CheckSize = 0.5,
 			Drag = 14,
@@ -764,8 +785,8 @@ const rules: Rules = {
 			Knife = { Height = 0.3, Tilt = 26, Spring = 20 },
 			Carry = { Spring = 22, Alpha = 0.4 },
 			Bin = { Right = -0.9, Back = 1.3, Size = 0.8 },
-			Shift = { Right = 4.5, Back = 1.6 },
-			Slide = 0.35,
+			Shift = { Right = 0, Back = 0 }, -- 0: the bun stays on the REAL board (the Toppings view frames the board and the bowls together, prep_targets); a number here is an extra slide from the board
+			Slide = 0.4,
 			Crumbs = 8,
 		},
 		Toppings = {
@@ -775,7 +796,7 @@ const rules: Rules = {
 				Smooth = 2,
 				Joint = 1.0,
 				Taper = 0.4,
-				Shine = 0.18,
+				Shine = 0,
 				Variance = 0.035,
 				Threshold = 0.15,
 				Done = 0.97,
@@ -783,13 +804,21 @@ const rules: Rules = {
 				Margin = { X = 0.15, Y = 0.45 },
 			},
 			Bottle = { Length = 1.5, Radius = 0.24, Tilt = 105, Rise = 0.6, Spring = 18 },
-			Dot = { Size = 0.05, Step = 0.11 },
+			Dot = { Size = 0.05, Step = 0.17 },
 			Ring = { Radius = 0.34, Thick = 0.05 },
 			Potato = { From = 0.15 },
 			Hand = { Spring = 16, Rise = 0.5 },
 		},
 		Editable = false,
 		GhostHand = false,
+		Presence = {
+			-- one colour per seat (station 1..4 take the first four), never red; Teal, Mustard, Lilac, Mint, Apricot, Sky, Pink, Lime
+			Palette = {Color3.fromHex("#3FA7B5"), Color3.fromHex("#F6C12B"), Color3.fromHex("#A98BD6"), Color3.fromHex("#6FCF97"), Color3.fromHex("#F29B6B"), Color3.fromHex("#5BA8F0"), Color3.fromHex("#E58BC0"), Color3.fromHex("#B7D84B")},
+			Highlights = 3, -- taken out of Budget.Highlights (Outline gets the rest); none at LowQuality
+			Fill = 0.55,
+			Range = 60, -- studs: the name tag fades out beyond it
+			Tag = { Width = 4.4, Height = 1.0, Lift = 1.1 }, -- studs
+		},
 		Juice = {
 			Particles = 120,
 			Emitters = 6,
@@ -839,13 +868,14 @@ const rules: Rules = {
 			},
 		},
 	},
-	Camera = { Fov = 70, Travel = 0.35, Min = 0.25, Max = 0.45, Leave = 0.30, Pitch = -55, Distance = 2.5, Fade = 0.15, Pan = { Omega = 13, Slop = 12, Inertia = 0.22, Hold = 0.15, Edge = 0.07, EdgeSpeed = 9, FlingMin = 4, Dots = { Size = 14, Active = 34, Gap = 4 } } }, -- FEAT-039; Fov 62 in every view (polish 2026-10-12, C-3): no zoom pop between sections; Travel/Min/Max in s by distance
+	Camera = { Fov = 70, Travel = 0.35, Min = 0.25, Max = 0.45, Leave = 0.30, Pitch = -55, Distance = 2.5, Fade = 0.15, Pan = { Slop = 8, Decay = 4.5, StopSpeed = 0.5, Hyst = 0.07, Edge = 0.07, EdgeSpeed = 11, Dots = { Size = 14, Active = 34, Gap = 4 } } }, -- FEAT-039; Fov 62 in every view (polish 2026-10-12, C-3): no zoom pop between sections; Travel/Min/Max in s by distance
 	ForcedExit = { Signal = 0.4, NoInput = 0.5 }, -- Q-221 A
 	CueLock = 6,
 	ClientIdle = 20, -- FEAT-039: 20 s without input = Parked
 	SeatIdle = 60,
 	Heartbeat = 15,
 	PlateMax = 90,
+	TutorialPlateAge = 80,
 	Reach = 14,
 	-- skilled plate with K = 2 takes ~6..8 s of gesture time: floor 3.4 s (refused), Perfect cap 4.6 s
 	MinPlate = 1.8,
@@ -854,7 +884,7 @@ const rules: Rules = {
 	MsSlack = 1.5,
 	Assist = 1.3,
 	TouchOffset = 28,
-	Grill = { Target = 0.5, From = 0.4, To = 0.6 }, -- FEAT-039 / Q-222: flip near the middle, no burning
+	Grill = { Target = 0.5, From = 0.4, To = 0.6, PostFlip = 2, Reaction = 20, Swing = 1.1 }, -- 2026-10-14: the pause waits for the flip; 20 = 0.25 s of delay is Perfect, 0.5 s Good
 	Rates = { Enter = 2, Leave = 2, Tab = 4, Grill = 6, Begin = 1, Finish = 1, Trash = 4, Order = 4 },
 }
 
@@ -897,10 +927,14 @@ const texts: Texts = {
 	TrashBusy = "Keep one frank for the plate",
 	TrashEmpty = "Nothing to throw",
 	Trashed = "Thrown away",
+	FlipAlert = "Flip!",
 	-- the drag tutorial lines (World/Coach): short, and they say DRAG
 	Coach = {
+		Pan = "Drag left or right to change station", -- TASK-262
 		Grill = "Drag a sausage from the box onto the grill",
 		Board = "Drag the knife along the dashes",
+		Sausage = "Drag the sausage into the bun", -- owner request 2026-10-14
+		Deliver = "Drag the plate onto the customer", -- TASK-254
 		Toppings = "Drag a bowl onto the bun",
 		Serve = "Drag the plate to the window",
 	},
@@ -922,6 +956,13 @@ const build = {
 	Cut = { Y = 0.5, From = 0.04, To = 0.96, Done = 0.94, Hold = 1.0 },
 	Groove = { X = 0.5, Y = 0.5 },
 	Magnet = 20,
+	-- model toppings (cheese, owner report 2026-10-14): a release this far outside the bun (bun-space share) still lands, a
+	-- drag shorter than DragMin (bun heights) is a click (selects the bowl, no refusal toast)
+	DropSlack = 0.15,
+	DragMin = 0.25,
+	-- the delivery AREA of the Toppings view (TASK-253): a box over the body of the customer at the window, studs; Lift = its
+	-- centre over the root part. The drop target of the plate is the same box (Depth deep)
+	Deliver = { Width = 2.2, Height = 2.6, Depth = 1.8, Lift = 0.9 },
 	HoldPlace = 0.35,
 	Sauce = {
 		Path = { { X = 0.10, Y = 0.20 }, { X = 0.30, Y = 0.80 }, { X = 0.50, Y = 0.20 }, { X = 0.70, Y = 0.80 }, { X = 0.90, Y = 0.20 } },
@@ -942,8 +983,12 @@ const build = {
 		NoBun = "Out of buns",
 		Closed = "We are closed",
 		Retry = "Pick the tab again to retry",
-		Expired = "Plate expired",
+		Expired = "Too slow! Bun back in the crate", -- the server lost the plate (shop closed): its bun was refunded (2026-10-14)
 		Full = "Plate is full. Press Next",
+		-- model toppings (owner report 2026-10-14): a drop off the bun, a press too short to settle / fill
+		DropOnBun = "Drop it on the bun",
+		HoldLonger = "Hold it a little longer",
+		DropOnCustomer = "Drop the plate on the customer", -- TASK-253
 		Hints = {
 			slice = "Drag the knife along the line",
 			slice_hold = "Hold on the line",

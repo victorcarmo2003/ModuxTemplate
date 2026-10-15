@@ -4,7 +4,7 @@
 -- Phases, durations and clock ranges come from Content.Shift (night override per row, Night length from
 -- Content.Nights); the decisions that are pure (next phase, next shift, skip, window) live in Flow.luau.
 -- The clock never pauses (DEC-085 a): a phase ends at PhaseStartedAt + Duration whoever is connected. Early ends:
--- "Open Shop" (Prep), a phase probe (Intro, Call, Closing, Finale, Resume), LoseNight, dev commands. Every end goes
+-- the service window opened in Prep (OpenShop, VehicleService; TASK-284), a phase probe (Intro, Call, Closing, Finale, Resume), LoseNight, dev commands. Every end goes
 -- through Advance, the same path as the timer.
 -- Shift boundary (end of Summary), fixed order: BeforeShift(prev) -> Flow.Next -> RunStateService:SetEndless(false) ->
 -- StartShift (atoms in one batch -> ShiftStarted -> PhaseChanged(first) -> Capture).
@@ -20,8 +20,9 @@
 -- the clock at HoldAt), the deadline never comes and the tutorial customer is the only one around; on release
 -- PhaseStartedAt moves forward by the time held, so the phase continues exactly where it stopped.
 -- No Require on peripheral services (T42): they plug in with SetPhaseProbe, SetVehicleProbe, SetVerdict, SetWipe,
--- LoseNight and AddRunReportStep. The OPEN/CLOSED sign has no field: clients derive it from Phase.
-local CollectionService = game:GetService("CollectionService")
+-- LoseNight and AddRunReportStep. The OPEN/CLOSED sign has no field: clients derive it from Phase + Paused.
+-- TASK-284 (owner request 2026-10-14, Provisional): the red "Open Shop" switch (open_sign) is gone. The service window is
+-- the shop: VehicleService calls OpenShop when it opens in Prep and SetPaused(closed) in the selling phases.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -82,11 +83,6 @@ type EconomyHook = {
 }
 
 const RECORD = 1 -- single record (network.md §1, rule 5)
-const TAG = "Interactable" -- anchor tag (architecture.md §18.2)
-const OPEN_ACTION = "open_sign"
-const OPEN_TEXT = "Open Shop"
-const CLOSE_TEXT = "Close Shop"
-const TOGGLE_COOLDOWN = 1 -- s between two Open / Closed toggles of the switch (Provisional)
 const MAX_DAY = 10000 -- Shift.Day wire range
 const MAX_ATTEMPT = 9 -- Shift.Attempt wire range
 const MAX_DURATION = 3600 -- Shift.PhaseDuration wire range
@@ -127,10 +123,9 @@ function RoundService:Setup()
 	self.Held = self.Libs.Charm.atom(0) :: Charm.Atom<number>
 	self.WipeEndsAt = self.Libs.Charm.atom(0) :: Charm.Atom<number>
 	self.WipeFrozen = self.Libs.Charm.atom(false) :: Charm.Atom<boolean>
-	-- "Closed" during the Open phase (user request 2026-10-12, Provisional): the switch pauses the arrival of new customers
-	-- (the ones already in the queue are still served); any phase change reopens it
+	-- Shop closed during a selling phase (Open, Night): the service window is shut (VehicleService, TASK-284), no new
+	-- customer arrives; any phase change reopens it (VehicleService then applies the window again)
 	self.Paused = self.Libs.Charm.atom(false) :: Charm.Atom<boolean>
-	self.ToggledAt = 0 :: number
 	-- Clock hold (SetClockHold): server time the current hold began, 0 = running. An atom: the Shift record reads it.
 	self.HoldAt = self.Libs.Charm.atom(0) :: Charm.Atom<number>
 	self.ClockHold = nil :: (() -> boolean)?
@@ -186,21 +181,44 @@ function RoundService:IsSelling(): boolean
 	return Content.Shift.ByKey[self.Phase()].Selling
 end
 
--- The shop switch is on "Closed" (Open phase only): no new customer arrives while true
+-- Last call (DEC-240): the DAY Closing (Content.Shift Closing.LastCall). Nobody new arrives but the trailer is still open:
+-- the crew, the prep mode, the tables and the sign keep working until the line and the tables are empty.
+function RoundService:IsLastCall(): boolean
+	if not self.Started or self.NightShift() then
+		return false
+	end
+	return Content.Shift.ByKey[self.Phase()].LastCall == true
+end
+
+-- The crew works the shop now: a selling phase or the day Last call (PrepService, SeatingService read this)
+function RoundService:IsServing(): boolean
+	return self.Started and (self:IsSelling() or self:IsLastCall())
+end
+
+-- The shop is closed (service window shut) in a selling phase: no new customer arrives while true
 function RoundService:IsPaused(): boolean
 	return self.Paused()
 end
 
--- Shop switch: Open <-> Closed during the Open phase. false = not toggled (wrong phase, not started).
+-- Shop Open <-> Closed during a selling phase (Open, Night): VehicleService mirrors the service window here (TASK-284).
+-- false = not toggled (not a selling phase, not started).
 function RoundService:SetPaused(paused: boolean): boolean
-	if not self.Started or self.Busy or self.Phase() ~= "Open" then
+	if not self.Started or self.Busy or not self:IsSelling() then
 		return false
 	end
-	if self.Paused() == paused then
-		return true
+	if self.Paused() ~= paused then
+		self.Paused(paused)
 	end
-	self.Paused(paused)
-	self:RefreshSigns()
+	return true
+end
+
+-- The service window opened in Prep (VehicleService, TASK-284): the selling phase starts at once, like the old "Open
+-- Shop" switch. false = not in Prep / not started (nothing changes).
+function RoundService:OpenShop(): boolean
+	if not self.Started or self.Busy or self.Phase() ~= "Prep" then
+		return false
+	end
+	self:Advance(workspace:GetServerTimeNow())
 	return true
 end
 
@@ -327,8 +345,8 @@ function RoundService:SetPhaseProbe(phase: Phase, probe: () -> boolean)
 	self.Probes[phase] = probe
 end
 
--- TutorialService: "the clock stands still now". Asked every tick; the service only honours it on the day shift in Prep
--- and Open (the phases the tutorial plays in). Last registration wins.
+-- TutorialService: "the clock stands still now". Asked every tick; the service only honours it on the day shift in Prep,
+-- Open (the first-hot-dog tutorial) and Closing (the Day 1 upgrade lesson, 2026-10-14). Last registration wins.
 function RoundService:SetClockHold(hold: () -> boolean)
 	if type(hold) ~= "function" then
 		error("[RoundService] SetClockHold needs a function", 2)
@@ -427,30 +445,6 @@ function RoundService:Resolve(phase: string, info: ShiftInfo): Phase
 	end) :: Phase
 end
 
--- Sign ------------------------------------------------------------------------------------------------------------
-
-function RoundService:IsSign(anchor: Instance): boolean
-	return anchor:GetAttribute("PromptAction") == OPEN_ACTION
-end
-
--- The trailer switch exists for the party in the phases of Content.Actions.open_sign.Requires.Phase (Prep, Open): "Open Shop"
--- in Prep (starts the Open phase), "Close Shop" while open, "Open Shop" again while the shop is on Closed
-function RoundService:RefreshSign(anchor: Instance)
-	const phases = Content.Actions.ByKey[OPEN_ACTION].Requires.Phase
-	const phase = self.Phase()
-	const enabled = self.Started and not self.Busy and phases ~= nil and table.find(phases, phase) ~= nil
-	const text = if phase == "Open" and not self.Paused() then CLOSE_TEXT else OPEN_TEXT
-	self.Dependencies.InteractionService:SetPrompt(anchor, enabled, text)
-end
-
-function RoundService:RefreshSigns()
-	for _, anchor in CollectionService:GetTagged(TAG) do
-		if self:IsSign(anchor) then
-			self:RefreshSign(anchor)
-		end
-	end
-end
-
 -- Phases ----------------------------------------------------------------------------------------------------------
 
 -- The clock should stand still now: a day shift in Prep or Open and the hook says yes (errors are a warn and "no")
@@ -460,7 +454,8 @@ function RoundService:HoldWanted(): boolean
 		return false
 	end
 	const phase = self.Phase()
-	if phase ~= "Prep" and phase ~= "Open" then
+	-- Closing (day = Last call, 6 PM): the Day 1 upgrade lesson (owner request 2026-10-14, Provisional)
+	if phase ~= "Prep" and phase ~= "Open" and phase ~= "Closing" then
 		return false
 	end
 	return ask(hold, "clock hold", false)
@@ -499,7 +494,6 @@ function RoundService:Enter(phase: Phase, startedAt: number, info: ShiftInfo?, h
 		self.Phase(phase)
 		self.PhaseStartedAt(startedAt)
 	end)
-	self:RefreshSigns()
 end
 
 -- Enters a phase of the current shift and fires what that phase means
@@ -650,7 +644,8 @@ function RoundService:Step()
 		return
 	end
 	const phase = self.Phase()
-	if Flow.CanProbe(phase) and now > self.PhaseStartedAt() and self:ProbeSaysEnd(phase) then
+	-- a held phase never ends by its probe either (the day Closing of the Day 1 upgrade lesson)
+	if Flow.CanProbe(phase) and self.HoldAt() <= 0 and now > self.PhaseStartedAt() and self:ProbeSaysEnd(phase) then
 		self:Advance(now)
 	end
 end
@@ -890,37 +885,7 @@ RoundService:OnStart(function(self)
 	-- EconomyService (740) built its step list in its OnInit, before every OnStart
 	self:HookEconomy()
 
-	-- Registered here, not in OnInit: InteractionService (730) builds its handler table in its own OnInit, after ours.
-	-- Its OnStart (scan of anchors) still runs after this one, so the default PromptEnabled sees the handler.
 	const runState = self.Dependencies.RunStateService
-	self.Dependencies.InteractionService:RegisterAction(OPEN_ACTION, {
-		Validate = function(player: Player, _anchor: Instance, _id: number): boolean
-				const phase = self.Phase()
-			return self.Started
-				and not self.Busy
-				and (phase == "Prep" or phase == "Open")
-				and runState:IsActive(player)
-				and os.clock() - self.ToggledAt >= TOGGLE_COOLDOWN
-		end,
-		Run = function(_player: Player, _anchor: Instance, _id: number)
-			self.ToggledAt = os.clock()
-			const phase = self.Phase()
-			if phase == "Prep" then
-				-- opening the trailer opens the shop: the Open phase starts at once
-				self:Advance(workspace:GetServerTimeNow())
-			elseif phase == "Open" then
-				self:SetPaused(not self.Paused())
-			end
-		end,
-	})
-
-	self:RefreshSigns()
-	CollectionService:GetInstanceAddedSignal(TAG):Connect(function(anchor)
-		if self:IsSign(anchor) then
-			self:RefreshSign(anchor)
-		end
-	end)
-
 	runState.MemberJoined:Connect(function()
 		self:StartRun()
 	end)

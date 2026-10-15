@@ -67,7 +67,7 @@ export type Wire = {
 	Leader: number?,
 }
 export type SaleResult = "Perfect" | "Complete" | "Incomplete" | "Wrong" | "Left" | "Refused" | "Slow"
-export type Variant = "blank" | "mirror" | "raincoat"
+export type Variant = "blank" | "mirror" | "raincoat" | "shake" | "neck" | "eyes" | "bighead" | "float" | "stare"
 export type CustomerActorSpec = {
 	Variant: Variant,
 	CustomerType: string?,
@@ -110,6 +110,7 @@ export type Public = {
 	ServeRules: { ServeRule },
 	SpawnAttempted: SignalLib.Signal<Outcome>,
 	SpawnHold: (() -> boolean)?,
+	SpawnHolds: { [string]: boolean },
 	Tickets: { [number]: Orders.Ticket },
 	TutorialRng: Random,
 	TutorialTryAt: number,
@@ -131,6 +132,7 @@ export type Public = {
 	IsSelling: (self: Public) -> boolean,
 	IsPaused: (self: Public) -> boolean,
 	SetSpawnHold: (self: Public, hold: () -> boolean) -> (),
+	HoldSpawns: (self: Public, reason: string, on: boolean) -> (),
 	SpawnHeld: (self: Public) -> boolean,
 	IsNightShift: (self: Public) -> boolean,
 	NightRow: (self: Public) -> Content.Night?,
@@ -161,6 +163,7 @@ export type Public = {
 	Remove: (self: Public, id: number) -> (),
 	Forget: (self: Public, id: number) -> boolean,
 	SendAllAway: (self: Public) -> (),
+	SendLineAway: (self: Public, player: Player?) -> (),
 	RemoveAll: (self: Public) -> (),
 	Update: (self: Public, id: number, patch: Patch) -> boolean,
 	GetTicket: (self: Public, id: number) -> Orders.Ticket?,

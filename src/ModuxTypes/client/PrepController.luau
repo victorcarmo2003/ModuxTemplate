@@ -5,7 +5,6 @@ local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local PlateView = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.PlateView)
 local PrepShell = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.PrepShell)
-local Beacon = require(StarterPlayer.StarterPlayerScripts.client.Prep.PrepController.Beacon)
 local Cursor = require(StarterPlayer.StarterPlayerScripts.client.Prep.PrepController.Cursor)
 local Gestures = require(StarterPlayer.StarterPlayerScripts.client.Prep.PrepController.Gestures)
 local Mock = require(StarterPlayer.StarterPlayerScripts.client.Prep.PrepController.Mock)
@@ -46,7 +45,6 @@ export type Public = {
 	Active: Vide.Source<boolean>,
 	Assist: Vide.Source<boolean>,
 	Badges: Vide.Source<{ [string]: number }>,
-	Beacon: Beacon.Beacon,
 	BoundNames: { string },
 	Cursor: Cursor.Cursor?,
 	CursorGui: ScreenGui?,
@@ -63,6 +61,7 @@ export type Public = {
 	Needs: Vide.Source<{ [string]: boolean }>,
 	NextBeat: number,
 	Pan: Pan.Pan?,
+	PanDriving: boolean,
 	PanNear: Vide.Source<number>,
 	PlateMask: number,
 	Pointer: Pointer.Pointer?,
@@ -91,7 +90,7 @@ export type Public = {
 	Vignette: Vide.Source<boolean>,
 	Setup: (self: Public) -> (),
 	MakeView: (self: Public) -> View,
-	InfoOf: (self: Public, key: string) -> { Stock: number, Locked: boolean, Used: boolean },
+	InfoOf: (self: Public, key: string) -> { Stock: number, Locked: boolean, Used: boolean, Wrapped: boolean },
 	LoadStages: (self: Public) -> (),
 	Load3DStages: (self: Public) -> (),
 	ResolveTab: (self: Public, tab: string?) -> string?,
@@ -128,13 +127,13 @@ export type Public = {
 	Bind: (self: Public, on: boolean) -> (),
 	Mount: (self: Public) -> (),
 	Unmounted: (self: Public) -> (),
-	Enter: (self: Public, station: number, mock: boolean?, tab: string?) -> boolean,
+	Enter: (self: Public, station: number, mock: boolean?, tab: string?, plate: number?) -> boolean,
 	CameraOptions: (self: Public, pose: Poses.Pose, dof: boolean, reduced: boolean) -> any,
 	Blink: (self: Public, cut: () -> ()) -> (),
 	BuildTrail: (self: Public, station: number) -> (),
 	StopOf: (self: Public, tab: string?) -> number,
 	PanSync: (self: Public) -> (),
-	PanCommit: (self: Public, index: number) -> (),
+	PanCommit: (self: Public, index: number, live: boolean) -> (),
 	BuildPan: (self: Public, pointer: Pointer.Pointer) -> (),
 	MoveTo: (self: Public, station: number) -> (),
 	Leave: (self: Public, reason: string, forced: boolean?, fromServer: boolean?) -> (),
@@ -142,6 +141,7 @@ export type Public = {
 	LoadPreview: (self: Public) -> (),
 	FirstStepOf: (self: Public, tab: string) -> string,
 	SpareCustomer: (self: Public, now: number) -> (),
+	TeachPan: (self: Public) -> (),
 	Update: (self: Public, dt: number) -> (),
 }
 

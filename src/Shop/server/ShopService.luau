@@ -2,8 +2,13 @@
 -- Robux shop: the single MarketplaceService.ProcessReceipt of the place, Lobby and Run (TASK-160; user request
 -- 2026-10-11, Provisional; architecture.md §10.1, data.md §1.4 and §1.7, network.md §15). It plays the
 -- MonetizationService role of architecture.md §10.1 (same priority, 790) under the feature name Shop.
--- Products: gem packs and class products from Content.Shop (ProductId 0 = not created yet: never registered); other
--- services add theirs with RegisterProduct in their OnInit (wave 4 revive).
+-- Products: gem packs from Content.Shop (ProductId 0 = not created yet: never registered); other services add theirs
+-- with RegisterProduct in their OnInit (ShopUtilityService, TASK-290).
+-- Game Passes (TASK-291; owner request 2026-10-14, Provisional): one per class (Content.Shop.GamePasses, PassId 0 = not
+-- created). The class is written to profile.Classes when the pass is bought here (PromptGamePassPurchaseFinished) and on
+-- each join for a pass owner (UserOwnsGamePassAsync in pcall, cached per player; a failed check retries on the next
+-- join). A class already in the profile is never written again. Once written it stays (profile.Classes is the one
+-- ownership list, data.md §1.7).
 -- Idempotent per PurchaseId: the grant patch and the PurchaseId (profile.Receipts, last RECEIPTS_KEPT) are written in
 -- one Update (one Charm batch, no yield between the "already granted?" check and the write), and PurchaseGranted is
 -- returned only after ProfileService:SaveConfirmed sees the PurchaseId in LastSavedData. Anything else returns
@@ -26,10 +31,13 @@ type Profile = Atomic.Table<Template.Data>
 export type Patch = Struct.Partial<Template.Data>
 
 -- What a product gives. Patch is applied with the PurchaseId in one batch (it must not touch Receipts); After runs
--- once, right after the grant (feedback only: Notice, ClassBuyResult). No yield inside a Handler.
+-- once, right after the grant (feedback, or the run-state effect of a utility, TASK-290). No yield inside a Handler.
+-- Wait = true: the product cannot be granted in this server now (a run utility bought in the lobby): nothing is written
+-- and the receipt stays NotProcessedYet, so Roblox delivers it again in a later server.
 export type Grant = {
 	Patch: Patch,
 	After: (() -> ())?,
+	Wait: boolean?,
 }
 export type Handler = (player: Player, profile: Profile) -> Grant
 
@@ -43,6 +51,7 @@ export type Receipt = {
 const RECEIPTS_KEPT = 50 -- circular list in the profile (data.md §1.1)
 const PROFILE_WAIT = 10 -- s a receipt waits for a profile that is still loading
 const GEMS_MAX = 2147483647 -- Profile.Gems wire range (network.md §4.5)
+const PASS_RETRY = 2 -- UserOwnsGamePassAsync attempts per pass on join
 
 const ShopService = Modux.Service(
 	"ShopService",
@@ -53,11 +62,16 @@ function ShopService:Setup()
 	self.Handlers = {} :: { [number]: Handler }
 	-- ProductId -> key, for logs
 	self.Names = {} :: { [number]: string }
+	-- key -> handler of every registered product, ProductId 0 included (DevReceipt)
+	self.ByKey = {} :: { [string]: Handler }
+	-- player -> PassId -> owns (only answers that came back; a failed call is not cached)
+	self.Passes = {} :: { [Player]: { [number]: boolean } }
 end
 
 -- Registers a Developer Product. Call in OnInit (receipts start in OnStart). A ProductId of 0 or less is a product not
 -- created on the Creator Hub yet: skipped with no error (Content.Shop placeholders).
 function ShopService:RegisterProduct(productId: number, name: string, handler: Handler)
+	self.ByKey[name] = handler
 	if productId <= 0 then
 		return
 	end
@@ -79,7 +93,7 @@ function ShopService:Notify(player: Player, kind: string, value: number)
 	})
 end
 
-function ShopService:ReplyClass(player: Player, key: string, reason: "Granted" | "Converted")
+function ShopService:ReplyClass(player: Player, key: string, reason: "Granted")
 	const net = self.Dependencies.NetService
 	if not net:IsRunning() or not net:IsReady(player) then
 		return
@@ -103,28 +117,81 @@ function ShopService:GemPackHandler(pack: Content.ShopGemPack): Handler
 	end
 end
 
--- Class product: unlocks the class. Already owned (bought with gems or a code between the prompt and the receipt):
--- the purchase turns into the class gem price, so nothing paid is lost (data.md §1.7, Provisional).
-function ShopService:ClassHandler(key: string): Handler
-	const class = Content.Classes.ByKey[key]
-	return function(player: Player, profile: Profile): Grant
-		const profiles = self.Dependencies.ProfileService
-		if profiles:OwnedClasses(profile)[key] then
-			return {
-				Patch = { Gems = math.clamp(profile.Gems() + class.Price, 0, GEMS_MAX) },
-				After = function()
-					self:ReplyClass(player, key, "Converted")
-					self:Notify(player, "gems_gained", class.Price)
-				end,
-			}
+-- Game Passes -----------------------------------------------------------------------------------------------------
+
+-- Owns the pass? Cached per player; nil = Roblox did not answer (try again later).
+function ShopService:OwnsPass(player: Player, passId: number): boolean?
+	if passId <= 0 then
+		return false
+	end
+	const cache = self.Passes[player] or {}
+	self.Passes[player] = cache
+	if cache[passId] ~= nil then
+		return cache[passId]
+	end
+	for _ = 1, PASS_RETRY do
+		const ok, owns = pcall(function()
+			return MarketplaceService:UserOwnsGamePassAsync(player.UserId, passId)
+		end)
+		if ok then
+			cache[passId] = owns == true
+			return cache[passId]
 		end
-		return {
-			Patch = { Classes = profiles:WithClass(profile, key) },
-			After = function()
-				self:ReplyClass(player, key, "Granted")
-				self:Notify(player, "class_bought", Content.Classes.IndexOf[key])
-			end,
-		}
+		task.wait(1)
+	end
+	return nil
+end
+
+-- The player owns the Game Pass of this class (cached answer only: never yields). ClassService pre-check.
+function ShopService:OwnsClassPass(player: Player, key: string): boolean
+	const pass = Content.Shop.GamePasses.ByKey[key]
+	const cache = self.Passes[player]
+	return pass ~= nil and cache ~= nil and cache[pass.PassId] == true
+end
+
+-- Writes the class of a pass to the profile once. notify = the purchase just happened (ClassBuyResult + Notice).
+function ShopService:GrantPass(player: Player, key: string, notify: boolean): boolean
+	const profiles = self.Dependencies.ProfileService
+	const profile = profiles:Get(player)
+	const class = Content.Classes.ByKey[key]
+	if not profile or not class or not class.InMvp then
+		return false
+	end
+	if not profiles:OwnedClasses(profile)[key] then
+		profiles:Update(player, { Classes = profiles:WithClass(profile, key) })
+		profiles:RequestSave(player)
+	end
+	if notify then
+		self:ReplyClass(player, key, "Granted")
+		self:Notify(player, "class_bought", Content.Classes.IndexOf[key])
+	end
+	return true
+end
+
+-- On join: every created pass this player owns unlocks its class (yields; runs in its own thread).
+function ShopService:CheckPasses(player: Player)
+	for _, pass in Content.Shop.GamePasses.List do
+		if pass.PassId <= 0 or player.Parent ~= Players then
+			continue
+		end
+		if self:OwnsPass(player, pass.PassId) then
+			self:GrantPass(player, pass.Key, false)
+		end
+	end
+end
+
+function ShopService:OnPassFinished(player: Player, passId: number, purchased: boolean)
+	if not purchased or passId <= 0 then
+		return
+	end
+	for _, pass in Content.Shop.GamePasses.List do
+		if pass.PassId == passId then
+			const cache = self.Passes[player] or {}
+			cache[passId] = true
+			self.Passes[player] = cache
+			self:GrantPass(player, pass.Key, true)
+			return
+		end
 	end
 end
 
@@ -132,13 +199,11 @@ function ShopService:RegisterContent()
 	for _, pack in Content.Shop.GemPacks.List do
 		self:RegisterProduct(pack.ProductId, pack.Key, self:GemPackHandler(pack))
 	end
-	for _, product in Content.Shop.ClassProducts.List do
-		const class = Content.Classes.ByKey[product.Key]
+	for _, pass in Content.Shop.GamePasses.List do
+		const class = Content.Classes.ByKey[pass.Key]
 		if not class or not class.InMvp then
-			warn(`[ShopService] Content.Shop.ClassProducts.{product.Key} is not an MVP class: not sold`)
-			continue
+			warn(`[ShopService] Content.Shop.GamePasses.{pass.Key} is not an MVP class: not sold`)
 		end
-		self:RegisterProduct(product.ProductId, product.Key, self:ClassHandler(product.Key))
 	end
 	if next(self.Handlers) == nil then
 		warn("[ShopService] no Developer Product ids in Content.Shop yet (all 0): Robux purchases are off")
@@ -200,6 +265,9 @@ function ShopService:Fulfil(
 			warn(`[ShopService] handler {name} failed for {purchaseId}: {grant}`)
 			return Enum.ProductPurchaseDecision.NotProcessedYet
 		end
+		if grant.Wait then
+			return Enum.ProductPurchaseDecision.NotProcessedYet
+		end
 		const patch = table.clone(grant.Patch) :: { [string]: any }
 		patch.Receipts = withReceipt(profile.Receipts(), purchaseId)
 		profiles:Update(player, patch :: any)
@@ -221,20 +289,23 @@ function ShopService:Fulfil(
 end
 
 -- Dev hook (DevService "receipt" command): runs the receipt path for a Content.Shop key without a Creator Hub product.
--- Server only, never reachable from the network; needs dev mode.
+-- A class key runs the Game Pass grant instead (no receipt). Server only, never reachable from the network; dev mode.
 function ShopService:DevReceipt(player: Player, key: string, purchaseId: string): string
 	if not self.Dependencies.PlaceService:IsDev() then
 		error("[ShopService] DevReceipt needs dev mode")
+	end
+	if Content.Shop.GamePasses.ByKey[key] then
+		return if self:GrantPass(player, key, true) then "PassGranted" else "PassRefused"
 	end
 	local handler: Handler? = nil
 	const pack = Content.Shop.GemPacks.ByKey[key]
 	if pack then
 		handler = self:GemPackHandler(pack)
-	elseif Content.Shop.ClassProducts.ByKey[key] then
-		handler = self:ClassHandler(key)
+	else
+		handler = self.ByKey[key] -- products other services registered (Content.Shop.Utilities, TASK-290)
 	end
 	if handler == nil then
-		error(`unknown shop key {key} (Content.Shop.GemPacks or ClassProducts)`, 0)
+		error(`unknown shop key {key} (Content.Shop.GemPacks, GamePasses or Utilities)`, 0)
 	end
 	return tostring(self:Fulfil(player, handler, purchaseId, key))
 end
@@ -242,6 +313,18 @@ end
 ShopService:OnInit(function(self)
 	self:Setup()
 	self:RegisterContent()
+
+	self.Dependencies.ProfileService.Loaded:Connect(function(player)
+		task.spawn(function()
+			self:CheckPasses(player)
+		end)
+	end)
+	MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player: Player, passId: number, purchased: boolean)
+		self:OnPassFinished(player, passId, purchased)
+	end)
+	Players.PlayerRemoving:Connect(function(player)
+		self.Passes[player] = nil
+	end)
 end)
 
 -- OnStart: every OnInit (other services' RegisterProduct) has run before the first receipt is accepted.

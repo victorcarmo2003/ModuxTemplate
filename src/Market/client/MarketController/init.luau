@@ -241,6 +241,10 @@ end
 
 -- Pure view of one fixed position (B1..B5) from the current vehicle, its level and the cash.
 function MarketController:BenchView(upgrade: Content.Upgrade, vehicle: string, level: number, wait: number): View
+	-- anomaly mode (Content.Mode, owner request 2026-10-14): Wide Counter and Drawer Lock are not on the stand
+	if Content.Mode.IsOff(upgrade.Key) then
+		return HIDDEN
+	end
 	if not table.find(upgrade.Vehicles, vehicle) then
 		-- "Trailer only" (B5 on the cart): show what it would be on the first vehicle that has it.
 		const home = upgrade.Vehicles[1]
@@ -315,6 +319,9 @@ end
 -- home vehicle for "Trailer only", nothing until the level is known (FEAT-015 v2 table).
 function MarketController:MiniTarget(upgrade: Content.Upgrade, vehicle: string, level: number, wait: number): Minis.Target
 	const badge = Labels.Badge(upgrade)
+	if Content.Mode.IsOff(upgrade.Key) then
+		return { State = "Empty", Part = "", Vehicle = vehicle, Badge = badge } -- anomaly mode: empty pedestal
+	end
 	if not table.find(upgrade.Vehicles, vehicle) then
 		const home = upgrade.Vehicles[1]
 		const rows = (if home then upgrade.Levels[home] else nil) or {}
@@ -551,7 +558,10 @@ end
 
 -- Shutter state from the Shift phase; the first record snaps, later changes animate (with the shutter SFX).
 function MarketController:ApplyPhase(phase: string, ready: boolean)
-	const open = not KIOSK_CLOSED[phase]
+	const round = self.Dependencies.RoundController
+	-- Day 1: also down until the first shift ends (Content.Mart.FirstShiftClosed, owner request 2026-10-14)
+	const info = { Day = Vide.untrack(round.Day), IsNight = Vide.untrack(round.IsNight) }
+	const open = not KIOSK_CLOSED[phase] and not MART.FirstShiftClosed(info, phase)
 	const animate = self.KioskSynced
 	const changed = Vide.untrack(self.KioskOpen) ~= open
 	self.KioskSynced = ready
@@ -639,7 +649,12 @@ function MarketController:CheapestOnSale(): number?
 	const day = Vide.untrack(round.Day)
 	local cheapest: number? = nil
 	for _, upgrade in Content.Upgrades.List do
-		if upgrade.SoldAt ~= "Bench" or not table.find(upgrade.Vehicles, vehicle) or day < upgrade.UnlockDay then
+		if
+			upgrade.SoldAt ~= "Bench"
+			or Content.Mode.IsOff(upgrade.Key)
+			or not table.find(upgrade.Vehicles, vehicle)
+			or day < upgrade.UnlockDay
+		then
 			continue
 		end
 		const level = Vide.untrack(self.Levels[upgrade.Key])
@@ -687,18 +702,29 @@ function MarketController:StepHint()
 	if hint == nil then
 		return
 	end
-	const phase = Vide.untrack(self.Dependencies.RoundController.Phase)
+	const round = self.Dependencies.RoundController
+	const phase = Vide.untrack(round.Phase)
+	const tutorial = self.Dependencies.TutorialController
+	-- Day 1 upgrade lesson (owner request 2026-10-14): the tutorial guides to the Storage pedestal (one arrow at a time)
+	const lesson = Vide.untrack(function(): string?
+		return tutorial:UpgradeLesson()
+	end)
+	if lesson ~= nil then
+		hint:Set(false)
+		return
+	end
 	if not HINT_PHASES[phase] then
 		self.HintDismissed = false -- a new window (next closing) may raise the hint again
 		hint:Set(false)
 		return
 	end
-	-- the tutorial owns the guidance on Day 1 (one arrow at a time): no gear-stand hint until it ends or is skipped
-	const tutorial = self.Dependencies.TutorialController
+	-- the tutorial owns the guidance on Day 1 (one arrow at a time): no gear-stand hint until it ends or is skipped;
+	-- and none while the stand is still down before the end of the first shift (Content.Mart.FirstShiftClosed)
 	const tutorialOn = Vide.untrack(function(): boolean
 		return tutorial:FirstRun()
 	end)
-	if tutorialOn then
+	const info = { Day = Vide.untrack(round.Day), IsNight = Vide.untrack(round.IsNight) }
+	if tutorialOn or MART.FirstShiftClosed(info, phase) then
 		hint:Set(false)
 		return
 	end
@@ -728,8 +754,7 @@ function MarketController:StepHint()
 		hint:Set(false)
 		return
 	end
-	hint:Set(target ~= nil)
-	hint:Step()
+	hint:Set(target ~= nil) -- the hint moves its own Beacon every frame (Hint.luau)
 end
 
 function MarketController:Step()
@@ -872,6 +897,8 @@ MarketController:OnStart(function(self)
 		Vide.effect(function()
 			const phase = round.Phase()
 			const ready = round.Ready()
+			round.Day()
+			round.IsNight()
 			Vide.untrack(function()
 				self:ApplyPhase(phase, ready)
 				return nil

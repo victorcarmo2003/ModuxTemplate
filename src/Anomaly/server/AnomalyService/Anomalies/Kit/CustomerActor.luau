@@ -15,6 +15,11 @@
 -- The actor gone without one of these (removed, sent away by someone else) ends the occurrence with no outcome.
 -- Stop sends a still-standing actor away (NightOver, Restore, dev stop).
 --
+-- V2 error (DEC-255, DEC-256; TASK-269), Options.Scare: the Wrong action is not -RuleBroken. Instead: Phase Failed,
+-- cue "jumpscare" (Entity = actor; players near it see the cartoon face, Effects/Kit/Jumpscare), the ledger as
+-- before, and SCARE_FAINT s later VitalService:Fall of who acted (Down, revivable with a Revive Kit; Spectator when
+-- the revives of the night are spent, DEC-129). Not a lost night by itself.
+--
 -- PROVISIONAL (TASK-111, backend-coder): Api.Context has no customer access beyond Spawn, so this kit resolves
 -- CustomerService and NpcService from their modules (same object the Modux core holds; AnomalyService already lists
 -- both in its Require, so they are initialised first). Proposed for the next TASK-106 pass: Context.Customers
@@ -61,6 +66,7 @@ export type Options = {
 	Spawn: SpawnHook?, -- default: ctx.Spawn({ Variant = Params.Variant })
 	CounterCue: string?, -- sent once when the actor reaches Q1 (N5 puddle)
 	FailCue: string?, -- sent on a failure (N1 blank_coin, N4 mirror_smile)
+	Scare: boolean?, -- V2 error (DEC-255): jumpscare + faint instead of -RuleBroken
 }
 
 -- Verb (Rules) -> customer action (CustomerService.Acted)
@@ -75,11 +81,16 @@ const LEAVING = "Leaving"
 const WRONG = "Wrong"
 const SHIFT_END = "shift_end"
 const EYE_OFFSET = Vector3.new(0, 1.5, 0) -- root -> eye when the rig has no Head
+const SCARE_CUE = "jumpscare"
+const SCARE_FAINT = 0.7 -- s from the cue to the faint: the face (~0.6 s) is on screen first (DEC-256)
+
+type Vital = { Fall: (self: any, player: Player, forced: string?) -> () }
 
 const Kit = {}
 
 local customersCache: Customers? = nil
 local npcsCache: Npcs? = nil
+local vitalCache: Vital? = nil
 
 function Kit.Customers(): Customers
 	if customersCache == nil then
@@ -93,6 +104,29 @@ function Kit.Npcs(): Npcs
 		npcsCache = (require :: any)(ServerScriptService.server.Npc.NpcService) :: Npcs
 	end
 	return npcsCache :: Npcs
+end
+
+function Kit.Vital(): Vital
+	if vitalCache == nil then
+		vitalCache = (require :: any)(ServerScriptService.server.Vital.VitalService) :: Vital
+	end
+	return vitalCache :: Vital
+end
+
+-- V2 error (DEC-255, DEC-256): jumpscare for who is near the actor, then `player` faints. Ledger as Kit.Fail.
+function Kit.Scare(ctx: Api.Context, occ: Api.Occurrence, state: State, player: Player)
+	ctx.Publish(occ, { Phase = "Failed" })
+	ctx.Cue(occ, SCARE_CUE, state.Actor)
+	if not state.Counted then
+		state.Counted = true
+		ctx.Economy.CountArrival()
+		ctx.Economy.CountResult(WRONG)
+	end
+	task.delay(SCARE_FAINT, function()
+		if player.Parent ~= nil then
+			Kit.Vital():Fall(player)
+		end
+	end)
 end
 
 -- Head of the actor's rig (the "seen" target), nil when the rig is gone.
@@ -240,7 +274,11 @@ function Kit.Module(options: Options): Api.Module
 				ctx.Finish(occ)
 			elseif action == params(rule).Wrong then
 				if player ~= nil then
-					Kit.Fail(ctx, occ, state, { player })
+					if options.Scare then
+						Kit.Scare(ctx, occ, state, player)
+					else
+						Kit.Fail(ctx, occ, state, { player })
+					end
 				end
 				const cue = options.FailCue
 				if cue ~= nil then

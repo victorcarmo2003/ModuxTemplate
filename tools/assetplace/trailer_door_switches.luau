@@ -1,5 +1,6 @@
 --!nonstrict
 --[[
+	OBSOLETE for the red switch since TASK-284 (2026-10-14): trailer_remove_open_switch.luau took TRL-SWITCH-OPEN out; do not re-run.
 	trailer_door_switches.luau (owner request 2026-10-12; Provisional). Edit-mode Studio snippet, NOT gameplay code.
 	Idempotent, surgical, NO Place.run, nothing deleted (the old shutter button goes to ServerStorage.Trailer_Backup_20261012).
 	Everything it touches is marked with the attribute MovedBy = "trailer_door_switches".

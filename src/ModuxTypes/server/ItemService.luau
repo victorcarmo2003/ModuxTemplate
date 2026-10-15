@@ -56,6 +56,7 @@ export type Public = {
 	Consume: (self: Public, player: Player, tool: Tool) -> (),
 	SetCount: (self: Public, tool: Tool, count: number) -> number,
 	AddTopping: (self: Public, tool: Tool, ingredient: string) -> boolean,
+	SetSauce: (self: Public, tool: Tool, sauce: string) -> boolean,
 	SetQuality: (self: Public, tool: Tool, quality: string?) -> boolean,
 	Transfer: (self: Public, tool: Tool, target: Player) -> boolean,
 	TargetOf: (self: Public, anchor: Instance) -> Player?,

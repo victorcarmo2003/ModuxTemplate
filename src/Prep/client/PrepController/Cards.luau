@@ -226,7 +226,8 @@ end
 -- Order card -------------------------------------------------------------------------------------------------------------
 
 -- One card of the Order tab (116 x 168): face, number, patience, toppings, what the customer said, and the one action.
--- Ready = Take (Mustard), Taken = Pin, pinned = Mine, Coming = Waiting (no button).
+-- Ready = "At the counter" (no button: the order is taken only by facing the customer, playtest 2026-10-14), Taken = Pin,
+-- pinned = Mine, Coming = Waiting (no button).
 function Cards.Order(controller: any, id: number): Frame
 	const card = Feed.CardOf(id)
 	const pinned = function(): boolean
@@ -282,19 +283,11 @@ function Cards.Order(controller: any, id: number): Frame
 		LayoutOrder = 4,
 		Size = UDim2.new(1, 0, 0, Theme.MinTouch),
 		BackgroundTransparency = 1,
-		CartoonButton({
-			Name = "Take",
-			Text = prep.Texts.Take,
-			TextSize = 18,
-			Tone = Theme.Tone.Mustard,
-			Size = UDim2.new(1, 0, 0, Theme.MinTouch),
-			Visible = function(): boolean
-				return status() == "Ready"
-			end,
-			OnActivated = function()
-				Feed.Take(controller, id)
-			end,
-		}),
+		stateChip(function(): string
+			return "At the counter"
+		end, Theme.Tone.Mustard, function(): boolean
+			return status() == "Ready"
+		end, false),
 		CartoonButton({
 			Name = "Pin",
 			Text = "Pin",

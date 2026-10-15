@@ -11,12 +11,15 @@
 -- MaxToppings reached -> topping_max; bowl empty -> out_of_stock {item}. Silent: no topping on the anchor, no hot dog
 -- in hand (core's Requires.Held) and a Blocked bowl (locked bowl, DEC-156: only a forged request reaches it; read by
 -- ctx.IsBlocked, TASK-057).
+-- Gift bowls (owner request 2026-10-14, Provisional): "Open" (topping_unwrap) on Prompt_Unwrap_<Suf> opens a closed gift bowl
+-- (ctx.IsWrapped) and fills it to capacity (ctx.Unwrap); a closed bowl refuses "Add" with topping_wrapped {item}.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 local StationApi = require(script.Parent.Parent.StationApi)
 local Refusal = require(script.Parent.Parent.Refusal)
 
 const ACTION = "topping_add"
+const UNWRAP = "topping_unwrap"
 const HOT_DOG = "hot_dog"
 
 -- Topping key of the anchor (a Sauce/Topping of Content.Ingredients), else nil.
@@ -71,6 +74,9 @@ local function canAdd(
 	if ctx.IsBlocked(ingredient) then
 		return nil, ingredient, nil
 	end
+	if ctx.IsWrapped(ingredient) then
+		return nil, ingredient, "topping_wrapped"
+	end
 	const toppings = toppingsOn(tool)
 	if table.find(toppings, ingredient) then
 		return nil, ingredient, "topping_repeat"
@@ -114,6 +120,19 @@ const Toppings: StationApi.Module = {
 				end
 				if not addTopping(ctx, player, tool, ingredient) then
 					warn(`[Toppings] {ingredient} taken from stock but not added to the hot dog of {player.Name}`)
+				end
+			end,
+		},
+		[UNWRAP] = {
+			Validate = function(ctx: StationApi.Context, _station: StationApi.Station, _player: Player, anchor: Instance)
+				const ingredient = toppingOf(anchor)
+				return ingredient ~= nil and ctx.IsWrapped(ingredient), nil
+			end,
+			-- inside the station lock: the first "Open" wins, a second one in the same frame finds it open
+			Run = function(ctx: StationApi.Context, _station: StationApi.Station, _player: Player, anchor: Instance)
+				const ingredient = toppingOf(anchor)
+				if ingredient ~= nil then
+					ctx.Unwrap(ingredient)
 				end
 			end,
 		},

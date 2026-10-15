@@ -53,7 +53,7 @@ local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Compon
 local TicketRail = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.TicketRail)
 local KitchenFx = require(StarterPlayer.StarterPlayerScripts.client.Kitchen.KitchenController.Fx)
 local KitchenSlots = require(StarterPlayer.StarterPlayerScripts.client.Kitchen.KitchenController.Slots)
-local Beacon = require(script.Beacon)
+local Prefs = require(StarterPlayer.StarterPlayerScripts.client.Settings.Prefs)
 local Cursor = require(script.Cursor)
 local Feed = require(script.Feed)
 local Grade = require(ReplicatedStorage.shared.Prep.Grade)
@@ -69,6 +69,7 @@ local Stage = require(script.Stage)
 local World = require(script.World)
 local BinZone = require(script.World.BinZone)
 local Director3D = require(script.World.Director3D)
+local FlipWatch = require(script.World.FlipWatch)
 local Zones = require(StarterPlayer.StarterPlayerScripts.client.Interface.Zones)
 
 const create = Vide.create
@@ -210,7 +211,6 @@ function PrepController:Setup()
 	-- the Ink veil of a blink (PrepController:Blink), nil when none
 	self.Veil = nil :: ScreenGui?
 	-- the pulsing marker over the Work prompts for a player who has not entered yet (P-3)
-	self.Beacon = Beacon.new() :: Beacon.Beacon
 	self.Pointer = nil :: Pointer.Pointer?
 	self.Gestures = nil :: Gestures.Recogniser?
 	self.Cursor = nil :: Cursor.Cursor?
@@ -222,6 +222,7 @@ function PrepController:Setup()
 	self.TrailStation = 0 :: number
 	self.Pan = nil :: Pan.Pan?
 	self.RoofBody = nil :: BasePart?
+	self.PanDriving = false :: boolean
 	self.PanNear = source(0) :: Vide.Source<number>
 	self.Unmount = nil :: (() -> ())?
 	self.Gui = nil :: ScreenGui?
@@ -254,7 +255,9 @@ function PrepController:MakeView(): View
 			return #toppings() >= Content.OrderRules.MaxToppings
 		end,
 		Info = function(key: string): { Stock: number, Locked: boolean, Used: boolean }
-			return self:InfoOf(key)
+			-- a closed gift bowl reads as locked on the panels (it is opened in the world)
+			const info = self:InfoOf(key)
+			return { Stock = info.Stock, Locked = info.Locked or info.Wrapped, Used = info.Used }
 		end,
 		Stroke = source({} :: { Vector2 }),
 		StrokeGuide = source({} :: { Vector2 }),
@@ -267,17 +270,19 @@ function PrepController:MakeView(): View
 end
 
 -- Stock of a topping box: the real stock (KitchenController, reactive) or the mock one.
-function PrepController:InfoOf(key: string): { Stock: number, Locked: boolean, Used: boolean }
+-- Wrapped = a gift bowl still closed (owner request 2026-10-14): "Open" it in the world first
+function PrepController:InfoOf(key: string): { Stock: number, Locked: boolean, Used: boolean, Wrapped: boolean }
 	const used = self.View.Used()[key] == true
 	if self.Mock then
 		const row = Mock.Stock[key]
-		return { Stock = if row ~= nil then row.Stock else 0, Locked = row ~= nil and row.Locked, Used = used }
+		return { Stock = if row ~= nil then row.Stock else 0, Locked = row ~= nil and row.Locked, Used = used, Wrapped = false }
 	end
 	const record = self.Dependencies.KitchenController:StockOf(key)
 	return {
 		Stock = if record ~= nil then record.Amount else 0,
 		Locked = record ~= nil and record.Blocked,
 		Used = used,
+		Wrapped = record ~= nil and record.Wrapped == true,
 	}
 end
 
@@ -403,7 +408,12 @@ end
 function PrepController:HintOf(tab: string): string
 	-- the drag tutorial speaks first while its hand is on screen (both sources are read: the binding depends on both)
 	const coachLine, coachTab = World.CoachLine(), World.CoachTab()
-	if coachLine ~= "" and coachTab == self:CoachKeyOf(tab) then
+	-- the sausage paw (rail -> bun) belongs to the Board section too (owner request 2026-10-14)
+	const coachSection = if coachTab == "Sausage" then "Board"
+		elseif coachTab == "Deliver" then "Toppings"
+		elseif coachTab == "Pan" then self:CoachKeyOf(tab)
+		else coachTab
+	if coachLine ~= "" and coachSection == self:CoachKeyOf(tab) then
 		return coachLine
 	end
 	const stage3D = self:Stage3DOf(tab)
@@ -504,7 +514,7 @@ function PrepController:SetTab(wanted: string)
 	const viewBefore = Poses.ViewOf(previousTab)
 	self.Tab(tab)
 	-- the camera glides when the view changes (2D: the grill and the board; 3D: one view per section, Poses.luau)
-	if self.InMode and not self.Leaving and not self.Mock and Poses.ViewOf(tab) ~= viewBefore then
+	if self.InMode and not self.Leaving and not self.Mock and not self.PanDriving and Poses.ViewOf(tab) ~= viewBefore then
 		self:MoveTo(untrack(self.Station))
 	end
 	-- keep the step on a tab that owns it
@@ -954,7 +964,11 @@ function PrepController:Mount()
 					self:Leave("Button", false, false)
 				end,
 				LeaveText = prep.Texts.Leave,
+				-- Settings "Prep helper" off (TASK-279): no step-by-step line (the blocked-Next toast still explains)
 				Hint = function(): string
+					if not Prefs.PrepAssist() then
+						return ""
+					end
 					return self:HintOf(self.Tab())
 				end,
 				Pips = function(): { Pip }
@@ -971,6 +985,8 @@ function PrepController:Mount()
 				end,
 				-- the dots light the section the camera is nearest to while it pans
 				Near = self.PanNear,
+				-- a flip window is open while another tab is in front: the Grill dot pulses, a "Flip!" chip calls back (FlipWatch)
+				Alert = FlipWatch.Alert,
 				DotSize = rules.Camera.Pan.Dots.Size,
 				DotActive = rules.Camera.Pan.Dots.Active,
 				Progress = {
@@ -1072,22 +1088,8 @@ function PrepController:Mount()
 							Roomy = function(): boolean
 								return layout().Kind == "Desktop"
 							end,
-							-- the customer at the counter waits to be taken (TASK-206): the Take of the ticket rail
-							Take = {
-								Visible = function(): boolean
-									return Feed.Front() ~= 0
-								end,
-								Text = function(): string
-									const id = Feed.Front()
-									return if id ~= 0 then `{prep.Texts.Take} {Feed.CardOf(id)().Name}` else prep.Texts.Take
-								end,
-								OnPress = function()
-									const id = untrack(Feed.Front)
-									if id ~= 0 then
-										Feed.Take(self, id)
-									end
-								end,
-							},
+							-- No Take here (playtest 2026-10-14): an order is taken only by facing the customer (the tap on him in the
+							-- Window view, World/Stages/Order, or the world prompt take_order), so the player looks at him (anomalies).
 							OnCycle = function()
 								self:CycleTicket()
 							end,
@@ -1175,6 +1177,7 @@ function PrepController:Mount()
 end
 
 function PrepController:Unmounted()
+	FlipWatch.Reset()
 	const unmount = self.Unmount
 	self.Unmount = nil
 	if unmount ~= nil then
@@ -1195,8 +1198,9 @@ function PrepController:Unmounted()
 	end
 end
 
--- Enters the station. `mock` = the dev preview (no seat, no packets). Returns whether it did.
-function PrepController:Enter(station: number, mock: boolean?, tab: string?): boolean
+-- Enters the station. `mock` = the dev preview (no seat, no packets). `plate` = the cosmetic mask of the seat record (nil / 0 =
+-- the server holds no built plate for us). Returns whether it did.
+function PrepController:Enter(station: number, mock: boolean?, tab: string?, plate: number?): boolean
 	if self.InMode then
 		if untrack(self.Station) ~= station and not self.Leaving then
 			self:MoveTo(station)
@@ -1258,6 +1262,11 @@ function PrepController:Enter(station: number, mock: boolean?, tab: string?): bo
 	self.Toasts(false)
 	self:ResetPlate()
 	self:LoadPreview()
+	-- TASK-260: the plate left on the board last time comes back (the server kept it parked). TASK-283: only when the seat record
+	-- still carries it; a plate the server dropped meanwhile (shop closed) must not come back as a picture the server lacks
+	if not self.Mock then
+		Session.Unpark(self, plate ~= nil and plate ~= 0)
+	end
 	self.Station(station)
 	self.Active(true)
 
@@ -1416,23 +1425,36 @@ end
 -- The camera went to the stop of the front tab on its own (a tab, LB / RB, a station change): the pan follows.
 function PrepController:PanSync()
 	const pan = self.Pan
-	if pan ~= nil then
+	-- a tab change that the pan itself asked for (the camera is already where the hand put it) must not pull `u` to the station
+	if pan ~= nil and not self.PanDriving then
 		pan:Sync(self:StopOf(nil))
 	end
 end
 
 -- The pan settled on stop `index`: that is the only moment the stage changes (Enter / Leave of the stages, the step and PrepTab
 -- follow SetTab); on the stop it already stood on, the camera just glides back onto it.
-function PrepController:PanCommit(index: number)
+function PrepController:PanCommit(index: number, live: boolean)
 	const trail = self.Trail
 	const stop = if trail ~= nil then trail.Stops[index] else nil
 	if stop == nil or not self.InMode or self.Leaving then
 		return
 	end
 	if stop.Tab == untrack(self.Tab) then
-		self:MoveTo(untrack(self.Station))
-	else
-		self:SetTab(stop.Tab)
+		if not live then
+			self:MoveTo(untrack(self.Station))
+		end
+		return
+	end
+	-- live: the active station changes while the camera keeps moving with the hand (no glide, `u` untouched)
+	-- (pcall: a stage that errors in Enter must never leave the flag up, or every later tab change would skip its camera glide)
+	self.PanDriving = live
+	const ok, problem = pcall(self.SetTab, self, stop.Tab)
+	self.PanDriving = false
+	if not ok then
+		warn(`[PrepController] pan: tab change to {stop.Tab} failed: {problem}`)
+	end
+	if live then
+		self.Pose = stop.Pose
 	end
 end
 
@@ -1456,12 +1478,13 @@ function PrepController:BuildPan(pointer: Pointer.Pointer)
 		Stop = function(): number
 			return self:StopOf(nil)
 		end,
-		Goal = function(eye: Vector3, look: Vector3, fov: number, omega: number)
+		Goal = function(eye: Vector3, look: Vector3, fov: number)
 			const focus = (eye - look).Magnitude
-			camera:PrepGoal(eye, look, fov, omega, focus, math.max(0.4, focus * 0.28))
+			-- omega 0 = a cut: the drag is 1:1 with the pointer, the smoothness is in `u` (inertia, edge ramp)
+			camera:PrepGoal(eye, look, fov, 0, focus, math.max(0.4, focus * 0.28))
 		end,
-		Commit = function(index: number)
-			self:PanCommit(index)
+		Commit = function(index: number, live: boolean)
+			self:PanCommit(index, live)
 		end,
 		Near = function(index: number?)
 			-- the stop index of the trail -> the index of its tab in the bar (the dots are drawn per tab)
@@ -1617,6 +1640,8 @@ function PrepController:Finish(takeover: boolean)
 	self.Active(false)
 	self.Station(0)
 	self.Toasts(false)
+	-- TASK-260: an open plate stays on the board (server parks it): keep its picture for the next Enter
+	Session.Park(self)
 	self:ResetPlate()
 	if takeover then
 		const camera = self.Dependencies.CameraController
@@ -1661,20 +1686,32 @@ function PrepController:FirstStepOf(tab: string): string
 	return "grill"
 end
 
--- The customer at the counter (the Take target) is not cut or ghosted by the Rig in the Window view, and only there: he comes
--- back to the cut / ghost zones with any other view (prep-3d.md §4.4). Re-judged at 4 Hz.
+-- The customer at the counter (the Take target) is not cut or ghosted by the Rig in the Window view, nor the one waiting for the
+-- plate in the Toppings view (the delivery by drag); with any other view he comes back to the cut / ghost zones (prep-3d.md
+-- §4.4). Re-judged at 4 Hz.
 function PrepController:SpareCustomer(now: number)
 	if now < self.SpareAt then
 		return
 	end
 	self.SpareAt = now + 0.25
 	local npc: number? = nil
-	if rules.ThreeD and Poses.ViewOf(untrack(self.Tab)) == "Window" and not self.Leaving then
+	const view = if rules.ThreeD and not self.Leaving then Poses.ViewOf(untrack(self.Tab)) else ""
+	if view == "Window" then
 		for _, id in untrack(Feed.Ids) do
 			const card = untrack(Feed.CardOf(id))
 			if card.Status == "Ready" and card.Place == "Counter" then
 				npc = id
 				break
+			end
+		end
+	elseif view == "Toppings" then
+		-- the customer waiting for the plate stays whole in the Toppings view too: it is the drop target of the delivery by drag
+		-- (World/Stages/Build, owner request 2026-10-14)
+		const pinned = untrack(Feed.Pinned)
+		for _, id in untrack(Feed.Ids) do
+			const card = untrack(Feed.CardOf(id))
+			if card.Status == "Taken" and card.Place == "Counter" and (npc == nil or id == pinned) then
+				npc = id
 			end
 		end
 	end
@@ -1683,13 +1720,32 @@ end
 
 -- Per frame -------------------------------------------------------------------------------------------------------------
 
+-- TASK-262 (owner request 2026-10-14): the first time the mode opens in the session, before any hot dog, the paw drags left and
+-- right across the view (Coach "Pan"): the sections are reached by dragging sideways. Once per session (module state); it goes
+-- at the first press like every hand of the Coach, and the grill hand waits for it.
+local panTaught = false
+-- TASK-266 (owner request 2026-10-14): off again, it showed up over the tutorial's bun-cut step and confused it (true = back)
+const TEACH_PAN = false
+
+function PrepController:TeachPan()
+	if not TEACH_PAN or panTaught or self.Pan == nil or self.Leaving or not rules.ThreeD then
+		return
+	end
+	const coach = World.Coach()
+	const camera = workspace.CurrentCamera
+	if coach:Active() or camera == nil then
+		return
+	end
+	panTaught = true
+	const frame = camera.CFrame
+	const flatRight = Vector3.new(frame.RightVector.X, 0, frame.RightVector.Z)
+	const right = if flatRight.Magnitude > 1e-3 then flatRight.Unit else Vector3.xAxis
+	-- a point in front of the camera, down on the counter, swept from left to right
+	const centre = frame.Position + frame.LookVector * 2.4 - Vector3.yAxis * 0.6
+	coach:Show("Pan", { centre - right * 1.1, centre + right * 1.1 })
+end
+
 function PrepController:Update(dt: number)
-	-- the beacon over the Work prompts: while the shop sells and the player is free
-	const phase = self.Dependencies.RoundController.Phase()
-	self.Beacon:Step(
-		dt,
-		not self.InMode and (phase == "Open" or phase == "Night") and untrack(self.Dependencies.VitalController.LocalState) == "Active"
-	)
 	if not self.InMode then
 		return
 	end
@@ -1697,6 +1753,9 @@ function PrepController:Update(dt: number)
 	self:SpareCustomer(os.clock())
 	if self.Pan ~= nil then
 		self.Pan:Step(dt)
+	end
+	if not panTaught and untrack(self.Shown) then
+		self:TeachPan()
 	end
 	const camera = self.Dependencies.CameraController
 	const mode = untrack(camera.Mode)
@@ -1741,6 +1800,14 @@ function PrepController:Update(dt: number)
 	if not self.Mock and now >= self.NextBeat then
 		self:SendTab()
 	end
+	FlipWatch.Step(self, function(key: string, speed: number)
+		if Content.Sounds.ByKey[key] == nil then
+			return
+		end
+		pcall(function()
+			((self.Dependencies.KitchenController :: any).Dependencies.AudioController):Play(key, nil, { Speed = speed })
+		end)
+	end)
 end
 
 -- Startup ---------------------------------------------------------------------------------------------------------------
@@ -1756,7 +1823,7 @@ PrepController:OnInit(function(self)
 	-- a seat of mine = the mode; the seat gone or given to someone else = out
 	local function onSeat(id: number, record: any)
 		if record.User == me then
-			self:Enter(id, false, record.Step)
+			self:Enter(id, false, record.Step, record.Plate)
 		elseif untrack(self.Station) == id and self.InMode then
 			self:Leave("Seat", false, true)
 		end

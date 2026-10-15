@@ -35,10 +35,10 @@
 	Guidance (user request 2026-10-11: "very clear what to interact with"): TutorialPanel (Cream card, top centre:
 	"3/9" chip, "STEP 3 OF 9", the instruction starting with the verb, hint, Skip), Beacon.luau (pulsing Mustard
 	Highlight on the exact piece of the step: the pot, the grill, the bun crate, the board, the customer; and a 3D
-	arrow bobbing over it), TutorialPointer on the screen edge while the target is off screen, and Spotlight on the
-	money pill for the UI step. From far away (camera > ARROW_FAR studs from the target) the 3D arrow gets small, so a
-	screen-sized bouncing billboard arrow (TutorialArrow, scaled like the HUD) hangs over the same spot; a step with
-	AlwaysArrow (the OPEN sign, playtest 2026-10-11) shows it at any distance. Pieces without a
+	arrow bobbing over it, grown with the distance so it keeps a readable size from far away), TutorialPointer on the screen
+	edge ONLY while neither the arrow tip nor the target is on screen (EdgePointer; owner request 2026-10-14: the arrow is
+	always the 3D one, the 2D badge only points the way when it is out of view), and Spotlight on the
+	money pill for the UI step. Pieces without a
 	visible part of their own (the OPEN sign's anchor on its stand, an invisible Mart shelf anchor) mark the small model
 	around them or the nearest visible piece (highlightOf). A step completed (the panel number goes up) turns the chip Green with a check for
 	CHECK_TIME s and plays `prompt_done`.
@@ -78,7 +78,7 @@
 	tutdebug (the TutorialDebug panel; F8 too). With dev mode on, past Day 1, or done or skipped, says
 	so once in the Output (the tutorial never runs for it: /dev tutorial reset).
 
-	PROVISIONAL: texts, IDLE, PROGRESS, ARROW_FAR, CALL_WAIT, NUDGE, TALK_TIME, TALK_MIN, REASK, CHECK_TIME, skip keys (Q, DPadDown), "a served
+	PROVISIONAL: texts, IDLE, PROGRESS, CALL_WAIT, NUDGE, TALK_TIME, TALK_MIN, REASK, CHECK_TIME, skip keys (Q, DPadDown), "a served
 	sale of the tutorial customer" as the first sale, ending on the day shift end.
 ]]
 local CollectionService = game:GetService("CollectionService")
@@ -94,8 +94,8 @@ local Cinematic = require(StarterPlayer.StarterPlayerScripts.client.Interface.Ci
 local Objective = require(StarterPlayer.StarterPlayerScripts.client.Interface.Objective)
 local Spotlight = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Spotlight)
 local TutorialPanel = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.TutorialPanel)
-local TutorialArrow = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.TutorialArrow)
 local TutorialPointer = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.TutorialPointer)
+local EdgePointer = require(StarterPlayer.StarterPlayerScripts.client.Interface.EdgePointer)
 local TutorialDebug = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.TutorialDebug)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
 local Rules = require(StarterPlayer.StarterPlayerScripts.client.Interaction.PromptController.Rules)
@@ -103,6 +103,8 @@ local TutorialRules = require(ReplicatedStorage.shared.Tutorial.Rules)
 local Beacon = require(script.Beacon)
 local Call = require(script.Call)
 local Steps = require(script.Steps)
+-- the plate of the 3D prep mode (module state shared with PrepController): the "deliver" step reads it (TASK-254)
+local PrepPlate = require(StarterPlayer.StarterPlayerScripts.client.Prep.PrepController.Stages.Build.Session)
 
 const TAG = "Interactable"
 const VEHICLE_TAG = "Vehicle"
@@ -119,17 +121,22 @@ const SERVED: { [string]: boolean } = { Perfect = true, Complete = true, Incompl
 const REASK = 15 -- s without a tutorial customer around before TutorialBegin goes out again
 const CHECK_TIME = 0.9 -- s the panel chip shows the green check of a completed step
 const TUTORIAL_CALL = Content.BossCallRules.Tutorial.Call
+-- Day 1 upgrade lesson (owner request 2026-10-14, Provisional): Walt's call, the upgrade to buy, the Gear Stand reach
+const LESSON = TutorialRules.Upgrade
+const LESSON_REACH = Content.Mart.Hint.Reach * 2 -- studs from the pedestal where "go" becomes "buy"
 const CALL_WAIT = 12 -- s of a silent phone before the tutorial goes on without Walt (panel only)
 const RUSH_TIME = 4 -- s between two step changes under which the player is rushing (no praise)
 const NUDGE = 20 -- s on the same step before Walt says it again (steps without Remind)
 const IDLE = 12 -- s without progress on a step with Remind before it turns urgent (and again every IDLE s)
 const PROGRESS = 2 -- studs closer to the target that count as progress (walking to it resets IDLE)
-const ARROW_FAR = 22 -- studs from the camera to the target from where the billboard arrow shows
-const ARROW_MAX = 400 -- studs: the billboard arrow's MaxDistance (the Mart door across the street)
 const TALK_MIN = 1.5 -- s a talk step stays at least while Walt is on the line
 const TALK_TIME = 7 -- s of a talk step without the call
 const STEP_SOUND = "prompt_done"
 const SKIP_BIND = "TutorialSkip"
+-- Owner request 2026-10-14 (Provisional): no Skip (Q / D-pad / button) and no top tutorial panel: Walt explains every step on the
+-- phone, the arrow / highlight still guide. The talk steps move on by themselves (TALK_TIME / Walt done). false = off
+const SKIPPABLE = false
+const SHOW_PANEL = false
 const SKIP_TEXT: { [string]: string } = {
 	KeyboardMouse = "Skip (Q)",
 	Gamepad = "Skip (D-pad Down)",
@@ -224,8 +231,8 @@ function TutorialController:Setup()
 	self.PointerAt = Vide.source(Vector2.zero) :: Vide.Source<Vector2>
 	self.PointerAngle = Vide.source(0) :: Vide.Source<number>
 	self.Scale = Vide.source(1) :: Vide.Source<number>
-	-- billboard arrow shown (the target is on screen and far from the camera)
-	self.ArrowFar = Vide.source(false) :: Vide.Source<boolean>
+	-- edge pointer maths (hysteresis state); the badge shows only while the arrow tip and the target are both off screen
+	self.Edge = EdgePointer.new(EDGE_MARGIN) :: EdgePointer.EdgePointer
 	-- no progress on the step for IDLE s: reminder, stronger pulse (until the step changes)
 	self.Urgent = Vide.source(false) :: Vide.Source<boolean>
 	-- os.clock of the last progress on the step (step start, getting closer, a reminder) and the closest distance
@@ -281,6 +288,13 @@ function TutorialController:Setup()
 	self.Mounted = false :: boolean
 	-- DevClient commands other controllers plug in (SetDevHandler): command -> handler(text)
 	self.DevHandlers = {} :: { [string]: (text: string) -> () }
+	-- Day 1 upgrade lesson: this player ran the tutorial this session (a rookie), Walt's lesson call was heard, the
+	-- lesson is on screen, the player reached the stand once, skipped it
+	self.Rookie = false :: boolean
+	self.LessonHeard = false :: boolean
+	self.LessonOn = false :: boolean
+	self.LessonNear = false :: boolean
+	self.LessonSkipped = false :: boolean
 end
 
 -- Reactive -------------------------------------------------------------------------------------------------------
@@ -319,6 +333,9 @@ end
 -- "STEP 3 OF 9" over the instruction
 function TutorialController:StepLabel(): string
 	const step = self:Step()
+	if step and step.Lesson then
+		return `STEP {step.Number} OF {Steps.LessonTotal}`
+	end
 	return if step then `STEP {step.Number} OF {Steps.Total}` else ""
 end
 
@@ -334,7 +351,11 @@ function TutorialController:PanelHint(): string
 	return if self:Focused() and step.PrepHint then step.PrepHint else step.Hint
 end
 
+-- Owner request 2026-10-14 (Provisional): the tutorial has no Skip any more (Walt leads it); "" = no Skip on the cards
 function TutorialController:SkipText(): string
+	if not SKIPPABLE then
+		return ""
+	end
 	const device = self.Dependencies.InputController.Device()
 	const step = self:Step()
 	const texts = if step and step.Talk then DONE_TEXT else SKIP_TEXT
@@ -776,10 +797,12 @@ end
 function TutorialController:Decide(): (string, Instance?, string)
 	const key, target, item = self:DecideLive()
 	const forced, forcedTarget, forcedItem = self:DecideForced(key)
+	-- TASK-258: seated in the prep mode there is no world arrow (the mode has its own coach paw)
+	const seated = self:Seated()
 	if forced ~= nil then
-		return forced, forcedTarget, forcedItem
+		return forced, if seated then nil else forcedTarget, forcedItem
 	end
-	return key, target, item
+	return key, if seated then nil else target, item
 end
 
 -- Current step and the anchor to point at, from the replicated state
@@ -794,10 +817,10 @@ function TutorialController:DecideLive(): (string, Instance?, string)
 		return self:DecideShop()
 	end
 
-	-- Walt is on the line (or never called): the trailer is opened first (Prep: the red switch; opening it opens the shop),
-	-- then the tutorial customer comes
+	-- Walt is on the line (or never called): the trailer is opened first (Prep: the window lever by the phone; opening the
+	-- window opens the shop, TASK-284), then the tutorial customer comes
 	if Vide.untrack(self.Dependencies.RoundController.Phase) == "Prep" then
-		return "open", self:Anchor("open_sign", false), ""
+		return "open", self:Anchor("shutter_toggle", false), ""
 	end
 
 	const guestId, guest, rig = self:Guest()
@@ -844,6 +867,17 @@ function TutorialController:DecideLive(): (string, Instance?, string)
 		return "serve", self:Anchor("serve", false, onGuest) or rig, ""
 	end
 
+	-- TASK-254: in the 3D prep mode the plate is built (bun cut, sausage in). TASK-258: first the order's toppings on the
+	-- Toppings view, then drag the plate onto the customer's delivery area. No world arrow while seated (the prep coach paw)
+	if self:Seated() and Vide.untrack(PrepPlate.Open) and Vide.untrack(PrepPlate.Placed) then
+		const missing = self:MissingTopping(guest.Order)
+		if missing ~= nil then
+			const row = Content.Ingredients.ByKey[missing]
+			return "toppings", nil, if row then row.Name else missing
+		end
+		return "deliver", nil, ""
+	end
+
 	const kitchen = self:Kitchen()
 	if kitchen.Rail > 0 and kitchen.BoardReady then
 		return "assemble", self:KitchenAnchor("board_add_sausage", false), ""
@@ -870,6 +904,20 @@ function TutorialController:Focused(): boolean
 	return not Content.Prep.Rules.WorldKitchenPrompts
 end
 
+-- First topping of the order not on the 3D prep plate yet (PrepPlate.Toppings), in the order of the catalog; nil = all on
+function TutorialController:MissingTopping(order: { [string]: boolean }): string?
+	const onPlate: { [string]: boolean } = {}
+	for _, entry in PrepPlate.Toppings() do
+		onPlate[entry.Key] = true
+	end
+	for _, key in Content.Ingredients.ToppingKeys do
+		if order[key] and not onPlate[key] then
+			return key
+		end
+	end
+	return nil
+end
+
 -- The player works at a station now (the server sets Working = n on the character, PrepService)
 function TutorialController:Seated(): boolean
 	const character = Players.LocalPlayer.Character
@@ -885,13 +933,12 @@ function TutorialController:KitchenAnchor(action: string, enabled: boolean): Ins
 	if self:Seated() then
 		return nil
 	end
-	-- DEC-224: two natural Work prompts; the grill steps point at the grill one, the bun and board steps at the board one
-	const step = if action == "grill_place" or action == "grill_collect" then "Grill" else "Build"
-	return self:Anchor("prep_work", false, function(anchor: Instance): boolean
-		const value = anchor:GetAttribute("PromptStep")
-		-- the board prompt is "Board" in the 3D set (it was "Build" before the sections were split)
-		return value == step or (step == "Build" and value == "Board")
-	end) or self:Anchor("prep_work", false)
+	-- TASK-258: every kitchen step points at the Work prompt that enters the mode. Only the grill one is on (owner decision
+	-- 2026-10-14, PrepService:SilenceSpareWork): the board one sits off by the bun crate, so a disabled prompt is never
+	-- the target while an enabled one exists (the disabled one only as a fallback before PromptEnabled replicates)
+	return self:Anchor(WORK_ACTION, true) or self:Anchor(WORK_ACTION, false, function(anchor: Instance): boolean
+		return anchor:GetAttribute("PromptStep") == "Grill"
+	end)
 end
 
 -- Presentation ---------------------------------------------------------------------------------------------------
@@ -1109,66 +1156,38 @@ function TutorialController:ClearGuidance()
 	Vide.batch(function()
 		self.Target(false)
 		self.PointerShown(false)
-		self.ArrowFar(false)
 		self.Spot(false)
 	end)
+	self.Edge.Reset()
 	self:SetHighlight(nil)
 	self:ResetIdle()
 end
 
--- Billboard arrow over the target only from far away (the 3D arrow reads fine up close)
-function TutorialController:SetFar(far: boolean)
-	if Vide.untrack(self.ArrowFar) ~= far then
-		self.ArrowFar(far)
-	end
-end
-
--- Edge pointer toward the target while it is off screen (every frame; the overlay ignores the GUI inset, so its
--- pixels are viewport pixels). Its margin follows the UI scale, so the scaled badge never leaves the screen.
+-- Edge pointer toward the target, ONLY while neither the arrow tip nor the target is on screen (EdgePointer; every
+-- frame, after Beacon.Step so the tip is current). The overlay ignores the GUI inset, so its pixels are viewport pixels;
+-- the margin that places the badge follows the UI scale, so the scaled badge never leaves the screen.
 function TutorialController:UpdatePointer()
 	const target = Vide.untrack(self.Target)
-	const camera = Workspace.CurrentCamera
 	const position = if target then positionOf(target) else nil
-	if position == nil or camera == nil or not Vide.untrack(self.Running) then
-		if Vide.untrack(self.PointerShown) then
-			self.PointerShown(false)
-		end
-		self:SetFar(false)
-		return
-	end
-	const margin = EDGE_MARGIN * Vide.untrack(self.Scale)
-	const viewport = camera.ViewportSize
-	const point, onScreen = camera:WorldToViewportPoint(position)
-	-- steps with AlwaysArrow (the OPEN sign) keep the billboard arrow up close too
-	const step = Steps.ByKey[Vide.untrack(self.StepKey)]
-	const always = step ~= nil and step.AlwaysArrow == true
-	self:SetFar(onScreen and (always or (position - camera.CFrame.Position).Magnitude > ARROW_FAR))
-	const centre = viewport / 2
-	local delta = Vector2.new(point.X, point.Y) - centre
-	if point.Z < 0 then
-		-- behind the camera: the projection is mirrored
-		delta = -delta
-	end
-	const inside = onScreen
-		and point.X > margin
-		and point.X < viewport.X - margin
-		and point.Y > margin
-		and point.Y < viewport.Y - margin
-	if inside or delta.Magnitude < 1 then
+	if position == nil or not Vide.untrack(self.Running) then
+		self.Edge.Reset()
 		if Vide.untrack(self.PointerShown) then
 			self.PointerShown(false)
 		end
 		return
 	end
-	const halfX = math.max(viewport.X / 2 - margin, 1)
-	const halfY = math.max(viewport.Y / 2 - margin, 1)
-	const t = math.min(
-		if delta.X ~= 0 then halfX / math.abs(delta.X) else math.huge,
-		if delta.Y ~= 0 then halfY / math.abs(delta.Y) else math.huge
-	)
+	const tip = self.Beacon.TipPosition()
+	const points = if tip then { tip, position } else { position }
+	const shown, at, angle = self.Edge.Update(points, Vide.untrack(self.Scale))
+	if not shown then
+		if Vide.untrack(self.PointerShown) then
+			self.PointerShown(false)
+		end
+		return
+	end
 	Vide.batch(function()
-		self.PointerAt(centre + delta * t)
-		self.PointerAngle(math.deg(math.atan2(delta.Y, delta.X)))
+		self.PointerAt(at)
+		self.PointerAngle(angle)
 		if not Vide.untrack(self.PointerShown) then
 			self.PointerShown(true)
 		end
@@ -1337,6 +1356,13 @@ end
 
 -- Skip key / tag: "Got it" on a talk step (next one), else skips the tutorial
 function TutorialController:Skip()
+	if self.LessonOn then
+		-- the upgrade lesson: off for this player (the server lets the 6 PM hold go once no rookie is left)
+		self.LessonSkipped = true
+		self.Libs.Net.TutorialLessonSkip:fireServer()
+		self:TickLesson()
+		return
+	end
 	const step = Steps.ByKey[Vide.untrack(self.StepKey)]
 	if step and step.Talk then
 		if self:Voiced() then
@@ -1401,6 +1427,10 @@ function TutorialController:Tick()
 	then
 		self.PastDay1(true)
 	end
+	-- the Day 1 upgrade lesson (6 PM) owns the panel while it runs
+	if self:TickLesson() then
+		return
+	end
 	const firstRun = Vide.untrack(function(): boolean
 		return self:FirstRun()
 	end)
@@ -1433,6 +1463,7 @@ function TutorialController:Tick()
 	if not Vide.untrack(self.Running) then
 		self.Running(true)
 	end
+	self.Rookie = true
 	if not self.Prepared then
 		-- generate Walt's voice ahead, while the phone rings
 		self.Prepared = true
@@ -1456,6 +1487,119 @@ function TutorialController:Tick()
 	if step then
 		self:TickIdle(step, target)
 	end
+end
+
+-- Upgrade lesson (owner request 2026-10-14, Provisional) ------------------------------------------------------------
+
+-- Level of an upgrade on the current vehicle from the Upgrades set (nil = record not here yet)
+function TutorialController:UpgradeLevel(key: string): number?
+	const index = Content.Upgrades.IndexOf[key]
+	for id, record in self.Libs.Net.Upgrades:entries() do
+		if id == index then
+			return record.Level
+		end
+	end
+	return nil
+end
+
+-- Any Gear Stand line above its start level (nil = the levels are not known yet)
+function TutorialController:BoughtGear(): boolean?
+	local known = false
+	for id, record in self.Libs.Net.Upgrades:entries() do
+		const upgrade = Content.Upgrades.List[id]
+		if upgrade == nil or upgrade.SoldAt ~= "Bench" then
+			continue
+		end
+		known = true
+		if record.Level > upgrade.StartLevel then
+			return true
+		end
+	end
+	return if known then false else nil
+end
+
+-- Key of the upgrade the lesson asks for while it runs for this player (nil = no lesson): a rookie of this session,
+-- the day Closing of Day 1 (6 PM), Walt's lesson call heard, nothing bought on the Gear Stand yet, not skipped.
+-- MarketController reads this to hide its own closing-time arrow (one arrow at a time).
+function TutorialController:UpgradeLesson(): string?
+	if not self.Rookie or self.LessonSkipped or not self.Dependencies.PlaceController:Is("Run") then
+		return nil
+	end
+	const round = self.Dependencies.RoundController
+	if
+		not Vide.untrack(round.Ready)
+		or Vide.untrack(round.Day) > 1
+		or Vide.untrack(round.IsNight)
+		or Vide.untrack(round.Phase) ~= "Closing"
+	then
+		return nil
+	end
+	if not self.LessonHeard then
+		const boss = self.Dependencies.BossController
+		if Vide.untrack(boss.Call) ~= LESSON.Call or Vide.untrack(boss.State) == "Idle" then
+			return nil
+		end
+		self.LessonHeard = true
+	end
+	if self:BoughtGear() ~= false then
+		return nil
+	end
+	return LESSON.Key
+end
+
+-- The pedestal (or bench prompt anchor) that sells `key` on the Gear Stand
+function TutorialController:LessonStand(key: string): Instance?
+	const upgrade = Content.Upgrades.ByKey[key]
+	if upgrade == nil then
+		return nil
+	end
+	const tags = Content.Mart.Tags
+	for _, pedestal in CollectionService:GetTagged(tags.Pedestal) do
+		if pedestal:GetAttribute(tags.Slot) == upgrade.BenchSpot and pedestal:IsDescendantOf(Workspace) then
+			return pedestal
+		end
+	end
+	for _, anchor in CollectionService:GetTagged(TAG) do
+		if anchor:GetAttribute("BenchSlot") == upgrade.BenchSpot and anchor:IsDescendantOf(Workspace) then
+			return anchor
+		end
+	end
+	return nil
+end
+
+-- One tick of the lesson; true = it owns the panel this tick (the first-hot-dog flow waits)
+function TutorialController:TickLesson(): boolean
+	const key = self:UpgradeLesson()
+	if key == nil then
+		if self.LessonOn then
+			self.LessonOn = false
+			Vide.batch(function()
+				self.Running(false)
+				self.StepKey("")
+			end)
+			self:ClearGuidance()
+		end
+		return false
+	end
+	if not Vide.untrack(self.Finished) then
+		-- the first-hot-dog flow is over with the day (normally already done): close it without a goodbye
+		self:Finish("over")
+	end
+	self.LessonOn = true
+	if not Vide.untrack(self.Running) then
+		self.Running(true)
+	end
+	const stand = self:LessonStand(key)
+	if stand ~= nil and self:DistanceTo(stand) <= LESSON_REACH then
+		self.LessonNear = true
+	end
+	const stepKey = if self.LessonNear then "upg_buy" else "upg_go"
+	self:SetStep(stepKey, stand, "")
+	const step = Steps.ByKey[stepKey]
+	if step then
+		self:TickIdle(step, stand)
+	end
+	return true
 end
 
 -- Voices ahead ---------------------------------------------------------------------------------------------------
@@ -1651,7 +1795,7 @@ function TutorialController:DebugLines(): string
 		`answered   {flag(self.Answered)}  voiced {flag(self:Voiced())}  greeted {flag(self.Greeted)}  uncalled {flag(self.Uncalled)}  held {flag(self.Holding)}`,
 		`target     {nameOf(if target then target else nil)}`,
 		`beacon     mounted {flag(self.Beacon.Mounted())}  marked {nameOf(self.Beacon.Marked())}`,
-		`arrow      far {flag(Vide.untrack(self.ArrowFar))}  pointer {flag(Vide.untrack(self.PointerShown))}  panel {flag(self.Mounted and panel ~= nil)}`,
+		`arrow      pointer {flag(Vide.untrack(self.PointerShown))}  panel {flag(self.Mounted and panel ~= nil)}`,
 		`guest      {guestText}`,
 		`voice      queued {stats.Queued}  loading {stats.Loading}  loaded {stats.Loaded}  failed {stats.Failed}  waiting {stats.Waiting}`,
 		`lines      to say {self.Call.Pending()}  busy {flag(self.Call.Busy())}`,
@@ -1876,7 +2020,8 @@ function TutorialController:Mount(playerGui: Instance)
 		end)
 		Vide.effect(function()
 			const step = self:Step()
-			const card: Objective.Card | false = if shown() and step ~= nil
+			-- TASK-255: no tutorial card in the prep shell either while the panel is off (SHOW_PANEL)
+			const card: Objective.Card | false = if SHOW_PANEL and shown() and step ~= nil
 				then {
 					Step = step.Number,
 					Total = Steps.Total,
@@ -1898,7 +2043,7 @@ function TutorialController:Mount(playerGui: Instance)
 			Objective.SetSkip(nil)
 		end)
 		Vide.effect(function()
-			const on = self.Running()
+			const on = self.Running() and SKIPPABLE
 			Vide.untrack(function()
 				self:BindSkip(on)
 				return nil
@@ -1917,7 +2062,7 @@ function TutorialController:Mount(playerGui: Instance)
 			TutorialPanel({
 				-- the focused prep mode shows the step in its own progress card (Objective): one card on top, not two
 				Shown = function()
-					return shown() and not Objective.Hosted()
+					return SHOW_PANEL and shown() and not Objective.Hosted()
 				end,
 				Step = function()
 					const step = self:Step()
@@ -2005,23 +2150,6 @@ function TutorialController:Mount(playerGui: Instance)
 			}),
 		})
 		overlay.Parent = playerGui
-
-		-- Screen-sized bouncing arrow over the target (Beacon's tip part) while it is far from the camera; straight in
-		-- PlayerGui (a BillboardGui does not draw inside a ScreenGui)
-		const arrow = TutorialArrow({
-			Name = "TutorialWorldArrow",
-			Adornee = function(): Instance?
-				return if self.Target() ~= false then self.Beacon.Tip else nil
-			end,
-			Shown = function()
-				return shown() and self.ArrowFar() and not Cinematic.Active()
-			end,
-			Offset = Vector3.zero,
-			MaxDistance = ARROW_MAX,
-			Scale = scale,
-			Strong = self.Urgent,
-		})
-		arrow.Parent = playerGui
 
 		-- dev only: tutorial debug readout (F8 / "/dev tutdebug"), shown even when the tutorial is off
 		if self:IsDev() then

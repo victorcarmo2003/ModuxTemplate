@@ -24,6 +24,10 @@ export type Door = {
 
 export type Mart = {
 	KioskClosedPhases: { string }, -- keys of Shift
+	-- Owner request 2026-10-14 (Provisional): the Gear Stand is CLOSED at the start of the run. On Day 1 (day shift) it is
+	-- also down in these phases: the first Mart visit is only for buns (tutorial shopping lesson); it opens at the end of
+	-- the first shift (the day Closing at 6 PM, where the Day 1 upgrade lesson sends the rookie to buy Storage)
+	FirstShiftClosedPhases: { string },
 	Pedestals: { Pedestal },
 	Doors: { Door }, -- animation order (Stagger) = list order
 	Door: {
@@ -80,6 +84,7 @@ export type Mart = {
 const mart: Mart = {
 	-- Q-176 A: closed only across the turn change (Summary, boss Call), lost night / resume and the non-play phases.
 	KioskClosedPhases = { "Summary", "Call", "NightLost", "Resume", "Intro", "Finale", "RunEnd" },
+	FirstShiftClosedPhases = { "Intro", "Prep", "Open" },
 	Pedestals = {
 		{ Slot = "B1", Offer = "Upgrade" },
 		{ Slot = "B2", Offer = "Upgrade" },
@@ -121,4 +126,30 @@ const mart: Mart = {
 	Fallback = { DoorHeight = 7, DoorAhead = 1, AnchorHeight = 4.2, Margin = 1.5 },
 }
 
-return table.freeze(mart)
+const firstShift: { [string]: boolean } = {}
+for _, phase in mart.FirstShiftClosedPhases do
+	firstShift[phase] = true
+end
+
+-- Same answer on the server (MarketService, UpgradeService) and the client (MarketController shutters): the Gear Stand
+-- is still closed because the first shift of the run has not ended (Day 1 day shift, phase in FirstShiftClosedPhases)
+local function firstShiftClosed(info: { Day: number, IsNight: boolean }, phase: string): boolean
+	return info.Day <= 1 and not info.IsNight and firstShift[phase] == true
+end
+
+table.freeze(mart)
+return table.freeze({
+	KioskClosedPhases = mart.KioskClosedPhases,
+	FirstShiftClosedPhases = mart.FirstShiftClosedPhases,
+	Pedestals = mart.Pedestals,
+	Doors = mart.Doors,
+	Door = mart.Door,
+	Mini = mart.Mini,
+	Purchase = mart.Purchase,
+	Cooldown = mart.Cooldown,
+	Plate = mart.Plate,
+	Hint = mart.Hint,
+	Tags = mart.Tags,
+	Fallback = mart.Fallback,
+	FirstShiftClosed = firstShiftClosed,
+})

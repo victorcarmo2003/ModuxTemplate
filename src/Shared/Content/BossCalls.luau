@@ -21,6 +21,10 @@
 --                  answers itself and is held open until no player has the tutorial pending, then stays
 --                  Rules.Tutorial.Goodbye s more (Walt's goodbye) and hangs up. The tutorial player's client voices
 --                  the step lines (TutorialController, Steps.luau); Lines are what everyone else hears.
+--   UpgradeLesson  Day 1 upgrade lesson (owner request 2026-10-14, Provisional): rings once in the day Closing (6 PM,
+--                  clock held by TutorialService) when the last-call line is empty and a rookie of the server has not
+--                  bought the first upgrade yet (TutorialService:LessonCallDue); Walt sends them to the Gear Stand for
+--                  Storage (shared.Tutorial.Rules.Upgrade). Answers itself like any day call.
 -- Speaker nil = Walt. A line lasts Rules.LineTime; the current line = floor((now - StartedAt) / LineTime).
 local Table = require(script.Parent.Table)
 
@@ -41,6 +45,7 @@ export type TriggerKind =
 	| "RunOver"
 	| "Hint"
 	| "Tutorial"
+	| "UpgradeLesson"
 
 -- Cue = something the server does when line `Line` (1-based) of a call starts talking (once per call):
 --   CoffeeHint    Night 1: the sanity bar and the coffee machine are emphasised until the first coffee (VitalService)
@@ -352,12 +357,28 @@ const base = Table.new({
 		Once = false,
 	},
 
+	-- Day 1 upgrade lesson (Trigger UpgradeLesson; owner request 2026-10-14, Provisional texts until narrative-writer)
+	{
+		Key = "call_tutorial_upgrade",
+		Lines = lines(
+			"Shift's over, Rookie. Nice work.",
+			"Before tonight, get some gear.",
+			"Gear Stand, at the Mart.",
+			"Get Storage. More buns, more sauce.",
+			"Short on cash? I've got you."
+		),
+		Trigger = { Kind = "UpgradeLesson" },
+		Priority = 4,
+		Once = true,
+	},
+
 	-- Day 1 tutorial hints (ui-text.md §11.1): each plays once, after the first time the party performs the action
 	hint("hint_grill_place", "grill_place", lines("Bar full? Grab it.")),
 	hint("hint_grill_collect", "grill_collect", lines("Now slice a bun.")),
 	hint("hint_bun_cut", "bun_cut", lines("Pop a frank in the bun.")),
 	hint("hint_board_add_sausage", "board_add_sausage", lines("Hot dog's ready. Wait for orders.")),
-	hint("hint_open_sign", "open_sign", lines("We're open! Folks are lining up.")),
+	-- TASK-284: the window lever opens the shop (key kept: BossCalls ids)
+	hint("hint_open_sign", "shutter_toggle", lines("We're open! Folks are lining up.", "Shut the window, shop's closed.")),
 	hint(
 		"hint_take_order",
 		"take_order",
@@ -392,7 +413,7 @@ const rules: Rules = {
 			"grill_collect",
 			"bun_cut",
 			"board_add_sausage",
-			"open_sign",
+			"shutter_toggle",
 			"take_order",
 			"serve",
 			"topping_add",

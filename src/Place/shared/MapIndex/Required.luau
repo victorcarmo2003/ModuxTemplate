@@ -207,10 +207,11 @@ local function base(wave: number): List
 		Points = WAVE1_POINTS,
 		Nodes = WAVE1_NODES,
 		Vehicles = {
-			trailer = { Stations = kitchen("trailer"), Actions = { open_sign = 1 } }, -- red wall switch TRL-SWITCH-OPEN (2026-10-12)
+			-- the service window lever TRL-SHUTTER is the shop (TASK-284, 2026-10-14; the red switch TRL-SWITCH-OPEN left)
+			trailer = { Stations = kitchen("trailer"), Actions = { shutter_toggle = 1 } },
 		},
 		Toppings = Content.Ingredients.ToppingKeys,
-		MapActions = {}, -- open_sign moved from the Pad stand to the trailer wall switch TRL-SWITCH-OPEN (2026-10-12)
+		MapActions = {}, -- the shop lever is the trailer service window (TASK-284)
 		Packages = Content.Packages.Keys,
 		Bench = bench(),
 		Tagged = {},
@@ -258,7 +259,7 @@ wave2.Nodes = concat(WAVE1_NODES, { "ST-R", "L1", "L2", "L3" })
 const trailerKitchen = kitchen("trailer")
 trailerKitchen.coffee_machine = { Actions = { brew_coffee = 1, restock = 1 } } -- FEAT-021
 wave2.Vehicles = {
-	trailer = { Stations = trailerKitchen, Actions = { open_sign = 1, answer_phone = 1, switch_light = 1 } }, -- DEC-124
+	trailer = { Stations = trailerKitchen, Actions = { shutter_toggle = 1, answer_phone = 1, switch_light = 1 } }, -- DEC-124, TASK-284
 }
 wave2.Tagged = {
 	{ Tag = "LightZone", Attribute = "ZoneId", Ids = lightZones() },
@@ -406,8 +407,8 @@ trailer3.coffee_machine = { Actions = { brew_coffee = 1, restock = 1 } }
 wave3.Vehicles = {
 	trailer = {
 		Stations = trailer3,
-		-- service window button TRL-SHUTTER (Prompt_Shutter) next to the switch (DEC-221); H1..H4 left the place
-		Actions = { open_sign = 1, answer_phone = 1, switch_light = 1, shutter_toggle = 1 },
+		-- service window lever TRL-SHUTTER (Prompt_Shutter) next to the phone (DEC-221) = the shop (TASK-284); H1..H4 left
+		Actions = { answer_phone = 1, switch_light = 1, shutter_toggle = 1 },
 	},
 }
 wave3.Tagged = concat(wave2.Tagged, {

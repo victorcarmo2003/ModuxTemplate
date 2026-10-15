@@ -24,6 +24,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local Charm = require(ReplicatedStorage.Packages.Charm)
 local Content = require(ReplicatedStorage.shared.Content)
 local Grade = require(ReplicatedStorage.shared.Prep.Grade)
+local Sauce = require(ReplicatedStorage.shared.Item.HotDogVisual.Sauce)
 local PlateMask = require(ReplicatedStorage.shared.Prep.PlateMask)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
@@ -106,6 +107,7 @@ const PrepService = Modux.Service("PrepService", {
 		"ItemService",
 		"KitchenService",
 		"CustomerService",
+		"TutorialService",
 	},
 	Priority = 645,
 })
@@ -123,6 +125,10 @@ function PrepService:Setup()
 	self.LockedUntil = {} :: { [Player]: number }
 	self.Published = {} :: { [number]: boolean }
 	self.Warned = {} :: { [string]: boolean }
+	-- TASK-260 (owner request 2026-10-14): a plate left by Leave / a forced exit stays on the board (kitchen ticket and stock kept)
+	-- and comes back on the next Enter of the same player. Refunded when the player leaves the server, the shop closes, or it
+	-- outlives Rules.PlateMax (never while the tutorial is pending)
+	self.Parked = {} :: { [Player]: { Plate: Session.Plate, Mask: number } }
 	-- (player, station) seated / (player, station, reason) left; reason "None" = voluntary
 	self.Entered = self.Libs.Signal.new() :: SignalLib.Signal<Player, number>
 	self.Left = self.Libs.Signal.new() :: SignalLib.Signal<Player, number, string>
@@ -322,6 +328,14 @@ function PrepService:StepOfAnchor(anchor: Instance): string
 	return resolved or DEFAULT_STEP
 end
 
+-- Only the grill carries the Work prompt (owner decision 2026-10-14): any other Prompt_Work (the cutting board / bun crate one) stays
+-- off. The mode itself still opens on the Build tab by the tabs; the other prompts of that corner are the restock ones.
+function PrepService:SilenceSpareWork(anchor: Instance)
+	if anchor:GetAttribute("PromptAction") == WORK_ACTION and self:StepOfAnchor(anchor) ~= DEFAULT_STEP then
+		self.Dependencies.InteractionService:SetPrompt(anchor, false, nil)
+	end
+end
+
 -- Network ---------------------------------------------------------------------------------------------------------------
 
 function PrepService:Reply(player: Player, act: string, ok: boolean, reason: string, grade: string?, value: number?)
@@ -392,7 +406,7 @@ function PrepService:CheckEnter(player: Player, station: number, skipReach: bool
 	if self.Sessions[player] ~= nil then
 		return "Seated", nil
 	end
-	if not self.Dependencies.RoundService:IsSelling() then
+	if not self.Dependencies.RoundService:IsServing() then
 		return "NotSelling", nil
 	end
 	if station < 1 or station > self.Count then
@@ -434,6 +448,13 @@ function PrepService:Enter(player: Player, station: number, skipReach: boolean?,
 	const now = os.clock()
 	const serverTime = workspace:GetServerTimeNow()
 	const seat = Session.new(player, station, serverTime, now, step or DEFAULT_STEP)
+	-- TASK-260: the plate this player left on the board comes back with the seat
+	const parked = self.Parked[player]
+	if parked ~= nil then
+		self.Parked[player] = nil
+		seat.Plate = parked.Plate
+		seat.Mask = parked.Mask
+	end
 	self.Sessions[player] = seat
 	self.BySeat[station] = seat
 	self:PublishSeat(seat)
@@ -462,7 +483,12 @@ function PrepService:Release(player: Player, reason: string, silent: boolean?): 
 	self.BySeat[seat.Station] = nil
 	const plate = seat.Plate
 	seat.Plate = nil
-	if plate ~= nil and plate.Reserved then
+	-- TASK-260: the plate stays parked on the board unless it can never come back (player gone, shop closed)
+	const keep = plate ~= nil and silent ~= true and reason ~= "KickAway" and reason ~= "KickClosing"
+		and self.Dependencies.RoundService:IsServing()
+	if plate ~= nil and keep then
+		self.Parked[player] = { Plate = plate, Mask = seat.Mask }
+	elseif plate ~= nil and plate.Reserved then
 		const ok, problem = pcall(Bridge.Refund, self.Dependencies.KitchenService, player)
 		if not ok then
 			warn(`[PrepService] refund of seat {seat.Station} errored: {problem}`)
@@ -522,7 +548,7 @@ end
 
 -- (ok, reason, value)
 function PrepService:Begin(player: Player, seat: Session.Seat): (boolean, string, number)
-	if not self.Dependencies.RoundService:IsSelling() then
+	if not self.Dependencies.RoundService:IsServing() then
 		return false, "NotSelling", 0
 	end
 	if seat.Plate ~= nil then
@@ -544,7 +570,7 @@ end
 -- SetQuality): the band can only go down, since the sausage adds a stage.
 function PrepService:Finish(player: Player, seat: Session.Seat, summary: Validate.Summary): (boolean, string, string, number)
 	const plate = seat.Plate
-	if plate == nil or not self.Dependencies.RoundService:IsSelling() then
+	if plate == nil or not self.Dependencies.RoundService:IsServing() then
 		return false, if plate == nil then "NoSession" else "NotSelling", "None", 0
 	end
 	const kitchen = self.Dependencies.KitchenService
@@ -574,6 +600,11 @@ function PrepService:Finish(player: Player, seat: Session.Seat, summary: Validat
 	seat.Plate = nil
 	seat.Made = made.Tool
 	self:ClearMask(seat)
+	-- the sauce line the player drew stays on the hot dog (owner request 2026-10-14): cosmetic, cleaned here
+	const sauce = self:SauceOf(summary, verdict.Keys)
+	if sauce ~= "" then
+		self.Dependencies.ItemService:SetSauce(made.Tool, sauce)
+	end
 	local band = verdict.Band
 	const sausage = made.SausageScore
 	if sausage ~= nil then
@@ -586,6 +617,31 @@ function PrepService:Finish(player: Player, seat: Session.Seat, summary: Validat
 		end
 	end
 	return true, "None", band, Grade.Points(cfg, band)
+end
+
+-- The drawn sauces of a summary as the Tool attribute (Sauce.Encode), "" = none. Only toppings of this plate made with the
+-- trace gesture (Content.Prep.Tolerances), each once, each cleaned (Sauce.Clean: integers in range, bounded, >= 2 points).
+function PrepService:SauceOf(summary: Validate.Summary, keys: { string }): string
+	const list = summary.Sauces
+	if type(list) ~= "table" then
+		return ""
+	end
+	const cleaned: { [string]: { number } } = {}
+	for index, entry in list :: { any } do
+		if index > Content.OrderRules.MaxToppings or type(entry) ~= "table" then
+			break
+		end
+		const key = entry.Key
+		const tolerance = if type(key) == "string" then cfg.Tolerances.ByKey[key] else nil
+		if tolerance == nil or tolerance.Gesture ~= "trace" or not table.find(keys, key) or cleaned[key] ~= nil then
+			continue
+		end
+		const points = Sauce.Clean(entry.Points)
+		if points ~= nil then
+			cleaned[key] = points
+		end
+	end
+	return Sauce.Encode(cleaned)
 end
 
 -- Drops the open plate: the reserved bun comes back (PlateMax, Leave) or is lost (bin)
@@ -651,6 +707,8 @@ function PrepService:AcceptMask(seat: Session.Seat, mask: number)
 	end
 	seat.Mask = mask
 	self:PublishSeat(seat)
+	-- TASK-260: the same mask on the board model, for every player
+	self.Dependencies.KitchenService:SetPlateMask(seat.Player, mask)
 end
 
 function PrepService:OnTab(player: Player, step: string, ticket: number, plate: number?)
@@ -678,8 +736,13 @@ function PrepService:OnGrill(player: Player, act: string, slot: number)
 	if seat == nil then
 		return
 	end
-	if not self.Dependencies.RoundService:IsSelling() then
+	if not self.Dependencies.RoundService:IsServing() then
 		self:Reply(player, "Grill", false, "NotSelling", nil, nil)
+		return
+	end
+	-- the tutorial teaches one sausage at a time (owner request 2026-10-14): a second Place is refused until the first one is off the grill
+	if act == "Place" and self.Dependencies.TutorialService:IsPending(player) and self.Dependencies.KitchenService:GrillBusy() > 0 then
+		self:Reply(player, "Grill", false, "OneSausage", nil, nil)
 		return
 	end
 	const outcome = Bridge.Grill(self.Dependencies.KitchenService, player, act, slot)
@@ -700,11 +763,14 @@ function PrepService:OnOrder(player: Player, act: string, npc: number)
 	if seat == nil then
 		return
 	end
-	if not self.Dependencies.RoundService:IsSelling() then
+	if not self.Dependencies.RoundService:IsServing() then
 		self:Reply(player, "Order", false, "NotSelling", nil, nil)
 		return
 	end
-	const outcome = Bridge.Order(self.Dependencies.CustomerService, player, act, npc)
+	-- the hot dog this seat just made, while it is still the player's (the plate dropped on the customer, 2026-10-14)
+	const made = seat.Made
+	const own = if made ~= nil and made.Parent ~= nil and made:IsDescendantOf(player) then made else nil
+	const outcome = Bridge.Order(self.Dependencies.CustomerService, player, act, npc, own)
 	self:Reply(player, "Order", outcome.Ok, outcome.Reason, outcome.Grade, outcome.Value)
 end
 
@@ -735,6 +801,8 @@ function PrepService:ConnectPackets()
 	end)
 	net.PrepGrill:onServer(function(value, player: Player)
 		if not self:Allow(player, "Grill") then
+			-- TASK-257: never silent, the client pairs every grill act with its answer
+			self:Reply(player, "Grill", false, "Busy", nil, nil)
 			return
 		end
 		self:OnGrill(player, value.Act, value.Slot)
@@ -788,6 +856,9 @@ function PrepService:RegisterWork()
 	const interaction = self.Dependencies.InteractionService
 	interaction:RegisterAction(WORK_ACTION, {
 		Validate = function(player: Player, anchor: Instance, _id: number): boolean
+			if self:StepOfAnchor(anchor) ~= DEFAULT_STEP then
+				return false
+			end
 			-- any Work prompt gives the next free seat (the seats are logical, DEC-224)
 			const reason = self:CheckEnter(player, self:NextSeat() or 1, true, self:StepOfAnchor(anchor))
 			if reason ~= "None" then
@@ -813,11 +884,25 @@ end
 
 -- Lifecycle -------------------------------------------------------------------------------------------------------------
 
--- Every 0.5 s: disconnected, ragdoll / faint / knock / dead, shift phase over, seat idle, plate older than PlateMax
+-- Every 0.5 s: disconnected, ragdoll / faint / knock / dead, shift phase over, seat idle; open plates kept young (TASK-289)
 function PrepService:Sweep()
 	const characters = self.Dependencies.CharacterService
-	const selling = self.Dependencies.RoundService:IsSelling()
+	const selling = self.Dependencies.RoundService:IsServing()
 	const now = os.clock()
+	-- TASK-260: parked plates (left on the board) refund when the shop closes. TASK-289 (owner request 2026-10-14): a plate never
+	-- expires by time (it used to past PlateMax): it stays this young, so its Finish always reads a plausible age
+	for player, parked in table.clone(self.Parked) do
+		if self.Parked[player] ~= parked then
+			continue
+		end
+		parked.Plate.StartedAt = math.max(parked.Plate.StartedAt, now - rules.TutorialPlateAge)
+		if not selling then
+			self.Parked[player] = nil
+			if parked.Plate.Reserved then
+				pcall(Bridge.Refund, self.Dependencies.KitchenService, player)
+			end
+		end
+	end
 	for player, seat in table.clone(self.Sessions) do
 		if self.Sessions[player] ~= seat then
 			continue
@@ -837,8 +922,9 @@ function PrepService:Sweep()
 			self:Release(player, "KickIdle", nil)
 		else
 			const plate = seat.Plate
-			if plate ~= nil and now - plate.StartedAt > rules.PlateMax then
-				self:DropPlate(player, seat)
+			if plate ~= nil then
+				-- TASK-289 (owner request 2026-10-14): the plate never expires (first only for the Day 1 rookie), it stays this young
+				plate.StartedAt = math.max(plate.StartedAt, now - rules.TutorialPlateAge)
 			end
 		end
 	end
@@ -876,12 +962,14 @@ PrepService:OnInit(function(self)
 		self:Recount()
 	end)
 	self.Dependencies.RoundService.PhaseChanged:Connect(function(_phase)
-		if not self.Dependencies.RoundService:IsSelling() then
+		if not self.Dependencies.RoundService:IsServing() then
 			self:ForceExitAll("KickClosing")
 		end
 	end)
 	self.Dependencies.PlayerService.PlayerRemoving:Connect(function(player)
 		self:Release(player, "KickAway", true)
+		-- a parked plate goes back to the stock (KitchenService refunds the ticket on the same signal)
+		self.Parked[player] = nil
 		self.Buckets[player] = nil
 		self.LockedUntil[player] = nil
 	end)
@@ -891,6 +979,12 @@ PrepService:OnStart(function(self)
 	if not self.Active then
 		return
 	end
+	for _, anchor in CollectionService:GetTagged("Interactable") do
+		self:SilenceSpareWork(anchor)
+	end
+	CollectionService:GetInstanceAddedSignal("Interactable"):Connect(function(anchor: Instance)
+		self:SilenceSpareWork(anchor)
+	end)
 	-- the set is written by the atom: the first run adds the records of the current count
 	self:Grow()
 	self.Libs.Charm.effect(function()
@@ -914,7 +1008,7 @@ end
 
 function PrepService:DevSeats(): string
 	self:DevGuard()
-	const lines: { string } = { `prep seats: {self.Count} active, selling {tostring(self.Dependencies.RoundService:IsSelling())}` }
+	const lines: { string } = { `prep seats: {self.Count} active, selling {tostring(self.Dependencies.RoundService:IsServing())}` }
 	for station = 1, self.Count do
 		const seat = self.BySeat[station]
 		if seat == nil then

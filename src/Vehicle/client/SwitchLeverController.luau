@@ -2,12 +2,12 @@
 --[[
 	SwitchLeverController (owner request 2026-10-12, Provisional)
 
-	The two wall switches of the trailer (model AST-039 LightSwitch: parts Box + Lever + PilotLamp): the BLUE one is the
-	lights (PromptAction switch_light), the RED one is the shop (PromptAction open_sign: Open Shop / Close Shop). Their
-	colours are set in the map (tools/assetplace/trailer_open_switch.luau); this only flips the Lever part, local and
-	purely visual: up = on (lights lit / shop open), down = off (lights out / shop closed or still in Prep), a short
-	tween and the `switch_click` sound at the switch. The state is the server's: the Lights record of the Switch group
-	(LightService) and RoundController Phase + Paused (RoundService).
+	The wall levers of the trailer (parts Box + Lever + PilotLamp): the BLUE switch is the lights (PromptAction
+	switch_light), the service window lever next to the phone is the shop (PromptAction shutter_toggle, TRL-SHUTTER;
+	TASK-284 2026-10-14: the red "Open Shop" switch open_sign left, the window is the shop). This only flips the Lever
+	part, local and purely visual: up = on (lights lit / window open), down = off (lights out / window shut), a short
+	tween and the `switch_click` sound at the lever. The state is the server's: the Lights record of the Switch group
+	(LightService) and the `Shutter` attribute of the vehicle Model (VehicleService, true = closed).
 	Provisional: TILT, TIME, the pivot on the Box surface.
 ]]
 local CollectionService = game:GetService("CollectionService")
@@ -20,7 +20,9 @@ local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 
 const ANCHOR_TAG = "Interactable"
 const LIGHT_ACTION = "switch_light"
-const SHOP_ACTION = "open_sign"
+const SHUTTER_ACTION = "shutter_toggle"
+const VEHICLE_TAG = "Vehicle"
+const SHUTTER_ATTRIBUTE = "Shutter" -- on the vehicle Model, true = closed
 const LEVER_NAME = "Lever"
 const TILT = math.rad(26) -- lever swing around the Box X axis, up (on) / down (off)
 const TIME = 0.18 -- s of the flip
@@ -33,6 +35,7 @@ type Switch = {
 	Rel: CFrame, -- authored Lever in Box space
 	Pivot: Vector3, -- tilt pivot in Box space (the Lever base on the Box surface)
 	Action: string,
+	Vehicle: Instance?, -- shutter lever: the `Vehicle`-tagged ancestor carrying the Shutter attribute
 	Angle: number,
 	From: number,
 	To: number,
@@ -54,7 +57,7 @@ function SwitchLeverController:Register(anchor: Instance)
 		return
 	end
 	const action = anchor:GetAttribute("PromptAction")
-	if typeof(action) ~= "string" or (action ~= LIGHT_ACTION and action ~= SHOP_ACTION) then
+	if typeof(action) ~= "string" or (action ~= LIGHT_ACTION and action ~= SHUTTER_ACTION) then
 		return
 	end
 	const box = anchor.Parent
@@ -66,12 +69,17 @@ function SwitchLeverController:Register(anchor: Instance)
 	const rel = box.CFrame:ToObjectSpace(lever.CFrame)
 	-- the Lever sits on the +Z face of the Box: the pivot is that face under the lever
 	const pivot = Vector3.new(rel.X, rel.Y, math.sign(rel.Z) * box.Size.Z / 2)
+	local vehicle: Instance? = model
+	while vehicle ~= nil and vehicle ~= workspace and not CollectionService:HasTag(vehicle, VEHICLE_TAG) do
+		vehicle = vehicle.Parent
+	end
 	self.Switches[anchor] = {
 		Box = box,
 		Lever = lever,
 		Rel = rel,
 		Pivot = pivot,
 		Action = action,
+		Vehicle = if vehicle ~= workspace then vehicle else nil,
 		Angle = 0,
 		From = 0,
 		To = 0,
@@ -84,9 +92,8 @@ function SwitchLeverController:IsOn(switch: Switch): boolean
 	if switch.Action == LIGHT_ACTION then
 		return self.LightOn
 	end
-	const round = self.Dependencies.RoundController
-	const phase = Content.Shift.ByKey[round.Phase()]
-	return phase ~= nil and phase.Selling and not round.Paused()
+	const vehicle = switch.Vehicle
+	return vehicle ~= nil and vehicle:GetAttribute(SHUTTER_ATTRIBUTE) ~= true
 end
 
 local function pose(switch: Switch, angle: number): CFrame

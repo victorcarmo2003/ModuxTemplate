@@ -5,6 +5,8 @@
 -- Content keys are stored as keys, never as indexes. Nested fields change by copy (the profile is reactive per
 -- top-level field): mutating in place neither fires the effect nor saves.
 -- Owner of this file: TASK-004 in wave 1 (board conflict point). Renaming or removing a field = Migrations.luau.
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local SettingsRules = require(ReplicatedStorage.shared.Settings.SettingsRules)
 
 export type RunRewards = {
 	RunId: string,
@@ -41,6 +43,9 @@ export type Data = {
 	-- Codes redeemed by this account: normalized code -> os.time() of the redeem (CodesService; user request
 	-- 2026-10-11, Provisional, data.md §1.7). Reconcile adds it as {} to older profiles, so no migration.
 	RedeemedCodes: { [string]: number },
+	-- Player settings (TASK-279; owner request 2026-10-14, Provisional): volumes, prompt mode, prep assist, reduced
+	-- motion. Writer: SettingsService (sanitized by SettingsRules). Reconcile adds the defaults to older profiles.
+	Settings: SettingsRules.Settings,
 }
 
 const Template: Data = {
@@ -82,6 +87,9 @@ const Template: Data = {
 
 	-- Codes: one redeem per code per account (CodesService, data.md §1.7)
 	RedeemedCodes = {},
+
+	-- Settings: SettingsService (TASK-279); a plain copy, the profile changes by copy
+	Settings = table.clone(SettingsRules.Defaults),
 }
 
 return Template

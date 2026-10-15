@@ -112,7 +112,7 @@ function RoundController:Setup()
 	self.IsNight = Vide.source(false) :: Vide.Source<boolean>
 	-- Shift.Vehicle (key of Content.Vehicles); MarketController reads it for "Trailer only" (FEAT-015, DEC-184)
 	self.Vehicle = Vide.source(DEFAULT_VEHICLE) :: Vide.Source<string>
-	-- Shift.Paused: the trailer switch is on "Closed" during the Open phase (no new customers; flap down, neon CLOSED)
+	-- Shift.Paused: the service window is shut during a selling phase (TASK-284: no new customers; neon CLOSED)
 	self.Paused = Vide.source(false) :: Vide.Source<boolean>
 	self.ClockText = Vide.source(self:Format(Content.Shift.ByKey[DEFAULT_PHASE].ClockFrom)) :: Vide.Source<string>
 	-- Calm / Shift / Last during the Night phase, nil otherwise (FEAT-003; not phases)

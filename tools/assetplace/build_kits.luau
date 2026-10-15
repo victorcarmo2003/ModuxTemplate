@@ -89,6 +89,10 @@ const EXPRESSIONS = {
 	"Normal_Night",
 	"Thief",
 }
+-- Anomaly-variant faces, outside the closed Content.Looks.Expressions (RigController picks them by variant, AST-060 /
+-- AST-062). Textures come from _blank_texture_ids.json, merged into `tex` by Kits.run (EyesClosed, AST-059, is not
+-- built here yet).
+const VARIANT_EXPRESSIONS = { "Blank", "EyesWhite", "EyesClosed" }
 const BODY = { "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg", "Apron", "Cap" }
 const ARMS = { "Left Arm", "Right Arm" }
 
@@ -295,7 +299,9 @@ function Kits.buildExpressions(tex: Tex, problems: { string }): Folder
 	local root = folder(ReplicatedStorage, "CrewExpressions")
 	root:ClearAllChildren()
 	local known: { [string]: boolean } = {}
-	for _, name in EXPRESSIONS do
+	local all = table.clone(EXPRESSIONS)
+	table.move(VARIANT_EXPRESSIONS, 1, #VARIANT_EXPRESSIONS, #all + 1, all)
+	for _, name in all do
 		known[name] = true
 		local id = tex["T_Expr_" .. name]
 		if not id then
@@ -690,7 +696,9 @@ function Kits.check(looks: Looks, tex: Tex?, fit: Fit?): { string }
 	else
 		table.insert(problems, "note: AccessoryFit not given: accessory check skipped")
 	end
-	for _, name in EXPRESSIONS do
+	local checked = table.clone(EXPRESSIONS)
+	table.move(VARIANT_EXPRESSIONS, 1, #VARIANT_EXPRESSIONS, #checked + 1, checked)
+	for _, name in checked do
 		local sa = expr and expr:FindFirstChild(name)
 		if not (sa and sa:IsA("SurfaceAppearance") and sa.ColorMap ~= "") then
 			table.insert(problems, "CrewExpressions." .. name .. " missing")
@@ -838,6 +846,15 @@ function Kits.run(opts: Options): string
 		end
 		if not tex then
 			tex = HttpService:JSONDecode(httpGet(join(opts.baseUrl, "Assets/textures/character/_texture_ids.json")))
+			-- AST-060 / AST-062 variant textures (T_Expr_Blank, T_Expr_EyesWhite, T_Head_*_Blank, ...) live in their own file
+			local ok, blank = pcall(function()
+				return HttpService:JSONDecode(httpGet(join(opts.baseUrl, "Assets/textures/character/_blank_texture_ids.json")))
+			end)
+			if ok and tex then
+				for k, v in blank do
+					tex[k] = v
+				end
+			end
 		end
 	end
 	assert(ids, "asset ids missing: pass opts.ids or opts.baseUrl")

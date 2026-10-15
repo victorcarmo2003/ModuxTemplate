@@ -20,6 +20,11 @@
 -- follow every PivotTo of the vehicle. Landing spots: MapPoint TRL-OUT / TRL-IN when the binding has them, else
 -- free ground found by raycast + overlap next to the steps, else the closest REV-n point, else the raw offset.
 -- No state is saved: the door is a convenience of the current shift.
+-- Lock (ANM-004 "The copies", DEC-247, Provisional): the game has no door lock; only an anomaly turns it on, with
+-- SetLocked(reason, true). That closes the leaf at once and, while any reason is held, the prompt stays ("Open door")
+-- but Use opens nothing: the player who tried gets Transition Kind "DoorLocked" (VehicleController plays the "Locked
+-- door" sound, SFX-232) and nothing else. The trailer Model carries the attribute DoorLocked = true meanwhile. The
+-- service window is not touched.
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -37,6 +42,7 @@ const TRL_POINT = "TRL" -- MapPoint of the trailer's pose at the Pad (VehicleSer
 const OUT_POINT = "TRL-OUT" -- optional MapPoint: where Exit Trailer drops the player (floor level)
 const IN_POINT = "TRL-IN" -- optional MapPoint: where Enter Trailer drops the player (floor level)
 const FREEZE = "TrailerDoor"
+const LOCKED_ATTRIBUTE = "DoorLocked" -- on the trailer Model while an anomaly holds the door locked
 const DOOR_ATTRIBUTE = "DoorOpen" -- on the trailer Model while the leaf is open (DoorController animates Door_Back, tag ScriptedDoor)
 const ANCHOR_IN_NAME = "Prompt_ExitTrailer"
 const ANCHOR_OUT_NAME = "Prompt_EnterTrailer"
@@ -51,7 +57,7 @@ const NEAR = 7
 const OPEN_TEXT = "Open door"
 const CLOSE_TEXT = "Close door"
 const ANCHOR_IN = Vector3.new(DOOR_X, 5.2, 2.5) -- y over the TRL point (trailer floor +2, chest height); inside the door
-const ANCHOR_OUT = Vector3.new(16.3, 3.2, 3.6) -- outside, on the west strip; 4 studs radius keeps the two prompts apart
+const ANCHOR_OUT = Vector3.new(16.3, 3.2, 3.6) -- outside, on the west strip; ~7.65 studs from ANCHOR_IN, Actions radius 3.6 each keeps the two prompts apart
 const LAND_IN = Vector3.new(8.5, 0, 1.5) -- inside, a step in front of the door, clear of the bin
 const FLOOR_LIFT = 2 -- trailer floor over the TRL point (MAP-01 §5.5)
 -- Outside candidates (local x, local z), the west strip first; tried from a UserId based start so mates do not stack
@@ -127,6 +133,8 @@ function TrailerDoorService:Setup()
 	self.Busy = {} :: { [Player]: boolean }
 	-- uses holding the leaf open right now (the attribute is on while > 0)
 	self.DoorHolds = 0 :: number
+	-- lock reasons held by anomalies (SetLocked); the door is locked while any is set
+	self.Locks = {} :: { [string]: boolean }
 	self.Tries = 0 :: number
 	self.NearAt = 0 :: number
 	self.Warned = {} :: { [string]: boolean }
@@ -409,6 +417,37 @@ function TrailerDoorService:IsOpen(): boolean
 	return model ~= nil and model:GetAttribute(DOOR_ATTRIBUTE) == true
 end
 
+-- The trailer back door exists and is in use (the cart has no back door: ANM-004 only costs sanity there)
+function TrailerDoorService:HasDoor(): boolean
+	return self.Enabled and self:IsPadded() and self:Model() ~= nil
+end
+
+function TrailerDoorService:IsLocked(): boolean
+	return next(self.Locks) ~= nil
+end
+
+-- Locks / unlocks the door for `reason` (an anomaly Ref). Locking closes the leaf at once. Several reasons stack.
+function TrailerDoorService:SetLocked(reason: string, on: boolean)
+	self.Locks[reason] = if on then true else nil
+	if on then
+		self:SetOpen(false)
+	end
+	const model = self:Model()
+	if model ~= nil then
+		model:SetAttribute(LOCKED_ATTRIBUTE, if self:IsLocked() then true else nil)
+	end
+end
+
+function TrailerDoorService:ClearLocks()
+	if next(self.Locks) ~= nil then
+		self.Locks = {}
+		const model = self:Model()
+		if model ~= nil then
+			model:SetAttribute(LOCKED_ATTRIBUTE, nil)
+		end
+	end
+end
+
 function TrailerDoorService:DoorPosition(): Vector3?
 	for anchor in self.ExitAnchors do
 		if anchor:IsA("Attachment") then
@@ -450,6 +489,13 @@ end
 -- behind the player.
 function TrailerDoorService:Use(player: Player, action: string)
 	self.LastUse[player] = os.clock()
+	if self:IsLocked() then
+		-- locked by an anomaly: nothing opens, only the player who tried hears it
+		if player.Parent ~= nil and self.Dependencies.NetService:IsRunning() then
+			self.Libs.Net.Transition:fireClient(player, { Kind = "DoorLocked", StartedAt = workspace:GetServerTimeNow() })
+		end
+		return
+	end
 	if not Content.Shift.TrailerDoorTeleport then
 		self:SetOpen(not self:IsOpen())
 		return
@@ -562,6 +608,7 @@ TrailerDoorService:OnStart(function(self)
 		self:Refresh()
 	end)
 	self.Dependencies.RoundService.ShiftStarted:Connect(function(_info)
+		self:ClearLocks()
 		self:EnsureAnchors()
 		self:Refresh()
 	end)

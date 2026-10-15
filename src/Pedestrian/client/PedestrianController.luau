@@ -8,7 +8,7 @@
 
 	  * Record (slot 1..8): { Path, Species, Outfit, Speed, AnchorAt, AnchorDist, StopDist, HeldUntil }.
 	  * Rig: CrewRig.Build(Species, Outfit) with `Tag = true` LOCAL (AnimalRig), so the RigController dresses it like
-	    any NPC, including the local Night of the low band (DEC-169). `RigController:Prepare` dresses it before it is
+	    any NPC (the low sanity band no longer dresses NPCs: Provisional 2026-10-14). `RigController:Prepare` dresses it before it is
 	    parented (no Day frame). The Humanoid Build adds is removed (local actor, out of the 12 Humanoids, §19.17);
 	    HumanoidRootPart anchored, every part without collision / query / touch. Pooled by Species + Outfit.
 	  * Walk animation: `AnimController:Bind(model, "npc")` (locomotion by the measured speed of the HumanoidRootPart;

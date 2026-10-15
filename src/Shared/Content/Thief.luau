@@ -18,7 +18,7 @@ export type Thief = {
 	ZoneEmptyTime: number, -- seconds with nobody Active in the zone before the approach
 	ApproachTime: number, -- fixed; walk speed = distance / ApproachTime (DEC-182)
 	MinDrawer: number, -- no theft below this drawer amount
-	CatchReward: number, -- $ to the drawer when caught (DrawerKind "Catch")
+	CatchReward: number, -- $ straight to Cash when caught (EconomyService:AddSale "Catch", DEC-238)
 	CapRetry: number, -- NPC cap full at the drawn time: retry after this many seconds, until the window ends
 	Lurks: { string },
 	Spawn: string,

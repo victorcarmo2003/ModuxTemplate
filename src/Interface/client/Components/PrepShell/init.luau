@@ -74,6 +74,10 @@ export type AssistButton = {
 	OnToggle: () -> (),
 }
 
+-- A call back to a section (the flip window of a sausage opened while another tab is in front): the dot of `Tab` pulses with a mini bar
+-- (`Share` 0..1 through the window) and a chip with `Text` appears near the dots; a tap on either goes to the tab.
+export type Alert = { Tab: string, Share: number, Id: number, Text: string }
+
 export type Toast = { Text: string, Kind: "Info" | "Good" | "Alert", Id: number }
 
 -- The thin progress card of the minimal 3D mode (top centre): the verb of the section, `Value` 0..1 over the whole run (the
@@ -139,6 +143,8 @@ export type Props = {
 	-- of the tab the camera is closest to while it pans along the trail (0 / nil = the tab in front); `DotSize` / `DotActive` = px of
 	-- the dot and of the active pill (Rules.Camera.Pan.Dots). The hit area stays the tab rectangle (>= 44 px).
 	Near: (() -> number)?,
+	-- The call back of the moment (false / nil = none), minimal mode only. Mustard, never red; no pulse with reduced motion.
+	Alert: (() -> Alert | false)?,
 	DotSize: number?,
 	DotActive: number?,
 	Progress: ProgressCard?,
@@ -173,8 +179,14 @@ const BADGE_TONE: { [string]: Theme.Tone } = {
 const LIFT = 3 -- px the active tab rises
 const PULSES = 3
 const PULSE_TIME = 0.6
+const ALERT_PERIOD = 0.9 -- s of one breath of the call back (the Grill dot)
+const CHIP_W = 112
+const CHIP_H = 44
 const SHAKE_TIME = 0.18
 const VIGNETTE = 0.35
+-- The progress card at the top centre (verb, live note, section bar; it also hosted the tutorial step) is off (owner playtest
+-- 2026-10-14, TASK-259, Provisional): the code stays, flip to bring it back
+const SHOW_PROGRESS = false
 
 local function money(value: number): string
 	const digits = tostring(math.max(math.floor(value), 0))
@@ -207,6 +219,100 @@ local function shaker(): (Vide.Source<number>, () -> ())
 		end)
 	end
 	return offset, kick
+end
+
+-- TASK-264 (owner request 2026-10-14): the section dots of the minimal mode are round ICON buttons: a sausage (grill), a bun
+-- (board) and a ketchup pot (toppings), from the icon sheet; the lit one is Mustard and a little bigger, hover / press pop with a
+-- spring and the name of the section floats over it. A tab without an entry keeps the plain dot.
+const SECTION_ICONS: { [string]: string } = {
+	Grill = "Ingredient/sausage",
+	Board = "Ingredient/bun",
+	Build = "Ingredient/bun",
+	Toppings = "Ingredient/ketchup",
+}
+const SECTION_ICON_SIZE = 40 -- px, the round button
+const SECTION_HOVER_SCALE = 1.25
+const SECTION_LIT_SCALE = 1.12
+
+-- One round section button (TASK-264): the icon on a Cream disc (Mustard when lit or called), Ink rim, a spring scale that pops on
+-- hover / press, and the section name in a small tag over it while hovered. Reduced motion: no spring (the scale jumps).
+local function sectionIcon(
+	icon: string,
+	label: string,
+	lit: () -> boolean,
+	called: () -> boolean,
+	hovered: () -> boolean,
+	pressed: () -> boolean
+): Frame
+	const target = function(): number
+		if pressed() then
+			return 0.92
+		elseif hovered() then
+			return SECTION_HOVER_SCALE
+		elseif lit() then
+			return SECTION_LIT_SCALE
+		end
+		return 1
+	end
+	const scale: () -> number = if Motion.Reduced()
+		then target
+		else Vide.spring(target, Theme.Motion.Pop, Theme.Motion.PopDamping) :: any
+	const rect = Icons.Rect(icon) or { Offset = Vector2.zero, Size = Vector2.zero }
+	return create("Frame")({
+		Name = "Dot",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(SECTION_ICON_SIZE, SECTION_ICON_SIZE),
+		BackgroundColor3 = function(): Color3
+			return if lit() or called() then Theme.Color.Mustard else Theme.Color.Cream
+		end,
+		createRaw("UIScale")({
+			Scale = function(): number
+				return math.max(scale(), 0.01)
+			end,
+		}),
+		create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+		createRaw("UIStroke")({
+			Color = Theme.Color.Ink,
+			Thickness = function(): number
+				return if lit() then 3 else 2
+			end,
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+		}),
+		create("ImageLabel")({
+			Name = "Icon",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromScale(0.78, 0.78),
+			BackgroundTransparency = 1,
+			Image = Icons.ImageOf(icon),
+			ImageRectOffset = rect.Offset,
+			ImageRectSize = rect.Size,
+			Visible = Icons.Has(icon),
+		}),
+		-- the name of the section, over the button while the pointer is on it
+		create("Frame")({
+			Name = "Tag",
+			AnchorPoint = Vector2.new(0.5, 1),
+			Position = UDim2.new(0.5, 0, 0, -8),
+			Size = UDim2.fromOffset(96, 26),
+			BackgroundColor3 = Theme.Color.Cream,
+			Visible = hovered,
+			ZIndex = 6,
+			create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+			createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
+			CartoonLabel({
+				Text = label,
+				TextSize = Theme.MinTextSize,
+				Color = Theme.Color.Ink,
+				Stroke = 0,
+				Box = UDim2.fromScale(1, 1),
+				XAlignment = Enum.TextXAlignment.Center,
+				YAlignment = Enum.TextYAlignment.Center,
+				ZIndex = 7,
+			}),
+		}),
+	}) :: Frame
 end
 
 -- Icon of the sheet when it exists, a flat dot otherwise.
@@ -641,16 +747,49 @@ return function(props: Props): Frame
 		const near = if props.Near ~= nil then props.Near() else 0
 		return if near > 0 then near else activeIndex()
 	end
+	-- the call back (flip window open elsewhere): the dot of its tab pulses in Mustard, a mini bar under it, a chip near the dots
+	const alertOf = function(): Alert | false
+		return if props.Alert ~= nil then props.Alert() else false
+	end
+	const alertOn = Vide.derive(function(): boolean
+		return minimal() and alertOf() ~= false
+	end)
+	const pulse = source(1)
+	local pulseRun = 0
+	effect(function()
+		const on = alertOn()
+		pulseRun += 1
+		const mine = pulseRun
+		pulse(1)
+		if on and not Motion.Reduced() then
+			task.spawn(function()
+				const start = os.clock()
+				while pulseRun == mine do
+					pulse((math.sin((os.clock() - start) * math.pi * 2 / ALERT_PERIOD - math.pi / 2) + 1) / 2)
+					task.wait()
+				end
+			end)
+		end
+	end)
+	cleanup(function()
+		pulseRun += 1
+	end)
 	const dotButtons: { any } = {}
 	for index, tab in tabs do
 		const lit = function(): boolean
 			return litIndex() == index
+		end
+		const called = function(): boolean
+			const value = alertOf()
+			return value ~= false and value.Tab == tab.Key and minimal()
 		end
 		const badge = function(): number
 			const counts = if props.Badges ~= nil then props.Badges() else nil
 			return if counts ~= nil then counts[tab.Key] or 0 else 0
 		end
 		const tone = BADGE_TONE[tab.Key] or Theme.Tone.Teal
+		const hovered = source(false)
+		const pressed = source(false)
 		table.insert(
 			dotButtons,
 			create("TextButton")({
@@ -671,7 +810,22 @@ return function(props: Props): Frame
 				Activated = function()
 					props.OnTab(tab.Key)
 				end,
-				create("Frame")({
+				MouseEnter = function()
+					hovered(true)
+				end,
+				MouseLeave = function()
+					hovered(false)
+					pressed(false)
+				end,
+				MouseButton1Down = function()
+					pressed(true)
+				end,
+				MouseButton1Up = function()
+					pressed(false)
+				end,
+				if SECTION_ICONS[tab.Key] ~= nil
+					then sectionIcon(SECTION_ICONS[tab.Key], tab.Label, lit, called, hovered, pressed)
+					else create("Frame")({
 					Name = "Dot",
 					AnchorPoint = Vector2.new(0.5, 0.5),
 					Position = UDim2.fromScale(0.5, 0.5),
@@ -679,7 +833,7 @@ return function(props: Props): Frame
 						return if lit() then UDim2.fromOffset(dotActive, dotSize) else UDim2.fromOffset(dotSize, dotSize)
 					end,
 					BackgroundColor3 = function(): Color3
-						return if lit() then Theme.Color.Mustard else Theme.Color.Cream
+						return if lit() or called() then Theme.Color.Mustard else Theme.Color.Cream
 					end,
 					create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
 					createRaw("UIStroke")({
@@ -688,6 +842,50 @@ return function(props: Props): Frame
 							return if lit() then 3 else 2
 						end,
 						ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+					}),
+				}),
+				-- the call: a Mustard ring that breathes round the dot, and the mini flip bar under it (a shape, not only a colour)
+				create("Frame")({
+					Name = "CallRing",
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Position = UDim2.fromScale(0.5, 0.5),
+					Size = function(): UDim2
+						const grow = 8 + 8 * pulse()
+						return if lit()
+							then UDim2.fromOffset(dotActive + grow, dotSize + grow)
+							else UDim2.fromOffset(dotSize + grow, dotSize + grow)
+					end,
+					BackgroundTransparency = 1,
+					Visible = called,
+					create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+					createRaw("UIStroke")({
+						Color = Theme.Color.Mustard,
+						Thickness = 3,
+						Transparency = function(): number
+							return 0.55 * (1 - pulse())
+						end,
+						ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+					}),
+				}),
+				create("Frame")({
+					Name = "CallBar",
+					AnchorPoint = Vector2.new(0.5, 0),
+					Position = UDim2.new(0.5, 0, 0.5, dotSize / 2 + 6),
+					Size = UDim2.fromOffset(30, 8),
+					BackgroundColor3 = Theme.Color.Cream,
+					ZIndex = 4,
+					Visible = called,
+					create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+					createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
+					create("Frame")({
+						Name = "Fill",
+						Size = function(): UDim2
+							const value = alertOf()
+							return UDim2.fromScale(if value ~= false then math.max(value.Share, 0.12) else 0, 1)
+						end,
+						BackgroundColor3 = Theme.Color.Mustard,
+						ZIndex = 5,
+						create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
 					}),
 				}),
 				-- the count of what waits on this section
@@ -729,6 +927,62 @@ return function(props: Props): Frame
 			})
 		)
 	end
+
+	-- the "Flip!" chip: above the transient pair (toast, hint), centred over the dot of the tab it calls back to (kept inside the canvas)
+	const chip = CartoonButton({
+		Name = "CallChip",
+		Tone = Theme.Tone.Mustard,
+		Radius = Theme.Radius.Pill,
+		Position = function(): UDim2
+			const l = layout()
+			const value = alertOf()
+			local at = 1
+			if value ~= false then
+				for index, tab in tabs do
+					if tab.Key == value.Tab then
+						at = index
+					end
+				end
+			end
+			const r = l.Tabs[at]
+			const x = math.clamp(r.X + r.W / 2 - CHIP_W / 2, 8, math.max(l.Canvas.X - CHIP_W - 8, 8))
+			return UDim2.fromOffset(x, l.Toast.Y - 6 - CHIP_H)
+		end,
+		Size = UDim2.fromOffset(CHIP_W, CHIP_H),
+		Padding = 0,
+		Selectable = true,
+		Visible = alertOn,
+		OnActivated = function()
+			const value = alertOf()
+			if value ~= false then
+				props.OnTab(value.Tab)
+			end
+		end,
+		Children = {
+			create("UIListLayout")({
+				FillDirection = Enum.FillDirection.Horizontal,
+				HorizontalAlignment = Enum.HorizontalAlignment.Center,
+				VerticalAlignment = Enum.VerticalAlignment.Center,
+				Padding = UDim.new(0, 6),
+				SortOrder = Enum.SortOrder.LayoutOrder,
+			}),
+			glyph("Ingredient/sausage", Theme.Color.Cream, 28),
+			CartoonLabel({
+				Name = "Text",
+				Text = function(): string
+					const value = alertOf()
+					return if value ~= false then value.Text else ""
+				end,
+				TextSize = 18,
+				Color = Theme.Color.Ink,
+				Stroke = 0,
+				Box = UDim2.fromOffset(60, 28),
+				XAlignment = Enum.TextXAlignment.Left,
+				YAlignment = Enum.TextYAlignment.Center,
+				LayoutOrder = 2,
+			}),
+		},
+	})
 
 	-- notch under the active tab (points at the board)
 	const notch = create("Frame")({
@@ -1181,6 +1435,10 @@ return function(props: Props): Frame
 	-- assist toggle: a round chip inside the pill (radius = pill height / 2 - pad, so its corners follow the pill), a target glyph
 	const assist = CartoonButton({
 		Name = "Assist",
+		-- owner decision 2026-10-14: no Assist chip in the chrome (the aim tolerance stays at 1); the toggle code is kept, hidden
+		Visible = function(): boolean
+			return false
+		end,
 		Tone = function()
 			return if props.Assist.On() then Theme.Tone.Teal else Theme.Tone.Cream
 		end,
@@ -1364,7 +1622,7 @@ return function(props: Props): Frame
 			}),
 		}) :: Frame
 	end
-	const progressCard = if progressProps ~= nil
+	const progressCard = if SHOW_PROGRESS and progressProps ~= nil
 		then CartoonPanel({
 			Name = "Progress",
 			Tone = function(): Theme.Tone
@@ -1851,6 +2109,7 @@ return function(props: Props): Frame
 			leave,
 			tabButtons,
 			dotButtons,
+			chip,
 			status,
 			strip,
 			nextHolder,

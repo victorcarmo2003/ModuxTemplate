@@ -588,6 +588,17 @@ function ItemService:AddTopping(tool: Tool, ingredient: string): boolean
 end
 
 -- Sets (or clears, nil) the prep quality of a hot dog in play. False = not a hot dog of this server or unknown quality.
+-- The sauce line drawn in the 3D prep mode (owner request 2026-10-14; HotDogVisual.Sauce): the attribute and the visual. The
+-- caller (PrepService) cleaned it. false = not a hot dog of a player.
+function ItemService:SetSauce(tool: Tool, sauce: string): boolean
+	if self.Owners[tool] == nil or self:ItemOf(tool) ~= HOT_DOG or #sauce > 400 then
+		return false
+	end
+	tool:SetAttribute(HotDogVisual.Sauce.Attribute, if sauce ~= "" then sauce else nil)
+	self:Paint(tool)
+	return true
+end
+
 function ItemService:SetQuality(tool: Tool, quality: string?): boolean
 	const player = self.Owners[tool]
 	if player == nil or self:ItemOf(tool) ~= HOT_DOG then

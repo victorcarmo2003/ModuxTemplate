@@ -17,6 +17,7 @@ export type Report = {
 	Arrived: number,
 	Completed: number,
 	Drawer: number,
+	Tips: number,
 	Stolen: number,
 	Grade: string,
 	Bonus: number,

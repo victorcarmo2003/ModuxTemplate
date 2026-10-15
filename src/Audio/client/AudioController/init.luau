@@ -5,8 +5,9 @@
 	Every sound of the game is played here, on the client. No network of its own: each controller calls Play/Loop on
 	the event it already receives (Sale, Notice, Call, Lights...). The server never creates a Sound.
 
-	- SoundGroups in SoundService: Master > Music, Ambient, Sfx, Voice, Ui. SetVolume(group, 0..1) is the hook for a
-	  future settings screen (Provisional: not persisted).
+	- SoundGroups in SoundService: Master > Music, Ambient, Sfx, Voice, Ui, Scare. SetVolume(group, 0..1) is driven by
+	  the Settings panel (SettingsController, TASK-279: saved per player). Scare holds every sound played with
+	  opts.Scare (jumpscares), so its volume is apart from the Sfx one.
 	- Play(key, at?, opts?) -> Sound?: one-shot from Content.Sounds, pooled per key. `at` = Vector3 (temporary
 	  Attachment in Terrain) or Instance (BasePart/Attachment, or the first BasePart of a Model); rows with
 	  Spatial = false always play on screen. Cap Content.SoundRules.MaxVoices (12, §12.5) counting one-shots and loops
@@ -59,7 +60,7 @@ local Stats = require(script.Stats)
 local Tiers = require(script.Tiers)
 
 const RULES = Content.SoundRules
-const GROUPS = { "Music", "Ambient", "Sfx", "Voice", "Ui" }
+const GROUPS = { "Music", "Ambient", "Sfx", "Voice", "Ui", "Scare" }
 const MASTER = "Master"
 const SCREEN = "AudioScreen" -- folder for 2D sounds
 const CALL_RECORD = 1 -- network.md §13.3
@@ -84,7 +85,7 @@ export type AmbientBed = {
 	Stop: (fade: number?) -> (),
 }
 
-export type GroupName = "Music" | "Ambient" | "Sfx" | "Voice" | "Ui"
+export type GroupName = "Music" | "Ambient" | "Sfx" | "Voice" | "Ui" | "Scare"
 export type At = Vector3 | Instance
 
 export type PlayOptions = {
@@ -167,7 +168,7 @@ function AudioController:WarnOnce(tag: string, message: string)
 	warn(`[AudioController] {message}`)
 end
 
--- SoundService > Master > Music/Ambient/Sfx/Voice/Ui (reused if already there)
+-- SoundService > Master > Music/Ambient/Sfx/Voice/Ui/Scare (reused if already there)
 function AudioController:BuildGroups()
 	local master = SoundService:FindFirstChild(MASTER)
 	if not (master and master:IsA("SoundGroup")) then
@@ -220,7 +221,7 @@ function AudioController:ApplyGroup(name: string, time: number?)
 	end
 end
 
--- Settings hook (Provisional: no screen yet, not persisted)
+-- Settings hook (SettingsController, TASK-279)
 function AudioController:SetVolume(group: GroupName | "Master", volume: number)
 	self.Volumes[group] = math.clamp(volume, 0, 1)
 	self:ApplyGroup(group)
@@ -307,7 +308,8 @@ function AudioController:Configure(sound: Sound, row: Content.Sound, opts: PlayO
 	const default = if not looped and (row.Group == "Sfx" or row.Group == "Voice") then VARY else 0
 	const vary = if opts and opts.Vary ~= nil then opts.Vary else default
 	const speed = (if opts and opts.Speed then opts.Speed else 1) * (1 + self.Rng:NextNumber(-vary, vary))
-	sound.SoundGroup = self.Groups[row.Group]
+	-- jumpscares go to their own group (Settings: Jumpscares volume), whatever the row's group
+	sound.SoundGroup = if opts and opts.Scare then self.Groups.Scare else self.Groups[row.Group]
 	sound.Looped = looped
 	sound.Volume = self:Volume(row, opts)
 	sound.PlaybackSpeed = math.max(speed, 0.01)

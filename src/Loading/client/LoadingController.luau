@@ -21,7 +21,12 @@
 	After ClientReady the curtain stays while the server says the intro is Waiting for the other participants
 	(Cutscene set) up to the server's ReadyTimeout + margin, then lifts (attribute Done on the ScreenGui).
 
-	Ready = Vide source, true once the curtain lifted (the gate is over for this join).
+	Skip (playtest 2026-10-14): after 10 s the boot shows "Skip loading"; a skip lifts the curtain at once and sets the
+	local attribute LoadingSkipped on the LocalPlayer. Here that sends ClientReady and sets Ready right away (the player
+	is in); the steps keep running in the background and the end of the gate (Lift) still releases the audio queue and
+	starts the background voices when they are done.
+
+	Ready = Vide source, true once the curtain lifted or the player skipped it (the gate is over for this join).
 ]]
 local ContentProvider = game:GetService("ContentProvider")
 local Players = game:GetService("Players")
@@ -37,6 +42,7 @@ local LoadQueue = require(StarterPlayer.StarterPlayerScripts.client.Audio.AudioC
 type Texts = { Status: { [string]: string } }
 
 const GUI_NAME = "LoadingScreen"
+const SKIPPED_ATTRIBUTE = "LoadingSkipped" -- set on the LocalPlayer by Loading/Boot when the player skips
 const KIT_TIMEOUT = 10 -- s for the crew kit warm-up (it keeps going in the background; RigController has its own cap)
 const MAP_TIMEOUT = 14 -- s for the meshes and textures of the map / lobby (the rest keeps loading behind the curtain)
 const ASSET_TIMEOUT = 12 -- s for PreloadAsync of sounds and images
@@ -95,6 +101,34 @@ function LoadingController:Setup()
 	self.Steps = { Game = 0, Start = 0, Kit = 0, Assets = 0, Voices = 0, Map = 0 } :: { [string]: number }
 	self.Gui = nil :: ScreenGui?
 	self.Sent = false :: boolean
+	self.Skipped = false :: boolean
+end
+
+-- The player skipped the loading screen (Loading/Boot): in now, the loading goes on behind
+function LoadingController:Skip()
+	if self.Skipped then
+		return
+	end
+	self.Skipped = true
+	self:SendReady()
+	self.Ready(true)
+end
+
+function LoadingController:WatchSkip()
+	const player = Players.LocalPlayer
+	if player:GetAttribute(SKIPPED_ATTRIBUTE) == true then
+		self:Skip()
+		return
+	end
+	local connection: RBXScriptConnection? = nil
+	connection = player:GetAttributeChangedSignal(SKIPPED_ATTRIBUTE):Connect(function()
+		if player:GetAttribute(SKIPPED_ATTRIBUTE) == true then
+			self:Skip()
+			if connection ~= nil then
+				connection:Disconnect()
+			end
+		end
+	end)
 end
 
 function LoadingController:FindGui(): ScreenGui?
@@ -365,9 +399,9 @@ function LoadingController:Run()
 	-- the server may start the intro now
 	self:SendReady()
 
-	-- hold the curtain while the intro waits for the other participants
+	-- hold the curtain while the intro waits for the other participants (not after a skip: the curtain is gone)
 	const cutscene = self.Dependencies.CutsceneController
-	if self.Dependencies.PlaceController:Is("Run") then
+	if self.Dependencies.PlaceController:Is("Run") and not self.Skipped then
 		const holdUntil = os.clock() + Content.Cutscenes.Rules.ReadyTimeout + CREW_MARGIN
 		-- one beat for the set to arrive after the packet
 		task.wait(0.3)
@@ -407,6 +441,7 @@ LoadingController:OnInit(function(self)
 end)
 
 LoadingController:OnStart(function(self)
+	self:WatchSkip()
 	task.spawn(function()
 		const ok, problem = pcall(function()
 			self:Run()

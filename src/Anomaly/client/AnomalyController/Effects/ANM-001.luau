@@ -21,6 +21,7 @@ local Workspace = game:GetService("Workspace")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Effect = require(script.Parent.Parent.Effect)
 local Kit = require(script.Parent.Kit.CustomerActor)
+local Jumpscare = require(script.Parent.Kit.Jumpscare)
 
 const VARIANT = "blank"
 const COIN_NAME = "Coin_Blank"
@@ -94,7 +95,7 @@ local function drawerTop(ctx: Effect.Context): Vector3?
 				elseif descendant:IsA("BasePart") then
 					return descendant.Position + Vector3.new(0, descendant.Size.Y / 2, 0)
 				end
-			elseif descendant:IsA("Model") and descendant:GetAttribute("MapId") == DRAWER_MAP_ID then
+			elseif descendant:IsA("Model") and (descendant:GetAttribute("MapId") == DRAWER_MAP_ID or descendant:GetAttribute("MapId") == "TRL-TIPJAR") then
 				for _, piece in descendant:GetDescendants() do
 					if piece:IsA("BasePart") then
 						const top = piece.Position.Y + piece.Size.Y / 2
@@ -166,6 +167,8 @@ return {
 	Cue = function(ctx: Effect.Context, cue: Effect.Cue)
 		if cue.Cue == "blank_coin" then
 			blankCoin(ctx, cue)
+		elseif cue.Cue == "jumpscare" then
+			Jumpscare.Cue(ctx, cue) -- V2 error (DEC-255, TASK-269)
 		end
 	end,
 } :: Effect.Module

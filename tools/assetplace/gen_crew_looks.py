@@ -2,6 +2,9 @@
 
 Sources (never edit CrewLooks.luau by hand; change the sources and run this again):
   - Assets/textures/character/_texture_ids.json  texture ids (faithful copy: a key missing there never enters)
+  - Assets/textures/character/_blank_texture_ids.json  ANM-001/ANM-004 "blank" variant: T_Head_<A>_Blank and
+                                                   T_Atlas_Kitchen_<Pack>_Blank_<A> (AST-060). Optional per species: a
+                                                   missing one is a hard error only if the file lists the species
   - Assets/textures/character/T_Head_<A>.png      fur colour = RGB stored under the alpha-0 texels (the head painter
                                                    keeps the fur there; same values as the skill's colors.json)
   - CAP_PLAIN below                                species wearing the plain Cap (floppy ears / no ears); every other
@@ -25,6 +28,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 TEX_JSON = ROOT / "Assets/textures/character/_texture_ids.json"
+BLANK_JSON = ROOT / "Assets/textures/character/_blank_texture_ids.json"
 TEX_DIR = ROOT / "Assets/textures/character"
 OUT = ROOT / "src/Crew/shared/CrewLooks.luau"
 
@@ -48,6 +52,11 @@ OUTFITS = {
     "civil_e": "Civil_E", "civil_f": "Civil_F", "civil_g": "Civil_G", "civil_h": "Civil_H",
     "thief": "Civil_Thief",  # Day only (DEC-159)
 }
+
+# Outfits whose sheets exist but are not uploaded yet (Provisional, owner has not approved the look): registered in
+# CrewLooks only once _texture_ids.json has their Day id, so nothing breaks before the upload. raincoat = AST-059
+# (ANM-005 Raincoat Lady, Content.Outfits Use "Reserved", sheets from gen_raincoat_textures.py).
+PENDING_OUTFITS = {"raincoat": "Civil_Raincoat"}
 
 # Plain Cap (REF_Cap = AST-053_CrewCap, 224 tris): floppy ears or no ears. Everyone else: ears up.
 CAP_PLAIN = {"Dog", "Frog", "Monkey", "Penguin", "Pig", "Sheep", "Turtle"}
@@ -86,8 +95,15 @@ def sheet_alpha_problems(stem: str) -> list[str]:
 
 def build() -> str:
     tex: dict[str, str] = json.loads(TEX_JSON.read_text(encoding="utf-8"))
+    blank: dict[str, str] = json.loads(BLANK_JSON.read_text(encoding="utf-8")) if BLANK_JSON.exists() else {}
     problems: list[str] = []
-    for stem in OUTFITS.values():
+    outfits = dict(OUTFITS)
+    for key, stem in PENDING_OUTFITS.items():
+        if f"T_{stem}_Day" in tex:
+            outfits[key] = stem
+        else:
+            print(f"gen_crew_looks: outfit '{key}' skipped (no id for T_{stem}_Day in _texture_ids.json yet)")
+    for stem in [*OUTFITS.values(), *PENDING_OUTFITS.values()]:
         problems.extend(sheet_alpha_problems(stem))
 
     def need(key: str) -> str:
@@ -105,6 +121,15 @@ def build() -> str:
     if unknown:
         problems.append(f"T_Head_* without a Content.Species key: {sorted(unknown)}")
 
+    def need_blank(key: str) -> str:
+        v = blank.get(key)
+        if not v:
+            problems.append(f"missing blank texture id {key}")
+            return ""
+        if not v.startswith("rbxassetid://"):
+            problems.append(f"{key} is not an rbxassetid: {v}")
+        return v
+
     lines: list[str] = []
     w = lines.append
     w("--!strict")
@@ -114,7 +139,16 @@ def build() -> str:
     w("-- Missing pack -> Day. Atlas.Day does not exist: the Day atlas is the piece's own texture (DayTextureID).")
     w("")
     w('export type Pack = "Day" | "Mid" | "Night"')
-    w("export type SpeciesLook = { Fur: Color3, EarsUp: boolean, CapRaise: number, Head: { [Pack]: string } }")
+    w("export type BlankLook = { Head: string, Atlas: { [Pack]: string } }")
+    w("-- Blank variant (ANM-001 / ANM-004, AST-060): smooth skin-colour head + atlas pieces (ears, tail, nose, snout, beak,")
+    w("-- eyes) repainted in the head colour. Absent (nil) for a species without it: Dress falls back to the ordinary look.")
+    w("export type SpeciesLook = {")
+    w("	Fur: Color3,")
+    w("	EarsUp: boolean,")
+    w("	CapRaise: number,")
+    w("	Head: { [Pack]: string },")
+    w("	Blank: BlankLook?,")
+    w("}")
     w("export type OutfitLook = { [Pack]: string }")
     w("export type CrewLooks = {")
     w("\tKitVersion: number,")
@@ -137,10 +171,15 @@ def build() -> str:
         w(f"\t\t\tEarsUp = {ears_up},")
         w(f"\t\t\tCapRaise = {CAP_RAISE:.2f},")
         w(f"\t\t\tHead = {{ {', '.join(heads)} }},")
+        if f"T_Head_{asset}_Blank" in blank:
+            atlas = ", ".join(
+                f'{pack} = "{need_blank(f"T_Atlas_Kitchen_{pack}_Blank_{asset}")}"' for pack in PACKS
+            )
+            w(f'\t\t\tBlank = {{ Head = "{need_blank(f"T_Head_{asset}_Blank")}", Atlas = {{ {atlas} }} }},')
         w("\t\t},")
     w("\t},")
     w("\tOutfits = { -- keys of Content.Outfits")
-    for key, stem in OUTFITS.items():
+    for key, stem in outfits.items():
         packs = []
         for pack in PACKS:
             k = f"T_{stem}_{pack}"
@@ -155,6 +194,10 @@ def build() -> str:
     w("")
     w("for _, s in looks.Species do")
     w("\ttable.freeze(s.Head)")
+    w("\tif s.Blank then")
+    w("\t\ttable.freeze(s.Blank.Atlas)")
+    w("\t\ttable.freeze(s.Blank)")
+    w("\tend")
     w("\ttable.freeze(s)")
     w("end")
     w("for _, o in looks.Outfits do")

@@ -43,6 +43,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local Charm = require(ReplicatedStorage.Packages.Charm)
 local Content = require(ReplicatedStorage.shared.Content)
 local Calls = require(script.Calls)
+local TutorialRules = require(ReplicatedStorage.shared.Tutorial.Rules)
 local Modux = require(ServerScriptService.server.Modux)
 
 export type State = "Idle" | "Ringing" | "Talking"
@@ -65,6 +66,8 @@ const LINE_TIME = Content.BossCallRules.LineTime
 const AUTO_ANSWER = Content.BossCallRules.AutoAnswer
 const MAX_QUEUE = 32 -- far above any real sequence; guards a runaway trigger
 const TUTORIAL = Content.BossCallRules.Tutorial
+-- Day 1 upgrade lesson call (owner request 2026-10-14, Provisional; Trigger UpgradeLesson, Once)
+const LESSON_CALL = TutorialRules.Upgrade.Call
 -- day phases where the tutorial call may ring and talk
 const TUTORIAL_PHASES: { [string]: boolean } = { Prep = true, Open = true }
 -- No call starts here; entering one hangs up (architecture.md §19.9 "Fila")
@@ -285,6 +288,7 @@ function BossService:Step()
 	const record = self.Record()
 	const t = now()
 	self:StepTutorial(t)
+	self:StepLesson()
 	if record ~= self.Record() then
 		return
 	end
@@ -383,6 +387,16 @@ function BossService:StepTutorial(t: number)
 	end
 	if pending then
 		self:QueueTutorial()
+	end
+end
+
+-- Day 1 upgrade lesson: queued once the first shift is over and the last-call line is empty (TutorialService decides)
+function BossService:StepLesson()
+	if self.Played[LESSON_CALL] or self:IsQueued(LESSON_CALL) or self.Record().Call == LESSON_CALL then
+		return
+	end
+	if self:CanStart() and self.Dependencies.TutorialService:LessonCallDue() then
+		self:Enqueue(LESSON_CALL)
 	end
 end
 

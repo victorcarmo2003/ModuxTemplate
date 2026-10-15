@@ -8,6 +8,11 @@
 -- Summary at 6 AM). The Night phase itself has Duration 0: its length is Nights[k].Duration (DEC-127).
 -- Selling: customers spawn and the drawer counts (Economy, Customer). Only Open and Night (Validate).
 -- SkipWithoutProbe: the phase is skipped when no feature registered a probe for it (architecture.md §19.0 rule 4).
+-- LastCall (DEC-240, user decision 2026-10-13): on a DAY shift the Closing row is "Last call": the clock stands at 6 PM,
+-- nobody new arrives (Selling stays false) but the trailer is still OPEN (the sign shows OPEN, the kitchen, the prep mode,
+-- the tables and the drawer keep working) and the queue and the tables are served without a rush. The day closes by itself
+-- when they are empty (counter probe); Duration is only the safety cap against an AFK crew. The night Closing
+-- (Night override) is NOT a last call: it keeps its own short cap and the counter is emptied.
 local Table = require(script.Parent.Table)
 
 export type Kind = "Day" | "Night" | "Any"
@@ -27,6 +32,7 @@ export type Phase = {
 	Selling: boolean,
 	SkipWithoutProbe: boolean,
 	Night: NightOverride?,
+	LastCall: boolean?, -- day shift only: still open to the crew and the queue, but no new arrival (Closing)
 }
 
 local function hours(h: number, m: number?): number
@@ -64,10 +70,13 @@ const base = Table.new({
 	},
 	-- Open: 8:00 AM -> 6:00 PM in 216 s, 1 game hour = 21.6 s (DEC-048, FEAT-003; was 360 s / 36 s, Q-200).
 	{ Key = "Open", Duration = 216, ClockFrom = hours(8), ClockTo = hours(18), Kind = "Day", Selling = true, SkipWithoutProbe = false },
-	-- Closing: sign CLOSED, queue still served; ends when the counter empties or at 20 s (DEC-048; was 30 s, Q-200). 6 PM / 6 AM.
+	-- Closing, day = LAST CALL (DEC-240; was "sign CLOSED, ends at 20 s", DEC-048, Q-200): no new arrival, the sign stays
+	-- OPEN, the queue and the tables are served; ends when the counter and the tables empty, or at the 120 s safety cap
+	-- (Provisional). Night (6 AM): the old 30 s Closing. 6 PM / 6 AM.
 	{
 		Key = "Closing",
-		Duration = 20,
+		Duration = 120,
+		LastCall = true,
 		ClockFrom = hours(18),
 		ClockTo = hours(18),
 		Kind = "Any",

@@ -24,8 +24,13 @@ return Table.new({
 	{ Key = "not_enough_cash", Text = "Not enough cash (${value})", Audience = "Player", ValueFrom = "Number", Wave = 1 },
 	{ Key = "upgrade_bought", Text = "{upgrade} upgraded!", Audience = "Party", ValueFrom = "Upgrades", Wave = 1 }, -- FEAT-015
 	-- Gear Stand hint at closing time (Q-203 Provisional; MarketService: once per shift, only with money for an upgrade or before the first purchase)
-	{ Key = "mart_hint", Text = "Closing time. Upgrades are on sale at the Mart.", Audience = "Party", ValueFrom = "None", Wave = 1 },
+	{ Key = "mart_hint", Text = "Upgrades are on sale at the Mart.", Audience = "Party", ValueFrom = "None", Wave = 1 },
+	-- Day Last call (DEC-240, user decision 2026-10-13): 6 PM, no new customer, the trailer stays open until the line and the
+	-- tables are served. Sent by CustomerService when the day Closing starts. Provisional text
+	{ Key = "last_call", Text = "Last call! Serve who is still here.", Audience = "Party", ValueFrom = "None", Wave = 1 },
 	{ Key = "ingredient_unlocked", Text = "New: {item}!", Audience = "Party", ValueFrom = "Ingredients", Wave = 1 }, -- FEAT-032
+	-- gift bowl still closed (owner request 2026-10-14, Provisional): use / restock refused until "Open"
+	{ Key = "topping_wrapped", Text = "Open the {item} bowl first!", Audience = "Player", ValueFrom = "Ingredients", Wave = 1 },
 	-- free package of the unlock day taken with the hands full: straight into the stock (Provisional, FEAT-007)
 	{ Key = "ingredient_stocked", Text = "New: {item} (stocked)", Audience = "Player", ValueFrom = "Ingredients", Wave = 1 },
 	{ Key = "class_bought", Text = "{class} unlocked!", Audience = "Player", ValueFrom = "Classes", Wave = 1 }, -- DEC-186
@@ -85,5 +90,6 @@ return Table.new({
 	{ Key = "prep_no_sausage", Text = "No sausage on the warmer yet.", Audience = "Player", ValueFrom = "None", Wave = 3 },
 	{ Key = "prep_too_fast", Text = "Too fast! Try again.", Audience = "Player", ValueFrom = "None", Wave = 3 },
 	{ Key = "prep_kicked", Text = "Prep interrupted.", Audience = "Player", ValueFrom = "None", Wave = 3 },
+	{ Key = "tutorial_one_sausage", Text = "One sausage is plenty for now.", Audience = "Player", ValueFrom = "None", Wave = 3 },
 	{ Key = "prep_idle", Text = "Stepped away from the station.", Audience = "Player", ValueFrom = "None", Wave = 3 },
 } :: { Notice })

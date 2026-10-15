@@ -1,5 +1,6 @@
 --!nonstrict
 --[[
+	OBSOLETE for the red switch since TASK-284 (2026-10-14): trailer_remove_open_switch.luau took TRL-SWITCH-OPEN out; do not re-run.
 	trailer_open_switch.luau (owner request 2026-10-12: "second switch in the trailer: Open Shop / Close Shop"; Provisional).
 	Edit-mode Studio snippet, NOT gameplay code. Idempotent, surgical, NO Place.run, nothing deleted (backup in
 	ServerStorage). Undo: run("trailer_open_switch", "undo").

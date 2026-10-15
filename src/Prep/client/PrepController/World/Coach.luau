@@ -1,7 +1,7 @@
 --!strict
 -- World/Coach: the drag tutorial of the 3D prep (TASK-209; decision 3 of the owner, 2026-10-12). A ghost hand made of Parts (no new
 -- mesh) loops a short version of the gesture of the section for a moment, so a new player learns that the game is played by
--- DRAGGING (the "hand" is a cartoon dog paw: Cream fur, Teal pad and toe beans, Ink outline): Grill = box -> free spot, Board = the knife along the dashes, Toppings = a bowl -> the bun, Serve = the plate -> the window.
+-- DRAGGING (the "hand" is a cartoon dog paw: Cream fur, Pink pad and toe beans, Ink outline): Grill = box -> free spot, Board = the knife along the dashes, Toppings = a bowl -> the bun, Serve = the plate -> the window.
 -- With it goes ONE line of hint (`Coach.Line`, a Vide source the shell hint reads, and `Coach.Tab`).
 --   * once per station, per section, per SESSION: the flag lives in this module only (no profile, no persistence)
 --   * it goes away at the first correct action (the stage calls `Done`) or at the first pointer press (any), and then never returns
@@ -17,6 +17,7 @@ local Content = require(ReplicatedStorage.shared.Content)
 local Motion = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Motion)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
 local Pointer = require(script.Parent.Parent.Pointer)
+local Prefs = require(StarterPlayer.StarterPlayerScripts.client.Settings.Prefs)
 
 export type Coach = {
 	-- Starts the loop of `section` (a key of Texts.Coach) over these world points (start -> end). false = not shown (seen already,
@@ -42,7 +43,7 @@ const seen: { [number]: { [string]: boolean } } = {}
 const CREAM = Theme.Color.Cream
 const INK = Theme.Color.Ink
 const MUSTARD = Theme.Color.Mustard
-const TEAL = Theme.Color.Teal
+const PINK = Theme.Color.Pink -- pads and toe beans (TASK-265, owner request 2026-10-14; were Teal)
 
 local function ball(name: string, size: Vector3, color: Color3, material: Enum.Material): Part
 	const made = Instance.new("Part")
@@ -84,10 +85,10 @@ function CoachModule.new(folder: Folder, rules: Content.PrepWorldRules, pointer:
 	end
 	const unit = palmSize
 	add("PawFur", CREAM, Vector3.new(0, 0.05, 0.6) * unit, Vector3.new(1.15, 0.5, 0.95) * unit)
-	add("PawPad", TEAL, Vector3.new(0, 0.25, 0.64) * unit, Vector3.new(0.62, 0.18, 0.46) * unit)
+	add("PawPad", PINK, Vector3.new(0, 0.25, 0.64) * unit, Vector3.new(0.62, 0.18, 0.46) * unit)
 	for index, spot in { Vector2.new(-0.58, 0.18), Vector2.new(-0.2, -0.1), Vector2.new(0.2, -0.1), Vector2.new(0.58, 0.18) } do
 		add(`PawToe{index}`, CREAM, Vector3.new(spot.X, 0.06, spot.Y) * unit, Vector3.new(0.48, 0.36, 0.52) * unit)
-		add(`PawBean{index}`, TEAL, Vector3.new(spot.X, 0.2, spot.Y) * unit, Vector3.new(0.25, 0.1, 0.26) * unit)
+		add(`PawBean{index}`, PINK, Vector3.new(spot.X, 0.2, spot.Y) * unit, Vector3.new(0.25, 0.1, 0.26) * unit)
 	end
 	const ring = Instance.new("Part")
 	ring.Name = "CoachTap"
@@ -215,7 +216,8 @@ function CoachModule.new(folder: Folder, rules: Content.PrepWorldRules, pointer:
 	const self = {} :: any
 
 	function self.Show(_: any, wanted: string, path: { Vector3 }): boolean
-		if not alive or #path < 2 then
+		-- Settings "Prep helper" off (TASK-279): no paw at all
+		if not alive or #path < 2 or not Vide.untrack(Prefs.PrepAssist) then
 			return false
 		end
 		const row = seen[station]

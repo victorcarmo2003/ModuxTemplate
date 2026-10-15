@@ -487,7 +487,7 @@ cliente = espécie + acessório + roupa civil sorteada).
 | `Species` | personagem da crew, NPC | `Species.Keys` (`dog`, `penguin`…) | `CharacterService` (da classe), `NpcService` | 1 |
 | `Outfit` | personagem, NPC | `Outfits.Keys`: `crew` (jogador), `civil_a`..`civil_h` (sorteada, DEC-160/188), `thief` (Quentin) | idem | 1 |
 | `CustomerType` | NPC | `CustomerTypes.Keys`; define o(s) acessório(s) (DEC-188). Passante: `pedestrian` (onda 2) | `NpcService` | 1 |
-| `LookPack` | personagem, NPC | `"Day"`, `"Mid"`, `"Night"` | crew: `CharacterService` (onda 1 sempre `Day`; onda 2 pelo `VitalService` conforme a faixa); NPC: `NpcService` (Day de dia, Mid à noite, DEC-181; Night só no clima de anomalia, onda 3, `Q-159`) | 1 |
+| `LookPack` | personagem, NPC | `"Day"`, `"Mid"`, `"Night"` | crew: `CharacterService` (onda 1 sempre `Day`; onda 2 pelo `VitalService` conforme a faixa); NPC: `NpcService` (Day de dia, Mid à noite, DEC-181; Night só no clima de anomalia, onda 3, `Q-159`; **Provisório (2026-10-14):** o client também veste Night, sempre, nas variantes `blank`/`raincoat`, e a faixa baixa do jogador local não veste mais NPCs) | 1 |
 | `NpcId` | NPC | id do registro em `Customers` | `NpcService` | 1 |
 | `FromWalker` | NPC | id (slot 1..`WalkPaths.Rules.Slots`) do registro de `Pedestrians` que virou este cliente (adoção, TASK-163); ausente nos outros. Escrito antes de o rig entrar no `Workspace`, no mesmo frame em que o registro do passante sai; o client usa para a troca sem pulo (TASK-164). Sem rig do `CustomerType` (sem acessório: o passante não tinha) | `NpcService` | 3 (**Provisório**, pedido ao architect ratificar) |
 
@@ -505,8 +505,8 @@ chaves" do binding (§18.0 item 4). O `CrewLooks.Outfits` (§18.9.3, TASK-006) d
 |---|---|---|
 | Crew: pack | `LookPack` do personagem; **todos** veem o mesmo (a faixa é estado do servidor) | DEC-167, DEC-169 |
 | Crew: 1ª pessoa | braços/mãos com o pack do próprio `LookPack`; retrato do rosto no HUD pelo mesmo atributo | DEC-167 |
-| NPC: pack | `LookPack` do modelo, **exceto** se o personagem local estiver com `LookPack = "Night"` à noite (faixa baixa, < 40): então todo cliente e passante é vestido **Night + `Normal_Night`** só neste client | **DEC-168, DEC-169** |
-| NPC: rosto | `Moods[Customers.Mood].Expression` (Normal, Happy, Skeptical, Stressed); na faixa baixa local, `Normal_Night` vence o humor (**Provisório**, `proposals-round-3.md` §2) | DEC-162, DEC-187, `Q-164` |
+| NPC: pack | `LookPack` do modelo, **exceto** se o personagem local estiver com `LookPack = "Night"` à noite (faixa baixa, < 40): então todo cliente e passante é vestido **Night + `Normal_Night`** só neste client | **DEC-168, DEC-169**. **Provisório (2026-10-14):** a faixa baixa local **não** veste mais NPC; o pack é o do modelo (Night só nas variantes `blank`/`raincoat`, sempre, `NIGHT_VARIANTS` no `RigController`; `mirror` fica com o pack do servidor). O Night do personagem do próprio jogador segue pelo servidor |
+| NPC: rosto | `Moods[Customers.Mood].Expression` (Normal, Happy, Skeptical, Stressed); o humor vale também na faixa baixa (**Provisório (2026-10-14)**: `Normal_Night` não vence mais); variantes têm rosto fixo: `blank` = `Blank`, `raincoat` = `EyesClosed`, `mirror` = `EyesWhite` | DEC-162, DEC-187, `Q-164` |
 | Fora da troca local | Opal (CHR-003, local, DEC-191), Quentin (só dia, só textura Day, DEC-159), atores de anomalia que dependem do sinal (`Q-147`, onda 3) | DEC-159, DEC-191 |
 | Transição | instantânea, sem VFX | DEC-167 |
 | Proibido | Desmaiado (X) em NPC; pack Mid na crew de dia | DEC-187 (Provisório), DEC-167 |
@@ -739,7 +739,7 @@ Divergências que ficam abertas entre as duas sessões:
 | Humor simplificado (Neutral/Happy/Annoyed/Complaining, só visual) | board, TASK-033 | `Q-164` |
 | `Sanity` como packet privado (onda 2) | DEC-167 (leitura do architect) | `Q-130` |
 | `Stations` id = `StationId × 100 + Slot` | architect, sugestão do §18.14 item 2 da TASK-002 | — |
-| Rosto Desmaiado na crew `Down`; `Normal_Night` vence o humor | DEC-167 (itens Provisórios), proposals-round-3 §2 | game-designer |
+| Rosto Desmaiado na crew `Down`; `Normal_Night` vence o humor (**Provisório (2026-10-14):** só o Desmaiado segue; o humor não é mais vencido pela faixa baixa) | DEC-167 (itens Provisórios), proposals-round-3 §2 | game-designer |
 | `Select` de classe no Run em modo dev | TASK-017 | lobby (`Q-085`, onda 2) |
 
 ## 13. Ondas 2–4: entradas (versão 5)

@@ -6,6 +6,7 @@ type Switch = {
 	Rel: CFrame, -- authored Lever in Box space
 	Pivot: Vector3, -- tilt pivot in Box space (the Lever base on the Box surface)
 	Action: string,
+	Vehicle: Instance?, -- shutter lever: the `Vehicle`-tagged ancestor carrying the Shutter attribute
 	Angle: number,
 	From: number,
 	To: number,

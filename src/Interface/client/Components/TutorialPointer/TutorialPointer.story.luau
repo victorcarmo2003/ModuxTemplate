@@ -1,5 +1,6 @@
 --!strict
--- TutorialPointer on a phone-sized frame: "Angle" turns the arrow; "X"/"Y" move the badge (px in the frame); "Scale"
+-- TutorialPointer (the only 2D guide arrow: it shows only while the 3D arrow and its target are off screen) on a
+-- phone-sized frame: "Angle" turns the arrow; "X"/"Y" move the badge (px in the frame); "Scale"
 -- = Theme.Scale; "Strong" pulses it (no progress reminder).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
