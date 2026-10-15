@@ -37,7 +37,7 @@ const PARTY: { [string]: Line } = {
 	WrongServer = { Text = "Not available here", Kind = "Alert" },
 	FriendsOnly = { Text = "This squad is friends only", Kind = "Alert" },
 	Configured = { Text = "The leader changed the squad settings", Kind = "Info" },
-	SetupFirst = { Text = "Pick the room size and who can join first", Kind = "Alert" },
+	SetupFirst = { Text = "Create the room first", Kind = "Alert" },
 	RoomClosed = { Text = "That room isn't open", Kind = "Alert" },
 	InviteOnly = { Text = "That room is invite only", Kind = "Alert" },
 	StartCancelled = { Text = "Leader cancelled", Kind = "Info" },

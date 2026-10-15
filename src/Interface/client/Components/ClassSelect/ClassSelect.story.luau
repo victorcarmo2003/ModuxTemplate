@@ -1,8 +1,13 @@
 --!strict
--- ClassSelect on a phone-sized frame (iPhone SE landscape, 667 x 375) or the whole viewport, every class of Content
--- with the viewport stage (ClassStage). Buy (gems or Robux) and Equip are simulated after "Latency" seconds the way the
--- server answers. "Robux" pretends the class products exist (R$ from Content.Shop). "Preview" builds the rigs
--- (needs ReplicatedStorage.Assets.Crew synced; otherwise the placeholder letter stays).
+-- ClassSelect on a phone (iPhone SE landscape, 667 x 375), a tablet (1024 x 768) or the whole viewport, every class
+-- of Content with the viewport stage (ClassStage). Check: list and card centred on the vertical, ~70% tall
+-- (TASK-297), class name over the arrows without cutting "Line Cook" (TASK-298); card on Phone, Tablet and Viewport:
+-- content packed at the top (portrait + chips, blurb, bars around the Rookie middle line, passive skill cards with
+-- their icons, TASK-302; outlines whole on all 4 sides), free height only above the buttons (TASK-299; try Hawker
+-- for the Tips bar, Hauler / Night Owl for the conditional speed, "Gems" 0 for the Need button); "TopBar" draws the
+-- Roblox buttons the title tab and the panels must clear. Buy (gems or Robux) and Equip are simulated after "Latency"
+-- seconds the way the server answers. "Robux" pretends the class products exist (R$ from Content.Shop). "Preview"
+-- builds the rigs (needs ReplicatedStorage.Assets.Crew synced; otherwise only the floor shadow stays).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -20,8 +25,11 @@ const untrack = Vide.untrack
 const cleanup = Vide.cleanup
 const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }) -> Instance
 
+const TOP_BAR = Vector2.new(120, 60) -- real px of the Roblox buttons on a phone (ClassSelect TOPBAR_LEFT / HEIGHT)
+
 type Controls = {
-	Phone: () -> boolean,
+	Device: () -> string,
+	TopBar: () -> boolean,
 	Scale: () -> number,
 	Gems: () -> number,
 	Latency: () -> number,
@@ -32,7 +40,8 @@ type Controls = {
 return UILabs.CreateVideStory({
 	vide = Vide,
 	controls = {
-		Phone = true,
+		Device = UILabs.Choose({ "Phone", "Tablet", "Viewport" }),
+		TopBar = true,
 		Scale = UILabs.Slider(1, 0.86, 1.6, 0.02), -- Theme.Scale: 1 phone, 1.4 at 1080p
 		Gems = UILabs.Slider(60, 0, 400, 5),
 		Latency = UILabs.Slider(0.4, 0, 3, 0.1),
@@ -91,9 +100,6 @@ return UILabs.CreateVideStory({
 		Species = function()
 			const class = Content.Classes.ByKey[focus()]
 			return if class then class.Species else "dog"
-		end,
-		Badge = function()
-			return string.upper(string.sub(focus(), 7, 7))
 		end,
 		Visible = function()
 			return true
@@ -155,6 +161,9 @@ return UILabs.CreateVideStory({
 		end,
 		Stage = stage,
 		Scale = controls.Scale,
+		Reserved = function()
+			return if controls.TopBar() then TOP_BAR else Vector2.zero
+		end,
 	})
 
 	return create("Frame")({
@@ -162,7 +171,11 @@ return UILabs.CreateVideStory({
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		Size = function()
-			return if controls.Phone() then UDim2.fromOffset(667, 375) else UDim2.fromScale(1, 1)
+			const device = controls.Device()
+			return if device == "Phone"
+				then UDim2.fromOffset(667, 375)
+				elseif device == "Tablet" then UDim2.fromOffset(1024, 768)
+				else UDim2.fromScale(1, 1)
 		end,
 		BackgroundColor3 = Color3.fromHex("#8FD3F4"),
 		ClipsDescendants = true,
@@ -171,5 +184,14 @@ return UILabs.CreateVideStory({
 			Color = ColorSequence.new(Color3.fromHex("#BDE7FA"), Theme.Color.Teal),
 		}),
 		screen,
+		-- mock of the Roblox buttons (top left) the screen must not cover
+		create("Frame")({
+			Name = "RobloxTopBar",
+			Size = UDim2.fromOffset(TOP_BAR.X, TOP_BAR.Y),
+			BackgroundColor3 = Color3.new(0, 0, 0),
+			BackgroundTransparency = 0.6,
+			ZIndex = 50,
+			Visible = controls.TopBar,
+		}),
 	})
 end)

@@ -1,17 +1,18 @@
 --!strict
 -- LobbyHud: the lobby HUD (user request 2026-10-11; layout 2026-10-12), cartoon kit (AST-091), mobile first.
 -- Laid out for the smallest landscape phone (620 x 340 px at Scale 1, inside DeviceSafeInsets); `Scale` grows it.
--- ALL of the lobby UI lives on the RIGHT side; the left side stays free for the Roblox menu and chat.
---   right, a little above the middle of the screen (never over the mobile jump button: the lowest ~200 px of the right
---                  edge stay free; short screens pin it to the top)
---                  gem balance pill (a button: opens the gem shop), gem icon + amount + "+"
---   under the pill four big tiles: Classes, Shop, Codes, Squad (Squad shows "2/4" when in a squad). One column
---                  (56 px tiles); on a short screen (under 440 px tall, phones in landscape) a 2 x 2 grid in the same
---                  order, so it stays clear of the mobile jump button (bottom right); tiles 48 px (over the 44 px
---                  touch target) on narrow screens
+-- Layout (user request 2026-10-15, TASK-295):
+--   left, centred vertically  four big tiles: Classes, Shop, Codes, Squad (Squad shows "2/4" when in a squad). One
+--                  column (56 px tiles); on a short screen (under 440 px tall, phones in landscape) a 2 x 2 grid in the
+--                  same order, so it stays clear of the mobile thumbstick (bottom left); tiles 48 px (over the 44 px
+--                  touch target) on narrow screens. Never higher than TOPBAR_FREE real px from the top: the Roblox
+--                  buttons (menu, chat, microphone) live in the top-left corner
+--   right, centred vertically  the gem balance pill, alone (a button: opens the gem shop), gem icon + amount + "+";
+--                  never over the mobile jump button (the lowest FREE_BOTTOM px of the right edge stay free)
 --   bottom centre  squad status card (SquadStatus: Solo / Squad n/4, member heads, Friends only) over the big Play
 --                  button (text and colour from `Play`: PLAY green, START SQUAD mustard, READY, STARTING..., CANCEL dark
---                  mustard while the countdown can still be aborted)
+--                  mustard while the countdown can still be aborted). Shown only while `PlayShown` (TASK-296: the
+--                  player is in a squad); pops in / out with Motion.Pop
 -- Kept clear of the mobile thumbstick (bottom left) and jump button (bottom right). Key badges ("C", "Y"...) on the
 -- tiles when the device is not touch (`Keys`). Pure: only props.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -60,6 +61,8 @@ export type Props = {
 	OnInvite: (() -> ())?,
 	-- Key chip on the Play button while it says CANCEL ("X", "ButtonX"); "" or missing = none (touch).
 	CancelKey: (() -> string)?,
+	-- Card + Play button shown (in a squad, TASK-296); missing = always shown.
+	PlayShown: (() -> boolean)?,
 	Scale: (() -> number)?,
 }
 
@@ -68,17 +71,18 @@ const TOP = 8
 const TILE = 56
 const TILE_SMALL = 48 -- compact / narrow: still over the 44 px touch target
 const TILE_GAP = 6
-const SIDE_GAP = 8 -- between the pill and the tiles
 const PILL = 44
 const PLAY_WIDTH = 210
 const PLAY_HEIGHT = 52
 const CARD_GAP = 8
 const SHORT = 440 -- px tall screens under this get the 2 x 2 grid
 const NARROW = 420 -- px wide screens under this get the small tiles
--- The column sits at 45% of the screen height, but never lower than this many real px from the bottom edge: the Roblox
--- jump / use buttons live bottom right (360 x 640, 667 x 375, 844 x 390, 1280 x 720 all keep the corner clear)
+-- The gem pill sits at the middle of the screen height, but never lower than this many real px from the bottom edge: the
+-- Roblox jump / use buttons live bottom right (360 x 640, 667 x 375, 844 x 390, 1280 x 720 all keep the corner clear)
 const FREE_BOTTOM = 200
-const CENTER = 0.45
+-- The tile column sits at the middle too, but never higher than this many real px from the top edge: the Roblox top bar
+-- (menu, chat, microphone; ~58 px, HudController TOPBAR_REAL) is over the top-left corner
+const TOPBAR_FREE = 64
 
 -- Dark mustard, Ink text stroke: reads as "stop" next to the green PLAY without the forbidden alert red.
 const CANCEL_TONE: Theme.Tone = {
@@ -113,6 +117,10 @@ return function(props: Props): Frame
 	const scaled = function(): number
 		return scale() * pop()
 	end
+	const playShown = function(): boolean
+		return if props.PlayShown then props.PlayShown() else true
+	end
+	const playPop = Motion.Pop(playShown)
 
 	-- Real px size of the screen (this root fills it): decides the grid and the tile size.
 	const area = source(Vector2.new(1000, 700))
@@ -122,12 +130,17 @@ return function(props: Props): Frame
 	const tile = function(): number
 		return if compact() or area().X < NARROW then TILE_SMALL else TILE
 	end
-	-- Real px height of the right column (it scales by `scaled`): decides where it sits
-	const sideHeight = source(0)
-	const sideTop = function(): number
+	-- Real px height of the tile column and of the gem pill (they scale by `scaled`): decide where they sit
+	const menuHeight = source(0)
+	const gemsHeight = source(0)
+	const menuTop = function(): number
 		const real = area()
-		const height = sideHeight()
-		const centred = real.Y * CENTER - height / 2
+		return math.max(TOPBAR_FREE, real.Y / 2 - menuHeight() / 2)
+	end
+	const gemsTop = function(): number
+		const real = area()
+		const height = gemsHeight()
+		const centred = real.Y / 2 - height / 2
 		const lowest = real.Y - FREE_BOTTOM - height
 		return math.max(TOP, math.min(centred, lowest))
 	end
@@ -222,28 +235,20 @@ return function(props: Props): Frame
 		BackgroundTransparency = 1,
 		Visible = props.Visible,
 
-		-- Right column: gem pill on top, the tiles under it (one stable order, one UIScale)
+		-- Right, centred vertically: the gem pill alone (opens the shop)
 		create("Frame")({
-			Name = "Side",
+			Name = "Wallet",
 			AnchorPoint = Vector2.new(1, 0),
 			Position = function()
-				return UDim2.new(1, -MARGIN, 0, sideTop())
+				return UDim2.new(1, -MARGIN, 0, gemsTop())
 			end,
 			Size = UDim2.fromOffset(0, 0),
 			AutomaticSize = Enum.AutomaticSize.XY,
 			BackgroundTransparency = 1,
 			createRaw("UIScale")({ Scale = scaled }),
-			create("UIListLayout")({
-				FillDirection = Enum.FillDirection.Vertical,
-				HorizontalAlignment = Enum.HorizontalAlignment.Right,
-				SortOrder = Enum.SortOrder.LayoutOrder,
-				Padding = UDim.new(0, SIDE_GAP),
-			}),
 
-			-- Gem balance: opens the shop
 			CartoonButton({
 				Name = "Gems",
-				LayoutOrder = 1,
 				Size = UDim2.fromOffset(0, PILL),
 				AutomaticSize = Enum.AutomaticSize.X,
 				Tone = Theme.Tone.Ink,
@@ -283,26 +288,29 @@ return function(props: Props): Frame
 					}),
 				},
 			}),
+		}),
 
-			-- Tiles: a column, or a 2 x 2 grid on short screens (same order)
-			create("Frame")({
-				Name = "Tiles",
-				LayoutOrder = 2,
-				Size = UDim2.fromOffset(0, 0),
-				AutomaticSize = Enum.AutomaticSize.XY,
-				BackgroundTransparency = 1,
-				createRaw("UIGridLayout")({
-					FillDirection = Enum.FillDirection.Horizontal,
-					FillDirectionMaxCells = function()
-						return if compact() then 2 else 1
-					end,
-					HorizontalAlignment = Enum.HorizontalAlignment.Right,
-					SortOrder = Enum.SortOrder.LayoutOrder,
-					CellSize = tileSize,
-					CellPadding = UDim2.fromOffset(TILE_GAP, TILE_GAP),
-				}),
-				tiles,
+		-- Left, centred vertically: the tiles, a column or a 2 x 2 grid on short screens (same order, one UIScale)
+		create("Frame")({
+			Name = "Menu",
+			Position = function()
+				return UDim2.fromOffset(MARGIN, menuTop())
+			end,
+			Size = UDim2.fromOffset(0, 0),
+			AutomaticSize = Enum.AutomaticSize.XY,
+			BackgroundTransparency = 1,
+			createRaw("UIScale")({ Scale = scaled }),
+			createRaw("UIGridLayout")({
+				FillDirection = Enum.FillDirection.Horizontal,
+				FillDirectionMaxCells = function()
+					return if compact() then 2 else 1
+				end,
+				HorizontalAlignment = Enum.HorizontalAlignment.Left,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				CellSize = tileSize,
+				CellPadding = UDim2.fromOffset(TILE_GAP, TILE_GAP),
 			}),
+			tiles,
 		}),
 
 		-- Play, with the squad status card over it
@@ -312,7 +320,15 @@ return function(props: Props): Frame
 			Position = UDim2.new(0.5, 0, 1, -MARGIN),
 			Size = UDim2.fromOffset(PLAY_WIDTH, PLAY_HEIGHT),
 			BackgroundTransparency = 1,
-			createRaw("UIScale")({ Scale = scaled }),
+			-- hidden until the player is in a squad (TASK-296); stays up while it shrinks away
+			Visible = function()
+				return playShown() or playPop() > 0.02
+			end,
+			createRaw("UIScale")({
+				Scale = function()
+					return scaled() * playPop()
+				end,
+			}),
 
 			SquadStatus({
 				Name = "Card",
@@ -360,18 +376,24 @@ return function(props: Props): Frame
 		end
 	end
 	const connection = root:GetPropertyChangedSignal("AbsoluteSize"):Connect(measure)
-	const side = root:FindFirstChild("Side") :: Frame?
-	const measureSide = function()
-		if side and side.AbsoluteSize.Y > 0 then
-			sideHeight(side.AbsoluteSize.Y)
+	-- real px heights of the two side blocks (with their UIScale): keep them centred
+	const connections = { connection }
+	const blocks: { [string]: Vide.Source<number> } = { Menu = menuHeight, Wallet = gemsHeight }
+	for name, height in blocks do
+		const frame = root:FindFirstChild(name) :: Frame?
+		if frame then
+			const measureFrame = function()
+				if frame.AbsoluteSize.Y > 0 then
+					height(frame.AbsoluteSize.Y)
+				end
+			end
+			table.insert(connections, frame:GetPropertyChangedSignal("AbsoluteSize"):Connect(measureFrame))
+			measureFrame()
 		end
 	end
-	const sideConnection = if side then side:GetPropertyChangedSignal("AbsoluteSize"):Connect(measureSide) else nil
-	measureSide()
 	cleanup(function()
-		connection:Disconnect()
-		if sideConnection then
-			sideConnection:Disconnect()
+		for _, each in connections do
+			each:Disconnect()
 		end
 	end)
 	return root

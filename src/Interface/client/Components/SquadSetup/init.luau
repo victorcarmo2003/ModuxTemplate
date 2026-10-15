@@ -4,11 +4,11 @@
 -- also opened by the lobby Play button for the player's own squad ("Create Squad" or already in one).
 -- A LobbyWindow (560 x 320 at Scale 1):
 --   left   the squad: `MaxPlayers` slots (head shot, name, "Leader" / "Ready" / "Not ready" tag); empty slots faded
---   right  a room is made in TWO STAGES (user request 2026-10-12, Provisional; network.md §16.9), private until confirmed:
---            stage 1  "How many players?" 1 2 3 4 (big buttons; 1 = solo room, closed at once)
---            stage 2  "Who can join?" Open · Friends only · Invite only · Closed (+ Back)
---            stage 3  the room: Who can join (tap to cycle) · Max players  -  n  +  (the leader changes them; the others
---                     only read them) · Start (leader) or "Waiting for the leader..." (members) · Cancel while starting
+--   right  ONE page (user request 2026-10-15, TASK-300; replaced the two-stage room of network.md §16.9): Who can join
+--          (tap to cycle) · Max players  -  n  +  (the leader changes them; the others only read them)
+--            draft (`Drafting`: my room is still private "Setup")  Create Room: the room is made with that size and
+--                     access and waits for players (nothing starts)
+--            room     Start (leader) or "Waiting for the leader..." (members) · Cancel while starting
 --          while starting: "Starting in n..."
 --          invite squad (`Invite`): Ready / Not ready for the members (platform members are ready by standing there)
 --   foot   platform squad: hint "Step off the platform to leave"
@@ -25,8 +25,6 @@ local LobbyWindow = require(script.Parent.LobbyWindow)
 
 const create = Vide.create
 const indexes = Vide.indexes
--- Vide 0.4.1 types `create` for 19 classes only; UIGridLayout is not among them.
-const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }) -> Instance
 
 export type Member = {
 	UserId: number,
@@ -54,12 +52,10 @@ export type Props = {
 	CanStart: () -> boolean,
 	OnAccess: (access: string) -> (),
 	OnMaxPlayers: (count: number) -> (),
-	-- 1 = pick the size, 2 = pick who can join, 3 = the room (members and a confirmed room always 3)
-	Stage: () -> number,
-	-- stage 1: the size was picked
-	OnCount: (count: number) -> (),
-	-- stage 2: back to the size
-	OnBack: () -> (),
+	-- my room is still private ("Setup"): Access / MaxPlayers are the draft and the button is Create Room. Default false.
+	Drafting: (() -> boolean)?,
+	-- Create Room: make the room with the shown size and access (it waits for players)
+	OnCreate: (() -> ())?,
 	OnStart: () -> (),
 	-- the leader may abort the countdown until shortly before the teleport (Cancel button; nil = no button)
 	CanCancel: (() -> boolean)?,
@@ -89,12 +85,14 @@ const AVATAR = 32
 -- who can join (PartyRules.Access without "Setup"): cycle order, button text and tone
 const ACCESS_ORDER = { "Open", "Friends", "Invite", "Closed" }
 const ACCESS_TEXT: { [string]: string } = {
+	Setup = "Setting up",
 	Open = "Open",
 	Friends = "Friends only",
 	Invite = "Invite only",
 	Closed = "Closed",
 }
 const ACCESS_TONE: { [string]: Theme.Tone } = {
+	Setup = Theme.Tone.Mustard,
 	Open = Theme.Tone.Green,
 	Friends = Theme.Tone.Teal,
 	Invite = Theme.Tone.Violet,
@@ -118,6 +116,9 @@ return function(props: Props): Frame
 	end
 	const ready = function(): boolean
 		return props.Ready ~= nil and props.Ready()
+	end
+	const drafting = function(): boolean
+		return props.Drafting ~= nil and props.Drafting()
 	end
 	const slots = function(): { Slot }
 		const list: { Slot } = {}
@@ -253,13 +254,10 @@ return function(props: Props): Frame
 		}) :: Frame
 	end
 
-	const stage3 = create("Frame")({
-		Name = "Stage3",
+	const room = create("Frame")({
+		Name = "Room",
 		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
-		Visible = function()
-			return props.Stage() >= 3
-		end,
 		create("UIListLayout")({
 			FillDirection = Enum.FillDirection.Vertical,
 			SortOrder = Enum.SortOrder.LayoutOrder,
@@ -322,6 +320,24 @@ return function(props: Props): Frame
 				end,
 			}),
 		}),
+		-- draft: make the room (it waits for players; nothing starts)
+		CartoonButton({
+			Name = "Create",
+			LayoutOrder = 3,
+			Size = UDim2.new(1, 0, 0, BUTTON + 8),
+			TextSize = 22,
+			Outline = Theme.Outline.Thick,
+			Tone = Theme.Tone.Green,
+			Visible = function()
+				return drafting() and props.IsLeader() and not starting()
+			end,
+			Text = "Create Room",
+			OnActivated = function()
+				if props.OnCreate then
+					props.OnCreate()
+				end
+			end,
+		}),
 		CartoonButton({
 			Name = "Start",
 			LayoutOrder = 3,
@@ -330,7 +346,7 @@ return function(props: Props): Frame
 			Outline = Theme.Outline.Thick,
 			Tone = Theme.Tone.Green,
 			Visible = function()
-				return props.IsLeader() and not starting()
+				return props.IsLeader() and not starting() and not drafting()
 			end,
 			Enabled = props.CanStart,
 			Text = function()
@@ -388,141 +404,15 @@ return function(props: Props): Frame
 				return if starting() then Theme.Color.Green else Theme.Color.Text
 			end,
 			Visible = function()
-				return starting() or not props.IsLeader()
+				return starting() or not props.IsLeader() or drafting()
 			end,
 			Text = function()
 				const left = props.Countdown()
 				if left ~= nil then
 					return if left > 0 then `Starting in {math.ceil(left)}...` else "Here we go!"
 				end
-				return "Waiting for the leader..."
+				return if drafting() then "Private until you create it" else "Waiting for the leader..."
 			end,
-		}),
-	})
-
-	-- stage 1: how many players (big buttons)
-	const countButtons: { Instance } = {}
-	for count = 1, maxSize do
-		table.insert(
-			countButtons,
-			CartoonButton({
-				Name = `Count{count}`,
-				LayoutOrder = count,
-				Size = UDim2.new(1 / maxSize, -5, 0, 72),
-				TextSize = 32,
-				Outline = Theme.Outline.Thick,
-				Tone = if count == 1 then Theme.Tone.Slate else Theme.Tone.Green,
-				Text = tostring(count),
-				OnActivated = function()
-					props.OnCount(count)
-				end,
-			})
-		)
-	end
-	const stage1 = create("Frame")({
-		Name = "Stage1",
-		Size = UDim2.fromScale(1, 1),
-		BackgroundTransparency = 1,
-		Visible = function()
-			return props.Stage() == 1
-		end,
-		create("UIListLayout")({
-			FillDirection = Enum.FillDirection.Vertical,
-			SortOrder = Enum.SortOrder.LayoutOrder,
-			Padding = UDim.new(0, 8),
-		}),
-		CartoonLabel({
-			Name = "Title",
-			LayoutOrder = 1,
-			Box = UDim2.new(1, 0, 0, 28),
-			TextSize = 22,
-			XAlignment = Enum.TextXAlignment.Left,
-			Text = "How many players?",
-		}),
-		create("Frame")({
-			Name = "Counts",
-			LayoutOrder = 2,
-			Size = UDim2.new(1, 0, 0, 72),
-			BackgroundTransparency = 1,
-			create("UIListLayout")({
-				FillDirection = Enum.FillDirection.Horizontal,
-				SortOrder = Enum.SortOrder.LayoutOrder,
-				Padding = UDim.new(0, 6),
-			}),
-			countButtons,
-		}),
-		CartoonLabel({
-			Name = "Hint",
-			LayoutOrder = 3,
-			Box = UDim2.new(1, 0, 0, 40),
-			TextSize = Theme.MinTextSize,
-			Wrapped = true,
-			XAlignment = Enum.TextXAlignment.Left,
-			Transparency = 0.25,
-			Text = "Your room stays private until you open it. 1 = just you.",
-		}),
-	})
-
-	-- stage 2: who can join
-	const accessButtons: { Instance } = {}
-	for index, access in ACCESS_ORDER do
-		table.insert(
-			accessButtons,
-			CartoonButton({
-				Name = access,
-				LayoutOrder = index,
-				Size = UDim2.new(0.5, -3, 0, 56),
-				TextSize = 18,
-				Outline = Theme.Outline.Thick,
-				Tone = ACCESS_TONE[access],
-				Text = ACCESS_TEXT[access],
-				OnActivated = function()
-					props.OnAccess(access)
-				end,
-			})
-		)
-	end
-	const stage2 = create("Frame")({
-		Name = "Stage2",
-		Size = UDim2.fromScale(1, 1),
-		BackgroundTransparency = 1,
-		Visible = function()
-			return props.Stage() == 2
-		end,
-		create("UIListLayout")({
-			FillDirection = Enum.FillDirection.Vertical,
-			SortOrder = Enum.SortOrder.LayoutOrder,
-			Padding = UDim.new(0, 8),
-		}),
-		CartoonLabel({
-			Name = "Title",
-			LayoutOrder = 1,
-			Box = UDim2.new(1, 0, 0, 28),
-			TextSize = 22,
-			XAlignment = Enum.TextXAlignment.Left,
-			Text = "Who can join?",
-		}),
-		create("Frame")({
-			Name = "Choices",
-			LayoutOrder = 2,
-			Size = UDim2.new(1, 0, 0, 120),
-			BackgroundTransparency = 1,
-			createRaw("UIGridLayout")({
-				FillDirection = Enum.FillDirection.Horizontal,
-				SortOrder = Enum.SortOrder.LayoutOrder,
-				CellSize = UDim2.new(0.5, -3, 0, 56),
-				CellPadding = UDim2.fromOffset(6, 8),
-			}),
-			accessButtons,
-		}),
-		CartoonButton({
-			Name = "Back",
-			LayoutOrder = 3,
-			Size = UDim2.fromOffset(110, BUTTON),
-			TextSize = 18,
-			Tone = Theme.Tone.Slate,
-			Text = "Back",
-			OnActivated = props.OnBack,
 		}),
 	})
 
@@ -532,9 +422,7 @@ return function(props: Props): Frame
 		Position = UDim2.fromScale(1, 0),
 		Size = UDim2.new(1, -(LEFT + GAP), 1, -(FOOT + 4)),
 		BackgroundTransparency = 1,
-		stage1,
-		stage2,
-		stage3,
+		room,
 	})
 
 	const foot = create("Frame")({

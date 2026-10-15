@@ -27,6 +27,9 @@ const LIFT = Vector3.new(0, 3, 0) -- HumanoidRootPart over the ground point (arc
 const FOV = 38
 const MARGIN = 1.4 -- room around the rig: framed once on the first rig, bigger animals must still fit
 const RISE = 0.06 -- the camera looks a little down at the rig
+-- The rig sits this share of the half view above the screen centre: its feet clear the class name and the arrows
+-- under it (ClassSelect, TASK-298).
+const LIFT_VIEW = 0.12
 
 return function(options: Options): Stage
 	const folder = Instance.new("Folder")
@@ -64,7 +67,8 @@ return function(options: Options): Stage
 		const centre = pivot.Position
 		const look = base.LookVector
 		const eye = centre + (look + Vector3.new(0, RISE, 0)).Unit * distance
-		framing = CFrame.lookAt(eye, centre)
+		const drop = Vector3.new(0, distance * math.tan(math.rad(FOV / 2)) * LIFT_VIEW, 0)
+		framing = CFrame.lookAt(eye - drop, centre - drop)
 		framed = true
 	end
 

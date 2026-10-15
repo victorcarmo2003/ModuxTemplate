@@ -6,9 +6,11 @@
 	PlaceController:GetServerRole(), which waits for it; missing = "Game"), or Workspace "ServerRole" = "Lobby" as a
 	Studio override. Elsewhere nothing is bound or mounted.
 
-	Layout (user request 2026-10-12): ALL the lobby UI is on the RIGHT (gem pill + tiles column at the top right, 2 x 2 grid
-	on short screens), the squad status card and the Play button at the bottom centre; the LEFT stays free for the Roblox
-	menu and chat (the Roblox player list is turned off in the lobby: the squad panel lists the players). The windows are
+	Layout (user request 2026-10-15, TASK-295): the tiles column on the LEFT, centred vertically (2 x 2 grid on short
+	screens; clear of the Roblox top-bar buttons), the gem pill alone on the RIGHT, centred vertically; the squad status
+	card and the Play button at the bottom centre, only while the player is in a squad (TASK-296: PlayShown; before
+	that the pads, the Squad tile and P are the way in). The Roblox player list is turned off in the lobby: the squad
+	panel lists the players. The windows are
 	centred full-screen modals over a dim backdrop and hide the HUD, so nothing sits over another screen: opening one
 	closes the previous (one Panel), the Roblox menu (Esc) closes it too, and a window shrinks to fit a narrow screen.
 	Toasts and the invite popup share one column at the top centre.
@@ -38,8 +40,9 @@
 	                countdown, then the teleport; Studio answers StudioNoTeleport and drops the squad). The choice
 	                closes; the HUD shows "Starting in n..." over the Play button.
 	  Create Squad  PartyQuickPlay { Mode = "Squad" }: an open invite squad (no platform); as soon as it arrives the
-	                setup window (SquadSetup) opens: Friends only, Max players, Invite players (-> SquadPanel), Leave,
-	                Start. No need to walk to a platform; stepping on a free one takes the squad there.
+	                setup window (SquadSetup) opens: one page (TASK-300) with Max players and Who can join, Create Room
+	                (the room then waits for players), then Start, Invite players (-> SquadPanel), Leave. No need to walk
+	                to a platform; stepping on a free one takes the squad there.
 	In a squad, Play opens the setup window of my squad (Start for the leader, Ready for invite squad members).
 
 	Zones (user request 2026-10-11, Provisional; Content.Lobby, shared.Lobby.LobbyZones): every lobby zone is a floor
@@ -64,7 +67,8 @@
 	shows the world stage every character is hidden locally (LocalTransparencyModifier; LOBBY.md §11).
 
 	Binds (InputController; touch = the HUD tiles and buttons, >= 44 px):
-	  Classes C / ButtonY · Shop B / DPadUp · Codes K / DPadLeft · Squad P / DPadRight · Play Return / DPadDown
+	  Classes C / ButtonY · Shop B / DPadUp · Codes K / DPadLeft · Squad P / DPadRight · Play Return / DPadDown (only
+	  while the Play button shows)
 	  Close (Menu) ButtonB · previous / next class (Menu) Left / Right, ButtonL1 / ButtonR1
 	  Play choice (Menu) Play Solo 1 · Create Squad 2 (gamepad: the selection starts on Play Solo, A picks)
 	The Classes bind has a higher priority than ClassController's Crew toggle (C / ButtonY), so in the lobby these keys
@@ -118,6 +122,12 @@ export type PartyRecord = {
 	StartAt: number,
 }
 
+-- One-page room setup (TASK-300): what Create Room will send.
+export type Draft = {
+	Access: string,
+	MaxPlayers: number,
+}
+
 export type Invite = {
 	PartyId: number,
 	From: number,
@@ -155,18 +165,18 @@ const PREVIOUS = "LobbyPrevious"
 const NEXT = "LobbyNext"
 -- Notices column (invite popup + toasts), top centre: px from the top; on a narrow screen under the HUD column
 const NOTICE_TOP = 8
-const NOTICE_TOP_NARROW = 290
+const NOTICE_TOP_NARROW = 64 -- under the Roblox top bar (the HUD sides are centred, the top is free)
 const NARROW_VIEWPORT = 420
 const BIND_PRIORITY = 10 -- over ClassController's Crew toggle (priority 0) on C / ButtonY
 
 -- First button a gamepad selects when a panel opens (by instance name, searched in the panel).
 const FIRST_SELECTION: { [Panel]: { string } } = {
-	None = { "Play" },
+	None = { "Play", "Squad" }, -- no squad yet: no Play button, the Squad tile
 	Classes = {}, -- the focused class row (its name is the class key)
 	Shop = { "Buy" },
 	Codes = { "Redeem" },
 	Squad = { "Start", "Ready", "Create", "Invite" },
-	Platform = { "Start", "Ready", "Toggle", "Leave" },
+	Platform = { "Create", "Start", "Ready", "Toggle", "Leave" },
 	Play = { "Solo", "Squad" },
 }
 
@@ -192,6 +202,18 @@ local function isLobby(placeRole: Roles.Role): boolean
 		return true
 	end
 	return workspace:GetAttribute(Roles.Attribute) == "Lobby"
+end
+
+-- Visible itself and every GuiObject above it (a hidden parent hides the button).
+local function shown(object: GuiObject): boolean
+	local current: Instance? = object
+	while current and current:IsA("GuiObject") do
+		if not current.Visible then
+			return false
+		end
+		current = current.Parent
+	end
+	return true
 end
 
 local function nameOf(userId: number): string
@@ -247,10 +269,11 @@ function LobbyController:Setup()
 	self.Roster = Vide.source({}) :: Vide.Source<{ Player }>
 	self.Sent = Vide.source({}) :: Vide.Source<{ [number]: boolean }>
 	self.Invites = Vide.source({}) :: Vide.Source<{ Invite }>
-	-- two-stage room (network.md §16.9): 1 = pick the size, 2 = pick who can join (local, while my room is "Setup")
-	self.SetupStage = Vide.source(1) :: Vide.Source<number>
-	-- PartyId whose setup stage was started
-	self.StageParty = 0 :: number
+	-- room draft (TASK-300): size and who can join, picked on the one-page setup while my room is still "Setup"; sent
+	-- only by Create Room (PartyConfigure)
+	self.Draft = Vide.source({ Access = "Open", MaxPlayers = PartyRules.Rules.DefaultMaxPlayers }) :: Vide.Source<Draft>
+	-- PartyId whose draft was started
+	self.DraftParty = 0 :: number
 	-- a quick play (PartyQuickPlay) waiting for its squad
 	self.QuickPending = Vide.source(false) :: Vide.Source<boolean>
 	self.QuickMode = "Solo" :: PlayChoice.Choice
@@ -744,6 +767,12 @@ function LobbyController:CancelKey(): string
 	return if self.Dependencies.InputController.Device() == "Touch" then "" else "X"
 end
 
+-- The status card and the Play button show only once the player has a squad (a pad, Create Squad, an accepted invite; a
+-- quick play waiting for its squad too). User request 2026-10-15, TASK-296. Reactive (Parties).
+function LobbyController:PlayShown(): boolean
+	return self:MyParty() ~= nil or self.QuickPending()
+end
+
 function LobbyController:PlayButton(): LobbyHud.PlayButton
 	const _, party = self:MyParty()
 	if party == nil then
@@ -949,34 +978,26 @@ function LobbyController:SetupMembers(): { SquadSetup.Member }
 	return list
 end
 
--- Two-stage room (network.md §16.9). A room I lead that is still "Setup" shows stage 1 (size) then 2 (who can join);
--- anything else (members, a confirmed room) shows the room itself, stage 3. The stages are local; the server only keeps
--- the room private ("Setup") until the leader picks an Access.
-function LobbyController:SetupStageNow(): number
+-- One-page room setup (user request 2026-10-15, TASK-300; replaces the two-stage room of network.md §16.9). A room I
+-- lead that is still "Setup" is a draft: size and who can join change only here, Create Room sends them (the room then
+-- exists and waits for players; Start / PLAY begins it later). Reactive.
+function LobbyController:Drafting(): boolean
 	const party = self:SetupParty()
-	if party == nil or party.Access ~= "Setup" or party.Leader ~= Players.LocalPlayer.UserId then
-		return 3
-	end
-	return Vide.untrack(self.SetupStage)
+	return party ~= nil and party.Access == "Setup" and party.Leader == Players.LocalPlayer.UserId
 end
 
--- A room of mine (re)appears in "Setup": start at stage 1.
-function LobbyController:CheckStage(id: number, record: PartyRecord)
-	if record.Access == "Setup" and record.Leader == Players.LocalPlayer.UserId and self.StageParty ~= id then
-		self.StageParty = id
-		self.SetupStage(1)
+-- A room of mine (re)appears in "Setup": a fresh draft (its size as the server has it).
+function LobbyController:CheckDraft(id: number, record: PartyRecord)
+	if record.Access == "Setup" and record.Leader == Players.LocalPlayer.UserId and self.DraftParty ~= id then
+		self.DraftParty = id
+		self.Draft({ Access = "Open", MaxPlayers = math.clamp(record.MaxPlayers, 1, PartyRules.Rules.MaxSize) })
 	end
 end
 
--- Stage 1 button: the room size. 1 = a closed room of one at once; more = on to "who can join".
-function LobbyController:PickCount(count: number)
-	const size = math.clamp(count, 1, PartyRules.Rules.MaxSize)
-	if size == 1 then
-		self:Configure("Closed", 1)
-		return
-	end
-	self:Configure("Setup", size)
-	self.SetupStage(2)
+-- Create Room: the draft becomes the room (Setup -> its access). A room of one is closed (nobody else fits).
+function LobbyController:CreateRoom()
+	const draft = Vide.untrack(self.Draft)
+	self:Configure(if draft.MaxPlayers <= 1 then "Closed" else draft.Access, draft.MaxPlayers)
 end
 
 -- Seconds before the teleport of the shown squad; nil = not starting.
@@ -1183,8 +1204,8 @@ function LobbyController:NoticeScale(): number
 	return math.max(math.min(self.Scale(), UiScale.Current()), Theme.Scale.Min)
 end
 
--- The left side stays free for the Roblox menu and chat: the player list (top right on desktop, under our column) is off
--- in the lobby, and the Roblox menu (Esc) closes the open window so the two never stack.
+-- The top left stays free for the Roblox menu and chat (the tiles sit at the middle of the left edge): the player list
+-- (top right on desktop) is off in the lobby, and the Roblox menu (Esc) closes the open window so the two never stack.
 function LobbyController:ClearLeftSide()
 	const ok, err = pcall(function()
 		StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, false)
@@ -1213,7 +1234,7 @@ function LobbyController:SelectFirst(panel: Panel)
 	const root: Instance = if panel == "None" then gui else (gui:FindFirstChild(PANEL_ROOT[panel], true) or gui)
 	for _, name in names do
 		for _, descendant in root:GetDescendants() do
-			if descendant.Name == name and descendant:IsA("GuiButton") and descendant.Visible then
+			if descendant.Name == name and descendant:IsA("GuiButton") and shown(descendant) then
 				GuiService.SelectedObject = descendant
 				return
 			end
@@ -1293,7 +1314,7 @@ function LobbyController:Bind()
 			Context = "Gameplay",
 		})
 		.OnPress(function()
-			if self:PlayButton().Enabled then
+			if self:PlayShown() and self:PlayButton().Enabled then
 				self:Click()
 				self:Play()
 			end
@@ -1543,6 +1564,9 @@ function LobbyController:Mount(playerGui: Instance)
 				CancelKey = function()
 					return self:CancelKey()
 				end,
+				PlayShown = function()
+					return self:PlayShown()
+				end,
 				Scale = self.Scale,
 			}),
 
@@ -1693,21 +1717,23 @@ function LobbyController:Mount(playerGui: Instance)
 					return party ~= nil and party.Leader == Players.LocalPlayer.UserId
 				end,
 				Access = function()
+					if self:Drafting() then
+						return self.Draft().Access
+					end
 					const party = self:SetupParty()
 					return if party then party.Access else "Setup"
 				end,
-				Stage = function()
-					return self:SetupStageNow()
+				Drafting = function()
+					return self:Drafting()
 				end,
-				OnCount = function(count: number)
+				OnCreate = function()
 					self:Click()
-					self:PickCount(count)
-				end,
-				OnBack = function()
-					self:Click()
-					self.SetupStage(1)
+					self:CreateRoom()
 				end,
 				MaxPlayers = function()
+					if self:Drafting() then
+						return self.Draft().MaxPlayers
+					end
 					const party = self:SetupParty()
 					return if party then party.MaxPlayers else PartyRules.Rules.DefaultMaxPlayers
 				end,
@@ -1724,6 +1750,12 @@ function LobbyController:Mount(playerGui: Instance)
 				end,
 				OnAccess = function(access: string)
 					self:Click()
+					if self:Drafting() then
+						const draft = table.clone(Vide.untrack(self.Draft))
+						draft.Access = access
+						self.Draft(draft)
+						return
+					end
 					const party = self:SetupParty()
 					if party then
 						self:Configure(access, party.MaxPlayers)
@@ -1731,6 +1763,12 @@ function LobbyController:Mount(playerGui: Instance)
 				end,
 				OnMaxPlayers = function(count: number)
 					self:Click()
+					if self:Drafting() then
+						const draft = table.clone(Vide.untrack(self.Draft))
+						draft.MaxPlayers = math.clamp(count, 1, PartyRules.Rules.MaxSize)
+						self.Draft(draft)
+						return
+					end
 					const party = self:SetupParty()
 					if party then
 						self:Configure(party.Access, count)
@@ -1772,8 +1810,8 @@ function LobbyController:Mount(playerGui: Instance)
 				end,
 			}),
 
-			-- Notices column, top centre (clear of the right-hand HUD): the invite popup, the toasts under it. One UIScale.
-			-- On a narrow screen it steps down under the HUD column instead of running into it.
+			-- Notices column, top centre (the HUD sides are centred vertically): the invite popup, the toasts under it. One
+			-- UIScale. On a narrow screen it steps down under the Roblox top bar instead of running into its buttons.
 			Vide.create("Frame")({
 				Name = "Notices",
 				AnchorPoint = Vector2.new(0.5, 0),
@@ -1891,14 +1929,14 @@ LobbyController:OnInit(function(self)
 		const copy = table.clone(Vide.untrack(self.Parties))
 		copy[id] = record :: any
 		self.Parties(copy)
-		self:CheckStage(id, record :: any)
+		self:CheckDraft(id, record :: any)
 		self:CheckQuickPlay()
 	end)
 	net.Party:onChanged(function(id, record)
 		const copy = table.clone(Vide.untrack(self.Parties))
 		copy[id] = record :: any
 		self.Parties(copy)
-		self:CheckStage(id, record :: any)
+		self:CheckDraft(id, record :: any)
 		self:CheckQuickPlay()
 	end)
 	net.Party:onRemoved(function(id)

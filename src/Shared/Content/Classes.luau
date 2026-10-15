@@ -3,7 +3,7 @@
 -- TASK-009: 6 in the MVP (dog, rabbit, cat, bear, fox, owl), panda/lion in the first update (DEC-186).
 -- Bonus + drawback are passive (DEC-186), numbers unchanged from DEC-069; prices by tier 0/45/120/180 (DEC-070).
 -- Keys are persisted in the profile (Classes, SelectedClass) and are the Profile/ClassAction enum: never rename.
--- Name and Description are placeholders (narrative-writer, DEC-022, ui-text.md "Crew" screen): change text, not keys.
+-- Name, Description and Blurb are placeholders (narrative-writer, DEC-022, ui-text.md "Crew" screen): change text, not keys.
 -- Raccoon is never a class species (DEC-159, DEC-186): Validate checks Species.ReservedFor.
 local Stats = require(script.Parent.Stats)
 local Table = require(script.Parent.Table)
@@ -11,6 +11,16 @@ local Table = require(script.Parent.Table)
 export type Op = "Set" | "Mul" | "Add"
 export type Scope = "Self" | "Party"
 export type When = "Always" | "Day" | "Night" | "PackagesAtLeast"
+export type SkillKind = "Perk" | "Drawback"
+
+-- A passive skill card of the class screen (TASK-302): presentation only of the class Effects (DEC-069), never
+-- a rule of its own. Icon = key of Assets/textures/ui/skills (tools/icons/skill_icons.py). Names / texts Provisional.
+export type Skill = {
+	Name: string,
+	Text: string,
+	Icon: string,
+	Kind: SkillKind,
+}
 
 export type Effect = {
 	Stat: Stats.Stat,
@@ -27,6 +37,8 @@ export type Class = {
 	Species: string, -- key of Species (1 <-> 1)
 	Name: string, -- placeholder (narrative-writer)
 	Description: string, -- placeholder: bonus . drawback, one line each (narrative-writer)
+	Blurb: string, -- placeholder flavour line of the class card, 1-2 short lines (narrative-writer; Provisional, TASK-299)
+	Skills: { Skill }, -- passive skill cards (TASK-302): perks first, then drawbacks
 	Tier: number,
 	Price: number, -- gems
 	InMvp: boolean,
@@ -40,6 +52,15 @@ return Table.new({
 		Species = "dog",
 		Name = "Rookie",
 		Description = "No perks, no drawbacks. Good at a bit of everything.",
+		Blurb = "Fresh on the crew and ready for any shift.",
+		Skills = {
+			{
+				Name = "All-Rounder",
+				Text = "All-Rounder keeps you at the crew standard in everything.",
+				Icon = "skill_all_round",
+				Kind = "Perk",
+			},
+		},
 		Tier = 0,
 		Price = 0, -- every new account owns it (DEC-186); the balance baseline (DEC-069)
 		InMvp = true,
@@ -51,6 +72,21 @@ return Table.new({
 		Species = "rabbit",
 		Name = "Runner",
 		Description = "Moves faster. Starts each night with 90 sanity.",
+		Blurb = "Quick on the feet, a bit jumpy after dark.",
+		Skills = {
+			{
+				Name = "Quick Legs",
+				Text = "Quick Legs gives you a move speed bonus.",
+				Icon = "skill_quick_legs",
+				Kind = "Perk",
+			},
+			{
+				Name = "Jumpy",
+				Text = "Jumpy starts each night with 90 sanity.",
+				Icon = "skill_jumpy",
+				Kind = "Drawback",
+			},
+		},
 		Tier = 1,
 		Price = 45, -- DEC-070 tier 1
 		InMvp = true,
@@ -65,6 +101,21 @@ return Table.new({
 		Species = "cat",
 		Name = "Line Cook",
 		Description = "Sausages you grill cook 15% faster. Walks a little slower.",
+		Blurb = "Knows every inch of the grill by heart.",
+		Skills = {
+			{
+				Name = "Grill Master",
+				Text = "Grill Master cooks your sausages 15% faster.",
+				Icon = "skill_grill_master",
+				Kind = "Perk",
+			},
+			{
+				Name = "Short Strides",
+				Text = "Short Strides makes you walk a little slower.",
+				Icon = "skill_short_strides",
+				Kind = "Drawback",
+			},
+		},
 		Tier = 1,
 		Price = 45, -- DEC-070 tier 1
 		InMvp = true,
@@ -79,6 +130,21 @@ return Table.new({
 		Species = "bear",
 		Name = "Hauler",
 		Description = "Carries 3 packages. Slower while carrying all 3.",
+		Blurb = "Big arms, big loads, steady pace.",
+		Skills = {
+			{
+				Name = "Bear Hug",
+				Text = "Bear Hug lets you carry 3 packages.",
+				Icon = "skill_bear_hug",
+				Kind = "Perk",
+			},
+			{
+				Name = "Heavy Load",
+				Text = "Heavy Load slows you down while carrying 3.",
+				Icon = "skill_heavy_load",
+				Kind = "Drawback",
+			},
+		},
 		Tier = 1,
 		Price = 45, -- DEC-070 tier 1; in the MVP since DEC-186
 		InMvp = true,
@@ -94,6 +160,21 @@ return Table.new({
 		Species = "fox",
 		Name = "Hawker",
 		Description = "Earns $2 tips on your orders. Tip window is 4 s shorter.",
+		Blurb = "Charms a tip out of anyone, if you are quick.",
+		Skills = {
+			{
+				Name = "Sweet Talk",
+				Text = "Sweet Talk earns $2 tips on your orders.",
+				Icon = "skill_sweet_talk",
+				Kind = "Perk",
+			},
+			{
+				Name = "Short Fuse",
+				Text = "Short Fuse makes the tip window 4 s shorter.",
+				Icon = "skill_short_fuse",
+				Kind = "Drawback",
+			},
+		},
 		Tier = 2,
 		Price = 120, -- DEC-070 tier 2; in the MVP since DEC-186
 		InMvp = true,
@@ -109,6 +190,21 @@ return Table.new({
 		Species = "owl",
 		Name = "Night Owl",
 		Description = "Starts nights with 120 sanity (max 120). Slower by day.",
+		Blurb = "Wide awake when the street goes quiet.",
+		Skills = {
+			{
+				Name = "Wide Awake",
+				Text = "Wide Awake starts nights at 120 sanity (max 120).",
+				Icon = "skill_wide_awake",
+				Kind = "Perk",
+			},
+			{
+				Name = "Daydreamer",
+				Text = "Daydreamer makes you walk slower by day.",
+				Icon = "skill_daydreamer",
+				Kind = "Drawback",
+			},
+		},
 		Tier = 2,
 		Price = 120, -- DEC-070 tier 2
 		InMvp = true,
@@ -124,6 +220,21 @@ return Table.new({
 		Species = "panda",
 		Name = "Barista",
 		Description = "Your coffee brews in 3 s and restores 35. Seeing anomalies hits harder.",
+		Blurb = "Brews the strongest coffee on the block.",
+		Skills = {
+			{
+				Name = "Double Shot",
+				Text = "Double Shot brews coffee in 3 s that restores 35.",
+				Icon = "skill_double_shot",
+				Kind = "Perk",
+			},
+			{
+				Name = "Spooked",
+				Text = "Spooked makes seeing anomalies hit harder.",
+				Icon = "skill_spooked",
+				Kind = "Drawback",
+			},
+		},
 		Tier = 2,
 		Price = 120, -- DEC-070 tier 2
 		InMvp = false, -- first update (DEC-186)
@@ -139,6 +250,21 @@ return Table.new({
 		Species = "lion",
 		Name = "Shift Lead",
 		Description = "Party boss bonus +5 points (does not stack). No tips on your orders.",
+		Blurb = "Runs the crew like it owns the stand.",
+		Skills = {
+			{
+				Name = "Rally Cry",
+				Text = "Rally Cry gives the party +5 boss bonus (no stacking).",
+				Icon = "skill_rally_cry",
+				Kind = "Perk",
+			},
+			{
+				Name = "Big Ego",
+				Text = "Big Ego gets no tips on your orders.",
+				Icon = "skill_big_ego",
+				Kind = "Drawback",
+			},
+		},
 		Tier = 3,
 		Price = 180, -- DEC-070 tier 3
 		InMvp = false, -- first update (DEC-186)

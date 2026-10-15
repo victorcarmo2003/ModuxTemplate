@@ -21,7 +21,14 @@ export type GemPack = {
 	Gems: number, -- credited to profile.Gems on the receipt (GemsEarned is not touched: earned, not bought)
 	Robux: number, -- suggested price (Creator Hub), display fallback
 	Name: string, -- placeholder (narrative-writer); also the suggested Creator Hub product name
+	-- Display only (TASK-301, Provisional): the card shows Base + Bonus; Base + Bonus == Gems, the receipt credits Gems.
+	Base: number,
+	Bonus: number, -- 0 = no bonus tag
+	Badge: GemBadge?, -- ribbon over the card
 }
+
+-- Ribbon of a gem pack card (GemShop): "Popular" (one mid pack), "Best" (the biggest, the highlighted card).
+export type GemBadge = "Popular" | "Best"
 
 export type GamePass = {
 	Key: string, -- Content.Classes key; only InMvp classes are sold
@@ -69,11 +76,38 @@ export type Shop = {
 
 -- Gem packs: bigger pack = cheaper gem (1.98 -> 1.28 R$/gem). Reference: a full solo run earns ~375 gems in ~6.4 h
 -- (economy.md §6); tier 1/2/3 classes cost 45/120/180 gems (DEC-070).
+-- Base / Bonus / Badge: display only (TASK-301, owner request 2026-10-15): the same totals shown as a promotion.
 const gemPacks: { GemPack } = {
-	{ Key = "gems_50", ProductId = 3718682061, Gems = 50, Robux = 99, Name = "Handful of Gems" },
-	{ Key = "gems_130", ProductId = 3718682070, Gems = 130, Robux = 229, Name = "Pouch of Gems" },
-	{ Key = "gems_300", ProductId = 3718682077, Gems = 300, Robux = 449, Name = "Crate of Gems" },
-	{ Key = "gems_700", ProductId = 3718682082, Gems = 700, Robux = 899, Name = "Truckload of Gems" },
+	{ Key = "gems_50", ProductId = 3718682061, Gems = 50, Robux = 99, Name = "Handful of Gems", Base = 50, Bonus = 0 },
+	{
+		Key = "gems_130",
+		ProductId = 3718682070,
+		Gems = 130,
+		Robux = 229,
+		Name = "Pouch of Gems",
+		Base = 100,
+		Bonus = 30,
+	},
+	{
+		Key = "gems_300",
+		ProductId = 3718682077,
+		Gems = 300,
+		Robux = 449,
+		Name = "Crate of Gems",
+		Base = 250,
+		Bonus = 50,
+		Badge = "Popular",
+	},
+	{
+		Key = "gems_700",
+		ProductId = 3718682082,
+		Gems = 700,
+		Robux = 899,
+		Name = "Truckload of Gems",
+		Base = 500,
+		Bonus = 200,
+		Badge = "Best",
+	},
 }
 
 -- Class Game Passes (TASK-291): a bit cheaper than buying the same gems in the smallest pack (tier 1: 79 vs ~99 for 50

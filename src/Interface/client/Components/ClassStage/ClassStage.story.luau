@@ -1,6 +1,7 @@
 --!strict
 -- ClassStage with every class species (Content.Classes): pick one to see the swap pop; the rig swings slowly.
--- Needs ReplicatedStorage.Assets.Crew synced for the rig; otherwise the placeholder letter stays.
+-- Needs ReplicatedStorage.Assets.Crew synced for the rig; otherwise only the floor shadow (the class name lives in
+-- ClassSelect, TASK-298).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -40,9 +41,6 @@ return UILabs.CreateVideStory({
 			Position = UDim2.fromScale(0.5, 0.5),
 			Size = UDim2.fromOffset(260, 340),
 			Species = species,
-			Badge = function()
-				return string.upper(string.sub(species(), 1, 1))
-			end,
 			Visible = controls.Visible,
 			Rig = function(key: string): Model?
 				const ok, model = pcall(function(): Model

@@ -3,8 +3,8 @@
 -- style) when the lobby has no world stage (MapPoint LOBBY-CLASS-STAGE): a transparent ViewportFrame with a
 -- WorldModel (so an idle animation can play) over a soft floor shadow. The rig faces the camera, swings slowly
 -- (Rig.Sway) and pops on every swap (Rig.Pop). The camera is framed once per species from its bounding box.
--- `Rig(species)` builds the model (CrewRig.Build + Dress, pcall'd by the caller); nil = the placeholder letter stays.
--- Each species is built once while the stage lives and destroyed with it. `OnShown(model)` runs after the rig is
+-- `Rig(species)` builds the model (CrewRig.Build + Dress, pcall'd by the caller); nil = only the floor shadow (the
+-- class name is drawn by ClassSelect over the arrows, TASK-298: no placeholder letter here). Each species is built once while the stage lives and destroyed with it. `OnShown(model)` runs after the rig is
 -- parented (idle animation). Per-frame work only while visible. Pure: only props.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -22,8 +22,8 @@ const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }
 
 export type Props = {
 	Species: () -> string,
-	-- Placeholder letter while the rig is missing.
-	Badge: () -> string,
+	-- Unused since TASK-298 (the class name is in ClassSelect); kept so older callers still type-check.
+	Badge: (() -> string)?,
 	Visible: () -> boolean,
 	Rig: ((species: string) -> Model?)?,
 	OnShown: ((model: Model) -> ())?,
@@ -156,6 +156,8 @@ return function(props: Props): Frame
 		Size = props.Size or UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
 		ZIndex = props.ZIndex or 1,
+		-- hidden with the world stage too (it used to leave the placeholder over the arrows)
+		Visible = props.Visible,
 
 		-- floor shadow under the feet
 		create("Frame")({
@@ -167,25 +169,6 @@ return function(props: Props): Frame
 			BackgroundTransparency = 0.6,
 			ZIndex = 1,
 			create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
-		}),
-
-		-- placeholder until the rig (or its kit) exists
-		create("TextLabel")({
-			Name = "Badge",
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.fromScale(0.6, 0.5),
-			BackgroundTransparency = 1,
-			FontFace = Theme.Font.Title,
-			TextScaled = true,
-			TextColor3 = Theme.Color.Text,
-			TextStrokeColor3 = Theme.Color.Ink,
-			TextStrokeTransparency = 0,
-			Text = props.Badge,
-			ZIndex = 2,
-			Visible = function()
-				return not shown()
-			end,
 		}),
 
 		viewport,

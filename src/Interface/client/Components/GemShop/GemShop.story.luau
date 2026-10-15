@@ -2,6 +2,10 @@
 -- GemShop with the packs of Content.Shop.GemPacks on a phone-sized frame (iPhone SE landscape, 667 x 375) or the whole
 -- viewport. "Created" pretends every product exists (ProductId > 0); off = the real table (ids still 0 -> "Soon").
 -- Buying adds the gems after "Latency" seconds, the way the receipt would.
+-- TASK-301: "Split" passes Base / Bonus / Badge from the table (off = the Pack without them, the LobbyController shape:
+-- the component reads them from Content by key, same result; read on the next rebuild: flip "Created").
+-- "Live" fakes a Creator Hub price (-10%) on every pack.
+-- Reduced motion: toggle the game Settings switch (or the Roblox setting) and the shine / pulse stop within 0.5 s.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -18,6 +22,8 @@ type Controls = {
 	Scale: () -> number,
 	Created: () -> boolean,
 	Latency: () -> number,
+	Split: () -> boolean,
+	Live: () -> boolean,
 }
 
 return UILabs.CreateVideStory({
@@ -27,6 +33,8 @@ return UILabs.CreateVideStory({
 		Scale = UILabs.Slider(1, 0.86, 1.6, 0.02), -- Theme.Scale: 1 phone, 1.4 at 1080p
 		Created = true,
 		Latency = UILabs.Slider(1, 0, 3, 0.1),
+		Split = true,
+		Live = false,
 	},
 }, function(props)
 	const controls: Controls = (props.controls :: any)
@@ -41,6 +49,7 @@ return UILabs.CreateVideStory({
 	end)
 
 	local function packs(created: boolean): { GemShop.Pack }
+		const split = Vide.untrack(controls.Split)
 		const list: { GemShop.Pack } = {}
 		for _, pack in Content.Shop.GemPacks.List do
 			table.insert(list, {
@@ -49,9 +58,19 @@ return UILabs.CreateVideStory({
 				Gems = pack.Gems,
 				Robux = pack.Robux,
 				Available = created or pack.ProductId > 0,
+				Base = if split then pack.Base else nil,
+				Bonus = if split then pack.Bonus else nil,
+				Badge = if split then pack.Badge else nil,
 			})
 		end
 		return list
+	end
+
+	const priceOf = function(key: string): number?
+		if not controls.Live() then
+			return nil
+		end
+		return math.floor(Content.Shop.GemPacks.ByKey[key].Robux * 0.9)
 	end
 
 	return create("Frame")({
@@ -73,6 +92,7 @@ return UILabs.CreateVideStory({
 					return true
 				end,
 				Gems = gems,
+				PriceOf = priceOf,
 				Busy = busy,
 				OnBuy = function(key: string)
 					busy(true)

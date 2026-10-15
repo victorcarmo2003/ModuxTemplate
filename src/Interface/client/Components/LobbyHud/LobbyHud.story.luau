@@ -2,7 +2,9 @@
 -- LobbyHud on a screen-sized frame: "Screen" picks 360x640 (portrait phone), 667x375 (phone landscape), 1280x720,
 -- 1920x1080 or the whole viewport; the global UI scale follows the screen (Theme.ScaleOf, touch floor 1 on the phones).
 -- "Play" picks the Play button + squad card state (solo PLAY, forming squad START SQUAD, member READY, starting);
--- "Squad" the badge on the tile; "Keys" shows the desktop key badges. Taps print the tile.
+-- "Squad" the badge on the tile; "Keys" shows the desktop key badges; "InSquad" off hides the card + Play button
+-- (TASK-296: no squad yet; toggle it to see the pop). Tiles on the left, gem pill on the right (TASK-295). Taps print
+-- the tile.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
@@ -19,6 +21,7 @@ type Controls = {
 	Play: () -> string,
 	Squad: () -> string,
 	Keys: () -> boolean,
+	InSquad: () -> boolean,
 }
 
 const SCREENS: { [string]: Vector2 } = {
@@ -86,6 +89,7 @@ return UILabs.CreateVideStory({
 		Play = UILabs.Choose({ "Solo", "Leader", "NotReady", "Ready", "Starting", "Cancel", "Waiting" }),
 		Squad = "2/4",
 		Keys = true,
+		InSquad = true,
 	},
 }, function(props)
 	const controls: Controls = (props.controls :: any)
@@ -122,6 +126,7 @@ return UILabs.CreateVideStory({
 			CancelKey = function()
 				return if controls.Keys() then "X" else ""
 			end,
+			PlayShown = controls.InSquad,
 			OnInvite = function()
 				print("[LobbyHud story] invite")
 			end,
