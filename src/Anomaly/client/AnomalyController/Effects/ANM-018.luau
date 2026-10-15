@@ -7,6 +7,7 @@ local Hide = require(script.Parent.Kit.Hide)
 return Hide.Effect({
 	Ref = "ANM-018",
 	Style = "Grin",
+	Signal = "Whisper", -- TASK-339: silent, only the whispered "hide" words on screen
 	Asset = "ANM-018_Grin",
 	Approach = 2,
 	Look = 4,

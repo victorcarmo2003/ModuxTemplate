@@ -188,6 +188,8 @@ const UPLOADED: { [string]: string } = {
 	ui_click = "rbxassetid://127105730240202",
 	thunder = "rbxassetid://9113169432", -- ATM-5 (TASK-275): "Artillery Distant 2 (SFX)", ProSoundEffects
 	locked_door = "rbxassetid://136518625715192", -- SFX-232 ReplicatedStorage.Assets.SFX["Locked door"] (user, ANM-004)
+	-- ANM-003 bell (TASK-340): ReplicatedStorage.Assets.SFX["Very scary bell sound/church bell"] (user upload)
+	church_bell = "rbxassetid://6891548543",
 }
 
 -- Per-row overrides of the sfx() defaults
@@ -312,6 +314,12 @@ const base = Table.new({
 	sfx("phone_glitch"),
 	sfx("horror_chase_stop", false, { Spatial = false, Volume = 0.4 }),
 	sfx("thunder", false, { Spatial = false, Volume = 0.6 }), -- ATM-5 storm (TASK-275)
+	-- anomalies, owner requests 2026-10-15 (TASK-331..340). Id "" = silence until the owner sends the file
+	sfx("church_bell", false, { Spatial = false, Volume = 0.9 }), -- ANM-003: the three strokes
+	sfx("neck_crack", false, { Volume = 0.9, MaxDistance = 50 }), -- ANM-012: the neck turns for good (owner's SFX)
+	sfx("window_slam", false, { Volume = 1, MaxDistance = 80 }), -- ANM-012: the window thrown open (door_close fallback)
+	sfx("car_screech", false, { Volume = 0.9, MaxDistance = 140 }), -- ANM-008: brakes in front of the trailer
+	sfx("swarm_flutter", false, { Volume = 0.8, MaxDistance = 90 }), -- ANM-003: moths and bats (shadow_whoosh fallback)
 	-- Ui
 	ui("toast"),
 	ui("summary"),

@@ -19,7 +19,6 @@ export type Entry = {
 	Max: number,
 	DarkSince: number?,
 	ProtectUntil: number,
-	CoffeeReadyAt: number,
 	-- Night 1 coffee lesson: server time the HUD emphasis ends (0 = none running); see StartCoffeeHint
 	HintUntil: number,
 	RevivesTonight: number,
@@ -36,7 +35,9 @@ export type Entry = {
 export type Band = Sanity.Band
 
 export type Public = {
+	DevFalling: boolean,
 	DevGodMode: boolean,
+	DevInfinite: { [number]: boolean },
 	DevLit: boolean?,
 	Enabled: boolean,
 	Entries: { [number]: Entry },
@@ -97,6 +98,8 @@ export type Public = {
 	StepHints: (self: Public, t: number, over: boolean) -> (),
 	DevSetSanity: (self: Public, player: Player, value: number) -> number,
 	DevFall: (self: Public, player: Player, state: LifeState?) -> (),
+	DevInfiniteSanity: (self: Public, player: Player, on: boolean) -> boolean,
+	IsDevInfinite: (self: Public, player: Player) -> boolean,
 	DevDark: (self: Public, mode: boolean?) -> (),
 	DevGod: (self: Public, on: boolean) -> (),
 	IsDevGod: (self: Public) -> boolean,

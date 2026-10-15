@@ -25,6 +25,7 @@ export type Stat =
 	| "TableCount" -- UPG-008 Patio Tables: tables bought on the Pad (FEAT-037)
 	| "TrailerTableCount" -- UPG-011 Trailer Tables: tables bought for the trailer (FEAT-037)
 	| "SitBonus" -- UPG-009 Patio Lights: added to every SitChance (FEAT-037)
+	| "BreakerHold" -- UPG-014 Breaker Box: hold of the breaker_reset prompt, s (TASK-324)
 
 const LIST: { Stat } = {
 	"WalkSpeed",
@@ -49,6 +50,7 @@ const LIST: { Stat } = {
 	"TableCount",
 	"TrailerTableCount",
 	"SitBonus",
+	"BreakerHold",
 }
 
 const SET: { [string]: boolean } = {}

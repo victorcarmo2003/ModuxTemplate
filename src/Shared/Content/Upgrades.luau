@@ -61,6 +61,27 @@ const coolerTrailer: { Level } = {
 	{ Level = 3, Price = 70, Effects = { StockCapacityLevel = 3 }, Part = "Cooler_L3" },
 	-- the map has Cooler_L1..L3: level 4 reuses Cooler_L3 (same Part = same piece, UpgradeService:RefreshPiece)
 	{ Level = 4, Price = 110, Effects = { StockCapacityLevel = 4 }, Part = "Cooler_L3" },
+	-- TASK-324 (owner request 2026-10-15, Provisional): one more level so the anomaly run has more to buy
+	{ Level = 5, Price = 120, Effects = { StockCapacityLevel = 5 }, Part = "Cooler_L3" },
+}
+
+-- UPG-013 Coffee Maker (TASK-324, owner request 2026-10-15, Provisional; anomaly mode only, B3): the factory machine
+-- (UPG-007) brews faster and a stronger cup. CoffeeBrewTime / CoffeeRestore are the base the class reads over
+-- (CoffeeMachine station passes them to ClassService:GetModifier): 6 s / +25 -> 5 s / +30 ($40) -> 4 s / +35 ($70).
+-- No piece on the trailer (Part names a Gear Stand miniature only; placeholder box until the art exists).
+const coffeeMakerTrailer: { Level } = {
+	{ Level = 1, Price = 0, Effects = { CoffeeBrewTime = 6, CoffeeRestore = 25 }, Part = "" },
+	{ Level = 2, Price = 40, Effects = { CoffeeBrewTime = 5, CoffeeRestore = 30 }, Part = "CoffeeMaker_L2" },
+	{ Level = 3, Price = 70, Effects = { CoffeeBrewTime = 4, CoffeeRestore = 35 }, Part = "CoffeeMaker_L3" },
+}
+
+-- UPG-014 Breaker Box (TASK-324, owner request 2026-10-15, Provisional; anomaly mode only, B4): the breaker of the
+-- blackout (ANM-020, family C) resets faster. BreakerHold = hold of the breaker_reset prompt (LightService sets
+-- PromptHold): 3 s (Actions.breaker_reset) -> 2 s ($30) -> 1 s ($60).
+const breakerBoxTrailer: { Level } = {
+	{ Level = 0, Price = 0, Effects = { BreakerHold = 3 }, Part = "" },
+	{ Level = 1, Price = 30, Effects = { BreakerHold = 2 }, Part = "Breaker_L1" },
+	{ Level = 2, Price = 60, Effects = { BreakerHold = 1 }, Part = "Breaker_L2" },
 }
 
 -- UPG-003 Counter (DEC-241, user decision 2026-10-13; prices Provisional): the line starts with ONE customer (the one at
@@ -179,6 +200,33 @@ return Table.new({
 		UnlockDay = 1,
 		SoldAt = "Bench",
 		BenchSpot = "B5",
+		PlaceSpots = {},
+		Scope = "Vehicle",
+	},
+	-- Anomaly mode only (Content.Mode.AnomalyOnlyUpgrades, TASK-324): the pedestals of Counter (B3) and Drawer Lock (B4)
+	{
+		Key = "coffee_maker",
+		Ref = "UPG-013",
+		Name = "Coffee Maker",
+		Vehicles = { "trailer" },
+		StartLevel = 1,
+		Levels = { trailer = coffeeMakerTrailer },
+		UnlockDay = 1,
+		SoldAt = "Bench",
+		BenchSpot = "B3",
+		PlaceSpots = {},
+		Scope = "Vehicle",
+	},
+	{
+		Key = "breaker_box",
+		Ref = "UPG-014",
+		Name = "Breaker Box",
+		Vehicles = { "trailer" },
+		StartLevel = 0,
+		Levels = { trailer = breakerBoxTrailer },
+		UnlockDay = 1,
+		SoldAt = "Bench",
+		BenchSpot = "B4",
 		PlaceSpots = {},
 		Scope = "Vehicle",
 	},

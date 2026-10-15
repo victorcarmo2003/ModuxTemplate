@@ -62,6 +62,7 @@ Sugestão de crédito no jogo: "UI icons by RhosGFX".
 ## Atmosferas ATM-# (2026-10-15, TASK-275)
 
 - `Assets/textures/vfx/T_VFX_RainStreak.png` (`rbxassetid://133719420594904`) e `T_VFX_RainSplash.png` (`rbxassetid://140140944653214`): **obra original**, geradas por script (PIL, gradiente/anel sintético). Sem fonte de terceiros. Ids também em `Assets/import/_texture_ids.json`.
+- `Assets/textures/vfx/T_VFX_Drop.png` (`rbxassetid://117354129483717`) e `T_VFX_Puddle.png` (`rbxassetid://96259435245932`), pingos e poça da Raincoat Lady (ANM-005, TASK-326, 2026-10-15): **obra original**, geradas por `tools/assetplace/gen_vfx_drop.py` (numpy/PIL, gota e disco sintéticos). Sem fonte de terceiros. Ids também em `Assets/import/_texture_ids.json`.
 - Áudio da Creator Store, biblioteca **Pro Sound Effects** (conta oficial `ProSoundEffects`, parceria licenciada com o Roblox para uso livre dentro de experiências Roblox; não sai da plataforma): `9112853286` "Rain Heavy 2 (SFX)" = `amb_rain`; `9113169432` "Artillery Distant 2 (SFX)" (descrição: "Possible Use: Thunder") = `thunder`. Provisório até o dono ouvir.
 
 ## Recursos da plataforma (não são asset de terceiros no repositório)

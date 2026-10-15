@@ -53,7 +53,7 @@ const base = Table.new({
 	{ Key = "sign_word", MaxSanity = 20, FamilyD = true, Effect = "SignWord", Cooldown = 180, Weight = 1 }, -- one odd word
 	{ Key = "window_shadow", MaxSanity = 20, FamilyD = true, Effect = "WindowShadow", Cooldown = 120, Weight = 1 }, -- AST-085
 	{ Key = "window_face", MaxSanity = 20, FamilyD = true, Effect = "WindowFace", Cooldown = 150, Weight = 1 }, -- face 0.3 s
-	{ Key = "monster_glimpse", MaxSanity = 20, FamilyD = true, Effect = "MonsterGlimpse", Cooldown = 180, Weight = 1 }, -- end of street
+	{ Key = "monster_glimpse", MaxSanity = 20, FamilyD = true, Effect = "MonsterGlimpse", Cooldown = 180, Weight = 3 }, -- end of street; TASK-341: x3 so N2-N5 show one
 } :: { Hallucination })
 
 return Table.with(base, {

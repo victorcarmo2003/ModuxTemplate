@@ -7,6 +7,7 @@ local Hide = require(script.Parent.Kit.Hide)
 return Hide.Effect({
 	Ref = "ANM-017",
 	Style = "Crawl",
+	Signal = "Scratch", -- TASK-339: fast scratching under the trailer
 	Asset = "ANM-017_Crawler",
 	Approach = 3,
 	Look = 3,

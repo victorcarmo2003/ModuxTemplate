@@ -25,6 +25,7 @@ local InputController = require(StarterPlayer.StarterPlayerScripts.client.ModuxT
 local PromptController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PromptController)
 local BackdropController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.BackdropController)
 local ItemController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ItemController)
+local JournalController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.JournalController)
 local KitchenController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.KitchenController)
 local LightController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.LightController)
 local LoadingController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.LoadingController)
@@ -39,6 +40,7 @@ local PedestrianController = require(StarterPlayer.StarterPlayerScripts.client.M
 local PlaceController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PlaceController)
 local PrepController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PrepController)
 local ProfileController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ProfileController)
+local NightLostController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.NightLostController)
 local RoundController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.RoundController)
 local SeatingController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.SeatingController)
 local SecurityController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.SecurityController)
@@ -81,6 +83,7 @@ export type AllControllers = {
 	PromptController: PromptController.Public,
 	BackdropController: BackdropController.Public,
 	ItemController: ItemController.Public,
+	JournalController: JournalController.Public,
 	KitchenController: KitchenController.Public,
 	LightController: LightController.Public,
 	LoadingController: LoadingController.Public,
@@ -95,6 +98,7 @@ export type AllControllers = {
 	PlaceController: PlaceController.Public,
 	PrepController: PrepController.Public,
 	ProfileController: ProfileController.Public,
+	NightLostController: NightLostController.Public,
 	RoundController: RoundController.Public,
 	SeatingController: SeatingController.Public,
 	SecurityController: SecurityController.Public,

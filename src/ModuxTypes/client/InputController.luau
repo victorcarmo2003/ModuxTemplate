@@ -34,6 +34,7 @@ export type Public = {
 	Context: Context,
 	Device: Vide.Source<Device>,
 	Handles: { [string]: Handle },
+	Holds: { [string]: boolean },
 	Listeners: { (Context) -> () },
 	Setup: (self: Public) -> (),
 	Dispatch: (self: Public, name: string, state: Enum.UserInputState) -> Enum.ContextActionResult,
@@ -41,6 +42,7 @@ export type Public = {
 	Unbind: (self: Public, name: string) -> (),
 	OnContextChange: (self: Public, callback: (Context) -> ()) -> (),
 	SetContext: (self: Public, context: Context) -> (),
+	Hold: (self: Public, owner: string, on: boolean) -> (),
 }
 
 return {}

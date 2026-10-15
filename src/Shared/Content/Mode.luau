@@ -18,28 +18,38 @@ local Table = require(script.Parent.Table)
 export type Mode = {
 	DayOnly: boolean, -- false = anomaly mode (default); true = the day-only mode with tables, thief and Wide Counter
 	DayOnlyUpgrades: { string }, -- keys of Content.Upgrades only sold in the day-only mode
+	AnomalyOnlyUpgrades: { string }, -- keys of Content.Upgrades only sold in the anomaly mode (TASK-324)
 	Fixed: { [Stats.Stat]: number }, -- Stat values while their day-only upgrade is off
 }
 
 const mode: Mode = {
 	DayOnly = false,
 	DayOnlyUpgrades = { "counter", "cash_drawer_lock", "trailer_tables", "patio_lights", "back_bar" },
+	AnomalyOnlyUpgrades = { "coffee_maker", "breaker_box" },
 	Fixed = { QueueSize = 2 },
 }
 
-const offSet: { [string]: boolean } = {}
+const dayOnly: { [string]: boolean } = {}
 for _, key in mode.DayOnlyUpgrades do
-	offSet[key] = true
+	dayOnly[key] = true
+end
+const anomalyOnly: { [string]: boolean } = {}
+for _, key in mode.AnomalyOnlyUpgrades do
+	anomalyOnly[key] = true
 end
 
 -- true = the upgrade is switched off in the current mode (never on sale)
 local function isOff(upgradeKey: string): boolean
-	return not mode.DayOnly and offSet[upgradeKey] == true
+	if mode.DayOnly then
+		return anomalyOnly[upgradeKey] == true
+	end
+	return dayOnly[upgradeKey] == true
 end
 
 return Table.record({
 	DayOnly = mode.DayOnly,
 	DayOnlyUpgrades = mode.DayOnlyUpgrades,
+	AnomalyOnlyUpgrades = mode.AnomalyOnlyUpgrades,
 	Fixed = mode.Fixed,
 	IsOff = isOff,
 })

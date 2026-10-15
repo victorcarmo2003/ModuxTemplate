@@ -74,6 +74,13 @@ return Lync.define("game", {
 	DevAudio = Lync.packet(Lync.struct({
 		Command = Lync.str(0, 32),
 	})),
+	-- c -> s, dev mode only (TASK-332; owner request 2026-10-15, Provisional). Writer: SettingsController (dev row of the
+	-- settings panel). Responder: DevService (OnInit, only when PlaceService:IsDev; runs the `mycoffee` / `infsanity`
+	-- commands for the sender). Nothing listens in a published server.
+	DevTool = Lync.packet(Lync.struct({
+		Tool = Lync.enum({ "Coffee", "InfiniteSanity" }),
+		On = Lync.bool(),
+	})),
 
 	-- Dev showcase (docs/tech/showcase.md; user request 2026-10-12, Provisional). Packets only, dev mode only (Studio
 	-- Run place): the responder lives in ShowcaseService, which refuses unless PlaceService:IsDev and
@@ -203,7 +210,8 @@ return Lync.define("game", {
 	-- §3.5, record = StationId * 100 + Slot (Slot 0 = single-record station). Writer: KitchenService
 	Stations = Lync.replicate(Lync.struct({
 		Kind = Lync.enum(Content.Stations.RecordKeys), -- grill, rail, board (2 records, DEC-190)
-		State = Lync.enum({ "Empty", "Working", "Ready" }),
+		-- Cleaning: coffee machine only (TASK-328), the wait after a cup is taken, StartedAt/Duration like Working
+		State = Lync.enum({ "Empty", "Working", "Ready", "Cleaning" }),
 		StartedAt = Lync.f64(), -- 0 = idle
 		Duration = Lync.quant(0, 120, 0.1), -- real duration (level and class applied)
 		Count = Lync.int(0, 30), -- rail: sausages on it; others 0
@@ -693,4 +701,15 @@ return Lync.define("game", {
 	SecurityOpen = Lync.packet(Lync.empty()),
 	-- c -> s: the client left the camera view (any way out); the server releases the freeze. Idempotent
 	SecurityLeave = Lync.packet(Lync.empty()),
+
+	-- Anomaly Book (TASK-335; owner request 2026-10-15, Provisional). s -> owner (fireClient, private). Writer:
+	-- JournalService, once the profile is loaded and the client is ready, and again on every new page. Pages = the
+	-- unlocked pages (Content.Journal keys, from profile.Journal); New = the page that just unlocked (toast + glow), nil
+	-- on the first send. Responder: JournalController (OnInit)
+	Journal = Lync.packet(Lync.struct({
+		Pages = Lync.bitfield(Content.Journal.Keys),
+		New = Lync.optional(Lync.enum(Content.Journal.Keys)),
+	})),
+	-- s -> owner: the read_journal prompt went through, open the book. Writer: JournalService
+	JournalOpen = Lync.packet(Lync.empty()),
 })

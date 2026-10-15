@@ -22,7 +22,6 @@ export type Sanity = {
 	DarkPerSecond: number, -- lost per second in the dark
 	DarkPhases: { string }, -- keys of Shift where the dark counts
 	Coffee: number, -- restored by a coffee (25; Barista 35 by CoffeeRestore)
-	CoffeeCooldown: number, -- seconds between two drinks
 	CoffeeDrinkTime: number, -- seconds of the drink animation
 	CoffeeNightOnly: boolean, -- Provisional (Q-170)
 	FirstNightStart: number, -- Night 1 only: the night starts at this value (capped by the class Max), teaches the coffee
@@ -44,7 +43,6 @@ const sanity: Sanity = {
 	DarkPerSecond = 1, -- FEAT-020
 	DarkPhases = { "Call", "Prep", "Night" }, -- not NightEnd: the night is already won (L2-03, Provisional)
 	Coffee = 25, -- FEAT-021
-	CoffeeCooldown = 60, -- FEAT-021
 	CoffeeDrinkTime = 1.5, -- FEAT-021
 	CoffeeNightOnly = true, -- Q-170 option A (Provisional): brewed by day, drunk only at night
 	FirstNightStart = 50, -- Provisional (user request 2026-10-11, Night 1 teaches coffee); progression.md "10 doses"

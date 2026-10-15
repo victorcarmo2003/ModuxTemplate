@@ -10,7 +10,10 @@ export type Public = {
 	Gui: ScreenGui?,
 	Setup: (self: Public) -> (),
 	Shows: (self: Public) -> boolean,
+	CanBuy: (self: Public) -> boolean,
+	Label: (self: Public) -> string,
 	Use: (self: Public) -> (),
+	Buy: (self: Public) -> (),
 	SetBound: (self: Public, on: boolean) -> (),
 	Mount: (self: Public, playerGui: Instance) -> (),
 }

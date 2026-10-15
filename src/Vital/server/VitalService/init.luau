@@ -22,7 +22,7 @@
 --   Verdict       RoundService:SetVerdict: someone present Active/Reviving
 --   Gate "Vital"  only Active, not knocked, interacts (InteractionService:AddGate)
 --   Coffee        ItemService:RegisterUse("coffee"): night only (Sanity.CoffeeNightOnly, Q-170 A Provisional),
---                 cooldown, not full; one sip (Content.CoffeeCup.Sips): the whole Restore once, then Consume
+--                 not full (no drink cooldown: the machine owns the wait, TASK-328); one sip (Content.CoffeeCup.Sips): the whole Restore once, then Consume
 --
 -- Hooks left for other tasks (§19.0 rule 1, no Require back):
 --   LightService (TASK-059)  in Require (architecture.md §19.2; Light does not require Vital, no cycle). IsLit is read
@@ -56,7 +56,6 @@ export type Entry = {
 	Max: number,
 	DarkSince: number?,
 	ProtectUntil: number,
-	CoffeeReadyAt: number,
 	-- Night 1 coffee lesson: server time the HUD emphasis ends (0 = none running); see StartCoffeeHint
 	HintUntil: number,
 	RevivesTonight: number,
@@ -78,6 +77,7 @@ const GATE = "Vital"
 const DROP_POINT = "DROP-T" -- MapPoint of the trailer counter (MAP-01 §5.5; FEAT-025, FEAT-036)
 const RESTORE_ATTRIBUTE = "Restore" -- coffee Tool attribute (network.md §7.1; CoffeeMachine)
 const NEVER_SENT = -1
+const DEV_INFINITE = "DevInfiniteSanity" -- player attribute (dev, TASK-332): read by the settings panel dev row
 
 local function now(): number
 	return workspace:GetServerTimeNow()
@@ -96,7 +96,6 @@ local function newEntry(userId: number): Entry
 		Max = 0,
 		DarkSince = nil,
 		ProtectUntil = 0,
-		CoffeeReadyAt = 0,
 		HintUntil = 0,
 		RevivesTonight = 0,
 		Seen = {},
@@ -151,6 +150,10 @@ function VitalService:Setup()
 	self.DevLit = nil :: boolean?
 	-- dev showcase: sanity never reaches 0 by itself (no natural fall); explicit dev falls still work
 	self.DevGodMode = false :: boolean
+	-- dev, per player (TASK-332): sanity never goes down and the member never faints (only dev falls); mirrored to the
+	-- player attribute DEV_INFINITE for the settings panel
+	self.DevInfinite = {} :: { [number]: boolean }
+	self.DevFalling = false :: boolean
 	self.WarnedLight = false :: boolean
 	self.MemberStateChanged = self.Libs.Signal.new() :: SignalLib.Signal<number, LifeState, LifeState>
 	self.Wipe = self.Libs.Signal.new() :: SignalLib.Signal<boolean, number>
@@ -375,6 +378,9 @@ function VitalService:AddSanity(player: Player, delta: number, cause: string): n
 	if entry.Max <= 0 or not self.Dependencies.RunStateService:IsActive(player) then
 		return entry.Sanity
 	end
+	if delta < 0 and self.DevInfinite[player.UserId] then
+		return entry.Sanity
+	end
 	const before = entry.Sanity
 	entry.Sanity = Sanity.clamp(before + delta, entry.Max)
 	if self.DevGodMode and entry.Sanity <= 0 then
@@ -470,6 +476,9 @@ function VitalService:Fall(player: Player, forced: LifeState?)
 	const runState = self.Dependencies.RunStateService
 	const userId = player.UserId
 	if not runState:IsActive(player) then
+		return
+	end
+	if self.DevInfinite[userId] and not self.DevFalling then
 		return
 	end
 	const entry = self:EntryOf(userId)
@@ -694,8 +703,9 @@ function VitalService:RestoreOf(player: Player, tool: Tool): number
 	return self.Dependencies.ClassService:GetModifier(player, "CoffeeRestore", Content.Sanity.Coffee)
 end
 
--- Validate of the coffee use. Day (Q-170 A): toast, the Tool stays. Cooldown: toast with the seconds left. A coffee that
--- is already being drunk (Tool attribute `Drinking`) cannot be used again.
+-- Validate of the coffee use. Day (Q-170 A): toast, the Tool stays. No cooldown (TASK-328: the machine cleans after each
+-- cup, Stations.coffee_machine.Params.CleanTime). A coffee that is already being drunk (Tool attribute `Drinking`)
+-- cannot be used again.
 function VitalService:CanDrink(player: Player, tool: Tool): (boolean, string?)
 	const rows = Content.Sanity
 	if tool:GetAttribute(Content.CoffeeCup.Sips.DrinkingAttribute) == true then
@@ -707,11 +717,6 @@ function VitalService:CanDrink(player: Player, tool: Tool): (boolean, string?)
 		return false, "coffee_night_only"
 	end
 	if entry.Max <= 0 then
-		return false, nil
-	end
-	const t = now()
-	if t < entry.CoffeeReadyAt then
-		self.Dependencies.RunStateService:Notify(player, "coffee_cooldown", math.ceil(entry.CoffeeReadyAt - t))
 		return false, nil
 	end
 	if entry.Sanity >= entry.Max then
@@ -740,7 +745,6 @@ function VitalService:Drink(player: Player, tool: Tool)
 	const entry = self:Ensure(player)
 	const restore = self:RestoreOf(player, tool)
 	tool:SetAttribute(sips.DrinkingAttribute, true)
-	entry.CoffeeReadyAt = now() + Content.Sanity.CoffeeCooldown
 	const before = entry.Sanity
 	const after = self:AddSanity(player, Sanity.restore(entry.Sanity, entry.Max, restore) - entry.Sanity, COFFEE)
 	-- feedback for the owner (green glow + "+N" on the bar) and the end of the Night 1 emphasis
@@ -849,7 +853,32 @@ function VitalService:DevFall(player: Player, state: LifeState?)
 	entry.LastCause = "dev"
 	self:SendSanity(player, false)
 	self:RefreshBand(player.UserId, true)
-	self:Fall(player, state)
+	self.DevFalling = true
+	const ok, problem = pcall(function()
+		self:Fall(player, state)
+	end)
+	self.DevFalling = false
+	if not ok then
+		error(problem, 0)
+	end
+end
+
+-- Dev (TASK-332): infinite sanity for one player, on or off. On fills the sanity (Active at night). Returns the state.
+function VitalService:DevInfiniteSanity(player: Player, on: boolean): boolean
+	if not self.Dependencies.PlaceService:IsDev() then
+		error("dev mode only", 0)
+	end
+	self.DevInfinite[player.UserId] = if on then true else nil
+	player:SetAttribute(DEV_INFINITE, if on then true else nil)
+	const entry = self:Ensure(player)
+	if on and entry.Max > 0 and self.Dependencies.RunStateService:IsActive(player) then
+		self:AddSanity(player, entry.Max - entry.Sanity, "dev")
+	end
+	return on
+end
+
+function VitalService:IsDevInfinite(player: Player): boolean
+	return self.DevInfinite[player.UserId] == true
 end
 
 function VitalService:DevDark(mode: boolean?)
@@ -904,6 +933,11 @@ function VitalService:Revive(player: Player, reviver: Player?): boolean
 		return false
 	end
 	if self:Ensure(player).RevivesTonight >= Content.Revive.MaxPerNight then
+		return false
+	end
+	-- only while the night is still playable: a revive in NightLost / RunEnd would burn the kit for nothing (TASK-330)
+	const round = self.Dependencies.RoundService
+	if not Flow.CanLose(round:GetPhase(), round:Info()) then
 		return false
 	end
 	return self:Restore(player, "Down")

@@ -15,11 +15,18 @@
 
 	Rotations go around the torso's up axis expressed in the joint frame, so they hold whatever the R6 C0 layout is.
 	The `jumpscare` cue of every family A anomaly is handled here too (Kit/Jumpscare).
+	ANM-012 cues (TASK-336, owner 2026-10-15): `neck_snap` (Entity = actor) marks the rig `NeckSnap` locally: the head
+	snaps round the rest of the way (SNAP_TIME, a roll) with the `neck_crack` SFX and stays there, no more sway;
+	`window_slam` (Entity = actor): the bang of the service window thrown open (`window_slam`, `door_close` when the
+	first has no Id yet) and a short camera kick for who stands near the window.
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local Vide = require(ReplicatedStorage.Packages.Vide)
+local Content = require(ReplicatedStorage.shared.Content)
+local TrailerFront = require(ReplicatedStorage.shared.Anomaly.TrailerFront)
 local Effect = require(script.Parent.Parent.Parent.Effect)
 local Actor = require(script.Parent.CustomerActor)
 local Jumpscare = require(script.Parent.Jumpscare)
@@ -32,6 +39,15 @@ const BIG_HEAD = 1.9
 const FLOAT = 0.7 -- studs
 const FLOAT_BOB = 0.12
 const FLOAT_BOB_SPEED = 1.6
+const SNAP_ATTRIBUTE = "NeckSnap" -- local only: os.clock() of the snap
+const SNAP_TIME = 0.12 -- s of the snap
+const SNAP_EXTRA = math.pi * 0.85 -- rad turned on top of the 180 (almost a full turn)
+const SNAP_ROLL = math.rad(28) -- head tilt after the snap
+const CRACK_KEY = "neck_crack"
+const SLAM_KEYS = { "window_slam", "door_close" } -- first key with an Id
+const SLAM_KICK = 20 -- studs from the window where the camera kicks
+const SLAM_KICK_ANGLE = math.rad(2.2)
+const SLAM_KICK_TIME = 0.25
 const STARE_MAX = math.rad(110)
 const STARE_TURN = 10 -- 1/s, how fast the head catches the camera
 
@@ -79,8 +95,20 @@ local function neck(model: Model): Actor.Undo
 	end
 	const base = motor.C0
 	const started = os.clock()
+	local swayAtSnap: number? = nil
 	const connection = RunService.Heartbeat:Connect(function()
-		const sway = math.sin((os.clock() - started) * NECK_SWAY_SPEED) * NECK_SWAY
+		const now = os.clock()
+		const snappedAt = model:GetAttribute(SNAP_ATTRIBUTE)
+		if type(snappedAt) == "number" then
+			-- TASK-336: the snap, then held there (no sway)
+			const from = swayAtSnap or (math.sin((snappedAt - started) * NECK_SWAY_SPEED) * NECK_SWAY)
+			swayAtSnap = from
+			const t = math.clamp((now - snappedAt) / SNAP_TIME, 0, 1)
+			const e = 1 - (1 - t) * (1 - t)
+			motor.C0 = base * yaw(base, math.pi + from + SNAP_EXTRA * e) * CFrame.Angles(0, 0, SNAP_ROLL * e)
+			return
+		end
+		const sway = math.sin((now - started) * NECK_SWAY_SPEED) * NECK_SWAY
 		motor.C0 = base * yaw(base, math.pi + sway)
 	end)
 	return function()
@@ -176,6 +204,57 @@ local function stare(model: Model): Actor.Undo
 	end
 end
 
+local function firstSound(keys: { string }): string?
+	for _, key in keys do
+		const row = Content.Sounds.ByKey[key]
+		if row ~= nil and row.Id ~= "" then
+			return key
+		end
+	end
+	return nil
+end
+
+-- neck_snap: mark the rig (the neck modifier reads it) and crack at the head
+local function snapNeck(ctx: Effect.Context, npcId: number)
+	const model = ctx.Npc(npcId)
+	if model == nil then
+		return
+	end
+	model:SetAttribute(SNAP_ATTRIBUTE, os.clock())
+	const head = model:FindFirstChild("Head")
+	ctx.Audio:Play(CRACK_KEY, if head ~= nil and head:IsA("BasePart") then head else model:GetPivot().Position)
+end
+
+-- window_slam: the bang at the service window and a short camera kick nearby
+local function slamWindow(ctx: Effect.Context)
+	const trailer = ctx.Point("TRL")
+	const at = if trailer ~= nil then TrailerFront.Of(trailer, ctx.Point("WALKER-10")).Window else nil
+	const key = firstSound(SLAM_KEYS)
+	if key ~= nil then
+		ctx.Audio:Play(key, at, { Volume = 1 })
+	end
+	const character = Players.LocalPlayer.Character
+	const root = if character then character:FindFirstChild("HumanoidRootPart") else nil
+	const camera = Workspace.CurrentCamera
+	if at == nil or camera == nil or root == nil or not root:IsA("BasePart") then
+		return
+	end
+	if (root.Position - at).Magnitude > SLAM_KICK then
+		return
+	end
+	const started = os.clock()
+	local last = 0
+	const connection = RunService.RenderStepped:Connect(function()
+		const t = (os.clock() - started) / SLAM_KICK_TIME
+		const kick = if t < 1 then SLAM_KICK_ANGLE * math.sin(t * math.pi) else 0
+		camera.CFrame = camera.CFrame * CFrame.Angles(kick - last, 0, 0)
+		last = kick
+	end)
+	task.delay(SLAM_KICK_TIME + 0.05, function()
+		connection:Disconnect()
+	end)
+end
+
 -- Builds the effect module of one family A anomaly.
 function OddCustomer.Effect(ref: string, variant: Variant): Effect.Module
 	return {
@@ -197,7 +276,15 @@ function OddCustomer.Effect(ref: string, variant: Variant): Effect.Module
 				return Actor.HoldStill(ctx, model)
 			end))
 		end,
-		Cue = Jumpscare.Cue,
+		Cue = function(ctx: Effect.Context, cue: Effect.Cue)
+			if cue.Cue == "neck_snap" then
+				snapNeck(ctx, cue.Entity)
+			elseif cue.Cue == "window_slam" then
+				slamWindow(ctx)
+			else
+				Jumpscare.Cue(ctx, cue)
+			end
+		end,
 	}
 end
 

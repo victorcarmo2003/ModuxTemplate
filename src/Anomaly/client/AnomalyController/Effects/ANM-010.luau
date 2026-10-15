@@ -15,6 +15,11 @@
 	  * "tunk" (`post_tunk`) at each Juniper post the frame LightController turns it off (lamp lit -> unlit while this
 	    occurrence lives). Posts already out when this client mounted stay quiet.
 	  * Phase Resolved / Failed, or the record leaves: the fog fades out over FOG_OUT, then everything is destroyed.
+	  * "Run" (TASK-334, owner 2026-10-15: he did not understand what to do): a fresh Hush cuts a security camera view
+	    (Kit/Watch), Walt says it on the radio (Kit/Radio), a pulsing Mustard banner at the top says RUN TO THE MART and
+	    the 3D guide arrow (Interface/Arrow3D) stands over the safe point SS; inside the safe radius the banner turns to
+	    "Stay inside the Mart". Gone when the record leaves Active.
+	Cue `jumpscare` (TASK-334): Entity = UserId % 65536 of a player caught outside; only that client shows the face.
 	Cue `hush_fog` (flavor of the error, DEC-195): a bank of fog drifts through the current vehicle for a few seconds.
 
 	PROVISIONAL (frontend-coder, TASK-118): fog look, density and rates below until AST-067 (`T_Fog` 256²) and the
@@ -22,11 +27,34 @@
 	controller plays a city ambience at night yet (amb_night_street has no player).
 ]]
 local CollectionService = game:GetService("CollectionService")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local StarterPlayer = game:GetService("StarterPlayer")
+local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 local Vide = require(ReplicatedStorage.Packages.Vide)
+local Arrow3D = require(StarterPlayer.StarterPlayerScripts.client.Interface.Arrow3D)
+local Motion = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Motion)
 local Effect = require(script.Parent.Parent.Effect)
+local Jumpscare = require(script.Parent.Kit.Jumpscare)
+local Radio = require(script.Parent.Kit.Radio)
+local Watch = require(script.Parent.Kit.Watch)
+
+-- "Run" warning (TASK-334; PROVISIONAL)
+const RUN_FRESH = 4 -- s: a record older than this when mounted does not replay the radio line
+const RUN_LINE = "The lamps are dying! Run INSIDE the Mart, now!"
+const RUN_LINE_TIME = 6
+const RUN_TEXT = "RUN TO THE MART!"
+const STAY_TEXT = "Stay inside the Mart"
+const SAFE_POINT = "SS"
+const SAFE_RADIUS = 10 -- Rules/ANM-010 Params.Radius (the server also counts the Mart interior LZ-4)
+const ARROW_LIFT = 7 -- studs above SS where the arrow tip rests
+const PULSE = 0.45 -- s per banner pulse
+const BANNER_INK = Color3.fromHex("#2B2233")
+const BANNER_MUSTARD = Color3.fromHex("#F6C12B")
+const BANNER_CREAM = Color3.fromHex("#FFF1D6")
+const ENTITY_MOD = 65536
 
 const FOG_IN = 4 -- seconds
 const FOG_OUT = 5
@@ -242,6 +270,97 @@ local function seep(ctx: Effect.Context, cue: Effect.Cue)
 	end)
 end
 
+-- Run warning ---------------------------------------------------------------------------------------------------
+
+local function banner(): (ScreenGui, TextLabel, UIScale)
+	const gui = Instance.new("ScreenGui")
+	gui.Name = "HushRun"
+	gui.ResetOnSpawn = false
+	gui.DisplayOrder = 42
+	const pill = Instance.new("Frame")
+	pill.Name = "Pill"
+	pill.AnchorPoint = Vector2.new(0.5, 0)
+	pill.Position = UDim2.new(0.5, 0, 0, 74)
+	pill.Size = UDim2.fromOffset(360, 58)
+	pill.BackgroundColor3 = BANNER_INK
+	pill.BackgroundTransparency = 0.08
+	pill.Parent = gui
+	const corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0.5, 0)
+	corner.Parent = pill
+	const stroke = Instance.new("UIStroke")
+	stroke.Color = BANNER_MUSTARD
+	stroke.Thickness = 4
+	stroke.Parent = pill
+	const scale = Instance.new("UIScale")
+	scale.Parent = pill
+	const label = Instance.new("TextLabel")
+	label.Name = "Text"
+	label.BackgroundTransparency = 1
+	label.Size = UDim2.new(1, -24, 1, -10)
+	label.Position = UDim2.fromOffset(12, 5)
+	label.FontFace = Font.fromEnum(Enum.Font.FredokaOne)
+	label.TextScaled = true
+	label.Text = RUN_TEXT
+	label.TextColor3 = BANNER_MUSTARD
+	label.Parent = pill
+	return gui, label, scale
+end
+
+local function nearSafe(ctx: Effect.Context): boolean
+	const character = Players.LocalPlayer.Character
+	const root = if character then character:FindFirstChild("HumanoidRootPart") else nil
+	const point = ctx.Point(SAFE_POINT)
+	if root == nil or not root:IsA("BasePart") or point == nil then
+		return false
+	end
+	const offset = root.Position - point.Position
+	return Vector2.new(offset.X, offset.Z).Magnitude <= SAFE_RADIUS
+end
+
+-- Banner + arrow while the record is Active; returns the stop function
+local function runWarning(ctx: Effect.Context, occ: Effect.Occurrence): () -> ()
+	if occ.Elapsed() <= RUN_FRESH then
+		task.spawn(function()
+			Watch.Interrupt()
+			Radio.Say(ctx, RUN_LINE, RUN_LINE_TIME)
+		end)
+	end
+	const gui, label, scale = banner()
+	const playerGui = Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+	gui.Parent = playerGui
+	const arrow = Arrow3D.new()
+	const reduced = Motion.Reduced()
+	const started = os.clock()
+	const connection = RunService.RenderStepped:Connect(function()
+		const safe = nearSafe(ctx)
+		label.Text = if safe then STAY_TEXT else RUN_TEXT
+		label.TextColor3 = if safe then BANNER_CREAM else BANNER_MUSTARD
+		if not reduced and not safe then
+			scale.Scale = 1 + 0.06 * math.abs(math.sin((os.clock() - started) * math.pi / PULSE))
+		else
+			scale.Scale = 1
+		end
+		const point = ctx.Point(SAFE_POINT)
+		if point ~= nil and not safe then
+			arrow.Show(ctx.Folder())
+			arrow.Step(point.Position + Vector3.new(0, ARROW_LIFT, 0), 2.5, true)
+		elseif arrow.Mounted() then
+			arrow.Hide()
+		end
+	end)
+	return function()
+		connection:Disconnect()
+		if arrow.Mounted() then
+			arrow.Detach()
+		end
+		TweenService:Create(label, TweenInfo.new(0.3), { TextTransparency = 1 }):Play()
+		task.delay(0.35, function()
+			gui:Destroy()
+		end)
+	end
+end
+
 return {
 	Ref = "ANM-010",
 	Mount = function(ctx: Effect.Context, occ: Effect.Occurrence)
@@ -275,22 +394,39 @@ return {
 			step(state, dt)
 		end)
 
+		local stopRun: (() -> ())? = nil
 		Vide.effect(function()
 			const phase = occ.Record().Phase
 			state.Rising = phase == "Signal" or phase == "Active"
 			if not state.Rising then
 				ctx.Audio:Loop("amb_fog", nil, false)
 			end
+			Vide.untrack(function()
+				if state.Rising and stopRun == nil then
+					stopRun = runWarning(ctx, occ)
+				elseif not state.Rising and stopRun ~= nil then
+					(stopRun :: () -> ())()
+					stopRun = nil
+				end
+			end)
 		end)
 		Vide.cleanup(function()
 			-- the record left the set: fade out on our own, then destroy
 			state.Orphan = true
 			ctx.Audio:Loop("amb_fog", nil, false)
+			if stopRun ~= nil then
+				(stopRun :: () -> ())()
+				stopRun = nil
+			end
 		end)
 	end,
 	Cue = function(ctx: Effect.Context, cue: Effect.Cue)
 		if cue.Cue == "hush_fog" then
 			seep(ctx, cue)
+		elseif cue.Cue == "jumpscare" then
+			if cue.Entity == Players.LocalPlayer.UserId % ENTITY_MOD then
+				Jumpscare.Show(ctx)
+			end
 		end
 	end,
 } :: Effect.Module

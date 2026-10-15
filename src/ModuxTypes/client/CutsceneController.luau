@@ -54,7 +54,6 @@ export type Public = {
 	Needed: Vide.Source<number>,
 	Party: boolean,
 	Playing: boolean,
-	PreviousContext: string?,
 	Progress: Vide.Source<number>,
 	PromptHolder: BasePart?,
 	PromptShown: Vide.Source<boolean>,

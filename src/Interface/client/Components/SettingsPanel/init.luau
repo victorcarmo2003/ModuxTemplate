@@ -4,6 +4,8 @@
 --   Sound  Music · Effects · Voices · Jumpscares   sliders 0..100% (Slider.luau)
 --   Game   Prompts (Single / Multi) · Prep helper (On / Off) · Reduce motion · Vibration (On / Off)   (Choice.luau)
 --          and one small line under them (`Hint`, e.g. the key that opens the panel; "" = none)
+--   Dev    (only when `Dev` is given: Studio dev mode, TASK-332) one more Game row: "Coffee" (a coffee in the hand) and
+--          "Sanity ∞" (infinite sanity, Mustard while on). Players never see it: the owner passes nil outside dev.
 -- Every change calls OnChange(key, value) at once (the owner applies it live and saves it debounced). No confirm button:
 -- the window only closes (X). Texts in English; house palette only (Ink, Mustard, Cream; never red).
 -- Pure: only props.
@@ -15,6 +17,7 @@ local CartoonLabel = require(script.Parent.CartoonLabel)
 local LobbyWindow = require(script.Parent.LobbyWindow)
 local Slider = require(script.Slider)
 local Choice = require(script.Choice)
+local CartoonButton = require(script.Parent.CartoonButton)
 
 const create = Vide.create
 
@@ -26,6 +29,14 @@ export type Props = {
 	Scale: (() -> number)?,
 	-- Small line at the bottom of the Game column ("" or nil = none).
 	Hint: (() -> string)?,
+	-- Dev row (TASK-332); nil = hidden (every published server)
+	Dev: DevProps?,
+}
+
+export type DevProps = {
+	InfiniteSanity: () -> boolean,
+	OnCoffee: () -> (),
+	OnInfiniteSanity: (on: boolean) -> (),
 }
 
 const WIDTH = 600
@@ -34,6 +45,8 @@ const COLUMN_GAP = 16
 const ROW = 44
 const ROW_GAP = 4
 const HEADING = 26
+const DEV_LABEL = 120
+const DEV_GAP = 6
 
 const ON_OFF: { Choice.Option } = {
 	{ Key = "On", Text = "On" },
@@ -54,6 +67,63 @@ local function heading(text: string): TextLabel
 		XAlignment = Enum.TextXAlignment.Left,
 		Box = UDim2.new(1, 0, 0, HEADING),
 	})
+end
+
+local function devRow(dev: DevProps, order: number): Frame
+	return create("Frame")({
+		Name = "Dev",
+		LayoutOrder = order,
+		Size = UDim2.new(1, 0, 0, ROW),
+		BackgroundTransparency = 1,
+
+		CartoonLabel({
+			Name = "Label",
+			TextSize = 18,
+			Color = Theme.Color.Mustard,
+			Text = "Dev tools",
+			XAlignment = Enum.TextXAlignment.Left,
+			Box = UDim2.fromOffset(DEV_LABEL, ROW),
+		}),
+
+		create("Frame")({
+			Name = "Options",
+			AnchorPoint = Vector2.new(1, 0),
+			Position = UDim2.fromScale(1, 0),
+			Size = UDim2.new(1, -DEV_LABEL, 1, 0),
+			BackgroundTransparency = 1,
+			create("UIListLayout")({
+				FillDirection = Enum.FillDirection.Horizontal,
+				HorizontalAlignment = Enum.HorizontalAlignment.Right,
+				VerticalAlignment = Enum.VerticalAlignment.Center,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, DEV_GAP),
+			}),
+			CartoonButton({
+				Name = "Coffee",
+				LayoutOrder = 1,
+				Size = UDim2.fromOffset(76, ROW - 4),
+				TextSize = 16,
+				Text = "Coffee",
+				Outline = Theme.Outline.Normal,
+				Tone = Theme.Tone.Ink,
+				OnActivated = dev.OnCoffee,
+			}),
+			CartoonButton({
+				Name = "InfiniteSanity",
+				LayoutOrder = 2,
+				Size = UDim2.fromOffset(92, ROW - 4),
+				TextSize = 16,
+				Text = "Sanity ∞",
+				Outline = Theme.Outline.Normal,
+				Tone = function(): Theme.Tone
+					return if dev.InfiniteSanity() then Theme.Tone.Mustard else Theme.Tone.Ink
+				end,
+				OnActivated = function()
+					dev.OnInfiniteSanity(not Vide.untrack(dev.InfiniteSanity))
+				end,
+			}),
+		}),
+	}) :: Frame
 end
 
 local function column(name: string, order: number, children: { any }): Frame
@@ -103,10 +173,11 @@ return function(props: Props): Frame
 		})
 	end
 
+	const dev = props.Dev
 	return LobbyWindow({
 		Name = "SettingsPanel",
 		Title = "Settings",
-		Size = Vector2.new(WIDTH, HEIGHT),
+		Size = Vector2.new(WIDTH, HEIGHT + (if dev then ROW + ROW_GAP else 0)),
 		Visible = props.Visible,
 		Scale = props.Scale,
 		OnClose = props.OnClose,
@@ -143,9 +214,10 @@ return function(props: Props): Frame
 				onOff("PrepAssist", "Prep helper", 2),
 				onOff("ReducedMotion", "Less motion", 3),
 				onOff("Vibration", "Vibration", 4),
+				if dev then devRow(dev, 5) else {},
 				CartoonLabel({
 					Name = "Hint",
-					LayoutOrder = 5,
+					LayoutOrder = 6,
 					TextSize = 14,
 					Color = Theme.Color.Cream,
 					Text = function()

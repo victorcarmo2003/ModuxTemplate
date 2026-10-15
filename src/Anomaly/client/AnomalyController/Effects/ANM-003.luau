@@ -15,6 +15,10 @@
 	  - Resumed: cue `clock_resume` (success or failure) or the record leaving the set; the hands jump to the current
 	    time and the ticking comes back.
 
+	  - TASK-340 (owner 2026-10-15): cue `bell` (Entity = stroke 1..3) tolls the church bell (Kit/Bell: SFX, a small
+	    "BELL n / 3" pill, a camera shudder); cue `swarm` (the trailer light was still on at the 3rd stroke): cartoon
+	    moths and bats swarm the light and the players before everyone faints (server).
+
 	Only local visual CFrames of the hand parts are written (purely visual; nobody else animates them). No VFX.
 
 	PROVISIONAL (frontend-coder, TASK-114): (a) the Effect API has no boot hook and no task owns the running bank
@@ -30,6 +34,7 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Effect = require(script.Parent.Parent.Effect)
+local Bell = require(script.Parent.Kit.Bell)
 
 const REF = "ANM-003"
 const STOP_CUE = "clock_stop"
@@ -408,6 +413,10 @@ const StoppedClock: Effect.Module = {
 				pending = { At = cue.At }
 				refreshFrozen(ctx)
 			end
+		elseif cue.Cue == "bell" then
+			Bell.Stroke(ctx, cue.Entity)
+		elseif cue.Cue == "swarm" then
+			Bell.Swarm(ctx, cue.Rng)
 		elseif cue.Cue == RESUME_CUE then
 			if occ ~= nil then
 				resumed[occ] = true

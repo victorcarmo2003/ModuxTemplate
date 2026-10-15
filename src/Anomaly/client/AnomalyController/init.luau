@@ -14,6 +14,8 @@
 	  - `Folder()` (Workspace.AnomalyEffects) holds local actors; emptied when the night ends (safety net: the server
 	    also clears the set).
 
+	  - Breaker.luau (TASK-334): the breaker panel shows the guide arrow while the power is out and a grey "No power
+	    issue" pill when the power is on.
 	  - stings (user request 2026-10-10, Content.SoundRules.Stings): AnomalyStart (horror_sting) when a record
 	    appears less than STING_FRESH s after its StartedAt (a late joiner hears nothing); AnomalyResolved
 	    (horror_chase_stop) when a live record turns Resolved. Both on screen with the DEC-173 scare cap.
@@ -29,6 +31,7 @@ local Content = require(ReplicatedStorage.shared.Content)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Effect = require(script.Effect)
+local Breaker = require(script.Breaker)
 
 export type Phase = Effect.Phase
 export type Record = Effect.Record
@@ -379,6 +382,8 @@ end)
 
 AnomalyController:OnStart(function(self)
 	self:WatchNight()
+	-- TASK-334: breaker arrow in the blackout, "No power issue" outside it
+	Breaker.Start()
 end)
 
 return AnomalyController

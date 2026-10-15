@@ -16,7 +16,6 @@ type Entry = {
 	Max: number,
 	Band: string,
 	RevivesTonight: number,
-	CoffeeReadyAt: number,
 	StateEndsAt: number,
 	LastCause: string,
 }
@@ -75,11 +74,10 @@ const Vital: Api.Module = function(ctx: Api.Context): { Api.Command }
 	local function status(player: Player): string
 		const entry = vital:Ensure(player)
 		const t = workspace:GetServerTimeNow()
-		const coffee = math.max(0, math.ceil(entry.CoffeeReadyAt - t))
 		const ends = if entry.StateEndsAt > 0 then `, ends in {math.ceil(entry.StateEndsAt - t)}s` else ""
 		const wipe = if vital.WipeEndsAt > 0 then `; wipe in {math.ceil(vital.WipeEndsAt - t)}s` else ""
 		return `{player.Name}: sanity {entry.Sanity}/{entry.Max}, {vital:GetState(player.UserId) or "not a member"}`
-			.. `{ends}, band {entry.Band}, revives tonight {entry.RevivesTonight}, coffee in {coffee}s, `
+			.. `{ends}, band {entry.Band}, revives tonight {entry.RevivesTonight}, `
 			.. `last cause "{entry.LastCause}"{wipe}`
 	end
 

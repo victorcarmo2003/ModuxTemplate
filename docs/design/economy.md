@@ -36,7 +36,7 @@ Dinheiro é inteiro **[DEC-072]**. Sem reputação **[DEC-051]**.
 | Sumidouros | Valor |
 |---|---|
 | Pacotes do mercado (prateleiras do Mart, nunca rotacionam) | `items.md` ITM-011 a ITM-019 |
-| Upgrades (bancada do Mart, sempre à venda) | $790 (Grill $210, Cooler $170, Counter $230, Lock $80, Lights $100) **[DEC-101, DEC-106]**. **Modo anomalia (2026-10-14, Provisório):** $530 = Grill $210 + **Storage $220** ($40/$70/$110, era o Cooler) + Lights $100; Counter, Lock e mesas fora de venda; o Gear Stand abre só no fim do 1º turno e a lição das 18h completa o caixa até **$100** se faltar para o Storage (`Q-260`, `Q-262`) |
+| Upgrades (bancada do Mart, sempre à venda) | $790 (Grill $210, Cooler $170, Counter $230, Lock $80, Lights $100) **[DEC-101, DEC-106]**. **Modo anomalia (2026-10-14, Provisório):** $530 = Grill $210 + **Storage $220** ($40/$70/$110, era o Cooler) + Lights $100; Counter, Lock e mesas fora de venda; o Gear Stand abre só no fim do 1º turno e a lição das 18h completa o caixa até **$100** se faltar para o Storage (`Q-260`, `Q-262`). **TASK-324 (2026-10-15, Provisório):** **$850** = Grill $210 + Storage $340 (nível 5 $120) + Lights $100 + Coffee Maker $110 (UPG-013, B3) + Breaker Box $90 (UPG-014, B4); conta no §5.0 |
 | Trailer (compra fixa no trailer) | $300 × party **[DEC-047, DEC-107]** |
 | Rescue Whistle (ITM-021; slot especial, 15%/turno) | $200 × party **[DEC-100, DEC-108, DEC-129]** |
 | Ladrão | floor(50%/30% da gaveta) **[DEC-050]** |
@@ -69,6 +69,60 @@ Custo = $1,25 (pão + salsicha) + Σ custo por uso. Tabela por ingrediente: `ite
 | Dados | `Flow.BaseInterval` etc. | `Flow.NightInterval` 40; `Nights[k].Customers` = { `BaseInterval` 40/36, `Max` 6 } (TASK-081, Provisório; FEAT-009) |
 
 ## 5. Lucro esperado (solo mediano, Rookie)
+
+### 5.0 Run do modo anomalia (TASK-324, 2026-10-15, Provisório; `Q-275`)
+
+> As seções 5.1 a 5.4 abaixo são do fluxo antigo (5 dias + 10 noites de 20–30 min, trailer comprado) e ficam como
+> histórico. Fluxo atual (`RunParams`, `Nights`, `Flow`): **Day 1** (tutorial, 216 s de loja, fila 2) e **Nights 1–10**
+> (540 s + 40 s por noite, intervalo 40 s nas N1–5 e 36 s nas N6–10), **fila de 1 à noite** (TASK-287: o próximo
+> cliente só nasce com o balcão livre), vendas **direto no dinheiro** (DEC-238), gorjeta no pote, bônus do chefe sobre
+> o faturamento do turno, **sem trailer para comprar**. Estimativa de planilha (sem simulação; conferir no playtest).
+
+Premissas por noite: chegadas ≈ duração ÷ (intervalo + ~4 s perdidos na tentativa com o balcão cheio); ~40% das
+ocorrências de anomalia (`Nights[k].Events`, família A) ocupam o balcão sem pagar; 85% dos clientes reais completos,
+7% incompletos (metade do preço); K médio 2,0 → preço médio **$7,67** (média dos complementos $1,83); gorjeta ~60% dos
+completos; bônus do chefe ~10% (mistura de A/B); custo dos ingredientes pelos pacotes atuais (`Packages`: pão
+$0,50, salsicha $0,75, complemento médio $0,69 por uso) → **$2,63** por hot dog, +8% de desperdício; café ~$5/noite.
+
+| Noite | Duração | Intervalo | Chegadas | Clientes reais | Completos | Lucro líquido |
+|---|---|---|---|---|---|---|
+| 1 | 540 s | 40 s | 12 | 11 | 9 | $53 |
+| 2 | 580 s | 40 s | 13 | 11 | 10 | $55 |
+| 3 | 620 s | 40 s | 14 | 12 | 10 | $60 |
+| 4 | 660 s | 40 s | 15 | 13 | 11 | $63 |
+| 5 | 700 s | 40 s | 16 | 14 | 12 | $68 |
+| 6 | 740 s | 36 s | 19 | 16 | 13 | $80 |
+| 7 | 780 s | 36 s | 20 | 17 | 14 | $85 |
+| 8 | 820 s | 36 s | 21 | 17 | 15 | $89 |
+| 9 | 860 s | 36 s | 22 | 18 | 15 | $92 |
+| 10 | 900 s | 36 s | 23 | 18 | 15 | $91 |
+| **Total** | 7.200 s | | 175 | 147 | 124 | **~$736** |
+
+| Run solo | Valor |
+|---|---|
+| Inicial | $30 |
+| Day 1 (13 clientes, K 1,2) | ~$56 |
+| Nights 1–10 | ~$736 |
+| **Total ganho** | **~$820** (+ até ~$40 da lição das 18h, se faltar para o Storage) |
+| Antes: só $530 à venda | sobrava ~$290 solo (e muito mais em party) — a queixa do dono |
+| **Agora: $850 à venda** (§2) | solo compra **quase tudo** (falta ~1 nível, ex.: o Strong Brew ou o Storage 5); sobra ~$0–40 |
+| Party de 2 (fatura ~1,4× pela fila de 1) | ~$1.150: compra tudo, sobra ~$300 (`Q-275` a) |
+
+Ordem natural de compra (cooldown de 1 turno por linha, `Mart.Cooldown`): Storage 2 no fim do Day 1; Grill 2 e
+Coffee/Breaker nas N1–N4 (o apagão estreia na N4); Storage 3–5, Grill 3 e Lights no meio da run; o que faltar no fim.
+Cada linha tem no máximo 5 compras úteis na run (turnos 1, 3, 5, 7, 9), então o Storage (4 compras) é o mais apertado.
+
+**Pacotes de dinheiro em Robux** (`Content.Shop`, mesmos ProductId e Robux; valor **fixo**, não depende da noite):
+
+| Produto | Robux | Antes | Agora | Equivale a | $ por Robux |
+|---|---|---|---|---|---|
+| `cash_100` "Tip Bag" | 29 | $100 | **$60** | ~1 noite (N1 $53, média $74) | 2,07 |
+| `cash_300` "Coin Pile" | 69 | $300 | **$150** | ~2 noites | 2,17 |
+| `cash_800` "Coin Chest" | 149 | $800 | **$330** | ~4 noites | 2,21 |
+
+O maior pacote compra ~39% do Gear Stand (antes: o de $800 comprava todos os $530 de uma vez). Fixo porque a
+descrição do Creator Hub precisa ser estável e o ganho por noite só varia ~1,7× da N1 à N10 (`Q-275` b). As chaves
+`cash_100/300/800` ficam (são os ids do Creator Hub e dos ícones).
 
 ### 5.1 Dias **[DEC-071; proposals-round-2 §3.7]**
 

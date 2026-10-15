@@ -22,8 +22,13 @@
 -- current vehicle, range) ends the blackout; AnomalyService sees it as the Action event. The switch does nothing while
 -- the power is out. A new shift or a restore ends it.
 --
+-- Posts out (ANM-003 bell, TASK-340; AnomalyService only): BeginPostsOut() puts only the HushOff posts out at once (At = 0);
+-- the trailer and its switch are untouched (the answer is turning the trailer light off). EndPostsOut() brings them back.
+-- A new shift or a restore ends it.
+--
 -- API: IsLit(pos), IsSwitchOn(), SetSwitch(on, player?) -> boolean, BeginHush(startedAt, holdUntil), EndHush(),
--- IsHush(), BeginBlackout(), EndBlackout(), IsBlackout(), GroupOn(key); signal SwitchChanged(on, player?).
+-- IsHush(), BeginBlackout(), EndBlackout(), IsBlackout(), BeginPostsOut(), EndPostsOut(), GroupOn(key); signal
+-- SwitchChanged(on, player?).
 --
 -- Current vehicle: VehicleService:Current() and its Swapped signal (architecture.md §19.2; VehicleService 620 does not
 -- require LightService, so no cycle, T42). PROVISIONAL: Hush auto-end at holdUntil and "trailer dark at the last
@@ -54,6 +59,7 @@ const POST_TAG = "StreetLight"
 const VEHICLE_TAG = "Vehicle"
 const VEHICLE_ATTRIBUTE = "Vehicle"
 const RADIUS_STAT = "LightRadius"
+const BREAKER_HOLD_STAT = "BreakerHold" -- UPG-014 Breaker Box (TASK-324): hold of the breaker prompt, s
 const TICK_RATE = 10 -- Hz: Hush timing (last post, holdUntil) and night/vehicle/upgrade changes
 const SNAPSHOT = "Lt"
 
@@ -114,6 +120,8 @@ function LightService:Setup()
 	self.Hush = nil :: Hush?
 	-- server time the power went out (ANM-020); nil = power on
 	self.Blackout = nil :: number?
+	-- ANM-003 bell (TASK-340): only the posts are out
+	self.PostsOut = false :: boolean
 	self.Breakers = {} :: { [Instance]: boolean }
 	self.Zones = {} :: { [Instance]: Zones.Zone }
 	self.ZonesDirty = true :: boolean
@@ -185,6 +193,7 @@ function LightService:Input(): Rules.Input
 		Now = now(),
 		Hush = self.Hush,
 		Blackout = self.Blackout ~= nil,
+		PostsOut = self.PostsOut,
 		Level = function(upgrade: string, vehicle: string): number
 			return upgrades:GetLevel(upgrade, vehicle) or 0
 		end,
@@ -223,7 +232,7 @@ function LightService:Refresh()
 			-- every post is already past its Order x Step on the client, so they all drop in the same frame
 			local at = input.Now
 			if not on and group.Kind == "Posts" then
-				if self.Blackout ~= nil and group.HushOff then
+				if (self.Blackout ~= nil or self.PostsOut) and group.HushOff then
 					at = 0
 				elseif hush ~= nil then
 					at = hush.StartedAt
@@ -322,6 +331,23 @@ function LightService:EndBlackout()
 	self:RefreshBreakers()
 end
 
+-- AnomalyService (ANM-003 bell, TASK-340): the street posts out at once, the trailer untouched.
+function LightService:BeginPostsOut()
+	if self.PostsOut then
+		return
+	end
+	self.PostsOut = true
+	self:Refresh()
+end
+
+function LightService:EndPostsOut()
+	if not self.PostsOut then
+		return
+	end
+	self.PostsOut = false
+	self:Refresh()
+end
+
 -- Snapshot "Lt" (data.md §3.3): { S = switch }
 function LightService:Capture(): { S: boolean }
 	return { S = self.Switch }
@@ -330,6 +356,7 @@ end
 function LightService:Restore(data: any)
 	self.Hush = nil
 	self:EndBlackout()
+	self:EndPostsOut()
 	const saved = if type(data) == "table" then data.S else nil
 	self:SetSwitch(if type(saved) == "boolean" then saved else true, nil, true)
 	self:Refresh()
@@ -438,15 +465,21 @@ function LightService:AddBreaker(anchor: Instance)
 	self:RefreshBreakers()
 end
 
--- Prompt on while the power is out, only on the current vehicle's breaker
+-- Prompt on while the power is out, only on the current vehicle's breaker. Its hold follows the Breaker Box upgrade
+-- (UPG-014, TASK-324); nil PromptHold = the table hold (Actions.breaker_reset).
 function LightService:RefreshBreakers()
 	const vehicle = self:Vehicle()
 	const out = self.Blackout ~= nil
 	const interaction = self.Dependencies.InteractionService
+	const hold = self.Dependencies.UpgradeService:GetEffect(BREAKER_HOLD_STAT)
+	const promptHold = if hold == Content.Actions.ByKey[BREAKER_ACTION].Hold then nil else hold
 	for anchor in self.Breakers do
 		if anchor.Parent == nil then
 			self.Breakers[anchor] = nil
 			continue
+		end
+		if anchor:GetAttribute("PromptHold") ~= promptHold then
+			interaction:SetPromptHold(anchor, promptHold)
 		end
 		const owner = vehicleOf(anchor)
 		const on = out and (owner == nil or owner == vehicle)
@@ -555,6 +588,7 @@ LightService:OnInit(function(self)
 	round.ShiftStarted:Connect(function(info)
 		self.Hush = nil
 		self:EndBlackout()
+		self:EndPostsOut()
 		if info.IsNight then
 			self:SetSwitch(true, nil, true) -- every night starts lit (FEAT-020)
 		end
@@ -611,6 +645,7 @@ LightService:OnStart(function(self)
 		self:Refresh()
 	end)
 	self.Dependencies.UpgradeService.Changed:Connect(function()
+		self:RefreshBreakers()
 		self:Refresh()
 	end)
 

@@ -178,6 +178,20 @@ DevService:OnInit(function(self)
 		return
 	end
 	self.Enabled = true
+
+	-- settings panel dev row (TASK-332): the same commands as the chat, for the sender
+	self.Libs.Net.DevTool:onServer(function(data, player: Player)
+		const ok, err = pcall(function()
+			if data.Tool == "Coffee" then
+				self:Execute("mycoffee", {}, player)
+			else
+				self:Execute("infsanity", { if data.On then "on" else "off" }, player)
+			end
+		end)
+		if not ok then
+			warn(`{PREFIX} DevTool {data.Tool}: {err}`)
+		end
+	end)
 end)
 
 DevService:OnStart(function(self)

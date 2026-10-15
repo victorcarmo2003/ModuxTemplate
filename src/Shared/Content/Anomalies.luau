@@ -83,6 +83,10 @@ const cues = Table.new({
 	{ Key = "smoke", Kind = "Both", Duration = 2 }, -- N2 flavor: the hot dog turns to smoke on the bite
 	{ Key = "clock_stop", Kind = "Both", Duration = 0 }, -- N3 sign: bank clock hands stop, ticking stops
 	{ Key = "clock_resume", Kind = "Both", Duration = 0 }, -- N3: ticking comes back
+	-- ANM-003 remade (TASK-340): Entity = stroke 1..3 of the church bell (the 1st also kills the street posts)
+	{ Key = "bell", Kind = "Audio", Duration = 0 },
+	-- ANM-003: the trailer light was on at the 3rd stroke: cartoon moths and bats swarm the light, then everyone faints
+	{ Key = "swarm", Kind = "Visual", Duration = 2 },
 	{ Key = "mirror_smile", Kind = "Visual", Duration = 2 }, -- N4 flavor: the copy's frozen smile
 	-- N4 door flow (DEC-247, Provisional). Entity = knock number 1..3; the 1st one also makes the copy appear (only for who is inside the trailer)
 	{ Key = "copy_knock", Kind = "Both", Duration = 0 }, -- N4: the copy stands at the back door and knocks
@@ -104,6 +108,10 @@ const cues = Table.new({
 	-- V2 (DEC-255, DEC-256): the wrong verb on a family A actor. Entity = actor NpcId; players near it see the cartoon
 	-- monster face full screen (~0.6 s, Scare cap) and the one who erred faints right after (server)
 	{ Key = "jumpscare", Kind = "Both", Duration = 1 },
+	-- ANM-012 (TASK-336): Entity = actor NpcId. The neck turns for good with a crack (refused or window shut in her face);
+	-- the window thrown open again with a bang
+	{ Key = "neck_snap", Kind = "Both", Duration = 0 },
+	{ Key = "window_slam", Kind = "Both", Duration = 0 },
 	-- V2 family B (DEC-254, TASK-272; Kit/Hide). Entity = 0 (party). Numbers Provisional (proposal §3 B)
 	{ Key = "hide_warn", Kind = "Both", Duration = 9 }, -- trailer lights flicker + low drone + boss on the radio: HIDE (8-10 s)
 	{ Key = "monster_pass", Kind = "Both", Duration = 10 }, -- the monster crosses the street, leans on the window, leaves
@@ -191,10 +199,13 @@ raincoat.SkipAtmospheres = { "ATM-4", "ATM-5" } -- DEC-251, DEC-257 note: dry ni
 const knock = anomaly(9, "anm_009_knock", "The knock", "Audio", 0, "PerPlayer", 0, true, {
 	"anm_005_raincoat_lady",
 	"anm_010_hush",
-}, { "knock", "door_crack" })
+}, { "knock", "door_crack", "jumpscare" })
 knock.SeeMode = "AudioZone" -- FEAT-019: seen = in the trailer zone when the first knock sounds
-knock.Trailer = "Helps" -- window in the trailer; in the cart: leave the zone
+knock.Trailer = "None" -- TASK-333: the answer is not opening the back door (same everywhere)
 knock.Family = "D" -- DEC-254: ANM-009 becomes a scare
+-- TASK-341 (Provisional): the knock joins the draw on Night 2 ("Odd noises? Just noises. Keep working."), the first D
+-- event with a stake before the monsters; Night 9's call still repeats "don't open" (Ref keeps ANM-009)
+knock.Night = 2
 
 const walker = anomaly(7, "anm_007_walker", "The Walker", "Street", 1, "Party", 300, true, {}, {
 	"post_buzz",
@@ -213,31 +224,42 @@ const hush = anomaly(10, "anm_010_hush", "The Hush", "World", 0, "PerPlayer", 20
 	"anm_005_raincoat_lady",
 	"anm_008_long_car",
 	"anm_009_knock",
-}, { "hush_fog" })
+}, { "hush_fog", "jumpscare" })
 hush.Family = "C" -- DEC-254: ANM-003/010 in family C
 hush.Scripted = { Night = 10, Clock = 1785 } -- FEAT-027: 3rd occurrence of Night 10 at 5:45 AM, leads to the Final
 
 const stoppedClock = anomaly(3, "anm_003_stopped_clock", "The stopped clock", "World", 0, "Party", 100, false, {
 	"anm_010_hush",
-}, { "clock_stop", "clock_resume" })
+	"anm_020_blackout", -- TASK-340: the bell's answer is the trailer switch, which does nothing in a blackout
+}, { "clock_stop", "clock_resume", "bell", "swarm" })
 stoppedClock.Trailer = "Needs" -- the verb is the trailer's light switch
-stoppedClock.Night = 5 -- family C opens on Night 4 with the blackout; the clock joins one night later
+stoppedClock.Night = 5 -- family C opens on Night 3 with the blackout (TASK-341); the clock joins on Night 5
 stoppedClock.Family = "C"
 
 const longCar = anomaly(8, "anm_008_long_car", "The long car", "Vehicle", 1, "PerPlayer", 100, true, {
 	"anm_005_raincoat_lady",
 	"anm_010_hush",
-}, { "car_highbeam", "car_flash", "car_honk", "trailer_blackout" })
+}, { "car_highbeam", "car_flash", "car_honk", "trailer_blackout", "jumpscare" })
 longCar.Trailer = "Helps" -- window in the trailer; in the cart: leave the zone
+-- TASK-331 (owner 2026-10-15, Provisional): back in the agenda as a family D scare with a verb (close the window before
+-- the high beam; else jumpscare + faint), drawn from Night 8 like before DEC-254
+longCar.Family = "D"
 
 -- V2 family C (DEC-254, TASK-273): everything goes dark, the breaker at the back (hold 3 s), the shade attacks in 30 s
-const blackout = anomaly(4, "anm_020_blackout", "The blackout", "World", 0, "Party", 100, true, {}, {
+const blackout = anomaly(4, "anm_020_blackout", "The blackout", "World", 0, "Party", 100, true, {
+	"anm_003_stopped_clock",
+}, {
 	"blackout_start",
 	"blackout_restore",
 	"jumpscare",
 })
 blackout.Ref = "ANM-020"
+blackout.Night = 3 -- TASK-341 (Provisional): the first power failure on Night 3 (was 4), presented by call_night_3
 blackout.Family = "C"
+
+-- TASK-341 (Provisional): debuts on Night 4 (was 3), the rain night, swapped with the blackout
+const turnedNeck = odd(4, 12, "anm_012_turned_neck", "The turned neck")
+turnedNeck.Cues = { "jumpscare", "neck_snap", "window_slam" } -- TASK-336
 
 const base = Table.new({
 	-- ViewRange: 60 default, 80 N6, 300 N7 (FEAT-019); 100 N3/N8 and 200 N10 Provisional (C-01 ~73 studs,
@@ -247,14 +269,14 @@ const base = Table.new({
 	stoppedClock,
 	copies,
 	raincoat,
-	-- ANM-006 and ANM-008 are cut from the agenda (DEC-254): Family nil, the ID and the module stay
+	-- ANM-006 is cut from the agenda (DEC-254): Family nil, the ID and the module stay. ANM-008 came back (TASK-331)
 	anomaly(6, "anm_006_wavers", "The wavers", "World", 0, "PerPlayer", 80, false, {}, { "curtain", "waver_more" }),
 	walker,
 	longCar,
 	knock,
 	hush,
 	odd(2, 11, "anm_011_shaker", "The shaker"),
-	odd(3, 12, "anm_012_turned_neck", "The turned neck"),
+	turnedNeck,
 	odd(5, 13, "anm_013_white_eyes", "The white eyes"),
 	odd(6, 14, "anm_014_big_head", "The big head"),
 	odd(7, 15, "anm_015_floater", "The floater"),

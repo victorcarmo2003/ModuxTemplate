@@ -206,7 +206,6 @@ function CutsceneController:Setup()
 	-- chain
 	self.Playing = false :: boolean
 	self.Party = false :: boolean
-	self.PreviousContext = nil :: string?
 	self.EndedAt = nil :: number?
 	self.EndAlpha = 0 :: number
 	-- skip hold
@@ -606,9 +605,7 @@ function CutsceneController:BeginChain()
 	-- one avatar in the scene whatever the server holds: always the Solo variant
 	self.Party = false
 	self.Mates = Hide.new()
-	const input = self.Dependencies.InputController
-	self.PreviousContext = input.Context
-	input:SetContext("Menu")
+	self.Dependencies.InputController:Hold("Cutscene", true)
 	self.Dependencies.CameraController:Cutscene(true)
 	self:BindSkip()
 	self:StartStepping()
@@ -639,11 +636,7 @@ function CutsceneController:EndChain()
 	self.Skippable(false)
 	self:UnbindSkip()
 	self.Dependencies.CameraController:Cutscene(false)
-	const input = self.Dependencies.InputController
-	if input.Context == "Menu" then
-		input:SetContext(if self.PreviousContext == "Menu" then "Menu" else "Gameplay")
-	end
-	self.PreviousContext = nil
+	self.Dependencies.InputController:Hold("Cutscene", false)
 end
 
 function CutsceneController:BeginSegment(key: string, startedAt: number)

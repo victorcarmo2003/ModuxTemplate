@@ -5,7 +5,8 @@
 --   Cash     EconomyService:TopUp(cash + Amount)            Restock / Pantry  KitchenService:StockFree(ingredient, cap)
 --   Coffee   VitalService:AddSanity to full at night; otherwise a coffee Tool (ItemService:Give) to drink later
 --   Revive   profile.ReviveCredits + 1 (DEC-117); ReviveKitService spends it (self while Down, or on a fallen mate,
---            VitalService:Revive; TASK-317) and gets the new count to the client
+--            VitalService:Revive; TASK-317) and gets the new count to the client. Bought while Down ("Revive now",
+--            TASK-330): the new credit is spent on the buyer right away (ReviveKitService:Use), kept if refused
 --   Radar    ShopGrant to the buyer (the client marks the anomalies of the Anomalies set for Amount s)
 --   Scare    ShopGrant to the chosen mate (the client plays the cartoon jumpscare, Mild, DEC-256)
 -- Run utilities (Cash, Restock, Pantry, Coffee, Radar) bought where no run exists (lobby) answer Wait: the receipt stays
@@ -135,7 +136,14 @@ function ShopUtilityService:Handler(utility: Utility): any
 			return {
 				Patch = { ReviveCredits = math.clamp(profile.ReviveCredits() + 1, 0, REVIVE_MAX) },
 				After = function()
-					self.Dependencies.ReviveKitService:SendCount(player)
+					const kits = self.Dependencies.ReviveKitService
+					-- bought while Down ("Revive now" on the faint screen, TASK-330): spent on the buyer at once;
+					-- refused (night over, revives spent) = the credit stays for later
+					if self.Dependencies.VitalService:GetState(player.UserId) == "Down" and kits:Use(player, player) then
+						self:Send(player, key, 1, 0)
+						return
+					end
+					kits:SendCount(player)
 					self:Send(player, key, 1, 0)
 				end,
 			}

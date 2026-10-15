@@ -229,7 +229,6 @@ function PrepController:Setup()
 	self.Gui = nil :: ScreenGui?
 	self.CursorGui = nil :: ScreenGui?
 	self.UnmountCursor = nil :: (() -> ())?
-	self.PreviousContext = "Gameplay" :: string
 	self.BoundNames = {} :: { string }
 	-- what Isolate hid and must give back
 	self.Saved = {} :: { [string]: any }
@@ -1301,9 +1300,7 @@ function PrepController:Enter(station: number, mock: boolean?, tab: string?, pla
 
 	self:HideRoof(true)
 	self:Isolate(true)
-	const input = self.Dependencies.InputController
-	self.PreviousContext = input.Context
-	input:SetContext("Menu")
+	self.Dependencies.InputController:Hold("Prep", true)
 	self.Rig:Enter(pose.Frame.Position, pose.Focus)
 
 	const pointer = Pointer.new()
@@ -1682,15 +1679,14 @@ function PrepController:Finish(takeover: boolean)
 	end
 	-- a forced exit keeps the input closed a little longer (Rules.ForcedExit.NoInput), then the context comes back
 	const input = self.Dependencies.InputController
-	const context = if self.PreviousContext == "Menu" then "Menu" else "Gameplay"
 	if self.Forced then
 		task.delay(rules.ForcedExit.NoInput, function()
 			if not self.InMode then
-				input:SetContext(context)
+				input:Hold("Prep", false)
 			end
 		end)
 	else
-		input:SetContext(context)
+		input:Hold("Prep", false)
 	end
 	self.Mock = false
 end

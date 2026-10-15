@@ -26,7 +26,7 @@ const Market: Api.Module = function(ctx: Api.Context): { Api.Command }
 		for _, row in Content.Mart.Pedestals do
 			local found: Content.Upgrade? = nil
 			for _, candidate in Content.Upgrades.List do
-				if candidate.BenchSpot == row.Slot then
+				if candidate.BenchSpot == row.Slot and not Content.Mode.IsOff(candidate.Key) then
 					found = candidate
 				end
 			end

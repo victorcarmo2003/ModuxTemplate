@@ -10,6 +10,7 @@ cropped to a circle.
     python tools/icons/shop_icons.py            # writes Assets/textures/ui/shop/<key>.png (+ .svg sources): the Creator
                                                 # Hub product images (numbered tiles), and shop/art/gems_<n>.png: the
                                                 # in-game gem art (no tile, no number; GemShop cards)
+    python tools/icons/shop_icons.py gems_50 cash_100   # only these tiles ("art/gems_50" for an art file)
 """
 from __future__ import annotations
 
@@ -343,7 +344,7 @@ def cash_100(ic: Icon) -> str:
         + f'<rect x="134" y="112" width="244" height="54" rx="20" fill="{lidc}" {ol()}/>'
         + f'<rect x="226" y="128" width="60" height="12" rx="6" fill="{INK}"/>'
         + gloss(176, 300, 9, 30, 0, 0.7)
-        + text("+100", 256, 96, 84, MUSTARD)
+        + text("+$60", 256, 96, 84, MUSTARD)
     )
 
 
@@ -382,19 +383,19 @@ def cash_300(ic: Icon) -> str:
         tile(ic, "green")
         + ground(rx=180, cy=440)
         + coin_pile(ic, [[(150, 380), (256, 384), (362, 380)], [(203, 300), (309, 300)], [(256, 222)]], 58)
-        + text("+300", 256, 120, 96, MUSTARD)
+        + text("+$150", 256, 120, 96, MUSTARD)
     )
 
 
 def cash_800(ic: Icon) -> str:
     back = coin_pile(ic, [[(150, 250), (210, 236), (270, 230), (330, 238), (372, 252)], [(180, 206), (246, 196), (312, 204)]], 34)
     front = coin_pile(ic, [[(118, 284), (392, 286)], [(330, 410)]], 30)
-    return tile(ic, "green") + chest(ic, back, front) + text("+800", 256, 120, 96, MUSTARD)
+    return tile(ic, "green") + chest(ic, back, front) + text("+$330", 256, 120, 96, MUSTARD)
 
 
 def gems_50(ic: Icon) -> str:
     # 1 gem
-    return tile(ic, "teal") + ground(rx=120, cy=420) + gem(ic, 256, 300, 230) + text("50", 256, 120, 104, WHITE)
+    return tile(ic, "teal") + ground(rx=120, cy=420) + gem(ic, 256, 300, 230) + text("1,000", 256, 120, 104, WHITE)
 
 
 def gems_130(ic: Icon) -> str:
@@ -403,7 +404,7 @@ def gems_130(ic: Icon) -> str:
         tile(ic, "teal")
         + ground(rx=170, cy=440)
         + gem_pile(ic, GEMS_130, 140)
-        + text("130", 256, 120, 96, WHITE)
+        + text("2,400", 256, 120, 96, WHITE)
     )
 
 
@@ -413,7 +414,7 @@ def gems_300(ic: Icon) -> str:
         tile(ic, "teal")
         + ground(rx=200, cy=446)
         + gem_pile(ic, GEMS_300, 112)
-        + text("300", 256, 120, 96, WHITE)
+        + text("4,800", 256, 120, 96, WHITE)
     )
 
 
@@ -429,7 +430,7 @@ def gem_chest(ic: Icon) -> str:
 
 def gems_700(ic: Icon) -> str:
     # a chest overflowing with gems
-    return tile(ic, "teal") + gem_chest(ic) + text("700", 256, 120, 96, WHITE)
+    return tile(ic, "teal") + gem_chest(ic) + text("10,000", 256, 120, 96, WHITE)
 
 
 # --- in-game gem art (owner 2026-10-15): the same objects with no tile and no number, centred and big, transparent ---
@@ -580,6 +581,9 @@ PAGE = """<!doctype html><html><head><meta charset="utf-8">
 
 
 def main() -> None:
+    import sys
+
+    only = set(sys.argv[1:])  # optional keys: render only these (e.g. gems_50 cash_100); none = everything
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "art").mkdir(parents=True, exist_ok=True)
     with sync_playwright() as pw:
@@ -587,6 +591,9 @@ def main() -> None:
         page = browser.new_page(viewport={"width": 512, "height": 512})
         jobs = [(OUT, key, build) for key, build in ICONS.items()] + [(OUT / "art", key, build) for key, build in ART.items()]
         for folder, key, build in jobs:
+            name = key if folder == OUT else f"art/{key}"
+            if only and name not in only:
+                continue
             ic = Icon()
             svg = ic.svg(build(ic))
             (folder / f"{key}.svg").write_text(svg, encoding="utf-8")

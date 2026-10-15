@@ -73,7 +73,7 @@ return Table.new({
 	-- wave 3 content task does not reopen this file.
 	{ Key = "bench_buy_item", Text = "Buy {item} — ${price}", Hold = 1.5, Radius = 7, Requires = {}, Night = "Any", Wave = 4 },
 	-- "Take Coffee" when the machine is Ready (PromptText from CoffeeMachine.luau, architecture.md §19.8)
-	{ Key = "brew_coffee", Text = "Brew Coffee", Hold = 1, Radius = 7, Requires = {}, Night = "Any", Wave = 2 },
+	{ Key = "brew_coffee", Text = "Take Coffee", Hold = 1, Radius = 7, Requires = {}, Night = "Any", Wave = 2 },
 	-- on the Prompt_Give anchor of a crew mate's HRP (CharacterService); the owner never targets its own
 	{
 		Key = "give_coffee",
@@ -133,4 +133,8 @@ return Table.new({
 	-- Security cameras (FEAT-040, TASK-285; owner request 2026-10-14, Provisional): Prompt_Cameras on the CCTV monitor of the
 	-- trailer (SecurityService makes it). Opens the camera view on this client (SecurityOpen) and freezes the body while watching.
 	{ Key = "watch_cameras", Text = "Cameras", Hold = 0, Radius = 6, Requires = {}, Night = "Any", Wave = 3 },
+
+	-- Anomaly Book (TASK-335; owner request 2026-10-15, Provisional): Prompt_Book on the book in the trailer
+	-- (tools/assetplace/anomaly_book.luau). Opens the book on this client (JournalOpen); nothing else changes.
+	{ Key = "read_journal", Text = "Anomaly Book", Hold = 0, Radius = 6, Requires = {}, Night = "Any", Wave = 3 },
 } :: { Action })

@@ -95,6 +95,10 @@ const STREET_LIGHT_TAG = "StreetLight"
 const VEHICLE_TAG = "Vehicle"
 const LIGHT_ZONE_TAG = "LightZone"
 const INTERIOR_FITTING = "Light_Interior" -- AST-027 fitting for AST-079 (bind_map01 warns while missing)
+-- The trailer body's ceiling lamp mesh: while the vehicle has no Light_Interior, the interior light hangs under it
+-- (owner 2026-10-15: the fallback used to land on the first LightZone found, LZ-2 at the back, not over the lamp)
+const CEILING_LAMP = "Lamp_Ceiling"
+const CEILING_DROP = 0.6 -- studs under the lamp mesh, so the shadowed light is not inside it
 const DECAL_NAME = "Pool_Decal" -- AST-036 On_Fake
 const EMISSIVE_ATTRIBUTE = "Emissive"
 const POST_GROUP_DEFAULT = "juniper_posts"
@@ -377,8 +381,22 @@ function LightController:Rescan()
 	for _, vehicle in CollectionService:GetTagged(VEHICLE_TAG) do
 		const vehicleKey = vehicle:GetAttribute("Vehicle")
 		const interior = if type(vehicleKey) == "string" then interiorGroups[vehicleKey] else nil
+		const hasFitting = vehicle:FindFirstChild(INTERIOR_FITTING, true) ~= nil
 		for _, d in vehicle:GetDescendants() do
-			if interior and d.Name == INTERIOR_FITTING then
+			if interior and not hasFitting and d.Name == CEILING_LAMP and d:IsA("BasePart") then
+				-- no AST-079 fitting: the light hangs under the ceiling lamp, the lamp glows with it
+				const fixture = self:NewFixture(interior, d, 0)
+				if #fixture.Lights == 0 then
+					const hook = Instance.new("Attachment")
+					hook.Name = FALLBACK_NAME
+					hook.Position = Vector3.new(0, -CEILING_DROP, 0)
+					hook.Parent = d
+					const light = self:FallbackLight()
+					light.Parent = hook
+					table.insert(fixture.Lights, light)
+				end
+				self:Add(fixture)
+			elseif interior and d.Name == INTERIOR_FITTING then
 				const fixture = self:NewFixture(interior, d, 0)
 				if #fixture.Lights == 0 and (d:IsA("Attachment") or d:IsA("BasePart")) then
 					-- fitting without a light (AST-079 pending): local light on it. PROVISIONAL

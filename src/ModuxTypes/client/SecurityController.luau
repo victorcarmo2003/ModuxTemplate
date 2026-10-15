@@ -19,7 +19,6 @@ export type Public = {
 	Light: Part?,
 	NightText: Vide.Source<string>,
 	Open: Vide.Source<boolean>,
-	PreviousContext: string,
 	Saved: Saved,
 	Scale: Vide.Source<number>,
 	Since: Vide.Source<number>,

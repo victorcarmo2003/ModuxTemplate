@@ -17,6 +17,7 @@ local Ingredients = require(script.Parent.Ingredients)
 local Items = require(script.Parent.Items)
 local LightGroups = require(script.Parent.LightGroups)
 local Mart = require(script.Parent.Mart)
+local Mode = require(script.Parent.Mode)
 local Moods = require(script.Parent.Moods)
 local Nights = require(script.Parent.Nights)
 local Notices = require(script.Parent.Notices)
@@ -174,8 +175,12 @@ local function checkUpgrades()
 				fail("Upgrades", index, row.Key, `BenchSpot '{row.BenchSpot}' is not B1..B5`)
 			end
 			for other = 1, index - 1 do
-				if Upgrades.List[other].BenchSpot == row.BenchSpot then
-					fail("Upgrades", index, row.Key, `BenchSpot {row.BenchSpot} already used by '{Upgrades.List[other].Key}'`)
+				const otherKey = Upgrades.List[other].Key
+				-- TASK-324: one day-only and one anomaly-only upgrade may share a pedestal (never both on sale)
+				const shared = (table.find(Mode.DayOnlyUpgrades, otherKey) ~= nil and table.find(Mode.AnomalyOnlyUpgrades, row.Key) ~= nil)
+					or (table.find(Mode.AnomalyOnlyUpgrades, otherKey) ~= nil and table.find(Mode.DayOnlyUpgrades, row.Key) ~= nil)
+				if Upgrades.List[other].BenchSpot == row.BenchSpot and not shared then
+					fail("Upgrades", index, row.Key, `BenchSpot {row.BenchSpot} already used by '{otherKey}'`)
 				end
 			end
 			if #row.PlaceSpots > 0 then

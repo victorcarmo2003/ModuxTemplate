@@ -90,15 +90,18 @@ const base = Table.new({
 	-- interval FEAT-009 (40 s / 36 s, Provisional, TASK-081). V2 columns (TASK-271): new anomaly, families,
 	-- atmosphere (ATM-1 normal, 2 pitch dark, 3 red fog, 4 rain, 5 storm, 6 white fog, 7 blood moon), events, scares.
 	-- Validate checks that Events x MinGap fits the Shift window of the night.
-	night(1, 540, "anm_001_blank_folks", { "A" }, "ATM-1", 4, 0, 1, 60, 40),
-	night(2, 580, "anm_011_shaker", { "A", "D" }, "ATM-1", 5, 2, 1, 60, 40),
-	night(3, 620, "anm_012_turned_neck", { "A", "D" }, "ATM-4", 5, 3, 1, 60, 40),
-	night(4, 660, "anm_020_blackout", { "A", "C", "D" }, "ATM-2", 6, 3, 2, 60, 40),
-	night(5, 700, "anm_013_white_eyes", { "A", "C", "D" }, "ATM-6", 6, 4, 2, 40, 40),
-	night(6, 740, "anm_007_walker", { "A", "B", "C", "D" }, "ATM-3", 7, 4, 2, 40, 36),
-	night(7, 780, "anm_017_crawler", { "A", "B", "C", "D" }, "ATM-5", 7, 5, 2, 40, 36),
-	night(8, 820, "anm_018_grin", { "A", "B", "C", "D" }, "ATM-2", 8, 5, 3, 25, 36),
-	night(9, 860, "anm_019_roof_walker", { "A", "B", "C", "D" }, "ATM-3", 9, 6, 3, 25, 36),
+	-- TASK-341 (owner 2026-10-15, Provisional; anomalies-v2-proposal.md §8): D opens on Night 1 (environment scares from
+	-- the first night), the blackout is presented on Night 3 (was 4, swapped with the turned neck), more events and
+	-- scares on Nights 1-5 and one more event on Nights 6-9 so the curve keeps rising.
+	night(1, 540, "anm_001_blank_folks", { "A", "D" }, "ATM-1", 4, 4, 1, 60, 40),
+	night(2, 580, "anm_011_shaker", { "A", "D" }, "ATM-1", 6, 4, 1, 50, 40),
+	night(3, 620, "anm_020_blackout", { "A", "C", "D" }, "ATM-2", 6, 4, 1, 50, 40),
+	night(4, 660, "anm_012_turned_neck", { "A", "C", "D" }, "ATM-4", 7, 5, 2, 45, 40),
+	night(5, 700, "anm_013_white_eyes", { "A", "C", "D" }, "ATM-6", 7, 5, 2, 40, 40),
+	night(6, 740, "anm_007_walker", { "A", "B", "C", "D" }, "ATM-3", 8, 5, 2, 40, 36),
+	night(7, 780, "anm_017_crawler", { "A", "B", "C", "D" }, "ATM-5", 8, 5, 2, 40, 36),
+	night(8, 820, "anm_018_grin", { "A", "B", "C", "D" }, "ATM-2", 9, 6, 3, 25, 36),
+	night(9, 860, "anm_019_roof_walker", { "A", "B", "C", "D" }, "ATM-3", 10, 6, 3, 25, 36),
 	night(10, 900, "anm_010_hush", { "A", "B", "C", "D" }, "ATM-7", 12, 6, 3, 25, 36),
 } :: { Night })
 

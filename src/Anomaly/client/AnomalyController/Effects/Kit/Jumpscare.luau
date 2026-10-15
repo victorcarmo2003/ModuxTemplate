@@ -16,6 +16,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Effect = require(script.Parent.Parent.Parent.Effect)
+local Watch = require(script.Parent.Watch)
 local Haptics = require(game:GetService("StarterPlayer").StarterPlayerScripts.client.Input.Haptics)
 
 const create = Vide.create
@@ -27,7 +28,7 @@ const HOLD = 0.6 -- s on screen (DEC-256)
 const POP = 0.12 -- s of the zoom-in
 const SHAKE = 18 -- px of screen jitter while it holds
 const FACE_NAME = "Jumpscare_Face"
-const FACE_IMAGE = "rbxassetid://82360613162335" -- jumpscare_face.png (uploaded 2026-10-15)
+const FACE_IMAGE = "rbxassetid://106866610219471" -- jumpscare_face.png: black face, white eyes, macabre grin (TASK-329, 2026-10-15)
 const INK = Color3.fromHex("#2B2233") -- Theme Ink: the house outline colour, never alert red
 const SKIN = Color3.fromHex("#4A3F55")
 const WHITE = Color3.fromHex("#FFFFFF")
@@ -129,8 +130,12 @@ local function face(): GuiObject
 	}) :: Frame
 end
 
--- true when the local character stands within RANGE of the actor (actor not streamed in = too far: no scare).
+-- true when the local character stands within RANGE of the actor (actor not streamed in = too far: no scare). A player
+-- watching the security cameras is not "there" (TASK-337): the body is at the monitor, the eyes on a screen.
 local function near(ctx: Effect.Context, npcId: number): boolean
+	if Watch.Watching() then
+		return false
+	end
 	const character = Players.LocalPlayer.Character
 	const root = if character then character:FindFirstChild("HumanoidRootPart") else nil
 	const model = ctx.Npc(npcId)

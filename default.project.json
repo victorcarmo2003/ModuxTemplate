@@ -38,6 +38,12 @@
 						"optional": "src/Admin/shared"
 					}
 				},
+				"Anomaly": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Anomaly/shared"
+					}
+				},
 				"Content": {
 					"$path": {
 						"optional": "src/Shared/Content"
@@ -262,6 +268,12 @@
 					"$ignoreUnknownInstances": false,
 					"$path": {
 						"optional": "src/Item/server"
+					}
+				},
+				"Journal": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Journal/server"
 					}
 				},
 				"Kitchen": {
@@ -585,6 +597,12 @@
 						"$ignoreUnknownInstances": false,
 						"$path": {
 							"optional": "src/Item/client"
+						}
+					},
+					"Journal": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Journal/client"
 						}
 					},
 					"Kitchen": {

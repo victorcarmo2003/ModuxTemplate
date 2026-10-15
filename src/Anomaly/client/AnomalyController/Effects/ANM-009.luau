@@ -13,6 +13,14 @@
 	  * `door_crack` (Duration 3): the door opens a finger (~10 degrees, state `Ajar`) and slams shut by itself, 6
 	    napkins fly in from the counter holder (AST-094 `VFX_Napkins`), 3 bluish wind wisps. Nobody comes in.
 
+	  * `jumpscare` (TASK-333): Entity = UserId % 65536 of who opened the back door during the knocks; only that client
+	    shows the face (Kit/Jumpscare). The faint is the server's.
+
+	Mount (TASK-333, owner 2026-10-15): while the record is Active a local figure stands OUTSIDE the back door (a tall
+	dark silhouette with white eyes and Walt's cap, cartoon and Mild), facing it, knocking. It is drawn only while the
+	local player watches camera 2 (LocalPlayer attributes `SecurityView` ~= "" and `SecurityCam` = KNOCKER_CAM, TASK-285):
+	from the door itself nobody is there.
+
 	The real door parts get LocalTransparencyModifier = 1 while a local clone swings (purely visual; restored).
 	PROVISIONAL (frontend-coder, TASK-118):
 	  - hinge = pivot of `Door_Back` when the model sets one (AST-066 "pivô na dobradiça"), else the door edge on its
@@ -32,6 +40,7 @@ local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Compon
 local UiScale = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.UiScale)
 local Haptics = require(StarterPlayer.StarterPlayerScripts.client.Input.Haptics)
 local Effect = require(script.Parent.Parent.Effect)
+local Jumpscare = require(script.Parent.Kit.Jumpscare)
 
 const create = Vide.create
 const spring = Vide.spring
@@ -72,6 +81,16 @@ const NAPKIN_FALLBACK_DROP = 2.5 -- studs under the door glass (counter height)
 const WISP_COUNT = 3
 const WISP_COLOR = Color3.fromHex("#C7E6F5")
 const WISP_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
+
+-- The knocker outside (TASK-333)
+const KNOCKER_CAM = "CAM2" -- Content.Security.Cams key that sees the back door
+const KNOCKER_OUT = 3.2 -- studs out from the door glass
+const KNOCKER_DROP = 7.45 -- studs from the door glass (AN-05) down to the ground when no raycast hits (MAP-01)
+const KNOCKER_BODY = Color3.fromHex("#1E1A2B")
+const KNOCKER_EYE = Color3.fromHex("#F4F1E8")
+const KNOCKER_CAP = Color3.fromHex("#3A4A6B") -- Walt's cap, faded
+const KNOCK_SWAY = math.rad(6)
+const ENTITY_MOD = 65536
 
 -- Subtitle strip
 const TEXT_SIZE = 16 -- >= Theme.MinTextSize on the smallest phone
@@ -529,13 +548,121 @@ local function doorCrack(ctx: Effect.Context, cue: Effect.Cue)
 	end
 end
 
+-- Knocker ------------------------------------------------------------------------------------------------------
+
+local function knockerPart(model: Model, name: string, shape: Enum.PartType, size: Vector3, at: CFrame, color: Color3)
+	const part = Instance.new("Part")
+	part.Name = name
+	part.Shape = shape
+	part.Size = size
+	part.CFrame = at
+	part.Color = color
+	part.Material = if color == KNOCKER_EYE then Enum.Material.Neon else Enum.Material.SmoothPlastic
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	part.CastShadow = false
+	part.Parent = model
+end
+
+-- Feet pose outside the back door, facing it (nil when the door is not known on this client)
+local function knockerPose(ctx: Effect.Context): CFrame?
+	const vehicle = vehicleModel(ctx)
+	const door = doorPoint(ctx, vehicle)
+	if door == nil or vehicle == nil then
+		return nil
+	end
+	const centre = vehicle:GetPivot().Position
+	local out = Vector3.new(door.X - centre.X, 0, door.Z - centre.Z)
+	out = if out.Magnitude > 1e-3 then out.Unit else Vector3.zAxis
+	const at = door + out * KNOCKER_OUT
+	const params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { vehicle, ctx.Folder() }
+	const hit = workspace:Raycast(at + Vector3.new(0, 2, 0), Vector3.new(0, -20, 0), params)
+	const ground = if hit then hit.Position.Y else door.Y - KNOCKER_DROP
+	const feet = Vector3.new(at.X, ground, at.Z)
+	return CFrame.lookAt(feet, feet - out)
+end
+
+-- Tall silhouette, pivot at the feet, facing -Z (the door)
+local function buildKnocker(pose: CFrame): Model
+	const model = Instance.new("Model")
+	model.Name = "Knocker"
+	knockerPart(model, "Body", Enum.PartType.Block, Vector3.new(2, 4.6, 1.1), pose * CFrame.new(0, 2.3, 0), KNOCKER_BODY)
+	knockerPart(model, "Head", Enum.PartType.Ball, Vector3.new(1.8, 1.8, 1.8), pose * CFrame.new(0, 5.4, 0), KNOCKER_BODY)
+	knockerPart(model, "Cap", Enum.PartType.Cylinder, Vector3.new(0.5, 1.9, 1.9), pose * CFrame.new(0, 6.3, 0) * CFrame.Angles(0, 0, math.rad(90)), KNOCKER_CAP)
+	for _, side in { -0.42, 0.42 } do
+		knockerPart(model, "Eye", Enum.PartType.Ball, Vector3.new(0.5, 0.62, 0.3), pose * CFrame.new(side, 5.55, -0.82), KNOCKER_EYE)
+	end
+	knockerPart(model, "Arm", Enum.PartType.Block, Vector3.new(0.5, 2.6, 0.5), pose * CFrame.new(0.9, 4.1, -0.9) * CFrame.Angles(math.rad(70), 0, 0), KNOCKER_BODY)
+	model.PrimaryPart = model:FindFirstChild("Body") :: BasePart
+	return model
+end
+
+-- Watching camera 2 right now (TASK-285 attributes on the LocalPlayer)
+local function onCamera(): boolean
+	const player = Players.LocalPlayer
+	const view = player:GetAttribute("SecurityView")
+	return type(view) == "string" and view ~= "" and player:GetAttribute("SecurityCam") == KNOCKER_CAM
+end
+
+local function mountKnocker(ctx: Effect.Context, occ: Effect.Occurrence)
+	local model: Model? = nil
+	local pose: CFrame? = nil
+	local shown = false
+	const started = os.clock()
+	const connection = RunService.RenderStepped:Connect(function()
+		const record = Vide.untrack(occ.Record)
+		const live = record.Phase == "Active"
+		if live and model == nil then
+			pose = knockerPose(ctx)
+			if pose ~= nil then
+				const built = buildKnocker(pose)
+				built.Parent = ctx.Folder()
+				model = built
+				shown = true -- forces the first visibility write below
+			end
+		end
+		const current = model
+		if current == nil then
+			return
+		end
+		const visible = live and onCamera()
+		if visible ~= shown then
+			shown = visible
+			for _, part in current:GetDescendants() do
+				if part:IsA("BasePart") then
+					part.LocalTransparencyModifier = if visible then 0 else 1
+				end
+			end
+		end
+		if visible and pose ~= nil then
+			-- a slow knocking sway
+			current:PivotTo((pose :: CFrame) * CFrame.Angles(math.sin((os.clock() - started) * 5) * KNOCK_SWAY * 0.3, 0, 0))
+		end
+	end)
+	Vide.cleanup(function()
+		connection:Disconnect()
+		if model ~= nil then
+			model:Destroy()
+		end
+	end)
+end
+
 return {
 	Ref = "ANM-009",
+	Mount = mountKnocker,
 	Cue = function(ctx: Effect.Context, cue: Effect.Cue)
 		if cue.Cue == "knock" then
 			knock(ctx, cue)
 		elseif cue.Cue == "door_crack" then
 			doorCrack(ctx, cue)
+		elseif cue.Cue == "jumpscare" then
+			if cue.Entity == Players.LocalPlayer.UserId % ENTITY_MOD then
+				Jumpscare.Show(ctx)
+			end
 		end
 	end,
 } :: Effect.Module

@@ -18,6 +18,7 @@ local Hallucinations = require(script.Hallucinations)
 local Haptics = require(script.Haptics)
 local HudReveal = require(script.HudReveal)
 local Ingredients = require(script.Ingredients)
+local Journal = require(script.Journal)
 local Items = require(script.Items)
 local LightGroups = require(script.LightGroups)
 local LightPresets = require(script.LightPresets)
@@ -93,6 +94,8 @@ export type HudRevealTrigger = HudReveal.Trigger
 export type HallucinationRules = Hallucinations.Rules
 export type Ingredient = Ingredients.Ingredient
 export type Item = Items.Item
+export type JournalPage = Journal.Page
+export type JournalRules = Journal.Rules
 export type ItemRules = Items.ItemRules
 export type LightGroup = LightGroups.LightGroup
 export type LightPreset = LightPresets.LightPreset
@@ -285,4 +288,8 @@ return table.freeze({
 	-- Security cameras: CCTV monitor in the trailer, fixed views from the pivots of the camera models, Normal / Night looks
 	-- (FEAT-040, TASK-285; owner request 2026-10-14; SecurityService, SecurityController). Provisional
 	Security = Security,
+
+	-- Anomaly Book in the trailer: one page per V2 anomaly, unlocked per profile (TASK-335; owner request 2026-10-15;
+	-- JournalService, JournalController). Provisional
+	Journal = Journal,
 })

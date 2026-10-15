@@ -234,9 +234,10 @@ function MarketController:CanPay(price: number): boolean
 	return not self.CashReady() or self.Cash() >= price
 end
 
+-- A pedestal shared by a day-only and an anomaly-only line (Content.Mode, TASK-324) shows the one on in this mode.
 function MarketController:UpgradeAt(slot: string): Content.Upgrade?
 	for _, upgrade in Content.Upgrades.List do
-		if upgrade.BenchSpot == slot then
+		if upgrade.BenchSpot == slot and not Content.Mode.IsOff(upgrade.Key) then
 			return upgrade
 		end
 	end

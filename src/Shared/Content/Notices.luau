@@ -65,7 +65,6 @@ return Table.new({
 	}, -- DEC-058
 	{ Key = "thief_caught", Text = "Nice catch! +${value}", Audience = "Party", ValueFrom = "Number", Wave = 2 }, -- DEC-050
 	{ Key = "thief_stole", Text = "The drawer got raided! -${value}", Audience = "Party", ValueFrom = "Number", Wave = 2 },
-	{ Key = "coffee_cooldown", Text = "Coffee again in {value}s", Audience = "Player", ValueFrom = "Number", Wave = 2 },
 	{ Key = "coffee_full", Text = "Already wide awake. Save it!", Audience = "Player", ValueFrom = "None", Wave = 2 },
 	-- drink refused by day while Q-170 option A stands (Provisional)
 	{ Key = "coffee_night_only", Text = "Save it for the night shift.", Audience = "Player", ValueFrom = "None", Wave = 2 },

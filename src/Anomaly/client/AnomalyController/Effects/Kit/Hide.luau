@@ -5,9 +5,13 @@
 	a thin call to Hide.Effect. Presentation only (T10): the hiding test and the faint are the server's.
 
 	Cues:
-	  hide_warn     the warning: trailer lights flicker (local, like ANM-008's blackout), a low rumble, the radio
-	                squelch and Walt's line "Hide! Out the back door!" (voice through BossController when it can, and
-	                a strip at the bottom of the screen for the cue Duration, WARN_STRIP s when the row has none).
+	  hide_warn     the warning, ONE sign per monster (TASK-339, owner 2026-10-15: Walt no longer shouts "Hide!" every
+	                time; each sign is explained once in the debut call, Content.BossCalls):
+	                  Buzz     (Walker)  the trailer lights flicker and buzz, heavy steps come closer
+	                  Scratch  (crawler) fast scratching under the trailer, low rumble, no light change
+	                  Whisper  (grin)    SILENT: only "hide" words whispered on screen (Kit/Whispers)
+	                  Roof     (roof walker) slow heavy steps on the trailer roof
+	                A player watching the security cameras is cut back to the head first (Kit/Watch, TASK-337).
 	  monster_pass  the pass starts (also the record turning Active): the monster is built and walks its path.
 	  jumpscare     Entity = UserId % 65536 of a player caught outside the HideZone: only that client shows the
 	                cartoon face (Effects/Kit/Jumpscare, API unchanged).
@@ -34,15 +38,18 @@ local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local Effect = require(script.Parent.Parent.Parent.Effect)
 local Jumpscare = require(script.Parent.Jumpscare)
+local Watch = require(script.Parent.Watch)
+local Whispers = require(script.Parent.Whispers)
 
-const create = Vide.create
-const createRaw = Vide.create :: any -- UIStroke is missing from Vide.create's class list (same as Jumpscare)
 
 export type Style = "Walk" | "Crawl" | "Grin" | "Roof"
+-- the warning sign of the monster (TASK-339)
+export type Signal = "Buzz" | "Scratch" | "Whisper" | "Roof"
 
 export type Options = {
 	Ref: string,
 	Style: Style,
+	Signal: Signal,
 	Asset: string?, -- Model under ReplicatedStorage.Assets that replaces the placeholder
 	-- seconds of the pass; Approach ~ server LookFrom, Approach + Look ~ server LookTo (Rules/<Ref>, Provisional)
 	Approach: number,
@@ -66,20 +73,23 @@ const WARN_FLICKER = { 0.12, 0.08, 0.2, 0.1, 0.3, 0.12, 0.15, 0.25, 0.1, 0.4, 0.
 const FLICKER_GROUPS = { "trailer_interior", "trailer_lights" }
 const LAMP_OFF_COLOR = Color3.fromHex("#EAD6B0")
 const RUMBLE_KEYS = { "hide_rumble", "horror_dramatic" } -- first key Content.Sounds has
-const RADIO_KEY = "phone_glitch"
+const BUZZ_KEY = "post_buzz"
+const SCRATCH_KEYS = { "crawler_scratch", "shadow_whoosh" } -- first key Content.Sounds has
+const SCRATCH_COUNT = 14 -- quick scratches over the warning
+const SCRATCH_SPEED = 1.7
+const APPROACH_STEPS = 6 -- heavy steps of the Walker coming closer
+const ROOF_STEPS = 7
+const UNDER_DROP = 3 -- studs below the trailer pivot where the scratches sound
 const STEP_KEY = "walker_step"
 const ROOF_STEP_KEY = "roof_step"
 const LOOK_KEY = "shadow_whoosh"
 const STEP_EVERY = 0.55 -- s between two footsteps
-const RADIO_LINE = "Hide! Out the back door, now!"
-const WARN_STRIP = 8 -- s the strip stays when the cue row has no Duration
+const WARN_FOR = 8 -- s the sign lasts when the cue row has no Duration
 const FADE_OUT = 0.6
 
 const INK = Color3.fromHex("#2B2233")
 const BODY = Color3.fromHex("#1E1A2B")
 const EYE = Color3.fromHex("#F4F1E8")
-const CREAM = Color3.fromHex("#FFF1D6")
-const MUSTARD = Color3.fromHex("#F6C12B")
 const TOOTH = Color3.fromHex("#FFFFFF")
 
 type Path = { Start: Vector3, Window: CFrame, Exit: Vector3, Roof: Vector3 }
@@ -376,81 +386,47 @@ local function flicker(ctx: Effect.Context)
 	end
 end
 
--- Walt's voice on the radio when BossController can speak (best effort; the strip always shows).
-local function radioVoice(text: string)
-	const client = script:FindFirstAncestor("client")
-	const feature = if client then client:FindFirstChild("Boss") else nil
-	const module = if feature then feature:FindFirstChild("BossController") else nil
-	if module == nil or not module:IsA("ModuleScript") then
+-- Sounds around the trailer, spread over `seconds` (`count` hits, louder towards the end when `grow`)
+local function series(ctx: Effect.Context, key: string?, at: Vector3?, count: number, seconds: number, speed: number?, grow: boolean)
+	if key == nil then
 		return
 	end
-	pcall(function()
-		const boss: any = (require :: any)(module)
-		const speak: any = if type(boss) == "table" then boss.Speak else nil
-		if type(speak) == "function" then
-			(speak :: any)(boss, text)
-		end
-	end)
+	for index = 1, count do
+		const volume = if grow then 0.35 + 0.65 * (index / count) else nil
+		ctx.Audio:Play(key, at, { Speed = speed, Volume = volume })
+		task.wait(seconds / count)
+	end
 end
 
-local function strip(seconds: number)
-	const playerGui = Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
-	if playerGui == nil then
+function Hide.Warn(ctx: Effect.Context, cue: Effect.Cue, options: Options)
+	Watch.Interrupt()
+	const seconds = if cue.Row.Duration > 0 then cue.Row.Duration else WARN_FOR
+	const trailer = ctx.Point(TRAILER_POINT)
+	const base = if trailer ~= nil then trailer.Position else nil
+	const signal = options.Signal
+	if signal == "Whisper" then
+		-- the silent one: nothing in the world, only the words on screen
+		Whispers.Play(seconds)
 		return
 	end
-	const label = createRaw("TextLabel")({
-		Name = "Line",
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromScale(0.94, 0.8),
-		BackgroundTransparency = 1,
-		FontFace = Font.fromEnum(Enum.Font.FredokaOne),
-		Text = `<font color="#F6C12B">WALT (radio):</font> {RADIO_LINE}`,
-		RichText = true,
-		TextScaled = true,
-		TextColor3 = CREAM,
-	})
-	const frame = create("Frame")({
-		Name = "Strip",
-		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -110),
-		Size = UDim2.new(0.5, 0, 0, 46),
-		BackgroundColor3 = INK,
-		BackgroundTransparency = 0.12,
-		create("UICorner")({ CornerRadius = UDim.new(0.3, 0) }),
-		createRaw("UIStroke")({ Color = MUSTARD, Thickness = 3 }),
-		createRaw("UISizeConstraint")({ MinSize = Vector2.new(280, 0), MaxSize = Vector2.new(640, 46) }),
-		label,
-	}) :: Frame
-	const gui = create("ScreenGui")({
-		Name = "HideWarning",
-		ResetOnSpawn = false,
-		DisplayOrder = 40,
-		frame,
-	}) :: ScreenGui
-	gui.Parent = playerGui
-	task.delay(seconds, function()
-		const fade = TweenInfo.new(0.3)
-		TweenService:Create(frame, fade, { BackgroundTransparency = 1 }):Play()
-		TweenService:Create(label, fade, { TextTransparency = 1 }):Play()
-		task.wait(0.35)
-		gui:Destroy()
-	end)
-end
-
-function Hide.Warn(ctx: Effect.Context, cue: Effect.Cue)
 	const rumble = firstSound(RUMBLE_KEYS)
-	if rumble ~= nil then
+	if rumble ~= nil and signal ~= "Roof" then
 		ctx.Play(rumble)
 	end
-	task.spawn(flicker, ctx)
-	task.delay(0.5, function()
-		if Content.Sounds.ByKey[RADIO_KEY] ~= nil then
-			ctx.Play(RADIO_KEY)
+	if signal == "Buzz" then
+		task.spawn(flicker, ctx)
+		if Content.Sounds.ByKey[BUZZ_KEY] ~= nil then
+			ctx.Play(BUZZ_KEY, base)
 		end
-		radioVoice(RADIO_LINE)
-		strip(if cue.Row.Duration > 0 then cue.Row.Duration else WARN_STRIP)
-	end)
+		const path = pathOf(ctx)
+		series(ctx, STEP_KEY, if path then path.Start else base, APPROACH_STEPS, seconds * 0.8, nil, true)
+	elseif signal == "Scratch" then
+		const under = if base ~= nil then base - Vector3.new(0, UNDER_DROP, 0) else nil
+		series(ctx, firstSound(SCRATCH_KEYS), under, SCRATCH_COUNT, seconds * 0.85, SCRATCH_SPEED, false)
+	elseif signal == "Roof" then
+		const roof = if base ~= nil then base + Vector3.new(0, ROOF_HEIGHT, 0) else nil
+		series(ctx, ROOF_STEP_KEY, roof, ROOF_STEPS, seconds * 0.85, 0.85, true)
+	end
 end
 
 -- Pass -----------------------------------------------------------------------------------------------------------
@@ -553,7 +529,7 @@ function Hide.Effect(options: Options): Effect.Module
 
 		Cue = function(ctx: Effect.Context, cue: Effect.Cue)
 			if cue.Cue == "hide_warn" then
-				Hide.Warn(ctx, cue)
+				Hide.Warn(ctx, cue, options)
 			elseif cue.Cue == "jumpscare" then
 				if cue.Entity == Players.LocalPlayer.UserId % ENTITY_MOD then
 					Jumpscare.Show(ctx)

@@ -11,6 +11,9 @@
 	  - Save: the whole record by `SettingsSave`, SAVE_DELAY s after the last change (a slider drag sends once).
 	  - Window: SettingsPanel in its own ScreenGui ("Settings", above the HUD). Toggled by the HUD gear (HudController) and
 	    by the key M / gamepad Select. While open, a Modal button frees the mouse from the first-person lock.
+	  - Dev row (TASK-332): only in Studio dev mode (PlaceController:IsDev), "Coffee" and "Sanity ∞" send `DevTool`
+	    (DevService runs /dev mycoffee and /dev infsanity for this player); the ∞ state is the player attribute
+	    DevInfiniteSanity written by VitalService. Never built for players (Dev = nil).
 ]]
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -32,10 +35,11 @@ const TOGGLE_KEY = Enum.KeyCode.M
 const TOGGLE_PAD = Enum.KeyCode.ButtonSelect
 const DISPLAY_ORDER = 20 -- above the HUD (1) and the prep shell
 const FIRST_CONTROL = "Track" -- the gamepad selection lands on the first volume slider
+const DEV_INFINITE = "DevInfiniteSanity" -- player attribute written by VitalService:DevInfiniteSanity (TASK-332)
 
 const SettingsController = Modux.Controller(
 	"SettingsController",
-	{ Require = { "AudioController", "InputController" }, Priority = 600 }
+	{ Require = { "AudioController", "InputController", "PlaceController" }, Priority = 600 }
 )
 
 function SettingsController:Setup()
@@ -46,6 +50,29 @@ function SettingsController:Setup()
 	self.SaveToken = 0 :: number
 	self.Scale = Vide.source(1) :: Vide.Source<number>
 	self.Gui = nil :: ScreenGui?
+	self.Infinite = Vide.source(false) :: Vide.Source<boolean>
+end
+
+-- Dev row props (TASK-332), nil outside Studio dev mode
+function SettingsController:DevProps(): SettingsPanel.DevProps?
+	if not self.Dependencies.PlaceController:IsDev() then
+		return nil
+	end
+	const player = Players.LocalPlayer
+	const read = function()
+		self.Infinite(player:GetAttribute(DEV_INFINITE) == true)
+	end
+	player:GetAttributeChangedSignal(DEV_INFINITE):Connect(read)
+	read()
+	return {
+		InfiniteSanity = self.Infinite,
+		OnCoffee = function()
+			self.Libs.Net.DevTool:fireServer({ Tool = "Coffee", On = true })
+		end,
+		OnInfiniteSanity = function(on: boolean)
+			self.Libs.Net.DevTool:fireServer({ Tool = "InfiniteSanity", On = on })
+		end,
+	}
 end
 
 -- Applies a full record everywhere it acts (audio, prompt attribute, Prefs). Idempotent.
@@ -150,6 +177,7 @@ function SettingsController:WatchViewport()
 end
 
 function SettingsController:Mount(playerGui: Instance)
+	const dev = self:DevProps()
 	const _, gui = Vide.root(function()
 		-- blur + veil behind the window (TASK-311)
 		Backdrop.Hold(self.Open)
@@ -186,6 +214,7 @@ function SettingsController:Mount(playerGui: Instance)
 				OnClose = function()
 					self:SetOpen(false)
 				end,
+				Dev = dev,
 			}),
 		})
 	end)

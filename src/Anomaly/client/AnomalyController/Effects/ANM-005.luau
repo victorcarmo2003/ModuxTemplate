@@ -9,8 +9,12 @@
 	  - placeholder raincoat until AST-059 (TASK-125): yellow `#F2C230` coat over the torso, sleeves, green boots,
 	    local parts welded to the limbs. The face stays visible (full, kind face: not N1). Skipped when the rig
 	    already wears a raincoat piece of the kit (an `Accessory`/Outfit containing "raincoat");
-	  - drips (owner request 2026-10-14, Provisional): water-blue square drops on every R6 body part falling with gravity,
-    plus a ground emitter at her feet that spreads flat puddle quads; both stop (and die out) when the Variant leaves.
+	    The coat and sleeves rise COAT_LIFT above the torso / arm tops (TASK-326: same height = the shoulders poked
+	    through the cloth).
+	  - drips (DEC-253; TASK-326, owner 2026-10-15): small elongated water drops (T_VFX_Drop, alpha teardrop) from the
+	    surface of every R6 body part, a few per second each, falling with gravity and dying at the ground; plus a
+	    ground emitter at her feet that lays flat soft discs (T_VFX_Puddle) for the subtle puddle. Both stop (and die
+	    out) when the Variant leaves.
 	  - cue `raincoat_drip` (she reaches Q1): a puddle under her that grows to Ø 2.5 while she stands there, and dries
 	    out a few seconds after she leaves. A late joiner (Mount long after the start) gets the puddle under her if she
 	    is standing still.
@@ -28,16 +32,20 @@ const COAT = Color3.fromHex("#F2C230") -- reserved raincoat yellow (style guide 
 const BOOTS = Color3.fromHex("#5FA36A")
 const DROP = Color3.fromHex("#6FB6EA") -- water blue drops (§10)
 const PUDDLE = Color3.fromHex("#4C6A8A") -- wet ground at night (same as the ending's puddle)
--- Assets/textures/vfx/T_VFX_Square.png (white 64x64 square), uploaded 2026-10-14.
-const SQUARE_TEXTURE = "rbxassetid://136202879109639"
+-- Assets/textures/vfx/T_VFX_Drop.png (white teardrop with alpha, 64x128) and T_VFX_Puddle.png (soft disc, 128x128),
+-- tools/assetplace/gen_vfx_drop.py, uploaded 2026-10-15 (TASK-326).
+const DROP_TEXTURE = "rbxassetid://117354129483717"
+const PUDDLE_TEXTURE = "rbxassetid://96259435245932"
 const DROP_NAME = "RaincoatDrips"
 const SPREAD_NAME = "RaincoatSpread"
 const BODY = { "Head", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg" }
-const DROP_RATE = 1.5 -- per body part (6 parts: a constant trickle, ~9/s in total)
+const DROP_RATE = 2 -- per body part (6 parts: a constant trickle, ~12/s in total)
 const DROP_GRAVITY = 30 -- studs/s^2 down
-const DROP_SQUASH = -0.6 -- ParticleEmitter.Squash: stretches the square into a drop (flip the sign if it reads wide)
+const DROP_SIZE = 0.16 -- studs
+const DROP_SQUASH = 0.8 -- ParticleEmitter.Squash > 0: taller and narrower (an elongated drop)
+const COAT_LIFT = 0.14 -- studs the coat / sleeve tops sit above the torso / arm tops (TASK-326)
 const PUDDLE_WATER = Color3.fromHex("#5C86B0") -- water spreading on the ground
-const SPREAD_RATE = 5
+const SPREAD_RATE = 2
 const EMIT_NEAR = 80 -- studs from the camera: farther away the emitters are off
 const EMIT_STEP = 0.5
 const EMIT_LINGER = 2.5 -- s: longest particle life + margin before the emitters are destroyed
@@ -86,16 +94,19 @@ local function dressCoat(model: Model): { BasePart }
 	const torso = Kit.Limb(model, "Torso")
 	if torso ~= nil then
 		const size = torso.Size
-		const coat = piece("Raincoat", Vector3.new(size.X * 1.12, size.Y * 1.45, size.Z * 1.2), COAT)
-		Kit.Attach(coat, torso, CFrame.new(0, -size.Y * 0.22, 0))
+		const height = size.Y * 1.5 -- down to the knees
+		const coat = piece("Raincoat", Vector3.new(size.X * 1.14, height, size.Z * 1.24), COAT)
+		Kit.Attach(coat, torso, CFrame.new(0, size.Y / 2 + COAT_LIFT - height / 2, 0))
 		table.insert(parts, coat)
 	end
 	for _, side in { "Left", "Right" } do
 		const arm = Kit.Limb(model, `{side} Arm`)
 		if arm ~= nil then
 			const size = arm.Size
-			const sleeve = piece("RaincoatSleeve", Vector3.new(size.X * 1.15, size.Y * 0.8, size.Z * 1.15), COAT)
-			Kit.Attach(sleeve, arm, CFrame.new(0, size.Y * 0.1, 0))
+			-- covers the shoulder cap (top above the arm top, so the swing never pokes it through)
+			const height = size.Y * 0.86
+			const sleeve = piece("RaincoatSleeve", Vector3.new(size.X * 1.2, height, size.Z * 1.2), COAT)
+			Kit.Attach(sleeve, arm, CFrame.new(0, size.Y / 2 + COAT_LIFT + 0.02 - height / 2, 0))
 			table.insert(parts, sleeve)
 		end
 		const leg = Kit.Limb(model, `{side} Leg`)
@@ -111,33 +122,39 @@ end
 
 -- Water emitters (owner request 2026-10-14, Provisional): the Raincoat Lady is a wet sheep dripping on a dry night.
 -- Every R6 body part drips; one more emitter at her feet spreads a puddle on the ground. Presentation only.
-local function dripEmitter(host: BasePart): ParticleEmitter
+local function dripEmitter(host: BasePart, feetY: number): ParticleEmitter
+	-- life = fall time from this part to the ground, so the drop dies where it lands
+	const height = math.clamp(host.Position.Y - feetY, 0.3, 8)
+	const fall = math.sqrt(2 * height / DROP_GRAVITY)
 	const emitter = Instance.new("ParticleEmitter")
 	emitter.Name = DROP_NAME
-	emitter.Texture = SQUARE_TEXTURE
+	emitter.Texture = DROP_TEXTURE
 	emitter.Color = ColorSequence.new(DROP)
-	emitter.LightEmission = 0.1
-	emitter.LightInfluence = 1
+	emitter.LightEmission = 0.15
+	emitter.LightInfluence = 0.8
 	emitter.Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0.1),
-		NumberSequenceKeypoint.new(0.6, 0.25),
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(0.08, 0.15),
+		NumberSequenceKeypoint.new(0.85, 0.25),
 		NumberSequenceKeypoint.new(1, 1),
 	})
-	emitter.Size = NumberSequence.new(0.1)
+	emitter.Size = NumberSequence.new(DROP_SIZE)
 	emitter.Squash = NumberSequence.new(DROP_SQUASH)
-	emitter.Lifetime = NumberRange.new(0.5, 0.8)
-	emitter.Speed = NumberRange.new(0, 0.4)
-	emitter.SpreadAngle = Vector2.new(20, 20)
+	emitter.Orientation = Enum.ParticleOrientation.FacingCameraWorldUp -- stays upright while it falls
+	emitter.Lifetime = NumberRange.new(fall * 0.9, fall)
+	emitter.Speed = NumberRange.new(0, 0.3)
+	emitter.SpreadAngle = Vector2.new(10, 10)
 	emitter.EmissionDirection = Enum.NormalId.Bottom
+	emitter.Shape = Enum.ParticleEmitterShape.Box
+	emitter.ShapeStyle = Enum.ParticleEmitterShapeStyle.Surface -- born on the skin / cloth, not inside the body
 	emitter.Acceleration = Vector3.new(0, -DROP_GRAVITY, 0)
 	emitter.Rate = DROP_RATE
-	emitter.Parent = host -- Box shape of the part: drops are born inside the body
+	emitter.Parent = host
 	return emitter
 end
 
--- Puddle on the ground at her feet: flat quads that open outward and fade (continuous while she is the Lady).
-local function spreadEmitter(model: Model, root: BasePart): ParticleEmitter
-	-- feet height in root space (lowest leg bottom), so it follows the rig scale
+-- Feet height in root space (lowest leg bottom), so it follows the rig scale.
+local function feetOf(model: Model, root: BasePart): number
 	local feet = -root.Size.Y / 2 - 2
 	for _, name in { "Left Leg", "Right Leg" } do
 		const leg = Kit.Limb(model, name)
@@ -145,6 +162,11 @@ local function spreadEmitter(model: Model, root: BasePart): ParticleEmitter
 			feet = math.min(feet, root.CFrame:PointToObjectSpace(leg.Position - Vector3.new(0, leg.Size.Y / 2, 0)).Y)
 		end
 	end
+	return feet
+end
+
+-- Puddle on the ground at her feet: flat soft discs that widen and fade (continuous while she is the Lady).
+local function spreadEmitter(feet: number, root: BasePart): ParticleEmitter
 	const attachment = Instance.new("Attachment")
 	attachment.Name = "RaincoatSpread"
 	attachment.Position = Vector3.new(0, feet + 0.08, 0)
@@ -152,25 +174,25 @@ local function spreadEmitter(model: Model, root: BasePart): ParticleEmitter
 
 	const emitter = Instance.new("ParticleEmitter")
 	emitter.Name = SPREAD_NAME
-	emitter.Texture = SQUARE_TEXTURE
+	emitter.Texture = PUDDLE_TEXTURE
 	emitter.Color = ColorSequence.new(PUDDLE_WATER)
 	emitter.LightEmission = 0
 	emitter.Transparency = NumberSequence.new({
 		NumberSequenceKeypoint.new(0, 1),
-		NumberSequenceKeypoint.new(0.15, 0.55),
-		NumberSequenceKeypoint.new(0.6, 0.7),
+		NumberSequenceKeypoint.new(0.2, 0.6),
+		NumberSequenceKeypoint.new(0.6, 0.72),
 		NumberSequenceKeypoint.new(1, 1),
 	})
-	emitter.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 2.2) })
-	emitter.Orientation = Enum.ParticleOrientation.VelocityParallel -- plane follows the outward (horizontal) velocity
+	emitter.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.4), NumberSequenceKeypoint.new(1, 1.8) })
+	-- a tiny upward velocity + VelocityPerpendicular = the disc lies flat on the ground
+	emitter.Orientation = Enum.ParticleOrientation.VelocityPerpendicular
 	emitter.Shape = Enum.ParticleEmitterShape.Disc
 	emitter.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
-	emitter.ShapeInOut = Enum.ParticleEmitterShapeInOut.Outward
 	emitter.EmissionDirection = Enum.NormalId.Top
-	emitter.Lifetime = NumberRange.new(1.6, 2.2)
-	emitter.Speed = NumberRange.new(0.5, 1)
-	emitter.Drag = 1.2 -- very soft slowdown: opens like water spreading
+	emitter.Lifetime = NumberRange.new(1.8, 2.4)
+	emitter.Speed = NumberRange.new(0.01)
 	emitter.SpreadAngle = Vector2.new(0, 0)
+	emitter.Rotation = NumberRange.new(0, 360)
 	emitter.RotSpeed = NumberRange.new(0)
 	emitter.Rate = SPREAD_RATE
 	emitter.Parent = attachment
@@ -184,17 +206,19 @@ local function dress(model: Model): Kit.Undo
 	for _, part in dressCoat(model) do
 		table.insert(made, part)
 	end
+	const root = Kit.Root(model)
+	const feet = if root ~= nil then feetOf(model, root) else -3
+	const feetY = if root ~= nil then root.CFrame:PointToWorldSpace(Vector3.new(0, feet, 0)).Y else -math.huge
 	for _, name in BODY do
 		const limb = Kit.Limb(model, name)
 		if limb ~= nil then
-			const emitter = dripEmitter(limb)
+			const emitter = dripEmitter(limb, feetY)
 			table.insert(emitters, emitter)
 			table.insert(made, emitter)
 		end
 	end
-	const root = Kit.Root(model)
 	if root ~= nil then
-		const spread = spreadEmitter(model, root)
+		const spread = spreadEmitter(feet, root)
 		table.insert(emitters, spread)
 		table.insert(made, spread)
 		table.insert(made, spread.Parent :: Instance)

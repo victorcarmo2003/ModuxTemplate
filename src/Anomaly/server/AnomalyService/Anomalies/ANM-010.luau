@@ -20,6 +20,12 @@
 --   Seen     1 s in the gaze cone (ViewRange 200) of the last post that went out.
 --   Stop     EndHush (only by the occurrence that began it) and the traffic Hold released.
 --
+-- TASK-334 (owner 2026-10-15, Provisional): the owner died "with a lot of doors opening and closing": those were the
+-- Mart's automatic doors (DoorController AutoDoor, proximity) swinging while he stood in the doorway, half in and half
+-- out of the safe zone, so a 5 Hz tick caught him "outside" during the hold. Now: (a) a watched player fails only after
+-- OutGrace s outside in a row; (b) the safe radius around SS is wider (Rules Params); (c) the error is the V2 one,
+-- jumpscare + faint (cue jumpscare, Entity = UserId % 65536; ScareFaint s later VitalService:Fall), no -RuleBroken;
+-- (d) the client warns clearly at the start (Walt on the radio, "RUN TO THE MART" and the guide arrow, Effects/ANM-010).
 -- PROVISIONAL (backend-coder, TASK-117): (a) safe zone also = the Mart interior LZ-4 (tests/wave-3.md L3-12, npcs.md
 -- N10 proposal); (b) "scripted" = started on Content.Anomalies Scripted.Night at or after Scripted.Clock, read from
 -- RoundService looked up by name (the module Context has no clock); (c) the safe zone at the corner post counts
@@ -31,6 +37,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local Content = require(ReplicatedStorage.shared.Content)
 local Zones = require(ReplicatedStorage.shared.Light.Zones)
 local Api = require(script.Parent.Parent.Api)
+local Kit = require(script.Parent.Kit.CustomerActor)
 
 const REF = "ANM-010"
 const HOLD_REASON = "anm_010"
@@ -41,7 +48,11 @@ const SCRIPTED_SLACK = 1 -- game minutes before Scripted.Clock that still count 
 const DEFAULT_POSTS_OFF = 15
 const DEFAULT_HOLD_FOR = 20
 const DEFAULT_POINT = "SS"
-const DEFAULT_RADIUS = 6
+const DEFAULT_RADIUS = 10
+const DEFAULT_OUT_GRACE = 2
+const DEFAULT_SCARE_FAINT = 0.7
+const SCARE_CUE = "jumpscare"
+const ENTITY_MOD = 65536 -- AnomalyCue.Entity is 0..65535
 
 type Stage = "Going" | "Holding"
 
@@ -59,6 +70,9 @@ type State = {
 	SafeZones: { Zones.Zone },
 	Range: number,
 	Watched: { [number]: Player },
+	OutSince: { [number]: number }, -- watched player outside the safe zone since (server time)
+	OutGrace: number,
+	ScareFaint: number,
 	Failed: { [number]: boolean },
 	AnyFailed: boolean,
 	Flavoured: boolean,
@@ -253,7 +267,16 @@ local function fail(ctx: Api.Context, occ: Api.Occurrence, state: State, players
 		return
 	end
 	state.AnyFailed = true
-	ctx.Fail(occ, list)
+	for _, player in list do
+		ctx.Cue(occ, SCARE_CUE, player.UserId % ENTITY_MOD)
+	end
+	task.delay(state.ScareFaint, function()
+		for _, player in list do
+			if player.Parent ~= nil then
+				Kit.Vital():Fall(player)
+			end
+		end
+	end)
 	if not state.Flavoured then
 		state.Flavoured = true
 		ctx.Cue(occ, "hush_fog", 0)
@@ -298,6 +321,9 @@ const Hush: Api.Module = {
 			SafeZones = safeZones(zoneIds(rule)),
 			Range = if row ~= nil then row.ViewRange else 0,
 			Watched = {},
+			OutSince = {},
+			OutGrace = param(rule, "OutGrace", DEFAULT_OUT_GRACE),
+			ScareFaint = param(rule, "ScareFaint", DEFAULT_SCARE_FAINT),
 			Failed = {},
 			AnyFailed = false,
 			Flavoured = false,
@@ -339,13 +365,19 @@ const Hush: Api.Module = {
 			return
 		end
 
-		-- Holding: a watched player who left the safe zone (or is no longer active) fails
+		-- Holding: a watched player who stays out of the safe zone OutGrace s in a row (or is no longer active) fails
 		const left: { Player } = {}
 		for userId, player in state.Watched do
 			if player.Parent ~= Players then
 				state.Watched[userId] = nil
-			elseif not safe(ctx, state, player) then
-				table.insert(left, player)
+			elseif safe(ctx, state, player) then
+				state.OutSince[userId] = nil
+			else
+				const since = state.OutSince[userId] or now
+				state.OutSince[userId] = since
+				if now - since >= state.OutGrace then
+					table.insert(left, player)
+				end
 			end
 		end
 		fail(ctx, occ, state, left)

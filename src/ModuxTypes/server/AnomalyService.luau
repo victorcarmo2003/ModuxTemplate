@@ -26,6 +26,8 @@ export type Run = {
 	CriticalSent: boolean,
 	Seen: { [number]: number },
 	SeenDone: { [number]: boolean },
+	-- UserIds Active when the occurrence started (Ended, TASK-335)
+	Party: { number },
 }
 export type Due = { Entry: Scheduler.Entry, RetryAt: number, Done: boolean }
 export type Gaze = { Yaw: number, Pitch: number, At: number }
@@ -38,6 +40,7 @@ export type Public = {
 	DevHeld: boolean,
 	DevSerial: number,
 	Enabled: boolean,
+	Ended: SignalLib.Signal<string, { Player }>,
 	Example: Api.Module?,
 	Gazes: { [Player]: Gaze },
 	InNight: boolean,
@@ -49,6 +52,7 @@ export type Public = {
 	Removing: { [number]: number },
 	Running: { [number]: Run },
 	Scares: { number },
+	Security: any,
 	Shift: { Day: number, Night: number, IsNight: boolean, Attempt: number },
 	Tension: SignalLib.Signal<boolean>,
 	TensionOn: boolean,
@@ -65,6 +69,7 @@ export type Public = {
 	IsProtected: (self: Public, player: Player) -> boolean,
 	InZone: (self: Public, player: Player, pointId: string, radius: number) -> boolean,
 	Looking: (self: Public, player: Player, target: Vector3, range: number) -> boolean,
+	IsWatching: (self: Public, player: Player) -> boolean,
 	OnGaze: (self: Public, value: any, player: Player) -> (),
 	RunOf: (self: Public, occ: Api.Occurrence) -> Run?,
 	AllocateId: (self: Public) -> number?,
@@ -74,6 +79,7 @@ export type Public = {
 	Cue: (self: Public, occ: Api.Occurrence, cue: string, entity: number?) -> (),
 	Fail: (self: Public, occ: Api.Occurrence, who: { Player } | "active") -> (),
 	Succeed: (self: Public, occ: Api.Occurrence) -> (),
+	EmitEnded: (self: Public, run: Run, reason: Api.StopReason) -> (),
 	CallStop: (self: Public, run: Run, reason: Api.StopReason) -> (),
 	Finish: (self: Public, occ: Api.Occurrence) -> (),
 	StopAll: (self: Public, reason: Api.StopReason) -> (),

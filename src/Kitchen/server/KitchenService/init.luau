@@ -1167,12 +1167,12 @@ function KitchenService:BuildContext(): StationApi.Context
 		AddTopping = function(tool: Tool, ingredient: string): boolean
 			return self.Dependencies.ItemService:AddTopping(tool, ingredient)
 		end,
-		Modifier = function(player: Player, stat: string): number
+		Modifier = function(player: Player, stat: string, base: number?): number
 			if not Content.Stats.Has[stat] then
 				fail(`[KitchenService] Modifier: {stat} is not a key of Content.Stats`)
 				return 1
 			end
-			return self.Dependencies.ClassService:GetModifier(player, stat :: Content.Stat)
+			return self.Dependencies.ClassService:GetModifier(player, stat :: Content.Stat, base)
 		end,
 		Effect = function(stat: string): number
 			return self.Dependencies.UpgradeService:GetEffect(stat)

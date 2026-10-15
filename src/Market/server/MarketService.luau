@@ -48,10 +48,11 @@ local function stringAttribute(anchor: Instance, name: string): string?
 	return if type(value) == "string" and value ~= "" then value else nil
 end
 
--- Upgrade on a bench slot (B1..B5), from Content.Upgrades.BenchSpot
+-- Upgrade on a bench slot (B1..B5), from Content.Upgrades.BenchSpot; a pedestal shared by a day-only and an anomaly-only
+-- line (Content.Mode, TASK-324) sells the one that is on in this mode
 local function upgradeAt(slot: string): Content.Upgrade?
 	for _, upgrade in Content.Upgrades.List do
-		if upgrade.BenchSpot == slot then
+		if upgrade.BenchSpot == slot and not Content.Mode.IsOff(upgrade.Key) then
 			return upgrade
 		end
 	end

@@ -32,6 +32,7 @@ local Workspace = game:GetService("Workspace")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Effect = require(script.Parent.Parent.Effect)
 local Jumpscare = require(script.Parent.Kit.Jumpscare)
+local Watch = require(script.Parent.Kit.Watch)
 
 const VEHICLE_TAG = "Vehicle"
 const ANCHOR_TAG = "Interactable"
@@ -506,6 +507,8 @@ return {
 	end,
 	Cue = function(ctx: Effect.Context, cue: Effect.Cue)
 		if cue.Cue == "blackout_start" then
+			-- no power, no cameras (TASK-337): a watcher is cut back to the head
+			Watch.Interrupt()
 			ctx.Play("post_tunk")
 			ctx.Play("neon_click")
 		elseif cue.Cue == "blackout_restore" then

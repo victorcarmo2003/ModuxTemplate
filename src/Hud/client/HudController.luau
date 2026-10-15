@@ -148,7 +148,6 @@ const REFUSAL: { [string]: boolean } = {
 	bench_busy = true,
 	upgrade_maxed = true,
 	shop_closed = true,
-	coffee_cooldown = true,
 	coffee_full = true,
 	coffee_night_only = true,
 	coffee_has_one = true,

@@ -1,9 +1,12 @@
 --!strict
 -- Coffee machine visuals (TASK-069; FEAT-021, DEC-055, DEC-125; architecture.md §19.8, network.md §3.5; AST-022).
 -- One Stations record (StationId * 100 + 0, Kind = coffee_machine), written by KitchenService/CoffeeMachine (TASK-068):
---   Empty     no bar, no cup, no steam
---   Working   ProgressBar at `Bar_Brew` from StartedAt/Duration (orange) + steam at `VFX_Steam`
---   Ready     full green bar + coffee cup at `Att_Cup` + steam, until someone takes it ("Take Coffee")
+--   Empty     no bar, no cup, no steam (waiting for stock: the machine brews by itself, TASK-328)
+--   Working   "Brewing" ProgressBar at `Bar_Brew` from StartedAt/Duration (orange) + steam at `VFX_Steam`
+--   Ready     full green bar + coffee cup standing on the counter by the machine + steam, until someone takes it
+--   Cleaning  "Cleaning" bar (blue) filling over the clean time after a cup was taken, no cup, no steam
+-- Cup spot (TASK-328): the authored `Att_Cup` hangs past the counter edge, so the cup stands on the first counter spot
+-- found under it, in front of the machine or beside it (raycast, local, Provisional until AST-022 moves the empty).
 -- The bar is computed from the record and the server clock, so a late joiner (onAdded) sees the right point.
 -- Presentation only: the server owns the brew, the stock and the Tool. Fittings missing from the binding
 -- (Bar_Brew, Att_Cup, VFX_Steam: TRL-COFFEE warns about them) fall back to local attachments derived from the
@@ -11,16 +14,19 @@
 -- Coffee stock (Fill / counter) is not drawn here: Stock.luau does not list coffee_machine (out of scope).
 -- Sound (TASK-079; sound-list §5.3 SFX-033): `coffee_brew` loop at the machine while Working; Working -> Ready plays
 -- `coffee_ready` (the soft bell at the end, style guide §10). The steam counts in the shared VFX budget (Fx.luau).
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local Components = StarterPlayer.StarterPlayerScripts.client.Interface.Components
 local ProgressBar = require(Components.ProgressBar)
+local Theme = require(Components.Theme)
 local Context = require(script.Parent.Context)
 local Fx = require(script.Parent.Fx)
 local Slots = require(script.Parent.Slots)
 
+const create = Vide.create
 const effect = Vide.effect
 const derive = Vide.derive
 const cleanup = Vide.cleanup
@@ -35,6 +41,13 @@ const BAR_MAX_DISTANCE = 40
 const CUP_FRONT_GAP = 0.35 -- fallback cup: this far in front of the machine face that holds Prompt_Brew
 const STEAM_RISE = 0.2
 const MIN_SPAN = 0.05
+const LABEL_RISE = 0.4 -- studs: the "Brewing" / "Cleaning" word sits above the bar
+const LABELS: { [string]: string } = { Working = "Brewing", Cleaning = "Cleaning" }
+const CLEAN_COLOR = Color3.fromHex("#4FB3E8") -- Provisional: the cleaning bar reads apart from the orange brew
+-- Cup spot search (TASK-328): footprint radius of the cup, how far the surface may sit from the machine bottom, steps
+const CUP_RADIUS = 0.2
+const CUP_SURFACE_SLACK = 0.35
+const CUP_SIDE_GAP = 0.3
 
 -- Placeholder steam (style guide palette: soft white, no asset id). Low rate for the reference phone.
 const STEAM_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
@@ -115,6 +128,63 @@ local function fitting(station: Instance, host: BasePart, name: string, fallback
 	return attachment
 end
 
+-- Cup spot (TASK-328) ---------------------------------------------------------------------------------------------------
+
+-- Height of the surface under `point` if a cup fits there: every footprint ray lands within the slack of the machine
+-- bottom (a counter, not the floor or the counter lip). nil = no room.
+local function surfaceAt(point: Vector3, top: number, bottom: number, params: RaycastParams): number?
+	const drop = top - bottom + 2
+	local height: number? = nil
+	for _, offset in { Vector3.zero, Vector3.xAxis, -Vector3.xAxis, Vector3.zAxis, -Vector3.zAxis } do
+		const origin = Vector3.new(point.X, top + 0.5, point.Z) + offset * CUP_RADIUS
+		const hit = workspace:Raycast(origin, Vector3.new(0, -drop, 0), params)
+		if hit == nil or math.abs(hit.Position.Y - bottom) > CUP_SURFACE_SLACK then
+			return nil
+		end
+		height = if height then math.max(height, hit.Position.Y) else hit.Position.Y
+	end
+	return height
+end
+
+-- Where the ready cup stands: the authored Att_Cup if it is over the counter, else right in front of the machine, else
+-- beside it (left, then right, toward the front); `fallback` when nothing fits (old placement).
+local function findCupSpot(station: Instance, box: Box, front: Vector3, top: number, bottom: number, fallback: Vector3): Vector3
+	const params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	const ignore: { Instance } = { station }
+	for _, player in Players:GetPlayers() do
+		if player.Character then
+			table.insert(ignore, player.Character)
+		end
+	end
+	params.FilterDescendantsInstances = ignore
+	params.RespectCanCollide = true
+
+	const side = front:Cross(Vector3.yAxis).Unit
+	const halfDepth = reach(box, front)
+	const halfWidth = reach(box, side)
+	const candidates: { Vector3 } = {}
+	const authored = Context.Find(station, "Att_Cup")
+	const authoredAt = if authored then worldPosition(authored) else nil
+	if authoredAt then
+		table.insert(candidates, authoredAt)
+	end
+	table.insert(candidates, box.Center + front * (halfDepth + CUP_RADIUS + 0.05))
+	const along = halfDepth - CUP_RADIUS - 0.1
+	const out = halfWidth + CUP_SIDE_GAP + CUP_RADIUS
+	for _, sign in { -1, 1 } do
+		table.insert(candidates, box.Center + front * along + side * (sign * out))
+		table.insert(candidates, box.Center + side * (sign * out))
+	end
+	for _, point in candidates do
+		const height = surfaceAt(point, top, bottom, params)
+		if height then
+			return Vector3.new(point.X, height, point.Z)
+		end
+	end
+	return fallback
+end
+
 -- Cup ------------------------------------------------------------------------------------------------------------------
 
 local warned = false
@@ -154,6 +224,8 @@ local function showCup(station: Instance, spot: Instance, host: BasePart, facing
 		child.Parent = model
 	end
 	copy:Destroy()
+	-- the Tool Handle carries a turned PivotOffset (hand pose): without this PivotTo lays the cup on its side (TASK-328)
+	handle.PivotOffset = CFrame.identity
 	model.PrimaryPart = handle
 
 	const parts: { BasePart } = {}
@@ -242,9 +314,15 @@ function Coffee.Mount(station: Instance, context: Context.Context)
 		return if record then record.State else "Empty"
 	end)
 	const clock = Slots.Clock(function()
-		return state() == "Working"
+		const current = state()
+		return current == "Working" or current == "Cleaning"
 	end)
 	local function progress(): number
+		const record = read()
+		if record and record.State == "Cleaning" then
+			-- Slots.Progress knows Working / Ready only; the clean wait fills the same way (TASK-328)
+			return if record.Duration > 0 then math.clamp((clock() - record.StartedAt) / record.Duration, 0, 1) else 1
+		end
 		return Slots.Progress(read, clock)
 	end
 
@@ -266,20 +344,57 @@ function Coffee.Mount(station: Instance, context: Context.Context)
 		Visible = function()
 			return state() ~= "Empty"
 		end,
+		FillColor = function()
+			const current = state()
+			if current == "Cleaning" then
+				return CLEAN_COLOR
+			end
+			return if current == "Ready" then Theme.Color.Ready else Theme.Color.Cooking
+		end,
 		StudsOffset = Vector3.zero,
 		MaxDistance = BAR_MAX_DISTANCE,
 	})
 	bar.Parent = host
 	cleanup(bar)
 
-	-- Cup: authored Att_Cup, else on the counter in front of the Prompt_Brew face
-	const cupSpot = fitting(station, host, "Att_Cup", function()
+	-- "Brewing" / "Cleaning" over the bar (TASK-328); nothing while Ready or Empty
+	const label = create("BillboardGui")({
+		Name = "ProgressLabel_Brew",
+		Adornee = barAnchor,
+		Size = UDim2.fromScale(2, 0.4),
+		StudsOffset = Vector3.new(0, LABEL_RISE, 0),
+		MaxDistance = BAR_MAX_DISTANCE,
+		LightInfluence = 0,
+		ResetOnSpawn = false,
+		Enabled = function()
+			return LABELS[state()] ~= nil
+		end,
+		create("TextLabel")({
+			Size = UDim2.fromScale(1, 1),
+			BackgroundTransparency = 1,
+			FontFace = Theme.Font.Title,
+			TextScaled = true,
+			TextColor3 = Theme.Color.Text,
+			TextStrokeColor3 = Theme.Color.Ink,
+			TextStrokeTransparency = 0,
+			Text = function()
+				return LABELS[state()] or ""
+			end,
+		}),
+	})
+	label.Parent = host
+	cleanup(label)
+
+	-- Cup: standing on the counter by the machine (cupSpot); a local attachment on the host follows the vehicle
+	const cupSpot = Instance.new("Attachment")
+	cupSpot.Name = "CupSpot"
+	cupSpot.Parent = host
+	cupSpot.WorldPosition = findCupSpot(station, box, front, top, bottom, (function(): Vector3
 		const position = box.Center + front * (halfDepth + CUP_FRONT_GAP)
 		return Vector3.new(position.X, bottom, position.Z)
-	end)
-	const cupHost = if cupSpot:IsA("Attachment") and cupSpot.Parent and cupSpot.Parent:IsA("BasePart")
-		then cupSpot.Parent
-		else host
+	end)())
+	cleanup(cupSpot)
+	const cupHost = host
 	effect(function()
 		if state() == "Ready" then
 			showCup(station, cupSpot, cupHost, front)
@@ -293,7 +408,7 @@ function Coffee.Mount(station: Instance, context: Context.Context)
 	const emitter = steamEmitter(steamSpot)
 	effect(function()
 		const current = state()
-		emitter.Enabled = current ~= "Empty"
+		emitter.Enabled = current == "Working" or current == "Ready"
 		emitter.Rate = if current == "Working" then STEAM_RATE_WORKING else STEAM_RATE_READY
 		if emitter.Enabled then
 			Fx.Track(emitter)
@@ -317,7 +432,8 @@ function Coffee.Mount(station: Instance, context: Context.Context)
 			left = math.max(0, record.StartedAt + record.Duration - workspace:GetServerTimeNow())
 		end
 		station:SetAttribute(cupSeconds, left)
-		station:SetAttribute(cupState, current)
+		-- the counter mug knows Empty / Working / Ready: a cleaning machine has no coffee in it
+		station:SetAttribute(cupState, if current == "Cleaning" then "Empty" else current)
 	end)
 	cleanup(function()
 		station:SetAttribute(cupState, nil)

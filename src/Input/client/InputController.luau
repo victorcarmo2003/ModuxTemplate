@@ -74,6 +74,8 @@ const InputController = Modux.Controller("InputController", { Priority = 900 })
 
 function InputController:Setup()
 	self.Context = "Gameplay" :: Context
+	-- owners holding the Menu context (Hold)
+	self.Holds = {} :: { [string]: boolean }
 	self.Handles = {} :: { [string]: Handle }
 	self.Listeners = {} :: { (Context) -> () }
 	self.Device = Vide.source(initialDevice()) :: Vide.Source<Device>
@@ -177,7 +179,17 @@ function InputController:OnContextChange(callback: (Context) -> ())
 	table.insert(self.Listeners, callback)
 end
 
+-- Legacy single slot (Lobby, Class): the same as Hold("Legacy", context == "Menu").
 function InputController:SetContext(context: Context)
+	self:Hold("Legacy", context == "Menu")
+end
+
+-- Menu by owner (TASK-327): the context is "Menu" while any owner holds it. Cutscene, Prep and Security used to save
+-- and restore the previous context each on their own, and an interleaving (one ending inside the other) restored a
+-- stale "Menu" for good: every world prompt stayed hidden (PromptController) while the tutorial arrow still showed.
+function InputController:Hold(owner: string, on: boolean)
+	self.Holds[owner] = if on then true else nil
+	const context: Context = if next(self.Holds) ~= nil then "Menu" else "Gameplay"
 	if self.Context == context then
 		return
 	end

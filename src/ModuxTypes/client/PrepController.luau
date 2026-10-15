@@ -67,7 +67,6 @@ export type Public = {
 	Pointer: Pointer.Pointer?,
 	PointerStops: { () -> () },
 	Pose: Poses.Pose?,
-	PreviousContext: string,
 	Rig: Rig.Rig,
 	RigReleased: boolean,
 	RoofBody: BasePart?,

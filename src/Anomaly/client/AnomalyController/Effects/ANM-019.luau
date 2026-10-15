@@ -7,6 +7,7 @@ local Hide = require(script.Parent.Kit.Hide)
 return Hide.Effect({
 	Ref = "ANM-019",
 	Style = "Roof",
+	Signal = "Roof", -- TASK-339: heavy steps on the trailer roof
 	Asset = "ANM-019_RoofWalker",
 	Approach = 5,
 	Look = 3,

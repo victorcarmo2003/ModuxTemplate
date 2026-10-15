@@ -1,4 +1,4 @@
-"""Jumpscare face (DEC-256): a cartoon monster face, Mild, no gore, in the game's UI sticker style.
+"""Jumpscare face (DEC-256, TASK-329): an all-black face with white eyes and a macabre grin; cartoon, Mild, no gore.
 
 Full-bleed 1024x1024 PNG with transparent corners, drawn as one sticker (Ink outline, two-tone shading, gloss) so it
 reads at a glance when it fills the screen for ~0.6 s (Effects/Kit/Jumpscare.luau).
@@ -29,52 +29,47 @@ def spiky_head(cx: float, cy: float, r: float, spikes: int, depth: float) -> str
 
 
 def face(ic: Icon) -> str:
-    fur = ic.two("#8E78D6", "#5B47A3", 0.58)
-    mouth = ic.soft("#3A1F3F", "#1E0F22")
-    tongue = ic.two("#FF9DBA", "#E06E92", 0.55)
-    eye = ic.two("#FFFFFF", "#E6E2F2", 0.6)
-    horn = ic.two("#FFE07A", "#E9A81C", 0.55)
-    # mouth: a wide grin below the eyes; teeth hang from its top edge and rise from its bottom edge
-    mouth_path = "M280,610 Q512,560 744,610 Q770,820 512,870 Q254,820 280,610 Z"
-    teeth_top = "".join(
-        f'<path d="M{x},{596 + abs(x - 512) * 0.06:.0f} L{x + 26},{668 + abs(x - 512) * 0.05:.0f} L{x + 52},{596 + abs(x - 512) * 0.06:.0f} Z" '
-        f'fill="{WHITE}" {ol(8)}/>'
-        for x in range(316, 690, 52)
+    """TASK-329 (owner 2026-10-15): an all-black face, glowing white eyes and a wide macabre grin. Cartoon, Mild."""
+    ic.defs.append(
+        '<radialGradient id="head" cx="50%" cy="40%" r="60%">'
+        '<stop offset="0" stop-color="#1C1424"/><stop offset="1" stop-color="#050307"/></radialGradient>'
+        '<filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="14"/></filter>'
+        '<filter id="soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="6"/></filter>'
     )
-    teeth_bottom = "".join(
-        f'<path d="M{x},{842 - abs(x - 492) * 0.12:.0f} L{x + 20},{790 - abs(x - 492) * 0.1:.0f} L{x + 40},{842 - abs(x - 492) * 0.12:.0f} Z" '
-        f'fill="{WHITE}" {ol(7)}/>'
-        for x in (392, 452, 532, 592)
+    # head: a black hood-like blob, rounded top, soft wavy bottom (no hard zigzag)
+    head = (
+        "M150,520 Q150,90 512,80 Q874,90 874,520 L874,860 "
+        "Q812,960 750,880 Q690,970 630,890 Q570,975 512,895 Q454,975 394,890 Q334,970 274,880 Q212,960 150,860 Z"
     )
+    # eyes: slanted almonds, pure white, with a soft glow behind
+    left_eye = "M300,420 Q370,350 455,410 Q385,455 300,420 Z"
+    right_eye = "M724,420 Q654,350 569,410 Q639,455 724,420 Z"
+    # grin: a crescent from cheek to cheek, corners curling up
+    grin = "M232,560 Q512,700 792,560 Q770,640 740,610 Q512,870 284,610 Q254,640 232,560 Z"
+    teeth = "".join(
+        f'<path d="M{x},{595 + 0.0009 * (x - 512) ** 2 * 1.0:.0f} L{x},{820 - 0.0021 * (x - 512) ** 2:.0f}" '
+        f'stroke="#0B0710" stroke-width="7" stroke-linecap="round"/>'
+        for x in range(300, 740, 34)
+    )
+    gum_line = '<path d="M262,600 Q512,720 762,600" fill="none" stroke="#0B0710" stroke-width="8" stroke-linecap="round"/>'
     return (
-        # horns
-        f'<path d="M300,250 Q230,120 270,40 Q330,140 390,215 Z" fill="{horn}" {ol(18)}/>'
-        f'<path d="M724,250 Q794,120 754,40 Q694,140 634,215 Z" fill="{horn}" {ol(18)}/>'
-        # furry head
-        f'<polygon points="{spiky_head(512, 540, 410, 26, 34)}" fill="{fur}" {ol(22)} stroke-linejoin="round"/>'
-        # angry brows
-        f'<path d="M260,268 L450,330" {ol(34)}/><path d="M764,268 L574,330" {ol(34)}/>'
-        # eyes, huge, tiny pupils
-        f'<ellipse cx="375" cy="430" rx="96" ry="108" fill="{eye}" {ol(16)}/>'
-        f'<ellipse cx="649" cy="430" rx="96" ry="108" fill="{eye}" {ol(16)}/>'
-        f'<circle cx="392" cy="450" r="24" fill="{INK}"/><circle cx="632" cy="450" r="24" fill="{INK}"/>'
-        + gloss(335, 375, 24, 13, -25, 0.9)
-        + gloss(609, 375, 24, 13, -25, 0.9)
-        # gaping mouth, tongue, teeth
-        + f'<path d="{mouth_path}" fill="{mouth}" {ol(20)}/>'
-        + f'<ellipse cx="512" cy="815" rx="130" ry="48" fill="{tongue}" {ol(10)}/>'
-        + teeth_top
-        + teeth_bottom
-        + f'<path d="{mouth_path}" fill="none" {ol(20)}/>'
-        # gloss on the fur
-        + gloss(250, 600, 40, 18, -40, 0.35)
-    )
+        f'<path d="{head}" fill="url(#head)"/>'
+        # eye glow, then the eyes
+        + f'<path d="{left_eye}" fill="{WHITE}" opacity="0.55" filter="url(#glow)"/>'
+        + f'<path d="{right_eye}" fill="{WHITE}" opacity="0.55" filter="url(#glow)"/>'
+        + f'<path d="{left_eye}" fill="{WHITE}"/><path d="{right_eye}" fill="{WHITE}"/>'
+        # grin glow, grin, teeth
+        + f'<path d="{grin}" fill="{WHITE}" opacity="0.35" filter="url(#soft)"/>'
+        + f'<path d="{grin}" fill="#F4F0FA"/>'
+        + f'<g clip-path="url(#grinclip)">{teeth}{gum_line}</g>'
+    ), grin
 
 
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     ic = Icon()
-    body = face(ic)
+    body, grin = face(ic)
+    ic.defs.append(f'<clipPath id="grinclip"><path d="{grin}"/></clipPath>')
     svg = (
         '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">'
         f'<defs>{"".join(ic.defs)}</defs>{body}</svg>'

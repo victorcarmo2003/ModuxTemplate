@@ -134,7 +134,10 @@ const gamePasses: { GamePass } = {
 }
 
 -- Utilities (TASK-290, Provisional; Q-271 to Q-273 in open-questions.md). Cheap impulse buys, 15..149 R$. Cash packs
--- follow the run economy (a Storage level costs $40..$110, economy.md): $100 is a good night, never a whole run.
+-- (TASK-324, owner request 2026-10-15, Provisional; economy.md §5): fixed amounts sized on a solo night of the anomaly
+-- run (~$55 on Night 1, ~$90 on Night 10, ~$75 average): $60 ~ one night, $150 ~ two, $330 ~ four, never the whole
+-- Gear Stand (~$850 in the anomaly mode). Bigger pack = a bit more cash per Robux (2.07 / 2.17 / 2.21). Keys and
+-- ProductIds stay (Creator Hub); only Amount, Text and the Creator Hub description changed (was $100 / $300 / $800).
 const utilities: { Utility } = {
 	{
 		Key = "util_scare",
@@ -209,10 +212,10 @@ const utilities: { Utility } = {
 		ProductId = 3718682111,
 		Robux = 29,
 		Name = "Tip Bag",
-		Text = "+$100 for the crew",
+		Text = "+$60 for the crew",
 		Icon = "Hud/coin",
 		Kind = "Cash",
-		Amount = 100,
+		Amount = 60,
 		Night = false,
 	},
 	{
@@ -220,10 +223,10 @@ const utilities: { Utility } = {
 		ProductId = 3718682118,
 		Robux = 69,
 		Name = "Coin Pile", -- art: a pile of the game's coins (owner 2026-10-15)
-		Text = "+$300 for the crew",
+		Text = "+$150 for the crew",
 		Icon = "Ui/cash",
 		Kind = "Cash",
-		Amount = 300,
+		Amount = 150,
 		Night = false,
 	},
 	{
@@ -231,10 +234,10 @@ const utilities: { Utility } = {
 		ProductId = 3718682122,
 		Robux = 149,
 		Name = "Coin Chest", -- art: a chest full of coins (owner 2026-10-15)
-		Text = "+$800 for the crew",
+		Text = "+$330 for the crew",
 		Icon = "Ui/tip_jar",
 		Kind = "Cash",
-		Amount = 800,
+		Amount = 330,
 		Night = false,
 	},
 }

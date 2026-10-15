@@ -232,18 +232,10 @@ const base = Table.new({
 		),
 		lines("Shaking? Refuse them.")
 	),
+	-- TASK-341 (Provisional): the blackout is presented on Night 3 and the turned neck on Night 4 (blocks swapped,
+	-- same lines, so the pre-generated voice still matches)
 	nightCall(
 		3,
-		lines(
-			"Rainy one tonight, Rookie.",
-			"Head turned all the way back?",
-			"That's no customer. Refuse it.",
-			"Head on backwards? Refuse."
-		),
-		lines("Head on backwards? Refuse.")
-	),
-	nightCall(
-		4,
 		lines(
 			"Lights might go out tonight.",
 			"Breaker's out back, behind the trailer.",
@@ -253,64 +245,88 @@ const base = Table.new({
 		lines("Lights out? Breaker. Hold it.")
 	),
 	nightCall(
+		4,
+		lines(
+			"Rainy one tonight, Rookie.",
+			"Head turned all the way back?",
+			"That's no customer. Refuse it.",
+			"Head on backwards? Refuse."
+		),
+		lines("Head on backwards? Refuse.")
+	),
+	-- TASK-339 / TASK-331 / TASK-333 / TASK-334 / TASK-340 (owner 2026-10-15, Provisional; new lines have no voice yet,
+	-- Speech falls back to TTS): Walt no longer shouts "Hide!" on every monster, so each family B monster's sign is
+	-- explained ONCE here, on its debut night; the long car, the knock, the bell and the Hush get their answer too.
+	nightCall(
 		5,
 		lines(
 			"Foggy tonight. Look at their eyes.",
 			"All white? Big grin? Refuse.",
 			"Twins in line? One's a copy.",
+			"Hear a church bell? Count it.",
+			"Kill the trailer light before the third.",
 			"White eyes or twins? Refuse."
 		),
-		lines("White eyes or twins? Refuse.")
+		lines("White eyes or twins? Refuse.", "Bell rings? Light off by the third.")
 	),
 	nightCall(
 		6,
 		lines(
 			"Something walks the street tonight.",
-			"Lights flicker? Leave the trailer.",
-			"Hide out back. Stay put.",
-			"Walker coming? Hide out back."
+			"Lights buzz and flicker? Heavy steps?",
+			"That's the Walker. Out the back door.",
+			"Hide behind the trailer. Stay put.",
+			"Buzzing lights? Hide out back."
 		),
-		lines("Walker coming? Hide out back.")
+		lines("Buzzing lights? Hide out back.")
 	),
 	nightCall(
 		7,
 		lines(
 			"Stormy one. Something crawls tonight.",
-			"It's fast. Low to the ground.",
-			"Same deal. Hide out back.",
-			"Crawling thing? Hide out back."
+			"Hear scratching under the trailer?",
+			"That's the crawler. It's fast.",
+			"Out the back and hide. Quick.",
+			"Scratching? Hide out back."
 		),
-		lines("Crawling thing? Hide out back.")
+		lines("Scratching? Hide out back.")
 	),
 	nightCall(
 		8,
 		lines(
 			"Dark one tonight, Rookie.",
-			"A big smile may fill the window.",
-			"Don't smile back. Go hide.",
-			"Big grin? Hide out back."
+			"One of them makes no sound at all.",
+			"If the word 'hide' creeps into your head...",
+			"Listen. Go hide out back.",
+			"A car flashes its brights at you?",
+			"Shut the window before the beam hits.",
+			"Whispers? Hide. Headlights? Window."
 		),
-		lines("Big grin? Hide out back.")
+		lines("Whispers? Hide. Headlights? Window.")
 	),
 	nightCall(
 		9,
 		lines(
-			"Hear steps on the roof?",
+			"Hear heavy steps on the roof?",
 			"That's not me. Never is.",
 			"Get out and hide. Quick.",
-			"Roof steps? Hide out back."
+			"And someone knocks out back?",
+			"It's not me either. Don't open.",
+			"Roof steps? Hide. Knocks? Don't open."
 		),
-		lines("Roof steps? Hide out back.")
+		lines("Roof steps? Hide. Knocks? Don't open.")
 	),
 	nightCall(
 		10,
 		lines(
 			"Last night, Rookie. Everything comes.",
 			"Refuse, hide, fix the lights.",
-			"Lamps all die? Run to the Mart.",
-			"Lamps out? Get to the Mart."
+			"Street lamps die one by one?",
+			"Run. Get INSIDE the Mart.",
+			"Stay in there till they're back.",
+			"Lamps out? Run inside the Mart."
 		),
-		lines("Lamps out? Get to the Mart.", "Refuse, hide, fix the lights.")
+		lines("Lamps out? Run inside the Mart.", "Refuse, hide, fix the lights.")
 	),
 	{
 		Key = "call_night_short",

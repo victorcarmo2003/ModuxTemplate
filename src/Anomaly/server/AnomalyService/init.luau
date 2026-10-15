@@ -27,6 +27,9 @@
 --   Tension     signal Tension(on) while an occurrence of an anomaly with Anomalies[k].Tension runs; also
 --               NpcService:SetTension(on) when it exists (TASK-108). PedestrianService listens to the signal.
 --   Cleanup     NightEnd -> Stop(..., "NightOver"); NightLost, a new shift, any other phase -> "Restore"; set cleared.
+--   Ended       signal Ended(key, players) when an occurrence ends (Finish, NightOver, or a Restore once it left Signal or
+--               someone failed): the members Active at its start plus whoever failed, still connected. Reader:
+--               JournalService (TASK-335, Anomaly Book pages).
 --
 -- Hooks of services that do not exist yet (PROVISIONAL, TASK-106): TrafficService (TASK-104) is in
 -- architecture.md §19.2 Require but was not in this build, so it is looked up by name at OnStart;
@@ -70,6 +73,8 @@ export type Run = {
 	CriticalSent: boolean,
 	Seen: { [number]: number },
 	SeenDone: { [number]: boolean },
+	-- UserIds Active when the occurrence started (Ended, TASK-335)
+	Party: { number },
 }
 
 export type Due = { Entry: Scheduler.Entry, RetryAt: number, Done: boolean }
@@ -189,6 +194,8 @@ function AnomalyService:Setup()
 	self.Queue = {} :: { Due }
 	-- family D scares of the night (TASK-274): game minutes still to fire, ascending (V2, DEC-254)
 	self.Scares = {} :: { number }
+	-- SecurityService, false when this build has none (IsWatching)
+	self.Security = nil :: any
 	self.Running = {} :: { [number]: Run }
 	-- finished record id -> server time it leaves the set
 	self.Removing = {} :: { [number]: number }
@@ -208,6 +215,8 @@ function AnomalyService:Setup()
 	self.Warned = {} :: { [string]: boolean }
 	-- Tension(on): created here so lower-priority services (PedestrianService 545) connect in their OnInit
 	self.Tension = self.Libs.Signal.new() :: SignalLib.Signal<boolean>
+	-- Ended(key, players): one occurrence is over for these players (TASK-335; JournalService connects in its OnInit)
+	self.Ended = self.Libs.Signal.new() :: SignalLib.Signal<string, { Player }>
 end
 
 function AnomalyService:WarnOnce(key: string, message: string)
@@ -375,6 +384,10 @@ function AnomalyService:Looking(player: Player, target: Vector3, range: number):
 	if not self.Dependencies.RunStateService:IsActive(player) then
 		return false
 	end
+	-- TASK-337: a player watching the security cameras sees through a screen, never with the eyes (no "seen")
+	if self:IsWatching(player) then
+		return false
+	end
 	-- the closed window blocks the view out (the back door's little window does not count, §19.14)
 	const vehicle = self.Dependencies.VehicleService
 	if vehicle:IsProtected(player) and not vehicle:IsInsidePoint(target) then
@@ -396,6 +409,15 @@ function AnomalyService:Looking(player: Player, target: Vector3, range: number):
 		Content.Sanity.SeeAngle,
 		blocked
 	)
+end
+
+-- SecurityService (TASK-285) has the watcher in Watching; looked up by name (it is not in the Require list).
+function AnomalyService:IsWatching(player: Player): boolean
+	if self.Security == nil then
+		self.Security = lookup("SecurityService") or false
+	end
+	const security = self.Security
+	return security ~= false and type(security.Watching) == "table" and security.Watching[player] == true
 end
 
 -- Gaze responder body (network.md §13.5): night shift, Active; otherwise the stored gaze is dropped.
@@ -540,6 +562,31 @@ function AnomalyService:Succeed(occ: Api.Occurrence)
 	self:Publish(occ, { Phase = "Resolved" })
 end
 
+-- Fires Ended for one finished run: its party at the start plus whoever failed, still in the game (TASK-335).
+-- A Restore counts only once the occurrence did something (left Signal, or someone failed).
+function AnomalyService:EmitEnded(run: Run, reason: Api.StopReason)
+	if reason == "Restore" and run.Record.Phase == "Signal" and next(run.Failed) == nil then
+		return
+	end
+	const ids: { [number]: boolean } = {}
+	for _, userId in run.Party do
+		ids[userId] = true
+	end
+	for userId in run.Failed do
+		ids[userId] = true
+	end
+	const players: { Player } = {}
+	for userId in ids do
+		const player = Players:GetPlayerByUserId(userId)
+		if player ~= nil then
+			table.insert(players, player)
+		end
+	end
+	if #players > 0 then
+		self.Ended:Fire(run.Occ.Key, players)
+	end
+end
+
 function AnomalyService:CallStop(run: Run, reason: Api.StopReason)
 	const ctx = self.Context
 	if ctx == nil then
@@ -566,6 +613,7 @@ function AnomalyService:Finish(occ: Api.Occurrence)
 		self.Removing[occ.Id] = now() + LINGER
 	end
 	self:CallStop(run, "Done")
+	self:EmitEnded(run, "Done")
 	self:RefreshTension()
 end
 
@@ -582,6 +630,7 @@ function AnomalyService:StopAll(reason: Api.StopReason)
 	for _, run in runs do
 		run.Done = true
 		self:CallStop(run, reason)
+		self:EmitEnded(run, reason)
 	end
 	const hadRecords = #runs > 0 or next(self.Removing) ~= nil
 	self.Removing = {}
@@ -634,7 +683,11 @@ function AnomalyService:StartOccurrence(key: string, module: Api.Module, slot: n
 		CriticalSent = false,
 		Seen = {},
 		SeenDone = {},
+		Party = {},
 	}
+	for _, player in self:ActivePlayers() do
+		table.insert(run.Party, player.UserId)
+	end
 	self.Running[id] = run
 	const ok, result = pcall(module.Start, ctx, occ)
 	run.Starting = false

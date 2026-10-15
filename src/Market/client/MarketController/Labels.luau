@@ -12,10 +12,13 @@ local Content = require(ReplicatedStorage.shared.Content)
 
 const LEVEL_NAMES: { [string]: { [number]: string } } = {
 	grill = { "Old Grill", "Double Grill", "Big Sizzle Grill" },
-	cooler = { "Small Storage", "Storage 2", "Storage 3", "Big Storage" }, -- owner request 2026-10-14 (Provisional names)
+	cooler = { "Small Storage", "Storage 2", "Storage 3", "Big Storage", "Huge Storage" }, -- owner request 2026-10-14 (Provisional names; level 5 TASK-324)
 	counter = { "Little Counter", "Wide Counter", "Long Counter" },
 	cash_drawer_lock = { [1] = "Drawer Lock" },
 	trailer_lights = { [1] = "Trailer Lights" },
+	-- TASK-324 (Provisional names): anomaly-mode lines on B3 / B4
+	coffee_maker = { "Coffee Maker", "Quick Brew", "Strong Brew" },
+	breaker_box = { [0] = "Old Breaker", [1] = "Quick Breaker", [2] = "Snap Breaker" },
 }
 
 -- The Storage line (UPG-002) quotes the buns and the sauce bowls.
@@ -78,6 +81,10 @@ function Labels.Effect(upgrade: Content.Upgrade, row: Content.UpgradeLevel): str
 	elseif key == "trailer_lights" then
 		const bonus = math.floor(((effects.DayFlowBonus or 1) - 1) * 100 + 0.5)
 		return `+{number(bonus)}% customers`
+	elseif key == "coffee_maker" then
+		return `{number(effects.CoffeeBrewTime or 0)} s brew · +{number(effects.CoffeeRestore or 0)} sanity`
+	elseif key == "breaker_box" then
+		return `Power back in {number(effects.BreakerHold or 0)} s`
 	end
 	return ""
 end

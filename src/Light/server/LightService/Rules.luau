@@ -26,6 +26,7 @@ export type Input = {
 	Now: number,
 	Hush: Hush?,
 	Blackout: boolean, -- ANM-020: the power is out (every HushOff group dark at once)
+	PostsOut: boolean, -- ANM-003 bell (TASK-340): only the HushOff posts are out, the trailer keeps its switch
 	Level: (upgrade: string, vehicle: string) -> number, -- 0 when the upgrade is not on that vehicle
 	Radius: (group: Content.LightGroup) -> number, -- LightRadius effect for Upgrade groups
 }
@@ -46,6 +47,9 @@ end
 
 function Rules.groupOn(group: Content.LightGroup, input: Input): boolean
 	if not input.Night or Rules.hushed(group, input) or (input.Blackout and group.HushOff) then
+		return false
+	end
+	if input.PostsOut and group.Kind == "Posts" and group.HushOff then
 		return false
 	end
 	const kind = group.Kind

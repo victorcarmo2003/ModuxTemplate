@@ -48,6 +48,7 @@ export type Record = {
 	ClockFrom: number,
 	ClockTo: number,
 	Paused: boolean,
+	Chances: number,
 }
 
 const RoundController = Modux.Controller("RoundController", { Priority = 800 })
@@ -117,6 +118,11 @@ function RoundController:Setup()
 	self.ClockText = Vide.source(self:Format(Content.Shift.ByKey[DEFAULT_PHASE].ClockFrom)) :: Vide.Source<string>
 	-- Calm / Shift / Last during the Night phase, nil otherwise (FEAT-003; not phases)
 	self.NightWindow = Vide.source(nil :: Window?) :: Vide.Source<Window?>
+	-- Phase timing (server time) and Shift.Chances: NightLostController shows the wait and whether the night repeats
+	-- (TASK-338). Chances is never shown as a number (DEC-053).
+	self.PhaseStartedAt = Vide.source(0) :: Vide.Source<number>
+	self.PhaseDuration = Vide.source(0) :: Vide.Source<number>
+	self.Chances = Vide.source(0) :: Vide.Source<number>
 	-- true once the first Shift record arrived
 	self.Ready = Vide.source(false) :: Vide.Source<boolean>
 	self.Clock = nil :: Clock?
@@ -165,6 +171,9 @@ function RoundController:Apply(record: Record)
 		self.IsNight(record.IsNight)
 		self.Vehicle(record.Vehicle)
 		self.Paused(record.Paused)
+		self.PhaseStartedAt(record.PhaseStartedAt)
+		self.PhaseDuration(record.PhaseDuration)
+		self.Chances(record.Chances)
 		self:Refresh()
 		self.Ready(true)
 	end)

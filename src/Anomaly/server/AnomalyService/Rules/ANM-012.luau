@@ -13,6 +13,8 @@ const rule: Api.Rule = {
 		Variant = "neck", -- CustomerService:SpawnActor variant
 		Wrong = "take_order", -- customer action that fails the rule
 		OmissionFails = false, -- left waiting until patience runs out: no penalty
+		-- s from the window shut in her face to her throwing it open again (TASK-336; PROVISIONAL)
+		SlamAfter = 1.2,
 	},
 }
 

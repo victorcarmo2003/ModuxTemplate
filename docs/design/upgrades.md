@@ -33,7 +33,7 @@ Critérios de aceite
 | ID | Upgrade | Níveis | Custo total | Veículo | Onde se compra | Rotaciona? |
 |---|---|---|---|---|---|---|
 | UPG-001 | Grill | 1–3 | $210 | ambos | bancada B1 | não |
-| UPG-002 | **Storage** (era Cooler; 2026-10-14, Provisório, `Q-260`) | 1–4 | $220 ($40 / $70 / $110) | trailer | bancada B2 | não |
+| UPG-002 | **Storage** (era Cooler; 2026-10-14, Provisório, `Q-260`; nível 5 TASK-324) | 1–5 | $340 ($40 / $70 / $110 / $120) | trailer | bancada B2 | não |
 | UPG-003 | Counter — **fora de venda no modo anomalia** (2026-10-14) | 1–5 (DEC-241) | $340 | trailer | bancada B3 | não |
 | UPG-004 | Cash Drawer Lock — **fora de venda no modo anomalia** (2026-10-14) | 0–1 | $80 | trailer | bancada B4 | não |
 | UPG-005 | Trailer Lights | 0–1 | $100 | só trailer | bancada B5 (após a compra do trailer) | não |
@@ -43,9 +43,11 @@ Critérios de aceite
 | UPG-009 | Patio Lights — Provisório | 0–1 | $120 | Pad | na mesa `TBL-1` (placa) no Pad (`Q-178`) | não |
 | UPG-011 | Trailer Table (4 mesas do trailer, `TBL-6..9`) — Provisório (`Q-209`) | 0–4 (1 mesa por nível) | $330 ($50 / $70 / $90 / $120) | **só trailer** (`Scope = "Vehicle"`) | na própria mesa fantasma, só depois de comprar o trailer (`Q-209`) | não |
 | UPG-010 | Back Bar (bancada externa do trailer) — Provisório, cortável | 0–1 | $90 | só trailer | na própria bancada dobrada, no trailer (`Q-178`, `Q-179`) | não |
-| UPG-012 | Security Camera — **Rascunho, só desenho** (2026-10-14, FEAT-040, `Q-267`) | 0–2 | $320 ($120 / $200, proposta) | trailer | bancada (pedestal a definir: B3/B4 ficam livres no modo anomalia) | não |
+| UPG-012 | Security Camera — **Rascunho, só desenho** (2026-10-14, FEAT-040, `Q-267`; as câmeras da TASK-285 vieram de fábrica, sem compra) | 0–2 | $320 ($120 / $200, proposta) | trailer | — (B3/B4 ficaram com UPG-013/014) | não |
+| UPG-013 | **Coffee Maker** (melhoria da cafeteira de fábrica UPG-007) — **só modo anomalia**, Provisório (TASK-324, `Q-275`) | 1–3 | $110 ($40 / $70) | trailer | bancada **B3** (o pedestal do Counter) | não |
+| UPG-014 | **Breaker Box** (disjuntor do apagão ANM-020) — **só modo anomalia**, Provisório (TASK-324, `Q-275`) | 0–2 | $90 ($30 / $60) | trailer | bancada **B4** (o pedestal do Drawer Lock) | não |
 
-> UPG-008 a UPG-011 (mesas) e o Patio Lights também ficam **fora de venda no modo anomalia** (2026-10-14). Soma do que se compra no modo anomalia, Provisório: Grill $210 + Storage $220 + Trailer Lights $100 = **$530** (+ UPG-012 quando existir).
+> UPG-008 a UPG-011 (mesas) e o Patio Lights também ficam **fora de venda no modo anomalia** (2026-10-14). Soma do que se compra no modo anomalia, Provisório: Grill $210 + Storage $220 + Trailer Lights $100 = **$530** (+ UPG-012 quando existir). **TASK-324 (2026-10-15, Provisório, `Q-275`):** Grill $210 + Storage $340 (nível 5 a $120) + Trailer Lights $100 + Coffee Maker $110 + Breaker Box $90 = **$850** (conta da run em `economy.md` §5). UPG-013 e UPG-014 são o inverso dos de dia: `Content.Mode.AnomalyOnlyUpgrades`, à venda só com `DayOnly = false`, e dividem o pedestal com o Counter (B3) e o Drawer Lock (B4) — cada modo mostra o seu.
 
 Soma de tudo que se compra com dinheiro (solo): $210 + $170 + $230 + $80 + $100 = **$790** (DEC-224: o trailer, $300, **não se compra mais**; era $1.090).
 Com as mesas do trailer (UPG-011 $330) e o Back Bar (UPG-010 $90), Provisório: **$1.210**. Se as mesas do Pad (UPG-008 $315, UPG-009 $120) voltarem (`Q-225`): $1.645. Antes (2026-10-11): $1.615. Os ~$2.860 ganhos por run solo vêm do fluxo antigo (DEC-057); a simulação de `economy.md` §7 deve ser refeita com o fluxo da `Q-207`.
@@ -93,7 +95,9 @@ veículo, então o critério da FEAT-015 "nenhum prompt de compra em equipamento
 | 3 | $70 | 20 | 20 | 25 | 7 | 12 | 10 | 20 |
 | 4 | $110 | 24 | 24 | 30 | 8 | 15 | 12 | 20 |
 
-  Regra do dono: pão +4 por nível; molhos começam em 15 e +5 por nível (3 compras = os 30 de antes); "a mesma lógica" nas outras coberturas = metade no nível 1 e o antigo nível 1 no topo. O nível 4 reusa a peça `Cooler_L3`. Placa do Gear Stand: "16 buns · 20 sauce". Comprado pela 1ª vez na lição das 18h do Dia 1 (FEAT-004, `Q-262`).
+| 5 (TASK-324) | $120 | 28 | 28 | 35 | 9 | 18 | 14 | 20 |
+
+  Regra do dono: pão +4 por nível; molhos começam em 15 e +5 por nível (3 compras = os 30 de antes); "a mesma lógica" nas outras coberturas = metade no nível 1 e o antigo nível 1 no topo. Os níveis 4 e 5 reusam a peça `Cooler_L3` (nível 5: "Huge Storage", TASK-324, Provisório; mesma regra +4 / +5 / +1). Placa do Gear Stand: "16 buns · 20 sauce". Comprado pela 1ª vez na lição das 18h do Dia 1 (FEAT-004, `Q-262`).
 - Conservação/validade (§11 do GDD V1): fora do MVP **[DEC-128]**; o Cooler só aumenta capacidade.
 - Critérios de aceite: capacidade sobe na hora; o estoque atual não muda.
 
@@ -181,6 +185,35 @@ veículo, então o critério da FEAT-015 "nenhum prompt de compra em equipamento
 | Upgrade | nenhum nível no MVP |
 
 - Critérios de aceite: um café por vez; sem dose, o prompt mostra "Out of coffee".
+- **2026-10-15 (TASK-324):** a cafeteira de fábrica ganha níveis comprados no Gear Stand: ver **UPG-013**.
+
+### UPG-013 — Coffee Maker (melhoria)
+
+- Status: Rascunho (Provisório, 2026-10-15) · Origem: pedido do dono "mais coisas para comprar no modo anomalia" (TASK-324, `Q-275`) · Veículo: trailer · Compra: Gear Stand **B3**, só no modo anomalia (`Content.Mode.AnomalyOnlyUpgrades`) · Chave `coffee_maker`
+
+| Nível | Nome no pedestal | Preço | Preparo | Sanidade por café | Dia | Noite |
+|---|---|---|---|---|---|---|
+| 1 | Coffee Maker | inicial | 6 s | +25 | — | base (UPG-007) |
+| 2 | Quick Brew | $40 | 5 s | +30 | — | café mais rápido e mais forte: menos tempo parado na cafeteira |
+| 3 | Strong Brew | $70 | 4 s | +35 | — | idem |
+
+- Implementação: `CoffeeBrewTime` / `CoffeeRestore` do nível são a **base**; a classe aplica por cima (`ClassService:GetModifier` com base; o Barista, `Set` 3 s / +35, segue igual). A cafeteira lê a base pelo `Effect` do `StationApi`.
+- Peça visível: nenhuma no trailer; miniatura do pedestal provisória (caixa com a inicial) até existir arte (`Q-275` c).
+- Critérios de aceite: café preparado depois da compra usa o novo tempo e o novo valor; café já pronto mantém o valor de quem o preparou.
+
+### UPG-014 — Breaker Box
+
+- Status: Rascunho (Provisório, 2026-10-15) · Origem: TASK-324 (`Q-275`), ligado à família C da V2 (apagão ANM-020, estreia na Night 4) · Veículo: trailer · Compra: Gear Stand **B4**, só no modo anomalia · Chave `breaker_box`
+
+| Nível | Nome no pedestal | Preço | Segurar o disjuntor | Noite |
+|---|---|---|---|---|
+| 0 | Old Breaker | — | 3 s (`Actions.breaker_reset`) | base |
+| 1 | Quick Breaker | $30 | 2 s | a luz volta mais rápido; menos tempo no escuro antes do ataque da sombra (30 s) |
+| 2 | Snap Breaker | $60 | 1 s | idem |
+
+- Implementação: stat novo `BreakerHold`; o `LightService` grava `PromptHold` na âncora do disjuntor (nil = o hold da tabela) e refaz a cada mudança de upgrade.
+- Não muda a regra da anomalia (chance, tempo do ataque, onde fica o disjuntor): só o tempo do gesto. De dia não tem efeito (exceção consciente a DEC-006, como UPG-004).
+- Critérios de aceite: com o nível 2, o prompt "Reset Breaker" pede 1 s; comprar durante o apagão já vale no prompt aceso.
 
 ### UPG-008 — Patio Tables (mesas do Pad)
 

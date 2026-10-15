@@ -18,7 +18,7 @@
 --                    "assembled" (player, { Altered = boolean }) from the board when a hot dog is made
 --   Context.Give     attrs.Altered = true marks the hot dog (Tool attribute Altered, network.md §7.1)
 
-export type SlotState = "Empty" | "Working" | "Ready"
+export type SlotState = "Empty" | "Working" | "Ready" | "Cleaning" -- Cleaning: coffee machine only (TASK-328)
 
 -- network.md §3.5. Id on the wire = Station.Id * 100 + Slot. Kind must be a Content.Stations.RecordKeys key.
 export type Record = {
@@ -56,7 +56,7 @@ export type Context = {
 	Held: (player: Player) -> Tool?,
 	Consume: (player: Player, tool: Tool) -> (),
 	AddTopping: (tool: Tool, ingredient: string) -> boolean, -- ItemService: same Tool, HotDogVisual refreshed
-	Modifier: (player: Player, stat: string) -> number, -- ClassService
+	Modifier: (player: Player, stat: string, base: number?) -> number, -- ClassService (base: the class applies over it)
 	Effect: (stat: string) -> number, -- UpgradeService, current vehicle
 	Publish: (station: Station) -> (), -- KitchenService writes the Stations set from station.Records
 	Notify: (player: Player, notice: string, value: number?) -> (),

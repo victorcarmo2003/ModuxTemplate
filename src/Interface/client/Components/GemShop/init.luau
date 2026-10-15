@@ -5,7 +5,7 @@
 --   ribbon    "BEST VALUE" (Mustard) / "POPULAR" (Violet) over the top edge (Pack.Badge)
 --   art       the pack gems filling the top of the card (GemShop/Images: shop/art, no tile, no number; Hud/gem until
 --             uploaded) over the retro rays spinning slowly (Sunburst; owner request 2026-10-15, no "+30%" chip anymore)
---   total     gem icon + "700" (what the receipt credits, Pack.Gems)
+--   total     gem icon + "10,000" (what the receipt credits, Pack.Gems)
 --   split     Green "200 BONUS" pill (only the bonus, TASK-307); the pack name when there is no bonus
 --   price     Green "R$ 899" pill (live Creator Hub price when known); Slate "Soon" for a product not created
 -- The whole card is the button (TASK-307, better for kids): a transparent TextButton "Buy" per slot, a click or tap

@@ -1,56 +1,61 @@
 --!strict
 --[[
-	ANM-008 The long car: client effect (TASK-118; anomalies.md N8; architecture.md §19.13 "Long car"; MAP-01 §9.5
-	ANM-008 route; AST-065, AST-083, AST-095 row 008; sound-list SFX-151..154).
+	ANM-008 The long car: client effect (TASK-118, TASK-331; anomalies.md N8; architecture.md §19.13 "Long car"; AST-065,
+	AST-083, AST-095 row 008; sound-list SFX-151..154).
 
-	Presents only. AnomalyService (TASK-117) decides the window, who hid and who pays; this file never reads a hide.
+	Presents only. AnomalyService decides who closed the window and who is scared; this file never reads a hide.
 
 	Mount (one occurrence of the `Anomalies` set):
 	  * local car from the TASK-099 kit `ReplicatedStorage.Assets.Vehicles.LongCar` (placeholder black block if the
 	    kit is missing). Anchored, no collision / query / touch: never hits anyone (T117-07).
-	  * timeline from `StartedAt` (same pose on every client, a late joiner sees it parked): comes in from E-IN on
-	    the Ninth WB lane, passes the parking mouth, stops, reverses into AN-12 facing MAP-01 south (MAP-01 §9.5).
-	    Lanes = MapPoints E-IN / E-OUT (position + LookVector), never world constants (the place is turned 180).
-	  * high beam when parked AND (Phase = Active OR cue `car_highbeam` arrived): kit SpotLights `HighBeam` (no
-	    shadow, range 30, they light only the curb) + 2 cold `Beam`s from Light_HighL/R to the trailer (T118-01).
-	  * Phase Resolved / Failed (or the record leaves the set): beam off, the car pulls out to the left onto the
-	    Ninth EB lane and leaves by E-OUT, then is destroyed. Engine hum (`car_engine`) on the car while it exists.
+	  * timeline from `StartedAt` (same pose on every client, a late joiner sees it parked), owner request 2026-10-15
+	    (TASK-331): it comes in from E-IN and ROLLS SLOWLY down the Ninth WB lane, then suddenly SPEEDS UP onto the
+	    front of the trailer (shared/Anomaly/TrailerFront: the same pose the server tests) and BRAKES with a skid, nose
+	    on the service window. Lane = MapPoint E-IN (position + LookVector), never world constants.
+	  * high beam when parked AND (Phase = Active OR cue `car_highbeam` arrived): kit SpotLights `HighBeam` + 2 cold
+	    `Beam`s from Light_HighL/R to the service window; the goofy horn the first time it turns on.
+	  * Phase Resolved / Failed (or the record leaves the set): beam off, the car backs out onto the lane and drives on,
+	    then is destroyed. Engine hum (`car_engine`) on the car, pitched up while it rushes.
 	Cues: `car_highbeam` (beam on), `car_flash` (beam blinks twice), `car_honk` (low soft honk on the car),
-	`trailer_blackout` (trailer lights off locally for the cue Duration, then LightController repaints; no rule).
+	`trailer_blackout` (trailer lights off locally for the cue Duration), `jumpscare` (Entity = UserId % 65536: only that
+	client shows the face; the faint is the server's).
 
-	PROVISIONAL (frontend-coder, TASK-118) — numbers TASK-117 must match on the server:
-	  ARRIVE_TIME = 9.5 s after StartedAt the car is parked on AN-12; `car_highbeam` + Phase Active should come
-	  ~2 s later (StartedAt + 11.5). Keep the record LEAVE_TIME (~6 s) after Resolved/Failed so the car drives
-	  away on every client; if the record goes earlier the car still leaves (it finishes on its own).
+	PROVISIONAL (TASK-331) - numbers Rules/ANM-008 must match on the server: ARRIVE_TIME = SLOW + RUSH + BRAKE = 8.2 s
+	after StartedAt the car is braked; the beam comes BeamDelay (1 s) later. Brake screech `car_screech` (Id "" until
+	the owner sends it: silence).
 ]]
-local CollectionService = game:GetService("CollectionService")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Vide = require(ReplicatedStorage.Packages.Vide)
+local TrailerFront = require(ReplicatedStorage.shared.Anomaly.TrailerFront)
 local Effect = require(script.Parent.Parent.Effect)
+local Jumpscare = require(script.Parent.Kit.Jumpscare)
 
--- Route (MAP-01 §5.4): the Ninth WB lane comes in at E-IN, the EB lane leaves at E-OUT (behind the curve). The lanes
--- are read from the binding MapPoints (position + LookVector = travel direction), so the route follows the map
--- whatever its orientation in the place (2026-10-10: the place is turned 180 in Y, tools/assetplace/map_frame.luau).
-const EDGE_RUN = 4 -- studs before E-IN where the car appears / past E-OUT where it vanishes
-const REVERSE_LEAD = 14 -- studs past AN-12 along the WB lane (MAP-01 west) where the car stops before reversing
-const LEAVE_TURN_RUN = 16 -- studs along the EB lane (MAP-01 east) where the left turn meets the EB lane
+-- Route: the Ninth WB lane comes in at E-IN (position + LookVector = travel direction), so the route follows the map
+-- whatever its orientation in the place (2026-10-10: the place is turned 180 in Y).
+const EDGE_RUN = 4 -- studs before E-IN where the car appears
+const RUSH_RUN = 34 -- studs before the trailer front (along the lane) where the car floors it
+const BACK_TIME = 1.6 -- s backing out onto the lane when it leaves
+const LEAVE_SPEED = 26 -- studs/s at the end of the leave ease-in
+const LEAVE_RUN = 170 -- studs driven along the lane before it vanishes
+const ENTITY_MOD = 65536
 -- Fallbacks when the points are not streamed in: MAP-01 (x, z) through the map frame (x, z) -> (-x, K - z)
 const MAP_K = 67.887287 -- tools/assetplace/map_frame.luau K
 local function mapPoint(x: number, z: number): Vector3
 	return Vector3.new(-x, 0, MAP_K - z)
 end
-const FALLBACK_SPOT = CFrame.lookAt(mapPoint(70, -22), mapPoint(70, 0)) -- AN-12, facing MAP-01 south
 const FALLBACK_E_IN = CFrame.lookAt(mapPoint(136, -5), mapPoint(135, -5)) -- WB lane, travelling MAP-01 west
-const FALLBACK_E_OUT = CFrame.lookAt(mapPoint(136, 5), mapPoint(137, 5)) -- EB lane, travelling MAP-01 east
+const FALLBACK_TRL = CFrame.lookAt(mapPoint(70, 20), mapPoint(70, 0))
 
 -- Timeline (seconds; PROVISIONAL, see header)
-const DRIVE_TIME = 6
-const PAUSE_TIME = 0.5
-const REVERSE_TIME = 3
-const ARRIVE_TIME = DRIVE_TIME + PAUSE_TIME + REVERSE_TIME
-const LEAVE_TURN_TIME = 3.5
-const TURN_SAMPLES = 12
+const SLOW_TIME = 5.6 -- rolling slowly: the warning
+const RUSH_TIME = 1.8 -- floors it
+const BRAKE_TIME = 0.8 -- skids round to face the window
+const ARRIVE_TIME = SLOW_TIME + RUSH_TIME + BRAKE_TIME
+const SLOW_SHARE = 0.35 -- share of the lane run covered while rolling, at least (the rest is the rush)
+const ENGINE_RUSH = 1.8 -- engine PlaybackSpeed while rushing
+const SCREECH = "car_screech"
 
 -- Look (AST-065: black #14162A, high beam cold white #F4F7FF)
 const CAR_COLOR = Color3.fromHex("#14162A")
@@ -66,8 +71,6 @@ const BEAM_TRANSPARENCY = NumberSequence.new({
 })
 const BEAM_SPREAD = 2 -- studs between the two beam ends on the trailer
 const TRAILER_LIFT = 4 -- studs above the trailer centre the beams aim at (service window height)
-const TRAILER_FALLBACK_RANGE = 63 -- MAP-01: ~63 studs from AN-12 to the trailer window
-const VEHICLE_TAG = "Vehicle"
 
 -- Flash (cue car_flash, Duration 1): off/on twice
 const FLASH = { { false, 0.15 }, { true, 0.2 }, { false, 0.15 }, { true, 0 } }
@@ -84,7 +87,7 @@ const LAMP_OFF_COLOR = Color3.fromHex("#EAD6B0")
 
 -- A lane = point on it + travel direction (horizontal unit)
 type Lane = { Origin: Vector3, Dir: Vector3 }
-type Route = { Wb: Lane, Eb: Lane, EdgeIn: Vector3, EdgeOut: Vector3 }
+type Route = { Wb: Lane, EdgeIn: Vector3, Front: TrailerFront.Front }
 
 type CarState = {
 	Ctx: Effect.Context,
@@ -96,8 +99,8 @@ type CarState = {
 	Spots: { SpotLight },
 	Beams: { Beam },
 	Target: BasePart, -- beam ends on the trailer
-	Spot: CFrame, -- AN-12 pose
-	Route: Route, -- lanes from E-IN / E-OUT
+	Spot: CFrame, -- braked pose in front of the trailer
+	Route: Route,
 	StartedAt: number,
 	Phase: Effect.Phase,
 	Cued: boolean, -- car_highbeam arrived
@@ -105,8 +108,10 @@ type CarState = {
 	FlashOn: boolean,
 	Parked: boolean, -- already placed on the spot
 	Honked: boolean, -- goofy honk already played (or skipped for a late joiner)
+	Rushing: boolean, -- engine pitched up
+	Screeched: boolean, -- brake screech played (or skipped for a late joiner)
+	Engine: Sound?,
 	LeaveAt: number?, -- server time the car starts to pull out
-	TurnLength: number,
 	Orphan: boolean, -- the record left the set
 	Done: boolean,
 	Connection: RBXScriptConnection?,
@@ -144,85 +149,70 @@ local function flatUnit(v: Vector3, default: Vector3): Vector3
 	return if flat.Magnitude > 1e-3 then flat.Unit else default
 end
 
-local function lane(point: CFrame): Lane
-	return { Origin = point.Position, Dir = flatUnit(point.LookVector, Vector3.xAxis) }
-end
-
--- Lanes of the route from the binding (E-IN = WB lane, E-OUT = EB lane), fallbacks when not streamed in
-local function route(ctx: Effect.Context): Route
-	const eIn = ctx.Point("E-IN") or FALLBACK_E_IN
-	const eOut = ctx.Point("E-OUT") or FALLBACK_E_OUT
-	const wb, eb = lane(eIn), lane(eOut)
-	return { Wb = wb, Eb = eb, EdgeIn = wb.Origin - wb.Dir * EDGE_RUN, EdgeOut = eb.Origin + eb.Dir * EDGE_RUN }
-end
-
 -- `p` projected on the lane line, at height y
 local function onLane(l: Lane, p: Vector3, y: number): Vector3
 	const q = l.Origin + l.Dir * (p - l.Origin):Dot(l.Dir)
 	return Vector3.new(q.X, y, q.Z)
 end
 
--- Reverse curve: from the WB lane past the spot, back into the spot (faces along the WB lane, then the spot)
-local function reverseCurve(spot: CFrame, r: Route): (Vector3, Vector3, Vector3)
-	const p = spot.Position
-	const r1 = onLane(r.Wb, p, p.Y)
-	return r1 + r.Wb.Dir * REVERSE_LEAD, r1, p
+-- Lane from E-IN and the trailer front (TRL + WALKER-10), fallbacks when not streamed in
+local function route(ctx: Effect.Context): Route
+	const eIn = ctx.Point("E-IN") or FALLBACK_E_IN
+	const wb: Lane = { Origin = eIn.Position, Dir = flatUnit(eIn.LookVector, Vector3.xAxis) }
+	const front = TrailerFront.Of(ctx.Point("TRL") or FALLBACK_TRL, ctx.Point("WALKER-10"))
+	return { Wb = wb, EdgeIn = wb.Origin - wb.Dir * EDGE_RUN, Front = front }
 end
 
--- Leave curve: out of the spot forward, turning left onto the EB lane
-local function leaveCurve(spot: CFrame, r: Route): (Vector3, Vector3, Vector3)
-	const p = spot.Position
-	const l1 = onLane(r.Eb, p, p.Y)
-	return p, l1, l1 + r.Eb.Dir * LEAVE_TURN_RUN
-end
-
-local function curveLength(a: Vector3, b: Vector3, c: Vector3): number
-	local length = 0
-	local last = a
-	for i = 1, TURN_SAMPLES do
-		const point = bezier(a, b, c, i / TURN_SAMPLES)
-		length += (point - last).Magnitude
-		last = point
-	end
-	return length
+-- Key points of the run: lane start, where it floors it, the lane point abeam the trailer, the braked spot
+local function keyPoints(r: Route): (Vector3, Vector3, Vector3, Vector3)
+	const spot = r.Front.Stop.Position
+	const y = spot.Y
+	const abeam = onLane(r.Wb, spot, y)
+	const start = onLane(r.Wb, r.EdgeIn, y)
+	-- the rush starts RUSH_RUN studs before the trailer, never behind the lane start
+	const run = math.max(0, (abeam - start):Dot(r.Wb.Dir))
+	const rush = start + r.Wb.Dir * math.max(run * SLOW_SHARE, run - RUSH_RUN)
+	return start, rush, abeam, spot
 end
 
 -- Pose while arriving / parked, `t` seconds after StartedAt
 local function arrivePose(spot: CFrame, r: Route, t: number): CFrame
-	const r0, r1, r2 = reverseCurve(spot, r)
-	if t < DRIVE_TIME then
-		-- ease-out along the WB lane: comes in fast, stops past the parking mouth
-		const a = math.max(t, 0) / DRIVE_TIME
-		const e = 1 - (1 - a) * (1 - a)
-		const start = onLane(r.Wb, r.EdgeIn, spot.Position.Y)
-		return facing(start:Lerp(r0, e), r.Wb.Dir)
-	elseif t < DRIVE_TIME + PAUSE_TIME then
-		return facing(r0, r.Wb.Dir)
+	const start, rush, abeam, stop = keyPoints(r)
+	if t < SLOW_TIME then
+		-- rolling slowly, a constant crawl down the lane
+		return facing(start:Lerp(rush, math.max(t, 0) / SLOW_TIME), r.Wb.Dir)
+	elseif t < SLOW_TIME + RUSH_TIME then
+		-- floors it: ease-in along a curve that swings off the lane onto the trailer front
+		const a = (t - SLOW_TIME) / RUSH_TIME
+		const e = a * a
+		return facing(bezier(rush, abeam, stop, e), bezierTangent(rush, abeam, stop, math.max(e, 0.05)))
 	elseif t < ARRIVE_TIME then
-		const e = smooth((t - DRIVE_TIME - PAUSE_TIME) / REVERSE_TIME)
-		-- reversing: the car faces against its motion
-		return facing(bezier(r0, r1, r2, e), -bezierTangent(r0, r1, r2, e))
+		-- brakes: skids round until the nose points at the window
+		const e = smooth((t - SLOW_TIME - RUSH_TIME) / BRAKE_TIME)
+		const from = facing(stop, bezierTangent(rush, abeam, stop, 1))
+		return from:Lerp(spot, e)
 	end
 	return spot
 end
 
--- Pose while leaving, `u` seconds after LeaveAt; nil = past E-OUT
+-- Pose while leaving, `u` seconds after LeaveAt; nil = gone
 local function leavePose(state: CarState, u: number): CFrame?
-	const spot = state.Spot
-	const l0, l1, l2 = leaveCurve(spot, state.Route)
-	if u < LEAVE_TURN_TIME then
-		-- ease-in out of the spot ("vai embora devagar")
-		const a = math.max(u, 0) / LEAVE_TURN_TIME
-		const e = a * a
-		return facing(bezier(l0, l1, l2, e), bezierTangent(l0, l1, l2, e))
+	const r = state.Route
+	const stop = state.Spot.Position
+	const abeam = onLane(r.Wb, stop, stop.Y)
+	if u < BACK_TIME then
+		-- backs out onto the lane, still facing the trailer, turning to the lane at the end
+		const e = smooth(u / BACK_TIME)
+		const pose = facing(stop:Lerp(abeam, e), state.Spot.LookVector)
+		return pose:Lerp(facing(abeam, r.Wb.Dir), e * e)
 	end
-	const speed = 2 * state.TurnLength / LEAVE_TURN_TIME -- end speed of the ease-in
-	const eb = state.Route.Eb
-	const run = speed * (u - LEAVE_TURN_TIME)
-	if run > (state.Route.EdgeOut - l2):Dot(eb.Dir) then
+	const v = u - BACK_TIME
+	const accel = LEAVE_SPEED / 2 -- reaches LEAVE_SPEED after 2 s
+	const run = if v < 2 then 0.5 * accel * v * v else accel * 2 + LEAVE_SPEED * (v - 2)
+	if run > LEAVE_RUN then
 		return nil
 	end
-	return facing(l2 + eb.Dir * run, eb.Dir)
+	return facing(abeam + r.Wb.Dir * run, r.Wb.Dir)
 end
 
 -- Model --------------------------------------------------------------------------------------------------------------
@@ -266,27 +256,9 @@ local function cloneCar(): Model
 	return fallbackModel()
 end
 
--- Current vehicle (trailer or cart) of the party: Vehicle tag with the Vehicle attribute of RoundController
-local function vehicleModel(ctx: Effect.Context): Instance?
-	const key = Vide.untrack(ctx.Round.Vehicle)
-	for _, instance in CollectionService:GetTagged(VEHICLE_TAG) do
-		if instance:GetAttribute("Vehicle") == key and instance:IsA("PVInstance") then
-			return instance
-		end
-	end
-	return nil
-end
-
--- Where the beams land: centre of the current vehicle, a bit up (the service window)
-local function beamTarget(ctx: Effect.Context, spot: CFrame): Vector3
-	const vehicle = vehicleModel(ctx)
-	if vehicle and vehicle:IsA("Model") then
-		const box = vehicle:GetBoundingBox()
-		return box.Position + Vector3.new(0, TRAILER_LIFT, 0)
-	elseif vehicle and vehicle:IsA("BasePart") then
-		return vehicle.Position + Vector3.new(0, TRAILER_LIFT, 0)
-	end
-	return spot.Position + spot.LookVector * TRAILER_FALLBACK_RANGE + Vector3.new(0, TRAILER_LIFT, 0)
+-- Where the beams land: the service window of the trailer (TrailerFront), a bit up
+local function beamTarget(lanes: Route): Vector3
+	return lanes.Front.Window + Vector3.new(0, TRAILER_LIFT, 0)
 end
 
 local function makeBeam(from: Attachment, to: Attachment): Beam
@@ -308,7 +280,8 @@ local function makeBeam(from: Attachment, to: Attachment): Beam
 end
 
 local function buildCar(ctx: Effect.Context, occ: Effect.Occurrence): CarState
-	const spot = ctx.Point("AN-12") or FALLBACK_SPOT
+	const lanes = route(ctx)
+	const spot = lanes.Front.Stop
 	const model = cloneCar()
 	model.Name = `LongCar_{occ.Id}`
 	const body = model.PrimaryPart :: BasePart
@@ -338,7 +311,7 @@ local function buildCar(ctx: Effect.Context, occ: Effect.Occurrence): CarState
 	end
 
 	-- beam ends on the trailer (one invisible anchor part, two attachments side by side)
-	const target = beamTarget(ctx, spot)
+	const target = beamTarget(lanes)
 	const holder = Instance.new("Part")
 	holder.Name = "HighBeamTarget"
 	holder.Anchored = true
@@ -362,8 +335,7 @@ local function buildCar(ctx: Effect.Context, occ: Effect.Occurrence): CarState
 	end
 
 	const startedAt = Vide.untrack(occ.Record).StartedAt
-	const lanes = route(ctx)
-	const l0, l1, l2 = leaveCurve(spot, lanes)
+	const late = ctx.Now() - startedAt > ARRIVE_TIME
 	const state: CarState = {
 		Ctx = ctx,
 		Model = model,
@@ -382,16 +354,18 @@ local function buildCar(ctx: Effect.Context, occ: Effect.Occurrence): CarState
 		Flashing = false,
 		FlashOn = false,
 		Parked = false,
-		Honked = ctx.Now() - startedAt > ARRIVE_TIME and Vide.untrack(occ.Record).Phase == "Active",
+		Honked = late and Vide.untrack(occ.Record).Phase == "Active",
+		Rushing = false,
+		Screeched = late,
+		Engine = nil,
 		LeaveAt = nil,
-		TurnLength = curveLength(l0, l1, l2),
 		Orphan = false,
 		Done = false,
 		Connection = nil,
 	}
 	model:PivotTo(arrivePose(spot, lanes, ctx.Now() - startedAt))
 	model.Parent = ctx.Folder()
-	ctx.Audio:Loop("car_engine", body, true)
+	state.Engine = ctx.Audio:Loop("car_engine", body, true)
 	return state
 end
 
@@ -464,6 +438,20 @@ local function step(state: CarState, occId: number)
 		return
 	end
 	const parked = now >= parkedAt
+	-- the rush: engine roars; the brake: one screech
+	const t = now - state.StartedAt
+	const rushing = t >= SLOW_TIME and t < SLOW_TIME + RUSH_TIME
+	if rushing ~= state.Rushing then
+		state.Rushing = rushing
+		const engine = state.Engine
+		if engine ~= nil and engine.Parent ~= nil then
+			engine.PlaybackSpeed = if rushing then ENGINE_RUSH else 1
+		end
+	end
+	if not state.Screeched and t >= SLOW_TIME + RUSH_TIME then
+		state.Screeched = true
+		state.Ctx.Audio:Play(SCREECH, state.Body)
+	end
 	local beam = parked and (state.Phase == "Active" or state.Cued)
 	if state.Flashing then
 		beam = parked and state.FlashOn
@@ -576,10 +564,14 @@ return {
 		elseif cue.Cue == "car_honk" then
 			const at: Vector3 | Instance = if state and not state.Done
 				then state.Body
-				else (ctx.Point("AN-12") or FALLBACK_SPOT).Position
+				else route(ctx).Front.Stop.Position
 			ctx.Audio:Play("car_honk_soft", at, { Speed = HONK_SPEED, Volume = HONK_VOLUME })
 		elseif cue.Cue == "trailer_blackout" then
 			blackout(ctx, cue.Row.Duration)
+		elseif cue.Cue == "jumpscare" then
+			if cue.Entity == Players.LocalPlayer.UserId % ENTITY_MOD then
+				Jumpscare.Show(ctx)
+			end
 		end
 	end,
 } :: Effect.Module

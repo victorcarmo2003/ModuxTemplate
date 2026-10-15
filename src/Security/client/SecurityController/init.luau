@@ -75,7 +75,6 @@ function SecurityController:Setup()
 	self.Light = nil :: Part?
 	self.Saved = {} :: Saved
 	self.BoundNames = {} :: { string }
-	self.PreviousContext = "Gameplay" :: string
 	self.Unmount = nil :: (() -> ())?
 	self.Connection = nil :: RBXScriptConnection?
 	-- parts of the camera model being looked through, hidden locally (the eye sits inside the housing)
@@ -133,9 +132,7 @@ function SecurityController:Enter()
 	end)
 	self.SwitchedAt = now
 	self:Isolate(true)
-	const input = self.Dependencies.InputController
-	self.PreviousContext = input.Context
-	input:SetContext("Menu")
+	self.Dependencies.InputController:Hold("Security", true)
 	self:Bind(true)
 	self:Mount()
 	self:ApplyLook()
@@ -199,7 +196,7 @@ function SecurityController:Teardown()
 	end
 	self:Bind(false)
 	self:Isolate(false)
-	self.Dependencies.InputController:SetContext(if self.PreviousContext == "Menu" then "Menu" else "Gameplay")
+	self.Dependencies.InputController:Hold("Security", false)
 	if self.Effect ~= nil then
 		self.Effect:Destroy()
 		self.Effect = nil

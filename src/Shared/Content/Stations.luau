@@ -75,13 +75,15 @@ const base = Table.new({
 		Params = {},
 	},
 	{
-		-- trailer only (wave 2, FEAT-021): BrewTime 6 s, Barista via the CoffeeBrewTime class stat
+		-- trailer only (wave 2, FEAT-021): BrewTime 6 s, Barista via the CoffeeBrewTime class stat. TASK-328 (owner request
+		-- 2026-10-15, Provisional): the machine brews by itself and owns the wait; after a cup is taken it cleans for
+		-- CleanTime s, then brews the next one (the player no longer has a drink cooldown)
 		Key = "coffee_machine",
 		Letter = "C",
 		Record = "Single",
 		Actions = { "brew_coffee", "restock" },
 		Ingredient = "coffee",
-		Params = { BrewTime = 6 },
+		Params = { BrewTime = 6, CleanTime = 60 },
 	},
 	{
 		-- focused prep seats Station_1..4 (DEC-223, prep-mode.md §6): the seat state lives in the PrepSeats set, not in

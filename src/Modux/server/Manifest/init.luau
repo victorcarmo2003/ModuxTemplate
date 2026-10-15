@@ -17,6 +17,7 @@ local TipJarService = require(ServerScriptService.server.ModuxTypes.TipJarServic
 local HallucinationService = require(ServerScriptService.server.ModuxTypes.HallucinationService)
 local InteractionService = require(ServerScriptService.server.ModuxTypes.InteractionService)
 local ItemService = require(ServerScriptService.server.ModuxTypes.ItemService)
+local JournalService = require(ServerScriptService.server.ModuxTypes.JournalService)
 local KitchenService = require(ServerScriptService.server.ModuxTypes.KitchenService)
 local LightService = require(ServerScriptService.server.ModuxTypes.LightService)
 local LobbyService = require(ServerScriptService.server.ModuxTypes.LobbyService)
@@ -67,6 +68,7 @@ export type AllServices = {
 	HallucinationService: HallucinationService.Public,
 	InteractionService: InteractionService.Public,
 	ItemService: ItemService.Public,
+	JournalService: JournalService.Public,
 	KitchenService: KitchenService.Public,
 	LightService: LightService.Public,
 	LobbyService: LobbyService.Public,

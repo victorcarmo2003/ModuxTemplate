@@ -133,3 +133,62 @@ Anomalia nova de cliente = 1 linha de dado + 1 função de modificador (10–30 
 | e | Esconder **fora do trailer, nos fundos** (porta dos fundos + esconderijo) | DEC-221 (fechar a janela) | sair e esconder nos fundos, como o dono pediu |
 | f | Atmosferas por noite | DEC-251 (N5 seca) | sim; a noite 5 não usa chuva |
 | g | O que fazer com N6 (wavers), N8 (carro comprido), N9 (batida), N2 (comida) | DEC-073 | N6, N8 cortadas; N9 vira susto (D); N2 vira cliente errado (A) |
+
+## 8. Ritmo do começo — noites 1–5 (TASK-341, Provisório)
+
+Pedido do dono (2026-10-15, playtest): as anomalias "só começam a ficar divertidas lá pela décima noite". Diagnóstico da tabela
+anterior (TASK-271): a noite 1 tinha **só a família A** e **um único** cliente errado no sorteio (4 sem-rosto em 9 min, 0 sustos);
+as noites 2–3 eram 5 eventos de "recusar" e 2–3 sustos; a primeira coisa fora do balcão (falha de energia) só vinha na noite 4,
+e nada com verbo da família D antes da noite 8. Resultado: cinco noites quase só de "recusar cliente estranho".
+
+### 8.1 Princípios do começo
+
+1. **Toda noite tem pelo menos duas famílias** (desde a noite 1: A + sustos D de ambiente).
+2. **Algo novo a cada noite**, e a novidade sai do balcão cedo: falha de energia na **noite 3**.
+3. **Um evento com risco que não é "recusar" antes da noite 4**: a batida na porta (ANM-009, D) entra no sorteio na **noite 2**
+   — a ligação da noite 2 já diz "Odd noises? Just noises. Keep working." (ignorar = certo; abrir = susto + desmaio).
+4. **Ritmo denso:** um acontecimento (evento ou susto) a cada ~45–55 s da janela de turno, contra 60–110 s antes.
+5. **Variedade:** o sorteio já evita a mesma anomalia em slots vizinhos quando o grupo tem outra; com 2–5 anomalias no grupo
+   desde a noite 2, isso passa a funcionar (na noite 1 o grupo A tem uma só — compensado pelos sustos D, que têm cooldown por efeito).
+6. **Monstro de relance antes da noite 6:** `monster_glimpse` com peso ×3 no catálogo D (≈ 1 em 6 sustos); com 18 sustos nas noites
+   2–5 a chance de pelo menos um relance passa de 90 %. Garantia exata pede código (TASK-343).
+
+### 8.2 Tabela aplicada (`Content/Nights.luau`, `Content/Anomalies.luau`, `Content/BossCalls.luau`)
+
+| Noite | Famílias | Novidade (ligação) | Estreia calada no sorteio | Atmosfera | Eventos | Sustos D | MaxSim | MinGap |
+|---|---|---|---|---|---|---|---|---|
+| 1 | A, **D** | sem rosto | — | normal | 4 | **4** (era 0) | 1 | 60 |
+| 2 | A, D | tremendo ("odd noises") | comida errada, **batida na porta** | normal | **6** (5) | **4** (2) | 1 | **50** |
+| 3 | A, **C**, D | **falha de energia** (era N4) | — | **breu** | **6** (5) | **4** (3) | 1 | **50** |
+| 4 | A, C, D | pescoço invertido (era N3) | — | **chuva** | **7** (6) | **5** (3) | 2 | **45** |
+| 5 | A, C, D | olhos brancos, a cópia, o sino | capa de chuva | neblina | **7** (6) | **5** (4) | 2 | 40 |
+| 6 | A, B, C, D | Walker (esconder) | cabeça grande | névoa vermelha | **8** (7) | **5** (4) | 2 | 40 |
+| 7 | A, B, C, D | rastejador | flutuante | tempestade | **8** (7) | 5 | 2 | 40 |
+| 8 | todas | sorriso + carro | olhar fixo | breu | **9** (8) | 6 (5) | 3 | 25 |
+| 9 | todas | sombra no teto (+ lembra a batida) | — | névoa vermelha | **10** (9) | 6 | 3 | 25 |
+| 10 | todas | Hush (5:45 roteirizado) | — | lua de sangue | 12 | 6 | 3 | 25 |
+
+Entre parênteses o valor antigo. Mudanças fora de `Nights.luau`, todas só dado:
+- `Anomalies.luau`: `anm_020_blackout` estreia na N3 (era 4), `anm_012_turned_neck` na N4 (era 3), `anm_009_knock` na N2 (era 9).
+- `BossCalls.luau`: os blocos `call_night_3` e `call_night_4` trocados (mesmas falas, então a voz pré-gerada continua batendo).
+- `Hallucinations.luau`: `monster_glimpse` peso 1 → 3.
+
+Cabe no `Validate` (Eventos × MinGap ≤ janela Shift = 0,8 × duração: N1 240/432 s, N2 300/464, N3 300/496, N4 315/528).
+
+### 8.3 Curva de cada noite (calmo → pico → respiro)
+
+Hoje o agendador corta a janela 9 PM–5 AM em fatias iguais (um evento por fatia, sustos idem) e a novidade cai no primeiro terço.
+Com dado só dá para mexer na densidade, não no formato. **Recomendação (TASK-342, código):** curva por noite com três trechos —
+**calmo** (9–11 PM: só A e sustos de ambiente), **pico** (11 PM–3 AM: ~60 % dos eventos, C/B/D com verbo, 2 simultâneos permitidos),
+**respiro** (3–5 AM: menos eventos, sustos leves) — e uma **pausa de respiro de ~30 s** depois de cada evento C/B. Os sustos D
+passam a servir de **prenúncio**: um susto 20–40 s antes de cada evento C/B.
+
+### 8.4 Fica para decisão / código
+
+| Ponto | Recomendação (Provisória) | Onde |
+|---|---|---|
+| Curva calmo → pico → respiro | `Curve` por noite no agendador + respiro após C/B + susto de prenúncio | TASK-342 |
+| Relance garantido (monstro antes da N6, rosto na janela na N2) | `Nights[k].FeaturedScares`: chaves D que tocam ao menos uma vez na noite | TASK-343 |
+| Ligação da N2 dizer a batida com todas as letras ("Knocks out back? Don't open.") | narrativa + voz gerada | TASK-344 |
+| Carro (ANM-008) mais cedo (N4/N5) | opção boa, mas pede mover 2 falas da N8 e gerar voz nova; manter N8 até o próximo playtest | sem task |
+| §5 desta proposta | substituída por esta tabela no que diz respeito às noites 1–5 | secretário |

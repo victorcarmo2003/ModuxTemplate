@@ -19,6 +19,7 @@ return {
 	ServerScriptService.server.Hallucination.HallucinationService,
 	ServerScriptService.server.Interaction.InteractionService,
 	ServerScriptService.server.Item.ItemService,
+	ServerScriptService.server.Journal.JournalService,
 	ServerScriptService.server.Kitchen.KitchenService,
 	ServerScriptService.server.Light.LightService,
 	ServerScriptService.server.Lobby.LobbyService,
