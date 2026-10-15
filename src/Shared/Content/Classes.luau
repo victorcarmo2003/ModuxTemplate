@@ -1,7 +1,8 @@
 --!strict
 -- Playable classes: animal = class (content-data.md §3.10; DEC-069, DEC-070, DEC-186).
 -- TASK-009: 6 in the MVP (dog, rabbit, cat, bear, fox, owl), panda/lion in the first update (DEC-186).
--- Bonus + drawback are passive (DEC-186), numbers unchanged from DEC-069; prices by tier 0/45/120/180 (DEC-070).
+-- Bonus + drawback are passive (DEC-186), numbers unchanged from DEC-069. Gem prices x75 economy (TASK-308, owner request
+-- 2026-10-15, Provisional; was 0/45/120/180 by tier, DEC-070): 0 / 2,000 / 3,000 / 10,000 / 15,000 / 20,000.
 -- Keys are persisted in the profile (Classes, SelectedClass) and are the Profile/ClassAction enum: never rename.
 -- Name, Description and Blurb are placeholders (narrative-writer, DEC-022, ui-text.md "Crew" screen): change text, not keys.
 -- Raccoon is never a class species (DEC-159, DEC-186): Validate checks Species.ReservedFor.
@@ -56,7 +57,7 @@ return Table.new({
 		Skills = {
 			{
 				Name = "All-Rounder",
-				Text = "All-Rounder keeps you at the crew standard in everything.",
+				Text = "All-Rounder keeps every stat at the crew standard.",
 				Icon = "skill_all_round",
 				Kind = "Perk",
 			},
@@ -88,7 +89,7 @@ return Table.new({
 			},
 		},
 		Tier = 1,
-		Price = 45, -- DEC-070 tier 1
+		Price = 2000, -- tier 1 (TASK-308; DEC-070 was 45)
 		InMvp = true,
 		Effects = {
 			{ Stat = "WalkSpeed", Op = "Set", Value = 18, Scope = "Self" }, -- 16 -> 18 (DEC-069)
@@ -117,7 +118,7 @@ return Table.new({
 			},
 		},
 		Tier = 1,
-		Price = 45, -- DEC-070 tier 1
+		Price = 2000, -- tier 1 (TASK-308; DEC-070 was 45)
 		InMvp = true,
 		Effects = {
 			{ Stat = "GrillTime", Op = "Mul", Value = 0.85, Scope = "Self" }, -- only sausages he placed (DEC-069)
@@ -146,7 +147,7 @@ return Table.new({
 			},
 		},
 		Tier = 1,
-		Price = 45, -- DEC-070 tier 1; in the MVP since DEC-186
+		Price = 3000, -- tier 1, top of it (TASK-308; DEC-070 was 45); in the MVP since DEC-186
 		InMvp = true,
 		Effects = {
 			{ Stat = "PackageLimit", Op = "Set", Value = 3, Scope = "Self" }, -- 2 -> 3 (DEC-069, DEC-049)
@@ -176,7 +177,7 @@ return Table.new({
 			},
 		},
 		Tier = 2,
-		Price = 120, -- DEC-070 tier 2; in the MVP since DEC-186
+		Price = 10000, -- tier 2 (TASK-308; DEC-070 was 120); in the MVP since DEC-186
 		InMvp = true,
 		Effects = {
 			-- "own order": Take Order per content-data §3.10 vs Serve per classes.md CLS-005 (Provisional, TASK-017)
@@ -194,7 +195,7 @@ return Table.new({
 		Skills = {
 			{
 				Name = "Wide Awake",
-				Text = "Wide Awake starts nights at 120 sanity (max 120).",
+				Text = "Wide Awake starts nights with 120 max sanity.",
 				Icon = "skill_wide_awake",
 				Kind = "Perk",
 			},
@@ -206,7 +207,7 @@ return Table.new({
 			},
 		},
 		Tier = 2,
-		Price = 120, -- DEC-070 tier 2
+		Price = 10000, -- tier 2 (TASK-308; DEC-070 was 120)
 		InMvp = true,
 		Effects = {
 			{ Stat = "SanityStart", Op = "Set", Value = 120, Scope = "Self" }, -- DEC-069 (wave 2)
@@ -224,7 +225,7 @@ return Table.new({
 		Skills = {
 			{
 				Name = "Double Shot",
-				Text = "Double Shot brews coffee in 3 s that restores 35.",
+				Text = "Double Shot: 3 s coffee that restores 35.",
 				Icon = "skill_double_shot",
 				Kind = "Perk",
 			},
@@ -236,7 +237,7 @@ return Table.new({
 			},
 		},
 		Tier = 2,
-		Price = 120, -- DEC-070 tier 2
+		Price = 15000, -- tier 2, top of it (TASK-308; DEC-070 was 120)
 		InMvp = false, -- first update (DEC-186)
 		Effects = {
 			{ Stat = "CoffeeBrewTime", Op = "Set", Value = 3, Scope = "Self" }, -- coffee he made (DEC-069)
@@ -254,7 +255,7 @@ return Table.new({
 		Skills = {
 			{
 				Name = "Rally Cry",
-				Text = "Rally Cry gives the party +5 boss bonus (no stacking).",
+				Text = "Rally Cry gives the party +5 boss bonus.",
 				Icon = "skill_rally_cry",
 				Kind = "Perk",
 			},
@@ -266,7 +267,7 @@ return Table.new({
 			},
 		},
 		Tier = 3,
-		Price = 180, -- DEC-070 tier 3
+		Price = 20000, -- tier 3 (TASK-308; DEC-070 was 180)
 		InMvp = false, -- first update (DEC-186)
 		Effects = {
 			{ Stat = "BossBonusPP", Op = "Add", Value = 5, Scope = "Party" }, -- does not stack (DEC-069)

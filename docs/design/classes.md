@@ -26,7 +26,7 @@ marcados como proposta. Nomes são placeholders (narrative-writer). Sistema: FEA
 | Teto | lucro/min solo entre −12% e +12% do Rookie; nenhuma classe toca regra de anomalia (verbo, crítica, chances, −35) |
 | Contrapeso | toda classe paga tem um, em outro eixo |
 | Obtenção | só com gemas ganhas jogando (gemas creditadas e salvas por evento, DEC-104; anti-AFK, DEC-083) |
-| Preço | tier 1 = 45 · tier 2 = 120 · tier 3 = 180 gemas **[DEC-070]** |
+| Preço | tier 1 = 45 · tier 2 = 120 · tier 3 = 180 gemas **[DEC-070]**. **Vigente (TASK-308, Provisório, 2026-10-15):** Coelho/Gato 2.000, Urso 3.000, Raposa/Coruja 10.000, Panda 15.000, Leão 20.000 (`economy.md` §9) |
 | Reviver, ambulância, atropelamento (rodadas 9–15) | nenhuma classe muda: limite de revives (DEC-129), janela de 10 s, prazo de reviver (DEC-115), preço do Rescue Whistle (DEC-129), tempo no chão do atropelamento, proteção de 5 s. Mesmo espírito de "nenhuma classe toca regra de anomalia" (DEC-069) e da guarda contra pay-to-win (Q-017) |
 | Sem XP | classes não têm nível nem XP **[DEC-081]** |
 

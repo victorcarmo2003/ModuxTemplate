@@ -12,7 +12,13 @@
 --   bottom centre  squad status card (SquadStatus: Solo / Squad n/4, member heads, Friends only) over the big Play
 --                  button (text and colour from `Play`: PLAY green, START SQUAD mustard, READY, STARTING..., CANCEL dark
 --                  mustard while the countdown can still be aborted). Shown only while `PlayShown` (TASK-296: the
---                  player is in a squad); pops in / out with Motion.Pop
+--                  player is in a squad); pops in / out with Motion.Pop. While `Gear` (TASK-306: the leader of a created
+--                  room) the Play button (START) shrinks to the left and a round gear (GearButton) sits on its right:
+--                  it reopens the room setup (OnGear). Same total width, so the card stays centred over both
+--   top centre     players online in the whole game (TASK-312, owner request 2026-10-15): Ink pill, people icon +
+--                  "200 players online" (12K, 1.2M), rolls with Motion.Count. The Roblox top bar keeps its buttons in
+--                  the corners, so the pill sits at TOP; on a narrow screen (portrait phone) under the bar (TOPBAR_FREE).
+--                  The Notices column (LobbyController) starts under it (same rule there, NOTICE_TOP*)
 -- Kept clear of the mobile thumbstick (bottom left) and jump button (bottom right). Key badges ("C", "Y"...) on the
 -- tiles when the device is not touch (`Keys`). Pure: only props.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -26,7 +32,9 @@ local CartoonButton = require(script.Parent.CartoonButton)
 local CartoonLabel = require(script.Parent.CartoonLabel)
 local KeyChip = require(script.Parent.KeyChip)
 local SquadStatus = require(script.Parent.SquadStatus)
+local GearButton = require(script.Parent.GearButton)
 local Icon = require(script.Parent.LobbyWindow.Icon)
+local Count = require(script.Parent.HudPill.Count)
 
 const create = Vide.create
 const source = Vide.source
@@ -63,7 +71,13 @@ export type Props = {
 	CancelKey: (() -> string)?,
 	-- Card + Play button shown (in a squad, TASK-296); missing = always shown.
 	PlayShown: (() -> boolean)?,
+	-- Round gear on the right of the Play button (TASK-306: the leader of a created room); missing = never.
+	Gear: (() -> boolean)?,
+	-- Tap on the gear (reopens the room setup).
+	OnGear: (() -> ())?,
 	Scale: (() -> number)?,
+	-- Players online in the whole game (TASK-312, `Online` set); missing or 0 = no pill.
+	Online: (() -> number)?,
 }
 
 const MARGIN = 12
@@ -75,6 +89,7 @@ const PILL = 44
 const PLAY_WIDTH = 210
 const PLAY_HEIGHT = 52
 const CARD_GAP = 8
+const GEAR_GAP = 8 -- px between the Play button and the gear (the gear is PLAY_HEIGHT round)
 const SHORT = 440 -- px tall screens under this get the 2 x 2 grid
 const NARROW = 420 -- px wide screens under this get the small tiles
 -- The gem pill sits at the middle of the screen height, but never lower than this many real px from the bottom edge: the
@@ -83,6 +98,25 @@ const FREE_BOTTOM = 200
 -- The tile column sits at the middle too, but never higher than this many real px from the top edge: the Roblox top bar
 -- (menu, chat, microphone; ~58 px, HudController TOPBAR_REAL) is over the top-left corner
 const TOPBAR_FREE = 64
+const ONLINE_PILL = 34 -- px tall (UIScale grows it)
+
+-- "950", "1.2K", "12K", "3.4M": one decimal under 10 of a unit, none above.
+local function short(value: number): string
+	const whole = math.max(math.floor(value + 0.5), 0)
+	if whole >= 1e6 then
+		const amount = whole / 1e6
+		return if amount < 10 then `{math.floor(amount * 10) / 10}M` else `{math.floor(amount)}M`
+	elseif whole >= 1e3 then
+		const amount = whole / 1e3
+		return if amount < 10 then `{math.floor(amount * 10) / 10}K` else `{math.floor(amount)}K`
+	end
+	return tostring(whole)
+end
+
+local function onlineText(value: number): string
+	const whole = math.max(math.floor(value + 0.5), 0)
+	return `{short(whole)} {if whole == 1 then "player" else "players"} online`
+end
 
 -- Dark mustard, Ink text stroke: reads as "stop" next to the green PLAY without the forbidden alert red.
 const CANCEL_TONE: Theme.Tone = {
@@ -121,6 +155,9 @@ return function(props: Props): Frame
 		return if props.PlayShown then props.PlayShown() else true
 	end
 	const playPop = Motion.Pop(playShown)
+	const gearShown = function(): boolean
+		return props.Gear ~= nil and props.Gear()
+	end
 
 	-- Real px size of the screen (this root fills it): decides the grid and the tile size.
 	const area = source(Vector2.new(1000, 700))
@@ -147,6 +184,11 @@ return function(props: Props): Frame
 	const tileSize = function(): UDim2
 		return UDim2.fromOffset(tile(), tile())
 	end
+
+	const online = function(): number
+		return if props.Online then props.Online() else 0
+	end
+	const onlineShown = Motion.Count(online)
 
 	const tiles: { Instance } = {}
 	for index, def in TILES do
@@ -235,6 +277,42 @@ return function(props: Props): Frame
 		BackgroundTransparency = 1,
 		Visible = props.Visible,
 
+		-- Top centre: players online in the whole game (TASK-312)
+		CartoonPanel({
+			Name = "Online",
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = function()
+				return UDim2.new(0.5, 0, 0, if area().X < NARROW then TOPBAR_FREE else TOP)
+			end,
+			Size = UDim2.fromOffset(0, ONLINE_PILL),
+			AutomaticSize = Enum.AutomaticSize.X,
+			Tone = Theme.Tone.Ink,
+			Lip = 3,
+			Outline = 2,
+			Padding = { Left = 6, Right = 12 },
+			Visible = function()
+				return online() > 0
+			end,
+			Children = {
+				createRaw("UIScale")({ Scale = scaled }),
+				create("UIListLayout")({
+					FillDirection = Enum.FillDirection.Horizontal,
+					VerticalAlignment = Enum.VerticalAlignment.Center,
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					Padding = UDim.new(0, 6),
+				}),
+				Icon("Ui/friends", ONLINE_PILL - 10, 1),
+				CartoonLabel({
+					Name = "Count",
+					LayoutOrder = 2,
+					TextSize = 18,
+					Text = function()
+						return onlineText(onlineShown())
+					end,
+				}),
+			},
+		}),
+
 		-- Right, centred vertically: the gem pill alone (opens the shop)
 		create("Frame")({
 			Name = "Wallet",
@@ -269,7 +347,7 @@ return function(props: Props): Frame
 						LayoutOrder = 2,
 						TextSize = 22,
 						Text = function()
-							return tostring(props.Gems())
+							return Count(props.Gems())
 						end,
 					}),
 					CartoonPanel({
@@ -340,7 +418,10 @@ return function(props: Props): Frame
 
 			CartoonButton({
 				Name = "Play",
-				Size = UDim2.fromScale(1, 1),
+				-- the gear takes the right end of the same width (TASK-306)
+				Size = function()
+					return if gearShown() then UDim2.new(1, -(PLAY_HEIGHT + GEAR_GAP), 1, 0) else UDim2.fromScale(1, 1)
+				end,
 				TextSize = 24,
 				Outline = Theme.Outline.Thick,
 				Radius = Theme.Radius.Card,
@@ -355,6 +436,19 @@ return function(props: Props): Frame
 					return props.Play().Text
 				end,
 				OnActivated = props.OnPlay,
+			}),
+			-- room setup again (leader of a created room, TASK-306)
+			GearButton({
+				Name = "Gear",
+				AnchorPoint = Vector2.new(1, 0.5),
+				Position = UDim2.fromScale(1, 0.5),
+				Size = PLAY_HEIGHT,
+				Visible = gearShown,
+				OnActivated = function()
+					if props.OnGear then
+						props.OnGear()
+					end
+				end,
 			}),
 			-- key badge of CANCEL, on the top-left corner of the button
 			KeyChip({

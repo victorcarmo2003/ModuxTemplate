@@ -186,17 +186,21 @@ local function resolve()
 					missing = true
 				end
 			end
+			-- a fallback with Size is the map's floor apron rectangle (TASK-314); else a circle of Radius
+			const size = row.Size
+			const halfX = if size ~= nil then size.X / 2 else row.Radius
+			const halfZ = if size ~= nil then size.Y / 2 else row.Radius
 			zone = {
 				Key = row.Key,
 				Panel = row.Panel,
 				Platform = row.Platform,
 				Color = row.Color,
-				Shape = "Circle",
+				Shape = if size ~= nil then "Rect" else "Circle",
 				CFrame = CFrame.new(center),
 				Center = center,
-				Radius = row.Radius,
-				HalfX = row.Radius,
-				HalfZ = row.Radius,
+				Radius = if size ~= nil then math.sqrt(halfX * halfX + halfZ * halfZ) else row.Radius,
+				HalfX = halfX,
+				HalfZ = halfZ,
 				FromMap = false,
 			}
 		end

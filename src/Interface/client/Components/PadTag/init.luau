@@ -5,7 +5,7 @@
 --                  Free FREE (Green) · Configuring SETUP (Mustard) · Open "n/max" (Green) · Closed FULL / CLOSED (Slate)
 --                  · Starting "n/max" (Teal, breathing). A pad has NO fixed capacity: the room takes the size its leader
 --                  chose (Max); a free pad or a room being set up shows none.
---   run seal     round Mustard seal under the pill: what the run starts as ("D1" = day 1, "N1" = night 1; Badge)
+--   (run seal removed, TASK-310; Badge is kept in the props but no longer drawn)
 --   caption      small line under the seal: the leader's name (truncated), or the status line ("STEP IN",
 --                "STARTING IN 3...") while nobody leads the room yet / during the countdown
 -- Pop: the pill jumps (scale) every time the count or the state changes (someone steps on / off, the room opens). The
@@ -47,7 +47,7 @@ export type Props = {
 	Status: () -> string,
 	-- name of the squad leader; "" or nil = none
 	Leader: (() -> string)?,
-	-- text of the run seal ("D1"); Content.Lobby.Squad.Pad.Badge
+	-- text of the old run seal ("D1"); not drawn since TASK-310
 	Badge: string,
 	-- World-space offset over the adornee (studs).
 	Offset: Vector3?,
@@ -232,31 +232,7 @@ return function(props: Props): BillboardGui
 				}),
 			}),
 
-			-- run seal
-			CartoonPanel({
-				Name = "Seal",
-				AnchorPoint = Vector2.new(0.5, 0),
-				Position = UDim2.fromScale(0.5, 0.38),
-				Size = UDim2.fromScale(0, 0.38),
-				Rotation = -6,
-				Tone = Theme.Tone.Mustard,
-				Outline = Theme.Outline.Normal,
-				Lip = 4,
-				Radius = UDim.new(0.5, 0),
-				Decor = { createRaw("UIAspectRatioConstraint")({ AspectRatio = 1, DominantAxis = Enum.DominantAxis.Height }) },
-				Children = {
-					CartoonLabel({
-						Name = "Badge",
-						Box = UDim2.fromScale(1, 1),
-						Scaled = true,
-						MaxTextSize = MAX_TEXT,
-						TextSize = 24,
-						Color = Theme.Color.Dark,
-						Stroke = 0,
-						Text = props.Badge,
-					}),
-				},
-			}),
+			-- (the run seal "D1"/"N1" was removed, TASK-310: zero width under its aspect constraint, it drew a white dot)
 
 			-- leader / status
 			CartoonLabel({

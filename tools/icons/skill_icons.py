@@ -85,14 +85,36 @@ def skill_quick_legs(ic: Icon) -> str:
 
 
 def skill_jumpy(ic: Icon) -> str:
-    moon = ic.two("#FFF3B8", "#F6C12B", 0.6)
+    """Runner drawback (90 sanity at night): a startled bunny, ears stiff, eyes wide, sweat drop, "!" and shakes."""
+    fur = ic.two(WHITE, "#E2DCEA", 0.62)
     drop = ic.two("#C9F1F6", "#63C8D4", 0.55)
+    shakes = "".join(
+        f'<path d="M{x},{y} q{d * 14},18 0,36 q{-d * 14},18 0,36" fill="none" {ol(10)}/>'
+        for x, y, d in ((70, 250, 1), (96, 330, 1), (442, 250, -1), (416, 330, -1))
+    )
     return (
         tile(ic, "orange")
-        + f'<path d="M300,96 A164,164 0 1 0 300,416 A132,132 0 1 1 300,96 Z" fill="{moon}" {ol()}/>'
-        + f'<path d="M386,170 Q426,236 404,262 Q386,284 362,262 Q342,236 386,170 Z" fill="{drop}" {ol(w)}/>'
-        + f'<path d="M396,300 Q420,338 406,354 Q394,368 380,354 Q366,338 396,300 Z" fill="{drop}" {ol(w)}/>'
-        + gloss(170, 220, 22, 10)
+        + shakes
+        # ears straight up and stretched
+        + f'<ellipse cx="196" cy="140" rx="36" ry="108" fill="{fur}" {ol()} transform="rotate(-4 196 140)"/>'
+        f'<ellipse cx="316" cy="140" rx="36" ry="108" fill="{fur}" {ol()} transform="rotate(4 316 140)"/>'
+        f'<ellipse cx="196" cy="150" rx="14" ry="74" fill="{PINK}" transform="rotate(-4 196 150)"/>'
+        f'<ellipse cx="316" cy="150" rx="14" ry="74" fill="{PINK}" transform="rotate(4 316 150)"/>'
+        # head
+        + f'<ellipse cx="256" cy="330" rx="146" ry="124" fill="{fur}" {ol()}/>'
+        # wide eyes, tiny pupils
+        + f'<circle cx="200" cy="312" r="42" fill="{WHITE}" {ol(w)}/><circle cx="312" cy="312" r="42" fill="{WHITE}" {ol(w)}/>'
+        f'<circle cx="200" cy="316" r="12" fill="{INK}"/><circle cx="312" cy="316" r="12" fill="{INK}"/>'
+        # worried brows
+        + f'<path d="M166,262 L222,244" fill="none" {ol(10)}/><path d="M346,262 L290,244" fill="none" {ol(10)}/>'
+        # nose + small open "o" mouth
+        + f'<path d="M244,364 L268,364 L256,378 Z" fill="{PINK}" {ol(6)}/>'
+        f'<ellipse cx="256" cy="408" rx="18" ry="20" fill="{INK}"/>'
+        # sweat drop on the side of the head
+        + f'<path d="M392,214 Q424,262 410,284 Q396,302 376,284 Q362,262 392,214 Z" fill="{drop}" {ol(w)}/>'
+        # "!" over the head
+        + text("!", 440, 150, 130, MUSTARD)
+        + gloss(172, 292, 18, 8)
     )
 
 

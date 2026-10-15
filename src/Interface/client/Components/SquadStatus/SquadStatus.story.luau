@@ -1,6 +1,7 @@
 --!strict
 -- SquadStatus (the squad card over the lobby Play button) with the Play button under it, in a bottom-centre frame.
--- Controls: Members 1..4 (the first is the local player), Max players, Squad (off = solo), Friends only, Leader (am I
+-- Controls: Members 1..4 (the first is the local player), Max players, Squad (off = solo), Friends only, Access (the
+-- access chip: Open none, Friends, Invite, Closed, Setup "Setting up" white on Mustard, TASK-305), Leader (am I
 -- the leader), Starting (countdown line; Cancel on = the button says CANCEL), Phone (667 x 375 frame).
 -- Member 2..4 use well-known user ids (head shots load through Players:GetUserThumbnailAsync); the last one is not ready.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -19,6 +20,7 @@ type Controls = {
 	Members: () -> number,
 	Max: () -> number,
 	FriendsOnly: () -> boolean,
+	Access: () -> string,
 	Leader: () -> boolean,
 	Starting: () -> boolean,
 	Cancel: () -> boolean,
@@ -54,6 +56,7 @@ local function infoOf(controls: Controls): SquadStatus.Info
 		Members = members,
 		Max = max,
 		FriendsOnly = squad and controls.FriendsOnly(),
+		Access = if squad then controls.Access() else nil,
 		Status = if starting then "Starting in 3..." elseif squad then "Waiting for players" else "Pick solo or squad",
 		CanInvite = squad and leader and not starting,
 		Starting = starting,
@@ -68,6 +71,7 @@ return UILabs.CreateVideStory({
 		Members = UILabs.Slider(2, 1, 4, 1),
 		Max = UILabs.Slider(4, 1, 4, 1),
 		FriendsOnly = false,
+		Access = UILabs.Choose({ "Setup", "Open", "Friends", "Invite", "Closed" }),
 		Leader = true,
 		Starting = false,
 		Cancel = true,

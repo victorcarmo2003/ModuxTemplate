@@ -24,6 +24,7 @@ return {
 	StarterPlayer.StarterPlayerScripts.client.Hud.HudController,
 	StarterPlayer.StarterPlayerScripts.client.Input.InputController,
 	StarterPlayer.StarterPlayerScripts.client.Interaction.PromptController,
+	StarterPlayer.StarterPlayerScripts.client.Interface.BackdropController,
 	StarterPlayer.StarterPlayerScripts.client.Item.ItemController,
 	StarterPlayer.StarterPlayerScripts.client.Kitchen.KitchenController,
 	StarterPlayer.StarterPlayerScripts.client.Light.LightController,

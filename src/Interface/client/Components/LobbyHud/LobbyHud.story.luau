@@ -1,10 +1,11 @@
 --!strict
 -- LobbyHud on a screen-sized frame: "Screen" picks 360x640 (portrait phone), 667x375 (phone landscape), 1280x720,
 -- 1920x1080 or the whole viewport; the global UI scale follows the screen (Theme.ScaleOf, touch floor 1 on the phones).
--- "Play" picks the Play button + squad card state (solo PLAY, forming squad START SQUAD, member READY, starting);
+-- "Play" picks the Play button + squad card state (solo PLAY, room still being set up SET UP ROOM, leader of a created
+-- room START + the gear (TASK-306), member READY, starting);
 -- "Squad" the badge on the tile; "Keys" shows the desktop key badges; "InSquad" off hides the card + Play button
 -- (TASK-296: no squad yet; toggle it to see the pop). Tiles on the left, gem pill on the right (TASK-295). Taps print
--- the tile.
+-- the tile. "Online" picks the players-online pill count at the top centre (TASK-312; K / M format; 0 = hidden).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
@@ -22,6 +23,7 @@ type Controls = {
 	Squad: () -> string,
 	Keys: () -> boolean,
 	InSquad: () -> boolean,
+	Online: () -> string,
 }
 
 const SCREENS: { [string]: Vector2 } = {
@@ -33,7 +35,8 @@ const SCREENS: { [string]: Vector2 } = {
 
 const PLAY: { [string]: LobbyHud.PlayButton } = {
 	Solo = { Text = "PLAY", Kind = "Go", Enabled = true },
-	Leader = { Text = "START SQUAD", Kind = "Wait", Enabled = true },
+	Setup = { Text = "SET UP ROOM", Kind = "Wait", Enabled = true },
+	Leader = { Text = "START", Kind = "Go", Enabled = true },
 	NotReady = { Text = "READY", Kind = "Wait", Enabled = true },
 	Ready = { Text = "READY!", Kind = "Go", Enabled = true },
 	Starting = { Text = "STARTING...", Kind = "Go", Enabled = true },
@@ -43,7 +46,16 @@ const PLAY: { [string]: LobbyHud.PlayButton } = {
 
 local function infoOf(state: string): SquadStatus.Info
 	const me = Players.LocalPlayer.UserId
-	if state == "Leader" or state == "NotReady" or state == "Ready" then
+	if state == "Setup" then
+		return {
+			Squad = true,
+			Members = { { UserId = me, Leader = true, Ready = true, Name = "You" } },
+			Max = 4,
+			FriendsOnly = false,
+			Access = "Setup",
+			Status = "Setting up the room...",
+		}
+	elseif state == "Leader" or state == "NotReady" or state == "Ready" then
 		return {
 			Squad = true,
 			Members = {
@@ -85,11 +97,12 @@ return UILabs.CreateVideStory({
 	vide = Vide,
 	controls = {
 		Screen = UILabs.Choose({ "667x375", "360x640", "1280x720", "1920x1080", "Fill" }),
-		Gems = UILabs.Slider(120, 0, 9999, 1),
-		Play = UILabs.Choose({ "Solo", "Leader", "NotReady", "Ready", "Starting", "Cancel", "Waiting" }),
+		Gems = UILabs.Slider(3750, 0, 50000, 50),
+		Play = UILabs.Choose({ "Solo", "Setup", "Leader", "NotReady", "Ready", "Starting", "Cancel", "Waiting" }),
 		Squad = "2/4",
 		Keys = true,
 		InSquad = true,
+		Online = UILabs.Choose({ "200", "1", "1234", "12000", "1250000", "0" }),
 	},
 }, function(props)
 	const controls: Controls = (props.controls :: any)
@@ -127,6 +140,15 @@ return UILabs.CreateVideStory({
 				return if controls.Keys() then "X" else ""
 			end,
 			PlayShown = controls.InSquad,
+			Online = function()
+				return tonumber(controls.Online()) or 0
+			end,
+			Gear = function()
+				return controls.Play() == "Leader"
+			end,
+			OnGear = function()
+				print("[LobbyHud story] room setup")
+			end,
 			OnInvite = function()
 				print("[LobbyHud story] invite")
 			end,

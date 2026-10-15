@@ -1356,3 +1356,19 @@ Nenhum pacote novo. Três mudanças de schema, todas **aditivas** (campos `optio
 Enum de aba: `PrepTab.Step` e `PrepSeats.Step` usam `Content.Prep.WireTabs` (união dos conjuntos 2D `Order, Grill, Build, Serve` e 3D `Grill, Board, Toppings, Serve`); o servidor só aceita o conjunto ativo (`Content.Prep.Tabs`, definido por `Rules.ThreeD`) e `Content.Prep.TabAlias` traduz a chave do outro modo (inclusive o atributo `PromptStep` do mapa).
 
 Tráfego: `PrepTab` ainda <= 4/s por jogador e só quando algo muda (+1 byte opcional); `Stations.Flip` = 1 escrita por virada; `PrepSeats.Plate` ~1 escrita/s no total. Mão fantasma (`PrepHand`, Q-233) **não** existe: fica atrás de `Rules.World.GhostHand = false`.
+
+## 18. Jogadores online (TASK-312; pedido do dono 2026-10-15, **Provisório**)
+
+Set `Online`, registro **1**, só em papéis de lobby (`Lobby`, `PrivateLobby`). Escritor: `PresenceService`
+(`src/Presence/server`). Leitor: `LobbyController` → `LobbyHud.Online` (pílula no topo central, "200 players online").
+
+| Campo | Tipo | Regra |
+|---|---|---|
+| `Count` | `int(0, 16777215)` | jogadores online na experiência inteira (lobbies, lobbies privados e runs); nunca abaixo da contagem local do servidor |
+
+Fonte (não é Lync): MemoryStore HashMap `Online_v1`. Todo servidor grava `JobId → #Players` a cada 30 s (expira em 90 s;
+`RemoveAsync` no `BindToClose`). Um lobby por vez pega a lease (`_lease`, `UpdateAsync`, 50 s), lista o mapa e grava
+`_total = { Count, At }` a cada 60 s; os demais lobbies só leem `_total` a cada 30 s. Custo ≈ 2 req/min por servidor
++ 2 por lobby + servidores/200 páginas por minuto, muito abaixo da cota (1000 + 100 × usuários). Studio ou erro do
+MemoryStore: só a contagem local. Tráfego: `update` só quando o número muda (no máximo a cada 30 s, mais entradas/saídas
+locais). Um registro de 24 bits: sem o piso de `drop.section` do README.

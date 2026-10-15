@@ -216,12 +216,13 @@ return function(props: Props): Frame
 			pictures,
 			create("ImageLabel")({
 				Name = `Layer{index}`,
-				AnchorPoint = if horizontal then Vector2.new(0.5, 0.5) else Vector2.new(0, 0.5),
+				-- centred in its box (left edge 6 px in the vertical stack): the pop grows from the middle
+				AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = function(): UDim2
 					if horizontal then
 						return UDim2.new(0, (index - 1) * pitch + pitch / 2, 0.5, 0)
 					end
-					return UDim2.new(0, 6, 0, bandCenter() + lift())
+					return UDim2.new(0.5, 6 - (medal + 18) / 2, 0, bandCenter() + lift())
 				end,
 				Size = if horizontal then UDim2.fromOffset(pitch - 2, sprite) else UDim2.new(1, -(medal + 18), 0, sprite),
 				BackgroundTransparency = 1,

@@ -11,8 +11,8 @@
 -- the class in profile.Classes when the pass is bought (PromptGamePassPurchaseFinished) and on every join for an owner
 -- of the pass (UserOwnsGamePassAsync, cached); a class already in the profile (gems, code) is never written twice.
 -- The real pass price: GetProductInfo(id, Enum.InfoType.GamePass). GamePasses.Key must be a Content.Classes key.
--- Shop icons (one per key, not uploaded yet): Assets/textures/ui/shop/<Key>.png (+ .svg source), e.g. util_scare.png,
--- class_fox.png, gems_50.png, cash_100.png.
+-- Shop icons (one per key): Assets/textures/ui/shop/<Key>.png (+ .svg source), e.g. util_scare.png, class_fox.png,
+-- gems_50.png, cash_100.png; uploaded 2026-10-15, ids in Assets/textures/ui/_texture_ids.json ("shop/<Key>").
 local Table = require(script.Parent.Table)
 
 export type GemPack = {
@@ -74,50 +74,62 @@ export type Shop = {
 	Utilities: Table.Table<Utility>,
 }
 
--- Gem packs: bigger pack = cheaper gem (1.98 -> 1.28 R$/gem). Reference: a full solo run earns ~375 gems in ~6.4 h
--- (economy.md §6); tier 1/2/3 classes cost 45/120/180 gems (DEC-070).
--- Base / Bonus / Badge: display only (TASK-301, owner request 2026-10-15): the same totals shown as a promotion.
+-- Gem packs: bigger pack = cheaper gem (99 -> 90 R$ per 1,000 gems). Gem economy x75 (TASK-308, owner request
+-- 2026-10-15, Provisional; economy.md §6/§9, Q-274): a full solo run earns ~28,000 gems in ~6.4 h; classes cost
+-- 2,000..20,000. Keys stay (Creator Hub products, icons); the Robux prices did not change, so the totals are capped by
+-- them: popular 4,800 and not 5,000 (5,000 for 449 would beat the 10,000 for 899 per gem).
+-- Base / Bonus / Badge: display only (TASK-301, owner request 2026-10-15): the same totals shown as a promotion,
+-- bigger bonus on bigger packs (0 / +20% / +33% / +43%).
 const gemPacks: { GemPack } = {
-	{ Key = "gems_50", ProductId = 3718682061, Gems = 50, Robux = 99, Name = "Handful of Gems", Base = 50, Bonus = 0 },
+	{
+		Key = "gems_50",
+		ProductId = 3718682061,
+		Gems = 1000,
+		Robux = 99,
+		Name = "Handful of Gems",
+		Base = 1000,
+		Bonus = 0,
+	},
 	{
 		Key = "gems_130",
 		ProductId = 3718682070,
-		Gems = 130,
+		Gems = 2400,
 		Robux = 229,
 		Name = "Pouch of Gems",
-		Base = 100,
-		Bonus = 30,
+		Base = 2000,
+		Bonus = 400,
 	},
 	{
 		Key = "gems_300",
 		ProductId = 3718682077,
-		Gems = 300,
+		Gems = 4800,
 		Robux = 449,
 		Name = "Crate of Gems",
-		Base = 250,
-		Bonus = 50,
+		Base = 3600,
+		Bonus = 1200,
 		Badge = "Popular",
 	},
 	{
 		Key = "gems_700",
 		ProductId = 3718682082,
-		Gems = 700,
+		Gems = 10000,
 		Robux = 899,
 		Name = "Truckload of Gems",
-		Base = 500,
-		Bonus = 200,
+		Base = 7000,
+		Bonus = 3000,
 		Badge = "Best",
 	},
 }
 
--- Class Game Passes (TASK-291): a bit cheaper than buying the same gems in the smallest pack (tier 1: 79 vs ~99 for 50
--- gems). Panda and Lion are not InMvp (DEC-186): no pass until the first update.
+-- Class Game Passes (TASK-291): were a bit cheaper than buying the same gems (tier 1: 79 vs ~99 for 50 gems). With the
+-- x75 gem prices (TASK-308) a pass is far cheaper than the gems of the class (Rabbit: 79 vs ~190); suggested Robux
+-- kept until the owner answers Q-274 (c). Panda and Lion are not InMvp (DEC-186): no pass until the first update.
 const gamePasses: { GamePass } = {
-	{ Key = "class_rabbit", PassId = 2036210519, Robux = 79, Name = "Rabbit Crew" }, -- tier 1, 45 gems
-	{ Key = "class_cat", PassId = 2037014530, Robux = 79, Name = "Cat Crew" }, -- tier 1, 45 gems
-	{ Key = "class_bear", PassId = 2037116542, Robux = 79, Name = "Bear Crew" }, -- tier 1, 45 gems
-	{ Key = "class_fox", PassId = 2040074273, Robux = 199, Name = "Fox Crew" }, -- tier 2, 120 gems
-	{ Key = "class_owl", PassId = 2037164541, Robux = 199, Name = "Owl Crew" }, -- tier 2, 120 gems
+	{ Key = "class_rabbit", PassId = 2036210519, Robux = 79, Name = "Rabbit Crew" }, -- tier 1, 2,000 gems
+	{ Key = "class_cat", PassId = 2037014530, Robux = 79, Name = "Cat Crew" }, -- tier 1, 2,000 gems
+	{ Key = "class_bear", PassId = 2037116542, Robux = 79, Name = "Bear Crew" }, -- tier 1, 3,000 gems
+	{ Key = "class_fox", PassId = 2040074273, Robux = 199, Name = "Fox Crew" }, -- tier 2, 10,000 gems
+	{ Key = "class_owl", PassId = 2037164541, Robux = 199, Name = "Owl Crew" }, -- tier 2, 10,000 gems
 }
 
 -- Utilities (TASK-290, Provisional; Q-271 to Q-273 in open-questions.md). Cheap impulse buys, 15..149 R$. Cash packs
@@ -206,7 +218,7 @@ const utilities: { Utility } = {
 		Key = "cash_300",
 		ProductId = 3718682118,
 		Robux = 69,
-		Name = "Cash Stack",
+		Name = "Coin Pile", -- art: a pile of the game's coins (owner 2026-10-15)
 		Text = "+$300 for the crew",
 		Icon = "Ui/cash",
 		Kind = "Cash",
@@ -217,7 +229,7 @@ const utilities: { Utility } = {
 		Key = "cash_800",
 		ProductId = 3718682122,
 		Robux = 149,
-		Name = "Money Truck",
+		Name = "Coin Chest", -- art: a chest full of coins (owner 2026-10-15)
 		Text = "+$800 for the crew",
 		Icon = "Ui/tip_jar",
 		Kind = "Cash",

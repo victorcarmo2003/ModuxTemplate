@@ -95,8 +95,9 @@ return function(props: Props): Frame
 
 	return create("Frame")({
 		Name = props.Name or "SkipPill",
-		AnchorPoint = Vector2.new(1, 1),
-		Position = UDim2.new(1, -(props.Right or 112), 1, -(props.Bottom or 24)),
+		-- anchored at its centre (bottom-right corner where it always sat): pop and press scale from the middle
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(1, -(props.Right or 112) - PILL_WIDTH / 2, 1, -(props.Bottom or 24) - PILL_HEIGHT / 2),
 		Size = UDim2.fromOffset(PILL_WIDTH, PILL_HEIGHT),
 		BackgroundTransparency = 1,
 		Visible = function()

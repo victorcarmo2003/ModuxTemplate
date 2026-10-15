@@ -22,6 +22,9 @@ export type Zone = {
 	PointId: string?, -- fallback: MapPoint that places the zone; nil = Center only
 	Center: Vector3, -- fallback: WORLD, floor level (of PointId)
 	Radius: number, -- fallback: studs, planar
+	-- fallback rectangle (TASK-314, owner 2026-10-15): full X / Z size in studs of the floor apron drawn in the map
+	-- (Apron_<Key>_Edge neon outline); set = the zone is that rectangle at Center instead of a circle
+	Size: Vector2?,
 	Color: Color3, -- frame colour (platforms: Squad.Colors by state instead)
 }
 
@@ -131,8 +134,9 @@ const lobby: Lobby = {
 			Panel = "Classes",
 			Platform = 0,
 			PointId = nil,
-			Center = Vector3.new(-1.5, 0, -577.1),
+			Center = Vector3.new(-1.5, 0, -576.45), -- centre of Apron_Classes_Edge (measured in Studio, TASK-314)
 			Radius = 9.1,
+			Size = Vector2.new(23.15, 16.64), -- Apron_Classes_Edge outline, inner (TASK-314)
 			Color = YELLOW,
 		},
 		{
@@ -151,6 +155,7 @@ const lobby: Lobby = {
 			PointId = "LOBBY-CODES",
 			Center = Vector3.new(-14.5, 0, -659.65),
 			Radius = 6.5,
+			Size = Vector2.new(15.34, 11.44), -- Apron_Codes_Edge outline, inner (TASK-314)
 			Color = BLUE,
 		},
 		squad(1, 19.3, -655.1),

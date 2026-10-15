@@ -135,6 +135,26 @@ Reviver por Robux (developer product, DEC-092): só o próprio caído compra, pa
 
 ## 6. Gemas **[DEC-070, DEC-083, DEC-084, DEC-104]**
 
+> **2026-10-15 — economia de gemas ×75 (pedido do dono, Provisório; TASK-308, `Q-274`).** O dono quer números grandes
+> ("ganhar muito pagando pouco"): pacotes de 1.000 a 10.000 gemas e classes de 2.000 a 20.000. Para o progresso
+> jogando não ficar lento, **toda recompensa de gemas foi multiplicada por 75** (o fator que mantém "uma run completa
+> compra todas as classes do MVP": 27.000 de classes MVP × 28.650 de run perfeita; antes 375 × 382). As tabelas abaixo
+> mostram os valores de DEC-070; o vigente no código é ×75:
+>
+> | Evento | DEC-070 | Vigente (×75) |
+> |---|---|---|
+> | Turno de dia concluído | 2 | **150** |
+> | Nota A no dia | +1 | **+75** |
+> | Noite N vencida | 15 + 2 × (N − 1) | **1.125 + 150 × (N − 1)** (1.125 … 2.475; soma 18.000) |
+> | Final (Night 10) | +100 | **+7.500** |
+> | Achievement "Day 100" | +300 | **+22.500** |
+> | Run perfeita | 382 | **28.650** |
+> | Dia infinito | ~24/h | **~1.800/h** |
+>
+> Marcos (solo mediano): fim da Night 2 ~3.500 gemas (1ª classe de 2.000); fim da Night 5 ~9.000 (Urso + uma de
+> 2.000, ou quase uma tier 2); run completa ~28.000 (as 5 pagas do MVP = 27.000). Coleção das 7 pagas: 62.000 ≈ 2,2 runs
+> (antes 1,8). Códigos de teste também ×75 (`HOTDOGS` 3.750). Saldo já salvo: ver `Q-274` (b).
+
 Creditadas e **salvas no instante de cada evento**, para quem está no servidor naquele instante (inclusive caído e espectador) **[DEC-104]**. A tela de resumo só mostra.
 
 | Evento | Gemas |
@@ -196,6 +216,35 @@ Adiada, com uma exceção **[DEC-062, DEC-092]** e o pedido do usuário de 2026-
 | Códigos de resgate | grátis (gemas ou classe por código) | — | **Provisório** (`Q-191`) |
 | Resto (passes, cosméticos) | — | — | adiado (**Q-017**) |
 
+**2026-10-15 — pacotes e preços de classe ×75 (pedido do dono, Provisório; TASK-308, `Q-274`).** Mesmos ProductId e
+Robux; só a quantidade de gemas muda. Gema mais barata no pacote maior; bônus de exibição maior no pacote maior
+(Base + Bonus = Gems). O dono pediu ~1.000–1.500 / ~3.000 / ~5.000 / 10.000; com os Robux fixos (99/229/449/899),
+3.000 e 5.000 dariam gema mais barata no pacote médio que no BEST VALUE, então os médios ficaram 2.400 e 4.800.
+
+| Produto | Gemas (Base + Bônus) | Robux | R$ por 1.000 gemas | Selo |
+|---|---|---|---|---|
+| `gems_50` "Handful of Gems" | **1.000** (1.000 + 0) | 99 | 99,0 | — |
+| `gems_130` "Pouch of Gems" | **2.400** (2.000 + 400, +20%) | 229 | 95,4 | — |
+| `gems_300` "Crate of Gems" | **4.800** (3.600 + 1.200, +33%) | 449 | 93,5 | POPULAR |
+| `gems_700` "Truckload of Gems" | **10.000** (7.000 + 3.000, +43%) | 899 | 89,9 | BEST VALUE |
+
+| Classe | Tier | Gemas (antes, DEC-070) | Vigente | Game Pass sugerido |
+|---|---|---|---|---|
+| Cachorro "Rookie" | 0 | 0 | **grátis** | — |
+| Coelho "Runner" | 1 | 45 | **2.000** | 79 |
+| Gato "Line Cook" | 1 | 45 | **2.000** | 79 |
+| Urso "Hauler" | 1 | 45 | **3.000** | 79 |
+| Raposa "Hawker" | 2 | 120 | **10.000** | 199 |
+| Coruja "Night Owl" | 2 | 120 | **10.000** | 199 |
+| Panda "Barista" (1ª atualização) | 2 | 120 | **15.000** | — |
+| Leão "Shift Lead" (1ª atualização) | 3 | 180 | **20.000** | — |
+
+Distribuição: dentro do tier, a mais forte/rara fica no topo da escala (Urso no topo do tier 1, Panda — fora do MVP —
+no topo do tier 2; Leão, único tier 3, 20.000). A compra da diferença (TopUp, TASK-304) segue igual: classe de 2.000
+com saldo 0 oferece o pacote de 2.400; classe de 20.000 oferece o de 10.000 (compra de novo). **Atenção (`Q-274` c):**
+o Game Pass de classe ficou muito mais barato que as gemas dela (Coelho: 79 × ~190 em gemas); os Robux dos passes não
+mudaram até o dono responder. A tabela de 2026-10-11 abaixo é histórico.
+
 **2026-10-11 (pedido do usuário, Provisório; TASK-160 a TASK-162):** no lobby, classe com **gemas ou Robux**, gemas
 compráveis com Robux e códigos. Preço em gemas das classes **não muda** (DEC-070: 45/120/180). Números sugeridos pelo
 backend-coder para o game-designer validar (`Q-190`); o preço real é o do Creator Hub (`Content.Shop.*.Robux` é só
@@ -226,7 +275,7 @@ Guardas de design: classe sempre comprável com gemas de jogo; teto ±12%; nenhu
 - Simulação solo Rookie, dias 1–5: acumulado entre $360 e $420 **[DEC-071]**.
 - Simulação solo: Night 1 rende entre $100 e $140; Night 10 entre $150 e $200.
 - A party nunca tem saldo negativo; toda transação é do servidor.
-- Soma de gemas de uma run perfeita = 382 **[DEC-070]**.
+- Soma de gemas de uma run perfeita = 382 **[DEC-070]** → **28.650** com a economia ×75 (TASK-308, Provisório).
 - Dia com < 3 pedidos completos credita 0 gemas.
 - Rescue Whistle custa exatamente $200 × multiplicador (party do fim do Day 1); aparece em 15% ± 1 p.p. dos turnos elegíveis (simulação).
 

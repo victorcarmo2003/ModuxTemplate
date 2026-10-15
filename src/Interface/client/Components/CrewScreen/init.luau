@@ -18,6 +18,7 @@ local CartoonButton = require(script.Parent.CartoonButton)
 local CartoonLabel = require(script.Parent.CartoonLabel)
 local CrewCard = require(script.Parent.CrewCard)
 local CardState = require(script.Parent.CrewCard.State)
+local Count = require(script.Parent.HudPill.Count)
 local Preview = require(script.Preview)
 
 const create = Vide.create
@@ -218,7 +219,7 @@ return function(props: Props): Frame
 							LayoutOrder = 2,
 							TextSize = 22,
 							Text = function()
-								return tostring(props.Gems())
+								return Count(props.Gems())
 							end,
 						}),
 					},

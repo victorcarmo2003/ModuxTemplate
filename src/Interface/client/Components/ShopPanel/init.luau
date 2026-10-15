@@ -269,6 +269,7 @@ return function(props: Props): Frame
 		Visible = props.Visible,
 		Scale = props.Scale,
 		OnClose = props.OnClose,
+		Rays = true, -- retro rays spinning behind the cards (owner request 2026-10-15)
 		Children = {
 			grid,
 			pickView,

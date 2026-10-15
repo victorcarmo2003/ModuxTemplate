@@ -171,31 +171,34 @@ const presets: LightPresets = {
 		SunRaysSpread = 0.1,
 	},
 	Lobby = {
-		-- Warm pass 2 (owner 2026-10-12: "lobby too cold"; then "same look as the run, still night, warm with a hint of unease"). All PROVISIONAL (Q-208). Brightness and ambient
-		-- readable for 20-30 players, but moody: low warm-dark haze, deep plum shadows, amber pools of light against the dark; every blue/mauve tone moved to amber/peach/cream; shadows warm plum-brown (ColorShiftBottom).
-		-- Before: Brightness 1.2, Ambient (95,70,55), Outdoor (120,90,70), Atm (176,124,124)/(122,70,82), Sat 0.15.
-		Brightness = 1.3,
-		Exposure = -0.3,
-		Ambient = Color3.fromRGB(112, 82, 66),
-		OutdoorAmbient = Color3.fromRGB(138, 102, 80),
-		ColorShiftTop = Color3.fromRGB(240, 170, 112), -- soft amber
-		ColorShiftBottom = Color3.fromRGB(52, 30, 30), -- warm plum-brown shadows (no blue)
+		-- TASK-313 (owner 2026-10-15, Play: "lobby too bright"). Same spirit as the TASK-293 night: a darker, cosy night,
+		-- a touch cooler (dusky plum-grey air and ambient), so the warm light reads from the neon signs (START SHIFT,
+		-- CODES), posts, string lights and pads; ambient kept readable for buttons, signs, pads and the path to them.
+		-- Before (warm pass 2, 2026-10-12, Q-208): Brightness 1.3, Exposure -0.3, Ambient (112,82,66), Outdoor
+		-- (138,102,80), ShiftTop (240,170,112), ShiftBottom (52,30,30), Atm 0.32/1.4 (172,116,92)/(120,64,56),
+		-- CC 0.04/0.15/0.1 Tint (255,226,196), Bloom 0.5/28/1.4. All PROVISIONAL.
+		Brightness = 0.55,
+		Exposure = -0.45,
+		Ambient = Color3.fromRGB(64, 56, 68), -- luminance ~59 (well above the #1B2140 reading minimum)
+		OutdoorAmbient = Color3.fromRGB(68, 62, 82),
+		ColorShiftTop = Color3.fromRGB(176, 128, 96), -- dimmer amber
+		ColorShiftBottom = Color3.fromRGB(30, 24, 36), -- plum shadows, a little cooler
 		EnvDiffuse = 0.6,
-		EnvSpecular = 0.5,
+		EnvSpecular = 0.6,
 		ShadowSoftness = 0.2,
-		AtmDensity = 0.32, -- moderate: the ~110x110 lobby stays clear, the far edge goes soft
+		AtmDensity = 0.34, -- the ~110x110 lobby stays clear, the far edge goes soft
 		AtmOffset = 0.5,
-		AtmGlare = 0.3,
-		AtmHaze = 1.4,
-		AtmColor = Color3.fromRGB(172, 116, 92), -- peach haze (not coral)
-		AtmDecay = Color3.fromRGB(120, 64, 56), -- warm amber-plum horizon
-		CCBrightness = 0.04,
-		Saturation = 0.15,
-		Contrast = 0.1,
-		Tint = Color3.fromRGB(255, 226, 196), -- cream-amber
-		BloomIntensity = 0.5, -- soft amber glow on the lobby neons (Bloom has no colour: the warmth comes from Tint)
+		AtmGlare = 0.2,
+		AtmHaze = 1.2,
+		AtmColor = Color3.fromRGB(70, 58, 76), -- dusky plum haze
+		AtmDecay = Color3.fromRGB(84, 52, 58), -- dim amber-plum horizon
+		CCBrightness = -0.01,
+		Saturation = 0.05,
+		Contrast = 0.14,
+		Tint = Color3.fromRGB(246, 236, 236), -- near neutral, a hint cool (the warmth comes from the lights)
+		BloomIntensity = 0.75, -- the neons and bulbs glow against the darker air
 		BloomSize = 28,
-		BloomThreshold = 1.4,
+		BloomThreshold = 1.1,
 		SunRays = 0,
 		SunRaysSpread = 0.1,
 	},

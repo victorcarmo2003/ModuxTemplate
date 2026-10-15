@@ -32,6 +32,7 @@ local ShopContent = require(ReplicatedStorage.shared.Content.Shop)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
 local Cinematic = require(StarterPlayer.StarterPlayerScripts.client.Interface.Cinematic)
+local Backdrop = require(StarterPlayer.StarterPlayerScripts.client.Interface.Backdrop)
 local ShopPanel = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.ShopPanel)
 local Jumpscare = require(StarterPlayer.StarterPlayerScripts.client.Anomaly.AnomalyController.Effects.Kit.Jumpscare)
 
@@ -462,6 +463,8 @@ end
 function ShopController:Mount(playerGui: Instance)
 	const settings = self.Dependencies.SettingsController
 	const _, gui = Vide.root(function()
+		-- blur + veil behind the window (TASK-311)
+		Backdrop.Hold(self.Open)
 		-- the settings window and the shop never share the screen
 		Vide.effect(function()
 			if settings.Open() then

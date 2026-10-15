@@ -25,7 +25,7 @@ export type Code = {
 
 return Table.new({
 	-- Provisional test codes (TASK-161, Q-191): replace or switch off before launch.
-	{ Key = "HOTDOGS", Reward = { Gems = 50 }, Note = "test code, Provisional" },
+	{ Key = "HOTDOGS", Reward = { Gems = 3750 }, Note = "test code, Provisional (50 x75, TASK-308)" },
 	{
 		Key = "BUNNYHOP",
 		Reward = { Class = "class_rabbit" },
@@ -34,7 +34,7 @@ return Table.new({
 	},
 	{
 		Key = "STALEBUN",
-		Reward = { Gems = 5 },
+		Reward = { Gems = 375 },
 		Expires = "2026-01-01T00:00:00Z",
 		Note = "already expired on purpose: tests the Expired answer",
 	},

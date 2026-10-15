@@ -22,7 +22,7 @@ return Table.new({
 		Hidden = true, -- DEC-058
 		Counter = "EndlessDays", -- data.md §1 (endless days with anti-AFK, across sessions)
 		Target = 100, -- DEC-084
-		Gems = 300, -- DEC-084
+		Gems = 22500, -- DEC-084: 300, x75 (TASK-308)
 		BadgeId = 0,
 	},
 } :: { Achievement })

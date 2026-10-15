@@ -13,16 +13,20 @@
 --   AddReportStep(name, fn)       fills ShiftReport fields of other features before it is sent (T48)
 --   CollectTips()                 prompt on the jar (collect_tips): jar -> Cash now; the ledger remembers it for the report
 --   TopUp(amount)                 first-run tutorial: Cash up to at least amount (TutorialService, Provisional)
+--   PromptCashPack(player, missing) not enough Cash for a player's buy: prompts the Cash pack covering the difference
+--                                 (Shop TopUp; owner request 2026-10-15). Spend calls it on failure with `player`
 -- Cash changes by Spend, AddSale, CollectTips, the deposit, TopUp and DevAddCash.
 -- Deposit on RoundService.ShiftEnded (start of Summary): grade A-D, bonus floor(day take x %) where the day take = Sales +
 -- Tips + Catches - Stolen (DEC-051 parity), Cash += tips left in the jar + bonus, Drawer = 0, report steps, ShiftReport to
 -- the group (Drawer = the day take), Reported(info, report).
+local MarketplaceService = game:GetService("MarketplaceService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local ServerScriptService = game:GetService("ServerScriptService")
 local Charm = require(ReplicatedStorage.Packages.Charm)
 local Content = require(ReplicatedStorage.shared.Content)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
+local TopUp = require(ReplicatedStorage.shared.Shop.TopUp)
 local Ledger = require(script.Ledger)
 local Modux = require(ServerScriptService.server.Modux)
 
@@ -49,6 +53,8 @@ const GEMS_MAX = 1000 -- ShiftReport.Gems wire range
 const BOSS_STAT = "BossBonusPP" -- Content.Stats (Shift Lead, Party scope, not stacking; DEC-069)
 -- Closing: no new customer but the queue is still served (day: Last call, DEC-240), so sales, jar and ledger still take entries
 const CLOSING = "Closing"
+-- Seconds between two Cash pack prompts for the same player (a refused buy spammed on a prompt must not stack them)
+const TOP_UP_COOLDOWN = 4
 const SALE_KINDS: { [string]: boolean } = { Sale = true, Catch = true }
 -- Sale.Result enum (network.md §4.3)
 const RESULTS: { [string]: boolean } =
@@ -93,6 +99,8 @@ function EconomyService:Setup()
 	self.Reported = self.Libs.Signal.new() :: SignalLib.Signal<ShiftInfo, Report>
 	-- Report steps in registration order (AddReportStep, T48)
 	self.Steps = {} :: { Step }
+	-- Last Cash pack prompt per player (os.clock), weak keys: a player who left is collected
+	self.PromptedAt = setmetatable({}, { __mode = "k" }) :: { [Player]: number }
 end
 
 -- Reads -----------------------------------------------------------------------------------------------------------
@@ -152,11 +160,35 @@ function EconomyService:Spend(amount: number, player: Player?): boolean
 	if cash < value then
 		if player then
 			self.Dependencies.RunStateService:Notify(player, "not_enough_cash", value)
+			self:PromptCashPack(player, value - cash)
 		end
 		return false
 	end
 	self.Cash(cash - value)
 	return true
+end
+
+-- Not enough Cash for a buy of `player` (owner request 2026-10-15): prompt the created Cash pack that covers the missing
+-- amount (TopUp.Cash: the smallest that covers it, else the biggest). The receipt goes through ShopUtilityService like a
+-- buy from the HUD cart (Cash += Amount for the whole party); the player still has to press the buy again. At most one
+-- prompt per TOP_UP_COOLDOWN s per player.
+function EconomyService:PromptCashPack(player: Player, missing: number)
+	const now = os.clock()
+	const last = self.PromptedAt[player]
+	if last and now - last < TOP_UP_COOLDOWN then
+		return
+	end
+	const pack = TopUp.Cash(missing)
+	if pack == nil then
+		return
+	end
+	self.PromptedAt[player] = now
+	const ok, err = pcall(function()
+		MarketplaceService:PromptProductPurchase(player, pack.ProductId)
+	end)
+	if not ok then
+		warn(`[EconomyService] PromptProductPurchase({pack.Key}) failed: {err}`)
+	end
 end
 
 -- Order price or thief reward straight into the shared Cash (DEC-238; it used to fall in the drawer, DEC-050). Only while

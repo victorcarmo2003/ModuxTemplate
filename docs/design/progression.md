@@ -244,6 +244,8 @@ Snapshot no início de cada turno, TTL 15 min, mesmo roster. Se todos saem e alg
 
 ## 7. Meta-progressão (classes)
 
+> **2026-10-15 (TASK-308, Provisório):** gemas e preços de classe ×75 (`economy.md` §6 e §9). Os marcos abaixo valem na proporção: multiplique as gemas por ~75.
+
 | Marco | Tempo (solo mediano, 1ª run) | Gemas | Classe possível |
 |---|---|---|---|
 | Fim da Night 2 | ~1 h 32 min | ~47 | Runner ou Line Cook (45) |

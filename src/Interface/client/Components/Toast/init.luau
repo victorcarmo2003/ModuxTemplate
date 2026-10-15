@@ -140,8 +140,12 @@ return function(props: Props): Frame
 
 		CartoonPanel({
 			Name = "Card",
+			-- anchored at the centre of its slot: the pop grows from the middle (owner request 2026-10-15)
+			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = function()
-				return if fromRight then UDim2.fromOffset(offset(), 0) else UDim2.fromOffset(0, offset())
+				return if fromRight
+					then UDim2.new(0.5, offset(), 0.5, 0)
+					else UDim2.new(0.5, 0, 0.5, offset())
 			end,
 			Size = UDim2.fromScale(1, 1),
 			-- Tags lean, alternating with their slot.

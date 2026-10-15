@@ -5,7 +5,11 @@
 -- TASK-301: "Split" passes Base / Bonus / Badge from the table (off = the Pack without them, the LobbyController shape:
 -- the component reads them from Content by key, same result; read on the next rebuild: flip "Created").
 -- "Live" fakes a Creator Hub price (-10%) on every pack.
--- Reduced motion: toggle the game Settings switch (or the Roblox setting) and the shine / pulse stop within 0.5 s.
+-- TASK-307: hover any card (mouse, or select it with a gamepad) and it pops from its centre with the shine; click
+-- anywhere on a card to buy (same OnBuy as the price pill had). The bonus pill reads "200 BONUS" (no base, no "+"),
+-- the BEST VALUE card has white star bursts around the art.
+-- Reduced motion: toggle the game Settings switch (or the Roblox setting) and the shine / pulse / pop / stars stop
+-- within 0.5 s (a hovered card keeps a still shine band).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
 local Vide = require(ReplicatedStorage.Packages.Vide)

@@ -6,6 +6,8 @@
 --   Buy       not owned, the player has the gems
 --   NoGems    not owned, not enough gems (Buy disabled, TASK-020 acceptance)
 
+local Count = require(script.Parent.Parent.HudPill.Count)
+
 export type State = "Selected" | "Owned" | "Buy" | "NoGems"
 
 -- Main button of the screen for the focused class. `Enabled = false` never fires anything.
@@ -31,7 +33,7 @@ function State.Tag(state: State, price: number): string
 	elseif state == "Owned" then
 		return "Owned"
 	end
-	return `{price} Gems`
+	return `{Count(price)} Gems`
 end
 
 -- `busy`: a request is on its way (or the profile has not arrived): nothing can be pressed.
@@ -43,9 +45,9 @@ function State.Button(state: State, price: number, busy: boolean): Button
 	elseif state == "Owned" then
 		return { Text = "Select", Enabled = true, Kind = "Accent" }
 	elseif state == "Buy" then
-		return { Text = `Buy · {price} Gems`, Enabled = true, Kind = "Accent" }
+		return { Text = `Buy · {Count(price)} Gems`, Enabled = true, Kind = "Accent" }
 	end
-	return { Text = `Need {price} Gems`, Enabled = false, Kind = "Off" }
+	return { Text = `Need {Count(price)} Gems`, Enabled = false, Kind = "Off" }
 end
 
 return table.freeze(State)

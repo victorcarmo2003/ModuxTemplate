@@ -135,6 +135,12 @@
 						"optional": "src/Settings/shared"
 					}
 				},
+				"Shop": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Shop/shared"
+					}
+				},
 				"Traffic": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
@@ -333,6 +339,12 @@
 					"$ignoreUnknownInstances": false,
 					"$path": {
 						"optional": "src/Prep/server"
+					}
+				},
+				"Presence": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Presence/server"
 					}
 				},
 				"Profile": {

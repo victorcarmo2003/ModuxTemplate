@@ -6,6 +6,7 @@
 --   panel     Ink CartoonPanel with studs that pops in (Motion.Pop), `Size` px at UI scale 1, times `Scale`
 --   header    Mustard title tab (icon + title) · optional gem balance pill · round Teal close button (44 px)
 --   body      `Children`, under the header (Body frame, full width)
+--   rays      `Rays`: the retro sunburst slowly spinning behind header and body (Sunburst; the shop menus)
 -- Pure: only props.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -16,6 +17,7 @@ local Motion = require(script.Parent.Motion)
 local CartoonPanel = require(script.Parent.CartoonPanel)
 local CartoonButton = require(script.Parent.CartoonButton)
 local CartoonLabel = require(script.Parent.CartoonLabel)
+local Sunburst = require(script.Parent.Sunburst)
 local Icon = require(script.Icon)
 
 const create = Vide.create
@@ -37,6 +39,8 @@ export type Props = {
 	Gems: (() -> number)?,
 	OnClose: () -> (),
 	Children: { any }?,
+	-- Retro rays slowly spinning behind the content (Sunburst; the shop menus). Default false.
+	Rays: boolean?,
 }
 
 const PAD = 10
@@ -167,6 +171,7 @@ return function(props: Props): Frame
 				}),
 			},
 			Children = {
+				if props.Rays then Sunburst({ Visible = props.Visible }) else nil,
 				header,
 				create("Frame")({
 					Name = "Body",

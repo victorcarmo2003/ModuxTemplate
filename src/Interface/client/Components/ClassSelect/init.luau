@@ -10,7 +10,8 @@
 --   right    Cream card of the focused class (TASK-299): round portrait, big name, species / price chips; a flavour
 --            line, attribute bars around the Rookie line (middle), passive skill cards (TASK-302), packed together at the top
 --            (the free height sits above the buttons) and shrunk together on a short screen; the buttons at the bottom:
---              not owned   "Buy  45" (gems, Mustard; Slate "Need 45" without the gems) + "Buy  R$ 79" (Robux,
+--              not owned   "Buy  2,000" (gems, Mustard; "Get 1,600 more" without the gems: the server prompts the gem pack
+--                          that covers it, Shop TopUp) + "Buy  R$ 79" (Robux,
 --                          Green; Slate "Robux (soon)" while the product id is 0)
 --              owned       "Equip" (Mustard) / "Equipped" (Green, not pressable)
 --              not in MVP  "Coming soon" (Slate)
@@ -29,6 +30,7 @@ local CartoonPanel = require(script.Parent.CartoonPanel)
 local CartoonButton = require(script.Parent.CartoonButton)
 local CartoonLabel = require(script.Parent.CartoonLabel)
 local Icon = require(script.Parent.LobbyWindow.Icon)
+local Count = require(script.Parent.HudPill.Count)
 local SkillImages = require(script.SkillImages)
 
 const create = Vide.create
@@ -121,6 +123,10 @@ const SECTION_GAP = 12 -- blurb, attributes and skills stay together at the top;
 const SKILL_GAP = 8 -- between two skill cards
 const SKILL_ICON = 40 -- square skill art (TASK-302)
 const EDGE = 4 -- room inside the clipped body for the outlines (2 px Outside stroke + 2 px lip)
+-- Skill name / line width in px: a fixed width wraps reliably inside the auto-sized card (a scale width under the
+-- kit's measured AutomaticSize kept one line and cut the text). Card inner width minus padding, art and gap.
+const SKILL_TEXT = CARD_WIDTH - PAD * 2 - EDGE * 2 - 14 - 4 - SKILL_ICON - 8
+const SKILL_LINES = 36 -- the skill line always has room for 2 lines (14 px); AutomaticSize grows it past that
 const STAT_TWEEN = 0.25 -- s, bar fill on a class swap (none with reduced motion)
 const FIT_GAP = 0.08 -- the section gaps, as a share of the content, when deciding to shrink
 const FIT_MIN = 0.7 -- smallest body scale (14 px text x 0.7 ~ 10 px at the phone floor: still readable)
@@ -364,14 +370,14 @@ return function(props: Props): Frame
 			end,
 			Tone = Theme.Tone.Mustard,
 			Enabled = function()
-				return canGems() and not props.Busy()
+				return not props.Busy()
 			end,
 			Text = function()
 				if props.Busy() then
 					return "..."
 				end
 				const price = focused().Price
-				return if canGems() then `Buy  {price}` else `Need {price}`
+				return if canGems() then `Buy  {Count(price)}` else `Get {Count(price - props.Gems())} more`
 			end,
 			OnActivated = function()
 				props.OnBuyGems(focused().Key)
@@ -635,7 +641,7 @@ return function(props: Props): Frame
 				CartoonLabel({
 					Name = "Title",
 					Position = UDim2.fromOffset(SKILL_ICON + 8, 0),
-					Box = UDim2.new(1, -(SKILL_ICON + 8), 0, 20),
+					Box = UDim2.fromOffset(SKILL_TEXT, 20),
 					TextSize = 16,
 					XAlignment = Enum.TextXAlignment.Left,
 					Color = Theme.Color.Dark,
@@ -648,7 +654,7 @@ return function(props: Props): Frame
 				CartoonLabel({
 					Name = "Text",
 					Position = UDim2.fromOffset(SKILL_ICON + 8, 20),
-					Box = UDim2.new(1, -(SKILL_ICON + 8), 0, 0),
+					Box = UDim2.fromOffset(SKILL_TEXT, SKILL_LINES),
 					AutomaticSize = Enum.AutomaticSize.Y,
 					TextSize = Theme.MinTextSize,
 					XAlignment = Enum.TextXAlignment.Left,
@@ -811,6 +817,9 @@ return function(props: Props): Frame
 
 	const card = CartoonPanel({
 		Name = "Card",
+		-- centred: the focus pop (cardPop) grows from the middle of the card
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
 		Size = UDim2.fromScale(1, 1),
 		Tone = Theme.Tone.Cream,
 		Outline = Theme.Outline.Thick,
@@ -909,7 +918,7 @@ return function(props: Props): Frame
 					end, function()
 						const s = state()
 						if s == "Locked" then
-							return tostring(focused().Price)
+							return Count(focused().Price)
 						elseif s == "Soon" then
 							return "Soon"
 						end
@@ -1037,7 +1046,7 @@ return function(props: Props): Frame
 						LayoutOrder = 2,
 						TextSize = 22,
 						Text = function()
-							return tostring(props.Gems())
+							return Count(props.Gems())
 						end,
 					}),
 				},
@@ -1068,8 +1077,11 @@ return function(props: Props): Frame
 		-- left: class list
 		create("Frame")({
 			Name = "ListAnchor",
-			AnchorPoint = Vector2.new(0, 0.5),
-			Position = UDim2.new(0, MARGIN, 0.5, 0),
+			-- anchored at its centre (left edge at MARGIN once fully open): the open pop grows from the middle
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = function()
+				return UDim2.new(0, MARGIN + LIST_WIDTH * scale() / 2, 0.5, 0)
+			end,
 			Size = function()
 				return UDim2.fromOffset(LIST_WIDTH, body())
 			end,
@@ -1115,8 +1127,11 @@ return function(props: Props): Frame
 		-- right: card of the focused class
 		create("Frame")({
 			Name = "CardAnchor",
-			AnchorPoint = Vector2.new(1, 0.5),
-			Position = UDim2.new(1, -MARGIN, 0.5, 0),
+			-- anchored at its centre (right edge at MARGIN once fully open): the open pop grows from the middle
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = function()
+				return UDim2.new(1, -MARGIN - CARD_WIDTH * scale() / 2, 0.5, 0)
+			end,
 			Size = function()
 				return UDim2.fromOffset(CARD_WIDTH, body())
 			end,

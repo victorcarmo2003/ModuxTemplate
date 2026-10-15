@@ -9,10 +9,14 @@
 -- (check and Update without yield); Currency "Robux" is a pre-check only: "Prompt" tells the client it may call
 -- MarketplaceService:PromptGamePassPurchase with Content.Shop.GamePasses[key].PassId (TASK-291: classes are Game
 -- Passes). The grant is ShopService's (it answers ClassBuyResult "Granted"). ClassAction "Buy" stays for the Crew screen.
+-- Not enough gems on a ClassBuy (owner request 2026-10-15): the server also prompts the created gem pack that covers the
+-- difference (Shop TopUp; ShopService credits the gems on the receipt and the player buys the class again).
+local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 local Content = require(ReplicatedStorage.shared.Content)
+local TopUp = require(ReplicatedStorage.shared.Shop.TopUp)
 local Modux = require(ServerScriptService.server.Modux)
 
 export type Action = "Buy" | "Select"
@@ -239,6 +243,25 @@ function ClassService:Buy(player: Player, key: string)
 	end
 end
 
+-- Gem pack covering what the class still costs (TopUp.Gems: the smallest created pack that covers it, else the biggest).
+function ClassService:PromptGemPack(player: Player, key: string)
+	const class = Content.Classes.ByKey[key]
+	const profile = self.Dependencies.ProfileService:Get(player)
+	if not class or not profile then
+		return
+	end
+	const pack = TopUp.Gems(class.Price - profile.Gems())
+	if pack == nil then
+		return
+	end
+	const ok, err = pcall(function()
+		MarketplaceService:PromptProductPurchase(player, pack.ProductId)
+	end)
+	if not ok then
+		warn(`[ClassService] PromptProductPurchase({pack.Key}) failed: {err}`)
+	end
+end
+
 -- ClassBuy (network.md §15). Every request gets one ClassBuyResult.
 function ClassService:HandleBuy(player: Player, key: string, currency: Currency)
 	if not self:Allow(player) then
@@ -250,6 +273,8 @@ function ClassService:HandleBuy(player: Player, key: string, currency: Currency)
 		self:Reply(player, key, reason)
 		if reason == "Ok" then
 			self:Notify(player, "class_bought", Content.Classes.IndexOf[key])
+		elseif reason == "NotEnoughGems" then
+			self:PromptGemPack(player, key)
 		end
 	else
 		self:Reply(player, key, self:CheckRobux(player, key))

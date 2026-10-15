@@ -299,7 +299,7 @@ return Lync.define("game", {
 		Grade = Lync.enum({ "A", "B", "C", "D" }), -- no customer = C (DEC-051)
 		Bonus = Lync.int(0, 1000000),
 		Deposited = Lync.int(0, 1000000),
-		Gems = Lync.int(0, 1000), -- wave 1: 0
+		Gems = Lync.int(0, 100000), -- wave 1: 0; x75 gem economy (TASK-308): a night pays up to ~2,500 + finale
 		AfkLocked = Lync.bool(), -- wave 1: false
 		LastChanceUsed = Lync.bool(), -- wave 1: false
 	})),
@@ -671,6 +671,13 @@ return Lync.define("game", {
 		-- prep-3d.md §7.2 N3 (TASK-194): cosmetic plate mask of the seat (Content.Prep.PlateMask), nil or 0 = no open plate.
 		-- Not authority: PrepFinish revalidates everything. At most 4 records, so no drop.section floor
 		Plate = Lync.optional(Lync.int(0, 255)),
+	})),
+
+	-- Players online in the whole game (TASK-312; owner request 2026-10-15, Provisional). Set, record 1,
+	-- lobby roles only. Writer: PresenceService (MemoryStore sum of every server, at most every 30 s; never under the
+	-- local count). Reader: LobbyController (LobbyHud online pill). One record, 24 bits: no drop.section floor
+	Online = Lync.replicate(Lync.struct({
+		Count = Lync.int(0, 16777215),
 	})),
 
 	-- Security cameras (FEAT-040, TASK-285; owner request 2026-10-14). s -> owner (fireClient, private): the watch_cameras

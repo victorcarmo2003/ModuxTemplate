@@ -385,166 +385,175 @@ return function(props: Props): Frame
 			return iconRect() ~= nil
 		end
 
-		return CartoonPanel({
-			Name = "Row",
+		-- fixed slot in the column; the panel scales from its centre inside it, so a selected / pressed row never pushes
+		-- the others or grows to the right (owner request 2026-10-15)
+		return create("Frame")({
+			Name = "RowSlot",
 			LayoutOrder = index,
 			Size = function()
 				return UDim2.fromOffset(rowWidth(), ROW_HEIGHT)
 			end,
-			Tone = function()
-				return if isSelected() then Theme.Tone.Mustard else Theme.Tone.Cream
-			end,
-			Transparency = function()
-				return if item.Enabled() then 0 else DISABLED_TRANSPARENCY
-			end,
-			Outline = Theme.Outline.Normal,
-			Decor = {
-				createRaw("UIScale")({
-					Scale = function()
-						return press() * bump() * (if isSelected() then SELECT_SCALE else 1)
-					end,
-				}),
-			},
-			Children = {
-				-- Console focus target: only the selected row is Selectable (gamepad), so the stick cannot walk the selection
-				-- off while moving; the owner chains the rows and drives GuiService.SelectedObject (default focus ring).
-				-- Never Active: it takes no mouse / touch.
-				(function(): GuiButton
-					const button = create("TextButton")({
-						Name = "Focus",
+			BackgroundTransparency = 1,
+			CartoonPanel({
+				Name = "Row",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = UDim2.fromScale(1, 1),
+				Tone = function()
+					return if isSelected() then Theme.Tone.Mustard else Theme.Tone.Cream
+				end,
+				Transparency = function()
+					return if item.Enabled() then 0 else DISABLED_TRANSPARENCY
+				end,
+				Outline = Theme.Outline.Normal,
+				Decor = {
+					createRaw("UIScale")({
+						Scale = function()
+							return press() * bump() * (if isSelected() then SELECT_SCALE else 1)
+						end,
+					}),
+				},
+				Children = {
+					-- Console focus target: only the selected row is Selectable (gamepad), so the stick cannot walk the selection
+					-- off while moving; the owner chains the rows and drives GuiService.SelectedObject (default focus ring).
+					-- Never Active: it takes no mouse / touch.
+					(function(): GuiButton
+						const button = create("TextButton")({
+							Name = "Focus",
+							Size = UDim2.fromScale(1, 1),
+							BackgroundTransparency = 1,
+							Text = "",
+							ZIndex = 7,
+							Active = false,
+							AutoButtonColor = false,
+							Selectable = function()
+								return isPad() and isSelected() and item.Enabled()
+							end,
+						}) :: GuiButton
+						if props.OnFocusButton then
+							const report = props.OnFocusButton
+							report(item, button)
+							Vide.cleanup(function()
+								report(item, nil)
+							end)
+						end
+						return button
+					end)(),
+
+					-- Hold fill, under the content
+					create("Frame")({
+						Name = "Fill",
+						AnchorPoint = Vector2.new(0, 0.5),
+						Position = UDim2.new(0, 3, 0.5, 0),
+						Size = function()
+							const f = progress()
+							return UDim2.new(f, -6 * f, 1, -6)
+						end,
+						BackgroundColor3 = Color3.new(1, 1, 1),
+						ZIndex = 0,
+						Visible = function()
+							return progress() > 0.001
+						end,
+						create("UICorner")({ CornerRadius = Theme.Radius.Pill }),
+						createRaw("UIGradient")({ Rotation = 90, Color = Theme.Gradient(Theme.Tone.Green) }),
+					}),
+
+					create("Frame")({
+						Name = "Body",
 						Size = UDim2.fromScale(1, 1),
 						BackgroundTransparency = 1,
-						Text = "",
-						ZIndex = 7,
-						Active = false,
-						AutoButtonColor = false,
-						Selectable = function()
-							return isPad() and isSelected() and item.Enabled()
-						end,
-					}) :: GuiButton
-					if props.OnFocusButton then
-						const report = props.OnFocusButton
-						report(item, button)
-						Vide.cleanup(function()
-							report(item, nil)
-						end)
-					end
-					return button
-				end)(),
+						ZIndex = 1,
+						createRaw("UIPadding")({
+							PaddingLeft = UDim.new(0, PAD_LEFT),
+							PaddingRight = UDim.new(0, PAD_RIGHT),
+						}),
+						createRaw("UIListLayout")({
+							FillDirection = Enum.FillDirection.Horizontal,
+							VerticalAlignment = Enum.VerticalAlignment.Center,
+							SortOrder = Enum.SortOrder.LayoutOrder,
+							Padding = UDim.new(0, INNER_GAP),
+						}),
 
-				-- Hold fill, under the content
-				create("Frame")({
-					Name = "Fill",
-					AnchorPoint = Vector2.new(0, 0.5),
-					Position = UDim2.new(0, 3, 0.5, 0),
-					Size = function()
-						const f = progress()
-						return UDim2.new(f, -6 * f, 1, -6)
-					end,
-					BackgroundColor3 = Color3.new(1, 1, 1),
-					ZIndex = 0,
-					Visible = function()
-						return progress() > 0.001
-					end,
-					create("UICorner")({ CornerRadius = Theme.Radius.Pill }),
-					createRaw("UIGradient")({ Rotation = 90, Color = Theme.Gradient(Theme.Tone.Green) }),
-				}),
+						-- Shortcut chip (fixed slot, so the labels line up whichever device is in use)
+						create("Frame")({
+							Name = "ChipSlot",
+							LayoutOrder = 1,
+							Size = UDim2.fromOffset(CHIP_SIZE, CHIP_SIZE),
+							BackgroundTransparency = 1,
+							CartoonPanel({
+								Name = "Chip",
+								Size = UDim2.fromScale(1, 1),
+								Tone = Theme.Tone.Ink,
+								Radius = Theme.Radius.Small,
+								Lip = 2,
+								Outline = Theme.Outline.Thin,
+								Visible = function()
+									return chipText() ~= "" or glyphOf() ~= ""
+								end,
+								Children = {
+									create("ImageLabel")({
+										Name = "Glyph",
+										AnchorPoint = Vector2.new(0.5, 0.5),
+										Position = UDim2.fromScale(0.5, 0.5),
+										Size = UDim2.fromOffset(GLYPH_SIZE, GLYPH_SIZE),
+										BackgroundTransparency = 1,
+										ZIndex = 3,
+										Image = glyphOf,
+										Visible = function()
+											return glyphOf() ~= ""
+										end,
+									}),
+									CartoonLabel({
+										Box = UDim2.fromScale(1, 1),
+										TextSize = HINT_SIZE,
+										Text = chipText,
+									}),
+								},
+							}),
+						}),
 
-				create("Frame")({
-					Name = "Body",
-					Size = UDim2.fromScale(1, 1),
-					BackgroundTransparency = 1,
-					ZIndex = 1,
-					createRaw("UIPadding")({
-						PaddingLeft = UDim.new(0, PAD_LEFT),
-						PaddingRight = UDim.new(0, PAD_RIGHT),
-					}),
-					createRaw("UIListLayout")({
-						FillDirection = Enum.FillDirection.Horizontal,
-						VerticalAlignment = Enum.VerticalAlignment.Center,
-						SortOrder = Enum.SortOrder.LayoutOrder,
-						Padding = UDim.new(0, INNER_GAP),
-					}),
-
-					-- Shortcut chip (fixed slot, so the labels line up whichever device is in use)
-					create("Frame")({
-						Name = "ChipSlot",
-						LayoutOrder = 1,
-						Size = UDim2.fromOffset(CHIP_SIZE, CHIP_SIZE),
-						BackgroundTransparency = 1,
-						CartoonPanel({
-							Name = "Chip",
-							Size = UDim2.fromScale(1, 1),
-							Tone = Theme.Tone.Ink,
-							Radius = Theme.Radius.Small,
-							Lip = 2,
-							Outline = Theme.Outline.Thin,
-							Visible = function()
-								return chipText() ~= "" or glyphOf() ~= ""
+						create("ImageLabel")({
+							Name = "Icon",
+							LayoutOrder = 2,
+							Size = UDim2.fromOffset(ICON_SIZE, ICON_SIZE),
+							BackgroundTransparency = 1,
+							Image = function()
+								return Icons.ImageOf(item.Icon())
 							end,
-							Children = {
-								create("ImageLabel")({
-									Name = "Glyph",
-									AnchorPoint = Vector2.new(0.5, 0.5),
-									Position = UDim2.fromScale(0.5, 0.5),
-									Size = UDim2.fromOffset(GLYPH_SIZE, GLYPH_SIZE),
-									BackgroundTransparency = 1,
-									ZIndex = 3,
-									Image = glyphOf,
-									Visible = function()
-										return glyphOf() ~= ""
-									end,
-								}),
-								CartoonLabel({
-									Box = UDim2.fromScale(1, 1),
-									TextSize = HINT_SIZE,
-									Text = chipText,
-								}),
-							},
+							ImageRectOffset = function()
+								const rect = iconRect()
+								return if rect then rect.Offset else Vector2.zero
+							end,
+							ImageRectSize = function()
+								const rect = iconRect()
+								return if rect then rect.Size else Vector2.zero
+							end,
+							ImageTransparency = function()
+								return if item.Enabled() then 0 else DISABLED_TRANSPARENCY
+							end,
+							Visible = hasIcon,
+						}),
+
+						CartoonLabel({
+							Name = "Label",
+							LayoutOrder = 3,
+							Box = function()
+								return UDim2.fromOffset(rowWidth() - CHROME, ROW_HEIGHT - Theme.Lip)
+							end,
+							TextSize = TEXT_SIZE,
+							Color = Theme.Color.Dark,
+							Stroke = 0,
+							XAlignment = Enum.TextXAlignment.Left,
+							Truncate = true,
+							Transparency = function()
+								return if item.Enabled() then 0 else DISABLED_TRANSPARENCY
+							end,
+							Text = item.Text,
 						}),
 					}),
-
-					create("ImageLabel")({
-						Name = "Icon",
-						LayoutOrder = 2,
-						Size = UDim2.fromOffset(ICON_SIZE, ICON_SIZE),
-						BackgroundTransparency = 1,
-						Image = function()
-							return Icons.ImageOf(item.Icon())
-						end,
-						ImageRectOffset = function()
-							const rect = iconRect()
-							return if rect then rect.Offset else Vector2.zero
-						end,
-						ImageRectSize = function()
-							const rect = iconRect()
-							return if rect then rect.Size else Vector2.zero
-						end,
-						ImageTransparency = function()
-							return if item.Enabled() then 0 else DISABLED_TRANSPARENCY
-						end,
-						Visible = hasIcon,
-					}),
-
-					CartoonLabel({
-						Name = "Label",
-						LayoutOrder = 3,
-						Box = function()
-							return UDim2.fromOffset(rowWidth() - CHROME, ROW_HEIGHT - Theme.Lip)
-						end,
-						TextSize = TEXT_SIZE,
-						Color = Theme.Color.Dark,
-						Stroke = 0,
-						XAlignment = Enum.TextXAlignment.Left,
-						Truncate = true,
-						Transparency = function()
-							return if item.Enabled() then 0 else DISABLED_TRANSPARENCY
-						end,
-						Text = item.Text,
-					}),
-				}),
-			},
-		})
+				},
+			}),
+		}) :: Frame
 	end
 
 	-- Touch fan option ---------------------------------------------------------------------------------------------
@@ -776,6 +785,50 @@ return function(props: Props): Frame
 		}),
 	}) :: Frame
 
+	-- The column pops from its centre (owner request 2026-10-15): anchored at its middle, placed half its width right of
+	-- the gap. Width in px at scale 1: measured size / (pop x UI scale), kept while the pop is too small to divide by.
+	const listWidth = source(0)
+	const list = create("Frame")({
+		Name = "List",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = function()
+			return UDim2.new(0.5, COLUMN_GAP + listWidth() / 2, 0.5, 0)
+		end,
+		Size = UDim2.fromOffset(0, 0),
+		AutomaticSize = Enum.AutomaticSize.XY,
+		BackgroundTransparency = 1,
+		Visible = function()
+			return not isTouch() and (shown() or pop() > 0.02)
+		end,
+		createRaw("UIScale")({ Scale = pop }),
+		createRaw("UIListLayout")({
+			FillDirection = Enum.FillDirection.Vertical,
+			HorizontalAlignment = Enum.HorizontalAlignment.Left,
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Padding = UDim.new(0, ROW_GAP),
+		}),
+
+		values(props.Items, row),
+
+		footer("NavHint", 100, Theme.Color.Cream, navHint),
+		footer("KeysHint", 100, Theme.Color.Cream, keysHint),
+		footer("ExtraHint", 101, Theme.Color.Gold, extraHint),
+		padStrip(),
+	}) :: Frame
+	const measureList = function()
+		const factor = Vide.untrack(pop) * Vide.untrack(scale)
+		if factor > 0.2 then
+			const px = list.AbsoluteSize.X / factor
+			if math.abs(px - Vide.untrack(listWidth)) > 0.5 then
+				listWidth(px)
+			end
+		end
+	end
+	const listConnection = list:GetPropertyChangedSignal("AbsoluteSize"):Connect(measureList)
+	Vide.cleanup(function()
+		listConnection:Disconnect()
+	end)
+
 	return create("Frame")({
 		Name = props.Name or "InteractionMenu",
 		Size = function()
@@ -789,30 +842,6 @@ return function(props: Props): Frame
 		circle,
 
 		-- Compact column to the right of the crosshair (desktop / gamepad)
-		create("Frame")({
-			Name = "List",
-			AnchorPoint = Vector2.new(0, 0.5),
-			Position = UDim2.new(0.5, COLUMN_GAP, 0.5, 0),
-			Size = UDim2.fromOffset(0, 0),
-			AutomaticSize = Enum.AutomaticSize.XY,
-			BackgroundTransparency = 1,
-			Visible = function()
-				return not isTouch() and (shown() or pop() > 0.02)
-			end,
-			createRaw("UIScale")({ Scale = pop }),
-			createRaw("UIListLayout")({
-				FillDirection = Enum.FillDirection.Vertical,
-				HorizontalAlignment = Enum.HorizontalAlignment.Left,
-				SortOrder = Enum.SortOrder.LayoutOrder,
-				Padding = UDim.new(0, ROW_GAP),
-			}),
-
-			values(props.Items, row),
-
-			footer("NavHint", 100, Theme.Color.Cream, navHint),
-			footer("KeysHint", 100, Theme.Color.Cream, keysHint),
-			footer("ExtraHint", 101, Theme.Color.Gold, extraHint),
-			padStrip(),
-		}),
+		list,
 	}) :: Frame
 end

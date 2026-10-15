@@ -29,6 +29,7 @@ local PedestrianService = require(ServerScriptService.server.ModuxTypes.Pedestri
 local PlaceService = require(ServerScriptService.server.ModuxTypes.PlaceService)
 local PlayerService = require(ServerScriptService.server.ModuxTypes.PlayerService)
 local PrepService = require(ServerScriptService.server.ModuxTypes.PrepService)
+local PresenceService = require(ServerScriptService.server.ModuxTypes.PresenceService)
 local ProfileService = require(ServerScriptService.server.ModuxTypes.ProfileService)
 local RewardService = require(ServerScriptService.server.ModuxTypes.RewardService)
 local RoundService = require(ServerScriptService.server.ModuxTypes.RoundService)
@@ -77,6 +78,7 @@ export type AllServices = {
 	PlaceService: PlaceService.Public,
 	PlayerService: PlayerService.Public,
 	PrepService: PrepService.Public,
+	PresenceService: PresenceService.Public,
 	ProfileService: ProfileService.Public,
 	RewardService: RewardService.Public,
 	RoundService: RoundService.Public,

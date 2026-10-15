@@ -3,33 +3,38 @@
 -- Promotion pass (TASK-301, owner request 2026-10-15): a LobbyWindow (640 x 360 at Scale 1, shrinks to fit a phone)
 -- with one card per pack in a row:
 --   ribbon    "BEST VALUE" (Mustard) / "POPULAR" (Violet) over the top edge (Pack.Badge)
---   chip      "+30%" tilted in the top-left corner (Bonus / Base), only with a bonus
---   art       the pack image (GemShop/Images; Hud/gem until uploaded), bigger for bigger packs
+--   art       the pack gems filling the top of the card (GemShop/Images: shop/art, no tile, no number; Hud/gem until
+--             uploaded) over the retro rays spinning slowly (Sunburst; owner request 2026-10-15, no "+30%" chip anymore)
 --   total     gem icon + "700" (what the receipt credits, Pack.Gems)
---   split     "500" + Green "+200 BONUS" pill; the pack name when there is no bonus
---   buy       Green "R$ 899" button (live Creator Hub price when known); Slate "Soon" for a product not created
--- The "Best" card is vivid blue with studs, a shine sweeping across it, twinkling sparkles around the art and a slow
--- pulse; the others are a muted slate blue with studs and no motion. Motion.Reduced: no shine, no pulse, sparkles
--- still (checked twice a second, the setting can change while the shop is open). The clock only runs while visible.
+--   split     Green "200 BONUS" pill (only the bonus, TASK-307); the pack name when there is no bonus
+--   price     Green "R$ 899" pill (live Creator Hub price when known); Slate "Soon" for a product not created
+-- The whole card is the button (TASK-307, better for kids): a transparent TextButton "Buy" per slot, a click or tap
+-- anywhere on it calls OnBuy; the price pill is only its face. Hovered (mouse or gamepad selection) a card pops from
+-- its centre (UIScale on a centred card inside a fixed slot, the list layout never moves) and gets the shine sweep.
+-- The "Best" card is vivid blue with studs, the shine sweeping on its own, white stars bursting around the art and a
+-- slow pulse; the others are a muted slate blue with studs and no motion until hovered. Motion.Reduced: no pop, no
+-- pulse, stars still, a hovered card shows a still shine band (checked twice a second, the setting can change while the
+-- shop is open). The clock only runs while visible.
 -- Base / Bonus / Badge are display only (Base + Bonus == Gems); a Pack without them reads Content.Shop.GemPacks.
 -- Pure: only props; the caller prompts the purchase (MarketplaceService:PromptProductPurchase) and the server credits
--- the gems on the receipt. Gamepad: every Buy button is Selectable (LobbyController selects the first "Buy").
+-- the gems on the receipt. Gamepad: every card button "Buy" is Selectable (LobbyController selects the first "Buy").
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local Theme = require(script.Parent.Theme)
-local Icons = require(script.Parent.Icons)
 local Motion = require(script.Parent.Motion)
 local CartoonPanel = require(script.Parent.CartoonPanel)
-local CartoonButton = require(script.Parent.CartoonButton)
 local CartoonLabel = require(script.Parent.CartoonLabel)
 local LobbyWindow = require(script.Parent.LobbyWindow)
 local Icon = require(script.Parent.LobbyWindow.Icon)
+local Sunburst = require(script.Parent.Sunburst)
 local Images = require(script.Images)
+local Count = require(script.Parent.HudPill.Count)
 
 const create = Vide.create
 const source = Vide.source
+const spring = Vide.spring
 const cleanup = Vide.cleanup
 const untrack = Vide.untrack
 -- Vide 0.4.1 types `create` for 19 classes only; UIScale and UIGradient are not among them.
@@ -55,7 +60,7 @@ export type Props = {
 	Gems: () -> number,
 	-- Live price per pack (GetProductInfo); nil = Pack.Robux.
 	PriceOf: ((key: string) -> number?)?,
-	-- A purchase prompt is open: the buttons wait.
+	-- A purchase prompt is open: the cards wait.
 	Busy: (() -> boolean)?,
 	OnBuy: (key: string) -> (),
 	OnClose: () -> (),
@@ -68,6 +73,7 @@ const GAP = 10
 const TOP = 14 -- room over the cards for the ribbons
 const BUTTON = 44
 const PAD = 8
+const ART = 104 -- height of the art area at the top of the card (the full inner width)
 
 -- Card surfaces: the highlighted pack is vivid blue, the others a muted slate blue (never the alert red).
 const VIVID: Theme.Tone = {
@@ -90,84 +96,166 @@ const GOLD = Color3.fromHex("#FFE27A")
 const SWEEP = 0.9
 const PERIOD = 2.8
 const PULSE = 0.025 -- scale amplitude of the highlighted card
+const HOVER = 1.06 -- scale of a hovered card
+const PRESS = 0.97 -- scale of a pressed card
 const CHECK = 0.5 -- s between two reads of Motion.Reduced
 
--- Sparkles around the art of the highlighted card: position (scale of the art frame), px size, phase.
-const SPARKLES: { { number } } = {
-	{ 0.14, 0.18, 18, 0 },
-	{ 0.86, 0.12, 14, 1.7 },
-	{ 0.9, 0.78, 16, 3.1 },
-	{ 0.1, 0.82, 12, 4.4 },
+-- White stars bursting around the art of the highlighted card: px size, period (s), phase (s). Each cycle a star pops
+-- (0 -> overshoot), shrinks away and waits; every cycle it lands somewhere else on the art.
+const STARS: { { number } } = {
+	{ 22, 1.9, 0 },
+	{ 16, 2.3, 0.7 },
+	{ 18, 2.1, 1.3 },
+	{ 14, 2.6, 0.4 },
+	{ 20, 2.4, 1.8 },
 }
+-- Where the stars rest with reduced motion (scale of the art frame).
+const STILL: { Vector2 } = {
+	Vector2.new(0.14, 0.18),
+	Vector2.new(0.86, 0.14),
+	Vector2.new(0.9, 0.8),
+	Vector2.new(0.1, 0.82),
+	Vector2.new(0.5, 0.08),
+}
+const GROW = 0.16 -- share of the cycle popping in (0 -> overshoot)
+const FADE = 0.42 -- share of the cycle after which the star is gone until the next one
+const SETTLE = 1.15 * math.sin(math.pi * 0.62) -- star scale at the end of the pop, where it starts shrinking
 
-type Display = { Base: number, Bonus: number, Badge: Badge? }
+type Display = { Bonus: number, Badge: Badge? }
 
 local function display(pack: Pack): Display
 	const data = Content.Shop.GemPacks.ByKey[pack.Key]
-	const base = pack.Base or (if data then data.Base else pack.Gems)
 	const bonus = pack.Bonus or (if data then data.Bonus else 0)
 	const badge: Badge? = pack.Badge or (if data then data.Badge else nil)
-	return { Base = base, Bonus = bonus, Badge = badge }
+	return { Bonus = bonus, Badge = badge }
 end
 
--- Pack image, or the sheet gem while the pack art is not uploaded.
-local function art(key: string, size: number): Instance
+-- Pack gems filling the art area (centred, Fit), or the sheet gem while the pack art is not uploaded.
+local function art(key: string): Instance
 	const image = Images[key]
 	if image == nil then
-		return Icon("Hud/gem", size, 1)
+		return create("Frame")({
+			Name = "Image",
+			Size = UDim2.fromScale(1, 1),
+			BackgroundTransparency = 1,
+			ZIndex = 1,
+			create("UIListLayout")({
+				HorizontalAlignment = Enum.HorizontalAlignment.Center,
+				VerticalAlignment = Enum.VerticalAlignment.Center,
+			}),
+			Icon("Hud/gem", ART - 24, 1),
+		})
 	end
 	return create("ImageLabel")({
-		Name = "Art",
-		LayoutOrder = 1,
-		Size = UDim2.fromOffset(size, size),
+		Name = "Image",
+		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
 		Image = image,
 		ScaleType = Enum.ScaleType.Fit,
+		ZIndex = 1,
 	})
 end
 
--- One twinkling star (Ui/sparkle): grows, turns and fades with the clock; still with reduced motion.
-local function sparkle(spec: { number }, clock: () -> number, calm: () -> boolean): Instance
-	const name = "Ui/sparkle"
-	const rect = Icons.Rect(name)
-	const size, phase = spec[3], spec[4]
-	const wave = function(): number
-		return if calm() then 0.85 else 0.5 + 0.5 * math.sin(clock() * 2.6 + phase)
-	end
-	return create("ImageLabel")({
-		Name = "Sparkle",
+-- 0..1 noise from two numbers (the spot of a star in one cycle).
+local function hash(a: number, b: number): number
+	const x = math.sin(a * 12.9898 + b * 78.233) * 43758.5453
+	return x - math.floor(x)
+end
+
+-- Ray of a star: a white bar fading at both ends.
+local function ray(length: number, thick: number, rotation: number): Instance
+	return create("Frame")({
+		Name = "Ray",
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(spec[1], spec[2]),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.new(length, 0, 0, thick),
+		Rotation = rotation,
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		ZIndex = 2,
+		create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+		createRaw("UIGradient")({
+			Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 1),
+				NumberSequenceKeypoint.new(0.5, 0),
+				NumberSequenceKeypoint.new(1, 1),
+			}),
+		}),
+	})
+end
+
+-- One white star burst (drawn, no image): pops 0 -> overshoot, shrinks away, waits, then pops at another spot of the
+-- art. Reduced motion: still at its STILL spot.
+local function star(index: number, clock: () -> number, calm: () -> boolean): Instance
+	const spec = STARS[index]
+	const size, period, phase = spec[1], spec[2], spec[3]
+	const cycle = function(): (number, number)
+		const t = (clock() + phase) / period
+		const n = math.floor(t)
+		return n, t - n
+	end
+	const scale = function(): number
+		if calm() then
+			return 0.8
+		end
+		const _, u = cycle()
+		if u < GROW then
+			-- sine arc past its top: 0 -> 1.15 (overshoot) -> SETTLE at the end of the pop
+			return 1.15 * math.sin((u / GROW) * math.pi * 0.62)
+		elseif u < FADE then
+			const v = (u - GROW) / (FADE - GROW)
+			return SETTLE * (1 - v * v)
+		end
+		return 0
+	end
+	return create("Frame")({
+		Name = "Star",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = function()
+			if calm() then
+				const spot = STILL[index]
+				return UDim2.fromScale(spot.X, spot.Y)
+			end
+			const n = cycle()
+			return UDim2.fromScale(0.1 + 0.8 * hash(n, index), 0.1 + 0.8 * hash(index, n + 0.5))
+		end,
 		Size = function()
-			const s = math.floor(size * (0.45 + 0.55 * wave()))
+			const s = math.floor(size * scale() + 0.5)
 			return UDim2.fromOffset(s, s)
 		end,
 		Rotation = function()
-			return if calm() then 0 else clock() * 45 + phase * 30
+			return if calm() then 0 else clock() * 60 + index * 25
+		end,
+		Visible = function()
+			return scale() > 0.02
 		end,
 		BackgroundTransparency = 1,
-		ImageColor3 = GOLD,
-		ImageTransparency = function()
-			return 0.6 * (1 - wave())
-		end,
-		Image = Icons.ImageOf(name),
-		ImageRectOffset = if rect then rect.Offset else Vector2.zero,
-		ImageRectSize = if rect then rect.Size else Vector2.zero,
-		Visible = Icons.Has(name),
 		ZIndex = 2,
+		create("Frame")({
+			Name = "Glow",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromScale(0.6, 0.6),
+			BackgroundColor3 = Color3.new(1, 1, 1),
+			BackgroundTransparency = 0.5,
+			ZIndex = 2,
+			create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+		}),
+		ray(1, 3, 0),
+		ray(1, 3, 90),
+		ray(0.6, 2, 45),
+		ray(0.6, 2, -45),
 	})
 end
 
--- White band sweeping across the face (UIGradient offset: follows the round corners, no clipping needed).
-local function shine(clock: () -> number, calm: () -> boolean): Instance
+-- White band sweeping across the face (UIGradient offset: follows the round corners, no clipping needed). `origin` is
+-- the clock time the sweep counts from (the hover start); reduced motion: a still band across the middle.
+local function shine(clock: () -> number, calm: () -> boolean, visible: () -> boolean, origin: () -> number): Instance
 	return create("Frame")({
 		Name = "Shine",
 		Size = UDim2.new(1, 0, 1, -Theme.Lip),
 		BackgroundColor3 = Color3.new(1, 1, 1),
 		BackgroundTransparency = 0,
-		Visible = function()
-			return not calm()
-		end,
+		Visible = visible,
 		ZIndex = 1,
 		create("UICorner")({ CornerRadius = Theme.Radius.Card }),
 		createRaw("UIGradient")({
@@ -181,7 +269,10 @@ local function shine(clock: () -> number, calm: () -> boolean): Instance
 				NumberSequenceKeypoint.new(1, 1),
 			}),
 			Offset = function()
-				const t = clock() % PERIOD
+				if calm() then
+					return Vector2.zero
+				end
+				const t = (clock() - origin()) % PERIOD
 				const x = if t < SWEEP then -1.2 + 2.4 * (t / SWEEP) else 1.2
 				return Vector2.new(x, 0)
 			end,
@@ -229,7 +320,7 @@ return function(props: Props): Frame
 		return props.Busy ~= nil and props.Busy()
 	end
 
-	-- Animation clock (s) of the highlighted card; runs only while the shop is open and motion is allowed.
+	-- Animation clock (s) of the cards; runs only while the shop is open and motion is allowed.
 	const clock = source(0)
 	const calm = source(Motion.Reduced())
 	local elapsed = 0
@@ -263,61 +354,90 @@ return function(props: Props): Frame
 	for index, pack in props.Packs do
 		const info = display(pack)
 		const best = info.Badge == "Best"
-		const iconSize = math.min(68 + index * 8, inner - 8)
 		const price = function(): number
 			const live = if props.PriceOf then props.PriceOf(pack.Key) else nil
 			return live or pack.Robux
 		end
-		const percent = if info.Base > 0 then math.floor(info.Bonus / info.Base * 100 + 0.5) else 0
+		const enabled = function(): boolean
+			return pack.Available and not busy()
+		end
+
+		-- Hover (mouse or gamepad selection) and press of the whole card. Only a product that exists reacts.
+		const hovered = source(false)
+		const pressed = source(false)
+		const since = source(0) -- clock at the hover start: the shine sweeps from there
+		const lit = function(): boolean
+			return pack.Available and hovered()
+		end
+		const hover = function(on: boolean)
+			if on and not untrack(hovered) then
+				since(untrack(clock) - SWEEP * 0.1)
+			end
+			hovered(on)
+			if not on then
+				pressed(false)
+			end
+		end
+		const pop = spring(function()
+			if pressed() and enabled() then
+				return PRESS
+			end
+			return if lit() then HOVER else 1
+		end, Theme.Motion.Press, 0.5)
+		const scale = function(): number
+			if calm() then
+				return 1
+			end
+			return math.max(pop(), 0) * (if best then pulse() else 1)
+		end
+		const shining = function(): boolean
+			return lit() or (best and not calm())
+		end
+		const origin = function(): number
+			return if lit() then since() else 0
+		end
+
+		const tone = function(): Theme.Tone
+			if not pack.Available then
+				return Theme.Tone.Slate
+			end
+			return if best then Theme.Tone.Mustard else Theme.Tone.Green
+		end
 
 		const artChildren: { any } = {
-			create("UIListLayout")({
-				HorizontalAlignment = Enum.HorizontalAlignment.Center,
-				VerticalAlignment = Enum.VerticalAlignment.Center,
-				SortOrder = Enum.SortOrder.LayoutOrder,
-			}),
-			art(pack.Key, iconSize),
+			create("UICorner")({ CornerRadius = Theme.Radius.Chip }),
+			Sunburst({ Visible = props.Visible, Transparency = 0.72, ZIndex = 0 }),
+			art(pack.Key),
 		}
-		const sparkles: { Instance } = {}
+		const stars: { Instance } = {}
 		if best then
-			for _, spec in SPARKLES do
-				table.insert(sparkles, sparkle(spec, clock, calm))
+			for i = 1, #STARS do
+				table.insert(stars, star(i, clock, calm))
 			end
 		end
 
-		-- "500 + 200 BONUS" or, without a bonus, the pack name
+		-- "200 BONUS" (only the bonus) or, without a bonus, the pack name
 		const split: { any } = if info.Bonus > 0
 			then {
 				create("UIListLayout")({
-					FillDirection = Enum.FillDirection.Horizontal,
 					HorizontalAlignment = Enum.HorizontalAlignment.Center,
 					VerticalAlignment = Enum.VerticalAlignment.Center,
-					SortOrder = Enum.SortOrder.LayoutOrder,
-					Padding = UDim.new(0, 4),
-				}),
-				CartoonLabel({
-					Name = "Base",
-					LayoutOrder = 1,
-					TextSize = 16,
-					Transparency = 0.1,
-					Text = tostring(info.Base),
 				}),
 				CartoonPanel({
 					Name = "Bonus",
-					LayoutOrder = 2,
 					Size = UDim2.fromOffset(0, 24),
 					AutomaticSize = Enum.AutomaticSize.X,
 					Tone = Theme.Tone.Green,
 					Lip = 2,
 					Outline = 2,
 					Gloss = false,
-					Padding = { Left = 6, Right = 6 },
+					Padding = { Left = 8, Right = 8 },
 					Children = {
 						CartoonLabel({
 							Box = UDim2.new(0, 0, 1, -2),
 							AutomaticSize = Enum.AutomaticSize.X,
 							TextSize = Theme.MinTextSize,
-							Text = `+{info.Bonus} BONUS`,
+							Text = `{Count(info.Bonus)} BONUS`,
 						}),
 					},
 				}),
@@ -348,10 +468,11 @@ return function(props: Props): Frame
 				create("Frame")({
 					Name = "Art",
 					LayoutOrder = 1,
-					Size = UDim2.fromOffset(inner, 100),
-					BackgroundTransparency = 1,
+					Size = UDim2.fromOffset(inner, ART),
+					BackgroundColor3 = Color3.new(1, 1, 1),
+					BackgroundTransparency = 0.88,
 					artChildren,
-					sparkles,
+					stars,
 				}),
 				create("Frame")({
 					Name = "Total",
@@ -371,7 +492,7 @@ return function(props: Props): Frame
 						LayoutOrder = 2,
 						TextSize = if best then 32 else 28,
 						Color = if best then GOLD else Color3.new(1, 1, 1),
-						Text = tostring(pack.Gems),
+						Text = Count(pack.Gems),
 					}),
 				}),
 				create("Frame")({
@@ -382,79 +503,104 @@ return function(props: Props): Frame
 					split,
 				}),
 			}),
-			CartoonButton({
-				Name = "Buy",
+			-- the face of the card button: looks like the old Buy button, the whole card takes the click
+			CartoonPanel({
+				Name = "Price",
 				AnchorPoint = Vector2.new(0.5, 1),
 				Position = UDim2.fromScale(0.5, 1),
 				Size = UDim2.new(1, 0, 0, BUTTON),
-				TextSize = 20,
+				Tone = tone,
 				Outline = Theme.Outline.Thick,
-				Tone = if best then Theme.Tone.Mustard else Theme.Tone.Green,
-				Enabled = function()
-					return pack.Available and not busy()
-				end,
-				Text = function()
-					if not pack.Available then
-						return "Soon"
-					end
-					return if busy() then "..." else `R$ {price()}`
-				end,
-				OnActivated = function()
-					props.OnBuy(pack.Key)
-				end,
+				Radius = Theme.Radius.Pill,
+				Children = {
+					CartoonLabel({
+						Box = UDim2.fromScale(1, 1),
+						TextSize = 20,
+						Color = function()
+							return tone().Text
+						end,
+						Stroke = function()
+							return if tone().Stroke then Theme.TextStroke(20) else 0
+						end,
+						Text = function()
+							if not pack.Available then
+								return "Soon"
+							end
+							return if busy() then "..." else `R$ {price()}`
+						end,
+					}),
+				},
 			}),
 		}
 
-		if percent > 0 then
-			table.insert(
-				children,
-				CartoonPanel({
-					Name = "Percent",
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					Position = UDim2.fromOffset(10, 12),
-					Size = UDim2.fromOffset(0, 26),
-					AutomaticSize = Enum.AutomaticSize.X,
-					Rotation = -10,
-					Tone = Theme.Tone.Green,
-					Lip = 2,
-					Outline = Theme.Outline.Normal,
-					Padding = { Left = 6, Right = 6 },
-					ZIndex = 3,
-					Children = {
-						CartoonLabel({
-							Box = UDim2.new(0, 0, 1, -2),
-							AutomaticSize = Enum.AutomaticSize.X,
-							TextSize = 16,
-							Text = `+{percent}%`,
-						}),
-					},
-				})
-			)
-		end
 		if info.Badge == "Best" then
-			table.insert(children, ribbon("BEST VALUE", Theme.Tone.Mustard, pulse))
+			table.insert(children, ribbon("BEST VALUE", Theme.Tone.Mustard, nil))
 		elseif info.Badge == "Popular" then
 			table.insert(children, ribbon("POPULAR", Theme.Tone.Violet, nil))
 		end
 
+		-- fixed slot in the row; the card button fills it and the card scales from its centre inside it, so the list
+		-- layout never sees the size change. The hovered slot draws over its neighbours.
 		table.insert(
 			cards,
-			CartoonPanel({
+			create("Frame")({
 				Name = pack.Key,
 				LayoutOrder = index,
 				Size = UDim2.new(0, cardWidth, 1, 0),
-				Tone = if best then VIVID else MUTED,
-				Outline = Theme.Outline.Thick,
-				Radius = Theme.Radius.Card,
-				Studs = true,
-				Padding = PAD,
-				Decor = if best
-					then {
-						createRaw("UIScale")({ Scale = pulse }),
-						shine(clock, calm),
-					}
-					else nil,
-				Children = children,
+				BackgroundTransparency = 1,
+				ZIndex = function()
+					return if hovered() then 2 else 1
+				end,
+				create("TextButton")({
+					Name = "Buy",
+					Size = UDim2.fromScale(1, 1),
+					BackgroundTransparency = 1,
+					AutoButtonColor = false,
+					Selectable = true,
+					Active = enabled,
+					Text = "",
+					MouseEnter = function()
+						hover(true)
+					end,
+					MouseLeave = function()
+						hover(false)
+					end,
+					SelectionGained = function()
+						hover(true)
+					end,
+					SelectionLost = function()
+						hover(false)
+					end,
+					MouseButton1Down = function()
+						if enabled() then
+							pressed(true)
+						end
+					end,
+					MouseButton1Up = function()
+						pressed(false)
+					end,
+					Activated = function()
+						if enabled() then
+							props.OnBuy(pack.Key)
+						end
+					end,
+					CartoonPanel({
+						Name = "Card",
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						Position = UDim2.fromScale(0.5, 0.5),
+						Size = UDim2.fromScale(1, 1),
+						Tone = if best then VIVID else MUTED,
+						Outline = Theme.Outline.Thick,
+						Radius = Theme.Radius.Card,
+						Studs = true,
+						Padding = PAD,
+						Decor = {
+							createRaw("UIScale")({ Scale = scale }),
+							shine(clock, calm, shining, origin),
+						},
+						Children = children,
+					}),
+				}),
 			})
 		)
 	end
@@ -468,6 +614,7 @@ return function(props: Props): Frame
 		Scale = props.Scale,
 		Gems = props.Gems,
 		OnClose = props.OnClose,
+		Rays = true, -- retro rays spinning behind the cards (owner request 2026-10-15)
 		Children = {
 			create("Frame")({
 				Name = "Packs",

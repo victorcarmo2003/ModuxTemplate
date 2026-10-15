@@ -22,6 +22,7 @@ local HallucinationController = require(StarterPlayer.StarterPlayerScripts.clien
 local HudController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.HudController)
 local InputController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.InputController)
 local PromptController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PromptController)
+local BackdropController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.BackdropController)
 local ItemController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ItemController)
 local KitchenController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.KitchenController)
 local LightController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.LightController)
@@ -75,6 +76,7 @@ export type AllControllers = {
 	HudController: HudController.Public,
 	InputController: InputController.Public,
 	PromptController: PromptController.Public,
+	BackdropController: BackdropController.Public,
 	ItemController: ItemController.Public,
 	KitchenController: KitchenController.Public,
 	LightController: LightController.Public,

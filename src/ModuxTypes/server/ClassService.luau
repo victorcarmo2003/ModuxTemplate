@@ -34,6 +34,7 @@ export type Public = {
 	CheckRobux: (self: Public, player: Player, key: string) -> BuyReason,
 	Reply: (self: Public, player: Player, key: string, reason: BuyReason) -> (),
 	Buy: (self: Public, player: Player, key: string) -> (),
+	PromptGemPack: (self: Public, player: Player, key: string) -> (),
 	HandleBuy: (self: Public, player: Player, key: string, currency: Currency) -> (),
 	Select: (self: Public, player: Player, key: string) -> (),
 	DevGrantGems: (self: Public, player: Player, amount: number) -> number,

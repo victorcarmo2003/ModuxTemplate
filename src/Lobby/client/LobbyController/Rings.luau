@@ -241,9 +241,28 @@ local function newSparks(zone: LobbyZones.Zone, color: Color3, parent: Instance)
 	return emitter
 end
 
+-- The map draws a neon outline around some floors (Apron_<Key>_Edge parts); they take the zone colour on this client so
+-- the map outline and the frame read as one (TASK-314: the Codes outline was cream under a blue frame). Pads excluded.
+local function tintApron(zone: LobbyZones.Zone, color: Color3)
+	if zone.Platform > 0 then
+		return
+	end
+	const assets = workspace:FindFirstChild("LOBBY_Assets")
+	if assets == nil then
+		return
+	end
+	const name = `Apron_{zone.Key}_Edge`
+	for _, descendant in assets:GetDescendants() do
+		if descendant.Name == name and descendant:IsA("BasePart") then
+			descendant.Color = color
+		end
+	end
+end
+
 local function buildZone(zone: LobbyZones.Zone, color: Color3, seed: number): ZoneVfx
 	const folder = Instance.new("Folder")
 	folder.Name = zone.Key
+	tintApron(zone, color)
 	const base: { BasePart } = {}
 	for i, bar in outline(zone, FRAME.Segments) do
 		base[i] = newBar(`Base{i}`, bar, zone.CFrame * bar.Offset, color, FRAME.Base, folder)

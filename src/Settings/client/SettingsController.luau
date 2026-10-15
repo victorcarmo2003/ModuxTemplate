@@ -20,6 +20,7 @@ local UserInputService = game:GetService("UserInputService")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local SettingsRules = require(ReplicatedStorage.shared.Settings.SettingsRules)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
+local Backdrop = require(StarterPlayer.StarterPlayerScripts.client.Interface.Backdrop)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
 local SettingsPanel = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.SettingsPanel)
 local Prefs = require(script.Parent.Prefs)
@@ -150,6 +151,8 @@ end
 
 function SettingsController:Mount(playerGui: Instance)
 	const _, gui = Vide.root(function()
+		-- blur + veil behind the window (TASK-311)
+		Backdrop.Hold(self.Open)
 		return Vide.create("ScreenGui")({
 			Name = "Settings",
 			ResetOnSpawn = false,

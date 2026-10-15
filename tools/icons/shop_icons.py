@@ -7,10 +7,13 @@ Same language as the AST-091 UI icon sheet and the CartoonPanel (Theme, style gu
 Developer products use a rounded square tile; game passes (classes) a round tile, because Roblox shows game passes
 cropped to a circle.
 
-    python tools/icons/shop_icons.py            # writes Assets/textures/ui/shop/<key>.png (+ .svg sources)
+    python tools/icons/shop_icons.py            # writes Assets/textures/ui/shop/<key>.png (+ .svg sources): the Creator
+                                                # Hub product images (numbered tiles), and shop/art/gems_<n>.png: the
+                                                # in-game gem art (no tile, no number; GemShop cards)
 """
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
@@ -91,26 +94,43 @@ TONES = {
 }
 
 
+RAYS = 16  # sunburst wedges (half of them light): the 90s soda-poster look (owner 2026-10-15)
+
+
+def sunburst(cx: float, cy: float, light: str, opacity: float = 0.42) -> str:
+    """Alternating rays out of the centre (every other wedge lighter)."""
+    out = []
+    step = 360 / RAYS
+    for i in range(0, RAYS, 2):
+        a0 = math.radians(-90 + i * step)
+        a1 = math.radians(-90 + (i + 1) * step)
+        x0, y0 = cx + 420 * math.cos(a0), cy + 420 * math.sin(a0)
+        x1, y1 = cx + 420 * math.cos(a1), cy + 420 * math.sin(a1)
+        out.append(f'<path d="M{cx},{cy} L{x0:.1f},{y0:.1f} L{x1:.1f},{y1:.1f} Z" fill="{light}" opacity="{opacity}"/>')
+    return "".join(out)
+
+
 def tile(ic: Icon, tone: str, round_: bool = False) -> str:
+    """CartoonPanel tile with the retro look: alternating sunburst rays behind the subject (owner 2026-10-15)."""
     top, bottom, lip = TONES[tone]
     fill = ic.soft(top, bottom)
-    dots = "".join(
-        f'<circle cx="{x}" cy="{y}" r="5" fill="{WHITE}" opacity="0.13"/>'
-        for x in range(40, 512, 36)
-        for y in range(40, 470, 36)
-        if (x // 36 + y // 36) % 2 == 0
+    ic.n += 1
+    clip = f"c{ic.n}"
+    shape = (
+        '<circle cx="256" cy="250" r="236"/>' if round_ else '<rect x="24" y="24" width="464" height="448" rx="58"/>'
     )
+    ic.defs.append(f'<clipPath id="{clip}">{shape}</clipPath>')
     if round_:
         return (
             f'<circle cx="256" cy="262" r="244" fill="{lip}" {ol()}/>'
             f'<circle cx="256" cy="250" r="244" fill="{fill}" {ol()}/>'
-            f'<g clip-path="circle(236px at 256px 250px)">{dots}</g>'
+            f'<g clip-path="url(#{clip})">{sunburst(256, 260, CREAM)}</g>'
             f'<circle cx="256" cy="250" r="228" fill="none" stroke="{WHITE}" stroke-width="5" opacity="0.55"/>'
         )
     return (
         f'<rect x="10" y="22" width="492" height="480" rx="70" fill="{lip}" {ol()}/>'
         f'<rect x="10" y="10" width="492" height="476" rx="70" fill="{fill}" {ol()}/>'
-        f'<g clip-path="inset(14px round 64px)">{dots}</g>'
+        f'<g clip-path="url(#{clip})">{sunburst(256, 260, CREAM)}</g>'
         f'<rect x="26" y="26" width="460" height="444" rx="56" fill="none" stroke="{WHITE}" stroke-width="5" opacity="0.55"/>'
     )
 
@@ -157,30 +177,6 @@ def gem(ic: Icon, x: float, y: float, s: float) -> str:
     )
 
 
-def bill(ic: Icon, x: float, y: float, k: float = 1.0, rot: float = 0) -> str:
-    """One banknote, front view, sticker shading, with the crew's hot dog in the middle."""
-    paper = ic.two("#9BE6A4", "#5FC172", 0.6)
-    return (
-        f'<g transform="translate({x} {y}) rotate({rot}) scale({k})">'
-        f'<rect x="-150" y="-62" width="300" height="124" rx="18" fill="{paper}" {ol(w)}/>'
-        f'<rect x="-128" y="-42" width="256" height="84" rx="12" fill="none" stroke="#2E8A46" stroke-width="6"/>'
-        f'<circle cx="0" cy="0" r="34" fill="#E9FBEA" {ol(6)}/>'
-        f'<text x="0" y="16" text-anchor="middle" font-family="Fredoka One" font-size="46" fill="#2E8A46">$</text>'
-        f'<circle cx="-104" cy="0" r="10" fill="#2E8A46"/><circle cx="104" cy="0" r="10" fill="#2E8A46"/>'
-        + gloss(-118, -40, 16, 6, 0, 0.7)
-        + '</g>'
-    )
-
-
-def bill_stack(ic: Icon, x: float, y: float, k: float = 1.0) -> str:
-    out = f'<g transform="translate({x} {y}) scale({k})">'
-    out += bill(ic, 0, 70, 1.0, 3) + bill(ic, 0, 20, 1.0, -4) + bill(ic, 0, -30, 1.0, 2)
-    out += f'<rect x="-34" y="-104" width="68" height="200" rx="10" fill="{MUSTARD}" {ol(w)}/>'
-    out += f'<rect x="-34" y="-104" width="68" height="60" rx="10" fill="#FFE07A"/>'
-    out += f'<rect x="-34" y="-104" width="68" height="200" rx="10" fill="none" {ol(w)}/>'
-    return out + '</g>'
-
-
 def bottle(ic: Icon, x: float, y: float, base: str, dark: str, label: str = "", k: float = 1.0) -> str:
     body = ic.two(base, dark, 0.62)
     return (
@@ -190,29 +186,6 @@ def bottle(ic: Icon, x: float, y: float, base: str, dark: str, label: str = "", 
         f'<rect x="-36" y="-8" width="72" height="50" rx="12" fill="{CREAM}" {ol(7)}/>'
         + (f'<text x="0" y="27" text-anchor="middle" font-family="Fredoka One" font-size="28" fill="{INK}">{label}</text>' if label else "")
         + gloss(-26, -46, 8, 22, 0, 0.8)
-        + '</g>'
-    )
-
-
-def trailer(ic: Icon, x: float, y: float, k: float, cargo: str) -> str:
-    """The Open Late hot dog trailer, side view, with something heaped in the open window."""
-    body = ic.two("#FFF4DC", "#F2D9A8", 0.6)
-    awning = "".join(
-        f'<rect x="{-150 + i * 40}" y="-92" width="40" height="34" fill="{MUSTARD if i % 2 == 0 else CREAM}"/>' for i in range(7)
-    )
-    return (
-        f'<g transform="translate({x} {y}) scale({k})">'
-        f'<rect x="-170" y="-110" width="320" height="190" rx="34" fill="{body}" {ol(W)}/>'
-        f'<path d="M150,30 L190,30" stroke="{INK}" stroke-width="{W}" stroke-linecap="round"/>'
-        f'<rect x="-140" y="-56" width="200" height="86" rx="14" fill="#4A3F55" {ol(w)}/>'
-        f'{cargo}'
-        f'<g clip-path="inset(0 round 0)">{awning}</g>'
-        f'<path d="M-150,-92 L130,-92 L130,-58 L-150,-58 Z" fill="none" {ol(w)}/>'
-        f'<rect x="84" y="-50" width="44" height="100" rx="10" fill="#F2D9A8" {ol(w)}/>'
-        f'<rect x="-170" y="40" width="320" height="16" fill="{MUSTARD}" {ol(7)}/>'
-        f'<circle cx="-90" cy="84" r="36" fill="#4A3F55" {ol(W)}/><circle cx="-90" cy="84" r="14" fill="{CREAM}"/>'
-        f'<circle cx="80" cy="84" r="36" fill="#4A3F55" {ol(W)}/><circle cx="80" cy="84" r="14" fill="{CREAM}"/>'
-        + gloss(-130, -90, 22, 8, 0, 0.7)
         + '</g>'
     )
 
@@ -374,64 +347,114 @@ def cash_100(ic: Icon) -> str:
     )
 
 
+def chest(ic: Icon, heap_back: str, heap_front: str) -> str:
+    """Open treasure chest, front view, overflowing: `heap_back` sits in the opening, `heap_front` spills over the rim."""
+    wood = ic.two("#C98A55", "#94592E", 0.55)
+    lid = ic.two("#A96B3C", "#7A4A26", 0.5)
+    gold = ic.two("#FFE58A", "#E9A81C", 0.55)
+    return (
+        ground(rx=200, cy=452)
+        + f'<polygon points="104,262 408,262 386,176 126,176" fill="{lid}" {ol()}/>'
+        + f'<rect x="236" y="176" width="40" height="86" fill="{gold}" {ol(w)}/>'
+        + heap_back
+        + f'<rect x="96" y="276" width="320" height="164" rx="18" fill="{wood}" {ol()}/>'
+        + f'<rect x="136" y="276" width="30" height="164" fill="{gold}" {ol(w)}/>'
+        f'<rect x="346" y="276" width="30" height="164" fill="{gold}" {ol(w)}/>'
+        + f'<rect x="230" y="306" width="52" height="56" rx="10" fill="{gold}" {ol(w)}/>'
+        f'<circle cx="256" cy="326" r="8" fill="{INK}"/><rect x="252" y="328" width="8" height="18" rx="3" fill="{INK}"/>'
+        + f'<rect x="86" y="262" width="340" height="30" rx="12" fill="{gold}" {ol()}/>'
+        + heap_front
+        + gloss(132, 312, 10, 26, 0, 0.5)
+    )
+
+
+def coin_pile(ic: Icon, rows: list[list[tuple[float, float]]], r: float) -> str:
+    return "".join(coin(ic, x, y, r) for row in rows for x, y in row)
+
+
+def gem_pile(ic: Icon, rows: list[list[tuple[float, float]]], s: float) -> str:
+    return "".join(gem(ic, x, y, s) for row in rows for x, y in row)
+
+
 def cash_300(ic: Icon) -> str:
+    # a pile of the game's coins (in-run Cash, sold only during a run): 3 - 2 - 1
     return (
         tile(ic, "green")
-        + ground(rx=180, cy=430)
-        + bill_stack(ic, 256, 300, 1.05)
-        + coin(ic, 392, 396, 44)
+        + ground(rx=180, cy=440)
+        + coin_pile(ic, [[(150, 380), (256, 384), (362, 380)], [(203, 300), (309, 300)], [(256, 222)]], 58)
         + text("+300", 256, 120, 96, MUSTARD)
     )
 
 
 def cash_800(ic: Icon) -> str:
-    cargo = "".join(f'<rect x="{-130 + i * 34}" y="{-50 + (i % 2) * 6}" width="44" height="24" rx="6" fill="#7FE08F" {ol(6)}/>' for i in range(6))
-    cargo += "".join(f'<circle cx="{-120 + i * 36}" cy="{-8 + (i % 2) * 6}" r="16" fill="#FFD84A" {ol(6)}/>' for i in range(6))
-    return (
-        tile(ic, "green")
-        + ground(rx=200, cy=444)
-        + trailer(ic, 256, 320, 1.15, cargo)
-        + text("+800", 256, 120, 96, MUSTARD)
-    )
+    back = coin_pile(ic, [[(150, 250), (210, 236), (270, 230), (330, 238), (372, 252)], [(180, 206), (246, 196), (312, 204)]], 34)
+    front = coin_pile(ic, [[(118, 284), (392, 286)], [(330, 410)]], 30)
+    return tile(ic, "green") + chest(ic, back, front) + text("+800", 256, 120, 96, MUSTARD)
 
 
 def gems_50(ic: Icon) -> str:
+    # 1 gem
     return tile(ic, "teal") + ground(rx=120, cy=420) + gem(ic, 256, 300, 230) + text("50", 256, 120, 104, WHITE)
 
 
 def gems_130(ic: Icon) -> str:
-    pouch = ic.two("#B48CE6", "#7A55B8", 0.6)
+    # 3 gems: 2 + 1
     return (
         tile(ic, "teal")
-        + ground(rx=160, cy=446)
-        + gem(ic, 210, 196, 96) + gem(ic, 300, 186, 110)
-        + f'<path d="M180,250 Q110,300 130,380 Q148,440 256,440 Q364,440 382,380 Q402,300 332,250 Z" fill="{pouch}" {ol()}/>'
-        + f'<path d="M168,250 L344,250" stroke="{INK}" stroke-width="30" stroke-linecap="round"/>'
-        f'<path d="M168,250 L344,250" stroke="{MUSTARD}" stroke-width="12" stroke-linecap="round"/>'
-        + gloss(170, 316, 14, 30, 10, 0.6)
+        + ground(rx=170, cy=440)
+        + gem_pile(ic, GEMS_130, 140)
         + text("130", 256, 120, 96, WHITE)
     )
 
 
 def gems_300(ic: Icon) -> str:
-    crate = ic.two("#D9A06A", "#A9693E", 0.5)
+    # 6 gems: 3 + 2 + 1
     return (
         tile(ic, "teal")
-        + ground(rx=190, cy=446)
-        + gem(ic, 170, 240, 100) + gem(ic, 256, 212, 120) + gem(ic, 342, 240, 100)
-        + f'<rect x="80" y="290" width="352" height="150" rx="22" fill="{crate}" {ol()}/>'
-        + f'<line x1="80" y1="364" x2="432" y2="364" stroke="{INK}" stroke-width="8"/>'
+        + ground(rx=200, cy=446)
+        + gem_pile(ic, GEMS_300, 112)
         + text("300", 256, 120, 96, WHITE)
     )
 
 
-def gems_700(ic: Icon) -> str:
-    cargo = "".join(
-        f'<polygon points="{x - 18},{y} {x},{y - 20} {x + 18},{y} {x},{y + 22}" fill="#7FE6F2" {ol(6)}/>'
-        for x, y in ((-120, -18), (-84, -10), (-48, -20), (-12, -8), (24, -18), (-100, 10), (-60, 12), (-22, 10))
-    )
-    return tile(ic, "teal") + ground(rx=200, cy=444) + trailer(ic, 256, 320, 1.15, cargo) + text("700", 256, 120, 96, WHITE)
+GEMS_130 = [[(190, 352), (322, 352)], [(256, 252)]]
+GEMS_300 = [[(146, 376), (256, 376), (366, 376)], [(201, 298), (311, 298)], [(256, 220)]]
 
+
+def gem_chest(ic: Icon) -> str:
+    back = gem_pile(ic, [[(150, 252), (214, 240), (280, 236), (346, 246)], [(184, 206), (250, 196), (318, 204)]], 70)
+    front = gem_pile(ic, [[(118, 290), (394, 292)], [(334, 414)]], 60)
+    return chest(ic, back, front)
+
+
+def gems_700(ic: Icon) -> str:
+    # a chest overflowing with gems
+    return tile(ic, "teal") + gem_chest(ic) + text("700", 256, 120, 96, WHITE)
+
+
+# --- in-game gem art (owner 2026-10-15): the same objects with no tile and no number, centred and big, transparent ---
+# The GemShop card draws its own spinning rays (Sunburst) behind them; the numbered tiles above stay the Creator Hub
+# product images.
+
+
+def centred(body: str, cx: float, cy: float, k: float) -> str:
+    return f'<g transform="translate(256 256) scale({k}) translate({-cx} {-cy})">{body}</g>'
+
+
+def art_gems_50(ic: Icon) -> str:
+    return centred(gem(ic, 256, 300, 230), 256, 300, 1.75)
+
+
+def art_gems_130(ic: Icon) -> str:
+    return centred(gem_pile(ic, GEMS_130, 140), 256, 302, 1.6)
+
+
+def art_gems_300(ic: Icon) -> str:
+    return centred(gem_pile(ic, GEMS_300, 112), 256, 298, 1.35)
+
+
+def art_gems_700(ic: Icon) -> str:
+    return centred(gem_chest(ic), 256, 314, 1.3)
 
 # --- game passes (classes): round tile, crew cap on every animal ---------------------------------------------------
 
@@ -544,6 +567,13 @@ ICONS = {
     "class_owl": class_owl,
 }
 
+ART = {
+    "gems_50": art_gems_50,
+    "gems_130": art_gems_130,
+    "gems_300": art_gems_300,
+    "gems_700": art_gems_700,
+}
+
 PAGE = """<!doctype html><html><head><meta charset="utf-8">
 <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=block" rel="stylesheet">
 <style>html,body{{margin:0;background:transparent}}</style></head><body>{svg}</body></html>"""
@@ -551,18 +581,20 @@ PAGE = """<!doctype html><html><head><meta charset="utf-8">
 
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
+    (OUT / "art").mkdir(parents=True, exist_ok=True)
     with sync_playwright() as pw:
         browser = pw.chromium.launch()
         page = browser.new_page(viewport={"width": 512, "height": 512})
-        for key, build in ICONS.items():
+        jobs = [(OUT, key, build) for key, build in ICONS.items()] + [(OUT / "art", key, build) for key, build in ART.items()]
+        for folder, key, build in jobs:
             ic = Icon()
             svg = ic.svg(build(ic))
-            (OUT / f"{key}.svg").write_text(svg, encoding="utf-8")
+            (folder / f"{key}.svg").write_text(svg, encoding="utf-8")
             page.set_content(PAGE.format(svg=svg))
             page.evaluate("document.fonts.ready")
             page.wait_for_timeout(150)
-            page.screenshot(path=str(OUT / f"{key}.png"), clip={"x": 0, "y": 0, "width": 512, "height": 512}, omit_background=True)
-            print(OUT / f"{key}.png")
+            page.screenshot(path=str(folder / f"{key}.png"), clip={"x": 0, "y": 0, "width": 512, "height": 512}, omit_background=True)
+            print(folder / f"{key}.png")
         browser.close()
 
 

@@ -41,9 +41,11 @@
 	                closes; the HUD shows "Starting in n..." over the Play button.
 	  Create Squad  PartyQuickPlay { Mode = "Squad" }: an open invite squad (no platform); as soon as it arrives the
 	                setup window (SquadSetup) opens: one page (TASK-300) with Max players and Who can join, Create Room
-	                (the room then waits for players), then Start, Invite players (-> SquadPanel), Leave. No need to walk
-	                to a platform; stepping on a free one takes the squad there.
-	In a squad, Play opens the setup window of my squad (Start for the leader, Ready for invite squad members).
+	                (the room then waits for players; the window closes back to the lobby HUD, TASK-306), Invite players
+	                (-> SquadPanel), Leave. No need to walk to a platform; stepping on a free one takes the squad there.
+	In a squad, Play opens the setup window of my squad (Ready for invite squad members; SET UP ROOM while the leader's
+	room is still a draft). The leader of a created room gets START (PartyStart at once) and a round gear beside it that
+	reopens the setup window (TASK-306, user request 2026-10-15).
 
 	Zones (user request 2026-10-11, Provisional; Content.Lobby, shared.Lobby.LobbyZones): every lobby zone is a floor
 	Part of the map tagged "LobbyZone" (attribute Zone = Classes / Shop / Codes / Squad1..4; circle on a disc, oriented
@@ -89,6 +91,7 @@ local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
 local PartyRules = require(ReplicatedStorage.shared.Party.PartyRules)
 local Roles = require(ReplicatedStorage.shared.ServerRole.Roles)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
+local Backdrop = require(StarterPlayer.StarterPlayerScripts.client.Interface.Backdrop)
 local ClassSelect = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.ClassSelect)
 local ClassEntries = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.ClassSelect.Entries)
 local ClassStage = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.ClassStage)
@@ -164,14 +167,16 @@ const CLOSE = "LobbyClose"
 const PREVIOUS = "LobbyPrevious"
 const NEXT = "LobbyNext"
 -- Notices column (invite popup + toasts), top centre: px from the top; on a narrow screen under the HUD column
+-- (real px, same rule as the LobbyHud online pill: TOP / TOPBAR_FREE); the column starts under that pill (TASK-312)
 const NOTICE_TOP = 8
 const NOTICE_TOP_NARROW = 64 -- under the Roblox top bar (the HUD sides are centred, the top is free)
 const NARROW_VIEWPORT = 420
+const ONLINE_SPACE = 40 -- px (x the notice scale) the LobbyHud online pill takes, gap included (34 + 6)
 const BIND_PRIORITY = 10 -- over ClassController's Crew toggle (priority 0) on C / ButtonY
 
 -- First button a gamepad selects when a panel opens (by instance name, searched in the panel).
 const FIRST_SELECTION: { [Panel]: { string } } = {
-	None = { "Play", "Squad" }, -- no squad yet: no Play button, the Squad tile
+	None = { "Play", "Squad" }, -- the Play / START button (TASK-306: before the gear); no squad yet: the Squad tile
 	Classes = {}, -- the focused class row (its name is the class key)
 	Shop = { "Buy" },
 	Codes = { "Redeem" },
@@ -240,6 +245,8 @@ function LobbyController:Setup()
 	-- camera viewport px (the invite / toast column steps under the HUD column on a narrow screen)
 	self.Viewport = Vide.source(Vector2.new(1280, 720)) :: Vide.Source<Vector2>
 	self.Toasts = Vide.source({}) :: Vide.Source<{ ToastStack.Entry }>
+	-- players online in the whole game (`Online` set, TASK-312); 0 = not known yet (no pill)
+	self.Online = Vide.source(0) :: Vide.Source<number>
 
 	-- classes
 	self.Entries = ClassEntries.Build() :: { ClassEntries.Entry }
@@ -788,9 +795,11 @@ function LobbyController:PlayButton(): LobbyHud.PlayButton
 	end
 	const me = Players.LocalPlayer.UserId
 	if party.Leader == me then
-		return if party.Access == "Setup"
-			then { Text = "SET UP ROOM", Kind = "Wait", Enabled = true }
-			else { Text = "START SQUAD", Kind = "Wait", Enabled = true }
+		if party.Access == "Setup" then
+			return { Text = "SET UP ROOM", Kind = "Wait", Enabled = true }
+		end
+		-- green once everyone is ready; mustard still taps (the server answers NotAllReady)
+		return { Text = "START", Kind = if self:AllReady(party) then "Go" else "Wait", Enabled = true }
 	end
 	return if party.Ready[me] == true
 		then { Text = "READY!", Kind = "Go", Enabled = true }
@@ -865,7 +874,17 @@ function LobbyController:PlayCard(): SquadStatus.Info
 	}
 end
 
--- Play button: outside a squad the choice (Play Solo / Create Squad); in a squad its setup window.
+-- The gear beside START: the leader of a created room, before the countdown (TASK-306). Reactive (Parties).
+function LobbyController:GearShown(): boolean
+	const _, party = self:MyParty()
+	return party ~= nil
+		and party.Leader == Players.LocalPlayer.UserId
+		and party.Access ~= "Setup"
+		and party.State ~= "Starting"
+end
+
+-- Play button: outside a squad the choice (Play Solo / Create Squad); the leader of a created room starts it
+-- (TASK-306); otherwise my squad's setup window.
 function LobbyController:Play()
 	-- event handlers run outside any reactive scope: plain reads
 	if self:CanCancel() then
@@ -877,6 +896,10 @@ function LobbyController:Play()
 		if not Vide.untrack(self.QuickPending) then
 			self:SetPanel("Play")
 		end
+		return
+	end
+	if self:GearShown() then
+		self.Libs.Net.PartyStart:fireServer()
 		return
 	end
 	self:SetPanel("Platform")
@@ -994,10 +1017,15 @@ function LobbyController:CheckDraft(id: number, record: PartyRecord)
 	end
 end
 
--- Create Room: the draft becomes the room (Setup -> its access). A room of one is closed (nobody else fits).
+-- Create Room: the draft becomes the room (Setup -> its access). A room of one is closed (nobody else fits). The setup
+-- window closes back to the lobby HUD (TASK-306): the squad card with START and the gear; a gamepad lands on START.
 function LobbyController:CreateRoom()
 	const draft = Vide.untrack(self.Draft)
 	self:Configure(if draft.MaxPlayers <= 1 then "Closed" else draft.Access, draft.MaxPlayers)
+	self:SetPanel("None")
+	task.defer(function()
+		self:SelectFirst("None")
+	end)
 end
 
 -- Seconds before the teleport of the shown squad; nil = not starting.
@@ -1469,6 +1497,13 @@ function LobbyController:Mount(playerGui: Instance)
 			end)
 		end)
 
+		-- Blur + Ink veil behind every window (TASK-311, BackdropController; full screen, no insets). The class screen on
+		-- the world stage keeps the world sharp: the rig in front of the camera is the content
+		Backdrop.Hold(function()
+			const panel = self.Panel()
+			return panel ~= "None" and (panel ~= "Classes" or not self.WorldStage())
+		end)
+
 		-- The setup window opened by Play closes when there is no squad to show anymore (left, solo run over)
 		Vide.effect(function()
 			const panel = self.Panel()
@@ -1567,7 +1602,15 @@ function LobbyController:Mount(playerGui: Instance)
 				PlayShown = function()
 					return self:PlayShown()
 				end,
+				Gear = function()
+					return self:GearShown()
+				end,
+				OnGear = function()
+					self:Click()
+					self:SetPanel("Platform")
+				end,
 				Scale = self.Scale,
+				Online = self.Online,
 			}),
 
 			ClassSelect({
@@ -1817,7 +1860,10 @@ function LobbyController:Mount(playerGui: Instance)
 				AnchorPoint = Vector2.new(0.5, 0),
 				Position = function()
 					const narrow = self.Viewport().X < NARROW_VIEWPORT
-					return UDim2.new(0.5, 0, 0, if narrow then NOTICE_TOP_NARROW * self:NoticeScale() else NOTICE_TOP)
+					const top = if narrow then NOTICE_TOP_NARROW else NOTICE_TOP
+					-- under the online pill while it is shown (HUD up, count known)
+					const pill = self.Panel() == "None" and self.Online() > 0
+					return UDim2.new(0.5, 0, 0, top + (if pill then ONLINE_SPACE * self:NoticeScale() else 0))
 				end,
 				Size = UDim2.fromOffset(0, 0),
 				AutomaticSize = Enum.AutomaticSize.XY,
@@ -1858,35 +1904,7 @@ function LobbyController:Mount(playerGui: Instance)
 			}),
 		})
 	end)
-	-- Full-screen dim behind the modal windows (Shop, Codes, Squad, Play, Setup): its own ScreenGui with no insets, so
-	-- it covers the whole screen (no lighter strip at the notch / under the Roblox bar); the windows themselves stay
-	-- inside the safe area of the Lobby gui (LobbyWindow has no backdrop of its own)
-	const unmountDim, dim = Vide.root(function()
-		return Vide.create("ScreenGui")({
-			Name = "LobbyDim",
-			ResetOnSpawn = false,
-			IgnoreGuiInset = true,
-			ScreenInsets = Enum.ScreenInsets.None,
-			ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-			DisplayOrder = 5,
-			Enabled = function()
-				const panel = self.Panel()
-				return panel ~= "None" and panel ~= "Classes"
-			end,
-			Vide.create("Frame")({
-				Name = "Dim",
-				Size = UDim2.fromScale(1, 1),
-				BackgroundColor3 = Theme.Color.Ink,
-				BackgroundTransparency = 0.5,
-				Active = true,
-			}),
-		})
-	end)
-	dim.Parent = playerGui
-	self.Unmount = function()
-		unmountDim()
-		unmount()
-	end
+	self.Unmount = unmount
 	self.Gui = gui
 	gui.Parent = playerGui
 	-- capacity signs over the squad pads (BillboardGuis in PlayerGui, adorned to local anchor Parts)
@@ -1943,6 +1961,14 @@ LobbyController:OnInit(function(self)
 		const copy = table.clone(Vide.untrack(self.Parties))
 		copy[id] = nil
 		self.Parties(copy)
+	end)
+
+	-- players online (record 1, lobby roles only; PresenceService)
+	net.Online:onAdded(function(_, record)
+		self.Online(record.Count)
+	end)
+	net.Online:onChanged(function(_, record)
+		self.Online(record.Count)
 	end)
 
 	net.PartyInviteReceived:onClient(function(data)

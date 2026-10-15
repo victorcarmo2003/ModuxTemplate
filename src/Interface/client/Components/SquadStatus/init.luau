@@ -269,9 +269,9 @@ return function(props: Props): Frame
 							Box = UDim2.new(0, 0, 1, 0),
 							AutomaticSize = Enum.AutomaticSize.X,
 							TextSize = Theme.MinTextSize,
-							Color = function()
-								return accessTone().Text
-							end,
+							-- white with the Ink stroke on every tone: Mustard's own dark text under a stroke was unreadable
+							-- (TASK-305)
+							Color = Theme.Color.Text,
 							Text = accessText,
 						}),
 					},

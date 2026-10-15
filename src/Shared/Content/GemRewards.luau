@@ -14,12 +14,14 @@ export type GemRewards = {
 	CreditMoment: "Event", -- fixed (DEC-104)
 }
 
+-- x75 of DEC-070 / FEAT-027 (TASK-308, owner request 2026-10-15, Provisional): the class prices went x44..x125, so a
+-- full run still buys every MVP class (perfect run 382 -> 28,650 gems; MVP classes 27,000).
 const rewards: GemRewards = {
-	DayShift = 2, -- DEC-070
-	DayGradeA = 1, -- DEC-070
-	NightBase = 15, -- DEC-070
-	NightPerIndex = 2, -- DEC-070
-	Finale = 100, -- FEAT-027
+	DayShift = 150, -- DEC-070: 2
+	DayGradeA = 75, -- DEC-070: 1
+	NightBase = 1125, -- DEC-070: 15
+	NightPerIndex = 150, -- DEC-070: 2
+	Finale = 7500, -- FEAT-027: 100
 	RunFailedExtra = 0,
 	CreditMoment = "Event", -- DEC-104
 }
