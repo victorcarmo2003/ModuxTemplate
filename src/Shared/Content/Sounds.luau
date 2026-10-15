@@ -190,6 +190,8 @@ const UPLOADED: { [string]: string } = {
 	locked_door = "rbxassetid://136518625715192", -- SFX-232 ReplicatedStorage.Assets.SFX["Locked door"] (user, ANM-004)
 	-- ANM-003 bell (TASK-340): ReplicatedStorage.Assets.SFX["Very scary bell sound/church bell"] (user upload)
 	church_bell = "rbxassetid://6891548543",
+	-- ANM-012 neck snap (TASK-336): ReplicatedStorage.Assets.SFX["Bone crack"] (user upload, 2026-10-15)
+	neck_crack = "rbxassetid://88191175836931",
 }
 
 -- Per-row overrides of the sfx() defaults
