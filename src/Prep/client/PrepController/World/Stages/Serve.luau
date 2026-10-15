@@ -18,6 +18,7 @@ local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
+local Haptics = require(StarterPlayer.StarterPlayerScripts.client.Input.Haptics)
 local Feed = require(script.Parent.Parent.Parent.Feed)
 local Stage = require(script.Parent.Parent.Parent.Stage)
 local Order = require(script.Parent.Order)
@@ -602,6 +603,7 @@ const Serve: Stage.Stage3D = {
 					previous(owner, stamp, npc)
 				end
 				onServed(owner, stamp, npc)
+				Haptics.Play("Serve") -- TASK-268
 			end
 		end
 		Feed.Start(controller)

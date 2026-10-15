@@ -126,6 +126,10 @@ return Table.new({
 	-- Tap, selling phases and the day Last call (Closing, DEC-240); the server revalidates seat, phase and the other station.
 	{ Key = "prep_work", Text = "Work", Hold = 0, Radius = 5, Requires = { Phase = { "Open", "Closing", "Night" } }, Night = "Any", Wave = 3 },
 
+	-- Revive Kit (TASK-317; DEC-117, DEC-255; Provisional): Prompt_Revive on the HRP of a fallen mate's body (ReviveKitService);
+	-- spends one profile.ReviveCredits of who holds it. The client shows it only with credits (ReviveKitController gate).
+	{ Key = "revive_mate", Text = "Use Revive Kit", Hold = 1.5, Radius = 7, Requires = {}, Night = "Any", Wave = 3 },
+
 	-- Security cameras (FEAT-040, TASK-285; owner request 2026-10-14, Provisional): Prompt_Cameras on the CCTV monitor of the
 	-- trailer (SecurityService makes it). Opens the camera view on this client (SecurityOpen) and freezes the body while watching.
 	{ Key = "watch_cameras", Text = "Cameras", Hold = 0, Radius = 6, Requires = {}, Night = "Any", Wave = 3 },

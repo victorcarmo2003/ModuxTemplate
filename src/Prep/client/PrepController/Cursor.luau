@@ -1,6 +1,6 @@
 --!strict
 -- Cursor: the virtual cursor of the focused prep mode (docs/tech/prep-mode.md §5: gamepad "stick left moves the cursor, A
--- holds / releases"; touch "cursor drawn 28 px above the finger"). It does two things:
+-- holds / releases"; TASK-268: the right stick and RT / R2 too; touch "cursor drawn 28 px above the finger"). It does two things:
 --   * gamepad: while the active device is a gamepad, the left stick moves a point over the screen (px / s, dead zone) and
 --     injects Move into the Pointer; Press / Release (the A button, bound by the controller) inject Down / Up at that point
 --   * feedback for every device: `Position` / `Visible` / `Held` Vide sources the controller draws as a ring (the gamepad
@@ -57,11 +57,14 @@ function Cursor.new(pointer: Pointer.Pointer): Cursor
 		if not pad then
 			return
 		end
+		-- either stick moves it (TASK-268: the right stick steers the free-drawn sauce); the one pushed further wins
 		local stick = Vector2.zero
 		for _, input in UserInputService:GetGamepadState(Enum.UserInputType.Gamepad1) do
-			if input.KeyCode == Enum.KeyCode.Thumbstick1 then
-				stick = Vector2.new(input.Position.X, -input.Position.Y)
-				break
+			if input.KeyCode == Enum.KeyCode.Thumbstick1 or input.KeyCode == Enum.KeyCode.Thumbstick2 then
+				const value = Vector2.new(input.Position.X, -input.Position.Y)
+				if value.Magnitude > stick.Magnitude then
+					stick = value
+				end
 			end
 		end
 		if stick.Magnitude < DEAD then
@@ -89,7 +92,8 @@ function Cursor.new(pointer: Pointer.Pointer): Cursor
 		end
 	end
 	function self.Press(_: any)
-		if pad then
+		-- A and RT share the grab: the second one down while the first is held does nothing
+		if pad and not pointer.Down then
 			pointer:Inject("Down", Vide.untrack(position), "Pad")
 		end
 	end

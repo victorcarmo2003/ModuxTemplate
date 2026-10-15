@@ -33,6 +33,7 @@ local function settingsRecord()
 		PromptMode = Lync.enum({ "Single", "Multi" }),
 		PrepAssist = Lync.bool(),
 		ReducedMotion = Lync.bool(),
+		Vibration = Lync.bool(),
 	})
 end
 
@@ -515,6 +516,13 @@ return Lync.define("game", {
 		Value = Lync.int(0, 100000),
 		From = Lync.f64(),
 	})),
+	-- Revive Kit (TASK-317). s -> owner. Writer: ReviveKitService. The profile.ReviveCredits of this player (sent on
+	-- Ready, on load and after every change). Responder: ReviveKitController (self button, mate prompt gate)
+	ReviveKits = Lync.packet(Lync.struct({
+		Count = Lync.int(0, 99),
+	})),
+	-- c -> s. Responder: ReviveKitService (own rate limit). The Down player spends one credit on itself
+	ReviveKitUse = Lync.packet(Lync.empty()),
 
 	-- Squad (party) in the lobby and the way back (network.md §16; architecture.md §20; user request 2026-10-11,
 	-- Provisional; TASK-154..156). Responders: PartyService (lobby roles), PartyRunService (LobbyReturn, game role).

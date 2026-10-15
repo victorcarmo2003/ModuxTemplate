@@ -15,9 +15,11 @@
 -- computed here besides the look of the ring. All numbers are in Content.Prep (Rules.World.Grill, Ring, Grill).
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local Grade = require(ReplicatedStorage.shared.Prep.Grade)
+local Haptics = require(StarterPlayer.StarterPlayerScripts.client.Input.Haptics)
 local FlipFocus = require(script.Parent.Parent.FlipFocus)
 local Feed = require(script.Parent.Parent.Parent.Feed)
 local Flips = require(script.Parent.Parent.Parent.Flips)
@@ -226,6 +228,8 @@ local function flip(current: Session, slot: number)
 	if not Feed.Flip(current.Controller, slot) then
 		return
 	end
+	-- the sausage turns: a short kick (TASK-268); the grade still comes from the server
+	Haptics.Play("Flip")
 	const _, _, share = phaseOf(current, slot, workspace:GetServerTimeNow())
 	note(`Flip sent, slot {slot} at {string.format("%.3f", share)} of the Duration`)
 	current.Pred[slot] = { Kind = "Flip", At = os.clock(), Settled = false }

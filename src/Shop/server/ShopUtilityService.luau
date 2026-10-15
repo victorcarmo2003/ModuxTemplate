@@ -4,7 +4,8 @@
 -- grant acts on the run through the public APIs of the owners (no rewrite of their state):
 --   Cash     EconomyService:TopUp(cash + Amount)            Restock / Pantry  KitchenService:StockFree(ingredient, cap)
 --   Coffee   VitalService:AddSanity to full at night; otherwise a coffee Tool (ItemService:Give) to drink later
---   Revive   profile.ReviveCredits + 1 (DEC-117; spent by the wave 4 ReviveService: no public revive API yet)
+--   Revive   profile.ReviveCredits + 1 (DEC-117); ReviveKitService spends it (self while Down, or on a fallen mate,
+--            VitalService:Revive; TASK-317) and gets the new count to the client
 --   Radar    ShopGrant to the buyer (the client marks the anomalies of the Anomalies set for Amount s)
 --   Scare    ShopGrant to the chosen mate (the client plays the cartoon jumpscare, Mild, DEC-256)
 -- Run utilities (Cash, Restock, Pantry, Coffee, Radar) bought where no run exists (lobby) answer Wait: the receipt stays
@@ -34,6 +35,7 @@ const ShopUtilityService = Modux.Service("ShopUtilityService", {
 		"KitchenService",
 		"VitalService",
 		"ItemService",
+		"ReviveKitService",
 	},
 	Priority = 400,
 })
@@ -133,6 +135,7 @@ function ShopUtilityService:Handler(utility: Utility): any
 			return {
 				Patch = { ReviveCredits = math.clamp(profile.ReviveCredits() + 1, 0, REVIVE_MAX) },
 				After = function()
+					self.Dependencies.ReviveKitService:SendCount(player)
 					self:Send(player, key, 1, 0)
 				end,
 			}

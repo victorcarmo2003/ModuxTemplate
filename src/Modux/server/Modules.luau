@@ -40,6 +40,7 @@ return {
 	ServerScriptService.server.Security.SecurityService,
 	ServerScriptService.server.ServerRole.RoleService,
 	ServerScriptService.server.Settings.SettingsService,
+	ServerScriptService.server.Shop.ReviveKitService,
 	ServerScriptService.server.Shop.ShopService,
 	ServerScriptService.server.Shop.ShopUtilityService,
 	ServerScriptService.server.Showcase.ShowcaseService,

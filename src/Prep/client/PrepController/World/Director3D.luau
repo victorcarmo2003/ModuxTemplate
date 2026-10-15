@@ -40,6 +40,7 @@ local ToolView = require(script.Parent.ToolView)
 local Types = require(script.Parent.Types)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
 local Fx = require(StarterPlayer.StarterPlayerScripts.client.Kitchen.KitchenController.Fx)
+local Haptics = require(StarterPlayer.StarterPlayerScripts.client.Input.Haptics)
 
 type Event = Gestures.Event
 
@@ -148,6 +149,7 @@ function Director3D.new(options: Options): Director
 	local undo: { () -> () } = {}
 	local pressed = false -- a gesture is in progress
 	local pouring = false
+	local rumbling = false -- the pour haptic is on (follows `pouring` in Frame)
 	-- the selected sauce (trace:K, drag mode): what to do with it when the mode ends
 	local selection: { Commit: () -> boolean, Leave: (canLand: boolean) -> (), Active: () -> boolean }? = nil
 	local lastX = 0
@@ -954,11 +956,21 @@ function Director3D.new(options: Options): Director
 		if tool:Kind() ~= "None" then
 			tool:Move(point, pouring and uv ~= nil, lean)
 		end
+		-- a light continuous rumble while a sauce pours (TASK-268; same on PS and Xbox, Settings Vibration)
+		const rumble = pouring and tool:Kind() ~= "None"
+		if rumble ~= rumbling then
+			rumbling = rumble
+			Haptics.Hold("Pour", rumble)
+		end
 	end
 
 	function self.Destroy(_: any)
 		disarm()
 		mode = "none"
+		if rumbling then
+			rumbling = false
+			Haptics.Hold("Pour", false)
+		end
 		for _, ring in rings do
 			ring:Destroy()
 		end

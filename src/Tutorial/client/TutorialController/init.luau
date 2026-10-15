@@ -14,7 +14,8 @@
 	MapPoint MKT-DOOR / its AutoDoor) -> mart_buy (the BAKERY shelf anchor, buy_package of TutorialRules.Package; from
 	the moment the player reached the door or the shelf) -> mart_back (the pack in hand, arrow on the bun crate restock
 	anchor) -> restock (near the crate) -> the bun stock goes above 0 (whoever restocked) = done. With buns left (no
-	tutorial stock: a party with a veteran) the talk step "mart" stands in for the four.
+	tutorial stock: a party with a veteran) the talk step "mart" stands in for the four. mart_go / mart_back also draw a
+	dashed trail on the ground from the trailer door to the Mart door and back (Trail.luau, TASK-322).
 	Tutorial customer: once the call is answered (or it never came) `TutorialBegin` goes out once; TutorialService has
 	CustomerService spawn one customer with the rig attribute shared.Tutorial.Rules.Attribute (fixed order, no time
 	limit, out of the grade). Asked again every REASK s while none is around and no sale came.
@@ -103,10 +104,12 @@ local TutorialRules = require(ReplicatedStorage.shared.Tutorial.Rules)
 local Beacon = require(script.Beacon)
 local Call = require(script.Call)
 local Steps = require(script.Steps)
+local Trail = require(script.Trail)
 -- the plate of the 3D prep mode (module state shared with PrepController): the "deliver" step reads it (TASK-254)
 local PrepPlate = require(StarterPlayer.StarterPlayerScripts.client.Prep.PrepController.Stages.Build.Session)
 
 const TAG = "Interactable"
+const TRAIL_RETRY = 1 -- s between two route builds while the map is still streaming in (TASK-322)
 const VEHICLE_TAG = "Vehicle"
 const STATION_TAG = "Station"
 const WORK_ACTION = "prep_work" -- Prompt_Work of Station_n (PrepService)
@@ -248,6 +251,13 @@ function TutorialController:Setup()
 	self.Beacon = Beacon.new(function(): Instance
 		return self:FxFolder()
 	end) :: Beacon.Beacon
+	-- dashed ground trail trailer <-> Mart on mart_go / mart_back (TASK-322); Route cached once the map is streamed
+	self.Trail = Trail.new(function(): Instance
+		return self:FxFolder()
+	end) :: Trail.Trail
+	self.TrailRoute = nil :: { Vector3 }?
+	self.TrailBack = nil :: { Vector3 }?
+	self.TrailTriedAt = 0 :: number -- os.clock of the last Trail.Route try
 	-- Tutorial customer: TutorialBegin sent (os.clock of the last one, 0 = never); its NpcId once seen (0 = none)
 	self.AskedAt = 0 :: number
 	self.GuestId = 0 :: number
@@ -1160,7 +1170,37 @@ function TutorialController:ClearGuidance()
 	end)
 	self.Edge.Reset()
 	self:SetHighlight(nil)
+	self.Trail.Hide()
 	self:ResetIdle()
+end
+
+-- Ground trail of the shopping walk (TASK-322): trailer -> Mart on mart_go, the way back on mart_back, gone on any
+-- other step (reaching the door / the crate changes the step). Every frame, before Trail.Step.
+function TutorialController:UpdateTrail()
+	const key = if Vide.untrack(self.Running) then Vide.untrack(self.StepKey) else ""
+	if key ~= "mart_go" and key ~= "mart_back" then
+		if self.Trail.Shown() then
+			self.Trail.Hide()
+		end
+		return
+	end
+	if self.TrailRoute == nil then
+		const now = os.clock()
+		if now - self.TrailTriedAt < TRAIL_RETRY then
+			return
+		end
+		self.TrailTriedAt = now
+		const route = Trail.Route()
+		if route == nil then
+			return
+		end
+		self.TrailRoute = route
+		self.TrailBack = Trail.Reversed(route)
+	end
+	const route = if key == "mart_go" then self.TrailRoute else self.TrailBack
+	if route then
+		self.Trail.Show(route)
+	end
 end
 
 -- Edge pointer toward the target, ONLY while neither the arrow tip nor the target is on screen (EdgePointer; every
@@ -2199,6 +2239,8 @@ TutorialController:OnStart(function(self)
 	RunService.Heartbeat:Connect(function()
 		-- the Beacon only moves while something is marked (ClearGuidance unmarks it when the tutorial stops)
 		self.Beacon.Step()
+		self:UpdateTrail()
+		self.Trail.Step()
 		if Vide.untrack(self.Running) then
 			self:UpdatePointer()
 		elseif Vide.untrack(self.PointerShown) then

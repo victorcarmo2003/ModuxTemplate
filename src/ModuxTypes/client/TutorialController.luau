@@ -7,6 +7,7 @@ local EdgePointer = require(StarterPlayer.StarterPlayerScripts.client.Interface.
 local Beacon = require(StarterPlayer.StarterPlayerScripts.client.Tutorial.TutorialController.Beacon)
 local Call = require(StarterPlayer.StarterPlayerScripts.client.Tutorial.TutorialController.Call)
 local Steps = require(StarterPlayer.StarterPlayerScripts.client.Tutorial.TutorialController.Steps)
+local Trail = require(StarterPlayer.StarterPlayerScripts.client.Tutorial.TutorialController.Trail)
 
 type GuestRecord = { State: string, Order: { [string]: boolean } }
 type Held = { Item: string, Toppings: { [string]: boolean } }
@@ -67,6 +68,10 @@ export type Public = {
 	StepAt: number,
 	StepKey: Vide.Source<string>,
 	Target: Vide.Source<Instance | false>,
+	Trail: Trail.Trail,
+	TrailBack: { Vector3 }?,
+	TrailRoute: { Vector3 }?,
+	TrailTriedAt: number,
 	Uncalled: boolean,
 	Unmounts: { () -> () },
 	Urgent: Vide.Source<boolean>,
@@ -108,6 +113,7 @@ export type Public = {
 	Focuses: (self: Public, anchor: Instance) -> boolean,
 	PromptAllowed: (self: Public, anchor: Instance) -> boolean,
 	ClearGuidance: (self: Public) -> (),
+	UpdateTrail: (self: Public) -> (),
 	UpdatePointer: (self: Public) -> (),
 	Rescale: (self: Public) -> (),
 	SetStep: (self: Public, key: string, target: Instance?, item: string) -> (),

@@ -38,6 +38,7 @@ local SeatingService = require(ServerScriptService.server.ModuxTypes.SeatingServ
 local SecurityService = require(ServerScriptService.server.ModuxTypes.SecurityService)
 local RoleService = require(ServerScriptService.server.ModuxTypes.RoleService)
 local SettingsService = require(ServerScriptService.server.ModuxTypes.SettingsService)
+local ReviveKitService = require(ServerScriptService.server.ModuxTypes.ReviveKitService)
 local ShopService = require(ServerScriptService.server.ModuxTypes.ShopService)
 local ShopUtilityService = require(ServerScriptService.server.ModuxTypes.ShopUtilityService)
 local ShowcaseService = require(ServerScriptService.server.ModuxTypes.ShowcaseService)
@@ -87,6 +88,7 @@ export type AllServices = {
 	SecurityService: SecurityService.Public,
 	RoleService: RoleService.Public,
 	SettingsService: SettingsService.Public,
+	ReviveKitService: ReviveKitService.Public,
 	ShopService: ShopService.Public,
 	ShopUtilityService: ShopUtilityService.Public,
 	ShowcaseService: ShowcaseService.Public,

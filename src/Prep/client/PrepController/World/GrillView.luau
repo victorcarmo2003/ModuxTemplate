@@ -184,8 +184,8 @@ function GrillView.new(options: Options): View
 	local carryPose: CFrame? = nil
 	const flights: { Fly } = {}
 	const tolerance = Content.Prep.Tolerances.ByKey["grill_flip"]
-	const perfect = (if tolerance ~= nil then tolerance.Perfect else 5) / 100
-	const good = (if tolerance ~= nil then tolerance.Good else 10) / 100
+	const perfect = (if tolerance ~= nil then tolerance.Perfect else 7) / 100
+	const good = (if tolerance ~= nil then tolerance.Good else 14) / 100
 	local lastRotation = CFrame.identity
 	local busy, busyTotal = 0, 1
 	const activeSlots: { [number]: boolean } = {}

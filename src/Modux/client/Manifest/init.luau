@@ -20,6 +20,7 @@ local DoorController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTy
 local EconomyController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.EconomyController)
 local HallucinationController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.HallucinationController)
 local HudController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.HudController)
+local HapticsController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.HapticsController)
 local InputController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.InputController)
 local PromptController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PromptController)
 local BackdropController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.BackdropController)
@@ -42,6 +43,7 @@ local RoundController = require(StarterPlayer.StarterPlayerScripts.client.ModuxT
 local SeatingController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.SeatingController)
 local SecurityController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.SecurityController)
 local SettingsController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.SettingsController)
+local ReviveKitController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ReviveKitController)
 local ShopController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ShopController)
 local ShowcaseController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ShowcaseController)
 local StageController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.StageController)
@@ -74,6 +76,7 @@ export type AllControllers = {
 	EconomyController: EconomyController.Public,
 	HallucinationController: HallucinationController.Public,
 	HudController: HudController.Public,
+	HapticsController: HapticsController.Public,
 	InputController: InputController.Public,
 	PromptController: PromptController.Public,
 	BackdropController: BackdropController.Public,
@@ -96,6 +99,7 @@ export type AllControllers = {
 	SeatingController: SeatingController.Public,
 	SecurityController: SecurityController.Public,
 	SettingsController: SettingsController.Public,
+	ReviveKitController: ReviveKitController.Public,
 	ShopController: ShopController.Public,
 	ShowcaseController: ShowcaseController.Public,
 	StageController: StageController.Public,

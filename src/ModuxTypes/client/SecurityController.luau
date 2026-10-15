@@ -15,6 +15,7 @@ export type Public = {
 	Fov: number,
 	Frame: CFrame?,
 	Hidden: { BasePart },
+	Inset: Vide.Source<number>,
 	Light: Part?,
 	NightText: Vide.Source<string>,
 	Open: Vide.Source<boolean>,

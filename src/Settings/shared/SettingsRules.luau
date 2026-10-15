@@ -9,6 +9,7 @@
 --                         the LocalPlayer attribute PromptMode)
 --   PrepAssist            step-by-step hint line and the drag paw of the prep mode (PrepController / World.Coach)
 --   ReducedMotion         game-side switch for Motion.Reduced (on top of the Roblox setting, never instead of it)
+--   Vibration             controller / phone vibration (Input/client/Haptics, TASK-268); off = nothing ever vibrates
 
 export type PromptMode = "Single" | "Multi"
 
@@ -20,9 +21,10 @@ export type Settings = {
 	PromptMode: PromptMode,
 	PrepAssist: boolean,
 	ReducedMotion: boolean,
+	Vibration: boolean,
 }
 
-export type Key = "Music" | "Sfx" | "Voice" | "Scare" | "PromptMode" | "PrepAssist" | "ReducedMotion"
+export type Key = "Music" | "Sfx" | "Voice" | "Scare" | "PromptMode" | "PrepAssist" | "ReducedMotion" | "Vibration"
 
 const DEFAULTS: Settings = {
 	Music = 100,
@@ -32,6 +34,7 @@ const DEFAULTS: Settings = {
 	PromptMode = "Single",
 	PrepAssist = true,
 	ReducedMotion = false,
+	Vibration = true,
 }
 -- Read only (frozen at run time); callers that need a record of their own use table.clone(Defaults).
 const Defaults: Settings = table.freeze(DEFAULTS) :: any
@@ -61,6 +64,7 @@ local function sanitize(raw: any): Settings
 		PromptMode = if mode == "Single" or mode == "Multi" then mode else Defaults.PromptMode,
 		PrepAssist = flag(data.PrepAssist, Defaults.PrepAssist),
 		ReducedMotion = flag(data.ReducedMotion, Defaults.ReducedMotion),
+		Vibration = flag(data.Vibration, Defaults.Vibration),
 	}
 	return value
 end
@@ -73,6 +77,7 @@ local function same(a: Settings, b: Settings): boolean
 		and a.PromptMode == b.PromptMode
 		and a.PrepAssist == b.PrepAssist
 		and a.ReducedMotion == b.ReducedMotion
+		and a.Vibration == b.Vibration
 end
 
 return table.freeze({

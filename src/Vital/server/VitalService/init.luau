@@ -30,6 +30,7 @@
 --   AnomalyService (wave 3)  SeeAnomaly, Penalize
 --   TrafficService (wave 3)  SetKnocked
 --   AmbulanceService (w4)    SetPickupHandler (default: RemoveBody after Revive.BodyFallback, T54)
+--   ReviveKitService         Revive(player, reviver?) (TASK-317): Down -> Active, same core (Restore) as DevRevive
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -881,11 +882,37 @@ function VitalService:DevRevive(player: Player): string
 	if not self.Dependencies.PlaceService:IsDev() then
 		error("dev mode only", 2)
 	end
-	const runState = self.Dependencies.RunStateService
 	const state = self:GetState(player.UserId)
 	if state ~= "Down" and state ~= "Spectator" then
 		error(`{player.Name} is {state or "not a member"}: only Down or Spectator can be revived`, 0)
 	end
+	if not self:Restore(player, state) then
+		error("SetLifeState refused", 0)
+	end
+	const entry = self:Ensure(player)
+	return `{player.Name} revived ({state} -> Active, sanity {entry.Sanity}/{entry.Max})`
+end
+
+-- Public revive (TASK-317; DEC-117, DEC-129, DEC-255): a Down member back Active, the same way as DevRevive. Only a Down
+-- with revives left tonight (Content.Revive.MaxPerNight); a Spectator stays out. reviver: the mate who used the kit (nil or
+-- the player = self). The caller pays (ReviveKitService spends the credit only when this returns true).
+function VitalService:Revive(player: Player, reviver: Player?): boolean
+	if not self.Enabled or self:GetState(player.UserId) ~= "Down" then
+		return false
+	end
+	if reviver ~= nil and reviver ~= player and not self:IsActive(reviver) then
+		return false
+	end
+	if self:Ensure(player).RevivesTonight >= Content.Revive.MaxPerNight then
+		return false
+	end
+	return self:Restore(player, "Down")
+end
+
+-- Core of every revive: half of the sanity, a Down counts as a revive used, new character at the normal spawn, stash
+-- back once it can hold tools, LifeEvent Revived. False = RunStateService refused the state.
+function VitalService:Restore(player: Player, state: LifeState): boolean
+	const runState = self.Dependencies.RunStateService
 	const entry = self:Ensure(player)
 	if entry.Max > 0 then
 		entry.Sanity = math.max(1, math.floor(entry.Max * 0.5 + 0.5))
@@ -896,7 +923,10 @@ function VitalService:DevRevive(player: Player): string
 	entry.StateEndsAt = 0
 	entry.KnockedUntil = 0
 	if not runState:SetLifeState(player.UserId, "Active") then
-		error("SetLifeState refused", 0)
+		if state == "Down" then
+			entry.RevivesTonight -= 1
+		end
+		return false
 	end
 	const characters = self.Dependencies.CharacterService
 	characters:RemoveBody(player, true)
@@ -905,7 +935,7 @@ function VitalService:DevRevive(player: Player): string
 			characters:Spawn(player)
 		end)
 		if not ok then
-			warn(`[VitalService] DevRevive spawn: {problem}`)
+			warn(`[VitalService] Restore spawn: {problem}`)
 			return
 		end
 		-- the character finishes loading after LoadCharacter returns: give the stash back once it can hold tools
@@ -918,7 +948,7 @@ function VitalService:DevRevive(player: Player): string
 		end)
 	end)
 	self:FireLife(player.UserId, "Revived")
-	return `{player.Name} revived ({state} -> Active, sanity {entry.Sanity}/{entry.Max})`
+	return true
 end
 
 -- Lifecycle -----------------------------------------------------------------------------------------------------------

@@ -1,0 +1,57 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+D:\UserData\Documents\ModuxGames\Sell Hotdogs\tools\voice\.venv\Lib\site-packages\torch\nn\modules\rnn.py:1011: UserWarning: dropout option adds dropout after all but last recurrent layer, so non-zero dropout expects num_layers greater than 1, but got dropout=0.2 and num_layers=1
+  super().__init__("LSTM", *args, **kwargs)
+D:\UserData\Documents\ModuxGames\Sell Hotdogs\tools\voice\.venv\Lib\site-packages\torch\nn\utils\weight_norm.py:145: FutureWarning: `torch.nn.utils.weight_norm` is deprecated in favor of `torch.nn.utils.parametrizations.weight_norm`.
+  WeightNorm.apply(module, name, dim)
+D:\UserData\Documents\ModuxGames\Sell Hotdogs\tools\voice\.venv\Lib\site-packages\torch\jit\_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+5 186 v_096b13dc05 2.464
+7 186 v_d4de2d7ad5 5.2
+17 186 v_d568870e1a 2.284
+18 186 v_8b321e9011 3.463
+20 186 v_98c4a63c8a 2.639
+28 186 v_007a36dafd 3.539
+29 186 v_ebd7999f2c 2.115
+30 186 v_527ed73269 3.359
+31 186 v_a0349e1b15 2.161
+32 186 v_084dafdffc 1.859
+37 186 v_23e9404721 3.608
+43 186 v_1f2cf087e2 1.959
+45 186 v_6f7ee39f7c 3.807
+46 186 v_48d6ba45d8 3.059
+58 186 v_2acea89ae4 3.562
+59 186 v_4dd3a0c486 2.137
+60 186 v_f61cf4a21c 1.91
+61 186 v_6e54a3b82e 3.284
+62 186 v_f5fd7c377a 1.934
+65 186 v_af7b4024e8 2.31
+76 186 v_b85259d172 3.486
+80 186 v_000bbfee95 2.186
+82 186 v_64c6d90ba0 3.736
+83 186 v_ee6632b065 3.459
+84 186 v_c80904b803 3.784
+85 186 v_5fce4faef9 1.858
+86 186 v_6b64b0bd67 3.713
+87 186 v_4bba8a4539 2.034
+88 186 v_3bd8c61c44 4.8
+91 186 v_f3c8411ef1 1.429
+108 186 v_75b57ee2a5 3.559
+116 186 v_c7df3518f4 5.6
+120 186 v_3e0308863a 1.687
+128 186 v_e17886c499 1.863
+130 186 v_1d0f57b532 2.114
+132 186 v_6f64f058ec 2.36
+133 186 v_d369e1710e 3.508
+136 186 v_9df7388327 3.313
+139 186 v_3c319f17d2 3.484
+141 186 v_8d74b17c53 3.587
+142 186 v_7c27354d0f 3.663
+143 186 v_5ae3e3e664 2.279
+146 186 v_b8fc2aa5f7 4.1
+147 186 v_8c90b1c58a 2.256
+151 186 v_5739dcbd1e 3.811
+161 186 v_f33d9b35e4 3.657
+162 186 v_c7f3089c5a 3.388
+173 186 v_7048a0d710 3.879
+175 186 v_d6a45f2dba 3.633
+179 186 v_0cda807d94 3.885

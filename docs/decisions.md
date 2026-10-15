@@ -3443,3 +3443,10 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
 - Origem: questionário (opção escolhida: "Fixa por noite").
 - Decidido: cada noite tem **uma atmosfera fixa** (breu, névoa vermelha, chuva, tempestade, neblina branca, lua de sangue na noite 10), conforme a tabela de `design/anomalies-v2-proposal.md` §5 (game-designer ajusta a ordem). Só ambiente (`Lighting`, `Atmosphere`, partículas, som). Prefixo novo **`ATM-#`**.
 - Nota: com DEC-254 a Raincoat Lady (DEC-251, noite seca) só aparece em noite sem chuva.
+
+### DEC-258 — 2026-10-15 — Revive Kit pode ser usado no colega (emenda DEC-116)
+
+- Origem: pergunta do orquestrador (opção escolhida: "Em si e no colega"), TASK-317.
+- Decidido: o crédito do Revive Kit (Developer Product `util_revive`) pode reviver o próprio jogador (botão na tela de desmaio) **ou um colega caído** (segurar E no corpo, gasta o crédito de quem usa).
+- Emenda: DEC-116 ("reviver com Robux: só o próprio jogador").
+- Impacto: `ReviveKitService` + ação `revive_mate` mantidos como implementados; `Q-273` fechada por esta decisão.

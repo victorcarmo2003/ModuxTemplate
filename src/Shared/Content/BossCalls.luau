@@ -155,8 +155,6 @@ local function hint(key: string, action: string, body: { Line }): BossCall
 	}
 end
 
-const WALKER = "And never watch the Walker."
-
 const base = Table.new({
 	{ Key = "none", Lines = {}, Trigger = { Kind = "None" }, Priority = 1, Once = false },
 
@@ -212,8 +210,8 @@ const base = Table.new({
 		Cues = { { Line = 1, Kind = "CoffeeHint" } },
 	},
 
-	-- nights (ui-text.md §11.6); the last line is the short form of the rule. Short = what follows the NightRepeat
-	-- opener on a repeat: the short form, plus the Walker reminder from Night 8 (not 7: its short form is the Walker)
+	-- nights (TASK-316, V2: DEC-254..257; anomalies-v2-proposal.md §5): each call presents only the novelty of the night
+	-- (Nights[k].NewAnomaly); the last line is its short form. Short = what follows the NightRepeat opener on a repeat
 	nightCall(
 		1,
 		lines(
@@ -227,92 +225,92 @@ const base = Table.new({
 	nightCall(
 		2,
 		lines(
-			"Night two. Check your food first.",
-			"Gray frank, bitten bun? Trash it.",
-			"Still refuse the faceless ones.",
-			"Wrong food? Throw it away."
+			"Night two. Watch the line close.",
+			"Someone shaking all over? Refuse.",
+			"Odd noises? Just noises. Keep working.",
+			"Shaking? Refuse them."
 		),
-		lines("Wrong food? Throw it away.")
+		lines("Shaking? Refuse them.")
 	),
 	nightCall(
 		3,
 		lines(
-			"Evening. Watch the bank clock.",
-			"If it stops, trailer lights off.",
-			"Count to five. Then lights on.",
-			"Clock stops? Lights off, count five."
+			"Rainy one tonight, Rookie.",
+			"Head turned all the way back?",
+			"That's no customer. Refuse it.",
+			"Head on backwards? Refuse."
 		),
-		lines("Clock stops? Lights off, count five.")
+		lines("Head on backwards? Refuse.")
 	),
 	nightCall(
 		4,
 		lines(
-			"Sometimes a customer shows up twice.",
-			"One's a copy. Everything's backwards.",
-			"Look at shirts and watches.",
-			"Two? Refuse the backwards one."
+			"Lights might go out tonight.",
+			"Breaker's out back, behind the trailer.",
+			"Hold it till the lights come back.",
+			"Lights out? Breaker. Hold it."
 		),
-		lines("Two? Refuse the backwards one.")
+		lines("Lights out? Breaker. Hold it.")
 	),
 	nightCall(
 		5,
 		lines(
-			"A lady in a yellow raincoat.",
-			"It won't rain. She'll drip anyway.",
-			"Serve her, whatever she asks.",
-			"Yellow raincoat? Always serve her."
+			"Foggy tonight. Look at their eyes.",
+			"All white? Big grin? Refuse.",
+			"Twins in line? One's a copy.",
+			"White eyes or twins? Refuse."
 		),
-		lines("Yellow raincoat? Always serve her.")
+		lines("White eyes or twins? Refuse.")
 	),
 	nightCall(
 		6,
 		lines(
-			"Folks upstairs might wave tonight.",
-			"Don't wave back. Eyes down.",
-			"They just want to be noticed.",
-			"Someone waving upstairs? Don't look up."
+			"Something walks the street tonight.",
+			"Lights flicker? Leave the trailer.",
+			"Hide out back. Stay put.",
+			"Walker coming? Hide out back."
 		),
-		lines("Someone waving upstairs? Don't look up.")
+		lines("Walker coming? Hide out back.")
 	),
 	nightCall(
 		7,
 		lines(
-			"Down Juniper, someone walks toward you.",
-			"Each look brings them closer.",
-			"Never let them reach your light.",
-			"Never watch the Walker."
+			"Stormy one. Something crawls tonight.",
+			"It's fast. Low to the ground.",
+			"Same deal. Hide out back.",
+			"Crawling thing? Hide out back."
 		),
-		lines("Never watch the Walker.")
+		lines("Crawling thing? Hide out back.")
 	),
 	nightCall(
 		8,
 		lines(
-			"A long car may park across.",
-			"Lights on you? Out of sight.",
-			"Window shut. Or the Mart.",
-			"Long car? Window shut, or Mart."
+			"Dark one tonight, Rookie.",
+			"A big smile may fill the window.",
+			"Don't smile back. Go hide.",
+			"Big grin? Hide out back."
 		),
-		lines("Long car? Window shut, or Mart.", WALKER)
+		lines("Big grin? Hide out back.")
 	),
 	nightCall(
 		9,
 		lines(
-			"I never visit at night. Never.",
-			"Knocking? It isn't me. I'm sorry.",
-			"Window shut. Or the Mart.",
-			"Knocking? Not me. Window, or Mart."
+			"Hear steps on the roof?",
+			"That's not me. Never is.",
+			"Get out and hide. Quick.",
+			"Roof steps? Hide out back."
 		),
-		lines("Knocking? Not me. Window, or Mart.", WALKER)
+		lines("Roof steps? Hide out back.")
 	),
 	nightCall(
 		10,
 		lines(
-			"Last night. The lamps may die.",
-			"Go stand beneath the Mart's sign.",
-			"It never goes out. I promise.",
-			"Lamps out? To the Mart sign."
+			"Last night, Rookie. Everything comes.",
+			"Refuse, hide, fix the lights.",
+			"Lamps all die? Run to the Mart.",
+			"Lamps out? Get to the Mart."
 		),
-		lines("Lamps out? To the Mart sign.", WALKER)
+		lines("Lamps out? Get to the Mart.", "Refuse, hide, fix the lights.")
 	),
 	{
 		Key = "call_night_short",

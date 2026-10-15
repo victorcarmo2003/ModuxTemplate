@@ -35,6 +35,7 @@ local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local StarterPlayer = game:GetService("StarterPlayer")
 local Workspace = game:GetService("Workspace")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local CrewRig = require(ReplicatedStorage.shared.Crew.CrewRig)
@@ -42,6 +43,7 @@ local Zones = require(ReplicatedStorage.shared.Light.Zones)
 local Effect = require(script.Parent.Parent.Effect)
 local Fade = require(script.Parent.Kit.Fade)
 local Kit = require(script.Parent.Kit.CustomerActor)
+local Haptics = require(StarterPlayer.StarterPlayerScripts.client.Input.Haptics)
 
 const VARIANT = "mirror"
 const ACCESSORY_ATTRIBUTE = "Accessory" -- CrewRig.Build marks every accessory piece
@@ -462,6 +464,11 @@ local function copyGrab()
 		end
 		if entry.Alive then
 			entry.Model:PivotTo(CFrame.lookAt(goal, goal + facing))
+			-- the copy grabbed the own player: strong and short (TASK-268)
+			const own = Players.LocalPlayer.Character
+			if body ~= nil and own ~= nil and body:IsDescendantOf(own) then
+				Haptics.Play("Grab")
+			end
 			vanish(entry, Fade.Duration)
 		end
 	end)

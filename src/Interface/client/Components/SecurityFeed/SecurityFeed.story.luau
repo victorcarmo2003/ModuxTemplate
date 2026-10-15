@@ -1,5 +1,6 @@
 --!strict
--- SecurityFeed preview: "Night" switches the look, "Cam" the camera, "Device" the key chips, "Static" the switch burst. The
+-- SecurityFeed preview: "Night" switches the look, "Cam" the camera, "Device" the key chips, "Static" the switch burst,
+-- "Scale" the UI scale, "Inset" the height of the Roblox top bar (the viewfinder and its stamps stay below it). The
 -- background is a flat street-ish colour (the real grade is the controller's ColorCorrectionEffect).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -17,6 +18,8 @@ type Controls = {
 	Cam: () -> number,
 	Device: () -> string,
 	Static: () -> number,
+	Scale: () -> number,
+	Inset: () -> number,
 }
 
 return UILabs.CreateVideStory({
@@ -26,6 +29,8 @@ return UILabs.CreateVideStory({
 		Cam = UILabs.Slider(1, 1, 2, 1),
 		Device = UILabs.Choose({ "KeyboardMouse", "Gamepad", "Touch" }),
 		Static = UILabs.Slider(0, 0, 1, 0.05),
+		Scale = UILabs.Slider(1, 0.86, 1.6, 0.02),
+		Inset = UILabs.Slider(58, 0, 80, 2),
 	},
 }, function(props)
 	const controls: Controls = (props.controls :: any)
@@ -69,9 +74,8 @@ return UILabs.CreateVideStory({
 				return "NIGHT 3"
 			end,
 			Device = controls.Device,
-			Scale = function()
-				return 1
-			end,
+			Scale = controls.Scale,
+			Inset = controls.Inset,
 			OnCam = function(_key) end,
 			OnView = function() end,
 			OnExit = function() end,

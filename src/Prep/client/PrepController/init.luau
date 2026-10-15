@@ -54,6 +54,7 @@ local TicketRail = require(StarterPlayer.StarterPlayerScripts.client.Interface.C
 local KitchenFx = require(StarterPlayer.StarterPlayerScripts.client.Kitchen.KitchenController.Fx)
 local KitchenSlots = require(StarterPlayer.StarterPlayerScripts.client.Kitchen.KitchenController.Slots)
 local Prefs = require(StarterPlayer.StarterPlayerScripts.client.Settings.Prefs)
+local Haptics = require(StarterPlayer.StarterPlayerScripts.client.Input.Haptics)
 local Cursor = require(script.Cursor)
 local Feed = require(script.Feed)
 local Grade = require(ReplicatedStorage.shared.Prep.Grade)
@@ -836,7 +837,7 @@ function PrepController:Isolate(on: boolean)
 	table.clear(saved)
 end
 
--- Keys and gamepad buttons of the mode (context Menu). B / Y / LB / RB / A and the left stick are the gamepad map.
+-- Keys and gamepad buttons of the mode (context Menu). B / Y / LB / RB / A (or RT) / X and the sticks are the gamepad map.
 function PrepController:Bind(on: boolean)
 	const input = self.Dependencies.InputController
 	if not on then
@@ -892,8 +893,9 @@ function PrepController:Bind(on: boolean)
 			end, nil)
 		end
 	end
-	-- A holds / releases the virtual cursor; the left stick is swallowed (the cursor reads it itself)
-	bind("PrepGrab", Enum.KeyCode.ButtonA, nil, function()
+	-- A (Cross) or the right trigger RT (R2) holds / releases the virtual cursor (TASK-268: the trigger pours the guided sauce, no
+	-- touchpad); the sticks are swallowed (the cursor reads them itself)
+	bind("PrepGrab", Enum.KeyCode.ButtonA, { Enum.KeyCode.ButtonR2 }, function()
 		const cursor = self.Cursor
 		if cursor ~= nil then
 			cursor:Press()
@@ -904,7 +906,31 @@ function PrepController:Bind(on: boolean)
 			cursor:Release()
 		end
 	end)
-	bind("PrepStick", Enum.KeyCode.Thumbstick1, nil, nil, nil)
+	bind("PrepStick", Enum.KeyCode.Thumbstick1, { Enum.KeyCode.Thumbstick2 }, nil, nil)
+	-- X (Square) switches the sauce between the guided pour (default on a gamepad) and free drawing (TASK-268)
+	bind("PrepPadFree", Enum.KeyCode.ButtonX, nil, function()
+		Session.PadFree(not untrack(Session.PadFree))
+	end, nil)
+end
+
+-- The gamepad buttons of the step, drawn over the hint pill (TASK-268): the grab button always, the trigger and the guided /
+-- free switch while a sauce is in hand.
+function PrepController:PadKeys(): { PrepShell.PadKey }
+	const texts = prep.Pad
+	const keys: { PrepShell.PadKey } = {}
+	const tab = self.Tab()
+	const key = Session.Active()
+	const tolerance = if key ~= "" and (tab == "Build" or tab == "Toppings") then prep.Tolerances.ByKey[key] else nil
+	if tolerance ~= nil and tolerance.Gesture == "trace" and not Session.Hold() then
+		table.insert(keys, { Key = Enum.KeyCode.ButtonR2, Text = texts.Pour })
+		table.insert(keys, {
+			Key = Enum.KeyCode.ButtonX,
+			Text = if Session.PadFree() then texts.Guided else texts.Free,
+		})
+		return keys
+	end
+	table.insert(keys, { Key = Enum.KeyCode.ButtonA, Text = texts.Grab })
+	return keys
 end
 
 -- The ScreenGui of the chrome (and the one of the cursor, in screen px).
@@ -1020,6 +1046,9 @@ function PrepController:Mount()
 				Streak = World.Streak,
 				Pad = function(): boolean
 					return self.Dependencies.InputController.Device() == "Gamepad"
+				end,
+				PadKeys = function(): { PrepShell.PadKey }
+					return self:PadKeys()
 				end,
 				Next = {
 					Label = function(): string
@@ -1620,6 +1649,8 @@ function PrepController:Finish(takeover: boolean)
 		cursor:Destroy()
 	end
 	self.Cursor = nil
+	-- no pour rumble outlives the mode (TASK-268)
+	Haptics.Stop()
 	const pointer = self.Pointer
 	if pointer ~= nil then
 		pointer:Destroy()
@@ -1790,7 +1821,12 @@ function PrepController:Update(dt: number)
 
 	const cursor = self.Cursor
 	if cursor ~= nil then
-		cursor:SetPad(untrack(self.Dependencies.InputController.Device) == "Gamepad")
+		const onPad = untrack(self.Dependencies.InputController.Device) == "Gamepad"
+		cursor:SetPad(onPad)
+		-- the guided sauce / knife default of a gamepad (TASK-268, Session.Guided)
+		if untrack(Session.Pad) ~= onPad then
+			Session.Pad(onPad)
+		end
 	end
 	const pointer = self.Pointer
 	const viewport = workspace.CurrentCamera

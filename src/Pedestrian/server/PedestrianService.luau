@@ -71,6 +71,8 @@ type Stop = {
 	Kind: "Crossing" | "Pause" | "Hold", -- Hold: behind another walker (spacing), not a place of the path
 	Crosswalk: string?,
 	Exit: number, -- Crossing: far curb (absolute); Pause: = At
+	-- Crossing: the curb itself; At may sit up to WAIT_SLOTS * WAIT_GAP behind it, in the waiting line (TASK-321)
+	Curb: number?,
 }
 
 type Walker = {
@@ -121,7 +123,7 @@ const END_ROOM = 6 -- studs: a walker this close to the end of a through path is
 -- a walking passer-by brakes when another one stands or walks the same way less than HOLD_GAP studs (+ its braking
 -- distance) ahead within HOLD_LANE studs of its line, and walks on once the way is clear (or after HOLD_MAX s).
 -- World space, so walkers of different paths sharing a sidewalk or a curb keep apart too. Oncoming walkers pass.
-const HOLD_GAP = 2.5 -- studs between two walkers in line
+const HOLD_GAP = 3 -- studs between two walkers in line (2.5 -> 3, TASK-321: the owner saw them glued together)
 const HOLD_LANE = 1.5 -- studs off the line that still count as "in the way"
 const HOLD_SAME = 0.3 -- min dot of the two headings: same way (perpendicular and oncoming walkers pass)
 const HOLD_MIN = 0.3 -- studs: closer than this along the line is "beside", not ahead
@@ -202,7 +204,13 @@ local function stopFrom(geo: WalkGeo.Geo, s: number, inclusive: boolean): Stop?
 	if not geo.Loop then
 		for _, crossing in geo.Crossings do
 			if ahead(crossing.From) then
-				return { At = crossing.From, Kind = "Crossing", Crosswalk = crossing.Crosswalk, Exit = crossing.To }
+				return {
+					At = crossing.From,
+					Kind = "Crossing",
+					Crosswalk = crossing.Crosswalk,
+					Exit = crossing.To,
+					Curb = crossing.From,
+				}
 			end
 		end
 		return nil
@@ -223,7 +231,7 @@ local function stopFrom(geo: WalkGeo.Geo, s: number, inclusive: boolean): Stop?
 		for _, crossing in geo.Crossings do
 			const at = base + crossing.From
 			if ahead(at) then
-				return { At = at, Kind = "Crossing", Crosswalk = crossing.Crosswalk, Exit = base + crossing.To }
+				return { At = at, Kind = "Crossing", Crosswalk = crossing.Crosswalk, Exit = base + crossing.To, Curb = at }
 			end
 		end
 	end
@@ -327,6 +335,14 @@ function PedestrianService:GeoOf(row: WalkPath): WalkGeo.Geo?
 	return geo
 end
 
+-- Waiting line at a curb (TASK-321, owner print 2026-10-15: walkers waiting for the walk sign stood inside each other,
+-- the stop of every walker of a crosswalk is the same curb point and the Hold above only sees walkers coming the same
+-- way), PROVISIONAL: a walker heading to a crosswalk takes the first spot from the curb back along its own sidewalk,
+-- WAIT_GAP studs apart, that no other walker stands on or claims first (who is nearer its curb claims first), and only
+-- crosses from the curb itself: the next in line walks up when the spot ahead clears.
+const WAIT_GAP = 2.8 -- studs (world, centre to centre) between two waiting walkers
+const WAIT_SLOTS = 6 -- spots behind the curb (then it waits where it is)
+const WAIT_MOVE = 0.05 -- studs: smaller changes of the spot are ignored
 -- Records ---------------------------------------------------------------------------------------------------------
 
 function PedestrianService:Publish(walker: Walker, added: boolean)
@@ -360,6 +376,16 @@ function PedestrianService:Anchor(walker: Walker, dist: number, inclusive: boole
 	if stop ~= nil then
 		stopDist = f32(math.max(stop.At, MIN_STOP))
 		stop.At = stopDist
+		if stop.Kind == "Crossing" then
+			stop.Curb = stopDist
+			-- TASK-321: from rest (spawn, end of a Hold, off a crossing) straight to its spot of the waiting line
+			walker.Dist = anchor
+			const spot = self:WaitSpot(walker, stop)
+			if spot < stopDist - WAIT_MOVE then
+				stopDist = f32(math.max(spot, MIN_STOP))
+				stop.At = stopDist
+			end
+		end
 	end
 	walker.Record.AnchorAt = t
 	walker.Record.AnchorDist = anchor
@@ -476,6 +502,10 @@ end
 function PedestrianService:TryCross(walker: Walker, stop: Stop, t: number)
 	const key = stop.Crosswalk
 	if key == nil then
+		return
+	end
+	-- TASK-321: only the first of the waiting line (on the curb) steps on the road
+	if stop.Curb ~= nil and walker.Dist < (stop.Curb :: number) - WAIT_MOVE then
 		return
 	end
 	-- never faster than the rider ahead in the same lane (it would catch up and walk through it)
@@ -599,6 +629,85 @@ function PedestrianService:Ahead(walker: Walker, reach: number): boolean
 	return false
 end
 
+-- First free spot of the waiting line of `stop` for `walker` (TASK-321): the curb, else WAIT_GAP steps back along its
+-- path. Taken = another walker standing there, or heading to a crosswalk stop there and nearer its own curb.
+function PedestrianService:WaitSpot(walker: Walker, stop: Stop): number
+	const curb = stop.Curb or stop.At
+	const mine = curb - walker.Dist
+	const claims: { Vector3 } = {}
+	for _, other in self.Walkers do
+		if other == walker or other.Crossing ~= nil then
+			continue
+		end
+		if other.Speed <= 0 then
+			table.insert(claims, self:PlaceOf(other))
+			continue
+		end
+		const theirs = other.Stop
+		if theirs == nil or theirs.Kind == "Pause" or other.Record.StopDist <= 0 then
+			continue
+		end
+		-- a walker braking behind another one (Hold) will stand at its StopDist: that place is taken too
+		const left = if theirs.Kind == "Hold" then -1 else (theirs.Curb or theirs.At) - other.Dist
+		if left < mine or (left == mine and other.Id < walker.Id) then
+			table.insert(claims, WalkGeo.LanePointAt(other.Geo, other.Record.StopDist, other.Lane))
+		end
+	end
+	for k = 0, WAIT_SLOTS do
+		const at = curb - k * WAIT_GAP
+		if at <= walker.Dist then
+			return walker.Dist
+		end
+		const place = WalkGeo.LanePointAt(walker.Geo, at, walker.Lane)
+		local free = true
+		for _, claim in claims do
+			const offset = claim - place
+			if Vector3.new(offset.X, 0, offset.Z).Magnitude < WAIT_GAP then
+				free = false
+				break
+			end
+		end
+		if free then
+			return at
+		end
+	end
+	return math.max(curb - WAIT_SLOTS * WAIT_GAP, walker.Dist)
+end
+
+-- Keeps the walker on its spot of the waiting line (TASK-321): a walking one stops earlier when its spot is taken
+-- (only while it can still brake there); a standing one walks up when a spot ahead clears. True when it re-anchored.
+function PedestrianService:Queue(walker: Walker, stop: Stop, t: number): boolean
+	const spot = self:WaitSpot(walker, stop)
+	const record = walker.Record
+	const parked = Motion.Parked(walker.Profile, record, walker.Cursor, t)
+	if not parked then
+		if spot < record.StopDist - WAIT_MOVE then
+			const brake = walker.Speed * walker.Speed / (2 * WalkGeo.Brake) + walker.Speed / TICK_RATE
+			if spot >= walker.Dist + brake then
+				record.StopDist = f32(math.max(spot, MIN_STOP))
+				record.HeldUntil = 0
+				walker.Cursor = Motion.Cursor(walker.Profile, record)
+				stop.At = record.StopDist
+				self:Publish(walker, false)
+			end
+		end
+		return false
+	end
+	if spot <= walker.Dist + WAIT_MOVE then
+		return false
+	end
+	record.AnchorAt = t
+	record.AnchorDist = f32(walker.Dist)
+	record.StopDist = f32(spot)
+	record.HeldUntil = 0
+	walker.Cursor = Motion.Cursor(walker.Profile, record)
+	walker.Speed = 0
+	walker.ParkedAt = nil
+	stop.At = record.StopDist
+	self:Publish(walker, false)
+	return true
+end
+
 -- Brakes the walker from where it is now (same rule as AdoptPick: the record's past does not change). A nearer stop
 -- already set is kept (it brakes there anyway). Returns true when it holds.
 function PedestrianService:Hold(walker: Walker, brake: number, t: number): boolean
@@ -660,6 +769,9 @@ function PedestrianService:StepWalker(walker: Walker, t: number)
 		return
 	end
 	const stop = walker.Stop
+	if stop ~= nil and stop.Kind == "Crossing" and self:Queue(walker, stop, t) then
+		return
+	end
 	if stop == nil or not Motion.Parked(walker.Profile, walker.Record, walker.Cursor, t) then
 		walker.ParkedAt = nil
 		return

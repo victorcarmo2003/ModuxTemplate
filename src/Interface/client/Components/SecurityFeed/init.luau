@@ -6,7 +6,9 @@
 --   band         a soft bright band rolling down the picture (the "leve distorção" of the tape, night only)
 --   vignette     dark corners
 --   static       a burst of grain + grey cover on a camera or view switch (`Static` 0..1)
---   stamps       REC (Mustard dot blinking, never red), camera label, view name, clock, night and elapsed time; monospace
+--   viewfinder   corners, thin rule-of-thirds guides and a centre cross (owner 2026-10-15, TASK-323), below the Roblox top bar
+--   stamps       inside the viewfinder, by its top corners: REC (Mustard dot blinking, never red), camera label, view name;
+--                clock, night and elapsed time; monospace
 --   controls     one button per camera, the Night / Normal toggle and Exit, each with its key (desktop / gamepad); touch taps
 -- Only `Time` animates it (seconds, written every frame by the owner while the view is up). Pure: only props.
 -- Wrap it in a ScreenGui with IgnoreGuiInset = true so the grain covers the top bar too.
@@ -29,7 +31,18 @@ const NOISE_TILE = 256
 const SCAN_TILE = 6
 const SCAN_SPEED = 12 -- px/s the scanlines crawl down
 const BAND_PERIOD = 5.5 -- s for the band to roll over the picture
-const MARGIN = 18 -- px from the screen edges
+const MARGIN = 18 -- px from the screen edges (UI scale 1)
+-- viewfinder (owner 2026-10-15, TASK-323): corners, rule-of-thirds guides and a centre cross; the stamps sit inside it
+const TOP_GAP = 10 -- px between the Roblox top bar and the viewfinder
+const TOP_MIN = 58 -- px the top bar takes when GuiService reports none (Studio, story)
+const BOTTOM = 44 + 18 + 14 -- px under the viewfinder: the controls row, its margin and a gap
+const INNER = 14 -- px from a corner to the stamps beside it
+const ARM = 34 -- px of one arm of a corner
+const LINE = 2 -- px of the corner arms and the centre cross
+const GUIDE = 1 -- px of the thirds guides
+const CROSS = 22 -- px of the centre cross arms
+const GUIDE_ALPHA = 0.78 -- transparency of the thirds guides
+const CROSS_ALPHA = 0.45 -- transparency of the centre cross
 -- stamp text: warm white in Normal, phosphor green in Night
 const STAMP_NORMAL = Color3.fromRGB(245, 241, 226)
 const STAMP_NIGHT = Color3.fromRGB(196, 255, 200)
@@ -50,6 +63,7 @@ export type Props = {
 	Night: () -> string, -- "NIGHT 3" / "DAY 2"
 	Device: () -> string, -- "KeyboardMouse" | "Gamepad" | "Touch"
 	Scale: () -> number,
+	Inset: () -> number, -- real px of the Roblox top bar (GuiService.TopbarInset.Height), 0 = unknown
 	OnCam: (key: string) -> (),
 	OnView: () -> (),
 	OnExit: () -> (),
@@ -59,6 +73,66 @@ export type Props = {
 local function hash(n: number, salt: number): number
 	const x = math.sin(n * 12.9898 + salt * 78.233) * 43758.5453
 	return x - math.floor(x)
+end
+
+local function tint(props: Props): Color3
+	return if props.View() == "Night" then STAMP_NIGHT else STAMP_NORMAL
+end
+
+-- One corner of the viewfinder: two straight arms (axis-aligned Frames, no rotation) meeting at `at` (0/1, 0/1).
+local function corner(props: Props, at: Vector2): Frame
+	local function arm(size: UDim2): Frame
+		return create("Frame")({
+			AnchorPoint = at,
+			Position = UDim2.fromScale(at.X, at.Y),
+			Size = size,
+			BackgroundColor3 = function()
+				return tint(props)
+			end,
+			BorderSizePixel = 0,
+			ZIndex = 14,
+		})
+	end
+	return create("Frame")({
+		Name = `Corner{at.X}{at.Y}`,
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		ZIndex = 14,
+		arm(UDim2.fromOffset(ARM, LINE)),
+		arm(UDim2.fromOffset(LINE, ARM)),
+	})
+end
+
+-- A thin thirds guide line of the viewfinder (vertical when its width is an offset, horizontal otherwise).
+local function guide(props: Props, position: UDim2, size: UDim2): Frame
+	return create("Frame")({
+		Name = "Guide",
+		AnchorPoint = if size.X.Scale == 0 then Vector2.new(0.5, 0) else Vector2.new(0, 0.5),
+		Position = position,
+		Size = size,
+		BackgroundColor3 = function()
+			return tint(props)
+		end,
+		BackgroundTransparency = GUIDE_ALPHA,
+		BorderSizePixel = 0,
+		ZIndex = 13,
+	})
+end
+
+-- One arm of the centre cross.
+local function cross(props: Props, size: UDim2): Frame
+	return create("Frame")({
+		Name = "Cross",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = size,
+		BackgroundColor3 = function()
+			return tint(props)
+		end,
+		BackgroundTransparency = CROSS_ALPHA,
+		BorderSizePixel = 0,
+		ZIndex = 13,
+	})
 end
 
 local function stamp(props: Props, text: () -> string, size: number, anchor: Vector2, position: UDim2, order: number?): TextLabel
@@ -72,7 +146,7 @@ local function stamp(props: Props, text: () -> string, size: number, anchor: Vec
 		TextSize = size,
 		Text = text,
 		TextColor3 = function()
-			return if props.View() == "Night" then STAMP_NIGHT else STAMP_NORMAL
+			return tint(props)
 		end,
 		TextStrokeColor3 = Theme.Color.Ink,
 		TextStrokeTransparency = 0.45,
@@ -95,6 +169,14 @@ end
 return function(props: Props): Frame
 	const frame = function(): number
 		return math.floor(props.Time() * 30)
+	end
+	const scaleOf = function(): number
+		return math.max(props.Scale(), 0.1)
+	end
+	-- px (in the scaled Chrome) from the screen top to the viewfinder: the Roblox top bar (real px) unscaled, plus a gap
+	const top = function(): number
+		const inset = props.Inset()
+		return (if inset > 0 then inset else TOP_MIN) / scaleOf() + TOP_GAP
 	end
 	const grain = function(): number
 		return math.clamp(props.Look().Noise + props.Static() * 0.8, 0, 0.95)
@@ -225,72 +307,93 @@ return function(props: Props): Frame
 			ZIndex = 6,
 		}),
 
-		-- stamps and controls, scaled with the rest of the UI
+		-- viewfinder, stamps and controls, scaled with the rest of the UI
 		create("Frame")({
 			Name = "Chrome",
 			-- the UIScale shrinks / grows from the top left: the frame is sized 1 / scale so it still covers the screen
 			Size = function()
-				const scale = math.max(props.Scale(), 0.1)
-				return UDim2.fromScale(1 / scale, 1 / scale)
+				return UDim2.fromScale(1 / scaleOf(), 1 / scaleOf())
 			end,
 			BackgroundTransparency = 1,
 			ZIndex = 10,
 			createRaw("UIScale")({
 				Scale = props.Scale,
 			}),
-			createRaw("UIPadding")({
-				PaddingTop = UDim.new(0, MARGIN),
-				PaddingBottom = UDim.new(0, MARGIN),
-				PaddingLeft = UDim.new(0, MARGIN),
-				PaddingRight = UDim.new(0, MARGIN),
-			}),
 
-			-- top left: REC + camera
+			-- the viewfinder: below the Roblox top bar, above the controls, a margin from the sides (responsive: every edge
+			-- is an offset from the screen, the guides are fractions of the box)
 			create("Frame")({
-				Name = "Rec",
-				Size = UDim2.fromOffset(10, 10),
-				Position = UDim2.fromOffset(2, 6),
-				BackgroundColor3 = Theme.Color.Mustard,
-				BorderSizePixel = 0,
-				BackgroundTransparency = function()
-					return if (props.Time() % rules.Rec) < rules.Rec / 2 then 0 else 1
+				Name = "Viewfinder",
+				Position = function()
+					return UDim2.fromOffset(MARGIN, top())
 				end,
-				ZIndex = 20,
-				createRaw("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
-			}),
-			stamp(props, function()
-				return "REC"
-			end, 18, Vector2.zero, UDim2.fromOffset(18, 0)),
-			stamp(props, function()
-				for _, cam in props.Cams do
-					if cam.Key == props.Cam() then
-						return cam.Label
+				Size = function()
+					return UDim2.new(1, -MARGIN * 2, 1, -(top() + BOTTOM))
+				end,
+				BackgroundTransparency = 1,
+				ZIndex = 12,
+
+				-- corners
+				corner(props, Vector2.new(0, 0)),
+				corner(props, Vector2.new(1, 0)),
+				corner(props, Vector2.new(0, 1)),
+				corner(props, Vector2.new(1, 1)),
+				-- rule-of-thirds grid
+				guide(props, UDim2.fromScale(1 / 3, 0), UDim2.new(0, GUIDE, 1, 0)),
+				guide(props, UDim2.fromScale(2 / 3, 0), UDim2.new(0, GUIDE, 1, 0)),
+				guide(props, UDim2.fromScale(0, 1 / 3), UDim2.new(1, 0, 0, GUIDE)),
+				guide(props, UDim2.fromScale(0, 2 / 3), UDim2.new(1, 0, 0, GUIDE)),
+				-- centre cross
+				cross(props, UDim2.fromOffset(CROSS, LINE)),
+				cross(props, UDim2.fromOffset(LINE, CROSS)),
+
+				-- top left, inside the corner: REC, camera, view
+				create("Frame")({
+					Name = "Rec",
+					Size = UDim2.fromOffset(10, 10),
+					Position = UDim2.fromOffset(INNER + 2, INNER + 5),
+					BackgroundColor3 = Theme.Color.Mustard,
+					BorderSizePixel = 0,
+					BackgroundTransparency = function()
+						return if (props.Time() % rules.Rec) < rules.Rec / 2 then 0 else 1
+					end,
+					ZIndex = 20,
+					createRaw("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+				}),
+				stamp(props, function()
+					return "REC"
+				end, 18, Vector2.zero, UDim2.fromOffset(INNER + 18, INNER)),
+				stamp(props, function()
+					for _, cam in props.Cams do
+						if cam.Key == props.Cam() then
+							return cam.Label
+						end
 					end
-				end
-				return props.Cam()
-			end, 28, Vector2.zero, UDim2.fromOffset(0, 24)),
-			stamp(props, function()
-				return if props.View() == "Night" then "NIGHT VISION" else "NORMAL"
-			end, 14, Vector2.zero, UDim2.fromOffset(0, 58)),
+					return props.Cam()
+				end, 28, Vector2.zero, UDim2.fromOffset(INNER, INNER + 22)),
+				stamp(props, function()
+					return if props.View() == "Night" then "NIGHT VISION" else "NORMAL"
+				end, 14, Vector2.zero, UDim2.fromOffset(INNER, INNER + 54)),
 
-			-- top right: clock, night, elapsed
-			stamp(props, props.Clock, 22, Vector2.new(1, 0), UDim2.fromScale(1, 0)),
-			stamp(props, props.Night, 14, Vector2.new(1, 0), UDim2.new(1, 0, 0, 28)),
-			stamp(props, function()
-				const elapsed = math.max(props.Time() - props.Since(), 0)
-				return string.format(
-					"%02d:%02d:%02d",
-					math.floor(elapsed / 3600),
-					math.floor(elapsed / 60) % 60,
-					math.floor(elapsed) % 60
-				)
-			end, 14, Vector2.new(1, 0), UDim2.new(1, 0, 0, 46)),
+				-- top right, inside the corner: clock, night, elapsed
+				stamp(props, props.Clock, 22, Vector2.new(1, 0), UDim2.new(1, -INNER, 0, INNER)),
+				stamp(props, props.Night, 14, Vector2.new(1, 0), UDim2.new(1, -INNER, 0, INNER + 28)),
+				stamp(props, function()
+					const elapsed = math.max(props.Time() - props.Since(), 0)
+					return string.format(
+						"%02d:%02d:%02d",
+						math.floor(elapsed / 3600),
+						math.floor(elapsed / 60) % 60,
+						math.floor(elapsed) % 60
+					)
+				end, 14, Vector2.new(1, 0), UDim2.new(1, -INNER, 0, INNER + 46)),
+			}),
 
-			-- bottom: controls
+			-- bottom: controls, under the viewfinder
 			create("Frame")({
 				Name = "Controls",
 				AnchorPoint = Vector2.new(0.5, 1),
-				Position = UDim2.fromScale(0.5, 1),
+				Position = UDim2.new(0.5, 0, 1, -MARGIN),
 				Size = UDim2.fromOffset(0, 44),
 				AutomaticSize = Enum.AutomaticSize.X,
 				BackgroundTransparency = 1,

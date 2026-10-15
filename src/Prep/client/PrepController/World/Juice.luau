@@ -19,6 +19,7 @@ local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local Motion = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Motion)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
+local Haptics = require(StarterPlayer.StarterPlayerScripts.client.Input.Haptics)
 
 export type Kind = "Dust" | "Sparks" | "Steam" | "Crumbs" | "Confetti" | "Coins" | "Ring"
 
@@ -428,8 +429,11 @@ function Juice.new(folder: Folder, rules: Content.PrepWorldRules, audio: Audio?)
 				self:Float(string.format(Content.Prep.Texts.Combo, run), at + Vector3.new(0.5, 0.15, 0), CREAM, 20)
 			end
 			self:Tone("grill_ready", at, run)
+			-- the mark was hit: one light kick (TASK-268)
+			Haptics.Play("Mark")
 		elseif band == "Good" then
 			self:Note(band)
+			Haptics.Play("Good")
 			self:Burst("Sparks", at, 6, CREAM)
 			self:Flash(target, CREAM)
 			self:Tone("grill_collect", at, 0)

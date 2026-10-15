@@ -336,16 +336,15 @@ local function build(): Live
 	perfect.Body.Visible = false
 	perfect.Body.Parent = channel
 
-	-- Timing: the knob of the settings slider (Cream, round, Ink outline), a bit taller than the bar
+	-- Timing: the knob of the settings slider (Cream, round, Ink outline), a bit taller than the bar.
+	-- TASK-318: its CENTRE is the fraction the server grades (Grade.SwingAt), in the same channel scale as the bands. The old
+	-- UIAspectRatioConstraint (ScaleWithParentSize, Size X = 0) resized the knob after the layout, so the fraction landed on its
+	-- edge, not its centre; RelativeYY sizes it square from the channel height up front and the 0.5 AnchorPoint holds.
 	const knob = surface("Knob", Theme.Tone.White, 2, Theme.Outline.Normal, 6, UDim.new(0.5, 0))
 	knob.Body.AnchorPoint = Vector2.new(0.5, 0.5)
-	knob.Body.Size = UDim2.fromScale(0, KNOB)
+	knob.Body.SizeConstraint = Enum.SizeConstraint.RelativeYY
+	knob.Body.Size = UDim2.fromScale(KNOB, KNOB)
 	knob.Body.Visible = false
-	const round = Instance.new("UIAspectRatioConstraint")
-	round.AspectRatio = 1
-	round.AspectType = Enum.AspectType.ScaleWithParentSize
-	round.DominantAxis = Enum.DominantAxis.Height
-	round.Parent = knob.Body
 	knob.Body.Parent = channel
 
 	gui.Parent = holder()

@@ -31,8 +31,7 @@ export type Look = {
 	Noise: number, -- grain opacity
 	Scanlines: number,
 	Vignette: number,
-	Wobble: number, -- studs of the hand-held drift of the view (the "leve distorção" with the rolling band)
-	Band: number, -- opacity of the rolling bright band, 0 = none
+	Band: number, -- opacity of the rolling bright band, 0 = none (the "leve distorção"; the view itself is static, TASK-323)
 	-- local infrared illuminator at the camera eye (a PointLight only this client sees): night vision lifts the dark street
 	Illuminator: number, -- PointLight Brightness, 0 = none
 	Range: number, -- studs (PointLight max 60)
@@ -96,7 +95,6 @@ const security: Security = {
 			Noise = 0.1,
 			Scanlines = 0.08,
 			Vignette = 0.35,
-			Wobble = 0.004,
 			Band = 0,
 			Illuminator = 0,
 			Range = 0,
@@ -109,7 +107,6 @@ const security: Security = {
 			Noise = 0.32,
 			Scanlines = 0.22,
 			Vignette = 0.75,
-			Wobble = 0.012,
 			Band = 0.08,
 			Illuminator = 1.1,
 			Range = 60,

@@ -63,6 +63,10 @@ const ECONOMY_ID = 1 -- single record (network.md §1 rule 5)
 const SPECIAL_SLOT = "S1"
 -- Shelf tag sits under the prompt pill, which is drawn at the anchor itself (Provisional, MAP-01 §7.4).
 const SHELF_OFFSET = Vector3.new(0, -1.3, 0)
+-- Chest freezers (TASK-319): the anchor floats over the rim, so the tag under the pill sank into the case and was cut
+-- by its edge. When something solid sits under the tag's spot, the tag goes over the pill instead.
+const SHELF_LIFTED = Vector3.new(0, 1.3, 0)
+const SHELF_CLEARANCE = 0.6 -- studs: half the ShelfTag height (0.475) + a small margin under it
 const SHELF_DISTANCE = 30
 const VEHICLE_TAG = "Vehicle"
 const VEHICLE_ATTRIBUTE = "Vehicle"
@@ -351,6 +355,28 @@ function MarketController:MiniTarget(upgrade: Content.Upgrade, vehicle: string, 
 		return { State = "Sale", Part = nextRow.Part, Vehicle = vehicle, Badge = badge }
 	end
 	return { State = "Maxed", Part = if current then current.Part else "", Vehicle = vehicle, Badge = badge }
+end
+
+-- Shelf tag offset: under the prompt pill, or over it when the spot under the pill is inside a case (TASK-319).
+local function shelfOffset(anchor: Instance): Vector3
+	const position = if anchor:IsA("Attachment") then anchor.WorldPosition elseif anchor:IsA("BasePart") then anchor.Position else nil
+	if position == nil then
+		return SHELF_OFFSET
+	end
+	const params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { if anchor:IsA("Attachment") then anchor.Parent or anchor else anchor }
+	const hit = workspace:Raycast(position, Vector3.new(0, SHELF_OFFSET.Y - SHELF_CLEARANCE, 0), params)
+	return if hit then SHELF_LIFTED else SHELF_OFFSET
+end
+
+-- Case parts stream in after the anchor: re-check where each shelf tag hangs.
+function MarketController:SyncShelves()
+	for anchor, mounted in self.Mounted do
+		if mounted.Slot == nil and anchor.Parent then
+			mounted.Gui.StudsOffset = shelfOffset(anchor)
+		end
+	end
 end
 
 function MarketController:MountShelf(anchor: Instance, packageKey: string): Mounted?
@@ -765,6 +791,7 @@ function MarketController:Step()
 		self.LastRelocate = now
 		self.Minis:Relocate()
 		self:SyncPlates()
+		self:SyncShelves()
 	end
 	self:StepHint()
 	self.Kiosk:Step(now)

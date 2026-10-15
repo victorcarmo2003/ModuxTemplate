@@ -283,6 +283,17 @@ function Paths.build(route: Route, halfCar: number): (Geo?, string?, { string })
 		end
 	end
 
+	-- TASK-321: a line less than a car length past another line of this route holds at that earlier one, so the car
+	-- never stands across it (SL-S's hold 87.5 left the front past SL-1S at 84: the CW-1 walkers were refused all
+	-- through their Walk while a northbound car waited at the PARE)
+	for name, at in holds do
+		for _, earlier in holds do
+			if earlier < at - EPSILON and at - earlier < 2 * halfCar then
+				holds[name] = math.min(holds[name], earlier)
+			end
+		end
+	end
+
 	const stops: { StopPoint } = {}
 	for _, stop in route.Stops do
 		const at = holds[stop.Line]

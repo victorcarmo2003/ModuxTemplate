@@ -7,7 +7,7 @@
 
 	  View      CameraController Prep mode (a scripted cut, Travel 0) on the PIVOT of the camera model
 	            (`Workspace.<Folder>.<Cam.Model>`, Content.Security; the owner stored his camera CFrame in the pivot), with the
-	            camera's Fov. A small hand-held drift (Look.Wobble) runs through PrepGoal every frame. The own rig is left alone
+	            camera's Fov. The view is static (owner 2026-10-15, TASK-323): no drift, only the screen effects move. The own rig is left alone
 	            (the body stays at the monitor, so it shows on a camera that sees the trailer).
 	  Looks     Normal: light grain + stamps. Night (night vision): green ColorCorrectionEffect (local, under Lighting), heavy
 	            grain, scanlines, vignette, rolling band, and a local infrared illuminator (a PointLight at the eye that only
@@ -26,6 +26,7 @@
 
 	The CCTV screen in the world (channel loop, REC, grain, clock) is Screen.luau.
 ]]
+local GuiService = game:GetService("GuiService")
 local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -47,7 +48,6 @@ const rules = security.Rules
 const GATE = "Security"
 const EFFECT_NAME = "SecurityLook"
 const LOOK_AHEAD = 20 -- studs: the point the camera looks at, along the pivot
-const WOBBLE_SPEED = 0.7 -- Hz of the hand-held drift
 
 type Saved = { [string]: any }
 
@@ -64,6 +64,7 @@ function SecurityController:Setup()
 	self.Since = Vide.source(0) :: Vide.Source<number>
 	self.Static = Vide.source(0) :: Vide.Source<number>
 	self.Scale = Vide.source(1) :: Vide.Source<number>
+	self.Inset = Vide.source(GuiService.TopbarInset.Height) :: Vide.Source<number>
 	self.Clock = Vide.source("") :: Vide.Source<string>
 	self.NightText = Vide.source("") :: Vide.Source<string>
 
@@ -314,7 +315,7 @@ function SecurityController:Publish()
 	player:SetAttribute(rules.CamAttribute, if open then untrack(self.Cam) else "")
 end
 
--- Every frame while open: animation clock, static decay, the drift of the view and the ways out.
+-- Every frame while open: animation clock, static decay, UI scale / top bar inset and the ways out.
 function SecurityController:Update()
 	const camera = self.Dependencies.CameraController
 	if untrack(camera.Mode) ~= "Prep" then
@@ -337,16 +338,9 @@ function SecurityController:Update()
 		self.Clock(untrack(round.ClockText))
 		self.NightText(if untrack(round.IsNight) then `NIGHT {untrack(round.Night)}` else `DAY {untrack(round.Day)}`)
 	end)
+	-- the view itself never moves (owner 2026-10-15, TASK-323): the cut of Cut() holds; only the screen effects animate
 	const frame = self.Frame
-	if frame == nil then
-		return
-	end
-	const wobble = self:Look().Wobble
-	const t = now * WOBBLE_SPEED * math.pi * 2
-	const drift = frame.RightVector * math.sin(t) * wobble + frame.UpVector * math.sin(t * 0.73 + 1.3) * wobble
-	const look = frame.Position + frame.LookVector * LOOK_AHEAD + drift * LOOK_AHEAD
-	camera:PrepGoal(frame.Position, look, self.Fov, 0)
-	if self.Light ~= nil then
+	if frame ~= nil and self.Light ~= nil then
 		self.Light.CFrame = frame
 	end
 	const viewport = workspace.CurrentCamera
@@ -355,6 +349,11 @@ function SecurityController:Update()
 		if math.abs(scale - untrack(self.Scale)) > 0.01 then
 			self.Scale(scale)
 		end
+	end
+	-- height of the Roblox top bar (its buttons): the stamps stay below it
+	const inset = GuiService.TopbarInset.Height
+	if inset ~= untrack(self.Inset) then
+		self.Inset(inset)
 	end
 end
 
@@ -481,6 +480,7 @@ function SecurityController:Mount()
 				Night = self.NightText,
 				Device = input.Device,
 				Scale = self.Scale,
+				Inset = self.Inset,
 				OnCam = function(key: string)
 					self:SetCam(key)
 				end,

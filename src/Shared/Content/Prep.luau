@@ -672,7 +672,8 @@ const gestures = Table.new({
 --   cheese          deviation of the slice from the target, % (<= 12, <= 25)
 --   bacon           mean timing error of the 3 taps, ms (<= 120, <= 250)
 --   potato_sticks   release distance from the green band, % of the bar (<= 8, <= 18)
---   grill_flip      seconds of delay between the pause (flip window open) and the flip x Rules.Grill.Reaction (Good <= 10, Perfect <= 5)
+--   grill_flip      distance of the swinging cursor's centre from the middle of the bar, % of the bar (Grade.FlipScore; TASK-257).
+--                   TASK-318 (owner 2026-10-15, easier): Perfect 5 -> 7, Good 10 -> 14 (bands 40% wider; drawn by GrillBar at 2x)
 -- A new topping is one row here (key = Ingredients key).
 const tolerances = Table.new({
 	{ Key = "bun_cut", Gesture = "slice", Unit = "PercentWidth", Perfect = 6, Good = 15, Worst = 40, ExcessWeight = 0, Icon = "" },
@@ -683,7 +684,7 @@ const tolerances = Table.new({
 	{ Key = "cheese", Gesture = "slide", Unit = "PercentTarget", Perfect = 12, Good = 25, Worst = 60, ExcessWeight = 0, Icon = "" },
 	{ Key = "bacon", Gesture = "taps", Unit = "Milliseconds", Perfect = 120, Good = 250, Worst = 600, ExcessWeight = 0, Icon = "" },
 	{ Key = "potato_sticks", Gesture = "hold", Unit = "PercentBar", Perfect = 8, Good = 18, Worst = 50, ExcessWeight = 0, Icon = "" },
-	{ Key = "grill_flip", Gesture = "taps", Unit = "PercentDuration", Perfect = 5, Good = 10, Worst = 50, ExcessWeight = 0, Icon = "" },
+	{ Key = "grill_flip", Gesture = "taps", Unit = "PercentDuration", Perfect = 7, Good = 14, Worst = 50, ExcessWeight = 0, Icon = "" },
 } :: { Tolerance })
 
 -- PrepResult.Reason. Notice = what the owner reads (Notices key); nil = the UI reacts on its own.
@@ -884,7 +885,7 @@ const rules: Rules = {
 	MsSlack = 1.5,
 	Assist = 1.3,
 	TouchOffset = 28,
-	Grill = { Target = 0.5, From = 0.4, To = 0.6, PostFlip = 2, Reaction = 20, Swing = 1.1 }, -- 2026-10-14: the pause waits for the flip; 20 = 0.25 s of delay is Perfect, 0.5 s Good
+	Grill = { Target = 0.5, From = 0.4, To = 0.6, PostFlip = 2, Reaction = 20, Swing = 1.2 }, -- 2026-10-14: the pause waits for the flip; TASK-318 (2026-10-15): Swing 1.1 -> 1.2 (cursor ~9% slower)
 	Rates = { Enter = 2, Leave = 2, Tab = 4, Grill = 6, Begin = 1, Finish = 1, Trash = 4, Order = 4 },
 }
 
@@ -1008,6 +1009,13 @@ const build = {
 return Table.record({
 	Build = build,
 	Rules = rules,
+	-- the words of the gamepad button chips over the hint pill (TASK-268; Provisional, English, <= 12 characters)
+	Pad = {
+		Grab = "Grab",
+		Pour = "Pour",
+		Free = "Free draw",
+		Guided = "Guided",
+	},
 	Tabs = tabs,
 	Steps = steps,
 	-- the fixed sets, whatever Rules.ThreeD says (Tabs / Steps above equal one of each pair)

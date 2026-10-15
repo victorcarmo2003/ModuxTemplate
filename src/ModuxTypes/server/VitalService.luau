@@ -102,6 +102,8 @@ export type Public = {
 	IsDevGod: (self: Public) -> boolean,
 	DevDarkMode: (self: Public) -> number,
 	DevRevive: (self: Public, player: Player) -> string,
+	Revive: (self: Public, player: Player, reviver: Player?) -> boolean,
+	Restore: (self: Public, player: Player, state: LifeState) -> boolean,
 }
 
 return {}

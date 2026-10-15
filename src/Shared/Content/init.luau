@@ -15,6 +15,7 @@ local Cutscenes = require(script.Cutscenes)
 local Flow = require(script.Flow)
 local GemRewards = require(script.GemRewards)
 local Hallucinations = require(script.Hallucinations)
+local Haptics = require(script.Haptics)
 local HudReveal = require(script.HudReveal)
 local Ingredients = require(script.Ingredients)
 local Items = require(script.Items)
@@ -133,6 +134,8 @@ export type PrepSlotPhase = Prep.SlotPhase
 export type PrepWorldRules = Prep.WorldRules
 export type Phase = Shift.Phase
 export type Revive = Revive.Revive
+export type HapticProfile = Haptics.Profile
+export type HapticKey = Haptics.Key
 export type RunParams = RunParams.RunParams
 export type Sanity = Sanity.Sanity
 export type Seating = Seating.Seating
@@ -216,6 +219,8 @@ return table.freeze({
 	SoundRules = Sounds.Rules,
 	Sounds = Sounds,
 	Thief = Thief,
+	-- TASK-268: vibration profiles (Input/client/Haptics), Provisional
+	Haptics = Haptics,
 
 	-- wave 3 (TASK-096; content-data.md §6.10, §6.11, §3.14). Numbers and texts Provisional; WalkPaths rows in TASK-098
 	Anomalies = Anomalies,

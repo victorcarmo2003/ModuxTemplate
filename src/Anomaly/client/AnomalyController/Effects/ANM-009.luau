@@ -30,6 +30,7 @@ local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
 local UiScale = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.UiScale)
+local Haptics = require(StarterPlayer.StarterPlayerScripts.client.Input.Haptics)
 local Effect = require(script.Parent.Parent.Effect)
 
 const create = Vide.create
@@ -55,6 +56,7 @@ const DOOR_POINT = "AN-05"
 const AJAR_ANGLE = math.rad(10)
 const OPEN_TIME = 0.35
 const CLOSE_TIME = 0.18 -- shuts "sozinha", a little faster
+const SLAM_RANGE = 30 -- studs: the own player this near the door feels the slam (TASK-268 haptics)
 
 -- Napkins (AST-094: Cream) and wind wisps (AST-095: 3 bluish)
 const NAPKIN_COUNT = 6
@@ -472,6 +474,7 @@ local function doorCrack(ctx: Effect.Context, cue: Effect.Cue)
 
 	const started = os.clock()
 	local last = started
+	local slammed = false
 	while true do
 		const now = os.clock()
 		const t = now - started
@@ -479,6 +482,15 @@ local function doorCrack(ctx: Effect.Context, cue: Effect.Cue)
 		last = now
 		if t >= duration then
 			break
+		end
+		-- the door slams shut: a medium kick for the own player near it (TASK-268)
+		if not slammed and t > duration - CLOSE_TIME then
+			slammed = true
+			const character = Players.LocalPlayer.Character
+			const root = if character then character:FindFirstChild("HumanoidRootPart") else nil
+			if door and root and root:IsA("BasePart") and (root.Position - door).Magnitude <= SLAM_RANGE then
+				Haptics.Play("Slam")
+			end
 		end
 		if swing then
 			local angle: number

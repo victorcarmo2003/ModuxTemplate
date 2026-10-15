@@ -83,6 +83,8 @@ const TEXT = {
 	Miss = "Drop it on the bun", -- Provisional
 	Trace = "Press and drag over the dashes", -- PREP3D_GST_TRACE
 	TraceHold = "Hold to pour, let go at the mark", -- PREP3D_GST_TRACE_HOLD
+	TracePad = "Hold the trigger, let go at the mark", -- TASK-268, Provisional
+	TracePadFree = "Steer the bottle, trigger pours", -- TASK-268, Provisional
 	Slide = "Drag the slice onto the bun", -- PREP3D_GST_SLIDE
 	SlideHold = "Hold where the slice goes", -- PREP3D_GST_SLIDE_HOLD
 	Taps = "Tap each ring as it closes", -- PREP3D_GST_TAPS
@@ -848,11 +850,16 @@ local function wantedMode(current: Sess): string
 	if current.Closing or current.Flying or not plateOpen() or untrack(Session.Pending) == "Finish" or current.Drag ~= nil then
 		return "none"
 	end
-	const holdMode = untrack(Session.Hold)
+	-- the touch Hold pill, or the guided default of a gamepad (TASK-268: sauce and knife), arms the hold form
+	local function guided(gesture: string): boolean
+		return untrack(function(): boolean
+			return Session.Guided(gesture)
+		end)
+	end
 	if current.Tab == "Board" then
 		const bun = bunState(current)
 		if bun == "Closed" or bun == "Cut" then
-			return if holdMode then "slice_hold" else "slice"
+			return if guided("slice") then "slice_hold" else "slice"
 		end
 		return "none"
 	end
@@ -865,7 +872,7 @@ local function wantedMode(current: Sess): string
 		return "none"
 	end
 	const gesture = tolerance.Gesture
-	return if holdMode and (gesture == "trace" or gesture == "slide") then `{gesture}_hold:{key}` else `{gesture}:{key}`
+	return if (gesture == "trace" or gesture == "slide") and guided(gesture) then `{gesture}_hold:{key}` else `{gesture}:{key}`
 end
 
 local function frame(current: Sess, dt: number, time: number)
@@ -1345,7 +1352,7 @@ const Build: Stage.Stage3D = {
 			end
 			const bun = controller.View.Bun()
 			if bun == "Closed" or bun == "Cut" then
-				return if Session.Hold() then TEXT.SliceHold else TEXT.Slice
+				return if Session.Guided("slice") then TEXT.SliceHold else TEXT.Slice
 			end
 			if not Session.Placed() then
 				return if Feed.Rail() == 0 then prep.Texts.Waiting else TEXT.Place
@@ -1360,12 +1367,15 @@ const Build: Stage.Stage3D = {
 		if tolerance == nil then
 			return if #Session.Toppings() >= MAX then TEXT.Full else TEXT.Add
 		end
-		const holdMode = Session.Hold()
 		const gesture = tolerance.Gesture
 		if gesture == "trace" then
-			return if holdMode then TEXT.TraceHold else TEXT.Trace
+			-- gamepad (TASK-268): the guided pour, or free drawing; X / Square switches (glyphs by KeyHint in the shell)
+			if Session.Pad() then
+				return if Session.Guided("trace") then TEXT.TracePad else TEXT.TracePadFree
+			end
+			return if Session.Guided("trace") then TEXT.TraceHold else TEXT.Trace
 		elseif gesture == "slide" then
-			return if holdMode then TEXT.SlideHold else TEXT.Slide
+			return if Session.Guided("slide") then TEXT.SlideHold else TEXT.Slide
 		elseif gesture == "taps" then
 			return TEXT.Taps
 		end

@@ -6,8 +6,9 @@
 	DEC-173). The faint itself is the server's (VitalService:Fall ~0.7 s after the cue): nothing is decided here.
 
 	Cartoon and Mild (DEC-172, DEC-256): an Ink-dark head with two huge white eyes and a wide toothy grin, no blood,
-	no alert red, no strobe. Placeholder made of Frames until the art-director's face sheet exists (a `Jumpscare_Face`
-	ImageLabel anywhere under ReplicatedStorage.Assets replaces the drawing). Provisional.
+	no alert red, no strobe. The face is FACE_IMAGE (Assets/textures/ui/fx/jumpscare_face.png, drawn by
+	tools/icons/jumpscare_face.py in the UI sticker style, 2026-10-15). A `Jumpscare_Face` ImageLabel anywhere under
+	ReplicatedStorage.Assets still wins; the Frames drawing is the last fallback (empty FACE_IMAGE).
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -15,6 +16,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Effect = require(script.Parent.Parent.Parent.Effect)
+local Haptics = require(game:GetService("StarterPlayer").StarterPlayerScripts.client.Input.Haptics)
 
 const create = Vide.create
 -- the type definitions miss UIStroke in Vide.create's class list (same workaround as BossController)
@@ -25,6 +27,7 @@ const HOLD = 0.6 -- s on screen (DEC-256)
 const POP = 0.12 -- s of the zoom-in
 const SHAKE = 18 -- px of screen jitter while it holds
 const FACE_NAME = "Jumpscare_Face"
+const FACE_IMAGE = "rbxassetid://82360613162335" -- jumpscare_face.png (uploaded 2026-10-15)
 const INK = Color3.fromHex("#2B2233") -- Theme Ink: the house outline colour, never alert red
 const SKIN = Color3.fromHex("#4A3F55")
 const WHITE = Color3.fromHex("#FFFFFF")
@@ -101,6 +104,17 @@ local function face(): GuiObject
 		clone.Size = UDim2.fromScale(1, 1)
 		return clone
 	end
+	if FACE_IMAGE ~= "" then
+		return create("ImageLabel")({
+			Name = "Head",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromScale(1, 1),
+			BackgroundTransparency = 1,
+			Image = FACE_IMAGE,
+			ScaleType = Enum.ScaleType.Fit,
+		}) :: ImageLabel
+	end
 	return create("Frame")({
 		Name = "Head",
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -162,6 +176,7 @@ function Jumpscare.Show(ctx: Effect.Context)
 	gui.Parent = playerGui
 
 	ctx.Play("jumpscare", nil, true)
+	Haptics.Play("Scare") -- strong and short, own player only (TASK-268)
 	TweenService
 		:Create(holder, TweenInfo.new(POP, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
 			Size = UDim2.fromScale(1.25, 1.25),

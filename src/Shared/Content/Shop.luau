@@ -49,7 +49,8 @@ export type ClassProduct = GamePass
 --            Restock  one ingredient to its capacity (Target = Ingredient; KitchenService:StockFree)
 --            Pantry   every open ingredient to its capacity
 --            Coffee   sanity to full at night; by day a coffee to keep (ItemService:Give)
---            Revive   +1 profile.ReviveCredits (DEC-117; spent by the wave 4 ReviveService)
+--            Revive   +1 profile.ReviveCredits (DEC-117); spent by ReviveKitService (TASK-317): self while Down, or on a
+--                     fallen mate's body (VitalService:Revive)
 --   Target   what the buyer picks before the prompt ("Mate" | "Ingredient"); nil = nothing to pick
 --   Night    only sold while a night shift runs (the client disables the card by day)
 export type UtilityKind = "Radar" | "Scare" | "Cash" | "Restock" | "Pantry" | "Coffee" | "Revive"
@@ -194,7 +195,7 @@ const utilities: { Utility } = {
 	},
 	{
 		Key = "util_revive",
-		ProductId = 0, -- created on the Creator Hub as 3718682106; kept at 0 until VitalService:Revive exists (Q-273)
+		ProductId = 3718682106, -- live since VitalService:Revive (TASK-317, closes Q-273)
 		Robux = 39,
 		Name = "Revive Kit",
 		Text = "Saved for when you go down",

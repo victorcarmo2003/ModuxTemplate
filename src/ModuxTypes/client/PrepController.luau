@@ -125,6 +125,7 @@ export type Public = {
 	HideRoof: (self: Public, on: boolean) -> (),
 	Isolate: (self: Public, on: boolean) -> (),
 	Bind: (self: Public, on: boolean) -> (),
+	PadKeys: (self: Public) -> { PrepShell.PadKey },
 	Mount: (self: Public) -> (),
 	Unmounted: (self: Public) -> (),
 	Enter: (self: Public, station: number, mock: boolean?, tab: string?, plate: number?) -> boolean,

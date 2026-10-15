@@ -54,6 +54,10 @@ Session.Placed = source(false)
 Session.Active = source("")
 -- Hold instead of drag (touch accessibility, docs/tech/prep-mode.md §5).
 Session.Hold = source(false)
+-- The active device is a gamepad (TASK-268; PrepController sets it every frame from InputController.Device).
+Session.Pad = source(false)
+-- Gamepad only: the player switched the sauce to free drawing (cursor + trigger) instead of the guided pour (X / Square).
+Session.PadFree = source(false)
 -- The live grade of the plate (polish 2026-10-12, U-3): the mean of the scores 0..100 of the stages done so far and how many they
 -- are (0 = nothing scored yet). A PREVIEW for the progress card and the seal (the server's verdict, with the sausage and the time
 -- floor, is the one that counts); it uses the same Score the gestures use and writes nothing to the wire.
@@ -424,6 +428,22 @@ end
 
 function Session.SetHold(on: boolean)
 	Session.Hold(on)
+end
+
+-- Whether a gesture runs in its hold form (the tool runs the path by itself; the press only chooses when to let go). The touch
+-- "Hold" pill turns it on for every gesture that has one; on a gamepad (TASK-268) the sauce (trace) and the knife (slice) are
+-- guided by default, unless the player switched the sauce to free drawing. Reactive (reads sources).
+function Session.Guided(gesture: string): boolean
+	if Session.Hold() then
+		return true
+	end
+	if not Session.Pad() then
+		return false
+	end
+	if gesture == "slice" then
+		return true
+	end
+	return gesture == "trace" and not Session.PadFree()
 end
 
 return Session

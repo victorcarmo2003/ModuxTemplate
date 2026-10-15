@@ -11,6 +11,8 @@ type Stop = {
 	Kind: "Crossing" | "Pause" | "Hold", -- Hold: behind another walker (spacing), not a place of the path
 	Crosswalk: string?,
 	Exit: number, -- Crossing: far curb (absolute); Pause: = At
+	-- Crossing: the curb itself; At may sit up to WAIT_SLOTS * WAIT_GAP behind it, in the waiting line (TASK-321)
+	Curb: number?,
 }
 type Walker = {
 	Id: number,
@@ -85,6 +87,8 @@ export type Public = {
 	RiderNear: (self: Public, walker: Walker, key: string) -> boolean,
 	LeaderSpeed: (self: Public, walker: Walker, key: string) -> number?,
 	Ahead: (self: Public, walker: Walker, reach: number) -> boolean,
+	WaitSpot: (self: Public, walker: Walker, stop: Stop) -> number,
+	Queue: (self: Public, walker: Walker, stop: Stop, t: number) -> boolean,
 	Hold: (self: Public, walker: Walker, brake: number, t: number) -> boolean,
 	StepWalker: (self: Public, walker: Walker, t: number) -> (),
 	Retarget: (self: Public) -> (),

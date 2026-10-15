@@ -4,6 +4,7 @@
 -- Outside a play session (UI Labs stories) it keeps the SettingsRules defaults, so stories are unaffected.
 --   PrepAssist()     prep mode hint line and drag paw on (PrepController, World.Coach)
 --   ReducedMotion()  game-side reduced motion (Motion.Reduced ORs it with the Roblox setting)
+--   Vibration()      controller / phone vibration allowed (Input/client/Haptics, TASK-268)
 -- Volumes and PromptMode are not here: SettingsController applies them (AudioController, LocalPlayer attribute).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -11,6 +12,7 @@ local SettingsRules = require(ReplicatedStorage.shared.Settings.SettingsRules)
 
 const prepAssist = Vide.source(SettingsRules.Defaults.PrepAssist)
 const reducedMotion = Vide.source(SettingsRules.Defaults.ReducedMotion)
+const vibration = Vide.source(SettingsRules.Defaults.Vibration)
 
 local function readPrepAssist(): boolean
 	return prepAssist()
@@ -18,6 +20,10 @@ end
 
 local function readReducedMotion(): boolean
 	return reducedMotion()
+end
+
+local function readVibration(): boolean
+	return vibration()
 end
 
 -- Only SettingsController writes.
@@ -28,10 +34,14 @@ local function set(settings: SettingsRules.Settings)
 	if Vide.untrack(reducedMotion) ~= settings.ReducedMotion then
 		reducedMotion(settings.ReducedMotion)
 	end
+	if Vide.untrack(vibration) ~= settings.Vibration then
+		vibration(settings.Vibration)
+	end
 end
 
 return table.freeze({
 	PrepAssist = readPrepAssist,
 	ReducedMotion = readReducedMotion,
+	Vibration = readVibration,
 	Set = set,
 })

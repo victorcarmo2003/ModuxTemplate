@@ -1113,6 +1113,7 @@ ClassBuyResult = Lync.packet(Lync.struct({
 | Responde | `ClassService` (L+R), taxa ≤ 2/s **somada** ao `ClassAction` |
 | `Currency = "Gems"` | compra na hora (`BuyWithGems`, `data.md` §1.7). Resposta `Ok` (+ `Notice class_bought` + `Profile` novo) ou `Owned` / `NotEnoughGems` / `NotForSale` (não `InMvp`) / `Unavailable` (Run fora do modo dev) / `Busy` (taxa ou perfil carregando) |
 | `Currency = "Robux"` | **só pré-checagem**, nada é escrito. `Prompt` = classe à venda, com produto criado e não possuída: o client chama `MarketplaceService:PromptProductPurchase(LocalPlayer, Content.Shop.ClassProducts.ByKey[Class].ProductId)`. Senão `Owned` / `NotForSale` / `Unavailable` (`ProductId` 0 = produto ainda não criado) / `Busy` |
+| Game Pass (TASK-291, 2026-10-14) | Classe em Robux é **Game Pass** (`Content.Shop.GamePasses`, `PassId`): o client chama `MarketplaceService:PromptGamePassPurchase`; o servidor concede em `PromptGamePassPurchaseFinished` e confere `UserOwnsGamePassAsync` ao entrar. As linhas abaixo sobre `ProductId`/recibo de classe valem só como histórico |
 | Recibo de classe | `ShopService` manda `ClassBuyResult{ Ok = true, Reason = "Granted" }` (+ `Notice class_bought`) ou `"Converted"` (já possuía: virou as gemas do preço, + `Notice gems_gained`). Chega **depois** do diálogo do Roblox fechar; pode chegar noutro servidor (recibo reentregue) |
 | `Ok` | `true` para `Ok`, `Prompt`, `Granted`, `Converted` |
 | Pular a pré-checagem | permitido: o client pode chamar o prompt direto; o servidor valida no recibo do mesmo jeito |

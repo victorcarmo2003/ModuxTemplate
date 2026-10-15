@@ -150,21 +150,35 @@ for _, routeRow in TRAFFIC.Routes.List do
 	end
 end
 
--- The light of a stop's axis is not green at server time t (TASK-263): the car must stop at that line
-local function redFor(kind: string, key: string, ref: string, t: number): boolean
+-- Axis of the light that rules a stop line (nil = no lamp, or Lights off)
+local function axisFor(kind: string, key: string, ref: string): ("EW" | "NS")?
 	if not TRAFFIC.Lights then
-		return false
+		return nil
 	end
 	local axis: ("EW" | "NS")? = LINE_AXIS[key]
 	if axis == nil and kind == "Crosswalk" then
 		const row = TRAFFIC.Crosswalks.ByKey[ref]
 		axis = if row ~= nil then row.Axis else nil
 	end
+	return axis
+end
+
+-- The light of a stop's axis is not green at server time t (TASK-263): the car must stop at that line
+local function redFor(kind: string, key: string, ref: string, t: number): boolean
+	const axis = axisFor(kind, key, ref)
 	if axis == nil then
 		return false
 	end
-	const phase = LIGHTS.sample(axis :: "EW" | "NS", t)
+	const phase = LIGHTS.sample(axis, t)
 	return phase ~= LIGHTS.PHASE_GREEN
+end
+
+-- Server time when `axis` is next green (t itself while it is green; TASK-320)
+local function greenFrom(axis: "EW" | "NS", t: number): number
+	if LIGHTS.sample(axis, t) == LIGHTS.PHASE_GREEN then
+		return t
+	end
+	return t + (LIGHTS.Offsets[axis] - t) % LIGHTS.CycleTime
 end
 
 -- The walk sign of a crosswalk says Walk (TASK-263): its walkers go along the OTHER axis than its street
@@ -516,7 +530,21 @@ local function earliestEntry(car: Car, t: number): number?
 	const free = table.clone(car.Record)
 	free.StopDist = 0
 	free.HeldUntil = 0
-	return Motion.TimeAt(car.Geo.Profile, free, cross[1] - HALF_CAR, t + HORIZON) or math.huge
+	local entry = Motion.TimeAt(car.Geo.Profile, free, cross[1] - HALF_CAR, t + HORIZON) or math.huge
+	-- TASK-320: a car still before its light enters no earlier than that light's next green. Without this a Ninth car
+	-- waiting at its red counted as "entering now", so the Juniper car at the PARE never got the box on its own green
+	-- (owner print 2026-10-15: green light, car parked)
+	for _, stop in car.Geo.Stops do
+		if stop.At > cross[1] + EPSILON or stop.At - HALF_CAR < car.Dist - EPSILON then
+			continue
+		end
+		const axis = axisFor(stop.Kind, stop.Key, stop.Ref)
+		if axis ~= nil then
+			entry = math.max(entry, greenFrom(axis, t))
+			break
+		end
+	end
+	return entry
 end
 
 -- The X-T box is free for [from, to] (to already has ConflictGap)

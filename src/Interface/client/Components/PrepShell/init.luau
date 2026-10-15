@@ -21,6 +21,7 @@
 -- Pure: only props, no network, no input binding (the PrepController binds keys and the gamepad). Build it inside a Vide root.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local GuiService = game:GetService("GuiService")
+local UserInputService = game:GetService("UserInputService")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Theme)
 local Icons = require(script.Parent.Icons)
@@ -48,6 +49,9 @@ export type Pip = { Label: string, Grade: Seal.Grade? }
 
 -- The live grade of the plate (polish 2026-10-12): the mean score 0..100 of the stages done and the shape of its band.
 export type Note = { Score: number, Grade: Seal.Grade }
+
+-- A gamepad button and what it does now ("Pour", "Free draw"), drawn over the hint pill (TASK-268).
+export type PadKey = { Key: Enum.KeyCode, Text: string }
 
 export type NextButton = {
 	Label: () -> string,
@@ -159,6 +163,9 @@ export type Props = {
 	TapMode: AssistButton?,
 	-- The gamepad is the device: the buttons wear their button glyph (B Leave, Y Next, LB / RB the first / last tab).
 	Pad: (() -> boolean)?,
+	-- The gamepad buttons of the current step (TASK-268): chips with the platform's own button image (A / Cross, RT / R2...)
+	-- over the hint pill, only while the gamepad is the device. nil / {} = none.
+	PadKeys: (() -> { PadKey })?,
 	-- The tutorial step of the moment (Objective module): when there is one, the progress card IS the tutorial card (chip, objective,
 	-- hint, live note, bar) and the Skip pill sits beside it; false / nil = the plain progress card.
 	Objective: (() -> Objective.Card | false)?,
@@ -183,6 +190,7 @@ const ALERT_PERIOD = 0.9 -- s of one breath of the call back (the Grill dot)
 const CHIP_W = 112
 const CHIP_H = 44
 const SHAKE_TIME = 0.18
+const PAD_KEYS = 3 -- gamepad button chips over the hint pill (TASK-268)
 const VIGNETTE = 0.35
 -- The progress card at the top centre (verb, live note, section bar; it also hosted the tutorial step) is off (owner playtest
 -- 2026-10-14, TASK-259, Provisional): the code stays, flip to bring it back
@@ -347,9 +355,36 @@ local function glyph(name: string, fallback: Color3, side: number): Frame
 	})
 end
 
--- A gamepad glyph on the corner of a button ("B", "Y", "LB", "RB"): shown only when the gamepad is the device. A round chip with
--- the letter, so the cue is the shape and the text, not the colour.
-local function padGlyph(text: string, visible: () -> boolean): Frame
+-- The image Roblox has for a gamepad button on this platform (PlayStation or Xbox art), "" when none (TASK-268).
+local function padImage(key: Enum.KeyCode): string
+	const ok, image = pcall(function()
+		return UserInputService:GetImageForKeyCode(key)
+	end)
+	return if ok and type(image) == "string" then image else ""
+end
+
+-- A gamepad glyph on the corner of a button (B, Y, LB, RB by their KeyCode): shown only when the gamepad is the device. The
+-- platform's own button image (Cross / A, R1 / RB...) when Roblox has one (TASK-268), else a round chip with the Xbox letter, so
+-- the cue is the shape and the text, not the colour.
+local function padGlyph(key: Enum.KeyCode, text: string, visible: () -> boolean): Frame
+	const image = padImage(key)
+	if image ~= "" then
+		return create("Frame")({
+			Name = "PadGlyph",
+			Position = UDim2.fromOffset(-8, -10),
+			Size = UDim2.fromOffset(26, 26),
+			BackgroundTransparency = 1,
+			ZIndex = 7,
+			Visible = visible,
+			create("ImageLabel")({
+				Size = UDim2.fromScale(1, 1),
+				BackgroundTransparency = 1,
+				Image = image,
+				ScaleType = Enum.ScaleType.Fit,
+				ZIndex = 8,
+			}),
+		})
+	end
 	return create("Frame")({
 		Name = "PadGlyph",
 		AnchorPoint = Vector2.new(0, 0),
@@ -632,7 +667,7 @@ return function(props: Props): Frame
 				XAlignment = Enum.TextXAlignment.Center,
 				YAlignment = Enum.TextYAlignment.Center,
 			}),
-			padGlyph("B", pad),
+			padGlyph(Enum.KeyCode.ButtonB, "B", pad),
 		},
 	})
 
@@ -700,7 +735,7 @@ return function(props: Props): Frame
 					}),
 					-- LB / RB walk the tabs: the glyph sits on the first and the last one (the minimal mode, gamepad)
 					if index == 1 or index == #tabs
-						then padGlyph(if index == 1 then "LB" else "RB", function(): boolean
+						then padGlyph(if index == 1 then Enum.KeyCode.ButtonL1 else Enum.KeyCode.ButtonR1, if index == 1 then "LB" else "RB", function(): boolean
 							return pad() and minimal()
 						end)
 						else nil,
@@ -920,7 +955,7 @@ return function(props: Props): Frame
 				}),
 				-- LB / RB walk the sections: the glyph sits on the first and the last dot (gamepad)
 				if index == 1 or index == #tabs
-					then padGlyph(if index == 1 then "LB" else "RB", function(): boolean
+					then padGlyph(if index == 1 then Enum.KeyCode.ButtonL1 else Enum.KeyCode.ButtonR1, if index == 1 then "LB" else "RB", function(): boolean
 						return pad() and minimal()
 					end)
 					else nil,
@@ -1316,7 +1351,7 @@ return function(props: Props): Frame
 		BackgroundTransparency = 1,
 		createRaw("UIScale")({ Scale = pulseScale }),
 		nextButton,
-		padGlyph("Y", pad),
+		padGlyph(Enum.KeyCode.ButtonY, "Y", pad),
 	})
 	-- a tap on the disabled button: shake and tell the owner (the hint says why)
 	const blocker = create("TextButton")({
@@ -1791,6 +1826,70 @@ return function(props: Props): Frame
 		},
 	})
 
+	-- the gamepad buttons of the step (TASK-268): up to PAD_KEYS chips over the hint pill, platform button art + a word
+	const padKeys = function(): { PadKey }
+		return if pad() and props.PadKeys ~= nil then props.PadKeys() else {}
+	end
+	const padChips: { any } = {
+		create("UIListLayout")({
+			FillDirection = Enum.FillDirection.Horizontal,
+			HorizontalAlignment = Enum.HorizontalAlignment.Center,
+			VerticalAlignment = Enum.VerticalAlignment.Center,
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Padding = UDim.new(0, 10),
+		}),
+	}
+	for index = 1, PAD_KEYS do
+		const row = function(): PadKey?
+			return padKeys()[index]
+		end
+		table.insert(
+			padChips,
+			create("Frame")({
+				Name = `PadKey{index}`,
+				LayoutOrder = index,
+				AutomaticSize = Enum.AutomaticSize.X,
+				Size = UDim2.fromOffset(0, 26),
+				BackgroundTransparency = 1,
+				Visible = function(): boolean
+					return row() ~= nil
+				end,
+				create("UIListLayout")({
+					FillDirection = Enum.FillDirection.Horizontal,
+					VerticalAlignment = Enum.VerticalAlignment.Center,
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					Padding = UDim.new(0, 4),
+				}),
+				create("ImageLabel")({
+					Name = "Button",
+					LayoutOrder = 1,
+					Size = UDim2.fromOffset(24, 24),
+					BackgroundTransparency = 1,
+					ScaleType = Enum.ScaleType.Fit,
+					Image = function(): string
+						const current = row()
+						return if current ~= nil then padImage(current.Key) else ""
+					end,
+				}),
+				CartoonLabel({
+					Name = "Label",
+					LayoutOrder = 2,
+					TextSize = 14,
+					Text = function(): string
+						const current = row()
+						if current == nil then
+							return ""
+						end
+						-- no button art on this platform: the button name goes before the word
+						return if padImage(current.Key) == "" then `{current.Key.Name}: {current.Text}` else current.Text
+					end,
+					XAlignment = Enum.TextXAlignment.Left,
+					YAlignment = Enum.TextYAlignment.Center,
+				}),
+			})
+		)
+	end
+
 	-- one line of hint above the tabs (minimal mode)
 	const hintPill = CartoonPanel({
 		Name = "Hint",
@@ -1818,6 +1917,17 @@ return function(props: Props): Frame
 				Box = UDim2.fromScale(1, 1),
 				XAlignment = Enum.TextXAlignment.Center,
 				YAlignment = Enum.TextYAlignment.Center,
+			}),
+			create("Frame")({
+				Name = "PadKeys",
+				AnchorPoint = Vector2.new(0.5, 1),
+				Position = UDim2.new(0.5, 0, 0, -6),
+				Size = UDim2.new(1, 40, 0, 26),
+				BackgroundTransparency = 1,
+				Visible = function(): boolean
+					return #padKeys() > 0
+				end,
+				padChips,
 			}),
 		},
 	})

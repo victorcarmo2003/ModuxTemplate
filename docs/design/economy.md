@@ -212,7 +212,7 @@ Adiada, com uma exceção **[DEC-062, DEC-092]** e o pedido do usuário de 2026-
 |---|---|---|---|
 | Reviver pela ambulância | developer product (repetível), só o próprio caído compra, para si **[DEC-116]**; recibo não aplicado = crédito no perfil **[DEC-117]** (FEAT-034) | adiado (**Q-098**) | definido como regra; preço adiado |
 | Pacotes de gemas | developer product (repetível) | ver tabela abaixo | **Provisório** (pedido do usuário 2026-10-11; `Q-190`) |
-| Classe paga (Coelho, Gato, Urso, Raposa, Coruja) | developer product **por classe** (não Game Pass; `Q-190` c) | ver tabela abaixo | **Provisório** (idem) |
+| Classe paga (Coelho, Gato, Urso, Raposa, Coruja) | **Game Pass por classe** (pedido do dono 2026-10-14, TASK-291; antes developer product, `Q-190` c) | ver tabela abaixo | **Provisório** (idem) |
 | Códigos de resgate | grátis (gemas ou classe por código) | — | **Provisório** (`Q-191`) |
 | Resto (passes, cosméticos) | — | — | adiado (**Q-017**) |
 
@@ -256,8 +256,8 @@ sugestão e fallback de exibição).
 | `gems_130` "Pouch of Gems" | 130 gemas | 229 | 1,76 |
 | `gems_300` "Crate of Gems" | 300 gemas | 449 | 1,50 |
 | `gems_700` "Truckload of Gems" | 700 gemas | 899 | 1,28 |
-| `class_rabbit`, `class_cat`, `class_bear` (tier 1, 45 gemas) | a classe | 79 cada | — |
-| `class_fox`, `class_owl` (tier 2, 120 gemas) | a classe | 199 cada | — |
+| `class_rabbit`, `class_cat`, `class_bear` (Game Pass, TASK-291; preço em gemas: TASK-308) | a classe | 79 cada | — |
+| `class_fox`, `class_owl` (Game Pass, TASK-291; preço em gemas: TASK-308) | a classe | 199 cada | — |
 
 - Classe direta sai um pouco mais barata que comprar as mesmas gemas no menor pacote (tier 1: 79 × ~99), para quem
   quer **um** animal; quem quer vários compra gemas. Panda e Leão (1ª atualização, DEC-186) não têm produto ainda.

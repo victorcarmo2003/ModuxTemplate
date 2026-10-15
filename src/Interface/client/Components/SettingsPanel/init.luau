@@ -1,8 +1,8 @@
 --!strict
 -- SettingsPanel: the settings window (TASK-279; owner request 2026-10-14, Provisional), cartoon kit, mobile first.
--- A LobbyWindow (600 x 310 at Scale 1, fits the smallest landscape phone) with two columns:
+-- A LobbyWindow (600 x 336 at Scale 1, UiScale.Fit shrinks it to the smallest landscape phone) with two columns:
 --   Sound  Music · Effects · Voices · Jumpscares   sliders 0..100% (Slider.luau)
---   Game   Prompts (Single / Multi) · Prep helper (On / Off) · Reduce motion (On / Off)   (Choice.luau)
+--   Game   Prompts (Single / Multi) · Prep helper (On / Off) · Reduce motion · Vibration (On / Off)   (Choice.luau)
 --          and one small line under them (`Hint`, e.g. the key that opens the panel; "" = none)
 -- Every change calls OnChange(key, value) at once (the owner applies it live and saves it debounced). No confirm button:
 -- the window only closes (X). Texts in English; house palette only (Ink, Mustard, Cream; never red).
@@ -29,7 +29,7 @@ export type Props = {
 }
 
 const WIDTH = 600
-const HEIGHT = 310
+const HEIGHT = 336 -- 310 + the Vibration row (TASK-268); UiScale.Fit still shrinks it on a small phone
 const COLUMN_GAP = 16
 const ROW = 44
 const ROW_GAP = 4
@@ -142,9 +142,10 @@ return function(props: Props): Frame
 				}),
 				onOff("PrepAssist", "Prep helper", 2),
 				onOff("ReducedMotion", "Less motion", 3),
+				onOff("Vibration", "Vibration", 4),
 				CartoonLabel({
 					Name = "Hint",
-					LayoutOrder = 4,
+					LayoutOrder = 5,
 					TextSize = 14,
 					Color = Theme.Color.Cream,
 					Text = function()
