@@ -75,6 +75,8 @@ return UILabs.CreateVideStory({
 				Price = `R$ {utility.Robux}`,
 				Enabled = note == "",
 				Note = note,
+				Category = utility.Category,
+				Tone = utility.Tone,
 			})
 		end
 		return out
@@ -172,6 +174,7 @@ return UILabs.CreateVideStory({
 		ShopPanel({
 			Visible = open,
 			Items = cards,
+			Categories = Content.Shop.Categories,
 			Flash = flash,
 			Picking = picking,
 			Status = status,

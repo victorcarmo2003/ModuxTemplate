@@ -224,6 +224,8 @@ function ShopController:Cards(): { ShopPanel.Card }
 			Price = self:PriceOf(utility),
 			Enabled = note == "",
 			Note = note,
+			Category = utility.Category,
+			Tone = utility.Tone,
 		})
 	end
 	return cards
@@ -504,6 +506,7 @@ function ShopController:Mount(playerGui: Instance)
 				Items = function()
 					return self:Cards()
 				end,
+				Categories = Content.Shop.Categories,
 				Flash = self.Flash,
 				Picking = self.Picking,
 				Status = self.Status,

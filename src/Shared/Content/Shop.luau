@@ -67,7 +67,13 @@ export type Utility = {
 	Amount: number, -- Radar: seconds; Cash: dollars; others 0
 	Target: UtilityTarget?,
 	Night: boolean,
+	Category: string, -- a Content.Shop.Categories key: the shop section the card sits in
+	Tone: string, -- Theme.Tone name of the card (owner 2026-10-16: coins yellow, scare red, revive green...)
 }
+
+-- In-run shop sections, in order (owner request 2026-10-16: "dividir em categorias", a header line + icon + title, then
+-- the cards; plain words a kid reads at a glance)
+export type Category = { Key: string, Title: string, Icon: string }
 
 -- Gifts (TASK-352; owner request 2026-10-16, Provisional): one Developer Product per giftable item, bought by the giver
 -- for another player. GiftPrompt stores the recipient, the receipt sends a ProfileStore message to the recipient's
@@ -89,6 +95,7 @@ export type Shop = {
 	GemPacks: Table.Table<GemPack>,
 	GamePasses: Table.Table<GamePass>,
 	Utilities: Table.Table<Utility>,
+	Categories: { Category },
 	Gifts: Table.Table<Gift>,
 	Keys: { string }, -- every product / pass key (gem packs, passes, utilities, gifts): the MetricUi.Key wire enum
 }
@@ -162,101 +169,119 @@ const utilities: { Utility } = {
 		ProductId = 3718677086,
 		Robux = 50,
 		Name = "Scare a Friend",
-		Text = "Boo! A cartoon jumpscare on a mate",
+		Text = "Give a friend a big BOO!",
 		Icon = "Ui/megaphone",
 		Kind = "Scare",
 		Amount = 0,
 		Target = "Mate",
 		Night = false,
+		Category = "Fun",
+		Tone = "Ketchup",
 	},
 	{
 		Key = "util_radar",
 		ProductId = 3718677699,
 		Robux = 20,
 		Name = "Anomaly Radar",
-		Text = "Marks every anomaly for 90 s",
+		Text = "Shows every anomaly for 90 s",
 		Icon = "Ui/spectate",
 		Kind = "Radar",
 		Amount = 90,
 		Night = true,
+		Category = "Survive",
+		Tone = "Ink",
 	},
 	{
 		Key = "util_coffee",
 		ProductId = 3718677756,
 		Robux = 10,
 		Name = "Hot Coffee",
-		Text = "Sanity back to full",
+		Text = "Fills your sanity bar",
 		Icon = "Item/coffee",
 		Kind = "Coffee",
 		Amount = 0,
 		Night = false,
+		Category = "Survive",
+		Tone = "Teal",
 	},
 	{
 		Key = "util_restock",
 		ProductId = 3718682098,
 		Robux = 25,
 		Name = "Wild Restock",
-		Text = "Fills any ingredient you pick",
+		Text = "Refills 1 ingredient",
 		Icon = "Item/pack_sausages",
 		Kind = "Restock",
 		Amount = 0,
 		Target = "Ingredient",
 		Night = false,
+		Category = "Kitchen",
+		Tone = "Violet",
 	},
 	{
 		Key = "util_pantry",
 		ProductId = 3718682101,
 		Robux = 59,
 		Name = "Full Pantry",
-		Text = "Fills every ingredient",
+		Text = "Refills all ingredients",
 		Icon = "Upgrade/cooler/3",
 		Kind = "Pantry",
 		Amount = 0,
 		Night = false,
+		Category = "Kitchen",
+		Tone = "Violet",
 	},
 	{
 		Key = "util_revive",
 		ProductId = 3718682106, -- live since VitalService:Revive (TASK-317, closes Q-273)
 		Robux = 39,
 		Name = "Revive Kit",
-		Text = "Saved for when you go down",
+		Text = "Get back up when you faint",
 		Icon = "Item/revive_kit",
 		Kind = "Revive",
 		Amount = 0,
 		Night = false,
+		Category = "Survive",
+		Tone = "Green",
 	},
 	{
 		Key = "cash_100",
 		ProductId = 3718682111,
 		Robux = 29,
 		Name = "Tip Bag",
-		Text = "+$60 for the crew",
+		Text = "+60 Coins",
 		Icon = "Hud/coin",
 		Kind = "Cash",
 		Amount = 60,
 		Night = false,
+		Category = "Coins",
+		Tone = "Mustard",
 	},
 	{
 		Key = "cash_300",
 		ProductId = 3718682118,
 		Robux = 69,
 		Name = "Coin Pile", -- art: a pile of the game's coins (owner 2026-10-15)
-		Text = "+$150 for the crew",
+		Text = "+150 Coins",
 		Icon = "Ui/cash",
 		Kind = "Cash",
 		Amount = 150,
 		Night = false,
+		Category = "Coins",
+		Tone = "Mustard",
 	},
 	{
 		Key = "cash_800",
 		ProductId = 3718682122,
 		Robux = 149,
 		Name = "Coin Chest", -- art: a chest full of coins (owner 2026-10-15)
-		Text = "+$330 for the crew",
+		Text = "+330 Coins",
 		Icon = "Ui/tip_jar",
 		Kind = "Cash",
 		Amount = 330,
 		Night = false,
+		Category = "Coins",
+		Tone = "Mustard",
 	},
 }
 
@@ -307,10 +332,18 @@ for _, list in { gemPacks :: { any }, gamePasses :: { any }, utilities :: { any 
 	end
 end
 
+const categories: { Category } = {
+	{ Key = "Coins", Title = "Coins", Icon = "Hud/coin" },
+	{ Key = "Survive", Title = "Survive the Night", Icon = "Item/revive_kit" },
+	{ Key = "Kitchen", Title = "Kitchen", Icon = "Item/pack_sausages" },
+	{ Key = "Fun", Title = "Fun", Icon = "Ui/megaphone" },
+}
+
 const shop: Shop = {
 	GemPacks = Table.new(gemPacks),
 	GamePasses = Table.new(gamePasses),
 	Utilities = Table.new(utilities),
+	Categories = table.freeze(categories),
 	Gifts = Table.new(gifts),
 	Keys = table.freeze(allKeys),
 }
