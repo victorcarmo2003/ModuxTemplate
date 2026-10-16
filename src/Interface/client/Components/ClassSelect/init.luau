@@ -375,9 +375,10 @@ return function(props: Props): Frame
 			FillDirection = Enum.FillDirection.Vertical,
 			VerticalAlignment = Enum.VerticalAlignment.Bottom,
 			SortOrder = Enum.SortOrder.LayoutOrder,
-			Padding = UDim.new(0, 6),
+			Padding = UDim.new(0, 10), -- the two buy buttons were glued together (owner 2026-10-16)
 		}),
-		-- Buy with gems
+		-- Buy with gems: always the price; red when the player has not enough (the click then answers "Not enough
+		-- gems" from the server), owner 2026-10-16
 		CartoonButton({
 			Name = "BuyGems",
 			LayoutOrder = 1,
@@ -389,7 +390,9 @@ return function(props: Props): Frame
 			Visible = function()
 				return state() == "Locked"
 			end,
-			Tone = Theme.Tone.Mustard,
+			Tone = function()
+				return if canGems() then Theme.Tone.Mustard else Theme.Tone.Ketchup
+			end,
 			Enabled = function()
 				return not props.Busy()
 			end,
@@ -397,8 +400,7 @@ return function(props: Props): Frame
 				if props.Busy() then
 					return "..."
 				end
-				const price = focused().Price
-				return if canGems() then `Buy  {Count(price)}` else `Get {Count(price - props.Gems())} more`
+				return Count(focused().Price)
 			end,
 			OnActivated = function()
 				props.OnBuyGems(focused().Key)
@@ -416,6 +418,8 @@ return function(props: Props): Frame
 				Size = rowButton,
 				TextSize = 18,
 				Outline = Theme.Outline.Thick,
+				Icon = "Ui/robux",
+				IconSize = 24,
 				Visible = function()
 					return state() == "Locked"
 				end,
@@ -428,7 +432,7 @@ return function(props: Props): Frame
 					if price == nil then
 						return "Robux (soon)"
 					end
-					return if price > 0 then `Buy  R$ {price}` else "Buy with Robux"
+					return if price > 0 then `Buy  {price}` else "Buy with Robux"
 				end,
 				OnActivated = function()
 					props.OnBuyRobux(focused().Key)

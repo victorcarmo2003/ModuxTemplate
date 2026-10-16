@@ -101,8 +101,18 @@ const UI_RECTS: { [string]: { number } } = {
 	["Ui/warning"] = { 896, 0, 128, 128 },
 }
 
+-- Whole images outside the sheets (rect 0,0,0,0 = the full image): the Roblox Robux glyph shipped with the client
+const SINGLES: { [string]: string } = {
+	["Ui/robux"] = "rbxasset://textures/ui/common/robux.png",
+}
+const FULL = { 0, 0, 0, 0 }
+
 -- Sheet image and cell of a name; nil when unknown or when its sheet is not uploaded yet.
 local function lookup(name: string): (string?, { number }?)
+	const single = SINGLES[name]
+	if single ~= nil then
+		return single, FULL
+	end
 	const r = RECTS[name]
 	if r ~= nil then
 		return IMAGE, r
