@@ -457,6 +457,40 @@ def art_gems_300(ic: Icon) -> str:
 def art_gems_700(ic: Icon) -> str:
     return centred(gem_chest(ic), 256, 314, 1.3)
 
+
+# In-game coin art (in-run shop cards, owner 2026-10-16: "trocar os vetores das moedas"): the three sizes read at a glance,
+# small sack -> pile -> overflowing chest, all with the game's $ coin; no tile, no number (the card says "+60 Coins").
+def coin_sack(ic: Icon) -> str:
+    cloth = ic.two("#E2B57A", "#B9814A", 0.55)
+    return (
+        ground(rx=150, cy=440)
+        # the sack body, tied at the neck
+        + f'<path d="M256,176 C176,176 120,268 124,350 C128,420 190,438 256,438 C322,438 384,420 388,350 C392,268 336,176 256,176 Z" '
+        f'fill="{cloth}" {ol()}/>'
+        + f'<path d="M210,150 C222,128 290,128 302,150 L292,186 C276,196 236,196 220,186 Z" fill="{cloth}" {ol()}/>'
+        + f'<rect x="208" y="176" width="96" height="22" rx="11" fill="#7A4A26" {ol(w)}/>'
+        # a big $ coin stamped on the sack
+        + coin(ic, 256, 320, 64)
+        # coins spilled in front
+        + coin(ic, 150, 412, 32) + coin(ic, 364, 414, 30) + coin(ic, 116, 384, 24)
+        + gloss(172, 262, 14, 34, 20, 0.55)
+    )
+
+
+def art_cash_100(ic: Icon) -> str:
+    return centred(coin_sack(ic), 256, 300, 1.2)
+
+
+def art_cash_300(ic: Icon) -> str:
+    pile = ground(rx=180, cy=440) + coin_pile(ic, [[(150, 380), (256, 384), (362, 380)], [(203, 300), (309, 300)], [(256, 222)]], 58)
+    return centred(pile, 256, 320, 1.25)
+
+
+def art_cash_800(ic: Icon) -> str:
+    back = coin_pile(ic, [[(150, 250), (210, 236), (270, 230), (330, 238), (372, 252)], [(180, 206), (246, 196), (312, 204)]], 34)
+    front = coin_pile(ic, [[(118, 284), (392, 286)], [(330, 410)]], 30)
+    return centred(chest(ic, back, front), 256, 316, 1.25)
+
 # --- game passes (classes): round tile, crew cap on every animal ---------------------------------------------------
 
 
@@ -573,6 +607,9 @@ ART = {
     "gems_130": art_gems_130,
     "gems_300": art_gems_300,
     "gems_700": art_gems_700,
+    "cash_100": art_cash_100,
+    "cash_300": art_cash_300,
+    "cash_800": art_cash_800,
 }
 
 PAGE = """<!doctype html><html><head><meta charset="utf-8">

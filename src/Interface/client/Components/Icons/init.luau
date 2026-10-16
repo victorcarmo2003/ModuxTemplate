@@ -104,6 +104,10 @@ const UI_RECTS: { [string]: { number } } = {
 -- Whole images outside the sheets (rect 0,0,0,0 = the full image): the Roblox Robux glyph shipped with the client
 const SINGLES: { [string]: string } = {
 	["Ui/robux"] = "rbxasset://textures/ui/common/robux.png",
+	-- coin pack art (tools/icons/shop_icons.py art/cash_*, owner 2026-10-16): sack, pile, chest
+	["Shop/cash_100"] = "rbxassetid://85020875005926",
+	["Shop/cash_300"] = "rbxassetid://138499953827803",
+	["Shop/cash_800"] = "rbxassetid://97587055399361",
 }
 const FULL = { 0, 0, 0, 0 }
 
