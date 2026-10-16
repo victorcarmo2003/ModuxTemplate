@@ -59,6 +59,19 @@ const LIVE_PHASES = { Signal = true, Active = true }
 
 export type AnomalyRecord = { Anomaly: string, Phase: string, StartedAt: number, Step: number, Anchor: number }
 
+-- Theme.Tone of each ingredient on the refill picker (owner 2026-10-16: picture + theme colour)
+const INGREDIENT_TONES: { [string]: string } = {
+	bun = "Mustard",
+	sausage = "Ketchup",
+	ketchup = "Ketchup",
+	mustard = "Mustard",
+	cheese = "Mustard",
+	bacon = "Ketchup",
+	potato_sticks = "Mustard",
+	cream_cheese = "White",
+	coffee = "Teal",
+}
+
 const ShopController = Modux.Controller("ShopController", {
 	Require = {
 		"PlaceController",
@@ -264,7 +277,12 @@ function ShopController:Buy(key: string)
 	elseif utility.Target == "Ingredient" then
 		const options: { ShopPanel.Option } = {}
 		for index, ingredient in Content.Ingredients.List do
-			table.insert(options, { Id = index, Text = ingredient.Name })
+			table.insert(options, {
+				Id = index,
+				Text = ingredient.Name,
+				Icon = `Ingredient/{ingredient.Key}`,
+				Tone = INGREDIENT_TONES[ingredient.Key] or "Cream",
+			})
 		end
 		self.PickKey = key
 		self.Picking({ Title = "Which one do you want to refill?", Options = options })

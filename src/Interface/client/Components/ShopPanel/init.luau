@@ -38,7 +38,9 @@ export type Card = {
 
 export type Category = { Key: string, Title: string, Icon: string }
 
-export type Option = { Id: number, Text: string }
+-- Icon = Icons name ("" = none); Tone = Theme.Tone name ("" = Ink): the refill picker shows each ingredient's picture
+-- on its colour (owner 2026-10-16)
+export type Option = { Id: number, Text: string, Icon: string?, Tone: string? }
 
 export type Pick = { Title: string, Options: { Option } }
 
@@ -61,6 +63,7 @@ export type Props = {
 const WIDTH = 600
 const HEIGHT = 400 -- taller for the sections (was 310)
 const HEADER = 30
+const OPTION_HEIGHT = 52 -- a picker button with room for the ingredient picture
 const LINE = 3
 const CELL = Vector2.new(184, 116)
 const GAP = 8
@@ -379,7 +382,7 @@ return function(props: Props): Frame
 			AutomaticCanvasSize = Enum.AutomaticSize.Y,
 			ScrollingDirection = Enum.ScrollingDirection.Y,
 			create("UIGridLayout")({
-				CellSize = UDim2.fromOffset(CELL.X, Theme.MinTouch),
+				CellSize = UDim2.fromOffset(CELL.X, OPTION_HEIGHT),
 				CellPadding = UDim2.fromOffset(GAP, GAP),
 				HorizontalAlignment = Enum.HorizontalAlignment.Center,
 				SortOrder = Enum.SortOrder.LayoutOrder,
@@ -389,9 +392,16 @@ return function(props: Props): Frame
 				return CartoonButton({
 					Name = "Option",
 					LayoutOrder = index,
-					Size = UDim2.fromOffset(CELL.X, Theme.MinTouch),
+					Size = UDim2.fromOffset(CELL.X, OPTION_HEIGHT),
 					TextSize = 16,
-					Tone = Theme.Tone.Ink,
+					Tone = function()
+						const name = option().Tone
+						return if name ~= nil then (Theme.Tone :: any)[name] or Theme.Tone.Ink else Theme.Tone.Ink
+					end,
+					Icon = function()
+						return option().Icon or ""
+					end,
+					IconSize = OPTION_HEIGHT - 14,
 					Text = function()
 						return option().Text
 					end,

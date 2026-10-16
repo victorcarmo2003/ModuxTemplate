@@ -26,7 +26,7 @@ type Controls = {
 	Nudge: () -> boolean,
 }
 
-const MATES = { { Id = 1, Text = "Mia" }, { Id = 2, Text = "Theo" }, { Id = 3, Text = "Juno" } }
+const MATES: { ShopPanel.Option } = { { Id = 1, Text = "Mia" }, { Id = 2, Text = "Theo" }, { Id = 3, Text = "Juno" } }
 
 return UILabs.CreateVideStory({
 	vide = Vide,
