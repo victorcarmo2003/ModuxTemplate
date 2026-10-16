@@ -3525,11 +3525,11 @@ local LOBBY_POINTS = {
 	{ id = "LOBBY-CLASS-STAGE", pos = Vector3.new(-1.5, 1.326, -562.15), look = Vector3.new(0, 0, -1) },
 	{ id = "LOBBY-CLASS-CAM", pos = Vector3.new(-1.5, 5.85, -577.75), look = Vector3.new(0, 0, 1), attrs = { Pitch = 2.39, Fov = 50 } },
 	{ id = "LOBBY-SHOP", pos = Vector3.new(-39.2, 0.0, -620.0), look = Vector3.new(-1, 0, 0) },
-	{ id = "LOBBY-CODES", pos = Vector3.new(-14.5, 0.0, -659.65), look = Vector3.new(0, 0, -1) },
-	{ id = "LOBBY-SQUAD-1", pos = Vector3.new(19.3, 0.39, -655.1), look = Vector3.new(1, 0, 0) },
-	{ id = "LOBBY-SQUAD-2", pos = Vector3.new(19.3, 0.39, -631.7), look = Vector3.new(1, 0, 0) },
-	{ id = "LOBBY-SQUAD-3", pos = Vector3.new(19.3, 0.39, -608.3), look = Vector3.new(1, 0, 0) },
-	{ id = "LOBBY-SQUAD-4", pos = Vector3.new(19.3, 0.39, -584.9), look = Vector3.new(1, 0, 0) },
+	{ id = "LOBBY-CODES", pos = Vector3.new(-19.79, 0.0, -599.16), look = Vector3.new(0, 0, -1) },
+	{ id = "LOBBY-SQUAD-1", pos = Vector3.new(39.4, 0.39, -655.1), look = Vector3.new(1, 0, 0) },
+	{ id = "LOBBY-SQUAD-2", pos = Vector3.new(38.82, 0.39, -631.0), look = Vector3.new(1, 0, 0) },
+	{ id = "LOBBY-SQUAD-3", pos = Vector3.new(39.4, 0.39, -608.3), look = Vector3.new(1, 0, 0) },
+	{ id = "LOBBY-SQUAD-4", pos = Vector3.new(39.4, 0.39, -584.9), look = Vector3.new(1, 0, 0) },
 	{ id = "LOBBY-START", pos = Vector3.new(56.35, 0.0, -620.0), look = Vector3.new(1, 0, 0) },
 }
 local function bindLobby(root: Instance): number
