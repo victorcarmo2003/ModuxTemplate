@@ -75,6 +75,7 @@ const TOSS_ARC = 3 -- studs of arc height (plus 10% of the distance)
 const TOSS_SPIN = math.rad(540)
 -- Where a car hit drops the held item (owner request 2026-10-16): right where the player stood, on the floor, out of
 -- any prop. The free spot is searched in rings around him; the old "nearest sidewalk" is the last resort.
+const MIN_DROP = 1.6 -- studs: largest side of a dropped model at least this (a bun pack Tool is ~0.8, lost on the ground)
 const SPOT_BOX = Vector3.new(1.4, 1.2, 1.4) -- studs: room the item needs above the floor
 const SPOT_RINGS = { 0, 1.5, 3, 4.5 } -- studs from the player
 const SPOT_ANGLES = 8
@@ -111,16 +112,47 @@ local function inRoad(position: Vector3, roads: { Required.Rect }): boolean
 	return false
 end
 
--- Ground under a point (characters, drops and untouchable parts ignored); the point itself when nothing is hit.
-function Drops.ground(drops: Drops, position: Vector3, ignore: { Instance }): Vector3
+-- Visible floor along a ray: the map's sidewalks and props are often CanCollide false (decor over a collision plane),
+-- so collision alone is not the floor; invisible parts (zones, hitboxes, bindings) are skipped instead (owner bug
+-- 2026-10-16: a bun pack landed under the sidewalk tile, on the road plane below it).
+local function floorRay(origin: Vector3, direction: Vector3, exclude: { Instance }): RaycastResult?
 	const params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
+	const skip = table.clone(exclude)
+	for _ = 1, 8 do
+		params.FilterDescendantsInstances = skip
+		const hit = Workspace:Raycast(origin, direction, params)
+		if hit == nil then
+			return nil
+		end
+		const part = hit.Instance
+		if not (part:IsA("BasePart") and part.Transparency >= 0.95) then
+			return hit
+		end
+		table.insert(skip, part)
+	end
+	return nil
+end
+
+-- Visible parts overlapping a box (invisible ones ignored, like floorRay)
+local function blocked(box: CFrame, size: Vector3, exclude: { Instance }): boolean
+	const params = OverlapParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = exclude
+	for _, part in Workspace:GetPartBoundsInBox(box, size, params) do
+		if part.Transparency < 0.95 then
+			return true
+		end
+	end
+	return false
+end
+
+-- Ground under a point (characters, drops and invisible parts ignored); the point itself when nothing is hit.
+function Drops.ground(drops: Drops, position: Vector3, ignore: { Instance }): Vector3
 	const exclude = table.clone(ignore)
 	table.insert(exclude, folderOf(drops))
-	params.FilterDescendantsInstances = exclude
-	params.RespectCanCollide = true
 	const origin = position + Vector3.yAxis * RAY_UP
-	const hit = Workspace:Raycast(origin, Vector3.yAxis * -(RAY_UP + RAY_DOWN), params)
+	const hit = floorRay(origin, Vector3.yAxis * -(RAY_UP + RAY_DOWN), exclude)
 	return if hit then hit.Position else position
 end
 
@@ -129,26 +161,18 @@ end
 function Drops.spot(drops: Drops, position: Vector3, ignore: { Instance }): Vector3?
 	const exclude = table.clone(ignore)
 	table.insert(exclude, folderOf(drops))
-	const rayParams = RaycastParams.new()
-	rayParams.FilterType = Enum.RaycastFilterType.Exclude
-	rayParams.FilterDescendantsInstances = exclude
-	rayParams.RespectCanCollide = true
-	const boxParams = OverlapParams.new()
-	boxParams.FilterType = Enum.RaycastFilterType.Exclude
-	boxParams.FilterDescendantsInstances = exclude
-	boxParams.RespectCanCollide = true
 	for _, radius in SPOT_RINGS do
 		const count = if radius == 0 then 1 else SPOT_ANGLES
 		for index = 0, count - 1 do
 			const angle = index / count * math.pi * 2
 			const at = position + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
 			const origin = at + Vector3.yAxis * SPOT_ABOVE
-			const hit = Workspace:Raycast(origin, Vector3.yAxis * -(SPOT_ABOVE + SPOT_BELOW), rayParams)
+			const hit = floorRay(origin, Vector3.yAxis * -(SPOT_ABOVE + SPOT_BELOW), exclude)
 			if hit == nil or hit.Normal.Y < 0.7 then
 				continue -- no floor, or a wall / slope too steep to rest on
 			end
 			const room = CFrame.new(hit.Position + Vector3.yAxis * (SPOT_BOX.Y / 2 + 0.05))
-			if #Workspace:GetPartBoundsInBox(room, SPOT_BOX, boxParams) == 0 then
+			if not blocked(room, SPOT_BOX, exclude) then
 				return hit.Position
 			end
 		end
@@ -268,6 +292,11 @@ function Drops.keep(
 	const model = drops.Deps.Display(drops.Deps.Template(item), item, `Drop_{item}`)
 	model:SetAttribute("Item", item)
 	model:SetAttribute("Drop", "Keep")
+	const _, raw = model:GetBoundingBox()
+	const largest = math.max(raw.X, raw.Y, raw.Z)
+	if largest > 0 and largest < MIN_DROP then
+		model:ScaleTo(model:GetScale() * MIN_DROP / largest) -- small Tools read on the ground
+	end
 	const cframe, size = model:GetBoundingBox()
 	const offset = model:GetPivot().Position - cframe.Position
 	const final = CFrame.new(ground + Vector3.yAxis * (size.Y / 2) + offset)
