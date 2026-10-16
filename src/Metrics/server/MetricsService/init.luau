@@ -1,7 +1,7 @@
 --!strict
 --[[
 	MetricsService (owner request 2026-10-16, Provisional): RoMetrics analytics for the whole game, as precise as the
-	server can see it. Single caller of RoMetrics.init (SDK 0.3.0). Priority 50: every service it listens to has built
+	server can see it. Single caller of RoMetrics.init (SDK 0.3.1). Priority 50: every service it listens to has built
 	its signals before this OnInit.
 
 	Key: HttpService:GetSecret("rometrics_key") (Creator Hub Secret, never in the source). Studio Play cannot read it,
@@ -99,6 +99,8 @@ function MetricsService:Init()
 	end
 	Log.SDK.init({
 		key = key,
+		-- The SDK default (ingest.rometrics.app) does not exist: always point at our ingest.
+		endpoint = "https://163-176-111-187.sslip.io",
 		enabledInStudio = studio,
 		debug = studio and Verbose.On(),
 	})
