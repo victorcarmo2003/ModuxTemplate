@@ -31,6 +31,8 @@ type Items = {
 }
 
 type Customers = {
+	DevNoArrivals: boolean,
+	DevSetArrivals: (self: any, on: boolean) -> (),
 	DevSpawn: (self: any) -> (string, number?),
 	DevSpawnPair: (self: any, leader: string?, partner: string?) -> (string, number?),
 }
@@ -86,6 +88,26 @@ const Customer: Api.Module = function(ctx: Api.Context): { Api.Command }
 				end
 				const outcome, id = customers:DevSpawnPair(leader, partner)
 				return `{outcome}{if id then ` (leader NpcId {id})` else ""}`
+			end,
+		},
+		{
+			Name = "arrivals",
+			Usage = "arrivals [on|off]",
+			Help = "pauses / resumes ORDINARY customers (anomaly customers still come); no argument toggles",
+			Run = function(args: { string }, _caller: Player?): string?
+				const word = string.lower(args[1] or "")
+				local on: boolean
+				if word == "on" then
+					on = true
+				elseif word == "off" then
+					on = false
+				elseif word == "" then
+					on = customers.DevNoArrivals
+				else
+					error("usage: arrivals [on|off]", 0)
+				end
+				customers:DevSetArrivals(on)
+				return if on then "ordinary customers: ON" else "ordinary customers: PAUSED (anomaly customers still come)"
 			end,
 		},
 	}

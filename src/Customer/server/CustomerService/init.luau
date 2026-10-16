@@ -329,6 +329,8 @@ function CustomerService:Setup()
 	self.SpawnHold = nil :: (() -> boolean)?
 	-- HoldSpawns reasons (anomalies): no new customer arrives while any is set
 	self.SpawnHolds = {} :: { [string]: boolean }
+	-- dev only (owner 2026-10-16): ordinary arrivals off to test anomalies; anomaly actors (SpawnActor) still come
+	self.DevNoArrivals = false :: boolean
 	-- Tutorial customer asked (RequestTutorial) and not spawned yet; server time of the next try
 	self.TutorialWanted = false :: boolean
 	self.TutorialTryAt = 0 :: number
@@ -461,6 +463,12 @@ end
 -- arrives while any reason is held. Independent of the tutorial hook above (that one has a single owner).
 function CustomerService:HoldSpawns(reason: string, on: boolean)
 	self.SpawnHolds[reason] = if on then true else nil
+end
+
+-- Dev: ordinary customers stop (on = false) or come back (on = true); anomaly actors are untouched. Studio dev only.
+function CustomerService:DevSetArrivals(on: boolean)
+	assert(self.Dependencies.PlaceService:IsDev(), "dev mode only")
+	self.DevNoArrivals = not on
 end
 
 function CustomerService:SpawnHeld(): boolean
@@ -1920,6 +1928,7 @@ function CustomerService:StepGuarantee(t: number)
 		self.NextSpawnAt <= 0
 		or not self:IsSelling()
 		or self:IsPaused()
+		or self.DevNoArrivals
 		or self:IsNightShift()
 		or self.TutorialWanted
 		or self:HasTutorial()
@@ -1954,6 +1963,7 @@ function CustomerService:Step()
 		and t >= self.NextSpawnAt
 		and self:IsSelling()
 		and not self:IsPaused()
+		and not self.DevNoArrivals
 		and not self:HasTutorial()
 		and not self.TutorialWanted
 	then

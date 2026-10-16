@@ -13,6 +13,10 @@ return {
 	IngredientKey = conch.args.enum_from_array("ingredient_key", Content.Ingredients.Keys),
 	ClassKey = conch.args.enum_from_array("class_key", Content.Classes.Keys),
 	UpgradeKey = conch.args.enum_from_array("upgrade_key", Content.Upgrades.Keys),
+	-- anomalies (owner 2026-10-16): every Content.Anomalies key, autocompleted in the console
+	AnomalyKey = conch.args.enum_from_array("anomaly_key", Content.Anomalies.Keys),
+	AnomalyAction = conch.args.enum_from_array("anomaly_action", { "trigger", "resolve", "wrong", "stop" }),
+	ArrivalsState = conch.args.enum_from_array("arrivals_state", { "on", "off" }),
 	-- Numbers (validated again in the callback: the server never trusts the parsed value)
 	Day = conch.args.number,
 	Money = conch.args.number,

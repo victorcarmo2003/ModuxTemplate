@@ -279,6 +279,52 @@ function AdminService:Register()
 		end,
 	})
 
+	-- anm <key> [action]: the same as "anomaly" with every anomaly in the autocomplete (owner 2026-10-16)
+	conch.register("anm", {
+		permissions = { PERMISSION },
+		description = "Trigger an anomaly from the list (autocomplete): anm <key> [trigger|resolve|wrong|stop]",
+		arguments = function()
+			return AdminArguments.AnomalyKey("anomaly"), conch.args.opt(AdminArguments.AnomalyAction("action"))
+		end,
+		callback = function(key: string, action: string?)
+			const row = (Content.Anomalies.ByKey :: any)[key]
+			if row == nil then
+				return fail(`no anomaly "{key}"`)
+			end
+			self:RunShowcase(action or "trigger", row.Ref, "")
+		end,
+	})
+
+	-- anomalies: the list to test, one line each (Ref, key, family, debut night)
+	conch.register("anomalies", {
+		permissions = { PERMISSION },
+		description = "List every anomaly (Ref, key, family, debut night) to use with anm",
+		arguments = function() end,
+		callback = function()
+			const lines: { string } = {}
+			for _, row in Content.Anomalies.List do
+				const family = (row :: any).Family
+				table.insert(
+					lines,
+					`{row.Ref}  {row.Key}  {row.Name}  family {family or "-"}  night {row.Night}`
+				)
+			end
+			conch.log("normal", table.concat(lines, "\n"))
+		end,
+	})
+
+	-- arrivals [on|off]: pause / resume ordinary customers (anomaly customers still come)
+	conch.register("arrivals", {
+		permissions = { PERMISSION },
+		description = "Pause / resume ORDINARY customers (anomaly customers still come); no argument toggles",
+		arguments = function()
+			return conch.args.opt(AdminArguments.ArrivalsState("state"))
+		end,
+		callback = function(state: string?)
+			self:RunDev("arrivals", if state then { state } else {})
+		end,
+	})
+
 	conch.register("scare", {
 		permissions = { PERMISSION },
 		description = "Showcase: play a hallucination (fake_call, whisper...) or 'sting:<sound key>' on your client",
