@@ -93,8 +93,7 @@ const cues = Table.new({
 	{ Key = "copy_grab", Kind = "Visual", Duration = 2 }, -- N4: the door was opened: the copy comes in and grabs
 	{ Key = "copy_vanish", Kind = "Visual", Duration = 2 }, -- N4: the copy fades out (Kit/Fade, 2 s), nobody opened
 	{ Key = "raincoat_drip", Kind = "Both", Duration = 0 }, -- N5 sign: drip and puddle (Actor anchor)
-	-- ANM-006 The stalker (DEC-260, TASK-351). stalker_step Entity = the new step (1..Steps): it lunges one step closer
-	{ Key = "stalker_step", Kind = "Both", Duration = 0 },
+	-- ANM-006 The stalker (DEC-260, TASK-351): it walks while on screen (record Step, footsteps on the client)
 	{ Key = "stalker_leap", Kind = "Both", Duration = 1 }, -- it leaps in through the open service window
 	{ Key = "stalker_bang", Kind = "Both", Duration = 1 }, -- window closed: it bangs on it and leaves
 	{ Key = "post_buzz", Kind = "Audio", Duration = 2 }, -- N7 start sign: last Juniper post buzzes (DEC-123)
@@ -251,7 +250,6 @@ longCar.Family = "D"
 -- across the street that only comes closer while somebody stares at it; at the window it leaps in on the nearest player
 -- (closed window = it bangs and leaves). Family D with a verb (like ANM-008), drawn from Night 4
 const stalker = anomaly(6, "anm_006_stalker", "The stalker", "World", 0, "Party", 90, true, {}, {
-	"stalker_step",
 	"stalker_leap",
 	"stalker_bang",
 	"jumpscare",

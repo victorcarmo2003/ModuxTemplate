@@ -3,9 +3,9 @@
 -- Verb dont_look. A tall figure stands on the far sidewalk in full view of the service window (shared/Anomaly/
 -- StalkerPath on the TrailerFront frame, the same line on both sides). It only moves while somebody stares at it:
 --   Start   MapPoint TRL bound (else Start false, retried, one warning) -> Phase Signal, Step 0.
---   Stare   every tick, if ANY Active player is Looking at it (gaze cone, ViewRange, line of sight; a player inside
---           the trailer with the window closed cannot see out), the stare clock runs; each StepEvery s of stare =
---           one step closer (record Step, the client lunges it forward). Nobody looking = it stands still.
+--   Stare   every tick, if ANY Active player has it on screen (Looking with ViewAngle, ViewRange, line of sight; a
+--           player inside the trailer with the window closed cannot see out), the stare clock runs; each StepEvery s
+--           of stare = one small step closer (record Step; the client walks it continuously). Nobody looking = still.
 --   Window  Step = Steps: Phase Active, LeapDelay s later it leaps in through the service window and attacks the
 --           NEAREST Active player to the window, wherever he is (cue jumpscare Entity = UserId % 65536, ScareFaint s
 --           later VitalService:Fall; DEC-255), Phase Failed. Window closed at that moment: it bangs on it (cue
@@ -26,14 +26,14 @@ const TRAILER_POINT = "TRL"
 const ACROSS_POINT = "WALKER-10"
 const LANE_POINT = "E-IN" -- street height (TASK-348; the client does the same)
 const SCARE_CUE = "jumpscare"
-const STEP_CUE = "stalker_step"
 const LEAP_CUE = "stalker_leap"
 const BANG_CUE = "stalker_bang"
 const ENTITY_MOD = 65536 -- AnomalyCue.Entity is 0..65535
 const MAX_DT = 0.5 -- s; a late tick never counts more than this
 -- Defaults when Rules/ANM-006 is missing (same numbers as the rule file)
-const DEFAULT_STEPS = 6
-const DEFAULT_STEP_EVERY = 1.2
+const DEFAULT_STEPS = 20
+const DEFAULT_STEP_EVERY = 0.6
+const DEFAULT_VIEW_ANGLE = 90
 const DEFAULT_AUTO_OFF = 28
 const DEFAULT_LEAP_DELAY = 1
 const DEFAULT_SCARE_FAINT = 0.7
@@ -52,6 +52,7 @@ type State = {
 	StepEvery: number,
 	Stare: number, -- s of stare toward the next step
 	Range: number,
+	ViewAngle: number,
 	EndsAt: number,
 	LeapAt: number,
 	FinishAt: number,
@@ -154,6 +155,7 @@ const Stalker: Api.Module = {
 			StepEvery = math.max(param(rule, "StepEvery", DEFAULT_STEP_EVERY), 0.2),
 			Stare = 0,
 			Range = if row ~= nil then row.ViewRange else 80,
+			ViewAngle = math.clamp(param(rule, "ViewAngle", DEFAULT_VIEW_ANGLE), 10, 170),
 			EndsAt = occ.StartedAt + param(rule, "AutoOff", DEFAULT_AUTO_OFF),
 			LeapAt = math.huge,
 			FinishAt = math.huge,
@@ -195,7 +197,7 @@ const Stalker: Api.Module = {
 		ctx.SeenTick(occ, at, state.Range, dt)
 		local stared = false
 		for _, player in ctx.Active() do
-			if ctx.Looking(player, at, state.Range) then
+			if ctx.Looking(player, at, state.Range, state.ViewAngle) then
 				stared = true
 				break
 			end
@@ -208,8 +210,7 @@ const Stalker: Api.Module = {
 			return
 		end
 		state.Stare -= state.StepEvery
-		state.Step += 1
-		ctx.Cue(occ, STEP_CUE, state.Step)
+		state.Step += 1 -- the client walks there smoothly with its own footsteps (no cue per step)
 		if state.Step >= state.Steps then
 			state.Stage = "AtWindow"
 			state.LeapAt = now + state.LeapDelay

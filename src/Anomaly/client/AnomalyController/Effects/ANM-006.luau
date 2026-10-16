@@ -5,8 +5,9 @@
 
 	  Signal    the figure fades in on the far sidewalk (shared/Anomaly/StalkerPath step 0, TrailerFront frame: the same
 	            line the server measures the gaze on), facing the service window, perfectly still.
-	  Step      record Step k: it LUNGES to step k in LUNGE s (a jerk, not a walk) and its head tilts a little more
-	            each step. Cue stalker_step plays a step sound at its feet.
+	  Step      record Step k: it WALKS on toward step k at a steady pace (WALK_RATE steps/s, legs swinging, a
+	            footstep every STEP_SOUND_EVERY s), and stops dead when the record stops climbing (nobody watching).
+	            Its head tilts a little more as it comes. Eyes glow (Neon + a small light) so a glance catches it.
 	  Active    at the window (Step = Steps): it presses against the glass, trembling.
 	  Leap      cue stalker_leap: it jumps through the service window into the trailer and vanishes (the jumpscare
 	            and the faint of the nearest player come with the cue `jumpscare`, Entity = UserId % 65536).
@@ -34,11 +35,15 @@ const TRAILER_POINT = "TRL"
 const ACROSS_POINT = "WALKER-10"
 const LANE_POINT = "E-IN"
 const ENTITY_MOD = 65536
-const STEPS = 6 -- Rules/ANM-006 Steps (the client never reads the rule: same number, Provisional)
+const STEPS = 20 -- Rules/ANM-006 Steps (the client never reads the rule: same number, Provisional)
+const WALK_RATE = 1 / 0.6 -- steps per second = 1 / Rules StepEvery (keeps pace with the server)
+const STEP_SOUND_EVERY = 0.42 -- s between two footsteps while walking
+const LEG_SWING = 28 -- degrees
+const EYE_GLOW_RANGE = 6
+const EYE_GLOW_BRIGHTNESS = 1.6
 const FADE_IN = 1.2
 const FADE_OUT = 0.9
-const LUNGE = 0.18 -- s of one lunge
-const TILT_PER_STEP = 7 -- degrees the head leans per step
+const TILT_MAX = 40 -- degrees the head leans at the window
 const TREMBLE = 0.08 -- studs of shake at the window
 const LEAP_TIME = 0.45
 const STEP_SOUND = "walker_step"
@@ -55,8 +60,10 @@ type Figure = {
 	Front: TrailerFront.Front,
 	Base: Vector3,
 	Ground: number,
-	Step: number, -- current shown step (fractional while lunging)
-	Lunge: Tween?,
+	Step: number, -- current shown step (fractional while walking)
+	Target: number, -- record Step it walks to
+	Phase: number, -- walk cycle (radians)
+	NextStepSound: number, -- os.clock of the next footstep
 	Gone: boolean,
 }
 
@@ -90,8 +97,23 @@ local function placeholder(): Model
 	part(model, "ArmL", Vector3.new(0.4, 4.8, 0.4), CFrame.new(-1.1, 4.4, 0) * CFrame.Angles(0, 0, math.rad(-6)), INK)
 	part(model, "ArmR", Vector3.new(0.4, 4.8, 0.4), CFrame.new(1.1, 4.4, 0) * CFrame.Angles(0, 0, math.rad(6)), INK)
 	const head = part(model, "Head", Vector3.new(2, 2, 2), CFrame.new(0, 8.4, 0), INK, Enum.PartType.Ball)
-	part(model, "EyeL", Vector3.new(0.55, 0.7, 0.2), CFrame.new(-0.42, 8.55, -0.92), EYE, Enum.PartType.Ball)
-	part(model, "EyeR", Vector3.new(0.55, 0.7, 0.2), CFrame.new(0.42, 8.55, -0.92), EYE, Enum.PartType.Ball)
+	for _, side in { -1, 1 } do
+		const eye = part(
+			model,
+			if side < 0 then "EyeL" else "EyeR",
+			Vector3.new(0.55, 0.7, 0.2),
+			CFrame.new(0.42 * side, 8.55, -0.92),
+			EYE,
+			Enum.PartType.Ball
+		)
+		eye.Material = Enum.Material.Neon -- glowing eyes: seen at a glance, even in the dark (owner 2026-10-16)
+		const glow = Instance.new("PointLight")
+		glow.Color = EYE
+		glow.Range = EYE_GLOW_RANGE
+		glow.Brightness = EYE_GLOW_BRIGHTNESS
+		glow.Shadows = false
+		glow.Parent = eye
+	end
 	model.PrimaryPart = head
 	return model
 end
@@ -124,12 +146,22 @@ local function place(figure: Figure, pose: CFrame)
 	const model = figure.Model
 	if model.PrimaryPart ~= nil and model.PrimaryPart:GetAttribute("Offset") ~= nil then
 		-- placeholder: every part keeps its authored offset from the feet; the head leans with the steps
-		const tilt = CFrame.Angles(0, 0, math.rad(TILT_PER_STEP * figure.Step))
+		const tilt = CFrame.Angles(0, 0, math.rad(TILT_MAX * math.clamp(figure.Step / STEPS, 0, 1)))
+		const swing = math.sin(figure.Phase) * math.rad(LEG_SWING)
 		for _, piece in figure.Parts do
 			const offset = piece:GetAttribute("Offset")
 			if typeof(offset) == "CFrame" then
-				const isHead = piece.Name == "Head" or string.sub(piece.Name, 1, 3) == "Eye"
-				piece.CFrame = pose * (if isHead then CFrame.new(0, 7.4, 0) * tilt * CFrame.new(0, -7.4, 0) * offset else offset)
+				const name = piece.Name
+				local frame = offset
+				if name == "Head" or string.sub(name, 1, 3) == "Eye" then
+					frame = CFrame.new(0, 7.4, 0) * tilt * CFrame.new(0, -7.4, 0) * offset
+				elseif name == "LegL" or name == "ArmR" or name == "LegR" or name == "ArmL" then
+					-- legs and arms swing from the hip / shoulder, opposite pairs
+					const sign = if name == "LegL" or name == "ArmR" then 1 else -1
+					const pivotY = if string.sub(name, 1, 3) == "Leg" then 2.2 else 6.8
+					frame = CFrame.new(0, pivotY, 0) * CFrame.Angles(swing * sign, 0, 0) * CFrame.new(0, -pivotY, 0) * offset
+				end
+				piece.CFrame = pose * frame
 			end
 		end
 	else
@@ -140,6 +172,11 @@ end
 local function setAlpha(figure: Figure, alpha: number, seconds: number)
 	for _, piece in figure.Parts do
 		TweenService:Create(piece, TweenInfo.new(seconds), { Transparency = alpha }):Play()
+	end
+	for _, light in figure.Model:GetDescendants() do
+		if light:IsA("PointLight") then
+			light.Enabled = alpha < 1
+		end
 	end
 end
 
@@ -153,25 +190,32 @@ local function frameOf(ctx: Effect.Context): (TrailerFront.Front?, Vector3, numb
 	return TrailerFront.Of(trailer, ctx.Point(ACROSS_POINT), ground), trailer.Position, ground
 end
 
--- Smooth lunge from the shown step to `step`
-local function lungeTo(figure: Figure, step: number)
+-- One frame of the walk: on toward the record's Step at WALK_RATE, legs swinging, a footstep every STEP_SOUND_EVERY s;
+-- still when it caught up (nobody watching); trembling against the glass at the window.
+local function walk(ctx: Effect.Context, figure: Figure, dt: number)
 	if figure.Gone then
 		return
 	end
-	const from = figure.Step
-	const started = os.clock()
-	local connection: RBXScriptConnection? = nil
-	connection = RunService.RenderStepped:Connect(function()
-		const t = math.clamp((os.clock() - started) / LUNGE, 0, 1)
-		const eased = 1 - (1 - t) ^ 3
-		figure.Step = from + (step - from) * eased
-		if not figure.Gone then
-			place(figure, poseAt(figure, figure.Step))
-		end
-		if t >= 1 and connection ~= nil then
-			connection:Disconnect()
-		end
-	end)
+	if figure.Step >= STEPS then
+		const jitter = Vector3.new(
+			(math.random() - 0.5) * TREMBLE,
+			(math.random() - 0.5) * TREMBLE,
+			(math.random() - 0.5) * TREMBLE
+		)
+		place(figure, poseAt(figure, STEPS) + jitter)
+		return
+	end
+	if figure.Step >= figure.Target then
+		return -- frozen mid-stride: it only moves while watched
+	end
+	figure.Step = math.min(figure.Step + WALK_RATE * dt, figure.Target)
+	figure.Phase += dt * WALK_RATE * math.pi
+	const now = os.clock()
+	if now >= figure.NextStepSound then
+		figure.NextStepSound = now + STEP_SOUND_EVERY
+		ctx.Play(STEP_SOUND, poseAt(figure, figure.Step).Position)
+	end
+	place(figure, poseAt(figure, figure.Step))
 end
 
 local function vanish(figure: Figure, seconds: number)
@@ -216,7 +260,6 @@ local function bang(ctx: Effect.Context, figure: Figure)
 		ctx.Play(BANG_SOUND, figure.Front.Window)
 	end)
 	task.delay(0.8, function()
-		lungeTo(figure, STEPS - 2)
 		vanish(figure, FADE_OUT)
 	end)
 end
@@ -246,7 +289,9 @@ return {
 			Base = base,
 			Ground = ground,
 			Step = first.Step,
-			Lunge = nil,
+			Target = first.Step,
+			Phase = 0,
+			NextStepSound = 0,
 			Gone = false,
 		}
 		figures[occ.Id] = figure
@@ -254,17 +299,8 @@ return {
 		model.Parent = ctx.Folder()
 		setAlpha(figure, 0, if occ.Elapsed() > FADE_IN then 0 else FADE_IN)
 
-		-- trembling against the glass while at the window
-		const shake = RunService.RenderStepped:Connect(function()
-			if figure.Gone or figure.Step < STEPS then
-				return
-			end
-			const jitter = Vector3.new(
-				(math.random() - 0.5) * TREMBLE,
-				(math.random() - 0.5) * TREMBLE,
-				(math.random() - 0.5) * TREMBLE
-			)
-			place(figure, poseAt(figure, STEPS) + jitter)
+		const shake = RunService.RenderStepped:Connect(function(dt: number)
+			walk(ctx, figure, dt)
 		end)
 
 		Vide.effect(function()
@@ -274,8 +310,8 @@ return {
 				task.delay(1.2, function()
 					vanish(figure, FADE_OUT)
 				end)
-			elseif record.Step ~= math.round(figure.Step) and record.Step > figure.Step then
-				lungeTo(figure, record.Step)
+			elseif record.Step > figure.Target then
+				figure.Target = record.Step
 			end
 		end)
 
@@ -290,11 +326,7 @@ return {
 	Cue = function(ctx: Effect.Context, cue: Effect.Cue)
 		const occ = cue.Occurrence
 		const figure = if occ ~= nil then figures[occ.Id] else nil
-		if cue.Cue == "stalker_step" then
-			if figure ~= nil then
-				ctx.Play(STEP_SOUND, poseAt(figure, cue.Entity).Position)
-			end
-		elseif cue.Cue == "stalker_leap" then
+		if cue.Cue == "stalker_leap" then
 			if figure ~= nil then
 				leapIn(ctx, figure)
 			end
