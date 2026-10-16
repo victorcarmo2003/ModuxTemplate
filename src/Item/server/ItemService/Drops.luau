@@ -134,13 +134,27 @@ local function floorRay(origin: Vector3, direction: Vector3, exclude: { Instance
 	return nil
 end
 
--- Visible parts overlapping a box (invisible ones ignored, like floorRay)
-local function blocked(box: CFrame, size: Vector3, exclude: { Instance }): boolean
-	const params = OverlapParams.new()
-	params.FilterType = Enum.RaycastFilterType.Exclude
-	params.FilterDescendantsInstances = exclude
-	for _, part in Workspace:GetPartBoundsInBox(box, size, params) do
-		if part.Transparency < 0.95 then
+-- Something visible inside the room the item needs above `floor`. Rays, not part boxes: GetPartBoundsInBox tests bounding
+-- boxes, and the map's big meshes (a 128 x 104 sidewalk tile, whole buildings) cover every spot that way, so every
+-- spot looked taken and the drop fell back under the sidewalk (owner bug 2026-10-16).
+local function blocked(floor: Vector3, size: Vector3, exclude: { Instance }): boolean
+	const top = floor + Vector3.yAxis * (size.Y + 0.05)
+	-- straight down from the top of the room: the first thing hit must be the floor itself
+	const down = floorRay(top, Vector3.yAxis * -(size.Y + 0.05), exclude)
+	if down ~= nil and down.Position.Y > floor.Y + 0.05 then
+		return true
+	end
+	-- across the room at half height: corner to corner and edge to edge
+	const middle = floor + Vector3.yAxis * (size.Y / 2)
+	const hx, hz = size.X / 2, size.Z / 2
+	for _, pair in {
+		{ Vector3.new(-hx, 0, -hz), Vector3.new(hx, 0, hz) },
+		{ Vector3.new(-hx, 0, hz), Vector3.new(hx, 0, -hz) },
+		{ Vector3.new(-hx, 0, 0), Vector3.new(hx, 0, 0) },
+		{ Vector3.new(0, 0, -hz), Vector3.new(0, 0, hz) },
+	} do
+		const from = middle + pair[1]
+		if floorRay(from, (middle + pair[2]) - from, exclude) ~= nil then
 			return true
 		end
 	end
@@ -171,8 +185,7 @@ function Drops.spot(drops: Drops, position: Vector3, ignore: { Instance }): Vect
 			if hit == nil or hit.Normal.Y < 0.7 then
 				continue -- no floor, or a wall / slope too steep to rest on
 			end
-			const room = CFrame.new(hit.Position + Vector3.yAxis * (SPOT_BOX.Y / 2 + 0.05))
-			if not blocked(room, SPOT_BOX, exclude) then
+			if not blocked(hit.Position, SPOT_BOX, exclude) then
 				return hit.Position
 			end
 		end
