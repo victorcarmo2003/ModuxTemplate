@@ -264,6 +264,30 @@ local function lifetime(drops: Drops, entry: Entry, despawn: number)
 end
 
 -- Pastelao toss: the anchored model flies from `from` to its resting pivot on a short arc, spinning a little.
+-- Lowest and highest world Y of every part corner of `model`
+local function extentY(model: Model): (number, number)
+	local low, high = math.huge, -math.huge
+	for _, part in model:GetDescendants() do
+		if part:IsA("BasePart") then
+			const half = part.Size / 2
+			for _, sx in { -1, 1 } do
+				for _, sy in { -1, 1 } do
+					for _, sz in { -1, 1 } do
+						const y = (part.CFrame * Vector3.new(half.X * sx, half.Y * sy, half.Z * sz)).Y
+						low = math.min(low, y)
+						high = math.max(high, y)
+					end
+				end
+			end
+		end
+	end
+	if low == math.huge then
+		const at = model:GetPivot().Position.Y
+		return at, at
+	end
+	return low, high
+end
+
 local function toss(drops: Drops, entry: Entry, from: Vector3, final: CFrame)
 	const model = entry.Model
 	const start = from + Vector3.yAxis * TOSS_LIFT
@@ -310,10 +334,13 @@ function Drops.keep(
 	if largest > 0 and largest < MIN_DROP then
 		model:ScaleTo(model:GetScale() * MIN_DROP / largest) -- small Tools read on the ground
 	end
-	const cframe, size = model:GetBoundingBox()
-	const offset = model:GetPivot().Position - cframe.Position
-	const final = CFrame.new(ground + Vector3.yAxis * (size.Y / 2) + offset)
+	-- upright at the spot, then lifted so its lowest corner rests exactly on `ground` (the old box/pivot offset was
+	-- measured before the rotation was reset and sank the bun pack 0.8 stud into the road, owner bug 2026-10-16)
+	model:PivotTo(CFrame.new(ground))
+	const low, high = extentY(model)
+	const final = CFrame.new(ground + Vector3.yAxis * (ground.Y - low))
 	model:PivotTo(final)
+	const size = Vector3.new(0, high - low, 0)
 
 	const primary = model.PrimaryPart :: BasePart
 	const anchor = Instance.new("Attachment")
