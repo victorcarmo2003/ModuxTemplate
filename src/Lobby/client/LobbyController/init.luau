@@ -111,6 +111,7 @@ local Pads = require(script.Pads)
 local Rings = require(script.Rings)
 local Stage = require(script.Stage)
 local Text = require(script.Text)
+local Traffic = require(script.Traffic)
 
 export type Panel = "None" | "Classes" | "Shop" | "Codes" | "Squad" | "Platform" | "Play"
 
@@ -1183,6 +1184,8 @@ end
 -- One Heartbeat for the lobby: ring VFX every frame, zones every Trigger.Poll s, the countdown clock.
 function LobbyController:RunZones()
 	self.Rings = Rings()
+	-- street traffic between the two lobby tunnels (owner 2026-10-16); nil when the map lacks the cars or the tunnels
+	const traffic = Traffic()
 	self:PaintPlatforms()
 	local t = 0
 	local nextZones = 0
@@ -1193,6 +1196,9 @@ function LobbyController:RunZones()
 		if rings then
 			const camera = workspace.CurrentCamera
 			rings.Step(t, if camera then camera.CFrame.Position else nil)
+		end
+		if traffic then
+			traffic.Step(dt)
 		end
 		const pads = self.Pads
 		if pads then

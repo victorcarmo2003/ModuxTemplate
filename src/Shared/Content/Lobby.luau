@@ -153,15 +153,18 @@ const lobby: Lobby = {
 			Panel = "Codes",
 			Platform = 0,
 			PointId = "LOBBY-CODES",
-			Center = Vector3.new(-14.5, 0, -659.65),
+			-- 2026-10-16: the Codes apron moved and turned 139.5 deg; the map places it with the tagged floor Zone_Codes (LobbyZone,
+			-- Zone = Codes, rotated rect). This fallback (axis-aligned) only matters without that Part
+			Center = Vector3.new(-19.79, 0, -599.16),
 			Radius = 6.5,
 			Size = Vector2.new(15.34, 11.44), -- Apron_Codes_Edge outline, inner (TASK-314)
 			Color = BLUE,
 		},
-		squad(1, 19.3, -655.1),
-		squad(2, 19.3, -631.7),
-		squad(3, 19.3, -608.3),
-		squad(4, 19.3, -584.9),
+		-- 2026-10-16: the pads moved to X ~39 (tagged SquadPad_n floors place them; these are the fallbacks)
+		squad(1, 39.4, -655.1),
+		squad(2, 38.82, -631.0),
+		squad(3, 39.4, -608.3),
+		squad(4, 39.4, -584.9),
 	},
 	Trigger = {
 		Hysteresis = 1.25,
