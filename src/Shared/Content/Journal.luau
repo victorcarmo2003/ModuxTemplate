@@ -1,14 +1,14 @@
 --!strict
--- Anomaly Book (TASK-335; owner request 2026-10-15, Provisional). One page per anomaly of the V2 agenda (every
+-- Anomaly Tablet (TASK-335, TASK-345 book -> tablet; owner request 2026-10-15, Provisional). One page per anomaly of the V2 agenda (every
 -- Content.Anomalies row with a Family, DEC-254): the page unlocks for a player the first time an occurrence of that
 -- anomaly ends while they took part (JournalService, saved in profile.Journal, kept across runs). Keys are the
 -- Anomalies keys, so the Journal packet's bitfield and the AnomalyService events share one name.
 -- Texts: English, short, for kids. Signs = what shows up; Not = what does NOT show up (tells it apart from the
 -- others); Fight = what to do. They repeat Walt's debut calls (Content.BossCalls), so nothing here is a secret the
 -- client did not already hear (T10 keeps only windows, deadlines and criticality on the server).
--- Book order = debut night (Content.Anomalies Night, so a change of the night table reorders the book), ties in the
+-- Tablet order = debut night (Content.Anomalies Night, so a change of the night table reorders it), ties in the
 -- order written here. The picture of each page lives in the
--- AnomalyBook component (Images.luau, uploaded art from tools/icons/journal_art.py).
+-- AnomalyTablet component (Images.luau, uploaded art from tools/icons/journal_art.py).
 local Table = require(script.Parent.Table)
 local Anomalies = require(script.Parent.Anomalies)
 
@@ -24,10 +24,10 @@ export type Page = {
 }
 
 export type Rules = {
-	Action: string, -- Content.Actions key of the book prompt
-	Model: string, -- name of the book Model inside the trailer Model (tools/assetplace/anomaly_book.luau)
-	Anchor: string, -- name of the prompt Attachment inside the book
-	Blink: number, -- s the book glows in the trailer after a new page (or until the book is opened)
+	Action: string, -- Content.Actions key of the tablet prompt
+	Model: string, -- name of the tablet Model (tools/assetplace/anomaly_tablet.luau)
+	Anchor: string, -- name of the prompt Attachment inside the tablet
+	Blink: number, -- s the tablet glows in the trailer after a new page (or until it is opened)
 	ToastText: string,
 	LockedTitle: string,
 	LockedText: string,
@@ -153,15 +153,15 @@ const pages = Table.new(sorted)
 
 const rules: Rules = {
 	Action = "read_journal",
-	Model = "TRL-BOOK",
-	Anchor = "Prompt_Book",
+	Model = "TRL-TABLET",
+	Anchor = "Prompt_Tablet",
 	Blink = 30,
-	ToastText = "New page in the Anomaly Book!",
+	ToastText = "New entry on the Anomaly Tablet!",
 	LockedTitle = "???",
-	LockedText = "Meet this one to fill the page.",
+	LockedText = "Meet this one to unlock the entry.",
 }
 
--- Every V2 agenda anomaly has a page, and every page is a real anomaly (book and agenda never drift)
+-- Every V2 agenda anomaly has a page, and every page is a real anomaly (tablet and agenda never drift)
 for _, row in Anomalies.List do
 	if row.Family ~= nil and pages.ByKey[row.Key] == nil then
 		error(`[Content.Journal] {row.Ref} ({row.Key}) is in the V2 agenda but has no page`)

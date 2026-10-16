@@ -1,9 +1,9 @@
 --!strict
--- /dev journal (TASK-335): Anomaly Book pages of the caller (or the first player from the Command Bar).
+-- /dev journal (TASK-335, TASK-345): Anomaly Tablet pages of the caller (or the first player from the Command Bar).
 --   journal            list the unlocked pages
 --   journal <ref|key>  unlock one page (ANM-007 or anm_007_walker): toast + glow on the client
 --   journal all        unlock every page
---   journal reset      forget every page (the book starts empty)
+--   journal reset      forget every page (the tablet starts empty)
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
@@ -28,7 +28,7 @@ const module: Api.Module = function(ctx: Api.Context): { Api.Command }
 		{
 			Name = "journal",
 			Usage = "journal [all | reset | <ANM-###>]",
-			Help = "Anomaly Book pages of the caller: list, unlock one or all, reset",
+			Help = "Anomaly Tablet pages of the caller: list, unlock one or all, reset",
 			Run = function(args: { string }, caller: Player?): string?
 				const player = caller or Players:GetPlayers()[1]
 				if player == nil then
@@ -64,7 +64,7 @@ const module: Api.Module = function(ctx: Api.Context): { Api.Command }
 				if key == nil then
 					error(`no page for "{arg}"`)
 				end
-				return if journal:Unlock(player, key) then `unlocked {key}` else `{key} was already in the book`
+				return if journal:Unlock(player, key) then `unlocked {key}` else `{key} was already on the tablet`
 			end,
 		},
 	}

@@ -1,17 +1,18 @@
 --!strict
 --[[
-	JournalController (TASK-335; owner request 2026-10-15, Provisional)
+	JournalController (TASK-335, TASK-345 book -> tablet; owner request 2026-10-15, Provisional)
 
-	The client of the Anomaly Book. The server (JournalService) owns the pages; here:
+	The client of the Anomaly Tablet. The server (JournalService) owns the pages; here:
 	  Pages    Vide source from the `Journal` packet (profile.Journal). New = a page that just unlocked: a HUD toast
-	           (Content.Journal.Rules.ToastText, HudController:PushText "Good"), the page is marked "NEW!" until the book
-	           is closed with it on screen, and the book in the trailer glows for Rules.Blink s (or until opened).
-	  Open     `JournalOpen` (the read_journal prompt on the book): the AnomalyBook window in its own ScreenGui
-	           ("AnomalyBook", DisplayOrder 20), behind the window backdrop (Backdrop.Hold, TASK-311). It opens on the
-	           newest unread page, else where it was left. While open: Left / Right arrows and LB / RB turn pages,
-	           gamepad B closes, the selection lands on "Next"; a Modal button frees the mouse from the first-person lock.
-	           Walking away from the book (Radius + AWAY studs) or a life state other than alive closes it.
-	  Glow     a Mustard Highlight on the book Model (Rules.Model; the parent Model of the read_journal anchor) pulsing.
+	           (Content.Journal.Rules.ToastText, HudController:PushText "Good"), the page is marked "NEW!" until the
+	           tablet is closed with it on screen, and the tablet in the trailer glows for Rules.Blink s (or until opened).
+	  Open     `JournalOpen` (the read_journal prompt on the tablet): the AnomalyTablet window in its own ScreenGui
+	           ("AnomalyTablet", DisplayOrder 20), behind the window backdrop (Backdrop.Hold, TASK-311). It opens on the
+	           newest unread page, else where it was left. Swipe / drag / wheel / dots live in the component; here, while
+	           open: Left / Right arrow keys, LB / RB, LT / RT and D-pad left / right turn pages, gamepad B closes, the
+	           selection lands on "Next"; a Modal button frees the mouse from the first-person lock.
+	           Walking away from the tablet (Radius + AWAY studs) or a life state other than alive closes it.
+	  Glow     a Mustard Highlight on the tablet Model (Rules.Model; the parent Model of the read_journal anchor) pulsing.
 	Presentation only: nothing here changes a page.
 ]]
 local CollectionService = game:GetService("CollectionService")
@@ -25,7 +26,7 @@ local Content = require(ReplicatedStorage.shared.Content)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Backdrop = require(StarterPlayer.StarterPlayerScripts.client.Interface.Backdrop)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
-local AnomalyBook = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.AnomalyBook)
+local AnomalyTablet = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.AnomalyTablet)
 
 const rules = Content.Journal.Rules
 const pageList = Content.Journal.List
@@ -33,7 +34,7 @@ const DISPLAY_ORDER = 20 -- with the other in-game windows (Settings), over the 
 const ANCHOR_TAG = "Interactable"
 const GLOW_NAME = "JournalGlow"
 const GLOW_PERIOD = 0.9 -- s of one pulse
-const AWAY = 6 -- studs past the prompt radius that close the book
+const AWAY = 6 -- studs past the prompt radius that close the tablet
 const AWAY_CHECK = 0.5 -- s between two distance checks
 const FIRST_CONTROL = "Next"
 const TURN_PREV = "JournalPrev"
@@ -57,7 +58,7 @@ function JournalController:Setup()
 	self.AwayThread = nil :: thread?
 end
 
--- The read_journal anchor (Attachment or Part) in the Workspace, nil while the book is not placed.
+-- The read_journal anchor (Attachment or Part) in the Workspace, nil while the tablet is not placed.
 function JournalController:Anchor(): Instance?
 	for _, anchor in CollectionService:GetTagged(ANCHOR_TAG) do
 		if anchor:GetAttribute("PromptAction") == rules.Action and anchor:IsDescendantOf(workspace) then
@@ -144,7 +145,7 @@ function JournalController:OnJournal(data: any)
 	end
 end
 
--- Newest unread page in book order (the last one), nil when none.
+-- Newest unread page in tablet order (the last one), nil when none.
 function JournalController:FreshIndex(): number?
 	const fresh = Vide.untrack(self.Fresh)
 	local found: number? = nil
@@ -156,7 +157,7 @@ function JournalController:FreshIndex(): number?
 	return found
 end
 
--- The page on screen is read: it loses its "NEW!" when the book closes or the page turns.
+-- The page on screen is read: it loses its "NEW!" when the tablet closes or the page turns.
 function JournalController:MarkRead()
 	const key = pageList[Vide.untrack(self.Index)].Key
 	const fresh = Vide.untrack(self.Fresh)
@@ -188,10 +189,10 @@ function JournalController:SetOpen(open: boolean)
 			self.Index(fresh)
 		end
 		self:StopGlow()
-		input:Bind({ Name = TURN_PREV, Key = Enum.KeyCode.Left, Keys = { Enum.KeyCode.ButtonL1 } }).OnPress(function()
+		input:Bind({ Name = TURN_PREV, Key = Enum.KeyCode.Left, Keys = { Enum.KeyCode.ButtonL1, Enum.KeyCode.ButtonL2, Enum.KeyCode.DPadLeft } }).OnPress(function()
 			self:Turn(-1)
 		end)
-		input:Bind({ Name = TURN_NEXT, Key = Enum.KeyCode.Right, Keys = { Enum.KeyCode.ButtonR1 } }).OnPress(function()
+		input:Bind({ Name = TURN_NEXT, Key = Enum.KeyCode.Right, Keys = { Enum.KeyCode.ButtonR1, Enum.KeyCode.ButtonR2, Enum.KeyCode.DPadRight } }).OnPress(function()
 			self:Turn(1)
 		end)
 		input:Bind({ Name = CLOSE, Key = Enum.KeyCode.ButtonB }).OnPress(function()
@@ -213,7 +214,7 @@ function JournalController:SetOpen(open: boolean)
 	self:Select(open)
 end
 
--- Closes the book when the body walks away from it or stops being alive.
+-- Closes the tablet when the body walks away from it or stops being alive.
 function JournalController:WatchAway()
 	const action = Content.Actions.ByKey[rules.Action]
 	const limit = (if action then action.Radius else 6) + AWAY
@@ -292,13 +293,13 @@ function JournalController:Mount(playerGui: Instance)
 		-- blur + veil behind the window (TASK-311)
 		Backdrop.Hold(self.Open)
 		return Vide.create("ScreenGui")({
-			Name = "AnomalyBook",
+			Name = "AnomalyTablet",
 			ResetOnSpawn = false,
 			ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 			DisplayOrder = DISPLAY_ORDER,
 			Enabled = self.Open,
 
-			-- frees the mouse from the first-person lock while the book is open
+			-- frees the mouse from the first-person lock while the tablet is open
 			Vide.create("TextButton")({
 				Name = "Cursor",
 				Size = UDim2.fromOffset(0, 0),
@@ -310,7 +311,7 @@ function JournalController:Mount(playerGui: Instance)
 				Visible = self.Open,
 			}),
 
-			AnomalyBook({
+			AnomalyTablet({
 				Visible = self.Open,
 				Pages = self.Pages,
 				Fresh = self.Fresh,
@@ -319,9 +320,9 @@ function JournalController:Mount(playerGui: Instance)
 				Hint = function()
 					const kind = device()
 					return if kind == "Gamepad"
-						then "LB / RB to turn pages  ·  B to close"
-						elseif kind == "KeyboardMouse" then "Arrow keys to turn pages"
-						else ""
+						then "LB / RB or the D-pad to turn pages  ·  B to close"
+						elseif kind == "KeyboardMouse" then "Drag, scroll or use the arrow keys to turn pages"
+						else "Swipe to turn pages"
 				end,
 				OnTurn = function(delta: number)
 					self:Turn(delta)

@@ -289,7 +289,7 @@ return table.freeze({
 	-- (FEAT-040, TASK-285; owner request 2026-10-14; SecurityService, SecurityController). Provisional
 	Security = Security,
 
-	-- Anomaly Book in the trailer: one page per V2 anomaly, unlocked per profile (TASK-335; owner request 2026-10-15;
+	-- Anomaly Tablet in the trailer: one page per V2 anomaly, unlocked per profile (TASK-335, TASK-345; owner request 2026-10-15;
 	-- JournalService, JournalController). Provisional
 	Journal = Journal,
 })

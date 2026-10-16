@@ -46,7 +46,7 @@ export type Data = {
 	-- Player settings (TASK-279; owner request 2026-10-14, Provisional): volumes, prompt mode, prep assist, reduced
 	-- motion. Writer: SettingsService (sanitized by SettingsRules). Reconcile adds the defaults to older profiles.
 	Settings: SettingsRules.Settings,
-	-- Anomaly Book pages (TASK-335; owner request 2026-10-15, Provisional): Content.Journal key -> os.time() of the
+	-- Anomaly Tablet pages (TASK-335, TASK-345; owner request 2026-10-15, Provisional): Content.Journal key -> os.time() of the
 	-- unlock. Writer: JournalService. Reconcile adds it as {} to older profiles, so no migration.
 	Journal: { [string]: number },
 }
@@ -94,7 +94,7 @@ const Template: Data = {
 	-- Settings: SettingsService (TASK-279); a plain copy, the profile changes by copy
 	Settings = table.clone(SettingsRules.Defaults),
 
-	-- Anomaly Book: JournalService (TASK-335); unknown keys are ignored on read
+	-- Anomaly Tablet: JournalService (TASK-335, TASK-345); unknown keys are ignored on read
 	Journal = {},
 }
 

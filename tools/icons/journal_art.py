@@ -1,14 +1,14 @@
-"""Anomaly Book "photos" (TASK-335), 512x352 PNG, one per Content.Journal page, in the game's sticker style.
+"""Anomaly Tablet "photos" (TASK-335, TASK-345), 512x352 PNG, one per Content.Journal page, in the game's sticker style.
 
 Same language as shop_icons.py (style guide §7.1): thick Ink outline, hard two-tone shading, white gloss blobs,
-Fredoka One text with an Ink stroke, never the alert red. Each photo is a full-bleed night scene (the AnomalyBook
+Fredoka One text with an Ink stroke, never the alert red. Each photo is a full-bleed night scene (the AnomalyTablet
 page puts it inside a white print, ScaleType Crop): spooky but cute, readable at ~180 px wide on a phone.
 
     python tools/icons/journal_art.py                    # writes Assets/textures/ui/journal/<key>.png (+ .svg)
     python tools/icons/journal_art.py anm_007_walker     # only these keys
 
 Upload: Roblox Studio MCP upload_image (served by `python -m http.server` on 127.0.0.1), ids into
-src/Interface/client/Components/AnomalyBook/Images.luau and Assets/textures/ui/_texture_ids.json ("journal/<key>").
+src/Interface/client/Components/AnomalyTablet/Images.luau and Assets/textures/ui/_texture_ids.json ("journal/<key>").
 """
 from __future__ import annotations
 

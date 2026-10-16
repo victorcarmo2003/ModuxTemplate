@@ -702,7 +702,7 @@ return Lync.define("game", {
 	-- c -> s: the client left the camera view (any way out); the server releases the freeze. Idempotent
 	SecurityLeave = Lync.packet(Lync.empty()),
 
-	-- Anomaly Book (TASK-335; owner request 2026-10-15, Provisional). s -> owner (fireClient, private). Writer:
+	-- Anomaly Tablet (TASK-335, TASK-345; owner request 2026-10-15, Provisional). s -> owner (fireClient, private). Writer:
 	-- JournalService, once the profile is loaded and the client is ready, and again on every new page. Pages = the
 	-- unlocked pages (Content.Journal keys, from profile.Journal); New = the page that just unlocked (toast + glow), nil
 	-- on the first send. Responder: JournalController (OnInit)
@@ -710,6 +710,6 @@ return Lync.define("game", {
 		Pages = Lync.bitfield(Content.Journal.Keys),
 		New = Lync.optional(Lync.enum(Content.Journal.Keys)),
 	})),
-	-- s -> owner: the read_journal prompt went through, open the book. Writer: JournalService
+	-- s -> owner: the read_journal prompt went through, open the tablet. Writer: JournalService
 	JournalOpen = Lync.packet(Lync.empty()),
 })

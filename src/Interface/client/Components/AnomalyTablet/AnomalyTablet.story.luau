@@ -1,13 +1,13 @@
 --!strict
--- AnomalyBook on a phone-sized frame (iPhone SE landscape, 667 x 375) or the whole viewport. "Found" = how many pages
--- (from the start of the book) are unlocked; the first unlocked one is "NEW!" while Fresh is on. The photos are the
--- uploaded ones (Images.luau); a page without one shows the placeholder print. Turning pages and closing are local.
+-- AnomalyTablet on a phone-sized frame (iPhone SE landscape, 667 x 375) or the whole viewport. "Found" = how many pages
+-- (from the start) are unlocked; the first one is "NEW!" while Fresh is on. Drag / swipe / wheel / arrows / dots turn
+-- pages locally (no server); the photos are the uploaded ones (Images.luau), a locked page shows the "???" print.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local Theme = require(script.Parent.Parent.Theme)
-local AnomalyBook = require(script.Parent)
+local AnomalyTablet = require(script.Parent)
 
 const create = Vide.create
 const source = Vide.source
@@ -62,7 +62,7 @@ return UILabs.CreateVideStory({
 			Name = "Reopen",
 			Size = UDim2.fromOffset(120, 36),
 			Position = UDim2.fromOffset(8, 8),
-			Text = "Open book",
+			Text = "Open tablet",
 			Visible = function()
 				return not open()
 			end,
@@ -71,7 +71,7 @@ return UILabs.CreateVideStory({
 			end,
 		}),
 
-		AnomalyBook({
+		AnomalyTablet({
 			Visible = open,
 			Pages = pages,
 			Fresh = function()
@@ -81,7 +81,7 @@ return UILabs.CreateVideStory({
 			Index = index,
 			Scale = controls.Scale,
 			Hint = function()
-				return if controls.Hint() then "Arrows or LB / RB to turn pages" else ""
+				return if controls.Hint() then "Swipe, drag or scroll to turn pages" else ""
 			end,
 			OnTurn = function(delta: number)
 				index(math.clamp(untrack(index) + delta, 1, total))

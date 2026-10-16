@@ -29,7 +29,7 @@
 --   Cleanup     NightEnd -> Stop(..., "NightOver"); NightLost, a new shift, any other phase -> "Restore"; set cleared.
 --   Ended       signal Ended(key, players) when an occurrence ends (Finish, NightOver, or a Restore once it left Signal or
 --               someone failed): the members Active at its start plus whoever failed, still connected. Reader:
---               JournalService (TASK-335, Anomaly Book pages).
+--               JournalService (TASK-335, TASK-345, Anomaly Tablet pages).
 --
 -- Hooks of services that do not exist yet (PROVISIONAL, TASK-106): TrafficService (TASK-104) is in
 -- architecture.md §19.2 Require but was not in this build, so it is looked up by name at OnStart;
@@ -215,7 +215,7 @@ function AnomalyService:Setup()
 	self.Warned = {} :: { [string]: boolean }
 	-- Tension(on): created here so lower-priority services (PedestrianService 545) connect in their OnInit
 	self.Tension = self.Libs.Signal.new() :: SignalLib.Signal<boolean>
-	-- Ended(key, players): one occurrence is over for these players (TASK-335; JournalService connects in its OnInit)
+	-- Ended(key, players): one occurrence is over for these players (TASK-335, TASK-345; JournalService connects in its OnInit)
 	self.Ended = self.Libs.Signal.new() :: SignalLib.Signal<string, { Player }>
 end
 
@@ -562,7 +562,7 @@ function AnomalyService:Succeed(occ: Api.Occurrence)
 	self:Publish(occ, { Phase = "Resolved" })
 end
 
--- Fires Ended for one finished run: its party at the start plus whoever failed, still in the game (TASK-335).
+-- Fires Ended for one finished run: its party at the start plus whoever failed, still in the game (TASK-335, TASK-345).
 -- A Restore counts only once the occurrence did something (left Signal, or someone failed).
 function AnomalyService:EmitEnded(run: Run, reason: Api.StopReason)
 	if reason == "Restore" and run.Record.Phase == "Signal" and next(run.Failed) == nil then

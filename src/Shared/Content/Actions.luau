@@ -134,7 +134,7 @@ return Table.new({
 	-- trailer (SecurityService makes it). Opens the camera view on this client (SecurityOpen) and freezes the body while watching.
 	{ Key = "watch_cameras", Text = "Cameras", Hold = 0, Radius = 6, Requires = {}, Night = "Any", Wave = 3 },
 
-	-- Anomaly Book (TASK-335; owner request 2026-10-15, Provisional): Prompt_Book on the book in the trailer
-	-- (tools/assetplace/anomaly_book.luau). Opens the book on this client (JournalOpen); nothing else changes.
-	{ Key = "read_journal", Text = "Anomaly Book", Hold = 0, Radius = 6, Requires = {}, Night = "Any", Wave = 3 },
+	-- Anomaly Tablet (TASK-335, TASK-345; owner request 2026-10-15, Provisional): Prompt_Tablet on the tablet in the
+	-- trailer (tools/assetplace/anomaly_tablet.luau). Opens it on this client (JournalOpen); nothing else changes.
+	{ Key = "read_journal", Text = "Anomaly Tablet", Hold = 0, Radius = 6, Requires = {}, Night = "Any", Wave = 3 },
 } :: { Action })

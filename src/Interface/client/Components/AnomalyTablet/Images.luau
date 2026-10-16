@@ -1,5 +1,5 @@
 --!strict
--- "Photos" of the Anomaly Book pages (TASK-335): Assets/textures/ui/journal/<key>.png, drawn by
+-- "Photos" of the Anomaly Tablet pages (TASK-335, TASK-345): Assets/textures/ui/journal/<key>.png, drawn by
 -- tools/icons/journal_art.py (house sticker style, 512 x 352 full-bleed night scenes) and uploaded through the Roblox
 -- Studio MCP. Ids also in Assets/textures/ui/_texture_ids.json ("journal/<key>"). Keyed by Content.Journal key.
 -- A key missing here = not uploaded: the page draws the placeholder (Ref + "?" on a dark photo).

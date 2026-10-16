@@ -1,16 +1,16 @@
 --!strict
 --[[
-	JournalService (TASK-335; owner request 2026-10-15, Provisional)
+	JournalService (TASK-335, TASK-345; owner request 2026-10-15, Provisional)
 
-	Server half of the Anomaly Book (the book in the trailer). Owns profile.Journal (Content.Journal key -> os.time() of
+	Server half of the Anomaly Tablet (the tablet in the trailer). Owns profile.Journal (Content.Journal key -> os.time() of
 	the unlock) and talks to the owner only:
 	  Unlock   AnomalyService.Ended(key, players): an occurrence of an anomaly with a page ended and these players took
 	           part (Active at its start, or failed it: they died to it or got past it). A page the profile does not
 	           have yet is written (copy, never in place) and saved with ProfileService:RequestSave. Kept across runs.
 	  Journal  s -> owner, once the profile is loaded AND the client is ready (whichever comes last), and again with
-	           New = the key on every new page (the client toasts and makes the book glow).
-	  Prompt   read_journal (the book, tools/assetplace/anomaly_book.luau; Run place only): JournalOpen to that player.
-	           Reading the book changes nothing on the server: no freeze, no gate.
+	           New = the key on every new page (the client toasts and makes the tablet glow).
+	  Prompt   read_journal (the tablet, tools/assetplace/anomaly_tablet.luau; Run place only): JournalOpen to that player.
+	           Reading the tablet changes nothing on the server: no freeze, no gate.
 	Nothing of money, items or stats rides on it.
 ]]
 local Players = game:GetService("Players")
@@ -82,7 +82,7 @@ function JournalService:Unlock(player: Player, key: string): boolean
 	return true
 end
 
--- Dev / Command Bar: forget every page of this player (the book starts empty again).
+-- Dev / Command Bar: forget every page of this player (the tablet starts empty again).
 function JournalService:Reset(player: Player)
 	const profiles = self.Dependencies.ProfileService
 	if profiles:Get(player) == nil then
