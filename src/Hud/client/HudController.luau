@@ -70,11 +70,9 @@ local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Compon
 local ToastStack = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Toast.Stack)
 local Toast = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Toast)
 
--- FEAT-014: summary on screen as long as the Summary phase (Content.Shift: 8 s day, 10 s night; halved by Q-200)
-const DAY_SUMMARY = Content.Shift.ByKey.Summary.Duration
-const NIGHT_SUMMARY = if Content.Shift.ByKey.Summary.Night ~= nil
-	then Content.Shift.ByKey.Summary.Night.Duration
-	else DAY_SUMMARY
+-- FEAT-014: the summary card stays SUMMARY_SHOWN s on screen, day and night (owner request 2026-10-16: the frame must be
+-- short; the Summary phase itself keeps its Content.Shift length, 8 s day / 10 s night, as the break between shifts)
+const SUMMARY_SHOWN = 3
 -- Phases that start a new shift: an old summary (or run end screen) still on screen goes away
 const NEW_SHIFT: { [string]: boolean } = { Intro = true, Prep = true, Open = true, Call = true, Night = true }
 -- network.md §4.2: toast on screen 3-6 s
@@ -386,7 +384,7 @@ function HudController:ShowReport(report: Report)
 		AfkLocked = report.AfkLocked,
 		LastChanceUsed = report.LastChanceUsed,
 	})
-	self.ReportThread = task.delay(if report.IsNight then NIGHT_SUMMARY else DAY_SUMMARY, function()
+	self.ReportThread = task.delay(SUMMARY_SHOWN, function()
 		self.ReportThread = nil
 		self.Report(false)
 	end)
