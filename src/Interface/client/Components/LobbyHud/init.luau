@@ -81,6 +81,7 @@ export type Props = {
 }
 
 const MARGIN = 12
+const MENU_LEFT = MARGIN + 18 -- px: room for the key badge that sits half outside each tile (owner 2026-10-16)
 const TOP = 8
 const TILE = 56
 const TILE_SMALL = 48 -- compact / narrow: still over the 44 px touch target
@@ -289,7 +290,7 @@ return function(props: Props): Frame
 			Tone = Theme.Tone.Ink,
 			Lip = 3,
 			Outline = 2,
-			Padding = { Left = 6, Right = 12 },
+			Padding = { Left = 12, Right = 12 }, -- even sides: icon + text centred in the pill (owner 2026-10-16)
 			Visible = function()
 				return online() > 0
 			end,
@@ -372,7 +373,7 @@ return function(props: Props): Frame
 		create("Frame")({
 			Name = "Menu",
 			Position = function()
-				return UDim2.fromOffset(MARGIN, menuTop())
+				return UDim2.fromOffset(MENU_LEFT, menuTop())
 			end,
 			Size = UDim2.fromOffset(0, 0),
 			AutomaticSize = Enum.AutomaticSize.XY,
