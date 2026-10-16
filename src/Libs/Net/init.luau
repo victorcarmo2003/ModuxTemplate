@@ -524,6 +524,29 @@ return Lync.define("game", {
 		Value = Lync.int(0, 100000),
 		From = Lync.f64(),
 	})),
+	-- Gifts (TASK-352; owner request 2026-10-16, Provisional; Content.Shop.Gifts). Responder/writer: GiftService.
+	-- c -> s, right before PromptProductPurchase of Content.Shop.Gifts[Key].ProductId (own rate limit). Stores Recipient
+	-- (UserId) as the target of this buyer's next receipt of that gift product. Answer: GiftResult (Ok = may prompt).
+	GiftPrompt = Lync.packet(Lync.struct({
+		Key = Lync.enum(Content.Shop.Gifts.Keys),
+		Recipient = Lync.f64(),
+	})),
+	-- s -> owner (the giver). Answer to GiftPrompt (Ok / Self / NotFound / Unavailable / Rate / Busy) and, after the
+	-- receipt, Sent (the message reached the recipient's profile) or Failed (receipt retried by Roblox later).
+	GiftResult = Lync.packet(Lync.struct({
+		Ok = Lync.bool(),
+		Reason = Lync.enum({ "Ok", "Sent", "Self", "NotFound", "Unavailable", "Rate", "Busy", "Failed" }),
+		Key = Lync.enum(Content.Shop.Gifts.Keys),
+	})),
+	-- s -> owner (the recipient), when a gift is delivered to the loaded profile (now, or on the next join if offline).
+	-- Kind Class: Key = class key, Amount 0. Kind Gems: Key = gem pack key ("" for an admin gift), Amount = gems; a
+	-- class the recipient already owned arrives as Kind Gems, Key = that class key, Amount = its gem Price.
+	GiftReceived = Lync.packet(Lync.struct({
+		Kind = Lync.enum({ "Class", "Gems" }),
+		Key = Lync.str(0, 32),
+		Amount = Lync.int(0, 2147483647),
+		FromName = Lync.str(0, 40),
+	})),
 	-- Revive Kit (TASK-317). s -> owner. Writer: ReviveKitService. The profile.ReviveCredits of this player (sent on
 	-- Ready, on load and after every change). Responder: ReviveKitController (self button, mate prompt gate)
 	ReviveKits = Lync.packet(Lync.struct({

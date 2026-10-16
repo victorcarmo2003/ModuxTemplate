@@ -15,6 +15,9 @@
 --                          Green; Slate "Robux (soon)" while the product id is 0)
 --              owned       "Equip" (Mustard) / "Equipped" (Green, not pressable)
 --              not in MVP  "Coming soon" (Slate)
+--            gift (TASK-353, owner request 2026-10-16): with `OnGift`, a round GiftButton (44 px) right of the Robux /
+--            Equip button (owned or not: a class can be gifted either way); hidden for "Coming soon" and for a class
+--            without a gift row (`Giftable`), Slate while `CanGift` says the product is not created yet
 -- The card pops on every class change. No backdrop: the rig shows through the middle. Pure: only props; the caller
 -- sends the requests and the server decides (Profile / Wallet / ClassBuyResult).
 local GuiService = game:GetService("GuiService")
@@ -32,6 +35,7 @@ local CartoonLabel = require(script.Parent.CartoonLabel)
 local Icon = require(script.Parent.LobbyWindow.Icon)
 local Count = require(script.Parent.HudPill.Count)
 local SkillImages = require(script.SkillImages)
+local GiftButton = require(script.Parent.GiftButton)
 
 const create = Vide.create
 const effect = Vide.effect
@@ -89,6 +93,11 @@ export type Props = {
 	OnBuyGems: (key: string) -> (),
 	OnBuyRobux: (key: string) -> (),
 	OnEquip: (key: string) -> (),
+	-- Gift button of the buy row (TASK-353); nil = none. `Giftable` false = hidden (no gift row), `CanGift` false =
+	-- disabled (product not created yet).
+	OnGift: ((key: string) -> ())?,
+	Giftable: ((key: string) -> boolean)?,
+	CanGift: ((key: string) -> boolean)?,
 	OnClose: () -> (),
 	-- Viewport stage (ClassStage) drawn behind the panels; nil = world stage.
 	Stage: Instance?,
@@ -348,6 +357,18 @@ return function(props: Props): Frame
 	const canGems = function(): boolean
 		return props.Gems() >= focused().Price
 	end
+	const onGift = props.OnGift
+	const giftShown = function(): boolean
+		if onGift == nil or state() == "Soon" then
+			return false
+		end
+		const giftable = props.Giftable
+		return giftable == nil or giftable(focused().Key)
+	end
+	-- the Robux / Equip button leaves room for the gift button
+	const rowButton = function(): UDim2
+		return UDim2.new(1, if giftShown() then -(BUTTON + 6) else 0, 1, 0)
+	end
 
 	const buttons: { any } = {
 		create("UIListLayout")({
@@ -383,64 +404,85 @@ return function(props: Props): Frame
 				props.OnBuyGems(focused().Key)
 			end,
 		}),
-		-- Buy with Robux
-		CartoonButton({
-			Name = "BuyRobux",
+		-- Buy with Robux / Equip, and the gift button beside them (TASK-353)
+		create("Frame")({
+			Name = "Row",
 			LayoutOrder = 2,
 			Size = UDim2.new(1, 0, 0, BUTTON),
-			TextSize = 18,
-			Outline = Theme.Outline.Thick,
-			Visible = function()
-				return state() == "Locked"
-			end,
-			Tone = Theme.Tone.Green,
-			Enabled = function()
-				return robux() ~= nil and not props.Busy()
-			end,
-			Text = function()
-				const price = robux()
-				if price == nil then
-					return "Robux (soon)"
-				end
-				return if price > 0 then `Buy  R$ {price}` else "Buy with Robux"
-			end,
-			OnActivated = function()
-				props.OnBuyRobux(focused().Key)
-			end,
-		}),
-		-- Equip / Equipped / Coming soon
-		CartoonButton({
-			Name = "Equip",
-			LayoutOrder = 3,
-			Size = UDim2.new(1, 0, 0, BUTTON),
-			TextSize = 20,
-			Outline = Theme.Outline.Thick,
-			Icon = function()
-				return if state() == "Equipped" then "Ui/check" else ""
-			end,
-			IconSize = 26,
-			Visible = function()
-				return state() ~= "Locked"
-			end,
-			Tone = function()
-				const s = state()
-				return if s == "Equipped" then Theme.Tone.Green else Theme.Tone.Mustard
-			end,
-			Enabled = function()
-				return state() == "Owned" and not props.Busy()
-			end,
-			Text = function()
-				const s = state()
-				if s == "Equipped" then
-					return "Equipped"
-				elseif s == "Soon" then
-					return "Coming soon"
-				end
-				return if props.Busy() then "..." else "Equip"
-			end,
-			OnActivated = function()
-				props.OnEquip(focused().Key)
-			end,
+			BackgroundTransparency = 1,
+			-- Buy with Robux
+			CartoonButton({
+				Name = "BuyRobux",
+				Size = rowButton,
+				TextSize = 18,
+				Outline = Theme.Outline.Thick,
+				Visible = function()
+					return state() == "Locked"
+				end,
+				Tone = Theme.Tone.Green,
+				Enabled = function()
+					return robux() ~= nil and not props.Busy()
+				end,
+				Text = function()
+					const price = robux()
+					if price == nil then
+						return "Robux (soon)"
+					end
+					return if price > 0 then `Buy  R$ {price}` else "Buy with Robux"
+				end,
+				OnActivated = function()
+					props.OnBuyRobux(focused().Key)
+				end,
+			}),
+			-- Equip / Equipped / Coming soon
+			CartoonButton({
+				Name = "Equip",
+				Size = rowButton,
+				TextSize = 20,
+				Outline = Theme.Outline.Thick,
+				Icon = function()
+					return if state() == "Equipped" then "Ui/check" else ""
+				end,
+				IconSize = 26,
+				Visible = function()
+					return state() ~= "Locked"
+				end,
+				Tone = function()
+					const s = state()
+					return if s == "Equipped" then Theme.Tone.Green else Theme.Tone.Mustard
+				end,
+				Enabled = function()
+					return state() == "Owned" and not props.Busy()
+				end,
+				Text = function()
+					const s = state()
+					if s == "Equipped" then
+						return "Equipped"
+					elseif s == "Soon" then
+						return "Coming soon"
+					end
+					return if props.Busy() then "..." else "Equip"
+				end,
+				OnActivated = function()
+					props.OnEquip(focused().Key)
+				end,
+			}),
+			GiftButton({
+				Name = "Gift",
+				AnchorPoint = Vector2.new(1, 0),
+				Position = UDim2.fromScale(1, 0),
+				Size = BUTTON,
+				Visible = giftShown,
+				Enabled = function()
+					const canGift = props.CanGift
+					return (canGift == nil or canGift(focused().Key)) and not props.Busy()
+				end,
+				OnActivated = function()
+					if onGift then
+						onGift(focused().Key)
+					end
+				end,
+			}),
 		}),
 	}
 

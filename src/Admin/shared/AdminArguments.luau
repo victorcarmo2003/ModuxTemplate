@@ -21,5 +21,8 @@ return {
 	Day = conch.args.number,
 	Money = conch.args.number,
 	Player = conch.args.player,
+	-- gift recipient (TASK-352): a player name (in this server, or any Roblox username) or a UserId (offline too)
+	Recipient = conch.args.string,
 	MaxMoney = MAX_MONEY,
+	MaxGiftGems = 1_000_000,
 }

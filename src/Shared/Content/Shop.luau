@@ -69,11 +69,28 @@ export type Utility = {
 	Night: boolean,
 }
 
+-- Gifts (TASK-352; owner request 2026-10-16, Provisional): one Developer Product per giftable item, bought by the giver
+-- for another player. GiftPrompt stores the recipient, the receipt sends a ProfileStore message to the recipient's
+-- profile (GiftService), delivered even offline. Key = "gift_" .. Target.
+--   Kind     Class  Target = a Content.Shop.GamePasses key (an owned class arrives as its gem Price instead)
+--            Gems   Target = a Content.Shop.GemPacks key (credits that pack's Gems)
+export type GiftKind = "Class" | "Gems"
+
+export type Gift = {
+	Key: string,
+	ProductId: number, -- 0 = not created on the Creator Hub yet ("coming soon": never prompted, the server refuses)
+	Kind: GiftKind,
+	Target: string, -- GamePasses key (Class) or GemPacks key (Gems)
+	Robux: number, -- suggested price (Creator Hub) = the price of the item itself, display fallback
+	Name: string, -- suggested Creator Hub product name
+}
+
 export type Shop = {
 	GemPacks: Table.Table<GemPack>,
 	GamePasses: Table.Table<GamePass>,
 	Utilities: Table.Table<Utility>,
-	Keys: { string }, -- every product / pass key (gem packs, passes, utilities): the MetricUi.Key wire enum
+	Gifts: Table.Table<Gift>,
+	Keys: { string }, -- every product / pass key (gem packs, passes, utilities, gifts): the MetricUi.Key wire enum
 }
 
 -- Gem packs: bigger pack = cheaper gem (99 -> 90 R$ per 1,000 gems). Gem economy x75 (TASK-308, owner request
@@ -243,8 +260,48 @@ const utilities: { Utility } = {
 	},
 }
 
+-- Gifts (TASK-352): derived, one per gem pack and one per class pass, same suggested Robux as the item. ProductIds
+-- come from the Creator Hub (owner); 0 = not created yet.
+const giftIds: { [string]: number } = {
+	gift_gems_50 = 0,
+	gift_gems_130 = 0,
+	gift_gems_300 = 0,
+	gift_gems_700 = 0,
+	gift_class_rabbit = 0,
+	gift_class_cat = 0,
+	gift_class_bear = 0,
+	gift_class_fox = 0,
+	gift_class_owl = 0,
+}
+
+const gifts: { Gift } = {}
+for _, pack in gemPacks do
+	const key = `gift_{pack.Key}`
+	const row: Gift = {
+		Key = key,
+		ProductId = giftIds[key] or 0,
+		Kind = "Gems",
+		Target = pack.Key,
+		Robux = pack.Robux,
+		Name = `Gift: {pack.Name}`,
+	}
+	table.insert(gifts, row)
+end
+for _, pass in gamePasses do
+	const key = `gift_{pass.Key}`
+	const row: Gift = {
+		Key = key,
+		ProductId = giftIds[key] or 0,
+		Kind = "Class",
+		Target = pass.Key,
+		Robux = pass.Robux,
+		Name = `Gift: {pass.Name}`,
+	}
+	table.insert(gifts, row)
+end
+
 const allKeys: { string } = {}
-for _, list in { gemPacks :: { any }, gamePasses :: { any }, utilities :: { any } } do
+for _, list in { gemPacks :: { any }, gamePasses :: { any }, utilities :: { any }, gifts :: { any } } do
 	for _, row in list do
 		table.insert(allKeys, row.Key)
 	end
@@ -254,6 +311,7 @@ const shop: Shop = {
 	GemPacks = Table.new(gemPacks),
 	GamePasses = Table.new(gamePasses),
 	Utilities = Table.new(utilities),
+	Gifts = Table.new(gifts),
 	Keys = table.freeze(allKeys),
 }
 

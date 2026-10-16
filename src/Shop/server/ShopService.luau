@@ -35,10 +35,14 @@ export type Patch = Struct.Partial<Template.Data>
 -- once, right after the grant (feedback, or the run-state effect of a utility, TASK-290). No yield inside a Handler.
 -- Wait = true: the product cannot be granted in this server now (a run utility bought in the lobby): nothing is written
 -- and the receipt stays NotProcessedYet, so Roblox delivers it again in a later server.
+-- Send (TASK-352, gifts): a yielding step that must succeed BEFORE the grant is written (the ProfileStore message of a
+-- gift). false or an error = NotProcessedYet, nothing written; Roblox retries and Send runs again, so what it sends must
+-- be idempotent on the other side (gift messages carry the PurchaseId, GiftService grants each id once).
 export type Grant = {
 	Patch: Patch,
 	After: (() -> ())?,
 	Wait: boolean?,
+	Send: ((purchaseId: string) -> boolean)?,
 }
 export type Handler = (player: Player, profile: Profile) -> Grant
 
@@ -67,6 +71,8 @@ function ShopService:Setup()
 	self.ByKey = {} :: { [string]: Handler }
 	-- player -> PassId -> owns (only answers that came back; a failed call is not cached)
 	self.Passes = {} :: { [Player]: { [number]: boolean } }
+	-- PurchaseIds whose Grant.Send is running (a concurrent ProcessReceipt of the same id waits for Roblox's retry)
+	self.Sending = {} :: { [string]: boolean }
 end
 
 -- Registers a Developer Product. Call in OnInit (receipts start in OnStart). A ProductId of 0 or less is a product not
@@ -261,6 +267,7 @@ function ShopService:Fulfil(
 	const profiles = self.Dependencies.ProfileService
 	local after: (() -> ())? = nil
 	-- from the check to the Update: no yield, so a concurrent ProcessReceipt for the same id sees it already granted
+	-- (Grant.Send is the one exception: it yields, then the id and the profile are checked again before the write)
 	if table.find(profile.Receipts(), purchaseId) == nil then
 		const ok, grant = pcall(handler, player, profile)
 		if not ok then
@@ -270,10 +277,31 @@ function ShopService:Fulfil(
 		if grant.Wait then
 			return Enum.ProductPurchaseDecision.NotProcessedYet
 		end
-		const patch = table.clone(grant.Patch) :: { [string]: any }
-		patch.Receipts = withReceipt(profile.Receipts(), purchaseId)
-		profiles:Update(player, patch :: any)
-		after = grant.After
+		if grant.Send then
+			if self.Sending[purchaseId] then
+				return Enum.ProductPurchaseDecision.NotProcessedYet
+			end
+			self.Sending[purchaseId] = true
+			const sentOk, sent = pcall(grant.Send, purchaseId)
+			self.Sending[purchaseId] = nil
+			if not sentOk or sent ~= true then
+				if not sentOk then
+					warn(`[ShopService] send of {name} failed for {purchaseId}: {sent}`)
+				end
+				return Enum.ProductPurchaseDecision.NotProcessedYet
+			end
+			-- Send yielded: the profile may be gone (left; Roblox retries, Send is idempotent) or the id written meanwhile.
+			-- The Patch was computed before the yield, so a Grant with Send keeps it to fields nobody else writes.
+			if profiles:Get(player) ~= profile then
+				return Enum.ProductPurchaseDecision.NotProcessedYet
+			end
+		end
+		if table.find(profile.Receipts(), purchaseId) == nil then
+			const patch = table.clone(grant.Patch) :: { [string]: any }
+			patch.Receipts = withReceipt(profile.Receipts(), purchaseId)
+			profiles:Update(player, patch :: any)
+			after = grant.After
+		end
 	end
 	if after then
 		task.spawn(after) -- the balance is already in the Profile packet; the toast does not wait for the DataStore

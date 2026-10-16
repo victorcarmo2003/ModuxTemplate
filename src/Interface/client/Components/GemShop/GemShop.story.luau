@@ -10,6 +10,7 @@
 -- the BEST VALUE card has white star bursts around the art.
 -- Reduced motion: toggle the game Settings switch (or the Roblox setting) and the shine / pulse / pop / stars stop
 -- within 0.5 s (a hovered card keeps a still shine band).
+-- TASK-353: the round gift button right of every price pill prints the pack key ("Created" off = disabled).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -105,6 +106,12 @@ return UILabs.CreateVideStory({
 						gems(gems() + Content.Shop.GemPacks.ByKey[key].Gems)
 						busy(false)
 					end)
+				end,
+				OnGift = function(key: string)
+					print(`[GemShop story] gift {key}`)
+				end,
+				CanGift = function(_key: string): boolean
+					return controls.Created()
 				end,
 				OnClose = function()
 					print("[GemShop story] close")

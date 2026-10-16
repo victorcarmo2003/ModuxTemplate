@@ -24,6 +24,13 @@ export type Stats = {
 	Revives: number,
 }
 
+-- Gift waiting for its receipt (TASK-352): the recipient the giver picked with GiftPrompt. Saved, so a receipt Roblox
+-- delivers again in another server still knows where the gift goes.
+export type GiftPending = {
+	Recipient: number, -- UserId
+	At: number, -- os.time() of the GiftPrompt
+}
+
 export type Data = {
 	Version: number,
 	Gems: number,
@@ -49,6 +56,11 @@ export type Data = {
 	-- Anomaly Tablet pages (TASK-335, TASK-345; owner request 2026-10-15, Provisional): Content.Journal key -> os.time() of the
 	-- unlock. Writer: JournalService. Reconcile adds it as {} to older profiles, so no migration.
 	Journal: { [string]: number },
+	-- Gifts (TASK-352; owner request 2026-10-16, Provisional). Writer: GiftService. GiftPending: Content.Shop.Gifts key
+	-- -> the recipient of this player's next receipt of that product. GiftsReceived: ids of the last delivered gift
+	-- messages (circular list), so a message sent twice (receipt retried) is granted once. Reconcile adds both as {}.
+	GiftPending: { [string]: GiftPending },
+	GiftsReceived: { string },
 }
 
 const Template: Data = {
@@ -96,6 +108,10 @@ const Template: Data = {
 
 	-- Anomaly Tablet: JournalService (TASK-335, TASK-345); unknown keys are ignored on read
 	Journal = {},
+
+	-- Gifts: GiftService (TASK-352)
+	GiftPending = {},
+	GiftsReceived = {},
 }
 
 return Template

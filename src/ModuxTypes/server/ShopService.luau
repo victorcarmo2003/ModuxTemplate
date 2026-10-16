@@ -18,6 +18,7 @@ export type Grant = {
 	Patch: Patch,
 	After: (() -> ())?,
 	Wait: boolean?,
+	Send: ((purchaseId: string) -> boolean)?,
 }
 export type Patch = Struct.Partial<Template.Data>
 
@@ -26,6 +27,7 @@ export type Public = {
 	Handlers: { [number]: Handler },
 	Names: { [number]: string },
 	Passes: { [Player]: { [number]: boolean } },
+	Sending: { [string]: boolean },
 	Setup: (self: Public) -> (),
 	RegisterProduct: (self: Public, productId: number, name: string, handler: Handler) -> (),
 	Notify: (self: Public, player: Player, kind: string, value: number) -> (),

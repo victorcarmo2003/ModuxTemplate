@@ -36,6 +36,27 @@ function ProfileService:Setup()
 	self.Profiles = {} :: { [Player]: Profile }
 	self.Disposers = {} :: { [Player]: () -> () }
 	self.Loaded = self.Libs.Signal.new() :: SignalLib.Signal<Player, Profile>
+	-- ProfileStore messages (ProfileStore:MessageAsync) of a loaded profile: (player, message, processed). The listener
+	-- applies the message and calls processed(); an unprocessed message stays in the profile and comes back next session.
+	-- Listener: GiftService (TASK-352)
+	self.Message = self.Libs.Signal.new() :: SignalLib.Signal<Player, { [string]: any }, () -> ()>
+end
+
+-- Sends a ProfileStore message to the profile of any UserId (online here, elsewhere or offline). Yields; false = the
+-- DataStore did not take it (the store is closing).
+function ProfileService:MessageAsync(userId: number, message: { [string]: any }): boolean
+	return self.Store:MessageAsync(`{userId}`, message) == true
+end
+
+-- A profile exists for this UserId (the player has played at least once). Yields; nil = the DataStore call failed.
+function ProfileService:ExistsAsync(userId: number): boolean?
+	const ok, profile = pcall(function()
+		return self.Store:GetAsync(`{userId}`)
+	end)
+	if not ok then
+		return nil
+	end
+	return profile ~= nil
 end
 
 function ProfileService:Get(player: Player): Profile?
@@ -235,6 +256,13 @@ function ProfileService:Load(player: Player)
 
 	self.Sessions[player] = session
 	self.Loaded:Fire(player, self:Bind(player, session))
+	-- after Bind and Loaded: listeners can read and Update the profile while they handle a message
+	session:MessageHandler(function(message: any, processed: () -> ())
+		if self.Sessions[player] ~= session or type(message) ~= "table" then
+			return
+		end
+		self.Message:Fire(player, message, processed)
+	end)
 end
 
 function ProfileService:Forget(player: Player)

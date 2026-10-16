@@ -263,6 +263,12 @@
 						"optional": "src/Economy/server"
 					}
 				},
+				"Gift": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Gift/server"
+					}
+				},
 				"Hallucination": {
 					"$ignoreUnknownInstances": false,
 					"$path": {

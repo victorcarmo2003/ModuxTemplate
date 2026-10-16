@@ -11,8 +11,11 @@
 --   anomaly <id> trigger|resolve|wrong|stop   forces / resolves / fails / stops one anomaly (ANM-###, key or night n).
 --   scare <id>             plays a hallucination (key) or a sting ("sting:<sound key>") on your client.
 --   tp, content            native and safe in production (no DevService needed).
+--   giftclass <player|userId> <class>, giftgems <player|userId> <amount>   gifts through GiftService (TASK-352; owner
+--                          request 2026-10-16, Provisional): a ProfileStore message, so it works in production and for
+--                          offline UserIds. The one profile mutation here, owner-approved; nothing else writes profiles.
 -- Policy: DevService only exists in Studio dev mode (PlaceService:IsDev). Published servers therefore expose only
--- the native commands; the bridge answers "dev commands are off". Do not add Content/profile mutations here
+-- the native commands; the bridge answers "dev commands are off". Do not add other Content/profile mutations here
 -- without an architect decision.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -27,7 +30,7 @@ const ROLE = "super-user"
 const PERMISSION = "admin"
 
 const AdminService = Modux.Service("AdminService", {
-	Require = { "PlayerService", "DevService", "ShowcaseService" },
+	Require = { "PlayerService", "DevService", "ShowcaseService", "GiftService" },
 	Priority = 50, -- below DevService (100): its OnStart has already loaded the commands when ours runs
 })
 
@@ -124,6 +127,46 @@ function AdminService:CommandTeleport(a: Player, b: Player?)
 	end
 	from:PivotTo(to:GetPivot())
 	conch.log("success", `{target.Name} teleported to {destination.Name}`)
+end
+
+-- "name" or "123456" -> UserId: a player in this server by name / display name, a number as is, else a Roblox
+-- username lookup. Yields.
+local function resolveUserId(text: string): number?
+	const number = tonumber(text)
+	if number ~= nil and number > 0 and number % 1 == 0 then
+		return number
+	end
+	const lower = string.lower(text)
+	for _, player in Players:GetPlayers() do
+		if string.lower(player.Name) == lower or string.lower(player.DisplayName) == lower then
+			return player.UserId
+		end
+	end
+	const ok, userId = pcall(function()
+		return Players:GetUserIdFromNameAsync(text)
+	end)
+	return if ok then userId else nil
+end
+
+-- giftclass / giftgems: the executor is read inside the Conch callback, the lookups and the send yield in a thread.
+function AdminService:CommandGift(target: string, kind: "Class" | "Gems", key: string, amount: number)
+	const caller = executor()
+	if not caller then
+		return fail("not allowed")
+	end
+	task.spawn(function()
+		const userId = resolveUserId(target)
+		if userId == nil then
+			return fail(`no player or UserId "{target}"`)
+		end
+		const sent = self.Dependencies.GiftService:SendFree(userId, kind, key, amount, caller)
+		if sent then
+			const what = if kind == "Class" then key else `{amount} gems`
+			conch.log("success", `gift sent to {userId}: {what} (delivered when their profile loads)`)
+		else
+			fail(`gift to {userId} not sent (DataStore busy or closing); try again`)
+		end
+	end)
 end
 
 function AdminService:CommandContent(kind: string, key: string)
@@ -345,6 +388,35 @@ function AdminService:Register()
 		end,
 		callback = function(id: string)
 			self:RunShowcase("scare", id, "")
+		end,
+	})
+
+	conch.register("giftclass", {
+		permissions = { PERMISSION },
+		description = "Gift a class to a player (name or UserId, offline too); already owned = its gem price",
+		arguments = function()
+			return AdminArguments.Recipient("player", "Player name or UserId"), AdminArguments.ClassKey("class")
+		end,
+		callback = function(target: string, key: string)
+			if Content.Classes.ByKey[key] == nil then
+				return fail(`no class "{key}"`)
+			end
+			self:CommandGift(target, "Class", key, 0)
+		end,
+	})
+
+	conch.register("giftgems", {
+		permissions = { PERMISSION },
+		description = "Gift gems to a player (name or UserId, offline too)",
+		arguments = function()
+			return AdminArguments.Recipient("player", "Player name or UserId"), AdminArguments.Money("amount", "Gem amount")
+		end,
+		callback = function(target: string, amount: number)
+			const value = integer(amount, 1, AdminArguments.MaxGiftGems)
+			if not value then
+				return fail(`amount must be a whole number from 1 to {AdminArguments.MaxGiftGems}`)
+			end
+			self:CommandGift(target, "Gems", "", value)
 		end,
 	})
 

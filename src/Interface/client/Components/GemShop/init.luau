@@ -18,6 +18,9 @@
 -- Base / Bonus / Badge are display only (Base + Bonus == Gems); a Pack without them reads Content.Shop.GemPacks.
 -- Pure: only props; the caller prompts the purchase (MarketplaceService:PromptProductPurchase) and the server credits
 -- the gems on the receipt. Gamepad: every card button "Buy" is Selectable (LobbyController selects the first "Buy").
+-- Gift (TASK-353, owner request 2026-10-16): with `OnGift`, a round GiftButton (44 px) sits right of the price pill
+-- (the pill gives it room); it opens the recipient picker (GiftController) instead of buying. Disabled (Slate) while
+-- `CanGift` says the gift product is not created yet.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -31,6 +34,7 @@ local Icon = require(script.Parent.LobbyWindow.Icon)
 local Sunburst = require(script.Parent.Sunburst)
 local Images = require(script.Images)
 local Count = require(script.Parent.HudPill.Count)
+local GiftButton = require(script.Parent.GiftButton)
 
 const create = Vide.create
 const source = Vide.source
@@ -63,6 +67,9 @@ export type Props = {
 	-- A purchase prompt is open: the cards wait.
 	Busy: (() -> boolean)?,
 	OnBuy: (key: string) -> (),
+	-- Gift button next to the price (TASK-353); nil = no gift button. `CanGift` false = disabled (product not created).
+	OnGift: ((key: string) -> ())?,
+	CanGift: ((key: string) -> boolean)?,
 	OnClose: () -> (),
 	Scale: (() -> number)?,
 }
@@ -73,6 +80,7 @@ const GAP = 10
 const TOP = 14 -- room over the cards for the ribbons
 const BUTTON = 44
 const PAD = 8
+const GIFT_GAP = 4 -- px between the price pill and the gift button
 const ART = 104 -- height of the art area at the top of the card (the full inner width)
 
 -- Card surfaces: the highlighted pack is vivid blue, the others a muted slate blue (never the alert red).
@@ -319,6 +327,7 @@ return function(props: Props): Frame
 	const busy = function(): boolean
 		return props.Busy ~= nil and props.Busy()
 	end
+	const gifting = props.OnGift ~= nil
 
 	-- Animation clock (s) of the cards; runs only while the shop is open and motion is allowed.
 	const clock = source(0)
@@ -506,9 +515,9 @@ return function(props: Props): Frame
 			-- the face of the card button: looks like the old Buy button, the whole card takes the click
 			CartoonPanel({
 				Name = "Price",
-				AnchorPoint = Vector2.new(0.5, 1),
-				Position = UDim2.fromScale(0.5, 1),
-				Size = UDim2.new(1, 0, 0, BUTTON),
+				AnchorPoint = Vector2.new(0, 1),
+				Position = UDim2.fromScale(0, 1),
+				Size = UDim2.new(1, if gifting then -(BUTTON + GIFT_GAP) else 0, 0, BUTTON),
 				Tone = tone,
 				Outline = Theme.Outline.Thick,
 				Radius = Theme.Radius.Pill,
@@ -532,6 +541,26 @@ return function(props: Props): Frame
 				},
 			}),
 		}
+
+		const onGift = props.OnGift
+		if onGift then
+			const canGift = props.CanGift
+			table.insert(
+				children,
+				GiftButton({
+					Name = "Gift",
+					AnchorPoint = Vector2.new(1, 1),
+					Position = UDim2.fromScale(1, 1),
+					Size = BUTTON,
+					Enabled = function()
+						return (canGift == nil or canGift(pack.Key)) and not busy()
+					end,
+					OnActivated = function()
+						onGift(pack.Key)
+					end,
+				})
+			)
+		end
 
 		if info.Badge == "Best" then
 			table.insert(children, ribbon("BEST VALUE", Theme.Tone.Mustard, nil))

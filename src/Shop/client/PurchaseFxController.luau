@@ -8,6 +8,9 @@
 	Local only, from MarketplaceService's own Prompt*PurchaseFinished on this client (isPurchased = true). The grant
 	itself and its toast stay the server's (ShopService / ShopUtilityService); this is only the celebration.
 	Reduced motion (Motion.Reduced): no confetti, the banner only fades.
+	Gifts (TASK-353, owner request 2026-10-16): the giver's finished gift purchase reads "Gift sent!"; the recipient
+	gets the same celebration from the GiftReceived packet (GiftService, now or on the next join if it was offline):
+	"<FromName> sent you <item>!" (a class already owned arrives as its gems: "... sent you 2,000 gems!").
 ]]
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
@@ -24,6 +27,7 @@ const FALL = { 1.6, 2.8 } -- s each piece takes to fall
 const SIZE = { 8, 16 } -- px
 const SPREAD = 0.15 -- s over which the pieces are launched
 const BANNER_HOLD = 1.6 -- s the banner stays before fading
+const GIFT_HOLD = 3 -- s a gift banner stays (longer line: who sent what)
 const DISPLAY_ORDER = 60
 const COLORS = {
 	Color3.fromHex("#F6C12B"), -- Mustard
@@ -54,6 +58,40 @@ function PurchaseFxController:Setup()
 	for _, pass in Content.Shop.GamePasses.List do
 		self.Names[pass.PassId] = pass.Name
 	end
+	for _, gift in Content.Shop.Gifts.List do
+		if gift.ProductId > 0 then
+			self.Names[gift.ProductId] = "Gift sent"
+		end
+	end
+end
+
+-- Thousands separator ("2,000").
+local function count(value: number): string
+	local text = tostring(math.floor(value))
+	while true do
+		const replaced, n = string.gsub(text, "^(-?%d+)(%d%d%d)", "%1,%2")
+		text = replaced
+		if n == 0 then
+			return text
+		end
+	end
+end
+
+-- What a GiftReceived brings, for the banner ("Cat Crew", "Handful of Gems", "2,000 gems").
+local function giftName(kind: string, key: string, amount: number): string
+	if kind == "Class" then
+		const pass = Content.Shop.GamePasses.ByKey[key]
+		if pass then
+			return pass.Name
+		end
+		const class = Content.Classes.ByKey[key]
+		return if class then class.Name else "a new class"
+	end
+	const pack = Content.Shop.GemPacks.ByKey[key]
+	if pack and pack.Gems == amount then
+		return pack.Name
+	end
+	return `{count(amount)} gems`
 end
 
 local function between(rng: Random, range: { number }): number
@@ -94,7 +132,7 @@ local function confetti(gui: ScreenGui)
 	end
 end
 
-local function banner(gui: ScreenGui, text: string, reduced: boolean)
+local function banner(gui: ScreenGui, text: string, reduced: boolean, hold: number)
 	const label = Instance.new("TextLabel")
 	label.Name = "Banner"
 	label.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -116,13 +154,25 @@ local function banner(gui: ScreenGui, text: string, reduced: boolean)
 	if not reduced then
 		TweenService:Create(scale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
 	end
-	task.delay(BANNER_HOLD, function()
+	task.delay(hold, function()
 		TweenService:Create(label, TweenInfo.new(0.5), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
 	end)
 end
 
 -- The celebration for one finished purchase of `id` (ProductId or PassId)
 function PurchaseFxController:Celebrate(id: number)
+	const name = self.Names[id]
+	self:Show(if name ~= nil then `{name}!` else "Thank you!", BANNER_HOLD)
+end
+
+-- A gift arrived (GiftReceived)
+function PurchaseFxController:CelebrateGift(gift: { Kind: string, Key: string, Amount: number, FromName: string })
+	const item = giftName(gift.Kind, gift.Key, gift.Amount)
+	self:Show(if gift.FromName ~= "" then `{gift.FromName} sent you {item}!` else `You got {item}!`, GIFT_HOLD)
+end
+
+-- Confetti + banner `text` + the buy sounds
+function PurchaseFxController:Show(text: string, hold: number)
 	const playerGui = Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
 	if playerGui == nil then
 		return
@@ -134,8 +184,7 @@ function PurchaseFxController:Celebrate(id: number)
 	gui.IgnoreGuiInset = true
 	gui.DisplayOrder = DISPLAY_ORDER
 	gui.Parent = playerGui
-	const name = self.Names[id]
-	banner(gui, if name ~= nil then `{name}!` else "Thank you!", reduced)
+	banner(gui, text, reduced, hold)
 	if not reduced then
 		confetti(gui)
 	end
@@ -144,7 +193,7 @@ function PurchaseFxController:Celebrate(id: number)
 			self.Dependencies.AudioController:Play(key)
 		end)
 	end
-	task.delay(FALL[2] + SPREAD + 0.5, function()
+	task.delay(math.max(FALL[2] + SPREAD, hold + 0.5) + 0.5, function()
 		gui:Destroy()
 	end)
 end
@@ -152,6 +201,9 @@ end
 PurchaseFxController:OnInit(function(self)
 	self:Setup()
 	const me = Players.LocalPlayer
+	self.Libs.Net.GiftReceived:onClient(function(gift)
+		self:CelebrateGift(gift)
+	end)
 	MarketplaceService.PromptProductPurchaseFinished:Connect(function(userId: number, productId: number, bought: boolean)
 		if bought and userId == me.UserId then
 			self:Celebrate(productId)

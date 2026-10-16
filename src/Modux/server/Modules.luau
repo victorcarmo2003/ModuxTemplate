@@ -17,6 +17,7 @@ return {
 	ServerScriptService.server.Dev.DevService,
 	ServerScriptService.server.Economy.EconomyService,
 	ServerScriptService.server.Economy.TipJarService,
+	ServerScriptService.server.Gift.GiftService,
 	ServerScriptService.server.Hallucination.HallucinationService,
 	ServerScriptService.server.Interaction.InteractionService,
 	ServerScriptService.server.Item.ItemService,

@@ -234,6 +234,7 @@ const LobbyController = Modux.Controller("LobbyController", {
 		"AudioController",
 		"AnimController",
 		"CameraController",
+		"GiftController",
 	},
 	Priority = 440,
 })
@@ -1464,6 +1465,7 @@ end
 
 function LobbyController:Mount(playerGui: Instance)
 	const profile = self.Dependencies.ProfileController
+	const gifts = self.Dependencies.GiftController
 	const isOpen = function(panel: Panel): () -> boolean
 		return function()
 			return self.Panel() == panel
@@ -1483,6 +1485,19 @@ function LobbyController:Mount(playerGui: Instance)
 			Vide.untrack(function()
 				if self.PromptClass == "" then
 					self:ClearPending()
+				end
+				return nil
+			end)
+		end)
+
+		-- The gift picker (TASK-353) shares the window scale and closes with the shop / class screen under it
+		Vide.effect(function()
+			const scale = self.Scale()
+			const panel = self.Panel()
+			Vide.untrack(function()
+				gifts.Scale(scale)
+				if panel ~= "Shop" and panel ~= "Classes" then
+					gifts:Close()
 				end
 				return nil
 			end)
@@ -1658,6 +1673,16 @@ function LobbyController:Mount(playerGui: Instance)
 					self:Click()
 					self:Equip(key)
 				end,
+				-- gift a class to another player (TASK-353, GiftController)
+				OnGift = function(key: string)
+					gifts:Open(`gift_{key}`)
+				end,
+				Giftable = function(key: string): boolean
+					return gifts:GiftOf(key) ~= nil
+				end,
+				CanGift = function(key: string): boolean
+					return gifts:CanGift(key)
+				end,
 				OnClose = close,
 				Stage = stage,
 				Scale = self.Scale,
@@ -1675,6 +1700,13 @@ function LobbyController:Mount(playerGui: Instance)
 				OnBuy = function(key: string)
 					self:Click()
 					self:BuyPack(key)
+				end,
+				-- gift a gem pack to another player (TASK-353, GiftController)
+				OnGift = function(key: string)
+					gifts:Open(`gift_{key}`)
+				end,
+				CanGift = function(key: string): boolean
+					return gifts:CanGift(key)
 				end,
 				OnClose = close,
 				Scale = self.Scale,
@@ -2038,6 +2070,10 @@ LobbyController:OnStart(function(self)
 	self:ThirdPerson()
 	self:RunZones()
 	self:ClearLeftSide()
+	-- gift answers (GiftResult) land in the lobby toast column
+	self.Dependencies.GiftController:SetToaster(function(text: string, kind: Text.Kind)
+		self:Toast(text, kind)
+	end)
 
 	MarketplaceService.PromptProductPurchaseFinished:Connect(function(userId: number, _productId: number, _bought: boolean)
 		if userId ~= Players.LocalPlayer.UserId then

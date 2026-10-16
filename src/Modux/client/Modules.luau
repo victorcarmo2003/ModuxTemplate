@@ -49,6 +49,7 @@ return {
 	StarterPlayer.StarterPlayerScripts.client.Seating.SeatingController,
 	StarterPlayer.StarterPlayerScripts.client.Security.SecurityController,
 	StarterPlayer.StarterPlayerScripts.client.Settings.SettingsController,
+	StarterPlayer.StarterPlayerScripts.client.Shop.GiftController,
 	StarterPlayer.StarterPlayerScripts.client.Shop.PurchaseFxController,
 	StarterPlayer.StarterPlayerScripts.client.Shop.ReviveKitController,
 	StarterPlayer.StarterPlayerScripts.client.Shop.ShopController,
