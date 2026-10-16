@@ -78,7 +78,7 @@ end
 
 -- 1. floor
 local nFloor = 0
-local floorFolder = lobby:FindFirstChild("LobbyFloor")
+local floorFolder = lobby:FindFirstChild("LobbyFloor", true)
 for _, d in (if floorFolder then floorFolder:GetDescendants() else {}) do
 	if d:IsA("MeshPart") then
 		addTexture(d, "TexLobby_Pave", IDS.Pave, Enum.NormalId.Top, TILE_PAVE, 1, nil)
@@ -89,7 +89,7 @@ end
 table.insert(log, "floor tiles: " .. nFloor)
 
 -- 2..3. procedural parts by name
-local proc = lobby:FindFirstChild("LobbyProcedural")
+local proc = lobby:FindFirstChild("LobbyProcedural", true)
 local function byName(n: string): BasePart?
 	local p = proc and proc:FindFirstChild(n)
 	return p and p:IsA("BasePart") and p or nil
@@ -115,7 +115,7 @@ if body then
 end
 
 -- 4. food court deck under the picnic tables M1..M3
-local fc = lobby:FindFirstChild("LobbyFoodCourt")
+local fc = lobby:FindFirstChild("LobbyFoodCourt", true)
 if fc then
 	local minV, maxV
 	for _, m in fc:GetChildren() do

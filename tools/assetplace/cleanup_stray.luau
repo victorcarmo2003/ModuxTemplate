@@ -34,7 +34,7 @@ local MOVE_OPTIONAL = {
 	{
 		on = false,
 		from = "Workspace.Model",
-		to = "Workspace.LOBBY_Assets.LobbyFountain",
+		to = "Workspace.LOBBY_Assets.Garden.LobbyFountain", -- done by hand 2026-10-16 (it was in MAP01_Assets.Extra)
 		rename = "Fountain_Toolbox",
 		why = "toolbox fountain (Water + Beams, rbxassetid 70456xxxxx) loose in the Workspace root at the lobby fountain; check its licence in docs/art/credits.md first",
 	},

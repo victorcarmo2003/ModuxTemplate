@@ -43,7 +43,7 @@ end
 -- Inner ends of the two tunnels along the road (Z), deepest point first per side
 local function tunnels(root: Instance): { Model }
 	const found: { Model } = {}
-	for _, child in root:GetChildren() do
+	for _, child in root:GetDescendants() do -- any folder of LOBBY_Assets (Street since the 2026-10-16 regroup)
 		if child.Name == TUNNEL and child:IsA("Model") then
 			table.insert(found, child)
 		end
@@ -53,7 +53,7 @@ end
 
 return function(): Traffic?
 	const root = Workspace:FindFirstChild("LOBBY_Assets")
-	const holder = if root ~= nil then root:FindFirstChild(TEMPLATE_FOLDER) else nil
+	const holder = if root ~= nil then root:FindFirstChild(TEMPLATE_FOLDER, true) else nil
 	if root == nil or holder == nil then
 		return nil
 	end

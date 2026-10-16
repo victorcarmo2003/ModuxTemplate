@@ -26,7 +26,7 @@ if not lobby then
 	return "[err] no LOBBY_Assets"
 end
 local proc = lobby.LobbyProcedural
-local decor = lobby.LobbyDecor
+local decor = lobby:FindFirstChild("LobbyDecor", true) :: Folder -- nested in Plaza since the 2026-10-16 regroup
 local log = {}
 pcall(function()
 	CHS:SetWaypoint("declutter_lobby_plaza: before")
