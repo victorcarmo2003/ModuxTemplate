@@ -28,7 +28,15 @@ const GATE = "Security"
 const MONITOR_WAIT = 30 -- s the first lookup of the monitor keeps trying (the place may still be loading)
 
 const SecurityService = Modux.Service("SecurityService", {
-	Require = { "PlaceService", "PlayerService", "NetService", "RunStateService", "InteractionService", "CharacterService" },
+	Require = {
+		"PlaceService",
+		"PlayerService",
+		"NetService",
+		"RunStateService",
+		"InteractionService",
+		"CharacterService",
+		"VehicleService",
+	},
 	Priority = 640,
 })
 
@@ -97,7 +105,10 @@ function SecurityService:Register()
 	const interaction = self.Dependencies.InteractionService
 	interaction:RegisterAction(rules.Action, {
 		Validate = function(player: Player, _anchor: Instance, _id: number): boolean
-			return not self.Watching[player] and self.Dependencies.RunStateService:IsActive(player)
+			-- only from inside the trailer (owner 2026-10-16): never through the wall from the hiding spot behind it
+			return not self.Watching[player]
+				and self.Dependencies.RunStateService:IsActive(player)
+				and self.Dependencies.VehicleService:IsInside(player)
 		end,
 		Run = function(player: Player, _anchor: Instance, _id: number)
 			self:Open(player)
