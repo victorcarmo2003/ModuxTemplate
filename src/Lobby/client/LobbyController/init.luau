@@ -1516,6 +1516,19 @@ function LobbyController:Mount(playerGui: Instance)
 			end)
 		end)
 
+		-- The zone rings leave the world while the class panel is open (they drew over the class on the stage, owner
+		-- 2026-10-16) and come back when it closes
+		Vide.effect(function()
+			const open = self.Panel() == "Classes"
+			Vide.untrack(function()
+				const rings = self.Rings
+				if rings then
+					rings.SetHidden(open)
+				end
+				return nil
+			end)
+		end)
+
 		-- Class swap on the world stage
 		Vide.effect(function()
 			const key = self.Focus()

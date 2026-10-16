@@ -25,6 +25,8 @@ export type Rings = {
 	SetPad: (key: string, color: Color3, pulse: Content.LobbyPadPulse?, occupied: boolean) -> (),
 	-- Colour shiver of the ring (someone stepped on / off).
 	Kick: (key: string) -> (),
+	-- Every zone frame out of the world while true (the class stage shows the character over them, owner 2026-10-16)
+	SetHidden: (on: boolean) -> (),
 	Destroy: () -> (),
 }
 
@@ -347,6 +349,7 @@ return function(): Rings
 	const random = Random.new()
 	local clock = 0
 	local built = -1 -- LobbyZones.Version() the frames were built for
+	local hidden = false
 
 	local function build()
 		const kept: { [string]: ZoneVfx } = table.clone(vfx)
@@ -410,6 +413,9 @@ return function(): Rings
 	const tween = math.max(VFX.ColorTween, 0.001)
 
 	local function step(t: number, camera: Vector3?)
+		if hidden then
+			return
+		end
 		const dt = math.clamp(t - clock, 0, 0.1)
 		clock = t
 		if LobbyZones.Version() ~= built then
@@ -502,6 +508,11 @@ return function(): Rings
 		end
 	end
 
+	local function setHidden(on: boolean)
+		hidden = on
+		root.Parent = if on then nil else workspace
+	end
+
 	local function destroy()
 		root:Destroy()
 		table.clear(order)
@@ -515,6 +526,7 @@ return function(): Rings
 		SetColor = setColor,
 		SetPad = setPad,
 		Kick = kick,
+		SetHidden = setHidden,
 		Destroy = destroy,
 	}
 end
