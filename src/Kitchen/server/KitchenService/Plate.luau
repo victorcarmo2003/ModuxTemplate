@@ -12,8 +12,9 @@
 --   RefundPlate   Leave / disconnect / timeout: the reserved bun goes back to the stock (an adopted altered bun goes back
 --                 to the board as it was) and the slot frees up.
 --   TrashPlate    the bin: bun (and, on request, the front sausage) are lost like Trash.luau; a hot dog in hand goes
---                 through the BIN-C "discard" path so the Discarded signal of ANM-002 still fires. Altered bun / sausage
---                 are never thrown away from here: only a hot dog can resolve the anomaly.
+--                 through the BIN-C "discard" path so the Discarded signal of ANM-002 still fires. TASK-346 (DEC-254:
+--                 ANM-002 is family A, discarding resolves it): an adopted altered bun is thrown away too and fires
+--                 Discarded (bun, Altered). The altered sausage of the rail is still never popped from here.
 --   GrillAct      Place / Flip / Collect, the grill moves without a prompt (Stations/Grill.luau).
 --   TrashSausage  the bin by drag: a sausage of a grill slot or of the rail is thrown away (2026-10-12).
 -- Results are (value?, reason?): reason is a Content.Prep.Reasons key (NoSession, NoStock, NoSausage, HandsFull, Busy,
@@ -75,6 +76,7 @@ export type Deps = {
 	CanGive: (player: Player) -> boolean, -- room in the hotbar for a hot dog
 	Give: (player: Player, toppings: string, altered: boolean, quality: string?) -> Tool?,
 	Discard: (player: Player) -> boolean, -- BIN-C "discard" of the hot dog in hand
+	Discarded: (player: Player, item: string) -> (), -- an altered item thrown away by the prep bin (Discarded, Altered = true)
 }
 
 export type TrashFrom = "Grill" | "Rail"
@@ -144,7 +146,7 @@ function Plate.new(deps: Deps): PlateApi
 			return nil, "NoStation"
 		end
 		const now = ctx.Now()
-		const altered = Board.ClaimAltered(ctx, vehicle)
+		const altered = Board.ClaimAltered(ctx, vehicle, slot)
 		if altered ~= nil then
 			const ticket: Ticket = { Slot = altered, Altered = true, PreCut = true, Stocked = false, Since = now }
 			plates[player] = ticket
@@ -233,8 +235,13 @@ function Plate.new(deps: Deps): PlateApi
 		const ticket = plates[player]
 		if ticket ~= nil then
 			plates[player] = nil
-			release(ticket, ticket.Altered)
-			out.Bun = not ticket.Altered
+			-- TASK-346: the altered bun is thrown away like a normal one and resolves ANM-002 (it may be gone at 6:00 AM already)
+			const held = ticket.Altered and Board.Holds(deps.Vehicle(), ticket.Slot)
+			release(ticket, false)
+			out.Bun = not ticket.Altered or held
+			if held then
+				deps.Discarded(player, BUN)
+			end
 		end
 		if options ~= nil and options.Sausage == true then
 			const vehicle = deps.Vehicle()

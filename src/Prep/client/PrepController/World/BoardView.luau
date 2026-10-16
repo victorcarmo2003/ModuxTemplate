@@ -100,6 +100,8 @@ export type Options = {
 	RailFront: number,
 	-- the juice of the world (World.Juice)
 	Juice: () -> Juice.Juice,
+	-- TASK-346: the plate's bun is the altered one (ANM-002): the open bun is the kit's BunBitten (AST-061), BunOpen if missing
+	Altered: (() -> boolean)?,
 }
 
 const BoardView = {}
@@ -779,8 +781,15 @@ function BoardView.new(options: Options): View
 		if wanted ~= "None" and (closed == nil or closed.Parent == nil) then
 			closed = makeBun("BunClosed")
 		end
+		const openName = if options.Altered ~= nil and options.Altered() and kitModel("Food", "BunBitten") ~= nil
+			then "BunBitten"
+			else "BunOpen"
+		if wanted == "Open" and open ~= nil and open.Parent ~= nil and open.Name ~= `Prep_{openName}` then
+			open:Destroy()
+			open = nil
+		end
 		if wanted == "Open" and (open == nil or open.Parent == nil) then
-			open = makeBun("BunOpen")
+			open = makeBun(openName)
 		end
 		if wanted == "None" then
 			if closed ~= nil then

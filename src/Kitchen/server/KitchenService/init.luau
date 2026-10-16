@@ -1346,6 +1346,12 @@ function KitchenService:BuildPlateDeps(): Plate.Deps
 			self:Perform(DISCARD, player, bin)
 			return self.Dependencies.ItemService.Owners[tool] == nil
 		end,
+		-- TASK-346: the altered bun of a plate thrown in the prep bin (ANM-002 listens to Discarded)
+		Discarded = function(player: Player, item: string)
+			task.defer(function()
+				self.Discarded:Fire(player, item, true, "Vehicle")
+			end)
+		end,
 	}
 end
 

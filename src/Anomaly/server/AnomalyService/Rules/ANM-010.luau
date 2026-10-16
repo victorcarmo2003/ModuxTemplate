@@ -22,14 +22,17 @@ const rule: Api.Rule = {
 		HoldFor = 20,
 		-- safe point (architecture.md §19.14: InZone(player, "SS", r)); 6 -> 10 (TASK-334, PROVISIONAL): the doorway counts
 		Point = "SS",
-		Radius = 10,
+		Radius = 14, -- 10 -> 14 (owner 2026-10-16: the inside of the doorway counts)
 		-- s outside the safe zone in a row before a watched player fails (the Mart doorway, TASK-334; PROVISIONAL)
 		OutGrace = 2,
 		-- s between the jumpscare and the faint
 		ScareFaint = 0.7,
 		-- extra safe volumes: LightZone ZoneIds (tests/wave-3.md L3-12, npcs.md N10 "e o interior do Mart": who is
 		-- shopping inside the Mart does not fail). PROVISIONAL (backend-coder, TASK-117)
-		SafeZones = { "LZ-4" },
+		-- owner 2026-10-16: standing just inside the Mart failed (LZ-4 alone left the entrance out): LZ-5 (entrance) too
+		SafeZones = { "LZ-4", "LZ-5" },
+		-- studs added on every side of each safe LightZone (the gap between LZ-4 and LZ-5 at the door)
+		ZoneMargin = 4,
 	},
 }
 

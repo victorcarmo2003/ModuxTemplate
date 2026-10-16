@@ -15,7 +15,8 @@ const rule: Api.Rule = {
 		Variant = "mirror", -- CustomerService:SpawnActor variant (CopyOf = the original)
 		Wrong = "take_order", -- customer action on the copy that fails the rule
 		OmissionFails = false, -- copy left waiting until patience runs out: no penalty
-		FreeSlots = 2, -- free counter slots (and NPC cap room) needed to start: original + copy (npcs.md N4)
+		CopyDelay = 2, -- s after the original left the counter, its copy comes alone (TASK-347, Provisional: one NPC at
+		-- the night counter, so the original and the copy never stand together)
 		-- "The copy knocks" (DEC-247, Provisional): after the copy is served the back door locks; DoorDelayMin..Max s
 		-- later (uniform, no new customer meanwhile) the copy knocks KnockCount times, KnockGapMin..Max s apart
 		DoorDelayMin = 8,

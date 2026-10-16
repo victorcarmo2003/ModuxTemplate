@@ -1,12 +1,17 @@
 --!strict
 -- ANM-004 The copies (N4; TASK-111; anomalies.md N4; npcs.md NPC-012; DEC-051, DEC-195, DEC-204, DEC-247).
--- An ordinary customer (the original: a normal spawn, counts in the customer cap and the ledger) and its mirrored copy
--- (actor Variant "mirror", CopyOf = original: same type, species and outfit, mirrored on the client — TASK-112) walk to
--- the counter together. Needs Params.FreeSlots free counter slots and NPC cap room, otherwise Start waits.
+-- An ordinary customer (the original: a normal spawn, counts in the customer cap and the ledger) comes to the counter
+-- ALONE; Params.CopyDelay s after it left the counter (served, refused, gave up or went to a table) its mirrored copy
+-- (actor Variant "mirror": the original's type, species and outfit read at Start, mirrored on the client — TASK-112)
+-- comes back alone (TASK-347, Provisional: the night counter holds ONE NPC, Flow.NightQueueSize / TASK-287, so the
+-- pair can never stand together). Start needs one free counter slot and NPC cap room, otherwise it waits. From Start
+-- until the copy spawns no other customer arrives (HoldSpawns), so the slot is the copy's; no room for the copy within
+-- COPY_WAIT s = the occurrence ends with no outcome. The original goes through CustomerService:Attempt, so the dev
+-- "arrivals off" (DevNoArrivals, regular flow only) never stops it.
 -- Refuse the copy = resolved. "Take Order" on the copy = Fail of who took it, arrival + Wrong, cue mirror_smile and the
 -- copy walks off (then the door flow below). Refusing the original is only a lost sale (CustomerService counts it).
 -- Copy left waiting = nothing.
--- Never on the same customer as N1: the copy is a "mirror" actor and the original is never an actor (CopyOf refuses).
+-- Never on the same customer as N1: the copy is a "mirror" actor and the original is an ordinary Attempt spawn.
 -- Verb and numbers: Rules/ANM-004.luau. Body: Kit/CustomerActor.
 --
 -- "The copy knocks" (DEC-247, Provisional; the error of "Take Order" on the copy; the verb "refuse" does not change):
@@ -31,6 +36,9 @@ local Api = require(script.Parent.Parent.Api)
 local Kit = require(script.Parent.Kit.CustomerActor)
 
 const SPAWN_TRIES = 4 -- draws for a spawn point different from the original's
+const LEAVING = "Leaving"
+const DEFAULT_COPY_DELAY = 2 -- s from the original leaving the counter to the copy's spawn (same as the rule file)
+const COPY_WAIT = 30 -- s the copy may wait for a slot / NPC room after its delay; then the occurrence ends, no outcome
 const REASON = "ANM-004" -- lock / spawn-hold reason
 const DOOR_ACTIONS: { [string]: boolean } = { trailer_exit = true, trailer_enter = true }
 const GRAB_FINISH = 4.5 -- s after the grab: copy_grab (2 s) + fade (2 s) + margin, then the occurrence ends
@@ -99,51 +107,112 @@ local function between(rng: Random, low: number, high: number): number
 	return rng:NextNumber(low, high)
 end
 
-local function spawnPair(ctx: Api.Context, occ: Api.Occurrence, rule: Api.Rule, state: Kit.State): number?
-	const variant = rule.Params.Variant
-	const need = rule.Params.FreeSlots
-	if type(variant) ~= "string" or type(need) ~= "number" then
-		return nil
+-- Look of the original, read at Start (the copy spawns after the original left: CopyOf would refuse it by then)
+type Look = { CustomerType: string, Species: string, Outfit: string }
+type NpcLook = { CustomerType: string, Species: string, Outfit: string }
+
+-- Waiting phase of one occurrence (TASK-347): the original is at the counter, the copy has not spawned yet
+type Wait = {
+	Original: number,
+	Look: Look,
+	From: string?, -- the original's spawn node (the copy picks another one)
+	LeftAt: number?, -- server time the original left the counter
+}
+
+const waits: { [Api.Occurrence]: Wait } = setmetatable({}, { __mode = "k" }) :: any
+
+-- Spawns the original (an ordinary customer) and starts the waiting phase. false = no slot / room now.
+local function startOriginal(ctx: Api.Context, occ: Api.Occurrence): boolean
+	const rule = ctx.Rule(occ.Key)
+	if rule == nil or type(rule.Params.Variant) ~= "string" or type(rule.Params.Wrong) ~= "string" then
+		return false
 	end
 	const customers = Kit.Customers()
 	const npcs = Kit.Npcs()
-	-- DEC-241: the counter holds ONE customer by default; the original and its copy need two slots (Counter L2+), so the
-	-- anomaly does not start while QueueSize() < FreeSlots (the agenda retries after a Counter purchase)
-	if customers:QueueSize() < need or customers:QueueSize() - customers:Occupants() < need then
-		return nil
+	if customers:QueueSize() - customers:Occupants() < 1 or npcs:Capacity() - npcs:Count() < 1 then
+		return false
 	end
-	if npcs:Capacity() - npcs:Count() < need then
-		return nil
-	end
-	-- the original is an ordinary customer: it must fit in the customer cap too
 	if customers:Count() >= customers:MaxCustomers() then
-		return nil
+		return false
 	end
 	const _, original = customers:Attempt()
 	if original == nil then
-		return nil
+		return false
 	end
-	const from = npcs:GetNode(original)
+	const source = ((npcs :: any):Get(original)) :: NpcLook?
+	if source == nil then
+		return false
+	end
+	waits[occ] = {
+		Original = original,
+		Look = { CustomerType = source.CustomerType, Species = source.Species, Outfit = source.Outfit },
+		From = npcs:GetNode(original),
+		LeftAt = nil,
+	}
+	const state: Kit.State = { Actor = 0, Original = original, LastTick = ctx.Now(), Fronted = false, Counted = false }
+	occ.State = state
+	spawns():HoldSpawns(REASON, true)
+	ctx.Log(occ, `original #{original} at the counter; its copy comes after it leaves`)
+	return true
+end
+
+-- Waits for the original to leave the counter, then spawns the copy alone in the slot it left.
+local function tickWait(ctx: Api.Context, occ: Api.Occurrence, wait: Wait, now: number)
+	const rule = ctx.Rule(occ.Key)
+	const state = occ.State :: Kit.State
+	if rule == nil then
+		return
+	end
+	if wait.LeftAt == nil then
+		const customer = Kit.Customers():Get(wait.Original)
+		if customer ~= nil and customer.State ~= LEAVING and not (customer :: any).AtTable then
+			return
+		end
+		wait.LeftAt = now
+		return
+	end
+	const due = (wait.LeftAt :: number) + param(rule, "CopyDelay", DEFAULT_COPY_DELAY)
+	if now < due then
+		return
+	end
+	if now >= due + COPY_WAIT then
+		waits[occ] = nil
+		spawns():HoldSpawns(REASON, false)
+		ctx.Log(occ, `no room for the copy of #{wait.Original}; dropped`)
+		ctx.Finish(occ)
+		return
+	end
 	local point: string? = nil
 	for _ = 1, SPAWN_TRIES do
-		const pick = npcs:PickSpawnPoint(true, occ.Rng)
-		if pick ~= from then
+		const pick = Kit.Npcs():PickSpawnPoint(true, occ.Rng)
+		if pick ~= wait.From then
 			point = pick
 			break
 		end
 	end
-	const copy = ctx.Spawn({ Variant = variant, CopyOf = original, From = point })
+	const look = wait.Look
+	-- the hold also stops actors: lifted for this spawn only, set again when it is refused (retried next tick)
+	spawns():HoldSpawns(REASON, false)
+	const copy = ctx.Spawn({
+		Variant = rule.Params.Variant,
+		CustomerType = look.CustomerType,
+		Species = look.Species,
+		Outfit = look.Outfit,
+		From = point,
+	})
 	if copy == nil then
-		ctx.Log(occ, `copy of #{original} refused; the original stays an ordinary customer`)
-		return nil
+		spawns():HoldSpawns(REASON, true)
+		return
 	end
-	state.Original = original
-	return copy
+	waits[occ] = nil
+	state.Actor = copy
+	state.LastTick = now
+	ctx.Publish(occ, { Phase = "Active", Anchor = copy })
+	ctx.Log(occ, `copy #{copy} of #{wait.Original} spawned`)
 end
 
 const base = Kit.Module({
 	Ref = "ANM-004",
-	Spawn = spawnPair,
 	FailCue = "mirror_smile",
 })
 
@@ -222,11 +291,14 @@ end
 return {
 	Ref = base.Ref,
 
-	Start = base.Start,
+	Start = startOriginal,
 
 	Tick = function(ctx: Api.Context, occ: Api.Occurrence, now: number)
+		const wait = waits[occ]
 		const door = doors[occ]
-		if door ~= nil then
+		if wait ~= nil then
+			tickWait(ctx, occ, wait, now)
+		elseif door ~= nil then
 			tickDoor(ctx, occ, door, now)
 		elseif base.Tick ~= nil then
 			base.Tick(ctx, occ, now)
@@ -235,8 +307,8 @@ return {
 
 	OnEvent = function(ctx: Api.Context, occ: Api.Occurrence, event: Api.Event)
 		const state = occ.State :: Kit.State?
-		if state == nil then
-			return
+		if state == nil or waits[occ] ~= nil then
+			return -- waiting phase: the original is an ordinary customer, no verb on it
 		end
 		const door = doors[occ]
 		if door ~= nil then
@@ -264,6 +336,10 @@ return {
 	end,
 
 	Stop = function(ctx: Api.Context, occ: Api.Occurrence, reason: Api.StopReason)
+		if waits[occ] ~= nil then
+			waits[occ] = nil
+			spawns():HoldSpawns(REASON, false)
+		end
 		if doors[occ] ~= nil then
 			doors[occ] = nil
 			release()

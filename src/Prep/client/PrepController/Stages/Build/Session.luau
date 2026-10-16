@@ -50,6 +50,8 @@ Session.Open = source(false)
 Session.Pending = source("")
 -- The sausage is in the bun.
 Session.Placed = source(false)
+-- The plate's bun is the altered one of ANM-002 (PrepResult Begin Value 1; TASK-346: the 3D view draws it bitten).
+Session.Altered = source(false)
 -- The topping being worked on (a key of Content.Ingredients.ToppingKeys), "" = none picked.
 Session.Active = source("")
 -- Hold instead of drag (touch accessibility, docs/tech/prep-mode.md §5).
@@ -108,6 +110,7 @@ function Session.Reset()
 		Session.Open(false)
 		Session.Pending("")
 		Session.Placed(false)
+		Session.Altered(false)
 		Session.Active("")
 	end)
 	data.Cut = nil
@@ -212,6 +215,7 @@ local function opened(controller: any, preCut: boolean)
 	data.StartedAt = os.clock()
 	Vide.batch(function()
 		Session.Open(true)
+		Session.Altered(preCut)
 		view.Message("")
 		view.Bun("Closed")
 		view.Guide(true)
@@ -370,6 +374,7 @@ end
 type Parked = {
 	Data: { StartedAt: number, Cut: number?, Place: number?, Toppings: { Topping } },
 	Placed: boolean,
+	Altered: boolean,
 	View: { [string]: any },
 }
 local parked: Parked? = nil
@@ -388,6 +393,7 @@ function Session.Park(controller: any)
 	parked = {
 		Data = { StartedAt = data.StartedAt, Cut = data.Cut, Place = data.Place, Toppings = table.clone(data.Toppings) },
 		Placed = untrack(Session.Placed),
+		Altered = untrack(Session.Altered),
 		View = view,
 	}
 end
@@ -415,6 +421,7 @@ function Session.Unpark(controller: any, held: boolean): boolean
 		end
 		Session.Open(true)
 		Session.Placed(saved.Placed)
+		Session.Altered(saved.Altered)
 	end)
 	if data.Cut ~= nil then
 		controller:Need("BunCut", true)

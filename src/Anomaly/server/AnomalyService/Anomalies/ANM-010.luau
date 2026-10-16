@@ -68,6 +68,7 @@ type State = {
 	Point: string,
 	Radius: number,
 	SafeZones: { Zones.Zone },
+	ZoneMargin: number, -- studs of slack around each safe box zone
 	Range: number,
 	Watched: { [number]: Player },
 	OutSince: { [number]: number }, -- watched player outside the safe zone since (server time)
@@ -245,9 +246,18 @@ local function safe(ctx: Api.Context, state: State, player: Player): boolean
 	if root == nil then
 		return false
 	end
+	const margin = state.ZoneMargin
 	for _, zone in state.SafeZones do
 		if Zones.contains(zone, root.Position) then
 			return true
+		end
+		-- a few studs of slack around a box zone: the doorway between two zones still counts (owner 2026-10-16)
+		if margin > 0 and zone.Kind ~= "Ball" then
+			const p = zone.CFrame:PointToObjectSpace(root.Position)
+			const half = zone.Half
+			if math.abs(p.X) <= half.X + margin and math.abs(p.Y) <= half.Y + margin and math.abs(p.Z) <= half.Z + margin then
+				return true
+			end
 		end
 	end
 	return false
@@ -319,6 +329,7 @@ const Hush: Api.Module = {
 			Point = text(rule, "Point", DEFAULT_POINT),
 			Radius = param(rule, "Radius", DEFAULT_RADIUS),
 			SafeZones = safeZones(zoneIds(rule)),
+			ZoneMargin = if rule ~= nil and type(rule.Params.ZoneMargin) == "number" then rule.Params.ZoneMargin else 0,
 			Range = if row ~= nil then row.ViewRange else 0,
 			Watched = {},
 			OutSince = {},

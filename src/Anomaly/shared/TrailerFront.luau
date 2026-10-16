@@ -5,7 +5,9 @@
 --   Out     horizontal unit from the trailer pivot (MapPoint TRL) to the street: towards WALKER-10 (across the street,
 --           MAP-01 §5.6) when the place has it, else the pose's LookVector.
 --   Window  service window spot, WINDOW_OUT studs out from the pivot.
---   Stop    where the long car brakes: STOP_OUT studs out (on the street), nose turned to the window.
+--   Stop    where the long car brakes: STOP_OUT studs out (on the street), nose turned to the window. Its height is
+--           `ground` (the street: the lane MapPoint E-IN) when given: the TRL pivot sits below the street (MAP-01: Y -1.52
+--           vs road ~0), so a car at the pivot height was sunk in the ground (TASK-348).
 -- PROVISIONAL (TASK-331): distances measured on MAP-01 (window wall ~6 out, lane ~24 out).
 local TrailerFront = {}
 
@@ -15,7 +17,7 @@ const STOP_OUT = 21 -- studs from the trailer pivot to the centre of the braked 
 export type Front = {
 	Out: Vector3,
 	Window: Vector3,
-	Stop: CFrame, -- car pivot on the ground, LookVector = towards the window
+	Stop: CFrame, -- car pivot on the ground (Y = `ground` when given), LookVector = towards the window
 }
 
 local function flat(vector: Vector3): Vector3
@@ -23,10 +25,11 @@ local function flat(vector: Vector3): Vector3
 	return if out.Magnitude < 1e-3 then Vector3.new(0, 0, -1) else out.Unit
 end
 
-function TrailerFront.Of(trailer: CFrame, across: CFrame?): Front
+function TrailerFront.Of(trailer: CFrame, across: CFrame?, ground: number?): Front
 	const out = if across ~= nil then flat(across.Position - trailer.Position) else flat(trailer.LookVector)
 	const base = trailer.Position
-	const stop = base + out * STOP_OUT
+	const flatStop = base + out * STOP_OUT
+	const stop = if ground ~= nil then Vector3.new(flatStop.X, ground, flatStop.Z) else flatStop
 	return {
 		Out = out,
 		Window = base + out * WINDOW_OUT,

@@ -159,7 +159,8 @@ end
 local function route(ctx: Effect.Context): Route
 	const eIn = ctx.Point("E-IN") or FALLBACK_E_IN
 	const wb: Lane = { Origin = eIn.Position, Dir = flatUnit(eIn.LookVector, Vector3.xAxis) }
-	const front = TrailerFront.Of(ctx.Point("TRL") or FALLBACK_TRL, ctx.Point("WALKER-10"))
+	-- the car drives at the lane's height (E-IN sits on the road), never at the TRL pivot (below the street, TASK-348)
+	const front = TrailerFront.Of(ctx.Point("TRL") or FALLBACK_TRL, ctx.Point("WALKER-10"), eIn.Position.Y)
 	return { Wb = wb, EdgeIn = wb.Origin - wb.Dir * EDGE_RUN, Front = front }
 end
 

@@ -1048,6 +1048,9 @@ local function build3D(controller: any)
 		Knife = if knifeInstance ~= nil and knifeInstance:IsA("BasePart") then knifeInstance else nil,
 		RailFront = 1,
 		Juice = World.Juice,
+		Altered = function(): boolean
+			return untrack(Session.Altered)
+		end,
 	})
 	const tool = ToolView.new(folder :: Folder, world, view.Orient)
 	const strokes = Strokes.new(folder :: Folder, world, view.Plane, function(uv: Vector2): number

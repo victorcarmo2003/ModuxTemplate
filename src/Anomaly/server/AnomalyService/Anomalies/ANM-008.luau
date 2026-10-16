@@ -29,6 +29,7 @@ local Kit = require(script.Parent.Kit.CustomerActor)
 const REF = "ANM-008"
 const TRAILER_POINT = "TRL"
 const ACROSS_POINT = "WALKER-10"
+const LANE_POINT = "E-IN" -- on the road: the car's height (TASK-348; the client effect does the same)
 const HOLD_REASON = "anm_008"
 const SCARE_CUE = "jumpscare"
 const ENTITY_MOD = 65536 -- AnomalyCue.Entity is 0..65535
@@ -158,7 +159,9 @@ const LongCar: Api.Module = {
 			end
 			return false
 		end
-		const front = TrailerFront.Of(trailer, MapIndex.FindPoint(ACROSS_POINT))
+		const lane = MapIndex.FindPoint(LANE_POINT)
+		const front =
+			TrailerFront.Of(trailer, MapIndex.FindPoint(ACROSS_POINT), if lane ~= nil then lane.Position.Y else nil)
 		const rule = ctx.Rule(REF)
 		const row = Content.Anomalies.ByKey[occ.Key]
 		const parkedAt = occ.StartedAt + param(rule, "ArriveAt", DEFAULT_ARRIVE_AT)

@@ -260,7 +260,9 @@ function Board.Reserve(ctx: Context, vehicle: string, slot: number?, duration: n
 end
 
 -- Takes the sliced altered bun (ANM-002) that sits free on the board for a plate. Returns its slot, nil = none.
-function Board.ClaimAltered(ctx: Context, vehicle: string): number?
+-- TASK-346: `preferred` (the seat's slot) receives the bun when it is a free active slot, so the 3D Build view that works on
+-- the seat's slot hides the world's copy and draws it as the plate's bun.
+function Board.ClaimAltered(ctx: Context, vehicle: string, preferred: number?): number?
 	const station = Board.Find(vehicle)
 	if station == nil then
 		return nil
@@ -268,10 +270,21 @@ function Board.ClaimAltered(ctx: Context, vehicle: string): number?
 	const reserved = reservedOf(station)
 	for slot, record in station.Records do
 		if record.State == "Ready" and (record.Altered or 0) > 0 and not reserved[slot] then
-			reserved[slot] = true
+			local target = slot
+			if preferred ~= nil and preferred ~= slot and table.find(activeSlots(station), preferred) ~= nil then
+				const free = station.Records[preferred]
+				if not reserved[preferred] and (free == nil or free.State == "Empty") then
+					station.Records[preferred] = record
+					station.Records[slot] = StationApi.empty(KIND)
+					target = preferred
+					sync(station)
+					ctx.Publish(station)
+				end
+			end
+			reserved[target] = true
 			refreshAdd(ctx, station)
-			Board.SetPlate(vehicle, slot, 0)
-			return slot
+			Board.SetPlate(vehicle, target, 0)
+			return target
 		end
 	end
 	return nil
