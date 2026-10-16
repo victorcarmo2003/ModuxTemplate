@@ -312,8 +312,13 @@ de `src/Libs`, requeira direto, e rode `tools/analyze.ps1` de novo.
 
 ```sh
 modux check          # falha se algo esta desatualizado (CI)
-tools/analyze.ps1    # roda o motor do editor sobre o projeto inteiro
+tools/analyze.ps1            # roda o motor do editor sobre o projeto inteiro (um processo só)
+tools/analyze.ps1 -Changed   # só as features mexidas desde o HEAD (rápido, enquanto trabalha)
 ```
+
+`-Changed` analisa as pastas `src/<Feature>` tocadas (`git diff` + não rastreados); se mexeu em
+`Shared`, `Libs`, `Modux` ou `ModuxTypes`, analisa tudo. Mudança de assinatura pode quebrar outra feature,
+então o gate completo continua obrigatório antes do commit.
 
 `analyze.ps1` passando não prova que os tipos existem — prova que nada errou.
 Para saber se o `self` está mesmo tipado, escreva um acesso que **deveria**

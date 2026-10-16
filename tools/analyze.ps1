@@ -2,7 +2,10 @@ param(
     [string]$Src    = "src",
     [string]$Filter = "*",
     [string]$Defs   = "",
-    [switch]$Detail
+    [switch]$Detail,
+    # Quick mode while working: only the features touched since HEAD (git diff + untracked). Shared code (Shared, Libs,
+    # Modux, ModuxTypes) or a changed signature can break other features, so the full gate still runs before a commit.
+    [switch]$Changed
 )
 
 $ErrorActionPreference = "Stop"
@@ -34,8 +37,6 @@ if (-not (Test-Path -LiteralPath $map)) {
 
 Write-Host "engine: luau-lsp + Rojo sourcemap + Roblox definitions" -ForegroundColor DarkGray
 
-$files = Get-ChildItem -Path $Src -Recurse -Filter *.luau |
-    Where-Object { $_.FullName -like $Filter }
 
 # LuauTypeInferIterationLimit 80000 (default 20000; was 40000 until the Anomaly/Showcase hooks, 2026-10-12): the Modux self of the biggest Services (10+ dependencies plus
 # typeof(Net)) exceeds the default budget and reports "Code is too complex to typecheck" on correct code (TASK-048).
@@ -43,16 +44,52 @@ $files = Get-ChildItem -Path $Src -Recurse -Filter *.luau |
 $base = @("analyze", "--sourcemap=$map", "--flag:LuauSolverV2=true", "--flag:LuauTypeInferIterationLimit=80000")
 if ($Defs) { $base += "--definitions=$Defs" }
 
-# Relative paths in batches: one command line with every absolute path exceeds the Windows limit
-# ("The filename or extension is too long") and the engine never runs, which used to report a false 0.
-$root = (Get-Location).Path
-$paths = @($files | ForEach-Object { $_.FullName.Substring($root.Length + 1) })
-$batch = 100
+# What to analyze. ONE engine process whenever possible: every process type-checks the shared Modux / Net / Content
+# types again from zero, so the old 9 batches of 100 files paid that cost 9 times (owner 2026-10-16: the gate was slow).
+#   default          the whole $Src folder as one directory argument (the engine walks it)
+#   -Changed         the touched feature folders only (src/<Feature>), or the whole folder when shared code changed
+#   -Filter <glob>   the matching files, in batches (a file list can exceed the Windows command-line limit, which used
+#                    to make the engine never run and report a false 0)
+$targets = @()
+if ($Changed) {
+    $touched = @(& git diff --name-only HEAD 2>$null) + @(& git ls-files --others --exclude-standard 2>$null)
+    $features = @{}
+    $shared = $false
+    foreach ($path in $touched) {
+        # extension first: every -match / -notmatch that matches rewrites $Matches
+        if (-not $path.EndsWith(".luau") -or $path -notmatch "^$Src/([^/]+)/") { continue }
+        $feature = $Matches[1]
+        if ($feature -in @("Shared", "Libs", "Modux", "ModuxTypes")) { $shared = $true } else { $features[$feature] = $true }
+    }
+    if ($shared) {
+        Write-Host "changed: shared code, analyzing all of $Src" -ForegroundColor DarkGray
+        $targets = @(, @($Src))
+    } elseif ($features.Count -eq 0) {
+        Write-Host "changed: no .luau under $Src since HEAD" -ForegroundColor DarkGray
+        Write-Host "total: 0 error(s), 0 cycle(s)"
+        exit 0
+    } else {
+        $dirs = @($features.Keys | Sort-Object | ForEach-Object { "$Src/$_" })
+        Write-Host "changed: $($dirs -join ', ')" -ForegroundColor DarkGray
+        $targets = @(, $dirs)
+    }
+} elseif ($Filter -eq "*") {
+    $targets = @(, @($Src))
+} else {
+    $root = (Get-Location).Path
+    $paths = @(Get-ChildItem -Path $Src -Recurse -Filter *.luau |
+        Where-Object { $_.FullName -like $Filter } |
+        ForEach-Object { $_.FullName.Substring($root.Length + 1) })
+    $batch = 300
+    for ($i = 0; $i -lt $paths.Count; $i += $batch) {
+        $targets += , @($paths[$i..([Math]::Min($i + $batch, $paths.Count) - 1)])
+    }
+}
+
 $output = @()
 $previous = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
-for ($i = 0; $i -lt $paths.Count; $i += $batch) {
-    $chunk = $paths[$i..([Math]::Min($i + $batch, $paths.Count) - 1)]
+foreach ($chunk in $targets) {
     $output += & $engine @($base + $chunk) 2>&1 | ForEach-Object { "$_" } | Where-Object { $_ -notmatch '\[INFO\]' }
 }
 $ErrorActionPreference = $previous

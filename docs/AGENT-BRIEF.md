@@ -8,8 +8,8 @@ Fontes: `CLAUDE.md`, `README.md`, `docs/PIPELINE.md`, `tools/assetplace/STUDIO_L
 ## 1. Gate (nesta ordem, antes de entregar)
 
 1. `rogen build` → `modux generate` → `modux check` (zero erro).
-2. `tools/analyze.ps1 -Filter "*SeuArquivo.luau"` filtrado **nos seus arquivos**. Erro fora deles: liste, não conserte.
-3. O **orquestrador** roda o `analyze.ps1` completo (demora > 2 min) e é o **único que commita**. Agente não faz `git commit`.
+2. `tools/analyze.ps1 -Changed` (só as features que você mexeu) ou `-Filter "*SeuArquivo.luau"`. Erro fora dos seus arquivos: liste, não conserte.
+3. O **orquestrador** roda o `analyze.ps1` completo (um processo só) e é o **único que commita**. Agente não faz `git commit`.
 4. Gerados, nunca à mão: `*/Manifest/init.luau`, `*/Modules.luau`, `shared/Libs.luau`, `src/ModuxTypes/**`, `src/Modux/**`.
 5. Warnings de CRLF/LF do git são ruído, ignore. Tipo gerado quebrado em `ModuxTypes` quase sempre é comentário `--` no meio de um `self.X = ... :: T -- texto` em Setup: comentário vai na linha de cima.
 
