@@ -303,7 +303,8 @@ const SHOPPING: { string } = { "mart_go", "mart_buy", "mart_back", "restock" }
 -- prep_work (Prompt_Work of Station_n, focused prep mode): the kitchen steps are done at a station, so the prompt is
 -- never gated (it only exists in the selling phases anyway: Content.Actions Requires.Phase).
 -- trailer_exit / trailer_enter: the back door is never gated (the tutorial must not lock the player in or out of the trailer)
-const ALWAYS: { string } = { "answer_phone", "prep_work", "trailer_exit", "trailer_enter" }
+-- pick_up_item: an item dropped by a car hit must always be recoverable, whatever the step (owner bug 2026-10-16)
+const ALWAYS: { string } = { "answer_phone", "prep_work", "trailer_exit", "trailer_enter", "pick_up_item" }
 const NEXT_ACTIONS: { [string]: { string } } = {
 	phone = { "shutter_toggle" },
 	open = { "take_order" },
