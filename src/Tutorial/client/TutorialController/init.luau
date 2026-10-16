@@ -109,7 +109,8 @@ local Trail = require(script.Trail)
 local PrepPlate = require(StarterPlayer.StarterPlayerScripts.client.Prep.PrepController.Stages.Build.Session)
 
 const TAG = "Interactable"
-const TRAIL_RETRY = 1 -- s between two route builds while the map is still streaming in (TASK-322)
+const TRAIL_RETRY = 1 -- s between two route builds (map still streaming in, or the player strayed) (TASK-322)
+const TRAIL_STRAY = 5 -- studs off the trail before it is rebuilt from the player
 const VEHICLE_TAG = "Vehicle"
 const STATION_TAG = "Station"
 const WORK_ACTION = "prep_work" -- Prompt_Work of Station_n (PrepService)
@@ -255,9 +256,10 @@ function TutorialController:Setup()
 	self.Trail = Trail.new(function(): Instance
 		return self:FxFolder()
 	end) :: Trail.Trail
-	self.TrailRoute = nil :: { Vector3 }?
-	self.TrailBack = nil :: { Vector3 }?
-	self.TrailTriedAt = 0 :: number -- os.clock of the last Trail.Route try
+	self.TrailRoute = nil :: { Vector3 }? -- current route, from the player's feet (Trail.RouteFrom)
+	self.TrailKey = "" :: string -- step the route was built for
+	self.TrailInside = false :: boolean -- the route was built from inside the trailer
+	self.TrailTriedAt = 0 :: number -- os.clock of the last Trail.RouteFrom try
 	-- Tutorial customer: TutorialBegin sent (os.clock of the last one, 0 = never); its NpcId once seen (0 = none)
 	self.AskedAt = 0 :: number
 	self.GuestId = 0 :: number
@@ -1184,20 +1186,29 @@ function TutorialController:UpdateTrail()
 		end
 		return
 	end
-	if self.TrailRoute == nil then
-		const now = os.clock()
-		if now - self.TrailTriedAt < TRAIL_RETRY then
-			return
-		end
-		self.TrailTriedAt = now
-		const route = Trail.Route()
-		if route == nil then
-			return
-		end
-		self.TrailRoute = route
-		self.TrailBack = Trail.Reversed(route)
+	-- the trail starts at the player (owner request 2026-10-16): rebuilt when he strays TRAIL_STRAY studs from it or
+	-- crosses the trailer wall (inside, it only leads to the Exit Trailer door)
+	const feet = Trail.Feet()
+	if feet == nil then
+		return
 	end
-	const route = if key == "mart_go" then self.TrailRoute else self.TrailBack
+	const inside = Trail.Inside(feet)
+	local route = self.TrailRoute
+	if route == nil or self.TrailKey ~= key or self.TrailInside ~= inside or Trail.Off(route, feet) > TRAIL_STRAY then
+		const now = os.clock()
+		if now - self.TrailTriedAt >= TRAIL_RETRY or (route ~= nil and (self.TrailKey ~= key or self.TrailInside ~= inside)) then
+			self.TrailTriedAt = now
+			local fresh = Trail.RouteFrom(feet, if key == "mart_go" then "Mart" else "Trailer")
+			if fresh == nil and (self.TrailKey ~= key or self.TrailInside ~= inside) then
+				route = nil -- the old route no longer fits: none until the map answers (retried every TRAIL_RETRY)
+				self.Trail.Hide()
+			end
+			self.TrailRoute = fresh or route
+			self.TrailKey = key
+			self.TrailInside = inside
+			route = self.TrailRoute
+		end
+	end
 	if route then
 		self.Trail.Show(route)
 	end

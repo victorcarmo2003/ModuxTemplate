@@ -228,6 +228,12 @@
 						"optional": "src/Coffee/server"
 					}
 				},
+				"Crew": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Crew/server"
+					}
+				},
 				"Customer": {
 					"$ignoreUnknownInstances": false,
 					"$path": {

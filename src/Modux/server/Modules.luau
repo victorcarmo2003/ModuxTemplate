@@ -11,6 +11,7 @@ return {
 	ServerScriptService.server.Class.ClassService,
 	ServerScriptService.server.Codes.CodesService,
 	ServerScriptService.server.Coffee.CoffeeHandService,
+	ServerScriptService.server.Crew.CrewColorService,
 	ServerScriptService.server.Customer.CustomerService,
 	ServerScriptService.server.Cutscene.CutsceneService,
 	ServerScriptService.server.Dev.DevService,

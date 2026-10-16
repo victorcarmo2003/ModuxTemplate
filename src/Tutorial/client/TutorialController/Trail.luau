@@ -3,9 +3,10 @@
 	Trail: dashed 3D path on the ground between the trailer door and the Mart door (TASK-322, owner request 2026-10-15,
 	Provisional). Shown on the shopping steps mart_go (trailer -> Mart) and mart_back (Mart -> trailer).
 
-	  - Route: MapPoint TRL-OUT (where Exit Trailer drops the player) -> NpcNode graph (MapIndex.Path, queue slots never
-	    in the middle, crosswalk edges kept, so it follows the sidewalk and the zebra) -> MapPoint MKT-DOOR. The owner
-	    builds the point list (Route) and hands it to Show; mart_back passes it reversed.
+	  - Route (owner request 2026-10-16, Provisional): it always STARTS AT THE PLAYER (RouteFrom). Inside the trailer
+	    (LightZone LZ-1) it only goes to the Exit Trailer prompt; outside: player -> NpcNode graph (MapIndex.Path,
+	    queue slots never in the middle, crosswalk edges kept, so it follows the sidewalk and the zebra) -> the goal
+	    (MapPoint MKT-DOOR on mart_go, TRL-OUT on mart_back). The owner rebuilds it when the player strays (Off).
 	  - Look: short flat Mustard dashes with one Ink-outlined Highlight on the whole trail (same colours as Arrow3D),
 	    occluded by buildings so it reads as paint on the floor.
 	  - Motion: the dashes slide toward the destination; the ones the player already walked past are hidden. Reduced
@@ -13,10 +14,12 @@
 	  - Under a cinematic (Cinematic.Active) it is taken out of the world and comes back when it ends.
 	Local only (client parts in a Workspace folder, no collision, no query, no touch, no shadow).
 ]]
+local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
+local Zones = require(ReplicatedStorage.shared.Light.Zones)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
 local Motion = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Motion)
 local Cinematic = require(StarterPlayer.StarterPlayerScripts.client.Interface.Cinematic)
@@ -49,6 +52,10 @@ const PARK = CFrame.new(0, -1e4, 0)
 
 const TRAILER_DOOR = "TRL-OUT"
 const MART_DOOR = "MKT-DOOR"
+const INTERIOR_ZONE = "LZ-1" -- LightZone of the trailer interior (VehicleService:IsInside reads the same volume)
+const EXIT_ACTION = "trailer_exit" -- PromptAction of the Exit Trailer anchor (TrailerDoorService)
+const ANCHOR_TAG = "Interactable"
+const FOOT_PROBE = 8 -- studs under the root the floor ray looks
 
 const Trail = {}
 
@@ -56,16 +63,61 @@ local function isQueue(id: string): boolean
 	return string.match(id, "^Q%d+$") ~= nil
 end
 
--- Trailer door -> Mart door through the graph; nil while the binding / the nodes are not streamed in.
-function Trail.Route(): { Vector3 }?
+export type Goal = "Mart" | "Trailer"
+
+-- Point on the floor under the local character, nil without a character
+function Trail.Feet(): Vector3?
+	const character = Players.LocalPlayer.Character
+	const root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
+	if character == nil or root == nil or not root:IsA("BasePart") then
+		return nil
+	end
+	const params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { character :: Instance }
+	const hit = workspace:Raycast(root.Position, -Vector3.yAxis * FOOT_PROBE, params)
+	return if hit then hit.Position else root.Position - Vector3.yAxis * 3
+end
+
+-- `position` (feet) inside the trailer interior (LZ-1)
+function Trail.Inside(position: Vector3): boolean
+	for _, instance in CollectionService:GetTagged(Zones.Tag) do
+		if instance:IsA("BasePart") and instance:GetAttribute("ZoneId") == INTERIOR_ZONE then
+			const zone = Zones.read(instance)
+			return zone ~= nil and Zones.contains(zone, position + Vector3.yAxis * 2)
+		end
+	end
+	return false
+end
+
+-- World position of the Exit Trailer prompt (inside, at the door), nil when not streamed
+local function exitDoor(): Vector3?
+	for _, anchor in CollectionService:GetTagged(ANCHOR_TAG) do
+		if anchor:GetAttribute("PromptAction") == EXIT_ACTION and anchor:IsDescendantOf(workspace) then
+			if anchor:IsA("Attachment") then
+				return anchor.WorldPosition
+			elseif anchor:IsA("BasePart") then
+				return anchor.Position
+			end
+		end
+	end
+	return nil
+end
+
+-- Route that starts at `from` (the player's feet): inside the trailer, to the Exit Trailer door; outside, through the
+-- graph to the goal door. nil while the binding / the nodes are not streamed in.
+function Trail.RouteFrom(from: Vector3, goal: Goal): { Vector3 }?
 	const ok, points = pcall(function(): { Vector3 }?
-		const from = MapIndex.FindPoint(TRAILER_DOOR)
-		const to = MapIndex.FindPoint(MART_DOOR)
-		if from == nil or to == nil then
+		if Trail.Inside(from) then
+			const door = exitDoor()
+			return if door ~= nil then { from, Vector3.new(door.X, from.Y, door.Z) } else nil
+		end
+		const target = MapIndex.FindPoint(if goal == "Mart" then MART_DOOR else TRAILER_DOOR)
+		if target == nil then
 			return nil
 		end
-		const first = MapIndex.NearestNode(from.Position, isQueue)
-		const last = MapIndex.NearestNode(to.Position, isQueue)
+		const first = MapIndex.NearestNode(from, isQueue)
+		const last = MapIndex.NearestNode(target.Position, isQueue)
 		if first == nil or last == nil then
 			return nil
 		end
@@ -73,22 +125,37 @@ function Trail.Route(): { Vector3 }?
 		if ids == nil then
 			return nil
 		end
-		const out = { from.Position }
-		for _, id in ids do
-			table.insert(out, MapIndex.Node(id).Position)
+		const out = { from }
+		for index, id in ids do
+			const node = MapIndex.Node(id).Position
+			-- a first node behind the player (the second one is closer to him than to it) is skipped: no U-turn
+			const after = ids[index + 1]
+			if index == 1 and after ~= nil then
+				const ahead = MapIndex.Node(after).Position
+				if (ahead - from).Magnitude < (ahead - node).Magnitude then
+					continue
+				end
+			end
+			table.insert(out, node)
 		end
-		table.insert(out, to.Position)
+		table.insert(out, target.Position)
 		return out
 	end)
 	return if ok then points else nil
 end
 
-function Trail.Reversed(points: { Vector3 }): { Vector3 }
-	const out: { Vector3 } = {}
-	for i = #points, 1, -1 do
-		table.insert(out, points[i])
+-- Flat distance from `position` to the polyline `points`
+function Trail.Off(points: { Vector3 }, position: Vector3): number
+	local best = math.huge
+	for i = 1, #points - 1 do
+		const a, b = points[i], points[i + 1]
+		const ab = Vector3.new(b.X - a.X, 0, b.Z - a.Z)
+		const ap = Vector3.new(position.X - a.X, 0, position.Z - a.Z)
+		const span = ab:Dot(ab)
+		const t = if span > 0 then math.clamp(ap:Dot(ab) / span, 0, 1) else 0
+		best = math.min(best, (ap - ab * t).Magnitude)
 	end
-	return out
+	return best
 end
 
 local function samePoints(a: { Vector3 }, b: { Vector3 }): boolean
@@ -224,7 +291,6 @@ function Trail.new(folder: () -> Instance): Trail
 			dashes[i]:Destroy()
 			dashes[i] = nil
 		end
-		startClock = os.clock()
 	end
 
 	return {
@@ -232,8 +298,11 @@ function Trail.new(folder: () -> Instance): Trail
 			if #list < 2 then
 				return
 			end
-			if not on or not samePoints(points, list) then
+			if not on then
 				build(list)
+				startClock = os.clock()
+			elseif not samePoints(points, list) then
+				build(list) -- moved route: the dash phase keeps going, no jump
 			end
 			on = true
 		end,

@@ -7,13 +7,14 @@
 --                        Tool he holds (the hot dog). The arm is the real one, frozen at his seat; what he drags live is
 --                        World/Ghost.luau (DEC-259, PrepGhost), which draws its own item and tag apart from the character.
 --                        That arm gets a Highlight in his colour and a BillboardGui with his username (Adornee = the arm).
--- Colour: Rules.World.Presence.Palette[station] (stable per seat, never red). `Mates.ColorOf(station)` is exported for UI chips.
+-- Colour: the working player's CrewColor (Presence.Palette entry, never red; name tag and outline use it too). `Mates.ColorOf(station)` is exported for UI chips.
 -- The own rig is NOT handled here (Rig.luau hides it whole). Everything is restored on Release / Destroy.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 
 local Content = require(ReplicatedStorage.shared.Content)
+local CrewColor = require(ReplicatedStorage.shared.Crew.CrewColor)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
 
 export type Mates = {
@@ -58,8 +59,15 @@ const SWITCHABLE = { "BillboardGui", "ParticleEmitter", "Trail", "Beam", "Surfac
 
 const Mates = {}
 
--- Colour of a seat (1..4 take the first palette entries); any number maps into the palette.
+-- Colour of a seat = the colour of the player working there (Crew/shared/CrewColor: the same one as his name tag and
+-- outline, owner request 2026-10-16); a free seat falls back to its palette entry.
 function Mates.ColorOf(station: number): Color3
+	for _, player in Players:GetPlayers() do
+		const character = player.Character
+		if character ~= nil and character:GetAttribute("Working") == station then
+			return CrewColor.Of(player)
+		end
+	end
 	const palette = presence.Palette
 	return palette[(math.max(station, 1) - 1) % #palette + 1]
 end
