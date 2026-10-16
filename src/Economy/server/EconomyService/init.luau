@@ -29,6 +29,7 @@ local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 local TopUp = require(ReplicatedStorage.shared.Shop.TopUp)
 local Ledger = require(script.Ledger)
 local Modux = require(ServerScriptService.server.Modux)
+local MetricsLog = require(ServerScriptService.server.Metrics.MetricsService.Log)
 
 export type Grade = Ledger.Grade
 export type SaleResult = Ledger.SaleResult
@@ -150,7 +151,7 @@ end
 -- Atomic check-and-debit: nothing yields between the read and the write, so two purchases handled in the same
 -- frame run one after the other and the second sees the debited balance (T021-07). On failure with `player`,
 -- that player gets "not_enough_cash" with the price.
-function EconomyService:Spend(amount: number, player: Player?): boolean
+function EconomyService:Spend(amount: number, player: Player?, sku: string?): boolean
 	const value = amountOf(amount)
 	if value == nil then
 		fail(`[EconomyService] Spend: amount must be a non-negative integer, got {amount}`)
@@ -165,6 +166,7 @@ function EconomyService:Spend(amount: number, player: Player?): boolean
 		return false
 	end
 	self.Cash(cash - value)
+	MetricsLog.cash("Sink", value, cash - value, "Spend", player, sku)
 	return true
 end
 
@@ -214,6 +216,7 @@ function EconomyService:AddSale(amount: number, kind: SaleKind): number
 	end
 	self.Cash(cash + added)
 	Ledger.credit(self.Shift, kind, added)
+	MetricsLog.cash("Source", added, cash + added, kind)
 	return added
 end
 
@@ -236,6 +239,7 @@ function EconomyService:AddTip(amount: number): number
 	end
 	self.Drawer(jar + added)
 	Ledger.credit(self.Shift, "Tip", added)
+	MetricsLog.server("tip", added, { jar = jar + added })
 	return added
 end
 
@@ -264,6 +268,7 @@ function EconomyService:Steal(amount: number): number
 	end
 	self.Drawer(drawer - taken)
 	self.Shift.Stolen += taken
+	MetricsLog.server("tips_stolen", taken)
 	return taken
 end
 
@@ -285,6 +290,7 @@ function EconomyService:CollectTips(): number
 		self.Drawer(jar - moved)
 	end)
 	self.Shift.Collected += moved
+	MetricsLog.cash("Source", moved, cash + moved, "TipsCollected")
 	return moved
 end
 
@@ -428,7 +434,7 @@ end
 -- First-run tutorial (user request 2026-10-11, Provisional; TutorialService): Cash goes up to at least `amount` (the
 -- price of the package Walt sends the rookie to buy), so the shopping lesson never stalls on money. Never lowers Cash.
 -- Returns what was added.
-function EconomyService:TopUp(amount: number): number
+function EconomyService:TopUp(amount: number, transaction: string?, player: Player?, sku: string?): number
 	const value = amountOf(amount)
 	if value == nil then
 		fail(`[EconomyService] TopUp: amount must be a non-negative integer, got {amount}`)
@@ -438,7 +444,9 @@ function EconomyService:TopUp(amount: number): number
 	if cash >= value then
 		return 0
 	end
-	self.Cash(math.min(value, CASH_MAX))
+	const balance = math.min(value, CASH_MAX)
+	self.Cash(balance)
+	MetricsLog.cash("Source", balance - cash, balance, transaction or "TutorialTopUp", player, sku)
 	return value - cash
 end
 

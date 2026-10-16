@@ -25,6 +25,7 @@ return {
 	ServerScriptService.server.Light.LightService,
 	ServerScriptService.server.Lobby.LobbyService,
 	ServerScriptService.server.Market.MarketService,
+	ServerScriptService.server.Metrics.MetricsService,
 	ServerScriptService.server.Net.NetService,
 	ServerScriptService.server.Npc.NpcService,
 	ServerScriptService.server.Party.PartyRunService,

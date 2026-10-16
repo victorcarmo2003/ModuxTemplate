@@ -4,6 +4,7 @@ local StarterPlayer = game:GetService("StarterPlayer")
 local AdminController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.AdminController)
 local AnimController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.AnimController)
 local AnomalyController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.AnomalyController)
+local OutsideController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.OutsideController)
 local AtmosphereController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.AtmosphereController)
 local AudioController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.AudioController)
 local BossController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.BossController)
@@ -63,6 +64,7 @@ export type AllControllers = {
 	AdminController: AdminController.Public,
 	AnimController: AnimController.Public,
 	AnomalyController: AnomalyController.Public,
+	OutsideController: OutsideController.Public,
 	AtmosphereController: AtmosphereController.Public,
 	AudioController: AudioController.Public,
 	BossController: BossController.Public,

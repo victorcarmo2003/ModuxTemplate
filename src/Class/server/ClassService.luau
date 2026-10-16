@@ -18,6 +18,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local Content = require(ReplicatedStorage.shared.Content)
 local TopUp = require(ReplicatedStorage.shared.Shop.TopUp)
 local Modux = require(ServerScriptService.server.Modux)
+local MetricsLog = require(ServerScriptService.server.Metrics.MetricsService.Log)
 
 export type Action = "Buy" | "Select"
 export type Currency = "Gems" | "Robux"
@@ -196,6 +197,7 @@ function ClassService:BuyWithGems(player: Player, key: string): BuyReason
 		Classes = profiles:WithClass(profile, key),
 	})
 	profiles:RequestSave(player)
+	MetricsLog.gems(player, "Sink", class.Price, gems - class.Price, "ClassBuy", key)
 	return "Ok"
 end
 

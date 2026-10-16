@@ -26,6 +26,7 @@ local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 local Ledger = require(ServerScriptService.server.Economy.EconomyService.Ledger)
 local Template = require(ServerScriptService.server.Profile.ProfileService.Template)
 local Modux = require(ServerScriptService.server.Modux)
+local MetricsLog = require(ServerScriptService.server.Metrics.MetricsService.Log)
 
 -- Same type as ProfileService.Profile (one atom per Template field)
 type Profile = Atomic.Table<Template.Data>
@@ -158,6 +159,7 @@ function RewardService:Credit(player: Player, profile: Profile, key: string, gem
 		end
 	end)
 	self.Dependencies.ProfileService:RequestSave(player)
+	MetricsLog.gems(player, "Source", gems, profile.Gems(), "Reward", key)
 	const userId = player.UserId
 	self.ShiftGems[userId] = (self.ShiftGems[userId] or 0) + gems
 	return gems

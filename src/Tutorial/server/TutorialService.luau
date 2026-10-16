@@ -41,6 +41,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local Content = require(ReplicatedStorage.shared.Content)
 local TutorialRules = require(ReplicatedStorage.shared.Tutorial.Rules)
 local Modux = require(ServerScriptService.server.Modux)
+local MetricsLog = require(ServerScriptService.server.Metrics.MetricsService.Log)
 
 const TICK_RATE = 2 -- Hz: the pending check of the tutorial customer
 const HOT_DOG = "hot_dog"
@@ -87,6 +88,10 @@ end
 
 -- The player finished or skipped the tutorial: over for this run (idempotent, not saved)
 function TutorialService:Complete(player: Player)
+	if not self.Closed[player.UserId] then
+		-- onboarding funnel, last step (analytics; the steps in between come from MetricTutorial)
+		MetricsLog.onboarding(player, #Content.Metrics.TutorialSteps + 2, "complete")
+	end
 	self.Closed[player.UserId] = true
 	self.Revived[player.UserId] = nil
 end
@@ -183,6 +188,9 @@ end
 function TutorialService:Begin(player: Player)
 	if not self:IsPending(player) then
 		return
+	end
+	if not self.Rookies[player.UserId] then
+		MetricsLog.onboarding(player, 1, "begin") -- onboarding funnel, step 1 (analytics)
 	end
 	self.Rookies[player.UserId] = true
 	self:Seed()

@@ -718,6 +718,19 @@ return Lync.define("game", {
 		Station = Lync.int(1, Content.Prep.Stations),
 	})),
 
+	-- Analytics (RoMetrics, owner request 2026-10-16; Content.Metrics). c -> s, responder MetricsService (OnInit); the
+	-- server rate-limits (Content.Metrics.UiRate) and never trusts them for anything but the analytics event.
+	-- A client-only UI moment. Key = what it was about (a Content.Shop key for product_prompt), "" = none; the server
+	-- keeps it only when it is a known Content.Shop key
+	MetricUi = Lync.packet(Lync.struct({
+		Event = Lync.enum(Content.Metrics.UiEvents),
+		Key = Lync.optional(Lync.enum(Content.Shop.Keys)),
+	})),
+	-- The local tutorial reached a step (index into Content.Metrics.TutorialSteps); logged once per step per player
+	MetricTutorial = Lync.packet(Lync.struct({
+		Step = Lync.int(1, 64),
+	})),
+
 	-- Players online in the whole game (TASK-312; owner request 2026-10-15, Provisional). Set, record 1,
 	-- lobby roles only. Writer: PresenceService (MemoryStore sum of every server, at most every 30 s; never under the
 	-- local count). Reader: LobbyController (LobbyHud online pill). One record, 24 bits: no drop.section floor

@@ -117,6 +117,9 @@ end
 function SettingsController:SetOpen(open: boolean)
 	if Vide.untrack(self.Open) ~= open then
 		self.Open(open)
+		if open then
+			self.Libs.Net.MetricUi:fireServer({ Event = "settings_open", Key = nil }) -- analytics
+		end
 		self:Select(open)
 	end
 end

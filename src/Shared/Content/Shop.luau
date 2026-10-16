@@ -73,6 +73,7 @@ export type Shop = {
 	GemPacks: Table.Table<GemPack>,
 	GamePasses: Table.Table<GamePass>,
 	Utilities: Table.Table<Utility>,
+	Keys: { string }, -- every product / pass key (gem packs, passes, utilities): the MetricUi.Key wire enum
 }
 
 -- Gem packs: bigger pack = cheaper gem (99 -> 90 R$ per 1,000 gems). Gem economy x75 (TASK-308, owner request
@@ -242,10 +243,18 @@ const utilities: { Utility } = {
 	},
 }
 
+const allKeys: { string } = {}
+for _, list in { gemPacks :: { any }, gamePasses :: { any }, utilities :: { any } } do
+	for _, row in list do
+		table.insert(allKeys, row.Key)
+	end
+end
+
 const shop: Shop = {
 	GemPacks = Table.new(gemPacks),
 	GamePasses = Table.new(gamePasses),
 	Utilities = Table.new(utilities),
+	Keys = table.freeze(allKeys),
 }
 
 return Table.record(shop)

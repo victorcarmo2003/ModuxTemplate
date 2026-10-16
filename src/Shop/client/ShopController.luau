@@ -121,6 +121,7 @@ function ShopController:SetOpen(open: boolean)
 		return
 	end
 	self.Open(open)
+	self.Libs.Net.MetricUi:fireServer({ Event = if open then "shop_open" else "shop_close", Key = nil }) -- analytics
 	if open then
 		self.Dependencies.SettingsController:SetOpen(false)
 		self.Glow(false)
@@ -233,6 +234,7 @@ function ShopController:Prompt(utility: Utility)
 		self:Say("Coming soon: this item is not on sale yet.")
 		return
 	end
+	self.Libs.Net.MetricUi:fireServer({ Event = "product_prompt", Key = utility.Key }) -- analytics
 	const ok, problem = pcall(function()
 		MarketplaceService:PromptProductPurchase(Players.LocalPlayer, utility.ProductId)
 	end)

@@ -24,6 +24,7 @@ local Atomic = require(ReplicatedStorage.shared.Types.Atomic)
 local Struct = require(ReplicatedStorage.shared.Types.Struct)
 local Template = require(ServerScriptService.server.Profile.ProfileService.Template)
 local Modux = require(ServerScriptService.server.Modux)
+local MetricsLog = require(ServerScriptService.server.Metrics.MetricsService.Log)
 
 -- Same type as ProfileService.Profile (one atom per Template field)
 type Profile = Atomic.Table<Template.Data>
@@ -112,6 +113,7 @@ function ShopService:GemPackHandler(pack: Content.ShopGemPack): Handler
 			Patch = { Gems = math.clamp(profile.Gems() + pack.Gems, 0, GEMS_MAX) },
 			After = function()
 				self:Notify(player, "gems_gained", pack.Gems)
+				MetricsLog.gems(player, "Source", pack.Gems, profile.Gems(), "GemPack", pack.Key)
 			end,
 		}
 	end
@@ -334,6 +336,9 @@ ShopService:OnStart(function(self)
 		if not ok then
 			warn(`[ShopService] ProcessReceipt error: {decision}`)
 			return Enum.ProductPurchaseDecision.NotProcessedYet
+		end
+		if decision == Enum.ProductPurchaseDecision.PurchaseGranted then
+			MetricsLog.receipt(receipt :: any) -- RoMetrics sale (once per PurchaseId, price = CurrencySpent)
 		end
 		return decision
 	end

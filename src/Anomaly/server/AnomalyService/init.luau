@@ -217,6 +217,10 @@ function AnomalyService:Setup()
 	self.Tension = self.Libs.Signal.new() :: SignalLib.Signal<boolean>
 	-- Ended(key, players): one occurrence is over for these players (TASK-335, TASK-345; JournalService connects in its OnInit)
 	self.Ended = self.Libs.Signal.new() :: SignalLib.Signal<string, { Player }>
+	-- analytics (MetricsService, owner 2026-10-16): Started(key, party size); Outcome(key, phase, failed players, party
+	-- size, stop reason) once per occurrence that ran
+	self.Started = self.Libs.Signal.new() :: SignalLib.Signal<string, number>
+	self.Outcome = self.Libs.Signal.new() :: SignalLib.Signal<string, string, { Player }, number, string>
 end
 
 function AnomalyService:WarnOnce(key: string, message: string)
@@ -377,7 +381,7 @@ local function blocked(from: Vector3, to: Vector3): boolean
 	return workspace:Raycast(from, offset.Unit * (distance - TARGET_SLACK), params) ~= nil
 end
 
-function AnomalyService:Looking(player: Player, target: Vector3, range: number): boolean
+function AnomalyService:Looking(player: Player, target: Vector3, range: number, angle: number?): boolean
 	if typeof(target) ~= "Vector3" or not finite(range) then
 		return false
 	end
@@ -406,7 +410,7 @@ function AnomalyService:Looking(player: Player, target: Vector3, range: number):
 		Vision.Direction(gaze.Yaw, gaze.Pitch),
 		target,
 		range,
-		Content.Sanity.SeeAngle,
+		angle or Content.Sanity.SeeAngle,
 		blocked
 	)
 end
@@ -565,6 +569,14 @@ end
 -- Fires Ended for one finished run: its party at the start plus whoever failed, still in the game (TASK-335, TASK-345).
 -- A Restore counts only once the occurrence did something (left Signal, or someone failed).
 function AnomalyService:EmitEnded(run: Run, reason: Api.StopReason)
+	const failedPlayers: { Player } = {}
+	for userId in run.Failed do
+		const player = Players:GetPlayerByUserId(userId)
+		if player ~= nil then
+			table.insert(failedPlayers, player)
+		end
+	end
+	self.Outcome:Fire(run.Occ.Key, run.Record.Phase, failedPlayers, #run.Party, reason)
 	if reason == "Restore" and run.Record.Phase == "Signal" and next(run.Failed) == nil then
 		return
 	end
@@ -704,6 +716,7 @@ function AnomalyService:StartOccurrence(key: string, module: Api.Module, slot: n
 	end
 
 	self.LastStartAt = t
+	self.Started:Fire(key, #run.Party)
 	-- TASK-284 (Content.ShopWindow, Provisional Q-270): this anomaly slams the service window shut as it starts
 	if Content.ShopWindow.Anomalies[key] == "Closes" then
 		self.Dependencies.VehicleService:SetShutter(true, nil, true)
@@ -832,8 +845,8 @@ function AnomalyService:BuildContext(): Api.Context
 		Active = function(): { Player }
 			return self:ActivePlayers()
 		end,
-		Looking = function(player: Player, target: Vector3, range: number): boolean
-			return self:Looking(player, target, range)
+		Looking = function(player: Player, target: Vector3, range: number, angle: number?): boolean
+			return self:Looking(player, target, range, angle)
 		end,
 		SeenTick = function(occ: Api.Occurrence, target: Vector3, range: number, dt: number)
 			self:SeenTick(occ, target, range, dt)

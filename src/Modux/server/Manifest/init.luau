@@ -23,6 +23,7 @@ local KitchenService = require(ServerScriptService.server.ModuxTypes.KitchenServ
 local LightService = require(ServerScriptService.server.ModuxTypes.LightService)
 local LobbyService = require(ServerScriptService.server.ModuxTypes.LobbyService)
 local MarketService = require(ServerScriptService.server.ModuxTypes.MarketService)
+local MetricsService = require(ServerScriptService.server.ModuxTypes.MetricsService)
 local NetService = require(ServerScriptService.server.ModuxTypes.NetService)
 local NpcService = require(ServerScriptService.server.ModuxTypes.NpcService)
 local PartyRunService = require(ServerScriptService.server.ModuxTypes.PartyRunService)
@@ -75,6 +76,7 @@ export type AllServices = {
 	LightService: LightService.Public,
 	LobbyService: LobbyService.Public,
 	MarketService: MarketService.Public,
+	MetricsService: MetricsService.Public,
 	NetService: NetService.Public,
 	NpcService: NpcService.Public,
 	PartyRunService: PartyRunService.Public,

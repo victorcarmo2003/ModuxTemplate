@@ -288,7 +288,7 @@ function MarketService:BuyPackage(player: Player, anchor: Instance)
 	if player:FindFirstChildOfClass("Backpack") == nil then
 		return
 	end
-	if not self.Dependencies.EconomyService:Spend(package.Price, player) then
+	if not self.Dependencies.EconomyService:Spend(package.Price, player, package.Key) then
 		return -- "not_enough_cash" already sent by Spend
 	end
 	self.LastBuy[player] = os.clock()

@@ -1266,6 +1266,11 @@ function TutorialController:SetStep(key: string, target: Instance?, item: string
 	Vide.batch(function()
 		if previous ~= key then
 			self.StepKey(key)
+			-- onboarding funnel (analytics): the server logs each step once
+			const index = table.find(Content.Metrics.TutorialSteps, key)
+			if index ~= nil then
+				self.Libs.Net.MetricTutorial:fireServer({ Step = index })
+			end
 		end
 		if Vide.untrack(self.Item) ~= item then
 			self.Item(item)

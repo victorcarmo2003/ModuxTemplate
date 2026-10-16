@@ -78,9 +78,9 @@ export type Context = {
 	Finish: (occ: Occurrence) -> (),
 	-- FEAT-023 active player: connected, Active, with a character (a knocked player is active)
 	Active: () -> { Player },
-	-- gaze cone (Sanity.SeeAngle) up to range + line of sight. Not Active, no fresh Gaze, or protected (window closed,
-	-- inside the trailer) with the target outside the trailer = false
-	Looking: (player: Player, target: Vector3, range: number) -> boolean,
+	-- gaze cone (Sanity.SeeAngle, or `angle` degrees full cone: ~90 = anywhere on screen) up to range + line of sight.
+	-- Not Active, no fresh Gaze, or protected (window closed, inside the trailer) with the target outside = false
+	Looking: (player: Player, target: Vector3, range: number, angle: number?) -> boolean,
 	-- accumulates dt for every Active player Looking at target; Sanity.SeeTime reached -> VitalService:SeeAnomaly
 	SeenTick: (occ: Occurrence, target: Vector3, range: number, dt: number) -> (),
 	-- direct "seen" (AudioZone anomalies): VitalService:SeeAnomaly(player, key)

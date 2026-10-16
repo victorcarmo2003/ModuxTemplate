@@ -166,6 +166,8 @@ function PrepService:Setup()
 	-- (player, station) seated / (player, station, reason) left; reason "None" = voluntary
 	self.Entered = self.Libs.Signal.new() :: SignalLib.Signal<Player, number>
 	self.Left = self.Libs.Signal.new() :: SignalLib.Signal<Player, number, string>
+	-- every answer to a prep packet (player, act, ok, reason, grade, value): analytics (MetricsService, owner 2026-10-16)
+	self.Replied = self.Libs.Signal.new() :: SignalLib.Signal<Player, string, boolean, string, string?, number?>
 end
 
 -- Reads ---------------------------------------------------------------------------------------------------------------
@@ -384,6 +386,7 @@ function PrepService:Reply(player: Player, act: string, ok: boolean, reason: str
 		Value = math.clamp(math.floor(value or 0), 0, 255),
 	}
 	self.Libs.Net.PrepResult:fireClient(player, payload)
+	self.Replied:Fire(player, act, ok, reason, grade, value)
 	if ok then
 		return
 	end

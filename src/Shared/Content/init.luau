@@ -53,6 +53,7 @@ local Stats = require(script.Stats)
 local Table = require(script.Table)
 local Thief = require(script.Thief)
 local TipJar = require(script.TipJar)
+local Metrics = require(script.Metrics)
 local Traffic = require(script.Traffic)
 local TrafficLights = require(script.TrafficLights)
 local Upgrades = require(script.Upgrades)
@@ -161,6 +162,7 @@ export type Stat = Stats.Stat
 export type Station = Stations.Station
 export type Thief = Thief.Thief
 export type TipJar = TipJar.TipJar
+export type Metrics = Metrics.Metrics
 export type Traffic = Traffic.Traffic
 export type TrafficDensity = Traffic.Density
 export type TrafficRoute = Traffic.Route
@@ -281,6 +283,8 @@ return table.freeze({
 
 	-- Tip jar that replaced the cash drawer (DEC-239, user decision 2026-10-13; TipJarService, EconomyController). Provisional
 	TipJar = TipJar,
+	-- RoMetrics analytics: the client-reported wire lists (owner request 2026-10-16; MetricsService). Provisional
+	Metrics = Metrics,
 
 	-- Sausage pose on the RestRail Parts (owner request 2026-10-12; Kitchen/shared/RailSlot). Provisional
 	RailSlot = RailSlot,

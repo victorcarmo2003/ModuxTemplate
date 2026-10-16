@@ -12,6 +12,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local Content = require(ReplicatedStorage.shared.Content)
 local Codes = require(script.Codes)
 local Modux = require(ServerScriptService.server.Modux)
+local MetricsLog = require(ServerScriptService.server.Metrics.MetricsService.Log)
 
 export type Reason = "Ok" | "Invalid" | "Expired" | "Already" | "Busy"
 export type Reward = { Gems: number, Class: string? }
@@ -157,6 +158,8 @@ function CodesService:Redeem(player: Player, raw: string): (Reason, Reward)
 		RedeemedCodes = codes,
 	})
 	profiles:RequestSave(player)
+	MetricsLog.gems(player, "Source", gems, profile.Gems(), "Code", key)
+	MetricsLog.player(player, "code_redeemed", gems, { code = key, class = grantedClass or "" })
 	return "Ok", { Gems = math.min(gems, REWARD_GEMS_MAX), Class = grantedClass }
 end
 

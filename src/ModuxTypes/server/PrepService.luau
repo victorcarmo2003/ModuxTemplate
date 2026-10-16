@@ -23,6 +23,7 @@ export type Public = {
 	LockedUntil: { [Player]: number },
 	Parked: { [Player]: { Plate: Session.Plate, Mask: number } },
 	Published: { [number]: boolean },
+	Replied: SignalLib.Signal<Player, string, boolean, string, string?, number?>,
 	Seats: Charm.Atom<{ [number]: SeatRecord }>,
 	Sessions: { [Player]: Session.Seat },
 	Warned: { [string]: boolean },

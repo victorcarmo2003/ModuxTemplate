@@ -251,7 +251,7 @@ function UpgradeService:Buy(key: string, player: Player?, quiet: boolean?): (boo
 		return false, reason
 	end
 	const nextRow = self:NextLevel(key) :: Content.UpgradeLevel
-	if not self.Dependencies.EconomyService:Spend(nextRow.Price, player) then
+	if not self.Dependencies.EconomyService:Spend(nextRow.Price, player, key) then
 		return false, "not_enough_cash"
 	end
 	self.BoughtAt[self:GuardKey(key)] = os.clock()

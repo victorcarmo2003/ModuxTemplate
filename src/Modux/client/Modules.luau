@@ -6,6 +6,7 @@ return {
 	StarterPlayer.StarterPlayerScripts.client.Admin.AdminController,
 	StarterPlayer.StarterPlayerScripts.client.Anim.AnimController,
 	StarterPlayer.StarterPlayerScripts.client.Anomaly.AnomalyController,
+	StarterPlayer.StarterPlayerScripts.client.Anomaly.OutsideController,
 	StarterPlayer.StarterPlayerScripts.client.Atmosphere.AtmosphereController,
 	StarterPlayer.StarterPlayerScripts.client.Audio.AudioController,
 	StarterPlayer.StarterPlayerScripts.client.Boss.BossController,

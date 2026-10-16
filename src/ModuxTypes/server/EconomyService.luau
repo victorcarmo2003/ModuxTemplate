@@ -30,7 +30,7 @@ export type Public = {
 	LastReport: (self: Public) -> Report?,
 	IsShopOpen: (self: Public) -> boolean,
 	IsDrawerOpen: (self: Public) -> boolean,
-	Spend: (self: Public, amount: number, player: Player?) -> boolean,
+	Spend: (self: Public, amount: number, player: Player?, sku: string?) -> boolean,
 	PromptCashPack: (self: Public, player: Player, missing: number) -> (),
 	AddSale: (self: Public, amount: number, kind: SaleKind) -> number,
 	AddTip: (self: Public, amount: number) -> number,
@@ -45,7 +45,7 @@ export type Public = {
 	Deposit: (self: Public, info: ShiftInfo) -> Report,
 	BeginShift: (self: Public) -> (),
 	RestoreCash: (self: Public, data: any) -> (),
-	TopUp: (self: Public, amount: number) -> number,
+	TopUp: (self: Public, amount: number, transaction: string?, player: Player?, sku: string?) -> number,
 	DevAddCash: (self: Public, amount: number) -> number,
 	Record: (self: Public) -> { Cash: number, Drawer: number },
 }

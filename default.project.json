@@ -311,6 +311,12 @@
 						"optional": "src/Market/server"
 					}
 				},
+				"Metrics": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Metrics/server"
+					}
+				},
 				"Modux": {
 					"$path": {
 						"optional": "src/Modux/server"

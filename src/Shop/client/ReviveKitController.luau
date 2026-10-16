@@ -98,6 +98,7 @@ function ReviveKitController:Buy()
 	end
 	const utility = Content.Shop.Utilities.ByKey[PRODUCT]
 	self.Busy(true)
+	self.Libs.Net.MetricUi:fireServer({ Event = "revive_prompt", Key = PRODUCT }) -- analytics
 	const ok, problem = pcall(function()
 		MarketplaceService:PromptProductPurchase(Players.LocalPlayer, utility.ProductId)
 	end)

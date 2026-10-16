@@ -212,7 +212,7 @@ function ShopUtilityService:Handler(utility: Utility): any
 				Patch = {},
 				After = function()
 					const economy = self.Dependencies.EconomyService
-					const added = economy:TopUp(economy:GetCash() + utility.Amount)
+					const added = economy:TopUp(economy:GetCash() + utility.Amount, "CashPack", player, key)
 					self:Send(player, key, added, 0)
 				end,
 			}
