@@ -47,6 +47,7 @@ local RoundController = require(StarterPlayer.StarterPlayerScripts.client.ModuxT
 local SeatingController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.SeatingController)
 local SecurityController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.SecurityController)
 local SettingsController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.SettingsController)
+local PurchaseFxController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PurchaseFxController)
 local ReviveKitController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ReviveKitController)
 local ShopController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ShopController)
 local ShowcaseController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ShowcaseController)
@@ -107,6 +108,7 @@ export type AllControllers = {
 	SeatingController: SeatingController.Public,
 	SecurityController: SecurityController.Public,
 	SettingsController: SettingsController.Public,
+	PurchaseFxController: PurchaseFxController.Public,
 	ReviveKitController: ReviveKitController.Public,
 	ShopController: ShopController.Public,
 	ShowcaseController: ShowcaseController.Public,
