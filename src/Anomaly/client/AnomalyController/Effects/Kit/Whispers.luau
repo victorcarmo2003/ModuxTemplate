@@ -52,7 +52,7 @@ local function between(rng: Random, range: { number }): number
 	return range[1] + (range[2] - range[1]) * rng:NextNumber()
 end
 
-local function spawnWord(gui: ScreenGui, rng: Random, reduced: boolean)
+local function spawnWord(gui: ScreenGui, rng: Random, reduced: boolean, words: { string })
 	const viewport = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
 	const left = rng:NextNumber() < 0.5
 	const radius = between(rng, ARC_RADIUS) * viewport.Y
@@ -69,7 +69,7 @@ local function spawnWord(gui: ScreenGui, rng: Random, reduced: boolean)
 	label.BackgroundTransparency = 1
 	label.AnchorPoint = Vector2.new(0.5, 0.5)
 	label.Position = UDim2.fromOffset(px, py)
-	const word = WORDS[rng:NextInteger(1, #WORDS)]
+	const word = words[rng:NextInteger(1, #words)]
 	label.Size = UDim2.fromOffset(math.ceil(size * math.max(5, #word * 0.62)), size + 8) -- long phrases fit
 	label.Font = FONT
 	label.Text = word
@@ -105,7 +105,8 @@ local function spawnWord(gui: ScreenGui, rng: Random, reduced: boolean)
 end
 
 -- Words for `seconds` (yields until done).
-function Whispers.Play(seconds: number)
+-- `words` replaces the "hide" list (the "get inside" nag, OutsideController); `rate` scales RATE (1 = default)
+function Whispers.Play(seconds: number, words: { string }?, rate: number?)
 	const playerGui = Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
 	if playerGui == nil or seconds <= 0 then
 		return
@@ -119,11 +120,13 @@ function Whispers.Play(seconds: number)
 	const rng = Random.new()
 	const reduced = Motion.Reduced()
 	const untilAt = os.clock() + seconds
+	const list = words or WORDS
+	const pace = RATE * (rate or 1)
 	-- a slow start, thicker towards the end
 	while os.clock() < untilAt and gui.Parent ~= nil do
 		const t = 1 - (untilAt - os.clock()) / seconds
-		spawnWord(gui, rng, reduced)
-		task.wait(1 / (RATE * (0.5 + t)))
+		spawnWord(gui, rng, reduced, list)
+		task.wait(1 / (pace * (0.5 + t)))
 	end
 	task.wait(LIFE[2] + 0.1)
 	gui:Destroy()
