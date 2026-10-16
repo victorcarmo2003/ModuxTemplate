@@ -19,6 +19,8 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
+local Required = require(ReplicatedStorage.shared.Place.MapIndex.Required)
+local Content = require(ReplicatedStorage.shared.Content)
 local Zones = require(ReplicatedStorage.shared.Light.Zones)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
 local Motion = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Motion)
@@ -56,6 +58,10 @@ const INTERIOR_ZONE = "LZ-1" -- LightZone of the trailer interior (VehicleServic
 const EXIT_ACTION = "trailer_exit" -- PromptAction of the Exit Trailer anchor (TrailerDoorService)
 const ANCHOR_TAG = "Interactable"
 const FOOT_PROBE = 8 -- studs under the root the floor ray looks
+-- String pulling (owner 2026-10-16: the trail made pointless turns): from each point, go straight to the farthest later
+-- point in reach, i.e. no obstacle at chest height and no carriageway crossed outside the graph's own crosswalk edges.
+const PULL_STEP = 2 -- studs between two road samples along a shortcut
+const PULL_HEIGHT = 2.5 -- studs above the floor of the clearance ray
 
 const Trail = {}
 
@@ -104,6 +110,62 @@ local function exitDoor(): Vector3?
 	return nil
 end
 
+local function inRoad(position: Vector3, roads: { Required.Rect }): boolean
+	for _, road in roads do
+		if position.X > road.X0 and position.X < road.X1 and position.Z > road.Z0 and position.Z < road.Z1 then
+			return true
+		end
+	end
+	return false
+end
+
+-- A straight shortcut a -> b: no road sample strictly between them, nothing solid at chest height
+local function shortcut(a: Vector3, b: Vector3, roads: { Required.Rect }, params: RaycastParams): boolean
+	const flat = Vector3.new(b.X - a.X, 0, b.Z - a.Z).Magnitude
+	const samples = math.max(math.ceil(flat / PULL_STEP), 1)
+	for index = 1, samples - 1 do
+		if inRoad(a:Lerp(b, index / samples), roads) then
+			return false
+		end
+	end
+	const from = a + Vector3.yAxis * PULL_HEIGHT
+	const to = b + Vector3.yAxis * PULL_HEIGHT
+	return workspace:Raycast(from, to - from, params) == nil
+end
+
+-- Drops every point the walk can skip: the backtrack to the nearest node and the zigzag between sidewalk nodes.
+-- Consecutive points are always kept (the graph's crosswalk edges cross the road on purpose).
+local function pull(points: { Vector3 }): { Vector3 }
+	if #points <= 2 then
+		return points
+	end
+	const roads = Required.ForWave(Content.RunParams.BindingWave).Roads
+	const params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	const skip: { Instance } = {}
+	for _, player in Players:GetPlayers() do
+		if player.Character then
+			table.insert(skip, player.Character)
+		end
+	end
+	params.FilterDescendantsInstances = skip
+	params.RespectCanCollide = true
+	const out = { points[1] }
+	local index = 1
+	while index < #points do
+		local reach = index + 1
+		for far = #points, index + 2, -1 do
+			if shortcut(points[index], points[far], roads, params) then
+				reach = far
+				break
+			end
+		end
+		table.insert(out, points[reach])
+		index = reach
+	end
+	return out
+end
+
 -- Route that starts at `from` (the player's feet): inside the trailer, to the Exit Trailer door; outside, through the
 -- graph to the goal door. nil while the binding / the nodes are not streamed in.
 function Trail.RouteFrom(from: Vector3, goal: Goal): { Vector3 }?
@@ -139,7 +201,7 @@ function Trail.RouteFrom(from: Vector3, goal: Goal): { Vector3 }?
 			table.insert(out, node)
 		end
 		table.insert(out, target.Position)
-		return out
+		return pull(out)
 	end)
 	return if ok then points else nil
 end
