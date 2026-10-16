@@ -35,7 +35,6 @@ const TITLE_SIZE = 40
 const LINE_SIZE = 18
 const BAR_HEIGHT = 26
 const BAR_INSET = 5
-const COUNT_WIDTH = 44
 
 local function bar(progress: () -> number, seconds: () -> number): Frame
 	return create("Frame")({
@@ -46,7 +45,7 @@ local function bar(progress: () -> number, seconds: () -> number): Frame
 
 		CartoonPanel({
 			Name = "Track",
-			Size = UDim2.new(1, -COUNT_WIDTH, 1, 0),
+			Size = UDim2.fromScale(1, 1), -- full width, centred; the count sits inside it (owner 2026-10-16)
 			Tone = Theme.Tone.Ink,
 			Outline = Theme.Outline.Thick,
 			Radius = Theme.Radius.Pill,
@@ -75,12 +74,13 @@ local function bar(progress: () -> number, seconds: () -> number): Frame
 
 		CartoonLabel({
 			Name = "Count",
-			AnchorPoint = Vector2.new(1, 0.5),
-			Position = UDim2.fromScale(1, 0.5),
-			Box = UDim2.fromOffset(COUNT_WIDTH - 6, BAR_HEIGHT + 6),
-			TextSize = 26,
-			Color = Theme.Color.Mustard,
-			XAlignment = Enum.TextXAlignment.Right,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Box = UDim2.new(1, 0, 1, 6),
+			TextSize = 22,
+			Color = Theme.Color.Cream,
+			XAlignment = Enum.TextXAlignment.Center,
+			ZIndex = 3,
 			Text = function()
 				const left = seconds()
 				return if left >= 0 then tostring(left) else ""
