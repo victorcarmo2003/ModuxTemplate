@@ -73,6 +73,13 @@ const TOSS_MAX = 1
 const TOSS_LIFT = 2 -- studs above the body where the item leaves
 const TOSS_ARC = 3 -- studs of arc height (plus 10% of the distance)
 const TOSS_SPIN = math.rad(540)
+-- Where a car hit drops the held item (owner request 2026-10-16): right where the player stood, on the floor, out of
+-- any prop. The free spot is searched in rings around him; the old "nearest sidewalk" is the last resort.
+const SPOT_BOX = Vector3.new(1.4, 1.2, 1.4) -- studs: room the item needs above the floor
+const SPOT_RINGS = { 0, 1.5, 3, 4.5 } -- studs from the player
+const SPOT_ANGLES = 8
+const SPOT_BELOW = 8 -- studs under the root the floor may be (the root stands ~3 above the feet)
+const SPOT_ABOVE = 1 -- studs above the root: never a roof or a shelf over his head
 
 const Drops = {}
 
@@ -115,6 +122,38 @@ function Drops.ground(drops: Drops, position: Vector3, ignore: { Instance }): Ve
 	const origin = position + Vector3.yAxis * RAY_UP
 	const hit = Workspace:Raycast(origin, Vector3.yAxis * -(RAY_UP + RAY_DOWN), params)
 	return if hit then hit.Position else position
+end
+
+-- Free floor spot for a car-hit drop at `position` (the player's root): the floor right under it when nothing is in the
+-- way, else the nearest free one in rings around it; nil when there is none (the caller falls back to the sidewalk).
+function Drops.spot(drops: Drops, position: Vector3, ignore: { Instance }): Vector3?
+	const exclude = table.clone(ignore)
+	table.insert(exclude, folderOf(drops))
+	const rayParams = RaycastParams.new()
+	rayParams.FilterType = Enum.RaycastFilterType.Exclude
+	rayParams.FilterDescendantsInstances = exclude
+	rayParams.RespectCanCollide = true
+	const boxParams = OverlapParams.new()
+	boxParams.FilterType = Enum.RaycastFilterType.Exclude
+	boxParams.FilterDescendantsInstances = exclude
+	boxParams.RespectCanCollide = true
+	for _, radius in SPOT_RINGS do
+		const count = if radius == 0 then 1 else SPOT_ANGLES
+		for index = 0, count - 1 do
+			const angle = index / count * math.pi * 2
+			const at = position + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
+			const origin = at + Vector3.yAxis * SPOT_ABOVE
+			const hit = Workspace:Raycast(origin, Vector3.yAxis * -(SPOT_ABOVE + SPOT_BELOW), rayParams)
+			if hit == nil or hit.Normal.Y < 0.7 then
+				continue -- no floor, or a wall / slope too steep to rest on
+			end
+			const room = CFrame.new(hit.Position + Vector3.yAxis * (SPOT_BOX.Y / 2 + 0.05))
+			if #Workspace:GetPartBoundsInBox(room, SPOT_BOX, boxParams) == 0 then
+				return hit.Position
+			end
+		end
+	end
+	return nil
 end
 
 -- Off the carriageway (FEAT-036): a point on a road of the binding moves to the nearest NpcNode that is not a

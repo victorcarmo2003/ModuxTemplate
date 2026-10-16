@@ -863,8 +863,9 @@ end
 
 -- Items on the ground (FEAT-036) -------------------------------------------------------------------------------------
 
--- Held Tool falls (car hit, DEC-103: only the equipped one). By Items[k].DropOnHit: Keep -> item on the ground
--- (sidewalk if it lands on the road), Lost -> splat, Vanish -> gone. False when nothing was held.
+-- Held Tool falls (car hit, DEC-103: only the equipped one). By Items[k].DropOnHit: Keep -> item on the ground where
+-- the player stood (Drops.spot: on the floor, out of any prop; the nearest sidewalk only when no free spot is found;
+-- owner 2026-10-16), Lost -> splat, Vanish -> gone. False when nothing was held.
 function ItemService:DropHeld(player: Player, _reason: string): boolean
 	const tool = self:GetHeld(player)
 	const key = tool and self:ItemOf(tool)
@@ -897,7 +898,8 @@ function ItemService:DropHeld(player: Player, _reason: string): boolean
 
 	const ignore: { Instance } = if character then { character } else {}
 	if item.DropOnHit == "Keep" then
-		const ground = Drops.ground(self.Drops, Drops.sidewalk(position), ignore)
+		const ground = Drops.spot(self.Drops, position, ignore)
+			or Drops.ground(self.Drops, Drops.sidewalk(position), ignore)
 		if entry ~= nil then
 			Drops.keep(self.Drops, item.Key, entry.Count, entry.Extra, ground, nil, player.UserId, position)
 		end
