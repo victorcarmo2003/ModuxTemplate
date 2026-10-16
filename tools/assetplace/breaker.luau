@@ -103,6 +103,7 @@ local function build(model: Model)
 	local frame = boxFrame(model)
 	local holder = Instance.new("Model")
 	holder.Name = NAME
+	holder.ModelStreamingMode = Enum.ModelStreamingMode.Persistent -- holds gameplay tags (PlaceService rule 5)
 	holder:SetAttribute(MARK, true)
 
 	-- the box looks along its own -Z (CFrame.lookAt): the front face is -Z

@@ -23,6 +23,7 @@ local StarterGui = game:GetService("StarterGui")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
+local Verbose = require(ReplicatedStorage.shared.Verbose)
 
 const FROZEN_ATTRIBUTE = "Frozen"
 const FAINTED_FACE = "Fainted" -- Content.Looks expression (DEC-216, Provisional DEC-167)
@@ -124,7 +125,7 @@ function CharacterController:GetControls(): Controls?
 		module = if scripts ~= nil then scripts:WaitForChild("PlayerModule", MODULE_WAIT) else nil
 		-- harmless: the server freezes the body anyway (CharacterService:Freeze zeroes walk/jump), later lookups
 		-- pick the module up if it arrives after MODULE_WAIT, and meanwhile the lock sinks the inputs. Studio only.
-		if module == nil and RunService:IsStudio() then
+		if module == nil and RunService:IsStudio() and Verbose.On() then
 			-- info, not a warning: this place ships without the stock PlayerModule (custom input), so the sink is the normal path
 			print("[CharacterController] no PlayerScripts.PlayerModule: the lock sinks walk/jump input instead")
 		end

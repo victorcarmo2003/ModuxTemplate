@@ -27,6 +27,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local Content = require(ReplicatedStorage.shared.Content)
+local Verbose = require(ReplicatedStorage.shared.Verbose)
 
 const MINI = Content.Mart.Mini
 const PURCHASE = Content.Mart.Purchase
@@ -332,7 +333,9 @@ local function make(self: Minis, target: Target): Shown?
 		model.PrimaryPart = part
 		strip(model)
 	else
-		warnOnce(self, "mini:" .. target.Part, `no kit model for miniature "{target.Part}": placeholder box`)
+		if Verbose.On() then
+			warnOnce(self, "mini:" .. target.Part, `no kit model for miniature "{target.Part}": placeholder box`)
+		end
 		model = box(target.Badge)
 	end
 	model.Name = "GearMini_" .. target.Part

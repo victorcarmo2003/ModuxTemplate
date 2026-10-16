@@ -20,6 +20,7 @@ local Vide = require(ReplicatedStorage.Packages.Vide)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local ShowcasePanel = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.ShowcasePanel)
 local UiScale = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.UiScale)
+local Verbose = require(ReplicatedStorage.shared.Verbose)
 
 type Item = ShowcasePanel.Item
 type Row = ShowcasePanel.Row
@@ -291,7 +292,7 @@ ShowcaseController:OnStart(function(self)
 	-- PlayerGui may arrive a frame late; do not hold up the other OnStart.
 	task.spawn(function()
 		self:Mount(Players.LocalPlayer:WaitForChild("PlayerGui"))
-		print(`{PREFIX} dev showcase ready (F9, "/dev showcase" or the Conch command "showcase")`)
+		Verbose.print(`{PREFIX} dev showcase ready (F9, "/dev showcase" or the Conch command "showcase")`)
 	end)
 end)
 

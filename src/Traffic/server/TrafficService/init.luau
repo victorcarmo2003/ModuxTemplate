@@ -56,6 +56,7 @@ local Content = require(ReplicatedStorage.shared.Content)
 local Motion = require(ReplicatedStorage.shared.Traffic.Motion)
 local Paths = require(script.Paths)
 local Modux = require(ServerScriptService.server.Modux)
+local Verbose = require(ReplicatedStorage.shared.Verbose)
 
 type Route = typeof(Content.Traffic.Routes.List[1])
 type Stop = typeof(Content.Traffic.Routes.List[1].Stops[1])
@@ -334,8 +335,10 @@ function TrafficService:GeoOf(route: Route): Paths.Geo?
 		return nil
 	end
 	const geo, problem, warnings = Paths.build(route, HALF_CAR)
-	for _, message in warnings do
-		self:WarnOnce(`geo:{message}`, message)
+	if Verbose.On() then
+		for _, message in warnings do
+			self:WarnOnce(`geo:{message}`, message)
+		end
 	end
 	if geo == nil then
 		self:WarnOnce(`path:{route.Key}`, `{problem or "no path"}: route {route.Key} has no cars`)

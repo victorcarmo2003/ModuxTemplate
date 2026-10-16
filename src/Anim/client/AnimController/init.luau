@@ -40,6 +40,7 @@ local Workspace = game:GetService("Workspace")
 local CrewRig = require(ReplicatedStorage.shared.Crew.CrewRig)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Clips = require(script.Clips)
+local Verbose = require(ReplicatedStorage.shared.Verbose)
 
 export type PlayOptions = {
 	Looped: boolean?,
@@ -336,7 +337,7 @@ function AnimController:Step(binding: Binding, camera: Camera?, now: number)
 	if self.Probe == "pending" and track ~= nil and track.IsPlaying and track.Length > 0 then
 		if model:GetAttribute("NpcId") ~= nil then
 			self.Probe = "ok"
-			if RunService:IsStudio() then
+			if RunService:IsStudio() and Verbose.On() then
 				print(`[AnimController] Q-167 probe ok: local Animator plays "{binding.Role}" on server NPC {model:GetFullName()}`)
 			end
 		end

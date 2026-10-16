@@ -107,6 +107,7 @@ local Steps = require(script.Steps)
 local Trail = require(script.Trail)
 -- the plate of the 3D prep mode (module state shared with PrepController): the "deliver" step reads it (TASK-254)
 local PrepPlate = require(StarterPlayer.StarterPlayerScripts.client.Prep.PrepController.Stages.Build.Session)
+local Verbose = require(ReplicatedStorage.shared.Verbose)
 
 const TAG = "Interactable"
 const TRAIL_RETRY = 1 -- s between two route builds (map still streaming in, or the player strayed) (TASK-322)
@@ -1688,7 +1689,7 @@ end
 
 -- One diagnostic line per transition of the call (dev mode only)
 function TutorialController:Trace(message: string)
-	if self:IsDev() then
+	if self:IsDev() and Verbose.On() then
 		print(`{DEV_PREFIX} {message}`)
 	end
 end

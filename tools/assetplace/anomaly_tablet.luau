@@ -133,6 +133,7 @@ end
 local function build(parent: Instance, frame: CFrame, width: number, height: number)
 	local holder = Instance.new("Model")
 	holder.Name = NAME
+	holder.ModelStreamingMode = Enum.ModelStreamingMode.Persistent -- holds gameplay tags (PlaceService rule 5)
 	holder:SetAttribute(MARK, true)
 
 	-- frame: -Z out of the screen; the tablet's back sits on the Part centre plane

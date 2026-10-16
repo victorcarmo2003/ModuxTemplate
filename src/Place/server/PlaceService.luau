@@ -18,6 +18,7 @@ local Content = require(ReplicatedStorage.shared.Content)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
 local Roles = require(ReplicatedStorage.shared.ServerRole.Roles)
 local Modux = require(ServerScriptService.server.Modux)
+local Verbose = require(ReplicatedStorage.shared.Verbose)
 
 export type Role = "Lobby" | "Run"
 
@@ -50,10 +51,8 @@ local function soft(self: any, title: string, notes: { string })
 	if #notes == 0 then
 		return
 	end
-	if self.Dev and workspace:GetAttribute("VerboseBinding") == true then
+	if self.Dev and (workspace:GetAttribute("VerboseBinding") == true or Verbose.On()) then
 		print(`[PlaceService] {title} has {#notes} note(s):\n  {table.concat(notes, "\n  ")}`)
-	else
-		print(`[PlaceService] {title}: {#notes} note(s) (set Workspace attribute VerboseBinding in dev to list)`)
 	end
 end
 
