@@ -8,13 +8,17 @@ local Session = require(ServerScriptService.server.Prep.PrepService.Session)
 local Validate = require(ServerScriptService.server.Prep.PrepService.Validate)
 
 export type SeatRecord = { User: number, Step: string, Ticket: number, Since: number, Plate: number }
+export type Claim = { Station: number, Player: Player }
 
 export type Public = {
 	Active: boolean,
 	Buckets: { [Player]: Session.Buckets },
 	BySeat: { [number]: Session.Seat },
+	Claims: Charm.Atom<{ [number]: Claim }>,
+	ClaimsPublished: { [number]: number },
 	Count: number,
 	Entered: SignalLib.Signal<Player, number>,
+	Leases: { [number]: number },
 	Left: SignalLib.Signal<Player, number, string>,
 	LockedUntil: { [Player]: number },
 	Parked: { [Player]: { Plate: Session.Plate, Mask: number } },
@@ -43,6 +47,7 @@ export type Public = {
 	SilenceSpareWork: (self: Public, anchor: Instance) -> (),
 	Reply: (self: Public, player: Player, act: string, ok: boolean, reason: string, grade: string?, value: number?) -> (),
 	Allow: (self: Public, player: Player, kind: string) -> boolean,
+	AllowOwn: (self: Public, player: Player, kind: string, rate: number) -> boolean,
 	Seated: (self: Public, player: Player, act: string) -> Session.Seat?,
 	CheckEnter: (self: Public, player: Player, station: number, skipReach: boolean?, step: string?) -> (string, CFrame?),
 	Enter: (self: Public, player: Player, station: number, skipReach: boolean?, step: string?) -> (boolean, string),
@@ -55,6 +60,16 @@ export type Public = {
 	DropPlate: (self: Public, player: Player, seat: Session.Seat) -> (),
 	Trash: (self: Public, player: Player, seat: Session.Seat) -> (boolean, string),
 	TrashSausage: (self: Public, player: Player, seat: Session.Seat, from: string, slot: number) -> (boolean, string),
+	PushClaims: (self: Public) -> (),
+	DropClaims: (self: Public, drop: (id: number, claim: Claim) -> boolean) -> (),
+	DropPlayerClaims: (self: Public, player: Player) -> (),
+	SausageLeft: (self: Public, from: string, slot: number) -> (),
+	HasSausage: (self: Public, from: string, slot: number) -> boolean,
+	HeldByOther: (self: Public, seat: Session.Seat, from: string, slot: number) -> boolean,
+	Grab: (self: Public, seat: Session.Seat, from: string, slot: number, on: boolean) -> (boolean, string, number),
+	BoardPoint: (self: Public, station: number) -> Vector3?,
+	OnPointer: (self: Public, player: Player, tool: string, topping: string?, pos: Vector3) -> (),
+	SweepClaims: (self: Public, now: number) -> (),
 	AcceptMask: (self: Public, seat: Session.Seat, mask: number) -> (),
 	OnTab: (self: Public, player: Player, step: string, ticket: number, plate: number?) -> (),
 	OnGrill: (self: Public, player: Player, act: string, slot: number) -> (),

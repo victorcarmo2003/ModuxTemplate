@@ -35,6 +35,7 @@ local Feed = require(script.Parent.Parent.Parent.Feed)
 local Session = require(script.Parent.Parent.Parent.Stages.Build.Session)
 local BoardView = require(script.Parent.Parent.BoardView)
 local Director3D = require(script.Parent.Parent.Director3D)
+local Ghost = require(script.Parent.Parent.Ghost)
 local Plane = require(script.Parent.Parent.Plane)
 local Strokes = require(script.Parent.Parent.Strokes)
 local Targets = require(script.Parent.Parent.Targets)
@@ -156,6 +157,7 @@ type Sess = {
 	Mark: DeliverMark.Mark,
 	DeliverTo: number,
 	CarryOver: boolean,
+	RailGrab: boolean, -- DEC-259: the front rail sausage is claimed by this drag (PrepGrab On sent)
 }
 
 local session: Sess? = nil
@@ -952,6 +954,15 @@ end
 
 -- Build and tear down ------------------------------------------------------------------------------------------------------------
 
+-- DEC-259: lets go of the claimed front rail sausage (PrepGrab Off).
+local function releaseRail(current: Sess)
+	if not current.RailGrab then
+		return
+	end
+	current.RailGrab = false
+	current.Controller.Libs.Net.PrepGrab:fireServer({ From = "Rail", Slot = 1, On = false })
+end
+
 local function teardown()
 	const current = session
 	if current == nil then
@@ -963,6 +974,7 @@ local function teardown()
 	if current.Stop ~= nil then
 		current.Stop()
 	end
+	releaseRail(current)
 	current.Director:Destroy()
 	current.Tool:Destroy()
 	current.Strokes:Destroy()
@@ -1122,6 +1134,7 @@ end)
 		Mark = DeliverMark.new(),
 		DeliverTo = 0,
 		CarryOver = false,
+		RailGrab = false,
 	}
 	current.Director = Director3D.new({
 		Folder = folder :: Folder,
@@ -1243,6 +1256,7 @@ local function dragSausage(current: Sess, point: Vector3)
 end
 
 local function endDrag(current: Sess)
+	releaseRail(current)
 	const had = current.Drag ~= nil
 	current.Drag = nil
 	current.CarryOver = false
@@ -1439,6 +1453,17 @@ const Build: Stage.Stage3D = {
 					sfx(current, "error", nil)
 					return
 				end
+				-- DEC-259: a colleague holds the front sausage of the rail: it does not come
+				const holder, heldText = Ghost.HeldBy("Rail", 1)
+				if holder ~= nil then
+					controller:Toast(heldText :: string, "Alert")
+					sfx(current, "error", nil)
+					return
+				end
+				if prep.Rules.World.GhostHand and not current.RailGrab then
+					current.RailGrab = true
+					controller.Libs.Net.PrepGrab:fireServer({ From = "Rail", Slot = 1, On = true })
+				end
 				current.Drag = { Kind = "Sausage", Points = {} }
 				current.View:SetCarry("Sausage", message.Point, nil)
 				current.Director:SetMode("none", false)
@@ -1476,6 +1501,7 @@ const Build: Stage.Stage3D = {
 				note(`sausage tapped: sent to the bun, score {tostring(score)}`)
 				current.View:Fly(function()
 					current.Flying = false
+					releaseRail(current)
 					current.WantMode = "?"
 					if current.Dead or placed() then
 						current.View:SetCarry(nil, nil, nil)
@@ -1549,7 +1575,21 @@ const Build: Stage.Stage3D = {
 			end
 		end
 	end,
-	OnResult = function(_controller: any, _result: any) end,
+	OnResult = function(controller: any, result: any)
+		-- DEC-259: the server says a colleague got the front rail sausage first; the drag drops
+		const current = live()
+		if current == nil or result.Act ~= "Grab" or result.Ok or result.Reason ~= "Held" or not current.RailGrab then
+			return
+		end
+		current.RailGrab = false
+		const aim = World.Aim()
+		if aim ~= nil then
+			aim:Cancel("Held")
+		end
+		endDrag(current)
+		controller:Toast(Ghost.HeldText("Rail", 1), "Alert")
+		sfx(current, "error", nil)
+	end,
 	-- The acts of the plate (PrepBegin, PrepFinish, PrepTrash) are heard here whatever tab is in front: the plate lives in the
 	-- Session, not in a tab. An accepted Finish closes the bun over the plate first (0.4 s), then the Session moves to Serve.
 	OnEvent = function(controller: any, event: any)

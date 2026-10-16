@@ -689,6 +689,35 @@ return Lync.define("game", {
 		Plate = Lync.optional(Lync.int(0, 255)),
 	})),
 
+	-- Live drag in the 3D prep (DEC-259, closes Q-233; TASK-349 server, TASK-350 client; Content.Prep.Rules.Ghost).
+	-- c -> s, latest wins at Ghost.Hz. What the seated player holds right now and where (world position of the held item).
+	-- Tool = None: nothing in hand (the ghost goes away). Topping = the ingredient of a Bottle / Slice / Strip / Pinch tool
+	PrepPointer = Lync.packet(Lync.struct({
+		Tool = Lync.enum((Content.Prep.ToolKinds :: any) :: { string }),
+		Topping = Lync.optional(Lync.enum(Content.Ingredients.ToppingKeys)),
+		Pos = Lync.vec3(),
+	})):newest(10),
+	-- s -> every OTHER player in the party (unreliable). Relay of a validated PrepPointer: Station = the sender's seat
+	-- (PrepSeats has the UserId, so the name tag and Presence.Palette colour come from there)
+	PrepGhost = Lync.packet(Lync.struct({
+		Station = Lync.int(1, Content.Prep.Stations),
+		Tool = Lync.enum((Content.Prep.ToolKinds :: any) :: { string }),
+		Topping = Lync.optional(Lync.enum(Content.Ingredients.ToppingKeys)),
+		Pos = Lync.vec3(),
+	})):unreliable(),
+	-- c -> s (reliable). Claim (On = true) or release a grill / rail sausage while it is dragged; answered with PrepResult
+	-- Act = Grab (Ok, or Reason Held / Invalid). Claims expire after Ghost.GrabLease s and on Leave / Kick / drop
+	PrepGrab = Lync.packet(Lync.struct({
+		From = Lync.enum(Content.Prep.GrabFrom),
+		Slot = Lync.int(1, 8),
+		On = Lync.bool(),
+	})),
+	-- Set, record id = (index of From in Content.Prep.GrabFrom - 1) * 8 + Slot (1..16). Writer: PrepService. A record =
+	-- that sausage is held by the seat Station; no record = free. Everyone else's grab / flip / collect / trash on it is refused
+	PrepClaims = Lync.replicate(Lync.struct({
+		Station = Lync.int(1, Content.Prep.Stations),
+	})),
+
 	-- Players online in the whole game (TASK-312; owner request 2026-10-15, Provisional). Set, record 1,
 	-- lobby roles only. Writer: PresenceService (MemoryStore sum of every server, at most every 30 s; never under the
 	-- local count). Reader: LobbyController (LobbyHud online pill). One record, 24 bits: no drop.section floor

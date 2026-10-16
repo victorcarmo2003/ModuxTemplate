@@ -3450,3 +3450,16 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
 - Decidido: o crédito do Revive Kit (Developer Product `util_revive`) pode reviver o próprio jogador (botão na tela de desmaio) **ou um colega caído** (segurar E no corpo, gasta o crédito de quem usa).
 - Emenda: DEC-116 ("reviver com Robux: só o próprio jogador").
 - Impacto: `ReviveKitService` + ação `revive_mate` mantidos como implementados; `Q-273` fechada por esta decisão.
+
+### DEC-259 — 2026-10-16 — Arrasto ao vivo no preparo co-op, com nome, highlight e trava (fecha Q-233)
+
+- Origem: pedido do dono em conversa ("os outros conseguem ver o ingrediente sendo arrastado e uma billboard acima… com uma highlight… seria bom um lock também"), confirmado ("Pode abrir as TASKs do arrasto ao vivo… registrar a DEC da Q-233").
+- Decidido:
+  - O que um jogador segura no preparo 3D (salsicha, pão, prato, garrafa, faca…) é visto **ao vivo** pelos outros, no mundo e no modo de preparo.
+  - O item fantasma tem um `Highlight` na cor do assento (`Presence.Palette`) e uma billboard com o nome do jogador.
+  - Na grelha e no trilho, que são compartilhados, a salsicha pega por alguém fica **travada** para os outros enquanto ele segura.
+  - A tábua já é por assento, então não precisa de trava.
+- Substitui a recomendação Provisória de Q-233 ("mão fantasma não"); `Rules.World.GhostHand = true`.
+- Impacto:
+  - Rede: `PrepPointer` (c→s, latest 10 Hz), `PrepGhost` (s→outros, unreliable), `PrepGrab` (c→s) e o set `PrepClaims`.
+  - TASK-349 (servidor) e TASK-350 (cliente).

@@ -1,7 +1,8 @@
 --!strict
 -- Focused prep mode, server side (docs/tech/prep-mode.md §2 to §5; DEC-223; TASK-170, P2). Run place only.
 -- Single responder of PrepEnter / PrepLeave / PrepTab / PrepGrill / PrepBegin / PrepFinish / PrepTrash / PrepOrder
--- (all in OnInit), single writer of the PrepSeats set (record id = station 1..4) and owner of the prep_work action.
+-- / PrepPointer / PrepGrab (all in OnInit), single writer of the PrepSeats set (record id = station 1..4) and of the
+-- PrepClaims set, and owner of the prep_work action.
 --   Seats        clamp(connected members, 1, Content.Prep.Stations) records, grown on MemberJoined and re-counted on
 --                ShiftStarted (never below an occupied seat). Player <-> seat is 1:1; the check and the write are
 --                synchronous, so two PrepEnter in the same frame never share a seat.
@@ -16,7 +17,13 @@
 --                AnomalyService (signal), ThiefService, Vital (sanity band) and cutscenes call it; PrepResult Act = Kick.
 --                KickSignal also locks re-entry for Rules.CueLock seconds.
 -- PrepResult answers failures of Tab (it is also the keep-alive, answered only when refused) and every other act.
--- Provisional: GLOBAL_RATE 6, RANGE_SLACK 2, STAND_LIFT 3 (the Att_Stand of the map is not placed yet, TASK-172).
+-- Live drag (DEC-259, TASK-349): PrepPointer of a seated player is checked against the seat's board (Ghost.MaxDistance) and
+-- relayed as PrepGhost to the other party members; PrepGrab claims a grill / rail sausage (single writer of the PrepClaims
+-- set). A claim lives Ghost.GrabLease s (renewed by Grab On and by every pointer that holds something) and goes away on Off,
+-- seat release, the sausage leaving its slot and the shop closing. Grill Flip / Collect, the bin and the plate (the front of
+-- the rail) are refused with Reason Held while another seat holds that sausage.
+-- Provisional: GLOBAL_RATE 6, RANGE_SLACK 2, STAND_LIFT 3 (the Att_Stand of the map is not placed yet, TASK-172); POINTER_SLACK,
+-- GRAB_RATE (outside GLOBAL_RATE: a 10 Hz pointer and a grab per drag would starve the other acts).
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -34,6 +41,8 @@ local Validate = require(script.Validate)
 local Modux = require(ServerScriptService.server.Modux)
 
 export type SeatRecord = { User: number, Step: string, Ticket: number, Since: number, Plate: number }
+-- A held grill / rail sausage (DEC-259). Key of the claims atom = PrepClaims record id
+export type Claim = { Station: number, Player: Player }
 
 const STATION_TAG = "Station"
 const PREP_KIND = "prep"
@@ -56,6 +65,12 @@ const MAX_TICKET = 65535
 const cfg = Content.Prep
 const rules = cfg.Rules
 const MAX_STATIONS = cfg.Stations
+const ghost = rules.World.Ghost
+const GRAB_SLOTS = 8 -- PrepGrab.Slot 1..8; PrepClaims record id = (index of From - 1) * GRAB_SLOTS + Slot
+const POINTER_SLACK = 1.5 -- the pointer bucket refills at Ghost.Hz * this (jitter of a newest(Hz) packet)
+const GRAB_RATE = 6 -- PrepGrab per second per player (own bucket)
+const BOARD_KIND = "board"
+const GRILL_KIND = "grill"
 
 local function clampStation(value: number): number
 	return math.clamp(math.floor(value), 1, MAX_STATIONS)
@@ -95,6 +110,20 @@ local function freeRecord(): SeatRecord
 	return { User = 0, Step = "Order", Ticket = 0, Since = 0, Plate = 0 }
 end
 
+-- PrepClaims record id of a grill / rail slot, nil = not a GrabFrom key or a slot out of range
+local function claimId(from: string, slot: number): number?
+	const index = table.find(cfg.GrabFrom, from)
+	if index == nil or slot ~= math.floor(slot) or slot < 1 or slot > GRAB_SLOTS then
+		return nil
+	end
+	return (index - 1) * GRAB_SLOTS + slot
+end
+
+-- (From, Slot) of a PrepClaims record id
+local function claimSlot(id: number): (string, number)
+	return cfg.GrabFrom[(id - 1) // GRAB_SLOTS + 1], (id - 1) % GRAB_SLOTS + 1
+end
+
 const PrepService = Modux.Service("PrepService", {
 	Require = {
 		"PlaceService",
@@ -124,6 +153,11 @@ function PrepService:Setup()
 	-- os.clock() until which a player may not sit again (forced exit by signal, Rules.CueLock)
 	self.LockedUntil = {} :: { [Player]: number }
 	self.Published = {} :: { [number]: boolean }
+	-- DEC-259: held grill / rail sausages by PrepClaims record id (frozen, replaced on every write); OnStart mirrors it to the set
+	self.Claims = self.Libs.Charm.atom({} :: { [number]: Claim }) :: Charm.Atom<{ [number]: Claim }>
+	self.ClaimsPublished = {} :: { [number]: number }
+	-- os.clock() until which each claim lives (renewals stay off the atom: they never change the set)
+	self.Leases = {} :: { [number]: number }
 	self.Warned = {} :: { [string]: boolean }
 	-- TASK-260 (owner request 2026-10-14): a plate left by Leave / a forced exit stays on the board (kitchen ticket and stock kept)
 	-- and comes back on the next Enter of the same player. Refunded when the player leaves the server, the shop closes, or it
@@ -385,6 +419,16 @@ function PrepService:Allow(player: Player, kind: string): boolean
 	return Session.Allow(buckets, kind, rate, now)
 end
 
+-- Rate gate of the live drag packets (DEC-259): own bucket, outside GLOBAL_RATE
+function PrepService:AllowOwn(player: Player, kind: string, rate: number): boolean
+	local buckets = self.Buckets[player]
+	if buckets == nil then
+		buckets = {}
+		self.Buckets[player] = buckets
+	end
+	return Session.Allow(buckets, kind, rate, os.clock())
+end
+
 -- Seated player of a packet that needs a seat; replies NoSession otherwise
 function PrepService:Seated(player: Player, act: string): Session.Seat?
 	const seat = self.Sessions[player]
@@ -481,6 +525,7 @@ function PrepService:Release(player: Player, reason: string, silent: boolean?): 
 	end
 	self.Sessions[player] = nil
 	self.BySeat[seat.Station] = nil
+	self:DropPlayerClaims(player)
 	const plate = seat.Plate
 	seat.Plate = nil
 	-- TASK-260: the plate stays parked on the board unless it can never come back (player gone, shop closed)
@@ -591,12 +636,17 @@ function PrepService:Finish(player: Player, seat: Session.Seat, summary: Validat
 		end
 		return false, reason, "None", value
 	end
+	-- DEC-259: the plate takes the front of the rail; a colleague dragging that sausage keeps it
+	if kitchen:RailCount() >= 1 and self:HeldByOther(seat, "Rail", 1) then
+		return false, "Held", "None", 0
+	end
 	const made, refusal, refusalValue = Bridge.Finish(kitchen, player, verdict.Keys, verdict.Band)
 	if made == nil then
 		-- Parked: the plate stays; PlateMax counts again from a plausible age (the player already waited the floor)
 		plate.StartedAt = os.clock() - math.min(elapsed, rules.PerfectMin + rules.PerTopping * #verdict.Keys)
 		return false, refusal, "None", refusalValue
 	end
+	self:SausageLeft("Rail", 1)
 	seat.Plate = nil
 	seat.Made = made.Tool
 	self:ClearMask(seat)
@@ -657,9 +707,18 @@ end
 
 function PrepService:Trash(player: Player, seat: Session.Seat): (boolean, string)
 	const plate = seat.Plate
+	const kitchen = self.Dependencies.KitchenService
+	-- DEC-259: an open plate goes to the bin with the front sausage of the rail; not while a colleague drags that one
+	const railBefore = kitchen:RailCount()
+	if plate ~= nil and railBefore >= 1 and self:HeldByOther(seat, "Rail", 1) then
+		return false, "Held"
+	end
 	seat.Plate = nil
 	self:ClearMask(seat)
-	const bridge = Bridge.Trash(self.Dependencies.KitchenService, self.Dependencies.ItemService, player, plate ~= nil)
+	const bridge = Bridge.Trash(kitchen, self.Dependencies.ItemService, player, plate ~= nil)
+	if kitchen:RailCount() < railBefore then
+		self:SausageLeft("Rail", 1)
+	end
 	if plate == nil and not bridge then
 		return false, "NoSession"
 	end
@@ -675,7 +734,216 @@ function PrepService:TrashSausage(player: Player, seat: Session.Seat, from: stri
 	if from == "Rail" and seat.Plate ~= nil and self.Dependencies.KitchenService:RailCount() <= 1 then
 		return false, "Busy"
 	end
-	return Bridge.TrashSausage(self.Dependencies.KitchenService, player, from, slot)
+	if self:HeldByOther(seat, from, slot) then
+		return false, "Held"
+	end
+	const ok, reason = Bridge.TrashSausage(self.Dependencies.KitchenService, player, from, slot)
+	if ok then
+		self:SausageLeft(from, slot)
+	end
+	return ok, reason
+end
+
+-- Live drag (DEC-259) ---------------------------------------------------------------------------------------------------
+
+-- Copies the claims atom into the PrepClaims set; renewals never reach it (only the holder station is on the wire)
+function PrepService:PushClaims()
+	if not self.Dependencies.NetService:IsRunning() then
+		return
+	end
+	const set = self.Libs.Net.PrepClaims
+	const claims = self.Claims()
+	for id, claim in claims do
+		const published = self.ClaimsPublished[id]
+		if published == nil then
+			set:add(id, { Station = claim.Station })
+		elseif published ~= claim.Station then
+			set:update(id, { Station = claim.Station })
+		end
+		self.ClaimsPublished[id] = claim.Station
+	end
+	for id in self.ClaimsPublished do
+		if claims[id] == nil then
+			set:remove(id)
+			self.ClaimsPublished[id] = nil
+		end
+	end
+end
+
+-- Removes every claim `drop` says yes to (one atom write at most)
+function PrepService:DropClaims(drop: (id: number, claim: Claim) -> boolean)
+	const claims = self.Claims()
+	local nextClaims: { [number]: Claim }? = nil
+	for id, claim in claims do
+		if drop(id, claim) then
+			const edited = nextClaims or table.clone(claims)
+			edited[id] = nil
+			nextClaims = edited
+			self.Leases[id] = nil
+		end
+	end
+	if nextClaims ~= nil then
+		self.Claims(table.freeze(nextClaims))
+	end
+end
+
+function PrepService:DropPlayerClaims(player: Player)
+	self:DropClaims(function(_id: number, claim: Claim): boolean
+		return claim.Player == player
+	end)
+end
+
+-- The sausage of a grill slot / rail position is gone. Rail positions are a queue (1 = front): the claims behind it move
+-- one place forward so each claim keeps following its sausage.
+function PrepService:SausageLeft(from: string, slot: number)
+	const gone = claimId(from, slot)
+	if gone == nil then
+		return
+	end
+	if from ~= "Rail" then
+		self:DropClaims(function(id: number, _claim: Claim): boolean
+			return id == gone
+		end)
+		return
+	end
+	const claims = self.Claims()
+	const nextClaims: { [number]: Claim } = {}
+	const nextLeases: { [number]: number } = {}
+	local changed = false
+	for id, claim in claims do
+		local target = id
+		const kind, position = claimSlot(id)
+		if kind == "Rail" and position == slot then
+			changed = true
+			continue
+		elseif kind == "Rail" and position > slot then
+			target = id - 1
+			changed = true
+		end
+		nextClaims[target] = claim
+		nextLeases[target] = self.Leases[id]
+	end
+	if changed then
+		self.Leases = nextLeases
+		self.Claims(table.freeze(nextClaims))
+	end
+end
+
+-- A sausage sits at that grill slot / rail position right now
+function PrepService:HasSausage(from: string, slot: number): boolean
+	const kitchen = self.Dependencies.KitchenService
+	if from == "Rail" then
+		return slot <= kitchen:RailCount()
+	end
+	const grill = kitchen:CurrentStation(GRILL_KIND)
+	const record = if grill ~= nil then grill.Records[slot] else nil
+	return record ~= nil and record.State ~= "Empty"
+end
+
+-- Another seat holds that sausage (a live claim)
+function PrepService:HeldByOther(seat: Session.Seat, from: string, slot: number): boolean
+	const id = claimId(from, slot)
+	const claim = if id ~= nil then self.Claims()[id] else nil
+	return claim ~= nil and claim.Station ~= seat.Station and (self.Leases[id :: number] or 0) > os.clock()
+end
+
+-- (ok, reason, claim id). On: free or already ours = claimed (lease renewed, any other claim of the seat dropped: one hand);
+-- held by another seat = Held; no sausage there = Invalid. Off: always Ok, drops the claim when it is ours.
+function PrepService:Grab(seat: Session.Seat, from: string, slot: number, on: boolean): (boolean, string, number)
+	const id = claimId(from, slot)
+	if id == nil then
+		return false, "Invalid", 0
+	end
+	const claim = self.Claims()[id]
+	if not on then
+		if claim ~= nil and claim.Station == seat.Station then
+			self:DropClaims(function(other: number, _claim: Claim): boolean
+				return other == id
+			end)
+		end
+		return true, "None", id
+	end
+	if self:HeldByOther(seat, from, slot) then
+		return false, "Held", id
+	end
+	if not self:HasSausage(from, slot) then
+		return false, "Invalid", id
+	end
+	self.Leases[id] = os.clock() + ghost.GrabLease
+	if claim ~= nil and claim.Station == seat.Station and claim.Player == seat.Player then
+		return true, "None", id
+	end
+	const nextClaims = table.clone(self.Claims())
+	for other, held in nextClaims do
+		if held.Station == seat.Station and other ~= id then
+			nextClaims[other] = nil
+			self.Leases[other] = nil
+		end
+	end
+	const record: Claim = { Station = seat.Station, Player = seat.Player }
+	nextClaims[id] = table.freeze(record :: any)
+	self.Claims(table.freeze(nextClaims))
+	return true, "None", id
+end
+
+-- Where the seat's board is (the pointer reach check): its board slot, else the board, else the seat's stand
+function PrepService:BoardPoint(station: number): Vector3?
+	const board = self.Dependencies.KitchenService:CurrentStation(BOARD_KIND)
+	if board ~= nil then
+		const slot = board.Slots[station]
+		if slot ~= nil and slot.Parent ~= nil then
+			return slot.WorldPosition
+		end
+		return board.Instance:GetPivot().Position
+	end
+	const stand = self:StandOf(station, nil)
+	return if stand ~= nil then stand.Position else nil
+end
+
+-- Relays a seated player's pointer to the rest of the party. A pointer too far from the seat's board (or without a board to
+-- check against) is dropped silently; one that holds something keeps the seat's claims alive.
+function PrepService:OnPointer(player: Player, tool: string, topping: string?, pos: Vector3)
+	const seat = self.Sessions[player]
+	if seat == nil or not rules.World.GhostHand then
+		return
+	end
+	const board = self:BoardPoint(seat.Station)
+	-- `not <=` also drops NaN
+	if board == nil or not ((pos - board).Magnitude <= ghost.MaxDistance) then
+		return
+	end
+	const now = os.clock()
+	Session.Touch(seat, now)
+	if tool ~= "None" then
+		for id, claim in self.Claims() do
+			if claim.Player == player then
+				self.Leases[id] = now + ghost.GrabLease
+			end
+		end
+	end
+	const others: { Player } = {}
+	for userId, member in self.Dependencies.RunStateService.Members() do
+		if userId ~= player.UserId and member.State ~= "Away" then
+			const other = Players:GetPlayerByUserId(userId)
+			if other ~= nil then
+				table.insert(others, other)
+			end
+		end
+	end
+	if #others == 0 then
+		return
+	end
+	const payload: any = { Station = seat.Station, Tool = tool, Topping = topping, Pos = pos }
+	self.Libs.Net.PrepGhost:fireClient(others, payload)
+end
+
+-- Claims past their lease, of a player no longer seated, or whose sausage left the slot by a path PrepService does not see
+-- (world prompts, anomalies)
+function PrepService:SweepClaims(now: number)
+	self:DropClaims(function(id: number, claim: Claim): boolean
+		const from, slot = claimSlot(id)
+		return (self.Leases[id] or 0) <= now or self.Sessions[claim.Player] == nil or not self:HasSausage(from, slot)
+	end)
 end
 
 -- Packets ---------------------------------------------------------------------------------------------------------------
@@ -745,7 +1013,15 @@ function PrepService:OnGrill(player: Player, act: string, slot: number)
 		self:Reply(player, "Grill", false, "OneSausage", nil, nil)
 		return
 	end
+	-- DEC-259: a sausage a colleague drags is not flipped nor collected by anyone else
+	if act ~= "Place" and slot > 0 and self:HeldByOther(seat, "Grill", slot) then
+		self:Reply(player, "Grill", false, "Held", nil, slot)
+		return
+	end
 	const outcome = Bridge.Grill(self.Dependencies.KitchenService, player, act, slot)
+	if outcome.Ok and act == "Collect" then
+		self:SausageLeft("Grill", slot)
+	end
 	self:Reply(player, "Grill", outcome.Ok, outcome.Reason, outcome.Grade, outcome.Value)
 end
 
@@ -848,6 +1124,25 @@ function PrepService:ConnectPackets()
 		end
 		self:OnOrder(player, value.Act, value.Npc)
 	end)
+	-- DEC-259: live drag. The pointer never answers (newest at Ghost.Hz); a grab always does (the client pairs it)
+	net.PrepPointer:onServer(function(value, player: Player)
+		if not self:AllowOwn(player, "Pointer", ghost.Hz * POINTER_SLACK) then
+			return
+		end
+		self:OnPointer(player, value.Tool, value.Topping, value.Pos)
+	end)
+	net.PrepGrab:onServer(function(value, player: Player)
+		if not self:AllowOwn(player, "Grab", GRAB_RATE) then
+			self:Reply(player, "Grab", false, "Rate", nil, nil)
+			return
+		end
+		const seat = self:Seated(player, "Grab")
+		if seat == nil then
+			return
+		end
+		const ok, reason, id = self:Grab(seat, value.From, value.Slot, value.On)
+		self:Reply(player, "Grab", ok, reason, nil, id)
+	end)
 end
 
 -- Prompt and gate -----------------------------------------------------------------------------------------------------
@@ -928,6 +1223,7 @@ function PrepService:Sweep()
 			end
 		end
 	end
+	self:SweepClaims(now)
 end
 
 PrepService:OnInit(function(self)
@@ -964,6 +1260,10 @@ PrepService:OnInit(function(self)
 	self.Dependencies.RoundService.PhaseChanged:Connect(function(_phase)
 		if not self.Dependencies.RoundService:IsServing() then
 			self:ForceExitAll("KickClosing")
+			-- end of the turn: no sausage stays held
+			self:DropClaims(function(_id: number, _claim: Claim): boolean
+				return true
+			end)
 		end
 	end)
 	self.Dependencies.PlayerService.PlayerRemoving:Connect(function(player)
@@ -989,6 +1289,9 @@ PrepService:OnStart(function(self)
 	self:Grow()
 	self.Libs.Charm.effect(function()
 		self:PushSeats()
+	end)
+	self.Libs.Charm.effect(function()
+		self:PushClaims()
 	end)
 end)
 

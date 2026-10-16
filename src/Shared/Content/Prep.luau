@@ -158,6 +158,16 @@ export type PresenceRules = {
 	Tag: { Width: number, Height: number, Lift: number },
 }
 
+-- Live drag (DEC-259, closes Q-233; TASK-349/350): the colleague's held item seen by everyone, and the grill / rail claim
+export type GhostRules = {
+	Hz: number, -- PrepPointer send rate (the Net packet is newest(Hz))
+	MaxDistance: number, -- studs: a pointer farther than this from the seat's board is dropped by the server
+	Stale: number, -- s without a PrepGhost of a station before its ghost fades out (clients)
+	Lerp: number, -- smoothing of the ghost position (exponential rate per s, clients)
+	GrabLease: number, -- s a grill / rail claim lives without being renewed or released (server)
+	Fill: number, -- Highlight.FillTransparency of the ghost item (colour = Presence.Palette[station])
+}
+
 export type JuiceRules = {
 	Particles: number, -- live particles of the prep (own budget)
 	Emitters: number, -- live emitters of the prep
@@ -278,7 +288,8 @@ export type WorldRules = {
 	Board: BoardRules,
 	Toppings: ToppingRules,
 	Editable: boolean, -- EditableMesh layer (prep-3d.md §6A); false until the S1b spike passes
-	GhostHand: boolean, -- colleague's ghost hand (Q-233)
+	GhostHand: boolean, -- colleague's live drag (DEC-259; was Q-233): PrepPointer / PrepGhost / PrepGrab / PrepClaims
+	Ghost: GhostRules,
 	Presence: PresenceRules, -- co-op presence: the colleague's working arm, name and colour (Rig/Mates.luau)
 	Juice: JuiceRules,
 	Coach: CoachRules,
@@ -704,6 +715,7 @@ const reasons = Table.new({
 	{ Key = "HandsFull", Notice = "hands_full" },
 	{ Key = "Rate" },
 	{ Key = "NoTicket" },
+	{ Key = "Held" }, -- DEC-259: a colleague holds that grill / rail sausage (PrepClaims); the client names who
 	-- forced exits (PrepResult Act = Kick)
 	{ Key = "KickSignal", Notice = "prep_kicked" },
 	{ Key = "KickSanity", Notice = "prep_kicked" },
@@ -811,7 +823,8 @@ const rules: Rules = {
 			Hand = { Spring = 16, Rise = 0.5 },
 		},
 		Editable = false,
-		GhostHand = false,
+		GhostHand = true, -- DEC-259
+		Ghost = { Hz = 10, MaxDistance = 16, Stale = 0.6, Lerp = 14, GrabLease = 5, Fill = 0.55 }, -- Provisional
 		Presence = {
 			-- one colour per seat (station 1..4 take the first four), never red; Teal, Mustard, Lilac, Mint, Apricot, Sky, Pink, Lime
 			Palette = {Color3.fromHex("#3FA7B5"), Color3.fromHex("#F6C12B"), Color3.fromHex("#A98BD6"), Color3.fromHex("#6FCF97"), Color3.fromHex("#F29B6B"), Color3.fromHex("#5BA8F0"), Color3.fromHex("#E58BC0"), Color3.fromHex("#B7D84B")},
@@ -1050,11 +1063,12 @@ return Table.record({
 	Reasons = reasons,
 	Texts = texts,
 	-- PrepResult.Act (wire enum)
-	Acts = { "Enter", "Leave", "Tab", "Grill", "Begin", "Finish", "Trash", "Order", "Kick" },
+	Acts = { "Enter", "Leave", "Tab", "Grill", "Begin", "Finish", "Trash", "Order", "Kick", "Grab" },
 	-- PrepResult.Grade (wire enum); None = the act has no grade
 	GradeKeys = { "None", "Messy", "Good", "Perfect" },
 	GrillActs = { "Place", "Flip", "Collect" }, -- PrepGrill.Act
 	TrashFrom = { "Plate", "Grill", "Rail" }, -- PrepTrash.From (the bin takes the plate, a sausage of the grill, the front of the rail); PrepResult.Value of a Trash = index - 1
 	OrderActs = { "Take", "Serve", "Refuse" }, -- PrepOrder.Act
+	GrabFrom = { "Grill", "Rail" }, -- PrepGrab.From; PrepClaims record id = (index of From - 1) * 8 + Slot (DEC-259)
 	Stations = 4, -- PrepEnter.Station 1..4, PrepSeats records (BoardSlots of the trailer)
 })

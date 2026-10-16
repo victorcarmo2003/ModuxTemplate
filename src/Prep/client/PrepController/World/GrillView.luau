@@ -21,6 +21,7 @@ local Content = require(ReplicatedStorage.shared.Content)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
 local Fx = require(StarterPlayer.StarterPlayerScripts.client.Kitchen.KitchenController.Fx)
 local Slots = require(StarterPlayer.StarterPlayerScripts.client.Kitchen.KitchenController.Slots)
+local Ghost = require(script.Parent.Ghost)
 local GrillRig = require(script.Parent.GrillRig)
 local Juice = require(script.Parent.Juice)
 local HintMark = require(StarterPlayer.StarterPlayerScripts.client.Interface.HintMark)
@@ -504,6 +505,7 @@ function GrillView.new(options: Options): View
 
 	function self.SetCarry(_: any, point: Vector3?, snap: number?, grilled: boolean)
 		if point == nil and snap == nil then
+			Ghost.Hold("grill", "None", nil, nil)
 			carryTarget = nil
 			if carry ~= nil then
 				carry:Destroy()
@@ -528,6 +530,8 @@ function GrillView.new(options: Options): View
 			pose = CFrame.new(point) * lastRotation.Rotation
 		end
 		carryTarget = pose
+		-- the live drag (DEC-259): the sausage in the hand, where the colleagues see it
+		Ghost.Hold("grill", "Sausage", nil, if pose ~= nil then pose.Position else point)
 	end
 
 	function self.TakeCarry(_: any): Model?
@@ -764,6 +768,7 @@ function GrillView.new(options: Options): View
 	end
 
 	function self.Destroy(_: any)
+		Ghost.Hold("grill", "None", nil, nil)
 		rig:Destroy()
 		for _, face in faces do
 			for _, mark in face.Marks do

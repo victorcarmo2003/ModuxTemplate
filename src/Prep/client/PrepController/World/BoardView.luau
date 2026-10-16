@@ -18,6 +18,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Content = require(ReplicatedStorage.shared.Content)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
+local Ghost = require(script.Parent.Ghost)
 local Juice = require(script.Parent.Juice)
 local Plane = require(script.Parent.Plane)
 
@@ -873,9 +874,12 @@ function BoardView.new(options: Options): View
 					bias = 0
 				end
 				liftTarget = Vector3.new(point.X, anchorPos.Y, point.Z)
+				Ghost.Hold("board", "Plate", nil, liftTarget)
 			end
 			return
 		end
+		-- the live drag (DEC-259): the plate or the sausage is let go (a new sausage carry reports itself below)
+		Ghost.Hold("board", "None", nil, nil)
 		if kind == nil and lifted then
 			-- let go: the stack goes back where it was
 			lifted = false
@@ -920,6 +924,7 @@ function BoardView.new(options: Options): View
 			-- the aim already lifted the point over the plane (Rules.World.Lift): the thing hangs ON the pointer ray, under the cursor
 			carryTarget = CFrame.new(point) * orient
 		end
+		Ghost.Hold("board", "Sausage", nil, if carryTarget ~= nil then carryTarget.Position else point)
 	end
 
 	function self.SetTopping(_: any, key: string, uv: Vector2?, grow: number)
@@ -1208,6 +1213,7 @@ function BoardView.new(options: Options): View
 	end
 
 	function self.Destroy(_: any)
+		Ghost.Hold("board", "None", nil, nil)
 		unhide()
 		flight = nil
 		if plate ~= nil then

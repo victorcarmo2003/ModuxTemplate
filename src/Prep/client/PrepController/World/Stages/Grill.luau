@@ -10,6 +10,8 @@
 --            turns at once (prediction) and a burst shows the band. Before the window a tap only shivers the sausage and sends
 --            nothing; after it ("late") the tap still flips.
 --   Collect  a ready sausage (check mark): tap it, or drag it to the rail; it flies to the next slot of the real rail.
+--   Lock     (DEC-259) a lifted grill / rail sausage is claimed (PrepGrab On, Off when it is let go); one a colleague holds
+--            (PrepClaims, World/Ghost.luau) does not come: shake + toast "<name> is holding it". A Grab refused Held drops the drag.
 --   Rollback the server's records (`Stations`, `PrepResult`) always win: a refused act undoes its prediction with a shake.
 -- Sends only through Feed (Place, Flip, Collect: the same queue and rates as the 2D stage). The grade is the server's: nothing is
 -- computed here besides the look of the ring. All numbers are in Content.Prep (Rules.World.Grill, Ring, Grill).
@@ -21,6 +23,7 @@ local Content = require(ReplicatedStorage.shared.Content)
 local Grade = require(ReplicatedStorage.shared.Prep.Grade)
 local Haptics = require(StarterPlayer.StarterPlayerScripts.client.Input.Haptics)
 local FlipFocus = require(script.Parent.Parent.FlipFocus)
+local Ghost = require(script.Parent.Parent.Ghost)
 local Feed = require(script.Parent.Parent.Parent.Feed)
 local Flips = require(script.Parent.Parent.Parent.Flips)
 local Stage = require(script.Parent.Parent.Parent.Stage)
@@ -67,6 +70,9 @@ type Session = {
 	CoachTried: boolean,
 	Pulse: { [string]: boolean },
 	Drag: { Kind: string, Slot: number }?,
+	-- DEC-259: the grill / rail sausage this drag claimed (PrepGrab On sent), and a press refused because a colleague holds it
+	Grab: { From: string, Slot: number }?,
+	Refused: boolean,
 	Phases: { [number]: Phase },
 	Stop: (() -> ())?,
 	-- the lid of the sausage container (opens while the pointer is over it)
@@ -290,6 +296,46 @@ local function restore(current: Session)
 			current.View:Hide(slot, false)
 		end
 	end
+end
+
+-- The live drag lock (DEC-259) ---------------------------------------------------------------------------------------------
+
+-- Lets go of the claimed sausage (PrepGrab Off).
+local function release(current: Session)
+	const grab = current.Grab
+	if grab == nil then
+		return
+	end
+	current.Grab = nil
+	current.Controller.Libs.Net.PrepGrab:fireServer({ From = grab.From, Slot = grab.Slot, On = false })
+	note(`grab off {grab.From} {grab.Slot}`)
+end
+
+-- Claims the lifted sausage once per drag (PrepGrab On; the pointers of the hand keep the lease alive on the server).
+local function claim(current: Session, from: string, slot: number)
+	if not world.GhostHand then
+		return
+	end
+	const grab = current.Grab
+	if grab ~= nil and grab.From == from and grab.Slot == slot then
+		return
+	end
+	release(current)
+	current.Grab = { From = from, Slot = slot }
+	current.Controller.Libs.Net.PrepGrab:fireServer({ From = from, Slot = slot, On = true })
+	note(`grab on {from} {slot}`)
+end
+
+-- A colleague holds that sausage: it does not come (it shakes on its roller, the toast names who holds it).
+local function refuseHeld(current: Session, from: string, slot: number, text: string)
+	current.Drag = nil
+	if from == "Grill" then
+		current.View:Hide(slot, false)
+		current.View:Shake(slot)
+	end
+	Haptics.Play("Tap")
+	current.Controller:Toast(text, "Alert")
+	note(`held: {from} {slot}`)
 end
 
 -- A tap on a roller does what its phase invites.
@@ -548,6 +594,8 @@ local function build(controller: any)
 		CoachTried = false,
 		Pulse = {},
 		Drag = nil,
+		Grab = nil,
+		Refused = false,
 		Phases = {},
 		Stop = nil,
 		Lid = nil,
@@ -596,6 +644,7 @@ local function teardown()
 	for slot in current.Pred do
 		current.View:Hide(slot, false)
 	end
+	release(current)
 	current.View:Destroy()
 	World.SetWorkPlane(nil)
 	const registry = World.Targets()
@@ -667,7 +716,28 @@ const Grill: Stage.Stage3D = {
 		const kind: string = message.Kind
 		if kind == "Press" then
 			const target = message.Target :: Types.Target
+			current.Refused = false
+			-- DEC-259: a sausage a colleague holds does not come (the rail is claimed by its front, position 1)
+			const targetKind = target.Target.Kind
+			if targetKind == "GrillSlot" or targetKind == "Rail" then
+				const from = if targetKind == "Rail" then "Rail" else "Grill"
+				const slot = if targetKind == "Rail" then 1 else target.Target.Slot
+				const holder, text = Ghost.HeldBy(from, slot)
+				if holder ~= nil then
+					current.Refused = true
+					refuseHeld(current, from, slot, text :: string)
+					return
+				end
+			end
 			current.Drag = { Kind = target.Target.Kind, Slot = target.Target.Slot }
+		elseif current.Refused and kind ~= "Release" and kind ~= "Cancel" then
+			-- the press found the sausage held: the rest of that gesture does nothing
+			if kind == "Drop" or kind == "Tap" then
+				current.Refused = false
+				current.View:SetCarry(nil, nil, false)
+				restore(current)
+			end
+			return
 		elseif kind == "Move" then
 			const source = message.Source :: Types.Target
 			const over = message.Over :: Types.Target?
@@ -687,13 +757,17 @@ const Grill: Stage.Stage3D = {
 				if phase ~= "Free" then
 					current.View:SetCarry(message.Point, nil, phase == "Ready" or share >= 0.5)
 					current.View:Hide(source.Target.Slot, true)
+					claim(current, "Grill", source.Target.Slot)
 				end
 			elseif source.Target.Kind == "Rail" then
 				current.View:SetCarry(message.Point, nil, true)
+				claim(current, "Rail", 1)
 			end
 		elseif kind == "Release" or kind == "Cancel" then
 			current.View:SetCarry(nil, nil, false)
 			current.Drag = nil
+			current.Refused = false
+			release(current)
 			-- a sausage that was lifted and not dropped anywhere goes back
 			restore(current)
 		elseif kind == "Drop" then
@@ -701,6 +775,7 @@ const Grill: Stage.Stage3D = {
 			const over = message.Over :: Types.Target
 			const from = if current.View:PoseOf(source.Target.Slot) ~= nil then current.View:PoseOf(source.Target.Slot) else nil
 			current.Drag = nil
+			release(current)
 			if over.Target.Kind == "Bin" and (source.Target.Kind == "GrillSlot" or source.Target.Kind == "Rail") then
 				-- the carried model goes into the bin (throw takes it)
 				if source.Target.Kind == "GrillSlot" then
@@ -736,6 +811,23 @@ const Grill: Stage.Stage3D = {
 	end,
 	OnResult = function(controller: any, result: any)
 		const current = session
+		if result.Act == "Grab" then
+			-- DEC-259: the server says a colleague got that sausage first; the drag drops and the sausage goes back
+			if current ~= nil and not result.Ok and result.Reason == "Held" then
+				const grab = current.Grab
+				current.Grab = nil
+				if grab ~= nil then
+					const aim = World.Aim()
+					if aim ~= nil then
+						aim:Cancel("Held")
+					end
+					current.View:SetCarry(nil, nil, false)
+					restore(current)
+					refuseHeld(current, grab.From, grab.Slot, Ghost.HeldText(grab.From, grab.Slot))
+				end
+			end
+			return
+		end
 		if result.Act ~= "Grill" then
 			note(`{result.Act}: ok {tostring(result.Ok)} reason {result.Reason}`)
 		end

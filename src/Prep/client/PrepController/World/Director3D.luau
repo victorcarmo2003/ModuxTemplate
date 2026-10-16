@@ -33,6 +33,7 @@ local taps = require(script.Parent.Parent.Gestures.taps)
 local trace = require(script.Parent.Parent.Gestures.trace)
 local Pointer = require(script.Parent.Parent.Pointer)
 local BoardView = require(script.Parent.BoardView)
+local Ghost = require(script.Parent.Ghost)
 local Plane = require(script.Parent.Plane)
 local Ray = require(script.Parent.Ray)
 local Strokes = require(script.Parent.Strokes)
@@ -956,6 +957,9 @@ function Director3D.new(options: Options): Director
 		if tool:Kind() ~= "None" then
 			tool:Move(point, pouring and uv ~= nil, lean)
 		end
+		-- the live drag (DEC-259): the knife and the topping tool in the hand, as the colleagues see them
+		Ghost.Hold("knife", if slicing then "Knife" else "None", nil, point)
+		Ghost.Hold("tool", tool:Kind(), tool:Key(), point)
 		-- a light continuous rumble while a sauce pours (TASK-268; same on PS and Xbox, Settings Vibration)
 		const rumble = pouring and tool:Kind() ~= "None"
 		if rumble ~= rumbling then
@@ -967,6 +971,8 @@ function Director3D.new(options: Options): Director
 	function self.Destroy(_: any)
 		disarm()
 		mode = "none"
+		Ghost.Hold("knife", "None", nil, nil)
+		Ghost.Hold("tool", "None", nil, nil)
 		if rumbling then
 			rumbling = false
 			Haptics.Hold("Pour", false)

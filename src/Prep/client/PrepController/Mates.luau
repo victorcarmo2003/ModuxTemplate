@@ -4,8 +4,8 @@
 --                        name tag (Humanoid.DisplayDistanceType) and their own billboards / emitters off
 --   co-op                a colleague who works at a seat of the trailer (attribute `Working` = station, set by PrepService on
 --                        the character) keeps ONE ARM visible: the right arm (R6 "Right Arm", R15 right arm parts) plus the
---                        Tool he holds (the hot dog). The arm is the real one, frozen at his seat: no pointer data travels
---                        (Rules.World.GhostHand stays false; a moving hand needs the PrepPointer packet, see prep-3d.md §10).
+--                        Tool he holds (the hot dog). The arm is the real one, frozen at his seat; what he drags live is
+--                        World/Ghost.luau (DEC-259, PrepGhost), which draws its own item and tag apart from the character.
 --                        That arm gets a Highlight in his colour and a BillboardGui with his username (Adornee = the arm).
 -- Colour: Rules.World.Presence.Palette[station] (stable per seat, never red). `Mates.ColorOf(station)` is exported for UI chips.
 -- The own rig is NOT handled here (Rig.luau hides it whole). Everything is restored on Release / Destroy.
@@ -83,7 +83,9 @@ local function setAlpha(parts: { BasePart }, value: number)
 	end
 end
 
-local function makeGui(mate: Mate, color: Color3, folder: Folder)
+-- The name tag of a colleague (cream card, a chip and a stroke in his seat colour), `Adornee` = what it floats over.
+-- World/Ghost.luau uses it for the live drag tag too.
+function Mates.Tag(text: string, color: Color3, adornee: Instance, parent: Instance): BillboardGui
 	const gui = Instance.new("BillboardGui")
 	gui.Name = "MateTag"
 	gui.AlwaysOnTop = true
@@ -93,7 +95,7 @@ local function makeGui(mate: Mate, color: Color3, folder: Folder)
 	gui.Size = UDim2.fromScale(presence.Tag.Width, presence.Tag.Height) -- scale = studs
 	gui.StudsOffsetWorldSpace = Vector3.new(0, presence.Tag.Lift, 0)
 	gui.MaxDistance = presence.Range
-	gui.Adornee = mate.ArmPart :: Instance
+	gui.Adornee = adornee
 	const card = Instance.new("Frame")
 	card.Name = "Card"
 	card.Size = UDim2.fromScale(1, 1)
@@ -130,13 +132,22 @@ local function makeGui(mate: Mate, color: Color3, folder: Folder)
 	label.Size = UDim2.fromScale(0.68, 0.7)
 	label.BackgroundTransparency = 1
 	label.FontFace = Theme.Font.Title
-	label.Text = mate.Player.Name
+	label.Text = text
 	label.TextScaled = true
 	label.TextXAlignment = Enum.TextXAlignment.Left
 	label.TextColor3 = Theme.Color.Ink
 	label.Parent = card
-	gui.Parent = folder
-	mate.Gui = gui
+	gui.Parent = parent
+	return gui
+end
+
+-- Graphics quality at or under Rules.World.Budget.LowQuality (no Highlight there). World/Ghost.luau reads it too.
+function Mates.LowQuality(): boolean
+	return lowQuality()
+end
+
+local function makeGui(mate: Mate, color: Color3, folder: Folder)
+	mate.Gui = Mates.Tag(mate.Player.Name, color, mate.ArmPart :: Instance, folder)
 end
 
 local function makeLight(adornee: Instance, color: Color3, folder: Folder): Highlight
