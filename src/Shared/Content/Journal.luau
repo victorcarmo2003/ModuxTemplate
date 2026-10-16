@@ -102,6 +102,11 @@ const written: { Page } = {
 		"A low rumble.",
 	}, { "The lights do NOT flicker." }, { "Out the back and hide.", "Quick! It is fast." }),
 
+	page("anm_006_stalker", "The Stalker", "Careful", {
+		"A tall figure across the street.",
+		"It only moves when you look at it.",
+	}, { "It never moves while nobody watches." }, { "Look away. Do not stare.", "Close the window if it gets close." }),
+
 	page("anm_016_starer", "The Starer", "Refuse", {
 		"Never blinks. Never moves.",
 		"The head follows you everywhere.",

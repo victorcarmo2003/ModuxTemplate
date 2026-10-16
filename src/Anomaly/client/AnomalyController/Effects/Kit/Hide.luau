@@ -7,7 +7,8 @@
 	Cues:
 	  hide_warn     the warning, ONE sign per monster (TASK-339, owner 2026-10-15: Walt no longer shouts "Hide!" every
 	                time; each sign is explained once in the debut call, Content.BossCalls):
-	                  Buzz     (Walker)  the trailer lights flicker and buzz, heavy steps come closer
+	                  Buzz     (Walker)  the trailer lights flicker and buzz, heavy steps come closer, and the
+	                                     "hide" words whispered on screen (Kit/Whispers, owner 2026-10-16)
 	                  Scratch  (crawler) fast scratching under the trailer, low rumble, no light change
 	                  Whisper  (grin)    SILENT: only "hide" words whispered on screen (Kit/Whispers)
 	                  Roof     (roof walker) slow heavy steps on the trailer roof
@@ -414,6 +415,8 @@ function Hide.Warn(ctx: Effect.Context, cue: Effect.Cue, options: Options)
 		ctx.Play(rumble)
 	end
 	if signal == "Buzz" then
+		-- the Walker also gets the whispered words on screen (owner request 2026-10-16)
+		Whispers.Play(seconds)
 		task.spawn(flicker, ctx)
 		if Content.Sounds.ByKey[BUZZ_KEY] ~= nil then
 			ctx.Play(BUZZ_KEY, base)

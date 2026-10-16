@@ -1,21 +1,24 @@
 --!strict
--- Server rule of ANM-006 The wavers (anomalies.md N6; npcs.md NPC-014; content-data.md §6.10; FEAT-023; TASK-115).
--- Verb "dont_look", personal target: a player fails by keeping the lit window in the gaze cone for LookLimit seconds
--- in a row (a glance only costs the -5 of "seen"). No omission: with nobody failing, the window goes dark by itself
--- after AutoOff seconds. Never critical (DEC-074).
---   LookLimit   s of continuous gaze that fail (npcs.md: 2.9 s does not fail, 3.0 s fails)
---   AutoOff     s from the start until the window goes dark (end of the occurrence)
---   CurtainLead s between the curtain sound (Phase Signal) and the waving silhouette (Phase Active); PROVISIONAL
---               (TASK-115: "curtain before the silhouette", npcs.md N6, gives no number)
+-- Server rule of ANM-006 The stalker (DEC-260, replaces The wavers; TASK-351). Verb "dont_look": the more the crew stares
+-- at it, the closer it comes. PROVISIONAL numbers (owner request 2026-10-16, tune in play).
+--   Steps       steps from the far sidewalk to the service window
+--   StepEvery   s of stare (any Active player looking at it; several lookers do not stack) per step
+--   AutoOff     s from the start: nobody brought it to the window, it fades away (Resolved)
+--   LeapDelay   s between reaching the window and leaping in (the last chance: close the window)
+--   ScareFaint  s between the jumpscare and the faint of the nearest player
+--   Linger      s the record stays after the end so every client plays the leap / bang / fade
 return {
-	Anomaly = "anm_006_wavers",
+	Anomaly = "anm_006_stalker",
 	Verb = "dont_look",
 	LikelyWrongVerb = "look",
 	Window = 0,
 	IsCritical = false,
 	Params = {
-		LookLimit = 3,
-		AutoOff = 20,
-		CurtainLead = 1,
+		Steps = 6,
+		StepEvery = 1.2,
+		AutoOff = 28,
+		LeapDelay = 1,
+		ScareFaint = 0.7,
+		Linger = 2.5,
 	},
 }

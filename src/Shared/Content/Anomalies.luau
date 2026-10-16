@@ -93,8 +93,10 @@ const cues = Table.new({
 	{ Key = "copy_grab", Kind = "Visual", Duration = 2 }, -- N4: the door was opened: the copy comes in and grabs
 	{ Key = "copy_vanish", Kind = "Visual", Duration = 2 }, -- N4: the copy fades out (Kit/Fade, 2 s), nobody opened
 	{ Key = "raincoat_drip", Kind = "Both", Duration = 0 }, -- N5 sign: drip and puddle (Actor anchor)
-	{ Key = "curtain", Kind = "Audio", Duration = 0 }, -- N6 start sound before the silhouette (FEAT-022 rule 2)
-	{ Key = "waver_more", Kind = "Visual", Duration = 5 }, -- N6 flavor: two hands, +2 windows lit
+	-- ANM-006 The stalker (DEC-260, TASK-351). stalker_step Entity = the new step (1..Steps): it lunges one step closer
+	{ Key = "stalker_step", Kind = "Both", Duration = 0 },
+	{ Key = "stalker_leap", Kind = "Both", Duration = 1 }, -- it leaps in through the open service window
+	{ Key = "stalker_bang", Kind = "Both", Duration = 1 }, -- window closed: it bangs on it and leaves
 	{ Key = "post_buzz", Kind = "Audio", Duration = 2 }, -- N7 start sign: last Juniper post buzzes (DEC-123)
 	{ Key = "post_flicker", Kind = "Visual", Duration = 0.5 }, -- N7: the post of the current step flickers
 	{ Key = "walker_step", Kind = "Both", Duration = 0 }, -- N7: one muffled step
@@ -245,6 +247,18 @@ longCar.Trailer = "Helps" -- window in the trailer; in the cart: leave the zone
 -- the high beam; else jumpscare + faint), drawn from Night 8 like before DEC-254
 longCar.Family = "D"
 
+-- ANM-006 The stalker (DEC-260, replaces The wavers cut by DEC-254; TASK-351; owner 2026-10-16, Provisional): a figure
+-- across the street that only comes closer while somebody stares at it; at the window it leaps in on the nearest player
+-- (closed window = it bangs and leaves). Family D with a verb (like ANM-008), drawn from Night 4
+const stalker = anomaly(6, "anm_006_stalker", "The stalker", "World", 0, "Party", 90, true, {}, {
+	"stalker_step",
+	"stalker_leap",
+	"stalker_bang",
+	"jumpscare",
+})
+stalker.Night = 4
+stalker.Family = "D"
+
 -- V2 family C (DEC-254, TASK-273): everything goes dark, the breaker at the back (hold 3 s), the shade attacks in 30 s
 const blackout = anomaly(4, "anm_020_blackout", "The blackout", "World", 0, "Party", 100, true, {
 	"anm_003_stopped_clock",
@@ -269,8 +283,7 @@ const base = Table.new({
 	stoppedClock,
 	copies,
 	raincoat,
-	-- ANM-006 is cut from the agenda (DEC-254): Family nil, the ID and the module stay. ANM-008 came back (TASK-331)
-	anomaly(6, "anm_006_wavers", "The wavers", "World", 0, "PerPlayer", 80, false, {}, { "curtain", "waver_more" }),
+	stalker,
 	walker,
 	longCar,
 	knock,

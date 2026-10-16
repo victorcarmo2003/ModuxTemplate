@@ -3463,3 +3463,16 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
 - Impacto:
   - Rede: `PrepPointer` (c→s, latest 10 Hz), `PrepGhost` (s→outros, unreliable), `PrepGrab` (c→s) e o set `PrepClaims`.
   - TASK-349 (servidor) e TASK-350 (cliente).
+
+### DEC-260 — 2026-10-16 — ANM-006 vira "The stalker": avança quando encarada e ataca o mais próximo (substitui The wavers)
+
+- Origem: pedido do dono em conversa ("as janelas... do trailer não dá para vê-las"; "quanto mais a gente encara, mais ela se mexe... pula pela janela e ataca... sempre o player mais próximo"), confirmado ("registra a DEC, abre a TASK e implementa no lugar da ANM-006").
+- Decidido (números **Provisórios**):
+  - Uma figura alta aparece do outro lado da rua, sempre à vista da janela de serviço.
+  - Ela só se mexe enquanto alguém da equipe olha para ela: a cada 1,2 s de olhar, avança um passo. São 6 passos até a janela.
+  - Na janela, ela espera 1 s e pula para dentro, atacando o jogador mais próximo da janela, onde quer que ele esteja (jumpscare + desmaio, DEC-255).
+  - Se a janela de serviço estiver fechada nesse momento, ela bate no vidro e vai embora.
+  - Se ninguém a levar até a janela em 28 s, ela some sozinha.
+- Família D com verbo (`dont_look`), como a ANM-008; sorteada a partir da Noite 4.
+- A chave muda de `anm_006_wavers` para `anm_006_stalker`; as janelas WV-1..3 deixam de ser usadas.
+- Impacto: TASK-351.

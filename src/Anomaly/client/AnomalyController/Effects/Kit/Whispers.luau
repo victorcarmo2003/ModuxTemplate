@@ -13,14 +13,32 @@ local StarterPlayer = game:GetService("StarterPlayer")
 local TweenService = game:GetService("TweenService")
 local Motion = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Motion)
 
-const WORDS = { "hide", "hide...", "HIDE", "hide", "hide…", "HIDE" }
+-- owner request 2026-10-16: more words, more often; "hide" stays the most common (listed several times)
+const WORDS = {
+	"hide",
+	"hide",
+	"hide...",
+	"hide…",
+	"HIDE",
+	"HIDE",
+	"hide!",
+	"hide now",
+	"get behind it",
+	"behind the trailer",
+	"it's coming",
+	"it sees you",
+	"don't let it see you",
+	"go. go.",
+	"shhh",
+	"out back",
+}
 const FONT = Enum.Font.Creepster
 const CREAM = Color3.fromHex("#FFF1D6")
 const MUSTARD = Color3.fromHex("#F6C12B")
 const INK = Color3.fromHex("#2B2233")
-const RATE = 9 -- words per second
+const RATE = 16 -- words per second (was 9; owner 2026-10-16)
 const LIFE = { 0.5, 1 } -- s each word stays
-const SIZE = { 22, 46 } -- px text size
+const SIZE = { 20, 46 } -- px text size
 const DRIP = { 18, 46 } -- px it slides down over its life
 const TILT = 14 -- degrees of random rotation
 -- arc of each lower corner: centre at the corner, radius in screen-height share, angles from the vertical
@@ -51,9 +69,10 @@ local function spawnWord(gui: ScreenGui, rng: Random, reduced: boolean)
 	label.BackgroundTransparency = 1
 	label.AnchorPoint = Vector2.new(0.5, 0.5)
 	label.Position = UDim2.fromOffset(px, py)
-	label.Size = UDim2.fromOffset(size * 5, size + 8)
+	const word = WORDS[rng:NextInteger(1, #WORDS)]
+	label.Size = UDim2.fromOffset(math.ceil(size * math.max(5, #word * 0.62)), size + 8) -- long phrases fit
 	label.Font = FONT
-	label.Text = WORDS[rng:NextInteger(1, #WORDS)]
+	label.Text = word
 	label.TextSize = size
 	label.TextColor3 = if rng:NextNumber() < 0.2 then MUSTARD else CREAM
 	label.TextStrokeColor3 = INK
