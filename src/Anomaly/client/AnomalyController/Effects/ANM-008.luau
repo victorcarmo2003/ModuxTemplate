@@ -21,7 +21,7 @@
 	client shows the face; the faint is the server's).
 
 	PROVISIONAL (TASK-331) - numbers Rules/ANM-008 must match on the server: ARRIVE_TIME = SLOW + RUSH + BRAKE = 8.2 s
-	after StartedAt the car is braked; the beam comes BeamDelay (1 s) later. Brake screech `car_screech` (Id "" until
+	after StartedAt the car is braked; the beam comes BeamDelay (2.5 s) later (server cue/phase). Brake screech `car_screech` (Id "" until
 	the owner sends it: silence).
 ]]
 local Players = game:GetService("Players")

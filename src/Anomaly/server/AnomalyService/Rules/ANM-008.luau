@@ -12,14 +12,15 @@ const rule: Api.Rule = {
 	Anomaly = "anm_008_long_car",
 	Verb = "shutter",
 	LikelyWrongVerb = "keep_working",
-	Window = 9,
+	Window = 10.5, -- was 9; owner 2026-10-16: +1.5 s (follows BeamDelay)
 	IsCritical = false,
 	Params = {
 		-- s after the start the car has braked in front of the trailer (client timeline of Effects/ANM-008:
 		-- slow 5.6 + rush 1.8 + brake 0.8); PROVISIONAL (TASK-331)
 		ArriveAt = 8.2,
 		-- s between braking and the high beam + horn (the last moment to close the window); PROVISIONAL
-		BeamDelay = 1,
+		-- was 1; owner 2026-10-16: +1.5 s to close the window (TASK-348)
+		BeamDelay = 2.5,
 		-- s after the beam the car stays with the beam on (it backs out and drives away after that)
 		StayFor = 6,
 		-- s the record stays after Resolved/Failed so every client drives the car away (Effects/ANM-008); PROVISIONAL

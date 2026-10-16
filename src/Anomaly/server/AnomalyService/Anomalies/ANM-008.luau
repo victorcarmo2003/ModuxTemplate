@@ -37,7 +37,7 @@ const CAR_HEIGHT = 2.5 -- studs above the ground: body of the car (target of the
 const MAX_DT = 0.5 -- s; a late tick never counts more than this
 -- Defaults when Rules/ANM-008 is missing (same numbers as the rule file)
 const DEFAULT_ARRIVE_AT = 8.2
-const DEFAULT_BEAM_DELAY = 1
+const DEFAULT_BEAM_DELAY = 2.5
 const DEFAULT_STAY_FOR = 6
 const DEFAULT_LEAVE_LINGER = 6
 const DEFAULT_SCARE_FAINT = 0.7
