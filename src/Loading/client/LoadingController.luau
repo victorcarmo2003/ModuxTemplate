@@ -290,7 +290,9 @@ function LoadingController:MapAssetList(): { Instance }
 			elseif item:IsA("Decal") or item:IsA("Texture") then
 				key = `d|{(item :: Decal).Texture}`
 			elseif item:IsA("SurfaceAppearance") then
-				key = `s|{item.ColorMap}|{item.NormalMap}`
+				-- ColorMap / NormalMap are Plugin-only reads ("lacking capability Plugin"): dedupe by the mesh it dresses
+				const parent = item.Parent
+				key = `s|{if parent ~= nil and parent:IsA("MeshPart") then parent.MeshId else ""}|{item.Name}`
 			end
 			if key ~= nil and not seen[key] then
 				seen[key] = true
