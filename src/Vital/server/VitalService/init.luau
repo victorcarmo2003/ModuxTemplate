@@ -77,6 +77,7 @@ const GATE = "Vital"
 const DROP_POINT = "DROP-T" -- MapPoint of the trailer counter (MAP-01 §5.5; FEAT-025, FEAT-036)
 const RESTORE_ATTRIBUTE = "Restore" -- coffee Tool attribute (network.md §7.1; CoffeeMachine)
 const NEVER_SENT = -1
+const DEV_AUTO_REVIVE_DELAY = 2 -- s after the faint (the jumpscare and the faint screen play first)
 const DEV_INFINITE = "DevInfiniteSanity" -- player attribute (dev, TASK-332): read by the settings panel dev row
 
 local function now(): number
@@ -153,6 +154,8 @@ function VitalService:Setup()
 	-- dev, per player (TASK-332): sanity never goes down and the member never faints (only dev falls); mirrored to the
 	-- player attribute DEV_INFINITE for the settings panel
 	self.DevInfinite = {} :: { [number]: boolean }
+	-- dev: players revived automatically right after they faint (DevSetAutoRevive)
+	self.DevAutoRevive = {} :: { [number]: boolean }
 	self.DevFalling = false :: boolean
 	self.WarnedLight = false :: boolean
 	self.MemberStateChanged = self.Libs.Signal.new() :: SignalLib.Signal<number, LifeState, LifeState>
@@ -504,6 +507,16 @@ function VitalService:Fall(player: Player, forced: LifeState?)
 		self:FireLife(userId, "Spectating")
 	end
 	self:Pickup(userId, bodyPos)
+	-- dev (owner 2026-10-16): auto revive shortly after the faint, so the jumpscare plays and the night goes on
+	if self.DevAutoRevive[userId] then
+		task.delay(DEV_AUTO_REVIVE_DELAY, function()
+			if player.Parent ~= nil and self.DevAutoRevive[userId] then
+				pcall(function()
+					self:DevRevive(player)
+				end)
+			end
+		end)
+	end
 end
 
 -- 6:00 AM (DEC-115): every Down (connected or Away) becomes a permanent Spectator; packages and the whistle go to
@@ -875,6 +888,20 @@ function VitalService:DevInfiniteSanity(player: Player, on: boolean): boolean
 		self:AddSanity(player, entry.Max - entry.Sanity, "dev")
 	end
 	return on
+end
+
+-- Dev (owner 2026-10-16): when on, the player stands up DEV_AUTO_REVIVE_DELAY s after any faint (no revive limit,
+-- no lost night). Returns the state.
+function VitalService:DevSetAutoRevive(player: Player, on: boolean): boolean
+	if not self.Dependencies.PlaceService:IsDev() then
+		error("dev mode only", 0)
+	end
+	self.DevAutoRevive[player.UserId] = if on then true else nil
+	return on
+end
+
+function VitalService:IsDevAutoRevive(player: Player): boolean
+	return self.DevAutoRevive[player.UserId] == true
 end
 
 function VitalService:IsDevInfinite(player: Player): boolean

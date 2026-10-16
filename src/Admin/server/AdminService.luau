@@ -325,6 +325,18 @@ function AdminService:Register()
 		end,
 	})
 
+	-- autorevive [on|off]: stand up 2 s after a faint, the night goes on (owner 2026-10-16)
+	conch.register("autorevive", {
+		permissions = { PERMISSION },
+		description = "Revive yourself automatically 2 s after any faint (no lost night); no argument toggles",
+		arguments = function()
+			return conch.args.opt(AdminArguments.ArrivalsState("state"))
+		end,
+		callback = function(state: string?)
+			self:RunDev("autorevive", if state then { state } else {})
+		end,
+	})
+
 	conch.register("scare", {
 		permissions = { PERMISSION },
 		description = "Showcase: play a hallucination (fake_call, whisper...) or 'sting:<sound key>' on your client",

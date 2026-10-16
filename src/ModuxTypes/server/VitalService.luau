@@ -35,6 +35,7 @@ export type Entry = {
 export type Band = Sanity.Band
 
 export type Public = {
+	DevAutoRevive: { [number]: boolean },
 	DevFalling: boolean,
 	DevGodMode: boolean,
 	DevInfinite: { [number]: boolean },
@@ -99,6 +100,8 @@ export type Public = {
 	DevSetSanity: (self: Public, player: Player, value: number) -> number,
 	DevFall: (self: Public, player: Player, state: LifeState?) -> (),
 	DevInfiniteSanity: (self: Public, player: Player, on: boolean) -> boolean,
+	DevSetAutoRevive: (self: Public, player: Player, on: boolean) -> boolean,
+	IsDevAutoRevive: (self: Public, player: Player) -> boolean,
 	IsDevInfinite: (self: Public, player: Player) -> boolean,
 	DevDark: (self: Public, mode: boolean?) -> (),
 	DevGod: (self: Public, on: boolean) -> (),

@@ -25,6 +25,8 @@ type Vital = {
 	GetState: (self: any, userId: number) -> string?,
 	DevSetSanity: (self: any, player: Player, value: number) -> number,
 	DevFall: (self: any, player: Player, state: string?) -> (),
+	DevSetAutoRevive: (self: any, player: Player, on: boolean) -> boolean,
+	IsDevAutoRevive: (self: any, player: Player) -> boolean,
 	DevDark: (self: any, mode: boolean?) -> (),
 	StartCoffeeHint: (self: any, callLeft: number) -> number,
 	WipeEndsAt: number,
@@ -121,6 +123,19 @@ const Vital: Api.Module = function(ctx: Api.Context): { Api.Command }
 				const player = targetOf(args[1], caller)
 				vital:DevFall(player, "Down")
 				return status(player)
+			end,
+		},
+		{
+			Name = "autorevive",
+			Usage = "autorevive [on|off] [player]",
+			Help = "after any faint the player stands up again in 2 s (no lost night); no argument toggles",
+			Run = function(args: { string }, caller: Player?): string?
+				const word = string.lower(args[1] or "")
+				const named = if word == "on" or word == "off" then args[2] else args[1]
+				const player = targetOf(named, caller)
+				const on = if word == "on" then true elseif word == "off" then false else not vital:IsDevAutoRevive(player)
+				vital:DevSetAutoRevive(player, on)
+				return `{player.Name}: auto revive {if on then "ON (stands up 2 s after a faint)" else "OFF"}`
 			end,
 		},
 		{
