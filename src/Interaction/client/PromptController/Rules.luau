@@ -48,6 +48,7 @@ export type Target = {
 -- Read side of the `Shutter` attribute (network.md §13.6), given by VehicleController.
 export type ShutterProbe = {
 	IsClosed: () -> boolean, -- service window of the vehicle in use is closed
+	IsInside: (() -> boolean)?, -- local character inside the trailer (LZ-1, the volume VehicleService:IsInside reads)
 }
 
 -- Counter actions the closed window stops (architecture.md §19.14 gate `Shutter`).
@@ -122,6 +123,11 @@ function Rules.Allows(target: Target, context: Context): boolean
 	if action.Night == "DayOnly" and context.IsNight then
 		return false
 	elseif action.Night == "NightOnly" and not context.IsNight then
+		return false
+	end
+
+	-- ANM-020: the breaker sits on the outer wall; from inside the trailer the prompt would reach through it.
+	if target.Action == "breaker_reset" and shutterProbe and shutterProbe.IsInside and shutterProbe.IsInside() then
 		return false
 	end
 

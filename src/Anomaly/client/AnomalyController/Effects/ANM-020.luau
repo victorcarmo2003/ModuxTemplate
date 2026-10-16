@@ -62,6 +62,10 @@ const BEACON_RANGE = 5
 const BEACON_BRIGHTNESS = 0.9
 const BEACON_PULSE = 1.6 -- s per pulse
 const BEACON_COLOR = Color3.fromHex("#E8B23A")
+const HIGHLIGHT_NAME = "ANM020_Highlight"
+const HIGHLIGHT_MODEL = "TRL-BREAKER" -- panel model (tools/assetplace/breaker.luau)
+const HIGHLIGHT_FILL = 0.75 -- fill transparency, pulses with the beacon
+const HIGHLIGHT_OUTLINE = 0
 
 const LAMP_OFF_MATERIAL = Enum.Material.SmoothPlastic
 const LAMP_OFF_COLOR = Color3.fromHex("#3A3540")
@@ -93,6 +97,7 @@ type Session = {
 	Glow: PointLight,
 	Beacon: PointLight?,
 	BeaconHolder: Instance?,
+	Highlight: Highlight?,
 	Shape: Model,
 	ShapeUntil: number, -- os.clock(); 0 = hidden
 	NextShape: number,
@@ -229,6 +234,28 @@ local function placeBeacon(session: Session)
 	end
 	light.Parent = anchor
 	session.BeaconHolder = anchor
+
+	-- Highlight over the whole panel (seen through walls, so the guide never loses it)
+	local adornee: Instance? = anchor:FindFirstAncestor(HIGHLIGHT_MODEL)
+	if adornee == nil then
+		adornee = if anchor:IsA("Attachment") then anchor.Parent else anchor
+	end
+	local highlight = session.Highlight
+	if highlight == nil then
+		const created = Instance.new("Highlight")
+		created.Name = HIGHLIGHT_NAME
+		created.FillColor = BEACON_COLOR
+		created.OutlineColor = BEACON_COLOR
+		created.FillTransparency = HIGHLIGHT_FILL
+		created.OutlineTransparency = HIGHLIGHT_OUTLINE
+		created.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+		session.Highlight = created
+		highlight = created
+	end
+	if highlight ~= nil and adornee ~= nil then
+		highlight.Adornee = adornee
+		highlight.Parent = adornee
+	end
 end
 
 -- The shape -------------------------------------------------------------------------------------------------------
@@ -361,6 +388,10 @@ local function step(session: Session)
 	if beacon ~= nil then
 		const wave = 0.5 + 0.5 * math.sin(clock * math.pi * 2 / BEACON_PULSE)
 		beacon.Brightness = BEACON_BRIGHTNESS * (0.35 + 0.65 * wave)
+		const highlight = session.Highlight
+		if highlight ~= nil then
+			highlight.FillTransparency = HIGHLIGHT_FILL + (1 - HIGHLIGHT_FILL) * 0.6 * (1 - wave)
+		end
 	end
 
 	if session.ShapeUntil > 0 then
@@ -419,6 +450,7 @@ local function begin(ctx: Effect.Context, occ: Effect.Occurrence): Session
 		Glow = glow,
 		Beacon = nil,
 		BeaconHolder = nil,
+		Highlight = nil,
 		Shape = shape,
 		ShapeUntil = 0,
 		NextShape = clock + between(rng, SHAPE_GAP_START),
@@ -453,6 +485,10 @@ local function finish(session: Session)
 	const beacon = session.Beacon
 	if beacon ~= nil then
 		beacon:Destroy()
+	end
+	const highlight = session.Highlight
+	if highlight ~= nil then
+		highlight:Destroy()
 	end
 	session.Shape:Destroy()
 	-- back to whatever the night look is: only our own effect fades and goes away

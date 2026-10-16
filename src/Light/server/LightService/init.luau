@@ -575,8 +575,9 @@ LightService:OnInit(function(self)
 	-- ANM-020 breaker (hold Content.Actions.breaker_reset.Hold on the client; the server checks the power is out).
 	-- AnomalyService gets the reset through InteractionService.Performed (Action event).
 	self.Dependencies.InteractionService:RegisterAction(BREAKER_ACTION, {
-		Validate = function(_player: Player, anchor: Instance, _id: number): boolean
-			return self:CanReset(anchor)
+		Validate = function(player: Player, anchor: Instance, _id: number): boolean
+			-- the panel is on the outer wall: never through it from inside the trailer
+			return self:CanReset(anchor) and not self.Dependencies.VehicleService:IsInside(player)
 		end,
 		Run = function(_player: Player, _anchor: Instance, _id: number)
 			self:EndBlackout()

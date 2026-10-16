@@ -36,8 +36,10 @@ local Content = require(ReplicatedStorage.shared.Content)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local PromptRules = require(StarterPlayer.StarterPlayerScripts.client.Interaction.PromptController.Rules)
 local ScreenFade = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.ScreenFade)
+local Zones = require(ReplicatedStorage.shared.Light.Zones)
 
 const VEHICLE_TAG = "Vehicle"
+const INTERIOR_ZONE = "LZ-1" -- LightZone of the trailer interior (VehicleService/Shutter.InteriorZone)
 const VEHICLE_ATTRIBUTE = "Vehicle"
 -- Legacy fade of the old vehicle swap (Transition "VehicleSwap"; nobody sends it since 2026-10-12): 1.5 s total.
 const FADE_IN = 0.2
@@ -362,6 +364,22 @@ function VehicleController:IsShutterClosed(): boolean
 	return false
 end
 
+-- Own character inside the trailer: LightZone LZ-1, the volume VehicleService:IsInside reads on the server
+function VehicleController:IsInside(): boolean
+	const character = Players.LocalPlayer.Character
+	const root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
+	if root == nil or not root:IsA("BasePart") then
+		return false
+	end
+	for _, instance in CollectionService:GetTagged(Zones.Tag) do
+		if instance:IsA("BasePart") and instance:GetAttribute("ZoneId") == INTERIOR_ZONE then
+			const zone = Zones.read(instance)
+			return zone ~= nil and Zones.contains(zone, root.Position)
+		end
+	end
+	return false
+end
+
 -- Transition packet: start (or restart) the cover from the server time; a late packet only plays what is left
 -- "Locked door": the server refused Open door (TrailerDoorService lock). Only the sound, at the leaf when it is found.
 function VehicleController:PlayLocked()
@@ -434,6 +452,9 @@ VehicleController:OnInit(function(self)
 	PromptRules.SetShutterProbe({
 		IsClosed = function(): boolean
 			return self:IsShutterClosed()
+		end,
+		IsInside = function(): boolean
+			return self:IsInside()
 		end,
 	})
 
