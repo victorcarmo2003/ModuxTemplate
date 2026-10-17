@@ -27,6 +27,8 @@
 --                  Storage (shared.Tutorial.Rules.Upgrade). Answers itself like any day call.
 -- Speaker nil = Walt. A line lasts Rules.LineTime; the current line = floor((now - StartedAt) / LineTime).
 local Table = require(script.Parent.Table)
+-- TASK-393: the Day 1 Gear Stand call names where the stand is (the restaurant has it in the back, Q-321)
+local Restaurant = require(script.Parent.Restaurant)
 
 export type Line = {
 	Text: string,
@@ -379,7 +381,7 @@ const base = Table.new({
 		Lines = lines(
 			"Shift's over, Rookie. Nice work.",
 			"Before tonight, get some gear.",
-			"Gear Stand, at the Mart.",
+			if Restaurant.Rules.Enabled then "Gear Stand, in the back." else "Gear Stand, at the Mart.",
 			"Get Storage. More buns, more sauce.",
 			"Short on cash? I've got you."
 		),

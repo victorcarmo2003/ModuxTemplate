@@ -35,6 +35,8 @@
 -- ends for good (LessonOver, latched) when any Gear Stand line is bought, the run leaves Day 1 / the day shift, no rookie
 -- is left, or after Content.Shift.TutorialHoldMax s of holding the Closing (AFK rookie). TutorialController shows the
 -- steps and MarketController the arrow (client side reads the Upgrades set and the Boss call).
+-- Restaurant (TASK-393, shared.Tutorial.Rules.Restock): StepRestock tops the Cash up once to the phone's quick order
+-- price after the tutorial customer was served, for the restock steps of the client.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -42,6 +44,7 @@ local Content = require(ReplicatedStorage.shared.Content)
 local TutorialRules = require(ReplicatedStorage.shared.Tutorial.Rules)
 local Modux = require(ServerScriptService.server.Modux)
 local MetricsLog = require(ServerScriptService.server.Metrics.MetricsService.Log)
+local SupplyOrder = require(ServerScriptService.server.Supply.SupplyService.Order)
 
 const TICK_RATE = 2 -- Hz: the pending check of the tutorial customer
 const HOT_DOG = "hot_dog"
@@ -58,6 +61,7 @@ const TutorialService = Modux.Service(
 			"EconomyService",
 			"RoundService",
 			"UpgradeService",
+			"SupplyService",
 		},
 		Priority = 500,
 	}
@@ -84,6 +88,9 @@ function TutorialService:Setup()
 	self.LessonOver = false :: boolean
 	self.LessonRung = false :: boolean
 	self.LessonSince = 0 :: number
+	-- Restaurant restock lesson (TASK-393): the tutorial customer was seen / is gone served; the cash went out once
+	self.GuestSeen = false :: boolean
+	self.RestockPaid = false :: boolean
 end
 
 -- The player finished or skipped the tutorial: over for this run (idempotent, not saved)
@@ -350,6 +357,8 @@ function TutorialService:DevReset(player: Player)
 	self.LessonOver = false
 	self.LessonRung = false
 	self.LessonSince = 0
+	self.GuestSeen = false
+	self.RestockPaid = false
 	self.Dependencies.CustomerService:EndTutorial()
 	self:DevSend(player, "tutorial_reset", "")
 end
@@ -364,8 +373,37 @@ function TutorialService:DevStatus(): string
 	return `tutorial [{table.concat(pending, ", ")}]; held {self.Dependencies.RoundService:IsClockHeld()}{if self.HoldExpired then " (timeout)" else ""}; customer asked {self.Asked}, around {self.Dependencies.CustomerService:HasTutorial()}; seeded {self.Seeded}; buns {self.Dependencies.KitchenService:GetStock(BUN)}; upgrade lesson active {self:LessonActive()}, rung {self.LessonRung}, over {self.LessonOver}`
 end
 
+-- Restaurant restock lesson (TASK-393; design/tutorial-restaurant.md §2): once the tutorial customer was served (seen,
+-- then gone while a rookie still has the tutorial), Cash is topped up ONCE to the price of the phone's quick order
+-- (SupplyService rules, Order.quick + Order.cost), so "Order Stock" never stalls on money. Nothing while a call is on
+-- the way or with the supply off.
+function TutorialService:StepRestock()
+	if not TutorialRules.Restock or self.RestockPaid then
+		return
+	end
+	if self.Dependencies.CustomerService:HasTutorial() then
+		self.GuestSeen = true
+		return
+	end
+	const supply = self.Dependencies.SupplyService
+	if not self.GuestSeen or not supply:IsLive() or supply:IsBusy() or not self:AnyPending() then
+		return
+	end
+	self.RestockPaid = true
+	const boxes = SupplyOrder.quick(supply:OpenPackages(), supply:Stock(), supply:MaxBoxes())
+	const prices: SupplyOrder.Price = {}
+	for key in boxes do
+		prices[key] = Content.Packages.ByKey[key].Price
+	end
+	const cost = SupplyOrder.cost(boxes, prices, Content.Restaurant.Supply.Fee)
+	if cost > 0 then
+		self.Dependencies.EconomyService:TopUp(cost)
+	end
+end
+
 function TutorialService:Step()
 	self:StepLesson()
+	self:StepRestock()
 	if self.Asked and not self:AnyPending() then
 		self.Asked = false
 		self.Dependencies.CustomerService:EndTutorial()
