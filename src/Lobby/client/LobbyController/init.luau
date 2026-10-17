@@ -230,6 +230,7 @@ end
 const LobbyController = Modux.Controller("LobbyController", {
 	Require = {
 		"PlaceController",
+		"PurchaseFxController",
 		"ProfileController",
 		"InputController",
 		"AudioController",
@@ -2053,6 +2054,8 @@ LobbyController:OnInit(function(self)
 		self.CodeFeedback({ Text = text, Kind = if data.Ok then "Good" else "Bad" })
 		if data.Ok then
 			self:Toast(text, "Good")
+			-- confetti + the buy chime for a redeemed code (owner 2026-10-17)
+			self.Dependencies.PurchaseFxController:Show("Code redeemed!", 1.6)
 		end
 	end)
 
