@@ -6,6 +6,7 @@
 -- hand does not hide the target. Nothing here knows about gestures or about the UI: Gestures.luau turns these events into
 -- Drag / Trace / Tap / Hold, and `HitGrab` reads the `PrepGrab` attribute of the GUI under a point.
 -- No Modux, no Vide: plain callbacks (a controller owns one and destroys it with the mode).
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 
@@ -28,6 +29,9 @@ export type Pointer = {
 	SetOffset: (self: Pointer, pixels: number) -> (),
 	-- The `PrepGrab` key of the topmost GUI under a point, nil when none.
 	HitGrab: (self: Pointer, position: Vector2) -> string?,
+	-- The `PrepPress` key (a chrome button: "Leave", "Next") on the GUI under a point or one of its ancestors, nil when none.
+	-- The gamepad cursor is not a mouse, so a GuiButton never fires for it: the owner presses the button itself.
+	HitPress: (self: Pointer, position: Vector2) -> string?,
 	Destroy: (self: Pointer) -> (),
 }
 
@@ -130,15 +134,41 @@ function Pointer.new(): Pointer
 	function self.SetOffset(_: any, pixels: number)
 		offset = pixels
 	end
+	-- GetGuiObjectsAtPosition speaks GUI space (the top bar inset taken out); the gamepad cursor lives in raw viewport px
+	local function guiPoint(position: Vector2): Vector2
+		return if self.Device == "Pad" then position - GuiService:GetGuiInset() else position
+	end
 	function self.HitGrab(_: any, position: Vector2): string?
 		const gui = Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
 		if gui == nil then
 			return nil
 		end
-		for _, object in gui:GetGuiObjectsAtPosition(position.X, position.Y) do
+		const at = guiPoint(position)
+		for _, object in gui:GetGuiObjectsAtPosition(at.X, at.Y) do
 			const key = object:GetAttribute("PrepGrab")
 			if type(key) == "string" and key ~= "" then
 				return key
+			end
+		end
+		return nil
+	end
+	function self.HitPress(_: any, position: Vector2): string?
+		const gui = Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+		if gui == nil then
+			return nil
+		end
+		const at = guiPoint(position)
+		for _, object in gui:GetGuiObjectsAtPosition(at.X, at.Y) do
+			if not object.Visible then
+				continue
+			end
+			local current: Instance? = object
+			while current ~= nil and current ~= gui do
+				const key = current:GetAttribute("PrepPress")
+				if type(key) == "string" and key ~= "" then
+					return key
+				end
+				current = current.Parent
 			end
 		end
 		return nil

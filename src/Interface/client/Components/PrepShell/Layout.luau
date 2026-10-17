@@ -291,7 +291,8 @@ local function mini(canvas: Vector2, count: number, activeIndex: number, options
 	-- the pill: PILL_PAD px of Ink all round, round chips of 44 (their corners follow the pill: radius = height / 2 - pad). Leave is 96
 	-- wide with its word on a desktop
 	const pad = PILL_PAD
-	const leaveW = if desktopShape then 96 else TOUCH
+	-- the red Leave button carries the close cross and its word on every shape (owner 2026-10-17)
+	const leaveW = if desktopShape then 104 else 84
 	-- the Assist chip is gone (owner decision 2026-10-14); only Tap can follow Leave
 	const chips = if options.Taps == true then 1 else 0
 	const pillW = pad + leaveW + chips * (pad + TOUCH) + pad
@@ -397,9 +398,13 @@ local function mini(canvas: Vector2, count: number, activeIndex: number, options
 	-- the bin zone (owner request 2026-10-14): bottom left, right after the Leave pill, level with the row of the section dots; it only
 	-- shows while something is being dragged (BinZone). Portrait: the left, over the hint row.
 	const binSide = if desktopShape then 88 else 72
-	const bin = if portraitShape
+	local bin = if portraitShape
 		then rect(margin, baseToast.Y - 8 - binSide, binSide, binSide)
-		else rect(pill.X + pill.W + 24, rowY + rowH - binSide, binSide, binSide)
+		else rect(pill.X + pill.W + 16, rowY + rowH - binSide, binSide, binSide)
+	-- a wide Leave (and the Tap chip) on a narrow phone: no room before the section dots, so the bin sits above the pill
+	if not portraitShape and overlaps(bin, bar) then
+		bin = rect(pill.X, pill.Y - 8 - binSide, binSide, binSide)
+	end
 	const centerTop = progress.Y + progress.H + 8
 	const center = if portraitShape
 		then zero

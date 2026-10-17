@@ -635,7 +635,10 @@ return function(props: Props): Frame
 		Tone = Theme.Tone.Ink,
 		Radius = Theme.Radius.Pill,
 		Lip = 3,
-		Visible = minimal,
+		-- only while the Tap chip shares it with Leave: alone, the red Leave button needs no frame (owner 2026-10-17)
+		Visible = function(): boolean
+			return minimal() and props.TapMode ~= nil
+		end,
 		Position = atMini(function(m)
 			return m.Pill
 		end),
@@ -644,33 +647,35 @@ return function(props: Props): Frame
 		end),
 	})
 
-	-- Leave: on screen whenever the chrome is
+	-- Leave: on screen whenever the chrome is. A red rounded button with the close cross and the word (owner 2026-10-17: the
+	-- cream disc in the Ink pill read badly); `PrepPress` lets the gamepad cursor press it (Pointer.HitPress)
 	const leave = CartoonButton({
 		Name = "Leave",
-		Tone = Theme.Tone.Cream,
+		Tone = Theme.Tone.Ketchup,
+		Radius = Theme.Radius.Card,
+		Icon = "Ui/close",
+		IconSize = 18,
+		-- the word only where it fits (the 2D chrome keeps a 44 px square: the cross alone)
+		Text = function()
+			const l = layout()
+			if l.Leave.W < 70 then
+				return ""
+			end
+			return if l.LeaveWide then (props.LeaveText or "Leave") else "Exit"
+		end,
+		TextSize = 16,
 		Position = at(function(l)
 			return l.Leave
 		end),
 		Size = sized(function(l)
 			return l.Leave
 		end),
-		Padding = 0,
+		Padding = 8,
 		OnActivated = props.OnLeave,
-		Children = {
-			CartoonLabel({
-				Text = function()
-					return if layout().LeaveWide then (props.LeaveText or "Leave") else "Exit"
-				end,
-				TextSize = 16,
-				Color = Theme.Color.Ink,
-				Stroke = 0,
-				Box = UDim2.fromScale(1, 1),
-				XAlignment = Enum.TextXAlignment.Center,
-				YAlignment = Enum.TextYAlignment.Center,
-			}),
-			padGlyph(Enum.KeyCode.ButtonB, "B", pad),
-		},
 	})
+	leave:SetAttribute("PrepPress", "Leave")
+	-- the B glyph rides on the button itself: `Children` would replace the icon and the word of CartoonButton
+	padGlyph(Enum.KeyCode.ButtonB, "B", pad).Parent = leave
 
 	-- tabs
 	const tabButtons: { any } = {}
@@ -1373,6 +1378,8 @@ return function(props: Props): Frame
 		end,
 	})
 	blocker.Parent = nextHolder
+	-- the gamepad cursor presses Next (or its blocker) through Pointer.HitPress, which reads this on the hit object or an ancestor
+	nextHolder:SetAttribute("PrepPress", "Next")
 
 	-- trash: hold to discard
 	const trash = CartoonButton({

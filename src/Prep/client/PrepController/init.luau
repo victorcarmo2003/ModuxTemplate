@@ -1308,6 +1308,17 @@ function PrepController:Enter(station: number, mock: boolean?, tab: string?, pla
 	self.Gestures = Gestures.new(pointer)
 	self.Cursor = Cursor.new(pointer)
 	table.insert(self.PointerStops, pointer:OnDown(function(position: Vector2)
+		-- the gamepad cursor over a chrome button presses it (a GuiButton never fires for an injected point; owner 2026-10-17)
+		if pointer.Device == "Pad" then
+			const press = pointer:HitPress(position)
+			if press == "Leave" then
+				self:Leave("Button", false, false)
+				return
+			elseif press == "Next" then
+				self:PressNext()
+				return
+			end
+		end
 		const key = pointer:HitGrab(position)
 		if key ~= nil then
 			const stage = self:StageOf()
