@@ -25,6 +25,10 @@
 -- but Use opens nothing: the player who tried gets Transition Kind "DoorLocked" (VehicleController plays the "Locked
 -- door" sound, SFX-232) and nothing else. The trailer Model carries the attribute DoorLocked = true meanwhile. The
 -- service window is not touched.
+-- Restaurant (TASK-385; tech/restaurant-flow.md rev. 2 §1, §4.2; DEC-280: the player never leaves the restaurant): with
+-- Content.Vehicles.trailer.HasBackDoor = false the service is inert on the Run place too: no action registered (an authored
+-- trailer_exit / trailer_enter anchor stays off, InteractionService:IsActive), no anchor created, no auto close, HasDoor()
+-- false (ANM-004 only costs sanity) and SetLocked does nothing. Read once at boot (data flag, like Content.Shift).
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -94,6 +98,12 @@ const RETRIES = 20
 local function stringAttribute(instance: Instance, name: string): string?
 	const value = instance:GetAttribute(name)
 	return if type(value) == "string" then value else nil
+end
+
+-- Content.Vehicles.trailer.HasBackDoor (false = the restaurant building: no back door at all)
+local function hasBackDoor(): boolean
+	const row = Content.Vehicles.ByKey[TRAILER]
+	return row ~= nil and row.HasBackDoor
 end
 
 local function trailerOf(instance: Instance): Model?
@@ -428,6 +438,9 @@ end
 
 -- Locks / unlocks the door for `reason` (an anomaly Ref). Locking closes the leaf at once. Several reasons stack.
 function TrailerDoorService:SetLocked(reason: string, on: boolean)
+	if not self.Enabled then
+		return -- no back door (lobby, or HasBackDoor = false): nothing to lock
+	end
 	self.Locks[reason] = if on then true else nil
 	if on then
 		self:SetOpen(false)
@@ -551,7 +564,7 @@ end
 
 TrailerDoorService:OnInit(function(self)
 	self:Setup()
-	if not self.Dependencies.PlaceService:Is("Run") then
+	if not self.Dependencies.PlaceService:Is("Run") or not hasBackDoor() then
 		return
 	end
 	self.Enabled = true
