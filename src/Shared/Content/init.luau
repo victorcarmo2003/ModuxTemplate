@@ -42,6 +42,7 @@ local Restaurant = require(script.Restaurant)
 local Revive = require(script.Revive)
 local RunParams = require(script.RunParams)
 local Sanity = require(script.Sanity)
+local Score = require(script.Score)
 local Seating = require(script.Seating)
 local Security = require(script.Security)
 local Shift = require(script.Shift)
@@ -113,6 +114,11 @@ export type MartDoor = Mart.Door
 export type MartPedestal = Mart.Pedestal
 export type Looks = Outfits.Looks
 export type MusicCue = Sounds.Cue
+export type ScoreStage = Score.Stage
+export type ScoreStageKey = Score.StageKey
+export type ScoreAnomaly = Score.AnomalyScore
+export type ScoreCaption = Score.Caption
+export type ScoreRules = Score.Rules
 export type Mood = Moods.Mood
 export type Mode = Mode.Mode
 export type Neon = Neon.Neon
@@ -320,4 +326,8 @@ return table.freeze({
 	-- Restaurant.Rules.Enabled is THE single switch (TASK-390): Prep, Seating, Vehicles, Anomalies and Nights derive their
 	-- restaurant values from Restaurant.Switch at require time (see the header of Restaurant.luau); false = published game
 	Restaurant = Restaurant,
+
+	-- Horror score in steps Calm / Uneasy / Tension / Climax / Release and the on-screen warnings (TASK-443, TASK-444;
+	-- owner request 2026-10-17; AnomalyController/Score). Provisional
+	Score = Score,
 })

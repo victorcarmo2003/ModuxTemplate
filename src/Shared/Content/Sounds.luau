@@ -27,6 +27,9 @@ export type Sound = {
 	-- last Crossfade s while the next copy fades in from the start; also the fade between two beds. Capped at 1/4 of
 	-- the track length by AudioController. 0 = plain Looped (or no fade) for the other groups.
 	Crossfade: number,
+	-- Name of the owner's Sound under ReplicatedStorage.Assets.SFX (searched by name in every subfolder, so the folder
+	-- can be reorganised, TASK-445). While Id is "" AudioController plays that Sound's SoundId instead (TASK-443).
+	Studio: string?,
 }
 
 export type When = {
@@ -218,6 +221,15 @@ local function sfx(key: string, looped: boolean?, opts: SfxOptions?): Sound
 	}
 end
 
+-- Row whose audio is the owner's Studio Sound (Assets.SFX, by name) until its rbxassetid is copied into UPLOADED
+local function studio(row: Sound, name: string): Sound
+	row.Studio = name
+	if row.Ref == "" then
+		row.Ref = `{name} (owner Studio upload)`
+	end
+	return row
+end
+
 local function ui(key: string, volume: number?): Sound
 	return {
 		Key = key,
@@ -241,6 +253,9 @@ const base = Table.new({
 	music("music_day_small", "rbxassetid://104601257905379", "Small Town (Axiom Project Studio upload)", false),
 	music("music_night_town", "rbxassetid://73501320034226", "Night Town (Axiom Project Studio upload)", false),
 	music("music_night_fall", "rbxassetid://135232738690923", "Night Fall (Axiom Project Studio upload)", false),
+	-- horror score themes (TASK-443, Content.Score): the owner's Studio Sounds, looped by the director
+	studio(music("score_violins"), "Scary Violins Sound Effect"), -- Tension (speed and volume ramp)
+	studio(music("score_coral"), "Horror Coral"), -- Climax
 	-- Ambient
 	ambient("amb_day_street", false, "rbxassetid://108990827199430", "CityAmbient (Axiom Project Studio upload)"),
 	ambient("amb_night_street", false, "rbxassetid://98652860867664", "NightCrickets (Axiom Project Studio upload)"),
@@ -329,6 +344,8 @@ const base = Table.new({
 	sfx("window_slam", false, { Volume = 1, MaxDistance = 80 }), -- ANM-012: the window thrown open (door_close fallback)
 	sfx("car_screech", false, { Volume = 0.9, MaxDistance = 140 }), -- ANM-008: brakes in front of the trailer
 	sfx("swarm_flutter", false, { Volume = 0.8, MaxDistance = 90 }), -- ANM-003: moths and bats (shadow_whoosh fallback)
+	-- ANM-020 blackout (TASK-444): the owner's "lights off" snap when the power goes out (post_tunk while unresolved)
+	studio(sfx("lights_off", false, { Spatial = false, Volume = 0.8 }), "lights off"),
 	-- restaurant (tech/restaurant-flow.md rev. 2 §4.2; wave R0 rows, Id "" = silence until the audio list uploads them)
 	sfx("plate_put", false, { Volume = 0.5, MaxDistance = 40 }),
 	sfx("ticket_pop", false, { Spatial = false, Volume = 0.4 }), -- HUD note pop-up per item at the tablet

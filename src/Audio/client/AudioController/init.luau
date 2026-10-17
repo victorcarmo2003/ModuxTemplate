@@ -41,6 +41,12 @@
 	  once per key.
 	- Caps (DEC-005, DEC-173): siren_soft never above SoundRules.SirenMaxVolume; opts.Scare clamps to
 	  SoundRules.ScareMaxVolume (Provisional: the table has no scare flag yet, the caller marks it).
+	- Owner Studio Sounds (TASK-443): a row with Id "" and a Studio name plays the SoundId of the Sound of that name found
+	  anywhere under ReplicatedStorage.Assets.SFX (Studio.luau); Row() returns that resolved copy.
+	- Horror score (TASK-443, Content.Score; AnomalyController/Score is the director): SetScoreHold(on) holds the
+	  tension layer off and fades the shift track while the score is in Uneasy / Tension / Climax (one tension theme at
+	  a time); SetKitchenDuck(mult) scales the Kitchen SoundGroup (child of Sfx) where the Content.Score.Rules.KitchenKeys rows
+	  play. `/dev score` reaches the director through DevAudio (Command "score:<stage>", ScoreHook).
 ]]
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -54,6 +60,7 @@ local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Players = game:GetService("Players")
 local Zones = require(ReplicatedStorage.shared.Light.Zones)
 local Bed = require(script.Bed)
+local Studio = require(script.Studio)
 local Cues = require(script.Cues)
 local LoadQueue = require(script.LoadQueue)
 local Stats = require(script.Stats)
@@ -77,6 +84,14 @@ const SCREEN_ANCHOR = "screen"
 const SHIFT_FADE = 1.5 -- s: fade of a shift track cut by a cue or by the next shift
 const AMBIENT_RATE = 4 -- Hz: zone check of the local character (Mart bed)
 const CUTSCENE_ATTRIBUTE = "CutsceneActive" -- CutsceneController (true while a chain plays, nil otherwise)
+const KITCHEN = "Kitchen" -- SoundGroup under Sfx for the kitchen keys (Content.Score.Rules.KitchenKeys)
+const SCORE_PREFIX = "score:" -- DevAudio Command routed to the score director
+
+-- kitchen keys the score ducks (each stage's DuckKitchen)
+const KITCHEN_KEYS: { [string]: boolean } = {}
+for _, key in Content.Score.Rules.KitchenKeys do
+	KITCHEN_KEYS[key] = true
+end
 
 export type PendingShift = { Id: string, IsNight: boolean }
 
@@ -158,6 +173,13 @@ function AudioController:Setup()
 	-- last phase / night window seen (nil = nothing seen yet: no sting on the first read)
 	self.SeenPhase = nil :: string?
 	self.SeenWindow = nil :: string?
+	-- horror score (AnomalyController/Score): Uneasy / Tension / Climax hold the tension layer and the shift track off
+	self.ScoreHold = Vide.source(false) :: Vide.Source<boolean>
+	-- kitchen duck multiplier (1 = none) and the director's dev hook (`/dev score <stage>`)
+	self.KitchenDuck = 1 :: number
+	self.ScoreHook = nil :: ((command: string) -> ())?
+	-- rows with a Studio name, resolved to the Studio Sound's id (key -> copy of the row with Id set)
+	self.Resolved = {} :: { [string]: Content.Sound }
 end
 
 function AudioController:WarnOnce(tag: string, message: string)
@@ -194,6 +216,18 @@ function AudioController:BuildGroups()
 		self.Groups[name] = soundGroup
 		self.Volumes[name] = 1
 	end
+	-- Kitchen under Sfx: the Sfx user volume still applies, the score ducks this one alone
+	const sfxGroup = self.Groups.Sfx
+	local kitchen = sfxGroup:FindFirstChild(KITCHEN)
+	if not (kitchen and kitchen:IsA("SoundGroup")) then
+		const created = Instance.new("SoundGroup")
+		created.Name = KITCHEN
+		created.Parent = sfxGroup
+		kitchen = created
+	end
+	const kitchenGroup = kitchen :: SoundGroup
+	kitchenGroup.Volume = 1
+	self.Groups[KITCHEN] = kitchenGroup
 	local screen = SoundService:FindFirstChild(SCREEN)
 	if not (screen and screen:IsA("Folder")) then
 		const created = Instance.new("Folder")
@@ -213,6 +247,9 @@ function AudioController:ApplyGroup(name: string, time: number?)
 	local volume = self.Volumes[name] or 1
 	if name == "Music" and self.Ducked() then
 		volume *= RULES.DuckOnCall
+	end
+	if name == KITCHEN then
+		volume = self.KitchenDuck -- no user slider of its own: the Sfx one above it applies
 	end
 	if time and time > 0 then
 		TweenService:Create(target, TweenInfo.new(time), { Volume = volume }):Play()
@@ -235,9 +272,49 @@ function AudioController:Row(key: string): Content.Sound?
 		return nil
 	end
 	if row.Id == "" then
-		return nil
+		return self:FromStudio(row)
 	end
 	return row
+end
+
+-- Row with Id "" and a Studio name: a copy carrying the SoundId of the owner's Studio Sound (nil = not found yet)
+function AudioController:FromStudio(row: Content.Sound): Content.Sound?
+	const name = row.Studio
+	if name == nil or name == "" then
+		return nil
+	end
+	const cached = self.Resolved[row.Key]
+	if cached ~= nil then
+		return cached
+	end
+	const id = Studio.IdOf(name)
+	if id == nil then
+		self:WarnOnce(`studio:{row.Key}`, `"{row.Key}": no Sound "{name}" under ReplicatedStorage.Assets.SFX yet`)
+		return nil
+	end
+	const resolved = table.clone(row)
+	resolved.Id = id
+	self.Resolved[row.Key] = resolved
+	return resolved
+end
+
+-- Horror score (AnomalyController/Score) -------------------------------------------------------------------------
+
+-- Uneasy / Tension / Climax: the street tension layer and the shift track stay off (one tension theme at a time)
+function AudioController:SetScoreHold(on: boolean)
+	if Vide.untrack(self.ScoreHold) ~= on then
+		self.ScoreHold(on)
+	end
+end
+
+-- Kitchen SoundGroup multiplier (1 = none), tweened over `time`
+function AudioController:SetKitchenDuck(multiplier: number, time: number?)
+	const value = math.clamp(multiplier, 0, 1)
+	if math.abs(value - self.KitchenDuck) < 0.001 then
+		return
+	end
+	self.KitchenDuck = value
+	self:ApplyGroup(KITCHEN, time)
 end
 
 function AudioController:Volume(row: Content.Sound, opts: PlayOptions?): number
@@ -309,7 +386,11 @@ function AudioController:Configure(sound: Sound, row: Content.Sound, opts: PlayO
 	const vary = if opts and opts.Vary ~= nil then opts.Vary else default
 	const speed = (if opts and opts.Speed then opts.Speed else 1) * (1 + self.Rng:NextNumber(-vary, vary))
 	-- jumpscares go to their own group (Settings: Jumpscares volume), whatever the row's group
-	sound.SoundGroup = if opts and opts.Scare then self.Groups.Scare else self.Groups[row.Group]
+	-- kitchen keys go to Kitchen (under Sfx) so the horror score can duck them alone (TASK-443)
+	sound.SoundGroup = if opts and opts.Scare
+		then self.Groups.Scare
+		elseif KITCHEN_KEYS[row.Key] and row.Group == "Sfx" then self.Groups[KITCHEN]
+		else self.Groups[row.Group]
 	sound.Looped = looped
 	sound.Volume = self:Volume(row, opts)
 	sound.PlaybackSpeed = math.max(speed, 0.01)
@@ -880,7 +961,17 @@ AudioController:OnInit(function(self)
 	self:BuildGroups()
 
 	-- dev-only (the server fires it from `/dev audio` in dev mode; never otherwise)
-	self.Libs.Net.DevAudio:onClient(function(_data)
+	self.Libs.Net.DevAudio:onClient(function(data)
+		const command = data.Command
+		if string.sub(command, 1, #SCORE_PREFIX) == SCORE_PREFIX then
+			const hook = self.ScoreHook
+			if hook ~= nil then
+				hook(string.sub(command, #SCORE_PREFIX + 1))
+			else
+				warn("[AudioController] /dev score: the score director is off (Content.Score.Rules.Enabled)")
+			end
+			return
+		end
 		self:DevReport()
 	end)
 
@@ -925,6 +1016,7 @@ AudioController:OnStart(function(self)
 			const stack = self.MusicStack()
 			const cue = if #stack > 0 then stack[#stack] else Cues.Pick(Content.Music.List, state)
 			const zone: string = self.ZoneAmbient()
+			const held: boolean = self.ScoreHold()
 			const ambient = Cues.Ambient(state, RULES.Ambient, RULES.AmbientOff, #stack > 0, if zone ~= "" then zone else nil)
 			Vide.untrack(function()
 				if cue ~= nil then
@@ -933,7 +1025,7 @@ AudioController:OnStart(function(self)
 				self:SetMusic(cue)
 				self:SetAmbient(ambient)
 				self:Warm(if state.Ready then state.Phase else "", state.IsNight)
-				self:SetTension(ambient ~= nil and state.IsNight and state.Window == RULES.Tension.Window)
+				self:SetTension(ambient ~= nil and state.IsNight and state.Window == RULES.Tension.Window and not held)
 				return nil
 			end)
 		end)
@@ -964,6 +1056,16 @@ AudioController:OnStart(function(self)
 					self:StopShiftTrack(SHIFT_FADE)
 				else
 					self:FlushShift()
+				end
+				return nil
+			end)
+		end)
+		-- horror score Uneasy / Tension / Climax: the shift track fades (one music at a time, TASK-443)
+		Vide.effect(function()
+			const held: boolean = self.ScoreHold()
+			Vide.untrack(function()
+				if held then
+					self:StopShiftTrack(SHIFT_FADE)
 				end
 				return nil
 			end)

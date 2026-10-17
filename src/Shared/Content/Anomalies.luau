@@ -120,6 +120,8 @@ const cues = Table.new({
 	-- V2 family C (DEC-254, TASK-273; ANM-020). Entity = 0
 	{ Key = "blackout_start", Kind = "Both", Duration = 0 }, -- snap, everything goes dark (trailer, posts, sign)
 	{ Key = "blackout_restore", Kind = "Both", Duration = 0 }, -- the breaker is back: lights return
+	-- TASK-444 (restaurant only): the omen before the blackout, the lights flicker 1-2 times (Phase Signal)
+	{ Key = "blackout_warn", Kind = "Visual", Duration = 0 },
 } :: { Cue })
 
 local function anomaly(
@@ -262,6 +264,7 @@ stalker.Family = "D"
 const blackout = anomaly(4, "anm_020_blackout", "The blackout", "World", 0, "Party", 100, true, {
 	"anm_003_stopped_clock",
 }, {
+	"blackout_warn",
 	"blackout_start",
 	"blackout_restore",
 	"jumpscare",

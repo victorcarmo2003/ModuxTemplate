@@ -36,6 +36,11 @@ const rule: Api.Rule = {
 		FaintDelay = 0.7,
 		-- s after the attack the power comes back by itself (the shape leaves). PROVISIONAL (TASK-273)
 		RestoreAfter = 3,
+		-- Restaurant only (Content.Restaurant.Rules.Enabled; TASK-444, owner request 2026-10-17). PROVISIONAL
+		OmenFor = 2.5, -- s of flicker (Phase Signal, score Uneasy) before the power goes out
+		RestaurantWindow = 15, -- s of dark before the shape comes (anomalies-v3-restaurant.md §7.1; Content.Score Ramp)
+		MaxDark = 20, -- s after the attack the power comes back by itself when nobody held the breaker
+		Margin = 1, -- studs around a HideZone (HIDE-P, the pantry) that still count as hidden
 	},
 }
 
