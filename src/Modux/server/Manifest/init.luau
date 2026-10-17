@@ -31,6 +31,7 @@ local PartyRunService = require(ServerScriptService.server.ModuxTypes.PartyRunSe
 local PartyService = require(ServerScriptService.server.ModuxTypes.PartyService)
 local PedestrianService = require(ServerScriptService.server.ModuxTypes.PedestrianService)
 local PlaceService = require(ServerScriptService.server.ModuxTypes.PlaceService)
+local PlateService = require(ServerScriptService.server.ModuxTypes.PlateService)
 local PlayerService = require(ServerScriptService.server.ModuxTypes.PlayerService)
 local PrepService = require(ServerScriptService.server.ModuxTypes.PrepService)
 local PresenceService = require(ServerScriptService.server.ModuxTypes.PresenceService)
@@ -87,6 +88,7 @@ export type AllServices = {
 	PartyService: PartyService.Public,
 	PedestrianService: PedestrianService.Public,
 	PlaceService: PlaceService.Public,
+	PlateService: PlateService.Public,
 	PlayerService: PlayerService.Public,
 	PrepService: PrepService.Public,
 	PresenceService: PresenceService.Public,

@@ -370,6 +370,12 @@
 						"optional": "src/Place/server"
 					}
 				},
+				"Plate": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Plate/server"
+					}
+				},
 				"Player": {
 					"$ignoreUnknownInstances": false,
 					"$path": {

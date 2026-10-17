@@ -33,6 +33,7 @@ return {
 	ServerScriptService.server.Party.PartyService,
 	ServerScriptService.server.Pedestrian.PedestrianService,
 	ServerScriptService.server.Place.PlaceService,
+	ServerScriptService.server.Plate.PlateService,
 	ServerScriptService.server.Player.PlayerService,
 	ServerScriptService.server.Prep.PrepService,
 	ServerScriptService.server.Presence.PresenceService,
