@@ -1845,3 +1845,19 @@ das APIs de 379/380 para o aceite em Play (o código anda com tipos-mock).
 
 O que **não** pode rodar junto: 380/413/414/418/425 (mesmo `CustomerService/init.luau`); 377/422 com qualquer task que toque
 Content/Net; 382/396..412/416/423 (mesma sessão de Studio); 392 enquanto 377 está aberta (`Restaurant.luau`).
+
+---
+
+## Rodada terror + testes (2026-10-17, pedido do dono; orquestrador)
+
+Começo → meio → fim. Studio é uma sessão só (S1 → S2 → S3 em sequência); código em worktrees em paralelo.
+
+| ID | Fase | O quê | Dono | Deps | Status |
+|---|---|---|---|---|---|
+| TASK-441 | Começo | Sincronizar no `restaurant_bind.luau` todas as edições à mão do dono (ajustes de pixels, placas da escotilha, CCTV, posição da câmera) — diff = 0 | Studio (S1) | — | Em andamento |
+| TASK-442 | Começo | Iluminação da cozinha: luzes acesas menos fortes (o dono clareou, ficou estourado), estado "luzes apagadas" realmente escuro com pontos de luz de emergência/fora; orçamento do style guide | Studio (S1) | 441 | Pendente |
+| TASK-443 | Meio | Sistema de música em passos (calmo → inquieto → tensão com violinos acelerando → clímax "bicho chegou" → alívio), dirigido pelo ciclo da anomalia (prenúncio → ativa → resolvida/erro); sons do dono `Scary Violins Sound Effect`, `Horror Coral`, `lights off` | frontend+backend (worktree) | — | Em andamento |
+| TASK-444 | Meio | Evento de apagão de terror (ANM-020 reforçado): energia cai, `lights off`, cozinha escurece, texto de aviso na tela, coral de horror, jogadores se escondem nos fundos (despensa) até religar o disjuntor | frontend+backend (worktree) | 443 (mesmo agente) | Em andamento |
+| TASK-445 | Meio | Organizar `ReplicatedStorage.Assets.SFX` em pastas por categoria e passo (nada removido) e atualizar referências do código | Studio (S2) + orquestrador | 441, 443 | Pendente |
+| TASK-446 | Fim | Plano de teste de ponta a ponta com a chave do restaurante ligada (boot, tablet, montagem, retirada, mesa, telefone/caixas, Gear Stand, apagão, música) | qa-tester | — | Em andamento |
+| TASK-447 | Fim | Testes em Play no Studio com a chave ligada, seguindo a 446; prints e lista de bugs | Studio (S3) | 441–446 | Pendente |
