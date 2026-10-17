@@ -162,6 +162,6 @@ return Table.new({
 	-- DT-WIN (wave R3): hand the plate out of the drive-thru window
 	{ Key = "drive_serve", Text = "Hand Out", Hold = 0, Radius = 6, Requires = {}, Night = "Any", Wave = 4 },
 	-- FEAT-050 supply: the phone opens the stock menu ("Call" confirms with Restaurant.Supply.PhoneHold); the hatch gives a box
-	{ Key = "order_stock", Text = "Order Stock", Hold = 0, Radius = 6, Requires = {}, Night = "Any", Wave = 4 },
-	{ Key = "take_box", Text = "Take Box", Hold = 0, Radius = 6, Requires = {}, Night = "Any", Wave = 4 },
+	{ Key = "order_stock", Text = "Order Stock", Hold = 0, Radius = 6, Requires = {}, Night = "Any", Wave = 3 },
+	{ Key = "take_box", Text = "Take Box", Hold = 0, Radius = 6, Requires = {}, Night = "Any", Wave = 3 },
 } :: { Action })
