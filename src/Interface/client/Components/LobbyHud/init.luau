@@ -278,8 +278,9 @@ return function(props: Props): Frame
 		BackgroundTransparency = 1,
 		Visible = props.Visible,
 
-		-- Top centre: players online in the whole game (TASK-312)
-		CartoonPanel({
+		-- Top centre: players online in the whole game (TASK-312). The UIScale sits on a wrapper around the whole pill:
+		-- inside the pill's content it grew the icon and text but not the pill, so they spilled out on big screens
+		create("Frame")({
 			Name = "Online",
 			AnchorPoint = Vector2.new(0.5, 0),
 			Position = function()
@@ -287,31 +288,37 @@ return function(props: Props): Frame
 			end,
 			Size = UDim2.fromOffset(0, ONLINE_PILL),
 			AutomaticSize = Enum.AutomaticSize.X,
-			Tone = Theme.Tone.Ink,
-			Lip = 3,
-			Outline = 2,
-			Padding = { Left = 12, Right = 12 }, -- even sides: icon + text centred in the pill (owner 2026-10-16)
+			BackgroundTransparency = 1,
 			Visible = function()
 				return online() > 0
 			end,
-			Children = {
-				createRaw("UIScale")({ Scale = scaled }),
-				create("UIListLayout")({
-					FillDirection = Enum.FillDirection.Horizontal,
-					VerticalAlignment = Enum.VerticalAlignment.Center,
-					SortOrder = Enum.SortOrder.LayoutOrder,
-					Padding = UDim.new(0, 6),
-				}),
-				Icon("Ui/friends", ONLINE_PILL - 10, 1),
-				CartoonLabel({
-					Name = "Count",
-					LayoutOrder = 2,
-					TextSize = 18,
-					Text = function()
-						return onlineText(onlineShown())
-					end,
-				}),
-			},
+			createRaw("UIScale")({ Scale = scaled }),
+			CartoonPanel({
+				Name = "Pill",
+				Size = UDim2.fromOffset(0, ONLINE_PILL),
+				AutomaticSize = Enum.AutomaticSize.X,
+				Tone = Theme.Tone.Ink,
+				Lip = 3,
+				Outline = 2,
+				Padding = { Left = 12, Right = 12 }, -- even sides: icon + text centred in the pill (owner 2026-10-16)
+				Children = {
+					create("UIListLayout")({
+						FillDirection = Enum.FillDirection.Horizontal,
+						VerticalAlignment = Enum.VerticalAlignment.Center,
+						SortOrder = Enum.SortOrder.LayoutOrder,
+						Padding = UDim.new(0, 6),
+					}),
+					Icon("Ui/friends", ONLINE_PILL - 10, 1),
+					CartoonLabel({
+						Name = "Count",
+						LayoutOrder = 2,
+						TextSize = 18,
+						Text = function()
+							return onlineText(onlineShown())
+						end,
+					}),
+				},
+			}),
 		}),
 
 		-- Right, centred vertically: the gem pill alone (opens the shop)

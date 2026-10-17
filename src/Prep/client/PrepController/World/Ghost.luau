@@ -255,7 +255,7 @@ local function newGhost(station: number): Ghost
 		light.Parent = root
 		ghost.Light = light
 	end
-	ghost.Tag = Mates.Tag(nameOf(station), color, anchor, root)
+	-- no name tag on the item (owner 2026-10-17: one billboard per player, the one over the head; the colour says who)
 	root.Parent = ensureFolder()
 	return ghost
 end

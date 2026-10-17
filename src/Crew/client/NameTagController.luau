@@ -28,10 +28,17 @@ const HEAD_LIFT = 1.4 -- studs over the head (Mates.Tag adds Presence.Tag.Lift)
 
 type Entry = { Connections: { RBXScriptConnection } }
 
-const NameTagController = Modux.Controller("NameTagController", { Priority = 300 })
+const LOBBY_INK = Color3.fromHex("#2B2233") -- lobby tag: name only, neutral Ink edge, no colour chip, no outline
+
+const NameTagController = Modux.Controller("NameTagController", { Require = { "PlaceController" }, Priority = 300 })
 
 function NameTagController:Setup()
 	self.Entries = {} :: { [Player]: Entry }
+end
+
+-- Colours and outlines are for the run only (owner 2026-10-16): in the lobby the tag shows just the name
+function NameTagController:InRun(): boolean
+	return self.Dependencies.PlaceController:Is("Run")
 end
 
 -- Tag + outline on `character` of `player`, replacing any older ones
@@ -46,10 +53,18 @@ function NameTagController:Decorate(player: Player, character: Model)
 			old:Destroy()
 		end
 	end
-	const color = CrewColor.Of(player)
+	const inRun = self:InRun()
+	const color = if inRun then CrewColor.Of(player) else LOBBY_INK
 	const tag = Mates.Tag(player.DisplayName, color, head, character)
 	tag.Name = TAG_NAME
 	tag.StudsOffsetWorldSpace += Vector3.new(0, HEAD_LIFT, 0)
+	if not inRun then
+		const chip = tag:FindFirstChild("Chip", true)
+		if chip ~= nil and chip:IsA("GuiObject") then
+			chip.Visible = false
+		end
+		return -- no outline in the lobby
+	end
 
 	const outline = Instance.new("Highlight")
 	outline.Name = OUTLINE_NAME
@@ -65,7 +80,7 @@ end
 -- Recolour in place (attribute arrived / changed)
 function NameTagController:Recolor(player: Player)
 	const character = player.Character
-	if character == nil then
+	if character == nil or not self:InRun() then
 		return
 	end
 	const color = CrewColor.Of(player)
