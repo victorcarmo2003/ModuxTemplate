@@ -316,6 +316,8 @@ zonas (classes amarelo, gems verde, codes azul, pads branco/vermelho/verde) não
 
 ### 5.3 Noite
 
+> **Exceção do apagão (DEC-287, 2026-10-17, nota do secretário):** durante o apagão (DEC-283, DEC-286) o ambiente **pode ficar mais escuro** que os mínimos desta seção e da paleta §2 (`#1B2140`, "sombras nunca pretas puras"); só a luz de emergência vermelha fica. Vale **só durante o apagão**; fora dele esta seção segue Aprovada como está. Sombras das tochas das mesas desligadas (DEC-288; teto ≤ 3 luzes com sombra, §5.1).
+
 `ClockTime` fixo próximo de 0 (o relógio do HUD anda; o céu não precisa). A tensão cresce **por noite** com valores de tabela
 (atmosfera mais densa, um poste da Ninth que pisca), não por mudança de modelo. Os postes da **Juniper** ficam acesos (são o palco do Walker e do Hush).
 

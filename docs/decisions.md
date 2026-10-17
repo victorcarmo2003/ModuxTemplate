@@ -3749,3 +3749,41 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
 - Decidido pelo dono: **organizar os sons em passos/pastas**; **nenhum som é removido**.
 - **Provisório:** estrutura das pastas e nomes dos passos pelo frontend-coder/áudio, refletida em `audio/sound-list.md`; IDs SFX/MUS/AMB existentes não mudam.
 - Impacto: **frontend-coder** (`Sounds`/`AudioController`), **game-designer** (`audio/sound-list.md`). Tarefas: **TASK-441 a TASK-447**.
+
+### DEC-285 — 2026-10-17 — Estoque INFINITO na despensa: pega caixas à vontade; o limite é o da estação (responde Q-350, Q-320)
+
+- Origem: decisão do dono ao orquestrador (2026-10-17), registrada pelo secretário.
+- Decidido pelo dono:
+  - **Estoque infinito** na despensa: o jogador **pega caixas à vontade** nas baias e **reabastece as estações**.
+  - **Sem** pedido por telefone, **sem** van de entrega, **sem** escotilha de entrega.
+  - O que obriga a voltar à despensa é o **limite de cada estação** (cooler das salsichas, cesta de pães, condimentos…).
+- Responde **`Q-350`** (1): "infinito" = infinito de verdade na despensa (opção B, não a leitura do secretário). **`Q-350`** (2) (a ida ao Mart some ou convive) **não foi dita**: Provisório, a compra de **ingredientes** no Mart perde o sentido (estoque é infinito); o Mart fica para upgrades/itens. Responde **`Q-320`** (`design/restaurant-flow.md`).
+- **Emendas (append-only):**
+  - **DEC-276**: as **caixas continuam** (DOGS/BUNS/MUSTARD, carregadas da despensa à estação); o **pedido por telefone, o veículo e a descarga saem**.
+  - **FEAT-050** (`design/restaurant-flow.md`, Supply: telefone, caixas, escotilha, estoque baixo): telefone, escotilha, custo do pedido e espera saem; ficam baias com caixas infinitas e o limite por estação. TASK-388/389 e `tests/restaurant-e2e.md` §3 a ajustar (task-planner/qa-tester).
+  - **DEC-180** ("Out of stock"): passa a valer **por estação** (estação vazia até alguém reabastecer), não para o estoque geral.
+  - **DEC-282** (despensa ampliada): é onde ficam as baias.
+- **Provisório:** capacidade de cada estação e unidades por caixa (game-designer); upgrades que aumentam a capacidade da estação substituem os de entrega.
+- Impacto: **game-designer** (FEAT-050, UPG), **level-designer** (baias na despensa, tirar escotilha), **architect**, **backend-coder**, **frontend-coder**, **task-planner**, **qa-tester**.
+
+### DEC-286 — 2026-10-17 — Apagão apaga TUDO; só a luz de emergência vermelha fica
+
+- Origem: mesma conversa (DEC-285).
+- Decidido pelo dono: no apagão (DEC-283) apaga **tudo**: luzes de dentro, **luzes externas do trailer** e **postes da rua**. Fica só a **luz de emergência vermelha**.
+- **Provisório:** posição e quantidade de luzes de emergência (level-designer; dentro do trailer, pelo menos uma na despensa); a luz vermelha é uma exceção de cor à regra "sem vermelho de alerta" da UI (`AGENT-BRIEF.md` §4 vale para UI, não para luz do mundo). As luzes voltam quando o apagão termina.
+- **Emendas:** `art/style-guide.md` §5.3 "os postes da Juniper ficam acesos" deixa de valer **durante o apagão**.
+- Impacto: **frontend-coder**/**backend-coder** (desligar todas as luzes locais), **level-designer**.
+
+### DEC-287 — 2026-10-17 — No apagão o ambiente pode ficar mais escuro que o mínimo do style guide (exceção aprovada)
+
+- Origem: mesma conversa (DEC-285).
+- Decidido pelo dono: durante o apagão o ambiente **pode ficar mais escuro** que o mínimo do `art/style-guide.md`. Exceção **aprovada**.
+- **Emenda (append-only):** `art/style-guide.md` §5.3 (e a regra de paleta "sombras nunca pretas puras", `#1B2140`), **só durante o apagão**. Nota do secretário no §5.3 (feito). O resto do style guide segue Aprovado (DEC-126).
+- **Provisório:** valores de `Ambient`/`Brightness` do apagão (art-director/frontend-coder); a regra "nenhuma mecânica depende de sombra de luz local" (§5.1) continua.
+- Impacto: **art-director**, **frontend-coder** (preset de luz do apagão).
+
+### DEC-288 — 2026-10-17 — Sombras das tochas das mesas desligadas (teto de 3 sombras)
+
+- Origem: mesma conversa (DEC-285).
+- Decidido pelo dono: as **tochas das mesas** ficam **sem sombra** (`Shadows = false`), para respeitar o orçamento de **≤ 3 luzes com sombra** visíveis (`art/style-guide.md` §5.1).
+- Impacto: **level-designer** / **frontend-coder** (propriedade das luzes), **art-director** (tabela §5.1 ganha a linha das tochas).
