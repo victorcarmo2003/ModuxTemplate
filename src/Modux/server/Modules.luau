@@ -25,6 +25,7 @@ return {
 	ServerScriptService.server.Kitchen.KitchenService,
 	ServerScriptService.server.Light.LightService,
 	ServerScriptService.server.Lobby.LobbyService,
+	ServerScriptService.server.Market.GearStandService,
 	ServerScriptService.server.Market.MarketService,
 	ServerScriptService.server.Metrics.MetricsService,
 	ServerScriptService.server.Net.NetService,

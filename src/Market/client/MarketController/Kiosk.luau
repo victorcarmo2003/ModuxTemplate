@@ -1,8 +1,8 @@
 --!strict
 --[[
 	Kiosk: the three roll-up shutters of the Gear Stand (TASK-140; FEAT-015 v2; MAP-01 §18.4; Q-176 A Provisional).
-	Plain module, client only: no Modux, no network. MarketController decides open/closed from the Shift phase
-	(Content.Mart.KioskClosedPhases) and calls Set; Step runs every frame from its OnTick.
+	Plain module, client only: no Modux, no network. MarketController decides open/closed from the server's business
+	hours (Content.Mart.Hours, GearStandService) and calls Set; Step runs every frame from its OnTick.
 
 	Map contract (TASK-138), tolerant:
 	  * Model tagged `GearShutter` (Content.Mart.Tags.Shutter), attribute `Slot` = "L" | "C" | "R" (Mart.Doors[].Key),
@@ -85,6 +85,7 @@ export type Kiosk = {
 	Remove: (self: Kiosk, model: Instance) -> (),
 	Fallback: (self: Kiosk, anchors: { [string]: Instance }) -> (),
 	Step: (self: Kiosk, now: number) -> boolean,
+	Center: (self: Kiosk) -> Vector3?,
 	Destroy: (self: Kiosk) -> (),
 }
 
@@ -464,6 +465,25 @@ function Kiosk.Step(self: Kiosk, now: number): boolean
 		end
 	end
 	return moving
+end
+
+-- Middle of the shutters in the world (the stand's door SFX plays here); nil without any shutter in Workspace.
+function Kiosk.Center(self: Kiosk): Vector3?
+	local sum, count = Vector3.zero, 0
+	for _, door in self.Doors do
+		const model = door.Model
+		if not model:IsDescendantOf(Workspace) then
+			continue
+		end
+		if model:IsA("Model") then
+			sum += model:GetPivot().Position
+			count += 1
+		elseif model:IsA("BasePart") then
+			sum += model.Position
+			count += 1
+		end
+	end
+	return if count > 0 then sum / count else nil
 end
 
 function Kiosk.Destroy(self: Kiosk)

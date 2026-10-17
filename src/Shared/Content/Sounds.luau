@@ -274,6 +274,11 @@ const base = Table.new({
 	sfx("door_knock"),
 	sfx("door_creak"),
 	sfx("locked_door"), -- ANM-004: back door locked by the anomaly (DEC-247)
+	-- Gear Stand business hours (owner request 2026-10-17; Content.Mart.Hours): the owner's ReplicatedStorage.Assets.SFX
+	-- ["Metal Door Open"] / ["Metal Door Close"]. Id still "" (rbxassetid not copied out of Studio yet): MarketController
+	-- plays the Studio Sound itself until the Id is filled in UPLOADED, then AudioController takes over.
+	sfx("gear_door_open", false, { MaxDistance = 80 }),
+	sfx("gear_door_close", false, { MaxDistance = 80 }),
 	sfx("curtain"),
 	sfx("post_buzz"), -- Walker start, DEC-123
 	sfx("post_tunk"),

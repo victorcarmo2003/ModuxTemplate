@@ -25,6 +25,12 @@ return Table.new({
 	{ Key = "upgrade_bought", Text = "{upgrade} upgraded!", Audience = "Party", ValueFrom = "Upgrades", Wave = 1 }, -- FEAT-015
 	-- Gear Stand hint at closing time (Q-203 Provisional; MarketService: once per shift, only with money for an upgrade or before the first purchase)
 	{ Key = "mart_hint", Text = "Upgrades are on sale at the Mart.", Audience = "Party", ValueFrom = "None", Wave = 1 },
+	-- Gear Stand business hours (owner request 2026-10-17, Provisional texts; GearStandService, Content.Mart.Hours)
+	{ Key = "gear_open", Text = "Gear Stand is OPEN", Audience = "Party", ValueFrom = "None", Wave = 1 },
+	{ Key = "gear_closing", Text = "Gear Stand closing in {value}s", Audience = "Party", ValueFrom = "Number", Wave = 1 },
+	{ Key = "gear_shut", Text = "Gear Stand CLOSED", Audience = "Party", ValueFrom = "None", Wave = 1 },
+	-- refusal to the player who tried to buy while it is closed (MarketService, throttled)
+	{ Key = "gear_closed", Text = "Gear Stand is closed", Audience = "Player", ValueFrom = "None", Wave = 1 },
 	-- Day Last call (DEC-240, user decision 2026-10-13): 6 PM, no new customer, the trailer stays open until the line and the
 	-- tables are served. Sent by CustomerService when the day Closing starts. Provisional text
 	{ Key = "last_call", Text = "Last call! Serve who is still here.", Audience = "Party", ValueFrom = "None", Wave = 1 },
