@@ -819,6 +819,12 @@
 							"optional": "src/Stage/client"
 						}
 					},
+					"Supply": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Supply/client"
+						}
+					},
 					"Tablet": {
 						"$ignoreUnknownInstances": false,
 						"$path": {

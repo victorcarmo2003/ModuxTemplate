@@ -59,6 +59,7 @@ local ShopController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTy
 local ShowcaseController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ShowcaseController)
 local SkinController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.SkinController)
 local StageController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.StageController)
+local SupplyController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.SupplyController)
 local TabletController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.TabletController)
 local ThiefController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ThiefController)
 local TrafficController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.TrafficController)
@@ -128,6 +129,7 @@ export type AllControllers = {
 	ShowcaseController: ShowcaseController.Public,
 	SkinController: SkinController.Public,
 	StageController: StageController.Public,
+	SupplyController: SupplyController.Public,
 	TabletController: TabletController.Public,
 	ThiefController: ThiefController.Public,
 	TrafficController: TrafficController.Public,

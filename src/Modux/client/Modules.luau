@@ -61,6 +61,7 @@ return {
 	StarterPlayer.StarterPlayerScripts.client.Showcase.ShowcaseController,
 	StarterPlayer.StarterPlayerScripts.client.Skin.SkinController,
 	StarterPlayer.StarterPlayerScripts.client.Stage.StageController,
+	StarterPlayer.StarterPlayerScripts.client.Supply.SupplyController,
 	StarterPlayer.StarterPlayerScripts.client.Tablet.TabletController,
 	StarterPlayer.StarterPlayerScripts.client.Thief.ThiefController,
 	StarterPlayer.StarterPlayerScripts.client.Traffic.TrafficController,
