@@ -40,6 +40,28 @@ export type LightPreset = {
 	SunRaysSpread: number,
 }
 
+-- ANM-020 total blackout in the restaurant (owner request 2026-10-17; values approved by the owner, darker than the style
+-- guide on purpose, only while the power is out; PROVISIONAL until a DEC). Effects/Kit/Blackout.luau: the Lighting
+-- fields below blend in over FadeIn s and back to the night values over FadeOut s; every Light / Neon / flame / SurfaceGui
+-- under Roots goes off locally (SurfaceGuis keep showing at SignBrightness with SignLightInfluence), except what sits
+-- under an instance named in KeepNames or with a MapId in KeepMapIds (the emergency lamp EMERG-P).
+export type BlackoutLook = {
+	Ambient: Color3,
+	OutdoorAmbient: Color3,
+	EnvDiffuse: number, -- Lighting.EnvironmentDiffuseScale
+	EnvSpecular: number, -- Lighting.EnvironmentSpecularScale
+	Brightness: number,
+	Exposure: number, -- Lighting.ExposureCompensation
+	FadeIn: number, -- s
+	FadeOut: number, -- s
+	SignBrightness: number, -- SurfaceGui.Brightness while dark
+	SignLightInfluence: number, -- SurfaceGui.LightInfluence while dark (1 = follows the dark)
+	Roots: { { string } }, -- Workspace paths darkened (besides the vehicle and the LightController fixtures)
+	FlameName: string, -- parts / models with this name are flames (torches on the tables): hidden locally
+	KeepNames: { string },
+	KeepMapIds: { string },
+}
+
 export type LightPresets = {
 	Day: LightPreset,
 	Golden: LightPreset,
@@ -52,6 +74,7 @@ export type LightPresets = {
 	GoldenFrom: number, -- hour the golden hour starts (§5.2: 4 PM)
 	GoldenTo: number, -- hour it is full (6 PM)
 	BlendTime: number, -- s of the smooth (eased) blend between two presets
+	Blackout: BlackoutLook,
 }
 
 local Table = require(script.Parent.Table)
@@ -236,6 +259,22 @@ const presets: LightPresets = {
 	GoldenFrom = 16,
 	GoldenTo = 18,
 	BlendTime = 3,
+	Blackout = {
+		Ambient = Color3.fromRGB(16, 17, 28),
+		OutdoorAmbient = Color3.fromRGB(22, 26, 44),
+		EnvDiffuse = 0.2,
+		EnvSpecular = 0.35,
+		Brightness = 0.15,
+		Exposure = -0.45,
+		FadeIn = 0.15,
+		FadeOut = 1.2,
+		SignBrightness = 0.1,
+		SignLightInfluence = 1,
+		Roots = { { "MAP01_Restaurant" }, { "MAP01_Assets", "Extra" } },
+		FlameName = "Flame",
+		KeepNames = { "Emergency" },
+		KeepMapIds = { "EMERG-P" },
+	},
 }
 
 return Table.record(presets)

@@ -1,16 +1,15 @@
 --!strict
 -- Product bays of the stock room (owner request 2026-10-17, Provisional; FEAT-050 extension of TASK-388). Plain module:
--- no Modux, no network. The SupplyService owns one State and decides when boxes come in and go out.
+-- no Modux, no network. The SupplyService owns one State and gives the boxes.
 --
 -- Map contract: every Model / BasePart tagged StockShelf (in the Workspace) with a string attribute Package = a key of
 -- Content.Packages, and an anchor named Prompt_TakeBox (Attachment or BasePart) under it, in front of the bay. A bay with
 -- no anchor gets an Attachment at its pivot (warned). Bays with an unknown Package are skipped (warned). Several bays may
--- hold the same package: a box that comes in goes to the one with the fewest boxes (ties: the first bound).
+-- hold the same package.
 --
--- Stock rule: a bay holds whole boxes (each one = Package.Amount units, a full Mart package). It fills only from the
--- phone (boxes of its package that arrive go straight to it instead of the hatch) and from the start boxes of the run;
--- "Take <Package>" takes one. Optional number attribute StartBoxes on a bay overrides Content.Restaurant.Supply.StartBoxes
--- for that bay at the start of Night 1. The server writes the number attribute Boxes on the bay (count for the client).
+-- Stock rule (owner 2026-10-17, Provisional): the stock room is infinite. A bay has no count and never runs out:
+-- "Take <Package>" always gives one box (a full Mart package, Package.Amount units). The limit is the stations' Capacity
+-- (KitchenService Restock); the package limit in hand is ItemService's.
 local CollectionService = game:GetService("CollectionService")
 
 export type Shelf = {
@@ -18,8 +17,6 @@ export type Shelf = {
 	Package: string,
 	Root: Instance,
 	Anchor: Instance,
-	Boxes: number,
-	Start: number?, -- StartBoxes attribute of the map, nil = Content
 }
 
 export type State = {
@@ -30,8 +27,6 @@ export type State = {
 const TAG = "StockShelf"
 const PACKAGE = "Package"
 const ANCHOR = "Prompt_TakeBox"
-const START = "StartBoxes"
-const BOXES = "Boxes"
 
 const Shelves = {}
 
@@ -88,14 +83,11 @@ function Shelves.bind(state: State, known: { [string]: any }): number
 		if state.ByAnchor[anchor] ~= nil then
 			continue
 		end
-		const start = root:GetAttribute(START)
 		const shelf: Shelf = {
 			Id = #state.List + 1,
 			Package = package,
 			Root = root,
 			Anchor = anchor,
-			Boxes = 0,
-			Start = if type(start) == "number" and start >= 0 then math.floor(start) else nil,
 		}
 		table.insert(state.List, shelf)
 		state.ByAnchor[anchor] = shelf
@@ -106,47 +98,6 @@ end
 function Shelves.has(state: State, package: string): boolean
 	for _, shelf in state.List do
 		if shelf.Package == package then
-			return true
-		end
-	end
-	return false
-end
-
--- Bay that takes the next box of this package (fewest boxes), nil = no bay for it
-function Shelves.target(state: State, package: string): Shelf?
-	local best: Shelf? = nil
-	for _, shelf in state.List do
-		if shelf.Package == package and (best == nil or shelf.Boxes < best.Boxes) then
-			best = shelf
-		end
-	end
-	return best
-end
-
--- Boxes on the bays, by package
-function Shelves.totals(state: State): { [string]: number }
-	const out: { [string]: number } = {}
-	for _, shelf in state.List do
-		out[shelf.Package] = (out[shelf.Package] or 0) + shelf.Boxes
-	end
-	return out
-end
-
-function Shelves.clear(state: State)
-	for _, shelf in state.List do
-		shelf.Boxes = 0
-	end
-end
-
--- Count for the client (attribute on the bay root)
-function Shelves.mark(shelf: Shelf)
-	shelf.Root:SetAttribute(BOXES, shelf.Boxes)
-end
-
--- Bays of a package with the StartBoxes attribute (they replace the Content start count for that package)
-function Shelves.authoredStart(state: State, package: string): boolean
-	for _, shelf in state.List do
-		if shelf.Package == package and shelf.Start ~= nil then
 			return true
 		end
 	end

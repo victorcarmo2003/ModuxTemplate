@@ -4,14 +4,12 @@ export type Public = {
 	Asked: boolean,
 	Closed: { [number]: boolean },
 	Enabled: boolean,
-	GuestSeen: boolean,
 	HoldExpired: boolean,
 	HoldSince: number,
 	LessonOver: boolean,
 	LessonRung: boolean,
 	LessonSince: number,
 	Past: boolean,
-	RestockPaid: boolean,
 	Revived: { [number]: boolean },
 	Rookies: { [number]: boolean },
 	Seeded: boolean,
@@ -38,7 +36,6 @@ export type Public = {
 	DevSend: (self: Public, player: Player, command: string, text: string?) -> (),
 	DevReset: (self: Public, player: Player) -> (),
 	DevStatus: (self: Public) -> string,
-	StepRestock: (self: Public) -> (),
 	Step: (self: Public) -> (),
 }
 

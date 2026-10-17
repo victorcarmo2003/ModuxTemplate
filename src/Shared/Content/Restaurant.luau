@@ -11,7 +11,7 @@
 --   Vehicles.trailer.HasBackDoor = false, Vehicles.trailer.Restaurant = true (DT-R1, DEC-280: no back door)
 --   Anomalies: the CutAnomalies rows lose Family and Scripted (out of the agenda, design/anomalies-v3-restaurant.md §8)
 --   Nights: NewAnomaly per night and debut night per row from NewAnomalies / DebutNights (the cut ones were premieres)
---   Supply.MartShelves = false (owner 2026-10-17: the Mart left the map, stock comes from the phone / bays; MapIndex
+--   Supply.MartShelves = false (owner 2026-10-17: the Mart left the map, stock comes from the stock room bays; MapIndex
 --     then requires no BUY-* shelf anchor, no OP-1 / MKT-DOOR point). Written below from Switch.MartShelves.
 -- Off (default) = every field keeps the published trailer value.
 -- "ByParty" lists have 4 entries: party of 1..4 active players at the start of the shift (Q-067).
@@ -124,19 +124,12 @@ export type Drive = {
 	PetMax: number,
 }
 
--- FEAT-050: phone -> van -> service hatch -> Restock. Boxes reuse Content.Packages (same content and price)
+-- FEAT-050: infinite stock room (owner 2026-10-17, Provisional): every StockShelf bay always gives a box of its package
+-- (take_box, no counter, no phone order, no cost) -> Restock at the station. Boxes reuse Content.Packages (same content);
+-- the limit is the station Capacity
 export type Supply = {
 	Enabled: boolean, -- false = Mart shelves stay the stock source
-	PhoneHold: number, -- = Actions.order_stock hold of the "Call" confirm (menu)
-	MaxBoxes: number, -- boxes per call
-	MaxBoxesBig: { number }, -- with UPG-031 levels 1..2
-	InTransit: number, -- calls on the way at once
-	Fee: number, -- $ per call
-	Eta: number, -- s
-	EtaExpress: { number }, -- UPG-017 levels 1..2
-	HatchSpots: number, -- Hatch set records 1..HatchSpots
 	LowAt: number, -- stock fraction: box icon + stock_low toast
-	StartBoxes: { [string]: number }, -- Packages key -> boxes on the hatch at the start of Night 1
 	MartShelves: boolean, -- true = the Mart still sells packages
 }
 
@@ -167,13 +160,6 @@ export type Binding = {
 	DriveIn: string,
 	DriveOut: string,
 	DriveWindow: string, -- anchor of drive_serve
-	HatchTag: string, -- Model of the service hatch (FEAT-050)
-	HatchSpot: string, -- number attribute 1..HatchSpots on each box spot
-	HatchPrompt: string, -- anchor of take_box
-	PhonePrompt: string, -- anchor of order_stock on the phone
-	VanStop: string, -- MapPoints of the delivery van (client-only vehicle)
-	VanIn: string,
-	VanOut: string,
 }
 
 export type Restaurant = {
@@ -267,16 +253,7 @@ const restaurant: Restaurant = {
 	},
 	Supply = {
 		Enabled = false,
-		PhoneHold = 0.5,
-		MaxBoxes = 4,
-		MaxBoxesBig = { 5, 6 },
-		InTransit = 1,
-		Fee = 2,
-		Eta = 45,
-		EtaExpress = { 30, 18 },
-		HatchSpots = 6,
 		LowAt = 0.25,
-		StartBoxes = { pack_sausages = 1, pack_buns = 1 },
 		MartShelves = true, -- derived: overwritten from Switch.MartShelves below (never edit by hand)
 	},
 	-- placeholder lines (narrative-writer owns them; English UI, no "sausage" for TTS: "dog" / "frank")
@@ -315,13 +292,6 @@ const restaurant: Restaurant = {
 		DriveIn = "DT-IN",
 		DriveOut = "DT-OUT",
 		DriveWindow = "DT-WIN",
-		HatchTag = "SupplyHatch",
-		HatchSpot = "HatchSpot",
-		HatchPrompt = "Prompt_TakeBox",
-		PhonePrompt = "Prompt_OrderStock",
-		VanStop = "VAN-STOP",
-		VanIn = "VAN-IN",
-		VanOut = "VAN-OUT",
 	},
 }
 

@@ -42,9 +42,9 @@ return table.freeze({
 		Cash = 100,
 	}),
 	-- Restaurant tutorial (TASK-393): the steps of the restaurant loop (tablet -> cut -> plate -> grill -> plate -> take
-	-- -> toppings -> pickup) replace the trailer kitchen steps; Restock = after the first sale, the phone order -> a box
-	-- from a product bay (StockShelf) -> Restock at its station (needs Content.Restaurant.Supply.Enabled too). Cash:
-	-- TutorialService tops up to the price of the phone's quick order once the tutorial customer was served.
+	-- -> toppings -> pickup) replace the trailer kitchen steps; Restock = after the first sale, a box from a product bay
+	-- (StockShelf) of the infinite stock room -> Restock at its station (needs Content.Restaurant.Supply.Enabled too; no
+	-- phone order, no cash top-up: owner 2026-10-17).
 	Restaurant = RESTAURANT,
 	Restock = RESTAURANT and Content.Restaurant.Supply.Enabled,
 })

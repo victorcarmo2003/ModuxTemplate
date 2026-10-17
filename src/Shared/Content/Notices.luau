@@ -107,8 +107,6 @@ return Table.new({
 	{ Key = "tablet_busy", Text = "Someone's taking that order.", Audience = "Player", ValueFrom = "None", Wave = 3 },
 	-- drive-thru car gave up (wave R3), to the party
 	{ Key = "drive_left", Text = "A car drove off!", Audience = "Party", ValueFrom = "None", Wave = 4 },
-	-- FEAT-050 supply: a call already on the way (Value = seconds left), the call went through (Value = seconds), low stock
-	{ Key = "supply_busy", Text = "A delivery is already on the way ({value} s).", Audience = "Player", ValueFrom = "Number", Wave = 4 },
-	{ Key = "supply_ordered", Text = "Boxes on the way! ({value} s)", Audience = "Party", ValueFrom = "Number", Wave = 4 },
+	-- FEAT-050 supply: a station is low on stock
 	{ Key = "stock_low", Text = "Low on {item}", Audience = "Party", ValueFrom = "Ingredients", Wave = 4 },
 } :: { Notice })

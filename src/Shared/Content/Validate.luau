@@ -16,6 +16,7 @@ local HudReveal = require(script.Parent.HudReveal)
 local Ingredients = require(script.Parent.Ingredients)
 local Items = require(script.Parent.Items)
 local LightGroups = require(script.Parent.LightGroups)
+local LightPresets = require(script.Parent.LightPresets)
 local Mart = require(script.Parent.Mart)
 local Mode = require(script.Parent.Mode)
 local Moods = require(script.Parent.Moods)
@@ -790,7 +791,30 @@ local function checkNights()
 	inRange("Flow", nil, nil, "NightInterval", Flow.NightInterval, 1, 600)
 end
 
+-- ANM-020 total blackout look (LightPresets.Blackout, owner 2026-10-17)
+local function checkBlackoutLook()
+	const name = "LightPresets"
+	const look = LightPresets.Blackout
+	inRange(name, nil, nil, "Blackout.EnvDiffuse", look.EnvDiffuse, 0, 1)
+	inRange(name, nil, nil, "Blackout.EnvSpecular", look.EnvSpecular, 0, 1)
+	inRange(name, nil, nil, "Blackout.Brightness", look.Brightness, 0, 10)
+	inRange(name, nil, nil, "Blackout.Exposure", look.Exposure, -3, 3)
+	inRange(name, nil, nil, "Blackout.FadeIn", look.FadeIn, 0.01, 10)
+	inRange(name, nil, nil, "Blackout.FadeOut", look.FadeOut, 0.01, 10)
+	inRange(name, nil, nil, "Blackout.SignBrightness", look.SignBrightness, 0, 10)
+	inRange(name, nil, nil, "Blackout.SignLightInfluence", look.SignLightInfluence, 0, 1)
+	for index, path in look.Roots do
+		if #path == 0 then
+			fail(name, index, nil, "Blackout.Roots entries are non-empty Workspace paths")
+		end
+	end
+	if look.FlameName == "" then
+		fail(name, nil, nil, "Blackout.FlameName must not be empty")
+	end
+end
+
 local function checkLightsAndSanity()
+	checkBlackoutLook()
 	checkKeys("LightGroups", LightGroups, KEY_PATTERN)
 	const zoneOwner: { [string]: string } = {}
 	for index, row in LightGroups.List do
@@ -2206,13 +2230,12 @@ end
 -- Restaurant (tech/restaurant-flow.md rev. 2 §4.2; design/restaurant-flow.md): ranges against the wire (Net Plates, Tablets,
 -- DriveCars, Hatch, Customers.Pickup / Drive), Dialog covers every ingredient of an order, the actions and stations exist
 const RESTAURANT_ACTIONS: { string } =
-	{ "tablet_take", "bun_slice", "plate_put", "plate_take", "grill_flip", "rail_take", "pickup_serve", "drive_serve", "order_stock", "take_box" }
+	{ "tablet_take", "bun_slice", "plate_put", "plate_take", "grill_flip", "rail_take", "pickup_serve", "drive_serve", "take_box" }
 const RESTAURANT_NOTICES: { string } =
-	{ "plates_full", "pickup_full", "plate_full", "plate_not_ready", "tablet_busy", "drive_left", "supply_busy", "supply_ordered", "stock_low" }
+	{ "plates_full", "pickup_full", "plate_full", "plate_not_ready", "tablet_busy", "drive_left", "stock_low" }
 const PICKUP_WIRE_MAX = 12 -- Net Customers.Pickup
 const DRIVE_WIRE_MAX = 3 -- Net Customers.Drive / DriveCars records
 const TABLET_WIRE_MAX = 8 -- Tablets records (TAB-n and the DT-PC index)
-const HATCH_WIRE_MAX = 8 -- Net Hatch records
 
 local function checkByParty(name: string, field: string, list: { number }, low: number, high: number)
 	if #list ~= 4 then
@@ -2298,25 +2321,8 @@ local function checkRestaurant()
 		last = at
 	end
 
-	const supply = Restaurant.Supply
-	inRange(name, nil, nil, "Supply.HatchSpots", supply.HatchSpots, 1, HATCH_WIRE_MAX)
-	inRange(name, nil, nil, "Supply.MaxBoxes", supply.MaxBoxes, 1, 24)
-	inRange(name, nil, nil, "Supply.InTransit", supply.InTransit, 1, 4)
-	inRange(name, nil, nil, "Supply.Fee", supply.Fee, 0, 1000)
-	inRange(name, nil, nil, "Supply.Eta", supply.Eta, 1, 600)
-	inRange(name, nil, nil, "Supply.LowAt", supply.LowAt, 0, 1)
-	for index, value in supply.EtaExpress do
-		inRange(name, index, nil, "Supply.EtaExpress", value, 1, supply.Eta)
-	end
-	for index, value in supply.MaxBoxesBig do
-		inRange(name, index, nil, "Supply.MaxBoxesBig", value, supply.MaxBoxes, 24)
-	end
-	for key, count in supply.StartBoxes do
-		if not Packages.ByKey[key] then
-			fail(name, nil, key, "Supply.StartBoxes key is not a Packages key")
-		end
-		inRange(name, nil, key, "Supply.StartBoxes", count, 0, supply.HatchSpots)
-	end
+	-- infinite stock room (owner 2026-10-17): only the low-stock warning is a number (the boxes are checkPackages')
+	inRange(name, nil, nil, "Supply.LowAt", Restaurant.Supply.LowAt, 0, 1)
 
 	const dialog = Restaurant.Dialog
 	const needs: { string } = { "bun", "sausage" }

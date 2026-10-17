@@ -52,9 +52,9 @@ export type Step = {
 }
 
 -- 2026-10-17 cut: the tutorial ends on the first sale (7 numbered steps); 11 with the Day 1 shopping lesson back on.
--- Restaurant (TASK-393): 8 to the first sale, 11 with the restock steps (design/tutorial-restaurant.md §2)
+-- Restaurant (TASK-393): 8 to the first sale, 10 with the restock steps (design/tutorial-restaurant.md §2)
 const TOTAL = if TutorialRules.Restaurant
-	then (if TutorialRules.Restock then 11 else 8)
+	then (if TutorialRules.Restock then 10 else 8)
 	elseif TutorialRules.Shopping then 11
 	else 7
 -- Day 1 upgrade lesson (owner request 2026-10-14, Provisional): when the first shift ends Walt calls (BossCalls
@@ -432,43 +432,23 @@ const LIST: { Step } = {
 		Done = "Stocked up!",
 		Remind = "Hold Restock at the bun crate.",
 	},
-	-- Restaurant restock (TASK-393, TutorialRules.Restock): phone PHONE-R -> boxes on the way -> a box from a product bay
-	-- (StockShelf) or the hatch -> Restock at the station of its ingredient
-	{
-		Key = "r_call",
-		Restaurant = true,
-		Number = 9,
-		Text = "Order stock",
-		Hint = 'Press "Order Stock" on the phone.',
-		Action = "order_stock",
-		Say = { "Running low? Call it in.", "Order Stock, on the phone." },
-		Done = "Order's in.",
-		Remind = "Order Stock on the phone.",
-	},
-	{
-		Key = "r_boxes",
-		Restaurant = true,
-		Number = 9,
-		Text = "Wait for the boxes",
-		Hint = "The van drops them in the stock room.",
-		Action = nil,
-		Say = { "Boxes are on the way." },
-	},
+	-- Restaurant restock (TASK-393, TutorialRules.Restock; owner 2026-10-17: infinite stock room, no phone order): a box
+	-- from a product bay (StockShelf) of the stock room -> Restock at the station of its ingredient
 	{
 		Key = "r_box",
 		Restaurant = true,
-		Number = 10,
+		Number = 9,
 		Text = "Take a box",
-		Hint = 'Press "Take Box" at a stock shelf.',
+		Hint = 'Go to the stock room. Press "Take" at a shelf.',
 		Action = "take_box",
-		Say = { "Boxes are in. Grab one." },
+		Say = { "Running low? Hit the stock room.", "Grab a box." },
 		Done = "Got it.",
 		Remind = "Take a box off the shelf.",
 	},
 	{
 		Key = "r_restock",
 		Restaurant = true,
-		Number = 11,
+		Number = 10,
 		Text = "Restock the station",
 		Hint = 'Hold "Restock" where it goes.',
 		Action = "restock",
@@ -554,8 +534,8 @@ const KITCHEN: { string } = {
 	"discard",
 	"pickup_serve",
 }
--- restock steps: the phone, the bays and the stations
-const RESTOCK: { string } = { "order_stock", "take_box", "restock" }
+-- restock steps: the stock room bays and the stations
+const RESTOCK: { string } = { "take_box", "restock" }
 const NEXT_ACTIONS: { [string]: { string } } = {
 	phone = { "shutter_toggle" },
 	wait_call = { "shutter_toggle" }, -- 2026-10-17: never lock the window behind a late phone
@@ -596,8 +576,6 @@ const NEXT_ACTIONS: { [string]: { string } } = {
 	r_discard = KITCHEN,
 	r_pickup = KITCHEN,
 	r_crew = KITCHEN,
-	r_call = RESTOCK,
-	r_boxes = RESTOCK,
 	r_box = RESTOCK,
 	r_restock = RESTOCK,
 }
