@@ -3,7 +3,8 @@
 -- off, or make it Empty (ANM-001 blank folks: card with no icon). Phone = 667 x 375 (iPhone SE landscape); the card
 -- sits top left under the Roblox bar (and under the sanity meter at night, see HudSanity) like in the HUD. "Revealed"
 -- plays the progressive reveal. Pair (FEAT-038): tick Pair for the 2-row card (2nd hot dog =
--- bacon + potato sticks).
+-- bacon + potato sticks). Talk (FEAT-043, TASK-384): tick Talk and drag Reveal 0 -> K (items said at the tablet: bun,
+-- sausage, the toppings, then the 2nd hot dog of a pair): each new cell pops in; Talk off = the card as before.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -27,6 +28,8 @@ type Controls = {
 	Empty: () -> boolean,
 	Patience: () -> number,
 	Pair: () -> boolean,
+	Talk: () -> boolean,
+	Reveal: () -> number,
 }
 
 return UILabs.CreateVideStory({
@@ -45,6 +48,8 @@ return UILabs.CreateVideStory({
 		Empty = false,
 		Patience = UILabs.Slider(0.8, 0, 1, 0.01),
 		Pair = false,
+		Talk = false,
+		Reveal = UILabs.Slider(0, 0, 10, 1),
 	},
 }, function(props)
 	-- UI Labs types the control sources loosely; pin them to what the story reads.
@@ -90,6 +95,9 @@ return UILabs.CreateVideStory({
 			end,
 			WarnAt = Content.Moods.Rules.AnnoyedAt,
 			Revealed = controls.Revealed,
+			Reveal = function()
+				return if controls.Talk() then math.floor(controls.Reveal()) else math.huge
+			end,
 			Position = UDim2.fromOffset(8, 68),
 		}),
 	})

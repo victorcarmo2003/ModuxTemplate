@@ -48,6 +48,16 @@
 
 	Listeners in OnInit (before Lync.start, README "Rede"); the late joiner gets the current records through onAdded.
 	Rigs are scanned in OnStart. No input: nothing here is clickable (FEAT-032).
+
+	Restaurant note priority (TASK-384; FEAT-043; tech/restaurant-flow.md §1, §3.2), only with
+	Content.Restaurant.Rules.Enabled (off = the trailer rule above, unchanged):
+	  1. my talk at a tablet (TabletController:MyTalk()): the card grows item by item on the server clock. The card
+	     methods return only what was said (bun -> the icon, then each topping; the 2nd row from its bun) and
+	     CardReveal() gives the count for HudOrder `Reveal`. Sounds are TabletController's (ticket_pop, dialog_blip);
+	  2. the `Ticket` (NpcId) of the hot_dog Tool in my hand, when that customer is Waiting;
+	  3. the prompt target (Waiting);
+	  4. the oldest head: the Waiting customer at the front of the pickup line (lowest `Pickup`), else Q1 as before.
+	A blank customer (ANM-001) keeps the empty card in every case.
 ]]
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -79,6 +89,9 @@ const DONE_TIME = 1.2 -- s a resolved row of a pair stays on the bubble (veil + 
 const BUBBLE_ONE_ROW = 68
 const BUBBLE_TWO_ROWS = 110
 const BAR_GAP = 4
+const RESTAURANT = Content.Restaurant
+const TICKET = "Ticket" -- hot_dog Tool attribute (PlateService, TASK-379): NpcId of the plate's order
+const TALK_BASE = "bun" -- 1st item of each hot dog in the talk order (TabletController)
 
 export type Record = {
 	State: string,
@@ -90,7 +103,11 @@ export type Record = {
 	Mood: string,
 	Order2: { [string]: boolean }?, -- pair leader: 2nd pending hot dog (network.md §14.2)
 	Leader: number?, -- pair partner: NpcId of its leader (no bubble)
+	Pickup: number?, -- restaurant: place in the pickup line PU-1..n (nil = not in it)
 }
+
+-- What the card reads during my talk at a tablet (TabletController:MyTalk(), TASK-383)
+type Talk = { Npc: number, Items: { string }, Reveal: number }
 
 -- Resolved row of a pair while it is shown (DONE_TIME): row 1 or 2 and its toppings.
 type Done = { Row: number, Toppings: { OrderBubble.Topping } }
@@ -126,7 +143,10 @@ type Tracked = {
 
 const CustomerController = Modux.Controller(
 	"CustomerController",
-	{ Require = { "RigController", "AudioController", "AnimController", "PromptController" }, Priority = 670 }
+	{
+		Require = { "RigController", "AudioController", "AnimController", "PromptController", "TabletController" },
+		Priority = 670,
+	}
 )
 
 function CustomerController:Setup()
@@ -236,6 +256,7 @@ function CustomerController:WriteRecord(id: number, record: Record?)
 		Mood = record.Mood,
 		Order2 = if record.Order2 then table.clone(record.Order2) else nil,
 		Leader = record.Leader,
+		Pickup = record.Pickup,
 	}
 	const old = Vide.untrack(entry.Record)
 	if old ~= false and old.State ~= "Waiting" and copy.State == "Waiting" then
@@ -591,13 +612,53 @@ local function isWaiting(entry: Entry?): boolean
 	return record ~= false and record.State == "Waiting"
 end
 
--- Customer of the card: the prompt target's rig when it is Waiting, else the Q1 customer in Waiting.
+-- NpcId on the Ticket of the hot_dog Tool in my hand (restaurant), when that customer is Waiting; 0 = none.
+function CustomerController:TicketFocus(): number
+	const character = Players.LocalPlayer.Character
+	const tool = if character then character:FindFirstChildOfClass("Tool") else nil
+	const value = if tool then tool:GetAttribute(TICKET) else nil
+	if typeof(value) == "number" and isWaiting(self.Entries[value]) then
+		return value
+	end
+	return 0
+end
+
+-- Oldest head (restaurant): the Waiting customer at the front of the pickup line; 0 = nobody in it.
+function CustomerController:PickupFocus(): number
+	local best, bestPlace = 0, math.huge
+	for id, entry in self.Entries do
+		const record = Vide.untrack(entry.Record)
+		if record == false or record.State ~= "Waiting" or record.Leader ~= nil or record.Pickup == nil then
+			continue
+		end
+		if record.Pickup < bestPlace then
+			best, bestPlace = id, record.Pickup
+		end
+	end
+	return best
+end
+
+-- Customer of the card: (restaurant: the Ticket in my hand,) the prompt target's rig when it is Waiting, else
+-- (restaurant: the front of the pickup line, else) the Q1 customer in Waiting. My talk is read by the card methods.
 function CustomerController:PickFocus(): number
+	const restaurant = RESTAURANT.Rules.Enabled
+	if restaurant then
+		const ticket = self:TicketFocus()
+		if ticket ~= 0 then
+			return ticket
+		end
+	end
 	const target = self.Dependencies.PromptController.Target
 	const rig = if target then target.Rig else nil
 	const value = if rig then rig:GetAttribute("NpcId") else nil
 	if typeof(value) == "number" and isWaiting(self.Entries[value]) then
 		return value
+	end
+	if restaurant then
+		const front = self:PickupFocus()
+		if front ~= 0 then
+			return front
+		end
 	end
 
 	const character = Players.LocalPlayer.Character
@@ -639,18 +700,79 @@ function CustomerController:FocusEntry(): (Entry?, Record?)
 	return entry, record
 end
 
+-- Reactive: my talk at a tablet (restaurant), the top priority of the card; nil = none.
+function CustomerController:CardTalk(): Talk?
+	if not RESTAURANT.Rules.Enabled then
+		return nil
+	end
+	const talk = self.Dependencies.TabletController:MyTalk()
+	if talk == nil then
+		return nil
+	end
+	return { Npc = talk.Npc, Items = talk.Items, Reveal = talk.Reveal }
+end
+
+-- Toppings of hot dog `row` (1 or 2) said so far in a talk; nil = that hot dog not started (its bun not said).
+local function talkRow(talk: Talk, row: number): { string }?
+	local start = 0
+	local seen = 0
+	for index, key in talk.Items do
+		if key == TALK_BASE then
+			seen += 1
+			if seen == row then
+				start = index
+				break
+			end
+		end
+	end
+	if start == 0 or talk.Reveal < start then
+		return nil
+	end
+	const keys: { string } = {}
+	for index = start + 2, math.min(#talk.Items, talk.Reveal) do
+		const key = talk.Items[index]
+		if key == TALK_BASE then
+			break
+		end
+		table.insert(keys, key)
+	end
+	return keys
+end
+
+function CustomerController:TalkBlank(talk: Talk): boolean
+	const entry = self.Entries[talk.Npc]
+	return entry ~= nil and entry.Variant() == BLANK
+end
+
+-- Items said so far in my talk (HudOrder `Reveal`); nil = no talk (the card shows the whole order).
+function CustomerController:CardReveal(): number?
+	const talk = self:CardTalk()
+	return if talk then talk.Reveal else nil
+end
+
 function CustomerController:CardShown(): boolean
+	if self:CardTalk() ~= nil then
+		return true
+	end
 	const entry = self:FocusEntry()
 	return entry ~= nil
 end
 
 function CustomerController:CardEmpty(): boolean
+	const talk = self:CardTalk()
+	if talk ~= nil then
+		return self:TalkBlank(talk)
+	end
 	const entry = self:FocusEntry()
 	return entry ~= nil and entry.Variant() == BLANK
 end
 
 -- Topping keys of the card order (display order, max 3); none for a blank customer.
 function CustomerController:CardToppings(): { string }
+	const talk = self:CardTalk()
+	if talk ~= nil then
+		return if self:TalkBlank(talk) then {} else talkRow(talk, 1) or {}
+	end
 	const entry, record = self:FocusEntry()
 	const keys: { string } = {}
 	if entry == nil or record == nil or entry.Variant() == BLANK then
@@ -664,6 +786,10 @@ end
 
 -- Topping keys of the 2nd hot dog of a pair on the card (TASK-148); nil = single row.
 function CustomerController:CardToppings2(): { string }?
+	const talk = self:CardTalk()
+	if talk ~= nil then
+		return if self:TalkBlank(talk) then nil else talkRow(talk, 2)
+	end
 	const entry, record = self:FocusEntry()
 	const second = if record ~= nil then record.Order2 else nil
 	if entry == nil or second == nil or entry.Variant() == BLANK then
@@ -677,6 +803,11 @@ function CustomerController:CardToppings2(): { string }?
 end
 
 function CustomerController:CardPatience(): number
+	const talk = self:CardTalk()
+	if talk ~= nil then
+		const talker = self.Entries[talk.Npc]
+		return if talker then self:PatienceOf(talker) else -1
+	end
 	const entry = self:FocusEntry()
 	return if entry then self:PatienceOf(entry) else -1
 end

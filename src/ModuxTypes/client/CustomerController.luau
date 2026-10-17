@@ -15,7 +15,9 @@ export type Record = {
 	Mood: string,
 	Order2: { [string]: boolean }?, -- pair leader: 2nd pending hot dog (network.md §14.2)
 	Leader: number?, -- pair partner: NpcId of its leader (no bubble)
+	Pickup: number?, -- restaurant: place in the pickup line PU-1..n (nil = not in it)
 }
+type Talk = { Npc: number, Items: { string }, Reveal: number }
 type Entry = {
 	Id: number,
 	Record: Vide.Source<Record | false>,
@@ -75,9 +77,14 @@ export type Public = {
 	ClearReaction: (self: Public, model: Model) -> (),
 	Cue: (self: Public, id: number, key: string) -> (),
 	Feedback: (self: Public, id: number, result: string) -> (),
+	TicketFocus: (self: Public) -> number,
+	PickupFocus: (self: Public) -> number,
 	PickFocus: (self: Public) -> number,
 	UpdateFocus: (self: Public) -> (),
 	FocusEntry: (self: Public) -> (Entry?, Record?),
+	CardTalk: (self: Public) -> Talk?,
+	TalkBlank: (self: Public, talk: Talk) -> boolean,
+	CardReveal: (self: Public) -> number?,
 	CardShown: (self: Public) -> boolean,
 	CardEmpty: (self: Public) -> boolean,
 	CardToppings: (self: Public) -> { string },
