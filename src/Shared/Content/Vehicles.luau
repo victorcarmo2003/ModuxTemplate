@@ -4,6 +4,7 @@
 -- 2026-10-12 (user decision, Provisional): ONE vehicle. The Food Trailer is the only vehicle from Day 1; the cart left
 -- the run (its models sit in ServerStorage), and so did the trailer purchase, the FOR SALE sign and the vehicle swap.
 -- The table keeps the Key / Levels-per-vehicle shape (Upgrades, Stations, Required binding) with a single row.
+local Restaurant = require(script.Parent.Restaurant)
 local Table = require(script.Parent.Table)
 
 export type Vehicle = {
@@ -33,7 +34,8 @@ return Table.new({
 		HasCoffee = true, -- UPG-007 Coffee Maker, fixed, not sold (DEC-055, DEC-125)
 		HasSwitch = true, -- "Lights" switch (DEC-189)
 		HasShutter = true, -- service window opens/closes from the button next to the switch (DEC-221)
-		HasBackDoor = true, -- wave R0: the trailer keeps its door until the restaurant map lands (R1-E / R1-H flip it)
-		Restaurant = false,
+		-- TASK-390: derived from Content.Restaurant.Rules.Enabled (Restaurant.Switch); off = the trailer keeps its door
+		HasBackDoor = Restaurant.Switch.HasBackDoor,
+		Restaurant = Restaurant.Switch.VehicleIsRestaurant,
 	},
 } :: { Vehicle })

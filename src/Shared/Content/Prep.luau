@@ -11,6 +11,7 @@
 --   plate Perfect if mean >= Plate.PerfectAvg and no Messy stage, Good if >= Plate.GoodAvg, else Messy
 --   time floor: a plate under PerfectMin + PerTopping x K seconds never passes Good; under MinPlate + PerTopping x K it
 --   is refused (Rules, server clock)
+local Restaurant = require(script.Parent.Restaurant)
 local Table = require(script.Parent.Table)
 
 -- Every tab key that exists on the wire. Order and Build are the 2D set (Rules.ThreeD = false, the one that runs today);
@@ -729,8 +730,9 @@ const reasons = Table.new({
 } :: { Reason })
 
 const rules: Rules = {
-	Enabled = true,
-	WorldKitchenPrompts = false, -- DEC-223: the world prompts of the kitchen are hidden; true = rollback without code
+	Enabled = Restaurant.Switch.PrepEnabled, -- TASK-390 / DT-R8: true (trailer); false while Content.Restaurant.Rules.Enabled
+	-- DEC-223: the world prompts of the kitchen are hidden; true = rollback without code (and the restaurant kitchen, TASK-390)
+	WorldKitchenPrompts = Restaurant.Switch.WorldKitchenPrompts,
 	Delivery = DELIVERY,
 	DoneHold = 0.8,
 	ThreeD = true, -- prep-3d.md §11.3: flips Tabs / Steps to the 3D sets and arms World.Stages (the 2D mode runs while false). On since TASK-203 (the owner plays the 3D grill); Board, Toppings and Serve still use the 2D stages through TabAlias

@@ -27,6 +27,7 @@
 -- table (CFrame = torso of the seated NPC, LookVector towards the table). Prompt anchors (optional): `BuyAnchor` and
 -- `CleanAnchor`; without them one anchor `RuntimeAnchor` is created at runtime over the top of the table. Optional
 -- `TrayAnchor` (client: tray + coin). Optional NpcNode `NodePrefix`n next to table n (graph route Q1 -> table).
+local Restaurant = require(script.Parent.Restaurant)
 local Table = require(script.Parent.Table)
 
 export type ShiftPair = { Day: number, Night: number }
@@ -106,8 +107,9 @@ export type Seating = {
 }
 
 const seating: Seating = {
-	SitAt = "Order",
-	DirtyTables = true,
+	-- TASK-390: both derived from Content.Restaurant.Rules.Enabled (Restaurant.Switch); off = "Order" / true (the trailer)
+	SitAt = Restaurant.Switch.SitAt,
+	DirtyTables = Restaurant.Switch.DirtyTables,
 	UnlockDay = 2,
 	Tables = 4,
 	Groups = {

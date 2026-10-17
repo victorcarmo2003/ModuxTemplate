@@ -1,9 +1,17 @@
 --!strict
 -- Restaurant flow, single record (tech/restaurant-flow.md rev. 2 §4.1; design/restaurant-flow.md FEAT-043..FEAT-050;
 -- DEC-269..DEC-280). Owner: game-designer (numbers) + architect (binding names). Every number Provisional.
--- Wave R0 = contracts only: nothing reads this yet. Rules.Enabled = false keeps the trailer flow (no pickup line, no plate
--- gate, tablets ignored, the new map points not required by MapIndex/Required). Rollback = Enabled false (+ Prep on +
--- the trailer back from ServerStorage.TRAILER_Backup_20261017).
+-- Rules.Enabled = false keeps the trailer flow (no pickup line, no plate gate, tablets ignored, the new map points not
+-- required by MapIndex/Required). Rollback = Enabled false (+ the trailer back from ServerStorage.TRAILER_Backup_20261017).
+--
+-- THE SINGLE SWITCH (TASK-390, tech/restaurant-flow.md §6): Rules.Enabled is the only thing to flip to turn the
+-- restaurant on. Every table that changes with it reads Switch below (derived here, never edited by hand there):
+--   Prep.Rules.Enabled = false, Prep.Rules.WorldKitchenPrompts = true   (DT-R8: no focused prep, world kitchen prompts)
+--   Seating.SitAt = "Served", Seating.DirtyTables = false                (DT-R11: sits after the sale, no tray)
+--   Vehicles.trailer.HasBackDoor = false, Vehicles.trailer.Restaurant = true (DT-R1, DEC-280: no back door)
+--   Anomalies: the CutAnomalies rows lose Family and Scripted (out of the agenda, design/anomalies-v3-restaurant.md §8)
+--   Nights: NewAnomaly per night and debut night per row from NewAnomalies / DebutNights (the cut ones were premieres)
+-- Off (default) = every field keeps the published trailer value.
 -- "ByParty" lists have 4 entries: party of 1..4 active players at the start of the shift (Q-067).
 local Table = require(script.Parent.Table)
 
@@ -324,8 +332,62 @@ local function pickupPoints(count: number?): { string }
 	return out
 end
 
-export type Module = Restaurant & { PickupPoints: (count: number?) -> { string } }
+-- What Rules.Enabled flips in the other Content tables (see the header). Pure data, read at require time.
+export type Switch = {
+	On: boolean, -- = Rules.Enabled
+	PrepEnabled: boolean, -- Prep.Rules.Enabled
+	WorldKitchenPrompts: boolean, -- Prep.Rules.WorldKitchenPrompts (the restaurant kitchen is world prompts)
+	SitAt: "Order" | "Served", -- Seating.SitAt
+	DirtyTables: boolean, -- Seating.DirtyTables
+	HasBackDoor: boolean, -- Vehicles.trailer.HasBackDoor
+	VehicleIsRestaurant: boolean, -- Vehicles.trailer.Restaurant
+	-- Anomalies keys out of the agenda (Family nil, Scripted nil); the row, module and Journal page stay (dev can force them)
+	CutAnomalies: { string },
+	NewAnomalies: { [number]: string }, -- night index -> Nights[k].NewAnomaly override
+	DebutNights: { [string]: number }, -- Anomalies key -> Night override (a night whose premiere was cut needs a debut)
+}
+
+const on = restaurant.Rules.Enabled
+
+-- design/anomalies-v3-restaurant.md §8.1 (DEC-279, Provisional until wave R4 adapts them) + Q-331 ("hide" leaves):
+--   ANM-002 food (work channel) · ANM-003 bank clock + trailer switch · ANM-004 back door knock · ANM-007, 017, 018, 019
+--   family B (hide in the HideZone behind the trailer, no back door) · ANM-009 back door knock / crack
+const CUT_ANOMALIES = {
+	"anm_002_wrong_food",
+	"anm_003_stopped_clock",
+	"anm_004_copies",
+	"anm_007_walker",
+	"anm_009_knock",
+	"anm_017_crawler",
+	"anm_018_grin",
+	"anm_019_roof_walker",
+}
+
+const switch: Switch = {
+	On = on,
+	PrepEnabled = not on,
+	WorldKitchenPrompts = on,
+	SitAt = if on then "Served" else "Order",
+	DirtyTables = not on,
+	HasBackDoor = not on,
+	VehicleIsRestaurant = on,
+	CutAnomalies = if on then CUT_ANOMALIES else {},
+	-- premieres of nights 6..9 were family B: the family A row debuting that night takes the call (Provisional; the
+	-- boss call texts of those nights still name the old monster until the narrative pass of wave R4)
+	NewAnomalies = if on
+		then {
+			[6] = "anm_014_big_head",
+			[7] = "anm_015_floater",
+			[8] = "anm_008_long_car",
+			[9] = "anm_016_starer",
+		}
+		else {},
+	DebutNights = if on then { anm_016_starer = 9 } else {}, -- nothing else debuts on night 9 once ANM-019 is cut
+}
+
+export type Module = Restaurant & { PickupPoints: (count: number?) -> { string }, Switch: Switch }
 
 const out: Module = table.clone(restaurant) :: any
 out.PickupPoints = pickupPoints
+out.Switch = switch
 return Table.record(out)
