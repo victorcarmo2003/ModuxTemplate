@@ -7,8 +7,14 @@ Base: `architecture.md` (§3, §18, §19.28), `network.md`, `content-data.md`, `
 `src/Customer`, `src/Kitchen`, `src/Prep`, `src/Seating`, `src/Delivery`, `src/Interaction`, `src/Hud`, `src/Item`, `src/Npc`,
 `src/Vehicle`, `src/Traffic`, `src/Upgrade`, `src/Shared/Content`, `src/Libs/Net/init.luau`. Anomalias do novo fluxo:
 `docs/design/anomalies-v3-restaurant.md` (game-designer, paralelo). Mapa: `docs/levels/MAP-01-r4-restaurant.md`
-(level-designer, paralelo; IDs `TAB-1..4`, `PLATE-1..8`, `GRILL-n`, `CUT-n`, `COND-n`, `DOOR-K`, `DT-STOP`, `DT-PC`, adotados aqui).
+(level-designer, paralelo; IDs `TAB-1..4`, `PLATE-1..8`, `GRILL-n`, `CUT-n`, `COND-n`, `DOOR-K`, `DT-STOP`, `DT-PC`, adotados aqui; rev. 2: `TAB-1` só, `PICKUP`, `PU-1..n`, sem `DOOR-K`).
 `DT-R#` = decisão técnica proposta (o secretário numera como DEC técnica; o dono pode vetar), lista em §9.
+
+**Rev. 2 (2026-10-17, mudança do dono):** **1 tablet** (`TAB-1`, ponta direita do balcão; 2º tablet só por upgrade);
+**sai a porta de saída**; o balcão vai até a ponta esquerda com o **pote de gorjetas** e o **ponto de retirada** (`PICKUP`,
+fila lateral `PU-1..n`). Cliente: fila no tablet → pede → espera na retirada → o jogador entrega o prato **no balcão** →
+o cliente leva o prato, senta, come e vai embora. **O jogador não sai da loja.** Esta revisão troca `serve_table` por
+entrega na retirada e volta a fila a ser única (é a fila de hoje). Onde o texto abaixo diverge, vale a rev. 2.
 
 **Premissa:** o jogo está publicado e com anúncio. A regra deste desenho é **reaproveitar o fluxo de mundo que já existe**
 (estações com prompt, Tool `hot_dog`, `topping_add`, sentar após o pedido, `serve_table`) e acrescentar só três peças novas:
@@ -19,21 +25,24 @@ Base: `architecture.md` (§3, §18, §19.28), `network.md`, `content-data.md`, `
 ## 0. A leitura em uma tabela
 
 O código já tem quase todo o "Overcooked": antes do modo focado (DEC-223) o trailer funcionava com prompts no mundo
-(`grill_place`, `grill_collect`, `bun_cut`, `board_add_sausage`, `topping_add`), e o cliente **já senta logo depois do
-"Take Order" e é servido na mesa** (`SeatingService`, Q-209). O restaurante troca o balcão único por 4 pontos de pedido e põe
-um "prato" físico entre as estações.
+(`grill_place`, `grill_collect`, `bun_cut`, `board_add_sausage`, `topping_add`). A fila única `Q1..Q5` com pedido em `Q1`
+é exatamente a fila do tablet. O que entra: um **ponto de pedido** com conversa, **pratos-slot**, uma **fila de retirada** e o
+cliente que **leva o prato e senta sozinho** (o "sentar depois de servido" já existiu antes da Q-209; volta como modo).
 
-| Etapa do brief | Hoje | No restaurante | Peça de código |
+| Etapa | Hoje | No restaurante (rev. 2) | Peça de código |
 |---|---|---|---|
-| cliente chega pelo meio e vai a um tablet | fila única `Q1..Q5`, só `Q1` pede | fila com **4 cabeças** (`Q1..Q4` = frente dos `TAB-1..4`), espera em `Q5..Q8` | `CustomerService/Queue` (muda) |
-| diálogo + nota construída item a item | "Take Order" instantâneo no rig; `HudOrder` mostra o pedido inteiro | `tablet_take` no tablet, conversa de 2 a 4 s, nota com pop-up por item; no fim o mesmo `TakeOrderFor` | `TabletService` (novo), `HudOrder` (+prop), `TabletController` (novo) |
-| pedido vai sozinho a um prato-slot com BillboardGui | não existe | ticket cai no `PLATE-n` livre (prato translúcido + papel do pedido) | `PlateService` + `PlateController` + `PlateTicket` (novos) |
-| cortar o pão e pôr no prato | `bun_cut` põe o pão na tábua do trailer | `bun_slice` no `CUT-n` dá o Tool `bun_sliced`; `plate_put` no prato | `Stations/Cut.luau` (novo), `PlateService` |
-| grelhar, empilhar, pegar a salsicha | grelha + trilho (`Rail`, até 30) | igual; virar por prompt (`grill_flip`); `rail_take` dá o Tool `sausage_grilled` | `Stations/Grill.luau`, `Stations/Rail.luau` (pequeno) |
-| pegar o prato, levar aos condimentos | Tool `hot_dog` + `topping_add` (segurar 1 s) | `plate_take` transforma o prato no Tool `hot_dog`; `COND-n` = estação `toppings` atual, sem mudança | reuso total |
-| sair pela porta e entregar na mesa | `serve_table` na mesa, `PickServeTool` acha o hot dog certo | igual; `DOOR-K` = `AutoDoor` (porta local, sem código) | reuso total |
-| drive-thru (paciência, buzina, vai embora, pet) | não existe | carro desenhado no client, cliente "sem rig", `DT-PC` = 5º tablet, `drive_serve` na janela | `DriveThru` (novo, onda R3) |
-| carregar prato/itens entre jogadores | hotbar (4), coffee tem `give_coffee` | entrega pelo **prato-slot** (pôr de volta, outro pega) e pela pilha; dar na mão fica para R4 | `PlateService` (`plate_put` com hot dog) |
+| cliente chega e entra na fila do tablet | fila única `Q1..Q5`, só `Q1` pede | **igual** (`Q1` = frente do `TAB-1`); 2º tablet por upgrade = 2ª cabeça (§3.1) | `CustomerService/Queue` (sem mudança no MVP) |
+| diálogo + nota construída item a item | "Take Order" instantâneo no rig | `tablet_take` no `TAB-1`, conversa de 2 a 4 s, pop-up por item; no fim o mesmo `TakeOrderFor` | `TabletService` (novo), `HudOrder` (+prop), `TabletController` (novo) |
+| depois de pedir | senta na mesa (Q-209) e espera lá | **anda até a fila de retirada** `PU-1..n` e espera em pé (relógio Order corre) | `CustomerService` (fila de retirada nova) |
+| pedido vai a um prato-slot com BillboardGui | não existe | ticket cai no `PLATE-n` livre | `PlateService` + `PlateController` + `PlateTicket` (novos) |
+| cortar, grelhar/virar/empilhar, montar, condimentos | prompts de mundo / Tool `hot_dog` | `bun_slice`, `grill_flip`, `rail_take`, `plate_put`/`plate_take`, `topping_add` (§2.2, §2.3) | `Stations/Cut.luau` (novo), `Grill`/`Rail` (pequeno), `PlateService` |
+| entregar | `serve` no rig do balcão / `serve_table` na mesa | **no balcão**: `pickup_serve` no `PICKUP` (ou `serve`/arrasto no rig do `PU-n`); o servidor acha na fila de retirada o cliente cujo pedido o hot dog atende | `CustomerService` (`ServeFor` reaproveitado) |
+| cliente leva o prato, senta, come, vai embora | (antes da Q-209) sentar depois de servido, `Eating` | servido Completo/Incompleto → pega o prato (rig `Carrying`), `SeatingService:Offer` **na venda**, senta, come, vai embora; sem mesa livre = leva para viagem | `SeatingService` (modo `SitAt = "Served"`), `SeatingController` (bandeja na mão) |
+| gorjeta | pote de gorjetas (`TipJarService`) + gorjeta na mesa suja | **pote na ponta esquerda do balcão** (existente); mesa **não** fica suja (o jogador não sai da loja, pergunta 5) | dados (`Seating`) |
+| drive-thru | não existe | carro no client, cliente sem rig, `DT-PC` = tablet do drive, `drive_serve` na janela | `DriveThru` (novo, onda R3) |
+| passar itens entre jogadores | hotbar, `give_coffee` | pelo prato-slot e pela pilha; dar na mão fica para R4 | `PlateService` |
+
+`serve_table` e a porta de saída **saem do fluxo** (o código de `serve_table` fica, sem âncora ligada; `DOOR-K` não existe).
 
 ---
 
@@ -41,12 +50,13 @@ um "prato" físico entre as estações.
 
 | Sistema (pasta) | Existe hoje (relevante) | Muda | Tamanho |
 |---|---|---|---|
-| `Customer/server/CustomerService` (2183 l.) | spawn, fila `Q1..Q5`, `Orders`/`OrderRoll` (preço, Completo/Incompleto/Errado, DEC-072), dois relógios de paciência (Q-192), pares, `SetSeater`, `TakeOrderFor`/`ServeFor`, `Acted`, `SpawnActor`, `SetHeld` | **Queue com cabeças fixas** (`Heads` = tablets ativos; quem sai de um tablet não empurra os outros; o próximo da espera vai ao tablet livre); `OnFronted` por cabeça; `AtHead(n)`; `PausePatience(id, on)` durante a conversa; prompt `take_order` do rig **desligado** quando há tablets no mapa; `SpawnDrive` (R3) | médio, **arquivo-quente** |
+| `Customer/server/CustomerService` (2183 l.) | spawn, fila `Q1..Q5`, `Orders`/`OrderRoll` (preço, Completo/Incompleto/Errado, DEC-072), dois relógios de paciência (Q-192), pares, `SetSeater`, `TakeOrderFor`/`ServeFor`, `Acted`, `SpawnActor`, `SetHeld` | (rev. 2) fila do tablet **inalterada** (`Q1..Q5`); **fila de retirada nova** (`PU-1..n`, módulo puro `Pickup.luau`: quem pediu entra no fim, sai quando servido ou sem paciência, os de trás andam); `ServeAtPickup(player)` (escolhe na fila de retirada o cliente que o hot dog atende: `Ticket` do Tool, senão o mais antigo com pedido igual, senão o 1º = Errado); depois da venda chama o Seater com o prato na mão (`Carrying`); `PausePatience(id, on)` durante a conversa; prompt `take_order` do rig desligado com `TAB-1` no mapa; cabeças só quando houver o upgrade do 2º tablet; `SpawnDrive` (R3) | médio, **arquivo-quente** |
 | `Customer/client/CustomerController` | escolhe o cliente da nota (`HudOrder`: alvo do prompt, senão `Q1` em Waiting), balões | prioridade da nota: conversa no meu tablet > ticket do prato na mão > alvo > cabeça mais antiga | pequeno |
 | `Kitchen/server/KitchenService` + `Stations/*` | estações descobertas por tag `Station` dentro de `Vehicle`; módulo novo em `Stations/` **não toca o init** (StationApi); `Grill.Flip` já existe (servidor carimba); `Rail` FIFO; `Toppings` (`topping_add` com `hot_dog` na mão) | `Stations/Cut.luau` (novo, kind `cut`, ingrediente `bun`, ação `bun_slice`, restock pelo core); `Grill.luau` ganha o prompt `grill_flip` (mesma `Grill.Flip`); `Rail.luau` ganha `rail_take` | pequeno; `init.luau` **não** muda |
 | `Prep/*` (modo focado, DEC-223) | ~25 mil linhas; inerte sem `Station_n` | **desligado por flag** (`Prep.Rules.Enabled = false`); código fica (§7.3) | 1 linha |
-| `Seating/server/SeatingService` | `Offer` no Take Order, mesa reservada, `serve_table`, comer, gorjeta na mesa, `clean_table` | **nada** de código; o restaurante usa as 4 mesas (`TableIndex 1..4`, grupo `Trailer`); quantas começam compradas é número (`Upgrades.trailer_tables`) | 0 |
-| `Delivery/client/DeliveryController` | arrastar o hot dog até o cliente do balcão | vale também para o cliente que ficou no tablet sem mesa; nada muda | 0 |
+| `Seating/server/SeatingService` | `Offer` no Take Order, mesa reservada, `serve_table`, comer, gorjeta na mesa, `clean_table` | (rev. 2) **modo `Content.Seating.SitAt = "Served"`**: o `Offer` vem da venda na retirada (não do "Take Order"); o grupo anda `PU-n` → mesa com o prato, senta, come `EatTime`, vai embora; sem mesa = sai com o prato; `serve_table` sem âncora; `DirtyTables = false` (gorjeta vai ao pote, mesa volta a Free) | pequeno |
+| `Seating/client/SeatingController` (`Tray`, `Meal`) | bandeja na mesa, hot dog na mão ao comer | bandeja/prato na mão enquanto o rig anda (`Carrying`) | pequeno |
+| `Delivery/client/DeliveryController` | arrastar o hot dog até o cliente do balcão | vale para o cliente no `PU-n` (o `serve` do rig na retirada aciona `ServeAtPickup`); nada muda | 0 |
 | `Interaction` (server + `PromptController`) | `Interact` único, `RegisterAction`, `AddGate`, `Requires.Held` (item ou categoria) | `Rules.luau` do cliente: mostrar `plate_put` só com `bun_sliced`/`sausage_grilled`/`hot_dog` na mão e `plate_take` só com mão livre (o servidor revalida) | pequeno, **quente** |
 | `Item/server/ItemService` | Tools do kit, limites por categoria, stash, snapshot `T`, `Toppings`, `Altered` | itens novos `bun_sliced`, `sausage_grilled` (categoria nova `Ingredient`, limite 2); atributo de Tool novo `Ticket` (NpcId do pedido; não entra no snapshot) | só dados + 1 atributo |
 | `Hud` + `Interface/Components/HudOrder` | nota no canto superior esquerdo (`Toppings`, `Toppings2`, `Patience`, `Revealed`) | prop nova `Reveal: (() -> number)?` (quantos itens já apareceram; o novo entra com pop 0,25 s, `Motion`); `HudController` **não muda** | pequeno |
@@ -80,11 +90,14 @@ só acrescenta **onde** o pedido está sendo trabalhado:
 | estado | `Customers.State` (`Queued` → `Ordering` no tablet → `Waiting`) + `Tablets[n].State` (`Talking`) + prato (`Plates[k].Npc`) | os três |
 | veredito e pagamento | `CustomerService:ServeTable` / `ServeFor` / `Serve` (DEC-072 inalterado) | `CustomerService` |
 
-Ciclo: `Queued` em `Q5..Q8` → cabeça livre `Qn` (frente do `TAB-n`) → `Ordering` (relógio Queue corre) → jogador faz
-`tablet_take` → `Tablets[n] = Talking` (relógio pausado, `PausePatience`) → fim da fala → `CustomerService:TakeOrderFor`
-(o mesmo caminho do prompt antigo: grava `Order`, relógio Order, `Acted("take_order")`, oferece mesa) → `PlateService`
-ouve `Acted` e põe o ticket num `PLATE-n` → cliente anda até a mesa (ou fica no tablet se não há mesa livre, servido ali
-com `serve`, fluxo atual).
+Ciclo (rev. 2): `Queued` em `Q2..Q5` → `Q1` (frente do `TAB-1`) → `Ordering` (relógio Queue corre) → jogador faz
+`tablet_take` → `Tablets[1] = Talking` (relógio pausado, `PausePatience`) → fim da fala → `CustomerService:TakeOrderFor`
+(o mesmo caminho do prompt antigo: grava `Order`, relógio Order, `Acted("take_order")`; **sem** `Offer` de mesa no modo
+`SitAt = "Served"`) → `PlateService` ouve `Acted` e põe o ticket num `PLATE-n` → cliente sai de `Q1` (a fila anda) e entra
+no fim da fila de retirada `PU-k` (`Customers.Pickup = k`, `State Waiting`) → jogador entrega no `PICKUP` →
+veredito DEC-072 → servido: `Customers.State = Leaving` com `Dining`, rig `Carrying = true`, `SeatingService:Offer` →
+mesa (senta, come, vai embora) ou saída direto com o prato; Errado: o hot dog volta à mão de quem entregou (regra atual),
+o cliente segue esperando; paciência acaba: `Left`/`Slow` como hoje, sai da retirada.
 
 ### 2.2 Plate (o prato-slot)
 
@@ -126,7 +139,8 @@ Com 2+ `GRILL-n` ou `CUT-n` o `KitchenService` já aceita kind repetido no mesmo
 
 ### 2.4 Tablet
 
-Dono: `TabletService`. Registros 1..4 = `TAB-1..4`; 5 = `DT-PC` (R3).
+Dono: `TabletService`. Rev. 2: **1 registro no MVP** (id 1 = `TAB-1`). Extensível sem mudar o schema: id 2 = `TAB-2`
+(upgrade do 2º tablet, só existe registro quando o upgrade está comprado e o mapa tem a peça); id 5 = `DT-PC` (R3).
 
 ```
 Tablet = { Index, Anchor, Stand (MapPoint Qn), State "Idle"|"Talking", Npc, User, StartedAt, EndsAt }
@@ -145,7 +159,8 @@ TalkTime = Rules.TalkBase + Rules.TalkStep x (2 + K)   -- pão, salsicha e cada 
 | Entrada | Tipo | Por quê |
 |---|---|---|
 | `Plates` | **set** | 4 jogadores veem os 8 pratos e quem entra tarde recebe o estado; poucas escritas (eventos) |
-| `Tablets` | **set** | quem fala em qual tablet e quando começou: alimenta a nota do taker e o balão para os outros; ≤ 5 registros |
+| `Tablets` | **set** | quem fala no tablet e quando começou: alimenta a nota do taker e o balão para os outros; 1 registro no MVP (até 3: `TAB-2` por upgrade, `DT-PC`) |
+| `Customers.Pickup` | campo opcional do set existente | posição na fila de retirada; todos veem quem espera onde (BillboardGui do pedido sobre o rig, já existe o balão) |
 | `DriveCars` (R3) | **set** | carro parado/chegando/saindo, visto por todos; ≤ 2 registros |
 | ações (`plate_put`, `tablet_take`, …) | `Interact` (packet existente) | nenhum packet novo: toda ação é prompt |
 | recusas | `Notice` (packet existente) | `plates_full`, `plate_full`, `plate_not_ready`, `tablet_busy` |
@@ -170,7 +185,8 @@ pequeno: `Plates` tem 8, mas cada registro carrega `Npc` de 16 bits e `Since` f6
 		Altered = Lync.optional(Lync.bool()), -- ANM-002 on a plate (wave R4); nil = false
 	})),
 
-	-- restaurant-flow.md §2.4, record = tablet 1..4 (TAB-n), 5 = drive-thru computer (DT-PC, wave R3). Writer: TabletService.
+	-- restaurant-flow.md §2.4, record 1 = TAB-1 (always), 2 = TAB-2 (only with the 2nd tablet upgrade bought and bound),
+	-- 5 = drive-thru computer (DT-PC, wave R3). Writer: TabletService.
 	-- The client reveals item i of Order at StartedAt + TalkBase + TalkStep * i (bun, sausage, then ToppingKeys order)
 	Tablets = Lync.replicate(Lync.struct({
 		State = Lync.enum({ "Idle", "Talking" }),
@@ -193,14 +209,16 @@ pequeno: `Plates` tem 8, mas cada registro carrega `Npc` de 16 bits e `Since` f6
 	})),
 ```
 
-E no `Customers` existente (R3), um campo opcional, sem quebrar escritores antigos:
+E no `Customers` existente, dois campos opcionais (R0), sem quebrar escritores antigos:
 
 ```lua
-		Drive = Lync.optional(Lync.int(1, 2)), -- drive-thru lane spot (DriveCars id); nil = a walking customer
+		-- restaurant-flow.md §2.1 rev. 2: place in the pickup line PU-1..n after "Take Order"; nil = not in the pickup line
+		Pickup = Lync.optional(Lync.int(1, 8)),
+		-- §3.4 (wave R3): drive-thru lane spot (DriveCars id); nil = a walking customer
+		Drive = Lync.optional(Lync.int(1, 2)),
 ```
 
-`Customers.Slot` mantém o schema (`int(0, 8)`); muda o significado documentado: `1..Heads` = cabeça no `TAB-n`, `Heads+1..8`
-= espera. Enums vêm do `Content` (Lync ordena os nomes; os dois lados requerem o mesmo `Content`).
+`Customers.Slot` mantém schema e significado (`1..5` = fila do tablet; com o 2º tablet, `1..Heads` = cabeças). Enums vêm do `Content` (Lync ordena os nomes; os dois lados requerem o mesmo `Content`).
 
 Ritmo: `Plates` < 2 escritas/s no pico (4 jogadores), `Tablets` 2 escritas por pedido, `DriveCars` 3 por carro. Soma
 < 150 B/s por client no pior caso: irrelevante perto de `Customers`/`Stations`.
@@ -209,17 +227,38 @@ Ritmo: `Plates` < 2 escritas/s no pico (4 jogadores), `Tablets` 2 escritas por p
 
 ## 3. Fluxos detalhados
 
-### 3.1 Fila com cabeças (CustomerService/Queue)
+### 3.1 Fila do tablet e fila de retirada (CustomerService)
 
-- `Queue` passa de lista única para `{ Heads: {[n]: id}, Line: {id} }` (puro, testável em Luau sem Roblox).
-- `Heads` ativos = `Effect("TabletCount")` (upgrade `counter` reaproveitado: hoje `QueueSize` 1..5; ver §4.4), limitado
-  aos `TAB-n` presentes no mapa; à noite `Content.Restaurant.Rules.NightTablets` (2, proposta do Q-334 do game-designer).
-- Chegada → fim da `Line` (`Q5..Q8`); cabeça livre → o primeiro da `Line` anda até `Qn` (o tablet mais perto dele, desempate
-  pelo índice). Quem sai de uma cabeça **não** move as outras cabeças.
-- `MapPoint` `Q1..Q4` = onde o cliente fica em frente ao `TAB-1..4` (atributo `Tablet = n`); `Q5..Q8` = espera, também
-  `NpcNode`. Sem tablets no mapa, `Heads = 1` e tudo se comporta como hoje (rollback).
-- O prompt `take_order` do rig fica desligado quando há `TAB-n` ligados (o pedido é no tablet). `serve` no rig continua
-  para quem ficou sem mesa.
+**Fila do tablet (rev. 2): a de hoje, sem mudança.** `Q1` = frente do `TAB-1`, `Q2..Q5` atrás (tamanho pelo upgrade
+`counter`, `QueueSize`). O prompt `take_order` do rig fica desligado quando o `TAB-1` está ligado (o pedido é no tablet).
+
+**2º tablet (upgrade, depois do MVP):** `Queue` ganha `Heads` (2 cabeças fixas: `Q1` = `TAB-1`, `Q1B` = `TAB-2`; quem sai de
+uma cabeça não move a outra; o primeiro da espera vai à cabeça livre). Ativado por `Effect("TabletCount")` = 2 **e** `TAB-2`
+no mapa; com 1, o código é o de hoje. Fica fora do MVP para não mexer no `Queue.luau` agora.
+
+**Fila de retirada (nova, MVP):** módulo puro `CustomerService/Pickup.luau` (mesmo formato do `Queue`: lista, `join`,
+`leave`, `point(k) = "PU-k"`; testável em Luau puro).
+
+- Depois do "Take Order" (fim da fala), o cliente sai de `Q1` (a fila do tablet anda) e anda até o fim da retirada
+  (`PU-k`, `Customers.Pickup = k`). `PU-1` = no balcão, ao lado do `PICKUP`; `PU-2..n` = fila lateral (`MapPoint` + `NpcNode`).
+- O relógio Order continua (Q-192); acabou → `Slow`, sai da fila, os de trás andam.
+- Tamanho: `Content.Restaurant.Rules.PickupSlots` (proposta 4). Retirada cheia → o "Take Order" é recusado
+  (`Notice pickup_full`) e o cliente fica no tablet: é a pressão natural da cozinha. `PlateSlots` (8) ≥ `PickupSlots`, então o
+  gate `Plates` raramente dispara.
+- Pares (FEAT-038): o par ocupa 1 lugar (o parceiro segue o líder como hoje, `StepPairs`); cada linha é servida à parte.
+- Sem `PU-n` no mapa: comportamento antigo (espera em `Q1`, servido ali). É o rollback.
+
+**Entrega no balcão:** `pickup_serve` "Hand Over" (tap, raio 6) no `Prompt_Serve` do `PICKUP` e o `serve` do rig de quem está
+na retirada (o arrasto do `DeliveryController` cai nele) chamam `CustomerService:ServeAtPickup(player)`. O servidor escolhe o
+cliente: (1) o dono do `Ticket` do hot dog, se está na retirada; (2) o mais antigo da retirada cujo pedido o hot dog
+atende (`Orders.Match`); (3) senão o `PU-1` → veredito Errado (regra atual: o hot dog volta à mão). Preço, gorjeta, humor
+e `Sale`: o caminho do `ServeFor` atual.
+
+**Depois de servido:** linha Completa/Incompleta → `Leave(..., dining = true)` com o rig `Carrying = true` (o client põe o
+prato com o `HotDogVisual` na mão do rig) → `SeatingService:Offer(party)` (modo `SitAt = "Served"`; as mesmas 5 condições)
+→ mesa: anda, senta, `Eating`, vai embora (fluxo atual a partir de `Eating`); sem mesa: sai pela rota de saída levando o
+prato. Mesa não fica suja (`Content.Seating.DirtyTables = false`): a gorjeta de mesa vai direto ao pote
+(`TipJarService`), porque o jogador não sai da loja (pergunta 5).
 
 ### 3.2 Diálogo e nota (client)
 
@@ -239,12 +278,13 @@ Ritmo: `Plates` < 2 escritas/s no pico (4 jogadores), `Tablets` 2 escritas por p
    `Customers`). Conteúdo do prato (pão, salsicha) desenhado no slot com o `HotDogVisual` (client, só visual).
 2. `CUT-n`: `bun_slice` → Tool `bun_sliced` → `plate_put`.
 3. `GRILL-n`: `grill_place` → pausa → `grill_flip` → `grill_collect` (pilha) → `rail_take` → `sausage_grilled` → `plate_put`.
-4. `plate_take` → `hot_dog` na mão → `COND-n` `topping_add` (segurar 1 s cada) → `DOOR-K` → mesa `serve_table`.
+4. `plate_take` → `hot_dog` na mão → `COND-n` `topping_add` (segurar 1 s cada) → balcão: `pickup_serve` no `PICKUP`
+   (rev. 2; sem porta, sem mesa).
 5. Errou o topping: `discard` no `BIN-K` (o pão e a salsicha se perdem, como hoje). Hand-off: pôr o prato de volta num
    slot vazio (`plate_put` com `hot_dog`), outro jogador pega.
 
-Veredito, preço, gorjeta (janela de gorjeta a partir do "Take Order", DEC-072), humor, mesa suja e `clean_table`:
-**inalterados**. Sem `Quality` (o mundo não dá nota de preparo; Perfect = Completo dentro da janela, como DEC-072).
+Veredito, preço, gorjeta (janela de gorjeta a partir do "Take Order", DEC-072) e humor: **inalterados**. Saem do fluxo do
+restaurante: `serve_table`, mesa suja e `clean_table` (código fica, sem âncora ligada). Sem `Quality` (o mundo não dá nota de preparo; Perfect = Completo dentro da janela, como DEC-072).
 
 ### 3.4 Drive-thru (onda R3)
 
@@ -269,10 +309,11 @@ ancorado e invisível em `DT-STOP` (custa 1 vaga de NPC por carro). A decisão �
 
 ```lua
 export type Rules = {
-	Enabled: boolean,        -- false = trailer flow (Queue Heads = 1, no plate gate, tablets ignored)
+	Enabled: boolean,        -- false = trailer flow (no pickup line, no plate gate, tablets ignored)
 	PlateSlots: number,      -- 8 (map may bind fewer)
-	TabletsDay: number,      -- cap of active heads by day (4); the Counter upgrade gives TabletCount up to this
-	NightTablets: number,    -- 2 (Q-334 proposal)
+	PickupSlots: number,     -- 4: PU-1..n; full = "Take Order" refused (pickup_full)
+	TabletsMax: number,      -- 2: TAB-1 always, TAB-2 with the upgrade (TabletCount); records 1..TabletsMax
+	TakeawayWhenNoTable: boolean, -- true: served with no free table = leaves carrying the plate
 	TalkBase: number,        -- 0.8 s greeting before the first pop-up
 	TalkStep: number,        -- 0.45 s per item (bun, sausage, each topping)
 	TalkRadius: number,      -- 10 studs (only for the balloon; the talk never cancels)
@@ -286,34 +327,41 @@ export type Binding = {
 	TabletTag: "Tablet", TabletIndex: "TabletIndex", TabletPrompt: "Prompt_Take",          -- Model TAB-n
 	PlateTag: "PlateSlot", PlateIndex: "PlateIndex", PlatePut: "Prompt_Put", PlateTake: "Prompt_Take",
 	PlateTicket: "Att_Ticket",                                                             -- Part PLATE-n
+	PickupTag: "Pickup", PickupPrompt: "Prompt_Serve", PickupPoint: "PU-%d",               -- Model PICKUP + MapPoints
 	DriveStop: "DT-STOP", DriveIn: "DT-IN", DriveOut: "DT-OUT", DrivePc: "DT-PC", DriveWindow: "DT-WIN",
-	Door: "DOOR-K",
 }
 ```
 
-Regras de binding (§18 da arquitetura): **tag + atributo** decidem, o nome (`TAB-1`, `PLATE-3`) é o `MapId` do level-designer,
-só para leitura humana e para o `check`. `TAB-n`: `Model` tag `Tablet`, `TabletIndex = n`, filhos `Prompt_Take` (tag
-`Interactable`, `PromptAction = tablet_take`), opcional `Att_Screen` (balão). `PLATE-n`: `Part` tag `PlateSlot`,
-`PlateIndex = n`, dois `Attachment` âncora (`Prompt_Put`/`Prompt_Take`), `Att_Ticket` (BillboardGui) e o prato visual como
-filho. `GRILL-n`/`CUT-n`/`COND-n`/`BIN-K`: `Model` tag `Station` + `StationKind`, contrato do §18.4 inalterado, **dentro** do
-Model `Vehicle = "trailer"` (o prédio). `DOOR-K`: tag `AutoDoor` (porta local, `DoorController`, sem código).
-`DT-*`: `MapPoint` (e `NpcNode` onde o pet anda); `DT-PC` = `Model` tag `Tablet`, `TabletIndex = 5`; `DT-WIN` = âncora
-`drive_serve`.
+Regras de binding (§18 da arquitetura), rev. 2: **tag + atributo** decidem, o nome é o `MapId` do level-designer.
+
+| Peça | Binding |
+|---|---|
+| `TAB-1` (ponta direita do balcão) | `Model` tag `Tablet`, `TabletIndex = 1`, filho `Prompt_Take` (tag `Interactable`, `PromptAction = tablet_take`), opcional `Att_Screen` (balão). `MapPoint` `Q1` na frente dele, `Q2..Q5` atrás (como hoje) |
+| `TAB-2` (opcional, upgrade) | igual, `TabletIndex = 2`, `MapPoint` `Q1B`; ausente no MVP |
+| `PICKUP` (ponta esquerda do balcão) | `Model` tag `Pickup`, filho `Prompt_Serve` (`PromptAction = pickup_serve`); `MapPoint` + `NpcNode` `PU-1` (no balcão) .. `PU-n` (fila lateral), em cadeia, ligados ao grafo das mesas e à saída |
+| pote de gorjetas | o `TRL-TIPJAR` existente (`TipJarService`), movido para a ponta esquerda, ao lado do `PICKUP` |
+| `PLATE-1..8` | `Part` tag `PlateSlot`, `PlateIndex = n`, âncoras `Prompt_Put`/`Prompt_Take`, `Att_Ticket` (BillboardGui), prato visual filho |
+| `GRILL-n`/`CUT-n`/`COND-n`/`BIN-K` | `Model` tag `Station` + `StationKind` (§18.4 inalterado), dentro do Model `Vehicle = "trailer"` (o prédio) |
+| mesas | as 4 `SeatTable` `TableIndex 1..4`, `TBL-1..4`; **sem** `ServeAnchor`/`CleanAnchor` ligados (o client não mostra prompt de mesa) |
+| `DOOR-K` | **sai** (o jogador não sai da loja); a cozinha é fechada, cliente nunca entra |
+| `DT-*` (R3) | `MapPoint`; `DT-PC` = `Model` tag `Tablet`, `TabletIndex = 5`; `DT-WIN` = âncora `drive_serve` |
 
 **Pontos de compatibilidade que o restaurante TEM de manter** (lidos por código vivo; `MapIndex/Required.luau` falha o boot
-sem eles): `TRL` (pivô do prédio), `CART` (frente do balcão dos tablets; Adopt e cutscene), `Q1..Q5` (agora `Q1..Q8`),
-`PS-1..4`/`PS-N1..4` (spawn dentro da cozinha), `DROP-T`, `L3`, `AN-05`, `TRL-OUT`, `LightZone LZ-1` (volume da cozinha =
-"dentro", proteção e luz), `TBL-1..4` e as mesas `SeatTable` `TableIndex 1..4`, `Prompt_Shutter` + peças da persiana.
+sem eles): `TRL` (pivô do prédio), `CART` (frente do `TAB-1`; Adopt e cutscene), `Q1..Q5` (fila do tablet), `PS-1..4`/`PS-N1..4`
+(spawn dentro da cozinha), `DROP-T`, `L3`, `AN-05`, `TRL-OUT` (pouso dentro da loja, já que não há saída), `LightZone LZ-1`
+(volume da cozinha = "dentro", proteção e luz), `TBL-1..4` e as `SeatTable`, `Prompt_Shutter` + persiana do balcão. Novos
+obrigatórios no restaurante: `PU-1..n`, o `PICKUP` e o `TAB-1`.
 
 ### 4.2 Linhas novas nas tabelas existentes
 
 | Tabela | Linhas |
 |---|---|
-| `Actions` | `tablet_take` "Take Order" (tap, r 6), `bun_slice` "Slice Bun" (0,8 s, r 6), `plate_put` "Add {item}"/"Put Plate" (tap, r 5), `plate_take` "Take Plate" (tap, r 5), `grill_flip` "Flip" (tap, r 7), `rail_take` "Take Sausage" (tap, r 7), `drive_take` não (é `tablet_take` no `DT-PC`), `drive_serve` "Hand Over" (tap, r 6, R3) |
+| `Actions` | `tablet_take` "Take Order" (tap, r 6), `bun_slice` "Slice Bun" (0,8 s, r 6), `plate_put` "Add {item}"/"Put Plate" (tap, r 5), `plate_take` "Take Plate" (tap, r 5), `grill_flip` "Flip" (tap, r 7), `rail_take` "Take Sausage" (tap, r 7), `pickup_serve` "Hand Over" (tap, r 6; rev. 2), `drive_serve` "Hand Over" (tap, r 6, R3); o drive usa `tablet_take` no `DT-PC` |
+| `Seating` | `SitAt = "Served"` (novo campo; `"Order"` = Q-209, o trailer), `DirtyTables = false` (gorjeta de mesa direto ao pote) |
 | `Items` | `bun_sliced`, `sausage_grilled` (categoria nova `Ingredient`); kit Tools em `ReplicatedStorage.Assets.Items.Tools/<key>` (FoodPack) |
 | `ItemRules.CategoryLimits` | `Ingredient = 2` (Provisório; upgrade de bandeja pode subir) |
 | `Stations` | `cut` (`Record = "None"`, `Ingredient = "bun"`, `Actions = {"bun_slice", "restock"}`, `Params = { CutTime = 0.8 }`); `grill.Actions` += `grill_flip`; `rail.Actions` += `rail_take` |
-| `Notices` | `plates_full`, `plate_full`, `plate_not_ready`, `tablet_busy`, `drive_left` (R3) |
+| `Notices` | `plates_full`, `pickup_full`, `plate_full`, `plate_not_ready`, `tablet_busy`, `drive_left` (R3) |
 | `Vehicles.trailer` | `HasBackDoor = false` (TrailerDoorService inerte), `Restaurant = true` |
 | `Sounds` | `plate_put`, `ticket_pop`, `dialog_blip`, `car_horn`, `car_horn_long`, `car_arrive` (SFX novos, audio-list) |
 | `Upgrades`/`Stats` | ver §4.4 |
@@ -333,7 +381,8 @@ Todos são `Stats` lidos por `ctx.Effect(stat)` dentro do módulo dono, sem serv
 
 | Stat (proposta) | Lido em | Efeito |
 |---|---|---|
-| `TabletCount` | `CustomerService/Queue` | cabeças ativas 1..4 (upgrade `counter` muda de `QueueSize` para `TabletCount`; o `QueueSize` antigo continua no snapshot, mapeado 1:1) |
+| `TabletCount` | `CustomerService/Queue`, `TabletService` | 1 ou 2 (upgrade novo "Second Tablet"; liga `TAB-2` e a 2ª cabeça, §3.1) |
+| `PickupSize` | `CustomerService/Pickup` | lugares na retirada (mais clientes esperando sem travar o tablet) |
 | `GrillAutoCollect` | `Stations/Grill.luau` (Tick) | salsicha pronta vai sozinha à pilha (tira um papel do solo) |
 | `SlicerStack` | `Stations/Cut.luau` (Tick) | o `CUT` corta sozinho até N pães; `bun_slice` vira instantâneo enquanto há pão cortado |
 | `AutoFlip` | `Stations/Grill.luau` | vira sozinho no fim do 1º lado |
@@ -354,8 +403,9 @@ Regra: um dono por arquivo por onda; arquivo novo sempre que possível. Antes da
 |---|---|
 | `src/Shared/Content/Restaurant.luau` (novo) + `Content/init.luau` (1 linha) | §4.1 |
 | `Content/Actions.luau`, `Items.luau`, `Stations.luau`, `Notices.luau`, `Vehicles.luau`, `Sounds.luau`, `Validate.luau` | §4.2 |
-| `src/Libs/Net/init.luau` | `Plates`, `Tablets` (§2.6). `DriveCars` e `Customers.Drive` já entram aqui também (schema pronto, sem escritor; evita reabrir o arquivo na R3) |
-| `src/Place/shared/MapIndex/Required.luau` | `Q6..Q8` opcionais; `DT-*` opcionais até a R3 |
+| `src/Libs/Net/init.luau` | `Plates`, `Tablets` (1 registro no MVP), `Customers.Pickup` (§2.6). `DriveCars` e `Customers.Drive` já entram aqui também (schema pronto, sem escritor; evita reabrir o arquivo na R3) |
+| `src/Place/shared/MapIndex/Required.luau` | `PU-1..n` (obrigatório quando há `TAB-1`), `Q1B` opcional; `DT-*` opcionais até a R3 |
+| `Content/Seating.luau` | `SitAt`, `DirtyTables` (§4.2) |
 | Aceite | `rogen build` → `modux generate` → `modux check` 0 erro; `Lync.start()` sem erro de schema em Play (o analyze não pega schema) |
 
 ### Onda R1: MVP em paralelo (8 trilhas, arquivos disjuntos)
@@ -364,14 +414,16 @@ Regra: um dono por arquivo por onda; arquivo novo sempre que possível. Antes da
 |---|---|---|---|
 | **R1-A** Kitchen | backend | `Kitchen/server/KitchenService/Stations/Cut.luau` (novo), `Stations/Grill.luau`, `Stations/Rail.luau` | R0 |
 | **R1-B** Plate (server) | backend | `src/Plate/server/PlateService/init.luau` (novo) + `Slots.luau` (novo, puro), `Dev/server/DevService/Commands/Plate.luau` (novo) | R0 |
-| **R1-C** Customer | backend | `Customer/server/CustomerService/Queue.luau`, `CustomerService/init.luau` (cabeças, `AtHead`, `PausePatience`, prompt do rig, `Heads` por `TabletCount`) | R0 |
+| **R1-C** Customer | backend | `Customer/server/CustomerService/Pickup.luau` (novo, puro, com testes de tabela), `CustomerService/init.luau` (fila de retirada, `Customers.Pickup`, `ServeAtPickup`, `serve` do rig na retirada, `PausePatience`, prompt `take_order` do rig desligado, Seater chamado na venda com `Carrying`, saída para viagem). `Queue.luau` **não** muda no MVP (cabeças só com o 2º tablet) | R0 |
 | **R1-D** Tablet (server) | backend | `src/Tablet/server/TabletService.luau` (novo), `Dev/.../Commands/Tablet.luau` (novo) | R0 (chama APIs de R1-B/R1-C por nome; mock por tipo até lá) |
 | **R1-E** Mapa | level-designer + Studio | restaurante no place (tag `Vehicle`, `Vehicle = "trailer"`), trailer antigo para `ServerStorage.TRAILER_Backup_20261017` (com `OrigPath`/`OrigTags`), snippet `tools/assetplace/restaurant_bind.luau` (novo, idempotente), kit Tools `bun_sliced`/`sausage_grilled`; seção nova no `STUDIO_LAYER.md` | R0 (nomes) |
 | **R1-F** Plate + Tablet (client) | frontend | `src/Plate/client/PlateController.luau` (novo), `src/Tablet/client/TabletController.luau` (novo), `Interface/client/Components/PlateTicket/` (novo + story), `Interface/client/Components/TabletDialog/` (novo + story), `Interaction/client/PromptController/Rules.luau` | R0 |
 | **R1-G** Nota do HUD | frontend | `Interface/client/Components/HudOrder/init.luau` (+`Reveal`, story), `Customer/client/CustomerController/init.luau` (prioridade da nota) | R0 |
 | **R1-H** Veículo | backend | `Vehicle/server/TrailerDoorService.luau` (`HasBackDoor`), conferir `VehicleService/Shutter.luau` com o `LZ-1` novo (sem mudança esperada) | R0 |
+| **R1-I** Seating (rev. 2) | backend | `Seating/server/SeatingService/init.luau` (modo `SitAt = "Served"`: `Offer` a partir da venda, grupo sai do `PU-n` com o prato; `DirtyTables = false`: gorjeta ao pote pelo `TipJarService`, mesa volta a Free; sem âncoras `serve_table`/`clean_table` no restaurante) | R0 |
+| **R1-J** Seating client (rev. 2) | frontend | `Seating/client/SeatingController/{Tray,Meal}.luau` (prato na mão do rig com `Carrying`, depois na mesa) | R0 |
 
-Prioridades de boot: `PlateService` **566** (`Require`: `InteractionService`, `ItemService`, `KitchenService`, `CustomerService`,
+Prioridades de boot (`SeatingService` 568 continua acima; o `CustomerService` chama o Seater por callback, sem `Require` novo): `PlateService` **566** (`Require`: `InteractionService`, `ItemService`, `KitchenService`, `CustomerService`,
 `RoundService`, `NetService`; conecta `CustomerService.Acted`/`Left` no `OnStart`), `TabletService` **564** (`InteractionService`,
 `CustomerService`, `PlateService`, `UpgradeService`, `NetService`), `DriveThruService` **562** (R3: `CustomerService`,
 `TabletService`, `PlateService`, `RoundService`, `NetService`). Controllers: `PlateController` e `TabletController` abaixo de
@@ -383,13 +435,14 @@ Prioridades de boot: `PlateService` **566** (`Require`: `InteractionService`, `I
 | Trilha | Arquivos |
 |---|---|
 | Prep desligado | `Content/Prep.luau`: `Rules.Enabled = false` (rollback = `true` + trailer de volta) |
-| Tutorial mínimo do restaurante (bloqueia release) | `Tutorial/server/TutorialService.luau`, `Tutorial/client/TutorialController/{init,Steps}.luau`, `Tutorial/shared/Rules.luau`: tablet → cortar → grelhar/virar → prato → condimento → mesa |
-| Smoke | `Dev/server/DevService/Commands/Smoke.luau`: um pedido de ponta a ponta por `/dev` (tablet → prato → serve_table) |
-| Números do restaurante | `Content/Restaurant.luau`, `Upgrades.luau` (mesas iniciais, `TabletCount`), `Flow.luau` (intervalo com 4 cabeças) — game-designer |
+| Tutorial mínimo do restaurante (bloqueia release) | `Tutorial/server/TutorialService.luau`, `Tutorial/client/TutorialController/{init,Steps}.luau`, `Tutorial/shared/Rules.luau`: tablet → cortar → grelhar/virar → prato → condimento → entregar no `PICKUP` |
+| Smoke | `Dev/server/DevService/Commands/Smoke.luau`: um pedido de ponta a ponta por `/dev` (tablet → prato → `pickup_serve` → cliente senta) |
+| Números do restaurante | `Content/Restaurant.luau`, `Upgrades.luau` (mesas iniciais, 2º tablet, `PickupSize`), `Flow.luau` (intervalo com 1 tablet) — game-designer |
 | QA | plano do qa-tester (solo e 4 jogadores, mobile) |
 
-**MVP técnico = R0 + R1 (A a H) + R2.** Loop jogável: cliente → tablet → conversa com nota → ticket no prato → cortar /
-grelhar / virar / empilhar → prato → condimentos → porta → mesa → paga e suja a mesa → limpar. Sem drive-thru, sem pets,
+**MVP técnico = R0 + R1 (A a J) + R2.** Loop jogável (rev. 2): cliente → fila do `TAB-1` → conversa com nota → espera na
+retirada → ticket no prato → cortar / grelhar / virar / empilhar → prato → condimentos → entrega no `PICKUP` → paga → o
+cliente leva o prato, senta, come, vai embora (gorjeta no pote). O jogador nunca sai da loja. Sem drive-thru, sem pets,
 sem voz, sem anomalias novas (as V2 que dependem de peça do trailer ficam desligadas por dado até a R4).
 
 ### Ondas seguintes
@@ -397,7 +450,7 @@ sem voz, sem anomalias novas (as V2 que dependem de peça do trailer ficam desli
 | Onda | Conteúdo | Arquivos |
 |---|---|---|
 | **R3** drive-thru | spike sem rig (meio dia), `SpawnDrive`, carro, buzina, `drive_serve`, tablet 5 | `src/DriveThru/server/DriveThruService.luau` (novo), `src/DriveThru/client/DriveThruController.luau` (novo), `CustomerService/init.luau` (dono R1-C), `TabletService.luau` (dono R1-D), `Content/Restaurant.luau` (`Drive`) |
-| **R4** anomalias V3 e co-op | `Content.Anomalies` + `Rules/ANM-0xx.luau` (doc do game-designer); `KitchenService:Alter("grill")` e `PlateService:Alter`; guichê por tablet (Q-330 a, dono `TabletService`); pets; `give_item` entre jogadores (padrão do `give_coffee`); voz das falas; upgrades do solo (§4.4) | arquivos de regra são novos; `Grill.luau`/`Cut.luau` voltam ao dono R1-A |
+| **R4** anomalias V3, co-op e 2º tablet | `Content.Anomalies` + `Rules/ANM-0xx.luau` (doc do game-designer); `KitchenService:Alter("grill")` e `PlateService:Alter`; 2º tablet (`Queue.luau` com cabeças, dono R1-C; `TabletService`); guichê por tablet (Q-330, perde peso com 1 tablet); pets; `give_item` entre jogadores (padrão do `give_coffee`); voz das falas; upgrades do solo (§4.4) | arquivos de regra são novos; `Grill.luau`/`Cut.luau` voltam ao dono R1-A |
 | **R5** limpeza | remover `src/Prep/client/**` e `PrepService` depois de 1 release estável do restaurante (o `Prep/shared/Grade` fica: `CustomerService` e `Grill` o requerem); apagar âncoras `Station_n` do backup | só remoção |
 
 ### Arquivos-quentes (conflito)
@@ -406,11 +459,12 @@ sem voz, sem anomalias novas (as V2 que dependem de peça do trailer ficam desli
 |---|---|---|
 | `src/Libs/Net/init.luau` | todo set/packet | só R0 (inclui o schema da R3) |
 | `src/Shared/Content/{Actions,Items,Stations,Notices,Vehicles,Validate,init}.luau` | toda feature acrescenta linha | só R0; números depois só em `Restaurant.luau`/`Upgrades.luau` |
-| `src/Customer/server/CustomerService/init.luau` (2183 l.) | fila, pedido, drive | **um dono para o projeto todo** (R1-C → R3) |
+| `src/Customer/server/CustomerService/init.luau` (2183 l.) | fila, retirada, pedido, drive | **um dono para o projeto todo** (R1-C → R3) |
 | `src/Customer/client/CustomerController/init.luau` | nota do HUD | só R1-G |
 | `src/Interaction/client/PromptController/Rules.luau` | visibilidade dos prompts | só R1-F |
 | `src/Kitchen/server/KitchenService/init.luau` | ninguém deve precisar (StationApi descobre módulos) | se precisar, para e fala com o architect |
 | `src/Hud/client/HudController.luau` | não muda | — |
+| `src/Seating/server/SeatingService/init.luau` | modo `SitAt` | só R1-I |
 | `src/Tutorial/**`, `Dev/.../Smoke.luau` | já modificados nesta árvore | só R2 |
 | place (Studio), `MAP-01_placements.luau`, `STUDIO_LAYER.md` | edição à mão do dono | só R1-E; **nunca `Place.run`** sem pedido (memória `studio-hand-edits`) |
 
@@ -427,7 +481,7 @@ sem voz, sem anomalias novas (as V2 que dependem de peça do trailer ficam desli
   flag de "veículo": o restaurante **herda a chave `trailer`** (DT-R1), então `Upgrades`, `Stations`, `Seating`, snapshots e
   as 75 referências a `"trailer"` continuam válidas. Renomear para `restaurant` é cosmético e caro: fica para a R5, se o dono quiser.
 - **Rollback** (sem código): `Restaurant.Rules.Enabled = false` + `Prep.Rules.Enabled = true` + trailer de volta do backup no
-  Studio (snippet `restaurant_bind.luau "undo"`). Com `Enabled = false` a fila volta a `Heads = 1` e o gate dos pratos some.
+  Studio (snippet `restaurant_bind.luau "undo"`). Com `Enabled = false` não há fila de retirada (serve em `Q1`), `Seating.SitAt` volta a `"Order"` e o gate dos pratos some.
 
 ---
 
@@ -435,12 +489,12 @@ sem voz, sem anomalias novas (as V2 que dependem de peça do trailer ficam desli
 
 | Item | Teto (Provisório) |
 |---|---|
-| Rigs animados no servidor | 12 (DEC-045) de dia: até 4 nos tablets + 4 na espera + até 8 sentados disputam o mesmo teto (`MaxCustomersDay` 8 já limita); à noite ≤ 9 (§6.3 do doc de anomalias, Q-334) |
+| Rigs animados no servidor | 12 (DEC-045) de dia: até 5 na fila do tablet + 4 na retirada + até 8 sentados disputam o mesmo teto (`MaxCustomersDay` 8 já limita); à noite ≤ 9 (§6.3 do doc de anomalias, Q-334) |
 | Carros do drive | 1 parado + 1 na fila, só client, **sem rig** (motorista no modelo) |
 | Pets | 1, rig do pool (conta no teto) |
-| BillboardGui | 8 pratos + 5 tablets, `MaxDistance` 40, atualizam só quando o registro muda |
+| BillboardGui | 8 pratos + 1 a 2 tablets + balões da retirada (já existem), `MaxDistance` 40, atualizam só quando o registro muda |
 | Rede | `Plates` < 2 escritas/s, `Tablets` por pedido, `DriveCars` por carro; nada a 10 Hz |
-| IA | sem mudança de estratégia: A* no grafo `NpcNode` (≤ 80 nós; o prédio troca nós do Pad, não soma), ≤ 2 rotas por frame, `MoveTo` por aresta ≤ 40 studs; cliente nunca entra na cozinha |
+| IA | sem mudança de estratégia: A* no grafo `NpcNode` (≤ 80 nós; o prédio troca nós do Pad, não soma), ≤ 2 rotas por frame, `MoveTo` por aresta ≤ 40 studs; cliente nunca entra na cozinha; grafo novo: `Q1..Q5` → `PU-1..n` → mesas/saída |
 | Servidor | `PlateService` sem tick (só eventos); `TabletService` tick 2 Hz só para fim de fala; `DriveThruService` 2 Hz |
 
 ---
@@ -449,12 +503,15 @@ sem voz, sem anomalias novas (as V2 que dependem de peça do trailer ficam desli
 
 | Risco | Mitigação |
 |---|---|
-| **Mobile: prompts amontoados** (8 pratos lado a lado, 4 tablets, grelha + pilha) | prompts contextuais por mão (`Rules.luau`: `plate_put` só com item certo, `plate_take` só com mão livre), raio 5 nos pratos, slots a ≥ 2,5 studs (pedido ao level-designer), o `InteractionMenu`/modo "Single" existente escolhe o mais perto; testar em 667x375 |
+| **Mobile: prompts amontoados** (8 pratos lado a lado, tablet, retirada, grelha + pilha) | prompts contextuais por mão (`Rules.luau`: `plate_put` só com item certo, `plate_take` só com mão livre), raio 5 nos pratos, slots a ≥ 2,5 studs (pedido ao level-designer), o `InteractionMenu`/modo "Single" existente escolhe o mais perto; testar em 667x375 |
 | **Câmera dentro de prédio pequeno** (parede e teto atrás do personagem) | teto e parede da frente com fade local quando o jogador está no `LZ-1` (client, `CameraController` ou snippet de `LocalTransparencyModifier`), ou `DevCameraOcclusionMode = Invisicam` no place; decidir em Play na R1-E |
 | **Boot quebra sem os pontos legados** (`TRL`, `CART`, `LZ-1`, `Q1..Q5`, `PS-*`, `DROP-T`, `L3`, `AN-05`, `TRL-OUT`) | lista de compatibilidade (§4.1) como aceite da R1-E; `check_map01` e `/dev smoke` antes de entregar |
 | **Anomalias V2 presas ao trailer** (ANM-002 tábua/trilho, ANM-004 porta dos fundos, ANM-009 batida, alucinações de teto, persiana) | no MVP desligar por dado as que dependem de peça que não existe; adaptação na R4 pelo doc do game-designer; `Alter("board")` devolve `false` sem tábua (já é seguro) |
 | **Studio e place** (dono edita à mão; `Place.run` apaga) | só snippets idempotentes e cirúrgicos (`restaurant_bind.luau`, por tag/atributo, com `undo`); `list_roblox_studios` antes; `Place.diff` = 0 e o dono salvar antes de qualquer rebuild; `MeshId` por clone do template |
-| **CustomerService enorme e já modificado** | um dono só; mudança da fila em `Queue.luau` puro com testes de tabela; commit da árvore antes da R0 |
+| **CustomerService enorme e já modificado** | um dono só; a retirada em `Pickup.luau` puro com testes de tabela (`Queue.luau` intocado no MVP); commit da árvore antes da R0 |
+| **Gargalo de 1 tablet** (rev. 2: um jogador preso no tablet, fila parada) | conversa curta e sem trava; `KioskTablet`/`TalkSpeed` e o 2º tablet como upgrades; `PickupSize` evita que a retirada cheia trave o tablet; medir `Left` na fila do tablet |
+| **Cliente na retirada "some" da vista da cozinha** | balão do pedido sobre o rig (já existe) + `PlateTicket` mostra o paciente; `PU-1` visível do `COND` (pedido ao level-designer) |
+| **Cliente carregando prato + pathfinding até a mesa** | mesmo `Diner.Sit` e rota `TBL-n`; o prato é só visual no client (`Carrying`); sem mesa livre, sai para viagem (nunca fica parado no salão) |
 | **Solo chato / pior que o trailer** (5 estações para um jogador) | pré-preparo (prato com pão+salsicha recebe o próximo ticket, `PreppedFirst`), upgrades de automação (§4.4) e `KioskTablet`; medir `Left`/`Slow` contra o baseline do trailer nos primeiros dias |
 | **Ritmo: conversa de 2 a 4 s por pedido** | `TalkStep` curto, conversa não trava o jogador, relógio de paciência pausado durante a fala; `TalkSpeed` como upgrade |
 | **Schema do Lync** (erro só em runtime, derruba o `start`) | R0 testa em Play; nenhum `keyBy`; registros acima de 1 byte |
@@ -469,17 +526,20 @@ sem voz, sem anomalias novas (as V2 que dependem de peça do trailer ficam desli
 - **DT-R1** O restaurante é o Model `Vehicle = "trailer"` (chave mantida); sem veículo novo, sem migração de snapshot.
 - **DT-R2** Sem entidade Order nova: o pedido continua o `Ticket` do `CustomerService`; o restaurante só diz onde ele está (cabeça, prato).
 - **DT-R3** O prato vira o Tool `hot_dog` ao ser pego (atributo `Ticket` só de guia); no slot é estado do `PlateService`. Itens intermediários são Tools (`bun_sliced`, `sausage_grilled`, categoria `Ingredient`).
-- **DT-R4** Fila com cabeças fixas (`Q1..Q4` = tablets) em `CustomerService/Queue`, `Heads` por `TabletCount`.
-- **DT-R5** Rede: 2 sets novos no MVP (`Plates`, `Tablets`), 1 na R3 (`DriveCars`), `Customers.Drive` opcional; nenhum packet novo, nenhum `keyBy`; buzina e pop-ups derivados do relógio do servidor.
+- **DT-R4** (rev. 2) Fila do tablet = a fila única atual; fila de retirada nova em `CustomerService/Pickup.luau`; cabeças fixas no `Queue` só com o upgrade do 2º tablet (`TabletCount`).
+- **DT-R5** Rede: 2 sets novos no MVP (`Plates`, `Tablets` com 1 registro, extensível a `TAB-2` e `DT-PC`), `Customers.Pickup` opcional, 1 na R3 (`DriveCars`), `Customers.Drive` opcional; nenhum packet novo, nenhum `keyBy`; buzina e pop-ups derivados do relógio do servidor.
 - **DT-R6** Cliente do drive-thru sem rig (motorista no modelo do carro, client), plano B rig invisível após spike.
 - **DT-R7** Estações novas como módulos do `KitchenService` (`Stations/Cut.luau`), sem tocar no `init`.
 - **DT-R8** Prep desligado por flag, código mantido até 1 release estável (remoção na R5, `Grade` fica).
 - **DT-R9** Features novas: `src/Plate`, `src/Tablet`, `src/DriveThru` (cada uma `server` + `client`); `Content.Restaurant` em `Shared/Content`.
-- **DT-R10** Binding por tag + atributo (`Tablet`/`TabletIndex`, `PlateSlot`/`PlateIndex`); nomes `TAB-n`, `PLATE-n`, `GRILL-n`, `CUT-n`, `COND-n`, `DOOR-K`, `DT-*` são `MapId`.
+- **DT-R10** Binding por tag + atributo (`Tablet`/`TabletIndex`, `PlateSlot`/`PlateIndex`); nomes `TAB-n`, `PLATE-n`, `GRILL-n`, `CUT-n`, `COND-n`, `PICKUP`, `PU-n`, `DT-*` são `MapId`.
+- **DT-R11** (rev. 2) Entrega no balcão (`pickup_serve` / `serve` no rig da retirada → `ServeAtPickup`); o cliente leva o prato e o `SeatingService` o senta **depois da venda** (`Seating.SitAt = "Served"`); `serve_table` e mesa suja saem do restaurante (código fica).
 
 Perguntas ao dono (o secretário numera; não bloqueiam a R0/R1, seguem com a recomendação):
 
 1. DEC-223 (modo focado) fica **suspensa no restaurante**? Recomendação: sim, flag desligada, código mantido.
-2. Quantos tablets e mesas no Dia 1 (o resto por upgrade)? Recomendação: 2 tablets e 2 mesas, até 4 e 4.
+2. Quantas mesas no Dia 1 e o 2º tablet é upgrade de que dia? Recomendação: 2 mesas (até 4); 2º tablet a partir do Dia 3.
 3. Pegar o prato exige pão **e** salsicha? Recomendação: sim no MVP (prato meio feito não sai do slot; o hand-off é pelo slot).
 4. Drive-thru entra no primeiro release do restaurante ou no seguinte? Recomendação: seguinte (R3), para soltar o loop principal antes.
+5. Sem o jogador sair da loja, quem limpa as mesas? Recomendação: ninguém; a mesa volta livre quando o cliente sai e a gorjeta de mesa cai no pote (`DirtyTables = false`).
+6. Sem mesa livre, o cliente servido leva o prato para viagem (paga igual) ou espera em pé? Recomendação: para viagem.

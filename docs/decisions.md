@@ -3675,3 +3675,26 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
 - Decidido pelo dono: as anomalias existentes **ANM-001 a ANM-020** precisam ser **revisadas** para o novo fluxo (restaurante, tablets, mesas, drive-thru; DEC-269 a DEC-276).
 - **Provisório:** a revisão diz, por anomalia, se fica como está, se adapta (sinal ou verbo) ou se sai; as que dependem da janela/porta do trailer seguem `Q-308`. `story/anomalies.md` (Aprovado) e `design/anomalies-v2-proposal.md` não são reescritos sem DEC; a revisão entra como proposta.
 - Impacto: **game-designer**, **narrative-writer**, **backend-coder** (depois).
+
+### DEC-280 — 2026-10-17 — Um tablet só, balcão inteiro, retirada no balcão: o jogador não sai da loja
+
+- Origem: nova fala do dono ao orquestrador (2026-10-17), registrada pelo secretário.
+- Decidido pelo dono:
+  - **Só 1 tablet** de atendimento, **colado na ponta direita** do balcão da frente. A linha de 4 tablets **sai**.
+  - A **porta de saída à esquerda sai**. O balcão se estende até a **ponta esquerda**.
+  - Na **ponta esquerda do balcão** fica o **pote de gorjetas** que já existe (DEC-239).
+  - Fluxo: os clientes fazem **fila atrás do tablet**; o jogador atende **um por um**; depois de pedir, cada cliente vai **esperar empilhado no lado esquerdo do balcão** (ponto de retirada); o jogador monta, pega o prato e **entrega no balcão** ao cliente certo; o cliente **leva o prato, senta numa mesa, come e vai embora**.
+  - O jogador **não sai mais** para entregar na mesa.
+  - Motivo do dono: manter o jogador **dentro da loja**. **A loja é o único ponto seguro**; ele não precisa ir lá fora.
+- **Provisório** (não dito): tamanho da fila atrás do tablet e da fila de retirada (game-designer); o cliente na retirada mostra a nota do pedido em cima (para o jogador achar o certo); a gorjeta cai no pote na entrega; "Clean Table" (FEAT-037) fica em `Q-351`, porque limpar mesa exige sair.
+- **Emendas (append-only):**
+  - **DEC-269**: "4 tablets" e "porta de saída à esquerda dos tablets" saem do layout; mesas, mesa de montagem, estações do fundo e drive-thru ficam.
+  - **DEC-270**: o pedido no tablet continua (mini-diálogo, nota montada item a item), mas num **tablet único**, com **fila**; "vai a um dos tablets" deixa de valer.
+  - **DEC-273**: **revogada no ponto da entrega**. A entrega é no **balcão** (lado esquerdo), não na mesa; a porta de saída não existe. Volta a ficar perto da DEC-230 (entrega por Tool + prompt no balcão).
+  - **FEAT-037**: o cliente senta **depois** de receber, como era antes da DEC-273.
+  - **DEC-241** (fila na janela): o conceito "fila de 1 + Counter" volta como fila **atrás do tablet**; o que o Counter (UPG-003) vira fica com o game-designer.
+  - **DEC-275**: o papel "entregar nas mesas" sai; vira "entregar na retirada".
+  - **Q-309**: respondida em parte (espera e quando senta); segue aberto quando paga.
+  - **Drive-thru (DEC-274)**: não citado pelo dono; **continua** (atende-se de dentro, pela janela direita).
+  - Tudo que exige sair da loja fica **em revisão** em `Q-351`: limpar mesa, disjuntor e esconderijo nos fundos (DEC-254 famílias B e C), descarga de caixas (DEC-276), tranca da ANM-004 na porta (`Q-308`).
+- Impacto: **level-designer** (`levels/MAP-01-r4-restaurant.md`: 1 tablet, balcão inteiro, pote, fila e retirada), **game-designer** (`design/restaurant-flow.md`), **architect**, **frontend-coder**, **backend-coder**.

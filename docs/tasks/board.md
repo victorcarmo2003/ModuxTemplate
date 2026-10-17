@@ -14,6 +14,8 @@ v2.2 (2026-10-12, **DEC-223/224/225**): **modo de preparo focado** (FEAT-039, V1
 quebrados em TASK-166 a TASK-193 (seção "Tabela de tasks — Modo de preparo focado", sobre `docs/tech/prep-mode.md`).
 v2.3 (2026-10-12, feedback do dono "tudo 3D"; rev. 2 com seções em sequência, abas embaixo e spike EditableMesh): **preparo 3D-first** em TASK-194 a TASK-219 (seção "Tabela de tasks — Preparo
 3D-first", sobre `docs/tech/prep-3d.md`); TASK-174, 175, 177, 178 e 179 marcadas "Substituída parcialmente por 3D".
+v2.4 (2026-10-17, **DEC-269 a DEC-280**): **restaurante** (MVP R0–R2, assets AST-123..139, backlog R3–R5) e **anomalias V3**
+(Provisório, Q-330..333) em TASK-377 a TASK-440 (seção "Tabela de tasks — Restaurante", no fim do arquivo).
 
 Base: `CLAUDE.md`, `README.md` (Modux V3), `docs/PIPELINE.md`, `docs/tech/architecture.md`, `network.md`, `data.md`,
 `content-data.md` (v3.1), `docs/design/*.md`, `docs/levels/MAP-01.md`, `docs/art/asset-list.md`, `decisions.md`
@@ -781,7 +783,12 @@ Origem: pedido do dono de melhorar o fluxo do hot dog do início ao fim (prompts
 
 ## Próximas paralelizáveis
 
-O que pode começar **agora** (v2.0), por agente:
+**Agora (v2.4, restaurante):** ver "Restaurante — paralelismo e caminho crítico" no fim do arquivo. Em resumo: TASK-377 (R0)
+em andamento; **prontas já**: art-director TASK-395, qa-tester TASK-394 (só o plano). Ao TASK-377 ir a `Em QA` abrem de uma
+vez, cada uma na própria worktree: backend 378, 379, 380, 381, 385, 386, 388 · frontend 383, 384, 387, 389 · level-designer 382
+(única sessão de Studio) · game-designer 392.
+
+O que podia começar (v2.0, histórico), por agente:
 
 | Agente | Tasks |
 |---|---|
@@ -1645,3 +1652,196 @@ Proposta: `design/monetization-offers-proposal.md` (Rascunho). Perguntas: `Q-293
 | TASK-373 | **Arte AST-123/124:** folhas Day/Mid/Night com mangas compridas e luvinhas (pedido do dono), atlas e cabeças por skin, ícones 512 + arte dos círculos, CSV do Creator Hub | art-director / modeler-3d | `tools/assetplace/gen_skin_textures.py`, `tools/icons/skin_icons.py`, `Assets/textures/character/skins/`, `Assets/textures/ui/shop/skin_*`, `docs/monetization/skins.csv` | Feito (enviado) |
 | TASK-374 | **UI:** fileira de círculos sob o card (`ClassSelect/SkinRow`), preview no palco, botão Buy R$ / Equip / Needs the class, chips Limited, faixa "Halloween Skins · Nd left"; `SkinController` (client) | frontend-coder | `src/Interface/client/Components/ClassSelect/{init,SkinRow,SkinIcons}.luau`, `src/Skin/client/SkinController.luau`, `src/Lobby/client/LobbyController/{init,Stage}.luau` | Feito (estático); falta Play com Rojo reconectado |
 | TASK-375 | **Dono no Creator Hub (feito 2026-10-17, ids em `Content.Skins`):** criar os 6 Developer Products de `docs/monetization/skins.csv` com as imagens `Assets/textures/ui/shop/skin_*.png` e colar os ids em `ProductId` de `Content.Skins` (até lá a skin aparece "Coming soon") | usuário | `src/Shared/Content/Skins.luau` | Feito |
+
+## Tabela de tasks — Restaurante (2026-10-17; TASK-377 a TASK-440; DEC-269 a DEC-280)
+
+Fontes: `tech/restaurant-flow.md` rev. 2 (ondas R0–R5, trilhas R1-A..J, arquivos-quentes §5), `design/restaurant-flow.md`
+(FEAT-043..050, UPG-015..034, onda 0 M1–M8), `levels/MAP-01-r4-restaurant.md` rev. 2 (pontos, AST-123..139),
+`design/anomalies-v3-restaurant.md` (reescrita 2). Tudo **Rascunho = base Provisória** (DEC-193). Itens Provisórios principais:
+DEC-223 suspensa no restaurante (pergunta 1 do tech §9), 1 pedido em trânsito no telefone, anomalias V3 inteiras (`Q-330..333`).
+
+**Regras desta seção (além das "Regras do board"):**
+- **Um dono por arquivo.** `Net/init.luau`, `Content/{Actions,Items,Stations,Notices,Vehicles,Sounds,Validate,Seating,init}.luau`
+  e `MapIndex/Required.luau`: só TASK-377 no MVP; depois só TASK-422 (anomalias). `Content/Restaurant.luau`: 377 → 392 → (R3) 414.
+- `CustomerService/init.luau`: **um dono no projeto todo**, em sequência 380 → 413 → 414 → 418 → 425. Nunca duas destas em paralelo.
+- `KitchenService/init.luau`: ninguém. Se precisar, para e fala com o architect.
+- **Place (Studio):** uma sessão por vez, nesta ordem: 382 → (396..412, um AST por vez) → 416 → 423. Nunca `Place.run` sem
+  pedido; `Place.diff` = 0 e o dono salvar antes de rebuild (memória `studio-hand-edits`).
+- Arquivos gerados (`*/Manifest/init.luau`, `*/Modules.luau`, `shared/Libs.luau`): conflito no merge se resolve rodando
+  `rogen build` → `modux generate`, nunca à mão.
+- **Aceite comum a toda task de código** (não repetido abaixo): `rogen build` → `modux generate` → `modux check` 0 erro e
+  `tools/analyze.ps1` 0 erro; task que toca `Net/init.luau` exige Play sem erro de `Lync.start()`.
+- Aceite em Play precisa do mapa (TASK-382). Antes dele, os coders testam pelos comandos `/dev` da própria task e por
+  `modux check`; o aceite em Play fica pendente e é fechado depois da 382.
+
+### Onda R0 — contratos (bloqueia tudo)
+
+| TASK | O quê | Dono | Arquivos | Deps | Status |
+|---|---|---|---|---|---|
+| TASK-377 | **Contratos do restaurante:** `Content.Restaurant` (Rules, Drive, Supply, Dialog, Binding), linhas novas (§4.2: ações `tablet_take`, `bun_slice`, `plate_put`, `plate_take`, `grill_flip`, `rail_take`, `pickup_serve`, `drive_serve`, `order_stock`, `take_box`; itens `bun_sliced`/`sausage_grilled` + categoria `Ingredient`; estação `cut`; notices; `Vehicles.trailer.HasBackDoor`/`Restaurant`; `Seating.SitAt`/`DirtyTables`; sons; `Validate`); Net: `Plates`, `Tablets`, `Customers.Pickup`/`Drive`, `DriveCars` e o set do estoque (`Hatch`, FEAT-050); `Required.luau` (`PU-1..n` com `TAB-1`, `Q1B`/`DT-*` opcionais) | backend-coder | `src/Shared/Content/{Restaurant,init,Actions,Items,Stations,Notices,Vehicles,Sounds,Seating,Validate}.luau`, `src/Libs/Net/init.luau`, `src/Place/shared/MapIndex/Required.luau` | — | **Em andamento** |
+
+### Onda R1 — MVP em paralelo (arquivos disjuntos; cada linha = 1 worktree)
+
+| TASK | O quê | Dono | Arquivos (só estes) | Deps | Status |
+|---|---|---|---|---|---|
+| TASK-378 | **R1-A Kitchen:** estação `cut` (`bun_slice` 0,8 s → Tool `bun_sliced`, estoque `Stock.bun`), `grill_flip` no slot, `rail_take` → `sausage_grilled`; conferir que `grill_place` usa a grelha da âncora tocada (2 grelhas) | backend-coder | `src/Kitchen/server/KitchenService/Stations/{Cut,Grill,Rail}.luau` | 377 | Bloqueada |
+| TASK-379 | **R1-B PlateService:** 8 slots, `plate_put`/`plate_take`, `Assign` no `Acted("take_order")` (prefere slot pré-preparado), `Release` no `Left`/venda, gate `plates_full`, atributo `Ticket` no Tool; `/dev plate` | backend-coder | `src/Plate/server/PlateService/{init,Slots}.luau` (novos), `src/Dev/server/DevService/Commands/Plate.luau` (novo) | 377 | Bloqueada |
+| TASK-380 | **R1-C Customer:** fila de retirada `Pickup.luau` (puro, testes de tabela), `Customers.Pickup`, `ServeAtPickup` (Ticket → pedido igual → PU-1 = Errado), `serve` do rig no PU-n, `PausePatience`, `take_order` do rig desligado com `TAB-1`, `pickup_full`, Seater chamado na venda com `Carrying`, para viagem sem mesa; `/dev pickup` | backend-coder | `src/Customer/server/CustomerService/{Pickup,init}.luau`, `src/Dev/server/DevService/Commands/Pickup.luau` (novo). **`Queue.luau` não muda** | 377 | Bloqueada |
+| TASK-381 | **R1-D TabletService:** registro 1 (`TAB-1`), `tablet_take` (raio 6, gate Plates/Pickup), `TalkTime = TalkBase + TalkStep × (2+K)`, tick 2 Hz, fim → `TakeOrderFor`; cliente sumiu → `Idle`; `/dev tablet` | backend-coder | `src/Tablet/server/TabletService.luau` (novo), `src/Dev/server/DevService/Commands/Tablet.luau` (novo) | 377 (APIs de 379/380 por nome; tipo-mock até o merge) | Bloqueada |
+| TASK-382 | **R1-E Mapa (blockout):** restaurante como Model `Vehicle = "trailer"` só com **Parts nomeadas** pelo `MapId` (casca, balcão, `TAB-1`, `PICKUP`, `PU-1..4`, `Q1..Q5`, `PLATE-1..8`, `GRILL-1/2`, `STOCK`, `BUN`, `CUT-1/2`, `COND-1/2`, `BIN-K`, `PHONE-R`, `HATCH-L`, `DROP-R`, despensa, 4 mesas, cerca, `NpcNode` do grafo); pontos legados da §11.1; trailer → `ServerStorage.TRAILER_Backup_20261017`; snippet idempotente com `undo`; kit Tools `bun_sliced`/`sausage_grilled` | level-designer (Studio) | place (Workspace + `ReplicatedStorage.Assets.Items.Tools`), `tools/assetplace/restaurant_bind.luau` (novo), `MAP-01_placements.luau`, `STUDIO_LAYER.md` (seção nova) | 377 (nomes) | Bloqueada |
+| TASK-383 | **R1-F Plate + Tablet client:** `PlateController` (prato translúcido, conteúdo com `HotDogVisual`), `PlateTicket` (BillboardGui, borda = paciência), `TabletController` + `TabletDialog` (pop-ups pelo relógio do servidor, balão para os outros), regras de prompt `plate_put`/`plate_take` por mão | frontend-coder | `src/Plate/client/PlateController.luau`, `src/Tablet/client/TabletController.luau`, `src/Interface/client/Components/{PlateTicket,TabletDialog}/` (novos + story), `src/Interaction/client/PromptController/Rules.luau` | 377 | Bloqueada |
+| TASK-384 | **R1-G Nota do HUD:** prop `Reveal` no `HudOrder` (pop 0,25 s); prioridade da nota (minha conversa > Ticket do prato na mão > alvo > cabeça mais antiga) | frontend-coder | `src/Interface/client/Components/HudOrder/init.luau` (+ story), `src/Customer/client/CustomerController/init.luau` | 377 | Bloqueada |
+| TASK-385 | **R1-H Veículo:** `TrailerDoorService` inerte com `HasBackDoor = false`; conferir `Shutter` com o `LZ-1` novo (sem mudança esperada) | backend-coder | `src/Vehicle/server/TrailerDoorService.luau` (+ `VehicleService/Shutter.luau` só se o teste pedir) | 377 | Bloqueada |
+| TASK-386 | **R1-I Seating server:** modo `SitAt = "Served"` (`Offer` vindo da venda, grupo PU-n → mesa com prato), `DirtyTables = false` (gorjeta de mesa ao pote, mesa volta a Free) | backend-coder | `src/Seating/server/SeatingService/init.luau` (+ `Diner.luau`/`Tables.luau` se preciso) | 377 | Bloqueada |
+| TASK-387 | **R1-J Seating client:** prato na mão do rig com `Carrying`, depois na mesa | frontend-coder | `src/Seating/client/SeatingController/{Tray,Meal}.luau` | 377 | Bloqueada |
+| TASK-388 | **FEAT-050 Supply server (telefone + caixas mínimo):** `order_stock` no `PHONE-R` (menu: caixas × preço + $2, 1 em trânsito, sem saldo = `not_enough_cash`), chegada após `Eta` direto na escotilha (van sem animação), `take_box` no `DROP-R` dá o Tool de pacote (`Content.Packages`, limite 2), Restock existente; caixas iniciais DOGS+BUNS; `/dev supply` | backend-coder | `src/Supply/server/SupplyService/{init,Order}.luau` (novos; `Order` puro), `src/Dev/server/DevService/Commands/Supply.luau` (novo) | 377 | Bloqueada |
+| TASK-389 | **FEAT-050 Supply client:** menu do telefone (linha por caixa, "+", "Call" hold 0,5 s, "On the way 0:32"), caixas visíveis na escotilha pelo set, ícone de caixa pulsando com ≤ 25% e toast "Low on Buns" | frontend-coder | `src/Supply/client/SupplyController.luau` (novo), `src/Interface/client/Components/StockMenu/` (novo + story) | 377 | Bloqueada |
+
+### Onda R2 — fechar o MVP
+
+| TASK | O quê | Dono | Arquivos | Deps | Status |
+|---|---|---|---|---|---|
+| TASK-390 | **Ligar o restaurante:** `Prep.Rules.Enabled = false` (DEC-223 suspensa, Provisório); desligar por dado as anomalias V2 presas a peça do trailer (ANM-002/003/004/007/009/019 e as que pedem porta) até a onda AV | backend-coder | `src/Shared/Content/{Prep,Anomalies,Nights}.luau` | 377 | Bloqueada |
+| TASK-391 | **`/dev smoke` do restaurante:** um pedido de ponta a ponta (tablet → prato → cortar/grelhar/virar → `plate_take` → topping → `pickup_serve` → paga → senta → come → sai) + linha do estoque (pedir 1 caixa, receber, Restock) | backend-coder | `src/Dev/server/DevService/Commands/Smoke.luau` | 378–390 | Bloqueada |
+| TASK-392 | **Números do restaurante:** `Restaurant` (Talk, Pickup, Supply, Drive), mesas iniciais, intervalo de fluxo com 1 tablet, economia sem `Quality` | game-designer | `src/Shared/Content/{Restaurant,Upgrades,Flow}.luau` | 377 | Bloqueada |
+| TASK-393 | **Tutorial mínimo (bloqueia o release):** tablet → cortar → grelhar/virar → prato → condimento → entregar no `PICKUP` (+ 1 passo do telefone); textos revisados pelo narrative-writer | frontend-coder | `src/Tutorial/server/TutorialService.luau`, `src/Tutorial/client/TutorialController/{init,Steps}.luau`, `src/Tutorial/shared/Rules.luau` | 391 | Bloqueada |
+| TASK-394 | **QA do MVP:** plano (solo, 2p, 4p, mobile 667×375, gamepad) e execução após 391/393 | qa-tester | `docs/tests/restaurant.md` (novo) | plano: — · execução: 391, 393 | Pronta (plano) |
+
+### Assets do restaurante (depois do blockout; um AST por task, Studio em sequência)
+
+| TASK | O quê | Dono | Deps | Status |
+|---|---|---|---|---|
+| TASK-395 | **Fichas AST-123..139** em `art/asset-list.md` (medidas do MAP-01 r4 §12.2, orçamento do style guide) **e resolver a colisão de ID**: a TASK-373 / `design/skins-proposal.md` já usaram AST-123/124 para skins | art-director | — | Pronta |
+| TASK-396..412 | Um por asset, na ordem: **396** AST-123 casca + despensa · **397** AST-124 balcão · **398** AST-125 tablet · **399** AST-126 PICKUP · **400** AST-127 mesa de montagem · **401** AST-128 prato-slot · **402** AST-129 janela DT · **403** AST-130 computador DT · **404** AST-131 kit da pista DT · **405** AST-132 cerca + arco · **406** AST-133 luminária de mesa · **407** AST-134 disjuntor · **408** AST-135 válvula de gás · **409** AST-136 interruptor · **410** AST-137 van · **411** AST-138 despensa/escotilha · **412** AST-139 texturas | modeler-3d (fonte em `Assets/blender/`, FBX em `Assets/models/`, upload, troca da Part do blockout por snippet idempotente, sem mudar `MapId`/tags) | 382, 395 (ficha aprovada por DEC) | Bloqueada |
+
+Prioridade dos assets: 397, 398, 399, 401 (o que o jogador usa) primeiro; 402–404 e 410 só com a R3 / van animada.
+
+### Backlog (curtas; viram detalhe quando a onda abrir)
+
+| TASK | O quê | Dono | Arquivos | Deps | Status |
+|---|---|---|---|---|---|
+| TASK-413 | **R3-0 spike:** cliente do drive sem rig no `CustomerService` (meio dia); decide plano A/B (DT-R6) | backend-coder | `CustomerService/init.luau` (branch de spike) | 380 | Backlog |
+| TASK-414 | **R3 drive-thru server:** `DriveThruService`, `SpawnDrive`, `DriveCars`, `DT-PC` = tablet 5, `drive_serve`, desistência | backend-coder | `src/DriveThru/server/DriveThruService.luau` (novo), `CustomerService/init.luau`, `TabletService.luau`, `Content/Restaurant.luau` (`Drive`) | 413, 381, 392 | Backlog |
+| TASK-415 | **R3 drive-thru client:** carro do kit de trânsito, `DT-IN → DT-STOP → DT-OUT`, buzina pelo relógio | frontend-coder | `src/DriveThru/client/DriveThruController.luau` (novo) | 377, 416 | Backlog |
+| TASK-416 | **R3 mapa DT:** `DT-*`, `DT-PC`, `DT-WIN`, pista (blockout) | level-designer | place, `restaurant_bind.luau` | 382 | Backlog |
+| TASK-417 | **R4 pets do drive-thru** (pet normal, prompt "Pet" +$2) | backend + frontend | `DriveThru/**` | 414, 415 | Backlog |
+| TASK-418 | **R4 2º tablet** (`TabletCount`, `Q1B`, cabeças no `Queue`) | backend-coder | `CustomerService/{Queue,init}.luau`, `TabletService.luau`, place (`TAB-2`) | 414 | Backlog |
+| TASK-419 | **R4 upgrades do solo** (UPG-015..034, ganchos §4.4): quebrar em tasks por módulo dono quando abrir | game-designer → backend | `Content/{Upgrades,Stats}.luau` + módulos donos | 394 | Backlog |
+| TASK-420 | **R4 `give_item`** entre jogadores (padrão do `give_coffee`) | backend-coder | `src/Item/server/ItemService/*` | 394 | Backlog |
+| TASK-421 | **R5 remover o Prep** (`Prep/client/**`, `PrepService`; `Prep/shared/Grade` fica) após 1 release estável | backend + frontend | só remoção | release estável | Backlog |
+
+### Onda AV — anomalias V3 (Provisório: `Q-330..333`; abre depois do MVP)
+
+MVP de anomalias = 6 (`anomalies-v3` §10): ANM-001 (+013/012), 031, 020, 017, 005, 006. **A ANM-031 depende do drive-thru
+(R3)**; sem a R3 o pacote cai para 5. 2ª onda: 033 (precisa dos pets, 417), 008, 010.
+
+| TASK | O quê | Dono | Arquivos | Deps | Status |
+|---|---|---|---|---|---|
+| TASK-422 | **AV0 contratos:** catálogo de 11 + retiradas off, `Nights` (§9), sanidade em faixas (+5/+20), sustos D, ações (alavanca DRIVE, disjuntor, ping), sting "O Frio", packet do ping, notices | architect / backend-coder | `Content/{Anomalies,Nights,Sanity,Hallucinations,Actions,Sounds,Notices,Validate}.luau`, `Net/init.luau` | 394, 390 | Backlog |
+| TASK-423 | **AV1 mapa da coluna de controle:** FRONT (persiana do balcão), DRIVE + `SHUT-DT`, painel LIGHT (KSW + `BRK-K` na coluna), quadro de regras, monitor das grelhas, âncoras AN-A..E (ponto de ônibus) | level-designer | place, `restaurant_bind.luau` | 382, 416 | Backlog |
+| TASK-424 | **AV2 controles server:** 2ª persiana (DRIVE) e painel LIGHT com disjuntor 3 s; falso positivo (DRIVE manda o carro embora) | backend-coder | `Vehicle/server/VehicleService/Shutter.luau`, `Light/server/LightService/init.luau` | 422 | Backlog |
+| TASK-425 | **AV2b calma:** durante anomalia de fora, spawn 0 e paciência congelada (fila, retirada, carro); −20% de clientes na noite de estreia | backend-coder | `CustomerService/init.luau` | 422, 414 | Backlog |
+| TASK-426 | **AV3 núcleo:** erro −35 em quem agiu, omissão em todos na loja, +5 no acerto, cai só em 0 (DEC-277), prenúncio só antes de anomalia de fora | backend-coder | `AnomalyService/{Api,Scheduler}.luau`, `Vital/server/VitalService/Sanity.luau` | 422 | Backlog |
+| TASK-427 | **AV4 feedback client:** "O Frio" (sting + postes esfriam), cartão de erro com a linha do quadro, selo OK, faixas de sanidade (vinheta, relances) | frontend-coder | `AnomalyController/Effects/Kit/Chill.luau` (novo), `Interface/client/Components/{RuleCard,OkStamp}/` (novos), `Vital/client/VitalController.luau` | 422 | Backlog |
+| TASK-428 | **AV5 ping "OUTSIDE!"** (Q / D-pad cima / botão mobile, 3 s, recarga 4 s) | frontend-coder (+ relay server) | `src/Ping/server/PingService.luau`, `src/Ping/client/PingController.luau` (novos) | 422 | Backlog |
+| TASK-429 | **AV6 quadro de regras + monitor das grelhas + alavancas** (SurfaceGui, linha nova brilha; monitor reusa a câmera da TASK-285) | frontend-coder | `Interface/client/Components/RuleBoard/` (novo), `Vehicle/client/SwitchLeverController.luau`, controller do monitor (a confirmar) | 423, 424 | Backlog |
+| TASK-430 | **ANM-001/013/012** no `TAB-1` (nota vazia, FRONT resolve) | backend + frontend | `Anomalies/` + `Rules/` + `Effects/` ANM-001, 012, 013; `Kit/CustomerActor.luau` (server e client) | 426, 381 | Backlog |
+| TASK-431 | **ANM-020** apagão com disjuntor na coluna | backend + frontend | `Anomalies/Rules/Effects` ANM-020 | 424, 426 | Backlog |
+| TASK-432 | **ANM-017** rastejador (Hide com teste = FRONT fechada) | backend + frontend | ANM-017 ×3, `Kit/Hide.luau` (server e client) | 423, 426 | Backlog |
+| TASK-433 | **ANM-005** Raincoat na retirada (poça = prazo) | backend + frontend | ANM-005 ×3 | 426, 380 | Backlog |
+| TASK-434 | **ANM-006** da parada (AN-B → vitrine; monitor conta como olhar) | backend + frontend | ANM-006 ×3, `Anomaly/shared/StalkerPath.luau`, `AnomalyService/Vision.luau` | 423, 426, 429 | Backlog |
+| TASK-435 | **ANM-031** carro sem motorista (DRIVE) | backend + frontend | ANM-031 ×3 (novos), `Kit/CustomerActor.luau` | 414, 415, 430 | Backlog |
+| TASK-436 | **ANM-033** pet errado (2ª onda) | backend + frontend | ANM-033 ×3 (novos) | 417, 426 | Backlog |
+| TASK-437 | **ANM-008** carro comprido no DT (2ª onda) | backend + frontend | ANM-008 ×3 | 414, 424 | Backlog |
+| TASK-438 | **ANM-010** The Hush nas mesas (2ª onda) | backend + frontend | ANM-010 ×3 | 424, 426 | Backlog |
+| TASK-439 | **Sustos D reapontados** para fora; saem `grill_hiss`/`bottle_fall` | frontend-coder | `Content/Hallucinations.luau` (após 422), efeitos dos sustos | 422 | Backlog |
+| TASK-440 | **QA anomalias V3** (teste da regra 13: ≤ 3 s, 2 postos, pico de 4 pedidos; log 0 prenúncio sem anomalia; teto de 12 rigs) | qa-tester | `docs/tests/anomalies-v3.md` (novo) | 430–435 | Backlog |
+
+Conflitos da onda AV: 430 → 435 (`Kit/CustomerActor`); 424 → 429 (alavancas); 422 é dona única dos Content/Net da onda.
+
+### Detalhe — critérios de aceite (MVP)
+
+**TASK-377 (R0).** `Content.Validate` passa no boot (faixas de `Restaurant`, `HornAt` decrescente, `Dialog.Ask` cobre `bun`,
+`sausage` e todo `ToppingKeys`, `Ingredient` com limite). Play sem erro de `Lync.start()`; nenhum `keyBy`. Com `TAB-1` ausente
+o boot não exige `PU-*` (rollback). Nada de comportamento muda com o mapa antigo.
+
+**TASK-378 (R1-A).** `/dev kitchen` (ou prompts) em Play: `bun_slice` segurando 0,8 s gasta 1 `Stock.bun` e dá `bun_sliced`;
+sem estoque recusa. `grill_flip` só aparece no slot `Working` na pausa e chama `Grill.Flip`. `rail_take` dá `sausage_grilled`
+e baixa o `Count`. Com 2 grelhas, `grill_place` na `GRILL-2` põe na `GRILL-2`. `Ingredient` limita a 2 na mão. `init` do
+KitchenService intocado (`git diff` vazio nele).
+
+**TASK-379 (R1-B).** `/dev plate list|assign <npc>|fill <n>|clear`: ticket cai no slot livre de menor índice (ou no
+pré-preparado com `PreppedFirst`); `plate_put` com `bun_sliced`/`sausage_grilled`/`hot_dog` consome o Tool certo; `plate_take`
+só com pão **e** salsicha e mão livre, dá `hot_dog` com `Toppings`, `Altered` e `Ticket`, e solta o ticket; 8 tickets →
+`plates_full` no `tablet_take`. `Left` zera `Npc` e mantém o conteúdo. Sem tick no servidor.
+
+**TASK-380 (R1-C).** `Pickup.luau` com testes de tabela (join/leave/anda/cheia) rodando no `/dev pickup test`. Em Play: depois
+do pedido o cliente sai de `Q1`, a fila anda e ele vai ao fim de `PU-1..4` (`Customers.Pickup` certo); retirada cheia →
+`pickup_full` e o cliente fica no tablet; `ServeAtPickup` escolhe pelo `Ticket`, depois pelo pedido igual, senão Errado no PU-1
+(hot dog volta à mão); servido sai com `Carrying` e chama o Seater; sem mesa sai com o prato; relógio Order acabando → `Slow`
+e sai da retirada. Sem `PU-n` no mapa: comportamento antigo. `Queue.luau` sem diff.
+
+**TASK-381 (R1-D).** `/dev tablet talk|state`: `tablet_take` com cliente em `Ordering` grava `Talking`, `StartedAt`,
+`EndsAt = StartedAt + TalkBase + TalkStep × (2+K)` e pausa a paciência; no fim `TakeOrderFor` e volta a `Idle`; jogador
+saindo do raio não cancela; cliente some no meio → `Idle` sem pedido; 2º `tablet_take` durante a fala → `tablet_busy`.
+
+**TASK-382 (R1-E).** Boot sem erro do `MapIndex/Required` (todos os legados da MAP-01 r4 §11.1 + `TAB-1`, `PICKUP`, `PU-1..4`);
+`check_map01` limpo; NPC vai `Q5 → Q1 → PU-k → TBL-n → saída` pelo grafo (≤ 80 nós); prompts a ≥ 2,5 studs; o jogador não
+alcança o pátio (barreira do balcão); `restaurant_bind.luau` rodado 2× não duplica e `undo` devolve o trailer do backup;
+`Place.diff` = 0 ao entregar, o dono salva.
+
+**TASK-383 (R1-F).** Stories de `PlateTicket` e `TabletDialog` no UI Labs. Em Play: ticket aparece sobre o prato certo
+(`MaxDistance 40`), prato vazio translúcido, pão/salsicha desenhados no slot; `plate_put` só aparece com o item certo na mão e
+`plate_take` só com mão livre; quem fala no tablet vê os pop-ups na hora do servidor, os outros só o balão; nada central na tela.
+
+**TASK-384 (R1-G).** Story do `HudOrder` com `Reveal` 0→K; em Play a nota cresce item a item durante a fala, com prato na mão
+mostra o pedido do `Ticket`; ANM-001 (`Empty`) segue vazia. `HudController` sem diff.
+
+**TASK-385 (R1-H).** Com `HasBackDoor = false` nenhuma âncora da porta é criada; persiana abre/fecha a loja com o `LZ-1` novo
+(`/dev shutter`).
+
+**TASK-386 (R1-I).** `/dev seating`: com `SitAt = "Served"` o `Offer` só acontece na venda; o grupo senta, come `EatTime`,
+sai; mesa volta a Free sem sujar; gorjeta de mesa cai no pote (`TipJarService`); `SitAt = "Order"` mantém o trailer.
+
+**TASK-387 (R1-J).** Rig com `Carrying` anda com prato + `HotDogVisual` na mão; ao sentar, o prato vai à mesa; sem `Carrying`,
+nada muda.
+
+**TASK-388 (FEAT-050 server).** `/dev supply order dogs 2 buns 1|arrive|state`: pedir 3 caixas debita Σ preços + $2; sem saldo
+`not_enough_cash` e nada chega; caixas chegam à escotilha em `Eta` ± 1 s; com 1 em trânsito o telefone recusa outro; com 2
+caixas na mão `take_box` recusa; Restock transfere até a capacidade, sobra fica na caixa, vazia some; ingrediente não liberado
+não entra no menu; início da Night 1 com 1 DOGS + 1 BUNS na escotilha.
+
+**TASK-389 (FEAT-050 client).** Story do `StockMenu`; em Play o menu abre no `PHONE-R`, mostra só ingredientes liberados, "Call"
+hold 0,5 s, contador "On the way"; caixas aparecem no `DROP-R`; estação ≤ 25% pulsa e o toast sai 1× por queda. Ciclo todo
+sem sair da loja.
+
+**TASK-390.** Nenhum `prep_work` aparece; as anomalias desligadas não sorteiam numa noite inteira (`/dev anomaly list`).
+Rollback documentado: `Prep.Rules.Enabled = true` + `Restaurant.Rules.Enabled = false`.
+
+**TASK-391.** `/dev smoke` passa solo no Studio do começo ao fim (cliente sentou e saiu, venda registrada, caixa recebida) e
+imprime o passo que falhou se falhar.
+
+**TASK-392.** `Validate` passa; simulação/planilha: Day 1 solo sem `Left` na fila do tablet com o intervalo novo; a entrega
+cabe na janela de gorjeta.
+
+**TASK-393.** Jogador novo (perfil limpo) faz o tutorial inteiro no restaurante sem `/dev`; nenhum passo cita o modo focado;
+pular e retomar funcionam.
+
+**TASK-394.** Plano cobre FEAT-043..046, 048, 050 e os aceites acima; execução registra solo, 2p, 4p e mobile.
+
+### Restaurante — paralelismo e caminho crítico
+
+**Caminho crítico do MVP:** **377 → 380 → 391 → 393 → 394 (execução)**. A 380 (CustomerService, 2183 linhas) é a trilha mais
+longa de R1; a **382** (mapa) corre ao lado e precisa estar pronta antes do aceite em Play de toda R1 e da 391. 381 depende
+das APIs de 379/380 para o aceite em Play (o código anda com tipos-mock).
+
+| Grupo | Quando abre | Worktrees em paralelo (arquivos disjuntos) |
+|---|---|---|
+| **G0** | agora | 377 (em andamento) · art-director 395 · qa 394 (plano) |
+| **G1** | 377 `Em QA` | backend: **380** · 379 · 381 · 378 · 386 · 388 · 385 (7 worktrees; com 4 sessões: 380 / 379→381 / 378→385 / 386→388) · frontend: 383 · 384 · 387 · 389 · level: **382** (Studio único) · game-designer 392 · backend 390 (só Content Prep/Anomalies/Nights) |
+| **G2** | G1 + 382 | 391 (smoke) → 393 (tutorial) → 394 (execução) · modeler 396..412 em sequência no Studio |
+| **G3** (backlog R3) | MVP fechado | 413 → 414 (CustomerService) · 416 → 415 · depois 417, 418 (418 espera 414 no CustomerService) |
+| **G4** (AV) | MVP + DEC das Q-330..333 | 422 → {424, 426, 427, 428, 439} em paralelo · 423 (Studio) · 425 após 414 · depois 429, 430..434 em paralelo (430 antes de 435) · 435..438 após R3 · 440 |
+
+O que **não** pode rodar junto: 380/413/414/418/425 (mesmo `CustomerService/init.luau`); 377/422 com qualquer task que toque
+Content/Net; 382/396..412/416/423 (mesma sessão de Studio); 392 enquanto 377 está aberta (`Restaurant.luau`).
