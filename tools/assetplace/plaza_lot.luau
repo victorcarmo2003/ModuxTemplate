@@ -165,7 +165,7 @@ local function label(part, text, faceId, color, bg)
 	local g = ensure(part, "Label", "SurfaceGui")
 	g.Face = faceId
 	g.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-	g.PixelsPerStud = 50
+	g.PixelsPerStud = 200 -- owner 2026-10-17: sharper signs (was 50)
 	g.LightInfluence = 0.6
 	local t = ensure(g, "Text", "TextLabel")
 	t.Size = UDim2.fromScale(1, 1)

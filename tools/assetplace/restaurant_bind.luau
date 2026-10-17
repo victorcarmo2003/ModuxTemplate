@@ -341,7 +341,8 @@ local OVERRIDES = {
 	External = {
 		["Bin:BIN-1"] = { CF = {-78.3, 2.4998, -24.6285, 0, 0, -1, 0, 1, 0, 1, 0, 0} },
 		["Bin:BIN-2"] = { CF = {-36.5, 2.4998, -33.5285, -1, 0, 0, 0, 1, 0, 0, 0, -1} },
-		["Extra:CCTV"] = { CF = {-25.6854, 4.95, -6.7127, 0, 0, 1, 0, 1, 0, -1, 0, 0} },
+		-- re-synced 2026-10-17 (rev. 4): the owner reset the CCTV pivot to its centre (monitor on the pantry south wall, X 35.9..40.1)
+		["Extra:CCTV"] = { CF = {-37.9854, 4.85, -10.5227, 0, 0, 1, 0, 1, 0, -1, 0, 0} },
 	},
 }
 -- OVERRIDES END
@@ -645,7 +646,7 @@ local function label(part, name, text, face, textColor, bg, font)
 	local g = ensure(part, name, "SurfaceGui")
 	g.Face = face or Enum.NormalId.Front
 	g.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-	g.PixelsPerStud = 60
+	g.PixelsPerStud = 200 -- owner 2026-10-17: sharper signs (was 60)
 	g.LightInfluence = 0.6
 	g.Enabled = ART
 	local l = ensure(g, "Text", "TextLabel")
@@ -1283,13 +1284,15 @@ for i, c in { { 26, 55 }, { 59, 55 }, { 26, 71 }, { 59, 71 } } do
 	ball(shell, "RoofCorner_" .. i, c[1], ROOF_Y, c[2], 2, BODY)
 end
 box(shell, "Ceiling", 25.5, 59.5, ROOF_Y - 0.05, ROOF_Y, 54.5, 71.5, { Color = C.OffWhite, CanCollide = false, blk = C.BlkWall, art = { Color = C.OffWhite } })
--- pantry module (enlarged to X 25..50): exit door DOOR-B X 27..32 (5 x 8) and loading hatch X 44..47 (Y 3..5.5) on the south wall
+-- pantry module (enlarged to X 25..50): exit door DOOR-B X 27..32 (5 x 8) and loading hatch X 44..47 (Y 6..8, rev. 4) on the south wall
 wall("Pantry_W", 25, 25.5, 0.2, P_ROOF_Y, 72, 78)
 wall("Pantry_S_W", 26, 27, 0.2, P_ROOF_Y, 78.5, 79)
 wall("Pantry_S_DoorHead", 27, 32, 8.45, P_ROOF_Y, 78.5, 79)
 wall("Pantry_S_Mid", 32, 44, 0.2, P_ROOF_Y, 78.5, 79)
-wall("Pantry_S_HatchSill", 44, 47, 0.2, TOP - 0.03, 78.5, 79)
-wall("Pantry_S_HatchHead", 44, 47, 5.5, P_ROOF_Y, 78.5, 79)
+-- hatch raised (rev. 4, 2026-10-17): opening Y HATCH_Y..HATCH_Y + 2, DROP-R is a high wall shelf under it (see section 6)
+local HATCH_Y = 6.0
+wall("Pantry_S_HatchSill", 44, 47, 0.2, HATCH_Y - 0.03, 78.5, 79)
+wall("Pantry_S_HatchHead", 44, 47, HATCH_Y + 2.0, P_ROOF_Y, 78.5, 79)
 wall("Pantry_S_E", 47, PX1 - 1, 0.2, P_ROOF_Y, 78.5, 79)
 wall("Pantry_E", PX1 - 0.5, PX1, 0.2, P_ROOF_Y, 72, 78)
 cyl(shell, "Pantry_Corner_SW", 26, (0.2 + P_ROOF_Y) / 2, 78, 2, P_ROOF_Y - 0.2, BODY)
@@ -1383,6 +1386,13 @@ if ART then
 	skin("Skin_PN", 35.7, PX1 - 0.5, 72, 72.06, Enum.NormalId.Front)
 	skin("Skin_PW", 25.5, 25.56, 72.06, 77.2, Enum.NormalId.Left)
 	skin("Skin_PS_A", 32.2, 43.7, 78.44, 78.5, Enum.NormalId.Back)
+	-- under the raised DROP-R shelf (rev. 4): tile + trim only. The cream plates around the hatch (Skin_PS_A_Upper copies,
+	-- X 43.75..48.1, Y 4.55..5.7 / 8.25..8.6 and X 47.3..48.1 full height) are the OWNER's (2026-10-17): kept as is
+	do
+		local lo = box(shell, "Skin_PS_B_Tile", 43.7, 48.0, FLOOR, 4.45, 78.44, 78.5, { Color = C.OffWhite, CanCollide = false, CanQuery = false, art = { Color = C.OffWhite } })
+		texture(lo, "Tex_Tile", TEX.PaveLight, Enum.NormalId.Back, 1.5, Color3.fromRGB(245, 246, 248), 0, 1)
+		box(shell, "Skin_PS_B_Trim", 43.7, 48.0, 4.35, 4.6, 78.41, 78.53, { Color = C.Mustard, CanCollide = false, CanQuery = false, art = { Color = C.Mustard } })
+	end
 	skin("Skin_PE", PX1 - 0.56, PX1 - 0.5, 72.06, 77.2, Enum.NormalId.Right)
 end
 
@@ -1651,7 +1661,7 @@ end
 
 -- 6. pantry (AST-155), enlarged (owner 2026-10-17): DOOR-P 5 x 8 from the kitchen, DOOR-B 5 x 8 to the outside (DEC-282),
 -- clear walkway X 25.5..32 from one door to the other, shelves on the partition and the south wall (aisle ~4), DROP-R under the
--- loading hatch on the south wall, crates DOGS / BUNS / MUSTARD on it, HIDE-P over the whole room.
+-- loading hatch on the south wall (raised, rev. 4; the DOGS / BUNS / MUSTARD crates moved outside), HIDE-P over the whole room.
 -- Doors (2026-10-17 rev. 2): CLOSED by default, AutoDoor (src/Door/client/DoorController.luau) DOOR-P swings on its MAP-west edge
 -- (world +X = "Right" for these unrotated parts) and stops at 75 degrees so, opened into the kitchen, it misses the journal
 -- tablet on the kitchen west wall. DOOR-B is a POCKET door (DoorSlide = -4.9, world -X = MAP east, into the solid wall X 32..37):
@@ -1714,19 +1724,25 @@ do
 		local exitSign = box(doors, "DOOR-B_Sign", 27.6, 31.4, 7.4, 8.1, 78.36, 78.42, { Color = C.Teal, CanCollide = false, CanQuery = false, art = { Color = C.Teal } })
 		label(exitSign, "Label", "EXIT · MART", Enum.NormalId.Back, C.Cream)
 	end
-	-- loading hatch on the south wall (lid closed = blocks the opening), DROP-R under it
+	-- loading hatch on the south wall (lid closed = blocks the opening), DROP-R under it.
+	-- rev. 4 (2026-10-17, owner: "props too close, they get in the way of the prompts"): the hatch is RAISED (opening
+	-- Y HATCH_Y..+2) and DROP-R is a high wall shelf (top HATCH_Y, bottom 5.7 = over an R6 head) on two steel brackets, so the
+	-- floor of the aisle is free from the stock row (fronts <= 74.2) to the south wall (>= 4.2) along the WHOLE north wall.
 	local hatch = ensure(pantry, "HATCH-L", "Model")
 	hatch:SetAttribute("MapId", "HATCH-L")
 	hatch:SetAttribute("PendingTag", "SupplyHatch")
-	box(hatch, "Frame_Top", 43.75, 47.25, 5.47, 5.75, 78.36, 79.14, { Color = C.SteelDark, blk = C.BlkKey, art = { Color = C.SteelDark, Material = Enum.Material.Metal } })
-	box(hatch, "Frame_Sill", 43.75, 47.25, 2.77, TOP + 0.02, 78.44, 79.14, { Color = C.SteelDark, blk = C.BlkKey, art = { Color = C.SteelDark, Material = Enum.Material.Metal } })
-	box(hatch, "Frame_W", 43.72, 44.02, TOP + 0.02, 5.5, 78.34, 79.16, { Color = C.Mustard, blk = C.BlkKey, art = { Color = C.Mustard } })
-	box(hatch, "Frame_E", 46.98, 47.28, TOP + 0.02, 5.5, 78.34, 79.16, { Color = C.Mustard, blk = C.BlkKey, art = { Color = C.Mustard } })
-	box(hatch, "Hatch_Lid", 44.02, 46.98, TOP + 0.02, 5.5, 78.7, 78.85, { Color = C.Steel, blk = C.BlkKey, art = { Color = C.Steel, Material = Enum.Material.DiamondPlate } })
-	local drop = box(pantry, "DROP-R", 43.2, 48.2, FLOOR, TOP, 76.6, 78.42, { Color = C.Wood, blk = C.BlkKey, art = { Color = C.Wood, Material = Enum.Material.WoodPlanks } })
+	box(hatch, "Frame_Top", 43.75, 47.25, HATCH_Y + 1.97, HATCH_Y + 2.25, 78.36, 79.14, { Color = C.SteelDark, blk = C.BlkKey, art = { Color = C.SteelDark, Material = Enum.Material.Metal } })
+	box(hatch, "Frame_Sill", 43.75, 47.25, HATCH_Y - 0.23, HATCH_Y + 0.02, 78.44, 79.14, { Color = C.SteelDark, blk = C.BlkKey, art = { Color = C.SteelDark, Material = Enum.Material.Metal } })
+	box(hatch, "Frame_W", 43.72, 44.02, HATCH_Y + 0.02, HATCH_Y + 2.0, 78.34, 79.16, { Color = C.Mustard, blk = C.BlkKey, art = { Color = C.Mustard } })
+	box(hatch, "Frame_E", 46.98, 47.28, HATCH_Y + 0.02, HATCH_Y + 2.0, 78.34, 79.16, { Color = C.Mustard, blk = C.BlkKey, art = { Color = C.Mustard } })
+	box(hatch, "Hatch_Lid", 44.02, 46.98, HATCH_Y + 0.02, HATCH_Y + 2.0, 78.7, 78.85, { Color = C.Steel, blk = C.BlkKey, art = { Color = C.Steel, Material = Enum.Material.DiamondPlate } })
+	local drop = box(pantry, "DROP-R", 43.2, 48.2, HATCH_Y - 0.3, HATCH_Y, 76.6, 78.42, { Color = C.Wood, blk = C.BlkKey, art = { Color = C.Wood, Material = Enum.Material.WoodPlanks } })
 	drop:SetAttribute("MapId", "DROP-R")
+	for i, x in { 43.6, 47.8 } do
+		box(pantry, "DROP-R_Bracket" .. i, x - 0.08, x + 0.08, HATCH_Y - 1.1, HATCH_Y - 0.15, 77.5, 78.4, { Color = C.SteelDark, CanCollide = false, CanQuery = false, blk = C.BlkProp, art = { Color = C.SteelDark, Material = Enum.Material.Metal } })
+	end
 	for i, x in { 44.4, 45.8, 47.2 } do
-		attach(drop, "HatchSpot" .. i, F(x, TOP + 1.0, 77.4))
+		attach(drop, "HatchSpot" .. i, F(x, HATCH_Y + 1.0, 77.4))
 	end
 	-- STOCK ROOM rev. 3 (2026-10-17, owner: "every ingredient on ONE side of the pantry, in a row, themed like the Mart").
 	-- North partition only (X 31..43.05, backs at Z 72.15, fronts <= 74.2: aisle >= 4.2 to the south wall, the wall in
@@ -1738,7 +1754,7 @@ do
 	-- The three meshes face local +Z (doors / shelf lips), so the pivot looks MAP north (world +Z) and the front faces the aisle.
 	-- Contract for the code (unchanged): one Model per Content.Packages key under StockBays, tag StockShelf, Package = the key,
 	-- MapId STOCK-<KEY>, an Attachment Prompt_TakeBox (Package, PromptAction take_box) 0.5 in front of its section, staggered
-	-- in height so two prompts stay >= 1.4 apart, and a part named Sign (the client's "xN" pill sits over it). Every box carries
+	-- in height so two prompts stay >= 2.5 apart (rev. 4; was 1.4), and a part named Sign (the client's "xN" pill sits over it). Every box carries
 	-- the AST-071 Ingredient/<key> icon (Interface/Components/Icons) on its aisle face. Sign band y 6.2..7.1 on the partition
 	-- (over the fridge top 5.7), unit headers y 7.35..8.05. The rev. 2 posts / boards / boxes go to TrailerBackup.Retired.
 	local SHEET = "rbxassetid://75974795918833" -- AST-071 icon sheet
@@ -1750,7 +1766,7 @@ do
 		local g = ensure(part, "Icon", "SurfaceGui")
 		g.Face = faceId
 		g.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-		g.PixelsPerStud = 80
+		g.PixelsPerStud = 200 -- owner 2026-10-17 (was 80)
 		g.LightInfluence = 0.6
 		g.Enabled = ART
 		local img = ensure(g, "Image", "ImageLabel")
@@ -1767,18 +1783,37 @@ do
 	local function stroke(textLabel)
 		local st = textLabel:FindFirstChild("Stroke") or Instance.new("UIStroke")
 		st.Name = "Stroke"
-		st.Thickness = 3
+		st.Thickness = 10 -- 3 px at the old 60 PPS = same width in studs at 200 PPS
 		st.Color = C.Ink
 		st.Parent = textLabel
 	end
 	local Z_BACK = 72.15
 	local Z_SIGN0, Z_SIGN1 = 72.15, 72.25
-	local UNITS = { -- name, cached asset, MAP x0, uniform scale, header text, header colour
-		{ "Freezer", "AST-107_MeatCase", 31.0, 0.65, "FREEZER", C.Teal },
-		{ "Fridge", "AST-030_FridgeDisplayShelves", 34.15, 0.75, "FRIDGE", Color3.fromRGB(70, 140, 200) },
-		{ "DryShelf", "AST-029_GondolaBoxesBare", 37.3, 0.75, "DRY GOODS", Color3.fromRGB(205, 150, 40) },
-		{ "SauceShelf", "AST-029_GondolaBoxesBare", 40.8, 0.5, "SAUCES", C.Ketchup },
+	-- rev. 4 (2026-10-17): the four units are spread over the WHOLE north wall of the enlarged pantry (X 30.85..49.35, equal
+	-- gaps ~1 between units and at the ends), the sauce gondola grows to x0.75 (two columns like the dry one), and the nine
+	-- prompts alternate two heights (PROMPT_LO / PROMPT_HI over the floor) so any two are >= 2.5 apart in 3D (min ~2.75).
+	local UNITS = { -- name, cached asset, MAP x0 (filled below), uniform scale, header text, header colour
+		{ "Freezer", "AST-107_MeatCase", 0, 0.65, "FREEZER", C.Teal },
+		{ "Fridge", "AST-030_FridgeDisplayShelves", 0, 0.75, "FRIDGE", Color3.fromRGB(70, 140, 200) },
+		{ "DryShelf", "AST-029_GondolaBoxesBare", 0, 0.75, "DRY GOODS", Color3.fromRGB(205, 150, 40) },
+		{ "SauceShelf", "AST-029_GondolaBoxesBare", 0, 0.75, "SAUCES", C.Ketchup },
 	}
+	do
+		local WALL_X0, WALL_X1 = 30.85, PX1 - 0.65
+		local sizes, sum = {}, 0
+		for i, u in UNITS do
+			local tpl = CACHE and CACHE:FindFirstChild(u[2])
+			local size = if tpl then select(2, tpl:GetBoundingBox()) else Vector3.new(4, 4, 2)
+			sizes[i] = size.X * u[4]
+			sum += sizes[i]
+		end
+		local gap = (WALL_X1 - WALL_X0 - sum) / (#UNITS + 1)
+		local x = WALL_X0 + gap
+		for i, u in UNITS do
+			u[3] = x
+			x += sizes[i] + gap
+		end
+	end
 	local units = folder(pantry, "StockUnits")
 	local U = {} -- unit name -> { x0, x1, cx, cz, front, top, s }
 	for _, u in UNITS do
@@ -1842,16 +1877,20 @@ do
 	local fz, fr, dr, sa = U.Freezer, U.Fridge, U.DryShelf, U.SauceShelf
 	local fMid, rMid, sMid = (fz.x0 + fz.x1) / 2, (fr.x0 + fr.x1) / 2, sa.cx
 	local col = 0.94 * dr.s / 0.75 -- dry gondola column step (1.25 unscaled)
+	local scol = 0.94 * sa.s / 0.75 -- sauce gondola column step
+	-- prompt heights over the floor (world Y ~2.25 / ~4.6): low = waist, high = eye level; neighbours alternate
+	local LO, HI = 1.8, 4.15
 	local ITEMS = {
-		{ "pack_sausages", "sausage", "DOGS", "Freezer", fz.x0, fMid, 2.2, Color3.fromRGB(196, 74, 52), freezerBoxes(fz.x0 + 0.25, fMid) },
-		{ "pack_bacon", "bacon", "BACON", "Freezer", fMid, fz.x1, 2.2, Color3.fromRGB(190, 70, 90), freezerBoxes(fMid, fz.x1 - 0.25) },
-		{ "pack_cheese", "cheese", "CHEESE", "Fridge", fr.x0, rMid, 3.2, Color3.fromRGB(240, 150, 30), fridgeBoxes(fr.x0 + 0.27, rMid - 0.1) },
-		{ "pack_cream_cheese", "cream_cheese", "CREAM\nCHEESE", "Fridge", rMid, fr.x1, 3.2, Color3.fromRGB(70, 140, 200), fridgeBoxes(rMid + 0.1, fr.x1 - 0.27) },
-		{ "pack_buns", "bun", "BUNS", "DryShelf", dr.x0, dr.cx - col / 2, 3.7, Color3.fromRGB(214, 150, 72), gondolaBoxes("DryShelf", dr.cx - col, 0.8, 1.0, 0.5), dr.cx - col },
-		{ "pack_potato_sticks", "potato_sticks", "POTATO\nSTICKS", "DryShelf", dr.cx - col / 2, dr.cx + col / 2, 2.3, Color3.fromRGB(205, 150, 40), gondolaBoxes("DryShelf", dr.cx, 0.8, 1.0, 0.5), dr.cx },
-		{ "pack_coffee", "coffee", "COFFEE", "DryShelf", dr.cx + col / 2, dr.x1, 3.7, Color3.fromRGB(110, 70, 45), gondolaBoxes("DryShelf", dr.cx + col, 0.8, 1.0, 0.5), dr.cx + col },
-		{ "pack_ketchup", "ketchup", "KETCHUP", "SauceShelf", sa.x0, sMid, 2.0, C.Ketchup, gondolaBoxes("SauceShelf", sMid - 0.5, 0.85, 0.75, 0.3), sMid - 0.5 },
-		{ "pack_mustard", "mustard", "MUSTARD", "SauceShelf", sMid, sa.x1, 3.0, Color3.fromRGB(222, 168, 20), gondolaBoxes("SauceShelf", sMid + 0.5, 0.85, 0.75, 0.3), sMid + 0.5 },
+		{ "pack_sausages", "sausage", "DOGS", "Freezer", fz.x0, fMid, LO, Color3.fromRGB(196, 74, 52), freezerBoxes(fz.x0 + 0.25, fMid) },
+		{ "pack_bacon", "bacon", "BACON", "Freezer", fMid, fz.x1, HI, Color3.fromRGB(190, 70, 90), freezerBoxes(fMid, fz.x1 - 0.25) },
+		{ "pack_cheese", "cheese", "CHEESE", "Fridge", fr.x0, rMid, LO, Color3.fromRGB(240, 150, 30), fridgeBoxes(fr.x0 + 0.27, rMid - 0.1) },
+		{ "pack_cream_cheese", "cream_cheese", "CREAM\nCHEESE", "Fridge", rMid, fr.x1, HI, Color3.fromRGB(70, 140, 200), fridgeBoxes(rMid + 0.1, fr.x1 - 0.27) },
+		-- dry: the two low prompts (buns / coffee) sit at the outer edges of their columns so they stay >= 2.5 apart
+		{ "pack_buns", "bun", "BUNS", "DryShelf", dr.x0, dr.cx - col / 2, LO, Color3.fromRGB(214, 150, 72), gondolaBoxes("DryShelf", dr.cx - col, 0.8, 1.0, 0.5), dr.x0 + 0.35 },
+		{ "pack_potato_sticks", "potato_sticks", "POTATO\nSTICKS", "DryShelf", dr.cx - col / 2, dr.cx + col / 2, HI, Color3.fromRGB(205, 150, 40), gondolaBoxes("DryShelf", dr.cx, 0.8, 1.0, 0.5), dr.cx },
+		{ "pack_coffee", "coffee", "COFFEE", "DryShelf", dr.cx + col / 2, dr.x1, LO, Color3.fromRGB(110, 70, 45), gondolaBoxes("DryShelf", dr.cx + col, 0.8, 1.0, 0.5), dr.x1 - 0.35 },
+		{ "pack_ketchup", "ketchup", "KETCHUP", "SauceShelf", sa.x0, sMid, HI, C.Ketchup, gondolaBoxes("SauceShelf", sMid - scol, 0.8, 1.0, 0.5), sMid - scol },
+		{ "pack_mustard", "mustard", "MUSTARD", "SauceShelf", sMid, sa.x1, LO, Color3.fromRGB(222, 168, 20), gondolaBoxes("SauceShelf", sMid + scol, 0.8, 1.0, 0.5), sMid + scol },
 	}
 	local bays = folder(pantry, "StockBays")
 	local retiredBay = nil
@@ -1981,11 +2020,13 @@ if extra then
 		t:SetAttribute("TableGroup", "Restaurant")
 	end
 	L("tables placed: " .. math.min(#tables, 4))
-	-- crates DOGS / BUNS / MUSTARD -> pantry, one on DROP-R, two on the floor beside it
+	-- crates DOGS / BUNS / MUSTARD (decor only, no gameplay): rev. 4 (2026-10-17, owner: they sat on DROP-R in the way of the
+	-- stock prompts) -> OUT of the pantry, the service nook east of it (sidewalk Y 0.4, against the kitchen back wall Z 72,
+	-- clear of the breaker approach X <= 52.5 and of Jack_3 at X 57.2..58): two stacked + one in front, slightly turned
 	local crates = {
-		Crate_1 = face(F(44.5, TOP, 77.5), DIR.N), -- on DROP-R, under the hatch
-		Crate_2 = face(F(46.95, TOP, 77.5), DIR.N),
-		Crate_3 = face(F(46.95, TOP + 2.0, 77.5), DIR.N), -- stacked
+		Crate_2 = face(F(54.2, 0.4, 73.5), DIR.N),
+		Crate_3 = face(F(54.2, 2.4, 73.5), DIR.N) * CFrame.Angles(0, math.rad(8), 0), -- stacked on Crate_2
+		Crate_1 = face(F(54.7, 0.4, 76.05), DIR.N) * CFrame.Angles(0, math.rad(-10), 0),
 	}
 	for n, cf in crates do
 		local c = extra:FindFirstChild(n)
@@ -2486,6 +2527,8 @@ local RETIRED = {
 	"TRL/Pantry/LOCK-P", "TRL/Pantry/Shelf1", "TRL/Pantry/Shelf2", "TRL/Pantry/Shelf_N3", "TRL/Pantry/HATCH-L/Frame_N", "TRL/Pantry/HATCH-L/Frame_S",
 	-- rev. 2 (2026-10-17): mixed shelves replaced by the StockShelf bays (one per package)
 	"TRL/Pantry/Shelf_N1", "TRL/Pantry/Shelf_N2", "TRL/Pantry/Shelf_E1", "TRL/Pantry/Shelf_S1", "TRL/Pantry/Shelf_S2",
+	-- rev. 4 (2026-10-17): first pass of the skin under the raised DROP-R; the owner's plate covers that band
+	"TRL/Shell/Skin_PS_B_Upper",
 }
 if not DIFF then
 	local retired = nil
