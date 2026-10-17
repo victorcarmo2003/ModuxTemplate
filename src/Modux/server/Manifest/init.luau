@@ -49,6 +49,7 @@ local ShopService = require(ServerScriptService.server.ModuxTypes.ShopService)
 local ShopUtilityService = require(ServerScriptService.server.ModuxTypes.ShopUtilityService)
 local ShowcaseService = require(ServerScriptService.server.ModuxTypes.ShowcaseService)
 local SkinService = require(ServerScriptService.server.ModuxTypes.SkinService)
+local SupplyService = require(ServerScriptService.server.ModuxTypes.SupplyService)
 local TabletService = require(ServerScriptService.server.ModuxTypes.TabletService)
 local ThiefService = require(ServerScriptService.server.ModuxTypes.ThiefService)
 local TrafficService = require(ServerScriptService.server.ModuxTypes.TrafficService)
@@ -107,6 +108,7 @@ export type AllServices = {
 	ShopUtilityService: ShopUtilityService.Public,
 	ShowcaseService: ShowcaseService.Public,
 	SkinService: SkinService.Public,
+	SupplyService: SupplyService.Public,
 	TabletService: TabletService.Public,
 	ThiefService: ThiefService.Public,
 	TrafficService: TrafficService.Public,

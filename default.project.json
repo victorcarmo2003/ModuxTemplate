@@ -466,6 +466,12 @@
 						"optional": "src/Skin/server"
 					}
 				},
+				"Supply": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Supply/server"
+					}
+				},
 				"Tablet": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
