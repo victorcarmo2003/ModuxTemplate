@@ -149,6 +149,26 @@ Caminhos dos packs (abreviados nas fichas):
 | AST-119 | Modo de preparo: vinheta do foco e entalhe de aba | ui | P2 | 2D | — | Rascunho (TASK-187) |
 | AST-120 | Grill plate (bar grill, 8 slots) — grelha de barras que substitui o AST-012 | equipment | P0 | Modelar | inspiração de forma só (sem cópia): `user/references/`; original, atlas KayKit `restaurantbits_texture` | Rascunho (modelo entregue, não enviado) |
 | AST-121 | Tip jar (pote de gorjetas) — vidro com borda de aço e etiqueta "TIPS" que ENCHE de notas verdes e moedas Mustard conforme as gorjetas se acumulam; substitui o caixa/POS do trailer (decisão do usuário 2026-10-13, DEC-239) | equipment | P0 | Modelar | **feito com Parts, sem malha nova** (`tools/assetplace/trailer_tipjar.luau`): cilindro de vidro Ø1,1 x 1,2 (Transparency 0,45), base e 10 blocos de borda Steel, etiqueta Cream com texto Ink "TIPS" virada para o cliente, `Fill_Volume` invisível 0,9 x 1,0 x 0,9, `Value_Anchor` e `Prompt_Collect`. MapId `TRL-TIPJAR`. Notas = Part 0,5 x 0,02 x 0,25 verde-nota `#6FB26B`, moedas = cilindro 0,04 x 0,3 Mustard, desenhadas no client (`EconomyController/TipJar.luau`, até `Content.TipJar.MaxBills`). Versão em malha (candidato CC0: `Assets/KitchenPack/Assets/fbx/jar_*`, KayKit, ver credits.md) fica para depois do upload | Rascunho (Provisório) |
+| AST-123 | Skins de classe, lote Halloween: folhas de roupa Day/Mid/Night, atlas e cabeças por skin (TASK-373) | character | P1 | 2D (textura sobre o rig AST-053) | `Assets/textures/character/skins/T_Skin_<Nome>{,Atlas,Head}_<Dia>.png` (6 skins × 3 packs) | Rascunho (entregue e enviado; ficha registrada 2026-10-17, TASK-395) |
+| AST-124 | Skins de classe: ícones 512 e arte dos círculos da loja (TASK-373) | ui | P1 | 2D + render | `Assets/textures/ui/shop/skin_*` (`tools/icons/skin_icons.py`) | Rascunho (entregue e enviado; ficha registrada 2026-10-17, TASK-395) |
+| ~~AST-125~~ … ~~AST-139~~ | ~~reserva do restaurante na rev. 2 do MAP-01 r4~~ | — | — | — | — | **Não usar** (IDs queimados: citados em docs antigos; renumerados para AST-140..156, TASK-395) |
+| AST-140 | Restaurante: casca modular (paredes rosadas, platibanda, telhado, piso) + despensa | building | P0 | Pack + edição | `KP/wall*.fbx`, `KP/pillar_A.fbx`, `KP/floor_kitchen*.fbx`, `CC/detail-awning-wide.fbx`; platibanda e telhado modelados | Rascunho |
+| AST-141 | Restaurante: balcão corrido com abertura e montantes | equipment | P0 | Pack + edição | `KP/kitchencounter_straight_A.fbx` / `_B.fbx`, `KP/pillar_B.fbx`; persiana AST-103 (34 × 4) | Rascunho |
+| AST-142 | Restaurante: tablet de pedido em suporte giratório (`TAB-1`) | equipment | P0 | Modelar | — (nenhum pack tem tablet) | Rascunho |
+| AST-143 | Restaurante: ponto de retirada PICKUP (bandeja + campainha + placa) | equipment | P0 | Pack + edição | placa = AST-106 pendurada (recolor); bandeja e campainha modeladas | Rascunho |
+| AST-144 | Restaurante: mesa de montagem inox com 8 marcas | equipment | P0 | Pack + edição | `KP/kitchencounter_straight_A.fbx` × n recolor Steel; marcas = `AST-019_QueueMark` | Rascunho |
+| AST-145 | Restaurante: prato-slot meio transparente (`PLATE-1..8`) | equipment | P0 | Pack | `KP/plate.fbx` (escala + Transparency) | Rascunho |
+| AST-146 | Restaurante: janela do drive-thru + placa DRIVE-THRU | building | P1 · R3 | Pack + edição | `KP/wall_orderwindow.fbx`; persiana AST-103 (4 × 4); placa AST-106 de parede | Rascunho |
+| AST-147 | Restaurante: computador do drive-thru (`DT-PC`) | equipment | P1 · R3 | Pack + edição | POS do AST-020 (J-Toastie, CC-BY 3.0, crédito já em `credits.md`) + headset modelado | Rascunho |
+| AST-148 | Restaurante: kit da pista do drive-thru (meio-fio, ilha, setas, `DT-MENU`) | street | P1 · R3 | Pack + edição | `CR/road-straight.fbx`, `CR/road-side-entry.fbx`, `CR/road-side-exit.fbx`, `CR/road-bend.fbx`, `CR/road-sign-empty.fbx` | Rascunho |
+| AST-149 | Restaurante: cerca baixa do pátio + arco do portão | street | P1 | Pack + edição | `CS/fence-low.fbx` / `CS/fence-1x4.fbx` recolor; arco com `KP/pillar_A.fbx` | Rascunho |
+| AST-150 | Restaurante: luminária de mesa (guarda-sol com lâmpada, `LIT-T1..4`) | street | P1 | Pack + edição | `CC/detail-parasol-b.fbx` (alt. `-a`, já usado no AST-026) + lâmpada modelada | Rascunho |
+| AST-151 | Restaurante: disjuntor de parede (`BRK-K`) | equipment | P1 | Pack + edição | alavanca do AST-039 sobre caixa nova | Rascunho |
+| AST-152 | Restaurante: válvula de gás de parede (`GAS-1`) | equipment | P1 | Modelar | — | Rascunho |
+| AST-153 | Restaurante: interruptor de parede (`KSW`, `R-OPEN`) | equipment | P1 | Pack (projeto) | `Assets/models/equipment/AST-039_LightSwitch.fbx` (Aprovado, DEC-140) sem mudar a malha | Rascunho |
+| AST-154 | Restaurante: van de entrega com porta lateral | vehicle | P1 · R3 | Pack + edição | `Assets/models/vehicle/AST-035_CarVan.fbx` (`CK/van.fbx`) com `Door_Side` separada | Rascunho |
+| AST-155 | Restaurante: despensa (estantes, porta com janelinha e tranca, escotilha de carga, `DROP-R`) | equipment | P0 | Pack + edição | `MM/shelf-boxes.fbx`, `KP/door_A.fbx`, `KP/crate.fbx`; escotilha e tranca modeladas | Rascunho |
+| AST-156 | Restaurante: pisos (ladrilho da cozinha, pavers do pátio, faixa da pista) | building | P1 | Pack (sem atlas novo) | `KP/floor_kitchen.fbx`, `KP/floor_kitchen_small.fbx`, `AST-032` (`Pad_Tile`), `CR/tile-low.fbx` | Rascunho |
 
 Totais: **77 IDs**, **76 fichas ativas** (AST-001 a AST-038 existentes, revistas; AST-039 a AST-075 da 1ª conciliação; AST-076 e AST-077 da 2ª revisão; **AST-077 Obsoleto** por DEC-130).
 Usam pack: **25** (4 direto, 21 com edição). Plataforma R6 + acessórios: **9**. Modelar / 2D / animação do zero: **43**. (DEC-138: AST-017, 018, 019, 024 passaram de Modelar para Pack + edição; antes 21 / 47.) DEC-140: AST-025 passou de Modelar para Pack + edição ("Trashcan" by Kenney via Poly Pizza, fora dos packs de `Assets/`) — usam pack **26** (4 / 22); Modelar **42**.
@@ -156,6 +176,7 @@ Usam pack: **25** (4 direto, 21 com edição). Plataforma R6 + acessórios: **9*
 **2026-10-10 (pedido do usuário):** ficha nova **AST-098** (bancada de feira do Mart, Rascunho) e modelo novo do **AST-042** (telefone de mesa de disco), ambos de Poly Pizza; licenças em `credits.md`. Totais: **98 IDs**, **97 fichas ativas**.
 **2026-10-11 (Mart v2, MAP-01 §18.9):** fichas novas **AST-103 a AST-107** (Rascunho), modelos entregues pelo modeler-3d (Blender headless). Os FBX `AST-099` a `AST-102` em `Assets/import/` (rodada de sourcing do mesmo dia) ainda não têm ficha aqui.
 **2026-10-12 (modo de preparo focado, TASK-187, DEC-223):** fichas novas **AST-108 a AST-119** (12 sprites 2D de UI, todas **Rascunho**; seção "Modo de preparo: sprites 2D" antes de "Fora desta lista"; spec em `prep-ui-spec.md` §15). Próximo ID livre: **AST-122** (AST-120 usado em 2026-10-12, AST-121 em 2026-10-13, ver fichas).
+**2026-10-17 (TASK-395, restaurante, DEC-269 a DEC-280):** colisão de ID resolvida. **AST-123/124 ficam com as skins** (TASK-373: já estão em `Content.Skins.Ref`, `SkinLooks.luau`, `skin_icons.py` e no Roblox) e ganham ficha aqui. A reserva AST-123..139 do MAP-01 r4 rev. 2 não pode ser mantida (123/124 ocupados) e **AST-125..139 ficam queimados** (citados em docs e no board antes da troca; não reaproveitar). Assets do restaurante = **AST-140 a AST-156** (grep `AST-1[2-9][0-9]` no repo inteiro, `src/`, `tools/`, `docs/` e nomes em `Assets/`: o maior ID citado era AST-139). **AST-122 segue livre** (nunca usado; fica como lacuna para não partir a faixa do restaurante). Os FBX `AST-099` a `AST-102` em `Assets/import/` continuam sem ficha (não reaproveitar). Próximo ID livre depois da faixa: **AST-157**.
 Mapeamento Kenney/KayKit por ficha (DEC-136, Rascunho): `asset-sourcing.md`. As entradas "→ sourcing:" na coluna "Arquivo de pack" vêm de lá; Origem e Status não mudaram.
 **DEC-137 (2026-10-09):** comida aprovada — AST-001 a AST-011 e AST-061 em **Aprovado**, com o candidato do sourcing como arquivo de origem (fila do `modeler-3d`). Demais fichas seguem Rascunho. `Q-133` (limite de atlases) segue aberta.
 **DEC-138 (2026-10-10):** equipamentos aprovados após o teste em `workspace.__ImportTest_Equip` — AST-014, 015, 017, 018, 019, 024, 040, 041, 049 em **Aprovado** com o candidato KP/MM como origem (partes sem candidato seguem para modelar no estilo). Banqueta `KP/chair_stool` com **assento plano** em todo uso. **AST-012**: candidato fogão KayKit **recusado**; vira **roller grill** modelada (Steel + painel Ketchup, sem marca), Aprovado na direção; silhueta em reescrita pelo art-director; níveis em `Q-134`.
@@ -1713,6 +1734,221 @@ Regras comuns:
 2. **P1:** AST-114 a AST-118 (cursores, partículas, tábua, retratos, selos de entrega).
 3. **P2:** AST-119.
 Aceite de revisão (art-director): escala de cinza legível, contraste de texto, contorno e paleta do AST-071, nomes `Prep/<grupo>/<nome>`, tamanho dentro do orçamento da folha, nenhum vermelho de alerta, nenhuma marca ou arte de outro jogo.
+
+## Skins de classe (`character`, `ui`) — AST-123 e AST-124 (TASK-373, 2026-10-17)
+
+Fichas registradas depois da entrega (TASK-395 achou o ID usado em `design/skins-proposal.md` e no código sem ficha aqui). Regras de estilo: skin é **só textura** sobre o rig AST-053 (DEC-148, DEC-150, DEC-164), sem malha nova no lote 1; tom "fantasia de Halloween do food truck", nunca sangue nem susto real; nenhuma cor reservada do style guide §2.4 (o vinho do vampiro não é o vermelho de alerta).
+
+### AST-123 — Folhas de roupa, atlas e cabeças das skins (lote Halloween)
+
+- **Status:** Rascunho (entregue e enviado pela TASK-373; texto da ficha sem DEC) · **Prioridade:** P1 · **Origem:** 2D sobre o rig existente (`tools/assetplace/gen_skin_textures.py`).
+- **Peças:** por skin (`Pumpkin`, `Ghost`, `Witch`, `Franken`, `Vampire`, `Skeleton`) e por pack (`Day`, `Mid`, `Night`, DEC-166): `T_Skin_<Nome>_<Pack>` (roupa: boné, camisa de manga comprida, calça, avental, emblema, luvinhas), `T_Skin_<Nome>Atlas_<Pack>` (orelhas, cauda, boné de orelha em pé) e, só nas skins com pelo próprio (Ghost, Witch, Franken, Skeleton), `T_Skin_<Nome>Head_<Pack>`. Pasta `Assets/textures/character/skins/`, ids em `_texture_ids.json`, prancha `_board.png`.
+- **Uso:** `Content.Skins[*].Ref = "AST-123"`, folhas ligadas em `src/Crew/shared/SkinLooks.luau`.
+- **Orçamento:** mesma resolução das folhas da crew (`T_Crew_Uniform_*`); memória dentro de `Q-144` (g). Nenhum tri novo.
+
+### AST-124 — Ícones das skins e arte dos círculos da loja
+
+- **Status:** Rascunho (entregue e enviado pela TASK-373) · **Prioridade:** P1 · **Origem:** render + 2D (`tools/icons/skin_icons.py`).
+- **Peças:** ícone 512² por skin (imagem do Developer Product no Creator Hub) e arte do círculo da fileira `ClassSelect/SkinRow`, em `Assets/textures/ui/shop/skin_*`; CSV `docs/monetization/skins.csv`.
+- **Regra:** silhueta da cabeça da classe + cor do `Swatch`; selo LIMITED vem da UI (AST-091), não pintado no ícone.
+
+---
+
+## Restaurante do MAP-01 r4 — AST-140 a AST-156 (TASK-395, 2026-10-17)
+
+Fonte espacial: `levels/MAP-01-r4-restaurant.md` rev. 2 (§5, §12; coordenadas `(X; Z)`, alturas Y do chão do lote). Decisões: DEC-269 (prédio pequeno, piso claro, paredes rosadas, mesas de piquenique), DEC-270/271 (tablet, prato-slot com BillboardGui), DEC-272 (estações), DEC-274 (drive-thru), DEC-276 (caixas, telefone, van), DEC-280 (1 tablet, balcão inteiro, ninguém sai). Tudo **Rascunho**; nada vai ao `modeler-3d` sem DEC do usuário (TASK-396..412 dependem dela).
+
+**Renumeração:** a rev. 2 do MAP-01 r4 reservou AST-123..139, mas AST-123/124 já eram das skins. A faixa do restaurante passa a ser **AST-140..156** na mesma ordem (123→140, 124→141, …, 139→156). AST-125..139 ficam queimados.
+
+**Reaproveitado sem ficha nova** (MAP-01 r4 §12.1): mesas e arbustos `AST-100_PicnicTable` / `AST-100_PlanterBushes`; estações AST-120 ×2, AST-018, AST-015, AST-014 ×2, AST-017 ×2 (variante de 5 de largura), AST-025, AST-022; pote AST-121; persianas = variantes do **AST-103** (`AST-103_RollerShutter` esticada: 34 × 4 para o `SHUT-1`, 4 × 4 para o `SHUT-DT`; ripas somam, não escalar a ripa); letreiro CORNER DOGS e caixas DOGS/BUNS/MUSTARD do place; telefone AST-042 (`Phone_Trailer`) no `PHONE-R`; coifa `KP/extractorhood`; cafeteira AST-022; linhas de parada AST-093.
+
+### Regras do kit
+
+- **Estilo:** toy low-poly com atlas (style guide §1.1). Peça de pack sem edição fica no atlas do pack; peça editada ou modelada vai para o atlas KayKit `restaurantbits_texture` (como AST-103..107, AST-120) ou `T_Palette_SH`. **Nenhum atlas de cor novo** (meta de 3, teto 4: §9.2). Texto (PICK UP, DRIVE-THRU, menu, OPEN) = `SurfaceGui`/decal da folha AST-072, nunca modelado.
+- **Paleta do restaurante (Provisória, falta linha no style guide §2.2 — documento Aprovado, só com DEC):** paredes **Rosé** `#EDB7B4` → `#C98C8E` (Sat ~55%, decorativo; distinta do Peach `#F2B8A0` dos apartamentos pelo matiz mais frio e por estar ao lado do Cream); rodapé e montantes Cream; platibanda Cream com faixa Ketchup (continuidade da marca do carrinho); telhado `#4B4F63`; piso da cozinha xadrez Off-white `#F1EEE6` / Steel claro (herdeiro do xadrez do trailer, mais claro: DEC-269 "piso claro"); pátio em pavers `#CFC8B8`. **Interativo** (tablet, PICKUP, pratos, disjuntor, válvula, interruptor, puxadores) em Sat ~85% com acento **Mustard** ou **Teal**; decorativo nunca Mustard puro.
+- **Leitura:** do `R-GATE` lê-se, sem girar a câmera, pote (esquerda) · PICKUP (meio-esquerda, placa pendurada Mustard) · tablet (direita, tela clara) contra o rosa. Cada peça interativa tem um detalhe saturado que aparece **no escuro** (Neon pequeno ou faixa Mustard), como o AST-039.
+- **Pivô:** base-centro para tudo que fica no chão ou no tampo; **costas-centro** (`Att_Mount` na face que encosta) para peças de parede (AST-151/152/153, placas). Frente = lado que o jogador usa: −Z (LookVector) no Roblox. Peças móveis com pivô no eixo (alavanca, volante, tampa, porta). 1 unidade do Blender = 1 stud.
+- **Binding:** o nome da Part/Model no place é o `MapId` do MAP-01 r4 (`TAB-1`, `PICKUP`, `PLATE-n`…); o asset entra **dentro** do Model do blockout trocando a Part, sem mudar tag/atributo (TASK-396..412). Attachments com os nomes do style guide §8.
+- **Colisão:** malha `CanCollide = false` quando complexa; colisores Parts simples por cima (parede invisível do balcão Y 3..7 só para personagem fica no blockout, não no asset). Decorativo: `CanQuery`/`CanTouch` false, `CollisionFidelity = Box`.
+- **Orçamento do conjunto (mobile, §9):**
+
+| Bloco | Alvo | Teto | Nota |
+|---|---|---|---|
+| Prédio montado sem estações (AST-140, 141, 144, 145 ×8, 146, 151–153, 155, 156 cozinha) | 9.000–13.000 | **16.000** | = teto do Food Trailer montado, que ele substitui |
+| Estações reaproveitadas | ~7.000 | — | já aprovadas; contam no quadro, não neste teto |
+| Pátio (4 mesas, 4 arbustos, cerca, arco, 4 luminárias, pavers) | 5.000–7.000 | 9.000 | |
+| Drive-thru (AST-147, 148) + van AST-154 | 3.000–4.500 | 6.000 | só entra com a R3 |
+| **Malhas únicas novas** (MeshId) da faixa inteira | ≤ 30 | 40 | mapa: alvo 130, teto 160 |
+| Instâncias novas (MeshPart + Part) | ≤ 350 | 450 | repetir módulos, não fatiar |
+| Texturas novas | 0 | 0 | tudo no atlas existente + `SurfaceGui` |
+| Luzes locais | 10 (MAP-01 r4 §9) | 18 | sombra só em 2 |
+
+- `RenderFidelity = Automatic`; sem LOD manual. Peças decorativas longe (cerca, arco, pista do DT): `Performance`.
+
+### AST-140 — Casca modular do restaurante + despensa
+
+- **Status:** Rascunho · **Prioridade:** P0 · **Origem:** Pack + edição. Paredes `KP/wall.fbx`, `KP/wall_half.fbx`, `KP/wall_doorway.fbx` (vão interno para a despensa), `KP/wall_window_closed.fbx` (fundo e laterais, opcional), quinas `KP/pillar_A.fbx`, piso `KP/floor_kitchen.fbx` (AST-156); toldo da fachada opcional `CC/detail-awning-wide.fbx`. **Modelar só:** platibanda (frisos Cream + faixa Ketchup) e telhado plano (laje + rufo), em módulos.
+- **Medidas (studs):** prédio externo X 25..60, Z 54..72 (**35 × 18**), paredes 0,5, **pé-direito 10**, telhado ~11,5 (laje 10..10,6 + platibanda até 11,5). Interior 34 × 17. Despensa anexa X 25..34, Z 72..79 (**9 × 7**), interior 8 × 5,5, mesmo pé-direito. Portas internas 3,5 × 7,5. Fachada norte = **sem parede** de Y 3,0 a 7,0 de ponta a ponta (o balcão AST-141 ocupa); acima de 7,0 uma viga-lintel Cream até 10.
+- **Módulo:** parede em módulos de **5,5 × 10 × 0,5** (6 por fachada longa + ajuste de 2 de largura) e meia-parede **5,5 × 3,0** para baixo do balcão se o KP não fechar; escala uniforme do KP (não esticar só uma eixo além de ±15%, senão o chanfro deforma; nesse caso remodelar o módulo no estilo).
+- **Silhueta:** caixote baixo e largo com platibanda reta e uma faixa Ketchup que corre a fachada toda; o letreiro CORNER DOGS do place (Y 12–15) é o único volume acima da platibanda. Lê "lanchonete de esquina", não "casa".
+- **Cores:** externo Rosé com rodapé Cream; interno Rosé claro na metade de cima e azulejo Off-white até Y 4 (faixa no atlas, sem textura nova); telhado `#4B4F63`.
+- **Encaixes:** `Att_SignCD` (42,5; 54) Y 12, `Att_OpenNeon` (28; 54,2) Y 7,5, `Light_K1..K3` (teto da cozinha, LZ-1), `Light_P` (despensa, LZ-P), `Mount_Hatch` (vão X 25, Z 74..77, peitoril 3,0), `Mount_DoorP` (vão X 26..29,5 na parede Z 72), `Mount_DTWin` (parede X 60, vão Z 59..63, Y 3..7).
+- **Variações:** nenhuma; despensa é parte do mesmo kit.
+- **Tris:** módulo ≤ 600 (alvo 50–200); casca + despensa montadas **6.000–9.000**, teto 10.000. Malhas únicas ≤ 10.
+- **Referência:** blockout da TASK-382 (medidas reais) + `docs/source/2026-10-17-restaurante-esboco.webp` (cores e proporção; nada de marca).
+
+### AST-141 — Balcão corrido com abertura e montantes
+
+- **Status:** Rascunho · **Prioridade:** P0 · **Origem:** Pack + edição — corpo `KP/kitchencounter_straight_A.fbx` (frente do cliente) e `_B.fbx` (lado de dentro) em módulos repetidos, montantes `KP/pillar_B.fbx` recolor Cream. Persiana `SHUT-1` = AST-103 (fora desta ficha).
+- **Medidas:** X 25,5..59,5 (**34**) × tampo **Y 3,0** × **1,8** de fundo (Z 53,8..55,6, atravessa a parede). Abertura Y 3,0..7,0. Montantes a cada ~5,5 (6 vãos), seção 0,4 × 0,4, só visuais (não bloqueiam prompt). Módulo de corpo 2 × 3,0 × 1,8 (17 instâncias).
+- **Silhueta:** tampo grosso (0,25) com borda boleada que salta 0,15 para fora; saia frontal com friso horizontal; trilho de pé Steel a Y 0,6 do lado do cliente.
+- **Cores:** tampo Cream, saia Ketchup (lado do cliente) com friso Mustard fino; montantes Cream; lado de dentro Steel.
+- **Encaixes (no tampo, Y 3,0):** `Att_TipJar` (27,5; 55), `Att_Pickup` (36; 54,7), `Att_Tablet` (56,5; 54,7), `Att_Tablet2` (50; 54,7, reserva), `Prompt_Shutter` (53,5; 55,3) Y 5,5, `Mount_Shutter` (topo da abertura, Y 7,0, para o AST-103 34 × 4).
+- **Tris:** módulo ≤ 150; balcão montado ≤ 2.500 (com montantes).
+
+### AST-142 — Tablet de pedido em suporte giratório (`TAB-1`)
+
+- **Status:** Rascunho · **Prioridade:** P0 · **Origem:** Modelar (nenhum pack tem tablet; o AST-020 é POS de caixa e ficaria igual ao computador do DT, ver AST-147).
+- **Medidas:** tela **0,9 × 0,65** com face útil ≥ **0,8 × 0,6** (`Screen`, peça separada e plana para `SurfaceGui`), moldura 0,06; centro da tela **1,2 sobre o tampo** (Y ~4,2; o ponto `TAB-1` do MAP-01 r4 §5.3 fica em Y 3,6, meio da haste). Haste Ø 0,12, base Ø 0,5 × 0,08. Tela inclinada 20° para o cliente, girada 15° para a pose do jogador (56,5; 56,6).
+- **Silhueta:** tablet grande em haste fina (lê "quiosque de pedido" a 10 studs); frente e verso diferentes (verso Teal com alça de mão), para o jogador ver o lado dele.
+- **Cores:** moldura `#4B4F63`, verso e haste Teal, base Steel; `Screen` Cream claro (no escuro vira emissivo pela UI). Lâmpada-piloto Neon Mustard na moldura (pisca com cliente esperando; leitura no escuro).
+- **Encaixes:** `Screen` (face −Z), `Att_Screen` (centro da tela), `Prompt_Take` (borda inferior, lado do jogador), `Light_Pilot`, `Att_Mount` (base).
+- **Estados:** `Idle`, `Talking` (UI), `Blocked` (piloto apagado) — só por `Color`/UI, mesma malha.
+- **Tris:** ≤ 300 (alvo 150–250).
+
+### AST-143 — Ponto de retirada PICKUP
+
+- **Status:** Rascunho · **Prioridade:** P0 · **Origem:** Pack + edição — placa = **AST-106 pendurada** (`AST-106_SignBakery` como base, recolor Mustard, texto "PICK UP" por `SurfaceGui` em `Face_Front`/`Face_Back`, hastes cortadas para pendurar do lintel do balcão a Y 7); **modelar** só a bandeja e a campainha de balcão.
+- **Medidas:** pegada **2 × 0,6 × 1,5** (bandeja 2 × 1,5 × 0,1 com aba de 0,15; campainha Ø 0,4 × 0,3 no canto direito). Centro (36; 54,7), Y 3,1. Placa 4 × 1,2 centrada sobre o PICKUP, borda de baixo a ~Y 6,5 (não tapa o rosto do cliente em PU-1 visto de dentro).
+- **Silhueta:** bandeja baixa com borda + campainha redonda: lê "entregue aqui" mesmo sem a placa.
+- **Cores:** bandeja Teal com borda Cream; campainha Steel com botão Mustard; placa moldura Mustard, painel Cream, texto Ink.
+- **Encaixes:** `Prompt_Serve` (centro da bandeja, +0,4), `Att_Plate` (onde o prato pousa na entrega, para o VFX), `VFX_Ding` (topo da campainha), `Att_Sign` (lintel).
+- **Tris:** bandeja + campainha ≤ 200; placa 344 (do AST-106). Total ≤ 600.
+
+### AST-144 — Mesa de montagem inox com 8 marcas
+
+- **Status:** Rascunho · **Prioridade:** P0 · **Origem:** Pack + edição — `KP/kitchencounter_straight_A.fbx` em 11 módulos de 2 recolor Steel (tampo inox, portas Steel escuro); marcas = **`AST-019_QueueMark`** (34 tris) recolor Mustard, Ø 2,2, coladas no tampo.
+- **Medidas:** X 31,5..53,5, Z 61..63,5 (**22 × 2,5**), tampo **Y 3,0**. Acessível dos dois lados e das pontas: as duas faces longas iguais (sem "costas").
+- **Marcas:** 8, centros em Z 62,25 e X **33,4 · 36,0 · 38,6 · 41,2 · 43,8 · 46,4 · 49,0 · 51,6** (2,6 entre centros). Número da vaga por `SurfaceGui` pequeno na borda do tampo (1..8, os dois lados).
+- **Silhueta:** bancada de inox baixa e comprida com prateleira inferior aberta (vê-se o chão por baixo: o corredor parece mais largo).
+- **Encaixes:** `Mount_Plate_1..8` (centro de cada marca, Y 3,05).
+- **Tris:** módulo ≤ 150; montada ≤ 2.000 (com as marcas).
+
+### AST-145 — Prato-slot meio transparente (`PLATE-1..8`)
+
+- **Status:** Rascunho · **Prioridade:** P0 · **Origem:** Pack — `KP/plate.fbx` escalado (sem mexer na malha).
+- **Medidas:** **Ø 2,0 × 0,15**; pousa em Y 3,05 (sobre a marca do AST-144).
+- **Estados (mesma malha, só `Transparency`/`Color`):** `Empty` Transparency 0,6, cor Cream (lê "vaga livre"); `Assigned` Transparency 0,25, cor Cream + anel Mustard (a marca do AST-144 acende em Neon); o conteúdo é o `HotDogVisual` existente (AST-001/002/003). Sem malha nova por estado (§8).
+- **Encaixes:** `Att_Content` (centro, +0,08), `Att_Ticket` (**2,5 acima**, BillboardGui), `Prompt_Put` / `Prompt_Take` (centro, +0,3).
+- **Tris:** ≤ 150 (o do pack; conferir no import). 8 instâncias da mesma MeshId.
+
+### AST-146 — Janela do drive-thru + placa DRIVE-THRU
+
+- **Status:** Rascunho · **Prioridade:** P1 · onda R3 · **Origem:** Pack + edição — `KP/wall_orderwindow.fbx` (peitoril e moldura) ajustado ao vão; persiana `SHUT-DT` = AST-103 4 × 4; placa = **AST-106 de parede** (`AST-106_WallSignDairy` como base, recolor Teal, texto "DRIVE-THRU" por `SurfaceGui`).
+- **Medidas:** parede leste X 60, vão Z 59..63 (**4**), peitoril Y **3,0** (peitoril 4 × 1 de fundo), topo **7,0**. Placa 6 × 1,4 por fora, centro (60,3; 61) Y 8,3, acima do `LIT-DT`.
+- **Silhueta:** janela com peitoril saliente para fora (0,5) e moldura grossa Cream que destaca do rosa; lê de dentro do carro e do corredor leste.
+- **Encaixes:** `Att_Serve` (centro do peitoril, âncora do `drive_serve`), `Prompt_ShutterDT` (59,2; 61) Y 6,3, `Mount_ShutterDT`, `Light_DT` (60,5; 61) Y 8, `AnomalyAnchor` `AN-R01` (lado de fora, altura da janela do motorista).
+- **Tris:** moldura + peitoril ≤ 600; placa ≤ 150.
+
+### AST-147 — Computador do drive-thru (`DT-PC`)
+
+- **Status:** Rascunho · **Prioridade:** P1 · onda R3 · **Origem:** Pack + edição — corpo = **POS do AST-020** ("POS Machine" de J-Toastie, CC-BY 3.0, crédito já em `credits.md`; sem a gaveta) recolor `#4B4F63` com moldura Teal para não repetir o caixa preto; **modelar** só o headset pendurado num gancho.
+- **Medidas:** **1,2 × 1,0 × 0,8** no peitoril (59,2; 61) Y 3,4; tela virada para a pose `DT-PC-P` (57,2; 61) = para o oeste. Tela útil ≥ 0,7 × 0,5 (`Screen`, peça separada).
+- **Silhueta:** monitor/POS + headset grande em gancho lateral (o headset é o que diferencia do tablet a 5 studs: tablet = haste fina; PC = caixa com fone).
+- **Cores:** corpo `#4B4F63`, moldura Teal, headset Cream com almofadas Ketchup, `Screen` Cream; piloto Neon Mustard (pisca com carro na janela).
+- **Encaixes:** `Screen`, `Att_Screen`, `Prompt_Take`, `Light_Pilot`, `VFX_Honk` (ondinhas 2D da buzina, aponta para a janela).
+- **Tris:** ≤ 900 (POS 606 + headset ≤ 150 + gancho).
+
+### AST-148 — Kit da pista do drive-thru
+
+- **Status:** Rascunho · **Prioridade:** P1 · onda R3 · **Origem:** Pack + edição — pista e meio-fio `CR/road-straight.fbx`, `CR/road-side-entry.fbx` / `CR/road-side-exit.fbx` (bocas DT-IN / DT-OUT), `CR/road-bend.fbx` (DT-UTURN), ilha = meio-fio do AST-032; `DT-MENU` = `CR/road-sign-empty.fbx` recolor com o menu por `SurfaceGui`; setas e "faixa" = Parts finas (0,02) Off-white no chão ou decal da folha AST-072 (nada de textura nova; ver AST-156).
+- **Medidas:** faixas de **6,5** (LANE-DT-S X 69..75,5; LANE-DT-N X 61..67,5), ilha X 67,5..69 (1,5) com meio-fio 0,3 de altura; retorno X 61..75,5, Z 72..80; `DT-MENU` **3 × 6 × 0,5** em (68,2; 44), face para o sul (o carro que desce lê). Linhas de parada DT-SL-IN/OUT = AST-093.
+- **Silhueta:** asfalto do mesmo kit da rua, ilha baixa com o menu alto: o menu é o único volume vertical da pista (não tapa o pátio pelos arbustos BUSH-R).
+- **Cores:** asfalto `#4A4E58`, meio-fio `#9A948A`, setas Off-white, menu moldura Teal + painel Cream.
+- **Encaixes:** `Light_Menu` (opcional, Neon no painel, sem luz real), `AnomalyAnchor` `AN-R06` no menu.
+- **Tris:** peça modular ≤ 600 (pack); menu ≤ 300; kit montado ≤ 3.000.
+
+### AST-149 — Cerca baixa do pátio + arco do portão
+
+- **Status:** Rascunho · **Prioridade:** P1 · **Origem:** Pack + edição — `CS/fence-low.fbx` (ou `CS/fence-1x4.fbx` cortado) recolor Cream com corrimão Ketchup; arco = 2 `KP/pillar_A.fbx` (recolor Cream) + travessa modelada com placa pequena (texto "CORNER DOGS" opcional por `SurfaceGui`, repete o letreiro).
+- **Medidas:** módulo **4 × 2,5** (altura ≤ 3, MAP-01 r4 `FENCE-R`); Z 32 (X 24..60) e X 24 (Z 32..54) = ~14 módulos; sem portão oeste (DEC-280). Arco **5 × 7** no `R-GATE` (36; 32), vão livre X 33,5..38,5 (≥ 5) e altura livre ≥ 6.
+- **Silhueta:** cerca de ripas baixa e vazada (vê-se o pátio da calçada) + arco que é o único ponto alto: diz "entrada é aqui".
+- **Encaixes:** `Light_Gate` (`LIT-GATE`, (36; 32,5) Y 7, `HushOff`), `AnomalyAnchor` `AN-R05`.
+- **Tris:** módulo ≤ 300; arco ≤ 800; conjunto ≤ 4.500.
+
+### AST-150 — Luminária de mesa (guarda-sol com lâmpada, `LIT-T1..4`)
+
+- **Status:** Rascunho · **Prioridade:** P1 · **Origem:** Pack + edição — `CC/detail-parasol-b.fbx` (ou `-a`, o mesmo do AST-026, para variar a cor) sem a mesinha da base, haste esticada; **modelar** só a lâmpada pendurada sob a copa (globo Neon + soquete).
+- **Medidas:** haste **Ø 0,2**, copa **Ø 5** com a borda a ~Y 7 e topo **Y 8**; globo Ø 0,5 sob o centro da copa, a ~Y 6,6. A haste desce no centro da mesa AST-100 (6,99 × 5,64): conferir no blockout se o tampo tem furo; se não tiver, a base fica no chão ao lado da ponta leste/oeste da mesa voltada para o corredor (não tapa os 4 assentos).
+- **Silhueta:** guarda-sol de copa listrada com uma lâmpada redonda que brilha embaixo: à noite a leitura é "poça de luz por mesa" (ordem do Hush: LIT-GATE → LIT-T3/T4 → LIT-T1/T2).
+- **Cores:** copa listrada Cream / Teal (T1, T3) e Cream / Mustard (T2, T4) — Mustard só na listra, Sat de decorativo; haste Steel; globo Neon `#FFE7C2`.
+- **Encaixes:** `Light_Table` (PointLight fraca, sem sombra), `Bulb` (peça Neon separada, apaga no Hush), `Att_Mount` (base).
+- **Estados:** `On`, `Off` (só `Bulb` + luz). **Tris:** ≤ 800 (prop médio).
+
+### AST-151 — Disjuntor de parede (`BRK-K`)
+
+- **Status:** Rascunho · **Prioridade:** P1 · **Origem:** Pack + edição — **alavanca do AST-039** (mesma malha, escala 1,3) sobre uma caixa nova com porta.
+- **Medidas:** caixa **1,2 × 1,6 × 0,4**, centro (25,7; 58,8) Y 4,5, frente para o leste. Porta articulada à esquerda (abre 100°); alavanca grande 0,55 no centro, visível com a porta aberta; a porta abre sozinha quando o disjuntor desarma (ANM-020).
+- **Silhueta:** caixa mais **alta e funda** que o interruptor (AST-153 é placa rasa 0,6 × 0,9): o jogador distingue os dois pela forma, não pela cor. Faixas de aviso diagonais Mustard/`#4B4F63` na porta.
+- **Cores:** caixa Steel, porta Steel claro com faixas de aviso, alavanca com ponta Mustard, piloto Neon (verde ligado / apagado desarmado).
+- **Encaixes:** `Prompt_Breaker` (frente da alavanca), `Door` (pivô na dobradiça), `Lever` (pivô no eixo), `Light_Pilot`, `VFX_Spark`, `Att_Mount`.
+- **Estados:** `On`, `Tripped` (alavanca abaixo + porta aberta + piloto apagado). **Tris:** ≤ 300.
+
+### AST-152 — Válvula de gás de parede (`GAS-1`)
+
+- **Status:** Rascunho · **Prioridade:** P1 · **Origem:** Modelar (nenhum pack tem registro/volante).
+- **Medidas:** **volante Ø 0,8** (espessura 0,1, 4 raios), cano Ø 0,2 que sai da parede 0,35 e desce 1,5 até o rodapé atrás da bancada; centro (25,7; 67) Y 4,5, frente para o leste (~6 studs do GRILL-1).
+- **Silhueta:** volante redondo grande e saliente: lê "girar" a 6 studs; o cano liga visualmente a válvula às grelhas (uma para as duas, ANM-025).
+- **Cores:** volante **Ketchup** com cubo Steel (interativo, Sat ~85%), cano Mustard escuro (convenção de gás; detalhe fino, não interfere no §2.4), etiqueta Cream pequena com chama por decal AST-072.
+- **Encaixes:** `Prompt_Gas` (frente do volante), `Wheel` (peça separada, pivô no eixo, gira 90° aberto/fechado), `VFX_Hiss`, `Att_Mount`.
+- **Estados:** `Open`, `Closed` (só rotação do `Wheel`). **Tris:** ≤ 250.
+
+### AST-153 — Interruptor de parede (`KSW` e `R-OPEN`)
+
+- **Status:** Rascunho · **Prioridade:** P1 · **Origem:** Pack (projeto) — **é o AST-039** (`Assets/models/equipment/AST-039_LightSwitch.fbx`, 128 tris, Aprovado DEC-140), sem mexer na malha. A ficha existe para o snippet do place (duas instâncias, IDs de mapa novos) e para a variante de cor do OPEN.
+- **Medidas:** placa **0,6 × 0,9 × 0,15**, alavanca 0,4 (as do AST-039). `KSW` em (59,3; 64,2) Y 4,5, frente para o oeste; `R-OPEN` em (25,7; 56) Y 4,5, frente para o leste.
+- **Variação:** `KSW` = cores do AST-039 (lâmpada-piloto verde); `R-OPEN` = mesma malha, piloto Neon **Teal** + etiqueta "OPEN" por `SurfaceGui` acima da placa (liga o `R-OPEN-NEON`). Diferença por cor de piloto e etiqueta; a diferença de forma está entre interruptor (raso) e disjuntor (AST-151, caixa funda).
+- **Encaixes:** `Prompt_Switch` (do AST-039), `Att_Mount` (costas; se o FBX não tiver, o snippet cria). **Tris:** 128.
+
+### AST-154 — Van de entrega com porta lateral
+
+- **Status:** Rascunho · **Prioridade:** P1 · onda R3 (van animada; no MVP a entrega aparece direto na escotilha, TASK-388) · **Origem:** Pack + edição — **`AST-035_CarVan`** (`CK/van.fbx`, modelo aprovado DEC-141) com a porta lateral direita recortada em peça `Door_Side` (desliza 1,5 para trás) e interior simples visível pela porta (piso + 3 caixas DOGS/BUNS/MUSTARD do place). Alternativa recusada: `AST-048` (`CK/delivery.fbx`, ~20 × 8 × 10, grande demais para o recuo LAY-J de 6 de largura).
+- **Medidas:** **~12 × 6 × 7** (C × L × A; conferir no FBX do AST-035 e escalar uniforme); porta lateral do lado **leste** quando parada em `DLV-STOP` (15; 72) virada para o norte = lado do passageiro (direito).
+- **Silhueta:** van de caixa alta com porta de correr, distinta dos carros de trânsito pela cor e pelo rack no teto (2 barras Steel).
+- **Cores (Sat ~55%, §2.2 Trânsito):** corpo Butter `#F3DFA2` com faixa Teal claro `#8FC9D1` — **nunca** Cream + Teal larga (é a ambulância) nem preto (long car, §2.4); sem logo de empresa real; ícone de caixinha por decal AST-072.
+- **Encaixes:** `Wheel_FL/FR/RL/RR` (do AST-035), `Door_Side` (pivô no trilho), `Att_Cargo` (piso de carga, origem das caixas que "deslizam"), `Light_Head` (Neon Cream, sem luz real).
+- **Tris:** ≤ 2.000 (carro de trânsito; base ~1.400 + porta + caixas).
+
+### AST-155 — Despensa: estantes, porta com janelinha e tranca, escotilha de carga, `DROP-R`
+
+- **Status:** Rascunho · **Prioridade:** P0 (porta, escotilha, `DROP-R`) / P1 (estantes) · **Origem:** Pack + edição — estantes `MM/shelf-boxes.fbx` (4,5 × 6 × 2,5 no AST-029) recortada para **4 × 6 × 1,5** e recheada com `KP/crate.fbx`, `KP/crate_buns.fbx`, `KP/jar_*_large.fbx`; porta `KP/door_A.fbx` com janelinha recortada (vidro = peça separada, Transparency 0,4); `DROP-R` = `KP/kitchencounter_straight_B.fbx` (1 módulo) ou pallet de `KP/crate.fbx` achatado. **Modelar:** escotilha (moldura + tampa) e tranca de porta (ferrolho).
+- **Medidas:**
+  - Porta `DOOR-P`: vão X 26..29,5 (**3,5 × 7,5**) na parede Z 72; janelinha 0,8 × 0,6 com centro a Y 6 (`AN-05`); tranca `LOCK-P` (27,75; 71,2) Y 4, ferrolho 0,5 × 0,2 com puxador Mustard.
+  - Escotilha `HATCH-L`: parede oeste X 25, vão Z 74..77, peitoril **Y 3,0**, abertura **3 × 2,5**; tampa basculante para cima (dobradiça no topo, abre 80° para fora), moldura 0,25.
+  - `DROP-R`: tampo **Y 3,0** em (26,5; 75), 2 × 3, colado à escotilha (as caixas deslizam da van para cá).
+  - Estantes: 2 unidades **4 × 6 × 1,5** nas paredes leste e sul da despensa, sem invadir o volume `HIDE-P` (X 25,5..33,5, Z 72,5..78,5; ≥ 4 de passagem livre).
+- **Silhueta:** de dentro da cozinha, a porta com a janelinha escura é o ponto de "medo" (AN-R08); a escotilha tem moldura Steel grossa com faixa Mustard (lê "carga" e "abre"), diferente de uma janela.
+- **Cores:** porta Cream com moldura Ketchup Faded, vidro escuro `#2B2233` (à noite não deixa ver o fundo); escotilha Steel com faixa Mustard; estantes Steel com caixas de papelão `#C98B5A`.
+- **Encaixes:** `Prompt_Lock` (ferrolho), `Door` (pivô na dobradiça), `Bolt` (pivô do ferrolho), `Att_Window` (`AN-05`), `Hatch_Lid` (pivô no topo), `Att_HatchIn` (caixa entra), `Att_Drop_1..4` (vagas das caixas no `DROP-R`), `Prompt_TakeBox` (um por vaga ou um central, decisão do coder), `Light_P` (lâmpada fraca, LZ-P).
+- **Estados:** porta `Locked`/`Unlocked`; escotilha `Closed`/`Open` (6–8 s na descarga). **Tris:** estante ≤ 800 cada (recheio incluso); porta ≤ 400; escotilha ≤ 400; tranca ≤ 150; `DROP-R` ≤ 200. Total ≤ 2.800.
+
+### AST-156 — Pisos: ladrilho da cozinha, pavers do pátio, faixa da pista
+
+- **Status:** Rascunho · **Prioridade:** P1 · **Origem:** Pack, **sem atlas nem textura nova** (o MAP-01 r4 §12.2 pedia "1 atlas"; recusado pelo style guide §1.2 e §9.2: teto de 3–4 atlases de cor e nenhuma textura de foto). Solução:
+  - Cozinha + despensa: `KP/floor_kitchen.fbx` (e `_small` para os recortes) recolor para o xadrez Off-white / Steel claro, em placas grandes (cada instância cobre o máximo que o módulo do pack permite sem deformar).
+  - Pátio X 24..60, Z 32..54: placas `Pad_Tile` do **AST-032** (ou `CR/tile-low.fbx`) recolor `#CFC8B8` com junta `#9A948A`; corredor do meio (X 33,5..38,5) em tom um pouco mais claro para guiar o cliente do R-GATE ao balcão.
+  - Faixa da pista do DT: Parts de 0,02 Off-white (tracejado) e setas do AST-148; nada pintado em textura.
+  - **Fallback (Provisório, só se o teste mostrar que as placas do pack pesam ou repetem demais):** 1 máscara de rejunte em escala de cinza **256²** tintável por `Texture` + `Color3`, usada nos três pisos. Conta como textura nova: pede DEC.
+- **Medidas:** cozinha 34 × 17 + despensa 8 × 5,5; pátio 36 × 22; topo do piso no Y do lote (o Pad hoje está em 0,45; `TRL` em Y 0,45).
+- **Tris:** placa ≤ 300; total de pisos ≤ 3.000. Placas `CanQuery`/`CanTouch` false, colisão = 1 Part por área.
+
+### Ordem para o modelador (depois da DEC)
+
+1. **P0, o que o jogador usa:** AST-141, AST-142, AST-143, AST-145 (TASK-397, 398, 399, 401), depois AST-144, AST-140, AST-155.
+2. **P1 do MVP:** AST-151, AST-152, AST-153, AST-150, AST-149, AST-156.
+3. **Só com a R3:** AST-146, AST-147, AST-148, AST-154.
+
+Aceite de revisão (art-director): medida do blockout da TASK-382 (±0,1), pivô e frente da ficha, nomes `AST-###_<Nome>` e attachments do §8, tris dentro da ficha e do bloco, nenhum atlas novo, peças interativas legíveis no escuro, nenhuma marca ou visual de outro jogo.
 
 ## Fora desta lista (próxima rodada)
 

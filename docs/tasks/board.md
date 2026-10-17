@@ -14,7 +14,7 @@ v2.2 (2026-10-12, **DEC-223/224/225**): **modo de preparo focado** (FEAT-039, V1
 quebrados em TASK-166 a TASK-193 (seção "Tabela de tasks — Modo de preparo focado", sobre `docs/tech/prep-mode.md`).
 v2.3 (2026-10-12, feedback do dono "tudo 3D"; rev. 2 com seções em sequência, abas embaixo e spike EditableMesh): **preparo 3D-first** em TASK-194 a TASK-219 (seção "Tabela de tasks — Preparo
 3D-first", sobre `docs/tech/prep-3d.md`); TASK-174, 175, 177, 178 e 179 marcadas "Substituída parcialmente por 3D".
-v2.4 (2026-10-17, **DEC-269 a DEC-280**): **restaurante** (MVP R0–R2, assets AST-123..139, backlog R3–R5) e **anomalias V3**
+v2.4 (2026-10-17, **DEC-269 a DEC-280**): **restaurante** (MVP R0–R2, assets AST-140..156, backlog R3–R5) e **anomalias V3**
 (Provisório, Q-330..333) em TASK-377 a TASK-440 (seção "Tabela de tasks — Restaurante", no fim do arquivo).
 
 Base: `CLAUDE.md`, `README.md` (Modux V3), `docs/PIPELINE.md`, `docs/tech/architecture.md`, `network.md`, `data.md`,
@@ -1656,7 +1656,7 @@ Proposta: `design/monetization-offers-proposal.md` (Rascunho). Perguntas: `Q-293
 ## Tabela de tasks — Restaurante (2026-10-17; TASK-377 a TASK-440; DEC-269 a DEC-280)
 
 Fontes: `tech/restaurant-flow.md` rev. 2 (ondas R0–R5, trilhas R1-A..J, arquivos-quentes §5), `design/restaurant-flow.md`
-(FEAT-043..050, UPG-015..034, onda 0 M1–M8), `levels/MAP-01-r4-restaurant.md` rev. 2 (pontos, AST-123..139),
+(FEAT-043..050, UPG-015..034, onda 0 M1–M8), `levels/MAP-01-r4-restaurant.md` rev. 2 (pontos, AST-140..156 após TASK-395),
 `design/anomalies-v3-restaurant.md` (reescrita 2). Tudo **Rascunho = base Provisória** (DEC-193). Itens Provisórios principais:
 DEC-223 suspensa no restaurante (pergunta 1 do tech §9), 1 pedido em trânsito no telefone, anomalias V3 inteiras (`Q-330..333`).
 
@@ -1711,8 +1711,8 @@ DEC-223 suspensa no restaurante (pergunta 1 do tech §9), 1 pedido em trânsito 
 
 | TASK | O quê | Dono | Deps | Status |
 |---|---|---|---|---|
-| TASK-395 | **Fichas AST-123..139** em `art/asset-list.md` (medidas do MAP-01 r4 §12.2, orçamento do style guide) **e resolver a colisão de ID**: a TASK-373 / `design/skins-proposal.md` já usaram AST-123/124 para skins | art-director | — | Pronta |
-| TASK-396..412 | Um por asset, na ordem: **396** AST-123 casca + despensa · **397** AST-124 balcão · **398** AST-125 tablet · **399** AST-126 PICKUP · **400** AST-127 mesa de montagem · **401** AST-128 prato-slot · **402** AST-129 janela DT · **403** AST-130 computador DT · **404** AST-131 kit da pista DT · **405** AST-132 cerca + arco · **406** AST-133 luminária de mesa · **407** AST-134 disjuntor · **408** AST-135 válvula de gás · **409** AST-136 interruptor · **410** AST-137 van · **411** AST-138 despensa/escotilha · **412** AST-139 texturas | modeler-3d (fonte em `Assets/blender/`, FBX em `Assets/models/`, upload, troca da Part do blockout por snippet idempotente, sem mudar `MapId`/tags) | 382, 395 (ficha aprovada por DEC) | Bloqueada |
+| TASK-395 | **Fichas AST-140..156** em `art/asset-list.md` (medidas do MAP-01 r4 §12.2, orçamento do style guide) **e resolver a colisão de ID**: a TASK-373 / `design/skins-proposal.md` já usaram AST-123/124 para skins | art-director | — | Feito (2026-10-17): AST-123/124 ficam com as skins (fichas registradas); restaurante renumerado para **AST-140..156** (mesma ordem); AST-125..139 queimados. Fichas **Rascunho**, aguardam DEC do usuário |
+| TASK-396..412 | Um por asset, na ordem: **396** AST-140 casca + despensa · **397** AST-141 balcão · **398** AST-142 tablet · **399** AST-143 PICKUP · **400** AST-144 mesa de montagem · **401** AST-145 prato-slot · **402** AST-146 janela DT · **403** AST-147 computador DT · **404** AST-148 kit da pista DT · **405** AST-149 cerca + arco · **406** AST-150 luminária de mesa · **407** AST-151 disjuntor · **408** AST-152 válvula de gás · **409** AST-153 interruptor (= AST-039, só place) · **410** AST-154 van · **411** AST-155 despensa/escotilha · **412** AST-156 pisos (sem atlas novo) | modeler-3d (fonte em `Assets/blender/`, FBX em `Assets/models/`, upload, troca da Part do blockout por snippet idempotente, sem mudar `MapId`/tags) | 382, 395 (ficha aprovada por DEC) | Bloqueada |
 
 Prioridade dos assets: 397, 398, 399, 401 (o que o jogador usa) primeiro; 402–404 e 410 só com a R3 / van animada.
 

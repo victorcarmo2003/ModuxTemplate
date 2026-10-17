@@ -127,7 +127,7 @@ Tampo a 3,0, 1,8 de fundo (Z 53,8..55,6, atravessa a parede), X 25,5..59,5. Joga
 | `PICKUP` | **Ponto de retirada** | (36; 54,7), Y 3,1 | (36; 56,6) | `Model` tag `Pickup`, filho `Prompt_Serve` (`PromptAction = pickup_serve`), "Hand Over" tap, raio 6 |
 | `TAB-2` (reserva) | 2º tablet (upgrade) | (50; 54,7) | (50; 56,6) | ausente no MVP |
 | `SHUT-1` / `Prompt_Shutter` | **Persiana do balcão** (enrolar, cobre a abertura toda) + puxador | puxador (53,5; 55,3), Y 5,5 | (53,5; 56,6) | verbo RECUSAR (DEC-261) a 3 do tablet. Com 1 tablet o "guichê por tablet" (Q-330) vira esta persiana única |
-| `TAB-1` | **Tablet** (AST-125), colado na ponta direita [DEC-280] | (56,5; 54,7), Y 3,6 | (56,5; 56,6) | `Model` tag `Tablet`, `TabletIndex = 1`, filho `Prompt_Take` (`PromptAction = tablet_take`), `Att_Screen` |
+| `TAB-1` | **Tablet** (AST-142), colado na ponta direita [DEC-280] | (56,5; 54,7), Y 3,6 | (56,5; 56,6) | `Model` tag `Tablet`, `TabletIndex = 1`, filho `Prompt_Take` (`PromptAction = tablet_take`), `Att_Screen` |
 
 Distâncias de prompt: pote ↔ PICKUP 8,5; PICKUP ↔ TAB-2 14; TAB-2 ↔ puxador 3,6; puxador ↔ TAB-1 3,4 (alturas diferentes).
 
@@ -359,27 +359,29 @@ Ruas, trânsito TR-1..TR-10 (+ TR-DT, + rota da van), CW-1..4, PARE, BAR-*, Mart
 | Kit | KitchenPack: `wall*`, `wall_orderwindow` (base do balcão), `door_A` (DOOR-P), `kitchencounter_*`, `kitchencabinet*`, `extractorhood`, `shelf_papertowel`, `plate` (base do prato-slot), `menu`; AST-093 (linhas de parada) | |
 | Telefone | o do trailer (DEC-124) | |
 
-### 12.2 Novo (reserva AST-123..AST-139; só lista)
+### 12.2 Novo (AST-140..AST-156; fichas em `art/asset-list.md`)
 
-| AST | Asset | Medidas (studs) |
-|---|---|---|
-| AST-123 | Casca do restaurante (paredes rosadas, platibanda, telhado, piso claro) + despensa | 35 × 18 × 11,5; despensa 9 × 7 |
-| AST-124 | Balcão corrido com abertura e montantes | 34 × 3,0 (tampo) × 1,8; abertura Y 3..7 |
-| AST-125 | Tablet em suporte giratório | tela 0,9 × 0,65 (face ≥ 0,8 × 0,6), 1,2 sobre o tampo |
-| AST-126 | Ponto de retirada PICKUP (bandeja/campainha + placa "PICK UP") | 2 × 0,6 × 1,5 |
-| AST-127 | Mesa de montagem inox com 8 marcas | 22 × 3,0 × 2,5 |
-| AST-128 | Prato-slot meio transparente (vazio / com pedido) | Ø 2,0 × 0,15 |
-| AST-129 | Janela do drive-thru + placa "DRIVE-THRU" | vão 4 × 4, peitoril 4 × 1 |
-| AST-130 | Computador do drive-thru (monitor + headset) | 1,2 × 1,0 × 0,8 |
-| AST-131 | Kit da pista DT (meio-fio, ilha, setas, `DT-MENU`) | menu 3 × 6 × 0,5 |
-| AST-132 | Cerca baixa do pátio + arco do portão | módulos 4 × 2,5; arco 5 × 7 |
-| AST-133 | Luminária de mesa (guarda-sol com lâmpada) | poste Ø 0,2, Y 8, copa Ø 5 |
-| AST-134 | Disjuntor de parede (caixa com alavanca) | 1,2 × 1,6 × 0,4 |
-| AST-135 | Válvula de gás de parede | volante Ø 0,8 |
-| AST-136 | Interruptor de parede (KSW e OPEN) | 0,6 × 0,9 × 0,15 |
-| AST-137 | Van de entrega (porta lateral) | ~12 × 6 × 7 |
-| AST-138 | Despensa: estantes, porta com janelinha e tranca, **escotilha de carga** com tampa | estantes 4 × 6 × 1,5; escotilha 3 × 2,5 |
-| AST-139 | Texturas: ladrilho da cozinha, pavers do pátio, faixa da pista | 1 atlas |
+Renumerado pela TASK-395 (art-director, 2026-10-17): a reserva AST-123..139 da rev. 2 colidia com as skins (AST-123/124, TASK-373). Mesma ordem, +17; AST-125..139 ficam queimados (não usar). Origem: P = reaproveita pack/asset do place com edição, N = modelagem nova.
+
+| AST | Asset | Medidas (studs) | Origem |
+|---|---|---|---|
+| AST-140 | Casca do restaurante (paredes rosadas, platibanda, telhado, piso claro) + despensa | 35 × 18 × 11,5; despensa 9 × 7 | P (KP `wall*`/`pillar_A`; platibanda e telhado N) |
+| AST-141 | Balcão corrido com abertura e montantes | 34 × 3,0 (tampo) × 1,8; abertura Y 3..7 | P (KP `kitchencounter_*`, `pillar_B`) |
+| AST-142 | Tablet em suporte giratório | tela 0,9 × 0,65 (face ≥ 0,8 × 0,6), 1,2 sobre o tampo | N |
+| AST-143 | Ponto de retirada PICKUP (bandeja/campainha + placa "PICK UP") | 2 × 0,6 × 1,5 | P (placa AST-106; bandeja e campainha N) |
+| AST-144 | Mesa de montagem inox com 8 marcas | 22 × 3,0 × 2,5 | P (KP `kitchencounter_straight_A`, AST-019 `QueueMark`) |
+| AST-145 | Prato-slot meio transparente (vazio / com pedido) | Ø 2,0 × 0,15 | P (KP `plate`) |
+| AST-146 | Janela do drive-thru + placa "DRIVE-THRU" | vão 4 × 4, peitoril 4 × 1 | P (KP `wall_orderwindow`, AST-103, AST-106) |
+| AST-147 | Computador do drive-thru (monitor + headset) | 1,2 × 1,0 × 0,8 | P (POS do AST-020; headset N) |
+| AST-148 | Kit da pista DT (meio-fio, ilha, setas, `DT-MENU`) | menu 3 × 6 × 0,5 | P (CityKitRoads, AST-032, AST-093) |
+| AST-149 | Cerca baixa do pátio + arco do portão | módulos 4 × 2,5; arco 5 × 7 | P (CS `fence-low`, KP `pillar_A`) |
+| AST-150 | Luminária de mesa (guarda-sol com lâmpada) | poste Ø 0,2, Y 8, copa Ø 5 | P (CC `detail-parasol-b`; lâmpada N) |
+| AST-151 | Disjuntor de parede (caixa com alavanca) | 1,2 × 1,6 × 0,4 | P (alavanca do AST-039; caixa N) |
+| AST-152 | Válvula de gás de parede | volante Ø 0,8 | N |
+| AST-153 | Interruptor de parede (KSW e OPEN) | 0,6 × 0,9 × 0,15 | P (= AST-039, sem mexer) |
+| AST-154 | Van de entrega (porta lateral) | ~12 × 6 × 7 | P (AST-035 `CarVan`) |
+| AST-155 | Despensa: estantes, porta com janelinha e tranca, **escotilha de carga** com tampa | estantes 4 × 6 × 1,5; escotilha 3 × 2,5 | P (MM `shelf-boxes`, KP `door_A`/`crate`; escotilha e tranca N) |
+| AST-156 | Pisos: ladrilho da cozinha, pavers do pátio, faixa da pista | sem atlas novo (style guide §9.2) | P (KP `floor_kitchen`, AST-032, Parts) |
 
 ## 13. Requisitos técnicos
 
