@@ -1,14 +1,16 @@
 --!strict
--- AnomalyTablet: the Anomaly Tablet window (TASK-345, was the TASK-335 book; owner request 2026-10-15, Provisional),
--- cartoon kit, mobile first. A landscape tablet, ONE anomaly per page (Content.Journal list order):
---   frame   Ink CartoonPanel with round corners, thick outline and lip (the bezel), camera dot on the top bezel, round
---           home button on the bottom bezel (closes, like the Teal X); pops in (Motion.Pop); `Size` 620 x 340 px at UI
---           scale 1, UiScale.Fit shrinks it to the smallest landscape phone
---   screen  Teal two-tone screen: status bar ("ANOMALY TABLET" · found count · n / total), a strip of Cream page cards
---           that SLIDES sideways (spring, or a jump with Motion.Reduced), page dots at the bottom (tap one to jump)
---   page    left: the "photo" (white print, tilted, Images.luau or a dark placeholder), name, tag chip (Refuse Mustard ·
---           Hide Teal · Lights Violet · Careful Green), "NEW!" sticker while unread; right: SIGNS / NOT THERE /
---           HOW TO BEAT IT bullets. Locked: "???" print and title, Content.Journal.Rules.LockedText
+-- AnomalyTablet: the Anomaly Tablet window (TASK-345, was the TASK-335 book; owner request 2026-10-15, Provisional).
+-- Dark cartoon pass (owner 2026-10-17: darker to match the flash photos, hazard flavour, but the cartoon kit's look and
+-- type; the three entry blocks clearly apart). Mobile first, ONE anomaly per page (Content.Journal list order):
+--   frame   dark CartoonPanel (the bezel) with a Mustard / Ink hazard band on the top bezel and an "ANOMALY FILES" plate
+--           on it, round home button on the bottom bezel (closes, like the X); pops in (Motion.Pop); `Size` 620 x 340 px
+--           at UI scale 1, UiScale.Fit shrinks it to the smallest landscape phone
+--   screen  night-blue screen: status bar (title · found count · n / total), a strip of dark page cards that SLIDES
+--           sideways (spring, or a jump with Motion.Reduced), page dots at the bottom (tap one to jump)
+--   page    left: the flash photo as a white print (tilted, tape, ref under it; Images.luau or a dark placeholder), name,
+--           threat chip (Refuse Mustard · Hide Teal · Lights Violet · Careful Green), "NEW!" sticker while unread; right:
+--           SIGNS / NOT THERE / HOW TO BEAT IT, each its own rounded box with a coloured title pill, SECTION_GAP apart.
+--           Locked: "???" print and title, Content.Journal.Rules.LockedText
 --   input   drag with the mouse or swipe with a finger (the strip follows, past ~18% of the width or a quick flick
 --           turns the page, rubber band at the ends), mouse wheel, round Mustard arrows on the side bezels ("Prev" /
 --           "Next": gamepad selection). Triggers / D-pad / arrow keys are the owner's binds (JournalController)
@@ -55,14 +57,15 @@ const SIZE = Vector2.new(620, 340)
 const DESIGN = Vector2.new(660, 380) -- the tablet plus the buttons over its edges and the hint line
 const BEZEL = 22
 const LIP = 6
-const STATUS = 22
+const STATUS = 24
 const DOTS = 22
 const CARD_GAP = 10
-const PHOTO = Vector2.new(176, 124)
+const PHOTO = Vector2.new(184, 128)
 const ARROW = 44
-const TEXT = 15
-const HEADING = 16
+const TEXT = 14
+const HEADING = 13
 const BULLETS = 2 -- slots per section (Content.Journal rows have at most 2)
+const SECTION_GAP = 8 -- px between the SIGNS / NOT THERE / HOW TO BEAT IT boxes
 const DOT = 8
 const DOT_ON = 14
 const TURN_SHARE = 0.18 -- of the screen width dragged to turn a page
@@ -72,9 +75,33 @@ const RUBBER = 0.35 -- drag kept past the first / last page
 const WHEEL_GAP = 0.25 -- s between two wheel turns
 const SLIDE = 0.32 -- spring period of the slide
 const SLIDE_DAMPING = 0.85
-const DIM = Color3.fromHex("#4A3D57") -- placeholder photo (Tone.Ink top)
-const SCREEN_TOP = Color3.fromHex("#63C8D4")
-const SCREEN_BOTTOM = Color3.fromHex("#256E7A")
+const DIM = Color3.fromHex("#2B2233") -- placeholder photo (Ink)
+const SCREEN_TOP = Color3.fromHex("#22334A")
+const SCREEN_BOTTOM = Color3.fromHex("#111A28")
+
+-- dark tones of this window (Theme.Tone shape: light top, darker bottom, lip under it)
+const SHELL: Theme.Tone = {
+	Top = Color3.fromHex("#3B3444"),
+	Bottom = Color3.fromHex("#29232F"),
+	Lip = Color3.fromHex("#16121A"),
+	Text = Theme.Color.Cream,
+	Stroke = true,
+}
+const CARD: Theme.Tone = {
+	Top = Color3.fromHex("#2C3B52"),
+	Bottom = Color3.fromHex("#223047"),
+	Lip = Color3.fromHex("#141D2B"),
+	Text = Theme.Color.Cream,
+	Stroke = true,
+}
+const BOX: Theme.Tone = {
+	Top = Color3.fromHex("#1A2536"),
+	Bottom = Color3.fromHex("#16202F"),
+	Lip = Color3.fromHex("#0E1520"),
+	Text = Theme.Color.Cream,
+	Stroke = true,
+}
+const HAZARD_INK = Color3.fromHex("#1A161E")
 
 const TAGS: { [string]: { Text: string, Tone: Theme.Tone } } = {
 	Refuse = { Text = "REFUSE", Tone = Theme.Tone.Mustard },
@@ -109,6 +136,26 @@ local function circle(name: string, size: number, color: Color3, position: UDim2
 	}) :: Frame
 end
 
+-- Ink diagonal stripes over the Mustard band (clipped by it)
+local function hazardStripes(count: number, width: number): { any }
+	const out: { any } = {}
+	for i = 0, count do
+		table.insert(
+			out,
+			create("Frame")({
+				Name = "Stripe",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.new(0, i * width * 2, 0.5, 0),
+				Size = UDim2.new(0, width, 3, 0),
+				Rotation = 40,
+				BackgroundColor3 = HAZARD_INK,
+				BorderSizePixel = 0,
+			})
+		)
+	end
+	return out
+end
+
 -- One page card (static row; lock and "NEW!" follow the props).
 local function pageCard(props: Props, images: { [string]: string }, index: number, row: Content.JournalPage): Frame
 	const open = function(): boolean
@@ -123,7 +170,8 @@ local function pageCard(props: Props, images: { [string]: string }, index: numbe
 	const tag = TAGS[row.Tag] or TAGS.Careful
 	const ref = Content.Anomalies.ByKey[row.Key].Ref
 
-	local function section(order: number, title: string, color: Color3, lines: { string }): Frame
+	-- One block of the entry: its own rounded dark box, the title as a pill in the block's tone, the lines under it.
+	local function section(order: number, title: string, tone: Theme.Tone, lines: { string }): any
 		const bullets: { any } = {}
 		for slot = 1, BULLETS do
 			const line = lines[slot]
@@ -134,7 +182,7 @@ local function pageCard(props: Props, images: { [string]: string }, index: numbe
 						Name = `Line{slot}`,
 						LayoutOrder = slot,
 						TextSize = TEXT,
-						Color = Theme.Color.Dark,
+						Color = Theme.Color.Cream,
 						Stroke = 0,
 						Wrapped = true,
 						XAlignment = Enum.TextXAlignment.Left,
@@ -146,39 +194,56 @@ local function pageCard(props: Props, images: { [string]: string }, index: numbe
 				)
 			end
 		end
-		return create("Frame")({
+		return CartoonPanel({
 			Name = title,
 			LayoutOrder = order,
 			Size = UDim2.fromScale(1, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
-			BackgroundTransparency = 1,
-			vertical({
-				CartoonLabel({
+			Tone = BOX,
+			Outline = 2,
+			OutlineColor = tone.Bottom,
+			Radius = UDim.new(0, 10),
+			Lip = 2,
+			Gloss = false,
+			Padding = { Left = 8, Right = 8, Top = 6, Bottom = 7 },
+			Children = vertical({
+				CartoonPanel({
 					Name = "Heading",
 					LayoutOrder = 0,
-					TextSize = HEADING,
-					Color = color,
-					Text = title,
-					XAlignment = Enum.TextXAlignment.Left,
-					Box = UDim2.new(1, 0, 0, HEADING + 6),
+					Size = UDim2.fromOffset(0, HEADING + 8),
+					AutomaticSize = Enum.AutomaticSize.X,
+					Tone = tone,
+					Outline = 2,
+					Radius = Theme.Radius.Pill,
+					Lip = 2,
+					Gloss = false,
+					Padding = { Left = 9, Right = 9 },
+					Children = {
+						CartoonLabel({
+							TextSize = HEADING,
+							Color = tone.Text,
+							Stroke = if tone.Stroke then 2 else 0,
+							Text = title,
+						}),
+					},
 				}),
 				bullets,
-			}, 1),
-		}) :: Frame
+			}, 4),
+		})
 	end
 
 	const photo = create("Frame")({
 		Name = "Photo",
 		LayoutOrder = 1,
 		Size = UDim2.fromOffset(PHOTO.X, PHOTO.Y),
-		BackgroundColor3 = Color3.new(1, 1, 1),
+		BackgroundColor3 = Theme.Color.Cream,
 		Rotation = if index % 2 == 0 then 2.5 else -2.5,
 		createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = Theme.Outline.Normal }),
 		create("UICorner")({ CornerRadius = UDim.new(0, 4) }),
 		create("Frame")({
 			Name = "Print",
 			Position = UDim2.fromOffset(7, 7),
-			Size = UDim2.new(1, -14, 1, -22),
+			Size = UDim2.new(1, -14, 1, -26),
 			BackgroundColor3 = DIM,
 			BorderSizePixel = 0,
 			ClipsDescendants = true,
@@ -195,7 +260,7 @@ local function pageCard(props: Props, images: { [string]: string }, index: numbe
 			CartoonLabel({
 				Name = "Unknown",
 				AnchorPoint = Vector2.new(0.5, 0.5),
-				Position = UDim2.fromScale(0.5, 0.45),
+				Position = UDim2.fromScale(0.5, 0.5),
 				TextSize = 40,
 				Color = Theme.Color.Mustard,
 				Text = "?",
@@ -203,19 +268,18 @@ local function pageCard(props: Props, images: { [string]: string }, index: numbe
 					return image() == ""
 				end,
 			}),
-			CartoonLabel({
-				Name = "Ref",
-				AnchorPoint = Vector2.new(0.5, 1),
-				Position = UDim2.new(0.5, 0, 1, -3),
-				TextSize = 14,
-				Color = Theme.Color.Cream,
-				Text = function()
-					return if open() then ref else rules.LockedTitle
-				end,
-				Visible = function()
-					return image() == ""
-				end,
-			}),
+		}),
+		-- the ref written under the print
+		CartoonLabel({
+			Name = "Ref",
+			AnchorPoint = Vector2.new(0.5, 1),
+			Position = UDim2.new(0.5, 0, 1, -2),
+			TextSize = 13,
+			Color = Theme.Color.Ink,
+			Stroke = 0,
+			Text = function()
+				return if open() then ref else rules.LockedTitle
+			end,
 		}),
 		create("Frame")({
 			Name = "Tape",
@@ -240,7 +304,7 @@ local function pageCard(props: Props, images: { [string]: string }, index: numbe
 			Padding = { Left = 8, Right = 8 },
 			Visible = fresh,
 			Children = {
-				CartoonLabel({ TextSize = 14, Color = Theme.Color.Dark, Stroke = 0, Text = "NEW!" }),
+				CartoonLabel({ TextSize = 15, Color = Theme.Color.Dark, Stroke = 0, Text = "NEW!" }),
 			},
 		}),
 	})
@@ -254,15 +318,14 @@ local function pageCard(props: Props, images: { [string]: string }, index: numbe
 			CartoonLabel({
 				Name = "Title",
 				LayoutOrder = 2,
-				TextSize = 22,
-				Color = Theme.Color.Dark,
-				Stroke = 0,
+				TextSize = 21,
+				Color = Theme.Color.Cream,
 				Text = function()
 					return if open() then row.Title else rules.LockedTitle
 				end,
 				Box = UDim2.new(1, 0, 0, 28),
 				Scaled = true,
-				MaxTextSize = 22,
+				MaxTextSize = 21,
 			}),
 			CartoonPanel({
 				Name = "Tag",
@@ -299,10 +362,10 @@ local function pageCard(props: Props, images: { [string]: string }, index: numbe
 			BackgroundTransparency = 1,
 			Visible = open,
 			vertical({
-				section(1, "SIGNS", Theme.Color.Teal, row.Signs),
-				section(2, "NOT THERE", Theme.Color.Slate, row.Not),
-				section(3, "HOW TO BEAT IT", Theme.Color.Green, row.Fight),
-			}, 4),
+				section(1, "SIGNS", Theme.Tone.Mustard, row.Signs),
+				section(2, "NOT THERE", Theme.Tone.Cream, row.Not),
+				section(3, "HOW TO BEAT IT", Theme.Tone.Teal, row.Fight),
+			}, SECTION_GAP),
 		}),
 		create("Frame")({
 			Name = "Locked",
@@ -322,15 +385,14 @@ local function pageCard(props: Props, images: { [string]: string }, index: numbe
 				Name = "Mark",
 				LayoutOrder = 1,
 				TextSize = 40,
-				Color = Theme.Color.Dark,
-				Stroke = 0,
+				Color = Theme.Color.Mustard,
 				Text = rules.LockedTitle,
 			}),
 			CartoonLabel({
 				Name = "Text",
 				LayoutOrder = 2,
 				TextSize = TEXT,
-				Color = Theme.Color.Dark,
+				Color = Theme.Color.Cream,
 				Stroke = 0,
 				Wrapped = true,
 				Text = rules.LockedText,
@@ -350,7 +412,7 @@ local function pageCard(props: Props, images: { [string]: string }, index: numbe
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = UDim2.fromScale(0.5, 0.5),
 			Size = UDim2.new(1, -CARD_GAP * 2, 1, 0),
-			Tone = Theme.Tone.Cream,
+			Tone = CARD,
 			Outline = Theme.Outline.Normal,
 			Radius = Theme.Radius.Card,
 			Lip = 3,
@@ -523,6 +585,7 @@ return function(props: Props): Frame
 				AnchorPoint = Vector2.new(1, 0),
 				Position = UDim2.fromScale(1, 0),
 				TextSize = 15,
+				Color = Theme.Color.Mustard,
 				Text = function()
 					return `{found()} found  ·  {props.Index()} / {total}`
 				end,
@@ -587,6 +650,45 @@ return function(props: Props): Frame
 		})
 	end
 
+	-- the hazard band on the top bezel: a Mustard pill with Ink stripes and a dark plate with the title on it
+	const band = CartoonPanel({
+		Name = "Hazard",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0, BEZEL / 2),
+		Size = UDim2.fromOffset(260, 22),
+		Tone = Theme.Tone.Mustard,
+		Outline = 2,
+		Radius = Theme.Radius.Pill,
+		Lip = 0,
+		Gloss = false,
+		Padding = 0,
+		Children = {
+			create("Frame")({
+				Name = "Stripes",
+				Size = UDim2.fromScale(1, 1),
+				BackgroundTransparency = 1,
+				ClipsDescendants = true,
+				hazardStripes(16, 9),
+			}),
+			CartoonPanel({
+				Name = "Plate",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = UDim2.fromOffset(0, 18),
+				AutomaticSize = Enum.AutomaticSize.X,
+				Tone = SHELL,
+				Outline = 2,
+				Radius = Theme.Radius.Pill,
+				Lip = 0,
+				Gloss = false,
+				Padding = { Left = 10, Right = 10 },
+				Children = {
+					CartoonLabel({ TextSize = 13, Color = Theme.Color.Mustard, Stroke = 0, Text = "ANOMALY FILES" }),
+				},
+			}),
+		},
+	})
+
 	const root = create("Frame")({
 		Name = "AnomalyTablet",
 		Size = UDim2.fromScale(1, 1),
@@ -599,7 +701,7 @@ return function(props: Props): Frame
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = UDim2.new(0.5, 0, 0.5, -10),
 			Size = UDim2.fromOffset(SIZE.X, SIZE.Y),
-			Tone = Theme.Tone.Ink,
+			Tone = SHELL,
 			Outline = Theme.Outline.Thick,
 			Radius = UDim.new(0, 30),
 			Lip = LIP,
@@ -617,13 +719,13 @@ return function(props: Props): Frame
 					Size = UDim2.fromScale(1, 1),
 					BackgroundTransparency = 1,
 					ZIndex = 5,
-					circle("Camera", 8, Color3.fromHex("#17111C"), UDim2.fromOffset(SIZE.X / 2, BEZEL / 2)),
+					band,
 					create("TextButton")({
 						Name = "Home",
 						AnchorPoint = Vector2.new(0.5, 0.5),
 						Position = UDim2.new(0.5, 0, 1, -(BEZEL / 2 + LIP)),
 						Size = UDim2.fromOffset(16, 16),
-						BackgroundColor3 = Color3.fromHex("#4A3D57"),
+						BackgroundColor3 = SHELL.Lip,
 						Text = "",
 						AutoButtonColor = true,
 						Selectable = false,
@@ -633,6 +735,7 @@ return function(props: Props): Frame
 						create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
 						createRaw("UIStroke")({ Color = Theme.Color.Slate, Thickness = 2 }),
 					}),
+					circle("Lamp", 8, Theme.Color.Mustard, UDim2.fromOffset(36, BEZEL / 2)),
 					arrow("Prev", 0, -1),
 					arrow("Next", 1, 1),
 					CartoonButton({
