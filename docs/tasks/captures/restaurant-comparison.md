@@ -19,7 +19,7 @@ Prints (mesma câmera antes/depois, FOV 70, Edit):
 | Janela do drive-thru | `restaurant-after/40_window_dt_before.jpg` | `restaurant-after/42_window_dt_after.jpg` |
 | Janela de serviço (frente) | — | `restaurant-after/41_window_front.jpg` |
 | Depósito por produto (rev. 2) | `restaurant-after/21_stock_after.jpg` | `restaurant-after/50_stock_aisle.jpg`, `51_stock_bays_north.jpg` |
-| Lote do Mart (vazio: o Mart foi para o ServerStorage) | — | `restaurant-after/60_mart_lot_empty.jpg` |
+| Lote do Mart → praça + estacionamento (`plaza_lot.luau`) | `restaurant-after/60_mart_lot_empty.jpg` | `restaurant-after/90_plaza_overview.jpg`, `90_plaza_parking.jpg`, `90_plaza_ground.jpg` |
 | Portas DOOR-P / DOOR-B fechadas e abertas (rev. 2) | `restaurant-after/31_door_exit_after.jpg` | `restaurant-after/70_doorP_closed_kitchen.jpg`, `71_doorP_open_doorB_closed.jpg`, `72_doorB_outside.jpg` |
 | Faixa de menu = quadro de pedidos (rev. 2) | — | `restaurant-after/80_menustrip_orderboard.jpg` |
 
@@ -90,4 +90,6 @@ Varredura de faces coplanares sobrepostas (mesma direção, mesmo plano ±0,004,
 
 **Quadro de pedidos:** `TRL/Kitchen/BackCounter/MenuStrip` com `OrderBoard = true`, `OrderBoardFace = "Back"`; face limpa = `Enum.NormalId.Back` (+Z do mundo = norte do MAP, virada para os cozinheiros e para a janela). Aparada para 26,6 × 3,95 (X do MAP 31,0..57,6, Y 4,4..8,35) para não entrar no batente/verga da `DOOR-P`, no poste de canto e no beiral; o texto antigo de preços ficou desligado.
 
-**Z-fighting:** 49 pares (era 16). 34 deles são os fundos dos postes da cerca e do pilar do portão contra o `Rail_E` e a `Union` que o dono baixou até o chão (faces de baixo, invisíveis); os 15 restantes são do conjunto já conhecido (pilotos dos interruptores, cafeteira, CCTV do dono, `LAY-J`, telefone/interruptor no azulejo leste). Nenhum par envolve as baias, as portas ou o quadro desta passada; não mexi nas peças do dono.
+**Z-fighting:** 15 pares (era 16). Os 34 pares novos que as edições do dono criaram (fundos dos postes da cerca e do pilar do portão contra o `Rail_E` e a `Union` deitados no chão) foram resolvidos subindo 0,02 a base dos 25 postes e do `Pillar_E` (`OVERRIDES`; as peças do dono não mudaram). Nenhum par envolve baias, portas ou quadro.
+
+**Lote do Mart:** decisão do dono, praça + estacionamento (`tools/assetplace/plaza_lot.luau`, `workspace.MAP01_PlazaLot`): 5 carros, 4 bancos, árvores, floreiras, 2 lixeiras, quiosque fechado, 2 postes com luz sem sombra, placa P; nada de loja nem ponto de compra.
