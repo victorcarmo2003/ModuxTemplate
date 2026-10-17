@@ -119,6 +119,9 @@ function PartyService:Setup()
 	self.Refused = {} :: { [number]: number }
 	-- UserId -> friends-only check in flight
 	self.Checking = {} :: { [number]: boolean }
+	-- UserId -> PartyId whose teleport has begun (countdown over); any other platform is ignored for them until the
+	-- squad is back to the idle state or their own teleport gives up (owner request 2026-10-17)
+	self.Teleporting = {} :: { [number]: number }
 	self.PollAt = 0 :: number
 	self.Tracked = self.Libs.Signal.new() :: SignalLib.Signal<string, Party, number, string>
 end
@@ -669,6 +672,9 @@ function PartyService:Fire(party: Party)
 		return
 	end
 	party.Launched = true
+	for _, userId in party.Members do
+		self.Teleporting[userId] = party.Id
+	end
 	task.spawn(function()
 		self:Launch(party)
 	end)
@@ -686,6 +692,11 @@ function PartyService:Reopen(party: Party, notify: boolean)
 	for _, userId in party.Members do
 		if self.InFlight[userId] ~= nil then
 			return
+		end
+	end
+	for _, userId in party.Members do
+		if self.Teleporting[userId] == party.Id then
+			self.Teleporting[userId] = nil
 		end
 	end
 	if party.Solo then
@@ -765,6 +776,7 @@ function PartyService:HandleInitFailed(player: Player, result: Enum.TeleportResu
 	end
 	if flight.Tries > #retries then
 		self.InFlight[player.UserId] = nil
+		self.Teleporting[player.UserId] = nil
 		const party = self.Parties[flight.PartyId]
 		if party ~= nil then
 			self:Reopen(party, false)
@@ -847,6 +859,11 @@ end
 
 function PartyService:EnterPlatform(player: Player, platform: number)
 	const userId = player.UserId
+	const teleporting = self.Teleporting[userId]
+	if self.InFlight[userId] ~= nil or (teleporting ~= nil and self.Parties[teleporting] ~= nil) then
+		return -- already on its way with another squad: this platform is denied to them
+	end
+	self.Teleporting[userId] = nil
 	const current = self:PartyOfUser(userId)
 	if current ~= nil and current.Platform == platform then
 		if current.Ready[userId] ~= true and isOpen(current) then
@@ -945,6 +962,7 @@ end
 function PartyService:Forget(player: Player)
 	const userId = player.UserId
 	self.InFlight[userId] = nil
+	self.Teleporting[userId] = nil
 	self.Invites[userId] = nil
 	self.OnPlatform[userId] = nil
 	self.Refused[userId] = nil
