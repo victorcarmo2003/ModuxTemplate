@@ -7,6 +7,10 @@
 -- Wave 3 (TASK-131, DEC-221, architecture.md §19.14 v4.2): VehicleController plugs a probe over the `Shutter`
 -- attribute of the current vehicle (SetShutterProbe). With the service window closed "Take Order" and "Serve"
 -- show no prompt (the server gate `Shutter` refuses them anyway). Without a probe nothing changes.
+-- Restaurant (TASK-383, tech/restaurant-flow.md rev. 2 §2.2 / §8 "prompts amontoados"): tablet_take / plate_put /
+-- plate_take never show with Content.Restaurant.Rules.Enabled off; plate_put only with the right Tool in hand, plate_take
+-- only with a free hand. PlateController plugs a probe over the Plates set (SetPlateProbe) to also drop the plates that
+-- cannot take that item, when the anchor carries its plate index as `Slot`.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 
@@ -51,6 +55,19 @@ export type ShutterProbe = {
 	IsInside: (() -> boolean)?, -- local character inside the trailer (LZ-1, the volume VehicleService:IsInside reads)
 }
 
+-- Read side of the Plates set (restaurant, TASK-383), given by PlateController. `Slot` of the target = plate index
+-- (PlateIndex) when the anchor carries it; without it only the hand decides.
+export type PlateRecord = { Npc: number, Bun: boolean, Sausage: boolean }
+export type PlateProbe = {
+	Plate: (index: number) -> PlateRecord?,
+}
+
+-- Restaurant prompts (tech/restaurant-flow.md rev. 2 §4.2): none while Content.Restaurant.Rules.Enabled is false (the
+-- trailer flow; the published game stays the same).
+const RESTAURANT_ACTIONS: { [string]: boolean } = { tablet_take = true, plate_put = true, plate_take = true }
+-- plate_put by hand (§2.2): what the plate takes from each Tool
+const PLATE_PUT_ITEMS: { [string]: boolean } = { bun_sliced = true, sausage_grilled = true, hot_dog = true }
+
 -- Counter actions the closed window stops (architecture.md §19.14 gate `Shutter`).
 const COUNTER_ACTIONS: { [string]: boolean } = { take_order = true, serve = true }
 
@@ -65,11 +82,42 @@ for _, package in Content.Packages.List do
 end
 
 local shutterProbe: ShutterProbe? = nil
+local plateProbe: PlateProbe? = nil
 
 const Rules = {}
 
 function Rules.SetShutterProbe(probe: ShutterProbe?)
 	shutterProbe = probe
+end
+
+function Rules.SetPlateProbe(probe: PlateProbe?)
+	plateProbe = probe
+end
+
+-- plate_put / plate_take by hand (TASK-383; design FEAT-044 / FEAT-045). The server revalidates and picks the Tool.
+--   plate_put   only with bun_sliced, sausage_grilled or hot_dog equipped; on a known plate: the bun only where there is
+--               none, the dog only on a bun without one, a whole hot dog only on an empty plate
+--   plate_take  only with a free hand (nothing equipped); on a known plate only with bun and dog on it
+local function plateAllows(action: string, held: Held?, slot: number?): boolean
+	if action == "plate_take" and held ~= nil then
+		return false
+	elseif action == "plate_put" and (held == nil or not PLATE_PUT_ITEMS[held.Item]) then
+		return false
+	end
+	const plate = if plateProbe and slot then plateProbe.Plate(slot) else nil
+	if plate == nil then
+		return true -- unknown plate: the hand decided, the server does the rest
+	end
+	if action == "plate_take" then
+		return plate.Bun and plate.Sausage
+	end
+	const item = (held :: Held).Item
+	if item == "bun_sliced" then
+		return not plate.Bun
+	elseif item == "sausage_grilled" then
+		return plate.Bun and not plate.Sausage
+	end
+	return not plate.Bun and not plate.Sausage -- hot_dog
 end
 
 -- Text of the `shutter_toggle` pill for the `Shutter` attribute of its vehicle (true = closed).
@@ -118,6 +166,14 @@ function Rules.Allows(target: Target, context: Context): boolean
 	const memberId = target.MemberId
 	if memberId and memberId == context.SelfId then
 		return false
+	end
+
+	if RESTAURANT_ACTIONS[target.Action] then
+		if not Content.Restaurant.Rules.Enabled then
+			return false
+		elseif target.Action ~= "tablet_take" and not plateAllows(target.Action, context.Held, target.Slot) then
+			return false
+		end
 	end
 
 	if action.Night == "DayOnly" and context.IsNight then

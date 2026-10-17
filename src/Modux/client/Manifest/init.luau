@@ -40,6 +40,7 @@ local ObjectiveController = require(StarterPlayer.StarterPlayerScripts.client.Mo
 local OpalController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.OpalController)
 local PedestrianController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PedestrianController)
 local PlaceController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PlaceController)
+local PlateController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PlateController)
 local PrepController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PrepController)
 local WorkSlideController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.WorkSlideController)
 local ProfileController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ProfileController)
@@ -57,6 +58,7 @@ local ShopController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTy
 local ShowcaseController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ShowcaseController)
 local SkinController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.SkinController)
 local StageController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.StageController)
+local TabletController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.TabletController)
 local ThiefController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ThiefController)
 local TrafficController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.TrafficController)
 local TrafficLightController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.TrafficLightController)
@@ -106,6 +108,7 @@ export type AllControllers = {
 	OpalController: OpalController.Public,
 	PedestrianController: PedestrianController.Public,
 	PlaceController: PlaceController.Public,
+	PlateController: PlateController.Public,
 	PrepController: PrepController.Public,
 	WorkSlideController: WorkSlideController.Public,
 	ProfileController: ProfileController.Public,
@@ -123,6 +126,7 @@ export type AllControllers = {
 	ShowcaseController: ShowcaseController.Public,
 	SkinController: SkinController.Public,
 	StageController: StageController.Public,
+	TabletController: TabletController.Public,
 	ThiefController: ThiefController.Public,
 	TrafficController: TrafficController.Public,
 	TrafficLightController: TrafficLightController.Public,

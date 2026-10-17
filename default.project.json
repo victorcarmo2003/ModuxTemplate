@@ -735,6 +735,12 @@
 							"optional": "src/Place/client"
 						}
 					},
+					"Plate": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Plate/client"
+						}
+					},
 					"Prep": {
 						"$ignoreUnknownInstances": false,
 						"$path": {
@@ -799,6 +805,12 @@
 						"$ignoreUnknownInstances": false,
 						"$path": {
 							"optional": "src/Stage/client"
+						}
+					},
+					"Tablet": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Tablet/client"
 						}
 					},
 					"Thief": {
