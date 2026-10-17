@@ -26,6 +26,7 @@ local Orders = require(script.Parent.Orders)
 local Outfits = require(script.Parent.Outfits)
 local Packages = require(script.Parent.Packages)
 local Prep = require(script.Parent.Prep)
+local Restaurant = require(script.Parent.Restaurant)
 local Revive = require(script.Parent.Revive)
 local RunParams = require(script.Parent.RunParams)
 local Sanity = require(script.Parent.Sanity)
@@ -2187,6 +2188,169 @@ local function checkTipJar()
 	end
 end
 
+-- Restaurant (tech/restaurant-flow.md rev. 2 §4.2; design/restaurant-flow.md): ranges against the wire (Net Plates, Tablets,
+-- DriveCars, Hatch, Customers.Pickup / Drive), Dialog covers every ingredient of an order, the actions and stations exist
+const RESTAURANT_ACTIONS: { string } =
+	{ "tablet_take", "bun_slice", "plate_put", "plate_take", "grill_flip", "rail_take", "pickup_serve", "drive_serve", "order_stock", "take_box" }
+const RESTAURANT_NOTICES: { string } =
+	{ "plates_full", "pickup_full", "plate_full", "plate_not_ready", "tablet_busy", "drive_left", "supply_busy", "supply_ordered", "stock_low" }
+const PICKUP_WIRE_MAX = 12 -- Net Customers.Pickup
+const DRIVE_WIRE_MAX = 3 -- Net Customers.Drive / DriveCars records
+const TABLET_WIRE_MAX = 8 -- Tablets records (TAB-n and the DT-PC index)
+const HATCH_WIRE_MAX = 8 -- Net Hatch records
+
+local function checkByParty(name: string, field: string, list: { number }, low: number, high: number)
+	if #list ~= 4 then
+		fail(name, nil, nil, `{field} needs 4 entries (party 1..4)`)
+	end
+	for index, value in list do
+		inRange(name, index, nil, field, value, low, high)
+	end
+end
+
+local function checkRestaurant()
+	const name = "Restaurant"
+	const rules = Restaurant.Rules
+	inRange(name, nil, nil, "Rules.PlateSlotsMax", rules.PlateSlotsMax, 1, 64)
+	inRange(name, nil, nil, "Rules.PlateSlots", rules.PlateSlots, 1, rules.PlateSlotsMax)
+	inRange(name, nil, nil, "Rules.PickupSlotsMax", rules.PickupSlotsMax, 1, PICKUP_WIRE_MAX)
+	checkByParty(name, "Rules.ActivePlates", rules.ActivePlates, 1, rules.PlateSlots)
+	checkByParty(name, "Rules.PickupSlots", rules.PickupSlots, 1, rules.PickupSlotsMax)
+	inRange(name, nil, nil, "Rules.TabletsMax", rules.TabletsMax, 1, TABLET_WIRE_MAX)
+	inRange(name, nil, nil, "Rules.DrivePcIndex", rules.DrivePcIndex, rules.TabletsMax + 1, TABLET_WIRE_MAX)
+	inRange(name, nil, nil, "Rules.QueuePerTablet", rules.QueuePerTablet, 1, 8)
+	inRange(name, nil, nil, "Rules.TalkRadius", rules.TalkRadius, rules.TakeRadius, 50)
+	inRange(name, nil, nil, "Rules.OrderNumberMax", rules.OrderNumberMax, 9, 255)
+	inRange(name, nil, nil, "Rules.FillAllHold", rules.FillAllHold, 0, 5)
+	inRange(name, nil, nil, "Rules.UrgentAt", rules.UrgentAt, 0, 1)
+	inRange(name, nil, nil, "Rules.SlotLock", rules.SlotLock, 0, 5)
+	const radii: { [string]: number } = { tablet_take = rules.TakeRadius, pickup_serve = rules.ServeRadius }
+	for key, radius in radii do
+		const action = Actions.ByKey[key]
+		if action ~= nil and action.Radius ~= radius then
+			fail(name, nil, nil, `Actions.{key}.Radius differs from Restaurant.Rules ({radius})`)
+		end
+	end
+
+	const talk = Restaurant.Talk
+	for field, value in talk :: any do
+		inRange(name, nil, nil, `Talk.{field}`, value :: number, 0, 60)
+	end
+	if talk.HurryMult < 1 or talk.VeteranMult < 1 then
+		fail(name, nil, nil, "Talk.HurryMult and Talk.VeteranMult speed up (>= 1)")
+	end
+	for field, value in Restaurant.Patience :: any do
+		inRange(name, nil, nil, `Patience.{field}`, value :: number, 0, 255) -- Customers.PatienceSpan is 8 bits
+	end
+	for field, value in Restaurant.Stacks :: any do
+		inRange(name, nil, nil, `Stacks.{field}`, value :: number, 1, 99)
+	end
+	const grill = Restaurant.Grill
+	inRange(name, nil, nil, "Grill.BurnAfter", grill.BurnAfter, 1, 600)
+	inRange(name, nil, nil, "Grill.FlipFrom", grill.FlipFrom, 0, 1)
+	inRange(name, nil, nil, "Grill.FlipTo", grill.FlipTo, grill.FlipFrom, 1)
+	inRange(name, nil, nil, "Grill.PickupGood", grill.PickupGood, grill.PickupPerfect, 600)
+	const slice = Actions.ByKey.bun_slice
+	const cut = Stations.ByKey.cut
+	if slice == nil or cut == nil or slice.Hold ~= Restaurant.Bun.CutHold or cut.Params.CutTime ~= Restaurant.Bun.CutHold then
+		fail(name, nil, nil, "Actions.bun_slice.Hold and Stations.cut.Params.CutTime must equal Restaurant.Bun.CutHold")
+	end
+	const tables = Restaurant.Tables
+	inRange(name, nil, nil, "Tables.Count", tables.Count, 1, Seating.Tables)
+	inRange(name, nil, nil, "Tables.GroupsPerTable", tables.GroupsPerTable, 1, 2)
+	inRange(name, nil, nil, "Tables.EatTime", tables.EatTime, 1, 120)
+	inRange(name, nil, nil, "Tables.EatJitter", tables.EatJitter, 0, tables.EatTime)
+	inRange(name, nil, nil, "Tables.TableTip", tables.TableTip, 0, Seating.MaxTip)
+	const flow = Restaurant.Flow
+	checkByParty(name, "Flow.PartyMult", flow.PartyMult, 0.1, 10)
+	checkByParty(name, "Flow.MaxCustomers", flow.MaxCustomers, 1, 12) -- DEC-045: 12 rigs
+	for index, value in flow.NightInterval do
+		inRange(name, index, nil, "Flow.NightInterval", value, 1, 600)
+	end
+
+	const drive = Restaurant.Drive
+	inRange(name, nil, nil, "Drive.Lanes", drive.Lanes, 1, DRIVE_WIRE_MAX)
+	inRange(name, nil, nil, "Drive.UnlockNight", drive.UnlockNight, 1, 100)
+	checkByParty(name, "Drive.ShareByParty", drive.ShareByParty, 0, 1)
+	checkByParty(name, "Drive.QueueByParty", drive.QueueByParty, 0, drive.Lanes - 1)
+	inRange(name, nil, nil, "Drive.PetChance", drive.PetChance, 0, 1)
+	inRange(name, nil, nil, "Drive.StressAt", drive.StressAt, 0, 1)
+	local last = 1
+	for index, at in drive.HornAt do
+		if at <= 0 or at >= last then
+			fail(name, index, nil, "Drive.HornAt must be decreasing fractions in (0, 1)")
+		end
+		last = at
+	end
+
+	const supply = Restaurant.Supply
+	inRange(name, nil, nil, "Supply.HatchSpots", supply.HatchSpots, 1, HATCH_WIRE_MAX)
+	inRange(name, nil, nil, "Supply.MaxBoxes", supply.MaxBoxes, 1, 24)
+	inRange(name, nil, nil, "Supply.InTransit", supply.InTransit, 1, 4)
+	inRange(name, nil, nil, "Supply.Fee", supply.Fee, 0, 1000)
+	inRange(name, nil, nil, "Supply.Eta", supply.Eta, 1, 600)
+	inRange(name, nil, nil, "Supply.LowAt", supply.LowAt, 0, 1)
+	for index, value in supply.EtaExpress do
+		inRange(name, index, nil, "Supply.EtaExpress", value, 1, supply.Eta)
+	end
+	for index, value in supply.MaxBoxesBig do
+		inRange(name, index, nil, "Supply.MaxBoxesBig", value, supply.MaxBoxes, 24)
+	end
+	for key, count in supply.StartBoxes do
+		if not Packages.ByKey[key] then
+			fail(name, nil, key, "Supply.StartBoxes key is not a Packages key")
+		end
+		inRange(name, nil, key, "Supply.StartBoxes", count, 0, supply.HatchSpots)
+	end
+
+	const dialog = Restaurant.Dialog
+	const needs: { string } = { "bun", "sausage" }
+	for _, key in Ingredients.ToppingKeys do
+		table.insert(needs, key)
+	end
+	for _, key in needs do
+		const lines = dialog.Ask[key]
+		if lines == nil or #lines == 0 then
+			fail(name, nil, key, "Dialog.Ask needs at least one line per order ingredient")
+		end
+	end
+	for key in dialog.Ask do
+		if not Ingredients.ByKey[key] then
+			fail(name, nil, key, "Dialog.Ask key is not an Ingredients key")
+		end
+	end
+	const lineSets: { [string]: { string } } =
+		{ Greeting = dialog.Greeting, Opening = dialog.Opening, Close = dialog.Close, Blank = dialog.Blank }
+	for field, lines in lineSets do
+		if #lines == 0 then
+			fail(name, nil, nil, `Dialog.{field} is empty`)
+		end
+	end
+	if string.format(Restaurant.Binding.PickupPoint, 1) == Restaurant.Binding.PickupPoint then
+		fail(name, nil, nil, "Binding.PickupPoint needs a %d")
+	end
+
+	for _, key in RESTAURANT_ACTIONS do
+		if not Actions.ByKey[key] then
+			fail(name, nil, key, "action missing in Actions")
+		end
+	end
+	for _, key in RESTAURANT_NOTICES do
+		if not Notices.ByKey[key] then
+			fail(name, nil, key, "notice missing in Notices")
+		end
+	end
+	if not Items.ByKey.bun_sliced or not Items.ByKey.sausage_grilled or not Items.ByKey.stock_box then
+		fail(name, nil, nil, "Items bun_sliced, sausage_grilled and stock_box are required")
+	end
+	if Items.Rules.CategoryLimits.Ingredient == nil then
+		fail(name, nil, nil, "ItemRules.CategoryLimits.Ingredient is required")
+	end
+	if Seating.SitAt ~= "Order" and Seating.SitAt ~= "Served" then
+		fail("Seating", nil, nil, `SitAt '{tostring(Seating.SitAt)}' must be Order or Served`)
+	end
+end
+
 return function()
 	checkKeySets()
 	checkTipJar()
@@ -2218,4 +2382,5 @@ return function()
 	checkMart()
 	checkSeating()
 	checkPrep()
+	checkRestaurant()
 end

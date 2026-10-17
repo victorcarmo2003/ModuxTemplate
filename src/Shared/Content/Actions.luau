@@ -141,4 +141,27 @@ return Table.new({
 	-- Anomaly Tablet (TASK-335, TASK-345; owner request 2026-10-15, Provisional): Prompt_Tablet on the tablet in the
 	-- trailer (tools/assetplace/anomaly_tablet.luau). Opens it on this client (JournalOpen); nothing else changes.
 	{ Key = "read_journal", Text = "Anomaly Tablet", Hold = 0, Radius = 6, Requires = {}, Night = "Any", Wave = 3 },
+
+	-- Restaurant (DEC-269..DEC-280; tech/restaurant-flow.md rev. 2 §4.2, design/restaurant-flow.md FEAT-043..FEAT-050).
+	-- Wave R0 contracts: no anchor in the place and no handler until R1 (Content.Restaurant.Rules.Enabled). The client shows
+	-- plate_put / plate_take by hand (PromptController/Rules.luau); the server revalidates. Texts placeholder (ui-text.md).
+	-- TAB-1 Prompt_Take (and DT-PC, R3): the talk at the tablet (TabletService). Radius = Restaurant.Rules.TakeRadius
+	{ Key = "tablet_take", Text = "Take Order", Hold = 0, Radius = 6, Requires = {}, Night = "Any", Wave = 3 },
+	-- CUT-n (Stations.cut): one bun -> bun_sliced stack. Hold = Restaurant.Bun.CutHold (wave 0 of the design)
+	{ Key = "bun_slice", Text = "Slice Bun", Hold = 0.6, Radius = 6, Requires = {}, Night = "Any", Wave = 3 },
+	-- PLATE-n Prompt_Put: "Add Bun" / "Add Dog" / "Put Plate" by hand (PromptText from PlateService)
+	{ Key = "plate_put", Text = "Put Plate", Hold = 0, Radius = 5, Requires = {}, Night = "Any", Wave = 3 },
+	-- PLATE-n Prompt_Take: the plate becomes the hot_dog Tool (attribute Ticket); PromptText "Pick Up #12"
+	{ Key = "plate_take", Text = "Take Plate", Hold = 0, Radius = 5, Requires = {}, Night = "Any", Wave = 3 },
+	-- GRILL-n Att_Slot<n>: flip inside the window (Restaurant.Grill.FlipFrom..FlipTo); the server stamps Grill.Flip
+	{ Key = "grill_flip", Text = "Flip", Hold = 0, Radius = 7, Requires = {}, Night = "Any", Wave = 3 },
+	-- hot pile next to the grill (Stations.rail): ready dogs -> sausage_grilled stack
+	{ Key = "rail_take", Text = "Take Dogs", Hold = 0, Radius = 7, Requires = {}, Night = "Any", Wave = 3 },
+	-- PICKUP Prompt_Serve: hand the plate over the counter (CustomerService:ServeAtPickup). Radius = Rules.ServeRadius
+	{ Key = "pickup_serve", Text = "Hand Over", Hold = 0, Radius = 7, Requires = {}, Night = "Any", Wave = 3 },
+	-- DT-WIN (wave R3): hand the plate out of the drive-thru window
+	{ Key = "drive_serve", Text = "Hand Out", Hold = 0, Radius = 6, Requires = {}, Night = "Any", Wave = 4 },
+	-- FEAT-050 supply: the phone opens the stock menu ("Call" confirms with Restaurant.Supply.PhoneHold); the hatch gives a box
+	{ Key = "order_stock", Text = "Order Stock", Hold = 0, Radius = 6, Requires = {}, Night = "Any", Wave = 4 },
+	{ Key = "take_box", Text = "Take Box", Hold = 0, Radius = 6, Requires = {}, Night = "Any", Wave = 4 },
 } :: { Action })

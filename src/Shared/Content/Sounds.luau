@@ -322,6 +322,15 @@ const base = Table.new({
 	sfx("window_slam", false, { Volume = 1, MaxDistance = 80 }), -- ANM-012: the window thrown open (door_close fallback)
 	sfx("car_screech", false, { Volume = 0.9, MaxDistance = 140 }), -- ANM-008: brakes in front of the trailer
 	sfx("swarm_flutter", false, { Volume = 0.8, MaxDistance = 90 }), -- ANM-003: moths and bats (shadow_whoosh fallback)
+	-- restaurant (tech/restaurant-flow.md rev. 2 §4.2; wave R0 rows, Id "" = silence until the audio list uploads them)
+	sfx("plate_put", false, { Volume = 0.5, MaxDistance = 40 }),
+	sfx("ticket_pop", false, { Spatial = false, Volume = 0.4 }), -- HUD note pop-up per item at the tablet
+	sfx("dialog_blip", false, { Volume = 0.4, MaxDistance = 30 }),
+	sfx("grill_burnt", false, { Volume = 0.6, MaxDistance = 50 }),
+	sfx("car_horn", false, { Volume = 0.8, MaxDistance = 120 }),
+	sfx("car_horn_long", false, { Volume = 0.9, MaxDistance = 120 }),
+	sfx("car_arrive", false, { Volume = 0.6, MaxDistance = 100 }),
+	sfx("van_arrive", false, { Volume = 0.6, MaxDistance = 100 }), -- FEAT-050 delivery at the hatch
 	-- Ui
 	ui("toast"),
 	ui("summary"),

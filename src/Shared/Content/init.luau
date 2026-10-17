@@ -38,6 +38,7 @@ local Orders = require(script.Orders)
 local Outfits = require(script.Outfits)
 local Packages = require(script.Packages)
 local Prep = require(script.Prep)
+local Restaurant = require(script.Restaurant)
 local Revive = require(script.Revive)
 local RunParams = require(script.RunParams)
 local Sanity = require(script.Sanity)
@@ -139,6 +140,13 @@ export type PrepSlotPhase = Prep.SlotPhase
 export type PrepWorldRules = Prep.WorldRules
 export type Phase = Shift.Phase
 export type Revive = Revive.Revive
+export type Restaurant = Restaurant.Restaurant
+export type RestaurantRules = Restaurant.Rules
+export type RestaurantTalk = Restaurant.Talk
+export type RestaurantDrive = Restaurant.Drive
+export type RestaurantSupply = Restaurant.Supply
+export type RestaurantDialog = Restaurant.Dialog
+export type RestaurantBinding = Restaurant.Binding
 export type HapticProfile = Haptics.Profile
 export type HapticKey = Haptics.Key
 export type RunParams = RunParams.RunParams
@@ -307,4 +315,8 @@ return table.freeze({
 
 	-- Class skins, Robux only (owner request 2026-10-17; design/skins-proposal.md; SkinService, SkinController). Provisional
 	Skins = Skins,
+
+	-- Restaurant flow (DEC-269..DEC-280; tech/restaurant-flow.md rev. 2 §4.1, design/restaurant-flow.md). Wave R0 contracts,
+	-- Rules.Enabled = false until the map and the R1 tracks land. Provisional
+	Restaurant = Restaurant,
 })

@@ -31,7 +31,8 @@ const base = Table.new({
 		Key = "grill",
 		Letter = "G",
 		Record = "PerSlot",
-		Actions = { "grill_collect" },
+		-- grill_flip: restaurant prompt on Att_Slot<n> (wave R0 contract, R1-A handler; tech/restaurant-flow.md §2.3)
+		Actions = { "grill_collect", "grill_flip" },
 		Params = {},
 	},
 	{
@@ -39,7 +40,8 @@ const base = Table.new({
 		Key = "rail",
 		Letter = "R",
 		Record = "Single",
-		Actions = {},
+		-- rail_take: restaurant hot pile "Take Dogs" -> sausage_grilled stack (wave R0 contract, R1-A handler)
+		Actions = { "rail_take" },
 		Params = {},
 	},
 	{
@@ -93,6 +95,16 @@ const base = Table.new({
 		Record = "None",
 		Actions = { "prep_work" },
 		Params = {},
+	},
+	{
+		-- Restaurant CUT-n (tech/restaurant-flow.md rev. 2 §2.3; design FEAT-045). Wave R0 contract: no module and no anchor
+		-- yet (R1-A writes Stations/Cut.luau). Stock is Stock.bun; CutTime = Actions.bun_slice.Hold = Restaurant.Bun.CutHold
+		Key = "cut",
+		Letter = "CUT",
+		Record = "None",
+		Actions = { "bun_slice", "restock" },
+		Ingredient = "bun",
+		Params = { CutTime = 0.6 },
 	},
 } :: { Station })
 

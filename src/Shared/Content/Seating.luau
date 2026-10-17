@@ -66,7 +66,13 @@ export type Seats = {
 	Couple: { number }, -- a couple: side by side
 }
 
+-- Restaurant (tech/restaurant-flow.md rev. 2 §3.1, §4.2): "Order" = sit right after "Take Order" (Q-209, the trailer);
+-- "Served" = sit after the sale at the pickup counter, carrying the plate (DEC-280)
+export type SitAt = "Order" | "Served"
+
 export type Seating = {
+	SitAt: SitAt, -- wave R0 contract; R1-I reads it. Default "Order" = the published game
+	DirtyTables: boolean, -- false: no tray / Clean Table, the table tip goes straight to the tip jar (restaurant)
 	UnlockDay: number, -- ghosts and sitting from this day (Day 1 = tutorial)
 	Tables: number, -- table records 1..Tables (TBL-1..TBL-4), sum of the Groups
 	Groups: { Group },
@@ -100,6 +106,8 @@ export type Seating = {
 }
 
 const seating: Seating = {
+	SitAt = "Order",
+	DirtyTables = true,
 	UnlockDay = 2,
 	Tables = 4,
 	Groups = {

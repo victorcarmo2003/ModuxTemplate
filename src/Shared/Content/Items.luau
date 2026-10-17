@@ -6,8 +6,8 @@
 -- A10); items left by a spectator on the counter (DROP-T) last until the end of the next shift (ItemService rule).
 local Table = require(script.Parent.Table)
 
-export type Kind = "Package" | "Consumable" | "Product" | "Revive" | "Anomaly"
-export type Category = "Package" | "HotDog" | "Coffee" | "Altered" | "Revive"
+export type Kind = "Package" | "Consumable" | "Product" | "Revive" | "Anomaly" | "Ingredient"
+export type Category = "Package" | "HotDog" | "Coffee" | "Altered" | "Revive" | "Ingredient"
 export type DropOnHit = "Keep" | "Lost" | "Vanish"
 
 export type Item = {
@@ -101,6 +101,46 @@ const base = Table.new({
 		KeepOnSpectate = false,
 		Use = true, -- wave 4 (ReviveService)
 	},
+	-- Restaurant (tech/restaurant-flow.md rev. 2 §4.2, design FEAT-045/FEAT-050; wave R0, kit Tools come with R1-E).
+	-- Stacks: Count = pieces in hand, capped by Content.Restaurant.Stacks (Bun / Sausage; UPG-018/019 raise it)
+	{
+		Key = "bun_sliced",
+		Ref = "ITM-022",
+		Name = "Buns",
+		Kind = "Ingredient",
+		Category = "Ingredient",
+		Stackable = true,
+		DropOnHit = "Keep",
+		DropDespawn = 90,
+		KeepOnSpectate = false,
+		Use = false,
+	},
+	{
+		Key = "sausage_grilled",
+		Ref = "ITM-023",
+		Name = "Dogs",
+		Kind = "Ingredient",
+		Category = "Ingredient",
+		Stackable = true,
+		DropOnHit = "Keep",
+		DropDespawn = 90,
+		KeepOnSpectate = false,
+		Use = false,
+	},
+	-- FEAT-050 stock box from the service hatch: attribute Package (Content.Packages key) + Count = units left; Restock like a
+	-- Mart package (category Package, same per-player limit: 2, PackageLimit stat 3)
+	{
+		Key = "stock_box",
+		Ref = "ITM-024",
+		Name = "Box",
+		Kind = "Package",
+		Category = "Package",
+		Stackable = true,
+		DropOnHit = "Keep",
+		DropDespawn = 90,
+		KeepOnSpectate = false,
+		Use = false,
+	},
 } :: { Item })
 
 const rules: ItemRules = {
@@ -111,6 +151,7 @@ const rules: ItemRules = {
 		Coffee = 1,
 		Altered = 1,
 		Revive = 1, -- DEC-100
+		Ingredient = 2, -- restaurant stacks: one bun_sliced + one sausage_grilled (design FEAT-045, Provisional)
 	},
 }
 

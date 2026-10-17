@@ -36,6 +36,7 @@ export type Public = {
 	RateCount: { [Player]: number },
 	RateStart: { [Player]: number },
 	Refused: { [number]: number },
+	Teleporting: { [number]: number },
 	Tracked: SignalLib.Signal<string, Party, number, string>,
 	Setup: (self: Public) -> (),
 	Get: (self: Public, partyId: number) -> Party?,

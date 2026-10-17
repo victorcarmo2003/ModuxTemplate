@@ -16,6 +16,10 @@ export type Vehicle = {
 	HasCoffee: boolean,
 	HasSwitch: boolean,
 	HasShutter: boolean, -- service window with Prompt_Shutter / shutter_toggle (DEC-221)
+	-- Restaurant (tech/restaurant-flow.md rev. 2 §4.2, DT-R1: the restaurant building IS the Model Vehicle = "trailer").
+	-- false = TrailerDoorService makes no back door anchors (the player never leaves the restaurant, DEC-280)
+	HasBackDoor: boolean,
+	Restaurant: boolean, -- true = this vehicle is the restaurant building (set with Content.Restaurant.Rules.Enabled)
 }
 
 return Table.new({
@@ -29,5 +33,7 @@ return Table.new({
 		HasCoffee = true, -- UPG-007 Coffee Maker, fixed, not sold (DEC-055, DEC-125)
 		HasSwitch = true, -- "Lights" switch (DEC-189)
 		HasShutter = true, -- service window opens/closes from the button next to the switch (DEC-221)
+		HasBackDoor = true, -- wave R0: the trailer keeps its door until the restaurant map lands (R1-E / R1-H flip it)
+		Restaurant = false,
 	},
 } :: { Vehicle })

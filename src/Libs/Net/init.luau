@@ -39,6 +39,10 @@ local function settingsRecord()
 	})
 end
 
+-- Restaurant sets (wave R0) live in their own namespace and module, Net.Restaurant: required here so both machines
+-- define it before Lync.start; code reaches them with require(ReplicatedStorage.shared.Libs.Net.Restaurant).
+require(script.Restaurant)
+
 return Lync.define("game", {
 	-- c -> s handshake (NetService.Audience)
 	Ready = Lync.packet(Lync.empty()),
@@ -216,7 +220,8 @@ return Lync.define("game", {
 	Stations = Lync.replicate(Lync.struct({
 		Kind = Lync.enum(Content.Stations.RecordKeys), -- grill, rail, board (2 records, DEC-190)
 		-- Cleaning: coffee machine only (TASK-328), the wait after a cup is taken, StartedAt/Duration like Working
-		State = Lync.enum({ "Empty", "Working", "Ready", "Cleaning" }),
+		-- Burnt: restaurant grill slot left Ready past Content.Restaurant.Grill.BurnAfter (design FEAT-045; wave R0, no writer yet)
+		State = Lync.enum({ "Empty", "Working", "Ready", "Cleaning", "Burnt" }),
 		StartedAt = Lync.f64(), -- 0 = idle
 		Duration = Lync.quant(0, 120, 0.1), -- real duration (level and class applied)
 		Count = Lync.int(0, 30), -- rail: sausages on it; others 0
@@ -248,6 +253,13 @@ return Lync.define("game", {
 		-- §14.2 (TASK-144; FEAT-038). Pair partner: NpcId of its leader (nil = not a partner). A partner never shows a
 		-- balloon nor prompts; its State is Arriving / Queued / Leaving only
 		Leader = Lync.optional(Lync.int(1, 65535)),
+		-- Restaurant (tech/restaurant-flow.md rev. 2 §2.6; wave R0, no writer until R1-C / R3). nil = the trailer flow.
+		-- Place in the pickup line PU-1..n after "Take Order" (n <= Content.Restaurant.Rules.PickupSlotsMax); nil = not in it
+		Pickup = Lync.optional(Lync.int(1, 12)),
+		-- #n of the order over the head, on the plate ticket and on the HUD note (design FEAT-043; 1..Rules.OrderNumberMax)
+		Number = Lync.optional(Lync.int(1, 255)),
+		-- §3.4 (wave R3): drive-thru lane spot (DriveCars id); nil = a walking customer
+		Drive = Lync.optional(Lync.int(1, 3)),
 	})),
 
 	-- §3.7, record = Content.Upgrades.IndexOf[key]; levels of the current vehicle only (DEC-184). Writer: UpgradeService

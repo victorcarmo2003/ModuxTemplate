@@ -419,6 +419,37 @@ wave3.Tagged = concat(wave2.Tagged, {
 })
 wave3.Routes = wave2.Routes
 
+-- Restaurant (DEC-269..DEC-280; tech/restaurant-flow.md rev. 2 §4.1). Only with Content.Restaurant.Rules.Enabled: until the
+-- restaurant map lands (track R1-E) the place has the trailer and none of these, so nothing new is required and the boot
+-- stays the same. The legacy points (TRL, CART, Q1..Q5, PS-*, DROP-T, L3, AN-05, TRL-OUT, LZ-1, TBL-1..4) stay required.
+-- Required when on: tags Tablet (TAB-1) and Pickup (PICKUP); MapPoint + NpcNode PU-1..n (n = largest active pickup line,
+-- Rules.PickupSlots) chained to Q1 and to the exit. Optional (never required here): TAB-2 / Q1B, PLATE-n (PlateService binds
+-- what exists), DT-* (wave R3), the supply hatch, phone prompt and VAN-* (FEAT-050).
+-- The restaurant kitchen has repeated kinds (GRILL-n, CUT-n, COND-n) and no board / bun crate, so the "exactly one station
+-- of each kind" rule of kitchen() does not fit it: only the coffee machine stays checked (KitchenService binds the rest by
+-- tag + StationKind). Change tools/assetplace/check_map01.luau together when this goes on.
+const restaurant = Content.Restaurant
+if restaurant.Rules.Enabled then
+	local pickups = 0
+	for _, count in restaurant.Rules.PickupSlots do
+		pickups = math.max(pickups, count)
+	end
+	const pickupIds = restaurant.PickupPoints(pickups)
+	wave3.Tags = union(wave3.Tags, { restaurant.Binding.TabletTag, restaurant.Binding.PickupTag })
+	wave3.Points = union(wave3.Points, pickupIds)
+	wave3.Nodes = union(wave3.Nodes, pickupIds)
+	wave3.Vehicles = {
+		trailer = {
+			Stations = { coffee_machine = { Actions = { brew_coffee = 1, restock = 1 } } },
+			Actions = { answer_phone = 1, switch_light = 1, shutter_toggle = 1 },
+		},
+	}
+	wave3.Routes = concat(wave2.Routes, {
+		{ From = "Q1", To = pickupIds[#pickupIds], Name = "ROUTE-PICKUP-IN" },
+		{ From = pickupIds[1], To = "EX-E", Name = "ROUTE-PICKUP-EXIT" },
+	})
+end
+
 const BY_WAVE: { List } = { wave1, wave2, wave3 }
 
 local function freezeDeep<V>(value: V): V

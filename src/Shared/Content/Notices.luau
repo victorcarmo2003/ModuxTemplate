@@ -91,4 +91,18 @@ return Table.new({
 	{ Key = "prep_kicked", Text = "Prep interrupted.", Audience = "Player", ValueFrom = "None", Wave = 3 },
 	{ Key = "tutorial_one_sausage", Text = "One sausage is plenty for now.", Audience = "Player", ValueFrom = "None", Wave = 3 },
 	{ Key = "prep_idle", Text = "Stepped away from the station.", Audience = "Player", ValueFrom = "None", Wave = 3 },
+
+	-- Restaurant (tech/restaurant-flow.md rev. 2 §2.5, design FEAT-043..FEAT-050; wave R0 contracts, nobody emits them yet).
+	-- Only to the player who acted unless noted; placeholder texts until ui-text.md
+	{ Key = "plates_full", Text = "Kitchen full! Clear a plate first.", Audience = "Player", ValueFrom = "None", Wave = 3 },
+	{ Key = "pickup_full", Text = "Kitchen full! Serve who is waiting.", Audience = "Player", ValueFrom = "None", Wave = 3 },
+	{ Key = "plate_full", Text = "That plate already has it.", Audience = "Player", ValueFrom = "None", Wave = 3 },
+	{ Key = "plate_not_ready", Text = "It needs a bun and a dog first.", Audience = "Player", ValueFrom = "None", Wave = 3 },
+	{ Key = "tablet_busy", Text = "Someone's taking that order.", Audience = "Player", ValueFrom = "None", Wave = 3 },
+	-- drive-thru car gave up (wave R3), to the party
+	{ Key = "drive_left", Text = "A car drove off!", Audience = "Party", ValueFrom = "None", Wave = 4 },
+	-- FEAT-050 supply: a call already on the way (Value = seconds left), the call went through (Value = seconds), low stock
+	{ Key = "supply_busy", Text = "A delivery is already on the way ({value} s).", Audience = "Player", ValueFrom = "Number", Wave = 4 },
+	{ Key = "supply_ordered", Text = "Boxes on the way! ({value} s)", Audience = "Party", ValueFrom = "Number", Wave = 4 },
+	{ Key = "stock_low", Text = "Low on {item}", Audience = "Party", ValueFrom = "Ingredients", Wave = 4 },
 } :: { Notice })
