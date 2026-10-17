@@ -6,11 +6,17 @@
 --   smoke           starts the run in the background (about 60 s); the report prints in the Output when it ends
 --   smoke status    "running" / the last report
 -- Report: "SMOKE: N ok, M failures, K warnings" then one line per failed step, error line and warning.
+--   smoke restaurant  the restaurant loop of one customer (Scenarios/RestaurantSmoke.luau, R-6): tablet -> plate -> cut ->
+--                     grill -> plate -> condiments -> pickup -> table, PASS / FAIL per step. Plain `smoke` runs it too
+--                     while Content.Restaurant.Rules.Enabled (the trailer steps above cannot pass with the switch on).
 -- Dev mode only (DevService loads Commands/ only then). It changes the run state (day, night, tables, tutorial):
 -- run it in a throwaway Play session.
 local LogService = game:GetService("LogService")
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Api = require(script.Parent.Parent.Api)
+local Content = require(ReplicatedStorage.shared.Content)
+local RestaurantSmoke = require(script.Parent.Parent.Scenarios.RestaurantSmoke)
 
 type Step = { Name: string, Run: () -> string? }
 
@@ -320,14 +326,30 @@ const Smoke: Api.Module = function(ctx: Api.Context): { Api.Command }
 	return {
 		{
 			Name = "smoke",
-			Usage = "smoke [status]",
-			Help = "smoke test: boot, intro skip, tutorial, day customer, seating, night 1, anomaly, trailer ready, trailer tables; prints 'SMOKE: N ok, M failures, K warnings'",
-			Run = function(args: { string }, _caller: Player?): string?
+			Usage = "smoke [status | restaurant]",
+			Help = "smoke test: boot, intro skip, tutorial, day customer, seating, night 1, anomaly, trailer ready, trailer tables; prints 'SMOKE: N ok, M failures, K warnings'. With the restaurant switch on (or `smoke restaurant`): one customer end to end, PASS/FAIL per step",
+			Run = function(args: { string }, caller: Player?): string?
 				if args[1] == "status" then
 					return if running then "smoke running" else lastReport
 				end
 				if running then
 					error("smoke is already running", 0)
+				end
+				const restaurant = args[1] == "restaurant" or (args[1] == nil and Content.Restaurant.Rules.Enabled)
+				if restaurant then
+					if not Content.Restaurant.Rules.Enabled then
+						error("restaurant off (Content.Restaurant.Rules.Enabled = false)", 0)
+					end
+					running = true
+					task.spawn(function()
+						const success, report = pcall(RestaurantSmoke.run, ctx, dev, caller)
+						lastReport = if success then report else `RESTAURANT SMOKE aborted: {report}`
+						running = false
+						print(lastReport)
+					end)
+					return "restaurant smoke started; the report prints in the Output (smoke status shows it)"
+				elseif args[1] ~= nil then
+					error("usage: smoke [status | restaurant]", 0)
 				end
 				running = true
 				task.spawn(function()
