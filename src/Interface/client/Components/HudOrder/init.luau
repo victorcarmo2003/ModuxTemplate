@@ -14,6 +14,10 @@
 -- the first; nil (or no prop) keeps the single-row card. Existing callers are unchanged.
 -- Progressive reveal (Content.HudReveal): `Revealed` scales the card in (0.25 s, Motion.Reveal) the first time the order
 -- card is released; nil = always. Position (HudController): top-left, under the sanity meter when that is on screen.
+-- Talk reveal (FEAT-043, TASK-384): `Reveal` = items said so far at the tablet, in the talk order (bun, sausage, the
+-- toppings of row 1, then bun, sausage, toppings of row 2; TabletController:MyTalk().Reveal). The hot dog icon shows from
+-- the bun on, topping i from item 2 + i; the 2nd row from its bun. Each new cell pops in (0.25 s, Motion.Reveal; reduced
+-- motion = no animation) and the card grows with it. nil (no prop) = every item, no pop: the card as before.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Icons = require(script.Parent.Icons)
@@ -43,6 +47,8 @@ export type Props = {
 	Title: string?,
 	-- Progressive reveal: scales in when true, away when false. nil = always.
 	Revealed: (() -> boolean)?,
+	-- Talk reveal: items said so far (0..#items, talk order, see the header). nil = all, no pop. Default nil.
+	Reveal: (() -> number)?,
 	Position: (UDim2 | () -> UDim2)?,
 	AnchorPoint: Vector2?,
 	Name: string?,
@@ -87,7 +93,21 @@ local function iconName(key: string): string
 	return `Ingredient/{key}`
 end
 
-local function cell(key: () -> string, order: number): Frame
+-- `pop` = the cell scales in when created (talk reveal); false = static, as before.
+local function cell(key: () -> string, order: number, pop: boolean): Frame
+	local scale: (() -> number)? = nil
+	if pop then
+		const born = Vide.source(false)
+		const thread = task.defer(function()
+			born(true)
+		end)
+		Vide.cleanup(function()
+			if coroutine.status(thread) == "suspended" then
+				task.cancel(thread)
+			end
+		end)
+		scale = Motion.Reveal(born)
+	end
 	local function hasArt(): boolean
 		return Icons.Has(iconName(key()))
 	end
@@ -105,6 +125,7 @@ local function cell(key: () -> string, order: number): Frame
 			return if hasArt() then 1 else 0
 		end,
 		create("UICorner")({ CornerRadius = Theme.Radius.Pill }),
+		if scale ~= nil then createRaw("UIScale")({ Scale = scale }) else nil,
 		createRaw("UIStroke")({
 			Color = Theme.Color.Ink,
 			Thickness = Theme.Outline.Normal,
@@ -165,14 +186,26 @@ return function(props: Props): Frame
 		return props.Revealed == nil or props.Revealed()
 	end)
 
-	-- Keys drawn in a row: bun, sausage, then the toppings; nothing for a blank customer.
-	local function rowKeys(toppings: { string }): { string }
+	const revealProp = props.Reveal
+	const popCells = revealProp ~= nil
+	-- Items said so far; no prop = every item.
+	local function said(): number
+		return if revealProp ~= nil then revealProp() else math.huge
+	end
+
+	-- Keys drawn in a row: bun, sausage, then the toppings; nothing for a blank customer. `before` = talk items said
+	-- before this row (row 1: 0; row 2: the 2 + K of row 1): the icon needs the bun, topping i needs item 2 + i.
+	local function rowKeys(toppings: { string }, before: number): { string }
 		if empty() then
+			return {}
+		end
+		const heard = said() - before
+		if heard < 1 then
 			return {}
 		end
 		const list = table.clone(BASE)
 		for index, key in toppings do
-			if index > MAX_TOPPINGS then
+			if index > MAX_TOPPINGS or heard < 2 + index then
 				break
 			end
 			table.insert(list, key)
@@ -181,17 +214,24 @@ return function(props: Props): Frame
 	end
 
 	local function keys(): { string }
-		return rowKeys(props.Toppings())
+		return rowKeys(props.Toppings(), 0)
 	end
 
-	-- 2nd row (pair): nil = none; never on a blank customer
+	-- 2nd row (pair): nil = none (or its bun not said yet); never on a blank customer
 	local function keys2(): { string }?
 		const read = props.Toppings2
 		if empty() or read == nil then
 			return nil
 		end
 		const second = read()
-		return if second ~= nil then rowKeys(second) else nil
+		if second == nil then
+			return nil
+		end
+		const before = 2 + math.min(#props.Toppings(), MAX_TOPPINGS)
+		if said() < before + 1 then
+			return nil
+		end
+		return rowKeys(second, before)
 	end
 
 	local function rows(): number
@@ -225,7 +265,9 @@ return function(props: Props): Frame
 				SortOrder = Enum.SortOrder.LayoutOrder,
 				Padding = UDim.new(0, GAP),
 			}),
-			indexes(list, cell),
+			indexes(list, function(key: () -> string, order: number): Frame
+				return cell(key, order, popCells)
+			end),
 		})
 	end
 
