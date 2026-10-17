@@ -35,6 +35,7 @@ export type Party = {
 	EatTime: number,
 	Height: number, -- root Y while standing (approach / stand point)
 	Token: number, -- bumped to cancel the walk thread
+	Served: boolean, -- SitAt "Served": the food came with it, it eats as soon as it sits (TASK-386)
 }
 export type SeatParty = { Leader: number, Partner: number?, Couple: boolean, CustomerType: string }
 export type Member = { Id: number, Seat: number, Rig: Diner.Rig? }
@@ -75,6 +76,7 @@ export type Public = {
 	SetState: (self: Public, spot: Spot, state: State) -> (),
 	ResetTables: (self: Public) -> (),
 	TrySeat: (self: Public, party: SeatParty) -> boolean,
+	OfferServed: (self: Public, party: SeatParty) -> boolean,
 	Reserve: (self: Public, index: number, party: SeatParty, seats: { number }, isNight: boolean) -> (),
 	WalkIn: (self: Public, party: Party) -> (),
 	SitDown: (self: Public, party: Party) -> (),
