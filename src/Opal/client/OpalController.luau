@@ -149,8 +149,14 @@ function OpalController:Speak()
 	end)
 end
 
--- Kiosk shutter down (door C in front of the counter): no balloon (FEAT-015 v2, Q-176 A).
+-- Kiosk shutter down (door C in front of the counter): no balloon (FEAT-015 v2, Q-176 A). Business hours (owner
+-- request 2026-10-17): the server's Workspace attribute Content.Mart.Hours.Attributes.Open; before it is published,
+-- the always-closed phases.
 function OpalController:KioskClosed(): boolean
+	const open = workspace:GetAttribute(Content.Mart.Hours.Attributes.Open)
+	if type(open) == "boolean" then
+		return not open
+	end
 	return KIOSK_CLOSED[Vide.untrack(self.Dependencies.RoundController.Phase)] == true
 end
 

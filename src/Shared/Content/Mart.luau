@@ -3,9 +3,14 @@
 -- The upgrade bench becomes a kiosk with three wooden roll-up shutters (L, C, R) and six pedestals with a floating
 -- miniature. Nothing here changes price, effect or rotation (Upgrades, DEC-101, DEC-106): this is presentation and
 -- the phases in which the kiosk serves. Single record (like Neon). Owner: game-designer; numbers PROVISIONAL.
---   * KioskClosedPhases: the shutters are down and the server refuses bench purchases (MarketService, TASK-139).
---     Every other Shift phase is open, day and night (DEC-049). The client derives the door from the Shift phase:
---     no network of its own.
+--   * KioskClosedPhases: the shutters are always down in these phases and the server refuses bench purchases
+--     (MarketService, TASK-139).
+--   * Hours (owner request 2026-10-17, Provisional): business hours on top of that. The stand OPENS at the end of each
+--     shift (RoundService.ShiftEnded = start of Summary), stays open through the break (Summary, Call, Prep) and for
+--     StayOpenIntoShift seconds after the next shift's first selling phase (Open / Night) starts, with a warning toast
+--     CloseWarning seconds before it CLOSES. Owner: GearStandService (server); the state rides in two Workspace
+--     attributes (Hours.Attributes), read by MarketController for the shutters and the door SFX.
+--     OpenAtShiftEnd = false = the old rule (open in every phase not in KioskClosedPhases).
 --   * Pedestals: order = left to right as seen by the player; Offer "Upgrade" reads Upgrades.BenchSpot, "Special"
 --     is the turn's special slot (FEAT-035). Doors: which pedestals each shutter covers (C covers Opal, Q-175).
 --   * Tags/attributes: the contract with the map (TASK-138); see MarketController/Kiosk.luau and Minis.luau.
@@ -22,12 +27,33 @@ export type Door = {
 	Pedestals: { string }, -- BenchSlots behind this shutter (fallback geometry and order)
 }
 
+export type Hours = {
+	OpenAtShiftEnd: boolean, -- false = no hours: open in every phase not in KioskClosedPhases (rollback without code)
+	StayOpenIntoShift: number, -- s the stand stays open after the next shift's first selling phase starts
+	CloseWarning: number, -- s before closing when the "closing in" toast goes out (0 = no warning)
+	Tick: number, -- Hz of the server close timer
+	Attributes: {
+		Open: string, -- Workspace attribute (boolean): the stand is open
+		ClosesAt: string, -- Workspace attribute (number): server time it closes, 0 = no close scheduled
+	},
+	Sfx: {
+		Open: string, -- Content.Sounds key played at the stand when the shutters go up
+		Close: string, -- Content.Sounds key played when they go down
+	},
+	-- Sound under ReplicatedStorage.Assets.SFX played instead while the Sounds row still has no Id (owner upload)
+	Assets: {
+		Open: string,
+		Close: string,
+	},
+}
+
 export type Mart = {
 	KioskClosedPhases: { string }, -- keys of Shift
 	-- Owner request 2026-10-14 (Provisional): the Gear Stand is CLOSED at the start of the run. On Day 1 (day shift) it is
 	-- also down in these phases: the first Mart visit is only for buns (tutorial shopping lesson); it opens at the end of
 	-- the first shift (the day Closing at 6 PM, where the Day 1 upgrade lesson sends the rookie to buy Storage)
 	FirstShiftClosedPhases: { string },
+	Hours: Hours,
 	Pedestals: { Pedestal },
 	Doors: { Door }, -- animation order (Stagger) = list order
 	Door: {
@@ -87,8 +113,20 @@ export type Mart = {
 }
 
 const mart: Mart = {
-	-- Q-176 A: closed only across the turn change (Summary, boss Call), lost night / resume and the non-play phases.
-	KioskClosedPhases = { "Summary", "Call", "NightLost", "Resume", "Intro", "Finale", "RunEnd" },
+	-- Always down: lost night / resume and the non-play phases. Summary and Call left the list with the business hours
+	-- (2026-10-17): the turn change is now when the stand is OPEN (Q-176 A had them closed).
+	KioskClosedPhases = { "NightLost", "Resume", "Intro", "Finale", "RunEnd" },
+	-- Business hours (owner request 2026-10-17, PROVISIONAL numbers): opens at ShiftEnded, 45 s into the next shift's
+	-- selling phase for the last purchases, "closing in 20s" toast, then CLOSED
+	Hours = {
+		OpenAtShiftEnd = true,
+		StayOpenIntoShift = 45,
+		CloseWarning = 20,
+		Tick = 4,
+		Attributes = { Open = "GearStandOpen", ClosesAt = "GearStandClosesAt" },
+		Sfx = { Open = "gear_door_open", Close = "gear_door_close" },
+		Assets = { Open = "Metal Door Open", Close = "Metal Door Close" },
+	},
 	-- 2026-10-17 Day 1 cut (owner decision, Provisional): no upgrade lesson, the stand is open from the start
 	FirstShiftClosedPhases = {},
 	Pedestals = {
@@ -150,6 +188,7 @@ table.freeze(mart)
 return table.freeze({
 	KioskClosedPhases = mart.KioskClosedPhases,
 	FirstShiftClosedPhases = mart.FirstShiftClosedPhases,
+	Hours = mart.Hours,
 	Pedestals = mart.Pedestals,
 	Doors = mart.Doors,
 	Door = mart.Door,

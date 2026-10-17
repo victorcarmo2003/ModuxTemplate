@@ -22,8 +22,11 @@
 	no event here (the Tool arrives through ItemController): SFX-061 is not played by this controller.
 
 	Gear Stand (Mart v2, TASK-140; FEAT-015 v2; MAP-01 §18.4; Q-176 A Provisional), zero network of its own:
-	  * shutters (Kiosk.luau): down in Content.Mart.KioskClosedPhases, up in every other phase of the Shift set
-	    (RoundController.Phase). Animated with Mart.Door times and the L -> C -> R stagger; the first record (late
+	  * shutters (Kiosk.luau): follow the business hours (owner request 2026-10-17, Content.Mart.Hours): the server's
+	    GearStandService publishes the Workspace attribute Hours.Attributes.Open; up while it is true (and outside the
+	    Day 1 FirstShiftClosedPhases). Each change plays the metal door SFX (Hours.Sfx) at the middle of the shutters:
+	    the Content.Sounds row through AudioController, or the owner's Studio Sound ReplicatedStorage.Assets.SFX
+	    [Hours.Assets] while the row has no Id yet. Animated with Mart.Door times and the L -> C -> R stagger; the first record (late
 	    joiner) snaps to the final state. Without GearShutter models a test shutter is generated (1 warning);
 	  * miniatures (Minis.luau) over the pedestals: the piece of the NEXT level on the current vehicle ("Sale", bob +
 	    spin), the current level when maxed (still), the first trailer level at 50% for "Trailer only" (still), none
@@ -39,7 +42,6 @@
 	    edge pointer when it is off screen; gone on reaching the stand or when Open starts. The toast is the server's
 	    Notice "mart_hint" (MarketService);
 	  * purchase: the old miniature spins and pops, 14 confetti + SFX-064 `buy` at the pedestal, the next one rises.
-	    Shutter SFX keys `kiosk_shutter_down` / `kiosk_shutter_up` play once they exist in Content.Sounds.
 ]]
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -80,12 +82,8 @@ const RELOCATE_EVERY = 2 -- s between two re-reads of the pedestal positions (st
 const MAP_WAIT = 60 -- s MapIndex.WaitReady may wait before the fallback shutters are generated
 -- Plate over the prompt anchor when the slot has no miniature position (the prompt pill sits at the anchor itself)
 const PLATE_OVER_PROMPT = Vector3.new(0, 1.6, 0)
-const DOOR_DOWN_SFX = "kiosk_shutter_down"
-const DOOR_UP_SFX = "kiosk_shutter_up"
-const KIOSK_CLOSED: { [string]: boolean } = {}
-for _, phase in MART.KioskClosedPhases do
-	KIOSK_CLOSED[phase] = true
-end
+const HOURS = MART.Hours
+const SFX_HOLD = 6 -- s a Studio fallback door Sound lives before it is cleaned up
 
 export type View = {
 	Visible: boolean,
@@ -116,6 +114,8 @@ const UNKNOWN_LEVEL = -1
 
 -- Stock[ingredient].Blocked as seen by the client; Unknown = record not received yet.
 type Availability = "Unknown" | "Open" | "Blocked"
+-- Gear Stand business hours as published by the server; Unknown = attribute not there yet.
+type GearState = "Unknown" | "Open" | "Closed"
 
 const MarketController =
 	Modux.Controller(
@@ -161,6 +161,8 @@ function MarketController:Setup()
 	self.Unmount = nil :: (() -> ())?
 	-- Gear Stand
 	self.KioskOpen = Vide.source(true) :: Vide.Source<boolean>
+	-- server business hours (Workspace attribute Hours.Attributes.Open); Unknown = not published yet
+	self.GearOpen = Vide.source("Unknown" :: GearState) :: Vide.Source<GearState>
 	self.KioskSynced = false :: boolean -- first Shift record applied (later changes animate)
 	self.Kiosk = Kiosk.new() :: Kiosk.Kiosk
 	self.Minis = Minis.new() :: Minis.Minis
@@ -595,22 +597,73 @@ function MarketController:RemovePedestal(pedestal: Instance)
 	end
 end
 
--- Shutter state from the Shift phase; the first record snaps, later changes animate (with the shutter SFX).
+-- Where the stand's door SFX plays: the middle of the shutters, else the first pedestal
+function MarketController:StandPoint(): Vector3?
+	const center = self.Kiosk:Center()
+	if center then
+		return center
+	end
+	const at = self.Minis:Where(MART.Pedestals[1].Slot)
+	return at
+end
+
+-- Metal door SFX at the stand (Content.Mart.Hours.Sfx). While the Content.Sounds row has no Id, the owner's Studio
+-- Sound ReplicatedStorage.Assets.SFX[Hours.Assets] is cloned on a local holder (Sfx SoundGroup when it exists).
+function MarketController:DoorCue(open: boolean)
+	const at = self:StandPoint()
+	if at == nil then
+		return
+	end
+	const key = if open then HOURS.Sfx.Open else HOURS.Sfx.Close
+	const row = Content.Sounds.ByKey[key]
+	if row and row.Id ~= "" then
+		self.Dependencies.AudioController:Play(key, at)
+		return
+	end
+	const assets = ReplicatedStorage:FindFirstChild("Assets")
+	const folder = if assets then assets:FindFirstChild("SFX") else nil
+	const source = if folder then folder:FindFirstChild(if open then HOURS.Assets.Open else HOURS.Assets.Close) else nil
+	if source == nil or not source:IsA("Sound") then
+		return
+	end
+	const holder = Instance.new("Part")
+	holder.Name = "GearStandSfx"
+	holder.Anchored = true
+	holder.CanCollide = false
+	holder.CanQuery = false
+	holder.CanTouch = false
+	holder.Transparency = 1
+	holder.Size = Vector3.one * 0.2
+	holder.CFrame = CFrame.new(at)
+	const sound = source:Clone()
+	sound.Looped = false
+	if row then
+		sound.RollOffMaxDistance = row.MaxDistance
+	end
+	sound.SoundGroup = self.Dependencies.AudioController.Groups.Sfx
+	sound.Parent = holder
+	holder.Parent = workspace
+	sound:Play()
+	task.delay(math.max(SFX_HOLD, sound.TimeLength + 0.5), function()
+		holder:Destroy()
+	end)
+end
+
+-- Shutter state from the server's business hours (Workspace attribute) and the Day 1 rule; the first value snaps,
+-- later changes animate with the metal door SFX.
 function MarketController:ApplyPhase(phase: string, ready: boolean)
 	const round = self.Dependencies.RoundController
-	-- Day 1: also down until the first shift ends (Content.Mart.FirstShiftClosed, owner request 2026-10-14)
+	-- Day 1: also down in FirstShiftClosedPhases (Content.Mart.FirstShiftClosed, owner request 2026-10-14)
 	const info = { Day = Vide.untrack(round.Day), IsNight = Vide.untrack(round.IsNight) }
-	const open = not KIOSK_CLOSED[phase] and not MART.FirstShiftClosed(info, phase)
+	const gear = Vide.untrack(self.GearOpen)
+	const open = gear == "Open" and not MART.FirstShiftClosed(info, phase)
 	const animate = self.KioskSynced
 	const changed = Vide.untrack(self.KioskOpen) ~= open
-	self.KioskSynced = ready
+	self.KioskSynced = ready and gear ~= "Unknown"
 	self.KioskOpen(open)
 	self.Kiosk:Set(open, animate)
 	if animate and changed then
-		const _, host = self.Minis:Where(MART.Pedestals[1].Slot)
-		if host then
-			self:Cue(if open then DOOR_UP_SFX else DOOR_DOWN_SFX, host)
-		end
+		self:DoorCue(open)
 	end
 end
 
@@ -807,12 +860,12 @@ function MarketController:StepHint()
 		return
 	end
 	-- the tutorial owns the guidance on Day 1 (one arrow at a time): no gear-stand hint until it ends or is skipped;
-	-- and none while the stand is still down before the end of the first shift (Content.Mart.FirstShiftClosed)
+	-- and none while the stand is closed (business hours, Content.Mart.Hours; Day 1 FirstShiftClosed)
 	const tutorialOn = Vide.untrack(function(): boolean
 		return tutorial:FirstRun()
 	end)
 	const info = { Day = Vide.untrack(round.Day), IsNight = Vide.untrack(round.IsNight) }
-	if tutorialOn or MART.FirstShiftClosed(info, phase) then
+	if tutorialOn or MART.FirstShiftClosed(info, phase) or not Vide.untrack(self.KioskOpen) then
 		hint:Set(false)
 		return
 	end
@@ -974,6 +1027,13 @@ MarketController:OnStart(function(self)
 	-- swap guard: remember when Shift.Vehicle changes (the first run is the initial value, not a swap)
 	const round = self.Dependencies.RoundController
 	local first = true
+	-- business hours published by GearStandService (Workspace attribute; late joiners read it here)
+	const readGear = function()
+		const value = workspace:GetAttribute(HOURS.Attributes.Open)
+		self.GearOpen(if value == true then "Open" elseif value == false then "Closed" else "Unknown")
+	end
+	readGear()
+	workspace:GetAttributeChangedSignal(HOURS.Attributes.Open):Connect(readGear)
 	self.Unmount = Vide.root(function()
 		Vide.effect(function()
 			round.Vehicle()
@@ -983,12 +1043,13 @@ MarketController:OnStart(function(self)
 			end
 			self.SwappedAt = os.clock()
 		end)
-		-- Gear Stand shutter follows the Shift phase (snap until the first record, animate afterwards)
+		-- Gear Stand shutter follows the business hours (snap until the first record, animate afterwards)
 		Vide.effect(function()
 			const phase = round.Phase()
 			const ready = round.Ready()
 			round.Day()
 			round.IsNight()
+			self.GearOpen()
 			Vide.untrack(function()
 				self:ApplyPhase(phase, ready)
 				return nil

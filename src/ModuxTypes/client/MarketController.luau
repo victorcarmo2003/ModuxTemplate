@@ -22,6 +22,7 @@ type Mounted = {
 	Slot: string?, -- bench slot whose plate this is (adornee follows the miniature)
 }
 type Availability = "Unknown" | "Open" | "Blocked"
+type GearState = "Unknown" | "Open" | "Closed"
 
 export type Public = {
 	BunDismissed: boolean,
@@ -31,6 +32,7 @@ export type Public = {
 	Cash: Vide.Source<number>,
 	CashReady: Vide.Source<boolean>,
 	Drawer: Vide.Source<number>,
+	GearOpen: Vide.Source<GearState>,
 	Gui: Instance?,
 	Hint: Hint.Hint?,
 	HintDismissed: boolean,
@@ -68,6 +70,8 @@ export type Public = {
 	Rebind: (self: Public, slot: string) -> (),
 	AddPedestal: (self: Public, pedestal: Instance) -> (),
 	RemovePedestal: (self: Public, pedestal: Instance) -> (),
+	StandPoint: (self: Public) -> Vector3?,
+	DoorCue: (self: Public, open: boolean) -> (),
 	ApplyPhase: (self: Public, phase: string, ready: boolean) -> (),
 	WatchMinis: (self: Public) -> (),
 	WatchKiosk: (self: Public) -> (),

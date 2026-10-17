@@ -10,10 +10,11 @@
 --     (Content.Upgrades.BenchSpot). Always on sale (DEC-106); no prompt when Maxed, "Trailer only" (not on the current
 --     vehicle) or before UnlockDay. The purchase is UpgradeService:Buy (atomic, its own guards).
 --   S1 (bench_buy_item, wave 4): prompt always off, "Nothing special today" (Q-120). The action is not registered.
---   Gear Stand shutter (Mart v2, TASK-139; FEAT-015 v2; Q-176 A Provisional): the kiosk is closed in the phases of
---     Content.Mart.KioskClosedPhases (Summary, Call, NightLost, Resume, Intro, Finale, RunEnd). Closed = bench prompts
---     off and every bench purchase refused in silence, in Validate AND Run (a hold that ends on the phase change buys
---     nothing). Shelves (buy_package) never close (Q-177 A). No network: the client derives the shutter from Shift.
+--   Gear Stand shutter (Mart v2, TASK-139; FEAT-015 v2): open / closed is GearStandService's (business hours, owner
+--     request 2026-10-17, Content.Mart.Hours: opens at the end of each shift, closes StayOpenIntoShift s into the next
+--     one; always closed in Content.Mart.KioskClosedPhases). Closed = bench prompts off and every bench purchase
+--     refused in Validate AND Run (a hold that ends on the close buys nothing), with the toast gear_closed (throttled)
+--     to the player who tried. Shelves (buy_package) never close (Q-177 A).
 --   Cooldown (Q-203 Provisional): a line bought on the stand is "Sold out" for Content.Mart.Cooldown.Turns shifts
 --     (UpgradeService owns the state); its prompt is off and the purchase refused in silence, the other lines stay free.
 -- Refusal toasts (FEAT-005 D-04; TASK-080), only to the player who acted, the same key at most once every
@@ -36,11 +37,6 @@ const PACKAGE_ACTION = "buy_package"
 const UPGRADE_ACTION = "bench_buy_upgrade"
 const ITEM_ACTION = "bench_buy_item"
 const PACKAGE_GAP = Content.Actions.ByKey[PACKAGE_ACTION].Hold * 0.8
--- Phases with the Gear Stand shutter down (Content.Mart; FEAT-015 v2)
-const KIOSK_CLOSED: { [string]: boolean } = {}
-for _, phase in Content.Mart.KioskClosedPhases do
-	KIOSK_CLOSED[phase] = true
-end
 const NOTICE_GAP = 2 -- seconds (FEAT-005 anti-spam; Provisional constant, TASK-080: no Content field yet)
 
 local function stringAttribute(anchor: Instance, name: string): string?
@@ -81,6 +77,7 @@ const MarketService = Modux.Service("MarketService", {
 		"RoundService",
 		"RunStateService",
 		"KitchenService",
+		"GearStandService",
 	},
 	Priority = 615,
 })
@@ -112,12 +109,12 @@ function MarketService:UpgradeOf(anchor: Instance): Content.Upgrade?
 	return if slot then upgradeAt(slot) else nil
 end
 
--- Gear Stand shutter up: the current Shift phase is not in Content.Mart.KioskClosedPhases (reactive inside an effect).
--- Also down on Day 1 until the first shift ends (Content.Mart.FirstShiftClosed, owner request 2026-10-14).
+-- Gear Stand shutter up: GearStandService's business hours (reactive inside an effect). Also down on Day 1 in
+-- Content.Mart.FirstShiftClosedPhases (owner request 2026-10-14; empty since the 2026-10-17 Day 1 cut).
 function MarketService:IsKioskOpen(): boolean
 	const round = self.Dependencies.RoundService
-	const phase = round:GetPhase()
-	return not KIOSK_CLOSED[phase] and not Content.Mart.FirstShiftClosed(round:Info(), phase)
+	return self.Dependencies.GearStandService:IsOpen()
+		and not Content.Mart.FirstShiftClosed(round:Info(), round:GetPhase())
 end
 
 -- Bench slot sells now: upgrade exists on the current vehicle, not maxed, unlocked today, not resting after a
@@ -181,10 +178,14 @@ function MarketService:HintDue(): boolean
 	return economy:GetCash() + economy:GetDrawer() >= cheapest or self:NeverBought()
 end
 
--- Closing starts: one toast per shift to the party. Never blocks a purchase (the stand is open all day). The day Closing
+-- Closing starts: one toast per shift to the party (only with the business hours off, Content.Mart.Hours). The day Closing
 -- is the Last call (DEC-240, the crew is still serving and has its own toast), so the hint waits for the Summary.
 function MarketService:OnPhase(phase: string, info: { Day: number, Night: number, IsNight: boolean })
 	if phase ~= "Closing" and phase ~= "Summary" then
+		return
+	end
+	-- business hours on: the stand's own "Gear Stand is OPEN" toast at the shift end replaces this hint
+	if Content.Mart.Hours.OpenAtShiftEnd then
 		return
 	end
 	if phase == "Closing" and self.Dependencies.RoundService:IsLastCall() then
@@ -296,8 +297,12 @@ function MarketService:BuyPackage(player: Player, anchor: Instance)
 end
 
 function MarketService:ValidateUpgrade(player: Player, anchor: Instance): boolean
-	if not self:CanAct(player) or not self:IsKioskOpen() then
-		return false -- shutter down: silent (the prompt is already off for everyone)
+	if not self:CanAct(player) then
+		return false
+	end
+	if not self:IsKioskOpen() then
+		self:Refuse(player, "gear_closed", 0) -- a hold that ended on the close, or a stale prompt
+		return false
 	end
 	const upgrade = self:UpgradeOf(anchor)
 	if upgrade == nil then
@@ -373,6 +378,7 @@ MarketService:OnStart(function(self)
 		upgrades:Capture()
 		upgrades.Cooldown()
 		upgrades.Turn()
+		self.Dependencies.GearStandService:IsOpen()
 		self:RefreshAll()
 	end)
 

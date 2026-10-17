@@ -1792,6 +1792,19 @@ local function checkMart()
 		end
 		hinted[phase] = true
 	end
+	-- Business hours (owner request 2026-10-17): the warning must fit inside the stay-open window
+	const hours = Mart.Hours
+	inRange("Mart", nil, nil, "Hours.StayOpenIntoShift", hours.StayOpenIntoShift, 0, 600)
+	inRange("Mart", nil, nil, "Hours.CloseWarning", hours.CloseWarning, 0, hours.StayOpenIntoShift)
+	inRange("Mart", nil, nil, "Hours.Tick", hours.Tick, 1, 60)
+	if hours.Attributes.Open == "" or hours.Attributes.ClosesAt == "" or hours.Attributes.Open == hours.Attributes.ClosesAt then
+		fail("Mart", nil, nil, "Hours.Attributes must be two different non-empty names")
+	end
+	for _, key in { hours.Sfx.Open, hours.Sfx.Close } do
+		if Sounds.ByKey[key] == nil then
+			fail("Mart", nil, key, "Hours.Sfx is not a Content.Sounds key")
+		end
+	end
 	inRange("Mart", nil, nil, "Fallback.DoorHeight", Mart.Fallback.DoorHeight, 1, 30)
 	if Mart.Tags.Pedestal == "" or Mart.Tags.Shutter == "" or Mart.Tags.Slot == "" then
 		fail("Mart", nil, nil, "Tags must not be empty")
