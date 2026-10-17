@@ -63,6 +63,8 @@ local TAGS_OFF = {
 -- deleted, DOOR-P / DOOR-B leaves and heads resized, CCTV lowered 0.40, security camera poses recorded (Cam:CAM1/CAM2).
 -- rev. 6 (2026-10-17, TASK-446): the diff also compares Texture / Decal (Transparency, Color3, Texture id as TextureId,
 -- StudsPerTileU/V, OffsetStudsU/V); interior floor / wall textures recorded (floors 0.67, wall tiles 0.70).
+-- rev. 7 (2026-10-17): the owner merged the two east wall tile skins into TRL/Shell/Union (Skin_E_N_Tile / Skin_E_S_Tile
+-- dropped below, the Union is his piece); security cameras CAM1 / CAM2 moved to new mounts (Cam:CAM1 / Cam:CAM2).
 local OVERRIDES = {
 	Parts = {
 		["Dress/AC_1/ACUnit"] = { CF = {-51.0849, 12.7011, -29.4254, -1, 0, 0, 0, 0.9916, 0.1293, 0, 0.1293, -0.9916} },
@@ -392,8 +394,13 @@ local OVERRIDES = {
 		["TRL/Shell/Floor_Kitchen/Tex_Tile"] = { Transparency = 0.670 },
 		["TRL/Shell/Floor_Pantry/Tex_Tile"] = { Transparency = 0.670 },
 		["TRL/Shell/Skin_B_Tile/Tex_Tile"] = { Transparency = 0.700 },
-		["TRL/Shell/Skin_E_N_Tile/Tex_Tile"] = { Transparency = 0.700 },
-		["TRL/Shell/Skin_E_S_Tile/Tex_Tile"] = { Transparency = 0.700 },
+		-- rev. 7 (2026-10-17, owner): the two east wall tile skins were standardised into ONE UnionOperation
+		-- TRL/Shell/Union (MAP X 59.44..59.5, Z 56..70, Y 0.45..4.45, its own Tex_Tile 0.70, owner's piece, kept as is). The
+		-- generated Skin_E_N_Tile / Skin_E_S_Tile (and their textures) are dropped so an apply does not rebuild them over it.
+		["TRL/Shell/Skin_E_N_Tile"] = { Deleted = true },
+		["TRL/Shell/Skin_E_N_Tile/Tex_Tile"] = { Deleted = true },
+		["TRL/Shell/Skin_E_S_Tile"] = { Deleted = true },
+		["TRL/Shell/Skin_E_S_Tile/Tex_Tile"] = { Deleted = true },
 		["TRL/Shell/Skin_PE_Tile/Tex_Tile"] = { Transparency = 0.700 },
 		["TRL/Shell/Skin_PN_Tile/Tex_Tile"] = { Transparency = 0.700 },
 		["TRL/Shell/Skin_PS_A_Tile/Tex_Tile"] = { Transparency = 0.700 },
@@ -407,11 +414,17 @@ local OVERRIDES = {
 		["Extra:CCTV"] = { CF = {-37.9854, 4.45, -10.5227, -1, 0, 0, 0, 1, 0, 0, 0, -1} },
 		-- security camera views (TASK-441): the pivot of each CAM model IS the view (Content.Security). The owner placed them by
 		-- hand; recorded here so the diff reports a later move (the bind poses them to exactly these values)
-		["Cam:CAM1"] = { CF = {-60.1624, 10.488, 28.9855, 0.8335, 0.195, -0.517, 0, 0.9357, 0.3528, 0.5526, -0.2941, 0.7799} },
+		-- rev. 7 (2026-10-17, owner asked for better views; poses chosen from variants, captures 110_cam_*.jpg):
+		-- CAM1 "patio": on the drive-thru street-light pole (pivot = back of the bracket on the pole face, MAP (60.06, 11.8, 38.75)),
+		-- looking west across the patio: counter / vitrine, the 4 tables, R-GATE, Ninth St and the Juniper corner with its lights
+		-- (AN-A, AN-C; CORNER DOGS neon in frame for the blackout).
+		["Cam:CAM1"] = { CF = {-60.06, 11.8, 29.14, 0.1496, 0.4164, -0.8968, 0, 0.907, 0.4212, 0.9887, -0.063, 0.1357} },
 		-- TASK-446 (2026-10-17, owner approved): the 4 torches "Flame" in MAP01_Assets.Extra (owner's pieces, outside the
 		-- restaurant) cast no shadow; applied to every Light under a part named Flame there
 		["Lights:Extra/Flame"] = { Shadows = false },
-		["Cam:CAM2"] = { CF = {-18.14, 13.757, -29.975, -0.7611, -0.2724, 0.5887, 0, 0.9075, 0.42, -0.6487, 0.3196, -0.6907} },
+		-- CAM2 "back + drive-thru": on the corner of the building across the back alley (AST-033 BuildingH, MAP (69.85, 12.2, 97.89)),
+		-- looking south-west: DOOR-B, the pantry hatch, breaker and crates, the drive-thru window, lane and U-turn (AN-D).
+		["Cam:CAM2"] = { CF = {-69.85, 12.2, -30, -0.8703, 0.1148, -0.4789, 0, 0.9724, 0.2331, 0.4925, 0.2029, -0.8463} },
 	},
 }
 -- OVERRIDES END
