@@ -42,28 +42,25 @@ passos, mesma ordem, mesma lição de upgrade desligada).
 | 7 | `r_pickup` | `hot_dog` certo na mão | `pickup_serve` do `PICKUP` | "Hand it over at pickup." |
 | 7 | `r_crew` | nenhum prato em andamento, nada na mão e um colega segurando um `hot_dog` | `PICKUP` | (silencioso) |
 | 8 | `money` | `Sale` do cliente do tutorial | holofote no dinheiro | (atual) |
-| 9 | `r_call` | depois do `money`, com `Supply` ligado e o telefone `PHONE-R` no mapa | `order_stock` | "Low on stock? Call it in." |
-| 9 | `r_boxes` | `Supply[1] = OnTheWay` | nenhuma | "Boxes are on the way." |
-| 10 | `r_box` | alguma baia (`StockShelf`, `Boxes > 0`) ou a escotilha com caixa | `take_box` mais perto | "Boxes are in. Grab one." |
-| 11 | `r_restock` | mão com caixa (Tool de pacote) | `restock` da estação do ingrediente da caixa | "Restock its station." |
+| 9 | `r_box` | depois do `money`, com `Supply` ligado e alguma baia `StockShelf` no mapa | `take_box` mais perto (despensa) | "Running low? Hit the stock room." |
+| 10 | `r_restock` | mão com caixa (Tool de pacote) | `restock` da estação do ingrediente da caixa | "Restock its station." |
 | — | fim | o estoque daquele ingrediente subiu (quem quer que tenha reabastecido) | — | "Stocked up!" + despedida |
 
 Prato de trabalho: o cliente do tutorial não recebe ticket de prato (`CustomerService` não dispara `Acted` para ele) e
 o veredito é pelos condimentos, então qualquer prato serve. O tutorial aponta o prato mais adiantado (pão e salsicha >
 um dos dois > vazio; empate = menor índice), preferindo os sem ticket.
 
-Sem `Supply` ligado (ou sem `order_stock` no mapa) o tutorial termina no `money`, como hoje.
+Sem `Supply` ligado (ou sem baia `take_box` no mapa) o tutorial termina no `money`, como hoje.
 
-Reabastecimento: o depósito está sendo refeito (salsicha/bacon no freezer, queijos na geladeira, secos na prateleira,
+Reabastecimento (dono, 2026-10-17, Provisório): **despensa com estoque infinito, sem pedido por telefone**. Cada baia
+`StockShelf` sempre dá uma caixa do seu produto (sem contador, nunca acaba, sem custo); o limite é a capacidade das
+estações. Fluxo: ir à despensa → pegar a caixa na baia → `Restock` na estação. O telefone `PHONE-R` fica só para as
+ligações do chefe (`answer_phone`). O depósito está sendo refeito (salsicha/bacon no freezer, queijos na geladeira, secos na prateleira,
 tudo de um lado da parede). O tutorial só depende do contrato: tag `StockShelf` + atributo `Package` + âncora
 `Prompt_TakeBox` (`take_box`); a seta vai na âncora ligada mais perto. Caixa na mão → a seta vai no `restock` da estação
 cujo `Ingredient` é o do pacote (pão = `CUT`, salsicha = grelha, condimentos = `COND`).
 
-Dinheiro: depois que o cliente do tutorial foi atendido, com um novato pendente e nenhuma ligação a caminho, o servidor
-completa o caixa até o preço do pedido rápido do telefone (`EconomyService:TopUp`, uma vez), como o tutorial já faz com o
-pacote de pão. A ligação nunca trava por falta de dinheiro.
-
-Espera da entrega (`Supply.Eta`, 45 s): o Day 1 continua parado; Walt avisa e repete a fala a cada 20 s.
+Dinheiro: o reabastecimento não custa nada (sem completar o caixa).
 
 ## 3. Fim do Day 1: Gear Stand
 
@@ -80,14 +77,14 @@ turno, fecha pouco depois do começo do próximo) é do Mart/Market, não deste 
 - **Co-op:** cada novato vê o próprio tutorial, mas os passos vêm do estado compartilhado: se um colega corta o pão, o
   prato fica com pão e o passo de todos pula para a salsicha; quem está com o prato na mão vê condimento/entrega; os
   outros veem `r_crew` (seta no `PICKUP`, sem fala). Um veterano no grupo não vê tutorial; o dia fica parado até o
-  último novato terminar (regra atual). O telefone e as caixas também valem para quem fizer primeiro.
+  último novato terminar (regra atual). As caixas e o reabastecimento também valem para quem fizer primeiro.
 - Os prompts mostrados durante o tutorial: os do passo + os da cozinha inteira do restaurante (cortar, prato, grelha,
   pilha, condimento, lixo, retirada) a partir do tablet, para quem adiantar ou ajudar não ficar travado.
 
 ## 5. Se o jogador pular ou sair da ordem
 
 - Não há botão de pular (decisão do dono 2026-10-14). Fazer fora de ordem nunca trava: o passo segue o estado (grelhar
-  antes de cortar mostra o passo do prato certo; segurar a caixa antes de ligar pula a ligação).
+  antes de cortar mostra o passo do prato certo; segurar a caixa já pula para o `Restock`).
 - Jogar o hot dog no lixo devolve o fluxo ao corte (nenhum prato em andamento).
 - Ficar parado: lembrete falado a cada 12 s; o Day 1 solta sozinho depois de `Shift.TutorialHoldMax` s.
 - O turno acabar antes do fim: o tutorial termina (`over`), como hoje.

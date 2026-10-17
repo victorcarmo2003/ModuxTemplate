@@ -2206,13 +2206,12 @@ end
 -- Restaurant (tech/restaurant-flow.md rev. 2 §4.2; design/restaurant-flow.md): ranges against the wire (Net Plates, Tablets,
 -- DriveCars, Hatch, Customers.Pickup / Drive), Dialog covers every ingredient of an order, the actions and stations exist
 const RESTAURANT_ACTIONS: { string } =
-	{ "tablet_take", "bun_slice", "plate_put", "plate_take", "grill_flip", "rail_take", "pickup_serve", "drive_serve", "order_stock", "take_box" }
+	{ "tablet_take", "bun_slice", "plate_put", "plate_take", "grill_flip", "rail_take", "pickup_serve", "drive_serve", "take_box" }
 const RESTAURANT_NOTICES: { string } =
-	{ "plates_full", "pickup_full", "plate_full", "plate_not_ready", "tablet_busy", "drive_left", "supply_busy", "supply_ordered", "stock_low" }
+	{ "plates_full", "pickup_full", "plate_full", "plate_not_ready", "tablet_busy", "drive_left", "stock_low" }
 const PICKUP_WIRE_MAX = 12 -- Net Customers.Pickup
 const DRIVE_WIRE_MAX = 3 -- Net Customers.Drive / DriveCars records
 const TABLET_WIRE_MAX = 8 -- Tablets records (TAB-n and the DT-PC index)
-const HATCH_WIRE_MAX = 8 -- Net Hatch records
 
 local function checkByParty(name: string, field: string, list: { number }, low: number, high: number)
 	if #list ~= 4 then
@@ -2298,25 +2297,8 @@ local function checkRestaurant()
 		last = at
 	end
 
-	const supply = Restaurant.Supply
-	inRange(name, nil, nil, "Supply.HatchSpots", supply.HatchSpots, 1, HATCH_WIRE_MAX)
-	inRange(name, nil, nil, "Supply.MaxBoxes", supply.MaxBoxes, 1, 24)
-	inRange(name, nil, nil, "Supply.InTransit", supply.InTransit, 1, 4)
-	inRange(name, nil, nil, "Supply.Fee", supply.Fee, 0, 1000)
-	inRange(name, nil, nil, "Supply.Eta", supply.Eta, 1, 600)
-	inRange(name, nil, nil, "Supply.LowAt", supply.LowAt, 0, 1)
-	for index, value in supply.EtaExpress do
-		inRange(name, index, nil, "Supply.EtaExpress", value, 1, supply.Eta)
-	end
-	for index, value in supply.MaxBoxesBig do
-		inRange(name, index, nil, "Supply.MaxBoxesBig", value, supply.MaxBoxes, 24)
-	end
-	for key, count in supply.StartBoxes do
-		if not Packages.ByKey[key] then
-			fail(name, nil, key, "Supply.StartBoxes key is not a Packages key")
-		end
-		inRange(name, nil, key, "Supply.StartBoxes", count, 0, supply.HatchSpots)
-	end
+	-- infinite stock room (owner 2026-10-17): only the low-stock warning is a number (the boxes are checkPackages')
+	inRange(name, nil, nil, "Supply.LowAt", Restaurant.Supply.LowAt, 0, 1)
 
 	const dialog = Restaurant.Dialog
 	const needs: { string } = { "bun", "sausage" }

@@ -161,7 +161,6 @@ return Table.new({
 	{ Key = "pickup_serve", Text = "Hand Over", Hold = 0, Radius = 7, Requires = {}, Night = "Any", Wave = 3 },
 	-- DT-WIN (wave R3): hand the plate out of the drive-thru window
 	{ Key = "drive_serve", Text = "Hand Out", Hold = 0, Radius = 6, Requires = {}, Night = "Any", Wave = 4 },
-	-- FEAT-050 supply: the phone opens the stock menu ("Call" confirms with Restaurant.Supply.PhoneHold); the hatch gives a box
-	{ Key = "order_stock", Text = "Order Stock", Hold = 0, Radius = 6, Requires = {}, Night = "Any", Wave = 3 },
+	-- FEAT-050 supply: a StockShelf bay of the stock room always gives a box of its package (infinite, owner 2026-10-17)
 	{ Key = "take_box", Text = "Take Box", Hold = 0, Radius = 6, Requires = {}, Night = "Any", Wave = 3 },
 } :: { Action })

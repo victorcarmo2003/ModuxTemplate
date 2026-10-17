@@ -84,9 +84,9 @@
 	r_listen while Tablets says Talking), then the plate furthest along (WorkPlate: the tutorial customer has no plate
 	ticket) is built: r_cut -> r_bun_plate -> r_grill -> r_cooking -> r_flip -> r_collect -> r_rail -> r_dog_plate ->
 	r_take_plate -> r_toppings (or r_discard) -> r_pickup ("Hand Over" at PICKUP); r_crew while a crewmate holds the hot
-	dog. After the money step, with TutorialRules.Restock and the order_stock phone in the map: r_call -> r_boxes (Supply
-	OnTheWay) -> r_box (take_box at a StockShelf bay or the hatch) -> r_restock (the station of the box's ingredient);
-	over once any station's stock goes up. The Day 1 upgrade lesson below is on in the restaurant (TutorialRules.Upgrade).
+	dog. After the money step, with TutorialRules.Restock and a take_box bay in the map (infinite stock room, owner
+	2026-10-17): r_box (take_box at a StockShelf bay) -> r_restock (the station of the box's ingredient); over once any
+	station's stock goes up. The Day 1 upgrade lesson below is on in the restaurant (TutorialRules.Upgrade).
 
 	PROVISIONAL: texts, IDLE, PROGRESS, CALL_WAIT, NUDGE, TALK_TIME, TALK_MIN, REASK, CHECK_TIME, skip keys (Q, DPadDown), "a served
 	sale of the tutorial customer" as the first sale, ending on the day shift end.
@@ -209,12 +209,11 @@ const PLATE_TAKE = "plate_take"
 const GRILL_FLIP = "grill_flip"
 const RAIL_TAKE = "rail_take"
 const PICKUP_SERVE = "pickup_serve"
-const ORDER_STOCK = "order_stock"
 const TAKE_BOX = "take_box"
 const RESTOCK = "restock"
 const BUN_SLICED = "bun_sliced"
 const SAUSAGE_GRILLED = "sausage_grilled"
-const RESTOCK_STEPS: { [string]: boolean } = { r_call = true, r_boxes = true, r_box = true, r_restock = true }
+const RESTOCK_STEPS: { [string]: boolean } = { r_box = true, r_restock = true }
 -- package Tool item key -> its Packages row (a box in hand)
 const PACKAGE_OF_ITEM: { [string]: Content.Package } = {}
 for _, row in Content.Packages.List do
@@ -1085,9 +1084,9 @@ function TutorialController:DecideRestaurant(guestId: number, guest: GuestRecord
 	return "r_grill", self:Anchor("grill_place", false), ""
 end
 
--- Restock steps start after the first sale: Supply on and the phone of the stock order in the map
+-- Restock steps start after the first sale: Supply on and a stock room bay (take_box) in the map
 function TutorialController:CanRestock(): boolean
-	return TutorialRules.Restock and self:Anchor(ORDER_STOCK, false) ~= nil
+	return TutorialRules.Restock and self:Anchor(TAKE_BOX, false) ~= nil
 end
 
 -- Units of every ingredient now (Stock set)
@@ -1110,16 +1109,6 @@ function TutorialController:Restocked(): boolean
 		if from == nil or amount < from then
 			self.RestockFrom[key] = amount
 		elseif amount > from then
-			return true
-		end
-	end
-	return false
-end
-
--- The phone order is on the way (Restaurant.Supply record 1)
-local function supplyOnTheWay(): boolean
-	for _, raw in Restaurant.Supply:entries() do
-		if (raw :: { State: string }).State == "OnTheWay" then
 			return true
 		end
 	end
@@ -1150,21 +1139,14 @@ function TutorialController:StationRestock(ingredient: string): Instance?
 	end) or self:Anchor(RESTOCK, false)
 end
 
--- Restock step from the hand, the boxes on the bays / hatch and the phone order
+-- Restock step from the hand and the stock room bays (always a box there)
 function TutorialController:DecideRestock(): (string, Instance?, string)
 	const held = self:Held()
 	const package = if held then PACKAGE_OF_ITEM[held.Item] else nil
 	if package ~= nil then
 		return "r_restock", self:StationRestock(package.Ingredient), ""
 	end
-	const box = self:Anchor(TAKE_BOX, true)
-	if box ~= nil then
-		return "r_box", box, ""
-	end
-	if supplyOnTheWay() then
-		return "r_boxes", nil, ""
-	end
-	return "r_call", self:Anchor(ORDER_STOCK, true) or self:Anchor(ORDER_STOCK, false), ""
+	return "r_box", self:Anchor(TAKE_BOX, true) or self:Anchor(TAKE_BOX, false), ""
 end
 
 -- Starts the restock steps (after the money step, or forced by /dev tutorial step)
@@ -1652,7 +1634,7 @@ function TutorialController:NextTalk()
 	if current == MONEY_STEP then
 		self.Spot(false)
 		if TutorialRules.Restaurant then
-			-- restaurant (TASK-393): the restock steps when the supply is on and the phone is in the map, else done
+			-- restaurant (TASK-393): the restock steps when the supply is on and a stock room bay is in the map, else done
 			if self:CanRestock() then
 				self:BeginRestock()
 			else
@@ -2058,7 +2040,7 @@ function TutorialController:ApplyForced()
 		return
 	end
 	if RESTOCK_STEPS[key] then
-		-- restaurant restock steps (TASK-393): decided from the hand, the bays and the phone order
+		-- restaurant restock steps (TASK-393): decided from the hand and the stock room bays
 		self.Forced = nil
 		self.Shopping = false
 		Vide.batch(function()
