@@ -1323,7 +1323,7 @@ box(front, "DTBarrier", 59.5, 60, TOP, 7, 59, 63, { Transparency = 1, CanQuery =
 if ART then
 	box(front, "DT_Frame_Top", 59.4, 60.15, 6.85, 7.1, 58.8, 63.2, { Color = C.Steel, CanCollide = false, art = { Color = C.Steel, Material = Enum.Material.Metal } })
 	box(front, "DT_Sill", 59.2, 60.5, 2.85, TOP, 58.8, 63.2, { Color = C.Cream, art = { Color = C.Cream } })
-	local dtSign = box(front, "DT_Sign", 60.1, 60.3, 7.4, 8.8, 58, 64, { Color = C.Teal, CanCollide = false, art = { Color = C.Teal } })
+	local dtSign = box(front, "DT_Sign", 60.1, 60.3, 7.6, 8.95, 58, 64, { Color = C.Teal, CanCollide = false, art = { Color = C.Teal } })
 	label(dtSign, "Label", "DRIVE-THRU", Enum.NormalId.Left, C.Cream)
 end
 
@@ -1897,8 +1897,9 @@ do
 	pc:SetAttribute("TabletIndex", 5)
 	box(pc, "Monitor", 59.0, 59.4, TOP + 0.3, TOP + 1.1, 60.4, 61.6, { Color = C.Roof, blk = C.BlkKey, art = { Color = C.Roof } })
 	box(pc, "Stand", 59.1, 59.3, TOP, TOP + 0.3, 60.9, 61.1, { Color = C.Teal, blk = C.BlkKey, art = { Color = C.Teal } })
-	local lit = lamp(drive, "LIT-DT", 60.6, 8.0, 61, 12, 0.7)
-	lit.Size = Vector3.new(0.6, 0.12, 1.6)
+	-- lamp bar between the window frame (top 7.1) and the sign (bottom 7.6): it used to cut through the DRIVE-THRU letters
+	local lit = lamp(drive, "LIT-DT", 60.55, 7.4, 61, 12, 0.7)
+	lit.Size = Vector3.new(0.7, 0.12, 2.4)
 	-- roof AC units (decor)
 	if ART then
 		packAsset(dress, "AC_1", "AST-034_ACUnit", face(F(50, 11.05, 66), DIR.N))
@@ -2341,8 +2342,15 @@ if DIFF then
 	local function near(a, b, tol)
 		return math.abs(a - b) <= tol
 	end
+	-- TrailerDeco is built once and then belongs to the owner (he regrouped the string lights in Models, 2026-10-17): skipped
+	local function ownerManaged(path)
+		return string.find(path, "^TRL/Front/TrailerDeco/") ~= nil
+	end
 	for path, w in want do
 		local h = have[path]
+		if ownerManaged(path) then
+			continue
+		end
 		if not h then
 			nDel += 1
 			table.insert(diffs, string.format('\t\t[%q] = { Deleted = true },', path))
@@ -2383,7 +2391,7 @@ if DIFF then
 		end
 	end
 	for path, h in have do
-		if not want[path] and (h:IsA("BasePart") or h:IsA("Model")) then
+		if not want[path] and not ownerManaged(path) and (h:IsA("BasePart") or h:IsA("Model")) then
 			-- only report the top of a new subtree
 			local par = h.Parent
 			if par == live or want[pathOf(par, live)] then

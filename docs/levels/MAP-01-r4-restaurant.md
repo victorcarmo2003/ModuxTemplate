@@ -8,6 +8,8 @@ Números são valores iniciais (DEC-044). O que não tem `[DEC-###]` é **propos
 
 **O que a DEC-280 mudou nesta revisão:** 1 tablet só (`TAB-1`, ponta direita do balcão); **sem porta saída** (`DOOR-K` saiu antes de nascer); balcão da frente inteiro, da parede oeste à leste; na ponta esquerda o pote de gorjetas e o ponto de retirada `PICKUP` com a fila lateral `PU-1..4`; fila `Q1..Q5` atrás do tablet; o cliente leva o prato e senta sozinho. **O jogador não sai da loja**: a loja é o ponto seguro, então disjuntor, esconderijo, válvula, interruptor e descarga das caixas ficam **por dentro**.
 
+**Rev. 3 (2026-10-17, TASK-382, DEC-281 e DEC-282, Provisório):** a casca é um **trailer expandido** (dois módulos acoplados com o visual do AST-027), não um prédio. A **despensa foi ampliada** para X 25..50, Z 72..79 (era 9 × 7) e ganhou uma **porta externa `DOOR-B`** no lado sul: o jogador sai pela despensa (DOOR-P → passagem livre X 25,5..32 → DOOR-B → calçada) para ir ao Mart. DOOR-P passa a 5 × 8 (X 25,5..30,5); a escotilha `HATCH-L` e o `DROP-R` foram para o lado sul da despensa (X 44..47). Detalhes e medidas: §5.9; comparação e prints: `docs/tasks/captures/restaurant-comparison.md`.
+
 ---
 
 ## 1. Resumo
@@ -74,7 +76,7 @@ Leitura em 3D: quem chega pela calçada vê a cerca baixa com o **portão no mei
 |---|---|---|---|---|
 | ZR-01 | Pátio (só clientes) | X 24..60; Z 32..54 | chegada pelo meio, fila do tablet, retirada, mesas | luminárias por mesa (`HushOff`); anomalias das mesas |
 | ZR-02 | Cozinha | X 25,5..59,5; Z 54,5..71,5 | balcão, montagem, estações, DT | = `LZ-1` (luz pelo KSW); **ponto seguro** [DEC-280] |
-| ZR-03 | Despensa / câmara fria | X 25,5..33,5; Z 72,5..78,5 | caixas chegam aqui (DROP-R) | `HideZone` (família B), também segura |
+| ZR-03 | Despensa / câmara fria (rev. 3: ampliada) | X 25,5..49,5; Z 72..78,5 | caixas chegam aqui (DROP-R); saída DOOR-B | `HideZone` (família B), também segura |
 | ZR-04 | Drive-thru (laço leste) | X 61..75,5; Z 16..80 | carros entram e saem pela Ninth, param na janela | ANM-008 e família A no carro |
 | ZR-05 | Recuo de carga LAY-J | X 12..18; Z 66..78 (calçada leste da Juniper Sul) | van para aqui | igual |
 | ZR-06 | Faixa de serviço | X 34..61; Z 72..80 | canteiro, sem uso (folga do retorno do DT) | escura |
@@ -165,13 +167,13 @@ Bancada X 30..59,5, Z 68,5..71,5 (3 de fundo), tampo 3,0. Pose em **Z 67,3**, pr
 | `GAS-1` | **Válvula de gás** das grelhas | parede oeste (25,7; 67) Y 4,5 | ~6 de GRILL-1; uma para as duas grelhas (ANM-025) |
 | `KSW` | **Interruptor da cozinha** (`LZ-1`) [DEC-189] | parede leste (59,3; 64,2) Y 4,5 | "ao lado da montagem" (ponta leste); ANM-003, 2ª chave da ANM-035 |
 | `PHONE-R` | **Telefone fixo**: chefe [DEC-124] **e pedido de reposição** [DEC-276] | parede leste (59,3; 67) Y 4,5 | 2,8 do KSW; 3,2 do COND-2 |
-| `HIDE-P` | `HideZone` da despensa | volume X 25,5..33,5, Z 72,5..78,5 | família B (ANM-007, 017, 018, 019) |
+| `HIDE-P` | `HideZone` da despensa | volume X 25,5..49,5, Z 72,5..78,5 (rev. 3) | família B (ANM-007, 017, 018, 019) |
 | `LIT-T1..4` | Luminária por mesa | centros de TBL-1..4, Y 8 | `HushOff`, ordem da rua para o prédio: LIT-GATE → LIT-T3/T4 → LIT-T1/T2 |
 | `PS-1..4` = `PS-N1..4` (legado) | Spawn dos jogadores (dia, noite, reconexão, atrasado) | (33; 58,5) · (38; 58,5) · (43; 58,5) · (48; 58,5), Y 0,45, virados para o norte | corredor da frente, olhando o balcão |
 | `TRL-OUT` (legado) | "Pouso" de quem sai do preparo / do trailer | (30; 59), dentro da loja | não há saída (restaurant-flow §4.1) |
 | `DROP-T` (legado) | Itens do espectador | (56; 64,5), chão | ≥ 2,5 de qualquer prompt |
 | `AN-05` (legado) | Âncora "porta dos fundos" | janelinha da DOOR-P, (27,75; 71,8) Y 6, por dentro | batidas ANM-009 (agora na porta da despensa ou na escotilha) |
-| `REV-1..4` (lido como restaurante, DEC-122) | Acordar depois da noite perdida / reviver | **proposta:** mover para dentro, = PS-1..4 | a ambulância continua em AMB-P (44; 13); `Q-317` |
+| `REV-1..4` (lido como restaurante, DEC-122) | Acordar depois da noite perdida / reviver | **rev. 3 (Provisório):** dentro do trailer, corredor do fundo (33 · 38 · 43 · 48; 65,9), virados para o norte | a ambulância continua em AMB-P (44; 13); a equipe entra pela `DOOR-B` (`Q-317` resolvida em parte) |
 
 Larguras com essas peças: passagem oeste X 25,5..31,5 com 1,8 ocupados → **4,2 livres**.
 
@@ -206,6 +208,18 @@ Capacidade: **1 na janela + 3 na fila**. Quem desiste segue o laço sem parar.
 | `HATCH-L` | **Escotilha de carga** na parede oeste da despensa | vão X 25, Z 74..77, peitoril 3,0, abertura 3 × 2,5 | o entregador empurra as caixas **para dentro**; abre só na descarga (6–8 s). Jogador não passa por ela |
 | `DROP-R` | **Ponto de descarga** (prateleira/pallet) | dentro da despensa, (26,5; 75), tampo 3,0 colado à escotilha | aparecem as caixas DOGS, BUNS, MUSTARD… (as que já estão no place) |
 | BOX-ROUTE | Caixa → estação | DROP-R → DOOR-P (27,75; 72) → corredor do fundo (Z 66–67) → STOCK / BUN / COND-n | **só corredor do fundo**: não cruza o corredor da frente, o caminho prato → PICKUP nem o balcão |
+
+### 5.9 Despensa ampliada e saída pelos fundos (rev. 3, DEC-282, Provisório)
+
+| ID | O quê | Posição / medidas | Nota |
+|---|---|---|---|
+| PANTRY | Módulo de trás (mesma altura da cozinha, cantos arredondados) | X 25..50, Z 72..79; interior X 25,5..49,5, Z 72..78,5 | a área verde do dono (até as lixeiras), lixeiras `P2` movidas para Z 83 (X 56 · 63,4) |
+| `DOOR-P` | Porta cozinha → despensa | vão X 25,5..30,5, Y 0,45..8,45 (**5 × 8**) | folha aberta rente à parede do lado da despensa, sem colisão; fechadura `LOCK-P` faz parte da folha |
+| `DOOR-B` | **Porta externa** despensa → calçada | vão X 27..32 na parede sul (Z 79), **5 × 8**; chapa de degrau X 26,8..32,2, Z 79..80,7 | folha aberta rente à parede de fora; placa "EXIT · MART" por dentro; MapPoint `DOOR-B` (29,5; 81,4), sem nó de NPC |
+| Passagem | DOOR-P → DOOR-B | faixa livre X 25,5..32 | conferida com varredura R6 (`restaurant_walk_check.luau`): 0 bloqueios |
+| `HATCH-L` | Escotilha de carga | parede sul, vão X 44..47, Y 3..5,5 | tampa fechada; a van ainda está no LAY-J (proposta: faixa de serviço Z 80–84, R3) |
+| `DROP-R` | Pallet sob a escotilha | X 43,2..48,2, Z 76,6..78,4, tampo 3,0 | caixas DOGS / BUNS / MUSTARD em cima (uma empilhada); `HatchSpot1..3` |
+| Estantes | 5 unidades com caixas e pacotes AST-011 | Shelf_N1/N2 na divisória (Z 72,06..73,24), Shelf_E1 na parede leste, Shelf_S1/S2 na parede sul (Z 77,26..78,44) | corredor ≥ 4 (73,24..77,26) |
 
 ## 6. Distâncias e tempos (16 studs/s)
 
@@ -411,6 +425,6 @@ Renumerado pela TASK-395 (art-director, 2026-10-17): a reserva AST-123..139 da r
 | Q-314 | Barreira invisível sobre o balcão (Y 3..7) para o jogador não pular para fora e o cliente não entrar | Sim, só para personagens; o prato passa pelo prompt |
 | Q-315 | Teto de NPCs: 12 (clientes ≤ 10 de dia / ≤ 9 à noite) ou 14 com clientes sentados ancorados? | 12 no lançamento |
 | Q-316 | Pets do carro: só na janela ou saem andando? | Só na janela |
-| Q-317 | **Sem porta para fora**, como o jogador vai ao Mart / Gear Stand, e onde acorda (REV) e é recolhido pela ambulância? | Upgrades por um painel dentro da loja (sem ida ao Mart no fluxo normal); REV-1..4 = PS-1..4 dentro; médicos entram por uma porta de serviço só deles (DOOR-S na despensa, ao lado da escotilha, nunca abre para jogador). Precisa de DEC do dono |
+| Q-317 | **Sem porta para fora**, como o jogador vai ao Mart / Gear Stand, e onde acorda (REV) e é recolhido pela ambulância? | **Resolvida em parte (rev. 3, DEC-282, Provisório):** saída pela `DOOR-B` da despensa até a calçada e o Mart; REV-1..4 dentro do trailer (corredor do fundo); a ambulância chega pela `DOOR-B`. Falta: regras de anomalia com a porta aberta (família B, Hide, ANM-028) e a rota da equipe da ambulância |
 | Q-318 | Ladrão de dia sem gaveta e sem jogador fora: alvo vira o pote (ponta esquerda, visto pelo vidro) ou sai? | Sai na 1ª versão; `L3` fica só como ponto legado |
 | Q-319 | Walker / postes: a "janela" agora é o vidro do balcão (Z 54). Mover `WALKER-10` para (36; 28) e reconferir NL-01..04 com raycast das poses do balcão? | Sim; se B1 tapar NL-01, puxar a fileira 10 studs para oeste |

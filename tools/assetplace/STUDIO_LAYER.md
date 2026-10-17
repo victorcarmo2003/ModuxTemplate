@@ -209,3 +209,13 @@ Marcador `_SHL_OrigPivot` (pose antes da 1ª execução; o undo volta a ela). Ap
 (-32.56, 4.93, 12.60) -> (-38.18, 4.93, 7.24), `Prompt_Shutter` em (-38.18, 4.71, 8.06). Depois de `Place.run` / `Bind.run`
 (que recriam o TRL-SHUTTER) e do `trailer_door_switches.luau`: rodar de novo. O `check_map01` só dá `info` pela distância ao
 `Prompt_Switch` (esperado).
+
+## Trailer expandido "Corner Dogs" (2026-10-17, `restaurant_bind.luau`, TASK-382, DEC-269..282, Provisório)
+
+`run("assetplace/restaurant_bind", mode)`, idempotente (2x = mesmo número de instâncias), nada apagado. Modos: `"dry"` (relatório), `"blockout"` (só Parts nomeadas, cores de blockout), `nil`/`"apply"` (blockout + arte), `"diff"` (monta em `workspace.__RST_Diff`, compara peça a peça com o place, escreve `ServerStorage._RST_DiffOut` = bloco `OVERRIDES` pronto para colar no snippet; não altera nada), `"undo"` (restaurante → `ServerStorage.TrailerBackup.Restaurant_Undone`, trailer e tudo o que foi movido de volta).
+
+- Montagem em `workspace.MAP01_Restaurant` (Folder, fora do `MAP01_Assets`: um `Place.run` não a apaga). Veículo = `MAP01_Restaurant.TRL` (tag `Vehicle`, `Vehicle = "trailer"`, `Restaurant = true`, Persistent). As estações, telefone, interruptor, persiana, disjuntor, pote, cafeteira, lixeira, diário, `Station_1..4`, `PrepTargets` e peças de upgrade são **clones** do AST-027 (com tags; nomes e `MapId` legados, id r4 em `RestaurantId`), posicionados peça a peça a partir do trailer do backup a cada execução.
+- Backup: o trailer inteiro, sobras de `Night_Trailer`, varais do `PadDecor`, postes do varal, bordas do Pad e `MAP01_Blockout.Pad.*` → `ServerStorage.TrailerBackup` (hierarquia espelhada, `OrigPath`, `OrigTags`, índice `_Index` para o undo). Peças de layouts antigos do próprio snippet → `TrailerBackup.Retired`.
+- Movidos (pose original em `_RST_OrigCF`): mesas → TBL-1..4, letreiro CORNER DOGS, caixas DOGS/BUNS/MUSTARD (DROP-R), lixeiras `P2`, menu (DT-MENU), vaso, floreiras (BUSH-R), CCTV, marcas de fila, pontos legados (TRL, CART, Q1..Q5, PS-*, DROP-T, AN-05, L3, TRL-OUT, WALKER-10, SPEC-P, REV-1..4), nós do pátio, LZ-1/2/3. Criados (`_RST_Created`): PU-1..4, N-PU-IN, DT-IN/OUT/STOP, DTQ-1..3, VAN-STOP, DOOR-B.
+- **Edições à mão do dono:** antes de rodar `apply`, rodar `"diff"`; se houver `changed/deleted/external`, colar `_RST_DiffOut` no bloco `OVERRIDES BEGIN/END` do snippet. `TrailerDeco` (varal, barra de luz) é do dono depois de criado: o snippet não recria nem compara.
+- Checagens: `zfight_scan.luau` (faces coplanares; 16 restantes são faces escondidas/caixa de malha/CCTV do dono) e `restaurant_walk_check.luau` (varredura R6 de 7 rotas, inclusive DOOR-P → DOOR-B). O dono salva (Ctrl+S).
