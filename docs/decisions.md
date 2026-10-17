@@ -3725,3 +3725,27 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
   - **DEC-269/DEC-273**: a "porta de saída à esquerda dos tablets" da frente **não volta**; a porta nova é **nos fundos**.
 - Resolve em parte (Provisório até o dono confirmar): **Q-317** (`levels/MAP-01-r4-restaurant.md`: acesso ao Mart, Gear Stand, REV/ambulância) e **Q-351** (o que exige sair): Mart, Gear Stand, descarga de caixas e Clean Table voltam a ser possíveis pela porta dos fundos.
 - Impacto: **level-designer** (`MAP-01-r4-restaurant.md`: porta externa, despensa maior, rota até o Mart, Q-317), **art-director/modeler-3d** (AST-140 com a porta e a despensa maior; fechadura), **game-designer**, **architect**.
+
+### DEC-283 — 2026-10-17 — Apagão: todos se escondem nos fundos (despensa), com aviso na tela e música de suspense em passos
+
+- Origem: fala do dono ao orquestrador (2026-10-17), registrada pelo secretário. Meta explícita de **terror**.
+- Decidido pelo dono:
+  - No **apagão** (a energia cai), os jogadores **se escondem nos fundos, na despensa**, enquanto as **luzes apagam**.
+  - Aparece um **texto de aviso na tela**.
+  - **Música de suspense em passos**: **violinos acelerando** até a **chegada da criatura**, depois **coral de horror**.
+- Responde **`Q-331`** (`design/anomalies-v3-restaurant.md`): a recomendação era "esconder sai"; o dono **traz de volta "esconder"** como resposta ao apagão.
+- **Emendas (append-only):**
+  - **DEC-278**: o conjunto refeito de anomalias **inclui** o apagão com resposta "esconder na despensa".
+  - **DEC-254** família C (religar o disjuntor nos fundos) e família B (esconder nos fundos): no apagão, a resposta passa a ser **esconder na despensa**; se o disjuntor ainda entra (antes ou depois de esconder) fica com o game-designer (Provisório: religar o disjuntor na despensa depois que a criatura vai embora).
+  - **DEC-221** (esconder saiu; janela no lugar): "esconder" **volta**, só no apagão.
+  - **DEC-280/DEC-282**: a despensa ampliada é o esconderijo.
+  - **DEC-277**: quem não está escondido quando a criatura chega perde sanidade (não cai na hora).
+- **Provisório** (não dito): texto do aviso (inglês, narrative-writer, ex.: "Power's out. Hide in the back!"); tempos dos passos da música (game-designer + áudio); quem está "escondido" = dentro do volume da despensa; com que frequência e em que noites o apagão acontece.
+- Impacto: **game-designer** (refazer a ficha no conjunto novo), **level-designer** (volume de esconderijo na despensa), **frontend-coder** (aviso, apagar luzes, música em passos), **backend-coder**, **narrative-writer**, áudio. Tarefas: **TASK-441 a TASK-447** (`tasks/board.md`).
+
+### DEC-284 — 2026-10-17 — Áudio organizado em passos e pastas, sem remover nenhum som
+
+- Origem: mesma fala (DEC-283).
+- Decidido pelo dono: **organizar os sons em passos/pastas**; **nenhum som é removido**.
+- **Provisório:** estrutura das pastas e nomes dos passos pelo frontend-coder/áudio, refletida em `audio/sound-list.md`; IDs SFX/MUS/AMB existentes não mudam.
+- Impacto: **frontend-coder** (`Sounds`/`AudioController`), **game-designer** (`audio/sound-list.md`). Tarefas: **TASK-441 a TASK-447**.

@@ -333,7 +333,7 @@ Pré-requisitos (fora deste doc): coluna de controle (2 alavancas + painel + qua
 | ID | Pergunta | Recomendação (Provisória) |
 |---|---|---|
 | Q-330 | A sanidade perdida por erro é **por jogador** ou **do grupo**? | **Por jogador**: ação errada tira de quem agiu; omissão (ninguém respondeu no prazo) tira de todos na loja. A noite só se perde se todos caírem |
-| Q-331 | **"Esconder" sai?** (família B, DEC-254: sair e esconder nos fundos) | **Sai**: a loja é o único ponto seguro (DEC-280). Os monstros que vêm até a vitrine passam a ser resolvidos **puxando FRONT antes de chegarem** (ANM-017) |
+| Q-331 | **Respondida pelo dono (DEC-283, 2026-10-17): esconder VOLTA no apagão — todos se escondem na despensa, luzes apagam, aviso na tela, música em passos. A recomendação abaixo está superada.** **"Esconder" sai?** (família B, DEC-254: sair e esconder nos fundos) | **Sai**: a loja é o único ponto seguro (DEC-280). Os monstros que vêm até a vitrine passam a ser resolvidos **puxando FRONT antes de chegarem** (ANM-017) |
 | Q-332 | Duas alavancas (FRONT e DRIVE) lado a lado, ou uma só que fecha tudo? (fecha a parte de anomalias da `Q-308`) | **Duas**: o falso positivo custa menos, e o atendente aprende "frente × drive-thru" pelo lugar onde a coisa está |
 | Q-333 | O catálogo de lançamento fica em **11 anomalias / 9 regras**, com o MVP de 6 (§10)? | **Sim** |
 
