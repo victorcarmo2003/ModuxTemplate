@@ -84,6 +84,26 @@
 -- TASK-354 (owner request 2026-10-17, Provisional): no "Refuse" prompt or button any more. Refusing = closing the
 -- service window (VehicleService.ShutterChanged -> SendLineAway: Refused, Acted "refuse" with who closed); anomaly
 -- actors read the same Shutter event in Anomaly/Kit/CustomerActor.
+--
+-- Restaurant (TASK-380, R1-C; tech/restaurant-flow.md rev. 2 §2.1, §3.1; design FEAT-043/FEAT-046; DEC-280; Provisional).
+-- Everything below is off unless Content.Restaurant.Rules.Enabled: with the flag off (or the map without PU-1) the flow
+-- above is untouched. The tablet queue is still Queue.luau (Q1..Q5, unchanged).
+--   Tablet mode (IsTabletMode: flag on + a Model tagged Binding.TabletTag with TabletIndex 1 in the Workspace): the rig's
+--     "Take Order" prompt stays off and is refused; the order is taken by TabletService through TakeOrderFor at the end of
+--     the talk. PausePatience(id, on) freezes the running clock during the talk (no give up, no Annoyed).
+--   Pickup mode (IsPickupMode: flag on + MapPoint PU-1): after "Take Order" the customer gets its #n (Customers.Number,
+--     1..Rules.OrderNumberMax per shift, wraps), leaves Q1 (the tablet queue moves up), joins the back of the pickup line
+--     (Pickup.luau, Customers.Pickup = k) and walks to PU-k with its Order clock running; out of patience = Slow, out of
+--     the line, the ones behind move up. Size = min(Rules.PickupSlots[party], PU-k points of the map); full = "Take
+--     Order" refused with pickup_full and the customer stays at the tablet. No table at the order in this mode.
+--     Hand-over: pickup_serve on the PICKUP prompt, or serve on the rig of a PU-n customer, -> ServeAtPickup (Pickup.choose:
+--     plate Ticket exact > oldest exact > ticket owner > the served rig > PU-1). Verdict, pay, tip and Sale are the ones of
+--     ServeCustomer (DEC-072: Wrong = $0, the hot dog stays in the hand, the customer leaves complaining).
+--     Served (no Wrong/Left/Refused line): the rigs get the attribute Carrying = true (the client puts the plate in the
+--     hand); with Content.Seating.SitAt = "Served" the Seater is offered the party AT THE SALE (Seater.Offer before
+--     Leave(dining = true): SeatingService walks it from PU-n to the table, eats, Dismiss); no table (or SitAt "Order")
+--     = takeaway: it walks out carrying the plate (Rules.TakeawayWhenNoTable).
+local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -96,6 +116,7 @@ local TutorialRules = require(ReplicatedStorage.shared.Tutorial.Rules)
 local Adopt = require(script.Adopt)
 local Group = require(script.Group)
 local Orders = require(script.Orders)
+local Pickup = require(script.Pickup)
 local Queue = require(script.Queue)
 local Modux = require(ServerScriptService.server.Modux)
 
@@ -136,6 +157,11 @@ export type Customer = {
 	-- Tutorial customer (RequestTutorial): fixed order, endless patience, out of the ledger
 	Tutorial: boolean,
 	Model: Model?, -- tutorial customer: rig carrying TutorialRules.Attribute (cleared when the record goes)
+	-- Restaurant (TASK-380)
+	Pickup: number, -- 0 = not in the pickup line; k = PU-k (target spot while walking there); leaders only
+	Number: number?, -- #n of the order (pickup mode), nil = none
+	PausedAt: number?, -- PausePatience: server time the running clock was frozen; nil = running
+	CarryModel: Model?, -- rig carrying the attribute Carrying (served at the pickup; cleared when the record goes)
 }
 
 -- What SeatingService gets when a customer or pair takes its order (Seater.Offer). Leader = the customer with the ticket.
@@ -175,6 +201,8 @@ export type Wire = {
 	Mood: string,
 	Order2: { [string]: boolean }?,
 	Leader: number?,
+	Pickup: number?,
+	Number: number?,
 }
 
 -- Sale.Result (network.md §4.3) = EconomyService SaleResult
@@ -230,6 +258,13 @@ const NEUTRAL = "Neutral" -- arrival mood (Content.Moods)
 const MOOD_LADDER = { HAPPY, NEUTRAL, ANNOYED, COMPLAINING }
 -- day phases where the tutorial customer may spawn (the tutorial runs in Prep and Open)
 const TUTORIAL_PHASES: { [string]: boolean } = { Prep = true, Open = true }
+-- Restaurant (TASK-380)
+const PICKUP_SERVE = "pickup_serve" -- Content.Actions key (PICKUP Prompt_Serve)
+const PICKUP_FULL = "pickup_full" -- Content.Notices key
+const CARRYING = "Carrying" -- rig attribute: the customer carries its plate (Seating client, R1-J)
+const TICKET = "Ticket" -- hot_dog Tool attribute written by PlateService (NpcId of the plate's order)
+const SERVED_SEAT_MODE = "Served" -- Content.Seating.SitAt: the Seater is offered the party at the sale
+const NUMBER_MAX = 255 -- Net Customers.Number wire range
 -- Exit split by shift: Content.Flow.Spawns.Exits (MAP-01 §9.8, Provisional; EX-E 60 / D1 40).
 
 -- djb2 over a string, exact in doubles (h x 33 + byte < 2^38). Run seed hash, architecture.md §4 rule 6.
@@ -340,6 +375,12 @@ function CustomerService:Setup()
 	self.TutorialTryAt = 0 :: number
 	-- look draws of the tutorial customer: never shifts the seeded customer draws
 	self.TutorialRng = Random.new() :: Random
+	-- Restaurant (TASK-380): pickup line PU-1..n and the last #n given this shift (0 = none yet)
+	self.PickupLine = Pickup.new() :: Pickup.Pickup
+	self.OrderNumber = 0 :: number
+	-- Ordered(id, player): an order was taken (every customer, the tutorial one included; Acted skips it). Fired after
+	-- the record moved to the pickup line (pickup mode) or to its table (Q-209). PlateService / TabletService may listen.
+	self.Ordered = self.Libs.Signal.new() :: SignalLib.Signal<number, Player>
 end
 
 function CustomerService:WarnOnce(key: string, message: string)
@@ -376,12 +417,12 @@ function CustomerService:Count(): number
 	return count
 end
 
--- Counter slots taken: customers at or walking to the counter (everyone but Leaving and the ones already at a table).
--- A pair takes 1 (the partner is not counted, FEAT-038).
+-- Counter slots taken: customers at or walking to the counter (everyone but Leaving, the ones already at a table and the
+-- ones in the pickup line). A pair takes 1 (the partner is not counted, FEAT-038).
 function CustomerService:Occupants(): number
 	local count = 0
 	for _, customer in self.Customers do
-		if customer.State ~= "Leaving" and customer.Leader == nil and not customer.AtTable then
+		if customer.State ~= "Leaving" and customer.Leader == nil and not customer.AtTable and customer.Pickup == 0 then
 			count += 1
 		end
 	end
@@ -415,8 +456,8 @@ function CustomerService:IsCounterEmpty(): boolean
 		return false
 	end
 	for _, customer in self.Customers do
-		if customer.AtTable and customer.State ~= "Leaving" then
-			return false
+		if (customer.AtTable or customer.Pickup > 0) and customer.State ~= "Leaving" then
+			return false -- waiting at a table or in the pickup line (TASK-380)
 		end
 		-- Last call only: at night the Closing sends everybody away, the diners included
 		if customer.Dining and customer.State == "Leaving" and not self:IsNightShift() then
@@ -571,6 +612,62 @@ function CustomerService:Flow(): { Party: number, MeanInterval: number, QueueSiz
 	}
 end
 
+-- Restaurant reads (TASK-380) ---------------------------------------------------------------------------------------
+
+-- PU-k MapPoints the map binds, counted from PU-1 up to the first missing one (0 = no pickup line in the map).
+function CustomerService:PickupPoints(): number
+	const format = Content.Restaurant.Binding.PickupPoint
+	local count = 0
+	for spot = 1, Pickup.MaxSpots do
+		const ok, point = pcall(MapIndex.FindPoint, Pickup.point(spot, format))
+		if not ok or point == nil then
+			break
+		end
+		count = spot
+	end
+	return count
+end
+
+-- Pickup line on: Content.Restaurant.Rules.Enabled and PU-1 in the map. Off = the trailer flow (served at Q1).
+function CustomerService:IsPickupMode(): boolean
+	return Content.Restaurant.Rules.Enabled and self:PickupPoints() > 0
+end
+
+-- Orders are taken at the tablet: Content.Restaurant.Rules.Enabled and TAB-1 (Model tagged Binding.TabletTag with
+-- Binding.TabletIndex = 1) in the Workspace. The rig's "Take Order" prompt is off then (TabletService calls TakeOrderFor).
+function CustomerService:IsTabletMode(): boolean
+	if not Content.Restaurant.Rules.Enabled then
+		return false
+	end
+	const binding = Content.Restaurant.Binding
+	for _, instance in CollectionService:GetTagged(binding.TabletTag) do
+		if instance:GetAttribute(binding.TabletIndex) == 1 and instance:IsDescendantOf(workspace) then
+			return true
+		end
+	end
+	return false
+end
+
+-- Spots of the pickup line now: Rules.PickupSlots[party] (party locked when the shop opened, DEC-185), never more than
+-- the PU-k points of the map. 0 = no pickup line.
+function CustomerService:PickupSize(): number
+	if not self:IsPickupMode() then
+		return 0
+	end
+	const slots = Content.Restaurant.Rules.PickupSlots
+	return Pickup.size(slots[math.clamp(self.Party, 1, #slots)], self:PickupPoints())
+end
+
+-- Customers (leaders) in the pickup line, PU-1 first (a copy).
+function CustomerService:PickupIds(): { number }
+	return table.clone(self.PickupLine.Order)
+end
+
+-- The pickup line has no free spot: "Take Order" is refused (pickup_full). false when pickup mode is off.
+function CustomerService:IsPickupFull(): boolean
+	return self:IsPickupMode() and Pickup.isFull(self.PickupLine, self:PickupSize())
+end
+
 -- Network ---------------------------------------------------------------------------------------------------------
 
 function CustomerService:Record(customer: Customer): Wire
@@ -584,6 +681,8 @@ function CustomerService:Record(customer: Customer): Wire
 		Mood = customer.Mood,
 		Order2 = customer.Order2,
 		Leader = customer.Leader,
+		Pickup = if customer.Pickup > 0 then customer.Pickup else nil,
+		Number = customer.Number,
 	}
 end
 
@@ -603,6 +702,12 @@ function CustomerService:Publish(customer: Customer, added: boolean)
 		end
 		if record.Leader == nil then
 			record.Leader = Lync.none
+		end
+		if record.Pickup == nil then
+			record.Pickup = Lync.none
+		end
+		if record.Number == nil then
+			record.Number = Lync.none
 		end
 		self.Libs.Net.Customers:update(customer.Id, record)
 	end
@@ -637,6 +742,76 @@ function CustomerService:Refresh()
 				self:Reached(customer, slot)
 			end
 		end)
+	end
+end
+
+-- Pickup line (TASK-380): sends everyone in it to the PU-k of their position (PU-1 = at the counter) and turns the
+-- PICKUP prompt on while somebody waits. Called after every join and leave of the pickup line.
+function CustomerService:RefreshPickup()
+	const points = self:PickupPoints()
+	const format = Content.Restaurant.Binding.PickupPoint
+	for spot, id in self.PickupLine.Order do
+		const customer = self.Customers[id]
+		if customer == nil or customer.Pickup == spot then
+			continue
+		end
+		customer.Pickup = spot
+		self:Publish(customer, false)
+		if points > 0 then
+			-- AvoidQueue: the walk from Q1 never steps through the tablet queue slots
+			self:Walk(customer, Pickup.point(math.min(spot, points), format), true, function() end)
+		end
+	end
+	self:SetPickupPrompt(#self.PickupLine.Order > 0)
+end
+
+-- PICKUP Prompt_Serve anchors (Model tagged Binding.PickupTag) on or off.
+function CustomerService:SetPickupPrompt(enabled: boolean)
+	if not Content.Restaurant.Rules.Enabled then
+		return
+	end
+	const binding = Content.Restaurant.Binding
+	for _, model in CollectionService:GetTagged(binding.PickupTag) do
+		if not model:IsDescendantOf(workspace) then
+			continue
+		end
+		const anchor = model:FindFirstChild(binding.PickupPrompt, true)
+		if anchor ~= nil and anchor:GetAttribute("PromptAction") == PICKUP_SERVE then
+			self.Dependencies.InteractionService:SetPrompt(anchor, enabled)
+		end
+	end
+end
+
+-- The prompt anchor is the PICKUP's Prompt_Serve (inside a Model tagged Binding.PickupTag in the Workspace).
+function CustomerService:IsPickupAnchor(anchor: Instance): boolean
+	const binding = Content.Restaurant.Binding
+	if anchor.Name ~= binding.PickupPrompt or not anchor:IsDescendantOf(workspace) then
+		return false
+	end
+	local parent = anchor.Parent
+	while parent ~= nil and parent ~= workspace do
+		if CollectionService:HasTag(parent, binding.PickupTag) then
+			return true
+		end
+		parent = parent.Parent
+	end
+	return false
+end
+
+-- The customer just had its order taken (pickup mode): out of the tablet queue (the queue moves up), to the back of the
+-- pickup line; its rig keeps the "Serve" prompt (serve on a PU-n rig = ServeAtPickup). Actors and the tutorial customer
+-- too (same flow); partners follow their leader (StepPairs).
+function CustomerService:EnterPickup(customer: Customer)
+	if customer.Leader ~= nil or customer.AtTable or customer.Pickup > 0 then
+		return
+	end
+	customer.Slot = 0
+	const wasQueued = Queue.leave(self.Line, customer.Id)
+	Pickup.join(self.PickupLine, customer.Id)
+	self:SetPrompts(customer.Id, true)
+	self:RefreshPickup()
+	if wasQueued then
+		self:Refresh()
 	end
 end
 
@@ -800,6 +975,10 @@ function CustomerService:Create(id: number, variant: Variant?, leader: number?, 
 		AtTable = false,
 		Tutorial = tutorial == true,
 		Model = nil,
+		Pickup = 0,
+		Number = nil,
+		PausedAt = nil,
+		CarryModel = nil,
 	}
 	if customer.Tutorial then
 		-- before the first replication of the record: the client knows it is the tutorial customer from the start
@@ -955,6 +1134,7 @@ function CustomerService:Leave(id: number, mood: string?, reason: LeaveReason?, 
 		mood = nil
 	end
 	const wasQueued = Queue.leave(self.Line, id)
+	const wasPicking = Pickup.leave(self.PickupLine, id)
 	const members: { Customer } = { customer }
 	const partner = if customer.Partner then self.Customers[customer.Partner] else nil
 	if partner ~= nil then
@@ -971,6 +1151,9 @@ function CustomerService:Leave(id: number, mood: string?, reason: LeaveReason?, 
 		member.Slot = 0
 		member.LeftAt = now()
 		member.Dining = dining == true
+		member.Pickup = 0
+		member.Number = nil -- the #n over the head goes with the plate (FEAT-043)
+		member.PausedAt = nil
 		if mood ~= nil then
 			member.Mood = mood
 		end
@@ -983,6 +1166,9 @@ function CustomerService:Leave(id: number, mood: string?, reason: LeaveReason?, 
 	end
 	if wasQueued then
 		self:Refresh()
+	end
+	if wasPicking then
+		self:RefreshPickup()
 	end
 	if atTable then
 		const seater = self.Seater
@@ -1069,6 +1255,13 @@ function CustomerService:Forget(id: number): boolean
 		model:SetAttribute(TutorialRules.Attribute, nil)
 		customer.Model = nil
 	end
+	const carried = customer.CarryModel
+	if carried ~= nil then
+		-- the rig goes back to the pool empty-handed (TASK-380)
+		carried:SetAttribute(CARRYING, nil)
+		customer.CarryModel = nil
+	end
+	const wasPicking = Pickup.leave(self.PickupLine, id)
 	const wasQueued = Queue.leave(self.Line, id)
 	if self.Dependencies.NetService:IsRunning() then
 		self.Libs.Net.Customers:remove(id)
@@ -1085,6 +1278,9 @@ function CustomerService:Forget(id: number): boolean
 	end
 	if wasQueued then
 		self:Refresh()
+	end
+	if wasPicking then
+		self:RefreshPickup()
 	end
 	return true
 end
@@ -1148,6 +1344,8 @@ function CustomerService:RemoveAll()
 		self:Remove(id)
 	end
 	Queue.clear(self.Line)
+	Pickup.clear(self.PickupLine)
+	self:SetPickupPrompt(false)
 end
 
 -- Writes for TASK-033 -----------------------------------------------------------------------------------------------
@@ -1285,7 +1483,43 @@ function CustomerService:OnFronted(id: number)
 	if customerAnchor ~= nil then
 		customerAnchor:SetAttribute("PromptAction", TAKE_ORDER)
 	end
-	self:SetPrompts(id, true)
+	-- TAB-1 in the map (TASK-380): the order is taken at the tablet, the rig shows no "Take Order"
+	self:SetPrompts(id, not self:IsTabletMode())
+end
+
+-- TabletService (TASK-381): freezes (on = true) or resumes the running patience clock of a customer during the talk at
+-- the tablet. While frozen nothing times it out and it does not turn Annoyed; resuming moves the deadline by the time it
+-- was frozen (one set write). "Take Order" clears a freeze. false = unknown customer, no clock running, already in that
+-- state, or leaving.
+function CustomerService:PausePatience(id: number, on: boolean): boolean
+	const customer = self.Customers[id]
+	const ticket = self.Tickets[id]
+	if customer == nil or ticket == nil or customer.State == "Leaving" or customer.Tutorial or ticket.Phase == "None" then
+		return false
+	end
+	if on then
+		if customer.PausedAt ~= nil then
+			return false
+		end
+		customer.PausedAt = now()
+		return true
+	end
+	const since = customer.PausedAt
+	if since == nil then
+		return false
+	end
+	customer.PausedAt = nil
+	-- the whole phase moves: same span on the wire, same Annoyed fraction
+	const frozen = math.max(now() - since, 0)
+	ticket.PhaseStartedAt += frozen
+	ticket.PatienceEndsAt += frozen
+	return self:Update(id, { PatienceEndsAt = ticket.PatienceEndsAt })
+end
+
+-- The patience clock of `id` is frozen (PausePatience).
+function CustomerService:IsPatiencePaused(id: number): boolean
+	const customer = self.Customers[id]
+	return customer ~= nil and customer.PausedAt ~= nil
 end
 
 -- Customer + ticket behind a prompt anchor, when the customer can still be served (not leaving).
@@ -1318,7 +1552,9 @@ function CustomerService:CanActOn(player: Player, id: number?, state: State?): b
 	if customer == nil or self.Tickets[id] == nil or customer.State == "Leaving" then
 		return false
 	end
-	if self:Front() ~= id or customer.Slot ~= 1 then
+	-- on Q1, or (TASK-380) anywhere in the pickup line: every #n there can be served
+	const inPickup = customer.Pickup > 0 and Pickup.spotOf(self.PickupLine, id) ~= nil
+	if not inPickup and (self:Front() ~= id or customer.Slot ~= 1) then
 		return false
 	end
 	-- the tutorial customer's order can be taken before the shop opens (Prep); serving it still needs the drawer
@@ -1386,11 +1622,26 @@ function CustomerService:TakeOrder(player: Player, anchor: Instance)
 	if id == nil or customer == nil or ticket == nil then
 		return
 	end
+	if self:RefusePickupFull(player, customer) then
+		return
+	end
 	self:OpenOrder(player, id, customer, ticket)
 end
 
--- "Take Order" from the prep mode Order tab (PrepService; prep-mode.md §2): the customer at the counter in Ordering
--- (`id` nil = the one on Q1), same gate and same write as the world prompt. Returns true when the order was taken.
+-- Pickup mode (TASK-380): no free spot in the pickup line = the order is not taken, the player gets pickup_full and the
+-- customer stays at the tablet (its Queue clock keeps running). The tutorial customer is never refused. true = refused.
+function CustomerService:RefusePickupFull(player: Player, customer: Customer): boolean
+	if customer.Tutorial or not self:IsPickupFull() then
+		return false
+	end
+	self:NotifyThrottled(player, PICKUP_FULL)
+	return true
+end
+
+-- "Take Order" from the prep mode Order tab (PrepService; prep-mode.md §2) and from the tablet at the end of the talk
+-- (TabletService, TASK-381): the customer at the counter in Ordering (`id` nil = the one on Q1), same gate and same write
+-- as the world prompt. Pickup mode: refused with pickup_full when the pickup line is full; taken = #n, out of Q1, to the
+-- back of the pickup line. Returns true when the order was taken.
 function CustomerService:TakeOrderFor(player: Player, id: number?): boolean
 	const target = if id ~= nil then id else self:Front()
 	if target == nil or not self:CanActOn(player, target, "Ordering") then
@@ -1399,6 +1650,9 @@ function CustomerService:TakeOrderFor(player: Player, id: number?): boolean
 	const customer = self.Customers[target]
 	const ticket = self.Tickets[target]
 	if customer == nil or ticket == nil then
+		return false
+	end
+	if self:RefusePickupFull(player, customer) then
 		return false
 	end
 	self:OpenOrder(player, target, customer, ticket)
@@ -1418,6 +1672,13 @@ function CustomerService:OpenOrder(player: Player, id: number, customer: Custome
 	end
 	const second = ticket.Lines[2]
 	customer.Order2 = if second then Orders.Set(second.Toppings) else nil
+	customer.PausedAt = nil -- the talk is over: the Order clock starts fresh
+	-- pickup mode (TASK-380): the #n goes out in the same write (FEAT-043, 1..OrderNumberMax per shift, wraps)
+	const pickup = self:IsPickupMode() and customer.Leader == nil
+	if pickup then
+		self.OrderNumber = self.OrderNumber % math.clamp(Content.Restaurant.Rules.OrderNumberMax, 1, NUMBER_MAX) + 1
+		customer.Number = self.OrderNumber
+	end
 	const written = self:Update(id, {
 		State = "Waiting",
 		Order = Orders.Set(ticket.Lines[1].Toppings),
@@ -1434,12 +1695,23 @@ function CustomerService:OpenOrder(player: Player, id: number, customer: Custome
 	if customerAnchor ~= nil then
 		customerAnchor:SetAttribute("PromptAction", SERVE)
 	end
+	if self:IsTabletMode() then
+		self:SetPrompts(id, true) -- the rig had no "Take Order" prompt (TASK-380); "Serve" comes on now
+	end
 	if not customer.Tutorial then
 		self.Acted:Fire(id, TAKE_ORDER, player, nil)
 	end
-	-- Q-209: a free table of the active vehicle takes the customer now; the food is served there
 	if self.Customers[id] == customer and customer.State == "Waiting" then
-		self:SeatAtOrder(customer)
+		if pickup then
+			-- TASK-380: to the pickup line; it sits (if at all) after the sale
+			self:EnterPickup(customer)
+		else
+			-- Q-209: a free table of the active vehicle takes the customer now; the food is served there
+			self:SeatAtOrder(customer)
+		end
+	end
+	if self.Customers[id] == customer and customer.State == "Waiting" then
+		self.Ordered:Fire(id, player)
 	end
 end
 
@@ -1503,7 +1775,87 @@ function CustomerService:Serve(player: Player, anchor: Instance)
 	if id == nil or customer == nil or ticket == nil then
 		return
 	end
+	if customer.Pickup > 0 then
+		-- TASK-380: serve on a PU-n rig (or the drag of DeliveryController) = hand-over at the pickup, this rig as target
+		self:ServeAtPickup(player, id)
+		return
+	end
 	self:ServeCustomer(player, id, customer, ticket)
+end
+
+-- Hand-over at the pickup (TASK-380; tech §3.1; FEAT-046): pickup_serve on the PICKUP prompt (`target` nil) or serve on
+-- the rig of a PU-n customer (`target` = that leader). The hot dog is the one in the hand, else the first hot dog of the
+-- hotbar (equipped); none = hint. The customer is chosen by Pickup.choose: the plate's Ticket (Tool attribute, NpcId)
+-- if the hot dog is exact for it, else the oldest one it is exact for, else the ticket owner, else the target, else PU-1.
+-- Verdict, pay, tip, quality, Sale, Acted and the pair's second hand are ServeCustomer's (DEC-072: Wrong = $0, the hot dog
+-- stays in the hand, the customer leaves). Returns the SaleResult of the first line served and the NpcId; nil = nothing
+-- served (pickup mode off, not an active member, drawer closed, nobody waiting, no hot dog).
+function CustomerService:ServeAtPickup(player: Player, target: number?): (SaleResult?, number?)
+	if not self:IsPickupMode() or not self.Dependencies.RunStateService:IsActive(player) then
+		return nil, nil
+	end
+	if not self.Dependencies.EconomyService:IsDrawerOpen() then
+		return nil, nil
+	end
+	if #self.PickupLine.Order == 0 then
+		return nil, nil
+	end
+	const items = self.Dependencies.ItemService
+	local tool = items:Holding(player, HOT_DOG)
+	if tool == nil then
+		for _, candidate in items:Tools(player) do
+			if items:ItemOf(candidate) == HOT_DOG then
+				tool = candidate
+				break
+			end
+		end
+		if tool == nil then
+			self:NotifyThrottled(player, SERVE_EMPTY_HINT)
+			return nil, nil
+		end
+		self:Equip(player, tool)
+	end
+	const served = tool :: Tool
+	const toppings = items:Toppings(served)
+	const id = Pickup.choose(self.PickupLine, self:TicketOwner(served), target, function(candidate: number): Pickup.Fit
+		const ticket = self.Tickets[candidate]
+		if ticket == nil then
+			return "Other"
+		end
+		const _, verdict = Orders.Match(ticket, toppings)
+		return if verdict == "Complete" then "Exact" else "Other"
+	end)
+	if id == nil then
+		return nil, nil
+	end
+	const customer = self.Customers[id]
+	const ticket = self.Tickets[id]
+	if
+		customer == nil
+		or ticket == nil
+		or customer.State ~= "Waiting"
+		or ticket.TakenAt <= 0
+		or #Orders.Pending(ticket) == 0
+	then
+		return nil, nil
+	end
+	return self:ServeCustomer(player, id, customer, ticket, served), id
+end
+
+-- Leader NpcId of the plate's order on a hot dog Tool (attribute Ticket, PlateService), nil = none / unknown customer.
+function CustomerService:TicketOwner(tool: Tool): number?
+	const value = tool:GetAttribute(TICKET)
+	if typeof(value) ~= "number" then
+		return nil
+	end
+	const customer = self.Customers[value]
+	if customer == nil then
+		return nil
+	end
+	if customer.Leader ~= nil and self.Customers[customer.Leader] ~= nil then
+		return customer.Leader
+	end
+	return value
 end
 
 -- "Serve" at the table (serve_table, SeatingService anchor; Q-209): same check, pay, tip and Sale as the counter; the
@@ -1739,9 +2091,42 @@ function CustomerService:Conclude(customer: Customer, ticket: Orders.Ticket)
 			mood = MOOD_LADDER[math.clamp(from - shift, 1, #MOOD_LADDER)]
 		end
 	end
+	-- pickup line (TASK-380): served without a Wrong line = it takes the plate, then a table or takeaway
+	if customer.Pickup > 0 and not bad then
+		self:LeaveServed(customer, mood)
+		return
+	end
 	-- at a table (Q-209): a good result = it eats there first; the others stand up and go
 	const eats = customer.AtTable and complete >= 1 and not bad
 	self:Leave(customer.Id, mood, "service", eats)
+end
+
+-- Served at the pickup (TASK-380; tech §3.1 "Depois de servido"): the rigs carry the plate (attribute Carrying, client
+-- R1-J); with Seating.SitAt = "Served" the Seater is offered the party now (Offer before Leave: taken = SeatingService
+-- walks it PU-n -> table, it eats and Dismiss sends it out); else, or with no table, takeaway: it walks out carrying the
+-- plate (Rules.TakeawayWhenNoTable; false = it leaves without the plate in hand). Actors and the tutorial customer never sit.
+function CustomerService:LeaveServed(customer: Customer, mood: string?)
+	const sits = Content.Seating.SitAt == SERVED_SEAT_MODE
+		and customer.Variant == nil
+		and not customer.Tutorial
+		and self:OfferSeat(customer)
+	if sits or Content.Restaurant.Rules.TakeawayWhenNoTable then
+		self:SetCarrying(customer)
+		const partner = if customer.Partner then self.Customers[customer.Partner] else nil
+		if partner ~= nil then
+			self:SetCarrying(partner)
+		end
+	end
+	self:Leave(customer.Id, mood, "service", sits)
+end
+
+-- Rig attribute Carrying = true (cleared when the record goes and the rig returns to the pool).
+function CustomerService:SetCarrying(customer: Customer)
+	const model = self.Dependencies.NpcService:GetModel(customer.Id)
+	if model ~= nil then
+		model:SetAttribute(CARRYING, true)
+		customer.CarryModel = model
+	end
 end
 
 -- Asks SeatingService to take the party at "Take Order" (Seater.Offer). false = no seater, refused, or it errored (warned).
@@ -1803,6 +2188,9 @@ function CustomerService:StepOrders(t: number)
 		if ticket.Phase == "None" then
 			continue -- behind Q1: no clock yet (Q-192)
 		end
+		if customer.PausedAt ~= nil then
+			continue -- talking at the tablet (PausePatience, TASK-380)
+		end
 		if t >= ticket.PatienceEndsAt then
 			self:GiveUp(id)
 		elseif customer.Mood == NEUTRAL and Orders.IsAnnoyed(ticket, t) then
@@ -1815,7 +2203,8 @@ function CustomerService:RegisterOrders()
 	const interaction = self.Dependencies.InteractionService
 	interaction:RegisterAction(TAKE_ORDER, {
 		Validate = function(player: Player, anchor: Instance): boolean
-			return self:CanAct(player, anchor, "Ordering")
+			-- TAB-1 in the map (TASK-380): the order is taken at the tablet only (TabletService -> TakeOrderFor)
+			return not self:IsTabletMode() and self:CanAct(player, anchor, "Ordering")
 		end,
 		Run = function(player: Player, anchor: Instance)
 			self:TakeOrder(player, anchor)
@@ -1832,6 +2221,19 @@ function CustomerService:RegisterOrders()
 		end,
 		Run = function(player: Player, anchor: Instance)
 			self:Serve(player, anchor)
+		end,
+	})
+	-- TASK-380: "Hand Over" on the PICKUP prompt; range and rate are InteractionService's (Actions.pickup_serve)
+	interaction:RegisterAction(PICKUP_SERVE, {
+		Validate = function(player: Player, anchor: Instance): boolean
+			return self:IsPickupMode()
+				and self:IsPickupAnchor(anchor)
+				and self.Dependencies.RunStateService:IsActive(player)
+				and self.Dependencies.EconomyService:IsDrawerOpen()
+				and #self.PickupLine.Order > 0
+		end,
+		Run = function(player: Player)
+			self:ServeAtPickup(player, nil)
 		end,
 	})
 end
@@ -2110,6 +2512,45 @@ function CustomerService:DevSpawn(): (Outcome, number?)
 	return self:Attempt()
 end
 
+-- Dev (/dev pickup, TASK-380): pickup line readout. Studio dev only.
+function CustomerService:DevPickupState(): string
+	assert(self.Dependencies.PlaceService:IsDev(), "dev mode only")
+	const lines: { string } = {
+		`restaurant {if Content.Restaurant.Rules.Enabled then "on" else "off"} | pickup mode {self:IsPickupMode()} | tablet mode {self:IsTabletMode()}`,
+		`PU points {self:PickupPoints()} | size {self:PickupSize()} | in line {#self.PickupLine.Order} | full {self:IsPickupFull()} | last #n {self.OrderNumber}`,
+	}
+	const t = now()
+	for spot, id in self.PickupLine.Order do
+		const customer = self.Customers[id]
+		const ticket = self.Tickets[id]
+		if customer == nil then
+			table.insert(lines, `PU-{spot}: {id} (no record)`)
+			continue
+		end
+		const pending: { string } = {}
+		for _, toppings in self:PendingToppings(id) do
+			table.insert(pending, if #toppings > 0 then table.concat(toppings, "+") else "plain")
+		end
+		const left = if ticket then math.max(math.floor(ticket.PatienceEndsAt - t), 0) else 0
+		table.insert(
+			lines,
+			`PU-{spot}: npc {id} #{customer.Number or "-"} {customer.State} wire Pickup {customer.Pickup} | {table.concat(pending, " | ")} | {left} s{if customer.PausedAt then " (paused)" else ""}`
+		)
+	end
+	const front = self:Front()
+	if front ~= nil then
+		const customer = self.Customers[front]
+		table.insert(lines, `Q1: npc {front} {if customer then customer.State else "?"}`)
+	end
+	return table.concat(lines, "\n")
+end
+
+-- Dev: the pure table tests of Pickup.luau. Returns the failures (empty = passed).
+function CustomerService:DevPickupTest(): { string }
+	assert(self.Dependencies.PlaceService:IsDev(), "dev mode only")
+	return Pickup.Test()
+end
+
 CustomerService:OnInit(function(self)
 	self:Setup()
 	if not self.Dependencies.PlaceService:Is("Run") then
@@ -2126,6 +2567,7 @@ CustomerService:OnInit(function(self)
 		self:RemoveAll()
 		self:Reseed()
 		self.NextSpawnAt = 0
+		self.OrderNumber = 0 -- #n starts at 1 every shift (FEAT-043)
 	end)
 	round.PhaseChanged:Connect(function(phase)
 		self:OnPhase(phase)

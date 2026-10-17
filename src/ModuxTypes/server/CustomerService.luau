@@ -8,6 +8,7 @@ local TutorialRules = require(ReplicatedStorage.shared.Tutorial.Rules)
 local Adopt = require(ServerScriptService.server.Customer.CustomerService.Adopt)
 local Group = require(ServerScriptService.server.Customer.CustomerService.Group)
 local Orders = require(ServerScriptService.server.Customer.CustomerService.Orders)
+local Pickup = require(ServerScriptService.server.Customer.CustomerService.Pickup)
 local Queue = require(ServerScriptService.server.Customer.CustomerService.Queue)
 
 export type State = "Arriving" | "Queued" | "Ordering" | "Waiting" | "Leaving"
@@ -42,6 +43,11 @@ export type Customer = {
 	-- Tutorial customer (RequestTutorial): fixed order, endless patience, out of the ledger
 	Tutorial: boolean,
 	Model: Model?, -- tutorial customer: rig carrying TutorialRules.Attribute (cleared when the record goes)
+	-- Restaurant (TASK-380)
+	Pickup: number, -- 0 = not in the pickup line; k = PU-k (target spot while walking there); leaders only
+	Number: number?, -- #n of the order (pickup mode), nil = none
+	PausedAt: number?, -- PausePatience: server time the running clock was frozen; nil = running
+	CarryModel: Model?, -- rig carrying the attribute Carrying (served at the pickup; cleared when the record goes)
 }
 export type Seater = {
 	Offer: (party: SeatParty) -> boolean,
@@ -65,6 +71,8 @@ export type Wire = {
 	Mood: string,
 	Order2: { [string]: boolean }?,
 	Leader: number?,
+	Pickup: number?,
+	Number: number?,
 }
 export type SaleResult = "Perfect" | "Complete" | "Incomplete" | "Wrong" | "Left" | "Refused" | "Slow"
 export type Variant = "blank" | "mirror" | "raincoat" | "shake" | "neck" | "eyes" | "bighead" | "float" | "stare"
@@ -103,8 +111,11 @@ export type Public = {
 	Line: Queue.Queue,
 	NextSpawnAt: number,
 	NoticeAt: { [Player]: { [string]: number } },
+	OrderNumber: number,
 	OrderRng: Random,
+	Ordered: SignalLib.Signal<number, Player>,
 	Party: number,
+	PickupLine: Pickup.Pickup,
 	Removed: SignalLib.Signal<number>,
 	Rng: Random,
 	Seater: Seater?,
@@ -143,10 +154,20 @@ export type Public = {
 	MeanInterval: (self: Public) -> number?,
 	NextInterval: (self: Public) -> number?,
 	Flow: (self: Public) -> { Party: number, MeanInterval: number, QueueSize: number, NextSpawnAt: number },
+	PickupPoints: (self: Public) -> number,
+	IsPickupMode: (self: Public) -> boolean,
+	IsTabletMode: (self: Public) -> boolean,
+	PickupSize: (self: Public) -> number,
+	PickupIds: (self: Public) -> { number },
+	IsPickupFull: (self: Public) -> boolean,
 	Record: (self: Public, customer: Customer) -> Wire,
 	Publish: (self: Public, customer: Customer, added: boolean) -> (),
 	Walk: (self: Public, customer: Customer, node: string, avoidQueue: boolean, done: (ok: boolean) -> ()) -> (),
 	Refresh: (self: Public) -> (),
+	RefreshPickup: (self: Public) -> (),
+	SetPickupPrompt: (self: Public, enabled: boolean) -> (),
+	IsPickupAnchor: (self: Public, anchor: Instance) -> boolean,
+	EnterPickup: (self: Public, customer: Customer) -> (),
 	Reached: (self: Public, customer: Customer, slot: number) -> (),
 	Join: (self: Public, customer: Customer) -> (),
 	Attempt: (self: Public) -> (Outcome, number?),
@@ -173,6 +194,8 @@ export type Public = {
 	LineOwner: (self: Public, customer: Customer, index: number) -> number,
 	ShowPending: (self: Public, customer: Customer, ticket: Orders.Ticket) -> (),
 	OnFronted: (self: Public, id: number) -> (),
+	PausePatience: (self: Public, id: number, on: boolean) -> boolean,
+	IsPatiencePaused: (self: Public, id: number) -> boolean,
 	TicketAt: (self: Public, anchor: Instance) -> (number?, Customer?, Orders.Ticket?),
 	CanAct: (self: Public, player: Player, anchor: Instance, state: State?) -> boolean,
 	CanActOn: (self: Public, player: Player, id: number?, state: State?) -> boolean,
@@ -180,12 +203,15 @@ export type Public = {
 	NoticeShopClosed: (self: Public, player: Player, anchor: Instance) -> (),
 	Settle: (self: Public, id: number, result: SaleResult, amount: number) -> (),
 	TakeOrder: (self: Public, player: Player, anchor: Instance) -> (),
+	RefusePickupFull: (self: Public, player: Player, customer: Customer) -> boolean,
 	TakeOrderFor: (self: Public, player: Player, id: number?) -> boolean,
 	OpenOrder: (self: Public, player: Player, id: number, customer: Customer, ticket: Orders.Ticket) -> (),
 	SeatAtOrder: (self: Public, customer: Customer) -> (),
 	PendingToppings: (self: Public, id: number) -> { { string } },
 	IsWaitingAtTable: (self: Public, id: number) -> boolean,
 	Serve: (self: Public, player: Player, anchor: Instance) -> (),
+	ServeAtPickup: (self: Public, player: Player, target: number?) -> (SaleResult?, number?),
+	TicketOwner: (self: Public, tool: Tool) -> number?,
 	CanServeTable: (self: Public, player: Player, id: number) -> boolean,
 	ServeTable: (self: Public, player: Player, id: number) -> (),
 	ServeFor: (self: Public, player: Player, tool: Tool?, target: number) -> SaleResult?,
@@ -196,6 +222,8 @@ export type Public = {
 	SellLine: (self: Public, id: number, customer: Customer, ticket: Orders.Ticket, player: Player, tool: Tool, index: number, verdict: Orders.Verdict, at: number) -> SaleResult,
 	Judge: (self: Public, ticket: Orders.Ticket, tool: Tool, override: SaleResult?) -> (number?, Orders.Verdict),
 	Conclude: (self: Public, customer: Customer, ticket: Orders.Ticket) -> (),
+	LeaveServed: (self: Public, customer: Customer, mood: string?) -> (),
+	SetCarrying: (self: Public, customer: Customer) -> (),
 	OfferSeat: (self: Public, customer: Customer) -> boolean,
 	SettlePending: (self: Public, customer: Customer, ticket: Orders.Ticket, result: SaleResult) -> (),
 	GiveUp: (self: Public, id: number) -> (),
@@ -214,6 +242,8 @@ export type Public = {
 	StepTutorial: (self: Public, t: number) -> (),
 	DevSpawnPair: (self: Public, leader: string?, partner: string?, orders: { { string } }?) -> (Outcome, number?),
 	DevSpawn: (self: Public) -> (Outcome, number?),
+	DevPickupState: (self: Public) -> string,
+	DevPickupTest: (self: Public) -> { string },
 }
 
 return {}
