@@ -1081,7 +1081,8 @@ function LobbyController:PadStatus(n: number): string
 			return "STARTING..."
 		end
 		const left = party.StartAt - self.Clock()
-		return if left > 0 then `STARTING IN {math.ceil(left)}...` else "GO!"
+		-- after the count the squad is on its way (owner 2026-10-17: everyone in the lobby sees it leave)
+		return if left > 0 then `STARTING IN {math.ceil(left)}...` else "TELEPORTING..."
 	end
 	if party.Access == "Setup" then
 		return "CONFIGURING"
