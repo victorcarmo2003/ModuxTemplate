@@ -1697,6 +1697,23 @@ do
 		end
 	end
 end
+-- grill slot anchors (TASK-441 QA, 2026-10-17): the trailer clone had Att_Slot1..4 in a row 0.9 apart, so the 4 collect
+-- prompts overlapped. Spread in a zigzag over the grill, each slot inside the upgrade piece where it becomes active
+-- (GrillSlots 2/3/4 = Grill_L1 X 31.4..34.1, L2 30.5..34.7, L3 30.5..35.6; depth Z 68.7..71.1, inset 0.15). Distances:
+-- 1-2 3.05, 2-4 2.5, 1-4 3.8, 2-3 3.2, 3-4 4.7, 1-3 2.28 (the only pair under 2.5: 2.5 for all four needs a grill
+-- ~7.5 wide or GrillSlots 3). MAP x / z; Y stays the clone's. Att_Flip<n> follow (code re-seats them on the slot anyway).
+local GRILL_SLOTS = { { 31.6, 70.95 }, { 33.9, 68.85 }, { 30.7, 68.85 }, { 35.4, 70.95 } }
+for _, s in CS:GetTagged("Station") do
+	if s:IsDescendantOf(kitchen) and s:GetAttribute("StationKind") == "grill" and s:GetAttribute("RestaurantId") == "GRILL-1" then
+		for _, a in s:GetDescendants() do
+			local n = a:IsA("Attachment") and a:GetAttribute("Slot")
+			local spot = type(n) == "number" and GRILL_SLOTS[n]
+			if spot and a:GetAttribute("PromptAction") == "grill_collect" then
+				a.WorldCFrame = CFrame.new(F(spot[1], a.WorldPosition.Y, spot[2])) * a.WorldCFrame.Rotation
+			end
+		end
+	end
+end
 -- grills: flip anchors Att_Flip<n> (FlipSlot = n, NO Slot attribute; Stations/Grill.luau grill_flip, behind Rules.Enabled),
 -- next to each slot anchor of the grill station (Attachment with Slot = n), 0.35 over it
 for _, s in CS:GetTagged("Station") do
