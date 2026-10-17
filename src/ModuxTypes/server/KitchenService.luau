@@ -62,6 +62,8 @@ export type Public = {
 	FreeId: (self: Public) -> number?,
 	StableKey: (self: Public, vehicle: string, kind: string) -> string,
 	AddStation: (self: Public, instance: Instance) -> (),
+	ApplyPendingKind: (self: Public, instance: Instance) -> (),
+	EnsureSliceAnchor: (self: Public, instance: Instance) -> (),
 	EnsureUnwrapAnchors: (self: Public, instance: Instance) -> (),
 	RemoveStation: (self: Public, instance: Instance) -> (),
 	RefreshSlots: (self: Public, upgradeKey: string, vehicle: string) -> (),

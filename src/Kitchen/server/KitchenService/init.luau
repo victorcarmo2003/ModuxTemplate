@@ -40,6 +40,13 @@
 --     grill_collect, bun_cut, board_add_sausage, topping_add) with their handlers still registered; true gives the old
 --     flow back with no other change. Throw Away stays on in both bins: the BIN-C one inside the trailer (playtest
 --     2026-10-14: a wrong hot dog in hand had only the street bin, outside) and the street bin.
+-- Restaurant (R-4, docs/tests/restaurant-e2e.md; Content.Restaurant.Rules.Enabled, off = nothing below happens):
+--   * the trailer prompts that build a hot dog with no plate / ticket (RESTAURANT_LEGACY: bun_cut on the bun crate,
+--     board_add_sausage on the board) stay off, like the prep-mode gate (handlers kept, Evaluate refuses them too);
+--     the restaurant flow keeps grill_place / grill_collect / grill_flip / rail_take / topping_add / bun_slice / plate_*.
+--   * a Station with PendingStationKind (the map's CUT-1, still the trailer board clone) binds as that kind: the
+--     StationKind attribute is rewritten before the bind (clients read it too) and, for "cut", a Prompt_Slice anchor
+--     (bun_slice) is made where the board's first prompt is, when the model has none.
 -- Gift bowls (owner request 2026-10-14, Provisional): a topping of Content.Ingredients.GiftKeys that unlocks comes as a CLOSED
 -- bowl. Wrapped = unlocked, a gift key and not in Opened (run state, atom, snapshot "Unw" like the amounts "Stk"). While wrapped
 -- TakeStock and Restock refuse (topping_wrapped notice) and the Stock record carries Wrapped = true; the action topping_unwrap
@@ -114,6 +121,15 @@ const WORLD_KITCHEN: { [string]: boolean } = {
 	board_add_sausage = true,
 	topping_add = true,
 }
+
+-- Restaurant on (R-4): trailer prompts that make a hot dog outside the plate / ticket flow
+const RESTAURANT_LEGACY: { [string]: boolean } = {
+	bun_cut = true,
+	board_add_sausage = true,
+}
+const PENDING_KIND = "PendingStationKind"
+const CUT = "cut"
+const SLICE = "bun_slice"
 
 -- Package Tool item key -> package row (what a held package restocks).
 const packageByItem: { [string]: Content.Package } = {}
@@ -596,6 +612,7 @@ function KitchenService:AddStation(instance: Instance)
 		warn(`[KitchenService] Station {instance:GetFullName()} is not a Model`)
 		return
 	end
+	self:ApplyPendingKind(instance)
 	const kind = instance:GetAttribute("StationKind")
 	const row = if type(kind) == "string" then Content.Stations.ByKey[kind] else nil
 	if row == nil then
@@ -635,6 +652,8 @@ function KitchenService:AddStation(instance: Instance)
 	}
 	if row.Key == "toppings" then
 		self:EnsureUnwrapAnchors(instance)
+	elseif row.Key == CUT then
+		self:EnsureSliceAnchor(instance)
 	end
 	self:CollectParts(station)
 	self.Stations[id] = station
@@ -654,6 +673,47 @@ function KitchenService:AddStation(instance: Instance)
 		warn(`[KitchenService] no module in Stations/ for StationKind "{row.Key}"`)
 	end
 	self:RefreshPrompts(station)
+end
+
+-- Restaurant on (R-4): PendingStationKind (a known Content.Stations key) becomes the StationKind before the bind
+function KitchenService:ApplyPendingKind(instance: Instance)
+	if not Content.Restaurant.Rules.Enabled then
+		return
+	end
+	const pending = instance:GetAttribute(PENDING_KIND)
+	if type(pending) ~= "string" or Content.Stations.ByKey[pending] == nil then
+		return
+	end
+	if instance:GetAttribute("StationKind") ~= pending then
+		instance:SetAttribute("StationKind", pending)
+	end
+end
+
+-- A cut station with no bun_slice anchor (CUT-1, the old board): one Prompt_Slice where its first prompt / slot is
+function KitchenService:EnsureSliceAnchor(instance: Instance)
+	local spot: Attachment? = nil
+	for _, child in instance:GetDescendants() do
+		if not child:IsA("Attachment") or ownerModel(child) ~= instance then
+			continue
+		end
+		if child:GetAttribute("PromptAction") == SLICE then
+			return
+		end
+		if spot == nil and (CollectionService:HasTag(child, ANCHOR_TAG) or child:GetAttribute("Slot") ~= nil) then
+			spot = child
+		end
+	end
+	if spot == nil then
+		warn(`[KitchenService] cut station {instance:GetFullName()} has no anchor to place Prompt_Slice on`)
+		return
+	end
+	const anchor = Instance.new("Attachment")
+	anchor.Name = "Prompt_Slice"
+	anchor.CFrame = spot.CFrame
+	anchor:SetAttribute("PromptAction", SLICE)
+	anchor:SetAttribute("PromptEnabled", false)
+	anchor.Parent = spot.Parent
+	CollectionService:AddTag(anchor, ANCHOR_TAG)
 end
 
 -- Gift bowls: one Prompt_Unwrap_<Suf> anchor per gift topping (PromptAction topping_unwrap, Ingredient), next to that bowl's
@@ -893,13 +953,20 @@ end
 
 -- Station anchor of one of the five world kitchen prompts while Prep.Rules.WorldKitchenPrompts is false (never the street
 -- bin: it has no Station). Read from Content every time, so flipping the flag is a data change only.
+-- Restaurant on (R-4): the legacy trailer assembly prompts (RESTAURANT_LEGACY) are hidden too.
 function KitchenService:HiddenByPrep(anchor: Instance): boolean
+	const action = anchor:GetAttribute("PromptAction")
+	if type(action) ~= "string" or self:StationOf(anchor) == nil then
+		return false
+	end
+	if Content.Restaurant.Rules.Enabled and RESTAURANT_LEGACY[action] then
+		return true
+	end
 	const override = self.WorldOverride
 	if (if override ~= nil then override else Content.Prep.Rules.WorldKitchenPrompts) then
 		return false
 	end
-	const action = anchor:GetAttribute("PromptAction")
-	return type(action) == "string" and WORLD_KITCHEN[action] == true and self:StationOf(anchor) ~= nil
+	return WORLD_KITCHEN[action] == true
 end
 
 function KitchenService:RefreshAllPrompts()
@@ -1047,6 +1114,9 @@ function KitchenService:Evaluate(key: string, player: Player, anchor: Instance):
 
 	if key == RESTOCK then
 		return self:CheckRestock(player, station, anchor)
+	end
+	if Content.Restaurant.Rules.Enabled and RESTAURANT_LEGACY[key] then
+		return false, nil, nil -- R-4: no hot dog outside the plate / ticket flow
 	end
 	const module = self.Modules[station.Kind]
 	const action = if module then module.Actions[key] else nil
