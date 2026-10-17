@@ -16,9 +16,14 @@
 
 	  - Breaker.luau (TASK-334): the breaker panel shows the guide arrow while the power is out and a grey "No power
 	    issue" pill when the power is on.
+	  - Score/ (TASK-443, TASK-444): the horror score director (Calm / Uneasy / Tension / Climax / Release) and the
+	    "POWER OUT" caption, driven by these records; started in OnStart (Content.Score.Rules.Enabled).
 	  - stings (user request 2026-10-10, Content.SoundRules.Stings): AnomalyStart (horror_sting) when a record
 	    appears less than STING_FRESH s after its StartedAt (a late joiner hears nothing); AnomalyResolved
 	    (horror_chase_stop) when a live record turns Resolved. Both on screen with the DEC-173 scare cap.
+	    With the horror score on (Content.Score.Rules.Enabled, Score/, TASK-443) the AnomalyStart sting is gone
+	    (the score's Uneasy is the one reserved omen, and family A must not be given away by a sound) and
+	    AnomalyResolved plays only for anomalies the score does not drive (its Release stage has the relief sting).
 
 	Public reads: `Count` (Vide source, live occurrences), `RecordOf(id)`, `Occurrences(key?)`.
 ]]
@@ -32,6 +37,7 @@ local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Effect = require(script.Effect)
 local Breaker = require(script.Breaker)
+local Score = require(script.Score)
 
 export type Phase = Effect.Phase
 export type Record = Effect.Record
@@ -53,6 +59,8 @@ const FOLDER_NAME = "AnomalyEffects"
 const SEED_SPAN = 65536
 const STING_FRESH = 3 -- s: a record older than this when it reaches the client does not sting
 const STINGS = Content.SoundRules.Stings
+const SCORE_ON = Content.Score.Rules.Enabled
+const SCORED = Content.Score.Anomalies :: { [string]: Content.ScoreAnomaly }
 
 const AnomalyController = Modux.Controller("AnomalyController", {
 	Require = {
@@ -281,7 +289,7 @@ function AnomalyController:Write(id: number, raw: any?)
 	if live and live.Occurrence.Key == record.Anomaly then
 		const previous = Vide.untrack(live.Source).Phase
 		live.Source(record)
-		if record.Phase == "Resolved" and previous ~= "Resolved" then
+		if record.Phase == "Resolved" and previous ~= "Resolved" and not (SCORE_ON and SCORED[live.Occurrence.Ref] ~= nil) then
 			self:Sting(STINGS.AnomalyResolved)
 		end
 		return
@@ -290,7 +298,7 @@ function AnomalyController:Write(id: number, raw: any?)
 	self:Unmount(id)
 	self:Mount(id, record)
 	const fresh = Workspace:GetServerTimeNow() - record.StartedAt <= STING_FRESH
-	if fresh and record.Phase ~= "Resolved" and record.Phase ~= "Failed" then
+	if fresh and not SCORE_ON and record.Phase ~= "Resolved" and record.Phase ~= "Failed" then
 		self:Sting(STINGS.AnomalyStart)
 	end
 end
@@ -384,6 +392,14 @@ AnomalyController:OnStart(function(self)
 	self:WatchNight()
 	-- TASK-334: breaker arrow in the blackout, "No power issue" outside it
 	Breaker.Start()
+	-- TASK-443: the horror score in steps (narrow views; the director only reads them)
+	Score.Start({
+		Audio = self.Dependencies.AudioController :: any,
+		Round = self.Dependencies.RoundController :: any,
+		Occurrences = function(): { Score.Live }
+			return self:Occurrences(nil) :: any
+		end,
+	})
 end)
 
 return AnomalyController

@@ -17,6 +17,10 @@
 	    moment and is gone the instant the player looks at it. Closer and more often as the dark goes on.
 	Cues: blackout_start (the crack), blackout_restore (power hum back), jumpscare (Entity 0: the face from
 	Kit/Jumpscare for whoever stands in the trailer zone, the same zone the server attacks; the faint is the server's).
+	Restaurant (TASK-444): blackout_warn = the omen while the record is Signal (the kitchen lights flicker 1-2 times,
+	locally, like Kit/Hide); the dark itself starts on Active. blackout_start plays the owner's "lights off" snap
+	(lights_off; post_tunk while that row has no audio). jumpscare with Entity = UserId % 65536 = only that player (the
+	one the server made pay: not hidden in the back). The music steps and the "POWER OUT" caption are Score/'s (the director).
 
 	PROVISIONAL (TASK-273): look numbers below, sound keys reused from Content.Sounds until the sound-list has its own,
 	shape made of Parts until the art-director's sheet. ESCALATE_OVER only paces the presentation (the real window is
@@ -69,6 +73,11 @@ const HIGHLIGHT_OUTLINE = 0
 
 const LAMP_OFF_MATERIAL = Enum.Material.SmoothPlastic
 const LAMP_OFF_COLOR = Color3.fromHex("#3A3540")
+
+-- Omen flicker (TASK-444): off / on / off / on, s each (1-2 blinks), on the kitchen fixtures LightController owns
+const OMEN_FLICKER = { 0.09, 0.14, 0.07, 0.45, 0.16, 0.1 }
+const OMEN_GROUPS = { "trailer_interior", "trailer_lights" }
+const ENTITY_MOD = 65536 -- AnomalyCue.Entity range (Kit/Hide.EntityOf on the server)
 
 -- Noises around the player
 const NOISES: { string } = { "roof_step", "whisper", "door_creak", "door_knock", "roof_step" }
@@ -505,6 +514,49 @@ local function finish(session: Session)
 	tween:Play()
 end
 
+-- The omen: the kitchen lamps blink off 1-2 times and come back (fixtures marked so LightController leaves them, then
+-- unmarked so it repaints them from the Lights set; same trick as Kit/Hide's warning)
+local function flicker(ctx: Effect.Context)
+	const light = ctx.Light
+	local off = true
+	for _, wait in OMEN_FLICKER do
+		for _, key in OMEN_GROUPS do
+			const fixtures = light.Fixtures[key]
+			if fixtures == nil then
+				continue
+			end
+			for _, fixture in fixtures do
+				for _, lamp in fixture.Lamps do
+					if off then
+						lamp.Part.Material = LAMP_OFF_MATERIAL
+						lamp.Part.Color = LAMP_OFF_COLOR
+					else
+						lamp.Part.Material = lamp.Material
+						lamp.Part.Color = lamp.Color
+					end
+				end
+				for _, item in fixture.Lights do
+					item.Enabled = not off
+				end
+				fixture.Lit = true
+				fixture.Live = true
+			end
+		end
+		off = not off
+		task.wait(wait)
+	end
+	for _, key in OMEN_GROUPS do
+		const fixtures = light.Fixtures[key]
+		if fixtures == nil then
+			continue
+		end
+		for _, fixture in fixtures do
+			fixture.Lit = nil
+			fixture.Live = nil
+		end
+	end
+end
+
 -- The local character stands in the zone the server attacks (TRL, flat radius)
 local function inZone(ctx: Effect.Context): boolean
 	const root = rootOf(Players.LocalPlayer)
@@ -522,7 +574,9 @@ return {
 		local session: Session? = nil
 		Vide.effect(function()
 			const phase = occ.Record().Phase
-			const dark = phase == "Signal" or phase == "Active"
+			-- Signal is the omen (TASK-444, restaurant): the dark starts with the power cut (Active); a record first seen
+			-- Failed is still dark (the power is out until the breaker / the restore)
+			const dark = phase == "Active" or (phase == "Failed" and session == nil)
 			Vide.untrack(function()
 				if dark and session == nil then
 					session = begin(ctx, occ)
@@ -545,8 +599,13 @@ return {
 		if cue.Cue == "blackout_start" then
 			-- no power, no cameras (TASK-337): a watcher is cut back to the head
 			Watch.Interrupt()
-			ctx.Play("post_tunk")
+			-- the owner's "lights off" snap (TASK-444); the old crack while that row has no audio
+			if ctx.Play("lights_off") == nil then
+				ctx.Play("post_tunk")
+			end
 			ctx.Play("neon_click")
+		elseif cue.Cue == "blackout_warn" then
+			flicker(ctx)
 		elseif cue.Cue == "blackout_restore" then
 			const session = current
 			if session ~= nil then
@@ -555,7 +614,12 @@ return {
 			ctx.Play("neon_click")
 			ctx.Play("post_buzz")
 		elseif cue.Cue == "jumpscare" then
-			if not inZone(ctx) then
+			if cue.Entity ~= 0 then
+				-- restaurant (TASK-444): only the player the server made pay
+				if cue.Entity ~= Players.LocalPlayer.UserId % ENTITY_MOD then
+					return
+				end
+			elseif not inZone(ctx) then
 				return
 			end
 			const session = current

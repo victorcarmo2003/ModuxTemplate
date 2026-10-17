@@ -17,34 +17,57 @@
 --
 -- PROVISIONAL (TASK-273): (a) nobody in the zone at the attack = no faint, Phase Failed all the same; (b) the power
 -- comes back RestoreAfter s after the attack; (c) no "seen" sanity hit (the dark already drains sanity, VitalService).
+--
+-- Restaurant (TASK-444, owner request 2026-10-17; only with Content.Restaurant.Rules.Enabled; off = the trailer timeline
+-- above, unchanged):
+--   Omen    Start publishes Phase Signal and cue blackout_warn (the lights flicker 1-2 times, the score goes Uneasy);
+--           OmenFor s later the power goes out (BeginBlackout, Phase Active, cue blackout_start: "lights off" snap,
+--           the "POWER OUT / HIDE IN THE BACK" caption, the violins rise). Refused while another blackout is on.
+--   Verb    the breaker (TRL-BREAKER, breaker_reset) within RestaurantWindow s: Resolved, the light comes back.
+--   Hide    the other answer: be inside a HideZone (HIDE-P, the pantry behind DOOR-P) when the shape comes.
+--   Error   RestaurantWindow s with the power out: every active player in the building (inside or within Radius of
+--           Point) and NOT in a HideZone pays -Sanity.RuleBroken (-35, DEC-277) through ctx.Fail, with the jumpscare
+--           cue for that player only (Entity = UserId % 65536). Never a faint by itself: only a sanity that reaches 0
+--           falls (VitalService). Phase Failed (the choir). The dark stays until the breaker is held, or MaxDark s.
 -- The Context has no blackout call yet, so LightService is resolved from its module (same lookup as Kit/CustomerActor;
 -- proposed for the next TASK-106 pass: Context.Light.BeginBlackout / EndBlackout / IsBlackout).
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
+local Content = require(ReplicatedStorage.shared.Content)
 local Api = require(script.Parent.Parent.Api)
 local Kit = require(script.Parent.Kit.CustomerActor)
+local Hide = require(script.Parent.Kit.Hide)
 
 const REF = "ANM-020"
 const BREAKER_ACTION = "breaker_reset"
 const SCARE_CUE = "jumpscare"
 const START_CUE = "blackout_start"
 const RESTORE_CUE = "blackout_restore"
+const WARN_CUE = "blackout_warn"
 -- Defaults when Rules/ANM-020 is missing (same numbers as the rule file)
 const DEFAULT_WINDOW = 30
 const DEFAULT_POINT = "TRL"
 const DEFAULT_RADIUS = 24
 const DEFAULT_FAINT = 0.7
 const DEFAULT_RESTORE = 3
+const DEFAULT_OMEN = 2.5
+const DEFAULT_RESTAURANT_WINDOW = 15
+const DEFAULT_MAX_DARK = 20
+const DEFAULT_MARGIN = 1
 
-type Stage = "Dark" | "Attacked"
+type Stage = "Omen" | "Dark" | "Attacked"
 
 type State = {
 	Stage: Stage,
+	Restaurant: boolean, -- Content.Restaurant.Rules.Enabled at the start (TASK-444 timeline)
+	DarkAt: number, -- restaurant: the end of the omen
 	AttackAt: number,
 	RestoreAt: number, -- set at the attack
 	Point: string,
 	Radius: number,
 	FaintDelay: number,
 	RestoreAfter: number,
+	Margin: number,
 }
 
 -- Narrow view of LightService (only what this module calls)
@@ -94,8 +117,43 @@ local function restore(ctx: Api.Context, occ: Api.Occurrence)
 	ctx.Finish(occ)
 end
 
+local function rootOf(player: Player): Vector3?
+	const character = player.Character
+	const root = if character then character:FindFirstChild("HumanoidRootPart") else nil
+	return if root ~= nil and root:IsA("BasePart") then root.Position else nil
+end
+
+-- Restaurant (TASK-444): whoever is in the building and not hidden in the back pays -35 (DEC-277), no faint by itself.
+local function attackRestaurant(ctx: Api.Context, occ: Api.Occurrence, state: State, now: number)
+	state.Stage = "Attacked"
+	state.RestoreAt = now + state.RestoreAfter
+	const zones = Hide.Zones()
+	const victims: { Player } = {}
+	for _, player in ctx.Active() do
+		const position = rootOf(player)
+		const inBuilding = ctx.Vehicle.IsInside(player) or ctx.InZone(player, state.Point, state.Radius)
+		const hidden = position ~= nil and Hide.Inside(zones, position, state.Margin)
+		if inBuilding and not hidden then
+			table.insert(victims, player)
+		end
+	end
+	ctx.Publish(occ, { Phase = "Failed" })
+	if #victims == 0 then
+		ctx.Log(occ, "the shape found the crew hidden (or nobody inside): nobody paid")
+		return
+	end
+	for _, player in victims do
+		ctx.Cue(occ, SCARE_CUE, Hide.EntityOf(player))
+	end
+	ctx.Fail(occ, victims)
+end
+
 -- 30 s in the dark: the shape attacks whoever is in the trailer zone.
 local function attack(ctx: Api.Context, occ: Api.Occurrence, state: State, now: number)
+	if state.Restaurant then
+		attackRestaurant(ctx, occ, state, now)
+		return
+	end
 	state.Stage = "Attacked"
 	state.RestoreAt = now + state.RestoreAfter
 	const victims: { Player } = {}
@@ -128,17 +186,33 @@ const Blackout: Api.Module = {
 			return false -- another blackout is on: the agenda tries again later
 		end
 		const rule = ctx.Rule(REF)
-		const window = if rule ~= nil and rule.Window > 0 then rule.Window else DEFAULT_WINDOW
+		const restaurant = Content.Restaurant.Rules.Enabled
+		const window = if restaurant
+			then param(rule, "RestaurantWindow", DEFAULT_RESTAURANT_WINDOW)
+			elseif rule ~= nil and rule.Window > 0 then rule.Window
+			else DEFAULT_WINDOW
+		const omen = if restaurant then param(rule, "OmenFor", DEFAULT_OMEN) else 0
 		const state: State = {
-			Stage = "Dark",
-			AttackAt = occ.StartedAt + window,
+			Stage = if omen > 0 then "Omen" else "Dark",
+			Restaurant = restaurant,
+			DarkAt = occ.StartedAt + omen,
+			AttackAt = occ.StartedAt + omen + window,
 			RestoreAt = 0,
 			Point = text(rule, "Point", DEFAULT_POINT),
 			Radius = param(rule, "Radius", DEFAULT_RADIUS),
 			FaintDelay = param(rule, "FaintDelay", DEFAULT_FAINT),
-			RestoreAfter = param(rule, "RestoreAfter", DEFAULT_RESTORE),
+			RestoreAfter = if restaurant
+				then param(rule, "MaxDark", DEFAULT_MAX_DARK)
+				else param(rule, "RestoreAfter", DEFAULT_RESTORE),
+			Margin = param(rule, "Margin", DEFAULT_MARGIN),
 		}
 		occ.State = state
+		if state.Stage == "Omen" then
+			-- TASK-444: the lights flicker first (the record goes out as Signal, the score goes Uneasy)
+			ctx.Publish(occ, { Phase = "Signal", Step = 0, Anchor = 0 })
+			ctx.Cue(occ, WARN_CUE, 0)
+			return true
+		end
 		service:BeginBlackout()
 		owner = occ
 		ctx.Publish(occ, { Phase = "Active", Step = 0, Anchor = 0 })
@@ -148,7 +222,21 @@ const Blackout: Api.Module = {
 
 	Tick = function(ctx: Api.Context, occ: Api.Occurrence, now: number)
 		const state = occ.State :: State
-		if state.Stage == "Dark" then
+		if state.Stage == "Omen" then
+			if now < state.DarkAt then
+				return
+			end
+			if light():IsBlackout() then
+				-- another blackout took the power meanwhile: this one has nothing to add
+				ctx.Finish(occ)
+				return
+			end
+			state.Stage = "Dark"
+			light():BeginBlackout()
+			owner = occ
+			ctx.Publish(occ, { Phase = "Active" })
+			ctx.Cue(occ, START_CUE, 0)
+		elseif state.Stage == "Dark" then
 			if not light():IsBlackout() then
 				-- the power came back some other way (new shift, restore): nothing left to do
 				owner = nil
@@ -166,6 +254,13 @@ const Blackout: Api.Module = {
 			return
 		end
 		const state = occ.State :: State
+		if state.Stage == "Attacked" and state.Restaurant then
+			-- TASK-444: after the attack the dark stays until somebody holds the breaker (the record stays Failed)
+			owner = nil
+			ctx.Cue(occ, RESTORE_CUE, 0)
+			ctx.Finish(occ)
+			return
+		end
 		if state.Stage ~= "Dark" then
 			return
 		end
