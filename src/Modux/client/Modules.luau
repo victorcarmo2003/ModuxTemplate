@@ -40,6 +40,7 @@ return {
 	StarterPlayer.StarterPlayerScripts.client.Net.NetController,
 	StarterPlayer.StarterPlayerScripts.client.Objective.ObjectiveController,
 	StarterPlayer.StarterPlayerScripts.client.Opal.OpalController,
+	StarterPlayer.StarterPlayerScripts.client.OrderBoard.OrderBoardController,
 	StarterPlayer.StarterPlayerScripts.client.Pedestrian.PedestrianController,
 	StarterPlayer.StarterPlayerScripts.client.Place.PlaceController,
 	StarterPlayer.StarterPlayerScripts.client.Plate.PlateController,

@@ -729,6 +729,12 @@
 							"optional": "src/Opal/client"
 						}
 					},
+					"OrderBoard": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/OrderBoard/client"
+						}
+					},
 					"Pedestrian": {
 						"$ignoreUnknownInstances": false,
 						"$path": {

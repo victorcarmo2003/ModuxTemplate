@@ -38,6 +38,7 @@ local OpenSignController = require(StarterPlayer.StarterPlayerScripts.client.Mod
 local NetController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.NetController)
 local ObjectiveController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ObjectiveController)
 local OpalController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.OpalController)
+local OrderBoardController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.OrderBoardController)
 local PedestrianController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PedestrianController)
 local PlaceController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PlaceController)
 local PlateController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PlateController)
@@ -106,6 +107,7 @@ export type AllControllers = {
 	NetController: NetController.Public,
 	ObjectiveController: ObjectiveController.Public,
 	OpalController: OpalController.Public,
+	OrderBoardController: OrderBoardController.Public,
 	PedestrianController: PedestrianController.Public,
 	PlaceController: PlaceController.Public,
 	PlateController: PlateController.Public,
