@@ -26,6 +26,10 @@
 --                pause (Working, first side done, not flipped yet); Run = the same move as Grill.Flip (server clock, ping).
 --                Authoring hint for the map: a separate Attachment Att_Flip<n> with FlipSlot = n and NO Slot attribute
 --                (an Attachment with Slot is a slot of the grill, KitchenService CollectParts).
+--   one prompt per slot (R-3, docs/tests/restaurant-e2e.md): Flip and Collect of the same slot never show together; the
+--                slot state picks one (slotPrompt: pause = Flip, Ready = Collect, else none) and both refreshers and both
+--                Validates follow it. On Bind (switch on) every Att_Flip<n> is moved onto the slot anchor of n (the map has
+--                it 0.35 stud over the Collect), so a slot shows one pill in one place.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 local Grade = require(ReplicatedStorage.shared.Prep.Grade)
@@ -266,19 +270,6 @@ local function readySlot(station: Station, anchor: Instance): number?
 	return slot
 end
 
-local function refreshCollect(ctx: Context, station: Station)
-	const room = Rail.Room(station.Vehicle) > 0
-	promptAll(ctx, station, COLLECT, function(anchor: Instance): boolean
-		return room and readySlot(station, anchor) ~= nil
-	end)
-end
-
-local function refreshPlace(ctx: Context, station: Station)
-	promptAll(ctx, station, PLACE, function(anchor: Instance): boolean
-		return (canPlace(ctx, station, anchor))
-	end)
-end
-
 -- Slot a grill_flip anchor flips: FlipSlot, else the Slot of its parent, else its own Slot.
 local function flipSlotOf(anchor: Instance): number?
 	const own = anchor:GetAttribute("FlipSlot")
@@ -298,13 +289,56 @@ local function inPause(station: Station, slot: number, now: number): boolean
 	return now >= record.StartedAt + Grade.FirstSide(Content.Prep, record.Duration) - FLIP_SLACK
 end
 
+-- The one prompt a slot may show (R-3): FLIP in the pause (restaurant only), COLLECT when Ready, nil otherwise.
+local function slotPrompt(station: Station, slot: number, now: number): string?
+	if Content.Restaurant.Rules.Enabled and inPause(station, slot, now) then
+		return FLIP
+	end
+	const record = station.Records[slot]
+	if record ~= nil and record.State == "Ready" then
+		return COLLECT
+	end
+	return nil
+end
+
+local function refreshCollect(ctx: Context, station: Station)
+	const room = Rail.Room(station.Vehicle) > 0
+	const now = ctx.Now()
+	promptAll(ctx, station, COLLECT, function(anchor: Instance): boolean
+		const slot = readySlot(station, anchor)
+		return room and slot ~= nil and slotPrompt(station, slot, now) == COLLECT
+	end)
+end
+
+local function refreshPlace(ctx: Context, station: Station)
+	promptAll(ctx, station, PLACE, function(anchor: Instance): boolean
+		return (canPlace(ctx, station, anchor))
+	end)
+end
+
 local function refreshFlip(ctx: Context, station: Station)
-	const on = Content.Restaurant.Rules.Enabled
 	const now = ctx.Now()
 	promptAll(ctx, station, FLIP, function(anchor: Instance): boolean
 		const slot = flipSlotOf(anchor)
-		return on and slot ~= nil and inPause(station, slot, now)
+		return slot ~= nil and slotPrompt(station, slot, now) == FLIP
 	end)
+end
+
+-- Restaurant on (R-3): each flip anchor sits on the slot anchor it flips, so Flip and Collect share one spot.
+local function alignFlipAnchors(station: Station)
+	if not Content.Restaurant.Rules.Enabled then
+		return
+	end
+	for _, anchor in station.Anchors do
+		if anchor:GetAttribute("PromptAction") ~= FLIP or not anchor:IsA("Attachment") then
+			continue
+		end
+		const slot = flipSlotOf(anchor)
+		const spot = if slot ~= nil then station.Slots[slot] else nil
+		if spot ~= nil and spot ~= anchor then
+			anchor.WorldCFrame = spot.WorldCFrame
+		end
+	end
 end
 
 -- Shared moves (prompt actions and prep mode) --------------------------------------------------------------------------
@@ -412,7 +446,8 @@ const place: StationApi.Action = {
 
 const collect: StationApi.Action = {
 	Validate = function(ctx: Context, station: Station, player: Player, anchor: Instance): (boolean, string?)
-		if station.Kind ~= GRILL or readySlot(station, anchor) == nil then
+		const slot = if station.Kind == GRILL then readySlot(station, anchor) else nil
+		if slot == nil or slotPrompt(station, slot, ctx.Now()) ~= COLLECT then
 			return false, nil
 		end
 		if Rail.Room(station.Vehicle) <= 0 then
@@ -463,7 +498,7 @@ const flip: StationApi.Action = {
 			return false, nil
 		end
 		const slot = flipSlotOf(anchor)
-		return slot ~= nil and inPause(station, slot, ctx.Now()), nil
+		return slot ~= nil and slotPrompt(station, slot, ctx.Now()) == FLIP, nil
 	end,
 	Run = function(ctx: Context, station: Station, player: Player, anchor: Instance)
 		const slot = flipSlotOf(anchor)
@@ -592,6 +627,7 @@ function Grill.Bind(ctx: Context, station: Station)
 			end
 		end
 		table.insert(grills, station)
+		alignFlipAnchors(station)
 		table.clear(station.Records)
 		sync(ctx, station)
 		ctx.Publish(station)

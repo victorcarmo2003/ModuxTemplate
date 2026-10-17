@@ -32,6 +32,8 @@ export type Public = {
 	Start: (self: Public, player: Player, tablet: Tablet) -> boolean,
 	Reset: (self: Public, tablet: Tablet) -> (),
 	Finish: (self: Public, tablet: Tablet) -> (),
+	UserGone: (self: Public, tablet: Tablet) -> boolean,
+	Cancel: (self: Public, tablet: Tablet, why: string) -> (),
 	StillThere: (self: Public, tablet: Tablet) -> boolean,
 	UpdateFull: (self: Public, tablet: Tablet) -> boolean,
 	Step: (self: Public) -> (),

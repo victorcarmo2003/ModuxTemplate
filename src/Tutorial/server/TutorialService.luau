@@ -33,7 +33,8 @@
 -- at 6 PM, no probe end), and once the last-call line is empty (the Closing probe) the lesson is "due": Cash is topped up
 -- to Rules.Upgrade.Cash (at least the Storage price) and BossService rings Rules.Upgrade.Call once (LessonCallDue). It
 -- ends for good (LessonOver, latched) when any Gear Stand line is bought, the run leaves Day 1 / the day shift, no rookie
--- is left, or after Content.Shift.TutorialHoldMax s of holding the Closing (AFK rookie). TutorialController shows the
+-- is left, or after Content.Shift.TutorialHoldMax s of holding the Closing (AFK rookie). When the call goes out the
+-- Gear Stand is opened for the lesson (GearStandService:OpenForLesson; its hours open it only on the Summary). TutorialController shows the
 -- steps and MarketController the arrow (client side reads the Upgrades set and the Boss call).
 -- Restaurant (TASK-393, shared.Tutorial.Rules.Restock): StepRestock tops the Cash up once to the phone's quick order
 -- price after the tutorial customer was served, for the restock steps of the client.
@@ -62,6 +63,7 @@ const TutorialService = Modux.Service(
 			"RoundService",
 			"UpgradeService",
 			"SupplyService",
+			"GearStandService",
 		},
 		Priority = 500,
 	}
@@ -273,6 +275,8 @@ function TutorialService:StepLesson()
 	end
 	self.LessonRung = true
 	self:LessonCash()
+	-- the stand opens on the Summary, after this Closing: open it for the lesson (R-2)
+	self.Dependencies.GearStandService:OpenForLesson()
 end
 
 -- The Closing of Day 1 stands still for the lesson (own safety timer: an AFK rookie never freezes the server)

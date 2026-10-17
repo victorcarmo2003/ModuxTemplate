@@ -16,6 +16,7 @@ export type Public = {
 	Schedule: (self: Public, now: number) -> (),
 	OnPhase: (self: Public, phase: string) -> (),
 	Step: (self: Public) -> (),
+	OpenForLesson: (self: Public) -> (),
 	Force: (self: Public, open: boolean) -> (),
 	Report: (self: Public) -> string,
 }

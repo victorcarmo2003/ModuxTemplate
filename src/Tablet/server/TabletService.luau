@@ -16,6 +16,11 @@
 -- (same gate and write as the old prompt; PlateService puts the ticket on a plate from Acted); if the customer left Q1
 -- or Ordering before that (anomaly, window closed, shift end) the tablet goes back to Idle with no order. Another
 -- tablet_take during the talk = Notice tablet_busy. Idle with no room = Full ("Kitchen full" lamp for everyone).
+-- Attendant gone mid-talk (R-8, docs/tests/restaurant-e2e.md; design FEAT-043 "afastar cancela, a paciência volta a
+-- correr" / "cancela sem criar pedido nem cobrar"): when the player who started the talk leaves the server or stops being
+-- an active member (Down, spectator), the talk is CANCELLED at once (Reset): no order, no charge, the customer keeps Q1 in
+-- Ordering with its patience running again, and the next tablet_take (anyone) starts the talk over. Logged with print,
+-- not lost behind a warn. Walking away is still not a cancel (board TASK-381; design gap noted in R-5).
 -- TASK-380 runs in parallel: the CustomerService methods it adds are called by name and skipped (logged once) while
 -- missing.
 local CollectionService = game:GetService("CollectionService")
@@ -228,6 +233,19 @@ function TabletService:Finish(tablet: Tablet)
 	end
 end
 
+-- The player who started the talk left the server or is no longer an active member (R-8)
+function TabletService:UserGone(tablet: Tablet): boolean
+	const user = tablet.User
+	return user == nil or user.Parent == nil or not self.Dependencies.RunStateService:IsActive(user)
+end
+
+-- Talk cancelled (R-8): back to Idle with no order, the customer stays in Q1 (Reset keeps its place and its clock)
+function TabletService:Cancel(tablet: Tablet, why: string)
+	const npc = tablet.Npc
+	self:Reset(tablet)
+	print(`[TabletService] TAB-{tablet.Index}: talk with {npc} cancelled ({why}); the customer waits at Q1`)
+end
+
 -- The customer is still the one at the head, in Ordering
 function TabletService:StillThere(tablet: Tablet): boolean
 	const customer = self.Dependencies.CustomerService:Get(tablet.Npc)
@@ -253,6 +271,8 @@ function TabletService:Step()
 		if tablet.State == "Talking" then
 			if not self:StillThere(tablet) then
 				self:Reset(tablet)
+			elseif self:UserGone(tablet) then
+				self:Cancel(tablet, "attendant left")
 			elseif t >= tablet.EndsAt then
 				self:Finish(tablet)
 			end
@@ -450,6 +470,11 @@ TabletService:OnInit(function(self)
 	})
 	Players.PlayerRemoving:Connect(function(player: Player)
 		self.NoticeAt[player] = nil
+		for _, tablet in self.Tablets do
+			if tablet.State == "Talking" and tablet.User == player then
+				self:Cancel(tablet, "attendant left the server")
+			end
+		end
 	end)
 end)
 

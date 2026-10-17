@@ -15,6 +15,9 @@
 -- Replication: two Workspace attributes (Hours.Attributes: GearStandOpen boolean, GearStandClosesAt server time, 0 = no
 -- close scheduled), like AtmosphereService: one small state, late joiners read it on join, no Lync entry. The client
 -- (MarketController) moves the shutters and plays the metal door SFX at the stand on every change.
+-- Tutorial (R-2, docs/tests/restaurant-e2e.md): the Day 1 upgrade lesson runs in the day Closing (clock held), before
+-- the Summary that opens the stand; TutorialService calls OpenForLesson when Walt's lesson call goes out. Same window as
+-- a shift end (no close scheduled until the next selling phase), so the normal hours go on from the Summary.
 -- Dev (`/dev gear open|close|state`): Force(open) wins until the next natural change (shift end / selling start /
 -- closed phase); open during a selling phase also schedules the close (now + StayOpenIntoShift) to test the warning.
 -- No snapshot: the state is derived again from the phase on every transition.
@@ -116,6 +119,17 @@ function GearStandService:Step()
 		self.Warned = true
 		self.Dependencies.RunStateService:Notify("all", "gear_closing", math.ceil(left))
 	end
+end
+
+-- Day 1 upgrade lesson (TutorialService): open now, like a shift end (the Summary right after keeps it open)
+function GearStandService:OpenForLesson()
+	if not self.Enabled or self.Open() then
+		return
+	end
+	self.Scheduled = false
+	self.ClosesAt = 0
+	self.Warned = false
+	self:Set(true, true)
 end
 
 -- Dev override (`/dev gear`): open = open now (and, in a selling phase, the close scheduled from now); close = now
