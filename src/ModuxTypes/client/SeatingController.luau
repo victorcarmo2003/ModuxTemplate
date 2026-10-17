@@ -23,6 +23,7 @@ type Spot = {
 	OrderUnmounts: { () -> () }, -- order label (plate + bubble) of a customer waiting at the table (Q-209)
 	OrderGuis: { Instance },
 }
+type Orders = { Order: { [string]: boolean }, Order2: { [string]: boolean }? }
 export type State = "Locked" | "Ghost" | "Free" | "Occupied" | "Dirty"
 
 export type Public = {
@@ -31,9 +32,12 @@ export type Public = {
 	Folder: Folder?,
 	Gui: Instance?,
 	Meal: Meal.Meal,
+	Orders: { [number]: Orders },
 	Spots: { [number]: Spot },
 	Tracked: { [Model]: { RBXScriptConnection } },
 	Setup: (self: Public) -> (),
+	CarriedToppings: (self: Public, rig: Model) -> { string },
+	RememberOrder: (self: Public, id: number, record: { Order: { [string]: boolean }, Order2: { [string]: boolean }? }) -> (),
 	RecordOf: (self: Public, index: number) -> Record?,
 	SpotOf: (self: Public, index: number) -> Spot,
 	FolderOf: (self: Public) -> Folder,

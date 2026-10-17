@@ -6,10 +6,14 @@
 -- has no coin mesh either): red plastic tray with a rim, crumpled paper wrapper, ketchup smear, soda cup with lid,
 -- and 1..MAX_COINS flat Mustard coins beside it (one per diner's TableTip, never Gold: AST-082).
 -- `at` = the tray anchor: Tray_Anchor of the table, else the centre of the table top (the caller decides).
+-- Tray.Plate: the plate a served customer carries and puts on the table (restaurant, SitAt "Served"; TASK-387).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 const TEMPLATE = "Table_Tray"
 const MAX_COINS = 4
+const PLATE_TEMPLATE = "Customer_Plate"
+const PLATE_SIZE = 1.4 -- studs, drawn plate diameter
+const PLATE_THICK = 0.08
 
 -- Palette (style guide §2.1)
 const KETCHUP = Color3.fromHex("#E2402E")
@@ -97,6 +101,43 @@ local function drawCoins(model: Model, at: CFrame, tip: number, tableTip: number
 		const offset = CFrame.new(1.05 + (index % 2) * 0.05, 0.04 + (index - 1) * 0.085, 0.25 - (index % 2) * 0.04)
 		upright(model, `Coin{index}`, 0.08, 0.4, MUSTARD, at * offset * CFrame.Angles(0, index * 0.7, 0))
 	end
+end
+
+-- The plate a served customer carries (restaurant, TASK-387; Meal.luau puts the hot dog on it). A Model named
+-- PLATE_TEMPLATE under ReplicatedStorage.Assets (pivot = centre of the plate bottom, optional number attribute TopHeight)
+-- replaces the drawn one (Provisional: white round plate with a teal band, no asset yet). Not parented, parts anchored;
+-- returns the model (PrimaryPart set, pivot = centre of the bottom) and the height of its top over the pivot.
+function Tray.Plate(): (Model, number)
+	const assets = ReplicatedStorage:FindFirstChild("Assets")
+	const found = if assets then assets:FindFirstChild(PLATE_TEMPLATE, true) else nil
+	if found ~= nil and found:IsA("Model") then
+		const copy = found:Clone()
+		const base = copy.PrimaryPart or copy:FindFirstChildWhichIsA("BasePart", true)
+		if base ~= nil then
+			const pivot = copy:GetPivot()
+			copy.PrimaryPart = base
+			base.PivotOffset = base.CFrame:ToObjectSpace(pivot)
+			for _, descendant in copy:GetDescendants() do
+				if descendant:IsA("BasePart") then
+					descendant.Anchored = true
+					descendant.CanCollide = false
+					descendant.CanQuery = false
+					descendant.CanTouch = false
+				end
+			end
+			copy:PivotTo(CFrame.identity)
+			const top = copy:GetAttribute("TopHeight")
+			return copy, if typeof(top) == "number" then top else PLATE_THICK
+		end
+		copy:Destroy()
+	end
+	const model = Instance.new("Model")
+	model.Name = "Seating_Plate"
+	const base = upright(model, "Plate", PLATE_THICK, PLATE_SIZE, WHITE, CFrame.new(0, PLATE_THICK / 2, 0))
+	upright(model, "Band", PLATE_THICK * 0.6, PLATE_SIZE + 0.08, TEAL, CFrame.new(0, PLATE_THICK * 0.3, 0))
+	model.PrimaryPart = base
+	base.PivotOffset = base.CFrame:Inverse() -- pivot = identity = centre of the bottom, Y up
+	return model, PLATE_THICK
 end
 
 -- New tray model (not parented). `at` = anchor frame on the table top (Y up).

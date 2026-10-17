@@ -22,6 +22,9 @@
 	    it is told apart by the phase, read one defer later (the Round record of the same flush has landed by then).
 	  - Diners (Meal.luau): rigs with the `Seated` attribute hold a hot dog that shrinks in 3 bites; npc_sit /
 	    npc_eat_seated play through AnimController when they have an Id.
+	  - Carried plate (TASK-387, restaurant): rigs with `Carrying` walk with a plate + their hot dog (Meal.luau,
+	    Tray.Plate); seated, the plate goes on the table and the hot dog to the hand. Toppings: the last non-empty order
+	    of the Customers set (the served record is already empty), cached here; table top = the spot's TrayAt.
 
 	Order at the table (Q-209, Provisional): a customer sits right after "Take Order" and waits (rig attribute `Seated`,
 	empty hands); the server table anchor carries "Serve Table n: <order>" (PromptController / interaction menu). Over an
@@ -92,6 +95,20 @@ type Spot = {
 	OrderGuis: { Instance },
 }
 
+-- Order of a customer as last seen with something in it (TASK-387).
+type Orders = { Order: { [string]: boolean }, Order2: { [string]: boolean }? }
+
+-- Topping keys of an order bitfield, in ToppingKeys order.
+local function keysOf(order: { [string]: boolean }): { string }
+	const keys: { string } = {}
+	for _, key in Content.Ingredients.ToppingKeys do
+		if order[key] then
+			table.insert(keys, key)
+		end
+	end
+	return keys
+end
+
 const SeatingController = Modux.Controller(
 	"SeatingController",
 	{ Require = { "RoundController", "AudioController", "AnimController", "CustomerController", "TrashController" }, Priority = 680 }
@@ -113,7 +130,50 @@ function SeatingController:Setup()
 		Stop = function(model: Model, key: string)
 			self.Dependencies.AnimController:Stop(model, key)
 		end,
+	}, {
+		Toppings = function(rig: Model): { string }
+			return self:CarriedToppings(rig)
+		end,
+		TableTop = function(index: number): CFrame?
+			const spot = self.Spots[index]
+			return if spot then spot.TrayAt else nil
+		end,
 	})) :: Meal.Meal
+	-- NpcId -> last non-empty order seen (the served record has an empty Order: the plate keeps what was ordered)
+	self.Orders = {} :: { [number]: Orders }
+end
+
+-- Topping keys of the plate a served rig carries (TASK-387): its own order, a partner the leader's 2nd hot dog.
+function SeatingController:CarriedToppings(rig: Model): { string }
+	const id = rig:GetAttribute("NpcId")
+	if typeof(id) ~= "number" then
+		return {}
+	end
+	const order = self.Orders[id]
+	if order ~= nil then
+		return keysOf(order.Order)
+	end
+	const record = Vide.untrack(function()
+		return self.Dependencies.CustomerController:RecordOf(id)
+	end)
+	const leader = if record then self.Orders[record.Leader or 0] else nil
+	if leader ~= nil and leader.Order2 ~= nil then
+		return keysOf(leader.Order2)
+	end
+	return {}
+end
+
+function SeatingController:RememberOrder(id: number, record: { Order: { [string]: boolean }, Order2: { [string]: boolean }? })
+	const known = self.Orders[id]
+	if known ~= nil and known.Order2 ~= nil and record.Order2 == nil then
+		return -- a pair being served line by line: keep both hot dogs as ordered
+	end
+	if next(keysOf(record.Order)) ~= nil then
+		self.Orders[id] = {
+			Order = table.clone(record.Order),
+			Order2 = if record.Order2 then table.clone(record.Order2) else nil,
+		}
+	end
 end
 
 -- Reactive read of a table record (nil = unknown). For other controllers and debugging.
@@ -670,6 +730,17 @@ SeatingController:OnInit(function(self)
 	end)
 	net.Tables:onRemoved(function(index)
 		self:WriteRecord(index, nil)
+	end)
+
+	-- toppings of the plate a served customer carries (TASK-387); presentation only
+	net.Customers:onAdded(function(id, record)
+		self:RememberOrder(id, record)
+	end)
+	net.Customers:onChanged(function(id, record)
+		self:RememberOrder(id, record)
+	end)
+	net.Customers:onRemoved(function(id)
+		self.Orders[id] = nil
 	end)
 
 	const applyCash = function(id: number, record: { Cash: number, Drawer: number })

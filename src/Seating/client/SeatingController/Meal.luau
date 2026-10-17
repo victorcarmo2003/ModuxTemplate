@@ -12,10 +12,21 @@
 --     `npc_sit` loops while seated when it has an Id (AnimController plays nothing for an empty Id, so this is free
 --     until TASK-151 brings the clips).
 -- Cleared when `Seated` goes nil, the rig leaves the Workspace or is destroyed.
+--
+-- Carried plate (restaurant, TASK-387; restaurant-flow.md §3.1 "Depois de servido"): while the rig has `Carrying` = true
+-- (CustomerService, served at the pickup) it walks with a plate (Tray.Plate) + the hot dog of its order on it
+-- (HotDogVisual, toppings from Hooks.Toppings), held in front of the torso. When it sits (`Seated`) the plate is put on
+-- the table in front of it (between the seat and Hooks.TableTop), and when it eats the hot dog goes from the plate to the
+-- hand (same bites as above, with its toppings); the empty plate stays until it stands up, then it walks out empty-handed.
+-- Takeaway (no table): it never sits, so it walks out with the plate. `Carrying` nil (record gone, rig back to the pool)
+-- clears it all. Without `Carrying` (trailer, SitAt "Order") nothing here changes. Visual only: the server decides.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HotDogVisual = require(ReplicatedStorage.shared.Item.HotDogVisual)
+local Tray = require(script.Parent.Tray)
 
 const SEATED_ATTRIBUTE = "Seated"
 const EATING_ATTRIBUTE = "Eating"
+const CARRYING_ATTRIBUTE = "Carrying"
 const TOOL_NAME = "hot_dog"
 const ARM = "Right Arm"
 const BITES = 3
@@ -26,10 +37,22 @@ const SETTLE = 0.25 -- s after `Seated` before the hot dog is put in the hand
 const GRIP = CFrame.new(0, -1, 0) * CFrame.Angles(-math.pi / 2, 0, 0)
 const BUN = Color3.fromHex("#E8B36B")
 const SAUSAGE = Color3.fromHex("#B5482E")
+const TOPPING_ANCHOR = "Att_Topping1" -- HotDogVisual: the up axis of the stack
+-- carried plate (Provisional, judged in Play): in torso space, a little under the chest and in front of it
+const HOLD_DROP = 0.3 -- share of the torso height under its centre
+const HOLD_AHEAD = 0.55 -- studs in front of the torso face
+const REACH = 1.4 -- studs from the seated root towards the table centre where the plate lands (at most)
+const REACH_SHARE = 0.75 -- ... and at most this share of the way to the centre
 
 export type Anim = {
 	Play: (model: Model, key: string, looped: boolean) -> (),
 	Stop: (model: Model, key: string) -> (),
+}
+
+-- What the controller knows that this module does not (TASK-387).
+export type Hooks = {
+	Toppings: (rig: Model) -> { string }, -- topping keys of the order the rig carries ({} = plain)
+	TableTop: (index: number) -> CFrame?, -- table top centre (Y up), nil = table not bound
 }
 
 type Diner = {
@@ -39,21 +62,33 @@ type Diner = {
 	Thread: thread?,
 }
 
+-- Plate of a rig with `Carrying` (TASK-387).
+type Carry = {
+	Model: Model?, -- plate (+ Food on it)
+	Food: Model?, -- hot dog on the plate
+	Hold: WeldConstraint?, -- torso -> plate while it walks
+	OnTable: boolean,
+	Seated: boolean, -- it sat with the plate: standing up again = done
+	Done: boolean, -- ate at a table: walks out empty-handed until `Carrying` goes
+}
+
 const Meal = {}
 Meal.__index = Meal
 
 export type Meal = typeof(setmetatable(
 	{} :: {
 		Anim: Anim,
+		Hooks: Hooks?,
 		Diners: { [Model]: Diner },
+		Carries: { [Model]: Carry },
 		Tracked: { [Model]: { RBXScriptConnection } },
 		Warned: boolean,
 	},
 	Meal
 ))
 
-function Meal.new(anim: Anim): Meal
-	return setmetatable({ Anim = anim, Diners = {}, Tracked = {}, Warned = false }, Meal)
+function Meal.new(anim: Anim, hooks: Hooks?): Meal
+	return setmetatable({ Anim = anim, Hooks = hooks, Diners = {}, Carries = {}, Tracked = {}, Warned = false }, Meal)
 end
 
 local function quiet(part: BasePart)
@@ -118,29 +153,53 @@ local function drawnFood(): (Model, CFrame)
 	return model, CFrame.identity
 end
 
-function Meal.Give(self: Meal, rig: Model): (Model?, WeldConstraint?)
-	const arm = rig:FindFirstChild(ARM)
-	if arm == nil or not arm:IsA("BasePart") then
-		return nil, nil
-	end
+-- A hot dog model (kit or drawn) with `toppings` stacked by HotDogVisual (kit only: the drawn one has no anchor).
+-- Parts anchored, not parented; returns the model and its Tool grip.
+function Meal.Food(self: Meal, toppings: { string }?): (Model, CFrame)
 	local food, grip = self:KitFood()
 	if food == nil then
 		food, grip = drawnFood()
 	end
 	const model = food :: Model
 	const handle = model.PrimaryPart :: BasePart
-	model:PivotTo(arm.CFrame * GRIP * grip:Inverse())
+	for _, descendant in model:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			descendant.Anchored = true
+		end
+	end
+	if toppings ~= nil and #toppings > 0 and handle:FindFirstChild(TOPPING_ANCHOR) ~= nil then
+		const ok, err = pcall(HotDogVisual.apply, model, toppings, nil)
+		if not ok then
+			warn(`[SeatingController] HotDogVisual.apply failed: {err}`)
+		end
+	end
+	return model, grip
+end
+
+-- Every part of `model` loose (no collision, massless) and welded to `root`.
+local function weldAll(model: Model, root: BasePart)
 	for _, descendant in model:GetDescendants() do
 		if descendant:IsA("BasePart") then
 			quiet(descendant)
-			if descendant ~= handle then
+			if descendant ~= root then
 				const inner = Instance.new("WeldConstraint")
-				inner.Part0 = handle
+				inner.Part0 = root
 				inner.Part1 = descendant
 				inner.Parent = descendant
 			end
 		end
 	end
+end
+
+function Meal.Give(self: Meal, rig: Model, toppings: { string }?): (Model?, WeldConstraint?)
+	const arm = rig:FindFirstChild(ARM)
+	if arm == nil or not arm:IsA("BasePart") then
+		return nil, nil
+	end
+	const model, grip = self:Food(toppings)
+	const handle = model.PrimaryPart :: BasePart
+	model:PivotTo(arm.CFrame * GRIP * grip:Inverse())
+	weldAll(model, handle)
 	const weld = Instance.new("WeldConstraint")
 	weld.Part0 = arm
 	weld.Part1 = handle
@@ -170,6 +229,143 @@ local function bite(diner: Diner, last: boolean)
 	end
 end
 
+-- Carried plate ---------------------------------------------------------------------------------------------------
+
+function Meal.ToppingsOf(self: Meal, rig: Model): { string }
+	const hooks = self.Hooks
+	if hooks == nil then
+		return {}
+	end
+	const ok, keys = pcall(hooks.Toppings, rig)
+	return if ok and type(keys) == "table" then keys else {}
+end
+
+-- Handle frame that lays the hot dog on `top` (Y up): the stack's up axis (Att_Topping1) up, resting on its side.
+local function lay(handle: BasePart, top: CFrame): CFrame
+	const anchor = handle:FindFirstChild(TOPPING_ANCHOR)
+	const turn = if anchor ~= nil and anchor:IsA("Attachment") then anchor.CFrame.Rotation else CFrame.identity
+	const up = turn.UpVector -- handle space
+	const size = handle.Size
+	const half = 0.5 * (math.abs(up.X) * size.X + math.abs(up.Y) * size.Y + math.abs(up.Z) * size.Z)
+	return top * CFrame.new(0, half, 0) * turn:Inverse()
+end
+
+-- Plate + hot dog in front of the torso (walking to the table, or takeaway).
+function Meal.Hold(self: Meal, rig: Model, carry: Carry)
+	const torso = rig:FindFirstChild("Torso") or rig:FindFirstChild("HumanoidRootPart")
+	if torso == nil or not torso:IsA("BasePart") then
+		return
+	end
+	const plate, topHeight = Tray.Plate()
+	plate.Name = "Seating_Carry"
+	const base = plate.PrimaryPart :: BasePart
+	const food = self:Food(self:ToppingsOf(rig))
+	food:PivotTo(lay(food.PrimaryPart :: BasePart, CFrame.new(0, topHeight, 0)))
+	food.Parent = plate
+	-- level in torso space (the torso stays upright while it walks)
+	plate:PivotTo(torso.CFrame * CFrame.new(0, -torso.Size.Y * HOLD_DROP, -(torso.Size.Z / 2 + HOLD_AHEAD)))
+	weldAll(plate, base)
+	const hold = Instance.new("WeldConstraint")
+	hold.Part0 = torso
+	hold.Part1 = base
+	hold.Parent = base
+	plate.Parent = rig
+	carry.Model = plate
+	carry.Food = food
+	carry.Hold = hold
+	carry.OnTable = false
+end
+
+-- Seated with the plate: it goes on the table, between the diner and the table centre. Idempotent.
+function Meal.Land(self: Meal, rig: Model)
+	const carry = self.Carries[rig]
+	const hooks = self.Hooks
+	const seated = rig:GetAttribute(SEATED_ATTRIBUTE)
+	if carry == nil or carry.OnTable or carry.Model == nil or hooks == nil or typeof(seated) ~= "number" then
+		return
+	end
+	const plate = carry.Model :: Model
+	const root = rig:FindFirstChild("HumanoidRootPart")
+	const top = hooks.TableTop(seated)
+	if top == nil or root == nil or not root:IsA("BasePart") then
+		return -- no bound table: the plate stays in the hands
+	end
+	const centre = top.Position
+	const from = Vector3.new(root.Position.X, centre.Y, root.Position.Z)
+	const toward = centre - from
+	const distance = toward.Magnitude
+	const at = if distance > 1e-3 then from + toward.Unit * math.min(REACH, distance * REACH_SHARE) else centre
+	if carry.Hold ~= nil then
+		carry.Hold:Destroy()
+		carry.Hold = nil
+	end
+	const flat = if distance > 1e-3 then toward.Unit else top.LookVector
+	plate:PivotTo(CFrame.lookAt(at, at + flat))
+	for _, descendant in plate:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			descendant.Anchored = true
+		end
+	end
+	carry.OnTable = true
+end
+
+-- The hot dog leaves the plate (it goes to the hand).
+local function takeFood(carry: Carry?)
+	if carry ~= nil and carry.Food ~= nil then
+		carry.Food:Destroy()
+		carry.Food = nil
+	end
+end
+
+function Meal.ClearCarry(_self: Meal, carry: Carry)
+	if carry.Model ~= nil then
+		carry.Model:Destroy()
+	end
+	carry.Model = nil
+	carry.Food = nil
+	carry.Hold = nil
+	carry.OnTable = false
+end
+
+function Meal.DropCarry(self: Meal, rig: Model)
+	const carry = self.Carries[rig]
+	if carry ~= nil then
+		self.Carries[rig] = nil
+		self:ClearCarry(carry)
+	end
+end
+
+function Meal.RefreshCarry(self: Meal, rig: Model)
+	if rig:GetAttribute(CARRYING_ATTRIBUTE) ~= true or not rig:IsDescendantOf(workspace) then
+		self:DropCarry(rig)
+		return
+	end
+	local carry = self.Carries[rig]
+	if carry == nil then
+		const created: Carry = { Model = nil, Food = nil, Hold = nil, OnTable = false, Seated = false, Done = false }
+		self.Carries[rig] = created
+		carry = created
+	end
+	const state = carry :: Carry
+	if state.Done then
+		return
+	end
+	if typeof(rig:GetAttribute(SEATED_ATTRIBUTE)) == "number" then
+		state.Seated = true
+		if state.Model == nil then
+			self:Hold(rig, state) -- late join: Land / Eat put it on the table after SETTLE
+		end
+	elseif state.Seated then
+		-- stood up from the table: the plate stays behind, it walks out empty-handed
+		state.Done = true
+		self:ClearCarry(state)
+	elseif state.Model == nil then
+		self:Hold(rig, state)
+	end
+end
+
+-- Seat ------------------------------------------------------------------------------------------------------------
+
 function Meal.Sit(self: Meal, rig: Model)
 	if self.Diners[rig] ~= nil then
 		return
@@ -177,6 +373,13 @@ function Meal.Sit(self: Meal, rig: Model)
 	const diner: Diner = { Eating = false, Food = nil, Grip = nil, Thread = nil }
 	self.Diners[rig] = diner
 	self.Anim.Play(rig, "npc_sit", true)
+	if self.Carries[rig] ~= nil then
+		task.delay(SETTLE, function()
+			if self.Diners[rig] == diner then
+				self:Land(rig)
+			end
+		end)
+	end
 end
 
 -- The food arrived: the hot dog goes into the hand and the bites start.
@@ -191,7 +394,15 @@ function Meal.Eat(self: Meal, rig: Model)
 		if self.Diners[rig] ~= diner then
 			return
 		end
-		diner.Food, diner.Grip = self:Give(rig)
+		const carry = self.Carries[rig]
+		local toppings: { string }? = nil
+		if carry ~= nil then
+			-- carried plate (TASK-387): it lands on the table and the hot dog of the order goes to the hand
+			self:Land(rig)
+			takeFood(carry)
+			toppings = self:ToppingsOf(rig)
+		end
+		diner.Food, diner.Grip = self:Give(rig, toppings)
 		for count = 1, BITES do
 			task.wait(BITE_EVERY)
 			if self.Diners[rig] ~= diner then
@@ -220,6 +431,7 @@ function Meal.Stand(self: Meal, rig: Model)
 end
 
 function Meal.Refresh(self: Meal, rig: Model)
+	self:RefreshCarry(rig)
 	const seated = rig:GetAttribute(SEATED_ATTRIBUTE)
 	if typeof(seated) == "number" and rig:IsDescendantOf(workspace) then
 		self:Sit(rig)
@@ -242,6 +454,7 @@ function Meal.Track(self: Meal, instance: Instance)
 	self.Tracked[rig] = {
 		rig:GetAttributeChangedSignal(SEATED_ATTRIBUTE):Connect(refresh),
 		rig:GetAttributeChangedSignal(EATING_ATTRIBUTE):Connect(refresh),
+		rig:GetAttributeChangedSignal(CARRYING_ATTRIBUTE):Connect(refresh),
 		rig.AncestryChanged:Connect(refresh),
 		rig.Destroying:Connect(function()
 			self:Untrack(rig)
@@ -263,6 +476,7 @@ function Meal.Untrack(self: Meal, instance: Instance)
 		connection:Disconnect()
 	end
 	self:Stand(instance)
+	self:DropCarry(instance)
 end
 
 return Meal
