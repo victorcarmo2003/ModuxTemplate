@@ -533,3 +533,30 @@ há anomalia. Foram ligados por pedido do usuário em 2026-10-10; precisam de DE
 
 Ainda sem id (silêncio): `drawer`, `upgrade_done`, `trash`, `phone_pickup`, `car_engine`, `hit_boing`, `siren_soft`, `post_tunk`,
 `hotdog_assemble`, `post_click`, `neon_click`, `skip_vote`.
+
+## 10. Pastas no Studio (DEC-284)
+
+TASK-445 (2026-10-17, Provisório). `ReplicatedStorage.Assets.SFX` organizado em subpastas no Studio: nenhum Sound removido nem
+renomeado (74 antes, 74 depois). As pastas `NPC` e `STAND` já existiam (do dono) e foram reaproveitadas para clientes e cozinha.
+O `AudioController` resolve o nome em qualquer subpasta (`src/Audio/client/AudioController/Studio.luau`, busca recursiva), então
+mover um Sound de pasta não muda nada no jogo. `Assets` não é sincronizado pelo Rojo: o dono salva o place (Ctrl+S).
+
+| Pasta | Sounds |
+|---|---|
+| `STAND` (cozinha) | do dono: `coffee_drink`, `topping_squirt`, `grill_drop`, `grill_ready`, `topping_sprinkle`, `phone_ring`, `bun_slice`, `grill_sizzle`, `grill_collect`, `coffee_brew`, `coffee_ready`; movidos: `hotdog_assemble`, `drawer`, `drawer_close`, `trash`, `splash`, `smoke_poof`, `phone_pickup`, `phone_hangup`, `switch_click`, `coin` |
+| `NPC` (clientes) | do dono: `serve`, `tip`, `cust_complain`, `cust_happy`, `order_take`, `cust_leave`, `thief_open`, `thief_caught`, `walker_step`; movido: `hit_boing` |
+| `UI` | `buy`, `prompt_done`, `prompt_hold`, `refuse`, `skip_vote`, `summary`, `toast`, `upgrade_done` |
+| `Ambience` | `amb_clock_tick`, `amb_fog`, `neon_click`, `post_buzz`, `post_click` |
+| `Horror` (stings, coral, violinos, apagão, anomalias, alucinações, desmaio) | `Bone crack`, `Female Exhale 2 (SFX)`, `Horror Coral`, `Scary Violins Sound Effect`, `Very scary bell sound/church bell`, `anomaly_see`, `horror_chase_stop`, `horror_dramatic`, `horror_sting`, `jumpscare`, `lights off`, `phone_glitch`, `roof_step`, `scary_violins`, `shadow_whoosh`, `whisper`, `faint`, `revive` |
+| `Doors` | `Door Knock 4 (SFX)`, `Locked door`, `door_close`, `door_creak`, `door_knock`, `curtain` |
+| `Vehicles` | `car_engine`, `car_honk_goofy`, `car_honk_soft`, `siren_soft` |
+| raiz de `SFX` (não mover) | `Metal Door Open`, `Metal Door Close` |
+
+Sem pasta `Music` / `Misc`: a música já vive em `Assets.Musics` e o ambiente longo em `Assets.AmbientSFX` (pastas irmãs, não
+mexidas); nenhum Sound sobrou sem categoria.
+
+**Referência por caminho fixo (motivo dos dois na raiz):** `MarketController:DoorCue` (`src/Market/client/MarketController/init.luau`,
+~linha 624) faz `Assets.SFX:FindFirstChild(Content.Mart.Hours.Assets.Open/Close)` sem busca recursiva, como reserva quando a linha
+`gear_door_open` / `gear_door_close` de `Content.Sounds` não tem id (hoje tem, então a reserva não roda). Se essa reserva passar a usar
+`AudioController`/`Studio.Find`, os dois podem ir para `Doors`. Nenhuma outra referência fixa a `Assets.SFX` em `src/` ou `tools/`
+(as demais são comentários ou passam pelo `Studio.Find`).

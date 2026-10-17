@@ -61,6 +61,8 @@ local TAGS_OFF = {
 -- 200 px/stud, pantry south wall rebuilt around a long dark glass hatch (HATCH-L 14 wide), DROP-R shelf + HatchSpot1..3 +
 -- brackets deleted, west / north pantry skins resized and tiles 0.75 transparent, Skin_PW_* / Skin_PS_A_Trim / Skin_PS_B_Tile
 -- deleted, DOOR-P / DOOR-B leaves and heads resized, CCTV lowered 0.40, security camera poses recorded (Cam:CAM1/CAM2).
+-- rev. 6 (2026-10-17, TASK-446): the diff also compares Texture / Decal (Transparency, Color3, Texture id as TextureId,
+-- StudsPerTileU/V, OffsetStudsU/V); interior floor / wall textures recorded (floors 0.67, wall tiles 0.70).
 local OVERRIDES = {
 	Parts = {
 		["Dress/AC_1/ACUnit"] = { CF = {-51.0849, 12.7011, -29.4254, -1, 0, 0, 0, 0.9916, 0.1293, 0, 0.1293, -0.9916} },
@@ -384,6 +386,18 @@ local OVERRIDES = {
 		["TRL/Shell/Wheels/Wheel_N4"] = { Deleted = true },
 		["TRL/Shell/Wheels/Wheel_S1"] = { Deleted = true },
 		["TRL/Shell/Wheels/Wheel_S2"] = { Deleted = true },
+		-- TASK-446 (2026-10-17, owner): interior textures lighter. The diff did not compare Texture / Decal before, so an apply
+		-- reset them; now recorded here. Kitchen + pantry floors 0.67, interior wall tiles 0.70 (the tile skin PARTS keep their
+		-- own 0.75 above). Patio textures (Floor_Patio, the owner's Union) untouched.
+		["TRL/Shell/Floor_Kitchen/Tex_Tile"] = { Transparency = 0.670 },
+		["TRL/Shell/Floor_Pantry/Tex_Tile"] = { Transparency = 0.670 },
+		["TRL/Shell/Skin_B_Tile/Tex_Tile"] = { Transparency = 0.700 },
+		["TRL/Shell/Skin_E_N_Tile/Tex_Tile"] = { Transparency = 0.700 },
+		["TRL/Shell/Skin_E_S_Tile/Tex_Tile"] = { Transparency = 0.700 },
+		["TRL/Shell/Skin_PE_Tile/Tex_Tile"] = { Transparency = 0.700 },
+		["TRL/Shell/Skin_PN_Tile/Tex_Tile"] = { Transparency = 0.700 },
+		["TRL/Shell/Skin_PS_A_Tile/Tex_Tile"] = { Transparency = 0.700 },
+		["TRL/Shell/Skin_W_Tile/Tex_Tile"] = { Transparency = 0.700 },
 	},
 	External = {
 		["Bin:BIN-1"] = { CF = {-78.3, 2.4998, -24.6285, 0, 0, -1, 0, 1, 0, 1, 0, 0} },
@@ -394,6 +408,9 @@ local OVERRIDES = {
 		-- security camera views (TASK-441): the pivot of each CAM model IS the view (Content.Security). The owner placed them by
 		-- hand; recorded here so the diff reports a later move (the bind poses them to exactly these values)
 		["Cam:CAM1"] = { CF = {-60.1624, 10.488, 28.9855, 0.8335, 0.195, -0.517, 0, 0.9357, 0.3528, 0.5526, -0.2941, 0.7799} },
+		-- TASK-446 (2026-10-17, owner approved): the 4 torches "Flame" in MAP01_Assets.Extra (owner's pieces, outside the
+		-- restaurant) cast no shadow; applied to every Light under a part named Flame there
+		["Lights:Extra/Flame"] = { Shadows = false },
 		["Cam:CAM2"] = { CF = {-18.14, 13.757, -29.975, -0.7611, -0.2724, 0.5887, 0, 0.9075, 0.42, -0.6487, 0.3196, -0.6907} },
 	},
 }
@@ -2636,6 +2653,31 @@ if cams then
 	end
 end
 
+-- owner's torches (MAP01_Assets.Extra, any depth: FireTorch, the picnic-table models): light fields from OVERRIDES
+do
+	local ov = OVERRIDES.External["Lights:Extra/Flame"]
+	local assets = workspace:FindFirstChild("MAP01_Assets")
+	local extra = assets and assets:FindFirstChild("Extra")
+	if ov and extra and not DIFF then
+		local n = 0
+		for _, d in extra:GetDescendants() do
+			if d:IsA("Light") and d.Parent and d.Parent.Name == "Flame" then
+				if ov.Shadows ~= nil then
+					d.Shadows = ov.Shadows
+				end
+				n += 1
+			end
+		end
+		L("torch lights (Extra/Flame): " .. n)
+	elseif ov and extra and DIFF then
+		for _, d in extra:GetDescendants() do
+			if d:IsA("Light") and d.Parent and d.Parent.Name == "Flame" and ov.Shadows ~= nil and d.Shadows ~= ov.Shadows then
+				L("[diff] torch light " .. d:GetFullName() .. " Shadows = " .. tostring(d.Shadows) .. " (override " .. tostring(ov.Shadows) .. ")")
+			end
+		end
+	end
+end
+
 -- 11a. pieces an older version of this snippet built and the current layout no longer has (enlarged pantry, DEC-282):
 -- moved to ServerStorage.TrailerBackup.Retired (never destroyed); the owner never edited any of them (diff of 2026-10-17)
 local RETIRED = {
@@ -2702,7 +2744,8 @@ local function index(top)
 	local map = {}
 	for _, d in top:GetDescendants() do
 		-- 2026-10-17 (TASK-441): lights and SurfaceGuis too, so the owner's Brightness / Range / PixelsPerStud edits are diffed
-		if d:IsA("BasePart") or d:IsA("Attachment") or d:IsA("Model") or d:IsA("Folder") or d:IsA("Light") or d:IsA("SurfaceGui") then
+		-- 2026-10-17 (TASK-446): Texture / Decal too (Decal covers Texture), so the owner's Transparency edits survive an apply
+		if d:IsA("BasePart") or d:IsA("Attachment") or d:IsA("Model") or d:IsA("Folder") or d:IsA("Light") or d:IsA("SurfaceGui") or d:IsA("Decal") then
 			map[pathOf(d, top)] = d
 		end
 	end
@@ -2791,6 +2834,31 @@ do
 				end
 				if ov.Enabled ~= nil then
 					inst.Enabled = ov.Enabled
+				end
+			elseif inst:IsA("Decal") then
+				-- Texture is a Decal subclass; tiling fields only on Texture
+				if ov.Transparency then
+					inst.Transparency = ov.Transparency
+				end
+				if ov.Color then
+					inst.Color3 = Color3.fromRGB(table.unpack(ov.Color))
+				end
+				if ov.TextureId then
+					inst.Texture = ov.TextureId
+				end
+				if inst:IsA("Texture") then
+					if ov.StudsPerTileU then
+						inst.StudsPerTileU = ov.StudsPerTileU
+					end
+					if ov.StudsPerTileV then
+						inst.StudsPerTileV = ov.StudsPerTileV
+					end
+					if ov.OffsetStudsU then
+						inst.OffsetStudsU = ov.OffsetStudsU
+					end
+					if ov.OffsetStudsV then
+						inst.OffsetStudsV = ov.OffsetStudsV
+					end
 				end
 			end
 			applied += 1
@@ -2915,10 +2983,35 @@ if DIFF then
 				table.insert(diffs, string.format("\t\t[%q] = { %s },", path, table.concat(e, ", ")))
 				table.insert(out, string.format("CHANGED (gui) %s :: %s", path, table.concat(e, ", ")))
 			end
+		elseif w:IsA("Decal") and h:IsA("Decal") then
+			-- TASK-446: Texture / Decal (Transparency, Color3, Texture id; tiling and offset on Texture)
+			local e = {}
+			if not near(w.Transparency, h.Transparency, 0.001) then
+				table.insert(e, string.format("Transparency = %.3f", h.Transparency))
+			end
+			local cw, ch = w.Color3, h.Color3
+			if not (near(cw.R, ch.R, 0.006) and near(cw.G, ch.G, 0.006) and near(cw.B, ch.B, 0.006)) then
+				table.insert(e, string.format("Color = {%d, %d, %d}", math.floor(ch.R * 255 + 0.5), math.floor(ch.G * 255 + 0.5), math.floor(ch.B * 255 + 0.5)))
+			end
+			if w.Texture ~= h.Texture then
+				table.insert(e, string.format("TextureId = %q", h.Texture))
+			end
+			if w:IsA("Texture") and h:IsA("Texture") then
+				for _, f in { "StudsPerTileU", "StudsPerTileV", "OffsetStudsU", "OffsetStudsV" } do
+					if not near(w[f], h[f], 0.001) then
+						table.insert(e, string.format("%s = %.3f", f, h[f]))
+					end
+				end
+			end
+			if #e > 0 then
+				nChg += 1
+				table.insert(diffs, string.format("		[%q] = { %s },", path, table.concat(e, ", ")))
+				table.insert(out, string.format("CHANGED (texture) %s :: %s", path, table.concat(e, ", ")))
+			end
 		end
 	end
 	for path, h in have do
-		if not want[path] and not ownerManaged(path) and (h:IsA("BasePart") or h:IsA("Model") or h:IsA("Light") or h:IsA("SurfaceGui")) then
+		if not want[path] and not ownerManaged(path) and (h:IsA("BasePart") or h:IsA("Model") or h:IsA("Light") or h:IsA("SurfaceGui") or h:IsA("Decal")) then
 			-- only report the top of a new subtree
 			local par = h.Parent
 			if par == live or want[pathOf(par, live)] then

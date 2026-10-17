@@ -121,6 +121,7 @@ end
 -- SFX uploaded by the user (ReplicatedStorage.Assets.SFX, 2026-10-10; the Sound in Studio is named after the key,
 -- a Sound shared by two keys carries the attribute `Keys`); key -> rbxassetid
 const UPLOADED: { [string]: string } = {
+	lights_off = "rbxassetid://85819123510701", -- ReplicatedStorage.Assets.SFX.Horror["lights off"] (owner, 2026-10-17)
 	gear_door_open = "rbxassetid://95190972742619", -- ReplicatedStorage.Assets.SFX["Metal Door Open"] (owner, 2026-10-17)
 	gear_door_close = "rbxassetid://140635119444127", -- ReplicatedStorage.Assets.SFX["Metal Door Close"]
 	phone_pickup = "rbxassetid://9117155406",
@@ -254,8 +255,8 @@ const base = Table.new({
 	music("music_night_town", "rbxassetid://73501320034226", "Night Town (Axiom Project Studio upload)", false),
 	music("music_night_fall", "rbxassetid://135232738690923", "Night Fall (Axiom Project Studio upload)", false),
 	-- horror score themes (TASK-443, Content.Score): the owner's Studio Sounds, looped by the director
-	studio(music("score_violins"), "Scary Violins Sound Effect"), -- Tension (speed and volume ramp)
-	studio(music("score_coral"), "Horror Coral"), -- Climax
+	studio(music("score_violins", "rbxassetid://6080419021", "Scary Violins Sound Effect (owner Studio upload)"), "Scary Violins Sound Effect"), -- Tension (speed and volume ramp)
+	studio(music("score_coral", "rbxassetid://1846886137", "Horror Coral (owner Studio upload)"), "Horror Coral"), -- Climax
 	-- Ambient
 	ambient("amb_day_street", false, "rbxassetid://108990827199430", "CityAmbient (Axiom Project Studio upload)"),
 	ambient("amb_night_street", false, "rbxassetid://98652860867664", "NightCrickets (Axiom Project Studio upload)"),
