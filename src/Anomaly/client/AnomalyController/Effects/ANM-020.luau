@@ -21,6 +21,9 @@
 	locally, like Kit/Hide); the dark itself starts on Active. blackout_start plays the owner's "lights off" snap
 	(lights_off; post_tunk while that row has no audio). jumpscare with Entity = UserId % 65536 = only that player (the
 	one the server made pay: not hidden in the back). The music steps and the "POWER OUT" caption are Score/'s (the director).
+	Total blackout (restaurant only, owner request 2026-10-17; Kit/Blackout, Content.LightPresets.Blackout): besides the
+	vehicle, every light / Neon / table torch / SurfaceGui glow of the restaurant goes off locally (the emergency lamp
+	EMERG-P stays), and Lighting blends to a darker look for as long as the dark lasts, back to the night values after.
 
 	PROVISIONAL (TASK-273): look numbers below, sound keys reused from Content.Sounds until the sound-list has its own,
 	shape made of Parts until the art-director's sheet. ESCALATE_OVER only paces the presentation (the real window is
@@ -34,7 +37,9 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 local Vide = require(ReplicatedStorage.Packages.Vide)
+local Content = require(ReplicatedStorage.shared.Content)
 local Effect = require(script.Parent.Parent.Effect)
+local Blackout = require(script.Parent.Kit.Blackout)
 local Jumpscare = require(script.Parent.Kit.Jumpscare)
 local Watch = require(script.Parent.Kit.Watch)
 
@@ -112,6 +117,7 @@ type Session = {
 	NextShape: number,
 	NextNoise: number,
 	Saved: { Saved },
+	Map: Blackout.Handle?, -- restaurant total blackout (Kit/Blackout)
 	Connection: RBXScriptConnection?,
 	Ended: boolean,
 }
@@ -465,10 +471,23 @@ local function begin(ctx: Effect.Context, occ: Effect.Occurrence): Session
 		NextShape = clock + between(rng, SHAPE_GAP_START),
 		NextNoise = clock + between(rng, NOISE_GAP_START),
 		Saved = {},
+		Map = nil,
 		Connection = nil,
 		Ended = false,
 	}
 	darkenVehicle(session)
+	if Content.Restaurant.Rules.Enabled then
+		-- total blackout (owner 2026-10-17): the rest of the restaurant, never what LightController or the vehicle pass own
+		const skip = owned(ctx)
+		for _, saved in session.Saved do
+			const instance: Instance? = saved.Light or saved.Part
+			if instance ~= nil then
+				skip[instance] = true
+			end
+		end
+		session.Map = Blackout.Darken(skip)
+		Blackout.Look(true)
+	end
 	session.Connection = RunService.RenderStepped:Connect(function()
 		step(session)
 	end)
@@ -490,6 +509,12 @@ local function finish(session: Session)
 		session.Connection = nil
 	end
 	restoreVehicle(session)
+	const map = session.Map
+	if map ~= nil then
+		session.Map = nil
+		map.Restore()
+		Blackout.Look(false)
+	end
 	session.Glow:Destroy()
 	const beacon = session.Beacon
 	if beacon ~= nil then

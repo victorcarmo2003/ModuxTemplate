@@ -16,6 +16,7 @@ local HudReveal = require(script.Parent.HudReveal)
 local Ingredients = require(script.Parent.Ingredients)
 local Items = require(script.Parent.Items)
 local LightGroups = require(script.Parent.LightGroups)
+local LightPresets = require(script.Parent.LightPresets)
 local Mart = require(script.Parent.Mart)
 local Mode = require(script.Parent.Mode)
 local Moods = require(script.Parent.Moods)
@@ -790,7 +791,30 @@ local function checkNights()
 	inRange("Flow", nil, nil, "NightInterval", Flow.NightInterval, 1, 600)
 end
 
+-- ANM-020 total blackout look (LightPresets.Blackout, owner 2026-10-17)
+local function checkBlackoutLook()
+	const name = "LightPresets"
+	const look = LightPresets.Blackout
+	inRange(name, nil, nil, "Blackout.EnvDiffuse", look.EnvDiffuse, 0, 1)
+	inRange(name, nil, nil, "Blackout.EnvSpecular", look.EnvSpecular, 0, 1)
+	inRange(name, nil, nil, "Blackout.Brightness", look.Brightness, 0, 10)
+	inRange(name, nil, nil, "Blackout.Exposure", look.Exposure, -3, 3)
+	inRange(name, nil, nil, "Blackout.FadeIn", look.FadeIn, 0.01, 10)
+	inRange(name, nil, nil, "Blackout.FadeOut", look.FadeOut, 0.01, 10)
+	inRange(name, nil, nil, "Blackout.SignBrightness", look.SignBrightness, 0, 10)
+	inRange(name, nil, nil, "Blackout.SignLightInfluence", look.SignLightInfluence, 0, 1)
+	for index, path in look.Roots do
+		if #path == 0 then
+			fail(name, index, nil, "Blackout.Roots entries are non-empty Workspace paths")
+		end
+	end
+	if look.FlameName == "" then
+		fail(name, nil, nil, "Blackout.FlameName must not be empty")
+	end
+end
+
 local function checkLightsAndSanity()
+	checkBlackoutLook()
 	checkKeys("LightGroups", LightGroups, KEY_PATTERN)
 	const zoneOwner: { [string]: string } = {}
 	for index, row in LightGroups.List do
