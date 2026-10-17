@@ -42,7 +42,7 @@ export type KioskRule = {
 	Pedestals: { string }, -- BenchSlot of every pedestal (Content.Mart.Pedestals)
 	Shutters: { string }, -- Content.Mart.Doors[].Key
 	OpalPoint: string, -- MapPoint of Opal's counter (Q-175 A)
-	OpalFacing: Vector3, -- WORLD direction OP-1 must face (MAP east = world -X, MAP-01 §18.4)
+	OpalFacing: Vector3?, -- WORLD direction OP-1 must face (MAP east = world -X, MAP-01 §18.4); nil = Mart off the map, OP-1 not checked
 }
 
 -- Pad tables (TASK-144; FEAT-037; MAP-01 "Mesas do Pad", TASK-149). Soft rule like the kiosk: MapIndex.SeatingNotes
@@ -64,7 +64,7 @@ export type List = {
 	Vehicles: { [string]: VehicleRule }, -- key of Content.Vehicles -> rule; exactly one Model of each
 	Toppings: { string }, -- ingredient keys of the toppings grid
 	MapActions: { [string]: number }, -- PromptAction outside any vehicle, exact count (open sign)
-	Packages: { string }, -- one buy_package anchor per key (Mart shelves)
+	Packages: { string }, -- one buy_package anchor per key (Mart shelves); empty when the Mart is off the map (MART_ON)
 	Bench: { [string]: string }, -- BenchSlot -> PromptAction (GEAR WALL)
 	Tagged: { TaggedIds },
 	StationGap: number, -- min distance between anchors of different stations (§18.7 item 4)
@@ -103,6 +103,12 @@ local function kitchen(vehicle: string): { [string]: StationRule }
 	}
 end
 
+-- The Mart (shelves BUY-*, checkout OP-1, door MKT-DOOR) left the map with the restaurant (owner 2026-10-17: it is kept in
+-- ServerStorage.Mart, the lot is a plaza; stock comes from the phone / bays, SupplyService). Off = no BUY-* anchor, no OP-1
+-- facing rule and the Mart points (MART_POINTS) not required. The Gear Stand (B1..B5, S1, shutters) stays required.
+const MART_ON = Content.Restaurant.Supply.MartShelves and not Content.Restaurant.Rules.Enabled
+const MART_POINTS = { "OP-1", "MKT-DOOR" }
+
 -- GEAR WALL: B1..B5 from Upgrades.BenchSpot (DEC-106), S1 = special spot (bench_buy_item).
 local function bench(): { [string]: string }
 	const out: { [string]: string } = { S1 = "bench_buy_item" }
@@ -131,7 +137,7 @@ local function kiosk(): KioskRule
 		Pedestals = pedestals,
 		Shutters = shutters,
 		OpalPoint = "OP-1",
-		OpalFacing = Vector3.new(-1, 0, 0),
+		OpalFacing = if MART_ON then Vector3.new(-1, 0, 0) else nil,
 	}
 end
 
@@ -212,7 +218,7 @@ local function base(wave: number): List
 		},
 		Toppings = Content.Ingredients.ToppingKeys,
 		MapActions = {}, -- the shop lever is the trailer service window (TASK-284)
-		Packages = Content.Packages.Keys,
+		Packages = if MART_ON then Content.Packages.Keys else {},
 		Bench = bench(),
 		Tagged = {},
 		StationGap = 2.5,
@@ -451,6 +457,23 @@ if restaurant.Rules.Enabled then
 end
 
 const BY_WAVE: { List } = { wave1, wave2, wave3 }
+
+-- Mart off the map: its points stay optional (the MapPoints may still exist; OpalController prefers Att_Opal)
+if not MART_ON then
+	const drop: { [string]: boolean } = {}
+	for _, id in MART_POINTS do
+		drop[id] = true
+	end
+	for _, list in BY_WAVE do
+		const kept: { string } = {}
+		for _, id in list.Points do
+			if not drop[id] then
+				table.insert(kept, id)
+			end
+		end
+		list.Points = kept
+	end
+end
 
 local function freezeDeep<V>(value: V): V
 	if type(value) == "table" and not table.isfrozen(value :: any) then

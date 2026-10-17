@@ -855,11 +855,15 @@ function MapIndex.KioskNotes(required: List): { string }
 		end
 	end
 
-	const point = MapIndex.FindPoint(rule.OpalPoint)
-	if point == nil then
-		note(`MapPoint {rule.OpalPoint} missing (Opal)`)
-	elseif point.LookVector:Dot(rule.OpalFacing) < 0.9 then
-		note(`MapPoint {rule.OpalPoint} does not face the store (MAP-01 §18.4: MAP east)`)
+	-- OpalFacing nil = the Mart left the map (Required MART_ON): Opal stands on the Gear Stand's Att_Opal, OP-1 is optional
+	const facing = rule.OpalFacing
+	if facing ~= nil then
+		const point = MapIndex.FindPoint(rule.OpalPoint)
+		if point == nil then
+			note(`MapPoint {rule.OpalPoint} missing (Opal)`)
+		elseif point.LookVector:Dot(facing) < 0.9 then
+			note(`MapPoint {rule.OpalPoint} does not face the store (MAP-01 §18.4: MAP east)`)
+		end
 	end
 	return notes
 end

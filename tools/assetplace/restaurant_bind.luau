@@ -1728,106 +1728,184 @@ do
 	for i, x in { 44.4, 45.8, 47.2 } do
 		attach(drop, "HatchSpot" .. i, F(x, TOP + 1.0, 77.4))
 	end
-	-- STOCK BAYS (2026-10-17 rev. 2, owner: "one bay per product, a big sign, take the box you want"). One bay per key of
-	-- Content.Packages. Contract for the code: each bay is a Model with tag StockShelf, attribute Package = the key, MapId
-	-- STOCK-<LABEL>, and an Attachment Prompt_TakeBox (attribute Package) 0.7 in front of the bay at chest height, inside its
-	-- Frame part (the backend puts the ProximityPrompt take_box there). North row on the partition (faces S), south row on the
-	-- south wall (faces N), coffee on the east wall (faces W); the partition in front of DROP-R stays free (aisle 4.1 everywhere,
-	-- R6 sweep). The rev. 1 shelves (Shelf_N1/N2/E1/S1/S2) are retired below (11a).
-	local BAYS = {
-		{ "pack_sausages", "DOGS", 32.6, 35.05, 72.1, 73.2, "S", Color3.fromRGB(196, 74, 52) },
-		{ "pack_buns", "BUNS", 35.25, 37.7, 72.1, 73.2, "S", Color3.fromRGB(214, 150, 72) },
-		{ "pack_ketchup", "KETCHUP", 37.9, 40.35, 72.1, 73.2, "S", C.Ketchup },
-		{ "pack_mustard", "MUSTARD", 40.55, 43.0, 72.1, 73.2, "S", Color3.fromRGB(222, 168, 20) },
-		{ "pack_cheese", "CHEESE", 32.5, 34.95, 77.3, 78.4, "N", Color3.fromRGB(240, 150, 30) },
-		{ "pack_bacon", "BACON", 35.15, 37.6, 77.3, 78.4, "N", Color3.fromRGB(190, 70, 90) },
-		{ "pack_potato_sticks", "POTATO\nSTICKS", 37.8, 40.25, 77.3, 78.4, "N", Color3.fromRGB(205, 150, 40) },
-		{ "pack_cream_cheese", "CREAM\nCHEESE", 40.45, 42.9, 77.3, 78.4, "N", Color3.fromRGB(70, 140, 200) },
-		{ "pack_coffee", "COFFEE", 48.3, 49.4, 72.2, 76.4, "W", Color3.fromRGB(110, 70, 45) },
+	-- STOCK ROOM rev. 3 (2026-10-17, owner: "every ingredient on ONE side of the pantry, in a row, themed like the Mart").
+	-- North partition only (X 31..43.05, backs at Z 72.15, fronts <= 74.2: aisle >= 4.2 to the south wall, the wall in
+	-- front of DROP-R stays free). Four Mart units cloned from ServerStorage.__AssetCache, scaled down UNIFORMLY to fit:
+	--   FREEZER  AST-107 meat case x0.65 (Food mesh hidden): sausages + bacon, flat boxes inside, icon on the top face
+	--   FRIDGE   AST-030 fridge x0.75: cheese + cream cheese, one box per shelf behind the glass doors
+	--   DRY      AST-029 gondola x0.75: buns / potato sticks / coffee, one column each, two shelves
+	--   SAUCES   AST-029 gondola x0.5: ketchup / mustard
+	-- The three meshes face local +Z (doors / shelf lips), so the pivot looks MAP north (world +Z) and the front faces the aisle.
+	-- Contract for the code (unchanged): one Model per Content.Packages key under StockBays, tag StockShelf, Package = the key,
+	-- MapId STOCK-<KEY>, an Attachment Prompt_TakeBox (Package, PromptAction take_box) 0.5 in front of its section, staggered
+	-- in height so two prompts stay >= 1.4 apart, and a part named Sign (the client's "xN" pill sits over it). Every box carries
+	-- the AST-071 Ingredient/<key> icon (Interface/Components/Icons) on its aisle face. Sign band y 6.2..7.1 on the partition
+	-- (over the fridge top 5.7), unit headers y 7.35..8.05. The rev. 2 posts / boards / boxes go to TrailerBackup.Retired.
+	local SHEET = "rbxassetid://75974795918833" -- AST-071 icon sheet
+	local ICON = { -- Ingredient/<key> cell offsets of AST-071 (128 x 128)
+		sausage = { 128, 0 }, bun = { 0, 0 }, ketchup = { 256, 0 }, mustard = { 384, 0 }, cheese = { 512, 0 },
+		bacon = { 640, 0 }, potato_sticks = { 768, 0 }, cream_cheese = { 896, 0 }, coffee = { 0, 128 },
 	}
-	local FACE = { S = Enum.NormalId.Front, N = Enum.NormalId.Back, W = Enum.NormalId.Right }
+	local function iconGui(part, ing, faceId)
+		local g = ensure(part, "Icon", "SurfaceGui")
+		g.Face = faceId
+		g.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+		g.PixelsPerStud = 80
+		g.LightInfluence = 0.6
+		g.Enabled = ART
+		local img = ensure(g, "Image", "ImageLabel")
+		img.BackgroundTransparency = 1
+		img.AnchorPoint = Vector2.new(0.5, 0.5)
+		img.Position = UDim2.fromScale(0.5, 0.5)
+		img.Size = UDim2.fromScale(0.86, 0.86)
+		img.Image = SHEET
+		img.ImageRectOffset = Vector2.new(ICON[ing][1], ICON[ing][2])
+		img.ImageRectSize = Vector2.new(128, 128)
+		img.ScaleType = Enum.ScaleType.Fit
+		return g
+	end
+	local function stroke(textLabel)
+		local st = textLabel:FindFirstChild("Stroke") or Instance.new("UIStroke")
+		st.Name = "Stroke"
+		st.Thickness = 3
+		st.Color = C.Ink
+		st.Parent = textLabel
+	end
+	local Z_BACK = 72.15
+	local Z_SIGN0, Z_SIGN1 = 72.15, 72.25
+	local UNITS = { -- name, cached asset, MAP x0, uniform scale, header text, header colour
+		{ "Freezer", "AST-107_MeatCase", 31.0, 0.65, "FREEZER", C.Teal },
+		{ "Fridge", "AST-030_FridgeDisplayShelves", 34.15, 0.75, "FRIDGE", Color3.fromRGB(70, 140, 200) },
+		{ "DryShelf", "AST-029_GondolaBoxesBare", 37.3, 0.75, "DRY GOODS", Color3.fromRGB(205, 150, 40) },
+		{ "SauceShelf", "AST-029_GondolaBoxesBare", 40.8, 0.5, "SAUCES", C.Ketchup },
+	}
+	local units = folder(pantry, "StockUnits")
+	local U = {} -- unit name -> { x0, x1, cx, cz, front, top, s }
+	for _, u in UNITS do
+		local name, asset, x0, s, title, color = u[1], u[2], u[3], u[4], u[5], u[6]
+		local tpl = CACHE and CACHE:FindFirstChild(asset)
+		local size = if tpl then select(2, tpl:GetBoundingBox()) else Vector3.new(4, 4, 2)
+		local w, h, d = size.X * s, size.Y * s, size.Z * s
+		local cx, cz = x0 + w / 2, Z_BACK + d / 2
+		U[name] = { x0 = x0, x1 = x0 + w, cx = cx, cz = cz, front = Z_BACK + d, top = FLOOR + h, s = s }
+		local m = packAsset(units, name, asset, face(F(cx, FLOOR, cz), DIR.N), s)
+		if m then
+			m:SetAttribute("MapId", "STOCK-UNIT-" .. string.upper(name))
+			-- AST-030: body and door trim share their outer side / top planes (z-fight); the trim sits 0.005 inside
+			local trim = m:FindFirstChild("Fridge_Trim")
+			if trim and trim:IsA("BasePart") then
+				trim.Size -= Vector3.new(0.01, 0.01, 0)
+			end
+			local food = m:FindFirstChild("Food")
+			if food and food:IsA("BasePart") then -- the meat case's own food: the boxes take its place
+				food.Transparency = 1
+				food.CanCollide = false
+				food.CanQuery = false
+			end
+		end
+		-- blockout stand-in (visible only in a "blockout" run)
+		box(units, name .. "_Blk", x0, x0 + w, FLOOR, FLOOR + h, Z_BACK, Z_BACK + d, { Color = C.BlkProp, Transparency = if ART then 1 else 0, CanCollide = not ART, CanQuery = false, CastShadow = false, blk = C.BlkProp })
+		local header = box(units, "Header_" .. name, x0 + 0.05, x0 + w - 0.05, 7.35, 8.05, Z_SIGN0, Z_SIGN1, { Color = color, CanCollide = false, CanQuery = false, CastShadow = false, blk = color, art = { Color = color } })
+		local hg = label(header, "Label", title, Enum.NormalId.Front, Color3.new(1, 1, 1), nil, Enum.Font.FredokaOne)
+		stroke(hg.Text)
+	end
+	-- items: key, icon, sign text, unit, section x0..x1 (MAP), prompt height, colour, boxes { x0, x1, y0, y1, z0, z1, face },
+	-- prompt x (default: section centre)
+	local function freezerBoxes(a0, a1)
+		local f = U.Freezer
+		local y0, y1 = FLOOR + 1.52, FLOOR + 1.80 -- where the case's Food sat (x0.65), under the lid
+		local mid = (a0 + a1) / 2
+		return {
+			{ a0 + 0.08, mid - 0.03, y0, y1, f.cz - 0.5, f.cz + 0.5, Enum.NormalId.Top },
+			{ mid + 0.03, a1 - 0.08, y0, y1, f.cz - 0.5, f.cz + 0.5, Enum.NormalId.Top },
+		}
+	end
+	local function fridgeBoxes(a0, a1)
+		local f = U.Fridge
+		local out = {}
+		for _, sy in { 0.91, 2.91, 4.91 } do -- shelf tops of AST-030 (unscaled), boxes 0.02 over them
+			local y0 = FLOOR + sy * f.s + 0.02
+			table.insert(out, { a0, a1, y0, y0 + 0.55, f.cz - 0.45, f.cz + 0.35, Enum.NormalId.Front })
+		end
+		return out
+	end
+	local function gondolaBoxes(unit, col, bw, bh, bd)
+		local g = U[unit]
+		local out = {}
+		for _, sy in { 1.245, 3.885 } do -- shelf tops of AST-029 bare (unscaled)
+			local y0 = FLOOR + sy * g.s + 0.02
+			local zc = g.cz + 0.54 * g.s
+			table.insert(out, { col - bw / 2, col + bw / 2, y0, y0 + bh, zc - bd / 2, zc + bd / 2, Enum.NormalId.Front })
+		end
+		return out
+	end
+	local fz, fr, dr, sa = U.Freezer, U.Fridge, U.DryShelf, U.SauceShelf
+	local fMid, rMid, sMid = (fz.x0 + fz.x1) / 2, (fr.x0 + fr.x1) / 2, sa.cx
+	local col = 0.94 * dr.s / 0.75 -- dry gondola column step (1.25 unscaled)
+	local ITEMS = {
+		{ "pack_sausages", "sausage", "DOGS", "Freezer", fz.x0, fMid, 2.2, Color3.fromRGB(196, 74, 52), freezerBoxes(fz.x0 + 0.25, fMid) },
+		{ "pack_bacon", "bacon", "BACON", "Freezer", fMid, fz.x1, 2.2, Color3.fromRGB(190, 70, 90), freezerBoxes(fMid, fz.x1 - 0.25) },
+		{ "pack_cheese", "cheese", "CHEESE", "Fridge", fr.x0, rMid, 3.2, Color3.fromRGB(240, 150, 30), fridgeBoxes(fr.x0 + 0.27, rMid - 0.1) },
+		{ "pack_cream_cheese", "cream_cheese", "CREAM\nCHEESE", "Fridge", rMid, fr.x1, 3.2, Color3.fromRGB(70, 140, 200), fridgeBoxes(rMid + 0.1, fr.x1 - 0.27) },
+		{ "pack_buns", "bun", "BUNS", "DryShelf", dr.x0, dr.cx - col / 2, 3.7, Color3.fromRGB(214, 150, 72), gondolaBoxes("DryShelf", dr.cx - col, 0.8, 1.0, 0.5), dr.cx - col },
+		{ "pack_potato_sticks", "potato_sticks", "POTATO\nSTICKS", "DryShelf", dr.cx - col / 2, dr.cx + col / 2, 2.3, Color3.fromRGB(205, 150, 40), gondolaBoxes("DryShelf", dr.cx, 0.8, 1.0, 0.5), dr.cx },
+		{ "pack_coffee", "coffee", "COFFEE", "DryShelf", dr.cx + col / 2, dr.x1, 3.7, Color3.fromRGB(110, 70, 45), gondolaBoxes("DryShelf", dr.cx + col, 0.8, 1.0, 0.5), dr.cx + col },
+		{ "pack_ketchup", "ketchup", "KETCHUP", "SauceShelf", sa.x0, sMid, 2.0, C.Ketchup, gondolaBoxes("SauceShelf", sMid - 0.5, 0.85, 0.75, 0.3), sMid - 0.5 },
+		{ "pack_mustard", "mustard", "MUSTARD", "SauceShelf", sMid, sa.x1, 3.0, Color3.fromRGB(222, 168, 20), gondolaBoxes("SauceShelf", sMid + 0.5, 0.85, 0.75, 0.3), sMid + 0.5 },
+	}
 	local bays = folder(pantry, "StockBays")
-	for _, b in BAYS do
-		local key, text, x0, x1, z0, z1, side, color = b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8]
+	local retiredBay = nil
+	for _, it in ITEMS do
+		local key, ing, text, unitName, x0, x1, promptY, color, packs, promptX = it[1], it[2], it[3], it[4], it[5], it[6], it[7], it[8], it[9], it[10]
+		local unit = U[unitName]
 		local id = "STOCK-" .. string.upper((string.gsub(key, "^pack_", "")))
 		local m = ensure(bays, id, "Model")
+		-- rev. 2 shelf pieces (posts, boards, boxes) -> TrailerBackup.Retired, never destroyed
+		if not DIFF and not DRY then
+			for _, c in m:GetChildren() do
+				if c:IsA("BasePart") and (string.match(c.Name, "^Post%d$") or string.match(c.Name, "^Board%d$") or string.match(c.Name, "^Box%d_%d$")) then
+					retiredBay = retiredBay or folder(folder(backupRoot(), "Retired"), "StockBays_rev2")
+					c:SetAttribute("RetiredFrom", c:GetFullName())
+					c.Parent = retiredBay
+				end
+			end
+		end
 		m:SetAttribute("MapId", id)
 		m:SetAttribute("Package", key)
 		m:SetAttribute("Label", (string.gsub(text, "\n", " ")))
+		m:SetAttribute("Unit", unitName)
 		CS:AddTag(m, "StockShelf")
-		local alongX = side ~= "W"
-		-- front edge (aisle side) and the outward normal in MAP (dx, dz)
-		local fx, fz = 0, 0
-		if side == "S" then
-			fz = 1
-		elseif side == "N" then
-			fz = -1
-		else
-			fx = -1
-		end
-		local frame = box(m, "Frame", x0, x1, FLOOR, 5.2, z0, z1, { Color = C.Steel, Transparency = if ART then 1 else 0, CanCollide = true, CastShadow = false, blk = C.BlkProp })
+		-- invisible section volume: hosts the prompt anchor (the unit mesh is the collider)
+		local frame = box(m, "Frame", x0 + 0.02, x1 - 0.02, FLOOR, unit.top, Z_BACK, unit.front, { Color = C.Steel, Transparency = if ART then 1 else 0.6, CanCollide = false, CanQuery = false, CastShadow = false, blk = C.BlkProp })
 		frame:SetAttribute("Package", key)
-		local cx, cz = (x0 + x1) / 2, (z0 + z1) / 2
-		local frontX = if fx < 0 then x0 else cx
-		local frontZ = if fz > 0 then z1 elseif fz < 0 then z0 else cz
-		attach(frame, "Prompt_TakeBox", F(frontX + fx * 0.7, FLOOR + 2.6, frontZ + fz * 0.7), { Package = key, PromptAction = "take_box" })
-		-- posts: the two front ones run up to carry the sign
-		local corners = { { x0 + 0.07, z0 + 0.07 }, { x1 - 0.07, z0 + 0.07 }, { x0 + 0.07, z1 - 0.07 }, { x1 - 0.07, z1 - 0.07 } }
-		for pi, pp in corners do
-			local isFront = (fz > 0 and pp[2] > cz) or (fz < 0 and pp[2] < cz) or (fx < 0 and pp[1] < cx)
-			box(m, "Post" .. pi, pp[1] - 0.06, pp[1] + 0.06, FLOOR, if isFront then 7.05 else 5.2, pp[2] - 0.06, pp[2] + 0.06, { Color = C.SteelDark, CanCollide = false, blk = C.BlkProp, art = { Color = C.SteelDark, Material = Enum.Material.Metal } })
+		local cx = promptX or (x0 + x1) / 2
+		attach(frame, "Prompt_TakeBox", F(cx, FLOOR + promptY, unit.front + 0.5), { Package = key, PromptAction = "take_box" })
+		for i, p in packs do
+			local pk = box(m, "Pack" .. i, p[1], p[2], p[3], p[4], p[5], p[6], { Color = C.Box, CanCollide = false, CanQuery = false, blk = C.BlkProp, art = { Color = if i % 2 == 1 then C.Box else Color3.fromRGB(184, 126, 82), Material = Enum.Material.Cardboard } })
+			iconGui(pk, ing, p[7])
 		end
-		for bi, y in { 0.6, 2.2, 3.8 } do
-			local bx0, bx1, bz0, bz1 = x0 + 0.01, x1 - 0.01, z0 + 0.01, z1 - 0.01
-			if alongX then
-				bx0, bx1 = x0 + 0.13, x1 - 0.13
-			else
-				bz0, bz1 = z0 + 0.13, z1 - 0.13
-			end
-			box(m, "Board" .. bi, bx0, bx1, y, y + 0.1, bz0, bz1, { Color = C.Steel, CanCollide = false, blk = C.BlkProp, art = { Color = C.Steel, Material = Enum.Material.Metal } })
-			-- two boxes of the product per board, its name on the aisle face
-			local len = if alongX then x1 - x0 else z1 - z0
-			local depth = if alongX then z1 - z0 else x1 - x0
-			local bw = (len - 0.5) / 2
-			for k = 1, 2 do
-				local a0 = 0.2 + (k - 1) * (bw + 0.1)
-				local a1 = a0 + bw
-				local h = if k == 1 then 1.1 else 1.0
-				local d0, d1 = 0.12, depth - 0.12
-				local px0, px1, pz0, pz1
-				if alongX then
-					px0, px1, pz0, pz1 = x0 + a0, x0 + a1, z0 + d0, z0 + d1
-				else
-					px0, px1, pz0, pz1 = x0 + d0, x0 + d1, z0 + a0, z0 + a1
-				end
-				local cb = box(m, "Box" .. bi .. "_" .. k, px0, px1, y + 0.1, y + 0.1 + h, pz0, pz1, { Color = C.Box, CanCollide = false, blk = C.BlkProp, art = { Color = if k == 1 then C.Box else Color3.fromRGB(184, 126, 82), Material = Enum.Material.Cardboard } })
-				label(cb, "Label", (string.gsub(text, "\n", " ")), FACE[side], color, nil, Enum.Font.FredokaOne)
-			end
+		-- sign on the partition over the unit: icon + name, the xN pill floats over it
+		local sign = box(m, "Sign", x0 + 0.05, x1 - 0.05, 6.2, 7.1, Z_SIGN0, Z_SIGN1, { Color = color, CanCollide = false, CanQuery = false, CastShadow = false, blk = color, art = { Color = color } })
+		local g = label(sign, "Label", text, Enum.NormalId.Front, Color3.new(1, 1, 1), nil, Enum.Font.FredokaOne)
+		g.Enabled = ART
+		local t = g.Text
+		t.AnchorPoint = Vector2.new(1, 0.5)
+		t.Position = UDim2.fromScale(0.97, 0.5)
+		t.Size = UDim2.fromScale(0.6, 0.86)
+		stroke(t)
+		local pad = t:FindFirstChild("Pad")
+		if pad then
+			pad.Parent = nil -- rev. 2 padding: the text now shares the board with the icon
 		end
-		-- big sign between the front posts, over the boxes
-		local sx0, sx1, sz0, sz1
-		if side == "S" then
-			sx0, sx1, sz0, sz1 = x0 + 0.14, x1 - 0.14, z1 - 0.18, z1 - 0.08
-		elseif side == "N" then
-			sx0, sx1, sz0, sz1 = x0 + 0.14, x1 - 0.14, z0 + 0.08, z0 + 0.18
-		else
-			sx0, sx1, sz0, sz1 = x0 + 0.08, x0 + 0.18, z0 + 0.14, z1 - 0.14
-		end
-		local sign = box(m, "Sign", sx0, sx1, 5.35, 7.0, sz0, sz1, { Color = color, CanCollide = false, blk = color, art = { Color = color } })
-		local g = label(sign, "Label", text, FACE[side], Color3.new(1, 1, 1), nil, Enum.Font.FredokaOne)
-		g.Enabled = true
-		local st = g.Text:FindFirstChild("Stroke") or Instance.new("UIStroke")
-		st.Name = "Stroke"
-		st.Thickness = 3
-		st.Color = Color3.fromRGB(43, 34, 51)
-		st.Parent = g.Text
-		local pad = g.Text:FindFirstChild("Pad") or Instance.new("UIPadding")
-		pad.Name = "Pad"
-		pad.PaddingLeft = UDim.new(0.05, 0)
-		pad.PaddingRight = UDim.new(0.05, 0)
-		pad.PaddingTop = UDim.new(0.06, 0)
-		pad.PaddingBottom = UDim.new(0.06, 0)
-		pad.Parent = g.Text
+		local img = ensure(g, "Icon", "ImageLabel")
+		img.BackgroundTransparency = 1
+		img.AnchorPoint = Vector2.new(0, 0.5)
+		img.Position = UDim2.fromScale(0.03, 0.5)
+		img.Size = UDim2.fromScale(0.34, 0.86)
+		img.Image = SHEET
+		img.ImageRectOffset = Vector2.new(ICON[ing][1], ICON[ing][2])
+		img.ImageRectSize = Vector2.new(128, 128)
+		img.ScaleType = Enum.ScaleType.Fit
 	end
 	local hide = box(root, "HIDE-P", 25.5, PX1 - 0.5, FLOOR, 8, 72.5, 78.5, { Transparency = 1, CanCollide = false, CanQuery = false, CastShadow = false })
 	hide:SetAttribute("MapId", "HIDE-P")

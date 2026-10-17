@@ -11,6 +11,8 @@
 --   Vehicles.trailer.HasBackDoor = false, Vehicles.trailer.Restaurant = true (DT-R1, DEC-280: no back door)
 --   Anomalies: the CutAnomalies rows lose Family and Scripted (out of the agenda, design/anomalies-v3-restaurant.md §8)
 --   Nights: NewAnomaly per night and debut night per row from NewAnomalies / DebutNights (the cut ones were premieres)
+--   Supply.MartShelves = false (owner 2026-10-17: the Mart left the map, stock comes from the phone / bays; MapIndex
+--     then requires no BUY-* shelf anchor, no OP-1 / MKT-DOOR point). Written below from Switch.MartShelves.
 -- Off (default) = every field keeps the published trailer value.
 -- "ByParty" lists have 4 entries: party of 1..4 active players at the start of the shift (Q-067).
 local Table = require(script.Parent.Table)
@@ -275,7 +277,7 @@ const restaurant: Restaurant = {
 		HatchSpots = 6,
 		LowAt = 0.25,
 		StartBoxes = { pack_sausages = 1, pack_buns = 1 },
-		MartShelves = true,
+		MartShelves = true, -- derived: overwritten from Switch.MartShelves below (never edit by hand)
 	},
 	-- placeholder lines (narrative-writer owns them; English UI, no "sausage" for TTS: "dog" / "frank")
 	Dialog = {
@@ -341,6 +343,7 @@ export type Switch = {
 	DirtyTables: boolean, -- Seating.DirtyTables
 	HasBackDoor: boolean, -- Vehicles.trailer.HasBackDoor
 	VehicleIsRestaurant: boolean, -- Vehicles.trailer.Restaurant
+	MartShelves: boolean, -- Supply.MartShelves (the Mart and its BUY-* shelves left the map with the restaurant)
 	-- Anomalies keys out of the agenda (Family nil, Scripted nil); the row, module and Journal page stay (dev can force them)
 	CutAnomalies: { string },
 	NewAnomalies: { [number]: string }, -- night index -> Nights[k].NewAnomaly override
@@ -371,6 +374,7 @@ const switch: Switch = {
 	DirtyTables = not on,
 	HasBackDoor = not on,
 	VehicleIsRestaurant = on,
+	MartShelves = not on,
 	CutAnomalies = if on then CUT_ANOMALIES else {},
 	-- premieres of nights 6..9 were family B: the family A row debuting that night takes the call (Provisional; the
 	-- boss call texts of those nights still name the old monster until the narrative pass of wave R4)
@@ -384,6 +388,8 @@ const switch: Switch = {
 		else {},
 	DebutNights = if on then { anm_016_starer = 9 } else {}, -- nothing else debuts on night 9 once ANM-019 is cut
 }
+
+restaurant.Supply.MartShelves = switch.MartShelves
 
 export type Module = Restaurant & { PickupPoints: (count: number?) -> { string }, Switch: Switch }
 

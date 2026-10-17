@@ -1015,7 +1015,17 @@ local function checkMapAnchors()
 	if #opens ~= 0 then
 		err(("2: %d open_sign anchors left (TASK-284: the red switch TRL-SWITCH-OPEN must leave the trailer)"):format(#opens))
 	end
-	for _, p in REQUIRED_PACKAGES do
+	-- owner 2026-10-17: the Mart left the map with the restaurant (Required.luau MART_ON); no BUY-* shelf is required then
+	local rst = loadedContent and loadedContent.Restaurant
+	local martOn = not (rst and (rst.Supply.MartShelves == false or rst.Rules.Enabled == true))
+	if not martOn then
+		local found = 0
+		for _, list in pk do
+			found += #list
+		end
+		info(("2: Mart off the map (Restaurant.Supply.MartShelves false): %d buy_package anchor(s), none required"):format(found))
+	end
+	for _, p in (if martOn then REQUIRED_PACKAGES else {}) do
 		if #(pk[p] or {}) ~= 1 then
 			err(("2: buy_package %s found %d time(s), need 1"):format(p, #(pk[p] or {})))
 		end

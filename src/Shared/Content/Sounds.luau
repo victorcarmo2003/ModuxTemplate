@@ -118,6 +118,8 @@ end
 -- SFX uploaded by the user (ReplicatedStorage.Assets.SFX, 2026-10-10; the Sound in Studio is named after the key,
 -- a Sound shared by two keys carries the attribute `Keys`); key -> rbxassetid
 const UPLOADED: { [string]: string } = {
+	gear_door_open = "rbxassetid://95190972742619", -- ReplicatedStorage.Assets.SFX["Metal Door Open"] (owner, 2026-10-17)
+	gear_door_close = "rbxassetid://140635119444127", -- ReplicatedStorage.Assets.SFX["Metal Door Close"]
 	phone_pickup = "rbxassetid://9117155406",
 	skip_vote = "rbxassetid://127105730240202",
 	upgrade_done = "rbxassetid://107354373677586",

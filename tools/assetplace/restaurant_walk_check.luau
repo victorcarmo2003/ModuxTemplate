@@ -15,7 +15,8 @@ local ROUTES = {
 	{ "front corridor (tablet / pickup / tip jar poses)", { { 27.8, 57.6 }, { 57.8, 57.6 } } },
 	{ "east passage front -> back", { { 56.8, 57.6 }, { 56.8, 66.6 } } },
 	{ "back corridor along the stations", { { 28.5, 66.6 }, { 57.8, 66.6 } } },
-	{ "pantry aisle (DROP-R, shelves)", { { 29.5, 74.8 }, { 47.0, 74.8 } } },
+	-- stock room rev. 3 (2026-10-17): every unit on the north partition (fronts <= 74.2), DROP-R + crates on the south wall (>= 76.4)
+	{ "pantry aisle (DROP-R, stock row)", { { 29.5, 75.3 }, { 47.0, 75.3 } } },
 	{ "patio: gate -> Q5 -> pickup lane", { { 36, 30 }, { 36, 48 }, { 46.5, 50.1 } } },
 }
 local rp = RaycastParams.new()
