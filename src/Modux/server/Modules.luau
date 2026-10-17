@@ -51,6 +51,7 @@ return {
 	ServerScriptService.server.Shop.ShopUtilityService,
 	ServerScriptService.server.Showcase.ShowcaseService,
 	ServerScriptService.server.Skin.SkinService,
+	ServerScriptService.server.Tablet.TabletService,
 	ServerScriptService.server.Thief.ThiefService,
 	ServerScriptService.server.Traffic.TrafficService,
 	ServerScriptService.server.Tutorial.TutorialService,

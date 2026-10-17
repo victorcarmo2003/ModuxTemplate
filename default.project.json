@@ -466,6 +466,12 @@
 						"optional": "src/Skin/server"
 					}
 				},
+				"Tablet": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Tablet/server"
+					}
+				},
 				"Thief": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
