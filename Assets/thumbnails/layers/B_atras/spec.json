@@ -1,0 +1,20 @@
+{
+  "out": "thumb_B_atras.png", "size": [1920, 1080],
+  "bg": {"path": "bg.jpg", "blur": 7, "brightness": 0.7, "tint": [0.6, 0.75, 1.4], "saturation": 0.3},
+  "spots": [
+    {"at": [0.6, 0.3], "radius": 0.4, "color": [255, 30, 70], "strength": 0.5},
+    {"at": [0.42, 0.62], "radius": 0.4, "color": [200, 220, 255], "strength": 0.35}
+  ],
+  "layers": [
+    {"path": "walker.jpg", "scale": 1.7, "offset": [80, 60], "anchor": "center", "spill": 15,
+     "saturation": 1.2, "contrast": 1.15, "brightness": 1.0,
+     "glow": {"color": [255, 30, 80], "width": 60, "strength": 1.0},
+     "outline": {"color": [255, 60, 110], "width": 6}},
+    {"path": "crew.jpg", "scale": 1.55, "offset": [-180, 280], "anchor": "bottom",
+     "saturation": 1.35, "contrast": 1.12, "brightness": 1.08,
+     "glow": {"color": [255, 230, 200], "width": 40, "strength": 0.45},
+     "outline": {"color": [255, 255, 255], "width": 9},
+     "rim": {"color": [255, 80, 120], "side": "right", "strength": 0.6}}
+  ],
+  "vignette": 0.6, "grade": {"contrast": 1.06, "saturation": 1.1}
+}

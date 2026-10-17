@@ -41,11 +41,13 @@ local RunStateService = require(ServerScriptService.server.ModuxTypes.RunStateSe
 local SeatingService = require(ServerScriptService.server.ModuxTypes.SeatingService)
 local SecurityService = require(ServerScriptService.server.ModuxTypes.SecurityService)
 local RoleService = require(ServerScriptService.server.ModuxTypes.RoleService)
+local SessionService = require(ServerScriptService.server.ModuxTypes.SessionService)
 local SettingsService = require(ServerScriptService.server.ModuxTypes.SettingsService)
 local ReviveKitService = require(ServerScriptService.server.ModuxTypes.ReviveKitService)
 local ShopService = require(ServerScriptService.server.ModuxTypes.ShopService)
 local ShopUtilityService = require(ServerScriptService.server.ModuxTypes.ShopUtilityService)
 local ShowcaseService = require(ServerScriptService.server.ModuxTypes.ShowcaseService)
+local SkinService = require(ServerScriptService.server.ModuxTypes.SkinService)
 local ThiefService = require(ServerScriptService.server.ModuxTypes.ThiefService)
 local TrafficService = require(ServerScriptService.server.ModuxTypes.TrafficService)
 local TutorialService = require(ServerScriptService.server.ModuxTypes.TutorialService)
@@ -95,11 +97,13 @@ export type AllServices = {
 	SeatingService: SeatingService.Public,
 	SecurityService: SecurityService.Public,
 	RoleService: RoleService.Public,
+	SessionService: SessionService.Public,
 	SettingsService: SettingsService.Public,
 	ReviveKitService: ReviveKitService.Public,
 	ShopService: ShopService.Public,
 	ShopUtilityService: ShopUtilityService.Public,
 	ShowcaseService: ShowcaseService.Public,
+	SkinService: SkinService.Public,
 	ThiefService: ThiefService.Public,
 	TrafficService: TrafficService.Public,
 	TutorialService: TutorialService.Public,

@@ -62,7 +62,7 @@ export type Public = {
 	WarnOnce: (self: Public, key: string, message: string) -> (),
 	Get: (self: Public, id: number) -> Npc?,
 	GetModel: (self: Public, id: number) -> Model?,
-	Anchors: (self: Public, id: number) -> (Attachment?, Attachment?),
+	Anchors: (self: Public, id: number) -> Attachment?,
 	IdOf: (self: Public, instance: Instance) -> number?,
 	GetNode: (self: Public, id: number) -> string?,
 	Count: (self: Public) -> number,

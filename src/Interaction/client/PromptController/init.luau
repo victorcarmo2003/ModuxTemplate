@@ -23,21 +23,16 @@
 	ends (released, cancelled or fired). `trash` (user request 2026-10-10) plays at the bin once a fired `discard`
 	actually took the hand Tool away (the server decided; no Tool gone within DISCARD_WAIT s = rejected = silence).
 
-	One prompt per customer (user playtest 2026-10-11, Q-201): the customer has two server anchors (`Prompt_Customer` =
-	Take Order / Serve and `Prompt_Refuse`), but the pill shows ONE. While the customer prompt is a candidate, the
-	Refuse anchor is never a candidate (no second pill or dot next to the ketchup); with the customer prompt as target
-	the second action runs on R (gamepad Y, a second touch button "Refuse"), held Refuse.Hold, and the pill says
-	"hold R: Refuse". When there is no customer prompt (a customer waiting for food and an empty hand) the Refuse
-	anchor is an ordinary prompt on E, as before. The server still checks everything on the Refuse anchor.
+	One prompt per customer: `Prompt_Customer` (Take Order / Serve). The second action on R / Y / a touch option (Refuse)
+	is gone with DEC-261 (TASK-354): refusing is closing the service window, the rig has no `Prompt_Refuse` any more.
 
 	Interaction menu (user request 2026-10-12, compact pass same day): order and selection in `Menu`, drawn by
 	Interface/Components/InteractionMenu. Priority tier then distance, stable (new rows are inserted, listed rows never
 	reshuffle), a row that leaves reach stays 1.5 s dimmed. The selected row is the target: E / X / a tap / hold act on it.
 	  Touch          ONE action circle above the jump button (one or more candidates) running the selected action, a hold
-	                 fills a ring on it; with 2+ options they fan out in an arc up/left of it (max 4, Refuse is its own
-	                 option next to Serve / Take Order). No CAS touch buttons: the circle and the fan are the only touch input.
+	                 fills a ring on it; with 2+ options they fan out in an arc up/left of it (max 4). No CAS touch buttons: the circle and the fan are the only touch input.
 	  Desktop/pad    two or more candidates -> a compact column right of the crosshair; wheel or Up/Down moves, 1..4 pick and
-	                 press directly, gamepad D-pad up/down. Refuse stays on R / Y with the customer row.
+	                 press directly, gamepad D-pad up/down.
 	One candidate on desktop = the pill as before. Billboards show the dot while the menu is up. Same Interact packet,
 	same server checks: the menu only chooses which prompt the existing path fires.
 
@@ -46,7 +41,7 @@
 	                 equipped. A key without a row is not bound, so it passes and the hotbar swaps the item as usual. The binds
 	                 leave (Unbind) the moment the menu closes. The footer says so ("1-n: menu · n+1-9: items").
 	  Mouse wheel    captured (Sink) only while the menu is up on desktop with 2+ live rows; otherwise Pass.
-	  Gamepad        D-pad up/down walk the rows (High, Sink on those two buttons only), X uses, hold Y refuses. Never ButtonA
+	  Gamepad        D-pad up/down walk the rows (High, Sink on those two buttons only), X uses. Never ButtonA
 	                 (jump) nor the sticks. Glyphs come from UserInputService:GetImageForKeyCode. Native console focus: only the
 	                 selected row button is Selectable and GuiService.SelectedObject follows it (ring); cleared on close.
 
@@ -93,11 +88,6 @@ const DONE_SOUND = "prompt_done"
 const DISCARD_ACTION = "discard"
 const DISCARD_SOUND = "trash"
 const DISCARD_WAIT = 1.5 -- s for the server to remove the thrown Tool
-const ALT_BIND_NAME = "InteractAlt"
-const REFUSE_ACTION = "refuse"
-const CUSTOMER_ANCHOR = "Prompt_Customer"
-const REFUSE_ANCHOR = "Prompt_Refuse"
-const ALT_KEY_LABEL = { KeyboardMouse = "R", Gamepad = "Y", Touch = "" }
 -- InteractionMenu (user request 2026-10-12): rows beyond one candidate; see the header
 const MENU_NEXT_BIND = "InteractMenuNext"
 const MENU_PREV_BIND = "InteractMenuPrev"
@@ -105,7 +95,7 @@ const MENU_PICK_BIND = "InteractMenuPick"
 const MENU_PICK_KEYS: { Enum.KeyCode } = { Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three, Enum.KeyCode.Four }
 const MENU_PICK_PAD: { Enum.KeyCode } =
 	{ Enum.KeyCode.KeypadOne, Enum.KeyCode.KeypadTwo, Enum.KeyCode.KeypadThree, Enum.KeyCode.KeypadFour }
-const MENU_MAX = 4 -- rows / fan options shown at once (Refuse included on touch)
+const MENU_MAX = 4 -- rows / fan options shown at once
 const MENU_WHEEL_BIND = "InteractMenuWheel"
 const FOCUS_NAME = "Focus" -- name of the row button the component reports
 -- Single prompt (TASK-278): see the header
@@ -125,7 +115,6 @@ end
 local function readGlyphs(): InteractionMenu.Glyphs
 	return {
 		Use = glyphOf(Enum.KeyCode.ButtonX),
-		Refuse = glyphOf(Enum.KeyCode.ButtonY),
 		Up = glyphOf(Enum.KeyCode.DPadUp),
 		Down = glyphOf(Enum.KeyCode.DPadDown),
 	}
@@ -140,9 +129,6 @@ function PromptController:Setup()
 	self.Prompts = {} :: { [Instance]: Prompt.Prompt }
 	self.Target = nil :: Prompt.Prompt?
 	self.Holding = nil :: Prompt.Prompt?
-	-- Second action of the target (Refuse of the customer prompt) and whether the hold in progress is that one
-	self.Alt = nil :: Prompt.Prompt?
-	self.AltHolding = false :: boolean
 	self.HoldThread = nil :: thread?
 	self.HoldSound = nil :: Sound?
 	self.LastFire = 0 :: number
@@ -167,11 +153,6 @@ function PromptController:Setup()
 	-- Console focus: row Item -> its Selectable button (reported by the component), and the AutoSelectGuiEnabled to give back
 	self.FocusButtons = {} :: { [InteractionMenu.Item]: GuiButton }
 	self.AutoSelectSaved = nil :: boolean?
-	self.Refuses = {} :: { [Prompt.Prompt]: Prompt.Prompt }
-	-- Refuse anchor -> its customer prompt
-	self.RefuseOwner = {} :: { [Prompt.Prompt]: Prompt.Prompt }
-	-- Mirror of AltHolding for the component (the touch fan fills the Refuse option, not the customer one)
-	self.AltHoldingSource = Vide.source(false) :: Vide.Source<boolean>
 	-- Single prompt (TASK-278): false while the game window has lost focus (the pointer counts as outside)
 	self.WindowFocused = true :: boolean
 end
@@ -447,11 +428,6 @@ function PromptController:CancelHold()
 	if holding then
 		self.Holding = nil
 		Prompt.SetHolding(holding, false)
-		if self.AltHolding then
-			self.AltHolding = false
-			self.AltHoldingSource(false)
-			Prompt.Refresh(holding) -- the pill goes back to the hold of its own action
-		end
 	end
 	const sound = self.HoldSound
 	if sound then
@@ -489,72 +465,6 @@ function PromptController:BeginHold(prompt: Prompt.Prompt)
 		end
 		self:CancelHold()
 	end)
-end
-
--- R / Y / the second touch button: Refuse on the customer prompt that is the target (hold, same rules as BeginHold)
-function PromptController:BeginAltHold()
-	const target = self.Target
-	const alt = self.Alt
-	if target == nil or alt == nil or self.Holding then
-		return
-	end
-	self.Holding = target
-	self.AltHolding = true
-	self.AltHoldingSource(true)
-	Prompt.SetHolding(target, true)
-	target.HoldDuration(alt.Hold)
-	self.HoldSound = self.Dependencies.AudioController:Play(HOLD_SOUND)
-	const id = alt.Id
-	self.HoldThread = task.delay(alt.Hold, function()
-		self.HoldThread = nil
-		if self.Target == target and self.Alt == alt and alt.Id == id and Prompt.IsLive(alt) then
-			self:Fire(alt)
-			Prompt.Celebrate(target)
-		end
-		self:CancelHold()
-	end)
-end
-
--- Sets the second action of the target (nil = none): binds / unbinds its input and writes the pill hint.
-function PromptController:SetAlt(alt: Prompt.Prompt?)
-	const target = self.Target
-	if alt ~= self.Alt then
-		self:CancelHold()
-		self.Alt = alt
-		const input = self.Dependencies.InputController
-		if alt == nil then
-			input:Unbind(ALT_BIND_NAME)
-		elseif input.Handles[ALT_BIND_NAME] == nil then
-			input
-				:Bind({
-					Name = ALT_BIND_NAME,
-					Key = Enum.KeyCode.R,
-					Keys = { Enum.KeyCode.ButtonY },
-					-- no CAS touch button: on a phone the action comes from the interaction menu (2026-10-12)
-					TouchButton = false,
-					Priority = Enum.ContextActionPriority.High.Value,
-					Context = "Gameplay",
-				})
-				.OnPress(function()
-					self:BeginAltHold()
-				end)
-				.OnRelease(function()
-					if self.AltHolding then
-						self:EndHold()
-					end
-				end)
-		end
-	end
-	-- Hint on the pill of the target only (touch has its own button)
-	const device = self.Dependencies.InputController.Device()
-	const key = ALT_KEY_LABEL[device]
-	const hint = if alt ~= nil and key ~= nil and key ~= "" then `  ·  hold {key}: {alt.Text()}` else ""
-	for _, prompt in self.Prompts do
-		const wanted = if prompt == target then hint else ""
-		if prompt.Hint() ~= wanted then
-			prompt.Hint(wanted)
-		end
-	end
 end
 
 -- Any release ends the hold in progress (the press may have come from another input).
@@ -608,8 +518,6 @@ function PromptController:MenuItemOf(prompt: Prompt.Prompt): InteractionMenu.Ite
 		return existing.Item
 	end
 	const enabled = Vide.source(true)
-	const input = self.Dependencies.InputController
-	const isRefuse = prompt.Target.Action == REFUSE_ACTION
 	const item: InteractionMenu.Item = {
 		Text = prompt.Text,
 		Short = function()
@@ -620,14 +528,7 @@ function PromptController:MenuItemOf(prompt: Prompt.Prompt): InteractionMenu.Ite
 			prompt.Text()
 			return Menu.IconOf(prompt.Target)
 		end,
-		-- A Refuse option (touch fan) fills while the customer prompt runs its alt hold; the customer option does not
-		Holding = function()
-			if isRefuse then
-				const owner = self.RefuseOwner[prompt]
-				return owner ~= nil and owner.Holding() and self.AltHoldingSource()
-			end
-			return prompt.Holding() and not (input.Device() == "Touch" and self.AltHoldingSource())
-		end,
+		Holding = prompt.Holding,
 		HoldDuration = prompt.HoldDuration,
 		Done = prompt.Done,
 		Enabled = enabled,
@@ -665,14 +566,8 @@ end
 function PromptController:PublishMenu()
 	const state = self.MenuState
 	const list: { InteractionMenu.Item } = {}
-	const touch = self.Dependencies.InputController.Device() == "Touch"
 	for _, prompt in state.Order do
 		table.insert(list, self:MenuItemOf(prompt))
-		-- Touch: Refuse is its own fan option right after the customer one (no R key on a phone)
-		const refuse = if touch then self.Refuses[prompt] else nil
-		if refuse then
-			table.insert(list, self:MenuItemOf(refuse))
-		end
 	end
 	-- Never more than MENU_MAX: drop from the end, keeping the selected row
 	const selectedItem = if state.Selected then self:MenuItemOf(state.Selected) else nil
@@ -697,8 +592,7 @@ function PromptController:PublishMenu()
 		self.MenuList(list)
 	end
 	for prompt, entry in self.MenuItems do
-		const owner = self.RefuseOwner[prompt]
-		entry.Enabled((if owner then state.Current[owner] else state.Current[prompt]) ~= nil)
+		entry.Enabled(state.Current[prompt] ~= nil)
 	end
 	const selected = if state.Selected then self:MenuItemOf(state.Selected) else nil
 	if Vide.untrack(self.MenuSelected) ~= selected then
@@ -710,7 +604,6 @@ end
 function PromptController:ApplyMenuTarget()
 	const selected = self.MenuState.Selected
 	self:SetTarget(selected)
-	self:SetAlt(if selected then self.Refuses[selected] else nil)
 	self:PublishMenu()
 end
 
@@ -735,18 +628,6 @@ function PromptController:MenuPress(prompt: Prompt.Prompt)
 	end
 	self:ApplyMenuTarget()
 	self:BeginHold(prompt)
-end
-
--- Touch Refuse option: select the customer row, then hold the Refuse that rides on it.
-function PromptController:MenuPressRefuse(owner: Prompt.Prompt)
-	if not self.MenuActive or self.Holding then
-		return
-	end
-	if not Menu.Select(self.MenuState, owner) then
-		return
-	end
-	self:ApplyMenuTarget()
-	self:BeginAltHold()
 end
 
 -- Direct keys 1..n for the listed rows, kept in step with the list length while the menu is up.
@@ -910,16 +791,10 @@ function PromptController:MountMenu(gui: Instance)
 				Tappable = function()
 					return input.Device() == "Touch"
 				end,
-				-- a tap selects and presses in one go; the Refuse option selects its customer and starts the alt hold
+				-- a tap selects and presses in one go
 				OnPress = function(item)
 					const prompt = self.MenuPrompts[item]
-					if prompt == nil then
-						return
-					end
-					const owner = self.RefuseOwner[prompt]
-					if owner then
-						self:MenuPressRefuse(owner)
-					else
+					if prompt ~= nil then
 						self:MenuPress(prompt)
 					end
 				end,
@@ -934,7 +809,6 @@ end
 
 function PromptController:HideAll()
 	self:SetTarget(nil)
-	self:SetAlt(nil)
 	Menu.Clear(self.MenuState)
 	self:SetMenuActive(false)
 	for _, prompt in self.Prompts do
@@ -988,12 +862,6 @@ function PromptController:RulesContext(character: Model): Rules.Context
 end
 
 -- Prompt of the anchor called `name` that shares the parent (the rig root) of `prompt`'s anchor
-function PromptController:Sibling(prompt: Prompt.Prompt, name: string): Prompt.Prompt?
-	const parent = prompt.Anchor.Parent
-	const found = if parent then parent:FindFirstChild(name) else nil
-	return if found then self.Prompts[found] else nil
-end
-
 function PromptController:Tick()
 	const character = Players.LocalPlayer.Character
 	const root = if character then character:FindFirstChild("HumanoidRootPart") else nil
@@ -1046,29 +914,6 @@ function PromptController:Tick()
 		places[prompt] = { Screen = screen, World = (position - root.Position).Magnitude }
 	end
 
-	-- One pill per customer: the Refuse anchor yields to the customer prompt of the same rig (see the header)
-	const refuses: { [Prompt.Prompt]: Prompt.Prompt } = {}
-	for prompt in candidates do
-		if prompt.Target.Action == REFUSE_ACTION then
-			const sibling = self:Sibling(prompt, CUSTOMER_ANCHOR)
-			if sibling ~= nil and candidates[sibling] ~= nil then
-				refuses[sibling] = prompt
-			end
-		end
-	end
-	for _, refuse in refuses do
-		candidates[refuse] = nil
-	end
-
-	self.Refuses = refuses
-	table.clear(self.RefuseOwner)
-	for owner, refuse in refuses do
-		self.RefuseOwner[refuse] = owner
-	end
-	for _, refuse in refuses do
-		places[refuse] = nil
-	end
-
 	-- Single mode (TASK-278): only the picked prompt stays a candidate, so no menu and no dots for the others
 	const device = self.Dependencies.InputController.Device()
 	local single: Prompt.Prompt? = nil
@@ -1111,14 +956,12 @@ function PromptController:Tick()
 
 	if showMenu then
 		self:SetTarget(menu.Selected)
-		self:SetAlt(if menu.Selected then refuses[menu.Selected] else nil)
 		self:PublishMenu()
 		self:BindMenuPicks(#menu.Order)
 		self:SyncFocus()
 	elseif single ~= nil then
 		-- Single mode: the pick already has its hysteresis
 		self:SetTarget(single)
-		self:SetAlt(refuses[single])
 	else
 		local best: Prompt.Prompt? = nil
 		local bestDistance = math.huge
@@ -1139,10 +982,6 @@ function PromptController:Tick()
 			-- Hysteresis; never switch in the middle of a hold.
 			self:SetTarget(best)
 		end
-
-		-- The Refuse that rides on the (new) target, if the customer prompt is the target
-		const target = self.Target
-		self:SetAlt(if target ~= nil then refuses[target] else nil)
 	end
 
 	for _, prompt in self.Prompts do
@@ -1172,7 +1011,7 @@ PromptController:OnStart(function(self)
 	local function refreshGlyphs()
 		const glyphs = readGlyphs()
 		const old = Vide.untrack(self.MenuGlyphs)
-		if glyphs.Use ~= old.Use or glyphs.Refuse ~= old.Refuse or glyphs.Up ~= old.Up or glyphs.Down ~= old.Down then
+		if glyphs.Use ~= old.Use or glyphs.Up ~= old.Up or glyphs.Down ~= old.Down then
 		self.MenuGlyphs(glyphs)
 		end
 	end

@@ -24,6 +24,10 @@ type Mounted = {
 type Availability = "Unknown" | "Open" | "Blocked"
 
 export type Public = {
+	BunDismissed: boolean,
+	BunHint: Hint.Hint?,
+	BunShown: boolean,
+	BunToasted: boolean,
 	Cash: Vide.Source<number>,
 	CashReady: Vide.Source<boolean>,
 	Drawer: Vide.Source<number>,
@@ -70,6 +74,7 @@ export type Public = {
 	CheapestOnSale: (self: Public) -> number?,
 	NeverBought: (self: Public) -> boolean,
 	HintTarget: (self: Public) -> Instance?,
+	StepBunHint: (self: Public) -> (),
 	StepHint: (self: Public) -> (),
 	Step: (self: Public) -> (),
 	Add: (self: Public, anchor: Instance) -> (),

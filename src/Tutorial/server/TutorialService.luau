@@ -87,10 +87,11 @@ function TutorialService:Setup()
 end
 
 -- The player finished or skipped the tutorial: over for this run (idempotent, not saved)
-function TutorialService:Complete(player: Player)
+function TutorialService:Complete(player: Player, how: string?)
 	if not self.Closed[player.UserId] then
-		-- onboarding funnel, last step (analytics; the steps in between come from MetricTutorial)
-		MetricsLog.onboarding(player, #Content.Metrics.TutorialSteps + 2, "complete")
+		-- onboarding funnel, last step (analytics; the milestones in between come from MetricTutorial): finished,
+		-- skipped or the day ended first (2026-10-17: before, a skip counted as completed)
+		MetricsLog.onboarding(player, #Content.Metrics.TutorialFunnel + 2, "complete", { how = how or "done" })
 	end
 	self.Closed[player.UserId] = true
 	self.Revived[player.UserId] = nil
@@ -158,8 +159,8 @@ end
 
 -- Tutorial stock: the bun stock capped at Rules.Buns, once per server, only in a run of rookies
 function TutorialService:Seed()
-	if self.Seeded or not self:AllPending() then
-		return
+	if not TutorialRules.Shopping or self.Seeded or not self:AllPending() then
+		return -- 2026-10-17 cut: no bun cap, the run keeps its normal stock
 	end
 	self.Seeded = true
 	const kitchen = self.Dependencies.KitchenService
@@ -225,7 +226,7 @@ end
 
 -- The upgrade lesson runs now: the day Closing of Day 1, a rookie around, nothing bought yet (latches off for good)
 function TutorialService:LessonActive(): boolean
-	if not self.Enabled or self.LessonOver then
+	if not self.Enabled or self.LessonOver or not TutorialRules.Upgrade.Enabled then
 		return false
 	end
 	const round = self.Dependencies.RoundService
@@ -389,8 +390,8 @@ TutorialService:OnInit(function(self)
 		self.Revived[player.UserId] = nil
 		self.Rookies[player.UserId] = nil
 	end)
-	self.Libs.Net.TutorialComplete:onServer(function(_, player: Player)
-		self:Complete(player)
+	self.Libs.Net.TutorialComplete:onServer(function(value, player: Player)
+		self:Complete(player, if type(value) == "table" and type(value.How) == "string" then value.How else nil)
 	end)
 	self.Libs.Net.TutorialBegin:onServer(function(_, player: Player)
 		self:Begin(player)

@@ -19,6 +19,7 @@ return {
 	ArrivalsState = conch.args.enum_from_array("arrivals_state", { "on", "off" }),
 	-- Numbers (validated again in the callback: the server never trusts the parsed value)
 	Day = conch.args.number,
+	Night = conch.args.number,
 	Money = conch.args.number,
 	Player = conch.args.player,
 	-- gift recipient (TASK-352): a player name (in this server, or any Roblox username) or a UserId (offline too)

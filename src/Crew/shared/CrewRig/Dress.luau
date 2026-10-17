@@ -18,6 +18,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Content = require(ReplicatedStorage.shared.Content)
 local CrewLooks = require(script.Parent.Parent.CrewLooks)
+local SkinLooks = require(script.Parent.Parent.SkinLooks)
 local Kit = require(script.Parent.Kit)
 
 export type Pack = CrewLooks.Pack
@@ -99,9 +100,22 @@ local function dress(model: Model, pack: Pack?, expression: string?, blank: bool
 	const wanted = pack or asPack(model:GetAttribute("LookPack")) or "Day"
 	const worn = effectivePack(outfit, wanted)
 
-	const sheet = sheets[worn] or sheets.Day
+	-- class skin (attribute Skin, CrewRig.Build): its own sheet per pack; no row = the outfit's sheet
+	const skin = model:GetAttribute("Skin")
+	local skinSheets: SkinLooks.SkinLook? = nil
+	if typeof(skin) == "string" and skin ~= "" then
+		skinSheets = SkinLooks.BySkin[skin]
+		if skinSheets == nil then
+			Kit.WarnOnce(`DressSkin:{skin}`, `skin '{skin}' has no SkinLooks row: dressed in the outfit sheet`)
+		end
+	end
+	const sheet = if skinSheets ~= nil then SkinLooks.Sheet(skinSheets, worn) else sheets[worn] or sheets.Day
 	const blankLook = if blank == true then look.Blank else nil
-	const headTexture = if blankLook then blankLook.Head else look.Head[worn] or look.Head.Day
+	const skinHead = if skinSheets ~= nil then skinSheets.Head else nil
+	const headTexture = if blankLook
+		then blankLook.Head
+		elseif skinHead ~= nil then SkinLooks.Sheet(skinHead, worn)
+		else look.Head[worn] or look.Head.Day
 	const atlas = if blankLook
 		then blankLook.Atlas[worn] or blankLook.Atlas.Day
 		elseif worn == "Day" then nil
@@ -114,6 +128,8 @@ local function dress(model: Model, pack: Pack?, expression: string?, blank: bool
 		local texture: string? = nil
 		if child:GetAttribute("OutfitPart") then
 			texture = sheet
+		elseif skinSheets ~= nil and child:GetAttribute("DayTextureID") == SkinLooks.BaseAtlas then
+			texture = SkinLooks.Sheet(skinSheets.Atlas, worn) -- atlas piece (cap, ears, tail): the skin's atlas copy
 		elseif child.Name == "Head" then
 			texture = headTexture
 		else

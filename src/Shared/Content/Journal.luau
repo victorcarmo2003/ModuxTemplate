@@ -27,7 +27,9 @@ export type Rules = {
 	Action: string, -- Content.Actions key of the tablet prompt
 	Model: string, -- name of the tablet Model (tools/assetplace/anomaly_tablet.luau)
 	Anchor: string, -- name of the prompt Attachment inside the tablet
-	Blink: number, -- s the tablet glows in the trailer after a new page (or until it is opened)
+	-- Gems paid once per page, the first time the player opens it on the tablet (owner request 2026-10-17,
+	-- Provisional). JournalService pays it and keeps the flag in profile.JournalClaimed.
+	Reward: number,
 	ToastText: string,
 	LockedTitle: string,
 	LockedText: string,
@@ -41,12 +43,12 @@ const written: { Page } = {
 	page("anm_001_blank_folks", "The Blank Folks", "Refuse", {
 		"A customer with no face.",
 		"No eyes, no nose, no mouth.",
-	}, { "Real customers always have a face." }, { "Refuse them.", "Never take their order." }),
+	}, { "Real customers always have a face." }, { "Refuse them: close the window.", "Never take their order." }),
 
 	page("anm_011_shaker", "The Shaker", "Refuse", {
 		"Shakes fast, all over.",
 		"Even while standing still in line.",
-	}, { "No sound. The face looks normal." }, { "Refuse them." }),
+	}, { "No sound. The face looks normal." }, { "Refuse them: close the window." }),
 
 	page("anm_002_wrong_food", "The Wrong Food", "Refuse", {
 		"Weird food on the rail or the board.",
@@ -56,7 +58,7 @@ const written: { Page } = {
 	page("anm_012_turned_neck", "The Turned Neck", "Refuse", {
 		"The head is turned all the way back.",
 		"Sometimes it spins, slowly.",
-	}, { "The body still faces you." }, { "Refuse it, or shut the window.", "It leaves with a CRACK." }),
+	}, { "The body still faces you." }, { "Refuse it: close the window.", "It leaves with a CRACK." }),
 
 	page("anm_020_blackout", "The Blackout", "Lights", {
 		"Pop! Everything goes dark.",
@@ -66,12 +68,12 @@ const written: { Page } = {
 	page("anm_013_white_eyes", "The White Eyes", "Refuse", {
 		"Eyes all white.",
 		"A smile way too big.",
-	}, { "No pupils at all." }, { "Refuse them." }),
+	}, { "No pupils at all." }, { "Refuse them: close the window." }),
 
 	page("anm_004_copies", "The Copies", "Refuse", {
 		"Two customers that look the same.",
 		"The copy is mirrored: backwards shirt text.",
-	}, { "The real one is not mirrored." }, { "Refuse the mirrored one.", "Serve the real one." }),
+	}, { "The real one is not mirrored." }, { "Close the window on the mirrored one.", "Serve the real one." }),
 
 	page("anm_005_raincoat_lady", "The Raincoat Lady", "Careful", {
 		"Yellow raincoat, eyes closed.",
@@ -86,7 +88,7 @@ const written: { Page } = {
 	page("anm_014_big_head", "The Big Head", "Refuse", {
 		"The head is way too big.",
 		"Or way too tiny.",
-	}, { "The body looks normal." }, { "Refuse them." }),
+	}, { "The body looks normal." }, { "Refuse them: close the window." }),
 
 	page("anm_007_walker", "The Walker", "Hide", {
 		"Trailer lights buzz and flicker.",
@@ -95,7 +97,7 @@ const written: { Page } = {
 
 	page("anm_015_floater", "The Floater", "Refuse", {
 		"Floats a little above the ground.",
-	}, { "No footsteps. No shadow." }, { "Refuse them." }),
+	}, { "No footsteps. No shadow." }, { "Refuse them: close the window." }),
 
 	page("anm_017_crawler", "The Crawler", "Hide", {
 		"Fast scratching under the trailer.",
@@ -110,7 +112,7 @@ const written: { Page } = {
 	page("anm_016_starer", "The Starer", "Refuse", {
 		"Never blinks. Never moves.",
 		"The head follows you everywhere.",
-	}, { "Looking at it on the cameras is safe." }, { "Refuse them." }),
+	}, { "Looking at it on the cameras is safe." }, { "Refuse them: close the window." }),
 
 	page("anm_018_grin", "The Grin", "Hide", {
 		"The word 'hide' whispers on your screen.",
@@ -160,7 +162,7 @@ const rules: Rules = {
 	Action = "read_journal",
 	Model = "TRL-TABLET",
 	Anchor = "Prompt_Tablet",
-	Blink = 30,
+	Reward = 100,
 	ToastText = "New entry on the Anomaly Tablet!",
 	LockedTitle = "???",
 	LockedText = "Meet this one to unlock the entry.",

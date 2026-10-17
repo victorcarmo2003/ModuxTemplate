@@ -141,6 +141,8 @@ function RoundService:Setup()
 	-- Run start gate (architecture.md §20.3, TASK-156): nil = start on the first member (dev / solo); set by
 	-- PartyRunService on a squad server so the run waits for the squad (or Content.RunParams.JoinWindow, DEC-098)
 	self.StartGate = nil :: (() -> boolean)?
+	-- Resume boot (SessionService, DEC-080): no run start while the session reads its Runs record
+	self.ResumeHold = false :: boolean
 	-- Signals are created here so lower-priority services connect in their OnInit (architecture.md §3.1)
 	self.PhaseChanged = self.Libs.Signal.new() :: SignalLib.Signal<Phase, number, number>
 	self.ShiftStarted = self.Libs.Signal.new() :: SignalLib.Signal<ShiftInfo>
@@ -215,7 +217,21 @@ end
 -- The service window opened in Prep (VehicleService, TASK-284): the selling phase starts at once, like the old "Open
 -- Shop" switch. false = not in Prep / not started (nothing changes).
 function RoundService:OpenShop(): boolean
-	if not self.Started or self.Busy or self.Phase() ~= "Prep" then
+	if not self.Started or self.Busy then
+		return false
+	end
+	const phase = self.Phase()
+	if phase == "Call" and self.NightShift() then
+		-- the night call no longer blocks (owner decision 2026-10-17, Provisional): Call -> Prep -> Night at once, the call
+		-- keeps talking (BossService does not hang up on Prep / Night)
+		const now = workspace:GetServerTimeNow()
+		self:Advance(now)
+		if self.Phase() == "Prep" and not self.Busy then
+			self:Advance(now)
+		end
+		return true
+	end
+	if phase ~= "Prep" then
 		return false
 	end
 	self:Advance(workspace:GetServerTimeNow())
@@ -390,6 +406,15 @@ end
 -- Run start gate (TASK-156): StartRun waits until gate() is true; Step polls it while a member is in.
 function RoundService:SetStartGate(gate: () -> boolean)
 	self.StartGate = gate
+end
+
+-- SessionService (DEC-080; architecture.md §5.5): true holds the run start while a fresh server reached by a rejoin
+-- teleport finds out whether it resumes a run; false lets the run start as usual (now, when a member is in).
+function RoundService:SetResumeHold(on: boolean)
+	self.ResumeHold = on == true
+	if not self.ResumeHold and next(self.Dependencies.RunStateService.Members()) ~= nil then
+		self:StartRun()
+	end
 end
 
 function RoundService:AddRunReportStep(name: string, step: RunReportStep)
@@ -670,13 +695,19 @@ end
 -- Run start: first shift of a new run when the first member is in (Provisional, TASK-012: the clock does not run on
 -- an empty dev server). Network writes start here; Lync.start already ran (NetService OnStart, priority 1000).
 function RoundService:StartRun()
-	if self.Started then
+	if self.Started or self.ResumeHold then
 		return
 	end
 	const gate = self.StartGate
 	if gate ~= nil and not gate() then
 		return
 	end
+	self:Publish()
+	self:StartShift(self:Info(), workspace:GetServerTimeNow(), true, true)
+end
+
+-- Started + the Shift set (network writes start here; Lync.start already ran: NetService OnStart, priority 1000)
+function RoundService:Publish()
 	self.Started = true
 	self.Libs.Net.Shift:add(RECORD, self:Record())
 	self.Libs.Charm.effect(function()
@@ -685,7 +716,24 @@ function RoundService:StartRun()
 			self.Libs.Net.Shift:update(RECORD, record)
 		end
 	end)
+end
+
+-- Resume boot (SessionService, DEC-080; architecture.md §5.5 steps 4-5): the run starts from the snapshot the session
+-- loaded (RunStateService:Load) in the Resume phase of its shift, instead of a new Day 1; the shift starts again (and
+-- captures) when Resume ends. False when the run already started or nothing could be restored (then Day 1 starts).
+function RoundService:ResumeRun(): boolean
+	if self.Started then
+		return false
+	end
+	self.ResumeHold = false
+	self:Publish()
+	-- RestoreShift sees Started: it holds the phases (Busy) and enters Resume once every service restored
+	if self.Dependencies.RunStateService:Restore("Resume") then
+		return true
+	end
+	warn("[RoundService] ResumeRun: no snapshot to restore; starting a new run")
 	self:StartShift(self:Info(), workspace:GetServerTimeNow(), true, true)
+	return false
 end
 
 -- Run report (T59) -------------------------------------------------------------------------------------------------

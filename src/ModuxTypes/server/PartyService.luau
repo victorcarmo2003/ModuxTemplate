@@ -2,6 +2,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local PartyRules = require(ReplicatedStorage.shared.Party.PartyRules)
+local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 
 export type Party = {
 	Id: number,
@@ -35,6 +36,7 @@ export type Public = {
 	RateCount: { [Player]: number },
 	RateStart: { [Player]: number },
 	Refused: { [number]: number },
+	Tracked: SignalLib.Signal<string, Party, number, string>,
 	Setup: (self: Public) -> (),
 	Get: (self: Public, partyId: number) -> Party?,
 	PartyOfUser: (self: Public, userId: number) -> Party?,

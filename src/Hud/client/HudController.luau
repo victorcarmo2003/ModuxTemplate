@@ -18,7 +18,8 @@
 	    Sanity/Max/Band, only with Max > 0 and own state Active; compact on a phone (34 px portrait, 110 x 10 bar),
 	    bigger on desktop; portrait = class icon of the AST-071 sheet on the species fur colour (letter fallback);
 	  - banners (HudBanner): night start "Night k" (repeated night: "Same night. Same rules."), 6:00 AM "You made
-	    it!", from the Shift set on a fresh phase change only (a late joiner gets no old banner);
+	    it!", from the Shift set on a fresh phase change only (a late joiner gets no old banner); Resume phase
+	    (DEC-080): "Resuming Day n" / "Resuming Night k" for the rest of the phase, late joiner included;
 	  - 10 s window (HudWipe) from Shift.WipeEndsAt (server time; WipeFrozen holds the number, wave 4);
 	  - spectate (HudSpectate) while own state is Down / Spectator: card for CARD_TIME s, "Watching: {name}" read from
 	    the camera subject (CameraController owns the view and the switch bind) and the switch hint of the device;
@@ -104,6 +105,9 @@ const RUN_END_TIME = 15
 -- Banner on screen; a phase change older than BANNER_FRESH s (late joiner, reconnect) gets no banner
 const BANNER_TIME = 3.5
 const BANNER_FRESH = 5
+-- Resume phase (DEC-080, architecture.md §5.5 step 5): the banner stays up for the rest of the phase, also for a crewmate
+-- who arrives mid-phase (the restored server is the one they teleport into); never shorter than BANNER_TIME (Provisional)
+const RESUME_PHASE = "Resume"
 -- Spectate card ("You fainted!", "You're out for now.") on screen after the state change (Provisional)
 const CARD_TIME = 10
 -- Phases where the 10 s window can run (architecture.md §19.4: LoseNight accepted in Call, Prep, Night)
@@ -184,11 +188,13 @@ export type Report = {
 
 -- Fields of the Shift record this controller reads (network.md §3.1)
 export type ShiftRecord = {
+	Day: number,
 	Night: number,
 	IsNight: boolean,
 	Attempt: number,
 	Phase: string,
 	PhaseStartedAt: number,
+	PhaseDuration: number,
 	WipeEndsAt: number,
 	WipeFrozen: boolean,
 }
@@ -427,10 +433,10 @@ function HudController:OnLifeEvent(event: LifeEvent)
 	-- Hit: comic text in the world (Traffic, wave 3); Wipe: the counter shows it
 end
 
-function HudController:ShowBanner(banner: HudBanner.Banner)
+function HudController:ShowBanner(banner: HudBanner.Banner, duration: number?)
 	cancel(self.BannerThread)
 	self.Banner(banner)
-	self.BannerThread = task.delay(BANNER_TIME, function()
+	self.BannerThread = task.delay(duration or BANNER_TIME, function()
 		self.BannerThread = nil
 		self.Banner(false)
 	end)
@@ -462,6 +468,17 @@ function HudController:ApplyShift(record: ShiftRecord)
 
 	const changed = record.Phase ~= self.ShiftPhase
 	self.ShiftPhase = record.Phase
+	if changed and record.Phase == RESUME_PHASE then
+		-- restored shift (DEC-080): "Resuming Day n" / "Resuming Night k" until the shift starts again
+		const left = record.PhaseStartedAt + record.PhaseDuration - workspace:GetServerTimeNow()
+		self:ShowBanner({
+			Title = if record.IsNight and record.Night > 0
+				then `Resuming Night {record.Night}`
+				else `Resuming Day {record.Day}`,
+			Line = "Waiting for your crew...",
+		}, math.max(left, BANNER_TIME))
+		return
+	end
 	if not changed or workspace:GetServerTimeNow() - record.PhaseStartedAt > BANNER_FRESH then
 		return
 	end
@@ -952,6 +969,8 @@ function HudController:Mount(playerGui: Instance)
 				OnNudge = function()
 					self.Dependencies.ShopController:OnNudge()
 				end,
+				NudgeIcon = self.Dependencies.ShopController.NudgeIcon,
+				NudgePad = self.Dependencies.ShopController.NudgePad,
 			}),
 
 			-- End of run covers everything (15 s)

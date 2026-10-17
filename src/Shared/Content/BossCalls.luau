@@ -211,26 +211,28 @@ const base = Table.new({
 	},
 
 	-- nights (TASK-316, V2: DEC-254..257; anomalies-v2-proposal.md §5): each call presents only the novelty of the night
-	-- (Nights[k].NewAnomaly); the last line is its short form. Short = what follows the NightRepeat opener on a repeat
+	-- (Nights[k].NewAnomaly); the last line is its short form. Short = what follows the NightRepeat opener on a repeat.
+	-- DEC-261 (TASK-354): "Refuse" became "Shut the window" (no Refuse button); those lines have no voice yet (TTS
+	-- fallback) until tools/voice runs again.
 	nightCall(
 		1,
 		lines(
 			"Evening, Rookie. Some customers look off.",
-			"No face at all? Just refuse.",
+			"No face at all? Shut the window.",
 			"They'll wander off. Grill stays hot.",
-			"No face? Refuse them."
+			"No face? Shut the window."
 		),
-		lines("No face? Refuse them.")
+		lines("No face? Shut the window.")
 	),
 	nightCall(
 		2,
 		lines(
 			"Night two. Watch the line close.",
-			"Someone shaking all over? Refuse.",
+			"Someone shaking all over? Shut the window.",
 			"Odd noises? Just noises. Keep working.",
-			"Shaking? Refuse them."
+			"Shaking? Shut the window."
 		),
-		lines("Shaking? Refuse them.")
+		lines("Shaking? Shut the window.")
 	),
 	-- TASK-341 (Provisional): the blackout is presented on Night 3 and the turned neck on Night 4 (blocks swapped,
 	-- same lines, so the pre-generated voice still matches)
@@ -249,10 +251,10 @@ const base = Table.new({
 		lines(
 			"Rainy one tonight, Rookie.",
 			"Head turned all the way back?",
-			"That's no customer. Refuse it.",
-			"Head on backwards? Refuse."
+			"That's no customer. Shut the window.",
+			"Head on backwards? Shut the window."
 		),
-		lines("Head on backwards? Refuse.")
+		lines("Head on backwards? Shut the window.")
 	),
 	-- TASK-339 / TASK-331 / TASK-333 / TASK-334 / TASK-340 (owner 2026-10-15, Provisional; new lines have no voice yet,
 	-- Speech falls back to TTS): Walt no longer shouts "Hide!" on every monster, so each family B monster's sign is
@@ -261,13 +263,13 @@ const base = Table.new({
 		5,
 		lines(
 			"Foggy tonight. Look at their eyes.",
-			"All white? Big grin? Refuse.",
+			"All white? Big grin? Shut the window.",
 			"Twins in line? One's a copy.",
 			"Hear a church bell? Count it.",
 			"Kill the trailer light before the third.",
-			"White eyes or twins? Refuse."
+			"White eyes or twins? Shut the window."
 		),
-		lines("White eyes or twins? Refuse.", "Bell rings? Light off by the third.")
+		lines("White eyes or twins? Shut the window.", "Bell rings? Light off by the third.")
 	),
 	nightCall(
 		6,
@@ -320,13 +322,13 @@ const base = Table.new({
 		10,
 		lines(
 			"Last night, Rookie. Everything comes.",
-			"Refuse, hide, fix the lights.",
+			"Shut the window, hide, fix the lights.",
 			"Street lamps die one by one?",
 			"Run. Get INSIDE the Mart.",
 			"Stay in there till they're back.",
 			"Lamps out? Run inside the Mart."
 		),
-		lines("Lamps out? Run inside the Mart.", "Refuse, hide, fix the lights.")
+		lines("Lamps out? Run inside the Mart.", "Shut the window, hide, fix the lights.")
 	),
 	{
 		Key = "call_night_short",

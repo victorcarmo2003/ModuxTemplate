@@ -27,8 +27,8 @@
 -- Q1 until "Take Order"; out = "Left", never attended) and Order (from "Take Order" until served; out = "Slow", the
 -- food took too long). "Take Order" (Q1, Ordering) writes Order + Phase + PatienceEndsAt + PatienceSpan + Waiting in
 -- one set write (T41), opens the tip window of the taker and turns the
--- customer prompt into "Serve". "Serve" checks the held hot dog against the order and pays into the drawer; "Refuse"
--- and patience running out send the customer away with $0. Every outcome: EconomyService:CountResult + Sale packet.
+-- customer prompt into "Serve". "Serve" checks the held hot dog against the order and pays into the drawer; closing the
+-- service window (SendLineAway, the refusal since TASK-354) and patience running out send the customer away with $0. Every outcome: EconomyService:CountResult + Sale packet.
 -- Mood (PROVISIONAL, Q-164): visual only — Annoyed at MoodRules.AnnoyedAt, Happy on Complete/Perfect, Complaining on
 -- Wrong/Refuse/gave up; never touches DEC-072 pay.
 --
@@ -78,8 +78,12 @@
 -- Prep quality (TASK-171; prep-mode.md §2; Q-219 B, Provisional): SellLine reads ItemService:QualityOf(tool) (Tool
 -- attribute Quality, nil = quick mode) and applies Grade.Effect(Content.Prep, band): Perfect = tip $2 and a tip window
 -- +4 s, Messy = no tip and the mood one band worse (Conclude), Good = as before. The price and the verdicts of
--- DEC-072 are untouched. TakeOrderFor / ServeFor / RefuseFor are the same paths as the three world prompts (same
--- checks, same pay) for the prep mode tabs (PrepService), which have no customer anchor.
+-- DEC-072 are untouched. TakeOrderFor / ServeFor are the same paths as the world prompt (same checks, same pay) for the
+-- prep mode tabs (PrepService), which have no customer anchor.
+--
+-- TASK-354 (owner request 2026-10-17, Provisional): no "Refuse" prompt or button any more. Refusing = closing the
+-- service window (VehicleService.ShutterChanged -> SendLineAway: Refused, Acted "refuse" with who closed); anomaly
+-- actors read the same Shutter event in Anomaly/Kit/CustomerActor.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -900,13 +904,9 @@ end
 -- Leave / remove --------------------------------------------------------------------------------------------------
 
 function CustomerService:SetPrompts(id: number, enabled: boolean)
-	const customerAnchor, refuseAnchor = self.Dependencies.NpcService:Anchors(id)
-	const interaction = self.Dependencies.InteractionService
+	const customerAnchor = self.Dependencies.NpcService:Anchors(id)
 	if customerAnchor ~= nil then
-		interaction:SetPrompt(customerAnchor, enabled)
-	end
-	if refuseAnchor ~= nil then
-		interaction:SetPrompt(refuseAnchor, enabled)
+		self.Dependencies.InteractionService:SetPrompt(customerAnchor, enabled)
 	end
 end
 
@@ -1268,7 +1268,7 @@ function CustomerService:ShowPending(customer: Customer, ticket: Orders.Ticket)
 	customer.Order2 = if pending[2] then Orders.Set(ticket.Lines[pending[2]].Toppings) else nil
 end
 
--- Reached Q1: "Take Order" and "Refuse" come on (the client still hides them by state, network.md §3.6). The Queue
+-- Reached Q1: "Take Order" comes on (the client still hides them by state, network.md §3.6). The Queue
 -- patience clock starts here (Q-192); the tutorial customer has no clock.
 function CustomerService:OnFronted(id: number)
 	const queued = self.Customers[id]
@@ -1773,34 +1773,6 @@ function CustomerService:SettlePending(customer: Customer, ticket: Orders.Ticket
 	end
 end
 
--- "Refuse" (FEAT-011, DEC-051): $0, unsatisfied. A pair is refused whole (2 unsatisfied, FEAT-038).
-function CustomerService:Refuse(player: Player, anchor: Instance)
-	const id, customer, ticket = self:TicketAt(anchor)
-	if id == nil or customer == nil or ticket == nil then
-		return
-	end
-	self:RefuseCustomer(player, id, customer, ticket)
-end
-
--- "Refuse" from the prep mode Order tab: the customer on Q1 (Ordering or Waiting), same gate as the world prompt (the
--- tutorial customer cannot be turned away). Returns true when it was refused.
-function CustomerService:RefuseFor(player: Player, id: number?): boolean
-	const target = if id ~= nil then id else self:Front()
-	const customer = if target ~= nil then self.Customers[target] else nil
-	const ticket = if target ~= nil then self.Tickets[target] else nil
-	if target == nil or customer == nil or ticket == nil or customer.Tutorial or not self:CanActOn(player, target, nil) then
-		return false
-	end
-	self:RefuseCustomer(player, target, customer, ticket)
-	return true
-end
-
-function CustomerService:RefuseCustomer(player: Player, id: number, customer: Customer, ticket: Orders.Ticket)
-	self:SettlePending(customer, ticket, "Refused")
-	self.Acted:Fire(id, REFUSE, player, "Refused")
-	self:Leave(id, COMPLAINING)
-end
-
 -- Patience ran out (FEAT-011 "Desistiu"): $0, unsatisfied; every pending line of a pair gave up. Two kinds (Q-192):
 -- the Queue clock = "Left" (never attended); the Order clock = "Slow" (the food took too long).
 function CustomerService:GiveUp(id: number)
@@ -1860,18 +1832,6 @@ function CustomerService:RegisterOrders()
 		end,
 		Run = function(player: Player, anchor: Instance)
 			self:Serve(player, anchor)
-		end,
-	})
-	interaction:RegisterAction(REFUSE, {
-		Validate = function(player: Player, anchor: Instance): boolean
-			const _, customer = self:TicketAt(anchor)
-			if customer ~= nil and customer.Tutorial then
-				return false -- the tutorial customer cannot be turned away
-			end
-			return self:CanAct(player, anchor, nil)
-		end,
-		Run = function(player: Player, anchor: Instance)
-			self:Refuse(player, anchor)
 		end,
 	})
 end

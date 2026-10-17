@@ -56,5 +56,11 @@
   "skills/skill_short_strides": "rbxassetid://130532625260859",
   "skills/skill_spooked": "rbxassetid://104958724036356",
   "skills/skill_sweet_talk": "rbxassetid://103412077589958",
-  "skills/skill_wide_awake": "rbxassetid://106035613791603"
+  "skills/skill_wide_awake": "rbxassetid://106035613791603",
+  "shop/art/skin_dog_pumpkin": "rbxassetid://90595785014013",
+  "shop/art/skin_rabbit_ghost": "rbxassetid://106836463837253",
+  "shop/art/skin_cat_witch": "rbxassetid://92950921999428",
+  "shop/art/skin_bear_franken": "rbxassetid://103076967688352",
+  "shop/art/skin_fox_vampire": "rbxassetid://104184038026282",
+  "shop/art/skin_owl_skeleton": "rbxassetid://77893559619131"
 }

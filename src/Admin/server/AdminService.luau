@@ -5,7 +5,7 @@
 --
 -- Commands:
 --   dev <command> [args]   bridge to DevService (same commands, args and help as chat "/dev"); no logic here.
---   day / cash / gems / upgrade   typed shortcuts that forward to the same DevService commands.
+--   day / night / cash / gems / upgrade   typed shortcuts that forward to the same DevService commands.
 --   dev-help               returns the DevService help text; the client-side "help" (AdminController) uses it.
 --   showcase               opens the dev showcase panel (ShowcaseService; same gate: Studio dev mode + allowed admin).
 --   anomaly <id> trigger|resolve|wrong|stop   forces / resolves / fails / stops one anomaly (ANM-###, key or night n).
@@ -28,6 +28,8 @@ local Modux = require(ServerScriptService.server.Modux)
 
 const ROLE = "super-user"
 const PERMISSION = "admin"
+-- last night of a run (same bound as RoundService:DevSetNight)
+const LAST_NIGHT = math.min(Content.RunParams.Nights, #Content.Nights.List)
 
 const AdminService = Modux.Service("AdminService", {
 	Require = { "PlayerService", "DevService", "ShowcaseService", "GiftService" },
@@ -225,6 +227,22 @@ function AdminService:Register()
 				return fail("day must be a whole number from 1 to 9999")
 			end
 			self:RunDev("day", { tostring(value) })
+		end,
+	})
+
+	-- night k (owner 2026-10-17): same as /dev night k (Night k on its own day, through Call and Prep)
+	conch.register("night", {
+		permissions = { PERMISSION },
+		description = "Start night n on its own day: Call, then Prep, then the Night (DevService: night)",
+		arguments = function()
+			return AdminArguments.Night("night", `Night number, 1 to {LAST_NIGHT}`)
+		end,
+		callback = function(night: number)
+			const value = integer(night, 1, LAST_NIGHT)
+			if not value then
+				return fail(`night must be a whole number from 1 to {LAST_NIGHT}`)
+			end
+			self:RunDev("night", { tostring(value) })
 		end,
 	})
 

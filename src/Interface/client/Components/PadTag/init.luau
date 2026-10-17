@@ -6,8 +6,10 @@
 --                  · Starting "n/max" (Teal, breathing). A pad has NO fixed capacity: the room takes the size its leader
 --                  chose (Max); a free pad or a room being set up shows none.
 --   (run seal removed, TASK-310; Badge is kept in the props but no longer drawn)
---   caption      small line under the seal: the leader's name (truncated), or the status line ("STEP IN",
---                "STARTING IN 3...") while nobody leads the room yet / during the countdown
+--   faces        round head shots of the players on the pad (owner request 2026-10-17: the lobby screen card is gone,
+--                the photo and the count live here), rbxthumb (no yield)
+--   caption      small line under the faces, only on a free pad ("STEP IN") and during the countdown
+--                ("STARTING IN 3..."); the rest of the time the pill and the faces say it all
 -- Pop: the pill jumps (scale) every time the count or the state changes (someone steps on / off, the room opens). The
 -- sign fades and grows in when it shows and shrinks out when it hides (Visible).
 -- Colours: Free Green, Configuring Mustard, Open Green, Closed Slate, Starting Teal (never red: style guide §7.4).
@@ -45,8 +47,10 @@ export type Props = {
 	State: () -> State,
 	-- "FULL" / "CLOSED" (shown in the Closed pill) / "STEP IN" / "STARTING IN 3..."
 	Status: () -> string,
-	-- name of the squad leader; "" or nil = none
+	-- name of the squad leader; "" or nil = none (no longer drawn: the faces say who is there, owner 2026-10-17)
 	Leader: (() -> string)?,
+	-- user ids of the players on the pad, leader first; nil or {} = no faces
+	Faces: (() -> { number })?,
 	-- text of the old run seal ("D1"); not drawn since TASK-310
 	Badge: string,
 	-- World-space offset over the adornee (studs).
@@ -59,7 +63,7 @@ const WIDTH = 7 -- studs
 const HEIGHT = 7.2
 const MAX_TEXT = 64
 const DEFAULT_DISTANCE = 140
-const NAME_CHARS = 12
+const FACES = 4 -- head shots at most (PartyRules.Rules.MaxSize)
 const BREATH_SPEED = 2 * math.pi / 0.7 -- rad/s while the countdown runs (one breath per 0.7 s)
 
 const TONE: { [State]: Theme.Tone } = {
@@ -70,13 +74,8 @@ const TONE: { [State]: Theme.Tone } = {
 	Starting = Theme.Tone.Teal,
 }
 
-local function short(name: string): string
-	const length = utf8.len(name)
-	if length == nil or length <= NAME_CHARS then
-		return name
-	end
-	const cut = (utf8.offset(name, NAME_CHARS + 1) or (#name + 1)) - 1
-	return string.sub(name, 1, cut) .. "..."
+local function headShot(userId: number): string
+	return `rbxthumb://type=AvatarHeadShot&id={userId}&w=150&h=150`
 end
 
 return function(props: Props): BillboardGui
@@ -105,11 +104,10 @@ return function(props: Props): BillboardGui
 
 	const caption = function(): string
 		const state = props.State()
-		if state == "Starting" or state == "Free" then
-			return props.Status()
-		end
-		const leader = if props.Leader then props.Leader() else ""
-		return if leader ~= "" then short(leader) else props.Status()
+		return if state == "Starting" or state == "Free" then props.Status() else ""
+	end
+	const faces = function(): { number }
+		return if props.Faces then props.Faces() else {}
 	end
 
 	-- Pop of the pill: someone stepped on / off or the room changed state.
@@ -234,12 +232,57 @@ return function(props: Props): BillboardGui
 
 			-- (the run seal "D1"/"N1" was removed, TASK-310: zero width under its aspect constraint, it drew a white dot)
 
-			-- leader / status
+			-- who is on the pad: one round head shot per player (owner request 2026-10-17)
+			create("Frame")({
+				Name = "Faces",
+				AnchorPoint = Vector2.new(0.5, 0),
+				Position = UDim2.fromScale(0.5, 0.38),
+				Size = UDim2.fromScale(1, 0.26),
+				BackgroundTransparency = 1,
+				create("UIListLayout")({
+					FillDirection = Enum.FillDirection.Horizontal,
+					HorizontalAlignment = Enum.HorizontalAlignment.Center,
+					VerticalAlignment = Enum.VerticalAlignment.Center,
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					Padding = UDim.new(0.03, 0),
+				}),
+				Vide.indexes(function()
+					const list = faces()
+					const out: { number } = {}
+					for index = 1, math.min(#list, FACES) do
+						out[index] = list[index]
+					end
+					return out
+				end, function(userId: () -> number, index: number)
+					return create("ImageLabel")({
+						Name = `Face{index}`,
+						LayoutOrder = index,
+						Size = UDim2.fromScale(0.22, 1),
+						BackgroundColor3 = Theme.Color.Cream,
+						Image = function()
+							return headShot(userId())
+						end,
+						createRaw("UIAspectRatioConstraint")({ AspectRatio = 1 }),
+						create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
+						createRaw("UIStroke")({
+							Color = function()
+								return if index == 1 then Theme.Color.Mustard else Theme.Color.Ink
+							end,
+							Thickness = Theme.Outline.Normal,
+						}),
+					})
+				end),
+			}),
+
+			-- status (free pad / countdown only)
 			CartoonLabel({
 				Name = "Caption",
 				AnchorPoint = Vector2.new(0.5, 1),
 				Position = UDim2.fromScale(0.5, 0.99),
 				Box = UDim2.fromScale(0.9, 0.13),
+				Visible = function()
+					return caption() ~= ""
+				end,
 				Scaled = true,
 				MaxTextSize = MAX_TEXT,
 				TextSize = 20,

@@ -9,6 +9,9 @@
 --            TASK-330): the new credit is spent on the buyer right away (ReviveKitService:Use), kept if refused
 --   Radar    ShopGrant to the buyer (the client marks the anomalies of the Anomalies set for Amount s)
 --   Scare    ShopGrant to the chosen mate (the client plays the cartoon jumpscare, Mild, DEC-256)
+--   Kit      Night Kit (DEC-267): Coffee + Radar + Revive in one receipt (ShopGrant Value = radar seconds)
+-- Thermos (DEC-267; Content.Shop.Passes Kind "Thermos", a Game Pass): at the start of every Night phase each owner gets a
+-- coffee Tool in the hand (ItemService:Give; skipped when the hands are full). PassId 0 = nobody owns it.
 -- Run utilities (Cash, Restock, Pantry, Coffee, Radar) bought where no run exists (lobby) answer Wait: the receipt stays
 -- unprocessed and Roblox delivers it again in a later server. Scare and Revive grant anywhere.
 -- Targets: the client sends ShopPick right before the prompt; the next receipt of that product uses it. A missing or
@@ -37,6 +40,7 @@ const ShopUtilityService = Modux.Service("ShopUtilityService", {
 		"VitalService",
 		"ItemService",
 		"ReviveKitService",
+		"RoundService",
 	},
 	Priority = 400,
 })
@@ -116,6 +120,39 @@ function ShopUtilityService:IngredientOf(picked: number): string?
 	return best
 end
 
+-- The coffee of a bundle: sanity to full when it counts (Active at night), else a coffee Tool if a hand is free.
+function ShopUtilityService:Coffee(player: Player)
+	const vital = self.Dependencies.VitalService
+	const _, max = vital:GetSanity(player)
+	if max > 0 and vital:IsActive(player) then
+		vital:AddSanity(player, max, SANITY_CAUSE)
+		return
+	end
+	const items = self.Dependencies.ItemService
+	if items:CanGive(player, "coffee") then
+		items:Give(player, "coffee")
+	end
+end
+
+-- Thermos (DEC-267): a coffee in the hand of every owner when a night starts.
+function ShopUtilityService:GiveThermos()
+	for _, pass in Content.Shop.Passes.List do
+		if pass.Kind ~= "Thermos" or pass.PassId <= 0 then
+			continue
+		end
+		for _, player in Players:GetPlayers() do
+			task.spawn(function()
+				if self.Dependencies.ShopService:OwnsPass(player, pass.PassId) and player.Parent == Players then
+					const items = self.Dependencies.ItemService
+					if items:CanGive(player, "coffee") then
+						items:Give(player, "coffee")
+					end
+				end
+			end)
+		end
+	end
+end
+
 function ShopUtilityService:Fill(ingredient: string): number
 	const kitchen = self.Dependencies.KitchenService
 	const _, capacity = kitchen:GetStock(ingredient)
@@ -127,7 +164,12 @@ function ShopUtilityService:Handler(utility: Utility): any
 	const key = utility.Key
 	return function(player: Player, profile: any): any
 		const kind = utility.Kind
-		const runOnly = kind == "Cash" or kind == "Restock" or kind == "Pantry" or kind == "Coffee" or kind == "Radar"
+		const runOnly = kind == "Cash"
+			or kind == "Restock"
+			or kind == "Pantry"
+			or kind == "Coffee"
+			or kind == "Radar"
+			or kind == "Kit"
 		if runOnly and not self:InRun() then
 			return { Patch = {}, Wait = true }
 		end
@@ -207,6 +249,15 @@ function ShopUtilityService:Handler(utility: Utility): any
 					self:Send(player, key, filled, 0)
 				end,
 			}
+		elseif kind == "Kit" then
+			return {
+				Patch = { ReviveCredits = math.clamp(profile.ReviveCredits() + 1, 0, REVIVE_MAX) },
+				After = function()
+					self:Coffee(player)
+					self.Dependencies.ReviveKitService:SendCount(player)
+					self:Send(player, key, utility.Amount, 0)
+				end,
+			}
 		elseif kind == "Cash" then
 			return {
 				Patch = {},
@@ -254,6 +305,17 @@ ShopUtilityService:OnInit(function(self)
 	Players.PlayerRemoving:Connect(function(player)
 		self.Picks[player] = nil
 		self.PickAt[player] = nil
+	end)
+end)
+
+ShopUtilityService:OnStart(function(self)
+	if not self:InRun() then
+		return
+	end
+	self.Dependencies.RoundService.PhaseChanged:Connect(function(phase)
+		if phase == "Night" then
+			self:GiveThermos()
+		end
 	end)
 end)
 

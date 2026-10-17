@@ -17,12 +17,18 @@ return table.freeze({
 	-- empties the crate and Walt sends the rookie to buy Package (Content.Packages key) and restock it.
 	Buns = 1,
 	Package = "pack_buns",
+	-- Day 1 cut (owner decision 2026-10-17, Provisional, docs/tasks/playtest-2026-10-17.md): the tutorial ends on the
+	-- first sale. Shopping = the bun cap + the Mart trip on Day 1 (false: normal stock; the Mart is a hint on any day
+	-- when the buns run low, MarketController, Content.Mart.LowBuns). The upgrade lesson below is off too: the Gear
+	-- Stand is open from Day 1 and the closing-time Gear Stand hint (MarketController) teaches it from then on.
+	Shopping = false,
 	-- Day 1 upgrade lesson (owner request 2026-10-14, Provisional): when the first shift ends (the day Closing, 6 PM) the
 	-- clock stays held, Walt calls (BossCalls row Call, Trigger UpgradeLesson) and the rookie is guided to the Gear Stand to
 	-- buy the first level of Key (Storage). The Gear Stand is closed before that (Content.Mart.FirstShiftClosed). Short on
 	-- money when the call rings: Cash is topped up to Cash (EconomyService:TopUp, like the bun package), never below the
 	-- price. Over once any Gear Stand line is bought, the run leaves Day 1, or Content.Shift.TutorialHoldMax s of holding.
 	Upgrade = table.freeze({
+		Enabled = false, -- 2026-10-17 cut (above): no call, no Closing hold, no Day 1 lesson steps
 		Key = "cooler",
 		Call = "call_tutorial_upgrade",
 		Cash = 100,

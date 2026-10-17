@@ -7,12 +7,10 @@
 -- (TASK-296: no squad yet; toggle it to see the pop). Tiles on the left, gem pill on the right (TASK-295). Taps print
 -- the tile. "Online" picks the players-online pill count at the top centre (TASK-312; K / M format; 0 = hidden).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Parent.Theme)
 local LobbyHud = require(script.Parent)
-local SquadStatus = require(script.Parent.Parent.SquadStatus)
 
 const create = Vide.create
 
@@ -43,50 +41,6 @@ const PLAY: { [string]: LobbyHud.PlayButton } = {
 	Cancel = { Text = "CANCEL", Kind = "Cancel", Enabled = true },
 	Waiting = { Text = "...", Kind = "Off", Enabled = false },
 }
-
-local function infoOf(state: string): SquadStatus.Info
-	const me = Players.LocalPlayer.UserId
-	if state == "Setup" then
-		return {
-			Squad = true,
-			Members = { { UserId = me, Leader = true, Ready = true, Name = "You" } },
-			Max = 4,
-			FriendsOnly = false,
-			Access = "Setup",
-			Status = "Setting up the room...",
-		}
-	elseif state == "Leader" or state == "NotReady" or state == "Ready" then
-		return {
-			Squad = true,
-			Members = {
-				{ UserId = me, Leader = state == "Leader", Ready = state ~= "NotReady", Name = "You" },
-				{ UserId = 1, Leader = state ~= "Leader", Ready = false, Name = "Roblox" },
-			},
-			Max = 4,
-			FriendsOnly = state == "Leader",
-			Status = "Waiting for 1 player",
-			CanInvite = state == "Leader",
-		}
-	elseif state == "Starting" or state == "Cancel" then
-		return {
-			Squad = true,
-			Members = {
-				{ UserId = me, Leader = true, Ready = true, Name = "You" },
-				{ UserId = 1, Leader = false, Ready = true, Name = "Roblox" },
-			},
-			Max = 2,
-			FriendsOnly = false,
-			Status = "Starting in 3...",
-		}
-	end
-	return {
-		Squad = false,
-		Members = { { UserId = me, Leader = true, Ready = true } },
-		Max = 1,
-		FriendsOnly = false,
-		Status = if state == "Waiting" then "Starting..." else "Pick solo or squad",
-	}
-end
 
 local function scaleOf(size: Vector2): number
 	-- phones keep the touch floor of 1 (Theme.Scale.MinTouch), the others follow the viewport rule
@@ -133,9 +87,6 @@ return UILabs.CreateVideStory({
 			Play = function()
 				return PLAY[controls.Play()] or PLAY.Solo
 			end,
-			Card = function()
-				return infoOf(controls.Play())
-			end,
 			CancelKey = function()
 				return if controls.Keys() then "X" else ""
 			end,
@@ -148,9 +99,6 @@ return UILabs.CreateVideStory({
 			end,
 			OnGear = function()
 				print("[LobbyHud story] room setup")
-			end,
-			OnInvite = function()
-				print("[LobbyHud story] invite")
 			end,
 			Keys = function()
 				if not controls.Keys() then

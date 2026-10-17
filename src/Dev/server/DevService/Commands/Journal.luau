@@ -3,7 +3,8 @@
 --   journal            list the unlocked pages
 --   journal <ref|key>  unlock one page (ANM-007 or anm_007_walker): toast + glow on the client
 --   journal all        unlock every page
---   journal reset      forget every page (the tablet starts empty)
+--   journal reset      forget every page and gem claim (the tablet starts empty; gems already paid stay)
+--   journal open       open the tablet on the caller's screen (as the read_journal prompt does)
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
@@ -27,8 +28,8 @@ const module: Api.Module = function(ctx: Api.Context): { Api.Command }
 	return {
 		{
 			Name = "journal",
-			Usage = "journal [all | reset | <ANM-###>]",
-			Help = "Anomaly Tablet pages of the caller: list, unlock one or all, reset",
+			Usage = "journal [all | reset | open | <ANM-###>]",
+			Help = "Anomaly Tablet pages of the caller: list (new = gems not claimed), unlock one or all, reset, open",
 			Run = function(args: { string }, caller: Player?): string?
 				const player = caller or Players:GetPlayers()[1]
 				if player == nil then
@@ -41,16 +42,21 @@ const module: Api.Module = function(ctx: Api.Context): { Api.Command }
 					if pages == nil then
 						error("profile not loaded")
 					end
+					const claimed = journal:Claimed(player)
 					const list: { string } = {}
 					for _, row in Content.Journal.List do
 						if pages[row.Key] then
-							table.insert(list, Content.Anomalies.ByKey[row.Key].Ref)
+							const ref = Content.Anomalies.ByKey[row.Key].Ref
+							table.insert(list, if claimed[row.Key] then ref else `{ref}(new)`)
 						end
 					end
 					return `{#list}/{#Content.Journal.List} pages: {table.concat(list, " ")}`
 				elseif arg == "reset" then
 					journal:Reset(player)
 					return "journal cleared"
+				elseif arg == "open" then
+					journal:Open(player)
+					return "tablet opened"
 				elseif arg == "all" then
 					local count = 0
 					for _, row in Content.Journal.List do

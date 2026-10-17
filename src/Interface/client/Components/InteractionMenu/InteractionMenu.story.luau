@@ -24,7 +24,6 @@ type Controls = {
 	Holding: () -> boolean,
 	HoldDuration: () -> number,
 	Done: () -> number,
-	RefuseHint: () -> boolean,
 	Tappable: () -> boolean,
 	Visible: () -> boolean,
 }
@@ -33,7 +32,6 @@ const SAMPLES = {
 	{ "Take Order", "Ui/megaphone", "Order" },
 	{ "Collect Cash", "Ui/cash", "Collect" },
 	{ "Add Ketchup", "Ingredient/ketchup", "Ketchup" },
-	{ "Refuse", "Ui/close", "Refuse" },
 	{ "Buy Hot Dog Buns — $4", "Item/pack_buns", "Buy $4" },
 	{ "Open Window", "Ui/bell", "Window" },
 }
@@ -49,7 +47,6 @@ return UILabs.CreateVideStory({
 		Holding = false,
 		HoldDuration = UILabs.Slider(1, 0.2, 3, 0.1),
 		Done = UILabs.Slider(0, 0, 50, 1),
-		RefuseHint = true,
 		Tappable = true,
 		Visible = true,
 	},
@@ -87,7 +84,7 @@ return UILabs.CreateVideStory({
 				return controls.DimmedRow() ~= index
 			end,
 			Hint = function()
-				return if controls.RefuseHint() and index == 1 then "  ·  hold R: Refuse" else ""
+				return ""
 			end,
 		})
 	end

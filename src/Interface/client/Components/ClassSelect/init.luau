@@ -18,6 +18,11 @@
 --            gift (TASK-353, owner request 2026-10-16): with `OnGift`, a round GiftButton (44 px) right of the Robux /
 --            Equip button (owned or not: a class can be gifted either way); hidden for "Coming soon" and for a class
 --            without a gift row (`Giftable`), Slate while `CanGift` says the product is not created yet
+-- skins (owner request 2026-10-17, design/skins-proposal.md): with `Skins`, a row of round buttons under the card (SkinRow:
+--            the crew uniform, then the class skins); a click previews the skin on the rig (the caller dresses the stage)
+--            and the card follows it: skin name, its line, "Limited" + Robux chips, and one button: "Buy  129" (Robux, Green),
+--            "Equip" / "Equipped", "Needs the class" or "Coming soon". On the uniform circle the class buttons come back;
+--            "Equip" there takes a worn skin off. A banner on the top centre counts down the limited sale.
 -- The card pops on every class change. No backdrop: the rig shows through the middle. Pure: only props; the caller
 -- sends the requests and the server decides (Profile / Wallet / ClassBuyResult).
 local GuiService = game:GetService("GuiService")
@@ -36,6 +41,7 @@ local Icon = require(script.Parent.LobbyWindow.Icon)
 local Count = require(script.Parent.HudPill.Count)
 local SkillImages = require(script.SkillImages)
 local GiftButton = require(script.Parent.GiftButton)
+local SkinRow = require(script.SkinRow)
 
 const create = Vide.create
 const effect = Vide.effect
@@ -79,6 +85,26 @@ export type Stat = {
 -- Equipped: owned and selected · Owned · Locked: for sale, not owned · Soon: not in the MVP
 export type State = "Equipped" | "Owned" | "Locked" | "Soon"
 
+export type SkinEntry = SkinRow.SkinEntry
+export type SkinState = SkinRow.SkinState
+
+-- Skins of the focused class (owner request 2026-10-17). Keys are Content.Skins keys; "" = the crew uniform.
+export type SkinProps = {
+	-- the uniform first, then the skins on show for that class
+	Entries: (class: string) -> { SkinEntry },
+	Focus: () -> string,
+	OnFocus: (key: string) -> (),
+	-- "" = the uniform: Equipped when no skin is worn with the class, Owned when one is
+	StateOf: (key: string) -> SkinState,
+	-- Robux price; nil = product not created yet
+	RobuxOf: (key: string) -> number?,
+	OnBuy: (key: string) -> (),
+	-- "" = back to the uniform
+	OnEquip: (key: string) -> (),
+	-- top centre banner text ("" = hidden): the limited sale countdown
+	Banner: () -> string,
+}
+
 export type Props = {
 	Entries: { Entry },
 	Visible: () -> boolean,
@@ -99,6 +125,7 @@ export type Props = {
 	Giftable: ((key: string) -> boolean)?,
 	CanGift: ((key: string) -> boolean)?,
 	OnClose: () -> (),
+	Skins: SkinProps?,
 	-- Viewport stage (ClassStage) drawn behind the panels; nil = world stage.
 	Stage: Instance?,
 	Scale: (() -> number)?,
@@ -121,6 +148,9 @@ const NAME_WIDTH = 170 -- class name over the arrows (TASK-298); a long name shr
 const NAME_HEIGHT = 34
 const FOOT = NAME_HEIGHT + 2 + ARROW
 const STAGE_WIDTH = 220
+const SKIN = 40 -- skin circle under the card (uniform + 5 skins fit the card width)
+const SKIN_GAP = 6
+const SKIN_TOP = 4 -- px between the card and the skin row
 -- Card (TASK-299)
 const PORTRAIT = 58
 const CHIP = 24
@@ -357,9 +387,44 @@ return function(props: Props): Frame
 	const canGems = function(): boolean
 		return props.Gems() >= focused().Price
 	end
+	-- skins (all false / "" without props.Skins)
+	const skins = props.Skins
+	const skinKey = function(): string
+		return if skins then skins.Focus() else ""
+	end
+	const skinOn = function(): boolean
+		return skinKey() ~= ""
+	end
+	const skinEntries = function(): { SkinEntry }
+		return if skins then skins.Entries(focused().Key) else {}
+	end
+	const skinEntry = function(): SkinEntry?
+		const key = skinKey()
+		if key == "" then
+			return nil
+		end
+		for _, entry in skinEntries() do
+			if entry.Key == key then
+				return entry
+			end
+		end
+		return nil
+	end
+	const skinState = function(): SkinState
+		return if skins then skins.StateOf(skinKey()) else "Soon"
+	end
+	const skinRobux = function(): number?
+		return if skins then skins.RobuxOf(skinKey()) else nil
+	end
+	-- the uniform circle of an owned class while a skin is worn: the class "Equip" takes the skin off
+	const uniformSwap = function(): boolean
+		const s = state()
+		return skins ~= nil and not skinOn() and (s == "Equipped" or s == "Owned") and skins.StateOf("") == "Owned"
+	end
+
 	const onGift = props.OnGift
 	const giftShown = function(): boolean
-		if onGift == nil or state() == "Soon" then
+		if onGift == nil or state() == "Soon" or skinOn() then
 			return false
 		end
 		const giftable = props.Giftable
@@ -388,7 +453,7 @@ return function(props: Props): Frame
 			Icon = "Hud/gem",
 			IconSize = 28,
 			Visible = function()
-				return state() == "Locked"
+				return state() == "Locked" and not skinOn()
 			end,
 			Tone = function()
 				return if canGems() then Theme.Tone.Mustard else Theme.Tone.Ketchup
@@ -421,7 +486,7 @@ return function(props: Props): Frame
 				Icon = "Ui/robux",
 				IconSize = 24,
 				Visible = function()
-					return state() == "Locked"
+					return state() == "Locked" and not skinOn()
 				end,
 				Tone = Theme.Tone.Green,
 				Enabled = function()
@@ -445,22 +510,24 @@ return function(props: Props): Frame
 				TextSize = 20,
 				Outline = Theme.Outline.Thick,
 				Icon = function()
-					return if state() == "Equipped" then "Ui/check" else ""
+					return if state() == "Equipped" and not uniformSwap() then "Ui/check" else ""
 				end,
 				IconSize = 26,
 				Visible = function()
-					return state() ~= "Locked"
+					return state() ~= "Locked" and not skinOn()
 				end,
 				Tone = function()
 					const s = state()
-					return if s == "Equipped" then Theme.Tone.Green else Theme.Tone.Mustard
+					return if s == "Equipped" and not uniformSwap() then Theme.Tone.Green else Theme.Tone.Mustard
 				end,
 				Enabled = function()
-					return state() == "Owned" and not props.Busy()
+					return (state() == "Owned" or uniformSwap()) and not props.Busy()
 				end,
 				Text = function()
 					const s = state()
-					if s == "Equipped" then
+					if uniformSwap() then
+						return if props.Busy() then "..." else "Equip"
+					elseif s == "Equipped" then
 						return "Equipped"
 					elseif s == "Soon" then
 						return "Coming soon"
@@ -468,7 +535,60 @@ return function(props: Props): Frame
 					return if props.Busy() then "..." else "Equip"
 				end,
 				OnActivated = function()
-					props.OnEquip(focused().Key)
+					if skins and uniformSwap() then
+						skins.OnEquip("")
+					else
+						props.OnEquip(focused().Key)
+					end
+				end,
+			}),
+			-- the previewed skin: Buy (Robux) / Equip / Equipped / Needs the class / Coming soon
+			CartoonButton({
+				Name = "Skin",
+				Size = rowButton,
+				TextSize = 18,
+				Outline = Theme.Outline.Thick,
+				Icon = function()
+					const s = skinState()
+					return if s == "Locked" then "Ui/robux" elseif s == "Equipped" then "Ui/check" else ""
+				end,
+				IconSize = 24,
+				Visible = skinOn,
+				Tone = function()
+					const s = skinState()
+					return if s == "Locked" or s == "Equipped"
+						then Theme.Tone.Green
+						elseif s == "Owned" then Theme.Tone.Mustard
+						else Theme.Tone.Slate
+				end,
+				Enabled = function()
+					const s = skinState()
+					return (s == "Locked" or s == "Owned") and not props.Busy()
+				end,
+				Text = function()
+					const s = skinState()
+					if s == "Locked" then
+						const price = skinRobux()
+						return if price and price > 0 then `Buy  {price}` else "Buy with Robux"
+					elseif s == "Owned" then
+						return if props.Busy() then "..." else "Equip"
+					elseif s == "Equipped" then
+						return "Equipped"
+					elseif s == "NeedsClass" then
+						return "Needs the class"
+					end
+					return "Coming soon"
+				end,
+				OnActivated = function()
+					if skins == nil then
+						return
+					end
+					const s = untrack(skinState)
+					if s == "Locked" then
+						skins.OnBuy(untrack(skinKey))
+					elseif s == "Owned" then
+						skins.OnEquip(untrack(skinKey))
+					end
 				end,
 			}),
 			GiftButton({
@@ -752,10 +872,12 @@ return function(props: Props): Frame
 			Stroke = 0,
 			Transparency = 0.25,
 			Text = function()
-				return focused().Blurb
+				const entry = skinEntry()
+				return if entry then entry.Text else focused().Blurb
 			end,
 			Visible = function()
-				return focused().Blurb ~= ""
+				const entry = skinEntry()
+				return (if entry then entry.Text else focused().Blurb) ~= ""
 			end,
 		}),
 		CartoonPanel({
@@ -928,7 +1050,8 @@ return function(props: Props): Frame
 					Color = Theme.Color.Dark,
 					Stroke = 0,
 					Text = function()
-						return focused().Title
+						const entry = skinEntry()
+						return if entry then entry.Name else focused().Title
 					end,
 				}),
 				create("Frame")({
@@ -970,15 +1093,26 @@ return function(props: Props): Frame
 						end
 						return if s == "Equipped" then "Equipped" else "Owned"
 					end, function()
-						return true
+						return not skinOn()
 					end),
 					chip("Robux", 3, function()
 						return Theme.Tone.Green
 					end, nil, function()
-						const price = robux()
+						const price = if skinOn() then skinRobux() else robux()
 						return if price and price > 0 then `R$ {price}` else "Robux"
 					end, function()
+						if skinOn() then
+							return skinState() == "Locked" and skinRobux() ~= nil
+						end
 						return state() == "Locked" and robux() ~= nil
+					end),
+					chip("Limited", 4, function()
+						return Theme.Tone.Violet
+					end, nil, function()
+						return "Limited"
+					end, function()
+						const entry = skinEntry()
+						return entry ~= nil and entry.Limited
 					end),
 				}),
 			}),
@@ -1185,6 +1319,64 @@ return function(props: Props): Frame
 			createRaw("UIScale")({ Scale = scaled }),
 			card,
 		}),
+
+		-- skins of the focused class, under the card (owner 2026-10-17)
+		if skins
+			then create("Frame")({
+				Name = "SkinAnchor",
+				AnchorPoint = Vector2.new(0.5, 0),
+				Position = function()
+					const s = scale()
+					return UDim2.new(1, -MARGIN - CARD_WIDTH * s / 2, 0.5, (body() / 2 + SKIN_TOP) * s)
+				end,
+				Size = UDim2.fromOffset(CARD_WIDTH, SKIN + 14),
+				BackgroundTransparency = 1,
+				Visible = function()
+					return #skinEntries() > 1
+				end,
+				createRaw("UIScale")({ Scale = scaled }),
+				SkinRow({
+					Entries = skinEntries,
+					Focus = skinKey,
+					StateOf = skins.StateOf,
+					OnFocus = skins.OnFocus,
+					Size = SKIN,
+					Gap = SKIN_GAP,
+				}),
+			})
+			else nil,
+
+		-- limited sale banner, top centre
+		if skins
+			then create("Frame")({
+				Name = "BannerAnchor",
+				AnchorPoint = Vector2.new(0.5, 0),
+				Position = UDim2.new(0.5, 0, 0, 10),
+				Size = UDim2.fromOffset(0, 34),
+				AutomaticSize = Enum.AutomaticSize.X,
+				BackgroundTransparency = 1,
+				Visible = function()
+					return skins.Banner() ~= ""
+				end,
+				createRaw("UIScale")({ Scale = scaled }),
+				CartoonPanel({
+					Name = "Banner",
+					Size = UDim2.fromOffset(0, 34),
+					AutomaticSize = Enum.AutomaticSize.X,
+					Rotation = 1,
+					Tone = Theme.Tone.Violet,
+					Radius = Theme.Radius.Pill,
+					Padding = { Left = 16, Right = 16 },
+					Children = {
+						CartoonLabel({
+							TextSize = 18,
+							Color = Theme.Color.Gold,
+							Text = skins.Banner,
+						}),
+					},
+				}),
+			})
+			else nil,
 
 		-- class name over the arrows, arrows under the rig
 		create("Frame")({

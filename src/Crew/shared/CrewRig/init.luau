@@ -25,7 +25,7 @@ export type BuildOptions = Build.Options
 export type Bands = { High: number, Mid: number }
 
 -- Attributes the client re-dresses on (network.md §5.2). NpcId is identity, not look.
-const LOOK_ATTRIBUTES = table.freeze({ "Species", "Outfit", "CustomerType", "LookPack" })
+const LOOK_ATTRIBUTES = table.freeze({ "Species", "Outfit", "CustomerType", "LookPack", "Skin" })
 
 local function packForSanity(value: number, bands: Bands): Pack
 	if value >= bands.High then

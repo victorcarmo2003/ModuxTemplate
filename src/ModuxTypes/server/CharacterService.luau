@@ -26,6 +26,7 @@ export type Public = {
 	IsFainted: (self: Public, player: Player) -> boolean,
 	Enqueue: (self: Public, player: Player) -> (),
 	SpeciesOf: (self: Public, player: Player) -> string,
+	SkinOf: (self: Public, player: Player) -> string?,
 	SpawnPrefix: (self: Public, info: ShiftInfo) -> string,
 	SpawnPointFor: (self: Public, player: Player, info: ShiftInfo) -> CFrame?,
 	PointFor: (self: Public, player: Player) -> CFrame?,

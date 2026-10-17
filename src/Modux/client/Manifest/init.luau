@@ -41,17 +41,21 @@ local OpalController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTy
 local PedestrianController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PedestrianController)
 local PlaceController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PlaceController)
 local PrepController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PrepController)
+local WorkSlideController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.WorkSlideController)
 local ProfileController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ProfileController)
 local NightLostController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.NightLostController)
 local RoundController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.RoundController)
 local SeatingController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.SeatingController)
 local SecurityController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.SecurityController)
+local SessionController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.SessionController)
 local SettingsController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.SettingsController)
 local GiftController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.GiftController)
+local OfferController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.OfferController)
 local PurchaseFxController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PurchaseFxController)
 local ReviveKitController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ReviveKitController)
 local ShopController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ShopController)
 local ShowcaseController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ShowcaseController)
+local SkinController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.SkinController)
 local StageController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.StageController)
 local ThiefController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ThiefController)
 local TrafficController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.TrafficController)
@@ -103,17 +107,21 @@ export type AllControllers = {
 	PedestrianController: PedestrianController.Public,
 	PlaceController: PlaceController.Public,
 	PrepController: PrepController.Public,
+	WorkSlideController: WorkSlideController.Public,
 	ProfileController: ProfileController.Public,
 	NightLostController: NightLostController.Public,
 	RoundController: RoundController.Public,
 	SeatingController: SeatingController.Public,
 	SecurityController: SecurityController.Public,
+	SessionController: SessionController.Public,
 	SettingsController: SettingsController.Public,
 	GiftController: GiftController.Public,
+	OfferController: OfferController.Public,
 	PurchaseFxController: PurchaseFxController.Public,
 	ReviveKitController: ReviveKitController.Public,
 	ShopController: ShopController.Public,
 	ShowcaseController: ShowcaseController.Public,
+	SkinController: SkinController.Public,
 	StageController: StageController.Public,
 	ThiefController: ThiefController.Public,
 	TrafficController: TrafficController.Public,

@@ -1,0 +1,121 @@
+{
+ "out": "thumb_I_semrosto.png",
+ "size": [
+  1920,
+  1080
+ ],
+ "bg": {
+  "path": "bg_street_low.jpg",
+  "blur": 6,
+  "brightness": 0.7,
+  "tint": [
+   0.75,
+   0.85,
+   1.3
+  ],
+  "saturation": 0.5
+ },
+ "spots": [
+  {
+   "at": [
+    0.66,
+    0.22
+   ],
+   "radius": 0.45,
+   "color": [
+    120,
+    190,
+    255
+   ],
+   "strength": 0.55
+  },
+  {
+   "at": [
+    0.3,
+    0.62
+   ],
+   "radius": 0.4,
+   "color": [
+    255,
+    225,
+    205
+   ],
+   "strength": 0.25
+  }
+ ],
+ "layers": [
+  {
+   "path": "m_blank.jpg",
+   "at": [
+    0.66,
+    0.64
+   ],
+   "height": 1.3,
+   "anchor": "center",
+   "spill": 9,
+   "saturation": 0.25,
+   "contrast": 1.3,
+   "brightness": 0.55,
+   "glow": {
+    "color": [
+     120,
+     200,
+     255
+    ],
+    "width": 70,
+    "strength": 1.0
+   },
+   "outline": {
+    "color": [
+     160,
+     220,
+     255
+    ],
+    "width": 6
+   }
+  },
+  {
+   "path": "w_owl_sad.jpg",
+   "at": [
+    0.3,
+    1.3
+   ],
+   "height": 1.12,
+   "anchor": "bottom",
+   "saturation": 1.35,
+   "contrast": 1.12,
+   "brightness": 1.06,
+   "glow": {
+    "color": [
+     255,
+     230,
+     210
+    ],
+    "width": 40,
+    "strength": 0.4
+   },
+   "outline": {
+    "color": [
+     255,
+     255,
+     255
+    ],
+    "width": 9
+   },
+   "rim": {
+    "color": [
+     150,
+     210,
+     255
+    ],
+    "side": "right",
+    "strength": 0.6
+   }
+  }
+ ],
+ "vignette": 0.6,
+ "grade": {
+  "contrast": 1.06,
+  "saturation": 1.1
+ }
+}

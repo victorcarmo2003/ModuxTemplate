@@ -9,6 +9,10 @@
 -- each join for a pass owner (UserOwnsGamePassAsync in pcall, cached per player; a failed check retries on the next
 -- join). A class already in the profile is never written again. Once written it stays (profile.Classes is the one
 -- ownership list, data.md §1.7).
+-- One-time bundles (DEC-267; Content.Shop.Bundles, e.g. the Starter Crate): Gems + ReviveCredits and a stamp in
+-- profile.OneTimeBought (the lobby hides the offer once stamped; a second receipt still grants, Robux were paid).
+-- Other Game Passes (Content.Shop.Passes, e.g. the Thermos): owned through OwnsPass; a purchase in this server marks
+-- the cache (OnPassFinished) so its owner service (ShopUtilityService) sees it at once.
 -- Idempotent per PurchaseId: the grant patch and the PurchaseId (profile.Receipts, last RECEIPTS_KEPT) are written in
 -- one Update (one Charm batch, no yield between the "already granted?" check and the write), and PurchaseGranted is
 -- returned only after ProfileService:SaveConfirmed sees the PurchaseId in LastSavedData. Anything else returns
@@ -57,6 +61,7 @@ const RECEIPTS_KEPT = 50 -- circular list in the profile (data.md §1.1)
 const PROFILE_WAIT = 10 -- s a receipt waits for a profile that is still loading
 const GEMS_MAX = 2147483647 -- Profile.Gems wire range (network.md §4.5)
 const PASS_RETRY = 2 -- UserOwnsGamePassAsync attempts per pass on join
+const REVIVE_MAX = 99 -- same cap as ShopUtilityService
 
 const ShopService = Modux.Service(
 	"ShopService",
@@ -120,6 +125,28 @@ function ShopService:GemPackHandler(pack: Content.ShopGemPack): Handler
 			After = function()
 				self:Notify(player, "gems_gained", pack.Gems)
 				MetricsLog.gems(player, "Source", pack.Gems, profile.Gems(), "GemPack", pack.Key)
+				MetricsLog.panel(player, "shop", 3, "bought", { pack = pack.Key })
+			end,
+		}
+	end
+end
+
+-- One-time bundle (DEC-267): Gems += Gems, ReviveCredits += Revives, OneTimeBought[Key] = now.
+function ShopService:BundleHandler(bundle: Content.ShopBundle): Handler
+	return function(player: Player, profile: Profile): Grant
+		const bought = table.clone(profile.OneTimeBought())
+		bought[bundle.Key] = os.time()
+		return {
+			Patch = {
+				Gems = math.clamp(profile.Gems() + bundle.Gems, 0, GEMS_MAX),
+				ReviveCredits = math.clamp(profile.ReviveCredits() + bundle.Revives, 0, REVIVE_MAX),
+				OneTimeBought = bought,
+			},
+			After = function()
+				if bundle.Gems > 0 then
+					self:Notify(player, "gems_gained", bundle.Gems)
+					MetricsLog.gems(player, "Source", bundle.Gems, profile.Gems(), "Bundle", bundle.Key)
+				end
 			end,
 		}
 	end
@@ -170,6 +197,7 @@ function ShopService:GrantPass(player: Player, key: string, notify: boolean): bo
 		profiles:RequestSave(player)
 	end
 	if notify then
+		MetricsLog.panel(player, "classes", 3, "buy", { class = key, currency = "robux" })
 		self:ReplyClass(player, key, "Granted")
 		self:Notify(player, "class_bought", Content.Classes.IndexOf[key])
 	end
@@ -192,6 +220,14 @@ function ShopService:OnPassFinished(player: Player, passId: number, purchased: b
 	if not purchased or passId <= 0 then
 		return
 	end
+	for _, pass in Content.Shop.Passes.List do
+		if pass.PassId == passId then
+			const cache = self.Passes[player] or {}
+			cache[passId] = true
+			self.Passes[player] = cache
+			return
+		end
+	end
 	for _, pass in Content.Shop.GamePasses.List do
 		if pass.PassId == passId then
 			const cache = self.Passes[player] or {}
@@ -206,6 +242,9 @@ end
 function ShopService:RegisterContent()
 	for _, pack in Content.Shop.GemPacks.List do
 		self:RegisterProduct(pack.ProductId, pack.Key, self:GemPackHandler(pack))
+	end
+	for _, bundle in Content.Shop.Bundles.List do
+		self:RegisterProduct(bundle.ProductId, bundle.Key, self:BundleHandler(bundle))
 	end
 	for _, pass in Content.Shop.GamePasses.List do
 		const class = Content.Classes.ByKey[pass.Key]

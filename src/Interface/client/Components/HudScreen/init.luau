@@ -65,6 +65,10 @@ export type Props = {
 	-- Quick note under the buttons ("" = hidden) and its click
 	Nudge: (() -> string)?,
 	OnNudge: (() -> ())?,
+	-- Icons name left of the note (contextual offers, TASK-363); "" = none
+	NudgeIcon: (() -> string)?,
+	-- controller button image of the note while it is an offer (TASK-363); "" = the shop button image
+	NudgePad: (() -> string)?,
 }
 
 const MARGIN = 10
@@ -270,8 +274,15 @@ return function(props: Props): Frame
 			Text = function()
 				return if props.Nudge then props.Nudge() else ""
 			end,
+			Icon = function()
+				return if props.NudgeIcon then props.NudgeIcon() else ""
+			end,
 			Pad = function()
-				return if device() == "Gamepad" then shopPad else ""
+				if device() ~= "Gamepad" then
+					return ""
+				end
+				const offerPad = if props.NudgePad then props.NudgePad() else ""
+				return if offerPad ~= "" then offerPad else shopPad
 			end,
 			PadText = "Right",
 			Touch = function()

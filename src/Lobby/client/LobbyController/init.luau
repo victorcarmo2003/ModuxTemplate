@@ -93,6 +93,7 @@ local Roles = require(ReplicatedStorage.shared.ServerRole.Roles)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Backdrop = require(StarterPlayer.StarterPlayerScripts.client.Interface.Backdrop)
 local ClassSelect = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.ClassSelect)
+local SkinIcons = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.ClassSelect.SkinIcons)
 local ClassEntries = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.ClassSelect.Entries)
 local ClassStage = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.ClassStage)
 local CodeRedeem = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.CodeRedeem)
@@ -102,7 +103,6 @@ local LobbyHud = require(StarterPlayer.StarterPlayerScripts.client.Interface.Com
 local PlayChoice = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.PlayChoice)
 local SquadPanel = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.SquadPanel)
 local SquadSetup = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.SquadSetup)
-local SquadStatus = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.SquadStatus)
 local PadTag = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.PadTag)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
 local UiScale = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.UiScale)
@@ -141,6 +141,8 @@ export type Invite = {
 
 const STAGE_POINT = "LOBBY-CLASS-STAGE"
 const OUTFIT = "crew"
+-- uniform circle of the skin row: the crew cap red and the shirt cream (T_Crew_Uniform_Day)
+const UNIFORM_SWATCH = { Color3.fromRGB(205, 30, 45), Color3.fromRGB(255, 241, 214) }
 const IDLE = "crew_idle"
 const CLICK_SOUND = "ui_click"
 const PENDING_TIMEOUT = 4 -- s without an answer: the class buttons come back
@@ -172,7 +174,7 @@ const NEXT = "LobbyNext"
 const NOTICE_TOP = 8
 const NOTICE_TOP_NARROW = 64 -- under the Roblox top bar (the HUD sides are centred, the top is free)
 const NARROW_VIEWPORT = 420
-const ONLINE_SPACE = 40 -- px (x the notice scale) the LobbyHud online pill takes, gap included (34 + 6)
+const ONLINE_SPACE = 34 -- px (x the notice scale) the LobbyHud online pill takes, gap included (28 + 6)
 const BIND_PRIORITY = 10 -- over ClassController's Crew toggle (priority 0) on C / ButtonY
 
 -- First button a gamepad selects when a panel opens (by instance name, searched in the panel).
@@ -184,6 +186,15 @@ const FIRST_SELECTION: { [Panel]: { string } } = {
 	Squad = { "Start", "Ready", "Create", "Invite" },
 	Platform = { "Create", "Start", "Ready", "Toggle", "Leave" },
 	Play = { "Solo", "Squad" },
+}
+
+-- MetricUi event of each window opening (MetricsService/Lobby.luau funnels; owner request 2026-10-17)
+const PANEL_METRIC: { [Panel]: string } = {
+	Shop = "lobby_shop_open",
+	Classes = "lobby_classes_open",
+	Codes = "lobby_codes_open",
+	Squad = "lobby_squad_open",
+	Play = "lobby_play_open",
 }
 
 -- Root instance of each panel (component Name), where SelectFirst looks.
@@ -237,6 +248,7 @@ const LobbyController = Modux.Controller("LobbyController", {
 		"AnimController",
 		"CameraController",
 		"GiftController",
+		"SkinController",
 	},
 	Priority = 440,
 })
@@ -254,6 +266,8 @@ function LobbyController:Setup()
 	-- classes
 	self.Entries = ClassEntries.Build() :: { ClassEntries.Entry }
 	self.Focus = Vide.source("class_dog") :: Vide.Source<string>
+	-- skin previewed on the stage (Content.Skins key; "" = the crew uniform; owner request 2026-10-17)
+	self.SkinFocus = Vide.source("") :: Vide.Source<string>
 	-- class key of the request on its way
 	self.Pending = Vide.source("") :: Vide.Source<string>
 	self.PendingThread = nil :: thread?
@@ -429,13 +443,15 @@ function LobbyController:Step(delta: number)
 	self.Focus(self.Entries[(index - 1 + delta) % n + 1].Key)
 end
 
--- Local preview rig: never tagged (RigController leaves it alone), dressed once here.
-function LobbyController:BuildRig(species: string): Model?
+-- Local preview rig: never tagged (RigController leaves it alone), dressed once here. `skin` = Content.Skins key previewed
+-- ("" / nil = the crew uniform).
+function LobbyController:BuildRig(species: string, skin: string?): Model?
 	const ok, result = pcall(function(): Model
 		const model = CrewRig.Build(species, OUTFIT, {
 			Tag = false,
 			Anchored = true,
 			Name = `LobbyClass_{species}`,
+			Skin = if skin ~= nil and skin ~= "" then skin else nil,
 		})
 		CrewRig.Dress(model)
 		return model
@@ -546,8 +562,8 @@ function LobbyController:OpenStage()
 		self.StagePoint = point
 		self.Stage = Stage({
 			Point = point,
-			Build = function(species: string): Model?
-				return self:BuildRig(species)
+			Build = function(species: string, skin: string): Model?
+				return self:BuildRig(species, skin)
 			end,
 			OnShown = function(model: Model)
 				self:PlayIdle(model)
@@ -566,6 +582,89 @@ end
 function LobbyController:SpeciesOf(key: string): string
 	const class = Content.Classes.ByKey[key]
 	return if class then class.Species else "dog"
+end
+
+-- Skins (owner request 2026-10-17, design/skins-proposal.md) ---------------------------------------------------------
+
+-- Focus a class and preview the skin it wears.
+function LobbyController:FocusClass(key: string)
+	if Vide.untrack(self.Panel) == "Classes" and Vide.untrack(self.Focus) ~= key then
+		self.Libs.Net.MetricUi:fireServer({ Event = "lobby_class_pick", Key = nil }) -- analytics: browsed a class
+	end
+	self.Focus(key)
+	self.SkinFocus(self.Dependencies.SkinController:EquippedOf(key))
+end
+
+-- Circles under the card: the crew uniform, then the skins on show for the class.
+function LobbyController:SkinEntries(class: string): { ClassSelect.SkinEntry }
+	const row = Content.Classes.ByKey[class]
+	const list: { ClassSelect.SkinEntry } = {
+		{
+			Key = "",
+			Name = if row then row.Name else "Crew",
+			Text = if row then row.Blurb else "",
+			Swatch = { UNIFORM_SWATCH[1], UNIFORM_SWATCH[2] },
+			Image = "",
+			Limited = false,
+		},
+	}
+	for _, key in self.Dependencies.SkinController:Shown(class) do
+		const skin = Content.Skins.ByKey[key]
+		table.insert(list, {
+			Key = key,
+			Name = skin.Name,
+			Text = skin.Text,
+			Swatch = skin.Swatch,
+			Image = SkinIcons[key] or "",
+			Limited = skin.Limited,
+		})
+	end
+	return list
+end
+
+function LobbyController:SkinStateOf(key: string): ClassSelect.SkinState
+	const skins = self.Dependencies.SkinController
+	const owned = self.Dependencies.ProfileController.Classes()
+	if key == "" then
+		const class = self.Focus()
+		if owned[class] ~= true then
+			return "Locked"
+		end
+		return if skins:EquippedOf(class) == "" then "Equipped" else "Owned"
+	end
+	const skin = Content.Skins.ByKey[key]
+	if skin == nil then
+		return "Soon"
+	end
+	if skins:Owns(key) then
+		if owned[skin.Class] ~= true then
+			return "NeedsClass"
+		end
+		return if skins:EquippedOf(skin.Class) == key then "Equipped" else "Owned"
+	end
+	return if skins:OnSale(key) then "Locked" else "Soon"
+end
+
+-- Wear `key` ("" = the uniform) with the focused class; an owned class that is not the selected one gets selected too.
+function LobbyController:EquipSkin(key: string)
+	const class = Vide.untrack(self.Focus)
+	self.Dependencies.SkinController:Equip(class, key)
+	if self:StateOf(class) == "Owned" then
+		self:Equip(class)
+	end
+end
+
+-- Top banner of the class screen: the limited sale countdown ("" = none on sale).
+function LobbyController:SkinBanner(): string
+	const left = self.Dependencies.SkinController:LimitedLeft()
+	if left == nil then
+		return ""
+	end
+	const days = math.floor(left / 86400)
+	if days >= 1 then
+		return `Halloween Skins · Limited · {days}d left`
+	end
+	return `Halloween Skins · Last day!`
 end
 
 -- Shop --------------------------------------------------------------------------------------------------------------
@@ -590,6 +689,7 @@ function LobbyController:BuyPack(key: string)
 		return
 	end
 	self.Prompting(true)
+	self.Libs.Net.MetricUi:fireServer({ Event = "lobby_gem_prompt", Key = nil }) -- analytics
 	const ok, err = pcall(function()
 		MarketplaceService:PromptProductPurchase(Players.LocalPlayer, pack.ProductId)
 	end)
@@ -807,74 +907,6 @@ function LobbyController:PlayButton(): LobbyHud.PlayButton
 	return if party.Ready[me] == true
 		then { Text = "READY!", Kind = "Go", Enabled = true }
 		else { Text = "READY", Kind = "Wait", Enabled = true }
-end
-
-function LobbyController:PlayStatus(): string
-	const _, party = self:MyParty()
-	if party == nil then
-		return if self.QuickPending() then "Starting..." else "Pick solo or squad"
-	end
-	if party.State == "Starting" then
-		if party.StartAt <= 0 then
-			return ""
-		end
-		const left = party.StartAt - self.Clock()
-		return if left > 0 then `Starting in {math.ceil(left)}...` else "Here we go!"
-	end
-	if party.Access == "Setup" then
-		return "Setting up the room..."
-	end
-	local waiting = 0
-	for _, userId in party.Members do
-		if userId ~= party.Leader and party.Ready[userId] ~= true then
-			waiting += 1
-		end
-	end
-	if waiting == 0 then
-		return if #party.Members > 1 then "Everyone is ready!" else "Invite your friends"
-	end
-	return if waiting == 1 then "Waiting for 1 player" else `Waiting for {waiting} players`
-end
-
--- Status card over the Play button: alone ("Solo") or in a squad ("Squad 2/4"), who is in it, Friends only.
-function LobbyController:PlayCard(): SquadStatus.Info
-	const _, party = self:MyParty()
-	const me = Players.LocalPlayer.UserId
-	self.Roster() -- names follow players joining / leaving
-	if party == nil then
-		return {
-			Squad = false,
-			Members = { { UserId = me, Leader = true, Ready = true, Name = nameOf(me) } },
-			Max = 1,
-			FriendsOnly = false,
-			Status = self:PlayStatus(),
-			CanInvite = false,
-			Starting = self.QuickPending(),
-		}
-	end
-	const members: { SquadStatus.Member } = {}
-	for _, userId in party.Members do
-		table.insert(members, {
-			UserId = userId,
-			Leader = userId == party.Leader,
-			Ready = party.Ready[userId] == true or userId == party.Leader,
-			Name = nameOf(userId),
-		})
-	end
-	-- a squad of one that is already starting is a solo run (Play Solo)
-	const solo = #members == 1 and party.State == "Starting"
-	return {
-		Squad = not solo,
-		Members = members,
-		Max = if solo then 1 else math.max(party.MaxPlayers, #members),
-		FriendsOnly = party.Access == "Friends" and not solo,
-		Access = if solo then nil else party.Access,
-		Status = self:PlayStatus(),
-		CanInvite = party.Leader == me
-			and party.State ~= "Starting"
-			and (party.Access == "Open" or party.Access == "Friends" or party.Access == "Invite"),
-		Starting = party.State == "Starting",
-	}
 end
 
 -- The gear beside START: the leader of a created room, before the countdown (TASK-306). Reactive (Parties).
@@ -1110,6 +1142,12 @@ function LobbyController:PadLeader(n: number): string
 	return nameOf(party.Leader)
 end
 
+-- Head shots on the sign of pad n (owner request 2026-10-17): the members, leader first
+function LobbyController:PadFaces(n: number): { number }
+	const party = self:PlatformParty(n)
+	return if party then party.Members else {}
+end
+
 -- Ring + floor glow of each platform by room state (Content.Lobby.Squad.Pad): green free / open, mustard configuring,
 -- Slate full / closed, Teal starting; the breath speeds up with the countdown; sparks while someone stands on it.
 function LobbyController:PaintPlatforms()
@@ -1291,13 +1329,17 @@ function LobbyController:SetPanel(panel: Panel)
 		end
 	end
 	if panel == "Classes" then
-		self.Focus(self.Dependencies.ProfileController.Selected())
+		self:FocusClass(self.Dependencies.ProfileController.Selected())
 		self:OpenStage()
 	end
 	if panel == "Codes" and Vide.untrack(self.CodeFeedback).Kind ~= "Wait" then
 		self.CodeFeedback({ Text = "", Kind = "None" })
 	end
 	self.Panel(panel)
+	const metric = PANEL_METRIC[panel]
+	if metric ~= nil then
+		self.Libs.Net.MetricUi:fireServer({ Event = metric :: any, Key = nil }) -- analytics (lobby window funnels)
+	end
 	self.Dependencies.InputController:SetContext(if panel == "None" then "Gameplay" else "Menu")
 	const selected = GuiService.SelectedObject
 	const gui = self.Gui
@@ -1555,11 +1597,12 @@ function LobbyController:Mount(playerGui: Instance)
 		-- Class swap on the world stage
 		Vide.effect(function()
 			const key = self.Focus()
+			const skin = self.SkinFocus()
 			const open = self.Panel() == "Classes" and self.WorldStage()
 			Vide.untrack(function()
 				const stage = self.Stage
 				if open and stage then
-					stage.Show(self:SpeciesOf(key))
+					stage.Show(self:SpeciesOf(key), skin)
 				end
 				return nil
 			end)
@@ -1615,9 +1658,6 @@ function LobbyController:Mount(playerGui: Instance)
 				Play = function()
 					return self:PlayButton()
 				end,
-				Card = function()
-					return self:PlayCard()
-				end,
 				Keys = function()
 					return self:DeviceKeys()
 				end,
@@ -1627,10 +1667,6 @@ function LobbyController:Mount(playerGui: Instance)
 				OnPlay = function()
 					self:Click()
 					self:Play()
-				end,
-				OnInvite = function()
-					self:Click()
-					self:SetPanel("Squad")
 				end,
 				CancelKey = function()
 					return self:CancelKey()
@@ -1666,7 +1702,7 @@ function LobbyController:Mount(playerGui: Instance)
 				OnFocus = function(key: string)
 					if Vide.untrack(self.Focus) ~= key then
 						self:Click()
-						self.Focus(key)
+						self:FocusClass(key)
 					end
 				end,
 				OnBuyGems = function(key: string)
@@ -1692,6 +1728,36 @@ function LobbyController:Mount(playerGui: Instance)
 					return gifts:CanGift(key)
 				end,
 				OnClose = close,
+				-- class skins (owner request 2026-10-17): circles under the card, preview on the stage, Robux only
+				Skins = {
+					Entries = function(class: string)
+						return self:SkinEntries(class)
+					end,
+					Focus = self.SkinFocus,
+					OnFocus = function(key: string)
+						if Vide.untrack(self.SkinFocus) ~= key then
+							self:Click()
+							self.SkinFocus(key)
+						end
+					end,
+					StateOf = function(key: string): ClassSelect.SkinState
+						return self:SkinStateOf(key)
+					end,
+					RobuxOf = function(key: string): number?
+						return self.Dependencies.SkinController:RobuxOf(key)
+					end,
+					OnBuy = function(key: string)
+						self:Click()
+						self.Dependencies.SkinController:Buy(key)
+					end,
+					OnEquip = function(key: string)
+						self:Click()
+						self:EquipSkin(key)
+					end,
+					Banner = function()
+						return self:SkinBanner()
+					end,
+				},
 				Stage = stage,
 				Scale = self.Scale,
 			}),
@@ -1979,6 +2045,9 @@ function LobbyController:Mount(playerGui: Instance)
 		Leader = function(n: number)
 			return self:PadLeader(n)
 		end,
+		Faces = function(n: number)
+			return self:PadFaces(n)
+		end,
 		Badge = LOBBY.Squad.Pad.Badge,
 		OnCount = function(n: number, from: number, to: number)
 			self:OnPadCount(n, from, to)
@@ -2038,7 +2107,9 @@ LobbyController:OnInit(function(self)
 			self:ClearQuickPlay() -- a quick play refused: the buttons come back
 		end
 		const line = Text.Party(data.Key, if data.UserId then nameOf(data.UserId) else nil)
-		self:Toast(line.Text, line.Kind)
+		if not line.Quiet then
+			self:Toast(line.Text, line.Kind)
+		end
 	end)
 
 	net.ClassBuyResult:onClient(function(data)
@@ -2054,7 +2125,7 @@ LobbyController:OnInit(function(self)
 		const text = Text.Code(data.Ok, data.Reason, data.Reward.Gems, data.Reward.Class)
 		self.CodeFeedback({ Text = text, Kind = if data.Ok then "Good" else "Bad" })
 		if data.Ok then
-			self:Toast(text, "Good")
+			-- no toast (owner 2026-10-17): the Codes window line says it and the confetti celebrates it
 			-- confetti + the buy chime for a redeemed code (owner 2026-10-17)
 			self.Dependencies.PurchaseFxController:Show("Code redeemed!", 1.6)
 		end
@@ -2083,6 +2154,14 @@ LobbyController:OnStart(function(self)
 	-- gift answers (GiftResult) land in the lobby toast column
 	self.Dependencies.GiftController:SetToaster(function(text: string, kind: Text.Kind)
 		self:Toast(text, kind)
+	end)
+
+	-- a skin bought (receipt -> SkinState): toast; the stage shows it when it is the one previewed
+	self.Dependencies.SkinController.Granted:Connect(function(key: string)
+		const skin = Content.Skins.ByKey[key]
+		if skin then
+			self:Toast(`{skin.Name} is yours!`, "Good")
+		end
 	end)
 
 	MarketplaceService.PromptProductPurchaseFinished:Connect(function(userId: number, _productId: number, _bought: boolean)

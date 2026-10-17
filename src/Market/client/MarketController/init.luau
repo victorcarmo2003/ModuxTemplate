@@ -107,6 +107,10 @@ const HINT_PHASES: { [string]: boolean } = {}
 for _, phase in MART.Hint.Phases do
 	HINT_PHASES[phase] = true
 end
+const BUN_PHASES: { [string]: boolean } = {}
+for _, phase in MART.BunHint.Phases do
+	BUN_PHASES[phase] = true
+end
 -- Upgrades record not received yet. A source of an optional type cannot be read with `()` (ambiguous overload).
 const UNKNOWN_LEVEL = -1
 
@@ -114,7 +118,10 @@ const UNKNOWN_LEVEL = -1
 type Availability = "Unknown" | "Open" | "Blocked"
 
 const MarketController =
-	Modux.Controller("MarketController", { Require = { "RoundController", "AudioController", "TutorialController" }, Priority = 680 })
+	Modux.Controller(
+	"MarketController",
+	{ Require = { "RoundController", "AudioController", "TutorialController", "HudController" }, Priority = 680 }
+)
 
 function MarketController:Setup()
 	-- Party cash (Economy.Cash). Until the first record arrives nothing is drawn red.
@@ -136,6 +143,11 @@ function MarketController:Setup()
 	self.Plates = {} :: { [string]: Part }
 	self.Hint = nil :: Hint.Hint?
 	self.HintDismissed = false :: boolean
+	-- Low-bun Mart hint (Content.Mart.BunHint, 2026-10-17): its own beacon; showing now; reached the door this low spell
+	self.BunHint = nil :: Hint.Hint?
+	self.BunShown = false :: boolean
+	self.BunDismissed = false :: boolean
+	self.BunToasted = false :: boolean
 	-- Stock set: Blocked per ingredient key.
 	self.Stock = {} :: { [string]: Vide.Source<Availability> }
 	for _, ingredient in Content.Ingredients.List do
@@ -724,10 +736,59 @@ function MarketController:HintTarget(): Instance?
 	return nil
 end
 
+-- Low buns (Content.Mart.BunHint, owner decision 2026-10-17: the Mart lesson left Day 1): an arrow to the Mart door and
+-- one toast per low spell, any day, while the tutorial is not running. Owns the screen over the gear-stand hint.
+function MarketController:StepBunHint()
+	const hint = self.BunHint
+	if hint == nil then
+		return
+	end
+	const rule = MART.BunHint
+	const tutorial = self.Dependencies.TutorialController
+	const phase = Vide.untrack(self.Dependencies.RoundController.Phase)
+	const stock = Vide.untrack(function(): number?
+		return tutorial:StockAmount("bun")
+	end)
+	const low = stock ~= nil and stock <= rule.LowBuns
+	if not low then
+		self.BunDismissed = false
+		self.BunToasted = false
+	end
+	const tutorialOn = Vide.untrack(function(): boolean
+		return tutorial:FirstRun()
+	end)
+	if not low or tutorialOn or self.BunDismissed or not BUN_PHASES[phase] then
+		self.BunShown = false
+		hint:Set(false)
+		return
+	end
+	const door = tutorial:MartDoor()
+	const character = Players.LocalPlayer.Character
+	const root = if character then character:FindFirstChild("HumanoidRootPart") else nil
+	if door and door:IsA("BasePart") and root and root:IsA("BasePart") then
+		if (root.Position - door.Position).Magnitude <= rule.Reach then
+			self.BunDismissed = true -- at the Mart: done until the stock goes back up
+			self.BunShown = false
+			hint:Set(false)
+			return
+		end
+	end
+	hint:SetTarget(door)
+	hint:Set(door ~= nil)
+	self.BunShown = door ~= nil
+	if door ~= nil and not self.BunToasted then
+		self.BunToasted = true
+		self.Dependencies.HudController:PushText("Buns running low! Grab more at the Mart.", "Info")
+	end
+end
+
 function MarketController:StepHint()
 	const hint = self.Hint
 	if hint == nil then
 		return
+	end
+	if self.BunShown then
+		hint:Set(false) -- one arrow at a time: the buns first
 	end
 	const round = self.Dependencies.RoundController
 	const phase = Vide.untrack(round.Phase)
@@ -794,6 +855,7 @@ function MarketController:Step()
 		self:SyncPlates()
 		self:SyncShelves()
 	end
+	self:StepBunHint()
 	self:StepHint()
 	self.Kiosk:Step(now)
 	const camera = workspace.CurrentCamera
@@ -938,6 +1000,7 @@ MarketController:OnStart(function(self)
 	task.spawn(function()
 		const playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 		self.Hint = Hint.new(playerGui)
+		self.BunHint = Hint.new(playerGui)
 		self:Watch(playerGui)
 		self:WatchKiosk()
 	end)

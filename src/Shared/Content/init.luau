@@ -45,6 +45,7 @@ local Seating = require(script.Seating)
 local Security = require(script.Security)
 local Shift = require(script.Shift)
 local Shop = require(script.Shop)
+local Skins = require(script.Skins)
 local ShopWindow = require(script.ShopWindow)
 local Sounds = require(script.Sounds)
 local Species = require(script.Species)
@@ -153,6 +154,10 @@ export type ShopGemPack = Shop.GemPack
 export type ShopClassProduct = Shop.ClassProduct
 export type ShopGift = Shop.Gift
 export type ShopGiftKind = Shop.GiftKind
+export type ShopOffer = Shop.Offer
+export type ShopOfferRules = Shop.OfferRules
+export type ShopBundle = Shop.Bundle
+export type ShopPass = Shop.Pass
 export type GroupPair = Flow.GroupPair
 export type Groups = Flow.Groups
 export type Adopt = Flow.Adopt
@@ -160,6 +165,7 @@ export type Sound = Sounds.Sound
 export type VoiceLine = VoiceLines.VoiceLine
 export type SoundRules = Sounds.SoundRules
 export type Species = Species.Species
+export type Skin = Skins.Skin
 export type Stat = Stats.Stat
 export type Station = Stations.Station
 export type Thief = Thief.Thief
@@ -298,4 +304,7 @@ return table.freeze({
 	-- Anomaly Tablet in the trailer: one page per V2 anomaly, unlocked per profile (TASK-335, TASK-345; owner request 2026-10-15;
 	-- JournalService, JournalController). Provisional
 	Journal = Journal,
+
+	-- Class skins, Robux only (owner request 2026-10-17; design/skins-proposal.md; SkinService, SkinController). Provisional
+	Skins = Skins,
 })

@@ -49,12 +49,12 @@ export type Item = {
 	Done: () -> number,
 	-- false = out of reach, in its grace: dimmed, never used
 	Enabled: () -> boolean,
-	-- Extra hint of the selected row ("  ·  hold R: Refuse"), shown in the footer (desktop / gamepad)
+	-- Extra hint of the selected row ("  ·  hold R: <action>"), shown in the footer (desktop); none in use since DEC-261
 	Hint: () -> string,
 }
 
 -- Gamepad button glyphs (UserInputService:GetImageForKeyCode of the controller in use); "" = no image, a text fallback shows
-export type Glyphs = { Use: string, Refuse: string, Up: string, Down: string }
+export type Glyphs = { Use: string, Up: string, Down: string }
 
 export type Props = {
 	-- Glyphs of the console buttons (owner PromptController; reads UserInputService, so it follows Xbox / PlayStation)
@@ -104,7 +104,7 @@ const RING_THICKNESS = 6
 const OPTION_ICON = 24
 const MAIN_ICON = 30
 
-const EMPTY_GLYPHS: Glyphs = { Use = "", Refuse = "", Up = "", Down = "" }
+const EMPTY_GLYPHS: Glyphs = { Use = "", Up = "", Down = "" }
 const GLYPH_SIZE = 18 -- console button image in the chip (22) / the footer strip
 const RELEASE_TIME = 0.15
 const SELECT_SCALE = 1.04
@@ -118,7 +118,7 @@ const RING_SWEEP = NumberSequence.new({
 })
 
 local function trimHint(hint: string): string
-	-- "  ·  hold R: Refuse" -> "hold R: Refuse"
+	-- "  ·  hold R: <action>" -> "hold R: <action>"
 	const text = string.gsub(hint, "^[%s\194\183]+", "")
 	return text
 end
@@ -226,13 +226,6 @@ return function(props: Props): Frame
 		const item = props.Selected()
 		return if item and props.Device() ~= "Gamepad" then trimHint(item.Hint()) else ""
 	end
-	-- "hold Y: Refuse" -> "hold: Refuse" (the glyph of the button sits before it)
-	const padExtraText = function(): string
-		const item = props.Selected()
-		const hint = if item then trimHint(item.Hint()) else ""
-		const action = string.match(hint, ":%s*(.+)$")
-		return if action then `hold: {action}` else ""
-	end
 	const glyphs = function(): Glyphs
 		return if props.Glyphs then props.Glyphs() else EMPTY_GLYPHS
 	end
@@ -291,7 +284,7 @@ return function(props: Props): Frame
 		}) :: TextLabel
 	end
 
-	-- Gamepad footer strip: [D-pad up][D-pad down] move  [X] use  [Y] hold: Refuse (glyphs of the controller in use)
+	-- Gamepad footer strip: [D-pad up][D-pad down] move  [X] use (glyphs of the controller in use)
 	local function padGlyph(name: string, order: number, pick: (Glyphs) -> string, visible: (() -> boolean)?): ImageLabel
 		const image = function(): string
 			return pick(glyphs())
@@ -308,9 +301,6 @@ return function(props: Props): Frame
 		}) :: ImageLabel
 	end
 	local function padStrip(): Frame
-		const hasExtra = function(): boolean
-			return padExtraText() ~= ""
-		end
 		return create("Frame")({
 			Name = "PadHint",
 			LayoutOrder = 102,
@@ -339,10 +329,6 @@ return function(props: Props): Frame
 			footer("UseText", 5, Theme.Color.Cream, function()
 				return "use"
 			end),
-			padGlyph("Refuse", 6, function(set: Glyphs)
-				return set.Refuse
-			end, hasExtra),
-			footer("RefuseText", 7, Theme.Color.Gold, padExtraText),
 		}) :: Frame
 	end
 

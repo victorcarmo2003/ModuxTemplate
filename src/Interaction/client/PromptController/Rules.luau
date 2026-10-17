@@ -5,8 +5,8 @@
 -- Rule of doubt: when a record is missing, the prompt stays (the server decides); only known facts hide it.
 -- Pure: no Modux, Lync or Vide. The controller passes the lookups in.
 -- Wave 3 (TASK-131, DEC-221, architecture.md §19.14 v4.2): VehicleController plugs a probe over the `Shutter`
--- attribute of the current vehicle (SetShutterProbe). With the service window closed "Take Order", "Serve" and
--- "Refuse" show no prompt (the server gate `Shutter` refuses them anyway). Without a probe nothing changes.
+-- attribute of the current vehicle (SetShutterProbe). With the service window closed "Take Order" and "Serve"
+-- show no prompt (the server gate `Shutter` refuses them anyway). Without a probe nothing changes.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 
@@ -52,7 +52,7 @@ export type ShutterProbe = {
 }
 
 -- Counter actions the closed window stops (architecture.md §19.14 gate `Shutter`).
-const COUNTER_ACTIONS: { [string]: boolean } = { take_order = true, serve = true, refuse = true }
+const COUNTER_ACTIONS: { [string]: boolean } = { take_order = true, serve = true }
 
 -- Pill text of `shutter_toggle` by state (ui-text.md §2; Provisional).
 const SHUTTER_TEXT_OPEN = "Close Window" -- window open: the button closes it

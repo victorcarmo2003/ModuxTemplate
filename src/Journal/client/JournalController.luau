@@ -4,16 +4,22 @@
 
 	The client of the Anomaly Tablet. The server (JournalService) owns the pages; here:
 	  Pages    Vide source from the `Journal` packet (profile.Journal). New = a page that just unlocked: a HUD toast
-	           (Content.Journal.Rules.ToastText, HudController:PushText "Good"), the page is marked "NEW!" until the
-	           tablet is closed with it on screen, and the tablet in the trailer glows for Rules.Blink s (or until opened).
+	           (Content.Journal.Rules.ToastText, HudController:PushText "Good").
+	  Fresh    (owner request 2026-10-17, Provisional) the unlocked pages whose gems were not claimed yet (Pages minus
+	           Claimed, profile.JournalClaimed: saved, so it survives a rejoin). Each is "NEW!" on the tablet. A Fresh
+	           page that stays on screen CLAIM_DELAY s while the tablet is open sends JournalClaim; the server pays
+	           Rules.Reward gems and answers with Gained = that key: GemCollect plays over the tablet (gems fly into a
+	           "+100" pill, coin per gem, buy chime at the end) and the page stops being Fresh.
 	  Open     `JournalOpen` (the read_journal prompt on the tablet): the AnomalyTablet window in its own ScreenGui
 	           ("AnomalyTablet", DisplayOrder 20), behind the window backdrop (Backdrop.Hold, TASK-311). It opens on the
 	           newest unread page, else where it was left. Swipe / drag / wheel / dots live in the component; here, while
 	           open: Left / Right arrow keys, LB / RB, LT / RT and D-pad left / right turn pages, gamepad B closes, the
 	           selection lands on "Next"; a Modal button frees the mouse from the first-person lock.
 	           Walking away from the tablet (Radius + AWAY studs) or a life state other than alive closes it.
-	  Glow     a Mustard Highlight on the tablet Model (Rules.Model; the parent Model of the read_journal anchor) pulsing.
-	Presentation only: nothing here changes a page.
+	  Unseen   any Fresh page. While Unseen: a Mustard Highlight on the tablet Model (Rules.Model; the parent Model of
+	           the read_journal anchor) pulsing, and the TabletBadge on its screen (where the "?" sticker was) shows a yellow "!"; else the badge shows a
+	           green check. Only opening every new page (and its claim) clears it.
+	Presentation only: the server decides pages and gems.
 ]]
 local CollectionService = game:GetService("CollectionService")
 local GuiService = game:GetService("GuiService")
@@ -27,6 +33,8 @@ local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Backdrop = require(StarterPlayer.StarterPlayerScripts.client.Interface.Backdrop)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
 local AnomalyTablet = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.AnomalyTablet)
+local TabletBadge = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.TabletBadge)
+local GemCollect = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.GemCollect)
 
 const rules = Content.Journal.Rules
 const pageList = Content.Journal.List
@@ -36,13 +44,27 @@ const GLOW_NAME = "JournalGlow"
 const GLOW_PERIOD = 0.9 -- s of one pulse
 const AWAY = 6 -- studs past the prompt radius that close the tablet
 const AWAY_CHECK = 0.5 -- s between two distance checks
+const BADGE_CHECK = 1 -- s between two looks for the tablet (streaming, trailer rebuilt or moved)
+const SCREEN_NAME = "Screen" -- the lit screen Part of the tablet Model (anomaly_tablet.luau)
+const STICKER_TEXT = "?" -- the sticker the badge replaces
+const CLAIM_DELAY = 0.6 -- s a new page stays on screen before its gems are claimed (the player sees it first)
+const CLAIM_RETRY = 5 -- s before a claim with no answer may be sent again
 const FIRST_CONTROL = "Next"
 const TURN_PREV = "JournalPrev"
 const TURN_NEXT = "JournalNext"
 const CLOSE = "JournalClose"
 
+type Spot = { AnchorPoint: Vector2, Position: UDim2, Size: UDim2, SizeConstraint: Enum.SizeConstraint }
+-- the sticker's place in anomaly_tablet.luau, until the real one is read
+const DEFAULT_SPOT: Spot = {
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(0.5, 0.66),
+	Size = UDim2.fromScale(0.42, 0.42),
+	SizeConstraint = Enum.SizeConstraint.RelativeXX,
+}
+
 const JournalController = Modux.Controller("JournalController", {
-	Require = { "InputController", "HudController" },
+	Require = { "InputController", "HudController", "AudioController" },
 	Priority = 450,
 })
 
@@ -53,7 +75,14 @@ function JournalController:Setup()
 	self.Index = Vide.source(1) :: Vide.Source<number>
 	self.Scale = Vide.source(1) :: Vide.Source<number>
 	self.Gui = nil :: ScreenGui?
-	self.GlowUntil = 0 :: number
+	self.Unseen = Vide.source(false) :: Vide.Source<boolean>
+	-- key -> os.clock() of a JournalClaim sent and not answered yet
+	self.Pending = {} :: { [string]: number }
+	self.ClaimSerial = 0 :: number
+	-- the badge on the tablet screen: its SurfaceGui, whether the tablet is there, and where the "?" sticker sits
+	self.BadgeGui = nil :: SurfaceGui?
+	self.BadgeOn = Vide.source(false) :: Vide.Source<boolean>
+	self.BadgeSpot = Vide.source(DEFAULT_SPOT) :: Vide.Source<Spot>
 	self.GlowConnection = nil :: RBXScriptConnection?
 	self.AwayThread = nil :: thread?
 end
@@ -80,7 +109,6 @@ end
 -- Glow --------------------------------------------------------------------------------------------------------------
 
 function JournalController:StopGlow()
-	self.GlowUntil = 0
 	if self.GlowConnection then
 		self.GlowConnection:Disconnect()
 		self.GlowConnection = nil
@@ -93,12 +121,11 @@ function JournalController:StopGlow()
 end
 
 function JournalController:StartGlow()
-	self.GlowUntil = os.clock() + rules.Blink
 	if self.GlowConnection then
 		return
 	end
 	self.GlowConnection = RunService.Heartbeat:Connect(function()
-		if os.clock() >= self.GlowUntil then
+		if not Vide.untrack(self.Unseen) then
 			self:StopGlow()
 			return
 		end
@@ -134,15 +161,78 @@ function JournalController:OnJournal(data: any)
 			end
 		end
 	end
+	const fresh: { [string]: boolean } = {}
+	for key in pages do
+		if type(data.Claimed) ~= "table" or data.Claimed[key] ~= true then
+			fresh[key] = true
+		else
+			self.Pending[key] = nil
+		end
+	end
 	self.Pages(pages)
-	const new = data.New
-	if type(new) == "string" and pages[new] then
-		const fresh = table.clone(Vide.untrack(self.Fresh))
-		fresh[new] = true
-		self.Fresh(fresh)
-		self.Dependencies.HudController:PushText(rules.ToastText, "Good")
+	self.Fresh(fresh)
+	const unseen = next(fresh) ~= nil
+	self.Unseen(unseen)
+	if unseen then
 		self:StartGlow()
 	end
+	const new = data.New
+	if type(new) == "string" and pages[new] then
+		self.Dependencies.HudController:PushText(rules.ToastText, "Good")
+	end
+	const gained = data.Gained
+	if type(gained) == "string" then
+		self:PlayCollect()
+	end
+	-- the page on screen may still be new (several new pages, or a claim that was dropped)
+	self:ScheduleClaim()
+end
+
+-- Gems fly out of the tablet into a "+Reward" pill; coin on every landing, the buy chime at the end.
+function JournalController:PlayCollect()
+	const audio = self.Dependencies.AudioController
+	GemCollect.Play({
+		Amount = rules.Reward,
+		OnLand = function(index: number, _count: number)
+			if index % 2 == 1 then
+				pcall(function()
+					audio:Play("coin")
+				end)
+			end
+		end,
+		OnDone = function()
+			pcall(function()
+				audio:Play("buy")
+			end)
+		end,
+	})
+end
+
+-- Claims the page on screen once it stayed there CLAIM_DELAY s with the tablet open (any turn restarts the wait).
+function JournalController:ScheduleClaim()
+	self.ClaimSerial += 1
+	const serial = self.ClaimSerial
+	if not Vide.untrack(self.Open) then
+		return
+	end
+	const key = pageList[Vide.untrack(self.Index)].Key
+	if not Vide.untrack(self.Fresh)[key] then
+		return
+	end
+	task.delay(CLAIM_DELAY, function()
+		if serial ~= self.ClaimSerial or not Vide.untrack(self.Open) then
+			return
+		end
+		if pageList[Vide.untrack(self.Index)].Key ~= key or not Vide.untrack(self.Fresh)[key] then
+			return
+		end
+		const sent = self.Pending[key]
+		if sent ~= nil and os.clock() - sent < CLAIM_RETRY then
+			return
+		end
+		self.Pending[key] = os.clock()
+		self.Libs.Net.JournalClaim:fireServer(key)
+	end)
 end
 
 -- Newest unread page in tablet order (the last one), nil when none.
@@ -157,23 +247,103 @@ function JournalController:FreshIndex(): number?
 	return found
 end
 
--- The page on screen is read: it loses its "NEW!" when the tablet closes or the page turns.
-function JournalController:MarkRead()
-	const key = pageList[Vide.untrack(self.Index)].Key
-	const fresh = Vide.untrack(self.Fresh)
-	if fresh[key] then
-		const copy = table.clone(fresh)
-		copy[key] = nil
-		self.Fresh(copy)
-	end
-end
-
 function JournalController:Turn(delta: number)
 	const index = math.clamp(Vide.untrack(self.Index) + delta, 1, #pageList)
 	if index ~= Vide.untrack(self.Index) then
-		self:MarkRead()
 		self.Index(index)
+		self:ScheduleClaim()
 	end
+end
+
+-- Badge -------------------------------------------------------------------------------------------------------------
+
+-- The "?" sticker on the tablet screen (tools/assetplace/anomaly_tablet.luau) and its SurfaceGui; nil while not placed.
+function JournalController:Sticker(): (TextLabel?, SurfaceGui?)
+	const model = self:BookModel()
+	const screen = if model then model:FindFirstChild(SCREEN_NAME) else nil
+	if screen == nil then
+		return nil, nil
+	end
+	const gui = screen:FindFirstChildOfClass("SurfaceGui")
+	if gui == nil then
+		return nil, nil
+	end
+	for _, child in gui:GetDescendants() do
+		if child:IsA("TextLabel") and child.Text == STICKER_TEXT then
+			return child, gui
+		end
+	end
+	return nil, gui
+end
+
+-- Follows the tablet: the badge SurfaceGui sits on the Screen part, over the "?" sticker (hidden on this client only),
+-- same place and size. Rechecked every BADGE_CHECK s (streaming, trailer rebuilt).
+function JournalController:WatchBadge()
+	task.spawn(function()
+		while true do
+			const sticker, gui = self:Sticker()
+			const surface = self.BadgeGui
+			if surface then
+				const screen = if gui then gui.Parent else nil
+				if surface.Adornee ~= screen then
+					surface.Adornee = screen :: any
+				end
+				if gui then
+					surface.CanvasSize = gui.CanvasSize
+					surface.Brightness = gui.Brightness
+				end
+			end
+			if sticker then
+				sticker.Visible = false
+				self.BadgeSpot({
+					AnchorPoint = sticker.AnchorPoint,
+					Position = sticker.Position,
+					Size = sticker.Size,
+					SizeConstraint = sticker.SizeConstraint,
+				})
+			end
+			self.BadgeOn(gui ~= nil)
+			task.wait(BADGE_CHECK)
+		end
+	end)
+end
+
+function JournalController:MountBadge(playerGui: Instance)
+	const spot = self.BadgeSpot
+	const surface = Instance.new("SurfaceGui")
+	surface.Name = "TabletBadge"
+	surface.Face = Enum.NormalId.Front
+	surface.LightInfluence = 0
+	surface.ZOffset = 1
+	surface.ResetOnSpawn = false
+	surface.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
+	-- the cartoon kit layers by sibling order (face over lip); Global would draw the dark lip over the face
+	surface.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	Vide.root(function()
+		const badge = TabletBadge({
+			Name = "Seal",
+			Alert = self.Unseen,
+			Visible = function()
+				return self.BadgeOn()
+			end,
+			AnchorPoint = Vide.untrack(spot).AnchorPoint,
+			Position = Vide.untrack(spot).Position,
+			Size = Vide.untrack(spot).Size,
+			SizeConstraint = Vide.untrack(spot).SizeConstraint,
+		})
+		badge.Parent = surface
+		-- the sticker geometry arrives with the first look at the tablet
+		Vide.effect(function()
+			const at = spot()
+			badge.AnchorPoint = at.AnchorPoint
+			badge.Position = at.Position
+			badge.Size = at.Size
+			badge.SizeConstraint = at.SizeConstraint
+		end)
+		return nil
+	end)
+	self.BadgeGui = surface
+	surface.Parent = playerGui
 end
 
 -- Window ------------------------------------------------------------------------------------------------------------
@@ -188,7 +358,6 @@ function JournalController:SetOpen(open: boolean)
 		if fresh then
 			self.Index(fresh)
 		end
-		self:StopGlow()
 		input:Bind({ Name = TURN_PREV, Key = Enum.KeyCode.Left, Keys = { Enum.KeyCode.ButtonL1, Enum.KeyCode.ButtonL2, Enum.KeyCode.DPadLeft } }).OnPress(function()
 			self:Turn(-1)
 		end)
@@ -200,7 +369,6 @@ function JournalController:SetOpen(open: boolean)
 		end)
 		self:WatchAway()
 	else
-		self:MarkRead()
 		input:Unbind(TURN_PREV)
 		input:Unbind(TURN_NEXT)
 		input:Unbind(CLOSE)
@@ -212,6 +380,7 @@ function JournalController:SetOpen(open: boolean)
 	end
 	self.Open(open)
 	self:Select(open)
+	self:ScheduleClaim()
 end
 
 -- Closes the tablet when the body walks away from it or stops being alive.
@@ -352,7 +521,10 @@ JournalController:OnStart(function(self)
 	self:WatchViewport()
 	-- PlayerGui may arrive a frame late; do not hold up the other OnStart.
 	task.spawn(function()
-		self:Mount(Players.LocalPlayer:WaitForChild("PlayerGui"))
+		const playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+		self:Mount(playerGui)
+		self:MountBadge(playerGui)
+		self:WatchBadge()
 	end)
 end)
 

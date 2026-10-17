@@ -33,6 +33,7 @@ export type Public = {
 	Notify: (self: Public, player: Player, kind: string, value: number) -> (),
 	ReplyClass: (self: Public, player: Player, key: string, reason: "Granted") -> (),
 	GemPackHandler: (self: Public, pack: Content.ShopGemPack) -> Handler,
+	BundleHandler: (self: Public, bundle: Content.ShopBundle) -> Handler,
 	OwnsPass: (self: Public, player: Player, passId: number) -> boolean?,
 	OwnsClassPass: (self: Public, player: Player, key: string) -> boolean,
 	GrantPass: (self: Public, player: Player, key: string, notify: boolean) -> boolean,

@@ -39,6 +39,11 @@
 	CrewExpressions, every CrewLooks texture) is preloaded once. Until that finishes (or WARMUP_TIMEOUT), NPC rigs
 	(outfit Use ~= "Crew") are hidden locally with LocalTransparencyModifier, so nobody sees a half-downloaded NPC
 	(dark body, no head/arms) during the intro. Only during the warm-up: no conflict with night anomaly effects.
+	Texture ids go to PreloadAsync wrapped in a Decal (`preloadable`): a plain "rbxassetid://" string always reports
+	Failure (checked in Studio 2026-10-17, as the audio ids of LoadQueue), so before that fix no look texture was really
+	preloaded and every outfit / head / skin downloaded when the rig first showed (owner 2026-10-17: the looks rendered
+	in front of the player at the start). Order: the crew (uniform, playable heads, class skins, atlas) first, then the
+	NPC looks.
 ]]
 local CollectionService = game:GetService("CollectionService")
 local ContentProvider = game:GetService("ContentProvider")
@@ -48,6 +53,7 @@ local StarterPlayer = game:GetService("StarterPlayer")
 local Content = require(ReplicatedStorage.shared.Content)
 local CrewLooks = require(ReplicatedStorage.shared.Crew.CrewLooks)
 local CrewRig = require(ReplicatedStorage.shared.Crew.CrewRig)
+local SkinLooks = require(ReplicatedStorage.shared.Crew.SkinLooks)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 
 type Pack = CrewRig.Pack
@@ -80,6 +86,36 @@ const MIRROR_SUFFIX = "_mirror" -- CrewLooks.Outfits key of the mirrored sheet (
 const WARMUP_TIMEOUT = 12
 
 const RigController = Modux.Controller("RigController", { Priority = 680 })
+
+-- PreloadAsync list item for a texture id: a Decal holding it (a plain id string is reported Failure and not
+-- downloaded). Instances pass through.
+local function preloadable(items: { any }): { any }
+	const out: { any } = {}
+	for _, item in items do
+		if typeof(item) == "string" then
+			if item ~= "" then
+				const holder = Instance.new("Decal")
+				holder.Texture = item
+				table.insert(out, holder)
+			end
+		else
+			table.insert(out, item)
+		end
+	end
+	return out
+end
+
+-- Every texture of a class skin (outfit sheets, atlas, head) by pack.
+local function skinTextures(look: SkinLooks.SkinLook): { string }
+	const out: { string } = { look.Day, look.Mid, look.Night, look.Atlas.Day, look.Atlas.Mid, look.Atlas.Night }
+	const head = look.Head
+	if head ~= nil then
+		table.insert(out, head.Day)
+		table.insert(out, head.Mid)
+		table.insert(out, head.Night)
+	end
+	return out
+end
 
 function RigController:Setup()
 	self.Rigs = {} :: { [Model]: Rig }
@@ -161,24 +197,48 @@ function RigController:Warmup()
 		if expressions ~= nil then
 			table.insert(list, expressions)
 		end
-		for _, look in CrewLooks.Species do
-			for _, id in look.Head do
+		-- the crew first: uniform, atlas, the playable species' heads and the class skins
+		for _, id in CrewLooks.Outfits.crew or {} do
+			table.insert(list, id)
+		end
+		for _, id in CrewLooks.Atlas do
+			table.insert(list, id)
+		end
+		const crewSpecies: { [string]: boolean } = {}
+		for _, class in Content.Classes.List do
+			crewSpecies[class.Species] = true
+			const look = CrewLooks.Species[class.Species]
+			if look ~= nil then
+				for _, id in look.Head do
+					table.insert(list, id)
+				end
+			end
+		end
+		for _, look in SkinLooks.BySkin do
+			for _, id in skinTextures(look) do
 				table.insert(list, id)
+			end
+		end
+		-- then the NPC looks
+		for key, look in CrewLooks.Species do
+			if not crewSpecies[key] then
+				for _, id in look.Head do
+					table.insert(list, id)
+				end
 			end
 			if look.Blank ~= nil then
 				table.insert(list, look.Blank.Head)
 			end
 		end
-		for _, sheets in CrewLooks.Outfits do
-			for _, id in sheets do
-				table.insert(list, id)
+		for key, sheets in CrewLooks.Outfits do
+			if key ~= "crew" then
+				for _, id in sheets do
+					table.insert(list, id)
+				end
 			end
 		end
-		for _, id in CrewLooks.Atlas do
-			table.insert(list, id)
-		end
 		pcall(function()
-			ContentProvider:PreloadAsync(list)
+			ContentProvider:PreloadAsync(preloadable(list))
 		end)
 		self:EndWarmup()
 	end)
@@ -321,6 +381,14 @@ function RigController:Preload(model: Model)
 		add("Outfit:" .. (outfit :: string), sheets)
 	end
 	add("Atlas", CrewLooks.Atlas)
+	const skin = model:GetAttribute("Skin")
+	const skinLook = if typeof(skin) == "string" then SkinLooks.BySkin[skin] else nil
+	if skinLook ~= nil and not self.Preloaded["Skin:" .. (skin :: string)] then
+		self.Preloaded["Skin:" .. (skin :: string)] = true
+		for _, id in skinTextures(skinLook) do
+			table.insert(ids, id)
+		end
+	end
 	if not self.Preloaded.Expressions then
 		self.Preloaded.Expressions = true
 		const folder = ReplicatedStorage:FindFirstChild("CrewExpressions")
@@ -333,7 +401,7 @@ function RigController:Preload(model: Model)
 	if #ids > 0 then
 		task.spawn(function()
 			pcall(function()
-				ContentProvider:PreloadAsync(ids)
+				ContentProvider:PreloadAsync(preloadable(ids))
 			end)
 		end)
 	end

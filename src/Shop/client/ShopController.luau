@@ -20,10 +20,20 @@
 	    the Scare card blinks for FLASH_TIME s.
 	  - Controller: opening a window with the gamepad puts the selection on its first button (GuiService), closing it
 	    lets go of a selection inside it.
+	  - Offers (TASK-363; owner request 2026-10-17, Provisional): `Offer` puts a contextual offer of OfferController in
+	    the same note (product icon + text + price, NudgeIcon). Clicking it runs the offer's click (the prompt of that
+	    product with its target picked, or the shop with its card flashing: `PromptOffer` / `ShowCard`); any other note
+	    (receipts, the scare nudge) drops the offer. The scare nudge asks `NudgeGate` first and reports `NudgeShown`, so
+	    OfferController keeps it inside the offers budget.
+	    Key (owner request 2026-10-17): while an offer shows, G (keyboard) / ButtonY (controller) does the same as the
+	    click; the note ends with "[G]" or the Y button image (NudgePad). Not E / ButtonX: those belong to the map's
+	    ProximityPrompts. ButtonY is also used by the prep mode, the faint screen and the security cameras, where an
+	    offer never shows (OfferController / CanOffer); the binding exists only while the offer is on the note.
 ]]
 local GuiService = game:GetService("GuiService")
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -41,6 +51,9 @@ type Utility = ShopContent.Utility
 const TOGGLE_ACTION = "ShopToggle"
 const TOGGLE_KEY = Enum.KeyCode.B
 const TOGGLE_PAD = Enum.KeyCode.DPadRight -- free in game servers (the lobby uses it for its squad panel)
+const OFFER_ACTION = "ShopOfferBuy"
+const OFFER_KEY = Enum.KeyCode.G
+const OFFER_PAD = Enum.KeyCode.ButtonY
 const DISPLAY_ORDER = 20 -- same layer as the settings window
 const SCARE_KEY = "util_scare"
 const SCARE_NOTE = "<scare>" -- Nudge value of the scare note: NudgeLine picks the words per device
@@ -93,6 +106,17 @@ function ShopController:Setup()
 	self.PickKey = "" :: string
 	self.Status = Vide.source("") :: Vide.Source<string>
 	self.Nudge = Vide.source("") :: Vide.Source<string>
+	-- Icons name left of the note (offers); "" = none
+	self.NudgeIcon = Vide.source("") :: Vide.Source<string>
+	-- click of the offer on the note (nil = the note is not an offer)
+	self.OfferClick = nil :: (() -> ())?
+	-- the note is an offer (adds the key hint); controller button image of the offer key
+	self.OfferHint = Vide.source(false) :: Vide.Source<boolean>
+	self.NudgePad = Vide.source("") :: Vide.Source<string>
+	self.OfferPadImage = "" :: string
+	-- OfferController hooks (nil = no budget): may the scare nudge show now; it just showed
+	self.NudgeGate = nil :: (() -> boolean)?
+	self.NudgeShown = nil :: (() -> ())?
 	self.Glow = Vide.source(false) :: Vide.Source<boolean>
 	-- other players in the server (Scare needs one)
 	self.Others = Vide.source(0) :: Vide.Source<number>
@@ -126,7 +150,96 @@ function ShopController:Say(text: string)
 end
 
 function ShopController:Note(text: string, time: number?)
+	self:EndOffer()
+	self.NudgeIcon("")
 	self:Flashy("Nudge", self.Nudge, text, time or NOTE_TIME)
+end
+
+-- A contextual offer on the note (OfferController): `click` runs when the player clicks it while it shows. Returns the
+-- note token: OfferController compares it later to know whether the offer was clicked, expired or replaced.
+function ShopController:Offer(text: string, icon: string, time: number, click: () -> ()): number
+	self:Flashy("Nudge", self.Nudge, text, time)
+	self.NudgeIcon(icon)
+	self.OfferClick = click
+	self.OfferHint(true)
+	self.NudgePad(self.OfferPadImage)
+	self.Glow(true)
+	self.Dependencies.InputController
+		:Bind({
+			Name = OFFER_ACTION,
+			Key = OFFER_KEY,
+			Keys = { OFFER_PAD },
+		})
+		.OnPress(function()
+			if self.OfferClick ~= nil and Vide.untrack(self.Nudge) ~= "" then
+				self:OnNudge()
+			end
+		end)
+	const token = self.Tokens.Nudge
+	task.delay(math.min(time, NUDGE_TIME * 2), function()
+		if self.Tokens.Nudge == token then
+			self.Glow(false)
+		end
+	end)
+	task.delay(time, function()
+		if self.Tokens.Nudge == token then
+			self:EndOffer()
+		end
+	end)
+	return token
+end
+
+-- The note stops being an offer: no click, no key, no hint.
+function ShopController:EndOffer()
+	self.OfferClick = nil
+	self.OfferHint(false)
+	self.NudgePad("")
+	self.Dependencies.InputController:Unbind(OFFER_ACTION)
+end
+
+-- Token of the note on screen now (Offer's return value while the same offer still shows)
+function ShopController:NoteToken(): number
+	return self.Tokens.Nudge
+end
+
+-- Nothing on the note and nothing that hides it: an offer may show.
+function ShopController:CanOffer(): boolean
+	if not self.Enabled or Vide.untrack(self.Open) or Cinematic.Active() then
+		return false
+	end
+	if Vide.untrack(self.Dependencies.SettingsController.Open) then
+		return false
+	end
+	-- only in the normal first person view (not prep, cutscene, spectate, the security cameras)
+	return Vide.untrack(self.Dependencies.CameraController.Mode) == "FirstPerson" and Vide.untrack(self.Nudge) == ""
+end
+
+-- The click of an offer: picks the target (Ingredient index / mate UserId) and opens the Roblox prompt of `key`.
+function ShopController:PromptOffer(key: string, target: number?)
+	const utility = Content.Shop.Utilities.ByKey[key]
+	if utility == nil then
+		return
+	end
+	if utility.ProductId <= 0 then
+		self:Note("Coming soon: this item is not on sale yet.")
+		return
+	end
+	if target ~= nil and utility.Target ~= nil then
+		self.Libs.Net.ShopPick:fireServer({ Product = utility.Key, Target = target })
+	end
+	const ok, problem = pcall(function()
+		MarketplaceService:PromptProductPurchase(Players.LocalPlayer, utility.ProductId)
+	end)
+	if not ok then
+		warn(`[ShopController] PromptProductPurchase {utility.Key}: {problem}`)
+		self:Note("The shop is busy. Try again in a moment.")
+	end
+end
+
+-- The other click of an offer (A/B of Q-293): opens the shop with the card of `key` flashing.
+function ShopController:ShowCard(key: string)
+	self:SetOpen(true)
+	self:FlashCard(key)
 end
 
 function ShopController:SetOpen(open: boolean)
@@ -173,6 +286,15 @@ end
 -- Words of the HUD note (reactive): the scare note follows the current input; other notes as they are.
 function ShopController:NudgeLine(): string
 	const raw = self.Nudge()
+	if raw ~= "" and self.OfferHint() then
+		const device = self.Dependencies.InputController.Device()
+		if device == "Touch" then
+			return raw
+		elseif device == "Gamepad" then
+			return if self.OfferPadImage ~= "" then `{raw} {"{pad}"}` else `{raw} [Y]`
+		end
+		return `{raw} [G]`
+	end
 	if raw ~= SCARE_NOTE then
 		return raw
 	end
@@ -191,13 +313,18 @@ end
 
 -- The Scare card blinks for FLASH_TIME s.
 function ShopController:FlashScare()
+	self:FlashCard(SCARE_KEY)
+end
+
+-- A card blinks for FLASH_TIME s.
+function ShopController:FlashCard(key: string)
 	self.Tokens.Flash += 1
 	const token = self.Tokens.Flash
 	task.spawn(function()
 		const stop = os.clock() + FLASH_TIME
 		local on = true
 		while os.clock() < stop and self.Tokens.Flash == token do
-			self.Flash(if on then SCARE_KEY else "")
+			self.Flash(if on then key else "")
 			on = not on
 			task.wait(FLASH_STEP)
 		end
@@ -208,6 +335,15 @@ function ShopController:FlashScare()
 end
 
 function ShopController:OnNudge()
+	const click = self.OfferClick
+	if click ~= nil then
+		self:EndOffer()
+		self.Tokens.Nudge += 1
+		self.Nudge("")
+		self.NudgeIcon("")
+		click()
+		return
+	end
 	self:SetOpen(true)
 	self:FlashScare()
 end
@@ -347,6 +483,11 @@ function ShopController:OnGrant(data: { Product: string, Value: number, From: nu
 		self:Note(if data.Value == 1 then "Sanity back to full!" else "A hot coffee for later")
 	elseif kind == "Revive" then
 		self:Note("Revive Kit saved")
+	elseif kind == "Kit" then
+		self.RadarUntil = os.clock() + data.Value
+		self.Announced = {}
+		self:Note("Night Kit ready!")
+		self:RefreshRadar()
 	end
 end
 
@@ -430,8 +571,15 @@ function ShopController:StepNudge()
 	if not self:CanNudge() then
 		return
 	end
+	const gate = self.NudgeGate
+	if gate ~= nil and not gate() then
+		return
+	end
 	self.NextNudge = now + NUDGE_EVERY
 	self:Note(SCARE_NOTE, NUDGE_TIME)
+	if self.NudgeShown ~= nil then
+		self.NudgeShown()
+	end
 	self.Glow(true)
 	task.delay(NUDGE_TIME, function()
 		self.Glow(false)
@@ -442,6 +590,13 @@ end
 
 function ShopController:CountOthers()
 	self.Others(math.max(#Players:GetPlayers() - 1, 0))
+end
+
+function ShopController:LoadPadImage()
+	const ok, image = pcall(function()
+		return UserInputService:GetImageForKeyCode(OFFER_PAD)
+	end)
+	self.OfferPadImage = if ok and type(image) == "string" then image else ""
 end
 
 function ShopController:LoadPrices()
@@ -564,6 +719,7 @@ ShopController:OnStart(function(self)
 	self:WatchAnomalies()
 	self:WatchViewport()
 	self:LoadPrices()
+	self:LoadPadImage()
 	self:CountOthers()
 	Players.PlayerAdded:Connect(function()
 		self:CountOthers()

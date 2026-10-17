@@ -3476,3 +3476,202 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
 - Família D com verbo (`dont_look`), como a ANM-008; sorteada a partir da Noite 4.
 - A chave muda de `anm_006_wavers` para `anm_006_stalker`; as janelas WV-1..3 deixam de ser usadas.
 - Impacto: TASK-351.
+
+### DEC-261 — 2026-10-17 — Recusar cliente = fechar a janela de atendimento (sem botão Refuse)
+
+- Origem: pedido do dono em conversa (print do trailer, 2026-10-17: tirar os botões de recusa, recusar fechando a janela; alavanca à esquerda da tela CAMERAS; prompt do preparo seguindo o jogador na bancada) e "pode seguir todas com o recomendado" para a Q-292.
+- Decidido:
+  - Não existe mais botão/prompt "Refuse". Recusar é fechar a janela de atendimento: toda a fila vai embora sem pagar (como a TASK-284 já fazia).
+  - Recusar **um** cliente estranho custa a fila inteira: é o preço de jogo (Q-292 a).
+  - Para as anomalias que vêm à janela, fechar a janela com elas na fila é a recusa de quem fechou (verbo "refuse" resolve; a que pede para servir trata como erro).
+  - Falas do chefe e textos que diziam "Refuse" passam a dizer "close the window" (Q-292 b).
+  - O código do segundo botão (R / Y / toque) sai do cliente (Q-292 c).
+  - A alavanca da janela fica na parede do fundo, à esquerda da tela CAMERAS; o prompt de entrar no preparo acompanha o jogador da grelha até ~70% da bancada (`Content.Prep.WorkSlide.Fraction`, número Provisório).
+- Impacto: TASK-354.
+
+### DEC-262 — 2026-10-17 — Ofertas contextuais: o clique abre o prompt do Roblox, com teste A/B (Q-293)
+
+- Origem: respostas do dono às perguntas do plano de ofertas (`design/monetization-offers-proposal.md`), repassadas pela sessão do Studio e confirmadas pelo dono nesta sessão em 2026-10-17.
+- Decidido:
+  - A oferta aparece só como nota no canto superior direito (embaixo do carrinho). Ela **nunca** abre a compra sozinha.
+  - Clicar na nota abre direto o prompt de compra do Roblox, com o alvo já escolhido (o ingrediente que acabou, o colega que assustou).
+  - Nas 2 primeiras semanas, metade dos jogadores testa o outro jeito: o clique abre a loja com o card piscando. Depois fica o que vender mais.
+  - A nota também aceita tecla enquanto está na tela: **G** no teclado e **Y** no controle, mostradas na própria nota. Não usa E / X (são dos prompts do mapa). O texto sempre diz que é compra e mostra o preço: nada de "Collect" ou "Free" (público infantil, regras do Roblox).
+- Impacto: TASK-362, TASK-363.
+
+### DEC-263 — 2026-10-17 — Faltou dinheiro: na run vira nota; no lobby continua o prompt (Q-294)
+
+- Decidido:
+  - Na run, faltar dinheiro numa compra mostra a nota "Need $X more? Tip Bag · R$ 29" em vez de abrir o prompt do Roblox sozinho.
+  - No lobby, comprar uma classe sem gemas suficientes continua abrindo o prompt do pacote de gemas (a criança clicou em comprar).
+- Impacto: TASK-364.
+
+### DEC-264 — 2026-10-17 — Café continua a 10 R$ (Q-295)
+
+- Decidido: o Hot Coffee fica a 10 R$. Não existe café a 1 R$ nem "First Coffee".
+
+### DEC-265 — 2026-10-17 — Limites das ofertas (Q-296)
+
+- Decidido (como proposto):
+  - 1 nota por vez, 6 s na tela, pelo menos 120 s entre duas ofertas, no máximo 3 por turno (o aviso de assustar um amigo conta).
+  - Oferta ignorada 2 vezes some até o fim da run; 4 ignoradas seguidas pausam todas por 15 min; 60 s sem oferta depois de um prompt de compra.
+  - Nunca durante anomalia, modo de preparo, cutscene, tutorial (Dia 1 e Noite 1) ou com a loja aberta.
+  - Opção "Shop tips: On/Off" nas configurações, ligada por padrão.
+- Impacto: TASK-361, TASK-362, TASK-365.
+
+### DEC-266 — 2026-10-17 — Revive Kit oferecido a quem está de pé quando um colega cai (Q-297)
+
+- Decidido: quando um colega desmaia, quem está de pé e não tem kit vê a oferta do Revive Kit, uma vez por queda, com texto neutro (sem culpa).
+- Confirma que a DEC-258 (o kit vale no colega) emenda a DEC-116 ("ninguém paga Robux pelo colega"); anotado em FEAT-034.
+
+### DEC-267 — 2026-10-17 — Produtos novos: Night Kit, Starter Crate, Thermos; cosméticos depois (Q-298)
+
+- Decidido:
+  - **Night Kit** (Developer Product, ~55 R$): café + radar + Revive Kit.
+  - **Starter Crate** (Developer Product, 99 R$): 2.400 gemas + 2 Revive Kits, **uma vez por jogador**, vendido no lobby.
+  - **Thermos** (Game Pass, 149 R$): um café grátis no começo de cada noite.
+  - **Cosméticos**: linha própria com o art-director, depois.
+  - **Não** fazer o First Coffee.
+- Os produtos ficam com id 0 (fora de venda) até o dono criá-los no Creator Hub.
+- Impacto: TASK-368.
+
+### DEC-268 — 2026-10-17 — Sem grupo de controle: todos veem as ofertas (Q-299)
+
+- Decidido: nenhum jogador fica de fora das ofertas para comparação.
+
+### DEC-269 — 2026-10-17 — O trailer sai; entra um restaurante pequeno com mesas de piquenique na frente
+
+- Origem: pedido do dono ao orquestrador (2026-10-17). Fonte: `docs/source/2026-10-17-restaurante-brief.md` e esboço `docs/source/2026-10-17-restaurante-esboco.webp`. Registrado pelo secretário.
+- Motivo do dono: com 2 jogadores, um cozinha e o outro fica olhando; o fluxo do trailer tem um gap no atendimento.
+- Decidido pelo dono:
+  - O **Food Trailer sai**. No lugar entra um **pequeno restaurante** (prédio retangular; no esboço, piso claro e paredes rosadas).
+  - **Na frente** (onde hoje é a área em frente ao trailer): **mesas de clientes** = mesinhas de piquenique (asset que já existe).
+  - Layout da cozinha (vista de cima, esboço): parede da frente com a **linha de tablets de atendimento** sobre um balcão; **porta de saída à esquerda dos tablets**; **mesa de montagem** no centro; parede do fundo, da esquerda para a direita: **grelhas**, **salsichas** (estoque), **pão/condimentos**; **drive-thru** na lateral direita.
+  - Plantas/arbustos na lateral direita das mesas.
+- **Provisório** (do esboço, não dito em número; level-designer fixa em `levels/MAP-01-r4-restaurant.md`):
+  - **4 mesas**, **4 tablets**, **8 pratos-slot** na mesa de montagem (contagem do desenho).
+  - Restaurante no lugar do Pad do trailer, mesmo quarteirão; medidas, portas e colisão pelo level-designer.
+  - Itens fixos "do trailer" passam para o restaurante: lâmpada + interruptor (DEC-189), cafeteira (DEC-125), telefone fixo (DEC-124), pote de gorjetas (DEC-239), interruptor `open_sign`. Posição pelo level-designer.
+  - Abertura (DEC-225) e "acorda ao lado do trailer" (DEC-122) passam a valer para o restaurante.
+- **Emendas (append-only; nada apagado):**
+  - **DEC-224** (Food Trailer veículo único): **superada no ponto "trailer"**. Continua valendo: sem carrinho, sem compra de veículo, local fixo desde o Dia 1, **4 mesas** na frente.
+  - **DEC-221**, **DEC-237**, **DEC-261** (janela de serviço do trailer, alavanca, recusar = fechar a janela) e **DEC-249/DEC-250** (ANM-004: tranca = porta do trailer): **o objeto "trailer" deixa de existir**; o equivalente no restaurante fica em aberto (`Q-308`). Até lá, Provisório da `Q-308`.
+  - **DEC-189**, **DEC-125**, **DEC-124**, **DEC-239**, **DEC-225**, **DEC-122**: valem com "trailer" lido como "restaurante" (Provisório acima).
+  - **AST-027** (trailer, Aprovado por DEC-141) sai do mapa principal (não apagar a ficha).
+- Impacto: **level-designer** (`levels/MAP-01-r4-restaurant.md`), **art-director/modeler-3d** (prédio, balcão, tablets, mesa de montagem), **architect** (`tech/restaurant-flow.md`), **narrative-writer** ("trailer" → restaurante em falas/UI), **task-planner** (depois).
+
+### DEC-270 — 2026-10-17 — Cliente de mesa pede no tablet com mini-diálogo; a nota do HUD se monta item a item
+
+- Origem: mesma fala (DEC-269).
+- Decidido pelo dono:
+  - O cliente de mesa chega **pelo meio** (entre as mesas) e vai a um dos **tablets de atendimento**.
+  - O jogador no tablet interage e abre um **mini-diálogo** (fala do dono: jogador "Olá, bom dia" / cliente "Olá, bom dia, eu gostaria de um hot dog assim, assim").
+  - A **nota de pedido do HUD** (a que já existe, canto superior esquerdo) **se monta durante o diálogo**: a nota aparece; cada item dito (pão, salsicha, cada condimento) entra com **pop-up animado**.
+- **Provisório** (não dito):
+  - Textos da UI em inglês (DEC-022); falas finais pelo narrative-writer, sem a palavra "sausage" na voz TTS (`AGENT-BRIEF.md` §4).
+  - Duração do diálogo, ritmo dos pop-ups, se dá para pular/acelerar, e o que acontece se o jogador sai do tablet no meio: game-designer em `design/restaurant-flow.md`.
+  - Onde o cliente espera e quando paga: `Q-309`.
+- **Emendas:** **DEC-241** (fila no balcão da janela do trailer; Counter UPG-003 = vagas na fila): a fila única na janela **sai**; o atendimento passa a ser pelos tablets. O que o Counter vira: game-designer (UPG-015+). **DEC-234** (ticket em camadas): a arte vale; o ticket ganha a montagem item a item.
+- Impacto: **frontend-coder** (diálogo, pop-ups da nota), **narrative-writer** (falas), **game-designer** (números), **architect**.
+
+### DEC-271 — 2026-10-17 — Pedido confirmado vai sozinho para um prato-slot da mesa de montagem, com BillboardGui da nota
+
+- Origem: mesma fala (DEC-269).
+- Decidido pelo dono:
+  - Pedido confirmado no tablet vai **automaticamente** para a **mesa de montagem**.
+  - Um **prato meio transparente** (slot) recebe o pedido e ganha uma **BillboardGui** em cima mostrando **o papel do pedido**.
+- **Provisório:** 8 slots (esboço); o que acontece com todos os slots ocupados (tablet bloqueia novo pedido, recomendação) e com o pedido de um cliente que desistiu: game-designer/architect.
+- Impacto: **architect**, **frontend-coder** (Billboard), **backend-coder**, **level-designer** (posição dos 8 slots).
+
+### DEC-272 — 2026-10-17 — Montagem por estações físicas: pão → prato, salsicha grelhada → prato, prato → condimentos
+
+- Origem: mesma fala (DEC-269).
+- Decidido pelo dono:
+  - **Qualquer jogador** monta.
+  - **Cortar o pão e colocar no prato**.
+  - **Grelhar a salsicha, pegar e colocar no prato**.
+  - **Pegar o prato e levar à estação de condimentos**; aplicar todos os pedidos.
+  - Estações na parede do fundo: grelhas, salsichas, pão/condimentos (DEC-269).
+- **Não afirmado:** se cada estação ainda abre a **câmera focada / minigame com nota** do modo de preparo (DEC-223 e seguintes) ou vira ação no mundo por prompt. Dúvida em **`Q-307`**; Provisório lá.
+- **Emendas:**
+  - **DEC-223** (modo de preparo focado como único jeito, 1–4 tábuas = jogadores, tudo numa bancada): o **fluxo de uma tábua por jogador com todas as etapas** é **substituído** pelo fluxo por estações físicas com o prato andando entre elas. Fica valendo: **DEC-016** (preparo por estações, reforçada), conteúdo do pedido, preço, Completo/Incompleto/Errado (DEC-072), K complementos (DEC-071), estoque.
+  - **DEC-226** (grelha de barras, 8 vagas, salsicha vira): segue valendo como **a grelha** do restaurante (Provisório; o esboço diz "grelhas", plural; quantidade pelo game-designer/level-designer).
+  - **DEC-259** (arrasto ao vivo no preparo co-op, trava): só vale se a `Q-307` mantiver as vistas focadas.
+  - DEC-227, DEC-228, DEC-229, DEC-231, DEC-232, DEC-233 (detalhes da tela de preparo): seguem **só onde a vista focada continuar** (`Q-307`).
+- Impacto: **game-designer** (`design/restaurant-flow.md`), **architect** (`tech/restaurant-flow.md`; `Content.Prep`/`Grade` reaproveitados ou não), **frontend-coder**, **backend-coder**, **level-designer**.
+
+### DEC-273 — 2026-10-17 — Entrega na mesa do cliente, saindo pela porta à esquerda dos tablets
+
+- Origem: mesma fala (DEC-269).
+- Decidido pelo dono: o prato pronto é levado pela **porta de saída** (à esquerda dos tablets) até o cliente **sentado na mesa**.
+- **Provisório:** o prato pronto é uma Tool na mão (como DEC-230); entrega por prompt na mesa/cliente; venda direto na conta da party (DEC-238); gorjeta e "Clean Table" no molde da FEAT-037.
+- **Emendas:** **DEC-230** (entrega pelo ProximityPrompt do **balcão**): o destino passa a ser a **mesa**. **FEAT-037** (cliente senta **depois** de receber no balcão): o cliente senta **antes** e recebe na mesa.
+- Impacto: **game-designer** (FEAT-037 nova versão), **backend-coder**, **frontend-coder**, **level-designer** (rota porta → mesas).
+
+### DEC-274 — 2026-10-17 — Drive-thru na lateral direita: computador, buzina, estresse, ir embora, pets, espaço para anomalias
+
+- Origem: mesma fala (DEC-269).
+- Decidido pelo dono:
+  - **Drive-thru**: pista de carro pela **lateral direita** do prédio; carro para na janela do lado direito.
+  - Jogador atende no **computador de atendimento** na parede direita.
+  - Espera longa: o carro **buzina**; depois o motorista fica **estressado** e **vai embora**.
+  - **Pets** podem vir de dentro do carro.
+  - O drive-thru abre **margem para anomalias** próprias.
+- **Provisório** (não dito): tempos de buzina/estresse/ida, como o pedido do carro entra na montagem (mesmo prato-slot, recomendação), como se entrega (na janela direita), o que são os pets (cliente extra, só visual ou anomalia), desde quando o drive-thru existe (Dia 1 ou upgrade/progressão): game-designer em `design/restaurant-flow.md`; anomalias em `design/anomalies-v3-restaurant.md`.
+- **Emendas:** carros hoje não param por jogador (DEC-087, DEC-133): o carro do drive-thru é **outro tipo de NPC** (para na janela por roteiro), não muda a regra do trânsito da rua.
+- Impacto: **level-designer** (pista e janela), **game-designer**, **architect**, **narrative-writer**, **art-director** (computador, janela), áudio (buzina; reaproveitar `car_honk_goofy` só se o dono quiser, DEC-222).
+
+### DEC-275 — 2026-10-17 — Meta de design: paralelismo total no co-op; solo viável por progressão e upgrades
+
+- Origem: mesma fala (DEC-269).
+- Decidido pelo dono:
+  - **Todo mundo trabalha ao mesmo tempo, em paralelo**, com progressão para todos. Papéis-exemplo: grelhar e empilhar salsichas; cortar pães e pôr nos pratos; atender no tablet; entregar nas mesas; drive-thru como frente extra.
+  - **Solo não pode ficar chato**: progressão/upgrades tornam o solo viável **sem** tirar o paralelismo do co-op.
+  - Jogo publicado com anúncio rodando: **prioridade é velocidade** de entrega.
+- Critério de aceite (para o game-designer e o qa-tester): com 2 a 4 jogadores, nenhum fica sem tarefa útil por mais de alguns segundos no pico do turno; com 1 jogador, o turno é vencível só com os upgrades da progressão normal. Números: `design/restaurant-flow.md` (Provisório).
+- **Emenda:** **DEC-223** "1–4 estações = jogadores" deixa de ser a forma de escalar o co-op; quem escala é a divisão de papéis por estação.
+- Impacto: **game-designer** (UPG-015+; FEAT novas a partir de **FEAT-043**, porque FEAT-042 já é "Os Regulares" em `design/bonds-proposal.md`), **task-planner** (ordem: entregar o fluxo mínimo primeiro).
+
+### DEC-276 — 2026-10-17 — Caixas de estoque (DOGS / BUNS / MUSTARD) reabastecem as estações do restaurante
+
+- Origem: adendo 2 do dono, mesma data (`source/2026-10-17-restaurante-brief.md` §Adendo 2; imagens `2026-10-17-mapa-atual-topo.webp` e `2026-10-17-caixas-estoque.png`). Registrado pelo secretário.
+- Decidido pelo dono: as **caixas de papelão que já existem no mapa** (rótulos DOGS, BUNS, MUSTARD) passam a ser **o meio de reabastecer o estoque** das estações do restaurante (salsichas, pães, condimentos).
+- **Provisório, recomendação do secretário a favor** (o dono pediu para avaliar com level-designer e secretário; não aprovado):
+  - O jogador **pede produtos por um telefone** do restaurante (o telefone fixo, DEC-124, ou um segundo aparelho).
+  - Um **veículo de entrega** chega e **despeja as caixas** num ponto de descarga do restaurante (posição pelo level-designer, perto da porta de saída ou do fundo).
+  - O jogador **pega uma caixa** (carrega, mãos ocupadas) e a leva até a estação; a estação **reabastece** ao receber.
+  - Motivo da recomendação: cria o papel de **estoquista** no co-op (DEC-275) sem sistema novo de compra; no solo, upgrades podem encurtar a espera ou aumentar a caixa (game-designer).
+  - Números (tempo de entrega, unidades por caixa, custo, limite de caixas no chão): game-designer em `design/restaurant-flow.md`.
+- Dúvidas: **`Q-350`** ("estoque infinito" e a ida ao Mart).
+- **Emendas:** o reabastecimento hoje é comprar no Mart e levar ao veículo (FEAT-015, DEC-101, DEC-131): fica em aberto se some ou convive (`Q-350`). Até lá vale o Provisório da `Q-350`.
+- Impacto: **level-designer** (ponto de descarga, rota do veículo, caixas no mapa), **game-designer** (números, upgrades), **architect** (caixa carregável, estoque por estação), **narrative-writer** (fala do pedido por telefone), **art-director** (caixa MUSTARD/DOGS/BUNS já existe; outros condimentos?).
+
+### DEC-277 — 2026-10-17 — Errar anomalia não derruba na hora: tira muita sanidade; só cai com a sanidade em zero
+
+- Origem: fala do dono ao orquestrador (2026-10-17), registrada pelo secretário.
+- Decidido pelo dono: errar uma anomalia **não mata nem derruba de imediato**. O jogador **perde bastante sanidade**. Só **cai/desmaia quando a sanidade zera** (fluxo da DEC-091: desmaio, reviver).
+- **Provisório** (não dito em número): perda por erro = **−35** de sanidade (valor da DEC-053, que volta a ser a referência); o jumpscare cartoon (DEC-256) continua tocando no erro. Número final e se varia por anomalia: game-designer.
+- **Emendas (append-only):**
+  - **DEC-255** (erro = jumpscare + desmaio): o **desmaio imediato sai**; fica o jumpscare. A DEC-053 (−35 por erro) volta a valer como base, emendada só no número se o game-designer propuser outro.
+  - **DEC-243** (ANM-002 letal = desmaio) e **DEC-244/DEC-246** (ANM-002 agarra quem serviu): o agarrão passa a tirar sanidade; derruba só se zerar.
+  - **DEC-260** (ANM-006 ataca o mais próximo, jumpscare + desmaio): idem, perda de sanidade.
+  - Toda ficha que diz "desmaio de quem agiu" (`design/anomalies-v3-restaurant.md`, `design/anomalies-v2-proposal.md`) segue esta DEC.
+  - Revive Kit e ofertas de queda (DEC-258, DEC-266): continuam, agora só na queda por sanidade zero.
+- Impacto: **game-designer** (números, fichas), **backend-coder** (`AnomalyService`: erro → sanidade, não `Fainted`), **qa-tester**.
+
+### DEC-278 — 2026-10-17 — Rascunho anomalies-v3 vai a "Em revisão"; anomalias que se confundem com o fluxo estão vetadas
+
+- Origem: mesma fala (DEC-277).
+- Decidido pelo dono:
+  - `design/anomalies-v3-restaurant.md` ficou **excessivo e confuso**. Status passa a **Em revisão**; nada dele é implementado.
+  - **Vetado como tipo:** anomalia que se confunde com o fluxo rápido normal (exemplos do dono: **tablet que chama sozinho**, **prato a mais**).
+  - O conjunto será **refeito com menos anomalias e mais claras**, baseado na pesquisa `research/anomaly-design-techniques.md` (em escrita).
+- **Provisório:** critério de aceite para o novo conjunto: o sinal de cada anomalia é distinguível de um evento normal do fluxo em até ~2 s por um jogador novo; o número de anomalias fica com o game-designer depois da pesquisa.
+- Impacto: **game-designer** (refazer o conjunto), **researcher** (pesquisa), **narrative-writer**.
+
+### DEC-279 — 2026-10-17 — Anomalias atuais (ANM-001 a ANM-020) revisadas para o fluxo do restaurante
+
+- Origem: mesma fala (DEC-277).
+- Decidido pelo dono: as anomalias existentes **ANM-001 a ANM-020** precisam ser **revisadas** para o novo fluxo (restaurante, tablets, mesas, drive-thru; DEC-269 a DEC-276).
+- **Provisório:** a revisão diz, por anomalia, se fica como está, se adapta (sinal ou verbo) ou se sai; as que dependem da janela/porta do trailer seguem `Q-308`. `story/anomalies.md` (Aprovado) e `design/anomalies-v2-proposal.md` não são reescritos sem DEC; a revisão entra como proposta.
+- Impacto: **game-designer**, **narrative-writer**, **backend-coder** (depois).

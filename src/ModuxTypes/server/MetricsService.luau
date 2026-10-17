@@ -1,6 +1,10 @@
 --!strict
 
+local ServerScriptService = game:GetService("ServerScriptService")
+local Lobby = require(ServerScriptService.server.Metrics.MetricsService.Lobby)
+
 export type Public = {
+	Lobby: Lobby.Lobby?,
 	ProductKeys: { [number]: string },
 	RunStarted: boolean,
 	Started: boolean,
@@ -14,7 +18,8 @@ export type Public = {
 	WireCrew: (self: Public) -> (),
 	WireWorld: (self: Public) -> (),
 	OnTutorialStep: (self: Public, player: Player, index: number) -> (),
-	OnUi: (self: Public, player: Player, event: string, key: string?) -> (),
+	OnUi: (self: Public, player: Player, event: string, key: string?, offer: string?) -> (),
+	WireLobby: (self: Public) -> (),
 	WireNet: (self: Public) -> (),
 }
 

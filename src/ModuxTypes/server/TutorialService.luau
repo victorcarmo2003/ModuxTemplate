@@ -14,7 +14,7 @@ export type Public = {
 	Rookies: { [number]: boolean },
 	Seeded: boolean,
 	Setup: (self: Public) -> (),
-	Complete: (self: Public, player: Player) -> (),
+	Complete: (self: Public, player: Player, how: string?) -> (),
 	OnDayOne: (self: Public) -> boolean,
 	IsPending: (self: Public, player: Player) -> boolean,
 	Reason: (self: Public, player: Player) -> string?,

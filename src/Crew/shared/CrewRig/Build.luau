@@ -16,6 +16,7 @@ local CollectionService = game:GetService("CollectionService")
 local Content = require(ReplicatedStorage.shared.Content)
 local AccessoryFit = require(script.Parent.Parent.AccessoryFit)
 local CrewLooks = require(script.Parent.Parent.CrewLooks)
+local SkinLooks = require(script.Parent.Parent.SkinLooks)
 local Kit = require(script.Parent.Kit)
 
 export type Pack = CrewLooks.Pack
@@ -31,6 +32,10 @@ export type Options = {
 	Cap: boolean?,
 	-- Hat that replaces the cap, by name in Assets.Crew.Hats ("ThiefHat" for Quick Quentin, DEC-159). Not raised.
 	Hat: string?,
+	-- Class skin (Content.Skins key; owner request 2026-10-17): written as attribute Skin (Dress swaps the outfit sheet),
+	-- its Fur replaces the species fur, its Accessories / Hat are added. Only on a crew outfit (Outfits.Use = "Crew");
+	-- an unknown key is ignored with one warning.
+	Skin: string?,
 	-- Initial LookPack attribute (default "Day").
 	LookPack: Pack?,
 	-- Model name (default "Rig_<species>_<outfit>").
@@ -232,7 +237,24 @@ local function build(species: string, outfit: string, opts: Options?): Model
 	if not table.find(Content.Looks.Packs, pack) then
 		error(`[CrewRig] unknown LookPack '{tostring(pack)}'`, 2)
 	end
-	const accessories = accessoryList(o.CustomerType, o.Accessories)
+	local skin: Content.Skin? = nil
+	if o.Skin ~= nil and outfitRow.Use == "Crew" then
+		skin = Content.Skins.ByKey[o.Skin]
+		if skin == nil then
+			Kit.WarnOnce("Skin:" .. o.Skin, `unknown skin '{o.Skin}' (Content.Skins): built in the crew uniform`)
+		end
+	end
+	local extraAccessories = o.Accessories
+	if skin ~= nil and skin.Accessories ~= nil then
+		const merged: { string } = table.clone(extraAccessories or {})
+		for _, name in skin.Accessories do
+			table.insert(merged, name)
+		end
+		extraAccessories = merged
+	end
+	const hat: string? = o.Hat or if skin ~= nil then skin.Hat else nil
+	const fur = if skin ~= nil and skin.Fur ~= nil then skin.Fur else look.Fur
+	const accessories = accessoryList(o.CustomerType, extraAccessories)
 	const asset = speciesRow.Asset
 
 	const parts: { [string]: BasePart } = {}
@@ -250,11 +272,11 @@ local function build(species: string, outfit: string, opts: Options?): Model
 
 	-- Headwear: a hat replaces the cap; ears-up species wear the cap with ear holes.
 	const wantCap = if o.Cap ~= nil then o.Cap else outfitRow.Use == "Crew"
-	if o.Hat ~= nil or not wantCap or look.EarsUp then
+	if hat ~= nil or not wantCap or look.EarsUp then
 		drop(parts, "Cap")
 	end
-	if o.Hat ~= nil then
-		takeAll(parts, Kit.CloneParts(Kit.Hat(o.Hat))) -- one MeshPart named "Hat"
+	if hat ~= nil then
+		takeAll(parts, Kit.CloneParts(Kit.Hat(hat))) -- one MeshPart named "Hat"
 	elseif wantCap and look.EarsUp then
 		takeAll(parts, Kit.CloneParts(Kit.CapEarsUp())) -- one MeshPart named "Cap"
 	end
@@ -308,17 +330,24 @@ local function build(species: string, outfit: string, opts: Options?): Model
 
 	-- Textures and pelt: outfit parts get the outfit's Day sheet and the fur colour; atlas pieces remember their Day
 	-- texture so Dress can swap to the Mid/Night atlas and back.
-	const daySheet = sheets.Day
-	head.Color = look.Fur
+	const skinSheets = if skin ~= nil then SkinLooks.BySkin[skin.Key] else nil
+	const daySheet = if skinSheets ~= nil then SkinLooks.Sheet(skinSheets, "Day") else sheets.Day
+	head.Color = fur
+	if skinSheets ~= nil and skinSheets.Head ~= nil and head:IsA("MeshPart") then
+		head.TextureID = SkinLooks.Sheet(skinSheets.Head, "Day") -- the skin fur is baked in its own head
+	end
 	for _, part in parts do
 		if not part:IsA("MeshPart") then
 			continue
 		end
 		if part:GetAttribute("OutfitPart") then
 			part.TextureID = daySheet
-			part.Color = look.Fur
+			part.Color = fur
 		elseif part ~= head and part ~= face and part.TextureID ~= "" and part:GetAttribute("DayTextureID") == nil then
 			part:SetAttribute("DayTextureID", part.TextureID)
+			if skinSheets ~= nil and part.TextureID == SkinLooks.BaseAtlas then
+				part.TextureID = SkinLooks.Sheet(skinSheets.Atlas, "Day") -- atlas piece: the skin's atlas copy
+			end
 		end
 	end
 	for _, extra in extras do
@@ -403,6 +432,9 @@ local function build(species: string, outfit: string, opts: Options?): Model
 		model:SetAttribute("CustomerType", o.CustomerType)
 	end
 	model:SetAttribute("LookPack", pack)
+	if skin ~= nil then
+		model:SetAttribute("Skin", skin.Key)
+	end
 	if o.Tag ~= false then
 		CollectionService:AddTag(model, TAG)
 	end

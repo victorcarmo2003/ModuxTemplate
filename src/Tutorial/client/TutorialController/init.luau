@@ -891,6 +891,10 @@ function TutorialController:DecideLive(): (string, Instance?, string)
 		return "deliver", nil, ""
 	end
 
+	-- Day 1 cut (2026-10-17): the focused kitchen is one step ("cook"); the prep mode's coach paw leads inside it
+	if self:Focused() then
+		return "cook", self:KitchenAnchor(WORK_ACTION, false), ""
+	end
 	const kitchen = self:Kitchen()
 	if kitchen.Rail > 0 and kitchen.BoardReady then
 		return "assemble", self:KitchenAnchor("board_add_sausage", false), ""
@@ -1386,6 +1390,10 @@ function TutorialController:NextTalk()
 	const current = Vide.untrack(self.StepKey)
 	if current == MONEY_STEP then
 		self.Spot(false)
+		if not TutorialRules.Shopping then
+			self:Finish("done") -- 2026-10-17 cut: Day 1 ends on the first sale (the Mart is a low-bun hint later)
+			return
+		end
 		if self:StockAmount(BUN) == 0 then
 			self.Shopping = true
 			self.ShopFrom = 0
@@ -1465,7 +1473,9 @@ function TutorialController:Finish(reason: string)
 	self:ClearGuidance()
 	if not self.Sent then
 		self.Sent = true
-		self.Libs.Net.TutorialComplete:fireServer()
+		self.Libs.Net.TutorialComplete:fireServer({
+			How = if reason == "done" or reason == "skip" then reason :: any else "over",
+		})
 	end
 end
 
@@ -1579,7 +1589,12 @@ end
 -- the day Closing of Day 1 (6 PM), Walt's lesson call heard, nothing bought on the Gear Stand yet, not skipped.
 -- MarketController reads this to hide its own closing-time arrow (one arrow at a time).
 function TutorialController:UpgradeLesson(): string?
-	if not self.Rookie or self.LessonSkipped or not self.Dependencies.PlaceController:Is("Run") then
+	if
+		not TutorialRules.Upgrade.Enabled
+		or not self.Rookie
+		or self.LessonSkipped
+		or not self.Dependencies.PlaceController:Is("Run")
+	then
 		return nil
 	end
 	const round = self.Dependencies.RoundController

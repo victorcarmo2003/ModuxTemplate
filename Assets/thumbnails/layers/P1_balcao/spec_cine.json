@@ -1,0 +1,90 @@
+{
+ "out": "thumb_P1_balcao_cine.png",
+ "size": [
+  1920,
+  1080
+ ],
+ "beauty": "beauty.jpg",
+ "visible": "vis.jpg",
+ "full": "full.jpg",
+ "characters": [
+  {
+   "key": [
+    0,
+    255,
+    255
+   ],
+   "outline": [
+    35,
+    35,
+    60
+   ],
+   "width": 8,
+   "saturation": 1.35,
+   "cel": {
+    "bands": 4,
+    "strength": 0.45
+   }
+  },
+  {
+   "key": [
+    255,
+    0,
+    255
+   ],
+   "outline": [
+    255,
+    40,
+    90
+   ],
+   "width": 10,
+   "saturation": 1.35,
+   "cel": {
+    "bands": 4,
+    "strength": 0.45
+   }
+  }
+ ],
+ "background": {
+  "focus": {
+   "near": 30,
+   "far": 450,
+   "blur": 9
+  },
+  "saturation": 1.05,
+  "brightness": 0.9
+ },
+ "grade": {
+  "saturation": 1.12,
+  "contrast": 1.12,
+  "split": {
+   "shadows": [
+    40,
+    70,
+    140
+   ],
+   "highlights": [
+    255,
+    220,
+    180
+   ],
+   "amount": 0.14
+  }
+ },
+ "key_light": {
+  "color": [
+   255,
+   238,
+   215
+  ],
+  "strength": 0.05,
+  "dim": 0.3,
+  "spread": 140
+ },
+ "bloom": {
+  "threshold": 0.92,
+  "size": 22,
+  "strength": 0.25
+ },
+ "vignette": 0.45
+}

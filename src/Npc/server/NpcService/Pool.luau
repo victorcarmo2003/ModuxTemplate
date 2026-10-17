@@ -15,8 +15,8 @@ export type Rig = {
 	Root: BasePart,
 	Humanoid: Humanoid,
 	Key: string,
-	Customer: Attachment, -- Prompt_Customer: take_order -> serve (CustomerService)
-	Refuse: Attachment, -- Prompt_Refuse: refuse
+	Customer: Attachment, -- Prompt_Customer: take_order -> serve (CustomerService). No Prompt_Refuse since TASK-354:
+	-- refusing is closing the service window
 	Active: boolean,
 	ReleasedAt: number,
 }
@@ -42,11 +42,8 @@ const ANCHOR_TAG = "Interactable"
 const REST_ATTRIBUTE = "RestC0"
 const SEATED_ATTRIBUTE = "Seated"
 const CUSTOMER_ACTION = "take_order"
-const REFUSE_ACTION = "refuse"
--- Anchor offsets from the HumanoidRootPart (torso centre). PROVISIONAL: Prompt_Customer at the neck, Prompt_Refuse
--- 2.5 below it (architecture.md §18.4; prompt spacing rule ≥ 2.5).
+-- Anchor offset from the HumanoidRootPart (torso centre). PROVISIONAL: Prompt_Customer at the neck (architecture.md §18.4).
 const CUSTOMER_OFFSET = Vector3.new(0, 1.5, 0)
-const REFUSE_OFFSET = Vector3.new(0, -1, 0)
 -- Server rig: only walking. Everything else off (architecture.md §12.3).
 const DISABLED_STATES = {
 	Enum.HumanoidStateType.Climbing,
@@ -130,7 +127,6 @@ function PoolModule.build(spec: BuildSpec): Rig
 		Humanoid = humanoid,
 		Key = "",
 		Customer = anchor(root, "Prompt_Customer", CUSTOMER_ACTION, CUSTOMER_OFFSET),
-		Refuse = anchor(root, "Prompt_Refuse", REFUSE_ACTION, REFUSE_OFFSET),
 		Active = false,
 		ReleasedAt = 0,
 	}
@@ -189,7 +185,6 @@ function PoolModule.release(pool: Pool, rig: Rig, now: number, parking: Instance
 		rig.Humanoid:MoveTo(rig.Root.Position)
 	end
 	resetAnchor(rig.Customer, CUSTOMER_ACTION)
-	resetAnchor(rig.Refuse, REFUSE_ACTION)
 	rig.Root.Anchored = false
 	for _, motor in rig.Model:GetDescendants() do
 		if motor:IsA("Motor6D") then

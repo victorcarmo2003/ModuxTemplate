@@ -198,6 +198,7 @@ function ClassService:BuyWithGems(player: Player, key: string): BuyReason
 	})
 	profiles:RequestSave(player)
 	MetricsLog.gems(player, "Sink", class.Price, gems - class.Price, "ClassBuy", key)
+	MetricsLog.panel(player, "classes", 3, "buy", { class = key, currency = "gems" })
 	return "Ok"
 end
 
@@ -309,6 +310,7 @@ function ClassService:Select(player: Player, key: string)
 	profile.SelectedClass(key)
 	profiles:RequestSave(player)
 	self:Notify(player, "class_selected", Content.Classes.IndexOf[key])
+	MetricsLog.panel(player, "classes", 3, "equip", { class = key })
 end
 
 -- Dev hook for the gems command (TASK-043, R2). Server only, never reachable from the network (T017-11).

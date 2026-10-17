@@ -33,6 +33,7 @@ local Content = require(ReplicatedStorage.shared.Content)
 local Grade = require(ReplicatedStorage.shared.Prep.Grade)
 local Sauce = require(ReplicatedStorage.shared.Item.HotDogVisual.Sauce)
 local PlateMask = require(ReplicatedStorage.shared.Prep.PlateMask)
+local WorkSlide = require(ReplicatedStorage.shared.Prep.WorkSlide)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 local Bridge = require(script.Bridge)
@@ -52,7 +53,8 @@ const STAND_ATTACHMENT = "Att_Stand"
 -- says where the player starts (attribute PromptStep on the Prompt_Work attachment) and which stand the rig takes
 -- (Att_Stand = grill, Att_Stand_Build = board); the seat itself is the next free one.
 const STEP_ATTRIBUTE = "PromptStep"
-const VIEW_STAND: { [string]: string } = { Grill = "Att_Stand", Build = "Att_Stand_Build", Board = "Att_Stand_Build" }
+const VIEW_STAND: { [string]: string } =
+	{ Grill = "Att_Stand", Build = "Att_Stand_Build", Board = "Att_Stand_Build", Toppings = "Att_Stand_Build" }
 const DEFAULT_STEP = "Grill"
 const WORKING_ATTRIBUTE = "Working"
 const FREEZE_REASON = "Prep"
@@ -329,12 +331,16 @@ function PrepService:StandOf(station: number, step: string?): CFrame?
 end
 
 -- The Work prompt closest to a position (the reach check of the PrepEnter packet; the prompt path is checked by
--- InteractionService). nil = the map has no prompt yet.
+-- InteractionService). nil = the map has no prompt yet. The grill prompt slides along the counter with the player
+-- (TASK-354, WorkSlide): its distance is measured from where that player sees it.
 function PrepService:WorkDistance(position: Vector3): number?
 	local best: number? = nil
 	for _, anchor in CollectionService:GetTagged("Interactable") do
 		if anchor:GetAttribute("PromptAction") == WORK_ACTION then
-			const at = self.Dependencies.InteractionService:Position(anchor)
+			local at = self.Dependencies.InteractionService:Position(anchor)
+			if at ~= nil and WorkSlide.Applies(anchor) then
+				at = WorkSlide.Position(anchor, at, position)
+			end
 			if at ~= nil then
 				const distance = (at - position).Magnitude
 				if best == nil or distance < best then
@@ -362,6 +368,33 @@ function PrepService:StepOfAnchor(anchor: Instance): string
 	-- Build (2D) and Board (3D) are the same prompt: it resolves to the key of the active tab set
 	const resolved = if type(value) == "string" and VIEW_STAND[value] ~= nil then resolveTab(value) else nil
 	return resolved or DEFAULT_STEP
+end
+
+-- Tab the mode opens on for a player at `position` (owner request 2026-10-17, Provisional): the active tab whose view Focus
+-- (Content.Prep.Views, in the Station_n model) is nearest on the floor plane. Standing by the board opens on the board, by the
+-- toppings on the toppings, by the grill on the grill. nil = no Focus in the map (the prompt's own step applies).
+function PrepService:StepNear(station: number, position: Vector3): string?
+	const model = self:StationModel(station)
+	if model == nil then
+		return nil
+	end
+	local best: string? = nil
+	local bestDistance = math.huge
+	for _, view in cfg.Views.List do
+		if cfg.Tabs.ByKey[view.Tab] ~= nil and VIEW_STAND[view.Tab] ~= nil then
+			const focus = model:FindFirstChild(view.Focus, true)
+			const at = if focus ~= nil and focus:IsA("Attachment") then focus.WorldPosition else nil
+			if at ~= nil then
+				const offset = at - position
+				const distance = offset.X * offset.X + offset.Z * offset.Z
+				if distance < bestDistance then
+					best = view.Tab
+					bestDistance = distance
+				end
+			end
+		end
+	end
+	return best
 end
 
 -- Only the grill carries the Work prompt (owner decision 2026-10-14): any other Prompt_Work (the cutting board / bun crate one) stays
@@ -1165,9 +1198,20 @@ function PrepService:RegisterWork()
 			end
 			return true
 		end,
+		-- TASK-354: the grill prompt follows the player along the counter (client), so the range is measured from there
+		Reach = function(_player: Player, anchor: Instance, root: Vector3): Vector3?
+			const at = self.Dependencies.InteractionService:Position(anchor)
+			if at == nil or not WorkSlide.Applies(anchor) then
+				return nil
+			end
+			return WorkSlide.Position(anchor, at, root)
+		end,
 		Run = function(player: Player, anchor: Instance, _id: number)
 			const station = self:NextSeat() or 1
-			const ok, reason = self:Enter(player, station, true, self:StepOfAnchor(anchor))
+			-- the mode opens on the part of the counter the player stands at (the grill prompt slides along all of it)
+			const root = self.Dependencies.InteractionService:RootOf(player)
+			const near = if root ~= nil then self:StepNear(station, root.Position) else nil
+			const ok, reason = self:Enter(player, station, true, near or self:StepOfAnchor(anchor))
 			self:Reply(player, "Enter", ok, reason, nil, if ok then station else nil)
 		end,
 	})
@@ -1331,8 +1375,14 @@ end
 -- Sits `player` at `station` (dev: no reach check; every other rule applies)
 function PrepService:DevEnter(player: Player, station: number, step: string?): string
 	self:DevGuard()
-	-- `step` = the tab of the prompt it stands in for (Grill or Build, the PromptStep of the real prompts)
-	const ok, reason = self:Enter(player, clampStation(station), true, if step ~= nil and VIEW_STAND[step] ~= nil then step else nil)
+	-- `step` = the tab of the prompt it stands in for (Grill or Build, the PromptStep of the real prompts); none = the part of
+	-- the counter the player stands at, like the sliding prompt
+	local tab = if step ~= nil and VIEW_STAND[step] ~= nil then step else nil
+	if tab == nil then
+		const root = self.Dependencies.InteractionService:RootOf(player)
+		tab = if root ~= nil then self:StepNear(clampStation(station), root.Position) else nil
+	end
+	const ok, reason = self:Enter(player, clampStation(station), true, tab)
 	self:Reply(player, "Enter", ok, reason, nil, if ok then station else nil)
 	if ok then
 		return `{player.Name} sits at station {station}`

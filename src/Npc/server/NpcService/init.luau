@@ -233,13 +233,10 @@ function NpcService:GetModel(id: number): Model?
 	return if npc then npc.Rig.Model else nil
 end
 
--- Customer and Refuse prompt anchors of an active NPC (architecture.md §18.4).
-function NpcService:Anchors(id: number): (Attachment?, Attachment?)
+-- Customer prompt anchor of an active NPC (architecture.md §18.4; the Refuse anchor is gone since TASK-354).
+function NpcService:Anchors(id: number): Attachment?
 	const npc = self.Active[id]
-	if npc == nil then
-		return nil, nil
-	end
-	return npc.Rig.Customer, npc.Rig.Refuse
+	return if npc then npc.Rig.Customer else nil
 end
 
 -- NpcId of the active rig that contains `instance` (prompt anchor, body part, the model itself).

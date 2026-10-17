@@ -250,7 +250,15 @@ function LoadingController:StepAssets()
 		const sounds: { any } = {}
 		const images: { any } = {}
 		for _, item in list do
-			table.insert(if typeof(item) == "Instance" then sounds else images, item)
+			if typeof(item) == "Instance" then
+				table.insert(sounds, item)
+			else
+				-- a plain id string is reported Failure by PreloadAsync and never downloaded (checked in Studio
+				-- 2026-10-17): the image goes in a Decal
+				const holder = Instance.new("Decal")
+				holder.Texture = item
+				table.insert(images, holder)
+			end
 		end
 		local soundsDone = 0
 		task.spawn(function()

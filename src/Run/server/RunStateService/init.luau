@@ -8,6 +8,7 @@
 -- Wave 2 (A3; architecture.md §19.3, §19.26; data.md §5.2, §5.3; TASK-052): SetLifeState (VitalService only),
 -- SetStash (ItemService only), SpendChance, SetEndless, ResetDev (T56) and the LifeChanged signal. Tools left the
 -- "M" snapshot: ItemService captures them under its own "T" key (T50).
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -372,6 +373,12 @@ function RunStateService:LastSnapshot(): Snapshots.Snapshot?
 	return self.Registry.Last
 end
 
+-- Resume boot (SessionService, DEC-080; architecture.md §5.5 step 3): the snapshot read from Snap[RunId] becomes the last
+-- capture; Restore("Resume") then puts it back. False when the format is unknown.
+function RunStateService:Load(snapshot: any): boolean
+	return Snapshots.load(self.Registry, snapshot)
+end
+
 -- data.md §5.3 "Run": Chances are not restored on a repeated night (already spent, DEC-110/112).
 function RunStateService:CaptureRun(): { [string]: any }
 	return {
@@ -436,6 +443,10 @@ function RunStateService:RestoreMembers(data: { [string]: any }, mode: RestoreMo
 		end
 		member.EverJoined = saved.J == true or member.EverJoined
 		const state: LifeState = if mode == "RepeatNight" or not isLifeState(saved.S) then "Active" else saved.S
+		-- a resumed run on a fresh server (DEC-080): who is not back yet is Away, their state kept for the return (Admit)
+		if previous == nil and Players:GetPlayerByUserId(userId) == nil then
+			member.State = "Away"
+		end
 		if member.State == "Away" then
 			member.StateBeforeAway = state
 		else

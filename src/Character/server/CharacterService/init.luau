@@ -76,7 +76,7 @@ const ANIMATE_NAME = "Animate"
 const ANIMATE_WAIT = 5
 
 const CharacterService = Modux.Service("CharacterService", {
-	Require = { "PlayerService", "PlaceService", "RunStateService", "ClassService", "RoundService" },
+	Require = { "PlayerService", "PlaceService", "RunStateService", "ClassService", "RoundService", "SkinService" },
 	Priority = 715,
 })
 
@@ -197,6 +197,12 @@ function CharacterService:SpeciesOf(player: Player): string
 	return Content.Classes.ByKey[FALLBACK_CLASS].Species
 end
 
+-- Class skin worn with the locked class (SkinService; owner request 2026-10-17): nil = the crew uniform. SkinEquip is
+-- refused in the Run (outside dev mode), so the skin stays the same for the whole run like the class.
+function CharacterService:SkinOf(player: Player): string?
+	return self.Dependencies.SkinService:SkinOf(player, self.Dependencies.ClassService:GetClass(player))
+end
+
 -- Spawn points ----------------------------------------------------------------------------------------------------
 
 -- "<prefix><n>" with a whole n only: "PS-" must not pick "PS-N1".
@@ -281,7 +287,11 @@ function CharacterService:Spawn(player: Player, point: string?)
 		self.ForcedPoint[player] = point
 	end
 	const species = self:SpeciesOf(player)
-	const template = CrewRig.Build(species, OUTFIT, { LookPack = self:PackOf(player), Name = TEMPLATE_NAME })
+	const template = CrewRig.Build(
+		species,
+		OUTFIT,
+		{ LookPack = self:PackOf(player), Name = TEMPLATE_NAME, Skin = self:SkinOf(player) }
+	)
 	const humanoid = template:FindFirstChildOfClass("Humanoid") :: Humanoid
 	humanoid.BreakJointsOnDeath = false -- §8.3
 

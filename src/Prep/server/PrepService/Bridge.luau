@@ -6,8 +6,7 @@
 --     RefundPlate(player)                  -> boolean              the reserved bun goes back
 --     TrashPlate(player, {Sausage?, Hand?}) -> {Bun, Sausage, Hand} the bin
 --     GrillAct(player, act, slot?)         -> GrillResult?, reason? Place / Flip / Collect
---   CustomerService (TASK-171): TakeOrderFor(player, id?) -> boolean, ServeFor(player, tool?, id) -> SaleResult?,
---     RefuseFor(player, id?) -> boolean
+--   CustomerService (TASK-171): TakeOrderFor(player, id?) -> boolean, ServeFor(player, tool?, id) -> SaleResult?
 --   ItemService: SetQuality(tool, band), QualityOf(tool)
 -- Services come in as `any` so a signature change of another task shows up here and nowhere else. Reasons that cross the wire
 -- are always keys of Content.Prep.Reasons (Bridge.Reason).
@@ -104,15 +103,12 @@ end
 
 -- Customer ---------------------------------------------------------------------------------------------------------------
 
--- act = Content.Prep.OrderActs value (Take, Serve, Refuse). NoTicket = the customer is not there / not in that state.
+-- act = Content.Prep.OrderActs value (Take, Serve; no Refuse since TASK-354: refusing is closing the window). NoTicket = the customer is not there / not in that state.
 -- made = the hot dog this seat just made (Serve judges that one: the plate dropped on the customer, owner request 2026-10-14);
 -- nil = CustomerService picks the exact one of the hotbar.
 function Bridge.Order(customer: any, player: Player, act: string, npc: number, made: Tool?): Outcome
 	if act == "Take" then
 		const ok = customer:TakeOrderFor(player, npc)
-		return { Ok = ok == true, Reason = if ok == true then "None" else "NoTicket", Grade = "None", Value = 0 }
-	elseif act == "Refuse" then
-		const ok = customer:RefuseFor(player, npc)
 		return { Ok = ok == true, Reason = if ok == true then "None" else "NoTicket", Grade = "None", Value = 0 }
 	end
 	const sale = customer:ServeFor(player, made, npc)

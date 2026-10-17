@@ -101,6 +101,20 @@ function Snapshots.restore(registry: Registry, mode: Mode): boolean
 	return restoreFrom(registry, registry.Last, mode)
 end
 
+-- Resume boot (SessionService, DEC-080): a snapshot read back from MemoryStore (Snap[RunId]) becomes the last capture,
+-- and the first one when this server has none. False when it is not a snapshot of this format (data.md §3.3: unknown V =
+-- "That shift can't be resumed.").
+function Snapshots.load(registry: Registry, snapshot: any): boolean
+	if type(snapshot) ~= "table" or snapshot.V ~= VERSION then
+		return false
+	end
+	registry.Last = snapshot
+	if registry.First == nil then
+		registry.First = snapshot
+	end
+	return true
+end
+
 -- Back to the first capture of the run (dev RunEnd, T56); it becomes the last one again.
 function Snapshots.rewind(registry: Registry, mode: Mode): boolean
 	const first = registry.First

@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Lync = require(ReplicatedStorage.Packages.Lync)
 local Content = require(ReplicatedStorage.shared.Content)
 local PartyRules = require(ReplicatedStorage.shared.Party.PartyRules) -- squad notices (§16, TASK-154)
+local SessionRules = require(ReplicatedStorage.shared.Session.SessionRules) -- rejoin offer (TASK-360)
 
 -- §13.7 Cutscene record (set and its CutsceneSnapshot fallback packet)
 local function cutsceneRecord()
@@ -34,6 +35,7 @@ local function settingsRecord()
 		PrepAssist = Lync.bool(),
 		ReducedMotion = Lync.bool(),
 		Vibration = Lync.bool(),
+		ShopTips = Lync.bool(),
 	})
 end
 
@@ -53,7 +55,10 @@ return Lync.define("game", {
 	-- c -> s, at most once per session (Provisional, user request 2026-10-11). Responder: TutorialService. The
 	-- first-hot-dog tutorial ended (finished or skipped) on this client: closed for this run in server memory (nothing
 	-- is saved). Cosmetic only (no money, item or stat rides on it), so the client is trusted to say it.
-	TutorialComplete = Lync.packet(Lync.empty()),
+	-- How (analytics, 2026-10-17): "done" finished, "skip" skipped, "over" the day ended first (onboarding funnel)
+	TutorialComplete = Lync.packet(Lync.struct({
+		How = Lync.enum({ "done", "skip", "over" }),
+	})),
 	-- c -> s (Provisional, user request 2026-10-11). Responder: TutorialService. The rookie answered Walt's tutorial
 	-- call (or it never came): the server spawns the tutorial customer (CustomerService:RequestTutorial) when this
 	-- player has the tutorial pending (Day 1 of the run, not finished or skipped). Idempotent while one is around.
@@ -487,6 +492,28 @@ return Lync.define("game", {
 		}),
 	})),
 
+	-- Class skins (owner request 2026-10-17, Provisional; design/skins-proposal.md). Robux only: the client prompts the
+	-- Developer Product of Content.Skins itself, SkinService grants on the receipt.
+	-- s -> owner, on load and on every change. Writer: SkinService. Owned = skins in profile.Skins; Equipped = the skin worn
+	-- per class (profile.EquippedSkins). Private by construction (fireClient).
+	SkinState = Lync.packet(Lync.struct({
+		Owned = Lync.bitfield(Content.Skins.Keys),
+		Equipped = Lync.array(
+			Lync.struct({
+				Class = Lync.enum(Content.Classes.Keys),
+				Skin = Lync.enum(Content.Skins.Keys),
+			}),
+			0,
+			16
+		),
+	})),
+	-- c -> s. Responder: SkinService (own rate limit). Wear `Skin` with `Class` ("none" = the crew uniform); refused when
+	-- the skin is not owned, is of another class, or the class is not owned.
+	SkinEquip = Lync.packet(Lync.struct({
+		Class = Lync.enum(Content.Classes.Keys),
+		Skin = Lync.enum(Content.Skins.Choices),
+	})),
+
 	-- §15.2 c -> s. Responder: CodesService (normalizes: trim, no spaces, upper case; own rate limit)
 	CodeRedeem = Lync.packet(Lync.struct({
 		Code = Lync.str(0, 32),
@@ -523,6 +550,15 @@ return Lync.define("game", {
 		Product = Lync.enum(Content.Shop.Utilities.Keys),
 		Value = Lync.int(0, 100000),
 		From = Lync.f64(),
+	})),
+	-- Contextual offers (TASK-361; owner request 2026-10-17, Provisional; Content.Shop.Offers). s -> one player.
+	-- Writer: EconomyService (Spend without enough Cash: the Cash pack covering the difference, instead of opening the
+	-- Roblox prompt by itself). Responder: OfferController, which shows it in the HUD nudge slot if its rules allow.
+	-- Product = Content.Shop.Utilities key the click buys; Value = missing dollars.
+	ShopOffer = Lync.packet(Lync.struct({
+		Offer = Lync.enum(Content.Shop.Offers.Keys),
+		Product = Lync.enum(Content.Shop.Utilities.Keys),
+		Value = Lync.int(0, 100000),
 	})),
 	-- Gifts (TASK-352; owner request 2026-10-16, Provisional; Content.Shop.Gifts). Responder/writer: GiftService.
 	-- c -> s, right before PromptProductPurchase of Content.Shop.Gifts[Key].ProductId (own rate limit). Stores Recipient
@@ -625,6 +661,20 @@ return Lync.define("game", {
 	-- §16.4 c -> s, game role only. Responder: PartyRunService. Go back to the lobby now (end-of-run screen button;
 	-- also accepted mid-run: leaving is always allowed, DEC-067)
 	LobbyReturn = Lync.packet(Lync.empty()),
+
+	-- Rejoin a run in progress (owner request 2026-10-17; DEC-063; architecture.md §5.4; network.md §13.8; TASK-360,
+	-- Provisional). Responder: SessionService (lobby roles). Enums from SessionRules
+	-- s -> player (lobby): Mode Rejoin / Resume = show the top-right offer; None = hide it (Reason says why, None =
+	-- silently). Resume (DEC-080, Q-291): nobody is in the run, it can be resumed from the start of its shift for Left s
+	Reconnect = Lync.packet(Lync.struct({
+		Mode = Lync.enum(SessionRules.Modes),
+		Day = Lync.int(0, 10000), -- 0 = not known yet (run still starting)
+		IsNight = Lync.bool(),
+		Reason = Lync.enum(SessionRules.Reasons),
+		Left = Lync.int(0, 3600), -- Resume: seconds of the resume window still open; 0 otherwise
+	})),
+	-- c -> s (lobby). Accept = teleport back to that run; false = dismiss (the offer is forgotten)
+	ReconnectReply = Lync.packet(Lync.struct({ Accept = Lync.bool() })),
 
 	-- Focused prep mode (DEC-223; docs/tech/prep-mode.md §3). Single responder of every c -> s packet below:
 	-- PrepService (OnInit). Per-player rate = Content.Prep.Rules.Rates. Enums come from Content.Prep (Lync sorts names).
@@ -748,6 +798,8 @@ return Lync.define("game", {
 	MetricUi = Lync.packet(Lync.struct({
 		Event = Lync.enum(Content.Metrics.UiEvents),
 		Key = Lync.optional(Lync.enum(Content.Shop.Keys)),
+		-- offer_* events (TASK-361): which contextual offer (Content.Shop.Offers key)
+		Offer = Lync.optional(Lync.enum(Content.Shop.Offers.Keys)),
 	})),
 	-- The local tutorial reached a step (index into Content.Metrics.TutorialSteps); logged once per step per player
 	MetricTutorial = Lync.packet(Lync.struct({
@@ -768,13 +820,19 @@ return Lync.define("game", {
 	SecurityLeave = Lync.packet(Lync.empty()),
 
 	-- Anomaly Tablet (TASK-335, TASK-345; owner request 2026-10-15, Provisional). s -> owner (fireClient, private). Writer:
-	-- JournalService, once the profile is loaded and the client is ready, and again on every new page. Pages = the
-	-- unlocked pages (Content.Journal keys, from profile.Journal); New = the page that just unlocked (toast + glow), nil
-	-- on the first send. Responder: JournalController (OnInit)
+	-- JournalService, once the profile is loaded and the client is ready, and again on every new page or claim. Pages =
+	-- the unlocked pages (Content.Journal keys, from profile.Journal); Claimed = the pages whose gems were paid
+	-- (profile.JournalClaimed, owner request 2026-10-17); New = the page that just unlocked (toast + glow), nil on the
+	-- first send; Gained = the page just claimed (the client plays the gem collect). Responder: JournalController (OnInit)
 	Journal = Lync.packet(Lync.struct({
 		Pages = Lync.bitfield(Content.Journal.Keys),
+		Claimed = Lync.bitfield(Content.Journal.Keys),
 		New = Lync.optional(Lync.enum(Content.Journal.Keys)),
+		Gained = Lync.optional(Lync.enum(Content.Journal.Keys)),
 	})),
+	-- c -> s: the player opened this page on the tablet; the server pays Content.Journal.Rules.Reward gems once per page
+	-- (unlocked and not claimed yet, else ignored). Idempotent. Responder: JournalService (OnInit)
+	JournalClaim = Lync.packet(Lync.enum(Content.Journal.Keys)),
 	-- s -> owner: the read_journal prompt went through, open the tablet. Writer: JournalService
 	JournalOpen = Lync.packet(Lync.empty()),
 })

@@ -51,9 +51,10 @@ export type ClassProduct = GamePass
 --            Coffee   sanity to full at night; by day a coffee to keep (ItemService:Give)
 --            Revive   +1 profile.ReviveCredits (DEC-117); spent by ReviveKitService (TASK-317): self while Down, or on a
 --                     fallen mate's body (VitalService:Revive)
+--            Kit      Night Kit (DEC-267): Coffee + Radar (Amount s) + Revive in one receipt
 --   Target   what the buyer picks before the prompt ("Mate" | "Ingredient"); nil = nothing to pick
 --   Night    only sold while a night shift runs (the client disables the card by day)
-export type UtilityKind = "Radar" | "Scare" | "Cash" | "Restock" | "Pantry" | "Coffee" | "Revive"
+export type UtilityKind = "Radar" | "Scare" | "Cash" | "Restock" | "Pantry" | "Coffee" | "Revive" | "Kit"
 export type UtilityTarget = "Mate" | "Ingredient"
 
 export type Utility = {
@@ -91,6 +92,96 @@ export type Gift = {
 	Name: string, -- suggested Creator Hub product name
 }
 
+-- Contextual offers (TASK-361; owner request 2026-10-17, Provisional; design/monetization-offers-proposal.md, Q-293..Q-299).
+-- A short clickable note in the HUD nudge slot (top right, under the cart) offering a utility at the moment the game
+-- needs it. It NEVER opens the Roblox prompt by itself: only the player's click does (or opens the shop, A/B of Q-293).
+-- OfferController (client) decides when; the server only sends ShopOffer for the Cash offer (EconomyService:Spend).
+--   Product   Content.Shop.Utilities key the click buys; "" = picked by the server (Cash: the TopUp pack in ShopOffer)
+--   Trigger   the game moment (OfferController):
+--             Sanity       night, sanity <= OfferRules.SanityShare of max, no coffee in the hand
+--             OutOfStock   an open ingredient (not Blocked / Wrapped) hit 0 while selling; target = that ingredient
+--             LowStock     OfferRules.OutCount+ open ingredients at 0, or LowStockCount+ under LowStockShare; beats OutOfStock
+--             Cash         not enough Cash for a buy (ShopOffer from the server; Value = missing dollars)
+--             MateDown     a mate is Down while I am Active (DEC-258: the kit works on a mate)
+--             NightRetry   the night repeated after a NightLost (Round Attempt > 1), once the night is calm
+--             AnomalyMiss  OfferRules.MissCount+ anomalies Failed this night, once they are over
+--             ScareBack    a mate scared me (util_scare, ShopGrant Value 1), ScareBackDelay s later; target = that mate
+--             NightStart   a night from OfferRules.KitNight on, once the night is calm (Night Kit, DEC-267)
+--   Text      English, may hold {ingredient} {name} {missing} {amount} {price}
+--   Priority  higher wins when two are due on the same tick
+--   PerShift  at most this many shows per shift (day or night); Cooldown = s between two shows of this offer
+--   Enabled   false = never shown (switch a trigger off without code)
+export type OfferTrigger =
+	"Sanity"
+	| "OutOfStock"
+	| "LowStock"
+	| "Cash"
+	| "MateDown"
+	| "NightRetry"
+	| "AnomalyMiss"
+	| "ScareBack"
+	| "NightStart"
+
+export type Offer = {
+	Key: string,
+	Product: string,
+	Trigger: OfferTrigger,
+	Text: string,
+	Priority: number,
+	PerShift: number,
+	Cooldown: number,
+	Enabled: boolean,
+}
+
+-- Budget and fatigue of the offers (proposal §4, Q-296), one place.
+export type OfferRules = {
+	Show: number, -- s on screen
+	Gap: number, -- s between two offers of any kind (the scare nudge counts)
+	PerShift: number, -- offers per shift (day or night), the scare nudge counts
+	MuteAfter: number, -- the same offer ignored this many times in a row = muted for the rest of the run
+	PauseAfter: number, -- this many offers ignored in a row = every offer paused for Pause s
+	Pause: number,
+	AfterPrompt: number, -- s without offers after any purchase prompt closed (bought or not)
+	ControlShare: number, -- 0..1: players (by UserId, fixed) who never see contextual offers (control group, Q-299)
+	ShopShare: number, -- 0..1: players whose click opens the shop with the card flashing instead of the prompt (Q-293 A/B)
+	SanityShare: number, -- Sanity trigger: sanity <= this share of max
+	OutCount: number, -- LowStock: this many open ingredients at 0
+	LowStockCount: number, -- LowStock: or this many open ingredients under LowStockShare of capacity
+	LowStockShare: number,
+	MissCount: number, -- AnomalyMiss: failed anomalies in the night
+	ScareBackDelay: number, -- s after the scare
+	Calm: number, -- s after the last live anomaly (Signal / Active) before any offer
+	FirstDay: number, -- no offers before this day / night (Day 1 and Night 1 are the tutorial and the free coffee lesson)
+	KitNight: number, -- NightStart: first night the Night Kit is offered
+}
+
+-- One-time bundles (DEC-267; owner 2026-10-17, Provisional): Developer Products a player buys once (lobby). The receipt
+-- grants Gems and Revives and stamps profile.OneTimeBought[Key]; a second receipt (bought again from another device
+-- before the lobby hid it) still grants (Robux were paid). ProductId 0 = not created on the Creator Hub yet.
+export type Bundle = {
+	Key: string,
+	ProductId: number,
+	Robux: number, -- suggested price (Creator Hub), display fallback
+	Name: string,
+	Text: string,
+	Icon: string,
+	Gems: number,
+	Revives: number, -- profile.ReviveCredits
+}
+
+-- Game Passes that are not classes (DEC-267). Kind:
+--   Thermos   a coffee in the hand at the start of every night (ShopUtilityService, Night phase; PassId 0 = not sold)
+export type PassKind = "Thermos"
+export type Pass = {
+	Key: string,
+	PassId: number,
+	Robux: number, -- suggested price (Creator Hub), display fallback
+	Name: string,
+	Text: string,
+	Icon: string,
+	Kind: PassKind,
+}
+
 export type Shop = {
 	GemPacks: Table.Table<GemPack>,
 	GamePasses: Table.Table<GamePass>,
@@ -98,6 +189,10 @@ export type Shop = {
 	Categories: { Category },
 	Gifts: Table.Table<Gift>,
 	Keys: { string }, -- every product / pass key (gem packs, passes, utilities, gifts): the MetricUi.Key wire enum
+	Offers: Table.Table<Offer>,
+	OfferRules: OfferRules,
+	Bundles: Table.Table<Bundle>,
+	Passes: Table.Table<Pass>,
 }
 
 -- Gem packs: bigger pack = cheaper gem (99 -> 90 R$ per 1,000 gems). Gem economy x75 (TASK-308, owner request
@@ -245,6 +340,19 @@ const utilities: { Utility } = {
 		Tone = "Green",
 	},
 	{
+		Key = "util_night_kit", -- DEC-267: Coffee + Radar + Revive Kit (sum 69 R$)
+		ProductId = 0, -- not created on the Creator Hub yet
+		Robux = 55,
+		Name = "Night Kit",
+		Text = "Coffee, Radar and a Revive Kit",
+		Icon = "Item/revive_kit",
+		Kind = "Kit",
+		Amount = 90, -- radar seconds
+		Night = true,
+		Category = "Survive",
+		Tone = "Green",
+	},
+	{
 		Key = "cash_100",
 		ProductId = 3718682111,
 		Robux = 29,
@@ -325,8 +433,171 @@ for _, pass in gamePasses do
 	table.insert(gifts, row)
 end
 
+-- Offers (TASK-361, Provisional; proposal §3.1 O1..O8). Prices come from the Creator Hub through {price}.
+const offers: { Offer } = {
+	{
+		Key = "offer_revive_mate", -- O5
+		Product = "util_revive",
+		Trigger = "MateDown",
+		Text = "{name} fainted! Get a Revive Kit · {price}",
+		Priority = 80,
+		PerShift = 2,
+		Cooldown = 120,
+		Enabled = true,
+	},
+	{
+		Key = "offer_coffee", -- O1
+		Product = "util_coffee",
+		Trigger = "Sanity",
+		Text = "Need a coffee? Get one · {price}",
+		Priority = 70,
+		PerShift = 1,
+		Cooldown = 600,
+		Enabled = true,
+	},
+	{
+		Key = "offer_pantry", -- O3
+		Product = "util_pantry",
+		Trigger = "LowStock",
+		Text = "Running out! Refill everything · {price}",
+		Priority = 60,
+		PerShift = 1,
+		Cooldown = 300,
+		Enabled = true,
+	},
+	{
+		Key = "offer_restock", -- O2
+		Product = "util_restock",
+		Trigger = "OutOfStock",
+		Text = "Out of {ingredient}! Refill it · {price}",
+		Priority = 50,
+		PerShift = 2,
+		Cooldown = 150,
+		Enabled = true,
+	},
+	{
+		Key = "offer_cash", -- O4
+		Product = "",
+		Trigger = "Cash",
+		Text = "Need ${missing} more? {product} +${amount} · {price}",
+		Priority = 45,
+		PerShift = 2,
+		Cooldown = 60,
+		Enabled = true,
+	},
+	{
+		Key = "offer_radar_retry", -- O6
+		Product = "util_radar",
+		Trigger = "NightRetry",
+		Text = "Try again with the Anomaly Radar · {price}",
+		Priority = 40,
+		PerShift = 1,
+		Cooldown = 600,
+		Enabled = true,
+	},
+	{
+		Key = "offer_radar_miss", -- O7
+		Product = "util_radar",
+		Trigger = "AnomalyMiss",
+		Text = "Spot them all: get the Anomaly Radar · {price}",
+		Priority = 35,
+		PerShift = 1,
+		Cooldown = 600,
+		Enabled = true,
+	},
+	{
+		Key = "offer_night_kit", -- DEC-267 (never shown while util_night_kit has ProductId 0)
+		Product = "util_night_kit",
+		Trigger = "NightStart",
+		Text = "Long night ahead? Get the Night Kit · {price}",
+		Priority = 38,
+		PerShift = 1,
+		Cooldown = 600,
+		Enabled = true,
+	},
+	{
+		Key = "offer_scare_back", -- O8
+		Product = "util_scare",
+		Trigger = "ScareBack",
+		Text = "Scare {name} back! · {price}",
+		Priority = 30,
+		PerShift = 1,
+		Cooldown = 600,
+		Enabled = true,
+	},
+}
+
+const offerRules: OfferRules = {
+	Show = 6,
+	Gap = 120,
+	PerShift = 3,
+	MuteAfter = 2,
+	PauseAfter = 4,
+	Pause = 900,
+	AfterPrompt = 60,
+	ControlShare = 0, -- DEC-268: no control group, everyone sees the offers
+	ShopShare = 0.5, -- DEC-262: A/B for the first 2 weeks, then 0 or 1
+	SanityShare = 0.35,
+	OutCount = 2,
+	LowStockCount = 3,
+	LowStockShare = 0.2,
+	MissCount = 2,
+	ScareBackDelay = 20,
+	Calm = 10,
+	FirstDay = 2,
+	KitNight = 3,
+}
+
+do
+	const utilityKeys: { [string]: boolean } = {}
+	for _, utility in utilities do
+		utilityKeys[utility.Key] = true
+	end
+	for _, offer in offers do
+		if offer.Product ~= "" and not utilityKeys[offer.Product] then
+			error(`[Content.Shop] offer {offer.Key}: Product {offer.Product} is not a Utilities key`)
+		end
+		if offer.Product == "" and offer.Trigger ~= "Cash" then
+			error(`[Content.Shop] offer {offer.Key}: only the Cash trigger may leave Product empty`)
+		end
+	end
+end
+
+-- One-time bundles and other passes (DEC-267). Ids 0 until the owner creates them on the Creator Hub.
+const bundles: { Bundle } = {
+	{
+		Key = "starter_crate",
+		ProductId = 0,
+		Robux = 99,
+		Name = "Starter Crate",
+		Text = "2,400 gems and 2 Revive Kits. Once per player!",
+		Icon = "Hud/gem",
+		Gems = 2400,
+		Revives = 2,
+	},
+}
+
+const passes: { Pass } = {
+	{
+		Key = "pass_thermos",
+		PassId = 0,
+		Robux = 149,
+		Name = "Thermos",
+		Text = "A hot coffee in your hand at the start of every night",
+		Icon = "Item/coffee",
+		Kind = "Thermos",
+	},
+}
+
 const allKeys: { string } = {}
-for _, list in { gemPacks :: { any }, gamePasses :: { any }, utilities :: { any }, gifts :: { any } } do
+for _, list in {
+	gemPacks :: { any },
+	gamePasses :: { any },
+	utilities :: { any },
+	gifts :: { any },
+	bundles :: { any },
+	passes :: { any },
+} do
 	for _, row in list do
 		table.insert(allKeys, row.Key)
 	end
@@ -346,6 +617,10 @@ const shop: Shop = {
 	Categories = table.freeze(categories),
 	Gifts = Table.new(gifts),
 	Keys = table.freeze(allKeys),
+	Offers = Table.new(offers),
+	OfferRules = offerRules,
+	Bundles = Table.new(bundles),
+	Passes = Table.new(passes),
 }
 
 return Table.record(shop)

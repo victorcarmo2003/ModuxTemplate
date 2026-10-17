@@ -7,11 +7,12 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 
 export type Kind = "Info" | "Good" | "Alert"
-export type Line = { Text: string, Kind: Kind }
+-- Quiet = no toast (owner request 2026-10-17, mobile clean-up: the screen already shows it, the toast only covered it)
+export type Line = { Text: string, Kind: Kind, Quiet: boolean? }
 
 -- {name} = the other player of the notice (PartyNotice.UserId)
 const PARTY: { [string]: Line } = {
-	Created = { Text = "Squad created!", Kind = "Good" },
+	Created = { Text = "Squad created!", Kind = "Good", Quiet = true }, -- the squad window opens
 	AlreadyInParty = { Text = "You're already in a squad", Kind = "Alert" },
 	NotInParty = { Text = "You're not in a squad", Kind = "Alert" },
 	NotLeader = { Text = "Only the squad leader can do that", Kind = "Alert" },
@@ -28,7 +29,7 @@ const PARTY: { [string]: Line } = {
 	NotAllReady = { Text = "Not everyone is ready yet", Kind = "Alert" },
 	Busy = { Text = "The squad is starting...", Kind = "Info" },
 	TooFast = { Text = "Easy there! Try again in a moment", Kind = "Alert" },
-	Starting = { Text = "Opening the shop... here we go!", Kind = "Good" },
+	Starting = { Text = "Opening the shop... here we go!", Kind = "Good", Quiet = true }, -- the pad sign counts down
 	TeleportRetry = { Text = "Trip failed, trying again...", Kind = "Alert" },
 	TeleportFailed = { Text = "Couldn't start the run. Try again!", Kind = "Alert" },
 	StudioNoTeleport = { Text = "Studio can't teleport: test Start on a live server", Kind = "Info" },
@@ -73,8 +74,8 @@ local function className(key: string?): string
 end
 
 local function party(key: string, name: string?): Line
-	const line = PARTY[key] or { Text = humanize(key), Kind = "Info" :: Kind }
-	return { Text = (string.gsub(line.Text, "{name}", name or "Someone")), Kind = line.Kind }
+	const line: Line = PARTY[key] or { Text = humanize(key), Kind = "Info" :: Kind, Quiet = nil }
+	return { Text = (string.gsub(line.Text, "{name}", name or "Someone")), Kind = line.Kind, Quiet = line.Quiet }
 end
 
 local function classBuy(reason: string, class: string): Line

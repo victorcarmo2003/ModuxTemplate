@@ -9,9 +9,6 @@ local Rules = require(StarterPlayer.StarterPlayerScripts.client.Interaction.Prom
 local Menu = require(StarterPlayer.StarterPlayerScripts.client.Interaction.PromptController.Menu)
 
 export type Public = {
-	Alt: Prompt.Prompt?,
-	AltHolding: boolean,
-	AltHoldingSource: Vide.Source<boolean>,
 	AutoSelectSaved: boolean?,
 	DoorPair: any,
 	FocusButtons: { [InteractionMenu.Item]: GuiButton },
@@ -32,8 +29,6 @@ export type Public = {
 	MenuState: Menu.State,
 	MenuVisible: Vide.Source<boolean>,
 	Prompts: { [Instance]: Prompt.Prompt },
-	RefuseOwner: { [Prompt.Prompt]: Prompt.Prompt },
-	Refuses: { [Prompt.Prompt]: Prompt.Prompt },
 	Target: Prompt.Prompt?,
 	WindowFocused: boolean,
 	Setup: (self: Public) -> (),
@@ -53,8 +48,6 @@ export type Public = {
 	WatchDiscard: (self: Public, anchor: Instance) -> (),
 	CancelHold: (self: Public) -> (),
 	BeginHold: (self: Public, prompt: Prompt.Prompt) -> (),
-	BeginAltHold: (self: Public) -> (),
-	SetAlt: (self: Public, alt: Prompt.Prompt?) -> (),
 	EndHold: (self: Public) -> (),
 	SetTarget: (self: Public, prompt: Prompt.Prompt?) -> (),
 	MenuItemOf: (self: Public, prompt: Prompt.Prompt) -> InteractionMenu.Item,
@@ -63,7 +56,6 @@ export type Public = {
 	ApplyMenuTarget: (self: Public) -> (),
 	MenuStep: (self: Public, delta: number) -> (),
 	MenuPress: (self: Public, prompt: Prompt.Prompt) -> (),
-	MenuPressRefuse: (self: Public, owner: Prompt.Prompt) -> (),
 	BindMenuPicks: (self: Public, count: number) -> (),
 	SetMenuActive: (self: Public, active: boolean) -> (),
 	OnWheel: (self: Public, state: Enum.UserInputState, wheel: InputObject) -> Enum.ContextActionResult,
@@ -72,7 +64,6 @@ export type Public = {
 	HideAll: (self: Public) -> (),
 	Held: (self: Public, character: Model) -> Rules.Held?,
 	RulesContext: (self: Public, character: Model) -> Rules.Context,
-	Sibling: (self: Public, prompt: Prompt.Prompt, name: string) -> Prompt.Prompt?,
 	Tick: (self: Public) -> (),
 	Watch: (self: Public, gui: Instance) -> (),
 	Retick: (self: Public) -> (),

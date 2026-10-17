@@ -753,7 +753,9 @@ function KitchenService:Publish(station: StationApi.Station)
 				continue
 			end
 			const state = record.State
-			if state ~= "Empty" and state ~= "Working" and state ~= "Ready" then
+			-- Cleaning: the coffee machine's wait after a take (TASK-328); dropping it here removed the record and the client
+			-- read Empty, so the cooldown never showed (owner request 2026-10-17)
+			if state ~= "Empty" and state ~= "Working" and state ~= "Ready" and state ~= "Cleaning" then
 				warn(`[KitchenService] {station.Kind}: bad State "{state}" at slot {slot}`)
 				continue
 			end

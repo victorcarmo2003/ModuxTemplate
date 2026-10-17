@@ -1,0 +1,12 @@
+{"out": "thumb_G_teto.png", "size": [1920, 1080],
+ "bg": {"path": "bg_trailer_inside.jpg", "blur": 7, "brightness": 0.7, "tint": [0.6, 0.8, 1.35], "saturation": 0.3},
+ "spots": [{"at": [0.3, 0.25], "radius": 0.4, "color": [60, 200, 255], "strength": 0.45},
+           {"at": [0.64, 0.62], "radius": 0.42, "color": [210, 225, 255], "strength": 0.35}],
+ "layers": [
+  {"path": "m_roof.jpg", "at": [0.3, 0.3], "height": 1.05, "anchor": "center", "spill": 15,
+   "saturation": 1.2, "contrast": 1.15, "glow": {"color": [60, 210, 255], "width": 55, "strength": 1.0},
+   "outline": {"color": [120, 230, 255], "width": 6}},
+  {"path": "w_cat_up.jpg", "at": [0.64, 1.32], "height": 1.15, "anchor": "bottom",
+   "saturation": 1.35, "contrast": 1.12, "brightness": 1.06, "glow": {"color": [200, 230, 255], "width": 40, "strength": 0.45},
+   "outline": {"color": [255, 255, 255], "width": 9}, "rim": {"color": [80, 210, 255], "side": "left", "strength": 0.6}}
+ ], "vignette": 0.6, "grade": {"contrast": 1.06, "saturation": 1.1}}

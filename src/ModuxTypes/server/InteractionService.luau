@@ -14,6 +14,9 @@ export type Handler = {
 	Run: (player: Player, anchor: Instance, id: number) -> (),
 	-- Optional: other PromptAction values whose anchors also accept this action (none in use since DEC-221).
 	On: { string }?,
+	-- Optional (TASK-354): where the anchor is for this player (an anchor that follows the player on the client, the
+	-- sliding grill Work prompt). Used by the range check instead of the anchor's own position; nil = the anchor's.
+	Reach: ((player: Player, anchor: Instance, root: Vector3) -> Vector3?)?,
 }
 export type Request = { Player: Player, Action: string }
 export type Bucket = { Tokens: number, At: number }

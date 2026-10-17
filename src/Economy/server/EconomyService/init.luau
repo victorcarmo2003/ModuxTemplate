@@ -13,13 +13,14 @@
 --   AddReportStep(name, fn)       fills ShiftReport fields of other features before it is sent (T48)
 --   CollectTips()                 prompt on the jar (collect_tips): jar -> Cash now; the ledger remembers it for the report
 --   TopUp(amount)                 first-run tutorial: Cash up to at least amount (TutorialService, Provisional)
---   PromptCashPack(player, missing) not enough Cash for a player's buy: prompts the Cash pack covering the difference
---                                 (Shop TopUp; owner request 2026-10-15). Spend calls it on failure with `player`
+--   PromptCashPack(player, missing) not enough Cash for a player's buy: OFFERS the Cash pack covering the difference
+--                                 (Shop TopUp; owner request 2026-10-15) in the HUD note (ShopOffer, TASK-364; owner
+--                                 request 2026-10-17: never opens the Roblox prompt by itself). Spend calls it on
+--                                 failure with `player`
 -- Cash changes by Spend, AddSale, CollectTips, the deposit, TopUp and DevAddCash.
 -- Deposit on RoundService.ShiftEnded (start of Summary): grade A-D, bonus floor(day take x %) where the day take = Sales +
 -- Tips + Catches - Stolen (DEC-051 parity), Cash += tips left in the jar + bonus, Drawer = 0, report steps, ShiftReport to
 -- the group (Drawer = the day take), Reported(info, report).
-local MarketplaceService = game:GetService("MarketplaceService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -56,6 +57,7 @@ const BOSS_STAT = "BossBonusPP" -- Content.Stats (Shift Lead, Party scope, not s
 const CLOSING = "Closing"
 -- Seconds between two Cash pack prompts for the same player (a refused buy spammed on a prompt must not stack them)
 const TOP_UP_COOLDOWN = 4
+const CASH_OFFER = "offer_cash" -- Content.Shop.Offers key of the Cash offer (TASK-364)
 const SALE_KINDS: { [string]: boolean } = { Sale = true, Catch = true }
 -- Sale.Result enum (network.md §4.3)
 const RESULTS: { [string]: boolean } =
@@ -170,10 +172,12 @@ function EconomyService:Spend(amount: number, player: Player?, sku: string?): bo
 	return true
 end
 
--- Not enough Cash for a buy of `player` (owner request 2026-10-15): prompt the created Cash pack that covers the missing
--- amount (TopUp.Cash: the smallest that covers it, else the biggest). The receipt goes through ShopUtilityService like a
--- buy from the HUD cart (Cash += Amount for the whole party); the player still has to press the buy again. At most one
--- prompt per TOP_UP_COOLDOWN s per player.
+-- Not enough Cash for a buy of `player` (owner request 2026-10-15): offer the created Cash pack that covers the missing
+-- amount (TopUp.Cash: the smallest that covers it, else the biggest). Since TASK-364 (owner request 2026-10-17,
+-- Provisional, Q-294) it is a ShopOffer to that player: OfferController shows it in the HUD note and only the player's
+-- click opens the Roblox prompt. The receipt goes through ShopUtilityService like a buy from the HUD cart (Cash +=
+-- Amount for the whole party); the player still has to press the buy again. At most one offer per TOP_UP_COOLDOWN s
+-- per player (OfferController adds its own budget on top).
 function EconomyService:PromptCashPack(player: Player, missing: number)
 	const now = os.clock()
 	const last = self.PromptedAt[player]
@@ -185,12 +189,11 @@ function EconomyService:PromptCashPack(player: Player, missing: number)
 		return
 	end
 	self.PromptedAt[player] = now
-	const ok, err = pcall(function()
-		MarketplaceService:PromptProductPurchase(player, pack.ProductId)
-	end)
-	if not ok then
-		warn(`[EconomyService] PromptProductPurchase({pack.Key}) failed: {err}`)
-	end
+	self.Libs.Net.ShopOffer:fireClient(player, {
+		Offer = CASH_OFFER,
+		Product = pack.Key,
+		Value = math.clamp(math.floor(missing), 0, 100000),
+	})
 end
 
 -- Order price or thief reward straight into the shared Cash (DEC-238; it used to fall in the drawer, DEC-050). Only while

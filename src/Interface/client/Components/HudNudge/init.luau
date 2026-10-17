@@ -5,6 +5,7 @@
 -- OnActivated (the owner opens the shop). The owner decides when it shows, for how long and the words per device.
 -- `{pad}` in the text is replaced by the controller button image `Pad` (UserInputService:GetImageForKeyCode); with no
 -- image it reads `PadText`. Height: Theme.MinTouch on touch (`Touch`), smaller otherwise.
+-- Icon (TASK-363, contextual offers): an Icons name shown left of the text ("" = none), e.g. the product of an offer.
 -- Pure: only props.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -12,6 +13,7 @@ local Theme = require(script.Parent.Theme)
 local Motion = require(script.Parent.Motion)
 local CartoonButton = require(script.Parent.CartoonButton)
 local CartoonLabel = require(script.Parent.CartoonLabel)
+local Icons = require(script.Parent.Icons)
 
 const create = Vide.create
 const source = Vide.source
@@ -28,6 +30,8 @@ export type Props = {
 	PadText: string?,
 	-- Touch screen: a full touch-size target
 	Touch: (() -> boolean)?,
+	-- Icons name left of the text ("" or nil = none)
+	Icon: (() -> string)?,
 	AnchorPoint: Vector2?,
 	Position: (UDim2 | () -> UDim2)?,
 	Name: string?,
@@ -36,6 +40,7 @@ export type Props = {
 const HEIGHT = 36
 const TOKEN = "{pad}"
 const PAD_ICON = 24
+const ICON = 26
 
 return function(props: Props): Frame
 	-- the last text stays on the button while it pops out
@@ -55,6 +60,21 @@ return function(props: Props): Frame
 	const pop = Motion.Pop(shown)
 	const height = function(): number
 		return if props.Touch and props.Touch() then Theme.MinTouch else HEIGHT
+	end
+	-- the icon follows the text: kept while the note pops out
+	const shownIcon = source("")
+	effect(function()
+		const text = props.Text()
+		const icon = if props.Icon then props.Icon() else ""
+		if text ~= "" then
+			untrack(function()
+				shownIcon(icon)
+				return nil
+			end)
+		end
+	end)
+	const iconRect = function(): Icons.Rect
+		return Icons.Rect(shownIcon()) or { Offset = Vector2.zero, Size = Vector2.zero }
 	end
 	const padImage = function(): string
 		return if props.Pad then props.Pad() else ""
@@ -117,6 +137,25 @@ return function(props: Props): Frame
 					VerticalAlignment = Enum.VerticalAlignment.Center,
 					SortOrder = Enum.SortOrder.LayoutOrder,
 					Padding = UDim.new(0, 4),
+				}),
+				create("ImageLabel")({
+					Name = "Icon",
+					LayoutOrder = 0,
+					Size = UDim2.fromOffset(ICON, ICON),
+					BackgroundTransparency = 1,
+					Image = function()
+						return Icons.ImageOf(shownIcon())
+					end,
+					ImageRectOffset = function()
+						return iconRect().Offset
+					end,
+					ImageRectSize = function()
+						return iconRect().Size
+					end,
+					ScaleType = Enum.ScaleType.Fit,
+					Visible = function()
+						return shownIcon() ~= "" and Icons.Has(shownIcon())
+					end,
 				}),
 				label("Before", 1, function()
 					const before = parts()

@@ -199,3 +199,13 @@ O dono acrescentou duas caçambas em `workspace.MAP01_Assets.Extra` (duas Parts 
 ## Alvos 3D do preparo: hitboxes e vistas (2026-10-12, `prep_targets.luau`, TASK-200, Provisorio)
 
 Snippet de Studio, idempotente, nada apagado: `run("prep_targets", "dry")` (plano + checagens, nao grava), `run("prep_targets")` (aplica), `run("prep_targets", "undo")` (hitboxes e ancoras novas vao para `ServerStorage.PrepTargets_Backup_20261012`, `CamAnchor`/`Focus` voltam ao CFrame guardado em `PTOrigCF`). Cria o Model `trailer.PrepTargets` com 20 hitboxes (tag `PrepTarget`, atributos `TargetKind`/`Slot`/`Key`/`Id`/`Object`) sobre os objetos reais do trailer e, em cada `Station_n.Mount`, `CamAnchor_Board`/`_Toppings`/`_Window`, `Focus_*`, `Att_Stand_Board`/`_Toppings`/`_Window` (e reaponta `CamAnchor`/`Focus` da vista Grill). Numeros e lacunas em `docs/levels/MAP-01.md` §19.2. Nao esta nos placements: depois de um `Place.run` rodar o `bind_map01` (chama o snippet por HTTP, depois do `bindPrepStations`) ou o snippet, antes do `check_map01` (regra 18). O `stations_prep` reescreve `CamAnchor`/`Focus`: rodar o `prep_targets` depois dele. O dono precisa salvar o place (Ctrl+S).
+
+## Alavanca da janela à esquerda da tela CAMERAS (2026-10-17, `trailer_shutter_left_of_cams.luau`, TASK-354, Provisório)
+
+`run("assetplace/trailer_shutter_left_of_cams", "dry" | "undo" | nil)`, idempotente e reversível. Um `PivotTo` do Model
+`TRL-SHUTTER` (MapId, com o `Prompt_Shutter` dentro) da parede leste para a parede do fundo, 0,6 stud à esquerda do monitor
+`Workspace.SecurityCams.CCTV` (visto de dentro do trailer), rente à parede (raycast), mesma altura, virado para dentro.
+Marcador `_SHL_OrigPivot` (pose antes da 1ª execução; o undo volta a ela). Aplicado no Studio em 2026-10-17: pivô
+(-32.56, 4.93, 12.60) -> (-38.18, 4.93, 7.24), `Prompt_Shutter` em (-38.18, 4.71, 8.06). Depois de `Place.run` / `Bind.run`
+(que recriam o TRL-SHUTTER) e do `trailer_door_switches.luau`: rodar de novo. O `check_map01` só dá `info` pela distância ao
+`Prompt_Switch` (esperado).

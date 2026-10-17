@@ -6,16 +6,19 @@ local TeleportService = game:GetService("TeleportService")
 
 local Teleport = {}
 
--- New reserved server of this place. Returns the access code (server-only secret) or nil + error.
-function Teleport.Reserve(): (string?, string?)
+-- New reserved server of this place. Returns the access code (server-only secret) and the PrivateServerId the server
+-- will have (the RunId of SessionService, TASK-360), or nil, nil + error.
+function Teleport.Reserve(): (string?, string?, string?)
+	local serverId = ""
 	const ok, result = pcall(function(): string
-		const code = TeleportService:ReserveServer(game.PlaceId)
+		const code, id = TeleportService:ReserveServer(game.PlaceId)
+		serverId = id
 		return code
 	end)
 	if not ok then
-		return nil, tostring(result)
+		return nil, nil, tostring(result)
 	end
-	return result, nil
+	return result, serverId, nil
 end
 
 -- Options for a reserved server (code) carrying data, or for the public servers of the place (code nil).

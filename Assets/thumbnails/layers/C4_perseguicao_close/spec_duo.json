@@ -1,0 +1,89 @@
+{
+ "out": "thumb_C15_perseguicao_duo.png",
+ "size": [
+  1920,
+  1080
+ ],
+ "beauty": "beauty_cones4.jpg",
+ "visible": "vis.jpg",
+ "full": "full.jpg",
+ "characters": [
+  {
+   "key": [
+    255,
+    0,
+    255
+   ],
+   "outline": [
+    255,
+    70,
+    70
+   ],
+   "width": 0,
+   "smooth": 3,
+   "saturation": 0.5,
+   "contrast": 1.0,
+   "border": {
+    "width": 3,
+    "color": [
+     25,
+     10,
+     15
+    ]
+   },
+   "lamps": {
+    "threshold": 0.88,
+    "color": [
+     255,
+     236,
+     190
+    ],
+    "core": 0.35,
+    "size": 16,
+    "strength": 1.1
+   }
+  },
+  {
+   "key": [
+    0,
+    255,
+    255
+   ],
+   "outline": [
+    255,
+    255,
+    255
+   ],
+   "width": 0,
+   "smooth": 3,
+   "saturation": 1.15,
+   "brightness": 1.05,
+   "contrast": 1.06,
+   "pixels": "fox_duo.jpg"
+  }
+ ],
+ "background": {
+  "saturation": 0.45,
+  "brightness": 0.95,
+  "tint": [
+   0.62,
+   0.82,
+   1.12
+  ],
+  "lift": [
+   18,
+   34,
+   62
+  ],
+  "focus": {
+   "near": 40,
+   "far": 600,
+   "blur": 5
+  }
+ },
+ "grade": {
+  "saturation": 1.05,
+  "contrast": 1.08
+ },
+ "vignette": 0.45
+}

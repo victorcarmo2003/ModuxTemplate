@@ -1068,7 +1068,12 @@ return Table.record({
 	GradeKeys = { "None", "Messy", "Good", "Perfect" },
 	GrillActs = { "Place", "Flip", "Collect" }, -- PrepGrill.Act
 	TrashFrom = { "Plate", "Grill", "Rail" }, -- PrepTrash.From (the bin takes the plate, a sausage of the grill, the front of the rail); PrepResult.Value of a Trash = index - 1
-	OrderActs = { "Take", "Serve", "Refuse" }, -- PrepOrder.Act
+	OrderActs = { "Take", "Serve" }, -- PrepOrder.Act (no Refuse since TASK-354: refusing is closing the window)
 	GrabFrom = { "Grill", "Rail" }, -- PrepGrab.From; PrepClaims record id = (index of From - 1) * 8 + Slot (DEC-259)
 	Stations = 4, -- PrepEnter.Station 1..4, PrepSeats records (BoardSlots of the trailer)
+	-- TASK-354 (owner request 2026-10-17, Provisional): the grill Work prompt slides along the counter with the player
+	-- (shared/Prep/WorkSlide). Model = the counter-wide Model of the vehicle (its bounding box is the counter); Fraction = how
+	-- far from the end nearest the authored prompt it may follow (0.7 = about where the toppings start); Step = the PromptStep
+	-- of the anchor that slides (the other Work prompts are silenced anyway).
+	WorkSlide = { Model = "PrepTargets", Fraction = 0.7, Step = "Grill" },
 })

@@ -345,7 +345,7 @@ E copie por cima de `src/Modux`, menos os quatro arquivos gerados
 
 `src/Admin/` traz o console Conch/ConchUI, aberto com **F2**, só para admins (Studio sempre; servidor publicado só
 `UserId` em `src/Admin/shared/AdminSettings.luau`). `dev <comando>` é a ponte para o `DevService` (mesmos comandos do
-chat `/dev`), mais `day`, `cash`, `gems`, `upgrade`, `tp` e `content`. Conch e ConchUI são requeridos direto, fora de
+chat `/dev`), mais `day`, `night`, `cash`, `gems`, `upgrade`, `tp` e `content`. Conch e ConchUI são requeridos direto, fora de
 `src/Libs`. Política e detalhes em `docs/tech/admin.md`. Depois de puxar a feature: `wally install`, o
 `wally-package-types` do Setup, `rogen build`, `modux generate` e reconectar o Rojo.
 

@@ -14,7 +14,6 @@ local LobbyHud = require(StarterPlayer.StarterPlayerScripts.client.Interface.Com
 local PlayChoice = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.PlayChoice)
 local SquadPanel = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.SquadPanel)
 local SquadSetup = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.SquadSetup)
-local SquadStatus = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.SquadStatus)
 local PadTag = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.PadTag)
 local ToastStack = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Toast.Stack)
 local Pads = require(StarterPlayer.StarterPlayerScripts.client.Lobby.LobbyController.Pads)
@@ -74,6 +73,7 @@ export type Public = {
 	Roster: Vide.Source<{ Player }>,
 	Scale: Vide.Source<number>,
 	Sent: Vide.Source<{ [number]: boolean }>,
+	SkinFocus: Vide.Source<string>,
 	Stage: Stage.Stage?,
 	StagePoint: CFrame?,
 	Standing: Vide.Source<number>,
@@ -95,7 +95,7 @@ export type Public = {
 	Equip: (self: Public, key: string) -> (),
 	OnClassBuyResult: (self: Public, class: string, reason: string) -> (),
 	Step: (self: Public, delta: number) -> (),
-	BuildRig: (self: Public, species: string) -> Model?,
+	BuildRig: (self: Public, species: string, skin: string?) -> Model?,
 	PlayIdle: (self: Public, model: Model) -> (),
 	TakeCamera: (self: Public) -> (),
 	HideCharacters: (self: Public, on: boolean) -> (),
@@ -103,6 +103,11 @@ export type Public = {
 	FindStagePoint: (self: Public) -> CFrame?,
 	OpenStage: (self: Public) -> (),
 	SpeciesOf: (self: Public, key: string) -> string,
+	FocusClass: (self: Public, key: string) -> (),
+	SkinEntries: (self: Public, class: string) -> { ClassSelect.SkinEntry },
+	SkinStateOf: (self: Public, key: string) -> ClassSelect.SkinState,
+	EquipSkin: (self: Public, key: string) -> (),
+	SkinBanner: (self: Public) -> string,
 	Packs: (self: Public) -> { GemShop.Pack },
 	BuyPack: (self: Public, key: string) -> (),
 	LoadPrices: (self: Public) -> (),
@@ -120,8 +125,6 @@ export type Public = {
 	CancelKey: (self: Public) -> string,
 	PlayShown: (self: Public) -> boolean,
 	PlayButton: (self: Public) -> LobbyHud.PlayButton,
-	PlayStatus: (self: Public) -> string,
-	PlayCard: (self: Public) -> SquadStatus.Info,
 	GearShown: (self: Public) -> boolean,
 	Play: (self: Public) -> (),
 	ClearQuickPlay: (self: Public) -> (),
@@ -140,6 +143,7 @@ export type Public = {
 	PadState: (self: Public, n: number) -> PadTag.State,
 	PadStatus: (self: Public, n: number) -> string,
 	PadLeader: (self: Public, n: number) -> string,
+	PadFaces: (self: Public, n: number) -> { number },
 	PaintPlatforms: (self: Public) -> (),
 	OnPadCount: (self: Public, n: number, _from: number, _to: number) -> (),
 	OnZone: (self: Public, zone: LobbyZones.Zone, inside: boolean) -> (),

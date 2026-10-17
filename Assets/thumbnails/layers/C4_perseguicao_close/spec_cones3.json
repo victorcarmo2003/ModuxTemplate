@@ -1,0 +1,81 @@
+{
+ "out": "thumb_C11_perseguicao_cones.png",
+ "size": [
+  1920,
+  1080
+ ],
+ "beauty": "beauty_cones3.jpg",
+ "visible": "vis.jpg",
+ "full": "full.jpg",
+ "characters": [
+  {
+   "key": [
+    255,
+    0,
+    255
+   ],
+   "outline": [
+    255,
+    70,
+    70
+   ],
+   "width": 6,
+   "smooth": 3,
+   "saturation": 1.0,
+   "contrast": 1.0,
+   "border": {
+    "width": 3,
+    "color": [
+     25,
+     10,
+     15
+    ]
+   },
+   "lamps": {
+    "threshold": 0.9,
+    "color": [
+     255,
+     255,
+     255
+    ],
+    "core": 0.45,
+    "size": 16,
+    "strength": 1.25
+   }
+  },
+  {
+   "key": [
+    0,
+    255,
+    255
+   ],
+   "outline": [
+    255,
+    255,
+    255
+   ],
+   "width": 9,
+   "smooth": 3,
+   "saturation": 0.95,
+   "border": {
+    "width": 4,
+    "color": [
+     25,
+     15,
+     20
+    ]
+   },
+   "brightness": 0.92,
+   "contrast": 0.95,
+   "pixels": "beauty_noite2.jpg"
+  }
+ ],
+ "background": {
+  "saturation": 1.05,
+  "brightness": 1.0
+ },
+ "grade": {
+  "saturation": 1.0,
+  "contrast": 1.03
+ }
+}

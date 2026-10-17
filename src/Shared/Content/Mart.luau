@@ -68,6 +68,11 @@ export type Mart = {
 		Phases: { string },
 		Reach: number, -- studs from the stand where the arrow is dismissed
 	},
+	BunHint: {
+		LowBuns: number, -- buns in the crate at or under which the Mart hint shows
+		Phases: { string }, -- keys of Shift
+		Reach: number, -- studs from the Mart door where it is dismissed
+	},
 	Tags: {
 		Pedestal: string, -- Model (or BasePart) of one pedestal, attribute Slot = BenchSlot
 		Shutter: string, -- Model of one roll-up shutter, attribute Slot = Doors[].Key
@@ -84,7 +89,8 @@ export type Mart = {
 const mart: Mart = {
 	-- Q-176 A: closed only across the turn change (Summary, boss Call), lost night / resume and the non-play phases.
 	KioskClosedPhases = { "Summary", "Call", "NightLost", "Resume", "Intro", "Finale", "RunEnd" },
-	FirstShiftClosedPhases = { "Intro", "Prep", "Open" },
+	-- 2026-10-17 Day 1 cut (owner decision, Provisional): no upgrade lesson, the stand is open from the start
+	FirstShiftClosedPhases = {},
 	Pedestals = {
 		{ Slot = "B1", Offer = "Upgrade" },
 		{ Slot = "B2", Offer = "Upgrade" },
@@ -122,6 +128,9 @@ const mart: Mart = {
 	Cooldown = { Turns = 2 },
 	Plate = { Distance = 45, Lift = 1.3, Width = 190 },
 	Hint = { Phases = { "Closing", "Summary", "Prep" }, Reach = 9 },
+	-- Low-bun hint (2026-10-17, Provisional): any selling phase with LowBuns buns or fewer in the crate, an arrow to the
+	-- Mart door and one toast per low spell; over on reaching the door (Reach) or once the stock is back above it
+	BunHint = { LowBuns = 2, Phases = { "Open", "Closing", "Night" }, Reach = 10 },
 	Tags = { Pedestal = "GearPedestal", Shutter = "GearShutter", Slot = "Slot" },
 	Fallback = { DoorHeight = 7, DoorAhead = 1, AnchorHeight = 4.2, Margin = 1.5 },
 }
@@ -149,6 +158,7 @@ return table.freeze({
 	Cooldown = mart.Cooldown,
 	Plate = mart.Plate,
 	Hint = mart.Hint,
+	BunHint = mart.BunHint,
 	Tags = mart.Tags,
 	Fallback = mart.Fallback,
 	FirstShiftClosed = firstShiftClosed,

@@ -121,6 +121,7 @@ function CodesService:Redeem(player: Player, raw: string): (Reason, Reward)
 	end
 
 	const key = normalize(raw)
+	MetricsLog.panel(player, "codes", 2, "try")
 	const code = Codes.ByKey[key]
 	if code == nil or code.Active == false or self.Broken[key] then
 		self:CountFail(player)
@@ -160,6 +161,7 @@ function CodesService:Redeem(player: Player, raw: string): (Reason, Reward)
 	profiles:RequestSave(player)
 	MetricsLog.gems(player, "Source", gems, profile.Gems(), "Code", key)
 	MetricsLog.player(player, "code_redeemed", gems, { code = key, class = grantedClass or "" })
+	MetricsLog.panel(player, "codes", 3, "redeemed", { code = key })
 	return "Ok", { Gems = math.min(gems, REWARD_GEMS_MAX), Class = grantedClass }
 end
 

@@ -1,0 +1,20 @@
+{
+  "out": "thumb_D_rua.png", "size": [1920, 1080],
+  "bg": {"path": "bg.jpg", "blur": 5, "brightness": 0.75, "tint": [0.8, 0.9, 1.2], "saturation": 0.7},
+  "spots": [
+    {"at": [0.62, 0.45], "radius": 0.45, "color": [150, 180, 255], "strength": 0.35},
+    {"at": [0.3, 0.38], "radius": 0.28, "color": [255, 30, 80], "strength": 0.45}
+  ],
+  "layers": [
+    {"path": "walker.jpg", "scale": 1.75, "offset": [-120, 40], "anchor": "bottom",
+     "saturation": 1.2, "contrast": 1.15, "brightness": 1.0,
+     "glow": {"color": [255, 40, 90], "width": 50, "strength": 0.9},
+     "outline": {"color": [255, 60, 110], "width": 5}},
+    {"path": "runner.jpg", "scale": 1.45, "offset": [-60, 330], "anchor": "bottom",
+     "saturation": 1.35, "contrast": 1.12, "brightness": 1.08,
+     "glow": {"color": [140, 180, 255], "width": 40, "strength": 0.6},
+     "outline": {"color": [255, 255, 255], "width": 8},
+     "rim": {"color": [150, 190, 255], "side": "right", "strength": 0.6}}
+  ],
+  "vignette": 0.6, "grade": {"contrast": 1.06, "saturation": 1.1}
+}

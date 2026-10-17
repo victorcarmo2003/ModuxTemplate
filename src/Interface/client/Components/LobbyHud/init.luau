@@ -9,12 +9,16 @@
 --                  buttons (menu, chat, microphone) live in the top-left corner
 --   right, centred vertically  the gem balance pill, alone (a button: opens the gem shop), gem icon + amount + "+";
 --                  never over the mobile jump button (the lowest FREE_BOTTOM px of the right edge stay free)
---   bottom centre  squad status card (SquadStatus: Solo / Squad n/4, member heads, Friends only) over the big Play
---                  button (text and colour from `Play`: PLAY green, START SQUAD mustard, READY, STARTING..., CANCEL dark
---                  mustard while the countdown can still be aborted). Shown only while `PlayShown` (TASK-296: the
---                  player is in a squad); pops in / out with Motion.Pop. While `Gear` (TASK-306: the leader of a created
---                  room) the Play button (START) shrinks to the left and a round gear (GearButton) sits on its right:
---                  it reopens the room setup (OnGear). Same total width, so the card stays centred over both
+--   bottom centre  the big Play button (text and colour from `Play`: PLAY green, START SQUAD mustard, READY,
+--                  STARTING..., CANCEL dark mustard while the countdown can still be aborted). Shown only while
+--                  `PlayShown` (TASK-296: the player is in a squad); pops in / out with Motion.Pop. While `Gear` (TASK-306:
+--                  the leader of a created room) the Play button (START) shrinks to the left and a round gear
+--                  (GearButton) sits on its right: it reopens the room setup (OnGear). The squad card that sat over it
+--                  is gone (owner request 2026-10-17, mobile clean-up): the faces and the countdown live on the pad sign
+--                  (PadTag)
+-- Mobile clean-up (owner request 2026-10-17, Provisional): each tile's name sits UNDER the tile (white, thin Ink
+-- stroke), never inside it (it spilled out and overlapped on phones); bigger icons; Normal outlines instead of Thick;
+-- smaller gem and online pills.
 --   top centre     players online in the whole game (TASK-312, owner request 2026-10-15): Ink pill, people icon +
 --                  "200 players online" (12K, 1.2M), rolls with Motion.Count. The Roblox top bar keeps its buttons in
 --                  the corners, so the pill sits at TOP; on a narrow screen (portrait phone) under the bar (TOPBAR_FREE).
@@ -31,7 +35,6 @@ local CartoonPanel = require(script.Parent.CartoonPanel)
 local CartoonButton = require(script.Parent.CartoonButton)
 local CartoonLabel = require(script.Parent.CartoonLabel)
 local KeyChip = require(script.Parent.KeyChip)
-local SquadStatus = require(script.Parent.SquadStatus)
 local GearButton = require(script.Parent.GearButton)
 local Icon = require(script.Parent.LobbyWindow.Icon)
 local Count = require(script.Parent.HudPill.Count)
@@ -59,14 +62,10 @@ export type Props = {
 	-- "2/4" while in a squad; "" = no badge.
 	Squad: () -> string,
 	Play: () -> PlayButton,
-	-- Card over the Play button: solo or squad, members, friends only, one status line.
-	Card: () -> SquadStatus.Info,
 	-- Key chip per tile ("C", "Y"); "" or missing = no chip (touch).
 	Keys: () -> { [string]: string },
 	OnOpen: (tile: Tile) -> (),
 	OnPlay: () -> (),
-	-- Tap on a free slot of the card (opens the invite list).
-	OnInvite: (() -> ())?,
 	-- Key chip on the Play button while it says CANCEL ("X", "ButtonX"); "" or missing = none (touch).
 	CancelKey: (() -> string)?,
 	-- Card + Play button shown (in a squad, TASK-296); missing = always shown.
@@ -83,13 +82,16 @@ export type Props = {
 const MARGIN = 12
 const MENU_LEFT = MARGIN + 18 -- px: room for the key badge that sits half outside each tile (owner 2026-10-16)
 const TOP = 8
-const TILE = 56
-const TILE_SMALL = 48 -- compact / narrow: still over the 44 px touch target
-const TILE_GAP = 6
-const PILL = 44
-const PLAY_WIDTH = 210
-const PLAY_HEIGHT = 52
-const CARD_GAP = 8
+const TILE = 52
+const TILE_SMALL = 46 -- compact / narrow: still over the 44 px touch target
+const TILE_GAP = 4
+const ICON = 0.62 -- icon size / tile size
+const CELL_WIDTH = 64 -- px: a grid cell is wider than its tile so the name under it fits ("Classes" at 14 px)
+const CAPTION = 17 -- px: the name line under a tile
+const CAPTION_STROKE = 1.5
+const PILL = 34
+const PLAY_WIDTH = 190
+const PLAY_HEIGHT = 46
 const GEAR_GAP = 8 -- px between the Play button and the gear (the gear is PLAY_HEIGHT round)
 const SHORT = 440 -- px tall screens under this get the 2 x 2 grid
 const NARROW = 420 -- px wide screens under this get the small tiles
@@ -99,7 +101,7 @@ const FREE_BOTTOM = 200
 -- The tile column sits at the middle too, but never higher than this many real px from the top edge: the Roblox top bar
 -- (menu, chat, microphone; ~58 px, HudController TOPBAR_REAL) is over the top-left corner
 const TOPBAR_FREE = 64
-const ONLINE_PILL = 34 -- px tall (UIScale grows it)
+const ONLINE_PILL = 28 -- px tall (UIScale grows it)
 
 -- "950", "1.2K", "12K", "3.4M": one decimal under 10 of a unit, none above.
 local function short(value: number): string
@@ -185,6 +187,12 @@ return function(props: Props): Frame
 	const tileSize = function(): UDim2
 		return UDim2.fromOffset(tile(), tile())
 	end
+	const cellSize = function(): UDim2
+		return UDim2.fromOffset(math.max(CELL_WIDTH, tile()), tile() + CAPTION)
+	end
+	const iconSize = function(): number
+		return math.floor(tile() * ICON)
+	end
 
 	const online = function(): number
 		return if props.Online then props.Online() else 0
@@ -199,75 +207,89 @@ return function(props: Props): Frame
 		const badge = function(): string
 			return if def.Key == "Squad" then props.Squad() else ""
 		end
+		const icon = Icon(def.Icon, 24, 1)
+		Vide.effect(function()
+			icon.Size = UDim2.fromOffset(iconSize(), iconSize())
+		end)
 		table.insert(
 			tiles,
-			CartoonButton({
-				Name = def.Key,
+			create("Frame")({
+				Name = `{def.Key}Cell`,
 				LayoutOrder = index,
-				Size = tileSize,
-				Tone = def.Tone,
-				Outline = Theme.Outline.Thick,
-				Radius = Theme.Radius.Card,
-				OnActivated = function()
-					props.OnOpen(def.Key)
-				end,
-				Children = {
-					create("Frame")({
-						Name = "Stack",
-						Size = UDim2.fromScale(1, 1),
-						BackgroundTransparency = 1,
-						create("UIListLayout")({
-							FillDirection = Enum.FillDirection.Vertical,
-							HorizontalAlignment = Enum.HorizontalAlignment.Center,
-							VerticalAlignment = Enum.VerticalAlignment.Center,
-							SortOrder = Enum.SortOrder.LayoutOrder,
-						}),
-						Icon(def.Icon, 24, 1),
-						CartoonLabel({
-							LayoutOrder = 1,
-							TextSize = 20,
-							Text = def.Fallback,
-							Visible = not Icons.Has(def.Icon),
-						}),
-						CartoonLabel({
-							LayoutOrder = 2,
-							TextSize = Theme.MinTextSize,
-							Color = def.Tone.Text,
-							Stroke = if def.Tone.Stroke then 2 else 0,
-							Text = def.Text,
-						}),
-					}),
-					-- key badge (desktop / gamepad), centred on the top-left corner: free of the screen edge
-					KeyChip({
-						Name = "Key",
-						AnchorPoint = Vector2.new(0.5, 0.5),
-						Position = UDim2.fromOffset(2, 2),
-						Text = keyText,
-					}),
-					-- squad badge, centred on the bottom-right corner
-					CartoonPanel({
-						Name = "Badge",
-						AnchorPoint = Vector2.new(0.5, 0.5),
-						Position = UDim2.new(1, -2, 1, -6),
-						Size = UDim2.fromOffset(0, 24),
-						AutomaticSize = Enum.AutomaticSize.X,
-						Tone = Theme.Tone.Violet,
-						Lip = 2,
-						Outline = 2,
-						Padding = { Left = 6, Right = 6 },
-						Visible = function()
-							return badge() ~= ""
-						end,
-						Children = {
-							CartoonLabel({
-								Box = UDim2.new(0, 0, 1, 0),
-								AutomaticSize = Enum.AutomaticSize.X,
-								TextSize = Theme.MinTextSize,
-								Text = badge,
+				BackgroundTransparency = 1,
+				CartoonButton({
+					Name = def.Key, -- LobbyController finds the Squad tile by name (gamepad selection)
+					AnchorPoint = Vector2.new(0.5, 0),
+					Position = UDim2.fromScale(0.5, 0),
+					Size = tileSize,
+					Tone = def.Tone,
+					Outline = Theme.Outline.Normal,
+					Radius = Theme.Radius.Card,
+					OnActivated = function()
+						props.OnOpen(def.Key)
+					end,
+					Children = {
+						create("Frame")({
+							Name = "Stack",
+							Size = UDim2.fromScale(1, 1),
+							BackgroundTransparency = 1,
+							create("UIListLayout")({
+								FillDirection = Enum.FillDirection.Vertical,
+								HorizontalAlignment = Enum.HorizontalAlignment.Center,
+								VerticalAlignment = Enum.VerticalAlignment.Center,
+								SortOrder = Enum.SortOrder.LayoutOrder,
 							}),
-						},
-					}),
-				},
+							icon,
+							CartoonLabel({
+								LayoutOrder = 1,
+								TextSize = 22,
+								Text = def.Fallback,
+								Visible = not Icons.Has(def.Icon),
+							}),
+						}),
+						-- key badge (desktop / gamepad), centred on the top-left corner: free of the screen edge
+						KeyChip({
+							Name = "Key",
+							AnchorPoint = Vector2.new(0.5, 0.5),
+							Position = UDim2.fromOffset(2, 2),
+							Text = keyText,
+						}),
+						-- squad badge, centred on the bottom-right corner
+						CartoonPanel({
+							Name = "Badge",
+							AnchorPoint = Vector2.new(0.5, 0.5),
+							Position = UDim2.new(1, -2, 1, -4),
+							Size = UDim2.fromOffset(0, 20),
+							AutomaticSize = Enum.AutomaticSize.X,
+							Tone = Theme.Tone.Violet,
+							Lip = 2,
+							Outline = 2,
+							Padding = { Left = 5, Right = 5 },
+							Visible = function()
+								return badge() ~= ""
+							end,
+							Children = {
+								CartoonLabel({
+									Box = UDim2.new(0, 0, 1, 0),
+									AutomaticSize = Enum.AutomaticSize.X,
+									TextSize = Theme.MinTextSize,
+									Stroke = CAPTION_STROKE,
+									Text = badge,
+								}),
+							},
+						}),
+					},
+				}),
+				-- the name, under the tile (owner 2026-10-17: inside it spilled out and overlapped on phones)
+				CartoonLabel({
+					Name = "Caption",
+					AnchorPoint = Vector2.new(0.5, 1),
+					Position = UDim2.fromScale(0.5, 1),
+					Box = UDim2.new(1, 0, 0, CAPTION),
+					TextSize = Theme.MinTextSize,
+					Stroke = CAPTION_STROKE,
+					Text = def.Text,
+				}),
 			})
 		)
 	end
@@ -298,9 +320,9 @@ return function(props: Props): Frame
 				Size = UDim2.fromOffset(0, ONLINE_PILL),
 				AutomaticSize = Enum.AutomaticSize.X,
 				Tone = Theme.Tone.Ink,
-				Lip = 3,
+				Lip = 2,
 				Outline = 2,
-				Padding = { Left = 12, Right = 12 }, -- even sides: icon + text centred in the pill (owner 2026-10-16)
+				Padding = { Left = 10, Right = 10 }, -- even sides: icon + text centred in the pill (owner 2026-10-16)
 				Children = {
 					create("UIListLayout")({
 						FillDirection = Enum.FillDirection.Horizontal,
@@ -312,7 +334,8 @@ return function(props: Props): Frame
 					CartoonLabel({
 						Name = "Count",
 						LayoutOrder = 2,
-						TextSize = 18,
+						TextSize = 15,
+						Stroke = CAPTION_STROKE,
 						Text = function()
 							return onlineText(onlineShown())
 						end,
@@ -338,7 +361,8 @@ return function(props: Props): Frame
 				Size = UDim2.fromOffset(0, PILL),
 				AutomaticSize = Enum.AutomaticSize.X,
 				Tone = Theme.Tone.Ink,
-				Padding = 4,
+				Outline = Theme.Outline.Normal,
+				Padding = 3,
 				OnActivated = function()
 					props.OnOpen("Shop")
 				end,
@@ -349,11 +373,11 @@ return function(props: Props): Frame
 						SortOrder = Enum.SortOrder.LayoutOrder,
 						Padding = UDim.new(0, 6),
 					}),
-					Icon("Hud/gem", PILL - 6, 1),
+					Icon("Hud/gem", PILL - 8, 1),
 					CartoonLabel({
 						Name = "Amount",
 						LayoutOrder = 2,
-						TextSize = 22,
+						TextSize = 18,
 						Text = function()
 							return Count(props.Gems())
 						end,
@@ -361,13 +385,14 @@ return function(props: Props): Frame
 					CartoonPanel({
 						Name = "Plus",
 						LayoutOrder = 3,
-						Size = UDim2.fromOffset(30, 30),
+						Size = UDim2.fromOffset(24, 24),
 						Tone = Theme.Tone.Green,
-						Lip = 3,
+						Lip = 2,
+						Outline = 2,
 						Children = {
 							CartoonLabel({
 								Box = UDim2.fromScale(1, 1),
-								TextSize = 22,
+								TextSize = 18,
 								Text = "+",
 							}),
 						},
@@ -393,7 +418,7 @@ return function(props: Props): Frame
 				end,
 				HorizontalAlignment = Enum.HorizontalAlignment.Left,
 				SortOrder = Enum.SortOrder.LayoutOrder,
-				CellSize = tileSize,
+				CellSize = cellSize,
 				CellPadding = UDim2.fromOffset(TILE_GAP, TILE_GAP),
 			}),
 			tiles,
@@ -416,22 +441,14 @@ return function(props: Props): Frame
 				end,
 			}),
 
-			SquadStatus({
-				Name = "Card",
-				AnchorPoint = Vector2.new(0.5, 1),
-				Position = UDim2.new(0.5, 0, 0, -CARD_GAP),
-				Info = props.Card,
-				OnInvite = props.OnInvite,
-			}),
-
 			CartoonButton({
 				Name = "Play",
 				-- the gear takes the right end of the same width (TASK-306)
 				Size = function()
 					return if gearShown() then UDim2.new(1, -(PLAY_HEIGHT + GEAR_GAP), 1, 0) else UDim2.fromScale(1, 1)
 				end,
-				TextSize = 24,
-				Outline = Theme.Outline.Thick,
+				TextSize = 22,
+				Outline = Theme.Outline.Normal,
 				Radius = Theme.Radius.Card,
 				Studs = true,
 				Tone = function()

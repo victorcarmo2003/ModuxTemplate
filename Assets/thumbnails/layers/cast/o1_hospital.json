@@ -1,0 +1,60 @@
+{
+ "out": "thumb_J_hospital_sorriso.png",
+ "size": [
+  1920,
+  1080
+ ],
+ "bg": {
+  "path": "bg_hospital.jpg",
+  "blur": 3,
+  "brightness": 0.95,
+  "saturation": 1.05
+ },
+ "layers": [
+  {
+   "path": "m_sorriso.jpg",
+   "at": [
+    0.68,
+    0.5
+   ],
+   "height": 1.0,
+   "anchor": "center",
+   "saturation": 1.15,
+   "contrast": 1.15,
+   "outline": {
+    "color": [
+     170,
+     90,
+     255
+    ],
+    "width": 9
+   },
+   "spill": 25
+  },
+  {
+   "path": "w_rabbit.jpg",
+   "at": [
+    0.32,
+    1.3
+   ],
+   "height": 1.15,
+   "anchor": "bottom",
+   "saturation": 1.3,
+   "contrast": 1.1,
+   "brightness": 1.04,
+   "outline": {
+    "color": [
+     255,
+     255,
+     255
+    ],
+    "width": 11
+   }
+  }
+ ],
+ "vignette": 0.25,
+ "grade": {
+  "contrast": 1.05,
+  "saturation": 1.1
+ }
+}

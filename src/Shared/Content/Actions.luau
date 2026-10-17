@@ -44,6 +44,8 @@ return Table.new({
 	{ Key = "take_order", Text = "Take Order", Hold = 0, Radius = 10, Requires = {}, Night = "Any", Wave = 1 },
 	-- no Requires.Held: the server picks the exact hot dog from the hotbar, or answers with a hint (2026-10-12)
 	{ Key = "serve", Text = "Serve", Hold = 0, Radius = 10, Requires = {}, Night = "Any", Wave = 1 },
+	-- TASK-354 (owner 2026-10-17, Provisional): no handler and no anchor any more (refusing = closing the service window);
+	-- the row stays for the Interact enum and the Acted/metrics verb "refuse"
 	{ Key = "refuse", Text = "Refuse", Hold = 1, Radius = 10, Requires = {}, Night = "Any", Wave = 1 },
 	-- Tip jar (DEC-239, user decision 2026-10-13; was "collect_cash" on the register, Q-201): tips in the jar -> party Cash
 	-- now. Anchor Prompt_Collect on the TRL-TIPJAR model (TipJarService); only enabled while the shop takes entries and the
@@ -101,7 +103,9 @@ return Table.new({
 		Text = "Close Window",
 		Hold = 0.5,
 		Radius = 7,
-		Requires = { Phase = { "Prep", "Open", "Closing", "Night" } },
+		-- "Call" (owner decision 2026-10-17, Provisional): the night call no longer locks the window; opening it while Walt
+		-- talks starts the night at once (RoundService:OpenShop), the call keeps going
+		Requires = { Phase = { "Call", "Prep", "Open", "Closing", "Night" } },
 		Night = "Any",
 		Wave = 1,
 	},

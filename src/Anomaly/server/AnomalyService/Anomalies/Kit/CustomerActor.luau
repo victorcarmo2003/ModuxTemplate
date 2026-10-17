@@ -12,6 +12,10 @@
 --   Omission  patience ran out (give_up): Params.OmissionFails -> Fail("active") (N5); otherwise no penalty (N1/N4).
 --   Ledger    DEC-051: an actor is not an arrival; CountArrival + CountResult("Wrong") only on a failure, once.
 --   Seen      1 s in the gaze cone of the actor's head, up to Content ViewRange (ctx.SeenTick, -5 once per night).
+--   Window    TASK-354 (owner 2026-10-17, Provisional): there is no "Refuse" prompt any more; closing the service window
+--             (Shutter event, Closed) while the actor is still in line IS the refusal: handled as Customer action
+--             "refuse" by who closed (nil = automatic: no Fail, the actor still leaves). CustomerService.SendLineAway
+--             skips actors, so this is the only place the window reaches them.
 -- The actor gone without one of these (removed, sent away by someone else) ends the occurrence with no outcome.
 -- Stop sends a still-standing actor away (NightOver, Restore, dev stop).
 --
@@ -75,6 +79,7 @@ const VERB_ACTION: { [string]: string } = {
 	serve = "serve",
 }
 const GIVE_UP = "give_up"
+const REFUSE = "refuse"
 const SERVE = "serve"
 const ORDERING = "Ordering"
 const LEAVING = "Leaving"
@@ -251,22 +256,27 @@ function Kit.Module(options: Options): Api.Module
 		end,
 
 		OnEvent = function(ctx: Api.Context, occ: Api.Occurrence, event: Api.Event)
-			if event.Kind ~= "Customer" then
-				return
-			end
 			const state = occ.State :: State
-			if event.Npc ~= state.Actor then
+			local action: string
+			local player: Player?
+			local result: string? = nil
+			if event.Kind == "Customer" then
+				if event.Npc ~= state.Actor then
+					return
+				end
+				action, player, result = event.Action, event.Player, event.Result
+			elseif event.Kind == "Shutter" and event.Closed and Kit.Standing(state.Actor) ~= nil then
+				action, player = REFUSE, event.Player -- the window shut in its face (TASK-354)
+			else
 				return
 			end
 			const rule = ctx.Rule(occ.Key)
 			if rule == nil then
 				return
 			end
-			const action = event.Action
 			const right = VERB_ACTION[rule.Verb]
-			const player = event.Player
 			if action == right then
-				if action ~= SERVE or passes(rule, event.Result) then
+				if action ~= SERVE or passes(rule, result) then
 					ctx.Succeed(occ)
 				end
 				-- PROVISIONAL (N5 wrongServeRetry): a Wrong serve sends the actor away (CustomerService has no

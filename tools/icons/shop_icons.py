@@ -34,9 +34,10 @@ w = 10  # inner lines
 class Icon:
     """Collects gradient defs while an icon is drawn."""
 
-    def __init__(self) -> None:
+    def __init__(self, bare: bool = False) -> None:
         self.defs: list[str] = []
         self.n = 0
+        self.bare = bare  # True: tile() draws nothing (the subject alone, reused inside the gift icons)
 
     def two(self, top: str, bottom: str, split: float = 0.6) -> str:
         """Hard two-tone vertical fill (the sticker shading)."""
@@ -113,6 +114,8 @@ def sunburst(cx: float, cy: float, light: str, opacity: float = 0.42) -> str:
 
 def tile(ic: Icon, tone: str, round_: bool = False) -> str:
     """CartoonPanel tile with the retro look: alternating sunburst rays behind the subject (owner 2026-10-15)."""
+    if ic.bare:
+        return ""
     top, bottom, lip = TONES[tone]
     fill = ic.soft(top, bottom)
     ic.n += 1
@@ -581,6 +584,112 @@ def class_owl(ic: Icon) -> str:
     )
 
 
+# --- gifts (TASK-352, owner 2026-10-16): Developer Products bought for another player --------------------------------
+# Violet tile (the GiftButton tone), an open Mustard box with a Teal ribbon (the GiftButton colours) and the item popping
+# out of it; gem gifts keep their amount on top. "gift" alone = the closed box with a bow (generic gift image).
+
+BOX = ("#FFE58A", "#F6C12B")
+RIBBON = ("#8BE3EE", "#3FA7B5")
+
+
+def placed(body: str, cx: float, cy: float, k: float, tx: float, ty: float) -> str:
+    """`body` drawn around (cx, cy) moved to (tx, ty) and scaled by k."""
+    return f'<g transform="translate({tx} {ty}) scale({k}) translate({-cx} {-cy})">{body}</g>'
+
+
+def bow(ic: Icon, x: float, y: float, k: float = 1.0) -> str:
+    rib = ic.two(*RIBBON, 0.55)
+    return (
+        f'<g transform="translate({x} {y}) scale({k})">'
+        f'<path d="M0,0 C-30,-62 -104,-58 -92,-12 C-84,18 -34,14 0,0 Z" fill="{rib}" {ol(w)}/>'
+        f'<path d="M0,0 C30,-62 104,-58 92,-12 C84,18 34,14 0,0 Z" fill="{rib}" {ol(w)}/>'
+        f'<path d="M-10,4 L-40,58 L-18,52 L-8,72 L4,8 Z" fill="{RIBBON[1]}" {ol(8)}/>'
+        f'<path d="M10,4 L40,58 L18,52 L8,72 L-4,8 Z" fill="{RIBBON[1]}" {ol(8)}/>'
+        f'<circle cx="0" cy="0" r="20" fill="{RIBBON[0]}" {ol(w)}/>'
+        + gloss(-56, -30, 12, 6, -30, 0.7)
+        + "</g>"
+    )
+
+
+def gift_box(ic: Icon, open_: bool) -> str:
+    """The box body (y 292..452); open = the lid tilted off to the left, else closed with a bow on top."""
+    body = ic.two(*BOX, 0.55)
+    lid = ic.two(*BOX, 0.6)
+    rib = ic.two(*RIBBON, 0.55)
+    out = ""
+    out += (
+        f'<rect x="112" y="292" width="288" height="160" rx="16" fill="{body}" {ol()}/>'
+        f'<rect x="232" y="292" width="48" height="160" fill="{rib}" {ol(w)}/>'
+        f'<rect x="112" y="292" width="288" height="160" rx="16" fill="none" {ol()}/>'
+        + gloss(150, 326, 18, 9)
+    )
+    if not open_:
+        out += (
+            f'<rect x="96" y="246" width="320" height="62" rx="14" fill="{lid}" {ol()}/>'
+            f'<rect x="232" y="246" width="48" height="62" fill="{rib}" {ol(w)}/>'
+            f'<rect x="96" y="246" width="320" height="62" rx="14" fill="none" {ol()}/>'
+            + bow(ic, 256, 236, 1.0)
+        )
+    return out
+
+
+def gift_lid(ic: Icon) -> str:
+    """The open lid, leaning back behind the item (drawn before it)."""
+    lid = ic.two(*BOX, 0.6)
+    rib = ic.two(*RIBBON, 0.55)
+    return (
+        f'<g transform="rotate(-28 400 292)">'
+        f'<rect x="250" y="228" width="190" height="56" rx="14" fill="{lid}" {ol()}/>'
+        f'<rect x="322" y="228" width="44" height="56" fill="{rib}" {ol(w)}/></g>'
+    )
+
+
+def gift_tile(ic: Icon, item: str, amount: str = "") -> str:
+    return (
+        tile(ic, "violet")
+        + ground(rx=170, cy=458)
+        + gift_lid(ic)
+        + item
+        + gift_box(ic, True)
+        + (text(amount, 256, 112, 92, WHITE) if amount else "")
+    )
+
+
+def gift(ic: Icon) -> str:
+    return tile(ic, "violet") + ground(rx=170, cy=458) + placed(gift_box(ic, False), 256, 330, 1.12, 256, 300)
+
+
+def gift_gems(build, cx: float, cy: float, k: float, amount: str):
+    def draw(ic: Icon) -> str:
+        return gift_tile(ic, placed(build(ic), cx, cy, k, 256, 236), amount)
+
+    return draw
+
+
+def gift_class(build):
+    def draw(ic: Icon) -> str:
+        bare = Icon(bare=True)
+        head = build(bare)
+        ic.defs.extend(d.replace('id="g', 'id="hg').replace("url(#g", "url(#hg") for d in bare.defs)
+        head = head.replace("url(#g", "url(#hg")
+        return gift_tile(ic, placed(head, 256, 280, 0.7, 256, 176))
+
+    return draw
+
+
+GIFTS = {
+    "gift": gift,
+    "gift_gems_50": gift_gems(lambda ic: gem(ic, 256, 300, 230), 256, 300, 0.78, "1,000"),
+    "gift_gems_130": gift_gems(lambda ic: gem_pile(ic, GEMS_130, 140), 256, 302, 0.72, "2,400"),
+    "gift_gems_300": gift_gems(lambda ic: gem_pile(ic, GEMS_300, 112), 256, 298, 0.62, "4,800"),
+    "gift_gems_700": gift_gems(gem_chest, 256, 314, 0.6, "10,000"),
+    "gift_class_rabbit": gift_class(class_rabbit),
+    "gift_class_cat": gift_class(class_cat),
+    "gift_class_bear": gift_class(class_bear),
+    "gift_class_fox": gift_class(class_fox),
+    "gift_class_owl": gift_class(class_owl),
+}
+
 ICONS = {
     "util_scare": util_scare,
     "util_radar": util_radar,
@@ -600,6 +709,7 @@ ICONS = {
     "class_bear": class_bear,
     "class_fox": class_fox,
     "class_owl": class_owl,
+    **GIFTS,
 }
 
 ART = {

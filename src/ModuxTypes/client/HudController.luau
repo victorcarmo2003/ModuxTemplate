@@ -27,11 +27,13 @@ export type Report = {
 	LastChanceUsed: boolean,
 }
 export type ShiftRecord = {
+	Day: number,
 	Night: number,
 	IsNight: boolean,
 	Attempt: number,
 	Phase: string,
 	PhaseStartedAt: number,
+	PhaseDuration: number,
 	WipeEndsAt: number,
 	WipeFrozen: boolean,
 }
@@ -82,7 +84,7 @@ export type Public = {
 	ShowReport: (self: Public, report: Report) -> (),
 	ShiftText: (self: Public) -> string,
 	OnLifeEvent: (self: Public, event: LifeEvent) -> (),
-	ShowBanner: (self: Public, banner: HudBanner.Banner) -> (),
+	ShowBanner: (self: Public, banner: HudBanner.Banner, duration: number?) -> (),
 	RefreshWipe: (self: Public) -> (),
 	ApplyShift: (self: Public, record: ShiftRecord) -> (),
 	SpectateMode: (self: Public) -> HudSpectate.Mode,

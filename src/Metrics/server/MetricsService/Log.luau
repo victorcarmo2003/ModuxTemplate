@@ -81,6 +81,21 @@ function Log.onboarding(player: Player, step: number, stepName: string?, props: 
 	RoMetrics:LogOnboardingFunnelStepEvent(player, step, stepName, props)
 end
 
+-- Step of a lobby window funnel (panel_shop / panel_classes / panel_codes; MetricsService/Lobby.luau owns the session
+-- of the open window). Services call it where the act happens (equip, buy, code); nothing outside a lobby server.
+local panelHook: ((player: Player, panel: string, step: number, name: string, props: Props?) -> ())? = nil
+
+function Log.panel(player: Player, panel: string, step: number, name: string, props: Props?)
+	if panelHook ~= nil then
+		panelHook(player, panel, step, name, props)
+	end
+end
+
+-- MetricsService only (lobby servers)
+function Log.SetPanelHook(hook: (player: Player, panel: string, step: number, name: string, props: Props?) -> ())
+	panelHook = hook
+end
+
 -- A granted developer product (ShopService owns ProcessReceipt): right before returning PurchaseGranted
 function Log.receipt(receipt: { [string]: any })
 	RoMetrics.trackReceipt(receipt)

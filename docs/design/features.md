@@ -1533,6 +1533,7 @@ Janela de 10 s — todos caídos **[DEC-094, DEC-102]**:
 
 - Dados: `Revive` (limite por noite 2, prazo 6:00 AM, sanidade 0,5, proteção 5 s, janela 10 s, extensão máx. 20 s, `RobuxSelfOnly = true`, `CreditOnUnapplied = true`), `Ambulance` (tabela acima).
 - Fora do MVP: ambulância como anomalia; reviver pago por colega com Robux (proibido por DEC-116); preço crescente (Q-098).
+- **Nota 2026-10-17 (DEC-266):** a DEC-258 emenda a DEC-116: o Revive Kit (comprado com Robux) pode ser usado no colega caído, e quem está de pé sem kit vê a oferta dele (1 por queda, texto neutro; `design/monetization-offers-proposal.md` O5). A frase "ninguém paga Robux pelo colega" acima vale só para o reviver da ambulância.
 - Critérios de aceite:
   - Sanidade 0 → em 8 s ± 1 a ambulância está em AMB-M ou AMB-P (± 2 s se havia carro de trânsito à frente na Ninth); 2 médicos descem, andam até o corpo e o levam na maca; em ≤ 16 s o corpo sumiu (pega na maca; 14,5 s no alcance máximo + 1 s de tolerância de chegada); a ambulância sai do mapa em ≤ 25 s (AMB-P) ou ≤ 29 s (AMB-M) (+2 s se houve atraso por trânsito).
   - Corpo no fundo oeste do trailer (caminho de ~75 studs desde AMB-P): os médicos vão e voltam em ≤ 10,5 s (`CollectTime`) desde a parada, sem fade; a ambulância parte em t = 20 s ± 1.

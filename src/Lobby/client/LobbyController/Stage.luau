@@ -11,14 +11,15 @@ local Rig = require(StarterPlayer.StarterPlayerScripts.client.Interface.Componen
 
 export type Options = {
 	Point: CFrame,
-	Build: (species: string) -> Model?,
+	-- skin: Content.Skins key previewed on the class screen ("" = the crew uniform, owner request 2026-10-17)
+	Build: (species: string, skin: string) -> Model?,
 	OnShown: (model: Model) -> (),
 	Take: () -> (),
 	Release: () -> (),
 }
 
 export type Stage = {
-	Show: (species: string) -> (),
+	Show: (species: string, skin: string?) -> (),
 	Close: () -> (),
 	Destroy: () -> (),
 }
@@ -45,17 +46,18 @@ return function(options: Options): Stage
 	local framing: CFrame = CFrame.lookAt(base.Position + base.LookVector * 12 + Vector3.new(0, 1, 0), base.Position)
 	local framed = false
 
-	local function rigFor(species: string): Model?
-		const cached = cache[species]
-		if cached or missing[species] then
+	local function rigFor(species: string, skin: string): Model?
+		const key = `{species}|{skin}`
+		const cached = cache[key]
+		if cached or missing[key] then
 			return cached
 		end
-		const built = options.Build(species)
+		const built = options.Build(species, skin)
 		if built then
 			built:PivotTo(base)
-			cache[species] = built
+			cache[key] = built
 		else
-			missing[species] = true
+			missing[key] = true
 		end
 		return built
 	end
@@ -94,7 +96,7 @@ return function(options: Options): Stage
 		end
 	end
 
-	local function show(species: string)
+	local function show(species: string, skin: string?)
 		if not open then
 			open = true
 			options.Take()
@@ -110,7 +112,7 @@ return function(options: Options): Stage
 				apply()
 			end)
 		end
-		const model = rigFor(species)
+		const model = rigFor(species, skin or "")
 		if model == current then
 			return
 		end

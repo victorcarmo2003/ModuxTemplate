@@ -21,6 +21,8 @@
 	  prep         prep_enter / prep_leave (reason) and every graded or refused prep act (PrepService.Replied)
 	  world        window_toggle, light_switch, discard, kitchen events, upgrades, every validated or refused action
 	  shop / ui    client UI moments (MetricUi: shop/settings opened, purchase prompts) and prompts closed unbought
+	  lobby        lobby servers only (Lobby.luau, owner request 2026-10-17): visit funnel, zones and dwell, squads
+	               (PartyService.Tracked), solo / squad starts, window funnels (shop, classes, codes)
 	Economy (Gems per player, crew Cash) is logged where it changes (Log.gems / Log.cash in Class, Codes, Reward,
 	Shop and Economy services).
 ]]
@@ -35,6 +37,7 @@ local Modux = require(ServerScriptService.server.Modux)
 local Content = require(ReplicatedStorage.shared.Content)
 local Verbose = require(ReplicatedStorage.shared.Verbose)
 local Log = require(script.Log)
+local Lobby = require(script.Lobby)
 
 const SECRET = "rometrics_key"
 const KEY_ATTRIBUTE = "RoMetricsTestKey" -- ServerStorage attribute, Studio only (place file, never in git)
@@ -55,6 +58,8 @@ const MetricsService = Modux.Service("MetricsService", {
 		"LightService",
 		"KitchenService",
 		"InteractionService",
+		"PartyService",
+		"PlaceService",
 	},
 	Priority = 50,
 })
@@ -68,6 +73,8 @@ function MetricsService:Setup()
 	self.UiAt = {} :: { [Player]: number }
 	-- tutorial steps already logged
 	self.Tutorial = {} :: { [Player]: { [number]: boolean } }
+	-- lobby funnels (lobby servers only, WireLobby)
+	self.Lobby = nil :: Lobby.Lobby?
 	-- ProductId -> Content.Shop key
 	self.ProductKeys = {} :: { [number]: string }
 	for _, list in { Content.Shop.GemPacks.List :: { any }, Content.Shop.Utilities.List :: { any } } do
@@ -245,10 +252,13 @@ function MetricsService:WireWorld()
 	end)
 end
 
--- Onboarding funnel: step 1 = began and the last = completed (TutorialService); Content.Metrics.TutorialSteps[i] = i + 1
+-- Onboarding funnel: step 1 = began and the last = completed (TutorialService); milestone i of
+-- Content.Metrics.TutorialFunnel = step i + 1. A step key maps to its milestone (TutorialMilestone); a later milestone
+-- fills in the earlier ones not seen (passed without the step showing: a mate opened the window, a squad veteran)
 function MetricsService:OnTutorialStep(player: Player, index: number)
-	const name = Content.Metrics.TutorialSteps[index]
-	if name == nil then
+	const key = Content.Metrics.TutorialSteps[index]
+	const milestone = if key then Content.Metrics.TutorialMilestone[key] else nil
+	if milestone == nil then
 		return
 	end
 	local seen = self.Tutorial[player]
@@ -256,28 +266,69 @@ function MetricsService:OnTutorialStep(player: Player, index: number)
 		seen = {}
 		self.Tutorial[player] = seen
 	end
-	if seen[index] then
-		return
+	for step = 1, milestone do
+		if not seen[step] then
+			seen[step] = true
+			Log.onboarding(player, step + 1, Content.Metrics.TutorialFunnel[step], { filled = step < milestone })
+		end
 	end
-	seen[index] = true
-	Log.onboarding(player, index + 1, name)
 end
 
-function MetricsService:OnUi(player: Player, event: string, key: string?)
+function MetricsService:OnUi(player: Player, event: string, key: string?, offer: string?)
 	const now = os.clock()
 	const last = self.UiAt[player]
 	if last ~= nil and now - last < Content.Metrics.UiRate then
 		return
 	end
 	self.UiAt[player] = now
-	Log.player(player, `ui_{event}`, nil, if key ~= nil then { key = key } else nil)
+	local props: { [string]: string }? = nil
+	if key ~= nil or offer ~= nil then
+		props = { key = key, offer = offer } :: any
+	end
+	Log.player(player, `ui_{event}`, nil, props)
+	const lobby = self.Lobby
+	if lobby ~= nil then
+		lobby:Ui(player, event)
+	end
+end
+
+-- Lobby servers: the visit funnel (position polled), the squads and the window funnels
+function MetricsService:WireLobby()
+	if not self.Dependencies.PlaceService:Is("Lobby") then
+		return
+	end
+	const lobby = Lobby.new()
+	self.Lobby = lobby
+	Log.SetPanelHook(function(player, panel, step, name, props)
+		lobby:Panel(player, panel, step, name, props)
+	end)
+	Players.PlayerAdded:Connect(function(player)
+		lobby:Join(player)
+	end)
+	for _, player in Players:GetPlayers() do
+		lobby:Join(player)
+	end
+	Players.PlayerRemoving:Connect(function(player)
+		lobby:Leave(player)
+	end)
+	RunService.Heartbeat:Connect(function()
+		lobby:Poll()
+	end)
+	self.Dependencies.PartyService.Tracked:Connect(function(kind, party, userId, detail)
+		lobby:Squad(kind, party, userId, detail)
+	end)
 end
 
 function MetricsService:WireNet()
 	const net = self.Libs.Net
 	net.MetricUi:onServer(function(value, player)
 		if type(value) == "table" and type(value.Event) == "string" then
-			self:OnUi(player, value.Event, if type(value.Key) == "string" then value.Key else nil)
+			self:OnUi(
+				player,
+				value.Event,
+				if type(value.Key) == "string" then value.Key else nil,
+				if type(value.Offer) == "string" then value.Offer else nil
+			)
 		end
 	end)
 	net.MetricTutorial:onServer(function(value, player)
@@ -309,6 +360,7 @@ MetricsService:OnInit(function(self)
 	self:WireCrew()
 	self:WireWorld()
 	self:WireNet()
+	self:WireLobby()
 end)
 
 return MetricsService

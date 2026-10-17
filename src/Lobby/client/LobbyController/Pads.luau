@@ -24,6 +24,8 @@ export type Props = {
 	Status: (n: number) -> string,
 	-- Name of the leader of the squad on pad n ("" = none).
 	Leader: (n: number) -> string,
+	-- User ids on pad n, leader first (the head shots of the sign).
+	Faces: (n: number) -> { number },
 	-- Text of the run seal ("D1"; Content.Lobby.Squad.Pad.Badge).
 	Badge: string,
 	-- Somebody stepped on / off pad n (the number of players on it changed). Presentation hook: sound, ring shiver.
@@ -101,6 +103,9 @@ return function(props: Props): Pads
 				Badge = props.Badge,
 				Leader = function()
 					return props.Leader(n)
+				end,
+				Faces = function()
+					return props.Faces(n)
 				end,
 				Count = function()
 					return props.Members(n)

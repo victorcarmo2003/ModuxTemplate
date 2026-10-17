@@ -25,6 +25,9 @@
 -- Punctuation of the Say / Done / greeting lines shapes Walt's voice (Speech speaks sentence by sentence: a pause after
 -- . ? ! and a longer one after "..."); fewer "!" = a calmer tone (user feedback 2026-10-11: "too shouted").
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TutorialRules = require(ReplicatedStorage.shared.Tutorial.Rules)
+
 export type Step = {
 	Key: string,
 	Number: number,
@@ -45,7 +48,8 @@ export type Step = {
 	Lesson: boolean?,
 }
 
-const TOTAL = 14
+-- 2026-10-17 cut: the tutorial ends on the first sale (7 numbered steps); 11 with the Day 1 shopping lesson back on
+const TOTAL = if TutorialRules.Shopping then 11 else 7
 -- Day 1 upgrade lesson (owner request 2026-10-14, Provisional): when the first shift ends Walt calls (BossCalls
 -- call_tutorial_upgrade, his lines are the call's own) and these two steps lead the rookie to the Gear Stand to buy
 -- Storage (shared.Tutorial.Rules.Upgrade); the Gear Stand was closed until then (Content.Mart.FirstShiftClosed)
@@ -98,6 +102,19 @@ const LIST: { Step } = {
 		Done = "A ketchup dog. Easy.",
 		Remind = "Take the order, Rookie.",
 	},
+	-- Day 1 cut (owner decision 2026-10-17, Provisional): in the focused prep mode the kitchen is ONE step, "make the hot
+	-- dog" at a station; the mode's own coach paw walks through grill -> bun -> sausage (the world-prompt steps below
+	-- stay for the world kitchen)
+	{
+		Key = "cook",
+		Number = 4,
+		Text = "Make the hot dog",
+		Hint = 'Press "Work" at a station and follow the paw.',
+		Action = "prep_work",
+		Say = { "Now make the hot dog.", "Take a station. Follow the paw." },
+		Done = "Beautiful.",
+		Remind = "Press Work at a station.",
+	},
 	{
 		Key = "grill",
 		Number = 4,
@@ -111,7 +128,7 @@ const LIST: { Step } = {
 	},
 	{
 		Key = "slice",
-		Number = 5,
+		Number = 4,
 		Text = "Slice a bun",
 		Hint = 'Hold "Slice Bun" at the bun crate.',
 		PrepHint = 'Press "Work" at a station. On the Build tab, drag the knife along the line.',
@@ -122,7 +139,7 @@ const LIST: { Step } = {
 	},
 	{
 		Key = "slicing",
-		Number = 5,
+		Number = 4,
 		Text = "Slicing the bun...",
 		Hint = "Keep holding!",
 		PrepHint = "Build the hot dog: sausage, ketchup, then Next.",
@@ -130,7 +147,7 @@ const LIST: { Step } = {
 	},
 	{
 		Key = "cooking",
-		Number = 6,
+		Number = 4,
 		Text = "Wait for the sausage",
 		Hint = 'It gets a "Collect" button when ready.',
 		PrepHint = "The bar stops when one side is done: tap the sausage to flip it, then it is ready in a couple of seconds.",
@@ -139,7 +156,7 @@ const LIST: { Step } = {
 	},
 	{
 		Key = "collect",
-		Number = 6,
+		Number = 4,
 		Text = "Collect the sausage",
 		Hint = 'Press "Collect" on the grill.',
 		PrepHint = 'Press "Work" at a station, then "Collect" on the Grill tab.',
@@ -150,7 +167,7 @@ const LIST: { Step } = {
 	},
 	{
 		Key = "assemble",
-		Number = 7,
+		Number = 4,
 		Text = "Put the sausage in the bun",
 		Hint = 'Press "Add Sausage" at the board.',
 		PrepHint = 'Press "Work" at a station. On the Build tab, drag the sausage onto the bun.',
@@ -161,7 +178,7 @@ const LIST: { Step } = {
 	},
 	{
 		Key = "toppings",
-		Number = 8,
+		Number = 5,
 		Text = "Add {item}",
 		Hint = 'Hold "Add" at the topping. The order is on the card, top left.',
 		-- TASK-258: seated with the bun and sausage on the plate, the order's topping goes on in the Toppings view
@@ -173,7 +190,7 @@ const LIST: { Step } = {
 	},
 	{
 		Key = "discard",
-		Number = 8,
+		Number = 5,
 		Text = "Throw it away",
 		Hint = "That's not what they asked. Hold \"Throw Away\" at the bin, then make a new one.",
 		Action = "discard",
@@ -183,7 +200,7 @@ const LIST: { Step } = {
 	-- TASK-254 (owner request 2026-10-14): the 3D prep delivery by drag, the plate onto the green DELIVER area of the customer
 	{
 		Key = "deliver",
-		Number = 9,
+		Number = 6,
 		Text = "Serve the hot dog",
 		-- TASK-258: only once the order's toppings are on the plate (TutorialController:MissingTopping)
 		Hint = "Drag the plate onto the customer.",
@@ -193,7 +210,7 @@ const LIST: { Step } = {
 	},
 	{
 		Key = "serve",
-		Number = 9,
+		Number = 6,
 		Text = "Serve the hot dog",
 		Hint = 'Press "Serve" on the customer.',
 		Action = "serve",
@@ -202,7 +219,7 @@ const LIST: { Step } = {
 	},
 	{
 		Key = "money",
-		Number = 10,
+		Number = 7,
 		Text = "First sale! Nice work!",
 		Hint = "Sales go straight to the shared money. Tips pile up in the jar.",
 		Action = nil,
@@ -211,7 +228,7 @@ const LIST: { Step } = {
 	},
 	{
 		Key = "mart_go",
-		Number = 11,
+		Number = 8,
 		Text = "Go to the Mart",
 		Hint = "Ninth Street Mart, across the street. Look both ways!",
 		Action = nil,
@@ -225,7 +242,7 @@ const LIST: { Step } = {
 	},
 	{
 		Key = "mart_buy",
-		Number = 12,
+		Number = 9,
 		Text = "Buy a pack of buns",
 		Hint = 'Hold "Buy Buns" at the BAKERY shelf.',
 		Action = "buy_package",
@@ -235,7 +252,7 @@ const LIST: { Step } = {
 	},
 	{
 		Key = "mart_back",
-		Number = 13,
+		Number = 10,
 		Text = "Bring it back",
 		Hint = "Carry the pack back to your trailer.",
 		Action = nil,
@@ -244,7 +261,7 @@ const LIST: { Step } = {
 	},
 	{
 		Key = "restock",
-		Number = 14,
+		Number = 11,
 		Text = "Restock the buns",
 		Hint = 'Hold "Restock" at the bun crate.',
 		Action = "restock",
@@ -255,7 +272,7 @@ const LIST: { Step } = {
 	-- stands in for the four shopping steps when the buns did not run out (no tutorial stock)
 	{
 		Key = "mart",
-		Number = 11,
+		Number = 8,
 		Text = "Restock at the Mart",
 		Hint = "Ninth Street Mart, across the street: buy a package, bring it back.",
 		Action = nil,
@@ -307,9 +324,11 @@ const SHOPPING: { string } = { "mart_go", "mart_buy", "mart_back", "restock" }
 const ALWAYS: { string } = { "answer_phone", "prep_work", "trailer_exit", "trailer_enter", "pick_up_item" }
 const NEXT_ACTIONS: { [string]: { string } } = {
 	phone = { "shutter_toggle" },
+	wait_call = { "shutter_toggle" }, -- 2026-10-17: never lock the window behind a late phone
 	open = { "take_order" },
 	wait_customer = { "take_order" },
 	order = { "grill_place" },
+	cook = { "serve" },
 	grill = { "bun_cut", "grill_collect" },
 	slice = { "grill_collect", "grill_place" },
 	slicing = { "grill_collect" },

@@ -45,6 +45,7 @@ export type Public = {
 	WorkDistance: (self: Public, position: Vector3) -> number?,
 	NextSeat: (self: Public) -> number?,
 	StepOfAnchor: (self: Public, anchor: Instance) -> string,
+	StepNear: (self: Public, station: number, position: Vector3) -> string?,
 	SilenceSpareWork: (self: Public, anchor: Instance) -> (),
 	Reply: (self: Public, player: Player, act: string, ok: boolean, reason: string, grade: string?, value: number?) -> (),
 	Allow: (self: Public, player: Player, kind: string) -> boolean,

@@ -2,7 +2,8 @@
 -- SettingsPanel: the settings window (TASK-279; owner request 2026-10-14, Provisional), cartoon kit, mobile first.
 -- A LobbyWindow (600 x 336 at Scale 1, UiScale.Fit shrinks it to the smallest landscape phone) with two columns:
 --   Sound  Music · Effects · Voices · Jumpscares   sliders 0..100% (Slider.luau)
---   Game   Prompts (Single / Multi) · Prep helper (On / Off) · Reduce motion · Vibration (On / Off)   (Choice.luau)
+--   Game   Prompts (Single / Multi) · Prep helper (On / Off) · Reduce motion · Vibration (On / Off) · Shop tips (On / Off)
+--          (Choice.luau)
 --          and one small line under them (`Hint`, e.g. the key that opens the panel; "" = none)
 --   Dev    (only when `Dev` is given: Studio dev mode, TASK-332) one more Game row: "Coffee" (a coffee in the hand) and
 --          "Sanity ∞" (infinite sanity, Mustard while on). Players never see it: the owner passes nil outside dev.
@@ -40,7 +41,7 @@ export type DevProps = {
 }
 
 const WIDTH = 600
-const HEIGHT = 336 -- 310 + the Vibration row (TASK-268); UiScale.Fit still shrinks it on a small phone
+const HEIGHT = 384 -- 310 + the Vibration row (TASK-268) + the Shop tips row (TASK-365); UiScale.Fit still shrinks it
 const COLUMN_GAP = 16
 const ROW = 44
 const ROW_GAP = 4
@@ -214,10 +215,11 @@ return function(props: Props): Frame
 				onOff("PrepAssist", "Prep helper", 2),
 				onOff("ReducedMotion", "Less motion", 3),
 				onOff("Vibration", "Vibration", 4),
-				if dev then devRow(dev, 5) else {},
+				onOff("ShopTips", "Shop tips", 5),
+				if dev then devRow(dev, 6) else {},
 				CartoonLabel({
 					Name = "Hint",
-					LayoutOrder = 6,
+					LayoutOrder = 7,
 					TextSize = 14,
 					Color = Theme.Color.Cream,
 					Text = function()

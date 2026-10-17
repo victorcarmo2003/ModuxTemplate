@@ -2,11 +2,14 @@
 -- Coffee machine visuals (TASK-069; FEAT-021, DEC-055, DEC-125; architecture.md §19.8, network.md §3.5; AST-022).
 -- One Stations record (StationId * 100 + 0, Kind = coffee_machine), written by KitchenService/CoffeeMachine (TASK-068):
 --   Empty     no bar, no cup, no steam (waiting for stock: the machine brews by itself, TASK-328)
---   Working   "Brewing" ProgressBar at `Bar_Brew` from StartedAt/Duration (orange) + steam at `VFX_Steam`
---   Ready     full green bar + coffee cup standing on the counter by the machine + steam, until someone takes it
---   Cleaning  "Cleaning" bar (blue) filling over the clean time after a cup was taken, no cup, no steam
--- Cup spot (TASK-328): the authored `Att_Cup` hangs past the counter edge, so the cup stands on the first counter spot
--- found under it, in front of the machine or beside it (raycast, local, Provisional until AST-022 moves the empty).
+--   Working   BrewTag "Brewing..." (Mustard) at `Bar_Brew` with the seconds left + steam at `VFX_Steam`
+--   Ready     BrewTag "Coffee ready!" (Green) + coffee cup standing on the counter in front of the machine + steam,
+--             until someone takes it
+--   Cleaning  BrewTag "Next cup in" (Teal) counting down the clean time after a cup was taken (the machine cooldown,
+--             owner request 2026-10-17), no cup, no steam
+-- Cup spot (owner request 2026-10-17, Provisional): centred in front of the machine, halfway between its front face and
+-- the counter edge (raycast, local; the owner moved the machine back to free that strip). If that strip has no room:
+-- the authored `Att_Cup`, right in front, then beside the machine (TASK-328 search).
 -- The bar is computed from the record and the server clock, so a late joiner (onAdded) sees the right point.
 -- Presentation only: the server owns the brew, the stock and the Tool. Fittings missing from the binding
 -- (Bar_Brew, Att_Cup, VFX_Steam: TRL-COFFEE warns about them) fall back to local attachments derived from the
@@ -20,8 +23,7 @@ local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local Components = StarterPlayer.StarterPlayerScripts.client.Interface.Components
-local ProgressBar = require(Components.ProgressBar)
-local Theme = require(Components.Theme)
+local BrewTag = require(Components.BrewTag)
 local Context = require(script.Parent.Context)
 local Fx = require(script.Parent.Fx)
 local Slots = require(script.Parent.Slots)
@@ -36,18 +38,18 @@ const KIND = "coffee_machine"
 const RECORD_SLOT = 0 -- single-record station (network.md §3.5)
 const ITEM_KEY = "coffee" -- ReplicatedStorage.Assets.Items.Tools.coffee (AST-010, build_items.luau)
 
-const BAR_RISE = 1.0 -- style guide §7.3: bar 1.0 stud above the item (fallback: above the machine top)
+const BAR_RISE = 0.75 -- fallback `Bar_Brew`: the tag centre this far above the machine top
 const BAR_MAX_DISTANCE = 40
 const CUP_FRONT_GAP = 0.35 -- fallback cup: this far in front of the machine face that holds Prompt_Brew
 const STEAM_RISE = 0.2
 const MIN_SPAN = 0.05
-const LABEL_RISE = 0.4 -- studs: the "Brewing" / "Cleaning" word sits above the bar
-const LABELS: { [string]: string } = { Working = "Brewing", Cleaning = "Cleaning" }
-const CLEAN_COLOR = Color3.fromHex("#4FB3E8") -- Provisional: the cleaning bar reads apart from the orange brew
+const MODES: { [string]: BrewTag.Mode } = { Working = "Brewing", Cleaning = "Cooldown", Ready = "Ready" }
 -- Cup spot search (TASK-328): footprint radius of the cup, how far the surface may sit from the machine bottom, steps
 const CUP_RADIUS = 0.2
 const CUP_SURFACE_SLACK = 0.35
 const CUP_SIDE_GAP = 0.3
+const CUP_SCAN_STEP = 0.05 -- studs per step when looking for the counter edge in front of the machine
+const CUP_SCAN_MAX = 3
 
 -- Placeholder steam (style guide palette: soft white, no asset id). Low rate for the reference phone.
 const STEAM_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
@@ -102,13 +104,26 @@ local function flat(vector: Vector3): Vector3?
 	return if horizontal.Magnitude >= MIN_SPAN then horizontal.Unit else nil
 end
 
--- Horizontal direction from the machine toward the operator (Prompt_Brew side); fallback = station look.
+-- Horizontal direction from the machine toward the operator: the box face on the Prompt_Brew side (the prompt sits off
+-- centre, so its own direction would skew the cup sideways); fallback = station look.
 local function frontOf(station: Instance, box: Box): Vector3
 	const prompt = Context.Find(station, "Prompt_Brew")
 	const position = if prompt then worldPosition(prompt) else nil
 	const toward = if position then flat(position - box.Center) else nil
 	if toward then
-		return toward
+		local best: Vector3? = nil
+		local score = 0
+		for _, axis in { box.Frame.LookVector, box.Frame.RightVector } do
+			const level = flat(axis)
+			if level then
+				const dot = level:Dot(toward)
+				if math.abs(dot) > score then
+					score = math.abs(dot)
+					best = if dot >= 0 then level else -level
+				end
+			end
+		end
+		return best or toward
 	end
 	const look = if station:IsA("PVInstance") then flat(station:GetPivot().LookVector) else nil
 	return look or -Vector3.zAxis
@@ -146,8 +161,29 @@ local function surfaceAt(point: Vector3, top: number, bottom: number, params: Ra
 	return height
 end
 
--- Where the ready cup stands: the authored Att_Cup if it is over the counter, else right in front of the machine, else
--- beside it (left, then right, toward the front); `fallback` when nothing fits (old placement).
+-- Centre of the free counter strip in front of the machine: walks out from the front face until the cup no longer fits
+-- (counter edge) and takes the middle. nil = no room in front.
+local function frontStrip(box: Box, front: Vector3, top: number, bottom: number, params: RaycastParams): Vector3?
+	const face = reach(box, front)
+	local last: number? = nil
+	local distance = face + CUP_RADIUS
+	while distance <= face + CUP_SCAN_MAX do
+		if surfaceAt(box.Center + front * distance, top, bottom, params) == nil then
+			break
+		end
+		last = distance
+		distance += CUP_SCAN_STEP
+	end
+	if last == nil then
+		return nil
+	end
+	const edge = last + CUP_RADIUS
+	return box.Center + front * ((face + edge) / 2)
+end
+
+-- Where the ready cup stands: centred in the free strip in front of the machine, else the authored Att_Cup if it is over
+-- the counter, else right in front of the machine, else beside it (left, then right, toward the front); `fallback` when
+-- nothing fits (old placement).
 local function findCupSpot(station: Instance, box: Box, front: Vector3, top: number, bottom: number, fallback: Vector3): Vector3
 	const params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
@@ -164,6 +200,10 @@ local function findCupSpot(station: Instance, box: Box, front: Vector3, top: num
 	const halfDepth = reach(box, front)
 	const halfWidth = reach(box, side)
 	const candidates: { Vector3 } = {}
+	const strip = frontStrip(box, front, top, bottom, params)
+	if strip then
+		table.insert(candidates, strip)
+	end
 	const authored = Context.Find(station, "Att_Cup")
 	const authoredAt = if authored then worldPosition(authored) else nil
 	if authoredAt then
@@ -333,57 +373,31 @@ function Coffee.Mount(station: Instance, context: Context.Context)
 	const bottom = box.Center.Y - halfHeight
 	const halfDepth = reach(box, front)
 
-	-- Bar: authored Bar_Brew (bar right on it), else above the machine top
+	-- Tag: authored Bar_Brew (tag centred on it), else above the machine top
 	const barAnchor = fitting(station, host, "Bar_Brew", function()
 		return Vector3.new(box.Center.X, top + BAR_RISE, box.Center.Z)
 	end)
-	const bar = ProgressBar({
-		Name = "ProgressBar_Brew",
+	const tag = BrewTag({
+		Name = "BrewTag",
 		Adornee = barAnchor,
-		Progress = progress,
 		Visible = function()
-			return state() ~= "Empty"
+			return MODES[state()] ~= nil
 		end,
-		FillColor = function()
-			const current = state()
-			if current == "Cleaning" then
-				return CLEAN_COLOR
+		Mode = function(): BrewTag.Mode
+			return MODES[state()] or "Ready"
+		end,
+		Progress = progress,
+		Seconds = function(): number
+			const record = read()
+			if record == nil or (record.State ~= "Working" and record.State ~= "Cleaning") then
+				return 0
 			end
-			return if current == "Ready" then Theme.Color.Ready else Theme.Color.Cooking
+			return math.max(0, record.StartedAt + record.Duration - clock())
 		end,
-		StudsOffset = Vector3.zero,
 		MaxDistance = BAR_MAX_DISTANCE,
 	})
-	bar.Parent = host
-	cleanup(bar)
-
-	-- "Brewing" / "Cleaning" over the bar (TASK-328); nothing while Ready or Empty
-	const label = create("BillboardGui")({
-		Name = "ProgressLabel_Brew",
-		Adornee = barAnchor,
-		Size = UDim2.fromScale(2, 0.4),
-		StudsOffset = Vector3.new(0, LABEL_RISE, 0),
-		MaxDistance = BAR_MAX_DISTANCE,
-		LightInfluence = 0,
-		ResetOnSpawn = false,
-		Enabled = function()
-			return LABELS[state()] ~= nil
-		end,
-		create("TextLabel")({
-			Size = UDim2.fromScale(1, 1),
-			BackgroundTransparency = 1,
-			FontFace = Theme.Font.Title,
-			TextScaled = true,
-			TextColor3 = Theme.Color.Text,
-			TextStrokeColor3 = Theme.Color.Ink,
-			TextStrokeTransparency = 0,
-			Text = function()
-				return LABELS[state()] or ""
-			end,
-		}),
-	})
-	label.Parent = host
-	cleanup(label)
+	tag.Parent = host
+	cleanup(tag)
 
 	-- Cup: standing on the counter by the machine (cupSpot); a local attachment on the host follows the vehicle
 	const cupSpot = Instance.new("Attachment")

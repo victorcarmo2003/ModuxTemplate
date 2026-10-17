@@ -35,6 +35,9 @@
 -- teleport (Token invalidates the pending Fire; Launched / late = "CancelTooLate"); idle state again, solo squad gone.
 -- Server never trusts the client: membership, leadership, state, size, presence of the target, friendship and rate
 -- are checked here; TeleportData is written only by this service.
+-- Tracked (analytics, owner request 2026-10-17; MetricsService listens): (kind, party, userId, detail) at Created,
+-- Configured (left "Setup"), Joined (detail "pad" | "invite"), Left, Disbanded and Fired (the countdown ended: the
+-- teleport begins, Studio included). Only read by the metrics.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -45,6 +48,7 @@ local LobbyZones = require(ReplicatedStorage.shared.Lobby.LobbyZones)
 local PartyRules = require(ReplicatedStorage.shared.Party.PartyRules)
 local Teleport = require(script.Teleport)
 local Modux = require(ServerScriptService.server.Modux)
+local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 
 export type State = "Forming" | "Configuring" | "Starting"
 export type Party = {
@@ -92,7 +96,7 @@ end
 
 const PartyService = Modux.Service(
 	"PartyService",
-	{ Require = { "RoleService", "PlayerService", "NetService" }, Priority = 680 }
+	{ Require = { "RoleService", "PlayerService", "NetService", "SessionService" }, Priority = 680 }
 )
 
 function PartyService:Setup()
@@ -116,6 +120,7 @@ function PartyService:Setup()
 	-- UserId -> friends-only check in flight
 	self.Checking = {} :: { [number]: boolean }
 	self.PollAt = 0 :: number
+	self.Tracked = self.Libs.Signal.new() :: SignalLib.Signal<string, Party, number, string>
 end
 
 -- Reads -----------------------------------------------------------------------------------------------------------
@@ -257,6 +262,7 @@ function PartyService:Create(leader: number, platform: number, access: string): 
 	self.Parties[party.Id] = party
 	self.PartyOf[leader] = party.Id
 	self:Publish(party, true)
+	self.Tracked:Fire("Created", party, leader, "")
 	return party
 end
 
@@ -265,6 +271,7 @@ function PartyService:Disband(party: Party)
 		return
 	end
 	self.Parties[party.Id] = nil
+	self.Tracked:Fire("Disbanded", party, party.Leader, "")
 	if party.Platform > 0 then
 		-- the platform is free again: whoever stands on it is tried again
 		for userId, platform in self.Refused do
@@ -295,6 +302,7 @@ function PartyService:RemoveMember(userId: number, kicked: boolean)
 		table.remove(party.Members, index)
 	end
 	party.Ready[userId] = nil
+	self.Tracked:Fire("Left", party, userId, if kicked then "kicked" else "")
 	if kicked then
 		self:Notice(userId, "Kicked", nil)
 	end
@@ -317,6 +325,12 @@ function PartyService:Join(party: Party, userId: number, ready: boolean)
 	self.PartyOf[userId] = party.Id
 	self:Publish(party, false)
 	self:NoticeParty(party, "Joined", userId)
+	self.Tracked:Fire(
+		"Joined",
+		party,
+		userId,
+		if party.Platform > 0 and self.OnPlatform[userId] == party.Platform then "pad" else "invite"
+	)
 end
 
 -- Leaves by hand (packet, accepted invite): standing on the squad's platform does not pull them back in.
@@ -519,9 +533,13 @@ function PartyService:HandleConfigure(player: Player, requested: string, maxPlay
 	if party.Access == access and party.MaxPlayers == max then
 		return
 	end
+	const wasSetup = party.Access == "Setup"
 	party.Access = access
 	party.MaxPlayers = max
 	self:Publish(party, false)
+	if wasSetup and access ~= "Setup" then
+		self.Tracked:Fire("Configured", party, player.UserId, access)
+	end
 	if access ~= "Setup" then
 		for _, userId in party.Members do
 			if userId ~= party.Leader then
@@ -644,6 +662,7 @@ function PartyService:Fire(party: Party)
 	if self.Parties[party.Id] ~= party or party.State ~= "Starting" or party.Launched then
 		return
 	end
+	self.Tracked:Fire("Fired", party, party.Leader, if party.Solo then "solo" else "squad")
 	if RunService:IsStudio() then
 		self:NoticeParty(party, "StudioNoTeleport", nil)
 		self:Reopen(party, false)
@@ -700,10 +719,13 @@ function PartyService:Launch(party: Party)
 			return -- disbanded meanwhile
 		end
 		if code == nil then
-			const reserved, problem = Teleport.Reserve()
+			const reserved, serverId, problem = Teleport.Reserve()
 			code = reserved
 			if reserved == nil then
 				warn(`[PartyService] ReserveServer failed for party {party.Id} (try {attempt}): {problem}`)
+			elseif serverId ~= nil and serverId ~= "" then
+				-- the run server claims this record on boot; it is what lets a dropped member rejoin (TASK-360)
+				self.Dependencies.SessionService:Register(serverId, reserved, party.Members)
 			end
 		end
 		if code ~= nil then

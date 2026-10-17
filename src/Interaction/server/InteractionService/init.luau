@@ -31,6 +31,9 @@ export type Handler = {
 	Run: (player: Player, anchor: Instance, id: number) -> (),
 	-- Optional: other PromptAction values whose anchors also accept this action (none in use since DEC-221).
 	On: { string }?,
+	-- Optional (TASK-354): where the anchor is for this player (an anchor that follows the player on the client, the
+	-- sliding grill Work prompt). Used by the range check instead of the anchor's own position; nil = the anchor's.
+	Reach: ((player: Player, anchor: Instance, root: Vector3) -> Vector3?)?,
 }
 
 export type Request = { Player: Player, Action: string }
@@ -253,7 +256,11 @@ function InteractionService:Process(player: Player, id: number, action: string)
 		return self:Reject(player, id, action, refused)
 	end
 
-	const position = Registry.position(anchor)
+	local position = Registry.position(anchor)
+	const reach = handler.Reach
+	if position ~= nil and reach ~= nil then
+		position = reach(player, anchor, root.Position) or position
+	end
 	if position == nil or (root.Position - position).Magnitude > row.Radius + RANGE_SLACK then
 		return self:Reject(player, id, action, "range")
 	end

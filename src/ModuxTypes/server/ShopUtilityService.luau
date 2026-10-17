@@ -14,6 +14,8 @@ export type Public = {
 	TakePick: (self: Public, player: Player, key: string) -> number,
 	MateOf: (self: Public, player: Player, picked: number) -> Player?,
 	IngredientOf: (self: Public, picked: number) -> string?,
+	Coffee: (self: Public, player: Player) -> (),
+	GiveThermos: (self: Public) -> (),
 	Fill: (self: Public, ingredient: string) -> number,
 	Handler: (self: Public, utility: Utility) -> any,
 }

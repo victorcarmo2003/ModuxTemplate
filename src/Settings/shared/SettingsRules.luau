@@ -10,6 +10,7 @@
 --   PrepAssist            step-by-step hint line and the drag paw of the prep mode (PrepController / World.Coach)
 --   ReducedMotion         game-side switch for Motion.Reduced (on top of the Roblox setting, never instead of it)
 --   Vibration             controller / phone vibration (Input/client/Haptics, TASK-268); off = nothing ever vibrates
+--   ShopTips              contextual shop offers in the HUD note (TASK-365; owner request 2026-10-17, Provisional)
 
 export type PromptMode = "Single" | "Multi"
 
@@ -22,9 +23,19 @@ export type Settings = {
 	PrepAssist: boolean,
 	ReducedMotion: boolean,
 	Vibration: boolean,
+	ShopTips: boolean,
 }
 
-export type Key = "Music" | "Sfx" | "Voice" | "Scare" | "PromptMode" | "PrepAssist" | "ReducedMotion" | "Vibration"
+export type Key =
+	"Music"
+	| "Sfx"
+	| "Voice"
+	| "Scare"
+	| "PromptMode"
+	| "PrepAssist"
+	| "ReducedMotion"
+	| "Vibration"
+	| "ShopTips"
 
 const DEFAULTS: Settings = {
 	Music = 100,
@@ -35,6 +46,7 @@ const DEFAULTS: Settings = {
 	PrepAssist = true,
 	ReducedMotion = false,
 	Vibration = true,
+	ShopTips = true,
 }
 -- Read only (frozen at run time); callers that need a record of their own use table.clone(Defaults).
 const Defaults: Settings = table.freeze(DEFAULTS) :: any
@@ -65,6 +77,7 @@ local function sanitize(raw: any): Settings
 		PrepAssist = flag(data.PrepAssist, Defaults.PrepAssist),
 		ReducedMotion = flag(data.ReducedMotion, Defaults.ReducedMotion),
 		Vibration = flag(data.Vibration, Defaults.Vibration),
+		ShopTips = flag(data.ShopTips, Defaults.ShopTips),
 	}
 	return value
 end
@@ -78,6 +91,7 @@ local function same(a: Settings, b: Settings): boolean
 		and a.PrepAssist == b.PrepAssist
 		and a.ReducedMotion == b.ReducedMotion
 		and a.Vibration == b.Vibration
+		and a.ShopTips == b.ShopTips
 end
 
 return table.freeze({

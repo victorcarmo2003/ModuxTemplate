@@ -42,6 +42,9 @@ export type Data = {
 	EndlessDays: number,
 	ReviveCredits: number,
 	Receipts: { string },
+	-- One-time bundles bought (DEC-267; Content.Shop.Bundles key -> os.time() of the receipt, e.g. the Starter Crate).
+	-- Writer: ShopService. Reconcile adds it as {} to older profiles, so no migration.
+	OneTimeBought: { [string]: number },
 	RunRewards: RunRewards,
 	Stats: Stats,
 	-- Legacy, unused (tutorial: Day 1 of every run, in memory; user request 2026-10-11, Provisional). Kept so saved
@@ -56,11 +59,20 @@ export type Data = {
 	-- Anomaly Tablet pages (TASK-335, TASK-345; owner request 2026-10-15, Provisional): Content.Journal key -> os.time() of the
 	-- unlock. Writer: JournalService. Reconcile adds it as {} to older profiles, so no migration.
 	Journal: { [string]: number },
+	-- Anomaly Tablet rewards claimed (owner request 2026-10-17, Provisional): Content.Journal key -> os.time() of the claim.
+	-- The flag that the page's gems (Content.Journal.Rules.Reward) were paid; a page in Journal without it shows "!" on
+	-- the tablet until the player opens it. Writer: JournalService. Reconcile adds it as {} to older profiles.
+	JournalClaimed: { [string]: number },
 	-- Gifts (TASK-352; owner request 2026-10-16, Provisional). Writer: GiftService. GiftPending: Content.Shop.Gifts key
 	-- -> the recipient of this player's next receipt of that product. GiftsReceived: ids of the last delivered gift
 	-- messages (circular list), so a message sent twice (receipt retried) is granted once. Reconcile adds both as {}.
 	GiftPending: { [string]: GiftPending },
 	GiftsReceived: { string },
+	-- Class skins (owner request 2026-10-17, Provisional; design/skins-proposal.md). Writer: SkinService. Skins:
+	-- Content.Skins key -> os.time() of the grant (Robux receipt). EquippedSkins: Content.Classes key -> the Content.Skins
+	-- key worn with that class (absent = the crew uniform). Reconcile adds both as {} to older profiles, so no migration.
+	Skins: { [string]: number },
+	EquippedSkins: { [string]: string },
 }
 
 const Template: Data = {
@@ -82,6 +94,7 @@ const Template: Data = {
 	-- Monetization (DEC-092; architecture.md §10)
 	ReviveCredits = 0, -- paid revive not used yet (DEC-117); self only (DEC-116)
 	Receipts = {}, -- last 50 processed PurchaseIds (circular list); writer: ShopService (data.md §1.4)
+	OneTimeBought = {}, -- one-time bundles (DEC-267); writer: ShopService
 
 	-- Gem idempotency per run (architecture.md §10.4)
 	-- Gems = sum credited in this run, for RunReport.Gems (v5.1, T59; TASK-074)
@@ -108,10 +121,15 @@ const Template: Data = {
 
 	-- Anomaly Tablet: JournalService (TASK-335, TASK-345); unknown keys are ignored on read
 	Journal = {},
+	JournalClaimed = {},
 
 	-- Gifts: GiftService (TASK-352)
 	GiftPending = {},
 	GiftsReceived = {},
+
+	-- Class skins: SkinService
+	Skins = {},
+	EquippedSkins = {},
 }
 
 return Template

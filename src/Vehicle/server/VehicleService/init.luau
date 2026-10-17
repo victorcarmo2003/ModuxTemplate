@@ -36,6 +36,7 @@ const POSE_TOLERANCE = 1.5 -- studs between the model pivot and the TRL point be
 -- Phases where the lever works (Content.Actions.shutter_toggle.Requires.Phase: Prep, Open, Closing, Night; TASK-284)
 const SHUTTER_PHASES: { string } = Content.Actions.ByKey.shutter_toggle.Requires.Phase or {}
 const PREP = "Prep"
+const CALL = "Call" -- night call (2026-10-17): the window lever works here too
 -- Service window (§19.14)
 const SHUTTER_ACTION = "shutter_toggle"
 const SHUTTER_ATTRIBUTE = "Shutter"
@@ -241,7 +242,7 @@ end
 function VehicleService:SyncShop(byPlayer: boolean)
 	const round = self.Dependencies.RoundService
 	const closed = self:IsShutterClosed()
-	if not closed and byPlayer and round:GetPhase() == PREP then
+	if not closed and byPlayer and (round:GetPhase() == PREP or round:GetPhase() == CALL) then
 		round:OpenShop()
 	elseif round:IsSelling() then
 		round:SetPaused(closed)
@@ -355,8 +356,9 @@ VehicleService:OnInit(function(self)
 	end)
 	round.PhaseChanged:Connect(function(phase)
 		const row = Content.Shift.ByKey[phase]
-		if phase == PREP then
-			-- shop closed until someone opens the window (TASK-284)
+		if phase == PREP or phase == CALL then
+			-- shop closed until someone opens the window (TASK-284); the night call too (2026-10-17: opening it there
+			-- starts the night while Walt keeps talking)
 			self:SetShutter(true, nil, true)
 		elseif table.find(OPEN_PHASES, phase) ~= nil or (row ~= nil and row.Selling) then
 			-- a selling phase opens the shop (the Prep ran out, or the window just opened it)

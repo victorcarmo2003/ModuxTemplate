@@ -1,0 +1,49 @@
+{
+ "out": "thumb_C5_perseguicao_noite.png",
+ "size": [
+  1920,
+  1080
+ ],
+ "beauty": "beauty_noite.jpg",
+ "visible": "vis.jpg",
+ "full": "full.jpg",
+ "characters": [
+  {
+   "key": [
+    255,
+    0,
+    255
+   ],
+   "outline": [
+    255,
+    60,
+    60
+   ],
+   "width": 8,
+   "saturation": 1.0,
+   "contrast": 1.0
+  },
+  {
+   "key": [
+    0,
+    255,
+    255
+   ],
+   "outline": [
+    255,
+    255,
+    255
+   ],
+   "width": 9,
+   "saturation": 1.25
+  }
+ ],
+ "background": {
+  "saturation": 1.05,
+  "brightness": 1.0
+ },
+ "grade": {
+  "saturation": 1.06,
+  "contrast": 1.04
+ }
+}

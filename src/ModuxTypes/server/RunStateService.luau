@@ -53,6 +53,7 @@ export type Public = {
 	Capture: (self: Public) -> Snapshots.Snapshot,
 	Restore: (self: Public, mode: RestoreMode) -> boolean,
 	LastSnapshot: (self: Public) -> Snapshots.Snapshot?,
+	Load: (self: Public, snapshot: any) -> boolean,
 	CaptureRun: (self: Public) -> { [string]: any },
 	RestoreRun: (self: Public, data: { [string]: any }, mode: RestoreMode) -> (),
 	CaptureMembers: (self: Public) -> { [string]: any },

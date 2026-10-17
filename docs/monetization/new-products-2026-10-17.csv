@@ -1,0 +1,4 @@
+type,key,name,price,description
+DeveloperProduct,util_night_kit,Night Kit,55,"Hot coffee, the Anomaly Radar for 90 seconds and a Revive Kit, all at once. Night only."
+DeveloperProduct,starter_crate,Starter Crate,99,"2,400 gems and 2 Revive Kits to start your crew. Once per player."
+GamePass,pass_thermos,Thermos,149,"Start every night with a hot coffee in your hand."
