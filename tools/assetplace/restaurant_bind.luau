@@ -418,7 +418,7 @@ local OVERRIDES = {
 		-- CAM1 "patio": on the drive-thru street-light pole (pivot = back of the bracket on the pole face, MAP (60.06, 11.8, 38.75)),
 		-- looking west across the patio: counter / vitrine, the 4 tables, R-GATE, Ninth St and the Juniper corner with its lights
 		-- (AN-A, AN-C; CORNER DOGS neon in frame for the blackout).
-		["Cam:CAM1"] = { CF = {-60.06, 11.8, 29.14, 0.1496, 0.4164, -0.8968, 0, 0.907, 0.4212, 0.9887, -0.063, 0.1357} },
+		["Cam:CAM1"] = { CF = {-60.117, 11.8, 29.083, 0.7047, 0.2955, -0.6451, 0, 0.9092, 0.4164, 0.7095, -0.2934, 0.6407} }, -- owner 2026-10-17: more of the counter (orientation -24.608, -45.197, 0),
 		-- TASK-446 (2026-10-17, owner approved): the 4 torches "Flame" in MAP01_Assets.Extra (owner's pieces, outside the
 		-- restaurant) cast no shadow; applied to every Light under a part named Flame there
 		["Lights:Extra/Flame"] = { Shadows = false },
