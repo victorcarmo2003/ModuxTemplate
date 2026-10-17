@@ -480,7 +480,14 @@ sem voz, sem anomalias novas (as V2 que dependem de peça do trailer ficam desli
 - **Trailer:** sai do mapa para `ServerStorage.TRAILER_Backup_20261017` (mesmo padrão do `CART_Backup`). O código não tem
   flag de "veículo": o restaurante **herda a chave `trailer`** (DT-R1), então `Upgrades`, `Stations`, `Seating`, snapshots e
   as 75 referências a `"trailer"` continuam válidas. Renomear para `restaurant` é cosmético e caro: fica para a R5, se o dono quiser.
-- **Rollback** (sem código): `Restaurant.Rules.Enabled = false` + `Prep.Rules.Enabled = true` + trailer de volta do backup no
+- **Chave única (TASK-390):** ligar o restaurante = só `Content.Restaurant.Rules.Enabled = true`. Os outros dados derivam de
+  `Content.Restaurant.Switch` na hora do `require` (ninguém edita à mão): `Prep.Rules.Enabled = false` e
+  `Prep.Rules.WorldKitchenPrompts = true` (a cozinha do restaurante é de prompts de mundo), `Seating.SitAt = "Served"`,
+  `Seating.DirtyTables = false`, `Vehicles.trailer.HasBackDoor = false` / `Restaurant = true`, as anomalias de
+  `Switch.CutAnomalies` saem da agenda (`Family = nil`, sem `Scripted`: ANM-002, 003, 004, 007, 009 e a família B inteira
+  017/018/019, que pede o HideZone atrás do trailer) e `Nights[6..9].NewAnomaly` passam a 014/015/008/016 (a 016 estreia na
+  N9). O `Validate` falha se algum desses campos não seguir a chave. Provisório até a R4 (anomalias V3).
+- **Rollback** (sem código): `Restaurant.Rules.Enabled = false` (tudo acima volta junto) + trailer de volta do backup no
   Studio (snippet `restaurant_bind.luau "undo"`). Com `Enabled = false` não há fila de retirada (serve em `Q1`), `Seating.SitAt` volta a `"Order"` e o gate dos pratos some.
 
 ---

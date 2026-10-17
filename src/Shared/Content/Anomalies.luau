@@ -37,6 +37,7 @@
 -- Family is open on the night (Nights[k].Families) and whose SkipAtmospheres does not hold the night's Atmosphere.
 -- SkipAtmospheres: ATM-# keys (Content.Atmospheres, TASK-275) where the row never plays (DEC-257 note: the Raincoat
 -- Lady is not drawn on rain nights).
+local Restaurant = require(script.Parent.Restaurant)
 local Table = require(script.Parent.Table)
 
 export type Actor = "Customer" | "Street" | "Vehicle" | "World" | "Audio" | "Item"
@@ -273,7 +274,7 @@ blackout.Family = "C"
 const turnedNeck = odd(4, 12, "anm_012_turned_neck", "The turned neck")
 turnedNeck.Cues = { "jumpscare", "neck_snap", "window_slam" } -- TASK-336
 
-const base = Table.new({
+const rows: { Anomaly } = {
 	-- ViewRange: 60 default, 80 N6, 300 N7 (FEAT-019); 100 N3/N8 and 200 N10 Provisional (C-01 ~73 studs,
 	-- AN-12 ~63, Juniper posts 82-135 from the counter; MAP-01 §6, §10.3)
 	blankFolks,
@@ -296,7 +297,20 @@ const base = Table.new({
 	monster(8, 18, "anm_018_grin", "The grin"),
 	monster(9, 19, "anm_019_roof_walker", "The roof walker"),
 	blackout,
-} :: { Anomaly })
+}
+
+-- TASK-390 (restaurant, Content.Restaurant.Rules.Enabled; Restaurant.Switch): the rows tied to the trailer's door,
+-- HideZone, switch or food leave the agenda by data (Family nil, no Scripted entry); Night per DebutNights. Off = untouched
+const cut = Restaurant.Switch.CutAnomalies
+for _, row in rows do
+	if table.find(cut, row.Key) then
+		row.Family = nil
+		row.Scripted = nil
+	end
+	row.Night = Restaurant.Switch.DebutNights[row.Key] or row.Night
+end
+
+const base = Table.new(rows)
 
 -- Anomaly that plays in the slots of a "Needs" anomaly when the vehicle has no switch: the newest anomaly debuting
 -- before it with Trailer None (nil if there is none, which Validate forbids)

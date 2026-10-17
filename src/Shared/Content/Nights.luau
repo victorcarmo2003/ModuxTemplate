@@ -21,6 +21,7 @@
 --               open families, never the same anomaly twice in a row
 --   Scares      family D scares without a verb (HallucinationController, TASK-274); 0 when D is closed
 local Flow = require(script.Parent.Flow)
+local Restaurant = require(script.Parent.Restaurant)
 local Table = require(script.Parent.Table)
 
 export type Customers = {
@@ -72,7 +73,8 @@ local function night(
 		Key = `night_{index}`,
 		Index = index,
 		Duration = duration,
-		NewAnomaly = anomaly,
+		-- TASK-390: with the restaurant on, a night whose premiere left the agenda presents Restaurant.Switch.NewAnomalies[k]
+		NewAnomaly = Restaurant.Switch.NewAnomalies[index] or anomaly,
 		Families = families,
 		Atmosphere = atmosphere,
 		Events = events,

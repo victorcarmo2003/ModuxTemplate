@@ -316,7 +316,8 @@ return table.freeze({
 	-- Class skins, Robux only (owner request 2026-10-17; design/skins-proposal.md; SkinService, SkinController). Provisional
 	Skins = Skins,
 
-	-- Restaurant flow (DEC-269..DEC-280; tech/restaurant-flow.md rev. 2 §4.1, design/restaurant-flow.md). Wave R0 contracts,
-	-- Rules.Enabled = false until the map and the R1 tracks land. Provisional
+	-- Restaurant flow (DEC-269..DEC-280; tech/restaurant-flow.md rev. 2 §4.1, design/restaurant-flow.md). Provisional.
+	-- Restaurant.Rules.Enabled is THE single switch (TASK-390): Prep, Seating, Vehicles, Anomalies and Nights derive their
+	-- restaurant values from Restaurant.Switch at require time (see the header of Restaurant.luau); false = published game
 	Restaurant = Restaurant,
 })
