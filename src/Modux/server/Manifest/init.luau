@@ -31,6 +31,7 @@ local PartyRunService = require(ServerScriptService.server.ModuxTypes.PartyRunSe
 local PartyService = require(ServerScriptService.server.ModuxTypes.PartyService)
 local PedestrianService = require(ServerScriptService.server.ModuxTypes.PedestrianService)
 local PlaceService = require(ServerScriptService.server.ModuxTypes.PlaceService)
+local PlateService = require(ServerScriptService.server.ModuxTypes.PlateService)
 local PlayerService = require(ServerScriptService.server.ModuxTypes.PlayerService)
 local PrepService = require(ServerScriptService.server.ModuxTypes.PrepService)
 local PresenceService = require(ServerScriptService.server.ModuxTypes.PresenceService)
@@ -48,6 +49,7 @@ local ShopService = require(ServerScriptService.server.ModuxTypes.ShopService)
 local ShopUtilityService = require(ServerScriptService.server.ModuxTypes.ShopUtilityService)
 local ShowcaseService = require(ServerScriptService.server.ModuxTypes.ShowcaseService)
 local SkinService = require(ServerScriptService.server.ModuxTypes.SkinService)
+local TabletService = require(ServerScriptService.server.ModuxTypes.TabletService)
 local ThiefService = require(ServerScriptService.server.ModuxTypes.ThiefService)
 local TrafficService = require(ServerScriptService.server.ModuxTypes.TrafficService)
 local TutorialService = require(ServerScriptService.server.ModuxTypes.TutorialService)
@@ -87,6 +89,7 @@ export type AllServices = {
 	PartyService: PartyService.Public,
 	PedestrianService: PedestrianService.Public,
 	PlaceService: PlaceService.Public,
+	PlateService: PlateService.Public,
 	PlayerService: PlayerService.Public,
 	PrepService: PrepService.Public,
 	PresenceService: PresenceService.Public,
@@ -104,6 +107,7 @@ export type AllServices = {
 	ShopUtilityService: ShopUtilityService.Public,
 	ShowcaseService: ShowcaseService.Public,
 	SkinService: SkinService.Public,
+	TabletService: TabletService.Public,
 	ThiefService: ThiefService.Public,
 	TrafficService: TrafficService.Public,
 	TutorialService: TutorialService.Public,
