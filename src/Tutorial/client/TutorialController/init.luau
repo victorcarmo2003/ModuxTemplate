@@ -79,6 +79,15 @@
 	tutdebug (the TutorialDebug panel; F8 too). With dev mode on, past Day 1, or done or skipped, says
 	so once in the Output (the tutorial never runs for it: /dev tutorial reset).
 
+	Restaurant (TASK-393; design/tutorial-restaurant.md, Provisional; only with Content.Restaurant.Rules.Enabled, else
+	everything above is unchanged): after the window, the tutorial customer's order is taken at the tablet (r_tablet,
+	r_listen while Tablets says Talking), then the plate furthest along (WorkPlate: the tutorial customer has no plate
+	ticket) is built: r_cut -> r_bun_plate -> r_grill -> r_cooking -> r_flip -> r_collect -> r_rail -> r_dog_plate ->
+	r_take_plate -> r_toppings (or r_discard) -> r_pickup ("Hand Over" at PICKUP); r_crew while a crewmate holds the hot
+	dog. After the money step, with TutorialRules.Restock and the order_stock phone in the map: r_call -> r_boxes (Supply
+	OnTheWay) -> r_box (take_box at a StockShelf bay or the hatch) -> r_restock (the station of the box's ingredient);
+	over once any station's stock goes up. The Day 1 upgrade lesson below is on in the restaurant (TutorialRules.Upgrade).
+
 	PROVISIONAL: texts, IDLE, PROGRESS, CALL_WAIT, NUDGE, TALK_TIME, TALK_MIN, REASK, CHECK_TIME, skip keys (Q, DPadDown), "a served
 	sale of the tutorial customer" as the first sale, ending on the day shift end.
 ]]
@@ -108,6 +117,7 @@ local Trail = require(script.Trail)
 -- the plate of the 3D prep mode (module state shared with PrepController): the "deliver" step reads it (TASK-254)
 local PrepPlate = require(StarterPlayer.StarterPlayerScripts.client.Prep.PrepController.Stages.Build.Session)
 local Verbose = require(ReplicatedStorage.shared.Verbose)
+local Restaurant = require(ReplicatedStorage.shared.Libs.Net.Restaurant)
 
 const TAG = "Interactable"
 const TRAIL_RETRY = 1 -- s between two route builds (map still streaming in, or the player strayed) (TASK-322)
@@ -190,6 +200,29 @@ const DEBUG_RATE = 0.25 -- s between two refreshes of the debug panel text
 const VOICE_WAIT = 20 -- s the voice test waits for one line to load
 const VOICE_TAIL = 0.4 -- s after a line of the voice test before the next one
 const DEV_PREFIX = "[TutorialDev]"
+-- Restaurant (TASK-393; design/tutorial-restaurant.md): actions and items of the restaurant loop and of the restock
+const RESTAURANT = Content.Restaurant
+const TABLET_TAKE = "tablet_take"
+const BUN_SLICE = "bun_slice"
+const PLATE_PUT = "plate_put"
+const PLATE_TAKE = "plate_take"
+const GRILL_FLIP = "grill_flip"
+const RAIL_TAKE = "rail_take"
+const PICKUP_SERVE = "pickup_serve"
+const ORDER_STOCK = "order_stock"
+const TAKE_BOX = "take_box"
+const RESTOCK = "restock"
+const BUN_SLICED = "bun_sliced"
+const SAUSAGE_GRILLED = "sausage_grilled"
+const RESTOCK_STEPS: { [string]: boolean } = { r_call = true, r_boxes = true, r_box = true, r_restock = true }
+-- package Tool item key -> its Packages row (a box in hand)
+const PACKAGE_OF_ITEM: { [string]: Content.Package } = {}
+for _, row in Content.Packages.List do
+	PACKAGE_OF_ITEM[row.Item] = row
+end
+-- Restaurant set record fields read here (Net.Restaurant)
+type PlateRecord = { Npc: number, Bun: boolean, Sausage: boolean }
+type TabletRecord = { State: string, Npc: number }
 -- Stations set record fields read here (network.md §3.5)
 type SlotRecord = { Kind: string, State: string, Count: number }
 -- Customers set record fields read here (network.md §3.6)
@@ -290,6 +323,9 @@ function TutorialController:Setup()
 	self.InMart = false :: boolean
 	-- bun stock when the shopping steps began (they end once it goes above: whoever restocked)
 	self.ShopFrom = 0 :: number
+	-- restaurant restock steps after the first sale (TASK-393); the stock marks they began from (Restocked)
+	self.Restocking = false :: boolean
+	self.RestockFrom = {} :: { [string]: number }
 	self.Unmounts = {} :: { () -> () }
 	-- Dev tools: step forced by /dev tutorial step (nil = the live flow), debug panel, voice test run, one-time note
 	self.Forced = nil :: string?
@@ -829,6 +865,10 @@ function TutorialController:DecideLive(): (string, Instance?, string)
 	if self.Shopping then
 		return self:DecideShop()
 	end
+	-- restaurant, after the first sale: phone order -> box -> Restock (TASK-393)
+	if self.Restocking then
+		return self:DecideRestock()
+	end
 
 	-- Walt is on the line (or never called): the trailer is opened first (Prep: the window lever by the phone; opening the
 	-- window opens the shop, TASK-284), then the tutorial customer comes
@@ -848,6 +888,10 @@ function TutorialController:DecideLive(): (string, Instance?, string)
 	if guest.State == "Arriving" or guest.State == "Queued" then
 		-- walking up: mark the customer itself
 		return "wait_customer", rig, ""
+	end
+	-- restaurant loop (TASK-393): tablet -> cut -> plate -> grill -> plate -> take -> toppings -> pickup
+	if TutorialRules.Restaurant then
+		return self:DecideRestaurant(guestId, guest, rig)
 	end
 	if guest.State == "Ordering" then
 		return "order", self:Anchor("take_order", false, onGuest) or rig, ""
@@ -913,6 +957,223 @@ function TutorialController:DecideLive(): (string, Instance?, string)
 	end
 	-- grill working, bun sliced: wait for the sausage
 	return "cooking", self:KitchenAnchor("grill_collect", false), ""
+end
+
+-- Restaurant (TASK-393; design/tutorial-restaurant.md) ------------------------------------------------------------
+
+-- PLATE-n index of a plate anchor (the anchor or an ancestor tagged Binding.PlateTag), nil = not a plate anchor
+local function plateIndexOf(anchor: Instance): number?
+	local current: Instance? = anchor
+	while current and current ~= Workspace do
+		if CollectionService:HasTag(current, RESTAURANT.Binding.PlateTag) then
+			const index = current:GetAttribute(RESTAURANT.Binding.PlateIndex)
+			return if typeof(index) == "number" then index else nil
+		end
+		current = current.Parent
+	end
+	return nil
+end
+
+-- The plate the tutorial works on (Plates set). The tutorial customer gets no plate ticket and the verdict goes by the
+-- toppings, so any plate serves: the one furthest along (bun and dog > one of them > empty), one without a ticket
+-- first, then the lowest index. Progress = 0..2 (bun + dog on it); nil = no plate bound.
+function TutorialController:WorkPlate(): (PlateRecord?, number?, number)
+	local best: PlateRecord? = nil
+	local bestIndex: number? = nil
+	local bestScore = -1
+	for index, raw in Restaurant.Plates:entries() do
+		const record = raw :: PlateRecord
+		const progress = (if record.Bun then 1 else 0) + (if record.Sausage then 1 else 0)
+		const score = progress * 4 + (if record.Npc == 0 then 2 else 0)
+		if score > bestScore or (score == bestScore and bestIndex ~= nil and index < bestIndex) then
+			best, bestIndex, bestScore = record, index, score
+		end
+	end
+	const progress = if best then (if best.Bun then 1 else 0) + (if best.Sausage then 1 else 0) else 0
+	return best, bestIndex, progress
+end
+
+-- A prompt of the plate `index` (nil = the nearest plate)
+function TutorialController:PlateAnchor(action: string, index: number?): Instance?
+	if index == nil then
+		return self:Anchor(action, false)
+	end
+	return self:Anchor(action, false, function(anchor: Instance): boolean
+		return plateIndexOf(anchor) == index
+	end) or self:Anchor(action, false)
+end
+
+-- Another player of the server holds a hot dog (co-op: a crewmate has the plate)
+local function crewHasHotDog(): boolean
+	for _, player in Players:GetPlayers() do
+		if player == Players.LocalPlayer then
+			continue
+		end
+		const character = player.Character
+		const tool = if character then character:FindFirstChildOfClass("Tool") else nil
+		if tool and tool:GetAttribute("Item") == HOT_DOG then
+			return true
+		end
+	end
+	return false
+end
+
+-- Restaurant loop of the tutorial customer from the replicated state (whoever does a step, it counts for everyone)
+function TutorialController:DecideRestaurant(guestId: number, guest: GuestRecord, rig: Model?): (string, Instance?, string)
+	local function onGuest(anchor: Instance): boolean
+		return npcIdOf(anchor) == guestId
+	end
+	if guest.State == "Ordering" then
+		for _, raw in Restaurant.Tablets:entries() do
+			const record = raw :: TabletRecord
+			if record.Npc == guestId and record.State == "Talking" then
+				return "r_listen", nil, ""
+			end
+		end
+		return "r_tablet", self:Anchor(TABLET_TAKE, true) or self:Anchor(TABLET_TAKE, false) or rig, ""
+	end
+	const held = self:Held()
+	if held and held.Item == HOT_DOG then
+		for key in held.Toppings do
+			if not guest.Order[key] then
+				return "r_discard", self:Anchor("discard", true) or self:Anchor("discard", false), ""
+			end
+		end
+		for _, key in Content.Ingredients.ToppingKeys do
+			if guest.Order[key] and not held.Toppings[key] then
+				const row = Content.Ingredients.ByKey[key]
+				return "r_toppings",
+					self:Anchor("topping_add", false, function(anchor)
+						return anchor:GetAttribute("Ingredient") == key
+					end),
+					if row then row.Name else key
+			end
+		end
+		return "r_pickup", self:Anchor(PICKUP_SERVE, false) or self:Anchor("serve", false, onGuest) or rig, ""
+	end
+	const plate, index, progress = self:WorkPlate()
+	if progress == 0 and crewHasHotDog() then
+		return "r_crew", self:Anchor(PICKUP_SERVE, false), ""
+	end
+	if held and held.Item == BUN_SLICED and not (plate and plate.Bun) then
+		return "r_bun_plate", self:PlateAnchor(PLATE_PUT, index), ""
+	end
+	if held and held.Item == SAUSAGE_GRILLED and not (plate and plate.Sausage) then
+		return "r_dog_plate", self:PlateAnchor(PLATE_PUT, index), ""
+	end
+	if plate and plate.Bun and plate.Sausage then
+		return "r_take_plate", self:PlateAnchor(PLATE_TAKE, index), ""
+	end
+	if not (plate and plate.Bun) then
+		return "r_cut", self:Anchor(BUN_SLICE, true) or self:Anchor(BUN_SLICE, false), ""
+	end
+	-- the dog: grill -> (pause) flip -> collect -> take it off the hot pile
+	const kitchen = self:Kitchen()
+	if kitchen.Rail > 0 then
+		return "r_rail", self:Anchor(RAIL_TAKE, true) or self:Anchor(RAIL_TAKE, false), ""
+	end
+	if kitchen.GrillReady then
+		return "r_collect", self:Anchor("grill_collect", true) or self:Anchor("grill_collect", false), ""
+	end
+	const flip = self:Anchor(GRILL_FLIP, true)
+	if flip then
+		return "r_flip", flip, ""
+	end
+	if kitchen.GrillWorking then
+		return "r_cooking", self:Anchor("grill_collect", false), ""
+	end
+	return "r_grill", self:Anchor("grill_place", false), ""
+end
+
+-- Restock steps start after the first sale: Supply on and the phone of the stock order in the map
+function TutorialController:CanRestock(): boolean
+	return TutorialRules.Restock and self:Anchor(ORDER_STOCK, false) ~= nil
+end
+
+-- Units of every ingredient now (Stock set)
+function TutorialController:StockAll(): { [string]: number }
+	const out: { [string]: number } = {}
+	for id, raw in self.Libs.Net.Stock:entries() do
+		const key = Content.Ingredients.Keys[id]
+		if key ~= nil then
+			out[key] = (raw :: { Amount: number }).Amount
+		end
+	end
+	return out
+end
+
+-- Restock steps over: some ingredient went above what it had when they began (whoever restocked). A lower amount
+-- lowers the mark (a unit used in between never hides the restock)
+function TutorialController:Restocked(): boolean
+	for key, amount in self:StockAll() do
+		const from = self.RestockFrom[key]
+		if from == nil or amount < from then
+			self.RestockFrom[key] = amount
+		elseif amount > from then
+			return true
+		end
+	end
+	return false
+end
+
+-- The phone order is on the way (Restaurant.Supply record 1)
+local function supplyOnTheWay(): boolean
+	for _, raw in Restaurant.Supply:entries() do
+		if (raw :: { State: string }).State == "OnTheWay" then
+			return true
+		end
+	end
+	return false
+end
+
+-- The restock anchor of the station of `ingredient` (anchor or station attribute Ingredient, or the station kind of the
+-- ingredient row), else the nearest one
+function TutorialController:StationRestock(ingredient: string): Instance?
+	const row = Content.Ingredients.ByKey[ingredient]
+	const kind = if row then row.Station else nil
+	return self:Anchor(RESTOCK, false, function(anchor: Instance): boolean
+		const own = anchor:GetAttribute("Ingredient")
+		if own ~= nil then
+			return own == ingredient
+		end
+		const station = ancestorWith(anchor, function(instance)
+			return CollectionService:HasTag(instance, STATION_TAG)
+		end)
+		if station == nil then
+			return false
+		end
+		const stationIngredient = station:GetAttribute("Ingredient")
+		if stationIngredient ~= nil then
+			return stationIngredient == ingredient
+		end
+		return kind ~= nil and station:GetAttribute("StationKind") == kind
+	end) or self:Anchor(RESTOCK, false)
+end
+
+-- Restock step from the hand, the boxes on the bays / hatch and the phone order
+function TutorialController:DecideRestock(): (string, Instance?, string)
+	const held = self:Held()
+	const package = if held then PACKAGE_OF_ITEM[held.Item] else nil
+	if package ~= nil then
+		return "r_restock", self:StationRestock(package.Ingredient), ""
+	end
+	const box = self:Anchor(TAKE_BOX, true)
+	if box ~= nil then
+		return "r_box", box, ""
+	end
+	if supplyOnTheWay() then
+		return "r_boxes", nil, ""
+	end
+	return "r_call", self:Anchor(ORDER_STOCK, true) or self:Anchor(ORDER_STOCK, false), ""
+end
+
+-- Starts the restock steps (after the money step, or forced by /dev tutorial step)
+function TutorialController:BeginRestock()
+	self.Restocking = true
+	table.clear(self.RestockFrom)
+	self:Restocked() -- the marks of now
+	const key, target, item = self:DecideRestock()
+	self:SetStep(key, target, item)
 end
 
 -- Focused prep mode (Content.Prep.Rules.WorldKitchenPrompts = false): the kitchen prompts of the world are gone and the
@@ -1390,6 +1651,15 @@ function TutorialController:NextTalk()
 	const current = Vide.untrack(self.StepKey)
 	if current == MONEY_STEP then
 		self.Spot(false)
+		if TutorialRules.Restaurant then
+			-- restaurant (TASK-393): the restock steps when the supply is on and the phone is in the map, else done
+			if self:CanRestock() then
+				self:BeginRestock()
+			else
+				self:Finish("done")
+			end
+			return
+		end
 		if not TutorialRules.Shopping then
 			self:Finish("done") -- 2026-10-17 cut: Day 1 ends on the first sale (the Mart is a low-bun hint later)
 			return
@@ -1547,6 +1817,11 @@ function TutorialController:Tick()
 		self:Finish("done")
 		return
 	end
+	-- restaurant restock over: a station got stock back (whoever restocked)
+	if self.Restocking and self:Restocked() then
+		self:Finish("done")
+		return
+	end
 	const key, target, item = self:Decide()
 	self:SetStep(key, target, item)
 	-- reminder: no progress for IDLE s (Remind), or the same waiting step for NUDGE s and Walt quiet
@@ -1636,7 +1911,8 @@ function TutorialController:LessonStand(key: string): Instance?
 			return anchor
 		end
 	end
-	return nil
+	-- restaurant (TASK-393): the stand inside the shop may only carry the buy prompt; the nearest one is the way there
+	return if TutorialRules.Restaurant then self:Anchor("bench_buy_upgrade", false) else nil
 end
 
 -- One tick of the lesson; true = it owns the panel this tick (the first-hot-dog flow waits)
@@ -1781,6 +2057,17 @@ function TutorialController:ApplyForced()
 		self.Forced = nil
 		return
 	end
+	if RESTOCK_STEPS[key] then
+		-- restaurant restock steps (TASK-393): decided from the hand, the bays and the phone order
+		self.Forced = nil
+		self.Shopping = false
+		Vide.batch(function()
+			self.CashRevealed(true)
+			self.ClockRevealed(true)
+		end)
+		self:BeginRestock()
+		return
+	end
 	if table.find(Steps.Shopping, key) ~= nil then
 		self.Forced = nil
 		self.Shopping = true
@@ -1795,6 +2082,7 @@ function TutorialController:ApplyForced()
 		return
 	end
 	self.Shopping = false
+	self.Restocking = false
 	if step.Talk then
 		self.Forced = nil
 		if key == MONEY_STEP then
@@ -1930,6 +2218,8 @@ function TutorialController:DevReset()
 	self.Shopping = false
 	self.InMart = false
 	self.ShopFrom = 0
+	self.Restocking = false
+	table.clear(self.RestockFrom)
 	self.Forced = nil
 	self.DevNoted = false
 	print(`{DEV_PREFIX} tutorial reset: it starts on the next day Prep/Open tick (phone first)`)

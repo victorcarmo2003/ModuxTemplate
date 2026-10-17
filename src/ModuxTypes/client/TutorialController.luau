@@ -9,6 +9,7 @@ local Call = require(StarterPlayer.StarterPlayerScripts.client.Tutorial.Tutorial
 local Steps = require(StarterPlayer.StarterPlayerScripts.client.Tutorial.TutorialController.Steps)
 local Trail = require(StarterPlayer.StarterPlayerScripts.client.Tutorial.TutorialController.Trail)
 
+type PlateRecord = { Npc: number, Bun: boolean, Sausage: boolean }
 type GuestRecord = { State: string, Order: { [string]: boolean } }
 type Held = { Item: string, Toppings: { [string]: boolean } }
 type Kitchen = {
@@ -56,6 +57,8 @@ export type Public = {
 	PointerAt: Vide.Source<Vector2>,
 	PointerShown: Vide.Source<boolean>,
 	Prepared: boolean,
+	RestockFrom: { [string]: number },
+	Restocking: boolean,
 	Revived: Vide.Source<boolean>,
 	Rookie: boolean,
 	Running: Vide.Source<boolean>,
@@ -104,6 +107,15 @@ export type Public = {
 	DecidePhone: (self: Public) -> (string?, Instance?),
 	Decide: (self: Public) -> (string, Instance?, string),
 	DecideLive: (self: Public) -> (string, Instance?, string),
+	WorkPlate: (self: Public) -> (PlateRecord?, number?, number),
+	PlateAnchor: (self: Public, action: string, index: number?) -> Instance?,
+	DecideRestaurant: (self: Public, guestId: number, guest: GuestRecord, rig: Model?) -> (string, Instance?, string),
+	CanRestock: (self: Public) -> boolean,
+	StockAll: (self: Public) -> { [string]: number },
+	Restocked: (self: Public) -> boolean,
+	StationRestock: (self: Public, ingredient: string) -> Instance?,
+	DecideRestock: (self: Public) -> (string, Instance?, string),
+	BeginRestock: (self: Public) -> (),
 	Focused: (self: Public) -> boolean,
 	MissingTopping: (self: Public, order: { [string]: boolean }) -> string?,
 	Seated: (self: Public) -> boolean,

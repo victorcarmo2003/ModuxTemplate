@@ -4,6 +4,12 @@
 -- One tutorial customer per server: TutorialService asks it once the rookie answered Walt's call (TutorialBegin).
 -- No time limit (patience never runs out, no ring), never counts on the shift grade, never an anomaly or a thief;
 -- the regular flow waits while it is at the counter. Its rig carries the attribute ATTRIBUTE = true.
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Content = require(ReplicatedStorage.shared.Content)
+
+-- Restaurant tutorial (TASK-393; design/tutorial-restaurant.md, Provisional): on with Content.Restaurant.Rules.Enabled.
+-- Off = every field below keeps its trailer value (the published tutorial is unchanged).
+const RESTAURANT = Content.Restaurant.Rules.Enabled
 
 return table.freeze({
 	-- fixed order of the tutorial customer (Content.Ingredients topping keys; Walt's lines name it, Steps.luau)
@@ -28,9 +34,17 @@ return table.freeze({
 	-- money when the call rings: Cash is topped up to Cash (EconomyService:TopUp, like the bun package), never below the
 	-- price. Over once any Gear Stand line is bought, the run leaves Day 1, or Content.Shift.TutorialHoldMax s of holding.
 	Upgrade = table.freeze({
-		Enabled = false, -- 2026-10-17 cut (above): no call, no Closing hold, no Day 1 lesson steps
+		-- 2026-10-17 cut (above): no call, no Closing hold, no Day 1 lesson steps. Back on in the restaurant only (TASK-393,
+		-- design/tutorial-restaurant.md §3): the Gear Stand step at the end of Day 1
+		Enabled = RESTAURANT,
 		Key = "cooler",
 		Call = "call_tutorial_upgrade",
 		Cash = 100,
 	}),
+	-- Restaurant tutorial (TASK-393): the steps of the restaurant loop (tablet -> cut -> plate -> grill -> plate -> take
+	-- -> toppings -> pickup) replace the trailer kitchen steps; Restock = after the first sale, the phone order -> a box
+	-- from a product bay (StockShelf) -> Restock at its station (needs Content.Restaurant.Supply.Enabled too). Cash:
+	-- TutorialService tops up to the price of the phone's quick order once the tutorial customer was served.
+	Restaurant = RESTAURANT,
+	Restock = RESTAURANT and Content.Restaurant.Supply.Enabled,
 })
