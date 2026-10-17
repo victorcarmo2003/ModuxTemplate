@@ -32,6 +32,18 @@
 --             diner stands within one tick (TICK_RATE).
 --   Phases    Closing (night 6 AM): nobody sits, diners finish. Day Last call (DEC-240): sitting still works. Any other non-selling phase: diners stand at once. Drawer closed
 --             (Summary, night end...): every table clean, tips on them lost (TipLostAtSummary). ShiftStarted: clean.
+--   Restaurant (TASK-386; tech/restaurant-flow.md rev. 2 §3.1, DT-R11; DEC-280). Two data flags, defaults = the trailer:
+--   SitAt     Content.Seating.SitAt = "Order" (default): the Q-209 flow above. "Served": the table is offered only AFTER the
+--             sale at the pickup counter, with the plate in hand. CustomerService (TASK-380) calls Seater.Offer after the
+--             sale with the customer already Leaving + Dining (AtTable false, rig Carrying = true); an Offer in any other
+--             state (the "Take Order" one) is refused. SeatingService:OfferServed(party) is the same call for a caller that
+--             does not go through the Seater. Same 5 conditions. Taken: the party walks PU-n -> TBL-n, sits and EATS at
+--             once (no serve_table wait, Seater.Left is not used for it), stands after EatTime and
+--             CustomerService:Dismiss sends it out. Refused (no table, chance, phase, tension): CustomerService sends it
+--             out carrying the plate (takeaway, Restaurant.Rules.TakeawayWhenNoTable).
+--   DirtyTables  true (default): the tray + TableTip stays on the table (Dirty) until clean_table. false: the table goes
+--             straight back to Free and the TableTip per diner goes into the tip jar (EconomyService:AddTip, the jar of
+--             TipJarService) when the party stands up after eating.
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -78,6 +90,7 @@ export type Party = {
 	EatTime: number,
 	Height: number, -- root Y while standing (approach / stand point)
 	Token: number, -- bumped to cancel the walk thread
+	Served: boolean, -- SitAt "Served": the food came with it, it eats as soon as it sits (TASK-386)
 }
 
 export type SeatParty = { Leader: number, Partner: number?, Couple: boolean, CustomerType: string }
@@ -129,6 +142,11 @@ local function hash(text: string): number
 		h = (h * 33 + string.byte(text, index)) % 4294967296
 	end
 	return h
+end
+
+-- Content.Seating.SitAt = "Served": the table comes after the sale (restaurant), read live (data flag)
+local function sitAtServed(): boolean
+	return SEATING.SitAt == "Served"
 end
 
 local function isQueueNode(id: string): boolean
@@ -683,6 +701,14 @@ function SeatingService:TrySeat(party: SeatParty): boolean
 		return false
 	end
 	const customers = self.Dependencies.CustomerService
+	-- SitAt "Served" (TASK-386): only after the sale (CustomerService already ran Leave(..., dining): Leaving + Dining),
+	-- never at "Take Order"
+	if sitAtServed() then
+		const record = customers:Get(party.Leader)
+		if record == nil or record.State ~= "Leaving" or not record.Dining then
+			return false
+		end
+	end
 	const size = if party.Partner ~= nil then 2 else 1
 	-- (4) phase, (5) tension
 	if not self:InSitPhase() or self:IsTense() then
@@ -729,6 +755,17 @@ function SeatingService:TrySeat(party: SeatParty): boolean
 	return true
 end
 
+-- Restaurant (TASK-386, SitAt "Served"): offer a table to a party that was just served at the pickup counter, already
+-- Leaving + Dining (CustomerService:Leave(leader, mood, reason, true)), plate in hand. Same rules as the Seater's Offer;
+-- must not yield. true = a table was reserved, the party is ours until Dismiss. false = no table (or SitAt is "Order"):
+-- the caller sends it out carrying the plate.
+function SeatingService:OfferServed(party: SeatParty): boolean
+	if not sitAtServed() then
+		return false
+	end
+	return self:TrySeat(party)
+end
+
 function SeatingService:Reserve(index: number, party: SeatParty, seats: { number }, isNight: boolean)
 	const spot = self.Spots[index]
 	const npc = self.Dependencies.NpcService
@@ -748,6 +785,7 @@ function SeatingService:Reserve(index: number, party: SeatParty, seats: { number
 		EatTime = Tables.EatTime(isNight, #members > 1, self.Rng),
 		Height = if leaderRig then leaderRig.Root.Position.Y else DEFAULT_HEIGHT,
 		Token = 1,
+		Served = sitAtServed(),
 	}
 	self.Parties[party.Leader] = record
 	for _, member in members do
@@ -806,6 +844,11 @@ function SeatingService:SitDown(party: Party)
 	-- is CustomerService's)
 	party.Phase = "Seated"
 	party.Until = 0
+	if party.Served then
+		-- SitAt "Served": the plate came with it, the meal starts on the seat (no serve_table wait)
+		self:StartMeal(party)
+		return
+	end
 	self:RefreshServe(spot)
 	self:Publish(spot)
 end
@@ -832,6 +875,9 @@ function SeatingService:OnCustomerLeft(leader: number, ate: boolean)
 	const party = self.Parties[leader]
 	if party == nil or party.Phase == "Leaving" then
 		return
+	end
+	if ate and party.Served then
+		return -- SitAt "Served": already paid for, it eats once it sits (SitDown)
 	end
 	if ate and party.Phase == "Seated" then
 		self:StartMeal(party)
@@ -865,7 +911,15 @@ function SeatingService:StandUp(party: Party)
 		end
 	end
 	spot.Party = nil
-	if ate then
+	if ate and not SEATING.DirtyTables then
+		-- DirtyTables false (restaurant, TASK-386): nobody cleans, the table tip goes straight into the tip jar
+		const tip = math.floor(Tables.Tip(0, #party.Members))
+		const economy = self.Dependencies.EconomyService
+		if tip > 0 and economy:IsDrawerOpen() then
+			economy:AddTip(tip)
+		end
+		self:SetState(spot, "Free")
+	elseif ate then
 		-- FEAT-037 invariant: whoever ate leaves a tray and the tip, whatever made them stand (Q-209: no meal, no tray)
 		spot.Tip = Tables.Tip(spot.Tip, #party.Members)
 		self:SetState(spot, "Dirty")

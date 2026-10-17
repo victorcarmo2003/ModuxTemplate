@@ -9,9 +9,17 @@
 -- Wave 3 (TASK-109, ANM-002, ITM-020): Alter puts one gray sausage at the FRONT of the queue (the next "Add Sausage"
 -- of any player takes it), using one rail place, no stock. At most one altered sausage per rail. Record.Altered =
 -- its position 1..Count (nil when none). Pop tells the board whether the sausage it took was the altered one.
+-- Restaurant (TASK-378; tech/restaurant-flow.md rev. 2 §2.3, design FEAT-045), behind Content.Restaurant.Rules.Enabled:
+--   rail_take (anchor with PromptAction rail_take inside the rail station, tap "Take Dogs")  the front sausages -> the
+--             sausage_grilled stack in hand (Tool Count, cap Content.Restaurant.Stacks.Sausage), or a new sausage_grilled
+--             Tool when the hand holds none (ItemService limits: hotbar, CategoryLimits.Ingredient -> hands_full). Takes as
+--             many as fit, FIFO; Count of the record drops by the same amount. The altered sausage (ANM-002) is never
+--             taken here (it stays at the front for the board; the restaurant anomalies come with wave R4): with it at the
+--             front the prompt is off. Prompt off while the rail is empty or the flag is off.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 local StationApi = require(script.Parent.Parent.StationApi)
+local Refusal = require(script.Parent.Parent.Refusal)
 
 type Context = StationApi.Context
 type Station = StationApi.Station
@@ -26,6 +34,8 @@ type RailState = { Queue: { Entry } }
 const KIND = "rail"
 const RECORD_SLOT = 0 -- single-record station (network.md §3.5)
 const COUNT_MAX = 30 -- Stations.Count wire range
+const TAKE = "rail_take"
+const ITEM = "sausage_grilled"
 
 -- Bound rail stations (one per vehicle expected). Stale entries (station removed/re-added) are skipped by alive().
 const bound: { Station } = {}
@@ -78,9 +88,86 @@ local function write(ctx: Context, station: Station)
 	ctx.Publish(station)
 end
 
+-- Restaurant "Take Dogs" ------------------------------------------------------------------------------------------------
+
+local function stackCap(): number
+	return math.max(math.floor(Content.Restaurant.Stacks.Sausage), 1)
+end
+
+-- Held sausage_grilled stack and its Count (nil, 0 when the hand holds something else or nothing).
+local function heldStack(ctx: Context, player: Player): (Tool?, number)
+	const tool = ctx.Held(player)
+	if tool == nil or tool:GetAttribute("Item") ~= ITEM then
+		return nil, 0
+	end
+	const raw = tool:GetAttribute("Count")
+	return tool, if type(raw) == "number" then math.floor(raw) else 1
+end
+
+-- Sausages "Take Dogs" can take now from the front (stops at the altered one).
+local function takeable(station: Station): number
+	local count = 0
+	for _, entry in stateOf(station).Queue do
+		if entry.Altered then
+			break
+		end
+		count += 1
+	end
+	return count
+end
+
+local function refreshTake(ctx: Context, station: Station)
+	const on = Content.Restaurant.Rules.Enabled and takeable(station) > 0
+	for _, anchor in station.Anchors do
+		if anchor:GetAttribute("PromptAction") == TAKE and anchor:GetAttribute("PromptEnabled") ~= on then
+			ctx.SetPrompt(anchor, on, nil)
+		end
+	end
+end
+
+const take: StationApi.Action = {
+	Validate = function(ctx: Context, station: Station, player: Player, _anchor: Instance): (boolean, string?)
+		if not Content.Restaurant.Rules.Enabled or station.Kind ~= KIND or takeable(station) < 1 then
+			return false, nil
+		end
+		const tool, count = heldStack(ctx, player)
+		if tool ~= nil and count >= stackCap() then
+			Refusal.notify(ctx, player, "hands_full", nil)
+			return false, nil
+		end
+		return true, nil
+	end,
+	-- Inside the rail lock, synchronous: the Tool first (the hand limits can refuse it), then the sausages leave the rail.
+	Run = function(ctx: Context, station: Station, player: Player, _anchor: Instance)
+		const tool, count = heldStack(ctx, player)
+		const room = stackCap() - (if tool ~= nil then count else 0)
+		const amount = math.min(room, takeable(station))
+		if amount < 1 then
+			return
+		end
+		if tool ~= nil then
+			ctx.Consume(player, tool)
+		end
+		if not ctx.Give(player, ITEM, { Count = count + amount }) then
+			if tool ~= nil then
+				warn(`[Rail] sausage_grilled stack of {player.Name} lost on restack ({count})`)
+			end
+			return -- a new stack refused: ItemService already told the player (hands_full)
+		end
+		const queue = stateOf(station).Queue
+		for _ = 1, amount do
+			table.remove(queue, 1)
+		end
+		write(ctx, station)
+		refreshTake(ctx, station)
+	end,
+}
+
 const Rail = {
 	Kinds = { KIND },
-	Actions = {} :: { [string]: StationApi.Action },
+	Actions = {
+		[TAKE] = take,
+	} :: { [string]: StationApi.Action },
 }
 
 -- Public API for the other station modules --------------------------------------------------------------------------
@@ -196,6 +283,12 @@ function Rail.Bind(ctx: Context, station: Station)
 	table.insert(bound, station)
 	station.State = { Queue = {} } :: RailState
 	write(ctx, station)
+	refreshTake(ctx, station)
+end
+
+-- 10 Hz, current vehicle only: keep "Take Dogs" in step with the rail (fed by the grill's Collect) and the flag.
+function Rail.Tick(ctx: Context, station: Station, _now: number)
+	refreshTake(ctx, station)
 end
 
 -- Wave 3 (TASK-109): one altered sausage at the front of this rail. False without room or with one already there.
