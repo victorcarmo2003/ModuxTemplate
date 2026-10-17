@@ -1,8 +1,8 @@
 --!strict
 -- PrepShell/Layout: where every block of the focused prep mode goes (docs/art/prep-ui-spec.md §4). Pure: a canvas size in
 -- UI px (the ScreenGui area divided by the global UI scale) in, rectangles out. Three shapes:
---   Phone    landscape, canvas height < 520 (844 x 390 is the design size; 667 x 375 is the floor and must fit too)
---   Desktop  landscape, canvas height >= 520 (about 1371 x 771 at 1280 x 720)
+--   Phone    landscape, canvas height < DESKTOP_MIN_H (844 x 390 is the design size; 667 x 375 is the floor and must fit too)
+--   Desktop  landscape, canvas height >= DESKTOP_MIN_H (about 1371 x 771 at 1280 x 720)
 --   Portrait canvas narrower than tall (about 358 x 774)
 -- The spec tables are for the design sizes; on other sizes the same rules apply (anchored to the edges, the board takes the
 -- rest) and the numbers land on the spec at the design sizes. No block overlaps another (spec §4 "Sem sobreposição").
@@ -39,7 +39,8 @@ export type Mini = {
 
 -- What the owner knows about the screen: `Taps` = the Tap chip is offered, `Objective` = the card carries a tutorial step (and the Skip
 -- pill), `Reserved` = rectangles (canvas px) of transient overlays that the hint and the toast keep off.
-export type Options = { Taps: boolean?, Objective: boolean?, Reserved: { Rect }? }
+-- `Sanity` = the sanity meter of the Hud is up (night): the ticket starts under it, else right under the Roblox menu.
+export type Options = { Taps: boolean?, Objective: boolean?, Reserved: { Rect }?, Sanity: boolean? }
 
 export type Result = {
 	Kind: Kind,
@@ -76,6 +77,9 @@ export type Result = {
 }
 
 const MARGIN = 12
+-- canvas height (UI px) from which the landscape layout is the desktop one. A phone at the touch scale 0.8 (Theme) has a
+-- 470..540 px canvas, so it must stay under this (was 520, 2026-10-17)
+const DESKTOP_MIN_H = 560
 const TAB_GAP = 6
 const TOUCH = 44
 -- Ink border of the pill that holds Leave / Assist / Tap; the round chips inside have radius height / 2 - PILL_PAD
@@ -276,12 +280,13 @@ local function mini(canvas: Vector2, count: number, activeIndex: number, options
 	const w, h = canvas.X, canvas.Y
 	const zero = rect(-100, -100, 0, 0)
 	const portraitShape = w < h
-	const desktopShape = not portraitShape and h >= 520
+	const desktopShape = not portraitShape and h >= DESKTOP_MIN_H
 	const margin = if desktopShape then 16 else MARGIN
 	const rowH = if desktopShape then 48 else TOUCH
 	const rowY = h - margin - rowH
-	const nextW = if desktopShape then 152 elseif w < 760 then 128 else 132
-	const nextH = if desktopShape then 56 elseif portraitShape then 54 else 52
+	-- owner 2026-10-17 (phone too crowded): Next 128 x 52 -> 112 x 46 on a phone
+	const nextW = if desktopShape then 152 elseif w < 760 then 108 else 112
+	const nextH = if desktopShape then 56 elseif portraitShape then 50 else 46
 	const next = rect(w - margin - nextW, h - margin - nextH, nextW, nextH)
 	-- the pill: PILL_PAD px of Ink all round, round chips of 44 (their corners follow the pill: radius = height / 2 - pad). Leave is 96
 	-- wide with its word on a desktop
@@ -319,13 +324,16 @@ local function mini(canvas: Vector2, count: number, activeIndex: number, options
 	const tabs = variableTabs(count, activeIndex, x, tabsY, small, wide, gap, if portraitShape then TOUCH else rowH)
 	const bar = rect(x, tabsY, total, if portraitShape then TOUCH else rowH)
 
-	const hintW = if portraitShape then w - 2 * margin elseif desktopShape then 400 elseif w < 760 then 332 else 400
+	const stripH = if desktopShape then 32 else 28
+	const hintW = if portraitShape then w - 2 * margin elseif desktopShape then 400 elseif w < 760 then 300 else 340
 	const hintX = (w - hintW) / 2
-	const baseHint = rect(hintX, tabsY - 6 - 32, hintW, 32)
-	const baseToast = rect(hintX, baseHint.Y - 6 - 32, hintW, 32)
-	-- the transient pair moves above the overlays that are up (Walt's subtitle)
+	const baseHint = rect(hintX, tabsY - 6 - stripH, hintW, stripH)
+	-- the toast takes the hint's slot (the shell hides the hint while a toast is up): ONE strip over the counter, not two
+	-- (owner 2026-10-17). `baseToast` stays the top of that strip for the world zone and the portrait bin.
+	const baseToast = baseHint
+	-- the strip moves above the overlays that are up (Walt's subtitle)
 	const hint = clearOf(baseHint, options.Reserved)
-	const toast = clearOf(rect(hintX, math.min(baseToast.Y, hint.Y - 6 - 32), hintW, 32), options.Reserved)
+	const toast = hint
 
 	local progress: Rect
 	local skip: Rect = zero
@@ -334,11 +342,11 @@ local function mini(canvas: Vector2, count: number, activeIndex: number, options
 	local hudStatus: Rect
 	local sanity: Rect
 	local menu: Rect
-	-- The Hud as it is built (HudScreen / HudSanity): the clock pill 112 x 38 at the top centre (y 6), day + money 96 + 6 + 96 on the
+	-- The Hud as it is built (HudScreen / HudSanity): the clock pill ~120 x 32 at the top centre (y 6), day + money 84 + 6 + 84 on the
 	-- top right (a column under 560 px), the sanity meter under the 60 px Roblox bar (180 x 38 on touch, 274 x 50 otherwise).
 	-- The progress card goes right under the clock (y 50). The seal of the plate sits on the right under the money pills (it stays while the
 	-- plate waits to be served, so it must not cover the customer in the middle of the Window view).
-	const hudClock = rect((w - 112) / 2, 6, 112, 38)
+	const hudClock = rect((w - 120) / 2, 6, 120, 32)
 	const objective = options.Objective == true
 	const skipW = 76
 	-- the card (and the Skip pill when there is a step): centred as one group
@@ -364,7 +372,7 @@ local function mini(canvas: Vector2, count: number, activeIndex: number, options
 		ticket = rect(margin, progress.Y + progress.H + 8, w - 2 * margin, 92)
 		seal = rect(w - margin - 96, ticket.Y + ticket.H + 8, 96, 122)
 	elseif desktopShape then
-		hudStatus = rect(w - 10 - 198, 6, 198, 38)
+		hudStatus = rect(w - 10 - 224, 6, 224, 32)
 		sanity = rect(8, 52, 274, 50)
 		menu = rect(0, 0, 112, 52)
 		progress, skip = group(if objective then 360 else 300, 52, if objective then 68 else 48)
@@ -372,16 +380,19 @@ local function mini(canvas: Vector2, count: number, activeIndex: number, options
 		ticket = rect(margin, top, 190, math.clamp(pill.Y - 8 - top, 200, 250))
 		seal = rect(w - margin - 120, hudStatus.Y + hudStatus.H + 10, 120, 150)
 	else
-		hudStatus = rect(w - 10 - 198, 6, 198, 38)
-		sanity = rect(8, 68, 180, 38)
-		menu = rect(0, 0, 112, 60)
-		const progressW = if objective then (if w < 760 then 330 else 360) elseif w < 760 then 267 else 280
-		progress, skip = group(progressW, 50, if objective then 64 else 44)
-		-- the tall paper starts under the sanity meter (68 + 38 + 6) and ends 8 px over the pill: 195 px at 667 x 375, 210 at 844 x 390
-		const top = 112
-		ticket = rect(margin, top, 132, math.clamp(pill.Y - 8 - top, 150, 230))
-		-- the Skip pill may reach under the money pills on a narrow phone: the seal goes under it
-		seal = rect(w - margin - 96, math.max(hudStatus.Y + hudStatus.H + 8, if skip.W > 0 then skip.Y + skip.H + 8 else 0), 96, 122)
+		-- the Hud on a phone (2026-10-17): day 84 + money 84 + the gear / cart column (38 x 78) on the right
+		hudStatus = rect(w - 10 - 218, 6, 218, 32)
+		-- the Roblox menu is ~58 real px tall; at the touch scale 0.8 that is ~72 UI px
+		menu = rect(0, 0, 112, 72)
+		sanity = if options.Sanity == true then rect(8, 80, 180, 38) else rect(8, 80, 0, 0)
+		const progressW = if objective then (if w < 760 then 300 else 330) elseif w < 760 then 240 else 260
+		progress, skip = group(progressW, 44, if objective then 60 else 40)
+		-- the tall paper sits right under the Roblox menu (owner 2026-10-17: it was too low), under the sanity meter at night,
+		-- and ends 8 px over the pill
+		const top = if options.Sanity == true then sanity.Y + sanity.H + 6 else menu.Y + menu.H + 6
+		ticket = rect(margin, top, 130, math.clamp(pill.Y - 8 - top, 190, 230))
+		-- under the gear / cart column (6 + 2 x 38 + 2) and the Skip pill
+		seal = rect(w - margin - 96, math.max(6 + 78 + 8, if skip.W > 0 then skip.Y + skip.H + 8 else 0), 96, 122)
 	end
 	-- the bin zone (owner request 2026-10-14): bottom left, right after the Leave pill, level with the row of the section dots; it only
 	-- shows while something is being dragged (BinZone). Portrait: the left, over the hint row.
@@ -453,7 +464,7 @@ local function compute(canvas: Vector2, hasPanel: boolean, count: number, active
 			x += width + TAB_GAP
 		end
 		result.Tabs = tabs
-	elseif canvas.Y >= 520 then
+	elseif canvas.Y >= DESKTOP_MIN_H then
 		result = desktop(canvas, hasPanel, count)
 	else
 		result = phone(canvas, hasPanel, count)

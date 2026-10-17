@@ -84,7 +84,7 @@ const Theme = {
 	-- Smallest readable size on a phone (frontend rule: text >= 14 px on the smallest screen). Never below 12 real px:
 	-- the global scale only goes under 1 without touch (Scale.Min 0.86 x 14 = 12).
 	MinTextSize = 14,
-	-- Smallest touch target (44 px). Touch screens never scale below 1, so a 44 px button stays 44 real px.
+	-- Smallest touch target (44 px at scale 1; touch screens scale down to Scale.MinTouch, 35 real px).
 	MinTouch = 44,
 	-- Height of a status chip / pill that is NOT touchable (money, clock, day, toast): smaller than a touch target
 	-- (user request 2026-10-11: "as interfaces no geral, todas estão muito grandes").
@@ -100,7 +100,7 @@ const Theme = {
 		Reference = 1080, -- viewport height (px) where the scale is Factor
 		Factor = 1.4,
 		Min = 0.86, -- mouse / gamepad: 14 px text x 0.86 = 12 real px
-		MinTouch = 1, -- touch: 44 px targets and 14 px text stay real px
+		MinTouch = 0.8, -- touch: 44 px targets -> 35 real px, 14 px text -> 11 (owner 2026-10-17: phone UI covered the counter; was 1)
 		Max = 1.6,
 	},
 	-- Text stroke for small text (kept for callers outside the kit). Bigger text: Theme.TextStroke(size).

@@ -897,7 +897,7 @@ const rules: Rules = {
 	PerfectMin = 3.0,
 	MsSlack = 1.5,
 	Assist = 1.3,
-	TouchOffset = 28,
+	TouchOffset = 0, -- owner 2026-10-17: the sauce must land under the finger (was 28 px above it)
 	Grill = { Target = 0.5, From = 0.4, To = 0.6, PostFlip = 2, Reaction = 20, Swing = 1.2 }, -- 2026-10-14: the pause waits for the flip; TASK-318 (2026-10-15): Swing 1.1 -> 1.2 (cursor ~9% slower)
 	Rates = { Enter = 2, Leave = 2, Tab = 4, Grill = 6, Begin = 1, Finish = 1, Trash = 4, Order = 4 },
 }

@@ -590,6 +590,7 @@ return function(props: Props): Frame
 			Taps = props.TapMode ~= nil,
 			Objective = objectiveCard() ~= false,
 			Reserved = reserved,
+			Sanity = props.Sanity ~= nil and props.Sanity() ~= nil,
 		})
 	end)
 	-- position / size of a block of the minimal mode (zero in the 2D chrome: those blocks are hidden there)
@@ -1897,7 +1898,8 @@ return function(props: Props): Frame
 		Radius = Theme.Radius.Pill,
 		Lip = 3,
 		Visible = function(): boolean
-			return minimal() and props.Hint() ~= ""
+			-- the toast takes this same slot while it is up (owner 2026-10-17: two stacked strips covered the counter on a phone)
+			return minimal() and props.Hint() ~= "" and props.Toast() == nil
 		end,
 		Position = atMini(function(m)
 			return m.Hint

@@ -74,9 +74,12 @@ export type Props = {
 const MARGIN = 10
 const TOP = 6
 -- Status pills are not touchable, so they go under the 44 px touch size (user request 2026-10-11: UI too big)
-const BIG = 38 -- money, day and clock: ONE height, text size and outline so they sit on the same line (2026-10-12)
+const BIG = 32 -- money, day and clock: ONE height, text size and outline so they sit on the same line (2026-10-12; 38 -> 32 owner 2026-10-17)
+const BIG_TEXT = 17
+-- round buttons on touch (gear, cart): a bit under the 44 px target, the pair sits in the corner (owner 2026-10-17: too big)
+const TOUCH_BUTTON = 38
 const ROW_GAP = 6
-const ROW_MIN_WIDTH = 560 -- px at UI scale 1: the row (day 96 + money 96 + gap) must clear the centred clock (112 px)
+const ROW_MIN_WIDTH = 520 -- px at UI scale 1: the row (day 84 + money 84 + gaps + buttons) must clear the centred clock (96 px)
 -- Toasts (owner request 2026-10-12): bottom centre, stacking up. The bottom edge sits above the Roblox hotbar (84 px, as
 -- the call subtitle) and the subtitle strip itself; the side margin keeps the column off the joystick and the jump button.
 const TOAST_BOTTOM = 140
@@ -112,7 +115,7 @@ return function(props: Props): Frame
 	end
 	-- round buttons: pill height with a mouse / controller, a full touch target on a touch screen
 	const buttonSize = function(): number
-		return if device() == "Touch" then Theme.MinTouch else BIG
+		return if device() == "Touch" then TOUCH_BUTTON else BIG
 	end
 	const revealed = function(key: string): boolean
 		return props.Reveal == nil or props.Reveal(key)
@@ -233,8 +236,8 @@ return function(props: Props): Frame
 					Name = "Cash",
 					LayoutOrder = 2,
 					Height = BIG,
-					TextSize = 20,
-					MinWidth = 96,
+					TextSize = BIG_TEXT,
+					MinWidth = 84,
 					Icon = function(): HudPill.Icon
 						return "Coin"
 					end,
@@ -251,8 +254,8 @@ return function(props: Props): Frame
 					Name = "Shift",
 					LayoutOrder = 1,
 					Height = BIG,
-					TextSize = 20,
-					MinWidth = 96,
+					TextSize = BIG_TEXT,
+					MinWidth = 84,
 					Icon = function(): HudPill.Icon
 						return if props.IsNight() then "Moon" else "Sun"
 					end,
@@ -269,7 +272,7 @@ return function(props: Props): Frame
 			AnchorPoint = Vector2.new(1, 0),
 			Position = function()
 				-- under the button column (taller on touch: no key labels, bigger buttons)
-				return UDim2.new(1, -MARGIN, 0, TOP + (if device() == "Touch" then Theme.MinTouch * 2 + 12 else NUDGE_TOP))
+				return UDim2.new(1, -MARGIN, 0, TOP + (if device() == "Touch" then TOUCH_BUTTON * 2 + 12 else NUDGE_TOP))
 			end,
 			Text = function()
 				return if props.Nudge then props.Nudge() else ""
@@ -313,8 +316,8 @@ return function(props: Props): Frame
 			AnchorPoint = Vector2.new(0.5, 0),
 			Position = UDim2.new(0.5, 0, 0, TOP),
 			Height = BIG,
-			TextSize = 20,
-			MinWidth = 112,
+			TextSize = BIG_TEXT,
+			MinWidth = 96,
 			Icon = function(): HudPill.Icon
 				return "Clock"
 			end,

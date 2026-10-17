@@ -107,7 +107,11 @@ function FlipFocusModule.new(): FlipFocus
 		if at == nil or camera == nil or holeFrame == nil then
 			return
 		end
-		const screen, onScreen = camera:WorldToViewportPoint(at)
+		-- GUI space (WorldToScreenPoint) minus the origin of this gui: a ScreenInsets.None gui starts left / above the safe area
+		-- (notch, top bar), and a viewport point used as an offset in it lands off the sausage on a phone with a side inset
+		-- (playtest 2026-10-17: the ring sat ~47 px left of the sausage)
+		const point, onScreen = camera:WorldToScreenPoint(at)
+		const screen = Vector2.new(point.X, point.Y) - gui.AbsolutePosition
 		if not onScreen then
 			if shown() then
 				shown(false)
@@ -118,8 +122,8 @@ function FlipFocusModule.new(): FlipFocus
 			return
 		end
 		-- the ring: the screen size of `radius` studs at that depth, never smaller than a finger
-		const edge = camera:WorldToViewportPoint(at + camera.CFrame.RightVector * radius)
-		const side = math.max(math.abs(edge.X - screen.X) * 2, 56)
+		const edge = camera:WorldToScreenPoint(at + camera.CFrame.RightVector * radius)
+		const side = math.max(math.abs(edge.X - point.X) * 2, 56)
 		holeFrame.Position = UDim2.fromOffset(screen.X, screen.Y)
 		holeFrame.Size = UDim2.fromOffset(side, side)
 		if not shown() then
