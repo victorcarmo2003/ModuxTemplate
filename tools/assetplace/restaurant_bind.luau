@@ -19,7 +19,7 @@
 
 	Kitchen: the trailer's stations and anchors are CLONED (with their tags) into TRL and placed on the new counters, so the
 	boot keeps the exactly-one-per-kind rule of MapIndex/Required (Restaurant.Rules.Enabled = false) and the restaurant one
-	(Enabled = true: coffee + phone + switch + shutter, Tablet / Pickup tags, PU-1..4). Clones keep their legacy names and
+	(Enabled = true: coffee + phone + switch + shutter, Tablet / Pickup tags, PU-1..8). Clones keep their legacy names and
 	MapId (TRL-PHONE, TRL-TIPJAR, TRL-BREAKER are read by code); the r4 id is the attribute RestaurantId. Second copies of a
 	kind (CUT-2) are blockout Models WITHOUT the Station tag (attribute PendingStation = kind) until the coders enable them.
 	All numbers are MAP-01 coordinates (+X east, +Z south); world = (-x, y, K - z) (map_frame.luau).
@@ -55,6 +55,12 @@ local TAGS_OFF = {
 -- the DOOR-P jamb/head, the SE corner post and the roof edge (order board, no z-fight).
 -- z-fight fix (coordinator, 2026-10-17): the 25 fence posts and Pillar_E start 0.02 higher (size -0.02, centre +0.01) so their
 -- bottoms are no longer coplanar with the owner's Rail_E and Union laid on the floor (owner pieces untouched).
+-- re-synced 2026-10-17 (rev. 5, TASK-441): the diff now also compares Light (Brightness, Range, Color, Shadows, Enabled,
+-- Angle, Face) and SurfaceGui (SizingMode, PixelsPerStud, CanvasSize, Face, LightInfluence, GuiBrightness, AlwaysOnTop,
+-- Enabled). Owner edits: table-lamp canopies 6.4 x 5.8 (two turned Mustard), MenuStrip label 60 px/stud, tip-jar labels
+-- 200 px/stud, pantry south wall rebuilt around a long dark glass hatch (HATCH-L 14 wide), DROP-R shelf + HatchSpot1..3 +
+-- brackets deleted, west / north pantry skins resized and tiles 0.75 transparent, Skin_PW_* / Skin_PS_A_Trim / Skin_PS_B_Tile
+-- deleted, DOOR-P / DOOR-B leaves and heads resized, CCTV lowered 0.40, security camera poses recorded (Cam:CAM1/CAM2).
 local OVERRIDES = {
 	Parts = {
 		["Dress/AC_1/ACUnit"] = { CF = {-51.0849, 12.7011, -29.4254, -1, 0, 0, 0, 0.9916, 0.1293, 0, 0.1293, -0.9916} },
@@ -94,9 +100,13 @@ local OVERRIDES = {
 		["Patio/FENCE-R/Rail_W_Top"] = { CF = {-24, 2.85, 24.8123, 1, 0, 0, 0, 1, 0, 0, 0, 1}, Size = {0.3000, 0.3000, 21.8500} },
 		["Patio/Floor_Path"] = { Deleted = true },
 		["Patio/LIT-T1/Bulb"] = { CF = {-25.4, 7.4, 24.4873, 1, 0, 0, 0, 1, 0, 0, 0, 1} },
+		["Patio/LIT-T1/Canopy"] = { CF = {-25.4, 7.8, 24.4873, 0, -1, 0, 1, 0, 0, 0, 0, 1}, Size = {0.3000, 6.4000, 5.8000}, Color = {246, 193, 43} },
 		["Patio/LIT-T2/Bulb"] = { CF = {-46.1, 7.4, 24.4873, 1, 0, 0, 0, 1, 0, 0, 0, 1} },
+		["Patio/LIT-T2/Canopy"] = { Size = {0.3000, 6.4000, 5.8000} },
 		["Patio/LIT-T3/Bulb"] = { CF = {-25.4, 7.4, 32.0873, 1, 0, 0, 0, 1, 0, 0, 0, 1} },
+		["Patio/LIT-T3/Canopy"] = { CF = {-25.4, 7.8, 32.0873, 0, -1, 0, 1, 0, 0, 0, 0, 1}, Size = {0.3000, 6.4000, 5.8000}, Color = {246, 193, 43} },
 		["Patio/LIT-T4/Bulb"] = { CF = {-46.1, 7.4, 32.0873, 1, 0, 0, 0, 1, 0, 0, 0, 1} },
+		["Patio/LIT-T4/Canopy"] = { CF = {-46.1, 7.8, 32.0873, 0, -1, 0, 1, 0, 0, 0, 0, 1}, Size = {0.3000, 6.4000, 5.8000} },
 		["Patio/R-GATE/Pillar_E"] = { CF = {-38.8, 3.435, 35.8873, 1, 0, 0, 0, 1, 0, 0, 0, 1}, Size = {0.6000, 5.9300, 0.6000} },
 		["Patio/R-GATE/Pillar_W"] = { CF = {-33.2, 3.485, 35.8873, 1, 0, 0, 0, 1, 0, 0, 0, 1}, Size = {0.6000, 6.0701, 0.6000} },
 		["TRL/Front/DT-PC"] = { Deleted = true },
@@ -240,6 +250,7 @@ local OVERRIDES = {
 		["TRL/Front/TRL-SIDENEON/Neon_ShopOpen/Tube#9"] = { CF = {-24.7007, 7.5796, 4.3954, 0, 1, 0, -1, 0, 0, 0, 0, 1} },
 		["TRL/Kitchen/BackCounter/Hood"] = { Deleted = true },
 		["TRL/Kitchen/BackCounter/MenuStrip"] = { CF = {-44.3, 6.375, -3.5227, 1, 0, 0, 0, 1, 0, 0, 0, 1}, Size = {26.6000, 3.9500, 0.0600} },
+		["TRL/Kitchen/BackCounter/MenuStrip/Label"] = { PixelsPerStud = 60.00 },
 		["TRL/Kitchen/PrepTargets/PT_Board_1"] = { CF = {-47.5, 3.5025, -1.6127, -1, 0, 0, 0, 1, 0, 0, 0, -1} },
 		["TRL/Kitchen/PrepTargets/PT_Board_2"] = { CF = {-46.7, 3.5025, -1.6127, -1, 0, 0, 0, 1, 0, 0, 0, -1} },
 		["TRL/Kitchen/PrepTargets/PT_Board_3"] = { CF = {-45.9, 3.5025, -1.6127, -1, 0, 0, 0, 1, 0, 0, 0, -1} },
@@ -326,8 +337,44 @@ local OVERRIDES = {
 		["TRL/Kitchen/TRL-TABLET/Home"] = { CF = {-25.7475, 4.34, -1.1127, -1, 0, 0, 0, 1, 0, 0, 0, -1} },
 		["TRL/Kitchen/TRL-TABLET/Mount"] = { CF = {-25.5525, 5, -1.1127, 0, 0, 1, 0, 1, 0, -1, 0, 0} },
 		["TRL/Kitchen/TRL-TABLET/Screen"] = { CF = {-25.7525, 5, -1.1127, 0, 0, 1, 0, 1, 0, -1, 0, 0} },
+		["TRL/Kitchen/TRL-TIPJAR/Label#2/Detail_TipLabel"] = { PixelsPerStud = 200.00 },
+		["TRL/Kitchen/TRL-TIPJAR/Label/Detail_TipLabel"] = { PixelsPerStud = 200.00 },
+		["TRL/Pantry/DROP-R"] = { Deleted = true },
+		["TRL/Pantry/DROP-R/HatchSpot1"] = { Deleted = true },
+		["TRL/Pantry/DROP-R/HatchSpot2"] = { Deleted = true },
+		["TRL/Pantry/DROP-R/HatchSpot3"] = { Deleted = true },
+		["TRL/Pantry/DROP-R_Bracket1"] = { Deleted = true },
+		["TRL/Pantry/DROP-R_Bracket2"] = { Deleted = true },
+		["TRL/Pantry/Doors/DOOR-B/Leaf"] = { Size = {4.9600, 7.9500, 0.1600} },
+		["TRL/Pantry/Doors/DOOR-B_Head"] = { CF = {-29.5, 8.485, -10.8627, 1, 0, 0, 0, 1, 0, 0, 0, 1}, Size = {5.3200, 0.3700, 0.6600} },
+		["TRL/Pantry/Doors/DOOR-P/Leaf"] = { CF = {-28.12, 4.375, -3.8627, 1, 0, 0, 0, 1, 0, 0, 0, 1}, Size = {4.6800, 7.9500, 0.1600} },
+		["TRL/Pantry/Doors/DOOR-P_Head"] = { CF = {-28.11, 8.385, -3.8627, 1, 0, 0, 0, 1, 0, 0, 0, 1}, Size = {5.1000, 0.1700, 0.7400} },
+		["TRL/Pantry/HATCH-L/Frame_E"] = { CF = {-47.13, 6.995, -10.8727, 1, 0, 0, 0, 1, 0, 0, 0, 1}, Size = {0.3000, 1.9500, 0.8000} },
+		["TRL/Pantry/HATCH-L/Frame_Sill"] = { CF = {-40.27, 5.895, -10.8627, 1, 0, 0, 0, 1, 0, 0, 0, 1}, Size = {14.0199, 0.2500, 0.7800} },
+		["TRL/Pantry/HATCH-L/Frame_Top"] = { CF = {-40.27, 8.11, -10.8627, 1, 0, 0, 0, 1, 0, 0, 0, 1}, Size = {14.0199, 0.2800, 0.7800} },
+		["TRL/Pantry/HATCH-L/Frame_W"] = { CF = {-33.1101, 7.01, -10.8627, 1, 0, 0, 0, 1, 0, 0, 0, 1}, Size = {0.3000, 2.4800, 0.7800} },
+		["TRL/Pantry/HATCH-L/Hatch_Lid"] = { CF = {-40.12, 7.01, -10.8877, 1, 0, 0, 0, 1, 0, 0, 0, 1}, Size = {13.7199, 1.9800, 0.3500}, Color = {0, 32, 96}, Material = "SmoothPlastic", Transparency = 0.750 },
+		["TRL/Shell/DOOR-B_Step"] = { CF = {-29.5, 0.435, -11.6977, 1, 0, 0, 0, 1, 0, 0, 0, 1}, Size = {5.4000, 0.0700, 2.2300} },
+		["TRL/Shell/Pantry_S_DoorHead"] = { CF = {-29.6, 8.95, -10.8627, 1, 0, 0, 0, 1, 0, 0, 0, 1}, Size = {5.2000, 1.0000, 0.5000} },
+		["TRL/Shell/Pantry_S_HatchHead"] = { CF = {-39.58, 8.85, -10.8627, 1, 0, 0, 0, 1, 0, 0, 0, 1}, Size = {14.8400, 1.2000, 0.5000} },
+		["TRL/Shell/Pantry_S_Mid"] = { CF = {-38, 2.985, -10.8627, 1, 0, 0, 0, 1, 0, 0, 0, 1}, Size = {12.0000, 5.5700, 0.5000} },
 		["TRL/Shell/Skin_E_N_Trim"] = { CF = {-59.47, 4.475, 10.3629, 1, 0, 0, 0, 1, 0, 0, 0, 1}, Size = {0.1200, 0.2500, 3.0488} },
 		["TRL/Shell/Skin_E_S_Trim"] = { CF = {-59.47, 4.475, 1.4121, 1, 0, 0, 0, 1, 0, 0, 0, 1}, Size = {0.1200, 0.2500, 7.0497} },
+		["TRL/Shell/Skin_PE_Tile"] = { Transparency = 0.750 },
+		["TRL/Shell/Skin_PN_Tile"] = { CF = {-40.05, 2.45, -4.1427, 1, 0, 0, 0, 1, 0, 0, 0, 1}, Size = {18.9000, 4.0000, 0.0600}, Transparency = 0.750 },
+		["TRL/Shell/Skin_PN_Trim"] = { CF = {-40.08, 4.475, -4.1427, 1, 0, 0, 0, 1, 0, 0, 0, 1}, Size = {18.8400, 0.2500, 0.1200} },
+		["TRL/Shell/Skin_PN_Upper"] = { CF = {-28.31, 8.925, -4.1427, 1, 0, 0, 0, 1, 0, 0, 0, 1}, Size = {4.7000, 0.9500, 0.0600} },
+		["TRL/Shell/Skin_PS_A_Tile"] = { CF = {-40.1325, 2.45, -10.5827, 1, 0, 0, 0, 1, 0, 0, 0, 1}, Size = {15.9449, 4.0000, 0.0600}, Transparency = 0.750 },
+		["TRL/Shell/Skin_PS_A_Trim"] = { Deleted = true },
+		["TRL/Shell/Skin_PS_A_Upper"] = { CF = {-32.56, 6.925, -10.5827, 1, 0, 0, 0, 1, 0, 0, 0, 1}, Size = {0.8000, 4.9500, 0.0600} },
+		["TRL/Shell/Skin_PS_B_Tile"] = { Deleted = true },
+		["TRL/Shell/Skin_PS_B_Trim"] = { CF = {-40.1273, 4.475, -10.5827, 1, 0, 0, 0, 1, 0, 0, 0, 1}, Size = {15.9345, 0.2500, 0.1200} },
+		["TRL/Shell/Skin_PW_Tile"] = { Deleted = true },
+		["TRL/Shell/Skin_PW_Trim"] = { Deleted = true },
+		["TRL/Shell/Skin_PW_Upper"] = { Deleted = true },
+		["TRL/Shell/Skin_W_Tile"] = { CF = {-25.53, 2.45, 1.2873, 1, 0, 0, 0, 1, 0, 0, 0, 1}, Size = {0.0600, 4.0000, 21.2000}, Transparency = 0.750 },
+		["TRL/Shell/Skin_W_Trim"] = { CF = {-25.53, 4.475, 1.2873, 1, 0, 0, 0, 1, 0, 0, 0, 1}, Size = {0.1200, 0.2500, 21.2000} },
+		["TRL/Shell/Skin_W_Upper"] = { CF = {-25.53, 6.925, 1.2873, 1, 0, 0, 0, 1, 0, 0, 0, 1}, Size = {0.0600, 4.9500, 21.2000} },
 		["TRL/Shell/Wheels/Arch_N_A"] = { Deleted = true },
 		["TRL/Shell/Wheels/Arch_N_B"] = { Deleted = true },
 		["TRL/Shell/Wheels/Arch_S"] = { Deleted = true },
@@ -342,7 +389,12 @@ local OVERRIDES = {
 		["Bin:BIN-1"] = { CF = {-78.3, 2.4998, -24.6285, 0, 0, -1, 0, 1, 0, 1, 0, 0} },
 		["Bin:BIN-2"] = { CF = {-36.5, 2.4998, -33.5285, -1, 0, 0, 0, 1, 0, 0, 0, -1} },
 		-- re-synced 2026-10-17 (rev. 4): the owner reset the CCTV pivot to its centre (monitor on the pantry south wall, X 35.9..40.1)
-		["Extra:CCTV"] = { CF = {-37.9854, 4.85, -10.5227, 0, 0, 1, 0, 1, 0, -1, 0, 0} },
+		-- re-synced 2026-10-17 (rev. 5, TASK-441): the owner lowered the monitor 0.40 and turned its pivot (same wall, same centre X/Z)
+		["Extra:CCTV"] = { CF = {-37.9854, 4.45, -10.5227, -1, 0, 0, 0, 1, 0, 0, 0, -1} },
+		-- security camera views (TASK-441): the pivot of each CAM model IS the view (Content.Security). The owner placed them by
+		-- hand; recorded here so the diff reports a later move (the bind poses them to exactly these values)
+		["Cam:CAM1"] = { CF = {-60.1624, 10.488, 28.9855, 0.8335, 0.195, -0.517, 0, 0.9357, 0.3528, 0.5526, -0.2941, 0.7799} },
+		["Cam:CAM2"] = { CF = {-18.14, 13.757, -29.975, -0.7611, -0.2724, 0.5887, 0, 0.9075, 0.42, -0.6487, 0.3196, -0.6907} },
 	},
 }
 -- OVERRIDES END
@@ -1953,21 +2005,53 @@ do
 end
 
 -- 7. lights (kitchen 3 + pantry 1; patio 4 + gate 1; DT 1 = 10, MAP-01 r4 §9) -----------------------------------------------
-local function lamp(parent, name, x, y, z, range, brightness, color)
+-- TASK-442 (2026-10-17, owner: "the kitchen got too bright"): the three kitchen lamps at 1.2 / 18 overlapped over the whole
+-- room AND LightController added its own fallback (1.6 / 14, shadowed) on LZ-1 because the vehicle had no Light_Interior, so
+-- white counters clipped at night. Now: K2 carries the `Light_Interior` fitting (Attachment 0.6 under the lamp, the one
+-- shadowed interior light of style guide §5.1): LightController drives it with the trailer switch / blackout and stops
+-- making the fallback. K1 / K3 are dimmer warm fill (always lit; the ANM-020 blackout puts them out locally with every other
+-- light of the vehicle), pantry lamps dimmer and warmer. Budget: 5 interior lights as before (3 + 2, the fallback is gone).
+local WARM = Color3.fromRGB(255, 222, 182)
+local function lamp(parent, name, x, y, z, range, brightness, color, fitting, shadows)
 	local p = box(parent, name, x - 1.2, x + 1.2, y - 0.08, y, z - 0.4, z + 0.4, { Color = C.Cream, CanCollide = false, CanQuery = false, CastShadow = false, art = { Color = Color3.fromRGB(255, 231, 194), Material = Enum.Material.Neon } })
-	local l = ensure(p, "Light", "PointLight")
+	local holder = p
+	if fitting then
+		holder = ensure(p, "Light_Interior", "Attachment")
+		holder.CFrame = CFrame.new(0, -0.6, 0)
+		local old = p:FindFirstChild("Light")
+		if old and old:IsA("PointLight") then
+			old.Parent = holder -- the light this snippet made before rev. 5 moves under the fitting (never destroyed)
+		end
+	end
+	local l = ensure(holder, "Light", "PointLight")
 	l.Range = range
 	l.Brightness = brightness
-	l.Color = color or Color3.fromRGB(255, 231, 194)
-	l.Shadows = false
+	l.Color = color or WARM
+	l.Shadows = shadows == true
 	l.Enabled = ART
 	return p
 end
-lamp(kitchen, "Light_K1", 33, ROOF_Y - 0.1, 63, 18, 1.2)
-lamp(kitchen, "Light_K2", 42.5, ROOF_Y - 0.1, 63, 18, 1.2)
-lamp(kitchen, "Light_K3", 52, ROOF_Y - 0.1, 63, 18, 1.2)
-lamp(pantry, "Light_P", 29.5, P_ROOF_Y - 0.1, 75.4, 12, 0.6)
-lamp(pantry, "Light_P2", 42.0, P_ROOF_Y - 0.1, 75.4, 12, 0.6)
+lamp(kitchen, "Light_K1", 33, ROOF_Y - 0.1, 63, 13, 0.45, WARM)
+lamp(kitchen, "Light_K2", 42.5, ROOF_Y - 0.1, 63, 15, 0.65, Color3.fromRGB(255, 231, 194), true, true)
+lamp(kitchen, "Light_K3", 52, ROOF_Y - 0.1, 63, 13, 0.45, WARM)
+lamp(pantry, "Light_P", 29.5, P_ROOF_Y - 0.1, 75.4, 10, 0.35, Color3.fromRGB(255, 214, 170))
+lamp(pantry, "Light_P2", 42.0, P_ROOF_Y - 0.1, 75.4, 10, 0.35, Color3.fromRGB(255, 214, 170))
+-- emergency lamp (TASK-442, Provisional): faint red on the inner east wall of the pantry, the side of the breaker (outside,
+-- MAP X 50.25). It lives OUTSIDE the TRL model on purpose: the ANM-020 blackout darkens every light / Neon of the vehicle
+-- model, so this is the one interior glow left in the dark (where the players hide). Always on, no shadow; in the lit room
+-- the warm lamps wash it out. Counts as 1 local light (style guide §5.1).
+do
+	local emerg = folder(root, "Emergency")
+	emerg:SetAttribute("MapId", "EMERG-P")
+	box(emerg, "Housing", 49.22, 49.5, 7.55, 8.15, 74.75, 75.75, { Color = C.SteelDark, CanCollide = false, CanQuery = false, CastShadow = false, art = { Color = Color3.fromRGB(46, 44, 50), Material = Enum.Material.Metal } })
+	local lens = box(emerg, "Lens", 49.12, 49.22, 7.65, 8.05, 74.85, 75.65, { Color = Color3.fromRGB(150, 30, 28), CanCollide = false, CanQuery = false, CastShadow = false, art = { Color = Color3.fromRGB(150, 30, 28), Material = Enum.Material.Neon, Transparency = 0.25 } })
+	local el = ensure(lens, "Light", "PointLight")
+	el.Range = 9
+	el.Brightness = 0.35
+	el.Color = Color3.fromRGB(255, 52, 44)
+	el.Shadows = false
+	el.Enabled = ART
+end
 
 -- 8. sign CORNER DOGS on the parapet, OPEN neon; tables, bushes, fence, gate, lamps --------------------------------------
 if extra then
@@ -2189,7 +2273,9 @@ do
 	box(pc, "Monitor", 59.0, 59.4, TOP + 0.3, TOP + 1.1, 60.4, 61.6, { Color = C.Roof, blk = C.BlkKey, art = { Color = C.Roof } })
 	box(pc, "Stand", 59.1, 59.3, TOP, TOP + 0.3, 60.9, 61.1, { Color = C.Teal, blk = C.BlkKey, art = { Color = C.Teal } })
 	-- lamp bar between the window frame (top 7.1) and the sign (bottom 7.6): it used to cut through the DRIVE-THRU letters
-	local lit = lamp(drive, "LIT-DT", 60.55, 7.4, 61, 12, 0.7)
+	-- TASK-442: 0.7 / 12 -> 0.5 / 8. The bar sits 1 stud outside the drive window and its light poured into the assembly
+	-- corner (the brightest spot of the kitchen during the ANM-020 blackout, which only darkens the TRL model)
+	local lit = lamp(drive, "LIT-DT", 60.55, 7.4, 61, 8, 0.5)
 	lit.Size = Vector3.new(0.7, 0.12, 2.4)
 	-- roof AC units (decor)
 	if ART then
@@ -2288,9 +2374,12 @@ for i, x in { 33, 38, 43, 48 } do
 	setPoint("REV-" .. i, x, PY, 65.9, DIR.N)
 end
 setPoint("SPEC-P", 66, 20, 28, dirMap(-24, 35))
--- new: PU-1..4 (MapPoint + NpcNode, clones of Q2), drive-thru and van points
-for i, x in { 36, 33.5, 31, 28.5 } do
-	newPoint("PU-" .. i, "Q2", x, FLOOR, 52.6, DIR.S)
+-- new: PU-1..8 (MapPoint + NpcNode, clones of Q2), drive-thru and van points. PU-1..5 in a row in front of the counter (2.5
+-- apart, going west), PU-6..8 (TASK-441 QA, PickupSlots up to 8) turn south along the west fence (X 25.6: 1.4 from the
+-- fence posts, 0.5 from the TBL-1 bench; overlap probe 2 x 4.9 x 1.4 clear on 2026-10-17), same 2.5 spacing
+local PU_SPOTS = { { 36, 52.6 }, { 33.5, 52.6 }, { 31, 52.6 }, { 28.5, 52.6 }, { 26, 52.6 }, { 25.6, 50.1 }, { 25.6, 47.6 }, { 25.6, 45.1 } }
+for i, s in PU_SPOTS do
+	newPoint("PU-" .. i, "Q2", s[1], FLOOR, s[2], DIR.S)
 end
 newPoint("DT-IN", "TRL-OUT", 72.25, 0.43, 16, DIR.S)
 newPoint("DT-OUT", "TRL-OUT", 64.25, 0.43, 16, DIR.N)
@@ -2307,7 +2396,7 @@ for _, id in { "DT-IN", "DT-OUT", "DT-STOP", "DTQ-1", "DTQ-2", "DTQ-3", "VAN-STO
 		CS:RemoveTag(p, "NpcNode")
 	end
 end
-for i = 1, 4 do
+for i = 1, #PU_SPOTS do
 	local p = point("PU-" .. i)
 	if p and not DIFF then
 		CS:AddTag(p, "MapPoint")
@@ -2404,7 +2493,7 @@ moveNode("TBL-2", 37.5, 43.4)
 moveNode("TBL-3", 34.5, 35.8)
 moveNode("TBL-4", 37.5, 35.8)
 -- links rebuilt from scratch for the patio nodes
-for _, id in { "N-PAD-1", "N-PAD-2", "N-PAD-3", "N-PU-IN", "TBL-1", "TBL-2", "TBL-3", "TBL-4", "PU-1", "PU-2", "PU-3", "PU-4" } do
+for _, id in { "N-PAD-1", "N-PAD-2", "N-PAD-3", "N-PU-IN", "TBL-1", "TBL-2", "TBL-3", "TBL-4", "PU-1", "PU-2", "PU-3", "PU-4", "PU-5", "PU-6", "PU-7", "PU-8" } do
 	local l = linksOf(id)
 	for _, o in l do
 		drop(o, id)
@@ -2429,8 +2518,13 @@ link("N-PAD-2", "Q5") -- queue tail on the corridor
 link("N-PAD-2", "N-PU-IN")
 link("N-PAD-2", "PU-4") -- pickup tail on the corridor
 link("Q1", "N-PU-IN") -- Q1 walks the counter lane to the pickup line
-for i = 1, 4 do
+for i = 1, 7 do
 	link("N-PU-IN", "PU-" .. i)
+end
+-- the side line along the fence is also chained, so PU-8 (whose straight line to N-PU-IN would graze the TBL-1 table) is
+-- reached through PU-7
+for i = 5, 7 do
+	link("PU-" .. i, "PU-" .. (i + 1))
 end
 link("L3", "N-Z02-07") -- thief lurk on the sidewalk in front of the bushes
 -- N-Z01-01 (old Pad east corner, now the drive-thru exit): off the graph
@@ -2513,6 +2607,17 @@ local cctv = cams and cams:FindFirstChild("CCTV")
 if cctv then
 	poseTo(cctv, face(F(54.5, 7.0, 71.3), DIR.N), "Extra:CCTV")
 end
+-- security camera views (TASK-441): only posed when the owner's pose is recorded in OVERRIDES ("Cam:<name>"); the pivot is
+-- the view, so with no override the camera is never touched
+if cams then
+	for _, name in { "CAM1", "CAM2" } do
+		local cam = cams:FindFirstChild(name)
+		local ov = OVERRIDES.External["Cam:" .. name]
+		if cam and cam:IsA("Model") and ov and ov.CF then
+			poseTo(cam, toCF(ov.CF), "Cam:" .. name)
+		end
+	end
+end
 
 -- 11a. pieces an older version of this snippet built and the current layout no longer has (enlarged pantry, DEC-282):
 -- moved to ServerStorage.TrailerBackup.Retired (never destroyed); the owner never edited any of them (diff of 2026-10-17)
@@ -2579,7 +2684,8 @@ end
 local function index(top)
 	local map = {}
 	for _, d in top:GetDescendants() do
-		if d:IsA("BasePart") or d:IsA("Attachment") or d:IsA("Model") or d:IsA("Folder") then
+		-- 2026-10-17 (TASK-441): lights and SurfaceGuis too, so the owner's Brightness / Range / PixelsPerStud edits are diffed
+		if d:IsA("BasePart") or d:IsA("Attachment") or d:IsA("Model") or d:IsA("Folder") or d:IsA("Light") or d:IsA("SurfaceGui") then
 			map[pathOf(d, top)] = d
 		end
 	end
@@ -2622,6 +2728,53 @@ do
 				end
 			elseif inst:IsA("Attachment") and ov.CF then
 				inst.CFrame = toCF(ov.CF)
+			elseif inst:IsA("Light") then
+				if ov.Brightness then
+					inst.Brightness = ov.Brightness
+				end
+				if ov.Range then
+					inst.Range = ov.Range
+				end
+				if ov.Color then
+					inst.Color = Color3.fromRGB(table.unpack(ov.Color))
+				end
+				if ov.Shadows ~= nil then
+					inst.Shadows = ov.Shadows
+				end
+				if ov.Enabled ~= nil then
+					inst.Enabled = ov.Enabled
+				end
+				if ov.Angle and (inst:IsA("SpotLight") or inst:IsA("SurfaceLight")) then
+					inst.Angle = ov.Angle
+				end
+				if ov.Face and (inst:IsA("SpotLight") or inst:IsA("SurfaceLight")) then
+					inst.Face = Enum.NormalId[ov.Face]
+				end
+			elseif inst:IsA("SurfaceGui") then
+				if ov.SizingMode then
+					inst.SizingMode = Enum.SurfaceGuiSizingMode[ov.SizingMode]
+				end
+				if ov.PixelsPerStud then
+					inst.PixelsPerStud = ov.PixelsPerStud
+				end
+				if ov.CanvasSize then
+					inst.CanvasSize = Vector2.new(table.unpack(ov.CanvasSize))
+				end
+				if ov.Face then
+					inst.Face = Enum.NormalId[ov.Face]
+				end
+				if ov.LightInfluence then
+					inst.LightInfluence = ov.LightInfluence
+				end
+				if ov.GuiBrightness then
+					inst.Brightness = ov.GuiBrightness
+				end
+				if ov.AlwaysOnTop ~= nil then
+					inst.AlwaysOnTop = ov.AlwaysOnTop
+				end
+				if ov.Enabled ~= nil then
+					inst.Enabled = ov.Enabled
+				end
 			end
 			applied += 1
 		end
@@ -2683,10 +2836,72 @@ if DIFF then
 				table.insert(diffs, string.format("\t\t[%q] = { CF = {%s} },", path, table.concat(cfList(h.CFrame), ", ")))
 				table.insert(out, string.format("CHANGED (attachment) %s dLocal=%.2f", path, (w.CFrame.Position - h.CFrame.Position).Magnitude))
 			end
+		elseif w:IsA("Light") and h:IsA("Light") then
+			local e = {}
+			if not near(w.Brightness, h.Brightness, 0.005) then
+				table.insert(e, string.format("Brightness = %.3f", h.Brightness))
+			end
+			if not near(w.Range, h.Range, 0.01) then
+				table.insert(e, string.format("Range = %.2f", h.Range))
+			end
+			local cw, ch = w.Color, h.Color
+			if not (near(cw.R, ch.R, 0.006) and near(cw.G, ch.G, 0.006) and near(cw.B, ch.B, 0.006)) then
+				table.insert(e, string.format("Color = {%d, %d, %d}", math.floor(ch.R * 255 + 0.5), math.floor(ch.G * 255 + 0.5), math.floor(ch.B * 255 + 0.5)))
+			end
+			if w.Shadows ~= h.Shadows then
+				table.insert(e, "Shadows = " .. tostring(h.Shadows))
+			end
+			if w.Enabled ~= h.Enabled then
+				table.insert(e, "Enabled = " .. tostring(h.Enabled))
+			end
+			if (h:IsA("SpotLight") or h:IsA("SurfaceLight")) and w.ClassName == h.ClassName then
+				if not near(w.Angle, h.Angle, 0.01) then
+					table.insert(e, string.format("Angle = %.2f", h.Angle))
+				end
+				if w.Face ~= h.Face then
+					table.insert(e, string.format("Face = %q", h.Face.Name))
+				end
+			end
+			if #e > 0 then
+				nChg += 1
+				table.insert(diffs, string.format("\t\t[%q] = { %s },", path, table.concat(e, ", ")))
+				table.insert(out, string.format("CHANGED (light) %s :: %s", path, table.concat(e, ", ")))
+			end
+		elseif w:IsA("SurfaceGui") and h:IsA("SurfaceGui") then
+			local e = {}
+			if w.SizingMode ~= h.SizingMode then
+				table.insert(e, string.format("SizingMode = %q", h.SizingMode.Name))
+			end
+			if not near(w.PixelsPerStud, h.PixelsPerStud, 0.01) then
+				table.insert(e, string.format("PixelsPerStud = %.2f", h.PixelsPerStud))
+			end
+			if h.SizingMode == Enum.SurfaceGuiSizingMode.FixedSize and (w.CanvasSize - h.CanvasSize).Magnitude > 0.5 then
+				table.insert(e, string.format("CanvasSize = {%d, %d}", h.CanvasSize.X, h.CanvasSize.Y))
+			end
+			if w.Face ~= h.Face then
+				table.insert(e, string.format("Face = %q", h.Face.Name))
+			end
+			if not near(w.LightInfluence, h.LightInfluence, 0.005) then
+				table.insert(e, string.format("LightInfluence = %.3f", h.LightInfluence))
+			end
+			if not near(w.Brightness, h.Brightness, 0.005) then
+				table.insert(e, string.format("GuiBrightness = %.3f", h.Brightness))
+			end
+			if w.AlwaysOnTop ~= h.AlwaysOnTop then
+				table.insert(e, "AlwaysOnTop = " .. tostring(h.AlwaysOnTop))
+			end
+			if w.Enabled ~= h.Enabled then
+				table.insert(e, "Enabled = " .. tostring(h.Enabled))
+			end
+			if #e > 0 then
+				nChg += 1
+				table.insert(diffs, string.format("\t\t[%q] = { %s },", path, table.concat(e, ", ")))
+				table.insert(out, string.format("CHANGED (gui) %s :: %s", path, table.concat(e, ", ")))
+			end
 		end
 	end
 	for path, h in have do
-		if not want[path] and not ownerManaged(path) and (h:IsA("BasePart") or h:IsA("Model")) then
+		if not want[path] and not ownerManaged(path) and (h:IsA("BasePart") or h:IsA("Model") or h:IsA("Light") or h:IsA("SurfaceGui")) then
 			-- only report the top of a new subtree
 			local par = h.Parent
 			if par == live or want[pathOf(par, live)] then
