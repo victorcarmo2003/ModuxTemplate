@@ -288,15 +288,15 @@ const utilities: { Utility } = {
 -- Gifts (TASK-352): derived, one per gem pack and one per class pass, same suggested Robux as the item. ProductIds
 -- come from the Creator Hub (owner); 0 = not created yet.
 const giftIds: { [string]: number } = {
-	gift_gems_50 = 0,
-	gift_gems_130 = 0,
-	gift_gems_300 = 0,
-	gift_gems_700 = 0,
-	gift_class_rabbit = 0,
-	gift_class_cat = 0,
-	gift_class_bear = 0,
-	gift_class_fox = 0,
-	gift_class_owl = 0,
+	gift_gems_50 = 3719096880,
+	gift_gems_130 = 3719096895,
+	gift_gems_300 = 3719096906,
+	gift_gems_700 = 3719096913,
+	gift_class_rabbit = 3719096829,
+	gift_class_cat = 3719096836,
+	gift_class_bear = 3719096850,
+	gift_class_fox = 3719096863,
+	gift_class_owl = 3719096870,
 }
 
 const gifts: { Gift } = {}
