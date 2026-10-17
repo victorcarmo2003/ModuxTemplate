@@ -3698,3 +3698,30 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
   - **Drive-thru (DEC-274)**: não citado pelo dono; **continua** (atende-se de dentro, pela janela direita).
   - Tudo que exige sair da loja fica **em revisão** em `Q-351`: limpar mesa, disjuntor e esconderijo nos fundos (DEC-254 famílias B e C), descarga de caixas (DEC-276), tranca da ANM-004 na porta (`Q-308`).
 - Impacto: **level-designer** (`levels/MAP-01-r4-restaurant.md`: 1 tablet, balcão inteiro, pote, fila e retirada), **game-designer** (`design/restaurant-flow.md`), **architect**, **frontend-coder**, **backend-coder**.
+
+### DEC-281 — 2026-10-17 — Não é prédio: é um TRAILER MAIOR, expandido, com o visual do AST-027
+
+- Origem: nova fala do dono ao orquestrador (2026-10-17), registrada pelo secretário.
+- Decidido pelo dono:
+  - Em vez de um restaurante/prédio, é um **trailer maior, expandido**, que **mantém o aspecto do trailer atual (AST-027)**, de que o dono gostou muito.
+  - **Por dentro** pode parecer um restaurante; **por fora** é trailer.
+- **Emenda (append-only):** **DEC-269** só na **casca/visual** ("prédio retangular, paredes rosadas" sai). Layout interno, fluxo e **DEC-270 a DEC-280** **seguem valendo** (tablet único, balcão, retirada, mesa de montagem, estações do fundo, drive-thru, mesas de piquenique na frente, jogador dentro). A nota da DEC-269 "AST-027 sai do mapa principal" deixa de valer: o AST-027 é a **base** da casca nova.
+- **Provisório:**
+  - **AST-140** (casca modular de prédio) vira **casca de trailer expandido derivada do AST-027** (mesmas formas, materiais e detalhes; mais comprido/largo para caber o layout). Ficha pelo art-director, modelo pelo modeler-3d.
+  - A **paleta rosada** do esboço sai; vale a paleta do trailer já no `art/style-guide.md` (Aprovado, DEC-126).
+  - Medidas internas seguem o `levels/MAP-01-r4-restaurant.md`; o level-designer ajusta se a casca de trailer pedir.
+- Impacto: **art-director** (ficha AST-140), **modeler-3d**, **level-designer**, **narrative-writer** (textos voltam a dizer "trailer"; DEC-269 tinha pedido "restaurante").
+
+### DEC-282 — 2026-10-17 — Trailer expandido ganha porta externa nos fundos/lado esquerdo; despensa ampliada para trás
+
+- Origem: fala do dono ao orquestrador (2026-10-17), com prints em `source/2026-10-17-ajustes-trailer/` (1: vista de cima, saída em vermelho e despensa em verde; 2: porta da despensa; 3: fechadura flutuante; 4: despensa apertada). Registrado pelo secretário.
+- Decidido pelo dono:
+  - **Porta externa** nos **fundos / lado esquerdo** do trailer expandido, **logo depois da porta interna da despensa**. Por ela o jogador **sai para ir ao Mart** e fazer o que precisa lá fora.
+  - O **balcão continua fechado**: entrega na retirada (DEC-280), **sem** porta de saída na frente.
+  - A **despensa/depósito é ampliada para trás** (estava apertada).
+- **Provisório:** posição exata, largura da porta e quanto a despensa cresce: level-designer, pelo print 1 (saída na ponta esquerda, marcada em vermelho; despensa estendida para trás, em verde). A fechadura flutuante do print 3 é bug de arte a corrigir (level-designer/modeler-3d).
+- **Emendas (append-only):**
+  - **DEC-280**, no ponto "o jogador não sai mais / não precisa ir lá fora": o jogador **pode sair** pela porta dos fundos; continua **sem** sair para entregar (a entrega segue no balcão). "Loja = único ponto seguro" continua como **leitura de design** (lá fora é risco), Provisório.
+  - **DEC-269/DEC-273**: a "porta de saída à esquerda dos tablets" da frente **não volta**; a porta nova é **nos fundos**.
+- Resolve em parte (Provisório até o dono confirmar): **Q-317** (`levels/MAP-01-r4-restaurant.md`: acesso ao Mart, Gear Stand, REV/ambulância) e **Q-351** (o que exige sair): Mart, Gear Stand, descarga de caixas e Clean Table voltam a ser possíveis pela porta dos fundos.
+- Impacto: **level-designer** (`MAP-01-r4-restaurant.md`: porta externa, despensa maior, rota até o Mart, Q-317), **art-director/modeler-3d** (AST-140 com a porta e a despensa maior; fechadura), **game-designer**, **architect**.
