@@ -460,6 +460,12 @@
 						"optional": "src/Skin/server"
 					}
 				},
+				"Supply": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Supply/server"
+					}
+				},
 				"Thief": {
 					"$ignoreUnknownInstances": false,
 					"$path": {

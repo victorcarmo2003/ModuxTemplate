@@ -50,6 +50,7 @@ return {
 	ServerScriptService.server.Shop.ShopUtilityService,
 	ServerScriptService.server.Showcase.ShowcaseService,
 	ServerScriptService.server.Skin.SkinService,
+	ServerScriptService.server.Supply.SupplyService,
 	ServerScriptService.server.Thief.ThiefService,
 	ServerScriptService.server.Traffic.TrafficService,
 	ServerScriptService.server.Tutorial.TutorialService,
