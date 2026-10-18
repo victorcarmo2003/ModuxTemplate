@@ -334,12 +334,12 @@ const on = restaurant.Rules.Enabled
 --   ANM-002 food (work channel) · ANM-003 bank clock + trailer switch · ANM-004 back door knock · ANM-007, 017, 018
 --   family B (hide in the HideZone behind the trailer, no back door; ANM-019 left the cut with TASK-484: it is "don't look up") · ANM-009 back door knock / crack
 -- TASK-483 (DEC-294): ANM-004 is back (no back door here, so the copy only costs sanity; stare pressure, its scene) and
--- ANM-017 is back as "get off the floor" (Kit/Hide Test "Floor", its scene)
+-- ANM-017 is back as "get off the floor" (Kit/Hide Test "Floor", its scene); ANM-009 is back (owner 2026-10-18: Walt
+-- knocking on the back door, now opened by hand, RestaurantDoorService)
 const CUT_ANOMALIES = {
 	"anm_002_wrong_food",
 	"anm_003_stopped_clock",
 	"anm_007_walker",
-	"anm_009_knock",
 	"anm_018_grin",
 }
 

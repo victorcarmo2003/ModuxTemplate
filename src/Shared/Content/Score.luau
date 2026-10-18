@@ -180,7 +180,8 @@ const anomalies: { [string]: AnomalyScore } = {
 	["ANM-010"] = { Signal = "Uneasy", Active = "Tension", Ramp = 15 }, -- the Hush
 	["ANM-017"] = { Signal = "Tension", Active = "Climax", Ramp = 9 },
 	["ANM-018"] = { Signal = "Tension", Active = "Climax", Ramp = 9 },
-	["ANM-019"] = { Signal = "Uneasy", Active = "Tension", Ramp = 16 }, -- TASK-484: the walk on the roof (Rules/ANM-019 WalkFor)
+	["ANM-019"] = { Signal = "Uneasy", Active = "Tension", Ramp = 16 },
+	["ANM-021"] = { Signal = "Tension", Active = "Climax", Ramp = 12 }, -- the red fog: rises with the bell, beats on the glass -- TASK-484: the walk on the roof (Rules/ANM-019 WalkFor)
 	-- the blackout (TASK-444): omen flicker -> dark + violins up to the attack -> choir if nobody reset the power
 	["ANM-020"] = {
 		Signal = nil, -- owner 2026-10-18: the omen is the phone glitch alone (HorrorScenes), no sting over it

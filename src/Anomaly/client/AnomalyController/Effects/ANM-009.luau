@@ -36,6 +36,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
+local Content = require(ReplicatedStorage.shared.Content)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
 local UiScale = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.UiScale)
 local Haptics = require(StarterPlayer.StarterPlayerScripts.client.Input.Haptics)
@@ -59,7 +60,8 @@ const KNOCK_GAP = 0.42
 const VEHICLE_TAG = "Vehicle"
 const DOOR_NAMES = { "Door_Back", "Door_Glass" }
 const NAPKIN_ANCHOR = "VFX_Napkins"
-const DOOR_POINT = "AN-05"
+-- restaurant (owner 2026-10-18, Walt knocking on the back door): the pantry's exit door DOOR-B, from outside
+const DOOR_POINT = if Content.Restaurant.Rules.Enabled then "SCENE-DOOR-OUT" else "AN-05"
 
 -- Door swing (state Ajar)
 const AJAR_ANGLE = math.rad(10)

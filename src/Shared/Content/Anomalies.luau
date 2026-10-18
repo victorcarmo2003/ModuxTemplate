@@ -125,6 +125,8 @@ const cues = Table.new({
 	{ Key = "blackout_restore", Kind = "Both", Duration = 0 }, -- the breaker is back: lights return
 	-- TASK-444 (restaurant only): the omen before the blackout, the lights flicker 1-2 times (Phase Signal)
 	{ Key = "blackout_warn", Kind = "Visual", Duration = 0 },
+	-- ANM-021 the red fog (owner 2026-10-18): the fog reaches the glass and starts beating on it
+	{ Key = "fog_bang", Kind = "Both", Duration = 0 },
 } :: { Cue })
 
 local function anomaly(
@@ -268,6 +270,7 @@ stalker.Family = "D"
 const blackout = anomaly(4, "anm_020_blackout", "The blackout", "World", 0, "Party", 100, true, {
 	"anm_003_stopped_clock",
 	"anm_019_roof_walker",
+	"anm_021_red_fog",
 }, {
 	"blackout_warn",
 	"blackout_start",
@@ -296,6 +299,15 @@ turnedNeck.Stare = true -- TASK-482 (DEC-294 §8): the turned head follows who s
 const whiteEyes = odd(5, 13, "anm_013_white_eyes", "The white eyes")
 whiteEyes.Stare = true -- TASK-482 (DEC-294 §8): white eyes / wrong smile
 
+-- Owner 2026-10-18 ("uma névoa vermelha começa a aparecer, o sino começa a tocar, tudo vai ficando vermelho e o player
+-- precisa fechar a janela"): family C like the blackout, a directed event with one simple answer (shut the window and
+-- keep it shut). Never with the blackout (both take the screen).
+const redFog = anomaly(5, "anm_021_red_fog", "The red fog", "World", 0, "Party", 120, true, {
+	"anm_020_blackout",
+}, { "fog_bang", "jumpscare" })
+redFog.Ref = "ANM-021"
+redFog.Family = "C"
+
 const rows: { Anomaly } = {
 	-- ViewRange: 60 default, 80 N6, 300 N7 (FEAT-019); 100 N3/N8 and 200 N10 Provisional (C-01 ~73 studs,
 	-- AN-12 ~63, Juniper posts 82-135 from the counter; MAP-01 §6, §10.3)
@@ -319,6 +331,7 @@ const rows: { Anomaly } = {
 	monster(8, 18, "anm_018_grin", "The grin"),
 	roofWalker,
 	blackout,
+	redFog,
 }
 
 -- TASK-390 (restaurant, Content.Restaurant.Rules.Enabled; Restaurant.Switch): the rows tied to the trailer's door,

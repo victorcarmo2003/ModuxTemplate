@@ -615,6 +615,133 @@ const hush: Scene = {
 	},
 }
 
+-- ANM-009 The knock, "it's me, Walt" (owner 2026-10-18; restaurant only: the pantry's exit door DOOR-B is opened by hand,
+-- Vehicle/RestaurantDoorService). Fitted to Rules/ANM-009 with the restaurant on: Active from the first series of
+-- knocks (Walt's voice, Effects/ANM-009), the second at 9 s, Window 20 s + DoorGrace 2; whoever OPENS the back door in
+-- that time gets the face (Failed). The answer is the simplest thing - do nothing - and the scene makes it hard: the
+-- handle tried, the door pushed, a dead silence, the voice again, the latch holding. Then the steps leave.
+const knock: Scene = {
+	Key = "anm_009_knock",
+	Name = "The knock",
+	Live = Restaurant.Rules.Enabled,
+	Steps = {
+		{ At = 0, Phase = "Active", Kind = "Silence", Value = 1, To = 0.35, Duration = 0.6 },
+		{ At = 0.3, Phase = "Active", Kind = "Cinema", Value = 0.1, Duration = 1.2 },
+		{ At = 0.5, Phase = "Active", Kind = "Grade", Target = "Cold", Value = 0, To = 0.55, Duration = 18 },
+		{ At = 0.5, Phase = "Active", Kind = "Heartbeat", Value = 66, To = 150, Duration = 17 },
+		{ At = 0.5, Phase = "Active", Kind = "Vignette", Value = 0, To = 0.38, Duration = 17 },
+		{ At = 2, Phase = "Active", Kind = "Whispers", Target = "knock", Value = 0.3, To = 1.4, Duration = 5.5 },
+		-- it tries the handle
+		{ At = 5.5, Phase = "Active", Kind = "Door", Target = "Rattle", Point = "SCENE-DOOR", Duration = 0.9 },
+		{ At = 5.5, Phase = "Active", Kind = "Sound", Target = "handle_rattle", Point = "SCENE-DOOR" },
+		{ At = 5.5, Phase = "Active", Kind = "Shake", Target = "Door", Point = "SCENE-DOOR" },
+		-- a dead silence before the voice again
+		{ At = 7.5, Phase = "Active", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 7.6, Phase = "Active", Kind = "Silence", Value = 0.35, To = 0.03, Duration = 0.5 },
+		{ At = 8, Phase = "Active", Kind = "Sound", Target = "breath_held" },
+		{ At = 9, Phase = "Active", Kind = "Silence", Value = 0.03, To = 0.5, Duration = 0.3 },
+		{ At = 9, Phase = "Active", Kind = "Blur", Value = 3, To = 0, Duration = 1 },
+		-- it pushes, hard, then the words come en masse
+		{ At = 12.5, Phase = "Active", Kind = "Door", Target = "Push", Point = "SCENE-DOOR", Duration = 0.6 },
+		{ At = 12.5, Phase = "Active", Kind = "Sound", Target = "door_force", Point = "SCENE-DOOR", Value = 1.2 },
+		{ At = 12.5, Phase = "Active", Kind = "Shake", Target = "Jolt" },
+		{ At = 12.6, Phase = "Active", Kind = "Whispers", Target = "knock", Value = 2.2, To = 3, Duration = 3.5 },
+		{ At = 14, Phase = "Active", Kind = "Door", Target = "Push", Point = "SCENE-DOOR", Duration = 0.6 },
+		{ At = 14, Phase = "Active", Kind = "Sound", Target = "door_force", Point = "SCENE-DOOR" },
+		{ At = 15.5, Phase = "Active", Kind = "Door", Target = "Hold", Point = "SCENE-DOOR", Duration = 0.4 },
+		{ At = 15.5, Phase = "Active", Kind = "Sound", Target = "latch_hold", Point = "SCENE-DOOR" },
+		{ At = 16.1, Phase = "Active", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 16.2, Phase = "Active", Kind = "Silence", Value = 0.5, To = 0.05, Duration = 0.3 },
+		{ At = 18, Phase = "Active", Kind = "Heartbeat", Value = 150, To = 110, Duration = 4 },
+		-- nobody opened (Resolved): the steps go away, the room comes back
+		{ At = 0, Phase = "Resolved", Kind = "Sound", Target = "walker_step", Point = "SCENE-DOOR-OUT", To = "SCENE-STEPS-FAR", Duration = 4 },
+		{ At = 0, Phase = "Resolved", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 0, Phase = "Resolved", Kind = "Silence", Value = 0.1, To = 1, Duration = 3 },
+		{ At = 1, Phase = "Resolved", Kind = "Heartbeat", Value = 0, To = 0 },
+		{ At = 1, Phase = "Resolved", Kind = "Grade", Value = 0.55, To = 0, Duration = 2.5 },
+		{ At = 1, Phase = "Resolved", Kind = "Vignette", Value = 0.38, To = 0, Duration = 2.5 },
+		{ At = 1.5, Phase = "Resolved", Kind = "Cinema", Value = 0, Duration = 1 },
+		-- someone opened it (Failed): the face (Effects/ANM-009), red, the others hear it
+		{ At = 0, Phase = "Failed", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 0, Phase = "Failed", Kind = "Silence", Value = 1, To = 1, Duration = 0 },
+		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Grade", Target = "Red", Value = 0.9, To = 0, Duration = 3 },
+		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Blur", Value = 14, To = 0, Duration = 1.4 },
+		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Heartbeat", Value = 0, To = 0 },
+		{ At = 0, Phase = "Failed", Who = "Safe", Kind = "Sound", Target = "door_force", Point = "SCENE-DOOR", Value = 1.3 },
+		{ At = 3, Phase = "Failed", Kind = "Heartbeat", Value = 0, To = 0 },
+		{ At = 1, Phase = "Failed", Kind = "Vignette", Value = 0.5, To = 0, Duration = 3 },
+		{ At = 1.5, Phase = "Failed", Kind = "Grade", Value = 0.5, To = 0, Duration = 2.5 },
+		{ At = 3, Phase = "Failed", Kind = "Cinema", Value = 0, Duration = 1 },
+	},
+}
+
+-- ANM-021 The red fog (owner 2026-10-18). Fitted to Rules/ANM-021: Signal = OmenFor 12 s (the fog rises red over the
+-- street, Effects/ANM-021; the bell tolls; everything turns red; the words say shut the window), Active = BangFor 14 s
+-- (it reaches the glass: heavy blows on the windows in cutscene look, the heart racing, a silence between the blows,
+-- the biggest one last), then Resolved / Failed (Linger 5 s, the fog recedes).
+const redFog: Scene = {
+	Key = "anm_021_red_fog",
+	Name = "The red fog",
+	Live = true,
+	Steps = {
+		-- the bell, three times, the colour bleeding red
+		{ At = 0, Phase = "Signal", Kind = "Sound", Target = "church_bell" },
+		{ At = 0, Phase = "Signal", Kind = "Grade", Target = "Red", Value = 0, To = 0.55, Duration = 11 },
+		{ At = 0.3, Phase = "Signal", Kind = "Cinema", Value = 0.1, Duration = 1.5 },
+		{ At = 1, Phase = "Signal", Kind = "Whispers", Target = "red_fog", Value = 0.4, To = 2.4, Duration = 10 },
+		{ At = 1, Phase = "Signal", Kind = "Heartbeat", Value = 70, To = 145, Duration = 11 },
+		{ At = 1, Phase = "Signal", Kind = "Vignette", Value = 0, To = 0.35, Duration = 11 },
+		{ At = 4, Phase = "Signal", Kind = "Sound", Target = "church_bell", Value = 0.9 },
+		{ At = 8, Phase = "Signal", Kind = "Sound", Target = "church_bell", Value = 1.1 },
+		{ At = 8, Phase = "Signal", Kind = "Silence", Value = 1, To = 0.4, Duration = 3 },
+		{ At = 11, Phase = "Signal", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 11.2, Phase = "Signal", Kind = "Silence", Value = 0.4, To = 0.03, Duration = 0.5 },
+		{ At = 11.4, Phase = "Signal", Kind = "Sound", Target = "breath_held" },
+		-- it reaches the glass: blows, a pause, blows, the last and biggest
+		{ At = 0, Phase = "Active", Kind = "Silence", Value = 0.03, To = 0.6, Duration = 0.2 },
+		{ At = 0, Phase = "Active", Kind = "Sound", Target = "window_slam", Point = "SCENE-WINDOW-EYES", Value = 1.3 },
+		{ At = 0, Phase = "Active", Kind = "Shake", Target = "Door", Value = 1.6 },
+		{ At = 0, Phase = "Active", Kind = "Blur", Value = 6, To = 0, Duration = 0.8 },
+		{ At = 0, Phase = "Active", Kind = "Grade", Target = "Red", Value = 0.75, To = 0.6, Duration = 1 },
+		{ At = 0.6, Phase = "Active", Kind = "Sound", Target = "window_slam", Point = "SCENE-WINDOW-EYES" },
+		{ At = 0.6, Phase = "Active", Kind = "Shake", Target = "Door" },
+		{ At = 1.3, Phase = "Active", Kind = "Sound", Target = "window_slam", Point = "SCENE-WINDOW-EYES", Value = 1.1 },
+		{ At = 1.3, Phase = "Active", Kind = "Shake", Target = "Door", Value = 1.2 },
+		{ At = 1.5, Phase = "Active", Kind = "Whispers", Target = "red_fog_hold", Value = 1.2, To = 2.6, Duration = 4 },
+		{ At = 1.5, Phase = "Active", Kind = "Heartbeat", Value = 150, To = 170, Duration = 4 },
+		{ At = 5.5, Phase = "Active", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 5.6, Phase = "Active", Kind = "Silence", Value = 0.6, To = 0.05, Duration = 0.4 },
+		{ At = 6, Phase = "Active", Kind = "Heartbeat", Value = 120, To = 120, Duration = 1 },
+		{ At = 8.5, Phase = "Active", Kind = "Silence", Value = 0.05, To = 0.6, Duration = 0.1 },
+		{ At = 8.5, Phase = "Active", Kind = "Sound", Target = "window_slam", Point = "SCENE-WINDOW-EYES", Value = 1.5 },
+		{ At = 8.5, Phase = "Active", Kind = "Shake", Target = "Jolt", Value = 1.5 },
+		{ At = 8.5, Phase = "Active", Kind = "Fov", Value = -5, To = 0, Duration = 0.8 },
+		{ At = 8.5, Phase = "Active", Kind = "Blur", Value = 10, To = 0, Duration = 1 },
+		{ At = 8.6, Phase = "Active", Kind = "Heartbeat", Value = 170, To = 170, Duration = 2 },
+		{ At = 9, Phase = "Active", Kind = "Sound", Target = "window_slam", Point = "SCENE-WINDOW-EYES", Value = 1.2 },
+		{ At = 9, Phase = "Active", Kind = "Shake", Target = "Door", Value = 1.4 },
+		{ At = 9.4, Phase = "Active", Kind = "Sound", Target = "window_slam", Point = "SCENE-WINDOW-EYES", Value = 1.2 },
+		{ At = 9.5, Phase = "Active", Kind = "Whispers", Target = "red_fog_hold", Value = 3, To = 3, Duration = 2 },
+		{ At = 11.5, Phase = "Active", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 11.5, Phase = "Active", Kind = "Heartbeat", Value = 150, To = 100, Duration = 3 },
+		-- it held (Resolved): the fog recedes, colour and sound come back
+		{ At = 0, Phase = "Resolved", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 0, Phase = "Resolved", Kind = "Silence", Value = 0.6, To = 1, Duration = 3 },
+		{ At = 0.5, Phase = "Resolved", Kind = "Heartbeat", Value = 0, To = 0 },
+		{ At = 0.5, Phase = "Resolved", Kind = "Grade", Value = 0.6, To = 0, Duration = 4 },
+		{ At = 0.5, Phase = "Resolved", Kind = "Vignette", Value = 0.35, To = 0, Duration = 3 },
+		{ At = 1.5, Phase = "Resolved", Kind = "Cinema", Value = 0, Duration = 1.2 },
+		-- someone opened / was outside (Failed)
+		{ At = 0, Phase = "Failed", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 0, Phase = "Failed", Kind = "Silence", Value = 1, To = 1, Duration = 0 },
+		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Blur", Value = 14, To = 0, Duration = 1.4 },
+		{ At = 0, Phase = "Failed", Kind = "Heartbeat", Value = 0, To = 0 },
+		{ At = 1, Phase = "Failed", Kind = "Grade", Value = 0.8, To = 0, Duration = 4 },
+		{ At = 1, Phase = "Failed", Kind = "Vignette", Value = 0.5, To = 0, Duration = 3 },
+		{ At = 3, Phase = "Failed", Kind = "Cinema", Value = 0, Duration = 1 },
+	},
+}
+
 -- Odd customers (family A and the copy's cousins; TASK-491; design/horror-cinematic.md §6.8). One shape for every
 -- customer anomaly anchored to the actor's record (Kit/CustomerActor: Active = it spawned and walks to the counter,
 -- Resolved = refused / handled, Failed = the wrong verb: jumpscare + faint of who did it). Short and quiet, like the
@@ -834,6 +961,31 @@ const words: { [string]: { string } } = {
 		"SEND IT AWAY",
 		"it's watching you",
 	},
+	-- owner 2026-10-18: Walt knocking (real hints: do not open, Walt has a key)
+	knock = {
+		"DON'T OPEN THE DOOR",
+		"DON'T OPEN THE DOOR",
+		"THAT'S NOT WALT",
+		"WALT HAS A KEY",
+		"stay quiet...",
+		"don't answer",
+	},
+	-- ANM-021 the red fog: shut the window, keep it shut
+	red_fog = {
+		"CLOSE THE WINDOW",
+		"CLOSE THE WINDOW",
+		"SHUT IT NOW",
+		"THE FOG IS COMING",
+		"don't let it in",
+		"the bell...",
+	},
+	red_fog_hold = {
+		"KEEP IT SHUT",
+		"KEEP IT SHUT",
+		"DON'T OPEN IT",
+		"STAY INSIDE",
+		"it wants in",
+	},
 	low_sanity = {
 		"LOW SANITY",
 		"DRINK COFFEE",
@@ -887,7 +1039,7 @@ const stare: Stare = {
 	},
 }
 
-const scenes: { Scene } = { blackout, roofWalker, crawler, turnedNeck, copies, stalker, longCar, hush }
+const scenes: { Scene } = { blackout, roofWalker, crawler, turnedNeck, copies, stalker, longCar, hush, knock, redFog }
 for _, scene in oddScenes do
 	table.insert(scenes, scene)
 end
