@@ -39,6 +39,10 @@ Tipos de passo: `Sound`, `Music`, `Lights`, `Lightning`, `Whispers` (palavras HI
 
 - **TASK-462** player de cena (client): lê `Anomalies`, agenda os passos, `/dev scene <key>`.
 - **TASK-463** câmera (perfis, FOV, nudge, opção). **TASK-464** vinheta e o passo `Whispers` (HIDE em rampa).
+  API (`CameraController`, camada por cima do modo; só em `FirstPerson`/`Spectate`/`Fixed`, some em cutscene, monitor
+  de segurança/`Prep` e `External`): `HorrorShake(perfil, escala?)`, `HorrorFov(delta, volta?, duração)` (sem `volta`
+  segura o delta), `HorrorNudge(ponto, graus, duração)` (só 1ª pessoa, solta no fim) e `HorrorClear()` para cancelar.
+  Tudo com clamp em `Rules` e × `ReduceMotion` com `Motion.Reduced()`.
 - **TASK-465** porta da despensa e `MapPoint`s. **TASK-466** sons novos. **TASK-467** liga a cena do apagão no jogo,
   convivendo com `Effects/Kit/Blackout` (TASK-444) sem duplicar som/luz: o kit passa a ler os passos da cena.
 
