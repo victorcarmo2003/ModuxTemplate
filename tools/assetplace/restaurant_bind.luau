@@ -2200,6 +2200,40 @@ if extra then
 		t:SetAttribute("TableGroup", "Restaurant")
 	end
 	L("tables placed: " .. math.min(#tables, 4))
+	-- TBL-2 repair (2026-10-18; owner: "não foi de propósito"): a hand edit left the TBL-2 model with only its seats and put
+	-- its mesh and torch, with a second set of seats, in an untagged Extra.Model at MAP (49.5, 43.3), on the X of TBL-4.
+	-- Table 2 goes back to its authored spot TBL[2] (the pivot its seats already have): mesh and torch move into the TBL-2
+	-- model, posed the way TBL-1 holds its own, and the stray model (left with its duplicate seats) goes to the backup
+	local t1, t2
+	for _, t in tables do
+		if t:GetAttribute("TableIndex") == 1 then
+			t1 = t
+		elseif t:GetAttribute("TableIndex") == 2 then
+			t2 = t
+		end
+	end
+	local stray = extra:FindFirstChild("Model")
+	local strayMesh = stray and not CS:HasTag(stray, "SeatTable") and stray:FindFirstChild("AST-100_PicnicTable")
+	local t1Mesh = t1 and t1:FindFirstChild("AST-100_PicnicTable")
+	if t2 and t1Mesh and strayMesh and not t2:FindFirstChild("AST-100_PicnicTable") then
+		if not DIFF and not DRY then
+			local move = t2:GetPivot() * t1:GetPivot():Inverse() * t1Mesh.CFrame * strayMesh.CFrame:Inverse()
+			for _, d in stray:GetChildren() do
+				if string.match(d.Name, "^Seat%d$") then
+					continue
+				end
+				if d:IsA("Model") then
+					d:PivotTo(move * d:GetPivot())
+					d.Name = "FireTorch"
+				elseif d:IsA("BasePart") then
+					d.CFrame = move * d.CFrame
+				end
+				d.Parent = t2
+			end
+			toBackup(stray, "TBL-2 repair: duplicate seats of a hand-made copy of table 2")
+		end
+		L("TBL-2 repaired: mesh and torch back at its authored spot")
+	end
 	-- crates DOGS / BUNS / MUSTARD (decor only, no gameplay): rev. 4 (2026-10-17, owner: they sat on DROP-R in the way of the
 	-- stock prompts) -> OUT of the pantry, the service nook east of it (sidewalk Y 0.4, against the kitchen back wall Z 72,
 	-- clear of the breaker approach X <= 52.5 and of Jack_3 at X 57.2..58): two stacked + one in front, slightly turned
@@ -2601,10 +2635,11 @@ end
 --   pickup lane at Z 50, 2.6 behind the slots: a rig walking along Z 52.6 grazed the counter top (Z 53.55) and the
 --     spacing gate stopped it behind every rig waiting in the line. Each slot is one step in from its lane node; the
 --     neighbour slots stay linked for the shuffle up the line; PU-6..8 along the fence as before;
---   TBL-2 / TBL-4 stand at X 49.5 since the owner's 2026-10-18 edit and their Seat1 / Seat3 face west from the east side:
---     their nodes moved to the corridor between the tables and the bushes (X 55.2), reached around the south end of
---     TBL-2 through N-PAD-3 (unused until now: the boot warned it had no links). The last metres to a seat are a
---     Walker.Direct walk, which goes around the table itself (Walker.Detour).
+--   Seat1 / Seat3 of the east tables face west from their east side. TBL-4 stands at X 49.5 since the owner's
+--     2026-10-18 edit: its node moved to the corridor between the table and the bushes (X 55.2), reached through N-PAD-3
+--     (unused until now: the boot warned it had no links). TBL-2 is back at its authored X 42 (repair above): its node
+--     stands south of it on the corridor N-PAD-2 -> N-PAD-3, 3 studs from its east approach points. The last metres to
+--     a seat are a Walker.Direct walk, which goes around the table itself (Walker.Detour).
 newNode("N-GATE", 36, 0.4, 29)
 moveNode("N-PAD-1", 36, 33.6)
 moveNode("N-PAD-2", 36, 47.9)
@@ -2615,7 +2650,7 @@ for i, x in PUL_X do
 	newNode("N-PUL-" .. i, x, FLOOR, 50)
 end
 moveNode("TBL-1", 34.5, 43.4)
-moveNode("TBL-2", 55.2, 43.3)
+moveNode("TBL-2", 47, 47.4)
 moveNode("TBL-3", 34.5, 35.8)
 moveNode("TBL-4", 55.2, 35.8)
 -- links rebuilt from scratch for the patio nodes
@@ -2645,9 +2680,9 @@ link("N-PAD-1", "N-PAD-2")
 link("N-PAD-1", "TBL-3")
 link("N-PAD-2", "TBL-1")
 link("TBL-1", "TBL-3")
-link("N-PAD-2", "N-PAD-3")
-link("N-PAD-3", "TBL-2")
-link("TBL-2", "TBL-4")
+link("N-PAD-2", "TBL-2")
+link("TBL-2", "N-PAD-3")
+link("N-PAD-3", "TBL-4")
 link("N-PAD-2", "Q5") -- queue tail on the corridor
 link("N-PAD-2", "N-PU-IN")
 link("N-PAD-2", "N-PUL-1")
