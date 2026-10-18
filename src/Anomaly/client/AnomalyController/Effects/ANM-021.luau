@@ -42,6 +42,7 @@ const RUN_FROM = 4 -- s into the omen it appears
 const OMEN = 12 -- Rules/ANM-021 OmenFor
 const STOP_OUT = 1.6 -- studs from the window point to its chest
 const BLOWS = { 0, 0.6, 1.3, 8.5, 9, 9.4 } -- s into the bangs (the scene's window_slam steps)
+const RUNNER_SCALE = 1.5 -- ~11 studs tall: reads from the counter down the street (owner 2026-10-18: "muito pequeno")
 const BODY = Color3.fromHex("#08070B")
 const EYE = Color3.fromRGB(255, 24, 24)
 
@@ -163,7 +164,9 @@ local function buildRunner(parent: Instance, window: CFrame): Runner
 		end
 	end
 	model.PrimaryPart = root
-	model.WorldPivot = CFrame.identity
+	-- pivot at the feet (the torso is 4.6 up): PivotTo on the ground stands it ON the ground, not waist-deep
+	root.PivotOffset = CFrame.new(0, -root.Position.Y, 0)
+	model:ScaleTo(RUNNER_SCALE)
 	model.Parent = parent
 	return { Model = model, Root = root, Arms = arms, Window = window }
 end
