@@ -1,180 +1,107 @@
 --!strict
--- Plate slots of the assembly table, pure (tech/restaurant-flow.md rev. 2 §2.2; design FEAT-044; TASK-379). No Roblox API:
--- PlateService owns the instances, the Tools and the wire; this module only decides which slot a ticket lands on and
--- what a put may do. Tested by Slots.selfTest() (/dev plate test).
+-- Central table slots as the clients see them, pure (tech/prep-conveyor.md §7.1; DEC-303 Q-383, DEC-304; TASK-516; was
+-- the PLATE-n pass of TASK-379, retired from the restaurant by DEC-302). No Roblox API: PlateService owns the instances,
+-- the Tools and the wire; this module only says what one slot of the Net.Restaurant Plates set shows. The plates
+-- themselves live in CenterTable.luau. Tested by Slots.selfTest() (/dev plate test), which also runs CenterTable's.
 --
--- A slot holds a ticket (Npc of the customer, Line of a pair) and/or contents (bun, sausage, toppings of a plate put
--- back). Npc = 0 means "no ticket": the slot is free for the next order and keeps whatever is on it (pre-prep, an
--- orphan whose customer left). Ticket landing (pick): with preppedFirst, a free plate that already has bun + sausage
--- and no topping outside the order (an identical one first), else the lowest free slot with nothing outside the order,
--- else the lowest free slot.
-local Slots = {}
+-- Slot state for the client (prep-conveyor.md §7.1):
+--   Free      no plate (Npc 0, no Orphan)
+--   Empty     a plate with its ticket and nothing on it (born at "take order")
+--   Building  bun and/or dog, no grade
+--   Assembled a grade (Perfect / Good / Messy): ready for the PICKUP
+--   Orphan    the customer left; only kept while something is on it (prep-conveyor.md §7.6)
+const CenterTable = require(script.Parent.CenterTable)
 
-export type Slot = {
-	Index: number,
-	Npc: number, -- NpcId of the ticket, 0 = none
-	Line: number, -- 1 = leader's hot dog, 2 = partner's (FEAT-038), 0 = no ticket
+const Slots = {}
+
+export type State = "Free" | "Empty" | "Building" | "Assembled" | "Orphan"
+
+-- Plain record of one slot (the wire struct of Net.Restaurant Plates; PlateService swaps nil optionals for Lync.none
+-- on update)
+export type Record = {
+	Npc: number,
+	Line: number,
 	Bun: boolean,
 	Sausage: boolean,
-	Toppings: { string }, -- a plate put back after the condiments (assembly order)
-	Since: number, -- server time the ticket landed, 0 = no ticket
-	Orphan: boolean, -- its customer left while the plate had something on it (FEAT-044 grey "?")
-	Altered: boolean, -- ANM-002 / altered hot dog put back (wave R4 reads it)
+	Toppings: { [string]: boolean },
+	Since: number,
+	Orphan: boolean?,
+	Altered: boolean?,
+	Grade: string?,
 }
 
--- What a put adds: "bun" (bun_sliced), "sausage" (sausage_grilled) or "plate" (a whole hot_dog put back)
-export type PutKind = "bun" | "sausage" | "plate"
+function Slots.state(plate: CenterTable.Plate?): State
+	if plate == nil then
+		return "Free"
+	elseif plate.Orphan or plate.Ticket == 0 then
+		return "Orphan"
+	elseif plate.Grade ~= nil then
+		return "Assembled"
+	elseif plate.Bun or plate.Dog then
+		return "Building"
+	end
+	return "Empty"
+end
 
--- Notice key of a refused put / take (Content.Notices)
-export type Refusal = "plate_full" | "plate_not_ready"
+function Slots.toppingSet(list: { string }): { [string]: boolean }
+	const out: { [string]: boolean } = {}
+	for _, key in list do
+		out[key] = true
+	end
+	return out
+end
 
-function Slots.new(index: number): Slot
+-- Topping list of a bitfield set, in `keys` order (Content.Ingredients.ToppingKeys)
+function Slots.toppingList(set: { [string]: boolean }?, keys: { string }): { string }
+	const out: { string } = {}
+	if set == nil then
+		return out
+	end
+	for _, key in keys do
+		if set[key] then
+			table.insert(out, key)
+		end
+	end
+	return out
+end
+
+-- Grade on the wire: only a key of `gradeKeys` (Content.Prep.GradeKeys), never "None" (None = not assembled)
+function Slots.wireGrade(grade: string?, gradeKeys: { string }): string?
+	if grade == nil or grade == "None" or table.find(gradeKeys, grade) == nil then
+		return nil
+	end
+	return grade
+end
+
+-- Record of a slot (nil plate = free)
+function Slots.record(plate: CenterTable.Plate?, gradeKeys: { string }): Record
+	if plate == nil then
+		return {
+			Npc = 0,
+			Line = 0,
+			Bun = false,
+			Sausage = false,
+			Toppings = {},
+			Since = 0,
+			Orphan = nil,
+			Altered = nil,
+			Grade = nil,
+		}
+	end
 	return {
-		Index = index,
-		Npc = 0,
-		Line = 0,
-		Bun = false,
-		Sausage = false,
-		Toppings = {},
-		Since = 0,
-		Orphan = false,
-		Altered = false,
+		Npc = math.clamp(plate.Ticket, 0, 65535),
+		Line = math.clamp(plate.Line, 0, 2),
+		Bun = plate.Bun,
+		Sausage = plate.Dog,
+		Toppings = Slots.toppingSet(plate.Toppings),
+		Since = plate.Since,
+		Orphan = if plate.Orphan then true else nil,
+		Altered = if plate.Altered then true else nil,
+		Grade = Slots.wireGrade(plate.Grade, gradeKeys),
 	}
 end
 
-function Slots.isFree(slot: Slot): boolean
-	return slot.Npc == 0
-end
-
--- Bun and sausage on it: the plate can be taken (Q 3 of the tech §9: no half plate leaves the slot)
-function Slots.isReady(slot: Slot): boolean
-	return slot.Bun and slot.Sausage
-end
-
-function Slots.isEmpty(slot: Slot): boolean
-	return not slot.Bun and not slot.Sausage and #slot.Toppings == 0
-end
-
--- Something on it or a ticket on it
-function Slots.isOccupied(slot: Slot): boolean
-	return slot.Npc ~= 0 or not Slots.isEmpty(slot)
-end
-
--- Every topping of `toppings` is in `order`
-function Slots.fits(toppings: { string }, order: { string }): boolean
-	for _, key in toppings do
-		if table.find(order, key) == nil then
-			return false
-		end
-	end
-	return true
-end
-
-function Slots.countFree(slots: { Slot }): number
-	local count = 0
-	for _, slot in slots do
-		if Slots.isFree(slot) then
-			count += 1
-		end
-	end
-	return count
-end
-
--- Slot a new ticket lands on, among `slots` (the active ones, any order). nil = none free.
-function Slots.pick(slots: { Slot }, order: { string }, preppedFirst: boolean): Slot?
-	local prepped: Slot? = nil
-	local preppedScore = -1
-	local clean: Slot? = nil
-	local any: Slot? = nil
-	for _, slot in slots do
-		if not Slots.isFree(slot) then
-			continue
-		end
-		const fits = Slots.fits(slot.Toppings, order)
-		if preppedFirst and fits and Slots.isReady(slot) then
-			-- identical first (every ordered topping already on it), then the one with more of the order, then the lower index
-			const score = #slot.Toppings
-			if score > preppedScore or (score == preppedScore and prepped ~= nil and slot.Index < prepped.Index) then
-				prepped = slot
-				preppedScore = score
-			end
-		end
-		if fits and (clean == nil or slot.Index < clean.Index) then
-			clean = slot
-		end
-		if any == nil or slot.Index < any.Index then
-			any = slot
-		end
-	end
-	return prepped or clean or any
-end
-
--- Puts a ticket on the slot
-function Slots.assign(slot: Slot, npc: number, line: number, at: number)
-	slot.Npc = npc
-	slot.Line = line
-	slot.Since = at
-	slot.Orphan = false
-end
-
--- The ticket goes away, the contents stay (serve the next order). Orphan when something was on it.
-function Slots.release(slot: Slot)
-	slot.Npc = 0
-	slot.Line = 0
-	slot.Since = 0
-	slot.Orphan = not Slots.isEmpty(slot)
-end
-
--- Back to an empty slot with no ticket (plate taken, shift start, dev clear)
-function Slots.clear(slot: Slot)
-	slot.Npc = 0
-	slot.Line = 0
-	slot.Bun = false
-	slot.Sausage = false
-	slot.Toppings = {}
-	slot.Since = 0
-	slot.Orphan = false
-	slot.Altered = false
-end
-
--- May `kind` go on the slot? `ticket` = Ticket of the hot dog put back (nil = none). Sausage only on a bun (FEAT-045
--- "Montagem"); a whole plate only on an empty slot whose ticket (if any) is the plate's own.
-function Slots.canPut(slot: Slot, kind: PutKind, ticket: number?): (boolean, Refusal?)
-	if kind == "bun" then
-		if slot.Bun then
-			return false, "plate_full"
-		end
-		return true, nil
-	elseif kind == "sausage" then
-		if not slot.Bun then
-			return false, "plate_not_ready"
-		end
-		if slot.Sausage then
-			return false, "plate_full"
-		end
-		return true, nil
-	end
-	if not Slots.isEmpty(slot) then
-		return false, "plate_full"
-	end
-	if slot.Npc ~= 0 and ticket ~= nil and ticket ~= slot.Npc then
-		return false, "plate_full"
-	end
-	return true, nil
-end
-
--- Kind to put when the hand holds nothing that says it: what the slot needs next (bun, then sausage); a whole plate
--- is only put by holding it. nil = nothing to add.
-function Slots.needs(slot: Slot): PutKind?
-	if not slot.Bun then
-		return "bun"
-	elseif not slot.Sausage then
-		return "sausage"
-	end
-	return nil
-end
-
--- Table tests (pure; /dev plate test). Returns passed, total and the failure lines.
+-- Table tests (pure; /dev plate test): the slot view + CenterTable.selfTest. Returns passed, total and the failures.
 function Slots.selfTest(): (number, number, { string })
 	const failures: { string } = {}
 	local total = 0
@@ -184,85 +111,39 @@ function Slots.selfTest(): (number, number, { string })
 			table.insert(failures, name)
 		end
 	end
-	local function row(count: number): { Slot }
-		const out: { Slot } = {}
-		for index = 1, count do
-			table.insert(out, Slots.new(index))
-		end
-		return out
-	end
+	const grades = { "None", "Messy", "Good", "Perfect" }
 
-	-- lowest free index
 	do
-		const slots = row(4)
-		Slots.assign(slots[1], 10, 1, 1)
-		const picked = Slots.pick(slots, {}, true)
-		check("lowest free", picked ~= nil and picked.Index == 2)
+		const t = CenterTable.new(8)
+		check("free", Slots.state(CenterTable.at(t, 8)) == "Free")
+		const plate = CenterTable.spawn(t, 3, 1, 5) :: CenterTable.Plate
+		check("empty", Slots.state(plate) == "Empty")
+		const record = Slots.record(plate, grades)
+		check("record ticket", record.Npc == 3 and record.Line == 1 and record.Since == 5 and record.Grade == nil)
+		plate.Bun = true
+		check("building", Slots.state(plate) == "Building")
+		plate.Dog = true
+		plate.Toppings = { "ketchup" }
+		plate.Grade = "Perfect"
+		check("assembled", Slots.state(plate) == "Assembled")
+		const done = Slots.record(plate, grades)
+		check("record assembled", done.Sausage and done.Toppings.ketchup == true and done.Grade == "Perfect")
+		plate.Grade = "None"
+		check("grade None not on the wire", Slots.record(plate, grades).Grade == nil)
+		CenterTable.release(t, 3)
+		check("orphan", Slots.state(plate) == "Orphan" and Slots.record(plate, grades).Orphan == true)
+		const free = Slots.record(nil, grades)
+		check("record free", free.Npc == 0 and free.Orphan == nil and next(free.Toppings) == nil)
 	end
-	-- prepped first (bun + sausage) over a lower empty one
-	do
-		const slots = row(4)
-		slots[3].Bun = true
-		slots[3].Sausage = true
-		const picked = Slots.pick(slots, { "ketchup" }, true)
-		check("prepped first", picked ~= nil and picked.Index == 3)
-		const plain = Slots.pick(slots, { "ketchup" }, false)
-		check("prepped off = lowest", plain ~= nil and plain.Index == 1)
-	end
-	-- identical put-back plate beats a bare prepped one; a wrong topping is never preferred
-	do
-		const slots = row(4)
-		for _, index in { 2, 3, 4 } do
-			slots[index].Bun = true
-			slots[index].Sausage = true
-		end
-		slots[2].Toppings = { "mustard" }
-		slots[4].Toppings = { "ketchup" }
-		const picked = Slots.pick(slots, { "ketchup" }, true)
-		check("identical first", picked ~= nil and picked.Index == 4)
-		slots[1].Toppings = { "mustard" }
-		slots[3].Npc = 9
-		slots[4].Npc = 9
-		const fallback = Slots.pick(slots, { "cheese" }, true)
-		check("wrong topping last", fallback ~= nil and fallback.Index == 1)
-	end
-	-- full = nil
-	do
-		const slots = row(2)
-		Slots.assign(slots[1], 1, 1, 1)
-		Slots.assign(slots[2], 2, 1, 1)
-		check("full", Slots.pick(slots, {}, true) == nil and Slots.countFree(slots) == 0)
-	end
-	-- release keeps the contents, marks the orphan; clear empties
-	do
-		const slot = Slots.new(1)
-		Slots.assign(slot, 7, 1, 5)
-		Slots.release(slot)
-		check("release empty = not orphan", slot.Npc == 0 and not slot.Orphan)
-		Slots.assign(slot, 7, 2, 5)
-		slot.Bun = true
-		Slots.release(slot)
-		check("release keeps bun", slot.Npc == 0 and slot.Line == 0 and slot.Since == 0 and slot.Bun and slot.Orphan)
-		Slots.clear(slot)
-		check("clear", Slots.isEmpty(slot) and not slot.Orphan and slot.Npc == 0)
-	end
-	-- puts
-	do
-		const slot = Slots.new(1)
-		check("sausage needs bun", select(2, Slots.canPut(slot, "sausage")) == "plate_not_ready")
-		check("bun ok", (Slots.canPut(slot, "bun")))
-		slot.Bun = true
-		check("second bun refused", select(2, Slots.canPut(slot, "bun")) == "plate_full")
-		check("sausage ok", (Slots.canPut(slot, "sausage")))
-		check("plate on bun refused", select(2, Slots.canPut(slot, "plate")) == "plate_full")
-		check("needs sausage", Slots.needs(slot) == "sausage")
-		slot.Sausage = true
-		check("ready", Slots.isReady(slot) and Slots.needs(slot) == nil)
-		const ghost = Slots.new(2)
-		Slots.assign(ghost, 5, 1, 1)
-		check("plate on own ticket", (Slots.canPut(ghost, "plate", 5)))
-		check("plate on other ticket", not (Slots.canPut(ghost, "plate", 6)))
-		check("plate with no ticket", (Slots.canPut(ghost, "plate", nil)))
+	check(
+		"topping list order",
+		table.concat(Slots.toppingList({ mustard = true, ketchup = true }, { "ketchup", "mustard" }), ",") == "ketchup,mustard"
+	)
+
+	const _, count, centerFailures = CenterTable.selfTest()
+	total += count
+	for _, name in centerFailures do
+		table.insert(failures, name)
 	end
 	return total - #failures, total, failures
 end
