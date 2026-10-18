@@ -50,6 +50,7 @@
 --              horizon (To degrees per nudge, <= Rules.MaxNudge); Value = 0 stops it. Helps, never locks
 -- Every number PROVISIONAL (DEC-290) until the owner's Play. Mild (DEC-172): no blood, scares <= 1 s, no clipped scream.
 local Table = require(script.Parent.Table)
+local Restaurant = require(script.Parent.Restaurant)
 
 export type Phase = "Signal" | "Active" | "Resolved" | "Failed"
 export type Who = "All" | "Caught" | "Safe"
@@ -266,8 +267,122 @@ const roofWalker: Scene = {
 	},
 }
 
+-- ANM-017 The crawler, "get off the floor" (TASK-483; DEC-294; design/horror-cinematic.md §6.2). Restaurant only (the
+-- trailer keeps the HideZone and its own warning). Fitted to Rules/ANM-017 with the restaurant on: Signal = WarnFor 10 s
+-- (it scratches under the kitchen floor, the boards give), Active = PassFor 9 s (it bursts out at the east end of the
+-- aisle, runs between the counters, rears up in the middle at 3-6 s looking up at whoever climbed: the look window
+-- of the rule), then Failed (someone stayed on the floor: jumpscare + faint, Effects/Kit/Hide) or Resolved. The body
+-- and its path are Effects/ANM-017; the scene adds the words (real hints: get off the floor), heart, edges and bars.
+const crawler: Scene = {
+	Key = "anm_017_crawler",
+	Name = "The crawler",
+	Live = Restaurant.Rules.Enabled,
+	Steps = {
+		-- the warning (Signal, 10 s): something under the floor
+		{ At = 0, Phase = "Signal", Kind = "Sound", Target = "horror_sting", Value = 0.6 },
+		{ At = 0, Phase = "Signal", Kind = "Shake", Target = "Jolt" },
+		{ At = 0, Phase = "Signal", Kind = "Cinema", Value = 0.11, Duration = 1 },
+		{ At = 0.3, Phase = "Signal", Kind = "Sound", Target = "floor_creak", Point = "TRL" },
+		{ At = 0.5, Phase = "Signal", Kind = "Whispers", Target = "crawler", Value = 0.5, To = 2.6, Duration = 8 },
+		{ At = 0.5, Phase = "Signal", Kind = "Heartbeat", Value = 72, To = 135, Duration = 9 },
+		{ At = 0.5, Phase = "Signal", Kind = "Vignette", Value = 0, To = 0.3, Duration = 9 },
+		{ At = 4, Phase = "Signal", Kind = "Sound", Target = "floor_creak", Point = "TRL", Value = 0.8 },
+		{ At = 6, Phase = "Signal", Kind = "Shake", Target = "Step" },
+		{ At = 7.5, Phase = "Signal", Kind = "Shake", Target = "Step" },
+		{ At = 8.5, Phase = "Signal", Kind = "Sound", Target = "breath_held" },
+		-- a breath of silence before it comes out
+		{ At = 9.3, Phase = "Signal", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		-- the pass (Active, 9 s): it bursts out and runs the aisle
+		{ At = 0, Phase = "Active", Kind = "Shake", Target = "Jolt" },
+		{ At = 0, Phase = "Active", Kind = "Fov", Value = -4, To = 0, Duration = 0.6 },
+		{ At = 0, Phase = "Active", Kind = "Sound", Target = "shadow_whoosh", Point = "TRL" },
+		{ At = 0, Phase = "Active", Kind = "Heartbeat", Value = 140, To = 165, Duration = 3 },
+		{ At = 0, Phase = "Active", Kind = "Vignette", Value = 0.3, To = 0.45, Duration = 3 },
+		-- it rears up and looks for feet on the floor: one burst of the words, then nothing
+		{ At = 3, Phase = "Active", Kind = "Sound", Target = "breath_held" },
+		{ At = 3, Phase = "Active", Kind = "Whispers", Target = "crawler", Value = 3, To = 3, Duration = 1.2 },
+		{ At = 4.2, Phase = "Active", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 6, Phase = "Active", Kind = "Heartbeat", Value = 150, To = 90, Duration = 3 },
+		{ At = 6, Phase = "Active", Kind = "Vignette", Value = 0.45, To = 0.15, Duration = 3 },
+		{ At = 6.5, Phase = "Active", Kind = "Sound", Target = "floor_creak", Point = "TRL", Value = 0.5 },
+		-- everyone stayed up (Resolved): it is gone under the floor
+		{ At = 0, Phase = "Resolved", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 0, Phase = "Resolved", Kind = "Heartbeat", Value = 0, To = 0 },
+		{ At = 0, Phase = "Resolved", Kind = "Vignette", Value = 0.15, To = 0, Duration = 1 },
+		{ At = 0.5, Phase = "Resolved", Kind = "Cinema", Value = 0, Duration = 1 },
+		-- someone stayed on the floor (Failed): the caught one gets the face (Effects/Kit/Hide), the others watch it go on
+		{ At = 0, Phase = "Failed", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Heartbeat", Value = 0, To = 0 },
+		{ At = 0.8, Phase = "Failed", Who = "Caught", Kind = "Vignette", Value = 0.5, To = 0, Duration = 3 },
+		{ At = 0, Phase = "Failed", Who = "Safe", Kind = "Heartbeat", Value = 155, To = 85, Duration = 4 },
+		{ At = 4, Phase = "Failed", Who = "Safe", Kind = "Heartbeat", Value = 0, To = 0 },
+		{ At = 1, Phase = "Failed", Who = "Safe", Kind = "Vignette", Value = 0.4, To = 0, Duration = 3 },
+		{ At = 4, Phase = "Failed", Kind = "Cinema", Value = 0, Duration = 1 },
+	},
+}
+
+-- ANM-012 The turned neck (TASK-483; DEC-294 "needs terror"; design/horror-cinematic.md §6.3). Anchored to the actor's
+-- record: Active = she spawned and walks to the counter (Kit/CustomerActor), then Resolved (refused: cue neck_snap,
+-- Anomalies/ANM-012) or Failed (her order taken: jumpscare + faint). The terror of looking at her is the stare pressure
+-- (TASK-482: heart, edges, head following, face, "STOP STARING"), so the scene has NO heart and keeps its words to the
+-- first seconds (hints: refuse her) before the stare can start; then cracks of her neck from the counter and the bars.
+const turnedNeck: Scene = {
+	Key = "anm_012_turned_neck",
+	Name = "The turned neck",
+	Live = true,
+	Steps = {
+		{ At = 0, Phase = "Active", Kind = "Sound", Target = "neck_crack", Point = "Q1", Value = 0.35 },
+		{ At = 1.5, Phase = "Active", Kind = "Cinema", Value = 0.08, Duration = 1.5 },
+		{ At = 2, Phase = "Active", Kind = "Vignette", Value = 0, To = 0.18, Duration = 8 },
+		{ At = 2.5, Phase = "Active", Kind = "Whispers", Target = "neck", Value = 0.3, To = 1.1, Duration = 7 },
+		{ At = 6, Phase = "Active", Kind = "Sound", Target = "neck_crack", Point = "Q1", Value = 0.6 },
+		{ At = 9.5, Phase = "Active", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 11, Phase = "Active", Kind = "Sound", Target = "neck_crack", Point = "Q1", Value = 0.8 },
+		-- the bars go before they get in the way of the work (prompts stay; the hotbar comes back)
+		{ At = 16, Phase = "Active", Kind = "Cinema", Value = 0, Duration = 1.5 },
+		{ At = 16, Phase = "Active", Kind = "Vignette", Value = 0.18, To = 0.08, Duration = 3 },
+		-- refused (Resolved): her neck snaps round (cue), then the room breathes again
+		{ At = 0, Phase = "Resolved", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 0.3, Phase = "Resolved", Kind = "Shake", Target = "Door" },
+		{ At = 1, Phase = "Resolved", Kind = "Sound", Target = "breath_held" },
+		{ At = 1.2, Phase = "Resolved", Kind = "Vignette", Value = 0.18, To = 0, Duration = 1.5 },
+		{ At = 1.5, Phase = "Resolved", Kind = "Cinema", Value = 0, Duration = 1 },
+		-- her order taken (Failed): the face (Kit Scare); everyone else hears the crack
+		{ At = 0, Phase = "Failed", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 0, Phase = "Failed", Who = "Safe", Kind = "Sound", Target = "neck_crack", Point = "Q1" },
+		{ At = 0.8, Phase = "Failed", Kind = "Vignette", Value = 0.4, To = 0, Duration = 3 },
+		{ At = 2, Phase = "Failed", Kind = "Cinema", Value = 0, Duration = 1 },
+	},
+}
+
+-- ANM-004 The copies (TASK-483; DEC-294 "tie it to the mental pressure"; design/horror-cinematic.md §6.4). Anchored to the
+-- copy's record: Active = the copy spawned (Anomalies/ANM-004), Resolved = refused, Failed = its order taken (cue
+-- mirror_smile; in the restaurant there is no back door, so it only costs sanity). Staring at it is the stare pressure
+-- with its own words (Words.stare_copy); the scene gives the first hint (they already left) and the bars.
+const copies: Scene = {
+	Key = "anm_004_copies",
+	Name = "The copies",
+	Live = true,
+	Steps = {
+		{ At = 0, Phase = "Active", Kind = "Sound", Target = "horror_sting", Value = 0.35 },
+		{ At = 0.5, Phase = "Active", Kind = "Cinema", Value = 0.08, Duration = 1.5 },
+		{ At = 2, Phase = "Active", Kind = "Vignette", Value = 0, To = 0.15, Duration = 8 },
+		{ At = 2, Phase = "Active", Kind = "Whispers", Target = "copy", Value = 0.3, To = 1, Duration = 8 },
+		{ At = 10, Phase = "Active", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 16, Phase = "Active", Kind = "Cinema", Value = 0, Duration = 1.5 },
+		{ At = 16, Phase = "Active", Kind = "Vignette", Value = 0.15, To = 0.06, Duration = 3 },
+		{ At = 0, Phase = "Resolved", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 0.5, Phase = "Resolved", Kind = "Vignette", Value = 0.15, To = 0, Duration = 1.5 },
+		{ At = 1, Phase = "Resolved", Kind = "Cinema", Value = 0, Duration = 1 },
+		{ At = 0, Phase = "Failed", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 0, Phase = "Failed", Kind = "Shake", Target = "Jolt" },
+		{ At = 0.2, Phase = "Failed", Kind = "Vignette", Value = 0.35, To = 0, Duration = 3 },
+		{ At = 2.5, Phase = "Failed", Kind = "Cinema", Value = 0, Duration = 1 },
+	},
+}
+
 -- Whisper word lists (DEC-293, owner 2026-10-18): the words on screen are real hints for the player, said in the
--- character's voice. blackout / roof = the scenes' Whispers steps (roof: TASK-484); low_sanity = VitalController while sanity is in the low band;
+-- character's voice. blackout / roof / crawler / neck / copy = the scenes' Whispers steps (TASK-484, TASK-483); low_sanity = VitalController while sanity is in the low band;
 -- suspense = after a suspense event's glance (SuspenseController, TASK-481).
 const words: { [string]: { string } } = {
 	blackout = {
@@ -312,6 +427,35 @@ const words: { [string]: { string } } = {
 		"eyes down...",
 		"it's right above you",
 		"don't look...",
+	},
+	-- TASK-483: the crawler (restaurant: get off the floor), the turned neck and the copy (refuse them)
+	crawler = {
+		"GET OFF THE FLOOR",
+		"GET OFF THE FLOOR",
+		"CLIMB ON THE COUNTER",
+		"CLIMB ON THE COUNTER",
+		"UP! GET UP!",
+		"IT'S UNDER THE FLOOR",
+		"don't touch the floor",
+		"stay up...",
+	},
+	neck = {
+		"DON'T TAKE HER ORDER",
+		"DON'T TAKE HER ORDER",
+		"SEND HER AWAY",
+		"REFUSE HER",
+		"her neck...",
+		"it's turned all the way round",
+		"don't look at her",
+	},
+	copy = {
+		"THAT'S NOT THEM",
+		"THEY ALREADY LEFT",
+		"THEY ALREADY LEFT",
+		"IT'S A COPY",
+		"DON'T TAKE ITS ORDER",
+		"SEND IT AWAY",
+		"it's backwards...",
 	},
 	low_sanity = {
 		"LOW SANITY",
@@ -365,7 +509,7 @@ const stare: Stare = {
 	},
 }
 
-return Table.with(Table.new({ blackout, roofWalker } :: { Scene }), {
+return Table.with(Table.new({ blackout, roofWalker, crawler, turnedNeck, copies } :: { Scene }), {
 	Rules = Table.record(rules),
 	Stare = Table.record(stare),
 	Words = Table.record(words),

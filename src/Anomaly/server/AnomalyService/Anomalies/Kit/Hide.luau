@@ -19,6 +19,12 @@
 -- (MAP-01, behind the trailer; tools/assetplace/hide_zone.luau creates one). The test is the part's box in its own
 -- space plus Margin studs around (and a generous height: the root stands ~3 studs above the feet). No zone in the
 -- place = Start false (the scheduler retries) and one warning.
+--
+-- Test "Floor" (TASK-483, DEC-294: the crawler in the restaurant, "get off the floor"): no HideZone. The safe players are
+-- the ones OFF THE FLOOR: the ground under the feet (raycast down from the root, characters ignored) is more than
+-- Params.Lift studs above Params.FloorY (counter tops, tables, crates). Feet on the floor for Params.Ground s in a row
+-- inside the look window = scared (a jump does not save: landing counts again; a quick hop is forgiven). Mid-air (no
+-- ground within GROUND_DOWN) counts as off the floor.
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -39,9 +45,18 @@ const DEFAULT_LOOK_FROM = 4
 const DEFAULT_LOOK_TO = 7
 const DEFAULT_MARGIN = 1
 const DEFAULT_SCARE_FAINT = 0.7
+-- Test "Floor" (TASK-483; Provisional): kitchen / patio floor top (tools/assetplace/restaurant_bind.luau FLOOR)
+const DEFAULT_FLOOR_Y = 0.45
+const DEFAULT_LIFT = 1.2 -- studs above the floor the ground under the feet must be (counter top = 3.0)
+const DEFAULT_GROUND = 0.4 -- s on the floor in a row that count
+const GROUND_DOWN = 12 -- studs the floor raycast looks below the root
+
+export type Test = "Zone" | "Floor"
 
 export type Options = {
 	Ref: string,
+	-- "Zone" (default) = stand in a HideZone; "Floor" = get off the floor (TASK-483). A function = decided at Start
+	Test: (Test | () -> Test)?,
 }
 
 type State = {
@@ -56,6 +71,11 @@ type State = {
 	Scared: { [Player]: boolean },
 	Failed: boolean,
 	Zones: { BasePart },
+	Test: Test,
+	FloorY: number,
+	Lift: number,
+	Ground: number,
+	OnFloor: { [Player]: number }, -- server time the feet touched the floor (Test "Floor")
 }
 
 type Live = { Ctx: Api.Context, Occ: Api.Occurrence }
@@ -109,6 +129,9 @@ function Hide.Rule(ref: string, params: { [string]: any }?): Api.Rule
 		LookTo = DEFAULT_LOOK_TO,
 		Margin = DEFAULT_MARGIN,
 		ScareFaint = DEFAULT_SCARE_FAINT,
+		FloorY = DEFAULT_FLOOR_Y,
+		Lift = DEFAULT_LIFT,
+		Ground = DEFAULT_GROUND,
 	}
 	for key, value in params or {} do
 		merged[key] = value
@@ -163,6 +186,27 @@ function Hide.Inside(zones: { BasePart }, position: Vector3, margin: number): bo
 	return false
 end
 
+-- Test "Floor": true when the ground under the player's feet is the floor (not a counter, table or crate).
+local function onFloor(player: Player, floorY: number, lift: number): boolean
+	const character = player.Character
+	const root = if character then character:FindFirstChild("HumanoidRootPart") else nil
+	if root == nil or not root:IsA("BasePart") then
+		return false
+	end
+	const params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	const ignore: { Instance } = {}
+	for _, other in game:GetService("Players"):GetPlayers() do
+		if other.Character ~= nil then
+			table.insert(ignore, other.Character)
+		end
+	end
+	params.FilterDescendantsInstances = ignore
+	params.IgnoreWater = true
+	const hit = workspace:Raycast(root.Position, Vector3.new(0, -GROUND_DOWN, 0), params)
+	return hit ~= nil and hit.Position.Y <= floorY + lift
+end
+
 local function rootOf(player: Player): Vector3?
 	const character = player.Character
 	const root = if character then character:FindFirstChild("HumanoidRootPart") else nil
@@ -208,8 +252,10 @@ function Hide.Module(options: Options): HideModule
 		Ref = ref,
 
 		Start = function(ctx: Api.Context, occ: Api.Occurrence): boolean
-			const zones = Hide.Zones()
-			if #zones == 0 then
+			const option = options.Test
+			const test: Test = if type(option) == "function" then option() elseif option ~= nil then option else "Zone"
+			const zones = if test == "Zone" then Hide.Zones() else {}
+			if test == "Zone" and #zones == 0 then
 				if not zonesWarned then
 					zonesWarned = true
 					ctx.Log(occ, `no HideZone part in the workspace (run tools/assetplace/hide_zone.luau); not started`)
@@ -234,6 +280,11 @@ function Hide.Module(options: Options): HideModule
 				Scared = {},
 				Failed = false,
 				Zones = zones,
+				Test = test,
+				FloorY = param(rule, "FloorY", DEFAULT_FLOOR_Y),
+				Lift = param(rule, "Lift", DEFAULT_LIFT),
+				Ground = param(rule, "Ground", DEFAULT_GROUND),
+				OnFloor = {},
 			}
 			occ.State = state
 			live[ref] = { Ctx = ctx, Occ = occ }
@@ -263,6 +314,19 @@ function Hide.Module(options: Options): HideModule
 			const zones = state.Zones
 			for _, player in ctx.Active() do
 				if state.Scared[player] then
+					continue
+				end
+				if state.Test == "Floor" then
+					if not onFloor(player, state.FloorY, state.Lift) then
+						state.OnFloor[player] = nil
+					else
+						const since = state.OnFloor[player]
+						if since == nil then
+							state.OnFloor[player] = now
+						elseif now - since >= state.Ground then
+							scare(ctx, occ, state, player)
+						end
+					end
 					continue
 				end
 				const position = rootOf(player)

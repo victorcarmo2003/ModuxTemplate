@@ -374,7 +374,9 @@ const base = Table.new({
 	-- and licence as the blackout bank; Provisional until the owner's Play
 	sfx("suspense_drop", false, { Spatial = false, Volume = 0.8, Id = "rbxassetid://9125484700", Ref = "SFX-244 Deep Hits Big Reverberant Booms Rumbling Tail 1 (SFX), ProSoundEffects" }),
 	sfx("suspense_hiss", false, { Volume = 0.6, MaxDistance = 90, Id = "rbxassetid://9113989919", Ref = "SFX-245 Creature Vocal Spider Hiss Exhale 1 (SFX), ProSoundEffects" }),
-	sfx("floor_scratch", false, { Volume = 0.6, MaxDistance = 50, Ref = "SFX-246 no safe candidate yet (silence)" }),
+	sfx("floor_scratch", false, { Volume = 0.7, MaxDistance = 50, Id = "rbxassetid://9126170038", Ref = "SFX-246 Wallpaper Rip Slowed Crunchy Tears Off Wall 4 (SFX), ProSoundEffects" }),
+	-- TASK-483: the boards giving under the crawler (restaurant, Signal of its scene)
+	sfx("floor_creak", false, { Volume = 0.6, MaxDistance = 50, Id = "rbxassetid://9120832269", Ref = "SFX-247 Wood Creak Intense Cracking Splintering 1 (SFX), ProSoundEffects" }),
 	-- restaurant (tech/restaurant-flow.md rev. 2 §4.2; wave R0 rows, Id "" = silence until the audio list uploads them)
 	sfx("plate_put", false, { Volume = 0.5, MaxDistance = 40 }),
 	sfx("ticket_pop", false, { Spatial = false, Volume = 0.4 }), -- HUD note pop-up per item at the tablet

@@ -325,13 +325,13 @@ const on = restaurant.Rules.Enabled
 -- design/anomalies-v3-restaurant.md §8.1 (DEC-279, Provisional until wave R4 adapts them) + Q-331 ("hide" leaves):
 --   ANM-002 food (work channel) · ANM-003 bank clock + trailer switch · ANM-004 back door knock · ANM-007, 017, 018
 --   family B (hide in the HideZone behind the trailer, no back door; ANM-019 left the cut with TASK-484: it is "don't look up") · ANM-009 back door knock / crack
+-- TASK-483 (DEC-294): ANM-004 is back (no back door here, so the copy only costs sanity; stare pressure, its scene) and
+-- ANM-017 is back as "get off the floor" (Kit/Hide Test "Floor", its scene)
 const CUT_ANOMALIES = {
 	"anm_002_wrong_food",
 	"anm_003_stopped_clock",
-	"anm_004_copies",
 	"anm_007_walker",
 	"anm_009_knock",
-	"anm_017_crawler",
 	"anm_018_grin",
 }
 
@@ -350,7 +350,7 @@ const switch: Switch = {
 	NewAnomalies = if on
 		then {
 			[6] = "anm_014_big_head",
-			[7] = "anm_015_floater",
+			-- [7] crawler presents Night 7 again (TASK-483), the floater debuts beside it as in the trailer
 			[8] = "anm_008_long_car",
 		}
 		else {},

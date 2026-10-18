@@ -480,7 +480,8 @@ viu de relance**; nada toca quando a criatura aparece.
 |---|---|---|---|---|---|---|---|
 | SFX-244 | `suspense_drop` | "Sub drop" grave com cauda | no relance, junto do puxão da câmera | ~5 s (cauda) | `9125484700` "Deep Hits Big Reverberant Booms Rumbling Tail 1 (SFX)"; reserva `1837830084` "BOOM-Sub Boom 05" (APMOfficial) | Sfx 0,8, tela | P1 |
 | SFX-245 | `suspense_hiss` | Chiado curto da criatura | no relance, na posição da criatura | ~1,2 s | `9113989919` "Creature Vocal Spider Hiss Exhale 1 (SFX)" | Sfx 0,6, 3D 90 studs | P1 |
-| SFX-246 | `floor_scratch` | Arranhão no assoalho (TASK-486, para as cenas da TASK-483) | — | — | **sem candidato seguro** (a busca só trouxe skate/cadeira); Id `""` | Sfx 0,6, 3D 50 studs | P2 |
+| SFX-246 | `floor_scratch` | Arranhão no assoalho (TASK-486; usado pela TASK-483, rastejador) | aviso do rastejador, sob o piso da cozinha | ~6 s | `9126170038` "Wallpaper Rip Slowed Crunchy Tears Off Wall 4 (SFX)", ProSoundEffects | Sfx 0,7, 3D 50 studs | P1 |
+| SFX-247 | `floor_creak` | Tábuas cedendo sob o rastejador (TASK-483) | aviso do rastejador, sob o piso | ~11 s | `9120832269` "Wood Creak Intense Cracking Splintering 1 (SFX)", ProSoundEffects | Sfx 0,6, 3D 50 studs | P1 |
 
 Estalo de osso (TASK-486): `neck_crack` (ANM-012) já usa o upload do dono "Bone crack"; reserva PSE `9113542363` "Bone Cracks 10 (SFX)".
 

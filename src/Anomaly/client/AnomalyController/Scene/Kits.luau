@@ -631,7 +631,18 @@ end
 
 const CINEMA_NAME = "HorrorCinema"
 const HUD_GUIS = { "Hud" } -- the game HUD (coins, shop, sanity...); TouchGui stays (mobile must still move)
-type Cinema = { Gui: ScreenGui, Top: Frame, Bottom: Frame, Saved: { [string]: boolean }, Backpack: boolean?, Chat: boolean? }
+-- World: the station outlines (Highlight) and the floating pills (BillboardGui: tips "$0", stock "9/20", "Ready!") turned
+-- off while the bars are up (owner 2026-10-18: the money still showed and the outlines flickered under the shakes).
+-- Only the workspace ones: the prompts (PromptController) and the breaker note live in PlayerGui and stay.
+type Cinema = {
+	Gui: ScreenGui,
+	Top: Frame,
+	Bottom: Frame,
+	Saved: { [string]: boolean },
+	Backpack: boolean?,
+	Chat: boolean?,
+	World: { Instance }?,
+}
 local cinema: Cinema? = nil
 
 local function hideHud(on: boolean, saved: { [string]: boolean }, current: Cinema)
@@ -660,6 +671,19 @@ local function hideHud(on: boolean, saved: { [string]: boolean }, current: Cinem
 			current.Backpack = enabled
 		end
 		pcall(StarterGui.SetCoreGuiEnabled, StarterGui, Enum.CoreGuiType.Backpack, false)
+		if current.World == nil then
+			const off: { Instance } = {}
+			for _, instance in workspace:GetDescendants() do
+				if instance:IsA("Highlight") or instance:IsA("BillboardGui") then
+					const thing = instance :: any
+					if thing.Enabled then
+						thing.Enabled = false
+						table.insert(off, instance)
+					end
+				end
+			end
+			current.World = off
+		end
 		const chat = TextChatService:FindFirstChildOfClass("ChatWindowConfiguration")
 		if chat ~= nil then
 			if current.Chat == nil then
@@ -670,6 +694,15 @@ local function hideHud(on: boolean, saved: { [string]: boolean }, current: Cinem
 	else
 		if current.Backpack ~= nil then
 			pcall(StarterGui.SetCoreGuiEnabled, StarterGui, Enum.CoreGuiType.Backpack, current.Backpack)
+		end
+		const world = current.World
+		if world ~= nil then
+			current.World = nil
+			for _, instance in world do
+				if instance.Parent ~= nil then
+					(instance :: any).Enabled = true
+				end
+			end
 		end
 		const chat = TextChatService:FindFirstChildOfClass("ChatWindowConfiguration")
 		if chat ~= nil and current.Chat ~= nil then

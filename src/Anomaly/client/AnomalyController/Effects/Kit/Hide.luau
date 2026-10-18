@@ -56,6 +56,12 @@ export type Options = {
 	Approach: number,
 	Look: number,
 	Leave: number,
+	-- TASK-483: a path of its own instead of the street (the crawler in the restaurant kitchen): MapPoints
+	-- { from, to } of a straight line; it comes in Extend studs before `from`, rears up at the middle facing the
+	-- MapPoint Face, and leaves Extend studs past `to`. Missing points = the street path.
+	Path: { string }?,
+	Extend: number?,
+	Face: string?,
 }
 
 const ENTITY_MOD = 65536
@@ -75,7 +81,7 @@ const FLICKER_GROUPS = { "trailer_interior", "trailer_lights" }
 const LAMP_OFF_COLOR = Color3.fromHex("#EAD6B0")
 const RUMBLE_KEYS = { "hide_rumble", "horror_dramatic" } -- first key Content.Sounds has
 const BUZZ_KEY = "post_buzz"
-const SCRATCH_KEYS = { "crawler_scratch", "shadow_whoosh" } -- first key Content.Sounds has
+const SCRATCH_KEYS = { "crawler_scratch", "floor_scratch", "shadow_whoosh" } -- first key Content.Sounds has
 const SCRATCH_COUNT = 14 -- quick scratches over the warning
 const SCRATCH_SPEED = 1.7
 const APPROACH_STEPS = 6 -- heavy steps of the Walker coming closer
@@ -134,7 +140,36 @@ end
 
 -- Path --------------------------------------------------------------------------------------------------------------
 
-local function pathOf(ctx: Effect.Context): Path?
+-- Options.Path (TASK-483): a line between two MapPoints, extended at both ends; the look spot at its middle.
+local function linePath(ctx: Effect.Context, options: Options): Path?
+	const ids = options.Path
+	if ids == nil or #ids < 2 then
+		return nil
+	end
+	const from, to = ctx.Point(ids[1]), ctx.Point(ids[2])
+	if from == nil or to == nil then
+		return nil
+	end
+	const along = flat(to.Position - from.Position)
+	const extend = options.Extend or 0
+	const middle = from.Position:Lerp(to.Position, 0.5)
+	const face = if options.Face ~= nil then ctx.Point(options.Face) else nil
+	const look = if face ~= nil then face.Position - middle else along:Cross(Vector3.yAxis)
+	return {
+		Start = from.Position - along * extend,
+		Window = facing(middle, look),
+		Exit = to.Position + along * extend,
+		Roof = middle + Vector3.new(0, ROOF_HEIGHT, 0),
+	}
+end
+
+local function pathOf(ctx: Effect.Context, options: Options?): Path?
+	if options ~= nil then
+		const line = linePath(ctx, options)
+		if line ~= nil then
+			return line
+		end
+	end
 	const trailer = ctx.Point(TRAILER_POINT)
 	if trailer == nil then
 		return nil
@@ -428,7 +463,7 @@ function Hide.Warn(ctx: Effect.Context, cue: Effect.Cue, options: Options)
 		if Content.Sounds.ByKey[BUZZ_KEY] ~= nil then
 			ctx.Play(BUZZ_KEY, base)
 		end
-		const path = pathOf(ctx)
+		const path = pathOf(ctx, options)
 		series(ctx, STEP_KEY, if path then path.Start else base, APPROACH_STEPS, seconds * 0.8, nil, true)
 	elseif signal == "Scratch" then
 		const under = if base ~= nil then base - Vector3.new(0, UNDER_DROP, 0) else nil
@@ -471,7 +506,7 @@ local function endPass(pass: Pass, fade: boolean)
 end
 
 local function beginPass(ctx: Effect.Context, options: Options): Pass?
-	const path = pathOf(ctx)
+	const path = pathOf(ctx, options)
 	if path == nil then
 		return nil
 	end
