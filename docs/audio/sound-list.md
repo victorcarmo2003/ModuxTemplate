@@ -470,6 +470,20 @@ nada que estoure; respiração bem baixa. Chave = linha de `src/Shared/Content/S
 | SFX-242 | `power_up` | Energia voltando ("thunk" + zumbido) | Resolved/Failed t = 0 | ~1 s | `9117885256` "Power Up Sweeteners 10 (SFX)" (thunk, zumbido, cliques) | Sfx 0,7, tela | P1 |
 | SFX-243 | `lamps_cascade` | Lâmpadas acendendo em cascata | Resolved/Failed t = 0,3, com `Lights Cascade` | ~7 s | `9116266327` "Light Bulb Buzz 6 (SFX)" (power ups e surges) | Sfx 0,5, tela | P2 |
 
+### 5.20 Eventos de suspense (TASK-481, TASK-486, DEC-294; Provisório)
+
+`design/horror-cinematic.md` §7, contrato em `tech/suspense.md`. Biblioteca **Pro Sound Effects** (licença em `art/credits.md`).
+Mild (DEC-172): grave curto, sem grito. Os dois tocam com `Scare` (teto `ScareMaxVolume`, DEC-173). Toca **só no client de quem
+viu de relance**; nada toca quando a criatura aparece.
+
+| ID | Chave | Nome curto | Quando toca | Duração | Asset (Creator Store) | Grupo / volume / espaço | Prioridade |
+|---|---|---|---|---|---|---|---|
+| SFX-244 | `suspense_drop` | "Sub drop" grave com cauda | no relance, junto do puxão da câmera | ~5 s (cauda) | `9125484700` "Deep Hits Big Reverberant Booms Rumbling Tail 1 (SFX)"; reserva `1837830084` "BOOM-Sub Boom 05" (APMOfficial) | Sfx 0,8, tela | P1 |
+| SFX-245 | `suspense_hiss` | Chiado curto da criatura | no relance, na posição da criatura | ~1,2 s | `9113989919` "Creature Vocal Spider Hiss Exhale 1 (SFX)" | Sfx 0,6, 3D 90 studs | P1 |
+| SFX-246 | `floor_scratch` | Arranhão no assoalho (TASK-486, para as cenas da TASK-483) | — | — | **sem candidato seguro** (a busca só trouxe skate/cadeira); Id `""` | Sfx 0,6, 3D 50 studs | P2 |
+
+Estalo de osso (TASK-486): `neck_crack` (ANM-012) já usa o upload do dono "Bone crack"; reserva PSE `9113542363` "Bone Cracks 10 (SFX)".
+
 ---
 
 ## 6. Mixagem e regras de terror (verificáveis)

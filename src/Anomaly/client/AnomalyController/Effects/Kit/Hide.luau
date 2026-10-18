@@ -259,9 +259,12 @@ const BUILDERS: { [Style]: (Model) -> () } = {
 	Roof = buildRoof,
 }
 
-local function body(ctx: Effect.Context, options: Options): Model
+-- The monster model (feet at the origin, facing -Z), parented to `parent`: the Model named `asset` under
+-- ReplicatedStorage.Assets when it exists, else the placeholder of `style`. Also used by the suspense events
+-- (Suspense/client/SuspenseController, TASK-481).
+function Hide.Build(style: Style, asset: string?, parent: Instance, name: string): Model
 	const assets = ReplicatedStorage:FindFirstChild("Assets")
-	const found = if assets ~= nil and options.Asset ~= nil then assets:FindFirstChild(options.Asset, true) else nil
+	const found = if assets ~= nil and asset ~= nil then assets:FindFirstChild(asset, true) else nil
 	if found ~= nil and found:IsA("Model") then
 		const clone = found:Clone()
 		for _, piece in clone:GetDescendants() do
@@ -272,15 +275,19 @@ local function body(ctx: Effect.Context, options: Options): Model
 				piece.CanTouch = false
 			end
 		end
-		clone.Parent = ctx.Folder()
+		clone.Parent = parent
 		return clone
 	end
 	const model = Instance.new("Model")
-	model.Name = `{options.Ref}_Monster`
-	BUILDERS[options.Style](model)
+	model.Name = name
+	BUILDERS[style](model)
 	model.WorldPivot = CFrame.identity
-	model.Parent = ctx.Folder()
+	model.Parent = parent
 	return model
+end
+
+local function body(ctx: Effect.Context, options: Options): Model
+	return Hide.Build(options.Style, options.Asset, ctx.Folder(), `{options.Ref}_Monster`)
 end
 
 -- Pose of the pass at `t` seconds: (pivot, moving, looking) ------------------------------------------------------

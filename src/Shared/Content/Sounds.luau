@@ -370,6 +370,11 @@ const base = Table.new({
 	sfx("breath_held", false, { Spatial = false, Volume = 0.25, Id = "rbxassetid://9125572450", Ref = "SFX-241 Gasps Male Deep Breaths Fast Pants Frightened (SFX), ProSoundEffects" }),
 	sfx("power_up", false, { Spatial = false, Volume = 0.7, Id = "rbxassetid://9117885256", Ref = "SFX-242 Power Up Sweeteners 10 (SFX), ProSoundEffects" }),
 	sfx("lamps_cascade", false, { Spatial = false, Volume = 0.5, Id = "rbxassetid://9116266327", Ref = "SFX-243 Light Bulb Buzz 6 (SFX), ProSoundEffects" }),
+	-- suspense events (TASK-481, TASK-486; DEC-294; design/horror-cinematic.md §7; sound-list.md §5.20). Same library
+	-- and licence as the blackout bank; Provisional until the owner's Play
+	sfx("suspense_drop", false, { Spatial = false, Volume = 0.8, Id = "rbxassetid://9125484700", Ref = "SFX-244 Deep Hits Big Reverberant Booms Rumbling Tail 1 (SFX), ProSoundEffects" }),
+	sfx("suspense_hiss", false, { Volume = 0.6, MaxDistance = 90, Id = "rbxassetid://9113989919", Ref = "SFX-245 Creature Vocal Spider Hiss Exhale 1 (SFX), ProSoundEffects" }),
+	sfx("floor_scratch", false, { Volume = 0.6, MaxDistance = 50, Ref = "SFX-246 no safe candidate yet (silence)" }),
 	-- restaurant (tech/restaurant-flow.md rev. 2 §4.2; wave R0 rows, Id "" = silence until the audio list uploads them)
 	sfx("plate_put", false, { Volume = 0.5, MaxDistance = 40 }),
 	sfx("ticket_pop", false, { Spatial = false, Volume = 0.4 }), -- HUD note pop-up per item at the tablet

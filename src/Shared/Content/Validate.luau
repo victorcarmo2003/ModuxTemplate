@@ -38,6 +38,7 @@ local Sounds = require(script.Parent.Sounds)
 local Species = require(script.Parent.Species)
 local Stations = require(script.Parent.Stations)
 local Stats = require(script.Parent.Stats)
+local Suspense = require(script.Parent.Suspense)
 local Table = require(script.Parent.Table)
 local Thief = require(script.Parent.Thief)
 local TipJar = require(script.Parent.TipJar)
@@ -1217,6 +1218,61 @@ local function checkHallucinations()
 	const interval = Hallucinations.Rules.Interval
 	if #interval ~= 2 or interval[1] < 1 or interval[2] < interval[1] then
 		fail("HallucinationRules", nil, nil, "Interval must be {min, max} with 1 <= min <= max")
+	end
+end
+
+-- Suspense events (TASK-481, DEC-294): spots exist, numbers in range, cost inside DEC-294 terms, hijack under the camera caps.
+local function checkSuspense()
+	checkKeys("Suspense", Suspense, KEY_PATTERN)
+	checkKeys("Suspense.Spots", Suspense.Spots, KEY_PATTERN)
+	const styles: { [string]: boolean } = { Grin = true, Walk = true, Crawl = true, Roof = true }
+	for index, row in Suspense.List do
+		if not styles[row.Style] then
+			fail("Suspense", index, row.Key, `Style '{row.Style}' is not Grin/Walk/Crawl/Roof`)
+		end
+		if #row.Spots == 0 then
+			fail("Suspense", index, row.Key, "needs at least one spot")
+		end
+		for _, spot in row.Spots do
+			if Suspense.Spots.ByKey[spot] == nil then
+				fail("Suspense", index, row.Key, `spot '{spot}' is not a row of Suspense.Spots`)
+			end
+		end
+		inRange("Suspense", index, row.Key, "FromNight", row.FromNight, 1, 10)
+		inRange("Suspense", index, row.Key, "Weight", row.Weight, 0.01, 100)
+		inRange("Suspense", index, row.Key, "Scale", row.Scale, 0.1, 5)
+		inRange("Suspense", index, row.Key, "Head", row.Head, 0, 30)
+	end
+	for index, spot in Suspense.Spots.List do
+		inRange("Suspense.Spots", index, spot.Key, "Scale", spot.Scale, 0.1, 5)
+	end
+	const rules = Suspense.Rules
+	const per, cost, window = rules.PerNight, rules.Cost, rules.Window
+	if #per ~= 2 or per[1] < 0 or per[2] < per[1] or per[2] > 10 then
+		fail("Suspense.Rules", nil, nil, "PerNight must be {min, max} with 0 <= min <= max <= 10")
+	end
+	if #cost ~= 2 or cost[1] < 0 or cost[2] < cost[1] or cost[2] > 100 then
+		fail("Suspense.Rules", nil, nil, "Cost must be {min, max} with 0 <= min <= max <= 100")
+	end
+	if #window ~= 2 or window[2] <= window[1] then
+		fail("Suspense.Rules", nil, nil, "Window must be {from, to} game minutes with from < to")
+	end
+	inRange("Suspense.Rules", nil, nil, "Life", rules.Life, 1, 60)
+	inRange("Suspense.Rules", nil, nil, "HiddenAngle", rules.HiddenAngle, 10, 180)
+	inRange("Suspense.Rules", nil, nil, "SeenAngle", rules.SeenAngle, 10, 180)
+	inRange("Suspense.Rules", nil, nil, "ScreenMargin", rules.ScreenMargin, 0, 0.45)
+	const hijack = rules.Hijack
+	const horror = HorrorScenes.Rules
+	inRange("Suspense.Rules", nil, nil, "Hijack.Duration", hijack.Duration, 0.05, horror.MaxControlLock)
+	inRange("Suspense.Rules", nil, nil, "Hijack.Pull", hijack.Pull, 0, horror.MaxPull)
+	inRange("Suspense.Rules", nil, nil, "Hijack.Fov", hijack.Fov, -horror.MaxFov, horror.MaxFov)
+	inRange("Suspense.Rules", nil, nil, "Hijack.Vignette", hijack.Vignette, 0, horror.MaxVignette)
+	inRange("Suspense.Rules", nil, nil, "Hijack.Pulse", hijack.Pulse, 0, 0.3)
+	if horror.Shakes[hijack.Shake] == nil then
+		fail("Suspense.Rules", nil, nil, `Hijack.Shake '{hijack.Shake}' is not a HorrorScenes.Rules.Shakes profile`)
+	end
+	if HorrorScenes.Words.suspense == nil then
+		fail("Suspense.Rules", nil, nil, "HorrorScenes.Words needs a 'suspense' list")
 	end
 end
 
@@ -2582,4 +2638,5 @@ return function()
 	checkPrep()
 	checkRestaurant()
 	checkHorrorScenes()
+	checkSuspense()
 end
