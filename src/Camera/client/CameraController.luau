@@ -69,6 +69,7 @@ local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
+local Motion = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Motion)
 
 export type Mode = "FirstPerson" | "Spectate" | "Fixed" | "Cutscene" | "Prep" | "External"
 
@@ -127,6 +128,11 @@ type PrepState = {
 	Far: number,
 }
 
+-- Horror camera layer (TASK-463; tech/horror-scene.md §4): one shake running, the ramp of the field-of-view delta, one nudge
+type HorrorShake = { Amplitude: number, Frequency: number, Duration: number, Start: number, Seed: number }
+type HorrorFovRamp = { From: number, Peak: number, Back: number?, Attack: number, Duration: number, Start: number }
+type HorrorNudge = { Target: Vector3, Angle: number, Duration: number, Start: number, Done: number }
+
 type Group = "Head" | "Arm" | "Body"
 
 -- the springs of the prep glide settle (98 %) in about PREP_SETTLE / Omega seconds: Omega = PREP_SETTLE / Travel
@@ -174,6 +180,19 @@ const SHOT_FOV_RATE = 14 -- 1/s: a shot animates its own fov, the camera only sm
 const DOF_RATE = 4 -- 1/s ease of the depth of field
 const DOF_FAR = 0.3 -- far blur while a focus holds (none while walking)
 const DOF_RADIUS_MIN = 8 -- studs in focus around the focus distance
+
+-- Horror camera layer (Content.HorrorScenes.Rules; see the Horror* methods). Provisional (TASK-463): the shake tilt per
+-- stud, the decay curve and the attack share of a Fov step that comes back.
+const HORROR = Content.HorrorScenes.Rules
+const HORROR_RENDER_STEP = "CameraController.HorrorUndo"
+-- before the stock CameraModule: it reads the view of the last frame, so the shake offset is taken off first
+const HORROR_UNDO_PRIORITY = Enum.RenderPriority.Camera.Value - 1
+-- modes the layer plays in (Cutscene, Prep = security monitor and prep, External: someone else owns the camera)
+const HORROR_MODES: { [Mode]: boolean } = { FirstPerson = true, Spectate = true, Fixed = true }
+const HORROR_TILT = math.rad(8) -- rad of shake tilt per stud of shake amplitude
+const HORROR_ATTACK = 0.25 -- share of a Fov step's Duration spent reaching the delta when it comes back
+const HORROR_ATTACK_MAX = 1.5 -- s
+const HORROR_NUDGE_MIN = 0.05 -- s: a 0 s nudge still eases
 
 -- R6 core parts: the head-group walk never crosses them.
 const CORE: { [string]: boolean } = {
@@ -412,9 +431,21 @@ function CameraController:Setup()
 	self.GazeYaw = NO_GAZE :: number
 	self.GazePitch = NO_GAZE :: number
 	self.GazeAt = 0 :: number
+	-- Horror layer: shakes running, field-of-view delta (now, its ramp, the part written on the camera), nudges running
+	self.HorrorShakes = {} :: { HorrorShake }
+	self.HorrorFovNow = 0 :: number
+	self.HorrorFovRamp = nil :: HorrorFovRamp?
+	self.HorrorFovApplied = 0 :: number
+	self.HorrorNudges = {} :: { HorrorNudge }
+	-- shake offset (camera space) written this frame, taken off before the stock camera runs again
+	self.HorrorOffset = nil :: CFrame?
 end
 
 function CameraController:SetMode(mode: Mode)
+	if not HORROR_MODES[mode] then
+		-- the camera goes to a mode the horror layer stays out of: its field of view back before the new owner reads it
+		self:HorrorClear()
+	end
 	if mode ~= "Prep" and Vide.untrack(self.Mode) == "Prep" then
 		-- someone took the camera while the prep mode was up: drop its effect and field of view
 		self:PrepClear()
@@ -469,6 +500,7 @@ function CameraController:Prep(on: boolean, frame: CFrame?, options: PrepOptions
 		if frame == nil or (mode ~= "FirstPerson" and mode ~= "Prep") then
 			return
 		end
+		self:HorrorClear()
 		const baseFov = if existing ~= nil then existing.BaseFov else camera.FieldOfView
 		local dof = if existing ~= nil then existing.Dof else nil
 		const wantedFocus = opts.Focus or 2.5
@@ -674,6 +706,7 @@ end
 function CameraController:Cutscene(on: boolean)
 	const camera = workspace.CurrentCamera
 	if on then
+		self:HorrorClear()
 		self.FocusGetter = nil
 		self.FocusFov = nil
 		if Vide.untrack(self.Mode) ~= "Cutscene" and camera ~= nil then
@@ -1260,6 +1293,224 @@ function CameraController:ElasticLook(dYaw: number, dPitch: number, dt: number, 
 	self.LookPitch = x.Y
 end
 
+--[[
+	Horror camera layer (TASK-463; Content.HorrorScenes steps Shake / Fov / Nudge, called by the scene player). A layer on
+	top of the mode, never a mode: it plays in FirstPerson, Spectate and Fixed and stays out of Cutscene, Prep (the
+	security monitor uses it) and External; a switch to one of those clears it. Every amount is clamped to the Rules and
+	scaled by Rules.ReduceMotion when Motion.Reduced().
+	  Shake  camera-space offset and tilt (decaying noise), written after the mode and taken off again before the stock
+	         camera reads the view (HorrorUndo), so the first-person look never drifts
+	  Fov    a delta added to whatever field of view the mode has (only the change is written, so the player's own value is
+	         kept underneath)
+	  Nudge  first person only: turns the real look a few degrees towards a point over at most Rules.MaxControlLock and lets
+	         go (the view stays where it got; the player's input keeps working the whole time)
+]]
+local function horrorScale(): number
+	return if Motion.Reduced() then HORROR.ReduceMotion else 1
+end
+
+local function smooth(x: number): number
+	const t = math.clamp(x, 0, 1)
+	return t * t * (3 - 2 * t)
+end
+
+-- One shake of a Rules.Shakes profile (Jolt / Step / Door); `scale` multiplies its amplitude (default 1).
+function CameraController:HorrorShake(profile: string, scale: number?)
+	const spec = HORROR.Shakes[profile]
+	if spec == nil then
+		warn(`[CameraController] unknown horror shake profile '{profile}'`)
+		return
+	end
+	if not HORROR_MODES[Vide.untrack(self.Mode)] then
+		return
+	end
+	const amplitude = spec.Amplitude * math.max(scale or 1, 0) * horrorScale()
+	if amplitude <= 0 or spec.Duration <= 0 then
+		return
+	end
+	table.insert(self.HorrorShakes, {
+		Amplitude = amplitude,
+		Frequency = spec.Frequency,
+		Duration = spec.Duration,
+		Start = os.clock(),
+		Seed = math.random() * 100,
+	})
+end
+
+-- Field-of-view delta in degrees (|delta| <= Rules.MaxFov), eased from the delta now. `back` nil: reaches `delta` over
+-- `duration` and holds it; `back` set (0 = the player's own fov): reaches `delta` in the first part, then eases to `back`.
+function CameraController:HorrorFov(delta: number, back: number?, duration: number)
+	if not HORROR_MODES[Vide.untrack(self.Mode)] then
+		return
+	end
+	const scale = horrorScale()
+	const peak = math.clamp(delta, -HORROR.MaxFov, HORROR.MaxFov) * scale
+	const total = math.max(duration, 0)
+	self.HorrorFovRamp = {
+		From = self.HorrorFovNow,
+		Peak = peak,
+		Back = if back ~= nil then math.clamp(back, -HORROR.MaxFov, HORROR.MaxFov) * scale else nil,
+		Attack = if back ~= nil then math.min(total * HORROR_ATTACK, HORROR_ATTACK_MAX) else total,
+		Duration = total,
+		Start = os.clock(),
+	}
+end
+
+-- Pulls the first-person look at most `degrees` (<= Rules.MaxNudge) towards `target` over `duration` s
+-- (<= Rules.MaxControlLock), then lets go. Never stops the player's own look input.
+function CameraController:HorrorNudge(target: Vector3, degrees: number, duration: number)
+	if Vide.untrack(self.Mode) ~= "FirstPerson" then
+		return
+	end
+	const angle = math.rad(math.clamp(math.abs(degrees), 0, HORROR.MaxNudge)) * horrorScale()
+	if angle <= 0 then
+		return
+	end
+	table.insert(self.HorrorNudges, {
+		Target = target,
+		Angle = angle,
+		Duration = math.clamp(duration, HORROR_NUDGE_MIN, HORROR.MaxControlLock),
+		Start = os.clock(),
+		Done = 0,
+	})
+end
+
+-- Ends the layer at once (scene cancelled, the camera goes to another owner): shakes and nudges dropped, the field of
+-- view back to what the mode had underneath.
+function CameraController:HorrorClear()
+	table.clear(self.HorrorShakes)
+	table.clear(self.HorrorNudges)
+	self.HorrorFovRamp = nil
+	self.HorrorFovNow = 0
+	const applied = self.HorrorFovApplied
+	self.HorrorFovApplied = 0
+	const camera = workspace.CurrentCamera
+	if applied ~= 0 and camera ~= nil then
+		camera.FieldOfView -= applied
+	end
+end
+
+-- Before the stock camera (HORROR_UNDO_PRIORITY): takes off the shake offset of the last frame, so the stock first-person
+-- camera turns from the real look. In Spectate / Fixed the mode writes the view again anyway; harmless there.
+function CameraController:HorrorUndo()
+	const offset = self.HorrorOffset
+	if offset == nil then
+		return
+	end
+	self.HorrorOffset = nil
+	const camera = workspace.CurrentCamera
+	if camera ~= nil and HORROR_MODES[Vide.untrack(self.Mode)] then
+		camera.CFrame *= offset:Inverse()
+	end
+end
+
+-- Delta of the field of view at `now` (the ramp ends on its last value).
+function CameraController:HorrorFovAt(now: number): number
+	const ramp = self.HorrorFovRamp
+	if ramp == nil then
+		return self.HorrorFovNow
+	end
+	const elapsed = now - ramp.Start
+	const back = ramp.Back
+	if elapsed >= ramp.Duration then
+		self.HorrorFovRamp = nil
+		return back or ramp.Peak
+	end
+	if elapsed < ramp.Attack then
+		return ramp.From + (ramp.Peak - ramp.From) * smooth(elapsed / ramp.Attack)
+	end
+	if back == nil then
+		return ramp.Peak
+	end
+	return ramp.Peak + (back - ramp.Peak) * smooth((elapsed - ramp.Attack) / math.max(ramp.Duration - ramp.Attack, 1e-3))
+end
+
+-- One frame of the layer, after the mode wrote the view: nudges (kept), field of view, shake offset (taken off later).
+function CameraController:ApplyHorror(now: number)
+	const camera = workspace.CurrentCamera
+	if camera == nil or loadingShown() or not HORROR_MODES[Vide.untrack(self.Mode)] then
+		return
+	end
+
+	const fov = self:HorrorFovAt(now)
+	self.HorrorFovNow = fov
+	if fov ~= self.HorrorFovApplied then
+		camera.FieldOfView += fov - self.HorrorFovApplied
+		self.HorrorFovApplied = fov
+	end
+
+	const nudges = self.HorrorNudges
+	if #nudges > 0 then
+		if Vide.untrack(self.Mode) ~= "FirstPerson" then
+			table.clear(nudges)
+		else
+			for index = #nudges, 1, -1 do
+				const nudge = nudges[index]
+				const progress = smooth((now - nudge.Start) / nudge.Duration)
+				self:NudgeView(camera, nudge.Target, nudge.Angle * (progress - nudge.Done))
+				nudge.Done = progress
+				if progress >= 1 then
+					table.remove(nudges, index)
+				end
+			end
+		end
+	end
+
+	const shakes = self.HorrorShakes
+	if #shakes == 0 then
+		return
+	end
+	local shift = Vector3.zero
+	for index = #shakes, 1, -1 do
+		const shake = shakes[index]
+		const elapsed = now - shake.Start
+		if elapsed >= shake.Duration then
+			table.remove(shakes, index)
+		else
+			const decay = (1 - elapsed / shake.Duration) ^ 2
+			const phase = elapsed * shake.Frequency
+			shift += Vector3.new(
+				math.noise(phase, shake.Seed, 0.5),
+				math.noise(shake.Seed, phase, 1.5),
+				math.noise(shake.Seed, 2.5, phase)
+			) * (2 * shake.Amplitude * decay)
+		end
+	end
+	if shift.Magnitude <= 1e-5 then
+		return
+	end
+	-- x, y: offset along the camera axes and a matching tilt; z: a small roll
+	const offset = CFrame.new(shift.X, shift.Y, 0)
+		* CFrame.Angles(shift.Y * HORROR_TILT, -shift.X * HORROR_TILT, shift.Z * HORROR_TILT)
+	camera.CFrame *= offset
+	self.HorrorOffset = offset
+end
+
+-- Turns the first-person look up to `step` radians towards `target` (yaw and pitch, no roll; never past the point).
+function CameraController:NudgeView(camera: Camera, target: Vector3, step: number)
+	if step <= 0 then
+		return
+	end
+	const frame = camera.CFrame
+	const direction = target - frame.Position
+	if direction.Magnitude < 0.01 then
+		return
+	end
+	const look = frame.LookVector
+	const yaw = yawOf(look)
+	const pitch = math.asin(math.clamp(look.Y, -1, 1))
+	const unit = direction.Unit
+	const dYaw = angleDelta(yaw, yawOf(unit))
+	const dPitch = math.asin(math.clamp(unit.Y, -1, 1)) - pitch
+	const gap = math.sqrt(dYaw * dYaw + dPitch * dPitch)
+	if gap < 1e-4 then
+		return
+	end
+	const k = math.min(step, gap) / gap
+	camera.CFrame = CFrame.new(frame.Position)
+		* CFrame.fromOrientation(math.clamp(pitch + dPitch * k, -PITCH_LIMIT, PITCH_LIMIT), yaw + dYaw * k, 0)
+end
+
 -- Keeps the camera on the mode's subject (only writes what differs).
 function CameraController:ApplyCamera(dt: number)
 	const mode = Vide.untrack(self.Mode)
@@ -1420,6 +1671,7 @@ function CameraController:Update(dt: number)
 	end
 	self:ApplyCamera(dt)
 	self:SendGaze(now)
+	self:ApplyHorror(now)
 
 	const body = self:Body()
 	if body ~= self.Character then
@@ -1476,6 +1728,9 @@ CameraController:OnStart(function(self)
 		end
 	end)
 
+	RunService:BindToRenderStep(HORROR_RENDER_STEP, HORROR_UNDO_PRIORITY, function()
+		self:HorrorUndo()
+	end)
 	RunService:BindToRenderStep(RENDER_STEP, RENDER_PRIORITY, function(dt: number)
 		self:Update(dt)
 	end)

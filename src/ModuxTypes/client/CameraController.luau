@@ -52,6 +52,9 @@ type PrepState = {
 	Dof: DepthOfFieldEffect?,
 	Far: number,
 }
+type HorrorShake = { Amplitude: number, Frequency: number, Duration: number, Start: number, Seed: number }
+type HorrorFovRamp = { From: number, Peak: number, Back: number?, Attack: number, Duration: number, Start: number }
+type HorrorNudge = { Target: Vector3, Angle: number, Duration: number, Start: number, Done: number }
 type Group = "Head" | "Arm" | "Body"
 
 export type Public = {
@@ -77,6 +80,12 @@ export type Public = {
 	GazeYaw: number,
 	Groups: { [BasePart]: Group },
 	HoldYaw: number?,
+	HorrorFovApplied: number,
+	HorrorFovNow: number,
+	HorrorFovRamp: HorrorFovRamp?,
+	HorrorNudges: { HorrorNudge },
+	HorrorOffset: CFrame?,
+	HorrorShakes: { HorrorShake },
 	LastLookInput: number,
 	LastPosition: Vector3?,
 	LastState: string,
@@ -130,6 +139,14 @@ export type Public = {
 	CutsceneBase: (self: Public, eye: Vector3, facing: Vector3, camera: Camera, dt: number, now: number) -> (),
 	CutsceneLens: (self: Public, camera: Camera, dt: number, distance: number?) -> (),
 	ElasticLook: (self: Public, dYaw: number, dPitch: number, dt: number, now: number) -> (),
+	HorrorShake: (self: Public, profile: string, scale: number?) -> (),
+	HorrorFov: (self: Public, delta: number, back: number?, duration: number) -> (),
+	HorrorNudge: (self: Public, target: Vector3, degrees: number, duration: number) -> (),
+	HorrorClear: (self: Public) -> (),
+	HorrorUndo: (self: Public) -> (),
+	HorrorFovAt: (self: Public, now: number) -> number,
+	ApplyHorror: (self: Public, now: number) -> (),
+	NudgeView: (self: Public, camera: Camera, target: Vector3, step: number) -> (),
 	ApplyCamera: (self: Public, dt: number) -> (),
 	IsFirstPerson: (self: Public) -> boolean,
 	SendGaze: (self: Public, now: number) -> (),
