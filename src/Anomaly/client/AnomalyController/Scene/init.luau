@@ -78,7 +78,7 @@ for _, scene in SCENES.List do
 	end
 	QUEUES[scene.Key] = byPhase
 end
-const EMPTY: { Step } = table.freeze({})
+const EMPTY: { Step } = table.freeze({} :: { Step })
 
 const Scene = {}
 

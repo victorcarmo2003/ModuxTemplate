@@ -43,6 +43,9 @@ export type State = {
 	Caption: boolean, -- this run showed the caption
 }
 
+-- AudioController PlayOptions (structural copy: a literal table did not unify with the optional fields)
+type PlayOptions = { Volume: number?, Speed: number?, Vary: number?, Scare: boolean? }
+
 export type Handler = (ctx: Effect.Context, state: State, step: Step, late: number) -> ()
 
 const SOUNDS = Content.Sounds
@@ -103,7 +106,7 @@ const sound: Handler = function(ctx, state, step, _late)
 	if key == nil then
 		return
 	end
-	const opts = { Volume = step.Value or 1 }
+	const opts: PlayOptions = { Volume = step.Value or 1 }
 	const from = if step.Point ~= nil then point(ctx, state, step.Point) else nil
 	if from == nil then
 		ctx.Audio:Play(key, nil, opts)
