@@ -79,7 +79,7 @@ const base = Table.new({
 		Name = "Cheese",
 		Kind = "Topping",
 		OrderPrice = 2,
-		UnlockDay = 2,
+		UnlockDay = 3, -- owner 2026-10-18: Night 2 (runs start at night: Night k = Day k + 1)
 		Weight = 7,
 		Capacity = { 5, 6, 7, 8, 9 }, -- same rule for every topping: about half at level 1, the old level-1 cap at level 4 (Provisional)
 		Station = "toppings",
@@ -92,7 +92,7 @@ const base = Table.new({
 		Name = "Bacon",
 		Kind = "Topping",
 		OrderPrice = 3,
-		UnlockDay = 3,
+		UnlockDay = 5, -- owner 2026-10-18: Night 4 (runs start at night: Night k = Day k + 1)
 		Weight = 6,
 		Capacity = { 5, 6, 7, 8, 9 }, -- same rule (Provisional)
 		Station = "toppings",
@@ -105,7 +105,7 @@ const base = Table.new({
 		Name = "Potato Sticks",
 		Kind = "Topping",
 		OrderPrice = 2,
-		UnlockDay = 4,
+		UnlockDay = 7, -- owner 2026-10-18: Night 6 (runs start at night: Night k = Day k + 1)
 		Weight = 6,
 		Capacity = { 6, 9, 12, 15, 18 }, -- same rule (Provisional)
 		Station = "toppings",
@@ -118,7 +118,7 @@ const base = Table.new({
 		Name = "Cream Cheese",
 		Kind = "Topping",
 		OrderPrice = 2,
-		UnlockDay = 6,
+		UnlockDay = 9, -- owner 2026-10-18: Night 8 (runs start at night: Night k = Day k + 1)
 		Weight = 5,
 		Capacity = { 6, 8, 10, 12, 14 }, -- same rule (Provisional; Q-062)
 		Station = "toppings",
