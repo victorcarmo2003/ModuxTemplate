@@ -28,6 +28,11 @@ Base: FEAT-005, FEAT-006, FEAT-009 a FEAT-011, FEAT-014, FEAT-015, FEAT-037 a FE
 > (DEC-302, DEC-303, DEC-304; DEC-298 e DEC-299 onde continuam valendo). Junto: UPG-016 sem queima (§3), economia da nota e do
 > bônus de virar (§4.5), §0, §1, §6 e §8 acertados. As DEC-297 e DEC-301 estão superadas; os trechos de "seções focadas por
 > estação", pilhas, "Fill All", passa e queima que sobram nas §5 e §7 são histórico da rev. 2.
+>
+> **Rev. 3.1 (game-designer, 2026-10-18):** FEAT-044 e FEAT-045 alinhadas com a **DEC-305** (dois prompts, grelha 8/6/4 s,
+> Perfect = base + $1, descanso de 8), com o contrato `tech/prep-conveyor.md` (TASK-512) e com o que a TASK-513 gravou em
+> `Content.Prep`, `Content.Restaurant`, `Content.Actions` e `Content.Items` (divergências D-1 a D-14 de
+> `tests/kitchen-redesign.md` §17). Onde esta ficha e o contrato discordarem, vale o contrato; os números vêm do `Content`.
 
 Tudo aqui é **Rascunho / Provisório** (fase 1, DEC-193): o trabalho pode seguir com estas recomendações; nada vira Aprovado
 sem DEC do dono. Números são valores iniciais de tabela (DEC-044): mudar número = mudar `Content`, nunca código.
@@ -51,8 +56,8 @@ Cliente entra ─► FILA do tablet (ponta direita) ─► TABLET: mini-diálogo
      espera EMPILHADO na RETIRADA (ponta esquerda), número #n sobre a cabeça
                                                          │
 Cozinha:  prato vazio com ticket #n nasce na MESA CENTRAL (8 vagas, FEAT-044) ─► segurar E: prato na mão, ticket no HUD
-          prompt único "Work" ─► ESTEIRA (FEAT-045): parada 1 grelha+descanso ─► 2 pão: cortar, salsicha ─► 3 molhos: padrão
-          grelhador em paralelo: grelha focada (sem queimar, virar = bônus) ─► mesa de descanso
+          prompt "Work" ─► ESTEIRA (FEAT-045): parada 1 grelha+descanso ─► 2 pão: cortar, salsicha ─► 3 molhos: padrão
+          grelhador em paralelo: prompt "Grill" ─► grelha focada (sem queimar, virar = bônus) ─► mesa de descanso
           prato pronto com nota ─► de volta à mesa central  OU  direto ao balcão de retirada
                                                          ▼
 Entrega NO BALCÃO ao cliente #n (FEAT-046) ─► ele senta numa mesa, come e vai embora (gorjeta de mesa no pote)
@@ -99,8 +104,8 @@ drive-thru e a escotilha são passagens de objeto, não de corpo.
 
 ### 1.2 Modo de preparo focado (DEC-223): o que continua e o que sai
 
-> **Rev. 3 (DEC-302/303):** esta seção é **histórico** da rev. 2. O modo focado volta ao restaurante **com esteira**: um prompt
-> único, a esteira **substitui** as abas/pan (DEC-232) e a tábua única por assento; a grelha focada **não queima**; o gesto
+> **Rev. 3 (DEC-302/303):** esta seção é **histórico** da rev. 2. O modo focado volta ao restaurante **com esteira**: dois
+> prompts, esteira e grelha (DEC-305, no lugar do prompt único da DEC-302), a esteira **substitui** as abas/pan (DEC-232) e a tábua única por assento; a grelha focada **não queima**; o gesto
 > `place` **volta** (salsicha da mesa de descanso ao pão); `Grade`, tolerâncias, gestos, dopamina, mão fantasma e saídas
 > forçadas continuam. Regras atuais: FEAT-045.
 
@@ -176,40 +181,45 @@ estações em prompt no mundo (opção B como rollback por flag).
 ### FEAT-044 — Mesa central: o prato nasce com o ticket e volta para a entrega
 
 - Status: Rascunho (Provisório) · Pilares: VENDER, GERENCIAR · Origem: DEC-271, **DEC-302**, **DEC-303** (Q-383 A), **DEC-304**
-  · rev. 3 (TASK-508, 2026-10-18): substitui a "mesa de montagem com pilhas e Fill All" (rev. 2) e a passa da DEC-297.
+  · rev. 3 (TASK-508, 2026-10-18): substitui a "mesa de montagem com pilhas e Fill All" (rev. 2) e a passa da DEC-297 ·
+  rev. 3.1: alinhada com DEC-305 (fileira de 8), `tech/prep-conveyor.md` §6 a §8 e o `Content` da TASK-513.
 - Resumo: a **mesa central** é o **início e o fim** do fluxo da cozinha (DEC-304). Cada pedido confirmado faz nascer um **prato
-  vazio com a plaquinha do ticket #n** numa vaga do grid de **8**. O montador **pega o prato segurando E**, leva à esteira
+  vazio com a plaquinha do ticket #n** numa das **8** vagas da mesa (fileira de 8, DEC-305). O montador **pega o prato segurando E**, leva à esteira
   (FEAT-045), monta e depois **devolve à mesa** (clicando numa vaga livre) ou **leva direto ao `PICKUP`** (FEAT-046). Enquanto um
   jogador segura um prato, o **ticket aparece no HUD**. Assim um cozinha e põe na mesa, outro pega e entrega.
 - Fora daqui: nada de pilhas (`bun_sliced`, `sausage_grilled`), "Fill All", `plate_put`/`plate_take` da passa nem montagem na
   mesa. A montagem é toda na esteira.
 
-| Regra | Valor (`Content.Restaurant.CenterTable`; **Provisório** onde o dono não deu número) |
+| Regra | Valor (`Content.Restaurant` e `Content.Actions`, gravados pela TASK-513; **Provisório** onde o dono não deu número) |
 |---|---|
-| Vagas | **8** em grid 4 × 2 (DEC-303), **todas ativas em qualquer party**. UPG-024 Long Pass: +2 / +4 (teto 12) **Provisório**, depende de caber no layout (TASK-503) |
-| Nascer | pedido confirmado (tablet, computador do drive-thru, kiosk) → prato vazio com ticket #n na **vaga livre de menor índice** (vaga 1 = a mais perto da esteira) em **≤ 0,5 s**; drive-thru ocupa da **maior** para a menor (perto da janela) |
-| Mesa cheia | 8 vagas ocupadas: o tablet mostra **"Kitchen full"** e não abre o diálogo (DEC-304, FEAT-043); o cliente espera em `Q1` com a paciência correndo; vaga liberada destrava em ≤ 0,5 s. Nunca existe pedido sem prato |
-| Plaquinha e billboard | plaquinha "#12" no prato (vai junto para a mão e para a esteira) · billboard sobre a vaga: "#12", ícone de carro se for drive-thru, ícones de pão, salsicha e complementos (cinza = falta, cheio = feito), anel de paciência Cream → Mustard → **Ink** (sem vermelho), com **forma** que muda (cheio → meio → 1/4 piscando) |
-| Estados do prato | `Empty` → `Bun` → `Base` (pão + salsicha) → condimentos → `Ready` (com nota, FEAT-045); K = 0: sai da esteira `Ready` depois do `Base`. Na mesa pode haver prato em qualquer estado (quem sai no meio devolve em montagem) |
-| Pegar | **segurar E 0,4 s** ("Take #12"), qualquer jogador, qualquer estado; vira prato-Tool no inventário; **máx. 2** na mão (DEC-299); o 3º recusa com `hands_full`; a vaga fica livre na hora |
-| Pôr | com um prato equipado, **clicar / tocar uma vaga livre** a ≤ **8 studs** (alvo ≥ 44 px no celular); o prato vai para a vaga; vaga ocupada não reage e não manda pacote |
-| Ticket no HUD | enquanto segura um prato, a nota do pedido (`HudOrder`, canto superior esquerdo) mostra o ticket do prato **equipado**: #n, itens, complementos, cheio = feito; troca em **≤ 0,2 s** ao trocar de prato; some ao soltar |
-| Prioridade | sem ordem obrigatória; o prato mais antigo pulsa em Mustard; paciência ≤ **25%** ganha "!" |
-| Cliente desistiu | prato **vazio** some na hora (nada perdido); prato com algo vira **órfão** (billboard cinza "?"); pedido novo **idêntico** reaproveita o órfão mais adiantado em vez de nascer vazio; senão o órfão fica até ir à lixeira ou até o `Summary` |
-| Órfão na mão | entregável a qualquer cliente com pedido pendente idêntico (reatribuído na entrega) |
-| Prato jogado fora | jogar fora um prato com ticket vivo faz nascer de novo o **prato vazio do mesmo #n** na mesa (vaga livre; se não houver, assim que abrir uma). O pedido nunca fica sem prato **(Provisório)** |
-| Disputa | 2 jogadores segurando E na mesma vaga: leva quem completar primeiro no servidor; o outro recebe "Taken" (FEAT-005) |
-| Rede (architect, TASK-512) | Set da mesa central com 1 registro por vaga (8, teto 12): ticket, estado, nota, máscara de complementos |
+| Vagas | **8** em **fileira de 8** (`CenterTable.Slots = 8`; Q-383 A; fileira em vez de grid 4 × 2 aceita na DEC-305, MAP-01-r4 §16.7). As 8 ficam **sempre ativas** e publicadas no set `Plates` (vaga livre = `Npc = 0`); o teto por party vale para os **tickets** (linha abaixo), não para as vagas. Vaga 1 = oeste (perto do `PICKUP`), vaga 8 = leste (perto do tablet e da entrada da esteira). UPG-024 Long Pass +2 / +4 (`Rules.PlateSlotsMax` 12, fio 1..12) **Provisório**, depende de caber no layout |
+| Nascer | pedido confirmado (tablet, computador do drive-thru, kiosk) → prato vazio com ticket #n (1 por linha de dupla, FEAT-038) na **vaga livre de maior índice** (leste; contrato §6.2, P14 aceita pelo dono) em **≤ 0,5 s**. Antes de criar um prato novo, um **órfão com conteúdo** que satisfaça o pedido adota o ticket (`Rules.OrphanReuse`, `Rules.PreppedFirst`). Drive-thru segue a mesma regra (o ícone de carro diferencia) |
+| Teto de tickets | `TicketCap = min(Rules.ActivePlates[party], CenterTable.Slots)` = **4 / 6 / 8 / 8** (1 / 2 / 3 / 4 jogadores; `ActivePlates = { 4, 6, 8, 8 }`), contando os pratos vivos em **qualquer forma** (mesa, mão, esteira). O tablet só toma o pedido se `pratos vivos + linhas do pedido ≤ TicketCap` (contrato §7.3, **Provisória P20**). Consequência: sempre há vaga livre para devolver um prato |
+| Mesa cheia / "Kitchen full" | teto atingido (não "8 vagas ocupadas"): o tablet mostra **"Kitchen full"** (lâmpada `Full`) e não abre o diálogo (DEC-304, FEAT-043); o cliente espera em `Q1` com a paciência correndo; um prato vendido ou encerrado destrava em ≤ 0,5 s. Nunca existe pedido sem prato |
+| Plaquinha e billboard | plaquinha "#12" no prato (vai junto para a mão e para a esteira) · billboard sobre a vaga (`Att_Ticket`): "#12", ícone de carro se for drive-thru, ícones de pão, salsicha e complementos (cinza = falta, cheio = feito), anel de paciência Cream → Mustard → **Ink** (sem vermelho), com **forma** que muda (cheio → meio → 1/4 piscando) |
+| Estados do prato | livre → prato vazio com ticket → em montagem (`Bun` e/ou `Sausage`, sem `Grade`) → montado (`Grade` = Perfect / Good / Messy) · órfão (`Orphan`). Na mão: `plate` (ITM-025) enquanto não montado, `hot_dog` (ITM-010) depois do Finish. Na mesa pode haver prato em qualquer estado (quem sai da esteira em `Out` sem nota devolve em montagem) |
+| Pegar | **segurar E 0,5 s** no `Prompt_Take` fixo da vaga (`Actions.plate_take`: `Hold` 0,5, `Radius` 5) — "Take Plate"; qualquer jogador ativo, qualquer estado (P18); vira Tool `plate` ou `hot_dog` no inventário; **máx. 2** na mão (DEC-299, categoria `HotDog`); o 3º recusa com `hands_full`; a vaga fica livre na hora |
+| Pôr | com um prato equipado (`plate` ou `hot_dog` com `PlateId`), **clicar / tocar uma vaga livre** a ≤ **12 studs** do centro dela (`CenterTable.Reach` 12, Provisório) → packet `CenterPut { Slot }`; teto `CenterTable.PutRate` **4 por s** por jogador. Vaga ocupada: o cliente não manda pacote; se mandar, `slot_taken`. Gamepad: vai para a vaga livre mais perto do personagem. Alvo ≥ 44 px no celular garantido até ~9 studs (`Click_Slot` de 1,0 de altura, MAP §16.7); entre 9 e 12 o alvo encolhe (~34 px a 12), aceitável porque quem usa a mesa está a ≤ 2 studs dela no corredor |
+| Ticket no HUD | enquanto segura um prato, a nota do pedido (`HudOrder`, canto superior esquerdo) mostra o ticket do prato **equipado**: #n, itens, complementos, cheio = feito; troca em **≤ 0,2 s** ao trocar de prato; some ao soltar. Dentro do foco da esteira o ticket vem do assento (`PrepSeats.Ticket`/`Line`) |
+| Prioridade | sem ordem obrigatória; o prato mais antigo pulsa em Mustard; paciência ≤ **25%** ganha "!" (`Rules.UrgentAt` 0,25) |
+| Cliente desistiu | prato **vazio** some na hora em qualquer forma (mesa: a vaga libera; mão: o Tool some; esteira: o assento fica sem prato e o foco termina); prato com algo vira **órfão** (`Orphan`, billboard cinza "?") e fica até ser adotado por um pedido novo que ele satisfaça, ir à lixeira ou o turno acabar (contrato §7.6, P21) |
+| Órfão na mão | **não é entregável**: o `PICKUP` entrega só ao dono do ticket (Q-383 A). Órfão no `PICKUP` = recusa `ticket_gone` ("They left. Set it on the table"); o caminho é devolver à mesa, onde ele pode ser adotado (contrato §8) |
+| Prato jogado fora / perdido por fora | jogar fora na lixeira do mundo (BIN-C) ou perder o Tool fora do `PlateService` com o cliente do ticket ainda esperando faz nascer **um prato vazio novo com o mesmo #n** numa vaga livre (contrato §7.6, P22 aceita). O pedido nunca fica sem prato |
+| Jogador sai do servidor com prato na mão | **Provisório deste doc (lacuna do contrato, D-14):** o prato vai para a **vaga livre de menor índice** da mesa central com ticket e conteúdo, como o prato da esteira na desconexão (`Shelve`, contrato §2.3 e §10.1). Se a implementação não conseguir ler o Tool a tempo, vale a P22 (nasce prato vazio com o mesmo #n). Em nenhum caso o ticket fica sem prato. Architect confirma no contrato |
+| Disputa | 2 jogadores segurando E na mesma vaga: o primeiro `Run` processado leva; o outro recebe `plate_gone` ("Someone grabbed it first"). 2 cliques na mesma vaga livre: o primeiro `CenterPut` processado põe, o outro recebe `slot_taken`. Sem trava extra |
+| Rede (contrato §7, §9.2) | set `Plates` (já existe) = 1 registro por vaga 1..8 (fio até 12): `Npc`, `Line`, `Bun`, `Sausage`, `Toppings`, `Since`, `Orphan`, `Altered` + **`Grade`** (novo); packet `CenterPut { Slot }` |
 
-- Dados: `Content.Restaurant.CenterTable` { `Slots` 8, `MaxSlots` 12, `TakeHold` 0,4, `PutRadius` 8, `UrgentAt` 0,25, `OrphanReuse` true, `DriveThruFrom` "High", `RespawnOnTrash` true }. Saem `Pass.ActiveByParty`, `Pass.FillAllHold` e a trava de 0,6 s do slot.
+- Dados (no `Content`, TASK-513): `Content.Restaurant.CenterTable` { `Slots` 8, `Reach` 12, `PutRate` 4 }; `Content.Restaurant.Rules` { `ActivePlates` { 4, 6, 8, 8 }, `PlateSlotsMax` 12, `UrgentAt` 0,25, `OrphanReuse` true, `PreppedFirst` true }; `Content.Actions.plate_take` { `Hold` 0,5, `Radius` 5 }; `Content.Restaurant.Binding` { `CenterModel` "CENTER", `CenterTag` "CenterSlot", `CenterIndex` "CenterIndex", `CenterMount` "Mount_Plate_%d", `CenterTake` "Prompt_Take", `CenterTicket` "Att_Ticket" }; item `plate` (ITM-025). As chaves propostas na rev. 3 `TakeHold`, `PutRadius`, `MaxSlots`, `DriveThruFrom` e `RespawnOnTrash` **não existem**: valem `plate_take.Hold`, `CenterTable.Reach`, `PlateSlotsMax`, a regra única do maior índice e a P22 do `PlateService`. Saem `Pass.ActiveByParty`, `Pass.FillAllHold` e a trava de 0,6 s do slot (TASK-506).
 - Critérios de aceite:
-  - Pedido confirmado faz nascer **exatamente 1** prato vazio na vaga certa em ≤ 0,5 s, com #n e ícones iguais aos da nota do HUD.
-  - Com as 8 vagas ocupadas, "Take Order" não abre e o tablet mostra "Kitchen full" para todos; pegar 1 prato destrava em ≤ 0,5 s.
-  - Segurar E 0,4 s pega o prato; com 2 pratos na mão o 3º é recusado com `hands_full`; pôr numa vaga livre devolve o prato com o mesmo estado e ticket.
+  - Pedido confirmado faz nascer **exatamente 1** prato vazio por linha na **vaga livre de maior índice** em ≤ 0,5 s, com #n e ícones iguais aos da nota do HUD (com as vagas 8 e 7 ocupadas, o novo nasce na 6).
+  - Solo, com 4 pratos vivos (em qualquer forma), "Take Order" não abre e o tablet mostra "Kitchen full" para todos; em dupla o teto é 6; vender ou encerrar 1 prato destrava em ≤ 0,5 s. Com o teto atingido sempre sobra ≥ 1 vaga livre na mesa.
+  - Segurar E 0,5 s pega o prato; soltar antes de 0,5 s não pega; com 2 pratos na mão o 3º é recusado com `hands_full`; pôr numa vaga livre devolve o prato com o mesmo estado e ticket.
+  - Clique numa vaga livre a ≤ 12 studs põe o prato; a 13 studs o servidor recusa (sem mudança no set); em 667 × 375 o `Click_Slot` tem ≥ 44 px a 6 studs.
   - Segurando um prato, o HUD mostra o ticket dele; com 2 pratos, o HUD segue o equipado em ≤ 0,2 s; sem prato, o HUD do ticket some.
-  - Contagem de pratos antes/depois de 20 ciclos pôr/pegar com 2 jogadores: nenhum prato duplica nem some.
-  - Prato de quem desistiu: vazio some, montado fica cinza e é reaproveitado por pedido idêntico; no `Summary` não sobra órfão.
+  - Contagem de pratos (`PlateService:AliveCount()`) antes/depois de 20 ciclos pôr/pegar com 2 jogadores: nenhum prato duplica nem some.
+  - Prato de quem desistiu: vazio some; com conteúdo fica cinza, é recusado no `PICKUP` com `ticket_gone` e é adotado por um pedido novo que ele satisfaça; no fim do turno não sobra órfão.
   - Jogar fora o prato #7 com o cliente #7 esperando faz nascer um prato vazio #7 na mesa.
+  - Jogador sai do servidor segurando o prato #5 (cliente #5 esperando): em ≤ 1 s existe um prato #5 na mesa central (com o conteúdo, ou vazio pela P22); `AliveCount()` igual antes e depois.
   - Nenhum anel usa vermelho; a urgência também muda de forma (teste em escala de cinza).
 
 ### FEAT-045 — Cozinha com esteira: grelha focada, mesa de descanso, montagem e nota
@@ -217,50 +227,63 @@ estações em prompt no mundo (opção B como rollback por flag).
 - Status: Rascunho (Provisório) · Pilares: VENDER, GERENCIAR · Origem: **DEC-302**, **DEC-303** (Q-379 a Q-382 A), DEC-304;
   DEC-298 (grelha sem queima, virar opcional, sem barra) e DEC-299 (2 pratos na mão) nos pontos que continuam; DEC-223 (modo
   focado), FEAT-039 (gestos), DEC-226 (grelha de barras), DEC-072 (resultado e gorjeta) · rev. 3 (TASK-508, 2026-10-18):
-  substitui "estações com seções focadas, pilhas, Fill All e queima" (rev. 2).
-- Resumo: um **prompt único** na bancada abre o **modo focado** (câmera travada na bancada de dois níveis). Em cima, da
+  substitui "estações com seções focadas, pilhas, Fill All e queima" (rev. 2) · rev. 3.1: **DEC-305** (dois prompts, grelha
+  8/6/4 s, Perfect = base + $1, descanso de 8, 4 paradas), `tech/prep-conveyor.md` §2 a §6 e o `Content.Prep` da TASK-513.
+- Resumo: **dois prompts** na bancada (DEC-305): **"Work"** abre o **modo focado da esteira** e **"Grill"** abre a **vista
+  focada da grelha** (câmera travada na bancada de dois níveis). Em cima, da
   **esquerda** para a **direita**: **grelha + mesa de descanso**, **tábua e pão**, **condimentos**. Embaixo, a **esteira**: cada
   montador tem o **próprio prato** (o que ele trouxe da mesa central) e o move com **setas esquerda/direita**. O **grelhador**
   usa a vista focada da grelha: põe e vira salsichas; a pronta vai para a **mesa de descanso**, estoque compartilhado. O
   montador corta o pão, arrasta a salsicha para o pão e **desenha os molhos seguindo um padrão**; sai com a **nota
   Perfect/Good/Messy**. Referência só de **mecânica** (estações em fila em cima, produto na esteira embaixo, setas); nenhum
   nome, arte ou layout de outro jogo.
-- "Esquerda/direita" é a da fala do dono; o level-designer confere o ponto de vista no mapa (TASK-503).
+- "Esquerda/direita" é a da fala do dono: a **esquerda = leste (X maior)**, com o cozinheiro olhando para o sul (DEC-305, MAP-01-r4 §16.1).
 
 **Papéis** (nenhum é fixo; o layout os torna naturais)
 
 | Papel | Onde | Faz |
 |---|---|---|
-| Grelhador | assento da grelha (vista focada) | põe salsichas cruas, vira na janela (bônus), mantém a mesa de descanso abastecida; nas folgas, tablet e estoque |
+| Grelhador | assento da grelha pelo prompt "Grill" (vista focada) | põe salsichas cruas, vira na janela (bônus), mantém a mesa de descanso abastecida; nas folgas, tablet e estoque |
 | Montador (até 2) | esteira | pega o prato na mesa central, corta, monta, desenha, devolve à mesa ou entrega |
 | Entregador / caixa | mesa central → `PICKUP`; tablet | pega pratos `Ready` da mesa e entrega ao dono do ticket; toma pedidos |
 
-**Entrar e sair** (assentos: contrato do architect na TASK-512; aqui a regra de jogo, **Provisória**)
+**Entrar e sair** (contrato `tech/prep-conveyor.md` §2; números do `Content`)
 
-| Regra | Valor (`Content.Prep.Conveyor`) |
+| Regra | Valor (`Content.Actions`, `Content.Prep.Conveyor`) |
 |---|---|
-| Prompt único | "Work" (toque, 0 s), na frente da bancada, raio 6; um só prompt para a esteira e a grelha |
-| Com prato equipado | entra como **montador**: o prato vai para a **parada 1** da esteira; **máx. 2** montadores (Q-380 A); o 3º com prato recebe "Belt full" |
-| Sem prato | entra como **grelhador** no assento da grelha (**1** assento); ocupado: "Grill busy" |
-| Sair | botão **Leave** em qualquer parada: o prato volta à mão com o que já tem (sem nota se não terminou); câmera solta em 0,3 s |
-| Anomalia, desmaio, desconexão | saída forçada (`PrepService:Kick`, como hoje): o prato volta à mão; desconexão = o prato volta à mesa central (vaga livre, ou órfão até abrir vaga). Nunca some prato nem ticket |
+| Dois prompts (DEC-305) | **"Work"** = `prep_work` no `Prompt_Work` (frente do deck baixo) e **"Grill"** = `prep_grill` no `Prompt_Grill` (frente da grelha); os dois de **toque** (`Hold` 0), **raio 5**, nas fases `Open`, `Closing` e `Night`. O prompt escolhe o assento; o que está na mão não decide nada |
+| Assentos | 3 fixos desde o início do turno, em qualquer party (`Conveyor.Seats = { Belt = { 1, 2 }, Grill = { 3 } }`): 1 e 2 = esteira (`Seat_Belt_1`, `Seat_Belt_2`), 3 = grelha (`Seat_Grill`, **Provisória P2**) |
+| Work | leva a um assento de esteira livre (1, depois 2). O prato da esteira é, nesta ordem: o prato **parado** do próprio jogador (retoma assento e prato, mesmo com outro prato na mão); o `plate` **equipado**; o `plate` de ticket mais antigo do inventário. O prato sai da mão e carrega na **parada 1** (`Stop_1`; ocupada → espera em `WaitL_1`). Nenhum prato novo é criado (DEC-304) |
+| Work recusado | sem `plate` na mão e sem prato parado: `NoPlate` ("Grab a plate from the table first", `need_plate`); os 2 assentos de esteira tomados: `BeltFull` ("Belt full. Wait for a spot", `belt_full`); hot dog já montado: `PlateDone` (silencioso). Um 3º montador nunca entra |
+| Grill | leva ao assento 3 (sem prato). Com prato na mão o jogador também entra: o prato **fica na mão**. Ocupado: `GrillBusy` (`prep_busy`, "Someone's already there."). `PrepGrill` só é aceito do assento 3: o montador **não grelha** da parada 1 (P5 caiu) |
+| Sair da esteira (Leave) com o prato fora de `Out` | o prato **fica parado e reservado** na esteira, na parada (ou espera) onde estava; o assento fica guardado para o dono (`Away = true` no `PrepSeats`; ninguém mais senta nele); câmera solta em 0,3 s. Ao voltar pelo Work, retoma do mesmo ponto (contrato §2.3, **Provisória P24**) |
+| Saída forçada `Kick*` (sinal de anomalia, sanidade, `Down`/desmaio, cutscene, ligação, ladrão, `Idle`) | **igual ao Leave**: prato parado e reservado; o `KickSignal` mantém o `CueLock` de 6 s |
+| Prato em `Out` (com ou sem nota) ao sair, ou fim automático depois do Finish (`Rules.DoneHold`) | volta **à mão**, equipado (`hot_dog` com nota, `plate` sem nota); o assento e a parada liberam |
+| `KickClosing` (a venda acabou) | volta **à mão**, em qualquer parada |
+| `KickAway` ou desconexão | vai para a **vaga livre de menor índice** da mesa central com ticket e conteúdo (o teto de tickets garante vaga, FEAT-044) |
+| Parado há mais de `Conveyor.ParkMax` (**120 s**, **Provisória P25**) | vai para a mesa central (vaga livre de menor índice); o assento libera; aviso `plate_shelved` ("Plate #n moved to the table") |
+| Sair da grelha (qualquer saída) | só libera o assento 3; as salsichas seguem cozinhando |
+| Garantia | nunca some prato nem ticket; pão e salsicha já entraram no prato no commit da etapa (nada de estoque é devolvido) |
 
 **Esteira** (Q-379 A, Q-380 A)
 
 | Parada | Em cima (bancada alta) | O que se faz com o prato aqui |
 |---|---|---|
-| 1 — Entrada | grelha + mesa de descanso (esquerda) | o prato entra aqui. Com o prato nesta parada o montador **também usa a grelha** (pôr, virar): é o caminho do **solo**, sem trocar de assento |
-| 2 — Pão | tábua e cesta de pão (meio); a mesa de descanso fica na divisa 1 \| 2, ao alcance desta parada | cortar o pão; arrastar a salsicha da mesa de descanso para o pão |
-| 3 — Condimentos | tigelas e garrafas (direita) | complementos; ao sair pela direita, a nota |
-| Saída | — | seta direita na parada 3 = **termina** (calcula a nota) e sai do foco com o prato `Ready` na mão |
+| 1 — `Grill` (entrada) | grelha + mesa de descanso (esquerda) | o prato entra aqui (ocupada: espera em `WaitL_1`). Grelha e descanso ficam à vista, mas o montador **não grelha** daqui (DEC-305: a grelha é do prompt "Grill") |
+| 2 — `Board` | tábua e cesta de pão (meio); a mesa de descanso fica na divisa 1 \| 2, ao alcance desta parada | cortar o pão; arrastar a salsicha da mesa de descanso para o pão |
+| 3 — `Toppings` | tigelas e garrafas (direita) | complementos + **Finish** (a nota) |
+| 4 — `Out` (saída) | — | seta direita na parada 3 com pão e salsicha = **Finish** (calcula a nota), o prato vai a `Out` e o foco termina em `Rules.DoneHold` com o `hot_dog` na mão. Sem pão ou salsicha, a seta leva a `Out` sem nota e o `plate` volta à mão como está. `Out` não reserva (cabe os 2) |
+
+`Content.Prep.Conveyor.Stops` = `Grill`, `Board`, `Toppings` (reservam) e `Out` (não reserva); 4 paradas (DEC-305, P6 a P8).
 
 | Regra | Valor |
 |---|---|
-| Setas | **1 parada por toque**; teclado A/D e ←/→, gamepad LB/RB e D-pad, toque: 2 botões de **64 px** (mín. 44 px) nos cantos de baixo |
+| Setas | **1 parada por toque** (packet `PrepBelt { Dir = Left \| Right }`), só o **próprio** prato (Q-379 A); na ponta não faz nada. Teclado A/D e ←/→, gamepad LB/RB e D-pad, toque: 2 botões de **64 px** (mín. 44 px) nos cantos de baixo. Teto `Conveyor.Rates.Belt` **6 por s** por jogador |
 | Viagem entre paradas | **0,35 s** (aceite ≤ 0,4 s) |
-| Ordem | as setas andam livres; a **ação** segue a ordem fixa: salsicha só em prato com pão; complemento só em prato com salsicha (recusa com motivo, sem custo) |
-| Uma estação, um prato | parada ocupada: o prato para na **vaga de espera** à esquerda dela, aviso "Waiting"; entra sozinho em ≤ 0,3 s quando a outra libera; nunca 2 pratos na mesma parada; nunca empurra |
-| Reserva | a parada é do prato que está nela; libera quando ele sai (seta, Leave, Kick). Dois pedidos no mesmo tick: ganha quem chegou antes no servidor; empate = ticket menor |
+| Ordem | as setas andam livres; a **ação** segue a ordem fixa: salsicha só em prato com pão; complemento só em prato com salsicha (recusa com motivo, sem custo). Etapa só com o prato **na** parada certa (`Wait = 0`); fora dela, `WrongStop` (silencioso). Teto de etapas `Conveyor.Rates.Stage` **2 por s** |
+| Uma estação, um prato | parada ocupada: o prato fica **ao lado** dela, **do lado de onde veio** (vindo da esquerda/leste = `WaitL_n`, `Wait = 1`; vindo da direita/oeste = `WaitR_n`, `Wait = 2`; contrato §3.3, P6), aviso "Waiting"; entra sozinho em ≤ 0,3 s quando a parada libera; um prato esperando pode seguir com outra seta; nunca 2 pratos na mesma parada; nunca empurra (Q-380 A) |
+| Reserva | 1 por parada reservável (1, 2, 3): é do prato que está nela com `Wait = 0`. Libera quando o prato sai por seta, pelo Finish (vai a `Out`) ou sai da esteira (à mão ou à mesa). **Prato parado (dono fora, `Away`) mantém a reserva**: o outro montador espera ao lado e é promovido quando ela liberar (P24) |
+| Dois pedidos "no mesmo tick" | não existe empate no servidor: os pacotes são processados um por vez, na ordem de chegada; o primeiro processado reserva, o segundo espera ao lado (contrato §4). Sem regra de "ticket menor" |
 | Pratos dos outros | cada um vê o prato do outro andar na esteira do mundo, com a cor do jogador (`Presence.Palette`) e o #n, dentro e fora do foco |
 
 **Grelha focada** (Q-381 A; DEC-298 confirmada: **não queima**, **virar opcional com bônus**, **sem barra**)
@@ -272,7 +295,7 @@ estações em prompt no mundo (opção B como rollback por flag).
 | Cozinhar | **contínuo, sem pausa** (sai a pausa que esperava o virar): pronta em `GrillTime` desde o "pôr". Tempo por nível: ver a tabela abaixo. Line Cook ×0,85 nas dele |
 | Estados e leitura | `Raw` (rosada) → `Cooking` (dourando aos poucos, fumaça fina) → `Ready` (dourada, a fumaça para, ícone "pronto" 0,6 s, SFX `grill_ready`). **Sem barra**, sem `GrillBar`, sem `ProgressBar` de mundo |
 | Queimar | **nunca** no modo esteira (DEC-298, DEC-303). A pronta fica pronta pelo tempo que for |
-| Pronta → mesa de descanso | vai **sozinha** em **0,3 s** (pulinho) para o lugar livre mais à esquerda da mesa de descanso **(Provisório)**; mesa cheia: fica na vaga da grelha como `Ready` (ocupa a vaga) e vai assim que abrir lugar (≤ 0,5 s), com o aviso "Rest table full" 1× |
+| Pronta → mesa de descanso | vai **sozinha** em **0,3 s** (pulinho) para o fim da fila da mesa de descanso (`Conveyor.Grill.AutoRest`; P11 aceita); mesa cheia: fica na vaga da grelha como `Ready`, sem queimar (ocupa a vaga), e desce assim que abrir lugar (≤ 0,5 s; a que ficou pronta primeiro desce primeiro; P12 aceita), com o aviso "Rest table full" 1×. `PrepGrill Place` segue aceito enquanto houver vaga livre na grelha |
 | Virar | tocar a salsicha em `Cooking`; **1 vez** por salsicha; virar fora da janela vira (gira 180° com salto) mas **sem bônus**; não virar não trava nada |
 | Janela do bônus | de **40% a 60%** do `GrillTime`, medida no relógio do servidor (carimbo do toque); largura mínima **1,0 s**, centrada em 50% |
 | Sinal da janela | quando ela abre: a salsicha **chia mais alto**, a fumaça engrossa e um "Flip!" pequeno sobe 0,6 s sobre ela (`Texts.FlipAlert`); quando fecha, a fumaça volta ao normal. Só visual e som, sem barra |
@@ -280,31 +303,28 @@ estações em prompt no mundo (opção B como rollback por flag).
 | Virar e a nota | o virar **não entra** na nota do prato no modo esteira (`Stages.Sausage = nil` em `Grade.Plate`): não virar não deixa o prato Messy. A nota é do montador; o bônus é do grelhador |
 | Grill Bot (UPG-021) | só põe cruas (mesa de descanso + grelha com < 4 salsichas); nunca vira; a pronta segue a mesma regra |
 
-Tempos e janela por nível do UPG-001. **Conflito a resolver:** a DEC-201 registra **12 / 10 / 8 s** ("não mudam"); o código
-usa **8 / 6 / 4 s** desde 2026-10-14 (`Upgrades.luau`, "slowed the same day: too fast to follow"), hoje com 2 s depois do
-virar. Pela ordem de autoridade **vale a DEC-201** até o dono responder; a **recomendação** é **8 / 6 / 4 s sem pausa**
-(é o ritmo que o dono já joga e o grelhador não fica parado na vista focada). A TASK-506 **não mexe** em `GrillTime` até a
-resposta.
+Tempos e janela por nível do UPG-001: **8 / 6 / 4 s**, sem pausa (**Decidido, DEC-305**, emenda a DEC-201 de 12/10/8; são os
+valores que `Upgrades.luau` já tem). A pausa de "esperar virar" do trailer não existe no modo esteira.
 
-| Nível | Vagas | `GrillTime` DEC-201 | Janela (s) | Vazão | `GrillTime` recomendado | Janela (s) | Vazão |
-|---|---|---|---|---|---|---|---|
-| 1 | 2 | 12 s | 4,8–7,2 | 10 / min | **8 s** | 3,2–4,8 | 15 / min |
-| 2 | 3 | 10 s | 4,0–6,0 | 18 / min | **6 s** | 2,4–3,6 | 30 / min |
-| 3 | 4 | 8 s | 3,2–4,8 | 30 / min | **4 s** | 1,5–2,5 (mín. 1,0 s) | 60 / min |
+| Nível | Vagas | `GrillTime` | Janela do bônus (s) | Vazão |
+|---|---|---|---|---|
+| 1 | 2 | **8 s** | 3,2–4,8 | 15 / min |
+| 2 | 3 | **6 s** | 2,4–3,6 | 30 / min |
+| 3 | 4 | **4 s** | 1,5–2,5 (mín. 1,0 s) | 60 / min |
 
-Demanda máxima: 4p na N10 = 7,8 pedidos/min. Com qualquer coluna a grelha nível 1 já dá conta; o UPG-001 passa a valer pela
-**espera menor** (primeira salsicha, solo) e não mais por vazão.
+Demanda máxima: 4p na N10 = 7,8 pedidos/min. A grelha nível 1 já dá conta; o UPG-001 vale pela **espera menor** (primeira
+salsicha, solo) e não por vazão.
 
 **Mesa de descanso** (compartilhada, junto da grelha)
 
-| Regra | Valor (`Content.Prep.Conveyor.Rest`) **Provisório** |
+| Regra | Valor (`Content.Prep.Conveyor.Rest`) |
 |---|---|
-| Lugares | **6** |
+| Lugares | **8** (`Rest.Capacity = 8` = `Vehicles.trailer.RailSlots`, teto do fio `PrepGrab.Slot` 1..8; aceito na DEC-305). É o rail que já existe (`Stations` kind `rail`) |
 | Quem põe | só a grelha (a pronta vai sozinha) |
-| Quem pega | qualquer montador, **arrastando** da parada 2 para o pão (gesto `place`); a salsicha pega por um sai do alcance do outro na hora (claim, DEC-259) |
+| Quem pega | qualquer montador, **arrastando** da parada 2 para o pão (gesto `place`): `PrepGrab { From = Rail, Slot = n }` (claim) e `PrepStage { Stage = Dog, Slot = n }`; qualquer posição sem claim de outro, o cliente sugere a mais antiga (P10). A salsicha pega por um sai do alcance do outro na hora (claim, DEC-259) |
 | Ordem | livre; a **mais antiga** fica realçada; as com bônus têm a marca cruzada |
 | Esfriar / queimar | **não** |
-| Vazia | o montador na parada 2 vê "Waiting for the grill" e pode esperar ou sair (o prato fica com o pão) |
+| Vazia | o montador na parada 2 vê "Waiting for the grill" e pode esperar ou sair pelo Leave (o prato fica **parado e reservado** na Tábua, com o pão) para grelhar no prompt "Grill" |
 | Fim da noite | salsichas da grelha e da mesa somem no `Summary` |
 
 **Pão e montagem** (parada 2)
@@ -362,7 +382,7 @@ cozinha = de "segurar E" no prato vazio até o "Hand Over"; **Provisório**, con
 
 | Trecho (K = 2) | s |
 |---|---|
-| Pegar o prato (0,4) + andar à bancada (1,5) | 1,9 |
+| Pegar o prato (segurar 0,5) + andar à bancada (1,5) | 2,0 |
 | Prompt "Work" + câmera | 0,35 |
 | Seta 1 → 2 | 0,35 |
 | Pão: cesta + corte | 1,3 |
@@ -371,28 +391,34 @@ cozinha = de "segurar E" no prato vazio até o "Hand Over"; **Provisório**, con
 | 2 complementos (escolher 0,3 + desenhar ~1,6 cada) | 3,8 |
 | Terminar: selo (0,6 visto) + sair do foco (0,3) | 0,9 |
 | Andar ao `PICKUP` (2,5) + segurar (0,5) | 3,0 |
-| **Total montador, salsicha já na mesa de descanso** | **≈ 12,8** |
+| **Total montador, salsicha já na mesa de descanso** | **≈ 12,9** |
+
+**Solo** (DEC-305: troca de assento Work → Grill → Work; contrato §2.4). Uma visita à grelha = andar entre `Prompt_Work` e
+`Prompt_Grill` (5,8 studs, 0,35 s) + prompt "Grill" e câmera (0,35) + pôr 2 cruas (0,6) + Leave (0,3) ≈ **1,6 s**, e abastece
+**2 pedidos** na grelha nível 1 (2 vagas; a mesa de descanso guarda 8): **≈ 0,8 s por pedido**. O ritmo hábil é grelhar
+**entre** pedidos (antes de pegar o prato seguinte), sem sair da esteira no meio. O caminho "corta o pão, sai (prato parado),
+grelha, volta" do contrato §2.4 é o da 1ª salsicha da noite.
 
 | Cenário | Alvo | Teto do aceite |
 |---|---|---|
-| Solo, K = 0 (com a crua do próximo pedido) | ≈ 9,5 s | ≤ 11 s |
-| Solo, K = 2 (+0,6 s para pôr a crua do **próximo** pedido na parada 1, sem virar) | ≈ 13,5 s | ≤ 15 s |
-| Solo, K = 2 virando (espera a janela na parada 1, nível 1 de 8 s) | ≈ 16,5 s | ≤ 18 s |
-| Solo, K = 3 | ≈ 15,5 s | ≤ 17 s |
-| Solo, 1º pedido da noite (grelha vazia, nível 1) | + espera de 8 s | — |
+| Solo, K = 0 (com a visita à grelha do próximo pedido) | ≈ 9,9 s | ≤ 11 s |
+| Solo, K = 2 (+0,8 s de grelha por pedido, sem virar) | ≈ 13,7 s | ≤ 15 s |
+| Solo, K = 2 virando (fica na grelha até a janela de 3,2–4,8 s, nível 1; 2 cruas por visita) | ≈ 16,0 s | ≤ 18 s |
+| Solo, K = 3 | ≈ 15,6 s | ≤ 17 s |
+| Solo, 1º pedido da noite (grelha vazia, nível 1: corta, sai, grelha, espera 8 s, volta) | + ≈ 9 s | — |
 | Dupla — montador que **devolve** o prato à mesa (sem andar ao `PICKUP`) | ≈ 11,5 s por pedido | ≤ 13 s de média em 10 pedidos |
 | Dupla — grelhador + caixa + entregador (diálogo 4,4 + pôr/virar 1,2 + pegar na mesa e entregar 3,5 + passos 1) | ≈ 10 s por pedido | — |
 | Dupla — do carimbo #n ao "Hand Over" de um pedido | ≈ 14 s | ≤ 20 s (janela de gorjeta K = 2 = 32 s) |
 | Dois montadores na esteira (esperas por parada ocupada) | +0,5 a 1,5 s por pedido | nenhuma espera > 4 s |
 
-Leitura: solo por pedido = diálogo 5,4 + cozinha ~13,5 + estoque 1,5 ≈ **20 s** (era ~24 s na rev. 2); dupla vence ~4,6–5
+Leitura: solo por pedido = diálogo 5,4 + cozinha ~13,7 + estoque 1,5 ≈ **20,6 s** (era ~24 s na rev. 2); dupla vence ~4,6–5
 pedidos/min contra a demanda 2p da N10 de 4,5/min: cheia, sem sobra, como pede a DEC-275.
 
 **Mãos** (DEC-174, DEC-299)
 
 | Tool | Máx. por jogador |
 |---|---|
-| prato com ticket (`hot_dog`, atributo `Ticket`; `FlipBonus`, `Grade`, complementos) | **2** |
+| prato com ticket: `plate` (ITM-025, não montado) ou `hot_dog` (ITM-010, montado; `Quality` = a nota, `FlipBonus`, complementos), ambos com `PlateId`, `Ticket`, `TicketLine`; categoria `HotDog` (`CategoryLimits.HotDog = 2`) | **2** (somados) |
 | `stock_box` (FEAT-050 / DEC-285) | 2 (Hauler 3) |
 | Coffee, Revive Kit | como hoje |
 | **Total** | **4**; 5º = `hands_full`. Sem pilhas: `bun_sliced` e `sausage_grilled` saem do restaurante |
@@ -401,20 +427,23 @@ pedidos/min contra a demanda 2p da N10 de 4,5/min: cheia, sem sobra, como pede a
 prato (o prato fica vazio na esteira, com o ticket); no mundo, "Throw Away" (segurar 0,5 s) com o prato equipado descarta o
 prato e faz nascer de novo o prato vazio do mesmo #n na mesa central (FEAT-044).
 
-- Dados: `Content.Prep.Conveyor` { `Stops` 3, `MaxBelt` 2, `GrillSeats` 1, `Travel` 0,35, `ArrowPx` 64, `WaitEnter` 0,3, `Rest` { `Spots` 6, `Move` 0,3 } }; `Content.Prep.Rules.Grill` no modo esteira { `Burn` false, `Pause` false, `FlipFrom` 0,4, `FlipTo` 0,6, `FlipMinWidth` 1,0, `FlipBonus` 1, `FlipInGrade` false, `Bar` false }; `Content.Prep.Build.Patterns` { `ketchup` "Zigzag", `mustard` "Wave", `cream_cheese` "Line" } com os pontos da tabela; `Content.Prep.Grades.Effects.Perfect.TipExtra` 1. Saem do restaurante: `Restaurant.Grill.BurnAfter`, `PickupPerfect/Good`, `Stacks`, tolerância `grill_pickup` (nunca entrou).
+- Dados (no `Content`, TASK-513): `Content.Prep.Rules.Mode` "Conveyor" (= `Restaurant.Switch.PrepMode` com o restaurante ligado); `Content.Prep.Conveyor` { `Stops` (4 linhas: `Grill`, `Board`, `Toppings`, `Out`), `Seats` { `Belt` { 1, 2 }, `Grill` { 3 } }, `Rates` { `Belt` 6, `Stage` 2 }, `ParkMax` 120, `Rest` { `Capacity` 8 }, `Grill` { `Burn` false, `FlipRequired` false, `AutoRest` true, `FlipBonus` 1, `Bar` false }, `Binding` { … `Seats` { "Seat_Belt_1", "Seat_Belt_2", "Seat_Grill" }, `GrillPrompt` "Prompt_Grill" … }, `Views` }; `Content.Actions` `prep_work` e `prep_grill` { `Hold` 0, `Radius` 5 }; `Content.Prep.Reasons` + `NoPlate`, `BeltFull`, `GrillBusy`, `WrongStop`, `PlateDone`; `Content.Prep.Grades.Effects.Perfect.TipExtra` 1; janela do bônus em `Restaurant.Grill.FlipFrom`/`FlipTo` (0,4 / 0,6). **Ainda fora do `Content`** (propostas deste doc, TASK-506 decide se viram chave ou constante de cliente): viagem 0,35 s, botões de seta de 64 px, entrada da espera 0,3 s, pulo ao descanso 0,3 s, largura mínima da janela 1,0 s, `Build.Patterns` (Zigzag / Wave / Line, DEC-305). As chaves da rev. 3 `MaxBelt`, `GrillSeats`, `Rest.Spots`, `FlipInGrade` **não existem**: valem `Seats`, `Rest.Capacity` e a P13 (o virar nunca entra em `Grade.Plate` no modo esteira). Saem do restaurante: `Restaurant.Grill.BurnAfter`, `PickupPerfect/Good`, `Stacks`, tolerância `grill_pickup` (nunca entrou).
 - Critérios de aceite:
-  - "Work" com prato equipado põe o prato na parada 1; sem prato abre a grelha; 3º jogador com prato recebe "Belt full".
-  - As setas movem só o próprio prato, 1 parada por toque, em ≤ 0,4 s; parada ocupada = o prato espera ao lado e entra sozinho em ≤ 0,3 s depois que ela libera; o log do Set nunca mostra 2 pratos na mesma parada.
+  - **Dois prompts:** "Work" (raio 5) com `plate` na mão põe o prato na parada 1 (ocupada: em `WaitL_1`); "Work" sem `plate` e sem prato parado é recusado com `need_plate` e não abre nada; "Grill" (raio 5) abre a grelha com ou sem prato na mão (o prato fica na mão); com 2 montadores, o 3º "Work" recebe `belt_full`; com a grelha ocupada, "Grill" recebe `prep_busy`.
+  - Da parada 1 o montador não consegue grelhar: `PrepGrill` vindo de um assento de esteira é recusado (log do servidor).
+  - As setas movem só o próprio prato, 1 parada por toque, em ≤ 0,4 s; parada ocupada = o prato espera ao lado **do lado de onde veio** (`Wait` 1 vindo do leste, 2 vindo do oeste) e entra sozinho em ≤ 0,3 s depois que ela libera; o log do Set nunca mostra 2 pratos na mesma parada com `Wait = 0`.
+  - Leave no meio (prato na Tábua com pão): o prato fica na Tábua, o registro do assento continua com o mesmo `User` e `Away = true`, o outro montador não senta nesse assento e espera ao lado da Tábua; o dono volta pelo "Work" e retoma o mesmo prato na mesma parada. Parado 120 s (`ParkMax`): vai à mesa central e o dono recebe `plate_shelved`.
+  - Solo (troca de assento): pegar o prato, Work, cortar, Leave, Grill, pôr 1 crua, Leave, esperar 8 s, Work, montar, desenhar, Finish: o pedido fecha sem nenhum travamento e sem prato a mais ou a menos.
   - Salsicha nunca virada fica pronta em `GrillTime` ± 0,1 s e **não queima** nem depois de 3 × `GrillTime`.
   - Virada a 50% do `GrillTime` grava `FlipBonus`; a 30% e a 70% não grava; o mesmo pedido entregue Completo na janela paga **exatamente $1 a mais** com bônus, 1 vez.
-  - A pronta chega à mesa de descanso em ≤ 0,5 s; com os 6 lugares cheios ela fica na grelha e vai sozinha quando abre lugar.
+  - A pronta chega à mesa de descanso em ≤ 0,5 s; com os **8** lugares cheios ela fica na grelha, não queima, e vai sozinha quando abre lugar.
   - Nenhuma barra de progresso de cozinha (`GrillBar`, `ProgressBar`, `BillboardGui` de barra) existe no modo esteira (`/dev` lista).
   - Salsicha só entra em prato com pão; complemento só em prato com salsicha; a recusa diz o motivo e não gasta estoque.
   - Ao escolher ketchup, mostarda ou cream cheese, a guia do padrão certo aparece sobre o pão; seguir o caminho exato dá Perfect em `/dev prep grade`.
   - O mesmo pedido Completo na janela paga $1 a mais com Perfect que com Good; Messy paga $0 de gorjeta e baixa o humor 1 faixa; não virar não muda a nota.
   - A nota mostrada no fim = a nota gravada no prato pelo servidor.
   - Solo hábil, K = 2, salsicha já na mesa de descanso: do "segurar E" ao "Hand Over" em ≤ 15 s em 4 de 5 tentativas (PC e celular 667×375).
-  - Leave, Kick por anomalia, desmaio e desconexão no meio: contagem de pratos e tickets igual antes e depois.
+  - Leave, Kick por anomalia e desmaio no meio: o prato fica parado e reservado na esteira (`Away`); `KickClosing` e saída com o prato em `Out`: o prato volta à mão; desconexão ou `KickAway`: o prato vai à vaga livre de menor índice da mesa central com ticket e conteúdo. Em todos os casos a contagem de pratos e tickets fica igual antes e depois.
   - Complemento não pedido → entrega Errada (DEC-072), o prato volta à mão.
   - `/dev prep grade` termina `N/N ok`; o modo trailer (chave do restaurante desligada) sem regressão no `/dev smoke`.
 

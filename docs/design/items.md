@@ -44,6 +44,10 @@ Critérios de aceite
 | ITM-019 | Ground Coffee (pacote de café; D-10) | pacote | **sim** |
 | ITM-020 | Altered item (ANM-002 The wrong food) | item de anomalia | **sim** |
 | ITM-021 | Rescue Whistle (chave `revive_kit`) | especial (reviver) | **sim** |
+| ITM-025 | Plate (chave `plate`; prato do restaurante não montado) | produto (em montagem) | **sim** |
+
+ITM-022 (`bun_sliced`), ITM-023 (`sausage_grilled`) e ITM-024 (`stock_box`) existem em `Content.Items` (restaurante rev. 2,
+`design/restaurant-flow.md` FEAT-045/FEAT-050) e ainda não têm ficha aqui; ITM-022 e ITM-023 saem do restaurante com a esteira.
 
 ## Tabela-mestra de ingredientes (`Ingredients`)
 
@@ -153,6 +157,37 @@ não repete; aparece no modelo do Hot Dog e como ícone no balão do pedido; no 
 | Valor | $4 + Σ complementos se completo **[DEC-071]** |
 
 - Critérios de aceite: o modelo na mão mostra todos os complementos; o servidor guarda a lista (o client não decide o conteúdo).
+
+### ITM-025 — Plate (prato não montado do restaurante)
+
+- Tipo: produto (em montagem) · Tool: sim · Status: Rascunho (Provisório; a linha já está em `Content.Items`, TASK-513) ·
+  Origem: **[DEC-299, DEC-302, DEC-304, DEC-305]**, `tech/prep-conveyor.md` §6.3 (DT-E8, P15 e P16 aceitas pelo dono),
+  `design/restaurant-flow.md` FEAT-044/045.
+- Só no restaurante com a esteira (`Prep.Rules.Mode = "Conveyor"`). No trailer não existe.
+
+| Campo | Valor |
+|---|---|
+| Chave / `Ref` | `plate` / `ITM-025` · nome de exibição "Plate" (placeholder, DEC-022) |
+| `Kind` / `Category` | `Product` / **`HotDog`** (a mesma do ITM-010) |
+| `Stackable` · `Use` | não · não |
+| `DropOnHit` · `DropDespawn` | `Keep` · 90 s |
+| `KeepOnSpectate` | não |
+| Nasce | **nunca na mão**: pedido confirmado → prato vazio com ticket #n numa vaga da mesa central (FEAT-044). Vira Tool ao **segurar E 0,5 s** na vaga (`plate_take`) |
+| Estados | vazio com ticket → pão cortado (`Bun`) → pão + salsicha (`Dog`) → complementos → **Finish** aceito na parada 3: o prato volta à mão como **`hot_dog` (ITM-010)** com `Quality` = a nota. O `plate` nunca é vendido |
+| Formas | mesa central (set `Plates`) ↔ mão (este Tool) ↔ esteira (`PrepSeats`); um prato está em exatamente uma forma (dono único `PlateService`) |
+| Atributos do Tool (escreve o `PlateService`) | `Item` = "plate", `PlateId`, `Ticket` (NpcId), `TicketLine` (1–2, dupla FEAT-038), `Orphan`, `Bun`, `Dog`, `Toppings`, `FlipBonus`, `Altered` |
+| Máx. na mão | **2** somando `plate` e `hot_dog` (`CategoryLimits.HotDog = 2`, DEC-299); o 3º pegar recusa com `hands_full` |
+| Custo | nenhum próprio: o pão e a salsicha saem do estoque no commit de cada etapa (ITM-001 $0,50, ITM-002 $0,75), os complementos no Finish |
+| Valor | $0: não é vendável. No `PICKUP` recusa com `plate_not_ready` ("Finish it on the belt first") |
+| Snapshot da run | **não entra** (como o `Ticket`, o `Stash` ignora); no turno seguinte `PlateService:Clear()` apaga pratos e tickets |
+| Perda | cliente desistiu + prato vazio = some; com conteúdo = órfão. Tool destruído fora do `PlateService` com o cliente esperando = nasce prato vazio novo com o mesmo #n (P22) |
+
+- Critérios de aceite:
+  - Segurar E 0,5 s numa vaga com prato não montado dá exatamente 1 Tool `plate` com `PlateId` e `Ticket` iguais aos da vaga; a vaga fica livre.
+  - Com 1 `plate` + 1 `hot_dog` na mão, pegar um 3º prato é recusado com `hands_full`.
+  - "Hand Over" no `PICKUP` com `plate` equipado é recusado com `plate_not_ready` e nada muda (Cash, cliente, prato).
+  - Finish aceito na esteira e saída do foco: o jogador recebe um `hot_dog` (não um `plate`) com o mesmo `PlateId`, `Ticket` e o `Quality` gravado pelo servidor.
+  - Fim do turno com `plate` no inventário: no turno seguinte ele não existe; o snapshot da run não o contém.
 
 ## Consumível noturno
 
