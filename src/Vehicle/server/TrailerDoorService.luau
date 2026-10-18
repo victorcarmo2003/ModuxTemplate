@@ -47,6 +47,7 @@ const OUT_POINT = "TRL-OUT" -- optional MapPoint: where Exit Trailer drops the p
 const IN_POINT = "TRL-IN" -- optional MapPoint: where Enter Trailer drops the player (floor level)
 const FREEZE = "TrailerDoor"
 const LOCKED_ATTRIBUTE = "DoorLocked" -- on the trailer Model while an anomaly holds the door locked
+const DOOR_LEAF = "Door_Back" -- the leaf DoorController swings; without it the trailer has no back door to prompt
 const DOOR_ATTRIBUTE = "DoorOpen" -- on the trailer Model while the leaf is open (DoorController animates Door_Back, tag ScriptedDoor)
 const ANCHOR_IN_NAME = "Prompt_ExitTrailer"
 const ANCHOR_OUT_NAME = "Prompt_EnterTrailer"
@@ -246,6 +247,12 @@ function TrailerDoorService:EnsureAnchors(): boolean
 	const pad = if MapIndex.HasBinding() then MapIndex.FindPoint(TRL_POINT) else nil
 	if model == nil or pad == nil then
 		return false
+	end
+	-- TASK-476: no leaf, no door. The restaurant shell (MAP01_Restaurant.TRL) has no Door_Back, and the offsets of the old
+	-- trailer door land on the coffee machine there, so with Restaurant.Rules.Enabled = false the fallback anchors put a
+	-- stray "Open door" on it. Authored anchors are still used as they are.
+	if model:FindFirstChild(DOOR_LEAF, true) == nil then
+		return true
 	end
 	const host = self:Host(model)
 	if host == nil then
