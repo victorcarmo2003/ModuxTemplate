@@ -68,6 +68,9 @@ export type Anomaly = {
 	Trailer: TrailerUse,
 	Family: Family?, -- V2 (DEC-254); nil = out of the agenda
 	SkipAtmospheres: { string }?, -- ATM-# keys where the scheduler never draws it (DEC-257)
+	-- TASK-482 (DEC-294 §8): staring at the actor's head builds the stare pressure (client) and drains sanity (server,
+	-- Sanity.Stare). Customer actors only (the head is the target)
+	Stare: boolean?,
 }
 
 export type CueKind = "Visual" | "Audio" | "Both"
@@ -191,6 +194,7 @@ const copies = anomaly(4, "anm_004_copies", "The copies", "Customer", 1, "Party"
 })
 copies.Night = 5 -- §5: presented with the white eyes on Night 5 (Ref keeps ANM-004)
 copies.Family = "A"
+copies.Stare = true -- TASK-482: the copy turns its head first; staring distorts its face
 
 const raincoat = anomaly(5, "anm_005_raincoat_lady", "The Raincoat Lady", "Customer", 1, "Party", 60, false, {
 	"anm_008_long_car",
@@ -276,6 +280,10 @@ blackout.Family = "C"
 -- TASK-341 (Provisional): debuts on Night 4 (was 3), the rain night, swapped with the blackout
 const turnedNeck = odd(4, 12, "anm_012_turned_neck", "The turned neck")
 turnedNeck.Cues = { "jumpscare", "neck_snap", "window_slam" } -- TASK-336
+turnedNeck.Stare = true -- TASK-482 (DEC-294 §8): the turned head follows who stares
+
+const whiteEyes = odd(5, 13, "anm_013_white_eyes", "The white eyes")
+whiteEyes.Stare = true -- TASK-482 (DEC-294 §8): white eyes / wrong smile
 
 const rows: { Anomaly } = {
 	-- ViewRange: 60 default, 80 N6, 300 N7 (FEAT-019); 100 N3/N8 and 200 N10 Provisional (C-01 ~73 studs,
@@ -292,7 +300,7 @@ const rows: { Anomaly } = {
 	hush,
 	odd(2, 11, "anm_011_shaker", "The shaker"),
 	turnedNeck,
-	odd(5, 13, "anm_013_white_eyes", "The white eyes"),
+	whiteEyes,
 	odd(6, 14, "anm_014_big_head", "The big head"),
 	odd(7, 15, "anm_015_floater", "The floater"),
 	odd(8, 16, "anm_016_starer", "The starer"),

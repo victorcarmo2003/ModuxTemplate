@@ -96,6 +96,24 @@ export type ShakeProfile = {
 	Duration: number, -- s
 }
 
+-- Stare pressure, the look (TASK-482; DEC-294, DEC-295 Q-368 A; tech/stare-pressure.md). The timing (cone, Delay,
+-- Release) is Content.Sanity.Stare, shared with the server drain; these are presentation only. Pressure 0..1 builds over
+-- Build s once the stare passed Delay and falls back to 0 over Sanity.Stare.Release when the player looks away.
+export type Stare = {
+	Build: number, -- s from the start of the pressure to its peak
+	HeartFrom: number, -- BPM when the pressure starts
+	HeartTo: number, -- BPM at the peak
+	Vignette: number, -- screen edge darkness at the peak (<= Rules.MaxVignette)
+	Flicker: number, -- +- edge flicker at the peak ("glaucoma"), off with Motion.Reduced
+	HeadSpeed: number, -- degrees/s the head turns to follow the camera at the peak (slow = creepy)
+	HeadMax: number, -- degrees the head may turn past its own pose
+	FaceStretch: number, -- face shell scale share at the peak (taller and narrower)
+	FaceRoll: number, -- degrees of face tilt at the peak, swaying
+	WhisperFrom: number, -- whisper rate when the pressure starts (1 = Kit default)
+	WhisperTo: number, -- whisper rate at the peak
+	Words: { [string]: string }, -- anomaly key -> key of Words; missing = "stare"
+}
+
 export type Rules = {
 	Latency: number, -- s a one-shot may start late and still play
 	ReduceMotion: number, -- scale of Shake/Fov/Nudge when Motion.Reduced() (the game's existing reduced-motion setting)
@@ -193,6 +211,25 @@ const words: { [string]: { string } } = {
 		"he's close",
 		"don't let him in",
 	},
+	-- TASK-482 stare pressure (DEC-294 §8): staring at an odd customer
+	stare = {
+		"STOP STARING",
+		"STOP STARING",
+		"DON'T LOOK",
+		"DON'T LOOK",
+		"LOOK AWAY",
+		"don't look...",
+		"it knows",
+		"it sees you looking",
+	},
+	stare_copy = {
+		"DON'T LOOK AT IT",
+		"DON'T LOOK AT IT",
+		"STOP STARING",
+		"LOOK AWAY",
+		"that's not them",
+		"don't look...",
+	},
 	low_sanity = {
 		"LOW SANITY",
 		"DRINK COFFEE",
@@ -218,8 +255,27 @@ const rules: Rules = {
 	},
 }
 
+-- TASK-482 (Provisional until the owner's Play; mild, DEC-172)
+const stare: Stare = {
+	Build = 6,
+	HeartFrom = 72,
+	HeartTo = 140,
+	Vignette = 0.42,
+	Flicker = 0.08,
+	HeadSpeed = 28,
+	HeadMax = 150,
+	FaceStretch = 0.14,
+	FaceRoll = 9,
+	WhisperFrom = 0.15,
+	WhisperTo = 0.9,
+	Words = {
+		anm_004_copies = "stare_copy",
+	},
+}
+
 return Table.with(Table.new({ blackout } :: { Scene }), {
 	Rules = Table.record(rules),
+	Stare = Table.record(stare),
 	Words = Table.record(words),
 	PhaseOrder = table.freeze({ Signal = 1, Active = 2, Resolved = 3, Failed = 3 }),
 })

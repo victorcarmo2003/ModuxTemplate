@@ -858,6 +858,14 @@ local function checkLightsAndSanity()
 	inRange("Sanity", nil, nil, "Bands.Mid", Sanity.Bands.Mid, 1, Sanity.Bands.High)
 	inRange("Sanity", nil, nil, "SeeAngle", Sanity.SeeAngle, 1, 180)
 	inRange("Sanity", nil, nil, "BasicLampRadius", Sanity.BasicLampRadius, 0, 100)
+	-- TASK-482 stare pressure: a narrower cone than the sight, the drain after the pressure and after the sight
+	const stare = Sanity.Stare
+	inRange("Sanity", nil, nil, "Stare.Angle", stare.Angle, 1, Sanity.SeeAngle)
+	inRange("Sanity", nil, nil, "Stare.Delay", stare.Delay, 0, 10)
+	inRange("Sanity", nil, nil, "Stare.Release", stare.Release, 0.1, 5)
+	inRange("Sanity", nil, nil, "Stare.DrainAfter", stare.DrainAfter, math.max(stare.Delay, Sanity.SeeTime), 20)
+	inRange("Sanity", nil, nil, "Stare.PerSecond", stare.PerSecond, 0, 10)
+	inRange("Sanity", nil, nil, "Stare.Cap", stare.Cap, 0, Sanity.Start)
 	inRange("Revive", nil, nil, "MaxPerNight", Revive.MaxPerNight, 0, 10)
 	inRange("Revive", nil, nil, "WipeWindow", Revive.WipeWindow, 1, 120)
 	inRange("Revive", nil, nil, "BodyFallback", Revive.BodyFallback, 0, 600)
@@ -1116,6 +1124,9 @@ local function checkAnomalies()
 		end
 		if row.Scope ~= "Party" and row.Scope ~= "PerPlayer" then
 			fail("Anomalies", index, key, `Scope '{row.Scope}' is not Party or PerPlayer (DEC-073)`)
+		end
+		if row.Stare and (row.Actor ~= "Customer" or row.SeeMode ~= "Cone") then
+			fail("Anomalies", index, key, "Stare needs a Customer actor seen in a Cone (TASK-482: the head is the target)")
 		end
 		if row.SeeMode == "Cone" then
 			inRange("Anomalies", index, key, "ViewRange", row.ViewRange, 1, 1000)
@@ -2509,6 +2520,31 @@ local function checkHorrorScenes()
 			if step.Kind ~= "Actor" and (step.Sound ~= nil or step.Seen ~= nil) then
 				fail("HorrorScenes", index, key, `{where} Sound / Seen are Actor fields only`)
 			end
+		end
+	end
+	-- TASK-482 stare pressure look
+	const stare = HorrorScenes.Stare
+	inRange("HorrorScenes", nil, "Stare", "Build", stare.Build, 0.5, 30)
+	inRange("HorrorScenes", nil, "Stare", "HeartFrom", stare.HeartFrom, 20, 220)
+	inRange("HorrorScenes", nil, "Stare", "HeartTo", stare.HeartTo, stare.HeartFrom, 220)
+	inRange("HorrorScenes", nil, "Stare", "Vignette", stare.Vignette, 0, rules.MaxVignette)
+	inRange("HorrorScenes", nil, "Stare", "Flicker", stare.Flicker, 0, 0.2)
+	inRange("HorrorScenes", nil, "Stare", "HeadSpeed", stare.HeadSpeed, 0, 180)
+	inRange("HorrorScenes", nil, "Stare", "HeadMax", stare.HeadMax, 0, 180)
+	inRange("HorrorScenes", nil, "Stare", "FaceStretch", stare.FaceStretch, 0, 0.3)
+	inRange("HorrorScenes", nil, "Stare", "FaceRoll", stare.FaceRoll, 0, 20)
+	inRange("HorrorScenes", nil, "Stare", "WhisperFrom", stare.WhisperFrom, 0, 5)
+	inRange("HorrorScenes", nil, "Stare", "WhisperTo", stare.WhisperTo, 0, 5)
+	if HorrorScenes.Words.stare == nil then
+		fail("HorrorScenes", nil, "Stare", "Words has no 'stare' list (the default)")
+	end
+	for anomaly, list in stare.Words do
+		const row = Anomalies.ByKey[anomaly]
+		if row == nil or not row.Stare then
+			fail("HorrorScenes", nil, "Stare", `Words '{anomaly}' is not an anomaly with Stare`)
+		end
+		if HorrorScenes.Words[list] == nil then
+			fail("HorrorScenes", nil, "Stare", `Words '{list}' is not a key of HorrorScenes.Words`)
 		end
 	end
 end

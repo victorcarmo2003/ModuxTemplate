@@ -18,6 +18,8 @@
 	    issue" pill when the power is on.
 	  - Score/ (TASK-443, TASK-444): the horror score director (Calm / Uneasy / Tension / Climax / Release) and the
 	    "POWER OUT" caption, driven by these records; started in OnStart (Content.Score.Rules.Enabled).
+	  - Stare.luau (TASK-482): the stare pressure look (heart, dark edges, whispers, head follow, face distortion) while
+	    the own camera stares at the actor of an Active occurrence whose row has `Stare`; the drain is the server's.
 	  - Scene/ (TASK-462): the horror scene player (Content.HorrorScenes), fed by Write / Unmount / OnCue, started in
 	    OnStart; plays a scene's steps on the timeline of its record (no packet of its own).
 	  - stings (user request 2026-10-10, Content.SoundRules.Stings): AnomalyStart (horror_sting) when a record
@@ -42,6 +44,7 @@ local Breaker = require(script.Breaker)
 local Score = require(script.Score)
 local Scene = require(script.Scene)
 local SceneKits = require(script.Scene.Kits)
+local Stare = require(script.Stare)
 
 export type Phase = Effect.Phase
 export type Record = Effect.Record
@@ -405,6 +408,8 @@ AnomalyController:OnStart(function(self)
 	Scene.Start(self:Context())
 	-- TASK-467: camera, screen, door, shadow and eyes steps (sibling kits TASK-463/464/465)
 	SceneKits.Register(Scene.Handle, self.Dependencies.CameraController :: any)
+	-- TASK-482: stare pressure of the customer anomalies (Content.Anomalies[k].Stare)
+	Stare.Start(self:Context(), self.Dependencies.CameraController :: any)
 	-- TASK-443: the horror score in steps (narrow views; the director only reads them)
 	Score.Start({
 		Audio = self.Dependencies.AudioController :: any,
