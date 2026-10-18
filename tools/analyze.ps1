@@ -38,10 +38,10 @@ if (-not (Test-Path -LiteralPath $map)) {
 Write-Host "engine: luau-lsp + Rojo sourcemap + Roblox definitions" -ForegroundColor DarkGray
 
 
-# LuauTypeInferIterationLimit 80000 (default 20000; was 40000 until the Anomaly/Showcase hooks, 2026-10-12): the Modux self of the biggest Services (10+ dependencies plus
+# LuauTypeInferIterationLimit 160000 (default 20000; 40000 until the Anomaly/Showcase hooks 2026-10-12, 80000 until the TASK-480/485 merge 2026-10-18: PlateController): the Modux self of the biggest Services (10+ dependencies plus
 # typeof(Net)) exceeds the default budget and reports "Code is too complex to typecheck" on correct code (TASK-048).
 # Same value in .vscode/settings.json (luau-lsp.fflags.override) so editor and gate agree.
-$base = @("analyze", "--sourcemap=$map", "--flag:LuauSolverV2=true", "--flag:LuauTypeInferIterationLimit=80000")
+$base = @("analyze", "--sourcemap=$map", "--flag:LuauSolverV2=true", "--flag:LuauTypeInferIterationLimit=160000")
 if ($Defs) { $base += "--definitions=$Defs" }
 
 # What to analyze. ONE engine process whenever possible: every process type-checks the shared Modux / Net / Content

@@ -87,6 +87,8 @@ export type Public = {
 	ShowBanner: (self: Public, banner: HudBanner.Banner, duration: number?) -> (),
 	RefreshWipe: (self: Public) -> (),
 	ApplyShift: (self: Public, record: ShiftRecord) -> (),
+	Fallen: (self: Public) -> boolean,
+	DownLine: (self: Public) -> string,
 	SpectateMode: (self: Public) -> HudSpectate.Mode,
 	ShowCard: (self: Public) -> (),
 	HideCard: (self: Public) -> (),

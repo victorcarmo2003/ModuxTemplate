@@ -8,7 +8,7 @@
     "luau-lsp.fflags.enableNewSolver": true,
     "luau-lsp.fflags.sync": true,
     "luau-lsp.fflags.override": {
-        "LuauTypeInferIterationLimit": "80000"
+        "LuauTypeInferIterationLimit": "160000"
     },
     "luau-lsp.completion.anonymousAutofilledFunction.enabled": true,
     "[lua]": {

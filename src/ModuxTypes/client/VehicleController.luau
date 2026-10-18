@@ -8,7 +8,8 @@ type Shutter = {
 	Part: BasePart,
 	Hinge: Attachment,
 	HingeOffset: CFrame, -- hinge in part space (authored)
-	Rest: CFrame, -- part in model-pivot space (authored = open)
+	Base: BasePart, -- still part of the vehicle the pose follows (TASK-480: never the Model pivot, see baseOf)
+	Rest: CFrame, -- part in Base space (authored = open)
 	Closed: number, -- radians around the hinge X axis
 	Angle: number,
 	From: number,
@@ -31,7 +32,9 @@ export type Public = {
 	WarnOnce: (self: Public, tag: string, message: string) -> (),
 	WatchVehicle: (self: Public, model: Instance) -> (),
 	UnwatchVehicle: (self: Public, model: Instance) -> (),
+	HasShutter: (self: Public, model: Model) -> boolean,
 	WatchShutter: (self: Public, model: Model, retry: boolean) -> (),
+	WatchFlap: (self: Public, model: Model, hinge: Attachment) -> (),
 	WantClosed: (self: Public, model: Model) -> boolean,
 	PoseShutter: (self: Public, shutter: Shutter) -> (),
 	SwingShutter: (self: Public, shutter: Shutter) -> (),

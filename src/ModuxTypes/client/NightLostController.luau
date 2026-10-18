@@ -12,7 +12,6 @@ export type Public = {
 	Title: (self: Public) -> string,
 	Line: (self: Public) -> string,
 	Progress: (self: Public) -> number,
-	Seconds: (self: Public) -> number,
 	Tick: (self: Public) -> (),
 	WatchViewport: (self: Public) -> (),
 	Mount: (self: Public, playerGui: Instance) -> (),
