@@ -1133,7 +1133,7 @@ Pedestal e porta precisam ser `ModelStreamingMode = Persistent` (como o resto do
 `Run`), prateleiras nunca fecham.
 
 **Âncoras de runtime** (mesmo contrato, criadas pelo dono): cliente NPC = `Attachment` `Prompt_Customer` no
-`HumanoidRootPart` do rig do pool (criado uma vez por rig pelo `NpcService`; `PromptAction` trocado pelo
+`HumanoidRootPart` do rig do pool, no peito à frente do torso (offset (0; 0,5; −0,6), TASK-474: nunca sobre o rosto) (criado uma vez por rig pelo `NpcService`; `PromptAction` trocado pelo
 `CustomerService`: `take_order` → `serve`; "Refuse" numa segunda âncora `Prompt_Refuse`, 1,5 abaixo); item derrubado =
 a própria Tool no `Workspace` com `pick_up_item` (`network.md` §7).
 
