@@ -65,6 +65,12 @@ const written: { Page } = {
 		"A shadow waits in the corner.",
 	}, { "No bell, no fog. Just dark." }, { "Run to the breaker out back.", "Hold it until the lights are on. Be fast!" }),
 
+	-- ANM-021 (owner 2026-10-18)
+	page("anm_021_red_fog", "The Red Fog", "Careful", {
+		"A red fog rolls down the street.",
+		"A bell rings. Everything turns red.",
+	}, { "Grey fog is just weather." }, { "Close the window before it reaches the glass.", "Keep it shut until it goes." }),
+
 	page("anm_013_white_eyes", "The White Eyes", "Refuse", {
 		"Eyes all white.",
 		"A smile way too big.",
