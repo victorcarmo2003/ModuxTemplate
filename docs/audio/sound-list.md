@@ -449,6 +449,27 @@ IDs 217 a 229 ficam reservados à TASK-185 (gestos do preparo). Gravações **a 
 | SFX-232 | Locked door (porta trancada) | ANM-004 (DEC-247): o jogador tenta abrir a porta dos fundos do trailer enquanto está trancada pela anomalia; **só este som toca**, nada mais | 0,5–1 s | **já existe no Studio**: `ReplicatedStorage.Assets.SFX["Locked door"]` (inserido pelo dono; licença própria dele) | P1 | 1 |
 | SFX-231 | Risada / sorriso | depois de agarrar quem serviu, **enquanto some** (fade de 2 s, DEC-246) | 1,5–3 s | risada do cliente, sinistra mas não gritada; **a ser fornecido pelo usuário** | P2 | 1 |
 
+### 5.19 Cena do apagão (ANM-020): banco de sons (TASK-466, DEC-290; Provisório)
+
+Itens de `design/horror-cinematic.md` §4.6. Áudio da Creator Store, biblioteca **Pro Sound Effects** (licença em
+`art/credits.md`); toda escolha é **Provisória** até o dono ouvir em Play (TASK-467). Mild (DEC-172): nenhum grito,
+nada que estoure; respiração bem baixa. Chave = linha de `src/Shared/Content/Sounds.luau`; a cena está em
+`Content.HorrorScenes` (`anm_020_blackout`). Trovão perto/longe fica fora: DEC-291 tirou os raios do apagão (`thunder` já existe para o ATM-5).
+
+| ID | Chave | Nome curto | Quando toca | Duração | Asset (Creator Store) | Grupo / volume / espaço | Prioridade |
+|---|---|---|---|---|---|---|---|
+| SFX-233 | `power_cut` | "Clunk" do quadro geral | t = 0 (Active), junto do `lights_off` do dono | ~3 s | `9113808115` "Circuit Breaker 1 (SFX)"; reserva `9125626478` "Lever Mechanism Crank Clicks Big Metal Clunk" | Sfx 0,8, tela | P1 |
+| SFX-234 | `hum_rise` | Zumbido elétrico subindo | aviso (Signal), com a piscada das luzes | ~3 s | `9116266188` "Light Bulb Buzz 4 (SFX)" (power ups, surges) | Sfx 0,4, tela | P2 |
+| SFX-235 | `hum_die` | Zumbido caindo para o silêncio | t = 0, por baixo do clunk | ~4 s | `9117871125` "Power Down 1 (SFX)" | Sfx 0,4, tela | P2 |
+| SFX-236 | `heavy_steps` | Passos pesados se aproximando (madeira/asfalto) | t = 18–30, de `SCENE-STEPS-FAR` até `SCENE-DOOR-OUT` | loop de passos | **sem candidato seguro**: a biblioteca PSE não tem passo humano pesado; os uploads de usuário achados são ripados de outros jogos (Half-Life, SCP, Mob Entertainment) = sem licença. Id `""`; a cena segue com `walker_step` (do dono) | Sfx 0,7, 3D 80 studs | P1 |
+| SFX-237 | `steps_stop` | Os passos param | t = 30, último passo na frente da porta | <1 s | `9114523345` "Foot Stomp 3 (SFX)" (um passo firme, assoalho) | Sfx 0,6, 3D 60 studs | P1 |
+| SFX-238 | `handle_rattle` | Maçaneta girando e travando | t = 32 (Door Rattle) | ~2 s | `9114138011` "Door Knob Jiggle 1 (SFX)" (várias pegadas e giros, madeira) | Sfx 0,6, 3D 40 studs | P1 |
+| SFX-239 | `door_force` | Porta forçando no batente | t = 33,4 (Door Push) | ~2 s | `9114152574` "Door Shake 1 (SFX)" | Sfx 0,6, 3D 40 studs | P1 |
+| SFX-240 | `latch_hold` | "Trava" metálica segura | t = 34 (Door Hold) | ~2 s | `9114881875` "Iron Door Latch 3 (SFX)" | Sfx 0,6, 3D 40 studs | P1 |
+| SFX-241 | `breath_held` | Respiração abafada do personagem | t = 22, só quem está escondido (`Who = "Safe"`) | ~1 s | `9125572450` "Gasps Male Deep Breaths Fast Pants Frightened (SFX)", bem baixo para soar abafado | Sfx 0,25, tela | P2 |
+| SFX-242 | `power_up` | Energia voltando ("thunk" + zumbido) | Resolved/Failed t = 0 | ~1 s | `9117885256` "Power Up Sweeteners 10 (SFX)" (thunk, zumbido, cliques) | Sfx 0,7, tela | P1 |
+| SFX-243 | `lamps_cascade` | Lâmpadas acendendo em cascata | Resolved/Failed t = 0,3, com `Lights Cascade` | ~7 s | `9116266327` "Light Bulb Buzz 6 (SFX)" (power ups e surges) | Sfx 0,5, tela | P2 |
+
 ---
 
 ## 6. Mixagem e regras de terror (verificáveis)

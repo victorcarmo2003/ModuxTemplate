@@ -85,17 +85,20 @@ export type Rules = {
 	Shakes: { [string]: ShakeProfile },
 }
 
--- ANM-020 blackout, the owner's reference scene (DEC-290; design/horror-cinematic.md §2). First pass with the sounds
--- that already exist; TASK-466 adds the breaker clunk, the handle rattle, the footsteps that stop and the power-up hum,
--- and TASK-467 tunes the timeline in Play.
+-- ANM-020 blackout, the owner's reference scene (DEC-290; design/horror-cinematic.md §2). Sound bank of TASK-466
+-- (sound-list.md §5.19): breaker clunk, hum, steps stopping, handle rattle, door forced, latch, held breath, power-up and
+-- lamp cascade. The approaching steps stay on walker_step until heavy_steps has an Id. TASK-467 tunes it in Play.
 const blackout: Scene = {
 	Key = "anm_020_blackout",
 	Name = "The blackout",
 	Steps = {
 		-- omen (Signal): the kitchen lights flicker once or twice
 		{ At = 0, Phase = "Signal", Kind = "Lights", Target = "Flicker", Duration = 1.2 },
+		{ At = 0, Phase = "Signal", Kind = "Sound", Target = "hum_rise" },
 		-- t = 0: everything goes dark with the breaker sound, a jolt and the bell
 		{ At = 0, Phase = "Active", Kind = "Lights", Target = "Off", Duration = 0 },
+		{ At = 0, Phase = "Active", Kind = "Sound", Target = "power_cut" },
+		{ At = 0, Phase = "Active", Kind = "Sound", Target = "hum_die" },
 		{ At = 0, Phase = "Active", Kind = "Sound", Target = "lights_off" },
 		{ At = 0, Phase = "Active", Kind = "Shake", Target = "Jolt" },
 		{ At = 0, Phase = "Active", Kind = "Fov", Value = -3, To = 0, Duration = 0.8 },
@@ -109,14 +112,18 @@ const blackout: Scene = {
 		{ At = 18, Phase = "Active", Kind = "Music", Target = "Stop" },
 		{ At = 18, Phase = "Active", Kind = "Sound", Target = "walker_step", Point = "SCENE-STEPS-FAR", To = "SCENE-DOOR-OUT", Duration = 12 },
 		{ At = 18, Phase = "Active", Kind = "Fov", Value = 1, To = 0, Duration = 12 },
+		{ At = 22, Phase = "Active", Kind = "Sound", Who = "Safe", Target = "breath_held" },
 		{ At = 24, Phase = "Active", Kind = "Shadow", Point = "SCENE-DOOR", Duration = 1.5 },
-		-- silence, then the creature tries the door once and cannot open it
+		-- the steps stop at the door; silence, then the creature tries the door once and cannot open it
+		{ At = 30, Phase = "Active", Kind = "Sound", Target = "steps_stop", Point = "SCENE-DOOR-OUT" },
 		{ At = 30, Phase = "Active", Kind = "Vignette", Value = 0.35, To = 0.45, Duration = 2 },
 		{ At = 32, Phase = "Active", Kind = "Door", Target = "Rattle", Point = "SCENE-DOOR", Duration = 1.2 },
-		{ At = 32, Phase = "Active", Kind = "Sound", Target = "locked_door", Point = "SCENE-DOOR" },
+		{ At = 32, Phase = "Active", Kind = "Sound", Target = "handle_rattle", Point = "SCENE-DOOR" },
 		{ At = 32, Phase = "Active", Kind = "Shake", Target = "Door", Point = "SCENE-DOOR" },
 		{ At = 33.4, Phase = "Active", Kind = "Door", Target = "Push", Point = "SCENE-DOOR", Duration = 0.6 },
-		{ At = 33.4, Phase = "Active", Kind = "Sound", Target = "door_knock", Point = "SCENE-DOOR", Value = 0.7 },
+		{ At = 33.4, Phase = "Active", Kind = "Sound", Target = "door_force", Point = "SCENE-DOOR" },
+		{ At = 34, Phase = "Active", Kind = "Door", Target = "Hold", Point = "SCENE-DOOR", Duration = 0.4 },
+		{ At = 34, Phase = "Active", Kind = "Sound", Target = "latch_hold", Point = "SCENE-DOOR" },
 		-- it leaves; the choir fades with it (DEC-283)
 		{ At = 36, Phase = "Active", Kind = "Music", Target = "score_coral" },
 		{ At = 36, Phase = "Active", Kind = "Sound", Target = "walker_step", Point = "SCENE-DOOR-OUT", To = "SCENE-STEPS-FAR", Duration = 8 },
@@ -124,10 +131,14 @@ const blackout: Scene = {
 		-- whoever stayed out: the eyes at the window for an instant (Q-356, Provisional), then the rule's own failure
 		{ At = 30, Phase = "Active", Kind = "Actor", Who = "Caught", Point = "SCENE-WINDOW-EYES", Duration = 1 },
 		-- relief: the power comes back in a cascade
-		{ At = 0, Phase = "Resolved", Kind = "Lights", Target = "Cascade", Duration = 1.5 },
+		{ At = 0, Phase = "Resolved", Kind = "Sound", Target = "power_up" },
+		{ At = 0.3, Phase = "Resolved", Kind = "Lights", Target = "Cascade", Duration = 1.5 },
+		{ At = 0.3, Phase = "Resolved", Kind = "Sound", Target = "lamps_cascade" },
 		{ At = 0, Phase = "Resolved", Kind = "Music", Target = "Stop" },
 		{ At = 0, Phase = "Resolved", Kind = "Vignette", Value = 0, To = 0, Duration = 0.5 },
-		{ At = 0, Phase = "Failed", Kind = "Lights", Target = "Cascade", Duration = 1.5 },
+		{ At = 0, Phase = "Failed", Kind = "Sound", Target = "power_up" },
+		{ At = 0.3, Phase = "Failed", Kind = "Lights", Target = "Cascade", Duration = 1.5 },
+		{ At = 0.3, Phase = "Failed", Kind = "Sound", Target = "lamps_cascade" },
 		{ At = 0, Phase = "Failed", Kind = "Music", Target = "Stop" },
 		{ At = 0, Phase = "Failed", Kind = "Vignette", Value = 0, To = 0, Duration = 0.5 },
 	},
