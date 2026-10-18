@@ -42,8 +42,13 @@ const ANCHOR_TAG = "Interactable"
 const REST_ATTRIBUTE = "RestC0"
 const SEATED_ATTRIBUTE = "Seated"
 const CUSTOMER_ACTION = "take_order"
--- Anchor offset from the HumanoidRootPart (torso centre). PROVISIONAL: Prompt_Customer at the neck (architecture.md §18.4).
-const CUSTOMER_OFFSET = Vector3.new(0, 1.5, 0)
+-- Anchor offset from the HumanoidRootPart (torso centre, -Z = the rig's front). TASK-474 (owner, Play 2026-10-18): the
+-- pill sat on the neck and hid the face, and anomalies are told by the face (white eyes, wrong smile). Now on the upper
+-- chest, in front of the torso: +0.5 keeps the pill (centred on the anchor, no StudsOffset) under the neck joint (+1.0)
+-- on every species (all share the R6 body kit; only the head changes), and 0.6 forward stays short of the restaurant
+-- counter (PU-n stands 1.2 from it) and above its top, so the camera sight check still clears it. Same anchor for the
+-- server range check (Registry.position), so client and server keep measuring the same point.
+const CUSTOMER_OFFSET = Vector3.new(0, 0.5, -0.6)
 -- Server rig: only walking. Everything else off (architecture.md §12.3).
 const DISABLED_STATES = {
 	Enum.HumanoidStateType.Climbing,
