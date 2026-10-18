@@ -152,3 +152,19 @@ Encarar uma anomalia de cliente (pescoço invertido, cópia, olhos brancos) por 
 - Continuando: sanidade cai aos poucos; o rosto distorce de leve (escala/rotação das partes do rosto; EditableMesh só se
   der certo — Q-368).
 - Olhar para longe solta tudo em ~1 s. Respeita `Motion.Reduced()`.
+
+## 9. Roteiros entregues em 2026-10-18 (TASK-483, 490, 491; Provisórios até o Play do dono)
+
+Todas as cenas estão em `Content.HorrorScenes` (`/dev anomaly ANM-xxx` numa noite em andamento).
+
+| Anomalia | Resposta (restaurante) | O que a cena faz |
+|---|---|---|
+| ANM-017 Rastejador | **subir no balcão** (pés fora do chão no momento em que ele empina) | arranhões e tábuas sob o piso, "GET OFF THE FLOOR / CLIMB ON THE COUNTER", coração 72→165, ele sai na ponta leste do corredor da cozinha e empina no meio |
+| ANM-012 Pescoço invertido | recusar | estalos do pescoço no balcão, "DON'T TAKE HER ORDER / SEND HER AWAY"; o terror de encarar é a pressão (§8) |
+| ANM-004 A cópia | recusar | "THAT'S NOT THEM / THEY ALREADY LEFT"; encarar = pressão com "DON'T LOOK AT IT" |
+| ANM-006 Stalker | não olhar; fechar a janela quando ele chega | "DON'T LOOK AT IT / IT MOVES WHEN YOU LOOK", e no vidro "CLOSE THE WINDOW!" |
+| ANM-008 Carro comprido | fechar a janela (as duas persianas, TASK-480) antes do farol | vem pela rua, entra na pista e **freia no drive-thru**; tranco, silêncio, farol alto; "CLOSE THE WINDOW / KEEP IT SHUT" |
+| ANM-010 Hush | **apagar a luz da loja** e manter (sem Mart no mapa) | postes de fora apagam um a um, seta no interruptor, "TURN OFF THE LIGHTS"; depois silêncio e coração lento |
+| 001, 005, 011, 013–016 | recusar (Raincoat: servir rápido) | cena curta padrão: sting, barras finas, dica nos primeiros segundos |
+
+Durante as barras de cinema os contornos e as pílulas do mundo apagam (DEC-296), e nas anomalias de mundo os clientes Night encaram o jogador.

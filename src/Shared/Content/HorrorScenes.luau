@@ -490,6 +490,47 @@ const hush: Scene = {
 	},
 }
 
+-- Odd customers (family A and the copy's cousins; TASK-491; design/horror-cinematic.md §6.8). One shape for every
+-- customer anomaly anchored to the actor's record (Kit/CustomerActor: Active = it spawned and walks to the counter,
+-- Resolved = refused / handled, Failed = the wrong verb: jumpscare + faint of who did it). Short and quiet, like the
+-- turned neck: a low sting when it arrives, thin bars, the edges closing a little, the hint words for the first
+-- seconds (before the stare pressure of the starable ones can start), the bars gone at 16 s so the work goes on.
+-- `words` = key of Words for its hints; `sting` = the arrival sound (Content.Sounds key).
+local function oddScene(key: string, name: string, words: string, sting: string?): Scene
+	return {
+		Key = key,
+		Name = name,
+		Live = true,
+		Steps = {
+			{ At = 0, Phase = "Active", Kind = "Sound", Target = sting or "horror_sting", Value = 0.3 },
+			{ At = 1, Phase = "Active", Kind = "Cinema", Value = 0.08, Duration = 1.5 },
+			{ At = 2, Phase = "Active", Kind = "Vignette", Value = 0, To = 0.16, Duration = 8 },
+			{ At = 2.5, Phase = "Active", Kind = "Whispers", Target = words, Value = 0.3, To = 1, Duration = 7 },
+			{ At = 9.5, Phase = "Active", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+			{ At = 16, Phase = "Active", Kind = "Cinema", Value = 0, Duration = 1.5 },
+			{ At = 16, Phase = "Active", Kind = "Vignette", Value = 0.16, To = 0.06, Duration = 3 },
+			{ At = 0, Phase = "Resolved", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+			{ At = 0.8, Phase = "Resolved", Kind = "Sound", Target = "breath_held" },
+			{ At = 0.5, Phase = "Resolved", Kind = "Vignette", Value = 0.16, To = 0, Duration = 1.5 },
+			{ At = 1, Phase = "Resolved", Kind = "Cinema", Value = 0, Duration = 1 },
+			{ At = 0, Phase = "Failed", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+			{ At = 0, Phase = "Failed", Who = "Safe", Kind = "Shake", Target = "Jolt" },
+			{ At = 0.8, Phase = "Failed", Kind = "Vignette", Value = 0.4, To = 0, Duration = 3 },
+			{ At = 2, Phase = "Failed", Kind = "Cinema", Value = 0, Duration = 1 },
+		},
+	}
+end
+
+const oddScenes: { Scene } = {
+	oddScene("anm_001_blank_folks", "The blank folks", "blank"),
+	oddScene("anm_005_raincoat_lady", "The Raincoat Lady", "raincoat"),
+	oddScene("anm_011_shaker", "The shaker", "shaker"),
+	oddScene("anm_013_white_eyes", "The white eyes", "white_eyes"),
+	oddScene("anm_014_big_head", "The big head", "big_head"),
+	oddScene("anm_015_floater", "The floater", "floater"),
+	oddScene("anm_016_starer", "The starer", "starer"),
+}
+
 -- Whisper word lists (DEC-293, owner 2026-10-18): the words on screen are real hints for the player, said in the
 -- character's voice. blackout / roof / crawler / neck / copy = the scenes' Whispers steps (TASK-484, TASK-483); low_sanity = VitalController while sanity is in the low band;
 -- suspense = after a suspense event's glance (SuspenseController, TASK-481).
@@ -617,6 +658,50 @@ const words: { [string]: { string } } = {
 		"keep them off",
 		"don't touch the switch",
 	},
+	-- TASK-491: odd customers. Refuse them (the Raincoat Lady is the exception: serve her fast)
+	blank = {
+		"IT HAS NO FACE",
+		"DON'T TAKE ITS ORDER",
+		"SEND IT AWAY",
+		"where is its face?",
+	},
+	raincoat = {
+		"SERVE HER FAST",
+		"SERVE HER FAST",
+		"DON'T CLOSE THE WINDOW",
+		"it isn't raining...",
+		"she's dripping",
+	},
+	shaker = {
+		"WHY IS IT SHAKING?",
+		"DON'T TAKE ITS ORDER",
+		"SEND IT AWAY",
+		"it can't stop...",
+	},
+	white_eyes = {
+		"LOOK AT ITS EYES",
+		"DON'T TAKE ITS ORDER",
+		"SEND IT AWAY",
+		"those aren't eyes...",
+	},
+	big_head = {
+		"ITS HEAD IS WRONG",
+		"DON'T TAKE ITS ORDER",
+		"SEND IT AWAY",
+		"too big...",
+	},
+	floater = {
+		"LOOK AT ITS FEET",
+		"DON'T TAKE ITS ORDER",
+		"SEND IT AWAY",
+		"it isn't touching the ground",
+	},
+	starer = {
+		"IT NEVER BLINKS",
+		"DON'T TAKE ITS ORDER",
+		"SEND IT AWAY",
+		"it's watching you",
+	},
 	low_sanity = {
 		"LOW SANITY",
 		"DRINK COFFEE",
@@ -669,7 +754,12 @@ const stare: Stare = {
 	},
 }
 
-return Table.with(Table.new({ blackout, roofWalker, crawler, turnedNeck, copies, stalker, longCar, hush } :: { Scene }), {
+const scenes: { Scene } = { blackout, roofWalker, crawler, turnedNeck, copies, stalker, longCar, hush }
+for _, scene in oddScenes do
+	table.insert(scenes, scene)
+end
+
+return Table.with(Table.new(scenes), {
 	Rules = Table.record(rules),
 	Stare = Table.record(stare),
 	Words = Table.record(words),
