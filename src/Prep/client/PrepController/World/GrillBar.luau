@@ -12,13 +12,18 @@
 -- (Theme.ScaleOf, readable like the HUD). Never red. Reduced motion (Motion.Reduced): no overshoot, no kick, no rise, no tilt.
 -- Only presentation: what is drawn comes from the stage (the server's state and grade). Pure Roblox instances, no Modux, no Vide,
 -- no network. One Heartbeat for every bar and badge while any is alive. `Clear` drops the badges (end of a visit).
+-- TASK-521 (Q-381 A, FEAT-045): in the conveyor kitchen (Content.Prep.Rules.Mode = "Conveyor") with Conveyor.Grill.Bar = false
+-- there are NO bars: `GrillBar.Enabled` is false and `new` hands out an inert bar that creates no instance (no BillboardGui
+-- of a cooking bar in the restaurant). The badges stay (the answer of a flip is not a bar).
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local StarterPlayer = game:GetService("StarterPlayer")
 local TextService = game:GetService("TextService")
 local Motion = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Motion)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
 local HintMark = require(StarterPlayer.StarterPlayerScripts.client.Interface.HintMark)
+local Content = require(ReplicatedStorage.shared.Content)
 
 export type Kind = "Cook" | "Timing"
 
@@ -74,6 +79,10 @@ type Badge = {
 }
 
 const GrillBar = {}
+
+-- the bars exist in this mode (the trailer always; the conveyor only with Conveyor.Grill.Bar)
+const ENABLED = Content.Prep.Rules.Mode ~= "Conveyor" or Content.Prep.Conveyor.Grill.Bar
+GrillBar.Enabled = ENABLED
 
 const CHANNEL_INSET = 3 -- px between the Ink pill and its sunk channel
 const BAR_LIP = 3 -- px of the lip under a bar (Theme.Lip is for HUD sized surfaces; a bar in studs is thinner)
@@ -372,7 +381,24 @@ local function build(): Live
 	return bar
 end
 
+-- A bar that draws nothing (the conveyor without bars): every method is a no-op.
+local function inertBar(): Bar
+	const self = {} :: any
+	function self.Show(_: any, _kind: Kind, _position: Vector3, _width: number, _height: number) end
+	function self.SetProgress(_: any, _value: number) end
+	function self.SetMark(_: any, _value: number?) end
+	function self.SetWindow(_: any, _center: number, _good: number, _perfect: number) end
+	function self.SetCursor(_: any, _value: number?) end
+	function self.Kick(_: any, _amount: number?) end
+	function self.Hide(_: any) end
+	function self.Destroy(_: any) end
+	return self :: Bar
+end
+
 function GrillBar.new(): Bar
+	if not ENABLED then
+		return inertBar()
+	end
 	const state = build()
 	const self = {} :: any
 

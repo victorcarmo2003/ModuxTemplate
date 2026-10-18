@@ -15,6 +15,18 @@
 --   Rollback the server's records (`Stations`, `PrepResult`) always win: a refused act undoes its prediction with a shake.
 -- Sends only through Feed (Place, Flip, Collect: the same queue and rates as the 2D stage). The grade is the server's: nothing is
 -- computed here besides the look of the ring. All numbers are in Content.Prep (Rules.World.Grill, Ring, Grill).
+--
+-- TASK-521, the conveyor kitchen (Content.Prep.Rules.Mode = "Conveyor"; Q-381 A, DEC-303, DEC-305; tech/prep-conveyor.md §5): the
+-- griller's seat (3) opens this stage. Same Put, no bar (Conveyor.Grill.Bar = false, World/GrillBar is inert):
+--   Cook     linear by the server clock, ready at StartedAt + Duration (8/6/4 s), flipped or not, never burns (TASK-515). The
+--            colour of the world sausage, steam wisps (GrillView:SetSteam) and the world smoke say how far it is.
+--   Flip     optional, once, while it cooks. Inside Restaurant.Grill.FlipFrom..FlipTo the sausage pulses and a cue pops
+--            (GrillView:Cue): a tap there stamps the bonus. A tap later still flips (no bonus); a tap before only shivers it.
+--            The answer comes from the record: Stations.Flip 101 = bonus, 1 = no bonus (TASK-515); "Bonus!" / "Flipped".
+--   Rest     no Collect: a ready sausage goes by itself to the rest table (the rail). The flight grill -> rest table starts
+--            when the rail Count grows (TASK-515: Working -> Empty in the same Tick), from the roller that just emptied.
+--            Rest table full: the sausage waits Ready on the grill with the check, and the hint says so.
+--   Next     the corner button leaves the seat (the griller has no board to go to).
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
@@ -53,9 +65,33 @@ const RAIL_TEXT = "The warmer is full."
 const FLIP_WORDS: { [string]: string } = { Perfect = "Perfect!", Good = "Nice!", Messy = "Oops!" }
 const WORK_DROP = 0.1 -- studs: the work plane sits this far over the roller top
 
+-- TASK-521 conveyor kitchen (see the header)
+const CONVEYOR = rules.Mode == "Conveyor"
+const bonusWindow = Content.Restaurant.Grill -- FlipFrom..FlipTo of the Duration (the server's bonus window)
+const BONUS_FLIP = 101 -- Stations.Flip of a flip inside the window (TASK-515: score 100 + 1); 1 = flipped outside it
+const FLY_MATCH = 1.5 -- s: a rail Count that grows is matched to a roller emptied at most this long ago
+-- Provisional texts (English UI; TASK-511 has no line for these yet)
+const BONUS_WORD = "Bonus!"
+const PLAIN_WORD = "Flipped"
+const BONUS_TEXT = "Flip it while it glows for a bonus!"
+const BONUS_HINT = "Flip it now for a bonus"
+const COOK_HINT = "Ready ones go to the warmer"
+const PUT_HINT = "Drag a sausage onto the grill"
+const EARLY_SHAKE = 0.6 -- share of ShakeAmount of a tap that came too early
+
+-- the hint line of the conveyor grill: the frame writes it (the phases are not reactive), Hint reads it
+const conveyorHint = Vide.source(PUT_HINT)
+
 type Phase = Types.SlotPhase
 
 type Pred = { Kind: string, At: number, Settled: boolean } -- Kind: Place | Flip | Collect | Trash
+
+-- TASK-521: a flip answered OK that waits for its record (Stations.Flip says bonus or not); Grade = the PrepResult band (fallback)
+type FlipAnswer = { At: number, Grade: string }
+-- TASK-521: a roller that emptied (its sausage left for the rest table) / a rest table position that appeared, both waiting
+-- for the other half so the flight goes from the right roller to the right place
+type Emptied = { Slot: number, At: number }
+type Owed = { Position: number, At: number }
 
 type Session = {
 	Controller: any,
@@ -81,6 +117,14 @@ type Session = {
 	Focus: FlipFocus.FlipFocus?,
 	Targets: { [string]: Types.Target },
 	Active: boolean,
+	-- TASK-521 (conveyor): flips waiting for their record, rollers emptied lately (no throw), the rail Count seen last frame,
+	-- and the one-time toasts
+	Answers: { [number]: FlipAnswer },
+	Emptied: { Emptied },
+	RailSeen: number?,
+	Owed: { Owed },
+	BonusToast: boolean,
+	FullToast: boolean,
 }
 
 local session: Session? = nil
@@ -117,6 +161,11 @@ local function liveFlip(current: Session, slot: number, record: any?): boolean
 	if record == nil then
 		return false
 	end
+	if CONVEYOR then
+		-- the conveyor never re-bases StartedAt (TASK-515), so the Flips.Live guard (a flipped sausage is past its first side)
+		-- would call every real flip a leftover; the server writes Flip = 0, never nil (TASK-256), so the stamp is the truth
+		return record.State ~= "Empty" and (record.Flip or 0) > 0
+	end
 	const entry = current.Kitchen:SlotView("grill", slot)
 	const id = if entry ~= nil then entry.Station:GetAttribute("StationId") else nil
 	if type(id) ~= "number" then
@@ -138,6 +187,18 @@ local function phaseOf(current: Session, slot: number, now: number): (boolean, P
 	const flipped = liveFlip(current, slot, record) or (predicted ~= nil and predicted.Kind == "Flip")
 	if record.State == "Ready" then
 		return true, "Ready", 1
+	end
+	if CONVEYOR then
+		-- no pause (TASK-515): linear to StartedAt + Duration; at 1 it is still Working for at most a Tick, then it leaves
+		const share = if record.Duration > 0 then math.clamp((now - record.StartedAt) / record.Duration, 0, 1) else 0
+		if flipped then
+			return true, "Flipped", share
+		elseif share < bonusWindow.FlipFrom then
+			return true, "Cooking", share
+		elseif share <= bonusWindow.FlipTo then
+			return true, "FlipWindow", share
+		end
+		return true, "Late", share
 	end
 	-- the first side runs, the sausage WAITS in the window for the flip, the second side runs (Grade.CookProgress)
 	const progress = Grade.CookProgress(Content.Prep, record.StartedAt, record.Duration, now, flipped)
@@ -173,6 +234,20 @@ local function railCapacity(current: Session): number
 		end
 	end
 	return top
+end
+
+-- The rail Count of the record (the rest table in the conveyor), nil when the rail is not streamed in.
+local function railCount(current: Session): number?
+	const entry = current.Kitchen:SlotView("rail", 1)
+	const id = if entry ~= nil then entry.Station:GetAttribute("StationId") else nil
+	if type(id) ~= "number" then
+		return nil
+	end
+	const record: any = current.Kitchen:SlotOf(id * 100)
+	if record == nil or record.Kind ~= "rail" then
+		return nil
+	end
+	return record.Count
 end
 
 local function pendingCollects(current: Session): number
@@ -345,6 +420,21 @@ local function tapSlot(current: Session, slot: number)
 	if not exists then
 		return
 	end
+	if CONVEYOR then
+		if phase == "Free" then
+			place(current, slot)
+		elseif (phase == "FlipWindow" or phase == "Late") and current.Pred[slot] == nil then
+			flip(current, slot)
+		elseif phase == "Ready" then
+			-- it waits for a place on the rest table (no Collect in the conveyor)
+			current.View:Shake(slot, world.Grill.ShakeAmount * EARLY_SHAKE)
+			current.Controller:Toast(prep.Texts.RestFull, "Info")
+		else
+			-- too early for the bonus, or already flipped: nothing is sent
+			current.View:Shake(slot, world.Grill.ShakeAmount * EARLY_SHAKE)
+		end
+		return
+	end
 	if phase == "Free" then
 		place(current, slot)
 	elseif phase == "FlipWindow" or phase == "Late" or (phase == "Cooking" and current.Pred[slot] == nil) then
@@ -375,6 +465,70 @@ local function setPulse(current: Session, id: string, on: boolean)
 	end
 end
 
+-- The conveyor part of a frame (TASK-521): flights to the rest table, flip answers from the record, the hint line.
+local function beltStep(current: Session, clock: number, stock: number, anyCooking: boolean, anyWindow: boolean, anyReady: boolean)
+	const view = current.View
+	-- every rail position that appeared is matched to a roller that emptied (either may come first: two records, two updates)
+	const count = railCount(current)
+	if count ~= nil then
+		const seen = current.RailSeen
+		if seen ~= nil and count > seen then
+			for position = seen + 1, count do
+				table.insert(current.Owed, { Position = position, At = clock })
+			end
+		end
+		current.RailSeen = count
+	end
+	for index = #current.Emptied, 1, -1 do
+		if clock - current.Emptied[index].At > FLY_MATCH then
+			table.remove(current.Emptied, index)
+		end
+	end
+	for index = #current.Owed, 1, -1 do
+		if clock - current.Owed[index].At > FLY_MATCH then
+			table.remove(current.Owed, index)
+		end
+	end
+	const capacity = railCapacity(current)
+	while #current.Owed > 0 and #current.Emptied > 0 do
+		const owed = table.remove(current.Owed, 1) :: Owed
+		const from = table.remove(current.Emptied, 1) :: Emptied
+		const landing = if capacity > 0 then math.min(owed.Position, capacity) else owed.Position
+		view:Fly(from.Slot, landing, nil)
+		note(`rest: roller {from.Slot} -> rest table {landing}`)
+	end
+	-- a flip answered OK says bonus or not once its record carries it (Stations.Flip 101 / 1); the band is the fallback
+	for slot, answer in current.Answers do
+		const record = recordOf(current, slot)
+		-- only a stamp of THIS sausage counts (Flips.Live: an old Flip left by the previous one does not)
+		const flip: number = if record ~= nil and liveFlip(current, slot, record) then record.Flip or 0 else 0
+		local bonus: boolean? = nil
+		if flip > 0 then
+			bonus = flip >= BONUS_FLIP
+		elseif clock - answer.At > PRED_TTL * 0.5 then
+			bonus = answer.Grade == "Perfect"
+		end
+		if bonus ~= nil then
+			current.Answers[slot] = nil
+			view:FlipResult(slot, if bonus then "Perfect" else "None", if bonus then BONUS_WORD else PLAIN_WORD)
+			note(`flip slot {slot}: bonus {tostring(bonus)} (Flip {flip})`)
+		end
+	end
+	local hint = PUT_HINT
+	if anyWindow then
+		hint = BONUS_HINT
+	elseif anyReady then
+		hint = prep.Texts.RestFull
+	elseif stock == 0 then
+		hint = OUT_TEXT
+	elseif anyCooking then
+		hint = COOK_HINT
+	end
+	if untrack(conveyorHint) ~= hint then
+		conveyorHint(hint)
+	end
+end
+
 local function frame(current: Session, dt: number, time: number)
 	const now = workspace:GetServerTimeNow()
 	const clock = os.clock()
@@ -382,6 +536,7 @@ local function frame(current: Session, dt: number, time: number)
 	const stock = stockLeft()
 	local anyCooking = false
 	local cooking, occupied = 0, 0
+	local anyWindow, anyReady = false, false
 	for slot = 1, MAX_SLOTS do
 		const exists, phase, progress = phaseOf(current, slot, now)
 		const id = `GrillSlot:{slot}`
@@ -413,7 +568,8 @@ local function frame(current: Session, dt: number, time: number)
 		-- TASK-257 (owner request 2026-10-14): the cooking bar from the moment the sausage lands (grey, Green fill, a line at 50%);
 		-- in the pause it swaps (springs) for the timing bar, whose cursor swings end to end until the tap (Grade.SwingAt, the same
 		-- clock the server grades with); after the flip the cooking bar comes back at 50% and fills to 100%; ready = gone (check)
-		if trashing or phase == "Free" or phase == "Ready" then
+		if CONVEYOR or trashing or phase == "Free" or phase == "Ready" then
+			-- the conveyor has no bar (TASK-521): GrillView draws nothing over the roller
 			view:SetRing(slot, "None", progress, nil)
 		elseif phase == "FlipWindow" and current.Pred[slot] == nil then
 			const record = recordOf(current, slot)
@@ -421,6 +577,12 @@ local function frame(current: Session, dt: number, time: number)
 			view:SetRing(slot, "Converge", progress, swing)
 		else
 			view:SetRing(slot, "Progress", progress, nil)
+		end
+		if CONVEYOR then
+			const cookingNow = phase == "Cooking" or phase == "FlipWindow" or phase == "Late" or phase == "Flipped"
+			view:SetSteam(slot, if cookingNow and not trashing then progress else nil)
+			anyWindow = anyWindow or (phase == "FlipWindow" and current.Pred[slot] == nil)
+			anyReady = anyReady or (phase == "Ready" and not trashing)
 		end
 		view:SetCheck(slot, phase == "Ready" and not trashing and (current.Pred[slot] == nil or current.Pred[slot].Kind ~= "Collect"))
 		-- the marks of the bars show on the face that is up after the flip and darken with the server clock until it is ready
@@ -431,17 +593,44 @@ local function frame(current: Session, dt: number, time: number)
 			if target.Model ~= model then
 				target.Model = model
 			end
-			setPulse(current, id, phase == "FlipWindow" or phase == "Late" or phase == "Ready")
+			-- the conveyor invites only in the bonus window (late is no bonus, ready goes to the rest table by itself)
+			const invite = if CONVEYOR
+				then phase == "FlipWindow" and current.Pred[slot] == nil
+				else phase == "FlipWindow" or phase == "Late" or phase == "Ready"
+			setPulse(current, id, invite)
 		end
 		-- the first side is done and the progress PAUSES: say it once per sausage (the ring, the pulse and the hint stay on)
 		if phase == "FlipWindow" and current.Phases[slot] ~= "FlipWindow" and current.Pred[slot] == nil then
-			current.Controller:Toast(FLIP_TEXT, "Alert")
+			if CONVEYOR then
+				-- the bonus window opened: a cue on the sausage; the toast only once per visit (flipping is optional)
+				view:Cue(slot)
+				if not current.BonusToast then
+					current.BonusToast = true
+					current.Controller:Toast(BONUS_TEXT, "Info")
+				end
+			else
+				current.Controller:Toast(FLIP_TEXT, "Alert")
+			end
+		end
+		if CONVEYOR then
+			const before = current.Phases[slot]
+			-- a roller that emptied without a throw: its sausage went to the rest table (the flight waits for the rail Count)
+			if before ~= nil and before ~= "Free" and phase == "Free" and not (predicted ~= nil and predicted.Kind == "Trash") then
+				table.insert(current.Emptied, { Slot = slot, At = clock })
+			end
+			if phase == "Ready" and before ~= "Ready" and not current.FullToast then
+				current.FullToast = true
+				current.Controller:Toast(prep.Texts.RestFull, "Info")
+			end
 		end
 		current.Phases[slot] = phase
 		if phase ~= "Free" and not trashing then
 			cooking += 1
 			occupied += 1
 		end
+	end
+	if CONVEYOR then
+		beltStep(current, clock, stock, anyCooking, anyWindow, anyReady)
 	end
 	setPulse(current, "SausageStock", not anyCooking and stock ~= 0)
 	view:SetBusy(cooking, MAX_SLOTS)
@@ -469,7 +658,8 @@ local function frame(current: Session, dt: number, time: number)
 	-- the focus screen: on the first sausage that waits for its flip (a flip already sent or a throw on its way does not count)
 	local waiting: number? = nil
 	for slot = 1, MAX_SLOTS do
-		if current.Phases[slot] == "FlipWindow" and current.Pred[slot] == nil then
+		-- the conveyor never dims the screen for a flip: it is optional (TASK-521)
+		if not CONVEYOR and current.Phases[slot] == "FlipWindow" and current.Pred[slot] == nil then
 			waiting = slot
 			break
 		end
@@ -529,6 +719,9 @@ local function register(current: Session, registry: Targets.Registry): number
 				end
 				if untrack(Feed.Rail) > 0 then
 					return true
+				end
+				if CONVEYOR then
+					return false -- no Collect: the rest table is only the source of a throw
 				end
 				for _, phase in open.Phases do
 					if phase == "Ready" then
@@ -602,6 +795,12 @@ local function build(controller: any)
 		Focus = nil,
 		Targets = {},
 		Active = true,
+		Answers = {},
+		Emptied = {},
+		RailSeen = nil,
+		Owed = {},
+		BonusToast = false,
+		FullToast = false,
 	}
 	session = current
 	const grillTargets = register(current, registry)
@@ -680,6 +879,9 @@ const Grill: Stage.Stage3D = {
 		if not Feed.HasGrill() then
 			return "No grill here"
 		end
+		if CONVEYOR then
+			return conveyorHint()
+		end
 		local ready, windowOpen = false, false
 		for index = 1, MAX_SLOTS do
 			const state = Feed.Slots[index]().State
@@ -702,9 +904,18 @@ const Grill: Stage.Stage3D = {
 	end,
 	-- Next never takes an order (playtest 2026-10-14): the order is taken only by facing the customer (Window view / world prompt)
 	Next = function(_controller: any): Stage.Next
+		if CONVEYOR then
+			-- the griller's seat has no board: the corner button leaves it (TASK-521)
+			return { Label = prep.Texts.Leave, Enabled = true, Pulse = false }
+		end
 		return { Label = prep.Steps3D.ByKey.grill.NextLabel, Enabled = true, Pulse = Feed.Rail() > 0 and Feed.Pinned() ~= 0 }
 	end,
 	OnNext = function(controller: any)
+		if CONVEYOR then
+			note("Next: leave the grill seat")
+			controller:Leave("Button", false, false)
+			return
+		end
 		note("Next: to the board")
 		controller:SetStage("bun")
 	end,
@@ -791,7 +1002,7 @@ const Grill: Stage.Stage3D = {
 				place(current, over.Target.Slot)
 			elseif source.Target.Kind == "GrillSlot" and over.Target.Kind == "Rail" then
 				const _, phase = phaseOf(current, source.Target.Slot, workspace:GetServerTimeNow())
-				if phase == "Ready" then
+				if phase == "Ready" and not CONVEYOR then
 					collect(current, source.Target.Slot, from)
 				else
 					current.View:Hide(source.Target.Slot, false)
@@ -885,7 +1096,10 @@ const Grill: Stage.Stage3D = {
 		if predicted ~= nil then
 			predicted.Settled = true
 		end
-		if sent.Act == "Flip" then
+		if sent.Act == "Flip" and CONVEYOR then
+			-- TASK-521: bonus or not is read from the record (beltStep), the band is the fallback
+			current.Answers[slot] = { At = os.clock(), Grade = result.Grade }
+		elseif sent.Act == "Flip" then
 			-- TASK-261: hit / near / miss answered on the sausage itself (no toast: the word floats there)
 			const band: string = result.Grade
 			current.View:FlipResult(slot, band, FLIP_WORDS[band] or FLIP_WORDS.Good)

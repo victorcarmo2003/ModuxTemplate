@@ -15,6 +15,12 @@
 -- of the cooking is that fade). A turn or a shake detaches the models from their weld, moves them with PivotTo and welds them again
 -- where they ended. Everything created here lives under the PrepWorld folder (or on the grill part, adornments) and is destroyed
 -- with `Destroy`. No Modux, no Vide, no network.
+-- TASK-521 (Q-381 A, conveyor kitchen without bars, GrillBar.Enabled = false): no ring and no cooking bar at all. The cooking
+-- reads on the sausage itself (the world fades raw -> grilled) plus:
+--   steam       wisps over a cooking sausage, more often as it gets done (SetSteam)
+--   cue         the flip-bonus window opened: a hop, a few Mustard sparks and a puff (Cue)
+--   check       the ready mark, as in the trailer (a ready one only stays on the grill while the rest table is full)
+--   flip answer "None" band = flipped outside the window (no bonus): a puff and a Slate badge, no error tone
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Content = require(ReplicatedStorage.shared.Content)
@@ -64,6 +70,10 @@ export type View = {
 	SetMarks: (self: View, slot: number, strength: number) -> (),
 	-- The slot is in use at this level of the grill (the placeholder plate covers these only).
 	SetActive: (self: View, slot: number, active: boolean) -> (),
+	-- TASK-521: steam wisps over the sausage of the slot; `share` = cooking share 0..1, nil = none.
+	SetSteam: (self: View, slot: number, share: number?) -> (),
+	-- TASK-521: the flip-bonus window of the slot just opened (a hop, sparks, a puff).
+	Cue: (self: View, slot: number) -> (),
 	-- How many rollers cook (the heat of the placeholder bars follows).
 	SetBusy: (self: View, busy: number, total: number) -> (),
 	Step: (self: View, dt: number, time: number) -> (),
@@ -112,6 +122,8 @@ type Face = {
 	Known: Model?, -- the container seen last frame (a new one = a sausage landed)
 	Marks: { Part },
 	MarkStrength: number,
+	Steam: number?, -- TASK-521: cooking share of the steam wisps, nil = off
+	SteamAt: number, -- os.clock of the next wisp
 }
 
 const GrillView = {}
@@ -127,6 +139,10 @@ const LAND_TIME = 0.3 -- s
 const MARK_X = { -0.25, 0, 0.25, 0.1, -0.1 } -- studs along the sausage where the bars touched it
 const MARK_TOP = 0.236 -- studs over the foot of the sausage (its top is 0.24)
 const MARK_COLOR = Color3.fromHex("#3A2418")
+-- TASK-521 steam wisps (Provisional): seconds between wisps raw -> done, and the lift over the roller
+const STEAM_SLOW, STEAM_FAST = 1.1, 0.35
+const STEAM_LIFT = 0.2
+const CUE_HOP = 0.05 -- studs of side shiver of the window cue
 
 -- The raw / grilled sausage model of the kit (ReplicatedStorage.Assets.Items.Food), nil when it is missing.
 local function template(name: string): Model?
@@ -213,6 +229,8 @@ function GrillView.new(options: Options): View
 				Known = nil,
 				Marks = {},
 				MarkStrength = 0,
+				Steam = nil,
+				SteamAt = 0,
 			}
 			faces[slot] = face
 			return face
@@ -449,8 +467,33 @@ function GrillView.new(options: Options): View
 		end
 	end
 
+	function self.SetSteam(_: any, slot: number, share: number?)
+		const face = faceOf(slot)
+		if share ~= nil and face.Steam == nil then
+			face.SteamAt = os.clock() + STEAM_SLOW * 0.5
+		end
+		face.Steam = share
+	end
+
+	function self.Cue(_: any, slot: number)
+		const pose = poseOf(slot)
+		if pose == nil then
+			return
+		end
+		const at = pose.Position + Vector3.new(0, 0.3, 0)
+		const juice = options.Juice()
+		juice:Burst("Sparks", at, 5, Theme.Color.Mustard)
+		juice:Burst("Steam", at, 3)
+		self:Shake(slot, CUE_HOP)
+	end
+
 	function self.SetRing(_: any, slot: number, ring: Ring, progress: number, swing: number?)
 		const face = faceOf(slot)
+		if not GrillBar.Enabled then
+			-- conveyor without bars (TASK-521): nothing is ever drawn over the roller
+			face.RingKind = "None"
+			return
+		end
 		face.RingKind = ring
 		const entry = options.SlotView("grill", slot)
 		const pose = poseOf(slot)
@@ -636,6 +679,10 @@ function GrillView.new(options: Options): View
 			if face.Bar ~= nil then
 				face.Bar:Kick(5)
 			end
+		elseif band == "None" then
+			-- TASK-521: flipped outside the bonus window: fine, just no bonus (no error tone, no shake)
+			juice:Burst("Steam", at, 4)
+			GrillBar.Badge(band, word, badgeAt, nil, float.Rise * 0.6, float.Time + 0.2)
 		else
 			juice:Burst("Dust", at, 5)
 			juice:Burst("Steam", at, 4)
@@ -661,6 +708,18 @@ function GrillView.new(options: Options): View
 					end
 				end
 				face.Known = container
+			end
+			-- TASK-521: steam wisps over a cooking sausage, faster as it gets done
+			const steam = face.Steam
+			if steam ~= nil and container ~= nil and not face.Hidden then
+				const clock = os.clock()
+				if clock >= face.SteamAt then
+					face.SteamAt = clock + STEAM_SLOW + (STEAM_FAST - STEAM_SLOW) * math.clamp(steam, 0, 1)
+					const pose = poseOf(slot)
+					if pose ~= nil then
+						options.Juice():Burst("Steam", pose.Position + Vector3.new(0, STEAM_LIFT, 0), if steam >= 0.7 then 2 else 1)
+					end
+				end
 			end
 			-- the grill marks of the flipped face
 			if face.MarkStrength > 0 and face.Anim == nil and container ~= nil then
