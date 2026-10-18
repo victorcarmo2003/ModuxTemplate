@@ -28,6 +28,10 @@
 	away from the middle of that ancestor Model (the trailer interior), i.e. outward. The Door_Back of the trailer has
 	DoorHinge = "Right", DoorAngle = 80 (tools/assetplace/trailer_door_switches.luau).
 
+	Held shut (TASK-467, horror scenes, Provisional): while the door instance has the attribute `DoorHeld = true` (set
+	locally by a horror scene, Anomaly/Scene/Kits, e.g. the pantry's exit door during the blackout) it stays closed: it does
+	not open for anyone near and, if open, closes now.
+
 	No input, no packet, never writes a set.
 ]]
 local CollectionService = game:GetService("CollectionService")
@@ -38,6 +42,7 @@ local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 const TAG = "AutoDoor"
 const SCRIPTED_TAG = "ScriptedDoor" -- door driven by the DoorOpen attribute of an ancestor Model
 const STATE_ATTRIBUTE = "DoorOpen"
+const HELD_ATTRIBUTE = "DoorHeld" -- local: a horror scene keeps the door shut (TASK-467)
 const RADIUS = 8 -- studs
 const MARGIN = 1 -- hysteresis: closes beyond RADIUS + MARGIN
 const CLOSE_DELAY = 1 -- s with nobody near before closing
@@ -321,6 +326,12 @@ function DoorController:Tick()
 	for _, door in self.Doors do
 		if door.Scripted then
 			self:TickScripted(door)
+			continue
+		end
+		if door.Instance:GetAttribute(HELD_ATTRIBUTE) == true then
+			if door.Open then
+				self:Animate(door, false, nil)
+			end
 			continue
 		end
 		const from = nearest(door, if door.Open then door.Radius + MARGIN else door.Radius)

@@ -41,6 +41,7 @@ export type State = {
 	Music: boolean, -- this run set the scene music
 	Lights: boolean, -- this run touched the lights
 	Caption: boolean, -- this run showed the caption
+	Undo: { [string]: () -> () }, -- TASK-467: what the kit handlers (camera, screen, door...) undo when the run ends
 }
 
 -- AudioController PlayOptions (structural copy: a literal table did not unify with the optional fields)
@@ -283,6 +284,7 @@ function Steps.State(id: number, key: string): State
 		Music = false,
 		Lights = false,
 		Caption = false,
+		Undo = {},
 	}
 end
 
@@ -323,6 +325,13 @@ function Steps.Clear(ctx: Effect.Context, state: State)
 	if state.Caption then
 		state.Caption = false
 		hideCaption()
+	end
+	for tag, undo in state.Undo do
+		state.Undo[tag] = nil
+		const ok, problem = pcall(undo)
+		if not ok then
+			warnOnce(`undo:{tag}`, `undo {tag} of {state.Key}: {problem}`)
+		end
 	end
 end
 

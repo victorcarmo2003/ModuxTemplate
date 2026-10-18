@@ -2406,7 +2406,7 @@ local function checkHorrorScenes()
 	const phases = setOf({ "Signal", "Active", "Resolved", "Failed" })
 	const whos = setOf({ "All", "Caught", "Safe" })
 	const lights = setOf({ "Off", "On", "Flicker", "Cascade" })
-	const doors = setOf({ "Rattle", "Push", "Hold" })
+	const doors = setOf({ "Rattle", "Push", "Hold", "Lock" })
 	const needPoint = setOf({ "Door", "Shadow", "Nudge", "Actor" })
 	const kinds = setOf({ "Sound", "Music", "Lights", "Lightning", "Whispers", "Vignette", "Shake", "Fov", "Nudge", "Text", "Actor", "Door", "Shadow" })
 	for index, scene in HorrorScenes.List do
@@ -2445,7 +2445,7 @@ local function checkHorrorScenes()
 				end
 			elseif step.Kind == "Door" then
 				if not doors[step.Target or ""] then
-					fail("HorrorScenes", index, key, `{where} Door '{tostring(step.Target)}' is not Rattle, Push or Hold`)
+					fail("HorrorScenes", index, key, `{where} Door '{tostring(step.Target)}' is not Rattle, Push, Hold or Lock`)
 				end
 			elseif step.Kind == "Shake" then
 				if rules.Shakes[step.Target or ""] == nil then
@@ -2465,7 +2465,9 @@ local function checkHorrorScenes()
 			elseif step.Kind == "Whispers" then
 				inRange("HorrorScenes", index, key, `{where}.Value`, step.Value or 0, 0, 5)
 				inRange("HorrorScenes", index, key, `{where}.To`, (step.To :: number?) or 0, 0, 5)
-				inRange("HorrorScenes", index, key, `{where}.Duration`, step.Duration or 0, 0.5, 60)
+				if (step.Value or 0) > 0 or ((step.To :: number?) or 0) > 0 then
+					inRange("HorrorScenes", index, key, `{where}.Duration`, step.Duration or 0, 0.5, 60)
+				end -- Value = To = 0 is a stop step (any Duration)
 			elseif step.Kind == "Text" then
 				if step.Text == nil or step.Text == "" then
 					fail("HorrorScenes", index, key, `{where} Text needs Text`)

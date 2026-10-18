@@ -35,6 +35,11 @@ Regras fixas:
 
 ## 2. A cena do apagão (referência do dono, DEC-290)
 
+> **TASK-467 (2026-10-18):** no restaurante o escuro dura **15 s** até o ataque (`RestaurantWindow`), então a cena real
+> comprime a tabela abaixo: HIDE + vinheta 2–11 s, passos 7–13 s, sombra 11 s, maçaneta/empurrão/trinco 13,4–15 s, olhos e
+> passos indo embora na fase Failed; luzes, estalo, música e legenda continuam com o efeito ANM-020 e o Score. Fonte da
+> verdade: `Content.HorrorScenes`. A porta dos fundos fica travada localmente durante o escuro (`DoorHeld`, Provisório).
+
 Duração alvo ~40–55 s da queda até a luz voltar. Tempos em segundos a partir da queda. Tudo **Provisório**.
 
 | t | Passo (fala do dono) | Som | Luz / VFX | Câmera / tela |

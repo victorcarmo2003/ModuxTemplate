@@ -99,6 +99,12 @@ const SHAPE_SIDE = { 60, 80 } -- degrees off the look direction
 const SHAPE_LIFE = { 0.6, 1.2 } -- s on screen when nobody looks
 const SHAPE_SEEN = 32 -- degrees: inside this cone the shape is gone at once
 const SHAPE_COLOR = Color3.fromHex("#0B0910")
+
+-- TASK-467: while the directed scene (Content.HorrorScenes, Scene/) plays this anomaly, its steps own the sounds of the
+-- dark (steps to the door, handle, latch); the random noises here would talk over them, so they stay quiet. The corner
+-- shape stays (it is not in the scene).
+const SCENE = Content.HorrorScenes.ByKey["anm_020_blackout"]
+const SCENE_LIVE = SCENE ~= nil and SCENE.Live == true
 const SHAPE_TRANSPARENCY = 0.08
 
 type Saved = { Light: Light?, Enabled: boolean, Part: BasePart?, Material: Enum.Material, Color: Color3 }
@@ -425,7 +431,9 @@ local function step(session: Session)
 	end
 
 	if clock >= session.NextNoise then
-		noise(session)
+		if not SCENE_LIVE then
+			noise(session)
+		end
 		session.NextNoise = clock + between(session.Rng, NOISE_GAP_START, t, NOISE_GAP_END)
 	end
 end

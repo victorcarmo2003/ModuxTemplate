@@ -2100,6 +2100,20 @@ do
 	el.Color = Color3.fromRGB(255, 52, 44)
 	el.Shadows = false
 	el.Enabled = ART
+	-- TASK-465 (DEC-290, design/horror-cinematic.md §2): cold light leaking under the exit door DOOR-B onto the pantry floor
+	-- (moonlight from the back alley). It lives in the Emergency folder, so the ANM-020 blackout keeps it: in the dark it is
+	-- the line the hiding players stare at, and the creature's shadow crosses it (HorrorScenes step Shadow, SCENE-DOOR).
+	-- MapId DOOR-GAP-B. No shadow, 1 local light (style guide §5.1).
+	local gap = box(emerg, "DoorGap_B", 27.3, 31.7, FLOOR + 0.004, FLOOR + 0.02, 78.15, 78.55, { Color = Color3.fromRGB(190, 205, 255), CanCollide = false, CanQuery = false, CastShadow = false, art = { Color = Color3.fromRGB(190, 205, 255), Material = Enum.Material.Neon, Transparency = 0.35 } })
+	gap:SetAttribute("MapId", "DOOR-GAP-B")
+	local gl = ensure(gap, "Light", "SurfaceLight")
+	gl.Face = Enum.NormalId.Top
+	gl.Range = 5
+	gl.Angle = 80
+	gl.Brightness = 0.6
+	gl.Color = Color3.fromRGB(170, 190, 255)
+	gl.Shadows = false
+	gl.Enabled = ART
 end
 
 -- 8. sign CORNER DOGS on the parapet, OPEN neon; tables, bushes, fence, gate, lamps --------------------------------------
@@ -2454,6 +2468,11 @@ for i, z in { 66, 52, 38 } do
 end
 newPoint("VAN-STOP", "TRL-OUT", 15, 0.4, 72, DIR.N)
 newPoint("DOOR-B", "TRL-OUT", 29.5, 0.4, 81.4, DIR.S) -- outside the exit door of the pantry (DEC-282), toward the Mart
+-- TASK-465 (DEC-290): points of the horror scenes (Content.HorrorScenes, blackout scene; tech/horror-scene.md)
+newPoint("SCENE-DOOR", "TRL-OUT", 29.5, FLOOR, 78.3, DIR.N) -- inside the pantry, at DOOR-B (door rattle, shadow on the gap)
+newPoint("SCENE-DOOR-OUT", "TRL-OUT", 29.5, 0.4, 80.9, DIR.N) -- just outside DOOR-B, where the creature stops
+newPoint("SCENE-STEPS-FAR", "TRL-OUT", 12, 0.4, 90, DIR.E) -- back alley, where its steps start
+newPoint("SCENE-WINDOW-EYES", "TRL-OUT", 42.5, 5, 53.4, DIR.N) -- outside the service window (whoever did not hide)
 -- PU and DT points created from Q2 / TRL-OUT: only the PU are graph nodes
 for _, id in { "DT-IN", "DT-OUT", "DT-STOP", "DTQ-1", "DTQ-2", "DTQ-3", "VAN-STOP", "DOOR-B" } do
 	local p = point(id)

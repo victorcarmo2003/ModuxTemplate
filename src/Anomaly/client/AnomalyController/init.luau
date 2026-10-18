@@ -41,6 +41,7 @@ local Effect = require(script.Effect)
 local Breaker = require(script.Breaker)
 local Score = require(script.Score)
 local Scene = require(script.Scene)
+local SceneKits = require(script.Scene.Kits)
 
 export type Phase = Effect.Phase
 export type Record = Effect.Record
@@ -73,6 +74,7 @@ const AnomalyController = Modux.Controller("AnomalyController", {
 		"RigController",
 		"AnimController",
 		"CustomerController",
+		"CameraController", -- TASK-467: horror scene camera steps (Scene/Kits)
 	},
 	Priority = 660,
 })
@@ -401,6 +403,8 @@ AnomalyController:OnStart(function(self)
 	Breaker.Start()
 	-- TASK-462: horror scenes on the records' timeline
 	Scene.Start(self:Context())
+	-- TASK-467: camera, screen, door, shadow and eyes steps (sibling kits TASK-463/464/465)
+	SceneKits.Register(Scene.Handle, self.Dependencies.CameraController :: any)
 	-- TASK-443: the horror score in steps (narrow views; the director only reads them)
 	Score.Start({
 		Audio = self.Dependencies.AudioController :: any,
