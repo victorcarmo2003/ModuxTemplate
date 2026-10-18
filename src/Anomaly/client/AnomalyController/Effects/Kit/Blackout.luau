@@ -44,7 +44,7 @@ export type Handle = { Restore: () -> (), Sweep: (duration: number, origin: Vect
 
 type Saved = {
 	Instance: Instance,
-	Kind: string, -- "Light" | "Neon" | "Flame" | "Emitter" | "Gui"
+	Kind: string, -- "Light" | "Neon" | "Flame" | "Emitter" | "Gui" | "Off" (Highlight / BillboardGui switched off, TASK-488)
 	Material: Enum.Material?,
 	Color: Color3?,
 	Number: number?, -- Flame: LocalTransparencyModifier; Gui: Brightness
@@ -119,6 +119,13 @@ local function off(instance: Instance, flame: boolean, out: { Saved })
 		table.insert(out, { Instance = instance, Kind = "Gui", Number = instance.Brightness, Influence = instance.LightInfluence })
 		instance.Brightness = LOOK.SignBrightness
 		instance.LightInfluence = LOOK.SignLightInfluence
+	elseif instance:IsA("Highlight") or instance:IsA("BillboardGui") then
+		-- TASK-488 (DEC-295, Q-359): the white station outlines and the "7/12" stock pills glowed in the dark
+		const thing = instance :: any
+		if thing.Enabled then
+			table.insert(out, { Instance = instance, Kind = "Off" })
+			thing.Enabled = false
+		end
 	end
 end
 
@@ -166,6 +173,11 @@ local function restoreOne(saved: Saved)
 		const gui = instance :: SurfaceGui
 		gui.Brightness = saved.Number :: number
 		gui.LightInfluence = saved.Influence :: number
+	elseif saved.Kind == "Off" then
+		const thing = instance :: any
+		if not thing.Enabled then
+			thing.Enabled = true
+		end
 	end
 end
 
