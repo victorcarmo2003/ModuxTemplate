@@ -26,11 +26,14 @@ export type Run = {
 	CriticalSent: boolean,
 	Seen: { [number]: number },
 	SeenDone: { [number]: boolean },
+	-- TASK-482 stare pressure per UserId (rows with Stare only)
+	Stares: { [number]: Stare },
 	-- UserIds Active when the occurrence started (Ended, TASK-335)
 	Party: { number },
 }
 export type Due = { Entry: Scheduler.Entry, RetryAt: number, Done: boolean }
 export type Gaze = { Yaw: number, Pitch: number, At: number }
+export type Stare = { Time: number, Away: number, Owed: number, Taken: number }
 type TrafficHook = { Hold: (self: any, reason: string, on: boolean) -> () }
 export type Entry = Scheduler.Entry
 export type Wire = { Anomaly: string, Phase: Api.Phase, StartedAt: number, Step: number, Anchor: number }
@@ -71,6 +74,7 @@ export type Public = {
 	IsProtected: (self: Public, player: Player) -> boolean,
 	InZone: (self: Public, player: Player, pointId: string, radius: number) -> boolean,
 	Looking: (self: Public, player: Player, target: Vector3, range: number, angle: number?) -> boolean,
+	Pitch: (self: Public, player: Player) -> number?,
 	IsWatching: (self: Public, player: Player) -> boolean,
 	OnGaze: (self: Public, value: any, player: Player) -> (),
 	RunOf: (self: Public, occ: Api.Occurrence) -> Run?,
@@ -88,6 +92,7 @@ export type Public = {
 	StartOccurrence: (self: Public, key: string, module: Api.Module, slot: number) -> (boolean, string?),
 	See: (self: Public, occ: Api.Occurrence, player: Player) -> (),
 	SeenTick: (self: Public, occ: Api.Occurrence, target: Vector3, range: number, dt: number) -> (),
+	StareTick: (self: Public, run: Run, target: Vector3, range: number, dt: number) -> (),
 	RefreshTension: (self: Public) -> (),
 	Emit: (self: Public, event: Api.Event) -> (),
 	BuildContext: (self: Public) -> Api.Context,

@@ -142,6 +142,7 @@ export type Public = {
 	HorrorShake: (self: Public, profile: string, scale: number?) -> (),
 	HorrorFov: (self: Public, delta: number, back: number?, duration: number) -> (),
 	HorrorNudge: (self: Public, target: Vector3, degrees: number, duration: number) -> (),
+	HorrorPull: (self: Public, target: Vector3, degrees: number, duration: number) -> (),
 	HorrorClear: (self: Public) -> (),
 	HorrorUndo: (self: Public) -> (),
 	HorrorFovAt: (self: Public, now: number) -> number,

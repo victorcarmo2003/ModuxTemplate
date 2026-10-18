@@ -60,6 +60,7 @@ local ShowcaseController = require(StarterPlayer.StarterPlayerScripts.client.Mod
 local SkinController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.SkinController)
 local StageController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.StageController)
 local SupplyController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.SupplyController)
+local SuspenseController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.SuspenseController)
 local TabletController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.TabletController)
 local ThiefController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ThiefController)
 local TrafficController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.TrafficController)
@@ -130,6 +131,7 @@ export type AllControllers = {
 	SkinController: SkinController.Public,
 	StageController: StageController.Public,
 	SupplyController: SupplyController.Public,
+	SuspenseController: SuspenseController.Public,
 	TabletController: TabletController.Public,
 	ThiefController: ThiefController.Public,
 	TrafficController: TrafficController.Public,

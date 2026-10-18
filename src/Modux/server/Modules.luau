@@ -53,6 +53,7 @@ return {
 	ServerScriptService.server.Showcase.ShowcaseService,
 	ServerScriptService.server.Skin.SkinService,
 	ServerScriptService.server.Supply.SupplyService,
+	ServerScriptService.server.Suspense.SuspenseService,
 	ServerScriptService.server.Tablet.TabletService,
 	ServerScriptService.server.Thief.ThiefService,
 	ServerScriptService.server.Traffic.TrafficService,
