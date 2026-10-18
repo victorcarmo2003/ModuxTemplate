@@ -9,6 +9,7 @@
 --     reaching it the moment the fog does (Signal end); during the bangs it beats on the glass with both arms, lunging
 --     on each blow of the scene; at the end it backs off into the fog and is gone.
 --   * cue jumpscare: only the client whose UserId % 65536 = Entity shows the face (Kit/Jumpscare).
+local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -29,8 +30,10 @@ const DECAY = Color3.fromHex("#4A080C")
 const PARTICLE = Color3.fromRGB(150, 26, 30)
 
 -- fog volume over the patio and the street (world box; outside the window, Z > the counter front)
-const FOG_CENTER = Vector3.new(-42, 1.6, 44)
-const FOG_SIZE = Vector3.new(110, 3, 62)
+const FOG_CENTER = Vector3.new(-42, 1.4, 48)
+const FOG_SIZE = Vector3.new(130, 2, 68)
+const FOG_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
+const FOG_RATES = { 46, 30 } -- particles/s per bank at full fog (owner 2026-10-18: "mais névoa vermelha")
 
 -- the runner
 const WINDOW_POINT = "SCENE-WINDOW-EYES" -- outside the service window (restaurant_bind)
@@ -82,13 +85,14 @@ local function fogBox(parent: Instance): (Part, { ParticleEmitter })
 	box.Size = FOG_SIZE
 	box.CFrame = CFrame.new(FOG_CENTER)
 	const emitters: { ParticleEmitter } = {}
-	for index, bank in { { 14, 18, 30, 0.55 }, { 22, 8, 14, 0.62 } } do
+	for index, bank in { { 14, 20, 34, 0.42 }, { 22, 10, 18, 0.5 } } do
 		const e = Instance.new("ParticleEmitter")
 		e.Name = `Bank{index}`
 		e.Shape = Enum.ParticleEmitterShape.Box
 		e.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+		e.Texture = FOG_TEXTURE
 		e.Color = ColorSequence.new(PARTICLE)
-		e.LightEmission = 0.25
+		e.LightEmission = 0.4
 		e.LightInfluence = 0.3
 		e.Size = NumberSequence.new({
 			NumberSequenceKeypoint.new(0, bank[2]),
@@ -168,13 +172,28 @@ local function pose(runner: Runner, at: CFrame)
 	runner.Model:PivotTo(at)
 end
 
+-- MapPoint by name: ctx.Point first, else the tagged part (ctx.Point only knows the points MapIndex indexed)
+local function pointOf(ctx: Effect.Context, id: string): CFrame?
+	const known = ctx.Point(id)
+	if known ~= nil then
+		return known
+	end
+	for _, instance in CollectionService:GetTagged("MapPoint") do
+		if instance.Name == id and instance:IsA("BasePart") then
+			return instance.CFrame
+		end
+	end
+	return nil
+end
+
 -- window spot: just outside the glass, facing in
 local function windowCFrame(ctx: Effect.Context): CFrame?
-	const point = ctx.Point(WINDOW_POINT)
+	const point = pointOf(ctx, WINDOW_POINT)
 	if point == nil then
+		warn("[ANM-021] no MapPoint " .. WINDOW_POINT .. ": the runner is skipped")
 		return nil
 	end
-	const kitchen = ctx.Point("TRL")
+	const kitchen = pointOf(ctx, "TRL")
 	const spot = Vector3.new(point.Position.X, 0.45, point.Position.Z)
 	const inward = if kitchen ~= nil then (kitchen.Position - spot) * Vector3.new(1, 0, 1) else Vector3.new(0, 0, -1)
 	const dir = if inward.Magnitude > 1e-3 then inward.Unit else Vector3.new(0, 0, -1)
@@ -189,12 +208,12 @@ local function step(ctx: Effect.Context, state: State, dt: number)
 		state.Alpha = math.max(0, state.Alpha - dt / FOG_OUT)
 	end
 	for index, e in state.Emitters do
-		e.Rate = (if index == 1 then 7 else 5) * state.Alpha
+		e.Rate = FOG_RATES[index] * state.Alpha
 	end
 	write(ctx, state.Alpha)
 
 	const runner = state.Runner
-	if runner ~= nil and runner.Model.Parent ~= nil then
+	if runner ~= nil then
 		const t = os.clock() - state.PhaseAt
 		const window = runner.Window
 		if state.Phase == "Signal" then
