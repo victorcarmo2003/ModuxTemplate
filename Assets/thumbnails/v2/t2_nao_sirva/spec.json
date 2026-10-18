@@ -1,0 +1,205 @@
+{
+ "out": "thumb_t2_nao_sirva.png",
+ "size": [
+  1920,
+  1080
+ ],
+ "bg": {
+  "path": "bg.jpg",
+  "blur": 2.5,
+  "saturation": 0.7,
+  "brightness": 0.8,
+  "tint": [
+   0.8,
+   0.86,
+   1.2
+  ],
+  "lift": [
+   10,
+   16,
+   40
+  ],
+  "gradient": {
+   "color": [
+    8,
+    12,
+    36
+   ],
+   "strength": 0.35,
+   "from": "bottom"
+  }
+ },
+ "spots": [
+  {
+   "at": [
+    0.74,
+    0.42
+   ],
+   "radius": 0.32,
+   "color": [
+    255,
+    40,
+    80
+   ],
+   "strength": 0.32
+  }
+ ],
+ "layers": [
+  {
+   "path": "worker.jpg",
+   "key": "green",
+   "spill": 14,
+   "choke": 2,
+   "despill": 0.6,
+   "at": [
+    0.31,
+    0.87
+   ],
+   "height": 0.74,
+   "anchor": "bottom",
+   "saturation": 1.15,
+   "contrast": 1.06,
+   "brightness": 1.05,
+   "outline": {
+    "color": [
+     25,
+     15,
+     30
+    ],
+    "width": 7
+   },
+   "outline2": {
+    "color": [
+     255,
+     255,
+     255
+    ],
+    "width": 4
+   }
+  },
+  {
+   "path": "bg.jpg",
+   "key": "none",
+   "crop": [
+    0,
+    520,
+    1215,
+    738
+   ],
+   "at": [
+    0.5,
+    1.0
+   ],
+   "height": 0.319,
+   "anchor": "bottom",
+   "saturation": 0.7,
+   "brightness": 0.8,
+   "tint": [
+    0.8,
+    0.86,
+    1.2
+   ],
+   "tint_amount": 1.0
+  },
+  {
+   "path": "customer.jpg",
+   "key": "green",
+   "spill": 16,
+   "choke": 2,
+   "despill": 0.6,
+   "at": [
+    0.74,
+    1.22
+   ],
+   "height": 1.12,
+   "anchor": "bottom",
+   "saturation": 1.1,
+   "contrast": 1.18,
+   "brightness": 1.05,
+   "sharpen": 0.4,
+   "outline": {
+    "color": [
+     15,
+     8,
+     20
+    ],
+    "width": 9
+   },
+   "glow": {
+    "color": [
+     255,
+     40,
+     80
+    ],
+    "width": 50,
+    "strength": 0.45
+   },
+   "rim": {
+    "color": [
+     255,
+     70,
+     100
+    ],
+    "side": "left",
+    "width": 9,
+    "strength": 0.45
+   }
+  }
+ ],
+ "text": [
+  {
+   "text": "DON'T SERVE HIM!",
+   "font": "LuckiestGuy-Regular.ttf",
+   "size": 0.125,
+   "max_width": 0.6,
+   "at": [
+    0.35,
+    0.16
+   ],
+   "color": [
+    255,
+    255,
+    255
+   ],
+   "gradient": [
+    [
+     255,
+     240,
+     120
+    ],
+    [
+     255,
+     150,
+     30
+    ]
+   ],
+   "stroke": {
+    "color": [
+     0,
+     0,
+     0
+    ],
+    "width": 0.012
+   },
+   "shadow": {
+    "offset": [
+     0.006,
+     0.008
+    ],
+    "opacity": 0.7
+   },
+   "rotate": -4
+  }
+ ],
+ "grade": {
+  "saturation": 1.08,
+  "contrast": 1.08,
+  "warm_cool": 0.15
+ },
+ "vignette": {
+  "strength": 0.35,
+  "bottom_bias": 0.3
+ },
+ "sharpen": 0.45,
+ "safe_bottom": 0.15
+}

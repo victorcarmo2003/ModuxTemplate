@@ -1,0 +1,117 @@
+{
+ "out": "icon4_raposa.png",
+ "size": [
+  512,
+  512
+ ],
+ "bg": {
+  "path": "bg_street.jpg",
+  "crop": [
+   350,
+   250,
+   950,
+   650
+  ],
+  "blur": 5,
+  "saturation": 0.6,
+  "brightness": 0.45,
+  "tint": [
+   0.7,
+   0.8,
+   1.35
+  ],
+  "lift": [
+   6,
+   10,
+   30
+  ]
+ },
+ "layers": [
+  {
+   "path": "walker.jpg",
+   "key": "green",
+   "spill": 14,
+   "choke": 2,
+   "at": [
+    0.8,
+    0.27
+   ],
+   "height": 0.48,
+   "anchor": "center",
+   "brightness": 0.8,
+   "glow": {
+    "color": [
+     120,
+     140,
+     255
+    ],
+    "width": 30,
+    "strength": 0.35
+   },
+   "crop": [
+    330,
+    170,
+    880,
+    560
+   ]
+  },
+  {
+   "path": "fox.jpg",
+   "key": "green",
+   "spill": 16,
+   "choke": 2,
+   "despill": 0.6,
+   "at": [
+    0.43,
+    1.14
+   ],
+   "height": 1.0,
+   "anchor": "bottom",
+   "saturation": 1.25,
+   "contrast": 1.08,
+   "brightness": 1.05,
+   "sharpen": 0.4,
+   "outline": {
+    "color": [
+     25,
+     15,
+     30
+    ],
+    "width": 5
+   },
+   "outline2": {
+    "color": [
+     255,
+     255,
+     255
+    ],
+    "width": 3
+   },
+   "shadow": {
+    "offset": [
+     8,
+     10
+    ],
+    "blur": 10,
+    "opacity": 0.5
+   },
+   "rim": {
+    "color": [
+     150,
+     190,
+     255
+    ],
+    "side": "right",
+    "width": 5,
+    "strength": 0.5
+   }
+  }
+ ],
+ "grade": {
+  "saturation": 1.1,
+  "contrast": 1.08,
+  "warm_cool": 0.12
+ },
+ "vignette": 0.35,
+ "sharpen": 0.4
+}

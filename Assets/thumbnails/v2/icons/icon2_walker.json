@@ -1,0 +1,67 @@
+{
+ "out": "icon2_walker.png",
+ "size": [
+  512,
+  512
+ ],
+ "bg_color": [
+  120,
+  8,
+  20
+ ],
+ "spots": [
+  {
+   "at": [
+    0.5,
+    0.42
+   ],
+   "radius": 0.75,
+   "color": [
+    255,
+    50,
+    60
+   ],
+   "strength": 0.8
+  }
+ ],
+ "layers": [
+  {
+   "path": "walker.jpg",
+   "key": "green",
+   "spill": 14,
+   "choke": 2,
+   "despill": 0.6,
+   "at": [
+    0.5,
+    1.06
+   ],
+   "height": 0.9,
+   "anchor": "bottom",
+   "contrast": 1.1,
+   "brightness": 1.0,
+   "outline": {
+    "color": [
+     0,
+     0,
+     0
+    ],
+    "width": 5
+   },
+   "glow": {
+    "color": [
+     255,
+     80,
+     80
+    ],
+    "width": 30,
+    "strength": 0.5
+   }
+  }
+ ],
+ "grade": {
+  "saturation": 1.05,
+  "contrast": 1.12
+ },
+ "vignette": 0.45,
+ "sharpen": 0.4
+}

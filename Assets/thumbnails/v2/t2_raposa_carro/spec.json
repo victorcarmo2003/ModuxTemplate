@@ -1,0 +1,152 @@
+{
+ "out": "thumb_t2_raposa_carro.png",
+ "size": [
+  1920,
+  1080
+ ],
+ "bg": {
+  "path": "bg.jpg",
+  "blur": 2.5,
+  "saturation": 0.75,
+  "brightness": 0.8,
+  "tint": [
+   0.8,
+   0.9,
+   1.25
+  ],
+  "lift": [
+   6,
+   10,
+   30
+  ]
+ },
+ "spots": [],
+ "layers": [
+  {
+   "path": "monster.jpg",
+   "key": "green",
+   "spill": 14,
+   "despill": 0.5,
+   "at": [
+    0.5,
+    0.4
+   ],
+   "height": 0.5,
+   "anchor": "center",
+   "saturation": 1.0,
+   "contrast": 1.1,
+   "brightness": 1.0,
+   "outline": {
+    "color": [
+     255,
+     60,
+     60
+    ],
+    "width": 5
+   },
+   "glow": {
+    "color": [
+     255,
+     240,
+     200
+    ],
+    "width": 35,
+    "strength": 0.3
+   },
+   "key_lo": 0.08,
+   "key_hi": 0.26
+  },
+  {
+   "path": "hero.jpg",
+   "key": "green",
+   "spill": 10,
+   "despill": 1.0,
+   "at": [
+    0.5,
+    1.28
+   ],
+   "height": 1.15,
+   "anchor": "bottom",
+   "saturation": 1.1,
+   "contrast": 1.04,
+   "brightness": 0.9,
+   "sharpen": 0.4,
+   "outline": {
+    "color": [
+     25,
+     15,
+     30
+    ],
+    "width": 9
+   },
+   "outline2": {
+    "color": [
+     255,
+     255,
+     255
+    ],
+    "width": 6
+   }
+  }
+ ],
+ "text": [
+  {
+   "text": "RUN!!",
+   "font": "Bangers-Regular.ttf",
+   "size": 0.2,
+   "at": [
+    0.5,
+    0.13
+   ],
+   "color": [
+    255,
+    255,
+    255
+   ],
+   "gradient": [
+    [
+     255,
+     255,
+     255
+    ],
+    [
+     255,
+     200,
+     200
+    ]
+   ],
+   "stroke": {
+    "color": [
+     0,
+     0,
+     0
+    ],
+    "width": 0.012
+   },
+   "shadow": {
+    "offset": [
+     0.007,
+     0.009
+    ],
+    "color": [
+     200,
+     20,
+     40
+    ],
+    "opacity": 0.8
+   },
+   "rotate": -6
+  }
+ ],
+ "grade": {
+  "saturation": 1.05,
+  "contrast": 1.06,
+  "warm_cool": 0.1
+ },
+ "vignette": {
+  "strength": 0.4,
+  "bottom_bias": 0.3
+ },
+ "sharpen": 0.45,
+ "safe_bottom": 0.15
+}

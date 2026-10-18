@@ -1,0 +1,90 @@
+{
+ "out": "icon3_cliente.png",
+ "size": [
+  512,
+  512
+ ],
+ "bg": {
+  "path": "bg_kitchen.jpg",
+  "crop": [
+   300,
+   150,
+   1000,
+   650
+  ],
+  "blur": 6,
+  "saturation": 0.8,
+  "brightness": 0.85,
+  "tint": [
+   1.05,
+   0.95,
+   0.95
+  ]
+ },
+ "spots": [
+  {
+   "at": [
+    0.5,
+    0.45
+   ],
+   "radius": 0.55,
+   "color": [
+    255,
+    50,
+    90
+   ],
+   "strength": 0.35
+  }
+ ],
+ "layers": [
+  {
+   "path": "cat.jpg",
+   "key": "green",
+   "spill": 16,
+   "choke": 2,
+   "despill": 0.6,
+   "at": [
+    0.5,
+    1.06
+   ],
+   "height": 0.98,
+   "anchor": "bottom",
+   "saturation": 1.15,
+   "contrast": 1.12,
+   "brightness": 1.05,
+   "sharpen": 0.4,
+   "outline": {
+    "color": [
+     20,
+     10,
+     25
+    ],
+    "width": 5
+   },
+   "outline2": {
+    "color": [
+     255,
+     255,
+     255
+    ],
+    "width": 3
+   },
+   "glow": {
+    "color": [
+     255,
+     40,
+     80
+    ],
+    "width": 30,
+    "strength": 0.5
+   }
+  }
+ ],
+ "grade": {
+  "saturation": 1.08,
+  "contrast": 1.06,
+  "warm_cool": 0.08
+ },
+ "vignette": 0.35,
+ "sharpen": 0.4
+}

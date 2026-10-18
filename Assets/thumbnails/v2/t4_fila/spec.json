@@ -1,0 +1,230 @@
+{
+ "out": "thumb_t4_fila.png",
+ "size": [
+  1920,
+  1080
+ ],
+ "bg": {
+  "path": "bg.jpg",
+  "blur": 2.5,
+  "saturation": 0.65,
+  "brightness": 0.8,
+  "tint": [
+   0.78,
+   0.86,
+   1.22
+  ],
+  "lift": [
+   10,
+   16,
+   40
+  ],
+  "gradient": {
+   "color": [
+    8,
+    12,
+    36
+   ],
+   "strength": 0.35,
+   "from": "bottom"
+  }
+ },
+ "spots": [
+  {
+   "at": [
+    0.63,
+    0.3
+   ],
+   "radius": 0.24,
+   "color": [
+    255,
+    50,
+    90
+   ],
+   "strength": 0.4
+  }
+ ],
+ "layers": [
+  {
+   "path": "customers.jpg",
+   "key": "green",
+   "spill": 12,
+   "despill": 0.6,
+   "at": [
+    0.66,
+    0.9
+   ],
+   "height": 0.74,
+   "anchor": "bottom",
+   "saturation": 1.15,
+   "contrast": 1.1,
+   "brightness": 1.0,
+   "outline": {
+    "color": [
+     20,
+     10,
+     25
+    ],
+    "width": 6
+   },
+   "shadow": {
+    "offset": [
+     14,
+     20
+    ],
+    "blur": 18,
+    "opacity": 0.45
+   },
+   "highlight": {
+    "region": [
+     478,
+     0,
+     739,
+     794
+    ],
+    "color": [
+     255,
+     30,
+     50
+    ],
+    "width": 8,
+    "fill": 0.12,
+    "glow": {
+     "width": 30,
+     "strength": 0.45
+    }
+   },
+   "choke": 1
+  },
+  {
+   "path": "bg.jpg",
+   "key": "none",
+   "crop": [
+    0,
+    545,
+    1215,
+    738
+   ],
+   "at": [
+    0.5,
+    1.0
+   ],
+   "height": 0.283,
+   "anchor": "bottom",
+   "saturation": 0.65,
+   "brightness": 0.8,
+   "tint": [
+    0.78,
+    0.86,
+    1.22
+   ],
+   "tint_amount": 1.0
+  },
+  {
+   "path": "hero.jpg",
+   "key": "green",
+   "spill": 10,
+   "despill": 1.0,
+   "at": [
+    0.25,
+    1.2
+   ],
+   "height": 1.08,
+   "anchor": "bottom",
+   "saturation": 1.25,
+   "contrast": 1.08,
+   "brightness": 1.0,
+   "sharpen": 0.5,
+   "outline": {
+    "color": [
+     25,
+     15,
+     30
+    ],
+    "width": 9
+   },
+   "outline2": {
+    "color": [
+     255,
+     255,
+     255
+    ],
+    "width": 6
+   },
+   "shadow": {
+    "offset": [
+     22,
+     28
+    ],
+    "blur": 22,
+    "opacity": 0.5
+   },
+   "rim": {
+    "color": [
+     150,
+     190,
+     255
+    ],
+    "side": "right",
+    "width": 9,
+    "strength": 0.5
+   },
+   "choke": 1
+  }
+ ],
+ "text": [
+  {
+   "text": "WHICH ONE?",
+   "font": "LuckiestGuy-Regular.ttf",
+   "size": 0.16,
+   "at": [
+    0.5,
+    0.14
+   ],
+   "color": [
+    255,
+    255,
+    255
+   ],
+   "gradient": [
+    [
+     255,
+     240,
+     120
+    ],
+    [
+     255,
+     150,
+     30
+    ]
+   ],
+   "stroke": {
+    "color": [
+     0,
+     0,
+     0
+    ],
+    "width": 0.012
+   },
+   "shadow": {
+    "offset": [
+     0.006,
+     0.008
+    ],
+    "opacity": 0.7
+   },
+   "rotate": -4
+  }
+ ],
+ "grade": {
+  "saturation": 1.1,
+  "contrast": 1.08,
+  "warm_cool": 0.12
+ },
+ "vignette": {
+  "strength": 0.35,
+  "bottom_bias": 0.3
+ },
+ "sharpen": 0.45,
+ "safe_bottom": 0.15
+}

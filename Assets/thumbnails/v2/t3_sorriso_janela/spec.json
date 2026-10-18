@@ -1,0 +1,194 @@
+{
+ "out": "thumb_t3_sorriso_janela.png",
+ "size": [
+  1920,
+  1080
+ ],
+ "bg": {
+  "path": "bg.jpg",
+  "blur": 2.5,
+  "saturation": 0.6,
+  "brightness": 0.8,
+  "tint": [
+   0.74,
+   0.84,
+   1.28
+  ],
+  "lift": [
+   10,
+   16,
+   40
+  ],
+  "gradient": {
+   "color": [
+    8,
+    12,
+    36
+   ],
+   "strength": 0.35,
+   "from": "bottom"
+  }
+ },
+ "spots": [
+  {
+   "at": [
+    0.7,
+    0.42
+   ],
+   "radius": 0.3,
+   "color": [
+    255,
+    60,
+    110
+   ],
+   "strength": 0.3
+  }
+ ],
+ "layers": [
+  {
+   "path": "monster.jpg",
+   "key": "green",
+   "spill": 14,
+   "despill": 0.5,
+   "at": [
+    0.7,
+    0.43
+   ],
+   "height": 0.44,
+   "anchor": "center",
+   "saturation": 1.0,
+   "contrast": 1.2,
+   "brightness": 1.1,
+   "outline": {
+    "color": [
+     20,
+     10,
+     25
+    ],
+    "width": 8
+   },
+   "glow": {
+    "color": [
+     255,
+     40,
+     90
+    ],
+    "width": 60,
+    "strength": 0.55
+   },
+   "crop": [
+    380,
+    150,
+    830,
+    552
+   ],
+   "choke": 1
+  },
+  {
+   "path": "hero.jpg",
+   "key": "green",
+   "spill": 18,
+   "despill": 1.0,
+   "at": [
+    0.28,
+    1.12
+   ],
+   "height": 1.05,
+   "anchor": "bottom",
+   "saturation": 1.25,
+   "contrast": 1.08,
+   "brightness": 1.0,
+   "sharpen": 0.5,
+   "outline": {
+    "color": [
+     25,
+     15,
+     30
+    ],
+    "width": 9
+   },
+   "outline2": {
+    "color": [
+     255,
+     255,
+     255
+    ],
+    "width": 6
+   },
+   "shadow": {
+    "offset": [
+     22,
+     28
+    ],
+    "blur": 22,
+    "opacity": 0.5
+   },
+   "rim": {
+    "color": [
+     150,
+     190,
+     255
+    ],
+    "side": "right",
+    "width": 9,
+    "strength": 0.5
+   },
+   "choke": 2
+  }
+ ],
+ "text": [
+  {
+   "text": "HIDE!",
+   "font": "LuckiestGuy-Regular.ttf",
+   "size": 0.17,
+   "at": [
+    0.5,
+    0.14
+   ],
+   "color": [
+    255,
+    255,
+    255
+   ],
+   "gradient": [
+    [
+     255,
+     240,
+     120
+    ],
+    [
+     255,
+     150,
+     30
+    ]
+   ],
+   "stroke": {
+    "color": [
+     0,
+     0,
+     0
+    ],
+    "width": 0.012
+   },
+   "shadow": {
+    "offset": [
+     0.006,
+     0.008
+    ],
+    "opacity": 0.7
+   },
+   "rotate": -4
+  }
+ ],
+ "grade": {
+  "saturation": 1.1,
+  "contrast": 1.08,
+  "warm_cool": 0.12
+ },
+ "vignette": {
+  "strength": 0.35,
+  "bottom_bias": 0.3
+ },
+ "sharpen": 0.45,
+ "safe_bottom": 0.15
+}
