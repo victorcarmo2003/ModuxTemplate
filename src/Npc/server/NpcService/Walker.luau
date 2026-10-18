@@ -370,12 +370,13 @@ function Walker.Detour(mover: Mover, target: Vector3): { Vector3 }
 	end
 	local function edge(i: number, j: number): RaycastResult?
 		const key = math.min(i, j) * 64 + math.max(i, j)
-		local hit = cache[key]
+		local hit: (RaycastResult | false)? = cache[key]
 		if hit == nil then
-			hit = sweep(points[i], points[j], floorY, params) or false
-			cache[key] = hit
+			const swept: RaycastResult | false = sweep(points[i], points[j], floorY, params) or false
+			cache[key] = swept
+			hit = swept
 		end
-		return if hit == false then nil else hit
+		return if hit == false or hit == nil then nil else hit
 	end
 	add(first.Instance)
 	for _ = 1, DETOUR_OBSTACLES do
