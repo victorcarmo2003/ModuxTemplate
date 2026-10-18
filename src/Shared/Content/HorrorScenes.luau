@@ -793,6 +793,54 @@ const oddScenes: { Scene } = {
 	oddScene("anm_016_starer", "The starer", "starer"),
 }
 
+-- Outside the shop at night (owner 2026-10-18; server Anomaly/OutsideService, client OutsideController). Personal: only
+-- the player outside sees it. Rise = 30 s of rising dread (words few then en masse, bars, "glaucoma" edges, heart, the
+-- colour draining, a hush at the end); Chase = the bell and the runner on him, the words turn to the chase; Escape = he
+-- got inside; Caught = the hit. Step.At is s since that stage began (Phase is unused here: "Active").
+export type OutsideScene = { Rise: { Step }, Chase: { Step }, Escape: { Step }, Caught: { Step } }
+
+const outside: OutsideScene = {
+	Rise = {
+		{ At = 0, Phase = "Active", Kind = "Whispers", Target = "outside", Value = 0.2, To = 3, Duration = 29 },
+		{ At = 0, Phase = "Active", Kind = "Vignette", Value = 0, To = 0.5, Duration = 30 },
+		{ At = 0, Phase = "Active", Kind = "Heartbeat", Value = 60, To = 155, Duration = 30 },
+		{ At = 2, Phase = "Active", Kind = "Cinema", Value = 0.1, Duration = 3 },
+		{ At = 2, Phase = "Active", Kind = "Grade", Target = "Cold", Value = 0, To = 0.55, Duration = 28 },
+		{ At = 25, Phase = "Active", Kind = "Silence", Value = 1, To = 0.15, Duration = 4 },
+		{ At = 28.5, Phase = "Active", Kind = "Sound", Target = "breath_held" },
+	},
+	Chase = {
+		{ At = 0, Phase = "Active", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 0, Phase = "Active", Kind = "Silence", Value = 0.15, To = 1, Duration = 0.2 },
+		{ At = 0, Phase = "Active", Kind = "Sound", Target = "church_bell", Value = 1.2 },
+		{ At = 0, Phase = "Active", Kind = "Shake", Target = "Jolt" },
+		{ At = 0, Phase = "Active", Kind = "Fov", Value = -4, To = 0, Duration = 0.8 },
+		{ At = 0, Phase = "Active", Kind = "Blur", Value = 8, To = 0, Duration = 1 },
+		{ At = 0, Phase = "Active", Kind = "Grade", Target = "Red", Value = 0.65, To = 0.65, Duration = 0.5 },
+		{ At = 0, Phase = "Active", Kind = "Heartbeat", Value = 165, To = 175, Duration = 20 },
+		{ At = 0.4, Phase = "Active", Kind = "Whispers", Target = "chase", Value = 3, To = 3, Duration = 60 },
+	},
+	Escape = {
+		{ At = 0, Phase = "Active", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 0, Phase = "Active", Kind = "Silence", Value = 1, To = 1, Duration = 0 },
+		{ At = 0.3, Phase = "Active", Kind = "Sound", Target = "breath_held" },
+		{ At = 0, Phase = "Active", Kind = "Heartbeat", Value = 140, To = 80, Duration = 4 },
+		{ At = 4, Phase = "Active", Kind = "Heartbeat", Value = 0, To = 0 },
+		{ At = 0.5, Phase = "Active", Kind = "Grade", Value = 0.6, To = 0, Duration = 3 },
+		{ At = 0.5, Phase = "Active", Kind = "Vignette", Value = 0.5, To = 0, Duration = 3 },
+		{ At = 1.5, Phase = "Active", Kind = "Cinema", Value = 0, Duration = 1.2 },
+	},
+	Caught = {
+		{ At = 0, Phase = "Active", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 0, Phase = "Active", Kind = "Silence", Value = 1, To = 1, Duration = 0 },
+		{ At = 0, Phase = "Active", Kind = "Heartbeat", Value = 0, To = 0 },
+		{ At = 0, Phase = "Active", Kind = "Grade", Target = "Red", Value = 0.9, To = 0, Duration = 3 },
+		{ At = 0, Phase = "Active", Kind = "Blur", Value = 14, To = 0, Duration = 1.4 },
+		{ At = 1, Phase = "Active", Kind = "Vignette", Value = 0.5, To = 0, Duration = 2.5 },
+		{ At = 2.5, Phase = "Active", Kind = "Cinema", Value = 0, Duration = 1 },
+	},
+}
+
 -- Whisper word lists (DEC-293, owner 2026-10-18): the words on screen are real hints for the player, said in the
 -- character's voice. blackout / roof / crawler / neck / copy = the scenes' Whispers steps (TASK-484, TASK-483); low_sanity = VitalController while sanity is in the low band;
 -- suspense = after a suspense event's glance (SuspenseController, TASK-481).
@@ -989,6 +1037,26 @@ const words: { [string]: { string } } = {
 		"STAY INSIDE",
 		"it wants in",
 	},
+	-- outside the shop at night (OutsideController): get back in, then the chase
+	outside = {
+		"GET INSIDE",
+		"GET INSIDE",
+		"GO BACK",
+		"IT'S NOT SAFE OUT HERE",
+		"you're too far",
+		"something is coming",
+		"it can smell you",
+		"back inside...",
+	},
+	chase = {
+		"RUN",
+		"RUN",
+		"RUN!",
+		"IT'S BEHIND YOU",
+		"DON'T LOOK BACK",
+		"GET INSIDE NOW",
+		"FASTER",
+	},
 	low_sanity = {
 		"LOW SANITY",
 		"DRINK COFFEE",
@@ -1051,6 +1119,7 @@ end
 return Table.with(Table.new(scenes), {
 	Rules = Table.record(rules),
 	Stare = Table.record(stare),
+	Outside = Table.record(outside),
 	Words = Table.record(words),
 	PhaseOrder = table.freeze({ Signal = 1, Active = 2, Resolved = 3, Failed = 3 }),
 })

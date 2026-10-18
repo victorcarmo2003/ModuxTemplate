@@ -3,6 +3,7 @@
 local ServerScriptService = game:GetService("ServerScriptService")
 local AdminService = require(ServerScriptService.server.ModuxTypes.AdminService)
 local AnomalyService = require(ServerScriptService.server.ModuxTypes.AnomalyService)
+local OutsideService = require(ServerScriptService.server.ModuxTypes.OutsideService)
 local AtmosphereService = require(ServerScriptService.server.ModuxTypes.AtmosphereService)
 local BossService = require(ServerScriptService.server.ModuxTypes.BossService)
 local CharacterService = require(ServerScriptService.server.ModuxTypes.CharacterService)
@@ -65,6 +66,7 @@ local VitalService = require(ServerScriptService.server.ModuxTypes.VitalService)
 export type AllServices = {
 	AdminService: AdminService.Public,
 	AnomalyService: AnomalyService.Public,
+	OutsideService: OutsideService.Public,
 	AtmosphereService: AtmosphereService.Public,
 	BossService: BossService.Public,
 	CharacterService: CharacterService.Public,

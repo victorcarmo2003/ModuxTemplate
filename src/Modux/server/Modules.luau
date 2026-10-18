@@ -5,6 +5,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 return {
 	ServerScriptService.server.Admin.AdminService,
 	ServerScriptService.server.Anomaly.AnomalyService,
+	ServerScriptService.server.Anomaly.OutsideService,
 	ServerScriptService.server.Atmosphere.AtmosphereService,
 	ServerScriptService.server.Boss.BossService,
 	ServerScriptService.server.Character.CharacterService,

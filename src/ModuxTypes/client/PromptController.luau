@@ -40,6 +40,7 @@ export type Public = {
 	AddGate: (self: Public, name: string, gate: (Instance) -> boolean) -> (),
 	RemoveGate: (self: Public, name: string) -> (),
 	Gated: (self: Public, anchor: Instance) -> boolean,
+	NearestSideAllows: (self: Public, anchor: Instance) -> boolean,
 	DoorSideAllows: (self: Public, anchor: Instance, action: string) -> boolean,
 	Add: (self: Public, anchor: Instance) -> (),
 	Remove: (self: Public, anchor: Instance) -> (),
