@@ -411,7 +411,8 @@ const rules: SoundRules = {
 	ScareMaxVolume = 0.5, -- DEC-173
 	ShiftMusic = {
 		Day = { "music_day_sunny", "music_day_small" },
-		Night = { "music_night_town", "music_night_fall" },
+		-- owner 2026-10-18: no soundtrack at night (the street ambience stays; the horror score still plays its stages)
+		Night = {},
 	},
 	ShiftMusicPhase = "Prep", -- 7 AM / 7 PM: start of every shift (Shift.luau)
 	ShiftMusicFresh = 5, -- Provisional (frontend-coder)

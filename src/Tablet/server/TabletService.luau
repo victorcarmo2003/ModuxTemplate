@@ -44,6 +44,7 @@ export type Tablet = {
 	EndsAt: number,
 	Order: { string }, -- topping keys of the 1st hot dog
 	Order2: { string }?, -- pair (FEAT-038)
+	PromptOn: boolean?, -- last state written to the prompt (owner 2026-10-18: it showed with nobody at the counter)
 }
 
 const ACTION = "tablet_take"
@@ -265,9 +266,28 @@ function TabletService:UpdateFull(tablet: Tablet): boolean
 	return true
 end
 
+-- The Take Order prompt shows only while the customer at the head of the queue is Ordering and the tablet is free.
+function TabletService:SyncPrompt(tablet: Tablet)
+	const anchor = tablet.Anchor
+	if anchor == nil then
+		return
+	end
+	local on = false
+	if tablet.State ~= "Talking" then
+		const npc = self:Head(tablet)
+		const customer = if npc ~= nil then self.Dependencies.CustomerService:Get(npc) else nil
+		on = customer ~= nil and customer.State == ORDERING
+	end
+	if tablet.PromptOn ~= on then
+		tablet.PromptOn = on
+		self.Dependencies.InteractionService:SetPrompt(anchor, on)
+	end
+end
+
 function TabletService:Step()
 	const t = now()
 	for _, tablet in self.Tablets do
+		self:SyncPrompt(tablet)
 		if tablet.State == "Talking" then
 			if not self:StillThere(tablet) then
 				self:Reset(tablet)

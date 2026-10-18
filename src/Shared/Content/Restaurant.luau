@@ -99,7 +99,9 @@ export type Tables = {
 
 export type Flow = {
 	PartyMult: ByParty,
-	NightInterval: { number }, -- s per night 1..10
+	NightInterval: { number }, -- s per night 1..10 (used by CustomerService at night with the restaurant on)
+	LullEvery: number, -- customers between two quiet stretches at night (0 = none)
+	LullSeconds: number, -- s added to the interval after every LullEvery customers (owner 2026-10-18: "no break")
 	Day1Interval: number,
 	MaxCustomers: ByParty,
 }
@@ -228,7 +230,10 @@ const restaurant: Restaurant = {
 	Tables = { Count = 4, GroupsPerTable = 2, EatTime = 12, EatJitter = 2, TableTip = 1, TrayFade = 3, SitHeadroom = 2 },
 	Flow = {
 		PartyMult = { 1.0, 1.8, 2.5, 3.1 },
-		NightInterval = { 30, 29, 28, 27, 26, 26, 25, 25, 24, 24 },
+		-- owner 2026-10-18: there was no break between customers; slower nights plus a quiet stretch (Provisional)
+		NightInterval = { 55, 52, 50, 48, 46, 45, 44, 43, 42, 40 },
+		LullEvery = 3,
+		LullSeconds = 45,
 		Day1Interval = 22,
 		MaxCustomers = { 5, 7, 9, 9 },
 	},

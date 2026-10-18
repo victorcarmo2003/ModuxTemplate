@@ -389,9 +389,9 @@ const turnedNeck: Scene = {
 		{ At = 6, Phase = "Active", Kind = "Sound", Target = "neck_crack", Point = "Q1", Value = 0.6 },
 		{ At = 9.5, Phase = "Active", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
 		{ At = 11, Phase = "Active", Kind = "Sound", Target = "neck_crack", Point = "Q1", Value = 0.8 },
-		-- the bars go before they get in the way of the work (prompts stay; the hotbar comes back)
-		{ At = 16, Phase = "Active", Kind = "Cinema", Value = 0, Duration = 1.5 },
-		{ At = 16, Phase = "Active", Kind = "Vignette", Value = 0.18, To = 0.08, Duration = 3 },
+		-- the bars go with the words (owner 2026-10-18: no black bars left alone after the warning)
+		{ At = 9.5, Phase = "Active", Kind = "Cinema", Value = 0, Duration = 1.5 },
+		{ At = 9.5, Phase = "Active", Kind = "Vignette", Value = 0.18, To = 0.08, Duration = 3 },
 		-- refused (Resolved): her neck snaps round (cue), then the room breathes again
 		{ At = 0, Phase = "Resolved", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
 		{ At = 0.3, Phase = "Resolved", Kind = "Shake", Target = "Door" },
@@ -408,7 +408,7 @@ const turnedNeck: Scene = {
 		{ At = 10.6, Phase = "Active", Kind = "Silence", Value = 1, To = 0.2, Duration = 0.4 },
 		{ At = 11, Phase = "Active", Kind = "Silence", Value = 0.2, To = 1, Duration = 1.5 },
 		{ At = 11, Phase = "Active", Kind = "Blur", Value = 4, To = 0, Duration = 1 },
-		{ At = 16, Phase = "Active", Kind = "Grade", Value = 0.32, To = 0.12, Duration = 3 },
+		{ At = 9.5, Phase = "Active", Kind = "Grade", Value = 0.32, To = 0.12, Duration = 3 },
 		-- TASK-493: colour and sound come back
 		{ At = 0, Phase = "Resolved", Kind = "Silence", Value = 1, To = 1, Duration = 0 },
 		{ At = 0.4, Phase = "Resolved", Kind = "Grade", Value = 0.4, To = 0, Duration = 2 },
@@ -435,8 +435,8 @@ const copies: Scene = {
 		{ At = 2, Phase = "Active", Kind = "Vignette", Value = 0, To = 0.15, Duration = 8 },
 		{ At = 2, Phase = "Active", Kind = "Whispers", Target = "copy", Value = 0.3, To = 1, Duration = 8 },
 		{ At = 10, Phase = "Active", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
-		{ At = 16, Phase = "Active", Kind = "Cinema", Value = 0, Duration = 1.5 },
-		{ At = 16, Phase = "Active", Kind = "Vignette", Value = 0.15, To = 0.06, Duration = 3 },
+		{ At = 10, Phase = "Active", Kind = "Cinema", Value = 0, Duration = 1.5 },
+		{ At = 10, Phase = "Active", Kind = "Vignette", Value = 0.15, To = 0.06, Duration = 3 },
 		{ At = 0, Phase = "Resolved", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
 		{ At = 0.5, Phase = "Resolved", Kind = "Vignette", Value = 0.15, To = 0, Duration = 1.5 },
 		{ At = 1, Phase = "Resolved", Kind = "Cinema", Value = 0, Duration = 1 },
@@ -445,7 +445,7 @@ const copies: Scene = {
 		{ At = 0.2, Phase = "Failed", Kind = "Vignette", Value = 0.35, To = 0, Duration = 3 },
 		{ At = 2.5, Phase = "Failed", Kind = "Cinema", Value = 0, Duration = 1 },
 		{ At = 2, Phase = "Active", Kind = "Grade", Target = "Cold", Value = 0, To = 0.28, Duration = 8 },
-		{ At = 16, Phase = "Active", Kind = "Grade", Value = 0.28, To = 0.1, Duration = 3 },
+		{ At = 10, Phase = "Active", Kind = "Grade", Value = 0.28, To = 0.1, Duration = 3 },
 		-- TASK-493: colour and sound come back
 		{ At = 0, Phase = "Resolved", Kind = "Silence", Value = 1, To = 1, Duration = 0 },
 		{ At = 0.4, Phase = "Resolved", Kind = "Grade", Value = 0.4, To = 0, Duration = 2 },
@@ -632,8 +632,8 @@ local function oddScene(key: string, name: string, words: string, sting: string?
 			{ At = 2, Phase = "Active", Kind = "Vignette", Value = 0, To = 0.16, Duration = 8 },
 			{ At = 2.5, Phase = "Active", Kind = "Whispers", Target = words, Value = 0.3, To = 1, Duration = 7 },
 			{ At = 9.5, Phase = "Active", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
-			{ At = 16, Phase = "Active", Kind = "Cinema", Value = 0, Duration = 1.5 },
-			{ At = 16, Phase = "Active", Kind = "Vignette", Value = 0.16, To = 0.06, Duration = 3 },
+			{ At = 9.5, Phase = "Active", Kind = "Cinema", Value = 0, Duration = 1.5 },
+			{ At = 9.5, Phase = "Active", Kind = "Vignette", Value = 0.16, To = 0.06, Duration = 3 },
 			{ At = 0, Phase = "Resolved", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
 			{ At = 0.8, Phase = "Resolved", Kind = "Sound", Target = "breath_held" },
 			{ At = 0.5, Phase = "Resolved", Kind = "Vignette", Value = 0.16, To = 0, Duration = 1.5 },
@@ -644,7 +644,7 @@ local function oddScene(key: string, name: string, words: string, sting: string?
 			{ At = 2, Phase = "Failed", Kind = "Cinema", Value = 0, Duration = 1 },
 			-- TASK-493: drained colour while it waits; the hit on whoever took its order
 			{ At = 2, Phase = "Active", Kind = "Grade", Target = "Cold", Value = 0, To = 0.25, Duration = 8 },
-			{ At = 16, Phase = "Active", Kind = "Grade", Value = 0.25, To = 0.08, Duration = 3 },
+			{ At = 9.5, Phase = "Active", Kind = "Grade", Value = 0.25, To = 0.08, Duration = 3 },
 			{ At = 0.4, Phase = "Resolved", Kind = "Grade", Value = 0.25, To = 0, Duration = 2 },
 			{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Grade", Target = "Red", Value = 0.85, To = 0, Duration = 2.8 },
 			{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Blur", Value = 12, To = 0, Duration = 1.4 },

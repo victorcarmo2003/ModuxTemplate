@@ -950,10 +950,11 @@ local function checkMedia()
 	inRange("SoundRules", nil, nil, "MaxVoices", Sounds.Rules.MaxVoices, 1, 64)
 	-- shift music pools: Music rows played once (user decision 2026-10-10)
 	const rules = Sounds.Rules
+	-- the Night pool may be empty (owner 2026-10-18: no soundtrack at night)
 	const pools: { { string } } = { rules.ShiftMusic.Day, rules.ShiftMusic.Night }
-	for _, pool in pools do
-		if #pool == 0 then
-			fail("SoundRules", nil, nil, "ShiftMusic pool is empty")
+	for index, pool in pools do
+		if #pool == 0 and index == 1 then
+			fail("SoundRules", nil, nil, "ShiftMusic.Day pool is empty")
 		end
 		for _, key in pool do
 			const sound = Sounds.ByKey[key]
