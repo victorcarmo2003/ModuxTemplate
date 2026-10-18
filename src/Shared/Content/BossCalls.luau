@@ -136,14 +136,23 @@ local function infinite(index: number, text: string): BossCall
 	}
 end
 
-local function nightCall(index: number, body: { Line }, short: { Line }): BossCall
+-- TASK-492: the restaurant text of a night call (Lines + Short), used instead of the trailer one when
+-- Restaurant.Rules.Enabled. It names the premiere that actually runs there (Restaurant.Switch.NewAnomalies) and its
+-- restaurant answer (horror-cinematic.md §9); nil = the trailer text fits both
+type RestaurantCall = {
+	Lines: { Line },
+	Short: { Line },
+}
+
+local function nightCall(index: number, body: { Line }, short: { Line }, restaurantCall: RestaurantCall?): BossCall
+	const variant = if Restaurant.Switch.On then restaurantCall else nil
 	return {
 		Key = `call_night_{index}`,
-		Lines = body,
+		Lines = if variant then variant.Lines else body,
 		Trigger = { Kind = "NightCall", Night = index },
 		Priority = 3,
 		Once = true,
-		Short = short,
+		Short = if variant then variant.Short else short,
 	}
 end
 
@@ -246,7 +255,17 @@ const base = Table.new({
 			"Hold it till the lights come back.",
 			"Lights out? Breaker. Hold it."
 		),
-		lines("Lights out? Breaker. Hold it.")
+		lines("Lights out? Breaker. Hold it."),
+		-- restaurant: the breaker is on the LIGHT panel (anomalies-v3-restaurant.md §3), no trailer
+		{
+			Lines = lines(
+				"Lights might go out tonight.",
+				"Breaker's on the light panel.",
+				"Hold it till the lights come back.",
+				"Lights out? Breaker. Hold it."
+			),
+			Short = lines("Lights out? Breaker. Hold it."),
+		}
 	),
 	nightCall(
 		4,
@@ -256,7 +275,19 @@ const base = Table.new({
 			"That's no customer. Shut the window.",
 			"Head on backwards? Shut the window."
 		),
-		lines("Head on backwards? Shut the window.")
+		lines("Head on backwards? Shut the window."),
+		-- restaurant: the stalker (ANM-006, drawn from Night 4) gets its answer here: don't look, shut it when it arrives
+		{
+			Lines = lines(
+				"Rainy one tonight, Rookie.",
+				"Head turned all the way back?",
+				"That's no customer. Shut the window.",
+				"Someone across the street? Don't look.",
+				"It reaches the glass? Shut the window.",
+				"Backwards head? Window. Watcher? Don't look."
+			),
+			Short = lines("Head on backwards? Shut the window.", "Someone across the street? Don't look."),
+		}
 	),
 	-- TASK-339 / TASK-331 / TASK-333 / TASK-334 / TASK-340 (owner 2026-10-15, Provisional; new lines have no voice yet,
 	-- Speech falls back to TTS): Walt no longer shouts "Hide!" on every monster, so each family B monster's sign is
@@ -271,7 +302,18 @@ const base = Table.new({
 			"Kill the trailer light before the third.",
 			"White eyes or twins? Shut the window."
 		),
-		lines("White eyes or twins? Shut the window.", "Bell rings? Light off by the third.")
+		lines("White eyes or twins? Shut the window.", "Bell rings? Light off by the third."),
+		-- restaurant: the stopped clock (bell) is cut (Restaurant.Switch.CutAnomalies), so no bell lines
+		{
+			Lines = lines(
+				"Foggy tonight. Look at their eyes.",
+				"All white? Big grin? Shut the window.",
+				"Twins in line? One's a copy.",
+				"Don't stare at them. Just shut it.",
+				"White eyes or twins? Shut the window."
+			),
+			Short = lines("White eyes or twins? Shut the window."),
+		}
 	),
 	nightCall(
 		6,
@@ -282,7 +324,17 @@ const base = Table.new({
 			"Hide behind the trailer. Stay put.",
 			"Buzzing lights? Hide out back."
 		),
-		lines("Buzzing lights? Hide out back.")
+		lines("Buzzing lights? Hide out back."),
+		-- restaurant: the Walker is cut; the big head (ANM-014) presents the night (Restaurant.Switch.NewAnomalies[6])
+		{
+			Lines = lines(
+				"Something's off with the heads tonight.",
+				"Head way too big for them?",
+				"That's no customer. Shut the window.",
+				"Big head? Shut the window."
+			),
+			Short = lines("Big head? Shut the window."),
+		}
 	),
 	nightCall(
 		7,
@@ -293,7 +345,18 @@ const base = Table.new({
 			"Out the back and hide. Quick.",
 			"Scratching? Hide out back."
 		),
-		lines("Scratching? Hide out back.")
+		lines("Scratching? Hide out back."),
+		-- restaurant: the crawler is "get off the floor" (TASK-483): climb on the counter
+		{
+			Lines = lines(
+				"Stormy one. Something crawls tonight.",
+				"Hear scratching under the floor?",
+				"That's the crawler. It's fast.",
+				"Get off the floor. Climb the counter.",
+				"Scratching? Up on the counter."
+			),
+			Short = lines("Scratching? Up on the counter."),
+		}
 	),
 	nightCall(
 		8,
@@ -306,7 +369,20 @@ const base = Table.new({
 			"Shut the window before the beam hits.",
 			"Whispers? Hide. Headlights? Window."
 		),
-		lines("Whispers? Hide. Headlights? Window.")
+		lines("Whispers? Hide. Headlights? Window."),
+		-- restaurant: the grin is cut; the long car (ANM-008) presents the night (Restaurant.Switch.NewAnomalies[8]) and
+		-- brakes at the drive-thru window (TASK-490)
+		{
+			Lines = lines(
+				"Dark one tonight, Rookie.",
+				"A long car comes down the street.",
+				"It brakes at the drive-thru.",
+				"Shut the window before the brights.",
+				"Keep it shut till it leaves.",
+				"Long car? Shut it. Keep it shut."
+			),
+			Short = lines("Long car? Shut it. Keep it shut."),
+		}
 	),
 	nightCall(
 		9,
@@ -318,7 +394,17 @@ const base = Table.new({
 			"It's not me either. Don't open.",
 			"Roof steps? Hide. Knocks? Don't open."
 		),
-		lines("Roof steps? Hide. Knocks? Don't open.")
+		lines("Roof steps? Hide. Knocks? Don't open."),
+		-- restaurant: the roof walker is "don't look up" (TASK-484) and the knock is cut (no back door)
+		{
+			Lines = lines(
+				"Hear heavy steps on the roof?",
+				"That's not me. Never is.",
+				"Keep your head down. Don't look up.",
+				"Roof steps? Don't look up."
+			),
+			Short = lines("Roof steps? Don't look up."),
+		}
 	),
 	nightCall(
 		10,
@@ -330,7 +416,19 @@ const base = Table.new({
 			"Stay in there till they're back.",
 			"Lamps out? Run inside the Mart."
 		),
-		lines("Lamps out? Run inside the Mart.", "Shut the window, hide, fix the lights.")
+		lines("Lamps out? Run inside the Mart.", "Shut the window, hide, fix the lights."),
+		-- restaurant: no Mart on the map; the Hush is answered by turning the shop light off and keeping it off (TASK-490)
+		{
+			Lines = lines(
+				"Last night, Rookie. Everything comes.",
+				"Shut the window, fix the lights.",
+				"Street lamps die one by one?",
+				"Turn off the shop light.",
+				"Keep it off till they're back.",
+				"Lamps out? Shop light off."
+			),
+			Short = lines("Lamps out? Shop light off.", "Shut the window, fix the lights."),
+		}
 	),
 	{
 		Key = "call_night_short",
