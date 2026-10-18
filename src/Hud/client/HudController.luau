@@ -20,9 +20,13 @@
 	  - banners (HudBanner): night start "Night k" (repeated night: "Same night. Same rules."), 6:00 AM "You made
 	    it!", from the Shift set on a fresh phase change only (a late joiner gets no old banner); Resume phase
 	    (DEC-080): "Resuming Day n" / "Resuming Night k" for the rest of the phase, late joiner included;
-	  - 10 s window (HudWipe) from Shift.WipeEndsAt (server time; WipeFrozen holds the number, wave 4);
-	  - spectate (HudSpectate) while own state is Down / Spectator: card for CARD_TIME s, "Watching: {name}" read from
-	    the camera subject (CameraController owns the view and the switch bind) and the switch hint of the device;
+	  - 10 s window (HudWipe) from Shift.WipeEndsAt (server time; WipeFrozen holds the bar, wave 4): a bar that drains
+	    with "Everyone's out!" inside, top centre, no seconds (TASK-485);
+	  - spectate (HudSpectate) while own state is Down / Spectator: Out card for CARD_TIME s; Down: centred "You
+	    fainted!" while ReviveKitController.Focus (the big revive offer, first seconds), then "Watching: {name}" read
+	    from the camera subject (CameraController owns the view and the switch bind) and the switch hint of the device;
+	  - clean faint screen (TASK-485, DEC-294): while not on their feet (Down / Spectator) the clock, day, money, shop
+	    cart and quick note are off (HudScreen Calm); the settings gear and the toasts stay;
 	  - toasts from `LifeEvent` with the crewmate's name (Down, Spectating, Revived, WipeCleared);
 	  - end of run screen (HudRunEnd) from the `RunReport` packet, 15 s.
 	The Shift set is read here only for WipeEndsAt/WipeFrozen and the banner timing (network.md §3.1 lists the HUD as
@@ -226,6 +230,7 @@ const HudController = Modux.Controller("HudController", {
 		"PlaceController",
 		"SettingsController",
 		"ShopController",
+		"ReviveKitController",
 	},
 	Priority = 500,
 })
@@ -254,7 +259,7 @@ function HudController:Setup()
 	self.Gui = nil :: ScreenGui?
 	self.Unmount = nil :: (() -> ())?
 
-	-- wave 2. WipeLeft: whole seconds of the 10 s window, -1 = none. WipePhase: the current phase can hold a
+	-- wave 2. WipeLeft: share of the 10 s window left (0..1, hundredths), -1 = none. WipePhase: the current phase can hold a
 	-- window. BannerKey: "night:attempt" of the last night-start banner (one per try). ShiftPhase: last Shift.Phase
 	-- seen. Watching: display name of the watched crewmate, "" = none.
 	self.WipeLeft = Vide.source(-1) :: Vide.Source<number>
@@ -442,7 +447,7 @@ function HudController:ShowBanner(banner: HudBanner.Banner, duration: number?)
 	end)
 end
 
--- Whole seconds left in the 10 s window from Shift.WipeEndsAt (server time); frozen keeps the number (DEC-118)
+-- Share of the 10 s window left from Shift.WipeEndsAt (server time); frozen keeps the bar (DEC-118)
 function HudController:RefreshWipe()
 	const shown = Vide.untrack(self.WipeLeft)
 	local left = -1
@@ -450,8 +455,9 @@ function HudController:RefreshWipe()
 		if self.WipeFrozen and shown >= 0 then
 			left = shown
 		else
-			const total = Content.Revive.WipeWindow
-			left = math.clamp(math.ceil(self.WipeEndsAt - workspace:GetServerTimeNow()), 0, total)
+			const total = math.max(Content.Revive.WipeWindow, 1)
+			const share = math.clamp((self.WipeEndsAt - workspace:GetServerTimeNow()) / total, 0, 1)
+			left = math.floor(share * 100 + 0.5) / 100
 		end
 	end
 	if left ~= shown then
@@ -495,6 +501,16 @@ function HudController:ApplyShift(record: ShiftRecord)
 	elseif record.Phase == "NightEnd" then
 		self:ShowBanner({ Title = "6:00 AM", Line = "You made it!" })
 	end
+end
+
+-- Not on their feet: the clean faint screen (HudScreen Calm)
+function HudController:Fallen(): boolean
+	return self:SpectateMode() ~= "None"
+end
+
+-- Context line under "You fainted!": the window's urgency when nobody is standing
+function HudController:DownLine(): string
+	return if self.WipeLeft() >= 0 then "Revive before the lights go out!" else "Your crew's still on shift."
 end
 
 -- Spectate mode from the own life state (Down: fainted tonight; Spectator: out until the next night)
@@ -893,11 +909,11 @@ function HudController:Mount(playerGui: Instance)
 			end
 		end)
 
-		-- Spectate card on each change to Down / Spectator
+		-- Out card on each change to Spectator (Down has its centred focus title instead)
 		Vide.effect(function()
 			const mode = self:SpectateMode()
 			Vide.untrack(function()
-				if mode == "None" then
+				if mode ~= "Out" then
 					self:HideCard()
 				else
 					self:ShowCard()
@@ -926,13 +942,17 @@ function HudController:Mount(playerGui: Instance)
 						return self:SpectateMode()
 					end,
 					Card = self.Card,
+					Focus = self.Dependencies.ReviveKitController.Focus,
+					Line = function()
+						return self:DownLine()
+					end,
 					Target = self.Watching,
 					Hint = function()
 						return self:SwitchHint()
 					end,
 					CardTop = UNDER_CLOCK,
 				}),
-				HudWipe({ Seconds = self.WipeLeft, Total = Content.Revive.WipeWindow }),
+				HudWipe({ Left = self.WipeLeft }),
 			}),
 
 			-- Order card (top-left column), under the wave-1 pills
@@ -956,6 +976,10 @@ function HudController:Mount(playerGui: Instance)
 				-- progressive reveal (Content.HudReveal): clock, shift, money, toasts
 				Reveal = function(key: string)
 					return self:IsOpen(key)
+				end,
+				-- clean faint screen (TASK-485)
+				Calm = function()
+					return self:Fallen()
 				end,
 				-- settings gear (TASK-279)
 				OnSettings = function()

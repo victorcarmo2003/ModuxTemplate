@@ -1,6 +1,6 @@
 --!strict
--- HudWipe: "Run" counts 10 -> 0 in real seconds (as the HUD does from Shift.WipeEndsAt); turn it off: it shrinks away.
--- "Seconds" picks a fixed value while "Run" is off; -1 hides the card. Phone = 667 x 375.
+-- HudWipe: "Run" drains the bar over 10 real seconds (as the HUD does from Shift.WipeEndsAt); turn it off: it shrinks
+-- away. "Left" picks a fixed share while "Run" is off; -0.05 hides the bar. Phone = 667 x 375.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
@@ -16,7 +16,7 @@ const cleanup = Vide.cleanup
 type Controls = {
 	Phone: () -> boolean,
 	Run: () -> boolean,
-	Seconds: () -> number,
+	Left: () -> number,
 }
 
 const TOTAL = 10
@@ -26,7 +26,7 @@ return UILabs.CreateVideStory({
 	controls = {
 		Phone = true,
 		Run = false,
-		Seconds = UILabs.Slider(7, -1, TOTAL, 1),
+		Left = UILabs.Slider(0.7, -0.05, 1, 0.05),
 	},
 }, function(props)
 	-- UI Labs types the control sources loosely; pin them to what the story reads.
@@ -40,10 +40,7 @@ return UILabs.CreateVideStory({
 		end
 		const endsAt = os.clock() + TOTAL
 		const connection = RunService.Heartbeat:Connect(function()
-			const left = math.max(math.ceil(endsAt - os.clock()), 0)
-			if left ~= running() then
-				running(left)
-			end
+			running(math.clamp((endsAt - os.clock()) / TOTAL, 0, 1))
 		end)
 		cleanup(function()
 			connection:Disconnect()
@@ -62,10 +59,9 @@ return UILabs.CreateVideStory({
 		ClipsDescendants = true,
 
 		HudWipe({
-			Seconds = function()
-				return if controls.Run() then running() else controls.Seconds()
+			Left = function()
+				return if controls.Run() then running() else controls.Left()
 			end,
-			Total = TOTAL,
 		}),
 	})
 end)

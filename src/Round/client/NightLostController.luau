@@ -3,9 +3,10 @@
 -- server repeats the night or ends the run) the bodies lie still and the clock holds, which read as a frozen game.
 -- This mounts NightLostScreen over everything but the settings / shop windows: Ink fade, "Everyone fainted…" (or
 -- "The night is lost" when someone was still standing: a critical anomaly), "Restarting the night" while a chance is
--- left (Shift.Chances, never shown as a number, DEC-053) or "No chances left" when the run ends, and a bar + whole
--- seconds from PhaseStartedAt / PhaseDuration (server time). It stays (bar full) until the next phase arrives, so the
--- restore gap is covered too. Presentation only: the server decides the phase. Game servers only.
+-- left (Shift.Chances, never shown as a number, DEC-053) or "No chances left" when the run ends, inside a bar that
+-- drains from PhaseStartedAt / PhaseDuration (server time; no seconds, TASK-485 / DEC-294). It stays (bar empty) until
+-- the next phase arrives, so the restore gap is covered too. Presentation only: the server decides the phase. Game
+-- servers only.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
@@ -55,18 +56,13 @@ function NightLostController:Progress(): number
 	return math.clamp(self.Elapsed() / duration, 0, 1)
 end
 
-function NightLostController:Seconds(): number
-	const duration = self.Dependencies.RoundController.PhaseDuration()
-	return math.max(math.ceil(duration - self.Elapsed()), 0)
-end
-
 function NightLostController:Tick()
 	const round = self.Dependencies.RoundController
 	if Vide.untrack(round.Phase) ~= PHASE then
 		return
 	end
 	const elapsed = workspace:GetServerTimeNow() - Vide.untrack(round.PhaseStartedAt)
-	-- tenths are enough for the bar; the whole seconds follow
+	-- tenths are enough for the bar
 	const stepped = math.floor(math.max(elapsed, 0) * TICK_RATE) / TICK_RATE
 	if stepped ~= Vide.untrack(self.Elapsed) then
 		self.Elapsed(stepped)
@@ -113,9 +109,6 @@ function NightLostController:Mount(playerGui: Instance)
 				end,
 				Progress = function()
 					return self:Progress()
-				end,
-				Seconds = function()
-					return self:Seconds()
 				end,
 				Scale = self.Scale,
 			}),

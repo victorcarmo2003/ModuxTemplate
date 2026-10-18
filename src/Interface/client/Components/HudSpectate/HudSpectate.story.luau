@@ -1,6 +1,7 @@
 --!strict
--- HudSpectate: "Mode" Down (fainted) / Out (spectator) / None. "Card" toggles the top card; "Target" empty shows
--- "Watching the trailer"; "Device" picks the switch hint. Phone = 667 x 375.
+-- HudSpectate: "Mode" Down (fainted) / Out (spectator) / None. "Card" toggles the Out top card; "Focus" the Down centre
+-- title (the first seconds after a fall, TASK-485); "Wipe" swaps its line to the nobody-standing one; "Target" empty
+-- shows "Watching the trailer"; "Device" picks the switch hint. Phone = 667 x 375.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -13,6 +14,8 @@ type Controls = {
 	Phone: () -> boolean,
 	Mode: () -> string,
 	Card: () -> boolean,
+	Focus: () -> boolean,
+	Wipe: () -> boolean,
 	Target: () -> string,
 	Device: () -> string,
 }
@@ -29,6 +32,8 @@ return UILabs.CreateVideStory({
 		Phone = true,
 		Mode = UILabs.Choose({ "Down", "Out", "None" }),
 		Card = true,
+		Focus = true,
+		Wipe = false,
 		Target = "Pickles",
 		Device = UILabs.Choose({ "Touch", "KeyboardMouse", "Gamepad" }),
 	},
@@ -52,6 +57,10 @@ return UILabs.CreateVideStory({
 				return controls.Mode() :: HudSpectate.Mode
 			end,
 			Card = controls.Card,
+			Focus = controls.Focus,
+			Line = function()
+				return if controls.Wipe() then "Revive before the lights go out!" else "Your crew's still on shift."
+			end,
 			Target = controls.Target,
 			Hint = function()
 				return if controls.Target() == "" then "" else HINT[controls.Device()] or ""

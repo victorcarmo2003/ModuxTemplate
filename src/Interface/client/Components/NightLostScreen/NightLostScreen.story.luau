@@ -1,6 +1,6 @@
 --!strict
--- NightLostScreen: "Shown" fades the cover in / out; "Run" fills the bar over 6 s (the NightLost phase) and counts
--- down; with "Run" off, "Progress" picks the fill. "LastChance" off shows the end-of-run line. Phone = 667 x 375.
+-- NightLostScreen: "Shown" fades the cover in / out; "Run" drains the bar over 6 s (the NightLost phase); with "Run"
+-- off, "Progress" picks how much of the wait is done. "LastChance" off shows the end-of-run line. Phone = 667 x 375.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
@@ -73,9 +73,6 @@ return UILabs.CreateVideStory({
 				return if controls.Repeat() then "Restarting the night" else "No chances left"
 			end,
 			Progress = progress,
-			Seconds = function()
-				return math.ceil(TOTAL * (1 - progress()))
-			end,
 		}),
 	})
 end)

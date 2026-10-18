@@ -14,6 +14,8 @@
 --   bottom     toasts (DEC-063): bottom centre, above the hotbar and the call subtitle, stacking up, with side margins that
 --              keep them off the joystick (left) and the jump button (right)
 --   centre     end-of-shift summary (FEAT-014), fades out by itself
+-- Down / out (TASK-485, DEC-294): `Calm()` true = the clean faint screen: clock, day, money, the shop cart and the
+-- quick note go away (the settings gear and the toasts stay). The owner also hides the nudge text.
 -- Progressive reveal (Content.HudReveal): `Reveal(key)` says whether the element of that row is on screen yet; the pills
 -- scale in (0.25 s) when it turns true. nil = everything shown.
 -- Nothing here is clickable (FEAT-032 acceptance) except the settings gear (TASK-279): Frames and TextLabels only. No reputation, boss chances, XP or
@@ -53,6 +55,8 @@ export type Props = {
 	Scale: (() -> number)?,
 	-- Progressive reveal (Content.HudReveal): keys "clock", "shift", "money", "toasts". nil = always shown.
 	Reveal: ((key: string) -> boolean)?,
+	-- Clean faint screen: hides clock, day, money and the shop cart (nil = never).
+	Calm: (() -> boolean)?,
 	-- Settings gear (TASK-279): pressed -> toggle the settings panel; nil = no gear. SettingsOpen turns it Mustard.
 	OnSettings: (() -> ())?,
 	SettingsOpen: (() -> boolean)?,
@@ -117,8 +121,11 @@ return function(props: Props): Frame
 	const buttonSize = function(): number
 		return if device() == "Touch" then TOUCH_BUTTON else BIG
 	end
+	const calm = function(): boolean
+		return props.Calm ~= nil and props.Calm()
+	end
 	const revealed = function(key: string): boolean
-		return props.Reveal == nil or props.Reveal(key)
+		return not calm() and (props.Reveal == nil or props.Reveal(key))
 	end
 	const toastWidth = function(): number
 		return math.clamp(area().X / scale() - TOAST_SIDE * 2, TOAST_MIN_WIDTH, TOAST_WIDTH)
@@ -200,6 +207,9 @@ return function(props: Props): Frame
 						Open = props.ShopOpen,
 						Glow = props.ShopGlow,
 						OnActivated = props.OnShop,
+						Visible = function()
+							return not calm()
+						end,
 					})
 					else nil,
 				if props.OnShop
@@ -211,6 +221,9 @@ return function(props: Props): Frame
 						Key = Enum.KeyCode.B,
 						Pad = SHOP_PAD,
 						PadText = "Right",
+						Visible = function()
+							return not calm()
+						end,
 					})
 					else nil,
 			}),
@@ -275,7 +288,7 @@ return function(props: Props): Frame
 				return UDim2.new(1, -MARGIN, 0, TOP + (if device() == "Touch" then TOUCH_BUTTON * 2 + 12 else NUDGE_TOP))
 			end,
 			Text = function()
-				return if props.Nudge then props.Nudge() else ""
+				return if props.Nudge and not calm() then props.Nudge() else ""
 			end,
 			Icon = function()
 				return if props.NudgeIcon then props.NudgeIcon() else ""
@@ -307,7 +320,7 @@ return function(props: Props): Frame
 			AnchorPoint = Vector2.new(0.5, 1),
 			Position = UDim2.new(0.5, 0, 1, -TOAST_BOTTOM),
 			Visible = function()
-				return revealed("toasts")
+				return props.Reveal == nil or props.Reveal("toasts") -- toasts stay on the faint screen (crew news)
 			end,
 		}),
 

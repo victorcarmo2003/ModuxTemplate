@@ -29,6 +29,7 @@ type Controls = {
 	ShowClock: () -> boolean,
 	ShowShift: () -> boolean,
 	ShowToasts: () -> boolean,
+	Fainted: () -> boolean,
 }
 
 const NOTICES: { { Text: string, Kind: "Info" | "Good" | "Alert" } } = {
@@ -53,6 +54,7 @@ return UILabs.CreateVideStory({
 		ShowClock = true,
 		ShowShift = true,
 		ShowToasts = true,
+		Fainted = false, -- clean faint screen (TASK-485): clock, day, money and the cart go away
 	},
 }, function(props)
 	-- UI Labs types the control sources loosely; pin them to what the story reads.
@@ -77,6 +79,7 @@ return UILabs.CreateVideStory({
 	end)
 
 	const hud = HudScreen({
+		Calm = controls.Fainted,
 		Clock = controls.Clock,
 		Shift = function()
 			return if controls.Night() then "Night" else `Day {controls.Day()}`
