@@ -205,19 +205,21 @@ export type SfxOptions = {
 	Volume: number?,
 	Spatial: boolean?,
 	MaxDistance: number?,
+	Id: string?, -- Creator Store audio not in UPLOADED (licence line in Ref)
+	Ref: string?,
 }
 
 local function sfx(key: string, looped: boolean?, opts: SfxOptions?): Sound
 	const spatial = if opts and opts.Spatial ~= nil then opts.Spatial else true
 	return {
 		Key = key,
-		Id = UPLOADED[key] or "",
+		Id = UPLOADED[key] or (if opts and opts.Id then opts.Id else ""),
 		Group = "Sfx",
 		Volume = if opts and opts.Volume then opts.Volume else 0.6,
 		Looped = looped == true,
 		Spatial = spatial,
 		MaxDistance = if not spatial then 0 elseif opts and opts.MaxDistance then opts.MaxDistance else 60,
-		Ref = "",
+		Ref = if opts and opts.Ref then opts.Ref else "",
 		Crossfade = 0,
 	}
 end
@@ -347,6 +349,20 @@ const base = Table.new({
 	sfx("swarm_flutter", false, { Volume = 0.8, MaxDistance = 90 }), -- ANM-003: moths and bats (shadow_whoosh fallback)
 	-- ANM-020 blackout (TASK-444): the owner's "lights off" snap when the power goes out (post_tunk while unresolved)
 	studio(sfx("lights_off", false, { Spatial = false, Volume = 0.8 }), "lights off"),
+	-- blackout scene bank (TASK-466; design/horror-cinematic.md §4.6; sound-list.md §5.19). Creator Store audio of the
+	-- Pro Sound Effects library (free inside Roblox experiences, credits.md); every pick Provisional until the owner's Play.
+	-- Id "" = no safe candidate yet (silence; the scene keeps the old key).
+	sfx("power_cut", false, { Spatial = false, Volume = 0.8, Id = "rbxassetid://9113808115", Ref = "SFX-233 Circuit Breaker 1 (SFX), ProSoundEffects" }),
+	sfx("hum_rise", false, { Spatial = false, Volume = 0.4, Id = "rbxassetid://9116266188", Ref = "SFX-234 Light Bulb Buzz 4 (SFX), ProSoundEffects" }),
+	sfx("hum_die", false, { Spatial = false, Volume = 0.4, Id = "rbxassetid://9117871125", Ref = "SFX-235 Power Down 1 (SFX), ProSoundEffects" }),
+	sfx("heavy_steps", false, { Volume = 0.7, MaxDistance = 80, Ref = "SFX-236 no safe candidate (walker_step stands in)" }),
+	sfx("steps_stop", false, { Volume = 0.6, MaxDistance = 60, Id = "rbxassetid://9114523345", Ref = "SFX-237 Foot Stomp 3 (SFX), ProSoundEffects" }),
+	sfx("handle_rattle", false, { Volume = 0.6, MaxDistance = 40, Id = "rbxassetid://9114138011", Ref = "SFX-238 Door Knob Jiggle 1 (SFX), ProSoundEffects" }),
+	sfx("door_force", false, { Volume = 0.6, MaxDistance = 40, Id = "rbxassetid://9114152574", Ref = "SFX-239 Door Shake 1 (SFX), ProSoundEffects" }),
+	sfx("latch_hold", false, { Volume = 0.6, MaxDistance = 40, Id = "rbxassetid://9114881875", Ref = "SFX-240 Iron Door Latch 3 (SFX), ProSoundEffects" }),
+	sfx("breath_held", false, { Spatial = false, Volume = 0.25, Id = "rbxassetid://9125572450", Ref = "SFX-241 Gasps Male Deep Breaths Fast Pants Frightened (SFX), ProSoundEffects" }),
+	sfx("power_up", false, { Spatial = false, Volume = 0.7, Id = "rbxassetid://9117885256", Ref = "SFX-242 Power Up Sweeteners 10 (SFX), ProSoundEffects" }),
+	sfx("lamps_cascade", false, { Spatial = false, Volume = 0.5, Id = "rbxassetid://9116266327", Ref = "SFX-243 Light Bulb Buzz 6 (SFX), ProSoundEffects" }),
 	-- restaurant (tech/restaurant-flow.md rev. 2 §4.2; wave R0 rows, Id "" = silence until the audio list uploads them)
 	sfx("plate_put", false, { Volume = 0.5, MaxDistance = 40 }),
 	sfx("ticket_pop", false, { Spatial = false, Volume = 0.4 }), -- HUD note pop-up per item at the tablet
