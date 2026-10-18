@@ -42,7 +42,7 @@ export type Public = {
 	Refresh: (self: Public) -> (),
 	Write: (self: Public, key: string, record: Record) -> (),
 	SetSwitch: (self: Public, on: boolean, player: Player?, force: boolean?) -> boolean,
-	BeginHush: (self: Public, startedAt: number, holdUntil: number) -> (),
+	BeginHush: (self: Public, startedAt: number, holdUntil: number, postsOnly: boolean?) -> (),
 	EndHush: (self: Public) -> (),
 	BeginBlackout: (self: Public) -> (),
 	EndBlackout: (self: Public) -> (),

@@ -34,6 +34,7 @@ local StarterPlayer = game:GetService("StarterPlayer")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 local Vide = require(ReplicatedStorage.Packages.Vide)
+local Content = require(ReplicatedStorage.shared.Content)
 local Arrow3D = require(StarterPlayer.StarterPlayerScripts.client.Interface.Arrow3D)
 local Motion = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Motion)
 local Effect = require(script.Parent.Parent.Effect)
@@ -48,6 +49,13 @@ const RUN_LINE_TIME = 6
 const RUN_TEXT = "RUN TO THE MART!"
 const STAY_TEXT = "Stay inside the Mart"
 const SAFE_POINT = "SS"
+-- TASK-490 (restaurant: no Mart): the answer is the shop light OFF, kept off; the arrow stands over the light switch
+const SHOP = Content.Restaurant.Rules.Enabled
+const SHOP_LINE = "The lamps outside are dying! Kill the lights in here, NOW!"
+const SHOP_RUN_TEXT = "TURN OFF THE LIGHTS!"
+const SHOP_STAY_TEXT = "Keep the lights off"
+const SWITCH_GROUP = "trailer_interior" -- the party switch's group (Content.LightGroups)
+const SWITCH_LIFT = 2.5
 const SAFE_RADIUS = 10 -- Rules/ANM-010 Params.Radius (the server also counts the Mart interior LZ-4)
 const ARROW_LIFT = 7 -- studs above SS where the arrow tip rests
 const PULSE = 0.45 -- s per banner pulse
@@ -308,6 +316,9 @@ local function banner(): (ScreenGui, TextLabel, UIScale)
 end
 
 local function nearSafe(ctx: Effect.Context): boolean
+	if SHOP then
+		return not ctx.Light:GroupOn(SWITCH_GROUP)
+	end
 	const character = Players.LocalPlayer.Character
 	const root = if character then character:FindFirstChild("HumanoidRootPart") else nil
 	const point = ctx.Point(SAFE_POINT)
@@ -323,7 +334,7 @@ local function runWarning(ctx: Effect.Context, occ: Effect.Occurrence): () -> ()
 	if occ.Elapsed() <= RUN_FRESH then
 		task.spawn(function()
 			Watch.Interrupt()
-			Radio.Say(ctx, RUN_LINE, RUN_LINE_TIME)
+			Radio.Say(ctx, if SHOP then SHOP_LINE else RUN_LINE, RUN_LINE_TIME)
 		end)
 	end
 	const gui, label, scale = banner()
@@ -334,17 +345,30 @@ local function runWarning(ctx: Effect.Context, occ: Effect.Occurrence): () -> ()
 	const started = os.clock()
 	const connection = RunService.RenderStepped:Connect(function()
 		const safe = nearSafe(ctx)
-		label.Text = if safe then STAY_TEXT else RUN_TEXT
+		label.Text = if SHOP then (if safe then SHOP_STAY_TEXT else SHOP_RUN_TEXT) elseif safe then STAY_TEXT else RUN_TEXT
 		label.TextColor3 = if safe then BANNER_CREAM else BANNER_MUSTARD
 		if not reduced and not safe then
 			scale.Scale = 1 + 0.06 * math.abs(math.sin((os.clock() - started) * math.pi / PULSE))
 		else
 			scale.Scale = 1
 		end
-		const point = ctx.Point(SAFE_POINT)
-		if point ~= nil and not safe then
+		local aim: Vector3? = nil
+		if SHOP then
+			const anchor = ctx.Light:SwitchAnchor()
+			if anchor ~= nil and anchor:IsA("Attachment") then
+				aim = anchor.WorldPosition + Vector3.new(0, SWITCH_LIFT, 0)
+			elseif anchor ~= nil and anchor:IsA("BasePart") then
+				aim = anchor.Position + Vector3.new(0, SWITCH_LIFT, 0)
+			elseif anchor ~= nil and anchor:IsA("Model") then
+				aim = anchor:GetPivot().Position + Vector3.new(0, SWITCH_LIFT, 0)
+			end
+		else
+			const point = ctx.Point(SAFE_POINT)
+			aim = if point ~= nil then point.Position + Vector3.new(0, ARROW_LIFT, 0) else nil
+		end
+		if aim ~= nil and not safe then
 			arrow.Show(ctx.Folder())
-			arrow.Step(point.Position + Vector3.new(0, ARROW_LIFT, 0), 2.5, true)
+			arrow.Step(aim, 2.5, true)
 		elseif arrow.Mounted() then
 			arrow.Hide()
 		end

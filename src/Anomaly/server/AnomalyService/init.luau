@@ -937,8 +937,8 @@ function AnomalyService:BuildContext(): Api.Context
 			return if type(id) == "number" then id else nil
 		end,
 		Light = {
-			BeginHush = function(startedAt: number, holdUntil: number)
-				light:BeginHush(startedAt, holdUntil)
+			BeginHush = function(startedAt: number, holdUntil: number, postsOnly: boolean?)
+				light:BeginHush(startedAt, holdUntil, postsOnly)
 			end,
 			EndHush = function()
 				light:EndHush()

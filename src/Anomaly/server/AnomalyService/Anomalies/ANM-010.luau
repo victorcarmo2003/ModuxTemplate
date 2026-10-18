@@ -20,6 +20,9 @@
 --   Seen     1 s in the gaze cone (ViewRange 200) of the last post that went out.
 --   Stop     EndHush (only by the occurrence that began it) and the traffic Hold released.
 --
+-- TASK-490 (restaurant, design/anomalies-v3-restaurant.md, Provisional): no Mart. The posts go out one by one as before
+-- but the shop keeps its light and its switch (LightService:BeginHush postsOnly); safe = the shop light switched OFF at
+-- the corner post and kept off until the posts come back (on again for OutGrace s = every watched player fails).
 -- TASK-334 (owner 2026-10-15, Provisional): the owner died "with a lot of doors opening and closing": those were the
 -- Mart's automatic doors (DoorController AutoDoor, proximity) swinging while he stood in the doorway, half in and half
 -- out of the safe zone, so a 5 Hz tick caught him "outside" during the hold. Now: (a) a watched player fails only after
@@ -70,6 +73,7 @@ type State = {
 	SafeZones: { Zones.Zone },
 	ZoneMargin: number, -- studs of slack around each safe box zone
 	Range: number,
+	Shop: boolean, -- restaurant (TASK-490): safe = the shop light switched OFF (no Mart in the map)
 	Watched: { [number]: Player },
 	OutSince: { [number]: number }, -- watched player outside the safe zone since (server time)
 	OutGrace: number,
@@ -236,6 +240,10 @@ local function rootOf(player: Player): BasePart?
 end
 
 local function safe(ctx: Api.Context, state: State, player: Player): boolean
+	if state.Shop then
+		-- design/anomalies-v3-restaurant.md ANM-010: the answer is the shop dark (LIGHT off) and kept off
+		return not ctx.Light.IsSwitchOn()
+	end
 	if ctx.InZone(player, state.Point, state.Radius) then
 		return true
 	end
@@ -331,6 +339,7 @@ const Hush: Api.Module = {
 			SafeZones = safeZones(zoneIds(rule)),
 			ZoneMargin = if rule ~= nil and type(rule.Params.ZoneMargin) == "number" then rule.Params.ZoneMargin else 0,
 			Range = if row ~= nil then row.ViewRange else 0,
+			Shop = Content.Restaurant.Rules.Enabled,
 			Watched = {},
 			OutSince = {},
 			OutGrace = param(rule, "OutGrace", DEFAULT_OUT_GRACE),
@@ -345,7 +354,7 @@ const Hush: Api.Module = {
 		if delay == nil then
 			ctx.Log(occ, "no juniper_posts StreetLight bound: corner post at PostsOff s, no Step")
 		end
-		ctx.Light.BeginHush(occ.StartedAt, holdUntil)
+		ctx.Light.BeginHush(occ.StartedAt, holdUntil, state.Shop)
 		hushOwner = occ
 		setHold(ctx, state, true)
 		ctx.Publish(occ, { Phase = "Active", Step = 0, Anchor = 0 })

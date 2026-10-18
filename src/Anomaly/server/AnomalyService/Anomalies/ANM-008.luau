@@ -30,6 +30,7 @@ const REF = "ANM-008"
 const TRAILER_POINT = "TRL"
 const ACROSS_POINT = "WALKER-10"
 const LANE_POINT = "E-IN" -- on the road: the car's height (TASK-348; the client effect does the same)
+const DRIVE_POINT = "DT-STOP" -- restaurant: the drive-thru window stop (TASK-490)
 const HOLD_REASON = "anm_008"
 const SCARE_CUE = "jumpscare"
 const ENTITY_MOD = 65536 -- AnomalyCue.Entity is 0..65535
@@ -160,8 +161,14 @@ const LongCar: Api.Module = {
 			return false
 		end
 		const lane = MapIndex.FindPoint(LANE_POINT)
-		const front =
-			TrailerFront.Of(trailer, MapIndex.FindPoint(ACROSS_POINT), if lane ~= nil then lane.Position.Y else nil)
+		-- TASK-490: in the restaurant it brakes at the drive-thru window (DT-STOP)
+		const front = TrailerFront.Pick(
+			Content.Restaurant.Rules.Enabled,
+			trailer,
+			MapIndex.FindPoint(ACROSS_POINT),
+			lane,
+			MapIndex.FindPoint(DRIVE_POINT)
+		)
 		const rule = ctx.Rule(REF)
 		const row = Content.Anomalies.ByKey[occ.Key]
 		const parkedAt = occ.StartedAt + param(rule, "ArriveAt", DEFAULT_ARRIVE_AT)

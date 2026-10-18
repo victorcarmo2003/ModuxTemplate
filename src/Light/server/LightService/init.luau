@@ -270,7 +270,8 @@ function LightService:SetSwitch(on: boolean, player: Player?, force: boolean?): 
 	if type(on) ~= "boolean" then
 		error("[LightService] SetSwitch needs a boolean", 2)
 	end
-	if (self.Hush ~= nil or self.Blackout ~= nil) and force ~= true then
+	const hush = self.Hush
+	if ((hush ~= nil and not hush.PostsOnly) or self.Blackout ~= nil) and force ~= true then
 		return false
 	end
 	if self.Switch == on then
@@ -282,8 +283,9 @@ function LightService:SetSwitch(on: boolean, player: Player?, force: boolean?): 
 	return true
 end
 
--- AnomalyService (ANM-010). holdUntil <= startedAt: the Hush lasts until EndHush().
-function LightService:BeginHush(startedAt: number, holdUntil: number)
+-- AnomalyService (ANM-010). holdUntil <= startedAt: the Hush lasts until EndHush(). postsOnly (restaurant, TASK-490):
+-- the shop keeps its light and the switch keeps working.
+function LightService:BeginHush(startedAt: number, holdUntil: number, postsOnly: boolean?)
 	if not finite(startedAt) or not finite(holdUntil) then
 		error("[LightService] BeginHush needs finite server times", 2)
 	end
@@ -291,6 +293,7 @@ function LightService:BeginHush(startedAt: number, holdUntil: number)
 		StartedAt = startedAt,
 		DarkAt = startedAt + Rules.cornerDelay(self.MaxOrder),
 		HoldUntil = if holdUntil > startedAt then holdUntil else 0,
+		PostsOnly = postsOnly == true,
 	}
 	-- a second BeginHush while the posts are already out restarts them from the new start
 	for _, group in Content.LightGroups.List do

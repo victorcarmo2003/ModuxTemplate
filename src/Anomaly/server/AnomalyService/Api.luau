@@ -93,7 +93,7 @@ export type Context = {
 	-- CustomerService:SpawnActor (TASK-108). nil = refused or not available yet
 	Spawn: (spec: ActorSpec) -> number?,
 	Light: {
-		BeginHush: (startedAt: number, holdUntil: number) -> (),
+		BeginHush: (startedAt: number, holdUntil: number, postsOnly: boolean?) -> (),
 		EndHush: () -> (),
 		IsLit: (position: Vector3) -> boolean,
 		IsSwitchOn: () -> boolean,

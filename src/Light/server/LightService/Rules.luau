@@ -17,6 +17,8 @@ export type Hush = {
 	StartedAt: number, -- server time the first post goes out
 	DarkAt: number, -- server time the last post is out: trailer zones go dark
 	HoldUntil: number, -- server time the Hush ends by itself; 0 = only EndHush
+	-- restaurant (TASK-490): only the posts go out; the shop keeps its light and its switch (the answer is turning it off)
+	PostsOnly: boolean?,
 }
 
 export type Input = {
@@ -41,6 +43,9 @@ function Rules.hushed(group: Content.LightGroup, input: Input): boolean
 	end
 	if group.Kind == "Posts" then
 		return true
+	end
+	if hush.PostsOnly then
+		return false
 	end
 	return input.Now >= hush.DarkAt
 end

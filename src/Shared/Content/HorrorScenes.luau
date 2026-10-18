@@ -381,6 +381,115 @@ const copies: Scene = {
 	},
 }
 
+-- ANM-006 The stalker, "don't look" (TASK-490; DEC-260; design/horror-cinematic.md §6.5). Fitted to Anomalies/ANM-006:
+-- Signal = it stands outside and only comes closer while someone stares (up to AutoOff 28 s), Active = it reached the
+-- window (LeapDelay 1 s: the last chance to close it), then Failed (it leapt in: jumpscare + faint of the nearest) or
+-- Resolved (window closed: it bangs and goes; or nobody looked: it fades). The words are the two hints: don't look, and
+-- close the window when it is there.
+const stalker: Scene = {
+	Key = "anm_006_stalker",
+	Name = "The stalker",
+	Live = true,
+	Steps = {
+		{ At = 0, Phase = "Signal", Kind = "Sound", Target = "horror_sting", Value = 0.4 },
+		{ At = 0.3, Phase = "Signal", Kind = "Cinema", Value = 0.09, Duration = 1.5 },
+		{ At = 1, Phase = "Signal", Kind = "Whispers", Target = "stalker", Value = 0.3, To = 1.6, Duration = 12 },
+		{ At = 1, Phase = "Signal", Kind = "Heartbeat", Value = 60, To = 100, Duration = 20 },
+		{ At = 1, Phase = "Signal", Kind = "Vignette", Value = 0, To = 0.25, Duration = 20 },
+		{ At = 13, Phase = "Signal", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		-- at the window: one second to shut it
+		{ At = 0, Phase = "Active", Kind = "Shake", Target = "Jolt" },
+		{ At = 0, Phase = "Active", Kind = "Fov", Value = -3, To = 0, Duration = 0.6 },
+		{ At = 0, Phase = "Active", Kind = "Heartbeat", Value = 160, To = 160, Duration = 1 },
+		{ At = 0, Phase = "Active", Kind = "Whispers", Target = "stalker_window", Value = 3, To = 3, Duration = 1 },
+		{ At = 0, Phase = "Active", Kind = "Vignette", Value = 0.25, To = 0.45, Duration = 0.6 },
+		-- gone (Resolved)
+		{ At = 0, Phase = "Resolved", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 0, Phase = "Resolved", Kind = "Heartbeat", Value = 0, To = 0 },
+		{ At = 0.3, Phase = "Resolved", Kind = "Sound", Target = "breath_held" },
+		{ At = 0.5, Phase = "Resolved", Kind = "Vignette", Value = 0.3, To = 0, Duration = 1.5 },
+		{ At = 1, Phase = "Resolved", Kind = "Cinema", Value = 0, Duration = 1 },
+		-- it leapt in (Failed)
+		{ At = 0, Phase = "Failed", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Heartbeat", Value = 0, To = 0 },
+		{ At = 0, Phase = "Failed", Who = "Safe", Kind = "Heartbeat", Value = 150, To = 80, Duration = 3 },
+		{ At = 3, Phase = "Failed", Who = "Safe", Kind = "Heartbeat", Value = 0, To = 0 },
+		{ At = 0.8, Phase = "Failed", Kind = "Vignette", Value = 0.45, To = 0, Duration = 2.5 },
+		{ At = 3, Phase = "Failed", Kind = "Cinema", Value = 0, Duration = 1 },
+	},
+}
+
+-- ANM-008 The long car (TASK-490; DEC-279 "to the drive-thru"; design/horror-cinematic.md §6.6). Fitted to Rules/ANM-008:
+-- Signal = it rolls down the lane (5.6 s), floors it (1.8 s), brakes at the window (8.2 s) and waits 2.5 s; Active = the
+-- high beam (whoever is not behind a closed window pays); StayFor 6 s with the beam on; then Failed / Resolved as it
+-- backs out. The car, beam, horn and engine are Effects/ANM-008; the scene adds the words (close the window), the heart
+-- racing with the engine, the jolt of the brake and the silence before the beam.
+const longCar: Scene = {
+	Key = "anm_008_long_car",
+	Name = "The long car",
+	Live = true,
+	Steps = {
+		{ At = 0.5, Phase = "Signal", Kind = "Cinema", Value = 0.1, Duration = 1.5 },
+		{ At = 0.5, Phase = "Signal", Kind = "Whispers", Target = "car", Value = 0.3, To = 2.6, Duration = 8 },
+		{ At = 0.5, Phase = "Signal", Kind = "Heartbeat", Value = 70, To = 150, Duration = 8 },
+		{ At = 0.5, Phase = "Signal", Kind = "Vignette", Value = 0, To = 0.35, Duration = 8 },
+		{ At = 5.6, Phase = "Signal", Kind = "Fov", Value = 2, To = 0, Duration = 1.8 },
+		-- it brakes in front of the window: jolt, then nothing but the engine
+		{ At = 8.2, Phase = "Signal", Kind = "Shake", Target = "Jolt" },
+		{ At = 8.4, Phase = "Signal", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 8.6, Phase = "Signal", Kind = "Sound", Target = "breath_held" },
+		{ At = 8.6, Phase = "Signal", Kind = "Heartbeat", Value = 155, To = 165, Duration = 2 },
+		-- the high beam
+		{ At = 0, Phase = "Active", Kind = "Shake", Target = "Jolt" },
+		{ At = 0, Phase = "Active", Kind = "Fov", Value = -4, To = 0, Duration = 0.7 },
+		{ At = 0, Phase = "Active", Kind = "Vignette", Value = 0.35, To = 0.5, Duration = 0.4 },
+		{ At = 0.4, Phase = "Active", Kind = "Heartbeat", Value = 150, To = 100, Duration = 5.5 },
+		{ At = 0.6, Phase = "Active", Kind = "Whispers", Target = "car_hold", Value = 0.5, To = 0.5, Duration = 5 },
+		{ At = 0, Phase = "Resolved", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 0, Phase = "Resolved", Kind = "Heartbeat", Value = 0, To = 0 },
+		{ At = 0.5, Phase = "Resolved", Kind = "Vignette", Value = 0.5, To = 0, Duration = 2 },
+		{ At = 1.5, Phase = "Resolved", Kind = "Cinema", Value = 0, Duration = 1 },
+		{ At = 0, Phase = "Failed", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 0, Phase = "Failed", Kind = "Heartbeat", Value = 0, To = 0 },
+		{ At = 0.5, Phase = "Failed", Kind = "Vignette", Value = 0.5, To = 0, Duration = 2.5 },
+		{ At = 2.5, Phase = "Failed", Kind = "Cinema", Value = 0, Duration = 1 },
+	},
+}
+
+-- ANM-010 The Hush (TASK-490; design/horror-cinematic.md §6.7). Fitted to Rules/ANM-010: Active from the start (the lamps
+-- outside go out one by one, the corner one at PostsOff 15 s), the hold until the posts come back (HoldFor 20 s), then
+-- Resolved / Failed. Restaurant: the answer is the shop light off and kept off; trailer: run to the Mart. The words say
+-- which (Words.hush_shop / Words.hush). After the corner post: silence, a slow heart.
+const hush: Scene = {
+	Key = "anm_010_hush",
+	Name = "The Hush",
+	Live = true,
+	Steps = {
+		{ At = 0, Phase = "Active", Kind = "Sound", Target = "horror_sting", Value = 0.4 },
+		{ At = 0.5, Phase = "Active", Kind = "Cinema", Value = 0.09, Duration = 1.5 },
+		{ At = 1, Phase = "Active", Kind = "Whispers", Target = if Restaurant.Rules.Enabled then "hush_shop" else "hush", Value = 0.4, To = 2.2, Duration = 13 },
+		{ At = 1, Phase = "Active", Kind = "Heartbeat", Value = 60, To = 130, Duration = 14 },
+		{ At = 1, Phase = "Active", Kind = "Vignette", Value = 0, To = 0.3, Duration = 14 },
+		-- the corner post: the street is gone; hold still in the dark
+		{ At = 15, Phase = "Active", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 15, Phase = "Active", Kind = "Shake", Target = "Step" },
+		{ At = 15.3, Phase = "Active", Kind = "Sound", Target = "breath_held" },
+		{ At = 15.3, Phase = "Active", Kind = "Heartbeat", Value = 120, To = 80, Duration = 18 },
+		{ At = 25, Phase = "Active", Kind = "Whispers", Target = if Restaurant.Rules.Enabled then "hush_shop_hold" else "hush_hold", Value = 0.2, To = 0.2, Duration = 6 },
+		{ At = 36, Phase = "Active", Kind = "Cinema", Value = 0, Duration = 1.5 },
+		{ At = 36, Phase = "Active", Kind = "Heartbeat", Value = 0, To = 0 },
+		{ At = 0, Phase = "Resolved", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 0, Phase = "Resolved", Kind = "Heartbeat", Value = 0, To = 0 },
+		{ At = 0.3, Phase = "Resolved", Kind = "Sound", Target = "lamps_cascade" },
+		{ At = 0.5, Phase = "Resolved", Kind = "Vignette", Value = 0.3, To = 0, Duration = 2 },
+		{ At = 1, Phase = "Resolved", Kind = "Cinema", Value = 0, Duration = 1 },
+		{ At = 0, Phase = "Failed", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 0, Phase = "Failed", Kind = "Heartbeat", Value = 0, To = 0 },
+		{ At = 0.5, Phase = "Failed", Kind = "Vignette", Value = 0.4, To = 0, Duration = 2.5 },
+		{ At = 2.5, Phase = "Failed", Kind = "Cinema", Value = 0, Duration = 1 },
+	},
+}
+
 -- Whisper word lists (DEC-293, owner 2026-10-18): the words on screen are real hints for the player, said in the
 -- character's voice. blackout / roof / crawler / neck / copy = the scenes' Whispers steps (TASK-484, TASK-483); low_sanity = VitalController while sanity is in the low band;
 -- suspense = after a suspense event's glance (SuspenseController, TASK-481).
@@ -457,6 +566,57 @@ const words: { [string]: { string } } = {
 		"SEND IT AWAY",
 		"it's backwards...",
 	},
+	-- TASK-490: the stalker, the long car, the Hush
+	stalker = {
+		"DON'T LOOK AT IT",
+		"DON'T LOOK AT IT",
+		"IT MOVES WHEN YOU LOOK",
+		"IT MOVES WHEN YOU LOOK",
+		"LOOK AWAY",
+		"don't look outside",
+		"it's closer...",
+	},
+	stalker_window = {
+		"CLOSE THE WINDOW!",
+		"CLOSE THE WINDOW!",
+		"SHUT IT!",
+	},
+	car = {
+		"CLOSE THE WINDOW",
+		"CLOSE THE WINDOW",
+		"SHUT THE DRIVE-THRU",
+		"DON'T LET IT SEE YOU",
+		"it's coming fast",
+		"that car is too long...",
+	},
+	car_hold = {
+		"KEEP IT SHUT",
+		"don't open it",
+		"wait for it to leave",
+	},
+	hush = {
+		"RUN TO THE MART",
+		"RUN TO THE MART",
+		"THE LIGHTS ARE DYING",
+		"GET INSIDE",
+		"hurry...",
+	},
+	hush_hold = {
+		"stay inside",
+		"don't go out",
+	},
+	hush_shop = {
+		"TURN OFF THE LIGHTS",
+		"TURN OFF THE LIGHTS",
+		"KILL THE LIGHTS",
+		"THE LAMPS ARE DYING",
+		"it can see the light...",
+		"the switch!",
+	},
+	hush_shop_hold = {
+		"keep them off",
+		"don't touch the switch",
+	},
 	low_sanity = {
 		"LOW SANITY",
 		"DRINK COFFEE",
@@ -509,7 +669,7 @@ const stare: Stare = {
 	},
 }
 
-return Table.with(Table.new({ blackout, roofWalker, crawler, turnedNeck, copies } :: { Scene }), {
+return Table.with(Table.new({ blackout, roofWalker, crawler, turnedNeck, copies, stalker, longCar, hush } :: { Scene }), {
 	Rules = Table.record(rules),
 	Stare = Table.record(stare),
 	Words = Table.record(words),

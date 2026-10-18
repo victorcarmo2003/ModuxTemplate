@@ -28,6 +28,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Vide = require(ReplicatedStorage.Packages.Vide)
+local Content = require(ReplicatedStorage.shared.Content)
 local TrailerFront = require(ReplicatedStorage.shared.Anomaly.TrailerFront)
 local Effect = require(script.Parent.Parent.Effect)
 local Jumpscare = require(script.Parent.Kit.Jumpscare)
@@ -160,7 +161,14 @@ local function route(ctx: Effect.Context): Route
 	const eIn = ctx.Point("E-IN") or FALLBACK_E_IN
 	const wb: Lane = { Origin = eIn.Position, Dir = flatUnit(eIn.LookVector, Vector3.xAxis) }
 	-- the car drives at the lane's height (E-IN sits on the road), never at the TRL pivot (below the street, TASK-348)
-	const front = TrailerFront.Of(ctx.Point("TRL") or FALLBACK_TRL, ctx.Point("WALKER-10"), eIn.Position.Y)
+	-- TASK-490: in the restaurant it brakes at the drive-thru window (DT-STOP), the same pose as the server
+	const front = TrailerFront.Pick(
+		Content.Restaurant.Rules.Enabled,
+		ctx.Point("TRL") or FALLBACK_TRL,
+		ctx.Point("WALKER-10"),
+		eIn,
+		ctx.Point("DT-STOP")
+	)
 	return { Wb = wb, EdgeIn = wb.Origin - wb.Dir * EDGE_RUN, Front = front }
 end
 
