@@ -7,6 +7,9 @@
 --                        Tool he holds (the hot dog). The arm is the real one, frozen at his seat; what he drags live is
 --                        World/Ghost.luau (DEC-259, PrepGhost), which draws its own item and tag apart from the character.
 --                        That arm gets a Highlight in his colour and a BillboardGui with his username (Adornee = the arm).
+-- Conveyor (Content.Prep.Rules.Mode = "Conveyor", TASK-519): a colleague at a BELT seat keeps no arm and no tag here; his
+--                        plate on the belt (World/BeltMates.luau: ticket #n, name, colour) is what shows him, so each
+--                        player has one tag. The griller (Conveyor.Seats.Grill) keeps the arm and the tag as above.
 -- Colour: the working player's CrewColor (Presence.Palette entry, never red; name tag and outline use it too). `Mates.ColorOf(station)` is exported for UI chips.
 -- The own rig is NOT handled here (Rig.luau hides it whole). Everything is restored on Release / Destroy.
 local Players = game:GetService("Players")
@@ -56,6 +59,13 @@ const ARM_NAMES: { [string]: boolean } = {
 	RightUpperArm = true,
 }
 const SWITCHABLE = { "BillboardGui", "ParticleEmitter", "Trail", "Beam", "SurfaceGui", "Highlight" }
+-- the belt seats of the conveyor (their plate is drawn by World/BeltMates, TASK-519); empty in the trailer
+const BELT_SEATS: { [number]: boolean } = {}
+if Content.Prep.Rules.Mode == "Conveyor" then
+	for _, seat in Content.Prep.Conveyor.Seats.Belt do
+		BELT_SEATS[seat] = true
+	end
+end
 
 const Mates = {}
 
@@ -327,7 +337,8 @@ function Mates.new(): Mates
 				entry.At = now
 				classify(entry)
 				const working = model:GetAttribute("Working")
-				entry.Seat = if type(working) == "number" then working else nil
+				-- a belt seat of the conveyor counts as "not armed": whole body hidden, no arm UI (the plate shows him)
+				entry.Seat = if type(working) == "number" and not BELT_SEATS[working] then working else nil
 				syncUi(entry)
 			end
 			const humanoid = model:FindFirstChildOfClass("Humanoid")

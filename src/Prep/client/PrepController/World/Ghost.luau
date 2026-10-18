@@ -14,12 +14,15 @@
 -- lives outside the mode too, so someone walking in the world sees the drag. Its folder sits under the camera, apart from
 -- the PrepWorld folder (World.Leave only calls Ghost.Clear). The colleague's character is World/Mates' (it hides the body in
 -- the mode); nothing here touches a character.
+-- Conveyor (TASK-519): Mount also mounts World/BeltMates, the plates of the belt seen in the world (PrepSeats Stop / Wait),
+-- for the same reason: they live outside the mode too.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Content = require(ReplicatedStorage.shared.Content)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
+local BeltMates = require(script.Parent.BeltMates)
 local Mates = require(script.Parent.Parent.Mates)
 local ToolView = require(script.Parent.ToolView)
 
@@ -83,7 +86,8 @@ const TOOL_VIEW: { [string]: ToolView.Kind } = { Bottle = "Bottle", Slice = "Sli
 
 -- Reading the seats -------------------------------------------------------------------------------------------------------
 
--- The seat of the local player (PrepSeats record with User = own UserId), nil = not seated.
+-- The seat of the local player (PrepSeats record with User = own UserId), nil = not seated. A conveyor record with Away
+-- = true is the own PARKED plate, not a seat the player sits at (solo: parked on the belt, working the grill, TASK-519).
 local function mySeat(): number?
 	if net == nil then
 		return nil
@@ -91,7 +95,7 @@ local function mySeat(): number?
 	const me = Players.LocalPlayer.UserId
 	for station = 1, prep.Stations do
 		const record = net.PrepSeats:get(station)
-		if record ~= nil and record.User == me then
+		if record ~= nil and record.User == me and record.Away ~= true then
 			return station
 		end
 	end
@@ -435,6 +439,8 @@ function Ghost.Mount(network: any, kitchenController: any)
 	net = network
 	kitchen = kitchenController
 	connection = RunService.Heartbeat:Connect(step)
+	-- the plates of the belt (TASK-519); inert outside Content.Prep.Rules.Mode = "Conveyor"
+	BeltMates.Mount(network)
 end
 
 -- The own hand: `source` = the view reporting (one entry each), `tool` = what it holds ("None" or a nil point = it let go),
