@@ -45,7 +45,8 @@ A pressão 0..1 conduz:
 - **coração**: batidas soltas (`Content.Sounds.heartbeat`, como o passo `Heartbeat` da cena) de 72 a 140 BPM;
 - **bordas "glaucoma"**: canal `stare` do `Kit/Screen` até 0,42 com tremulação ±0,08 (sem tremulação com `Motion.Reduced()`);
 - **whispers**: `Kit/Whispers.Stream` com a lista `Words.stare` ("STOP STARING", "DON'T LOOK"…) ou a da anomalia;
-- **cabeça seguindo**: a cabeça gira devagar para a câmera (28°/s no pico, até 150° além da pose), pelo `C1` do `Neck`
+- **cabeça seguindo**: a cabeça gira devagar para a câmera (28°/s no pico, até 150° além da pose) e inclina de lado até 28°
+  no pico (`HeadTilt`; o cliente na janela já está de frente, então só o giro não mexia nada, dono 2026-10-18), pelo `C1` do `Neck`
   (os modificadores da família A escrevem o `C0`, então o pescoço do ANM-012 continua valendo);
 - **rosto**: a casca `Face` do CrewRig fica mais alta e estreita (até 14 %) e balança ±9° (Q-368 A, sem EditableMesh).
 
@@ -54,7 +55,8 @@ Cabeça e rosto voltam à pose do servidor quando a pressão cai. Números em `C
 ## 4. Como testar (Play)
 
 1. Noite em andamento: `/dev anomaly ANM-012` (depois `ANM-004`, `ANM-013`). Ficar em primeira pessoa no balcão.
-2. Olhar direto para a cabeça do cliente: ~2 s depois coração, bordas e whispers; a cabeça começa a seguir; o rosto distorce.
+2. Olhar direto para a cabeça do cliente (mira no rosto: o cone é 18°): ~2 s depois coração, bordas e whispers; a cabeça
+   começa a seguir e a inclinar de lado; o rosto distorce.
 3. Ficar mais ~1 s: a sanidade cai 1–2 por segundo e para em −20 (mais os −5 da visão, uma vez por noite).
 4. Desviar o olhar: tudo some em ~1 s; voltar a olhar antes de 1 s retoma de onde estava.
 5. Com movimento reduzido ligado: sem tremulação das bordas; o resto igual.

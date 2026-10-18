@@ -124,6 +124,9 @@ export type Stare = {
 	Flicker: number, -- +- edge flicker at the peak ("glaucoma"), off with Motion.Reduced
 	HeadSpeed: number, -- degrees/s the head turns to follow the camera at the peak (slow = creepy)
 	HeadMax: number, -- degrees the head may turn past its own pose
+	-- degrees the head tilts sideways at the peak: a customer that already faces the camera (at the window) has nothing to
+	-- turn, so the tilt is what shows the stare moved it
+	HeadTilt: number,
 	FaceStretch: number, -- face shell scale share at the peak (taller and narrower)
 	FaceRoll: number, -- degrees of face tilt at the peak, swaying
 	WhisperFrom: number, -- whisper rate when the pressure starts (1 = Kit default)
@@ -1030,6 +1033,7 @@ const stare: Stare = {
 	Flicker = 0.08,
 	HeadSpeed = 28,
 	HeadMax = 150,
+	HeadTilt = 28, -- owner 2026-10-18: the customer at the window "did not move" while stared at
 	FaceStretch = 0.14,
 	FaceRoll = 9,
 	WhisperFrom = 0.15,

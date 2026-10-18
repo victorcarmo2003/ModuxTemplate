@@ -15,8 +15,10 @@
 	  edges     Kit/Screen vignette channel "stare" up to Vignette, with a slow flicker of +-Flicker ("glaucoma";
 	            no flicker with Motion.Reduced)
 	  whispers  Kit/Whispers.Stream of Words[key] (default "stare": STOP STARING, DON'T LOOK), WhisperFrom -> WhisperTo
-	  head      the actor's head turns towards the camera at HeadSpeed * pressure deg/s, at most HeadMax past its own pose
-	            (Neck Motor6D C1, so the family A modifiers that write C0 every frame, ANM-012's neck, still hold)
+	  head      the actor's head turns towards the camera at HeadSpeed * pressure deg/s, at most HeadMax past its own pose,
+	            and tilts sideways up to HeadTilt * pressure (a customer at the window already faces the camera: with the
+	            turn alone nothing moved, owner 2026-10-18) (Neck Motor6D C1, so the family A modifiers that write C0 every
+	            frame, ANM-012's neck, still hold)
 	  face      the face shell (CrewRig "Face", welded to the Head) taller and narrower by FaceStretch and swaying by
 	            FaceRoll degrees (Q-368 A: scale/rotation of the face parts, no EditableMesh)
 	The head and the face are local only and come back to the server's pose as the pressure falls; a rig that streamed
@@ -44,6 +46,7 @@ type Pose = {
 	Motor: Motor6D?,
 	BaseC1: CFrame,
 	Turn: number, -- rad past the rig's own pose
+	Tilt: number, -- rad of sideways head tilt shown now
 	Face: BasePart?,
 	FaceWeld: WeldConstraint?,
 	FaceSize: Vector3,
@@ -59,6 +62,7 @@ const TICK = 0.1 -- s between two target / line-of-sight reads
 const HALF_COS = math.cos(math.rad(RULES.Angle / 2))
 const HEAD_MAX = math.rad(LOOK.HeadMax)
 const HEAD_SPEED = math.rad(LOOK.HeadSpeed)
+const HEAD_TILT = math.rad(LOOK.HeadTilt)
 const FACE_ROLL = math.rad(LOOK.FaceRoll)
 const CATCH_UP = 2 -- 1/s: how fast the pressure catches up when the stare resumes before the release
 const SETTLE = 3 -- 1/s: how fast the head and face go back when the pressure is gone
@@ -238,6 +242,7 @@ local function poseOf(model: Model, head: BasePart): Pose
 		Motor = motor,
 		BaseC1 = if motor ~= nil then motor.C1 else CFrame.identity,
 		Turn = 0,
+		Tilt = 0,
 		Face = if weld ~= nil then face else nil,
 		FaceWeld = weld,
 		FaceSize = if face ~= nil then face.Size else Vector3.one,
@@ -273,9 +278,14 @@ local function applyHead(pose: Pose, dt: number, driven: boolean)
 	else
 		pose.Turn -= pose.Turn * math.min(1, dt * SETTLE)
 	end
-	-- the physical turn around the torso's up, in the joint frame, after the animation (C1 side)
+	const tilt = if driven then HEAD_TILT * pressure else 0
+	pose.Tilt += (tilt - pose.Tilt) * math.min(1, dt * SETTLE)
+	-- the physical turn around the torso's up, then the tilt around the head's own front, in the joint frame, after the
+	-- animation (C1 side)
 	const axis = motor.C0:VectorToObjectSpace(Vector3.yAxis)
-	motor.C1 = pose.BaseC1 * CFrame.fromAxisAngle(axis, pose.Turn):Inverse()
+	const front = motor.C0:VectorToObjectSpace(-Vector3.zAxis)
+	const turn = CFrame.fromAxisAngle(axis, pose.Turn) * CFrame.fromAxisAngle(front, pose.Tilt)
+	motor.C1 = pose.BaseC1 * turn:Inverse()
 end
 
 local function applyFace(pose: Pose, dt: number, driven: boolean, now: number)
@@ -324,7 +334,7 @@ local function stepPoses(dt: number, now: number)
 		const driven = current ~= nil and current.Model == model and pressure > 0
 		applyHead(pose, dt, driven and looking)
 		applyFace(pose, dt, driven, now)
-		if not driven and math.abs(pose.Turn) < EPSILON and pose.Distort < EPSILON then
+		if not driven and math.abs(pose.Turn) < EPSILON and math.abs(pose.Tilt) < EPSILON and pose.Distort < EPSILON then
 			restore(pose)
 		end
 	end
