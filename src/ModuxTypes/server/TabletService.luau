@@ -10,6 +10,7 @@ export type Tablet = {
 	EndsAt: number,
 	Order: { string }, -- topping keys of the 1st hot dog
 	Order2: { string }?, -- pair (FEAT-038)
+	PromptOn: boolean?, -- last state written to the prompt (owner 2026-10-18: it showed with nobody at the counter)
 }
 export type TabletState = "Idle" | "Talking" | "Full"
 
@@ -36,6 +37,7 @@ export type Public = {
 	Cancel: (self: Public, tablet: Tablet, why: string) -> (),
 	StillThere: (self: Public, tablet: Tablet) -> boolean,
 	UpdateFull: (self: Public, tablet: Tablet) -> boolean,
+	SyncPrompt: (self: Public, tablet: Tablet) -> (),
 	Step: (self: Public) -> (),
 	Record: (self: Public, tablet: Tablet) -> any,
 	Publish: (self: Public, tablet: Tablet) -> (),

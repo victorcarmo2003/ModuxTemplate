@@ -109,6 +109,7 @@ export type Public = {
 	LastWasPair: boolean,
 	Left: SignalLib.Signal<number, LeaveReason>,
 	Line: Queue.Queue,
+	LullCount: number,
 	NextSpawnAt: number,
 	NoticeAt: { [Player]: { [string]: number } },
 	OrderNumber: number,

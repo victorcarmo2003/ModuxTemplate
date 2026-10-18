@@ -57,6 +57,7 @@ local ThiefService = require(ServerScriptService.server.ModuxTypes.ThiefService)
 local TrafficService = require(ServerScriptService.server.ModuxTypes.TrafficService)
 local TutorialService = require(ServerScriptService.server.ModuxTypes.TutorialService)
 local UpgradeService = require(ServerScriptService.server.ModuxTypes.UpgradeService)
+local RestaurantDoorService = require(ServerScriptService.server.ModuxTypes.RestaurantDoorService)
 local TrailerDoorService = require(ServerScriptService.server.ModuxTypes.TrailerDoorService)
 local VehicleService = require(ServerScriptService.server.ModuxTypes.VehicleService)
 local VitalService = require(ServerScriptService.server.ModuxTypes.VitalService)
@@ -118,6 +119,7 @@ export type AllServices = {
 	TrafficService: TrafficService.Public,
 	TutorialService: TutorialService.Public,
 	UpgradeService: UpgradeService.Public,
+	RestaurantDoorService: RestaurantDoorService.Public,
 	TrailerDoorService: TrailerDoorService.Public,
 	VehicleService: VehicleService.Public,
 	VitalService: VitalService.Public,

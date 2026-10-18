@@ -59,6 +59,7 @@ return {
 	ServerScriptService.server.Traffic.TrafficService,
 	ServerScriptService.server.Tutorial.TutorialService,
 	ServerScriptService.server.Upgrade.UpgradeService,
+	ServerScriptService.server.Vehicle.RestaurantDoorService,
 	ServerScriptService.server.Vehicle.TrailerDoorService,
 	ServerScriptService.server.Vehicle.VehicleService,
 	ServerScriptService.server.Vital.VitalService,

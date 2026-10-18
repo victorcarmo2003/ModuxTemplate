@@ -32,6 +32,9 @@
 	locally by a horror scene, Anomaly/Scene/Kits, e.g. the pantry's exit door during the blackout) it stays closed: it does
 	not open for anyone near and, if open, closes now.
 
+	Manual (owner 2026-10-18, restaurant back door DOOR-B): an AutoDoor with the attribute `DoorManual = true` ignores
+	proximity: it is open while its own `DoorOpen` attribute is true (Vehicle/RestaurantDoorService, prompt Open / Close),
+	swinging away from the side of the player who opened it (attribute `DoorFrom`, a Vector3). DoorHeld still wins.
 	No input, no packet, never writes a set.
 ]]
 local CollectionService = game:GetService("CollectionService")
@@ -331,6 +334,14 @@ function DoorController:Tick()
 		if door.Instance:GetAttribute(HELD_ATTRIBUTE) == true then
 			if door.Open then
 				self:Animate(door, false, nil)
+			end
+			continue
+		end
+		if door.Instance:GetAttribute("DoorManual") == true then
+			const wanted = door.Instance:GetAttribute("DoorOpen") == true
+			if wanted ~= door.Open then
+				const side = door.Instance:GetAttribute("DoorFrom")
+				self:Animate(door, wanted, if wanted and typeof(side) == "Vector3" then side else nil)
 			end
 			continue
 		end

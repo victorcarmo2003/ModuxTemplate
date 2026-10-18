@@ -166,6 +166,8 @@ export type Binding = {
 
 export type Restaurant = {
 	Rules: Rules,
+	-- MapIds of the AutoDoor Models opened by hand (prompt) instead of by proximity (owner 2026-10-18; RestaurantDoorService)
+	ManualDoors: { string },
 	Talk: Talk,
 	Patience: Patience,
 	Stacks: Stacks,
@@ -180,6 +182,7 @@ export type Restaurant = {
 }
 
 const restaurant: Restaurant = {
+	ManualDoors = { "DOOR-B" },
 	Rules = {
 		Enabled = false,
 		PlateSlots = 8,
