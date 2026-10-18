@@ -359,16 +359,12 @@ function AdminService:Register()
 	-- anomalies: the list to test, one line each (Ref, key, family, debut night)
 	conch.register("anomalies", {
 		permissions = { PERMISSION },
-		description = "List every anomaly (Ref, key, family, debut night) to use with anm",
+		description = "List the anomalies in play order (#, night, Ref, key) to use with anm; the cut ones are left out",
 		arguments = function() end,
 		callback = function()
 			const lines: { string } = {}
-			for _, row in Content.Anomalies.List do
-				const family = (row :: any).Family
-				table.insert(
-					lines,
-					`{row.Ref}  {row.Key}  {row.Name}  family {family or "-"}  night {row.Night}`
-				)
+			for index, row in AdminArguments.PlayableAnomalies do
+				table.insert(lines, `#{index}  night {row.Night}  {row.Ref}  {row.Key}  {row.Name}`)
 			end
 			conch.log("normal", table.concat(lines, "\n"))
 		end,

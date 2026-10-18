@@ -82,7 +82,24 @@ end
 
 local function anomalyItems(): { Item }
 	const out: { Item } = {}
+	-- owner 2026-10-18: the cut anomalies (Restaurant.Switch.CutAnomalies) leave the panel; the rest in play order
+	const cut: { [string]: boolean } = {}
+	for _, key in Content.Restaurant.Switch.CutAnomalies do
+		cut[key] = true
+	end
+	const rows: { Content.Anomaly } = {}
 	for _, row in Content.Anomalies.List do
+		if not cut[row.Key] then
+			table.insert(rows, row)
+		end
+	end
+	table.sort(rows, function(a: Content.Anomaly, b: Content.Anomaly): boolean
+		if a.Night ~= b.Night then
+			return a.Night < b.Night
+		end
+		return a.Ref < b.Ref
+	end)
+	for _, row in rows do
 		const ref = row.Ref
 		const actions: { Action } = { act("trigger", "Trigger") }
 		if Resolve.HasCorrect(ref) then
@@ -96,7 +113,7 @@ local function anomalyItems(): { Item }
 				table.insert(actions, act("dev", if step == 4 then "Step 4 (loses)" else `Step {step}`, `walker {step}`))
 			end
 		end
-		if ref == "ANM-008" or ref == "ANM-009" or ref == "ANM-010" then
+		if (ref == "ANM-008" or ref == "ANM-009" or ref == "ANM-010") and not Content.Restaurant.Rules.Enabled then
 			table.insert(actions, act("sc", "Go to Mart", "tp:SS"))
 			table.insert(actions, act("sc", "Go to trailer", "tp:TRL"))
 		end

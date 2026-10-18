@@ -7,14 +7,44 @@ local conch = require(ReplicatedStorage.Packages.Conch)
 
 const MAX_MONEY = 1_000_000_000
 
+-- Anomalies in play order (owner 2026-10-18: drop the cut ones from the console, numbers in order): the rows not in
+-- Restaurant.Switch.CutAnomalies, by debut night, then by Ref.
+local function playable(): { any }
+	const cut: { [string]: boolean } = {}
+	for _, key in Content.Restaurant.Switch.CutAnomalies do
+		cut[key] = true
+	end
+	const out: { any } = {}
+	for _, row in Content.Anomalies.List do
+		if not cut[row.Key] then
+			table.insert(out, row)
+		end
+	end
+	table.sort(out, function(a: any, b: any): boolean
+		if a.Night ~= b.Night then
+			return a.Night < b.Night
+		end
+		return a.Ref < b.Ref
+	end)
+	return out
+end
+
+const PLAYABLE = playable()
+const PLAYABLE_KEYS: { string } = {}
+for _, row in PLAYABLE do
+	table.insert(PLAYABLE_KEYS, row.Key)
+end
+
 return {
+	-- anomalies the console offers, in play order (see playable)
+	PlayableAnomalies = PLAYABLE,
 	-- Content keys (ITM/UPG/CLS rows)
 	ItemKey = conch.args.enum_from_array("item_key", Content.Items.Keys),
 	IngredientKey = conch.args.enum_from_array("ingredient_key", Content.Ingredients.Keys),
 	ClassKey = conch.args.enum_from_array("class_key", Content.Classes.Keys),
 	UpgradeKey = conch.args.enum_from_array("upgrade_key", Content.Upgrades.Keys),
 	-- anomalies (owner 2026-10-16): every Content.Anomalies key, autocompleted in the console
-	AnomalyKey = conch.args.enum_from_array("anomaly_key", Content.Anomalies.Keys),
+	AnomalyKey = conch.args.enum_from_array("anomaly_key", PLAYABLE_KEYS),
 	AnomalyAction = conch.args.enum_from_array("anomaly_action", { "trigger", "resolve", "wrong", "stop" }),
 	ArrivalsState = conch.args.enum_from_array("arrivals_state", { "on", "off" }),
 	-- Numbers (validated again in the callback: the server never trusts the parsed value)
