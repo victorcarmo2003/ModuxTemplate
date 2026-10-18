@@ -13,6 +13,9 @@
 	the words leave the corner arcs and spread over the whole screen, bigger and longer (full spread at MASS_RATE).
 	They live in Kit/Screen's layer (under the HUD), so the mass never hides a HUD button. Does not yield: returns a
 	stop function (the scene was cancelled); the words already shown fade out on their own.
+
+	Stream(words, rate) (TASK-482, stare pressure): words at RATE * rate() per second for as long as it runs, the rate
+	read live (0 = none for now), in Kit/Screen's layer, corner arcs only. Does not yield: returns a stop function.
 ]]
 local Players = game:GetService("Players")
 local StarterPlayer = game:GetService("StarterPlayer")
@@ -228,6 +231,38 @@ function Whispers.Ramp(seconds: number, rateFrom: number, rateTo: number, words:
 			const spread = math.clamp((rate - 1) / (MASS_RATE - 1), 0, 1)
 			spawnWord(layer, rng, reduced, list, spread)
 			task.wait(1 / (RATE * rate))
+		end
+		stop()
+	end)
+	return stop
+end
+
+-- Live stream (TASK-482): the rate is read before every word; rate() <= 0 pauses the words (the bed drops to its lowest).
+-- Does not yield; the returned function stops it (idempotent).
+function Whispers.Stream(words: { string }, rate: () -> number): () -> ()
+	local running = true
+	local bed: Sound? = nil
+	local function stop()
+		running = false
+		const current = bed
+		bed = nil
+		stopBed(current)
+	end
+	const layer = Screen.Layer()
+	if layer == nil or #words == 0 then
+		return stop
+	end
+	bed = startBed()
+	const rng = Random.new()
+	const reduced = Motion.Reduced()
+	task.spawn(function()
+		while running and layer.Parent ~= nil do
+			const value = rate()
+			bedLevel(bed, if value > 0 then 0.3 + value else 0)
+			if value > 0 then
+				spawnWord(layer, rng, reduced, words, 0)
+			end
+			task.wait(1 / (RATE * math.max(value, 0.05)))
 		end
 		stop()
 	end)

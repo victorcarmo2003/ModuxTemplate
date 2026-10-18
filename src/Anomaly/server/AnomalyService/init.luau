@@ -16,6 +16,11 @@
 --               everyone, DEC-204), Fail (who pays, DEC-204; once per player per occurrence; critical ->
 --               LoseNight("critical"), DEC-094), Succeed, Finish, Active, Looking (Gaze + Vision), SeenTick/See
 --               (VitalService:SeeAnomaly), Rule, Spawn, Light, Vehicle, InZone, Kitchen, Traffic, Economy.
+--   Stare       TASK-482 (DEC-294 §8; tech/stare-pressure.md): SeenTick of a row with Anomalies[k].Stare also counts
+--               the continuous stare at the target in the narrow cone Sanity.Stare.Angle (Active record only). Looking
+--               away Release s restarts the count. Past DrainAfter s the player loses PerSecond sanity per second
+--               (whole points, the fraction carried), at most Cap per occurrence. The sight (SeeAnomaly, once per night
+--               at SeeTime) comes first and is never repeated by the stare.
 --   Events      CustomerService.Acted, LightService.SwitchChanged, InteractionService.Performed,
 --               VehicleService.ShutterChanged (OnInit); KitchenService.Discarded when it exists (OnStart) -> OnEvent of
 --               every running occurrence.
@@ -73,6 +78,8 @@ export type Run = {
 	CriticalSent: boolean,
 	Seen: { [number]: number },
 	SeenDone: { [number]: boolean },
+	-- TASK-482 stare pressure per UserId (rows with Stare only)
+	Stares: { [number]: Stare },
 	-- UserIds Active when the occurrence started (Ended, TASK-335)
 	Party: { number },
 }
@@ -80,6 +87,10 @@ export type Run = {
 export type Due = { Entry: Scheduler.Entry, RetryAt: number, Done: boolean }
 
 export type Gaze = { Yaw: number, Pitch: number, At: number }
+
+-- TASK-482: continuous stare of one player at one occurrence. Time = s staring, Away = s since the last stare,
+-- Owed = sanity fraction not applied yet, Taken = sanity already drained by this occurrence
+export type Stare = { Time: number, Away: number, Owed: number, Taken: number }
 
 type TrafficHook = { Hold: (self: any, reason: string, on: boolean) -> () }
 
@@ -695,6 +706,7 @@ function AnomalyService:StartOccurrence(key: string, module: Api.Module, slot: n
 		CriticalSent = false,
 		Seen = {},
 		SeenDone = {},
+		Stares = {},
 		Party = {},
 	}
 	for _, player in self:ActivePlayers() do
@@ -763,6 +775,44 @@ function AnomalyService:SeenTick(occ: Api.Occurrence, target: Vector3, range: nu
 		run.Seen[userId] = total
 		if total >= need then
 			self:See(occ, player)
+		end
+	end
+	if run.Row.Stare and run.Record.Phase == "Active" then
+		self:StareTick(run, target, range, dt)
+	end
+end
+
+-- TASK-482: stare count and sanity drain (header "Stare"). Called from SeenTick, same target and range.
+function AnomalyService:StareTick(run: Run, target: Vector3, range: number, dt: number)
+	const rules = Content.Sanity.Stare
+	const vital = self.Dependencies.VitalService
+	for _, player in self:ActivePlayers() do
+		const userId = player.UserId
+		local stare = run.Stares[userId]
+		if stare == nil then
+			stare = { Time = 0, Away = 0, Owed = 0, Taken = 0 }
+			run.Stares[userId] = stare
+		end
+		const track = stare :: Stare
+		if not self:Looking(player, target, range, rules.Angle) then
+			track.Away += dt
+			if track.Away >= rules.Release then
+				track.Time = 0
+				track.Owed = 0
+			end
+			continue
+		end
+		track.Away = 0
+		track.Time += dt
+		if track.Time < rules.DrainAfter or track.Taken >= rules.Cap then
+			continue
+		end
+		track.Owed += rules.PerSecond * math.min(dt, track.Time - rules.DrainAfter)
+		const whole = math.min(math.floor(track.Owed), rules.Cap - track.Taken)
+		if whole >= 1 then
+			track.Owed -= whole
+			track.Taken += whole
+			vital:AddSanity(player, -whole, `stare:{run.Occ.Key}`)
 		end
 	end
 end

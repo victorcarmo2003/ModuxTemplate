@@ -96,6 +96,7 @@ export type HorrorScene = HorrorScenes.Scene
 export type HorrorStep = HorrorScenes.Step
 export type HorrorStepKind = HorrorScenes.StepKind
 export type HorrorRules = HorrorScenes.Rules
+export type HorrorStare = HorrorScenes.Stare
 export type GemRewards = GemRewards.GemRewards
 export type Hallucination = Hallucinations.Hallucination
 export type HudRevealElement = HudReveal.Element

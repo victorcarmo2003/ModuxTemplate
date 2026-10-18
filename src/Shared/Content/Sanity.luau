@@ -11,6 +11,18 @@ export type Bands = {
 	Mid: number, -- >= Mid -> "Mid"; below -> "Night" (absolute points, DEC-167)
 }
 
+-- Stare pressure (TASK-482; DEC-294, DEC-295; design/horror-cinematic.md §8; tech/stare-pressure.md). Rows flagged
+-- Anomalies[k].Stare only. Same cone on both sides: the client builds the look from Delay, the server drains from
+-- DrainAfter. Sight first (SeeAnomaly at SeeTime, once per night), then the stare: never the same second twice.
+export type Stare = {
+	Angle: number, -- degrees, full cone around the gaze (narrower than SeeAngle: looking STRAIGHT at it)
+	Delay: number, -- s of continuous stare before the pressure starts (heart, edges, head)
+	Release: number, -- s looking away that release everything (the stare count restarts)
+	DrainAfter: number, -- s of continuous stare before sanity starts to fall (>= Delay; > SeeTime)
+	PerSecond: number, -- sanity lost per second of stare past DrainAfter
+	Cap: number, -- most sanity one occurrence can take from one player by staring
+}
+
 export type Sanity = {
 	Start: number,
 	SeeAnomaly: number, -- lost once per anomaly per night when seen
@@ -30,6 +42,7 @@ export type Sanity = {
 	BasicLampRadius: number, -- studs of the factory lamp beyond its LightZone volumes (0: LZ-1 and LZ-2 only)
 	Bands: Bands,
 	BandMinHold: number, -- seconds a band must hold before the look changes (Provisional, DEC-167)
+	Stare: Stare,
 }
 
 const sanity: Sanity = {
@@ -51,6 +64,8 @@ const sanity: Sanity = {
 	BasicLampRadius = 0, -- Provisional (TASK-081, DEC-189)
 	Bands = { High = 60, Mid = 40 }, -- DEC-167
 	BandMinHold = 0, -- 1 s if it flickers in the wave 2 test (Provisional)
+	-- TASK-482 (Provisional, DEC-294 "~2 s", "~1 s"): mild (DEC-172), ~10 s of stare = -10, at most -20 per occurrence
+	Stare = { Angle = 18, Delay = 2, Release = 1, DrainAfter = 3, PerSecond = 1.5, Cap = 20 },
 }
 
 return Table.record(sanity)
