@@ -7,11 +7,18 @@
 	Play(seconds) spawns them for `seconds` (one ScreenGui, destroyed at the end). Reduced motion (Motion.Reduced):
 	no pop and no drip, the words only fade in and out where they appear.
 	Colours from the house palette (cream with an ink stroke, a few mustard): never alert red (style-guide).
+
+	Ramp(seconds, rateFrom, rateTo, words?) (TASK-464, DEC-291, scene step `Whispers`): the rate goes from `rateFrom`
+	to `rateTo` (1 = RATE) over `seconds`, directed by the scene: a few "HIDE" at first, a mass at the end. Past rate 1
+	the words leave the corner arcs and spread over the whole screen, bigger and longer (full spread at MASS_RATE).
+	They live in Kit/Screen's layer (under the HUD), so the mass never hides a HUD button. Does not yield: returns a
+	stop function (the scene was cancelled); the words already shown fade out on their own.
 ]]
 local Players = game:GetService("Players")
 local StarterPlayer = game:GetService("StarterPlayer")
 local TweenService = game:GetService("TweenService")
 local Motion = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Motion)
+local Screen = require(script.Parent.Screen)
 
 -- owner request 2026-10-16: more words, more often; "hide" stays the most common (listed several times)
 const WORDS = {
@@ -45,6 +52,12 @@ const TILT = 14 -- degrees of random rotation
 const ARC_RADIUS = { 0.18, 0.34 }
 const ARC_ANGLE = { 8, 82 } -- degrees: 0 = straight up from the corner, 90 = along the bottom edge
 const POP = 0.14 -- s of the pop
+-- the mass (TASK-464, DEC-291; PROVISIONAL until the owner's Play): rate at which the words cover the screen
+const MASS_RATE = 3
+const MASS_SHARE = 0.85 -- share of the words off the corner arcs at full spread
+const MASS_SIZE = 34 -- px added to the biggest word at full spread
+const MASS_LIFE = 0.7 -- s added to the longest life at full spread
+const MASS_MARGIN = 0.06 -- screen share kept clear at the edges (the words never sit cut in half)
 
 const Whispers = {}
 
@@ -52,18 +65,25 @@ local function between(rng: Random, range: { number }): number
 	return range[1] + (range[2] - range[1]) * rng:NextNumber()
 end
 
-local function spawnWord(gui: ScreenGui, rng: Random, reduced: boolean, words: { string })
+-- `spread` 0..1: 0 = only the corner arcs (the family B sign), 1 = the mass all over the screen
+local function spawnWord(gui: GuiBase2d, rng: Random, reduced: boolean, words: { string }, spread: number)
 	const viewport = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
-	const left = rng:NextNumber() < 0.5
-	const radius = between(rng, ARC_RADIUS) * viewport.Y
-	const angle = math.rad(between(rng, ARC_ANGLE))
-	-- from the corner: up by cos, inwards by sin
-	const x = math.sin(angle) * radius
-	const y = math.cos(angle) * radius
-	const px = if left then x else viewport.X - x
-	const py = viewport.Y - y
-	const size = math.floor(between(rng, SIZE))
-	const life = between(rng, LIFE)
+	local px: number, py: number
+	if spread > 0 and rng:NextNumber() < spread * MASS_SHARE then
+		px = viewport.X * (MASS_MARGIN + rng:NextNumber() * (1 - 2 * MASS_MARGIN))
+		py = viewport.Y * (MASS_MARGIN + rng:NextNumber() * (1 - 2 * MASS_MARGIN))
+	else
+		const left = rng:NextNumber() < 0.5
+		const radius = between(rng, ARC_RADIUS) * viewport.Y
+		const angle = math.rad(between(rng, ARC_ANGLE))
+		-- from the corner: up by cos, inwards by sin
+		const x = math.sin(angle) * radius
+		const y = math.cos(angle) * radius
+		px = if left then x else viewport.X - x
+		py = viewport.Y - y
+	end
+	const size = math.floor(between(rng, { SIZE[1], SIZE[2] + MASS_SIZE * spread }))
+	const life = between(rng, { LIFE[1], LIFE[2] + MASS_LIFE * spread })
 	const label = Instance.new("TextLabel")
 	label.Name = "Whisper"
 	label.BackgroundTransparency = 1
@@ -125,11 +145,42 @@ function Whispers.Play(seconds: number, words: { string }?, rate: number?)
 	-- a slow start, thicker towards the end
 	while os.clock() < untilAt and gui.Parent ~= nil do
 		const t = 1 - (untilAt - os.clock()) / seconds
-		spawnWord(gui, rng, reduced, list)
+		spawnWord(gui, rng, reduced, list, 0)
 		task.wait(1 / (pace * (0.5 + t)))
 	end
 	task.wait(LIFE[2] + 0.1)
 	gui:Destroy()
+end
+
+-- Scene ramp (TASK-464): rate `rateFrom` -> `rateTo` (1 = RATE) over `seconds`, in Kit/Screen's layer under the HUD.
+-- Does not yield; the returned function stops the spawning (idempotent).
+function Whispers.Ramp(seconds: number, rateFrom: number, rateTo: number, words: { string }?): () -> ()
+	local running = true
+	local function stop()
+		running = false
+	end
+	const layer = Screen.Layer()
+	if layer == nil or seconds <= 0 then
+		return stop
+	end
+	const rng = Random.new()
+	const reduced = Motion.Reduced()
+	const list = words or WORDS
+	const startedAt = os.clock()
+	task.spawn(function()
+		while running and layer.Parent ~= nil do
+			const t = (os.clock() - startedAt) / seconds
+			if t >= 1 then
+				break
+			end
+			const rate = math.max(rateFrom + (rateTo - rateFrom) * t, 0.05)
+			const spread = math.clamp((rate - 1) / (MASS_RATE - 1), 0, 1)
+			spawnWord(layer, rng, reduced, list, spread)
+			task.wait(1 / (RATE * rate))
+		end
+		running = false
+	end)
+	return stop
 end
 
 return table.freeze(Whispers)

@@ -39,5 +39,8 @@ Tipos de passo: `Sound`, `Music`, `Lights`, `Lightning`, `Whispers` (palavras HI
 
 - **TASK-462** player de cena (client): lê `Anomalies`, agenda os passos, `/dev scene <key>`.
 - **TASK-463** câmera (perfis, FOV, nudge, opção). **TASK-464** vinheta e o passo `Whispers` (HIDE em rampa).
+  Chamadas (`Effects/Kit`, TASK-464): `Vignette` → `Screen.SetVignette(Value, To, Duration, sceneKey)` (um canal por
+  cena, vale o mais forte, teto `MaxVignette`; `Screen.ClearVignette(sceneKey)` ao cancelar). `Whispers` →
+  `local stop = Whispers.Ramp(Duration, Value, To)` (não bloqueia; `stop()` ao cancelar). Clímax: `Screen.Pulse(≤ 0,3)`.
 - **TASK-465** porta da despensa e `MapPoint`s. **TASK-466** sons novos. **TASK-467** liga a cena do apagão no jogo,
   convivendo com `Effects/Kit/Blackout` (TASK-444) sem duplicar som/luz: o kit passa a ler os passos da cena.
