@@ -168,6 +168,9 @@ export type Restaurant = {
 	Rules: Rules,
 	-- MapIds of the AutoDoor Models opened by hand (prompt) instead of by proximity (owner 2026-10-18; RestaurantDoorService)
 	ManualDoors: { string },
+	-- world boxes that also count as "inside" besides the kitchen zone LZ-1 (owner 2026-10-18: the stock room / pantry;
+	-- Anomaly/OutsideService). Min / Max corners, measured in Studio on 2026-10-18
+	SafeBoxes: { { Min: Vector3, Max: Vector3 } },
 	Talk: Talk,
 	Patience: Patience,
 	Stacks: Stacks,
@@ -183,6 +186,9 @@ export type Restaurant = {
 
 const restaurant: Restaurant = {
 	ManualDoors = { "DOOR-B" },
+	SafeBoxes = {
+		{ Min = Vector3.new(-48.3, -1, -11.2), Max = Vector3.new(-25.5, 12, -3.4) }, -- pantry / stock room
+	},
 	Rules = {
 		Enabled = false,
 		PlateSlots = 8,

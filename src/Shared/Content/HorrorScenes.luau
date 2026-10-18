@@ -809,6 +809,8 @@ const outside: OutsideScene = {
 		{ At = 25, Phase = "Active", Kind = "Silence", Value = 1, To = 0.15, Duration = 4 },
 		{ At = 28.5, Phase = "Active", Kind = "Sound", Target = "breath_held" },
 	},
+	-- owner 2026-10-18: during the chase no whispers, only a rare red RUN / HIDE; the edges pulse instead of closing in
+	-- (he must see where he runs); a touch brighter, the night's blue kept (Grade Lift)
 	Chase = {
 		{ At = 0, Phase = "Active", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
 		{ At = 0, Phase = "Active", Kind = "Silence", Value = 0.15, To = 1, Duration = 0.2 },
@@ -816,9 +818,9 @@ const outside: OutsideScene = {
 		{ At = 0, Phase = "Active", Kind = "Shake", Target = "Jolt" },
 		{ At = 0, Phase = "Active", Kind = "Fov", Value = -4, To = 0, Duration = 0.8 },
 		{ At = 0, Phase = "Active", Kind = "Blur", Value = 8, To = 0, Duration = 1 },
-		{ At = 0, Phase = "Active", Kind = "Grade", Target = "Red", Value = 0.65, To = 0.65, Duration = 0.5 },
+		{ At = 0, Phase = "Active", Kind = "Grade", Target = "Lift", Value = 0, To = 0.7, Duration = 1.2 },
 		{ At = 0, Phase = "Active", Kind = "Heartbeat", Value = 165, To = 175, Duration = 20 },
-		{ At = 0.4, Phase = "Active", Kind = "Whispers", Target = "chase", Value = 3, To = 3, Duration = 60 },
+		{ At = 1.5, Phase = "Active", Kind = "Whispers", Target = "chase", Text = "Red", Value = 0.12, To = 0.12, Duration = 120 },
 	},
 	Escape = {
 		{ At = 0, Phase = "Active", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
@@ -840,6 +842,18 @@ const outside: OutsideScene = {
 		{ At = 2.5, Phase = "Active", Kind = "Cinema", Value = 0, Duration = 1 },
 	},
 }
+
+-- the chase's pulsing edges: 0.5 <-> 0.18 every 0.7 s for two minutes (generated, not typed)
+do
+	local t = 0
+	while t < 120 do
+		const close: Step = { At = t, Phase = "Active", Kind = "Vignette", Value = 0.5, To = 0.18, Duration = 0.35 }
+		const open: Step = { At = t + 0.35, Phase = "Active", Kind = "Vignette", Value = 0.18, To = 0.5, Duration = 0.35 }
+		table.insert(outside.Chase, close)
+		table.insert(outside.Chase, open)
+		t += 0.7
+	end
+end
 
 -- Whisper word lists (DEC-293, owner 2026-10-18): the words on screen are real hints for the player, said in the
 -- character's voice. blackout / roof / crawler / neck / copy = the scenes' Whispers steps (TASK-484, TASK-483); low_sanity = VitalController while sanity is in the low band;
@@ -1050,12 +1064,7 @@ const words: { [string]: { string } } = {
 	},
 	chase = {
 		"RUN",
-		"RUN",
-		"RUN!",
-		"IT'S BEHIND YOU",
-		"DON'T LOOK BACK",
-		"GET INSIDE NOW",
-		"FASTER",
+		"HIDE",
 	},
 	low_sanity = {
 		"LOW SANITY",

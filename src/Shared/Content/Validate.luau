@@ -2578,8 +2578,8 @@ local function checkHorrorScenes()
 				-- TASK-493: strength 0..1, Target Cold | Red | Sick
 				inRange("HorrorScenes", index, key, `{where}.Value`, step.Value or 0, 0, 1)
 				inRange("HorrorScenes", index, key, `{where}.To`, (step.To :: number?) or 0, 0, 1)
-				if step.Target ~= nil and step.Target ~= "Cold" and step.Target ~= "Red" and step.Target ~= "Sick" then
-					fail("HorrorScenes", index, key, `{where} Grade Target '{step.Target}' is not Cold, Red or Sick`)
+				if step.Target ~= nil and step.Target ~= "Cold" and step.Target ~= "Red" and step.Target ~= "Sick" and step.Target ~= "Lift" then
+					fail("HorrorScenes", index, key, `{where} Grade Target '{step.Target}' is not Cold, Red, Sick or Lift`)
 				end
 			elseif step.Kind == "Blur" then
 				inRange("HorrorScenes", index, key, `{where}.Value`, step.Value or 0, 0, rules.MaxBlur)

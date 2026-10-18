@@ -156,7 +156,9 @@ const whispers: Handler = function(_ctx, state, step, late)
 	end
 	-- DEC-293: Target = a list of Content.HorrorScenes.Words (real hints); nil = the Kit's HIDE list
 	const list = if step.Target ~= nil then Content.HorrorScenes.Words[step.Target] else nil
-	state.Undo.whispers = Whispers.Ramp(seconds, math.max(from, 0.05), math.max(to, 0.05), list)
+	-- Text "Red" (owner 2026-10-18, the chase): the words in red, without the whispering bed
+	const options: Whispers.RampOptions? = if step.Text == "Red" then { Color = Color3.fromRGB(214, 28, 34), Bed = false } else nil
+	state.Undo.whispers = Whispers.Ramp(seconds, math.max(from, 0.05), math.max(to, 0.05), list, options)
 end
 
 -- Door ------------------------------------------------------------------------------------------------------------------
@@ -1166,6 +1168,7 @@ const GRADE_TINTS: { [string]: Color3 } = {
 	Cold = Color3.fromRGB(196, 212, 255),
 	Red = Color3.fromRGB(255, 128, 118),
 	Sick = Color3.fromRGB(208, 255, 196),
+	Lift = Color3.fromRGB(255, 255, 255), -- owner 2026-10-18 (the chase): a touch brighter, the night's blue kept
 }
 const SILENCE_GROUPS = { { "Master", "Music" }, { "Master", "Ambient" }, { "Master", "Sfx", "Kitchen" } }
 
@@ -1226,9 +1229,10 @@ const grade: Handler = function(_ctx, state, step, late)
 		end
 		-- Red keeps its colour (owner 2026-10-18: "tudo vai ficando vermelho"); Cold / Sick drain it
 		const red = gradeTint == "Red"
-		effect.Saturation = (if red then 0.15 else -0.75) * strongest
-		effect.Contrast = 0.32 * strongest
-		effect.Brightness = (if red then -0.02 else -0.06) * strongest
+		const lift = gradeTint == "Lift"
+		effect.Saturation = (if red then 0.15 elseif lift then 0 else -0.75) * strongest
+		effect.Contrast = (if lift then 0.06 else 0.32) * strongest
+		effect.Brightness = (if red then -0.02 elseif lift then 0.12 else -0.06) * strongest
 		effect.TintColor = Color3.new(1, 1, 1):Lerp(tint, strongest)
 		effect.Enabled = strongest > 0.001
 	end)

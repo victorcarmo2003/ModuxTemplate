@@ -18,6 +18,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
+local Content = require(ReplicatedStorage.shared.Content)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
 local Modux = require(ServerScriptService.server.Modux)
 
@@ -35,9 +36,12 @@ const RULES = {
 	Rise = 30, -- s of rising dread before the chaser comes (owner: "30 segundos")
 	SpawnDistance = 60, -- studs from the player where the chaser appears
 	Pause = 2.5, -- s it stands and stares before it runs (the bell, the moment to react)
-	Speed = 9, -- studs/s at first (the player walks 16: running inside saves him)
-	MaxSpeed = 17,
-	Ramp = 15, -- s to reach MaxSpeed
+	-- speed relative to the player's WalkSpeed (owner 2026-10-18: "um pouco mais rápida que o player; quanto mais
+	-- distante, mais rápida"): Near x the player's speed within NearDistance, rising to Far x at FarDistance and beyond
+	Near = 1.4, -- 16 walk -> 22.4 studs/s
+	Far = 2,
+	NearDistance = 10,
+	FarDistance = 45,
 	Catch = 3.5, -- studs (flat)
 	Faint = 0.7, -- s from the face to the faint
 	Linger = 3,
@@ -140,6 +144,23 @@ function OutsideService:SpawnFor(root: BasePart): Vector3
 	return ground(best, root.Position.Y, p)
 end
 
+-- inside the vehicle interior (LZ-1) or in one of Content.Restaurant.SafeBoxes (the pantry / stock room)
+function OutsideService:IsSafe(player: Player, root: BasePart): boolean
+	if self.Dependencies.VehicleService:IsInside(player) then
+		return true
+	end
+	if not Content.Restaurant.Rules.Enabled then
+		return false
+	end
+	const p = root.Position
+	for _, box in Content.Restaurant.SafeBoxes do
+		if p.X >= box.Min.X and p.X <= box.Max.X and p.Y >= box.Min.Y and p.Y <= box.Max.Y and p.Z >= box.Min.Z and p.Z <= box.Max.Z then
+			return true
+		end
+	end
+	return false
+end
+
 function OutsideService:Step(dt: number)
 	const t = now()
 	const round = self.Dependencies.RoundService
@@ -158,7 +179,7 @@ function OutsideService:Step(dt: number)
 			end
 			continue
 		end
-		if not night or root == nil or not self.Dependencies.RunStateService:IsActive(player) or vehicles:IsInside(player) then
+		if not night or root == nil or not self.Dependencies.RunStateService:IsActive(player) or self:IsSafe(player, root) then
 			self:Clear(player, tr)
 			continue
 		end
@@ -177,10 +198,13 @@ function OutsideService:Step(dt: number)
 			if into < 0 then
 				continue -- it stands and stares first
 			end
-			const speed = RULES.Speed + (RULES.MaxSpeed - RULES.Speed) * math.clamp(into / RULES.Ramp, 0, 1)
+			const humanoid = if player.Character ~= nil then player.Character:FindFirstChildOfClass("Humanoid") else nil
+			const walk = if humanoid ~= nil and humanoid.WalkSpeed > 0 then humanoid.WalkSpeed else 16
 			const target = Vector3.new(root.Position.X, tr.Chaser.Y, root.Position.Z)
 			const offset = target - tr.Chaser
 			const flat = Vector3.new(offset.X, 0, offset.Z).Magnitude
+			const far = math.clamp((flat - RULES.NearDistance) / (RULES.FarDistance - RULES.NearDistance), 0, 1)
+			const speed = walk * (RULES.Near + (RULES.Far - RULES.Near) * far)
 			if flat <= RULES.Catch then
 				self:SetStage(player, tr, "Caught", t)
 				task.delay(RULES.Faint, function()

@@ -71,7 +71,7 @@ local function between(rng: Random, range: { number }): number
 end
 
 -- `spread` 0..1: 0 = only the corner arcs (the family B sign), 1 = the mass all over the screen
-local function spawnWord(gui: GuiBase2d, rng: Random, reduced: boolean, words: { string }, spread: number)
+local function spawnWord(gui: GuiBase2d, rng: Random, reduced: boolean, words: { string }, spread: number, color: Color3?)
 	const viewport = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
 	local px: number, py: number
 	if spread > 0 and rng:NextNumber() < spread * MASS_SHARE then
@@ -99,7 +99,7 @@ local function spawnWord(gui: GuiBase2d, rng: Random, reduced: boolean, words: {
 	label.Font = FONT
 	label.Text = word
 	label.TextSize = size
-	label.TextColor3 = if rng:NextNumber() < 0.2 then MUSTARD else CREAM
+	label.TextColor3 = if color ~= nil then color elseif rng:NextNumber() < 0.2 then MUSTARD else CREAM
 	label.TextStrokeColor3 = INK
 	label.TextStrokeTransparency = 0.25
 	label.TextTransparency = 1
@@ -202,7 +202,10 @@ end
 
 -- Scene ramp (TASK-464): rate `rateFrom` -> `rateTo` (1 = RATE) over `seconds`, in Kit/Screen's layer under the HUD.
 -- Does not yield; the returned function stops the spawning (idempotent).
-function Whispers.Ramp(seconds: number, rateFrom: number, rateTo: number, words: { string }?): () -> ()
+-- options (owner 2026-10-18, the outside chase): Color = every word in that colour; Bed = false = no whispering bed
+export type RampOptions = { Color: Color3?, Bed: boolean? }
+
+function Whispers.Ramp(seconds: number, rateFrom: number, rateTo: number, words: { string }?, options: RampOptions?): () -> ()
 	local running = true
 	local bed: Sound? = nil
 	local function stop()
@@ -215,7 +218,11 @@ function Whispers.Ramp(seconds: number, rateFrom: number, rateTo: number, words:
 	if layer == nil or seconds <= 0 then
 		return stop
 	end
-	bed = startBed()
+	const withBed = options == nil or options.Bed ~= false
+	if withBed then
+		bed = startBed()
+	end
+	const color = if options ~= nil then options.Color else nil
 	const rng = Random.new()
 	const reduced = Motion.Reduced()
 	const list = words or WORDS
@@ -227,9 +234,11 @@ function Whispers.Ramp(seconds: number, rateFrom: number, rateTo: number, words:
 				break
 			end
 			const rate = math.max(rateFrom + (rateTo - rateFrom) * t, 0.05)
-			bedLevel(bed, 0.3 + rate / math.max(rateTo, 1))
+			if withBed then
+				bedLevel(bed, 0.3 + rate / math.max(rateTo, 1))
+			end
 			const spread = math.clamp((rate - 1) / (MASS_RATE - 1), 0, 1)
-			spawnWord(layer, rng, reduced, list, spread)
+			spawnWord(layer, rng, reduced, list, spread, color)
 			task.wait(1 / (RATE * rate))
 		end
 		stop()
