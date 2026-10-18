@@ -127,6 +127,22 @@ const base = Table.new({
 		KeepOnSpectate = false,
 		Use = false,
 	},
+	-- Conveyor plate (DEC-304, prep-conveyor.md §6.3, DT-E8): the plate NOT assembled yet, in the hand (born empty with the
+	-- ticket on the central table). Assembled (Finish accepted) it becomes hot_dog. Same HotDog category: 2 plates in hand at
+	-- most (DEC-299). Attributes written by PlateService: PlateId, Ticket, TicketLine, Orphan, Bun, Dog, Toppings, FlipBonus.
+	-- Not in the run snapshot (Stash). Ref ITM-025: Provisional, to be registered in design/items.md
+	{
+		Key = "plate",
+		Ref = "ITM-025",
+		Name = "Plate",
+		Kind = "Product",
+		Category = "HotDog",
+		Stackable = false,
+		DropOnHit = "Keep",
+		DropDespawn = 90,
+		KeepOnSpectate = false,
+		Use = false,
+	},
 	-- FEAT-050 stock box from the service hatch: attribute Package (Content.Packages key) + Count = units left; Restock like a
 	-- Mart package (category Package, same per-player limit: 2, PackageLimit stat 3)
 	{

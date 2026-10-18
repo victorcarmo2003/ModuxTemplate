@@ -3,10 +3,12 @@
 -- DEC-269..DEC-280). Owner: game-designer (numbers) + architect (binding names). Every number Provisional.
 -- Rules.Enabled = false keeps the trailer flow (no pickup line, no plate gate, tablets ignored, the new map points not
 -- required by MapIndex/Required). Rollback = Enabled false (+ the trailer back from ServerStorage.TRAILER_Backup_20261017).
+-- TASK-513 (DEC-302..DEC-305, tech/prep-conveyor.md §1): Enabled = true in the repository (as in the owner's Studio).
 --
 -- THE SINGLE SWITCH (TASK-390, tech/restaurant-flow.md §6): Rules.Enabled is the only thing to flip to turn the
 -- restaurant on. Every table that changes with it reads Switch below (derived here, never edited by hand there):
---   Prep.Rules.Enabled = false, Prep.Rules.WorldKitchenPrompts = true   (DT-R8: no focused prep, world kitchen prompts)
+--   Prep.Rules.Enabled = true in both modes, Prep.Rules.Mode = "Conveyor" (restaurant) / "Trailer", and
+--   Prep.Rules.WorldKitchenPrompts = false in both modes (DT-E1, prep-conveyor.md §1: the focused prep with the conveyor)
 --   Seating.SitAt = "Served", Seating.DirtyTables = false                (DT-R11: sits after the sale, no tray)
 --   Vehicles.trailer.HasBackDoor = false, Vehicles.trailer.Restaurant = true (DT-R1, DEC-280: no back door)
 --   Anomalies: the CutAnomalies rows lose Family and Scripted (out of the agenda, design/anomalies-v3-restaurant.md §8)
@@ -144,6 +146,15 @@ export type Dialog = {
 	KitchenFull: string, -- tablet lamp text
 }
 
+-- Central table (DEC-303 Q-383, DEC-304; prep-conveyor.md §7): the plate is born here with the ticket and comes back here.
+-- Slots = records 1..Slots of Net Plates (wire 1..12, CenterPut.Slot); Reach = studs from the slot a CenterPut is accepted;
+-- PutRate = CenterPut per second per player (PlateService)
+export type CenterTable = {
+	Slots: number,
+	Reach: number,
+	PutRate: number,
+}
+
 export type Binding = {
 	TabletTag: string, -- Model TAB-n
 	TabletIndex: string, -- number attribute 1..TabletsMax, DrivePcIndex
@@ -154,6 +165,13 @@ export type Binding = {
 	PlatePut: string,
 	PlateTake: string,
 	PlateTicket: string, -- BillboardGui anchor
+	-- central table (prep-conveyor.md §7.4; MAP-01-r4 §16.5 d), bound instead of PlateTag while Prep.Rules.Mode = "Conveyor"
+	CenterModel: string, -- Model of the table
+	CenterTag: string, -- CollectionService tag on each Click_Slot_n (the click target)
+	CenterIndex: string, -- number attribute 1..CenterTable.Slots on the Click_Slot_n
+	CenterMount: string, -- format, n = slot: where the client draws the plate of the slot
+	CenterTake: string, -- Attachment child of the Click_Slot_n (plate_take prompt, fixed on the slot)
+	CenterTicket: string, -- BillboardGui anchor of the #n over the slot
 	PickupTag: string, -- Model PICKUP
 	PickupPrompt: string,
 	PickupPoint: string, -- MapPoint + NpcNode format, n = 1..PickupSlotsMax
@@ -180,6 +198,7 @@ export type Restaurant = {
 	Flow: Flow,
 	Drive: Drive,
 	Supply: Supply,
+	CenterTable: CenterTable,
 	Dialog: Dialog,
 	Binding: Binding,
 }
@@ -190,7 +209,7 @@ const restaurant: Restaurant = {
 		{ Min = Vector3.new(-48.3, -1, -11.2), Max = Vector3.new(-25.5, 12, -3.4) }, -- pantry / stock room
 	},
 	Rules = {
-		Enabled = false,
+		Enabled = true, -- TASK-513 (DEC-302, DT-E1): on in the repository; the trailer is the rollback (false)
 		PlateSlots = 8,
 		PlateSlotsMax = 12,
 		ActivePlates = { 4, 6, 8, 8 },
@@ -270,6 +289,8 @@ const restaurant: Restaurant = {
 		LowAt = 0.25,
 		MartShelves = true, -- derived: overwritten from Switch.MartShelves below (never edit by hand)
 	},
+	-- Q-383 A (8 slots); Reach and PutRate Provisional (prep-conveyor.md §7.2, §11.1)
+	CenterTable = { Slots = 8, Reach = 12, PutRate = 4 },
 	-- placeholder lines (narrative-writer owns them; English UI, no "sausage" for TTS: "dog" / "frank")
 	Dialog = {
 		Greeting = { "Hi! What can I get you?" },
@@ -298,6 +319,12 @@ const restaurant: Restaurant = {
 		PlatePut = "Prompt_Put",
 		PlateTake = "Prompt_Take",
 		PlateTicket = "Att_Ticket",
+		CenterModel = "CENTER",
+		CenterTag = "CenterSlot",
+		CenterIndex = "CenterIndex",
+		CenterMount = "Mount_Plate_%d",
+		CenterTake = "Prompt_Take",
+		CenterTicket = "Att_Ticket",
 		PickupTag = "Pickup",
 		PickupPrompt = "Prompt_Serve",
 		PickupPoint = "PU-%d",
@@ -321,8 +348,9 @@ end
 -- What Rules.Enabled flips in the other Content tables (see the header). Pure data, read at require time.
 export type Switch = {
 	On: boolean, -- = Rules.Enabled
-	PrepEnabled: boolean, -- Prep.Rules.Enabled
-	WorldKitchenPrompts: boolean, -- Prep.Rules.WorldKitchenPrompts (the restaurant kitchen is world prompts)
+	PrepEnabled: boolean, -- Prep.Rules.Enabled (true in both modes since TASK-513)
+	PrepMode: "Trailer" | "Conveyor", -- Prep.Rules.Mode: abas/pan + board per seat, or the conveyor (prep-conveyor.md §1)
+	WorldKitchenPrompts: boolean, -- Prep.Rules.WorldKitchenPrompts (false in both modes since TASK-513)
 	SitAt: "Order" | "Served", -- Seating.SitAt
 	DirtyTables: boolean, -- Seating.DirtyTables
 	HasBackDoor: boolean, -- Vehicles.trailer.HasBackDoor
@@ -351,8 +379,9 @@ const CUT_ANOMALIES = {
 
 const switch: Switch = {
 	On = on,
-	PrepEnabled = not on,
-	WorldKitchenPrompts = on,
+	PrepEnabled = true,
+	PrepMode = if on then "Conveyor" else "Trailer",
+	WorldKitchenPrompts = false,
 	SitAt = if on then "Served" else "Order",
 	DirtyTables = not on,
 	HasBackDoor = not on,

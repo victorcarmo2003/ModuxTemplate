@@ -130,7 +130,10 @@ return Table.new({
 
 	-- Focused prep mode (DEC-223; prep-mode.md §2): Prompt_Work on each Station_n of the trailer; owner PrepService.
 	-- Tap, selling phases and the day Last call (Closing, DEC-240); the server revalidates seat, phase and the other station.
+	-- Conveyor (Prep.Rules.Mode = "Conveyor", prep-conveyor.md §2.2): Prompt_Work in front of the low deck = a belt seat
 	{ Key = "prep_work", Text = "Work", Hold = 0, Radius = 5, Requires = { Phase = { "Open", "Closing", "Night" } }, Night = "Any", Wave = 3 },
+	-- Conveyor (DEC-305, two prompts): Prompt_Grill = the grill seat (Conveyor.Seats.Grill); owner PrepService, same phases
+	{ Key = "prep_grill", Text = "Grill", Hold = 0, Radius = 5, Requires = { Phase = { "Open", "Closing", "Night" } }, Night = "Any", Wave = 3 },
 
 	-- Revive Kit (TASK-317; DEC-117, DEC-255; Provisional): Prompt_Revive on the HRP of a fallen mate's body (ReviveKitService);
 	-- spends one profile.ReviveCredits of who holds it. The client shows it only with credits (ReviveKitController gate).
@@ -153,14 +156,16 @@ return Table.new({
 	{ Key = "bun_slice", Text = "Slice Bun", Hold = 0.6, Radius = 6, Requires = {}, Night = "Any", Wave = 3 },
 	-- PLATE-n Prompt_Put: "Add Bun" / "Add Dog" / "Put Plate" by hand (PromptText from PlateService)
 	{ Key = "plate_put", Text = "Put Plate", Hold = 0, Radius = 5, Requires = {}, Night = "Any", Wave = 3 },
-	-- PLATE-n Prompt_Take: the plate becomes the hot_dog Tool (attribute Ticket); PromptText "Pick Up #12"
-	{ Key = "plate_take", Text = "Take Plate", Hold = 0, Radius = 5, Requires = {}, Night = "Any", Wave = 3 },
+	-- PLATE-n Prompt_Take: the plate becomes the hot_dog Tool (attribute Ticket); PromptText "Pick Up #12". Conveyor: the
+	-- Prompt_Take of a central table slot, held (DEC-302 "hold E"; 0.5 s Provisional, prep-conveyor.md §7.2)
+	{ Key = "plate_take", Text = "Take Plate", Hold = 0.5, Radius = 5, Requires = {}, Night = "Any", Wave = 3 },
 	-- GRILL-n Att_Slot<n>: flip inside the window (Restaurant.Grill.FlipFrom..FlipTo); the server stamps Grill.Flip
 	{ Key = "grill_flip", Text = "Flip", Hold = 0, Radius = 7, Requires = {}, Night = "Any", Wave = 3 },
 	-- hot pile next to the grill (Stations.rail): ready dogs -> sausage_grilled stack
 	{ Key = "rail_take", Text = "Take Dogs", Hold = 0, Radius = 7, Requires = {}, Night = "Any", Wave = 3 },
-	-- PICKUP Prompt_Serve: hand the plate over the counter (CustomerService:ServeAtPickup). Radius = Rules.ServeRadius
-	{ Key = "pickup_serve", Text = "Hand Over", Hold = 0, Radius = 7, Requires = {}, Night = "Any", Wave = 3 },
+	-- PICKUP Prompt_Serve: hand the plate over the counter (CustomerService:ServeAtPickup). Radius = Rules.ServeRadius.
+	-- Held (DEC-302; 0.5 s Provisional, prep-conveyor.md §8)
+	{ Key = "pickup_serve", Text = "Hand Over", Hold = 0.5, Radius = 7, Requires = {}, Night = "Any", Wave = 3 },
 	-- DT-WIN (wave R3): hand the plate out of the drive-thru window
 	{ Key = "drive_serve", Text = "Hand Out", Hold = 0, Radius = 6, Requires = {}, Night = "Any", Wave = 4 },
 	-- FEAT-050 supply: a StockShelf bay of the stock room always gives a box of its package (infinite, owner 2026-10-17)

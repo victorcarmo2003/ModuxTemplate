@@ -18,6 +18,9 @@ local Table = require(script.Parent.Table)
 -- Board and Toppings are the 3D set (prep-3d.md §3.0). Grill and Serve are in both.
 export type Tab = "Order" | "Grill" | "Build" | "Board" | "Toppings" | "Serve"
 export type Delivery = "Prompt" | "Window"
+-- Which prep runs (tech/prep-conveyor.md §1, DT-E1): "Trailer" = tabs / pan and a board per seat; "Conveyor" = the
+-- restaurant conveyor with stops. Derived from Restaurant.Switch.PrepMode; the ONLY selector the Prep code reads
+export type Mode = "Trailer" | "Conveyor"
 export type Band = "Perfect" | "Good" | "Messy"
 -- SausagePlaced = the 3D Board section: bun cut AND sausage in the groove (prep-3d.md §3.0)
 export type Need = "Nothing" | "BunCut" | "PlateBuilt" | "SausagePlaced" | "TicketPicked"
@@ -331,8 +334,55 @@ export type Reason = {
 	Notice: string?, -- key of Notices shown to the owner, nil = silent
 }
 
+-- The restaurant conveyor (tech/prep-conveyor.md §2-§5, §11.1; DEC-302..DEC-305). Every number Provisional (TASK-508).
+-- Stops: order = left -> right of the cook (east -> west on MAP-01); Key = the stop, Tab = the wire tab of PrepSeats.Step
+-- there, Reserve = one plate at a time on it (Out holds both). PrepSeats.Stop = index of the row (1..#Stops)
+export type BeltStop = {
+	Key: string, -- "Grill" | "Board" | "Toppings" | "Out"
+	Tab: Tab,
+	Reserve: boolean,
+}
+
+-- Camera of the conveyor focus (MAP-01-r4 §16.5 c): anchors on the bench (shared by every seat), not per seat. Stop = the
+-- stop index the view belongs to, 0 = no stop (the wide Belt view and the griller's Grill view). Fov 0 = Rules.Camera.Fov
+export type BeltView = {
+	Key: string, -- "Belt" | "Rest" | "Board" | "Toppings" | "Grill"
+	Anchor: string,
+	Focus: string,
+	Fov: number,
+	Stop: number,
+}
+
+export type ConveyorRules = {
+	Stops: Table.Table<BeltStop>,
+	-- seat ids of PrepSeats (1..Stations): Belt = the assemblers (a plate each), Grill = the griller (no plate)
+	Seats: { Belt: { number }, Grill: { number } },
+	Rates: { Belt: number, Stage: number }, -- PrepBelt / PrepStage per second per player
+	ParkMax: number, -- s: a parked plate (its owner left the seat) goes to the central table after this (P25)
+	Rest: { Capacity: number }, -- the rest table = the rail (Stations rail, PrepClaims Rail); 1..8 (PrepGrab.Slot)
+	-- the grill of the conveyor (Q-381 A, DEC-305): never burns, flipping is optional (inside Restaurant.Grill.FlipFrom..
+	-- FlipTo it stamps a bonus), a ready sausage goes to the rest table by itself, FlipBonus $ once per plate at the sale,
+	-- Bar = the world GrillBar of the trailer (false: no bar, design FEAT-045)
+	Grill: { Burn: boolean, FlipRequired: boolean, AutoRest: boolean, FlipBonus: number, Bar: boolean },
+	-- names inside the bench Model (MAP-01-r4 §16.5 a, c). Stop / WaitLeft / WaitRight are formats (n = stop); Seats[i] =
+	-- the foot of seat i; GrillPrompt = the prep_grill anchor; Camera / Focus = the wide view; Grill = the griller's camera
+	Binding: {
+		Model: string,
+		Stop: string,
+		WaitLeft: string,
+		WaitRight: string,
+		Seats: { string },
+		GrillPrompt: string,
+		Camera: string,
+		Focus: string,
+		Grill: string,
+	},
+	Views: Table.Table<BeltView>,
+}
+
 export type Rules = {
 	Enabled: boolean,
+	Mode: Mode, -- Restaurant.Switch.PrepMode (prep-conveyor.md §1)
 	-- true brings the old world prompts back (grill_place ... discard); false hides them (prep-mode.md §7, DT-5)
 	WorldKitchenPrompts: boolean,
 	-- 3D-first prep (docs/tech/prep-3d.md, TASK-194). false = the 2D mode that runs today: `Tabs` and `Steps` below are the
@@ -397,7 +447,9 @@ export type Grades = {
 	Bands: { Perfect: number, Good: number }, -- minimum 0..100 score of each band
 	Plate: { PerfectAvg: number, GoodAvg: number },
 	Unflipped: number, -- score of a sausage that was never flipped (Q-222: Messy)
-	Effects: { [Band]: { Tip: number?, TipWindow: number, Mood: number } }, -- Tip nil = as today (OrderRules.TipAmount)
+	-- Tip nil = as today (OrderRules.TipAmount). TipExtra = $ added to the base tip (DEC-305: Perfect = base + $1); the conveyor
+	-- reads TipExtra, the trailer keeps the fixed Tip
+	Effects: { [Band]: { Tip: number?, TipExtra: number?, TipWindow: number, Mood: number } },
 	Labels: { [Band]: string },
 }
 
@@ -418,6 +470,18 @@ export type Texts = {
 	TrashEmpty: string,
 	Trashed: string,
 	FlipAlert: string, -- the chip that calls the player back to the grill while a flip window is open on another tab
+	-- the conveyor (TASK-513; texts of TASK-511, docs/story/ui-text.md §17, ids BELT_*). Toasts take the ticket #n by
+	-- string.format (%d); Stops by Conveyor.Stops key; Patterns by sauce topping key (DEC-305: fixed pattern per sauce)
+	Left: string,
+	Right: string,
+	Finish: string, -- the right arrow on stop 3 with bun and sausage (sends PrepFinish)
+	BeltWait: string, -- chip over a plate waiting beside a busy stop (Waiting stays the empty-warmer hint)
+	BeltFull: string,
+	NoPlate: string,
+	RestFull: string, -- the warmer is full, ready sausages wait on the grill (once)
+	Stops: { [string]: string },
+	Patterns: { [string]: string },
+	Toasts: { Parked: string, Resume: string, Ready: string, Off: string, Closing: string, Emptied: string },
 	Coach: { Pan: string, Grill: string, Board: string, Sausage: string, Toppings: string, Deliver: string, Serve: string },
 }
 
@@ -727,11 +791,18 @@ const reasons = Table.new({
 	{ Key = "KickThief", Notice = "prep_kicked" },
 	{ Key = "KickIdle", Notice = "prep_idle" },
 	{ Key = "KickAway" },
+	-- the conveyor (prep-conveyor.md §2.2, §4, §6.5; TASK-513)
+	{ Key = "NoPlate", Notice = "need_plate" }, -- prep_work with no unassembled plate in hand and none parked
+	{ Key = "BeltFull", Notice = "belt_full" }, -- both belt seats taken
+	{ Key = "GrillBusy", Notice = "prep_busy" }, -- the grill seat is taken
+	{ Key = "WrongStop" }, -- a stage / Finish away from its stop or while waiting beside it (the client should not send it)
+	{ Key = "PlateDone" }, -- an assembled hot dog does not go back on the belt
 } :: { Reason })
 
 const rules: Rules = {
-	Enabled = Restaurant.Switch.PrepEnabled, -- TASK-390 / DT-R8: true (trailer); false while Content.Restaurant.Rules.Enabled
-	-- DEC-223: the world prompts of the kitchen are hidden; true = rollback without code (and the restaurant kitchen, TASK-390)
+	Enabled = Restaurant.Switch.PrepEnabled, -- TASK-513 (DT-E1): true in both modes (trailer and restaurant conveyor)
+	Mode = Restaurant.Switch.PrepMode, -- "Conveyor" with the restaurant on, "Trailer" otherwise
+	-- DEC-223: the world prompts of the kitchen are hidden; false in both modes since TASK-513 (the F2 world kitchen is gone)
 	WorldKitchenPrompts = Restaurant.Switch.WorldKitchenPrompts,
 	Delivery = DELIVERY,
 	DoneHold = 0.8,
@@ -920,7 +991,8 @@ const grades: Grades = {
 	Plate = { PerfectAvg = 88, GoodAvg = 60 }, -- FEAT-039
 	Unflipped = 0,
 	Effects = {
-		Perfect = { Tip = 2, TipWindow = 4, Mood = 0 }, -- Q-219 B: only tip and mood, never the price
+		-- Q-219 B: only tip and mood, never the price. Tip = the trailer's fixed tip; TipExtra = DEC-305 (conveyor: base + $1)
+		Perfect = { Tip = 2, TipExtra = 1, TipWindow = 4, Mood = 0 },
 		Good = { TipWindow = 0, Mood = 0 },
 		Messy = { Tip = 0, TipWindow = 0, Mood = -1 },
 	},
@@ -944,6 +1016,23 @@ const texts: Texts = {
 	TrashEmpty = "Nothing to throw",
 	Trashed = "Thrown away",
 	FlipAlert = "Flip!",
+	Left = "Left", -- BELT_UI_LEFT
+	Right = "Right", -- BELT_UI_RIGHT
+	Finish = "Finish", -- BELT_UI_FINISH
+	BeltWait = "Waiting", -- BELT_UI_WAIT
+	BeltFull = "Belt full. Wait for a spot", -- BELT_REF_BELT_FULL
+	NoPlate = "Grab a plate from the table first", -- BELT_REF_NO_PLATE
+	RestFull = "Warmer full. They'll wait here", -- BELT_GRILL_REST_FULL
+	Stops = { Grill = "Grill", Board = "Board", Toppings = "Toppings", Out = "Out" }, -- BELT_UI_STOP_*
+	Patterns = { ketchup = "Zigzag", mustard = "Wave", cream_cheese = "Line" }, -- BELT_PAT_*
+	Toasts = {
+		Parked = "Plate #%d waits on the belt", -- BELT_TOAST_PARKED
+		Resume = "Back to plate #%d", -- BELT_TOAST_RESUME
+		Ready = "#%d ready. Table or pickup", -- BELT_TOAST_READY
+		Off = "#%d back in hand, unfinished", -- BELT_TOAST_OFF
+		Closing = "Closing time. Plate back in hand", -- BELT_TOAST_CLOSING
+		Emptied = "Plate emptied. Ticket kept", -- BELT_TOAST_EMPTIED
+	},
 	-- the drag tutorial lines (World/Coach): short, and they say DRAG
 	Coach = {
 		Pan = "Drag left or right to change station", -- TASK-262
@@ -1021,6 +1110,40 @@ const build = {
 	},
 }
 
+-- The restaurant conveyor (tech/prep-conveyor.md §11.1; MAP-01-r4 §16.5). Read only while Rules.Mode = "Conveyor"
+const conveyor: ConveyorRules = {
+	Stops = Table.new({
+		{ Key = "Grill", Tab = "Grill", Reserve = true }, -- entry; the grill and the rest table in view (no grilling from here)
+		{ Key = "Board", Tab = "Board", Reserve = true }, -- cut the bun, drag the sausage from the rest table into it
+		{ Key = "Toppings", Tab = "Toppings", Reserve = true }, -- draw the toppings + Finish (the grade)
+		{ Key = "Out", Tab = "Toppings", Reserve = false }, -- exit: the focus ends, the plate goes back to the hand
+	} :: { BeltStop }),
+	Seats = { Belt = { 1, 2 }, Grill = { 3 } }, -- Q-380 A (2 on the belt); P2 (1 griller)
+	Rates = { Belt = 6, Stage = 2 },
+	ParkMax = 120,
+	Rest = { Capacity = 8 }, -- DEC-305 (8 sausages) = Vehicles.trailer.RailSlots
+	Grill = { Burn = false, FlipRequired = false, AutoRest = true, FlipBonus = 1, Bar = false },
+	Binding = {
+		Model = "Mount_Belt",
+		Stop = "Stop_%d",
+		WaitLeft = "WaitL_%d",
+		WaitRight = "WaitR_%d",
+		Seats = { "Seat_Belt_1", "Seat_Belt_2", "Seat_Grill" },
+		GrillPrompt = "Prompt_Grill",
+		Camera = "CamAnchor_Belt",
+		Focus = "Focus_Belt",
+		Grill = "CamAnchor_Grill",
+	},
+	-- MAP-01-r4 §16.5 c: Fov 70 on the wide view, 55 on the stop views and on the grill
+	Views = Table.new({
+		{ Key = "Belt", Anchor = "CamAnchor_Belt", Focus = "Focus_Belt", Fov = 70, Stop = 0 },
+		{ Key = "Rest", Anchor = "CamAnchor_Rest", Focus = "Focus_Rest", Fov = 55, Stop = 1 },
+		{ Key = "Board", Anchor = "CamAnchor_Board", Focus = "Focus_Board", Fov = 55, Stop = 2 },
+		{ Key = "Toppings", Anchor = "CamAnchor_Toppings", Focus = "Focus_Toppings", Fov = 55, Stop = 3 },
+		{ Key = "Grill", Anchor = "CamAnchor_Grill", Focus = "Focus_Grill", Fov = 55, Stop = 0 },
+	} :: { BeltView }),
+}
+
 return Table.record({
 	Build = build,
 	Rules = rules,
@@ -1065,14 +1188,19 @@ return Table.record({
 	Reasons = reasons,
 	Texts = texts,
 	-- PrepResult.Act (wire enum)
-	Acts = { "Enter", "Leave", "Tab", "Grill", "Begin", "Finish", "Trash", "Order", "Kick", "Grab" },
+	-- Belt = PrepBelt answer (Value = the new stop), Stage = PrepStage answer (Value = the accepted score); TASK-513
+	Acts = { "Enter", "Leave", "Tab", "Grill", "Begin", "Finish", "Trash", "Order", "Kick", "Grab", "Belt", "Stage" },
 	-- PrepResult.Grade (wire enum); None = the act has no grade
 	GradeKeys = { "None", "Messy", "Good", "Perfect" },
 	GrillActs = { "Place", "Flip", "Collect" }, -- PrepGrill.Act
 	TrashFrom = { "Plate", "Grill", "Rail" }, -- PrepTrash.From (the bin takes the plate, a sausage of the grill, the front of the rail); PrepResult.Value of a Trash = index - 1
 	OrderActs = { "Take", "Serve" }, -- PrepOrder.Act (no Refuse since TASK-354: refusing is closing the window)
 	GrabFrom = { "Grill", "Rail" }, -- PrepGrab.From; PrepClaims record id = (index of From - 1) * 8 + Slot (DEC-259)
-	Stations = 4, -- PrepEnter.Station 1..4, PrepSeats records (BoardSlots of the trailer)
+	Stations = 4, -- PrepEnter.Station 1..4, PrepSeats records (BoardSlots of the trailer; 3 records with the conveyor)
+	-- the restaurant conveyor (TASK-513; tech/prep-conveyor.md §11.1)
+	Conveyor = conveyor,
+	BeltDirs = { "Left", "Right" }, -- PrepBelt.Dir: one stop toward the grill (Left) or toward Out (Right)
+	BeltStages = { "Cut", "Dog" }, -- PrepStage.Stage: bun cut (Slot 0), sausage from rest table position Slot 1..8
 	-- TASK-354 (owner request 2026-10-17, Provisional): the grill Work prompt slides along the counter with the player
 	-- (shared/Prep/WorkSlide). Model = the counter-wide Model of the vehicle (its bounding box is the counter); Fraction = how
 	-- far from the end nearest the authored prompt it may follow (0.7 = about where the toppings start); Step = the PromptStep

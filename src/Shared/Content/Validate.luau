@@ -2263,6 +2263,9 @@ local function checkPrep()
 		if effect.Tip ~= nil then
 			inRange("Prep.Grades", nil, band, "Effects.Tip", effect.Tip, 0, 1000)
 		end
+		if effect.TipExtra ~= nil then
+			inRange("Prep.Grades", nil, band, "Effects.TipExtra", effect.TipExtra, 0, 1000)
+		end
 	end
 	if grades.Effects.Messy.Tip ~= 0 then
 		fail("Prep.Grades", nil, "Messy", "Messy pays no tip (Q-219 B)")
@@ -2278,6 +2281,147 @@ local function checkPrep()
 	end
 	if not Animations.ByKey.work then
 		fail("Prep", nil, nil, "Animations.work is required (the rig at the station)")
+	end
+end
+
+-- The restaurant conveyor (TASK-513; tech/prep-conveyor.md §2-§5, §9, §11.1): ranges against the wire (PrepSeats.Stop
+-- 0..15, Wait 0..2; PrepStage.Slot 0..8; PrepGrab.Slot 1..8), seats inside 1..Stations, enums with the names the services read
+const BELT_STOP_KEYS: { string } = { "Grill", "Board", "Toppings", "Out" }
+const BELT_REASONS: { string } = { "NoPlate", "BeltFull", "GrillBusy", "WrongStop", "PlateDone" }
+const BELT_STOP_WIRE_MAX = 15 -- Net PrepSeats.Stop
+const BELT_SLOT_WIRE_MAX = 8 -- Net PrepStage.Slot / PrepGrab.Slot
+
+local function hasFormat(text: string): boolean
+	return string.format(text, 1) ~= text
+end
+
+local function checkConveyor()
+	const name = "Prep.Conveyor"
+	const conveyor = Prep.Conveyor
+	checkKeys(name .. ".Stops", conveyor.Stops, VALUE_PATTERN)
+	checkKeys(name .. ".Views", conveyor.Views, VALUE_PATTERN)
+	const stops = conveyor.Stops.List
+	if #stops ~= #BELT_STOP_KEYS or #stops > BELT_STOP_WIRE_MAX then
+		fail(name, nil, nil, `Stops needs the {#BELT_STOP_KEYS} stops Grill, Board, Toppings, Out (P6)`)
+	end
+	const wire = setOf(Prep.WireTabs)
+	for index, row in stops do
+		if row.Key ~= BELT_STOP_KEYS[index] then
+			fail(name, index, row.Key, `Stops[{index}] must be '{BELT_STOP_KEYS[index]}' (order = left -> right)`)
+		end
+		if not wire[row.Tab] then
+			fail(name, index, row.Key, `Tab '{row.Tab}' is not a wire tab (PrepSeats.Step)`)
+		end
+		if Prep.Texts.Stops[row.Key] == nil or Prep.Texts.Stops[row.Key] == "" then
+			fail(name, index, row.Key, "Prep.Texts.Stops needs a label per stop")
+		end
+	end
+	if stops[#stops] == nil or stops[#stops].Reserve then
+		fail(name, nil, nil, "the last stop (Out) is not reservable: it holds every plate")
+	end
+
+	-- seats: belt and grill apart, inside the PrepSeats ids; one binding name per seat
+	const seats = conveyor.Seats
+	const seen: { [number]: string } = {}
+	for role, list in { Belt = seats.Belt, Grill = seats.Grill } :: { [string]: { number } } do
+		if #list == 0 then
+			fail(name, nil, role, "Seats needs at least one seat per role")
+		end
+		for _, seat in list do
+			inRange(name, nil, role, "Seats", seat, 1, Prep.Stations)
+			if seen[seat] ~= nil then
+				fail(name, nil, role, `seat {seat} is already a {seen[seat]} seat`)
+			end
+			seen[seat] = role
+		end
+	end
+	if #seats.Belt > 2 then
+		fail(name, nil, "Belt", "at most 2 plates on the belt (Q-380 A)")
+	end
+	const binding = conveyor.Binding
+	if #binding.Seats ~= #seats.Belt + #seats.Grill then
+		fail(name, nil, nil, "Binding.Seats needs one name per seat (index = seat)")
+	end
+	for seat in seen do
+		if binding.Seats[seat] == nil or binding.Seats[seat] == "" then
+			fail(name, nil, nil, `Binding.Seats[{seat}] is missing`)
+		end
+	end
+	for field, value in binding :: any do
+		if type(value) == "string" and value == "" then
+			fail(name, nil, nil, `Binding.{field} is empty`)
+		end
+	end
+	if not hasFormat(binding.Stop) or not hasFormat(binding.WaitLeft) or not hasFormat(binding.WaitRight) then
+		fail(name, nil, nil, "Binding.Stop / WaitLeft / WaitRight need a %d")
+	end
+
+	inRange(name, nil, nil, "Rates.Belt", conveyor.Rates.Belt, 1, 60)
+	inRange(name, nil, nil, "Rates.Stage", conveyor.Rates.Stage, 1, 60)
+	inRange(name, nil, nil, "ParkMax", conveyor.ParkMax, 10, 3600)
+	inRange(name, nil, nil, "Rest.Capacity", conveyor.Rest.Capacity, 1, BELT_SLOT_WIRE_MAX)
+	const trailer = Vehicles.ByKey.trailer
+	if trailer ~= nil and conveyor.Rest.Capacity > trailer.RailSlots then
+		fail(name, nil, nil, "Rest.Capacity is above Vehicles.trailer.RailSlots (the rest table is the rail)")
+	end
+	const grill = conveyor.Grill
+	inRange(name, nil, nil, "Grill.FlipBonus", grill.FlipBonus, 0, 1000)
+	if grill.Burn or grill.FlipRequired then
+		fail(name, nil, nil, "Grill: no burning and no required flip on the conveyor (Q-381 A, DEC-298)")
+	end
+	for index, row in conveyor.Views.List do
+		if row.Anchor == "" or row.Focus == "" then
+			fail(name .. ".Views", index, row.Key, "empty Anchor or Focus")
+		end
+		if row.Fov ~= 0 then
+			inRange(name .. ".Views", index, row.Key, "Fov", row.Fov, 20, 100)
+		end
+		inRange(name .. ".Views", index, row.Key, "Stop", row.Stop, 0, #stops)
+	end
+	if not conveyor.Views.ByKey.Belt or not conveyor.Views.ByKey.Grill then
+		fail(name .. ".Views", nil, nil, "needs the wide Belt view and the griller's Grill view")
+	end
+
+	-- wire enums and answers
+	if #Prep.BeltDirs ~= 2 or not table.find(Prep.BeltDirs, "Left") or not table.find(Prep.BeltDirs, "Right") then
+		fail("Prep", nil, nil, "BeltDirs must be { Left, Right } (PrepBelt.Dir)")
+	end
+	if not table.find(Prep.BeltStages, "Cut") or not table.find(Prep.BeltStages, "Dog") then
+		fail("Prep", nil, nil, "BeltStages needs Cut and Dog (PrepStage.Stage)")
+	end
+	if not table.find(Prep.Acts, "Belt") or not table.find(Prep.Acts, "Stage") then
+		fail("Prep", nil, nil, "Acts needs Belt and Stage (PrepResult.Act)")
+	end
+	for _, key in BELT_REASONS do
+		if not Prep.Reasons.ByKey[key] then
+			fail("Prep.Reasons", nil, key, "conveyor reason missing")
+		end
+	end
+	for _, key in Ingredients.ToppingKeys do
+		if Prep.ToolOf[key] == "Bottle" and (Prep.Texts.Patterns[key] == nil or Prep.Texts.Patterns[key] == "") then
+			fail("Prep.Texts", nil, key, "Patterns needs a name per sauce (Bottle) topping")
+		end
+	end
+	for field, text in Prep.Texts.Toasts :: any do
+		if text == "" then
+			fail("Prep.Texts", nil, nil, `Toasts.{field} is empty`)
+		end
+	end
+
+	-- prompts: prep_grill like prep_work (same phases, tap)
+	const work = Actions.ByKey.prep_work
+	const grillAction = Actions.ByKey.prep_grill
+	if work == nil or grillAction == nil then
+		fail(name, nil, nil, "Actions prep_work and prep_grill are required (DEC-305, two prompts)")
+	end
+	if table.concat(work.Requires.Phase or {}, ",") ~= table.concat(grillAction.Requires.Phase or {}, ",") then
+		fail("Actions", nil, "prep_grill", "Requires.Phase must equal prep_work's")
+	end
+
+	-- the plate in hand (DT-E8): HotDog category, never stacked
+	const plate = Items.ByKey.plate
+	if plate == nil or plate.Category ~= "HotDog" or plate.Stackable then
+		fail(name, nil, nil, "Items.plate is required, Category HotDog, not Stackable (DEC-299, prep-conveyor.md §6.3)")
 	end
 end
 
@@ -2303,10 +2447,37 @@ end
 
 -- Restaurant (tech/restaurant-flow.md rev. 2 §4.2; design/restaurant-flow.md): ranges against the wire (Net Plates, Tablets,
 -- DriveCars, Hatch, Customers.Pickup / Drive), Dialog covers every ingredient of an order, the actions and stations exist
-const RESTAURANT_ACTIONS: { string } =
-	{ "tablet_take", "bun_slice", "plate_put", "plate_take", "grill_flip", "rail_take", "pickup_serve", "drive_serve", "take_box" }
-const RESTAURANT_NOTICES: { string } =
-	{ "plates_full", "pickup_full", "plate_full", "plate_not_ready", "tablet_busy", "drive_left", "stock_low" }
+const RESTAURANT_ACTIONS: { string } = {
+	"tablet_take",
+	"bun_slice",
+	"plate_put",
+	"plate_take",
+	"grill_flip",
+	"rail_take",
+	"pickup_serve",
+	"drive_serve",
+	"take_box",
+	"prep_work",
+	"prep_grill",
+}
+const RESTAURANT_NOTICES: { string } = {
+	"plates_full",
+	"pickup_full",
+	"plate_full",
+	"plate_not_ready",
+	"tablet_busy",
+	"drive_left",
+	"stock_low",
+	-- conveyor (TASK-513)
+	"need_plate",
+	"belt_full",
+	"slot_taken",
+	"plate_gone",
+	"ticket_other",
+	"ticket_gone",
+	"plate_shelved",
+}
+const PLATES_WIRE_MAX = 12 -- Net Plates records / CenterPut.Slot
 const PICKUP_WIRE_MAX = 12 -- Net Customers.Pickup
 const DRIVE_WIRE_MAX = 3 -- Net Customers.Drive / DriveCars records
 const TABLET_WIRE_MAX = 8 -- Tablets records (TAB-n and the DT-PC index)
@@ -2424,6 +2595,26 @@ local function checkRestaurant()
 	if string.format(Restaurant.Binding.PickupPoint, 1) == Restaurant.Binding.PickupPoint then
 		fail(name, nil, nil, "Binding.PickupPoint needs a %d")
 	end
+	-- central table (TASK-513; prep-conveyor.md §7): slots on the wire, reach and put rate
+	const center = Restaurant.CenterTable
+	inRange(name, nil, nil, "CenterTable.Slots", center.Slots, 1, PLATES_WIRE_MAX)
+	inRange(name, nil, nil, "CenterTable.Reach", center.Reach, 1, 50)
+	inRange(name, nil, nil, "CenterTable.PutRate", center.PutRate, 1, 60)
+	const binding = Restaurant.Binding
+	for field, value in { CenterModel = binding.CenterModel, CenterTag = binding.CenterTag, CenterIndex = binding.CenterIndex, CenterTake = binding.CenterTake, CenterTicket = binding.CenterTicket } :: { [string]: string } do
+		if value == "" then
+			fail(name, nil, nil, `Binding.{field} is empty`)
+		end
+	end
+	if string.format(binding.CenterMount, 1) == binding.CenterMount then
+		fail(name, nil, nil, "Binding.CenterMount needs a %d")
+	end
+	for _, key in { "plate_take", "pickup_serve" } do
+		const action = Actions.ByKey[key]
+		if action ~= nil and action.Hold <= 0 then
+			fail(name, nil, key, "held on the conveyor (DEC-302: hold E); Hold must be above 0")
+		end
+	end
 
 	for _, key in RESTAURANT_ACTIONS do
 		if not Actions.ByKey[key] then
@@ -2448,8 +2639,16 @@ local function checkRestaurant()
 	const switch = Restaurant.Switch
 	const on = rules.Enabled
 	const trailer = Vehicles.ByKey.trailer
-	if switch.On ~= on or Prep.Rules.Enabled == on or Prep.Rules.WorldKitchenPrompts ~= on then
-		fail(name, nil, nil, "Prep.Rules.Enabled / WorldKitchenPrompts must follow Restaurant.Switch (TASK-390)")
+	-- TASK-513 (DT-E1, prep-conveyor.md §1): the focused prep runs in both modes, with the conveyor in the restaurant, and
+	-- the world kitchen prompts are gone in both
+	if switch.On ~= on or not switch.PrepEnabled or switch.WorldKitchenPrompts then
+		fail(name, nil, nil, "Switch: PrepEnabled = true and WorldKitchenPrompts = false in both modes (TASK-513)")
+	end
+	if switch.PrepMode ~= (if on then "Conveyor" else "Trailer") then
+		fail(name, nil, nil, "Switch.PrepMode must be Conveyor with the restaurant on, Trailer otherwise (TASK-513)")
+	end
+	if Prep.Rules.Enabled ~= true or Prep.Rules.Mode ~= switch.PrepMode or Prep.Rules.WorldKitchenPrompts ~= false then
+		fail(name, nil, nil, "Prep.Rules.Enabled / Mode / WorldKitchenPrompts must follow Restaurant.Switch (TASK-513)")
 	end
 	if Seating.SitAt ~= (if on then "Served" else "Order") or Seating.DirtyTables == on then
 		fail("Seating", nil, nil, "SitAt / DirtyTables must follow Restaurant.Switch (TASK-390)")
@@ -2677,6 +2876,7 @@ return function()
 	checkMart()
 	checkSeating()
 	checkPrep()
+	checkConveyor()
 	checkRestaurant()
 	checkHorrorScenes()
 	checkSuspense()

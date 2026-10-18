@@ -19,6 +19,15 @@ local function restaurantPlates()
 		Since = Lync.f64(),
 		Orphan = Lync.optional(Lync.bool()),
 		Altered = Lync.optional(Lync.bool()), -- ANM-002 on a plate (wave R4); nil = false
+		-- conveyor (TASK-513, network.md §19.1): grade of an assembled plate, nil = not assembled yet
+		Grade = Lync.optional(Lync.enum(Content.Prep.GradeKeys)),
+	})
+end
+
+-- CenterPut (TASK-513; tech/prep-conveyor.md §7.2): the central table slot clicked
+local function restaurantCenterPut()
+	return Lync.struct({
+		Slot = Lync.int(1, 12),
 	})
 end
 
@@ -65,8 +74,16 @@ return Lync.define("restaurant", {
 	-- README drop.section floor does not apply.
 	-- §2.2, record = plate slot 1..Content.Restaurant.Rules.PlateSlotsMax (only the slots the map binds). Writer: PlateService.
 	-- Npc = NpcId of the ticket on this plate, 0 = none; Line = which hot dog of a pair (1 leader, 2 partner), 0 = none;
-	-- Since = server time the ticket landed (oldest first), 0 = none; Orphan = its customer left (grey "?", FEAT-044)
+	-- Since = server time the ticket landed (oldest first), 0 = none; Orphan = its customer left (grey "?", FEAT-044).
+	-- Conveyor (Content.Prep.Rules.Mode = "Conveyor"; prep-conveyor.md §7.1): record = central table slot
+	-- 1..Content.Restaurant.CenterTable.Slots, every slot always published (free = Npc 0 and no Orphan); Grade = the band of
+	-- an assembled plate, nil = not assembled
 	Plates = Lync.replicate(restaurantPlates()),
+
+	-- c -> s (TASK-513; network.md §19.1, prep-conveyor.md §7.2), <= Content.Restaurant.CenterTable.PutRate per s. Put the
+	-- EQUIPPED plate / hot dog on the free central table slot Slot (the click is not a ProximityPrompt). Responder:
+	-- PlateService (OnInit): active player, within CenterTable.Reach of the slot, slot free; refusals by Notice (slot_taken)
+	CenterPut = Lync.packet(restaurantCenterPut()),
 
 	-- §2.4, record 1 = TAB-1 (always), 2 = TAB-2 (UPG-027 bought and bound), Content.Restaurant.Rules.DrivePcIndex = DT-PC
 	-- (wave R3). Writer: TabletService. Full = no free plate or pickup spot ("Kitchen full" lamp for everyone). The client

@@ -39,6 +39,43 @@ local function settingsRecord()
 	})
 end
 
+-- Focused prep records (DEC-223; conveyor fields: TASK-513, network.md §19, tech/prep-conveyor.md §3.4, §9). Built
+-- outside the define table on purpose: one more inline struct there makes the "game" define "too complex to typecheck"
+-- (LuauSolverV2 budget, prep-conveyor.md §9.3 / P23)
+local function prepSeatRecord()
+	return Lync.struct({
+		User = Lync.f64(), -- UserId, 0 = free
+		Step = Lync.enum(Content.Prep.WireTabs),
+		Ticket = Lync.int(0, 65535), -- pinned NpcId, 0 = none; conveyor: the NpcId of the ticket OF THE PLATE on the belt
+		Since = Lync.f64(), -- server time of the seat
+		-- prep-3d.md §7.2 N3 (TASK-194): cosmetic plate mask of the seat (Content.Prep.PlateMask), nil or 0 = no open plate.
+		-- Not authority: PrepFinish revalidates everything. Conveyor: the server writes the bun / sausage bits at the commit
+		Plate = Lync.optional(Lync.int(0, 255)),
+		-- Conveyor only (Content.Prep.Rules.Mode = "Conveyor"; nil in the trailer). Stop = stop 1..#Conveyor.Stops of this
+		-- seat's plate, nil / 0 = no plate on the belt (grill seat). Wait = 0 / nil on the stop, 1 = waiting beside it on the
+		-- left (WaitL_n), 2 = on the right (WaitR_n). Line = ticket line (1 leader, 2 pair partner, FEAT-038), 0 / nil = the
+		-- only one. Away = the owner left and the plate is parked and reserved on the belt (the seat stays theirs)
+		Stop = Lync.optional(Lync.int(0, 15)),
+		Wait = Lync.optional(Lync.int(0, 2)),
+		Line = Lync.optional(Lync.int(0, 2)),
+		Away = Lync.optional(Lync.bool()),
+	})
+end
+
+local function prepBelt()
+	return Lync.struct({
+		Dir = Lync.enum(Content.Prep.BeltDirs),
+	})
+end
+
+local function prepStage()
+	return Lync.struct({
+		Stage = Lync.enum(Content.Prep.BeltStages),
+		Score = Lync.int(0, 100),
+		Slot = Lync.int(0, 8), -- Cut: 0; Dog: rest table position 1..Content.Prep.Conveyor.Rest.Capacity
+	})
+end
+
 -- Restaurant sets (wave R0) live in their own namespace and module, Net.Restaurant: required here so both machines
 -- define it before Lync.start; code reaches them with require(ReplicatedStorage.shared.Libs.Net.Restaurant).
 require(script.Restaurant)
@@ -776,18 +813,19 @@ return Lync.define("game", {
 		Grade = Lync.enum(Content.Prep.GradeKeys),
 		Value = Lync.int(0, 255),
 	})),
-	-- Set, record id = station 1..Content.Prep.Stations (only the active ones: clamp(connected members, 1, 4), grows only).
-	-- Writer: PrepService. Who works where, for the StationTag and late joiners. At most 4 records, so the keyframe floor of
+	-- Set, record id = station 1..Content.Prep.Stations (only the active ones: clamp(connected members, 1, 4), grows only;
+	-- conveyor: 3 fixed records, Content.Prep.Conveyor.Seats). Writer: PrepService. Who works where, for the StationTag and
+	-- late joiners; conveyor: where each plate is on the belt (network.md §19.1). At most 4 records, so the keyframe floor of
 	-- README "drop.section" (8+ records) cannot happen; User is f64 and Since f64, both far above a byte
-	PrepSeats = Lync.replicate(Lync.struct({
-		User = Lync.f64(), -- UserId, 0 = free
-		Step = Lync.enum(Content.Prep.WireTabs),
-		Ticket = Lync.int(0, 65535), -- pinned NpcId, 0 = none
-		Since = Lync.f64(), -- server time of the seat
-		-- prep-3d.md §7.2 N3 (TASK-194): cosmetic plate mask of the seat (Content.Prep.PlateMask), nil or 0 = no open plate.
-		-- Not authority: PrepFinish revalidates everything. At most 4 records, so no drop.section floor
-		Plate = Lync.optional(Lync.int(0, 255)),
-	})),
+	PrepSeats = Lync.replicate(prepSeatRecord()),
+
+	-- Conveyor (TASK-513; network.md §19.1, tech/prep-conveyor.md §3.3, §6.5). Responder: PrepService (OnInit); refused with
+	-- PrepResult (Act Belt / Stage) outside Content.Prep.Rules.Mode = "Conveyor".
+	-- c -> s, <= Conveyor.Rates.Belt per s. Move OWN plate one stop (no target field: nobody moves another seat's plate)
+	PrepBelt = Lync.packet(prepBelt()),
+	-- c -> s, <= Conveyor.Rates.Stage per s. Commit one stage on the plate (bun from the stock, sausage from the rest table
+	-- position Slot), all or nothing; answer PrepResult Act = Stage (Value = the accepted score)
+	PrepStage = Lync.packet(prepStage()),
 
 	-- Live drag in the 3D prep (DEC-259, closes Q-233; TASK-349 server, TASK-350 client; Content.Prep.Rules.Ghost).
 	-- c -> s, latest wins at Ghost.Hz. What the seated player holds right now and where (world position of the held item).
