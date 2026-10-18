@@ -3826,3 +3826,17 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
 - **Emendas (append-only):** DEC-290 passo 3 ("raios") → "HIDE em rampa". `design/horror-cinematic.md` §2/§4, `Content.HorrorScenes` (passo `Whispers`), TASK-464 ajustados.
 - Nota sobre `Q-357`: o jogo já tem a opção de reduzir movimento (`Motion.Reduced()`); a câmera de terror (TASK-463) usa essa mesma opção — Provisório até o dono confirmar.
 - Impacto: **frontend-coder** (TASK-464), **game-designer**.
+
+### DEC-292 — 2026-10-18 — Apagão: só o disjuntor salva; 30 s com violino subindo e susto no fim; o telefone abre o aviso
+
+- Origem: teste do dono no Play (2026-10-18), mensagens seguidas ao orquestrador.
+- Decidido pelo dono:
+  - **Esconder não salva mais.** O apagão só se resolve **religando o disjuntor**; se a janela acaba, **todos os jogadores perdem** ("senão todos os jogadores perdem").
+  - **Música**: `Scary Violin Notes` (o antigo Scary Violins, 10 s) em **loop**, com volume **subindo** até o fim; por cima, `Scary Violin UP` (uma nota subindo, arquivo de 35 s) tocado **uma vez** e **cortado aos 30 s** (os 5 s finais descartados).
+  - **Susto exatamente no fim da última nota** (aos 30 s do escuro).
+  - **Aviso**: o `phone_glitch` toca do começo (arquivo de 6,5 s, inteiro); **2 s depois** vem o "lights off" com todo o evento.
+  - Ajustes do teste: porta automática abre mais perto; disjuntor não pode ser usado através da parede; sombra e passos do mesmo lado; mais luz em volta do jogador no escuro (luz branca suave no centro dele).
+  - Ideia aprovada para seguir: **The Walker** fazendo os passos de verdade, mas **visível só pelas câmeras de segurança** ("parece um fantasma"); quem vai lá fora não vê nada.
+- **Provisório:** "todos perdem" lido como **cada jogador ativo paga −35 de sanidade** (DEC-277), sem desmaio direto — `Q-358`; 30 s = `Rules/ANM-020 RestaurantWindow`; aviso `OmenFor` = 2 s; luz do jogador 0,9 / alcance 14, branca.
+- **Emendas (append-only):** DEC-283 (esconder na despensa) **deixa de valer** para o apagão; DEC-290/291 seguem (cena dirigida, HIDE em rampa — ver `Q-360`); a legenda passa a "POWER OUT / FIX THE BREAKER".
+- Impacto: **backend-coder** (regra), **frontend-coder** (Score, cena, porta, prompts), **level-designer**, **game-designer**. Tarefas: **TASK-472 a TASK-479**.

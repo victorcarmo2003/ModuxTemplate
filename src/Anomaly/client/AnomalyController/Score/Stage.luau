@@ -27,7 +27,7 @@ export type Pick = {
 
 const STAGES = Content.Score.ByKey
 const ANOMALIES = Content.Score.Anomalies :: { [string]: Content.ScoreAnomaly }
-const HOT: { [string]: boolean } = { Uneasy = true, Tension = true, Climax = true }
+const HOT: { [string]: boolean } = { Uneasy = true, Tension = true, Rise = true, Climax = true }
 
 const Stage = {}
 

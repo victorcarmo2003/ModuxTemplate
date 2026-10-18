@@ -37,8 +37,9 @@ const rule: Api.Rule = {
 		-- s after the attack the power comes back by itself (the shape leaves). PROVISIONAL (TASK-273)
 		RestoreAfter = 3,
 		-- Restaurant only (Content.Restaurant.Rules.Enabled; TASK-444, owner request 2026-10-17). PROVISIONAL
-		OmenFor = 2.5, -- s of flicker (Phase Signal, score Uneasy) before the power goes out
-		RestaurantWindow = 15, -- s of dark before the shape comes (anomalies-v3-restaurant.md §7.1; Content.Score Ramp)
+		OmenFor = 2, -- s from the phone glitch to the power cut (owner 2026-10-18: "two seconds after phone_glitch, lights off"; was 2.5)
+		RestaurantWindow = 30, -- s of dark before the shape comes = the rising violin (Scary Violin UP cut at 30 s, owner 2026-10-18; was 15).
+		-- Mirrors Content.Score anomalies["ANM-020"].Ramp (the client cuts the music and shows the jumpscare at exactly this second)
 		MaxDark = 20, -- s after the attack the power comes back by itself when nobody held the breaker
 		Margin = 1, -- studs around a HideZone (HIDE-P, the pantry) that still count as hidden
 	},

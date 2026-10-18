@@ -78,6 +78,8 @@ local Menu = require(script.Menu)
 const TAG = "Interactable"
 const TICK_RATE = 10
 const MAX_SCREEN_DISTANCE_FRACTION = 0.35
+const SIGHT_STEPS = 4 -- see-through parts skipped before giving up (counts as visible)
+const SIGHT_SEE_THROUGH = 0.9 -- a part at least this transparent never blocks a prompt
 const HYSTERESIS_MARGIN_FRACTION = 0.05
 const BIND_NAME = "Interact"
 -- Client-side floor between two Interact (network.md §4.1: <= 8/s); the server drops the excess anyway.
@@ -185,6 +187,39 @@ end
 
 -- The one prompt Single mode shows among `candidates` (screen point and character distance of each), with hysteresis on
 -- the current target; never switches during a hold
+-- Line of sight from the camera to the anchor (owner 2026-10-18: the breaker could be held through the wall). A hit on
+-- the anchor's own Model (the appliance / panel it belongs to), on the character or on a see-through part (Transparency
+-- >= SIGHT_SEE_THROUGH, invisible zones and markers) does not block; anything else solid between them does.
+function PromptController:InSight(anchor: Instance, position: Vector3, from: Vector3, character: Model): boolean
+	const own = anchor:FindFirstAncestorWhichIsA("Model")
+	const ignore: { Instance } = { character }
+	if own ~= nil then
+		table.insert(ignore, own)
+	elseif anchor:IsA("BasePart") then
+		table.insert(ignore, anchor)
+	end
+	const params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	local origin = from
+	for _ = 1, SIGHT_STEPS do
+		params.FilterDescendantsInstances = ignore
+		const offset = position - origin
+		if offset.Magnitude < 0.05 then
+			return true
+		end
+		const hit = workspace:Raycast(origin, offset, params)
+		if hit == nil then
+			return true
+		end
+		const part = hit.Instance
+		if part:IsA("BasePart") and part.Transparency < SIGHT_SEE_THROUGH then
+			return false
+		end
+		table.insert(ignore, part)
+	end
+	return true
+end
+
 function PromptController:PickSingle(
 	candidates: { [Prompt.Prompt]: { Screen: Vector2, World: number } },
 	pointer: Vector2?,
@@ -907,6 +942,10 @@ function PromptController:Tick()
 		end
 		const point, onScreen = camera:WorldToViewportPoint(position)
 		if not onScreen then
+			continue
+		end
+		-- owner 2026-10-18: no prompt through a wall (the breaker was held from the kitchen)
+		if not self:InSight(prompt.Anchor, position, camera.CFrame.Position, character) then
 			continue
 		end
 		const screen = Vector2.new(point.X, point.Y)

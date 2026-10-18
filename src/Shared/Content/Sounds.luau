@@ -257,7 +257,9 @@ const base = Table.new({
 	music("music_night_town", "rbxassetid://73501320034226", "Night Town (Axiom Project Studio upload)", false),
 	music("music_night_fall", "rbxassetid://135232738690923", "Night Fall (Axiom Project Studio upload)", false),
 	-- horror score themes (TASK-443, Content.Score): the owner's Studio Sounds, looped by the director
-	studio(music("score_violins", "rbxassetid://6080419021", "Scary Violins Sound Effect (owner Studio upload)"), "Scary Violins Sound Effect"), -- Tension (speed and volume ramp)
+	studio(music("score_violins", "rbxassetid://6080419021", "Scary Violins Sound Effect (owner Studio upload)"), "Scary Violin Notes"), -- Tension (speed and volume ramp); the blackout loops it (Rise). Studio name renamed by the owner 2026-10-18
+	-- the blackout's rising single violin note, 35 s file played ONCE and cut at 30 s (owner 2026-10-18; Content.Score stage Rise, Layer)
+	studio(music("score_violin_up", "rbxassetid://123948659352085", "Scary Violin UP (owner Studio upload)", false), "Scary Violin UP"),
 	studio(music("score_coral", "rbxassetid://1846886137", "Horror Coral (owner Studio upload)"), "Horror Coral"), -- Climax
 	-- Ambient
 	ambient("amb_day_street", false, "rbxassetid://108990827199430", "CityAmbient (Axiom Project Studio upload)"),

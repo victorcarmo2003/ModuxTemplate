@@ -53,7 +53,7 @@ end
 local function buildNote(): BillboardGui
 	const gui = Instance.new("BillboardGui")
 	gui.Name = "BreakerNote"
-	gui.AlwaysOnTop = true
+	gui.AlwaysOnTop = false -- owner 2026-10-18: the note showed through the walls (kitchen side)
 	gui.LightInfluence = 0
 	gui.Size = UDim2.fromOffset(170, 38)
 	gui.StudsOffsetWorldSpace = Vector3.new(0, 1.4, 0)

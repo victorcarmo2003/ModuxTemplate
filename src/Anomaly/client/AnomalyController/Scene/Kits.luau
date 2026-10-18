@@ -8,7 +8,8 @@
 	  Door                 the door leaf nearest the step's MapPoint shakes locally: Rattle (handle tried, fast jitter),
 	                       Push (forced against the frame), Hold (one hard jolt, the latch holds). Back to its pose after.
 	                       Lock: the AutoDoor of that leaf stays shut (attribute DoorHeld, DoorController) until the run ends
-	  Shadow               a dark band slides along the light under that door (DOOR-GAP-B, TASK-465) and dims it
+	  Shadow               a dark band on the light under that door (DOOR-GAP-B, TASK-465), dimming it: Pass crosses it,
+	                       Arrive comes in from the side of the step's To MapPoint (the steps) and stays, Leave goes back out
 	  Actor                two white eyes at the step's MapPoint for Duration s (the window, for whoever did not hide)
 	Presentation only, client side, nothing replicated. Every handler registers its undo in state.Undo so the end of the
 	run (record gone) leaves the world as it was.
@@ -204,6 +205,11 @@ end
 
 -- Shadow under the door -------------------------------------------------------------------------------------------------
 
+-- One band per run and gap: Arrive leaves it standing in the middle, a later Leave takes it out (owner 2026-10-18: the
+-- shadow and the steps came from different sides; now both come from / go to the step's `To` MapPoint side)
+type Band = { Part: BasePart, Light: Light?, Brightness: number }
+const bands: { [string]: Band } = {}
+
 const shadow: Handler = function(ctx, state, step, _late)
 	const at = pointOf(ctx, step.Point)
 	if at == nil then
@@ -215,44 +221,77 @@ const shadow: Handler = function(ctx, state, step, _late)
 	if gap == nil then
 		return
 	end
+	const mode = step.Target or "Pass"
 	const duration = math.max(step.Duration or 1.2, 0.2)
-	-- the band crosses the long side of the gap
-	const long = if gap.Size.X >= gap.Size.Z then gap.CFrame.RightVector else gap.CFrame.LookVector
+	const wide = gap.Size.X >= gap.Size.Z
+	local long = if wide then gap.CFrame.RightVector else gap.CFrame.LookVector
 	const length = math.max(gap.Size.X, gap.Size.Z)
 	const width = math.min(gap.Size.X, gap.Size.Z)
-	const band = Instance.new("Part")
-	band.Name = "HorrorScene_Shadow"
-	band.Anchored = true
-	band.CanCollide = false
-	band.CanQuery = false
-	band.CanTouch = false
-	band.CastShadow = false
-	band.Material = Enum.Material.SmoothPlastic
-	band.Color = SHADOW_COLOR
-	band.Transparency = 0.12
-	band.Size = if gap.Size.X >= gap.Size.Z then Vector3.new(length * 0.3, 0.03, width + 0.04) else Vector3.new(width + 0.04, 0.03, length * 0.3)
-	const from = gap.CFrame * CFrame.new(0, 0.012, 0) + (-long * length * 0.65)
-	band.CFrame = from
-	band.Parent = ctx.Folder()
-	const light = gap:FindFirstChildWhichIsA("Light")
-	const brightness = if light ~= nil then light.Brightness else 0
-	if light ~= nil then
-		TweenService:Create(light, TweenInfo.new(duration * 0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, 0, true), { Brightness = brightness * 0.25 }):Play()
+	-- the side the creature is on: towards the `To` point along the gap
+	const side = if type(step.To) == "string" then pointOf(ctx, step.To) else nil
+	if side ~= nil and (side.Position - gap.Position):Dot(long) < 0 then
+		long = -long
 	end
-	TweenService:Create(band, TweenInfo.new(duration, Enum.EasingStyle.Linear), { CFrame = from + long * length * 1.3 }):Play()
-	local done = false
-	local function stop()
-		if done then
+	const centre = gap.CFrame * CFrame.new(0, 0.012, 0)
+	const outside = centre + long * length * 0.75 -- just off the gap, on the creature's side
+	const key = `{state.Id}:{gap:GetFullName()}`
+	local band = bands[key]
+
+	local function clear()
+		const current = bands[key]
+		if current == nil then
 			return
 		end
-		done = true
-		band:Destroy()
-		if light ~= nil and light.Parent ~= nil then
-			light.Brightness = brightness
+		bands[key] = nil
+		current.Part:Destroy()
+		if current.Light ~= nil and current.Light.Parent ~= nil then
+			current.Light.Brightness = current.Brightness
 		end
 	end
-	task.delay(duration + 0.05, stop)
-	state.Undo[`shadow:{gap:GetFullName()}`] = stop
+
+	if mode == "Leave" then
+		if band == nil then
+			return
+		end
+		TweenService:Create(band.Part, TweenInfo.new(duration, Enum.EasingStyle.Sine, Enum.EasingDirection.In), { CFrame = outside }):Play()
+		if band.Light ~= nil then
+			TweenService:Create(band.Light, TweenInfo.new(duration), { Brightness = band.Brightness }):Play()
+		end
+		task.delay(duration + 0.05, clear)
+		return
+	end
+
+	if band == nil then
+		const part = Instance.new("Part")
+		part.Name = "HorrorScene_Shadow"
+		part.Anchored = true
+		part.CanCollide = false
+		part.CanQuery = false
+		part.CanTouch = false
+		part.CastShadow = false
+		part.Material = Enum.Material.SmoothPlastic
+		part.Color = SHADOW_COLOR
+		part.Transparency = 0.12
+		part.Size = if wide then Vector3.new(length * 0.32, 0.03, width + 0.04) else Vector3.new(width + 0.04, 0.03, length * 0.32)
+		part.CFrame = outside
+		part.Parent = ctx.Folder()
+		const light = gap:FindFirstChildWhichIsA("Light")
+		const created: Band = { Part = part, Light = light, Brightness = if light ~= nil then light.Brightness else 0 }
+		band = created
+		bands[key] = created
+		state.Undo[`shadow:{key}`] = clear
+	end
+	const current = band :: Band
+	if current.Light ~= nil then
+		TweenService:Create(current.Light, TweenInfo.new(duration), { Brightness = current.Brightness * 0.35 }):Play()
+	end
+	if mode == "Arrive" then
+		TweenService:Create(current.Part, TweenInfo.new(duration, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), { CFrame = centre }):Play()
+		return
+	end
+	-- Pass: across to the other side and gone
+	TweenService:Create(current.Part, TweenInfo.new(duration, Enum.EasingStyle.Linear), { CFrame = centre - long * length * 0.75 }):Play()
+	task.delay(duration + 0.05, clear)
 end
 
 -- Eyes at a MapPoint ----------------------------------------------------------------------------------------------------

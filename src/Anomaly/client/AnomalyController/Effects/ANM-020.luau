@@ -61,9 +61,10 @@ const CC_TINT = Color3.fromHex("#B8C2E0")
 
 -- Minimum local glow (no flashlight in the game)
 const GLOW_NAME = "ANM020_Glow"
-const GLOW_RANGE = 9
-const GLOW_BRIGHTNESS = 0.45
-const GLOW_COLOR = Color3.fromHex("#A9B6DA")
+-- owner 2026-10-18: too dark to see the door next to you; a soft white light like a lantern at the player's centre
+const GLOW_RANGE = 14
+const GLOW_BRIGHTNESS = 0.9
+const GLOW_COLOR = Color3.fromHex("#EEF2FF")
 
 -- Breaker beacon (house Mustard, never alert red)
 const BEACON_NAME = "ANM020_Beacon"
@@ -105,6 +106,14 @@ const SHAPE_COLOR = Color3.fromHex("#0B0910")
 -- shape stays (it is not in the scene).
 const SCENE = Content.HorrorScenes.ByKey["anm_020_blackout"]
 const SCENE_LIVE = SCENE ~= nil and SCENE.Live == true
+
+-- owner 2026-10-18: the jumpscare lands EXACTLY when the rising violin dies (Content.Score Rise, LayerCut). The server's
+-- jumpscare cue comes a tick + the network later, so in the restaurant this client shows it itself at the second the dark
+-- ran out (Started + the score ramp = Rules/ANM-020 RestaurantWindow) while the power is still out; the server cue that
+-- follows is then ignored (DEC-292: every active player pays, so every client scares). The server still decides the -35.
+const SCORE_ROW = Content.Score.Anomalies["ANM-020"]
+const SCARE_AT = if SCORE_ROW ~= nil then SCORE_ROW.Ramp else 30
+const SCARE_DEDUP = 3 -- s: a server jumpscare cue this close to the local one is the same scare
 const SHAPE_TRANSPARENCY = 0.08
 
 type Saved = { Light: Light?, Enabled: boolean, Part: BasePart?, Material: Enum.Material, Color: Color3 }
@@ -124,6 +133,7 @@ type Session = {
 	NextNoise: number,
 	Saved: { Saved },
 	Map: Blackout.Handle?, -- restaurant total blackout (Kit/Blackout)
+	ScaredAt: number, -- os.clock() of the local jumpscare (0 = none yet)
 	Connection: RBXScriptConnection?,
 	Ended: boolean,
 }
@@ -480,6 +490,7 @@ local function begin(ctx: Effect.Context, occ: Effect.Occurrence): Session
 		NextNoise = clock + between(rng, NOISE_GAP_START),
 		Saved = {},
 		Map = nil,
+		ScaredAt = 0,
 		Connection = nil,
 		Ended = false,
 	}
@@ -499,6 +510,18 @@ local function begin(ctx: Effect.Context, occ: Effect.Occurrence): Session
 	session.Connection = RunService.RenderStepped:Connect(function()
 		step(session)
 	end)
+	if Content.Restaurant.Rules.Enabled then
+		-- counted from the moment the dark began on this client (the record's StartedAt is the omen's, 2 s earlier), the same
+		-- reference the score uses for the rising note's cut (Play 2026-10-18: 27.98 s vs 30.10 s before this)
+		task.delay(SCARE_AT, function()
+			if session.Ended or current ~= session then
+				return
+			end
+			hideShape(session, false)
+			session.ScaredAt = os.clock()
+			Jumpscare.Show(ctx)
+		end)
+	end
 	current = session
 	return session
 end
@@ -647,6 +670,10 @@ return {
 			ctx.Play("neon_click")
 			ctx.Play("post_buzz")
 		elseif cue.Cue == "jumpscare" then
+			const live = current
+			if live ~= nil and live.ScaredAt > 0 and os.clock() - live.ScaredAt < SCARE_DEDUP then
+				return -- already shown on the beat (local, Started + SCARE_AT)
+			end
 			if cue.Entity ~= 0 then
 				-- restaurant (TASK-444): only the player the server made pay
 				if cue.Entity ~= Players.LocalPlayer.UserId % ENTITY_MOD then

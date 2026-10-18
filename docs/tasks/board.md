@@ -1911,3 +1911,22 @@ passos (TASK-443), apagão de terror (TASK-444), `AtmosphereController.Lightning
 
 Paralelismo: 461 primeiro (curta). Depois **462, 463, 464 e 466** em worktrees separadas (arquivos disjuntos) e **465** no Studio
 (única sessão de Studio; não junto com 449/454). 467 junta tudo.
+
+## Tabela de tasks — Feedback do Play do apagão (2026-10-18; TASK-472 a TASK-479; DEC-292)
+
+Já feito nesta rodada (Em QA, commit do orquestrador): porta automática abre a 5 studs (era 8); prompts não atravessam parede
+(checagem de linha de visão no PromptController); status do disjuntor sem AlwaysOnTop; sombra chega/sai pelo lado dos passos;
+luz do jogador no apagão mais branca e forte; regra "só o disjuntor salva" (todos pagam); Score `Rise` (notas em loop + nota
+subindo cortada aos 30 s); `phone_glitch` no aviso (2 s); susto local exatamente aos 30 s (medido no Play: 30,00 s); cena do
+apagão esticada para 30 s; porta dos fundos não é mais travada (é o caminho do disjuntor).
+
+| TASK | Item | Descrição e critério de aceite | Dono | Depende | Status |
+|---|---|---|---|---|---|
+| TASK-472 | Walker | **The Walker dos passos, visível só pelas câmeras**: durante o apagão o modelo AST-064 anda do beco até a porta dos fundos (mesma rota/tempo dos passos da cena), com os passos saindo dele; local, **invisível em primeira pessoa** e **visível só na vista das câmeras de segurança** (Kit/Watch). Aceite: lá fora não se vê nada; pela CAM2 ele aparece andando. | frontend-coder | 467 | Pendente |
+| TASK-473 | bug | **Prompt das câmeras de segurança sumiu** (monitor CCTV): reproduzir com a chave do restaurante ligada, achar a causa (anchor, gate de wave, linha de visão nova?) e corrigir. | debugger | — | Pendente |
+| TASK-474 | prompt | **Prompt de pegar o pedido do cliente fora do rosto**: âncora no peito ou no tablet, para os olhos (anomalias de olho branco) ficarem visíveis. | frontend-coder | — | Pendente |
+| TASK-475 | bug | **Telefone com seta e destaque presos** (Tutorial/Beacon ou BossController): reproduzir, achar por que a marca não sai e corrigir. | debugger | — | Pendente |
+| TASK-476 | bug | **Prompt "abrir porta" perdido em cima da cafeteira** (não existe no Edit: criado em jogo): achar quem cria e remover/realocar. | debugger | — | Pendente |
+| TASK-477 | mapa | **Mesa de trabalho invadindo a porta** da cozinha: encurtar no `restaurant_bind.luau` e no Studio (sincronizar as edições à mão do dono antes). | level-designer (Studio) | — | Pendente |
+| TASK-478 | design | **Estação de preparo em etapas com prato na mão**: proposta de fluxo (cortar o pão → prato → salsicha → condimentos → entrega), com estações separadas no mapa; o dono acha o próprio fluxo "bagunçado" e quer opções. Só proposta + perguntas antes de código. | game-designer + level-designer | — | Pendente |
+| TASK-479 | feedback | **Tomar café com feedback visual maior** (efeito na tela, partículas, número de sanidade subindo, som). | frontend-coder | — | Pendente |

@@ -94,7 +94,7 @@ const STAGE_KEYS: { [string]: StageKey } = {
 type Mark = { Key: string, Ref: string, Phase: string, Since: number, StartedAt: number }
 
 -- The theme playing: its Sound, the stage it belongs to and when it started (os.clock, for the fade-in envelope)
-type Theme = { Stage: StageKey, Sound: Sound, StartedAt: number }
+type Theme = { Stage: StageKey, Sound: Sound, StartedAt: number, Layer: Sound? } -- Layer: the stage's one-shot (Stage.Layer)
 
 type Director = {
 	Deps: Deps,
@@ -250,6 +250,42 @@ end
 
 local function fadeOut(theme: Theme, time: number)
 	fadeSound(theme.Sound, time)
+	-- the layer (the rising note) never fades: it dies with the stage
+	const layer = theme.Layer
+	if layer ~= nil then
+		theme.Layer = nil
+		layer:Destroy()
+	end
+end
+
+-- The stage's one-shot layer (owner 2026-10-18: the blackout's rising violin), started at the point of the file that matches
+-- the time since the driving phase began (server clock), so it ends at LayerCut on every client. nil = none / already past.
+local function newLayer(director: Director, stage: Content.ScoreStage): Sound?
+	const key = stage.Layer
+	if key == nil then
+		return nil
+	end
+	const elapsed = math.max(now() - director.Pick.Since, 0)
+	const cut = stage.LayerCut
+	if cut ~= nil and elapsed >= cut then
+		return nil
+	end
+	const audio = director.Deps.Audio
+	const row = audio:Row(key)
+	const screen = audio.Screen
+	if row == nil or screen == nil or not audio:Ensure(row) then
+		return nil
+	end
+	const sound = Instance.new("Sound")
+	sound.Name = `Score_{stage.Key}_Layer`
+	sound.SoundId = row.Id
+	sound.SoundGroup = audio.Groups.Music
+	sound.Looped = false
+	sound.Volume = stage.LayerVolume or row.Volume
+	sound.TimePosition = elapsed
+	sound.Parent = screen
+	sound:Play()
+	return sound
 end
 
 -- The theme Sound of a stage (nil = silent stage, or the row has no audio yet)
@@ -276,7 +312,7 @@ local function newTheme(director: Director, stage: Content.ScoreStage): Theme?
 	sound.PlaybackSpeed = stage.Speed
 	sound.Parent = screen
 	sound:Play()
-	return { Stage = stage.Key, Sound = sound, StartedAt = os.clock() }
+	return { Stage = stage.Key, Sound = sound, StartedAt = os.clock(), Layer = newLayer(director, stage) }
 end
 
 -- Enters `key`: crossfade of the themes, sting, hold and duck
@@ -330,6 +366,17 @@ local function shape(director: Director)
 	const ramps = stage.VolumeTo ~= stage.Volume or stage.SpeedTo ~= stage.Speed
 	const t = if ramps then Stage.Progress(stage, since, ramp, now()) else 0
 	const envelope = if stage.FadeIn > 0 then math.clamp((os.clock() - theme.StartedAt) / stage.FadeIn, 0, 1) else 1
+	-- past LayerCut (the jumpscare second) the layer is cut dead and the theme stays silent until the stage changes
+	const cut = stage.LayerCut
+	if cut ~= nil and now() - since >= cut then
+		const layer = theme.Layer
+		if layer ~= nil then
+			theme.Layer = nil
+			layer:Destroy()
+		end
+		theme.Sound.Volume = 0
+		return
+	end
 	theme.Sound.Volume = (stage.Volume + (stage.VolumeTo - stage.Volume) * t) * envelope
 	theme.Sound.PlaybackSpeed = stage.Speed + (stage.SpeedTo - stage.Speed) * t
 end

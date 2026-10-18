@@ -17,7 +17,7 @@
 -- Rules.Enabled = false: no director, the AnomalyController stings come back (the published behaviour).
 local Table = require(script.Parent.Table)
 
-export type StageKey = "Calm" | "Uneasy" | "Tension" | "Climax" | "Release"
+export type StageKey = "Calm" | "Uneasy" | "Tension" | "Rise" | "Climax" | "Release"
 
 export type Stage = {
 	Key: StageKey,
@@ -33,6 +33,11 @@ export type Stage = {
 	Sting: string?, -- one-shot on entering the stage (Content.Sounds key, on screen)
 	DuckKitchen: number, -- kitchen SFX volume multiplier while in this stage (1 = none)
 	Hold: number, -- s: minimum time in the stage before a lower one may replace it (Release: then Calm)
+	-- Second sound played ONCE from the start of the driving phase (owner 2026-10-18, the blackout's rising violin), in
+	-- step with the server clock (a late client starts it where it is), stopped dead LayerCut s after the phase began.
+	Layer: string?, -- Content.Sounds key
+	LayerVolume: number?,
+	LayerCut: number?, -- s after the phase began; nil = plays to its end
 }
 
 -- How one anomaly drives the score, by Ref (Content.Anomalies[k].Ref). Missing phase = that phase does not score.
@@ -128,6 +133,26 @@ const stages = Table.new({
 		DuckKitchen = 0.35,
 		Hold = 1,
 	}),
+	-- the blackout (owner 2026-10-18): the violin notes looped, rising in volume for the whole window, over ONE rising
+	-- note (Scary Violin UP) that is cut dead at 30 s, the second the jumpscare lands (Effects/ANM-020)
+	stage({
+		Key = "Rise",
+		Priority = 3,
+		Sound = "score_violins",
+		Volume = 0.1,
+		VolumeTo = 0.75,
+		Speed = 1,
+		SpeedTo = 1,
+		Curve = 1.4,
+		FadeIn = 0.6,
+		FadeOut = 0, -- dies with the note
+		Sting = nil,
+		DuckKitchen = 0.35,
+		Hold = 1,
+		Layer = "score_violin_up",
+		LayerVolume = 0.7,
+		LayerCut = 30, -- = Rules/ANM-020 RestaurantWindow
+	}),
 	stage({
 		Key = "Climax",
 		Priority = 4,
@@ -158,10 +183,10 @@ const anomalies: { [string]: AnomalyScore } = {
 	["ANM-019"] = { Signal = "Tension", Active = "Climax", Ramp = 9 },
 	-- the blackout (TASK-444): omen flicker -> dark + violins up to the attack -> choir if nobody reset the power
 	["ANM-020"] = {
-		Signal = "Uneasy",
-		Active = "Tension",
+		Signal = nil, -- owner 2026-10-18: the omen is the phone glitch alone (HorrorScenes), no sting over it
+		Active = "Rise", -- owner 2026-10-18: notes loop + rising note, cut at the jumpscare
 		Failed = "Climax",
-		Ramp = 15, -- Rules/ANM-020 RestaurantWindow
+		Ramp = 30, -- Rules/ANM-020 RestaurantWindow (the jumpscare second on the client, Effects/ANM-020)
 		RampTrailer = 30, -- Rules/ANM-020 Window
 		Caption = "power_out",
 	},
@@ -171,7 +196,7 @@ const captions = Table.new({
 	{
 		Key = "power_out",
 		Title = "POWER OUT",
-		Line = "HIDE IN THE BACK",
+		Line = "FIX THE BREAKER", -- DEC-292 (owner 2026-10-18): hiding no longer saves; was "HIDE IN THE BACK"
 		LineTrailer = "FIND THE BREAKER",
 		Duration = 2.6,
 	},

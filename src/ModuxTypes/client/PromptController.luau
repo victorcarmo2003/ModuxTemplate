@@ -34,6 +34,7 @@ export type Public = {
 	Setup: (self: Public) -> (),
 	IsSingle: (self: Public, device: string) -> boolean,
 	SinglePointer: (self: Public, device: string, viewport: Vector2) -> Vector2?,
+	InSight: (self: Public, anchor: Instance, position: Vector3, from: Vector3, character: Model) -> boolean,
 	PickSingle: (self: Public, candidates: { [Prompt.Prompt]: { Screen: Vector2, World: number } }, pointer: Vector2?, margin: number) -> Prompt.Prompt?,
 	SetGate: (self: Public, gate: ((Instance) -> boolean)?) -> (),
 	AddGate: (self: Public, name: string, gate: (Instance) -> boolean) -> (),

@@ -28,7 +28,9 @@
 --   Actor      client-only actor at Point: Target = model name under ReplicatedStorage.Assets (or the anomaly's own
 --              placeholder); To = MapPoint it walks to over Duration
 --   Door       the hiding door: Target "Rattle" | "Push" | "Hold" | "Lock" (kept shut until the run ends); Point = door MapPoint; Duration
---   Shadow     a shadow crosses the light under the door: Point = door MapPoint, Duration
+--   Shadow     a shadow on the light under the door: Point = door MapPoint, To = MapPoint of the side it comes from / goes to
+--              (the steps), Target "Pass" (crosses, default) | "Arrive" (comes in from that side and stays in the middle) |
+--              "Leave" (the one standing there goes back out to that side), over Duration
 -- Every number PROVISIONAL (DEC-290) until the owner's Play. Mild (DEC-172): no blood, scares <= 1 s, no clipped scream.
 local Table = require(script.Parent.Table)
 
@@ -102,44 +104,47 @@ const blackout: Scene = {
 	Key = "anm_020_blackout",
 	Name = "The blackout",
 	Live = true,
+	-- owner 2026-10-18: the phone glitch starts the omen (6.5 s file, played whole); 2 s later the power cuts (OmenFor 2);
+	-- the dark lasts 30 s (RestaurantWindow) under the score's Rise stage (violin notes looped, rising, over one rising note
+	-- cut dead at 30 s); the jumpscare lands on that second (Effects/ANM-020). Hiding no longer saves (DEC-292).
 	Steps = {
-		-- omen (Signal, ~2.5 s): the hum rises under the flicker
-		{ At = 0, Phase = "Signal", Kind = "Sound", Target = "hum_rise" },
-		-- t = 0: the breaker drops, the hum dies, a jolt, the bell
+		-- omen (Signal, 2 s): the phone glitch; its strange voice runs ~4.5 s into the dark
+		{ At = 0, Phase = "Signal", Kind = "Sound", Target = "phone_glitch" },
+		-- t = 0: the breaker drops, the hum dies, a jolt
 		{ At = 0, Phase = "Active", Kind = "Sound", Target = "power_cut" },
-		-- the pantry's exit door stays shut for the whole dark (it is the door the creature tries; AutoDoor held)
-		{ At = 0, Phase = "Active", Kind = "Door", Target = "Lock", Point = "SCENE-DOOR" },
 		{ At = 0, Phase = "Active", Kind = "Sound", Target = "hum_die" },
 		{ At = 0, Phase = "Active", Kind = "Shake", Target = "Jolt" },
 		{ At = 0, Phase = "Active", Kind = "Fov", Value = -3, To = 0, Duration = 0.8 },
-		{ At = 1.2, Phase = "Active", Kind = "Sound", Target = "church_bell" },
+		-- the bell once the voice is gone
+		{ At = 5, Phase = "Active", Kind = "Sound", Target = "church_bell" },
 		-- the HIDE words: a few, then all over the screen (DEC-291); the edges close in
-		{ At = 2, Phase = "Active", Kind = "Whispers", Value = 0.4, To = 3, Duration = 9 },
-		{ At = 2, Phase = "Active", Kind = "Vignette", Value = 0, To = 0.35, Duration = 9 },
+		{ At = 5, Phase = "Active", Kind = "Whispers", Value = 0.4, To = 3, Duration = 17 },
+		{ At = 5, Phase = "Active", Kind = "Vignette", Value = 0, To = 0.35, Duration = 17 },
 		-- the steps: from the back alley to the pantry's exit door
-		{ At = 7, Phase = "Active", Kind = "Sound", Target = "walker_step", Point = "SCENE-STEPS-FAR", To = "SCENE-DOOR-OUT", Duration = 6 },
-		{ At = 7, Phase = "Active", Kind = "Fov", Value = 1, To = 0, Duration = 6 },
-		{ At = 9, Phase = "Active", Kind = "Sound", Who = "Safe", Target = "breath_held" },
-		{ At = 11, Phase = "Active", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
-		{ At = 11, Phase = "Active", Kind = "Shadow", Point = "SCENE-DOOR", Duration = 1.2 },
-		{ At = 12.6, Phase = "Active", Kind = "Sound", Target = "steps_stop", Point = "SCENE-DOOR-OUT" },
-		{ At = 12.6, Phase = "Active", Kind = "Vignette", Value = 0.35, To = 0.45, Duration = 1.4 },
-		-- the creature tries the door once: the handle, a push, the latch holds
-		{ At = 13.4, Phase = "Active", Kind = "Door", Target = "Rattle", Point = "SCENE-DOOR", Duration = 0.9 },
-		{ At = 13.4, Phase = "Active", Kind = "Sound", Target = "handle_rattle", Point = "SCENE-DOOR" },
-		{ At = 13.4, Phase = "Active", Kind = "Shake", Target = "Door", Point = "SCENE-DOOR" },
-		{ At = 14.3, Phase = "Active", Kind = "Door", Target = "Push", Point = "SCENE-DOOR", Duration = 0.5 },
-		{ At = 14.3, Phase = "Active", Kind = "Sound", Target = "door_force", Point = "SCENE-DOOR" },
-		{ At = 14.8, Phase = "Active", Kind = "Door", Target = "Hold", Point = "SCENE-DOOR", Duration = 0.4 },
-		{ At = 14.8, Phase = "Active", Kind = "Sound", Target = "latch_hold", Point = "SCENE-DOOR" },
-		-- the window ends (Failed): the eyes at the service window for whoever stayed out (Q-356, Provisional),
-		-- then it walks away; the dark stays until the breaker (Effects/ANM-020)
-		{ At = 0, Phase = "Failed", Kind = "Actor", Who = "Caught", Point = "SCENE-WINDOW-EYES", Duration = 1 },
-		{ At = 1, Phase = "Failed", Kind = "Sound", Target = "walker_step", Point = "SCENE-DOOR-OUT", To = "SCENE-STEPS-FAR", Duration = 6 },
-		{ At = 1, Phase = "Failed", Kind = "Vignette", Value = 0.45, To = 0.15, Duration = 4 },
+		{ At = 18, Phase = "Active", Kind = "Sound", Target = "walker_step", Point = "SCENE-STEPS-FAR", To = "SCENE-DOOR-OUT", Duration = 8 },
+		{ At = 18, Phase = "Active", Kind = "Fov", Value = 1, To = 0, Duration = 8 },
+		{ At = 20, Phase = "Active", Kind = "Sound", Target = "breath_held" },
+		{ At = 22, Phase = "Active", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		-- its shadow comes in under the door from the side of its steps and stops there (owner 2026-10-18)
+		{ At = 24.8, Phase = "Active", Kind = "Shadow", Target = "Arrive", Point = "SCENE-DOOR", To = "SCENE-STEPS-FAR", Duration = 1.2 },
+		{ At = 26, Phase = "Active", Kind = "Sound", Target = "steps_stop", Point = "SCENE-DOOR-OUT" },
+		{ At = 26, Phase = "Active", Kind = "Vignette", Value = 0.35, To = 0.5, Duration = 3.5 },
+		-- it tries the door once: the handle, a push, the latch holds - right before the note dies
+		{ At = 27, Phase = "Active", Kind = "Door", Target = "Rattle", Point = "SCENE-DOOR", Duration = 0.9 },
+		{ At = 27, Phase = "Active", Kind = "Sound", Target = "handle_rattle", Point = "SCENE-DOOR" },
+		{ At = 27, Phase = "Active", Kind = "Shake", Target = "Door", Point = "SCENE-DOOR" },
+		{ At = 28.2, Phase = "Active", Kind = "Door", Target = "Push", Point = "SCENE-DOOR", Duration = 0.5 },
+		{ At = 28.2, Phase = "Active", Kind = "Sound", Target = "door_force", Point = "SCENE-DOOR" },
+		{ At = 29, Phase = "Active", Kind = "Door", Target = "Hold", Point = "SCENE-DOOR", Duration = 0.4 },
+		{ At = 29, Phase = "Active", Kind = "Sound", Target = "latch_hold", Point = "SCENE-DOOR" },
+		-- 30 s (Failed): the jumpscare (Effects/ANM-020, on the beat), then it walks away; the dark stays until the breaker
 		{ At = 0, Phase = "Failed", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 1, Phase = "Failed", Kind = "Sound", Target = "walker_step", Point = "SCENE-DOOR-OUT", To = "SCENE-STEPS-FAR", Duration = 6 },
+		{ At = 1, Phase = "Failed", Kind = "Shadow", Target = "Leave", Point = "SCENE-DOOR", To = "SCENE-STEPS-FAR", Duration = 1.2 },
+		{ At = 1, Phase = "Failed", Kind = "Vignette", Value = 0.5, To = 0.15, Duration = 4 },
 		-- the breaker held in time (Resolved): the power comes back
 		{ At = 0, Phase = "Resolved", Kind = "Sound", Target = "power_up" },
+		{ At = 0, Phase = "Resolved", Kind = "Shadow", Target = "Leave", Point = "SCENE-DOOR", To = "SCENE-STEPS-FAR", Duration = 0.8 },
 		{ At = 0.3, Phase = "Resolved", Kind = "Sound", Target = "lamps_cascade" },
 		{ At = 0, Phase = "Resolved", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
 		{ At = 0, Phase = "Resolved", Kind = "Vignette", Value = 0, To = 0, Duration = 0.6 },

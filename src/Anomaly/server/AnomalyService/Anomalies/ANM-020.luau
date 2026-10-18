@@ -24,9 +24,9 @@
 --           OmenFor s later the power goes out (BeginBlackout, Phase Active, cue blackout_start: "lights off" snap,
 --           the "POWER OUT / HIDE IN THE BACK" caption, the violins rise). Refused while another blackout is on.
 --   Verb    the breaker (TRL-BREAKER, breaker_reset) within RestaurantWindow s: Resolved, the light comes back.
---   Hide    the other answer: be inside a HideZone (HIDE-P, the pantry behind DOOR-P) when the shape comes.
---   Error   RestaurantWindow s with the power out: every active player in the building (inside or within Radius of
---           Point) and NOT in a HideZone pays -Sanity.RuleBroken (-35, DEC-277) through ctx.Fail, with the jumpscare
+--   Hide    no longer an answer (DEC-292, owner 2026-10-18): only the breaker saves the crew.
+--   Error   RestaurantWindow s with the power out: EVERY active player (DEC-292; before: in the building and not in a
+--           HideZone) pays -Sanity.RuleBroken (-35, DEC-277) through ctx.Fail, with the jumpscare
 --           cue for that player only (Entity = UserId % 65536). Never a faint by itself: only a sanity that reaches 0
 --           falls (VitalService). Phase Failed (the choir). The dark stays until the breaker is held, or MaxDark s.
 -- The Context has no blackout call yet, so LightService is resolved from its module (same lookup as Kit/CustomerActor;
@@ -50,8 +50,8 @@ const DEFAULT_POINT = "TRL"
 const DEFAULT_RADIUS = 24
 const DEFAULT_FAINT = 0.7
 const DEFAULT_RESTORE = 3
-const DEFAULT_OMEN = 2.5
-const DEFAULT_RESTAURANT_WINDOW = 15
+const DEFAULT_OMEN = 2
+const DEFAULT_RESTAURANT_WINDOW = 30
 const DEFAULT_MAX_DARK = 20
 const DEFAULT_MARGIN = 1
 
@@ -117,29 +117,19 @@ local function restore(ctx: Api.Context, occ: Api.Occurrence)
 	ctx.Finish(occ)
 end
 
-local function rootOf(player: Player): Vector3?
-	const character = player.Character
-	const root = if character then character:FindFirstChild("HumanoidRootPart") else nil
-	return if root ~= nil and root:IsA("BasePart") then root.Position else nil
-end
-
--- Restaurant (TASK-444): whoever is in the building and not hidden in the back pays -35 (DEC-277), no faint by itself.
+-- Restaurant (TASK-444; DEC-292, owner 2026-10-18): hiding no longer saves anyone. Only the breaker ends the dark in time;
+-- when the window runs out EVERY active player pays -35 (DEC-277), wherever they stand, no faint by itself. (Before
+-- DEC-292: whoever was in the building and not in a HideZone.)
 local function attackRestaurant(ctx: Api.Context, occ: Api.Occurrence, state: State, now: number)
 	state.Stage = "Attacked"
 	state.RestoreAt = now + state.RestoreAfter
-	const zones = Hide.Zones()
 	const victims: { Player } = {}
 	for _, player in ctx.Active() do
-		const position = rootOf(player)
-		const inBuilding = ctx.Vehicle.IsInside(player) or ctx.InZone(player, state.Point, state.Radius)
-		const hidden = position ~= nil and Hide.Inside(zones, position, state.Margin)
-		if inBuilding and not hidden then
-			table.insert(victims, player)
-		end
+		table.insert(victims, player)
 	end
 	ctx.Publish(occ, { Phase = "Failed" })
 	if #victims == 0 then
-		ctx.Log(occ, "the shape found the crew hidden (or nobody inside): nobody paid")
+		ctx.Log(occ, "nobody active: nobody paid")
 		return
 	end
 	for _, player in victims do
