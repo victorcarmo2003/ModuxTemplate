@@ -17,6 +17,14 @@
 --                 Discarded (bun, Altered). The altered sausage of the rail is still never popped from here.
 --   GrillAct      Place / Flip / Collect, the grill moves without a prompt (Stations/Grill.luau).
 --   TrashSausage  the bin by drag: a sausage of a grill slot or of the rail is thrown away (2026-10-12).
+-- Conveyor (TASK-514; tech/prep-conveyor.md §6.5, §10.2; Content.Prep.Rules.Mode = "Conveyor"). The plate is the
+-- PlateService's (a prato-Tool with a ticket); this module only moves what the kitchen holds, one stage at a time, and keeps
+-- no open plate (nothing is reserved, nothing to refund):
+--   Begin(player, nil, {Belt = true})  the bun of a belt plate: the altered bun of the board is adopted (PreCut, ANM-002),
+--                 else 1 bun leaves the stock. No board slot is held.
+--   BeltToppings  all or nothing: one use of every topping; no Give, no rail.
+--   TakeRest      the sausage at a rest table (rail) position, any position (Rail.PopAt of TASK-515; until it lands only
+--                 the front one); returns its flip score, the flip bonus stamp and whether it is the altered one.
 -- Results are (value?, reason?): reason is a Content.Prep.Reasons key (NoSession, NoStock, NoSausage, HandsFull, Busy,
 -- NoStation, Invalid). The plate band travels in ItemService:Give options (Quality, TASK-171).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -81,9 +89,21 @@ export type Deps = {
 
 export type TrashFrom = "Grill" | "Rail"
 
+-- Begin options. Belt = the conveyor bun (no board slot, no open plate kept)
+export type BeginOptions = { Belt: boolean? }
+
+-- A sausage taken from the rest table (conveyor)
+export type RestEntry = {
+	Score: number?, -- grill flip score (nil = ungraded)
+	Flip: boolean, -- flipped inside the bonus window (TASK-515 stamp; false until it lands)
+	Altered: boolean, -- the altered sausage (ANM-002)
+}
+
 export type PlateApi = {
 	TrashSausage: (player: Player, from: TrashFrom, slot: number) -> (boolean, string?),
-	Begin: (player: Player, slot: number?) -> (Ticket?, string?),
+	Begin: (player: Player, slot: number?, options: BeginOptions?) -> (Ticket?, string?),
+	BeltToppings: (player: Player, keys: { string }) -> (boolean, string?),
+	TakeRest: (player: Player, slot: number) -> (RestEntry?, string?),
 	Finish: (player: Player, spec: Spec) -> (Result?, string?),
 	Refund: (player: Player) -> boolean,
 	Trash: (player: Player, options: TrashOptions?) -> TrashResult,
@@ -134,7 +154,29 @@ function Plate.new(deps: Deps): PlateApi
 		Board.Release(ctx, deps.Vehicle(), ticket.Slot, keep)
 	end
 
-	local function begin(player: Player, slot: number?): (Ticket?, string?)
+	-- Conveyor: the bun of a belt plate. Nothing is held: the bun is in the plate the moment this returns
+	local function beltBun(player: Player): (Ticket?, string?)
+		if not deps.IsMember(player) then
+			return nil, "Invalid"
+		end
+		const vehicle = deps.Vehicle()
+		const now = ctx.Now()
+		-- ANM-002: the altered bun on the board goes into the plate as it is (already sliced) and leaves the board
+		const altered = if Board.Find(vehicle) ~= nil then Board.ClaimAltered(ctx, vehicle, nil) else nil
+		if altered ~= nil then
+			Board.Release(ctx, vehicle, altered, false)
+			return { Slot = 0, Altered = true, PreCut = true, Stocked = false, Since = now }, nil
+		end
+		if ctx.IsBlocked(BUN) or ctx.GetStock(BUN) < 1 or not ctx.TakeStock(BUN, 1) then
+			return nil, "NoStock"
+		end
+		return { Slot = 0, Altered = false, PreCut = false, Stocked = true, Since = now }, nil
+	end
+
+	local function begin(player: Player, slot: number?, options: BeginOptions?): (Ticket?, string?)
+		if options ~= nil and options.Belt == true then
+			return beltBun(player)
+		end
 		if not deps.IsMember(player) or (slot ~= nil and not isSlot(slot)) then
 			return nil, "Invalid"
 		end
@@ -272,6 +314,71 @@ function Plate.new(deps: Deps): PlateApi
 		return false, "Invalid"
 	end
 
+	-- Conveyor: one use of every topping of a belt plate, all or nothing (checked first, then taken without a yield)
+	local function beltToppings(player: Player, keys: { string }): (boolean, string?)
+		if not deps.IsMember(player) then
+			return false, "NoSession"
+		end
+		if not validSpec({ Toppings = keys }) then
+			return false, "Invalid"
+		end
+		for _, key in keys do
+			if ctx.IsBlocked(key) then
+				return false, "Invalid"
+			end
+			if ctx.GetStock(key) < 1 then
+				return false, "NoStock"
+			end
+		end
+		for _, key in keys do
+			if not ctx.TakeStock(key, 1) then
+				warn(`[Plate] {key} was checked but could not be taken for {player.Name}`)
+			end
+		end
+		return true, nil
+	end
+
+	-- Rail.PopAt (TASK-515): (Taken?, "Empty"?), Taken = { Score, Flip, Altered }; a (taken, altered, score, flip) tuple is read too.
+	-- Without it only the front position can be taken (Rail.Pop).
+	local function popRest(vehicle: string, slot: number): (boolean, boolean, number?, boolean)
+		const popAt = (Rail :: any).PopAt
+		if type(popAt) == "function" then
+			const first, altered, score, flip = popAt(ctx, vehicle, slot)
+			if type(first) == "table" then
+				const entry = first :: any
+				return true, entry.Altered == true, if type(entry.Score) == "number" then entry.Score else nil, entry.Flip == true
+			end
+			if first ~= true then
+				return false, false, nil, false
+			end
+			return true, altered == true, if type(score) == "number" then score else nil, flip == true
+		end
+		if slot ~= 1 then
+			return false, false, nil, false
+		end
+		const taken, altered, score = Rail.Pop(ctx, vehicle)
+		return taken, altered, score, false
+	end
+
+	-- Conveyor: the sausage at rest table position `slot` (1 = the front) goes into a belt plate
+	local function takeRest(player: Player, slot: number): (RestEntry?, string?)
+		if not deps.IsMember(player) or not isSlot(slot) or slot > Content.Prep.Conveyor.Rest.Capacity then
+			return nil, "Invalid"
+		end
+		const vehicle = deps.Vehicle()
+		if Rail.Find(vehicle) == nil then
+			return nil, "NoStation"
+		end
+		if slot > Rail.Count(vehicle) then
+			return nil, "NoSausage"
+		end
+		const taken, altered, score, flip = popRest(vehicle, slot)
+		if not taken then
+			return nil, "NoSausage"
+		end
+		return { Score = score, Flip = flip, Altered = altered }, nil
+	end
+
 	local function grill(player: Player, act: GrillAction, slot: number?): (GrillResult?, string?)
 		if not deps.IsMember(player) then
 			return nil, "Invalid"
@@ -314,7 +421,13 @@ function Plate.new(deps: Deps): PlateApi
 				if reason == "RailFull" then
 					Refusal.notify(ctx, player, "rail_full", nil)
 				end
+				-- conveyor (TASK-515): the ready sausage goes to the rest table by itself, so a Collect finds the slot Empty or
+				-- NotReady; a silent refusal (Invalid has no toast), nothing to grade
 				return nil, "Invalid"
+			end
+			-- conveyor: flipping is only a bonus (P13), an unflipped sausage carries no reserve grade
+			if Content.Prep.Rules.Mode == "Conveyor" then
+				return { Slot = slot, Score = score, Band = if score ~= nil then Grade.Band(Content.Prep, score) else nil }, nil
 			end
 			const graded = if score ~= nil then score else Content.Prep.Grades.Unflipped
 			return { Slot = slot, Score = graded, Band = Grade.Band(Content.Prep, graded) }, nil
@@ -329,6 +442,8 @@ function Plate.new(deps: Deps): PlateApi
 		Trash = trash,
 		Grill = grill,
 		TrashSausage = trashSausage,
+		BeltToppings = beltToppings,
+		TakeRest = takeRest,
 		Of = function(player: Player): Ticket?
 			const ticket = plates[player]
 			return if ticket then copy(ticket) else nil

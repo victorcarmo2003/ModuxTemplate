@@ -8,6 +8,13 @@
 --     GrillAct(player, act, slot?)         -> GrillResult?, reason? Place / Flip / Collect
 --   CustomerService (TASK-171): TakeOrderFor(player, id?) -> boolean, ServeFor(player, tool?, id) -> SaleResult?
 --   ItemService: SetQuality(tool, band), QualityOf(tool)
+-- Conveyor (TASK-514; tech/prep-conveyor.md §10.2, §10.3), only while Content.Prep.Rules.Mode = "Conveyor":
+--   KitchenService plate api (Kitchen/Plate.luau, reached through KitchenService.Plates: the KitchenService wrappers of
+--   TASK-169 do not forward the Belt options)
+--     Begin(player, nil, {Belt = true}) -> Ticket?, reason?   the bun of a belt plate (stock or the altered bun); no board slot
+--     BeltToppings(player, keys)       -> boolean, reason?    one use of every topping, all or nothing; no Give, no rail
+--     TakeRest(player, slot)           -> RestEntry?, reason? the sausage at that rest table position (Rail.PopAt)
+--   PlateService (TASK-516): Of, WorkablePlate, Borrow, Commit, Empty, Giveback, Shelve (prep-conveyor.md §10.1)
 -- Services come in as `any` so a signature change of another task shows up here and nowhere else. Reasons that cross the wire
 -- are always keys of Content.Prep.Reasons (Bridge.Reason).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -99,6 +106,171 @@ function Bridge.Grill(kitchen: any, player: Player, act: string, slot: number): 
 		return { Ok = false, Reason = Bridge.Reason(reason), Grade = "None", Value = 0 }
 	end
 	return { Ok = true, Reason = "None", Grade = gradeKey(result.Band), Value = wholeByte(result.Slot) }
+end
+
+-- Conveyor: kitchen (TASK-514) -------------------------------------------------------------------------------------------
+
+-- The plate api of the kitchen, nil = the kitchen is off (not the Run place, or not started)
+local function plateApi(kitchen: any): any
+	if kitchen == nil or kitchen.Active ~= true then
+		return nil
+	end
+	return kitchen.Plates
+end
+
+-- The bun of a belt plate (PrepStage Cut). (ok, reason, preCut): preCut = the altered bun of the board was adopted (ANM-002)
+function Bridge.Cut(kitchen: any, player: Player): (boolean, string, boolean)
+	const api = plateApi(kitchen)
+	if api == nil then
+		return false, "NoStation", false
+	end
+	const ticket, reason = api.Begin(player, nil, { Belt = true })
+	if ticket == nil then
+		return false, Bridge.Reason(reason), false
+	end
+	return true, "None", ticket.PreCut == true
+end
+
+export type RestEntry = { Score: number?, Flip: boolean, Altered: boolean }
+
+-- The sausage at rest table position `slot` (PrepStage Dog). (ok, reason, entry)
+function Bridge.Dog(kitchen: any, player: Player, slot: number): (boolean, string, RestEntry?)
+	const api = plateApi(kitchen)
+	if api == nil then
+		return false, "NoStation", nil
+	end
+	-- KitchenService:TakeRest when the kitchen exposes it (TASK-515), else the plate api of Plate.luau (same Rail.PopAt)
+	local entry: any, reason: any = nil, nil
+	if type(kitchen.TakeRest) == "function" then
+		entry, reason = kitchen:TakeRest(player, slot)
+	else
+		entry, reason = api.TakeRest(player, slot)
+	end
+	if reason == "Empty" then
+		reason = "NoSausage"
+	end
+	if type(entry) ~= "table" then
+		return false, Bridge.Reason(reason or "NoSausage"), nil
+	end
+	return true, "None", {
+		Score = if type(entry.Score) == "number" then entry.Score else nil,
+		Flip = entry.Flip == true,
+		Altered = entry.Altered == true,
+	}
+end
+
+-- One use of every topping of the plate (PrepFinish), all or nothing. (ok, reason)
+function Bridge.Toppings(kitchen: any, player: Player, keys: { string }): (boolean, string)
+	const api = plateApi(kitchen)
+	if api == nil then
+		return false, "NoSession"
+	end
+	const ok, reason = api.BeltToppings(player, keys)
+	if ok ~= true then
+		return false, Bridge.Reason(reason)
+	end
+	return true, "None"
+end
+
+-- Conveyor: plates (PlateService, TASK-516) ------------------------------------------------------------------------------
+
+-- prep-conveyor.md §10.1 PlateState (the fields PrepService reads; a frozen copy)
+export type PlateState = {
+	Id: number,
+	Ticket: number,
+	Line: number,
+	Bun: boolean,
+	Dog: boolean,
+	Toppings: { string },
+	Grade: string?,
+	FlipBonus: boolean,
+	Altered: boolean,
+	Cut: number?,
+	Place: number?,
+	StartedAt: number?,
+	Form: string,
+	Holder: Player?,
+}
+
+-- prep-conveyor.md §10.1 PlatePatch
+export type PlatePatch = {
+	Bun: boolean?,
+	Dog: boolean?,
+	Toppings: { string }?,
+	Grade: string?,
+	FlipBonus: boolean?,
+	Altered: boolean?,
+	Sauce: string?,
+	Cut: number?,
+	Place: number?,
+	StartedAt: number?,
+}
+
+const warned: { [string]: boolean } = {}
+
+-- The PlateService method `name`, nil (one warning) while TASK-516 has not landed it
+local function plateMethod(plates: any, name: string): any
+	const method = if plates ~= nil then plates[name] else nil
+	if type(method) ~= "function" then
+		if not warned[name] then
+			warned[name] = true
+			warn(`[PrepService] PlateService:{name} is missing (prep-conveyor.md §10.1, TASK-516): the conveyor refuses plates`)
+		end
+		return nil
+	end
+	return method
+end
+
+local function state(value: any): PlateState?
+	if type(value) ~= "table" or type(value.Id) ~= "number" then
+		return nil
+	end
+	return value :: PlateState
+end
+
+function Bridge.PlateOf(plates: any, id: number): PlateState?
+	const method = plateMethod(plates, "Of")
+	return if method ~= nil then state(method(plates, id)) else nil
+end
+
+-- The plate of the hand that goes on the belt (prep-conveyor.md §2.2: equipped, else the oldest ticket), nil = none
+function Bridge.Workable(plates: any, player: Player): PlateState?
+	const method = plateMethod(plates, "WorkablePlate")
+	return if method ~= nil then state(method(plates, player)) else nil
+end
+
+-- Hand -> Belt: the Tool leaves the hand (not sold). nil = not this player's plate
+function Bridge.Borrow(plates: any, player: Player, id: number): PlateState?
+	const method = plateMethod(plates, "Borrow")
+	return if method ~= nil then state(method(plates, player, id)) else nil
+end
+
+-- A stage written into the plate on the belt
+function Bridge.Commit(plates: any, id: number, patch: PlatePatch): boolean
+	const method = plateMethod(plates, "Commit")
+	return method ~= nil and method(plates, id, patch) == true
+end
+
+-- The bin (prep-conveyor.md §6.6): the content is lost, the ticket stays
+function Bridge.Empty(plates: any, id: number): boolean
+	const method = plateMethod(plates, "Empty")
+	return method ~= nil and method(plates, id) == true
+end
+
+-- Belt -> Hand (plate, or hot_dog once graded), equipped. nil = it did not reach the hand
+function Bridge.Giveback(plates: any, player: Player, id: number): Tool?
+	const method = plateMethod(plates, "Giveback")
+	if method == nil then
+		return nil
+	end
+	const tool = method(plates, player, id)
+	return if typeof(tool) == "Instance" and tool:IsA("Tool") then tool else nil
+end
+
+-- Belt / Hand -> a free slot of the central table. false = no slot (cannot happen while tickets <= slots, DT-E10)
+function Bridge.Shelve(plates: any, id: number): boolean
+	const method = plateMethod(plates, "Shelve")
+	return method ~= nil and method(plates, id) ~= nil
 end
 
 -- Customer ---------------------------------------------------------------------------------------------------------------
