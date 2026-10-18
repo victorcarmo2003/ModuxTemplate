@@ -14,6 +14,10 @@
 -- Wave 3 (TASK-109, ANM-002, ITM-020): Alter puts a bitten bun, already sliced (Ready), on a free active slot
 -- (Record.Altered = 1, no stock). A hot dog made with an altered bun or the rail's altered sausage gets the Tool
 -- attribute Altered = true (ctx.Give -> ItemService GiveOptions.Altered). Every hot dog made emits "assembled" (player, { Altered }) through ctx.Emit.
+-- Conveyor (TASK-496; prep-conveyor.md §1.1; Content.Prep.Rules.Mode = "Conveyor"): the sausage goes on the bun by a gesture at
+-- the Board stop of the belt. "Add Sausage" stays off and board_add_sausage is refused, so no hot dog is made outside the
+-- plate / ticket flow. A board bound in the restaurant is scenery; the public API below (Find, Reserve, ClaimAltered...) is
+-- left as it is for Plate.luau.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 local StationApi = require(script.Parent.Parent.StationApi)
@@ -25,6 +29,7 @@ type Station = StationApi.Station
 const KIND = "board"
 const ADD = "board_add_sausage"
 const HOT_DOG = "hot_dog"
+const CONVEYOR = "Conveyor"
 
 -- Private state: slots held by an open prep plate (TASK-169). A reserved slot is never finished by Tick nor taken by
 -- "Add Sausage"; Board.Reserve / ClaimAltered / Release are the only writers.
@@ -103,7 +108,10 @@ local function oldestReady(station: Station): number?
 end
 
 local function canAdd(station: Station): boolean
-	return station.Kind == KIND and oldestReady(station) ~= nil and Rail.Count(station.Vehicle) >= 1
+	return Content.Prep.Rules.Mode ~= CONVEYOR
+		and station.Kind == KIND
+		and oldestReady(station) ~= nil
+		and Rail.Count(station.Vehicle) >= 1
 end
 
 local function refreshAdd(ctx: Context, station: Station)

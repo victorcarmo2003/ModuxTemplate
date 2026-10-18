@@ -40,13 +40,16 @@
 --     grill_collect, bun_cut, board_add_sausage, topping_add) with their handlers still registered; true gives the old
 --     flow back with no other change. Throw Away stays on in both bins: the BIN-C one inside the trailer (playtest
 --     2026-10-14: a wrong hot dog in hand had only the street bin, outside) and the street bin.
--- Restaurant (R-4, docs/tests/restaurant-e2e.md; Content.Restaurant.Rules.Enabled, off = nothing below happens):
---   * the trailer prompts that build a hot dog with no plate / ticket (RESTAURANT_LEGACY: bun_cut on the bun crate,
---     board_add_sausage on the board) stay off, like the prep-mode gate (handlers kept, Evaluate refuses them too);
---     the restaurant flow keeps grill_place / grill_collect / grill_flip / rail_take / topping_add / bun_slice / plate_*.
---   * a Station with PendingStationKind (the map's CUT-1, still the trailer board clone) binds as that kind: the
---     StationKind attribute is rewritten before the bind (clients read it too) and, for "cut", a Prompt_Slice anchor
---     (bun_slice) is made where the board's first prompt is, when the model has none.
+-- Conveyor (TASK-496; tech/prep-conveyor.md §1.1; DEC-302, DEC-305; Content.Prep.Rules.Mode = "Conveyor", the restaurant):
+--   * one kitchen flow, the focused prep with the conveyor. Every world prompt of the F2 kitchen (CONVEYOR_HIDDEN:
+--     grill_place, grill_collect, grill_flip, bun_cut, bun_slice, board_add_sausage, rail_take, topping_add) is off and
+--     Evaluate refuses it (handlers kept: the trailer uses the same modules). The pieces (CUT-n, COND-n, grill, rail)
+--     stay as scenery and focus anchors. Still on: restock, topping_unwrap (a closed gift bowl), discard, coffee and the
+--     prompts of other services (prep_work, prep_grill, tablet, plate_take of the central table, pickup).
+--   * the selector is Prep.Rules.Mode only, never Restaurant.Rules.Enabled (DT-E1). Trailer ("Trailer") unchanged.
+-- Restaurant map binding (R-4; Content.Restaurant.Rules.Enabled): a Station with PendingStationKind (the map's CUT-1, still
+-- the trailer board clone) binds as that kind, so CUT-n never binds as a board: the StationKind attribute is rewritten
+-- before the bind (clients read it too). Outside the conveyor a "cut" with no Prompt_Slice gets one (bun_slice).
 -- Gift bowls (owner request 2026-10-14, Provisional): a topping of Content.Ingredients.GiftKeys that unlocks comes as a CLOSED
 -- bowl. Wrapped = unlocked, a gift key and not in Opened (run state, atom, snapshot "Unw" like the amounts "Stk"). While wrapped
 -- TakeStock and Restock refuse (topping_wrapped notice) and the Stock record carries Wrapped = true; the action topping_unwrap
@@ -122,11 +125,21 @@ const WORLD_KITCHEN: { [string]: boolean } = {
 	topping_add = true,
 }
 
--- Restaurant on (R-4): trailer prompts that make a hot dog outside the plate / ticket flow
-const RESTAURANT_LEGACY: { [string]: boolean } = {
+-- Conveyor (Content.Prep.Rules.Mode = "Conveyor", the restaurant; prep-conveyor.md §1.1; TASK-496): every world prompt of
+-- the F2 kitchen. The focused prep with the conveyor is the only kitchen flow of MAP-01: these anchors stay as scenery and
+-- focus anchors, prompt off and action refused (handlers stay registered: the trailer uses the same modules).
+-- plate_put / plate_take of the old PLATE-n pass are PlateService's (TASK-516), not station anchors of this service.
+const CONVEYOR_HIDDEN: { [string]: boolean } = {
+	grill_place = true,
+	grill_collect = true,
+	grill_flip = true,
 	bun_cut = true,
+	bun_slice = true,
 	board_add_sausage = true,
+	rail_take = true,
+	topping_add = true,
 }
+const CONVEYOR = "Conveyor"
 const PENDING_KIND = "PendingStationKind"
 const CUT = "cut"
 const SLICE = "bun_slice"
@@ -178,6 +191,20 @@ local function report(label: string, ok: boolean, err: any)
 	if not ok then
 		warn(`[KitchenService] {label} errored: {err}`)
 	end
+end
+
+-- Action key of a world kitchen prompt that is off right now: the five of WORLD_KITCHEN while Prep.Rules.WorldKitchenPrompts
+-- is false (both modes since TASK-513), and the whole F2 set (CONVEYOR_HIDDEN) while Prep.Rules.Mode = "Conveyor"
+-- (TASK-496). The dev override (`prep kitchen`, KitchenService.WorldOverride) true gives every one back, false hides them;
+-- nil = the Content values. A hidden action is refused too (Evaluate), not only its prompt.
+local function worldHidden(override: boolean?, action: string): boolean
+	if override ~= nil then
+		return not override and (WORLD_KITCHEN[action] == true or CONVEYOR_HIDDEN[action] == true)
+	end
+	if Content.Prep.Rules.Mode == CONVEYOR and CONVEYOR_HIDDEN[action] == true then
+		return true
+	end
+	return not Content.Prep.Rules.WorldKitchenPrompts and WORLD_KITCHEN[action] == true
 end
 
 local function wholeNumber(value: any, low: number, high: number): number
@@ -238,7 +265,7 @@ function KitchenService:Setup()
 	self.Context = self:BuildContext() :: StationApi.Context
 	-- Prep mode (TASK-169): open plates and grill moves, see Plate.luau
 	self.Plates = Plate.new(self:BuildPlateDeps()) :: Plate.PlateApi
-	-- Anchors the prep mode hides while Prep.Rules.WorldKitchenPrompts is false
+	-- Anchors the prep mode hides (worldHidden: WorldKitchenPrompts false, or the conveyor's F2 set)
 	self.Hidden = {} :: { [Instance]: boolean }
 	-- Dev only (`prep kitchen`): true / false stands in for the Content flag, nil = the Content value
 	self.WorldOverride = nil :: boolean?
@@ -652,7 +679,8 @@ function KitchenService:AddStation(instance: Instance)
 	}
 	if row.Key == "toppings" then
 		self:EnsureUnwrapAnchors(instance)
-	elseif row.Key == CUT then
+	elseif row.Key == CUT and Content.Prep.Rules.Mode ~= CONVEYOR then
+		-- conveyor (TASK-496): CUT-n is scenery and a focus anchor, no Prompt_Slice is made on it
 		self:EnsureSliceAnchor(instance)
 	end
 	self:CollectParts(station)
@@ -675,7 +703,8 @@ function KitchenService:AddStation(instance: Instance)
 	self:RefreshPrompts(station)
 end
 
--- Restaurant on (R-4): PendingStationKind (a known Content.Stations key) becomes the StationKind before the bind
+-- Restaurant map (R-4): PendingStationKind (a known Content.Stations key) becomes the StationKind before the bind. Map
+-- binding only (CUT-1 is a "cut", never a second board); the kitchen flow is chosen by Prep.Rules.Mode.
 function KitchenService:ApplyPendingKind(instance: Instance)
 	if not Content.Restaurant.Rules.Enabled then
 		return
@@ -951,22 +980,14 @@ function KitchenService:RefreshPrompts(station: StationApi.Station)
 	end
 end
 
--- Station anchor of one of the five world kitchen prompts while Prep.Rules.WorldKitchenPrompts is false (never the street
--- bin: it has no Station). Read from Content every time, so flipping the flag is a data change only.
--- Restaurant on (R-4): the legacy trailer assembly prompts (RESTAURANT_LEGACY) are hidden too.
+-- Station anchor of a world kitchen prompt the focused prep replaces (never the street bin: it has no Station). Read from
+-- Content every time, so flipping the flag is a data change only.
 function KitchenService:HiddenByPrep(anchor: Instance): boolean
 	const action = anchor:GetAttribute("PromptAction")
 	if type(action) ~= "string" or self:StationOf(anchor) == nil then
 		return false
 	end
-	if Content.Restaurant.Rules.Enabled and RESTAURANT_LEGACY[action] then
-		return true
-	end
-	const override = self.WorldOverride
-	if (if override ~= nil then override else Content.Prep.Rules.WorldKitchenPrompts) then
-		return false
-	end
-	return WORLD_KITCHEN[action] == true
+	return worldHidden(self.WorldOverride, action)
 end
 
 function KitchenService:RefreshAllPrompts()
@@ -1115,8 +1136,10 @@ function KitchenService:Evaluate(key: string, player: Player, anchor: Instance):
 	if key == RESTOCK then
 		return self:CheckRestock(player, station, anchor)
 	end
-	if Content.Restaurant.Rules.Enabled and RESTAURANT_LEGACY[key] then
-		return false, nil, nil -- R-4: no hot dog outside the plate / ticket flow
+	if worldHidden(self.WorldOverride, key) then
+		-- the focused prep replaces it (DT-5; TASK-496 in the conveyor): a forged request makes no bun_sliced, no
+		-- sausage_grilled and no hot dog outside the plate / ticket flow
+		return false, nil, nil
 	end
 	const module = self.Modules[station.Kind]
 	const action = if module then module.Actions[key] else nil
