@@ -124,9 +124,10 @@ const written: { Page } = {
 		"Its headlights get brighter.",
 	}, { "It never honks for food." }, { "Shut the window before the beam.", "Stay inside until it drives away." }),
 
-	page("anm_019_roof_walker", "The Roof Walker", "Hide", {
+	page("anm_019_roof_walker", "The Roof Walker", "Careful", {
 		"Slow, heavy steps on the roof.",
-	}, { "It is never Walt." }, { "Get out and hide out back." }),
+		"Dust falls. The lamps swing.",
+	}, { "It is never Walt." }, { "Keep your head down.", "Don't look up until it's gone." }),
 
 	page("anm_009_knock", "The Knock", "Careful", {
 		"Knock knock knock at the back door.",

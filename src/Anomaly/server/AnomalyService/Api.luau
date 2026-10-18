@@ -81,6 +81,9 @@ export type Context = {
 	-- gaze cone (Sanity.SeeAngle, or `angle` degrees full cone: ~90 = anywhere on screen) up to range + line of sight.
 	-- Not Active, no fresh Gaze, or protected (window closed, inside the trailer) with the target outside = false
 	Looking: (player: Player, target: Vector3, range: number, angle: number?) -> boolean,
+	-- TASK-484: signed camera pitch in degrees (+ = up) of an Active player's latest Gaze; nil = no fresh Gaze, not
+	-- Active or watching the security cameras (a screen, not the eyes)
+	Pitch: (player: Player) -> number?,
 	-- accumulates dt for every Active player Looking at target; Sanity.SeeTime reached -> VitalService:SeeAnomaly
 	SeenTick: (occ: Occurrence, target: Vector3, range: number, dt: number) -> (),
 	-- direct "seen" (AudioZone anomalies): VitalService:SeeAnomaly(player, key)

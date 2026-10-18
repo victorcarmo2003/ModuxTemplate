@@ -21,13 +21,13 @@ fase do passo (`Step.Phase`, `Step.At` segundos depois). Todos os clients tocam 
 ## 2. Tipos (resumo; a fonte é o arquivo de dados)
 
 `Scene { Key = <chave de Content.Anomalies>, Name, Steps }` · `Step { At, Phase, Kind, Who?, Target?, Value?, To?,
-Duration?, Point?, Burst?, Text?, Sound?, Seen? }` (`Sound`/`Seen` só no `Actor`, TASK-472) · `Rules { Latency, ReduceMotion, MaxControlLock, MaxVignette, MaxFov, MaxNudge,
+Duration?, Point?, Burst?, Text?, Sound?, Seen? }` (`Sound` no `Actor` e no `Roof`, `Seen` só no `Actor`, TASK-472/484) · `Rules { Latency, ReduceMotion, MaxControlLock, MaxVignette, MaxFov, MaxNudge,
 MaxPull, Shakes }` (`MaxPull` = teto do puxão de câmera dos eventos de suspense, `CameraController:HorrorPull`; não é passo de cena).
 
 Eventos de suspense (TASK-481, DEC-294) usam o mesmo kit de câmera/tela/whispers fora de cena: contrato em `tech/suspense.md`.
 
 Tipos de passo: `Sound`, `Music`, `Lights`, `Lightning`, `Whispers` (palavras HIDE na tela em rampa, DEC-291), `Vignette`, `Shake`, `Fov`, `Nudge`, `Text`, `Actor`, `Door`,
-`Shadow` (semântica no cabeçalho de `HorrorScenes.luau`). `Point` é nome de `MapPoint` (`SCENE-DOOR`, `SCENE-DOOR-OUT`,
+`Shadow`, `Roof`, `HeadDown` (TASK-484; semântica no cabeçalho de `HorrorScenes.luau`). `Point` é nome de `MapPoint` (`SCENE-DOOR`, `SCENE-DOOR-OUT`,
 `SCENE-STEPS-FAR`, `SCENE-WINDOW-EYES` no restaurante — criados pela TASK-465).
 
 ## 3. Limites (checados pela validação)

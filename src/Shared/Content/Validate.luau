@@ -2476,7 +2476,8 @@ local function checkHorrorScenes()
 	const doors = setOf({ "Rattle", "Push", "Hold", "Lock" })
 	const needPoint = setOf({ "Door", "Shadow", "Nudge" }) -- Actor: only the eyes (no Target) need one
 	const seens = setOf({ "All", "Cameras" })
-	const kinds = setOf({ "Sound", "Music", "Lights", "Lightning", "Whispers", "Heartbeat", "Cinema", "Vignette", "Shake", "Fov", "Nudge", "Text", "Actor", "Door", "Shadow" })
+	const kinds = setOf({ "Sound", "Music", "Lights", "Lightning", "Whispers", "Heartbeat", "Cinema", "Vignette", "Shake", "Fov", "Nudge", "Text", "Actor", "Door", "Shadow", "Roof", "HeadDown" })
+	const roofs = setOf({ "Walk", "Leave", "Thud" })
 	for index, scene in HorrorScenes.List do
 		const key = scene.Key
 		if Anomalies.ByKey[key] == nil then
@@ -2551,6 +2552,26 @@ local function checkHorrorScenes()
 				if step.Text == nil or step.Text == "" then
 					fail("HorrorScenes", index, key, `{where} Text needs Text`)
 				end
+			elseif step.Kind == "Roof" then
+				-- TASK-484: fractions of the walk line (0 = one end, 1 = the other)
+				if not roofs[step.Target or "Walk"] then
+					fail("HorrorScenes", index, key, `{where} Roof '{tostring(step.Target)}' is not Walk, Leave or Thud`)
+				end
+				if step.Value ~= nil then
+					inRange("HorrorScenes", index, key, `{where}.Value`, step.Value, 0, 1)
+				end
+				if step.To ~= nil and type(step.To) ~= "number" then
+					fail("HorrorScenes", index, key, `{where} Roof To is a fraction of the walk (0..1)`)
+				elseif type(step.To) == "number" then
+					inRange("HorrorScenes", index, key, `{where}.To`, step.To, 0, 1)
+				end
+				if step.Sound ~= nil and Sounds.ByKey[step.Sound] == nil then
+					fail("HorrorScenes", index, key, `{where} Roof Sound '{step.Sound}' is not a Content.Sounds key`)
+				end
+			elseif step.Kind == "HeadDown" then
+				-- TASK-484: Value = pitch (degrees, 0 = stop), To = nudge degrees (<= MaxNudge)
+				inRange("HorrorScenes", index, key, `{where}.Value`, step.Value or 0, 0, 80)
+				inRange("HorrorScenes", index, key, `{where}.To`, (step.To :: number?) or 0, 0, rules.MaxNudge)
 			elseif step.Kind == "Actor" then
 				-- TASK-472: Target nil = the eyes at Point; Target = a model walking to To
 				if step.Target == nil or step.Target == "" then
@@ -2573,8 +2594,8 @@ local function checkHorrorScenes()
 					fail("HorrorScenes", index, key, `{where} Actor Value is 1 (gone on arrival) or nil`)
 				end
 			end
-			if step.Kind ~= "Actor" and (step.Sound ~= nil or step.Seen ~= nil) then
-				fail("HorrorScenes", index, key, `{where} Sound / Seen are Actor fields only`)
+			if (step.Kind ~= "Actor" and step.Seen ~= nil) or (step.Kind ~= "Actor" and step.Kind ~= "Roof" and step.Sound ~= nil) then
+				fail("HorrorScenes", index, key, `{where} Sound is an Actor / Roof field, Seen an Actor field only`)
 			end
 		end
 	end

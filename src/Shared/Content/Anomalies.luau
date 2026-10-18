@@ -267,6 +267,7 @@ stalker.Family = "D"
 -- V2 family C (DEC-254, TASK-273): everything goes dark, the breaker at the back (hold 3 s), the shade attacks in 30 s
 const blackout = anomaly(4, "anm_020_blackout", "The blackout", "World", 0, "Party", 100, true, {
 	"anm_003_stopped_clock",
+	"anm_019_roof_walker",
 }, {
 	"blackout_warn",
 	"blackout_start",
@@ -276,6 +277,16 @@ const blackout = anomaly(4, "anm_020_blackout", "The blackout", "World", 0, "Par
 blackout.Ref = "ANM-020"
 blackout.Night = 3 -- TASK-341 (Provisional): the first power failure on Night 3 (was 4), presented by call_night_3
 blackout.Family = "C"
+
+-- TASK-484 (DEC-294, DEC-295 / Q-367 A): the roof walker is no longer a hide monster. It walks on the roof, overhead,
+-- and whoever LOOKS UP while it walks pays (Gaze pitch, Rules/ANM-019). No street actor (World, no NPC slot); only the
+-- caught cue. Never with the blackout (both take the screen: bars, whispers, heartbeat). Family B keeps its agenda slot
+-- ("something is coming", Night 9 premiere).
+const roofWalker = anomaly(9, "anm_019_roof_walker", "The roof walker", "World", 0, "Party", 100, true, {
+	"anm_020_blackout",
+}, { "jumpscare" })
+roofWalker.Ref = "ANM-019"
+roofWalker.Family = "B"
 
 -- TASK-341 (Provisional): debuts on Night 4 (was 3), the rain night, swapped with the blackout
 const turnedNeck = odd(4, 12, "anm_012_turned_neck", "The turned neck")
@@ -306,7 +317,7 @@ const rows: { Anomaly } = {
 	odd(8, 16, "anm_016_starer", "The starer"),
 	monster(7, 17, "anm_017_crawler", "The crawler"),
 	monster(8, 18, "anm_018_grin", "The grin"),
-	monster(9, 19, "anm_019_roof_walker", "The roof walker"),
+	roofWalker,
 	blackout,
 }
 
