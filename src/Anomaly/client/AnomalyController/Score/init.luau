@@ -19,6 +19,9 @@
 	    every stage sets the kitchen SFX duck to its DuckKitchen (AudioController:SetKitchenDuck).
 	  - Captions (TASK-444): a record of a listed anomaly with a Caption turning Active (seen live, or arriving Active
 	    less than Rules.CaptionFresh s old) shows Content.Score.Captions[k] once (HorrorCaption, its own ScreenGui).
+	  - Score.Scene(key) (TASK-462, horror scene Music steps): the scene owns the theme. The stage theme fades out and
+	    Content.Sounds[key] loops in its place ("Stop" = silence); Score.Scene(nil) gives the theme back to the stage.
+	    Stage hold, duck and stings go on as usual meanwhile.
 	  - `/dev score <calm|uneasy|tension|climax|release|auto>`: forces a stage until `auto` (DevAudio "score:<stage>",
 	    AudioController.ScoreHook).
 	Content.Score.Rules.Enabled = false: Start does nothing and AnomalyController keeps its old stings.
@@ -77,6 +80,8 @@ const RULES = SCORE.Rules
 const ANOMALIES = SCORE.Anomalies :: { [string]: Content.ScoreAnomaly }
 const TICK = 1 / 15 -- s: stage pick and the Tension ramp
 const DEV_RAMP = 15 -- s of the ramp of a forced Tension
+const SCENE_FADE = 1 -- s: crossfade between the stage theme and a scene's (Score.Scene)
+const SCENE_STOP = "Stop"
 const STAGE_KEYS: { [string]: StageKey } = {
 	calm = "Calm",
 	uneasy = "Uneasy",
@@ -100,6 +105,8 @@ type Director = {
 	Marks: { [number]: Mark },
 	Forced: StageKey?,
 	ForcedSince: number,
+	SceneOn: boolean, -- a horror scene owns the theme (Score.Scene)
+	SceneSound: Sound?,
 	Started: boolean,
 	Warned: { [string]: boolean },
 	CaptionShown: Vide.Source<boolean>,
@@ -229,8 +236,7 @@ end
 
 -- Themes -------------------------------------------------------------------------------------------------------------
 
-local function fadeOut(theme: Theme, time: number)
-	const sound = theme.Sound
+local function fadeSound(sound: Sound, time: number)
 	if time <= 0 then
 		sound:Destroy()
 		return
@@ -240,6 +246,10 @@ local function fadeOut(theme: Theme, time: number)
 		sound:Destroy()
 	end)
 	tween:Play()
+end
+
+local function fadeOut(theme: Theme, time: number)
+	fadeSound(theme.Sound, time)
 end
 
 -- The theme Sound of a stage (nil = silent stage, or the row has no audio yet)
@@ -281,7 +291,9 @@ local function enter(director: Director, key: StageKey, sting: boolean)
 
 	const old = director.Theme
 	const sameSound = old ~= nil and from ~= nil and from.Sound == to.Sound
-	if not sameSound then
+	if director.SceneOn then
+		-- a horror scene owns the theme (Score.Scene): the stage only moves hold, duck and sting
+	elseif not sameSound then
 		if old ~= nil then
 			director.Theme = nil
 			fadeOut(old, if from ~= nil then from.FadeOut else 1)
@@ -407,6 +419,8 @@ function Score.Start(deps: Deps)
 		Marks = {},
 		Forced = nil,
 		ForcedSince = 0,
+		SceneOn = false,
+		SceneSound = nil,
 		Started = false,
 		Warned = {},
 		CaptionShown = Vide.source(false),
@@ -441,6 +455,62 @@ function Score.Start(deps: Deps)
 		elapsed = 0
 		step(director)
 	end)
+end
+
+-- A scene's own looped theme (fades in to the row volume)
+local function sceneSound(director: Director, key: string): Sound?
+	const audio = director.Deps.Audio
+	const row = audio:Row(key)
+	const screen = audio.Screen
+	if row == nil or screen == nil or not audio:Ensure(row) then
+		return nil
+	end
+	const sound = Instance.new("Sound")
+	sound.Name = `Score_Scene_{key}`
+	sound.SoundId = row.Id
+	sound.SoundGroup = audio.Groups.Music
+	sound.Looped = true
+	sound.Volume = 0
+	sound.Parent = screen
+	sound:Play()
+	TweenService:Create(sound, TweenInfo.new(SCENE_FADE), { Volume = row.Volume }):Play()
+	return sound
+end
+
+-- Horror scene Music step (TASK-462): key = Content.Sounds key the scene loops instead of the stage theme, "Stop" =
+-- silence, nil = the stage gets its theme back. false = the director is not running (score off): the caller plays it.
+function Score.Scene(key: string?): boolean
+	const director = current
+	if director == nil then
+		return false
+	end
+	const old = director.SceneSound
+	if old ~= nil then
+		director.SceneSound = nil
+		fadeSound(old, SCENE_FADE)
+	end
+	if key == nil then
+		if director.SceneOn then
+			director.SceneOn = false
+			const stage = SCORE.ByKey[director.Stage]
+			if stage ~= nil and director.Theme == nil then
+				director.Theme = newTheme(director, stage)
+			end
+		end
+		return true
+	end
+	if not director.SceneOn then
+		director.SceneOn = true
+		const theme = director.Theme
+		if theme ~= nil then
+			director.Theme = nil
+			fadeOut(theme, SCENE_FADE)
+		end
+	end
+	if key ~= SCENE_STOP then
+		director.SceneSound = sceneSound(director, key)
+	end
+	return true
 end
 
 -- Stage of the moment ("Calm" before Start or with the score off)

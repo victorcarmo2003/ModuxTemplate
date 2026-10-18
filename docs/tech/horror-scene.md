@@ -41,3 +41,26 @@ Tipos de passo: `Sound`, `Music`, `Lights`, `Lightning`, `Whispers` (palavras HI
 - **TASK-463** câmera (perfis, FOV, nudge, opção). **TASK-464** vinheta e o passo `Whispers` (HIDE em rampa).
 - **TASK-465** porta da despensa e `MapPoint`s. **TASK-466** sons novos. **TASK-467** liga a cena do apagão no jogo,
   convivendo com `Effects/Kit/Blackout` (TASK-444) sem duplicar som/luz: o kit passa a ler os passos da cena.
+
+### 4.1 Player (TASK-462, Em QA, 2026-10-18)
+
+- Código: `src/Anomaly/client/AnomalyController/Scene/` (`init.luau` relógio/filas/`Who`, `Steps.luau` despachante,
+  `Lights.luau`). Dentro do AnomalyController (sem controller novo): `Write`/`Unmount`/`OnCue` alimentam
+  `Scene.Record`/`Scene.Remove`/`Scene.Cue`; `OnStart` chama `Scene.Start`.
+- Âncora: fase vista mudando ao vivo = hora do servidor na chegada; primeira fase vista = `StartedAt` (exato se o
+  registro nasceu nela; para quem entra depois do `Signal` erra para "mais atrasado": pula one-shot em vez de repetir).
+  `StartedAt` não muda com a fase no servidor, por isso a âncora é local.
+- Implementados: `Sound` (2D, ou 3D em peça local no `MapPoint`, andando até `To` e repetindo som não-loop),
+  `Music` (`Score.Scene(key|"Stop"|nil)`, novo no diretor da TASK-443; com o score desligado, `AudioController:Loop`),
+  `Lights` (fixtures do LightController marcadas + `Kit/Blackout.Darken/Look`; `Cascade` usa o novo `Handle.Sweep`,
+  aditivo — o comportamento do kit não mudou), `Text` (`HorrorCaption` da TASK-444, título/linha cortados no 1º ". ").
+- Stubs (log uma vez no Studio): `Shake`/`Fov`/`Nudge` TASK-463, `Vignette`/`Whispers` TASK-464, `Door`/`Shadow`
+  TASK-465, `Actor`/`Lightning` TASK-467. Cada task pluga o seu com `Scene.Handle(kind, handler)` — assinatura
+  `(ctx, state, step, late)`; `late` > 0 = aplicar estado de onde a cena está.
+- **Flag `Live`** por cena (`Content.HorrorScenes`): `nil` = só toca via `/dev scene`. A cena do apagão fica sem `Live`
+  até a TASK-467, porque `Effects/ANM-020` + `Kit/Blackout` + `Score/` já fazem luz/som/legenda (evita duplicar).
+- `/dev scene [<key|ANM-###|n>|stop]` (`Dev/Commands/Scene.luau`): marca o atributo `ReplicatedStorage.DevHorrorScene`
+  e força a anomalia (fase Night). No dev o efeito do ANM-020 roda junto, então alguns sons/luzes saem dobrados até a
+  TASK-467.
+- QA pendente (Play, 2 clients): passos < 150 ms de diferença; entrar atrasado aplica luz/música; cancelar limpo ao
+  terminar; `MapPoint`s `SCENE-*` ainda não existem (TASK-465) — som 3D cai para 2D com aviso.

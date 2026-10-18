@@ -8,6 +8,7 @@
 	local Blackout = require(script.Parent.Kit.Blackout)
 	local handle = Blackout.Darken(skip)  -- every light under LightPresets.Blackout.Roots off locally (skip = owned by others)
 	handle.Restore()                      -- gives back what is still as we left it
+	handle.Sweep(1.5, origin)             -- same, nearest first, spread over 1.5 s (horror scene Cascade, TASK-462)
 	Blackout.Look(true)                   -- Lighting blends to the blackout look over FadeIn s
 	Blackout.Look(false)                  -- and back to the night values over FadeOut s
 	```
@@ -39,7 +40,7 @@ const RENDER_PRIORITY = Enum.RenderPriority.Camera.Value + 3 -- after Atmosphere
 const LAMP_OFF_MATERIAL = Enum.Material.SmoothPlastic
 const LAMP_OFF_COLOR = Color3.fromHex("#3A3540")
 
-export type Handle = { Restore: () -> () }
+export type Handle = { Restore: () -> (), Sweep: (duration: number, origin: Vector3) -> () }
 
 type Saved = {
 	Instance: Instance,
@@ -168,6 +169,40 @@ local function restoreOne(saved: Saved)
 	end
 end
 
+local function positionOf(instance: Instance): Vector3?
+	if instance:IsA("BasePart") then
+		return instance.Position
+	end
+	const part = instance:FindFirstAncestorWhichIsA("BasePart")
+	return if part ~= nil then part.Position else nil
+end
+
+-- Restores the entries nearest to origin first, the farthest one `duration` s later (a staggered power-up)
+local function sweep(entries: { Saved }, duration: number, origin: Vector3)
+	if duration <= 0 then
+		for _, entry in entries do
+			restoreOne(entry)
+		end
+		return
+	end
+	const distance: { [Saved]: number } = {}
+	local far = 0
+	for _, entry in entries do
+		const position = positionOf(entry.Instance)
+		const d = if position ~= nil then (position - origin).Magnitude else 0
+		distance[entry] = d
+		far = math.max(far, d)
+	end
+	for _, entry in entries do
+		const delay = if far > 0 then duration * distance[entry] / far else 0
+		if delay <= 0 then
+			restoreOne(entry)
+		else
+			task.delay(delay, restoreOne, entry)
+		end
+	end
+end
+
 -- Everything that glows under the roots goes off locally. skip = instances another system drives (LightController
 -- fixtures, what the effect already saved): never touched
 function Blackout.Darken(skip: { [Instance]: boolean }): Handle
@@ -189,6 +224,15 @@ function Blackout.Darken(skip: { [Instance]: boolean }): Handle
 				restoreOne(entry)
 			end
 			table.clear(saved)
+		end,
+		Sweep = function(duration: number, origin: Vector3)
+			if done then
+				return
+			end
+			done = true
+			const entries = table.clone(saved)
+			table.clear(saved)
+			sweep(entries, duration, origin)
 		end,
 	}
 end

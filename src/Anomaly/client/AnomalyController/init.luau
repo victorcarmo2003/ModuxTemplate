@@ -18,6 +18,8 @@
 	    issue" pill when the power is on.
 	  - Score/ (TASK-443, TASK-444): the horror score director (Calm / Uneasy / Tension / Climax / Release) and the
 	    "POWER OUT" caption, driven by these records; started in OnStart (Content.Score.Rules.Enabled).
+	  - Scene/ (TASK-462): the horror scene player (Content.HorrorScenes), fed by Write / Unmount / OnCue, started in
+	    OnStart; plays a scene's steps on the timeline of its record (no packet of its own).
 	  - stings (user request 2026-10-10, Content.SoundRules.Stings): AnomalyStart (horror_sting) when a record
 	    appears less than STING_FRESH s after its StartedAt (a late joiner hears nothing); AnomalyResolved
 	    (horror_chase_stop) when a live record turns Resolved. Both on screen with the DEC-173 scare cap.
@@ -38,6 +40,7 @@ local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Effect = require(script.Effect)
 local Breaker = require(script.Breaker)
 local Score = require(script.Score)
+local Scene = require(script.Scene)
 
 export type Phase = Effect.Phase
 export type Record = Effect.Record
@@ -270,6 +273,7 @@ function AnomalyController:Unmount(id: number)
 	end
 	self.Lives[id] = nil
 	self.Count(math.max(0, self.Count() - 1))
+	Scene.Remove(id)
 	const destroy = live.Destroy
 	if destroy then
 		const ok, problem = pcall(destroy)
@@ -289,6 +293,7 @@ function AnomalyController:Write(id: number, raw: any?)
 	if live and live.Occurrence.Key == record.Anomaly then
 		const previous = Vide.untrack(live.Source).Phase
 		live.Source(record)
+		Scene.Record(id, record)
 		if record.Phase == "Resolved" and previous ~= "Resolved" and not (SCORE_ON and SCORED[live.Occurrence.Ref] ~= nil) then
 			self:Sting(STINGS.AnomalyResolved)
 		end
@@ -297,6 +302,7 @@ function AnomalyController:Write(id: number, raw: any?)
 	-- new record, or the cyclic id now carries another anomaly
 	self:Unmount(id)
 	self:Mount(id, record)
+	Scene.Record(id, record)
 	const fresh = Workspace:GetServerTimeNow() - record.StartedAt <= STING_FRESH
 	if fresh and not SCORE_ON and record.Phase ~= "Resolved" and record.Phase ~= "Failed" then
 		self:Sting(STINGS.AnomalyStart)
@@ -326,6 +332,7 @@ function AnomalyController:OnCue(raw: any)
 		self:WarnOnce(`cue:{row.Key}:{cueRow.Key}`, `cue "{cueRow.Key}" is not listed for {row.Key}`)
 		return
 	end
+	Scene.Cue(row.Key, cueRow.Key, raw.Entity)
 	const module = self.Effects[row.Ref]
 	const handler = if module then module.Cue else nil
 	if handler == nil then
@@ -392,6 +399,8 @@ AnomalyController:OnStart(function(self)
 	self:WatchNight()
 	-- TASK-334: breaker arrow in the blackout, "No power issue" outside it
 	Breaker.Start()
+	-- TASK-462: horror scenes on the records' timeline
+	Scene.Start(self:Context())
 	-- TASK-443: the horror score in steps (narrow views; the director only reads them)
 	Score.Start({
 		Audio = self.Dependencies.AudioController :: any,

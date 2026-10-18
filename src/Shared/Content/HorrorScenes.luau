@@ -66,6 +66,10 @@ export type Step = {
 export type Scene = {
 	Key: string, -- = Content.Anomalies key
 	Name: string, -- English, dev/log only
+	-- true = the client player (TASK-462) plays it in the real game; nil/false = only through `/dev scene <key>`
+	-- (kept off while an Effects/ module still does the same job, so no sound or light is doubled; TASK-467 turns the
+	-- blackout on)
+	Live: boolean?,
 	Steps: { Step }, -- any order; the player sorts by phase, then At
 }
 
