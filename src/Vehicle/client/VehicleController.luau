@@ -24,6 +24,10 @@
 	(the server shuts it in Prep); outside them the flap hangs closed while the shop is not selling (Summary, Call, ...).
 	Local only: a 4 Hz tick compares the wanted pose with the flap.
 	Provisional (TASK-131): the "hang down" default, the quad ease and the flap needing to be Anchored and unwelded.
+	Linked flaps (TASK-480, DEC-294): a vehicle may hold more than one flap. Every BasePart named `Shutter_Panel*` with a
+	`Shutter_Hinge` swings (the drive-thru one is `Shutter_Panel_DT`); they all read the same `Shutter` attribute, so
+	whatever closes or opens the main window moves them together, same tween and same sound (each at its own hinge).
+	The button click plays once, at the main flap.
 ]]
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -56,6 +60,7 @@ const DOOR_OUT = 0.3
 const SHUTTER_ATTRIBUTE = "Shutter"
 const HINGE_NAME = "Shutter_Hinge"
 const PANEL_NAME = "Shutter_Panel"
+const PANEL_PREFIX = "Shutter_Panel_" -- extra flaps linked to the main one (TASK-480: Shutter_Panel_DT)
 const CLOSED_ANGLE_ATTRIBUTE = "ClosedAngle" -- optional override on the hinge, degrees around its X axis
 const SHUTTER_TIME = 0.6 -- s of the local tween (§19.14)
 const HINGE_RETRY = 5 -- s: one more look for the hinge when the Model replicates before its children
@@ -74,7 +79,8 @@ type Shutter = {
 	Part: BasePart,
 	Hinge: Attachment,
 	HingeOffset: CFrame, -- hinge in part space (authored)
-	Rest: CFrame, -- part in model-pivot space (authored = open)
+	Base: BasePart, -- still part of the vehicle the pose follows (TASK-480: never the Model pivot, see baseOf)
+	Rest: CFrame, -- part in Base space (authored = open)
 	Closed: number, -- radians around the hinge X axis
 	Angle: number,
 	From: number,
@@ -93,21 +99,30 @@ local function fadeAlpha(elapsed: number, fadeIn: number, hold: number, out: num
 	return math.clamp(1 - (elapsed - fadeIn - hold) / out, 0, 1)
 end
 
--- Shutter_Hinge of a vehicle: the one on Shutter_Panel when both exist (P51), else the first one on a BasePart
-local function findHinge(model: Model): Attachment?
-	local found: Attachment? = nil
+local function isPanel(part: Instance): boolean
+	return part.Name == PANEL_NAME or string.sub(part.Name, 1, #PANEL_PREFIX) == PANEL_PREFIX
+end
+
+-- Shutter_Hinge Attachments of a vehicle: every one on a Shutter_Panel* part (main + linked flaps, TASK-480); with no
+-- panel at all, the first one on any BasePart (P51: the Awning mesh)
+local function findHinges(model: Model): { Attachment }
+	const hinges: { Attachment } = {}
+	local fallback: Attachment? = nil
 	for _, descendant in model:GetDescendants() do
 		if descendant:IsA("Attachment") and descendant.Name == HINGE_NAME then
 			const parent = descendant.Parent
 			if parent ~= nil and parent:IsA("BasePart") then
-				if parent.Name == PANEL_NAME then
-					return descendant
+				if isPanel(parent) then
+					table.insert(hinges, descendant)
 				end
-				found = found or descendant
+				fallback = fallback or descendant
 			end
 		end
 	end
-	return found
+	if #hinges == 0 and fallback ~= nil then
+		table.insert(hinges, fallback)
+	end
+	return hinges
 end
 
 -- Swing (radians around the hinge X axis) from the authored pose to the closed one; nil = cannot tell
@@ -130,9 +145,32 @@ local function closedAngle(hinge: Attachment): number?
 	return angle
 end
 
+-- Part the flap poses follow. Not Model:GetPivot(): without a PrimaryPart that is the bounding-box centre, which
+-- moves when the flaps themselves swing (TASK-480: the closed flaps slid ~2 studs into the windows). PrimaryPart when
+-- there is one, else the biggest anchored BasePart of the vehicle that is not a flap (shell/floor: no door leaf or prop
+-- that other controllers move).
+local function baseOf(model: Model): BasePart?
+	if model.PrimaryPart ~= nil then
+		return model.PrimaryPart
+	end
+	local best: BasePart? = nil
+	local bestVolume = -1
+	for _, descendant in model:GetDescendants() do
+		if descendant:IsA("BasePart") and descendant.Anchored and descendant:FindFirstChild(HINGE_NAME) == nil then
+			const size = descendant.Size
+			const volume = size.X * size.Y * size.Z
+			if volume > bestVolume then
+				best = descendant
+				bestVolume = volume
+			end
+		end
+	end
+	return best
+end
+
 local function shutterPose(shutter: Shutter, angle: number): CFrame
 	const offset = shutter.HingeOffset
-	return shutter.Model:GetPivot() * shutter.Rest * offset * CFrame.Angles(angle, 0, 0) * offset:Inverse()
+	return shutter.Base.CFrame * shutter.Rest * offset * CFrame.Angles(angle, 0, 0) * offset:Inverse()
 end
 
 local function samePose(a: CFrame, b: CFrame): boolean
@@ -152,7 +190,7 @@ function VehicleController:Setup()
 	self.FadeIsDoor = false :: boolean
 	self.FadeConnection = nil :: RBXScriptConnection?
 	self.Unmounts = {} :: { () -> () }
-	-- Service window flaps by vehicle Model (TASK-131)
+	-- Service window flaps by flap part (TASK-131; several per vehicle Model since TASK-480)
 	self.Shutters = {} :: { [Instance]: Shutter }
 	self.ShutterPending = {} :: { [Instance]: boolean }
 	self.ShutterStep = nil :: RBXScriptConnection?
@@ -175,19 +213,29 @@ end
 
 function VehicleController:UnwatchVehicle(model: Instance)
 	self.ShutterPending[model] = nil
-	const shutter = self.Shutters[model]
-	if shutter then
-		self.Shutters[model] = nil
-		for _, shutterConnection in shutter.Connections do
-			shutterConnection:Disconnect()
+	for part, shutter in self.Shutters do
+		if shutter.Model == model then
+			self.Shutters[part] = nil
+			for _, shutterConnection in shutter.Connections do
+				shutterConnection:Disconnect()
+			end
 		end
 	end
+end
+
+function VehicleController:HasShutter(model: Model): boolean
+	for _, shutter in self.Shutters do
+		if shutter.Model == model then
+			return true
+		end
+	end
+	return false
 end
 
 -- Binds the flap of a vehicle with HasShutter. `retry`: the Model may replicate before its children, so a missing
 -- hinge is looked for once more HINGE_RETRY s later before the warn.
 function VehicleController:WatchShutter(model: Model, retry: boolean)
-	if self.Shutters[model] ~= nil then
+	if self:HasShutter(model) then
 		return
 	end
 	const key = model:GetAttribute(VEHICLE_ATTRIBUTE)
@@ -196,8 +244,8 @@ function VehicleController:WatchShutter(model: Model, retry: boolean)
 		return
 	end
 
-	const hinge = findHinge(model)
-	if hinge == nil then
+	const hinges = findHinges(model)
+	if #hinges == 0 then
 		if retry then
 			self.ShutterPending[model] = true
 			task.delay(HINGE_RETRY, function()
@@ -215,11 +263,17 @@ function VehicleController:WatchShutter(model: Model, retry: boolean)
 		return
 	end
 	self.ShutterPending[model] = nil
+	for _, hinge in hinges do
+		self:WatchFlap(model, hinge)
+	end
+end
 
+-- One flap (hinge on its part) of a watched vehicle
+function VehicleController:WatchFlap(model: Model, hinge: Attachment)
 	const part = hinge.Parent :: BasePart
 	if not part.Anchored or #part:GetJoints() > 0 then
 		self:WarnOnce(
-			`welded:{row.Key}`,
+			`welded:{part:GetFullName()}`,
 			`{part:GetFullName()} must be Anchored and unwelded to swing locally; the window flap stays still`
 		)
 		return
@@ -227,9 +281,14 @@ function VehicleController:WatchShutter(model: Model, retry: boolean)
 	const closed = closedAngle(hinge)
 	if closed == nil then
 		self:WarnOnce(
-			`noangle:{row.Key}`,
+			`noangle:{part:GetFullName()}`,
 			`{part:GetFullName()} already hangs down from {HINGE_NAME}; set its {CLOSED_ANGLE_ATTRIBUTE} (degrees). The window flap stays still`
 		)
+		return
+	end
+
+	const base = baseOf(model)
+	if base == nil then
 		return
 	end
 
@@ -240,7 +299,8 @@ function VehicleController:WatchShutter(model: Model, retry: boolean)
 		Part = part,
 		Hinge = hinge,
 		HingeOffset = hinge.CFrame,
-		Rest = model:GetPivot():ToObjectSpace(part.CFrame),
+		Base = base,
+		Rest = base.CFrame:ToObjectSpace(part.CFrame),
 		Closed = closed,
 		Angle = angle,
 		From = angle,
@@ -248,7 +308,7 @@ function VehicleController:WatchShutter(model: Model, retry: boolean)
 		StartedAt = nil,
 		Connections = {},
 	}
-	self.Shutters[model] = shutter
+	self.Shutters[part] = shutter
 
 	table.insert(
 		shutter.Connections,
@@ -262,7 +322,7 @@ function VehicleController:WatchShutter(model: Model, retry: boolean)
 		part:GetPropertyChangedSignal("CFrame"):Connect(function()
 			if shutter.StartedAt == nil then
 				task.defer(function()
-					if self.Shutters[model] == shutter and shutter.StartedAt == nil then
+					if self.Shutters[part] == shutter and shutter.StartedAt == nil then
 						self:PoseShutter(shutter)
 					end
 				end)
@@ -312,7 +372,9 @@ function VehicleController:SwingShutter(shutter: Shutter)
 
 	const sound = if isClosed then SOUND_CLOSE else SOUND_OPEN
 	const audio = self.Dependencies.AudioController
-	audio:Play(SOUND_BUTTON, shutter.Hinge.WorldPosition)
+	if shutter.Part.Name == PANEL_NAME or not isPanel(shutter.Part) then
+		audio:Play(SOUND_BUTTON, shutter.Hinge.WorldPosition)
+	end
 	if Content.Sounds.ByKey[sound] ~= nil then
 		audio:Play(sound, shutter.Hinge.WorldPosition)
 	end

@@ -1426,16 +1426,21 @@ local function checkWave3(points: { [string]: Instance }, vehicles: { [string]: 
 				end
 			end
 		end
+		-- linked flaps (TASK-480): extra hinges on Shutter_Panel_* parts (drive-thru) do not count against the main one
 		local hinges: { Instance } = {}
+		local mainHinges = 0
 		for _, d in trl:GetDescendants() do
 			if d.Name == "Shutter_Hinge" then
 				table.insert(hinges, d)
+				if not (d.Parent and string.sub(d.Parent.Name, 1, 14) == "Shutter_Panel_") then
+					mainHinges += 1
+				end
 			end
 		end
 		if #hinges == 0 then
 			warn_("trailer: no Shutter_Hinge (VehicleController cannot animate the window flap; MAP-01 §7.2, P51)")
-		elseif #hinges > 1 then
-			warn_(("trailer: %d Shutter_Hinge (need 1; the client turns the piece that holds it)"):format(#hinges))
+		elseif mainHinges > 1 then
+			warn_(("trailer: %d main Shutter_Hinge (need 1; the client turns the piece that holds it)"):format(mainHinges))
 		end
 		for _, h in hinges do
 			if not (h:IsA("Attachment") and h.Parent and h.Parent:IsA("BasePart")) then

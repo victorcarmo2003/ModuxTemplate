@@ -1558,6 +1558,25 @@ do
 			L("[warn] trailer Shutter_Panel missing: no service window flap")
 		end
 	end
+	-- TASK-480 (DEC-294): drive-thru flap linked to the main one (same Shutter attribute, VehicleController swings every
+	-- Shutter_Panel*). Clone of the main flap cut to the DT opening (X 60, Z 58.8..63.2, Y 3..7): open = awning out east
+	-- under the DRIVE-THRU sign, hinge at the outer face Y 7.2; closed it hangs down onto the sill top (Y 3.0).
+	local mainFlap = front:FindFirstChild("Shutter_Panel")
+	if mainFlap and not front:FindFirstChild("Shutter_Panel_DT") then
+		local DT_L, DT_W, DT_HX, DT_HY = 4.2, 4.4, 60.25, 7.2
+		local dt = mainFlap:Clone()
+		dt.Name = "Shutter_Panel_DT"
+		dt.Size = Vector3.new(DT_W, DT_L, 0.2)
+		dt.CFrame = CFrame.fromMatrix(F(DT_HX + DT_L / 2, DT_HY, 61), Vector3.new(0, 0, 1), Vector3.new(1, 0, 0))
+		local h = dt:FindFirstChild("Shutter_Hinge")
+		if h then
+			h.CFrame = CFrame.new(0, DT_L / 2, 0) * (h.CFrame - h.CFrame.Position)
+			h:SetAttribute("ClosedAngle", 90) -- the main hinge's -90 would swing this one up (it opens the other way)
+		end
+		dt:SetAttribute("BindCreated", nil)
+		dt:SetAttribute("RST", true)
+		dt.Parent = front
+	end
 	if #deco:GetChildren() == 0 then
 		for _, ch in source:GetChildren() do
 			if ch:IsA("BasePart") and string.match(ch.Name, "^Detail_") then
