@@ -109,6 +109,7 @@ local UiScale = require(StarterPlayer.StarterPlayerScripts.client.Interface.Comp
 local ToastStack = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Toast.Stack)
 local Pads = require(script.Pads)
 local Rings = require(script.Rings)
+local Extras = require(script.Extras)
 local Stage = require(script.Stage)
 local Text = require(script.Text)
 local Traffic = require(script.Traffic)
@@ -312,6 +313,7 @@ function LobbyController:Setup()
 	-- server time, ticked every CLOCK_INTERVAL s (countdowns)
 	self.Clock = Vide.source(0) :: Vide.Source<number>
 	self.Rings = nil :: Rings.Rings?
+	self.Extras = nil :: Extras.Extras? -- TASK-452: set-dressing NPCs (crew at the HQ cart, shopkeeper, food court)
 	self.Pads = nil :: Pads.Pads?
 	self.Hiding = false :: boolean
 
@@ -1179,6 +1181,11 @@ end
 -- Zones -------------------------------------------------------------------------------------------------------------
 
 function LobbyController:OnZone(zone: LobbyZones.Zone, inside: boolean)
+	-- TASK-450: the zone glows only while the local player is in it
+	const rings = self.Rings
+	if rings then
+		rings.SetInside(zone.Key, inside)
+	end
 	if zone.Platform > 0 then
 		if inside then
 			self.Standing(zone.Platform)
@@ -1224,6 +1231,7 @@ end
 -- One Heartbeat for the lobby: ring VFX every frame, zones every Trigger.Poll s, the countdown clock.
 function LobbyController:RunZones()
 	self.Rings = Rings()
+	self.Extras = Extras()
 	-- street traffic between the two lobby tunnels (owner 2026-10-16); nil when the map lacks the cars or the tunnels
 	const traffic = Traffic()
 	self:PaintPlatforms()
@@ -1236,6 +1244,11 @@ function LobbyController:RunZones()
 		if rings then
 			const camera = workspace.CurrentCamera
 			rings.Step(t, if camera then camera.CFrame.Position else nil)
+		end
+		const extras = self.Extras
+		if extras then
+			const camera = workspace.CurrentCamera
+			extras.Step(t, if camera then camera.CFrame.Position else nil)
 		end
 		if traffic then
 			traffic.Step(dt)
@@ -1589,6 +1602,10 @@ function LobbyController:Mount(playerGui: Instance)
 				const rings = self.Rings
 				if rings then
 					rings.SetHidden(open)
+				end
+				const extras = self.Extras
+				if extras then
+					extras.SetHidden(open)
 				end
 				return nil
 			end)

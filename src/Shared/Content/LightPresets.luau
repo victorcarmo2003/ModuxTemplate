@@ -141,12 +141,14 @@ const presets: LightPresets = {
 	-- tint, lower bloom threshold so the warm posts / signs / string lights / trailer read as the light sources.
 	-- Before: Night1 Brightness 0.6, Exposure 0, Ambient (60,48,52), Outdoor (72,56,56), Atm (58,42,64) purple-amber,
 	-- Sat -0.15, Tint (244,224,206); Night10 0.4, Ambient (50,40,56), Outdoor (58,46,58), Atm (46,34,56). PROVISIONAL.
+	-- TASK-455 (DEC-289 M2, 2026-10-18): colder moon and more haze so the dark has shapes (silhouettes of the
+	-- buildings, the street fading into mist) instead of a flat black void; Ambient untouched (reading minimum). PROVISIONAL.
 	Night1 = {
 		Brightness = 0.25,
 		Exposure = -0.3,
 		Ambient = Color3.fromRGB(36, 40, 60), -- luminance ~40 (>= #1B2140 ~34)
-		OutdoorAmbient = Color3.fromRGB(32, 38, 62),
-		ColorShiftTop = Color3.fromRGB(70, 84, 120), -- faint cold moonlight from above
+		OutdoorAmbient = Color3.fromRGB(40, 50, 86), -- TASK-455: cold moon, the buildings read as silhouettes (§5.3 #2A3058 area)
+		ColorShiftTop = Color3.fromRGB(100, 120, 185), -- TASK-455: colder moonlight from above (was 70,84,120)
 		ColorShiftBottom = Color3.fromRGB(0, 0, 0),
 		EnvDiffuse = 0.6,
 		EnvSpecular = 0.8,
@@ -154,12 +156,12 @@ const presets: LightPresets = {
 		AtmDensity = 0.38,
 		AtmOffset = 1,
 		AtmGlare = 0,
-		AtmHaze = 1.2,
+		AtmHaze = 1.5, -- TASK-455: §5.3 Night 1 haze (was 1.2)
 		AtmColor = Color3.fromRGB(24, 28, 46), -- dark blue night air
 		AtmDecay = Color3.fromRGB(18, 20, 36),
 		CCBrightness = -0.02,
 		Saturation = -0.2,
-		Contrast = 0.16,
+		Contrast = 0.2, -- TASK-455: darker pockets around the warm pools (was 0.16)
 		Tint = Color3.fromRGB(228, 234, 255), -- mild cold tint (warm lamps still read warm)
 		BloomIntensity = 0.9,
 		BloomSize = 24,
@@ -171,8 +173,8 @@ const presets: LightPresets = {
 		Brightness = 0.18,
 		Exposure = -0.4,
 		Ambient = Color3.fromRGB(32, 35, 54), -- luminance ~35 (>= #1B2140 ~34)
-		OutdoorAmbient = Color3.fromRGB(28, 32, 54),
-		ColorShiftTop = Color3.fromRGB(56, 66, 100),
+		OutdoorAmbient = Color3.fromRGB(34, 42, 74), -- TASK-455 (was 28,32,54)
+		ColorShiftTop = Color3.fromRGB(84, 100, 160), -- TASK-455 (was 56,66,100)
 		ColorShiftBottom = Color3.fromRGB(0, 0, 0),
 		EnvDiffuse = 0.6,
 		EnvSpecular = 0.8,
@@ -180,7 +182,7 @@ const presets: LightPresets = {
 		AtmDensity = 0.45,
 		AtmOffset = 1,
 		AtmGlare = 0,
-		AtmHaze = 1.8,
+		AtmHaze = 2.2, -- TASK-455: §5.3 Night 10 haze (was 1.8)
 		AtmColor = Color3.fromRGB(20, 22, 40),
 		AtmDecay = Color3.fromRGB(14, 14, 28),
 		CCBrightness = -0.03,
@@ -194,34 +196,35 @@ const presets: LightPresets = {
 		SunRaysSpread = 0.1,
 	},
 	Lobby = {
-		-- TASK-313 (owner 2026-10-15, Play: "lobby too bright"). Same spirit as the TASK-293 night: a darker, cosy night,
-		-- a touch cooler (dusky plum-grey air and ambient), so the warm light reads from the neon signs (START SHIFT,
-		-- CODES), posts, string lights and pads; ambient kept readable for buttons, signs, pads and the path to them.
-		-- Before (warm pass 2, 2026-10-12, Q-208): Brightness 1.3, Exposure -0.3, Ambient (112,82,66), Outdoor
-		-- (138,102,80), ShiftTop (240,170,112), ShiftBottom (52,30,30), Atm 0.32/1.4 (172,116,92)/(120,64,56),
-		-- CC 0.04/0.15/0.1 Tint (255,226,196), Bloom 0.5/28/1.4. All PROVISIONAL.
-		Brightness = 0.55,
-		Exposure = -0.45,
-		Ambient = Color3.fromRGB(64, 56, 68), -- luminance ~59 (well above the #1B2140 reading minimum)
-		OutdoorAmbient = Color3.fromRGB(68, 62, 82),
-		ColorShiftTop = Color3.fromRGB(176, 128, 96), -- dimmer amber
-		ColorShiftBottom = Color3.fromRGB(30, 24, 36), -- plum shadows, a little cooler
+		-- TASK-448 (DEC-289, 2026-10-18): cold world, warm focus. The sky, the air and the ambient go blue-plum so the
+		-- buildings read as silhouettes and the warm light belongs only to the focal points (HQ cart, Gem Shop, food court,
+		-- signs); the floor stops being the brightest thing (TASK-449). Values from the owner-approved mockup
+		-- (art/mockups/ambiente-2026-10-18). Ambient luminance ~46 (>= #1B2140 reading minimum). PROVISIONAL until Play.
+		-- Before (TASK-313, 2026-10-15): Brightness 0.55, Exposure -0.45, Ambient (64,56,68), Outdoor (68,62,82),
+		-- ShiftTop (176,128,96), ShiftBottom (30,24,36), Atm 0.34/0.5/0.2/1.2 (70,58,76)/(84,52,58),
+		-- CC -0.01/0.05/0.14 Tint (246,236,236), Bloom 0.75/28/1.1.
+		Brightness = 0.5,
+		Exposure = -0.35,
+		Ambient = Color3.fromRGB(42, 44, 64),
+		OutdoorAmbient = Color3.fromRGB(46, 56, 96), -- cold moon on the facades
+		ColorShiftTop = Color3.fromRGB(110, 130, 190), -- cold light from above
+		ColorShiftBottom = Color3.fromRGB(14, 14, 28),
 		EnvDiffuse = 0.6,
 		EnvSpecular = 0.6,
 		ShadowSoftness = 0.2,
-		AtmDensity = 0.34, -- the ~110x110 lobby stays clear, the far edge goes soft
-		AtmOffset = 0.5,
-		AtmGlare = 0.2,
-		AtmHaze = 1.2,
-		AtmColor = Color3.fromRGB(70, 58, 76), -- dusky plum haze
-		AtmDecay = Color3.fromRGB(84, 52, 58), -- dim amber-plum horizon
+		AtmDensity = 0.36,
+		AtmOffset = 0.4,
+		AtmGlare = 0,
+		AtmHaze = 1.4,
+		AtmColor = Color3.fromRGB(34, 40, 66), -- blue-plum night air
+		AtmDecay = Color3.fromRGB(44, 40, 72),
 		CCBrightness = -0.01,
-		Saturation = 0.05,
-		Contrast = 0.14,
-		Tint = Color3.fromRGB(246, 236, 236), -- near neutral, a hint cool (the warmth comes from the lights)
-		BloomIntensity = 0.75, -- the neons and bulbs glow against the darker air
-		BloomSize = 28,
-		BloomThreshold = 1.1,
+		Saturation = 0.1,
+		Contrast = 0.18,
+		Tint = Color3.fromRGB(240, 242, 255), -- a hint cold (the warmth comes from the lights)
+		BloomIntensity = 0.8,
+		BloomSize = 26,
+		BloomThreshold = 1.05,
 		SunRays = 0,
 		SunRaysSpread = 0.1,
 	},

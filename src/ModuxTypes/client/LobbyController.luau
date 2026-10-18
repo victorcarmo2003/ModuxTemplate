@@ -18,6 +18,7 @@ local PadTag = require(StarterPlayer.StarterPlayerScripts.client.Interface.Compo
 local ToastStack = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Toast.Stack)
 local Pads = require(StarterPlayer.StarterPlayerScripts.client.Lobby.LobbyController.Pads)
 local Rings = require(StarterPlayer.StarterPlayerScripts.client.Lobby.LobbyController.Rings)
+local Extras = require(StarterPlayer.StarterPlayerScripts.client.Lobby.LobbyController.Extras)
 local Stage = require(StarterPlayer.StarterPlayerScripts.client.Lobby.LobbyController.Stage)
 local Text = require(StarterPlayer.StarterPlayerScripts.client.Lobby.LobbyController.Text)
 
@@ -51,6 +52,7 @@ export type Public = {
 	Draft: Vide.Source<Draft>,
 	DraftParty: number,
 	Entries: { ClassEntries.Entry },
+	Extras: Extras.Extras?,
 	Focus: Vide.Source<string>,
 	FovBefore: number,
 	Gui: ScreenGui?,

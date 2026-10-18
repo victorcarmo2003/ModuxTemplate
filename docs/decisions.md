@@ -3787,3 +3787,33 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
 - Origem: mesma conversa (DEC-285).
 - Decidido pelo dono: as **tochas das mesas** ficam **sem sombra** (`Shadows = false`), para respeitar o orçamento de **≤ 3 luzes com sombra** visíveis (`art/style-guide.md` §5.1).
 - Impacto: **level-designer** / **frontend-coder** (propriedade das luzes), **art-director** (tabela §5.1 ganha a linha das tochas).
+
+### DEC-289 — 2026-10-18 — Direção de ambiente do lobby e do MAP-01 aprovada: todos os itens L1–L6 e M1–M5 viram TASK (responde Q-352, Q-353, Q-354)
+
+- Origem: pedido do dono ("o lobby tem muito neon mas parece morto… ampliar o terror dentro do mapa"); proposta do art-director em `art/direcao-ambiente-lobby-mapa.md` com mockups em `art/mockups/ambiente-2026-10-18/`. Dono: "Pode transformar todos os itens da proposta (L1–L6 e M1–M5) em TASKs."
+- Decidido pelo dono: entram **todos** os itens, como propostos:
+  - **Lobby:** L1 mundo frio, foco quente (preset `Lobby`); L2 neon do chão só ao entrar na zona + piso mais escuro; L3 ~1 em 3 janelas acesas; L4 luz-chave só nos 3 focos (HQ, Gem Shop, food court); L5 NPCs de cenário em loop; L6 "detalhe errado" (olhos numa janela escura, The Walker do outro lado da rua).
+  - **MAP-01:** M1 metade do pátio no escuro; M2 luar frio e névoa para o escuro ter forma; M3 postes que falham; M4 monstros físicos aparecem primeiro como dois olhos brancos na borda da luz; M5 sons de ambiente.
+- Responde **`Q-352`** (A: teaser de terror no lobby, discreto e Mild), **`Q-353`** (A: NPCs de cenário sempre ligados), **`Q-354`** (A: neon do chão acende só com o jogador na zona) — as recomendações da proposta.
+- **Emendas (append-only):**
+  - `art/style-guide.md` §5.2b (nota Provisória de Q-208, "nenhum tom azul" no lobby): deixa de valer; o lobby passa a ter **ambiente/céu frio** (azul-ameixa) e **luz quente só nos focos**. Q-208 fica superada.
+  - `art/style-guide.md` §5.3: além dos até 2 postes da **Ninth** que piscam, **um poste da Ninth pode ficar apagado** de propósito; os postes da **Juniper** seguem acesos fora de anomalia (palco do Walker) — sem mudança.
+  - Documento `art/direcao-ambiente-lobby-mapa.md` → **Aprovado** nos itens L1–L6 e M1–M5; os números citados (cores do preset, brilhos, fração de janelas) seguem **Provisórios**, ajustáveis no Play.
+- **Provisório:** valores finais do preset `Lobby` e dos `Night*` (art-director, no Play em celular); poses/animações dos NPCs e espécies (art-director); frequência e regras do teaser (game-designer, sempre Mild, sem susto nem som alto); quais pontos do pátio/drive-thru recebem os "olhos" (level-designer).
+- Impacto: **art-director**, **level-designer**, **frontend-coder**, **game-designer** (áudio, regras do teaser), **qa-tester**, **task-planner**. Tarefas: **TASK-448 a TASK-460**.
+
+### DEC-290 — 2026-10-18 — Terror cinematográfico vira pilar: anomalias entram como cena dirigida (som, luz, VFX, câmera), começando pelo apagão
+
+- Origem: fala do dono (2026-10-18), logo depois da DEC-289: "a questão de progressão de terror é uma coisa que a gente tem que investir muito… principalmente com efeitos sonoros, efeitos visuais e efeitos de câmera".
+- Decidido pelo dono:
+  - As anomalias **não** devem só "aparecer andando e ficar na fila" ou "tocar um sonzinho e você se esconde". Cada uma entra como uma **sequência com escalada** (calma → aviso → escalada → chegada → clímax → alívio).
+  - **Investimento prioritário** em efeitos sonoros, efeitos visuais e efeitos de câmera para a progressão do terror.
+  - **Sequência de referência (o apagão)**, na ordem dita pelo dono:
+    1. de repente **todas as luzes se apagam**, com **som de queda do quadro geral**;
+    2. o **sino** toca (o que já existe);
+    3. começam os **raios**: primeiro **raros**, depois **em massa** na tela (o que já existe, agora em rampa);
+    4. começam os **passos**; o jogador precisa **se esconder nos fundos** (despensa), onde há uma **luzinha saindo por baixo da porta** no chão;
+    5. a criatura **tenta abrir a porta uma vez**, **não consegue**: som de **porta trancada falhando** ao abrir.
+- **Provisório:** "raid, devagar" da fala transcrita lido como **raios** (tempestade em rampa) — confirmar com o dono; tempos de cada passo, mixagem e intensidade (game-designer + art-director); efeitos de câmera nunca tiram o controle por mais de ~2 s e respeitam uma opção de "reduzir movimento"; tudo **Mild** (sem sangue, susto curto; DEC-172).
+- **Emendas (append-only):** DEC-283 (apagão → esconder na despensa) ganha o roteiro acima como forma oficial da cena; DEC-286 (apaga tudo, só emergência vermelha) continua valendo — a "luz debaixo da porta" da despensa é a luz de emergência vista por baixo da porta. DEC-289 M4 ("olhos na borda da luz") passa a ser o primeiro passo de entrada dos monstros físicos dentro deste pilar.
+- Impacto: **game-designer** (roteiro e tempos de cada anomalia), **art-director** (VFX e luz), **frontend-coder** (sequenciador, câmera, VFX), **backend-coder** (tempo sincronizado da cena, porta), **level-designer** (porta e fresta de luz da despensa), **qa-tester**. Documento: `design/horror-cinematic.md`. Tarefas: **TASK-461 a TASK-471**.

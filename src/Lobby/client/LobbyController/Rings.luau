@@ -13,6 +13,10 @@
 -- The caller's single Heartbeat calls Step(t); ghosts move with one workspace:BulkMoveTo per zone; transparency is
 -- written only when it moved by more than a step; a zone farther than ActiveDistance from the camera is unparented
 -- and skipped. LobbyZones.Version() moving (a floor edited / streamed in) rebuilds the frames, colours kept.
+-- TASK-450 (DEC-289 L2, Q-354 A): a zone glows only while it is ACTIVE = the local player stands in it (SetInside) or,
+-- for a squad pad, someone stands on it (SetPad occupied). An idle zone keeps a solid outline in its colour (SmoothPlastic,
+-- fixed transparency): no Neon, no breath, no rising ghosts, no light, pad discs solid and faint, so the floor is no
+-- longer the brightest thing of the lobby. Turning active brings the glow back (same breath as before).
 -- Presentation only: the server decides squads and what the colours mean.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
@@ -27,6 +31,8 @@ export type Rings = {
 	Kick: (key: string) -> (),
 	-- Every zone frame out of the world while true (the class stage shows the character over them, owner 2026-10-16)
 	SetHidden: (on: boolean) -> (),
+	-- The local player is inside this zone (true) or left it (false): the zone glows (TASK-450)
+	SetInside: (key: string, inside: boolean) -> (),
 	Destroy: () -> (),
 }
 
@@ -64,6 +70,8 @@ type ZoneVfx = {
 	TweenAt: number, -- t the tween started; < 0 = no tween running
 	BaseAlpha: number, -- last transparency written to the base frame
 	Shown: boolean,
+	Inside: boolean, -- the local player stands in the zone (TASK-450)
+	Lit: boolean, -- glow state painted now (Neon); false = idle solid outline
 }
 
 const LOBBY = Content.Lobby
@@ -74,6 +82,8 @@ const ALPHA_STEP = 0.02
 const GLOW_GROW = 1.4 -- studs each glow disc reaches past the one inside it
 const WHITE = Color3.new(1, 1, 1)
 const FOLDER = "LobbyZoneVfx"
+const IDLE_ALPHA = 0.35 -- transparency of an idle (not lit) outline: solid colour, no glow (TASK-450, Provisional)
+const IDLE_GLOW_ALPHA = 0.9 -- pad discs while nobody stands on the pad
 
 local function smooth(x: number): number
 	const c = math.clamp(x, 0, 1)
@@ -314,7 +324,38 @@ local function buildZone(zone: LobbyZones.Zone, color: Color3, seed: number): Zo
 		TweenAt = -1,
 		BaseAlpha = FRAME.Base,
 		Shown = false,
+		Inside = false,
+		Lit = true, -- built as Neon; the first step settles it
 	}
+end
+
+-- Paints the glow state of a zone: lit = Neon frame, ghosts, light; idle = solid outline only.
+local function setLit(entry: ZoneVfx, lit: boolean)
+	entry.Lit = lit
+	const material = if lit then Enum.Material.Neon else Enum.Material.SmoothPlastic
+	for _, part in entry.Base do
+		part.Material = material
+		if not lit then
+			part.Transparency = IDLE_ALPHA
+		end
+	end
+	entry.BaseAlpha = if lit then -1 else IDLE_ALPHA -- -1 forces the breath to write again
+	for i, part in entry.Glow do
+		part.Material = material
+		if not lit then
+			part.Transparency = IDLE_GLOW_ALPHA
+			entry.GlowAlpha[i] = IDLE_GLOW_ALPHA
+		end
+	end
+	for _, ghost in entry.Ghosts do
+		ghost.Alpha = 1
+		for _, part in ghost.Parts do
+			part.Transparency = 1
+		end
+	end
+	if entry.Light then
+		entry.Light.Enabled = lit
+	end
 end
 
 -- Writes `color` to every part of the zone (entry.Color stays the colour the zone is heading to / resting at).
@@ -370,6 +411,7 @@ return function(): Rings
 				entry.Phase = old.Phase
 				entry.Occupied = old.Occupied
 				entry.KickAt = old.KickAt
+				entry.Inside = old.Inside
 			end
 			vfx[zone.Key] = entry
 			table.insert(order, entry)
@@ -453,7 +495,11 @@ return function(): Rings
 				entry.Shown = near
 				entry.Folder.Parent = if near then root else nil
 			end
-			if near then
+			const active = entry.Inside or entry.Occupied
+			if active ~= entry.Lit then
+				setLit(entry, active)
+			end
+			if near and active then
 				const seed = entry.Seed
 				-- base frame: brightest at wave 1, dims by the breath depth (a pad state sets its own period and depth)
 				const pulse = entry.Pulse
@@ -508,6 +554,13 @@ return function(): Rings
 		end
 	end
 
+	local function setInside(key: string, inside: boolean)
+		const entry = vfx[key]
+		if entry then
+			entry.Inside = inside
+		end
+	end
+
 	local function setHidden(on: boolean)
 		hidden = on
 		root.Parent = if on then nil else workspace
@@ -527,6 +580,7 @@ return function(): Rings
 		SetPad = setPad,
 		Kick = kick,
 		SetHidden = setHidden,
+		SetInside = setInside,
 		Destroy = destroy,
 	}
 end

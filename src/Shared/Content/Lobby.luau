@@ -84,8 +84,35 @@ export type Pad = {
 	KickTime: number, -- s of the colour shiver when someone steps on / off
 }
 
+-- Set-dressing NPCs of the lobby (TASK-451; DEC-289 L5, Q-353 A: always on). Client-only, anchored CrewRig rigs, no
+-- collision, no network (TASK-452 plays them). Position = WORLD feet (floor level); Yaw = degrees the model faces,
+-- 0 = +Z (towards the HQ facade), 180 = -Z (towards the plaza), 90 = +X. Loop = one short looped action:
+--   Grill  turns sausages at the cart (arm sweeps, hot dog in hand)   Serve  holds a hot dog out, small bob
+--   Wave   waves at whoever stands in the zone, idles otherwise      Wipe   wipes the counter
+--   Eat    bites a hot dog at a table                                 Chat   turns the head to a neighbour, laughs
+--   Drive  sits at the wheel, looks around
+-- Every position from the owner-approved mockup (art/mockups/ambiente-2026-10-18) or marked "measure"; PROVISIONAL.
+export type ExtraLoop = "Grill" | "Serve" | "Wave" | "Wipe" | "Eat" | "Chat" | "Drive"
+
+export type Extra = {
+	Key: string,
+	Species: string, -- CrewRig species (lowercase)
+	Outfit: string, -- "crew" | "civil_a".."civil_h"
+	Expression: string, -- CrewRig.Dress expression
+	Position: Vector3,
+	Yaw: number,
+	Loop: ExtraLoop,
+	Hold: string?, -- tool under ReplicatedStorage.Assets.Items.Tools held in the right hand
+}
+
+export type Extras = {
+	Range: number, -- studs: hidden (and not animated) farther than this from the camera
+	Rows: { Extra },
+}
+
 export type Lobby = {
 	Zones: { Zone },
+	Extras: Extras, -- TASK-451
 	Trigger: {
 		Hysteresis: number, -- studs added to the edge (radius / half size) to count as "out"
 		Height: number, -- studs: max |dy| between the root and the zone floor top
@@ -226,6 +253,19 @@ const lobby: Lobby = {
 			GlowAlpha = 0.86,
 			Sparks = { Rate = 6, Distance = 60 },
 			KickTime = 0.45,
+		},
+	},
+	-- TASK-451 (DEC-289 L5): who works and who eats in the lobby
+	Extras = {
+		Range = 120,
+		Rows = {
+			{ Key = "hq_grill", Species = "bear", Outfit = "crew", Expression = "Happy", Position = Vector3.new(-2.2, 1, -569.5), Yaw = 180, Loop = "Grill", Hold = "hot_dog" },
+			{ Key = "hq_serve", Species = "rabbit", Outfit = "crew", Expression = "Smile", Position = Vector3.new(2.6, 1, -569.2), Yaw = 195, Loop = "Serve" },
+			{ Key = "shop_keeper", Species = "cat", Outfit = "crew", Expression = "Happy", Position = Vector3.new(-41.8, 0.6, -620), Yaw = 90, Loop = "Wave" },
+			{ Key = "food_pig", Species = "pig", Outfit = "civil_b", Expression = "Happy", Position = Vector3.new(-37.8, 0, -583.5), Yaw = 205, Loop = "Eat", Hold = "hot_dog" },
+			{ Key = "food_dog", Species = "dog", Outfit = "civil_e", Expression = "Smile", Position = Vector3.new(-34.2, 0, -583.8), Yaw = 160, Loop = "Chat" },
+			-- measure in Studio (TASK-452): driver's seat of the START van AST-035 at (54.5, -0.24, -620)
+			{ Key = "van_driver", Species = "fox", Outfit = "crew", Expression = "Normal", Position = Vector3.new(53.4, 1.2, -621.4), Yaw = 270, Loop = "Drive" },
 		},
 	},
 	Camera = {

@@ -12,6 +12,7 @@ local Cutscenes = require(script.Parent.Cutscenes)
 local Flow = require(script.Parent.Flow)
 local GemRewards = require(script.Parent.GemRewards)
 local Hallucinations = require(script.Parent.Hallucinations)
+local HorrorScenes = require(script.Parent.HorrorScenes)
 local HudReveal = require(script.Parent.HudReveal)
 local Ingredients = require(script.Parent.Ingredients)
 local Items = require(script.Parent.Items)
@@ -2398,6 +2399,78 @@ local function checkRestaurant()
 	end
 end
 
+-- TASK-461 (DEC-290): horror scenes are keyed by anomaly; targets checked against Sounds and the scene rules.
+local function checkHorrorScenes()
+	checkKeys("HorrorScenes", HorrorScenes, KEY_PATTERN)
+	const rules = HorrorScenes.Rules
+	const phases = setOf({ "Signal", "Active", "Resolved", "Failed" })
+	const whos = setOf({ "All", "Caught", "Safe" })
+	const lights = setOf({ "Off", "On", "Flicker", "Cascade" })
+	const doors = setOf({ "Rattle", "Push", "Hold" })
+	const needPoint = setOf({ "Door", "Shadow", "Nudge", "Actor" })
+	const kinds = setOf({ "Sound", "Music", "Lights", "Lightning", "Vignette", "Shake", "Fov", "Nudge", "Text", "Actor", "Door", "Shadow" })
+	for index, scene in HorrorScenes.List do
+		const key = scene.Key
+		if Anomalies.ByKey[key] == nil then
+			fail("HorrorScenes", index, key, "Key is not a Content.Anomalies key")
+		end
+		if #scene.Steps == 0 then
+			fail("HorrorScenes", index, key, "no steps")
+		end
+		for n, step in scene.Steps do
+			const where = `Steps[{n}]`
+			if not phases[step.Phase] then
+				fail("HorrorScenes", index, key, `{where} Phase '{step.Phase}' is not a record phase`)
+			end
+			if not kinds[step.Kind] then
+				fail("HorrorScenes", index, key, `{where} Kind '{step.Kind}' unknown`)
+			end
+			if step.Who ~= nil and not whos[step.Who] then
+				fail("HorrorScenes", index, key, `{where} Who '{step.Who}' is not All, Caught or Safe`)
+			end
+			inRange("HorrorScenes", index, key, `{where}.At`, step.At, 0, 300)
+			if step.Duration ~= nil then
+				inRange("HorrorScenes", index, key, `{where}.Duration`, step.Duration, 0, 120)
+			end
+			if needPoint[step.Kind] and (step.Point == nil or step.Point == "") then
+				fail("HorrorScenes", index, key, `{where} {step.Kind} needs a Point (MapPoint name)`)
+			end
+			if step.Kind == "Sound" or (step.Kind == "Music" and step.Target ~= "Stop") then
+				if step.Target == nil or Sounds.ByKey[step.Target] == nil then
+					fail("HorrorScenes", index, key, `{where} {step.Kind} '{tostring(step.Target)}' is not a Content.Sounds key`)
+				end
+			elseif step.Kind == "Lights" then
+				if not lights[step.Target or ""] then
+					fail("HorrorScenes", index, key, `{where} Lights '{tostring(step.Target)}' is not Off, On, Flicker or Cascade`)
+				end
+			elseif step.Kind == "Door" then
+				if not doors[step.Target or ""] then
+					fail("HorrorScenes", index, key, `{where} Door '{tostring(step.Target)}' is not Rattle, Push or Hold`)
+				end
+			elseif step.Kind == "Shake" then
+				if rules.Shakes[step.Target or ""] == nil then
+					fail("HorrorScenes", index, key, `{where} Shake '{tostring(step.Target)}' is not in Rules.Shakes`)
+				end
+			elseif step.Kind == "Vignette" then
+				inRange("HorrorScenes", index, key, `{where}.Value`, step.Value or 0, 0, rules.MaxVignette)
+				inRange("HorrorScenes", index, key, `{where}.To`, (step.To :: number?) or 0, 0, rules.MaxVignette)
+			elseif step.Kind == "Fov" then
+				inRange("HorrorScenes", index, key, `{where}.Value`, step.Value or 0, -rules.MaxFov, rules.MaxFov)
+			elseif step.Kind == "Nudge" then
+				inRange("HorrorScenes", index, key, `{where}.Value`, step.Value or 0, 0, rules.MaxNudge)
+				inRange("HorrorScenes", index, key, `{where}.Duration`, step.Duration or 0, 0, rules.MaxControlLock)
+			elseif step.Kind == "Lightning" then
+				inRange("HorrorScenes", index, key, `{where}.Value`, step.Value or 0, 0, 60)
+				inRange("HorrorScenes", index, key, `{where}.To`, (step.To :: number?) or 0, 0, 60)
+			elseif step.Kind == "Text" then
+				if step.Text == nil or step.Text == "" then
+					fail("HorrorScenes", index, key, `{where} Text needs Text`)
+				end
+			end
+		end
+	end
+end
+
 return function()
 	checkKeySets()
 	checkTipJar()
@@ -2430,4 +2503,5 @@ return function()
 	checkSeating()
 	checkPrep()
 	checkRestaurant()
+	checkHorrorScenes()
 end

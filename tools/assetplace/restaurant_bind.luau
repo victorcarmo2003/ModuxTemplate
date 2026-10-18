@@ -421,7 +421,9 @@ local OVERRIDES = {
 		["Cam:CAM1"] = { CF = {-60.117, 11.8, 29.083, 0.7047, 0.2955, -0.6451, 0, 0.9092, 0.4164, 0.7095, -0.2934, 0.6407} }, -- owner 2026-10-17: more of the counter (orientation -24.608, -45.197, 0),
 		-- TASK-446 (2026-10-17, owner approved): the 4 torches "Flame" in MAP01_Assets.Extra (owner's pieces, outside the
 		-- restaurant) cast no shadow; applied to every Light under a part named Flame there
-		["Lights:Extra/Flame"] = { Shadows = false },
+		-- TASK-454 (DEC-289 M1, 2026-10-18): the torches west of world X -45 (the dark half of the patio) are out: Light off and
+		-- the Flame part hidden (Transparency 1) with its candle ParticleEmitters off
+		["Lights:Extra/Flame"] = { Shadows = false, OffWestOfX = -45 },
 		-- CAM2 "back + drive-thru": on the corner of the building across the back alley (AST-033 BuildingH, MAP (69.85, 12.2, 97.89)),
 		-- looking south-west: DOOR-B, the pantry hatch, breaker and crates, the drive-thru window, lane and U-turn (AN-D).
 		["Cam:CAM2"] = { CF = {-69.85, 12.2, -30, -0.8703, 0.1148, -0.4789, 0, 0.9724, 0.2331, 0.4925, 0.2029, -0.8463} },
@@ -2139,13 +2141,22 @@ if extra then
 		local orig = t:GetAttribute("_RST_OrigCF") or t:GetPivot()
 		local target = face(F(TBL[i][1], 0.4, TBL[i][2]), DIR.S)
 		local T = target * orig:Inverse()
+		local mine = {}
 		for _, l in loose do
 			local lorig = l:GetAttribute("_RST_OrigCF") or l:GetPivot()
 			if (lorig.Position - orig.Position).Magnitude < 3.5 then
 				poseTo(l, T * lorig, "Torch:TBL-" .. i)
+				table.insert(mine, l)
 			end
 		end
 		poseTo(t, target, "Table:TBL-" .. i)
+		-- 2026-10-18 (owner: "a candle floating"): a loose torch becomes part of its table model, so the Seating look
+		-- (SeatingController/Look) hides it and puts its flame out together with the table (locked / ghost tables)
+		for _, l in mine do
+			if not DIFF then
+				l.Parent = t
+			end
+		end
 		t:SetAttribute("TableIndex", i)
 		t:SetAttribute("RestaurantId", "TBL-" .. i)
 		t:SetAttribute("TableGroup", "Restaurant")
@@ -2271,6 +2282,9 @@ do
 end
 -- table lamps LIT-T1..4 (blockout of AST-150: pole + canopy + bulb), beside each table on the corridor side
 local LITS = { { 25.4, 43.4, 3 }, { 46.1, 43.4, 3 }, { 25.4, 35.8, 2 }, { 46.1, 35.8, 2 } }
+-- TASK-454 (DEC-289 M1, 2026-10-18): the west half of the patio stays dark (LIT-T2 / LIT-T4: bulb unlit, light off), so the
+-- edge between the warm counter and the dark is where things show up at night. The bulbs keep their Light (disabled).
+local DARK_LITS = { [2] = true, [4] = true }
 for i, l in LITS do
 	local f = folder(patio, "LIT-T" .. i)
 	cyl(f, "Pole", l[1], (FLOOR + 7.6) / 2, l[2], 0.2, 7.6 - FLOOR, { Color = C.Steel, blk = C.BlkProp, art = { Color = C.SteelDark, Material = Enum.Material.Metal } })
@@ -2279,13 +2293,17 @@ for i, l in LITS do
 	b.Shape = Enum.PartType.Ball
 	b.Size = Vector3.new(0.5, 0.5, 0.5)
 	b.CFrame = CFrame.new(F(l[1], 7.3, l[2]))
-	styled(b, { Color = Color3.fromRGB(255, 231, 194), CanCollide = false, art = { Material = Enum.Material.Neon, Color = Color3.fromRGB(255, 231, 194) } })
+	if DARK_LITS[i] then
+		styled(b, { Color = Color3.fromRGB(92, 84, 76), CanCollide = false, art = { Material = Enum.Material.SmoothPlastic, Color = Color3.fromRGB(92, 84, 76) } })
+	else
+		styled(b, { Color = Color3.fromRGB(255, 231, 194), CanCollide = false, art = { Material = Enum.Material.Neon, Color = Color3.fromRGB(255, 231, 194) } })
+	end
 	local pl = ensure(b, "Light", "PointLight")
 	pl.Range = 12
 	pl.Brightness = 0.8
 	pl.Color = Color3.fromRGB(255, 231, 194)
 	pl.Shadows = false
-	pl.Enabled = ART
+	pl.Enabled = ART and not DARK_LITS[i]
 	b:SetAttribute("HushOff", true)
 	b:SetAttribute("Order", l[3])
 	f:SetAttribute("MapId", "LIT-T" .. i)
@@ -2678,6 +2696,16 @@ do
 				if ov.Shadows ~= nil then
 					d.Shadows = ov.Shadows
 				end
+				local flame = d.Parent
+				if ov.OffWestOfX ~= nil and flame:IsA("BasePart") and flame.Position.X < ov.OffWestOfX then
+					d.Enabled = false
+					flame.Transparency = 1
+					for _, fx in flame:GetDescendants() do
+						if fx:IsA("ParticleEmitter") then
+							fx.Enabled = false
+						end
+					end
+				end
 				n += 1
 			end
 		end
@@ -2686,6 +2714,11 @@ do
 		for _, d in extra:GetDescendants() do
 			if d:IsA("Light") and d.Parent and d.Parent.Name == "Flame" and ov.Shadows ~= nil and d.Shadows ~= ov.Shadows then
 				L("[diff] torch light " .. d:GetFullName() .. " Shadows = " .. tostring(d.Shadows) .. " (override " .. tostring(ov.Shadows) .. ")")
+			end
+			local flame = d.Parent
+			if d:IsA("Light") and flame and flame.Name == "Flame" and flame:IsA("BasePart") and ov.OffWestOfX ~= nil
+				and flame.Position.X < ov.OffWestOfX and (d.Enabled or flame.Transparency < 1) then
+				L("[diff] torch " .. flame:GetFullName() .. " should be out (west of X " .. ov.OffWestOfX .. ")")
 			end
 		end
 	end

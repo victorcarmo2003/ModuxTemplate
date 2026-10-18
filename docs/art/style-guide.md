@@ -307,6 +307,8 @@ das 4:00 PM às 6:00 PM entra a hora dourada (laranja suave), única pista de qu
 
 ### 5.2b Lobby (nota Provisória, 2026-10-12, Q-208)
 
+> **DEC-289 (2026-10-18, nota):** a regra "nenhum tom azul" abaixo deixa de valer. O lobby passa a ter ambiente/céu frio (azul-ameixa) e luz quente só nos focos (HQ, Gem Shop, food court); neon do chão acende só na zona. Valores novos: TASK-448 (Provisórios). Em §5.3, um poste da **Ninth** pode ficar apagado de propósito (os da Juniper seguem acesos fora de anomalia).
+
 O lobby é uma praça noturna **aconchegante**, não a noite tensa do jogo: preset próprio `Lobby` em `Content.LightPresets`
 (ClockTime 20,75; `Brightness` 1,6; `Ambient` `#705242` / `OutdoorAmbient` `#8A6650`; sombras ameixa-marrom `#341E1E`;
 `Atmosphere` Color `#AC745C` · Decay `#784038` · Density 0,32 · Haze 1,4 (névoa baixa e quente-escura); `ColorCorrection` Saturation +0,18 · Tint `#FFE2C4`; Bloom 0,8).
