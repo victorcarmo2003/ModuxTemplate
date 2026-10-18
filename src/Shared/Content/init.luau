@@ -94,6 +94,7 @@ export type CutsceneRules = Cutscenes.Rules
 export type CutsceneVoice = Cutscenes.Voice
 export type HorrorScene = HorrorScenes.Scene
 export type HorrorStep = HorrorScenes.Step
+export type HorrorStepKind = HorrorScenes.StepKind
 export type HorrorRules = HorrorScenes.Rules
 export type GemRewards = GemRewards.GemRewards
 export type Hallucination = Hallucinations.Hallucination
