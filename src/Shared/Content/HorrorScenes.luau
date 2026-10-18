@@ -21,6 +21,10 @@
 --   Whispers   the words on screen (Effects/Kit/Whispers), ramping: Value = rate at the start, To = rate at the end
 --              (1 = Kit default), over Duration (DEC-291: few at first, then en masse). Target = key of Words (the
 --              list said; DEC-293: real hints, not just HIDE); nil = the Kit's own HIDE list
+--   Heartbeat  single heartbeats (Content.Sounds heartbeat) at Value BPM ramping to To BPM over Duration, louder and a
+--              touch higher as it speeds up; Value = 0 stops it (owner 2026-10-18)
+--   Cinema     film look: black bars (Value = height of each bar, fraction of the screen, 0..0.2) eased over Duration,
+--              and the game HUD (coins, shop, hotbar, chat) hidden; Value = 0 brings the HUD back. Prompts stay.
 --   Vignette   screen darkening: Value -> To over Duration (0..Rules.MaxVignette)
 --   Shake      camera shake: Target = profile key of Rules.Shakes, Value = scale (default 1)
 --   Fov        field of view delta: Value degrees (|Value| <= Rules.MaxFov), To = 0 to come back, over Duration
@@ -49,6 +53,8 @@ export type StepKind =
 	| "Lights"
 	| "Lightning"
 	| "Whispers"
+	| "Heartbeat"
+	| "Cinema"
 	| "Vignette"
 	| "Shake"
 	| "Fov"
@@ -126,6 +132,12 @@ const blackout: Scene = {
 		{ At = 0, Phase = "Active", Kind = "Fov", Value = -3, To = 0, Duration = 0.8 },
 		-- the bell the moment the lights go out (owner 2026-10-18)
 		{ At = 0, Phase = "Active", Kind = "Sound", Target = "church_bell" },
+		-- film look: black bars close in and the HUD goes (coins, shop, hotbar, chat); prompts stay (owner 2026-10-18)
+		{ At = 0, Phase = "Active", Kind = "Cinema", Value = 0.11, Duration = 0.8 },
+		-- the heart starts as the steps get near, speeds up, and stops dead just before the note dies: 0.6 s of
+		-- violin alone, then the jumpscare
+		{ At = 14, Phase = "Active", Kind = "Heartbeat", Value = 62, To = 150, Duration = 15 },
+		{ At = 29.4, Phase = "Active", Kind = "Heartbeat", Value = 0, To = 0 },
 		-- the HIDE words: a few, then all over the screen (DEC-291); the edges close in
 		{ At = 5, Phase = "Active", Kind = "Whispers", Target = "blackout", Value = 0.4, To = 3, Duration = 17 },
 		{ At = 5, Phase = "Active", Kind = "Vignette", Value = 0, To = 0.35, Duration = 17 },
@@ -149,11 +161,14 @@ const blackout: Scene = {
 		{ At = 29, Phase = "Active", Kind = "Sound", Target = "latch_hold", Point = "SCENE-DOOR" },
 		-- 30 s (Failed): the jumpscare (Effects/ANM-020, on the beat), then it walks away; the dark stays until the breaker
 		{ At = 0, Phase = "Failed", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 0, Phase = "Failed", Kind = "Heartbeat", Value = 0, To = 0 },
 		{ At = 1, Phase = "Failed", Kind = "Actor", Target = "AST-064_Walker", Point = "SCENE-DOOR-OUT", To = "SCENE-STEPS-FAR", Duration = 6, Sound = "walker_step", Seen = "Cameras", Value = 1 },
 		{ At = 1, Phase = "Failed", Kind = "Shadow", Target = "Leave", Point = "SCENE-DOOR", To = "SCENE-STEPS-FAR", Duration = 1.2 },
 		{ At = 1, Phase = "Failed", Kind = "Vignette", Value = 0.5, To = 0.15, Duration = 4 },
 		-- the breaker held in time (Resolved): the power comes back
 		{ At = 0, Phase = "Resolved", Kind = "Sound", Target = "power_up" },
+		{ At = 0, Phase = "Resolved", Kind = "Heartbeat", Value = 0, To = 0 },
+		{ At = 0.4, Phase = "Resolved", Kind = "Cinema", Value = 0, Duration = 0.8 },
 		{ At = 0, Phase = "Resolved", Kind = "Shadow", Target = "Leave", Point = "SCENE-DOOR", To = "SCENE-STEPS-FAR", Duration = 0.8 },
 		-- the Walker goes back if it had come (no Point: nothing when the breaker held before t = 18)
 		{ At = 0, Phase = "Resolved", Kind = "Actor", Target = "AST-064_Walker", To = "SCENE-STEPS-FAR", Duration = 6, Sound = "walker_step", Seen = "Cameras", Value = 1 },

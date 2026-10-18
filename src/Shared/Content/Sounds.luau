@@ -190,6 +190,8 @@ const UPLOADED: { [string]: string } = {
 	horror_dramatic = "rbxassetid://72200450832308",
 	scary_violins = "rbxassetid://6080419021",
 	phone_glitch = "rbxassetid://140367728848843",
+	whispers_bed = "rbxassetid://102565494871173", -- owner Studio upload "Whispers" (2026-10-18)
+	heartbeat = "rbxassetid://139459003161851", -- owner Studio upload "heartbeat" (2026-10-18)
 	horror_chase_stop = "rbxassetid://123355946453444",
 	ui_click = "rbxassetid://127105730240202",
 	thunder = "rbxassetid://9113169432", -- ATM-5 (TASK-275): "Artillery Distant 2 (SFX)", ProSoundEffects
@@ -341,6 +343,9 @@ const base = Table.new({
 	sfx("horror_dramatic", false, { Spatial = false, Volume = 0.5 }),
 	sfx("scary_violins", false, { Spatial = false, Volume = 0.4 }),
 	sfx("phone_glitch"),
+	-- owner 2026-10-18: a whisper bed under the on-screen whispers (Kit/Whispers) and a single heartbeat (HorrorScenes Heartbeat)
+	studio(sfx("whispers_bed", true, { Spatial = false, Volume = 0.45 }), "Whispers"),
+	studio(sfx("heartbeat", false, { Spatial = false, Volume = 0.9 }), "heartbeat"),
 	sfx("horror_chase_stop", false, { Spatial = false, Volume = 0.4 }),
 	sfx("thunder", false, { Spatial = false, Volume = 0.6 }), -- ATM-5 storm (TASK-275)
 	-- anomalies, owner requests 2026-10-15 (TASK-331..340). Id "" = silence until the owner sends the file

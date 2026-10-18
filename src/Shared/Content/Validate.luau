@@ -2409,7 +2409,7 @@ local function checkHorrorScenes()
 	const doors = setOf({ "Rattle", "Push", "Hold", "Lock" })
 	const needPoint = setOf({ "Door", "Shadow", "Nudge" }) -- Actor: only the eyes (no Target) need one
 	const seens = setOf({ "All", "Cameras" })
-	const kinds = setOf({ "Sound", "Music", "Lights", "Lightning", "Whispers", "Vignette", "Shake", "Fov", "Nudge", "Text", "Actor", "Door", "Shadow" })
+	const kinds = setOf({ "Sound", "Music", "Lights", "Lightning", "Whispers", "Heartbeat", "Cinema", "Vignette", "Shake", "Fov", "Nudge", "Text", "Actor", "Door", "Shadow" })
 	for index, scene in HorrorScenes.List do
 		const key = scene.Key
 		if Anomalies.ByKey[key] == nil then
@@ -2463,6 +2463,14 @@ local function checkHorrorScenes()
 			elseif step.Kind == "Lightning" then
 				inRange("HorrorScenes", index, key, `{where}.Value`, step.Value or 0, 0, 60)
 				inRange("HorrorScenes", index, key, `{where}.To`, (step.To :: number?) or 0, 0, 60)
+			elseif step.Kind == "Heartbeat" then
+				inRange("HorrorScenes", index, key, `{where}.Value`, step.Value or 0, 0, 220)
+				inRange("HorrorScenes", index, key, `{where}.To`, (step.To :: number?) or 0, 0, 220)
+				if Sounds.ByKey.heartbeat == nil then
+					fail("HorrorScenes", index, key, `{where} Heartbeat needs the heartbeat row in Content.Sounds`)
+				end
+			elseif step.Kind == "Cinema" then
+				inRange("HorrorScenes", index, key, `{where}.Value`, step.Value or 0, 0, 0.2)
 			elseif step.Kind == "Whispers" then
 				if step.Target ~= nil and HorrorScenes.Words[step.Target] == nil then
 					fail("HorrorScenes", index, key, `{where} Whispers '{step.Target}' is not a key of HorrorScenes.Words`)

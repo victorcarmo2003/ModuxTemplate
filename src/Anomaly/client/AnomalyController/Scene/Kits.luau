@@ -20,6 +20,9 @@
 	run (record gone) leaves the world as it was.
 ]]
 local CollectionService = game:GetService("CollectionService")
+local TextChatService = game:GetService("TextChatService")
+local StarterGui = game:GetService("StarterGui")
+local SoundService = game:GetService("SoundService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -571,6 +574,165 @@ const actor: Handler = function(ctx, state, step, late)
 	walk(ctx, walker :: Walker, step, goal, late)
 end
 
+-- Heartbeat -------------------------------------------------------------------------------------------------------------
+
+-- One run's heartbeat loop: a beat every 60/BPM s, BPM from Value to To over Duration (owner 2026-10-18)
+const heartbeat: Handler = function(_ctx, state, step, late)
+	const running = state.Undo.heartbeat
+	if running ~= nil then
+		state.Undo.heartbeat = nil
+		running()
+	end
+	const from = step.Value or 0
+	const to = if type(step.To) == "number" then step.To else from
+	if from <= 0 and to <= 0 then
+		return -- stop step: a sudden silence
+	end
+	const row = Content.Sounds.ByKey.heartbeat
+	if row == nil or row.Id == "" then
+		return
+	end
+	const found = SoundService:FindFirstChild("Sfx", true)
+	const group: SoundGroup? = if found ~= nil and found:IsA("SoundGroup") then found else nil
+	const duration = math.max((step.Duration or 0) - late, 0.1)
+	const startedAt = os.clock()
+	local alive = true
+	state.Undo.heartbeat = function()
+		alive = false
+	end
+	task.spawn(function()
+		while alive do
+			const t = math.clamp((os.clock() - startedAt) / duration, 0, 1)
+			-- past Duration it holds the last rate until a stop step or the end of the run
+			const bpm = math.max(from + (to - from) * t, 20)
+			const beat = Instance.new("Sound")
+			beat.Name = "HorrorScene_Heartbeat"
+			beat.SoundId = row.Id
+			beat.Volume = row.Volume * (0.55 + 0.65 * t)
+			beat.PlaybackSpeed = 0.95 + 0.2 * t
+			beat.SoundGroup = group
+			beat.Parent = SoundService
+			beat:Play()
+			task.delay(2, function()
+				beat:Destroy()
+			end)
+			task.wait(60 / bpm)
+		end
+	end)
+end
+
+-- Cinema: black bars + HUD hidden -----------------------------------------------------------------------------------------
+
+const CINEMA_NAME = "HorrorCinema"
+const HUD_GUIS = { "Hud" } -- the game HUD (coins, shop, sanity...); TouchGui stays (mobile must still move)
+type Cinema = { Gui: ScreenGui, Top: Frame, Bottom: Frame, Saved: { [string]: boolean }, Backpack: boolean?, Chat: boolean? }
+local cinema: Cinema? = nil
+
+local function hideHud(on: boolean, saved: { [string]: boolean }, current: Cinema)
+	const playerGui = Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+	if playerGui == nil then
+		return
+	end
+	for _, name in HUD_GUIS do
+		const gui = playerGui:FindFirstChild(name)
+		if gui ~= nil and gui:IsA("ScreenGui") then
+			if on then
+				if saved[name] == nil then
+					saved[name] = gui.Enabled
+				end
+				gui.Enabled = false
+			elseif saved[name] ~= nil then
+				gui.Enabled = saved[name]
+			end
+		end
+	end
+	if on then
+		const ok, enabled = pcall(function(): boolean
+			return StarterGui:GetCoreGuiEnabled(Enum.CoreGuiType.Backpack)
+		end)
+		if ok and current.Backpack == nil then
+			current.Backpack = enabled
+		end
+		pcall(StarterGui.SetCoreGuiEnabled, StarterGui, Enum.CoreGuiType.Backpack, false)
+		const chat = TextChatService:FindFirstChildOfClass("ChatWindowConfiguration")
+		if chat ~= nil then
+			if current.Chat == nil then
+				current.Chat = chat.Enabled
+			end
+			chat.Enabled = false
+		end
+	else
+		if current.Backpack ~= nil then
+			pcall(StarterGui.SetCoreGuiEnabled, StarterGui, Enum.CoreGuiType.Backpack, current.Backpack)
+		end
+		const chat = TextChatService:FindFirstChildOfClass("ChatWindowConfiguration")
+		if chat ~= nil and current.Chat ~= nil then
+			chat.Enabled = current.Chat
+		end
+	end
+end
+
+local function bar(name: string, gui: ScreenGui, anchorY: number): Frame
+	const frame = Instance.new("Frame")
+	frame.Name = name
+	frame.BackgroundColor3 = Color3.new(0, 0, 0)
+	frame.BorderSizePixel = 0
+	frame.AnchorPoint = Vector2.new(0, anchorY)
+	frame.Position = UDim2.fromScale(0, anchorY)
+	frame.Size = UDim2.fromScale(1, 0)
+	frame.Parent = gui
+	return frame
+end
+
+local function closeCinema(duration: number)
+	const current = cinema
+	if current == nil then
+		return
+	end
+	cinema = nil
+	hideHud(false, current.Saved, current)
+	const info = TweenInfo.new(math.max(duration, 0.05), Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+	TweenService:Create(current.Top, info, { Size = UDim2.fromScale(1, 0) }):Play()
+	const tween = TweenService:Create(current.Bottom, info, { Size = UDim2.fromScale(1, 0) })
+	tween.Completed:Once(function()
+		current.Gui:Destroy()
+	end)
+	tween:Play()
+end
+
+const cinemaStep: Handler = function(_ctx, state, step, late)
+	const amount = step.Value or 0
+	const duration = math.max((step.Duration or 0.8) - late, 0.05)
+	if amount <= 0 then
+		closeCinema(duration)
+		return
+	end
+	local current = cinema
+	if current == nil then
+		const playerGui = Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+		if playerGui == nil then
+			return
+		end
+		const gui = Instance.new("ScreenGui")
+		gui.Name = CINEMA_NAME
+		gui.ResetOnSpawn = false
+		gui.IgnoreGuiInset = true
+		gui.DisplayOrder = 40 -- under the whispers (45) and the jumpscare
+		gui.Parent = playerGui
+		const created: Cinema = { Gui = gui, Top = bar("Top", gui, 0), Bottom = bar("Bottom", gui, 1), Saved = {} }
+		cinema = created
+		current = created
+	end
+	const live = current :: Cinema
+	hideHud(true, live.Saved, live)
+	const info = TweenInfo.new(duration, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+	TweenService:Create(live.Top, info, { Size = UDim2.fromScale(1, amount) }):Play()
+	TweenService:Create(live.Bottom, info, { Size = UDim2.fromScale(1, amount) }):Play()
+	state.Undo.cinema = function()
+		closeCinema(0.6)
+	end
+end
+
 const Kits = {}
 
 -- Called once by AnomalyController after Scene.Start (needs CameraController).
@@ -581,6 +743,8 @@ function Kits.Register(handle: (kind: Content.HorrorStepKind, handler: Handler) 
 		end
 	end
 	handle("Vignette", vignette)
+	handle("Heartbeat", heartbeat)
+	handle("Cinema", cinemaStep)
 	handle("Whispers", whispers)
 	handle("Door", door)
 	handle("Shadow", shadow)

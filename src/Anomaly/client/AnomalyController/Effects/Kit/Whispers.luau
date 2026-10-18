@@ -16,7 +16,9 @@
 ]]
 local Players = game:GetService("Players")
 local StarterPlayer = game:GetService("StarterPlayer")
+local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
+local Content = require(game:GetService("ReplicatedStorage").shared.Content)
 local Motion = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Motion)
 local Screen = require(script.Parent.Screen)
 
@@ -124,6 +126,46 @@ local function spawnWord(gui: GuiBase2d, rng: Random, reduced: boolean, words: {
 	end)
 end
 
+-- Whisper bed (owner 2026-10-18): the "Whispers" sound loops under the words while they appear, its volume following how
+-- thick they are, and fades out after the last one. Content.Sounds whispers_bed, Sfx group, on screen.
+const BED_FADE = 0.8
+local function startBed(): Sound?
+	const row = Content.Sounds.ByKey.whispers_bed
+	if row == nil or row.Id == "" then
+		return nil
+	end
+	const sound = Instance.new("Sound")
+	sound.Name = "WhispersBed"
+	sound.SoundId = row.Id
+	sound.Looped = true
+	sound.Volume = 0
+	const group = SoundService:FindFirstChild("Sfx", true)
+	if group ~= nil and group:IsA("SoundGroup") then
+		sound.SoundGroup = group
+	end
+	sound.Parent = SoundService
+	sound:Play()
+	return sound
+end
+
+local function bedLevel(sound: Sound?, level: number)
+	if sound ~= nil then
+		const row = Content.Sounds.ByKey.whispers_bed
+		sound.Volume = (if row ~= nil then row.Volume else 0.45) * math.clamp(level, 0.25, 1.4)
+	end
+end
+
+local function stopBed(sound: Sound?)
+	if sound == nil then
+		return
+	end
+	const tween = TweenService:Create(sound, TweenInfo.new(BED_FADE), { Volume = 0 })
+	tween.Completed:Once(function()
+		sound:Destroy()
+	end)
+	tween:Play()
+end
+
 -- Words for `seconds` (yields until done).
 -- `words` replaces the "hide" list (the "get inside" nag, OutsideController); `rate` scales RATE (1 = default)
 function Whispers.Play(seconds: number, words: { string }?, rate: number?)
@@ -142,12 +184,15 @@ function Whispers.Play(seconds: number, words: { string }?, rate: number?)
 	const untilAt = os.clock() + seconds
 	const list = words or WORDS
 	const pace = RATE * (rate or 1)
+	const bed = startBed()
 	-- a slow start, thicker towards the end
 	while os.clock() < untilAt and gui.Parent ~= nil do
 		const t = 1 - (untilAt - os.clock()) / seconds
+		bedLevel(bed, (rate or 1) * (0.5 + t))
 		spawnWord(gui, rng, reduced, list, 0)
 		task.wait(1 / (pace * (0.5 + t)))
 	end
+	stopBed(bed)
 	task.wait(LIFE[2] + 0.1)
 	gui:Destroy()
 end
@@ -156,13 +201,18 @@ end
 -- Does not yield; the returned function stops the spawning (idempotent).
 function Whispers.Ramp(seconds: number, rateFrom: number, rateTo: number, words: { string }?): () -> ()
 	local running = true
+	local bed: Sound? = nil
 	local function stop()
 		running = false
+		const current = bed
+		bed = nil
+		stopBed(current)
 	end
 	const layer = Screen.Layer()
 	if layer == nil or seconds <= 0 then
 		return stop
 	end
+	bed = startBed()
 	const rng = Random.new()
 	const reduced = Motion.Reduced()
 	const list = words or WORDS
@@ -174,11 +224,12 @@ function Whispers.Ramp(seconds: number, rateFrom: number, rateTo: number, words:
 				break
 			end
 			const rate = math.max(rateFrom + (rateTo - rateFrom) * t, 0.05)
+			bedLevel(bed, 0.3 + rate / math.max(rateTo, 1))
 			const spread = math.clamp((rate - 1) / (MASS_RATE - 1), 0, 1)
 			spawnWord(layer, rng, reduced, list, spread)
 			task.wait(1 / (RATE * rate))
 		end
-		running = false
+		stop()
 	end)
 	return stop
 end
