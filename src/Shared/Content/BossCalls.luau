@@ -27,6 +27,7 @@
 --                  Storage (shared.Tutorial.Rules.Upgrade). Answers itself like any day call.
 -- Speaker nil = Walt. A line lasts Rules.LineTime; the current line = floor((now - StartedAt) / LineTime).
 local Table = require(script.Parent.Table)
+local VoiceLines = require(script.Parent.VoiceLines)
 -- TASK-393: the Day 1 Gear Stand call names where the stand is (the restaurant has it in the back, Q-321)
 local Restaurant = require(script.Parent.Restaurant)
 
@@ -225,210 +226,65 @@ const base = Table.new({
 	-- (Nights[k].NewAnomaly); the last line is its short form. Short = what follows the NightRepeat opener on a repeat.
 	-- DEC-261 (TASK-354): "Refuse" became "Shut the window" (no Refuse button); those lines have no voice yet (TTS
 	-- fallback) until tools/voice runs again.
+	-- owner 2026-10-18: the night calls were too long (4-7 lines, ~15 s) and the voice ran behind the subtitle; now 2-3
+	-- lines each, only the sign and the answer. Short = what follows the NightRepeat opener on a repeat.
 	nightCall(
 		1,
-		lines(
-			"Evening, Rookie. Some customers look off.",
-			"No face at all? Shut the window.",
-			"They'll wander off. Grill stays hot.",
-			"No face? Shut the window."
-		),
+		lines("Evening, Rookie. Some customers look off.", "No face? Shut the window.", "And don't stay outside too long."),
 		lines("No face? Shut the window.")
 	),
 	nightCall(
 		2,
-		lines(
-			"Night two. Watch the line close.",
-			"Someone shaking all over? Shut the window.",
-			"Odd noises? Just noises. Keep working.",
-			"Shaking? Shut the window."
-		),
+		lines("Someone shaking all over?", "Shut the window. Keep working."),
 		lines("Shaking? Shut the window.")
 	),
-	-- TASK-341 (Provisional): the blackout is presented on Night 3 and the turned neck on Night 4 (blocks swapped,
-	-- same lines, so the pre-generated voice still matches)
 	nightCall(
 		3,
-		lines(
-			"Lights might go out tonight.",
-			"Breaker's out back, behind the trailer.",
-			"Hold it till the lights come back.",
-			"Lights out? Breaker. Hold it."
-		),
+		lines("Lights might go out tonight.", "Breaker's out back. Hold it."),
 		lines("Lights out? Breaker. Hold it."),
-		-- restaurant: the breaker is on the LIGHT panel (anomalies-v3-restaurant.md §3), no trailer
-		{
-			Lines = lines(
-				"Lights might go out tonight.",
-				"Breaker's on the light panel.",
-				"Hold it till the lights come back.",
-				"Lights out? Breaker. Hold it."
-			),
-			Short = lines("Lights out? Breaker. Hold it."),
-		}
+		{ Lines = lines("Lights might go out tonight.", "Breaker's on the light panel. Hold it."), Short = lines("Lights out? Breaker. Hold it.") }
 	),
 	nightCall(
 		4,
-		lines(
-			"Rainy one tonight, Rookie.",
-			"Head turned all the way back?",
-			"That's no customer. Shut the window.",
-			"Head on backwards? Shut the window."
-		),
+		lines("Head turned all the way back?", "That's no customer. Shut the window."),
 		lines("Head on backwards? Shut the window."),
-		-- restaurant: the stalker (ANM-006, drawn from Night 4) gets its answer here: don't look, shut it when it arrives
-		{
-			Lines = lines(
-				"Rainy one tonight, Rookie.",
-				"Head turned all the way back?",
-				"That's no customer. Shut the window.",
-				"Someone across the street? Don't look.",
-				"It reaches the glass? Shut the window.",
-				"Backwards head? Window. Watcher? Don't look."
-			),
-			Short = lines("Head on backwards? Shut the window.", "Someone across the street? Don't look."),
-		}
+		{ Lines = lines("Head turned all the way back? Shut the window.", "Someone across the street? Don't look."), Short = lines("Backwards head? Window. Watcher? Don't look.") }
 	),
-	-- TASK-339 / TASK-331 / TASK-333 / TASK-334 / TASK-340 (owner 2026-10-15, Provisional; new lines have no voice yet,
-	-- Speech falls back to TTS): Walt no longer shouts "Hide!" on every monster, so each family B monster's sign is
-	-- explained ONCE here, on its debut night; the long car, the knock, the bell and the Hush get their answer too.
 	nightCall(
 		5,
-		lines(
-			"Foggy tonight. Look at their eyes.",
-			"All white? Big grin? Shut the window.",
-			"Twins in line? One's a copy.",
-			"Hear a church bell? Count it.",
-			"Kill the trailer light before the third.",
-			"White eyes or twins? Shut the window."
-		),
-		lines("White eyes or twins? Shut the window.", "Bell rings? Light off by the third."),
-		-- restaurant: the stopped clock (bell) is cut (Restaurant.Switch.CutAnomalies), so no bell lines
-		{
-			Lines = lines(
-				"Foggy tonight. Look at their eyes.",
-				"All white? Big grin? Shut the window.",
-				"Twins in line? One's a copy.",
-				"Don't stare at them. Just shut it.",
-				"White eyes or twins? Shut the window."
-			),
-			Short = lines("White eyes or twins? Shut the window."),
-		}
+		lines("White eyes? Twins in line? Shut the window.", "Bell rings? Light off by the third."),
+		lines("White eyes or twins? Shut the window."),
+		{ Lines = lines("White eyes? Twins in line? Shut the window.", "Red fog on the street?", "Shut it. Stay inside till it's gone."), Short = lines("Eyes, twins, red fog? Shut the window.") }
 	),
 	nightCall(
 		6,
-		lines(
-			"Something walks the street tonight.",
-			"Lights buzz and flicker? Heavy steps?",
-			"That's the Walker. Out the back door.",
-			"Hide behind the trailer. Stay put.",
-			"Buzzing lights? Hide out back."
-		),
+		lines("Lights buzz? Heavy steps?", "Hide out back, behind the trailer."),
 		lines("Buzzing lights? Hide out back."),
-		-- restaurant: the Walker is cut; the big head (ANM-014) presents the night (Restaurant.Switch.NewAnomalies[6])
-		{
-			Lines = lines(
-				"Something's off with the heads tonight.",
-				"Head way too big for them?",
-				"That's no customer. Shut the window.",
-				"Big head? Shut the window."
-			),
-			Short = lines("Big head? Shut the window."),
-		}
+		{ Lines = lines("Head way too big for them?", "Shut the window."), Short = lines("Big head? Shut the window.") }
 	),
 	nightCall(
 		7,
-		lines(
-			"Stormy one. Something crawls tonight.",
-			"Hear scratching under the trailer?",
-			"That's the crawler. It's fast.",
-			"Out the back and hide. Quick.",
-			"Scratching? Hide out back."
-		),
+		lines("Scratching under the trailer?", "Out the back and hide. Quick."),
 		lines("Scratching? Hide out back."),
-		-- restaurant: the crawler is "get off the floor" (TASK-483): climb on the counter
-		{
-			Lines = lines(
-				"Stormy one. Something crawls tonight.",
-				"Hear scratching under the floor?",
-				"That's the crawler. It's fast.",
-				"Get off the floor. Climb the counter.",
-				"Scratching? Up on the counter."
-			),
-			Short = lines("Scratching? Up on the counter."),
-		}
+		{ Lines = lines("Scratching under the floor?", "Get off the floor. Climb the counter."), Short = lines("Scratching? Up on the counter.") }
 	),
 	nightCall(
 		8,
-		lines(
-			"Dark one tonight, Rookie.",
-			"One of them makes no sound at all.",
-			"If the word 'hide' creeps into your head...",
-			"Listen. Go hide out back.",
-			"A car flashes its brights at you?",
-			"Shut the window before the beam hits.",
-			"Whispers? Hide. Headlights? Window."
-		),
+		lines("Whispers say hide? Hide out back.", "Car flashes its brights? Shut the window."),
 		lines("Whispers? Hide. Headlights? Window."),
-		-- restaurant: the grin is cut; the long car (ANM-008) presents the night (Restaurant.Switch.NewAnomalies[8]) and
-		-- brakes at the drive-thru window (TASK-490)
-		{
-			Lines = lines(
-				"Dark one tonight, Rookie.",
-				"A long car comes down the street.",
-				"It brakes at the drive-thru.",
-				"Shut the window before the brights.",
-				"Keep it shut till it leaves.",
-				"Long car? Shut it. Keep it shut."
-			),
-			Short = lines("Long car? Shut it. Keep it shut."),
-		}
+		{ Lines = lines("A long car at the drive-thru?", "Shut the window. Keep it shut."), Short = lines("Long car? Shut it. Keep it shut.") }
 	),
 	nightCall(
 		9,
-		lines(
-			"Hear heavy steps on the roof?",
-			"That's not me. Never is.",
-			"Get out and hide. Quick.",
-			"And someone knocks out back?",
-			"It's not me either. Don't open.",
-			"Roof steps? Hide. Knocks? Don't open."
-		),
+		lines("Steps on the roof? Get out and hide.", "Knocks out back? It's not me. Don't open."),
 		lines("Roof steps? Hide. Knocks? Don't open."),
-		-- restaurant: the roof walker is "don't look up" (TASK-484) and the knock is cut (no back door)
-		{
-			Lines = lines(
-				"Hear heavy steps on the roof?",
-				"That's not me. Never is.",
-				"Keep your head down. Don't look up.",
-				"Roof steps? Don't look up."
-			),
-			Short = lines("Roof steps? Don't look up."),
-		}
+		{ Lines = lines("Steps on the roof? Don't look up.", "Knocks on the back door?", "It's not me. Don't open."), Short = lines("Roof steps? Don't look up. Knocks? Don't open.") }
 	),
 	nightCall(
 		10,
-		lines(
-			"Last night, Rookie. Everything comes.",
-			"Shut the window, hide, fix the lights.",
-			"Street lamps die one by one?",
-			"Run. Get INSIDE the Mart.",
-			"Stay in there till they're back.",
-			"Lamps out? Run inside the Mart."
-		),
-		lines("Lamps out? Run inside the Mart.", "Shut the window, hide, fix the lights."),
-		-- restaurant: no Mart on the map; the Hush is answered by turning the shop light off and keeping it off (TASK-490)
-		{
-			Lines = lines(
-				"Last night, Rookie. Everything comes.",
-				"Shut the window, fix the lights.",
-				"Street lamps die one by one?",
-				"Turn off the shop light.",
-				"Keep it off till they're back.",
-				"Lamps out? Shop light off."
-			),
-			Short = lines("Lamps out? Shop light off.", "Shut the window, fix the lights."),
-		}
+		lines("Last night, Rookie.", "Lamps dying? Run inside the Mart."),
+		lines("Lamps out? Run inside the Mart."),
+		{ Lines = lines("Last night, Rookie.", "Lamps dying outside? Shop light off.", "Keep it off till they're back."), Short = lines("Lamps out? Shop light off.") }
 	),
 	{
 		Key = "call_night_short",
@@ -562,7 +418,55 @@ local function linesOf(key: string, night: number): { Line }
 	return out
 end
 
+-- Line timing (owner 2026-10-18: the voice ran behind a fixed 2.5 s subtitle and was cut): each line lasts its
+-- pre-generated voice (Content.VoiceLines, Length) + LINE_GAP; a line with no voice keeps Rules.LineTime. Server
+-- (EndsAt, the current line) and client (subtitle, voice) use these same functions, so everyone is on the same line.
+const LINE_GAP = 0.45 -- s of silence between two lines
+const MIN_LINE = 1.4 -- s: even a one-word line stays readable
+
+-- the same normalisation as Cutscene/Speech.Spoken (the VoiceLines.Index key)
+local function spoken(text: string): string
+	local out = string.gsub(text, "%d[%d%-%s]*%d", "")
+	out = string.gsub(out, "^[%s%.,!%?]+", "")
+	out = string.gsub(out, "%s+", " ")
+	return out
+end
+
+local function durationOf(line: Line): number
+	const speaker = string.lower(line.Speaker or "walt")
+	const key = VoiceLines.Index[speaker .. "\0" .. spoken(line.Text)]
+	const voice = if key ~= nil then VoiceLines.Lines[key] else nil
+	if voice == nil then
+		return rules.LineTime
+	end
+	return math.max(voice.Length + LINE_GAP, MIN_LINE)
+end
+
+-- total length of a call's lines (s)
+local function lengthOf(list: { Line }): number
+	local total = 0
+	for _, line in list do
+		total += durationOf(line)
+	end
+	return total
+end
+
+-- index of the line speaking `elapsed` s into the call (1..#list), #list + 1 when it is over
+local function lineAt(list: { Line }, elapsed: number): number
+	local t = 0
+	for index, line in list do
+		t += durationOf(line)
+		if elapsed < t then
+			return index
+		end
+	end
+	return #list + 1
+end
+
 return Table.with(base, {
 	Rules = Table.record(rules),
 	LinesOf = linesOf,
+	LengthOf = lengthOf,
+	LineAt = lineAt,
+	DurationOf = durationOf,
 })

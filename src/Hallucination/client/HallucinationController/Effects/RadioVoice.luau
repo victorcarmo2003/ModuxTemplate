@@ -73,7 +73,18 @@ const RadioVoice: Context.Effect = {
 		if not hold(env, run, 0.9) then
 			return
 		end
-		env.Subtitle(SPEAKER, LINES[env.Random:NextInteger(1, #LINES)])
+		const line = LINES[env.Random:NextInteger(1, #LINES)]
+		env.Subtitle(SPEAKER, line)
+		-- owner 2026-10-18: the stranger is voiced (pre-generated "radio" voice, Speech through BossController)
+		pcall(function()
+			const client = script:FindFirstAncestor("client")
+			const feature = if client then client:FindFirstChild("Boss") else nil
+			const module = if feature then feature:FindFirstChild("BossController") else nil
+			if module ~= nil and module:IsA("ModuleScript") then
+				const boss: any = (require :: any)(module)
+				boss:Speak(line, "radio")
+			end
+		end)
 		if not hold(env, run, LINE_TIME) then
 			return
 		end

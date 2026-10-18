@@ -62,7 +62,6 @@ const VEHICLE_ATTRIBUTE = "Vehicle"
 const PHONE_ACTION = "answer_phone"
 const CAUGHT_COUNTER = "quentin_caught_day" -- written by ThiefService (TASK-072)
 const SNAPSHOT = "Bs"
-const LINE_TIME = Content.BossCallRules.LineTime
 const AUTO_ANSWER = Content.BossCallRules.AutoAnswer
 const MAX_QUEUE = 32 -- far above any real sequence; guards a runaway trigger
 const TUTORIAL = Content.BossCallRules.Tutorial
@@ -248,7 +247,8 @@ function BossService:Talk(key: string, at: number)
 	end
 	table.clear(self.Cued)
 	-- the tutorial call is held open until no tutorial is pending (StepTutorial)
-	self.EndsAt = if key == TUTORIAL.Call then math.huge else at + #self:LinesOf(key) * LINE_TIME
+	-- each line lasts its voice (Content.BossCalls.LengthOf, owner 2026-10-18), not a fixed LineTime
+	self.EndsAt = if key == TUTORIAL.Call then math.huge else at + Content.BossCalls.LengthOf(self:LinesOf(key))
 	self:Write(key, "Talking", at)
 end
 
@@ -324,7 +324,7 @@ function BossService:RunCues(record: Record, t: number)
 	if cues == nil then
 		return
 	end
-	const line = math.floor((t - record.StartedAt) / LINE_TIME) + 1
+	const line = Content.BossCalls.LineAt(self:LinesOf(record.Call), t - record.StartedAt)
 	for index, cue in cues do
 		const id = `{record.Call}#{index}@{record.StartedAt}`
 		if line >= cue.Line and not self.Cued[id] then
@@ -580,7 +580,7 @@ function BossService:DevStatus(): string
 	end
 	if record.State == "Talking" then
 		const lines = #self:LinesOf(record.Call)
-		const line = math.floor((now() - record.StartedAt) / LINE_TIME) + 1
+		const line = Content.BossCalls.LineAt(self:LinesOf(record.Call), now() - record.StartedAt)
 		text ..= ` line {math.clamp(line, 1, math.max(lines, 1))}/{lines}`
 	elseif record.State == "Ringing" then
 		text ..= ` (auto-answer in {math.max(0, math.ceil(record.StartedAt + AUTO_ANSWER - now()))} s)`

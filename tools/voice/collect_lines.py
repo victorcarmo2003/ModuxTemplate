@@ -13,6 +13,9 @@ FILES = {
     "cutscenes": "Shared/Content/Cutscenes.luau",
     "bosscalls": "Shared/Content/BossCalls.luau",
     "steps": "Tutorial/client/TutorialController/Steps.luau",
+    # owner 2026-10-18: every voiced line, one voice per character
+    "hush": "Anomaly/client/AnomalyController/Effects/ANM-010.luau",
+    "radiovoice": "Hallucination/client/HallucinationController/Effects/RadioVoice.luau",
 }
 
 
@@ -129,6 +132,29 @@ def main():
             add("walt", val, f"Steps.luau:{line} ({field})")
             if field in ("Done", "Remind"):
                 field = None
+
+    # Walt on the anomalies' radio (Kit/Radio.Say): the RUN_LINE / SHOP_LINE constants of the Hush
+    t = toks["hush"]
+    for i in range(len(t) - 2):
+        if t[i][0] == "id" and t[i][1] in ("RUN_LINE", "SHOP_LINE") and t[i + 1][1] == "=" and t[i + 2][0] == "str":
+            add("walt", t[i + 2][1], f"Radio:ANM-010.luau:{t[i + 2][2]}")
+
+    # the stranger on the radio (hallucination radio_voice): every string of its LINES table
+    t = toks["radiovoice"]
+    inside = False
+    depth = 0
+    for i, (kind, val, line) in enumerate(t):
+        if kind == "id" and val == "LINES":
+            inside = True
+            depth = 0
+        elif inside and kind == "sym" and val == "{":
+            depth += 1
+        elif inside and kind == "sym" and val == "}":
+            depth -= 1
+            if depth == 0:
+                inside = False
+        elif inside and depth > 0 and kind == "str":
+            add("radio", val, f"RadioVoice.luau:{line}")
 
     out = dict(sorted(lines.items(), key=lambda kv: (kv[1]["speaker"], kv[1]["text"])))
     path = os.path.join(ROOT, "tools", "voice", "lines.json")

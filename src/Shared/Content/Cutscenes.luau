@@ -280,6 +280,8 @@ const rules: Rules = {
 		-- user feedback 2026-10-11: a calmer, slower Walt (was 0.95)
 		walt = { VoiceId = "1", Speed = 1, Volume = 1 }, -- owner 2026-10-18: a quicker call (was 0.9)
 		crew = { VoiceId = "2", Speed = 1.05, Volume = 0.9 },
+		-- owner 2026-10-18: the stranger on the radio (hallucination radio_voice) has a voice of its own
+		radio = { VoiceId = "3", Speed = 0.9, Volume = 0.8 },
 	},
 	-- no street cars in the intro (owner D3 2026-10-12: short, clean scene); the type stays for other scenes
 	Cars = {},

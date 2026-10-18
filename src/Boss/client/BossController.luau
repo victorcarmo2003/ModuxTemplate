@@ -54,7 +54,6 @@ local Theme = require(Components.Theme)
 const RECORD_ID = 1 -- single record (network.md §13.3)
 const SHIFT_ID = 1 -- Shift record (network.md §3.1): Night picks the Short lines of a repeated night
 const NONE = "none"
-const LINE_TIME = Content.BossCallRules.LineTime
 const SPEAKER = "Walt" -- BossCalls Line.Speaker nil
 const TICK_RATE = 10 -- Hz: line changes every 2.5 s, lamp blinks at 2 Hz
 const BLINK_HZ = 2
@@ -149,8 +148,9 @@ function BossController:Voice(): Speech.Speech
 	return created
 end
 
-local function beatOf(text: string): Content.CutsceneBeat
-	return { At = 0, Kind = "Line", Target = VOICE_SPEAKER, Speaker = VOICE_SPEAKER, Text = text }
+local function beatOf(text: string, speaker: string?): Content.CutsceneBeat
+	const who = speaker or VOICE_SPEAKER
+	return { At = 0, Kind = "Line", Target = who, Speaker = who, Text = text }
 end
 
 -- Queues the voice of every line of a call (once per key and night: a repeated night appends its Short lines)
@@ -226,8 +226,9 @@ function BossController:WarnSilent(line: Content.CutsceneBeat)
 end
 
 -- Walt says the line on screen now; the subtitle never waits for it
-function BossController:Speak(text: string)
-	const beat = beatOf(text)
+-- speaker = a Content.Cutscenes.Rules.Voices key (nil = Walt); the radio stranger is "radio"
+function BossController:Speak(text: string, speaker: string?)
+	const beat = beatOf(text, speaker)
 	self.CancelSay = self:Voice().Say(beat, {
 		OnMiss = function(_line: Content.CutsceneBeat)
 			self:WarnSilent(beat)
@@ -330,7 +331,7 @@ function BossController:Refresh()
 
 	local index = 0
 	if state == "Talking" and #self.Lines > 0 then
-		const at = math.floor((now - self.StartedAt) / LINE_TIME) + 1
+		const at = Content.BossCalls.LineAt(self.Lines, now - self.StartedAt) -- each line = its voice length
 		if at >= 1 and at <= #self.Lines then
 			index = at
 		end

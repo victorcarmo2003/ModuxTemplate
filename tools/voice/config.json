@@ -4,10 +4,30 @@
  "out_rate": 24000,
  "ogg_quality": 4,
  "voices": {
-  "walt": { "voice": "am_fenrir", "lang": "a", "speed": 0.9, "post": "walt" },
-  "crew": { "voice": "af_heart", "lang": "a", "speed": 1.0, "post": "crew" }
+  "walt": {
+   "voice": "am_fenrir",
+   "lang": "a",
+   "speed": 0.9,
+   "post": "walt"
+  },
+  "crew": {
+   "voice": "af_heart",
+   "lang": "a",
+   "speed": 1.0,
+   "post": "crew"
+  },
+  "radio": {
+   "voice": "bm_lewis",
+   "lang": "b",
+   "speed": 0.85,
+   "post": "radio"
+  }
  },
- "pauses": { "stop": 0.3, "ask": 0.45, "dots": 0.6 },
+ "pauses": {
+  "stop": 0.3,
+  "ask": 0.45,
+  "dots": 0.6
+ },
  "post": {
   "walt": {
    "pitch_semitones": -1.5,
@@ -23,9 +43,21 @@
    "lowpass": 9000,
    "compress": "acompressor=threshold=0.1:ratio=2.5:attack=5:release=80:makeup=2",
    "saturate": 1.0
+  },
+  "radio": {
+   "pitch_semitones": -3,
+   "highpass": 200,
+   "lowpass": 4200,
+   "compress": "acompressor=threshold=0.1:ratio=4:attack=5:release=80:makeup=2",
+   "saturate": 2.2,
+   "reverb": "aecho=0.8:0.5:40:0.18"
   }
  },
- "phone": { "highpass": 300, "lowpass": 3400, "gain_db": 2 },
+ "phone": {
+  "highpass": 300,
+  "lowpass": 3400,
+  "gain_db": 2
+ },
  "phone_rule": "walt lines from BossCalls, Steps, and Cutscenes.luau lines of scene [intro] (the intro call) get the phone filter; in-person cutscene lines stay clean",
  "gen_text_overrides": {
   "v_0520e8b100": "I worked that corner forty years. Since nineteen seventy-nine."

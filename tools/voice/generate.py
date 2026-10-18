@@ -111,6 +111,8 @@ def post(wav_in, out_path, role, phone):
 
 
 def is_phone(entry):
+    if entry["speaker"] == "radio":
+        return True  # the stranger on the radio (owner 2026-10-18)
     if entry["speaker"] != "walt":
         return False
     for s in entry["sources"]:
