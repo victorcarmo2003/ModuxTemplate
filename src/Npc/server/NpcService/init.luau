@@ -134,6 +134,7 @@ const NIGHT_PACK = "Night"
 const MAX_ID = 65535 -- NpcId wire range (Customers id, Sale.Npc)
 const ROUTES_PER_FRAME = 2 -- architecture.md §12.3
 const LIFT = 3 -- HumanoidRootPart above the floor point (architecture.md §18.5)
+const OFF_GRAPH = 3 -- studs from the first node of a route beyond which a walk starts "off the graph" (WalkTo)
 -- Arrival points by shift: Content.Flow.Spawns.Arrivals (MAP-01 §9.8, Provisional). Points missing from the binding
 -- are skipped (the draw falls back to the others).
 
@@ -573,7 +574,7 @@ function NpcService:WalkTo(id: number, target: string, options: WalkOptions?): b
 	end
 
 	const points: { Vector3 } = {}
-	const crossings: { [number]: string } = {}
+	local crossings: { [number]: string } = {}
 	for index = 2, #path do
 		const node = MapIndex.Node(path[index])
 		table.insert(points, node.Position)
@@ -596,6 +597,29 @@ function NpcService:WalkTo(id: number, target: string, options: WalkOptions?): b
 			points[index - 1] += shift
 		end
 	end
+	-- off the graph (a seat's approach point, a pushed or snapped rig) with props between the rig and the second node of
+	-- the route: walk to the first node first, around them (Walker.Detour), instead of cutting straight through
+	-- (restaurant patio, 2026-10-18, PROVISIONAL)
+	const start = MapIndex.Node(path[1]).Position
+	const root = npc.Rig.Root.Position
+	local lead = 0
+	if
+		#points > 0
+		and Vector3.new(start.X - root.X, 0, start.Z - root.Z).Magnitude > OFF_GRAPH
+		and not Walker.Clear(npc.Rig, points[1])
+	then
+		const way = Walker.Detour(npc.Rig, start)
+		table.insert(way, start)
+		lead = #way
+		const shifted: { [number]: string } = {}
+		for index, cw in crossings do
+			shifted[index + lead] = cw
+		end
+		crossings = shifted
+		for index = lead, 1, -1 do
+			table.insert(points, 1, way[index])
+		end
+	end
 	-- spacing gate (the thief runs: it never waits)
 	const gate: Walker.Gate? = if npc.Role == "Thief"
 		then nil
@@ -603,7 +627,11 @@ function NpcService:WalkTo(id: number, target: string, options: WalkOptions?): b
 			return self:Blocked(id, direction)
 		end
 	const done = Walker.Follow(npc.Rig, points, alive, function(index: number)
-		npc.Node = path[index + 1]
+		if index > lead then
+			npc.Node = path[index - lead + 1]
+		elseif index == lead then
+			npc.Node = path[1]
+		end
 	end, self:Crossing(id, crossings), gate, { Ease = npc.Role ~= "Thief" })
 	if not done or not alive() then
 		return false

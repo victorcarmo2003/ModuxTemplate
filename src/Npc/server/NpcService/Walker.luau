@@ -21,6 +21,11 @@
 -- points); points that are only passed through count as reached inside a small radius, so the rig keeps walking (no
 -- stop per waypoint); WalkSpeed eases at the start and the end of a walk; the body turns with an AlignOrientation
 -- (capped angular speed) towards the point and a little ahead to the next one, never on the spot. No network.
+-- Detour (restaurant patio, 2026-10-18, PROVISIONAL): an off-graph walk (Direct: seat approach points; the first leg of
+-- a graph walk that starts away from its node) whose straight line is blocked walks around the blocking props instead
+-- (corners of their boxes, shortest clear way, Walker.Detour). The swept box uses the rig's collision group, so other
+-- rigs and NpcPass props never count. A Direct walk that stalls within DIRECT_NEAR of its goal counts as arrived (an
+-- approach point beside a fence or a lamp pole: the seat snap does the rest).
 
 export type Mover = { Model: Model, Root: BasePart, Humanoid: Humanoid }
 
@@ -51,6 +56,15 @@ const HARD_CAP = 5 -- side-steps before a snap even in view (never stays stuck)
 const HIDDEN_RADIUS = 40 -- studs: no player character this close = nobody sees the snap
 -- Spacing gate, PROVISIONAL
 const GATE_MAX = 3 -- seconds a rig waits behind another per waypoint before it walks on anyway
+-- Detour, PROVISIONAL (restaurant patio, 2026-10-18)
+const DETOUR_WIDTH = 1.8 -- studs: width of the swept box (rig torso 2; a brush along a pole still counts as clear)
+const DETOUR_BOTTOM = 0.7 -- studs above the floor where the swept box starts (floor trims and rails below)
+const DETOUR_TOP = 4.6 -- studs above the floor where it ends
+const DETOUR_MARGIN = 1.5 -- studs around an obstacle's box for the corner points (half the rig + clearance)
+const DETOUR_END = 1.2 -- studs: a hit this close to the end of a leg is the goal's own neighbour (fence, pole)
+const DETOUR_SPAN = 16 -- studs: wider obstacles (walls, buildings) are never walked around
+const DETOUR_OBSTACLES = 3 -- obstacles one detour may go around
+const DIRECT_NEAR = 1.5 -- studs: a Direct walk stalled this close to its goal has arrived
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -70,7 +84,8 @@ type Item = { Position: Vector3, Index: number, Loose: boolean, Last: boolean }
 
 -- Per-step motion: the point after this one (look-ahead), loose, WalkSpeed easing at the start / the end of a walk
 -- Base = the WalkSpeed the owner set (the walk writes it back at its end; nil = the step does)
-type Motion = { Loose: boolean, After: Vector3?, EaseIn: boolean, EaseOut: boolean, Base: number? }
+-- Near = a stall this close to the target counts as reached (Direct only)
+type Motion = { Loose: boolean, After: Vector3?, EaseIn: boolean, EaseOut: boolean, Base: number?, Near: number? }
 
 export type Options = { Ease: boolean } -- Ease false = the owner drives WalkSpeed (the thief)
 
@@ -261,6 +276,166 @@ local function plan(mover: Mover, points: { Vector3 }, crossing: Crossing?): { I
 	return items
 end
 
+-- Detour -----------------------------------------------------------------------------------------------------------
+
+-- Cast settings of a rig: its own collision group (other rigs, players and NpcPass props are not in the way)
+local function sweepParams(mover: Mover): RaycastParams
+	const params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { mover.Model }
+	params.RespectCanCollide = true
+	params.CollisionGroup = mover.Root.CollisionGroup
+	return params
+end
+
+-- First solid thing a rig-wide box meets walking flat from `a` to `b` on the floor `floorY`; nil = clear. A hit within
+-- DETOUR_END of `b` does not count (the goal's own neighbour).
+local function sweep(a: Vector3, b: Vector3, floorY: number, params: RaycastParams): RaycastResult?
+	const height = DETOUR_TOP - DETOUR_BOTTOM
+	const y = floorY + DETOUR_BOTTOM + height / 2
+	const from = Vector3.new(a.X, y, a.Z)
+	const delta = Vector3.new(b.X, y, b.Z) - from
+	const length = delta.Magnitude
+	if length < 0.05 then
+		return nil
+	end
+	const hit = workspace:Blockcast(CFrame.lookAt(from, from + delta), Vector3.new(DETOUR_WIDTH, height, 0.2), delta, params)
+	if hit ~= nil and hit.Distance >= length - DETOUR_END then
+		return nil
+	end
+	return hit
+end
+
+-- Flat corners of `part`'s world box grown by DETOUR_MARGIN, at height `y`; nil when it is too big to walk around.
+local function corners(part: BasePart, y: number): { Vector3 }?
+	const frame, size = part.CFrame, part.Size
+	local low = Vector3.new(math.huge, 0, math.huge)
+	local high = -low
+	for _, x in { -0.5, 0.5 } do
+		for _, z in { -0.5, 0.5 } do
+			for _, h in { -0.5, 0.5 } do
+				const corner = frame * Vector3.new(size.X * x, size.Y * h, size.Z * z)
+				low = Vector3.new(math.min(low.X, corner.X), 0, math.min(low.Z, corner.Z))
+				high = Vector3.new(math.max(high.X, corner.X), 0, math.max(high.Z, corner.Z))
+			end
+		end
+	end
+	if high.X - low.X > DETOUR_SPAN or high.Z - low.Z > DETOUR_SPAN then
+		return nil
+	end
+	const m = DETOUR_MARGIN
+	return {
+		Vector3.new(low.X - m, y, low.Z - m),
+		Vector3.new(high.X + m, y, low.Z - m),
+		Vector3.new(high.X + m, y, high.Z + m),
+		Vector3.new(low.X - m, y, high.Z + m),
+	}
+end
+
+-- The straight way from the rig to `target` is clear of props (Detour casts).
+function Walker.Clear(mover: Mover, target: Vector3): boolean
+	const start = mover.Root.Position
+	return sweep(start, target, start.Y - LIFT, sweepParams(mover)) == nil
+end
+
+-- Points to walk through (in order, `target` excluded) to get around the props between the rig and `target`: the
+-- shortest clear way over the corners of the blocking boxes. Empty = the straight way is clear, or no way around was
+-- found (the caller walks straight, as before).
+function Walker.Detour(mover: Mover, target: Vector3): { Vector3 }
+	const start = mover.Root.Position
+	const floorY = start.Y - LIFT
+	const params = sweepParams(mover)
+	const first = sweep(start, target, floorY, params)
+	if first == nil then
+		return {}
+	end
+	const points: { Vector3 } = { start, target } -- 1 = the rig, 2 = the goal, then the corners
+	const known: { [Instance]: true } = {}
+	const cache: { [number]: RaycastResult | false } = {}
+	local count = 0
+	local function add(part: Instance): boolean
+		if known[part] ~= nil or count >= DETOUR_OBSTACLES or not part:IsA("BasePart") then
+			return false
+		end
+		known[part] = true
+		const list = corners(part, target.Y)
+		if list == nil then
+			return false
+		end
+		count += 1
+		for _, corner in list do
+			table.insert(points, corner)
+		end
+		return true
+	end
+	local function edge(i: number, j: number): RaycastResult?
+		const key = math.min(i, j) * 64 + math.max(i, j)
+		local hit = cache[key]
+		if hit == nil then
+			hit = sweep(points[i], points[j], floorY, params) or false
+			cache[key] = hit
+		end
+		return if hit == false then nil else hit
+	end
+	add(first.Instance)
+	for _ = 1, DETOUR_OBSTACLES do
+		-- Dijkstra over the few points (at most 2 + 4 * DETOUR_OBSTACLES)
+		const n = #points
+		const cost: { number } = table.create(n, math.huge)
+		const from: { number } = table.create(n, 0)
+		const done: { boolean } = table.create(n, false)
+		const blockers: { Instance } = {}
+		cost[1] = 0
+		while true do
+			local best, at = math.huge, 0
+			for i = 1, n do
+				if not done[i] and cost[i] < best then
+					best, at = cost[i], i
+				end
+			end
+			if at == 0 or at == 2 then
+				break
+			end
+			done[at] = true
+			for j = 1, n do
+				if done[j] or j == at then
+					continue
+				end
+				const length = flat(points[j] - points[at]).Magnitude
+				if cost[at] + length >= cost[j] then
+					continue
+				end
+				const hit = edge(at, j)
+				if hit ~= nil then
+					table.insert(blockers, hit.Instance)
+					continue
+				end
+				cost[j] = cost[at] + length
+				from[j] = at
+			end
+		end
+		if cost[2] < math.huge then
+			const way: { Vector3 } = {}
+			local at = from[2]
+			while at > 1 do
+				table.insert(way, 1, points[at])
+				at = from[at]
+			end
+			return way
+		end
+		local grew = false
+		for _, part in blockers do
+			if add(part) then
+				grew = true
+			end
+		end
+		if not grew then
+			break
+		end
+	end
+	return {}
+end
+
 -- Dev: little balls on the planned curve (Walker.SetDebug)
 local function draw(items: { Item })
 	const folder = Instance.new("Folder")
@@ -426,6 +601,10 @@ local function step(
 			best = distance
 			progressAt = now
 		elseif now - progressAt > STUCK_TIME then
+			if motion ~= nil and motion.Near ~= nil and distance < motion.Near then
+				finished = true -- stalled right beside the goal: close enough
+				break
+			end
 			tries += 1
 			if snap and (tries > HARD_CAP or (tries > SIDESTEPS and hidden(mover))) then
 				warn(`[NpcService] {mover.Model.Name} stuck {tries}x on the way to {target}: snapped to the waypoint`)
@@ -572,13 +751,35 @@ function Walker.Follow(
 	return done
 end
 
--- One straight MoveTo to `target` (no graph: Pad tables, pair partners; TASK-145/146). YIELDS. true = reached, false =
--- gave up after `timeout` s (default STEP_TIMEOUT) or cancelled. Never snaps: the caller decides.
+-- Walk to `target` off the graph (seat approach points, pair partners; TASK-145/146): straight, or around the props in
+-- the way (Walker.Detour). YIELDS. true = reached (or stalled within DIRECT_NEAR of it), false = gave up after
+-- `timeout` s (default STEP_TIMEOUT, the whole walk) or cancelled. Never snaps: the caller decides.
 function Walker.Direct(mover: Mover, target: Vector3, alive: () -> boolean, timeout: number?): boolean
 	if not alive() then
 		return false
 	end
-	return step(mover, target, alive, timeout, false, nil, { Loose = false, EaseIn = true, EaseOut = true })
+	const deadline = os.clock() + (timeout or STEP_TIMEOUT)
+	const way = Walker.Detour(mover, target)
+	if debugDraw and #way > 0 then
+		const items: { Item } = {}
+		for index, point in way do
+			table.insert(items, { Position = point, Index = index, Loose = true, Last = true })
+		end
+		draw(items)
+	end
+	for index, point in way do
+		const motion: Motion = { Loose = true, After = way[index + 1] or target, EaseIn = index == 1, EaseOut = false }
+		step(mover, point, alive, math.max(deadline - os.clock(), POLL), false, nil, motion)
+		if not alive() then
+			return false
+		end
+	end
+	return step(mover, target, alive, math.max(deadline - os.clock(), POLL), false, nil, {
+		Loose = false,
+		EaseIn = #way == 0,
+		EaseOut = true,
+		Near = DIRECT_NEAR,
+	})
 end
 
 -- Stops any MoveTo in progress.

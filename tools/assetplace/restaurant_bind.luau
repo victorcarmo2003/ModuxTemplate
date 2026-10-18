@@ -2459,7 +2459,7 @@ end
 local PY = FLOOR + 0.05
 setPoint("TRL", 42.5, FLOOR, 63, DIR.N)
 setPoint("CART", 56.5, FLOOR, 53.3, DIR.N)
-setPoint("Q1", 56.5, FLOOR, 52.6, DIR.S)
+setPoint("Q1", 56.5, FLOOR, 52.3, DIR.S) -- 52.3 (was 52.6, 2026-10-18): a rig walking off it no longer brushes the counter top (Z 53.55)
 for i, x in { 54, 51.5, 49, 46.5 } do
 	setPoint("Q" .. (i + 1), x, FLOOR, 50.1, DIR.E)
 end
@@ -2479,8 +2479,9 @@ end
 setPoint("SPEC-P", 66, 20, 28, dirMap(-24, 35))
 -- new: PU-1..8 (MapPoint + NpcNode, clones of Q2), drive-thru and van points. PU-1..5 in a row in front of the counter (2.5
 -- apart, going west), PU-6..8 (TASK-441 QA, PickupSlots up to 8) turn south along the west fence (X 25.6: 1.4 from the
--- fence posts, 0.5 from the TBL-1 bench; overlap probe 2 x 4.9 x 1.4 clear on 2026-10-17), same 2.5 spacing
-local PU_SPOTS = { { 36, 52.6 }, { 33.5, 52.6 }, { 31, 52.6 }, { 28.5, 52.6 }, { 26, 52.6 }, { 25.6, 50.1 }, { 25.6, 47.6 }, { 25.6, 45.1 } }
+-- fence posts, 0.5 from the TBL-1 bench; overlap probe 2 x 4.9 x 1.4 clear on 2026-10-17), same 2.5 spacing. PU-1..5 at
+-- Z 52.3 (was 52.6, 2026-10-18): the shuffle along the row no longer brushes the counter top (Z 53.55)
+local PU_SPOTS = { { 36, 52.3 }, { 33.5, 52.3 }, { 31, 52.3 }, { 28.5, 52.3 }, { 26, 52.3 }, { 25.6, 50.1 }, { 25.6, 47.6 }, { 25.6, 45.1 } }
 for i, s in PU_SPOTS do
 	newPoint("PU-" .. i, "Q2", s[1], FLOOR, s[2], DIR.S)
 end
@@ -2591,17 +2592,41 @@ local function newNode(id, x, y, z)
 	p.CFrame = if ov and ov.CF then toCF(ov.CF) else CFrame.new(F(x, y, z))
 	return p
 end
--- patio nodes: N-PAD-1 = inside the gate, N-PAD-2 = middle corridor, N-PU-IN = counter lane; N-PAD-3 unused (kept, unlinked)
+-- patio nodes: N-GATE = outside the gate, N-PAD-1 = inside it, N-PAD-2 = middle corridor, N-PU-IN + N-PUL-1..4 = pickup
+-- lane, N-PAD-3 = south end of the east corridor (east tables)
+-- NPC routes rework (2026-10-18, PROVISIONAL; playtest "Npc_1 stuck 3x on the way to N-Z08-01"): every edge of the
+-- patio was swept with a rig-wide box (2 x 4, Npc collision group) and is clear. What changed and why:
+--   N-GATE: the diagonal N-Z02-05 / N-Z02-07 -> N-PAD-1 cut the corner of R-GATE Pillar_E (X 38.5); now straight through
+--     the middle of the gate;
+--   pickup lane at Z 50, 2.6 behind the slots: a rig walking along Z 52.6 grazed the counter top (Z 53.55) and the
+--     spacing gate stopped it behind every rig waiting in the line. Each slot is one step in from its lane node; the
+--     neighbour slots stay linked for the shuffle up the line; PU-6..8 along the fence as before;
+--   TBL-2 / TBL-4 stand at X 49.5 since the owner's 2026-10-18 edit and their Seat1 / Seat3 face west from the east side:
+--     their nodes moved to the corridor between the tables and the bushes (X 55.2), reached around the south end of
+--     TBL-2 through N-PAD-3 (unused until now: the boot warned it had no links). The last metres to a seat are a
+--     Walker.Direct walk, which goes around the table itself (Walker.Detour).
+newNode("N-GATE", 36, 0.4, 29)
 moveNode("N-PAD-1", 36, 33.6)
 moveNode("N-PAD-2", 36, 47.9)
-moveNode("N-PAD-3", 47.5, 45.0)
-newNode("N-PU-IN", 40, FLOOR, 52.6)
+moveNode("N-PAD-3", 55.2, 47.4)
+newNode("N-PU-IN", 40, FLOOR, 50)
+local PUL_X = { 36, 33.5, 31, 28.5 } -- lane node k is behind PU-k
+for i, x in PUL_X do
+	newNode("N-PUL-" .. i, x, FLOOR, 50)
+end
 moveNode("TBL-1", 34.5, 43.4)
-moveNode("TBL-2", 37.5, 43.4)
+moveNode("TBL-2", 55.2, 43.3)
 moveNode("TBL-3", 34.5, 35.8)
-moveNode("TBL-4", 37.5, 35.8)
+moveNode("TBL-4", 55.2, 35.8)
 -- links rebuilt from scratch for the patio nodes
-for _, id in { "N-PAD-1", "N-PAD-2", "N-PAD-3", "N-PU-IN", "TBL-1", "TBL-2", "TBL-3", "TBL-4", "PU-1", "PU-2", "PU-3", "PU-4", "PU-5", "PU-6", "PU-7", "PU-8" } do
+local PATIO_NODES = { "N-GATE", "N-PAD-1", "N-PAD-2", "N-PAD-3", "N-PU-IN", "TBL-1", "TBL-2", "TBL-3", "TBL-4" }
+for i = 1, #PUL_X do
+	table.insert(PATIO_NODES, "N-PUL-" .. i)
+end
+for i = 1, #PU_SPOTS do
+	table.insert(PATIO_NODES, "PU-" .. i)
+end
+for _, id in PATIO_NODES do
 	local l = linksOf(id)
 	for _, o in l do
 		drop(o, id)
@@ -2613,28 +2638,54 @@ drop("Q5", "N-PAD-2")
 drop("L3", "N-PAD-2")
 drop("L3", "N-Z01-04")
 -- queue Q5 .. Q1 stays chained (Q1-Q2-...-Q5)
-link("N-PAD-1", "N-Z02-05")
-link("N-PAD-1", "N-Z02-07")
+link("N-GATE", "N-Z02-05")
+link("N-GATE", "N-Z02-07")
+link("N-GATE", "N-PAD-1")
 link("N-PAD-1", "N-PAD-2")
 link("N-PAD-1", "TBL-3")
-link("N-PAD-1", "TBL-4")
 link("N-PAD-2", "TBL-1")
-link("N-PAD-2", "TBL-2")
 link("TBL-1", "TBL-3")
+link("N-PAD-2", "N-PAD-3")
+link("N-PAD-3", "TBL-2")
 link("TBL-2", "TBL-4")
 link("N-PAD-2", "Q5") -- queue tail on the corridor
 link("N-PAD-2", "N-PU-IN")
-link("N-PAD-2", "PU-4") -- pickup tail on the corridor
-link("Q1", "N-PU-IN") -- Q1 walks the counter lane to the pickup line
-for i = 1, 7 do
-	link("N-PU-IN", "PU-" .. i)
+link("N-PAD-2", "N-PUL-1")
+link("Q1", "N-PU-IN") -- Q1 walks off the counter to the pickup lane
+link("N-PU-IN", "N-PUL-1")
+for i = 1, #PUL_X do
+	if i < #PUL_X then
+		link("N-PUL-" .. i, "N-PUL-" .. (i + 1))
+	end
+	link("N-PUL-" .. i, "PU-" .. i)
 end
--- the side line along the fence is also chained, so PU-8 (whose straight line to N-PU-IN would graze the TBL-1 table) is
--- reached through PU-7
-for i = 5, 7 do
+link("N-PUL-4", "PU-5")
+link("N-PUL-4", "PU-6")
+-- the slots are chained too (PU-1 .. PU-8): one step up the line when the slot ahead frees; PU-8 (whose way to the lane
+-- would graze the TBL-1 bench) is only reached through PU-7
+for i = 1, #PU_SPOTS - 1 do
 	link("PU-" .. i, "PU-" .. (i + 1))
 end
 link("L3", "N-Z02-07") -- thief lurk on the sidewalk in front of the bushes
+-- N-Z01-04 (old Pad west corner, 0.5 from the west fence; it linked one way to L3 across the whole patio): off the graph
+local z0104 = nodePart("N-Z01-04")
+if z0104 then
+	for _, o in linksOf("N-Z01-04") do
+		drop(o, "N-Z01-04")
+	end
+	setLinks("N-Z01-04", {})
+	if not DIFF then
+		CS:RemoveTag(z0104, "NpcNode")
+	end
+end
+-- spawn / despawn ends the city fill buildings now cover (rigs were born inside a wall and snapped out of it, unseen):
+-- SP-S / ST-R in FILL-SE BuildingH, EX-E in B1 BuildingA, DR-APT in the Bellmoor Savings body, SP-A in the ToyStore east
+-- wall. Same links, new spots on the open sidewalk
+setPoint("SP-S", 17.5, 0.4, 92, DIR.N) -- Juniper South, beyond BAR-S, short of BuildingH (Z 97.7)
+setPoint("ST-R", 20, 0.4, 95, DIR.N)
+setPoint("EX-E", 126, 0.4, 27, DIR.E) -- Ninth sidewalk east end, past B1 (its alley is built over)
+setPoint("DR-APT", 32, 0.4, -28, DIR.S) -- just outside the bank front (Z -29.8)
+setPoint("SP-A", 20.5, 0.4, -92, DIR.W) -- west of the ToyStore east wall (X 24.4)
 -- N-Z01-01 (old Pad east corner, now the drive-thru exit): off the graph
 local z0101 = nodePart("N-Z01-01")
 if z0101 then

@@ -14,15 +14,23 @@ export type Adjacency = { [string]: { string } }
 
 export type PathOptions = {
 	AvoidCrossings: boolean?, -- skip crosswalk edges (thief, MAP-01 §9.2)
-	AvoidQueue: boolean?, -- queue slots Q1..Qn are never intermediate (customers outside the queue walk around it)
+	-- queue slots Q1..Qn are never intermediate (customers outside the queue walk around it), and stepping through a
+	-- pickup slot PU-n costs PICKUP_PASS more (the lane behind the pickup line wins over walking along the slots, where
+	-- the other customers stand; restaurant patio 2026-10-18, PROVISIONAL)
+	AvoidQueue: boolean?,
 }
 
 const EPSILON = 1e-9
+const PICKUP_PASS = 4 -- studs added for walking through a pickup slot that is neither the start nor the goal
 
 const Graph = {}
 
 function Graph.isQueue(id: string): boolean
 	return string.match(id, "^Q%d+$") ~= nil
+end
+
+function Graph.isPickup(id: string): boolean
+	return string.match(id, "^PU%-%d+$") ~= nil
 end
 
 -- A crosswalk edge joins the two curb nodes of the same crosswalk (§18.6).
@@ -126,6 +134,7 @@ function Graph.path(
 			continue
 		end
 		const node = nodes[current]
+		const pass = if avoidQueue and current ~= from and Graph.isPickup(current) then PICKUP_PASS else 0
 		for _, other in adjacency[current] or {} do
 			if closed[other] then
 				continue
@@ -134,7 +143,7 @@ function Graph.path(
 			if avoidCrossings and Graph.isCrossing(node, neighbor) then
 				continue
 			end
-			const total = cost[current] + (node.Position - neighbor.Position).Magnitude
+			const total = cost[current] + pass + (node.Position - neighbor.Position).Magnitude
 			const known = cost[other]
 			if known == nil or total < known - EPSILON then
 				cost[other] = total
