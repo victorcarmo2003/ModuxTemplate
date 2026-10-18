@@ -33,10 +33,11 @@ type Track = {
 const RULES = {
 	Start = 3, -- s outside before the rise begins (the first words)
 	Rise = 30, -- s of rising dread before the chaser comes (owner: "30 segundos")
-	SpawnDistance = 42, -- studs from the player where the chaser appears
-	Speed = 13, -- studs/s at first (the player walks 16: running inside saves him)
+	SpawnDistance = 60, -- studs from the player where the chaser appears
+	Pause = 2.5, -- s it stands and stares before it runs (the bell, the moment to react)
+	Speed = 9, -- studs/s at first (the player walks 16: running inside saves him)
 	MaxSpeed = 17,
-	Ramp = 12, -- s to reach MaxSpeed
+	Ramp = 15, -- s to reach MaxSpeed
 	Catch = 3.5, -- studs (flat)
 	Faint = 0.7, -- s from the face to the faint
 	Linger = 3,
@@ -58,12 +59,27 @@ local function rootOf(player: Player): BasePart?
 	return if root ~= nil and root:IsA("BasePart") then root else nil
 end
 
-local function ground(at: Vector3, ignore: { Instance }): Vector3
-	const params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Exclude
-	params.FilterDescendantsInstances = ignore
-	const hit = workspace:Raycast(at + Vector3.new(0, 20, 0), Vector3.new(0, -60, 0), params)
-	return if hit ~= nil then hit.Position else at
+local function characters(): { Instance }
+	const ignore: { Instance } = {}
+	for _, other in Players:GetPlayers() do
+		if other.Character ~= nil then
+			table.insert(ignore, other.Character)
+		end
+	end
+	return ignore
+end
+
+local function params(): RaycastParams
+	const p = RaycastParams.new()
+	p.FilterType = Enum.RaycastFilterType.Exclude
+	p.FilterDescendantsInstances = characters()
+	return p
+end
+
+-- ground under `at`, looked for from `fromY` (the player's height: never a roof above the street)
+local function ground(at: Vector3, fromY: number, p: RaycastParams): Vector3
+	const hit = workspace:Raycast(Vector3.new(at.X, fromY + 3, at.Z), Vector3.new(0, -12, 0), p)
+	return if hit ~= nil then hit.Position else Vector3.new(at.X, fromY - 3, at.Z)
 end
 
 const OutsideService = Modux.Service("OutsideService", {
@@ -105,13 +121,23 @@ function OutsideService:SpawnFor(root: BasePart): Vector3
 			away = d.Unit
 		end
 	end
-	const ignore: { Instance } = {}
-	for _, other in Players:GetPlayers() do
-		if other.Character ~= nil then
-			table.insert(ignore, other.Character)
+	-- the clearest line among a few headings around "away": as far as SpawnDistance, stopping short of a wall
+	const p = params()
+	local best = root.Position + away * 20
+	local bestDistance = 0
+	for _, degrees in { 0, 35, -35, 70, -70, 110, -110, 180 } do
+		const dir = CFrame.fromAxisAngle(Vector3.yAxis, math.rad(degrees)):VectorToWorldSpace(away)
+		const hit = workspace:Raycast(root.Position, dir * RULES.SpawnDistance, p)
+		const distance = if hit ~= nil then (hit.Position - root.Position).Magnitude - 3 else RULES.SpawnDistance
+		if distance > bestDistance then
+			bestDistance = distance
+			best = root.Position + dir * distance
+			if distance >= RULES.SpawnDistance - 0.5 then
+				break
+			end
 		end
 	end
-	return ground(root.Position + away * RULES.SpawnDistance, ignore)
+	return ground(best, root.Position.Y, p)
 end
 
 function OutsideService:Step(dt: number)
@@ -147,7 +173,10 @@ function OutsideService:Step(dt: number)
 			tr.Chaser = self:SpawnFor(root)
 			player:SetAttribute(CHASE_POS, tr.Chaser)
 		elseif tr.Stage == "Chase" and tr.Chaser ~= nil then
-			const into = t - tr.StageAt
+			const into = t - tr.StageAt - RULES.Pause
+			if into < 0 then
+				continue -- it stands and stares first
+			end
 			const speed = RULES.Speed + (RULES.MaxSpeed - RULES.Speed) * math.clamp(into / RULES.Ramp, 0, 1)
 			const target = Vector3.new(root.Position.X, tr.Chaser.Y, root.Position.Z)
 			const offset = target - tr.Chaser
@@ -161,7 +190,8 @@ function OutsideService:Step(dt: number)
 				end)
 			else
 				const move = math.min(speed * dt, flat)
-				tr.Chaser = tr.Chaser + offset.Unit * move
+				const next = tr.Chaser + Vector3.new(offset.X, 0, offset.Z).Unit * move
+				tr.Chaser = ground(next, root.Position.Y, params())
 				player:SetAttribute(CHASE_POS, tr.Chaser)
 			end
 		end
