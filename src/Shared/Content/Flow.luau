@@ -97,6 +97,11 @@ export type Flow = {
 	Guarantee: Guarantee, -- Q-202 (Provisional)
 	FullRetry: number, -- s: a spawn attempt skipped by a full counter tries again after this (DEC-241, Provisional)
 	NightQueueSize: number, -- counter slots at night, whatever the Counter level (TASK-287, Provisional)
+	-- s (min, max) after the counter frees at night before the next customer may come (owner 2026-10-18: "quando eu
+	-- recuso um cliente vem outro logo após"); drawn again each time
+	CounterGap: { number },
+	-- s the customer who left the counter takes to walk out of the shop area; CounterGap starts counting after it
+	CounterLeave: number,
 }
 
 const flow: Flow = {
@@ -180,6 +185,8 @@ const flow: Flow = {
 	-- TASK-287 (owner request 2026-10-14, Provisional): at night ONE NPC at the counter at a time. An anomaly actor
 	-- (CustomerService:SpawnActor) takes the ordinary customer's turn; the next one comes when the current one leaves.
 	NightQueueSize = 1,
+	CounterGap = { 10, 20 }, -- owner 2026-10-18, Provisional
+	CounterLeave = 5, -- owner 2026-10-18: "a contagem deve só iniciar quando o cliente que estava na frente sair"
 }
 
 return Table.record(flow)

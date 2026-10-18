@@ -96,6 +96,8 @@ export type SeatParty = {
 export type Public = {
 	Acted: SignalLib.Signal<number, ActedAction, Player?, SaleResult?>,
 	ActorRng: Random,
+	CounterFreeAt: number,
+	CounterWasFull: boolean,
 	Customers: { [number]: Customer },
 	DevNoArrivals: boolean,
 	EmptyLimit: number,

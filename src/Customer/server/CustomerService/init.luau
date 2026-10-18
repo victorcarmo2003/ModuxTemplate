@@ -337,6 +337,11 @@ function CustomerService:Setup()
 	self.Party = 1 :: number
 	-- 0 = no spawn scheduled
 	self.NextSpawnAt = 0 :: number
+	-- night pacing (owner 2026-10-18): the counter freed, the next customer waits until CounterFreeAt (Flow.CounterGap)
+	self.CounterFreeAt = 0 :: number
+	self.CounterWasFull = false :: boolean
+	-- restaurant nights: customers since the last quiet stretch (Restaurant.Flow.LullEvery)
+	self.LullCount = 0 :: number
 	self.Warned = {} :: { [string]: boolean }
 	-- Created here so lower-priority services (Anomaly 570, TASK-033 handlers) connect in their OnInit.
 	-- SpawnAttempted(outcome): every attempt. Joined(id): reached the queue (counted as arrival).
@@ -610,7 +615,7 @@ function CustomerService:NextInterval(): number?
 	const restaurant = Content.Restaurant
 	if restaurant.Rules.Enabled and self:IsNightShift() then
 		const every = restaurant.Flow.LullEvery
-		self.LullCount = (self.LullCount or 0) + 1
+		self.LullCount += 1
 		if every > 0 and self.LullCount >= every then
 			self.LullCount = 0
 			interval += restaurant.Flow.LullSeconds
@@ -2337,9 +2342,23 @@ function CustomerService:Step()
 	self:StepGuarantee(t)
 	-- the regular flow waits while the tutorial customer is at (or walking to) the counter: the next attempt comes
 	-- right after it was served
+	-- night pacing (owner 2026-10-18): no arrival while a world anomaly with Tension runs (the street is empty, the
+	-- scene owns the screen), and a random Flow.CounterGap after the counter frees before the next one may come
+	const night = self:IsNightShift()
+	const full = Queue.isFull(self:Occupants(), self:QueueSize())
+	if night and full then
+		self.CounterWasFull = true
+	elseif night and self.CounterWasFull then
+		self.CounterWasFull = false
+		const gap = Content.Flow.CounterGap
+		-- the leaving customer walks out of the shop area first (CounterLeave), then the random gap counts
+		self.CounterFreeAt = t + Content.Flow.CounterLeave + gap[1] + self.Rng:NextNumber() * (gap[2] - gap[1])
+	end
+	const resting = night and (t < self.CounterFreeAt or self.Dependencies.NpcService:IsTension())
 	if
 		self.NextSpawnAt > 0
 		and t >= self.NextSpawnAt
+		and not resting
 		and self:IsSelling()
 		and not self:IsPaused()
 		and not self.DevNoArrivals
