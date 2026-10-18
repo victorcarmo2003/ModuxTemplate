@@ -16,6 +16,8 @@
 -- CartoonPanel track with a glossy two-tone fill, the number with a heavy Ink stroke.
 -- Coffee lesson (user request 2026-10-11, Provisional): `Emphasis` makes a Mustard ring breathe around the bar (Night 1,
 -- until the first coffee); `Gain` = a coffee gave N: a Green flash over the bar, a Green ring and a floating "+N".
+-- TASK-479 (owner feedback 2026-10-18, Provisional): the gain is bigger and shorter (GAIN_TIME): the whole meter pops
+-- (GAIN_POP), the "+N" is larger and pops in, the number flashes Green. Reduced motion: no pop, only the fades.
 -- Pure: only props.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -94,10 +96,13 @@ const PULSE_HZ = 0.5
 const PULSE_DEPTH = 0.35
 const HINT_HZ = 1.2 -- breathing of the emphasis ring
 const HINT_RING = 3 -- px the ring sits outside the bar
-const GAIN_TIME = 1.6 -- s of the green flash and the floating number
+const GAIN_TIME = 1.2 -- s of the green flash and the floating number
 const GAIN_COLOR = Color3.fromHex("#7BE08A")
-const GAIN_RISE = 12 -- px the "+N" drifts down while it fades
-const GAIN_TEXT = 18
+const GAIN_RISE = 16 -- px the "+N" drifts down while it fades
+const GAIN_TEXT = 26
+const GAIN_POP = 0.18 -- extra scale of the whole meter at the peak of the gain
+const GAIN_POP_TIME = 0.35 -- s of the meter pop (the start of GAIN_TIME)
+const GAIN_LABEL_FROM = 0.4 -- scale the "+N" pops in from
 
 const RING: { [Band]: Color3 } = {
 	Day = FULL,
@@ -269,6 +274,25 @@ return function(props: Props): Frame
 		end)
 	end)
 
+	-- 0..1 bump of the meter at the start of a gain (one overshooting beat); 0 with reduced motion
+	const gainPop = function(): number
+		const t = gain() * GAIN_TIME / GAIN_POP_TIME
+		if t >= 1 or Motion.Reduced() then
+			return 0
+		end
+		return math.sin(t * math.pi) * (1 - t * 0.4)
+	end
+	-- scale of the "+N": pops from GAIN_LABEL_FROM with a small overshoot, then holds
+	const gainLabelScale = function(): number
+		if Motion.Reduced() then
+			return 1
+		end
+		const t = math.clamp(gain() * GAIN_TIME / 0.25, 0, 1)
+		const back = 1.7
+		const eased = 1 + (back + 1) * (t - 1) ^ 3 + back * (t - 1) ^ 2 -- Back Out
+		return GAIN_LABEL_FROM + (1 - GAIN_LABEL_FROM) * eased
+	end
+
 	-- Presentation pulse (Intro): once per meter, the first moment it is shown AND revealed. Progress 0..1 (1 = idle).
 	-- The Heartbeat connection lives outside the effect (the effect re-runs on every Max / Shown change).
 	const intro = source(1)
@@ -328,7 +352,7 @@ return function(props: Props): Frame
 		end,
 		createRaw("UIScale")({
 			Scale = function()
-				return REVEAL_FROM + (1 - REVEAL_FROM) * reveal()
+				return (REVEAL_FROM + (1 - REVEAL_FROM) * reveal()) * (1 + GAIN_POP * gainPop())
 			end,
 		}),
 
@@ -451,12 +475,17 @@ return function(props: Props): Frame
 				return `+{gainAmount()}`
 			end,
 			Transparency = function()
-				return math.clamp((gain() - 0.55) / 0.45, 0, 1)
+				return math.clamp((gain() - 0.6) / 0.4, 0, 1)
 			end,
 			Visible = function()
 				return gain() < 1
 			end,
 			ZIndex = 5,
+			Children = {
+				createRaw("UIScale")({
+					Scale = gainLabelScale,
+				}),
+			},
 		}),
 
 		-- Presentation pulse: a Mustard ring around the whole meter (night 1)
@@ -499,7 +528,10 @@ return function(props: Props): Frame
 			TextSize = function()
 				return dims().Text
 			end,
-			TextColor3 = Theme.Color.Text,
+			TextColor3 = function()
+				-- Green while the gain plays, back to white as it fades
+				return GAIN_COLOR:Lerp(Theme.Color.Text, math.clamp(gain() * 1.5, 0, 1))
+			end,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			Text = function()
 				return tostring(math.floor(props.Value()))
