@@ -3887,6 +3887,42 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
 - O modo cinema (barras pretas) também apaga, só no mundo, os contornos `Highlight` e as pílulas `BillboardGui` (gorjeta "$0", estoque "9/20", "Ready!"); os prompts ficam. Volta tudo quando as barras saem.
 - Impacto: frontend-coder, art-director.
 
+### DEC-297 — 2026-10-18 — Cozinha do restaurante: tudo no mundo 3D, prato viajando, sem modo focado (responde Q-369, Q-370)
+
+- Origem: respostas do dono ao orquestrador em chat (2026-10-18), repassadas ao secretário; o dono escolheu a recomendação de cada pergunta de `design/kitchen-redesign.md` §6. Registrado pelo secretário.
+- Decidido pelo dono:
+  - **Q-369 (A):** a cozinha é **toda no mundo 3D**: o prato viaja pelas estações (passa → pão → grelha → condimentos → PICKUP), com prompts curtos e **sem modo focado**.
+  - **Q-370 (A):** o **modo focado sai do restaurante**. O código do `Prep` fica guardado (não é apagado) para uma possível onda 2.
+- **Provisório** (de `design/kitchen-redesign.md` §5, não dito em número): cerca de 6 prompts por pedido com K = 2; "Cut Bun" segurar 0,6 s; um só fluxo de cozinha ligado no restaurante (sem os prompts antigos do trailer e sem `Work`); critérios de aceite de §5.
+- **Emendas (append-only):**
+  - **DEC-223** (modo focado é o único jeito): **superada no restaurante**. Continua só como código guardado.
+  - **DEC-229, DEC-232, DEC-233, DEC-259** (detalhes da tela focada) e **Q-307** (A híbrido): deixam de valer no restaurante (a Q-307 já estava superada pela DEC-295).
+  - **DEC-295** (Q-361 C, prato viaja; Q-363 apoios marcados; Q-364 ordem fixa): **mantida**; a parte "seções focadas por estação" de `prep-stations-proposal.md` sai, as ações viram prompts de mundo.
+  - Docs **desatualizados até a reescrita**: `tech/prep-mode.md`, `tech/prep-3d.md`, `tech/restaurant-flow.md` (§3.3 pilhas e passa), `design/restaurant-flow.md` FEAT-044/045 (seções focadas, pilhas, "Fill All").
+- Impacto: **architect** (reescrever `tech/restaurant-flow.md`; chave única), **task-planner** (TASK-487 volta com este escopo), **backend-coder**, **frontend-coder**, **level-designer** (âncoras dos prompts junto da peça), **qa-tester**, **narrative-writer** (tutorial da cozinha).
+
+### DEC-298 — 2026-10-18 — Grelha: virar é opcional (bônus), não queima na onda 1, feedback só visual sem barra (responde Q-371, Q-372, Q-375)
+
+- Origem: mesma conversa (DEC-297).
+- Decidido pelo dono:
+  - **Q-371 (B):** a salsicha **fica pronta sozinha**; **virar na hora certa dá bônus** (opcional). Acaba a pausa que hoje trava a salsicha até o Flip.
+  - **Q-372 (A):** **não queima** na onda 1.
+  - **Q-375 (B):** feedback de cozimento **só visual**: cor da salsicha, fumaça e ícone "pronto" sobre ela. **Sem barra de progresso.**
+- **Provisório:** o bônus de virar é de gorjeta (valor e janela pelo game-designer; referência: janela de 40% a 60% do tempo, `Content.Prep.Tolerances.grill_flip`); o prompt Flip, quando existir, fica sobre a salsicha (≤ 0,5 stud).
+- **Emendas:** **FEAT-045** (queima em 10 s, `Burnt`, Heat Lamp UPG-016): queima fora da onda 1; o UPG-016 perde o efeito até a queima voltar (game-designer). **Q-222**: respondida para a onda 1 (sem queimar). As `ProgressBar` por vaga da grelha (`KitchenController`) saem.
+- Impacto: **game-designer** (bônus, UPG-016), **backend-coder** (`Stations/Grill.luau`), **frontend-coder** (visual da salsicha, tirar barras), **qa-tester**.
+
+### DEC-299 — 2026-10-18 — Sem nota de precisão; condimentos por segurar; 2 pratos na mão (responde Q-373, Q-374, Q-376)
+
+- Origem: mesma conversa (DEC-297).
+- Decidido pelo dono:
+  - **Q-373 (A):** a nota **Perfect/Good/Messy sai**. A gorjeta segue pela **rapidez** (janela da DEC-072).
+  - **Q-374 (A):** condimentos por **segurar 0,5 s por topping**; **só as tigelas do pedido acendem**.
+  - **Q-376 (B):** até **2 pratos** na mão, como Tools da hotbar; a estação age no prato **equipado**.
+- **Provisório:** o único bônus de "habilidade" que fica é o de virar a salsicha (DEC-298); complemento não pedido aplicado = Errado na entrega (DEC-072, como hoje).
+- **Emendas:** **Q-219 (B)** (Perfect paga gorjeta, Messy tira) e o efeito de `Quality` na gorjeta: **saem** no restaurante. `Grade.luau` fica no código (é requerido por `Grill` e `CustomerService`), sem uso de nota no prato. **DEC-295 / Q-362** (2 pratos): confirmada.
+- Impacto: **game-designer** (economia sem gorjeta Perfect), **backend-coder** (`CustomerService`, `Toppings`), **frontend-coder** (tigelas acesas), **qa-tester**.
+
 ### DEC-300 — 2026-10-18 — Abertura mais curta: sem atravessar a rua, a noite cai no fim e o jogo começa à noite no restaurante
 
 - Origem: pedido do dono em chat (2026-10-18), com desenho sobre a vista de cima do MAP01_Restaurant, repassado pelo orquestrador. Registrado pelo agente de implementação no formato do secretário.
@@ -3897,3 +3933,75 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
 - **Provisório** (não dito): intro de ~32 s (era 35 s); a rota é medida a partir do cartaz (`"Poster>o,s"`, segue o cartaz se o dono movê-lo); o anoitecer leva 4,5 s a partir de 26,4 s, com o sol se pondo de 16:30; lâmpadas e atmosfera (ATM) só acendem depois do anoitecer; Walt diz "Start tonight" (era "Start today"); a run nova abre na **Noite 1 (Dia 2)** com Intro → ligação da noite → Prep → Noite; PriceParty é fixado no fim da Noite 1 (era fim do Dia 1); chave `Content.Shift.RunStartsAtNight` (false = Dia 1 antigo).
 - **Emendas (append-only):** a DEC de 2026-10-12 (D3 rev. 2, intro na calçada do trailer) e `script.md` §1 / `levels/MAP-01.md` §11.1: ponto de partida e travessia substituídos por esta rota. O calendário do usuário de 2026-10-12 (Dia 1 de dia com tutorial, depois só noites) perde o Dia 1 na run nova. **DEC-240** (última chamada às 18h do Dia 1) e o tutorial do Dia 1 deixam de rodar enquanto `RunStartsAtNight = true`: ver **Q-378**.
 - Impacto: **frontend-coder** (`Content.Cutscenes` intro, `CutsceneController` Nightfall, `LightController`), **backend-coder** (`RoundService`/`Flow`, `AtmosphereService`), **narrative-writer** (`script.md` §1, falas), **level-designer** (MAP-01 §11.1), **game-designer** (tutorial e PriceParty sem Dia 1, Q-378), **qa-tester**. TASK-493.
+
+### DEC-301 — 2026-10-18 — Bancada da cozinha reorganizada: o fluxo anda da ESQUERDA para a DIREITA do cozinheiro, na ordem das etapas (responde Q-377)
+
+- Origem: fala do dono ao orquestrador em chat (2026-10-18), repassada ao secretário: "Atualmente roda com prompts mas eu quero trocar e melhorar isso, incluindo a organização de onde fica cada coisa na bancada, acho que o fluxo ideal seria da esquerda para a direita não da direita para a esquerda igual fazemos hoje, na verdade se ele começa no pão fica meio que pão no meio, depois direita e depois ir laaá para a esquerda para jogar os condimentos".
+- Decidido pelo dono:
+  - A bancada é **reorganizada** para o hot dog andar **da esquerda para a direita**, do ponto de vista do cozinheiro de frente para a bancada do fundo, **na ordem das etapas**: passa/prato → pão → grelha → condimentos → pickup.
+  - Hoje está fora de ordem: **pão no meio**, **grelha à direita**, **condimentos lá na esquerda** (o jogador vai e volta).
+  - Hoje roda com prompts de mundo e o dono quer **trocar e melhorar** isso (DEC-297 já define o fluxo novo).
+- **Provisório** (não dito): posições exatas pelo **level-designer** (proposta em `design/kitchen-redesign.md` §7). Referência: `prep-stations-proposal.md` §4 já desenhava COND-1 a oeste, grelha no meio e pão a leste, que é a ordem nova vista pelo cozinheiro. Onde fica a parada de condimentos do drive-thru (`COND-2`) fica com o level-designer.
+- **Também (resposta à Q-377, Provisório pela leitura do orquestrador):** o Studio do dono roda o fluxo de mundo com `Content.Restaurant.Rules.Enabled` ligado à mão; o repositório está com `false`. Na onda 1 a chave fica **ligada no repositório** (consequência da DEC-297: um só fluxo, o do restaurante).
+- **Emendas:** `levels/MAP-01-r4-restaurant.md` §5.5 (ordem GRILL → STOCK → BUN → CUT → COND de oeste para leste) e as posições de `tools/assetplace/restaurant_bind.luau:1006-1011` ficam **desatualizadas** até a proposta do level-designer.
+- Impacto: **level-designer** (layout e bind, sincronizar antes as edições à mão do dono no Studio), **architect** (chave ligada), **task-planner** (entra na TASK-487), **qa-tester** (rota de um pedido sem voltar).
+
+### DEC-302 — 2026-10-18 — Volta o modo focado de preparo no restaurante, agora com ESTEIRA (supera DEC-297 e DEC-301)
+
+- Origem: fala do dono ao orquestrador em chat (2026-10-18), repassada ao secretário. Palavras do dono: "vamos usar o sistema de cozinha que a gente tinha antes" (um proximity prompt único e etapas) e "Eu não sei porque que foi retirado. Eu não pedi para ele ter sido retirado. Então eu quero implementar ele de novo." Resumo fiel do orquestrador para o resto da fala (abaixo).
+- **Fato técnico registrado:** o modo focado (DEC-223, `src/Prep`) **nunca foi apagado**. No repositório ele está **ligado** (`Content.Restaurant.Rules.Enabled = false`). Ele só some no Studio do dono porque lá a chave do restaurante foi ligada à mão, e a chave ligada desliga o Prep (`src/Shared/Content/Restaurant.luau:338-341`: `PrepEnabled = not on`).
+- Decidido pelo dono:
+  - **Volta o sistema de cozinha anterior:** um **ProximityPrompt único** abre o preparo e as **etapas** seguem na tela focada:
+    1. **Salsicha:** grelhar clicando nela; pronta, ela vai para a **mesa de descanso**.
+    2. **Pão:** clicar na cesta de pão e **arrastar o dedo para cortar**.
+    3. **Montar:** clicar ou segurar para **arrastar a salsicha para o pão**.
+    4. **Condimentos:** o prato vai para a mesa de condimentos; clicar no condimento e **desenhar com ketchup e mostarda seguindo um padrão de desenho**.
+  - **Multijogador mais fácil.** Layout, na orientação da fala do dono: **à esquerda** a grelha junto com a mesa de descanso das salsichas; **no meio** a tábua e o pão; **à direita** a mesa de condimentos.
+  - **"Muito importante": ESTEIRA do começo ao fim.** Cada jogador tem o **seu pratinho** com o seu hot dog e o **arrasta para a esquerda e para a direita na esteira**, pondo a salsicha e cortando o pão. As **estações** (ingredientes, grelha) ficam numa **bancada mais acima**; o **prato fica embaixo, na esteira**. Referência de **mecânica** (não de assets, nomes ou arte): o jogo de bolo do Purple Place (Windows 7), com a fila de estações em cima, a esteira com o bolo embaixo e setas esquerda/direita para mover.
+  - **Papéis:** um jogador fica grelhando e pondo salsichas na mesa de descanso; outro passa pela esteira fazendo as etapas.
+  - **Mesa do centro (pedidos prontos):** o prato é posto **livremente num grid**: **clicar** põe o prato; **segurar E** (ProximityPrompt) pega de volta e o prato vai para o **inventário**. A **entrega no pickup** é igual: ProximityPrompt segurando o prato. Assim um cozinha e põe na mesa e o outro entrega.
+- **Provisório** (não dito pelo dono):
+  - "Esquerda/direita" é a da fala do dono; o **level-designer confere no mapa** de que ponto de vista (cozinheiro de frente para a bancada ou câmera da esteira).
+  - Perguntas abertas: **Q-379 a Q-383** (`open-questions.md`; `design/kitchen-redesign.md` §0).
+- **Emendas (append-only; as DEC antigas não foram editadas):**
+  - **DEC-297** (tudo no mundo 3D, sem modo focado; o foco sai do restaurante): **superada**. O modo focado **volta** no restaurante, com esteira.
+  - **DEC-301** (bancada da esquerda para a direita na ordem pão → grelha → condimentos): **superada no layout** pelo layout desta DEC (grelha + descanso à esquerda, tábua e pão no meio, condimentos à direita). A parte da Q-377 (o Studio roda com a chave ligada à mão; o repositório tem `false`) continua como fato; a frase "na onda 1 a chave fica ligada no repositório" **cai** até a Q-379/arquitetura definirem como restaurante e Prep convivem.
+  - **DEC-223** (modo focado é o jeito de fazer o hot dog): **volta a valer no restaurante**, com a esteira no lugar das abas/pan (DEC-232) e da tábua única por jogador; o número de estações deixa de ser 1–4 = jogadores (cada jogador tem o seu prato na esteira).
+  - **DEC-298:** "virar opcional", "não queima" e "sem barra" ficam **a revisar** contra a grelha focada antiga (Q-381). As barras laranjas de mundo do print continuam fora.
+  - **DEC-299:** a **remoção da nota** Perfect/Good/Messy fica **em dúvida** (o padrão de desenho dos condimentos pede nota ou ao menos um padrão a cumprir; Q-382). O **"segurar 0,5 s por topping" cai**: volta o desenho. Os **2 pratos na mão continuam** (o prato vai para o inventário ao ser pego da mesa central).
+  - **DEC-295** (prato viaja entre estações físicas) e **DEC-272** (estações físicas): o prato viaja **na esteira**, dentro do foco; o "andar com o prato" passa a valer só entre a mesa central e o pickup.
+  - Docs: `design/kitchen-redesign.md` ganha "Rumo atual (DEC-302)"; o diagnóstico vira histórico. `tech/prep-mode.md` e `prep-3d.md` **voltam a ser base** (com a esteira a desenhar); `tech/restaurant-flow.md` §3.3 e FEAT-044/045 seguem desatualizados.
+  - Tarefas **TASK-494 a TASK-511**: **Em revisão (DEC-302)**; replanejamento depois das respostas.
+- Impacto: **game-designer** (esteira, nota, grelha), **architect** (esteira por jogador, convívio Prep × restaurante, grid da mesa central), **level-designer** (bancada alta + esteira, mesa central, orientação), **frontend-coder**, **backend-coder**, **art-director** (esteira, setas, mesa de descanso), **task-planner** (replanejar 494–511), **qa-tester**.
+
+### DEC-303 — 2026-10-18 — Esteira: foco por jogador, até 2 na esteira, grelha focada sem queimar, nota e padrão de desenho de volta, mesa central de 8 vagas com ticket (responde Q-379 a Q-383)
+
+- Origem: respostas do dono ao orquestrador em chat (2026-10-18), repassadas ao secretário; o dono escolheu a recomendação em todas.
+- Decidido pelo dono:
+  - **Q-379 (A):** a esteira é **modo focado por jogador**: câmera travada na bancada; as setas movem só o **próprio** prato; os outros veem o prato dele andar no mundo.
+  - **Q-380 (A):** **até 2 jogadores** na esteira ao mesmo tempo; cada estação atende **um prato por vez**; o 2º prato **espera ao lado**, sem empurrar.
+  - **Q-381 (A):** o grelhador usa a **vista focada da grelha** (clicar põe/vira, a pronta vai à mesa de descanso), **sem queimar**, **virar opcional com bônus**, **sem barra** (cor e fumaça).
+  - **Q-382 (A):** **voltam** o **padrão de desenho** do ketchup e da mostarda e a **nota Perfect/Good/Messy**; **Perfect dá gorjeta extra** (Q-219 B).
+  - **Q-383 (A):** a **mesa central** tem **8 vagas** no grid; o prato leva o **ticket #n**; o `PICKUP` entrega ao **dono do ticket**.
+- **Provisório:** números da nota e da gorjeta Perfect seguem os de `tech/prep-mode.md` §2 (Perfect = gorjeta $2 e janela +4 s; Messy = sem gorjeta e humor −1 faixa) até o game-designer revisar; valor do bônus de virar com o game-designer.
+- **Emendas (append-only):**
+  - **DEC-298:** confirmada **dentro da grelha focada** (sem queimar, virar opcional com bônus, sem barra).
+  - **DEC-299:** a **remoção da nota cai** (a nota volta); "segurar 0,5 s por topping" já tinha caído na DEC-302; 2 pratos na mão continuam.
+  - **Q-219:** respondida para o restaurante como (B).
+  - **DEC-223:** "1–4 estações = jogadores" segue substituído: até 2 pratos na esteira por vez.
+- Impacto: **architect** (esteira por jogador sobre `src/Prep`, vez da estação, grid de 8 com `Ticket`), **game-designer** (números da nota e do bônus), **level-designer** (bancada + esteira + mesa central), **frontend-coder**, **backend-coder**, **task-planner**, **qa-tester**.
+
+### DEC-304 — 2026-10-18 — O prato nasce na mesa central com o ticket; o ticket fica na tela enquanto o jogador segura o prato (emenda DEC-302 e DEC-303)
+
+- Origem: emenda do dono ao orquestrador em chat (2026-10-18), repassada ao secretário. Palavras do dono: "quando ele faz um pedido, surge um prato ali na mesa com um ticket, ele pega o prato e vai montando o cachorro quente. [...] E ele já leva o ticket junto e o ticket já fica meio que na tela ali enquanto ele tiver o prato."
+- Decidido pelo dono:
+  - Pedido tomado no tablet → nasce um **prato vazio com o ticket #n** numa vaga livre da **mesa central**.
+  - O montador **pega esse prato** (segurar E), **leva à esteira** e monta o hot dog; depois **devolve o prato à mesa** ou **leva direto ao `PICKUP`**.
+  - Enquanto o jogador **segura o prato**, o **ticket aparece na tela** (HUD).
+  - A **mesa central é o início e o fim** do fluxo.
+- **Provisório:** o ticket na tela usa a nota do pedido que já existe (`HudOrder`, canto superior esquerdo); com 2 pratos, mostra o do prato equipado. Sem vaga livre na mesa (8 ocupadas), o tablet não toma pedido ("Kitchen full", FEAT-043/044).
+- **Emendas (append-only):**
+  - **DEC-302**: o prato do jogador **não nasce na esteira** ao entrar no preparo; ele vem da mesa central. O passo "clicar para pôr o prato na mesa" vale para o prato **pronto** (ou para devolver um prato em montagem).
+  - **DEC-303 / Q-383**: as 8 vagas recebem pratos **desde o pedido** (vazios com ticket), não só os prontos.
+  - **DEC-271** (pedido vai sozinho a um prato-slot com o papel do pedido) volta a valer, agora na mesa central.
+- Impacto: **architect**, **backend-coder** (`PlateService`: prato vazio com `Ticket` na vaga), **frontend-coder** (ticket no HUD com o prato na mão), **level-designer** (mesa central entre tablet, esteira e `PICKUP`), **task-planner**, **qa-tester**.
