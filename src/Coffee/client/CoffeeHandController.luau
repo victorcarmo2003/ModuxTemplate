@@ -8,6 +8,8 @@
 	Click response (TASK-479, Provisional): the server applies the sip Sips.DrinkTime after the click, so the holder's
 	client puffs a little steam from its cup at once on Tool.Activated (no wait for the round trip); the payoff itself
 	(screen pulse, sparkles, "+N") is VitalController / HudSanity on the `Gain` cue. Skipped with reduced motion.
+	Sounds (owner 2026-10-18): `coffee_ready` at the cup when it lands in a hand (the coffee is taken), `coffee_drink` when
+	the Tool turns `Drinking` (the sip). Cups already in a hand when this client starts stay silent.
 	Presentation only: nothing is sent to the server.
 ]]
 local CollectionService = game:GetService("CollectionService")
@@ -24,8 +26,10 @@ const HOME = "HandHome" -- surface CFrame in body space when full (written on th
 const STEAM_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
 const STEAM_PUFF = 4 -- wisps on the click
 const STEAM_LIFE = 0.7 -- s
+const TAKE_SOUND = "coffee_ready" -- the coffee lands in the hand
+const DRINK_SOUND = "coffee_drink" -- the sip
 
-const CoffeeHandController = Modux.Controller("CoffeeHandController", { Priority = 310 })
+const CoffeeHandController = Modux.Controller("CoffeeHandController", { Require = { "AudioController" }, Priority = 310 })
 
 function CoffeeHandController:Setup()
 	self.Cups = {} :: { [Instance]: { RBXScriptConnection } }
@@ -107,7 +111,8 @@ function CoffeeHandController:Puff(cup: Instance)
 	end)
 end
 
-function CoffeeHandController:Add(cup: Instance)
+-- loud = the cup just came into a hand (not one found when this client started)
+function CoffeeHandController:Add(cup: Instance, loud: boolean)
 	if self.Cups[cup] ~= nil then
 		return
 	end
@@ -121,7 +126,11 @@ function CoffeeHandController:Add(cup: Instance)
 	table.insert(
 		links,
 		tool:GetAttributeChangedSignal(Params.Sips.DrinkingAttribute):Connect(function()
-			self:Paint(cup, tool:GetAttribute(Params.Sips.DrinkingAttribute) == true)
+			const drinking = tool:GetAttribute(Params.Sips.DrinkingAttribute) == true
+			self:Paint(cup, drinking)
+			if drinking then
+				self.Dependencies.AudioController:Play(DRINK_SOUND, cup)
+			end
 		end)
 	)
 	-- Activated only fires on the holder's client; the character check keeps it to our own hand
@@ -139,6 +148,8 @@ function CoffeeHandController:Add(cup: Instance)
 	end
 	if tool:GetAttribute(Params.Sips.DrinkingAttribute) == true then
 		self:Paint(cup, true)
+	elseif loud then
+		self.Dependencies.AudioController:Play(TAKE_SOUND, cup)
 	end
 end
 
@@ -159,13 +170,13 @@ end)
 
 CoffeeHandController:OnStart(function(self)
 	CollectionService:GetInstanceAddedSignal(Params.Hand.Tag):Connect(function(cup)
-		self:Add(cup)
+		self:Add(cup, true)
 	end)
 	CollectionService:GetInstanceRemovedSignal(Params.Hand.Tag):Connect(function(cup)
 		self:Remove(cup)
 	end)
 	for _, cup in CollectionService:GetTagged(Params.Hand.Tag) do
-		self:Add(cup)
+		self:Add(cup, false)
 	end
 end)
 
