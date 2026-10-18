@@ -88,6 +88,10 @@ local function glass(ctx: Api.Context, occ: Api.Occurrence, state: State)
 		if ctx.Vehicle.IsProtected(player) then
 			state.Watched[player.UserId] = player
 		else
+			ctx.Log(
+				occ,
+				`{player.Name} not protected at the glass (window closed {ctx.Vehicle.IsShutterClosed()}, inside {ctx.Vehicle.IsInside(player)})`
+			)
 			table.insert(failing, player)
 		end
 	end
@@ -137,6 +141,7 @@ const RedFog: Api.Module = {
 		const out: { Player } = {}
 		for _, player in state.Watched do
 			if player.Parent ~= nil and not ctx.Vehicle.IsInside(player) then
+				ctx.Log(occ, `{player.Name} stepped out during the bangs`)
 				table.insert(out, player)
 			end
 		end
@@ -161,6 +166,7 @@ const RedFog: Api.Module = {
 			return
 		end
 		if event.Kind == "Shutter" and not event.Closed and event.Player ~= nil then
+			ctx.Log(occ, `{event.Player.Name} opened the window during the bangs`)
 			scare(ctx, occ, state, event.Player)
 		end
 	end,

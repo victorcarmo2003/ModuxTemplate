@@ -1164,7 +1164,7 @@ const GRADE_NAME = "HorrorGrade"
 const BLUR_NAME = "HorrorBlur"
 const GRADE_TINTS: { [string]: Color3 } = {
 	Cold = Color3.fromRGB(196, 212, 255),
-	Red = Color3.fromRGB(255, 176, 170),
+	Red = Color3.fromRGB(255, 128, 118),
 	Sick = Color3.fromRGB(208, 255, 196),
 }
 const SILENCE_GROUPS = { { "Master", "Music" }, { "Master", "Ambient" }, { "Master", "Sfx", "Kitchen" } }
@@ -1224,9 +1224,11 @@ const grade: Handler = function(_ctx, state, step, late)
 		for _, level in gradeLevel do
 			strongest = math.max(strongest, level)
 		end
-		effect.Saturation = -0.75 * strongest
+		-- Red keeps its colour (owner 2026-10-18: "tudo vai ficando vermelho"); Cold / Sick drain it
+		const red = gradeTint == "Red"
+		effect.Saturation = (if red then 0.15 else -0.75) * strongest
 		effect.Contrast = 0.32 * strongest
-		effect.Brightness = -0.06 * strongest
+		effect.Brightness = (if red then -0.02 else -0.06) * strongest
 		effect.TintColor = Color3.new(1, 1, 1):Lerp(tint, strongest)
 		effect.Enabled = strongest > 0.001
 	end)

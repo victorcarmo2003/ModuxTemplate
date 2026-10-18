@@ -34,6 +34,8 @@ local Content = require(ReplicatedStorage.shared.Content)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Rain = require(script.Rain)
 local Lightning = require(script.Lightning)
+local Flicker = require(script.Flicker)
+local GroundFog = require(script.GroundFog)
 
 type AtmosphereRow = Content.Atmosphere
 type Preset = Content.LightPreset
@@ -426,6 +428,10 @@ AtmosphereController:OnStart(function(self)
 		return
 	end
 	self.Enabled = true
+	-- owner 2026-10-18: a kitchen tube flickers and buzzes now and then at night
+	Flicker(self.Dependencies.LightController :: any, self.Dependencies.AudioController :: any)
+	-- owner 2026-10-18: the low mist of the Hush on every night, by default
+	GroundFog()
 	self:Retarget()
 	-- late joiner / reconnect: the night's atmosphere is already full
 	if self.Target then
