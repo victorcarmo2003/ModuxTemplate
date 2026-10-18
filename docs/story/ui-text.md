@@ -10,6 +10,8 @@ Conciliado com DEC-106, DEC-110 a DEC-116, DEC-124, DEC-129 e `consistency-repor
 Revisão 2026-10-10 (TASK-082, onda 2): §10 a §15 novas (avisos, ligações do Walt, HUD noturno, placa do trailer, fim de
 run); D-02 e D-03 do `tests/wave-1-report.md` resolvidos **do lado do documento** (§2, §15). Tudo da revisão é
 **Provisório** (DEC-193): o usuário não revisou. Revisão 2026-10-12 (TASK-213): §16 Preparo 3D (dicas, recusas, selos, tutorial 3D com ids `PREP3D_*`), Provisório.
+Revisão 2026-10-18 (TASK-511): §17 Cozinha com esteira do restaurante (prompts, esteira, grelha, mesa central, ticket no HUD,
+`PICKUP`, nota, recusas e roteiro do tutorial com ids `BELT_*`), Provisório.
 
 ## 1. Nome do medidor (Q-054, arquivada; "Sanity" provisório)
 
@@ -765,3 +767,228 @@ secretário no fim da rodada.
   `src/Shared/Content/VoiceLines.luau`). Ordem de `generate`/`upload` inferida dos nomes; conferir o cabeçalho de cada script. Não gerei áudio.
 - Todas as falas novas passam no filtro: sem "sausage", sem dígito, sem número de telefone, <= 6 palavras.
 - Nada a regenerar para a despedida, saudação, `money`, `mart_*` e `restock`.
+
+## 17. Cozinha com esteira do restaurante (TASK-511, 2026-10-18, Provisório)
+
+Fontes: `tech/prep-conveyor.md` (TASK-512, contrato; §11.1 lista as chaves de `Content`), `design/restaurant-flow.md`
+FEAT-044/045 (TASK-508), DEC-302, DEC-303, DEC-304 e **DEC-305** (dois prompts: **Work** na esteira, **Grill** na grelha).
+Onde FEAT-045 e o contrato discordam (prompt único, Leave devolvendo o prato à mão), vale o contrato emendado pela DEC-305 e
+§2.3 (o prato fica parado na esteira). **Tudo Provisório, sem DEC.** Texto de jogo em inglês (DEC-022). Nada de nome, fala ou
+texto do jogo de referência da esteira: só a mecânica entrou.
+
+Limites (os de §16): prompt **<= 16** caracteres · dica e toast **<= 36** · rótulo de botão/chip **<= 12** · fala do Walt
+**<= 8 palavras**, sem dígito, sem "sausage". Verbo primeiro, sem bronca: a recusa diz o que falta.
+
+**Vocabulário da esteira (Provisório):**
+
+| Termo no jogo | O que é | Por quê |
+|---|---|---|
+| **belt** | a esteira | curto, cabe no chip |
+| **Grill · Board · Toppings · Out** | as 4 paradas (`Conveyor.Stops`) | Grill/Board/Toppings já são os nomes das seções do Prep (§16.2); `Out` é a saída |
+| **warmer** | a mesa de descanso (rail no código) | evita duas "tables" na mesma cozinha; o aviso `prep_no_sausage` já diz "warmer" |
+| **table** | a mesa central (`CENTER`) | é a única "table" que o jogador usa; plaquinhas e prompts dizem só "table" |
+| **pickup** | o balcão `PICKUP` | igual à placa |
+| **#{n}** | o ticket | igual ao billboard e à plaquinha do prato |
+| **sausage** (UI) / **frank** (voz) | a salsicha | UI usa o nome do ingrediente (`Ingredients.sausage.Name = "Sausage"`); a voz segue o filtro de §16 |
+
+Coluna **Chave**: as marcadas **(512)** estão no contrato (`prep-conveyor.md` §11.1); as marcadas **(nova)** são proposta
+deste doc para a TASK-513 incluir (ou o frontend guardar como constante, se a 513 preferir não abrir chave).
+
+### 17.1 Prompts de mundo (ProximityPrompt)
+
+| Id | Onde | Chave | ActionText | ObjectText |
+|---|---|---|---|---|
+| BELT_PR_WORK | `Prompt_Work`, frente do deck baixo | `Actions.prep_work.Text` (já existe) | "Work" | "Belt"; com prato parado do jogador: "Plate #{n}" **(nova)** |
+| BELT_PR_GRILL | `Prompt_Grill` | `Actions.prep_grill.Text` **(512)** | "Grill" | — |
+| BELT_PR_TAKE | `Prompt_Take` de cada vaga da mesa central (segurar) | `Actions.plate_take.Text` (hoje "Take Plate") | "Take #{n}" (FEAT-044); sem suporte a `{n}`: "Take Plate" | estado da vaga **(nova)**: "Empty plate" · "In progress" · "Ready" · "No owner" |
+| BELT_PR_HANDOVER | `PICKUP` (segurar) | `Actions.pickup_serve.Text` (já existe) | "Hand Over" | "#{n}" do prato equipado |
+| BELT_PR_TOSS | BIN-C com o prato na mão | `Actions.discard` (já existe) | sem mudança ("Throw Away") | — |
+
+Pôr o prato na mesa é **clique**, não prompt (`CenterPut`). Dica no hover da vaga livre com prato equipado **(nova)**:
+
+| Id | Entrada | Texto |
+|---|---|---|
+| BELT_TIP_PUT_MOUSE | mouse | "Click to set #{n} here" |
+| BELT_TIP_PUT_TOUCH | toque | "Tap to set #{n} here" |
+| BELT_UI_PUT_PAD | chip do gamepad (vaga mais perto) | "Set down" |
+
+### 17.2 Foco da esteira (montador)
+
+**Botões e chips** (`Prep.Texts`):
+
+| Id | Elemento | Chave | Texto |
+|---|---|---|---|
+| BELT_UI_LEFT | seta esquerda (rótulo de acessibilidade e chip do gamepad) | `Texts.Left` **(512)** | "Left" |
+| BELT_UI_RIGHT | seta direita | `Texts.Right` **(512)** | "Right" |
+| BELT_UI_FINISH | seta direita na parada 3, com pão e salsicha (manda `PrepFinish`) | `Texts.Finish` **(nova)** | "Finish" |
+| BELT_UI_LEAVE | botão de sair | `Texts.Leave` (já existe) | "Leave" |
+| BELT_UI_STOP_* | nome da parada sob o prato | `Texts.Stops` **(nova)** | "Grill" · "Board" · "Toppings" · "Out" |
+| BELT_UI_WAIT | chip sobre o prato que espera ao lado | `Texts.BeltWait` **(nova)** | "Waiting" |
+
+`Texts.Waiting` ("Waiting for the grill") **não** é o chip da espera: continua sendo a dica do warmer vazio (abaixo). Por isso
+a chave nova `BeltWait`.
+
+**Dicas por parada** (linha de dica, uma por vez):
+
+| Id | Situação | Texto |
+|---|---|---|
+| BELT_TIP_START | parada 1, prato vazio | "Press Right to reach the board" |
+| BELT_TIP_CRATE | parada 2, sem pão | "Tap the crate for a bun" |
+| BELT_TIP_CUT | parada 2, pão inteiro | "Drag the knife along the line" (= `Hints.slice`) |
+| BELT_TIP_DOG | parada 2, pão cortado, warmer com salsicha | "Drag a sausage from the warmer" |
+| BELT_TIP_DOG_WAIT | parada 2, warmer vazio | "Waiting for the grill" (= `Texts.Waiting`) |
+| BELT_TIP_BOARD_DONE | parada 2, pão + salsicha | "Press Right for the toppings" |
+| BELT_TIP_TOPPINGS | parada 3, faltam complementos | "Pick a glowing topping and draw" |
+| BELT_TIP_FINISH | parada 3, pedido completo | "All set. Press Finish" |
+| BELT_TIP_NOTOP | parada 3, pedido sem complemento (K = 0) | "No toppings. Press Finish" |
+| BELT_TIP_UNFINISHED | parada 3 sem pão ou salsicha (a seta tira o prato sem nota) | "Unfinished. Right takes it off" |
+| BELT_TIP_WAIT | prato esperando ao lado de parada ocupada | "Station busy. You're next" |
+| BELT_TIP_LEAVE | hover no Leave, prato não montado | "Leave. Your plate stays here" |
+| BELT_TIP_PAD | glifos do gamepad | "{LB} {RB}: move the plate" |
+
+**Padrões de desenho** (DEC-305: padrão fixo por molho; `Prep.Build.Patterns`):
+
+| Id | Molho | Rótulo (`Texts.Patterns`, **nova**) | Dica do gesto `trace` |
+|---|---|---|---|
+| BELT_PAT_ZIGZAG | ketchup | "Zigzag" | "Ketchup: trace the zigzag" |
+| BELT_PAT_WAVE | mustard | "Wave" | "Mustard: trace the wave" |
+| BELT_PAT_LINE | cream cheese | "Line" | "Cream cheese: trace the line" |
+
+`Build.Texts.Hints.trace` passa de "Trace the zig-zag" para **"Trace the {pattern}"** (o nome em minúscula). Isto também corrige
+§16.1, onde mustard e cream cheese diziam "zig-zag". Cheese, bacon e potato sticks seguem as dicas de §16.1 e §16.3.
+
+**Toasts da esteira** (`Prep.Texts`, todos **(nova)**):
+
+| Id | Quando (contrato) | Texto |
+|---|---|---|
+| BELT_TOAST_PARKED | Leave ou `Kick*` com prato não montado: fica parado e reservado (§2.3) | "Plate #{n} waits on the belt" |
+| BELT_TOAST_RESUME | `Work` de volta ao prato parado | "Back to plate #{n}" |
+| BELT_TOAST_READY | Finish aceito, o hot dog volta à mão | "#{n} ready. Table or pickup" |
+| BELT_TOAST_OFF | prato sai em `Out` sem nota | "#{n} back in hand, unfinished" |
+| BELT_TOAST_CLOSING | `KickClosing` | "Closing time. Plate back in hand" |
+| BELT_TOAST_EMPTIED | lixeira com o prato na esteira (§6.6) | "Plate emptied. Ticket kept" |
+
+### 17.3 Vista da grelha (grelhador)
+
+Sem barra (DEC-298/303): os textos não falam de "bar" nem de "ring" do trailer; a leitura é cor, fumaça e chiado.
+
+| Id | Situação | Chave | Texto |
+|---|---|---|---|
+| BELT_GRILL_ENTER | ao entrar pelo Grill | (nova) | "Tap the box to grill a sausage" |
+| BELT_GRILL_COOK | hover numa salsicha cozinhando | (nova) | "Cooking. Flip it for a bonus" |
+| BELT_GRILL_ALERT | janela de virar aberta (sobe 0,6 s) | `Texts.FlipAlert` (já existe) | "Flip!" |
+| BELT_GRILL_FLIP_OK | virou dentro da janela | (nova) | "Flip bonus!" |
+| BELT_GRILL_FLIP_LATE | virou fora da janela | (nova) | "Flipped. No bonus this time" |
+| BELT_GRILL_FLIPPED | tentou virar de novo | (nova; §16.5 PREP3D_REF_FLIPPED) | "Already flipped" |
+| BELT_GRILL_READY | pronta, desce ao warmer | (nova) | "Ready! Off to the warmer" |
+| BELT_GRILL_REST_FULL | warmer cheio, a pronta espera na grelha (1×) | `Texts.RestFull` **(nova)** | "Warmer full. They'll wait here" |
+
+### 17.4 Recusas (Notices)
+
+| Id | Situação (`Reason`) | Chave | Texto | Estado |
+|---|---|---|---|---|
+| BELT_REF_NO_PLATE | `NoPlate`: Work sem prato na mão nem parado | `Notices.need_plate` **(512)** | "Grab a plate from the table first" | novo |
+| BELT_REF_BELT_FULL | `BeltFull`: 2 montadores na esteira | `Notices.belt_full` **(512)** | "Belt full. Wait for a spot" | novo |
+| BELT_REF_GRILL_BUSY | `GrillBusy`: assento da grelha ocupado | `Notices.prep_busy` (já existe) | "Someone's already there." | sem mudança (o contrato aponta para ela) |
+| BELT_REF_SLOT_TAKEN | `CenterPut` em vaga ocupada (2 cliques) | `Notices.slot_taken` **(512)** | "That spot's taken" | novo |
+| BELT_REF_PLATE_GONE | 2 jogadores segurando E na mesma vaga | `Notices.plate_gone` **(512)** | "Someone grabbed it first" | novo |
+| BELT_REF_TICKET_OTHER | `PICKUP` com prato de cliente que não está na retirada | `Notices.ticket_other` **(512)** | "#{n} isn't at the pickup yet" (`ValueFrom = "Number"`); sem número: "That customer isn't here yet" | novo |
+| BELT_REF_TICKET_GONE | prato órfão no `PICKUP` | `Notices.ticket_gone` **(512)** | "They left. Set it on the table" | novo |
+| BELT_REF_NOT_READY | `PICKUP` com prato não montado | `Notices.plate_not_ready` (já existe) | "Finish it on the belt first" | troca "It needs a bun and a dog first." |
+| BELT_REF_DONE | `PlateDone`: Work com hot dog já montado (o contrato deixa silencioso) | `Notices.plate_done` **(nova, opcional)** | "Already done. Take it to pickup" | novo, só se a 513 quiser avisar |
+| BELT_REF_HANDS | 3º prato na mão (`hands_full`) | `Notices.hands_full` (já existe) | "Hands full" | sem mudança |
+| BELT_REF_KITCHEN_FULL | mesa cheia: o tablet não toma o pedido | `Notices.plates_full` (já existe) | "Kitchen full! Serve a plate first" | troca "Kitchen full! Clear a plate first." (no fluxo novo não se "limpa" prato); a lâmpada do tablet segue "Kitchen full" |
+| BELT_REF_WARMER_EMPTY | `NoSausage` ao arrastar do warmer | `Notices.prep_no_sausage` (já existe) | "No sausage on the warmer yet." | sem mudança |
+| BELT_REF_SHELVED | prato parado além de `ParkMax` foi para a mesa | `Notices.plate_shelved` **(nova)** | "Plate #{n} moved to the table" | novo |
+
+`WrongStop` fica silencioso (o cliente só oferece a etapa da parada certa). Recusas que já existem para estoque, grelha cheia e
+complementos (`out_of_stock`, `grill_full`, `topping_max`, `topping_repeat`) seguem §16.5.
+
+### 17.5 Mesa central (billboard da vaga) e ticket no HUD
+
+**Billboard sobre a vaga** (`Att_Ticket`; sem frase, só marca):
+
+| Id | Estado | Texto |
+|---|---|---|
+| BELT_BB_TICKET | qualquer prato com ticket | "#{n}" |
+| BELT_BB_URGENT | paciência <= 25% | "#{n}!" |
+| BELT_BB_ORPHAN | órfão | "?" |
+
+Plaquinha no prato (mão e esteira): "#{n}". Drive-thru: só ícone de carro, sem texto.
+
+**Ticket no HUD** (`PlateController/TicketHud`, posição do `HudOrder`; mostra o prato equipado):
+
+| Id | Elemento | Texto |
+|---|---|---|
+| BELT_HUD_TITLE | cabeçalho | "#{n}" |
+| BELT_HUD_DRIVE | chip, pedido do drive-thru | "Drive-thru" |
+| BELT_HUD_BASE | linhas da base (cheio = feito) | "Bun" · "Sausage" (nomes de `Ingredients`) |
+| BELT_HUD_TOPS | complementos do pedido | nomes de `Ingredients` (Ketchup, Mustard...) |
+| BELT_HUD_NOTOP | pedido sem complemento | "No toppings" |
+| BELT_HUD_READY | prato montado | o selo da nota (§17.6) no lugar da lista de faltas |
+| BELT_HUD_FLIP | prato com bônus de virar | "Flip bonus" |
+| BELT_HUD_ORPHAN | cliente foi embora | "Customer left" |
+| BELT_HUD_MORE | 2 pratos na mão (o outro) | "+1 plate" |
+
+### 17.6 Nota (selo ao terminar)
+
+Selos de §16.6 sem mudança: "Perfect!" · "Good" · "Messy". Linhas pequenas sob o selo (DEC-305: Perfect = gorjeta base + $1):
+
+| Id | Quando | Chave | Texto |
+|---|---|---|---|
+| BELT_SEAL_TIP | Perfect (`Grades.Effects.Perfect.TipExtra`) | (nova) | "+${tip} tip if on time" |
+| BELT_SEAL_FLIP | prato com `FlipBonus` | (nova) | "+${bonus} flip bonus" |
+
+"if on time" porque a gorjeta só cai dentro da janela de FEAT-048: o texto não promete o que a entrega tardia não paga. O
+motivo do Messy reaproveita os `PREP3D_SEAL_WHY_*` de §16.6, **menos** `PREP3D_SEAL_WHY_FLIP`: no modo esteira o virar não entra
+na nota (P13).
+
+**Do §16 que não aparece no modo esteira** (fica para o trailer): abas e dicas de aba (§16.2), botão Next e as dicas
+`PREP3D_TIP_NEXT_*`, `PREP3D_TIP_RAIL`, `PREP3D_TIP_ROLLER_*` com "ring", `PREP3D_TIP_COLLECT`, Serve/Hatch/janela,
+`PREP3D_REF_SAVED` ("Plate saved for 20 s") e `PREP3D_REF_EXPIRED` (o prato parado não expira; vai à mesa).
+
+### 17.7 Roteiro do tutorial da cozinha (só doc; Q-378)
+
+Status: **Provisório, só roteiro, sem task de código.** Segue a recomendação (A) da Q-378: o tutorial vira o primeiro pedido
+da **Noite 1**, guiado pelo Walt, sem anomalia até o primeiro hot dog entregue. Se o dono escolher (B) ou (C), o roteiro serve
+igual para o Dia 1 ou vira só dicas de contexto (coluna Dica).
+
+Regras: <= 3 falas por passo; pulável; caminho **solo** (o mesmo que o contrato garante, §2.4); com party, qualquer jogador
+cumpre o passo e ele avança para todos. O passo `k_flip` é opcional: se a salsicha fica pronta sem virar, ele passa sozinho.
+Convenções de §16.7: **Say** ao começar, **Done** ao passar, **Remind** depois de ocioso. **Áudio**: `E` = texto já em
+`tools/voice/lines.json` (conferido); `NOVA` = gerar.
+
+| Passo | Pulse | Dica (`PrepHint`, <= 36) | Fala do Walt | Papel | Áudio |
+|---|---|---|---|---|---|
+| `k_order` | tablet | "Take the order at the tablet" | "First customer. Take their order." | Say | NOVA |
+| | | | "Tablet. Take the order." | Remind | NOVA |
+| `k_grill` | `Prompt_Grill` | 'Press "Grill" at the grill' | "Get a frank on the grill." | Say | NOVA |
+| | | | "Onto the grill." | Remind | E |
+| `k_place` | caixa de salsichas, depois vaga livre | "Tap the box to grill a sausage" | "Nice." | Done | E |
+| `k_flip` (opcional) | a salsicha cozinhando | "Flip it when it sizzles. Bonus!" | "Flip it when it sizzles." | Say | NOVA |
+| | | | "Perfect." (virou na janela) | Done | E |
+| `k_rest` | warmer, depois Leave | "Ready ones go to the warmer" · depois "Press Leave" | "Off to the warmer. Step out." | Say | NOVA |
+| `k_take` | vaga do prato #n | "Hold to take plate #{n}" | "Their plate is on the table." | Say | NOVA |
+| | | | "Hold to pick it up." | Say | NOVA |
+| | | | "Got it." | Done | E |
+| | | | "Grab the plate off the table." | Remind | NOVA |
+| `k_work` | `Prompt_Work` | 'Press "Work" at the belt' | "Now the belt. Press Work." | Say | NOVA |
+| `k_right` | seta direita | "Press Right to reach the board" | "Slide it right." | Say | NOVA |
+| `k_cut` | cesta, depois a faca | "Tap the crate, drag the knife" | "Bun on the board. Cut it." | Say | NOVA |
+| | | | "Good." | Done | E |
+| `k_dog` | warmer, depois o vão do pão | "Drag a sausage from the warmer" | "Frank in the bun." | Say | E |
+| | | | "Beautiful." | Done | E |
+| | | | "Put it in the bun." | Remind | E |
+| `k_top` | seta direita, ketchup, guia do zigzag | "Right, then trace the zigzag" | "They want ketchup." | Say | E |
+| | | | "Follow the lines." | Say | NOVA |
+| | | | "Nothing extra." | Say | E |
+| `k_finish` | seta Finish | "Press Finish to see your grade" | "Done? Push it off the end." | Say | NOVA |
+| | | | "Perfect." / "Nice." / "Bit messy. Still sells." | Done por nota | E / E / NOVA |
+| `k_serve` | `PICKUP` | "Hold Hand Over at the pickup" · em party: "Or set it on the table" | "Now serve it." | Say | E |
+| | | | "Hand it over." | Remind | E |
+| `k_end` | — | — | "That's the job. Keep them coming." | Say | NOVA |
+| | | | em party: "One grills, one builds. Easy." | Say | NOVA |
+
+Falas **NOVA**: 16 textos únicos, todos com <= 6 palavras, sem dígito, sem "sausage". A fala Done por nota tem o mesmo problema
+do coletor descrito em §16.8 (campo que o `collect_lines.py` reconheça). "Bit messy. Still sells." substitui, no modo esteira,
+o "Bit late. Still fine." de §16.7 (que fala de tempo e não de bagunça).

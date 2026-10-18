@@ -16,6 +16,15 @@ diz o comportamento do código e a diferença fica na coluna "Nota" (não é bug
 Análise estática no momento da escrita: `modux check` = up to date; `tools/analyze.ps1 -Detail` = **0 erro, 0 ciclo**.
 Isso não prova comportamento: schema do Lync, binding do mapa e fluxo só aparecem em Play.
 
+> **Atualização 2026-10-18 (TASK-509, qa-tester): a cozinha deste plano é a do fluxo F2 e está VELHA.** A DEC-302 (modo
+> focado com esteira), a DEC-303, a DEC-304 (prato nasce na mesa central com o ticket) e a DEC-305 (dois prompts) trocam a
+> cozinha do restaurante; o contrato é `tech/prep-conveyor.md` e o plano novo é **`tests/kitchen-redesign.md`** (executado pela
+> TASK-510). Os casos marcados **[VELHO]** abaixo testam prompts de mundo do F2 (Slice Bun, Add Bun/Add Sausage, Grill/Flip/
+> Collect de mundo, Take Dogs, `topping_add` de mundo, passa `PLATE-n`, `plate_put`/`plate_take` da passa) que a TASK-496
+> desliga no restaurante: **não executar** depois da TASK-513/496; com a chave ligada antes delas, valem só como retrato do
+> F2. O resto (tablet, retirada, mesa, estoque, Gear Stand, portas, terror, chave desligada) continua valendo.
+> Riscos **R-4** e **R-8** (§9) estavam velhos e foram corrigidos pelo código; a §9 diz onde.
+
 ---
 
 ## 0. Pré-condições
@@ -24,7 +33,7 @@ Isso não prova comportamento: schema do Lync, binding do mapa e fluxo só apare
 
 | # | Arquivo | Mudança | Por quê |
 |---|---|---|---|
-| P1 | `src/Shared/Content/Restaurant.luau` | `Rules.Enabled = true` | chave única (TASK-390): deriva `Prep.Rules.Enabled = false`, `WorldKitchenPrompts = true`, `Seating.SitAt = "Served"`, `DirtyTables = false`, `Vehicles.trailer.HasBackDoor = false`, corte das anomalias `Switch.CutAnomalies`, `Supply.MartShelves = false` |
+| P1 | `src/Shared/Content/Restaurant.luau` | `Rules.Enabled = true` | **[VELHO na parte do Prep]** depois da TASK-513 a chave fica `true` no repositório e deriva `Prep.Rules.Enabled = true`, `Prep.Rules.Mode = "Conveyor"`, `WorldKitchenPrompts = false` (`prep-conveyor.md` §1). Texto original: chave única (TASK-390): deriva `Prep.Rules.Enabled = false`, `WorldKitchenPrompts = true`, `Seating.SitAt = "Served"`, `DirtyTables = false`, `Vehicles.trailer.HasBackDoor = false`, corte das anomalias `Switch.CutAnomalies`, `Supply.MartShelves = false` |
 | P2 | mesmo arquivo | `Supply.Enabled = true` | telefone, baias `StockShelf`, escotilha, passos `r_call`/`r_box`/`r_restock` do tutorial |
 | P3 | — | **não** mexer em `Prep.luau`, `Seating.luau`, `Vehicles.luau`: os campos são derivados; o `Validate` falha se alguém editar à mão | |
 | P4 | terminal | `rogen build` → `modux generate` → `modux check` → `powershell tools/analyze.ps1 -Detail` (0/0) → `rojo serve` | ordem do README |
@@ -57,14 +66,14 @@ Atalhos usados em todo o plano (todos existem hoje): `/dev intro skip`, `/dev tu
 |---|---|---|---|
 | B1 | Play (1 jogador), olhar o Output do servidor nos primeiros 10 s | nenhum `error`; nenhum `[MapIndex] ... missing`; `Lync.start()` sem erro de schema (`Plates`, `Tablets`, `Supply`, `Hatch`, `Customers.Pickup/Number`) | |
 | B2 | procurar no Output `binding passes wave 2 but not wave 3` | **não pode aparecer**. Se aparecer, o `PlaceService` rebaixou a falha do wave 3 a aviso: listar as linhas `2: required MapPoint PU-…` / `6: required node PU-…` / `no path Q1 -> PU-…` | **R-1**: o `Required` exige `PU-1..PU-8` (máximo de `Rules.PickupSlots` = {4,6,8,8}) e o `restaurant_bind.luau` cria só `PU-1..4` |
-| B3 | procurar `anchor spacing (rule 4)` | lista vazia, ou só pares conhecidos e aceitos (anotar todos com distância) | ver R-4 (CUT-1 legado × CUT-2) |
+| B3 | procurar `anchor spacing (rule 4)` | lista vazia, ou só pares conhecidos e aceitos (anotar todos com distância) | ver R-4 (CUT-1 × CUT-2; a TASK-504 tira o `CUT-2` do restaurante) |
 | B4 | procurar `Gear Stand binding` / `Pad tables binding` | nenhum problema (avisos soft só se a TASK-441 já conhece) | |
 | B5 | `/dev tablet` | `TAB-1` ligado, estado `Idle`, sem cliente; nunca "not enabled" | |
-| B6 | `/dev plate` | 8 slots ligados (`PLATE-1..8`), ativos = 4 (party de 1), todos sem ticket | |
+| B6 | **[VELHO]** `/dev plate` (passa `PLATE-n`; na esteira a mesa central tem 8 vagas sempre ativas: `kitchen-redesign.md` PT-*) | 8 slots ligados (`PLATE-1..8`), ativos = 4 (party de 1), todos sem ticket | |
 | B7 | `/dev pickup` | modo pickup **on**, pontos `PU-k` achados, tamanho = min(`PickupSlots[party]`, PU no mapa) | com 4 PU no mapa o tamanho fica 4 mesmo com 2+ jogadores (R-1) |
 | B8 | `/dev supply` | 0 chamadas; baias `StockShelf` listadas (uma por pacote); escotilha com 6 vagas | |
 | B9 | Mart | sem prateleiras `BUY-*` exigidas (`MartShelves = false`); o Gear Stand (B1..B5, S1, persianas) continua no mapa e ligado | DEC-282 diz "sair para ir ao Mart": hoje o Mart saiu do mapa com a chave ligada. Pergunta para o dono, não bug |
-| B10 | prompts do Prep | nenhum `prep_work` em lugar nenhum (Prep desligado) | |
+| B10 | **[VELHO]** prompts do Prep | nenhum `prep_work` em lugar nenhum (Prep desligado) | depois da 513/514 o Prep fica ligado no restaurante: `prep_work` e `prep_grill` **aparecem** (`kitchen-redesign.md` CH-2) |
 
 ---
 
@@ -90,7 +99,7 @@ normal com `/dev arrivals on`.
 | L10 | dinheiro no fim da fala | **não muda** (o pagamento é na entrega, DEC-072) | design FEAT-048 dizia "paga ao confirmar"; o código não faz isso: anotar |
 | L11 | cliente ANM-001 (sem rosto), se a noite tiver | nota em branco, sem pop-ups | |
 
-### 2.2 Prato-slot (FEAT-044)
+### 2.2 Prato-slot (FEAT-044) — [VELHO] (passa `PLATE-n`; trocado pela mesa central: `kitchen-redesign.md` §6.1)
 
 | # | Passo / atalho | Esperado |
 |---|---|---|
@@ -100,7 +109,7 @@ normal com `/dev arrivals on`.
 | P4 | pegar 1 prato (`plate_take`) com P3 ativo | o tablet destrava (`Full` → `Idle`) em ≤ 0,5 s |
 | P5 | `/dev plate clear` | todos vazios, sem ticket |
 
-### 2.3 Corte, grelha, pilha, condimento (FEAT-045)
+### 2.3 Corte, grelha, pilha, condimento (FEAT-045) — [VELHO] (prompts de mundo do F2; trocados pela esteira: `kitchen-redesign.md` §5 a §7)
 
 | # | Passo / atalho | Esperado | Nota |
 |---|---|---|---|
@@ -119,7 +128,7 @@ normal com `/dev arrivals on`.
 | K13 | `hot_dog` equipado → condimentos (`COND-n`, segurar 1 s por topping) | só os toppings aplicados entram; nota do HUD passa a mostrar o pedido do `Ticket` do prato na mão | |
 | K14 | errar um topping → "Throw Away" na lixeira | Tool some, pão/salsicha perdidos | |
 | K15 | "Put Plate" com `hot_dog` num slot vazio (hand-off) | o slot recebe pão + salsicha + toppings + ticket; outro jogador pega com "Take Plate" | |
-| K16 | **olhar o `CUT-1`** (clone da tábua do trailer) e a caixa de pão legada | anotar se aparecem `bun_cut` / `board_add_sausage` / prompts da tábua antiga | **R-4**: com a chave ligada `WorldKitchenPrompts = true` liga os 5 prompts de mundo do trailer; o `CUT-1` continua `StationKind = board` (o atributo `PendingStationKind = cut` não é lido por nenhum código) |
+| K16 | **olhar o `CUT-1`** (clone da tábua do trailer) e a caixa de pão legada | anotar se aparecem `bun_cut` / `board_add_sausage` / prompts da tábua antiga | **R-4 [VELHO]**: o `PendingStationKind` **é** lido (`ApplyPendingKind`) e `bun_cut`/`board_add_sausage` ficam escondidos com a chave ligada; o esperado hoje é **nenhum** prompt da tábua antiga no `CUT-1`, só o `Prompt_Slice` (ver §9 R-4) |
 | K17 | celular (emulador 667×375) na frente da grelha | anotar se dá para tocar o "Flip"/"Collect" da vaga certa | **R-3**: as âncoras de vaga ficam a < 1 stud uma da outra e `Att_Flip<n>` fica 0,35 acima do `grill_collect`; a regra 4 do MapIndex não confere âncoras do mesmo dono |
 
 ### 2.4 Retirada, mesa, viagem (FEAT-046)
@@ -128,7 +137,7 @@ normal com `/dev arrivals on`.
 |---|---|---|---|
 | D1 | `hot_dog` certo → "Hand Over" no `PICKUP` (ou `/dev pickup serve`) | vende para o cliente do `Ticket`, onde quer que esteja em `PU-1..n`; dinheiro + preço (+ gorjeta na janela); a fila anda em ≤ 2 s | |
 | D2 | entregar arrastando no rig de um `PU-n` (DeliveryController) | mesmo resultado (`ServeAtPickup` com alvo) | |
-| D3 | `hot_dog` sem `Ticket` (feito pela tábua legada ou `Ticket` apagado) | vai ao mais antigo com pedido idêntico; senão `PU-1` → Errado | |
+| D3 | **[VELHO]** `hot_dog` sem `Ticket` (feito pela tábua legada ou `Ticket` apagado) | vai ao mais antigo com pedido idêntico; senão `PU-1` → Errado | na esteira a entrega é só ao dono do ticket (Q-383 A; `kitchen-redesign.md` EN-8, BO-4) |
 | D4 | `hot_dog` errado | veredito Errado: o hot dog **volta à mão**, o cliente segue esperando | |
 | D5 | faltando topping | Incompleto: paga menos (DEC-072), cliente sai insatisfeito | |
 | D6 | servido Completo com mesa livre | cliente anda com o prato na mão (`Carrying`) até `TBL-n`, senta, come ~12 s, levanta; **$1 por pessoa** cai no pote; mesa volta a livre sem "Clean Table" | |
@@ -142,8 +151,8 @@ normal com `/dev arrivals on`.
 | # | Passo | Esperado | Nota |
 |---|---|---|---|
 | O1 | durante a fala no tablet | card "NEW" com itens apagados e sem barra | |
-| O2 | ticket no prato | card #n (= o do cliente) em `Queued`; com pão ou salsicha → `Preparing` | |
-| O3 | prato pego | card fica no último estado (≥ `Preparing`) até a venda; some na venda/desistência | `Ready` só aparece se um `hot_dog` com todos os toppings voltar ao slot (os toppings vão no prato na mão) |
+| O2 | **[VELHO]** ticket no prato | card #n (= o do cliente) em `Queued`; com pão ou salsicha → `Preparing` | |
+| O3 | **[VELHO]** prato pego | card fica no último estado (≥ `Preparing`) até a venda; some na venda/desistência | `Ready` só aparece se um `hot_dog` com todos os toppings voltar ao slot (os toppings vão no prato na mão) |
 | O4 | barra | drena pela paciência; "!" abaixo de 25% | |
 | O5 | 4 clientes no painel | mais antigo à esquerda; mesmo #n em todos os clients | |
 
@@ -197,9 +206,9 @@ Preparo: Play limpo (perfil novato) ou `/dev tutorial reset`; `/dev tutdebug` mo
 | U2 | Prep | `open`: "Open the window." na alavanca |
 | U3 | cliente na fila → `Q1` | `wait_customer` → `r_tablet` "Take their order at the tablet." |
 | U4 | fala | `r_listen` sem seta |
-| U5 | corte e prato | `r_cut` → `r_bun_plate` (seta no prato mais adiantado, sem ticket: o cliente do tutorial não ganha ticket) |
-| U6 | grelha | `r_grill` → `r_cooking` → `r_flip` "Flip it." → `r_collect` → `r_rail` → `r_dog_plate` |
-| U7 | prato e ketchup | `r_take_plate` → `r_toppings` "Ketchup on it."; topping errado → `r_discard` |
+| U5 | **[VELHO]** corte e prato | `r_cut` → `r_bun_plate` (seta no prato mais adiantado, sem ticket: o cliente do tutorial não ganha ticket) |
+| U6 | **[VELHO]** grelha | `r_grill` → `r_cooking` → `r_flip` "Flip it." → `r_collect` → `r_rail` → `r_dog_plate` |
+| U7 | **[VELHO]** prato e ketchup | `r_take_plate` → `r_toppings` "Ketchup on it."; topping errado → `r_discard` |
 | U8 | entrega | `r_pickup` "Hand it over at pickup." → `money` |
 | U9 | estoque (`Supply.Enabled`) | `r_call` (caixa completado até o preço do pedido rápido, uma vez) → `r_boxes` (fala repete a cada 20 s, Day 1 parado) → `r_box` → `r_restock` → "Stocked up!" |
 | U10 | fora de ordem: grelhar antes de cortar; jogar o hot dog no lixo | nunca trava; o passo segue o estado; lixo volta ao corte |
@@ -215,11 +224,11 @@ Preparo: Play limpo (perfil novato) ou `/dev tutorial reset`; `/dev tutdebug` mo
 |---|---|---|
 | C1 | os 2 entram; `/dev plate` | ativos = 6 (party 2); `/dev pickup` tamanho = min(6, PU no mapa) (R-1) |
 | C2 | J1 no tablet, J2 cortando/grelhando ao mesmo tempo | nenhum espera o outro; a nota de J1 monta os itens; J2 vê o balão sobre o cliente |
-| C3 | os 2 tocam o mesmo prato no mesmo frame ("Add Bun") | só um efeito; o outro recebe o toast da recusa |
-| C4 | J1 pega o prato, J2 entrega? (hand-off pelo slot: J1 "Put Plate", J2 "Take Plate") | ticket e toppings preservados |
+| C3 | **[VELHO]** os 2 tocam o mesmo prato no mesmo frame ("Add Bun") | só um efeito; o outro recebe o toast da recusa |
+| C4 | **[VELHO]** J1 pega o prato, J2 entrega? (hand-off pelo slot: J1 "Put Plate", J2 "Take Plate") | ticket e toppings preservados |
 | C5 | J2 toca o tablet durante a fala de J1 | `tablet_busy` |
-| C6 | J1 sai do jogo no meio da fala | no fim a fala volta a `Idle` sem pedido (`TakeOrderFor` recusa um jogador que saiu; aviso no Output); a paciência do cliente volta a correr; J2 consegue tomar o pedido de novo |
-| C7 | J1 sai com um `hot_dog` (Ticket) na mão | o cliente daquele #n continua na retirada; o prato se perde; nada trava; J2 refaz e entrega (vai por pedido idêntico) |
+| C6 | J1 sai do jogo no meio da fala (repetir com J1 desmaiado/espectador) | **na hora** (sem esperar o fim da fala) o tablet volta a `Idle` sem pedido, sem cobrança e sem ticket; o cliente **fica em `Q1`** em `Ordering` com a paciência correndo de novo; Output do servidor com `print` "[TabletService] TAB-1: talk with <npc> cancelled (attendant left the server)" (ou "attendant left" no desmaio); J2 toma o pedido de novo desde o começo (R-8 corrigido) |
+| C7 | **[VELHO]** J1 sai com um `hot_dog` (Ticket) na mão | o cliente daquele #n continua na retirada; o prato se perde; nada trava; J2 refaz e entrega (vai por pedido idêntico) |
 | C8 | painel de pedidos e billboards | iguais nos 2 clients (#n, estado, barra) |
 | C9 | `stock_low`, `supply_ordered`, `gear_*` | toast para os 2 (Audience Party) |
 | C10 | DEC-275 | log: nenhum jogador > 5 s parado sem tarefa útil por mais de 25% do turno (medir à mão no 1º teste) |
@@ -247,12 +256,12 @@ Escrito pela spec do board e DEC-283/284; ajustar os nomes dos comandos quando a
 
 | # | Caso | Esperado |
 |---|---|---|
-| E1 | executor manda `Interact` de `plate_put` sem Tool na mão | servidor recusa (escolhe o Tool no Backpack ou recusa), nada muda no `Plates` |
+| E1 | **[VELHO]** executor manda `Interact` de `plate_put` sem Tool na mão | servidor recusa (escolhe o Tool no Backpack ou recusa), nada muda no `Plates` |
 | E2 | `Interact` de `tablet_take` a 50 studs | recusa por raio (`TakeRadius` 6) |
 | E3 | `Interact` de `pickup_serve` com `hot_dog` cujo atributo `Ticket` foi editado no client | atributo de Tool é do servidor; se o client mexer, o servidor usa o seu ou cai em pedido idêntico; veredito pelos toppings, nunca trava |
 | E4 | spam de `take_box` (10 por s) | cadência do `SupplyService` recusa; no máximo 1 caixa por toque |
 | E5 | spam de `order_stock` | um pedido; os outros `supply_busy` (toast com anti-spam de 2 s) |
-| E6 | `grill_flip` fora da pausa | silencioso, nada muda |
+| E6 | **[VELHO]** `grill_flip` fora da pausa | silencioso, nada muda |
 | E7 | saldo insuficiente no telefone / no Gear Stand | `not_enough_cash`; nada debitado, nada entregue |
 | E8 | fim do turno com fala ativa / pratos com ticket | `ShiftStarted` zera o tablet; pratos/órfãos não sobram no turno seguinte |
 | E9 | resume de snapshot no meio do turno | caixas nas baias/escotilha voltam (`Sup`); chamadas a caminho caem com o dinheiro devolvido; `Ticket` não volta |
@@ -281,9 +290,9 @@ Escrito pela spec do board e DEC-283/284; ajustar os nomes dos comandos quando a
 | R-1 | `Required` exige `PU-1..PU-8` + rotas `Q1 → PU-8` com a chave ligada; o bind cria só `PU-1..4`. Resultado provável: aviso "passes wave 2 but not wave 3" (o wave 3 inteiro deixa de ser checado como fatal) e retirada travada em 4 com 2+ jogadores | `src/Place/shared/MapIndex/Required.luau:439-456`; `tools/assetplace/restaurant_bind.luau:2291-2294`, `:2309-2315` | B2, B7, C1 |
 | R-2 | Lição do Gear Stand no Closing do Day 1 com o stand fechado: o horário só abre no `Summary`, e o Closing é segurado pela lição. Novato vai ao stand e recebe `gear_closed` | `src/Market/server/GearStandService.luau` (`OnPhase`, abre só em `Summary`); `src/Tutorial/shared/Rules.luau:36-43`; `src/Tutorial/server/TutorialService.luau:234-256` | U12 |
 | R-3 | Prompts da grelha amontoados: `Att_Flip<n>` a 0,35 stud do `grill_collect` da mesma vaga e vagas vizinhas < 1 stud; a regra 4 (2,5 studs) só compara donos diferentes, então nada avisa | `restaurant_bind.luau:1648-1659`; `src/Place/shared/MapIndex/init.luau:637-668` | K17 |
-| R-4 | Cozinha legada ligada junto: `WorldKitchenPrompts = true` liga os 5 prompts de mundo; `CUT-1` continua tábua `board` (o `PendingStationKind` não é lido por ninguém), então há um 2º caminho de montagem sem prato/ticket, e o `CUT-1` fica a ~2,3 studs do `CUT-2` | `restaurant_bind.luau:1679-1697`; `src/Kitchen/server/KitchenService/init.luau:894-900` | B3, K16, D3 |
+| R-4 | **[VELHO, corrigido no código; revisto 2026-10-18 pela TASK-509]** Texto original: "`WorldKitchenPrompts = true` liga os 5 prompts de mundo; `CUT-1` continua tábua `board` (o `PendingStationKind` não é lido por ninguém), então há um 2º caminho de montagem sem prato/ticket". **Hoje:** (a) `KitchenService:ApplyPendingKind` lê o `PendingStationKind` e regrava o `StationKind` antes do bind com a chave ligada, então o `CUT-1` liga como `cut`, e o `EnsureSliceAnchor` cria nele um `Prompt_Slice` quando falta; (b) os prompts de montagem do trailer sem prato/ticket (`bun_cut`, `board_add_sausage`, tabela `RESTAURANT_LEGACY`) ficam escondidos no `HiddenByPrep` e recusados no `Evaluate` com a chave ligada. Não há mais 2º caminho de montagem. **Sobra:** dois `cut` (`CUT-1` e `CUT-2`) a ~2,3 studs (< 2,5 da regra 4; medida do texto original, não refeita) até a TASK-504 tirar o `CUT-2` do restaurante (MAP-01-r4 §16.9); e, depois da TASK-513/496, todos os prompts de mundo do F2 somem no restaurante (`WorldKitchenPrompts = false`, `prep-conveyor.md` §1.1), o que torna o R-4 inteiro sem objeto | `src/Kitchen/server/KitchenService/init.luau:125-129` (`RESTAURANT_LEGACY`), `:615` e `:678-690` (`ApplyPendingKind`), `:692` (`EnsureSliceAnchor`), `:957-970` (`HiddenByPrep`), `:1118-1120` (`Evaluate`); `tools/assetplace/restaurant_bind.luau:1734-1754` (`CUT-2` e o `PendingStationKind` do `CUT-1`) | B3 (só a distância CUT-1 × CUT-2); K16 e D3 **[VELHO]**; esteira: `kitchen-redesign.md` CH-3 |
 | R-5 | Design × código: sem queima, sem "Hurry"/veterano, a fala não cancela ao afastar, pagamento na entrega (sem estorno), pedido de estoque sem menu e por toque (o cabeçalho diz segurar). Critérios de aceite do FEAT-043/045/048/050 vão falhar se forem lidos ao pé da letra | `src/Tablet/server/TabletService.luau:9-20`; `Kitchen/.../Stations/Grill.luau:6`; `Supply/.../init.luau:7-12`; `Content/Actions.luau:165` | L4, L6, L7, L10, K5, S1 |
 | R-6 | `/dev smoke` é do trailer (passos `mart`, `seating buy + sit`, `trailer ready`): com a chave ligada falha e não existe o smoke do restaurante pedido no tech §5 R2 | `src/Dev/server/DevService/Commands/Smoke.luau:119-237` | X8 (desligada); com a chave ligada só como informação |
 | R-7 | Ondas: `drive_serve` é `Wave = 4` com `BindingWave = 3` (fica desligado, correto enquanto o drive-thru é R3). Os avisos `supply_*`/`stock_low` têm `Wave = 4`, mas em `Notices` o `Wave` é só documentação (não corta) | `Content/Actions.luau:163`; `Content/Notices.luau:6, 111-113` | nenhum (informativo) |
-| R-8 | Pedido em fala com o atendente que sai: o tablet volta a `Idle` e o pedido é perdido em silêncio (só `warn` no servidor); o cliente refaz a fila de pedido do zero na frente | `src/Tablet/server/TabletService.luau:218-229` | C6 |
+| R-8 | **[VELHO, corrigido no código; revisto 2026-10-18 pela TASK-509]** Texto original: "o tablet volta a `Idle` e o pedido é perdido em silêncio (só `warn`); o cliente refaz a fila do zero". **Hoje:** quando o jogador que começou a fala sai do servidor (`PlayerRemoving`) ou deixa de ser membro ativo (`RunStateService:IsActive` falso: desmaio, espectador), o `TabletService:Cancel` chama o `Reset` **na hora**: tablet `Idle`, sem pedido, sem cobrança; o cliente **fica em `Q1`** em `Ordering` e a paciência volta a correr (`Pause(npc, false)`); log com `print`, não `warn`. O próximo `tablet_take` (de qualquer um) recomeça a fala. Andar para longe continua **não** cancelando (TASK-381; divergência de design no R-5) | `src/Tablet/server/TabletService.luau:19-23` (cabeçalho), `:207-221` (`Reset`), `:237-248` (`UserGone`, `Cancel`), `:293-295` (`Step`), `:491-497` (`PlayerRemoving`) | C6 (reescrito); esteira: `kitchen-redesign.md` BO-9 |
 | R-9 | Mart fora do mapa com a chave ligada (`MartShelves = not on`) contra DEC-282 ("sair pela porta dos fundos para ir ao Mart"); no rollback o Mart precisa voltar do `ServerStorage.Mart` | `Content/Restaurant.luau:385`; `Required.luau:105-110` | B9, X5 |

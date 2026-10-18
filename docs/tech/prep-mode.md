@@ -1,5 +1,43 @@
 Status: Rascunho
 
+> **Aviso (DEC-302 a DEC-305, 2026-10-18; TASK-507): este documento volta a ser base do modo focado, no trailer e no
+> restaurante.** O modo focado (DEC-223) **vale no restaurante (MAP-01)**, agora com **esteira**: `Prep.Rules.Mode =
+> "Conveyor"` com o restaurante ligado e `"Trailer"` sem ele; `Prep.Rules.Enabled = true` e `WorldKitchenPrompts = false`
+> nos dois modos. Na cozinha do MAP-01 **não há prompts de mundo** de grelha, pão, tábua, rail, condimentos ou passa. O
+> desenho da esteira (assentos, dois prompts, paradas, setas, reserva, mesa de descanso, prato com ticket, mesa central,
+> PICKUP, rede e assinaturas) está **só** em `tech/prep-conveyor.md`; aqui não se repete o contrato, só se aponta.
+>
+> - **Vale nos dois modos, sem mudança:** servidor autoritativo e validação por plausibilidade (§3), `Grade` como única
+>   conta de nota, `Content.Prep` (`Tolerances`, `Grades`, `Gestures`), câmera `Prep`, `Freeze`, saídas forçadas e
+>   `CueLock` (§5), Mobile/Assist/gamepad (§5), os pacotes `Prep*` de hoje (com as regras do modo esteira em
+>   `prep-conveyor.md` §2 a §6) e o miolo 3D de `tech/prep-3d.md`.
+> - **Vale só no trailer** (`Mode = "Trailer"`): abas/pan (DEC-232), aba de entrada por `StepNear`, tábua com uma vaga por
+>   assento (`Att_Bun n`, `BoardSlots = 4`), assentos = membros (1 a 4), `PrepBegin`/reserva de pão, abas Order e Serve
+>   (`PrepOrder`), Finish que tira a salsicha do rail e cria o `hot_dog`, `Parked` da TASK-260, `Tip = 2` fixo do Perfect,
+>   salsicha não virada = Messy.
+> - **No restaurante vale a esteira** (`prep-conveyor.md`): dois prompts `prep_work` (esteira) e `prep_grill` (grelha)
+>   (DEC-305); 3 assentos fixos, até 2 pratos na esteira, uma estação por prato (DEC-303); o prato vem da mesa central com o
+>   ticket e o ticket fica no HUD (DEC-304); grelha 8/6/4 s, sem queima, virar opcional com bônus e fora da nota, pronta
+>   vai sozinha à mesa de descanso de 8 (DEC-303, DEC-305); padrão fixo por molho Zigzag, Wave e Line; Perfect = gorjeta
+>   base + $1 (DEC-305).
+>
+> | Seção | O que muda com a esteira (restaurante) | Onde está o contrato |
+> |---|---|---|
+> | §2 Ativar | dois prompts (`Prompt_Work` na esteira, `Prompt_Grill` na grelha), não um `Work` por `Station_n`; o prompt escolhe o assento | `prep-conveyor.md` §2.1, §2.2 |
+> | §2 Aba de entrada | não há `StepNear`: a "aba" é a parada onde o prato está (`Step` = aba da parada) | §3.1, §3.4 |
+> | §2 UI | setas esquerda/direita levam o próprio prato entre paradas; sem abas Order/Serve; o pedido nasce no tablet e a entrega é no `PICKUP` | §3.3, §6.2, §8 |
+> | §2 Etapas | Cut e Dog gravados por etapa (`PrepStage`) na parada Tábua; condimentos e nota no `PrepFinish` na parada Condimentos; o grelhador fica no assento 3 | §5, §6.5 |
+> | §2 Finish / Leave / lixeira | Finish não cria Tool nem mexe no rail; o prato volta à mão como `hot_dog` em `Out`; Leave deixa o prato parado e reservado; lixeira esvazia o prato e mantém o ticket | §2.3, §6.5 a §6.7 |
+> | §2 Nota | Perfect = gorjeta base + $1 (`TipExtra` 1), não $2; a salsicha fica fora da nota do prato | §5, §8 |
+> | §3 Rede | a tabela abaixo continua; entram `PrepBelt`, `PrepStage` e os campos `Stop`/`Wait`/`Line`/`Away` do `PrepSeats`; o relógio de plausibilidade conta do commit Cut | §9, `network.md` §19 |
+> | §4 Co-op | 3 registros fixos (1–2 esteira, 3 grelha); reserva por parada; o ticket é o do prato (não se fixa ticket) | §2.1, §4 |
+> | §5 Saídas | Leave e `Kick*` deixam o prato parado na esteira; desconexão manda à mesa central | §2.3 |
+> | §5 HUD | em foco na esteira o ticket vem do `PrepSeats.Ticket` do próprio assento | §6.4 |
+> | §6 Mapa | sem `Station_n` no MAP-01: `Mount_Belt`, `Stop_n`, `WaitL_n`/`WaitR_n`, `Seat_Belt_1/2`, `Seat_Grill`, `Prompt_Grill`, `CamAnchor_Belt`/`_Grill` | §2.1, §3.1, §11.1; `levels/MAP-01-r4-restaurant.md` §16 |
+> | §6 Código | `PrepService` ganha `Require` de `PlateService`; `Belt.luau` puro novo | §4, §10 |
+> | §7 Migração | `WorldKitchenPrompts = false` nos dois modos; o rollback para prompts de mundo deixa de existir depois da TASK-506 (só resta voltar ao trailer); lista exata do que some no restaurante | §1, §1.1 |
+> | §8 Ondas | histórico (trailer); as ondas da esteira estão no board, tabela "Cozinha com esteira" | `tasks/board.md` |
+>
 > **Nota (2026-10-12, feedback do dono "é tudo 3d"): a interface do minigame mudou de rumo.** `docs/tech/prep-3d.md` (Rascunho, Provisório) supera deste documento **a UI 2D do miolo**: tábua 2D, painel de ingredientes, células da grelha, cartões de Order/Serve e StrokeCanvas (§2 coluna "Cliente", §5 Mobile "arrasto sobre Frames", §6 "UI é 2D (Frames...)", DT-8). O minigame passa a ser interação direta com os objetos 3D do trailer (raio do ponteiro, anéis, brilhos, partículas); só ticket, abas, Leave, Next/Serve, Assist, nota/selo, dica e toast ficam em 2D. **Continua valendo daqui, sem mudança:** rede e autoridade (§3), co-op e assentos (§4), noite e saídas forçadas (§5), mapa `Station_n` e `Content.Prep` (§6), migração dos prompts e `WorldKitchenPrompts` (§7), riscos e métricas (§9). Migração por flag `Prep.Rules.ThreeD`; tasks TASK-194 a TASK-215 (`docs/tasks/board.md`); TASK-174, 175, 177, 178 e 179 marcadas "Substituída parcialmente por 3D".
 
 # Modo de preparo focado (V1): desenho técnico
@@ -25,7 +63,7 @@ Fontes: [Flipline Blog](https://www.flipline.com/blog/?p=9841), [Papa's Pizzeria
 
 ## 2. Fluxo do jogador e do servidor
 
-**Ativar.** Prompt `Work` (`prep_work`, tap, raio 5) no `Prompt_Work` de cada `Station_n`; no mobile o botão de interagir já serve (sem botão novo). Servidor (`PrepService`): membro Active, fase de venda, estação ativa e livre, veículo corrente, jogador sem outra estação, sem trava de reentrada (§5). Se ok: grava o assento no set `PrepSeats`, `CharacterService:Freeze(player, "Prep", true)` (o `CharacterController` já trava controles por `Frozen`), `PivotTo` em `Att_Stand`, atributo `Working = n` no personagem. Cliente (`PrepController`): `CameraController:Prep(on, camCFrame, focus, fov)` (modo novo, Scriptable, tween 0,35 s, instantâneo com "reduced motion", DOF só em qualidade > 3), `InputController:SetContext("Menu")`, gate de prompts do mundo, monta a UI Vide.
+**Ativar.** (Trailer; no restaurante, dois prompts: `prep-conveyor.md` §2.2.) Prompt `Work` (`prep_work`, tap, raio 5) no `Prompt_Work` de cada `Station_n`; no mobile o botão de interagir já serve (sem botão novo). Servidor (`PrepService`): membro Active, fase de venda, estação ativa e livre, veículo corrente, jogador sem outra estação, sem trava de reentrada (§5). Se ok: grava o assento no set `PrepSeats`, `CharacterService:Freeze(player, "Prep", true)` (o `CharacterController` já trava controles por `Frozen`), `PivotTo` em `Att_Stand`, atributo `Working = n` no personagem. Cliente (`PrepController`): `CameraController:Prep(on, camCFrame, focus, fov)` (modo novo, Scriptable, tween 0,35 s, instantâneo com "reduced motion", DOF só em qualidade > 3), `InputController:SetContext("Menu")`, gate de prompts do mundo, monta a UI Vide.
 
 **Aba de entrada (pedido do dono 2026-10-17, Provisório).** O modo abre na parte da bancada onde o jogador está, não sempre na grill: `PrepService:StepNear` escolhe, entre as abas ativas, a vista (`Content.Prep.Views`) cujo `Focus` no `Station_n` fica mais perto do jogador no plano do chão. Perto da grill = `Grill`, da tábua de pães = `Board`, das coberturas = `Toppings` (abre com o aviso "corte o pão e ponha a salsicha primeiro" se não há prato). O `Step` vai no registro de `PrepSeats` e o cliente abre nessa aba e câmera; o personagem vai para `Att_Stand_Build` em Board e Toppings. Sem `Focus` no mapa vale o `PromptStep` do prompt. `/dev prep enter <n>` sem aba usa a mesma regra.
 
@@ -41,7 +79,7 @@ Fontes: [Flipline Blog](https://www.flipline.com/blog/?p=9841), [Papa's Pizzeria
 
 **Finish (transação única, tudo ou nada).** Cliente manda o RESUMO; o servidor valida (§3), e só então: tira a salsicha da frente do trilho (`Rail.Pop`, com a nota dela), toma 1 uso de cada topping (`TakeStock`), cria o `hot_dog` (`ItemService:Give` com `Toppings`, `Quality`, `Altered`), libera a vaga da tábua e emite `assembled`. Falta de estoque ou trilho vazio = recusa **sem mudar nada**; o prato continua no cliente (`Parked`) até haver salsicha. Hotbar cheia (`hands_full`) idem. **Leave** devolve o pão reservado (se não houve Finish); **lixeira** perde pão e salsicha (como `Trash.luau`) e, com prato na mão, dispara `Perform("discard")` na BIN-C para manter o sinal `Discarded` do ANM-002.
 
-**Nota.** Pontos por etapa Perfect 100, Good 70, Messy 30 (FEAT-039); prato Perfect se média >= 88 e nenhuma Messy, Good se >= 60. O cliente envia medidas 0 a 100; o **servidor** converte em faixa (`Content.Prep.Grades`), então retocar números é só dados. Efeito (Q-219 B, só gorjeta e humor, nunca o preço): Perfect = gorjeta $2 e janela +4 s; Messy = sem gorjeta, humor -1 faixa. Ponto de extensão único: `CustomerService:SellLine` lê `ItemService:QualityOf(tool)`.
+**Nota.** Pontos por etapa Perfect 100, Good 70, Messy 30 (FEAT-039); prato Perfect se média >= 88 e nenhuma Messy, Good se >= 60. O cliente envia medidas 0 a 100; o **servidor** converte em faixa (`Content.Prep.Grades`), então retocar números é só dados. Efeito (Q-219 B, só gorjeta e humor, nunca o preço): Perfect = gorjeta $2 (**trailer**; no restaurante, gorjeta base + $1, DEC-305) e janela +4 s; Messy = sem gorjeta, humor -1 faixa. Ponto de extensão único: `CustomerService:SellLine` lê `ItemService:QualityOf(tool)`.
 
 ## 3. Autoridade e rede
 
@@ -64,6 +102,9 @@ Entradas novas em `src/Libs/Net/init.luau` (donos: `PrepService` responde todas,
 Sem `keyBy`. Sem Remote novo fora do Lync. Os sets `Stations`, `Stock`, `Customers`, `Tables`, `Thief` e `Anomalies` já existem e alimentam a UI inteira.
 
 ## 4. Co-op (1 a 4 estações)
+
+> Trailer. No restaurante: 3 assentos fixos (2 de esteira, 1 de grelha) e reserva por parada, `prep-conveyor.md` §2 e §4.
+
 
 - **Quantas:** `PrepSeats` só tem registro para as estações ativas = `clamp(membros conectados, 1, 4)`, recalculado no `ShiftStarted` e em `MemberJoined`; **só cresce** durante o turno (assento ocupado nunca some). Cada `Station_n` é uma posição de câmera e de uso sobre a mesma bancada (Q-220 C); a vaga `n` da tábua é do assento `n`.
 - **Vínculo:** jogador <-> assento é 1:1 (`PrepEnter` recusa com `Busy` ou "já está sentado"); a checagem e a escrita são síncronas, então dois toques no mesmo frame nunca ocupam o mesmo assento. Saída/queda/Away libera e devolve o pão reservado.
@@ -115,7 +156,7 @@ Mais: `Content.Actions` ganha `prep_work`; `Content.Stations` ganha `prep` (`Rec
 
 | Item | Destino |
 |---|---|
-| `grill_place`, `grill_collect`, `bun_cut`, `board_add_sausage`, `topping_add`, `discard` da BIN-C | **ocultos** com `Prep.Rules.WorldKitchenPrompts = false` (`KitchenService:RefreshPrompts` força `PromptEnabled = false`; os handlers continuam registrados). Ligar o flag devolve o fluxo antigo: **rollback sem código** |
+| `grill_place`, `grill_collect`, `bun_cut`, `board_add_sausage`, `topping_add`, `discard` da BIN-C | **ocultos** com `Prep.Rules.WorldKitchenPrompts = false` (`KitchenService:RefreshPrompts` força `PromptEnabled = false`; os handlers continuam registrados). Ligar o flag devolve o fluxo antigo: **rollback sem código** (**emenda DEC-302**: o flag fica `false` nos dois modos; no restaurante a lista do que some é `prep-conveyor.md` §1.1 e não há rollback para prompts de mundo depois da TASK-506) |
 | Módulos `Grill`/`Board`/`BunCrate`/`Toppings`/`Rail`/`Trash` | ficam (a transação do Prep usa as mesmas funções; `Rail`/`Board` ganham nota e `Occupy`) |
 | `KitchenController` (visuais de grelha, trilho, tábua, estoque, tampas) | ficam: o mundo continua refletindo o estado |
 | Hotbar | não há Tool de salsicha/pão (verificado em `Content.Items`); o `hot_dog` é a única saída; pacotes seguem para restock |

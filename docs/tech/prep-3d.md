@@ -1,5 +1,32 @@
 Status: Rascunho (Provisório até DEC do dono; nada aqui é código)
 
+> **Aviso (DEC-302 a DEC-305, 2026-10-18; TASK-507): este documento volta a ser base do miolo 3D do modo focado, no trailer
+> e no restaurante.** No restaurante (MAP-01) o foco roda com **esteira** (`Prep.Rules.Mode = "Conveyor"`); o contrato da
+> esteira (assentos, dois prompts, paradas, setas, reserva, mesa de descanso, prato com ticket, mesa central, PICKUP, rede)
+> está **só** em `tech/prep-conveyor.md` e não se repete aqui. A cozinha do MAP-01 **não usa prompts de mundo** de preparo
+> (`WorldKitchenPrompts = false` nos dois modos).
+>
+> - **Vale nos dois modos:** interação por raio sobre `PrepTarget` (§2.1, §2.2, §2.3), feedback 3D (§2.4), predição só visual
+>   (§2.5), highlight e ferramentas (§2.6), gestos `slice`/`place`/`trace` e o `PlaneRegion`, `Grade` intacta, swap x
+>   EditableMesh (§6A), orçamento (§8), acessibilidade (§9), N1 a N3 (§7.2), lições das fatias (§16, §17).
+> - **Vale só no trailer:** seções em sequência com abas embaixo e Next (§3.0, §5 item 3), aba Order/Take na janela (§3.1),
+>   Serve pela vista `Window` e alvo `Hatch` (§3.5), `Station_n` com 2 prompts Work e `Att_Bun n` por assento (§4.2), 1 a 4
+>   assentos com marionete na tábua (§10), `PrepBegin` na caixa de pães (§3.3), Collect manual (§3.2).
+>
+> | Seção | O que muda com a esteira (restaurante) | Contrato |
+> |---|---|---|
+> | §1, §3.0 Navegação | sem abas nem Next: setas esquerda/direita movem o próprio prato pelas paradas Grelha, Tábua, Condimentos e Saída; a vista é a da parada | `prep-conveyor.md` §3.1, §3.3 |
+> | §2.2 Alvos | `Board` = o prato do jogador na parada Tábua (não `Att_Bun n`); `Rail` = mesa de descanso de 8 (qualquer posição livre, `PrepGrab` + `PrepStage Dog`); sem `Hatch` nem `Customer` | §5, §6.5 |
+> | §3.2 Grill | grelhador no assento 3 (prompt `Prompt_Grill`); pronta em 8/6/4 s, **sem pausa e sem queima**; virar opcional, só bônus (`FlipBonus`), fora da nota; a pronta vai sozinha ao descanso; cheio = espera na grelha sem queimar; sem Collect | §2.2, §5 |
+> | §3.3 Corte | na parada Tábua; o toque na caixa de pães não reserva nada: o pão entra no prato no commit `PrepStage Cut` | §6.5 |
+> | §3.4 Salsicha e toppings | salsicha arrastada do descanso (`PrepStage Dog`); molhos com **padrão fixo por molho** (Zigzag, Wave, Line; DEC-305); `PrepFinish` na parada Condimentos | §6.5 |
+> | §3.5 Serve | não existe no foco: o prato vai a `Out`, volta à mão como `hot_dog`, e o jogador o põe na mesa central ou entrega segurando E no `PICKUP` ao dono do ticket | §6.7, §7, §8 |
+> | §4 Câmera e vistas | câmera larga `CamAnchor_Belt`/`Focus_Belt` + vistas de parada (`Rest`, `Board`, `Toppings`) e `CamAnchor_Grill` do grelhador; âncoras na bancada, não por assento | §3.1, §11.1; `levels/MAP-01-r4-restaurant.md` §16.6 |
+> | §5 HUD | sem barra de seções nem Next; setas esquerda/direita; ticket do prato do assento | §6.4; TASK-518, TASK-520 |
+> | §7 Rede | entram `PrepBelt`, `PrepStage` e campos novos do `PrepSeats`; nenhum pacote por frame | §9, `network.md` §19 |
+> | §10 Co-op | até 2 pratos na esteira, o 2º espera ao lado; os outros veem o prato andar no mundo | §4; TASK-519 |
+> | §11.3 Rollback | `WorldKitchenPrompts = true` **não** volta mais o restaurante a prompts de mundo depois da TASK-506 | §1 |
+
 # Preparo 3D-first: o minigame é o mundo, não um painel
 
 Autor: architect · 2026-10-12 · Base: feedback do dono (abaixo), DEC-223, `docs/tech/prep-mode.md` (continua valendo para rede, assentos, nota, saídas e migração dos prompts), `docs/art/prep-ui-spec.md` (a parte de HUD e câmera continua; a parte "tábua 2D" é superada aqui), FEAT-039, o código atual de `src/Prep/**`, `src/Kitchen/**` e `Content.Prep`. Tudo **Provisório**. `DT-n` = decisão técnica proposta (o secretário numera; o dono pode vetar), lista em §14. Não implementa feature nenhuma; o plano de execução está em `docs/tasks/board.md` (TASK-194 a TASK-219).
@@ -51,7 +78,7 @@ Pointer (mouse/toque/gamepad, já existe) ─► World/Aim ──► Targets (re
 
 - **Um raio por evento de movimento, no máximo um por frame.** `Pointer` já entrega Down/Move/Up em px. `World/Ray` converte para um raio da `CurrentCamera`. Atenção ao espaço: `InputObject.Position` de mouse e toque vem no espaço do GUI (com o inset do topo), então o par correto é `Camera:ScreenPointToRay`; o cursor virtual do gamepad (px na viewport) usa o mesmo caminho depois de somar o inset. É exatamente a pendência já aberta no registro do dia ("conferir o espaço de coordenadas do toque/cursor"); a TASK-196 fecha com `/dev prep ray` (imprime hit e uv por clique) em mouse, toque emulado e gamepad.
 - **`RaycastParams` em modo `Include`** com **só** os hitboxes `PrepTarget` (CollectionService, listados uma vez no Enter, dezenas de partes). Decoração, pratos, NPCs e o rig nunca bloqueiam o raio e o raio custa quase nada. Hitbox = `Part` invisível (`Transparency 1`, `CanQuery true`, `CanCollide false`, `CanTouch false`, `Massless`), filho do objeto real (acompanha o `PivotTo` do trailer).
-- **`ProximityPrompt` e `ClickDetector` NÃO**: o prompt não arrasta, o `ClickDetector` não é confiável com câmera `Scriptable` nem no toque e no gamepad. O único prompt do modo continua o `Prompt_Work` que entra na estação.
+- **`ProximityPrompt` e `ClickDetector` NÃO**: o prompt não arrasta, o `ClickDetector` não é confiável com câmera `Scriptable` nem no toque e no gamepad. O único prompt do modo continua o `Prompt_Work` que entra na estação (no restaurante são dois, `Prompt_Work` e `Prompt_Grill`, DEC-305; ainda nenhum prompt dentro do foco).
 - **Tamanho do hitbox.** A 2,5 studs da câmera com FOV vertical 55, o quadro tem 2,6 studs de altura: em 667x375 isso dá **~144 px por stud** (844x390: ~150; 1280x720: ~277). Alvo mínimo de toque 44 px = **0,31 stud**. Regra: `hitbox = max(tamanho visual, 0,31 stud) x 1,3 se Assist`; a salsicha (0,24 de espessura, 1,0 de comprimento) ganha hitbox de 1,1 x 0,5. Provisório; a TASK-212 afina em Play.
 - **Hover** (só mouse e cursor do gamepad): contorno no alvo sob o ponteiro; no toque não há hover, então o **alvo acionável pulsa sozinho** (o convite é o feedback).
 - **Offset de toque** (28 px acima do dedo, `Rules.TouchOffset`) fica, para arrastos; o marcador 3D mostra exatamente o ponto que vale. Para toques discretos o alvo é o do ponto deslocado (o contorno já indica qual vai ser acionado antes de soltar). Validar em Play (risco R4).
@@ -406,7 +433,7 @@ Meta de quadros: >= 30 fps no foco no celular fraco (TASK-193/214); se faltar, o
 | F5 | QA integrada; `ThreeD = true` por padrão | `true` |
 | F6 | limpeza do 2D (TASK-215) | o flag some |
 
-Mecanismo: **`Prep.Rules.ThreeD`** (bool) mais `Rules.World.Stages` (mapa por estágio) escolhem, por estágio, o módulo 3D (`World/Stages/<Nome>.luau`, contrato `Stage3D`: `Enter/Leave/Step/Hint/Next/OnResult/OnEvent` e sem `Board/Panel`) ou o 2D atual (`Stages/<Nome>.luau`). `LoadStages` já descobre arquivos; o 3D usa outra pasta e o mesmo registro. **Rollback por camadas, sem código**: `Stages.<X> = false` volta o estágio ao 2D; `ThreeD = false` volta tudo ao 2D; `WorldKitchenPrompts = true` volta ao modo antigo de prompts no mundo (DEC-223, intacto).
+Mecanismo: **`Prep.Rules.ThreeD`** (bool) mais `Rules.World.Stages` (mapa por estágio) escolhem, por estágio, o módulo 3D (`World/Stages/<Nome>.luau`, contrato `Stage3D`: `Enter/Leave/Step/Hint/Next/OnResult/OnEvent` e sem `Board/Panel`) ou o 2D atual (`Stages/<Nome>.luau`). `LoadStages` já descobre arquivos; o 3D usa outra pasta e o mesmo registro. **Rollback por camadas, sem código**: `Stages.<X> = false` volta o estágio ao 2D; `ThreeD = false` volta tudo ao 2D; `WorldKitchenPrompts = true` volta ao modo antigo de prompts no mundo (DEC-223, intacto). **Emenda DEC-302:** `WorldKitchenPrompts` fica `false` nos dois modos e esse último degrau deixa de existir depois da TASK-506 (`prep-conveyor.md` §1).
 
 ## 12. Fatia vertical e ordem recomendada
 
