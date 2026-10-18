@@ -1003,7 +1003,7 @@ local function centerOf(m)
 end
 local CLONES = {
 	-- name in the trailer, RestaurantId, x, centre y rule, z, old front, new front
-	{ "TRL-G_AST-012_RollerGrill", "GRILL-1", 33.05, "top", 69.9, DIR.S, DIR.N },
+	{ "TRL-G_AST-012_RollerGrill", "GRILL-1", 33.5, "top", 69.9, DIR.S, DIR.N }, -- TASK-477: +0.45 with the shorter back counter
 	{ "TRL-R_AST-013_RestRail", "RAIL", 37.6, "top", 69.95, DIR.S, DIR.N },
 	{ "TRL-S_AST-018_CoolerL1", "STOCK", 40.6, "top", 70.15, DIR.S, DIR.N },
 	{ "TRL-B_AST-015_BunCrate", "BUN", 43.9, "top", 69.7, DIR.S, DIR.N },
@@ -1683,14 +1683,18 @@ end
 
 -- 5. back counter (stations sit on it), coffee bench, pending second stations -------------------------------------------
 local back = folder(kitchen, "BackCounter")
-local bcTop = box(back, "Top", 30.5, 59.42, TOP - 0.25, TOP, 68.5, 71.4, { Color = C.Steel, blk = C.BlkProp, art = { Color = C.Steel, Material = Enum.Material.Metal } })
-local bcBody = box(back, "Body", 30.6, 59.4, FLOOR, TOP - 0.25, 68.6, 71.3, { Color = C.SteelDark, blk = C.BlkProp, art = { Color = C.SteelDark } })
+-- TASK-477 (owner 2026-10-18): the west end ran into the DOOR-P jamb (X 30.44..30.66); it now starts at X 31.0 and the
+-- roller grill on it moved +0.45 (GRILL-1 in CLONES, GRILL_SLOTS), still clear of the rest rail (X 36.1)
+local BC_X0 = 31.0
+local bcTop = box(back, "Top", BC_X0, 59.42, TOP - 0.25, TOP, 68.5, 71.4, { Color = C.Steel, blk = C.BlkProp, art = { Color = C.Steel, Material = Enum.Material.Metal } })
+local bcBody = box(back, "Body", BC_X0 + 0.1, 59.4, FLOOR, TOP - 0.25, 68.6, 71.3, { Color = C.SteelDark, blk = C.BlkProp, art = { Color = C.SteelDark } })
 local bench = box(kitchen, "CoffeeBench", 25.6, 27.5, FLOOR, TOP, 60.2, 62.4, { Color = C.Steel, blk = C.BlkProp, art = { Color = C.Steel, Material = Enum.Material.Metal } })
 if ART then
 	bcBody.Transparency = 1
+	local bcModule = (59.42 - BC_X0) / 10
 	for i = 1, 10 do
-		local x = 30.5 + 2.89 * (i - 0.5)
-		packAsset(back, "Module" .. i, "AST-019_CounterStraight", face(F(x, FLOOR, 69.95), DIR.N), Vector3.new(2.89 / 3, (TOP - 0.25 - FLOOR) / 3.5, 2.88 / 3))
+		local x = BC_X0 + bcModule * (i - 0.5)
+		packAsset(back, "Module" .. i, "AST-019_CounterStraight", face(F(x, FLOOR, 69.95), DIR.N), Vector3.new(bcModule / 3, (TOP - 0.25 - FLOOR) / 3.5, 2.88 / 3))
 	end
 	bench.Transparency = 1
 	packAsset(kitchen, "CoffeeBench_Module", "AST-019_CounterStraight", face(F(26.57, FLOOR, 61.3), DIR.E), Vector3.new(2.2 / 3, (TOP - FLOOR) / 3.5, 1.88 / 3))
@@ -1734,7 +1738,8 @@ end
 -- (GrillSlots 2/3/4 = Grill_L1 X 31.4..34.1, L2 30.5..34.7, L3 30.5..35.6; depth Z 68.7..71.1, inset 0.15). Distances:
 -- 1-2 3.05, 2-4 2.5, 1-4 3.8, 2-3 3.2, 3-4 4.7, 1-3 2.28 (the only pair under 2.5: 2.5 for all four needs a grill
 -- ~7.5 wide or GrillSlots 3). MAP x / z; Y stays the clone's. Att_Flip<n> follow (code re-seats them on the slot anyway).
-local GRILL_SLOTS = { { 31.6, 70.95 }, { 33.9, 68.85 }, { 30.7, 68.85 }, { 35.4, 70.95 } }
+-- TASK-477: all four +0.45 with the grill (the X ranges above are the old ones, +0.45)
+local GRILL_SLOTS = { { 32.05, 70.95 }, { 34.35, 68.85 }, { 31.15, 68.85 }, { 35.85, 70.95 } }
 for _, s in CS:GetTagged("Station") do
 	if s:IsDescendantOf(kitchen) and s:GetAttribute("StationKind") == "grill" and s:GetAttribute("RestaurantId") == "GRILL-1" then
 		for _, a in s:GetDescendants() do

@@ -186,10 +186,9 @@ function Rules.Allows(target: Target, context: Context): boolean
 	if target.Action == "breaker_reset" and shutterProbe and shutterProbe.IsInside and shutterProbe.IsInside() then
 		return false
 	end
-	-- Security cameras: only from inside the trailer, never through the wall from the hiding spot behind it.
-	if target.Action == "watch_cameras" and shutterProbe and shutterProbe.IsInside and not shutterProbe.IsInside() then
-		return false
-	end
+	-- Security cameras (TASK-473): no "inside the trailer" rule any more. The CCTV moved to the pantry south wall, outside
+	-- LZ-1 (kitchen only), so that rule hid it everywhere; the line-of-sight check (PromptController:InSight) now keeps it
+	-- from showing through the wall from the hiding spot behind it.
 
 	-- Service window closed (DEC-221): no counter prompt; the queue waits.
 	if COUNTER_ACTIONS[target.Action] and shutterProbe and shutterProbe.IsClosed() then
