@@ -147,7 +147,8 @@ function VitalController:Setup()
 	self.HintUntil = 0 :: number -- server time the emphasis ends
 	self.HintMachine = nil :: Instance? -- coffee machine marked by this emphasis
 	self.CoffeeAt = nil :: number? -- os.clock of the last coffee payoff (TASK-479)
-	self.Warm = Vide.source(0) :: Vide.Source<number> -- warm edge glow 0..1
+	-- warm edge glow 0..1
+	self.Warm = Vide.source(0) :: Vide.Source<number>
 
 	self.DarkTickAt = NO_TICK :: number
 	self.FaintAt = nil :: number?
