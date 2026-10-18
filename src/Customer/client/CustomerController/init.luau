@@ -71,6 +71,7 @@ local OrderBubble = require(StarterPlayer.StarterPlayerScripts.client.Interface.
 local PatienceBar = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.PatienceBar)
 local ReactionBubble = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.ReactionBubble)
 local Reactions = require(script.Reactions)
+local NightWatch = require(script.NightWatch)
 
 const MAX_BUBBLES = 8 -- TASK-034 acceptance; <= 8 customers by day (network.md §3.6)
 const REACTION_TIME = 3 -- s
@@ -924,6 +925,8 @@ CustomerController:OnInit(function(self)
 end)
 
 CustomerController:OnStart(function(self)
+	-- Night customers stare at this player while an anomaly with Tension runs (owner 2026-10-18)
+	NightWatch()
 	-- PlayerGui may arrive a frame late; do not hold up the other OnStart.
 	task.spawn(function()
 		self:Watch(Players.LocalPlayer:WaitForChild("PlayerGui"))

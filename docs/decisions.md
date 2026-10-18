@@ -3878,3 +3878,11 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
 - Régua de qualidade para todas as anomalias: **o apagão** (DEC-290..293) — cena dirigida, som, câmera, tela, whispers com dica, susto no tempo certo.
 - O preparo em estações (Q-361..366) é uma reforma grande: fica como **TASK-487** depois das anomalias (o dono vai testar as anomalias primeiro).
 - Impacto: todos os agentes.
+
+## DEC-296 — Clientes "Night" encaram durante as anomalias; cinema apaga pílulas e contornos (2026-10-18)
+
+- Fala do dono (2026-10-18, testando o rastejador): "a tela tá com essas linhas brancas piscando… durante essa anomalia ainda consigo ver o dinheiro" e "pegar a skin Night… durante o evento de alguma anomalia trocar a skin deles para essa, fazer com que a cabeça deles fique seguindo o player… quando finalizar a anomalia eles voltam para a skin original".
+- Enquanto roda uma anomalia com `Tension` (as de mundo/monstro: apagão, teto, rastejador, Walker, etc.), os clientes da rua vestem o pack Night (já existia, `NpcService:SetTension`) e **viram a cabeça devagar seguindo cada jogador** (no client de cada um, `CustomerController/NightWatch`); quando a anomalia acaba, a cabeça volta à pose e a skin volta. **Provisório.**
+- Anomalias de cliente (família A, cópia) continuam **sem** Night nos outros clientes: o cliente estranho precisa ser o único estranho (Q-147 c).
+- O modo cinema (barras pretas) também apaga, só no mundo, os contornos `Highlight` e as pílulas `BillboardGui` (gorjeta "$0", estoque "9/20", "Ready!"); os prompts ficam. Volta tudo quando as barras saem.
+- Impacto: frontend-coder, art-director.
