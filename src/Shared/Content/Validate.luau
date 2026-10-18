@@ -2407,7 +2407,8 @@ local function checkHorrorScenes()
 	const whos = setOf({ "All", "Caught", "Safe" })
 	const lights = setOf({ "Off", "On", "Flicker", "Cascade" })
 	const doors = setOf({ "Rattle", "Push", "Hold", "Lock" })
-	const needPoint = setOf({ "Door", "Shadow", "Nudge", "Actor" })
+	const needPoint = setOf({ "Door", "Shadow", "Nudge" }) -- Actor: only the eyes (no Target) need one
+	const seens = setOf({ "All", "Cameras" })
 	const kinds = setOf({ "Sound", "Music", "Lights", "Lightning", "Whispers", "Vignette", "Shake", "Fov", "Nudge", "Text", "Actor", "Door", "Shadow" })
 	for index, scene in HorrorScenes.List do
 		const key = scene.Key
@@ -2472,6 +2473,30 @@ local function checkHorrorScenes()
 				if step.Text == nil or step.Text == "" then
 					fail("HorrorScenes", index, key, `{where} Text needs Text`)
 				end
+			elseif step.Kind == "Actor" then
+				-- TASK-472: Target nil = the eyes at Point; Target = a model walking to To
+				if step.Target == nil or step.Target == "" then
+					if step.Point == nil or step.Point == "" then
+						fail("HorrorScenes", index, key, `{where} Actor (eyes) needs a Point (MapPoint name)`)
+					end
+				else
+					if type(step.To) ~= "string" or step.To == "" then
+						fail("HorrorScenes", index, key, `{where} Actor '{step.Target}' needs To (MapPoint it walks to)`)
+					end
+					inRange("HorrorScenes", index, key, `{where}.Duration`, step.Duration or 0, 0.5, 60)
+				end
+				if step.Sound ~= nil and Sounds.ByKey[step.Sound] == nil then
+					fail("HorrorScenes", index, key, `{where} Actor Sound '{step.Sound}' is not a Content.Sounds key`)
+				end
+				if step.Seen ~= nil and not seens[step.Seen] then
+					fail("HorrorScenes", index, key, `{where} Actor Seen '{tostring(step.Seen)}' is not All or Cameras`)
+				end
+				if step.Value ~= nil and step.Value ~= 0 and step.Value ~= 1 then
+					fail("HorrorScenes", index, key, `{where} Actor Value is 1 (gone on arrival) or nil`)
+				end
+			end
+			if step.Kind ~= "Actor" and (step.Sound ~= nil or step.Seen ~= nil) then
+				fail("HorrorScenes", index, key, `{where} Sound / Seen are Actor fields only`)
 			end
 		end
 	end

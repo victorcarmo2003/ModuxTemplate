@@ -5,6 +5,7 @@
 	`SecurityCam` Cam key) and can drop the camera view.
 
 	  Watching()   true while the local player looks through a security camera (the body stands at the monitor).
+	  Changed(fn)  fn(watching) on every enter / leave of the camera view (TASK-472).
 	  Interrupt()  a warning that must be felt in the world (family B hide warning, the Hush, the blackout, the bell)
 	               cuts the camera view back to the head, so the warning is never missed behind the feed.
 	The jumpscare of a family A customer (Kit/Jumpscare, "near" the actor) is not shown to a watcher: the face belongs
@@ -17,6 +18,14 @@ const Watch = {}
 function Watch.Watching(): boolean
 	const view = Players.LocalPlayer:GetAttribute("SecurityView")
 	return type(view) == "string" and view ~= ""
+end
+
+-- Calls `callback(watching)` each time the local player enters or leaves the camera view (TASK-472: actors seen only
+-- on the cameras). Disconnect the returned connection when done.
+function Watch.Changed(callback: (watching: boolean) -> ()): RBXScriptConnection
+	return Players.LocalPlayer:GetAttributeChangedSignal("SecurityView"):Connect(function()
+		callback(Watch.Watching())
+	end)
 end
 
 function Watch.Cam(): string?

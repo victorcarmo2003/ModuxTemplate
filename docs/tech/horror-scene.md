@@ -21,7 +21,7 @@ fase do passo (`Step.Phase`, `Step.At` segundos depois). Todos os clients tocam 
 ## 2. Tipos (resumo; a fonte é o arquivo de dados)
 
 `Scene { Key = <chave de Content.Anomalies>, Name, Steps }` · `Step { At, Phase, Kind, Who?, Target?, Value?, To?,
-Duration?, Point?, Burst?, Text? }` · `Rules { Latency, ReduceMotion, MaxControlLock, MaxVignette, MaxFov, MaxNudge,
+Duration?, Point?, Burst?, Text?, Sound?, Seen? }` (`Sound`/`Seen` só no `Actor`, TASK-472) · `Rules { Latency, ReduceMotion, MaxControlLock, MaxVignette, MaxFov, MaxNudge,
 Shakes }`.
 
 Tipos de passo: `Sound`, `Music`, `Lights`, `Lightning`, `Whispers` (palavras HIDE na tela em rampa, DEC-291), `Vignette`, `Shake`, `Fov`, `Nudge`, `Text`, `Actor`, `Door`,
@@ -71,3 +71,28 @@ Tipos de passo: `Sound`, `Music`, `Lights`, `Lightning`, `Whispers` (palavras HI
   TASK-467.
 - QA pendente (Play, 2 clients): passos < 150 ms de diferença; entrar atrasado aplica luz/música; cancelar limpo ao
   terminar; `MapPoint`s `SCENE-*` ainda não existem (TASK-465) — som 3D cai para 2D com aviso.
+
+### 4.2 The Walker nas câmeras (TASK-472, 2026-10-18; Provisório)
+
+- Pedido do dono: os passos do apagão são do **The Walker** de verdade (AST-064), mas ele só aparece pelas câmeras de
+  segurança; quem sai pela porta da despensa em 1ª pessoa não vê nada (só ouve).
+- Sem tipo novo: o `Actor` ganhou dois campos (`Step.Sound`, `Step.Seen`). `Target` nil = os olhos de antes;
+  `Target` = nome de `Model` em qualquer lugar de `ReplicatedStorage.Assets` (pivô nos pés, frente −Z, como no
+  `Kit/Hide`; sem o modelo, silhueta escura de placeholder com aviso). Anda pelo chão (raycast sob o `MapPoint`) de onde
+  está — ou de `Point`, onde surge — até `To` em `Duration`, e fica parado; `Value = 1` some ao chegar; sem `Point` só
+  anda se já estiver lá. Um ator por `Target` e por run. `Actor` passou a ser tipo "segurado" (quem entra atrasado o
+  recebe no ponto certo do caminho).
+- Passos no modelo: `Sound` toca numa peça `Feet` do modelo a cada passo (mesma cadência do antigo som andante: repete
+  pela duração do arquivo, mín. 0,3 s). Substitui as linhas `Sound walker_step` andantes da cena (Active 18→26,
+  Failed 1→7) — mesmo tempo; `steps_stop` em 26 continua.
+- Visibilidade (`Seen = "Cameras"`): `LocalTransparencyModifier = 1` em todas as peças e decals, luzes/partículas/guis
+  desligados e `CastShadow = false` sempre; volta a 0 só enquanto `Kit/Watch.Watching()` (atributo `SecurityView` do
+  `SecurityController`). Troca ao vivo por `Watch.Changed(fn)` (novo).
+- Linhas: Active 18 entra em `SCENE-STEPS-FAR` → `SCENE-DOOR-OUT` (8 s) e fica; Failed 1 volta (6 s) e some; Resolved 0
+  volta (6 s, só se já tinha vindo). Janela de 30 s e porta 27–29,4 iguais.
+- Atenção: `Effects/ANM-020` corta quem está no monitor no início do apagão (`Watch.Interrupt`, "sem energia, sem
+  câmera"), mas o servidor não bloqueia reabrir — o jogador volta ao monitor no escuro e vê o Walker. Se o dono quiser
+  câmera desligada no apagão, isto conflita (pergunta para o lote).
+- Asset: o modelo real está em `ServerStorage.DevScenes.AssetReview.D_Characters["AST-064_Walker"]` (só Studio); precisa
+  de cópia em `ReplicatedStorage.Assets` (o `Kit/Hide` da ANM-007 procura o mesmo nome). Rig parado (sem animação de
+  andar ainda; só balanço) — animação fica para depois.
