@@ -43,19 +43,19 @@ const base = Table.new({
 	-- Resume wait after a reconnect (DEC-080); = RunParams.ResumeWait (architect). Clock held.
 	{ Key = "Resume", Duration = 15, ClockFrom = 0, ClockTo = 0, Kind = "Any", Selling = false, SkipWithoutProbe = false },
 	-- Intro cutscene, first shift of a new run only (FEAT-004; PROVISIONAL frontend-coder 2026-10-12, owner D3: short
-	-- intro, was 108 s; D3 rev. 2: 35 s; DEC-300: 32 s). Cap 67 s = the wait for every participant's ClientReady
-	-- (Cutscenes.Rules.ReadyTimeout 30 s) + the intro Cap (35 s) + 2 s margin (Validate); the probe ends it once the chain is
+	-- intro, was 108 s; D3 rev. 2: 35 s; DEC-300: 29 s). Cap 64 s = the wait for every participant's ClientReady
+	-- (Cutscenes.Rules.ReadyTimeout 30 s) + the intro Cap (32 s) + 2 s margin (Validate); the probe ends it once the chain is
 	-- over. Clock stopped at 7:00 AM; on a run that starts at night (RunStartsAtNight, DEC-300) the intro opens Night 1
 	-- and the clock stands at 7:00 PM.
 	{
 		Key = "Intro",
-		Duration = 67,
+		Duration = 64,
 		ClockFrom = hours(7),
 		ClockTo = hours(7),
 		Kind = "Any",
 		Selling = false,
 		SkipWithoutProbe = true,
-		Night = { Duration = 67, ClockFrom = hours(19), ClockTo = hours(19) },
+		Night = { Duration = 64, ClockFrom = hours(19), ClockTo = hours(19) },
 	},
 	-- Day shortened (user playtest 2026-10-11, PROVISIONAL Q-200): day turn ~7.7 min -> ~4.6 min (Prep 60 -> 30 s,
 	-- Open 360 -> 216 s, Closing 30 -> 20 s, Summary 15 -> 8 s; night shift: Summary 20 -> 10 s).

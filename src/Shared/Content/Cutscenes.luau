@@ -278,7 +278,7 @@ const rules: Rules = {
 	},
 	Voices = {
 		-- user feedback 2026-10-11: a calmer, slower Walt (was 0.95)
-		walt = { VoiceId = "1", Speed = 0.9, Volume = 1 },
+		walt = { VoiceId = "1", Speed = 1, Volume = 1 }, -- owner 2026-10-18: a quicker call (was 0.9)
 		crew = { VoiceId = "2", Speed = 1.05, Volume = 0.9 },
 	},
 	-- no street cars in the intro (owner D3 2026-10-12: short, clean scene); the type stays for other scenes
@@ -316,7 +316,8 @@ const scenes = Table.new({
 		Marks = {},
 		Beats = {},
 	},
-	-- Opening, ~32 s (FEAT-004; DEC-300, owner 2026-10-18, PROVISIONAL numbers: faster, no street crossing, ends at night;
+	-- Opening, ~29 s (FEAT-004; DEC-300, owner 2026-10-18, PROVISIONAL numbers: faster, no street crossing, ends at night;
+	-- the call shortened again the same day: Walt answers right away, ~3 s per line;
 	-- was 35 s from the north sidewalk across the Ninth, owner D3 2026-10-12 rev. 2).
 	-- It starts on the restaurant's OWN sidewalk, the side of the door with the metal bars, already walking along it
 	-- towards the flyer ("Poster>18,-46": 18 studs out of the flyer's face, 46 studs to its left), turns at the corner
@@ -324,13 +325,13 @@ const scenes = Table.new({
 	-- reads the live flyer: the route follows it when the user moves it in Studio). Reads it, calls Walt and ends looking at
 	-- the restaurant (MapPoint TRL) while the night falls over it (Nightfall: the day look leaves and LightController blends
 	-- to the night of the shift; the run starts on Night 1, DEC-300). The game fades in inside the restaurant, at night.
-	-- Lines are short (<= 6 words; Walt on the phone: 3 lines). The call is ~11 s of voice + pauses: Cap 35 = Duration + 3.
+	-- Lines are short (<= 6 words; Walt on the phone: 3 lines). The call is ~9 s of voice + pauses: Cap 32 = Duration + 3.
 	-- Starts once every participant's client is ready (Rules.ReadyTimeout), so the Intro phase cap (Shift.luau) covers
 	-- that wait + Cap.
 	{
 		Key = "intro",
-		Duration = 32,
-		Cap = 35,
+		Duration = 29,
+		Cap = 32,
 		Skippable = true,
 		Participants = "ConnectedAtStart",
 		Music = "lobby", -- PROVISIONAL stand-in for MUS-005 (Abertura); the shift track waits for the end of the chain
@@ -338,7 +339,7 @@ const scenes = Table.new({
 		Marks = { "Poster>18,-46" },
 		Cinema = true,
 		Look = "Cinematic",
-		Nightfall = { At = 26.4, Time = 4.5 },
+		Nightfall = { At = 23.4, Time = 4.5 },
 		-- Shots (owner request 2026-10-12, PROVISIONAL): the cuts follow the beats below.
 		Shots = {
 			-- 1 establishing: a detached camera behind and above the walker, craning down, over the title
@@ -375,7 +376,7 @@ const scenes = Table.new({
 			},
 			-- 4 the call: match cut through black on the number, slow push-in while it rings
 			{
-				At = 13,
+				At = 12.6,
 				Name = "Phone",
 				Cut = "Dip",
 				Fov = { 50, 36 },
@@ -385,7 +386,7 @@ const scenes = Table.new({
 				Rack = 2.5,
 			},
 			{
-				At = 21.4,
+				At = 18.6,
 				Name = "Drift",
 				Fov = { 36, 40 },
 				Orbit = { -7, 4 },
@@ -396,7 +397,7 @@ const scenes = Table.new({
 			},
 			-- 5 the restaurant: crane up to reveal it while the night falls over it
 			{
-				At = 26.4,
+				At = 23.4,
 				Name = "Reveal",
 				Fov = { 44, 54 },
 				Dolly = { Vector3.new(0, -0.8, 0), Vector3.new(0, 1.2, 0) },
@@ -421,18 +422,19 @@ const scenes = Table.new({
 			crew(11.8, "I'll call them.", "Solo"),
 			crew(11.8, "Let's call them.", "Party"),
 			-- Beat 3, the call (the number is only on the prompt and the flyer: nobody says digits)
-			focus(13, "Phone", 55),
-			{ At = 13.2, Kind = "Prompt", Target = "Phone", Text = `Call {PHONE}` },
-			{ At = 14.2, Kind = "Actor", Target = "FlipPhone" }, -- slot 1 only, already open (AST-038)
+			focus(12.6, "Phone", 55),
+			{ At = 12.8, Kind = "Prompt", Target = "Phone", Text = `Call {PHONE}` },
+			{ At = 13.6, Kind = "Actor", Target = "FlipPhone" }, -- slot 1 only, already open (AST-038)
 			-- the voice speaks sentence by sentence with a pause after . ? ! (Speech.Pieces); the hang-up (Actors
 			-- FLIP_TIME, after the flip beat) waits for the last line
-			walt(14.8, "Bramble's Corner Dogs. Walt here."),
-			walt(18.8, "You noticed the flyer. Good."),
-			walt(22.4, "Start tonight. Keys under the mustard."),
+			-- Walt picks up at once (owner 2026-10-18: a quicker call), ~3 s a line
+			walt(14, "Bramble's Corner Dogs. Walt here."),
+			walt(16.9, "You noticed the flyer. Good."),
+			walt(19.7, "Start tonight. Keys under the mustard."),
 			-- Beat 4: the flip closes (hang-up click), everyone turns to the restaurant (MapPoint TRL, eased) and holds on
 			-- it while the night falls (Nightfall); fade out; the game fades in inside the restaurant, at night
-			focus(26.4, "TRL", 55),
-			{ At = 30.6, Kind = "Fade", Target = "Out" },
+			focus(23.4, "TRL", 55),
+			{ At = 27.6, Kind = "Fade", Target = "Out" },
 		},
 	},
 	-- Dawn of Night 10, variant A1 (DEC-075, DEC-076); <= 60 s; MAP-01 §11.3 SS-1..4, WALT-1, RL-1 -> RL-END
