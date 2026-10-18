@@ -48,6 +48,11 @@
 --              where it is). Each step: Sound (default roof_step) above the ceiling, dust falling, lamps near it swaying
 --   HeadDown   (TASK-484) held: while it lasts, a look pitched above Value degrees is nudged softly back below the
 --              horizon (To degrees per nudge, <= Rules.MaxNudge); Value = 0 stops it. Helps, never locks
+--   Grade      (TASK-493, owner 2026-10-18 "distorção de cores") colour distortion of the whole screen: strength Value ->
+--              To (0..1) over Duration; Target "Cold" (default: drained, blue) | "Red" | "Sick" (green). Held; 0 = off
+--   Blur       (TASK-493) screen blur: Value -> To (0..Rules.MaxBlur) over Duration. Held; 0 = off
+--   Silence    (TASK-493, the dramatic pause) music, ambience and the kitchen fade to Value -> To (volume scale 0..1)
+--              over Duration; the Sfx (steps, heart, breath, the hit) are untouched. 1 = back
 -- Every number PROVISIONAL (DEC-290) until the owner's Play. Mild (DEC-172): no blood, scares <= 1 s, no clipped scream.
 local Table = require(script.Parent.Table)
 local Restaurant = require(script.Parent.Restaurant)
@@ -72,6 +77,9 @@ export type StepKind =
 	| "Shadow"
 	| "Roof"
 	| "HeadDown"
+	| "Grade"
+	| "Blur"
+	| "Silence"
 
 export type Step = {
 	At: number,
@@ -132,6 +140,7 @@ export type Rules = {
 	MaxNudge: number, -- degrees
 	-- degrees; a suspense event's camera hijack (CameraController:HorrorPull, Content.Suspense.Rules.Hijack.Pull), not a scene step
 	MaxPull: number,
+	MaxBlur: number, -- TASK-493: BlurEffect Size at most
 	Shakes: { [string]: ShakeProfile },
 }
 
@@ -204,6 +213,12 @@ const blackout: Scene = {
 		{ At = 0.3, Phase = "Resolved", Kind = "Sound", Target = "lamps_cascade" },
 		{ At = 0, Phase = "Resolved", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
 		{ At = 0, Phase = "Resolved", Kind = "Vignette", Value = 0, To = 0, Duration = 0.6 },
+		-- TASK-493: the colour drains out of the dark as the steps come; a blur on the push of the door
+		{ At = 5, Phase = "Active", Kind = "Grade", Target = "Cold", Value = 0, To = 0.6, Duration = 22 },
+		{ At = 28.2, Phase = "Active", Kind = "Blur", Value = 5, To = 0, Duration = 0.8 },
+		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Grade", Target = "Red", Value = 0.9, To = 0.35, Duration = 3 },
+		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Blur", Value = 14, To = 0, Duration = 1.5 },
+		{ At = 0, Phase = "Resolved", Kind = "Grade", Value = 0.6, To = 0, Duration = 1.5 },
 	},
 }
 
@@ -264,6 +279,23 @@ const roofWalker: Scene = {
 		{ At = 1.4, Phase = "Failed", Who = "Caught", Kind = "Vignette", Value = 0.5, To = 0, Duration = 3.5 },
 		{ At = 3.5, Phase = "Failed", Who = "Caught", Kind = "Heartbeat", Value = 0, To = 0 },
 		{ At = 3.5, Phase = "Failed", Kind = "Cinema", Value = 0, Duration = 1 },
+		-- TASK-493: drained colour; right above you the world goes quiet, then comes back as it walks on
+		{ At = 0.5, Phase = "Signal", Kind = "Grade", Target = "Cold", Value = 0, To = 0.25, Duration = 3 },
+		{ At = 0, Phase = "Active", Kind = "Grade", Target = "Cold", Value = 0.25, To = 0.55, Duration = 7 },
+		{ At = 7, Phase = "Active", Kind = "Silence", Value = 1, To = 0.1, Duration = 0.5 },
+		{ At = 7, Phase = "Active", Kind = "Blur", Value = 0, To = 2.5, Duration = 2.5 },
+		{ At = 9.5, Phase = "Active", Kind = "Silence", Value = 0.1, To = 1, Duration = 2 },
+		{ At = 9.5, Phase = "Active", Kind = "Blur", Value = 2.5, To = 0, Duration = 1.5 },
+		{ At = 9.5, Phase = "Active", Kind = "Grade", Value = 0.55, To = 0.25, Duration = 6 },
+		-- TASK-493: colour and sound come back
+		{ At = 0, Phase = "Resolved", Kind = "Silence", Value = 1, To = 1, Duration = 0 },
+		{ At = 0.4, Phase = "Resolved", Kind = "Grade", Value = 0.4, To = 0, Duration = 2 },
+		{ At = 0, Phase = "Resolved", Kind = "Blur", Value = 0, To = 0, Duration = 0 },
+		-- TASK-493: the hit on whoever was caught: red, blurred, then back
+		{ At = 0.6, Phase = "Failed", Who = "Caught", Kind = "Grade", Target = "Red", Value = 0.85, To = 0, Duration = 2.8 },
+		{ At = 0.6, Phase = "Failed", Who = "Caught", Kind = "Blur", Value = 12, To = 0, Duration = 1.4 },
+		{ At = 0.6, Phase = "Failed", Kind = "Silence", Value = 1, To = 1, Duration = 0 },
+		{ At = 2.1, Phase = "Failed", Who = "Safe", Kind = "Grade", Value = 0.4, To = 0, Duration = 2.5 },
 	},
 }
 
@@ -318,6 +350,25 @@ const crawler: Scene = {
 		{ At = 4, Phase = "Failed", Who = "Safe", Kind = "Heartbeat", Value = 0, To = 0 },
 		{ At = 1, Phase = "Failed", Who = "Safe", Kind = "Vignette", Value = 0.4, To = 0, Duration = 3 },
 		{ At = 4, Phase = "Failed", Kind = "Cinema", Value = 0, Duration = 1 },
+		-- TASK-493: sick colour while it is under the floor; one beat of silence, then it bursts out loud
+		{ At = 0.5, Phase = "Signal", Kind = "Grade", Target = "Sick", Value = 0, To = 0.45, Duration = 9 },
+		{ At = 9.3, Phase = "Signal", Kind = "Silence", Value = 1, To = 0.05, Duration = 0.4 },
+		{ At = 0, Phase = "Active", Kind = "Silence", Value = 0.05, To = 1, Duration = 0.2 },
+		{ At = 0, Phase = "Active", Kind = "Sound", Target = "horror_sting", Value = 1 },
+		{ At = 0, Phase = "Active", Kind = "Blur", Value = 7, To = 0, Duration = 0.9 },
+		{ At = 3, Phase = "Active", Kind = "Grade", Target = "Sick", Value = 0.45, To = 0.75, Duration = 1.5 },
+		{ At = 3, Phase = "Active", Kind = "Blur", Value = 0, To = 3, Duration = 1.5 },
+		{ At = 6, Phase = "Active", Kind = "Blur", Value = 3, To = 0, Duration = 2 },
+		{ At = 6, Phase = "Active", Kind = "Grade", Value = 0.75, To = 0.3, Duration = 3 },
+		-- TASK-493: colour and sound come back
+		{ At = 0, Phase = "Resolved", Kind = "Silence", Value = 1, To = 1, Duration = 0 },
+		{ At = 0.4, Phase = "Resolved", Kind = "Grade", Value = 0.4, To = 0, Duration = 2 },
+		{ At = 0, Phase = "Resolved", Kind = "Blur", Value = 0, To = 0, Duration = 0 },
+		-- TASK-493: the hit on whoever was caught: red, blurred, then back
+		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Grade", Target = "Red", Value = 0.85, To = 0, Duration = 2.8 },
+		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Blur", Value = 12, To = 0, Duration = 1.4 },
+		{ At = 0, Phase = "Failed", Kind = "Silence", Value = 1, To = 1, Duration = 0 },
+		{ At = 1.5, Phase = "Failed", Who = "Safe", Kind = "Grade", Value = 0.4, To = 0, Duration = 2.5 },
 	},
 }
 
@@ -352,6 +403,21 @@ const turnedNeck: Scene = {
 		{ At = 0, Phase = "Failed", Who = "Safe", Kind = "Sound", Target = "neck_crack", Point = "Q1" },
 		{ At = 0.8, Phase = "Failed", Kind = "Vignette", Value = 0.4, To = 0, Duration = 3 },
 		{ At = 2, Phase = "Failed", Kind = "Cinema", Value = 0, Duration = 1 },
+		-- TASK-493: the colour leaves the counter as she waits; the loud crack blurs the view
+		{ At = 2, Phase = "Active", Kind = "Grade", Target = "Cold", Value = 0, To = 0.32, Duration = 10 },
+		{ At = 10.6, Phase = "Active", Kind = "Silence", Value = 1, To = 0.2, Duration = 0.4 },
+		{ At = 11, Phase = "Active", Kind = "Silence", Value = 0.2, To = 1, Duration = 1.5 },
+		{ At = 11, Phase = "Active", Kind = "Blur", Value = 4, To = 0, Duration = 1 },
+		{ At = 16, Phase = "Active", Kind = "Grade", Value = 0.32, To = 0.12, Duration = 3 },
+		-- TASK-493: colour and sound come back
+		{ At = 0, Phase = "Resolved", Kind = "Silence", Value = 1, To = 1, Duration = 0 },
+		{ At = 0.4, Phase = "Resolved", Kind = "Grade", Value = 0.4, To = 0, Duration = 2 },
+		{ At = 0, Phase = "Resolved", Kind = "Blur", Value = 0, To = 0, Duration = 0 },
+		-- TASK-493: the hit on whoever was caught: red, blurred, then back
+		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Grade", Target = "Red", Value = 0.85, To = 0, Duration = 2.8 },
+		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Blur", Value = 12, To = 0, Duration = 1.4 },
+		{ At = 0, Phase = "Failed", Kind = "Silence", Value = 1, To = 1, Duration = 0 },
+		{ At = 1.5, Phase = "Failed", Who = "Safe", Kind = "Grade", Value = 0.4, To = 0, Duration = 2.5 },
 	},
 }
 
@@ -378,6 +444,17 @@ const copies: Scene = {
 		{ At = 0, Phase = "Failed", Kind = "Shake", Target = "Jolt" },
 		{ At = 0.2, Phase = "Failed", Kind = "Vignette", Value = 0.35, To = 0, Duration = 3 },
 		{ At = 2.5, Phase = "Failed", Kind = "Cinema", Value = 0, Duration = 1 },
+		{ At = 2, Phase = "Active", Kind = "Grade", Target = "Cold", Value = 0, To = 0.28, Duration = 8 },
+		{ At = 16, Phase = "Active", Kind = "Grade", Value = 0.28, To = 0.1, Duration = 3 },
+		-- TASK-493: colour and sound come back
+		{ At = 0, Phase = "Resolved", Kind = "Silence", Value = 1, To = 1, Duration = 0 },
+		{ At = 0.4, Phase = "Resolved", Kind = "Grade", Value = 0.4, To = 0, Duration = 2 },
+		{ At = 0, Phase = "Resolved", Kind = "Blur", Value = 0, To = 0, Duration = 0 },
+		-- TASK-493: the hit on whoever was caught: red, blurred, then back
+		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Grade", Target = "Red", Value = 0.85, To = 0, Duration = 2.8 },
+		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Blur", Value = 12, To = 0, Duration = 1.4 },
+		{ At = 0, Phase = "Failed", Kind = "Silence", Value = 1, To = 1, Duration = 0 },
+		{ At = 1.5, Phase = "Failed", Who = "Safe", Kind = "Grade", Value = 0.4, To = 0, Duration = 2.5 },
 	},
 }
 
@@ -416,6 +493,21 @@ const stalker: Scene = {
 		{ At = 3, Phase = "Failed", Who = "Safe", Kind = "Heartbeat", Value = 0, To = 0 },
 		{ At = 0.8, Phase = "Failed", Kind = "Vignette", Value = 0.45, To = 0, Duration = 2.5 },
 		{ At = 3, Phase = "Failed", Kind = "Cinema", Value = 0, Duration = 1 },
+		-- TASK-493: drained, cold street; at the glass the room goes silent for a breath, then the hit
+		{ At = 1, Phase = "Signal", Kind = "Grade", Target = "Cold", Value = 0, To = 0.45, Duration = 20 },
+		{ At = 0, Phase = "Active", Kind = "Silence", Value = 1, To = 0.05, Duration = 0.25 },
+		{ At = 0, Phase = "Active", Kind = "Sound", Target = "horror_sting", Value = 1 },
+		{ At = 0, Phase = "Active", Kind = "Blur", Value = 6, To = 1.5, Duration = 0.8 },
+		{ At = 0, Phase = "Active", Kind = "Grade", Target = "Cold", Value = 0.45, To = 0.7, Duration = 0.6 },
+		-- TASK-493: colour and sound come back
+		{ At = 0, Phase = "Resolved", Kind = "Silence", Value = 1, To = 1, Duration = 0 },
+		{ At = 0.4, Phase = "Resolved", Kind = "Grade", Value = 0.4, To = 0, Duration = 2 },
+		{ At = 0, Phase = "Resolved", Kind = "Blur", Value = 0, To = 0, Duration = 0 },
+		-- TASK-493: the hit on whoever was caught: red, blurred, then back
+		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Grade", Target = "Red", Value = 0.85, To = 0, Duration = 2.8 },
+		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Blur", Value = 12, To = 0, Duration = 1.4 },
+		{ At = 0, Phase = "Failed", Kind = "Silence", Value = 1, To = 1, Duration = 0 },
+		{ At = 1.5, Phase = "Failed", Who = "Safe", Kind = "Grade", Value = 0.4, To = 0, Duration = 2.5 },
 	},
 }
 
@@ -453,6 +545,22 @@ const longCar: Scene = {
 		{ At = 0, Phase = "Failed", Kind = "Heartbeat", Value = 0, To = 0 },
 		{ At = 0.5, Phase = "Failed", Kind = "Vignette", Value = 0.5, To = 0, Duration = 2.5 },
 		{ At = 2.5, Phase = "Failed", Kind = "Cinema", Value = 0, Duration = 1 },
+		-- TASK-493: colour drains as it comes; parked, everything but the engine goes silent; the beam blinds
+		{ At = 0.5, Phase = "Signal", Kind = "Grade", Target = "Cold", Value = 0, To = 0.4, Duration = 8 },
+		{ At = 8.4, Phase = "Signal", Kind = "Silence", Value = 1, To = 0.08, Duration = 0.6 },
+		{ At = 0, Phase = "Active", Kind = "Silence", Value = 0.08, To = 1, Duration = 0.3 },
+		{ At = 0, Phase = "Active", Kind = "Blur", Value = 12, To = 1, Duration = 1.2 },
+		{ At = 0, Phase = "Active", Kind = "Grade", Target = "Cold", Value = 0.85, To = 0.45, Duration = 2 },
+		{ At = 1.2, Phase = "Active", Kind = "Blur", Value = 1, To = 0, Duration = 4 },
+		-- TASK-493: colour and sound come back
+		{ At = 0, Phase = "Resolved", Kind = "Silence", Value = 1, To = 1, Duration = 0 },
+		{ At = 0.4, Phase = "Resolved", Kind = "Grade", Value = 0.4, To = 0, Duration = 2 },
+		{ At = 0, Phase = "Resolved", Kind = "Blur", Value = 0, To = 0, Duration = 0 },
+		-- TASK-493: the hit on whoever was caught: red, blurred, then back
+		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Grade", Target = "Red", Value = 0.85, To = 0, Duration = 2.8 },
+		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Blur", Value = 12, To = 0, Duration = 1.4 },
+		{ At = 0, Phase = "Failed", Kind = "Silence", Value = 1, To = 1, Duration = 0 },
+		{ At = 1.5, Phase = "Failed", Who = "Safe", Kind = "Grade", Value = 0.4, To = 0, Duration = 2.5 },
 	},
 }
 
@@ -487,6 +595,23 @@ const hush: Scene = {
 		{ At = 0, Phase = "Failed", Kind = "Heartbeat", Value = 0, To = 0 },
 		{ At = 0.5, Phase = "Failed", Kind = "Vignette", Value = 0.4, To = 0, Duration = 2.5 },
 		{ At = 2.5, Phase = "Failed", Kind = "Cinema", Value = 0, Duration = 1 },
+		-- TASK-493: colour drains with every lamp; at the corner post the world goes mute (the Hush), then slowly back
+		{ At = 1, Phase = "Active", Kind = "Grade", Target = "Cold", Value = 0, To = 0.55, Duration = 14 },
+		{ At = 15, Phase = "Active", Kind = "Silence", Value = 1, To = 0.08, Duration = 1.2 },
+		{ At = 15, Phase = "Active", Kind = "Blur", Value = 0, To = 2, Duration = 3 },
+		{ At = 30, Phase = "Active", Kind = "Silence", Value = 0.08, To = 0.6, Duration = 6 },
+		{ At = 30, Phase = "Active", Kind = "Blur", Value = 2, To = 0, Duration = 4 },
+		{ At = 36, Phase = "Active", Kind = "Grade", Value = 0.55, To = 0.2, Duration = 4 },
+		{ At = 36, Phase = "Active", Kind = "Silence", Value = 0.6, To = 1, Duration = 2 },
+		-- TASK-493: colour and sound come back
+		{ At = 0, Phase = "Resolved", Kind = "Silence", Value = 1, To = 1, Duration = 0 },
+		{ At = 0.4, Phase = "Resolved", Kind = "Grade", Value = 0.4, To = 0, Duration = 2 },
+		{ At = 0, Phase = "Resolved", Kind = "Blur", Value = 0, To = 0, Duration = 0 },
+		-- TASK-493: the hit on whoever was caught: red, blurred, then back
+		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Grade", Target = "Red", Value = 0.85, To = 0, Duration = 2.8 },
+		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Blur", Value = 12, To = 0, Duration = 1.4 },
+		{ At = 0, Phase = "Failed", Kind = "Silence", Value = 1, To = 1, Duration = 0 },
+		{ At = 1.5, Phase = "Failed", Who = "Safe", Kind = "Grade", Value = 0.4, To = 0, Duration = 2.5 },
 	},
 }
 
@@ -517,6 +642,13 @@ local function oddScene(key: string, name: string, words: string, sting: string?
 			{ At = 0, Phase = "Failed", Who = "Safe", Kind = "Shake", Target = "Jolt" },
 			{ At = 0.8, Phase = "Failed", Kind = "Vignette", Value = 0.4, To = 0, Duration = 3 },
 			{ At = 2, Phase = "Failed", Kind = "Cinema", Value = 0, Duration = 1 },
+			-- TASK-493: drained colour while it waits; the hit on whoever took its order
+			{ At = 2, Phase = "Active", Kind = "Grade", Target = "Cold", Value = 0, To = 0.25, Duration = 8 },
+			{ At = 16, Phase = "Active", Kind = "Grade", Value = 0.25, To = 0.08, Duration = 3 },
+			{ At = 0.4, Phase = "Resolved", Kind = "Grade", Value = 0.25, To = 0, Duration = 2 },
+			{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Grade", Target = "Red", Value = 0.85, To = 0, Duration = 2.8 },
+			{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Blur", Value = 12, To = 0, Duration = 1.4 },
+			{ At = 1.5, Phase = "Failed", Who = "Safe", Kind = "Grade", Value = 0.25, To = 0, Duration = 2 },
 		},
 	}
 end
@@ -729,6 +861,7 @@ const rules: Rules = {
 	MaxFov = 6,
 	MaxNudge = 3,
 	MaxPull = 30, -- TASK-481 (DEC-294), Provisional
+	MaxBlur = 18, -- TASK-493, Provisional (readable through it)
 	Shakes = {
 		Jolt = { Amplitude = 0.12, Frequency = 18, Duration = 0.15 },
 		Step = { Amplitude = 0.03, Frequency = 10, Duration = 0.12 },

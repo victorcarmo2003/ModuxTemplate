@@ -2476,7 +2476,7 @@ local function checkHorrorScenes()
 	const doors = setOf({ "Rattle", "Push", "Hold", "Lock" })
 	const needPoint = setOf({ "Door", "Shadow", "Nudge" }) -- Actor: only the eyes (no Target) need one
 	const seens = setOf({ "All", "Cameras" })
-	const kinds = setOf({ "Sound", "Music", "Lights", "Lightning", "Whispers", "Heartbeat", "Cinema", "Vignette", "Shake", "Fov", "Nudge", "Text", "Actor", "Door", "Shadow", "Roof", "HeadDown" })
+	const kinds = setOf({ "Sound", "Music", "Lights", "Lightning", "Whispers", "Heartbeat", "Cinema", "Vignette", "Shake", "Fov", "Nudge", "Text", "Actor", "Door", "Shadow", "Roof", "HeadDown", "Grade", "Blur", "Silence" })
 	const roofs = setOf({ "Walk", "Leave", "Thud" })
 	for index, scene in HorrorScenes.List do
 		const key = scene.Key
@@ -2568,6 +2568,19 @@ local function checkHorrorScenes()
 				if step.Sound ~= nil and Sounds.ByKey[step.Sound] == nil then
 					fail("HorrorScenes", index, key, `{where} Roof Sound '{step.Sound}' is not a Content.Sounds key`)
 				end
+			elseif step.Kind == "Grade" then
+				-- TASK-493: strength 0..1, Target Cold | Red | Sick
+				inRange("HorrorScenes", index, key, `{where}.Value`, step.Value or 0, 0, 1)
+				inRange("HorrorScenes", index, key, `{where}.To`, (step.To :: number?) or 0, 0, 1)
+				if step.Target ~= nil and step.Target ~= "Cold" and step.Target ~= "Red" and step.Target ~= "Sick" then
+					fail("HorrorScenes", index, key, `{where} Grade Target '{step.Target}' is not Cold, Red or Sick`)
+				end
+			elseif step.Kind == "Blur" then
+				inRange("HorrorScenes", index, key, `{where}.Value`, step.Value or 0, 0, rules.MaxBlur)
+				inRange("HorrorScenes", index, key, `{where}.To`, (step.To :: number?) or 0, 0, rules.MaxBlur)
+			elseif step.Kind == "Silence" then
+				inRange("HorrorScenes", index, key, `{where}.Value`, step.Value or 0, 0, 1)
+				inRange("HorrorScenes", index, key, `{where}.To`, (step.To :: number?) or 0, 0, 1)
 			elseif step.Kind == "HeadDown" then
 				-- TASK-484: Value = pitch (degrees, 0 = stop), To = nudge degrees (<= MaxNudge)
 				inRange("HorrorScenes", index, key, `{where}.Value`, step.Value or 0, 0, 80)

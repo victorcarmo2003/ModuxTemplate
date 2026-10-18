@@ -46,6 +46,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 local Content = require(ReplicatedStorage.shared.Content)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
+local Sight = require(ReplicatedStorage.shared.Anomaly.Sight)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 local Api = require(script.Api)
 local Rules = require(script.Rules)
@@ -390,7 +391,8 @@ local function blocked(from: Vector3, to: Vector3): boolean
 	end
 	params.FilterDescendantsInstances = ignore
 	params.IgnoreWater = true
-	return workspace:Raycast(from, offset.Unit * (distance - TARGET_SLACK), params) ~= nil
+	-- TASK-493: glass and invisible barriers (the counter's) do not block the view
+	return not Sight.Clear(from, offset.Unit * (distance - TARGET_SLACK), params)
 end
 
 function AnomalyService:Looking(player: Player, target: Vector3, range: number, angle: number?): boolean

@@ -22,7 +22,10 @@
 	                       lamps near it swaying (local CFrame, put back at the end), a small camera thump when close
 	HeadDown (TASK-484)  while held, a look pitched up past Value degrees gets a soft nudge back below the horizon (To
 	                       degrees <= Rules.MaxNudge, 0.45 s each, every 0.5 s at most): it helps, it never locks
-	Presentation only, client side, nothing replicated. Every handler registers its undo in state.Undo so the end of the
+	Grade / Blur (TASK-493)  a ColorCorrectionEffect / BlurEffect of our own in Lighting (HorrorGrade, HorrorBlur),
+                       eased with a heartbeat-sized tremble; Silence (TASK-493) eases SoundService Master > Music,
+                       Ambient and Sfx > Kitchen down (the dramatic pause) and back
+Presentation only, client side, nothing replicated. Every handler registers its undo in state.Undo so the end of the
 	run (record gone) leaves the world as it was.
 ]]
 local CollectionService = game:GetService("CollectionService")
@@ -1154,6 +1157,171 @@ const headDown: Handler = function(_ctx, state, step, late)
 	end)
 end
 
+-- Grade / Blur / Silence (TASK-493) ---------------------------------------------------------------------------------
+
+const Lighting = game:GetService("Lighting")
+const GRADE_NAME = "HorrorGrade"
+const BLUR_NAME = "HorrorBlur"
+const GRADE_TINTS: { [string]: Color3 } = {
+	Cold = Color3.fromRGB(196, 212, 255),
+	Red = Color3.fromRGB(255, 176, 170),
+	Sick = Color3.fromRGB(208, 255, 196),
+}
+const SILENCE_GROUPS = { { "Master", "Music" }, { "Master", "Ambient" }, { "Master", "Sfx", "Kitchen" } }
+
+-- Eases `from` -> `to` over `seconds`, calling `apply(value)` every frame; returns the stop function.
+local function ease(from: number, to: number, seconds: number, apply: (number) -> ()): () -> ()
+	if seconds <= 0 then
+		apply(to)
+		return function() end
+	end
+	const started = os.clock()
+	local connection: RBXScriptConnection? = nil
+	connection = RunService.RenderStepped:Connect(function()
+		const t = math.clamp((os.clock() - started) / seconds, 0, 1)
+		const e = t * t * (3 - 2 * t)
+		apply(from + (to - from) * e)
+		if t >= 1 and connection ~= nil then
+			connection:Disconnect()
+			connection = nil
+		end
+	end)
+	return function()
+		if connection ~= nil then
+			connection:Disconnect()
+			connection = nil
+		end
+	end
+end
+
+local function effectOf(className: string, name: string): Instance
+	const existing = Lighting:FindFirstChild(name)
+	if existing ~= nil and existing.ClassName == className then
+		return existing
+	end
+	const created = Instance.new(className)
+	created.Name = name
+	created.Parent = Lighting
+	return created
+end
+
+const gradeLevel: { [string]: number } = {} -- scene key -> current strength (the strongest one shows)
+local gradeTint = "Cold"
+local gradeStop: (() -> ())? = nil
+
+const grade: Handler = function(_ctx, state, step, late)
+	const effect = effectOf("ColorCorrectionEffect", GRADE_NAME) :: ColorCorrectionEffect
+	const from = step.Value or 0
+	const to = if type(step.To) == "number" then step.To else from
+	gradeTint = step.Target or gradeTint
+	const tint = GRADE_TINTS[gradeTint] or GRADE_TINTS.Cold
+	if gradeStop ~= nil then
+		gradeStop()
+	end
+	gradeStop = ease(from, to, math.max((step.Duration or 0) - late, 0), function(v: number)
+		gradeLevel[state.Key] = v
+		local strongest = 0
+		for _, level in gradeLevel do
+			strongest = math.max(strongest, level)
+		end
+		effect.Saturation = -0.75 * strongest
+		effect.Contrast = 0.32 * strongest
+		effect.Brightness = -0.06 * strongest
+		effect.TintColor = Color3.new(1, 1, 1):Lerp(tint, strongest)
+		effect.Enabled = strongest > 0.001
+	end)
+	state.Undo.grade = function()
+		if gradeStop ~= nil then
+			gradeStop()
+			gradeStop = nil
+		end
+		gradeLevel[state.Key] = nil
+		if next(gradeLevel) == nil then
+			effect:Destroy()
+		end
+	end
+end
+
+local blurStop: (() -> ())? = nil
+
+const blur: Handler = function(_ctx, state, step, late)
+	const effect = effectOf("BlurEffect", BLUR_NAME) :: BlurEffect
+	const max = Content.HorrorScenes.Rules.MaxBlur
+	const from = math.clamp(step.Value or 0, 0, max)
+	const to = math.clamp(if type(step.To) == "number" then step.To else from, 0, max)
+	if blurStop ~= nil then
+		blurStop()
+	end
+	blurStop = ease(from, to, math.max((step.Duration or 0) - late, 0), function(v: number)
+		effect.Size = v
+		effect.Enabled = v > 0.05
+	end)
+	state.Undo.blur = function()
+		if blurStop ~= nil then
+			blurStop()
+			blurStop = nil
+		end
+		effect:Destroy()
+	end
+end
+
+type Ducked = { Group: SoundGroup, Base: number }
+local ducked: { Ducked }? = nil
+local silenceStop: (() -> ())? = nil
+local silenceLevel = 1
+
+local function silenceGroups(): { Ducked }
+	if ducked ~= nil then
+		return ducked
+	end
+	const out: { Ducked } = {}
+	for _, path in SILENCE_GROUPS do
+		local node: Instance? = SoundService
+		for _, name in path do
+			node = if node ~= nil then node:FindFirstChild(name) else nil
+		end
+		if node ~= nil and node:IsA("SoundGroup") then
+			table.insert(out, { Group = node, Base = node.Volume })
+		end
+	end
+	ducked = out
+	return out
+end
+
+local function restoreSilence()
+	if silenceStop ~= nil then
+		silenceStop()
+		silenceStop = nil
+	end
+	const list = ducked
+	if list ~= nil then
+		for _, item in list do
+			item.Group.Volume = item.Base
+		end
+	end
+	ducked = nil
+	silenceLevel = 1
+end
+
+const silence: Handler = function(_ctx, state, step, late)
+	const list = silenceGroups()
+	const from = math.clamp(step.Value or silenceLevel, 0, 1)
+	const to = math.clamp(if type(step.To) == "number" then step.To else from, 0, 1)
+	if silenceStop ~= nil then
+		silenceStop()
+	end
+	silenceStop = ease(from, to, math.max((step.Duration or 0) - late, 0), function(v: number)
+		silenceLevel = v
+		for _, item in list do
+			item.Group.Volume = item.Base * v
+		end
+		if v >= 0.999 and to >= 0.999 then
+			restoreSilence()
+		end
+	end)
+	state.Undo.silence = restoreSilence
+end
+
 const Kits = {}
 
 -- Called once by AnomalyController after Scene.Start (needs CameraController).
@@ -1173,6 +1341,9 @@ function Kits.Register(handle: (kind: Content.HorrorStepKind, handler: Handler) 
 	handle("Actor", actor)
 	handle("Roof", roofStepHandler)
 	handle("HeadDown", headDown)
+	handle("Grade", grade)
+	handle("Blur", blur)
+	handle("Silence", silence)
 end
 
 -- The camera kit given to Register (Effects/ANM-019 punches the view of the caught player with it); nil before

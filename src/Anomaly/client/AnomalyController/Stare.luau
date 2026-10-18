@@ -29,6 +29,7 @@ local SoundService = game:GetService("SoundService")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Workspace = game:GetService("Workspace")
 local Content = require(ReplicatedStorage.shared.Content)
+local Sight = require(ReplicatedStorage.shared.Anomaly.Sight)
 local Motion = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Motion)
 local Effect = require(script.Parent.Effect)
 local Screen = require(script.Parent.Effects.Kit.Screen)
@@ -144,7 +145,7 @@ local function inSight(context: Effect.Context, head: BasePart, model: Model, ra
 	end
 	params.FilterDescendantsInstances = ignore
 	params.IgnoreWater = true
-	return Workspace:Raycast(eye, offset, params) == nil
+	return Sight.Clear(eye, offset, params) -- TASK-493: glass / invisible barriers do not hide it
 end
 
 -- Heart ----------------------------------------------------------------------------------------------------------------

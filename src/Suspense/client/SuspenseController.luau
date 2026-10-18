@@ -25,6 +25,7 @@ local StarterPlayer = game:GetService("StarterPlayer")
 local Workspace = game:GetService("Workspace")
 local Content = require(ReplicatedStorage.shared.Content)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
+local Sight = require(ReplicatedStorage.shared.Anomaly.Sight)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Kit = StarterPlayer.StarterPlayerScripts.client.Anomaly.AnomalyController.Effects.Kit
 local Hide = require(Kit.Hide)
@@ -141,7 +142,7 @@ function SuspenseController:Glanced(show: Show): boolean
 	then
 		return false
 	end
-	return Workspace:Raycast(origin, offset, exclude({ show.Model })) == nil
+	return Sight.Clear(origin, offset, exclude({ show.Model })) -- TASK-493: glass / invisible barriers
 end
 
 -- The scare, once per event on this client.
