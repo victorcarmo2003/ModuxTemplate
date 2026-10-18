@@ -319,7 +319,7 @@ Orçamento: 3 cozinha + 1 despensa + 5 pátio + 1 DT = **10 locais** (teto 18); 
 | AN-R04 | **Mesas à noite** TBL-1..4 + LIT-T (todas olham, lugar extra, luminária que apaga) | balcão inteiro | ANM-005, 010, 016, 030 |
 | AN-R05 | **Portão** R-GATE (figura que para e não entra) | balcão, reto pelo corredor do meio (~22) | fim de rota do Walker: `WALKER-10` movido para (36; 28) (`Q-319`) |
 | AN-R06 | **Fila de carros** e DT-MENU (faróis parados) | janela do DT e pátio entre os arbustos | ANM-031/032 |
-| AN-R07 | **Telhado** (passos), descida pela fachada até o balcão | som na cozinha; descida vista pelo vidro | ANM-019 |
+| AN-R07 | **Telhado** (passos), descida pela fachada até o balcão | som na cozinha; descida vista pelo vidro | ANM-019 (TASK-484: a caminhada é posta sobre cada jogador pelo client, sem MapPoint; a queda usa o vidro à frente dele) |
 | AN-R08 | **Despensa**: DOOR-P (tranca, janelinha) e HATCH-L (batidas, abre sozinha) | corredor do fundo | ANM-009, 004 (tranca), sustos D |
 | AN-R09 | **Grelhas** + GAS-1 | corredor do fundo | ANM-025 |
 | AN-R10 | **Arbustos** BUSH-R (olhos) | balcão, ponta do tablet | sustos D |

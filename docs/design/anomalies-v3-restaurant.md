@@ -263,7 +263,7 @@ Campos de todas: **Aceite** inclui sempre o teste da regra 13 (≤ 3 s, 2 postos
 | ANM-016 Não pisca | **Sai** | sutil ("olhar fixo" se confunde com o cliente normal olhando o jogador) |
 | ANM-017 | **Adapta** | ex-família B: em vez de esconder, FRONT antes de ele chegar |
 | ANM-018 O Sorriso | **Sai** | o rosto na vitrine já é susto D (`window_face`); sem verbo próprio |
-| ANM-019 Sombra no teto | **Sai** | o teto não é visível de dentro (regra 3) |
+| ANM-019 Sombra no teto | ~~Sai~~ **Volta (TASK-484)** | o teto não é visível de dentro (regra 3) — por isso a regra virou "não olhe para cima": só se ouve e se sente (passos, poeira, lâmpadas); `horror-cinematic.md` §6.1 |
 | ANM-020 | **Adapta** | disjuntor dentro da loja, na coluna de controle |
 
 ### 8.2 ANM-021..040 (da versão 1)

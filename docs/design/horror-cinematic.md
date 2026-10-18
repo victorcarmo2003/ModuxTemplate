@@ -107,7 +107,30 @@ O apagão virou a referência ("efeito de cinema"). As outras anomalias precisam
 | ANM-017 Rastejador | aprovado ("subir no balcão") | arranhão sob o assoalho → corre pela cozinha → os jogadores precisam **sair do chão** (subir no balcão); quem fica no chão quando ele passa paga |
 | ANM-012 Pescoço invertido | gostou, mas falta terror | soma a **pressão de encarar** (§8): encarar demais faz a cabeça girar devagar seguindo o jogador, estalos, coração acelera, bordas da tela escurecem piscando, sanidade cai, whispers "STOP STARING", "DON'T LOOK" |
 | ANM-004 A Cópia | gostou; ligar à pressão mental | a cópia vira a cabeça antes; encarar ativa a pressão (§8) com distorção leve do rosto; whispers trocam para "DON'T LOOK AT IT" |
-| ANM-019 Sombra no teto | conceito "genial", mas não há nada que leve o jogador para fora | **replanejar**: em vez de punir quem sai, punir **quem olha para cima** ou **quem olha as câmeras** enquanto ela anda no teto (Q-367) |
+| ANM-019 Sombra no teto | conceito "genial", mas não há nada que leve o jogador para fora | **Implementado (TASK-484, Q-367 A / DEC-295): "não olhe para cima"** — enquanto ela anda no teto, quem olha para cima paga; roteiro em §6.1 |
+
+### 6.1 ANM-019 Sombra no teto — "não olhe para cima" (TASK-484, Provisório)
+
+Regra (servidor, `Rules/ANM-019`, T10): enquanto ela anda, o servidor lê o `Gaze` de cada jogador ativo (pitch da câmera,
+10 Hz). Câmera **acima de 35°** por **0,6 s seguidos** = pegou (olhada rápida < ~0,5 s é perdoada; sem `Gaze` fresco —
+terceira pessoa, câmeras de segurança, lag — nunca conta). O 1º segundo da caminhada também é perdoado (o reflexo de olhar
+no baque). Quem é pego paga **−RuleBroken** de sanidade (`ctx.Fail`, como toda regra quebrada; sem desmaio por si só) e a
+caminhada acaba ali. Ninguém olhou até o fim = **Resolved**. Sem ator, sem HideZone: funciona no trailer e no restaurante
+(a caminhada passa sobre a cabeça de cada jogador). Volta à agenda do restaurante (sai do corte da TASK-390) e é de novo a
+estreia da noite 9; nunca junto com o apagão (`ExclusiveWith`).
+
+| Fase (s) | Todos | Só quem olhou (Caught) | Os outros (Safe) |
+|---|---|---|---|
+| Signal 0–3 | **baque** numa ponta do teto (poeira, lâmpadas balançam, solavanco), barras de cinema, whispers "DON'T LOOK UP / KEEP YOUR HEAD DOWN / IT'S ON THE ROOF", coração 70→90, respiração; quem estava nas câmeras volta para a cabeça | — | — |
+| Active 0–7 | passos pesados atravessando o teto até **em cima do jogador**, poeira a cada passo, lâmpadas perto balançando, tranco leve da câmera quando perto; whispers sobem; coração 90→140; bordas escurecem; **empurrão suave para baixo** se a câmera passa de 20° (3° por vez, nunca trava) | — | — |
+| Active 7–9,5 | **para em cima**: silêncio das palavras, coração 150–160, respiração, depois uma rajada de DON'T LOOK UP em massa | — | — |
+| Active 9,5–16 | segue até a outra ponta, palavras e coração baixando | — | — |
+| Failed (alguém olhou) | barras saem aos 3,5 s | a sombra **cai de cabeça para baixo na frente da janela** para onde ele olha, pendura com olhos brancos, tranco + FOV + puxão leve para ela, depois o rosto (`Kit/Jumpscare`, 0,6 s) e ela é puxada de volta (~1,4 s, `Effects/ANM-019`) | baque dela pulando do teto, whoosh, passos correndo e sumindo |
+| Resolved (ninguém olhou) | baque dela saltando da outra ponta, bordas e barras voltam | — | — |
+
+Kit novo (`Scene/Kits`): passos `Roof` (Walk / Leave / Thud ao longo de uma linha pela posição do jogador; som acima do
+forro, poeira caindo, lâmpadas balançando localmente) e `HeadDown` (empurrão para baixo enquanto dura). Música: Uneasy no
+aviso, Tension (rampa de 16 s) na caminhada. Números todos Provisórios até o Play do dono.
 
 ## 7. Eventos de suspense (novo sistema, DEC-294)
 

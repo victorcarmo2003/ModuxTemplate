@@ -16,6 +16,12 @@
 	                       arrival. Its Sound plays on a "Feet" part of the model at each step. Seen "Cameras": every part
 	                       LocalTransparencyModifier 1, lights / particles / guis off and no shadow, unless Kit/Watch says
 	                       this client looks through a security camera (switched live on Watch.Changed)
+	Roof (TASK-484)      heavy steps on the roof along a line through this client's position (seeded heading): Walk
+	                       from Value to To (fractions of the line) over Duration, Leave (from where it is, fading), Thud
+	                       (one landing). Each step: Sound (roof_step) just above the ceiling, dust falling under it, the
+	                       lamps near it swaying (local CFrame, put back at the end), a small camera thump when close
+	HeadDown (TASK-484)  while held, a look pitched up past Value degrees gets a soft nudge back below the horizon (To
+	                       degrees <= Rules.MaxNudge, 0.45 s each, every 0.5 s at most): it helps, it never locks
 	Presentation only, client side, nothing replicated. Every handler registers its undo in state.Undo so the end of the
 	run (record gone) leaves the world as it was.
 ]]
@@ -733,10 +739,393 @@ const cinemaStep: Handler = function(_ctx, state, step, late)
 	end
 end
 
+-- Roof: something heavy on the roof, overhead (TASK-484, ANM-019) -------------------------------------------------------
+
+-- The walk is a line across the roof through this client's own position (seeded heading: the same on every client),
+-- so it always passes right over the player's head. Each step: the step sound just above the ceiling, a puff of dust
+-- under it, the lamps near it swaying, a faint camera thump when it is close.
+const ROOF_HALF = 30 -- studs from the middle of the walk to each end
+const ROOF_STRIDE = 4.5 -- studs between two steps
+const ROOF_SIDE = 0.8 -- studs left / right of the line (left foot, right foot)
+const ROOF_PROBE = 40 -- studs up from the eye to find the ceiling
+const ROOF_OPEN = 10 -- studs above the eye when there is no ceiling (outside)
+const ROOF_ABOVE = 1.5 -- studs above the ceiling the steps sound
+const ROOF_STEP_KEY = "roof_step"
+const ROOF_LAND_KEY = "steps_stop"
+const ROOF_THUMP_RANGE = 14 -- studs (flat): closer steps shake the camera a little
+const ROOF_SWAY_RANGE = 20 -- studs (flat) from a step to the lamps it sways
+const ROOF_LAMP_PARTS = 8 -- a lamp Model with more parts than this is a building: only the part itself sways
+const SWAY_MAX = math.rad(9)
+const SWAY_STEP = math.rad(3.5)
+const SWAY_THUD = math.rad(8)
+const SWAY_REST = math.rad(0.15)
+const SWAY_RATE = 4.2 -- rad/s of the swing
+const SWAY_DAMP = 1.1 -- 1/s
+const DUST_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
+const DUST_COLOR = Color3.fromRGB(140, 123, 102)
+const GRIT_COLOR = Color3.fromRGB(84, 72, 60)
+const DUST_LIFE = 3 -- s a dust / step carrier part lives
+
+type Lamp = {
+	Parts: { BasePart },
+	Origins: { CFrame },
+	Pivot: Vector3, -- top of the lamp: it swings from there
+	Energy: number, -- swing amplitude (rad)
+	Clock: number,
+}
+
+type RoofRun = {
+	From: Vector3,
+	To: Vector3,
+	At: number, -- fraction 0..1 of the line where the last step fell
+	Lamps: { Lamp }?,
+	Sway: RBXScriptConnection?,
+	Walk: number, -- token of the walk playing (a new one stops the old)
+}
+
+local cameraRef: Camera? = nil
+const roofRuns: { [State]: RoofRun } = setmetatable({}, { __mode = "k" }) :: any
+
+-- Every anchored part holding a Light under root, with the small Model around it (the lamp shade, the cord)
+local function lampsOf(root: Instance): { Lamp }
+	const out: { Lamp } = {}
+	const taken: { [BasePart]: boolean } = {}
+	for _, light in root:GetDescendants() do
+		if not light:IsA("Light") then
+			continue
+		end
+		const part = light.Parent
+		if part == nil or not part:IsA("BasePart") or not part.Anchored or taken[part] then
+			continue
+		end
+		local parts: { BasePart } = { part }
+		const model = part.Parent
+		if model ~= nil and model ~= root and model:IsA("Model") then
+			const pieces: { BasePart } = {}
+			for _, piece in model:GetDescendants() do
+				if piece:IsA("BasePart") and piece.Anchored and not taken[piece] then
+					table.insert(pieces, piece)
+				end
+			end
+			if #pieces <= ROOF_LAMP_PARTS then
+				parts = pieces
+			end
+		end
+		local top = -math.huge
+		local center = Vector3.zero
+		const origins: { CFrame } = {}
+		for _, piece in parts do
+			taken[piece] = true
+			table.insert(origins, piece.CFrame)
+			top = math.max(top, piece.Position.Y + piece.Size.Y / 2)
+			center += piece.Position
+		end
+		center /= #parts
+		table.insert(out, {
+			Parts = parts,
+			Origins = origins,
+			Pivot = Vector3.new(center.X, top, center.Z),
+			Energy = 0,
+			Clock = 0,
+		})
+	end
+	return out
+end
+
+local function restoreLamps(run: RoofRun)
+	const sway = run.Sway
+	if sway ~= nil then
+		sway:Disconnect()
+		run.Sway = nil
+	end
+	for _, lamp in run.Lamps or {} do
+		for index, piece in lamp.Parts do
+			if piece.Parent ~= nil then
+				piece.CFrame = lamp.Origins[index]
+			end
+		end
+		lamp.Energy = 0
+	end
+end
+
+-- The run's walk line (built on its first Roof step; undone with the run)
+local function roofRun(state: State): RoofRun
+	const existing = roofRuns[state]
+	if existing ~= nil then
+		return existing
+	end
+	const character = Players.LocalPlayer.Character
+	const root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
+	const view = Workspace.CurrentCamera
+	const center = if root ~= nil and root:IsA("BasePart")
+		then root.Position
+		elseif view ~= nil then view.CFrame.Position
+		else Vector3.zero
+	const heading = state.Rng:NextNumber(0, math.pi * 2)
+	const direction = Vector3.new(math.cos(heading), 0, math.sin(heading))
+	const run: RoofRun = {
+		From = center - direction * ROOF_HALF,
+		To = center + direction * ROOF_HALF,
+		At = 0,
+		Lamps = nil,
+		Sway = nil,
+		Walk = 0,
+	}
+	roofRuns[state] = run
+	state.Undo.roof = function()
+		run.Walk += 1
+		restoreLamps(run)
+		roofRuns[state] = nil
+	end
+	return run
+end
+
+local function swing(run: RoofRun)
+	if run.Sway ~= nil then
+		return
+	end
+	run.Sway = RunService.Heartbeat:Connect(function(dt: number)
+		local moving = false
+		for _, lamp in run.Lamps or {} do
+			if lamp.Energy <= 0 then
+				continue
+			end
+			lamp.Clock += dt
+			lamp.Energy *= math.exp(-SWAY_DAMP * dt)
+			if lamp.Energy < SWAY_REST then
+				lamp.Energy = 0
+			else
+				moving = true
+			end
+			const angle = lamp.Energy * math.sin(lamp.Clock * SWAY_RATE)
+			const pivot = CFrame.new(lamp.Pivot)
+			const turn = pivot * CFrame.Angles(angle, 0, angle * 0.6) * pivot:Inverse()
+			for index, piece in lamp.Parts do
+				if piece.Parent ~= nil then
+					piece.CFrame = if lamp.Energy > 0 then turn * lamp.Origins[index] else lamp.Origins[index]
+				end
+			end
+		end
+		const sway = run.Sway
+		if not moving and sway ~= nil then
+			sway:Disconnect()
+			run.Sway = nil
+		end
+	end)
+end
+
+local function kickLamps(run: RoofRun, at: Vector3, range: number, amount: number)
+	if run.Lamps == nil then
+		run.Lamps = lampsOf(restaurant() or Workspace)
+	end
+	local any = false
+	for _, lamp in run.Lamps :: { Lamp } do
+		const offset = lamp.Pivot - at
+		const distance = Vector2.new(offset.X, offset.Z).Magnitude
+		if distance <= range then
+			lamp.Energy = math.min(SWAY_MAX, lamp.Energy + amount * (1 - distance / range))
+			any = true
+		end
+	end
+	if any then
+		swing(run)
+	end
+end
+
+-- Y of the ceiling underside above `at` (eye height), or open sky above it
+local function ceilingAt(ctx: Effect.Context, at: Vector3): number
+	const params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	const ignore: { Instance } = { ctx.Folder() }
+	const character = Players.LocalPlayer.Character
+	if character ~= nil then
+		table.insert(ignore, character)
+	end
+	params.FilterDescendantsInstances = ignore
+	params.IgnoreWater = true
+	const hit = Workspace:Raycast(at, Vector3.new(0, ROOF_PROBE, 0), params)
+	return if hit ~= nil then hit.Position.Y else at.Y + ROOF_OPEN
+end
+
+local function carrierAt(ctx: Effect.Context, name: string, at: Vector3, size: Vector3): Part
+	const part = Instance.new("Part")
+	part.Name = name
+	part.Size = size
+	part.Transparency = 1
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	part.CastShadow = false
+	part.Position = at
+	part.Parent = ctx.Folder()
+	task.delay(DUST_LIFE, part.Destroy, part)
+	return part
+end
+
+-- A puff of dust and a few grains falling from the ceiling at `at`
+local function dust(ctx: Effect.Context, at: Vector3, amount: number)
+	const part = carrierAt(ctx, "HorrorScene_Dust", at, Vector3.new(2, 0.2, 2))
+	const puff = Instance.new("ParticleEmitter")
+	puff.Texture = DUST_TEXTURE
+	puff.Color = ColorSequence.new(DUST_COLOR)
+	puff.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.25), NumberSequenceKeypoint.new(1, 1.1) })
+	puff.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.55), NumberSequenceKeypoint.new(1, 1) })
+	puff.Lifetime = NumberRange.new(1.2, 2.2)
+	puff.Speed = NumberRange.new(0.4, 1.4)
+	puff.SpreadAngle = Vector2.new(30, 30)
+	puff.EmissionDirection = Enum.NormalId.Bottom
+	puff.Acceleration = Vector3.new(0, -2.5, 0)
+	puff.Drag = 1.5
+	puff.RotSpeed = NumberRange.new(-40, 40)
+	puff.Rate = 0
+	puff.Parent = part
+	const grit = Instance.new("ParticleEmitter")
+	grit.Texture = DUST_TEXTURE
+	grit.Color = ColorSequence.new(GRIT_COLOR)
+	grit.Size = NumberSequence.new(0.07)
+	grit.Transparency = NumberSequence.new(0.1)
+	grit.Lifetime = NumberRange.new(0.7, 1.1)
+	grit.Speed = NumberRange.new(0.5, 1.5)
+	grit.SpreadAngle = Vector2.new(20, 20)
+	grit.EmissionDirection = Enum.NormalId.Bottom
+	grit.Acceleration = Vector3.new(0, -26, 0)
+	grit.Rate = 0
+	grit.Parent = part
+	puff:Emit(math.max(1, math.round(6 * amount)))
+	grit:Emit(math.max(1, math.round(10 * amount)))
+end
+
+-- One step (or the landing, `heavy`) at the flat point `at`: the sound above the ceiling, dust, lamps, a thump
+local function roofStep(
+	ctx: Effect.Context,
+	state: State,
+	run: RoofRun,
+	at: Vector3,
+	sound: string,
+	volume: number,
+	heavy: boolean
+)
+	const view = Workspace.CurrentCamera
+	const eye = if view ~= nil then view.CFrame.Position else at
+	const ceiling = ceilingAt(ctx, Vector3.new(at.X, eye.Y, at.Z))
+	const part = carrierAt(ctx, "HorrorScene_RoofStep", Vector3.new(at.X, ceiling + ROOF_ABOVE, at.Z), Vector3.one * 0.2)
+	ctx.Audio:Play(sound, part, { Volume = volume, Speed = if heavy then 0.6 else 0.72 + state.Rng:NextNumber(0, 0.1) })
+	if heavy then
+		ctx.Audio:Play(ROOF_LAND_KEY, part, { Volume = volume })
+	end
+	const strength = math.min(volume, 1)
+	dust(ctx, Vector3.new(at.X, ceiling - 0.15, at.Z), (if heavy then 4 else 1) * strength)
+	kickLamps(
+		run,
+		Vector3.new(at.X, ceiling, at.Z),
+		if heavy then ROOF_SWAY_RANGE * 2 else ROOF_SWAY_RANGE,
+		(if heavy then SWAY_THUD else SWAY_STEP) * strength
+	)
+	const camera = cameraRef
+	if camera == nil then
+		return
+	end
+	const flat = Vector2.new(at.X - eye.X, at.Z - eye.Z).Magnitude
+	if heavy then
+		camera:HorrorShake("Jolt", math.clamp(1 - flat / (ROOF_THUMP_RANGE * 3), 0.3, 1))
+	elseif flat < ROOF_THUMP_RANGE then
+		camera:HorrorShake("Step", strength * (1 - flat / ROOF_THUMP_RANGE))
+	else
+		return
+	end
+	state.Undo.camera = function()
+		camera:HorrorClear()
+	end
+end
+
+local function roofPoint(run: RoofRun, fraction: number): Vector3
+	return run.From:Lerp(run.To, math.clamp(fraction, 0, 1))
+end
+
+-- Target "Walk" (steady heavy steps from Value to To, fractions of the line, over Duration), "Leave" (from where it is
+-- to To, fading out) or "Thud" (one landing at Value; nil = where it is). Sound = step key (roof_step)
+const roofStepHandler: Handler = function(ctx, state, step, late)
+	const run = roofRun(state)
+	const target = step.Target or "Walk"
+	const sound = step.Sound or ROOF_STEP_KEY
+	if target == "Thud" then
+		const at = step.Value or run.At
+		run.At = at
+		roofStep(ctx, state, run, roofPoint(run, at), sound, 1.3, true)
+		return
+	end
+	const leaving = target == "Leave"
+	const from = if leaving or step.Value == nil then run.At else step.Value
+	const to = if type(step.To) == "number" then step.To else 1
+	const duration = math.max((step.Duration or 4) - late, 0.2)
+	const count = math.max(2, math.round(math.abs(to - from) * ROOF_HALF * 2 / ROOF_STRIDE))
+	const side = (run.To - run.From).Unit:Cross(Vector3.yAxis)
+	run.Walk += 1
+	const token = run.Walk
+	task.spawn(function()
+		for index = 1, count do
+			task.wait(duration / count)
+			if run.Walk ~= token or roofRuns[state] ~= run then
+				return
+			end
+			const fraction = from + (to - from) * (index / count)
+			run.At = fraction
+			const volume = if leaving then 1 - 0.8 * (index / count) else 1
+			const foot = if index % 2 == 0 then ROOF_SIDE else -ROOF_SIDE
+			roofStep(ctx, state, run, roofPoint(run, fraction) + side * foot, sound, volume, false)
+		end
+	end)
+end
+
+-- HeadDown (TASK-484): while it walks, a look going up past Value degrees gets a soft nudge back down (To degrees, at
+-- most Rules.MaxNudge, each nudge HEAD_DOWN_NUDGE s, far under Rules.MaxControlLock): it helps, the player can always
+-- look up anyway. Value = 0 stops it.
+const HEAD_DOWN_EVERY = 0.15 -- s between two checks
+const HEAD_DOWN_GAP = 0.5 -- s between two nudges
+const HEAD_DOWN_NUDGE = 0.45 -- s of each nudge
+const HEAD_DOWN_AIM = math.rad(-12) -- the nudge aims a little below the horizon, straight ahead
+const headDown: Handler = function(_ctx, state, step, late)
+	const running = state.Undo.headdown
+	if running ~= nil then
+		state.Undo.headdown = nil
+		running()
+	end
+	const threshold = step.Value or 0
+	const seconds = (step.Duration or 0) - late
+	const camera = cameraRef
+	if threshold <= 0 or seconds <= 0 or camera == nil then
+		return
+	end
+	const degrees = if type(step.To) == "number" then step.To else Content.HorrorScenes.Rules.MaxNudge
+	local alive = true
+	state.Undo.headdown = function()
+		alive = false
+	end
+	task.spawn(function()
+		const ends = os.clock() + seconds
+		local nextNudge = 0
+		while alive and os.clock() < ends do
+			const view = Workspace.CurrentCamera
+			if view ~= nil and os.clock() >= nextNudge then
+				const look = view.CFrame.LookVector
+				if math.deg(math.asin(math.clamp(look.Y, -1, 1))) > threshold then
+					const _, yaw = view.CFrame:ToOrientation()
+					const aim = CFrame.fromOrientation(HEAD_DOWN_AIM, yaw, 0).LookVector
+					camera:HorrorNudge(view.CFrame.Position + aim * 20, degrees, HEAD_DOWN_NUDGE)
+					nextNudge = os.clock() + HEAD_DOWN_GAP
+				end
+			end
+			task.wait(HEAD_DOWN_EVERY)
+		end
+	end)
+end
+
 const Kits = {}
 
 -- Called once by AnomalyController after Scene.Start (needs CameraController).
 function Kits.Register(handle: (kind: Content.HorrorStepKind, handler: Handler) -> (), camera: Camera?)
+	cameraRef = camera
 	if camera ~= nil then
 		for kind, handler in cameraHandlers(camera) do
 			handle(kind :: Content.HorrorStepKind, handler)
@@ -749,6 +1138,13 @@ function Kits.Register(handle: (kind: Content.HorrorStepKind, handler: Handler) 
 	handle("Door", door)
 	handle("Shadow", shadow)
 	handle("Actor", actor)
+	handle("Roof", roofStepHandler)
+	handle("HeadDown", headDown)
+end
+
+-- The camera kit given to Register (Effects/ANM-019 punches the view of the caught player with it); nil before
+function Kits.Camera(): Camera?
+	return cameraRef
 end
 
 return table.freeze(Kits)

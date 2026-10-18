@@ -1,6 +1,6 @@
 --!strict
 -- V2 family B "something is coming", verb HIDE (DEC-254, DEC-255, DEC-256; TASK-272; anomalies-v2-proposal.md §3 B).
--- One body for every family B monster (ANM-007 The Walker, ANM-017 crawler, ANM-018 grin, ANM-019 roof walker); each
+-- One body for every family B monster (ANM-007 The Walker, ANM-017 crawler, ANM-018 grin; ANM-019 left with TASK-484); each
 -- Anomalies/<Ref>.luau is a thin call to Hide.Module and each Rules/<Ref>.luau a call to Hide.Rule. Lives in a Folder
 -- (Kit/), so AnomalyService:LoadModules never schedules it.
 --

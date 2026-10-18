@@ -14,7 +14,7 @@
 --               Start false = retry in RETRY s; past the end of the window = dropped. Scripted entries are forced.
 --   Context     one table of functions shared by every module (Api.Context): Publish (set), Cue (packet to
 --               everyone, DEC-204), Fail (who pays, DEC-204; once per player per occurrence; critical ->
---               LoseNight("critical"), DEC-094), Succeed, Finish, Active, Looking (Gaze + Vision), SeenTick/See
+--               LoseNight("critical"), DEC-094), Succeed, Finish, Active, Looking (Gaze + Vision), Pitch (Gaze), SeenTick/See
 --               (VitalService:SeeAnomaly), Rule, Spawn, Light, Vehicle, InZone, Kitchen, Traffic, Economy.
 --   Events      CustomerService.Acted, LightService.SwitchChanged, InteractionService.Performed,
 --               VehicleService.ShutterChanged (OnInit); KitchenService.Discarded when it exists (OnStart) -> OnEvent of
@@ -91,6 +91,7 @@ const SEED_MAX = 65535 -- AnomalyCue.Seed wire range
 const RETRY = 1 -- s between two Start attempts of the same due entry (Start returned false)
 const LINGER = 1 -- s a finished record stays in the set so clients see its last Phase
 const GAZE_STALE = 1 -- s; the client sends at 10 Hz, an older gaze means it stopped (day, not Active)
+const PITCH_STALE = 1.6 -- s; Pitch (TASK-484): a still look is resent only every 1 s (CameraController GAZE_HEARTBEAT)
 const TARGET_SLACK = 2 -- studs; a hit this close to the target does not block the line of sight
 const EYE_OFFSET = Vector3.new(0, 1.5, 0) -- HumanoidRootPart -> eye when the Head is missing
 const DOMAIN = "anomaly"
@@ -413,6 +414,18 @@ function AnomalyService:Looking(player: Player, target: Vector3, range: number, 
 		angle or Content.Sanity.SeeAngle,
 		blocked
 	)
+end
+
+-- TASK-484 (ANM-019 "don't look up"): signed pitch in degrees (+ = up) of the latest Gaze, or nil (see Api.Context.Pitch).
+function AnomalyService:Pitch(player: Player): number?
+	if not self.Dependencies.RunStateService:IsActive(player) or self:IsWatching(player) then
+		return nil
+	end
+	const gaze = self.Gazes[player]
+	if gaze == nil or now() - gaze.At > PITCH_STALE then
+		return nil
+	end
+	return Vision.Signed(gaze.Pitch)
 end
 
 -- SecurityService (TASK-285) has the watcher in Watching; looked up by name (it is not in the Require list).
@@ -847,6 +860,9 @@ function AnomalyService:BuildContext(): Api.Context
 		end,
 		Looking = function(player: Player, target: Vector3, range: number, angle: number?): boolean
 			return self:Looking(player, target, range, angle)
+		end,
+		Pitch = function(player: Player): number?
+			return self:Pitch(player)
 		end,
 		SeenTick = function(occ: Api.Occurrence, target: Vector3, range: number, dt: number)
 			self:SeenTick(occ, target, range, dt)

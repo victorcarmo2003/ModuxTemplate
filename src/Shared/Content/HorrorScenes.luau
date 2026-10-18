@@ -42,6 +42,12 @@
 --   Shadow     a shadow on the light under the door: Point = door MapPoint, To = MapPoint of the side it comes from / goes to
 --              (the steps), Target "Pass" (crosses, default) | "Arrive" (comes in from that side and stays in the middle) |
 --              "Leave" (the one standing there goes back out to that side), over Duration
+--   Roof       (TASK-484) heavy steps on the roof along a line through each client's own position (so it always passes
+--              overhead; same seeded heading everywhere). Target "Walk" = from Value to To (fractions 0..1 of the line)
+--              over Duration; "Leave" = from where it is to To (default 1), fading; "Thud" = one landing at Value (nil =
+--              where it is). Each step: Sound (default roof_step) above the ceiling, dust falling, lamps near it swaying
+--   HeadDown   (TASK-484) held: while it lasts, a look pitched above Value degrees is nudged softly back below the
+--              horizon (To degrees per nudge, <= Rules.MaxNudge); Value = 0 stops it. Helps, never locks
 -- Every number PROVISIONAL (DEC-290) until the owner's Play. Mild (DEC-172): no blood, scares <= 1 s, no clipped scream.
 local Table = require(script.Parent.Table)
 
@@ -63,6 +69,8 @@ export type StepKind =
 	| "Actor"
 	| "Door"
 	| "Shadow"
+	| "Roof"
+	| "HeadDown"
 
 export type Step = {
 	At: number,
@@ -76,7 +84,7 @@ export type Step = {
 	Point: string?,
 	Burst: number?,
 	Text: string?,
-	Sound: string?, -- Actor: Content.Sounds key of its steps
+	Sound: string?, -- Actor / Roof: Content.Sounds key of its steps
 	Seen: ("All" | "Cameras")?, -- Actor: who sees it
 }
 
@@ -178,8 +186,68 @@ const blackout: Scene = {
 	},
 }
 
+-- ANM-019 The roof walker, "don't look up" (TASK-484; DEC-294, DEC-295 / Q-367 A; design/horror-cinematic.md). Fitted to
+-- Rules/ANM-019: Signal = OmenFor 3 s (it lands on the roof), Active = WalkFor 16 s (the rule counts from 1 s: a look
+-- above 35 degrees held 0.6 s), then Failed (somebody looked up: it drops in front of that player's window, the others
+-- hear it leave) or Resolved (it reached the far end and went), LeaveFor 5 s each. The walk passes over every player's
+-- own head at ~7 s and stands there, silent, 2.5 s before it goes on. The caught player's drop and hit are cue-driven
+-- (Effects/ANM-019, on the jumpscare cue); the scene adds what everyone hears and feels.
+const roofWalker: Scene = {
+	Key = "anm_019_roof_walker",
+	Name = "The roof walker",
+	Live = true,
+	Steps = {
+		-- omen (Signal, 3 s): something heavy lands at one end of the roof
+		{ At = 0, Phase = "Signal", Kind = "Roof", Target = "Thud", Value = 0 },
+		{ At = 0, Phase = "Signal", Kind = "Sound", Target = "horror_sting", Value = 0.7 },
+		{ At = 0, Phase = "Signal", Kind = "Fov", Value = -2, To = 0, Duration = 0.6 },
+		{ At = 0.2, Phase = "Signal", Kind = "Cinema", Value = 0.11, Duration = 1 },
+		{ At = 0.5, Phase = "Signal", Kind = "HeadDown", Value = 20, To = 3, Duration = 3 },
+		{ At = 0.6, Phase = "Signal", Kind = "Whispers", Target = "roof", Value = 0.5, To = 1.2, Duration = 3 },
+		{ At = 0.8, Phase = "Signal", Kind = "Heartbeat", Value = 70, To = 90, Duration = 2.5 },
+		{ At = 1.2, Phase = "Signal", Kind = "Sound", Target = "breath_held" },
+		-- the walk (Active, 16 s): towards the player, overhead at ~7 s
+		{ At = 0, Phase = "Active", Kind = "Roof", Target = "Walk", Value = 0, To = 0.5, Duration = 7 },
+		{ At = 0, Phase = "Active", Kind = "HeadDown", Value = 20, To = 3, Duration = 16 },
+		{ At = 0, Phase = "Active", Kind = "Whispers", Target = "roof", Value = 0.8, To = 2.4, Duration = 7 },
+		{ At = 0, Phase = "Active", Kind = "Heartbeat", Value = 90, To = 140, Duration = 7 },
+		{ At = 0, Phase = "Active", Kind = "Vignette", Value = 0, To = 0.32, Duration = 7 },
+		-- it stops right above: the words go quiet, the heart races, then one burst of DON'T LOOK UP
+		{ At = 7, Phase = "Active", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 7, Phase = "Active", Kind = "Heartbeat", Value = 150, To = 160, Duration = 2.5 },
+		{ At = 7, Phase = "Active", Kind = "Vignette", Value = 0.32, To = 0.42, Duration = 2.5 },
+		{ At = 7.3, Phase = "Active", Kind = "Sound", Target = "breath_held" },
+		{ At = 7.8, Phase = "Active", Kind = "Whispers", Target = "roof", Value = 3, To = 3, Duration = 1.5 },
+		-- it goes on to the far end
+		{ At = 9.5, Phase = "Active", Kind = "Roof", Target = "Walk", Value = 0.5, To = 1, Duration = 6 },
+		{ At = 9.5, Phase = "Active", Kind = "Whispers", Target = "roof", Value = 1.5, To = 0.3, Duration = 6 },
+		{ At = 9.5, Phase = "Active", Kind = "Heartbeat", Value = 140, To = 90, Duration = 6 },
+		{ At = 9.5, Phase = "Active", Kind = "Vignette", Value = 0.42, To = 0.15, Duration = 6 },
+		-- nobody looked up (Resolved): it jumps off the far end and is gone
+		{ At = 0, Phase = "Resolved", Kind = "HeadDown", Value = 0 },
+		{ At = 0, Phase = "Resolved", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 0, Phase = "Resolved", Kind = "Heartbeat", Value = 0, To = 0 },
+		{ At = 0.2, Phase = "Resolved", Kind = "Roof", Target = "Thud", Value = 1 },
+		{ At = 0.4, Phase = "Resolved", Kind = "Vignette", Value = 0.15, To = 0, Duration = 1.5 },
+		{ At = 0.8, Phase = "Resolved", Kind = "Cinema", Value = 0, Duration = 1 },
+		-- somebody looked up (Failed): the caught one gets the drop + hit (Effects/ANM-019); everyone else hears it
+		-- jump off the roof and run
+		{ At = 0, Phase = "Failed", Kind = "HeadDown", Value = 0 },
+		{ At = 0, Phase = "Failed", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 0, Phase = "Failed", Kind = "Heartbeat", Value = 0, To = 0 },
+		{ At = 0.3, Phase = "Failed", Who = "Safe", Kind = "Roof", Target = "Thud" },
+		{ At = 0.5, Phase = "Failed", Who = "Safe", Kind = "Sound", Target = "shadow_whoosh", Value = 0.6 },
+		{ At = 0.8, Phase = "Failed", Who = "Safe", Kind = "Roof", Target = "Leave", To = 1, Duration = 2.4 },
+		{ At = 0.8, Phase = "Failed", Who = "Safe", Kind = "Vignette", Value = 0.3, To = 0, Duration = 2.5 },
+		{ At = 1.4, Phase = "Failed", Who = "Caught", Kind = "Heartbeat", Value = 150, To = 80, Duration = 3 },
+		{ At = 1.4, Phase = "Failed", Who = "Caught", Kind = "Vignette", Value = 0.5, To = 0, Duration = 3.5 },
+		{ At = 3.5, Phase = "Failed", Who = "Caught", Kind = "Heartbeat", Value = 0, To = 0 },
+		{ At = 3.5, Phase = "Failed", Kind = "Cinema", Value = 0, Duration = 1 },
+	},
+}
+
 -- Whisper word lists (DEC-293, owner 2026-10-18): the words on screen are real hints for the player, said in the
--- character's voice. blackout = the scene's Whispers step; low_sanity = VitalController while sanity is in the low band.
+-- character's voice. blackout / roof = the scenes' Whispers steps (roof: TASK-484); low_sanity = VitalController while sanity is in the low band.
 const words: { [string]: { string } } = {
 	blackout = {
 		"HE'S COMING",
@@ -192,6 +260,18 @@ const words: { [string]: { string } } = {
 		"hurry...",
 		"he's close",
 		"don't let him in",
+	},
+	roof = {
+		"DON'T LOOK UP",
+		"DON'T LOOK UP",
+		"DON'T LOOK UP",
+		"KEEP YOUR HEAD DOWN",
+		"KEEP YOUR HEAD DOWN",
+		"IT'S ON THE ROOF",
+		"IT'S ON THE ROOF",
+		"eyes down...",
+		"it's right above you",
+		"don't look...",
 	},
 	low_sanity = {
 		"LOW SANITY",
@@ -218,7 +298,7 @@ const rules: Rules = {
 	},
 }
 
-return Table.with(Table.new({ blackout } :: { Scene }), {
+return Table.with(Table.new({ blackout, roofWalker } :: { Scene }), {
 	Rules = Table.record(rules),
 	Words = Table.record(words),
 	PhaseOrder = table.freeze({ Signal = 1, Active = 2, Resolved = 3, Failed = 3 }),

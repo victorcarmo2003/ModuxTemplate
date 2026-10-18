@@ -11,8 +11,8 @@
 	    phase seen is anchored at record.StartedAt (exact when the record starts in that phase; for a late joiner who
 	    arrives after Signal it errs on the late side, so it skips one-shots rather than replaying them).
 	  - Late steps (a late joiner, a phase entered before Start, a hitch): a one-shot more than Rules.Latency late is
-	    dropped; the held kinds (Lights, Vignette, Lightning, Music, Whispers, Actor) apply their last past step with `late`
-	    so the handler shows the state the scene is in.
+	    dropped; the held kinds (Lights, Vignette, Lightning, Music, Whispers, Actor, HeadDown) apply their last past step
+	    with `late` so the handler shows the state the scene is in.
 	  - Who: "Caught" plays only after this client got the anomaly's caught cue (AnomalyCue "jumpscare" with
 	    Entity = UserId % 65536); "Safe" = not caught (yet); nil/"All" = everyone. Checked when the step fires.
 	  - A phase change drops the pending steps of the old phase; the record leaving (or its id reused) clears the run:
@@ -53,7 +53,9 @@ const DEV_ATTRIBUTE = "DevHorrorScene"
 const ENTITY_MOD = 65536 -- AnomalyCue.Entity range (Kit/Hide.EntityOf on the server)
 const CAUGHT_CUE = "jumpscare"
 -- Actor (TASK-472): a late joiner gets the walking model where it should be (the handler skips `late` s of the walk)
-const HELD: { [string]: boolean } = { Lights = true, Vignette = true, Lightning = true, Music = true, Whispers = true, Actor = true }
+-- HeadDown (TASK-484): a late joiner still gets the head-down help for the rest of the walk
+const HELD: { [string]: boolean } =
+	{ Lights = true, Vignette = true, Lightning = true, Music = true, Whispers = true, Actor = true, HeadDown = true }
 
 -- scene key -> phase -> steps by At (ties keep the data order)
 const QUEUES: { [string]: { [string]: { Step } } } = {}

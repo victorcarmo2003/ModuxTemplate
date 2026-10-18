@@ -323,8 +323,8 @@ export type Switch = {
 const on = restaurant.Rules.Enabled
 
 -- design/anomalies-v3-restaurant.md §8.1 (DEC-279, Provisional until wave R4 adapts them) + Q-331 ("hide" leaves):
---   ANM-002 food (work channel) · ANM-003 bank clock + trailer switch · ANM-004 back door knock · ANM-007, 017, 018, 019
---   family B (hide in the HideZone behind the trailer, no back door) · ANM-009 back door knock / crack
+--   ANM-002 food (work channel) · ANM-003 bank clock + trailer switch · ANM-004 back door knock · ANM-007, 017, 018
+--   family B (hide in the HideZone behind the trailer, no back door; ANM-019 left the cut with TASK-484: it is "don't look up") · ANM-009 back door knock / crack
 const CUT_ANOMALIES = {
 	"anm_002_wrong_food",
 	"anm_003_stopped_clock",
@@ -333,7 +333,6 @@ const CUT_ANOMALIES = {
 	"anm_009_knock",
 	"anm_017_crawler",
 	"anm_018_grin",
-	"anm_019_roof_walker",
 }
 
 const switch: Switch = {
@@ -346,17 +345,18 @@ const switch: Switch = {
 	VehicleIsRestaurant = on,
 	MartShelves = not on,
 	CutAnomalies = if on then CUT_ANOMALIES else {},
-	-- premieres of nights 6..9 were family B: the family A row debuting that night takes the call (Provisional; the
+	-- premieres of nights 6..8 were family B: the family A row debuting that night takes the call (Provisional; the
 	-- boss call texts of those nights still name the old monster until the narrative pass of wave R4)
 	NewAnomalies = if on
 		then {
 			[6] = "anm_014_big_head",
 			[7] = "anm_015_floater",
 			[8] = "anm_008_long_car",
-			[9] = "anm_016_starer",
 		}
 		else {},
-	DebutNights = if on then { anm_016_starer = 9 } else {}, -- nothing else debuts on night 9 once ANM-019 is cut
+	-- TASK-484: ANM-019 is back in the restaurant ("don't look up", no HideZone) and presents Night 9 again; the starer
+	-- keeps its own debut (Night 8, silently, like before the cut)
+	DebutNights = {},
 }
 
 restaurant.Supply.MartShelves = switch.MartShelves
