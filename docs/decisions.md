@@ -3866,3 +3866,15 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
   - **Notas do violino**: volume de 0 até no máximo 2.
 - **Provisório:** números de sanidade e frequência (game-designer); detalhes em `design/horror-cinematic.md` §6–§8.
 - Impacto: **game-designer**, **frontend-coder**, **backend-coder**, **level-designer**. Tarefas: **TASK-480 a TASK-486**.
+
+### DEC-295 — 2026-10-18 — O dono delega: valem as recomendações das perguntas abertas (Q-358, Q-359, Q-361 a Q-368)
+
+- Origem: fala do dono (2026-10-18, antes de dormir): "Vou deixar tudo nas suas mãos por agora. Pode tomar as decisões recomendadas também… quando eu acordar eu vou testar todas as anomalias… a anomalia do blackout é perfeita, é exatamente o que eu quero para o jogo."
+- Valem as recomendações (todas **Provisórias** até o teste do dono):
+  - **Q-358**: no apagão, cada jogador ativo paga −35 de sanidade quando a janela acaba (não é fim de run).
+  - **Q-359**: "a linha branca" = os contornos brancos/números das estações que continuam brilhando no escuro; no apagão eles apagam (leitura do orquestrador, a confirmar).
+  - **Q-361**: preparo em estações com o **prato viajando** (opção C da proposta). **Q-362**: até 2 pratos na mão (Tools da hotbar). **Q-363**: prato só em apoios marcados. **Q-364**: ordem fixa pão → salsicha → condimentos, a próxima estação acende. **Q-365**: no apagão a grelha pausa. **Q-366**: "Drink Here" na cafeteira, a caneca continua.
+  - **Q-367**: a sombra no teto pune **quem olha para cima** enquanto ela anda. **Q-368**: distorção do rosto por escala/rotação das peças (sem EditableMesh por agora).
+- Régua de qualidade para todas as anomalias: **o apagão** (DEC-290..293) — cena dirigida, som, câmera, tela, whispers com dica, susto no tempo certo.
+- O preparo em estações (Q-361..366) é uma reforma grande: fica como **TASK-487** depois das anomalias (o dono vai testar as anomalias primeiro).
+- Impacto: todos os agentes.

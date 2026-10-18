@@ -1942,3 +1942,5 @@ apagão esticada para 30 s; porta dos fundos não é mais travada (é o caminho 
 | TASK-484 | teto | **ANM-019 replanejada** conforme Q-367 (proposta + regra). | game-designer | Q-367 | Pendente |
 | TASK-485 | UI | **Tela de desmaio/morte limpa**: some dinheiro e HUD extra; revive grande no centro por 5–10 s; depois spectate com revive pequeno em cima; sem contador de bolinhas; barra se esvaindo com o texto dentro; mesma limpeza no "Everyone fainted". | frontend-coder | — | Pendente |
 | TASK-486 | áudio | Sons dos eventos (sub drop, estalo de osso, arranhão no assoalho) com licença verificada. | game-designer + frontend-coder | — | Pendente |
+| TASK-487 | preparo | **Preparo em estações com prato na mão** (DEC-295: opção C, 2 pratos, apoios marcados, ordem fixa, grelha pausa no apagão, "Drink Here") a partir de `design/prep-stations-proposal.md`; quebrar em sub-tasks antes de codar. Depois das anomalias. | task-planner → coders | — | Pendente |
+| TASK-488 | apagão | **Contornos/números das estações apagam no apagão** (Q-359 leitura): o que brilha no escuro além da luz de emergência e da fresta some até a luz voltar. | frontend-coder | — | Pendente |
