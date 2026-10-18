@@ -54,6 +54,7 @@ local Sounds = require(script.Sounds)
 local Species = require(script.Species)
 local Stations = require(script.Stations)
 local Stats = require(script.Stats)
+local Suspense = require(script.Suspense)
 local Table = require(script.Table)
 local Thief = require(script.Thief)
 local TipJar = require(script.TipJar)
@@ -96,6 +97,9 @@ export type HorrorScene = HorrorScenes.Scene
 export type HorrorStep = HorrorScenes.Step
 export type HorrorStepKind = HorrorScenes.StepKind
 export type HorrorRules = HorrorScenes.Rules
+export type SuspenseEvent = Suspense.Event
+export type SuspenseSpot = Suspense.Spot
+export type SuspenseRules = Suspense.Rules
 export type GemRewards = GemRewards.GemRewards
 export type Hallucination = Hallucinations.Hallucination
 export type HudRevealElement = HudReveal.Element
@@ -263,6 +267,8 @@ return table.freeze({
 	Cutscenes = Cutscenes,
 	-- TASK-461 (DEC-290): anomalies as directed scenes, played from the Anomalies record (design/horror-cinematic.md)
 	HorrorScenes = HorrorScenes,
+	-- TASK-481 (DEC-294): suspense events, not anomalies (design/horror-cinematic.md §7; tech/suspense.md). Provisional
+	Suspense = Suspense,
 	HallucinationRules = Hallucinations.Rules,
 	Hallucinations = Hallucinations,
 	Traffic = Traffic,

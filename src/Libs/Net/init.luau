@@ -172,6 +172,21 @@ return Lync.define("game", {
 		Keys = Lync.array(Lync.str(1, 40), 0, 32),
 	})),
 
+	-- s -> Audience. Suspense event (TASK-481, DEC-294; tech/suspense.md; writer SuspenseService): the creature of Event
+	-- appears now on Spot and stays Content.Suspense.Rules.Life s. Id = event id of the night (1..255, cyclic). Not an
+	-- anomaly: no set, a late joiner simply misses it. Client-only presentation; the cost is the server's.
+	Suspense = Lync.packet(Lync.struct({
+		Id = Lync.int(0, 255),
+		Event = Lync.enum(Content.Suspense.Keys),
+		Spot = Lync.enum(Content.Suspense.SpotKeys),
+		Seed = Lync.int(0, 65535),
+	})),
+	-- c -> s. "I caught it at a glance" (sender SuspenseController; responder SuspenseService, which checks the event is
+	-- live, the player Active and the Gaze plausible, then charges Content.Suspense.Rules.Cost once per player per event)
+	SuspenseSeen = Lync.packet(Lync.struct({
+		Id = Lync.int(0, 255),
+	})),
+
 	-- Run sets, wave 1 ---------------------------------------------------------------------------------------------
 
 	-- §3.1, record 1. Writer: RoundService. Wave 1 writes only day fields (Night = 0, IsNight = false...)

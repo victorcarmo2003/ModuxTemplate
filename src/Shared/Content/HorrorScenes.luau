@@ -103,6 +103,8 @@ export type Rules = {
 	MaxVignette: number,
 	MaxFov: number, -- degrees
 	MaxNudge: number, -- degrees
+	-- degrees; a suspense event's camera hijack (CameraController:HorrorPull, Content.Suspense.Rules.Hijack.Pull), not a scene step
+	MaxPull: number,
 	Shakes: { [string]: ShakeProfile },
 }
 
@@ -179,7 +181,8 @@ const blackout: Scene = {
 }
 
 -- Whisper word lists (DEC-293, owner 2026-10-18): the words on screen are real hints for the player, said in the
--- character's voice. blackout = the scene's Whispers step; low_sanity = VitalController while sanity is in the low band.
+-- character's voice. blackout = the scene's Whispers step; low_sanity = VitalController while sanity is in the low band;
+-- suspense = after a suspense event's glance (SuspenseController, TASK-481).
 const words: { [string]: { string } } = {
 	blackout = {
 		"HE'S COMING",
@@ -202,6 +205,14 @@ const words: { [string]: { string } } = {
 		"coffee...",
 		"the coffee machine",
 	},
+	suspense = {
+		"WHAT WAS THAT?",
+		"WHAT WAS THAT?",
+		"DON'T TURN AROUND",
+		"DID YOU SEE IT?",
+		"it's gone...",
+		"keep working",
+	},
 }
 
 const rules: Rules = {
@@ -211,6 +222,7 @@ const rules: Rules = {
 	MaxVignette = 0.6,
 	MaxFov = 6,
 	MaxNudge = 3,
+	MaxPull = 30, -- TASK-481 (DEC-294), Provisional
 	Shakes = {
 		Jolt = { Amplitude = 0.12, Frequency = 18, Duration = 0.15 },
 		Step = { Amplitude = 0.03, Frequency = 10, Duration = 0.12 },

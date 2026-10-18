@@ -1375,6 +1375,25 @@ function CameraController:HorrorNudge(target: Vector3, degrees: number, duration
 	})
 end
 
+-- Suspense hijack (TASK-481, DEC-294): the same eased pull as HorrorNudge but up to Rules.MaxPull degrees, so a glance
+-- at the edge of the screen is dragged towards the creature. Never stops the player's own look input.
+function CameraController:HorrorPull(target: Vector3, degrees: number, duration: number)
+	if Vide.untrack(self.Mode) ~= "FirstPerson" then
+		return
+	end
+	const angle = math.rad(math.clamp(math.abs(degrees), 0, HORROR.MaxPull)) * horrorScale()
+	if angle <= 0 then
+		return
+	end
+	table.insert(self.HorrorNudges, {
+		Target = target,
+		Angle = angle,
+		Duration = math.clamp(duration, HORROR_NUDGE_MIN, HORROR.MaxControlLock),
+		Start = os.clock(),
+		Done = 0,
+	})
+end
+
 -- Ends the layer at once (scene cancelled, the camera goes to another owner): shakes and nudges dropped, the field of
 -- view back to what the mode had underneath.
 function CameraController:HorrorClear()
