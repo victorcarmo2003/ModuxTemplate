@@ -36,6 +36,11 @@
 	                screen, at the end of the drink. Provisional: no packet for the use; dev "sanity" also rises.
 	  faint         a member's record goes Active -> Down; at that member's character (spatial: crewmates nearby hear it)
 	  revive        a member's record goes back to Active from Down / Reviving / Spectator; at the character
+
+	Coffee payoff (TASK-479, owner feedback 2026-10-18 "more responsiveness, bigger feedback"; Provisional): on the
+	server cue `Gain` (Amount > 0) a warm pulse of COFFEE.Time s on this client only: the dark edges lift, a soft
+	Mustard-amber edge glow, a short warm / brighter ColorCorrection, and a burst of Cream sparkles + 2 steam wisps at
+	the own head. Reduced motion (Motion.Reduced) keeps the colour fade and drops the particles. No red, no shake.
 ]]
 local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
@@ -47,6 +52,7 @@ local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Vignette = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Vignette)
+local Motion = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Motion)
 
 export type LifeState = "Active" | "Down" | "Reviving" | "Spectator" | "Away"
 export type Band = "Day" | "Mid" | "Night"
@@ -81,6 +87,25 @@ const LOOK = table.freeze({
 	FaintHold = 1,
 	FaintOut = 1,
 })
+
+-- Coffee payoff (TASK-479). Art numbers, Provisional: warm, never red, under ~1.2 s.
+const COFFEE = table.freeze({
+	Time = 1.1, -- s of the whole pulse
+	Rise = 0.12, -- s up to the peak, then it eases out
+	Lift = 0.7, -- fraction of the dark edges taken away at the peak
+	Glow = 0.4, -- warm edge opacity at the peak
+	GlowColor = Color3.fromHex("#FFB84D"), -- Mustard-amber
+	Saturation = 0.15,
+	Brightness = 0.06,
+	Tint = Color3.fromHex("#FFE9C4"), -- warm Cream
+	Sparkles = 14,
+	SparkleColor = Color3.fromHex("#FFF1D6"), -- Theme Cream
+	SparkleAccent = Color3.fromHex("#F6C12B"), -- Theme Mustard
+	Steam = 2,
+	Life = 0.9, -- s a particle lives (the attachment goes after Life + 0.2)
+})
+const SPARKLE_TEXTURE = "rbxasset://textures/particles/sparkles_main.dds"
+const STEAM_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
 
 const NO_TICK = -math.huge
 const DARK_HOLD = 1.6 -- seconds after the last dark tick (server ticks at 1 Hz)
@@ -121,6 +146,8 @@ function VitalController:Setup()
 	self.GainId = 0 :: number
 	self.HintUntil = 0 :: number -- server time the emphasis ends
 	self.HintMachine = nil :: Instance? -- coffee machine marked by this emphasis
+	self.CoffeeAt = nil :: number? -- os.clock of the last coffee payoff (TASK-479)
+	self.Warm = Vide.source(0) :: Vide.Source<number> -- warm edge glow 0..1
 
 	self.DarkTickAt = NO_TICK :: number
 	self.FaintAt = nil :: number?
@@ -241,10 +268,95 @@ function VitalController:ApplyCue(kind: string, amount: number, untilT: number)
 	elseif kind == "Gain" then
 		self.GainId += 1
 		self.CoffeeGain({ Amount = amount, Id = self.GainId })
+		if amount > 0 then
+			self:CoffeePayoff()
+		end
 		self:EndHint()
 	else
 		self:EndHint()
 	end
+end
+
+-- Coffee payoff (TASK-479) ---------------------------------------------------------------------------------------------
+
+-- Starts the warm pulse (Step reads CoffeeAt) and, unless reduced motion, the sparkle + steam burst at the own head.
+function VitalController:CoffeePayoff()
+	self.CoffeeAt = os.clock()
+	if Motion.Reduced() then
+		return
+	end
+	const character = Players.LocalPlayer.Character
+	const anchor = if character
+		then character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
+		else nil
+	if anchor == nil or not anchor:IsA("BasePart") then
+		return
+	end
+	const attachment = Instance.new("Attachment")
+	attachment.Name = "CoffeeFx"
+	attachment.Position = Vector3.new(0, 0.6, 0)
+
+	const sparkle = Instance.new("ParticleEmitter")
+	sparkle.Texture = SPARKLE_TEXTURE
+	sparkle.Enabled = false
+	sparkle.LightEmission = 0.6
+	sparkle.LightInfluence = 0
+	sparkle.Color = ColorSequence.new(COFFEE.SparkleColor, COFFEE.SparkleAccent)
+	sparkle.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.15),
+		NumberSequenceKeypoint.new(0.3, 0.45),
+		NumberSequenceKeypoint.new(1, 0),
+	})
+	sparkle.Transparency = NumberSequence.new(0, 1)
+	sparkle.Lifetime = NumberRange.new(COFFEE.Life * 0.6, COFFEE.Life)
+	sparkle.Speed = NumberRange.new(3, 6)
+	sparkle.SpreadAngle = Vector2.new(180, 180)
+	sparkle.Drag = 4
+	sparkle.Acceleration = Vector3.new(0, 2, 0)
+	sparkle.RotSpeed = NumberRange.new(-180, 180)
+	sparkle.Parent = attachment
+
+	const steam = Instance.new("ParticleEmitter")
+	steam.Texture = STEAM_TEXTURE
+	steam.Enabled = false
+	steam.LightInfluence = 0
+	steam.Color = ColorSequence.new(Color3.new(1, 1, 1))
+	steam.Size = NumberSequence.new(0.4, 1.2)
+	steam.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(0.25, 0.6),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	steam.Lifetime = NumberRange.new(COFFEE.Life)
+	steam.Speed = NumberRange.new(1.5, 2.5)
+	steam.SpreadAngle = Vector2.new(20, 20)
+	steam.EmissionDirection = Enum.NormalId.Top
+	steam.Parent = attachment
+
+	attachment.Parent = anchor
+	sparkle:Emit(COFFEE.Sparkles)
+	steam:Emit(COFFEE.Steam)
+	task.delay(COFFEE.Life + 0.2, function()
+		attachment:Destroy()
+	end)
+end
+
+-- 0..1 strength of the coffee pulse now: quick rise, eased fall; 0 when idle.
+function VitalController:CoffeeAmount(now: number): number
+	const at = self.CoffeeAt
+	if at == nil then
+		return 0
+	end
+	const t = now - at
+	if t >= COFFEE.Time then
+		self.CoffeeAt = nil
+		return 0
+	elseif t < COFFEE.Rise then
+		const up = t / COFFEE.Rise
+		return 1 - (1 - up) * (1 - up)
+	end
+	const down = (t - COFFEE.Rise) / (COFFEE.Time - COFFEE.Rise)
+	return (1 - down) * (1 - down)
 end
 
 function VitalController:ApplyMember(userId: number, record: Member)
@@ -422,6 +534,11 @@ function VitalController:Step(dt: number)
 		self.BlurUntil = 0
 	end
 
+	-- coffee: the dark edges lift and a warm glow shows (own client only, while Active)
+	const coffee = if active then self:CoffeeAmount(now) else 0
+	edge *= 1 - COFFEE.Lift * coffee
+	write(self.Warm, math.clamp(COFFEE.Glow * coffee, 0, 1))
+
 	const blackout, closing = self:FaintAmount(now)
 	edge = math.max(edge, closing)
 	blurSize = math.max(blurSize, LOOK.BlurSize * closing)
@@ -430,13 +547,16 @@ function VitalController:Step(dt: number)
 	write(self.Blackout, math.clamp(blackout, 0, 1))
 
 	const color, blur = self:Effects()
-	const colorOn = math.abs(shown.Saturation) > EPSILON or shown.Tint > EPSILON
+	const colorOn = math.abs(shown.Saturation) > EPSILON or shown.Tint > EPSILON or coffee > EPSILON
 	if color.Enabled ~= colorOn then
 		color.Enabled = colorOn
 	end
 	if colorOn then
-		color.Saturation = shown.Saturation
-		color.TintColor = Color3.new(1, 1, 1):Lerp(LOOK.Tint, math.clamp(shown.Tint, 0, 1))
+		color.Saturation = shown.Saturation + COFFEE.Saturation * coffee
+		color.Brightness = COFFEE.Brightness * coffee
+		color.TintColor = Color3.new(1, 1, 1)
+			:Lerp(LOOK.Tint, math.clamp(shown.Tint, 0, 1))
+			:Lerp(COFFEE.Tint, math.clamp(coffee, 0, 1))
 	end
 	const blurOn = blurSize > 0.05
 	if blur.Enabled ~= blurOn then
@@ -460,6 +580,12 @@ function VitalController:Mount(playerGui: Instance)
 			Vignette({
 				Strength = self.Vignette,
 				Blackout = self.Blackout,
+			}),
+			-- coffee payoff: warm edge glow over the dark edges (TASK-479)
+			Vignette({
+				Name = "CoffeeGlow",
+				Strength = self.Warm,
+				Color = COFFEE.GlowColor,
 			}),
 		})
 	end)
