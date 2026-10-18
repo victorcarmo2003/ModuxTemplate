@@ -472,6 +472,12 @@
 						"optional": "src/Supply/server"
 					}
 				},
+				"Suspense": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Suspense/server"
+					}
+				},
 				"Tablet": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
@@ -823,6 +829,12 @@
 						"$ignoreUnknownInstances": false,
 						"$path": {
 							"optional": "src/Supply/client"
+						}
+					},
+					"Suspense": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Suspense/client"
 						}
 					},
 					"Tablet": {
