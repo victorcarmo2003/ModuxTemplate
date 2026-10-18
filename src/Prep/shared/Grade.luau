@@ -7,6 +7,7 @@
 --   Plate(stages, ...)        stage scores + plate time -> plate band (server, at PrepFinish)
 --   Plausible(...)            floors on the server clock and on the client Ms (server)
 --   FlipScore(...)            sausage flip score from the server timestamps (server)
+--   SaleEffect(...)           plate band (+ flip bonus) -> tip effect of the sale, trailer or conveyor (server, TASK-517)
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local PrepContent = require(ReplicatedStorage.shared.Content.Prep)
 
@@ -209,6 +210,39 @@ end
 -- Effect of a plate band on the sale (Q-219 B): tip in $ (nil = base tip), extra tip window seconds, mood bands.
 function Grade.Effect(cfg: Config, band: Band): { Tip: number?, TipWindow: number, Mood: number }
 	return cfg.Grades.Effects[band]
+end
+
+-- What a served plate does to the tip of a Complete sale (TASK-517; Orders.TipFor reads it):
+--   Tip       nil = the taker's base tip, 0 = no base tip, > 0 = at least that many $ (the trailer's fixed Perfect tip)
+--   Extra     $ added on top of that, inside the same window
+--   TipWindow seconds added to the tip window; Mood = mood bands (Messy -1)
+export type SaleEffect = { Tip: number?, Extra: number, TipWindow: number, Mood: number }
+
+-- Sale effect of a plate. Trailer (conveyor false): Grade.Effect as before (Q-219 B: Perfect = fixed Tip), no Extra; band
+-- nil = quick mode = nil (Orders.Tip). Conveyor (DEC-305; prep-conveyor.md §8; FEAT-045 rev. 3): the fixed Tip is ignored,
+-- only its "0 = none" stays (Messy); Perfect adds Effects.Perfect.TipExtra to the base tip; flipBonus = $ of the sausage
+-- flipped in the window (Content.Prep.Conveyor.Grill.FlipBonus, 0 = not flipped), added once per plate, Messy included.
+-- band nil on the conveyor (a hot dog with no grade) = the base tip plus the flip bonus.
+function Grade.SaleEffect(cfg: Config, band: Band?, conveyor: boolean, flipBonus: number): SaleEffect?
+	if not conveyor then
+		if band == nil then
+			return nil
+		end
+		const effect = Grade.Effect(cfg, band)
+		return { Tip = effect.Tip, Extra = 0, TipWindow = effect.TipWindow, Mood = effect.Mood }
+	end
+	const flip = if flipBonus == flipBonus then math.max(flipBonus, 0) else 0
+	if band == nil then
+		return { Tip = nil, Extra = flip, TipWindow = 0, Mood = 0 }
+	end
+	const effect = cfg.Grades.Effects[band]
+	const fixed = effect.Tip
+	return {
+		Tip = if fixed ~= nil and fixed <= 0 then 0 else nil,
+		Extra = math.max(effect.TipExtra or 0, 0) + flip,
+		TipWindow = effect.TipWindow,
+		Mood = effect.Mood,
+	}
 end
 
 return table.freeze(Grade)
