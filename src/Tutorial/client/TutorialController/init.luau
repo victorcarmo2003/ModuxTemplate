@@ -1754,6 +1754,11 @@ function TutorialController:Tick()
 		return self:FirstRun()
 	end)
 	if not firstRun then
+		-- TASK-475: the run left Day 1 mid-step (the phone ringing): take the arrow + highlight down with it
+		if Vide.untrack(self.Running) then
+			self.Running(false)
+			self:ClearGuidance()
+		end
 		self:NoteDone()
 		return
 	end
