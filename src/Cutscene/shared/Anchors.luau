@@ -23,7 +23,10 @@
 	            Point ("{slot}" = slot), side by side (Rules.LineSpacing) on a shared one. nil = not in the map
 	            (or not streamed in yet on a client).
 	  Point(id)  MapPoint by id; "a|b" / "a|b@f" = the point at fraction f (default 0.5) from MapPoint a to b, facing
-	            a -> b; "Poster" / "Phone" = those anchors; "Sign" = SignStand().
+	            a -> b; "Poster" / "Phone" = those anchors; "Sign" = SignStand(); "Poster>o,s" = a ground spot o studs
+	            out of the flyer's printed face and s studs to its right (seen from the flyer), facing along that side
+	            line towards the flyer's normal line -- a walk that follows the flyer when the user moves it,
+	            with no MapPoint in the place (TASK-493).
 ]]
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -344,8 +347,28 @@ function Anchors.OnFallback(target: string): boolean
 	return target == SIGN_TARGET and Anchors.Sign() == nil
 end
 
--- "Poster" / "Phone" / "Sign" / "a|b@f" (fraction f of MapPoint a -> b, default the middle, facing a -> b) /
--- MapPoint id
+-- Ground spot `out` studs out of the flyer's face and `side` studs to its right, facing along the side line towards the
+-- flyer's normal line (side 0: facing the flyer)
+local function posterOffset(out: number, side: number): CFrame?
+	const poster = Anchors.Poster()
+	if poster == nil then
+		return nil
+	end
+	const look = flat(poster.LookVector)
+	if look == nil then
+		return nil
+	end
+	const right = look:Cross(Vector3.yAxis)
+	const at = poster.Position + look * out + right * side
+	const fallback = poster.Position.Y - FLYER_HEIGHT
+	const y = groundAt(at + Vector3.new(0, GROUND_LIFT, 0), fallback) or fallback
+	const position = Vector3.new(at.X, y, at.Z)
+	const facing = if side < 0 then right elseif side > 0 then -right else -look
+	return CFrame.lookAt(position, position + facing)
+end
+
+-- "Poster" / "Phone" / "Sign" / "Poster>o,s" (posterOffset) / "a|b@f" (fraction f of MapPoint a -> b, default the
+-- middle, facing a -> b) / MapPoint id
 function Anchors.Point(id: string): CFrame?
 	if id == "Poster" then
 		return Anchors.Poster()
@@ -353,6 +376,11 @@ function Anchors.Point(id: string): CFrame?
 		return Anchors.Phone()
 	elseif id == SIGN_TARGET then
 		return Anchors.SignStand()
+	end
+	const out, side = string.match(id, "^Poster>([%d%.%-]+),([%d%.%-]+)$")
+	if out ~= nil and side ~= nil then
+		const o, s = tonumber(out), tonumber(side)
+		return if o ~= nil and s ~= nil then posterOffset(o, s) else nil
 	end
 	const a, rest = string.match(id, "^([^|]+)|(.+)$")
 	if a ~= nil and rest ~= nil then

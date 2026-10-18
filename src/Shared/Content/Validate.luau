@@ -1302,6 +1302,11 @@ local function checkCutscenes()
 			-- one avatar per cutscene (owner 2026-10-12): Route only reads the first mark
 			fail("Cutscenes", index, key, "needs at least 1 Mark (only the first is used)")
 		end
+		const nightfall = row.Nightfall
+		if nightfall ~= nil then
+			inRange("Cutscenes", index, key, "Nightfall.At", nightfall.At, 0, row.Duration)
+			inRange("Cutscenes", index, key, "Nightfall.Time", nightfall.Time, 0.1, 30)
+		end
 		const nextKey = row.Next
 		if nextKey ~= nil and (nextKey == key or nextKey == "none" or not Cutscenes.ByKey[nextKey]) then
 			fail("Cutscenes", index, key, `Next '{nextKey}' is not another scene`)

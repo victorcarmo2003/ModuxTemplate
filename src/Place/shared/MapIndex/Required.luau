@@ -319,10 +319,11 @@ local function cutscenePoints(): { string }
 		posts[id] = true
 	end
 	-- Special targets of src/Cutscene/shared/Anchors.luau: "Sign" / "Poster" / "Phone" are found at runtime (tags,
-	-- names) and need no MapPoint; "a|b@f" / "a|b" is a point between two MapPoints, so only a and b are required.
+	-- names) and need no MapPoint, nor does "Poster>o,s" (a spot beside the flyer); "a|b@f" / "a|b" is a point between
+	-- two MapPoints, so only a and b are required.
 	const anchors: { [string]: boolean } = { Sign = true, Poster = true, Phone = true }
 	local function pointsOf(target: string): { string }
-		if anchors[target] or posts[target] then
+		if anchors[target] or posts[target] or string.find(target, "^Poster>") then
 			return {}
 		end
 		const a, rest = string.match(target, "^([^|]+)|(.+)$")
@@ -333,7 +334,9 @@ local function cutscenePoints(): { string }
 	end
 	local out: { string } = {}
 	for _, scene in Content.Cutscenes.List do
-		out = union(out, scene.Marks)
+		for _, mark in scene.Marks do
+			out = union(out, pointsOf(mark))
+		end
 		for _, beat in scene.Beats do
 			if beat.Kind ~= "MoveTo" and beat.Kind ~= "LookAt" then
 				continue

@@ -3886,3 +3886,14 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
 - Anomalias de cliente (família A, cópia) continuam **sem** Night nos outros clientes: o cliente estranho precisa ser o único estranho (Q-147 c).
 - O modo cinema (barras pretas) também apaga, só no mundo, os contornos `Highlight` e as pílulas `BillboardGui` (gorjeta "$0", estoque "9/20", "Ready!"); os prompts ficam. Volta tudo quando as barras saem.
 - Impacto: frontend-coder, art-director.
+
+### DEC-300 — 2026-10-18 — Abertura mais curta: sem atravessar a rua, a noite cai no fim e o jogo começa à noite no restaurante
+
+- Origem: pedido do dono em chat (2026-10-18), com desenho sobre a vista de cima do MAP01_Restaurant, repassado pelo orquestrador. Registrado pelo agente de implementação no formato do secretário.
+- Decidido pelo dono:
+  - O personagem **não atravessa mais a rua**. Já vem andando pela **calçada do próprio restaurante**: sai do lado da porta com as barras metálicas, corre a calçada até a esquina e vira até o **cartaz HELP WANTED** (P-01), ao lado das mesas de fora.
+  - No **fim da cutscene**, enquanto ele olha para o restaurante, **a noite vai caindo** (luz de dia → noite durante o olhar).
+  - **Corte direto**: o jogo começa **dentro do restaurante, já à noite**. O dia inicial (Dia 1) é pulado.
+- **Provisório** (não dito): intro de ~32 s (era 35 s); a rota é medida a partir do cartaz (`"Poster>o,s"`, segue o cartaz se o dono movê-lo); o anoitecer leva 4,5 s a partir de 26,4 s, com o sol se pondo de 16:30; lâmpadas e atmosfera (ATM) só acendem depois do anoitecer; Walt diz "Start tonight" (era "Start today"); a run nova abre na **Noite 1 (Dia 2)** com Intro → ligação da noite → Prep → Noite; PriceParty é fixado no fim da Noite 1 (era fim do Dia 1); chave `Content.Shift.RunStartsAtNight` (false = Dia 1 antigo).
+- **Emendas (append-only):** a DEC de 2026-10-12 (D3 rev. 2, intro na calçada do trailer) e `script.md` §1 / `levels/MAP-01.md` §11.1: ponto de partida e travessia substituídos por esta rota. O calendário do usuário de 2026-10-12 (Dia 1 de dia com tutorial, depois só noites) perde o Dia 1 na run nova. **DEC-240** (última chamada às 18h do Dia 1) e o tutorial do Dia 1 deixam de rodar enquanto `RunStartsAtNight = true`: ver **Q-378**.
+- Impacto: **frontend-coder** (`Content.Cutscenes` intro, `CutsceneController` Nightfall, `LightController`), **backend-coder** (`RoundService`/`Flow`, `AtmosphereService`), **narrative-writer** (`script.md` §1, falas), **level-designer** (MAP-01 §11.1), **game-designer** (tutorial e PriceParty sem Dia 1, Q-378), **qa-tester**. TASK-493.

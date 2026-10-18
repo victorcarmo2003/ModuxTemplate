@@ -18,6 +18,9 @@
 	    day locked with ClockTime following the clock, golden hour 4 -> 6 PM; night interpolated Night 1 -> Night 10.
 	    While a cutscene with a Look plays (attribute CutsceneLook of the local player, set by CutsceneController) the
 	    day preset is replaced by Content.LightPresets.Cinematic (owner request 2026-10-12) and comes back after it.
+	    On a night shift (the intro of a run that starts on Night 1, DEC-300) the look is a late afternoon at
+	    DuskClock with every lamp off; when it leaves (CutsceneNightfall = s of blend) the night comes over that time
+	    and the lamps come on.
 	    Changes blend (smoothstep) over BLEND_TIME; the first write happens in OnStart, without blend.
 
 	Fixtures (binding, MAP-01 §16):
@@ -145,6 +148,9 @@ const LOBBY: Preset = PRESETS.Lobby
 const CINEMATIC: Preset = PRESETS.Cinematic
 -- attribute of the local player CutsceneController sets while a scene with a Look plays (Content.Cutscenes[].Look)
 const LOOK_ATTRIBUTE = "CutsceneLook"
+-- s of blend into the night when the look leaves at a scene's Nightfall (DEC-300; set by CutsceneController)
+const NIGHTFALL_ATTRIBUTE = "CutsceneNightfall"
+const DUSK_CLOCK = Content.LightPresets.DuskClock
 
 local function lerp(a: number, b: number, t: number): number
 	return a + (b - a) * t
@@ -234,6 +240,7 @@ function LightController:Setup()
 	self.From = nil :: Preset?
 	self.FromClock = DAY_CLOCK_MIN :: number
 	self.BlendStart = 0 :: number
+	self.BlendTime = BLEND_TIME :: number
 	self.Mode = "" :: string -- "day" | "night:<k>"; a change starts a blend
 	-- os.clock() of the last night / attempt / vehicle change (switch click guard)
 	self.ContextAt = 0 :: number
@@ -581,10 +588,12 @@ function LightController:RefreshFixtures()
 	const now = Workspace:GetServerTimeNow()
 	const camera = Workspace.CurrentCamera
 	const eye = if camera then camera.CFrame.Position else nil
+	-- the day look of a cutscene keeps every lamp off, also on a night shift (until its Nightfall, DEC-300)
+	const daylight = Players.LocalPlayer:GetAttribute(LOOK_ATTRIBUTE) == "Cinematic"
 	for key, fixtures in self.Fixtures do
-		const groupOn = self:GroupOn(key)
+		const groupOn = not daylight and self:GroupOn(key)
 		for _, fixture in fixtures do
-			const lit = self:FixtureLit(fixture, groupOn, now)
+			const lit = not daylight and self:FixtureLit(fixture, groupOn, now)
 			local live = lit
 			if fixture.Order > 0 then
 				live = lit
@@ -598,12 +607,16 @@ end
 
 -- Lighting preset ------------------------------------------------------------------------------------------------
 
--- Cutscene look on top of the day: the scene's own preset instead of the day one (same clock), blended like any change
+-- Cutscene look on top of the day: the scene's own preset instead of the day one (same clock), blended like any change.
+-- On a night shift (DEC-300: the run's intro on Night 1) the look holds a late afternoon (DuskClock) until the scene's
+-- Nightfall takes it away.
 function LightController:Target(): (Preset, number, string)
 	const preset, clock, mode = self:BaseTarget()
 	const look = Players.LocalPlayer:GetAttribute(LOOK_ATTRIBUTE)
 	if look == "Cinematic" and mode == "day" then
 		return CINEMATIC, clock, `look:{look}`
+	elseif look == "Cinematic" and string.sub(mode, 1, 6) == "night:" then
+		return CINEMATIC, DUSK_CLOCK, `look:{look}`
 	end
 	return preset, clock, mode
 end
@@ -676,12 +689,14 @@ function LightController:RefreshPreset()
 		self.From = previous
 		self.FromClock = self.AppliedClock
 		self.BlendStart = now
+		const nightfall = Players.LocalPlayer:GetAttribute(NIGHTFALL_ATTRIBUTE)
+		self.BlendTime = if type(nightfall) == "number" and nightfall > 0 then nightfall else BLEND_TIME
 	end
 	local preset = target
 	local outClock = clock
 	const from = self.From
 	if from then
-		local alpha = (now - self.BlendStart) / BLEND_TIME
+		local alpha = (now - self.BlendStart) / self.BlendTime
 		if alpha >= 1 then
 			self.From = nil
 		else

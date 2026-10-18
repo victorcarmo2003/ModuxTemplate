@@ -12,7 +12,7 @@
 	Which key:
 	  * a Night phase starts: Content.Nights row of that night, field `Atmosphere` (TASK-271's table); while the rows
 	    have no such field, Content.Atmospheres.Rules.Fallback[night]; unknown key = Rules.Default
-	  * any other phase: nil (the client blends back to the day)
+	  * any other phase: nil (the client blends back to the day); also the Intro of a run that starts at night (DEC-300)
 	  * Force(key) (dev, `/dev atmosphere`): wins over the night until Force(nil); "" forces "no atmosphere"
 
 	API: Get() -> key?, KeyFor(night) -> key, Force(key?), IsForced(). The Scheduler does not need to call anything
@@ -92,7 +92,9 @@ end
 
 function AtmosphereService:Refresh()
 	const round = self.Dependencies.RoundService
-	self:Set(if round:IsNight() then self:KeyFor(round:GetNight()) else nil)
+	-- the run's intro is played on Night 1 (DEC-300) but stays clear: the atmosphere comes in after its nightfall
+	const night = round:IsNight() and round:GetPhase() ~= "Intro"
+	self:Set(if night then self:KeyFor(round:GetNight()) else nil)
 end
 
 AtmosphereService:OnInit(function(self)

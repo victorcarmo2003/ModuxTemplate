@@ -32,7 +32,8 @@
 --   Actor    client-only actor or prop Target appears/acts (Walt, Raincoat Lady, street cars, flip phone, flyer)
 -- The camera is always the avatar's head (DEC-088, DEC-097): it eases to the focus of each beat and allows an elastic
 -- free look around it (Rules.Look), springing back when the player lets go.
--- No night or anomaly element ever enters the intro (only Day props, street cars of the traffic kit, the flyer).
+-- No night or anomaly element ever enters the intro (only Day props, street cars of the traffic kit, the flyer) until
+-- its Nightfall: from then on the light blends to the night of the shift (DEC-300).
 local Table = require(script.Parent.Table)
 
 export type BeatKind = "Fade" | "Text" | "MoveTo" | "LookAt" | "Focus" | "Prompt" | "Line" | "Actor"
@@ -215,6 +216,9 @@ export type Cutscene = {
 	Cinema: boolean?,
 	Look: string?, -- Content.LightPresets key LightController applies while this scene plays ("Cinematic")
 	Shots: { Shot }?,
+	-- s into the scene when its Look leaves and the light blends to the night of the shift over Time s (LightController;
+	-- only on a night shift: the intro of a run that starts on Night 1, DEC-300). nil = the Look holds to the end.
+	Nightfall: { At: number, Time: number }?,
 }
 
 local function walt(at: number, text: string, variant: Variant?): Beat
@@ -312,27 +316,29 @@ const scenes = Table.new({
 		Marks = {},
 		Beats = {},
 	},
-	-- Opening, ~35 s (FEAT-004; owner D3 2026-10-12 rev. 2, PROVISIONAL: short and objective; was 44 s, before 73 s).
-	-- It starts on the NORTH sidewalk of the Ninth, straight across from the trailer (MapPoints CutsceneMark1..4;
-	-- tools/assetplace/cutscene_points.luau), walks east to the crosswalk CW-4 (CS-1, the nearest one to the flyer and the
-	-- widest: 12 studs), CROSSES the empty street on its stripes (CS-1 -> CS-3; traffic is held for the whole scene and no
-	-- car or passer-by is in it), then walks west along the trailer's side of the Ninth to the stand in front of the Help
-	-- Wanted flyer (rev. 3: the owner moved it to X -36, its printed face looks east; Rules.Stand reads the live flyer),
-	-- reads it, calls Walt and ends looking at the trailer (MapPoint TRL).
-	-- Lines are short (<= 6 words; Walt on the phone: 3 lines). The call is ~12 s of voice + pauses, so the scene cannot
-	-- be much shorter than 35 s: Cap 38 = Duration + 3. Starts once every participant's client is ready
-	-- (Rules.ReadyTimeout), so the Intro phase cap (Shift.luau) covers that wait + Cap.
+	-- Opening, ~32 s (FEAT-004; DEC-300, owner 2026-10-18, PROVISIONAL numbers: faster, no street crossing, ends at night;
+	-- was 35 s from the north sidewalk across the Ninth, owner D3 2026-10-12 rev. 2).
+	-- It starts on the restaurant's OWN sidewalk, the side of the door with the metal bars, already walking along it
+	-- towards the flyer ("Poster>18,-46": 18 studs out of the flyer's face, 46 studs to its left), turns at the corner
+	-- ("Poster>18,-4") and walks to the stand in front of the Help Wanted flyer on the P-01 post (Rules.Stand
+	-- reads the live flyer: the route follows it when the user moves it in Studio). Reads it, calls Walt and ends looking at
+	-- the restaurant (MapPoint TRL) while the night falls over it (Nightfall: the day look leaves and LightController blends
+	-- to the night of the shift; the run starts on Night 1, DEC-300). The game fades in inside the restaurant, at night.
+	-- Lines are short (<= 6 words; Walt on the phone: 3 lines). The call is ~11 s of voice + pauses: Cap 35 = Duration + 3.
+	-- Starts once every participant's client is ready (Rules.ReadyTimeout), so the Intro phase cap (Shift.luau) covers
+	-- that wait + Cap.
 	{
 		Key = "intro",
-		Duration = 35,
-		Cap = 38,
+		Duration = 32,
+		Cap = 35,
 		Skippable = true,
 		Participants = "ConnectedAtStart",
 		Music = "lobby", -- PROVISIONAL stand-in for MUS-005 (Abertura); the shift track waits for the end of the chain
-		-- one avatar (owner 2026-10-12): only the first mark; every client shows just its own body (CutsceneMark2..4 stay in the map)
-		Marks = { "CutsceneMark1" },
+		-- one avatar (owner 2026-10-12): every client shows just its own body, from the one mark
+		Marks = { "Poster>18,-46" },
 		Cinema = true,
 		Look = "Cinematic",
+		Nightfall = { At = 26.4, Time = 4.5 },
 		-- Shots (owner request 2026-10-12, PROVISIONAL): the cuts follow the beats below.
 		Shots = {
 			-- 1 establishing: a detached camera behind and above the walker, craning down, over the title
@@ -345,11 +351,11 @@ const scenes = Table.new({
 				Far = 0.5,
 				Rack = 3,
 			},
-			-- 2 the walk and the crossing: back to the head through a dip, hand-held
-			{ At = 3.8, Name = "Walk", Cut = "Dip", Fov = { 54, 56 }, Sway = 0.6, Far = 0 },
+			-- 2 the walk along the sidewalk and round the corner: back to the head through a dip, hand-held
+			{ At = 3, Name = "Walk", Cut = "Dip", Fov = { 54, 56 }, Sway = 0.6, Far = 0 },
 			-- 3 the poster: lazy orbit, then the push-in while it reads
 			{
-				At = 12,
+				At = 9,
 				Name = "Poster",
 				Fov = { 58, 48 },
 				Orbit = { -10, 3 },
@@ -359,7 +365,7 @@ const scenes = Table.new({
 				Rack = 3,
 			},
 			{
-				At = 14.4,
+				At = 11,
 				Name = "Read",
 				Fov = { 46, 34 },
 				Orbit = { 3, 9 },
@@ -369,7 +375,7 @@ const scenes = Table.new({
 			},
 			-- 4 the call: match cut through black on the number, slow push-in while it rings
 			{
-				At = 17,
+				At = 13,
 				Name = "Phone",
 				Cut = "Dip",
 				Fov = { 50, 36 },
@@ -379,7 +385,7 @@ const scenes = Table.new({
 				Rack = 2.5,
 			},
 			{
-				At = 26,
+				At = 21.4,
 				Name = "Drift",
 				Fov = { 36, 40 },
 				Orbit = { -7, 4 },
@@ -388,9 +394,9 @@ const scenes = Table.new({
 				Far = 0.6,
 				Blend = 1.5,
 			},
-			-- 5 the trailer: crane up to reveal it in the sun
+			-- 5 the restaurant: crane up to reveal it while the night falls over it
 			{
-				At = 31.8,
+				At = 26.4,
 				Name = "Reveal",
 				Fov = { 44, 54 },
 				Dolly = { Vector3.new(0, -0.8, 0), Vector3.new(0, 1.2, 0) },
@@ -401,35 +407,32 @@ const scenes = Table.new({
 		},
 		Beats = {
 			{ At = 0, Kind = "Fade", Target = "In" },
-			{ At = 0.6, Kind = "Text", Target = "Title", Text = "Sell Hotdogs!", Sub = "Ninth & Juniper", Hold = 3.2 },
-			-- Beat 1, the walk: one run from CutsceneMark (north sidewalk, across from the trailer) east to CS-1 (curb, in line
-			-- with the crosswalk), straight across the stripes (CS-2) to CS-3 (their south end) and west to the stand in front
-			-- of the P-01 flyer (Rules.Stand), ~74 studs, eased to a stop by 14 s
-			focus(3.8, "Walk"),
-			{ At = 3.8, Kind = "MoveTo", Target = "CS-1" },
-			{ At = 3.9, Kind = "MoveTo", Target = "CS-2" },
-			{ At = 4, Kind = "MoveTo", Target = "CS-3" },
-			{ At = 4.1, Kind = "MoveTo", Target = "CS-P{slot}", Arrive = 14 },
-			crew(4.4, "I really need a job."),
+			{ At = 0.5, Kind = "Text", Target = "Title", Text = "Sell Hotdogs!", Sub = "Ninth & Juniper", Hold = 2.6 },
+			-- Beat 1, the walk: one run along the restaurant's sidewalk, round the corner and on to the stand
+			-- in front of the P-01 flyer (Rules.Stand), ~57 studs, eased to a stop by 10.5 s
+			focus(3, "Walk"),
+			{ At = 3, Kind = "MoveTo", Target = "Poster>18,-4" },
+			{ At = 3.1, Kind = "MoveTo", Target = "CS-P{slot}", Arrive = 10.5 },
+			crew(3.4, "I really need a job."),
 			-- Beat 2, the poster: seen from the sidewalk, read it
-			focus(12, "Poster", 55),
-			crew(13.4, "Help wanted?"),
-			focus(14.4, "Poster", 45), -- reading the flyer and its number
-			crew(15.4, "I'll call them.", "Solo"),
-			crew(15.4, "Let's call them.", "Party"),
+			focus(9, "Poster", 55),
+			crew(10, "Help wanted?"),
+			focus(11, "Poster", 45), -- reading the flyer and its number
+			crew(11.8, "I'll call them.", "Solo"),
+			crew(11.8, "Let's call them.", "Party"),
 			-- Beat 3, the call (the number is only on the prompt and the flyer: nobody says digits)
-			focus(17, "Phone", 55),
-			{ At = 17.2, Kind = "Prompt", Target = "Phone", Text = `Call {PHONE}` },
-			{ At = 18.4, Kind = "Actor", Target = "FlipPhone" }, -- slot 1 only, already open (AST-038)
+			focus(13, "Phone", 55),
+			{ At = 13.2, Kind = "Prompt", Target = "Phone", Text = `Call {PHONE}` },
+			{ At = 14.2, Kind = "Actor", Target = "FlipPhone" }, -- slot 1 only, already open (AST-038)
 			-- the voice speaks sentence by sentence with a pause after . ? ! (Speech.Pieces); the hang-up (Actors
 			-- FLIP_TIME, after the flip beat) waits for the last line
-			walt(19, "Bramble's Corner Dogs. Walt here."),
-			walt(23.3, "You noticed the flyer. Good."),
-			walt(27.1, "Start today. Keys under the mustard."),
-			-- Beat 4: the focus stays on the phone/poster through the call; the flip closes (hang-up click), a breath,
-			-- then everyone turns to the trailer (MapPoint TRL, eased) and holds on it; fade out; the game fades in after
-			focus(31.8, "TRL", 55),
-			{ At = 33.4, Kind = "Fade", Target = "Out" },
+			walt(14.8, "Bramble's Corner Dogs. Walt here."),
+			walt(18.8, "You noticed the flyer. Good."),
+			walt(22.4, "Start tonight. Keys under the mustard."),
+			-- Beat 4: the flip closes (hang-up click), everyone turns to the restaurant (MapPoint TRL, eased) and holds on
+			-- it while the night falls (Nightfall); fade out; the game fades in inside the restaurant, at night
+			focus(26.4, "TRL", 55),
+			{ At = 30.6, Kind = "Fade", Target = "Out" },
 		},
 	},
 	-- Dawn of Night 10, variant A1 (DEC-075, DEC-076); <= 60 s; MAP-01 §11.3 SS-1..4, WALT-1, RL-1 -> RL-END

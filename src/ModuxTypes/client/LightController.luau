@@ -45,6 +45,7 @@ export type Public = {
 	AppliedClock: number,
 	Atmosphere: Atmosphere?,
 	BlendStart: number,
+	BlendTime: number,
 	Bloom: BloomEffect?,
 	ColorCorrection: ColorCorrectionEffect?,
 	ContextAt: number,

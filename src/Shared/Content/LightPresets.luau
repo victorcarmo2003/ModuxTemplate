@@ -73,6 +73,7 @@ export type LightPresets = {
 	NightClock: number, -- ClockTime of every night (§5.3: fixed near 0)
 	GoldenFrom: number, -- hour the golden hour starts (§5.2: 4 PM)
 	GoldenTo: number, -- hour it is full (6 PM)
+	DuskClock: number, -- ClockTime of the intro's day look on a night shift; its Nightfall runs the sun down from here (DEC-300)
 	BlendTime: number, -- s of the smooth (eased) blend between two presets
 	Blackout: BlackoutLook,
 }
@@ -261,6 +262,7 @@ const presets: LightPresets = {
 	NightClock = 0,
 	GoldenFrom = 16,
 	GoldenTo = 18,
+	DuskClock = 16.5, -- PROVISIONAL (DEC-300): late afternoon light, the sun sets during the Nightfall blend
 	BlendTime = 3,
 	Blackout = {
 		Ambient = Color3.fromRGB(16, 17, 28),

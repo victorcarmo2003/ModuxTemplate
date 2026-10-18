@@ -142,6 +142,7 @@ const VOTE_SOUND = "skip_vote"
 const VOTE_CLIP = "wave_skip"
 const ACTIVE_ATTRIBUTE = "CutsceneActive"
 const LOOK_ATTRIBUTE = "CutsceneLook" -- Content.Cutscenes[].Look: LightController applies that preset while the scene plays
+const NIGHTFALL_ATTRIBUTE = "CutsceneNightfall" -- Content.Cutscenes[].Nightfall.Time: s LightController blends to the night
 const CINEMA_ORDER = 50 -- letterbox and vignette: under the fade (51) and the subtitles (52)
 const VIGNETTE_COLOR = Color3.fromRGB(34, 20, 12) -- warm dark edge, never the night blue
 const ACTOR_LIFT = Vector3.new(0, 2, 0) -- focus on a car: a bit above its base
@@ -535,6 +536,7 @@ function CutsceneController:ClearSegment()
 		ambience.Destroy()
 	end
 	Players.LocalPlayer:SetAttribute(LOOK_ATTRIBUTE, nil)
+	Players.LocalPlayer:SetAttribute(NIGHTFALL_ATTRIBUTE, nil)
 	self.Scene = nil
 	self.Beats = {}
 	table.clear(self.Fired)
@@ -913,6 +915,13 @@ end
 -- Cinema of this frame (scenes with Shots / Cinema): the camera rig of the shot, the black of a dip and the height of the
 -- letterbox bars. Sounds (title, dip, shot cues) fire for instants crossed live only. Returns (dip, bar fraction).
 function CutsceneController:StepCinema(scene: Scene, elapsed: number, last: number): (number, number)
+	-- Nightfall (DEC-300): the scene's look leaves and LightController blends to the night of the shift over its Time
+	const nightfall = scene.Nightfall
+	const player = Players.LocalPlayer
+	if nightfall ~= nil and elapsed >= nightfall.At and player:GetAttribute(NIGHTFALL_ATTRIBUTE) == nil then
+		player:SetAttribute(NIGHTFALL_ATTRIBUTE, nightfall.Time)
+		player:SetAttribute(LOOK_ATTRIBUTE, nil)
+	end
 	if scene.Cinema ~= true and scene.Shots == nil then
 		return 0, 0
 	end

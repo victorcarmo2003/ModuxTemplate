@@ -528,7 +528,7 @@ function RoundService:Go(phase: Phase, startedAt: number)
 	if phase == "Summary" then
 		-- Shift is over: Economy deposits and sends ShiftReport, then PriceParty is fixed on Day 1 (DEC-121)
 		self.ShiftEnded:Fire(info)
-		if info.Day == 1 and not info.IsNight then
+		if Flow.IsFirst(info, Content.Shift.RunStartsAtNight) then
 			self.Dependencies.RunStateService:FixPriceParty()
 		end
 	elseif phase == "NightEnd" then
@@ -608,8 +608,8 @@ function RoundService:EndRun(startedAt: number)
 	self.Busy = true
 	if not self.Dependencies.RunStateService:ResetDev() then
 		self.Busy = false
-		warn("[RoundService] RunEnd: no first capture to go back to; starting Day 1 again")
-		self:StartShift({ Day = 1, Night = 0, IsNight = false, Attempt = 0 }, startedAt, true, true)
+		warn("[RoundService] RunEnd: no first capture to go back to; starting a new run again")
+		self:StartShift(Flow.Start(Content.Shift.RunStartsAtNight), startedAt, true, true)
 	end
 end
 
@@ -703,7 +703,7 @@ function RoundService:StartRun()
 		return
 	end
 	self:Publish()
-	self:StartShift(self:Info(), workspace:GetServerTimeNow(), true, true)
+	self:StartShift(Flow.Start(Content.Shift.RunStartsAtNight), workspace:GetServerTimeNow(), true, true)
 end
 
 -- Started + the Shift set (network writes start here; Lync.start already ran: NetService OnStart, priority 1000)
@@ -732,7 +732,7 @@ function RoundService:ResumeRun(): boolean
 		return true
 	end
 	warn("[RoundService] ResumeRun: no snapshot to restore; starting a new run")
-	self:StartShift(self:Info(), workspace:GetServerTimeNow(), true, true)
+	self:StartShift(Flow.Start(Content.Shift.RunStartsAtNight), workspace:GetServerTimeNow(), true, true)
 	return false
 end
 

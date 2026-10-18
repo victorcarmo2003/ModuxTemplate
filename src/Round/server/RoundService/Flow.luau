@@ -56,17 +56,33 @@ function Flow.DayOfNight(night: number): number
 	return night + 1
 end
 
--- First phase of a shift: Intro only on the first shift of a new run; a night opens with the boss call
-function Flow.First(info: Info, newRun: boolean): string
-	if info.IsNight then
-		return "Call"
+-- First shift of a new run: Day 1 (the day shift), or Night 1 on Day 2 when the run skips the day (DEC-300)
+function Flow.Start(atNight: boolean): Info
+	return Flow.OfDay(if atNight then Flow.DayOfNight(1) else 1, 1)
+end
+
+-- The run's first shift (Day 1, or Night 1 of a run that starts at night): PriceParty is fixed at its end (DEC-121)
+function Flow.IsFirst(info: Info, atNight: boolean): boolean
+	if atNight then
+		return info.IsNight and info.Night <= 1
 	end
-	return if newRun then "Intro" else "Prep"
+	return info.Day <= 1 and not info.IsNight
+end
+
+-- First phase of a shift: Intro only on the first shift of a new run (also on a night, DEC-300); a night opens with
+-- the boss call
+function Flow.First(info: Info, newRun: boolean): string
+	if newRun then
+		return "Intro"
+	end
+	return if info.IsNight then "Call" else "Prep"
 end
 
 -- Fixed successor of a phase, nil when the service decides (Night, Summary, NightLost, RunEnd)
 function Flow.After(phase: string, info: Info, lastNight: number): string?
-	if phase == "Intro" or phase == "Call" then
+	if phase == "Intro" then
+		return if info.IsNight then "Call" else "Prep"
+	elseif phase == "Call" then
 		return "Prep"
 	elseif phase == "Resume" then
 		return Flow.First(info, false)
