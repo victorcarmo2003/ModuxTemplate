@@ -17,6 +17,14 @@ onde a chave do restaurante foi ligada à mão e desliga o Prep (`src/Shared/Con
 
 ### 0.1 Fluxo novo, passo a passo (Provisório nos pontos das Q-379 a Q-383)
 
+> **DEC-305 (emenda):** **dois prompts**, um na **grelha** (`Prompt_Grill`) e um na **esteira**, no lugar do prompt único
+> (rejeita P3/P5 de `tech/prep-conveyor.md`); solo, o montador sai da esteira, vai à grelha e volta. Grelha **8/6/4 s**
+> (emenda DEC-201). **Perfect = gorjeta base + $1** (`TipExtra` 1). **UPG-016 Heat Lamp fora de venda** sem queima.
+> Provisórias aceitas por padrão, sem Q: mesa central em **fileira de 8** (MAP-01-r4 §16); "esquerda" do dono = **leste**
+> (X maior, bancada olhando para o sul); descanso com **8 salsichas**; **4 paradas** (Grelha, Tábua, Condimentos, Saída);
+> pronta vai **sozinha ao descanso**, descanso cheio = **espera na grelha**; virar **fora da nota**, só bônus; padrão fixo
+> por molho: **Zigzag, Wave, Line**. Onde a tabela abaixo diz "prompt único", vale esta emenda.
+>
 > **DEC-304 (emenda):** o pedido tomado no tablet cria um **prato vazio com o ticket #n** numa vaga da **mesa central**. O
 > montador pega esse prato (segurar E), leva à esteira, monta, e devolve à mesa ou leva direto ao `PICKUP`. Enquanto segura
 > o prato, o **ticket fica na tela** (HUD). A mesa central é o **início e o fim** do fluxo. Os passos abaixo seguem esta ordem.

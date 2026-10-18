@@ -4005,3 +4005,27 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
   - **DEC-303 / Q-383**: as 8 vagas recebem pratos **desde o pedido** (vazios com ticket), não só os prontos.
   - **DEC-271** (pedido vai sozinho a um prato-slot com o papel do pedido) volta a valer, agora na mesa central.
 - Impacto: **architect**, **backend-coder** (`PlateService`: prato vazio com `Ticket` na vaga), **frontend-coder** (ticket no HUD com o prato na mão), **level-designer** (mesa central entre tablet, esteira e `PICKUP`), **task-planner**, **qa-tester**.
+
+### DEC-305 — 2026-10-18 — Cozinha da esteira: dois prompts (grelha e esteira), grelha 8/6/4 s, Perfect = gorjeta base + $1, Heat Lamp fora de venda
+
+- Origem: respostas do dono ao orquestrador em chat (2026-10-18), repassadas ao secretário, sobre `tech/prep-conveyor.md` (TASK-512, §12), `levels/MAP-01-r4-restaurant.md` §16 (TASK-503), `design/restaurant-flow.md` FEAT-044/045 (TASK-508) e `art/asset-list.md` AST-157 a AST-163 (TASK-523).
+- Decidido pelo dono:
+  - **Dois prompts:** um para a **grelha** e outro para a **esteira**, em vez de um prompt único que escolhe pelo que está na mão. **Rejeita a P3 e a P5** do `prep-conveyor.md`. Solo: o montador sai da esteira, usa o prompt da grelha e volta. A âncora **`Prompt_Grill`** reservada pelo level-designer passa a valer.
+  - **Tempo de grelha 8 / 6 / 4 s** por nível (UPG-001), como o código já faz. **Emenda a DEC-201** (12/10/8).
+  - **Perfect paga a gorjeta base + $1** (`TipExtra` = 1, somado), no lugar do valor fixo de $2.
+  - **UPG-016 Heat Lamp sai de venda** no restaurante enquanto não houver queima.
+- **Provisórias aceitas por padrão** (não perguntadas ao dono; seguem a recomendação dos docs, sem Q):
+  - mesa central em **fileira de 8** (o grid 4×2 não cabe; MAP-01-r4 §16);
+  - a "esquerda" da fala do dono = **leste (X maior)**; quem está na bancada olha para o sul;
+  - mesa de descanso com **8 salsichas** (a FEAT dizia 6; arte e layout dizem 8);
+  - **4 paradas** na esteira: Grelha, Tábua, Condimentos e Saída (P6 a P8);
+  - a salsicha pronta **vai sozinha ao descanso**; com o descanso cheio, **espera na grelha** (P11, P12);
+  - o **virar fica fora da nota**, conta só como bônus (P13);
+  - **padrão fixo por molho**: Zigzag, Wave e Line.
+- **Emendas (append-only):**
+  - **DEC-302** ("um ProximityPrompt único abre o preparo"): passa a ser **dois prompts** (grelha e esteira).
+  - **DEC-303** (Perfect dá gorjeta extra) e o Provisório "Perfect = $2" de `tech/prep-mode.md` §2: o valor vira **base + $1**.
+  - **DEC-201** (12/10/8 s): **8/6/4 s**.
+  - **DEC-298** (sem queima): o UPG-016 fica fora de venda até a queima voltar.
+  - `tech/prep-conveyor.md` P3/P5: rejeitadas; o dono do doc (architect) atualiza.
+- Impacto: **architect** (`prep-conveyor.md` P3/P5 e §12), **game-designer** (UPG-016, `TipExtra`, FEAT-045 8 salsichas), **level-designer** (`Prompt_Grill`), **backend-coder**, **frontend-coder**, **task-planner**, **qa-tester**.

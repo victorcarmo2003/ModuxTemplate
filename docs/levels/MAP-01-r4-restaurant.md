@@ -10,6 +10,8 @@ Números são valores iniciais (DEC-044). O que não tem `[DEC-###]` é **propos
 
 **Rev. 3 (2026-10-17, TASK-382, DEC-281 e DEC-282, Provisório):** a casca é um **trailer expandido** (dois módulos acoplados com o visual do AST-027), não um prédio. A **despensa foi ampliada** para X 25..50, Z 72..79 (era 9 × 7) e ganhou uma **porta externa `DOOR-B`** no lado sul: o jogador sai pela despensa (DOOR-P → passagem livre X 25,5..32 → DOOR-B → calçada) para ir ao Mart. DOOR-P passa a 5 × 8 (X 25,5..30,5); a escotilha `HATCH-L` e o `DROP-R` foram para o lado sul da despensa (X 44..47). Detalhes e medidas: §5.9; comparação e prints: `docs/tasks/captures/restaurant-comparison.md`.
 
+**Rev. 4 (2026-10-18, TASK-503, DEC-302 a DEC-304, Provisório):** a cozinha volta ao modo focado, agora com **esteira**. A bancada do fundo vira **bancada em dois níveis** (estações em cima, esteira embaixo), a mesa de montagem vira a **mesa central** de 8 vagas onde o prato nasce com o ticket, e o `PICKUP` fica onde está. Tudo na **§16**; ela vale sobre §5.4, §5.5, §6 e §7.1 onde discordarem.
+
 ---
 
 ## 1. Resumo
@@ -135,12 +137,16 @@ Distâncias de prompt: pote ↔ PICKUP 8,5; PICKUP ↔ TAB-2 14; TAB-2 ↔ puxad
 
 ### 5.4 Mesa de montagem e pratos-slot
 
+> Rev. 4: a mesa vira a **mesa central** (DEC-303, DEC-304), com as mesmas 8 posições; o uso novo está na §16.5.
+
 | ID | O quê | Posição | Binding |
 |---|---|---|---|
 | ASM | Mesa de montagem | X 31,5..53,5, Z 61..63,5 (**22 × 2,5**), tampo 3,0 | acesso pelos dois corredores e pelas duas pontas |
 | `PLATE-1..8` | Pratos-slot meio transparentes [DEC-271] | Z 62,25, Y 3,05; X **33,4 · 36,0 · 38,6 · 41,2 · 43,8 · 46,4 · 49,0 · 51,6** (2,6 entre centros) | `Part` tag `PlateSlot`, `PlateIndex = n`, `Prompt_Put` / `Prompt_Take`, `Att_Ticket` 2,5 acima (BillboardGui). Alcance 6, sem exigir linha de visão. PLATE-8 (leste) fica no caminho mais curto para a retirada |
 
 ### 5.5 Estações do fundo
+
+> **Superada pela §16 (rev. 4, DEC-302).** A tabela abaixo é histórico da rev. 2/3 (ordem do fluxo de mundo F2).
 
 Bancada X 30..59,5, Z 68,5..71,5 (3 de fundo), tampo 3,0. Pose em **Z 67,3**, prompt na borda (Z 68,9; Y 3,3), virado para o sul. Cada estação = `Model` tag `Station` + `StationKind`, dentro do Model `TRL`.
 
@@ -428,3 +434,312 @@ Renumerado pela TASK-395 (art-director, 2026-10-17): a reserva AST-123..139 da r
 | Q-317 | **Sem porta para fora**, como o jogador vai ao Mart / Gear Stand, e onde acorda (REV) e é recolhido pela ambulância? | **Resolvida em parte (rev. 3, DEC-282, Provisório):** saída pela `DOOR-B` da despensa até a calçada e o Mart; REV-1..4 dentro do trailer (corredor do fundo); a ambulância chega pela `DOOR-B`. Falta: regras de anomalia com a porta aberta (família B, Hide, ANM-028) e a rota da equipe da ambulância |
 | Q-318 | Ladrão de dia sem gaveta e sem jogador fora: alvo vira o pote (ponta esquerda, visto pelo vidro) ou sai? | Sai na 1ª versão; `L3` fica só como ponto legado |
 | Q-319 | Walker / postes: a "janela" agora é o vidro do balcão (Z 54). Mover `WALKER-10` para (36; 28) e reconferir NL-01..04 com raycast das poses do balcão? | Sim; se B1 tapar NL-01, puxar a fileira 10 studs para oeste |
+
+---
+
+## 16. Cozinha com esteira: bancada em dois níveis, esteira e mesa central (rev. 4, TASK-503)
+
+Fontes: **DEC-302** (modo focado volta com esteira; grelha + mesa de descanso à esquerda, tábua e pão no meio, condimentos à
+direita; estações numa bancada mais alta, prato embaixo na esteira), **DEC-303** (foco por jogador, até 2 pratos na esteira,
+1 prato por estação e o 2º espera ao lado, grelha focada, mesa central de 8 vagas com ticket), **DEC-304** (o prato vazio nasce
+na mesa central com o ticket; a mesa é o início e o fim). Medidas das peças: fichas **AST-157 a AST-163** (`art/asset-list.md`,
+TASK-523). Posições atuais lidas em `tools/assetplace/restaurant_bind.luau` (CLONES l. 1004-1020, PICKUP l. 1621-1654,
+ASM/PLATE l. 1656-1701, BackCounter l. 1703-1733) e nas edições à mão do dono no topo do mesmo arquivo.
+**Tudo nesta seção é Provisório** (proposta do level-designer), menos o que cita DEC. Nomes de âncora conferidos com as fichas
+da TASK-523; o contrato da TASK-512 ainda não existe e pode renomear (§16.10). O mundo da referência de mecânica não entra:
+nenhuma forma, nome ou tela copiada.
+
+### 16.1 Qual é a "esquerda" (conferido)
+
+- O cozinheiro na bancada do fundo fica no corredor do fundo **olhando para o sul** (+Z do MAP). Olhando para o sul, a **esquerda
+  é o leste (X maior)** e a **direita é o oeste (X menor)**.
+- A câmera do foco (§16.6) também fica ao norte da bancada olhando para o sul. Então **a esquerda da tela = a esquerda do
+  cozinheiro = leste**. Não há ambiguidade entre os dois pontos de vista.
+- Confere com a fala do dono na DEC-301: "condimentos lá na esquerda" quando o `COND-1` estava em X 54,6 (leste).
+- Marcos para o dono: **esquerda = lado do tablet e da janela do drive-thru (parede leste)**; **direita = lado da porta da
+  despensa e do `PICKUP` (oeste)**.
+- No place (mapa girado 180°, §2) o leste do MAP é o −X do mundo. A rotação de 180° não espelha nada: esquerda e direita
+  continuam as mesmas para quem está dentro.
+- **Atenção na planta da §16.3:** ela tem o norte para cima, então a esquerda do cozinheiro aparece à **direita do desenho** e o
+  prato anda para a esquerda do desenho (`<`). A vista da §16.4 é a do cozinheiro, e nela o prato anda da esquerda para a direita
+  (`>`).
+
+Fluxo de um pedido, de leste para oeste: o prato entra na esteira pela ponta da grelha, passa pelo descanso, pelo pão e pelos
+condimentos, e sai na ponta oeste, a ~4 studs da mesa central e a ~21 do `PICKUP`, sem voltar a um X já passado.
+
+### 16.2 Profundidade: o conflito do AST-158 e a resolução
+
+A bancada do AST-158 tem **4,4 de fundo** (deck baixo da esteira 1,6 + prateleira alta 2,8). A bancada atual já está colada na
+parede do fundo (tampo até Z 71,4; a face interna da parede fica em 71,5), então **recuar até a parede não ganha nada**. Estreitar
+o deck baixo para 1,4 também não basta: a frente iria a Z 67,2 e o corredor do fundo ficaria com 3,7.
+
+**Resolução (Provisória):** a bancada fica com os 4,4 do AST-158 (Z 67,0..71,4) e a **mesa central anda 1,0 para o norte**
+(Z 60,0..62,5, era 61..63,5). Larguras:
+
+| Faixa | Z | Largura | Mínimo (§1) |
+|---|---|---|---|
+| Balcão da frente (tampo) | 53,8..55,6 | — | — |
+| Corredor da frente (caixa, entregador, spawns PS-1..4) | 55,6..60,0 | **4,4** (era 5,4) | 4 |
+| Mesa central | 60,0..62,5 | 2,5 | — |
+| Corredor do fundo (montadores, grelhador, rota das caixas) | 62,5..67,0 | **4,5** (era 5,0) | 4 |
+| Bancada: deck baixo (esteira) | 67,0..68,6 | 1,6 | — |
+| Bancada: prateleira alta (estações) | 68,6..71,4 | 2,8 | — |
+
+Os dois corredores comportam **2 jogadores lado a lado** (R6 tem 2 de largura: 2 × 2 + folga 0,4 = 4,4). A colisão
+jogador-jogador está desligada (DEC-175), então ninguém trava ninguém. O deck baixo segue com 1,6 e o AST-157 não muda.
+
+### 16.3 Vista de cima (ASCII)
+
+Escala: **1 coluna = 0,5 stud (X)**, **1 linha = 1 stud (Z)**, com X de 25 a 60 e Z de 54 a 72. Norte para cima. ASCII com
+erro de ±0,5; **as tabelas da §16.5 são a fonte da verdade**.
+
+```
+  X →  25        30        35        40        45        50        55        60
+       |         |         |         |         |         |         |         |
+  54   W====$==============PPPPP================================L=====T======W   balcão: $ pote · P PICKUP · L persiana · T TAB-1
+  55   W=====================================================================W
+  56   W.....................p........................................p......W   p = poses (PICKUP, TAB-1)
+  57   W...................................C.................................W   C = câmera larga do foco (Z 58,1, Y 8,9)
+  58   W...............@.........@.........@.........@.......................W   @ = PS-1..4
+  59   W.....................................................................J   J = janela do drive-thru
+  60   Wccccc.......aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa............J   a = MESA CENTRAL (Z 60,0..62,5)
+  61   Wccccc.......aaaa1aaaa2aaaa3aaaa4aaaaa5aaaa6aaaa7aaaa8aaaa......m.....J   1..8 = vagas (Mount_Plate_n); m = DT-PC
+  62   Wccccc.......aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa............J   c = cafeteira
+  63   W.....................................................................W   corredor do fundo (Z 62,5..67,0)
+  64   W..u............r.........r.........r.........r......................SW   u = BIN-K; r = REV-1..4 (movidos, §16.8); S = KSW
+  65   W............................b.........b..........g...................W   b = Seat_Belt_2 / _1; g = Seat_Grill
+  66   W.....................................................................W
+  67   W..........._<<<<<<<<<<<<<<<<<<<<<<<<<!<<<<<<<<<<<<__________________FW   deck baixo: < esteira (o prato anda para oeste); ! = Prompt_Work; F = PHONE-R
+  68   W..........._<<<4<<<<<<<<3<<<<<<<<2<<<<<<<1<<<<w<<<__________________.W   4..1 = Stop_4..1; w = WaitL_1 (entrada)
+  69   W...........^^^^^^^KKKKKKKKKKKKTTTBBBBBRRRRRRGGGGGGGGGGDDDD^^^^^^^^^^.W   prateleira alta (Y 3,9): K condimentos · T tábua · B pães
+  70   W...........^^^^^^^KKKKKKKKKKKKTTTBBBBBRRRRRRGGGGGGGGGGDDDD^^^^^^^^^^YW   R mesa de descanso · G grelha · D salsichas cruas; Y = GAS-1 (movido)
+  71   W...........^^^^^^^KKKKKKKKKKKKTTTBBBBBRRRRRRGGGGGGGGGGDDDD^^^^^^^^^^.W
+  72   W+++++++++++WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW   + = DOOR-P (despensa)
+```
+
+Leitura em 3D: de qualquer ponto do corredor do fundo vê-se a bancada inteira, em degrau: embaixo a esteira escura com as
+marcas Mustard de parada e em cima as três massas de estação (aço da grelha, madeira do pão, aço com friso Teal dos
+condimentos, AST-158). A mesa central fica entre o fundo e o balcão e é vista dos dois corredores. Ninguém precisa sair do
+cômodo.
+
+### 16.4 Vista do cozinheiro e da câmera larga (elevação, olhando para o sul)
+
+Escala: 1 coluna = 0,5 stud, **X diminui para a direita** (esquerda = leste). Fora de escala na altura.
+
+```
+  X:       55      51      47      43      39      35      31
+  Y 4–5,2   DDDDDGGGGGGGGGGRRRRRRBBBBBTTTKKKKKKKKKKKK          estações na prateleira alta (D cruas · G grelha · R descanso · B pães · T tábua · K condimentos)
+  Y 3,9    =================================================  tampo alto (degrau de 0,9)
+  Y 3,08   _________>>>>w>>>>1>>>>>>>2>>>>>>>>3>>>>>>>>4>>>_  esteira: o prato anda da ESQUERDA para a DIREITA (w entrada, 1..4 paradas)
+  Y 4,2                          !                            Prompt_Work (frente do deck)
+  pés                g          b         b                   Seat_Grill · Seat_Belt_1 · Seat_Belt_2 (Z 65,8)
+           ← ESQUERDA (leste: tablet, DT)        DIREITA (oeste: despensa, PICKUP) →
+```
+
+### 16.5 Posições e rotações (referencial MAP; no place = `(−x, y, 67,887 − z)`)
+
+Convenções: "frente para o norte" = a frente da peça olha para o cozinheiro (`DIR.N` do bind, como hoje); "olha para o sul"
+= LookVector +Z do MAP = **−Z do mundo** (yaw 0 no place). Y = altura no mundo (piso 0,45).
+
+**a) Bancada e esteira**
+
+| Âncora (AST) | O quê | Posição / medidas | Rotação | No place (x; z) |
+|---|---|---|---|---|
+| `BENCH2` (AST-158) | Bancada de dois níveis (substitui o `BackCounter`) | X 31,0..59,42 (a ponta oeste segue a TASK-477: livre do batente da DOOR-P); deck baixo Z 67,0..68,6, tampo Y 3,0; prateleira alta Z 68,6..71,4, tampo Y 3,9; espelho até Y 5,2 colado na parede | frente para o norte | X −31,0..−59,42; Z 0,887..−3,513 |
+| `Mount_Belt` (AST-157) | Origem da esteira | esteira X 31,2..50,4 (19,2 = 4 × `Straight_4` + `Straight_2` + 2 pontas), centro da lona Z 67,8, lona Y 3,0 | ao longo de X; ponta "L" no leste (50,4) | (−40,8; 0,087) |
+| `Stop_1` | Parada 1: **grelha + descanso** (o montador pega a salsicha) | (46,2; 3,08; 67,8) | — | (−46,2; 0,087) |
+| `Stop_2` | Parada 2: **tábua e pão** (cortar, pôr a salsicha no pão) | (42,0; 3,08; 67,8) | — | (−42,0; 0,087) |
+| `Stop_3` | Parada 3: **condimentos** (desenhar) | (37,35; 3,08; 67,8) | — | (−37,35; 0,087) |
+| `Stop_4` | Parada 4: **saída** (o prato volta à mão) | (33,0; 3,08; 67,8) | — | (−33,0; 0,087) |
+| `WaitL_n` / `WaitR_n` | Espera ao lado (DEC-303), ±2,1 de `Stop_n`; **L = leste** (esquerda do cozinheiro), **R = oeste** | WaitL: 48,3 · 44,1 · 39,45 · 35,1; WaitR: 44,1 · 39,9 · 35,25 · — (`WaitR_4` cairia fora da esteira: não existe, o prato sai) | — | x negativo, z 0,087 |
+| (entrada) | O prato entra em `Stop_1`; se ela está ocupada, entra em `WaitL_1` (48,3), na frente da grelha | — | — | — |
+
+Distâncias entre paradas: 1–2 **4,2** · 2–3 **4,65** · 3–4 **4,35** (≥ 4,2, mínimo do AST-157). Algumas esperas vizinhas
+coincidem (`WaitR_1` = `WaitL_2` = X 44,1) ou quase (`WaitR_2` 39,9 × `WaitL_3` 39,45). Com no máximo 2 pratos na esteira
+isso não gera conflito: um prato que espera tem o outro numa parada, nunca em outra espera.
+
+**b) Estações na prateleira alta** (base-centro no tampo Y 3,9; centro Z 70,0; todas com a frente para o norte)
+
+| Âncora | Estação | X (largura) | Centro | Peça de origem (bind) | Prompt de mundo |
+|---|---|---|---|---|---|
+| `Mount_Stock` (novo, sem ficha) | Salsichas cruas (cooler AST-018) | 52,3..54,3 (2,0) | (53,3; 70,0) | clone `STOCK` (TRL-S) | `Prompt_Restock` (53,3; 4,8; 70,4), só com caixa DOGS |
+| `Mount_Grill` | **Grelha** AST-120 (vista focada, DEC-303) | 47,5..52,1 (4,6) | (49,8; 70,0) | clone `GRILL-1` (TRL-G) | nenhum (`grill_collect`/`grill_flip` desligados, TASK-496/515) |
+| `Mount_Rest` | **Mesa de descanso** AST-160 (`Rail_8`, capacidade 8) | 44,3..47,3 (3,0) | (45,8; 70,0) | clone `RAIL` (TRL-R), que passa a se chamar `REST` | nenhum (`Prompt_Rail` desligado no modo esteira) |
+| `Mount_BunCrate` | **Caixa de pães** AST-015 | 42,1..44,1 (2,0) | (43,1; 70,0) | clone `BUN` | `Prompt_Restock` (43,1; 4,8; 70,4), só com caixa BUNS |
+| `Mount_Board` | **Tábua + faca** AST-014 | 40,3..41,9 (1,6) | (41,1; 70,0) | clone `CUT-1` | nenhum |
+| `Mount_Sauce` | **Condimentos** AST-017 (~5,5) | 34,6..40,1 (5,5) | (37,35; 70,0) | clone `COND-1` | `Prompt_Restock` (37,35; 4,8; 70,4), só com caixa de condimento |
+| (livre) | Tampo sem estação | 31,0..34,4 e 54,5..59,42 | — | — | — |
+
+A mesa de descanso fica **colada no lado do pão** (borda direita do bloco esquerdo, como pede o AST-160): `Stop_1` fica sob ela
+e o `Stop_2` fica a 4,2.
+
+**c) Assentos, prompt único e câmeras**
+
+| Âncora | O quê | Posição | Rotação | No place |
+|---|---|---|---|---|
+| `Seat_Grill` | Pé do grelhador | (49,8; 0,45; 65,8) | olha para o sul | (−49,8; 0,45; 2,087) |
+| `Seat_Belt_1` | Pé do montador 1 | (44,6; 0,45; 65,8) | olha para o sul | (−44,6; 0,45; 2,087) |
+| `Seat_Belt_2` | Pé do montador 2 | (39,4; 0,45; 65,8) | olha para o sul | (−39,4; 0,45; 2,087) |
+| `Prompt_Work` | **Prompt único** (DEC-302), na frente do deck baixo | (44,0; 4,2; 67,1) | — | (−44,0; 4,2; 0,787) |
+| `Prompt_Grill` (reserva) | Só se a TASK-512 separar a entrada da grelha | (49,8; 4,2; 67,1) | — | (−49,8; 4,2; 0,787) |
+| `CamAnchor_Belt` / `Focus_Belt` | **Câmera larga** do foco da esteira: as 3 estações e a esteira inteira | câmera (42,75; 8,87; 58,12) → alvo (42,75; 3,8; 69,0); d 12, 25° para baixo, `Fov` **70** | olha para o sul, pitch −25° | (−42,75; 8,87; 9,767) → (−42,75; 3,8; −1,113) |
+| `CamAnchor_Rest` / `Focus_Rest` | Vista perto da `Stop_1` | câmera (46,2; 7,14; 65,36) → alvo (46,2; 3,6; 68,9); d 5,0, 45°, `Fov` 55 | sul, −45° | z 2,527 → −1,013 |
+| `CamAnchor_Board` / `Focus_Board` | Vista perto da `Stop_2` | câmera (42,0; 7,14; 65,36) → alvo (42,0; 3,6; 68,9) | sul, −45° | idem |
+| `CamAnchor_Toppings` / `Focus_Toppings` | Vista perto da `Stop_3` | câmera (37,35; 7,14; 65,36) → alvo (37,35; 3,6; 68,9) | sul, −45° | idem |
+| `CamAnchor_Grill` / `Focus_Grill` | Vista do grelhador: cruas + grelha + descanso | câmera (49,3; 8,18; 66,66) → alvo (49,3; 4,2; 70,0); d 5,2, 50°, `Fov` 55 | sul, −50° | (−49,3; 8,18; 1,227) → (−49,3; 4,2; −2,113) |
+
+Rotação de cada câmera = `CFrame.lookAt(CamAnchor, Focus)`. O nome segue a regra de `tech/prep-3d.md` §4.1
+(`CamAnchor_<Vista>`/`Focus_<Vista>`, atributo `Fov`). As âncoras ficam na bancada (são de todos), não por assento:
+as duas pessoas na esteira usam a mesma câmera larga e a mesma câmera de parada.
+
+**d) Mesa central (DEC-303, DEC-304) e PICKUP**
+
+| Âncora | O quê | Posição | Rotação | No place |
+|---|---|---|---|---|
+| `CENTER` (AST-161 em fileira; ver §16.7) | Mesa central, tampo 22 × 2,5, Y 3,0 | X 31,5..53,5, **Z 60,0..62,5** (anda 1,0 para o norte) | comprida em X | Z 7,887..5,387 |
+| `Mount_Plate_1..8` | Centro de cada vaga (o prato AST-162 pousa aqui) | Z **61,25**, Y 3,05; X **33,4 · 36,0 · 38,6 · 41,2 · 43,8 · 46,4 · 49,0 · 51,6** (2,6 entre centros; **1 = oeste**, igual aos `PLATE-n` de hoje) | prato com o comprimento em X | x negativo, z 6,637 |
+| `Click_Slot_1..8` | Alvo do clique de **pôr** | caixa invisível **2,2 (X) × 1,0 (Y) × 2,2 (Z)**, de Y 3,0 a 4,0, centrada em cada `Mount_Plate_n` (0,4 de folga entre vizinhas) | — | — |
+| `Prompt_Take` (no prato, AST-162) | **Segurar E** pega o prato | centro do prato + 0,4 (Y ~3,5) | — | — |
+| `PICKUP` (AST-143) | Entrega segurando o prato (sem mudança de lugar) | bandeja (36; 54,7), Y 3,1; `Prompt_Serve` (36; 3,5; 54,9), agora de **segurar**; pose (36; 56,6) | como hoje | (−36; 3,5; 12,987) |
+
+O prato vazio nasce na **vaga livre de maior número** (leste: perto do tablet e da entrada da esteira). O prato pronto volta em
+qualquer vaga, e quem sai da esteira na ponta oeste tende a usar as vagas 1–3, perto do `PICKUP`. É regra visual Provisória
+para a TASK-516; não muda o contrato.
+
+### 16.6 Câmera do foco: o que cabe em 16:9 e em 667 × 375
+
+O aspecto de 667 × 375 é 1,78, o mesmo de 16:9, então o enquadramento é igual no PC e no celular. Contas com o FOV vertical
+do Roblox:
+
+- **Câmera larga** (`Fov` 70; tan 35° × 1,78 = 1,245 na horizontal). O ponto mais apertado é a ponta oeste da esteira, na frente
+  (X 31,2; Z 67,0), que cai a **88% da meia-largura**. Sobram ~39 px de margem em 667, e a ponta leste das cruas fica a 75%.
+  Na vertical, a faixa da bancada vai de ~146 px (topo do espelho) a ~225 px (frente da esteira) numa tela de 375. Ficam
+  ~150 px livres embaixo para as setas (AST-159, ≥ 44 px, cantos inferiores) e a barra do topo (36 px) não cobre nada.
+  O prato de 1,8 aparece com ~50 px de largura, legível para "qual é o meu", mas nada é tocado nessa vista: só as setas.
+  A câmera fica a Y 8,87, abaixo do teto, sobre o corredor da frente. Nenhuma luminária pode ficar no volume entre ela e a
+  bancada (X 31..55, Z 58..71, Y 4..9,5).
+- **Câmeras de parada** (`Fov` 55, d 5,0, 45°). Mostram 9,3 studs de largura, ou **~72 px/stud** em 667. Pegam o prato
+  inteiro na esteira (borda da frente a 67% da meia-altura) e a estação inteira em cima (topo a 86%). A grade de condimentos
+  (5,5) inteira na `Stop_3` dá ~400 px. **Alvo mínimo de toque nessas vistas: 0,61 stud** (44 px).
+- **Câmera da grelha** (`Fov` 55, d 5,2, 50°). Mostra 9,6 studs, de X 44,5 a 54,1: as cruas, a grelha e a mesa de descanso
+  quase inteira, com ~69 px/stud. As vagas da grelha precisam de **≥ 0,65 stud entre centros** (pedido ao modeler/art-director,
+  se o AST-120 tiver vagas mais juntas).
+- **Proposta para a TASK-518:** a câmera larga é a vista enquanto o prato anda. Quando ele **chega numa parada**, a câmera desliza
+  (0,35 s, `Rules.Camera.Travel`) para a câmera daquela parada, onde ficam os gestos. A seta seguinte volta para a larga. Assim
+  a vista larga cumpre o aceite ("vê as 3 estações e a esteira inteira") e os gestos ficam grandes no celular.
+- **Telas mais estreitas** (4:3, iPad): a meia-largura cai para 0,93 e a ponta oeste sai do quadro. A regra para a TASK-518 é
+  calcular o FOV vertical para manter **tan(meia-largura) ≥ 1,245** quando o aspecto for < 1,7.
+- **Avatares no caminho:** quem está nos assentos (Z 65,8, cabeça até Y 5,45) fica entre a câmera larga e a esteira. O
+  `Rig.luau` já esconde o próprio rig e corta os outros (`tech/prep-3d.md` §4.4); a regra precisa valer também para os colegas
+  em pé no corredor do fundo enquanto o jogador está no foco.
+
+### 16.7 Mesa central: fileira de 8, não grid 4 × 2 (divergência com o AST-161)
+
+O AST-161 propõe uma ilha de **11 × 5,4** com grid 4 × 2. **Não cabe** no MAP-01 r4 com a bancada de 4,4. Do fundo do balcão
+(Z 55,6) à parede (71,4) há **15,8**, e corredor da frente 4 + ilha 5,4 + corredor do fundo 4 + bancada 4,4 = **17,8**. Girar a ilha
+fecha um corredor, e a ponta oeste (X 25,5..31,5) já tem a cafeteira, a lixeira e a passagem para a despensa.
+Fica a **fileira de 8** no lugar da mesa de montagem (AST-144, 22 × 2,5), com os mesmos espaçamentos que o AST-161 pede (2,6 entre
+centros, marca Ø 2,2) e os mesmos encaixes (`Mount_Plate_n`, `Click_Slot_n`) e estados (`Free`/`Taken`/`Ready`). Uma fileira de 8
+é um grid 1 × 8: é acessível dos dois corredores (o montador põe e pega pelo fundo, o entregador pelo da frente), e cada vaga
+fica a ≤ 2 studs de quem está no corredor. **Pedido ao art-director:** fundir o AST-161 no AST-144 (fileira) ou criar a variante
+"fileira" do AST-161.
+
+**Distância mínima para o toque (mesa central):**
+
+| Medida | Valor | Por quê |
+|---|---|---|
+| Entre centros de vaga | **2,6** | ≥ 2,5 entre prompts vizinhos (§1, §13). Prato 1,8 × 1,0 deixa 0,8 de folga |
+| Entre `Click_Slot` vizinhos | **0,4** (caixas de 2,2) | o toque nunca cai em duas vagas |
+| Altura do `Click_Slot` | **1,0** (a ficha diz 0,2) | em 1ª pessoa (olho a Y 4,95), FOV 70, tela de 375: com 0,2 de altura o alvo tem ~65 px a 4 studs e só **~35 px a 6**. Com 1,0 tem **~68 px a 6 studs**, então passa de 44 px em todo o alcance |
+| Alcance do clique de pôr | ≤ **6** do centro da vaga | igual ao prompt; a 6 o alvo ainda tem ≥ 44 px |
+| Prompt "segurar E" | um por prato (AST-162), com só o mais próximo visível (regra do `PromptController/Rules`, TASK-522) | 8 prompts a 2,6 se sobrepõem na tela sem essa regra |
+
+**Distância mínima entre prompts de mundo na cozinha** (≥ 2,5, §13):
+
+| Par | Distância |
+|---|---|
+| `Prompt_Work` ↔ `Prompt_Restock` da caixa de pães | 3,5 |
+| `Prompt_Work` ↔ vaga mais próxima (5) | 5,9 |
+| `Prompt_Work` ↔ `Prompt_Grill` (reserva) | 5,8 |
+| `Prompt_Take` ↔ `Prompt_Take` (pratos vizinhos) | 2,6 |
+| `PICKUP` ↔ vaga 1 | 6,9 |
+| `GAS-1` (novo lugar) ↔ `PHONE-R` | 3,0 |
+| `PHONE-R` ↔ `KSW` | 2,8 |
+| `Prompt_Restock` das cruas ↔ `GAS-1` | 6,0 |
+
+Os 3 `Prompt_Restock` só aparecem com a caixa certa na mão (regra de hoje). No foco, os alvos de toque seguem
+`tech/prep-3d.md` §2.1: ≥ 44 px, ou seja ≥ 0,61 stud nas câmeras de parada e ≥ 0,65 na da grelha (§16.6).
+
+### 16.8 Fluxo, papéis e corredor (DEC-275)
+
+| Papel | Onde fica | Corredor | Cruza com |
+|---|---|---|---|
+| Caixa | TAB-1 + persiana + DT-PC (leste) | frente | ninguém (o prato vazio nasce sozinho na mesa) |
+| **Grelhador** | `Seat_Grill` (49,8; 65,8), vista da grelha; põe na mesa de descanso | fundo, ponta leste | ninguém (parado no foco) |
+| **Montador** (até 2) | pega o prato na mesa central pelo fundo (≤ 2 studs) → `Prompt_Work` (≤ 4) → `Seat_Belt_1/2` | fundo | o outro montador (lado a lado, 5,2 entre assentos) |
+| **Entregador** | pega o prato pronto na mesa central pelo corredor da frente → `PICKUP` (4–7 studs) | frente | o caixa, só se cruzar para o leste |
+| Reposição | DOOR-P → corredor do fundo atrás dos assentos (Z 63..65) → `Prompt_Restock` | fundo | passa atrás dos montadores; sem colisão |
+
+- **Rota do prato:** tablet → vaga leste da mesa (sozinho) → mão do montador → `Stop_1` … `Stop_4` (leste → oeste) → mão → vaga
+  oeste da mesa (≤ 3 studs) **ou** direto ao `PICKUP` (~21 studs contornando a ponta oeste da mesa, 1,3 s a 16/s). Drive-thru:
+  `Stop_4` → corredor do fundo → DT-WIN, ~22 studs (1,4 s).
+- **Solo:** sem prato na mão o jogador grelha; com o prato, monta. Mesa → `Prompt_Work` 4 studs (0,25 s). A regra de qual
+  assento o prompt único abre é da TASK-512; a recomendação é **com prato na mão → esteira; sem prato → grelha**.
+- Os avatares ficam parados no assento durante o foco; os colegas veem o prato andar na esteira (TASK-519).
+
+### 16.9 O que muda, sai ou é reapontado
+
+| Peça hoje (bind) | Destino |
+|---|---|
+| `BackCounter` (mesa de trabalho da TASK-477, X 31,0..59,42, Z 68,5..71,4) | vira o `BENCH2` (AST-158) com a mesma ponta oeste em X 31,0 e a frente em Z 67,0. A TASK-504 aplica junto com a TASK-477 |
+| `ASM` + `PLATE-1..8` (AST-144/145) | viram a `CENTER` (mesa central) 1,0 ao norte; `Mount_Plate_n`/`Click_Slot_n`. Proposta para a TASK-512: manter a tag `PlateSlot` + `PlateIndex` = n no `Click_Slot_n` para o `MapIndex` não quebrar. `Prompt_Put`/`Prompt_Take` da vaga saem (o pegar vai para o prato e o pôr vira clique) |
+| `GRILL-1`, `RAIL`, `STOCK`, `BUN`, `CUT-1`, `COND-1` (clones do trailer) | movidos para a prateleira alta (§16.5 b), como **cenário e alvo do foco**; os prompts do F2 ficam desligados no restaurante (TASK-496). `GRILL_SLOTS`/`Att_Flip<n>` acompanham a grelha. `RAIL` passa a se chamar `REST` |
+| `CUT-2` (tábua de blockout) | **sai do restaurante** (só existia para o F2) |
+| `GRILL-2`, `COND-2` (só no doc) | não nascem: uma grelha, um bloco de condimentos (o upgrade de 2ª grelha volta como pedido ao game-designer) |
+| `Station_1..4/Mount` do restaurante (âncoras de prep clonadas do trailer) | substituídos pelas âncoras da §16.5 c. O trailer mantém os dele; o modo trailer não muda |
+| `PrepTargets/PT_*` (editados à mão pelo dono) | acompanham a estação de cada um (transformação rígida); a TASK-504 sincroniza antes |
+| `MenuStrip` (quadro de pedidos, editado à mão pelo dono: Y 4,4..8,35) | sobe **1,0** (Y 5,4..9,35). Senão o espelho (5,2) e as estações cobrem a faixa de baixo. **Confirmar com o dono** (é edição dele) |
+| `Hood` | já apagado pelo dono; não volta |
+| `GAS-1` (parede oeste, 25,7; 67) | vai para a **parede leste**, (59,3; 4,8; 70,0), a ~7 da grelha. Onde está ficaria a 24. A AN-R09 vai junto |
+| `REV-1..4` (Z 65,9) | vão para **Z 64,5** (mesmos X), para não nascer em cima dos assentos |
+| `DROP-T` (56; 64,5), `KSW`, `PHONE-R`, `BIN-K`, `R-COFFEE`, `DOOR-P`, `TRL-OUT`, `PS-1..4` | ficam |
+| §6 (tempos), §7.1 (papéis), §5.5 (estações) | superados nos pontos desta seção |
+
+### 16.10 Nomes: conferência com as fichas da TASK-523
+
+Uso os nomes do art-director: `Stop_1..4`, `WaitL_n`/`WaitR_n` (±2,1), `Seat_Belt_1/2`, `Seat_Grill`, `Prompt_Work`,
+`Mount_Plate_n`, `Click_Slot_n`, `Mount_Grill/Rest/BunCrate/Board/Sauce`, `Mount_Belt`. Divergências:
+
+1. **`Prompt_Work` não fica no centro do deck baixo** (X 40,8), mas em **X 44,0**, entre o descanso e o pão. No centro, o grelhador
+   ficaria a ~9 do prompt. Em 44,0 ele fica a ≤ 6 dos três assentos e a ≤ 4 da mesa central.
+2. **`Click_Slot_n` com 1,0 de altura** (a ficha diz 0,2), pelo toque a 6 studs (§16.7).
+3. **`WaitR_4` não existe** (cairia fora da esteira; o prato sai na `Stop_4`).
+4. **Mesa central em fileira** (§16.7), não ilha 4 × 2.
+5. Âncoras novas sem ficha: `Mount_Stock` (cruas, AST-018), `Prompt_Grill` (reserva), `CamAnchor_*`/`Focus_*` (§16.5 c).
+6. Mesa de descanso com **capacidade 8** (`Rail_8`): o espaço reservado é de 3,0 × 2,5. Se o número final passar a 12 (`Rail_12`,
+   4,5 de largura), o bloco esquerdo cresce 1,5 para o leste (grelha e cruas vão 1,5 para o leste e `WaitL_1` também). O resto
+   não muda.
+
+Os nomes ainda passam pelo contrato da TASK-512, que pode renomear. A TASK-504 só aplica depois da 512.
+
+### 16.11 Critérios de aceite (para a TASK-504 conferir no Studio)
+
+1. Print de cima igual à §16.3 (±0,5).
+2. Corredores: frente ≥ 4,4, fundo ≥ 4,5. Varredura R6 (`restaurant_walk_check.luau`) com 0 bloqueios entre DOOR-P,
+   assentos, mesa central, `PICKUP`, TAB-1 e DT-WIN.
+3. Pela `CamAnchor_Belt`, em 1280 × 720 e em 667 × 375: as 3 estações, a mesa de descanso, as cruas e a esteira de ponta a
+   ponta no quadro, com ≥ 5% de margem lateral.
+4. Pelas câmeras de parada e da grelha: a estação e o prato inteiros no quadro; alvos de toque ≥ 44 px em 667 × 375.
+5. Prompts de mundo da cozinha a ≥ 2,5 entre vizinhos (tabela da §16.7); `Click_Slot` vizinhos sem sobreposição.
+6. Nenhuma peça do rail flutuando; nenhum "[RailSlot] … may float" no console.
+7. Visto do `Seat_Belt_1`, olhando para a bancada: grelha à esquerda, pão no meio, condimentos à direita.
+
+### 16.12 Perguntas para o secretário consolidar (não registradas em `open-questions.md`)
+
+| Pergunta | Recomendação (Provisória) |
+|---|---|
+| Mesa central: fileira de 8 (cabe) ou ilha 4 × 2 (exige tirar 2 studs de algum corredor ou da bancada)? | Fileira de 8 (§16.7) |
+| O quadro de pedidos (`MenuStrip`, edição do dono) pode subir 1,0 para não ficar atrás das estações? | Sim |
+| `GAS-1` vai para a parede leste, perto da grelha nova? | Sim (a alternativa é ficar a 24 da grelha, o que ajuda o susto, mas o jogador tem que largar o posto) |
+| Prompt único: abre a esteira com prato na mão e a grelha sem prato? | Sim (decisão da TASK-512) |
+| Câmera: larga enquanto o prato anda e perto na parada? | Sim (decisão da TASK-518) |

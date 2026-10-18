@@ -169,6 +169,13 @@ Caminhos dos packs (abreviados nas fichas):
 | AST-154 | Restaurante: van de entrega com porta lateral | vehicle | P1 · R3 | Pack + edição | `Assets/models/vehicle/AST-035_CarVan.fbx` (`CK/van.fbx`) com `Door_Side` separada | Rascunho |
 | AST-155 | Restaurante: despensa (estantes, porta com janelinha e tranca, escotilha de carga, `DROP-R`) | equipment | P0 | Pack + edição | `MM/shelf-boxes.fbx`, `KP/door_A.fbx`, `KP/crate.fbx`; escotilha e tranca modeladas | Rascunho |
 | AST-156 | Restaurante: pisos (ladrilho da cozinha, pavers do pátio, faixa da pista) | building | P1 | Pack (sem atlas novo) | `KP/floor_kitchen.fbx`, `KP/floor_kitchen_small.fbx`, `AST-032` (`Pad_Tile`), `CR/tile-low.fbx` | Rascunho |
+| AST-157 | Cozinha com esteira: esteira modular (trecho reto, rolos, bordas, pontas, marcas de parada) | equipment | P0 | Modelar | — (nenhum pack tem esteira); rolete = malha do `AST-013_RestRail` | Rascunho (TASK-523) |
+| AST-158 | Cozinha com esteira: bancada de dois níveis (deck baixo da esteira + prateleira alta das estações) | equipment | P0 | Pack + edição | `KP/kitchencounter_straight_A.fbx`, `KP/kitchencounter_straight_A_backsplash.fbx`, `KP/kitchencounter_straight_B.fbx`, `KP/kitchencabinet_half.fbx` | Rascunho (TASK-523) |
+| AST-159 | Cozinha com esteira: setas esquerda/direita e trilho de paradas (UI 2D) | ui | P0 | 2D (estilo do AST-071/108) | folha `Prep_Icons` existente | Rascunho (TASK-523) |
+| AST-160 | Cozinha com esteira: mesa de descanso das salsichas (estoque compartilhado) | equipment | P0 | Pack (projeto) + edição | `Assets/models/equipment/AST-013_RestRail.fbx` (`Rail_8`, Aprovado DEC-140) + suporte de `KP/kitchencabinet_half.fbx` | Rascunho (TASK-523) |
+| AST-161 | Cozinha com esteira: mesa central de 8 vagas em grid 4 × 2 | equipment | P0 | Pack + edição | `KP/kitchencounter_straight_A.fbx` recolor Steel (como AST-144); marcas `AST-019_QueueMark` | Rascunho (TASK-523) |
+| AST-162 | Cozinha com esteira: prato do hot dog (Tool + mundo + esteira) | equipment | P0 | Pack + edição | `FP/plate-rectangle.fbx` (Kenney Food Kit, CC0) | Rascunho (TASK-523) |
+| AST-163 | Cozinha com esteira: plaquinha do ticket no prato | equipment | P0 | Modelar | — (peça mínima; texto por `SurfaceGui`) | Rascunho (TASK-523) |
 
 Totais: **77 IDs**, **76 fichas ativas** (AST-001 a AST-038 existentes, revistas; AST-039 a AST-075 da 1ª conciliação; AST-076 e AST-077 da 2ª revisão; **AST-077 Obsoleto** por DEC-130).
 Usam pack: **25** (4 direto, 21 com edição). Plataforma R6 + acessórios: **9**. Modelar / 2D / animação do zero: **43**. (DEC-138: AST-017, 018, 019, 024 passaram de Modelar para Pack + edição; antes 21 / 47.) DEC-140: AST-025 passou de Modelar para Pack + edição ("Trashcan" by Kenney via Poly Pizza, fora dos packs de `Assets/`) — usam pack **26** (4 / 22); Modelar **42**.
@@ -177,6 +184,7 @@ Usam pack: **25** (4 direto, 21 com edição). Plataforma R6 + acessórios: **9*
 **2026-10-11 (Mart v2, MAP-01 §18.9):** fichas novas **AST-103 a AST-107** (Rascunho), modelos entregues pelo modeler-3d (Blender headless). Os FBX `AST-099` a `AST-102` em `Assets/import/` (rodada de sourcing do mesmo dia) ainda não têm ficha aqui.
 **2026-10-12 (modo de preparo focado, TASK-187, DEC-223):** fichas novas **AST-108 a AST-119** (12 sprites 2D de UI, todas **Rascunho**; seção "Modo de preparo: sprites 2D" antes de "Fora desta lista"; spec em `prep-ui-spec.md` §15). Próximo ID livre: **AST-122** (AST-120 usado em 2026-10-12, AST-121 em 2026-10-13, ver fichas).
 **2026-10-17 (TASK-395, restaurante, DEC-269 a DEC-280):** colisão de ID resolvida. **AST-123/124 ficam com as skins** (TASK-373: já estão em `Content.Skins.Ref`, `SkinLooks.luau`, `skin_icons.py` e no Roblox) e ganham ficha aqui. A reserva AST-123..139 do MAP-01 r4 rev. 2 não pode ser mantida (123/124 ocupados) e **AST-125..139 ficam queimados** (citados em docs e no board antes da troca; não reaproveitar). Assets do restaurante = **AST-140 a AST-156** (grep `AST-1[2-9][0-9]` no repo inteiro, `src/`, `tools/`, `docs/` e nomes em `Assets/`: o maior ID citado era AST-139). **AST-122 segue livre** (nunca usado; fica como lacuna para não partir a faixa do restaurante). Os FBX `AST-099` a `AST-102` em `Assets/import/` continuam sem ficha (não reaproveitar). Próximo ID livre depois da faixa: **AST-157**.
+**2026-10-18 (TASK-523, cozinha com esteira, DEC-302 a DEC-304):** fichas novas **AST-157 a AST-163** (7, todas **Rascunho**; seção "Cozinha com esteira" antes de "Fora desta lista"). Grep `AST-15[7-9]|AST-16[0-9]` em `docs/`, `src/`, `tools/` antes da numeração: nenhum uso. AST-122 segue livre (lacuna). Próximo ID livre: **AST-164**.
 Mapeamento Kenney/KayKit por ficha (DEC-136, Rascunho): `asset-sourcing.md`. As entradas "→ sourcing:" na coluna "Arquivo de pack" vêm de lá; Origem e Status não mudaram.
 **DEC-137 (2026-10-09):** comida aprovada — AST-001 a AST-011 e AST-061 em **Aprovado**, com o candidato do sourcing como arquivo de origem (fila do `modeler-3d`). Demais fichas seguem Rascunho. `Q-133` (limite de atlases) segue aberta.
 **DEC-138 (2026-10-10):** equipamentos aprovados após o teste em `workspace.__ImportTest_Equip` — AST-014, 015, 017, 018, 019, 024, 040, 041, 049 em **Aprovado** com o candidato KP/MM como origem (partes sem candidato seguem para modelar no estilo). Banqueta `KP/chair_stool` com **assento plano** em todo uso. **AST-012**: candidato fogão KayKit **recusado**; vira **roller grill** modelada (Steel + painel Ketchup, sem marca), Aprovado na direção; silhueta em reescrita pelo art-director; níveis em `Q-134`.
@@ -1833,6 +1841,7 @@ Fonte espacial: `levels/MAP-01-r4-restaurant.md` rev. 2 (§5, §12; coordenadas 
 - **Silhueta:** bancada de inox baixa e comprida com prateleira inferior aberta (vê-se o chão por baixo: o corredor parece mais largo).
 - **Encaixes:** `Mount_Plate_1..8` (centro de cada marca, Y 3,05).
 - **Tris:** módulo ≤ 150; montada ≤ 2.000 (com as marcas).
+- **Nota TASK-523 (2026-10-18, Provisória):** a cozinha com esteira (DEC-302/303) pede a mesa central em **grid** → proposta **AST-161** (4 × 2, mesmos módulos e marcas). Se a TASK-503 mantiver uma fileira de 8, esta ficha volta a valer com os estados do AST-161. Status desta ficha não muda sem DEC.
 
 ### AST-145 — Prato-slot meio transparente (`PLATE-1..8`)
 
@@ -1841,6 +1850,7 @@ Fonte espacial: `levels/MAP-01-r4-restaurant.md` rev. 2 (§5, §12; coordenadas 
 - **Estados (mesma malha, só `Transparency`/`Color`):** `Empty` Transparency 0,6, cor Cream (lê "vaga livre"); `Assigned` Transparency 0,25, cor Cream + anel Mustard (a marca do AST-144 acende em Neon); o conteúdo é o `HotDogVisual` existente (AST-001/002/003). Sem malha nova por estado (§8).
 - **Encaixes:** `Att_Content` (centro, +0,08), `Att_Ticket` (**2,5 acima**, BillboardGui), `Prompt_Put` / `Prompt_Take` (centro, +0,3).
 - **Tris:** ≤ 150 (o do pack; conferir no import). 8 instâncias da mesma MeshId.
+- **Nota TASK-523 (2026-10-18, Provisória):** com a DEC-304 o prato é um objeto real que nasce na vaga com o ticket → **AST-162** (prato) + **AST-163** (plaquinha). Este prato meio transparente deixa de ser necessário no modo esteira (a vaga livre passa a ser lida pela marca do AST-161). Status não muda sem DEC.
 
 ### AST-146 — Janela do drive-thru + placa DRIVE-THRU
 
@@ -1949,6 +1959,152 @@ Fonte espacial: `levels/MAP-01-r4-restaurant.md` rev. 2 (§5, §12; coordenadas 
 3. **Só com a R3:** AST-146, AST-147, AST-148, AST-154.
 
 Aceite de revisão (art-director): medida do blockout da TASK-382 (±0,1), pivô e frente da ficha, nomes `AST-###_<Nome>` e attachments do §8, tris dentro da ficha e do bloco, nenhum atlas novo, peças interativas legíveis no escuro, nenhuma marca ou visual de outro jogo.
+
+## Cozinha com esteira — AST-157 a AST-163 (TASK-523, 2026-10-18)
+
+Fonte: **DEC-302** (modo focado volta com esteira; layout: grelha + mesa de descanso à esquerda, tábua e pão no meio, condimentos à direita; estações numa bancada mais alta, prato embaixo na esteira), **DEC-303** (foco por jogador, até 2 pratos na esteira, 1 prato por estação e o 2º espera ao lado, grelha sem queimar, nota de volta, mesa central de 8 vagas com ticket) e **DEC-304** (o prato vazio nasce na mesa central com o ticket #n; ticket no HUD enquanto o jogador segura o prato). Desenho: `design/kitchen-redesign.md` §0. Tudo **Rascunho**; nada vai ao `modeler-3d` sem DEC do dono. **Placeholders valem até os modelos**: cada ficha diz qual Part substitui o modelo, para a TASK-504 e a TASK-510 rodarem sem arte.
+
+**Referência de mecânica, não de arte.** O jogo de bolo do Purple Place serviu só para "estações em cima, prato embaixo, setas para mover". Nenhuma forma, cor, proporção, ícone, nome ou layout de tela vem de lá. A aparência destas fichas sai das referências originais citadas em cada uma (equipamento real de cozinha industrial e peças já aprovadas do projeto) e da paleta do style guide §2.
+
+**Conferido nos packs antes de pedir modelo** (`KP/` 144 FBX, `FP/` Food Kit): não existe esteira, rolo de esteira nem plaquinha de pedido. Servem e entram: `KP/kitchencounter_straight_A` / `_A_backsplash` / `_B`, `KP/kitchencabinet_half` (bancada e suportes), `FP/plate-rectangle` (prato), `AST-019_QueueMark` (marcas de vaga) e o `AST-013_RestRail` do projeto (mesa de descanso e seção do rolo da esteira).
+
+**Reaproveitado sem ficha nova:** grelha AST-120 (bloco esquerdo), caixa de pães AST-015 e tábua + faca AST-014 (meio), tigelas de condimento AST-017 / garrafas AST-004 e AST-005 (direita), salsicha AST-002, pão AST-001, hot dog AST-003 e coberturas (conteúdo do prato), PICKUP AST-143, ticket 2D do HUD = AST-112 (papel, pino) no `HudOrder` existente, selos de nota AST-113 (mini 64² na plaquinha), padrão de desenho = `sauce_guide` do AST-111. Glifos `hourglass` e `warn` do AST-108 servem para "esperando" e recusas.
+
+### Regras do kit
+
+- **Estilo e atlas:** toy low-poly (style guide §1.1). Peça editada ou modelada vai para o atlas KayKit `restaurantbits_texture` (como AST-103..107, AST-120, AST-140..156) ou `T_Palette_SH`. **Nenhum atlas de cor novo, nenhuma textura nova em 3D.** UI 2D entra na folha `Prep_Icons` já orçada (≤ 6 MB com `Prep_Board`, AST-108..119). Números e texto (`#12`, `1..8`) por `SurfaceGui`/`CartoonLabel`, nunca modelados (§1.1).
+- **Paleta da cozinha com esteira (Provisória; o style guide é Aprovado, linha nova só com DEC):** metais Steel; lona da esteira Slate `#4B4F63` (mesma do telhado/moldura do restaurante: escura o bastante para o prato Cream e a salsicha saltarem); acento interativo **Mustard** (marcas de parada, marcas de vaga, botões); **Teal** para "ocupado/seu"; prato e plaquinha Cream. Sem vermelho de estado (§7.5). Nenhum cinza-azulado em comida ou prato (§2.4, ANM-002).
+- **Leitura:** da câmera do foco, a esteira (embaixo) e as 3 estações (em cima) leem em 3 massas separadas por cor e altura; o prato do jogador é o objeto mais claro da faixa de baixo. No mundo, a 10 studs, um prato andando na esteira se lê pela silhueta clara sobre a lona escura (TASK-519).
+- **Pivô e eixos:** base-centro para tudo que fica no chão ou no tampo; frente = lado do cozinheiro = −Z (LookVector) no Roblox; 1 unidade do Blender = 1 stud. "Esquerda/direita" = do cozinheiro de frente para a bancada (Provisório, a TASK-503 confere).
+- **Alturas (Provisórias, a TASK-503 fecha):** tampo do deck baixo / lona da esteira **Y 3,0** (igual aos balcões do restaurante, AST-141/144); tampo da prateleira alta **Y 3,9** (degrau de 0,9: as estações ficam visíveis por cima do prato e continuam abaixo do olho 4,5 para quem passa em 1ª pessoa).
+- **Profundidade (Provisória):** deck baixo **1,6** + prateleira alta **2,8** = **4,4** de fundo. **Conflito a resolver na TASK-503:** a fileira de estações do MAP-01 r4 (Z ~67,6..70,2) com 4,4 de fundo come o corredor do fundo (Z 63,5..68,5, hoje 5) e o deixa abaixo de 4 (mínimo do MAP-01 r4 §1). Opções do level-designer: recuar a bancada até a parede ou estreitar o deck baixo para 1,4.
+- **Colisão:** malhas com `CanCollide = false`; um colisor Part simples por bloco de bancada. Prato e plaquinha: `CanCollide = false`, `CanTouch = false`; `CanQuery = true` só onde há clique (prato na mesa, vaga da mesa).
+- **Orçamento do conjunto (mobile, §9):**
+
+| Bloco | Alvo | Teto | Nota |
+|---|---|---|---|
+| Esteira montada (AST-157, ~20 de comprimento) | 1.200–1.800 | **2.000** | modular; conta como "estação" dupla |
+| Bancada de dois níveis (AST-158, ~20 de largura) | 1.500–2.200 | 2.500 | módulos do KP repetidos |
+| Mesa de descanso (AST-160) | ~640 | 800 | `Rail_8` 440 + suporte ≤ 200 |
+| Mesa central (AST-161) | 1.000–1.500 | 1.800 | 8 marcas incluídas |
+| Pratos com plaquinha (AST-162 + 163), por unidade | ~200 | 260 | até **10** no mapa (8 na mesa + 2 na esteira) sem contar o hot dog |
+| **Total novo** (sem estações reaproveitadas e sem comida) | ~6.500 | **9.000** | entra no teto de 16.000 do prédio montado (bloco do AST-140) **no lugar** do AST-144 + 8× AST-145 (~3.200), ou seja +3.300 a +5.800 líquidos |
+| Malhas únicas novas (MeshId) | ≤ 12 | 15 | mapa: alvo 130, teto 160 (§9.2) |
+| Instâncias novas (MeshPart + Part) | ≤ 90 | 120 | repetir módulos, não fatiar |
+| Texturas novas | 0 (3D) · ~12 células na `Prep_Icons` (2D) | 0 · 16 células | |
+| Luzes | 0 | 0 | Neon pequeno só em marca de parada/vaga, se preciso |
+
+- `RenderFidelity = Automatic`, sem LOD manual (§9.4).
+
+### AST-157 — Esteira modular
+
+- **Status:** Rascunho · **Prioridade:** P0 · **Origem:** Modelar (nenhum pack tem esteira). Rolos = **a mesma malha do rolete do `AST-013_RestRail`** (Aprovado, DEC-140), escalada no comprimento; não remodelar o rolete.
+- **Uso:** trilho por onde o prato de cada montador anda entre as paradas, no foco (TASK-518) e no mundo para os colegas (TASK-519). A lona **não anima** (sem textura rolando); o movimento lê pelo prato que desliza e pelos 2 tambores das pontas que giram durante o tween (opcional, 2 peças).
+- **Peças (cada uma um objeto/MeshPart, atlas KayKit):**
+  - `Belt_Straight_4` — trecho reto de **4 × 0,35 × 1,6** (C × A × P): lona Slate **1,3** de largura com chanfro nas bordas, 2 bordas laterais Steel de 0,15 que sobem **0,12** acima da lona (o prato não "cai" visualmente), 3 rolos aparentes nas laterais (só a ponta do cilindro, abaixo da borda). Topo da lona = **origem + 0,35**.
+  - `Belt_Straight_2` — mesmo trecho com 2 de comprimento (fecha a medida final).
+  - `Belt_End_L` / `Belt_End_R` — ponta com **tambor** Ø 0,35 visível (peça separada `Drum`, pivô no eixo), tampa lateral arredondada Steel e batente Mustard de 0,1 que fecha a lona (o prato nunca sai pela ponta). 0,6 de comprimento.
+  - `Belt_StopMark` — marca de parada: **chevron Mustard** de 0,4 × 0,02 colado na face frontal da borda (lado do cozinheiro) + traço fino Mustard atravessando a lona (0,06 de largura, nível da lona + 0,005). Uma por parada. Sem número modelado (o ícone da estação fica na UI, AST-159).
+  - `Belt_Leg` — pé Steel escuro 0,2 × 2,65 × 0,2 (só se o deck baixo do AST-158 não for corpo fechado; com o corpo do KP, não usar).
+- **Medidas (Provisórias, comprimento final pela TASK-503):** comprimento útil **~20** (= largura da fileira de estações: grelha 4,6 + descanso 3,0 + caixa de pães 2,0 + tábua 1,6 + condimentos ~5,5 + folgas) = 4× `Straight_4` + 1× `Straight_2` + 2 pontas. Lona a **Y 3,0** sobre o deck baixo do AST-158.
+- **Paradas (attachments no Model montado, nomes Provisórios até o contrato da TASK-512):** `Stop_1` (sob grelha + mesa de descanso, centrado na **borda direita do bloco esquerdo**, perto da mesa de descanso), `Stop_2` (tábua e pão), `Stop_3` (condimentos), `Stop_4` (saída, ponta direita). Cada `Stop_n` no centro da lona, Y = topo da lona + 0,08 (onde o prato pousa). **Espera ao lado (DEC-303):** `WaitL_n` e `WaitR_n` a **±2,1** de `Stop_n` ao longo da esteira (o prato de 1,8 + folga 0,3 não encosta no da parada). Mínimo entre paradas: **4,2** (cabe parada + espera dos dois lados sem sobrepor a espera da parada vizinha).
+- **Silhueta:** faixa baixa e comprida, escura em cima e clara nas bordas, com tambores redondos nas pontas: lê "esteira de cozinha" a 10 studs, nunca "balcão". Nada de corrimão alto, cobertura ou túnel.
+- **Cores:** lona Slate `#4B4F63`; bordas, tampas e rolos Steel; marcas e batentes Mustard; tambores Steel com cubo Mustard.
+- **Encaixes:** `Stop_1..4`, `WaitL_1..4`, `WaitR_1..4`, `Drum` ×2 (pivô no eixo), `Att_Cam_Focus` (sugestão de alvo da câmera: centro da esteira, 1,0 acima; a câmera final é da TASK-503), `Prompt_Work` **não** fica aqui (âncora do prompt único é da bancada, AST-158).
+- **Tris:** `Straight_4` ≤ 220 (alvo 160), `Straight_2` ≤ 140, ponta ≤ 250 com tambor, marca ≤ 20. Montada ≤ **2.000**. Malhas únicas: 5.
+- **Placeholder (até o modelo):** Part `SmoothPlastic` 20 × 0,35 × 1,6 cor `#4B4F63` + 2 Parts finas Steel nas bordas + 4 Parts Mustard 0,06 × 0,01 × 1,3 nas paradas; os attachments acima com os mesmos nomes.
+- **Referência original:** esteira de bandejas de refeitório/cozinha industrial (lona escura entre perfis de aço, tambores nas pontas) + seção dos roletes do `AST-013` e moldura do `AST-120` para a linguagem de forma. O modeler-3d entrega render `Assets/reference/AST-157_belt_three.png` e `_focus.png` (vista da câmera do foco) para a revisão.
+
+### AST-158 — Bancada de dois níveis
+
+- **Status:** Rascunho · **Prioridade:** P0 · **Origem:** Pack + edição — deck baixo = `KP/kitchencounter_straight_A.fbx` (corpo e portas) em módulos de 2, **tampo cortado** para receber a esteira (a lona do AST-157 fica no lugar do tampo); prateleira alta = `KP/kitchencounter_straight_B.fbx` elevada (o degrau de 0,9 é um "rodapé" Steel modelado entre os dois níveis) com `KP/kitchencounter_straight_A_backsplash.fbx` atrás (fecha o fundo da câmera do foco); pontas = `KP/kitchencabinet_half.fbx`. Escala não uniforme ≤ ±15% por eixo (regra do AST-140); além disso, remodelar o módulo no estilo.
+- **Uso:** a bancada da cozinha com esteira: estações reaproveitadas em cima (AST-120, AST-160, AST-015, AST-014, AST-017), esteira embaixo (AST-157), âncora do **prompt único** `Work` (TASK-504/514).
+- **Medidas (Provisórias):** largura **~21** (esteira 20 + pontas); deck baixo **1,6** de fundo, tampo/lona Y **3,0**; prateleira alta **2,8** de fundo, tampo Y **3,9**; backsplash até Y **5,2**. Módulo de 2 × 3,0 × 1,6 (baixo) e 2 × 3,9 × 2,8 (alto). Ver o conflito de profundidade nas regras do kit.
+- **Blocos marcados no tampo alto (só referência visual, por cor do tampo):** esquerda (grelha + descanso) tampo Steel; meio (pão e tábua) tampo **madeira clara** do atlas KayKit (a faixa da tábua); direita (condimentos) tampo Steel com friso Teal. Três tampos diferentes = três estações lidas sem placa.
+- **Silhueta:** degrau visível de frente (baixo-escuro com a esteira, alto-claro com as estações) e um espelho alto atrás: a forma "arquibancada de 2 degraus" é a assinatura da cozinha nova e não lembra o balcão corrido do AST-141.
+- **Cores:** corpos Steel (porta Steel escuro), rodapé do degrau Cream, backsplash azulejo Off-white `#F1EEE6` (faixa do atlas, igual ao interno do AST-140), tampos conforme os blocos.
+- **Encaixes:** `Mount_Grill`, `Mount_Rest`, `Mount_BunCrate`, `Mount_Board`, `Mount_Sauce` (base-centro de cada estação no tampo alto), `Mount_Belt` (origem do AST-157 no deck baixo), `Prompt_Work` (centro do deck baixo, 1,2 acima da lona, frente; **um só**, DEC-302), `Seat_Belt_1`/`Seat_Belt_2` (pé do montador, 1,2 à frente do deck; 2 lugares, DEC-303), `Seat_Grill` (pé do grelhador, em frente ao `Mount_Grill`), `Light_Work` (opcional, faixa Neon Cream sob o backsplash, sem luz real).
+- **Tris:** módulo baixo ≤ 150, módulo alto ≤ 200 (com backsplash), rodapé ≤ 40 por módulo. Montada ≤ **2.500**. Malhas únicas: ≤ 5.
+- **Placeholder:** 2 Parts (deck baixo 21 × 3,0 × 1,6 Steel; prateleira 21 × 3,9 × 2,8 Steel) + Part 21 × 1,3 × 0,2 Off-white de espelho; attachments com os mesmos nomes.
+- **Referência original:** "pass" de cozinha profissional com prateleira elevada sobre a linha de montagem (bancada inox com degrau e espelho de azulejo); módulos do KitchenPack para o estilo.
+
+### AST-159 — Setas da esteira e trilho de paradas (UI)
+
+- **Status:** Rascunho · **Prioridade:** P0 · **Origem:** 2D no estilo do AST-071/108 (desenho chapado, contorno Ink `#2B2233` 4 px, sem texto na arte). Folha `Prep_Icons` (células 128²) e `Prep_Board` (peças 9-slice).
+- **Peças (`Prep/Belt/*`):**
+  - `arrow_left`, `arrow_right` — **seta grossa com haste** (não chevron: o chevron `next` do AST-108 é "avançar etapa"; a seta é "mover o prato") dentro de um **círculo** Cream; ponta arredondada. 128², exibida a **64 px** no celular e 56 px no PC (alvo de toque ≥ **44 px** sempre, TASK-518).
+  - `arrow_ring` — anel 128² tintável (máscara branca) para estado: normal = sem anel, pressionado = anel Mustard, parada ocupada = anel Teal pulsando + glifo `hourglass` do AST-108 no canto. Fim da esteira = seta a 50% de opacidade (por código).
+  - `stops_track` — trilho de paradas, 9-slice 256 × 48 (`Prep_Board`): barra Slate com bolinhas tracejadas nas paradas.
+  - `stop_grill` (grelha de barras vista de cima, com salsicha), `stop_bun` (pão aberto + faca), `stop_sauce` (tigela com cordão de molho), `stop_out` (prato com seta para fora) — 128², exibidos a 32–40 px sobre o trilho. **Novos**: o `tab_grill` do AST-108 desenha o roller grill, superado pelo AST-120.
+  - `plate_pip` — marcador do prato no trilho, 64² máscara tintável: o seu = Cream com contorno Ink grosso; o do colega = cor do jogador (`Presence.Palette`) com contorno fino.
+- **Layout (sugestão; a TASK-518 decide):** setas nos **cantos inferiores** da área segura, na altura da esteira, fora do retângulo do prato e da hotbar; trilho de paradas centrado logo acima da hotbar. No celular 667 × 375 o trilho ocupa ≤ 40% da largura. Atalhos de teclado/gamepad (←/→, A/D, LB/RB) por `CartoonLabel` pequeno sob a seta, não desenhados.
+- **Leitura em escala de cinza:** seta (forma) e anel (pressionado x ocupado) se distinguem sem cor; ocupado leva o `hourglass`.
+- **Fallback (placeholder):** `TextButton` circular Cream 64 px com "◀"/"▶" em Ink (o `CartoonLabel` já usado no Prep) e trilho como `Frame` Slate com 4 `Frame` redondos.
+- **Orçamento:** 9 células de 128² + 1 peça 256 × 48 (dentro das folhas existentes; 0 textura nova fora delas).
+- **Referência original:** botões grandes de jogo mobile do próprio kit (AST-091) e glifos AST-108; nenhuma seta, cor ou moldura do jogo de referência.
+
+### AST-160 — Mesa de descanso das salsichas
+
+- **Status:** Rascunho · **Prioridade:** P0 · **Origem:** Pack (projeto) + edição — **`AST-013_RestRail` variante `Rail_8`** (Aprovado DEC-140, 440 tris, 8 vagas, inclinado para o jogador) **sem mexer na malha**, sobre um suporte novo de `KP/kitchencabinet_half.fbx` cortado (calço que leva o trilho à altura e inclinação certas no tampo alto) com aba frontal Mustard.
+- **Uso:** estoque **compartilhado** de salsichas prontas (DEC-303 / Q-381): o grelhador põe, qualquer montador pega na parada 1 (TASK-515/521). Fica **na borda direita do bloco esquerdo**, colada no lado do pão, para que a salsicha seja arrastada ao pão com o menor trajeto na tela (TASK-520).
+- **Capacidade:** **8** (as vagas do `Rail_8`), Provisório até a TASK-508/512. Se o número final for maior, variante **`Rail_12`** = mesmo trilho com 12 roletes no mesmo passo e 1,5× o comprimento (edição do AST-013, nova ficha só se a malha mudar além disso).
+- **Medidas:** trilho 3 L × 2,5 P (do AST-013); suporte 3 × 0,25 × 2,5 (calço); topo dos roletes a ~Y 4,2 com o tampo alto a 3,9.
+- **Estados visíveis (sem malha nova):** vaga ocupada = salsicha `Sausage_Grilled` (AST-002) no `Slot_n`; vaga livre = nada (o rolete Mustard aparece); mesa cheia = as 8 salsichas + **faixa Teal** na aba (por `Color`), lida pelo grelhador sem HUD. Bônus de virar (DEC-303) = estrelinha do AST-092 na salsicha, não na mesa.
+- **Silhueta:** trilho de roletes inclinado sobre um calço com aba: lê "salsichas prontas, pegue aqui" a 10 studs; distinto da grelha (barras + chama) e da tábua (madeira plana).
+- **Cores:** do AST-013 (Steel + roletes Mustard); calço Steel, aba Mustard.
+- **Encaixes:** `Slot1..Slot8` (do AST-013), `Prompt_Rail` (do AST-013; no modo esteira fica desligado, a pega é por arrastar no foco), `Att_Mount` (base do calço), `VFX_Ready` (centro, para o sino de "pronto").
+- **Tris:** 440 + calço ≤ 200 = **≤ 640** (teto 800).
+- **Placeholder:** o próprio `Rail_8` já está no projeto; sem ele, Part 3 × 0,3 × 2,5 Steel inclinada 15° com 8 attachments.
+- **Referência original:** trilho de roletes do próprio projeto (AST-013); "bandeja de espera" de lanchonete.
+
+### AST-161 — Mesa central de 8 vagas em grid
+
+- **Status:** Rascunho · **Prioridade:** P0 · **Origem:** Pack + edição — mesmos materiais do AST-144: `KP/kitchencounter_straight_A.fbx` recolor Steel em **2 fileiras costas com costas** (ilha) + **tampo único modelado** por cima (placa chanfrada Steel, sem emenda sob as vagas); marcas = `AST-019_QueueMark` (34 tris) recolor.
+- **Uso:** início e fim do fluxo (DEC-304): o pedido tomado no tablet faz nascer o prato vazio com ticket numa vaga; segurar E pega; clicar numa vaga livre põe (TASK-516/522).
+- **Medidas (Provisórias, posição pela TASK-503):** tampo **11,0 × 5,4**, Y **3,0**; grid **4 colunas × 2 fileiras**, **2,6** entre centros nos dois eixos (prato de 1,8 × 1,0 + plaquinha cabem com 0,8 de folga; a TASK-503 declara a distância mínima de toque). Centros relativos ao centro do tampo: X **−3,9 · −1,3 · +1,3 · +3,9**, Z **−1,3 · +1,3**. Vagas 1–4 na fileira −Z, 5–8 na fileira +Z, numeradas da esquerda para a direita vistas do lado do tablet. Acesso pelos 4 lados (a ilha não tem "costas").
+- **Marcas:** Ø **2,2**, Y 3,0 + 0,01. Número da vaga por `SurfaceGui` na borda do tampo, na frente de cada marca (1..8; os dois lados longos).
+- **Estados da marca (só `Color`/`Material`, mesma malha):** `Free` = Cream fosco (lê "vaga livre"; substitui o prato meio transparente do AST-145); `Taken` (prato vazio ou em montagem) = Teal; `Ready` (prato montado) = **Mustard** com anel fino `Neon` (lido à noite e de longe pelo entregador). Sem vermelho.
+- **Silhueta:** ilha baixa e larga, tampo liso com 8 discos em grade e prateleira inferior aberta: lê "mesa de pratos" e não "bancada de trabalho".
+- **Cores:** Steel; portas Steel escuro; marcas conforme o estado; friso Mustard fino na borda do tampo (interativo, §3).
+- **Encaixes:** `Mount_Plate_1..8` (centro de cada marca, Y 3,05; o prato AST-162 pousa aqui), `Click_Slot_1..8` (Part invisível 2,2 × 0,2 × 2,2 por vaga, `CanQuery = true`, para o clique de pôr), `Prompt` do pegar fica **no prato** (AST-162), não na mesa.
+- **Tris:** módulo ≤ 150, tampo ≤ 120, marcas 8 × 34. Montada ≤ **1.800**.
+- **Placeholder:** Part 11 × 3,0 × 5,4 Steel + 8 cilindros Ø 2,2 × 0,02 Cream nas posições acima, com os mesmos nomes.
+- **Referência original:** mesa de expedição ("pass") de restaurante com pratos à espera de retirada; módulos KP do AST-144.
+
+### AST-162 — Prato do hot dog
+
+- **Status:** Rascunho · **Prioridade:** P0 · **Origem:** Pack + edição — **`FP/plate-rectangle.fbx`** (Kenney Food Kit 2.0, CC0; licença do pack já em `credits.md`, acrescentar AST-162 na linha do Food Kit quando a ficha for aprovada), escala uniforme; a borda (`Rim`) separada em peça própria para receber a cor do dono. Se a malha do pack não separar a borda, modelar só o anel (≤ 40 tris).
+- **Uso:** o prato-Tool com ticket (DEC-304): nasce vazio na vaga da mesa central, vai à mão (até 2, DEC-299), entra na esteira no foco, volta à mão montado, à mesa ou ao `PICKUP`. O conteúdo é o `HotDogVisual` existente (AST-001/002/003 e coberturas), não faz parte desta malha.
+- **Medidas:** **1,8 × 0,12 × 1,0** (C × A × L), cantos arredondados; o hot dog (1,2) deitado ao longo do comprimento, com folga para a plaquinha numa ponta.
+- **Estados (mesma malha):** `Empty`, `Building`, `Done` — a malha do prato não muda; o estado aparece no conteúdo e na plaquinha (AST-163).
+- **Dono (TASK-519):** `Rim` com `Color` da paleta do jogador (`Presence.Palette`) enquanto o prato está na esteira ou na mão; na mesa central volta ao Cream (o ticket identifica). Ninguém usa cor reservada (§2.4).
+- **Tool:** peça raiz `Handle` com origem no centro da base; `Grip` ajustado no import para o prato ficar no terço inferior direito em 1ª pessoa, inclinado ~10° para a câmera (o jogador vê o conteúdo e a plaquinha). Com 2 pratos, o equipado é o que mostra o ticket no HUD (TASK-522).
+- **Silhueta:** retângulo baixo de bordas arredondadas, mais claro que tudo em volta (lona Slate, tampo Steel): lê "prato" a 10 studs na esteira e na mesa; distinto do prato redondo da plataforma do lobby (AST-088) e do disco do AST-145.
+- **Cores:** Cream `#FFF1D6` → `#EAD6B0` (faixa do atlas Kenney mais próxima; se não houver, remapear para `T_Palette_SH`).
+- **Encaixes:** `Handle`/`Att_Hand`, `Att_Content` (centro, topo do prato + 0,01: base do hot dog), `Att_Ticket` (ponta direita, onde encaixa o AST-163), `Prompt_Take` (centro, +0,4; "segurar E" na mesa central), `Att_Ticket_BB` (0,9 acima do centro, só para `BillboardGui` de longe, se a TASK-522 quiser).
+- **Tris:** ≤ **150** com o `Rim` (pack ~100; conferir no import).
+- **Placeholder:** Part 1,8 × 0,12 × 1,0 Cream (cantos retos servem); mesmos attachments.
+- **Referência original:** prato retangular de lanchonete para hot dog; malha do Food Kit.
+
+### AST-163 — Plaquinha do ticket no prato
+
+- **Status:** Rascunho · **Prioridade:** P0 · **Origem:** Modelar (peça mínima: nenhum pack tem). Texto por `SurfaceGui`; selo da nota = mini 64² do AST-113 (`ImageLabel`).
+- **Uso:** mostra o **#n** do ticket no prato, na mesa, na esteira, na mão e no `PICKUP` (DEC-303/304). O pedido completo (itens e toppings) fica no HUD (TASK-522, AST-112), **não** na plaquinha.
+- **Forma:** **prendedor** Teal (clipe de 0,15 × 0,25 × 0,12 preso na borda do prato) + **cartão** Cream **0,55 × 0,4 × 0,03** em pé, inclinado 20° para trás, com borda superior serrilhada (eco do papel do AST-112, em forma, não em textura).
+- **Faces:** `Face_Front` e `Face_Back` (peças planas de 0,5 × 0,35 para `SurfaceGui`, uma por lado): "#12" em Fredoka Ink ocupando ≥ 70% da altura; à direita, o mini-selo da nota quando `Done`.
+- **Estados (só `Color`/UI):** `Empty`/`Building` = cartão Cream; `Done` = cartão com **faixa Mustard** no topo + mini-selo Perfect/Good/Messy (AST-113); ticket órfão (cliente saiu, regra da TASK-512) = cartão Slate claro `#A9AEBF` com o número riscado por UI. Sem vermelho.
+- **Leitura:** número legível a **4 studs** (mesa central em 1ª pessoa) e no foco; de longe (> 8 studs) usar o `Att_Ticket_BB` do prato com `BillboardGui` pequeno (decisão da TASK-522; sem malha extra).
+- **Encaixes:** `Att_Mount` (base do clipe = `Att_Ticket` do AST-162), `Face_Front`, `Face_Back`.
+- **Tris:** ≤ **60** (clipe 24 + cartão chanfrado 28 + faces 4).
+- **Placeholder:** Part 0,55 × 0,4 × 0,03 Cream com `SurfaceGui` nas duas faces, soldada ao prato.
+- **Referência original:** prendedor de comanda em espeto/clip de lanchonete; papel do ticket AST-112 do próprio projeto.
+
+### Ordem para o modelador (depois da DEC)
+
+1. **P0, o que o jogador toca:** AST-162 + AST-163 (prato e plaquinha; destravam TASK-516/522 com malha real), AST-157 (esteira), AST-159 (setas, entra na rodada da TASK-188).
+2. **P0, cenário de uso:** AST-158 (bancada), AST-161 (mesa central), AST-160 (calço da mesa de descanso; o `Rail_8` já existe).
+
+Aceite de revisão (art-director): medidas da TASK-503 (±0,1) e desta ficha onde a 503 não fechar; pivô e frente; nomes `AST-###_<Nome>` e attachments do §8 com os nomes das fichas (ou os do contrato da TASK-512, se mudarem); tris dentro da ficha e do bloco; nenhum atlas ou textura 3D nova; prato mais claro que a lona e o tampo na vista do foco (print 16:9 e 667 × 375); setas com alvo ≥ 44 px; nenhuma forma, cor ou layout do jogo de referência.
 
 ## Fora desta lista (próxima rodada)
 

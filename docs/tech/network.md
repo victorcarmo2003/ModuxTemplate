@@ -22,6 +22,9 @@ troca `FriendsOnly` por `Access`; `PartyConfigure` troca `FriendsOnly` por `Acce
 `InviteOnly`; plataformas sem capacidade fixa.
 **Versão 5.7, 2026-10-11 (pedido do usuário, Provisório):** botão Play do lobby com escolha (§16.7): packet novo
 `PartyQuickPlay { Mode = "Solo" | "Squad" }`; squad "Solo" de 1 começa já e some ao voltar ao estado ocioso.
+**Versão 5.9, 2026-10-18 (TASK-512; DEC-302, DEC-303, DEC-304; Provisório):** cozinha com esteira (§19): packets novos
+`PrepBelt` e `PrepStage` (namespace "game"), `CenterPut` (namespace "restaurant"); set `PrepSeats` ganha `Stop`, `Wait`,
+`Line`, `Away` (prato parado na esteira; emenda do dono: dois prompts, ação nova `prep_grill`); set `Plates` ganha `Grade` e passa a ser a mesa central (vagas 1..8). Contrato completo em `prep-conveyor.md`.
 **Versão 5.2, 2026-10-10 (DEC-221):** set `Hides` sai; janela do trailer = atributo `Shutter` no `Model` do veículo
 (§13.6, T61); `Actions` perde `hide`/`get_up` e ganha `shutter_toggle`; `Notices` troca `hide_taken` por `shutter_closed`.
 Versão 4, 2026-10-10 (**TASK-001**: estado DEC-140 a DEC-201, núcleo da onda 1). Versão anterior: 3.1, 2026-10-08.
@@ -1373,3 +1376,52 @@ Fonte (não é Lync): MemoryStore HashMap `Online_v1`. Todo servidor grava `JobI
 + 2 por lobby + servidores/200 páginas por minuto, muito abaixo da cota (1000 + 100 × usuários). Studio ou erro do
 MemoryStore: só a contagem local. Tráfego: `update` só quando o número muda (no máximo a cada 30 s, mais entradas/saídas
 locais). Um registro de 24 bits: sem o piso de `drop.section` do README.
+
+## 19. Cozinha com esteira (v5.9, TASK-512; DEC-302, DEC-303, DEC-304; **Provisório**)
+
+Contrato completo, regras de jogo e assinaturas entre serviços: `prep-conveyor.md`. Vale só com
+`Content.Prep.Rules.Mode = "Conveyor"` (restaurante ligado, §1 de `prep-conveyor.md`); no modo `"Trailer"` nenhuma entrada
+abaixo é escrita e as mudanças de schema são **aditivas** (campos `optional`), então o trailer compila e codifica como hoje.
+Grava tudo: **TASK-513** (único dono de `Net/*` nesta rodada). Sem `keyBy`. Enums vêm de `Content.Prep` (Lync ordena os nomes).
+
+### 19.1 Entradas novas e mudadas
+
+| Entrada | Arquivo | Tipo / direção | Schema | Escritor | Leitor | Ritmo | Por quê |
+|---|---|---|---|---|---|---|---|
+| `PrepBelt` | `Net/init.luau` | packet c → s | `{ Dir = enum(Content.Prep.BeltDirs) }` (`Left`, `Right`) | `PrepController` (setas: teclado, toque, gamepad) | `PrepService` (responder no `OnInit`) | ≤ `Conveyor.Rates.Belt` = 6/s por jogador | pedido de mover **o próprio** prato uma parada; sem campo de alvo, então não há como mover o prato de outro. Evento: packet |
+| `PrepStage` | `Net/init.luau` | packet c → s | `{ Stage = enum(Content.Prep.BeltStages), Score = int(0, 100), Slot = int(0, 8) }` (`Cut`: `Slot` 0; `Dog`: `Slot` = posição 1..8 do descanso) | `PrepController` (fim do gesto de cortar / de arrastar a salsicha) | `PrepService` | ≤ `Conveyor.Rates.Stage` = 2/s | commit de uma etapa no prato (pão do estoque, salsicha do descanso); tudo ou nada; resposta em `PrepResult Act = Stage` |
+| `PrepResult` | `Net/init.luau` | packet s → dono | sem mudança de schema; `Act` + `Belt`, `Stage`; `Reason` + `NoPlate`, `BeltFull`, `GrillBusy`, `WrongStop`, `PlateDone` | `PrepService` | `PrepController` | 1 por pedido | `Belt`: `Ok = true` e `Value` = parada nova 1..4 (se o prato ficou esperando ao lado, o cliente vê `Wait` 1 ou 2 no `PrepSeats`); `Stage`: `Value` = nota aceita |
+| `PrepSeats` | `Net/init.luau` | set, id = assento 1..4 | **+** `Stop = optional(int(0, 15))`, `Wait = optional(int(0, 2))` (0 = na parada, 1 = esperando à esquerda `WaitL_n`, 2 = à direita `WaitR_n`), `Line = optional(int(0, 2))`, `Away = optional(bool)` (true = o dono saiu e o prato está parado e reservado na esteira; o assento continua dele). `Ticket` passa a ser o NpcId do ticket **do prato** na esteira; `Step` = aba da parada; `Plate` = máscara do conteúdo (bits de pão/salsicha escritos pelo servidor no commit) | `PrepService` | `PrepController` (`Mates`, `World/BeltMates`, StationTag, ticket do foco), `MetricsService` | 1 escrita por seta aceita, por commit, por promoção e por sair/voltar (`Away`); pior caso ≈ 12/s no set, típico < 1/s | todos veem o prato de cada montador andar e quem chega tarde recebe o estado. **3 registros** no modo esteira (1–2 esteira, 3 grelha), 4 no trailer: sem `drop.section` (< 8 registros; `User`/`Since` `f64`) |
+| `Plates` | `Net/Restaurant.luau` | set, id = vaga 1..`CenterTable.Slots` (8; fio 1..12) | **+** `Grade = optional(enum(Content.Prep.GradeKeys))` (nil = não montado). Os campos de hoje (`Npc`, `Line`, `Bun`, `Sausage`, `Toppings`, `Since`, `Orphan`, `Altered`) passam a descrever o prato **na vaga da mesa central** | `PlateService` | `PlateController` (grid, ticket na vaga), `OrderBoardController`, `TutorialController` | por pedido: nascer, pegar, pôr, órfão (~4 escritas por pedido) | estado compartilhado da mesa central; 8 registros largos (`Npc` 16 bits, `Since` `f64`): sem `drop.section` |
+| `CenterPut` | `Net/Restaurant.luau` | packet c → s | `{ Slot = int(1, 12) }` | `PlateController` (clique/toque na vaga livre; gamepad: vaga livre mais perto) | `PlateService` (responder no `OnInit`; primeiro packet do namespace "restaurant") | ≤ `CenterTable.PutRate` = 4/s | pôr o prato equipado numa vaga; a vaga é escolhida no clique, que não é ProximityPrompt. Recusa por `Notice` (`slot_taken`), como o resto do `PlateService` |
+
+### 19.2 Sem mudança de schema, com regra nova no modo esteira
+
+| Entrada | Regra no modo esteira |
+|---|---|
+| `PrepEnter` | `Station` é o assento pedido (1–2 esteira exige prato não montado na mão ou prato parado; 3 = grelha). O caminho normal são os prompts: `prep_work` (`Prompt_Work`) → esteira, `prep_grill` (`Prompt_Grill`) → grelha |
+| `PrepLeave` | prato fora de `Out`: fica parado na esteira (`Away = true`, reserva mantida); prato em `Out`: volta à mão, a parada libera e promove quem esperava |
+| `PrepTab` | segue como batimento e máscara de toppings; o servidor ignora a troca de aba (a aba vem da parada) |
+| `PrepGrill` | aceito só do assento 3 (grelha); sem pausa de virar, sem queima; pronta em 8/6/4 s |
+| `PrepFinish` | só na parada 3; `Cut` e `Place` do resumo são ignorados (o servidor usa os que gravou no `PrepStage`); não cria Tool |
+| `PrepTrash` | `From = Plate` esvazia o prato na esteira e mantém o ticket |
+| `PrepGrab` / `PrepClaims` | `From = Rail` = mesa de descanso (8 posições) |
+| `PrepPointer` / `PrepGhost` | sem mudança (`Station` = assento) |
+| `PrepBegin`, `PrepOrder` | sem uso: recusa `Invalid` / `Locked` |
+| `Stations` | grelha: `Burnt` nunca escrito; `Flip` segue sendo a nota do virar; rail: `Count` = salsichas no descanso |
+| `Customers` | sem mudança; `Number` é o #n do ticket no HUD e na vaga |
+| `Interact` | ação nova `prep_grill` (entra na grelha; o enum `Action` cresce com `Content.Actions.Keys`, sem campo novo); `plate_take` (segurar 0,5 s, vaga da mesa central) e `pickup_serve` (segurar 0,5 s) |
+
+### 19.3 Atributos de Tool novos (sem Lync; completa o §7.1)
+
+Item novo `plate` (prato não montado). Atributos escritos pelo `PlateService`: `PlateId` (int), `Ticket` (NpcId; já
+existia no `hot_dog`), `TicketLine` (1..2), `Orphan` (bool), `Bun` e `Dog` (bool, só `plate`), `FlipBonus` (bool). A nota do
+prato montado é o atributo **`Quality`** que já existe. Notas de etapa e relógio do prato ficam só no servidor.
+
+### 19.4 Orçamento e tipos
+
+Tráfego novo por jogador < 2 pacotes/s em ritmo normal (setas e etapas); sets: `PrepSeats` ~1 byte por escrita,
+`Plates` sem mudança de ordem de grandeza. Os structs novos são montados fora da tabela do `define` (funções locais, como
+`cutsceneRecord`) por causa do orçamento do LuauSolverV2 no namespace "game"; se ainda estourar, `PrepBelt` e `PrepStage`
+vão para um namespace próprio `Net/Belt.luau` requerido pelo `init.luau` (como `Net/Restaurant.luau`), decisão registrada
+pela TASK-513 (`prep-conveyor.md` P23).

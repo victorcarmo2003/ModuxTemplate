@@ -24,6 +24,11 @@ foi superada pela mudança do dono: agora espera na retirada e senta **depois**)
 Base: FEAT-005, FEAT-006, FEAT-009 a FEAT-011, FEAT-014, FEAT-015, FEAT-037 a FEAT-041, `upgrades.md`, `economy.md` §5.0,
 `tech/prep-mode.md`, `tech/prep-3d.md`, DEC-045, DEC-051, DEC-072, DEC-101, DEC-174, DEC-223, DEC-226, DEC-238, DEC-239, DEC-259.
 
+> **Rev. 3 (game-designer, 2026-10-18, TASK-508):** FEAT-044 e FEAT-045 reescritas na versão **cozinha com esteira**
+> (DEC-302, DEC-303, DEC-304; DEC-298 e DEC-299 onde continuam valendo). Junto: UPG-016 sem queima (§3), economia da nota e do
+> bônus de virar (§4.5), §0, §1, §6 e §8 acertados. As DEC-297 e DEC-301 estão superadas; os trechos de "seções focadas por
+> estação", pilhas, "Fill All", passa e queima que sobram nas §5 e §7 são histórico da rev. 2.
+
 Tudo aqui é **Rascunho / Provisório** (fase 1, DEC-193): o trabalho pode seguir com estas recomendações; nada vira Aprovado
 sem DEC do dono. Números são valores iniciais de tabela (DEC-044): mudar número = mudar `Content`, nunca código.
 Anomalias são de outro agente (`design/anomalies-v3-restaurant.md`, em revisão, DEC-278); aqui só **ganchos** (§9).
@@ -45,9 +50,10 @@ Cliente entra ─► FILA do tablet (ponta direita) ─► TABLET: mini-diálogo
                                                          ▼
      espera EMPILHADO na RETIRADA (ponta esquerda), número #n sobre a cabeça
                                                          │
-Cozinha:  prato-slot #n nasce na Mesa de Montagem (FEAT-044)
-          pão: corte ─► pilha ─► prato · salsicha: grelha cru→pronto→queimado ─► pilha ─► prato (FEAT-045)
-          prato ─► condimentos ─► balcão de retirada
+Cozinha:  prato vazio com ticket #n nasce na MESA CENTRAL (8 vagas, FEAT-044) ─► segurar E: prato na mão, ticket no HUD
+          prompt único "Work" ─► ESTEIRA (FEAT-045): parada 1 grelha+descanso ─► 2 pão: cortar, salsicha ─► 3 molhos: padrão
+          grelhador em paralelo: grelha focada (sem queimar, virar = bônus) ─► mesa de descanso
+          prato pronto com nota ─► de volta à mesa central  OU  direto ao balcão de retirada
                                                          ▼
 Entrega NO BALCÃO ao cliente #n (FEAT-046) ─► ele senta numa mesa, come e vai embora (gorjeta de mesa no pote)
 
@@ -83,7 +89,7 @@ drive-thru e a escotilha são passagens de objeto, não de corpo.
 | `CustomerService` (paciência Q-192, `SellLine`, Completo/Incompleto/Errado DEC-072, duplas FEAT-038, `serve` com prompt e arrasto FEAT-041) | **igual na essência**: a entrega no balcão de retirada é o `serve` de hoje com outro ponto | pedido ganha #n; paga ao confirmar (Q-309); estados `Waiting` (na retirada) e `Eating` |
 | Fila do balcão (`Q1..`) | vira a **fila do tablet** (até 4) | o Counter (UPG-003) sai |
 | `Seating` (FEAT-037, `SitHeadroom`, `MaxDiners`, `EatTime`, gorjeta de mesa) | **o cliente senta depois de receber**, como a FEAT-037 original | sem "Clean Table": o jogador não sai; a bandeja some sozinha |
-| `KitchenService` (grelha, trilho, pão, toppings, lixeira, estoque, `TakeStock`, `Restock`) | **base das estações** (FEAT-045) e do reabastecimento (FEAT-050) | grelha ganha `Burnt`; trilho vira bandeja quente do Grill Bot |
+| `KitchenService` (grelha, trilho, pão, toppings, lixeira, estoque, `TakeStock`, `Restock`) | **base das estações** (FEAT-045) e do reabastecimento (FEAT-050) | rev. 3: a grelha **não queima** no restaurante (DEC-298/303); o trilho vira a **mesa de descanso** compartilhada |
 | Handlers antigos de prompt (`grill_place`, `grill_collect`, `bun_cut`, `topping_add`, `discard`) + flag `WorldKitchenPrompts` | rollback da onda 0 (opção B da Q-307) | saem pilhas e prato em vez do Tool HotDog |
 | `ItemService` (Tools, `Quality`, hotbar 4, DEC-174) | Tools do `tech/restaurant-flow.md`: `bun_sliced`, `sausage_grilled`, `hot_dog` (com atributo `Ticket` = #n); novo aqui: `stock_box` | proposta deste doc: `bun_sliced` e `sausage_grilled` ganham atributo `Count` (pilha); sem ele vale 1 por Tool |
 | Pacotes do Mart (ITM-011 a ITM-019) | viram **caixas** com o mesmo conteúdo e preço (FEAT-050) | chegam pela escotilha |
@@ -92,6 +98,11 @@ drive-thru e a escotilha são passagens de objeto, não de corpo.
 | Janela do trailer + alavanca (DEC-261) | sai (DEC-269); equivalente: **persiana do balcão (atendimento + retirada) + janela do drive-thru, uma alavanca** (Provisório da Q-308) | gancho de anomalia |
 
 ### 1.2 Modo de preparo focado (DEC-223): o que continua e o que sai
+
+> **Rev. 3 (DEC-302/303):** esta seção é **histórico** da rev. 2. O modo focado volta ao restaurante **com esteira**: um prompt
+> único, a esteira **substitui** as abas/pan (DEC-232) e a tábua única por assento; a grelha focada **não queima**; o gesto
+> `place` **volta** (salsicha da mesa de descanso ao pão); `Grade`, tolerâncias, gestos, dopamina, mão fantasma e saídas
+> forçadas continuam. Regras atuais: FEAT-045.
 
 A DEC-272 trocou "uma tábua por jogador com todas as etapas" por estações físicas. Segue-se a recomendação Provisória da
 **Q-307 (A) híbrido**: **cada estação abre só a sua seção** da vista focada que já existe (grelha = `Grill`, tábua = `Board`,
@@ -162,97 +173,250 @@ estações em prompt no mundo (opção B como rollback por flag).
   - Andar para longe no meio cancela sem criar pedido nem cobrar.
   - Nunca mais de 5 clientes na fila do tablet (`Q1..Q5`).
 
-### FEAT-044 — Fila de pedidos na mesa de montagem (pratos-slot)
+### FEAT-044 — Mesa central: o prato nasce com o ticket e volta para a entrega
 
-- Status: Rascunho (Provisório) · Pilares: VENDER, GERENCIAR · Origem: DEC-271
-- Resumo: cada pedido confirmado vira um **prato meio transparente** num slot da Mesa de Montagem, com **BillboardGui**: #n,
-  ícones do pedido e o anel de paciência. O prato fica sólido conforme recebe pão e salsicha. Pegar o prato **libera o slot**.
+- Status: Rascunho (Provisório) · Pilares: VENDER, GERENCIAR · Origem: DEC-271, **DEC-302**, **DEC-303** (Q-383 A), **DEC-304**
+  · rev. 3 (TASK-508, 2026-10-18): substitui a "mesa de montagem com pilhas e Fill All" (rev. 2) e a passa da DEC-297.
+- Resumo: a **mesa central** é o **início e o fim** do fluxo da cozinha (DEC-304). Cada pedido confirmado faz nascer um **prato
+  vazio com a plaquinha do ticket #n** numa vaga do grid de **8**. O montador **pega o prato segurando E**, leva à esteira
+  (FEAT-045), monta e depois **devolve à mesa** (clicando numa vaga livre) ou **leva direto ao `PICKUP`** (FEAT-046). Enquanto um
+  jogador segura um prato, o **ticket aparece no HUD**. Assim um cozinha e põe na mesa, outro pega e entrega.
+- Fora daqui: nada de pilhas (`bun_sliced`, `sausage_grilled`), "Fill All", `plate_put`/`plate_take` da passa nem montagem na
+  mesa. A montagem é toda na esteira.
 
-| Regra | Valor (`Content.Restaurant.Pass`) |
+| Regra | Valor (`Content.Restaurant.CenterTable`; **Provisório** onde o dono não deu número) |
 |---|---|
-| Slots físicos | 8 (`PLATE-1..8`, `Content.Restaurant.Rules.PlateSlots`), até 12 com UPG-024 |
-| Slots ativos por party | 1p **4** · 2p **6** · 3p **8** · 4p **8**; +2 por nível de UPG-024 |
-| Ocupação | slot ativo livre **mais à esquerda** (perto da grelha); drive-thru: **mais à direita** (perto da janela) |
-| Billboard | "#12" grande · ícone de carro se for drive-thru · ícones de pão, salsicha e complementos (cinza = falta, cheio = feito) · anel de paciência Cream → Mustard → **Ink** (sem vermelho), com **forma** que muda (cheio → meio → 1/4 piscando) |
-| Prioridade | sem ordem obrigatória; o mais antigo pulsa em Mustard; paciência ≤ 25% ganha "!" |
-| Estados | `Ghost` → `Bun` → `Base` (pão + salsicha) → condimentos (FEAT-045) → `Ready`; K = 0: `Base` já é `Ready` |
-| Encher | pilha certa na mão: **toque** no slot = 1 item; **segurar 0,5 s** = "Fill All": 1 item por prato que precisa, do mais antigo ao mais novo, até a pilha acabar |
-| Pegar | `plate_take` "Take Plate" (toque), em prato `Base` ou `Ready`; vira Tool `hot_dog` com `Ticket` = #n; o slot fica livre na hora. `plate_put` devolve um `hot_dog` ao slot |
-| 9º pedido (slots cheios) | o tablet trava ("Kitchen full", FEAT-043). Nunca há pedido sem prato. Pegar um prato destrava em ≤ 0,5 s |
-| Cliente desistiu | o prato vira **órfão** (billboard cinza "?"). Pedido novo **idêntico** reaproveita o órfão mais adiantado; senão fica até alguém jogar fora ou até o `Summary` (descarte, ingredientes perdidos) |
+| Vagas | **8** em grid 4 × 2 (DEC-303), **todas ativas em qualquer party**. UPG-024 Long Pass: +2 / +4 (teto 12) **Provisório**, depende de caber no layout (TASK-503) |
+| Nascer | pedido confirmado (tablet, computador do drive-thru, kiosk) → prato vazio com ticket #n na **vaga livre de menor índice** (vaga 1 = a mais perto da esteira) em **≤ 0,5 s**; drive-thru ocupa da **maior** para a menor (perto da janela) |
+| Mesa cheia | 8 vagas ocupadas: o tablet mostra **"Kitchen full"** e não abre o diálogo (DEC-304, FEAT-043); o cliente espera em `Q1` com a paciência correndo; vaga liberada destrava em ≤ 0,5 s. Nunca existe pedido sem prato |
+| Plaquinha e billboard | plaquinha "#12" no prato (vai junto para a mão e para a esteira) · billboard sobre a vaga: "#12", ícone de carro se for drive-thru, ícones de pão, salsicha e complementos (cinza = falta, cheio = feito), anel de paciência Cream → Mustard → **Ink** (sem vermelho), com **forma** que muda (cheio → meio → 1/4 piscando) |
+| Estados do prato | `Empty` → `Bun` → `Base` (pão + salsicha) → condimentos → `Ready` (com nota, FEAT-045); K = 0: sai da esteira `Ready` depois do `Base`. Na mesa pode haver prato em qualquer estado (quem sai no meio devolve em montagem) |
+| Pegar | **segurar E 0,4 s** ("Take #12"), qualquer jogador, qualquer estado; vira prato-Tool no inventário; **máx. 2** na mão (DEC-299); o 3º recusa com `hands_full`; a vaga fica livre na hora |
+| Pôr | com um prato equipado, **clicar / tocar uma vaga livre** a ≤ **8 studs** (alvo ≥ 44 px no celular); o prato vai para a vaga; vaga ocupada não reage e não manda pacote |
+| Ticket no HUD | enquanto segura um prato, a nota do pedido (`HudOrder`, canto superior esquerdo) mostra o ticket do prato **equipado**: #n, itens, complementos, cheio = feito; troca em **≤ 0,2 s** ao trocar de prato; some ao soltar |
+| Prioridade | sem ordem obrigatória; o prato mais antigo pulsa em Mustard; paciência ≤ **25%** ganha "!" |
+| Cliente desistiu | prato **vazio** some na hora (nada perdido); prato com algo vira **órfão** (billboard cinza "?"); pedido novo **idêntico** reaproveita o órfão mais adiantado em vez de nascer vazio; senão o órfão fica até ir à lixeira ou até o `Summary` |
 | Órfão na mão | entregável a qualquer cliente com pedido pendente idêntico (reatribuído na entrega) |
-| Trava co-op | quem enche um slot o trava 0,6 s (DEC-259, cor do jogador) |
-| Rede (architect) | set de pedidos até 14 registros (12 slots + 2 carros): acima de 8, todo campo com ≥ 7 bits (`drop.section`) |
+| Prato jogado fora | jogar fora um prato com ticket vivo faz nascer de novo o **prato vazio do mesmo #n** na mesa (vaga livre; se não houver, assim que abrir uma). O pedido nunca fica sem prato **(Provisório)** |
+| Disputa | 2 jogadores segurando E na mesma vaga: leva quem completar primeiro no servidor; o outro recebe "Taken" (FEAT-005) |
+| Rede (architect, TASK-512) | Set da mesa central com 1 registro por vaga (8, teto 12): ticket, estado, nota, máscara de complementos |
 
-- Dados: `Content.Restaurant.Pass` { `Slots` 8, `MaxSlots` 12, `ActiveByParty` {4,6,8,8}, `FillAllHold` 0,5, `UrgentAt` 0,25, `OrphanReuse` true }.
+- Dados: `Content.Restaurant.CenterTable` { `Slots` 8, `MaxSlots` 12, `TakeHold` 0,4, `PutRadius` 8, `UrgentAt` 0,25, `OrphanReuse` true, `DriveThruFrom` "High", `RespawnOnTrash` true }. Saem `Pass.ActiveByParty`, `Pass.FillAllHold` e a trava de 0,6 s do slot.
 - Critérios de aceite:
-  - Pedido confirmado aparece no slot certo em ≤ 0,5 s, com #n e ícones iguais aos da nota.
-  - Solo: o 5º pedido simultâneo não é criado; pegar 1 prato libera e o 5º pode ser tomado.
-  - "Fill All" com 3 pães e 5 pratos sem pão enche os 3 mais antigos.
-  - Prato de quem desistiu fica cinza e é reaproveitado por pedido idêntico; no `Summary` não sobra órfão.
+  - Pedido confirmado faz nascer **exatamente 1** prato vazio na vaga certa em ≤ 0,5 s, com #n e ícones iguais aos da nota do HUD.
+  - Com as 8 vagas ocupadas, "Take Order" não abre e o tablet mostra "Kitchen full" para todos; pegar 1 prato destrava em ≤ 0,5 s.
+  - Segurar E 0,4 s pega o prato; com 2 pratos na mão o 3º é recusado com `hands_full`; pôr numa vaga livre devolve o prato com o mesmo estado e ticket.
+  - Segurando um prato, o HUD mostra o ticket dele; com 2 pratos, o HUD segue o equipado em ≤ 0,2 s; sem prato, o HUD do ticket some.
+  - Contagem de pratos antes/depois de 20 ciclos pôr/pegar com 2 jogadores: nenhum prato duplica nem some.
+  - Prato de quem desistiu: vazio some, montado fica cinza e é reaproveitado por pedido idêntico; no `Summary` não sobra órfão.
+  - Jogar fora o prato #7 com o cliente #7 esperando faz nascer um prato vazio #7 na mesa.
   - Nenhum anel usa vermelho; a urgência também muda de forma (teste em escala de cinza).
 
-### FEAT-045 — Estações da cozinha e mãos
+### FEAT-045 — Cozinha com esteira: grelha focada, mesa de descanso, montagem e nota
 
-- Status: Rascunho (Provisório) · Pilares: VENDER, GERENCIAR · Origem: DEC-272; FEAT-006, FEAT-039
-- Resumo: grelha, pão e condimentos no fundo; montagem no centro; retirada na frente. O jogador carrega **pilhas**, **pratos** e
-  **caixas** como Tools (limite 4, DEC-174). Cada estação abre só a sua seção da vista focada (§1.2).
+- Status: Rascunho (Provisório) · Pilares: VENDER, GERENCIAR · Origem: **DEC-302**, **DEC-303** (Q-379 a Q-382 A), DEC-304;
+  DEC-298 (grelha sem queima, virar opcional, sem barra) e DEC-299 (2 pratos na mão) nos pontos que continuam; DEC-223 (modo
+  focado), FEAT-039 (gestos), DEC-226 (grelha de barras), DEC-072 (resultado e gorjeta) · rev. 3 (TASK-508, 2026-10-18):
+  substitui "estações com seções focadas, pilhas, Fill All e queima" (rev. 2).
+- Resumo: um **prompt único** na bancada abre o **modo focado** (câmera travada na bancada de dois níveis). Em cima, da
+  **esquerda** para a **direita**: **grelha + mesa de descanso**, **tábua e pão**, **condimentos**. Embaixo, a **esteira**: cada
+  montador tem o **próprio prato** (o que ele trouxe da mesa central) e o move com **setas esquerda/direita**. O **grelhador**
+  usa a vista focada da grelha: põe e vira salsichas; a pronta vai para a **mesa de descanso**, estoque compartilhado. O
+  montador corta o pão, arrasta a salsicha para o pão e **desenha os molhos seguindo um padrão**; sai com a **nota
+  Perfect/Good/Messy**. Referência só de **mecânica** (estações em fila em cima, produto na esteira embaixo, setas); nenhum
+  nome, arte ou layout de outro jogo.
+- "Esquerda/direita" é a da fala do dono; o level-designer confere o ponto de vista no mapa (TASK-503).
 
-**Mãos** (recomendação A de Q-322):
+**Papéis** (nenhum é fixo; o layout os torna naturais)
 
-| Tool | Conteúdo | Capacidade | Máx. por jogador |
-|---|---|---|---|
-| `bun_sliced` "Buns ×n" (atributo `Count`) | pães cortados (cada um com sua nota de corte) | **3** (UPG-019: 5 / 8; Hauler +1) | 1 |
-| `sausage_grilled` "Dogs ×n" (atributo `Count`; vem do `rail_take`/coleta) | salsichas prontas (cada uma com sua nota) | **3** (UPG-018: 5 / 8; Hauler +1) | 1 |
-| `hot_dog` "#12" (atributo `Ticket`) | pedido, pão, salsicha, complementos, nota | 1 prato por Tool | **2** (`HotDog` 2) |
-| `stock_box` "DOGS" etc. | caixa de estoque (FEAT-050) | conteúdo da caixa | **2** (Hauler 3; UPG-032 carrinho) |
-| Coffee, Revive Kit | como hoje | — | FEAT-005 |
-| **Total** | | | **4 Tools**; 5º = `hands_full` |
+| Papel | Onde | Faz |
+|---|---|---|
+| Grelhador | assento da grelha (vista focada) | põe salsichas cruas, vira na janela (bônus), mantém a mesa de descanso abastecida; nas folgas, tablet e estoque |
+| Montador (até 2) | esteira | pega o prato na mesa central, corta, monta, desenha, devolve à mesa ou entrega |
+| Entregador / caixa | mesa central → `PICKUP`; tablet | pega pratos `Ready` da mesa e entrega ao dono do ticket; toma pedidos |
 
-| Opção (Q-322) | Prós | Contras | Escopo |
-|---|---|---|---|
-| **A. Pilhas, pratos e caixas como Tools (recomendada)** | reusa `ItemService`, hotbar, snapshot; lote (cortar 3, grelhar 3); solo carrega tudo | hotbar cheia em party | baixo |
-| B. Mãos Overcooked (1 coisa) | leitura imediata, caos divertido | quebra DEC-174; solo vira vai-e-volta; sistema novo | alto |
-| C. Bandejas compartilhadas, sem carregar ingredientes | simples | some o "pegar e pôr no prato" da DEC-272 | médio |
+**Entrar e sair** (assentos: contrato do architect na TASK-512; aqui a regra de jogo, **Provisória**)
 
-**Grelha** (`GRILL-1`, barras AST-120, 8 vagas físicas, DEC-226; UPG-001, UPG-015, UPG-016)
-
-| Regra | Valor (`Content.Restaurant.Grill`) |
+| Regra | Valor (`Content.Prep.Conveyor`) |
 |---|---|
-| Vagas | as **vagas ativas do UPG-001** na grelha de barras (a contagem por nível vigente no `Content` manda); 2ª grelha com UPG-015 |
-| Entrar | prompt "Grill" (toque): abre só a seção `Grill`; **Leave** ou pilha cheia sai |
-| Pôr | arrastar da caixa de salsichas à vaga, ou toque na caixa = 1ª vaga livre; consome 1 do estoque |
-| Cozinhar | **12 / 10 / 8 s** (UPG-001); Line Cook −15% nas dele |
-| Virar | janela de 40% a 60% do tempo, `grill_flip` carimbado no servidor; sem virar = Messy |
-| Estados | `Raw` → `Ready` (dourada, brilho + check, SFX `grill_ready`) → `Burnt` (preta, fumaça grossa, SFX próprio) |
-| Queimar (`BurnAfter`) | **10 s** depois de `Ready` (UPG-016: **18 / 30 s** + apito 3 s antes); vale com o jogador fora da vista |
-| Coletar | arrastar ou tocar a pronta → `sausage_grilled`; "Collect All" leva todas até a capacidade. No mundo, "Collect" (toque) também coleta |
-| Nota da salsicha | média de `grill_flip` e `grill_pickup` (≤ 3 s depois de pronta = Perfect · ≤ 7 s Good · depois Messy) |
-| Queimada | não entra na pilha; ocupa a vaga até ir à lixeira 2D (DEC-231) ou "Scrape" no mundo; estoque perdido |
-| Bandeja quente (trilho AST-013, 8) | usada pelo Grill Bot (UPG-021); qualquer um pode "Take Dogs"; ali **não queima** |
+| Prompt único | "Work" (toque, 0 s), na frente da bancada, raio 6; um só prompt para a esteira e a grelha |
+| Com prato equipado | entra como **montador**: o prato vai para a **parada 1** da esteira; **máx. 2** montadores (Q-380 A); o 3º com prato recebe "Belt full" |
+| Sem prato | entra como **grelhador** no assento da grelha (**1** assento); ocupado: "Grill busy" |
+| Sair | botão **Leave** em qualquer parada: o prato volta à mão com o que já tem (sem nota se não terminou); câmera solta em 0,3 s |
+| Anomalia, desmaio, desconexão | saída forçada (`PrepService:Kick`, como hoje): o prato volta à mão; desconexão = o prato volta à mesa central (vaga livre, ou órfão até abrir vaga). Nunca some prato nem ticket |
 
-**Pão e corte** (caixa de pão + `CUT-1..2`): 2 tábuas. **Alvo:** "Cut Buns" abre a seção `Board`; corta **em sequência** até
-encher a pilha ou acabar o pão (`slice` ~1,0 s por pão), **Done** sai; nota `bun_cut` por pão. **Onda 0:** "Cut Bun" segurar
-0,6 s por pão, nota Good fixa. 1 pão do estoque por corte.
+**Esteira** (Q-379 A, Q-380 A)
 
-**Montagem** (FEAT-044): pilha na mão + `plate_put` "Add Bun" / "Add Sausage" (toque) no slot, ou "Fill All". Salsicha só em prato com pão.
+| Parada | Em cima (bancada alta) | O que se faz com o prato aqui |
+|---|---|---|
+| 1 — Entrada | grelha + mesa de descanso (esquerda) | o prato entra aqui. Com o prato nesta parada o montador **também usa a grelha** (pôr, virar): é o caminho do **solo**, sem trocar de assento |
+| 2 — Pão | tábua e cesta de pão (meio); a mesa de descanso fica na divisa 1 \| 2, ao alcance desta parada | cortar o pão; arrastar a salsicha da mesa de descanso para o pão |
+| 3 — Condimentos | tigelas e garrafas (direita) | complementos; ao sair pela direita, a nota |
+| Saída | — | seta direita na parada 3 = **termina** (calcula a nota) e sai do foco com o prato `Ready` na mão |
 
-**Condimentos** (`COND-1..2`): 2 lugares. Com `hot_dog` em `Base` equipado: "Add Toppings #12" abre a seção `Toppings` com o
-prato na tábua; **só as tigelas do pedido acendem**; gestos de FEAT-039 (selecionar → arrastar, DEC-233), ordem livre; **Done**
-devolve o prato `Ready`. Complemento não pedido é aplicável (tigela apagada, mas usável) e vira **Errado** na entrega.
-Tempo-alvo K=2: **4–6 s** na seção + 0,65 s de entrar/sair. **Onda 0:** prompts antigos "Add {item}" (hold 1 s) no prato na mão.
+| Regra | Valor |
+|---|---|
+| Setas | **1 parada por toque**; teclado A/D e ←/→, gamepad LB/RB e D-pad, toque: 2 botões de **64 px** (mín. 44 px) nos cantos de baixo |
+| Viagem entre paradas | **0,35 s** (aceite ≤ 0,4 s) |
+| Ordem | as setas andam livres; a **ação** segue a ordem fixa: salsicha só em prato com pão; complemento só em prato com salsicha (recusa com motivo, sem custo) |
+| Uma estação, um prato | parada ocupada: o prato para na **vaga de espera** à esquerda dela, aviso "Waiting"; entra sozinho em ≤ 0,3 s quando a outra libera; nunca 2 pratos na mesma parada; nunca empurra |
+| Reserva | a parada é do prato que está nela; libera quando ele sai (seta, Leave, Kick). Dois pedidos no mesmo tick: ganha quem chegou antes no servidor; empate = ticket menor |
+| Pratos dos outros | cada um vê o prato do outro andar na esteira do mundo, com a cor do jogador (`Presence.Palette`) e o #n, dentro e fora do foco |
 
-**Lixeira** (de fábrica, perto da montagem): "Throw Away" (hold 0,5 s) descarta o Tool equipado.
+**Grelha focada** (Q-381 A; DEC-298 confirmada: **não queima**, **virar opcional com bônus**, **sem barra**)
 
-- Dados: `Content.Restaurant.Grill`, `.Bun`, `.Condiments`, `.Stacks` { `Bun` 3, `Sausage` 3, `Plates` 2, `Boxes` 2 }; `Content.Prep.Tolerances` + `grill_pickup`; `Content.Items` + `bun_sliced`, `sausage_grilled`, `hot_dog`, `stock_box`.
+| Regra | Valor (`Content.Prep.Rules.Grill` no modo esteira; `Content.Upgrades` grill) |
+|---|---|
+| Vagas | as **vagas ativas do UPG-001** (2 / 3 / 4) na grelha de barras de 8 vagas físicas (DEC-226); 2ª grelha com UPG-015 |
+| Pôr | tocar a caixa de salsichas = 1ª vaga livre, ou arrastar a crua até a vaga; consome 1 do estoque da estação (DEC-285) |
+| Cozinhar | **contínuo, sem pausa** (sai a pausa que esperava o virar): pronta em `GrillTime` desde o "pôr". Tempo por nível: ver a tabela abaixo. Line Cook ×0,85 nas dele |
+| Estados e leitura | `Raw` (rosada) → `Cooking` (dourando aos poucos, fumaça fina) → `Ready` (dourada, a fumaça para, ícone "pronto" 0,6 s, SFX `grill_ready`). **Sem barra**, sem `GrillBar`, sem `ProgressBar` de mundo |
+| Queimar | **nunca** no modo esteira (DEC-298, DEC-303). A pronta fica pronta pelo tempo que for |
+| Pronta → mesa de descanso | vai **sozinha** em **0,3 s** (pulinho) para o lugar livre mais à esquerda da mesa de descanso **(Provisório)**; mesa cheia: fica na vaga da grelha como `Ready` (ocupa a vaga) e vai assim que abrir lugar (≤ 0,5 s), com o aviso "Rest table full" 1× |
+| Virar | tocar a salsicha em `Cooking`; **1 vez** por salsicha; virar fora da janela vira (gira 180° com salto) mas **sem bônus**; não virar não trava nada |
+| Janela do bônus | de **40% a 60%** do `GrillTime`, medida no relógio do servidor (carimbo do toque); largura mínima **1,0 s**, centrada em 50% |
+| Sinal da janela | quando ela abre: a salsicha **chia mais alto**, a fumaça engrossa e um "Flip!" pequeno sobe 0,6 s sobre ela (`Texts.FlipAlert`); quando fecha, a fumaça volta ao normal. Só visual e som, sem barra |
+| Bônus de virar | **+$1 de gorjeta** por prato cuja salsicha foi virada na janela (atributo `FlipBonus` carimbado no servidor, viaja grelha → mesa de descanso → prato). Pago na entrega **Completa dentro da janela de gorjeta**, como toda gorjeta (FEAT-048); 1 vez por prato. A salsicha com bônus tem a **marca de grelha cruzada** (visível na mesa de descanso) |
+| Virar e a nota | o virar **não entra** na nota do prato no modo esteira (`Stages.Sausage = nil` em `Grade.Plate`): não virar não deixa o prato Messy. A nota é do montador; o bônus é do grelhador |
+| Grill Bot (UPG-021) | só põe cruas (mesa de descanso + grelha com < 4 salsichas); nunca vira; a pronta segue a mesma regra |
+
+Tempos e janela por nível do UPG-001. **Conflito a resolver:** a DEC-201 registra **12 / 10 / 8 s** ("não mudam"); o código
+usa **8 / 6 / 4 s** desde 2026-10-14 (`Upgrades.luau`, "slowed the same day: too fast to follow"), hoje com 2 s depois do
+virar. Pela ordem de autoridade **vale a DEC-201** até o dono responder; a **recomendação** é **8 / 6 / 4 s sem pausa**
+(é o ritmo que o dono já joga e o grelhador não fica parado na vista focada). A TASK-506 **não mexe** em `GrillTime` até a
+resposta.
+
+| Nível | Vagas | `GrillTime` DEC-201 | Janela (s) | Vazão | `GrillTime` recomendado | Janela (s) | Vazão |
+|---|---|---|---|---|---|---|---|
+| 1 | 2 | 12 s | 4,8–7,2 | 10 / min | **8 s** | 3,2–4,8 | 15 / min |
+| 2 | 3 | 10 s | 4,0–6,0 | 18 / min | **6 s** | 2,4–3,6 | 30 / min |
+| 3 | 4 | 8 s | 3,2–4,8 | 30 / min | **4 s** | 1,5–2,5 (mín. 1,0 s) | 60 / min |
+
+Demanda máxima: 4p na N10 = 7,8 pedidos/min. Com qualquer coluna a grelha nível 1 já dá conta; o UPG-001 passa a valer pela
+**espera menor** (primeira salsicha, solo) e não mais por vazão.
+
+**Mesa de descanso** (compartilhada, junto da grelha)
+
+| Regra | Valor (`Content.Prep.Conveyor.Rest`) **Provisório** |
+|---|---|
+| Lugares | **6** |
+| Quem põe | só a grelha (a pronta vai sozinha) |
+| Quem pega | qualquer montador, **arrastando** da parada 2 para o pão (gesto `place`); a salsicha pega por um sai do alcance do outro na hora (claim, DEC-259) |
+| Ordem | livre; a **mais antiga** fica realçada; as com bônus têm a marca cruzada |
+| Esfriar / queimar | **não** |
+| Vazia | o montador na parada 2 vê "Waiting for the grill" e pode esperar ou sair (o prato fica com o pão) |
+| Fim da noite | salsichas da grelha e da mesa somem no `Summary` |
+
+**Pão e montagem** (parada 2)
+
+| Passo | Gesto (FEAT-039) | Tolerância (`Content.Prep.Tolerances`, sem mudança) | Tempo hábil |
+|---|---|---|---|
+| Pegar o pão | tocar a cesta: o pão vai ao prato; consome 1 pão da estação | — | 0,3 s |
+| Cortar | arrastar a faca ao longo da linha (`slice`); ou segurar 1,0 s (modo Hold) | `bun_cut` Perfect ≤ 6 · Good ≤ 15 · zero em 40 (% da largura) | 1,0 s |
+| Pôr a salsicha | arrastar da mesa de descanso para o vão do pão (`place`); ou segurar 0,35 s | `sausage_place` ≤ 10 · ≤ 22 · 60 (% do comprimento) | 0,8 s |
+
+**Condimentos e padrão de desenho** (parada 3; Q-382 A)
+
+- **Só as tigelas do pedido acendem**; as outras ficam apagadas e usáveis: complemento não pedido = **Errado** na entrega (DEC-072).
+- Ketchup, mostarda e cream cheese: **desenhar seguindo o padrão** (gesto `trace`). Ao escolher a garrafa, a guia tracejada do
+  padrão aparece sobre o pão; o traço que o jogador faz fica por cima. Queijo (`slide`), bacon (`taps`) e batata (`hold`)
+  seguem os gestos de FEAT-039.
+- Padrão **fixo por molho** na onda 1 (o jogador aprende um desenho por molho). Padrão que muda por pedido: fora da onda 1.
+
+| Molho | Padrão | Pontos do caminho (espaço do pão 0..1, x à direita, y para baixo) | Tempo hábil |
+|---|---|---|---|
+| Ketchup | **Zigzag** | (0,10; 0,20) (0,30; 0,80) (0,50; 0,20) (0,70; 0,80) (0,90; 0,20) — o de hoje (`Build.Sauce.Path`) | 1,6 s |
+| Mostarda | **Wave** (onda, 2 períodos, guia suavizada pelos pontos) | (0,10; 0,50) (0,20; 0,30) (0,30; 0,50) (0,40; 0,70) (0,50; 0,50) (0,60; 0,30) (0,70; 0,50) (0,80; 0,70) (0,90; 0,50) | 1,8 s |
+| Cream cheese | **Line** (linha no meio) | (0,10; 0,50) (0,90; 0,50) | 0,9 s |
+
+Tolerância igual para os 3 (a de hoje): Perfect ≤ **15** · Good ≤ **40** · zero em **80** (% de cobertura que falta),
+excesso ×**1,5**; um ponto do caminho conta coberto a ≤ **0,15** altura do pão; traço a mais de **0,4** do caminho é
+excesso (`Build.Sauce.Reach`, `Spill`). Squeeze Pro (UPG-023) e Assist ×1,3 continuam alargando a linha lida, sem mudar `Grade`.
+
+**Nota do prato** (Q-382 A: volta; calculada **só em `Grade`**, sem mudança de fórmula)
+
+| Regra | Valor (`Content.Prep.Grades`, como hoje) |
+|---|---|
+| Etapas que contam | corte, salsicha no pão, 1 por complemento (o **virar não conta** no modo esteira) |
+| Faixa por etapa | score ≥ **85** Perfect · ≥ **55** Good · abaixo Messy; pontos **100 / 70 / 30** |
+| Nota do prato | média ≥ **88** e nenhuma etapa Messy = **Perfect**; média ≥ **60** = **Good**; abaixo = **Messy** |
+| Piso de tempo | Perfect pede ≥ **3,0 + 0,8 × K s** entre pôr o prato na esteira e terminar (relógio do servidor); abaixo cai para Good. Recusa abaixo de 1,8 + 0,8 × K s; teto 90 s |
+| Mostrada | ao terminar (seta direita na parada 3): selo 1,0 s e confete 22 / 10 / 0; fica no prato (plaquinha e HUD) até a entrega |
+
+**Efeito na venda** (só em entrega **Completa**; Incompleto e Errado seguem a DEC-072 sem olhar a nota)
+
+| Nota | Gorjeta (dentro da janela de FEAT-048) | Janela de gorjeta | Humor do cliente |
+|---|---|---|---|
+| Perfect | **base + $1** (Rookie: $2) | **+4 s** | igual |
+| Good | base (Rookie: $1) | igual | igual |
+| Messy | **$0** | igual | **−1 faixa** |
+| + salsicha virada na janela | **+$1** (soma com a linha acima, inclusive em Messy) | — | — |
+
+- Perfect passa a ser **extra somado** à gorjeta base (`TipExtra` 1), não um valor fixo: hoje `Grades.Effects.Perfect.Tip = 2`
+  substitui a base, e o Hawker (base $2) não ganharia nada. Com a soma: Hawker Perfect = $3, Shift Lead (base $0) Perfect =
+  $1. **Provisório** (TASK-517/506).
+- Gorjeta máxima por prato do Rookie: $1 + $1 (Perfect) + $1 (virar) = **$3**. Impacto na economia: §4.5.
+
+**Tempos-alvo por pedido** (jogador hábil, mesa central e `PICKUP` a ~2 studs da bancada como no layout de referência;
+cozinha = de "segurar E" no prato vazio até o "Hand Over"; **Provisório**, conferir em Play na TASK-510)
+
+| Trecho (K = 2) | s |
+|---|---|
+| Pegar o prato (0,4) + andar à bancada (1,5) | 1,9 |
+| Prompt "Work" + câmera | 0,35 |
+| Seta 1 → 2 | 0,35 |
+| Pão: cesta + corte | 1,3 |
+| Salsicha da mesa de descanso ao pão | 0,8 |
+| Seta 2 → 3 | 0,35 |
+| 2 complementos (escolher 0,3 + desenhar ~1,6 cada) | 3,8 |
+| Terminar: selo (0,6 visto) + sair do foco (0,3) | 0,9 |
+| Andar ao `PICKUP` (2,5) + segurar (0,5) | 3,0 |
+| **Total montador, salsicha já na mesa de descanso** | **≈ 12,8** |
+
+| Cenário | Alvo | Teto do aceite |
+|---|---|---|
+| Solo, K = 0 (com a crua do próximo pedido) | ≈ 9,5 s | ≤ 11 s |
+| Solo, K = 2 (+0,6 s para pôr a crua do **próximo** pedido na parada 1, sem virar) | ≈ 13,5 s | ≤ 15 s |
+| Solo, K = 2 virando (espera a janela na parada 1, nível 1 de 8 s) | ≈ 16,5 s | ≤ 18 s |
+| Solo, K = 3 | ≈ 15,5 s | ≤ 17 s |
+| Solo, 1º pedido da noite (grelha vazia, nível 1) | + espera de 8 s | — |
+| Dupla — montador que **devolve** o prato à mesa (sem andar ao `PICKUP`) | ≈ 11,5 s por pedido | ≤ 13 s de média em 10 pedidos |
+| Dupla — grelhador + caixa + entregador (diálogo 4,4 + pôr/virar 1,2 + pegar na mesa e entregar 3,5 + passos 1) | ≈ 10 s por pedido | — |
+| Dupla — do carimbo #n ao "Hand Over" de um pedido | ≈ 14 s | ≤ 20 s (janela de gorjeta K = 2 = 32 s) |
+| Dois montadores na esteira (esperas por parada ocupada) | +0,5 a 1,5 s por pedido | nenhuma espera > 4 s |
+
+Leitura: solo por pedido = diálogo 5,4 + cozinha ~13,5 + estoque 1,5 ≈ **20 s** (era ~24 s na rev. 2); dupla vence ~4,6–5
+pedidos/min contra a demanda 2p da N10 de 4,5/min: cheia, sem sobra, como pede a DEC-275.
+
+**Mãos** (DEC-174, DEC-299)
+
+| Tool | Máx. por jogador |
+|---|---|
+| prato com ticket (`hot_dog`, atributo `Ticket`; `FlipBonus`, `Grade`, complementos) | **2** |
+| `stock_box` (FEAT-050 / DEC-285) | 2 (Hauler 3) |
+| Coffee, Revive Kit | como hoje |
+| **Total** | **4**; 5º = `hands_full`. Sem pilhas: `bun_sliced` e `sausage_grilled` saem do restaurante |
+
+**Lixeira**: no foco, arrastar à lixeira 2D (DEC-227) aceita a salsicha da grelha ou da mesa de descanso e o **conteúdo** do
+prato (o prato fica vazio na esteira, com o ticket); no mundo, "Throw Away" (segurar 0,5 s) com o prato equipado descarta o
+prato e faz nascer de novo o prato vazio do mesmo #n na mesa central (FEAT-044).
+
+- Dados: `Content.Prep.Conveyor` { `Stops` 3, `MaxBelt` 2, `GrillSeats` 1, `Travel` 0,35, `ArrowPx` 64, `WaitEnter` 0,3, `Rest` { `Spots` 6, `Move` 0,3 } }; `Content.Prep.Rules.Grill` no modo esteira { `Burn` false, `Pause` false, `FlipFrom` 0,4, `FlipTo` 0,6, `FlipMinWidth` 1,0, `FlipBonus` 1, `FlipInGrade` false, `Bar` false }; `Content.Prep.Build.Patterns` { `ketchup` "Zigzag", `mustard` "Wave", `cream_cheese` "Line" } com os pontos da tabela; `Content.Prep.Grades.Effects.Perfect.TipExtra` 1. Saem do restaurante: `Restaurant.Grill.BurnAfter`, `PickupPerfect/Good`, `Stacks`, tolerância `grill_pickup` (nunca entrou).
 - Critérios de aceite:
-  - Pronta não coletada vira `Burnt` em `BurnAfter` ± 0,2 s; com UPG-016 nível 2, em 30 s.
-  - "Collect All" leva as prontas até a capacidade; a sobra fica e continua o relógio de queimar.
-  - Queimada nunca entra em pilha nem em prato; descartá-la não devolve estoque.
-  - Com 4 Tools, pegar pilha, prato, caixa ou café é recusado com `hands_full`.
+  - "Work" com prato equipado põe o prato na parada 1; sem prato abre a grelha; 3º jogador com prato recebe "Belt full".
+  - As setas movem só o próprio prato, 1 parada por toque, em ≤ 0,4 s; parada ocupada = o prato espera ao lado e entra sozinho em ≤ 0,3 s depois que ela libera; o log do Set nunca mostra 2 pratos na mesma parada.
+  - Salsicha nunca virada fica pronta em `GrillTime` ± 0,1 s e **não queima** nem depois de 3 × `GrillTime`.
+  - Virada a 50% do `GrillTime` grava `FlipBonus`; a 30% e a 70% não grava; o mesmo pedido entregue Completo na janela paga **exatamente $1 a mais** com bônus, 1 vez.
+  - A pronta chega à mesa de descanso em ≤ 0,5 s; com os 6 lugares cheios ela fica na grelha e vai sozinha quando abre lugar.
+  - Nenhuma barra de progresso de cozinha (`GrillBar`, `ProgressBar`, `BillboardGui` de barra) existe no modo esteira (`/dev` lista).
+  - Salsicha só entra em prato com pão; complemento só em prato com salsicha; a recusa diz o motivo e não gasta estoque.
+  - Ao escolher ketchup, mostarda ou cream cheese, a guia do padrão certo aparece sobre o pão; seguir o caminho exato dá Perfect em `/dev prep grade`.
+  - O mesmo pedido Completo na janela paga $1 a mais com Perfect que com Good; Messy paga $0 de gorjeta e baixa o humor 1 faixa; não virar não muda a nota.
+  - A nota mostrada no fim = a nota gravada no prato pelo servidor.
+  - Solo hábil, K = 2, salsicha já na mesa de descanso: do "segurar E" ao "Hand Over" em ≤ 15 s em 4 de 5 tentativas (PC e celular 667×375).
+  - Leave, Kick por anomalia, desmaio e desconexão no meio: contagem de pratos e tickets igual antes e depois.
   - Complemento não pedido → entrega Errada (DEC-072), o prato volta à mão.
-  - `/dev prep grade` termina `N/N ok` com a linha `grill_pickup`.
-  - Dois jogadores no mesmo slot/vaga no mesmo frame: só um efeito; o outro recebe o toast da recusa (FEAT-005).
+  - `/dev prep grade` termina `N/N ok`; o modo trailer (chave do restaurante desligada) sem regressão no `/dev smoke`.
 
 ### FEAT-046 — Entrega no balcão de retirada
 
@@ -329,7 +493,7 @@ Pagamento ao confirmar (Q-309) com o mesmo resultado líquido de DEC-072:
 
 | Resultado na entrega | Dinheiro | Gorjeta | Nota do turno |
 |---|---|---|---|
-| Completo | fica o preço | $1 na janela (Hawker $2, Shift Lead $0); Perfect $2 e janela +4 s; Messy $0 (Q-219 B) | satisfeito |
+| Completo | fica o preço | $1 na janela (Hawker $2, Shift Lead $0); Perfect $2 e janela +4 s; Messy $0 (Q-219 B). Rev. 3: Perfect = **base + $1**, mais **+$1** se a salsicha foi virada na janela (FEAT-045) | satisfeito |
 | Incompleto | **estorno de 50%** (floor) | — | insatisfeito |
 | Errado | nada muda; o prato volta à mão; o cliente segue esperando o certo | — | (só conta se terminar em desistência) |
 | Desistiu (preparo) | **estorno integral** | — | insatisfeito |
@@ -477,7 +641,7 @@ o jogador não sai da loja, então o Gear Stand do Mart (DEC-101) fica fora de a
 | ID | Upgrade | Níveis | Total | Libera | Onde | Efeito em 1 linha | Papel |
 |---|---|---|---|---|---|---|---|
 | UPG-015 | Second Grill | $120 | $120 | N2 | no lugar (`GRILL-2`) | 2ª grelha de barras, vagas do UPG-001 | grelha (party) |
-| UPG-016 | Heat Lamp | $40 / $80 | $120 | N1 | no lugar | queima em 18 / 30 s (base 10) + apito 3 s antes | grelha |
+| UPG-016 | Heat Lamp | $40 / $80 | $120 | N1 | no lugar | **fora de venda no restaurante** (rev. 3: sem queima, DEC-298/303); era queima em 18 / 30 s | grelha |
 | UPG-017 | Express Delivery | $40 / $80 | $120 | N2 | Gear Stand | entrega de caixas em 30 / 18 s (base 45) | estoque |
 | UPG-018 | Long Tongs | $30 / $60 | $90 | N1 | Gear Stand | pilha de salsichas 5 / 8 (base 3) | grelha |
 | UPG-019 | Bread Basket | $30 / $60 | $90 | N1 | Gear Stand | pilha de pães 5 / 8 (base 3) | pão |
@@ -515,6 +679,9 @@ o jogador não sai da loja, então o Gear Stand do Mart (DEC-101) fica fora de a
 
 À venda no novo fluxo: mantidos $850 (Grill $210, Storage $340, Lights $100, Coffee $110, Breaker $90) + novos $2.605 =
 **$3.455**. Solo compra ~37% (escolha), dupla ~58%, party de 4 ~85% (sem o Trainee, que não usa).
+**Rev. 3:** com a Heat Lamp fora de venda, novos $2.485 e total **$3.335**. As pilhas saíram (FEAT-045): UPG-018 Long Tongs
+e UPG-019 Bread Basket (capacidade de pilha), e as descrições de UPG-020 (bandeja de pães cortados), UPG-021 (bandeja quente)
+e UPG-022 (molho no prato-slot) ficam **a revisar** contra a esteira numa ficha à parte; até lá, não entram na onda da esteira.
 
 ### Fichas
 
@@ -528,12 +695,26 @@ Todas: Status Rascunho (Provisório) · Origem: brief 2026-10-17 + mudança do d
 - Aceite: vagas novas nascem vazias; comprar o UPG-001 depois sobe as duas.
 
 #### UPG-016 — Heat Lamp
+
+**Rev. 3 (TASK-508):** a grelha do restaurante **não queima** (DEC-298, confirmada na grelha focada pela DEC-303), então o
+efeito antigo (`BurnAfter` 10 → 18 / 30 s + apito) **não tem objeto**. A DEC-298 já diz "o UPG-016 perde o efeito até a
+queima voltar". Opções:
+
+| Opção | O que a Heat Lamp faz | Prós | Contras | Escopo |
+|---|---|---|---|---|
+| **A. Fora de venda no restaurante (recomendada)** | nada; some do catálogo (como UPG-003/004); a linha fica nos dados para quando a queima voltar | segue a DEC-298 ao pé da letra; zero código novo; tira $120 de sumidouro que não ajudava | um upgrade barato de N1 a menos para o solo | nenhum (só `ForSale = false` no restaurante) |
+| B. "Janela de virar maior" | janela do bônus 40–60% → **35–65% / 30–70%** ($40 / $80) | dá ao grelhador um upgrade de habilidade, par do Squeeze Pro | reaproveita o nome para outro efeito (uma lâmpada não explica o virar); aumenta a gorjeta média (§4.5) | baixo (1 número no `Content`) |
+| C. "Mesa de descanso maior" | 6 → **9 / 12** lugares | combina com "manter quente" | a mesa de 6 quase nunca enche (sem queima, a grelha só espera): upgrade sem efeito sentido | baixo |
+
+Recomendação: **A**, Provisória. A **B** é a alternativa se o dono quiser um upgrade para o grelhador (vira pergunta). Se a
+queima voltar numa onda futura, volta a tabela antiga:
+
 | Nível | Preço | `BurnAfter` | Apito | Peça |
 |---|---|---|---|---|
 | 0 | — | 10 s | não | — |
 | 1 | $40 | 18 s | 3 s antes, só dentro da cozinha | lâmpada quente sobre a grelha |
 | 2 | $80 | 30 s | idem | 2 lâmpadas |
-- Noite: menos queimadas quando uma anomalia tira o grelhador da grelha. Aceite: salsicha já pronta passa a usar o novo valor, contado desde o `Ready`; o apito toca 1× por salsicha, 3,0 ± 0,2 s antes.
+- Aceite (rev. 3): com a chave do restaurante ligada, a Heat Lamp não aparece à venda (nem no Gear Stand nem como fantasma no lugar); quem já tinha o nível guardado não perde nada nem é reembolsado (o nível segue no escopo e volta a valer com a queima).
 
 #### UPG-017 — Express Delivery
 | Nível | Preço | Entrega | Peça |
@@ -682,7 +863,7 @@ nas N9–N10 a demanda é 2,5/min e os ganhos grandes rendem mais). Payback em m
 |---|---|---|---|---|---|
 | (base) | — | — | $11,20 | — | ~$34/min |
 | UPG-034 Quick Greeting 1 | $35 | 1,3 | +0,64 | 55 | +3% (caixa é o mais cheio) |
-| UPG-016 Heat Lamp 1 | $40 | ~1 + desperdício | +0,65 | 62 | +3% |
+| ~~UPG-016 Heat Lamp 1~~ | $40 | fora de venda na rev. 3 (sem queima) | — | — | — |
 | UPG-018 Long Tongs 1 | $30 | 0,8 | +0,39 | 77 | +2% |
 | UPG-019 Bread Basket 1 | $30 | 0,8 | +0,39 | 77 | +2% |
 | UPG-022 Sauce Caddy | $70 | 1,5 | +0,75 | 93 | +2% |
@@ -725,6 +906,10 @@ Sem XP nem níveis (DEC-081): progresso = dinheiro + noite de liberação. Rota 
 | Night 9 | Trainee ($140) | $1.055 | $1.123 | $68 |
 | Night 10 | Express 1 ($40) + Storage 3 ($70) | $1.165 | $1.276 | $111 |
 
+**Rev. 3:** sem a Heat Lamp (fora de venda), a compra da N1 fica só Quick Greeting 1: custo acumulado **−$40** da N1 em diante
+(sobra final ~$151); as gorjetas da nota e do virar somam ~**+$48** na run solo (§4.5). Long Tongs (Day 1) está a revisar
+(sem pilhas): os $30 viram sobra até a ficha nova.
+
 Party de 4 (~2,3× o dinheiro): fim da N3 ~$790 → Second Tablet, Second Grill, Long Pass 1, Heat Lamp, Tongs, Basket, Big Boxes;
 fim da N6 ~$1.600 → quase todo o catálogo de party; sobra na N10 ~$300–600 (aceito, DEC-082).
 
@@ -735,6 +920,33 @@ fim da N6 ~$1.600 → quase todo o catálogo de party; sobra na N10 ~$300–600 
 | T1 "primeira noite" | $30–$50 | 016-1, 017-1, 018-1, 019-1, 030-1, 031-1, 034-1, 023-1, 024-1 | Day 1–N3 |
 | T2 "a loja anda sozinha" | $60–$100 | 022, 026, 027, 032, 016-2, 017-2, 018-2, 019-2, 023-2, 024-2, 030-2, 031-2, 034-2, 020-2 | N3–N6 |
 | T3 "automação" | $110–$150 | 015, 020-1, 021, 025, 028, 029, 033 | N3–N9 |
+
+Rev. 3: 016-1 e 016-2 saem dos tiers (fora de venda); 018 e 019 a revisar.
+
+### 4.5 Esteira: nota, gorjeta Perfect e bônus de virar (rev. 3, Provisório)
+
+Premissas: na rev. 2 a gorjeta média por completo era **$0,56** ($1 × 56% das entregas dentro da janela). Na esteira entram
+o extra do Perfect (+$1), a perda do Messy (−$1 de base) e o bônus de virar (+$1), todos só dentro da janela (mesmos 56%).
+Taxas esperadas de playtest (conferir no log da TASK-510):
+
+| Grupo | Perfect | Good | Messy | Salsicha virada na janela | Gorjeta média por completo | Δ por completo |
+|---|---|---|---|---|---|---|
+| rev. 2 (sem nota) | — | — | — | — | $0,56 | — |
+| Solo (monta e grelha; vira pouco) | 30% | 55% | 15% | 25% | 0,56 × (0,85 + 0,30 + 0,25) = **$0,78** | **+$0,22** |
+| Dupla (grelhador dedicado) | 40% | 50% | 10% | 50% | 0,56 × (0,90 + 0,40 + 0,50) = **$1,01** | **+$0,45** |
+| Teto (tudo Perfect e virado, na janela) | 100% | — | — | 100% | $3,00 | +$2,44 |
+
+| Efeito na run | Solo | Dupla |
+|---|---|---|
+| Completos na run (§4.1; dupla ≈ 1,6×) | ~220 | ~350 |
+| Gorjeta extra na run | ~**+$48** (+3,8% sobre $1.276) | ~**+$158** (+8% sobre ~$2.000) |
+| Margem + gorjeta por completo | $5,60 → **$5,82** | $5,60 → **$6,05** |
+
+Leitura: o dinheiro extra fica abaixo de +10% da run (sem inflar a curva de upgrades) e premia mais a dupla que se divide em
+grelhador e montador, que é o que a DEC-302 quer ("multijogador mais fácil"). O teto de $3 por prato é 39% do preço médio:
+gorjeta grande o bastante para ser sentida, mas não troca o objetivo de servir rápido (a janela continua mandando).
+Critério: em playtest 2p, a gorjeta média por completo fica entre **$0,70 e $1,30**; fora disso, ajusta-se `TipExtra` ou
+`FlipBonus` no `Content`, não o código.
 
 ---
 
@@ -782,7 +994,8 @@ UPG-020, 021, 029, 032, 033, 023; balanceamento por simulação (solo e 4p) e aj
 | `Rules` | `Enabled`, `Sections` { `Grill`, `Board`, `Toppings` } (false na onda 0), `PlayersStayInside` true |
 | `Flow` | `PartyMult`, `NightInterval[10]`, `Day1Interval`, `MaxCustomers[4]`, `Jitter` 0,25 |
 | `Tablets`, `Pass`, `Pickup` | FEAT-043, FEAT-044, FEAT-046 |
-| `Grill`, `Bun`, `Condiments`, `Stacks` | FEAT-045 |
+| `CenterTable` (rev. 3) | FEAT-044 |
+| ~~`Grill`, `Bun`, `Condiments`, `Stacks`~~ → `Content.Prep.Conveyor`, `Prep.Rules.Grill` (modo esteira), `Prep.Build.Patterns` (rev. 3) | FEAT-045 |
 | `Tables` | FEAT-046 |
 | `DriveThru` | FEAT-047 |
 | `Patience` | FEAT-048 |
@@ -815,7 +1028,7 @@ UPG-020, 021, 029, 032, 033, 023; balanceamento por simulação (solo e 4p) e aj
 |---|---|---|
 | Rookie | régua | régua |
 | Runner (Coelho) | velocidade | expedição e estoque |
-| Line Cook (Gato) | grelha −15% | grelha −15% e `BurnAfter` +20% nas dele |
+| Line Cook (Gato) | grelha −15% | grelha −15% nas dele (a janela de virar acompanha); o `BurnAfter` +20% sai na rev. 3 (sem queima) |
 | Hauler (Urso) | 3 pacotes | 3 caixas e +1 nas pilhas |
 | Hawker (Raposa) | gorjeta $2, janela −4 s | diálogo −20%, gorjeta $2, janela −4 s |
 | Night Shift, Barista, Shift Lead | — | sem mudança |
