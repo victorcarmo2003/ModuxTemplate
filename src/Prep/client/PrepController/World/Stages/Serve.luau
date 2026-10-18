@@ -12,6 +12,8 @@
 --             only Take of the mode (no Take button, playtest 2026-10-14).
 -- Sends only through Feed (Serve, Take). No GuiObject but one short BillboardGui for the verdict (a Provisional exception to the
 -- "no BillboardGui per target" of §8: one, 1 s, destroyed with the stage). Numbers: Content.Prep.Rules.World.Serve.
+-- Conveyor (Content.Prep.Rules.Mode = "Conveyor", TASK-520): inert. The grade is shown on the Toppings stop (World/Stages/Build) and
+-- the plate leaves the focus in the hand, for the central table or the PICKUP (DEC-304).
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
@@ -33,6 +35,7 @@ const rules = prep.Rules
 const world = rules.World
 const cfg = world.Serve
 
+const CONVEYOR = rules.Mode == "Conveyor"
 const NOT_READY_TEXT = "Nothing to serve yet" -- ui-text.md §16.5 PREP3D_REF_NOT_READY
 const NO_TICKET_TEXT = "Pin a ticket first" -- PREP3D_REF_NO_TICKET
 const SERVING_TEXT = "Serving..."
@@ -594,6 +597,11 @@ const Serve: Stage.Stage3D = {
 	Tabs = { "Serve" },
 	Enter = function(controller: any, tab: string)
 		teardown()
+		-- the conveyor (TASK-520, DEC-304) has no window: the finished plate goes back to the hand and from there to the central
+		-- table or the PICKUP, never to a customer from the focus. A Serve tab armed there by mistake builds nothing.
+		if CONVEYOR then
+			return
+		end
 		-- the hook of the 2D Serve stage (toast, board clear, back to the grill) stays; ours adds the verdict in the world
 		if not hooked then
 			hooked = true

@@ -20,6 +20,21 @@
 -- card) while the plate is ready (bun open, sausage in, no Finish on its way). Dragging the PLATE onto him is Done + Serve: the one
 -- summary (PrepFinish) goes out and, once it is accepted, PrepOrder Serve for that customer (Feed.Serve); the SERVER judges the hot
 -- dog just made (PrepService passes seat.Made to CustomerService:ServeFor). The Done button and the world `serve` prompt stay.
+-- Conveyor (TASK-520; DEC-302, DEC-303 Q-382, DEC-305; tech/prep-conveyor.md §6.5, network.md §19, ui-text.md §17.2). With
+-- Content.Prep.Rules.Mode = "Conveyor" the plate is the assembler's own plate ON THE BELT: the Board tab is the Board stop, the
+-- Toppings tab the Toppings stop, and the bun, the sausage and the toppings are drawn on the plate prop of World/Belt (TASK-518:
+-- the stops, the arrows, the camera and the dish are the controller's; the stack here follows `World.Belt.PlateFrame()`):
+--   Board     tap the crate: the bun lands on the plate (drawn only, nothing is sent: the bun leaves the stock with the cut); drag
+--             the knife along the line: PrepStage Cut with the score. Drag ANY free sausage of the rest table (the rail; the one
+--             nearest the press, never one a colleague holds: Ghost.HeldBy) into the bun: PrepGrab claims that position and the
+--             drop sends PrepStage Dog with its Slot. Each commit is predicted and undone when PrepResult Stage says no.
+--   Toppings  the bowls of the ticket pulse; each sauce is traced along ITS pattern (World/Strokes: ketchup Zigzag, mustard Wave,
+--             cream cheese Line), drawn over the bun and scored against it with the same trace measure and Grade. Right on this
+--             stop is OnNext = the one PrepFinish; the seal is the SERVER's grade (PrepResult Finish), the stack leaves to the hand
+--             (the server moves the plate to Out and gives it back) and the toast says "#n ready. Table or pickup".
+-- Nothing is committed unless controller:BeltCanWork() (the plate stands on the stop in the record). The seat record
+-- (PrepSeats.Plate, bun and sausage bits written by the server at each commit) is the truth: a plate taken over from the table or
+-- parked earlier shows what the server has. No delivery by drag; the bin empties the plate and keeps the ticket (§6.6).
 local CollectionService = game:GetService("CollectionService")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
@@ -39,6 +54,7 @@ local Ghost = require(script.Parent.Parent.Ghost)
 local Plane = require(script.Parent.Parent.Plane)
 local Strokes = require(script.Parent.Parent.Strokes)
 local Targets = require(script.Parent.Parent.Targets)
+local trace = require(script.Parent.Parent.Parent.Gestures.trace)
 local ToolView = require(script.Parent.Parent.ToolView)
 local Types = require(script.Parent.Parent.Types)
 local World = require(script.Parent.Parent)
@@ -59,6 +75,121 @@ const FRAME_TICK = 0.1 -- s: the plate and the targets are re-judged at 10 Hz
 -- the customer drop target of the Toppings view (owner request 2026-10-14): the area is Content.Prep.Build.Deliver (TASK-253)
 const FIND_EVERY = 0.25 -- s between two searches for the rig
 const CUSTOMER_ID = Types.IdOf("Customer", 0, "")
+
+-- Conveyor (TASK-520) ------------------------------------------------------------------------------------------------------------
+const CONVEYOR = prep.Rules.Mode == "Conveyor"
+const conveyor = prep.Conveyor
+const STAGE_TIMEOUT = 3 -- s without a PrepResult Stage: the commit is forgotten and the seat record decides
+const STAGE_RETRY = 0.6 -- s: a commit refused for its rate (Reason Rate) is sent once more after this
+const MASK_GRACE = 1.5 -- s a confirmed bun / sausage may be missing from the seat record before the picture follows it
+const BENCH_REACH = 25 -- studs: a scanned target farther than this from the plate belongs to another kitchen
+const READY_TOAST_DELAY = 0.9 -- s after the grade toast: "#n ready. Table or pickup"
+const PLATE_TOP = 0.14 -- studs over World/Belt.PlateFrame(): the top of the plate prop (its lift 0.08 + half its 0.12 thickness)
+-- ui-text.md §17.2 (BELT_TIP_*, Provisional; English, DEC-022; <= 36 characters)
+const BELT_TEXT = {
+	Dog = "Drag a sausage from the warmer", -- BELT_TIP_DOG
+	BoardDone = "Press Right for the toppings", -- BELT_TIP_BOARD_DONE
+	Toppings = "Pick a glowing topping and draw", -- BELT_TIP_TOPPINGS
+	Finish = "All set. Press Finish", -- BELT_TIP_FINISH
+	NoTop = "No toppings. Press Finish", -- BELT_TIP_NOTOP
+}
+
+-- The commits of the belt plate (module level: they outlive a stop left while the answer travels). Pending = "Cut" | "Dog" | "".
+type Belt = {
+	Pending: string,
+	Stamp: number,
+	Score: number,
+	Slot: number,
+	Retried: boolean,
+	-- the server accepted it (a missing bit in the seat record afterwards means the server emptied the plate)
+	Confirmed: { [string]: boolean },
+	MissSince: number, -- os.clock() a confirmed bit was first seen missing, 0 = none
+	Quiet: number, -- os.clock() before which the seat record is not read (the bin emptied the plate; the record follows later)
+}
+const belt: Belt = { Pending = "", Stamp = 0, Score = 0, Slot = 0, Retried = false, Confirmed = {}, MissSince = 0, Quiet = 0 }
+
+local function beltForget()
+	belt.Pending = ""
+	belt.Stamp += 1
+	belt.Retried = false
+	table.clear(belt.Confirmed)
+	belt.MissSince = 0
+end
+
+-- Where an anchor is in the world (Attachment, Part or Model), nil = none.
+local function anchorPosition(instance: Instance?): Vector3?
+	if instance == nil then
+		return nil
+	elseif instance:IsA("Attachment") then
+		return instance.WorldPosition
+	elseif instance:IsA("BasePart") then
+		return instance.Position
+	elseif instance:IsA("Model") then
+		return instance:GetPivot().Position
+	end
+	return nil
+end
+
+-- Where the bun base goes: on the own plate prop of World/Belt, or on the stop of `tab` when the prop is not drawn.
+local function beltPoint(tab: string): Vector3?
+	const frame = World.Belt.PlateFrame()
+	if frame ~= nil then
+		return frame.Position + Vector3.yAxis * PLATE_TOP
+	end
+	const index = conveyor.Stops.IndexOf[if tab == "Toppings" then "Toppings" else "Board"]
+	const at = if index ~= nil then anchorPosition(World.Belt.Anchor(string.format(conveyor.Binding.Stop, index))) else nil
+	return if at ~= nil then at + Vector3.yAxis * PLATE_TOP else nil
+end
+
+-- The own PrepSeats record (nil = none).
+local function seatRecord(controller: any): any
+	const station = Session.Peek(controller.Station)
+	if type(station) ~= "number" or station < 1 then
+		return nil
+	end
+	const ok, record = pcall(function(): any
+		return controller.Libs.Net.PrepSeats:get(station)
+	end)
+	return if ok then record else nil
+end
+
+-- The #n of the ticket of the plate on the belt (0 = not known).
+local function ticketNumber(controller: any): number
+	const station = Session.Peek(controller.Station)
+	if type(station) ~= "number" then
+		return 0
+	end
+	const ok, number = pcall(function(): any
+		return controller:BeltTicketNumber(station)
+	end)
+	return if ok and type(number) == "number" then number else 0
+end
+
+-- The toppings the plate's ticket asks for (Order, or Order2 for the 2nd line of a pair), nil = not known. Reactive on the customer.
+local function wantedToppings(controller: any): { [string]: boolean }?
+	const record = seatRecord(controller)
+	const npc = if record ~= nil then record.Ticket else nil
+	if type(npc) ~= "number" or npc <= 0 then
+		return nil
+	end
+	const customer: any = controller.Dependencies.CustomerController:RecordOf(npc)
+	if customer == nil then
+		return nil
+	end
+	const bits = if record.Line == 2 and customer.Order2 ~= nil then customer.Order2 else customer.Order
+	return if type(bits) == "table" then bits else nil
+end
+
+-- The stage may commit now (the plate stands on its stop in the record; TASK-518). Always true in the trailer.
+local function canWork(controller: any): boolean
+	if not CONVEYOR then
+		return true
+	end
+	const ok, answer = pcall(function(): any
+		return controller:BeltCanWork()
+	end)
+	return ok and answer == true
+end
 
 -- Short texts (Provisional; ui-text.md §16, PREP3D_*; English, DEC-022; <= 36 characters)
 const TEXT = {
@@ -158,6 +289,8 @@ type Sess = {
 	DeliverTo: number,
 	CarryOver: boolean,
 	RailGrab: boolean, -- DEC-259: the front rail sausage is claimed by this drag (PrepGrab On sent)
+	-- conveyor (TASK-520): the rest table position the drag took (PrepGrab / PrepStage Dog Slot; always 1 in the trailer)
+	RailSlot: number,
 }
 
 local session: Sess? = nil
@@ -263,6 +396,10 @@ end
 
 -- The plate can go to the customer now (the Done of the Toppings view, by drag)
 local function canDeliver(current: Sess): boolean
+	-- the conveyor delivers at the table or the pickup, never by drag from the belt (DEC-304)
+	if CONVEYOR then
+		return false
+	end
 	return current.Active
 		and not current.Dead
 		and not current.Closing
@@ -408,6 +545,47 @@ local function live(): Sess?
 	return nil
 end
 
+-- Conveyor: the rest table position a press at `point` takes: the filled one (1..Feed.Rail) nearest the press that no colleague
+-- holds (DEC-259 claims), nil = none free; the second value is the "<name> is holding it" line when one was skipped.
+local function restSlotAt(current: Sess, point: Vector3?): (number?, string?)
+	const count = math.clamp(untrack(Feed.Rail), 0, conveyor.Rest.Capacity)
+	local best: number? = nil
+	local bestDistance = math.huge
+	local heldText: string? = nil
+	for slot = 1, count do
+		const holder, text = Ghost.HeldBy("Rail", slot)
+		if holder ~= nil then
+			heldText = heldText or text
+			continue
+		end
+		-- without a picture of the slot the front (oldest) one wins
+		local distance = 1e6 + slot
+		const entry = current.Kitchen:SlotView("rail", slot)
+		if point ~= nil and entry ~= nil and entry.Spot ~= nil and entry.Spot.Host ~= nil then
+			distance = ((entry.Spot.Host.CFrame * entry.Spot.Offset).Position - point).Magnitude
+		end
+		if distance < bestDistance then
+			best = slot
+			bestDistance = distance
+		end
+	end
+	return best, heldText
+end
+
+-- Conveyor: the scanned hitboxes of this kitchen only (the trailer may be streamed in too, with targets of the same ids).
+local function nearParts(current: Sess, parts: { BasePart }): { BasePart }
+	if not CONVEYOR then
+		return parts
+	end
+	const kept: { BasePart } = {}
+	for _, part in parts do
+		if (part.Position - current.Home).Magnitude <= BENCH_REACH then
+			table.insert(kept, part)
+		end
+	end
+	return kept
+end
+
 local function register(current: Sess, registry: Targets.Registry)
 	for _, scanned in table.clone(registry:List()) do
 		const kind = scanned.Target.Kind
@@ -421,9 +599,10 @@ local function register(current: Sess, registry: Targets.Registry)
 					and untrack(Session.Pending) == ""
 					and not open.Closing
 					and Session.Peek(open.Controller.View.Seal) == false
+					and (not CONVEYOR or (belt.Pending == "" and canWork(open.Controller)))
 			end
 		elseif kind == "Rail" then
-			-- the drag source of the front sausage, while the bun waits for it
+			-- the drag source of the front sausage (any free one on the conveyor), while the bun waits for it
 			enabled = function(): boolean
 				const open = live()
 				return open ~= nil
@@ -432,6 +611,7 @@ local function register(current: Sess, registry: Targets.Registry)
 					and not open.Flying
 					and not placed()
 					and untrack(Feed.Rail) > 0
+					and (not CONVEYOR or (belt.Pending == "" and canWork(open.Controller) and restSlotAt(open, nil) ~= nil))
 			end
 		elseif kind == "Topping" then
 			const key = scanned.Target.Topping
@@ -441,11 +621,12 @@ local function register(current: Sess, registry: Targets.Registry)
 					and (not placed() or (usedKeys(open)[key] ~= true) or toolKey() == key)
 			end
 		end
-		if enabled ~= nil then
-			const real = if scanned.Parts[1] ~= nil then realObject(scanned.Parts[1], kind, scanned.Target.Topping) else nil
+		const parts = nearParts(current, scanned.Parts)
+		if enabled ~= nil and #parts > 0 then
+			const real = if parts[1] ~= nil then realObject(parts[1], kind, scanned.Target.Topping) else nil
 			const added = registry:Add({
 				Target = scanned.Target,
-				Parts = scanned.Parts,
+				Parts = parts,
 				Model = real or scanned.Model,
 				Enabled = enabled,
 			})
@@ -497,9 +678,184 @@ local function beginPlate(current: Sess)
 		sfx(current, "error", nil)
 		return
 	end
+	if CONVEYOR then
+		if belt.Pending ~= "" or not canWork(controller) then
+			return
+		end
+		-- the bun is only drawn: it leaves the stock with the cut (PrepStage Cut), so the plate opens here without a packet
+		note("bun on the belt plate (drawn; the cut commits it)")
+		Session.OnResult(controller, { Act = "Begin", Ok = true, Reason = "None", Grade = "None", Value = 0 })
+		sfx(current, "grill_collect", current.View.Plane.Frame.Position)
+		return
+	end
 	note("Begin sent (the bun crate)")
 	Session.Begin(controller)
 	sfx(current, "grill_collect", current.View.Plane.Frame.Position)
+end
+
+-- Conveyor commits (PrepStage) -------------------------------------------------------------------------------------------------
+
+local function sendStage(current: Sess, stage: string, score: number, slot: number, retry: boolean)
+	const controller = current.Controller
+	belt.Pending = stage
+	belt.Score = score
+	belt.Slot = slot
+	belt.Retried = retry
+	belt.Stamp += 1
+	const stamp = belt.Stamp
+	if controller.Mock then
+		-- `/dev prep ui`: no packet, the prediction is the truth
+		belt.Pending = ""
+		belt.Confirmed[stage] = true
+		return
+	end
+	note(`PrepStage {stage} score {math.floor(score)} slot {slot}`)
+	controller.Libs.Net.PrepStage:fireServer({
+		Stage = stage,
+		Score = math.clamp(math.floor(score), 0, 100),
+		Slot = math.clamp(math.floor(slot), 0, 8),
+	})
+	task.delay(STAGE_TIMEOUT, function()
+		if belt.Stamp == stamp and belt.Pending == stage then
+			-- no answer: the seat record decides (reconcile)
+			belt.Pending = ""
+		end
+	end)
+end
+
+-- The server has the bit of a stage on the plate (PrepSeats.Plate), nil = no record.
+local function maskHas(controller: any, stage: string): boolean?
+	const record = seatRecord(controller)
+	if record == nil then
+		return nil
+	end
+	const mask = if type(record.Plate) == "number" then record.Plate else 0
+	const plate = PlateMask.Unpack(mask)
+	return if stage == "Cut" then plate.Cut else plate.Sausage
+end
+
+-- A refused commit: the prediction goes (the Notice of the reason was shown by the controller).
+local function undoStage(controller: any, stage: string, reason: string)
+	note(`PrepStage {stage} refused: {reason}`)
+	if stage == "Cut" then
+		controller:ResetPlate()
+		Session.Reset()
+		beltForget()
+		controller.Step("bun")
+		return
+	end
+	Vide.batch(function()
+		Session.Placed(false)
+		controller.View.Sausage(false)
+	end)
+	controller:Need("SausagePlaced", false)
+	controller:Need("PlateBuilt", false)
+	const current = session
+	if current ~= nil then
+		current.SausageOn = false
+		current.View:SetSausage("None", nil)
+		current.View:SetCarry(nil, nil, nil)
+	end
+	if reason == "Held" then
+		controller:Toast(Ghost.HeldText("Rail", belt.Slot), "Alert")
+	end
+end
+
+-- PrepResult Act = Stage (whatever tab is in front).
+local function onStageResult(controller: any, result: any)
+	const stage = belt.Pending
+	if stage == "" then
+		return
+	end
+	if result.Ok then
+		belt.Pending = ""
+		belt.Confirmed[stage] = true
+		belt.MissSince = 0
+		note(`PrepStage {stage} accepted ({tostring(result.Value)})`)
+		return
+	end
+	const reason: string = result.Reason
+	if reason == "Rate" and not belt.Retried then
+		const stamp = belt.Stamp
+		task.delay(STAGE_RETRY, function()
+			const current = session
+			if belt.Stamp == stamp and belt.Pending == stage and current ~= nil and not current.Dead then
+				sendStage(current, stage, belt.Score, belt.Slot, true)
+			end
+		end)
+		return
+	end
+	belt.Pending = ""
+	-- Invalid = the plate already has it (a lost answer, a plate taken over): the record says which
+	if reason == "Invalid" and maskHas(controller, stage) == true then
+		belt.Confirmed[stage] = true
+		return
+	end
+	undoStage(controller, stage, reason)
+end
+
+-- The picture follows the server's plate (PrepSeats.Plate): a bun / sausage it has and the picture lacks is adopted (a plate taken
+-- over, a parked one); a confirmed one it lost (the plate was emptied, the ticket left) goes after MASK_GRACE.
+local function reconcile(current: Sess)
+	const controller = current.Controller
+	if belt.Pending ~= "" or untrack(Session.Pending) ~= "" or current.Closing or current.Flying or current.Drag ~= nil then
+		return
+	end
+	if os.clock() < belt.Quiet or Session.Peek(controller.View.Seal) ~= false then
+		return
+	end
+	const record = seatRecord(controller)
+	if record == nil or type(record.Stop) ~= "number" or record.Stop <= 0 then
+		return
+	end
+	const plate = PlateMask.Unpack(if type(record.Plate) == "number" then record.Plate else 0)
+	const neutral = prep.Grades.Bands.Good -- the score of a stage done elsewhere: the server keeps the real one
+	if plate.Cut and Session.Cut() == nil then
+		note("the server's plate has its bun cut: adopted")
+		if not plateOpen() then
+			Session.OnResult(controller, { Act = "Begin", Ok = true, Reason = "None", Grade = "None", Value = 0 })
+		end
+		Vide.batch(function()
+			controller.View.Bun("Open")
+			controller.View.Cut(1)
+			controller.View.Guide(false)
+		end)
+		Session.SetCut(controller, neutral)
+		belt.Confirmed.Cut = true
+		controller.Step("place")
+	end
+	if plate.Cut and plate.Sausage and not placed() then
+		note("the server's plate has its sausage: adopted")
+		Session.SetPlace(controller, neutral)
+		controller:Need("SausagePlaced", true)
+		controller.View.Sausage({ X = build.Groove.X, Y = build.Groove.Y, State = "Ready" })
+		belt.Confirmed.Dog = true
+	end
+	const lostCut = belt.Confirmed.Cut == true and not plate.Cut and Session.Cut() ~= nil
+	const lostDog = belt.Confirmed.Dog == true and not plate.Sausage and placed()
+	if not lostCut and not lostDog then
+		belt.MissSince = 0
+		return
+	end
+	const now = os.clock()
+	if belt.MissSince == 0 then
+		belt.MissSince = now
+		return
+	end
+	if now - belt.MissSince < MASK_GRACE then
+		return
+	end
+	belt.MissSince = 0
+	if lostCut then
+		note("the server's plate is empty: the picture follows")
+		controller:ResetPlate()
+		Session.Reset()
+		beltForget()
+		controller.Step("bun")
+	else
+		belt.Confirmed.Dog = false
+		undoStage(controller, "Dog", "Lost")
+	end
 end
 
 local function pickTool(current: Sess, key: string, held: boolean)
@@ -562,6 +918,9 @@ local function onCut(current: Sess, score: number)
 	current.Step = "place"
 	current.View:Burst(bandOf(score))
 	note(`cut {score}`)
+	if CONVEYOR then
+		sendStage(current, "Cut", score, 0, false)
+	end
 end
 
 local function onPlaced(current: Sess, score: number)
@@ -576,6 +935,11 @@ local function onPlaced(current: Sess, score: number)
 	sfx(current, "hotdog_assemble", current.View.Plane.Frame.Position)
 	current.View:Burst(bandOf(score))
 	note(`placed {score}`)
+	if CONVEYOR then
+		-- the plate stays on the belt (the dish is World/Belt's); the player moves it on with the arrows
+		sendStage(current, "Dog", score, current.RailSlot, false)
+		return
+	end
 	-- the bun crate stands where the plate will sit (between the board and the bowls): it steps aside while the plate is open
 	const crate = current.Targets["BunCrate"]
 	if crate ~= nil and crate.Model ~= nil then
@@ -593,6 +957,10 @@ end
 -- Where the plate sits to be dressed: next to the bowls, on the bench, derived from the real bowl targets (centre of the grid, the
 -- side of the player, never off the bench: View:FindSpot). Cached; the board itself is the fallback.
 local function assemblyOf(current: Sess): Vector3
+	if CONVEYOR then
+		-- the plate is dressed where it stands: on the Toppings stop of the belt
+		return beltPoint("Toppings") or current.Home
+	end
 	if current.Assembly ~= nil then
 		return current.Assembly
 	end
@@ -664,8 +1032,25 @@ local function assemblyOf(current: Sess): Vector3
 	return chosen
 end
 
-local function onTopping(current: Sess, key: string, score: number, amount: number, path: { { Vector2 } }?)
+local function onTopping(current: Sess, key: string, measured: number, amount: number, path: { { Vector2 } }?)
 	const controller = current.Controller
+	local score = measured
+	-- conveyor (DEC-305): a drawn sauce is scored against ITS pattern (the same trace measure and Grade); the guided pour (hold, the
+	-- gamepad) keeps its own score, it does not draw
+	const guided = untrack(function(): boolean
+		return Session.Guided("trace")
+	end)
+	if CONVEYOR and path ~= nil and #path > 0 and Strokes.PatternOf(key) ~= nil and not guided then
+		const params: trace.Params = {
+			Aspect = Plane.Aspect(current.View.Plane),
+			Path = Strokes.PathOf(key),
+			Reach = build.Sauce.Reach,
+			Spill = build.Sauce.Spill,
+		}
+		const coverage, excess = trace.MeasureAll(path :: { { any } }, params)
+		score = Score.Value(prep, key, coverage, excess, Session.Peek(controller.Assist) == true)
+		note(`topping {key} on the {Strokes.PatternOf(key) or "?"}: coverage {math.floor(coverage)} excess {math.floor(excess)}`)
+	end
 	current.Drawn[key] = true
 	Session.AddTopping(controller, key, score, amount, path)
 	World.Coach():Done("Toppings")
@@ -685,7 +1070,7 @@ local function resetPlate(current: Sess, dust: boolean)
 		current.View:ShowWorld(crate.Model)
 	end
 	current.View:SetPlate(false)
-	current.View:MoveTo(current.Home, 0)
+	current.View:MoveTo(if CONVEYOR then (beltPoint(current.Tab) or current.Home) else current.Home, 0)
 	current.View:SetSausage("None", nil)
 	current.View:SetCarry(nil, nil, nil)
 	for key in current.Drawn do
@@ -742,7 +1127,7 @@ local function syncPlate(current: Sess)
 					end
 				else
 					current.Strokes:Begin(Strokes.ColorOf(entry.Key))
-					for _, point in build.Sauce.Path do
+					for _, point in Strokes.PathOf(entry.Key) do
 						current.Strokes:Add(Vector2.new(point.X, point.Y))
 					end
 					current.Strokes:Keep()
@@ -852,6 +1237,10 @@ local function wantedMode(current: Sess): string
 	if current.Closing or current.Flying or not plateOpen() or untrack(Session.Pending) == "Finish" or current.Drag ~= nil then
 		return "none"
 	end
+	-- conveyor: nothing is worked while the plate travels, waits beside a busy stop or a commit is on its way
+	if CONVEYOR and (belt.Pending ~= "" or not canWork(current.Controller)) then
+		return "none"
+	end
 	-- the touch Hold pill, or the guided default of a gamepad (TASK-268: sauce and knife), arms the hold form
 	local function guided(gesture: string): boolean
 		return untrack(function(): boolean
@@ -888,6 +1277,9 @@ local function frame(current: Sess, dt: number, time: number)
 	if current.Tick <= 0 then
 		current.Tick = FRAME_TICK
 		if current.Active then
+			if CONVEYOR then
+				reconcile(current)
+			end
 			syncPlate(current)
 			syncMask(current)
 			-- the virtual bin shows while the plate can be thrown (an open bun, no finish on its way)
@@ -899,11 +1291,19 @@ local function frame(current: Sess, dt: number, time: number)
 			if registry ~= nil then
 				-- pulses: the invitation of the moment (touch has no hover)
 				const open = plateOpen()
-				setPulse(current, "BunCrate", current.Tab == "Board" and not open and untrack(Session.Pending) == "")
-				setPulse(current, "Rail", current.Tab == "Board" and open and current.View:Bun() == "Open" and not placed() and untrack(Feed.Rail) > 0)
+				const working = not CONVEYOR or (belt.Pending == "" and canWork(controller))
+				setPulse(current, "BunCrate", working and current.Tab == "Board" and not open and untrack(Session.Pending) == "")
+				setPulse(current, "Rail", working and current.Tab == "Board" and open and current.View:Bun() == "Open" and not placed() and untrack(Feed.Rail) > 0)
+				-- conveyor: only the bowls of the ticket still missing glow (DEC-299 / TASK-502 rule, BELT_TIP_TOPPINGS)
+				const wanted = if CONVEYOR then untrack(function(): { [string]: boolean }?
+					return wantedToppings(controller)
+				end) else nil
+				const used = usedKeys(current)
 				for key in current.Targets do
 					if string.sub(key, 1, 8) == "Topping:" then
-						setPulse(current, key, current.Tab == "Toppings" and open and placed() and toolKey() == "" and #Session.Toppings() < MAX)
+						const topping = string.sub(key, 9)
+						const asked = wanted == nil or (wanted[topping] == true and used[topping] ~= true)
+						setPulse(current, key, working and asked and current.Tab == "Toppings" and open and placed() and toolKey() == "" and #Session.Toppings() < MAX)
 					end
 				end
 				const board = current.Targets[`Board:{current.Seat}`]
@@ -919,6 +1319,8 @@ local function frame(current: Sess, dt: number, time: number)
 		const key = toolKey()
 		if key ~= current.ToolKey then
 			current.ToolKey = key
+			-- the guide track follows the pattern of the sauce (conveyor; a no-op in the trailer), before the gesture arms
+			current.Strokes:SetPattern(if key ~= "" then key else nil)
 			if key == "" then
 				current.Tool:Set("None", "")
 			else
@@ -945,6 +1347,13 @@ local function frame(current: Sess, dt: number, time: number)
 		end
 		current.Director:Frame(dt)
 		followCustomer(current)
+		if CONVEYOR and not (current.Drag ~= nil and current.Drag.Kind == "Plate") then
+			-- the stack rides on the own plate of World/Belt (it glides between the stops)
+			const at = beltPoint(current.Tab)
+			if at ~= nil and (at - current.View:Anchor()).Magnitude > 0.01 then
+				current.View:MoveTo(at, 0)
+			end
+		end
 	else
 		current.Mark:Hide()
 	end
@@ -960,7 +1369,7 @@ local function releaseRail(current: Sess)
 		return
 	end
 	current.RailGrab = false
-	current.Controller.Libs.Net.PrepGrab:fireServer({ From = "Rail", Slot = 1, On = false })
+	current.Controller.Libs.Net.PrepGrab:fireServer({ From = "Rail", Slot = math.clamp(current.RailSlot, 1, 8), On = false })
 end
 
 local function teardown()
@@ -1008,45 +1417,66 @@ local function build3D(controller: any)
 		error("the 3D world is not running")
 	end
 	const seat = Session.Peek(controller.Station)
-	-- the authored hitbox of the seat's board slot (the registry may hold a stage target of an older entry instead)
-	local part: BasePart? = nil
-	for _, instance in CollectionService:GetTagged(world.Tag) do
-		if
-			instance:IsA("BasePart")
-			and instance:GetAttribute(world.Attr.Kind) == "Board"
-			and instance:GetAttribute(world.Attr.Slot) == seat
-			and instance:IsDescendantOf(workspace)
-		then
-			part = instance
-			break
+	local centre: Vector3
+	local knifeInstance: Instance? = nil
+	local right = Vector3.xAxis
+	if CONVEYOR then
+		-- the belt (TASK-520): the bun goes on the own plate of World/Belt, at the stop in front; the bench's knife cuts it
+		const point = beltPoint(Session.Peek(controller.Tab))
+		if point == nil then
+			error("no plate on the conveyor (World/Belt has no plate frame and the bench has no Stop_n)")
 		end
-	end
-	if part == nil then
-		error("no Board hitbox for the seat in the trailer (tag PrepTarget, TargetKind Board)")
-	end
-	const targetsModel = part.Parent
-	const trailer = if targetsModel ~= nil then targetsModel.Parent else nil
-	const attachment = if trailer ~= nil then trailer:FindFirstChild(`Att_Bun{seat}`, true) else nil
-	const anchor = if attachment ~= nil and attachment:IsA("Attachment") then attachment.WorldPosition else part.Position - Vector3.new(0, 0.25, -0.2)
-	-- the working bun sits in the middle of the board mesh (the seat's slot would crowd the crate), at the height of the slot
-	-- (the CUTTING board of the trailer: the topping counter has a white slab named Board too, the plate's spot, not this one)
-	local boardMesh: Instance? = nil
-	if trailer ~= nil then
-		for _, child in trailer:GetChildren() do
-			if child:IsA("Model") and child:GetAttribute("StationKind") == "board" then
-				boardMesh = child:FindFirstChild("Board", true)
+		centre = point :: Vector3
+		const knife = World.Belt.Anchor("Knife")
+		if knife ~= nil and knife:IsA("BasePart") and (knife.Position - centre).Magnitude <= BENCH_REACH then
+			knifeInstance = knife
+		end
+		-- the screen right of the stop view, flat: the bun lies along it (the belt runs along it too)
+		const pose = controller:BeltPose("Board")
+		const reference = if pose ~= nil then pose.Frame else (camera :: Camera).CFrame
+		const flat = Vector3.new(reference.RightVector.X, 0, reference.RightVector.Z)
+		right = if flat.Magnitude > 1e-3 then flat.Unit else Vector3.xAxis
+	else
+		-- the authored hitbox of the seat's board slot (the registry may hold a stage target of an older entry instead)
+		local part: BasePart? = nil
+		for _, instance in CollectionService:GetTagged(world.Tag) do
+			if
+				instance:IsA("BasePart")
+				and instance:GetAttribute(world.Attr.Kind) == "Board"
+				and instance:GetAttribute(world.Attr.Slot) == seat
+				and instance:IsDescendantOf(workspace)
+			then
+				part = instance
 				break
 			end
 		end
-		boardMesh = boardMesh or trailer:FindFirstChild("Board", true)
+		if part == nil then
+			error("no Board hitbox for the seat in the trailer (tag PrepTarget, TargetKind Board)")
+		end
+		const targetsModel = part.Parent
+		const trailer = if targetsModel ~= nil then targetsModel.Parent else nil
+		const attachment = if trailer ~= nil then trailer:FindFirstChild(`Att_Bun{seat}`, true) else nil
+		const anchor = if attachment ~= nil and attachment:IsA("Attachment") then attachment.WorldPosition else part.Position - Vector3.new(0, 0.25, -0.2)
+		-- the working bun sits in the middle of the board mesh (the seat's slot would crowd the crate), at the height of the slot
+		-- (the CUTTING board of the trailer: the topping counter has a white slab named Board too, the plate's spot, not this one)
+		local boardMesh: Instance? = nil
+		if trailer ~= nil then
+			for _, child in trailer:GetChildren() do
+				if child:IsA("Model") and child:GetAttribute("StationKind") == "board" then
+					boardMesh = child:FindFirstChild("Board", true)
+					break
+				end
+			end
+			boardMesh = boardMesh or trailer:FindFirstChild("Board", true)
+		end
+		centre = if boardMesh ~= nil and boardMesh:IsA("BasePart") then Vector3.new(boardMesh.Position.X, anchor.Y, anchor.Z) else anchor
+		knifeInstance = if trailer ~= nil then trailer:FindFirstChild("Knife", true) else nil
+		-- the screen right of the Board view, flat: the bun lies along it
+		const pose = Poses.Of(seat, "Board")
+		const reference = if pose ~= nil then pose.Frame else (camera :: Camera).CFrame
+		const flat = Vector3.new(reference.RightVector.X, 0, reference.RightVector.Z)
+		right = if flat.Magnitude > 1e-3 then flat.Unit else Vector3.xAxis
 	end
-	const centre = if boardMesh ~= nil and boardMesh:IsA("BasePart") then Vector3.new(boardMesh.Position.X, anchor.Y, anchor.Z) else anchor
-	const knifeInstance = if trailer ~= nil then trailer:FindFirstChild("Knife", true) else nil
-	-- the screen right of the Board view, flat: the bun lies along it
-	const pose = Poses.Of(seat, "Board")
-	const reference = if pose ~= nil then pose.Frame else (camera :: Camera).CFrame
-	const flat = Vector3.new(reference.RightVector.X, 0, reference.RightVector.Z)
-	const right = if flat.Magnitude > 1e-3 then flat.Unit else Vector3.xAxis
 	const kitchen = controller.Dependencies.KitchenController
 	const view = BoardView.new({
 		Folder = folder :: Folder,
@@ -1059,6 +1489,7 @@ local function build3D(controller: any)
 		end,
 		Knife = if knifeInstance ~= nil and knifeInstance:IsA("BasePart") then knifeInstance else nil,
 		RailFront = 1,
+		Belt = CONVEYOR,
 		Juice = World.Juice,
 		Altered = function(): boolean
 			return untrack(Session.Altered)
@@ -1135,6 +1566,7 @@ end)
 		DeliverTo = 0,
 		CarryOver = false,
 		RailGrab = false,
+		RailSlot = 1,
 	}
 	current.Director = Director3D.new({
 		Folder = folder :: Folder,
@@ -1303,13 +1735,18 @@ const Build: Stage.Stage3D = {
 		-- Where the hot dog is, in ONE place: once the sausage is in (placed) the plate is on the topping table and never goes back to
 		-- the board. A stage that was torn down and built again (the pan crossed the Grill and came back) starts with no plate in its
 		-- view, so the plate is rebuilt from the Session here, before it is placed.
-		if placed() and plateOpen() and not current.View:HasPlate() then
-			current.View:SetPlate(true)
+		if CONVEYOR then
+			-- the stack rides on the belt plate (the frame keeps it there while it glides)
+			current.View:MoveTo(beltPoint(tab) or current.View:Anchor(), 0)
+		else
+			if placed() and plateOpen() and not current.View:HasPlate() then
+				current.View:SetPlate(true)
+			end
+			current.View:MoveTo(
+				if current.View:HasPlate() then assemblyOf(current) else current.Home,
+				if first then 0 else boardRules.Slide
+			)
 		end
-		current.View:MoveTo(
-			if current.View:HasPlate() then assemblyOf(current) else current.Home,
-			if first then 0 else boardRules.Slide
-		)
 		current.Placed = true
 		Session.Sync(controller)
 		-- coming back to the Board with the bun already cut: the step follows the plate
@@ -1361,7 +1798,55 @@ const Build: Stage.Stage3D = {
 		const tab = controller.Tab()
 		const open = Session.Open()
 		if controller.View.Seal() ~= false then
-			return prep.Build.Texts.Ready
+			return if CONVEYOR then "" else prep.Build.Texts.Ready
+		end
+		if CONVEYOR then
+			if tab == "Board" then
+				if not open then
+					return TEXT.Crate
+				end
+				const bun = controller.View.Bun()
+				if bun == "Closed" or bun == "Cut" then
+					return if Session.Guided("slice") then TEXT.SliceHold else TEXT.Slice
+				end
+				if not Session.Placed() then
+					return if Feed.Rail() == 0 then prep.Texts.Waiting else BELT_TEXT.Dog
+				end
+				return BELT_TEXT.BoardDone
+			end
+			if not open or not Session.Placed() then
+				return TEXT.NeedPlate
+			end
+			const key = Session.Active()
+			const tolerance = if key ~= "" then prep.Tolerances.ByKey[key] else nil
+			if tolerance ~= nil and tolerance.Gesture == "trace" and not Session.Guided("trace") then
+				-- BELT_PAT_*: "Ketchup: trace the zigzag"
+				const pattern = Strokes.PatternOf(key)
+				const row = Content.Ingredients.ByKey[key]
+				if pattern ~= nil and row ~= nil then
+					return `{row.Name}: trace the {string.lower(prep.Texts.Patterns[key] or pattern)}`
+				end
+			end
+			if tolerance == nil then
+				const wanted = wantedToppings(controller)
+				const used = controller.View.Used()
+				if wanted ~= nil then
+					local asked, missing = 0, 0
+					for topping, on in wanted do
+						if on then
+							asked += 1
+							if used[topping] ~= true then
+								missing += 1
+							end
+						end
+					end
+					if asked == 0 then
+						return BELT_TEXT.NoTop
+					end
+					return if missing == 0 or #Session.Toppings() >= MAX then BELT_TEXT.Finish else BELT_TEXT.Toppings
+				end
+				return if #Session.Toppings() >= MAX then BELT_TEXT.Finish else BELT_TEXT.Toppings
+			end
 		end
 		if tab == "Board" then
 			if not open then
@@ -1407,6 +1892,14 @@ const Build: Stage.Stage3D = {
 		const cut = controller.Needs().BunCut == true
 		const tab = controller.Tab()
 		const toppings = #controller.View.Toppings()
+		if CONVEYOR then
+			-- the belt (TASK-518): Right is the arrow; on the Toppings stop it is this Finish (OnNext), ready with the bun and the sausage
+			if tab ~= "Toppings" then
+				return { Label = prep.Texts.Right, Enabled = false }
+			end
+			const ready = open and isPlaced and not sealed and not finishing
+			return { Label = prep.Texts.Finish, Enabled = ready, Pulse = ready }
+		end
 		if sealed or finishing then
 			return { Label = prep.Texts.Next, Enabled = false }
 		end
@@ -1418,6 +1911,22 @@ const Build: Stage.Stage3D = {
 		return { Label = if prep.Rules.Delivery == "Prompt" then prep.Texts.Done else prep.Texts.Next, Enabled = ready, Pulse = ready and toppings > 0 }
 	end,
 	OnNext = function(controller: any)
+		if CONVEYOR then
+			-- the Finish of the Toppings stop (the Right arrow); the Board stop has no Next (the arrow moves the plate)
+			const current = session
+			if Session.Peek(controller.Tab) ~= "Toppings" or (current ~= nil and current.Closing) then
+				return
+			end
+			if belt.Pending ~= "" or not canWork(controller) then
+				return
+			end
+			if current ~= nil then
+				current.Director:Commit()
+			end
+			note("Finish: PrepFinish (conveyor)")
+			Session.Finish(controller)
+			return
+		end
 		if Session.Peek(controller.Tab) == "Board" then
 			note("Next: to the toppings")
 			controller:SetStage("toppings")
@@ -1453,16 +1962,33 @@ const Build: Stage.Stage3D = {
 					sfx(current, "error", nil)
 					return
 				end
-				-- DEC-259: a colleague holds the front sausage of the rail: it does not come
-				const holder, heldText = Ghost.HeldBy("Rail", 1)
-				if holder ~= nil then
-					controller:Toast(heldText :: string, "Alert")
-					sfx(current, "error", nil)
-					return
-				end
-				if prep.Rules.World.GhostHand and not current.RailGrab then
+				if CONVEYOR then
+					-- any free sausage of the rest table, the one nearest the press; a colleague's is out of reach at once (DEC-259)
+					if belt.Pending ~= "" or not canWork(controller) then
+						return
+					end
+					const slot, heldText = restSlotAt(current, message.Point)
+					if slot == nil then
+						controller:Toast(heldText or prep.Texts.Waiting, "Alert")
+						sfx(current, "error", nil)
+						return
+					end
+					current.RailSlot = slot
+					current.View:SetRailSlot(slot)
 					current.RailGrab = true
-					controller.Libs.Net.PrepGrab:fireServer({ From = "Rail", Slot = 1, On = true })
+					controller.Libs.Net.PrepGrab:fireServer({ From = "Rail", Slot = slot, On = true })
+				else
+					-- DEC-259: a colleague holds the front sausage of the rail: it does not come
+					const holder, heldText = Ghost.HeldBy("Rail", 1)
+					if holder ~= nil then
+						controller:Toast(heldText :: string, "Alert")
+						sfx(current, "error", nil)
+						return
+					end
+					if prep.Rules.World.GhostHand and not current.RailGrab then
+						current.RailGrab = true
+						controller.Libs.Net.PrepGrab:fireServer({ From = "Rail", Slot = 1, On = true })
+					end
 				end
 				current.Drag = { Kind = "Sausage", Points = {} }
 				current.View:SetCarry("Sausage", message.Point, nil)
@@ -1501,6 +2027,10 @@ const Build: Stage.Stage3D = {
 				note(`sausage tapped: sent to the bun, score {tostring(score)}`)
 				current.View:Fly(function()
 					current.Flying = false
+					if CONVEYOR and not current.Dead and not placed() then
+						-- the commit (PrepStage Dog) takes the claimed position: the server drops the claim with it
+						current.RailGrab = false
+					end
 					releaseRail(current)
 					current.WantMode = "?"
 					if current.Dead or placed() then
@@ -1535,6 +2065,10 @@ const Build: Stage.Stage3D = {
 				table.insert(drag.Points, uv)
 				const score, near = current.Director:MeasurePlace(drag.Points)
 				note(`sausage drop: uv ({string.format("%.2f", uv.X)}, {string.format("%.2f", uv.Y)}), {#drag.Points} samples, score {tostring(score)}, inside the magnet {tostring(near)}`)
+				if CONVEYOR and score ~= nil and near then
+					-- the commit (PrepStage Dog) takes the claimed position: the server drops the claim with it
+					current.RailGrab = false
+				end
 				endDrag(current)
 				if score ~= nil and near then
 					onPlaced(current, score)
@@ -1570,6 +2104,12 @@ const Build: Stage.Stage3D = {
 					thrown:Destroy()
 				end
 				controller:Trash("Plate")
+				if CONVEYOR then
+					-- §6.6: the plate stays on the belt, empty, with its ticket
+					beltForget()
+					belt.Quiet = os.clock() + MASK_GRACE
+					controller:Toast(prep.Texts.Toasts.Emptied, "Info")
+				end
 			else
 				endDrag(current)
 			end
@@ -1587,7 +2127,7 @@ const Build: Stage.Stage3D = {
 			aim:Cancel("Held")
 		end
 		endDrag(current)
-		controller:Toast(Ghost.HeldText("Rail", 1), "Alert")
+		controller:Toast(Ghost.HeldText("Rail", current.RailSlot), "Alert")
 		sfx(current, "error", nil)
 	end,
 	-- The acts of the plate (PrepBegin, PrepFinish, PrepTrash) are heard here whatever tab is in front: the plate lives in the
@@ -1598,8 +2138,22 @@ const Build: Stage.Stage3D = {
 		end
 		const result = event.Result
 		const act: string = result.Act
+		if CONVEYOR and act == "Stage" then
+			onStageResult(controller, result)
+			return
+		end
 		if act ~= "Begin" and act ~= "Finish" and act ~= "Trash" then
 			return
+		end
+		if CONVEYOR and act == "Finish" and result.Ok then
+			-- the hot dog goes back to the hand (the server moved the plate to Out): say where it goes next (BELT_TOAST_READY)
+			const number = ticketNumber(controller)
+			beltForget()
+			if number > 0 then
+				task.delay(READY_TOAST_DELAY, function()
+					controller:Toast(string.format(prep.Texts.Toasts.Ready, number), "Good")
+				end)
+			end
 		end
 		-- a sausage thrown from the grill or the rail (Trash with a Value) is the business of the Grill stage
 		if act == "Trash" and result.Value ~= 0 then
