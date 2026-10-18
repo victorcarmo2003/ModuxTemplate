@@ -11,6 +11,10 @@
 	    util_revive purchase; ShopUtilityService spends the new credit on the buyer at once when it is still Down. The
 	    button stays busy until the prompt closes. Both forms hide outside Call / Prep / Night (NightLost, RunEnd:
 	    VitalService:Revive refuses there).
+	  - Clean faint screen (TASK-485, DEC-294): for FOCUS_TIME s after the fall (`Focus`) the offer is BIG in the centre
+	    of the screen, under the "You fainted!" title (HudSpectate); after that it is a small button right above the
+	    spectate pill, still usable. Same Use / Buy either way; only where and how big changes. Both sit in a full-screen
+	    frame scaled like the HUD (UiScale) inside a centred row, so they stay centred whatever their measured width.
 	  - Mate: the `revive_mate` prompt on a fallen mate's body (Prompt_Revive) shows only with credits
 	    (PromptController:AddGate("ReviveKit")). Range, hold and the reviver's own state are the PromptController's.
 	Game servers only (the lobby has no Down).
@@ -24,6 +28,8 @@ local Content = require(ReplicatedStorage.shared.Content)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Cinematic = require(StarterPlayer.StarterPlayerScripts.client.Interface.Cinematic)
 local CartoonButton = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.CartoonButton)
+local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
+local UiScale = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.UiScale)
 
 const ACTION = "revive_mate"
 const GATE = "ReviveKit"
@@ -33,6 +39,15 @@ const BIND_PAD = Enum.KeyCode.ButtonY
 const DISPLAY_ORDER = 15 -- over the HUD (spectate status), under the settings / shop windows (20)
 const WAIT = 2 -- s the button stays busy after a use without an answer
 const PRODUCT = "util_revive"
+-- s the offer stays big in the centre after the fall (DEC-294: 5-10 s; Provisional)
+const FOCUS_TIME = 7
+-- px at UI scale 1: the big offer starts this far under the screen centre (the title sits above it)
+const FOCUS_GAP = 6
+const FOCUS_HEIGHT = 64
+-- px at UI scale 1 from the bottom: the small offer sits over the spectate pill (HudSpectate: 84 + pill 40 + hint)
+const SMALL_BOTTOM = 158
+-- Vide 0.4.1 types `create` for 19 classes only; UIScale is not among them.
+const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }) -> Instance
 -- phases where a Down can still be revived (RoundService Flow LOSABLE, night only)
 const LIVE_PHASES: { [string]: boolean } = { Call = true, Prep = true, Night = true }
 
@@ -53,11 +68,37 @@ function ReviveKitController:Setup()
 	self.Busy = Vide.source(false) :: Vide.Source<boolean>
 	self.Bound = false :: boolean
 	self.Gui = nil :: ScreenGui?
+	-- true for FOCUS_TIME s after the local player goes Down (the big centred offer); HudSpectate follows it too
+	self.Focus = Vide.source(false) :: Vide.Source<boolean>
+	self.FocusThread = nil :: thread?
 end
 
 function ReviveKitController:Shows(): boolean
 	const round = self.Dependencies.RoundController
 	return self.Dependencies.VitalController.LocalState() == "Down" and round.IsNight() and LIVE_PHASES[round.Phase()] == true
+end
+
+-- The offer can show: Down in a live phase with a credit or a buyable kit
+function ReviveKitController:Offered(): boolean
+	return self:Shows() and (self.Count() > 0 or self:CanBuy())
+end
+
+-- Starts the focus window on a fall; any other state ends it at once.
+function ReviveKitController:SetFocus(down: boolean)
+	const thread = self.FocusThread
+	if thread and coroutine.status(thread) == "suspended" then
+		task.cancel(thread)
+	end
+	self.FocusThread = nil
+	if Vide.untrack(self.Focus) ~= down then
+		self.Focus(down)
+	end
+	if down then
+		self.FocusThread = task.delay(FOCUS_TIME, function()
+			self.FocusThread = nil
+			self.Focus(false)
+		end)
+	end
 end
 
 -- "Revive now" needs a live product id; credits always work
@@ -131,10 +172,57 @@ function ReviveKitController:SetBound(on: boolean)
 	end
 end
 
+type Look = { TextSize: number, IconSize: number, Padding: number, Outline: number?, Studs: boolean? }
+
+-- One form of the offer: a full-width row that centres the button (its width is measured, so a lone anchored button
+-- drifts off centre while the label settles).
+function ReviveKitController:Row(
+	name: string,
+	anchor: Vector2,
+	position: UDim2,
+	height: number,
+	visible: () -> boolean,
+	look: Look
+): Frame
+	return Vide.create("Frame")({
+		Name = name,
+		AnchorPoint = anchor,
+		Position = position,
+		Size = UDim2.new(1, 0, 0, height),
+		BackgroundTransparency = 1,
+		Visible = visible,
+		Vide.create("UIListLayout")({
+			FillDirection = Enum.FillDirection.Horizontal,
+			HorizontalAlignment = Enum.HorizontalAlignment.Center,
+			VerticalAlignment = Enum.VerticalAlignment.Center,
+		}),
+		CartoonButton({
+			Name = if name == "Focus" then "UseReviveKit" else `UseReviveKit{name}`,
+			Text = function()
+				return self:Label()
+			end,
+			TextSize = look.TextSize,
+			Icon = "Item/revive_kit",
+			IconSize = look.IconSize,
+			Padding = look.Padding,
+			Outline = look.Outline,
+			Studs = look.Studs,
+			Size = UDim2.fromOffset(0, height),
+			AutomaticSize = Enum.AutomaticSize.X,
+			Enabled = function()
+				return not self.Busy()
+			end,
+			OnActivated = function()
+				self:Use()
+			end,
+		}),
+	}) :: Frame
+end
+
 function ReviveKitController:Mount(playerGui: Instance)
 	const _, gui = Vide.root(function()
 		Vide.effect(function()
-			const shows = self:Shows() and (self.Count() > 0 or self:CanBuy())
+			const shows = self:Offered()
 			Vide.untrack(function()
 				self:SetBound(shows)
 				return nil
@@ -151,23 +239,34 @@ function ReviveKitController:Mount(playerGui: Instance)
 				return not Cinematic.Active()
 			end,
 
-			CartoonButton({
-				Name = "UseReviveKit",
-				Text = function()
-					return self:Label()
+			Vide.create("Frame")({
+				Name = "Offer",
+				Size = function()
+					const scale = UiScale.Current()
+					return UDim2.fromScale(1 / scale, 1 / scale)
 				end,
-				Icon = "Item/revive_kit",
-				Enabled = function()
-					return not self.Busy()
-				end,
-				Visible = function()
-					return self:Shows() and (self.Count() > 0 or self:CanBuy())
-				end,
-				AnchorPoint = Vector2.new(0.5, 1),
-				Position = UDim2.new(0.5, 0, 1, -140),
-				OnActivated = function()
-					self:Use()
-				end,
+				BackgroundTransparency = 1,
+				createRaw("UIScale")({ Scale = UiScale.Current }),
+
+				-- phase 1: big, centred, under the title
+				self:Row("Focus", Vector2.new(0.5, 0), UDim2.new(0.5, 0, 0.5, FOCUS_GAP), FOCUS_HEIGHT, function()
+					return self:Offered() and self.Focus()
+				end, {
+					TextSize = 26,
+					IconSize = 44,
+					Padding = 26,
+					Outline = Theme.Outline.Thick,
+					Studs = true,
+				}),
+
+				-- phase 2: small, over the spectate pill
+				self:Row("Small", Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -SMALL_BOTTOM), Theme.MinTouch, function()
+					return self:Offered() and not self.Focus()
+				end, {
+					TextSize = 15,
+					IconSize = 24,
+					Padding = 12,
+				}),
 			}),
 		})
 	end)
@@ -204,12 +303,13 @@ ReviveKitController:OnStart(function(self)
 		return Vide.untrack(self.Count) > 0
 	end)
 
-	-- a revive (or the 6:00 AM Spectator) ends the wait at once
+	-- a revive (or the 6:00 AM Spectator) ends the wait at once; a fall opens the focus window
 	Vide.root(function()
 		Vide.effect(function()
-			self.Dependencies.VitalController.LocalState()
+			const state = self.Dependencies.VitalController.LocalState()
 			Vide.untrack(function()
 				self.Busy(false)
+				self:SetFocus(state == "Down")
 				return nil
 			end)
 		end)

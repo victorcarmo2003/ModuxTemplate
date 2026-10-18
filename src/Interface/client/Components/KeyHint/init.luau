@@ -24,6 +24,8 @@ export type Props = {
 	Width: number?,
 	Name: string?,
 	LayoutOrder: number?,
+	-- Extra gate on top of the device rule (nil = always).
+	Visible: (() -> boolean)?,
 }
 
 const HEIGHT = 18
@@ -56,7 +58,7 @@ return function(props: Props): Frame
 		Size = UDim2.fromOffset(width, HEIGHT),
 		BackgroundTransparency = 1,
 		Visible = function()
-			return props.Device() ~= "Touch"
+			return props.Device() ~= "Touch" and (props.Visible == nil or props.Visible())
 		end,
 
 		CartoonLabel({

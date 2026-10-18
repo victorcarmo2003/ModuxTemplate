@@ -1,15 +1,16 @@
 --!strict
 -- NightLostScreen: the cover while a lost night restarts (TASK-338; owner request 2026-10-15, Provisional). Shown over
 -- the whole NightLost phase so the frozen bodies and the held clock never read as a hang: an Ink fade over the screen,
--- the title ("Everyone fainted…"), a Cream tag with what comes next ("Restarting the night") and a Mustard bar that
--- fills until the restart, with the whole seconds left on its right. Mustard and Ink, never red, no shake.
+-- the title ("Everyone fainted…") and a DrainBar that empties until the restart with what comes next inside it
+-- ("Restarting the night" / "No chances left"). Clean faint screen (TASK-485, DEC-294): no separate tag, no seconds.
+-- Mustard and Ink, never red, no shake.
 -- The card pops in once (Motion.Pop); the fade follows Motion.Reveal (instant with reduced motion).
 -- Status only: nothing clickable (Active = false everywhere). Pure: only props.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Theme)
 local Motion = require(script.Parent.Motion)
-local CartoonPanel = require(script.Parent.CartoonPanel)
+local DrainBar = require(script.Parent.DrainBar)
 local CartoonLabel = require(script.Parent.CartoonLabel)
 
 const create = Vide.create
@@ -20,10 +21,8 @@ export type Props = {
 	Shown: () -> boolean,
 	Title: () -> string,
 	Line: () -> string,
-	-- 0..1 of the wait done (the bar fill)
+	-- 0..1 of the wait done (the bar drains as it grows)
 	Progress: () -> number,
-	-- whole seconds left (< 0 = no number)
-	Seconds: () -> number,
 	-- Theme.ScaleOf(viewport); default 1
 	Scale: (() -> number)?,
 	Name: string?,
@@ -32,62 +31,8 @@ export type Props = {
 const COVER = 0.12 -- background transparency at full fade (the world stays faintly visible)
 const WIDTH = 360
 const TITLE_SIZE = 40
-const LINE_SIZE = 18
-const BAR_HEIGHT = 26
-const BAR_INSET = 5
-
-local function bar(progress: () -> number, seconds: () -> number): Frame
-	return create("Frame")({
-		Name = "Wait",
-		LayoutOrder = 3,
-		Size = UDim2.fromOffset(WIDTH - 40, BAR_HEIGHT),
-		BackgroundTransparency = 1,
-
-		CartoonPanel({
-			Name = "Track",
-			Size = UDim2.fromScale(1, 1), -- full width, centred; the count sits inside it (owner 2026-10-16)
-			Tone = Theme.Tone.Ink,
-			Outline = Theme.Outline.Thick,
-			Radius = Theme.Radius.Pill,
-			Lip = 3,
-			Children = {
-				create("Frame")({
-					Name = "Fill",
-					Position = UDim2.fromOffset(BAR_INSET - 2, BAR_INSET - 2),
-					Size = function()
-						const alpha = math.clamp(progress(), 0, 1)
-						return UDim2.new(alpha, -(BAR_INSET - 2) * 2 * alpha, 1, -(BAR_INSET - 2) * 2)
-					end,
-					BackgroundColor3 = Theme.Color.Mustard,
-					BorderSizePixel = 0,
-					Visible = function()
-						return progress() > 0.01
-					end,
-					create("UICorner")({ CornerRadius = Theme.Radius.Pill }),
-					createRaw("UIGradient")({
-						Rotation = 90,
-						Color = ColorSequence.new(Theme.Tone.Mustard.Top, Theme.Tone.Mustard.Bottom),
-					}),
-				}),
-			},
-		}),
-
-		CartoonLabel({
-			Name = "Count",
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.5),
-			Box = UDim2.new(1, 0, 1, 6),
-			TextSize = 22,
-			Color = Theme.Color.Cream,
-			XAlignment = Enum.TextXAlignment.Center,
-			ZIndex = 3,
-			Text = function()
-				const left = seconds()
-				return if left >= 0 then tostring(left) else ""
-			end,
-		}),
-	}) :: Frame
-end
+const BAR_HEIGHT = 36
+const BAR_TEXT = 19
 
 return function(props: Props): Frame
 	const fade = Motion.Reveal(props.Shown)
@@ -137,28 +82,17 @@ return function(props: Props): Frame
 				Stroke = 4,
 			}),
 
-			CartoonPanel({
-				Name = "Line",
+			DrainBar({
+				Name = "Wait",
 				LayoutOrder = 2,
-				Size = UDim2.fromOffset(0, LINE_SIZE + 18),
-				AutomaticSize = Enum.AutomaticSize.X,
-				Rotation = -1.5,
-				Tone = Theme.Tone.Cream,
-				Lip = 3,
-				Padding = { Left = 16, Right = 16 },
-				Children = {
-					CartoonLabel({
-						Box = UDim2.new(0, 0, 1, 0),
-						AutomaticSize = Enum.AutomaticSize.X,
-						Text = props.Line,
-						TextSize = LINE_SIZE,
-						Color = Theme.Color.Dark,
-						Stroke = 0,
-					}),
-				},
+				Left = function()
+					return 1 - math.clamp(props.Progress(), 0, 1)
+				end,
+				Text = props.Line,
+				Width = WIDTH - 20,
+				Height = BAR_HEIGHT,
+				TextSize = BAR_TEXT,
 			}),
-
-			bar(props.Progress, props.Seconds),
 		}),
 	}) :: Frame
 end

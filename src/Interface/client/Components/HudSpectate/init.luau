@@ -1,12 +1,15 @@
 --!strict
 -- HudSpectate: what a player who is not on their feet sees (FEAT-025, DEC-091, DEC-093, DEC-115, DEC-129;
 -- ui-text.md §12.3; style guide §7.2).
---   top centre  card, for a while after the change: Down "You fainted!" · "Your crew's still on shift."
---               Out (Spectator) "You're out for now." · "Watch your crew. Cheer them on!" · "Your gems are safe."
+--   centre      Down, while `Focus` (the first seconds after the fall, TASK-485 / DEC-294): big "You fainted!" and one
+--               Cream tag of context (`Line`), sitting right over the centre of the screen; the big revive offer
+--               (ReviveKitController, its own ScreenGui) starts right under the centre. The pill waits until it ends.
+--   top centre  Out (Spectator) card, for a while after the change: "You're out for now." · "Watch your crew. Cheer
+--               them on!" · "Your gems are safe."
 --   bottom      pill "Watching: {name}" (or "Watching the trailer" with nobody standing) + the switch hint of the
 --               current device ("Tap to switch" / "Press E to switch" / "Press X to switch")
--- Wave 2: no ambulance, no revive offer, no lobby button. Status only: the switch itself is the camera's bind
--- (CameraController); nothing here is clickable (FEAT-032). Pure: only props.
+-- No ambulance, no lobby button; the revive offer is ReviveKitController's (its own ScreenGui). Status only: the switch
+-- itself is the camera's bind (CameraController); nothing here is clickable (FEAT-032). Pure: only props.
 -- Cartoon pass (AST-091): the card is a Cream CartoonPanel that pops in (Motion.Pop); the "Watching" pill is an Ink
 -- panel with the binoculars icon between two arrow icons (decoration only: they show the switch, they are not buttons).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -28,8 +31,12 @@ export type Mode = "None" | "Down" | "Out"
 
 export type Props = {
 	Mode: () -> Mode,
-	-- Show the top card (the owner turns it off after a few seconds).
+	-- Show the top card of Out (the owner turns it off after a few seconds).
 	Card: () -> boolean,
+	-- Down: the focus window (centred title + line, no pill yet). nil = never.
+	Focus: (() -> boolean)?,
+	-- Down: the context line under the title. Default "Your crew's still on shift."
+	Line: (() -> string)?,
 	-- Name of the watched crewmate; "" = nobody standing (fixed trailer view).
 	Target: () -> string,
 	-- Switch hint for the current device; "" hides it.
@@ -47,10 +54,14 @@ const LINE_SIZE = 15
 const HINT_SIZE = 14
 const PILL = 40
 const ARROW = 28
+const FOCUS_TITLE = 44
+const FOCUS_LINE = 18
+const FOCUS_GAP = 10 -- px over the screen centre (the revive offer starts under it)
+const DOWN_LINE = "Your crew's still on shift."
 
 const LINES: { [Mode]: { string } } = {
 	None = {},
-	Down = { "You fainted!", "Your crew's still on shift." },
+	Down = {},
 	Out = { "You're out for now.", "Watch your crew. Cheer them on!", "Your gems are safe." },
 }
 
@@ -93,10 +104,16 @@ return function(props: Props): Frame
 			lastMode(mode)
 		end
 	end)
+	const focused = function(): boolean
+		return props.Mode() == "Down" and props.Focus ~= nil and props.Focus()
+	end
 	const cardScale = Motion.Pop(function()
-		return shown() and props.Card()
+		return props.Mode() == "Out" and props.Card()
 	end)
-	const pillScale = Motion.Pop(shown)
+	const focusScale = Motion.Pop(focused)
+	const pillScale = Motion.Pop(function()
+		return shown() and not focused()
+	end)
 
 	const textAt = function(index: number): () -> string
 		return function()
@@ -109,8 +126,56 @@ return function(props: Props): Frame
 		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
 		Visible = function()
-			return shown() or cardScale() > 0.02 or pillScale() > 0.02
+			return shown() or cardScale() > 0.02 or focusScale() > 0.02 or pillScale() > 0.02
 		end,
+
+		create("Frame")({
+			Name = "Focus",
+			AnchorPoint = Vector2.new(0.5, 1),
+			Position = UDim2.new(0.5, 0, 0.5, -FOCUS_GAP),
+			Size = UDim2.fromOffset(0, 0),
+			AutomaticSize = Enum.AutomaticSize.XY,
+			BackgroundTransparency = 1,
+			Visible = function()
+				return focusScale() > 0.02
+			end,
+			createRaw("UIScale")({ Scale = focusScale }),
+			create("UIListLayout")({
+				FillDirection = Enum.FillDirection.Vertical,
+				HorizontalAlignment = Enum.HorizontalAlignment.Center,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 8),
+			}),
+			CartoonLabel({
+				Name = "Title",
+				LayoutOrder = 1,
+				Text = "You fainted!",
+				TextSize = FOCUS_TITLE,
+				Stroke = 4,
+			}),
+			CartoonPanel({
+				Name = "Line",
+				LayoutOrder = 2,
+				Size = UDim2.fromOffset(0, FOCUS_LINE + 18),
+				AutomaticSize = Enum.AutomaticSize.X,
+				Rotation = -1.5,
+				Tone = Theme.Tone.Cream,
+				Lip = 3,
+				Padding = { Left = 16, Right = 16 },
+				Children = {
+					CartoonLabel({
+						Box = UDim2.new(0, 0, 1, 0),
+						AutomaticSize = Enum.AutomaticSize.X,
+						Text = function()
+							return if props.Line then props.Line() else DOWN_LINE
+						end,
+						TextSize = FOCUS_LINE,
+						Color = Theme.Color.Dark,
+						Stroke = 0,
+					}),
+				},
+			}),
+		}),
 
 		CartoonPanel({
 			Name = "Card",
