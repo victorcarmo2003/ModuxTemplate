@@ -2464,6 +2464,9 @@ local function checkHorrorScenes()
 				inRange("HorrorScenes", index, key, `{where}.Value`, step.Value or 0, 0, 60)
 				inRange("HorrorScenes", index, key, `{where}.To`, (step.To :: number?) or 0, 0, 60)
 			elseif step.Kind == "Whispers" then
+				if step.Target ~= nil and HorrorScenes.Words[step.Target] == nil then
+					fail("HorrorScenes", index, key, `{where} Whispers '{step.Target}' is not a key of HorrorScenes.Words`)
+				end
 				inRange("HorrorScenes", index, key, `{where}.Value`, step.Value or 0, 0, 5)
 				inRange("HorrorScenes", index, key, `{where}.To`, (step.To :: number?) or 0, 0, 5)
 				if (step.Value or 0) > 0 or ((step.To :: number?) or 0) > 0 then

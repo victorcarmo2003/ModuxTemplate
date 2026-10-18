@@ -142,7 +142,9 @@ const whispers: Handler = function(_ctx, state, step, late)
 	if (from <= 0 and to <= 0) or seconds <= 0.2 then
 		return -- a stop step (or nothing left of the ramp)
 	end
-	state.Undo.whispers = Whispers.Ramp(seconds, math.max(from, 0.05), math.max(to, 0.05))
+	-- DEC-293: Target = a list of Content.HorrorScenes.Words (real hints); nil = the Kit's HIDE list
+	const list = if step.Target ~= nil then Content.HorrorScenes.Words[step.Target] else nil
+	state.Undo.whispers = Whispers.Ramp(seconds, math.max(from, 0.05), math.max(to, 0.05), list)
 end
 
 -- Door ------------------------------------------------------------------------------------------------------------------

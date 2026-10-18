@@ -3840,3 +3840,16 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
 - **Provisório:** "todos perdem" lido como **cada jogador ativo paga −35 de sanidade** (DEC-277), sem desmaio direto — `Q-358`; 30 s = `Rules/ANM-020 RestaurantWindow`; aviso `OmenFor` = 2 s; luz do jogador 0,9 / alcance 14, branca.
 - **Emendas (append-only):** DEC-283 (esconder na despensa) **deixa de valer** para o apagão; DEC-290/291 seguem (cena dirigida, HIDE em rampa — ver `Q-360`); a legenda passa a "POWER OUT / FIX THE BREAKER".
 - Impacto: **backend-coder** (regra), **frontend-coder** (Score, cena, porta, prompts), **level-designer**, **game-designer**. Tarefas: **TASK-472 a TASK-479**.
+
+### DEC-293 — 2026-10-18 — Whispers dão dicas reais; sino no corte da luz; luz do jogador 60 % menor (responde Q-360)
+
+- Origem: fala do dono (2026-10-18), depois do teste do apagão.
+- Decidido pelo dono:
+  - As palavras na tela (**whispers**) passam a dar **dicas reais**, na voz do personagem. Sanidade baixa: "LOW SANITY", "DRINK COFFEE", "I NEED COFFEE", "WHERE'S THE COFFEE?". Apagão: "HE'S COMING", "WHERE'S THE BREAKER?", "I NEED TO FIX THE LIGHTS" etc.
+  - O **sino** toca **no momento em que as luzes apagam**.
+  - O **alcance da luz própria do jogador** no escuro cai **60 %**.
+  - As notas do violino (`Scary Violin Notes`) não estavam audíveis: devem ser ouvidas.
+- Responde **`Q-360`** (opção B: palavras do disjuntor, não "HIDE").
+- **Provisório:** listas em `Content.HorrorScenes.Words` (`blackout`, `low_sanity`); sanidade baixa = faixa "Night" (< 40, DEC-167), uma rajada de 3 s a cada 20 s; volume das notas 0,45 → 1,6; luz do jogador alcance 5,6.
+- **Emendas:** DEC-291 (HIDE em rampa) → a rampa continua, com as palavras da lista `blackout`.
+- Impacto: **frontend-coder**, **game-designer** (textos; `ui-text.md` quando existir).

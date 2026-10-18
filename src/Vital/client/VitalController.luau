@@ -121,6 +121,13 @@ const MACHINE_KIND = "coffee_machine"
 const MACHINE_LIFT = 1.2 -- studs between the top of the machine and the arrow tip
 const HINT_RETRY = 0.5 -- s between two looks for the machine while it is not in the Workspace yet
 const COFFEE_AFTER_ACTIVE = 1 -- s: a rise this soon after coming back to Active is the revive resend, not coffee
+-- Low-sanity whispers (DEC-293, owner 2026-10-18): while sanity is in the low band ("Night", below Sanity.Bands.Mid) the
+-- character's own words on screen say what to do ("LOW SANITY", "DRINK COFFEE"...): a short burst every LOW_WHISPER_EVERY s.
+const LOW_WHISPER_EVERY = 20
+const LOW_WHISPER_FOR = 3
+const LOW_WHISPER_RATE = 0.5
+const LOW_WHISPER_FIRST = 4 -- s after entering the band before the first burst
+local Whispers = require(StarterPlayer.StarterPlayerScripts.client.Anomaly.AnomalyController.Effects.Kit.Whispers)
 
 local function approach(current: number, target: number, dt: number): number
 	-- Exponential ease, ~98% of the way in EnterTime.
@@ -624,6 +631,24 @@ end)
 VitalController:OnStart(function(self)
 	RunService.RenderStepped:Connect(function(dt: number)
 		self:Step(dt)
+	end)
+	-- DEC-293: hints on screen while sanity is low (a night only: Max > 0; never while down or spectating)
+	task.spawn(function()
+		local nextAt = math.huge
+		while true do
+			task.wait(1)
+			const low = Vide.untrack(self.Max) > 0
+				and Vide.untrack(self.Band) == "Night"
+				and Vide.untrack(self.LocalState) == "Active"
+			if not low then
+				nextAt = math.huge
+			elseif nextAt == math.huge then
+				nextAt = os.clock() + LOW_WHISPER_FIRST
+			elseif os.clock() >= nextAt then
+				nextAt = os.clock() + LOW_WHISPER_EVERY
+				task.spawn(Whispers.Play, LOW_WHISPER_FOR, Content.HorrorScenes.Words.low_sanity, LOW_WHISPER_RATE)
+			end
+		end
 	end)
 	-- PlayerGui may arrive a frame late; do not hold up the other OnStart.
 	task.spawn(function()

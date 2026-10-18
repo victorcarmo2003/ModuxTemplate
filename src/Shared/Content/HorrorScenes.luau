@@ -18,8 +18,9 @@
 --   Lights     Target "Off" | "On" | "Flicker" | "Cascade" over Duration (the anomaly's own light roots)
 --   Lightning  storm ramp: Value = first interval s, To = last interval s, over Duration; Burst = strikes per window at
 --              the end (rain/thunder of AtmosphereController, seeded)
---   Whispers   the "HIDE" words on screen (Effects/Kit/Whispers), ramping: Value = rate at the start, To = rate at the
---              end (1 = Kit default), over Duration (owner DEC-291: "few HIDE at first, then en masse")
+--   Whispers   the words on screen (Effects/Kit/Whispers), ramping: Value = rate at the start, To = rate at the end
+--              (1 = Kit default), over Duration (DEC-291: few at first, then en masse). Target = key of Words (the
+--              list said; DEC-293: real hints, not just HIDE); nil = the Kit's own HIDE list
 --   Vignette   screen darkening: Value -> To over Duration (0..Rules.MaxVignette)
 --   Shake      camera shake: Target = profile key of Rules.Shakes, Value = scale (default 1)
 --   Fov        field of view delta: Value degrees (|Value| <= Rules.MaxFov), To = 0 to come back, over Duration
@@ -123,10 +124,10 @@ const blackout: Scene = {
 		{ At = 0, Phase = "Active", Kind = "Sound", Target = "hum_die" },
 		{ At = 0, Phase = "Active", Kind = "Shake", Target = "Jolt" },
 		{ At = 0, Phase = "Active", Kind = "Fov", Value = -3, To = 0, Duration = 0.8 },
-		-- the bell once the voice is gone
-		{ At = 5, Phase = "Active", Kind = "Sound", Target = "church_bell" },
+		-- the bell the moment the lights go out (owner 2026-10-18)
+		{ At = 0, Phase = "Active", Kind = "Sound", Target = "church_bell" },
 		-- the HIDE words: a few, then all over the screen (DEC-291); the edges close in
-		{ At = 5, Phase = "Active", Kind = "Whispers", Value = 0.4, To = 3, Duration = 17 },
+		{ At = 5, Phase = "Active", Kind = "Whispers", Target = "blackout", Value = 0.4, To = 3, Duration = 17 },
 		{ At = 5, Phase = "Active", Kind = "Vignette", Value = 0, To = 0.35, Duration = 17 },
 		-- the steps: The Walker (AST-064) from the back alley to the pantry's exit door, its own steps on its feet; seen
 		-- only through the security cameras, never in first person (owner 2026-10-18, TASK-472)
@@ -162,6 +163,32 @@ const blackout: Scene = {
 	},
 }
 
+-- Whisper word lists (DEC-293, owner 2026-10-18): the words on screen are real hints for the player, said in the
+-- character's voice. blackout = the scene's Whispers step; low_sanity = VitalController while sanity is in the low band.
+const words: { [string]: { string } } = {
+	blackout = {
+		"HE'S COMING",
+		"HE'S COMING",
+		"WHERE'S THE BREAKER?",
+		"WHERE'S THE BREAKER?",
+		"I NEED TO FIX THE LIGHTS",
+		"FIX THE LIGHTS",
+		"THE BREAKER IS OUTSIDE",
+		"hurry...",
+		"he's close",
+		"don't let him in",
+	},
+	low_sanity = {
+		"LOW SANITY",
+		"DRINK COFFEE",
+		"I NEED COFFEE",
+		"I NEED COFFEE",
+		"WHERE'S THE COFFEE?",
+		"coffee...",
+		"the coffee machine",
+	},
+}
+
 const rules: Rules = {
 	Latency = 0.15,
 	ReduceMotion = 0.25,
@@ -178,5 +205,6 @@ const rules: Rules = {
 
 return Table.with(Table.new({ blackout } :: { Scene }), {
 	Rules = Table.record(rules),
+	Words = Table.record(words),
 	PhaseOrder = table.freeze({ Signal = 1, Active = 2, Resolved = 3, Failed = 3 }),
 })

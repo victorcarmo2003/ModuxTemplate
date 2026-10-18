@@ -62,7 +62,7 @@ const CC_TINT = Color3.fromHex("#B8C2E0")
 -- Minimum local glow (no flashlight in the game)
 const GLOW_NAME = "ANM020_Glow"
 -- owner 2026-10-18: too dark to see the door next to you; a soft white light like a lantern at the player's centre
-const GLOW_RANGE = 14
+const GLOW_RANGE = 5.6 -- owner 2026-10-18: 60 % shorter (was 14), only what is right next to you
 const GLOW_BRIGHTNESS = 0.9
 const GLOW_COLOR = Color3.fromHex("#EEF2FF")
 
