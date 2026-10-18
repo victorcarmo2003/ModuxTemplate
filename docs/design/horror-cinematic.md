@@ -94,3 +94,38 @@ anomalia acontece pela regra que já existe (o pacote de erro não muda). Jumpsc
 - Quem não se escondeu: jumpscare curto na janela (proposta) ou só o erro da regra, sem susto?
 - Opção "Reduzir movimento": o jogo **já tem** `Motion.Reduced()` (Interface/Components/Motion); a câmera de terror usa ela
   (Provisório, Q-357).
+
+---
+
+## 6. Roteiro revisado com o dono (2026-10-18, DEC-294)
+
+O apagão virou a referência ("efeito de cinema"). As outras anomalias precisam do mesmo peso. Ajustes do dono sobre o §3:
+
+| Anomalia | Decisão / ajuste | Roteiro proposto |
+|---|---|---|
+| ANM-018 O Sorriso | não há janela visível de dentro além do **drive-thru**; a janela do drive-thru precisa fechar junto com a principal | Vira o **primeiro evento de suspense** (§7): a criatura preta grande aparece **num lugar que ninguém está olhando** (bancada ou janela do drive-thru); quem olhar de relance tem a **câmera sequestrada** (zoom curto nela) com um som grave; −5 a −10 de sanidade; some. Uma versão "anomalia" do Sorriso fica para depois |
+| ANM-017 Rastejador | aprovado ("subir no balcão") | arranhão sob o assoalho → corre pela cozinha → os jogadores precisam **sair do chão** (subir no balcão); quem fica no chão quando ele passa paga |
+| ANM-012 Pescoço invertido | gostou, mas falta terror | soma a **pressão de encarar** (§8): encarar demais faz a cabeça girar devagar seguindo o jogador, estalos, coração acelera, bordas da tela escurecem piscando, sanidade cai, whispers "STOP STARING", "DON'T LOOK" |
+| ANM-004 A Cópia | gostou; ligar à pressão mental | a cópia vira a cabeça antes; encarar ativa a pressão (§8) com distorção leve do rosto; whispers trocam para "DON'T LOOK AT IT" |
+| ANM-019 Sombra no teto | conceito "genial", mas não há nada que leve o jogador para fora | **replanejar**: em vez de punir quem sai, punir **quem olha para cima** ou **quem olha as câmeras** enquanto ela anda no teto (Q-367) |
+
+## 7. Eventos de suspense (novo sistema, DEC-294)
+
+Sustos que **não são anomalias**: sem regra para resolver, sem aviso padrão, aleatórios, para o jogador nunca se sentir seguro
+("não sempre aviso e gatilho").
+
+- Um evento escolhe um ponto **fora da tela de todos** (bancada, janela do drive-thru, fim da rua, despensa) e aparece ali.
+- Quem o vê de relance (entra no campo de visão perto da borda) tem a câmera puxada para ele: zoom ~0,4 s, som grave
+  ("sub drop"), −5 a −10 de sanidade (Provisório). Some em seguida.
+- Frequência baixa e aleatória por noite (Provisório: 1–3 por noite a partir da noite 2; nunca durante uma anomalia ativa).
+- Usa os modelos de monstro que já existem (silhueta preta, olhos brancos). Mild: o susto é curto.
+
+## 8. Pressão de encarar (novo sistema, DEC-294)
+
+Encarar uma anomalia de cliente (pescoço invertido, cópia, olhos brancos) por tempo demais tem custo:
+
+- Depois de ~2 s olhando direto: coração começa e acelera; bordas da tela escurecem piscando de leve ("glaucoma");
+  a cabeça do cliente vira para seguir o jogador; whispers trocam para "STOP STARING", "DON'T LOOK".
+- Continuando: sanidade cai aos poucos; o rosto distorce de leve (escala/rotação das partes do rosto; EditableMesh só se
+  der certo — Q-368).
+- Olhar para longe solta tudo em ~1 s. Respeita `Motion.Reduced()`.

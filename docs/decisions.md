@@ -3853,3 +3853,16 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
 - **Provisório:** listas em `Content.HorrorScenes.Words` (`blackout`, `low_sanity`); sanidade baixa = faixa "Night" (< 40, DEC-167), uma rajada de 3 s a cada 20 s; volume das notas 0,45 → 1,6; luz do jogador alcance 5,6.
 - **Emendas:** DEC-291 (HIDE em rampa) → a rampa continua, com as palavras da lista `blackout`.
 - Impacto: **frontend-coder**, **game-designer** (textos; `ui-text.md` quando existir).
+
+### DEC-294 — 2026-10-18 — Eventos de suspense, pressão de encarar, roteiro revisado e tela de desmaio limpa
+
+- Origem: fala do dono (2026-10-18) sobre o roteiro das próximas anomalias e o teste da morte/desmaio.
+- Decidido pelo dono:
+  - **Eventos de suspense** aleatórios, que não são anomalias: um bicho grande aparece onde ninguém está olhando (bancada, janela do drive-thru); quem olha de relance tem a **câmera sequestrada** com zoom e som grave, −5 a −10 de sanidade. "Mais eventos de suspense… vai ser muito importante para o jogo."
+  - **Pressão de encarar**: encarar a anomalia demais acelera o coração, escurece as bordas da tela piscando, a cabeça segue o jogador, o rosto distorce, a sanidade cai, e as whispers dizem "pare de encarar / não olhe".
+  - **Janela do drive-thru** ganha fechamento, ligado à janela principal (fecha uma, fecha as duas).
+  - Rastejador aprovado; pescoço invertido precisa de mais terror; sombra no teto precisa de mecânica nova.
+  - **Desmaio/morte**: tela limpa — esconder dinheiro e o excesso de HUD; **focar o botão de revive** no centro por 5–10 s; depois as opções de spectate, com o revive pequeno em cima; sem o contador de bolinhas; barra que se esvai com o texto dentro, sem número de segundos. Vale também para "Everyone fainted".
+  - **Notas do violino**: volume de 0 até no máximo 2.
+- **Provisório:** números de sanidade e frequência (game-designer); detalhes em `design/horror-cinematic.md` §6–§8.
+- Impacto: **game-designer**, **frontend-coder**, **backend-coder**, **level-designer**. Tarefas: **TASK-480 a TASK-486**.
