@@ -1,7 +1,8 @@
 --!strict
 -- StockCounter: "7/12" pill over a stock station in the world (FEAT-007 "Indicador", style guide §7.1 pill).
--- Ink pill with white text; turns Low (red) when the station is about to run out. Fixed pixel size (not studs),
--- so the text keeps >= 14 px on a phone at any distance. Not AlwaysOnTop: walls and the cart hide it.
+-- Ink pill with white text; turns Low (red) when the station is about to run out. Pixel layout (17 px text up close),
+-- shrunk with distance by WorldScale like a real tag (owner 2026-10-18: a fixed pixel size grew relative to the world
+-- from far and covered the HUD). Not AlwaysOnTop: walls and the cart hide it.
 -- Pure: only props. The caller parents the returned BillboardGui (the adornee itself is fine: no input here).
 -- Cartoon pass (AST-091): Ink CartoonPanel pill (Ketchup when Low) with a heavy-stroke number.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -10,6 +11,7 @@ local Cinematic = require(script.Parent.Parent.Cinematic)
 local Theme = require(script.Parent.Theme)
 local CartoonPanel = require(script.Parent.CartoonPanel)
 local CartoonLabel = require(script.Parent.CartoonLabel)
+local WorldScale = require(script.Parent.WorldScale)
 
 const create = Vide.create
 const spring = Vide.spring
@@ -41,7 +43,7 @@ return function(props: Props): BillboardGui
 		return if props.Low() then 1.12 else 1
 	end, 0.25, 0.45)
 
-	return create("BillboardGui")({
+	const gui = create("BillboardGui")({
 		Name = props.Name or "StockCounter",
 		Adornee = props.Adornee,
 		Size = UDim2.fromOffset(WIDTH, HEIGHT),
@@ -79,4 +81,6 @@ return function(props: Props): BillboardGui
 			},
 		}),
 	})
+	WorldScale.Track(gui, WIDTH, HEIGHT)
+	return gui
 end

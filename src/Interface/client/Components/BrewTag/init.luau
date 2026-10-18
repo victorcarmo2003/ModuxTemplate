@@ -5,7 +5,7 @@
 --   Brewing   Mustard badge and bar, seconds of the brew
 --   Cooldown  Teal badge and bar, time until the machine can brew again (0:42)
 --   Ready     Green badge, "Ready!" in place of the bar
--- Fixed pixel size (not studs), like StockCounter: readable on a phone at any distance. Every outline stays inside the
+-- Pixel layout shrunk with distance by WorldScale, like StockCounter (owner 2026-10-18). Every outline stays inside the
 -- BillboardGui (insets), so no stroke is clipped at the edges. Not AlwaysOnTop. Pure: only props; build it inside a
 -- Vide root.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -15,6 +15,7 @@ local Theme = require(script.Parent.Theme)
 local Icons = require(script.Parent.Icons)
 local CartoonPanel = require(script.Parent.CartoonPanel)
 local CartoonLabel = require(script.Parent.CartoonLabel)
+local WorldScale = require(script.Parent.WorldScale)
 
 const create = Vide.create
 -- Vide 0.4.1 types `create` for 19 classes only; UIStroke and UIGradient are not among them.
@@ -68,7 +69,7 @@ return function(props: Props): BillboardGui
 		return props.Mode() ~= "Ready"
 	end
 	const icon = Icons.Rect(ICON)
-	return create("BillboardGui")({
+	const gui = create("BillboardGui")({
 		Name = props.Name or "BrewTag",
 		Adornee = props.Adornee,
 		Size = UDim2.fromOffset(WIDTH, HEIGHT),
@@ -180,4 +181,6 @@ return function(props: Props): BillboardGui
 			}),
 		}),
 	})
+	WorldScale.Track(gui, WIDTH, HEIGHT)
+	return gui
 end
