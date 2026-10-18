@@ -399,8 +399,10 @@ end
 
 -- Only the grill carries the Work prompt (owner decision 2026-10-14): any other Prompt_Work (the cutting board / bun crate one) stays
 -- off. The mode itself still opens on the Build tab by the tabs; the other prompts of that corner are the restock ones.
+-- With the focused mode off (restaurant: Content.Prep.Rules.Enabled false) every Work prompt is off: a leftover "Work"
+-- sat on the cutting board and took the E away from the Slice prompt (owner 2026-10-18: "a mesa de trabalho não funciona").
 function PrepService:SilenceSpareWork(anchor: Instance)
-	if anchor:GetAttribute("PromptAction") == WORK_ACTION and self:StepOfAnchor(anchor) ~= DEFAULT_STEP then
+	if anchor:GetAttribute("PromptAction") == WORK_ACTION and (not rules.Enabled or self:StepOfAnchor(anchor) ~= DEFAULT_STEP) then
 		self.Dependencies.InteractionService:SetPrompt(anchor, false, nil)
 	end
 end
