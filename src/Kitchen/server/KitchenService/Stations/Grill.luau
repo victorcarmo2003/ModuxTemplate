@@ -2,7 +2,7 @@
 -- Grill + sausage stock (FEAT-006 steps 1-3; UPG-001; DEC-015, DEC-046, DEC-069, DEC-201; architecture.md §18.4,
 -- §18.12; network.md §3.5; TASK-026). StationKinds "grill" and "sausage_stock" (§18.12).
 --   grill_place   (sausage_stock, tap "Grill")  1 sausage from stock -> lowest free slot of the vehicle's grill;
---                 Duration = Effect GrillTime (12/10/8 s) x Modifier GrillTime of who placed it (Line Cook 0.85)
+--                 Duration = Effect GrillTime (8/6/4 s, UPG-001; DEC-305) x Modifier GrillTime of who placed it (Line Cook 0.85)
 --   Tick 10 Hz    Working -> Ready when the sausage was FLIPPED and StartedAt + Duration is reached (no burning in the MVP). The
 --                 cook is two sides (2026-10-14): the first takes Duration - Rules.Grill.PostFlip s, then the sausage WAITS (Working,
 --                 progress paused, the flip window open) until the flip; Flip re-bases StartedAt so PostFlip s (1 s) later it is Ready.
@@ -30,6 +30,21 @@
 --                slot state picks one (slotPrompt: pause = Flip, Ready = Collect, else none) and both refreshers and both
 --                Validates follow it. On Bind (switch on) every Att_Flip<n> is moved onto the slot anchor of n (the map has
 --                it 0.35 stud over the Collect), so a slot shows one pill in one place.
+-- Conveyor kitchen (TASK-515; tech/prep-conveyor.md §5, §10.2; Q-381 A, DEC-303, DEC-305), Content.Prep.Rules.Mode = "Conveyor":
+--   no pause   with Conveyor.Grill.FlipRequired = false the sausage is Ready by itself at StartedAt + Duration (8/6/4 s),
+--              flipped or not. Never burns: no Burnt state is ever written, a Ready sausage stays Ready on the grill for as
+--              long as it waits.
+--   flip       optional, only while Working, once. Server clock minus the tap latency (<= 0.3 s): inside
+--              Restaurant.Grill.FlipFrom..FlipTo of the Duration it stamps the bonus (Bonus[slot] = true, score 100), outside it
+--              is a flip without bonus (score 0). The cook schedule never moves. Stations.Flip = score + 1 (101 / 1), so the
+--              client tells "flipped with bonus" from "flipped". The bonus travels to the rest table (Rail Entry.Flip) and from
+--              there to the plate (PrepService, FlipBonus) and to the sale (TASK-517).
+--   auto rest  with Conveyor.Grill.AutoRest a Ready sausage goes by itself to the end of the rest table (the rail, capacity
+--              Conveyor.Rest.Capacity = 8). Rest table full: it waits on the grill (Ready) and goes down when a place opens,
+--              the one that was ready first going first (restReady, every Tick: at most 0.1 s after a place opens).
+--              The sausage carries no grade into the plate (P13): Entry.Score = the flip score or nil, never Unflipped.
+--   prompts    no world Flip / Collect (slotPrompt nil); the world prompts are hidden by KitchenService:HiddenByPrep anyway.
+-- Trailer mode keeps every rule above this block.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 local Grade = require(ReplicatedStorage.shared.Prep.Grade)
@@ -40,8 +55,12 @@ local Refusal = require(script.Parent.Parent.Refusal)
 type Context = StationApi.Context
 type Station = StationApi.Station
 
--- Private state of a grill: flip score by slot (set when the sausage is flipped, cleared when it leaves the slot).
-type GrillState = { Flipped: { [number]: number } }
+-- Private state of a grill: flip score by slot (set when the sausage is flipped, cleared when it leaves the slot); Bonus =
+-- conveyor flip inside the window (TASK-515), same lifetime.
+type GrillState = { Flipped: { [number]: number }, Bonus: { [number]: boolean } }
+
+-- A Ready sausage waiting for the rest table (conveyor auto rest).
+type ReadyRef = { Grill: Station, Slot: number, At: number }
 
 const GRILL = "grill"
 const STOCK = "sausage_stock"
@@ -54,6 +73,24 @@ const TIME_STAT = "GrillTime"
 const DURATION_STEP = 0.1 -- Stations.Duration is quant(0, 120, 0.1): the server uses the value the wire carries
 const DURATION_MAX = 120
 const FLIP_SLACK = 0.1 -- s: a flip this much before the pause still counts (network jitter)
+const LATENCY_MAX = 0.3 -- s: the tap latency the server gives back to a flip
+const BONUS_SCORE = 100 -- conveyor flip score inside the window (Stations.Flip 101)
+const MISS_SCORE = 0 -- conveyor flip score outside the window (Stations.Flip 1)
+
+-- Conveyor kitchen (Content.Prep.Rules.Mode is the only selector, prep-conveyor.md §1).
+local function beltMode(): boolean
+	return Content.Prep.Rules.Mode == "Conveyor"
+end
+
+-- The trailer pause: the sausage waits for the flip before its second side.
+local function flipRequired(): boolean
+	return not beltMode() or Content.Prep.Conveyor.Grill.FlipRequired
+end
+
+-- A Ready sausage goes to the rest table by itself (no Collect).
+local function autoRest(): boolean
+	return beltMode() and Content.Prep.Conveyor.Grill.AutoRest
+end
 
 -- Bound grill stations (one per vehicle expected). Stale entries (station removed/re-added) are skipped by alive().
 const grills: { Station } = {}
@@ -78,14 +115,28 @@ local function grillsOf(vehicle: string): { Station }
 	return out
 end
 
-local function flippedOf(station: Station): { [number]: number }
+local function stateOf(station: Station): GrillState
 	const state = station.State
-	if type(state) == "table" and type(state.Flipped) == "table" then
-		return (state :: GrillState).Flipped
+	if type(state) == "table" and type(state.Flipped) == "table" and type(state.Bonus) == "table" then
+		return state :: GrillState
 	end
-	const fresh: GrillState = { Flipped = {} }
+	const fresh: GrillState = { Flipped = {}, Bonus = {} }
 	station.State = fresh
-	return fresh.Flipped
+	return fresh
+end
+
+local function flippedOf(station: Station): { [number]: number }
+	return stateOf(station).Flipped
+end
+
+local function bonusOf(station: Station): { [number]: boolean }
+	return stateOf(station).Bonus
+end
+
+-- The sausage of `slot` left the grill (or a new one came in): its flip stamps go.
+local function clearStamps(station: Station, slot: number)
+	flippedOf(station)[slot] = nil
+	bonusOf(station)[slot] = nil
 end
 
 local function slotOf(anchor: Instance): number?
@@ -282,6 +333,9 @@ end
 
 -- The slot is in the pause: Working, first side done (FLIP_SLACK early still counts), not flipped yet.
 local function inPause(station: Station, slot: number, now: number): boolean
+	if not flipRequired() then
+		return false -- conveyor: no pause
+	end
 	const record = station.Records[slot]
 	if record == nil or record.State ~= "Working" or record.Flip ~= nil or flippedOf(station)[slot] ~= nil then
 		return false
@@ -295,7 +349,7 @@ local function slotPrompt(station: Station, slot: number, now: number): string?
 		return FLIP
 	end
 	const record = station.Records[slot]
-	if record ~= nil and record.State == "Ready" then
+	if record ~= nil and record.State == "Ready" and not autoRest() then
 		return COLLECT
 	end
 	return nil
@@ -376,7 +430,7 @@ local function placeSausage(
 		Count = 0,
 		Flip = nil,
 	}
-	flippedOf(grill)[slot] = nil
+	clearStamps(grill, slot)
 	sync(ctx, grill)
 	ctx.Publish(grill)
 	refreshCollect(ctx, grill)
@@ -410,18 +464,57 @@ local function collectSlot(ctx: Context, grill: Station, slot: number, graded: b
 	end
 	const flipped = flippedOf(grill)[slot]
 	local score: number? = flipped
-	if score == nil and graded then
+	-- conveyor (P13): flipping is optional, an unflipped sausage carries no grade into the plate
+	if score == nil and graded and not beltMode() then
 		score = Content.Prep.Grades.Unflipped
 	end
-	if not Rail.Push(ctx, grill.Vehicle, score) then
+	if not Rail.Push(ctx, grill.Vehicle, score, bonusOf(grill)[slot] == true) then
 		return false, "RailFull"
 	end
-	flippedOf(grill)[slot] = nil
+	clearStamps(grill, slot)
 	grill.Records[slot] = StationApi.empty(GRILL)
 	sync(ctx, grill)
 	ctx.Publish(grill)
 	refreshCollect(ctx, grill)
 	return true, nil
+end
+
+-- Conveyor auto rest: the Ready sausages of the vehicle's grills go to the rest table, the one ready first going first,
+-- while it has room. The others stay Ready on the grill (they never burn) for the next Tick. Synchronous.
+local function restReady(ctx: Context, vehicle: string)
+	local room = Rail.Room(vehicle)
+	if room <= 0 then
+		return
+	end
+	const ready: { ReadyRef } = {}
+	for _, grill in grillsOf(vehicle) do
+		for slot, record in grill.Records do
+			if record.State == "Ready" then
+				-- no pause in the conveyor: StartedAt is never re-based, so StartedAt + Duration is when it became Ready
+				table.insert(ready, { Grill = grill, Slot = slot, At = record.StartedAt + record.Duration })
+			end
+		end
+	end
+	if #ready == 0 then
+		return
+	end
+	table.sort(ready, function(a: ReadyRef, b: ReadyRef): boolean
+		if a.At ~= b.At then
+			return a.At < b.At
+		elseif a.Grill.Id ~= b.Grill.Id then
+			return a.Grill.Id < b.Grill.Id
+		end
+		return a.Slot < b.Slot
+	end)
+	for _, ref in ready do
+		if room <= 0 then
+			break
+		end
+		if not collectSlot(ctx, ref.Grill, ref.Slot, false) then
+			break -- the rest table refused (full or gone): next Tick
+		end
+		room -= 1
+	end
 end
 
 -- Actions -------------------------------------------------------------------------------------------------------------
@@ -465,6 +558,21 @@ const collect: StationApi.Action = {
 	end,
 }
 
+-- Conveyor flip (TASK-515): optional, only while Working, once; inside Restaurant.Grill.FlipFrom..FlipTo of the Duration
+-- (server clock, `seen` = now minus the tap latency) it stamps the bonus. The cook schedule never moves.
+local function flipBelt(ctx: Context, grill: Station, slot: number, record: StationApi.Record, seen: number): number
+	const window = Content.Restaurant.Grill
+	const fraction = if record.Duration > 0 then (seen - record.StartedAt) / record.Duration else -1
+	const bonus = fraction >= window.FlipFrom and fraction <= window.FlipTo
+	const score = if bonus then BONUS_SCORE else MISS_SCORE
+	flippedOf(grill)[slot] = score
+	bonusOf(grill)[slot] = bonus
+	record.Flip = score + 1
+	ctx.Publish(grill)
+	refreshFlip(ctx, grill)
+	return score
+end
+
 -- Flips the sausage of `slot` on THIS grill once (see Grill.Flip). Returns (score, nil) or (nil, reason).
 local function flipOn(ctx: Context, grill: Station, slot: number, latency: number?): (number?, string?)
 	const record = grill.Records[slot]
@@ -476,8 +584,15 @@ local function flipOn(ctx: Context, grill: Station, slot: number, latency: numbe
 		return nil, "Flipped"
 	end
 	const now = ctx.Now()
+	const seen = now - math.clamp(latency or 0, 0, LATENCY_MAX)
+	if not flipRequired() then
+		-- conveyor: a Ready sausage is done cooking, the flip is over
+		if record.State ~= "Working" then
+			return nil, "Ready"
+		end
+		return flipBelt(ctx, grill, slot, record, seen), nil
+	end
 	const first = Grade.FirstSide(Content.Prep, record.Duration)
-	const seen = now - math.clamp(latency or 0, 0, 0.3)
 	const tolerance = Content.Prep.Tolerances.ByKey["grill_flip"]
 	const score = Grade.FlipScore(Content.Prep, tolerance, record.StartedAt, seen, record.Duration)
 	flipped[slot] = score
@@ -539,6 +654,8 @@ end
 -- saw it. A flip before the pause is accepted with the worst grade and keeps the cooking schedule (no time is skipped); a flip
 -- in the pause re-bases StartedAt so the second side runs PostFlip s from now.
 -- TASK-378: the restaurant "Flip" prompt runs the same move on the touched grill (flipOn).
+-- TASK-515 (conveyor): no pause; only while Working (a Ready one = "Ready"); inside the window = score 100 with the bonus,
+-- outside = score 0 without it; the cook schedule does not move. Grill.FlipBonusOf tells the bonus.
 function Grill.Flip(ctx: Context, vehicle: string, slot: number, latency: number?): (number?, string?)
 	const grill = findSlot(vehicle, slot)
 	if grill == nil then
@@ -547,7 +664,8 @@ function Grill.Flip(ctx: Context, vehicle: string, slot: number, latency: number
 	return flipOn(ctx, grill, slot, latency)
 end
 
--- Ready sausage of `slot` to the rail, graded (never flipped = Grades.Unflipped). (true, nil) or (false, reason): "Empty" | "NotReady" | "RailFull".
+-- Ready sausage of `slot` to the rail, graded (never flipped = Grades.Unflipped; conveyor: no grade, P13). (true, nil) or
+-- (false, reason): "Empty" | "NotReady" | "RailFull". In the conveyor the Tick already does this by itself (auto rest).
 function Grill.CollectSlot(ctx: Context, vehicle: string, slot: number): (boolean, string?)
 	const grill = findSlot(vehicle, slot)
 	if grill == nil then
@@ -563,7 +681,7 @@ function Grill.Discard(ctx: Context, vehicle: string, slot: number): (boolean, s
 	if grill == nil or record == nil or record.State == "Empty" then
 		return false, "Empty"
 	end
-	flippedOf(grill)[slot] = nil
+	clearStamps(grill, slot)
 	grill.Records[slot] = StationApi.empty(GRILL)
 	sync(ctx, grill)
 	ctx.Publish(grill)
@@ -577,6 +695,12 @@ function Grill.FlipScoreOf(vehicle: string, slot: number): number?
 	return if grill then flippedOf(grill)[slot] else nil
 end
 
+-- Conveyor (TASK-515): true when the sausage of `slot` was flipped inside the window (the bonus it takes to the rest table).
+function Grill.FlipBonusOf(vehicle: string, slot: number): boolean
+	const grill = findSlot(vehicle, slot)
+	return grill ~= nil and bonusOf(grill)[slot] == true
+end
+
 -- Dev (`prep kitchen`): pretends `seconds` have passed for the sausage of `slot` (no waiting for the 10 Hz Tick).
 function Grill.DevAge(ctx: Context, vehicle: string, slot: number, seconds: number): boolean
 	const grill, record = findSlot(vehicle, slot)
@@ -584,11 +708,15 @@ function Grill.DevAge(ctx: Context, vehicle: string, slot: number, seconds: numb
 		return false
 	end
 	record.StartedAt -= seconds
-	if record.State == "Working" and record.Flip ~= nil and ctx.Now() >= record.StartedAt + record.Duration then
+	const cooked = record.Flip ~= nil or not flipRequired()
+	if record.State == "Working" and cooked and ctx.Now() >= record.StartedAt + record.Duration then
 		record.State = "Ready"
 	end
 	ctx.Publish(grill)
 	refreshCollect(ctx, grill)
+	if autoRest() then
+		restReady(ctx, vehicle)
+	end
 	return true
 end
 
@@ -618,7 +746,7 @@ function Grill.DevDuration(vehicle: string, slot: number): number
 end
 
 function Grill.Bind(ctx: Context, station: Station)
-	station.State = if station.Kind == GRILL then { Flipped = {} } :: GrillState else nil
+	station.State = if station.Kind == GRILL then { Flipped = {}, Bonus = {} } :: GrillState else nil
 	if station.Kind == GRILL then
 		for index = #grills, 1, -1 do
 			const other = grills[index]
@@ -646,15 +774,19 @@ function Grill.Tick(ctx: Context, station: Station, now: number)
 		return
 	end
 	local changed = sync(ctx, station)
+	const paused = flipRequired()
 	for _, record in station.Records do
-		-- an unflipped sausage waits for the flip however long it takes (no burning)
-		if record.State == "Working" and record.Flip ~= nil and now >= record.StartedAt + record.Duration then
+		-- trailer: an unflipped sausage waits for the flip however long it takes; conveyor: no pause (TASK-515). Never burns.
+		if record.State == "Working" and (record.Flip ~= nil or not paused) and now >= record.StartedAt + record.Duration then
 			record.State = "Ready"
 			changed = true
 		end
 	end
 	if changed then
 		ctx.Publish(station)
+	end
+	if autoRest() then
+		restReady(ctx, station.Vehicle)
 	end
 	refreshCollect(ctx, station)
 	refreshPlace(ctx, station)
@@ -678,6 +810,7 @@ function Grill.Restore(ctx: Context, station: Station, _data: any)
 	end
 	table.clear(station.Records)
 	table.clear(flippedOf(station))
+	table.clear(bonusOf(station))
 	sync(ctx, station)
 	ctx.Publish(station)
 	refreshCollect(ctx, station)
