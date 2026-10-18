@@ -7,7 +7,8 @@
 --   Stages/<Name>.luau (Stage3D)   TASK-203 Grill, 204 Board, 205 Toppings, 206 Order and Serve
 --   GrillView  TASK-203        Director3D  TASK-204/205        Strokes  205        Puppet  208        Coach  209
 --   Editable  TASK-218 (behind Rules.World.Editable)        Ghost  TASK-350 (the live drag of the co-op, DEC-259: mounted by the
---   controller's OnInit, it lives outside the mode too)
+--   controller's OnInit, it lives outside the mode too)        Belt  TASK-518 (the own plate on the restaurant conveyor and the
+--   camera poses of the two-level bench; Content.Prep.Rules.Mode = "Conveyor" only)
 -- The layer is inert while Content.Prep.Rules.ThreeD is false, and the 2D mode runs exactly as before: `Enter` does nothing
 -- (only the dev switch `/dev prep ray`, the player attribute PrepRay, wakes the aim to print what a click hits). The controller
 -- (TASK-198) calls Enter and Leave; no one else does. While it runs there is ONE frame loop (Aim's RenderStepped) and one folder
@@ -17,6 +18,7 @@ local StarterPlayer = game:GetService("StarterPlayer")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 local Aim = require(script.Aim)
+local Belt = require(script.Belt)
 local Bin = require(script.Bin)
 local Coach = require(script.Coach)
 local Ghost = require(script.Ghost)
@@ -42,6 +44,7 @@ World.CoachTab = Coach.Tab
 World.Streak = Juice.Streak
 World.Plane = Plane
 World.Ghost = Ghost
+World.Belt = Belt
 
 local running: {
 	Folder: Folder,
@@ -146,6 +149,8 @@ function World.Leave()
 		return
 	end
 	running = nil
+	-- the own plate of the conveyor never outlives the mode (TASK-518)
+	Belt.HidePlate()
 	-- the live drag (DEC-259): nothing is held any more (the colleagues get Tool = None once)
 	Ghost.Clear()
 	if current.Aim ~= nil then
