@@ -11,7 +11,7 @@
 	           (descending priority, OnInit of all then OnStart of all) reaches its OnStart last
 	  Kit      RigController warm-up done (crew meshes, expressions, look textures: RigController:Warmup)
 	  Assets   LoadQueue (the one audio queue, small batches) of the intro sounds (music cue, phone, horns, car, prompt, skip, day
-	           ambience) and the UI images (Icons.Ids)
+	           ambience), the UI images (Icons.Ids) and the critical images (PreloadController/Images CriticalUi / CriticalWorld)
 	  Voices   Run place only: the text-to-speech lines of the first seconds of the intro (CutsceneController:
 	           PreloadVoices; one piece at a time with retry, see Speech.luau); the later intro lines keep loading in
 	           order of use. Walt's tutorial lines (rookies) load in the background after the curtain lifts
@@ -38,6 +38,7 @@ local Content = require(ReplicatedStorage.shared.Content)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Icons = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Icons)
 local LoadQueue = require(StarterPlayer.StarterPlayerScripts.client.Audio.AudioController.LoadQueue)
+local Images = require(StarterPlayer.StarterPlayerScripts.client.Preload.PreloadController.Images)
 
 type Texts = { Status: { [string]: string } }
 
@@ -205,6 +206,14 @@ function LoadingController:AssetList(): { any }
 			table.insert(list, id)
 		end
 	end
+	-- the images a scare shows at once (jumpscare face, anomaly looks, horror overlays, tablet photos): owner
+	-- 2026-10-18, preload everything; the rest loads in the background (PreloadController)
+	for _, id in Images.CriticalUi do
+		if not seen[id] then
+			seen[id] = true
+			table.insert(list, id)
+		end
+	end
 	return list
 end
 
@@ -254,11 +263,18 @@ function LoadingController:StepAssets()
 				table.insert(sounds, item)
 			else
 				-- a plain id string is reported Failure by PreloadAsync and never downloaded (checked in Studio
-				-- 2026-10-17): the image goes in a Decal
-				const holder = Instance.new("Decal")
-				holder.Texture = item
+				-- 2026-10-17): a UI image goes in an ImageLabel (a Decal asks for the 3D texture of the asset, which a
+				-- UI image may not have: "Asset content representation is being generated", 2026-10-18)
+				const holder = Instance.new("ImageLabel")
+				holder.Image = item
 				table.insert(images, holder)
 			end
+		end
+		-- world textures a scare shows at once (rain, drips): through a Decal
+		for _, id in Images.CriticalWorld do
+			const holder = Instance.new("Decal")
+			holder.Texture = id
+			table.insert(images, holder)
 		end
 		local soundsDone = 0
 		task.spawn(function()

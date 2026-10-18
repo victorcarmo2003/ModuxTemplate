@@ -759,6 +759,12 @@
 							"optional": "src/Plate/client"
 						}
 					},
+					"Preload": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Preload/client"
+						}
+					},
 					"Prep": {
 						"$ignoreUnknownInstances": false,
 						"$path": {

@@ -44,6 +44,7 @@ return {
 	StarterPlayer.StarterPlayerScripts.client.Pedestrian.PedestrianController,
 	StarterPlayer.StarterPlayerScripts.client.Place.PlaceController,
 	StarterPlayer.StarterPlayerScripts.client.Plate.PlateController,
+	StarterPlayer.StarterPlayerScripts.client.Preload.PreloadController,
 	StarterPlayer.StarterPlayerScripts.client.Prep.PrepController,
 	StarterPlayer.StarterPlayerScripts.client.Prep.WorkSlideController,
 	StarterPlayer.StarterPlayerScripts.client.Profile.ProfileController,
