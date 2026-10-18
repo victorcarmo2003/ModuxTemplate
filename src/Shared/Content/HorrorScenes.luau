@@ -25,8 +25,14 @@
 --   Fov        field of view delta: Value degrees (|Value| <= Rules.MaxFov), To = 0 to come back, over Duration
 --   Nudge      the view is pulled at most Value degrees towards Point (<= Rules.MaxNudge); never locks input
 --   Text       on-screen warning Text (English placeholder until ui-text.md), held Duration s (DEC-283)
---   Actor      client-only actor at Point: Target = model name under ReplicatedStorage.Assets (or the anomaly's own
---              placeholder); To = MapPoint it walks to over Duration
+--   Actor      client-only actor (TASK-472). Target nil = two white eyes at Point for Duration s. Target = Model name
+--              anywhere under ReplicatedStorage.Assets (pivot at the feet, facing -Z; a dark placeholder while the art is
+--              missing): walks from where it stands (or from Point, where it appears, when not there yet; no Point = only
+--              if already there) to the MapPoint To over Duration, then stands (one actor per Target and run). Sound =
+--              Content.Sounds key played on its feet at each step while it walks (the steps belong to the model).
+--              Seen "Cameras" = invisible (no light, no shadow) unless this client looks through a security camera
+--              (Kit/Watch); nil/"All" = always seen. Value = 1: gone when it arrives (walks off). Held: a late joiner
+--              gets it where it should be.
 --   Door       the hiding door: Target "Rattle" | "Push" | "Hold" | "Lock" (kept shut until the run ends); Point = door MapPoint; Duration
 --   Shadow     a shadow on the light under the door: Point = door MapPoint, To = MapPoint of the side it comes from / goes to
 --              (the steps), Target "Pass" (crosses, default) | "Arrive" (comes in from that side and stays in the middle) |
@@ -63,6 +69,8 @@ export type Step = {
 	Point: string?,
 	Burst: number?,
 	Text: string?,
+	Sound: string?, -- Actor: Content.Sounds key of its steps
+	Seen: ("All" | "Cameras")?, -- Actor: who sees it
 }
 
 export type Scene = {
@@ -99,7 +107,7 @@ export type Rules = {
 -- the HIDE words ramping (few, then en masse), the vignette, the steps coming to the pantry's back door, the shadow on
 -- the light under it, the handle tried and the latch holding just as the window ends, the eyes at the window for
 -- whoever stayed out, the steps leaving. Sound bank of TASK-466 (sound-list.md §5.19); the approaching steps stay on
--- walker_step until heavy_steps has an Id.
+-- walker_step until heavy_steps has an Id. TASK-472: the steps are The Walker's own (Actor), seen only on the cameras.
 const blackout: Scene = {
 	Key = "anm_020_blackout",
 	Name = "The blackout",
@@ -120,8 +128,9 @@ const blackout: Scene = {
 		-- the HIDE words: a few, then all over the screen (DEC-291); the edges close in
 		{ At = 5, Phase = "Active", Kind = "Whispers", Value = 0.4, To = 3, Duration = 17 },
 		{ At = 5, Phase = "Active", Kind = "Vignette", Value = 0, To = 0.35, Duration = 17 },
-		-- the steps: from the back alley to the pantry's exit door
-		{ At = 18, Phase = "Active", Kind = "Sound", Target = "walker_step", Point = "SCENE-STEPS-FAR", To = "SCENE-DOOR-OUT", Duration = 8 },
+		-- the steps: The Walker (AST-064) from the back alley to the pantry's exit door, its own steps on its feet; seen
+		-- only through the security cameras, never in first person (owner 2026-10-18, TASK-472)
+		{ At = 18, Phase = "Active", Kind = "Actor", Target = "AST-064_Walker", Point = "SCENE-STEPS-FAR", To = "SCENE-DOOR-OUT", Duration = 8, Sound = "walker_step", Seen = "Cameras" },
 		{ At = 18, Phase = "Active", Kind = "Fov", Value = 1, To = 0, Duration = 8 },
 		{ At = 20, Phase = "Active", Kind = "Sound", Target = "breath_held" },
 		{ At = 22, Phase = "Active", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
@@ -139,12 +148,14 @@ const blackout: Scene = {
 		{ At = 29, Phase = "Active", Kind = "Sound", Target = "latch_hold", Point = "SCENE-DOOR" },
 		-- 30 s (Failed): the jumpscare (Effects/ANM-020, on the beat), then it walks away; the dark stays until the breaker
 		{ At = 0, Phase = "Failed", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
-		{ At = 1, Phase = "Failed", Kind = "Sound", Target = "walker_step", Point = "SCENE-DOOR-OUT", To = "SCENE-STEPS-FAR", Duration = 6 },
+		{ At = 1, Phase = "Failed", Kind = "Actor", Target = "AST-064_Walker", Point = "SCENE-DOOR-OUT", To = "SCENE-STEPS-FAR", Duration = 6, Sound = "walker_step", Seen = "Cameras", Value = 1 },
 		{ At = 1, Phase = "Failed", Kind = "Shadow", Target = "Leave", Point = "SCENE-DOOR", To = "SCENE-STEPS-FAR", Duration = 1.2 },
 		{ At = 1, Phase = "Failed", Kind = "Vignette", Value = 0.5, To = 0.15, Duration = 4 },
 		-- the breaker held in time (Resolved): the power comes back
 		{ At = 0, Phase = "Resolved", Kind = "Sound", Target = "power_up" },
 		{ At = 0, Phase = "Resolved", Kind = "Shadow", Target = "Leave", Point = "SCENE-DOOR", To = "SCENE-STEPS-FAR", Duration = 0.8 },
+		-- the Walker goes back if it had come (no Point: nothing when the breaker held before t = 18)
+		{ At = 0, Phase = "Resolved", Kind = "Actor", Target = "AST-064_Walker", To = "SCENE-STEPS-FAR", Duration = 6, Sound = "walker_step", Seen = "Cameras", Value = 1 },
 		{ At = 0.3, Phase = "Resolved", Kind = "Sound", Target = "lamps_cascade" },
 		{ At = 0, Phase = "Resolved", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
 		{ At = 0, Phase = "Resolved", Kind = "Vignette", Value = 0, To = 0, Duration = 0.6 },

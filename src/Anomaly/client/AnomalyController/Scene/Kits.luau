@@ -10,11 +10,17 @@
 	                       Lock: the AutoDoor of that leaf stays shut (attribute DoorHeld, DoorController) until the run ends
 	  Shadow               a dark band on the light under that door (DOOR-GAP-B, TASK-465), dimming it: Pass crosses it,
 	                       Arrive comes in from the side of the step's To MapPoint (the steps) and stays, Leave goes back out
-	  Actor                two white eyes at the step's MapPoint for Duration s (the window, for whoever did not hide)
+	  Actor                no Target: two white eyes at the step's MapPoint for Duration s. Target = Model under
+	                       ReplicatedStorage.Assets (TASK-472; dark placeholder while missing): walks on the floor from
+	                       where it stands (or appears at Point) to To over Duration, then stands; Value = 1 removes it on
+	                       arrival. Its Sound plays on a "Feet" part of the model at each step. Seen "Cameras": every part
+	                       LocalTransparencyModifier 1, lights / particles / guis off and no shadow, unless Kit/Watch says
+	                       this client looks through a security camera (switched live on Watch.Changed)
 	Presentation only, client side, nothing replicated. Every handler registers its undo in state.Undo so the end of the
 	run (record gone) leaves the world as it was.
 ]]
 local CollectionService = game:GetService("CollectionService")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -22,6 +28,7 @@ local Workspace = game:GetService("Workspace")
 local Content = require(ReplicatedStorage.shared.Content)
 local Effect = require(script.Parent.Parent.Effect)
 local Screen = require(script.Parent.Parent.Effects.Kit.Screen)
+local Watch = require(script.Parent.Parent.Effects.Kit.Watch)
 local Whispers = require(script.Parent.Parent.Effects.Kit.Whispers)
 local Steps = require(script.Parent.Steps)
 
@@ -45,6 +52,15 @@ const HELD_ATTRIBUTE = "DoorHeld" -- DoorController keeps a held door shut
 const SHADOW_COLOR = Color3.fromRGB(8, 8, 14)
 const EYE_SIZE = 0.55
 const EYE_GAP = 0.45 -- studs from the centre to each eye
+const WALKER_COLOR = Color3.fromHex("#14162A") -- AST-064 fur (placeholder only)
+const FLOOR_PROBE = 14 -- studs down from a MapPoint to find the floor
+const STEP_GAP = 0.6 -- s between two footsteps when the sound length is unknown (as Scene/Steps)
+const MIN_STEP_GAP = 0.3
+const WALK_BOB = 0.15 -- studs
+const WALK_BOB_RATE = 6 -- rad/s
+-- what could glow on a model seen only on the cameras: switched off with it
+const GLOW_CLASSES = { "Light", "ParticleEmitter", "Beam", "Trail", "Fire", "Smoke", "Sparkles", "Highlight", "LayerCollector" }
+const warnedModel: { [string]: boolean } = {}
 
 local function pointOf(ctx: Effect.Context, id: string?): CFrame?
 	if id == nil then
@@ -296,9 +312,10 @@ end
 
 -- Eyes at a MapPoint ----------------------------------------------------------------------------------------------------
 
-const actor: Handler = function(ctx, state, step, _late)
+local function eyes(ctx: Effect.Context, state: State, step: Step, late: number)
 	const at = pointOf(ctx, step.Point)
-	if at == nil then
+	const hold = (step.Duration or 1) - late
+	if at == nil or hold <= 0 then
 		return
 	end
 	const model = Instance.new("Model")
@@ -324,8 +341,232 @@ const actor: Handler = function(ctx, state, step, _late)
 		model:Destroy()
 		state.Undo[tag] = nil
 	end
-	task.delay(math.max(step.Duration or 1, 0.1), stop)
+	task.delay(math.max(hold, 0.1), stop)
 	state.Undo[tag] = stop
+end
+
+-- A model walking a MapPoint path (TASK-472) ----------------------------------------------------------------------------
+
+-- One per run and Target: a later Actor step of the same Target walks it on from where it stands
+type Walker = {
+	Tag: string,
+	Model: Model,
+	Feet: BasePart, -- carrier of its steps, moves with the model
+	Pivot: CFrame, -- feet on the floor, facing the way it walks
+	Token: number, -- bumped by each walk (a newer walk ends the older one)
+	Parts: { BasePart },
+	Decals: { Decal },
+	Glows: { [Instance]: boolean }, -- lights / particles / guis and their own Enabled
+	Watch: RBXScriptConnection?,
+}
+const walkers: { [string]: Walker } = {}
+
+local function walkerModel(name: string): Model
+	const assets = ReplicatedStorage:FindFirstChild("Assets")
+	const found = if assets ~= nil then assets:FindFirstChild(name, true) else nil
+	if found ~= nil and found:IsA("Model") then
+		return found:Clone()
+	end
+	if not warnedModel[name] then
+		warnedModel[name] = true
+		warn(`[Scene] Model {name} not found under ReplicatedStorage.Assets: dark placeholder`)
+	end
+	-- tall dark figure, pivot at the feet facing -Z (the Walker's silhouette, no eyes: seen only on the cameras)
+	const model = Instance.new("Model")
+	model.Name = name
+	const bodyPart = Instance.new("Part")
+	bodyPart.Name = "Body"
+	bodyPart.Size = Vector3.new(2.2, 6.2, 1.4)
+	bodyPart.CFrame = CFrame.new(0, 3.1, 0)
+	bodyPart.Color = WALKER_COLOR
+	bodyPart.Material = Enum.Material.SmoothPlastic
+	bodyPart.Parent = model
+	const head = Instance.new("Part")
+	head.Name = "Head"
+	head.Shape = Enum.PartType.Ball
+	head.Size = Vector3.one * 1.7
+	head.CFrame = CFrame.new(0, 7, 0)
+	head.Color = WALKER_COLOR
+	head.Material = Enum.Material.SmoothPlastic
+	head.Parent = model
+	model.WorldPivot = CFrame.identity
+	return model
+end
+
+local function showWalker(walker: Walker, visible: boolean)
+	const modifier = if visible then 0 else 1
+	for _, part in walker.Parts do
+		part.LocalTransparencyModifier = modifier
+	end
+	for _, decal in walker.Decals do
+		decal.LocalTransparencyModifier = modifier
+	end
+	for glow, enabled in walker.Glows do
+		(glow :: any).Enabled = visible and enabled
+	end
+end
+
+local function removeWalker(tag: string)
+	const walker = walkers[tag]
+	if walker == nil then
+		return
+	end
+	walkers[tag] = nil
+	walker.Token += 1
+	if walker.Watch ~= nil then
+		walker.Watch:Disconnect()
+		walker.Watch = nil
+	end
+	walker.Model:Destroy()
+end
+
+-- Floor under a MapPoint (the points sit at about head / sound height)
+local function floorUnder(ctx: Effect.Context, at: Vector3): Vector3
+	const ignore: { Instance } = { ctx.Folder() }
+	for _, player in Players:GetPlayers() do
+		if player.Character ~= nil then
+			table.insert(ignore, player.Character)
+		end
+	end
+	const params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = ignore
+	const hit = Workspace:Raycast(at + Vector3.new(0, 2, 0), Vector3.new(0, -FLOOR_PROBE, 0), params)
+	return if hit ~= nil then hit.Position else at
+end
+
+local function spawnWalker(ctx: Effect.Context, tag: string, name: string, seen: string, at: Vector3, towards: Vector3): Walker
+	const model = walkerModel(name)
+	const parts: { BasePart } = {}
+	const decals: { Decal } = {}
+	const glows: { [Instance]: boolean } = {}
+	for _, piece in model:GetDescendants() do
+		if piece:IsA("BasePart") then
+			piece.Anchored = true
+			piece.CanCollide = false
+			piece.CanQuery = false
+			piece.CanTouch = false
+			piece.CastShadow = false -- no shadow on the floor gives it away
+			table.insert(parts, piece)
+		elseif piece:IsA("Decal") then
+			table.insert(decals, piece)
+		elseif piece:IsA("Humanoid") then
+			piece.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+		else
+			for _, class in GLOW_CLASSES do
+				if piece:IsA(class) then
+					glows[piece] = (piece :: any).Enabled == true
+					break
+				end
+			end
+		end
+	end
+	const feet = Instance.new("Part")
+	feet.Name = "Feet"
+	feet.Size = Vector3.one * 0.2
+	feet.Transparency = 1
+	feet.Anchored = true
+	feet.CanCollide = false
+	feet.CanQuery = false
+	feet.CanTouch = false
+	feet.CastShadow = false
+	feet.CFrame = model:GetPivot() + Vector3.new(0, 0.3, 0)
+	feet.Parent = model
+	const flat = Vector3.new(towards.X - at.X, 0, towards.Z - at.Z)
+	const pivot = if flat.Magnitude > 1e-3 then CFrame.lookAt(at, at + flat) else CFrame.new(at)
+	const walker: Walker = {
+		Tag = tag,
+		Model = model,
+		Feet = feet,
+		Pivot = pivot,
+		Token = 0,
+		Parts = parts,
+		Decals = decals,
+		Glows = glows,
+		Watch = nil,
+	}
+	-- hidden before it enters the world, so it never flashes in first person
+	if seen == "Cameras" then
+		showWalker(walker, Watch.Watching())
+		walker.Watch = Watch.Changed(function(watching)
+			showWalker(walker, watching)
+		end)
+	else
+		showWalker(walker, true)
+	end
+	model:PivotTo(pivot)
+	model.Parent = ctx.Folder()
+	walkers[tag] = walker
+	return walker
+end
+
+local function walk(ctx: Effect.Context, walker: Walker, step: Step, to: Vector3, late: number)
+	walker.Token += 1
+	const token = walker.Token
+	const from = walker.Pivot.Position
+	const flat = Vector3.new(to.X - from.X, 0, to.Z - from.Z)
+	const facing = if flat.Magnitude > 1e-3 then flat.Unit else walker.Pivot.LookVector
+	const duration = math.max(step.Duration or 1, 0.1)
+	const key = step.Sound
+	const gone = step.Value == 1
+	const started = os.clock() - late
+	local nextStep = late -- s into the walk of the next footstep
+	local connection: RBXScriptConnection? = nil
+	connection = RunService.Heartbeat:Connect(function()
+		if walker.Token ~= token or walker.Model.Parent == nil then
+			if connection ~= nil then
+				connection:Disconnect()
+			end
+			return
+		end
+		const t = os.clock() - started
+		const k = math.clamp(t / duration, 0, 1)
+		-- steady pace (same travel as the old moving footstep sound); a small bob while it walks
+		const position = from:Lerp(to, k)
+		walker.Pivot = CFrame.lookAt(position, position + facing)
+		const bob = if k < 1 then math.abs(math.sin(t * WALK_BOB_RATE)) * WALK_BOB else 0
+		walker.Model:PivotTo(walker.Pivot + Vector3.new(0, bob, 0))
+		if key ~= nil and k < 1 and t >= nextStep then
+			const played = ctx.Play(key, walker.Feet)
+			const length = if played ~= nil and played.TimeLength > 0 then played.TimeLength else STEP_GAP
+			nextStep = t + math.max(length, MIN_STEP_GAP)
+		end
+		if k >= 1 then
+			if connection ~= nil then
+				connection:Disconnect()
+			end
+			if gone then
+				removeWalker(walker.Tag)
+			end
+		end
+	end)
+end
+
+const actor: Handler = function(ctx, state, step, late)
+	const target = step.Target
+	if target == nil or target == "" then
+		eyes(ctx, state, step, late)
+		return
+	end
+	const to = if type(step.To) == "string" then pointOf(ctx, step.To) else nil
+	if to == nil then
+		return
+	end
+	const goal = floorUnder(ctx, to.Position)
+	const tag = `walker:{state.Id}:{target}`
+	local walker = walkers[tag]
+	if walker == nil then
+		-- no Point = only walks one already standing (e.g. Resolved before it came)
+		const from = pointOf(ctx, step.Point)
+		if from == nil then
+			return
+		end
+		walker = spawnWalker(ctx, tag, target, step.Seen or "All", floorUnder(ctx, from.Position), goal)
+		state.Undo[tag] = function()
+			removeWalker(tag)
+		end
+	end
+	walk(ctx, walker :: Walker, step, goal, late)
 end
 
 const Kits = {}
