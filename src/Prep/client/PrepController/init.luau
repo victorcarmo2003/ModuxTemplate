@@ -31,6 +31,16 @@
 
 	Dev (Studio Run place only): `/dev prep ui` toggles the mode locally with mock data (DevClient "prep_ui", text = the
 	station, default 1). It never sends a Prep packet.
+
+	Restaurant conveyor (Content.Prep.Rules.Mode = "Conveyor"; TASK-518, tech/prep-conveyor.md §2-§4, MAP-01-r4 §16.5, §16.6;
+	DEC-302, DEC-303 Q-379 A). The seat says the role (Conveyor.Seats): 1-2 = the belt (an assembler with a plate), 3 = the grill.
+	  - no tabs, no dots, no Next and no pan: the camera stays on the two-level bench (World/Belt.luau poses, Conveyor.Views:
+	    the wide Belt view, Fov 70, while the plate moves; the close view of the stop, Fov 55, once it lands there; the griller
+	    gets the Grill view). The tab follows the stop of the own plate (Conveyor.Stops[n].Tab): stages never change it.
+	  - the arrows (on screen, >= 44 px; Left / Right or A / D; LB / RB) move ONLY the own plate one stop (PrepBelt); the client
+	    predicts the step (World/Belt.Predict) and draws it in <= 0.4 s, the PrepSeats record is the truth. A busy stop leaves the
+	    plate waiting beside it ("Waiting" chip). Right on the Toppings stop with bun and sausage is the Finish (the stage's Next).
+	  - the PrepSeats record of the own seat with Away = true is a parked plate (the owner is out): it never enters the mode.
 ]]
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -47,6 +57,9 @@ local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Objective = require(StarterPlayer.StarterPlayerScripts.client.Interface.Objective)
 local Zones = require(StarterPlayer.StarterPlayerScripts.client.Interface.Zones)
 local Motion = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Motion)
+local CartoonButton = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.CartoonButton)
+local CartoonLabel = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.CartoonLabel)
+local Icons = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Icons)
 local PlateView = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.PlateView)
 local PrepShell = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.PrepShell)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
@@ -68,6 +81,7 @@ local Poses = require(script.Poses)
 local Rig = require(script.Rig)
 local Stage = require(script.Stage)
 local World = require(script.World)
+local Belt = require(script.World.Belt)
 local BinZone = require(script.World.BinZone)
 local Director3D = require(script.World.Director3D)
 local FlipWatch = require(script.World.FlipWatch)
@@ -79,6 +93,16 @@ const untrack = Vide.untrack
 
 const prep = Content.Prep
 const rules = prep.Rules
+-- the restaurant conveyor (TASK-518): fixed at boot, Content.Prep.Rules.Mode is the only selector (prep-conveyor.md §1)
+const conveyorMode = rules.Mode == "Conveyor"
+const conveyor = prep.Conveyor
+
+-- The job of the own seat in the conveyor: Belt = an assembler with a plate (Conveyor.Seats.Belt), Grill = the griller, None = the
+-- trailer (or not seated)
+export type BeltRole = "None" | "Belt" | "Grill"
+
+-- What the client keeps of each PrepSeats record in the conveyor (the colleague's plate blocks a stop for the prediction)
+type BeltSeat = { User: number, Stop: number, Wait: number, Away: boolean, Plate: number, Ticket: number }
 
 export type Toast = { Text: string, Kind: "Info" | "Good" | "Alert", Id: number }
 
@@ -152,6 +176,28 @@ const KITCHEN_ACTIONS: { [string]: boolean } = {
 	board_add_sausage = true,
 	topping_add = true,
 }
+-- The conveyor hides these too (tech/prep-conveyor.md §1.1): the grill is focused, the warmer is reached only from the focus and the
+-- old pass is not bound (`plate_take` stays: the central table uses it)
+const CONVEYOR_ACTIONS: { [string]: boolean } = {
+	grill_flip = true,
+	bun_slice = true,
+	rail_take = true,
+	plate_put = true,
+}
+-- Belt arrows (TASK-518; AST-159 stand-in): px of the hit box (>= 44 real px on the smallest phone, no UI scale on them)
+const BELT_ARROW = 64
+const BELT_GAP = 10
+const BELT_LABEL_W = 132
+-- s a prediction waits for the PrepSeats record before it gives way to it
+const BELT_PENDING = 1.5
+-- the chrome of the trailer the conveyor has no use for (PrepShell children, by name): the tabs, the section dots, Next, the
+-- "Flip!" chip that calls back to the Grill tab
+const BELT_HIDDEN_PREFIX = { "Tab_", "Dot_" }
+const BELT_HIDDEN_NAMES: { [string]: boolean } = { NextHolder = true, Next = true, NextBlocked = true, CallChip = true }
+-- Hint lines of the belt (docs/story/ui-text.md §17.2; Content has no key for them yet, request to the TASK-513 owner)
+const BELT_TIP_START = "Press Right to reach the board" -- BELT_TIP_START
+const BELT_TIP_WAIT = "Station busy. You're next" -- BELT_TIP_WAIT
+const BELT_TIP_PAD = "LB RB: move the plate" -- BELT_TIP_PAD ({LB} {RB} glyphs drawn as text)
 
 local function newPips(): { Pip }
 	return { { Label = "Cut" }, { Label = "Place" }, { Label = "Top" } }
@@ -233,6 +279,25 @@ function PrepController:Setup()
 	-- what Isolate hid and must give back
 	self.Saved = {} :: { [string]: any }
 	self.PointerStops = {} :: { () -> () }
+
+	-- the restaurant conveyor (TASK-518). Role of the own seat; Stop / Wait = where the own plate is DRAWN (the prediction while
+	-- one is pending, else the record); BeltTruth = the PrepSeats record; BeltPending = the prediction of the last arrow
+	self.BeltRole = source("None" :: BeltRole) :: Vide.Source<BeltRole>
+	self.BeltStop = source(0) :: Vide.Source<number>
+	self.BeltWait = source(0) :: Vide.Source<number>
+	-- the own plate has bun and sausage (the Right arrow on the Toppings stop is the Finish then)
+	self.BeltReady = source(false) :: Vide.Source<boolean>
+	self.BeltTruth = { Stop = 0, Wait = 0 } :: Belt.Place
+	self.BeltPending = nil :: { Place: Belt.Place, At: number }?
+	-- every PrepSeats record of the conveyor, by seat
+	self.BeltSeats = {} :: { [number]: BeltSeat }
+	self.BeltNextSend = 0 :: number
+	-- the Conveyor.Views key the camera is on ("" = none yet) and when the plate lands on its stop (0 = it is there)
+	self.BeltView = "" :: string
+	self.BeltArriveAt = 0 :: number
+	-- the belt itself changes the tab (stages never do in the conveyor)
+	self.BeltDriving = false :: boolean
+	self.BeltHides = {} :: { RBXScriptConnection }
 end
 
 function PrepController:MakeView(): View
@@ -381,12 +446,18 @@ end
 -- their 3D stage is armed.
 function PrepController:StageOf(tab: string?): Stage.Stage?
 	const key = tab or untrack(self.Tab)
+	if self:BeltIdle(key) then
+		return nil
+	end
 	return self.Stages[key] or self.Stages[prep.TabAlias[key] or ""]
 end
 
 -- The 3D stage of a tab when it is armed (Rules.ThreeD + World.Stages.<tab> + the module exists), else nil.
 function PrepController:Stage3DOf(tab: string?): Stage.Stage3D?
 	const key = tab or untrack(self.Tab)
+	if self:BeltIdle(key) then
+		return nil
+	end
 	const stage = self.Stages3D[key]
 	if stage ~= nil and Stage.Armed(rules, key) then
 		return stage
@@ -396,6 +467,10 @@ end
 
 -- The tab draws in the world (the shell goes minimal); reactive when read inside a binding.
 function PrepController:Armed(tab: string): boolean
+	-- the conveyor is always the minimal 3D chrome (an idle stop has no stage, and still no 2D board)
+	if conveyorMode then
+		return true
+	end
 	return self:Stage3DOf(tab) ~= nil
 end
 
@@ -406,6 +481,11 @@ end
 
 -- One line of hint / the corner button of a tab, from its 3D stage when armed, else from the 2D one.
 function PrepController:HintOf(tab: string): string
+	-- the conveyor speaks of the belt while the plate waits or has nothing to do where it is (ui-text.md §17.2)
+	const beltLine = self:BeltHint()
+	if beltLine ~= nil then
+		return beltLine
+	end
 	-- the drag tutorial speaks first while its hand is on screen (both sources are read: the binding depends on both)
 	const coachLine, coachTab = World.CoachLine(), World.CoachTab()
 	-- the sausage paw (rail -> bun) belongs to the Board section too (owner request 2026-10-14)
@@ -508,13 +588,25 @@ function PrepController:SetTab(wanted: string)
 	if tab == nil or untrack(self.Tab) == tab then
 		return
 	end
+	-- the conveyor: the tab is the one of the stop the own plate stands on (TASK-518); only the belt changes it
+	if conveyorMode and not self.BeltDriving then
+		return
+	end
 	const previousTab = untrack(self.Tab)
 	self:CancelGestures()
 	self:LeaveStage(previousTab)
 	const viewBefore = Poses.ViewOf(previousTab)
 	self.Tab(tab)
-	-- the camera glides when the view changes (2D: the grill and the board; 3D: one view per section, Poses.luau)
-	if self.InMode and not self.Leaving and not self.Mock and not self.PanDriving and Poses.ViewOf(tab) ~= viewBefore then
+	-- the camera glides when the view changes (2D: the grill and the board; 3D: one view per section, Poses.luau); the conveyor
+	-- moves its camera with the plate (BeltArrive)
+	if
+		not conveyorMode
+		and self.InMode
+		and not self.Leaving
+		and not self.Mock
+		and not self.PanDriving
+		and Poses.ViewOf(tab) ~= viewBefore
+	then
 		self:MoveTo(untrack(self.Station))
 	end
 	-- keep the step on a tab that owns it
@@ -539,6 +631,10 @@ const STEP_ALIAS: { [string]: string } = { build = "place", place = "build" }
 function PrepController:SetStage(stepKey: string)
 	const step = prep.Steps.ByKey[stepKey] or prep.Steps.ByKey[STEP_ALIAS[stepKey] or ""]
 	if step == nil then
+		return
+	end
+	-- the conveyor: a step of another stop waits for the plate to get there (the belt sets the tab, SetTab picks its first step)
+	if conveyorMode and not self.BeltDriving and step.Tab ~= untrack(self.Tab) then
 		return
 	end
 	self.Step(step.Key)
@@ -638,7 +734,17 @@ function PrepController:CancelGestures()
 	end
 end
 
+-- Next (Return, gamepad Y, the corner button). On the conveyor belt it is the Right arrow (which is the Finish on the Toppings stop).
 function PrepController:PressNext()
+	if conveyorMode and untrack(self.BeltRole) == "Belt" then
+		self:BeltPress("Right")
+		return
+	end
+	self:StageNext()
+end
+
+-- The corner button of the stage in front (Next / Done; the Finish of the conveyor).
+function PrepController:StageNext()
 	const tab = untrack(self.Tab)
 	const stage3D = self:Stage3DOf(tab)
 	const stage = self:StageOf(tab)
@@ -719,6 +825,18 @@ function PrepController:OnResult(result: any)
 	if result.Act == "Kick" then
 		self:Leave("Kick", true, true)
 		self:Notice(result.Reason)
+		return
+	end
+	-- the answer to an arrow (TASK-518): a refusal takes the prediction back to the record; Invalid (an end of the belt, a stop the
+	-- server saw differently) stays silent
+	if result.Act == "Belt" then
+		if not result.Ok then
+			self:BeltRefused()
+			if result.Reason ~= "Invalid" then
+				self:Notice(result.Reason)
+			end
+		end
+		self:Broadcast({ Kind = "Result", Result = result })
 		return
 	end
 	-- a sausage thrown by drag (Trash with a Value) is answered by its stage, with its own words
@@ -878,18 +996,31 @@ function PrepController:Bind(on: boolean)
 	bind("PrepNext", Enum.KeyCode.Return, { Enum.KeyCode.ButtonY }, function()
 		self:PressNext()
 	end, nil)
-	bind("PrepTabNext", Enum.KeyCode.Tab, { Enum.KeyCode.ButtonR1 }, function()
-		nextTab(1)
-	end, nil)
-	bind("PrepTabPrev", Enum.KeyCode.ButtonL1, nil, function()
-		nextTab(-1)
-	end, nil)
-	for index, key in TAB_KEYS do
-		const row = prep.Tabs.List[index]
-		if row ~= nil then
-			bind(`PrepTab{index}`, key, nil, function()
-				self:SetTab(row.Key)
+	if conveyorMode then
+		-- the belt arrows (TASK-518): desktop arrows and A / D, gamepad LB / RB, touch = the on-screen arrows (BeltBar). Only the
+		-- belt seats move a plate; the griller has no arrow
+		if untrack(self.BeltRole) == "Belt" then
+			bind("PrepBeltLeft", Enum.KeyCode.Left, { Enum.KeyCode.A, Enum.KeyCode.ButtonL1 }, function()
+				self:BeltPress("Left")
 			end, nil)
+			bind("PrepBeltRight", Enum.KeyCode.Right, { Enum.KeyCode.D, Enum.KeyCode.ButtonR1 }, function()
+				self:BeltPress("Right")
+			end, nil)
+		end
+	else
+		bind("PrepTabNext", Enum.KeyCode.Tab, { Enum.KeyCode.ButtonR1 }, function()
+			nextTab(1)
+		end, nil)
+		bind("PrepTabPrev", Enum.KeyCode.ButtonL1, nil, function()
+			nextTab(-1)
+		end, nil)
+		for index, key in TAB_KEYS do
+			const row = prep.Tabs.List[index]
+			if row ~= nil then
+				bind(`PrepTab{index}`, key, nil, function()
+					self:SetTab(row.Key)
+				end, nil)
+			end
 		end
 	end
 	-- A (Cross) or the right trigger RT (R2) holds / releases the virtual cursor (TASK-268: the trigger pours the guided sauce, no
@@ -1157,11 +1288,17 @@ function PrepController:Mount()
 					return list
 				end,
 			}),
+			-- the belt arrows of the conveyor (TASK-518); nil in the trailer
+			if conveyorMode then self:BeltBar() else nil,
 		}) :: ScreenGui
 	end)
 	self.Unmount = unmount
 	self.Gui = gui
 	gui.Parent = playerGui
+	-- the conveyor has no tabs, dots or Next (TASK-518): PrepShell still builds them, they are kept hidden
+	if conveyorMode then
+		self:BeltHideChrome(gui)
+	end
 
 	-- the cursor ring (gamepad cursor, touch point) in raw screen px: no insets
 	const cursor = self.Cursor
@@ -1206,6 +1343,10 @@ end
 
 function PrepController:Unmounted()
 	FlipWatch.Reset()
+	for _, connection in self.BeltHides do
+		connection:Disconnect()
+	end
+	table.clear(self.BeltHides)
 	const unmount = self.Unmount
 	self.Unmount = nil
 	if unmount ~= nil then
@@ -1250,8 +1391,34 @@ function PrepController:Enter(station: number, mock: boolean?, tab: string?, pla
 	end
 	-- the tab it opens on: the one of the prompt used (the seat record; a key of the other mode resolves through TabAlias), the
 	-- first of the set (Order in 2D, Grill in 3D) when it is not known
-	const startTab = self:ResolveTab(tab) or prep.Tabs.List[1].Key
-	local pose = Poses.Of(station, Poses.ViewOf(startTab))
+	local startTab = self:ResolveTab(tab) or prep.Tabs.List[1].Key
+	-- the conveyor (TASK-518): the role of the seat, the stop of its plate and the camera of the bench. A plate that loads (stop 1)
+	-- opens on the wide view (the bench and the whole belt); one that comes back to a working stop opens on that stop
+	const role = self:BeltRoleOf(station)
+	const place = self:BeltSeatPlace(station)
+	local beltView = ""
+	local pose: Poses.Pose? = nil
+	if role == "Belt" then
+		startTab = self:ResolveTab(Belt.StopTab(place.Stop)) or startTab
+		beltView = if place.Wait == 0 and place.Stop > 1 then Belt.StopView(place.Stop) or "Belt" else "Belt"
+	elseif role == "Grill" then
+		startTab = self:ResolveTab("Grill") or startTab
+		beltView = "Grill"
+	end
+	if beltView ~= "" then
+		pose = Belt.Pose(beltView)
+		if pose == nil and beltView ~= "Belt" and beltView ~= "Grill" then
+			beltView = "Belt"
+			pose = Belt.Pose(beltView)
+		end
+		if pose == nil then
+			beltView = ""
+		end
+	end
+	if pose == nil then
+		-- the trailer, or a bench without its camera anchors yet: the station poses of Poses.luau
+		pose = Poses.Of(station, Poses.ViewOf(startTab))
+	end
 	if pose == nil and mock then
 		pose = Poses.Mock()
 	end
@@ -1296,6 +1463,17 @@ function PrepController:Enter(station: number, mock: boolean?, tab: string?, pla
 		Session.Unpark(self, plate ~= nil and plate ~= 0)
 	end
 	self.Station(station)
+	self.BeltRole(role)
+	self.BeltView = beltView
+	self.BeltTruth = place
+	self.BeltPending = nil
+	self.BeltNextSend = 0
+	self.BeltArriveAt = 0
+	Vide.batch(function()
+		self.BeltStop(if role == "Belt" then place.Stop else 0)
+		self.BeltWait(if role == "Belt" then place.Wait else 0)
+		self.BeltReady(self:BeltPlateReady(station))
+	end)
 	self.Active(true)
 
 	self:HideRoof(true)
@@ -1359,6 +1537,10 @@ function PrepController:Enter(station: number, mock: boolean?, tab: string?, pla
 		end
 		if startTab ~= "Order" then
 			self:EnterStage(startTab)
+		end
+		-- the own plate on the belt, where the record has it (no glide on the way in)
+		if role == "Belt" then
+			Belt.ShowPlate(place, self:BeltTicketNumber(station), true)
 		end
 	end)
 	if not mounted then
@@ -1441,7 +1623,8 @@ function PrepController:BuildTrail(station: number)
 		return
 	end
 	self.TrailStation = station
-	self.Trail = if rules.ThreeD then Poses.Trail(station) else nil
+	-- the conveyor has no trail: the camera stays on the bench (TASK-518)
+	self.Trail = if Pan.Wanted() then Poses.Trail(station) else nil
 end
 
 -- The index of the trail stop a tab stands on (1 when there is no trail).
@@ -1501,7 +1684,7 @@ function PrepController:BuildPan(pointer: Pointer.Pointer)
 		self.Pan:Destroy()
 		self.Pan = nil
 	end
-	if not rules.ThreeD or self.Trail == nil then
+	if not Pan.Wanted() or self.Trail == nil then
 		return
 	end
 	const camera = self.Dependencies.CameraController
@@ -1566,6 +1749,10 @@ end
 
 -- Another station while seated (the server moved the seat): new pose, same session.
 function PrepController:MoveTo(station: number)
+	if conveyorMode then
+		self:BeltMoveTo(station)
+		return
+	end
 	const pose = Poses.Of(station, Poses.ViewOf(untrack(self.Tab)))
 	if pose == nil then
 		return
@@ -1587,6 +1774,498 @@ function PrepController:MoveTo(station: number)
 	World.SetView(pose.Frame, pose.Fov, (pose.Frame.Position - pose.Focus).Magnitude)
 	self.Rig:SetPose(pose.Frame.Position, pose.Focus)
 	self.Station(station)
+end
+
+-- Conveyor belt (TASK-518) ---------------------------------------------------------------------------------------------------
+-- The camera on the two-level bench, the arrows that move the own plate, the prediction and the stage of the stop. The server
+-- decides (PrepBelt -> PrepSeats.Stop / Wait); this client predicts one step and gives way to the record.
+
+-- An assembler at the grill stop has nothing to do there (the griller grills, prep-conveyor.md §2.2): no stage runs for it.
+function PrepController:BeltIdle(tab: string): boolean
+	return conveyorMode and untrack(self.BeltRole) == "Belt" and tab == "Grill"
+end
+
+-- The role of a seat in the conveyor (Content.Prep.Conveyor.Seats); None in the trailer.
+function PrepController:BeltRoleOf(station: number): BeltRole
+	if not conveyorMode then
+		return "None"
+	end
+	for _, seat in conveyor.Seats.Belt do
+		if seat == station then
+			return "Belt"
+		end
+	end
+	for _, seat in conveyor.Seats.Grill do
+		if seat == station then
+			return "Grill"
+		end
+	end
+	return "None"
+end
+
+-- Keeps a PrepSeats record of the conveyor (every seat: the colleague's plate blocks a stop for the prediction).
+function PrepController:BeltRecord(id: number, record: any)
+	self.BeltSeats[id] = {
+		User = tonumber(record.User) or 0,
+		Stop = tonumber(record.Stop) or 0,
+		Wait = tonumber(record.Wait) or 0,
+		Away = record.Away == true,
+		Plate = tonumber(record.Plate) or 0,
+		Ticket = tonumber(record.Ticket) or 0,
+	}
+end
+
+-- Where the record has the plate of a seat; a seat without a stop yet loads on stop 1 (prep-conveyor.md §3.2).
+function PrepController:BeltSeatPlace(station: number): Belt.Place
+	const seat = self.BeltSeats[station]
+	if seat ~= nil and seat.Stop > 0 then
+		return { Stop = seat.Stop, Wait = seat.Wait }
+	end
+	return { Stop = 1, Wait = 0 }
+end
+
+-- The plate of a seat has its bun cut and its sausage (the server bits of PrepSeats.Plate, or the local mask of the stage).
+function PrepController:BeltPlateReady(station: number): boolean
+	const seat = self.BeltSeats[station]
+	const mask = bit32.bor(if seat ~= nil then seat.Plate else 0, self.PlateMask)
+	const cut = bit32.lshift(1, prep.PlateMask.Cut)
+	const sausage = bit32.lshift(1, prep.PlateMask.Sausage)
+	return bit32.btest(mask, cut) and bit32.btest(mask, sausage)
+end
+
+-- The #n of the ticket of a seat's plate (Customers.Number), 0 = unknown.
+function PrepController:BeltTicketNumber(station: number): number
+	const seat = self.BeltSeats[station]
+	if seat == nil or seat.Ticket == 0 then
+		return 0
+	end
+	const record: any = self.Dependencies.CustomerController:RecordOf(seat.Ticket)
+	return if record ~= nil then tonumber(record.Number) or 0 else 0
+end
+
+-- The plates of the other seats on the belt (parked ones too: they keep their stop).
+function PrepController:BeltOthers(): { Belt.Place }
+	const own = untrack(self.Station)
+	const list: { Belt.Place } = {}
+	for id, seat in self.BeltSeats do
+		if id ~= own and seat.Stop > 0 then
+			table.insert(list, { Stop = seat.Stop, Wait = seat.Wait })
+		end
+	end
+	return list
+end
+
+-- Where the own plate is drawn now (the prediction while one is pending).
+function PrepController:BeltPlace(): Belt.Place
+	return { Stop = untrack(self.BeltStop), Wait = untrack(self.BeltWait) }
+end
+
+-- The stage of the stop may commit (PrepStage / PrepFinish): the plate is ON the stop in the record and the drawing agrees (no arrow
+-- in flight, landed). For the stages of the conveyor (TASK-520); always true in the trailer.
+function PrepController:BeltCanWork(): boolean
+	if not conveyorMode or untrack(self.BeltRole) ~= "Belt" then
+		return true
+	end
+	const truth = self.BeltTruth
+	return self.BeltPending == nil
+		and self.BeltArriveAt == 0
+		and truth.Wait == 0
+		and truth.Stop == untrack(self.BeltStop)
+		and Belt.StopKey(truth.Stop) ~= "Out"
+end
+
+-- The camera pose of a conveyor view (Conveyor.Views key), for the stages that frame their work (TASK-520, 521).
+function PrepController:BeltPose(view: string): Poses.Pose?
+	return Belt.Pose(view)
+end
+
+-- A belt arrow (button, key, LB / RB; Next is Right): one stop for the own plate. Right on the Toppings stop is the Finish of the
+-- stage (prep-conveyor.md §3.3, P8; the server of TASK-514 takes PrepFinish there, not PrepBelt): the stage sends PrepFinish, or
+-- says what is missing when its Next is not ready.
+function PrepController:BeltPress(dir: Belt.Dir)
+	if not conveyorMode or not self.InMode or self.Leaving or untrack(self.BeltRole) ~= "Belt" or not untrack(self.Shown) then
+		return
+	end
+	-- never in the middle of a precision gesture (the knife, a pour) or with something in the hand: the plate must not run off
+	if Director3D.IsPrecisionActive() then
+		return
+	end
+	const aim = World.Aim()
+	if aim ~= nil and aim.Source ~= nil then
+		return
+	end
+	const now = os.clock()
+	if now < self.BeltNextSend then
+		return
+	end
+	const from = self:BeltPlace()
+	if from.Stop < 1 then
+		return
+	end
+	if dir == "Right" and from.Wait == 0 and Belt.StopKey(from.Stop) == "Toppings" then
+		self:StageNext()
+		return
+	end
+	const to = Belt.Predict(from, dir, self:BeltOthers())
+	if to == nil then
+		-- an end of the belt: a nudge, nothing is sent
+		Belt.Nudge(dir)
+		return
+	end
+	self.BeltNextSend = now + 1 / math.max(conveyor.Rates.Belt, 1)
+	if self.Mock then
+		-- `/dev prep ui`: the prediction is the truth, no packet
+		self.BeltTruth = to
+		self.BeltPending = nil
+	else
+		self.BeltPending = { Place = to, At = now }
+		self.Libs.Net.PrepBelt:fireServer({ Dir = dir })
+	end
+	self:BeltShow(to, false)
+end
+
+-- Draws the own plate at `place`. Leaving a stop stops the work there and opens the camera to the whole bench while the plate
+-- travels; BeltArrive brings the stop in front when it lands (MAP-01-r4 §16.6).
+function PrepController:BeltShow(place: Belt.Place, instant: boolean)
+	const station = untrack(self.Station)
+	const beforeStop, beforeWait = untrack(self.BeltStop), untrack(self.BeltWait)
+	Vide.batch(function()
+		self.BeltStop(place.Stop)
+		self.BeltWait(place.Wait)
+		self.BeltReady(self:BeltPlateReady(station))
+	end)
+	const travel = Belt.ShowPlate(place, self:BeltTicketNumber(station), instant or Motion.Reduced())
+	if beforeStop == place.Stop and beforeWait == place.Wait then
+		return
+	end
+	if beforeStop ~= place.Stop then
+		self:CancelGestures()
+		self:BeltCamera("Belt", not instant)
+	end
+	if travel > 0 then
+		self.BeltArriveAt = os.clock() + travel
+	else
+		self:BeltArrive()
+	end
+end
+
+-- The plate landed where it is drawn: the stage of that stop comes to the front (Out keeps the last one: the focus is ending) and
+-- the camera goes to the close view of the stop, or stays on the whole bench while the plate waits beside a busy one.
+function PrepController:BeltArrive()
+	self.BeltArriveAt = 0
+	if not self.InMode or self.Leaving then
+		return
+	end
+	const stop, wait = untrack(self.BeltStop), untrack(self.BeltWait)
+	const tab = if Belt.StopKey(stop) ~= "Out" then self:ResolveTab(Belt.StopTab(stop)) else nil
+	if tab ~= nil and tab ~= untrack(self.Tab) then
+		self.BeltDriving = true
+		const ok, problem = pcall(self.SetTab, self, tab)
+		self.BeltDriving = false
+		if not ok then
+			warn(`[PrepController] belt: the stage of stop {stop} failed: {problem}`)
+		end
+	end
+	const view = if wait == 0 then Belt.StopView(stop) else nil
+	self:BeltCamera(view or "Belt", true)
+end
+
+-- The record of the own seat changed: the prediction is confirmed, still in flight (a chain of arrows: the record walks behind
+-- it) or wrong (the record wins).
+function PrepController:BeltApply(id: number)
+	if untrack(self.BeltRole) ~= "Belt" then
+		return
+	end
+	const seat = self.BeltSeats[id]
+	if seat == nil or seat.Stop <= 0 then
+		return
+	end
+	const truth: Belt.Place = { Stop = seat.Stop, Wait = seat.Wait }
+	self.BeltTruth = truth
+	const pending = self.BeltPending
+	if pending ~= nil then
+		if pending.Place.Stop ~= truth.Stop then
+			return
+		end
+		self.BeltPending = nil
+	end
+	self:BeltShow(truth, false)
+end
+
+-- PrepResult Belt refused: back to the record.
+function PrepController:BeltRefused()
+	self.BeltPending = nil
+	self:BeltShow(self.BeltTruth, false)
+end
+
+-- Per frame: the landing of the plate, and a prediction the record never confirmed gives way to it.
+function PrepController:BeltStep(now: number)
+	if self.BeltArriveAt > 0 and now >= self.BeltArriveAt then
+		self:BeltArrive()
+	end
+	const pending = self.BeltPending
+	if pending ~= nil and now - pending.At > BELT_PENDING then
+		self.BeltPending = nil
+		self:BeltShow(self.BeltTruth, false)
+	end
+end
+
+-- The camera on a conveyor view (Conveyor.Views key), gliding in Rules.Camera.Travel s (a cut with reduced motion or `glide` false).
+function PrepController:BeltCamera(key: string, glide: boolean)
+	if self.BeltView == key then
+		return
+	end
+	const pose = Belt.Pose(key)
+	if pose == nil then
+		return
+	end
+	self.BeltView = key
+	const camera = self.Dependencies.CameraController
+	const reduced = Motion.Reduced()
+	const options = self:CameraOptions(pose, untrack(self.Vignette) == false, reduced)
+	const travel = if reduced or not glide then 0 else rules.Camera.Travel
+	options.Travel = travel
+	options.Min = travel
+	camera:Prep(true, pose.Frame, options)
+	self.Pose = pose
+	World.SetView(pose.Frame, pose.Fov, (pose.Frame.Position - pose.Focus).Magnitude)
+	self.Rig:SetPose(pose.Frame.Position, pose.Focus)
+end
+
+-- The server moved the seat while seated (the conveyor has fixed seats: rare). The role may change: the stage in front is let go
+-- and taken again under the new role.
+function PrepController:BeltMoveTo(station: number)
+	const role = self:BeltRoleOf(station)
+	const tab = untrack(self.Tab)
+	const changed = role ~= untrack(self.BeltRole)
+	if changed then
+		self:LeaveStage(tab)
+	end
+	self.Station(station)
+	if changed then
+		self.BeltRole(role)
+		self:Bind(false)
+		self:Bind(true)
+		if role ~= "Belt" then
+			Belt.HidePlate()
+		end
+		self:EnterStage(tab)
+	end
+	self.BeltView = ""
+	self.BeltPending = nil
+	if role == "Belt" then
+		const place = self:BeltSeatPlace(station)
+		self.BeltTruth = place
+		self:BeltShow(place, true)
+		self:BeltArrive()
+		return
+	end
+	if role == "Grill" then
+		self.BeltDriving = true
+		pcall(self.SetTab, self, "Grill")
+		self.BeltDriving = false
+	end
+	self:BeltCamera(if role == "Grill" then "Grill" else "Belt", true)
+end
+
+-- Out of the mode: nothing of the belt is kept.
+function PrepController:BeltReset()
+	self.BeltRole("None")
+	Vide.batch(function()
+		self.BeltStop(0)
+		self.BeltWait(0)
+		self.BeltReady(false)
+	end)
+	self.BeltTruth = { Stop = 0, Wait = 0 }
+	self.BeltPending = nil
+	self.BeltNextSend = 0
+	self.BeltView = ""
+	self.BeltArriveAt = 0
+	self.BeltDriving = false
+end
+
+-- The line of hint of the belt (reactive), nil = the stage speaks: waiting beside a busy stop, or on the grill stop with nothing
+-- to do there.
+function PrepController:BeltHint(): string?
+	if not conveyorMode or self.BeltRole() ~= "Belt" then
+		return nil
+	end
+	if self.BeltWait() ~= 0 then
+		return BELT_TIP_WAIT
+	end
+	if Belt.StopKey(self.BeltStop()) == "Grill" then
+		return if self.Dependencies.InputController.Device() == "Gamepad" then BELT_TIP_PAD else BELT_TIP_START
+	end
+	return nil
+end
+
+-- PrepShell builds the trailer chrome whatever the mode: in the conveyor its tabs, dots, Next and the Grill call-back chip stay hidden.
+function PrepController:BeltHideChrome(gui: ScreenGui)
+	local function hide(object: Instance)
+		if not object:IsA("GuiObject") then
+			return
+		end
+		const name = object.Name
+		local match = BELT_HIDDEN_NAMES[name] == true
+		if not match then
+			for _, prefix in BELT_HIDDEN_PREFIX do
+				if string.sub(name, 1, #prefix) == prefix then
+					match = true
+					break
+				end
+			end
+		end
+		if not match then
+			return
+		end
+		const guiObject = object :: GuiObject
+		guiObject.Visible = false
+		table.insert(
+			self.BeltHides,
+			guiObject:GetPropertyChangedSignal("Visible"):Connect(function()
+				if guiObject.Visible then
+					guiObject.Visible = false
+				end
+			end)
+		)
+	end
+	for _, descendant in gui:GetDescendants() do
+		hide(descendant)
+	end
+	table.insert(self.BeltHides, gui.DescendantAdded:Connect(hide))
+end
+
+-- The belt arrows (AST-159 stand-in): bottom centre, Left / the stop / Right, hit boxes of BELT_ARROW real px (no UI scale), the
+-- stop name and the "Waiting" chip between them; Right reads "Finish" on the Toppings stop. Only for a belt seat. Portrait: one row
+-- higher (the Leave pill is below).
+function PrepController:BeltBar(): Frame
+	const input = self.Dependencies.InputController
+	const texts = prep.Texts
+	const stopCount = #conveyor.Stops.List
+	const camera = workspace.CurrentCamera
+	const portrait = source(false)
+	if camera ~= nil then
+		local function measure()
+			const size = camera.ViewportSize
+			portrait(size.X < size.Y)
+		end
+		measure()
+		const connection = camera:GetPropertyChangedSignal("ViewportSize"):Connect(measure)
+		Vide.cleanup(function()
+			connection:Disconnect()
+		end)
+	end
+	const pad = function(): boolean
+		return input.Device() == "Gamepad"
+	end
+	const finish = function(): boolean
+		return Belt.StopKey(self.BeltStop()) == "Toppings" and self.BeltWait() == 0
+	end
+	const rightWidth = function(): number
+		return if finish() then BELT_ARROW * 2 else BELT_ARROW
+	end
+	const leftText = function(): string
+		if pad() then
+			return "LB"
+		end
+		return if Icons.Has("Ui/arrow_left") then "" else "<"
+	end
+	const rightText = function(): string
+		if finish() then
+			return if pad() then `RB {texts.Finish}` else texts.Finish
+		end
+		if pad() then
+			return "RB"
+		end
+		return if Icons.Has("Ui/arrow_right") then "" else ">"
+	end
+	return create("Frame")({
+		Name = "Belt",
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = function(): UDim2
+			return UDim2.new(0.5, 0, 1, if portrait() then -(8 + 52 + 8) else -8)
+		end,
+		Size = function(): UDim2
+			return UDim2.fromOffset(BELT_ARROW + BELT_GAP + BELT_LABEL_W + BELT_GAP + rightWidth(), BELT_ARROW)
+		end,
+		BackgroundTransparency = 1,
+		Visible = function(): boolean
+			return self.BeltRole() == "Belt" and self.Shown()
+		end,
+		CartoonButton({
+			Name = "BeltLeft",
+			Icon = function(): string
+				return if pad() then "" else "Ui/arrow_left"
+			end,
+			IconSize = 36,
+			Text = leftText,
+			TextSize = 18,
+			Tone = Theme.Tone.Cream,
+			Size = UDim2.fromOffset(BELT_ARROW, BELT_ARROW),
+			Position = UDim2.fromOffset(0, 0),
+			Padding = 4,
+			Enabled = function(): boolean
+				return self.BeltStop() > 1
+			end,
+			OnActivated = function()
+				self:BeltPress("Left")
+			end,
+		}),
+		create("Frame")({
+			Name = "BeltStop",
+			Position = UDim2.fromOffset(BELT_ARROW + BELT_GAP, 0),
+			Size = UDim2.fromOffset(BELT_LABEL_W, BELT_ARROW),
+			BackgroundTransparency = 1,
+			CartoonLabel({
+				Name = "Stop",
+				Text = function(): string
+					return texts.Stops[Belt.StopKey(self.BeltStop())] or ""
+				end,
+				TextSize = 20,
+				Box = UDim2.new(1, 0, 0, 30),
+				AnchorPoint = Vector2.new(0.5, 0),
+				Position = function(): UDim2
+					return UDim2.new(0.5, 0, 0, if self.BeltWait() ~= 0 then 2 else 17)
+				end,
+			}),
+			CartoonLabel({
+				Name = "Waiting",
+				Text = texts.BeltWait,
+				TextSize = 16,
+				Color = Theme.Color.Mustard,
+				Box = UDim2.new(1, 0, 0, 26),
+				AnchorPoint = Vector2.new(0.5, 0),
+				Position = UDim2.new(0.5, 0, 0, 34),
+				Visible = function(): boolean
+					return self.BeltWait() ~= 0
+				end,
+			}),
+		}),
+		CartoonButton({
+			Name = "BeltRight",
+			Icon = function(): string
+				return if pad() or finish() then "" else "Ui/arrow_right"
+			end,
+			IconSize = 36,
+			Text = rightText,
+			TextSize = 18,
+			Tone = function(): Theme.Tone
+				return if finish() and self.BeltReady() then Theme.Tone.Mustard else Theme.Tone.Cream
+			end,
+			Size = function(): UDim2
+				return UDim2.fromOffset(rightWidth(), BELT_ARROW)
+			end,
+			Position = UDim2.fromOffset(BELT_ARROW + BELT_GAP + BELT_LABEL_W + BELT_GAP, 0),
+			Padding = 4,
+			Enabled = function(): boolean
+				const stop = self.BeltStop()
+				return stop >= 1 and stop < stopCount
+			end,
+			OnActivated = function()
+				self:BeltPress("Right")
+			end,
+		}),
+	}) :: Frame
 end
 
 -- The way out. `forced` = the server (or an anomaly signal) threw the player out: 0.4 s and the input stays closed for
@@ -1672,6 +2351,9 @@ function PrepController:Finish(takeover: boolean)
 	self.Trail = nil
 	self.TrailStation = 0
 	self.PanNear(0)
+	-- the conveyor (TASK-518): the own plate leaves the screen (World.Leave hid it too), the state is reset
+	Belt.HidePlate()
+	self:BeltReset()
 	self:Bind(false)
 	self:Unmounted()
 	self:Isolate(false)
@@ -1825,6 +2507,9 @@ function PrepController:Update(dt: number)
 		self:Leave("State", true, true)
 		return
 	end
+	if conveyorMode then
+		self:BeltStep(now)
+	end
 
 	const cursor = self.Cursor
 	if cursor ~= nil then
@@ -1865,8 +2550,17 @@ PrepController:OnInit(function(self)
 
 	-- a seat of mine = the mode; the seat gone or given to someone else = out
 	local function onSeat(id: number, record: any)
-		if record.User == me then
+		-- the conveyor (TASK-518): every seat is kept (a colleague's plate blocks a stop for the prediction); a seat of mine
+		-- with Away = true is my plate parked on the belt while I am out: it is not a seat to enter
+		if conveyorMode then
+			self:BeltRecord(id, record)
+		end
+		const parked = conveyorMode and record.Away == true
+		if record.User == me and not parked then
 			self:Enter(id, false, record.Step, record.Plate)
+			if conveyorMode and self.InMode and untrack(self.Station) == id then
+				self:BeltApply(id)
+			end
 		elseif untrack(self.Station) == id and self.InMode then
 			self:Leave("Seat", false, true)
 		end
@@ -1874,6 +2568,7 @@ PrepController:OnInit(function(self)
 	net.PrepSeats:onAdded(onSeat)
 	net.PrepSeats:onChanged(onSeat)
 	net.PrepSeats:onRemoved(function(id)
+		self.BeltSeats[id] = nil
 		if untrack(self.Station) == id and self.InMode then
 			self:Leave("Seat", false, true)
 		end
@@ -1937,7 +2632,7 @@ PrepController:OnStart(function(self)
 		end
 		if not rules.WorldKitchenPrompts then
 			const action = anchor:GetAttribute("PromptAction")
-			if type(action) == "string" and KITCHEN_ACTIONS[action] then
+			if type(action) == "string" and (KITCHEN_ACTIONS[action] or (conveyorMode and CONVEYOR_ACTIONS[action])) then
 				return false
 			end
 		end

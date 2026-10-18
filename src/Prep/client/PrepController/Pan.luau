@@ -12,6 +12,7 @@
 -- something is in the hand it waits for the drop so the drag is not cancelled. NEVER while the player positions or pours a topping or
 -- makes a precision gesture (cut, sauce): the touch pan needs that no tool is armed, and everything stops while `Precision` is true.
 -- Reduced motion: no live movement; a sideways swipe is one station, applied by the controller as a blink.
+-- Off in the restaurant conveyor (Pan.Wanted, TASK-518): the belt arrows replace it.
 -- No Modux, no Vide: plain callbacks; the controller owns one and destroys it with the mode.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -115,6 +116,13 @@ local function insideZone(px: Vector2, zones: { Zone }): boolean
 end
 
 const Pan = {}
+
+-- Whether the pan runs at all: the 3D trailer prep only. The restaurant conveyor (Content.Prep.Rules.Mode = "Conveyor", TASK-518)
+-- has no trail of stations: the camera stays on the two-level bench and the belt arrows move the plate (World/Belt.luau).
+function Pan.Wanted(): boolean
+	const rules = Content.Prep.Rules
+	return rules.ThreeD and rules.Mode ~= "Conveyor"
+end
 
 function Pan.new(options: Options): Pan
 	const pointer = options.Pointer

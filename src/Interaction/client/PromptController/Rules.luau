@@ -11,6 +11,14 @@
 -- plate_take never show with Content.Restaurant.Rules.Enabled off; plate_put only with the right Tool in hand, plate_take
 -- only with a free hand. PlateController plugs a probe over the Plates set (SetPlateProbe) to also drop the plates that
 -- cannot take that item, when the anchor carries its plate index as `Slot`.
+-- Conveyor (TASK-522, DEC-304; tech/prep-conveyor.md §7.2 / §8): with Content.Prep.Rules.Mode = "Conveyor" the probe says so
+-- (`Conveyor`) and the plate actions read the central table instead of the old pass:
+--   plate_put     never a prompt (putting is a click / tap on the free slot, packet CenterPut)
+--   plate_take    "hold E" on a slot with a plate (free slot = no prompt), only while the hands carry fewer plates than
+--                 ItemRules.CategoryLimits.HotDog, and only the nearest plate's prompt (8 prompts 2.6 studs apart would
+--                 overlap on a phone; MAP-01-r4 §16.7)
+--   pickup_serve  only with an assembled plate (hot_dog) equipped whose ticket customer waits at the pickup; an unassembled
+--                 plate, an orphan or a customer not at the pickup = no prompt. Unknown customer = the server decides
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 
@@ -57,9 +65,21 @@ export type ShutterProbe = {
 
 -- Read side of the Plates set (restaurant, TASK-383), given by PlateController. `Slot` of the target = plate index
 -- (PlateIndex) when the anchor carries it; without it only the hand decides.
-export type PlateRecord = { Npc: number, Bun: boolean, Sausage: boolean }
+-- Conveyor (TASK-522): Orphan = the customer left (the slot still holds the plate); Grade = band of an assembled plate.
+export type PlateRecord = { Npc: number, Bun: boolean, Sausage: boolean, Orphan: boolean?, Grade: string? }
+-- The plate / hot dog Tool the local player has equipped (attributes PlateService writes; prep-conveyor.md §6.3).
+-- AtPickup: its ticket customer is Waiting in the pickup line; nil = not known (no Customers record): the server decides.
+export type HeldPlate = { Item: string, Ticket: number, Orphan: boolean, AtPickup: boolean? }
 export type PlateProbe = {
 	Plate: (index: number) -> PlateRecord?,
+	-- Conveyor (TASK-522): the central table rules above apply. nil / false = the pass of TASK-383
+	Conveyor: boolean?,
+	-- plates + hot dogs carried (equipped and in the backpack); nil = not known
+	Hands: (() -> number)?,
+	-- central table slot of the only plate_take prompt that may show (the plate nearest the character); nil = no rule
+	NearestTake: (() -> number?)?,
+	-- equipped plate / hot dog; nil = none of them equipped
+	Equipped: (() -> HeldPlate?)?,
 }
 
 -- Restaurant prompts (tech/restaurant-flow.md rev. 2 §4.2): none while Content.Restaurant.Rules.Enabled is false (the
@@ -67,6 +87,10 @@ export type PlateProbe = {
 const RESTAURANT_ACTIONS: { [string]: boolean } = { tablet_take = true, plate_put = true, plate_take = true }
 -- plate_put by hand (§2.2): what the plate takes from each Tool
 const PLATE_PUT_ITEMS: { [string]: boolean } = { bun_sliced = true, sausage_grilled = true, hot_dog = true }
+-- Conveyor (TASK-522): plates the hands may carry (DEC-299) and the Tool of an assembled plate
+const HANDS_MAX = Content.ItemRules.CategoryLimits.HotDog
+const ASSEMBLED_ITEM = "hot_dog"
+const PICKUP_ACTION = "pickup_serve"
 
 -- Counter actions the closed window stops (architecture.md §19.14 gate `Shutter`).
 const COUNTER_ACTIONS: { [string]: boolean } = { take_order = true, serve = true }
@@ -120,6 +144,39 @@ local function plateAllows(action: string, held: Held?, slot: number?): boolean
 	return not plate.Bun and not plate.Sausage -- hot_dog
 end
 
+-- Conveyor (TASK-522; prep-conveyor.md §7.2): the central table. plate_put is a click, never a prompt; plate_take needs a
+-- plate on the slot, room in the hands and to be the nearest plate. A missing fact keeps the prompt (the server decides).
+local function centerAllows(action: string, slot: number?, probe: PlateProbe): boolean
+	if action == "plate_put" then
+		return false
+	elseif action ~= "plate_take" then
+		return true
+	end
+	const hands = if probe.Hands then probe.Hands() else nil
+	if hands ~= nil and hands >= HANDS_MAX then
+		return false
+	end
+	if slot == nil then
+		return true
+	end
+	const plate = probe.Plate(slot)
+	if plate ~= nil and plate.Npc == 0 and plate.Orphan ~= true then
+		return false -- free slot: nothing to take
+	end
+	const nearest = if probe.NearestTake then probe.NearestTake() else nil
+	return nearest == nil or nearest == slot
+end
+
+-- Conveyor (TASK-522; prep-conveyor.md §8): "Hand Over" only with an assembled plate equipped whose customer waits at the
+-- pickup. Without the probe (trailer, restaurant off) nothing changes.
+local function pickupAllows(probe: PlateProbe): boolean
+	const equipped = if probe.Equipped then probe.Equipped() else nil
+	if equipped == nil or equipped.Item ~= ASSEMBLED_ITEM or equipped.Ticket == 0 or equipped.Orphan then
+		return false
+	end
+	return equipped.AtPickup ~= false
+end
+
 -- Text of the `shutter_toggle` pill for the `Shutter` attribute of its vehicle (true = closed).
 function Rules.ShutterText(closed: boolean): string
 	return if closed then SHUTTER_TEXT_CLOSED else SHUTTER_TEXT_OPEN
@@ -168,12 +225,23 @@ function Rules.Allows(target: Target, context: Context): boolean
 		return false
 	end
 
+	const probe = plateProbe
+	const conveyor = probe ~= nil and probe.Conveyor == true
 	if RESTAURANT_ACTIONS[target.Action] then
 		if not Content.Restaurant.Rules.Enabled then
 			return false
-		elseif target.Action ~= "tablet_take" and not plateAllows(target.Action, context.Held, target.Slot) then
-			return false
+		elseif target.Action ~= "tablet_take" then
+			if probe ~= nil and conveyor then
+				if not centerAllows(target.Action, target.Slot, probe) then
+					return false
+				end
+			elseif not plateAllows(target.Action, context.Held, target.Slot) then
+				return false
+			end
 		end
+	end
+	if target.Action == PICKUP_ACTION and probe ~= nil and conveyor and not pickupAllows(probe) then
+		return false
 	end
 
 	if action.Night == "DayOnly" and context.IsNight then

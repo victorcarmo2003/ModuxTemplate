@@ -7,6 +7,9 @@
 -- Restock on Prompt_Restock is the core's (KitchenService, row Actions "restock").
 -- Everything is behind Content.Restaurant.Rules.Enabled: false = prompt off and the action refused (the published map has no
 -- CUT-n anyway). Prompt off while the bun stock is 0 (same rule as the bun crate / "Grill"); a refused hold says why.
+-- Conveyor (TASK-496; prep-conveyor.md §1.1; Content.Prep.Rules.Mode = "Conveyor", i.e. the restaurant): CUT-n is scenery and a
+-- focus anchor of the belt; "Slice Bun" stays off and bun_slice is refused, so no bun_sliced Tool is ever made. The selector is
+-- Prep.Rules.Mode (DT-E1); with the trailer there is no CUT-n on the map.
 -- Cadence: the hold is the client's, so the server refuses a second slice by the same player sooner than the hold
 -- (Content.Restaurant.Bun.CutHold minus a network slack). No Stations record. Snapshot: nothing kept (the amount is "Stk").
 -- Refusal toasts (Refusal.luau): no bun -> out_of_stock {item}; stack full and no room for a new Tool -> hands_full.
@@ -26,9 +29,11 @@ const SLICE = "bun_slice"
 const BUN = "bun"
 const ITEM = "bun_sliced"
 const HOLD_SLACK = 0.2 -- s: a slice this much sooner than the hold still counts (network jitter)
+const CONVEYOR = "Conveyor"
 
+-- the F2 world kitchen: restaurant map on and the prep not in the conveyor (never true since TASK-513; TASK-506 cleans up)
 local function enabled(): boolean
-	return Content.Restaurant.Rules.Enabled
+	return Content.Restaurant.Rules.Enabled and Content.Prep.Rules.Mode ~= CONVEYOR
 end
 
 local function ingredientOf(station: Station): string

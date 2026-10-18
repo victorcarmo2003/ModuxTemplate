@@ -10,7 +10,13 @@
 -- TASK-283 (owner report 2026-10-14): a prep plate with its sausage in (`Plate<slot>` of the board, Sausage bit) still counts that
 -- sausage on the rail until the hot dog is made (KitchenService Plate.Finish pops the front one), so the picture showed it twice.
 -- The front slots, one per such plate, stay empty; the plate model on the board (Board.luau) carries it.
+-- TASK-521 (Q-381 A; tech/prep-conveyor.md §5): in the conveyor kitchen the rail IS the rest table, shared by every assembler.
+-- The ready sausages fill it by themselves (no Collect); the picture stays the count of the record. No board plates hold
+-- sausages there (the plate takes its sausage at the PrepStage Dog commit, Rail.PopAt), so nothing is reserved; a ready
+-- Check (Slots.ReadyMark) floats over the table while it has any, readable from the belt and the dining side.
+-- The food is parented to the station only AFTER RailSlot.Spots (its BasePart tier reads the station's parts as the surface).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Content = require(ReplicatedStorage.shared.Content)
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Context = require(script.Parent.Context)
 local Slots = require(script.Parent.Slots)
@@ -23,6 +29,8 @@ const derive = Vide.derive
 const KIND = "rail"
 const RECORD_SLOT = 0 -- single-record station (network.md §3.5)
 const PLATE_PATTERN = "^Plate%d+$" -- Board.luau / server Stations/Board: the mask of a prep plate per slot
+const CONVEYOR = Content.Prep.Rules.Mode == "Conveyor"
+const READY_LIFT = 0.9 -- studs over the middle of the rest table where the ready Check floats (Provisional)
 
 -- Sausages the prep plates on the board next to this rail already hold (live: follows the board's attributes)
 local function plateSausages(station: Instance): () -> number
@@ -76,7 +84,10 @@ function Rail.Mount(station: Instance, context: Context.Context)
 		const record = read()
 		return if record then record.Altered else 0
 	end)
-	const reserved = plateSausages(station)
+	-- the trailer: sausages already on a prep plate of the board; the conveyor has none (see the header)
+	const reserved = if CONVEYOR then function(): number
+		return 0
+	end else plateSausages(station)
 	-- pose of each sausage = Rail_<slot>/Part (owner request 2026-10-12; RailSlot), anchors only as fallback
 	const spots = Slots.Spots(station, false)
 	RailSlot.Spots(station, spots)
@@ -93,6 +104,20 @@ function Rail.Mount(station: Instance, context: Context.Context)
 			if name then
 				Slots.Food(name, spot, station)
 			end
+		end)
+	end
+	if CONVEYOR then
+		Slots.ReadyMark(function(): Vector3?
+			local sum, total = Vector3.zero, 0
+			for _, spot in spots do
+				if spot.Host.Parent ~= nil then
+					sum += (spot.Host.CFrame * spot.Offset).Position
+					total += 1
+				end
+			end
+			return if total > 0 then sum / total + Vector3.new(0, READY_LIFT, 0) else nil
+		end, function(): boolean
+			return count() > 0
 		end)
 	end
 end

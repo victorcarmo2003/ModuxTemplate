@@ -13,6 +13,9 @@
 -- ctx.IsBlocked, TASK-057).
 -- Gift bowls (owner request 2026-10-14, Provisional): "Open" (topping_unwrap) on Prompt_Unwrap_<Suf> opens a closed gift bowl
 -- (ctx.IsWrapped) and fills it to capacity (ctx.Unwrap); a closed bowl refuses "Add" with topping_wrapped {item}.
+-- Conveyor (TASK-496; prep-conveyor.md §1.1; Content.Prep.Rules.Mode = "Conveyor"): toppings are drawn at the Toppings stop of
+-- the belt. "Add {item}" stays off (KitchenService hides it) and topping_add is refused here too (silent). "Open" and the
+-- restock stay on: a closed gift bowl must still open, the belt takes its units through TakeStock.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 local StationApi = require(script.Parent.Parent.StationApi)
@@ -21,6 +24,7 @@ local Refusal = require(script.Parent.Parent.Refusal)
 const ACTION = "topping_add"
 const UNWRAP = "topping_unwrap"
 const HOT_DOG = "hot_dog"
+const CONVEYOR = "Conveyor"
 
 -- Topping key of the anchor (a Sauce/Topping of Content.Ingredients), else nil.
 local function toppingOf(anchor: Instance): string?
@@ -63,6 +67,9 @@ local function canAdd(
 	player: Player,
 	anchor: Instance
 ): (Tool?, string?, string?)
+	if Content.Prep.Rules.Mode == CONVEYOR then
+		return nil, nil, nil
+	end
 	const ingredient = toppingOf(anchor)
 	if ingredient == nil then
 		return nil, nil, nil

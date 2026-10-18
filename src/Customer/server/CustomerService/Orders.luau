@@ -15,6 +15,9 @@
 --   prep quality (TASK-171; prep-mode.md §2, Q-219 B): TipFor reads the Content.Prep.Grades effect of the served hot dog:
 --              Perfect = tip $2 and a window +4 s, Messy = no tip (and a mood band worse, CustomerService), Good = as above.
 --              The price and Complete / Incomplete / Wrong never change (DEC-072).
+--              Conveyor (TASK-517; DEC-305; FEAT-045 rev. 3): Perfect = base tip + TipExtra ($1) and the window +4 s, Good =
+--              base, Messy = no base tip; a sausage flipped in the window adds FlipBonus ($1) once per plate (Messy too).
+--              Every extra is inside the window like any tip (Grade.SaleEffect builds the effect).
 -- Pairs (TASK-146; FEAT-038): a ticket has 1 or 2 lines (one hot dog each). K = K1 + K2 for patience and the tip
 -- window; price, pay and tip per line. Match picks the pending line a served hot dog answers: equal -> Complete;
 -- subset -> Incomplete of the line with the fewest missing toppings; anything else -> Wrong (first pending line).
@@ -195,8 +198,9 @@ function Orders.Tip(ticket: Ticket, at: number): number
 end
 
 -- What a prep quality does to the tip (Content.Prep.Grades.Effects[band]): Tip nil = the taker's tip as today, 0 = none,
--- else at least that many $; TipWindow = seconds added to the window.
-export type TipEffect = { Tip: number?, TipWindow: number }
+-- else at least that many $; Extra = $ added on top inside the same window (TASK-517, conveyor: Perfect TipExtra + flip
+-- bonus; 0 in the trailer); TipWindow = seconds added to the window. Built by Grade.SaleEffect.
+export type TipEffect = { Tip: number?, Extra: number, TipWindow: number }
 
 -- Tip for a Complete sale served at `at` with a hot dog of the given prep quality effect (nil = quick mode: as Orders.Tip).
 function Orders.TipFor(ticket: Ticket, at: number, effect: TipEffect?): number
@@ -208,10 +212,8 @@ function Orders.TipFor(ticket: Ticket, at: number, effect: TipEffect?): number
 	end
 	const base = math.max(math.floor(ticket.TipAmount), 0)
 	const tip = effect.Tip
-	if tip == nil then
-		return base
-	end
-	return if tip <= 0 then 0 else math.max(base, math.floor(tip))
+	const main = if tip == nil then base elseif tip <= 0 then 0 else math.max(base, math.floor(tip))
+	return main + math.max(math.floor(effect.Extra), 0)
 end
 
 -- Starts the Queue clock (the customer is at Q1, nobody attended it yet).

@@ -8,6 +8,8 @@
 -- stock is 0. Snapshot: nothing kept (the amount is "Stk").
 -- Refusal toasts (D-04, TASK-080, via Refusal.luau): no bun in stock -> out_of_stock {item}; board without a free slot
 -- -> board_full. A vehicle without a board stays silent (map problem, not the player's).
+-- Conveyor (TASK-496; prep-conveyor.md §1.1; Content.Prep.Rules.Mode = "Conveyor"): the bun is cut by a gesture at the
+-- Board stop of the belt. "Slice Bun" stays off and bun_cut is refused (silent); the crate is scenery.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 local StationApi = require(script.Parent.Parent.StationApi)
@@ -22,6 +24,7 @@ const CUT = "bun_cut"
 const BUN = "bun"
 const DURATION_STEP = 0.1 -- Stations.Duration is quant(0, 120, 0.1)
 const DURATION_MAX = 120
+const CONVEYOR = "Conveyor"
 
 local function ingredientOf(station: Station): string
 	return station.Ingredient or BUN
@@ -36,7 +39,7 @@ end
 
 -- (ok, notice?): stock first (restocking is what the player can do), then a free board slot.
 local function canCut(ctx: Context, station: Station): (boolean, string?)
-	if station.Kind ~= KIND or Board.Find(station.Vehicle) == nil then
+	if Content.Prep.Rules.Mode == CONVEYOR or station.Kind ~= KIND or Board.Find(station.Vehicle) == nil then
 		return false, nil
 	end
 	if ctx.GetStock(ingredientOf(station)) < 1 then

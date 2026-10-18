@@ -80,6 +80,10 @@
 -- +4 s, Messy = no tip and the mood one band worse (Conclude), Good = as before. The price and the verdicts of
 -- DEC-072 are untouched. TakeOrderFor / ServeFor are the same paths as the world prompt (same checks, same pay) for the
 -- prep mode tabs (PrepService), which have no customer anchor.
+-- Conveyor (TASK-517; Content.Prep.Rules.Mode = "Conveyor"; DEC-305, prep-conveyor.md §8): SellLine applies
+-- Grade.SaleEffect instead: Perfect = base tip + Grades.Effects.Perfect.TipExtra (not the fixed $2), Good = base, Messy =
+-- no base tip and a mood band worse; the plate's FlipBonus attribute adds Conveyor.Grill.FlipBonus once per plate. All of
+-- it inside the tip window, on a Complete sale only.
 --
 -- TASK-354 (owner request 2026-10-17, Provisional): no "Refuse" prompt or button any more. Refusing = closing the
 -- service window (VehicleService.ShutterChanged -> SendLineAway: Refused, Acted "refuse" with who closed); anomaly
@@ -263,6 +267,9 @@ const PICKUP_SERVE = "pickup_serve" -- Content.Actions key (PICKUP Prompt_Serve)
 const PICKUP_FULL = "pickup_full" -- Content.Notices key
 const CARRYING = "Carrying" -- rig attribute: the customer carries its plate (Seating client, R1-J)
 const TICKET = "Ticket" -- hot_dog Tool attribute written by PlateService (NpcId of the plate's order)
+-- plate / hot_dog Tool attribute written by PlateService: the sausage was flipped in the window (prep-conveyor.md §6.3)
+const FLIP_BONUS = "FlipBonus"
+const CONVEYOR = "Conveyor" -- Content.Prep.Rules.Mode of the restaurant conveyor (prep-conveyor.md §1)
 const SERVED_SEAT_MODE = "Served" -- Content.Seating.SitAt: the Seater is offered the party at the sale
 const NUMBER_MAX = 255 -- Net Customers.Number wire range
 -- Exit split by shift: Content.Flow.Spawns.Exits (MAP-01 §9.8, Provisional; EX-E 60 / D1 40).
@@ -2051,10 +2058,15 @@ function CustomerService:SellLine(
 	local result: SaleResult = verdict
 	local amount = 0
 	if verdict ~= "Wrong" then
-		-- Prep quality (TASK-171): read before the Tool goes away. Only tip and mood, never the price (Q-219 B)
+		-- Prep quality (TASK-171): read before the Tool goes away. Only tip and mood, never the price (Q-219 B).
+		-- Conveyor (TASK-517): Perfect = base tip + TipExtra, plus the flip bonus of the plate; the Tool is consumed below,
+		-- so the bonus is paid once per plate (a Wrong plate keeps it and pays nothing here)
 		const quality = items:QualityOf(tool)
-		const effect = if quality ~= nil then Grade.Effect(Content.Prep, quality :: any) else nil
-		line.Mood = if effect ~= nil then effect.Mood else nil
+		const conveyor = Content.Prep.Rules.Mode == CONVEYOR
+		const flip = if conveyor and tool:GetAttribute(FLIP_BONUS) == true then Content.Prep.Conveyor.Grill.FlipBonus else 0
+		const effect = Grade.SaleEffect(Content.Prep, quality :: any, conveyor, flip)
+		-- conveyor: Incomplete does not look at the grade (FEAT-045 rev. 3, DEC-072); trailer as before
+		line.Mood = if effect ~= nil and (verdict == "Complete" or not conveyor) then effect.Mood else nil
 		-- Wrong: $0; the hot dog stays in the server's hand (FEAT-011 "Errado devolvido")
 		items:Consume(player, tool)
 		amount += economy:AddSale(Orders.Pay(verdict, line.Price), "Sale")

@@ -16,9 +16,15 @@
 -- path, oriented along it and following the surface; a soft wave of light runs along them (`Tick`) and a dash goes out when a stroke
 -- covers it. `Progress` is the share of the track covered: the stage shows it live. Pools are made once (Rules.World.Budget.SaucePool
 -- pieces; at most SauceSegmentsPerStroke per stroke and SauceSegmentsPerPlate per plate); nothing is created per frame.
+-- Patterns (TASK-520; DEC-303 Q-382, DEC-305 "padrao fixo por molho", Provisional geometry): with the conveyor
+-- (Content.Prep.Rules.Mode = "Conveyor") each sauce has its own path, named by Content.Prep.Texts.Patterns (ketchup Zigzag,
+-- mustard Wave, cream cheese Line); `PathOf(key)` is the one place that answers it (the trailer keeps the zig-zag of
+-- Content.Prep.Build.Sauce.Path for every sauce). `SetPattern(key)` makes the guide track of `SetDots` follow that path whatever
+-- list the caller passes, so the pattern drawn over the bun is always the one the stage scores against.
 -- No Modux, no Vide, no network.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
+local Geometry = require(script.Parent.Parent.Gestures.Geometry)
 local Plane = require(script.Parent.Plane)
 local Sauce = require(ReplicatedStorage.shared.Item.HotDogVisual.Sauce)
 local Theme = require(game:GetService("StarterPlayer").StarterPlayerScripts.client.Interface.Components.Theme)
@@ -34,8 +40,11 @@ export type Strokes = {
 	Drop: (self: Strokes) -> (),
 	-- Takes back every KEPT stroke of a group (a deselect that did not land).
 	Remove: (self: Strokes, group: string) -> (),
-	-- The guide track on (list of bun-space points along the path) or off (nil).
+	-- The guide track on (list of bun-space points along the path) or off (nil). With a pattern set (`SetPattern`) a list is
+	-- replaced by the dots of that pattern.
 	SetDots: (self: Strokes, dots: { Vector2 }?) -> (),
+	-- The sauce whose pattern the guide track follows (TASK-520, conveyor only); nil = the list given to SetDots as it is.
+	SetPattern: (self: Strokes, key: string?) -> (),
 	-- The dashes the stroke points cover go out.
 	Cover: (self: Strokes, points: { Vector2 }, reach: number, aspect: number) -> (),
 	-- Share of the track covered, 0..1 (1 when there is no track).
@@ -50,6 +59,8 @@ export type Strokes = {
 	Destroy: (self: Strokes) -> (),
 }
 
+export type PathPoint = { X: number, Y: number }
+
 const Strokes = {}
 
 const LIFT = 0.42 -- share of its own width the bead sits over the surface (the rest sinks into it)
@@ -60,6 +71,65 @@ const TAPER_LENGTH = 3 -- widths over which the tip thins
 -- The colour of a sauce (food, not a UI state): the same table the hot dog's drawn line uses (HotDogVisual.Sauce)
 function Strokes.ColorOf(key: string): Color3
 	return Sauce.ColorOf(key)
+end
+
+-- Patterns ----------------------------------------------------------------------------------------------------------------------
+-- Bun space (0..1 on both axes, x along the bun, y toward the player; the groove is y 0.5). Provisional shapes (TASK-520), kept
+-- apart enough that one pattern drawn over another scores low: the zig-zag starts at the far edge (Sauce.Path), the wave starts
+-- on the groove and makes one and a half waves, the line runs over the sausage.
+const CONVEYOR = Content.Prep.Rules.Mode == "Conveyor"
+const WAVE_SAMPLES = 24
+const WAVE_FROM, WAVE_TO = 0.1, 0.9
+const WAVE_AMPLITUDE = 0.25
+const WAVE_TURNS = 1.5
+const LINE_FROM, LINE_TO = 0.08, 0.92
+
+local function copyPath(points: { any }): { PathPoint }
+	const out: { PathPoint } = {}
+	for _, point in points do
+		table.insert(out, table.freeze({ X = point.X, Y = point.Y }))
+	end
+	return table.freeze(out)
+end
+
+const ZIGZAG = copyPath(Content.Prep.Build.Sauce.Path)
+const WAVE = (function(): { PathPoint }
+	const out: { any } = {}
+	for index = 0, WAVE_SAMPLES do
+		const t = index / WAVE_SAMPLES
+		table.insert(out, {
+			X = WAVE_FROM + (WAVE_TO - WAVE_FROM) * t,
+			Y = 0.5 - WAVE_AMPLITUDE * math.sin(t * WAVE_TURNS * 2 * math.pi),
+		})
+	end
+	return copyPath(out)
+end)()
+const LINE = copyPath({ { X = LINE_FROM, Y = 0.5 }, { X = 0.5, Y = 0.5 }, { X = LINE_TO, Y = 0.5 } })
+const PATHS: { [string]: { PathPoint } } = { Zigzag = ZIGZAG, Wave = WAVE, Line = LINE }
+
+-- The pattern name of a sauce ("Zigzag" | "Wave" | "Line", Content.Prep.Texts.Patterns), nil = none (not a sauce, or the trailer).
+function Strokes.PatternOf(key: string): string?
+	if not CONVEYOR then
+		return nil
+	end
+	const name = Content.Prep.Texts.Patterns[key]
+	return if name ~= nil and PATHS[name] ~= nil then name else nil
+end
+
+-- The path a sauce is traced along (bun space). The trailer: the zig-zag of Content.Prep.Build.Sauce.Path for every sauce.
+function Strokes.PathOf(key: string): { PathPoint }
+	const name = Strokes.PatternOf(key)
+	return if name ~= nil then PATHS[name] else ZIGZAG
+end
+
+-- The guide dots of a path, one every `step` bun heights (the same sampling Director3D uses for the zig-zag).
+function Strokes.DotsOf(path: { PathPoint }, aspect: number, step: number): { Vector2 }
+	const samples = Geometry.Samples(Geometry.Space(path, aspect), step)
+	const dots: { Vector2 } = {}
+	for index = 1, #samples.xs do
+		table.insert(dots, Vector2.new(samples.xs[index] / aspect, samples.ys[index]))
+	end
+	return dots
 end
 
 local function newPart(folder: Folder, name: string, ball: boolean): Part
@@ -145,12 +215,14 @@ function Strokes.new(
 	end
 
 	-- the guide path in the world, to pick a step that lets the longest stroke (Meter.Max path lengths) fit the per-stroke budget
+	-- (the longest of the patterns: a wave is longer than the zig-zag)
 	local pathLength = 0
-	do
-		const path = Content.Prep.Build.Sauce.Path
+	for _, path in PATHS do
+		local length = 0
 		for index = 2, #path do
-			pathLength += math.sqrt(((path[index].X - path[index - 1].X) * plane.Length) ^ 2 + ((path[index].Y - path[index - 1].Y) * plane.Width) ^ 2)
+			length += math.sqrt(((path[index].X - path[index - 1].X) * plane.Length) ^ 2 + ((path[index].Y - path[index - 1].Y) * plane.Width) ^ 2)
 		end
+		pathLength = math.max(pathLength, length)
 	end
 	const pieces = math.max(look.Smooth, 1) -- cylinders per Catmull-Rom piece
 	const longest = pathLength * Content.Prep.Build.Sauce.Meter.Max * 1.05
@@ -168,6 +240,7 @@ function Strokes.new(
 	local head: Piece? = nil -- the chord from the end of the finished curve to the pointer
 	local plate = 0
 	local covered = 0
+	local pattern: string? = nil -- the sauce whose pattern the guide follows (SetPattern)
 
 	const self = {} :: any
 
@@ -410,7 +483,15 @@ function Strokes.new(
 	end
 
 	-- The guide track ----------------------------------------------------------------------------------------------------------------
-	function self.SetDots(_: any, list: { Vector2 }?)
+	function self.SetPattern(_: any, key: string?)
+		pattern = if key ~= nil and Strokes.PatternOf(key) ~= nil then key else nil
+	end
+
+	function self.SetDots(_: any, given: { Vector2 }?)
+		local list = given
+		if list ~= nil and pattern ~= nil then
+			list = Strokes.DotsOf(Strokes.PathOf(pattern), Plane.Aspect(plane), dotRules.Step)
+		end
 		table.clear(dashUv)
 		table.clear(dashOn)
 		covered = 0

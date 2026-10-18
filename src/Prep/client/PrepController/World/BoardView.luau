@@ -11,6 +11,9 @@
 --   (the bin is World/Bin now: one virtual bin per view, lower left of the screen)
 -- The world draws its own board bun from the `Stations` record (KitchenController Board part); it is hidden LOCALLY (LocalTransparency
 -- Modifier) while this view lives and given back on Destroy. Everything made here lives under the PrepWorld folder and dies with it.
+-- Belt (TASK-520, the restaurant conveyor, Content.Prep.Rules.Mode = "Conveyor"): the plate lies on the belt at a stop, not on a
+-- cutting board: no mat is cloned and no world board is hidden, the bench under the plate is the belt (found by the same ray from
+-- the anchor's height), and the rest table sausage hidden while one is carried is the position the drag took (`SetRailSlot`).
 -- No Modux, no Vide, no network.
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -73,6 +76,8 @@ export type View = {
 	SurfaceHeight: (self: View, uv: Vector2) -> number,
 	-- The live progress ring around the plate: 0..1 of the gesture in progress (the cut, the sauce covered, the mound); nil hides it.
 	SetProgress: (self: View, fraction: number?) -> (),
+	-- TASK-520: the rest table (rail) position whose sausage is hidden while one is carried or placed (the conveyor drags any one).
+	SetRailSlot: (self: View, slot: number) -> (),
 	-- The carried model, handed over (the bin swallows it); nil when nothing is carried. A lifted plate hands over a copy of the bun and
 	-- the real stack vanishes (`Restore` brings it back if the server refuses the trash).
 	TakeCarry: (self: View) -> Model?,
@@ -97,8 +102,10 @@ export type Options = {
 	SlotView: (kind: string, slot: number) -> any,
 	-- the real knife of the board, nil when it is not found
 	Knife: BasePart?,
-	-- the rail slot whose sausage is hidden while it is on the bun / in the hand (1 = the front)
+	-- the rail slot whose sausage is hidden while it is on the bun / in the hand (1 = the front; `SetRailSlot` changes it)
 	RailFront: number,
+	-- TASK-520: the plate is on the conveyor belt (no cutting board mat, no world board bun to hide); nil / false = the trailer
+	Belt: boolean?,
 	-- the juice of the world (World.Juice)
 	Juice: () -> Juice.Juice,
 	-- TASK-346: the plate's bun is the altered one (ANM-002): the open bun is the kit's BunBitten (AST-061), BunOpen if missing
@@ -183,13 +190,18 @@ function BoardView.new(options: Options): View
 	-- bench). The real cutting board is the parent of the knife; its clone (the mat) always lies under the plate and slides with it,
 	-- its top over the bench found by a ray, and the real board is hidden locally while the mat lives. Without a board in the
 	-- trailer the plate stays at the Y it was given.
-	const boardInstance = if options.Knife ~= nil then options.Knife.Parent else nil
+	const belt = options.Belt == true
+	-- on the belt there is no cutting board under the plate: the knife is still drawn, but its board is left alone
+	const boardInstance = if options.Knife ~= nil and not belt then options.Knife.Parent else nil
 	const boardPart: BasePart? = if boardInstance ~= nil and boardInstance:IsA("BasePart") and boardInstance.Name == "Board" then boardInstance else nil
 	local mat: BasePart? = nil
 	local matRotation = CFrame.identity
 	local matThickness = 0
 	-- the bench top that the board lay on (its bottom): the Y the ray is expected to find, and the fallback
-	local benchFallback = if boardPart ~= nil then boardPart.Position.Y - boardPart.Size.Y / 2 else options.Anchor.Y - 0.25
+	-- (the belt: the stop anchor sits a hair over the belt top, so the ray from its height finds it)
+	local benchFallback = if boardPart ~= nil then boardPart.Position.Y - boardPart.Size.Y / 2
+		elseif belt then options.Anchor.Y - 0.08
+		else options.Anchor.Y - 0.25
 	const rayParams = RaycastParams.new()
 	rayParams.FilterType = Enum.RaycastFilterType.Exclude
 	do
@@ -497,8 +509,10 @@ function BoardView.new(options: Options): View
 
 	-- TASK-283: the world's copy of the plate (KitchenController Board, `BunPlate_Slot<n>`) steps aside while this view draws it
 	local viewStation: Instance? = nil
+	local railFront = options.RailFront
 	local function refreshHidden()
-		const entry = options.SlotView("board", options.Seat)
+		-- the belt has no world board bun of this seat to hide
+		const entry = if belt then nil else options.SlotView("board", options.Seat)
 		if entry ~= nil and entry.Station ~= nil then
 			if viewStation ~= entry.Station then
 				viewStation = entry.Station
@@ -526,10 +540,10 @@ function BoardView.new(options: Options): View
 			hide(boardPart)
 		end
 		if hideRail then
-			const rail = options.SlotView("rail", options.RailFront)
+			const rail = options.SlotView("rail", railFront)
 			if rail ~= nil and rail.Station ~= nil then
 				for _, child in rail.Station:GetChildren() do
-					if child:IsA("Model") and string.find(child.Name, `^Sausage%a*_Slot{options.RailFront}$`) ~= nil then
+					if child:IsA("Model") and string.find(child.Name, `^Sausage%a*_Slot{railFront}$`) ~= nil then
 						hide(child)
 						if table.find(railHidden, child) == nil then
 							table.insert(railHidden, child)
@@ -720,6 +734,28 @@ function BoardView.new(options: Options): View
 		end
 	end
 
+	function self.SetRailSlot(_: any, slot: number)
+		const wanted = math.clamp(math.floor(slot), 1, 8)
+		if wanted == railFront then
+			return
+		end
+		-- the sausage hidden for the old position comes back before the new one is hidden
+		if #railHidden > 0 then
+			for _, instance in railHidden do
+				const at = table.find(hidden, instance)
+				if at ~= nil then
+					table.remove(hidden, at)
+				end
+				if instance.Parent ~= nil then
+					setLocal(instance, 0)
+				end
+			end
+			table.clear(railHidden)
+		end
+		railFront = wanted
+		refreshHidden()
+	end
+
 	function self.Restore(_: any)
 		const bun = if state == "Open" then open elseif state == "Closed" then closed else nil
 		if bun ~= nil then
@@ -843,7 +879,7 @@ function BoardView.new(options: Options): View
 		if uv ~= nil then
 			sausageUv = uv
 		end
-		hideRail = mode == "Placed" or carryKind == "Sausage"
+		hideRail = (mode == "Placed" and not belt) or carryKind == "Sausage"
 		if mode == "None" then
 			if sausage ~= nil then
 				setAlpha(sausage, 1)
@@ -891,7 +927,7 @@ function BoardView.new(options: Options): View
 			carryTarget = nil
 			carryKind = ""
 			const wasHidden = hideRail
-			hideRail = sausageMode == "Placed"
+			hideRail = sausageMode == "Placed" and not belt
 			if wasHidden and not hideRail then
 				-- a carried sausage that did not land: the one on the rail comes back at once
 				refreshHidden()
@@ -917,7 +953,7 @@ function BoardView.new(options: Options): View
 				carry = made
 			end
 		end
-		hideRail = sausageMode == "Placed" or kind == "Sausage"
+		hideRail = (sausageMode == "Placed" and not belt) or kind == "Sausage"
 		if snap ~= nil then
 			carryTarget = sausageCf(snap)
 		elseif point ~= nil then
@@ -1054,7 +1090,7 @@ function BoardView.new(options: Options): View
 		carryTarget = nil
 		carryPose = nil
 		carryKind = ""
-		hideRail = sausageMode == "Placed"
+		hideRail = sausageMode == "Placed" and not belt
 		return model
 	end
 

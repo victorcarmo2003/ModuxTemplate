@@ -22,6 +22,19 @@
 -- set). A claim lives Ghost.GrabLease s (renewed by Grab On and by every pointer that holds something) and goes away on Off,
 -- seat release, the sausage leaving its slot and the shop closing. Grill Flip / Collect, the bin and the plate (the front of
 -- the rail) are refused with Reason Held while another seat holds that sausage.
+-- Conveyor (TASK-514; tech/prep-conveyor.md §2 to §6, §10; DEC-302..305), only while Content.Prep.Rules.Mode = "Conveyor"
+-- (the restaurant): the trailer path above does not change.
+--   Seats        3 fixed PrepSeats records (Conveyor.Seats): 1-2 = the belt (assemblers, a plate each), 3 = the grill.
+--   Prompts      prep_work (Prompt_Work) -> a free belt seat, needs a plate: the parked one of this player, else the plate of
+--                the hand (PlateService:WorkablePlate -> Borrow; no plate is ever made here, DEC-304); NoPlate / PlateDone /
+--                BeltFull. prep_grill (Prompt_Grill) -> the grill seat; GrillBusy. PrepEnter asks for a seat by number.
+--   Belt         PrepBelt moves only the seat's own plate one stop (Belt.luau: reservation, waiting beside, promotion);
+--                PrepStage commits Cut (bun) / Dog (rest table sausage) on the Board stop, PrepFinish grades on Toppings
+--                (Grade only; the Cut / Place the server stored, never the summary's) and sends the plate to Out. A plate
+--                in Out goes back to the hand (PlateService:Giveback) and the focus ends.
+--   Leaving      Leave / Kick* with the plate before Out: it stays PARKED and reserved on the belt (Away = true, P24) and
+--                the next prep_work of that player resumes it; Out / KickClosing: back to the hand; KickAway, disconnect,
+--                Conveyor.ParkMax: to the central table (PlateService:Shelve).
 -- Provisional: GLOBAL_RATE 6, RANGE_SLACK 2, STAND_LIFT 3 (the Att_Stand of the map is not placed yet, TASK-172); POINTER_SLACK,
 -- GRAB_RATE (outside GLOBAL_RATE: a 10 Hz pointer and a grab per drag would starve the other acts).
 local CollectionService = game:GetService("CollectionService")
@@ -36,12 +49,24 @@ local PlateMask = require(ReplicatedStorage.shared.Prep.PlateMask)
 local WorkSlide = require(ReplicatedStorage.shared.Prep.WorkSlide)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
+local Belt = require(script.Belt)
 local Bridge = require(script.Bridge)
 local Session = require(script.Session)
 local Validate = require(script.Validate)
 local Modux = require(ServerScriptService.server.Modux)
 
-export type SeatRecord = { User: number, Step: string, Ticket: number, Since: number, Plate: number }
+export type SeatRecord = {
+	User: number,
+	Step: string,
+	Ticket: number,
+	Since: number,
+	Plate: number,
+	-- conveyor only (network.md §19.1): stop of the seat's plate, waiting side, ticket line, parked
+	Stop: number?,
+	Wait: number?,
+	Line: number?,
+	Away: boolean?,
+}
 -- A held grill / rail sausage (DEC-259). Key of the claims atom = PrepClaims record id
 export type Claim = { Station: number, Player: Player }
 
@@ -73,6 +98,51 @@ const POINTER_SLACK = 1.5 -- the pointer bucket refills at Ghost.Hz * this (jitt
 const GRAB_RATE = 6 -- PrepGrab per second per player (own bucket)
 const BOARD_KIND = "board"
 const GRILL_KIND = "grill"
+const HOT_DOG = "hot_dog"
+-- Conveyor (TASK-514)
+const GRILL_ACTION = "prep_grill"
+const conveyor = cfg.Conveyor
+const CONVEYOR = rules.Mode == "Conveyor"
+const BELT_SEATS = conveyor.Seats.Belt
+const GRILL_SEATS = conveyor.Seats.Grill
+const ANCHOR_RETRY = 10 -- s between two searches of a named bench anchor the map does not have yet
+const FLIP_ATTRIBUTE = "FlipBonus" -- hot_dog Tool attribute the sale reads (TASK-517)
+
+-- Highest seat id of the conveyor: its PrepSeats record count
+local function conveyorSeatCount(): number
+	local highest = 0
+	for _, seat in BELT_SEATS do
+		highest = math.max(highest, seat)
+	end
+	for _, seat in GRILL_SEATS do
+		highest = math.max(highest, seat)
+	end
+	return math.clamp(highest, 1, MAX_STATIONS)
+end
+
+-- Content.Prep.Conveyor.Stops as Belt rows
+local function beltStops(): { Belt.BeltStop }
+	const list: { Belt.BeltStop } = {}
+	for _, row in conveyor.Stops.List do
+		table.insert(list, { Key = row.Key, Tab = row.Tab, Reserve = row.Reserve })
+	end
+	return list
+end
+
+-- Tab of a stop (PrepSeats.Step), the first stop's when out of range
+local function stopTab(stop: number?): string
+	const row = if stop ~= nil then conveyor.Stops.List[stop] else nil
+	return if row ~= nil then row.Tab else conveyor.Stops.List[1].Tab
+end
+
+-- Plate mask of a plate state (bun / sausage bits, toppings once graded)
+local function maskOf(state: Bridge.PlateState): number
+	return PlateMask.Pack({
+		Cut = state.Bun,
+		Sausage = state.Dog,
+		Toppings = if state.Grade ~= nil then state.Toppings else nil,
+	})
+end
 
 local function clampStation(value: number): number
 	return math.clamp(math.floor(value), 1, MAX_STATIONS)
@@ -139,6 +209,8 @@ const PrepService = Modux.Service("PrepService", {
 		"KitchenService",
 		"CustomerService",
 		"TutorialService",
+		-- conveyor (prep-conveyor.md §10): the plate of the hand goes on the belt and back; no Require back (no cycle)
+		"PlateService",
 	},
 	Priority = 645,
 })
@@ -165,6 +237,13 @@ function PrepService:Setup()
 	-- and comes back on the next Enter of the same player. Refunded when the player leaves the server, the shop closes, or it
 	-- outlives Rules.PlateMax (never while the tutorial is pending)
 	self.Parked = {} :: { [Player]: { Plate: Session.Plate, Mask: number } }
+	-- conveyor (TASK-514): where each belt seat's plate is (Belt.luau), the plates parked on it by players that left the seat
+	-- (by player and by seat; the seat stays theirs) and the bench anchors found by name (Seat_Belt_n, Seat_Grill)
+	self.Belt = Belt.new(beltStops()) :: Belt.Belt
+	self.Away = {} :: { [Player]: Session.Parked }
+	self.AwayBySeat = {} :: { [number]: Player }
+	self.Anchors = {} :: { [string]: Instance }
+	self.AnchorMiss = {} :: { [string]: number }
 	-- (player, station) seated / (player, station, reason) left; reason "None" = voluntary
 	self.Entered = self.Libs.Signal.new() :: SignalLib.Signal<Player, number>
 	self.Left = self.Libs.Signal.new() :: SignalLib.Signal<Player, number, string>
@@ -198,6 +277,10 @@ end
 
 -- Connected members (not Away), clamped to 1..Stations
 function PrepService:WantedCount(): number
+	-- conveyor: the fixed records of Conveyor.Seats, whatever the party size (prep-conveyor.md §2.1)
+	if CONVEYOR then
+		return conveyorSeatCount()
+	end
 	local connected = 0
 	for userId, member in self.Dependencies.RunStateService.Members() do
 		if member.State ~= "Away" and Players:GetPlayerByUserId(userId) ~= nil then
@@ -215,6 +298,10 @@ end
 
 -- Writes the seat record of `seat` (step, ticket, plate mask) into the seats atom
 function PrepService:PublishSeat(seat: Session.Seat)
+	if seat.Kind ~= "Trailer" then
+		self:RefreshSeat(seat.Station)
+		return
+	end
 	self:WriteSeat(seat.Station, {
 		User = seat.Player.UserId,
 		Step = seat.Step,
@@ -271,6 +358,10 @@ function PrepService:PushSeats()
 			Ticket = record.Ticket,
 			Since = record.Since,
 			Plate = record.Plate,
+			Stop = record.Stop,
+			Wait = record.Wait,
+			Line = record.Line,
+			Away = record.Away,
 		}
 		if self.Published[station] then
 			set:update(station, value)
@@ -313,6 +404,11 @@ end
 -- Where the rig stands: Att_Stand of the Station model, else the MapIndex point Station_n. nil = the map has neither yet
 -- (TASK-172): the seat still works, the character is not moved and no reach check is possible.
 function PrepService:StandOf(station: number, step: string?): CFrame?
+	-- conveyor: the foot of the seat on the bench (Conveyor.Binding.Seats[n], MAP-01-r4 §16.5 c), shared by every stop
+	if CONVEYOR then
+		const name = conveyor.Binding.Seats[station]
+		return if name ~= nil then self:NamedAnchor(name) else nil
+	end
 	const model = self:StationModel(station)
 	if model ~= nil then
 		const name = VIEW_STAND[step or DEFAULT_STEP] or STAND_ATTACHMENT
@@ -333,12 +429,13 @@ end
 -- The Work prompt closest to a position (the reach check of the PrepEnter packet; the prompt path is checked by
 -- InteractionService). nil = the map has no prompt yet. The grill prompt slides along the counter with the player
 -- (TASK-354, WorkSlide): its distance is measured from where that player sees it.
-function PrepService:WorkDistance(position: Vector3): number?
+function PrepService:WorkDistance(position: Vector3, action: string?): number?
+	const wanted = action or WORK_ACTION
 	local best: number? = nil
 	for _, anchor in CollectionService:GetTagged("Interactable") do
-		if anchor:GetAttribute("PromptAction") == WORK_ACTION then
+		if anchor:GetAttribute("PromptAction") == wanted and not (CONVEYOR and self:StationOfAnchor(anchor) ~= nil) then
 			local at = self.Dependencies.InteractionService:Position(anchor)
-			if at ~= nil and WorkSlide.Applies(anchor) then
+			if at ~= nil and not CONVEYOR and WorkSlide.Applies(anchor) then
 				at = WorkSlide.Position(anchor, at, position)
 			end
 			if at ~= nil then
@@ -401,9 +498,590 @@ end
 -- off. The mode itself still opens on the Build tab by the tabs; the other prompts of that corner are the restock ones.
 -- With the focused mode off (restaurant: Content.Prep.Rules.Enabled false) every Work prompt is off: a leftover "Work"
 -- sat on the cutting board and took the E away from the Slice prompt (owner 2026-10-18: "a mesa de trabalho não funciona").
+-- Conveyor (DEC-305, two prompts): the Prompt_Work of the bench stays on; a Work prompt inside an old prep Station_n model
+-- (clones of the trailer) is off; prep_grill only lives with the conveyor.
 function PrepService:SilenceSpareWork(anchor: Instance)
-	if anchor:GetAttribute("PromptAction") == WORK_ACTION and (not rules.Enabled or self:StepOfAnchor(anchor) ~= DEFAULT_STEP) then
+	const action = anchor:GetAttribute("PromptAction")
+	local silence = false
+	if action == WORK_ACTION then
+		if not rules.Enabled then
+			silence = true
+		elseif CONVEYOR then
+			silence = self:StationOfAnchor(anchor) ~= nil
+		else
+			silence = self:StepOfAnchor(anchor) ~= DEFAULT_STEP
+		end
+	elseif action == GRILL_ACTION then
+		silence = not rules.Enabled or not CONVEYOR
+	end
+	if silence then
 		self.Dependencies.InteractionService:SetPrompt(anchor, false, nil)
+	end
+end
+
+-- Conveyor --------------------------------------------------------------------------------------------------------------
+
+-- World CFrame of a bench anchor found by name (Attachment, BasePart or Model), nil = the map does not have it yet (searched
+-- again after ANCHOR_RETRY s)
+function PrepService:NamedAnchor(name: string): CFrame?
+	local found: Instance? = self.Anchors[name]
+	if found ~= nil and not found:IsDescendantOf(workspace) then
+		found = nil
+		self.Anchors[name] = nil
+	end
+	if found == nil then
+		const now = os.clock()
+		if (self.AnchorMiss[name] or 0) > now then
+			return nil
+		end
+		found = workspace:FindFirstChild(name, true)
+		if found == nil then
+			self.AnchorMiss[name] = now + ANCHOR_RETRY
+			return nil
+		end
+		self.Anchors[name] = found
+	end
+	const instance = found :: Instance
+	if instance:IsA("Attachment") then
+		return instance.WorldCFrame
+	elseif instance:IsA("BasePart") then
+		return instance.CFrame
+	elseif instance:IsA("Model") then
+		return instance:GetPivot()
+	end
+	return nil
+end
+
+function PrepService:IsBeltSeat(station: number): boolean
+	return CONVEYOR and table.find(BELT_SEATS, station) ~= nil
+end
+
+function PrepService:IsGrillSeat(station: number): boolean
+	return CONVEYOR and table.find(GRILL_SEATS, station) ~= nil
+end
+
+-- Nobody sits there and no parked plate keeps it
+function PrepService:BeltSeatFree(station: number): boolean
+	return self.BySeat[station] == nil and self.AwayBySeat[station] == nil
+end
+
+-- Writes the conveyor record of `station` from its session, else its parked plate, else free
+function PrepService:RefreshSeat(station: number)
+	if station < 1 or station > self.Count then
+		return
+	end
+	const seat = self.BySeat[station]
+	const owner = self.AwayBySeat[station]
+	const parked = if owner ~= nil then self.Away[owner] else nil
+	const stop, side = Belt.at(self.Belt, station)
+	if seat ~= nil then
+		self:WriteSeat(station, {
+			User = seat.Player.UserId,
+			Step = seat.Step,
+			Ticket = seat.Ticket,
+			Since = seat.Since,
+			Plate = seat.Mask,
+			Stop = stop or 0,
+			Wait = side,
+			Line = seat.Line,
+			Away = nil,
+		})
+	elseif owner ~= nil and parked ~= nil then
+		self:WriteSeat(station, {
+			User = owner.UserId,
+			Step = stopTab(stop),
+			Ticket = parked.Ticket,
+			Since = parked.SeatSince,
+			Plate = parked.Mask,
+			Stop = stop or 0,
+			Wait = side,
+			Line = parked.Line,
+			Away = true,
+		})
+	else
+		self:WriteSeat(station, freeRecord())
+	end
+end
+
+-- The seat promoted by a Belt call (it now holds the stop it waited beside): its record changes
+function PrepService:Promoted(station: number?)
+	if station ~= nil then
+		self:RefreshSeat(station)
+	end
+end
+
+-- The plate of `station` leaves the belt (to the hand or the table); the plate waiting for its stop goes in
+function PrepService:OffBelt(station: number)
+	self:Promoted(Belt.leave(self.Belt, station))
+end
+
+-- Belt -> hand. The hot_dog carries the flip stamp and the grade the sale reads (TASK-517: FlipBonus / Quality); PlateService
+-- writes them, this only fills a missing one. Not in the hand = the central table.
+function PrepService:GiveBack(player: Player, id: number)
+	const plates = self.Dependencies.PlateService
+	const state = Bridge.PlateOf(plates, id)
+	const tool = Bridge.Giveback(plates, player, id)
+	if tool == nil then
+		Bridge.Shelve(plates, id)
+		return
+	end
+	if state ~= nil and state.Grade ~= nil and tool:GetAttribute("Item") == HOT_DOG then
+		if tool:GetAttribute(FLIP_ATTRIBUTE) == nil then
+			tool:SetAttribute(FLIP_ATTRIBUTE, state.FlipBonus == true)
+		end
+		if self.Dependencies.ItemService:QualityOf(tool) == nil then
+			self.Dependencies.ItemService:SetQuality(tool, state.Grade)
+		end
+	end
+end
+
+-- A parked plate leaves the belt: "Hand" (back to its owner, else the table), "Shelve" (the central table), "Gone" (the
+-- plate no longer exists)
+function PrepService:DropParked(player: Player, how: string)
+	const parked = self.Away[player]
+	if parked == nil then
+		return
+	end
+	self.Away[player] = nil
+	if self.AwayBySeat[parked.Station] == player then
+		self.AwayBySeat[parked.Station] = nil
+	end
+	self:OffBelt(parked.Station)
+	self:RefreshSeat(parked.Station)
+	if how == "Hand" and player.Parent ~= nil then
+		self:GiveBack(player, parked.PlateId)
+	elseif how ~= "Gone" then
+		Bridge.Shelve(self.Dependencies.PlateService, parked.PlateId)
+	end
+end
+
+-- The seat ends with the plate: parked on the belt (Leave / Kick* before Out), back to the hand (Out, closing) or to the
+-- central table (gone, KickAway). prep-conveyor.md §2.3
+function PrepService:LeaveBelt(player: Player, seat: Session.Seat, reason: string, silent: boolean?)
+	const id = seat.PlateId
+	seat.PlateId = nil
+	const station = seat.Station
+	if id == nil then
+		self:OffBelt(station)
+		return
+	end
+	const stop = Belt.at(self.Belt, station)
+	const atOut = stop ~= nil and stop == Belt.exit(self.Belt)
+	const selling = self.Dependencies.RoundService:IsServing()
+	if silent == true or reason == "KickAway" or player.Parent == nil then
+		self:OffBelt(station)
+		Bridge.Shelve(self.Dependencies.PlateService, id)
+	elseif atOut or reason == "KickClosing" or not selling or stop == nil then
+		self:OffBelt(station)
+		self:GiveBack(player, id)
+	else
+		self.Away[player] = {
+			Station = station,
+			PlateId = id,
+			Ticket = seat.Ticket,
+			Line = seat.Line,
+			Mask = seat.Mask,
+			Since = os.clock(),
+			SeatSince = seat.Since,
+		}
+		self.AwayBySeat[station] = player
+	end
+end
+
+-- ("None" | reason, station, plate id, resume). Everything a belt seat checks before committing. requested = PrepEnter.Station
+function PrepService:CheckBelt(player: Player, requested: number?, skipReach: boolean?): (string, number?, number?, boolean)
+	const common = self:CheckCommon(player)
+	if common ~= "None" then
+		return common, nil, nil, false
+	end
+	if requested ~= nil and not self:IsBeltSeat(requested) then
+		return "NoStation", nil, nil, false
+	end
+	if skipReach ~= true and not self:InReach(player, WORK_ACTION) then
+		return "NoStation", nil, nil, false
+	end
+	const plates = self.Dependencies.PlateService
+	-- the plate this player left on the belt comes back first, whatever is in the hand (§2.2)
+	const parked = self.Away[player]
+	if parked ~= nil and Bridge.PlateOf(plates, parked.PlateId) ~= nil then
+		return "None", parked.Station, parked.PlateId, true
+	end
+	local station: number? = nil
+	if requested ~= nil then
+		station = if self:BeltSeatFree(requested) then requested else nil
+	else
+		for _, candidate in BELT_SEATS do
+			if candidate <= self.Count and self:BeltSeatFree(candidate) then
+				station = candidate
+				break
+			end
+		end
+	end
+	if station == nil then
+		return "BeltFull", nil, nil, false
+	end
+	const state = Bridge.Workable(plates, player)
+	if state == nil then
+		-- an assembled hot dog of a ticket does not go back on the belt
+		const held = self.Dependencies.ItemService:Holding(player, HOT_DOG)
+		if held ~= nil and held:GetAttribute("PlateId") ~= nil then
+			return "PlateDone", nil, nil, false
+		end
+		return "NoPlate", nil, nil, false
+	end
+	if state.Grade ~= nil then
+		return "PlateDone", nil, nil, false
+	end
+	return "None", station, state.Id, false
+end
+
+-- ("None" | reason, station) of the grill seat
+function PrepService:CheckGrill(player: Player, requested: number?, skipReach: boolean?): (string, number?)
+	const common = self:CheckCommon(player)
+	if common ~= "None" then
+		return common, nil
+	end
+	if requested ~= nil and not self:IsGrillSeat(requested) then
+		return "NoStation", nil
+	end
+	if skipReach ~= true and not self:InReach(player, GRILL_ACTION) then
+		return "NoStation", nil
+	end
+	for _, candidate in GRILL_SEATS do
+		if (requested == nil or candidate == requested) and candidate <= self.Count and self.BySeat[candidate] == nil then
+			return "None", candidate
+		end
+	end
+	return "GrillBusy", nil
+end
+
+-- Seats the player (Freeze, Working, rig on the seat's foot) and fires Entered
+function PrepService:Sit(player: Player, seat: Session.Seat)
+	self.Sessions[player] = seat
+	self.BySeat[seat.Station] = seat
+	self:RefreshSeat(seat.Station)
+	const stand = self:StandOf(seat.Station, nil)
+	const characters = self.Dependencies.CharacterService
+	characters:Freeze(player, FREEZE_REASON, true)
+	const character = characters:CharacterOf(player)
+	if character ~= nil then
+		character:SetAttribute(WORKING_ATTRIBUTE, seat.Station)
+		if stand ~= nil then
+			character:PivotTo(stand + STAND_LIFT)
+		end
+	end
+	self.Entered:Fire(player, seat.Station)
+end
+
+-- (ok, reason, station). prep_work / PrepEnter on a belt seat: the parked plate resumes, else the plate of the hand loads on
+-- the entry stop (taken from the hand by PlateService:Borrow; no plate is made)
+function PrepService:EnterBelt(player: Player, requested: number?, skipReach: boolean?): (boolean, string, number?)
+	const reason, station, id, resume = self:CheckBelt(player, requested, skipReach)
+	if reason ~= "None" or station == nil or id == nil then
+		return false, if reason == "None" then "Invalid" else reason, nil
+	end
+	const plates = self.Dependencies.PlateService
+	local state: Bridge.PlateState? = nil
+	if resume then
+		state = Bridge.PlateOf(plates, id)
+		self.Away[player] = nil
+		self.AwayBySeat[station] = nil
+	else
+		state = Bridge.Borrow(plates, player, id)
+		if state == nil then
+			return false, "NoPlate", nil
+		end
+		Belt.load(self.Belt, station, 1)
+	end
+	if state == nil then
+		self:OffBelt(station)
+		self:RefreshSeat(station)
+		return false, "NoPlate", nil
+	end
+	const stop = Belt.at(self.Belt, station)
+	const seat = Session.new(player, station, workspace:GetServerTimeNow(), os.clock(), stopTab(stop), "Belt")
+	seat.PlateId = state.Id
+	seat.Ticket = math.clamp(state.Ticket, 0, MAX_TICKET)
+	seat.Line = math.clamp(state.Line, 0, 2)
+	seat.Mask = maskOf(state)
+	self:Sit(player, seat)
+	return true, "None", station
+end
+
+-- (ok, reason, station). prep_grill / PrepEnter on the grill seat. A plate in the hand stays in the hand
+function PrepService:EnterGrill(player: Player, requested: number?, skipReach: boolean?): (boolean, string, number?)
+	const reason, station = self:CheckGrill(player, requested, skipReach)
+	if reason ~= "None" or station == nil then
+		return false, if reason == "None" then "Invalid" else reason, nil
+	end
+	self:Sit(player, Session.new(player, station, workspace:GetServerTimeNow(), os.clock(), "Grill", "Grill"))
+	return true, "None", station
+end
+
+-- The seat's plate state, nil (with the seat's plate dropped) when it is gone
+function PrepService:BeltPlate(seat: Session.Seat): Bridge.PlateState?
+	const id = seat.PlateId
+	if id == nil then
+		return nil
+	end
+	return Bridge.PlateOf(self.Dependencies.PlateService, id)
+end
+
+-- The focus ends by itself once the plate sits in Out (after Rules.DoneHold, like the seal of the trailer)
+function PrepService:EndAtOut(player: Player, seat: Session.Seat)
+	task.delay(rules.DoneHold, function()
+		if self.Sessions[player] ~= seat then
+			return
+		end
+		const stop = Belt.at(self.Belt, seat.Station)
+		if stop == Belt.exit(self.Belt) then
+			self:Release(player, "None", nil)
+		end
+	end)
+end
+
+-- PrepBelt: one stop for the seat's own plate. (ok, reason, stop)
+function PrepService:MoveBelt(player: Player, seat: Session.Seat, dir: string): (boolean, string, number)
+	if seat.Kind ~= "Belt" or seat.PlateId == nil then
+		return false, "WrongStop", 0
+	end
+	if dir ~= "Left" and dir ~= "Right" then
+		return false, "Invalid", 0
+	end
+	const ok, stop, _wait, promoted = Belt.move(self.Belt, seat.Station, dir)
+	if not ok then
+		return false, "Invalid", stop
+	end
+	seat.Step = stopTab(stop)
+	self:RefreshSeat(seat.Station)
+	self:Promoted(promoted)
+	const problem = Belt.problem(self.Belt)
+	if problem ~= nil then
+		warn(`[PrepService] belt invariant broken: {problem}`)
+	end
+	if stop == Belt.exit(self.Belt) then
+		self:EndAtOut(player, seat)
+	end
+	return true, "None", stop
+end
+
+-- PrepStage: Cut (the bun) / Dog (a rest table sausage) on the Board stop, all or nothing. (ok, reason)
+function PrepService:Stage(player: Player, seat: Session.Seat, stage: string, score: number, slot: number): (boolean, string)
+	if not self.Dependencies.RoundService:IsServing() then
+		return false, "NotSelling"
+	end
+	if seat.Kind ~= "Belt" or not Belt.canWork(self.Belt, seat.Station, "Board") then
+		return false, "WrongStop"
+	end
+	const state = self:BeltPlate(seat)
+	if state == nil then
+		return false, "NoSession"
+	end
+	if state.Grade ~= nil then
+		return false, "PlateDone"
+	end
+	const plates = self.Dependencies.PlateService
+	const kitchen = self.Dependencies.KitchenService
+	const whole = math.clamp(math.floor(score), 0, 100)
+	if stage == "Cut" then
+		if state.Bun then
+			return false, "Invalid"
+		end
+		const ok, reason, preCut = Bridge.Cut(kitchen, player)
+		if not ok then
+			return false, reason
+		end
+		const patch: Bridge.PlatePatch = { Bun = true, Cut = whole, StartedAt = os.clock() }
+		if preCut then
+			patch.Altered = true
+		end
+		if not Bridge.Commit(plates, state.Id, patch) then
+			warn(`[PrepService] the bun of plate {state.Id} left the stock but the commit failed`)
+			return false, "NoSession"
+		end
+	elseif stage == "Dog" then
+		if not state.Bun or state.Dog then
+			return false, "Invalid"
+		end
+		if slot < 1 or slot > conveyor.Rest.Capacity then
+			return false, "Invalid"
+		end
+		if self:HeldByOther(seat, "Rail", slot) then
+			return false, "Held"
+		end
+		const ok, reason, entry = Bridge.Dog(kitchen, player, slot)
+		if not ok or entry == nil then
+			return false, reason
+		end
+		self:SausageLeft("Rail", slot)
+		-- the flip stamp of the grill travels with the sausage into the plate (paid once at the sale, TASK-517)
+		const patch: Bridge.PlatePatch = { Dog = true, Place = whole, FlipBonus = entry.Flip }
+		if entry.Altered then
+			patch.Altered = true
+		end
+		if not Bridge.Commit(plates, state.Id, patch) then
+			warn(`[PrepService] the rest table sausage {slot} left for plate {state.Id} but the commit failed`)
+			return false, "NoSession"
+		end
+	else
+		return false, "Invalid"
+	end
+	const after = Bridge.PlateOf(plates, state.Id)
+	seat.Mask = if after ~= nil then maskOf(after) else seat.Mask
+	self:RefreshSeat(seat.Station)
+	return true, "None"
+end
+
+-- PrepFinish on the Toppings stop: graded by Grade only, with the Cut / Place the server stored (the summary's are ignored)
+-- and without the sausage (P13). The plate goes to Out and the focus ends. (ok, reason, grade, value)
+function PrepService:FinishBelt(player: Player, seat: Session.Seat, summary: Validate.Summary): (boolean, string, string, number)
+	if not self.Dependencies.RoundService:IsServing() then
+		return false, "NotSelling", "None", 0
+	end
+	if seat.Kind ~= "Belt" or not Belt.canWork(self.Belt, seat.Station, "Toppings") then
+		return false, "WrongStop", "None", 0
+	end
+	const state = self:BeltPlate(seat)
+	if state == nil then
+		return false, "NoSession", "None", 0
+	end
+	if state.Grade ~= nil then
+		return false, "PlateDone", "None", 0
+	end
+	if not state.Bun or not state.Dog then
+		return false, "Invalid", "None", 0
+	end
+	if type(summary) ~= "table" then
+		return false, "Invalid", "None", 0
+	end
+	const kitchen = self.Dependencies.KitchenService
+	-- the plate never expires (TASK-289): its age is read at most TutorialPlateAge, like a trailer plate kept young
+	const elapsed = math.min(os.clock() - (state.StartedAt or 0), rules.TutorialPlateAge)
+	const ms = if type(summary.Ms) == "number" then summary.Ms else 0
+	const graded: Validate.Summary = {
+		Cut = math.clamp(math.floor(state.Cut or 0), 0, 100),
+		Place = math.clamp(math.floor(state.Place or 0), 0, 100),
+		Toppings = summary.Toppings,
+		Ms = math.clamp(math.floor(math.min(ms, elapsed * 1000)), 0, 120000),
+		Sauces = summary.Sauces,
+	}
+	const stock: Validate.Stock = {
+		Amount = function(key: string): number
+			return (kitchen:GetStock(key))
+		end,
+		IsBlocked = function(key: string): boolean
+			return kitchen:IsBlocked(key)
+		end,
+	}
+	const verdict, reason, value = Validate.Summary(cfg, graded, elapsed, nil, stock)
+	if verdict == nil then
+		return false, reason, "None", value
+	end
+	const ok, refusal = Bridge.Toppings(kitchen, player, verdict.Keys)
+	if not ok then
+		return false, refusal, "None", 0
+	end
+	const plates = self.Dependencies.PlateService
+	if not Bridge.Commit(plates, state.Id, { Toppings = verdict.Keys, Grade = verdict.Band, Sauce = self:SauceOf(summary, verdict.Keys) }) then
+		warn(`[PrepService] the toppings of plate {state.Id} left the stock but the commit failed`)
+		return false, "NoSession", "None", 0
+	end
+	seat.Mask = PlateMask.Pack({ Cut = true, Sausage = true, Toppings = verdict.Keys })
+	self:Promoted(Belt.finish(self.Belt, seat.Station))
+	seat.Step = stopTab(Belt.exit(self.Belt))
+	self:RefreshSeat(seat.Station)
+	self:EndAtOut(player, seat)
+	return true, "None", verdict.Band, Grade.Points(cfg, verdict.Band)
+end
+
+-- PrepTrash From = Plate on the belt (§6.6): the content is lost, the plate stays on the belt with its ticket
+function PrepService:TrashBelt(seat: Session.Seat): (boolean, string)
+	if seat.Kind ~= "Belt" or seat.PlateId == nil then
+		return false, "NoSession"
+	end
+	const plates = self.Dependencies.PlateService
+	const state = Bridge.PlateOf(plates, seat.PlateId :: number)
+	if state == nil then
+		return false, "NoSession"
+	end
+	if not state.Bun and not state.Dog then
+		return false, "NoSession"
+	end
+	if not Bridge.Empty(plates, state.Id) then
+		return false, "Invalid"
+	end
+	seat.Mask = 0
+	self:RefreshSeat(seat.Station)
+	return true, "None"
+end
+
+-- Conveyor mask of PrepTab: only topping bits that grow, on top of the bun / sausage bits the server wrote, on the Toppings
+-- stop. Cosmetic (the Finish grades); a mask that does not fit is ignored.
+function PrepService:AcceptBeltMask(seat: Session.Seat, mask: number)
+	if mask == seat.Mask or seat.Kind ~= "Belt" or not Belt.canWork(self.Belt, seat.Station, "Toppings") then
+		return
+	end
+	if not PlateMask.Valid(seat.Mask, mask, Content.OrderRules.MaxToppings) then
+		return
+	end
+	const old = PlateMask.Unpack(seat.Mask)
+	const new = PlateMask.Unpack(mask)
+	if new.Cut ~= old.Cut or new.Sausage ~= old.Sausage or not new.Sausage then
+		return
+	end
+	seat.Mask = mask
+	self:RefreshSeat(seat.Station)
+end
+
+-- 2 Hz: a belt plate that is gone (an empty orphan, PlateService:Release) ends the seat; a ticket that changed (orphan) is
+-- republished; parked plates go to the table past ParkMax, back to the hand when the shop closes
+function PrepService:SweepBelt(now: number, selling: boolean)
+	for player, seat in table.clone(self.Sessions) do
+		if self.Sessions[player] ~= seat or seat.Kind ~= "Belt" or seat.PlateId == nil then
+			continue
+		end
+		const state = self:BeltPlate(seat)
+		if state == nil then
+			seat.PlateId = nil
+			self:OffBelt(seat.Station)
+			self:Release(player, "None", nil)
+		elseif state.Ticket ~= seat.Ticket or state.Line ~= seat.Line then
+			seat.Ticket = math.clamp(state.Ticket, 0, MAX_TICKET)
+			seat.Line = math.clamp(state.Line, 0, 2)
+			self:RefreshSeat(seat.Station)
+		end
+	end
+	const plates = self.Dependencies.PlateService
+	for player, parked in table.clone(self.Away) do
+		if self.Away[player] ~= parked then
+			continue
+		end
+		const state = Bridge.PlateOf(plates, parked.PlateId)
+		if state == nil then
+			self:DropParked(player, "Gone")
+		elseif player.Parent == nil or now - parked.Since > conveyor.ParkMax then
+			self:DropParked(player, "Shelve")
+		elseif not selling then
+			self:DropParked(player, "Hand")
+		elseif state.Ticket ~= parked.Ticket then
+			parked.Ticket = math.clamp(state.Ticket, 0, MAX_TICKET)
+			self:RefreshSeat(parked.Station)
+		end
+	end
+end
+
+-- ShiftStarted: PlateService:Clear() wiped every plate, so the belt starts empty
+function PrepService:ResetBelt()
+	self.Belt = Belt.new(beltStops())
+	self.Away = {}
+	self.AwayBySeat = {}
+	for _, seat in self.Sessions do
+		if seat.Kind == "Belt" then
+			seat.PlateId = nil
+		end
+	end
+	for station = 1, self.Count do
+		self:RefreshSeat(station)
 	end
 end
 
@@ -480,19 +1158,16 @@ end
 
 -- Enter and leave -------------------------------------------------------------------------------------------------------
 
--- ("None" | reason, stand). Everything PrepEnter and the prompt check before committing.
-function PrepService:CheckEnter(player: Player, station: number, skipReach: boolean?, step: string?): (string, CFrame?)
+-- "None" | reason: the checks of every seat (mode on, not seated, selling, a live free character, no re-entry lock)
+function PrepService:CheckCommon(player: Player): string
 	if not self.Active or not rules.Enabled then
-		return "Locked", nil
+		return "Locked"
 	end
 	if self.Sessions[player] ~= nil then
-		return "Seated", nil
+		return "Seated"
 	end
 	if not self.Dependencies.RoundService:IsServing() then
-		return "NotSelling", nil
-	end
-	if station < 1 or station > self.Count then
-		return "NoStation", nil
+		return "NotSelling"
 	end
 	const characters = self.Dependencies.CharacterService
 	if
@@ -502,10 +1177,33 @@ function PrepService:CheckEnter(player: Player, station: number, skipReach: bool
 		or characters:IsKnocked(player)
 		or characters:IsFrozen(player)
 	then
-		return "Locked", nil
+		return "Locked"
 	end
 	if (self.LockedUntil[player] or 0) > os.clock() then
-		return "Locked", nil
+		return "Locked"
+	end
+	return "None"
+end
+
+-- The player stands within the radius of a prompt of `action` (the PrepEnter packet path; a map without the prompt passes)
+function PrepService:InReach(player: Player, action: string): boolean
+	const root = self.Dependencies.InteractionService:RootOf(player)
+	if root == nil then
+		return false
+	end
+	const distance = self:WorkDistance(root.Position, action)
+	return distance == nil or distance <= Content.Actions.ByKey[action].Radius + RANGE_SLACK
+end
+
+-- ("None" | reason, stand). Everything PrepEnter and the prompt check before committing (trailer).
+function PrepService:CheckEnter(player: Player, station: number, skipReach: boolean?, step: string?): (string, CFrame?)
+	if station < 1 or station > self.Count then
+		const common = self:CheckCommon(player)
+		return if common ~= "None" then common else "NoStation", nil
+	end
+	const common = self:CheckCommon(player)
+	if common ~= "None" then
+		return common, nil
 	end
 	if self.BySeat[station] ~= nil then
 		return "Busy", nil
@@ -523,6 +1221,18 @@ end
 
 -- (ok, reason). Checks and commits in one synchronous step.
 function PrepService:Enter(player: Player, station: number, skipReach: boolean?, step: string?): (boolean, string)
+	-- conveyor: the station asked for picks the role (prep-conveyor.md §2.2, PrepEnter of dev and old clients)
+	if CONVEYOR then
+		if self:IsGrillSeat(station) then
+			const ok, reason = self:EnterGrill(player, station, skipReach)
+			return ok, reason
+		elseif self:IsBeltSeat(station) then
+			const ok, reason = self:EnterBelt(player, station, skipReach)
+			return ok, reason
+		end
+		const common = self:CheckCommon(player)
+		return false, if common ~= "None" then common else "NoStation"
+	end
 	const reason, stand = self:CheckEnter(player, station, skipReach, step)
 	if reason ~= "None" then
 		return false, reason
@@ -577,7 +1287,13 @@ function PrepService:Release(player: Player, reason: string, silent: boolean?): 
 			warn(`[PrepService] refund of seat {seat.Station} errored: {problem}`)
 		end
 	end
-	if self.Seats()[seat.Station] ~= nil then
+	if seat.Kind == "Belt" then
+		-- conveyor: the plate parks on the belt, goes back to the hand or to the central table (prep-conveyor.md §2.3)
+		self:LeaveBelt(player, seat, reason, silent)
+		self:RefreshSeat(seat.Station)
+	elseif seat.Kind == "Grill" then
+		self:RefreshSeat(seat.Station)
+	elseif self.Seats()[seat.Station] ~= nil then
 		self:WriteSeat(seat.Station, freeRecord())
 	end
 	if reason == "KickSignal" then
@@ -926,6 +1642,11 @@ end
 
 -- Where the seat's board is (the pointer reach check): its board slot, else the board, else the seat's stand
 function PrepService:BoardPoint(station: number): Vector3?
+	-- conveyor: no board per seat; the bench is measured from the seat's foot (Ghost.MaxDistance covers the bench)
+	if CONVEYOR then
+		const stand = self:StandOf(station, nil)
+		return if stand ~= nil then stand.Position else nil
+	end
 	const board = self.Dependencies.KitchenService:CurrentStation(BOARD_KIND)
 	if board ~= nil then
 		const slot = board.Slots[station]
@@ -1027,6 +1748,13 @@ function PrepService:OnTab(player: Player, step: string, ticket: number, plate: 
 		self:Reply(player, "Tab", false, "Invalid", nil, nil)
 		return
 	end
+	-- conveyor (network.md §19.2): keep-alive and topping mask only; the tab comes from the stop, the ticket from the plate
+	if CONVEYOR then
+		if plate ~= nil then
+			self:AcceptBeltMask(seat, plate)
+		end
+		return
+	end
 	if seat.Step ~= key or seat.Ticket ~= ticket then
 		seat.Step = key
 		seat.Ticket = ticket
@@ -1044,6 +1772,11 @@ function PrepService:OnGrill(player: Player, act: string, slot: number)
 	end
 	if not self.Dependencies.RoundService:IsServing() then
 		self:Reply(player, "Grill", false, "NotSelling", nil, nil)
+		return
+	end
+	-- conveyor: only the grill seat grills (DEC-305: the assembler leaves the belt and takes the Grill prompt)
+	if CONVEYOR and seat.Kind ~= "Grill" then
+		self:Reply(player, "Grill", false, "WrongStop", nil, nil)
 		return
 	end
 	-- the tutorial teaches one sausage at a time (owner request 2026-10-14): a second Place is refused until the first one is off the grill
@@ -1066,6 +1799,11 @@ end
 function PrepService:OnFinish(player: Player, summary: Validate.Summary)
 	const seat = self:Seated(player, "Finish")
 	if seat == nil then
+		return
+	end
+	if CONVEYOR then
+		const ok, reason, grade, value = self:FinishBelt(player, seat, summary)
+		self:Reply(player, "Finish", ok, reason, grade, value)
 		return
 	end
 	const ok, reason, grade, value = self:Finish(player, seat, summary)
@@ -1129,6 +1867,11 @@ function PrepService:ConnectPackets()
 		if seat == nil then
 			return
 		end
+		-- conveyor: the plate comes from the hand and the bun from PrepStage Cut (prep-conveyor.md §6.5)
+		if CONVEYOR then
+			self:Reply(player, "Begin", false, "Invalid", nil, nil)
+			return
+		end
 		const ok, reason, value = self:Begin(player, seat)
 		self:Reply(player, "Begin", ok, reason, nil, value)
 	end)
@@ -1148,7 +1891,10 @@ function PrepService:ConnectPackets()
 		end
 		const from: string = value.From
 		const index = table.find(cfg.TrashFrom, from) or 1
-		if from == "Plate" then
+		if from == "Plate" and CONVEYOR then
+			const ok, reason = self:TrashBelt(seat)
+			self:Reply(player, "Trash", ok, reason, nil, 0)
+		elseif from == "Plate" then
 			const ok, reason = self:Trash(player, seat)
 			self:Reply(player, "Trash", ok, reason, nil, 0)
 		else
@@ -1160,7 +1906,45 @@ function PrepService:ConnectPackets()
 		if not self:Allow(player, "Order") then
 			return
 		end
+		-- conveyor: orders are the tablet's and the PICKUP's (network.md §19.2)
+		if CONVEYOR then
+			self:Reply(player, "Order", false, "Locked", nil, nil)
+			return
+		end
 		self:OnOrder(player, value.Act, value.Npc)
+	end)
+	-- Conveyor (TASK-514): own buckets at Conveyor.Rates, outside GLOBAL_RATE; every packet is answered (PrepResult Belt / Stage)
+	net.PrepBelt:onServer(function(value, player: Player)
+		if not self:AllowOwn(player, "Belt", conveyor.Rates.Belt) then
+			self:Reply(player, "Belt", false, "Rate", nil, nil)
+			return
+		end
+		if not CONVEYOR then
+			self:Reply(player, "Belt", false, "Locked", nil, nil)
+			return
+		end
+		const seat = self:Seated(player, "Belt")
+		if seat == nil then
+			return
+		end
+		const ok, reason, stop = self:MoveBelt(player, seat, value.Dir)
+		self:Reply(player, "Belt", ok, reason, nil, stop)
+	end)
+	net.PrepStage:onServer(function(value, player: Player)
+		if not self:AllowOwn(player, "Stage", conveyor.Rates.Stage) then
+			self:Reply(player, "Stage", false, "Rate", nil, nil)
+			return
+		end
+		if not CONVEYOR then
+			self:Reply(player, "Stage", false, "Locked", nil, nil)
+			return
+		end
+		const seat = self:Seated(player, "Stage")
+		if seat == nil then
+			return
+		end
+		const ok, reason = self:Stage(player, seat, value.Stage, value.Score, value.Slot)
+		self:Reply(player, "Stage", ok, reason, nil, if ok then value.Score else nil)
 	end)
 	-- DEC-259: live drag. The pointer never answers (newest at Ghost.Hz); a grab always does (the client pairs it)
 	net.PrepPointer:onServer(function(value, player: Player)
@@ -1189,6 +1973,18 @@ function PrepService:RegisterWork()
 	const interaction = self.Dependencies.InteractionService
 	interaction:RegisterAction(WORK_ACTION, {
 		Validate = function(player: Player, anchor: Instance, _id: number): boolean
+			-- conveyor: Prompt_Work of the bench = a belt seat (needs a plate); the Work prompts of old Station_n models are off
+			if CONVEYOR then
+				if self:StationOfAnchor(anchor) ~= nil then
+					return false
+				end
+				const reason = self:CheckBelt(player, nil, true)
+				if reason ~= "None" then
+					self:Reply(player, "Enter", false, reason, nil, nil)
+					return false
+				end
+				return true
+			end
 			if self:StepOfAnchor(anchor) ~= DEFAULT_STEP then
 				return false
 			end
@@ -1202,6 +1998,9 @@ function PrepService:RegisterWork()
 		end,
 		-- TASK-354: the grill prompt follows the player along the counter (client), so the range is measured from there
 		Reach = function(_player: Player, anchor: Instance, root: Vector3): Vector3?
+			if CONVEYOR then
+				return nil
+			end
 			const at = self.Dependencies.InteractionService:Position(anchor)
 			if at == nil or not WorkSlide.Applies(anchor) then
 				return nil
@@ -1209,12 +2008,35 @@ function PrepService:RegisterWork()
 			return WorkSlide.Position(anchor, at, root)
 		end,
 		Run = function(player: Player, anchor: Instance, _id: number)
+			if CONVEYOR then
+				const ok, reason, seated = self:EnterBelt(player, nil, true)
+				self:Reply(player, "Enter", ok, reason, nil, seated)
+				return
+			end
 			const station = self:NextSeat() or 1
 			-- the mode opens on the part of the counter the player stands at (the grill prompt slides along all of it)
 			const root = self.Dependencies.InteractionService:RootOf(player)
 			const near = if root ~= nil then self:StepNear(station, root.Position) else nil
 			const ok, reason = self:Enter(player, station, true, near or self:StepOfAnchor(anchor))
 			self:Reply(player, "Enter", ok, reason, nil, if ok then station else nil)
+		end,
+	})
+	-- conveyor (DEC-305): Prompt_Grill = the grill seat; off in the trailer (SilenceSpareWork) and refused there
+	interaction:RegisterAction(GRILL_ACTION, {
+		Validate = function(player: Player, _anchor: Instance, _id: number): boolean
+			if not CONVEYOR then
+				return false
+			end
+			const reason = self:CheckGrill(player, nil, true)
+			if reason ~= "None" then
+				self:Reply(player, "Enter", false, reason, nil, nil)
+				return false
+			end
+			return true
+		end,
+		Run = function(player: Player, _anchor: Instance, _id: number)
+			const ok, reason, seated = self:EnterGrill(player, nil, true)
+			self:Reply(player, "Enter", ok, reason, nil, seated)
 		end,
 	})
 	-- a seated player's world prompts stay quiet; the tabs reach the same services through PrepOrder
@@ -1272,6 +2094,9 @@ function PrepService:Sweep()
 			end
 		end
 	end
+	if CONVEYOR then
+		self:SweepBelt(now, selling)
+	end
 	self:SweepClaims(now)
 end
 
@@ -1293,6 +2118,8 @@ PrepService:OnInit(function(self)
 	end)
 	runState.MemberAway:Connect(function(player)
 		self:Release(player, "KickAway", nil)
+		-- conveyor: a plate parked by a member that went Away goes to the central table (prep-conveyor.md §2.3)
+		self:DropParked(player, "Shelve")
 	end)
 	runState.LifeChanged:Connect(function(userId, _old, new)
 		if new == "Active" then
@@ -1301,14 +2128,24 @@ PrepService:OnInit(function(self)
 		const player = Players:GetPlayerByUserId(userId)
 		if player ~= nil then
 			self:Release(player, if new == "Away" then "KickAway" else "KickDown", nil)
+			if new == "Away" then
+				self:DropParked(player, "Shelve")
+			end
 		end
 	end)
 	self.Dependencies.RoundService.ShiftStarted:Connect(function(_info)
 		self:Recount()
+		if CONVEYOR then
+			self:ResetBelt()
+		end
 	end)
 	self.Dependencies.RoundService.PhaseChanged:Connect(function(_phase)
 		if not self.Dependencies.RoundService:IsServing() then
 			self:ForceExitAll("KickClosing")
+			-- conveyor: the plates parked on the belt go back to their owners' hands (else the central table)
+			for player in table.clone(self.Away) do
+				self:DropParked(player, "Hand")
+			end
 			-- end of the turn: no sausage stays held
 			self:DropClaims(function(_id: number, _claim: Claim): boolean
 				return true
@@ -1317,6 +2154,8 @@ PrepService:OnInit(function(self)
 	end)
 	self.Dependencies.PlayerService.PlayerRemoving:Connect(function(player)
 		self:Release(player, "KickAway", true)
+		-- conveyor: the plate parked on the belt goes to the central table with its ticket and content
+		self:DropParked(player, "Shelve")
 		-- a parked plate goes back to the stock (KitchenService refunds the ticket on the same signal)
 		self.Parked[player] = nil
 		self.Buckets[player] = nil
@@ -1363,15 +2202,40 @@ function PrepService:DevSeats(): string
 	const lines: { string } = { `prep seats: {self.Count} active, selling {tostring(self.Dependencies.RoundService:IsServing())}` }
 	for station = 1, self.Count do
 		const seat = self.BySeat[station]
-		if seat == nil then
+		const stop, side = Belt.at(self.Belt, station)
+		const beltText = if stop ~= nil then ` belt stop {stop} wait {side}` else ""
+		const owner = self.AwayBySeat[station]
+		if seat == nil and owner ~= nil then
+			table.insert(lines, `  {station}: parked by {owner.Name}{beltText}`)
+		elseif seat == nil then
 			table.insert(lines, `  {station}: free`)
+		elseif seat.Kind ~= "Trailer" then
+			table.insert(lines, `  {station}: {seat.Player.Name} {seat.Kind} ticket {seat.Ticket} plate {seat.PlateId or 0}{beltText}`)
 		else
 			const plate = seat.Plate
 			const plateText = if plate ~= nil then `plate open {string.format("%.1f", os.clock() - plate.StartedAt)}s` else "no plate"
 			table.insert(lines, `  {station}: {seat.Player.Name} tab {seat.Step} ticket {seat.Ticket}, {plateText}`)
 		end
 	end
+	const problem = Belt.problem(self.Belt)
+	if problem ~= nil then
+		table.insert(lines, `  BELT INVARIANT BROKEN: {problem}`)
+	end
 	return table.concat(lines, "\n")
+end
+
+-- `prep belt` (TASK-505 wires the command): the table test of Belt.luau. Errors on any failure
+function PrepService:DevBelt(): string
+	self:DevGuard()
+	const passed, total, failures = Belt.test(beltStops())
+	for _, name in failures do
+		warn(`[prep belt] FAIL {name}`)
+	end
+	const summary = `prep belt: {passed}/{total} ok, {total - passed} failed`
+	if passed ~= total then
+		error(summary, 0)
+	end
+	return summary
 end
 
 -- Sits `player` at `station` (dev: no reach check; every other rule applies)
@@ -1519,6 +2383,22 @@ function PrepService:DevFinish(player: Player, keys: { string }, force: boolean)
 	const seat = self.Sessions[player]
 	if seat == nil then
 		return `{player.Name} is not seated: /dev prep enter <n> first`
+	end
+	-- conveyor: the plate must sit on the Toppings stop with bun and sausage (the real FinishBelt path)
+	if CONVEYOR then
+		const toppings: { { Key: string, Score: number } } = {}
+		for _, key in keys do
+			table.insert(toppings, { Key = key, Score = 100 })
+		end
+		const state = self:BeltPlate(seat)
+		if force and state ~= nil and seat.PlateId ~= nil then
+			Bridge.Commit(self.Dependencies.PlateService, seat.PlateId :: number, {
+				StartedAt = os.clock() - (rules.PerfectMin + rules.PerTopping * #keys + 0.5),
+			})
+		end
+		const ok, reason, grade, value = self:FinishBelt(player, seat, { Cut = 100, Place = 100, Toppings = toppings, Ms = 0 })
+		self:Reply(player, "Finish", ok, reason, grade, value)
+		return if ok then `belt finished: {grade} ({value} pts)` else `belt refused: {reason}`
 	end
 	local note = ""
 	if seat.Plate == nil then

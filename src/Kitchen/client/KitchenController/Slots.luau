@@ -9,18 +9,28 @@
 --   Clock(active)            server time, refreshed every frame only while `active()` is true
 --   Progress(read, clock)    0..1 from StartedAt/Duration (Ready = 1)
 --   Food(name, spot, parent) local clone of ReplicatedStorage.Assets.Items.Food.<name>, welded to the host part
---   Bar(spot, ...)           ProgressBar (style guide §7.3: 1.0 stud above the food)
+--   Bar(spot, ...)           ProgressBar (style guide §7.3: 1.0 stud above the food); in the conveyor kitchen with
+--                            Content.Prep.Conveyor.Grill.Bar = false no bar at all: a ready Check over the food instead
+--   ReadyMark(at, on)        the ready Check (HintMark, in studs) over a world point while `on()` (TASK-521)
+--
+-- TASK-521 (Q-381 A, DEC-303; design/kitchen-redesign.md Q2): Spots picks the SAME anchor per slot as the server
+-- (KitchenService:CollectParts): only Attachments, only those whose nearest `Station` ancestor is this station, Slot 1..99,
+-- an anchor with `Level` only on that level (the optional `level` argument; unknown level = unlevelled anchors only), else
+-- the last unlevelled one. Before, a BasePart with `Slot` (the PrepTarget hitboxes carry one) could win on the client while
+-- the server used the Attachment: the prompt and the sausage landed on different spots.
 --
 -- Food lies flat on the anchor with its pivot (base centre, §18.9.5) on the anchor position. Orientation comes from
 -- the slot layout, not from the anchor rotation (the .fbx empties carry no reliable rotation): the model's X (its
 -- long axis) runs along the line of slots (`along = true`, buns end to end on the board) or across it (`false`,
 -- sausages side by side on the rollers and on the rail). Provisional until the visual check in the place.
+local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Components = StarterPlayer.StarterPlayerScripts.client.Interface.Components
 local ProgressBar = require(Components.ProgressBar)
+local HintMark = require(StarterPlayer.StarterPlayerScripts.client.Interface.HintMark)
 local Content = require(ReplicatedStorage.shared.Content)
 local Grade = require(ReplicatedStorage.shared.Prep.Grade)
 local Context = require(script.Parent.Context)
@@ -33,6 +43,18 @@ const BAR_MAX_DISTANCE = 40
 const MIN_SPAN = 0.05
 -- the pivot of food is the base centre: a turn about the long axis goes through the middle of the body, half of AST-002's 0.24
 const FLIP_CENTER = 0.12
+-- the server's slot rule (KitchenService init.luau STATION_TAG / MAX_SLOT)
+const STATION_TAG = "Station"
+const MAX_SLOT = 99
+-- the conveyor kitchen (tech/prep-conveyor.md §1, §5): Prep.Rules.Mode is the only selector
+const CONVEYOR = Content.Prep.Rules.Mode == "Conveyor"
+-- world bars of the kitchen: the trailer keeps them; the conveyor only with Conveyor.Grill.Bar (false: FEAT-045, Q-381 A)
+const WORLD_BARS = not CONVEYOR or Content.Prep.Conveyor.Grill.Bar
+-- the ready Check over the food (Provisional): studs (about 27 px at 10 studs on a 667 x 375 phone, Fov 70), gap over the
+-- food, and how long "ready" must hold before it shows (the conveyor grill empties to the rest table in the same Tick)
+const READY_SIZE = 1.0
+const READY_GAP = 0.6
+const READY_DELAY = 0.35
 
 export type Spot = {
 	Slot: number,
@@ -117,28 +139,68 @@ local function flat(vector: Vector3): Vector3?
 	return if horizontal.Magnitude >= MIN_SPAN then horizontal.Unit else nil
 end
 
--- Slot anchors of the station: Attachment/BasePart with an integer `Slot` >= 1. When a slot has several anchors
--- (one per upgrade `Level`, §18.4), the one without `Level` wins, else the lowest Level (Provisional: the grill
--- binding of TASK-005 has none today).
-function Slots.Spots(station: Instance, along: boolean): { [number]: Spot }
+-- Nearest `Station` ancestor (KitchenService ownerModel): an anchor of a station nested inside this one is not ours.
+local function ownerStation(instance: Instance): Instance?
+	local current = instance.Parent
+	while current ~= nil do
+		if CollectionService:HasTag(current, STATION_TAG) then
+			return current
+		end
+		current = current.Parent
+	end
+	return nil
+end
+
+const warnedSpots: { [Instance]: boolean } = setmetatable({}, { __mode = "k" }) :: any
+
+-- Slot anchors of the station, by the server's rule (KitchenService:CollectParts; see the header). `level` = the upgrade
+-- level of the station's kind when the caller knows it. Unknown level (nil): a slot with an unlevelled anchor uses it (the
+-- server's pick unless an exact Level anchor exists); a slot with only Level anchors falls back to the lowest Level (the old
+-- client rule, so the upgrade slots of the trailer grill keep their spot). Duplicates warn once per station: the place should hold one anchor per slot (Q2, R-3 of the e2e).
+function Slots.Spots(station: Instance, along: boolean, level: number?): { [number]: Spot }
 	const anchors: { [number]: Instance } = {}
+	const exact: { [number]: boolean } = {}
+	const plain: { [number]: number } = {}
+	const lowest: { [number]: Instance } = {}
 	for _, descendant in station:GetDescendants() do
-		if not (descendant:IsA("Attachment") or descendant:IsA("BasePart")) then
+		if not descendant:IsA("Attachment") then
 			continue
 		end
 		const slot = descendant:GetAttribute("Slot")
-		if typeof(slot) ~= "number" or slot < 1 or slot % 1 ~= 0 then
+		if typeof(slot) ~= "number" or slot < 1 or slot > MAX_SLOT or slot % 1 ~= 0 then
 			continue
 		end
-		const current = anchors[slot]
-		if current == nil then
-			anchors[slot] = descendant
+		-- a nested station's anchor (nil = the tag did not stream yet: the server would count it for this station)
+		const owner = ownerStation(descendant)
+		if owner ~= nil and owner ~= station then
 			continue
 		end
-		const level = descendant:GetAttribute("Level")
-		const currentLevel = current:GetAttribute("Level")
-		if currentLevel ~= nil and (level == nil or (typeof(level) == "number" and typeof(currentLevel) == "number" and level < currentLevel)) then
+		const only = descendant:GetAttribute("Level")
+		if typeof(only) == "number" then
+			if level ~= nil and only == level then
+				anchors[slot] = descendant
+				exact[slot] = true
+			elseif level == nil then
+				const best = lowest[slot]
+				const bestLevel = if best ~= nil then best:GetAttribute("Level") else nil
+				if best == nil or (typeof(bestLevel) == "number" and only < bestLevel) then
+					lowest[slot] = descendant
+				end
+			end
+		elseif not exact[slot] then
 			anchors[slot] = descendant
+			plain[slot] = (plain[slot] or 0) + 1
+		end
+	end
+	for slot, anchor in lowest do
+		if anchors[slot] == nil then
+			anchors[slot] = anchor
+		end
+	end
+	for slot, count in plain do
+		if count > 1 and not exact[slot] and not warnedSpots[station] then
+			warnedSpots[station] = true
+			warn(`[KitchenController] {station:GetFullName()}: {count} anchors with Slot = {slot}; the last one is used, as on the server (keep one per slot)`)
 		end
 	end
 
@@ -210,8 +272,9 @@ function Slots.Progress(read: Reader, clock: () -> number): number
 	elseif record.State ~= "Working" or record.Duration <= 0 then
 		return 0
 	end
-	if record.Kind == "grill" then
+	if record.Kind == "grill" and not CONVEYOR then
 		-- the first side runs, the sausage waits for the flip, the second side runs (Grade.CookProgress)
+		-- (the conveyor grill has no pause: ready at StartedAt + Duration, flipped or not, TASK-515; the line below)
 		return Grade.CookProgress(Content.Prep, record.StartedAt, record.Duration, clock(), record.Flip > 0)
 	end
 	return math.clamp((clock() - record.StartedAt) / record.Duration, 0, 1)
@@ -373,7 +436,79 @@ function Slots.SetBarsHidden(hidden: boolean)
 	end
 end
 
+-- Whether the world bars of the kitchen exist in this mode (false in the conveyor kitchen, Conveyor.Grill.Bar).
+Slots.WorldBars = WORLD_BARS
+
+-- Reactive: the focused prep mode is on screen (its own marks replace the world ones).
+function Slots.BarsHidden(): boolean
+	return barsHidden()
+end
+
+-- The ready Check (HintMark, in studs, seen by everyone in the world) over `at()` while `on()` has held READY_DELAY s; hidden
+-- while the focused prep mode is on screen. Inside the part's Vide root.
+function Slots.ReadyMark(at: () -> Vector3?, on: () -> boolean)
+	const wanted = Vide.derive(function(): boolean
+		return on() and not barsHidden()
+	end)
+	local mark: HintMark.Mark? = nil
+	local token = 0
+	local alive = true
+	local function show()
+		const position = at()
+		if not alive or position == nil then
+			return
+		end
+		local current = mark
+		if current == nil then
+			current = HintMark.new()
+			mark = current
+		end
+		current:Show("Check", position, READY_SIZE)
+	end
+	Vide.effect(function()
+		const value = wanted()
+		Vide.untrack(function()
+			token += 1
+			const mine = token
+			if value then
+				task.delay(READY_DELAY, function()
+					if token == mine then
+						show()
+					end
+				end)
+			else
+				const shown = mark
+				if shown ~= nil then
+					shown:Hide()
+				end
+			end
+			return nil
+		end)
+	end)
+	cleanup(function()
+		alive = false
+		token += 1
+		const shown = mark
+		mark = nil
+		if shown ~= nil then
+			shown:Destroy()
+		end
+	end)
+end
+
 function Slots.Bar(spot: Spot, height: number, progress: () -> number, visible: () -> boolean)
+	if not WORLD_BARS then
+		-- conveyor kitchen (Q-381 A): no bar; the colour of the food says the cooking, the Check says "ready"
+		Slots.ReadyMark(function(): Vector3?
+			if spot.Host.Parent == nil then
+				return nil
+			end
+			return (spot.Host.CFrame * spot.Offset * CFrame.new(0, height + READY_GAP, 0)).Position
+		end, function(): boolean
+			return visible() and progress() >= 1
+		end)
+		return
+	end
 	const anchor = Instance.new("Attachment")
 	anchor.Name = `Bar_Slot{spot.Slot}`
 	anchor.CFrame = spot.Offset * CFrame.new(0, height + BAR_GAP, 0)

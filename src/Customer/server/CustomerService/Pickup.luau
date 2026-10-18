@@ -5,6 +5,11 @@
 -- to PICKUP, PU-2..n = the side line). Whoever ordered joins at the back; it leaves when served, out of patience or sent
 -- away, and everyone behind moves one spot up. A pair takes one spot (the leader's id). No Service, no network, no
 -- Instance: table tests in Pickup.Test (run by /dev pickup test).
+-- Conveyor kitchen (TASK-516; tech/prep-conveyor.md §8; Q-383 A): with Content.Prep.Rules.Mode = "Conveyor" choose is
+-- strict: the hot dog goes ONLY to the customer of its ticket, and only while that customer is in the line (the
+-- "oldest exact", "target" and "PU-1" branches are off). PlateService's gate "PlateTicket" sends the refusal notices.
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Content = require(ReplicatedStorage.shared.Content)
 
 export type Pickup = {
 	Order: { number }, -- customer ids (leaders), oldest first; index = spot
@@ -98,9 +103,23 @@ end
 --   4. the target, if in the line;
 --   5. PU-1 (the verdict decides: usually Wrong, the hot dog stays in the hand).
 -- nil = the line is empty.
-function Pickup.choose(line: Pickup, owner: number?, target: number?, fit: (id: number) -> Fit): (number?, Reason?)
+-- `strict` (nil = Content.Prep.Rules.Mode == "Conveyor"): only 1 and 3 (the ticket owner in the line); nil otherwise.
+function Pickup.choose(
+	line: Pickup,
+	owner: number?,
+	target: number?,
+	fit: (id: number) -> Fit,
+	strict: boolean?
+): (number?, Reason?)
 	const inLine = function(id: number?): boolean
 		return id ~= nil and table.find(line.Order, id) ~= nil
+	end
+	const ownerOnly = if strict ~= nil then strict else Content.Prep.Rules.Mode == "Conveyor"
+	if ownerOnly then
+		if owner == nil or not inLine(owner) then
+			return nil, nil
+		end
+		return owner, if fit(owner) == "Exact" then "ticket" else "owner"
 	end
 	if owner ~= nil and inLine(owner) and fit(owner) == "Exact" then
 		return owner, "ticket"
@@ -225,16 +244,38 @@ function Pickup.Test(): { string }
 		end
 		const id, why = Pickup.choose(line, case.Owner, case.Target, function(candidate: number): Fit
 			return if table.find(case.Exact, candidate) then "Exact" else "Other"
-		end)
+		end, false)
 		check(`choose {case.Name}`, id, case.Want)
 		check(`choose {case.Name} reason`, why, case.Why)
 	end
 	do
 		const id, why = Pickup.choose(Pickup.new(), 1, 1, function(): Fit
 			return "Exact"
-		end)
+		end, false)
 		check("choose empty line", id, nil)
 		check("choose empty line reason", why, nil)
+	end
+
+	-- strict (conveyor, Q-383 A): only the ticket owner in the line, never another exact customer, the target or PU-1
+	const strictCases: {
+		{ Name: string, Exact: { number }, Owner: number?, Target: number?, Want: number?, Why: Reason? }
+	} =
+		{
+			{ Name = "owner exact", Exact = { 1, 3 }, Owner = 3, Target = nil, Want = 3, Why = "ticket" },
+			{ Name = "owner not exact", Exact = { 2 }, Owner = 3, Target = 2, Want = 3, Why = "owner" },
+			{ Name = "owner not in line", Exact = { 1, 2 }, Owner = 9, Target = 2, Want = nil, Why = nil },
+			{ Name = "no ticket", Exact = { 1 }, Owner = nil, Target = 1, Want = nil, Why = nil },
+		}
+	for _, case in strictCases do
+		const line = Pickup.new()
+		for id = 1, 3 do
+			Pickup.join(line, id)
+		end
+		const id, why = Pickup.choose(line, case.Owner, case.Target, function(candidate: number): Fit
+			return if table.find(case.Exact, candidate) then "Exact" else "Other"
+		end, true)
+		check(`strict {case.Name}`, id, case.Want)
+		check(`strict {case.Name} reason`, why, case.Why)
 	end
 
 	return failures
