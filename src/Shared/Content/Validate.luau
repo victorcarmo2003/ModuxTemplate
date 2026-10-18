@@ -2408,7 +2408,7 @@ local function checkHorrorScenes()
 	const lights = setOf({ "Off", "On", "Flicker", "Cascade" })
 	const doors = setOf({ "Rattle", "Push", "Hold" })
 	const needPoint = setOf({ "Door", "Shadow", "Nudge", "Actor" })
-	const kinds = setOf({ "Sound", "Music", "Lights", "Lightning", "Vignette", "Shake", "Fov", "Nudge", "Text", "Actor", "Door", "Shadow" })
+	const kinds = setOf({ "Sound", "Music", "Lights", "Lightning", "Whispers", "Vignette", "Shake", "Fov", "Nudge", "Text", "Actor", "Door", "Shadow" })
 	for index, scene in HorrorScenes.List do
 		const key = scene.Key
 		if Anomalies.ByKey[key] == nil then
@@ -2462,6 +2462,10 @@ local function checkHorrorScenes()
 			elseif step.Kind == "Lightning" then
 				inRange("HorrorScenes", index, key, `{where}.Value`, step.Value or 0, 0, 60)
 				inRange("HorrorScenes", index, key, `{where}.To`, (step.To :: number?) or 0, 0, 60)
+			elseif step.Kind == "Whispers" then
+				inRange("HorrorScenes", index, key, `{where}.Value`, step.Value or 0, 0, 5)
+				inRange("HorrorScenes", index, key, `{where}.To`, (step.To :: number?) or 0, 0, 5)
+				inRange("HorrorScenes", index, key, `{where}.Duration`, step.Duration or 0, 0.5, 60)
 			elseif step.Kind == "Text" then
 				if step.Text == nil or step.Text == "" then
 					fail("HorrorScenes", index, key, `{where} Text needs Text`)

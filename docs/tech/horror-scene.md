@@ -24,7 +24,7 @@ fase do passo (`Step.Phase`, `Step.At` segundos depois). Todos os clients tocam 
 Duration?, Point?, Burst?, Text? }` · `Rules { Latency, ReduceMotion, MaxControlLock, MaxVignette, MaxFov, MaxNudge,
 Shakes }`.
 
-Tipos de passo: `Sound`, `Music`, `Lights`, `Lightning`, `Vignette`, `Shake`, `Fov`, `Nudge`, `Text`, `Actor`, `Door`,
+Tipos de passo: `Sound`, `Music`, `Lights`, `Lightning`, `Whispers` (palavras HIDE na tela em rampa, DEC-291), `Vignette`, `Shake`, `Fov`, `Nudge`, `Text`, `Actor`, `Door`,
 `Shadow` (semântica no cabeçalho de `HorrorScenes.luau`). `Point` é nome de `MapPoint` (`SCENE-DOOR`, `SCENE-DOOR-OUT`,
 `SCENE-STEPS-FAR`, `SCENE-WINDOW-EYES` no restaurante — criados pela TASK-465).
 
@@ -33,11 +33,11 @@ Tipos de passo: `Sound`, `Music`, `Lights`, `Lightning`, `Vignette`, `Shake`, `F
 - `Sound`/`Music` só com chaves de `Content.Sounds` (`Music` aceita `"Stop"`); `Shake` só com perfis de `Rules.Shakes`.
 - `Vignette` ≤ `MaxVignette` (0,6); `Fov` |valor| ≤ `MaxFov` (6°); `Nudge` ≤ `MaxNudge` (3°) e duração ≤
   `MaxControlLock` (2 s): a câmera nunca é tomada do jogador.
-- Opção "Reduzir movimento" (Q-357): `Shake`, `Fov` e `Nudge` multiplicados por `Rules.ReduceMotion` (0,25).
+- Com `Motion.Reduced()` (opção que o jogo já tem): `Shake`, `Fov` e `Nudge` multiplicados por `Rules.ReduceMotion` (0,25).
 
 ## 4. Quem implementa
 
 - **TASK-462** player de cena (client): lê `Anomalies`, agenda os passos, `/dev scene <key>`.
-- **TASK-463** câmera (perfis, FOV, nudge, opção). **TASK-464** vinheta, clarão, raios em rampa no `Lightning`.
+- **TASK-463** câmera (perfis, FOV, nudge, opção). **TASK-464** vinheta e o passo `Whispers` (HIDE em rampa).
 - **TASK-465** porta da despensa e `MapPoint`s. **TASK-466** sons novos. **TASK-467** liga a cena do apagão no jogo,
   convivendo com `Effects/Kit/Blackout` (TASK-444) sem duplicar som/luz: o kit passa a ler os passos da cena.

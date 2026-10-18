@@ -21,7 +21,7 @@ Curva de toda cena (vale para todas as anomalias, com durações diferentes):
 |---|---|---|
 | **Calma** | o jogador está trabalhando; contraste para o que vem | música base, luz normal |
 | **Aviso** | "algo mudou" — um detalhe, não um susto | um som fora do lugar, luz que pisca, olhos no escuro (M4) |
-| **Escalada** | o perigo cresce e o jogador decide o que fazer | raios em rampa, violinos acelerando, passos, vinheta |
+| **Escalada** | o perigo cresce e o jogador decide o que fazer | "HIDE" na tela em rampa, violinos acelerando, passos, vinheta |
 | **Chegada** | a criatura está perto | silêncio curto, passos param, câmera respira |
 | **Clímax** | o momento que vira história | maçaneta, batida na porta, jumpscare curto (opcional) |
 | **Alívio** | soltar a tensão e voltar ao trabalho | luz volta, música calma, respiro do personagem |
@@ -42,10 +42,10 @@ Duração alvo ~40–55 s da queda até a luz voltar. Tempos em segundos a parti
 | −8 a 0 | (aviso, opcional) | zumbido elétrico subindo, lâmpada estalando | 1–2 piscadas das luzes da cozinha | — |
 | **0** | **todas as luzes apagam** | **"clunk" do quadro geral** + queda do zumbido para silêncio | blackout total (DEC-286), só a emergência vermelha | tranco curto (shake 0,15 s), FOV −3° e volta |
 | 1,5 | **o sino toca** (já existe) | sino com reverb longo | — | texto de aviso na tela (DEC-283) |
-| 3 | **raios começam raros** | trovão distante, atrasado do clarão | 1 raio a cada ~6–8 s; clarão estoura a janela e mostra a cozinha por 0,1 s | — |
-| 3–18 | escalada | violinos acelerando (TASK-443), chuva subindo | **raios em rampa**: intervalo 8 s → 1,5 s; no fim, rajadas de 2–3 seguidos ("em massa") | vinheta escura entra devagar (0 → 0,35) |
+| 3 | **o "HIDE" começa a aparecer, pouco** | — | poucas palavras "hide" sussurradas na tela (`Kit/Whispers`) | — |
+| 3–18 | escalada | violinos acelerando (TASK-443) | **"HIDE" em rampa**: taxa 0,4 → 3, até as palavras tomarem a tela ("em massa") | vinheta escura entra devagar (0 → 0,35) |
 | ~12 | jogadores correm para os fundos | próprios passos ecoam mais | **luz debaixo da porta da despensa** (fresta vermelha/quente no chão) guia o caminho | — |
-| 18 | **passos começam** | passos pesados, do lado de fora, se aproximando (pan 3D, cada vez mais perto) | raios param de repente | música corta para um pedal grave |
+| 18 | **passos começam** | passos pesados, do lado de fora, se aproximando (pan 3D, cada vez mais perto) | as palavras param de repente | música corta para um pedal grave |
 | 18–30 | chegada | passos, respiração do personagem do jogador (abafada) | a fresta de luz debaixo da porta é **cortada por uma sombra** quando a criatura passa | câmera "respira" (FOV ±1° lento), shake mínimo a cada passo |
 | ~30 | silêncio | **os passos param** na frente da porta; 2 s de nada | — | vinheta aperta (0,45) |
 | **~32** | **a criatura tenta abrir a porta uma vez** | **maçaneta girando e travando** (2 tentativas rápidas), **porta forçando no batente** | a porta treme (anim. de 0,6 s); poeira cai do batente | shake curto na direção da porta |
@@ -75,7 +75,8 @@ anomalia acontece pela regra que já existe (o pacote de erro não muda). Jumpsc
 2. **Câmera de terror**: perfis de shake (tranco, passo, porta), "respiração" de FOV, nudge leve; todos atenuados pela
    opção "Reduzir movimento".
 3. **Efeitos de tela**: vinheta animada, leve grão/aberração só no clímax (≤ 0,3 s), clarão do raio.
-4. **Raios em rampa**: o `Lightning` atual ganha intervalo variável no tempo (rampa) e rajadas.
+4. **"HIDE" em rampa**: o `Kit/Whispers` (palavras na tela) tocado com taxa que sobe ao longo da cena (DEC-291).
+   Os raios do `Lightning` seguem disponíveis para outras cenas, mas não entram no apagão.
 5. **Porta da despensa "viva"**: fresta de luz no chão (Neon fino + `SurfaceLight` fraca), sombra que cruza a fresta,
    animação de tranco e sons de maçaneta.
 6. **Banco de sons** (entradas em `audio/sound-list.md`): quadro geral caindo, zumbido elétrico (subir/cair), trovão
@@ -84,6 +85,7 @@ anomalia acontece pela regra que já existe (o pacote de erro não muda). Jumpsc
 
 ## 5. Perguntas (lote, não bloqueiam)
 
-- "Raid, devagar" na fala = **raios** em rampa? (Provisório: sim.)
+- ~~"Raid, devagar" = raios?~~ **Respondida (DEC-291):** é o texto **"HIDE"** na tela, pouco no começo e em massa no fim.
 - Quem não se escondeu: jumpscare curto na janela (proposta) ou só o erro da regra, sem susto?
-- Opção "Reduzir movimento" no menu de configurações: entra junto (proposta: sim).
+- Opção "Reduzir movimento": o jogo **já tem** `Motion.Reduced()` (Interface/Components/Motion); a câmera de terror usa ela
+  (Provisório, Q-357).

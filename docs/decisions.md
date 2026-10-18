@@ -3817,3 +3817,12 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
 - **Provisório:** "raid, devagar" da fala transcrita lido como **raios** (tempestade em rampa) — confirmar com o dono; tempos de cada passo, mixagem e intensidade (game-designer + art-director); efeitos de câmera nunca tiram o controle por mais de ~2 s e respeitam uma opção de "reduzir movimento"; tudo **Mild** (sem sangue, susto curto; DEC-172).
 - **Emendas (append-only):** DEC-283 (apagão → esconder na despensa) ganha o roteiro acima como forma oficial da cena; DEC-286 (apaga tudo, só emergência vermelha) continua valendo — a "luz debaixo da porta" da despensa é a luz de emergência vista por baixo da porta. DEC-289 M4 ("olhos na borda da luz") passa a ser o primeiro passo de entrada dos monstros físicos dentro deste pilar.
 - Impacto: **game-designer** (roteiro e tempos de cada anomalia), **art-director** (VFX e luz), **frontend-coder** (sequenciador, câmera, VFX), **backend-coder** (tempo sincronizado da cena, porta), **level-designer** (porta e fresta de luz da despensa), **qa-tester**. Documento: `design/horror-cinematic.md`. Tarefas: **TASK-461 a TASK-471**.
+
+### DEC-291 — 2026-10-18 — Correção da DEC-290: o que aparece "pouco e depois em massa" é o texto HIDE, não raios (responde Q-355)
+
+- Origem: correção do dono (2026-10-18): "Eu não comentei raios, eu comentei hide, que é o texto que aparece na tela quando o jogador tem que se esconder de uma anomalia ou quando passa muito tempo fora do trailer."
+- Decidido: no passo 3 da sequência do apagão (DEC-290), começam as palavras **"HIDE"** na tela (`Effects/Kit/Whispers`): **poucas no começo, depois em massa**. Os raios **não** fazem parte do apagão.
+- Responde **`Q-355`**: a leitura Provisória "raios" estava errada.
+- **Emendas (append-only):** DEC-290 passo 3 ("raios") → "HIDE em rampa". `design/horror-cinematic.md` §2/§4, `Content.HorrorScenes` (passo `Whispers`), TASK-464 ajustados.
+- Nota sobre `Q-357`: o jogo já tem a opção de reduzir movimento (`Motion.Reduced()`); a câmera de terror (TASK-463) usa essa mesma opção — Provisório até o dono confirmar.
+- Impacto: **frontend-coder** (TASK-464), **game-designer**.

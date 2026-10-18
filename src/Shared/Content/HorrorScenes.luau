@@ -18,6 +18,8 @@
 --   Lights     Target "Off" | "On" | "Flicker" | "Cascade" over Duration (the anomaly's own light roots)
 --   Lightning  storm ramp: Value = first interval s, To = last interval s, over Duration; Burst = strikes per window at
 --              the end (rain/thunder of AtmosphereController, seeded)
+--   Whispers   the "HIDE" words on screen (Effects/Kit/Whispers), ramping: Value = rate at the start, To = rate at the
+--              end (1 = Kit default), over Duration (owner DEC-291: "few HIDE at first, then en masse")
 --   Vignette   screen darkening: Value -> To over Duration (0..Rules.MaxVignette)
 --   Shake      camera shake: Target = profile key of Rules.Shakes, Value = scale (default 1)
 --   Fov        field of view delta: Value degrees (|Value| <= Rules.MaxFov), To = 0 to come back, over Duration
@@ -37,6 +39,7 @@ export type StepKind =
 	| "Music"
 	| "Lights"
 	| "Lightning"
+	| "Whispers"
 	| "Vignette"
 	| "Shake"
 	| "Fov"
@@ -74,7 +77,7 @@ export type ShakeProfile = {
 
 export type Rules = {
 	Latency: number, -- s a one-shot may start late and still play
-	ReduceMotion: number, -- scale of Shake/Fov/Nudge with the "Reduce motion" setting (Q-357)
+	ReduceMotion: number, -- scale of Shake/Fov/Nudge when Motion.Reduced() (the game's existing reduced-motion setting)
 	MaxControlLock: number, -- s; no step may take the camera longer than this
 	MaxVignette: number,
 	MaxFov: number, -- degrees
@@ -98,12 +101,11 @@ const blackout: Scene = {
 		{ At = 0, Phase = "Active", Kind = "Fov", Value = -3, To = 0, Duration = 0.8 },
 		{ At = 1.5, Phase = "Active", Kind = "Sound", Target = "church_bell" },
 		{ At = 1.5, Phase = "Active", Kind = "Text", Text = "THE POWER IS OUT. HIDE IN THE PANTRY!", Duration = 4 },
-		-- the storm ramps: rare strikes, then many (owner: "first a low rate, then en masse")
-		{ At = 3, Phase = "Active", Kind = "Lightning", Value = 7, To = 1.5, Duration = 15, Burst = 3 },
+		-- the HIDE words ramp: a few at first, then all over the screen (owner, DEC-291)
+		{ At = 3, Phase = "Active", Kind = "Whispers", Value = 0.4, To = 3, Duration = 15 },
 		{ At = 3, Phase = "Active", Kind = "Music", Target = "score_violins" },
 		{ At = 3, Phase = "Active", Kind = "Vignette", Value = 0, To = 0.35, Duration = 15 },
-		-- the steps: the storm stops, heavy steps come closer to the pantry door
-		{ At = 18, Phase = "Active", Kind = "Lightning", Value = 0, To = 0, Duration = 0 },
+		-- the steps: the words stop, heavy steps come closer to the pantry door
 		{ At = 18, Phase = "Active", Kind = "Music", Target = "Stop" },
 		{ At = 18, Phase = "Active", Kind = "Sound", Target = "walker_step", Point = "SCENE-STEPS-FAR", To = "SCENE-DOOR-OUT", Duration = 12 },
 		{ At = 18, Phase = "Active", Kind = "Fov", Value = 1, To = 0, Duration = 12 },
