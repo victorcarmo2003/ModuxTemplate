@@ -28,7 +28,7 @@ local function catalog(): string
 	const lines: { string } = {}
 	for _, row in Content.Anomalies.List do
 		const family = row.Family
-		const tags = if Kit.isCut(row.Key) then " [cut: restaurant]" elseif family == nil then " [off agenda]" else ""
+		const tags = if family == nil then " [off agenda]" else ""
 		table.insert(lines, `  {row.Ref} {row.Name} ({row.Key}){if family then `, family {family}` else ""}{tags}`)
 	end
 	return `catalog:\n{table.concat(lines, "\n")}`

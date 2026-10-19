@@ -80,31 +80,11 @@ correct["ANM-004"] = function(env: Env): string
 	return "refused the copy"
 end
 
-correct["ANM-002"] = function(env: Env): string
-	running(env, "ANM-002")
-	-- simulated discard: the real one is a trip to the bin with the item in hand
-	env.Anomaly:DevEmit({ Kind = "Discard", Player = env.Player, Item = "hot_dog", Altered = true })
-	env.Kitchen:ClearAltered()
-	return "discard event injected (altered item cleared from the station)"
-end
-
 correct["ANM-005"] = function(env: Env): string
 	const id, _model = actor(env, "ANM-005")
 	-- simulated serve: the real one needs a made hot dog in hand
 	env.Anomaly:DevEmit({ Kind = "Customer", Npc = id, Action = "serve", Player = env.Player, Result = "Complete" })
 	return "serve event injected (Complete)"
-end
-
-correct["ANM-003"] = function(env: Env): string
-	running(env, "ANM-003")
-	const hold = paramNumber(env, "ANM-003", "DarkHold", 5)
-	if not env.Lights:SetSwitch(false, env.Player) then
-		error("the light switch refused (Hush running?)", 0)
-	end
-	task.delay(hold + 0.7, function()
-		env.Lights:SetSwitch(true, env.Player)
-	end)
-	return `switch off now, back on in {string.format("%.1f", hold + 0.7)} s`
 end
 
 local function shutterOrLeave(env: Env, ref: string): string

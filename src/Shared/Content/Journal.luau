@@ -50,11 +50,6 @@ const written: { Page } = {
 		"Even while standing still in line.",
 	}, { "No sound. The face looks normal." }, { "Refuse them: close the window." }),
 
-	page("anm_002_wrong_food", "The Wrong Food", "Refuse", {
-		"Weird food on the rail or the board.",
-		"A little grey puff and a sizzle.",
-	}, { "No customer asked for it." }, { "Throw it in the trash.", "Never serve it." }),
-
 	page("anm_012_turned_neck", "The Turned Neck", "Refuse", {
 		"The head is turned all the way back.",
 		"Sometimes it spins, slowly.",
@@ -86,20 +81,10 @@ const written: { Page } = {
 		"She drips water on a dry night.",
 	}, { "She is NOT a monster." }, { "Serve her! Never refuse her.", "Don't make her wait." }),
 
-	page("anm_003_stopped_clock", "The Bell", "Lights", {
-		"A church bell rings. Count it!",
-		"Street lamps die on the first ring.",
-	}, { "The trailer light stays on... for now." }, { "Turn OFF the trailer light", "before the third ring." }),
-
 	page("anm_014_big_head", "The Big Head", "Refuse", {
 		"The head is way too big.",
 		"Or way too tiny.",
 	}, { "The body looks normal." }, { "Refuse them: close the window." }),
-
-	page("anm_007_walker", "The Walker", "Hide", {
-		"Trailer lights buzz and flicker.",
-		"Heavy steps come closer.",
-	}, { "No scratching, no whispers." }, { "Go out the back door.", "Hide behind the trailer. Stay put." }),
 
 	page("anm_015_floater", "The Floater", "Refuse", {
 		"Floats a little above the ground.",
@@ -119,11 +104,6 @@ const written: { Page } = {
 		"Never blinks. Never moves.",
 		"The head follows you everywhere.",
 	}, { "Looking at it on the cameras is safe." }, { "Refuse them: close the window." }),
-
-	page("anm_018_grin", "The Grin", "Hide", {
-		"The word 'hide' whispers on your screen.",
-		"A huge face at the window.",
-	}, { "No sound at all. No steps." }, { "When the whispers come, hide out back." }),
 
 	page("anm_008_long_car", "The Long Car", "Careful", {
 		"A long car stops by the trailer.",

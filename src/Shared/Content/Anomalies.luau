@@ -37,7 +37,6 @@
 -- Family is open on the night (Nights[k].Families) and whose SkipAtmospheres does not hold the night's Atmosphere.
 -- SkipAtmospheres: ATM-# keys (Content.Atmospheres, TASK-275) where the row never plays (DEC-257 note: the Raincoat
 -- Lady is not drawn on rain nights).
-local Restaurant = require(script.Parent.Restaurant)
 local Table = require(script.Parent.Table)
 
 export type Actor = "Customer" | "Street" | "Vehicle" | "World" | "Audio" | "Item"
@@ -84,13 +83,6 @@ export type Cue = {
 -- Instant effects (packet AnomalyCue). Flavor effects only from DEC-195 (no frozen clock, no +$1).
 const cues = Table.new({
 	{ Key = "blank_coin", Kind = "Visual", Duration = 0 }, -- N1 flavor: coin with no design in the drawer
-	{ Key = "smoke", Kind = "Both", Duration = 2 }, -- N2 flavor: the hot dog turns to smoke on the bite
-	{ Key = "clock_stop", Kind = "Both", Duration = 0 }, -- N3 sign: bank clock hands stop, ticking stops
-	{ Key = "clock_resume", Kind = "Both", Duration = 0 }, -- N3: ticking comes back
-	-- ANM-003 remade (TASK-340): Entity = stroke 1..3 of the church bell (the 1st also kills the street posts)
-	{ Key = "bell", Kind = "Audio", Duration = 0 },
-	-- ANM-003: the trailer light was on at the 3rd stroke: cartoon moths and bats swarm the light, then everyone faints
-	{ Key = "swarm", Kind = "Visual", Duration = 2 },
 	{ Key = "mirror_smile", Kind = "Visual", Duration = 2 }, -- N4 flavor: the copy's frozen smile
 	-- N4 door flow (DEC-247, Provisional). Entity = knock number 1..3; the 1st one also makes the copy appear (only for who is inside the trailer)
 	{ Key = "copy_knock", Kind = "Both", Duration = 0 }, -- N4: the copy stands at the back door and knocks
@@ -100,9 +92,6 @@ const cues = Table.new({
 	-- ANM-006 The stalker (DEC-260, TASK-351): it walks while on screen (record Step, footsteps on the client)
 	{ Key = "stalker_leap", Kind = "Both", Duration = 1 }, -- it leaps in through the open service window
 	{ Key = "stalker_bang", Kind = "Both", Duration = 1 }, -- window closed: it bangs on it and leaves
-	{ Key = "post_buzz", Kind = "Audio", Duration = 2 }, -- N7 start sign: last Juniper post buzzes (DEC-123)
-	{ Key = "post_flicker", Kind = "Visual", Duration = 0.5 }, -- N7: the post of the current step flickers
-	{ Key = "walker_step", Kind = "Both", Duration = 0 }, -- N7: one muffled step
 	{ Key = "car_highbeam", Kind = "Visual", Duration = 0 }, -- N8 sign: high beam on the trailer
 	{ Key = "car_flash", Kind = "Visual", Duration = 1 }, -- N8: high beam flashes twice
 	{ Key = "car_honk", Kind = "Audio", Duration = 0 }, -- N8 flavor: low honk
@@ -185,9 +174,6 @@ const blankFolks = anomaly(1, "anm_001_blank_folks", "The blank folks", "Custome
 })
 blankFolks.Family = "A" -- V2 family A (DEC-254)
 
-const wrongFood = anomaly(2, "anm_002_wrong_food", "The wrong food", "Item", 0, "Party", 60, false, {}, { "smoke" })
-wrongFood.Family = "A" -- DEC-254: ANM-002 joins family A
-
 const copies = anomaly(4, "anm_004_copies", "The copies", "Customer", 1, "Party", 60, false, {}, {
 	"mirror_smile",
 	"copy_knock",
@@ -217,34 +203,13 @@ knock.Family = "D" -- DEC-254: ANM-009 becomes a scare
 -- event with a stake before the monsters; Night 9's call still repeats "don't open" (Ref keeps ANM-009)
 knock.Night = 2
 
-const walker = anomaly(7, "anm_007_walker", "The Walker", "Street", 1, "Party", 300, true, {}, {
-	"post_buzz",
-	"post_flicker",
-	"walker_step",
-	"hide_warn",
-	"monster_pass",
-	"jumpscare",
-})
-walker.Night = 6 -- §5: the first family B monster, Night 6 (Ref keeps ANM-007)
-walker.Family = "B" -- DEC-254: ANM-007 is the first hide monster (TASK-272)
-walker.Scripted = { Night = 10, Clock = 1785 } -- FEAT-027: stands under the last post during the scripted Hush
-
 const hush = anomaly(10, "anm_010_hush", "The Hush", "World", 0, "PerPlayer", 200, true, {
-	"anm_003_stopped_clock",
 	"anm_005_raincoat_lady",
 	"anm_008_long_car",
 	"anm_009_knock",
 }, { "hush_fog", "jumpscare" })
-hush.Family = "C" -- DEC-254: ANM-003/010 in family C
+hush.Family = "C" -- DEC-254: family C
 hush.Scripted = { Night = 10, Clock = 1785 } -- FEAT-027: 3rd occurrence of Night 10 at 5:45 AM, leads to the Final
-
-const stoppedClock = anomaly(3, "anm_003_stopped_clock", "The stopped clock", "World", 0, "Party", 100, false, {
-	"anm_010_hush",
-	"anm_020_blackout", -- TASK-340: the bell's answer is the trailer switch, which does nothing in a blackout
-}, { "clock_stop", "clock_resume", "bell", "swarm" })
-stoppedClock.Trailer = "Needs" -- the verb is the trailer's light switch
-stoppedClock.Night = 5 -- family C opens on Night 3 with the blackout (TASK-341); the clock joins on Night 5
-stoppedClock.Family = "C"
 
 const longCar = anomaly(8, "anm_008_long_car", "The long car", "Vehicle", 1, "PerPlayer", 100, true, {
 	"anm_005_raincoat_lady",
@@ -268,7 +233,6 @@ stalker.Family = "D"
 
 -- V2 family C (DEC-254, TASK-273): everything goes dark, the breaker at the back (hold 3 s), the shade attacks in 30 s
 const blackout = anomaly(4, "anm_020_blackout", "The blackout", "World", 0, "Party", 100, true, {
-	"anm_003_stopped_clock",
 	"anm_019_roof_walker",
 	"anm_021_red_fog",
 }, {
@@ -312,12 +276,9 @@ const rows: { Anomaly } = {
 	-- ViewRange: 60 default, 80 N6, 300 N7 (FEAT-019); 100 N3/N8 and 200 N10 Provisional (C-01 ~73 studs,
 	-- AN-12 ~63, Juniper posts 82-135 from the counter; MAP-01 §6, §10.3)
 	blankFolks,
-	wrongFood,
-	stoppedClock,
 	copies,
 	raincoat,
 	stalker,
-	walker,
 	longCar,
 	knock,
 	hush,
@@ -328,22 +289,10 @@ const rows: { Anomaly } = {
 	odd(7, 15, "anm_015_floater", "The floater"),
 	odd(8, 16, "anm_016_starer", "The starer"),
 	monster(7, 17, "anm_017_crawler", "The crawler"),
-	monster(8, 18, "anm_018_grin", "The grin"),
 	roofWalker,
 	blackout,
 	redFog,
 }
-
--- TASK-390 (restaurant, Content.Restaurant.Rules.Enabled; Restaurant.Switch): the rows tied to the trailer's door,
--- HideZone, switch or food leave the agenda by data (Family nil, no Scripted entry); Night per DebutNights. Off = untouched
-const cut = Restaurant.Switch.CutAnomalies
-for _, row in rows do
-	if table.find(cut, row.Key) then
-		row.Family = nil
-		row.Scripted = nil
-	end
-	row.Night = Restaurant.Switch.DebutNights[row.Key] or row.Night
-end
 
 const base = Table.new(rows)
 

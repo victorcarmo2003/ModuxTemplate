@@ -41,12 +41,9 @@ end
 
 const ANOMALY_DESC: { [string]: string } = {
 	["ANM-001"] = "A faceless customer walks to the counter (empty order bubble, no breathing). Taking its order costs sanity; refusing resolves it; leaving it is free.",
-	["ANM-002"] = "A gray sausage or a bitten bun shows up on the rail or a board. Serving a hot dog made with it fails (it turns to smoke); throwing it away resolves.",
-	["ANM-003"] = "The bank clock stops and its ticking dies. Party target: lights off ~5 s then on again within 60 s, or everyone pays. Trailer light switch.",
 	["ANM-004"] = "Two identical customers, the copy is mirrored. Refuse the copy. Taking the copy's order fails; refusing the original is only a lost sale.",
 	["ANM-005"] = "The Raincoat Lady drips on a dry night. Always serve her; refusing her (or letting her patience run out) fails.",
 	["ANM-006"] = "A tall figure across the street only moves while someone stares at it. At the window it leaps in on the nearest player (closed window: it bangs and leaves). Look away and it fades by itself.",
-	["ANM-007"] = "CRITICAL. The Walker steps closer for every second anyone looks at it (4 posts). Reaching the last post loses the night at once. Never look.",
 	["ANM-008"] = "A long black car parks across the street and flashes its high beam at the trailer. Close the service window before the flash and keep it shut.",
 	["ANM-009"] = "Three knocks, a pause, three more at the back door ('Walt' voice). Close the service window and stay inside until it stops.",
 	["ANM-010"] = "The Juniper posts go out one by one to the corner. Be at the Mart sign (safe spot) when the last post goes out; stay until the lights return.",
@@ -82,16 +79,10 @@ end
 
 local function anomalyItems(): { Item }
 	const out: { Item } = {}
-	-- owner 2026-10-18: the cut anomalies (Restaurant.Switch.CutAnomalies) leave the panel; the rest in play order
-	const cut: { [string]: boolean } = {}
-	for _, key in Content.Restaurant.Switch.CutAnomalies do
-		cut[key] = true
-	end
+	-- in play order
 	const rows: { Content.Anomaly } = {}
 	for _, row in Content.Anomalies.List do
-		if not cut[row.Key] then
-			table.insert(rows, row)
-		end
+		table.insert(rows, row)
 	end
 	table.sort(rows, function(a: Content.Anomaly, b: Content.Anomaly): boolean
 		if a.Night ~= b.Night then
@@ -107,11 +98,6 @@ local function anomalyItems(): { Item }
 		end
 		if Resolve.HasWrong(ref) then
 			table.insert(actions, act("wrong", "Wrong verb"))
-		end
-		if ref == "ANM-007" then
-			for step = 1, 4 do
-				table.insert(actions, act("dev", if step == 4 then "Step 4 (loses)" else `Step {step}`, `walker {step}`))
-			end
 		end
 		table.insert(actions, act("stop", "Reset"))
 		table.insert(out, {

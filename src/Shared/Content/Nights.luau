@@ -21,7 +21,6 @@
 --               open families, never the same anomaly twice in a row
 --   Scares      family D scares without a verb (HallucinationController, TASK-274); 0 when D is closed
 local Flow = require(script.Parent.Flow)
-local Restaurant = require(script.Parent.Restaurant)
 local Table = require(script.Parent.Table)
 
 export type Customers = {
@@ -73,8 +72,7 @@ local function night(
 		Key = `night_{index}`,
 		Index = index,
 		Duration = duration,
-		-- TASK-390: with the restaurant on, a night whose premiere left the agenda presents Restaurant.Switch.NewAnomalies[k]
-		NewAnomaly = Restaurant.Switch.NewAnomalies[index] or anomaly,
+		NewAnomaly = anomaly,
 		Families = families,
 		Atmosphere = atmosphere,
 		Events = events,
@@ -100,9 +98,9 @@ const base = Table.new({
 	night(3, 620, "anm_020_blackout", { "A", "C", "D" }, "ATM-2", 6, 4, 1, 50, 40),
 	night(4, 660, "anm_012_turned_neck", { "A", "C", "D" }, "ATM-4", 7, 5, 2, 45, 40),
 	night(5, 700, "anm_013_white_eyes", { "A", "C", "D" }, "ATM-6", 7, 5, 2, 40, 40),
-	night(6, 740, "anm_007_walker", { "A", "B", "C", "D" }, "ATM-3", 8, 5, 2, 40, 36),
+	night(6, 740, "anm_014_big_head", { "A", "B", "C", "D" }, "ATM-3", 8, 5, 2, 40, 36),
 	night(7, 780, "anm_017_crawler", { "A", "B", "C", "D" }, "ATM-5", 8, 5, 2, 40, 36),
-	night(8, 820, "anm_018_grin", { "A", "B", "C", "D" }, "ATM-2", 9, 6, 3, 25, 36),
+	night(8, 820, "anm_008_long_car", { "A", "B", "C", "D" }, "ATM-2", 9, 6, 3, 25, 36),
 	night(9, 860, "anm_019_roof_walker", { "A", "B", "C", "D" }, "ATM-3", 10, 6, 3, 25, 36),
 	night(10, 900, "anm_010_hush", { "A", "B", "C", "D" }, "ATM-7", 12, 6, 3, 25, 36),
 } :: { Night })

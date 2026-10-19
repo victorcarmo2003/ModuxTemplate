@@ -7,18 +7,11 @@ local conch = require(ReplicatedStorage.Packages.Conch)
 
 const MAX_MONEY = 1_000_000_000
 
--- Anomalies in play order (owner 2026-10-18: drop the cut ones from the console, numbers in order): the rows not in
--- Restaurant.Switch.CutAnomalies, by debut night, then by Ref.
+-- Anomalies in play order (owner 2026-10-18: numbers in order): by debut night, then by Ref.
 local function playable(): { any }
-	const cut: { [string]: boolean } = {}
-	for _, key in Content.Restaurant.Switch.CutAnomalies do
-		cut[key] = true
-	end
 	const out: { any } = {}
 	for _, row in Content.Anomalies.List do
-		if not cut[row.Key] then
-			table.insert(out, row)
-		end
+		table.insert(out, row)
 	end
 	table.sort(out, function(a: any, b: any): boolean
 		if a.Night ~= b.Night then

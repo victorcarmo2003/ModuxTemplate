@@ -7,12 +7,9 @@
 -- A key missing here = not uploaded: the page draws the placeholder ("?" on a dark print).
 const IMAGES: { [string]: string } = {
 	anm_001_blank_folks = "rbxassetid://93411118395581",
-	anm_002_wrong_food = "rbxassetid://85434082247860",
-	anm_003_stopped_clock = "rbxassetid://72527470459890",
 	anm_004_copies = "rbxassetid://127849355243716",
 	anm_005_raincoat_lady = "rbxassetid://127161413498365",
 	anm_006_stalker = "rbxassetid://112559536931919",
-	anm_007_walker = "rbxassetid://137336318915315",
 	anm_008_long_car = "rbxassetid://107979332456309",
 	anm_009_knock = "rbxassetid://122437612318104",
 	anm_010_hush = "rbxassetid://138604106785686",
@@ -23,7 +20,6 @@ const IMAGES: { [string]: string } = {
 	anm_015_floater = "rbxassetid://88597122913821",
 	anm_016_starer = "rbxassetid://126146357945175",
 	anm_017_crawler = "rbxassetid://113714055015815",
-	anm_018_grin = "rbxassetid://116836648031335",
 	anm_019_roof_walker = "rbxassetid://107194096377875",
 	anm_020_blackout = "rbxassetid://116889914786039",
 }

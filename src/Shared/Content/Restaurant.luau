@@ -3,8 +3,6 @@
 -- DEC-269..DEC-280). Owner: game-designer (numbers) + architect (binding names). Every number Provisional.
 -- The restaurant is the only flow (DEC-307, 2026-10-18): the trailer mode and its rollback switch are gone. The
 -- tables that used to follow the switch (Prep, Seating, Vehicles, Supply) hold the restaurant values themselves.
--- Switch keeps only the anomaly agenda changes of the restaurant (cut rows, premieres, debut nights) until the cut
--- rows leave the catalog (TASK-564).
 -- "ByParty" lists have 4 entries: party of 1..4 active players at the start of the shift (Q-067).
 local Table = require(script.Parent.Table)
 
@@ -332,45 +330,8 @@ local function pickupPoints(count: number?): { string }
 	return out
 end
 
--- The anomaly agenda of the restaurant (DEC-279, DEC-294, DEC-307). Pure data, read at require time.
-export type Switch = {
-	-- Anomalies keys out of the agenda (Family nil, Scripted nil); the row, module and Journal page stay (dev can force them)
-	CutAnomalies: { string },
-	NewAnomalies: { [number]: string }, -- night index -> Nights[k].NewAnomaly override
-	DebutNights: { [string]: number }, -- Anomalies key -> Night override (a night whose premiere was cut needs a debut)
-}
-
-
--- design/anomalies-v3-restaurant.md §8.1 (DEC-279, Provisional until wave R4 adapts them) + Q-331 ("hide" leaves):
---   ANM-002 food (work channel) · ANM-003 bank clock + trailer switch · ANM-004 back door knock · ANM-007, 017, 018
---   family B (hide in the HideZone behind the trailer, no back door; ANM-019 left the cut with TASK-484: it is "don't look up") · ANM-009 back door knock / crack
--- TASK-483 (DEC-294): ANM-004 is back (no back door here, so the copy only costs sanity; stare pressure, its scene) and
--- ANM-017 is back as "get off the floor" (Kit/Hide Test "Floor", its scene); ANM-009 is back (owner 2026-10-18: Walt
--- knocking on the back door, now opened by hand, RestaurantDoorService)
-const CUT_ANOMALIES = {
-	"anm_002_wrong_food",
-	"anm_003_stopped_clock",
-	"anm_007_walker",
-	"anm_018_grin",
-}
-
-const switch: Switch = {
-	CutAnomalies = CUT_ANOMALIES,
-	-- premieres of nights 6..8 were family B: the family A row debuting that night takes the call (Provisional; the
-	-- boss call texts of those nights still name the old monster until the narrative pass of wave R4)
-	NewAnomalies = {
-		[6] = "anm_014_big_head",
-		-- [7] crawler presents Night 7 again (TASK-483), the floater debuts beside it as in the trailer
-		[8] = "anm_008_long_car",
-	},
-	-- TASK-484: ANM-019 is back in the restaurant ("don't look up", no HideZone) and presents Night 9 again; the starer
-	-- keeps its own debut (Night 8, silently, like before the cut)
-	DebutNights = {},
-}
-
-export type Module = Restaurant & { PickupPoints: (count: number?) -> { string }, Switch: Switch }
+export type Module = Restaurant & { PickupPoints: (count: number?) -> { string } }
 
 const out: Module = table.clone(restaurant) :: any
 out.PickupPoints = pickupPoints
-out.Switch = switch
 return Table.record(out)

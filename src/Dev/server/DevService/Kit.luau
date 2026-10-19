@@ -176,10 +176,6 @@ function Kit.anomaly(word: string): string
 	error(`unknown anomaly "{word}" (key, ANM-###, number or name; "trigger list")`, 0)
 end
 
--- true when the restaurant took the row out of the agenda (Content.Restaurant.Switch.CutAnomalies)
-function Kit.isCut(key: string): boolean
-	return table.find(Content.Restaurant.Switch.CutAnomalies, key) ~= nil
-end
 
 -- Shifts ------------------------------------------------------------------------------------------------------------
 

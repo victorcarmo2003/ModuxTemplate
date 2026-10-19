@@ -170,14 +170,11 @@ const stages = Table.new({
 
 -- Outside anomalies only (rule 2: the omen is reserved). Ramps mirror the Rules windows (Provisional).
 const anomalies: { [string]: AnomalyScore } = {
-	["ANM-003"] = { Signal = "Uneasy", Active = "Tension", Ramp = 20 }, -- the bell
 	["ANM-006"] = { Signal = "Uneasy", Active = "Tension", Ramp = 20 }, -- the stalker at the bus stop
-	["ANM-007"] = { Signal = "Tension", Active = "Climax", Ramp = 9 }, -- family B: the warning IS the approach
 	["ANM-008"] = { Signal = "Uneasy", Active = "Tension", Ramp = 8 }, -- the long car
 	["ANM-009"] = { Signal = "Uneasy", Active = "Tension", Ramp = 10 }, -- knock at the back
 	["ANM-010"] = { Signal = "Uneasy", Active = "Tension", Ramp = 15 }, -- the Hush
 	["ANM-017"] = { Signal = "Tension", Active = "Climax", Ramp = 9 },
-	["ANM-018"] = { Signal = "Tension", Active = "Climax", Ramp = 9 },
 	["ANM-019"] = { Signal = "Uneasy", Active = "Tension", Ramp = 16 },
 	["ANM-021"] = { Signal = "Tension", Active = "Climax", Ramp = 12 }, -- the red fog: rises with the bell, beats on the glass -- TASK-484: the walk on the roof (Rules/ANM-019 WalkFor)
 	-- the blackout (TASK-444): omen flicker -> dark + violins up to the attack -> choir if nobody reset the power

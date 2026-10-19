@@ -1072,9 +1072,7 @@ local function checkAnomalies()
 			end
 		end
 		inRange("Anomalies", index, key, "Night", row.Night, 1, RunParams.Nights)
-		-- V1 rows only: a V2 row cut by the restaurant switch (Restaurant.Switch.CutAnomalies, TASK-390) keeps its V2 Ref
-		const restaurantCut = table.find(Restaurant.Switch.CutAnomalies, key) ~= nil
-		if row.Family == nil and not restaurantCut and row.Ref ~= string.format("ANM-%03d", row.Night) then
+		if row.Family == nil and row.Ref ~= string.format("ANM-%03d", row.Night) then
 			fail("Anomalies", index, key, `Ref '{row.Ref}' must be ANM-00k for debut night k (DEC-096; V1 row)`)
 		end
 		if not string.match(row.Ref, "^ANM%-%d%d%d$") then
@@ -2634,20 +2632,6 @@ local function checkRestaurant()
 	end
 	if Seating.SitAt ~= "Order" and Seating.SitAt ~= "Served" then
 		fail("Seating", nil, nil, `SitAt '{tostring(Seating.SitAt)}' must be Order or Served`)
-	end
-	const switch = Restaurant.Switch
-	for _, key in switch.CutAnomalies do
-		const row = Anomalies.ByKey[key]
-		if row == nil then
-			fail(name, nil, key, "Switch.CutAnomalies: not a Content.Anomalies key")
-		elseif row.Family ~= nil or row.Scripted ~= nil then
-			fail(name, nil, key, "Switch.CutAnomalies: the row is still in the agenda")
-		end
-	end
-	for key in switch.DebutNights do
-		if Anomalies.ByKey[key] == nil then
-			fail(name, nil, key, "Switch.DebutNights: not a Content.Anomalies key")
-		end
 	end
 end
 
