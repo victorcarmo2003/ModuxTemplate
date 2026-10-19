@@ -41,8 +41,8 @@ e gorjeta · `SO` solo · `SA` saídas · `TR` trailer · `CE` celular · `AB` a
 | P3 | Studio | uma sessão por vez (board: não junto com 449/454/465/477/480). Antes: sincronizar as edições à mão do dono no `restaurant_bind.luau`, `Place.diff` = 0, o dono salva. **Nunca `Place.run`** (`AGENT-BRIEF.md` §3) |
 | P4 | Jogadores | Test > Clients and Servers: **1**, **2** e **4** clients. Output do servidor e de cada client abertos |
 | P5 | Celular | Test > Device: dispositivo personalizado **667 × 375** (paisagem), entrada por toque. Um client em 667×375 e o outro em PC na dupla |
-| P6 | Dev mode | `DevService` carregado; atalhos: `/dev intro skip`, `/dev day 2`, `/dev shutter open`, `/dev arrivals off`, `/dev customer pair ketchup mustard`, `/dev tablet [state\|talk\|finish]`, `/dev pickup [serve\|ticket <npc>]`, `/dev prep grade`, `/dev prep seats`, `/dev smoke`, `/dev interactlog`, `/dev upgrade` (nível da grelha), `/dev anomaly <key>`, `/dev sanity <n>`; da **TASK-505**: `/dev belt`, `/dev center`, `/dev plate` |
-| P7 | Preparo padrão | `/dev intro skip` → `/dev day 2` → `/dev shutter open` → esperar `Open` → `/dev arrivals off` → um cliente por vez com `/dev customer pair ketchup mustard` (K = 2, pedido conhecido) |
+| P6 | Dev mode | `DevService` carregado; atalhos: `/dev tutorial intro`, `/dev day 2`, `/dev skip`, `/dev customer off`, `/dev customer pair ketchup mustard`, `/dev tablet [state\|talk\|finish]`, `/dev pickup [serve\|ticket <npc>]`, `/dev prep grade`, `/dev prep seats`, `/dev smoke`, `/dev debug interact`, `/dev upgrade` (nível da grelha), `/dev trigger <key>`, `/dev sanity <n>`; da **TASK-505**: `/dev belt`, `/dev center`, `/dev plate` |
+| P7 | Preparo padrão | `/dev tutorial intro` → `/dev day 2` → `/dev skip` → esperar `Open` → `/dev customer off` → um cliente por vez com `/dev customer pair ketchup mustard` (K = 2, pedido conhecido) |
 
 ### 0.2 Snippets de medição (Command Bar)
 
@@ -369,7 +369,7 @@ Jogadores: 2. Para cada caso, S5 **antes e depois** (`AliveCount`, tickets vivos
 | SA-2 | voltar pelo Work com **outro** prato na mão | retoma o prato parado, na mesma parada; o da mão fica na mão | S2, Explorer | 514 | |
 | SA-3 | Leave com o prato em `Out` (depois do Finish) | `hot_dog` volta à mão equipado; assento e parada liberam | S2 | 514 | |
 | SA-4 | desconectar (fechar o client) com o prato na parada 3 | o prato vai para uma vaga livre da mesa com ticket e conteúdo; assento e parada liberam; quem esperava é promovido | S4, S2, S5 | 514, 516 | §7.3 garante vaga |
-| SA-5 | desmaio (`/dev sanity 0` ou `Down`) e uma anomalia que dá `Kick` (`/dev anomaly <key>` com sinal) com o prato na parada 2 | prato **parado** como no Leave; `CueLock` de 6 s no sinal; nada some | S2, S5 | 514 | |
+| SA-5 | desmaio (`/dev sanity 0` ou `Down`) e uma anomalia que dá `Kick` (`/dev trigger <key>` com sinal) com o prato na parada 2 | prato **parado** como no Leave; `CueLock` de 6 s no sinal; nada some | S2, S5 | 514 | |
 | SA-6 | prato parado por mais de `ParkMax` (120 s; PR-6) | vai sozinho à mesa central; o assento libera | S2, S4 | 514 | P25 |
 | SA-7 | fim da venda (`KickClosing`) com prato parado na esteira | volta **à mão** | S2, Explorer | 514 | |
 | SA-8 | grelhador sai (Leave, desmaio, desconexão) com 2 salsichas cozinhando | o assento 3 libera; as salsichas seguem cozinhando e vão ao descanso | S3 | 514, 515 | |
@@ -410,7 +410,7 @@ Client em 667×375 com toque. Cada caso: 10 tentativas seguidas; anotar acertos/
 
 Command Bar da visão **Client** com `local Net = require(game.ReplicatedStorage.shared.Libs.Net)` (e
 `require(game.ReplicatedStorage.shared.Libs.Net.Restaurant)`), mesma API do controller. Cada caso termina com o servidor
-intacto (nenhum erro no Output), `AliveCount` igual e sem punição a jogador legítimo. `/dev interactlog` ligado.
+intacto (nenhum erro no Output), `AliveCount` igual e sem punição a jogador legítimo. `/dev debug interact` ligado.
 
 | ID | Ataque | Esperado | Dep. |
 |---|---|---|---|
@@ -455,7 +455,7 @@ intacto (nenhum erro no Output), `AliveCount` igual e sem punição a jogador le
 | BO-8 | jogador sai **segurando E no `PICKUP`** | nenhuma venda, nenhum dinheiro; o prato segue BO-7 | 516 |
 | BO-9 | atendente do tablet sai no meio da fala | fala cancelada na hora, sem pedido e sem prato; cliente fica em `Q1` (e2e C6, R-8 corrigido) | — (já no código) |
 | BO-10 | fim do turno (`ShiftStarted`) com pratos na mesa, mão e esteira | `PlateService:Clear()`: nenhum prato nem ticket no turno seguinte; salsichas da grelha e do descanso somem no `Summary` | 514, 516 |
-| BO-11 | `/dev anomaly anm_020_blackout` com 2 pratos na esteira | saída forçada = pratos parados (SA-5); luz volta, retoma | 514 |
+| BO-11 | `/dev trigger anm_020_blackout` com 2 pratos na esteira | saída forçada = pratos parados (SA-5); luz volta, retoma | 514 |
 | BO-12 | resume de snapshot no meio do turno | nenhum `plate` volta do snapshot (P16); tickets e pratos zerados sem erro | 516 |
 
 ---

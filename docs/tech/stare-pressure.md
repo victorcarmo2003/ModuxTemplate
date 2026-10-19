@@ -54,7 +54,7 @@ Cabeça e rosto voltam à pose do servidor quando a pressão cai. Números em `C
 
 ## 4. Como testar (Play)
 
-1. Noite em andamento: `/dev anomaly ANM-012` (depois `ANM-004`, `ANM-013`). Ficar em primeira pessoa no balcão.
+1. Noite em andamento: `/dev trigger ANM-012` (depois `ANM-004`, `ANM-013`). Ficar em primeira pessoa no balcão.
 2. Olhar direto para a cabeça do cliente (mira no rosto: o cone é 18°): ~2 s depois coração, bordas e whispers; a cabeça
    começa a seguir e a inclinar de lado; o rosto distorce.
 3. Ficar mais ~1 s: a sanidade cai 1–2 por segundo e para em −20 (mais os −5 da visão, uma vez por noite).

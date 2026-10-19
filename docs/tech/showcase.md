@@ -13,7 +13,7 @@ antes de registrar o responder: os packets existem no schema mas ninguém escuta
 | Jeito | |
 |---|---|
 | tecla **F9** | liga/desliga (só em dev, `ShowcaseController`) |
-| chat `/dev showcase` | pede ao servidor para abrir o painel do chamador |
+| chat `/dev ui showcase` | pede ao servidor para abrir o painel do chamador |
 | Conch (F2) `showcase` | idem |
 | Conch `anomaly <ANM-###, chave ou noite> trigger, resolve, wrong ou stop` | age numa anomalia sem abrir o painel |
 | Conch `scare <id>` | toca uma alucinação (`fake_call`, `whisper`...) ou `sting:<som>` (`sting:jumpscare`) no seu client |

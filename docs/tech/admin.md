@@ -25,7 +25,7 @@ Os dois são requeridos direto (`ReplicatedStorage.Packages.Conch/ConchUI`), nun
 | `dev-help` | servidor devolve o texto de ajuda do DevService (usado pelo `help`) |
 | `dev <comando> [args]` | ponte para o `DevService`: os mesmos comandos, args e help do chat `/dev` (`dev help` lista) |
 | `day <n>`, `night <n>`, `cash <n>`, `gems <n> [player]`, `upgrade [key] [level]` | atalhos tipados; encaminham ao comando homônimo do DevService |
-| `showcase` | abre o painel de showcase (testar anomalias, sustos e mecânicas; também F9 e `/dev showcase`). Ver `showcase.md` |
+| `showcase` | abre o painel de showcase (testar anomalias, sustos e mecânicas; também F9 e `/dev ui showcase`). Ver `showcase.md` |
 | `anomaly <id> <trigger, resolve, wrong ou stop>` | `<id>` = `ANM-###`, chave ou número da noite; passa pelo `ShowcaseService` (mesmo gate dev + whitelist) |
 | `scare <id>` | alucinação (`fake_call`, `whisper`...) ou `sting:<som>` no seu client |
 | `tp <player>` / `tp <alvo> <player>` | teletransporte |
@@ -36,7 +36,7 @@ Comando novo em `src/Dev/server/DevService/Commands/` aparece sozinho em `dev <c
 
 `showcase`, `anomaly` e `scare` falam com o `ShowcaseService` (feature `src/Showcase`), que só liga em modo dev e reconfere
 `IsDev` + `AdminSettings.IsAllowed` em cada chamada; publicado respondem "showcase is not available here". Comandos novos do
-`DevService` ligados a eles: `/dev showcase` e `/dev revive [player]`.
+`DevService` ligados a eles: `/dev ui showcase` e `/dev revive [player]`.
 
 **Política de produção:** o `DevService` só existe em modo dev (`PlaceService:IsDev()`: Run em Studio sem
 PrivateServerId). Publicado, `dev ...`, `day`, `night`, `cash`, `gems`, `upgrade` respondem "dev commands are off"

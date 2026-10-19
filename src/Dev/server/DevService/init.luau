@@ -4,7 +4,8 @@
 -- Entry without Lync, two ways:
 --   Command Bar (Server view): require(game.ServerScriptService.server.Dev.DevService).Run("day", 4)
 --   Chat: /dev <command> <args>   (TextChatCommand created on the server; "/dev help" lists the commands)
--- Commands come from Commands/*.luau (contract in Api.luau), discovered at OnStart: new command = new file.
+-- Commands come from Commands/*.luau (contract in Api.luau), discovered at OnStart: new command = new file. The live
+-- set and what was removed: docs/tech/dev-commands.md.
 -- The Command Bar may get its own copy of this module (separate require cache), so Run forwards through a
 -- BindableFunction parented to this script; with dev mode off there is no bridge and Run errors.
 -- Replies go to the server Output only (Provisional, TASK-042: no Net entry for dev feedback).
@@ -94,20 +95,32 @@ function DevService:Load()
 	table.sort(self.Order)
 end
 
+-- Live commands, one line each (Hidden ones are left out: they are old names kept for Admin / showcase / DevTool)
 function DevService:Help(): string
-	const lines = { `commands ({ALIAS} <command> or DevService.Run("<command>", ...)):`, `  help - this list` }
+	const lines = { `commands ({ALIAS} <command>, "{ALIAS} help <command>" for its usage):` }
 	for _, name in self.Order do
 		const command = self.Commands[name]
-		table.insert(lines, `  {command.Usage} - {command.Help}`)
+		if command.Hidden ~= true then
+			table.insert(lines, `  {command.Usage} - {command.Help}`)
+		end
 	end
 	return table.concat(lines, "\n")
+end
+
+-- "help <command>": its usage and help line (hidden names too)
+function DevService:HelpOf(name: string): string
+	const command = self.Commands[string.lower(name)]
+	if command == nil then
+		error(`{PREFIX} unknown command "{name}" (try "help")`, 0)
+	end
+	return `{command.Usage} - {command.Help}`
 end
 
 -- Runs one command and prints its reply. Errors propagate (unknown command, bad args, refused by the owner).
 function DevService:Execute(name: string, args: { string }, caller: Player?): string?
 	const key = string.lower(name)
 	if key == HELP then
-		const text = self:Help()
+		const text = if args[1] ~= nil then self:HelpOf(args[1]) else self:Help()
 		log(text)
 		return text
 	end

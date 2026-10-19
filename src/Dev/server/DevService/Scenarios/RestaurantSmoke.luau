@@ -200,11 +200,11 @@ local function run(api: Api.Context, dev: Dev, caller: Player?): string
 			Name = "setup",
 			Run = function(): string?
 				home = root().CFrame
-				pcall(dev, "intro", "skip") -- refused when no intro is playing
+				pcall(dev, "tutorial", "intro") -- refused when no intro is playing
 				task.wait(0.5)
 				dev("day", "2")
 				task.wait(1)
-				dev("arrivals", "off")
+				dev("customer", "off")
 				if round:GetPhase() == "Prep" then
 					dev("skip")
 					task.wait(1)

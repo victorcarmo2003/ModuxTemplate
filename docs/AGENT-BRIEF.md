@@ -31,6 +31,7 @@ Fontes: `CLAUDE.md`, `README.md`, `docs/PIPELINE.md`, `tools/assetplace/STUDIO_L
 - Para carregar um snippet do repo: `tools/studio/README.md` (`run_snippet`). Não cole snippets longos no prompt.
 - Não altere o mapa fora do escopo da tarefa. Edit lighting é frio: julgue cor em Play.
 - Teste de fumaça: `/dev smoke` (`tools/studio/smoke.md`). Rode antes de entregar mudança de servidor.
+- Comandos de dev: `/dev help` lista os vivos; tabela, nomes antigos e removidos em `docs/tech/dev-commands.md`.
 
 ## 3b. Modo de preparo focado (`docs/tech/prep-mode.md`, DEC-223)
 

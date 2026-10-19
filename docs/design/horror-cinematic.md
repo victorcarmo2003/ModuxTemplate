@@ -365,7 +365,7 @@ Encarar uma anomalia de cliente (pescoço invertido, cópia, olhos brancos) por 
 
 ## 9. Roteiros entregues em 2026-10-18 (TASK-483, 490, 491; Provisórios até o Play do dono)
 
-Todas as cenas estão em `Content.HorrorScenes` (`/dev anomaly ANM-xxx` numa noite em andamento).
+Todas as cenas estão em `Content.HorrorScenes` (`/dev trigger ANM-xxx` numa noite em andamento).
 
 | Anomalia | Resposta (restaurante) | O que a cena faz |
 |---|---|---|

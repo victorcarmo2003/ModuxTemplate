@@ -40,13 +40,13 @@ Isso não prova comportamento: schema do Lync, binding do mapa e fluxo só apare
 | P5 | Studio | place com o restaurante aplicado (`restaurant_bind.luau` rodado, TASK-441 sincronizada, `Place.diff` = 0). **Nunca `Place.run`** sem pedido (memória `studio-hand-edits`) | |
 | P6 | Studio | Dev mode ligado (DevService carrega `Commands/`); Output do servidor **e** do client abertos | os `/dev` respondem no Output do client em alguns comandos |
 
-Atalhos usados em todo o plano (todos existem hoje): `/dev intro skip`, `/dev tutorial reset|step <key>|auto`, `/dev tutdebug`,
-`/dev day <n>`, `/dev night <k>`, `/dev skip`, `/dev arrivals on|off`, `/dev customer pair a,b c,d`, `/dev cash <n>`,
+Atalhos usados em todo o plano (nomes de 2026-10-18, `docs/tech/dev-commands.md`): `/dev tutorial intro`, `/dev tutorial reset|step <key>|auto`, `/dev tutorial debug`,
+`/dev day <n>`, `/dev night <k>`, `/dev skip`, `/dev customer on|off`, `/dev customer pair a,b c,d`, `/dev money cash <n>`,
 `/dev tablet [state|talk|finish|time <k>]`, `/dev plate [list|assign <npc>|fill <n>|prep <n>|clear|test]`,
-`/dev pickup [test|take|serve [npc]|ticket <npc>|pause <npc> on|off]`, `/dev railfeed [n]`, `/dev seating`,
-`/dev supply [state|order <pkg> <n>…|arrive|take [<pkg>]|seed|clear|test]`, `/dev gear [open|close|state]`, `/dev market`,
-`/dev shutter [open|close|in]`, `/dev closed on|off`, `/dev light on|off|here`, `/dev anomaly <key>|stop|agenda`,
-`/dev sanity <n>`, `/dev audio`, `/dev interactlog`.
+`/dev pickup [test|take|serve [npc]|ticket <npc>|pause <npc> on|off]`, `/dev kitchen rail [n]`, `/dev customer tables`,
+`/dev kitchen stock [state|order <pkg> <n>…|arrive|take [<pkg>]|seed|clear|test]`, `/dev shop gear [open|close|state]`, `/dev shop market`,
+`/dev debug light on|off|here`, `/dev trigger <anomalia>|stop|list`,
+`/dev sanity <n>`, `/dev debug audio`, `/dev debug interact`.
 **Não existe** `/dev kitchen` para cortar/virar (use os prompts) e o `/dev smoke` ainda é o do trailer (ver R-6).
 
 ### 0.2 Testes de tabela puros (rodar primeiro, 1 jogador)
@@ -55,7 +55,7 @@ Atalhos usados em todo o plano (todos existem hoje): `/dev intro skip`, `/dev tu
 |---|---|---|
 | T1 | `/dev pickup test` | todas as linhas `ok` (join / leave / a fila anda / cheia / choose) |
 | T2 | `/dev plate test` | todas `ok` (`Slots.luau`) |
-| T3 | `/dev supply test` | todas `ok` (`Order.luau`: quick, custo, limites) |
+| T3 | `/dev kitchen stock test` | todas `ok` (`Order.luau`: quick, custo, limites) |
 | T4 | `/dev prep grade` | `N/N ok` (o `Grade` continua sendo requerido por `Grill`/`CustomerService`) |
 
 ---
@@ -71,7 +71,7 @@ Atalhos usados em todo o plano (todos existem hoje): `/dev intro skip`, `/dev tu
 | B5 | `/dev tablet` | `TAB-1` ligado, estado `Idle`, sem cliente; nunca "not enabled" | |
 | B6 | **[VELHO]** `/dev plate` (passa `PLATE-n`; na esteira a mesa central tem 8 vagas sempre ativas: `kitchen-redesign.md` PT-*) | 8 slots ligados (`PLATE-1..8`), ativos = 4 (party de 1), todos sem ticket | |
 | B7 | `/dev pickup` | modo pickup **on**, pontos `PU-k` achados, tamanho = min(`PickupSlots[party]`, PU no mapa) | com 4 PU no mapa o tamanho fica 4 mesmo com 2+ jogadores (R-1) |
-| B8 | `/dev supply` | 0 chamadas; baias `StockShelf` listadas (uma por pacote); escotilha com 6 vagas | |
+| B8 | `/dev kitchen stock` | 0 chamadas; baias `StockShelf` listadas (uma por pacote); escotilha com 6 vagas | |
 | B9 | Mart | sem prateleiras `BUY-*` exigidas (`MartShelves = false`); o Gear Stand (B1..B5, S1, persianas) continua no mapa e ligado | DEC-282 diz "sair para ir ao Mart": hoje o Mart saiu do mapa com a chave ligada. Pergunta para o dono, não bug |
 | B10 | **[VELHO]** prompts do Prep | nenhum `prep_work` em lugar nenhum (Prep desligado) | depois da 513/514 o Prep fica ligado no restaurante: `prep_work` e `prep_grill` **aparecem** (`kitchen-redesign.md` CH-2) |
 
@@ -79,9 +79,9 @@ Atalhos usados em todo o plano (todos existem hoje): `/dev intro skip`, `/dev tu
 
 ## 2. Loop principal (1 jogador, Day 2 para fugir do tutorial)
 
-Preparo: `/dev intro skip` → `/dev day 2` → na Prep abrir a janela (alavanca `shutter_toggle` ou `/dev shutter open` e esperar o Open)
-→ `/dev arrivals off` e criar clientes um a um com `/dev customer pair ketchup mustard` (pedido conhecido) ou deixar o fluxo
-normal com `/dev arrivals on`.
+Preparo: `/dev tutorial intro` → `/dev day 2` → `/dev skip` até a fase de venda
+→ `/dev customer off` e criar clientes um a um com `/dev customer pair ketchup mustard` (pedido conhecido) ou deixar o fluxo
+normal com `/dev customer on`.
 
 ### 2.1 Tablet e nota (FEAT-043)
 
@@ -120,7 +120,7 @@ normal com `/dev arrivals on`.
 | K5 | esperar o 1º lado | a salsicha **para** (Working, pausada) e aparece "Flip" sobre aquela vaga; sem virar ela **nunca fica pronta** | não há queima no código (`BurnAfter` do design não existe): anotar |
 | K6 | "Flip" | 1 s depois `Ready`; aparece "Collect" | |
 | K7 | "Collect" | salsicha vai para a pilha (rail); `Count` do rail +1 | |
-| K8 | "Take Dogs" na pilha (ou `/dev railfeed 3` e depois "Take Dogs") | Tool `sausage_grilled` com até 3 (`Stacks.Sausage`); sobra fica na pilha | |
+| K8 | "Take Dogs" na pilha (ou `/dev kitchen rail 3` e depois "Take Dogs") | Tool `sausage_grilled` com até 3 (`Stacks.Sausage`); sobra fica na pilha | |
 | K9 | 3º Tool de `Ingredient` (já com `bun_sliced` + `sausage_grilled`) | `hands_full` (`CategoryLimits.Ingredient = 2`) | |
 | K10 | "Add Sausage" no prato | salsicha no slot; prato `Base` | |
 | K11 | "Take Plate" com mão livre | Tool `hot_dog` com atributo `Ticket` = NpcId; o slot **libera o ticket** na hora | |
@@ -141,7 +141,7 @@ normal com `/dev arrivals on`.
 | D4 | `hot_dog` errado | veredito Errado: o hot dog **volta à mão**, o cliente segue esperando | |
 | D5 | faltando topping | Incompleto: paga menos (DEC-072), cliente sai insatisfeito | |
 | D6 | servido Completo com mesa livre | cliente anda com o prato na mão (`Carrying`) até `TBL-n`, senta, come ~12 s, levanta; **$1 por pessoa** cai no pote; mesa volta a livre sem "Clean Table" | |
-| D7 | 8 lugares ocupados (`/dev seating` para ver) ou sem folga no teto | quem recebe sai **para viagem** levando o prato; nunca fica parado no salão | |
+| D7 | 8 lugares ocupados (`/dev customer tables` para ver) ou sem folga no teto | quem recebe sai **para viagem** levando o prato; nunca fica parado no salão | |
 | D8 | deixar a paciência de preparo zerar | cliente sai (`Slow`), sai da retirada, os de trás andam; o prato vira órfão (ticket solto) | estorno não existe no código (pagamento é na entrega) |
 | D9 | retirada cheia (`Rules.PickupSlots[party]`) e tentar "Take Order" | `pickup_full` "Kitchen full! Serve who is waiting."; cliente fica no tablet | |
 | D10 | par (`/dev customer pair ketchup mustard`) | 1 lugar na retirada; 2 tickets (Line 1 e 2) em 2 pratos; entrega das duas linhas | |
@@ -164,9 +164,9 @@ normal com `/dev arrivals on`.
 |---|---|---|---|
 | S1 | "Order Stock" no telefone `PHONE-R` (toque) | pedido rápido (`Order.quick`: até 4 caixas, menor estoque primeiro); débito = Σ preços + $2; toast `supply_ordered` para a party com o ETA | não há menu de escolha (falta packet; TASK-389) e o prompt é toque, não segurar |
 | S2 | ligar de novo com pedido a caminho | `supply_busy` com os segundos restantes; nada debitado | |
-| S3 | `/dev cash -9999` e ligar | `not_enough_cash`; nada chega | |
-| S4 | esperar 45 s ou `/dev supply arrive` | cada caixa vai para a **baia do pacote** (`StockShelf`); sem baia, para a escotilha (vagas 1..6); o resto espera "fora" e entra quando abre vaga (`/dev supply`) | |
-| S5 | "Take <pacote>" na baia (ou `/dev supply take buns`) | Tool de pacote na mão; 3ª caixa = `package_limit` (2; urso 3) | |
+| S3 | `/dev money cash -9999` e ligar | `not_enough_cash`; nada chega | |
+| S4 | esperar 45 s ou `/dev kitchen stock arrive` | cada caixa vai para a **baia do pacote** (`StockShelf`); sem baia, para a escotilha (vagas 1..6); o resto espera "fora" e entra quando abre vaga (`/dev kitchen stock`) | |
+| S5 | "Take <pacote>" na baia (ou `/dev kitchen stock take buns`) | Tool de pacote na mão; 3ª caixa = `package_limit` (2; urso 3) | |
 | S6 | "Restock" (segurar 1 s) na estação do ingrediente (pão = `CUT`, salsicha = caixa da grelha, condimento = `COND`) | transfere até a capacidade; sobra fica na caixa; caixa vazia some | |
 | S7 | gastar o pão até ≤ 25% | ícone de caixa pulsando no `StockMenu` e toast `stock_low` "Low on Bun" **1× por queda** | |
 | S8 | `/dev night 1` (1ª Night da run) | `StartBoxes` (1 DOGS + 1 BUNS) chegam de uma vez | |
@@ -182,9 +182,9 @@ normal com `/dev arrivals on`.
 |---|---|---|
 | G1 | run nova, Day 1 Open | Gear Stand **fechado** (Intro fecha; só abre no fim do 1º turno) |
 | G2 | fim do turno (`/dev skip` até `Summary`) | abre: persianas sobem, som de porta de metal no stand, toast `gear_open` "Gear Stand is OPEN" para todos |
-| G3 | início do próximo turno de venda (Open/Night) | `/dev gear` mostra o fechamento agendado para +45 s; aos 20 s restantes toast `gear_closing` "closing in 20s"; depois fecha com som e `gear_shut` |
+| G3 | início do próximo turno de venda (Open/Night) | `/dev shop gear` mostra o fechamento agendado para +45 s; aos 20 s restantes toast `gear_closing` "closing in 20s"; depois fecha com som e `gear_shut` |
 | G4 | comprar com ele fechado | `gear_closed`; nada debitado |
-| G5 | `/dev gear open` / `/dev gear close` | força e mostra persiana + som + toast; volta à regra na próxima troca natural |
+| G5 | `/dev shop gear open` / `/dev shop gear close` | força e mostra persiana + som + toast; volta à regra na próxima troca natural |
 | G6 | `NightLost`/`Resume` | sempre fechado |
 
 ### 4.2 Portas automáticas (DoorController, local)
@@ -198,7 +198,7 @@ normal com `/dev arrivals on`.
 
 ### 4.3 Tutorial Day 1 (restaurante)
 
-Preparo: Play limpo (perfil novato) ou `/dev tutorial reset`; `/dev tutdebug` mostra o passo ao vivo.
+Preparo: Play limpo (perfil novato) ou `/dev tutorial reset`; `/dev tutorial debug` mostra o passo ao vivo.
 
 | # | Passo | Esperado (seta / fala do Walt) |
 |---|---|---|
@@ -241,12 +241,12 @@ Escrito pela spec do board e DEC-283/284; ajustar os nomes dos comandos quando a
 
 | # | Passo / atalho | Esperado |
 |---|---|---|
-| H1 | `/dev night 1` → `/dev anomaly anm_020_blackout` | a energia cai: som `lights off`, cozinha **realmente escura** (TASK-442) com só luz de emergência/fora; **texto de aviso na tela** (ex.: "Power's out. Hide in the back!") para todos |
+| H1 | `/dev night 1` → `/dev trigger anm_020_blackout` | a energia cai: som `lights off`, cozinha **realmente escura** (TASK-442) com só luz de emergência/fora; **texto de aviso na tela** (ex.: "Power's out. Hide in the back!") para todos |
 | H2 | música | passa de calmo → inquieto → tensão com **violinos acelerando** → clímax "bicho chegou" (`Horror Coral`) → alívio; cada passo dirigido pelo ciclo da anomalia (prenúncio → ativa → resolvida/erro), nunca dois passos tocando juntos |
 | H3 | 2 jogadores: J1 dentro da despensa (`HIDE-P`), J2 fora quando a criatura chega | J1 sem perda; J2 perde sanidade (−35, DEC-277) e só cai se zerar; jumpscare no erro |
 | H4 | religar o disjuntor (fundos) depois que a criatura vai embora | luzes voltam, música vai a "alívio", aviso some |
-| H5 | `/dev anomaly stop` no meio | tudo volta: luz, música calma, sem texto preso na tela |
-| H6 | `/dev audio` antes e depois de 3 apagões | contagem de instâncias de som não cresce (sem vazamento); `LoadQueue` sem pico |
+| H5 | `/dev trigger stop` no meio | tudo volta: luz, música calma, sem texto preso na tela |
+| H6 | `/dev debug audio` antes e depois de 3 apagões | contagem de instâncias de som não cresce (sem vazamento); `LoadQueue` sem pico |
 | H7 | jogador entra (late join) durante o apagão | vê escuro + aviso + o passo de música atual |
 | H8 | TASK-445: sons em pastas por passo | nenhum som "não encontrado" no Output de client; IDs SFX/MUS/AMB iguais (DEC-284) |
 
@@ -273,11 +273,11 @@ Escrito pela spec do board e DEC-283/284; ajustar os nomes dos comandos quando a
 | # | Passo | Esperado |
 |---|---|---|
 | X1 | rebuild (P4) e Play no **mesmo** place | boot sem erro; o fluxo do trailer: "Take Order" no rig em `Q1`, servido em `Q1`, `Seating.SitAt = "Order"`, mesa suja e "Clean Table" |
-| X2 | `/dev tablet`, `/dev plate`, `/dev supply` | respondem que o restaurante está desligado (não erram em silêncio) |
+| X2 | `/dev tablet`, `/dev plate`, `/dev kitchen stock` | respondem que o restaurante está desligado (não erram em silêncio) |
 | X3 | prompts `tablet_take`/`plate_*`/`grill_flip`/`rail_take`/`bun_slice`/`pickup_serve`/`order_stock`/`take_box` | nenhum aparece |
 | X4 | Prep | modo focado volta (`Prep.Rules.Enabled = true`) com as âncoras `Station_n` que existirem |
 | X5 | Mart | prateleiras `BUY-*` exigidas de novo (`MartShelves = true`): no place do restaurante o Mart está em `ServerStorage.Mart` → anotar se o boot acusa `OP-1`/`MKT-DOOR`/`BUY-*` (rollback precisa do Mart de volta) |
-| X6 | anomalias | `CutAnomalies` voltam à agenda (`/dev anomaly agenda` na Night 6..9 mostra as estreias originais) |
+| X6 | anomalias | `CutAnomalies` voltam à agenda (`/dev trigger list` na Night 6..9 mostra as estreias originais) |
 | X7 | tutorial | idêntico ao do trailer; lição do Gear Stand desligada |
 | X8 | `/dev smoke` | `SMOKE: N ok, 0 failures` (o smoke é do trailer) |
 
