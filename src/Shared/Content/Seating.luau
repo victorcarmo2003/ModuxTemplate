@@ -73,7 +73,6 @@ export type SitAt = "Order" | "Served"
 
 export type Seating = {
 	SitAt: SitAt, -- wave R0 contract; R1-I reads it. Default "Order" = the published game
-	DirtyTables: boolean, -- false: no tray / Clean Table, the table tip goes straight to the tip jar (restaurant)
 	UnlockDay: number, -- ghosts and sitting from this day (Day 1 = tutorial)
 	Tables: number, -- table records 1..Tables (TBL-1..TBL-4), sum of the Groups
 	Groups: { Group },
@@ -88,7 +87,6 @@ export type Seating = {
 	NightSitMult: number,
 	GroupSitBonus: number,
 	SitChanceCap: number,
-	CleanHold: number, -- = Actions.clean_table.Hold (Validate)
 	BuyHold: number, -- = Actions.buy_in_place.Hold (Validate)
 	PromptRadius: number, -- = Radius of both actions (Validate)
 	TipLostAtSummary: boolean, -- Q-181 A (only true is implemented)
@@ -109,7 +107,6 @@ export type Seating = {
 const seating: Seating = {
 	-- TASK-390: both derived from Content.Restaurant.Rules.Enabled (Restaurant.Switch); off = "Order" / true (the trailer)
 	SitAt = "Served",
-	DirtyTables = false,
 	UnlockDay = 2,
 	Tables = 4,
 	Groups = {
@@ -135,7 +132,6 @@ const seating: Seating = {
 	NightSitMult = 0.75,
 	GroupSitBonus = 0.20,
 	SitChanceCap = 0.95,
-	CleanHold = 1,
 	BuyHold = 1.5,
 	PromptRadius = 7,
 	TipLostAtSummary = true,

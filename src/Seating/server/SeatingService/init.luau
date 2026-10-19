@@ -65,7 +65,6 @@ export type Spot = {
 	Model: Model?, -- nil = not in the binding (record still published: the client ignores it)
 	Seats: { [number]: BasePart },
 	Buy: Instance?, -- anchor of buy_in_place
-	Clean: Instance?, -- anchor of clean_table (same instance as Buy when both are the runtime anchor)
 	Node: string?, -- graph node next to the table (TBL-n, or the nearest node)
 	Group: Content.SeatingGroup,
 	Collide: { [BasePart]: boolean }, -- authored CanCollide of every part
@@ -99,7 +98,6 @@ const SEATING = Content.Seating
 const BINDING = SEATING.Binding
 const MAX_NODE_GAP = 20 -- studs: a table farther than this from every graph node is warned (nobody can walk to it)
 const BUY = "buy_in_place"
-const CLEAN = "clean_table"
 const ANCHOR_TAG = "Interactable"
 const UPGRADE_ATTRIBUTE = "Upgrade"
 const TICK_RATE = 5 -- Hz (tension: diners up within 1 s, FEAT-037)
@@ -142,11 +140,6 @@ local function hash(text: string): number
 		h = (h * 33 + string.byte(text, index)) % 4294967296
 	end
 	return h
-end
-
--- Content.Seating.SitAt = "Served": the table comes after the sale (restaurant), read live (data flag)
-local function sitAtServed(): boolean
-	return SEATING.SitAt == "Served"
 end
 
 local function isQueueNode(id: string): boolean
@@ -446,20 +439,10 @@ function SeatingService:BuildSpot(index: number, model: Model?): Spot
 			spot.Collide[part] = part.CanCollide
 		end
 	end
-	local buy = boundAnchor(model, BINDING.BuyAnchor)
-	local clean = boundAnchor(model, BINDING.CleanAnchor)
-	if buy == nil or clean == nil then
-		const shared = runtimeAnchor(model, BINDING.RuntimeAnchor, ANCHOR_LIFT)
-		buy = buy or shared
-		clean = clean or shared
-	end
+	const buy = boundAnchor(model, BINDING.BuyAnchor) or runtimeAnchor(model, BINDING.RuntimeAnchor, ANCHOR_LIFT)
 	spot.Buy = buy
-	spot.Clean = clean
 	if buy ~= nil then
 		prepareAnchor(buy, BUY, index, spot.Group.UpgradeKey)
-	end
-	if clean ~= nil and clean ~= buy then
-		prepareAnchor(clean, CLEAN, index, spot.Group.UpgradeKey)
 	end
 	-- serve_table anchor (Q-209): its own, on while a customer waits there for its food
 	const serve = boundAnchor(model, BINDING.ServeAnchor) or runtimeAnchor(model, BINDING.RuntimeServeAnchor, SERVE_LIFT)
@@ -562,25 +545,9 @@ function SeatingService:ApplyPrompts(spot: Spot)
 	self:RefreshServe(spot)
 	const interaction = self.Dependencies.InteractionService
 	const buy = spot.Buy
-	const clean = spot.Clean
 	const forSale = spot.State == "Ghost" and spot.Price > 0
-	const dirty = spot.State == "Dirty"
-	if buy ~= nil and buy == clean then
-		-- one runtime anchor for both actions
-		if dirty then
-			buy:SetAttribute("PromptAction", CLEAN)
-			interaction:SetPrompt(buy, true)
-		else
-			buy:SetAttribute("PromptAction", BUY)
-			interaction:SetPrompt(buy, forSale, if forSale then buyText(spot.Group.Label, spot.Price) else nil)
-		end
-		return
-	end
 	if buy ~= nil then
 		interaction:SetPrompt(buy, forSale, if forSale then buyText(spot.Group.Label, spot.Price) else nil)
-	end
-	if clean ~= nil then
-		interaction:SetPrompt(clean, dirty)
 	end
 end
 
@@ -703,11 +670,9 @@ function SeatingService:TrySeat(party: SeatParty): boolean
 	const customers = self.Dependencies.CustomerService
 	-- SitAt "Served" (TASK-386): only after the sale (CustomerService already ran Leave(..., dining): Leaving + Dining),
 	-- never at "Take Order"
-	if sitAtServed() then
-		const record = customers:Get(party.Leader)
-		if record == nil or record.State ~= "Leaving" or not record.Dining then
-			return false
-		end
+	const record = customers:Get(party.Leader)
+	if record == nil or record.State ~= "Leaving" or not record.Dining then
+		return false
 	end
 	const size = if party.Partner ~= nil then 2 else 1
 	-- (4) phase, (5) tension
@@ -760,9 +725,6 @@ end
 -- must not yield. true = a table was reserved, the party is ours until Dismiss. false = no table (or SitAt is "Order"):
 -- the caller sends it out carrying the plate.
 function SeatingService:OfferServed(party: SeatParty): boolean
-	if not sitAtServed() then
-		return false
-	end
 	return self:TrySeat(party)
 end
 
@@ -785,7 +747,7 @@ function SeatingService:Reserve(index: number, party: SeatParty, seats: { number
 		EatTime = Tables.EatTime(isNight, #members > 1, self.Rng),
 		Height = if leaderRig then leaderRig.Root.Position.Y else DEFAULT_HEIGHT,
 		Token = 1,
-		Served = sitAtServed(),
+		Served = true,
 	}
 	self.Parties[party.Leader] = record
 	for _, member in members do
@@ -911,21 +873,15 @@ function SeatingService:StandUp(party: Party)
 		end
 	end
 	spot.Party = nil
-	if ate and not SEATING.DirtyTables then
-		-- DirtyTables false (restaurant, TASK-386): nobody cleans, the table tip goes straight into the tip jar
+	if ate then
+		-- nobody cleans (TASK-386, DEC-307): the table tip goes straight into the tip jar
 		const tip = math.floor(Tables.Tip(0, #party.Members))
 		const economy = self.Dependencies.EconomyService
 		if tip > 0 and economy:IsDrawerOpen() then
 			economy:AddTip(tip)
 		end
-		self:SetState(spot, "Free")
-	elseif ate then
-		-- FEAT-037 invariant: whoever ate leaves a tray and the tip, whatever made them stand (Q-209: no meal, no tray)
-		spot.Tip = Tables.Tip(spot.Tip, #party.Members)
-		self:SetState(spot, "Dirty")
-	else
-		self:SetState(spot, "Free")
 	end
+	self:SetState(spot, "Free")
 	self:RefreshServe(spot)
 	task.spawn(function()
 		const leader = party.Members[1]
@@ -1091,30 +1047,6 @@ function SeatingService:BuyAt(player: Player, anchor: Instance)
 	self:Refresh()
 end
 
--- clean_table: a Dirty table while the shop takes entries (the tip goes into the tip jar, DEC-239).
-function SeatingService:CanClean(anchor: Instance): boolean
-	const index = indexOf(anchor)
-	const spot = if index then self.Spots[index] else nil
-	return spot ~= nil
-		and spot.State == "Dirty"
-		and spot.Party == nil
-		and self.Dependencies.EconomyService:IsDrawerOpen()
-end
-
-function SeatingService:Clean(anchor: Instance)
-	const index = indexOf(anchor)
-	const spot = if index then self.Spots[index] else nil
-	if spot == nil or spot.State ~= "Dirty" then
-		return
-	end
-	const tip = spot.Tip
-	spot.Tip = 0
-	if tip > 0 then
-		self.Dependencies.EconomyService:AddTip(tip) -- into the tip jar (DEC-239)
-	end
-	self:SetState(spot, "Free")
-end
-
 -- serve_table: leader NpcId of the party sitting at the table of this anchor and waiting for its food, else nil.
 function SeatingService:ServeLeader(anchor: Instance): number?
 	const index = indexOf(anchor)
@@ -1153,14 +1085,6 @@ function SeatingService:RegisterActions()
 		end,
 		Run = function(player: Player, anchor: Instance)
 			self:BuyAt(player, anchor)
-		end,
-	})
-	interaction:RegisterAction(CLEAN, {
-		Validate = function(_player: Player, anchor: Instance): boolean
-			return self:CanClean(anchor)
-		end,
-		Run = function(_player: Player, anchor: Instance)
-			self:Clean(anchor)
 		end,
 	})
 end
@@ -1225,28 +1149,6 @@ end
 function SeatingService:DevForceSit()
 	self:DevCheck()
 	self.ForceSit = true
-end
-
-function SeatingService:DevDirty(index: number, tip: number?)
-	self:DevCheck()
-	const spot = self.Spots[index]
-	if spot == nil or index - spot.Group.First + 1 > self:Owned(spot.Group) or not self:IsActive(spot.Group) then
-		error(`table {index} is not bought`, 2)
-	end
-	if spot.Party ~= nil then
-		error(`table {index} is in use`, 2)
-	end
-	spot.Tip = math.clamp(tip or SEATING.TableTip, 0, SEATING.MaxTip)
-	self:SetState(spot, "Dirty")
-end
-
-function SeatingService:DevClean(index: number)
-	self:DevCheck()
-	const spot = self.Spots[index]
-	if spot == nil or spot.State ~= "Dirty" then
-		error(`table {index} is not dirty`, 2)
-	end
-	self:Clean(spot.Clean or spot.Buy or (spot.Model :: Instance))
 end
 
 function SeatingService:DevList(groupKey: string?): string

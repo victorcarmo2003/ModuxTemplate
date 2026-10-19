@@ -66,7 +66,6 @@ local TabletController = require(StarterPlayer.StarterPlayerScripts.client.Modux
 local ThiefController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ThiefController)
 local TrafficController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.TrafficController)
 local TrafficLightController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.TrafficLightController)
-local TrashController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.TrashController)
 local TutorialController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.TutorialController)
 local SwitchLeverController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.SwitchLeverController)
 local VehicleController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.VehicleController)
@@ -138,7 +137,6 @@ export type AllControllers = {
 	ThiefController: ThiefController.Public,
 	TrafficController: TrafficController.Public,
 	TrafficLightController: TrafficLightController.Public,
-	TrashController: TrashController.Public,
 	TutorialController: TutorialController.Public,
 	SwitchLeverController: SwitchLeverController.Public,
 	VehicleController: VehicleController.Public,

@@ -43,7 +43,6 @@ const PRIORITY: { [string]: number } = {
 	bench_buy_upgrade = 4,
 	bench_buy_item = 4,
 	buy_in_place = 4,
-	clean_table = 4,
 	switch_light = 5,
 	shutter_toggle = 5,
 	safe_spot = 5,
@@ -70,7 +69,6 @@ const ICONS: { [string]: string } = {
 	switch_light = "Ui/lantern",
 	answer_phone = "Hud/phone",
 	shutter_toggle = "Ui/lantern",
-	clean_table = "Ui/sparkle",
 }
 
 const Menu = {}
@@ -115,7 +113,6 @@ const SHORT: { [string]: string } = {
 	answer_phone = "Answer",
 	safe_spot = "Hide",
 	shutter_toggle = "Window",
-	clean_table = "Clean",
 }
 
 function Menu.ShortOf(target: Rules.Target, text: string): string

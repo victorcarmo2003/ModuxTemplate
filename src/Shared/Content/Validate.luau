@@ -552,7 +552,7 @@ end
 -- Wave 2 (TASK-047; content-data.md §6) ---------------------------------------------------------------------------
 
 const SELLING_PHASES: { [string]: boolean } = { Open = true, Night = true }
-const SKIP_PHASES: { [string]: boolean } = { Intro = true, Call = true, Finale = true }
+const SKIP_PHASES: { [string]: boolean } = { Call = true, Finale = true }
 
 local function checkShiftWave2()
 	for index, row in Shift.List do
@@ -560,7 +560,7 @@ local function checkShiftWave2()
 			fail("Shift", index, row.Key, "Selling is only for Open and Night (architecture.md §19.4)")
 		end
 		if row.SkipWithoutProbe and not SKIP_PHASES[row.Key] then
-			fail("Shift", index, row.Key, "SkipWithoutProbe is only for Intro, Call and Finale (§19.0 rule 4)")
+			fail("Shift", index, row.Key, "SkipWithoutProbe is only for Call and Finale (§19.0 rule 4)")
 		end
 		const night = row.Night
 		if night ~= nil then
@@ -1284,7 +1284,7 @@ local function checkCutscenes()
 	if Cutscenes.Keys[1] ~= "none" then
 		fail("Cutscenes", 1, Cutscenes.Keys[1], "first row must be the sentinel 'none'")
 	end
-	for _, required in { "intro", "finale", "credits" } do
+	for _, required in { "finale", "credits" } do
 		if not Cutscenes.ByKey[required] then
 			fail("Cutscenes", nil, nil, `scene '{required}' is required (FEAT-004, FEAT-027)`)
 		end
@@ -1372,43 +1372,6 @@ local function checkCutscenes()
 			fail("Cutscenes.Rules", nil, car, `Cars.Horn '{row.Horn}' is not a sound`)
 		end
 		inRange("Cutscenes.Rules", nil, car, "Cars.Look", row.Look, 1, #Traffic.Looks.Shapes * #Traffic.Looks.Paints)
-	end
-	const intro = Cutscenes.ByKey.intro
-	-- the intro starts after the ClientReady wait (Rules.ReadyTimeout at most), inside the same phase
-	const introNeeds = intro.Cap + Cutscenes.Rules.ReadyTimeout
-	if introNeeds > Shift.ByKey.Intro.Duration then
-		fail(
-			"Cutscenes",
-			nil,
-			"intro",
-			`Cap {intro.Cap} + ReadyTimeout {Cutscenes.Rules.ReadyTimeout} above the Intro phase cap ({Shift.ByKey.Intro.Duration} s)`
-		)
-	end
-	-- owner D3 2026-10-12 rev. 2: short, clean intro (no street cars; it crosses on the crosswalk); at most 35 s, Cap =
-	-- Duration + a few s
-	if intro.Duration > 35 then
-		fail("Cutscenes", nil, "intro", `Duration {intro.Duration} s above 35 s: the intro must stay short (owner D3 2026-10-12)`)
-	end
-	if intro.Cap > intro.Duration + 4 then
-		fail("Cutscenes", nil, "intro", `Cap {intro.Cap} s more than 4 s above Duration {intro.Duration} s`)
-	end
-	if introNeeds + 2 ~= Shift.ByKey.Intro.Duration then
-		fail("Cutscenes", nil, "intro", `Intro phase cap {Shift.ByKey.Intro.Duration} s must be ReadyTimeout + Cap + 2 = {introNeeds + 2} s`)
-	end
-	for _, beat in intro.Beats do
-		if beat.Kind == "Actor" and Cutscenes.Rules.Cars[beat.Target] ~= nil then
-			fail("Cutscenes", nil, "intro", `Actor '{beat.Target}' is a street car: the intro has none (owner D3 2026-10-12)`)
-		end
-	end
-	-- the last Line (+ the 3 s of its voice) must end inside the scene
-	local lastLine = 0
-	for _, beat in intro.Beats do
-		if beat.Kind == "Line" then
-			lastLine = math.max(lastLine, beat.At)
-		end
-	end
-	if lastLine + 3 > intro.Duration then
-		fail("Cutscenes", nil, "intro", `last Line at {lastLine} s leaves under 3 s before Duration {intro.Duration} s`)
 	end
 	-- finale and its Next chain play inside the Finale phase
 	local total, hops = 0, 0
@@ -1668,7 +1631,7 @@ local function checkSeating()
 	inRange(name, nil, nil, "StandTimeout", Seating.StandTimeout, 1, 120)
 	inRange(name, nil, nil, "WalkTimeout", Seating.WalkTimeout, 1, 30)
 	inRange(name, nil, nil, "Approach", Seating.Approach, 0, 10)
-	const holds: { [string]: number } = { buy_in_place = Seating.BuyHold, clean_table = Seating.CleanHold }
+	const holds: { [string]: number } = { buy_in_place = Seating.BuyHold }
 	for key, hold in holds do
 		const action = Actions.ByKey[key]
 		if action == nil then

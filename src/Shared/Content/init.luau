@@ -24,7 +24,6 @@ local Items = require(script.Items)
 local LightGroups = require(script.LightGroups)
 local LightPresets = require(script.LightPresets)
 local CoffeeCup = require(script.CoffeeCup)
-local Trash = require(script.Trash)
 local RailSlot = require(script.RailSlot)
 local Lobby = require(script.Lobby)
 local Mart = require(script.Mart)
@@ -316,8 +315,6 @@ return table.freeze({
 	-- CoffeeCupController). Provisional
 	CoffeeCup = CoffeeCup,
 
-	-- Table trash dumpsters: the cleaned tray flies to the nearest bin (owner request 2026-10-12; TrashController). Provisional
-	Trash = Trash,
 
 	-- Tip jar that replaced the cash drawer (DEC-239, user decision 2026-10-13; TipJarService, EconomyController). Provisional
 	TipJar = TipJar,

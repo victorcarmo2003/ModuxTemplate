@@ -15,7 +15,6 @@ export type Spot = {
 	Model: Model?, -- nil = not in the binding (record still published: the client ignores it)
 	Seats: { [number]: BasePart },
 	Buy: Instance?, -- anchor of buy_in_place
-	Clean: Instance?, -- anchor of clean_table (same instance as Buy when both are the runtime anchor)
 	Node: string?, -- graph node next to the table (TBL-n, or the nearest node)
 	Group: Content.SeatingGroup,
 	Collide: { [BasePart]: boolean }, -- authored CanCollide of every part
@@ -89,8 +88,6 @@ export type Public = {
 	Step: (self: Public) -> (),
 	CanBuyAt: (self: Public, anchor: Instance) -> boolean,
 	BuyAt: (self: Public, player: Player, anchor: Instance) -> (),
-	CanClean: (self: Public, anchor: Instance) -> boolean,
-	Clean: (self: Public, anchor: Instance) -> (),
 	ServeLeader: (self: Public, anchor: Instance) -> number?,
 	RegisterActions: (self: Public) -> (),
 	Reseed: (self: Public) -> (),
@@ -99,8 +96,6 @@ export type Public = {
 	DevGroup: (self: Public, key: string?) -> Content.SeatingGroup,
 	DevBuy: (self: Public, groupKey: string?) -> number,
 	DevForceSit: (self: Public) -> (),
-	DevDirty: (self: Public, index: number, tip: number?) -> (),
-	DevClean: (self: Public, index: number) -> (),
 	DevList: (self: Public, groupKey: string?) -> string,
 }
 

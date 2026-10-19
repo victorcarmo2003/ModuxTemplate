@@ -116,7 +116,6 @@ return Table.new({
 	-- ui-text.md (TASK-150). buy_in_place: "{item}" = "Table" / the upgrade name, "{price}" filled by the owner
 	-- (PromptText); the anchor carries the attribute Upgrade (and TableIndex on a table).
 	{ Key = "buy_in_place", Text = "Buy {item} — ${price}", Hold = 1.5, Radius = 7, Requires = {}, Night = "Any", Wave = 3 },
-	{ Key = "clean_table", Text = "Clean Table", Hold = 1, Radius = 7, Requires = {}, Night = "Any", Wave = 3 },
 	-- Order at the table (Q-209, Provisional): the customer sat after "Take Order"; the prompt sits on the table
 	-- (ServeAnchor, SeatingService) and its PromptText names the table and the order ("Serve Table 2: Ketchup + Cheese").
 	{ Key = "serve_table", Text = "Serve Table", Hold = 0, Radius = 8, Requires = {}, Night = "Any", Wave = 3 },
