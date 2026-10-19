@@ -278,7 +278,9 @@ function TabletService:SyncPrompt(tablet: Tablet)
 		const customer = if npc ~= nil then self.Dependencies.CustomerService:Get(npc) else nil
 		on = customer ~= nil and customer.State == ORDERING
 	end
-	if tablet.PromptOn ~= on then
+	-- compared with the attribute too, not only the last write: an anchor switched off from elsewhere (a phase skip, a
+	-- run restore) came back on only after the head changed, so the first customer of a run was refused "state"
+	if tablet.PromptOn ~= on or anchor:GetAttribute("PromptEnabled") ~= on then
 		tablet.PromptOn = on
 		self.Dependencies.InteractionService:SetPrompt(anchor, on)
 	end
