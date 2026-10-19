@@ -40,6 +40,276 @@ local FLOOR = 0.45 -- patio / kitchen floor top (Pad top)
 local TOP = 3.0 -- counter tops (MAP-01 r4 §2, Q-312)
 local BK_NAME = "TrailerBackup"
 local ROOT_NAME = "MAP01_Restaurant"
+
+-- TASK-567 (docs/tech/kitchen-world.md §5; DEC-306, DEC-308): run("assetplace/restaurant_bind", "kitchen_world") rebinds the
+-- back bench of the owner's layout (workspace.MAP01_Restaurant.Trailer.Kitchen, 2026-10-18) for the world kitchen and returns.
+-- Surgical and idempotent: finds every piece by name, never by coordinate of the world (positions are read from the pieces
+-- themselves), marks what it made with KW = true and skips what is already right. "kitchen_world_dry" reports only.
+--   TLR-BUN_CRATE      MapId TRL-BC (the only bun_crate: Slice Bun + Restock)
+--   TLR_BUN_CUT        StationKind board, MapId TRL-T; bun_cut / restock anchors and the scenery buns off; Att_Bun1..8
+--                      (Slot n, 4 x 2 on the tray top) and Prompt_Board (plate_add_bun)
+--   TLR-CUTTING_BOARD  scenery: no Station tag, no StationKind / PendingStationKind, its prompts and slots off
+--   TRL-SAUSAGE_RAIL   + Prompt_Rail (plate_add_sausage) over the middle of the rail
+--   TLR-GRILLS         Att_Slot1..4 (grill_collect, Slot n) on top of PT_GrillSlot_n + Att_Flip1..4 (grill_flip, FlipSlot n)
+--   Plates/Mark1..8    the old PLATE-n prompts and PlateSlot tags off; one Prompt_Plate (plate_take) over Mark1
+--   PRODUCTION/Pan_*   each pan a Station (tag) with StationKind toppings (Prompt_Use_<Suf> topping_add and
+--                      Prompt_Restock_<Suf> already carry Ingredient)
+--   focused prep       Station_1..4, Kitchen.Prep (PT_Hatch, PT_Bin, CounterBounds) and every PrepTarget part go to
+--                      ServerStorage.TrailerBackup.KitchenWorld (tags off, OrigPath kept)
+if MODE == "kitchen_world" or MODE == "kitchen_world_dry" then
+	local dry = MODE == "kitchen_world_dry"
+	local out = {}
+	local function say(text)
+		table.insert(out, text)
+	end
+	local trailer = workspace:FindFirstChild("MAP01_Restaurant") and workspace.MAP01_Restaurant:FindFirstChild("Trailer")
+	local kitchen = trailer and trailer:FindFirstChild("Kitchen")
+	if kitchen == nil then
+		return "kitchen_world: workspace.MAP01_Restaurant.Trailer.Kitchen not found (nothing done)"
+	end
+	if not dry then
+		pcall(function()
+			CHS:SetWaypoint("restaurant_bind kitchen_world: before")
+		end)
+	end
+
+	local function setAttr(inst, name, value)
+		if inst:GetAttribute(name) ~= value then
+			say(("  %s.%s = %s"):format(inst:GetFullName(), name, tostring(value)))
+			if not dry then
+				inst:SetAttribute(name, value)
+			end
+		end
+	end
+	local function tag(inst, name, on)
+		if CS:HasTag(inst, name) ~= on then
+			say(("  %s tag %s %s"):format(inst:GetFullName(), name, on and "on" or "off"))
+			if not dry then
+				if on then
+					CS:AddTag(inst, name)
+				else
+					CS:RemoveTag(inst, name)
+				end
+			end
+		end
+	end
+	-- an Interactable anchor (attributes before the tag: InteractionService reads them when tagged)
+	local function anchor(parent, name, world, attrs)
+		local a = parent:FindFirstChild(name)
+		if a == nil then
+			say(("  + %s.%s"):format(parent:GetFullName(), name))
+			if dry then
+				return nil
+			end
+			a = Instance.new("Attachment")
+			a.Name = name
+			a:SetAttribute("KW", true)
+			a.Parent = parent
+		end
+		if not dry then
+			a.WorldPosition = world
+			for k, v in attrs do
+				a:SetAttribute(k, v)
+			end
+		end
+		tag(a, "Interactable", attrs.PromptAction ~= nil)
+		return a
+	end
+	-- prompts of a model off: no tag, no action (scenery)
+	local function silence(model, keep)
+		for _, d in model:GetDescendants() do
+			if d:GetAttribute("PromptAction") ~= nil and not (keep and keep[d]) then
+				tag(d, "Interactable", false)
+				setAttr(d, "PromptAction", nil)
+			end
+		end
+	end
+	local function topOf(part)
+		return part.Position + Vector3.new(0, part.Size.Y / 2, 0)
+	end
+	local backup = SS:FindFirstChild(BK_NAME)
+	local function stow(inst)
+		say(("  -> backup %s"):format(inst:GetFullName()))
+		if dry then
+			return
+		end
+		if backup == nil then
+			backup = Instance.new("Folder")
+			backup.Name = BK_NAME
+			backup.Parent = SS
+		end
+		local bin = backup:FindFirstChild("KitchenWorld") or Instance.new("Folder")
+		bin.Name = "KitchenWorld"
+		bin.Parent = backup
+		inst:SetAttribute("OrigPath", inst:GetFullName())
+		for _, d in { inst, unpack(inst:GetDescendants()) } do
+			for _, t in { "Station", "Interactable", "PrepTarget", "PlateSlot" } do
+				if CS:HasTag(d, t) then
+					CS:RemoveTag(d, t)
+				end
+			end
+		end
+		inst.Parent = bin
+	end
+
+	-- bun crate: the only bun_crate
+	local crate = kitchen:FindFirstChild("TLR-BUN_CRATE")
+	if crate then
+		setAttr(crate, "MapId", "TRL-BC")
+	else
+		say("WARN TLR-BUN_CRATE missing")
+	end
+
+	-- cut-bun pile
+	local pile = kitchen:FindFirstChild("TLR_BUN_CUT")
+	if pile then
+		setAttr(pile, "StationKind", "board")
+		setAttr(pile, "MapId", "TRL-T")
+		setAttr(pile, "Ingredient", nil)
+		setAttr(pile, "Asset", "AST-015_BunCrate (cut-bun pile)")
+		local tray = pile:FindFirstChild("Crate", true)
+		silence(pile)
+		for _, d in pile:GetDescendants() do
+			if d:IsA("BasePart") and d.Name == "Buns" and d.Transparency < 1 then
+				say("  hide " .. d:GetFullName())
+				if not dry then
+					d:SetAttribute("KW_Transparency", d.Transparency)
+					d.Transparency = 1
+				end
+			end
+		end
+		if tray and tray:IsA("BasePart") then
+			local top = topOf(tray)
+			-- 4 x 2 places: the long side of the tray (its X) holds 4, the short one 2 (Provisional, judged in Play)
+			local right = tray.CFrame.RightVector
+			local back = tray.CFrame.LookVector
+			local stepX = tray.Size.X / 4
+			local stepZ = tray.Size.Z / 2
+			for n = 1, 8 do
+				local col = (n - 1) % 4
+				local row = math.floor((n - 1) / 4)
+				local at = top + right * ((col - 1.5) * stepX) + back * ((row - 0.5) * stepZ)
+				local a = anchor(tray, "Att_Bun" .. n, at, {})
+				if a and not dry then
+					a:SetAttribute("Slot", n)
+				end
+			end
+			anchor(tray, "Prompt_Board", top + Vector3.new(0, 0.6, 0), { PromptAction = "plate_add_bun" })
+		else
+			say("WARN TLR_BUN_CUT has no Crate part")
+		end
+	else
+		say("WARN TLR_BUN_CUT missing")
+	end
+
+	-- old cutting board: scenery
+	local board = kitchen:FindFirstChild("TLR-CUTTING_BOARD")
+	if board then
+		tag(board, "Station", false)
+		setAttr(board, "StationKind", nil)
+		setAttr(board, "PendingStationKind", nil)
+		silence(board)
+		for _, d in board:GetDescendants() do
+			if d:IsA("Attachment") and d:GetAttribute("Slot") ~= nil then
+				setAttr(d, "Slot", nil)
+			end
+		end
+	end
+
+	-- rest rail: Add Sausage
+	local rail = kitchen:FindFirstChild("TRL-SAUSAGE_RAIL")
+	if rail then
+		local mesh = rail:FindFirstChild("Rail_8") or rail:FindFirstChildWhichIsA("BasePart", true)
+		if mesh then
+			anchor(mesh, "Prompt_Rail", topOf(mesh) + Vector3.new(0, 0.5, 0), { PromptAction = "plate_add_sausage" })
+		end
+	end
+
+	-- grill: Collect / Flip per slot on the PT_GrillSlot_n hitboxes (stowed below, read first)
+	local grill = kitchen:FindFirstChild("TLR-GRILLS")
+	if grill then
+		local host = grill:FindFirstChild("KW_Slots")
+		if host == nil and not dry then
+			host = Instance.new("Part")
+			host.Name = "KW_Slots"
+			host.Anchored = true
+			host.CanCollide = false
+			host.CanQuery = false
+			host.CanTouch = false
+			host.Transparency = 1
+			host.Size = Vector3.new(0.2, 0.2, 0.2)
+			host.CFrame = grill:GetPivot()
+			host:SetAttribute("KW", true)
+			host.Parent = grill
+		end
+		for n = 1, 4 do
+			local hit = grill:FindFirstChild("PT_GrillSlot_" .. n)
+			if hit and hit:IsA("BasePart") then
+				local at = topOf(hit)
+				local slot = host and anchor(host, "Att_Slot" .. n, at, { PromptAction = "grill_collect", Slot = n })
+				if host then
+					anchor(host, "Att_Flip" .. n, at + Vector3.new(0, 0.35, 0), { PromptAction = "grill_flip", FlipSlot = n })
+				end
+				if slot == nil and not dry then
+					say("WARN grill slot " .. n .. " not made")
+				end
+			elseif grill:FindFirstChild("Att_Slot" .. n, true) == nil then
+				say("WARN TLR-GRILLS: no PT_GrillSlot_" .. n .. " and no Att_Slot" .. n)
+			end
+		end
+	end
+
+	-- plate pile: one Prompt_Plate, the old pass off
+	local plates = kitchen:FindFirstChild("Plates")
+	if plates then
+		for _, d in plates:GetDescendants() do
+			if CS:HasTag(d, "PlateSlot") then
+				tag(d, "PlateSlot", false)
+			end
+		end
+		local keep = {}
+		local first = plates:FindFirstChild("Mark1")
+		local host = first and (first:FindFirstChild("PLATE-1") or first:FindFirstChildWhichIsA("BasePart", true))
+		if host then
+			local a = anchor(host, "Prompt_Plate", topOf(host) + Vector3.new(0, 0.45, 0), { PromptAction = "plate_take" })
+			if a then
+				keep[a] = true
+			end
+		end
+		silence(plates, keep)
+	end
+
+	-- condiment table: each pan a toppings station
+	local production = kitchen:FindFirstChild("PRODUCTION")
+	if production then
+		for _, pan in production:GetChildren() do
+			if pan:IsA("Model") and pan.Name:match("^Pan_") then
+				setAttr(pan, "StationKind", "toppings")
+				tag(pan, "Station", true)
+			end
+		end
+	end
+
+	-- focused prep leftovers
+	for _, name in { "Station_1", "Station_2", "Station_3", "Station_4", "Prep" } do
+		local inst = kitchen:FindFirstChild(name)
+		if inst then
+			stow(inst)
+		end
+	end
+	for _, part in CS:GetTagged("PrepTarget") do
+		if part:IsDescendantOf(kitchen) then
+			stow(part)
+		end
+	end
+
+	if not dry then
+		pcall(function()
+			CHS:SetWaypoint("restaurant_bind kitchen_world: after")
+		end)
+	end
+	return (dry and "kitchen_world (dry):\n" or "kitchen_world:\n") .. table.concat(out, "\n")
+end
 local TAGS_OFF = {
 	"Vehicle", "VehicleCover", "Station", "Interactable", "SeatTable", "NpcNode", "MapPoint", "UpgradePiece",
 	"LightZone", "AnomalyAnchor", "OpenSignBoard", "PrepTarget", "NeonSign", "ShopNeon", "ScriptedDoor", "TrashBin",

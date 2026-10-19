@@ -7,12 +7,13 @@
 --   setup        intro skip, day 2 (no tutorial), ordinary arrivals off, Prep -> Open, plates cleared, stock filled,
 --                kitchen items of the player's hotbar removed
 --   customer     DevSpawn, someone in Ordering at Q1 (30 s)
---   tablet       tablet_take on TAB-1 -> Talking -> the customer is Waiting with a ticket on a plate (talk + 5 s)
---   cut          bun_slice on a CUT-n -> bun_sliced in the hotbar
---   plate bun    plate_put on the ticket's plate -> Bun
---   grill        grill_place -> Flip on (pause) -> grill_flip -> Collect on -> grill_collect -> rail +1
---   rail         rail_take -> sausage_grilled in the hotbar
---   plate dog    plate_put -> Sausage; plate_take -> hot_dog with Ticket = the customer
+--   tablet       tablet_take on TAB-1 -> Talking -> the customer is Waiting (talk + 5 s)
+--   world kitchen (kitchen-world.md §1; TASK-569):
+--   cut          bun_cut on the bun crate -> the cut-bun pile +1 (after the cut time)
+--   grill        grill_place -> Flip on -> grill_flip -> Collect on -> grill_collect -> rail +1
+--   plate        plate_take on the plate pile -> a plate Tool with Ticket = the customer
+--   plate bun    plate_add_bun -> Bun on the plate
+--   plate dog    plate_add_sausage -> the plate is the hot_dog Tool, same Ticket
 --   condiments   topping_add for every topping of the order (hot dog equipped)
 --   pickup       pickup_serve on PICKUP -> the customer is no longer Waiting (cash delta reported)
 --   table        the customer sits (Dining) or takes it away (leaves) within 20 s
@@ -29,7 +30,7 @@ export type Dev = (name: string, ...any) -> string
 type Step = { Name: string, Run: () -> string? }
 
 const ANCHOR_TAG = "Interactable"
-const KITCHEN_ITEMS: { [string]: boolean } = { bun_sliced = true, sausage_grilled = true, hot_dog = true }
+const KITCHEN_ITEMS: { [string]: boolean } = { plate = true, hot_dog = true }
 const SETTLE = 0.4
 const LIFT = Vector3.new(0, 2.5, 0)
 
@@ -63,7 +64,6 @@ local function run(api: Api.Context, dev: Dev, caller: Player?): string
 	const interaction = api.Get("InteractionService")
 	const kitchen = api.Get("KitchenService")
 	const items = api.Get("ItemService")
-	const plates = api.Get("PlateService")
 	const tablets = api.Get("TabletService")
 	const customers = api.Get("CustomerService")
 	const round = api.Get("RoundService")
@@ -78,7 +78,7 @@ local function run(api: Api.Context, dev: Dev, caller: Player?): string
 	end)
 
 	local npc = 0
-	local plateIndex = 0
+	local plateTool: Tool? = nil
 	local hotDog: Tool? = nil
 	local home: CFrame? = nil
 
@@ -165,14 +165,6 @@ local function run(api: Api.Context, dev: Dev, caller: Player?): string
 		end
 		humanoid:EquipTool(tool)
 		task.wait(0.1)
-	end
-
-	local function plate(): any
-		const slot = plates.Slots[plateIndex]
-		if slot == nil then
-			error(`PLATE-{plateIndex} is not bound`, 0)
-		end
-		return slot
 	end
 
 	local function customerState(): string
@@ -269,17 +261,11 @@ local function run(api: Api.Context, dev: Dev, caller: Player?): string
 				if not waited1 then
 					error(`customer {npc} is {customerState()} {string.format("%.1f", talk + 5)} s after the talk began`, 0)
 				end
-				const slots = plates:SlotsOf(npc)
-				if slots[1] == nil then
-					error(`customer {npc} Waiting but no plate holds its ticket`, 0)
-				end
-				plateIndex = slots[1].Index
 				const customer = customers:Get(npc)
 				return string.format(
-					"talk %.1f s; #%s on PLATE-%d; order [%s]",
+					"talk %.1f s; #%s; order [%s]",
 					talk,
 					tostring(if customer then customer.Number else nil),
-					plateIndex,
 					table.concat(orderToppings(), ",")
 				)
 			end,
@@ -287,22 +273,15 @@ local function run(api: Api.Context, dev: Dev, caller: Player?): string
 		{
 			Name = "cut",
 			Run = function(): string?
-				act(pick("bun_slice", current), "bun_slice")
-				const tool = toolOf("bun_sliced")
-				if tool == nil then
-					error(`no bun_sliced in the hotbar after bun_slice{why()}`, 0)
+				const before = kitchen:BunCount()
+				act(pick("bun_cut", current), "bun_cut")
+				const ok = waitFor(function(): boolean
+					return kitchen:BunCount() > before
+				end, 3)
+				if not ok then
+					error(`cut-bun pile {kitchen:BunCount()} after bun_cut (was {before}){why()}`, 0)
 				end
-				return `bun_sliced x{items:Count(tool)}`
-			end,
-		},
-		{
-			Name = "plate bun",
-			Run = function(): string?
-				act(plates.PutAnchors[plateIndex], "plate_put")
-				if not plate().Bun then
-					error(`PLATE-{plateIndex} has no bun after plate_put{why()}`, 0)
-				end
-				return `PLATE-{plateIndex} bun`
+				return `pile {before} -> {kitchen:BunCount()}`
 			end,
 		},
 		{
@@ -319,9 +298,9 @@ local function run(api: Api.Context, dev: Dev, caller: Player?): string
 						end
 					end
 					return false
-				end, 30)
+				end, 5)
 				if not waited2 then
-					error(`no Flip prompt on in 30 s after grill_place{why()}`, 0)
+					error(`no Flip prompt on in 5 s after grill_place{why()}`, 0)
 				end
 				act(flip :: Instance, "grill_flip")
 				local collect: Instance? = nil
@@ -333,9 +312,9 @@ local function run(api: Api.Context, dev: Dev, caller: Player?): string
 						end
 					end
 					return false
-				end, 10)
+				end, 15)
 				if not waited3 then
-					error(`no Collect prompt on in 10 s after grill_flip{why()}`, 0)
+					error(`no Collect prompt on in 15 s after grill_flip{why()}`, 0)
 				end
 				act(collect :: Instance, "grill_collect")
 				if kitchen:RailCount() <= rail then
@@ -345,33 +324,46 @@ local function run(api: Api.Context, dev: Dev, caller: Player?): string
 			end,
 		},
 		{
-			Name = "rail",
+			Name = "plate",
 			Run = function(): string?
-				act(pick("rail_take", current), "rail_take")
-				const tool = toolOf("sausage_grilled")
+				act(pick("plate_take"), "plate_take")
+				const tool = toolOf("plate")
 				if tool == nil then
-					error(`no sausage_grilled in the hotbar after rail_take{why()}`, 0)
+					error(`no plate after plate_take{why()}`, 0)
 				end
-				return `sausage_grilled x{items:Count(tool)}`
+				plateTool = tool
+				if tool:GetAttribute("Ticket") ~= npc then
+					error(`plate Ticket {tool:GetAttribute("Ticket")} (expected {npc}: the oldest ticket)`, 0)
+				end
+				return `plate {tool:GetAttribute("PlateId")} Ticket {npc}`
+			end,
+		},
+		{
+			Name = "plate bun",
+			Run = function(): string?
+				equip(plateTool :: Tool)
+				act(pick("plate_add_bun", current), "plate_add_bun")
+				if (plateTool :: Tool):GetAttribute("Bun") ~= true then
+					error(`no Bun on the plate after plate_add_bun{why()}`, 0)
+				end
+				return "bun on the plate"
 			end,
 		},
 		{
 			Name = "plate dog",
 			Run = function(): string?
-				act(plates.PutAnchors[plateIndex], "plate_put")
-				if not plate().Sausage then
-					error(`PLATE-{plateIndex} has no sausage after plate_put{why()}`, 0)
-				end
-				act(plates.TakeAnchors[plateIndex], "plate_take")
+				equip(plateTool :: Tool)
+				act(pick("plate_add_sausage", current), "plate_add_sausage")
+				task.wait(0.2)
 				const tool = toolOf("hot_dog")
 				if tool == nil then
-					error(`no hot_dog after plate_take{why()}`, 0)
+					error(`no hot_dog after plate_add_sausage{why()}`, 0)
 				end
 				if tool:GetAttribute("Ticket") ~= npc then
 					error(`hot_dog Ticket {tool:GetAttribute("Ticket")} (expected {npc})`, 0)
 				end
 				hotDog = tool
-				return `hot_dog Ticket {npc}`
+				return `hot_dog Ticket {npc}, Flipped {tostring(tool:GetAttribute("Flipped"))}`
 			end,
 		},
 		{
