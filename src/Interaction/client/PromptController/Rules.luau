@@ -7,18 +7,12 @@
 -- Wave 3 (TASK-131, DEC-221, architecture.md §19.14 v4.2): VehicleController plugs a probe over the `Shutter`
 -- attribute of the current vehicle (SetShutterProbe). With the service window closed "Take Order" and "Serve"
 -- show no prompt (the server gate `Shutter` refuses them anyway). Without a probe nothing changes.
--- Restaurant (TASK-383, tech/restaurant-flow.md rev. 2 §2.2 / §8 "prompts amontoados"): tablet_take / plate_put /
--- plate_take never show with Content.Restaurant.Rules.Enabled off; plate_put only with the right Tool in hand, plate_take
--- only with a free hand. PlateController plugs a probe over the Plates set (SetPlateProbe) to also drop the plates that
--- cannot take that item, when the anchor carries its plate index as `Slot`.
--- Conveyor (TASK-522, DEC-304; tech/prep-conveyor.md §7.2 / §8): with Content.Prep.Rules.Mode = "Conveyor" the probe says so
--- (`Conveyor`) and the plate actions read the central table instead of the old pass:
---   plate_put     never a prompt (putting is a click / tap on the free slot, packet CenterPut)
---   plate_take    "hold E" on a slot with a plate (free slot = no prompt), only while the hands carry fewer plates than
---                 ItemRules.CategoryLimits.HotDog, and only the nearest plate's prompt (8 prompts 2.6 studs apart would
---                 overlap on a phone; MAP-01-r4 §16.7)
---   pickup_serve  only with an assembled plate (hot_dog) equipped whose ticket customer waits at the pickup; an unassembled
---                 plate, an orphan or a customer not at the pickup = no prompt. Unknown customer = the server decides
+-- World kitchen (kitchen-world.md §1-§3; TASK-570): PlateController plugs a probe (SetPlateProbe) over the local hands:
+--   plate_take         only with no plate in the hands (one plate per hand, Provisional)
+--   plate_add_bun      only with a plate equipped that has no bun yet (Requires.Held = plate)
+--   plate_add_sausage  only with a plate equipped that has no sausage yet
+--   pickup_serve       only with a hot dog equipped; one with a ticket only while its customer waits at the pickup (AtPickup
+--                      false = no prompt, nil = not known: the server decides)
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 
@@ -63,33 +57,18 @@ export type ShutterProbe = {
 	IsInside: (() -> boolean)?, -- local character inside the trailer (LZ-1, the volume VehicleService:IsInside reads)
 }
 
--- Read side of the Plates set (restaurant, TASK-383), given by PlateController. `Slot` of the target = plate index
--- (PlateIndex) when the anchor carries it; without it only the hand decides.
--- Conveyor (TASK-522): Orphan = the customer left (the slot still holds the plate); Grade = band of an assembled plate.
-export type PlateRecord = { Npc: number, Bun: boolean, Sausage: boolean, Orphan: boolean?, Grade: string? }
--- The plate / hot dog Tool the local player has equipped (attributes PlateService writes; prep-conveyor.md §6.3).
--- AtPickup: its ticket customer is Waiting in the pickup line; nil = not known (no Customers record): the server decides.
-export type HeldPlate = { Item: string, Ticket: number, Orphan: boolean, AtPickup: boolean? }
+-- The plate / hot dog Tool the local player has equipped (attributes of shared/Plate/PlateTool). AtPickup: its ticket customer
+-- is Waiting in the pickup line; nil = not known (no ticket, no Customers record): the server decides.
+export type HeldPlate = { Item: string, Ticket: number, Bun: boolean, Sausage: boolean, AtPickup: boolean? }
 export type PlateProbe = {
-	Plate: (index: number) -> PlateRecord?,
-	-- Conveyor (TASK-522): the central table rules above apply. nil / false = the pass of TASK-383
-	Conveyor: boolean?,
 	-- plates + hot dogs carried (equipped and in the backpack); nil = not known
 	Hands: (() -> number)?,
-	-- central table slot of the only plate_take prompt that may show (the plate nearest the character); nil = no rule
-	NearestTake: (() -> number?)?,
 	-- equipped plate / hot dog; nil = none of them equipped
 	Equipped: (() -> HeldPlate?)?,
 }
 
--- Restaurant prompts (tech/restaurant-flow.md rev. 2 §4.2): none while Content.Restaurant.Rules.Enabled is false (the
--- trailer flow; the published game stays the same).
-const RESTAURANT_ACTIONS: { [string]: boolean } = { tablet_take = true, plate_put = true, plate_take = true }
--- plate_put by hand (§2.2): what the plate takes from each Tool
-const PLATE_PUT_ITEMS: { [string]: boolean } = { bun_sliced = true, sausage_grilled = true, hot_dog = true }
--- Conveyor (TASK-522): plates the hands may carry (DEC-299) and the Tool of an assembled plate
-const HANDS_MAX = Content.ItemRules.CategoryLimits.HotDog
 const ASSEMBLED_ITEM = "hot_dog"
+const PLATE_ITEM = "plate"
 const PICKUP_ACTION = "pickup_serve"
 
 -- Counter actions the closed window stops (architecture.md §19.14 gate `Shutter`).
@@ -118,63 +97,25 @@ function Rules.SetPlateProbe(probe: PlateProbe?)
 	plateProbe = probe
 end
 
--- plate_put / plate_take by hand (TASK-383; design FEAT-044 / FEAT-045). The server revalidates and picks the Tool.
---   plate_put   only with bun_sliced, sausage_grilled or hot_dog equipped; on a known plate: the bun only where there is
---               none, the dog only on a bun without one, a whole hot dog only on an empty plate
---   plate_take  only with a free hand (nothing equipped); on a known plate only with bun and dog on it
-local function plateAllows(action: string, held: Held?, slot: number?): boolean
-	if action == "plate_take" and held ~= nil then
-		return false
-	elseif action == "plate_put" and (held == nil or not PLATE_PUT_ITEMS[held.Item]) then
-		return false
-	end
-	const plate = if plateProbe and slot then plateProbe.Plate(slot) else nil
-	if plate == nil then
-		return true -- unknown plate: the hand decided, the server does the rest
-	end
+-- The plate rules above; a missing fact keeps the prompt (the server decides).
+local function plateAllows(action: string, probe: PlateProbe): boolean
 	if action == "plate_take" then
-		return plate.Bun and plate.Sausage
+		const hands = if probe.Hands then probe.Hands() else nil
+		return hands == nil or hands < 1
 	end
-	const item = (held :: Held).Item
-	if item == "bun_sliced" then
-		return not plate.Bun
-	elseif item == "sausage_grilled" then
-		return plate.Bun and not plate.Sausage
-	end
-	return not plate.Bun and not plate.Sausage -- hot_dog
-end
-
--- Conveyor (TASK-522; prep-conveyor.md §7.2): the central table. plate_put is a click, never a prompt; plate_take needs a
--- plate on the slot, room in the hands and to be the nearest plate. A missing fact keeps the prompt (the server decides).
-local function centerAllows(action: string, slot: number?, probe: PlateProbe): boolean
-	if action == "plate_put" then
-		return false
-	elseif action ~= "plate_take" then
-		return true
-	end
-	const hands = if probe.Hands then probe.Hands() else nil
-	if hands ~= nil and hands >= HANDS_MAX then
-		return false
-	end
-	if slot == nil then
-		return true
-	end
-	const plate = probe.Plate(slot)
-	if plate ~= nil and plate.Npc == 0 and plate.Orphan ~= true then
-		return false -- free slot: nothing to take
-	end
-	const nearest = if probe.NearestTake then probe.NearestTake() else nil
-	return nearest == nil or nearest == slot
-end
-
--- Conveyor (TASK-522; prep-conveyor.md §8): "Hand Over" only with an assembled plate equipped whose customer waits at the
--- pickup. Without the probe (trailer, restaurant off) nothing changes.
-local function pickupAllows(probe: PlateProbe): boolean
 	const equipped = if probe.Equipped then probe.Equipped() else nil
-	if equipped == nil or equipped.Item ~= ASSEMBLED_ITEM or equipped.Ticket == 0 or equipped.Orphan then
-		return false
+	if action == "plate_add_bun" or action == "plate_add_sausage" then
+		if equipped == nil or equipped.Item ~= PLATE_ITEM then
+			return false
+		end
+		return if action == "plate_add_bun" then not equipped.Bun else not equipped.Sausage
+	elseif action == PICKUP_ACTION then
+		if equipped == nil or equipped.Item ~= ASSEMBLED_ITEM then
+			return false
+		end
+		return equipped.Ticket == 0 or equipped.AtPickup ~= false
 	end
-	return equipped.AtPickup ~= false
+	return true
 end
 
 -- Text of the `shutter_toggle` pill for the `Shutter` attribute of its vehicle (true = closed).
@@ -226,19 +167,7 @@ function Rules.Allows(target: Target, context: Context): boolean
 	end
 
 	const probe = plateProbe
-	const conveyor = probe ~= nil and probe.Conveyor == true
-	if RESTAURANT_ACTIONS[target.Action] then
-		if target.Action ~= "tablet_take" then
-			if probe ~= nil and conveyor then
-				if not centerAllows(target.Action, target.Slot, probe) then
-					return false
-				end
-			elseif not plateAllows(target.Action, context.Held, target.Slot) then
-				return false
-			end
-		end
-	end
-	if target.Action == PICKUP_ACTION and probe ~= nil and conveyor and not pickupAllows(probe) then
+	if probe ~= nil and not plateAllows(target.Action, probe) then
 		return false
 	end
 
@@ -269,6 +198,10 @@ function Rules.Allows(target: Target, context: Context): boolean
 
 	const held = context.Held
 	if requires.Held and not Rules.Holds(held, requires.Held) then
+		return false
+	end
+	-- Throw Away: a plate / hot dog or a box (Trash.Discardable)
+	if target.Action == "discard" and not (Rules.Holds(held, "HotDog") or Rules.Holds(held, "Package")) then
 		return false
 	end
 

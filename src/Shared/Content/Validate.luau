@@ -1901,318 +1901,15 @@ local function checkHudReveal()
 	end
 end
 
--- Focused prep mode (prep-mode.md §6; DEC-223). Every key here becomes a wire enum in Net (PrepTab, PrepGrill, PrepOrder,
--- PrepFinish, PrepResult), so duplicates and bad names fail here, not in Lync.start().
-const PREP_NEEDS: { [string]: boolean } = { Nothing = true, BunCut = true, PlateBuilt = true, SausagePlaced = true, TicketPicked = true }
-const PREP_TOOLS_REQUIRED: { string } = { "Bottle", "Slice", "Strip", "Pinch" }
+-- Hot dog grade of the world kitchen (kitchen-world.md §4; TASK-569): bands, tips and the Perfect time
 const PREP_BANDS: { string } = { "Perfect", "Good", "Messy" }
-const PREP_REQUIRED_TARGETS: { string } = { "bun_cut", "sausage_place", "grill_flip" }
-
-local function checkPrepIcon(table_: string, index: number, key: string, icon: string)
-	if icon ~= "" and not string.match(icon, "^rbxassetid://%d+$") then
-		fail(table_, index, key, `Icon '{icon}' is neither empty nor rbxassetid://<n>`)
-	end
-end
-
--- A tab set: labels, one-line hints (the hint line of the HUD), wire membership.
-local function checkPrepTabSet(name: string, tabsOf: Table.Table<Prep.TabRow>, wire: { [string]: boolean }, maxHint: number)
-	for index, row in tabsOf.List do
-		if row.Label == "" or row.Hint == "" then
-			fail(name, index, row.Key, "empty Label or Hint")
-		end
-		if #row.Hint > maxHint then
-			fail(name, index, row.Key, `Hint is one line of at most {maxHint} characters`)
-		end
-		if not wire[row.Key] then
-			fail(name, index, row.Key, "key missing in Prep.WireTabs")
-		end
-		checkPrepIcon(name, index, row.Key, row.Icon)
-	end
-end
-
--- A step set: its tab belongs to the same tab set, its view exists, its need is known.
-local function checkPrepStepSet(name: string, stepsOf: Table.Table<Prep.Step>, tabsOf: Table.Table<Prep.TabRow>, maxHint: number)
-	for index, row in stepsOf.List do
-		if not tabsOf.ByKey[row.Tab] then
-			fail(name, index, row.Key, `Tab '{row.Tab}' not in the tabs of the same set`)
-		end
-		if not Prep.Views.ByKey[row.View] then
-			fail(name, index, row.Key, `View '{row.View}' not in Prep.Views`)
-		end
-		if not PREP_NEEDS[row.Needs] then
-			fail(name, index, row.Key, `Needs '{row.Needs}' is not a known condition`)
-		end
-		if row.Label == "" or row.Hint == "" or row.NextLabel == "" then
-			fail(name, index, row.Key, "empty Label, Hint or NextLabel")
-		end
-		if #row.Hint > maxHint then
-			fail(name, index, row.Key, `Hint is one line of at most {maxHint} characters`)
-		end
-		checkPrepIcon(name, index, row.Key, row.Icon)
-	end
-end
 
 local function checkPrep()
-	checkKeys("Prep.TabsLegacy", Prep.TabsLegacy, VALUE_PATTERN)
-	checkKeys("Prep.Tabs3D", Prep.Tabs3D, VALUE_PATTERN)
-	checkKeys("Prep.StepsLegacy", Prep.StepsLegacy, KEY_PATTERN)
-	checkKeys("Prep.Steps3D", Prep.Steps3D, KEY_PATTERN)
-	checkKeys("Prep.Views", Prep.Views, VALUE_PATTERN)
-	checkKeys("Prep.Gestures", Prep.Gestures, KEY_PATTERN)
-	checkKeys("Prep.Tolerances", Prep.Tolerances, KEY_PATTERN)
-	checkKeys("Prep.Reasons", Prep.Reasons, VALUE_PATTERN)
-	if #Prep.Reasons.List > 255 or not Prep.Reasons.ByKey.None then
-		fail("Prep.Reasons", nil, nil, "needs the row 'None' and at most 255 rows")
-	end
-
-	-- Tabs and Steps are one of the two fixed sets, chosen by Rules.ThreeD (prep-3d.md §11.3); the wire enum is the union
-	const threeD = Prep.Rules.ThreeD
-	if Prep.Tabs ~= (if threeD then Prep.Tabs3D else Prep.TabsLegacy) or Prep.Steps ~= (if threeD then Prep.Steps3D else Prep.StepsLegacy) then
-		fail("Prep", nil, nil, "Tabs / Steps must be the set of Rules.ThreeD")
-	end
-	const wire = setOf(Prep.WireTabs)
-	checkPrepTabSet("Prep.TabsLegacy", Prep.TabsLegacy, wire, 40)
-	checkPrepTabSet("Prep.Tabs3D", Prep.Tabs3D, wire, 36)
-	for key in wire do
-		-- Serve leaves both sets while Rules.Delivery = "Prompt" but stays on the wire (enum order, rollback to "Window")
-		if key ~= "Serve" and not Prep.TabsLegacy.ByKey[key] and not Prep.Tabs3D.ByKey[key] then
-			fail("Prep.WireTabs", nil, key, "not a tab of either set")
-		end
-	end
-	for alias, target in Prep.TabAlias do
-		if not wire[alias] or not wire[target] then
-			fail("Prep.TabAlias", nil, alias, "alias and target must be wire tabs")
-		end
-	end
-	checkPrepStepSet("Prep.StepsLegacy", Prep.StepsLegacy, Prep.TabsLegacy, 40)
-	checkPrepStepSet("Prep.Steps3D", Prep.Steps3D, Prep.Tabs3D, 36)
-	-- the 3D set: every section (tab) has a view and a first step, and the views chain without a loop
-	for index, row in Prep.Tabs3D.List do
-		local found = false
-		for _, view in Prep.Views.List do
-			found = found or view.Tab == row.Key
-		end
-		if not found then
-			fail("Prep.Tabs3D", index, row.Key, "no Prep.Views row shows this tab")
-		end
-		found = false
-		for _, step in Prep.Steps3D.List do
-			found = found or step.Tab == row.Key
-		end
-		if not found then
-			fail("Prep.Tabs3D", index, row.Key, "no Prep.Steps3D row uses this tab")
-		end
-	end
-	for index, row in Prep.Views.List do
-		if not Prep.Tabs3D.ByKey[row.Tab] then
-			fail("Prep.Views", index, row.Key, `Tab '{row.Tab}' not in Prep.Tabs3D`)
-		end
-		if row.Anchor == "" or row.Focus == "" then
-			fail("Prep.Views", index, row.Key, "empty Anchor or Focus")
-		end
-		if row.Fov ~= 0 then
-			inRange("Prep.Views", index, row.Key, "Fov", row.Fov, 20, 100)
-		end
-		-- Pitch / Distance 0 = the anchor frame is used as authored (Poses.luau); either one set = the derived pose
-		if row.Pitch ~= 0 or row.Distance ~= 0 then
-			inRange("Prep.Views", index, row.Key, "Pitch", row.Pitch, -89, -20)
-			inRange("Prep.Views", index, row.Key, "Distance", row.Distance, 1, 20)
-		end
-		inRange("Prep.Views", index, row.Key, "Dolly", row.Dolly, -10, 10)
-		inRange("Prep.Views", index, row.Key, "Side", row.Side, -10, 10)
-		if row.Fallback ~= "" and row.Fallback ~= Prep.LegacyView.Key and not Prep.Views.ByKey[row.Fallback] then
-			fail("Prep.Views", index, row.Key, `Fallback '{row.Fallback}' is neither a view nor the legacy Build pair`)
-		end
-		-- no loop: follow the chain, at most #Views hops
-		local walk: string = row.Fallback
-		local hops = 0
-		while walk ~= "" and walk ~= Prep.LegacyView.Key do
-			hops += 1
-			if hops > #Prep.Views.List then
-				fail("Prep.Views", index, row.Key, "Fallback chain loops")
-			end
-			walk = Prep.Views.ByKey[walk].Fallback
-		end
-	end
-	for index, row in Prep.Gestures.List do
-		inRange("Prep.Gestures", index, row.Key, "Hz", row.Hz, 0, 60)
-		inRange("Prep.Gestures", index, row.Key, "MaxPoints", row.MaxPoints, 1, 255)
-		inRange("Prep.Gestures", index, row.Key, "MinPoints", row.MinPoints, 1, row.MaxPoints)
-		if row.Hz == 0 and row.Drag then
-			fail("Prep.Gestures", index, row.Key, "Drag needs a sampling rate (Hz > 0)")
-		end
-	end
-
-	const toppings = setOf(Ingredients.ToppingKeys)
-	const required = setOf(PREP_REQUIRED_TARGETS)
-	for index, row in Prep.Tolerances.List do
-		if not toppings[row.Key] and not required[row.Key] then
-			fail("Prep.Tolerances", index, row.Key, "key is neither an Ingredients topping nor bun_cut, sausage_place, grill_flip")
-		end
-		if not Prep.Gestures.ByKey[row.Gesture] then
-			fail("Prep.Tolerances", index, row.Key, `Gesture '{row.Gesture}' not in Prep.Gestures`)
-		end
-		if not (row.Perfect > 0 and row.Perfect < row.Good and row.Good < row.Worst) then
-			fail("Prep.Tolerances", index, row.Key, "needs 0 < Perfect < Good < Worst")
-		end
-		inRange("Prep.Tolerances", index, row.Key, "Worst", row.Worst, 1, 1000)
-		inRange("Prep.Tolerances", index, row.Key, "ExcessWeight", row.ExcessWeight, 0, 10)
-		checkPrepIcon("Prep.Tolerances", index, row.Key, row.Icon)
-	end
-	for key in toppings do
-		if not Prep.Tolerances.ByKey[key] then
-			fail("Prep.Tolerances", nil, key, "every order topping needs a tolerance row (prep-mode.md §6)")
-		end
-	end
-	for key in required do
-		if not Prep.Tolerances.ByKey[key] then
-			fail("Prep.Tolerances", nil, key, "required target is missing")
-		end
-	end
-	for index, row in Prep.Reasons.List do
-		if row.Notice ~= nil and not Notices.ByKey[row.Notice] then
-			fail("Prep.Reasons", index, row.Key, `Notice '{row.Notice}' not in Notices`)
-		end
-	end
-
-	const rules = Prep.Rules
-	const camera = rules.Camera
-	inRange("Prep.Rules", nil, nil, "Camera.Fov", camera.Fov, 20, 100)
-	inRange("Prep.Rules", nil, nil, "Camera.Travel", camera.Travel, 0, 3)
-	inRange("Prep.Rules", nil, nil, "Camera.Leave", camera.Leave, 0, 3)
-	inRange("Prep.Rules", nil, nil, "Camera.Pitch", camera.Pitch, -89, 0)
-	inRange("Prep.Rules", nil, nil, "Camera.Distance", camera.Distance, 0.5, 20)
-	inRange("Prep.Rules", nil, nil, "Camera.Pan.Slop", camera.Pan.Slop, 1, 80)
-	inRange("Prep.Rules", nil, nil, "Camera.Pan.Decay", camera.Pan.Decay, 0.5, 20)
-	inRange("Prep.Rules", nil, nil, "Camera.Pan.StopSpeed", camera.Pan.StopSpeed, 0.05, 5)
-	inRange("Prep.Rules", nil, nil, "Camera.Pan.Hyst", camera.Pan.Hyst, 0, 0.3)
-	inRange("Prep.Rules", nil, nil, "Camera.Pan.Edge", camera.Pan.Edge, 0.02, 0.2)
-	inRange("Prep.Rules", nil, nil, "Camera.Pan.EdgeSpeed", camera.Pan.EdgeSpeed, 1, 40)
-	inRange("Prep.Rules", nil, nil, "ForcedExit.Signal", rules.ForcedExit.Signal, 0, 5)
-	inRange("Prep.Rules", nil, nil, "ForcedExit.NoInput", rules.ForcedExit.NoInput, 0, 5)
-	inRange("Prep.Rules", nil, nil, "CueLock", rules.CueLock, 0, 60)
-	inRange("Prep.Rules", nil, nil, "Heartbeat", rules.Heartbeat, 1, 60)
-	inRange("Prep.Rules", nil, nil, "ClientIdle", rules.ClientIdle, 1, 300)
-	inRange("Prep.Rules", nil, nil, "SeatIdle", rules.SeatIdle, rules.Heartbeat * 2, 600)
-	inRange("Prep.Rules", nil, nil, "PlateMax", rules.PlateMax, 10, 600)
-	-- the tutorial age must stay under PlateMax (the plate never expires) and over the biggest plate's floor
-	inRange("Prep.Rules", nil, nil, "TutorialPlateAge", rules.TutorialPlateAge, rules.PerfectMin + rules.PerTopping * Orders.Rules.MaxToppings + 1, rules.PlateMax - 1)
-	inRange("Prep.Rules", nil, nil, "Reach", rules.Reach, 1, 100)
-	inRange("Prep.Rules", nil, nil, "MinPlate", rules.MinPlate, 0, 60)
-	inRange("Prep.Rules", nil, nil, "PerTopping", rules.PerTopping, 0, 30)
-	inRange("Prep.Rules", nil, nil, "PerfectMin", rules.PerfectMin, rules.MinPlate, 120)
-	inRange("Prep.Rules", nil, nil, "MsSlack", rules.MsSlack, 0, 10)
-	inRange("Prep.Rules", nil, nil, "Assist", rules.Assist, 1, 3)
-	inRange("Prep.Rules", nil, nil, "TouchOffset", rules.TouchOffset, 0, 200)
-	-- the time floors must fit inside PlateMax with the biggest plate, and Ms on the wire is Net.PrepFinish.Ms (0..120000)
-	if rules.PerfectMin + rules.PerTopping * Orders.Rules.MaxToppings >= rules.PlateMax then
-		fail("Prep.Rules", nil, nil, "PerfectMin + PerTopping x MaxToppings must stay under PlateMax")
-	end
-	if rules.PlateMax * 1000 > 120000 then
-		fail("Prep.Rules", nil, nil, "PlateMax above 120 s does not fit PrepFinish.Ms (0..120000)")
-	end
-	const grill = rules.Grill
-	if not (grill.From >= 0 and grill.From < grill.Target and grill.Target < grill.To and grill.To <= 1) then
-		fail("Prep.Rules", nil, nil, "Grill needs 0 <= From < Target < To <= 1")
-	end
-	for field, rate in rules.Rates :: any do
-		inRange("Prep.Rules", nil, nil, `Rates.{field}`, rate, 1, 60)
-	end
-	inRange("Prep", nil, nil, "Stations", Prep.Stations, 1, 4)
-
-	-- 3D world (prep-3d.md §2, §8, §9)
-	const world = rules.World
-	if world.Tag == "" or world.Attr.Kind == "" or world.Attr.Slot == "" or world.Attr.Key == "" or world.Attr.Fov == "" then
-		fail("Prep.Rules", nil, nil, "World.Tag and World.Attr names must not be empty")
-	end
-	inRange("Prep.Rules", nil, nil, "World.Hitbox.MinPx", world.Hitbox.MinPx, 1, 200)
-	inRange("Prep.Rules", nil, nil, "World.Hitbox.MinStuds", world.Hitbox.MinStuds, 0.05, 3)
-	inRange("Prep.Rules", nil, nil, "World.Hitbox.AssistScale", world.Hitbox.AssistScale, 1, 3)
-	inRange("Prep.Rules", nil, nil, "World.Hitbox.Sausage.Length", world.Hitbox.Sausage.Length, 0.1, 5)
-	inRange("Prep.Rules", nil, nil, "World.Hitbox.Sausage.Width", world.Hitbox.Sausage.Width, 0.1, 5)
-	inRange("Prep.Rules", nil, nil, "World.Lift", world.Lift, 0, 3)
-	const ring = world.Ring
-	if not (ring.To > 0 and ring.To < ring.From and ring.From <= 5) then
-		fail("Prep.Rules", nil, nil, "World.Ring needs 0 < To < From <= 5")
-	end
-	inRange("Prep.Rules", nil, nil, "World.Ring.Good", ring.Good, 0.005, 1)
-	inRange("Prep.Rules", nil, nil, "World.Ring.Perfect", ring.Perfect, ring.Good, 1)
-	inRange("Prep.Rules", nil, nil, "World.Ring.Late", ring.Late, 0.1, ring.From)
-	inRange("Prep.Rules", nil, nil, "World.Ring.Turn", ring.Turn, 0, 3)
-	inRange("Prep.Rules", nil, nil, "World.Ring.Hop", ring.Hop, 0, 3)
-	inRange("Prep.Rules", nil, nil, "World.Hover.Grow", world.Hover.Grow, 0, 1)
-	inRange("Prep.Rules", nil, nil, "World.Hover.Rise", world.Hover.Rise, 0, 1)
-	inRange("Prep.Rules", nil, nil, "World.Attract", world.Attract, 0, 400)
-	inRange("Prep.Rules", nil, nil, "World.Marker", world.Marker, 0.01, 2)
-	inRange("Prep.Rules", nil, nil, "World.Settle", world.Settle, 0, 3)
-	for field, value in world.Budget :: any do
-		inRange("Prep.Rules", nil, nil, `World.Budget.{field}`, value, 0, 1000)
-	end
-	if world.Budget.Hitboxes < 1 or world.Budget.RaysPerFrame < 1 or world.Budget.ColorHz < 1 then
-		fail("Prep.Rules", nil, nil, "World.Budget Hitboxes, RaysPerFrame and ColorHz are at least 1")
-	end
-	if world.Budget.SauceSegmentsPerStroke > world.Budget.SaucePool or world.Budget.SauceSegmentsPerPlate > world.Budget.SaucePool then
-		fail("Prep.Rules", nil, nil, "World.Budget sauce segments per stroke and per plate must fit the pool")
-	end
-
-	-- plate mask (N3): cut, sausage and every topping key are bits of a byte
-	const mask = Prep.PlateMask
-	if #Ingredients.ToppingKeys > mask.MaxToppingKeys then
-		fail("Prep.PlateMask", nil, nil, `#Ingredients.ToppingKeys = {#Ingredients.ToppingKeys} does not fit {mask.MaxToppingKeys} topping bits`)
-	end
-	if mask.FirstTopping + mask.MaxToppingKeys > mask.Bits or mask.Bits > 8 or mask.Cut == mask.Sausage then
-		fail("Prep.PlateMask", nil, nil, "Cut, Sausage and the topping bits must fit in Bits (<= 8) without overlap")
-	end
-	if mask.Cut >= mask.FirstTopping or mask.Sausage >= mask.FirstTopping then
-		fail("Prep.PlateMask", nil, nil, "Cut and Sausage come before the topping bits")
-	end
-	if Orders.Rules.MaxToppings > mask.MaxToppingKeys then
-		fail("Prep.PlateMask", nil, nil, "OrderRules.MaxToppings is above the topping bits of the mask")
-	end
-
-	-- tools and targets
-	const targetKinds = setOf(Prep.TargetKinds :: any)
-	const toolKinds = setOf(Prep.ToolKinds :: any)
-	if not toolKinds.None or #Prep.TargetKinds ~= 11 then
-		fail("Prep", nil, nil, "ToolKinds needs 'None' and TargetKinds has the 11 kinds of prep-3d.md §2.2 (+ Plate, TASK-206)")
-	end
-	for _, tool in PREP_TOOLS_REQUIRED do
-		if not toolKinds[tool] then
-			fail("Prep.ToolKinds", nil, tool, "missing")
-		end
-	end
-	for _, key in Ingredients.ToppingKeys do
-		const tool = Prep.ToolOf[key]
-		if tool == nil or tool == "None" or not toolKinds[tool] then
-			fail("Prep.ToolOf", nil, key, "every topping needs a tool of ToolKinds (not None)")
-		end
-	end
-	for key in Prep.ToolOf do
-		if not setOf(Ingredients.ToppingKeys)[key] then
-			fail("Prep.ToolOf", nil, key, "not an Ingredients topping")
-		end
-	end
-	if not targetKinds.Topping or not targetKinds.GrillSlot then
-		fail("Prep.TargetKinds", nil, nil, "needs GrillSlot and Topping")
-	end
-	for stage in world.Stages :: any do
-		if stage ~= "Grill" and stage ~= "Board" and stage ~= "Toppings" and stage ~= "Order" and stage ~= "Serve" then
-			fail("Prep.Rules", nil, nil, `World.Stages.{stage} is not a stage`)
-		end
-	end
-
 	const grades = Prep.Grades
 	const points = grades.Points
 	if not (points.Messy >= 0 and points.Messy < points.Good and points.Good < points.Perfect and points.Perfect <= 100) then
 		fail("Prep.Grades", nil, nil, "Points need 0 <= Messy < Good < Perfect <= 100")
 	end
-	if not (grades.Bands.Good > 0 and grades.Bands.Good < grades.Bands.Perfect and grades.Bands.Perfect < 100) then
-		fail("Prep.Grades", nil, nil, "Bands need 0 < Good < Perfect < 100")
-	end
-	if not (grades.Plate.GoodAvg > points.Messy and grades.Plate.GoodAvg < grades.Plate.PerfectAvg and grades.Plate.PerfectAvg <= points.Perfect) then
-		fail("Prep.Grades", nil, nil, "Plate needs Points.Messy < GoodAvg < PerfectAvg <= Points.Perfect")
-	end
-	inRange("Prep.Grades", nil, nil, "Unflipped", grades.Unflipped, 0, grades.Bands.Good - 1)
 	for _, band in PREP_BANDS do
 		const effect = (grades.Effects :: any)[band]
 		const label = (grades.Labels :: any)[band]
@@ -2231,158 +1928,14 @@ local function checkPrep()
 	if grades.Effects.Messy.Tip ~= 0 then
 		fail("Prep.Grades", nil, "Messy", "Messy pays no tip (Q-219 B)")
 	end
-	if (grades.Effects.Perfect.Tip or 0) < Orders.Rules.TipAmount then
-		fail("Prep.Grades", nil, "Perfect", "Perfect tip is below the base tip (OrderRules.TipAmount)")
-	end
-
-	-- cross references with the rest of Content
-	const station = Stations.ByKey.prep
-	if station == nil or station.Record ~= "None" or not table.find(station.Actions, "prep_work") then
-		fail("Prep", nil, nil, "Stations.prep with Record None and the action prep_work is required")
-	end
-	if not Animations.ByKey.work then
-		fail("Prep", nil, nil, "Animations.work is required (the rig at the station)")
-	end
-end
-
--- The restaurant conveyor (TASK-513; tech/prep-conveyor.md §2-§5, §9, §11.1): ranges against the wire (PrepSeats.Stop
--- 0..15, Wait 0..2; PrepStage.Slot 0..8; PrepGrab.Slot 1..8), seats inside 1..Stations, enums with the names the services read
-const BELT_STOP_KEYS: { string } = { "Grill", "Board", "Toppings", "Out" }
-const BELT_REASONS: { string } = { "NoPlate", "BeltFull", "GrillBusy", "WrongStop", "PlateDone" }
-const BELT_STOP_WIRE_MAX = 15 -- Net PrepSeats.Stop
-const BELT_SLOT_WIRE_MAX = 8 -- Net PrepStage.Slot / PrepGrab.Slot
-
-local function hasFormat(text: string): boolean
-	return string.format(text, 1) ~= text
-end
-
-local function checkConveyor()
-	const name = "Prep.Conveyor"
-	const conveyor = Prep.Conveyor
-	checkKeys(name .. ".Stops", conveyor.Stops, VALUE_PATTERN)
-	checkKeys(name .. ".Views", conveyor.Views, VALUE_PATTERN)
-	const stops = conveyor.Stops.List
-	if #stops ~= #BELT_STOP_KEYS or #stops > BELT_STOP_WIRE_MAX then
-		fail(name, nil, nil, `Stops needs the {#BELT_STOP_KEYS} stops Grill, Board, Toppings, Out (P6)`)
-	end
-	const wire = setOf(Prep.WireTabs)
-	for index, row in stops do
-		if row.Key ~= BELT_STOP_KEYS[index] then
-			fail(name, index, row.Key, `Stops[{index}] must be '{BELT_STOP_KEYS[index]}' (order = left -> right)`)
-		end
-		if not wire[row.Tab] then
-			fail(name, index, row.Key, `Tab '{row.Tab}' is not a wire tab (PrepSeats.Step)`)
-		end
-		if Prep.Texts.Stops[row.Key] == nil or Prep.Texts.Stops[row.Key] == "" then
-			fail(name, index, row.Key, "Prep.Texts.Stops needs a label per stop")
-		end
-	end
-	if stops[#stops] == nil or stops[#stops].Reserve then
-		fail(name, nil, nil, "the last stop (Out) is not reservable: it holds every plate")
-	end
-
-	-- seats: belt and grill apart, inside the PrepSeats ids; one binding name per seat
-	const seats = conveyor.Seats
-	const seen: { [number]: string } = {}
-	for role, list in { Belt = seats.Belt, Grill = seats.Grill } :: { [string]: { number } } do
-		if #list == 0 then
-			fail(name, nil, role, "Seats needs at least one seat per role")
-		end
-		for _, seat in list do
-			inRange(name, nil, role, "Seats", seat, 1, Prep.Stations)
-			if seen[seat] ~= nil then
-				fail(name, nil, role, `seat {seat} is already a {seen[seat]} seat`)
-			end
-			seen[seat] = role
-		end
-	end
-	if #seats.Belt > 2 then
-		fail(name, nil, "Belt", "at most 2 plates on the belt (Q-380 A)")
-	end
-	const binding = conveyor.Binding
-	if #binding.Seats ~= #seats.Belt + #seats.Grill then
-		fail(name, nil, nil, "Binding.Seats needs one name per seat (index = seat)")
-	end
-	for seat in seen do
-		if binding.Seats[seat] == nil or binding.Seats[seat] == "" then
-			fail(name, nil, nil, `Binding.Seats[{seat}] is missing`)
-		end
-	end
-	for field, value in binding :: any do
-		if type(value) == "string" and value == "" then
-			fail(name, nil, nil, `Binding.{field} is empty`)
-		end
-	end
-	if not hasFormat(binding.Stop) or not hasFormat(binding.WaitLeft) or not hasFormat(binding.WaitRight) then
-		fail(name, nil, nil, "Binding.Stop / WaitLeft / WaitRight need a %d")
-	end
-
-	inRange(name, nil, nil, "Rates.Belt", conveyor.Rates.Belt, 1, 60)
-	inRange(name, nil, nil, "Rates.Stage", conveyor.Rates.Stage, 1, 60)
-	inRange(name, nil, nil, "ParkMax", conveyor.ParkMax, 10, 3600)
-	inRange(name, nil, nil, "Rest.Capacity", conveyor.Rest.Capacity, 1, BELT_SLOT_WIRE_MAX)
-	const trailer = Vehicles.ByKey.trailer
-	if trailer ~= nil and conveyor.Rest.Capacity > trailer.RailSlots then
-		fail(name, nil, nil, "Rest.Capacity is above Vehicles.trailer.RailSlots (the rest table is the rail)")
-	end
-	const grill = conveyor.Grill
-	inRange(name, nil, nil, "Grill.FlipBonus", grill.FlipBonus, 0, 1000)
-	if grill.Burn or grill.FlipRequired then
-		fail(name, nil, nil, "Grill: no burning and no required flip on the conveyor (Q-381 A, DEC-298)")
-	end
-	for index, row in conveyor.Views.List do
-		if row.Anchor == "" or row.Focus == "" then
-			fail(name .. ".Views", index, row.Key, "empty Anchor or Focus")
-		end
-		if row.Fov ~= 0 then
-			inRange(name .. ".Views", index, row.Key, "Fov", row.Fov, 20, 100)
-		end
-		inRange(name .. ".Views", index, row.Key, "Stop", row.Stop, 0, #stops)
-	end
-	if not conveyor.Views.ByKey.Belt or not conveyor.Views.ByKey.Grill then
-		fail(name .. ".Views", nil, nil, "needs the wide Belt view and the griller's Grill view")
-	end
-
-	-- wire enums and answers
-	if #Prep.BeltDirs ~= 2 or not table.find(Prep.BeltDirs, "Left") or not table.find(Prep.BeltDirs, "Right") then
-		fail("Prep", nil, nil, "BeltDirs must be { Left, Right } (PrepBelt.Dir)")
-	end
-	if not table.find(Prep.BeltStages, "Cut") or not table.find(Prep.BeltStages, "Dog") then
-		fail("Prep", nil, nil, "BeltStages needs Cut and Dog (PrepStage.Stage)")
-	end
-	if not table.find(Prep.Acts, "Belt") or not table.find(Prep.Acts, "Stage") then
-		fail("Prep", nil, nil, "Acts needs Belt and Stage (PrepResult.Act)")
-	end
-	for _, key in BELT_REASONS do
-		if not Prep.Reasons.ByKey[key] then
-			fail("Prep.Reasons", nil, key, "conveyor reason missing")
-		end
-	end
-	for _, key in Ingredients.ToppingKeys do
-		if Prep.ToolOf[key] == "Bottle" and (Prep.Texts.Patterns[key] == nil or Prep.Texts.Patterns[key] == "") then
-			fail("Prep.Texts", nil, key, "Patterns needs a name per sauce (Bottle) topping")
-		end
-	end
-	for field, text in Prep.Texts.Toasts :: any do
-		if text == "" then
-			fail("Prep.Texts", nil, nil, `Toasts.{field} is empty`)
-		end
-	end
-
-	-- prompts: prep_grill like prep_work (same phases, tap)
-	const work = Actions.ByKey.prep_work
-	const grillAction = Actions.ByKey.prep_grill
-	if work == nil or grillAction == nil then
-		fail(name, nil, nil, "Actions prep_work and prep_grill are required (DEC-305, two prompts)")
-	end
-	if table.concat(work.Requires.Phase or {}, ",") ~= table.concat(grillAction.Requires.Phase or {}, ",") then
-		fail("Actions", nil, "prep_grill", "Requires.Phase must equal prep_work's")
-	end
-
-	-- the plate in hand (DT-E8): HotDog category, never stacked
+	const assembly = Prep.Assembly
+	inRange("Prep.Assembly", nil, nil, "PerfectMin", assembly.PerfectMin, 1, 600)
+	inRange("Prep.Assembly", nil, nil, "PerfectTime", assembly.PerfectTime, assembly.PerfectMin, 600)
+	inRange("Prep.Assembly", nil, nil, "PerPlayer", assembly.PerPlayer, 0, 60)
+	-- the plate in hand (ITM-025, kitchen-world.md §2): HotDog category, never stacked
 	const plate = Items.ByKey.plate
 	if plate == nil or plate.Category ~= "HotDog" or plate.Stackable then
-		fail(name, nil, nil, "Items.plate is required, Category HotDog, not Stackable (DEC-299, prep-conveyor.md §6.3)")
+		fail("Prep", nil, nil, "Items.plate is required, Category HotDog, not Stackable (kitchen-world.md §2)")
 	end
 end
 
@@ -2410,16 +1963,14 @@ end
 -- DriveCars, Hatch, Customers.Pickup / Drive), Dialog covers every ingredient of an order, the actions and stations exist
 const RESTAURANT_ACTIONS: { string } = {
 	"tablet_take",
-	"bun_slice",
-	"plate_put",
+	"bun_cut",
 	"plate_take",
+	"plate_add_bun",
+	"plate_add_sausage",
 	"grill_flip",
-	"rail_take",
 	"pickup_serve",
 	"drive_serve",
 	"take_box",
-	"prep_work",
-	"prep_grill",
 }
 const RESTAURANT_NOTICES: { string } = {
 	"plates_full",
@@ -2429,16 +1980,11 @@ const RESTAURANT_NOTICES: { string } = {
 	"tablet_busy",
 	"drive_left",
 	"stock_low",
-	-- conveyor (TASK-513)
-	"need_plate",
-	"belt_full",
-	"slot_taken",
-	"plate_gone",
+	-- world kitchen (kitchen-world.md §2)
+	"pile_empty",
 	"ticket_other",
 	"ticket_gone",
-	"plate_shelved",
 }
-const PLATES_WIRE_MAX = 12 -- Net Plates records / CenterPut.Slot
 const PICKUP_WIRE_MAX = 12 -- Net Customers.Pickup
 const DRIVE_WIRE_MAX = 3 -- Net Customers.Drive / DriveCars records
 const TABLET_WIRE_MAX = 8 -- Tablets records (TAB-n and the DT-PC index)
@@ -2494,11 +2040,6 @@ local function checkRestaurant()
 	inRange(name, nil, nil, "Grill.FlipFrom", grill.FlipFrom, 0, 1)
 	inRange(name, nil, nil, "Grill.FlipTo", grill.FlipTo, grill.FlipFrom, 1)
 	inRange(name, nil, nil, "Grill.PickupGood", grill.PickupGood, grill.PickupPerfect, 600)
-	const slice = Actions.ByKey.bun_slice
-	const cut = Stations.ByKey.cut
-	if slice == nil or cut == nil or slice.Hold ~= Restaurant.Bun.CutHold or cut.Params.CutTime ~= Restaurant.Bun.CutHold then
-		fail(name, nil, nil, "Actions.bun_slice.Hold and Stations.cut.Params.CutTime must equal Restaurant.Bun.CutHold")
-	end
 	const tables = Restaurant.Tables
 	inRange(name, nil, nil, "Tables.Count", tables.Count, 1, Seating.Tables)
 	inRange(name, nil, nil, "Tables.GroupsPerTable", tables.GroupsPerTable, 1, 2)
@@ -2556,27 +2097,6 @@ local function checkRestaurant()
 	if string.format(Restaurant.Binding.PickupPoint, 1) == Restaurant.Binding.PickupPoint then
 		fail(name, nil, nil, "Binding.PickupPoint needs a %d")
 	end
-	-- central table (TASK-513; prep-conveyor.md §7): slots on the wire, reach and put rate
-	const center = Restaurant.CenterTable
-	inRange(name, nil, nil, "CenterTable.Slots", center.Slots, 1, PLATES_WIRE_MAX)
-	inRange(name, nil, nil, "CenterTable.Reach", center.Reach, 1, 50)
-	inRange(name, nil, nil, "CenterTable.PutRate", center.PutRate, 1, 60)
-	const binding = Restaurant.Binding
-	for field, value in { CenterModel = binding.CenterModel, CenterTag = binding.CenterTag, CenterIndex = binding.CenterIndex, CenterTake = binding.CenterTake, CenterTicket = binding.CenterTicket } :: { [string]: string } do
-		if value == "" then
-			fail(name, nil, nil, `Binding.{field} is empty`)
-		end
-	end
-	if string.format(binding.CenterMount, 1) == binding.CenterMount then
-		fail(name, nil, nil, "Binding.CenterMount needs a %d")
-	end
-	for _, key in { "plate_take", "pickup_serve" } do
-		const action = Actions.ByKey[key]
-		if action ~= nil and action.Hold <= 0 then
-			fail(name, nil, key, "held on the conveyor (DEC-302: hold E); Hold must be above 0")
-		end
-	end
-
 	for _, key in RESTAURANT_ACTIONS do
 		if not Actions.ByKey[key] then
 			fail(name, nil, key, "action missing in Actions")
@@ -2803,7 +2323,6 @@ return function()
 	checkMart()
 	checkSeating()
 	checkPrep()
-	checkConveyor()
 	checkRestaurant()
 	checkHorrorScenes()
 	checkSuspense()

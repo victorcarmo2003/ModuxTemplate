@@ -24,32 +24,18 @@
 --     "board" (bitten bun, sliced). Only in phase Night; false = no room / already one / station busy (retry later).
 --     ClearAltered() removes them; it also runs by itself when the phase leaves Night (ITM-020: gone at 6:00 AM).
 --     HasAltered(kind?) reads it. Stations set field Altered (0..30) is written from Record.Altered.
---   * A hot dog made with an altered item carries the Tool attribute Altered = true (Board.luau via Context.Give).
+--   * A hot dog made with an altered item carries the Tool attribute Altered = true (FillPlate, from the plate).
 --   * Discarded(player, item, altered, where) after every Throw Away that removed the Tool (BIN-C "Vehicle", street
 --     bin "Street"). Emitted(name, player, data) relays Context.Emit ("assembled"). Both fire deferred, outside the
 --     station lock, so a listener may call Alter/ClearAltered.
--- Prep mode (TASK-169; docs/tech/prep-mode.md §2, §6, §7; DEC-223), for PrepService (Plate.luau has the rules):
---   * BeginPlate(player, slot?) -> Ticket?, reason?            reserves 1 bun + a board slot (one plate per player)
---   * FinishPlate(player, spec) -> Result?, reason?            all or nothing: hot dog + rail sausage + toppings
---   * RefundPlate(player) -> boolean                           Leave / timeout / disconnect: the bun goes back
---   * TrashPlate(player, options?) -> TrashResult              the bin (bun, sausage, hot dog in hand)
---   * GrillAct(player, "Place"|"Flip"|"Collect", slot?) -> GrillResult?, reason?   grill moves, flip stamped by the server
---   * PlateOf(player) -> Ticket?                               copy of the open plate
---   * TakeStock(ingredient, n) already exists and is synchronous (two callers never take the same unit).
---   * Prep.Rules.WorldKitchenPrompts = false keeps PromptEnabled = false on the five world kitchen prompts (grill_place,
---     grill_collect, bun_cut, board_add_sausage, topping_add) with their handlers still registered; true gives the old
---     flow back with no other change. Throw Away stays on in both bins: the BIN-C one inside the trailer (playtest
---     2026-10-14: a wrong hot dog in hand had only the street bin, outside) and the street bin.
--- Conveyor (TASK-496; tech/prep-conveyor.md §1.1; DEC-302, DEC-305; Content.Prep.Rules.Mode = "Conveyor", the restaurant):
---   * one kitchen flow, the focused prep with the conveyor. Every world prompt of the F2 kitchen (CONVEYOR_HIDDEN:
---     grill_place, grill_collect, grill_flip, bun_cut, bun_slice, board_add_sausage, rail_take, topping_add) is off and
---     Evaluate refuses it (handlers kept: the trailer uses the same modules). The pieces (CUT-n, COND-n, grill, rail)
---     stay as scenery and focus anchors. Still on: restock, topping_unwrap (a closed gift bowl), discard, coffee and the
---     prompts of other services (prep_work, prep_grill, tablet, plate_take of the central table, pickup).
---   * the selector is Prep.Rules.Mode only, never Restaurant.Rules.Enabled (DT-E1). Trailer ("Trailer") unchanged.
--- Restaurant map binding (R-4; Content.Restaurant.Rules.Enabled): a Station with PendingStationKind (the map's CUT-1, still
--- the trailer board clone) binds as that kind, so CUT-n never binds as a board: the StationKind attribute is rewritten
--- before the bind (clients read it too). Outside the conveyor a "cut" with no Prompt_Slice gets one (bun_slice).
+-- World kitchen (docs/tech/kitchen-world.md; DEC-306, DEC-308; TASK-568/569, TASK-581): the focused prep and the conveyor
+-- are gone; every world prompt of the kitchen is on (grill, collect, flip, slice, Add Bun, Add Sausage, condiments, bin).
+--   * the plate in hand (ITM-025): Context.HeldPlate / FillPlate. FillPlate puts the bun or the sausage on the `plate` Tool
+--     (attributes of shared/Plate/PlateTool); with both on it the plate becomes the hot_dog Tool in the same hand (Id,
+--     Ticket, Line, Since and Flipped carried over, Altered when any piece was altered) and "assembled" is emitted. PlateService
+--     owns the ticket and the Plates set; it follows the Tools through ItemService.Changed.
+--   * legacy map pieces: a Station whose StationKind (or PendingStationKind) is "prep" or "cut" (the seats of the focused prep,
+--     the old cutting board) is scenery now and is skipped without a warning until the binding removes it (kitchen-world.md §5).
 -- Gift bowls (owner request 2026-10-14, Provisional): a topping of Content.Ingredients.GiftKeys that unlocks comes as a CLOSED
 -- bowl. Wrapped = unlocked, a gift key and not in Opened (run state, atom, snapshot "Unw" like the amounts "Stk"). While wrapped
 -- TakeStock and Restock refuse (topping_wrapped notice) and the Stock record carries Wrapped = true; the action topping_unwrap
@@ -57,7 +43,6 @@
 -- fills the stock to capacity. An old snapshot without "Unw" opens every bowl already unlocked (nothing to unwrap again).
 -- Dev: DevWrap(key) unlocks the bowl for this run, closes it again and empties it (/dev kitchen wrap <key>).
 local CollectionService = game:GetService("CollectionService")
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -65,11 +50,11 @@ local Charm = require(ReplicatedStorage.Packages.Charm)
 local Content = require(ReplicatedStorage.shared.Content)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 local StationApi = require(script.StationApi)
-local Plate = require(script.Plate)
 local Refusal = require(script.Refusal)
 local Board = require(script.Stations.Board)
 local Grill = require(script.Stations.Grill)
 local Rail = require(script.Stations.Rail)
+local PlateTool = require(ReplicatedStorage.shared.Plate.PlateTool)
 local Trash = require(script.Stations.Trash)
 local Modux = require(ServerScriptService.server.Modux)
 
@@ -111,38 +96,12 @@ const TICK_RATE = 10 -- station timers (architecture.md §18.12)
 const ALTER_PHASE = "Night" -- altered items only exist while the night is being played (ITM-020)
 const ALTER_KINDS: { [string]: boolean } = { rail = true, board = true }
 const HOT_DOG = "hot_dog"
--- StationKinds with no module in Stations/ on purpose (their state lives in another service)
-const EXTERNAL_KINDS: { [string]: boolean } = { prep = true }
 const COFFEE = "coffee"
--- Prompt actions of the kitchen that the prep mode replaces (prep-mode.md §7). Station anchors only. Not `discard`:
--- the prep bin only takes the open plate, a hot dog already in hand (wrong order, altered ANM-002) is thrown away at
--- the BIN-C of the trailer or at a street bin (playtest 2026-10-14; the client gate of PrepController leaves it too).
-const WORLD_KITCHEN: { [string]: boolean } = {
-	grill_place = true,
-	grill_collect = true,
-	bun_cut = true,
-	board_add_sausage = true,
-	topping_add = true,
-}
-
--- Conveyor (Content.Prep.Rules.Mode = "Conveyor", the restaurant; prep-conveyor.md §1.1; TASK-496): every world prompt of
--- the F2 kitchen. The focused prep with the conveyor is the only kitchen flow of MAP-01: these anchors stay as scenery and
--- focus anchors, prompt off and action refused (handlers stay registered: the trailer uses the same modules).
--- plate_put / plate_take of the old PLATE-n pass are PlateService's (TASK-516), not station anchors of this service.
-const CONVEYOR_HIDDEN: { [string]: boolean } = {
-	grill_place = true,
-	grill_collect = true,
-	grill_flip = true,
-	bun_cut = true,
-	bun_slice = true,
-	board_add_sausage = true,
-	rail_take = true,
-	topping_add = true,
-}
-const CONVEYOR = "Conveyor"
+const PLATE = PlateTool.Plate
+const PLATE_ATTR = PlateTool.Attr
+-- StationKinds of the old flows still on the map (kitchen-world.md §5): skipped quietly, scenery until the binding removes them
+const LEGACY_KINDS: { [string]: boolean } = { prep = true, cut = true }
 const PENDING_KIND = "PendingStationKind"
-const CUT = "cut"
-const SLICE = "bun_slice"
 
 -- Package Tool item key -> package row (what a held package restocks).
 const packageByItem: { [string]: Content.Package } = {}
@@ -191,20 +150,6 @@ local function report(label: string, ok: boolean, err: any)
 	if not ok then
 		warn(`[KitchenService] {label} errored: {err}`)
 	end
-end
-
--- Action key of a world kitchen prompt that is off right now: the five of WORLD_KITCHEN while Prep.Rules.WorldKitchenPrompts
--- is false (both modes since TASK-513), and the whole F2 set (CONVEYOR_HIDDEN) while Prep.Rules.Mode = "Conveyor"
--- (TASK-496). The dev override (`prep kitchen`, KitchenService.WorldOverride) true gives every one back, false hides them;
--- nil = the Content values. A hidden action is refused too (Evaluate), not only its prompt.
-local function worldHidden(override: boolean?, action: string): boolean
-	if override ~= nil then
-		return not override and (WORLD_KITCHEN[action] == true or CONVEYOR_HIDDEN[action] == true)
-	end
-	if Content.Prep.Rules.Mode == CONVEYOR and CONVEYOR_HIDDEN[action] == true then
-		return true
-	end
-	return not Content.Prep.Rules.WorldKitchenPrompts and WORLD_KITCHEN[action] == true
 end
 
 local function wholeNumber(value: any, low: number, high: number): number
@@ -263,12 +208,6 @@ function KitchenService:Setup()
 	-- Wave 3 (TASK-109). Context.Emit of a station module: (event name, player or nil, data or nil).
 	self.Emitted = self.Libs.Signal.new() :: SignalLib.Signal<string, Player?, { [string]: any }?>
 	self.Context = self:BuildContext() :: StationApi.Context
-	-- Prep mode (TASK-169): open plates and grill moves, see Plate.luau
-	self.Plates = Plate.new(self:BuildPlateDeps()) :: Plate.PlateApi
-	-- Anchors the prep mode hides (worldHidden: WorldKitchenPrompts false, or the conveyor's F2 set)
-	self.Hidden = {} :: { [Instance]: boolean }
-	-- Dev only (`prep kitchen`): true / false stands in for the Content flag, nil = the Content value
-	self.WorldOverride = nil :: boolean?
 end
 
 -- Stock reads ---------------------------------------------------------------------------------------------------
@@ -639,8 +578,10 @@ function KitchenService:AddStation(instance: Instance)
 		warn(`[KitchenService] Station {instance:GetFullName()} is not a Model`)
 		return
 	end
-	self:ApplyPendingKind(instance)
 	const kind = instance:GetAttribute("StationKind")
+	if LEGACY_KINDS[kind :: any] or LEGACY_KINDS[instance:GetAttribute(PENDING_KIND) :: any] then
+		return -- the focused prep seats and the old cutting board are scenery (kitchen-world.md §5)
+	end
 	const row = if type(kind) == "string" then Content.Stations.ByKey[kind] else nil
 	if row == nil then
 		warn(`[KitchenService] Station {instance:GetFullName()}: StationKind "{kind}" is not in Content.Stations`)
@@ -679,9 +620,6 @@ function KitchenService:AddStation(instance: Instance)
 	}
 	if row.Key == "toppings" then
 		self:EnsureUnwrapAnchors(instance)
-	elseif row.Key == CUT and Content.Prep.Rules.Mode ~= CONVEYOR then
-		-- conveyor (TASK-496): CUT-n is scenery and a focus anchor, no Prompt_Slice is made on it
-		self:EnsureSliceAnchor(instance)
 	end
 	self:CollectParts(station)
 	self.Stations[id] = station
@@ -692,54 +630,12 @@ function KitchenService:AddStation(instance: Instance)
 	if module ~= nil then
 		report(`Bind of {row.Key}`, pcall(module.Bind, self.Context, station))
 		self:Publish(station)
-	elseif EXTERNAL_KINDS[row.Key] then
-		-- explicit no-op: the seat state of this kind lives in another service (prep: PrepService, PrepSeats set)
-		self.Warned[row.Key] = true
 	elseif not self.Warned[row.Key] then
 		-- Provisional: warn, not error, while TASK-026/027/028 are not in (restock still works on these stations).
 		self.Warned[row.Key] = true
 		warn(`[KitchenService] no module in Stations/ for StationKind "{row.Key}"`)
 	end
 	self:RefreshPrompts(station)
-end
-
--- Restaurant map (R-4): PendingStationKind (a known Content.Stations key) becomes the StationKind before the bind. Map
--- binding only (CUT-1 is a "cut", never a second board); the kitchen flow is chosen by Prep.Rules.Mode.
-function KitchenService:ApplyPendingKind(instance: Instance)
-	const pending = instance:GetAttribute(PENDING_KIND)
-	if type(pending) ~= "string" or Content.Stations.ByKey[pending] == nil then
-		return
-	end
-	if instance:GetAttribute("StationKind") ~= pending then
-		instance:SetAttribute("StationKind", pending)
-	end
-end
-
--- A cut station with no bun_slice anchor (CUT-1, the old board): one Prompt_Slice where its first prompt / slot is
-function KitchenService:EnsureSliceAnchor(instance: Instance)
-	local spot: Attachment? = nil
-	for _, child in instance:GetDescendants() do
-		if not child:IsA("Attachment") or ownerModel(child) ~= instance then
-			continue
-		end
-		if child:GetAttribute("PromptAction") == SLICE then
-			return
-		end
-		if spot == nil and (CollectionService:HasTag(child, ANCHOR_TAG) or child:GetAttribute("Slot") ~= nil) then
-			spot = child
-		end
-	end
-	if spot == nil then
-		warn(`[KitchenService] cut station {instance:GetFullName()} has no anchor to place Prompt_Slice on`)
-		return
-	end
-	const anchor = Instance.new("Attachment")
-	anchor.Name = "Prompt_Slice"
-	anchor.CFrame = spot.CFrame
-	anchor:SetAttribute("PromptAction", SLICE)
-	anchor:SetAttribute("PromptEnabled", false)
-	anchor.Parent = spot.Parent
-	CollectionService:AddTag(anchor, ANCHOR_TAG)
 end
 
 -- Gift bowls: one Prompt_Unwrap_<Suf> anchor per gift topping (PromptAction topping_unwrap, Ingredient), next to that bowl's
@@ -941,19 +837,6 @@ function KitchenService:RefreshPrompts(station: StationApi.Station)
 				self.Gated[anchor] = true
 				interaction:SetPrompt(anchor, false, nil)
 			end
-		elseif self:HiddenByPrep(anchor) then
-			-- prep mode (DT-5): the handler stays registered, only the prompt is off; Wanted keeps what the module asked
-			self.Gated[anchor] = nil
-			self.Hidden[anchor] = true
-			if anchor:GetAttribute("PromptEnabled") ~= false then
-				interaction:SetPrompt(anchor, false, nil)
-			end
-		elseif self.Hidden[anchor] then
-			-- flag back on: the prompt returns to what its module last asked
-			self.Hidden[anchor] = nil
-			self.Gated[anchor] = nil
-			const wanted = self.Wanted[anchor]
-			interaction:SetPrompt(anchor, if wanted then wanted.Enabled else true, if wanted then wanted.Text else nil)
 		elseif action == RESTOCK or action == UNWRAP then
 			-- restock waits for an open bowl; "Open" only exists on a closed gift bowl (owner request 2026-10-14)
 			self.Gated[anchor] = nil
@@ -975,16 +858,6 @@ function KitchenService:RefreshPrompts(station: StationApi.Station)
 			end
 		end
 	end
-end
-
--- Station anchor of a world kitchen prompt the focused prep replaces (never the street bin: it has no Station). Read from
--- Content every time, so flipping the flag is a data change only.
-function KitchenService:HiddenByPrep(anchor: Instance): boolean
-	const action = anchor:GetAttribute("PromptAction")
-	if type(action) ~= "string" or self:StationOf(anchor) == nil then
-		return false
-	end
-	return worldHidden(self.WorldOverride, action)
 end
 
 function KitchenService:RefreshAllPrompts()
@@ -1133,11 +1006,6 @@ function KitchenService:Evaluate(key: string, player: Player, anchor: Instance):
 	if key == RESTOCK then
 		return self:CheckRestock(player, station, anchor)
 	end
-	if worldHidden(self.WorldOverride, key) then
-		-- the focused prep replaces it (DT-5; TASK-496 in the conveyor): a forged request makes no bun_sliced, no
-		-- sausage_grilled and no hot dog outside the plate / ticket flow
-		return false, nil, nil
-	end
 	const module = self.Modules[station.Kind]
 	const action = if module then module.Actions[key] else nil
 	if action == nil then
@@ -1259,6 +1127,12 @@ function KitchenService:BuildContext(): StationApi.Context
 		AddTopping = function(tool: Tool, ingredient: string): boolean
 			return self.Dependencies.ItemService:AddTopping(tool, ingredient)
 		end,
+		HeldPlate = function(player: Player): Tool?
+			return self.Dependencies.ItemService:Holding(player, PLATE)
+		end,
+		FillPlate = function(player: Player, plate: Tool, part: StationApi.PlatePart, fill: StationApi.PlateFill): boolean
+			return self:FillPlate(player, plate, part, fill)
+		end,
 		Modifier = function(player: Player, stat: string, base: number?): number
 			if not Content.Stats.Has[stat] then
 				fail(`[KitchenService] Modifier: {stat} is not a key of Content.Stats`)
@@ -1282,7 +1156,7 @@ function KitchenService:BuildContext(): StationApi.Context
 				const wanted: Wanted = { Enabled = enabled, Text = text }
 				self.Wanted[anchor] = wanted
 			end
-			const on = enabled and (station == nil or self:IsCurrent(station)) and not self:HiddenByPrep(anchor)
+			const on = enabled and (station == nil or self:IsCurrent(station))
 			self.Dependencies.InteractionService:SetPrompt(anchor, on, text)
 		end,
 		-- Deferred: modules emit from inside the station lock; listeners run after it.
@@ -1389,142 +1263,60 @@ function KitchenService:ReportDiscard(player: Player, tool: Tool?, item: string,
 	end)
 end
 
--- Prep mode (TASK-169) ----------------------------------------------------------------------------------------------
+-- Plate in hand (TASK-569; kitchen-world.md §2) -------------------------------------------------------------------------
 
-function KitchenService:BuildPlateDeps(): Plate.Deps
-	return {
-		Context = self.Context,
-		Vehicle = function(): string
-			return self:GetVehicle()
-		end,
-		IsMember = function(player: Player): boolean
-			return self.Active and self.Dependencies.RunStateService:IsActive(player)
-		end,
-		Station = function(kind: string): StationApi.Station?
-			return self:CurrentStation(kind)
-		end,
-		-- a refund may leave the amount above the capacity (Q-169): the unit was paid for
-		Refund = function(ingredient: string, n: number)
-			self:SetAmount(ingredient, (self.Amounts()[ingredient] or 0) + n)
-		end,
-		CanGive = function(player: Player): boolean
-			return (self.Dependencies.ItemService:CanGive(player, HOT_DOG))
-		end,
-		Give = function(player: Player, toppings: string, altered: boolean, quality: string?): Tool?
-			return self.Dependencies.ItemService:Give(player, HOT_DOG, {
-				Toppings = toppings,
-				Altered = if altered then true else nil,
-				Quality = quality,
-				Silent = true,
-			})
-		end,
-		-- BIN-C "discard" through the normal pipeline: same hand rule, Discarded signal for ANM-002
-		Discard = function(player: Player): boolean
-			const station = self:CurrentStation("trash")
-			if station == nil then
-				return false
+-- Puts `part` on the player's `plate` Tool (synchronous, inside the station lock). With bun and sausage on it the plate becomes
+-- the hot_dog Tool in the same hand: the plate goes first (the HotDog category has room then), the hot dog carries the plate's
+-- PlateTool.Carried attributes and Altered. A hot dog that cannot be made (no kit Tool) gives the plate back as it was.
+function KitchenService:FillPlate(player: Player, plate: Tool, part: StationApi.PlatePart, fill: StationApi.PlateFill): boolean
+	const items = self.Dependencies.ItemService
+	if items.Owners[plate] ~= player or items:ItemOf(plate) ~= PLATE or plate:GetAttribute(part) == true then
+		return false
+	end
+	const altered = fill.Altered == true or plate:GetAttribute(PLATE_ATTR.Altered) == true
+	if part == "Sausage" and fill.Flipped == true then
+		plate:SetAttribute(PLATE_ATTR.Flipped, true)
+	end
+	const other = if part == "Bun" then PLATE_ATTR.Sausage else PLATE_ATTR.Bun
+	if plate:GetAttribute(other) ~= true then
+		plate:SetAttribute(part, true)
+		plate:SetAttribute(PLATE_ATTR.Altered, if altered then true else nil)
+		items.Changed:Fire(player)
+		return true
+	end
+	const carried: { [string]: any } = {}
+	for _, name in PlateTool.Carried do
+		carried[name] = plate:GetAttribute(name)
+	end
+	items:Consume(player, plate)
+	const hotDog = items:Give(player, HOT_DOG, { Altered = if altered then true else nil, Silent = true })
+	if hotDog == nil then
+		warn(`[KitchenService] the plate of {player.Name} could not become a hot dog; it goes back as it was`)
+		const back = items:Give(player, PLATE, { Silent = true })
+		if back ~= nil then
+			for name, value in carried do
+				back:SetAttribute(name, value)
 			end
-			local bin: Instance? = nil
-			for _, anchor in station.Anchors do
-				if anchor:GetAttribute("PromptAction") == DISCARD then
-					bin = anchor
-					break
-				end
-			end
-			const tool = self:DiscardTarget(player)
-			if bin == nil or tool == nil then
-				return false
-			end
-			self:Perform(DISCARD, player, bin)
-			return self.Dependencies.ItemService.Owners[tool] == nil
-		end,
-		-- TASK-346: the altered bun of a plate thrown in the prep bin (ANM-002 listens to Discarded)
-		Discarded = function(player: Player, item: string)
-			task.defer(function()
-				self.Discarded:Fire(player, item, true, "Vehicle")
-			end)
-		end,
-	}
-end
-
--- Reserves 1 bun and a board slot (`slot` = the seat's, else the lowest free one). nil + reason (Content.Prep.Reasons).
-function KitchenService:BeginPlate(player: Player, slot: number?): (Plate.Ticket?, string?)
-	if not self.Active then
-		return nil, "NoStation"
+			back:SetAttribute(PLATE_ATTR.Bun, part == "Bun" or other == PLATE_ATTR.Bun)
+			back:SetAttribute(PLATE_ATTR.Sausage, part == "Sausage" or other == PLATE_ATTR.Sausage)
+			back:SetAttribute(PLATE_ATTR.Altered, if altered then true else nil)
+			items.Changed:Fire(player)
+		end
+		return false
 	end
-	return self.Plates.Begin(player, slot)
-end
-
--- Makes the hot dog of the open plate: all or nothing (see Plate.luau). nil + reason leaves stock, rail and slot as they were.
-function KitchenService:FinishPlate(player: Player, spec: Plate.Spec): (Plate.Result?, string?)
-	if not self.Active then
-		return nil, "NoSession"
+	for name, value in carried do
+		hotDog:SetAttribute(name, value)
 	end
-	return self.Plates.Finish(player, spec)
+	items.Changed:Fire(player)
+	self.Context.Emit("assembled", player, { Altered = altered })
+	return true
 end
 
--- Gives the reserved bun back (Leave, timeout, disconnect). False = no open plate.
--- TASK-260: the cosmetic mask of the player's open plate (PlateMask, already checked by PrepService) on the board model, so every
--- player sees the plate as it grows (KitchenController Board part)
-function KitchenService:SetPlateMask(player: Player, mask: number)
-	if not self.Active then
-		return
-	end
-	const ticket = self.Plates.Of(player)
-	if ticket ~= nil then
-		Board.SetPlate(self:GetVehicle(), ticket.Slot, mask)
-	end
-end
+-- Dev helpers ------------------------------------------------------------------------------------
 
-function KitchenService:RefundPlate(player: Player): boolean
-	return self.Active and self.Plates.Refund(player)
-end
-
--- The bin: loses the plate's bun, optionally the front sausage and the hot dog in hand.
-function KitchenService:TrashPlate(player: Player, options: Plate.TrashOptions?): Plate.TrashResult
-	if not self.Active then
-		return { Bun = false, Sausage = false, Hand = false }
-	end
-	return self.Plates.Trash(player, options)
-end
-
--- Place (a sausage from the stock to a free slot), Flip (stamped with the server clock) or Collect (to the rail).
-function KitchenService:GrillAct(player: Player, act: Plate.GrillAction, slot: number?): (Plate.GrillResult?, string?)
-	if not self.Active then
-		return nil, "NoStation"
-	end
-	return self.Plates.Grill(player, act, slot)
-end
-
--- The bin by drag: throws away the sausage of a grill slot or of a rail position (1 = front). (ok, reason Content.Prep.Reasons key).
-function KitchenService:TrashSausage(player: Player, from: Plate.TrashFrom, slot: number): (boolean, string?)
-	if not self.Active then
-		return false, "NoStation"
-	end
-	return self.Plates.TrashSausage(player, from, slot)
-end
-
-function KitchenService:PlateOf(player: Player): Plate.Ticket?
-	return if self.Active then self.Plates.Of(player) else nil
-end
-
--- Dev helpers (`prep kitchen`) ------------------------------------------------------------------------------------
-
--- Puts a graded sausage on the rail without cooking it. False = no rail / full.
-function KitchenService:DevFeedRail(score: number?): boolean
-	return self.Active and Rail.Push(self.Context, self:GetVehicle(), score)
-end
-
--- Pretends `seconds` passed for the sausage in grill `slot`. Returns its Duration (0 = nothing there).
-function KitchenService:DevAgeGrill(slot: number, seconds: number): number
-	const vehicle = self:GetVehicle()
-	Grill.DevAge(self.Context, vehicle, slot, seconds)
-	return Grill.DevDuration(vehicle, slot)
-end
-
--- Stations.Flip of the grill `slot` as written to the set (flip score + 1), 0 = not flipped (TASK-195 dev check).
-function KitchenService:DevFlipWire(slot: number): number
-	return Grill.DevFlipWire(self:GetVehicle(), slot)
+-- Puts a grilled sausage on the rail without cooking it (`flipped` = with the flip bonus). False = no rail / full.
+function KitchenService:DevFeedRail(flipped: boolean?): boolean
+	return self.Active and Rail.Push(self.Context, self:GetVehicle(), if flipped then 100 else nil, flipped == true)
 end
 
 -- Sausages on the grill of the current vehicle (any slot that is not empty).
@@ -1537,27 +1329,9 @@ function KitchenService:RailCount(): number
 	return Rail.Count(self:GetVehicle())
 end
 
--- Free slots of the current board (nil-safe: 0 without a board).
-function KitchenService:BoardFree(): number
-	const vehicle = self:GetVehicle()
-	const station = Board.Find(vehicle)
-	if station == nil then
-		return 0
-	end
-	local free = 0
-	for slot in station.Slots do
-		const record = station.Records[slot]
-		if record ~= nil and record.State == "Empty" then
-			free += 1
-		end
-	end
-	return free
-end
-
--- true / false stands in for Prep.Rules.WorldKitchenPrompts until nil; the prompts are refreshed at once.
-function KitchenService:DevWorldPrompts(on: boolean?)
-	self.WorldOverride = on
-	self:RefreshAllPrompts()
+-- Cut buns waiting on the pile of the current vehicle.
+function KitchenService:BunCount(): number
+	return Board.Count(self:GetVehicle())
 end
 
 -- Snapshot --------------------------------------------------------------------------------------------------------
@@ -1670,11 +1444,6 @@ KitchenService:OnInit(function(self)
 		return self:CaptureOpened()
 	end, function(data, _mode)
 		self:RestoreOpened(data)
-	end)
-
-	-- A player that leaves takes nothing with them: the reserved bun goes back (TASK-169)
-	Players.PlayerRemoving:Connect(function(player: Player)
-		self.Plates.Refund(player)
 	end)
 
 	-- Signals exist since RoundService's OnInit (750 > 650)

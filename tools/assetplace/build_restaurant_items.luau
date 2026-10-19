@@ -9,6 +9,9 @@
 	  bun_sliced       from Assets.Items.Food.BunOpen (AST-001)
 	  sausage_grilled  from Assets.Items.Food.SausageGrilled (AST-002)
 	  stock_box        Provisional cardboard box (one Part, brown), attribute Package / Count are set by the server
+	  plate            ITM-025, the plate in hand of the world kitchen (kitchen-world.md §2; TASK-570): a cream dish (Handle,
+	                   flat block, +Y = top) + round Rim. Built only when the kit has none (an authored plate is kept); the client draws
+	                   the bun / sausage on top of the Handle (PlateController/HandFood)
 	Same conventions as build_items.luau: Handle + welded parts, unanchored, Massless, no collision/touch/query,
 	CanBeDropped false, Grip = base centre (item upright, front -Z), Att_Hand, attribute Item / Asset.
 ]]
@@ -98,11 +101,35 @@ local function stockBox()
 	return tool
 end
 
+local function plate()
+	local tool = Instance.new("Tool")
+	tool.Name = "plate"
+	tool:SetAttribute("Item", "plate")
+	-- the Handle is a flat block (its +Y is the top the client puts the food on); the round look is the Rim
+	local dish = Instance.new("Part")
+	dish.Size = Vector3.new(1.3, 0.08, 1.3)
+	dish.CFrame = CFrame.new()
+	dish.Color = Color3.fromHex("#F4F1EA")
+	dish.Material = Enum.Material.SmoothPlastic
+	local rim = Instance.new("Part")
+	rim.Name = "Rim"
+	rim.Shape = Enum.PartType.Cylinder
+	rim.Size = Vector3.new(0.05, 1.75, 1.75)
+	rim.CFrame = CFrame.new(0, -0.03, 0) * CFrame.Angles(0, 0, math.rad(90))
+	rim.Color = Color3.fromHex("#D9D2C3")
+	rim.Material = Enum.Material.SmoothPlastic
+	finish(tool, dish, { dish, rim }, "ITM-025_Plate (Provisional)")
+	return tool
+end
+
 local built = {
 	fromFood("bun_sliced", "BunOpen", "AST-001_Bun"),
 	fromFood("sausage_grilled", "SausageGrilled", "AST-002_Sausage"),
 	stockBox(),
 }
+if tools:FindFirstChild("plate") == nil then
+	table.insert(built, plate())
+end
 for _, tool in built do
 	local old = tools:FindFirstChild(tool.Name)
 	if old then
@@ -110,4 +137,8 @@ for _, tool in built do
 	end
 	tool.Parent = tools
 end
-print("[build_restaurant_items] built bun_sliced, sausage_grilled, stock_box")
+local names = {}
+for _, tool in built do
+	table.insert(names, tool.Name)
+end
+print("[build_restaurant_items] built " .. table.concat(names, ", "))

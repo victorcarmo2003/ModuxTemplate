@@ -93,9 +93,9 @@ local function kitchen(vehicle: string): { [string]: StationRule }
 	return {
 		sausage_stock = { Actions = { grill_place = 1, restock = 1 } },
 		grill = { SlotAnchors = maxGrillSlots(vehicle) },
-		rail = { Slots = row.RailSlots },
+		rail = { Actions = { plate_add_sausage = 1 }, Slots = row.RailSlots }, -- kitchen-world.md §3
 		bun_crate = { Actions = { bun_cut = 1, restock = 1 } },
-		board = { Actions = { board_add_sausage = 1 }, Slots = row.BoardSlots }, -- DEC-190, DEC-215
+		board = { Actions = { plate_add_bun = 1 }, Slots = row.BoardSlots }, -- DEC-190, DEC-215; the cut-bun pile (8)
 		toppings = { PerIngredient = { "topping_add", "restock" } },
 		trash = { Actions = { discard = 1 } },
 	}

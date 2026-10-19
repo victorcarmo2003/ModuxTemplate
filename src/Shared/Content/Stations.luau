@@ -36,12 +36,11 @@ const base = Table.new({
 		Params = {},
 	},
 	{
-		-- capacity: Vehicles[v].RailSlots; consumed by board_add_sausage
+		-- the rest rail pile (kitchen-world.md §2): capacity Vehicles[v].RailSlots (8); "Add Sausage" puts its oldest on the plate
 		Key = "rail",
 		Letter = "R",
 		Record = "Single",
-		-- rail_take: restaurant hot pile "Take Dogs" -> sausage_grilled stack (wave R0 contract, R1-A handler)
-		Actions = { "rail_take" },
+		Actions = { "plate_add_sausage" },
 		Params = {},
 	},
 	{
@@ -53,11 +52,12 @@ const base = Table.new({
 		Params = { CutTime = 0.8 }, -- FEAT-006; 1.5 -> 0.8 s to match the knife sound bun_slice (user request 2026-10-11)
 	},
 	{
-		-- slot count: Vehicles[v].BoardSlots (cart 2, trailer 3; DEC-190, DEC-215); one prompt on the board
+		-- the cut-bun pile TLR_BUN_CUT (kitchen-world.md §2): slots Att_Bun1..n, n = Vehicles[v].BoardSlots (8); "Add Bun" puts
+		-- its oldest bun on the plate
 		Key = "board",
 		Letter = "T",
 		Record = "PerSlot",
-		Actions = { "board_add_sausage" },
+		Actions = { "plate_add_bun" },
 		Params = {},
 	},
 	{
@@ -86,25 +86,6 @@ const base = Table.new({
 		Actions = { "brew_coffee", "restock" },
 		Ingredient = "coffee",
 		Params = { BrewTime = 6, CleanTime = 60 },
-	},
-	{
-		-- focused prep seats Station_1..4 (DEC-223, prep-mode.md §6): the seat state lives in the PrepSeats set, not in
-		-- Stations; Att_Stand, CamAnchor, Focus, Att_Bun and Prompt_Work hang from the model
-		Key = "prep",
-		Letter = "W",
-		Record = "None",
-		Actions = { "prep_work" },
-		Params = {},
-	},
-	{
-		-- Restaurant CUT-n (tech/restaurant-flow.md rev. 2 §2.3; design FEAT-045). Wave R0 contract: no module and no anchor
-		-- yet (R1-A writes Stations/Cut.luau). Stock is Stock.bun; CutTime = Actions.bun_slice.Hold = Restaurant.Bun.CutHold
-		Key = "cut",
-		Letter = "CUT",
-		Record = "None",
-		Actions = { "bun_slice", "restock" },
-		Ingredient = "bun",
-		Params = { CutTime = 0.6 },
 	},
 } :: { Station })
 

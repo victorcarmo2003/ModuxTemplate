@@ -43,8 +43,6 @@ local PedestrianController = require(StarterPlayer.StarterPlayerScripts.client.M
 local PlaceController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PlaceController)
 local PlateController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PlateController)
 local PreloadController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PreloadController)
-local PrepController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PrepController)
-local WorkSlideController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.WorkSlideController)
 local ProfileController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ProfileController)
 local NightLostController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.NightLostController)
 local RoundController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.RoundController)
@@ -114,8 +112,6 @@ export type AllControllers = {
 	PlaceController: PlaceController.Public,
 	PlateController: PlateController.Public,
 	PreloadController: PreloadController.Public,
-	PrepController: PrepController.Public,
-	WorkSlideController: WorkSlideController.Public,
 	ProfileController: ProfileController.Public,
 	NightLostController: NightLostController.Public,
 	RoundController: RoundController.Public,

@@ -9,8 +9,8 @@
 --   Clock(active)            server time, refreshed every frame only while `active()` is true
 --   Progress(read, clock)    0..1 from StartedAt/Duration (Ready = 1)
 --   Food(name, spot, parent) local clone of ReplicatedStorage.Assets.Items.Food.<name>, welded to the host part
---   Bar(spot, ...)           ProgressBar (style guide §7.3: 1.0 stud above the food); in the conveyor kitchen with
---                            Content.Prep.Conveyor.Grill.Bar = false no bar at all: a ready Check over the food instead
+--   Bar(spot, ...)           ProgressBar (style guide §7.3: 1.0 stud above the food); the world kitchen (kitchen-world.md)
+--                            draws it on the grill and the cut-bun pile
 --   ReadyMark(at, on)        the ready Check (HintMark, in studs) over a world point while `on()` (TASK-521)
 --
 -- TASK-521 (Q-381 A, DEC-303; design/kitchen-redesign.md Q2): Spots picks the SAME anchor per slot as the server
@@ -32,7 +32,6 @@ local Components = StarterPlayer.StarterPlayerScripts.client.Interface.Component
 local ProgressBar = require(Components.ProgressBar)
 local HintMark = require(StarterPlayer.StarterPlayerScripts.client.Interface.HintMark)
 local Content = require(ReplicatedStorage.shared.Content)
-local Grade = require(ReplicatedStorage.shared.Prep.Grade)
 local Context = require(script.Parent.Context)
 
 const source = Vide.source
@@ -46,10 +45,8 @@ const FLIP_CENTER = 0.12
 -- the server's slot rule (KitchenService init.luau STATION_TAG / MAX_SLOT)
 const STATION_TAG = "Station"
 const MAX_SLOT = 99
--- the conveyor kitchen (tech/prep-conveyor.md §1, §5): Prep.Rules.Mode is the only selector
-const CONVEYOR = Content.Prep.Rules.Mode == "Conveyor"
--- world bars of the kitchen: the trailer keeps them; the conveyor only with Conveyor.Grill.Bar (false: FEAT-045, Q-381 A)
-const WORLD_BARS = not CONVEYOR or Content.Prep.Conveyor.Grill.Bar
+-- world bars of the kitchen: on in the world kitchen (kitchen-world.md; the conveyor had none, Q-381 A)
+const WORLD_BARS = true
 -- the ready Check over the food (Provisional): studs (about 27 px at 10 studs on a 667 x 375 phone, Fov 70), gap over the
 -- food, and how long "ready" must hold before it shows (the conveyor grill empties to the rest table in the same Tick)
 const READY_SIZE = 1.0
@@ -272,11 +269,7 @@ function Slots.Progress(read: Reader, clock: () -> number): number
 	elseif record.State ~= "Working" or record.Duration <= 0 then
 		return 0
 	end
-	if record.Kind == "grill" and not CONVEYOR then
-		-- the first side runs, the sausage waits for the flip, the second side runs (Grade.CookProgress)
-		-- (the conveyor grill has no pause: ready at StartedAt + Duration, flipped or not, TASK-515; the line below)
-		return Grade.CookProgress(Content.Prep, record.StartedAt, record.Duration, clock(), record.Flip > 0)
-	end
+	-- no pause on the grill: ready at StartedAt + Duration, flipped or not (kitchen-world.md §1)
 	return math.clamp((clock() - record.StartedAt) / record.Duration, 0, 1)
 end
 
@@ -458,11 +451,8 @@ function Slots.ReadyMark(at: () -> Vector3?, on: () -> boolean)
 		if not alive or position == nil then
 			return
 		end
-		local current = mark
-		if current == nil then
-			current = HintMark.new()
-			mark = current
-		end
+		const current: HintMark.Mark = mark or HintMark.new()
+		mark = current
 		current:Show("Check", position, READY_SIZE)
 	end
 	Vide.effect(function()

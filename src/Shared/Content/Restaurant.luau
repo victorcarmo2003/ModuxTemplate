@@ -132,15 +132,6 @@ export type Dialog = {
 	KitchenFull: string, -- tablet lamp text
 }
 
--- Central table (DEC-303 Q-383, DEC-304; prep-conveyor.md §7): the plate is born here with the ticket and comes back here.
--- Slots = records 1..Slots of Net Plates (wire 1..12, CenterPut.Slot); Reach = studs from the slot a CenterPut is accepted;
--- PutRate = CenterPut per second per player (PlateService)
-export type CenterTable = {
-	Slots: number,
-	Reach: number,
-	PutRate: number,
-}
-
 export type Binding = {
 	TabletTag: string, -- Model TAB-n
 	TabletIndex: string, -- number attribute 1..TabletsMax, DrivePcIndex
@@ -151,13 +142,6 @@ export type Binding = {
 	PlatePut: string,
 	PlateTake: string,
 	PlateTicket: string, -- BillboardGui anchor
-	-- central table (prep-conveyor.md §7.4; MAP-01-r4 §16.5 d), bound instead of PlateTag while Prep.Rules.Mode = "Conveyor"
-	CenterModel: string, -- Model of the table
-	CenterTag: string, -- CollectionService tag on each Click_Slot_n (the click target)
-	CenterIndex: string, -- number attribute 1..CenterTable.Slots on the Click_Slot_n
-	CenterMount: string, -- format, n = slot: where the client draws the plate of the slot
-	CenterTake: string, -- Attachment child of the Click_Slot_n (plate_take prompt, fixed on the slot)
-	CenterTicket: string, -- BillboardGui anchor of the #n over the slot
 	PickupTag: string, -- Model PICKUP
 	PickupPrompt: string,
 	PickupPoint: string, -- MapPoint + NpcNode format, n = 1..PickupSlotsMax
@@ -184,7 +168,6 @@ export type Restaurant = {
 	Flow: Flow,
 	Drive: Drive,
 	Supply: Supply,
-	CenterTable: CenterTable,
 	Dialog: Dialog,
 	Binding: Binding,
 }
@@ -274,8 +257,6 @@ const restaurant: Restaurant = {
 		LowAt = 0.25,
 		MartShelves = false, -- the Mart left the map (DEC-307)
 	},
-	-- Q-383 A (8 slots); Reach and PutRate Provisional (prep-conveyor.md §7.2, §11.1)
-	CenterTable = { Slots = 8, Reach = 12, PutRate = 4 },
 	-- placeholder lines (narrative-writer owns them; English UI, no "sausage" for TTS: "dog" / "frank")
 	Dialog = {
 		Greeting = { "Hi! What can I get you?" },
@@ -304,12 +285,6 @@ const restaurant: Restaurant = {
 		PlatePut = "Prompt_Put",
 		PlateTake = "Prompt_Take",
 		PlateTicket = "Att_Ticket",
-		CenterModel = "CENTER",
-		CenterTag = "CenterSlot",
-		CenterIndex = "CenterIndex",
-		CenterMount = "Mount_Plate_%d",
-		CenterTake = "Prompt_Take",
-		CenterTicket = "Att_Ticket",
 		PickupTag = "Pickup",
 		PickupPrompt = "Prompt_Serve",
 		PickupPoint = "PU-%d",

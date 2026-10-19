@@ -123,6 +123,12 @@
 						"optional": "src/Place/shared"
 					}
 				},
+				"Plate": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Plate/shared"
+					}
+				},
 				"Prep": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
@@ -386,12 +392,6 @@
 					"$ignoreUnknownInstances": false,
 					"$path": {
 						"optional": "src/Player/server"
-					}
-				},
-				"Prep": {
-					"$ignoreUnknownInstances": false,
-					"$path": {
-						"optional": "src/Prep/server"
 					}
 				},
 				"Presence": {
@@ -769,12 +769,6 @@
 						"$ignoreUnknownInstances": false,
 						"$path": {
 							"optional": "src/Preload/client"
-						}
-					},
-					"Prep": {
-						"$ignoreUnknownInstances": false,
-						"$path": {
-							"optional": "src/Prep/client"
 						}
 					},
 					"Profile": {

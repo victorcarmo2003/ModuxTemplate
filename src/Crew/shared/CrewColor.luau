@@ -1,16 +1,24 @@
 --!strict
 -- CrewColor: one colour per player of the server (owner request 2026-10-16, Provisional). The same colour paints his
 -- name tag over the head, the outline on his character (Crew/client/NameTagController) and everything of his in the
--- co-op prep (Prep Mates arm, ghost item, grill claim, DEC-259), so the crew tells who is who at a glance.
--- Colours = Content.Prep.Rules.World.Presence.Palette (never red). The server (CrewColorService) writes the palette
+-- co-op kitchen, so the crew tells who is who at a glance.
+-- Colours = PALETTE below (never red; moved here from the focused prep's Presence.Palette, TASK-581). The server (CrewColorService) writes the palette
 -- index on the Player attribute `CrewColor` (lowest free one on join); until it arrives the index comes from the join
 -- order (sorted UserId), so a client never shows a colourless tag.
 -- Pure: no Modux, Lync or Vide.
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Content = require(ReplicatedStorage.shared.Content)
 
-const PALETTE = Content.Prep.Rules.World.Presence.Palette
+-- Teal, Mustard, Lilac, Mint, Apricot, Sky, Pink, Lime (Provisional)
+const PALETTE: { Color3 } = {
+	Color3.fromHex("#3FA7B5"),
+	Color3.fromHex("#F6C12B"),
+	Color3.fromHex("#A98BD6"),
+	Color3.fromHex("#6FCF97"),
+	Color3.fromHex("#F29B6B"),
+	Color3.fromHex("#5BA8F0"),
+	Color3.fromHex("#E58BC0"),
+	Color3.fromHex("#B7D84B"),
+}
 
 const CrewColor = {}
 

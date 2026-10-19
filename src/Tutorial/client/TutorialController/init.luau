@@ -81,10 +81,10 @@
 
 	Restaurant (TASK-393; design/tutorial-restaurant.md, Provisional; only with Content.Restaurant.Rules.Enabled, else
 	everything above is unchanged): after the window, the tutorial customer's order is taken at the tablet (r_tablet,
-	r_listen while Tablets says Talking), then the plate furthest along (WorkPlate: the tutorial customer has no plate
-	ticket) is built: r_cut -> r_bun_plate -> r_grill -> r_cooking -> r_flip -> r_collect -> r_rail -> r_dog_plate ->
-	r_take_plate -> r_toppings (or r_discard) -> r_pickup ("Hand Over" at PICKUP); r_crew while a crewmate holds the hot
-	dog. After the money step, with TutorialRules.Restock and a take_box bay in the map (infinite stock room, owner
+	r_listen while Tablets says Talking), then the world kitchen (kitchen-world.md §1; TASK-581): r_cut (the cut-bun pile) ->
+	r_grill -> r_cooking -> r_flip -> r_collect (the rest rail) -> r_take_plate -> r_bun_plate -> r_dog_plate (the plate
+	becomes the hot dog) -> r_toppings (or r_discard) -> r_pickup ("Hand Over" at PICKUP); r_crew while a crewmate holds the
+	hot dog. After the money step, with TutorialRules.Restock and a take_box bay in the map (infinite stock room, owner
 	2026-10-17): r_box (take_box at a StockShelf bay) -> r_restock (the station of the box's ingredient); over once any
 	station's stock goes up. The Day 1 upgrade lesson below is on in the restaurant (TutorialRules.Upgrade).
 
@@ -114,8 +114,6 @@ local Beacon = require(script.Beacon)
 local Call = require(script.Call)
 local Steps = require(script.Steps)
 local Trail = require(script.Trail)
--- the plate of the 3D prep mode (module state shared with PrepController): the "deliver" step reads it (TASK-254)
-local PrepPlate = require(StarterPlayer.StarterPlayerScripts.client.Prep.PrepController.Stages.Build.Session)
 local Verbose = require(ReplicatedStorage.shared.Verbose)
 local Restaurant = require(ReplicatedStorage.shared.Libs.Net.Restaurant)
 
@@ -124,7 +122,6 @@ const TRAIL_RETRY = 1 -- s between two route builds (map still streaming in, or 
 const TRAIL_STRAY = 5 -- studs off the trail before it is rebuilt from the player
 const VEHICLE_TAG = "Vehicle"
 const STATION_TAG = "Station"
-const WORK_ACTION = "prep_work" -- Prompt_Work of Station_n (PrepService)
 const HOT_DOG = "hot_dog"
 const TICK_RATE = 10
 -- Phases where the tutorial runs (day shift, before the summary)
@@ -203,16 +200,15 @@ const DEV_PREFIX = "[TutorialDev]"
 -- Restaurant (TASK-393; design/tutorial-restaurant.md): actions and items of the restaurant loop and of the restock
 const RESTAURANT = Content.Restaurant
 const TABLET_TAKE = "tablet_take"
-const BUN_SLICE = "bun_slice"
-const PLATE_PUT = "plate_put"
+const BUN_CUT = "bun_cut"
 const PLATE_TAKE = "plate_take"
+const ADD_BUN = "plate_add_bun"
+const ADD_SAUSAGE = "plate_add_sausage"
 const GRILL_FLIP = "grill_flip"
-const RAIL_TAKE = "rail_take"
+const PLATE = "plate"
 const PICKUP_SERVE = "pickup_serve"
 const TAKE_BOX = "take_box"
 const RESTOCK = "restock"
-const BUN_SLICED = "bun_sliced"
-const SAUSAGE_GRILLED = "sausage_grilled"
 const RESTOCK_STEPS: { [string]: boolean } = { r_box = true, r_restock = true }
 -- package Tool item key -> its Packages row (a box in hand)
 const PACKAGE_OF_ITEM: { [string]: Content.Package } = {}
@@ -220,7 +216,6 @@ for _, row in Content.Packages.List do
 	PACKAGE_OF_ITEM[row.Item] = row
 end
 -- Restaurant set record fields read here (Net.Restaurant)
-type PlateRecord = { Npc: number, Bun: boolean, Sausage: boolean }
 type TabletRecord = { State: string, Npc: number }
 -- Stations set record fields read here (network.md §3.5)
 type SlotRecord = { Kind: string, State: string, Count: number }
@@ -396,7 +391,7 @@ function TutorialController:PanelHint(): string
 	if self.Urgent() and step.Remind then
 		return step.Remind
 	end
-	return if self:Focused() and step.PrepHint then step.PrepHint else step.Hint
+	return step.Hint
 end
 
 -- Owner request 2026-10-14 (Provisional): the tutorial has no Skip any more (Walt leads it); "" = no Skip on the cards
@@ -488,6 +483,16 @@ function TutorialController:Held(): Held?
 	end
 	const toppings = tool:GetAttribute("Toppings")
 	return { Item = item, Toppings = Rules.ParseToppings(if typeof(toppings) == "string" then toppings else nil) }
+end
+
+-- What is on the plate Tool in the own hand (attributes Bun / Sausage, shared/Plate/PlateTool); nil = no plate in hand
+function TutorialController:HeldPlate(): { Bun: boolean, Sausage: boolean }?
+	const character = Players.LocalPlayer.Character
+	const tool = if character then character:FindFirstChildOfClass("Tool") else nil
+	if tool == nil or tool:GetAttribute("Item") ~= PLATE then
+		return nil
+	end
+	return { Bun = tool:GetAttribute("Bun") == true, Sausage = tool:GetAttribute("Sausage") == true }
 end
 
 function TutorialController:Kitchen(): Kitchen
@@ -845,12 +850,10 @@ end
 function TutorialController:Decide(): (string, Instance?, string)
 	const key, target, item = self:DecideLive()
 	const forced, forcedTarget, forcedItem = self:DecideForced(key)
-	-- TASK-258: seated in the prep mode there is no world arrow (the mode has its own coach paw)
-	const seated = self:Seated()
 	if forced ~= nil then
-		return forced, if seated then nil else forcedTarget, forcedItem
+		return forced, forcedTarget, forcedItem
 	end
-	return key, if seated then nil else target, item
+	return key, target, item
 end
 
 -- Current step and the anchor to point at, from the replicated state
@@ -905,9 +908,7 @@ function TutorialController:DecideLive(): (string, Instance?, string)
 				return "discard", self:Anchor("discard", true) or self:Anchor("discard", false), ""
 			end
 		end
-		-- focused kitchen: the toppings were chosen on the Build tab before the hot dog existed and no world prompt adds
-		-- one now; a hot dog short of a topping is served as it is (Incomplete counts as the first sale)
-		if not self:Focused() then
+		do
 			for _, key in Content.Ingredients.ToppingKeys do
 				if guest.Order[key] and not held.Toppings[key] then
 					const row = Content.Ingredients.ByKey[key]
@@ -923,24 +924,9 @@ function TutorialController:DecideLive(): (string, Instance?, string)
 		return "serve", self:Anchor("serve", false, onGuest) or rig, ""
 	end
 
-	-- TASK-254: in the 3D prep mode the plate is built (bun cut, sausage in). TASK-258: first the order's toppings on the
-	-- Toppings view, then drag the plate onto the customer's delivery area. No world arrow while seated (the prep coach paw)
-	if self:Seated() and Vide.untrack(PrepPlate.Open) and Vide.untrack(PrepPlate.Placed) then
-		const missing = self:MissingTopping(guest.Order)
-		if missing ~= nil then
-			const row = Content.Ingredients.ByKey[missing]
-			return "toppings", nil, if row then row.Name else missing
-		end
-		return "deliver", nil, ""
-	end
-
-	-- Day 1 cut (2026-10-17): the focused kitchen is one step ("cook"); the prep mode's coach paw leads inside it
-	if self:Focused() then
-		return "cook", self:KitchenAnchor(WORK_ACTION, false), ""
-	end
 	const kitchen = self:Kitchen()
 	if kitchen.Rail > 0 and kitchen.BoardReady then
-		return "assemble", self:KitchenAnchor("board_add_sausage", false), ""
+		return "assemble", self:KitchenAnchor(ADD_SAUSAGE, false), ""
 	end
 	if kitchen.GrillReady then
 		return "collect", self:KitchenAnchor("grill_collect", true), ""
@@ -971,35 +957,6 @@ local function plateIndexOf(anchor: Instance): number?
 		current = current.Parent
 	end
 	return nil
-end
-
--- The plate the tutorial works on (Plates set). The tutorial customer gets no plate ticket and the verdict goes by the
--- toppings, so any plate serves: the one furthest along (bun and dog > one of them > empty), one without a ticket
--- first, then the lowest index. Progress = 0..2 (bun + dog on it); nil = no plate bound.
-function TutorialController:WorkPlate(): (PlateRecord?, number?, number)
-	local best: PlateRecord? = nil
-	local bestIndex: number? = nil
-	local bestScore = -1
-	for index, raw in Restaurant.Plates:entries() do
-		const record = raw :: PlateRecord
-		const progress = (if record.Bun then 1 else 0) + (if record.Sausage then 1 else 0)
-		const score = progress * 4 + (if record.Npc == 0 then 2 else 0)
-		if score > bestScore or (score == bestScore and bestIndex ~= nil and index < bestIndex) then
-			best, bestIndex, bestScore = record, index, score
-		end
-	end
-	const progress = if best then (if best.Bun then 1 else 0) + (if best.Sausage then 1 else 0) else 0
-	return best, bestIndex, progress
-end
-
--- A prompt of the plate `index` (nil = the nearest plate)
-function TutorialController:PlateAnchor(action: string, index: number?): Instance?
-	if index == nil then
-		return self:Anchor(action, false)
-	end
-	return self:Anchor(action, false, function(anchor: Instance): boolean
-		return plateIndexOf(anchor) == index
-	end) or self:Anchor(action, false)
 end
 
 -- Another player of the server holds a hot dog (co-op: a crewmate has the plate)
@@ -1050,38 +1007,39 @@ function TutorialController:DecideRestaurant(guestId: number, guest: GuestRecord
 		end
 		return "r_pickup", self:Anchor(PICKUP_SERVE, false) or self:Anchor("serve", false, onGuest) or rig, ""
 	end
-	const plate, index, progress = self:WorkPlate()
-	if progress == 0 and crewHasHotDog() then
+	-- world kitchen (TASK-581; kitchen-world.md §1): the piles first, then the plate (Take Plate, Add Bun, Add Sausage)
+	const plateHeld = held ~= nil and held.Item == PLATE
+	const plate = if plateHeld then self:HeldPlate() else nil
+	if plate == nil and crewHasHotDog() then
 		return "r_crew", self:Anchor(PICKUP_SERVE, false), ""
 	end
-	if held and held.Item == BUN_SLICED and not (plate and plate.Bun) then
-		return "r_bun_plate", self:PlateAnchor(PLATE_PUT, index), ""
-	end
-	if held and held.Item == SAUSAGE_GRILLED and not (plate and plate.Sausage) then
-		return "r_dog_plate", self:PlateAnchor(PLATE_PUT, index), ""
-	end
-	if plate and plate.Bun and plate.Sausage then
-		return "r_take_plate", self:PlateAnchor(PLATE_TAKE, index), ""
-	end
-	if not (plate and plate.Bun) then
-		return "r_cut", self:Anchor(BUN_SLICE, true) or self:Anchor(BUN_SLICE, false), ""
-	end
-	-- the dog: grill -> (pause) flip -> collect -> take it off the hot pile
 	const kitchen = self:Kitchen()
-	if kitchen.Rail > 0 then
-		return "r_rail", self:Anchor(RAIL_TAKE, true) or self:Anchor(RAIL_TAKE, false), ""
+	const needBun = not (plate and plate.Bun)
+	const needDog = not (plate and plate.Sausage)
+	if plateHeld and needBun and kitchen.BoardReady then
+		return "r_bun_plate", self:Anchor(ADD_BUN, false), ""
 	end
-	if kitchen.GrillReady then
-		return "r_collect", self:Anchor("grill_collect", true) or self:Anchor("grill_collect", false), ""
+	if plateHeld and needDog and kitchen.Rail > 0 then
+		return "r_dog_plate", self:Anchor(ADD_SAUSAGE, false), ""
 	end
-	const flip = self:Anchor(GRILL_FLIP, true)
-	if flip then
-		return "r_flip", flip, ""
+	if needBun and not kitchen.BoardReady then
+		return "r_cut", self:Anchor(BUN_CUT, true) or self:Anchor(BUN_CUT, false), ""
 	end
-	if kitchen.GrillWorking then
-		return "r_cooking", self:Anchor("grill_collect", false), ""
+	if needDog and kitchen.Rail == 0 then
+		-- the dog: grill -> flip (optional) -> collect onto the rest rail
+		if kitchen.GrillReady then
+			return "r_collect", self:Anchor("grill_collect", true) or self:Anchor("grill_collect", false), ""
+		end
+		const flip = self:Anchor(GRILL_FLIP, true)
+		if flip then
+			return "r_flip", flip, ""
+		end
+		if kitchen.GrillWorking then
+			return "r_cooking", self:Anchor("grill_collect", false), ""
+		end
+		return "r_grill", self:Anchor("grill_place", false), ""
 	end
-	return "r_grill", self:Anchor("grill_place", false), ""
+	return "r_take_plate", self:Anchor(PLATE_TAKE, false), ""
 end
 
 -- Restock steps start after the first sale: Supply on and a stock room bay (take_box) in the map
@@ -1158,47 +1116,9 @@ function TutorialController:BeginRestock()
 	self:SetStep(key, target, item)
 end
 
--- Focused prep mode (Content.Prep.Rules.WorldKitchenPrompts = false): the kitchen prompts of the world are gone and the
--- kitchen steps are done at a station of the trailer (prep-mode.md §5; shim until the rewrite, TASK-183/184)
-function TutorialController:Focused(): boolean
-	return not Content.Prep.Rules.WorldKitchenPrompts
-end
-
--- First topping of the order not on the 3D prep plate yet (PrepPlate.Toppings), in the order of the catalog; nil = all on
-function TutorialController:MissingTopping(order: { [string]: boolean }): string?
-	const onPlate: { [string]: boolean } = {}
-	for _, entry in PrepPlate.Toppings() do
-		onPlate[entry.Key] = true
-	end
-	for _, key in Content.Ingredients.ToppingKeys do
-		if order[key] and not onPlate[key] then
-			return key
-		end
-	end
-	return nil
-end
-
--- The player works at a station now (the server sets Working = n on the character, PrepService)
-function TutorialController:Seated(): boolean
-	const character = Players.LocalPlayer.Character
-	return character ~= nil and typeof(character:GetAttribute("Working")) == "number"
-end
-
--- What a kitchen step points at: the world prompt of the action, or in the focused mode the Work prompt of the nearest
--- station (nothing while the player is already at one: the prep UI is the guide)
+-- What a kitchen step points at: the world prompt of the action (the focused prep left, TASK-581)
 function TutorialController:KitchenAnchor(action: string, enabled: boolean): Instance?
-	if not self:Focused() then
-		return self:Anchor(action, enabled)
-	end
-	if self:Seated() then
-		return nil
-	end
-	-- TASK-258: every kitchen step points at the Work prompt that enters the mode. Only the grill one is on (owner decision
-	-- 2026-10-14, PrepService:SilenceSpareWork): the board one sits off by the bun crate, so a disabled prompt is never
-	-- the target while an enabled one exists (the disabled one only as a fallback before PromptEnabled replicates)
-	return self:Anchor(WORK_ACTION, true) or self:Anchor(WORK_ACTION, false, function(anchor: Instance): boolean
-		return anchor:GetAttribute("PromptStep") == "Grill"
-	end)
+	return self:Anchor(action, enabled)
 end
 
 -- Presentation ---------------------------------------------------------------------------------------------------
@@ -1295,10 +1215,6 @@ local function highlightOf(anchor: Instance): Instance?
 	if anchor:IsA("Model") and typeof(anchor:GetAttribute("NpcId")) == "number" then
 		return anchor
 	end
-	-- Prompt_Work of a station: its model holds only attachments, nothing to outline (SetHighlight puts a marker)
-	if anchor:IsA("Attachment") and anchor:GetAttribute("PromptAction") == WORK_ACTION then
-		return nil
-	end
 	const rig = ancestorWith(anchor, function(instance)
 		return typeof(instance:GetAttribute("NpcId")) == "number" and instance:IsA("Model")
 	end)
@@ -1355,10 +1271,6 @@ end
 -- Pulsing Highlight + 3D arrow on what the anchor belongs to (Beacon.luau); nil clears both
 function TutorialController:SetHighlight(anchor: Instance?)
 	local adornee = if anchor then highlightOf(anchor) else nil
-	if adornee == nil and anchor ~= nil and anchor:IsA("Attachment") and anchor:GetAttribute("PromptAction") == WORK_ACTION then
-		-- Prompt_Work of a station is an Attachment inside a model with no parts: the arrow stands on an invisible marker
-		adornee = self:WorkMarker(anchor)
-	end
 	const lift = if adornee and adornee:IsA("Model") and typeof(adornee:GetAttribute("NpcId")) == "number"
 		then CUSTOMER_LIFT
 		else ARROW_LIFT

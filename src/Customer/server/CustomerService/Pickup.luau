@@ -5,9 +5,10 @@
 -- to PICKUP, PU-2..n = the side line). Whoever ordered joins at the back; it leaves when served, out of patience or sent
 -- away, and everyone behind moves one spot up. A pair takes one spot (the leader's id). No Service, no network, no
 -- Instance: table tests in Pickup.Test (run by /dev pickup test).
--- Conveyor kitchen (TASK-516; tech/prep-conveyor.md §8; Q-383 A): with Content.Prep.Rules.Mode = "Conveyor" choose is
--- strict: the hot dog goes ONLY to the customer of its ticket, and only while that customer is in the line (the
--- "oldest exact", "target" and "PU-1" branches are off). PlateService's gate "PlateTicket" sends the refusal notices.
+-- World kitchen (kitchen-world.md §1 #10; Q-383 A): a hot dog with a ticket (a plate tied to an order) is strict: it goes ONLY
+-- to the customer of its ticket, and only while that customer is in the line (the "oldest exact", "target" and "PU-1" branches
+-- are off). A hot dog with no ticket takes the oldest exact one, as before. PlateService's gate "PlateTicket" sends the
+-- refusal notices.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 
@@ -103,7 +104,7 @@ end
 --   4. the target, if in the line;
 --   5. PU-1 (the verdict decides: usually Wrong, the hot dog stays in the hand).
 -- nil = the line is empty.
--- `strict` (nil = Content.Prep.Rules.Mode == "Conveyor"): only 1 and 3 (the ticket owner in the line); nil otherwise.
+-- `strict` (nil = the hot dog has a ticket owner): only 1 and 3 (the ticket owner in the line); nil otherwise.
 function Pickup.choose(
 	line: Pickup,
 	owner: number?,
@@ -114,7 +115,7 @@ function Pickup.choose(
 	const inLine = function(id: number?): boolean
 		return id ~= nil and table.find(line.Order, id) ~= nil
 	end
-	const ownerOnly = if strict ~= nil then strict else Content.Prep.Rules.Mode == "Conveyor"
+	const ownerOnly = if strict ~= nil then strict else owner ~= nil
 	if ownerOnly then
 		if owner == nil or not inLine(owner) then
 			return nil, nil

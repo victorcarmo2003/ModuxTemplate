@@ -223,6 +223,7 @@ export type Public = {
 	PickServeTool: (self: Public, player: Player, ticket: Orders.Ticket) -> Tool?,
 	Equip: (self: Public, player: Player, tool: Tool) -> (),
 	SellLine: (self: Public, id: number, customer: Customer, ticket: Orders.Ticket, player: Player, tool: Tool, index: number, verdict: Orders.Verdict, at: number) -> SaleResult,
+	GradeOf: (self: Public, tool: Tool, line: Orders.Line, ticket: Orders.Ticket, at: number) -> string?,
 	Judge: (self: Public, ticket: Orders.Ticket, tool: Tool, override: SaleResult?) -> (number?, Orders.Verdict),
 	Conclude: (self: Public, customer: Customer, ticket: Orders.Ticket) -> (),
 	LeaveServed: (self: Public, customer: Customer, mood: string?) -> (),

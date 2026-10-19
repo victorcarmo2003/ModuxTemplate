@@ -16,6 +16,7 @@ export type Public = {
 	SetStage: (self: Public, player: Player, track: Track, stage: Stage, t: number) -> (),
 	Clear: (self: Public, player: Player, track: Track) -> (),
 	SpawnFor: (self: Public, root: BasePart) -> Vector3,
+	IsSafe: (self: Public, player: Player, root: BasePart) -> boolean,
 	Step: (self: Public, dt: number) -> (),
 }
 

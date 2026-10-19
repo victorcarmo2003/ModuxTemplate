@@ -1,7 +1,7 @@
 --!strict
 -- Topping bowls and bottles, station K (FEAT-006 step 6; DEC-071, DEC-072, DEC-156; architecture.md §18.4, §18.12;
 -- content-data.md §3.6, §3.18; TASK-028). Station module of KitchenService (StationApi.Module).
--- "Add {item}" (topping_add, hold 1 s from Content.Actions) on the anchor Prompt_Use_<Suf>, whose Ingredient
+-- "Add {item}" (topping_add, hold 0.5 s from Content.Actions; DEC-299) on the anchor Prompt_Use_<Suf>, whose Ingredient
 -- attribute says the topping. Hot dog in hand (checked by the core from Requires.Held), topping not on it yet, fewer
 -- than OrderRules.MaxToppings, Stock >= 1 and not Blocked: takes 1 unit and adds it to the hot dog.
 -- No Stations record (Record = "None"): the state of every bowl is the Stock set (Amount, Blocked), so lid + padlock
@@ -13,9 +13,9 @@
 -- ctx.IsBlocked, TASK-057).
 -- Gift bowls (owner request 2026-10-14, Provisional): "Open" (topping_unwrap) on Prompt_Unwrap_<Suf> opens a closed gift bowl
 -- (ctx.IsWrapped) and fills it to capacity (ctx.Unwrap); a closed bowl refuses "Add" with topping_wrapped {item}.
--- Conveyor (TASK-496; prep-conveyor.md §1.1; Content.Prep.Rules.Mode = "Conveyor"): toppings are drawn at the Toppings stop of
--- the belt. "Add {item}" stays off (KitchenService hides it) and topping_add is refused here too (silent). "Open" and the
--- restock stay on: a closed gift bowl must still open, the belt takes its units through TakeStock.
+-- World kitchen (kitchen-world.md §1 #9; TASK-569): the condiment table PRODUCTION (Pan_*, tag Station, StationKind toppings).
+-- The plate with bun and sausage on it IS the hot_dog Tool (ctx.FillPlate turns it), so "Add {item}" takes the hot dog in
+-- hand as before; an empty or half plate never shows it (Requires.Held = hot_dog).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 local StationApi = require(script.Parent.Parent.StationApi)
@@ -24,7 +24,6 @@ local Refusal = require(script.Parent.Parent.Refusal)
 const ACTION = "topping_add"
 const UNWRAP = "topping_unwrap"
 const HOT_DOG = "hot_dog"
-const CONVEYOR = "Conveyor"
 
 -- Topping key of the anchor (a Sauce/Topping of Content.Ingredients), else nil.
 local function toppingOf(anchor: Instance): string?
@@ -67,9 +66,6 @@ local function canAdd(
 	player: Player,
 	anchor: Instance
 ): (Tool?, string?, string?)
-	if Content.Prep.Rules.Mode == CONVEYOR then
-		return nil, nil, nil
-	end
 	const ingredient = toppingOf(anchor)
 	if ingredient == nil then
 		return nil, nil, nil
