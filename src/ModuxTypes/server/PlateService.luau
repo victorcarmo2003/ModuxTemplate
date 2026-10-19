@@ -1,52 +1,55 @@
 --!strict
 
-local ServerScriptService = game:GetService("ServerScriptService")
-local Slots = require(ServerScriptService.server.Plate.PlateService.Slots)
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 
-export type Carry = { Line: number, Since: number }
+export type Entry = {
+	Id: number,
+	Player: Player,
+	Tool: Tool,
+	Ticket: number, -- NpcId, 0 = none
+	Line: number, -- 1 leader, 2 pair partner, 0 = none
+	Since: number, -- server time the order was taken, 0 = none
+}
+type Wire = {
+	Npc: number,
+	Bun: boolean,
+	Sausage: boolean,
+	Toppings: { [string]: boolean },
+	Since: number,
+	Altered: boolean?,
+}
+export type FreeTicket = { Npc: number, Line: number, Since: number }
 
 export type Public = {
-	AnchorSlot: { [Instance]: number },
-	Carried: { [Tool]: Carry },
-	DevNext: number,
+	Changed: SignalLib.Signal<number>,
 	Enabled: boolean,
 	NoticeAt: { [Player]: { [string]: number } },
-	Parts: { [number]: Instance },
-	Published: { [number]: boolean },
-	PutAnchors: { [number]: Instance },
-	Slots: { [number]: Slots.Slot },
-	TakeAnchors: { [number]: Instance },
+	Plates: { [number]: Entry },
+	Sent: { [number]: Wire },
 	Setup: (self: Public) -> (),
-	IsLive: (self: Public) -> boolean,
-	ActiveCount: (self: Public) -> number,
-	IsActive: (self: Public, index: number) -> boolean,
-	Active: (self: Public) -> { Slots.Slot },
-	FreeCount: (self: Public) -> number,
-	LinesOf: (self: Public, npc: number?) -> number,
-	HasRoom: (self: Public, lines: number?) -> boolean,
-	HasRoomFor: (self: Public, npc: number?) -> boolean,
-	SlotOf: (self: Public, anchor: Instance) -> Slots.Slot?,
-	SlotsOf: (self: Public, npc: number) -> { Slots.Slot },
-	Record: (self: Public, slot: Slots.Slot) -> any,
-	Publish: (self: Public, index: number) -> (),
-	Refresh: (self: Public) -> (),
-	NotifyThrottled: (self: Public, player: Player, key: string) -> (),
-	Assign: (self: Public, npc: number, lines: number?) -> { number },
+	AliveCount: (self: Public) -> number,
+	HasRoomFor: (self: Public, _npc: number?) -> boolean,
+	Of: (self: Public, id: number) -> Entry?,
+	PlateOf: (self: Public, player: Player) -> Entry?,
+	NumberOf: (self: Public, npc: number) -> number,
+	FreeTickets: (self: Public) -> { FreeTicket },
+	WireOf: (self: Public, entry: Entry) -> Wire,
+	Publish: (self: Public, id: number) -> (),
+	NotifyThrottled: (self: Public, player: Player, key: string, value: number?) -> (),
+	Stamp: (self: Public, entry: Entry) -> (),
+	FreeId: (self: Public) -> number?,
+	Bind: (self: Public, entry: Entry) -> boolean,
+	Follow: (self: Public, player: Player) -> (),
+	ValidateTake: (self: Public, player: Player) -> boolean,
+	Take: (self: Public, player: Player) -> Entry?,
+	OnTicket: (self: Public, _npc: number) -> (),
 	Release: (self: Public, npc: number) -> number,
 	Clear: (self: Public) -> (),
-	PickPut: (self: Public, player: Player, slot: Slots.Slot) -> (Tool?, Slots.PutKind?, string?),
-	CanUse: (self: Public, player: Player, anchor: Instance) -> Slots.Slot?,
-	ValidatePut: (self: Public, player: Player, anchor: Instance) -> boolean,
-	Put: (self: Public, player: Player, anchor: Instance) -> (),
-	ValidateTake: (self: Public, player: Player, anchor: Instance) -> boolean,
-	Take: (self: Public, player: Player, anchor: Instance) -> (),
-	BindAnchor: (self: Public, index: number, root: Instance, name: string, action: string) -> Instance?,
-	Bind: (self: Public) -> (),
+	CheckPickup: (self: Public, player: Player, action: string, anchor: Instance) -> (boolean, string?),
 	DevCheck: (self: Public) -> (),
 	DevList: (self: Public) -> string,
-	DevAssign: (self: Public, npc: number) -> string,
-	DevFill: (self: Public, count: number) -> string,
-	DevPrep: (self: Public, index: number) -> string,
+	DevGive: (self: Public, player: Player) -> string,
 	DevClear: (self: Public) -> string,
 }
 
