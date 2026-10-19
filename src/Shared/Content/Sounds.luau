@@ -421,7 +421,7 @@ const rules: SoundRules = {
 	ShiftMusicFresh = 5, -- Provisional (frontend-coder)
 	Ambient = { Day = "amb_day_street", Night = "amb_night_street" },
 	AmbientZones = { ["LZ-4"] = "amb_mart_hum" }, -- MAP-01 §10.2: LZ-4 = Mart interior
-	AmbientOff = { "Intro", "Finale", "RunEnd" },
+	AmbientOff = { "Finale", "RunEnd" },
 	Tension = { Key = "amb_horror", Window = "Last" }, -- 5-6 AM (Provisional: no Tension on the client)
 	Stings = {
 		AnomalyStart = "horror_sting",

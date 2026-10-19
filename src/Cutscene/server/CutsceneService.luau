@@ -1,13 +1,13 @@
 --!strict
--- Cutscenes: opening and dawn of Night 10 (architecture.md §19.16, R23; network.md §6.2, §13.7; FEAT-004, FEAT-027;
--- script.md §1; ending.md §2; DEC-078, DEC-088, DEC-194, DEC-205; TASK-120). Run place only. Single writer of the
+-- Cutscenes: dawn of Night 10 and the credits (architecture.md §19.16, R23; network.md §6.2, §13.7; FEAT-004, FEAT-027;
+-- script.md §1; ending.md §2; DEC-078, DEC-088, DEC-194, DEC-205, DEC-309; TASK-120). Run place only. Single writer of the
 -- Cutscene set (record 1; Scene = "none" when idle).
 --
--- Trigger: RoundService phase probes. PhaseChanged("Intro") plays "intro"; PhaseChanged("Finale") plays "finale"
+-- Trigger: RoundService phase probes. PhaseChanged("Finale") plays "finale"
 -- and then its Next ("credits") as a new segment with 0 votes. The probe says "can end" once the chain is over, so
 -- the phase ends early; the phase cap still wins (leaving the phase stops the scene).
 -- Participants: members connected (not Away) when the chain starts, in roster order (slot 1..4). A late member is
--- not one: no vote, no freeze; during the Intro CharacterService keeps it without a body until the phase ends.
+-- not one: no vote, no freeze; it spawns normally.
 -- ONE avatar per cutscene (owner 2026-10-12): every participant walks the plan of slot 1 (first mark, first stand spot) and
 -- each client hides the other players' characters (CutsceneController/Hide); votes, freeze and the record are per player.
 -- Avatars: CharacterService:Freeze(p, "Cutscene", true); at the start of each segment the body is pivoted to
@@ -21,12 +21,12 @@
 -- Votes >= Needed = ceil(0.5 x connected participants), recomputed when someone leaves. Everything else in the
 -- beats (fade, text, lines, actors, look, prompt) is client presentation (CutsceneController, TASK-121).
 -- Traffic: TrafficService:Hold("cutscene", on) while a chain plays (runtime lookup: Traffic is not in Require).
--- Ready gate (user feedback 2026-10-11: the start of the intro was lost under the client's loading): a chain does not
+-- Ready gate (user feedback 2026-10-11: the start of a scene was lost under the client's loading): a chain does not
 -- start at Play. The participants are frozen and the record says Waiting (Scene "none") until every connected
 -- participant sent ClientReady (LoadingController: loading screen done) or Rules.ReadyTimeout s passed; then the
 -- first segment begins with StartedAt = now, so nobody misses its first beats.
 -- PROVISIONAL (TASK-120 note): side-by-side spacing on shared targets (Rules.LineSpacing); walk pace = Rules.Walk;
--- intro end moves participants to their spawn point (PS-n, "at work"); chain ends when no participant is connected.
+-- chain ends when no participant is connected.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -54,7 +54,7 @@ const VOTE_SHARE = 0.5 -- DEC-194
 const TICK_RATE = 10 -- Hz: beat timing and late bodies
 const SPAWN_LIFT = Vector3.new(0, 3, 0) -- architecture.md §18.5
 const RULES = Content.Cutscenes.Rules
-const PHASE_SCENES: { [string]: string } = { Intro = "intro", Finale = "finale" }
+const PHASE_SCENES: { [string]: string } = { Finale = "finale" }
 -- Help Wanted flyer dressing (Rules.Poster; PROVISIONAL look, frontend-coder 2026-10-11)
 const DRESSED_ATTRIBUTE = "CutsceneDressed"
 const POSTER_PPS = 200
@@ -167,7 +167,7 @@ function CutsceneService:Setup()
 	-- current segment ("none" = idle) and its start (server clock)
 	self.Scene = NONE :: string
 	self.StartedAt = 0 :: number
-	-- Round phase that owns the chain (Intro/Finale); nil = dev play
+	-- Round phase that owns the chain (Finale); nil = dev play
 	self.Owner = nil :: string?
 	-- true once the chain of the owning phase is over (phase probe)
 	self.Done = true :: boolean
@@ -544,7 +544,7 @@ function CutsceneService:StepPending()
 	self.Changed:Fire(key)
 end
 
--- Ends the chain: everyone free, traffic back, record idle. After the intro the party is "at work" (PS-n).
+-- Ends the chain: everyone free, traffic back, record idle.
 function CutsceneService:Finish()
 	if self:IsWaiting() and not self:IsPlaying() then
 		-- held chain dropped before it started (phase over, nobody left, dev stop)
@@ -561,8 +561,6 @@ function CutsceneService:Finish()
 		self.Done = true
 		return
 	end
-	const wasIntro = self.Owner == "Intro"
-	const participants = self.Participants
 	self.Scene = NONE
 	self.StartedAt = 0
 	self.Owner = nil
@@ -575,18 +573,6 @@ function CutsceneService:Finish()
 	self:ReleaseAll()
 	self:HoldTraffic(false)
 	self:Write()
-	if wasIntro then
-		const characters = self.Dependencies.CharacterService
-		const info = self.Dependencies.RoundService:Info()
-		for _, userId in participants do
-			const player = Players:GetPlayerByUserId(userId)
-			const character = if player ~= nil then self:BodyOf(player) else nil
-			const point = if player ~= nil and character ~= nil then characters:SpawnPointFor(player, info) else nil
-			if character ~= nil and point ~= nil then
-				character:PivotTo(point + SPAWN_LIFT)
-			end
-		end
-	end
 	self.Changed:Fire(NONE)
 end
 
@@ -704,7 +690,7 @@ CutsceneService:OnInit(function(self)
 	end
 	self.Enabled = true
 
-	-- Registered before RoundService:StartRun (its OnStart): Intro and Finale are not skipped (§19.0 rule 4)
+	-- Registered before RoundService:StartRun (its OnStart): Finale is not skipped (§19.0 rule 4)
 	const round = self.Dependencies.RoundService
 	for phase in PHASE_SCENES do
 		round:SetPhaseProbe(phase :: any, function(): boolean

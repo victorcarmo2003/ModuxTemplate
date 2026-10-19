@@ -51,7 +51,7 @@ Conciliação das rodadas 13–15 (DEC-110 a DEC-129, 2026-10-08):
 | Party para preços = roster que entrou até o fim do Day 1, fixo | DEC-121 | FEAT-001, FEAT-016, FEAT-035 |
 | Noite perdida: todos acordam em pé na calçada ao lado do trailer | DEC-122 | FEAT-026 |
 | Sinal do Walker: último poste da Juniper zumbe ~2 s | DEC-123 | FEAT-022 |
-| Todas as ligações no telefone fixo do veículo; celular flip só na intro | DEC-124 | FEAT-018 |
+| Todas as ligações no telefone fixo do veículo; celular flip removido junto com a intro (DEC-309) | DEC-124 | FEAT-018 |
 | Cafeteira fixa no trailer | DEC-125 | FEAT-015, FEAT-021 |
 | Noite crescente 20 → 30 min | DEC-127 | FEAT-002 |
 | Fora do MVP: eventos de demanda, validade, missões diárias | DEC-128 | FEAT-007 |
@@ -163,8 +163,8 @@ Spawn do atrasado (proposta, **Q-112 c, d**; alinhado com a sugestão do narrati
 
 | Momento da chegada | Onde aparece | Estado |
 |---|---|---|
-| Durante a intro | **não** entra na cutscene; fica na tela de carregamento até a intro acabar e spawna na esquina, ao lado do carrinho, no início do Day 1 | não vota "Skip" (não está na cutscene); recebe só as dicas do tutorial que ainda não tocaram (FEAT-018) |
-| Depois da intro, de dia | ao lado do veículo, sem cutscene | normal |
+| Durante a abertura da run | sem cutscene de abertura (DEC-309): o atrasado spawna normalmente no seu ponto de trabalho | normal |
+| De dia | ao lado do veículo, sem cutscene | normal |
 | À noite | dentro do trailer | sanidade inicial da classe; vale como ativo a partir do spawn (pode encerrar uma janela de "todos caídos", FEAT-034) |
 | Durante ligação do chefe | ouve só as linhas restantes (FEAT-018) | — |
 
@@ -178,7 +178,7 @@ Spawn do atrasado (proposta, **Q-112 c, d**; alinhado com a sugestão do narrati
   - Com 1 membro sem chegar, a run começa 60 s depois do 1º a chegar; o atrasado entra no Day 2 e spawna ao lado do veículo sem cutscene.
   - Party de 3 em que o 3º chega no Day 1: preço do trailer = $570. Chega no Day 2: preço = $450 **[DEC-121]**.
   - Party de 3 em que o 3º chega no Day 1 e sai no Day 3: o preço continua $570 **[DEC-121]**.
-  - Atrasado que conecta durante a intro não aparece na cutscene dos outros e spawna ao lado do carrinho quando o Day 1 começa.
+  - Atrasado que conecta no início da run spawna normalmente, sem cutscene (DEC-205 emendada pela DEC-309).
   - A classe exibida no lobby é a classe aplicada na run, e não muda até o fim dela.
 
 ### FEAT-002 — Estrutura da run (máquina de estados)
@@ -193,7 +193,7 @@ Não existe modo dia infinito (FEAT-017 removido). Estados antigos, mantidos com
 Estados (HISTÓRICO, substituído pelo bloco acima):
 
 ```
-RunStart → Intro (FEAT-004) → Day(1) → Day(2) … → Day(n)
+RunStart → Noite 1 (Call) ou Day(1) (Prep) → Day(1) → Day(2) … → Day(n)
 Day(n) com trailer comprado no turno → Night(1)
 Night(k) vencida → Day(n+1) → Night(k+1) …
 Night(k) perdida com a chance ainda não usada → Night(k) de novo (snapshot)   (FEAT-026) [DEC-110, DEC-112]
@@ -273,24 +273,24 @@ Turno de noite (proposta; duração D_N de `RunConfig`):
 
 ### FEAT-004 — Cutscenes: início e voto para pular
 
-- Status: Rascunho · Pilares: DESCOBRIR · Origem: **[DEC-021, DEC-008, DEC-039, DEC-067, DEC-078, DEC-088, DEC-097, DEC-098]**
+- Status: Rascunho · Pilares: DESCOBRIR · Origem: **[DEC-021, DEC-008, DEC-039, DEC-067, DEC-078, DEC-088, DEC-097, DEC-098]**; emenda **DEC-309** (intro removida)
 - Resumo: sistema único de cutscene, controlado pelo servidor e igual para toda a party. Câmera em **1ª pessoa (POV do próprio avatar)**; cena **compartilhada**: cada jogador vê os avatares R6 dos colegas na cena, o próprio não **[DEC-088, DEC-097]**.
   Os avatares andam por trilhos roteirizados (o jogador não controla o movimento durante a cutscene; só olha em volta, com limite de ±60° do eixo do plano). Cada client renderiza a cena localmente, sincronizada pelo servidor.
-  Duas cutscenes no MVP: **intro** (Bellmoor → panfleto no poste da Ninth & Juniper → ligação para Walt → carrinho; roteiro em `script.md` §1, adaptação para 1–4 avatares em **Q-106 c**) e **final** (FEAT-027).
+  Duas cutscenes: **final** e **créditos** (FEAT-027). A cutscene de **abertura (intro) foi removida** a pedido do dono (**DEC-309**): a run nova entra direto na primeira fase do turno (Noite 1: ligação do chefe, DEC-300).
 
 O que é e o que não é cutscene (proposta):
 
 | Sequência | Cutscene? | Pulável? |
 |---|---|---|
-| Intro (`cs_intro`) | sim | sim, voto |
+| ~~Intro (`cs_intro`)~~ removida (DEC-309) | — | — |
 | Final: revelação (`cs_finale`) e créditos + pós-créditos (`cs_credits`) | sim (2 segmentos) | sim, voto por segmento |
 | Fade da troca de veículo (FEAT-016), sequência de derrota (FEAT-026), desmaio e ambulância (FEAT-034) | não: transições/sequências no mundo | não |
 | Ligações do chefe (FEAT-018) | não | não (e não se repetem) |
 
 | Parâmetro | Valor |
 |---|---|
-| Intro: duração alvo | ~65 s com pausas dramáticas (placa NO HELP WANTED, susto do carro no meio da CW-2, panfleto visto de longe, ligação, olhar para o carrinho); teto de segurança 70 s — **Provisório** (frontend-coder, 2026-10-11, feedback do usuário após jogar; era 35–45 s, teto 50) |
-| Quando | intro uma vez por run, logo após o teleporte; final uma vez por run |
+| Intro | **removida** (DEC-309); as linhas abaixo sobre a intro são histórico |
+| Quando | final uma vez por run (a intro deixou de existir, DEC-309) |
 | Sincronia | o **servidor** inicia e encerra; todos os clients tocam a mesma cutscene no mesmo instante (tolerância ≤ 0,5 s) |
 | Voto | durante a cutscene, hold 1 s no botão de interagir = "Skip"; o voto é individual, não se desfaz e vale só para o segmento atual |
 | Limiar | pula quando votos ≥ **ceil(50% × jogadores conectados)**: 1p 1 · 2p 1 · 3p 2 · 4p 2 **[DEC-078]** (proposta para **Q-077 a**) |
@@ -298,17 +298,15 @@ O que é e o que não é cutscene (proposta):
 | Indicador | dica "Hold to skip" e contador "Skip 1/2" no canto da tela só durante a cutscene (não é HUD, DEC-015) |
 | Mudou a party | se alguém desconecta ou reconecta, o limiar é recalculado na hora; votos de quem saiu deixam de contar |
 | 1ª vez na conta | também pode pular (a regra anterior "só quem já viu" foi descartada) |
-| Reconexão / atrasado | quem **já estava** na cutscene e reconecta entra no ponto atual, já no trilho do seu avatar; o atrasado que nunca entrou não vê a intro e spawna quando ela acaba (FEAT-001); quem conecta depois não revê **[DEC-098]** |
-| Party na intro | os avatares andam juntos em fila curta (trilhos 1–4); quem faz a ligação no plano 6 é o avatar no trilho 1 = quem criou a party no lobby (só visual: não há líder na run, DEC-067). Os outros ficam ao lado olhando o panfleto |
-| Tom da intro | inocente, sem pista de horror **[DEC-008]** |
+| Reconexão / atrasado | quem **já estava** na cutscene e reconecta entra no ponto atual, já no trilho do seu avatar; o atrasado que nunca entrou spawna normalmente (FEAT-001, DEC-309); quem conecta depois não revê **[DEC-098]** |
+| (removido) | linha da intro retirada (DEC-309) |
+| (removido) | linha da intro retirada (DEC-309) |
 
 - Dados: `Cutscenes` (id, segmentos, duração máx., pulável, limiar de voto = 0,5).
 - Critérios de aceite:
   - Solo: hold 1 s pula a cutscene na hora.
   - Party de 4: 1 voto não pula; 2 votos pulam para todos ao mesmo tempo.
   - Party de 3 com 1 desconectado durante a cutscene: o limiar cai de 2 para 1 sem reiniciar a cutscene.
-  - Day(1) começa no máximo 70 s após o fim do teleporte (Provisório, era 50 s).
-  - A intro não mostra nenhum elemento sobrenatural.
   - Nenhuma transição, sequência de ambulância nem ligação oferece "Skip".
   - Party de 4: cada jogador vê os outros 3 avatares na cena e não vê o próprio corpo; a câmera é a do próprio avatar.
 
@@ -786,7 +784,7 @@ DEC-106, DEC-107, DEC-129 seguem; o que está aqui é apresentação + quando a 
 | S1 vazio / com item / vendido | vazio: pedestal sem mini, placa "Nothing special today" · com item: mini do Rescue Whistle (ITM-021) flutuando, moldura e anel **Mustard** + lâmpada Neon + `VFX_Rare` · vendido: mini some, placa "Sold out" até o fim do turno (FEAT-035) |
 | Compra | prompt na frente da mini; "Buy {upgrade} — ${preço}", **hold 1,5 s**, Radius 7; o alvo é o prompt mais perto do centro da tela (`PromptController`) |
 | Porta aberta | fases `Prep`, `Open`, `Closing`, `Night`, `NightEnd` |
-| Porta fechada | fases `Summary`, `Call`, `NightLost`, `Resume`, `Intro`, `Finale`, `RunEnd`. Prompts dos pedestais desligados; o servidor recusa compra com a porta fechada (inclusive hold que termina no instante da troca de fase) |
+| Porta fechada | fases `Summary`, `Call`, `NightLost`, `Resume`, `Finale`, `RunEnd`. Prompts dos pedestais desligados; o servidor recusa compra com a porta fechada (inclusive hold que termina no instante da troca de fase) |
 | Troca por turno | a porta desce no `Summary`; o S1 é sorteado no início do `Prep` (FEAT-035); a porta sobe já com a oferta nova. Noite perdida/retomada: desce no `NightLost`, sobe no `Prep` com **a mesma** oferta (snapshot) |
 | Animação da porta | 3 portas (L, C, R); **desce em 2,0 s**, **sobe em 1,6 s**; defasagem **0,25 s** entre portas (L → C → R); só client, derivada da fase (zero rede nova); quem chega no meio vê o estado final |
 | À noite | **aberta** (DEC-049; o S1 só existe depois do trailer, então quase todo uso dele é à noite; e o trailer recompra upgrades do nível 1, DEC-184) |
@@ -864,7 +862,7 @@ Comparação (orçamento do client, por quadro, com o jogador dentro do Mart):
 
 | Regra | Valor |
 |---|---|
-| Como toca | telefone **fixo** do veículo (carrinho de dia, trailer à noite) toca (som + luz) **[DEC-124]**; o celular flip só aparece na intro; qualquer jogador atende com toque "Answer"; atende sozinho após 15 s |
+| Como toca | telefone **fixo** do veículo (carrinho de dia, trailer à noite) toca (som + luz) **[DEC-124]**; qualquer jogador atende com toque "Answer"; atende sozinho após 15 s |
 | Quem ouve | todos da party (viva-voz), com legenda; jogador longe ouve mais baixo, mas a legenda é igual |
 | Ritmo | **servidor** avança as linhas: 2,5 s por linha, igual para todos; sem avanço por toque (ninguém pula linha de regra sem querer, nem pela party) |
 | Repetir | **impossível** **[DEC-025: memorizar]**: o telefone não tem prompt de rediscar/reouvir; não existe histórico de legendas; ligação não é cutscene e não tem "Skip" |

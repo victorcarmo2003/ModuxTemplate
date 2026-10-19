@@ -32,8 +32,6 @@
 --                                (server clock) for VitalService:SetKnocked; nil = not knocked. The owner's client
 --                                already predicted it (TrafficController) and owns the physics: the server only flips
 --                                the joints (everyone sees them) and PlatformStand; GettingUp is the client's
---   CanSpawn in Intro            members connected when the Intro starts are its participants; anyone else waits
---                                and spawns when the Intro ends, straight at work, no cutscene (DEC-205)
 local CollectionService = game:GetService("CollectionService")
 local PhysicsService = game:GetService("PhysicsService")
 local Players = game:GetService("Players")
@@ -97,8 +95,6 @@ function CharacterService:Setup()
 	self.Fainted = setmetatable({}, { __mode = "k" }) :: any
 	-- characters knocked down by a car (the token tells a stale timer from the current knock)
 	self.Knocked = setmetatable({}, { __mode = "k" }) :: any
-	-- UserIds taking part in the running Intro (DEC-205); nil outside the Intro
-	self.IntroParticipants = nil :: { [number]: boolean }?
 end
 
 -- Collision groups (T26, DEC-175) ----------------------------------------------------------------------------------
@@ -142,9 +138,7 @@ function CharacterService:CanSpawn(player: Player): boolean
 	if member == nil or member.State ~= "Active" then
 		return false
 	end
-	-- late member during the Intro: waits for its end (DEC-205, architecture.md §19.16)
-	const participants = self.IntroParticipants
-	return participants == nil or participants[player.UserId] == true
+	return true
 end
 
 -- Live crew character of the player, or nil.
@@ -618,34 +612,6 @@ function CharacterService:Knock(player: Player, seconds: number, impulse: Vector
 	return knock.Until
 end
 
--- Intro participants (DEC-205; architecture.md §19.16) ---------------------------------------------------------------
-
--- Intro starts: members connected now (not Away) are its participants. Intro ends: whoever waited spawns.
-function CharacterService:OnPhaseChanged(phase: string)
-	if phase == "Intro" then
-		const participants: { [number]: boolean } = {}
-		for userId, member in self.Dependencies.RunStateService.Members() do
-			if member.State ~= "Away" and Players:GetPlayerByUserId(userId) ~= nil then
-				participants[userId] = true
-			end
-		end
-		self.IntroParticipants = participants
-		return
-	end
-	if self.IntroParticipants == nil then
-		return
-	end
-	self.IntroParticipants = nil
-	for _, player in Players:GetPlayers() do
-		if player.Character ~= nil or self.Spawning[player] or table.find(self.Queue, player) ~= nil then
-			continue
-		end
-		if self:CanSpawn(player) then
-			self:Enqueue(player)
-		end
-	end
-end
-
 -- Body goes away (PickupHandler fallback after Revive.BodyFallback, T54; AmbulanceService on Load, wave 4).
 -- Fades unless instant; the player stays without a character until someone spawns it.
 function CharacterService:RemoveBody(player: Player, instant: boolean?)
@@ -818,9 +784,6 @@ CharacterService:OnInit(function(self)
 	-- RoundService (750) ran its Setup before this OnInit (§19.0 rule 2)
 	self.Dependencies.RoundService.ShiftStarted:Connect(function(info)
 		self:OnShiftStarted(info)
-	end)
-	self.Dependencies.RoundService.PhaseChanged:Connect(function(phase)
-		self:OnPhaseChanged(phase)
 	end)
 end)
 

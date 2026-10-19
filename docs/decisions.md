@@ -4058,3 +4058,10 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
   - **Q-390 A:** o minigame da esteira (DEC-302) e o preparo focado saem. O hot dog é montado no mundo, como na DEC-306: salsichas fritas empilhadas no descanso, pães cortados empilhados na bandeja, prato na mão (pão + salsicha), condimentos na mesa de condimentos, servir. A nota continua no `Grade` e o ticket continua.
   - **Q-395 A:** a **Gear Stand** (bancada de upgrades B1..B5) e a **Opal** ficam no restaurante; só as prateleiras do Mercado (`BUY-*`, `buy_package`) saem.
 - Emendas (append-only): **DEC-302**, **DEC-303** (passa e mesa central da esteira), **DEC-304** (o prato nasce na mesa central), **DEC-305** (dois prompts grelha/esteira) e **DEC-223** (preparo focado) deixam de valer no que conflita com a montagem no mundo. Contrato novo: TASK-566.
+
+### DEC-309 — 2026-10-19 — A cutscene introdutória sai: a run nova entra direto na primeira fase do turno
+
+- Origem: pedido do dono em chat (2026-10-19): "Vamos remover a cutscene introdutória do jogo". Registrado pelo agente de implementação no formato do secretário.
+- Decidido pelo dono: a cena `intro` e a fase de rodada `Intro` saem. Uma run nova entra direto na primeira fase do turno: **Noite 1, ligação do chefe** (`Call`; DEC-300 segue valendo para o início à noite) ou, com `RunStartsAtNight = false`, `Prep` do dia. O motor de cutscene continua para o **finale** e os **créditos** (DEC-075, DEC-076).
+- Emendas (append-only): **DEC-021** (introdução por cutscene: não há mais), **DEC-078** e **DEC-088** (só a parte da cutscene de abertura; valem para finale e créditos), **DEC-205** (membro atrasado não espera mais fim de abertura: spawna normalmente), **DEC-225** (abertura curta: removida) e **DEC-300** (só a parte da abertura/queda da noite na cutscene; o início à noite fica).
+- Impacto: **architect**, **backend-coder** (Round, Cutscene, Character), **frontend-coder** (Loading, Stage, Hud), **narrative-writer** (`story/script.md` §1), **level-designer** (MAP-01 §11.1), **qa-tester**.

@@ -5,9 +5,9 @@
 	ProgressBar, DrawerValue, BenchCard, OrderBubble, ReactionBubble).
 
 	Cinematic = in the Run place and any of:
-	  * no Shift record yet (the first frames of a run, before the intro starts), for at most WAIT_LIMIT s;
-	  * Shift.Phase is Intro or Finale (the phases that own a cutscene chain, Content.Shift);
-	  * the Cutscene set plays a scene (CutsceneController.SceneKey ~= "none": intro, finale, credits).
+	  * no Shift record yet (the first frames of a run, before the first phase), for at most WAIT_LIMIT s;
+	  * Shift.Phase is Finale (the phase that owns a cutscene chain, Content.Shift);
+	  * the Cutscene set plays a scene (CutsceneController.SceneKey ~= "none": finale, credits).
 	The lobby never has a cinematic.
 
 	PROVISIONAL: reads CutsceneController.SceneKey (the Vide source it already fills from the Cutscene set), since the
@@ -21,7 +21,7 @@ local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Cinematic = require(StarterPlayer.StarterPlayerScripts.client.Interface.Cinematic)
 
 const NONE = "none"
-const CINEMATIC_PHASES: { [string]: boolean } = { Intro = true, Finale = true }
+const CINEMATIC_PHASES: { [string]: boolean } = { Finale = true }
 -- s without a Shift record before the HUD shows anyway (a run that never writes the record must not stay blank)
 const WAIT_LIMIT = 15
 

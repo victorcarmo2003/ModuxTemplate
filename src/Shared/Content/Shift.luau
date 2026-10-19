@@ -42,21 +42,6 @@ end
 const base = Table.new({
 	-- Resume wait after a reconnect (DEC-080); = RunParams.ResumeWait (architect). Clock held.
 	{ Key = "Resume", Duration = 15, ClockFrom = 0, ClockTo = 0, Kind = "Any", Selling = false, SkipWithoutProbe = false },
-	-- Intro cutscene, first shift of a new run only (FEAT-004; PROVISIONAL frontend-coder 2026-10-12, owner D3: short
-	-- intro, was 108 s; D3 rev. 2: 35 s; DEC-300: 29 s). Cap 64 s = the wait for every participant's ClientReady
-	-- (Cutscenes.Rules.ReadyTimeout 30 s) + the intro Cap (32 s) + 2 s margin (Validate); the probe ends it once the chain is
-	-- over. Clock stopped at 7:00 AM; on a run that starts at night (RunStartsAtNight, DEC-300) the intro opens Night 1
-	-- and the clock stands at 7:00 PM.
-	{
-		Key = "Intro",
-		Duration = 64,
-		ClockFrom = hours(7),
-		ClockTo = hours(7),
-		Kind = "Any",
-		Selling = false,
-		SkipWithoutProbe = true,
-		Night = { Duration = 64, ClockFrom = hours(19), ClockTo = hours(19) },
-	},
 	-- Day shortened (user playtest 2026-10-11, PROVISIONAL Q-200): day turn ~7.7 min -> ~4.6 min (Prep 60 -> 30 s,
 	-- Open 360 -> 216 s, Closing 30 -> 20 s, Summary 15 -> 8 s; night shift: Summary 20 -> 10 s).
 	-- Prep: 7:00 -> 8:00 AM, up to 30 s; "Open Shop" ends it early (DEC-048, FEAT-003). Night: 7 -> 8 PM, 90 s.
@@ -143,9 +128,8 @@ return Table.with(base, {
 	-- Back door of the trailer (user request 2026-10-12, Provisional): false = the prompt opens / closes the leaf and the
 	-- player walks through; true = the old fade + teleport (Exit / Enter Trailer).
 	TrailerDoorTeleport = false,
-	-- A new run skips the day shift (owner 2026-10-18, DEC-300): it opens on Night 1 (Day 2) with the intro cutscene, which
-	-- ends looking at the restaurant while the night falls; the game fades in inside it, at night. false = the old Day 1
-	-- (day shift + tutorial) first.
+	-- A new run skips the day shift (owner 2026-10-18, DEC-300): it opens straight on Night 1 (Day 2), with the boss call
+	-- (the intro cutscene was removed, DEC-309). false = the old Day 1 (day shift + tutorial) first.
 	RunStartsAtNight = true,
 	ClockStepMinutes = 5, -- HUD updates every 5 game minutes (1.8 s real on day) (DEC-048; user request 2026-10-11, was 10)
 })

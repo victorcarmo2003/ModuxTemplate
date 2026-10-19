@@ -10,7 +10,6 @@
 -- (§19.22, TASK-048): problem in Studio = error (loud), published = warn. Provisional (TASK-048): while the binding of
 -- the configured wave is still being authored (TASK-083), a place that passes the previous wave only warns, so the
 -- other wave 2 tasks keep play-testing; a place that fails the previous wave too is an error as before.
-local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -84,11 +83,6 @@ function PlaceService:ValidateMap()
 	const seats = MapIndex.SeatingNotes(MapIndex.Required.ForWave(wave))
 	if #seats > 0 then
 		warn(`[PlaceService] Pad tables binding has {#seats} problem(s):\n  {table.concat(seats, "\n  ")}`)
-	end
-	-- the cutscene's NO HELP WANTED stop falls back to Rules.Sign.Fallback without a tagged sign: a note, not a problem
-	const signTag = Content.Cutscenes.Rules.Sign.Tag
-	if #CollectionService:GetTagged(signTag) == 0 then
-		soft(self, "intro sign", { `no instance tagged {signTag}: the intro stops at MapPoint {Content.Cutscenes.Rules.Sign.Fallback}` })
 	end
 	const problems, spacing = split(MapIndex.Validate(MapIndex.Required.ForWave(wave)))
 	if #spacing > 0 then

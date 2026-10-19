@@ -99,7 +99,7 @@ type Phone = {
 }
 
 const BossController =
-	Modux.Controller("BossController", { Require = { "RoundController", "AudioController" }, Priority = 660 })
+	Modux.Controller("BossController", { Require = { "RoundController", "AudioController", "ObjectiveController" }, Priority = 660 })
 
 function BossController:Setup()
 	self.State = Vide.source("Idle") :: Vide.Source<string>
@@ -115,6 +115,7 @@ function BossController:Setup()
 	self.LineIndex = 0 :: number
 	self.LampOn = false :: boolean
 	self.Phone = nil :: Phone?
+	self.PhoneGuided = nil :: Instance? -- the phone marked by GuidePhone (nil = no mark of ours)
 	self.Vehicle = nil :: Instance?
 	self.VehicleConnections = {} :: { RBXScriptConnection }
 	self.RippleGui = nil :: BillboardGui?
@@ -356,6 +357,26 @@ function BossController:Refresh()
 	self:SetRing(ringing)
 	if ringing then
 		self.RippleAt(now)
+	end
+	self:GuidePhone(ringing)
+end
+
+-- Ringing: the arrow + highlight of the objective point at the phone until somebody answers (owner 2026-10-19: "setas
+-- me guiando para atender o telefone"). Cleared only if the mark is still ours (another objective may have taken it).
+function BossController:GuidePhone(ringing: boolean)
+	const objective = self.Dependencies.ObjectiveController
+	const phone = self.Phone
+	const target = if phone then phone.Model else nil
+	if ringing and target ~= nil then
+		if self.PhoneGuided ~= target then
+			self.PhoneGuided = target
+			objective:Mark(target)
+		end
+	elseif self.PhoneGuided ~= nil then
+		if objective.Beacon.Marked() == self.PhoneGuided then
+			objective:Clear()
+		end
+		self.PhoneGuided = nil
 	end
 end
 

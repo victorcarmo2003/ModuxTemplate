@@ -87,7 +87,6 @@ export type Public = {
 	ClearSegment: (self: Public) -> (),
 	VoiceVolume: (self: Public) -> number,
 	SpeechOf: (self: Public) -> Speech.Speech,
-	PreloadVoices: (self: Public, timeout: number, progress: ((number) -> ())?) -> (),
 	BeginChain: (self: Public) -> (),
 	EndChain: (self: Public) -> (),
 	BeginSegment: (self: Public, key: string, startedAt: number) -> (),

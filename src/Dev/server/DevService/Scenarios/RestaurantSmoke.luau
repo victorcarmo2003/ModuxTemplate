@@ -4,7 +4,7 @@
 -- `/dev smoke restaurant`). Every world action goes through InteractionService:Drain, the same server path as a
 -- prompt (range, PromptEnabled, gates, the owner's Validate and Run): the player's character is moved next to each
 -- anchor first. Steps, PASS / FAIL each (a FAIL skips the rest, they depend on it):
---   setup        intro skip, day 2 (no tutorial), ordinary arrivals off, Prep -> Open, plates cleared, stock filled,
+--   setup        day 2 (no tutorial), ordinary arrivals off, Prep -> Open, plates cleared, stock filled,
 --                kitchen items of the player's hotbar removed
 --   customer     DevSpawn, someone in Ordering at Q1 (30 s)
 --   tablet       tablet_take on TAB-1 -> Talking -> the customer is Waiting (talk + 5 s)
@@ -192,7 +192,6 @@ local function run(api: Api.Context, dev: Dev, caller: Player?): string
 			Name = "setup",
 			Run = function(): string?
 				home = root().CFrame
-				pcall(dev, "tutorial", "intro") -- refused when no intro is playing
 				task.wait(0.5)
 				dev("day", "2")
 				task.wait(1)
