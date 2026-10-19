@@ -259,13 +259,20 @@ local function run(api: Api.Context, dev: Dev, caller: Player?): string
 				if tablet == nil or tablet.Anchor == nil then
 					error("TAB-1 not bound", 0)
 				end
-				-- the customer may still be walking up at Q1: the tablet only takes an Ordering head
+				-- the customer may still be walking up at Q1: the tablet only takes an Ordering head, and its prompt turns on
+				-- with TabletService's next Step (a tap before that is refused "state")
+				const anchor = tablet.Anchor :: Instance
 				waitFor(function(): boolean
-					return customerState() == "Ordering"
+					return customerState() == "Ordering" and anchor:GetAttribute("PromptEnabled") == true
 				end, 10)
-				act(tablet.Anchor, "tablet_take")
+				act(anchor, "tablet_take")
 				if tablet.State ~= "Talking" or tablet.Npc ~= npc then
-					error(`tablet {tablet.State} with {tablet.Npc} after tablet_take{why()}`, 0)
+					-- why the tablet refused, from the same checks (TabletService:Check / CustomerService:CanActOn)
+					const ok, notice = tablets:Check(player, tablet)
+					error(
+						`tablet {tablet.State} with {tablet.Npc} after tablet_take{why()}; prompt {tostring(anchor:GetAttribute("PromptEnabled"))}, check {tostring(ok)} {notice or ""}, can act {tostring(customers:CanActOn(player, npc, "Ordering"))}, front {tostring(customers:Front())}, drawer {tostring(economy:IsDrawerOpen())}`,
+						0
+					)
 				end
 				const talk = tablet.EndsAt - tablet.StartedAt
 				const waited1 = waitFor(function(): boolean
@@ -316,38 +323,65 @@ local function run(api: Api.Context, dev: Dev, caller: Player?): string
 			Run = function(): string?
 				equip(plateTool :: Tool)
 				act(cookAnchor("Grill"), "cook_focus")
-				kitchen.Cook.Act(player, { Act = "Place", Slot = 1, Score = 0 })
 				const grill = kitchen.Cook.Target("Grill")
 				const id = if grill then grill:GetAttribute("StationId") else nil
+				const station = if type(id) == "number" then kitchen.Stations[id] else nil
+				if station == nil then
+					error("no grill station bound", 0)
+				end
+				-- the lowest free place (a sausage of an earlier run never burns and keeps its place); none free but one Ready:
+				-- that one goes onto the plate
+				local slot = 0
+				local readySlot = 0
+				const slots: { number } = {}
+				for index in station.Records do
+					table.insert(slots, index)
+				end
+				table.sort(slots)
+				for _, index in slots do
+					const value = station.Records[index]
+					if slot == 0 and value.State == "Empty" then
+						slot = index
+					elseif readySlot == 0 and value.State == "Ready" then
+						readySlot = index
+					end
+				end
+				if slot == 0 and readySlot == 0 then
+					error(`no free or ready place on the grill ({#slots} active)`, 0)
+				end
 				local record: any = nil
 				local function state(value: any): string
 					return if value ~= nil then tostring(value.State) else "none"
 				end
 				local function read(): any
-					const station = if type(id) == "number" then kitchen.Stations[id] else nil
-					return if station then station.Records[1] else nil
+					return station.Records[if slot ~= 0 then slot else readySlot]
 				end
 				local function isWorking(): boolean
 					record = read()
 					return state(record) == "Working"
 				end
-				if not waitFor(isWorking, 3) then
-					error(`slot 1 not cooking after Place{why()}`, 0)
+				if slot ~= 0 then
+					const stock = kitchen:GetStock("sausage")
+					kitchen.Cook.Act(player, { Act = "Place", Slot = slot, Score = 0 })
+					if not waitFor(isWorking, 3) then
+						error(`place {slot} is {state(read())} after Place (sausage stock {stock}){why()}`, 0)
+					end
+					const window = Content.Restaurant.Grill
+					waitFor(function(): boolean
+						const now = workspace:GetServerTimeNow()
+						return (now - record.StartedAt) / record.Duration >= (window.FlipFrom + window.FlipTo) / 2
+					end, 20)
+					kitchen.Cook.Act(player, { Act = "Flip", Slot = slot, Score = 0 })
 				end
-				const window = Content.Restaurant.Grill
-				waitFor(function(): boolean
-					const now = workspace:GetServerTimeNow()
-					return (now - record.StartedAt) / record.Duration >= (window.FlipFrom + window.FlipTo) / 2
-				end, 20)
-				kitchen.Cook.Act(player, { Act = "Flip", Slot = 1, Score = 0 })
+				const used = if slot ~= 0 then slot else readySlot
 				local function isReady(): boolean
 					record = read()
 					return state(record) == "Ready"
 				end
 				if not waitFor(isReady, 20) then
-					error(`slot 1 not Ready{why()}`, 0)
+					error(`place {used} not Ready{why()}`, 0)
 				end
-				kitchen.Cook.Act(player, { Act = "Dog", Slot = 1, Score = 90 })
+				kitchen.Cook.Act(player, { Act = "Dog", Slot = used, Score = 90 })
 				task.wait(0.3)
 				const tool = toolOf("hot_dog")
 				if tool == nil then
