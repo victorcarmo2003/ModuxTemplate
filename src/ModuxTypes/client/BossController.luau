@@ -57,7 +57,7 @@ export type Public = {
 	PrepareCall: (self: Public, key: string, night: number) -> (),
 	PrepareUpcoming: (self: Public) -> (),
 	WarnSilent: (self: Public, line: Content.CutsceneBeat) -> (),
-	Speak: (self: Public, text: string) -> (),
+	Speak: (self: Public, text: string, speaker: string?) -> (),
 	Quiet: (self: Public) -> (),
 	Night: (self: Public) -> number,
 	Apply: (self: Public, record: Record) -> (),

@@ -8,7 +8,6 @@ local Flow = require(ServerScriptService.server.Round.RoundService.Flow)
 
 export type Phase =
 	"Resume"
-	| "Intro"
 	| "Prep"
 	| "Open"
 	| "Closing"
