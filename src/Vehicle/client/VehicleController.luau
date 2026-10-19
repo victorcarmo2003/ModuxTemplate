@@ -347,6 +347,20 @@ function VehicleController:WantClosed(model: Model): boolean
 	return not row.Selling
 end
 
+-- The vehicle's window is worked by a wall lever (a shutter_toggle anchor whose model holds a `Lever` part)
+local function hasLever(model: Model): boolean
+	for _, d in model:GetDescendants() do
+		if d:GetAttribute("PromptAction") == "shutter_toggle" then
+			const holder = d.Parent
+			const owner = if holder then holder.Parent else nil
+			if owner ~= nil and owner:FindFirstChild("Lever") ~= nil then
+				return true
+			end
+		end
+	end
+	return false
+end
+
 function VehicleController:PoseShutter(shutter: Shutter)
 	const pose = shutterPose(shutter, shutter.Angle)
 	if not samePose(shutter.Part.CFrame, pose) then
@@ -372,7 +386,8 @@ function VehicleController:SwingShutter(shutter: Shutter)
 
 	const sound = if isClosed then SOUND_CLOSE else SOUND_OPEN
 	const audio = self.Dependencies.AudioController
-	if shutter.Part.Name == PANEL_NAME or not isPanel(shutter.Part) then
+	-- a wall lever (Box + Lever) clicks on its own in SwitchLeverController: one click, not two (owner 2026-10-18)
+	if (shutter.Part.Name == PANEL_NAME or not isPanel(shutter.Part)) and not hasLever(shutter.Model) then
 		audio:Play(SOUND_BUTTON, shutter.Hinge.WorldPosition)
 	end
 	if Content.Sounds.ByKey[sound] ~= nil then

@@ -10,15 +10,15 @@ local RunService = game:GetService("RunService")
 type Bank = { Rate: number, Size: { number }, Lifetime: { number }, Speed: { number }, Peak: number }
 
 const FOG_AREA = 170
-const FOG_HEIGHT = 1.2
+const FOG_HEIGHT = 1.5
 const FOG_FOLLOW = 0.25
 const FADE = 6
 const TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
-const COLOR = Color3.fromHex("#8E97B4")
+const COLOR = Color3.fromHex("#9AA3C0") -- owner 2026-10-18 2nd pass: exactly the Hush banks (Effects/ANM-010)
 const GROUND_Y = 0.4 -- street level of MAP-01 (the patio is 0.45)
 const BANKS: { Bank } = {
-	{ Rate = 5, Size = { 16, 26 }, Lifetime = { 9, 12 }, Speed = { 0.4, 1 }, Peak = 0.76 },
-	{ Rate = 3, Size = { 8, 12 }, Lifetime = { 6, 8 }, Speed = { 0.2, 0.6 }, Peak = 0.68 },
+	{ Rate = 6, Size = { 16, 26 }, Lifetime = { 9, 12 }, Speed = { 0.4, 1 }, Peak = 0.72 },
+	{ Rate = 4, Size = { 8, 12 }, Lifetime = { 6, 8 }, Speed = { 0.2, 0.6 }, Peak = 0.62 },
 }
 
 local function emitter(bank: Bank): ParticleEmitter

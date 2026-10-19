@@ -78,8 +78,9 @@ local Menu = require(script.Menu)
 const TAG = "Interactable"
 const TICK_RATE = 10
 const MAX_SCREEN_DISTANCE_FRACTION = 0.35
-const SIGHT_STEPS = 4 -- see-through parts skipped before giving up (counts as visible)
+const SIGHT_STEPS = 8 -- see-through / small parts skipped before giving up (counts as visible)
 const SIGHT_SEE_THROUGH = 0.9 -- a part at least this transparent never blocks a prompt
+const SIGHT_MIN_SIZE = 2.5 -- studs: a part whose largest side is under this (tablet, cups, bottles) never blocks a prompt
 const HYSTERESIS_MARGIN_FRACTION = 0.05
 const BIND_NAME = "Interact"
 -- Client-side floor between two Interact (network.md §4.1: <= 8/s); the server drops the excess anyway.
@@ -188,8 +189,9 @@ end
 -- The one prompt Single mode shows among `candidates` (screen point and character distance of each), with hysteresis on
 -- the current target; never switches during a hold
 -- Line of sight from the camera to the anchor (owner 2026-10-18: the breaker could be held through the wall). A hit on
--- the anchor's own Model (the appliance / panel it belongs to), on the character or on a see-through part (Transparency
--- >= SIGHT_SEE_THROUGH, invisible zones and markers) does not block; anything else solid between them does.
+-- the anchor's own Model (the appliance / panel it belongs to), on the character, on a see-through part (Transparency
+-- >= SIGHT_SEE_THROUGH, invisible zones and markers) or on a small prop (largest side < SIGHT_MIN_SIZE: the counter
+-- tablet hid the customer's prompt, owner 2026-10-18) does not block; anything else solid between them does.
 function PromptController:InSight(anchor: Instance, position: Vector3, from: Vector3, character: Model): boolean
 	const own = anchor:FindFirstAncestorWhichIsA("Model")
 	const ignore: { Instance } = { character }
@@ -212,7 +214,11 @@ function PromptController:InSight(anchor: Instance, position: Vector3, from: Vec
 			return true
 		end
 		const part = hit.Instance
-		if part:IsA("BasePart") and part.Transparency < SIGHT_SEE_THROUGH then
+		if
+			part:IsA("BasePart")
+			and part.Transparency < SIGHT_SEE_THROUGH
+			and math.max(part.Size.X, part.Size.Y, part.Size.Z) >= SIGHT_MIN_SIZE
+		then
 			return false
 		end
 		table.insert(ignore, part)

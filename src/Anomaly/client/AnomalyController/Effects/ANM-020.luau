@@ -662,6 +662,7 @@ return {
 			ctx.Play("neon_click")
 		elseif cue.Cue == "blackout_warn" then
 			flicker(ctx)
+			ctx.Play("light_flicker") -- owner 2026-10-18: every light flicker has its sound
 		elseif cue.Cue == "blackout_restore" then
 			const session = current
 			if session ~= nil then

@@ -62,6 +62,18 @@ export type BlackoutLook = {
 	KeepMapIds: { string },
 }
 
+-- Kitchen switch off at night (owner 2026-10-18: "quando apagar as luzes, quero que fique totalmente escuro";
+-- PROVISIONAL until a DEC). LightController blends the indoor Lighting fields to these over FadeIn s while the
+-- trailer_interior group is off at night (switch, Hush) and back over FadeOut s; every kitchen / pantry lamp goes off
+-- with the group. OutdoorAmbient is untouched, so the street through the window keeps its night.
+export type SwitchOffLook = {
+	Ambient: Color3,
+	EnvDiffuse: number, -- Lighting.EnvironmentDiffuseScale
+	EnvSpecular: number, -- Lighting.EnvironmentSpecularScale
+	FadeIn: number, -- s
+	FadeOut: number, -- s
+}
+
 export type LightPresets = {
 	Day: LightPreset,
 	Golden: LightPreset,
@@ -76,6 +88,7 @@ export type LightPresets = {
 	DuskClock: number, -- ClockTime of the intro's day look on a night shift; its Nightfall runs the sun down from here (DEC-300)
 	BlendTime: number, -- s of the smooth (eased) blend between two presets
 	Blackout: BlackoutLook,
+	SwitchOff: SwitchOffLook,
 }
 
 local Table = require(script.Parent.Table)
@@ -154,11 +167,13 @@ const presets: LightPresets = {
 		EnvDiffuse = 0.6,
 		EnvSpecular = 0.8,
 		ShadowSoftness = 0.2,
-		AtmDensity = 0.5, -- owner 2026-10-18: a light fog on the street (was 0.38)
+		-- owner 2026-10-18 (2nd pass, print of Night 5): the thick blue-grey fog of the Hush (Effects/ANM-010 at full) is the
+		-- default night air: its density cap, haze cap and 60% of its #3A4060 colour (was 0.5 / 2.4 / (34, 38, 56)).
+		AtmDensity = 0.72,
 		AtmOffset = 1,
 		AtmGlare = 0,
-		AtmHaze = 2.4, -- owner 2026-10-18: the street fading into mist (was 1.5; TASK-455 was 1.2)
-		AtmColor = Color3.fromRGB(34, 38, 56), -- dark blue night air, a touch lighter so the fog reads (was 24, 28, 46)
+		AtmHaze = 3.5,
+		AtmColor = Color3.fromRGB(48, 54, 80),
 		AtmDecay = Color3.fromRGB(18, 20, 36),
 		CCBrightness = -0.02,
 		Saturation = -0.2,
@@ -180,11 +195,11 @@ const presets: LightPresets = {
 		EnvDiffuse = 0.6,
 		EnvSpecular = 0.8,
 		ShadowSoftness = 0.2,
-		AtmDensity = 0.58, -- owner 2026-10-18: thicker fog by the last night (was 0.45)
+		AtmDensity = 0.72, -- owner 2026-10-18 2nd pass: the Hush fog (was 0.58)
 		AtmOffset = 1,
 		AtmGlare = 0,
-		AtmHaze = 3, -- owner 2026-10-18 (was 2.2; TASK-455 was 1.8)
-		AtmColor = Color3.fromRGB(30, 32, 50), -- (was 20, 22, 40)
+		AtmHaze = 3.5, -- (was 3)
+		AtmColor = Color3.fromRGB(47, 51, 78), -- (was 30, 32, 50)
 		AtmDecay = Color3.fromRGB(14, 14, 28),
 		CCBrightness = -0.03,
 		Saturation = -0.28,
@@ -279,6 +294,13 @@ const presets: LightPresets = {
 		FlameName = "Flame",
 		KeepNames = { "Emergency" },
 		KeepMapIds = { "EMERG-P" },
+	},
+	SwitchOff = {
+		Ambient = Color3.fromRGB(4, 4, 7),
+		EnvDiffuse = 0,
+		EnvSpecular = 0.08,
+		FadeIn = 0.12,
+		FadeOut = 0.35,
 	},
 }
 

@@ -37,7 +37,7 @@ const rules: Rules = {
 
 const base = Table.new({
 	-- < 60
-	{ Key = "fake_call", MaxSanity = 60, FamilyD = true, Effect = "FakeCall", Cooldown = 180, Weight = 1 }, -- rings, "Walt: ..."
+	{ Key = "fake_call", MaxSanity = 60, FamilyD = true, Effect = "FakeCall", Cooldown = 600, Weight = 0.25 }, -- owner 2026-10-18: phone_glitch too often (was 180 / 1) -- rings, "Walt: ..."
 	{ Key = "grill_hiss", MaxSanity = 60, FamilyD = true, Effect = "GrillHiss", Cooldown = 90, Weight = 1 }, -- empty grill sizzle
 	{ Key = "bottle_fall", MaxSanity = 60, FamilyD = true, Effect = "BottleFall", Cooldown = 150, Weight = 1 }, -- ketchup tips over
 	-- < 40
@@ -45,7 +45,7 @@ const base = Table.new({
 	{ Key = "roof_knock", MaxSanity = 40, FamilyD = true, Effect = "RoofKnock", Cooldown = 120, Weight = 1 }, -- 3 knocks on the roof
 	{ Key = "ghost_customer", MaxSanity = 40, FamilyD = true, Effect = "GhostCustomer", Cooldown = 120, Weight = 1 }, -- gone on 2nd look
 	{ Key = "post_flicker", MaxSanity = 40, FamilyD = true, Effect = "PostFlicker", Cooldown = 120, Weight = 1 }, -- no buzz (DEC-123)
-	{ Key = "radio_voice", MaxSanity = 40, FamilyD = true, Effect = "RadioVoice", Cooldown = 180, Weight = 1 }, -- static + one line
+	{ Key = "radio_voice", MaxSanity = 40, FamilyD = true, Effect = "RadioVoice", Cooldown = 600, Weight = 0.25 }, -- owner 2026-10-18: phone_glitch too often (was 180 / 1) -- static + one line
 	{ Key = "street_watcher", MaxSanity = 40, FamilyD = true, Effect = "StreetWatcher", Cooldown = 150, Weight = 1 }, -- far, staring
 	-- < 20
 	{ Key = "whisper", MaxSanity = 20, FamilyD = true, Effect = "Whisper", Cooldown = 120, Weight = 1 }, -- "Rookie..."

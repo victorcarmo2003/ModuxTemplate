@@ -9,6 +9,7 @@ export type Public = {
 	EnsureAnchor: (self: Public) -> Attachment?,
 	Open: (self: Public, player: Player) -> (),
 	Release: (self: Public, player: Player, gone: boolean?) -> (),
+	InSight: (self: Public, player: Player, anchor: Instance) -> boolean,
 	Register: (self: Public) -> (),
 }
 

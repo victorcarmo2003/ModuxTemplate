@@ -69,6 +69,7 @@ export type Public = {
 	NewFixture: (self: Public, group: string, root: Instance, order: number) -> Fixture,
 	Add: (self: Public, fixture: Fixture) -> (),
 	Rescan: (self: Public) -> (),
+	AddRoomLights: (self: Public, interiorGroups: { [string]: string }) -> (),
 	IsPanel: (self: Public, part: BasePart) -> boolean,
 	FallbackLight: (self: Public) -> PointLight,
 	EnsureFallbacks: (self: Public) -> (),

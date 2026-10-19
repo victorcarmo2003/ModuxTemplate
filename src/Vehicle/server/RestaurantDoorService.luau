@@ -4,8 +4,9 @@
 --
 -- Doors: every Model tagged AutoDoor whose MapId is in Content.Restaurant.ManualDoors (DOOR-B, the pantry's exit). At
 -- start the Model gets DoorManual = true and DoorOpen = false: the client DoorController stops opening it by proximity and
--- follows DoorOpen. Two prompt anchors (Attachments on the leaf's frame, one per side, PromptAction door_toggle) open
--- and close it. While open the server copy of the leaf does not collide (customers and players walk through).
+-- follows DoorOpen. One prompt anchor (an Attachment in the leaf's plane at handle height, PromptAction door_toggle,
+-- reached from both sides; owner 2026-10-18: "na porta tem dois proximity prompts", there used to be one per face) opens
+-- and closes it. While open the server copy of the leaf does not collide (customers and players walk through).
 -- Lock (anomalies): SetLocked(reason, on) - while any reason holds, the door closes at once, the prompt reads "Locked"
 -- and pressing it does nothing but fire Tried. Several reasons stack (as TrailerDoorService:SetLocked).
 -- Signals: Opened(player, mapId), Closed(player?, mapId), Tried(player, mapId) (pressed while locked). Readers: the
@@ -33,7 +34,6 @@ const ACTION = "door_toggle"
 const OPEN_TEXT = "Open Door"
 const CLOSE_TEXT = "Close Door"
 const LOCKED_TEXT = "Locked"
-const SIDE_OUT = 1.1 -- studs from the leaf plane to each prompt anchor
 const HANDLE_Y = 3.6 -- studs above the leaf bottom
 
 const RestaurantDoorService = Modux.Service("RestaurantDoorService", {
@@ -162,8 +162,8 @@ function RestaurantDoorService:Bind(model: Instance)
 		return
 	end
 	const leaf: BasePart = main
-	-- prompt anchors on both faces of the leaf, at handle height; parented to the model (not the leaf: the leaf moves on
-	-- the client, the prompt must stay at the frame)
+	-- one prompt anchor in the leaf's plane at handle height; parented to the model (not the leaf: the leaf moves on
+	-- the client, the prompt must stay at the frame). PromptController's sight check ignores the door's own Model.
 	const holder = Instance.new("Part")
 	holder.Name = "DoorPromptHolder"
 	holder.Anchored = true
@@ -175,18 +175,14 @@ function RestaurantDoorService:Bind(model: Instance)
 	holder.CFrame = leaf.CFrame
 	holder.Parent = model
 	const anchors: { Attachment } = {}
-	const thin = if leaf.Size.X < leaf.Size.Z then Vector3.xAxis else Vector3.zAxis
-	const lift = -leaf.Size.Y / 2 + HANDLE_Y
-	for index, sign in { 1, -1 } do
-		const attachment = Instance.new("Attachment")
-		attachment.Name = `Prompt_Door{index}`
-		attachment.Position = thin * (sign * (SIDE_OUT + math.min(leaf.Size.X, leaf.Size.Z) / 2)) + Vector3.new(0, lift, 0)
-		attachment:SetAttribute("PromptAction", ACTION)
-		attachment.Parent = holder
-		CollectionService:AddTag(attachment, ANCHOR_TAG)
-		table.insert(anchors, attachment)
-		self.AnchorDoor[attachment] = mapId
-	end
+	const attachment = Instance.new("Attachment")
+	attachment.Name = "Prompt_Door"
+	attachment.Position = Vector3.new(0, -leaf.Size.Y / 2 + HANDLE_Y, 0)
+	attachment:SetAttribute("PromptAction", ACTION)
+	attachment.Parent = holder
+	CollectionService:AddTag(attachment, ANCHOR_TAG)
+	table.insert(anchors, attachment)
+	self.AnchorDoor[attachment] = mapId
 	model:SetAttribute("DoorManual", true)
 	model:SetAttribute("DoorOpen", false)
 	const door: Door = { MapId = mapId, Model = model, Leaves = leaves, Collide = collide, Anchors = anchors, Open = false }

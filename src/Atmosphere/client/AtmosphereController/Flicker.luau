@@ -1,7 +1,8 @@
 --!strict
 -- Kitchen tube flicker (owner 2026-10-18: "a parte interna da cozinha tá muito suave, precisamos de algo mais
 -- aterrorizante"). At night only (Workspace attribute Atmosphere set by AtmosphereService), every GAP_MIN..GAP_MAX s one
--- fixture of the kitchen's switch group flickers for a moment with a buzz, the way Effects/Kit/Hide flickers the trailer:
+-- fixture of the kitchen's switch group flickers for a moment with `light_flicker` (owner 2026-10-18: in place of the
+-- post_buzz, which stays for specific events), the way Effects/Kit/Hide flickers the trailer:
 -- the fixture is marked Lit/Live so LightController leaves it, toggled, then unmarked so LightController repaints it.
 -- Skipped while the blackout owns the lights. Local only, presentation only.
 local Lighting = game:GetService("Lighting")
@@ -21,7 +22,7 @@ const PATTERNS = {
 	{ 0.15, 0.08, 0.05, 0.06, 0.6 },
 	{ 0.04, 0.04, 0.04, 0.3, 0.08, 0.05, 0.08 },
 }
-const BUZZ = "post_buzz"
+const SOUND = "light_flicker"
 const BLACKOUT_EFFECT = "ANM020_Blackout" -- Effects/ANM-020's own ColorCorrectionEffect while the power is out
 
 local function paint(fixture: Fixture, on: boolean)
@@ -51,7 +52,7 @@ local function once(light: LightKit, audio: Audio, rng: Random)
 	fixture.Lit = true
 	fixture.Live = true
 	pcall(function()
-		audio:Play(BUZZ, fixture.Position, { Volume = 0.5 })
+		audio:Play(SOUND, fixture.Position)
 	end)
 	local on = false
 	for _, wait in PATTERNS[rng:NextInteger(1, #PATTERNS)] do

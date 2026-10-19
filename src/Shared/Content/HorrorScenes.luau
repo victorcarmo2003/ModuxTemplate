@@ -630,6 +630,8 @@ const knock: Scene = {
 	Steps = {
 		{ At = 0, Phase = "Active", Kind = "Silence", Value = 1, To = 0.35, Duration = 0.6 },
 		{ At = 0.3, Phase = "Active", Kind = "Cinema", Value = 0.1, Duration = 1.2 },
+		-- its shadow on the light under the door, there the whole time it knocks (owner 2026-10-18, as in the blackout)
+		{ At = 0, Phase = "Active", Kind = "Shadow", Target = "Arrive", Point = "SCENE-DOOR", To = "SCENE-STEPS-FAR", Duration = 1 },
 		{ At = 0.5, Phase = "Active", Kind = "Grade", Target = "Cold", Value = 0, To = 0.55, Duration = 18 },
 		{ At = 0.5, Phase = "Active", Kind = "Heartbeat", Value = 66, To = 150, Duration = 17 },
 		{ At = 0.5, Phase = "Active", Kind = "Vignette", Value = 0, To = 0.38, Duration = 17 },
@@ -658,6 +660,7 @@ const knock: Scene = {
 		{ At = 18, Phase = "Active", Kind = "Heartbeat", Value = 150, To = 110, Duration = 4 },
 		-- nobody opened (Resolved): the steps go away, the room comes back
 		{ At = 0, Phase = "Resolved", Kind = "Sound", Target = "walker_step", Point = "SCENE-DOOR-OUT", To = "SCENE-STEPS-FAR", Duration = 4 },
+		{ At = 0, Phase = "Resolved", Kind = "Shadow", Target = "Leave", Point = "SCENE-DOOR", To = "SCENE-STEPS-FAR", Duration = 1.2 },
 		{ At = 0, Phase = "Resolved", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
 		{ At = 0, Phase = "Resolved", Kind = "Silence", Value = 0.1, To = 1, Duration = 3 },
 		{ At = 1, Phase = "Resolved", Kind = "Heartbeat", Value = 0, To = 0 },
@@ -665,6 +668,7 @@ const knock: Scene = {
 		{ At = 1, Phase = "Resolved", Kind = "Vignette", Value = 0.38, To = 0, Duration = 2.5 },
 		{ At = 1.5, Phase = "Resolved", Kind = "Cinema", Value = 0, Duration = 1 },
 		-- someone opened it (Failed): the face (Effects/ANM-009), red, the others hear it
+		{ At = 0, Phase = "Failed", Kind = "Shadow", Target = "Leave", Point = "SCENE-DOOR", To = "SCENE-STEPS-FAR", Duration = 0.3 },
 		{ At = 0, Phase = "Failed", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
 		{ At = 0, Phase = "Failed", Kind = "Silence", Value = 1, To = 1, Duration = 0 },
 		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Grade", Target = "Red", Value = 0.9, To = 0, Duration = 3 },

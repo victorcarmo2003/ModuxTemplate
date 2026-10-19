@@ -23,6 +23,12 @@
 	    and the lamps come on.
 	    Changes blend (smoothstep) over BLEND_TIME; the first write happens in OnStart, without blend.
 
+	Kitchen switch (owner 2026-10-18: "o padrão das luzes apagadas vira o de luzes ligadas; apagado = totalmente escuro"):
+	the shadowed Light_Interior light is never lit (the old "off" look is the lit kitchen now) and the switch group also
+	takes every Neon panel of the vehicle that carries a Light (Light_K1/K3, Light_P/P2, the K2 panel). Group off at night
+	(switch, Hush) = those panels and lights off and the indoor Lighting fields (Ambient, EnvironmentDiffuse/Specular)
+	blended to Content.LightPresets.SwitchOff in a render step after the AtmosphereController's (Dark section).
+
 	Fixtures (binding, MAP-01 §16):
 	  * StreetLight tag (Group, Order): every Light descendant + lamp parts.
 	  * Vehicle tag: `Light_Interior` (AST-079 fitting on AST-027) -> trailer_interior. AST-079 is not modelled
@@ -43,6 +49,7 @@
 local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Workspace = game:GetService("Workspace")
@@ -108,6 +115,7 @@ const POST_GROUP_DEFAULT = "juniper_posts"
 const FALLBACK_NAME = "LightController_Fallback"
 const SWITCH_ACTION = "switch_light" -- PromptAction of the switch anchor (LightService)
 const SWITCH_SOUND = "switch_click"
+const LEVER_NAME = "Lever" -- SwitchLeverController's lever part (it plays the click itself)
 const CONTEXT_GRACE = 1.5 -- s after a night / attempt / vehicle change in which a Switch flip is the shift's, not a click
 
 const TICK_RATE = 20 -- Hz: Hush steps of 1.5 s and preset blends stay smooth; each pass only writes on change
@@ -132,6 +140,18 @@ const FALLBACK_RANGE = 14
 const FALLBACK_BRIGHTNESS = 1.6
 const FALLBACK_COLOR = Color3.fromHex("#FFE7C2")
 const FALLBACK_DROP = 0.4 -- studs below the zone ceiling
+
+-- Switch-off dark (Content.LightPresets.SwitchOff): written after AtmosphereController (Camera + 2) and the ANM-020
+-- blackout look (Camera + 3), so the dark wins the frame and follows whatever they left as the base
+const SWITCH_OFF = Content.LightPresets.SwitchOff
+const DARK_STEP = "LightController_SwitchOff"
+const DARK_PRIORITY = Enum.RenderPriority.Camera.Value + 4
+
+const ROOM_MARGIN = 2 -- studs around the kitchen zone for AddRoomLights (LIT-DT hangs 1 stud past LZ-1)
+const ROOM_KEEP: { [string]: boolean } = {}
+for _, name in Content.LightPresets.Blackout.KeepNames do
+	ROOM_KEEP[name] = true
+end
 
 const LAMP_OFF_MATERIAL = Enum.Material.SmoothPlastic
 const LAMP_OFF_COLOR = Color3.fromHex("#EAD6B0") -- Cream (style guide §2.1)
@@ -244,6 +264,10 @@ function LightController:Setup()
 	self.Mode = "" :: string -- "day" | "night:<k>"; a change starts a blend
 	-- os.clock() of the last night / attempt / vehicle change (switch click guard)
 	self.ContextAt = 0 :: number
+	-- switch-off dark: 0 = off, 1 = full; base = the value another writer left in Lighting, written = ours
+	self.Dark = 0 :: number
+	self.DarkBase = nil :: { Ambient: Color3, EnvDiffuse: number, EnvSpecular: number }?
+	self.DarkWritten = nil :: { Ambient: Color3, EnvDiffuse: number, EnvSpecular: number }?
 end
 
 -- Night number of the shift (RoundController.Night lands with TASK-055; until then first night).
@@ -404,12 +428,19 @@ function LightController:Rescan()
 				end
 				self:Add(fixture)
 			elseif interior and d.Name == INTERIOR_FITTING then
+				-- owner 2026-10-18: the kitchen's lit look is the one without this light, so it never comes on
+				for _, light in d:GetDescendants() do
+					if light:IsA("Light") then
+						light.Enabled = false
+					end
+				end
+			elseif interior and d:IsA("BasePart") and self:IsPanel(d) then
+				-- a Neon panel with its own light: lit with the switch, dark with it (Light_Interior lights excluded)
 				const fixture = self:NewFixture(interior, d, 0)
-				if #fixture.Lights == 0 and (d:IsA("Attachment") or d:IsA("BasePart")) then
-					-- fitting without a light (AST-079 pending): local light on it. PROVISIONAL
-					const light = self:FallbackLight()
-					light.Parent = d
-					table.insert(fixture.Lights, light)
+				for i = #fixture.Lights, 1, -1 do
+					if fixture.Lights[i]:FindFirstAncestor(INTERIOR_FITTING) then
+						table.remove(fixture.Lights, i)
+					end
 				end
 				self:Add(fixture)
 			elseif d:GetAttribute("Upgrade") ~= nil then
@@ -420,8 +451,91 @@ function LightController:Rescan()
 	for _, piece in CollectionService:GetTagged("UpgradePiece") do
 		addPiece(piece)
 	end
+	self:AddRoomLights(interiorGroups)
 
 	self:EnsureFallbacks()
+end
+
+-- Lights of the restaurant outside the vehicle model that sit in the kitchen (a Block LightZone of a Switch group, plus
+-- ROOM_MARGIN studs): the drive-thru lamp LIT-DT. They go dark with the switch (owner 2026-10-18: "implementa ela ao
+-- interruptor pra apagar junto"). The emergency lamp (LightPresets.Blackout.KeepNames) is never taken.
+function LightController:AddRoomLights(interiorGroups: { [string]: string })
+	const current = self.Dependencies.RoundController.Vehicle()
+	const group = interiorGroups[current]
+	if group == nil then
+		return
+	end
+	const boxes: { BasePart } = {}
+	for _, zone in CollectionService:GetTagged(LIGHT_ZONE_TAG) do
+		if zone:GetAttribute("Group") == group and zone:IsA("Part") and zone.Shape == Enum.PartType.Block then
+			table.insert(boxes, zone)
+		end
+	end
+	if #boxes == 0 then
+		return
+	end
+	local function inRoom(position: Vector3): boolean
+		for _, box in boxes do
+			const at = box.CFrame:PointToObjectSpace(position)
+			const half = box.Size / 2 + Vector3.one * ROOM_MARGIN
+			if math.abs(at.X) <= half.X and math.abs(at.Y) <= half.Y and math.abs(at.Z) <= half.Z then
+				return true
+			end
+		end
+		return false
+	end
+	const seen: { [Instance]: boolean } = {}
+	for _, path in Content.LightPresets.Blackout.Roots do
+		local root: Instance? = Workspace
+		for _, name in path do
+			root = if root then root:FindFirstChild(name) else nil
+		end
+		if root == nil then
+			continue
+		end
+		for _, light in (root :: Instance):GetDescendants() do
+			if not light:IsA("Light") then
+				continue
+			end
+			const holder = light.Parent
+			if holder == nil or seen[holder] or not (holder:IsA("BasePart") or holder:IsA("Attachment")) then
+				continue
+			end
+			local skip = false
+			local node: Instance? = holder
+			while node ~= nil and node ~= Workspace do
+				if ROOM_KEEP[node.Name] or CollectionService:HasTag(node, VEHICLE_TAG) then
+					skip = true
+					break
+				end
+				node = node.Parent
+			end
+			const position = if holder:IsA("BasePart") then holder.Position else (holder :: Attachment).WorldPosition
+			if skip or not inRoom(position) then
+				continue
+			end
+			seen[holder] = true
+			self:Add(self:NewFixture(group, holder, 0))
+		end
+	end
+end
+
+-- Kitchen panel: a lamp part (Neon at discovery / Emissive) with a Light child, not an upgrade piece
+function LightController:IsPanel(part: BasePart): boolean
+	if part:FindFirstChildWhichIsA("Light") == nil then
+		return false
+	end
+	local node: Instance? = part
+	while node ~= nil and node ~= Workspace do
+		if node:GetAttribute("Upgrade") ~= nil or CollectionService:HasTag(node, "UpgradePiece") then
+			return false
+		end
+		node = node.Parent
+	end
+	const original = self.Originals[part]
+	return original ~= nil and original.Material == Enum.Material.Neon
+		or part.Material == Enum.Material.Neon
+		or part:GetAttribute(EMISSIVE_ATTRIBUTE) == true
 end
 
 function LightController:FallbackLight(): PointLight
@@ -713,6 +827,74 @@ function LightController:RefreshPreset()
 	self:Write(preset, outClock)
 end
 
+-- Switch-off dark ------------------------------------------------------------------------------------------------
+
+-- The kitchen is dark: night, a Switch group of the current vehicle off, no cutscene day look
+function LightController:WantsDark(): boolean
+	const round = self.Dependencies.RoundController
+	if not round.IsNight() or Players.LocalPlayer:GetAttribute(LOOK_ATTRIBUTE) == "Cinematic" then
+		return false
+	end
+	if self.Dependencies.PlaceController:Is("Lobby") then
+		return false
+	end
+	for _, group in Content.LightGroups.List do
+		if group.Kind == "Switch" and (group.Vehicle == nil or group.Vehicle == round.Vehicle()) then
+			return not self:GroupOn(group.Key)
+		end
+	end
+	return false
+end
+
+function LightController:StepDark(dt: number)
+	if self.Dark <= 0 and not self:WantsDark() then
+		return
+	end
+	-- base: whatever another writer left since our last write (preset, atmosphere, blackout)
+	const current = {
+		Ambient = Lighting.Ambient,
+		EnvDiffuse = Lighting.EnvironmentDiffuseScale,
+		EnvSpecular = Lighting.EnvironmentSpecularScale,
+	}
+	const written = self.DarkWritten
+	local base = self.DarkBase or current
+	if written then
+		if current.Ambient ~= written.Ambient then
+			base.Ambient = current.Ambient
+		end
+		if math.abs(current.EnvDiffuse - written.EnvDiffuse) > 1e-4 then
+			base.EnvDiffuse = current.EnvDiffuse
+		end
+		if math.abs(current.EnvSpecular - written.EnvSpecular) > 1e-4 then
+			base.EnvSpecular = current.EnvSpecular
+		end
+	else
+		base = current
+	end
+	self.DarkBase = base
+	if self:WantsDark() then
+		self.Dark = math.min(1, self.Dark + dt / SWITCH_OFF.FadeIn)
+	else
+		self.Dark = math.max(0, self.Dark - dt / SWITCH_OFF.FadeOut)
+	end
+	const t = self.Dark
+	const out = {
+		Ambient = base.Ambient:Lerp(SWITCH_OFF.Ambient, t),
+		EnvDiffuse = lerp(base.EnvDiffuse, SWITCH_OFF.EnvDiffuse, t),
+		EnvSpecular = lerp(base.EnvSpecular, SWITCH_OFF.EnvSpecular, t),
+	}
+	Lighting.Ambient = out.Ambient
+	Lighting.EnvironmentDiffuseScale = out.EnvDiffuse
+	Lighting.EnvironmentSpecularScale = out.EnvSpecular
+	if t <= 0 then
+		-- the last write is exactly the base again: nothing of ours stays in Lighting
+		self.DarkBase = nil
+		self.DarkWritten = nil
+	else
+		self.DarkWritten = out
+	end
+end
+
 -- Switch click ---------------------------------------------------------------------------------------------------
 
 -- Marks every night / attempt / vehicle change (the Lights records that change with it are not a click)
@@ -764,6 +946,12 @@ function LightController:CheckSwitch(key: string, on: boolean)
 		end
 	end
 	local at: Vector3 | Instance | nil = self:SwitchAnchor()
+	-- a wall lever (Box + Lever) clicks on its own in SwitchLeverController: one click, not two (owner 2026-10-18)
+	const box = if typeof(at) == "Instance" then at.Parent else nil
+	const model = if box then box.Parent else nil
+	if model ~= nil and model:FindFirstChild(LEVER_NAME) ~= nil then
+		return
+	end
 	if at == nil then
 		const fixtures = self.Fixtures[key]
 		if fixtures and fixtures[1] then
@@ -823,6 +1011,9 @@ LightController:OnStart(function(self)
 	self:Track("UpgradePiece", true)
 	self:Track(LIGHT_ZONE_TAG, false)
 	self:WatchContext()
+	RunService:BindToRenderStep(DARK_STEP, DARK_PRIORITY, function(dt: number)
+		self:StepDark(dt)
+	end)
 end)
 
 LightController:OnTick(function(self)

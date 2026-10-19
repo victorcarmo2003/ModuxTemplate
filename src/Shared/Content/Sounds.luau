@@ -200,6 +200,7 @@ const UPLOADED: { [string]: string } = {
 	church_bell = "rbxassetid://6891548543",
 	-- ANM-012 neck snap (TASK-336): ReplicatedStorage.Assets.SFX["Bone crack"] (user upload, 2026-10-15)
 	neck_crack = "rbxassetid://88191175836931",
+	light_flicker = "rbxassetid://133372234255494", -- ReplicatedStorage.Assets.SFX["light flicker"] (owner, 2026-10-18)
 }
 
 -- Per-row overrides of the sfx() defaults
@@ -356,6 +357,8 @@ const base = Table.new({
 	sfx("swarm_flutter", false, { Volume = 0.8, MaxDistance = 90 }), -- ANM-003: moths and bats (shadow_whoosh fallback)
 	-- ANM-020 blackout (TASK-444): the owner's "lights off" snap when the power goes out (post_tunk while unresolved)
 	studio(sfx("lights_off", false, { Spatial = false, Volume = 0.8 }), "lights off"),
+	-- owner 2026-10-18: the sound of every light flicker (kitchen tube, Hide, ANM-020 warning) in place of post_buzz
+	studio(sfx("light_flicker", false, { Volume = 0.6, MaxDistance = 50 }), "light flicker"),
 	-- blackout scene bank (TASK-466; design/horror-cinematic.md §4.6; sound-list.md §5.19). Creator Store audio of the
 	-- Pro Sound Effects library (free inside Roblox experiences, credits.md); every pick Provisional until the owner's Play.
 	-- Id "" = no safe candidate yet (silence; the scene keeps the old key).

@@ -25,6 +25,9 @@ local Modux = require(ServerScriptService.server.Modux)
 const rules = Content.Security.Rules
 const ANCHOR_TAG = "Interactable"
 const GATE = "Security"
+const SIGHT_STEPS = 8 -- see-through / small parts skipped before giving up (counts as visible)
+const SIGHT_SEE_THROUGH = 0.9
+const SIGHT_MIN_SIZE = 2.5 -- studs
 const MONITOR_WAIT = 30 -- s the first lookup of the monitor keeps trying (the place may still be loading)
 
 const SecurityService = Modux.Service("SecurityService", {
@@ -35,7 +38,6 @@ const SecurityService = Modux.Service("SecurityService", {
 		"RunStateService",
 		"InteractionService",
 		"CharacterService",
-		"VehicleService",
 	},
 	Priority = 640,
 })
@@ -101,14 +103,55 @@ function SecurityService:Release(player: Player, gone: boolean?)
 	end
 end
 
+-- Clear line from the player's head to the prompt anchor: the monitor's own model, the character, see-through parts and
+-- small props (largest side < SIGHT_MIN_SIZE) do not block; a wall does (same rule as PromptController:InSight)
+function SecurityService:InSight(player: Player, anchor: Instance): boolean
+	const character = player.Character
+	const head = if character ~= nil then character:FindFirstChild("Head") else nil
+	if character == nil or head == nil or not head:IsA("BasePart") or not anchor:IsA("Attachment") then
+		return false
+	end
+	const ignore: { Instance } = { character }
+	const own = anchor:FindFirstAncestorWhichIsA("Model")
+	if own ~= nil then
+		table.insert(ignore, own)
+	end
+	const params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	const target = anchor.WorldPosition
+	local origin = head.Position
+	for _ = 1, SIGHT_STEPS do
+		params.FilterDescendantsInstances = ignore
+		const offset = target - origin
+		if offset.Magnitude < 0.05 then
+			return true
+		end
+		const hit = workspace:Raycast(origin, offset, params)
+		if hit == nil then
+			return true
+		end
+		const part = hit.Instance
+		if
+			part.Transparency < SIGHT_SEE_THROUGH
+			and math.max(part.Size.X, part.Size.Y, part.Size.Z) >= SIGHT_MIN_SIZE
+		then
+			return false
+		end
+		table.insert(ignore, part)
+	end
+	return true
+end
+
 function SecurityService:Register()
 	const interaction = self.Dependencies.InteractionService
 	interaction:RegisterAction(rules.Action, {
-		Validate = function(player: Player, _anchor: Instance, _id: number): boolean
-			-- only from inside the trailer (owner 2026-10-16): never through the wall from the hiding spot behind it
+		Validate = function(player: Player, anchor: Instance, _id: number): boolean
+			-- never through a wall (owner 2026-10-16: the hiding spot behind the trailer). Was "inside the trailer
+			-- (VehicleService:IsInside)", which refused every press in the restaurant: the monitor stands in the pantry,
+			-- outside LZ-1 (owner 2026-10-18: "as câmeras não estão funcionando")
 			return not self.Watching[player]
 				and self.Dependencies.RunStateService:IsActive(player)
-				and self.Dependencies.VehicleService:IsInside(player)
+				and self:InSight(player, anchor)
 		end,
 		Run = function(player: Player, _anchor: Instance, _id: number)
 			self:Open(player)

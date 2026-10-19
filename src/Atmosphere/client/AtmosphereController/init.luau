@@ -428,7 +428,7 @@ AtmosphereController:OnStart(function(self)
 		return
 	end
 	self.Enabled = true
-	-- owner 2026-10-18: a kitchen tube flickers and buzzes now and then at night
+	-- owner 2026-10-18: a kitchen tube flickers now and then at night, with light_flicker
 	Flicker(self.Dependencies.LightController :: any, self.Dependencies.AudioController :: any)
 	-- owner 2026-10-18: the low mist of the Hush on every night, by default
 	GroundFog()
