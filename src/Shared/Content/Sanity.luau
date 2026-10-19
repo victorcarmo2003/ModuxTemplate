@@ -52,8 +52,8 @@ const sanity: Sanity = {
 	SeeAngle = 40,
 	SeeRange = 60,
 	RuleBroken = 35, -- FEAT-019
-	DarkDelay = 3, -- FEAT-020
-	DarkPerSecond = 1, -- FEAT-020
+	DarkDelay = 5, -- FEAT-020; owner 2026-10-18 "a sanidade está descendo muito rápido" (was 3)
+	DarkPerSecond = 0.5, -- FEAT-020; owner 2026-10-18 (was 1). Fractions add up in VitalService (DarkOwed)
 	DarkPhases = { "Call", "Prep", "Night" }, -- not NightEnd: the night is already won (L2-03, Provisional)
 	Coffee = 25, -- FEAT-021
 	CoffeeDrinkTime = 1.5, -- FEAT-021
@@ -65,7 +65,8 @@ const sanity: Sanity = {
 	Bands = { High = 60, Mid = 40 }, -- DEC-167
 	BandMinHold = 0, -- 1 s if it flickers in the wave 2 test (Provisional)
 	-- TASK-482 (Provisional, DEC-294 "~2 s", "~1 s"): mild (DEC-172), ~10 s of stare = -10, at most -20 per occurrence
-	Stare = { Angle = 18, Delay = 2, Release = 1, DrainAfter = 3, PerSecond = 1.5, Cap = 20 },
+	-- owner 2026-10-18: PerSecond 1.5 -> 1 (sanity fell too fast)
+	Stare = { Angle = 18, Delay = 2, Release = 1, DrainAfter = 3, PerSecond = 1, Cap = 20 },
 }
 
 return Table.record(sanity)

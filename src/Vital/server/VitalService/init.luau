@@ -55,6 +55,8 @@ export type Entry = {
 	Sanity: number,
 	Max: number,
 	DarkSince: number?,
+	-- dark loss not paid yet (sanity is whole; DarkPerSecond may be a fraction)
+	DarkOwed: number,
 	ProtectUntil: number,
 	-- Night 1 coffee lesson: server time the HUD emphasis ends (0 = none running); see StartCoffeeHint
 	HintUntil: number,
@@ -96,6 +98,7 @@ local function newEntry(userId: number): Entry
 		Sanity = 0,
 		Max = 0,
 		DarkSince = nil,
+		DarkOwed = 0,
 		ProtectUntil = 0,
 		HintUntil = 0,
 		RevivesTonight = 0,
@@ -679,9 +682,11 @@ function VitalService:DarkTick(t: number)
 		if entry.DarkSince == nil then
 			entry.DarkSince = t
 		end
-		const loss = Sanity.darkLoss(entry.DarkSince, entry.ProtectUntil, t, Content.Sanity)
-		if loss > 0 then
-			self:AddSanity(player, -loss, "dark")
+		entry.DarkOwed += Sanity.darkLoss(entry.DarkSince, entry.ProtectUntil, t, Content.Sanity)
+		const whole = math.floor(entry.DarkOwed)
+		if whole > 0 then
+			entry.DarkOwed -= whole
+			self:AddSanity(player, -whole, "dark")
 		end
 	end
 end

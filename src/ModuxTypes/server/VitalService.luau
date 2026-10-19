@@ -18,6 +18,8 @@ export type Entry = {
 	Sanity: number,
 	Max: number,
 	DarkSince: number?,
+	-- dark loss not paid yet (sanity is whole; DarkPerSecond may be a fraction)
+	DarkOwed: number,
 	ProtectUntil: number,
 	-- Night 1 coffee lesson: server time the HUD emphasis ends (0 = none running); see StartCoffeeHint
 	HintUntil: number,
