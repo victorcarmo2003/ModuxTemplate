@@ -48,6 +48,8 @@ export type Customer = {
 	Number: number?, -- #n of the order (pickup mode), nil = none
 	PausedAt: number?, -- PausePatience: server time the running clock was frozen; nil = running
 	CarryModel: Model?, -- rig carrying the attribute Carrying (served at the pickup; cleared when the record goes)
+	-- look of the hot dog it was handed (SellLine, before the Tool goes): the rig's Carry* attributes at SetCarrying
+	CarryLook: { Toppings: string?, Sauce: string?, Altered: boolean, Dish: boolean }?,
 }
 export type Seater = {
 	Offer: (party: SeatParty) -> boolean,
@@ -228,6 +230,7 @@ export type Public = {
 	Conclude: (self: Public, customer: Customer, ticket: Orders.Ticket) -> (),
 	LeaveServed: (self: Public, customer: Customer, mood: string?) -> (),
 	SetCarrying: (self: Public, customer: Customer) -> (),
+	KeepLook: (self: Public, customer: Customer, index: number, tool: Tool) -> (),
 	OfferSeat: (self: Public, customer: Customer) -> boolean,
 	SettlePending: (self: Public, customer: Customer, ticket: Orders.Ticket, result: SaleResult) -> (),
 	GiveUp: (self: Public, id: number) -> (),

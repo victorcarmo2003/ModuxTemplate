@@ -20,13 +20,24 @@
 -- hand (same bites as above, with its toppings); the empty plate stays until it stands up, then it walks out empty-handed.
 -- Takeaway (no table): it never sits, so it walks out with the plate. `Carrying` nil (record gone, rig back to the pool)
 -- clears it all. Without `Carrying` (trailer, SitAt "Order") nothing here changes. Visual only: the server decides.
+-- THE hot dog handed over (owner 2026-10-19): with the rig attribute CarryToppings (CustomerService:SetCarrying, from the
+-- served Tool) the carried and eaten hot dog is that one: its toppings, the sauce lines the player drew (CarrySauce ->
+-- the model's Sauce attribute, HotDogVisual draws them) and, with CarryDish, the kit plate's dish under it (as on the Tool;
+-- the empty dish stays on the table). CarryAltered is kept on the model (Altered). Without CarryToppings: the order's
+-- toppings on the drawn plate, as before.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local HotDogVisual = require(ReplicatedStorage.shared.Item.HotDogVisual)
+local PlateTool = require(ReplicatedStorage.shared.Plate.PlateTool)
 local Tray = require(script.Parent.Tray)
 
 const SEATED_ATTRIBUTE = "Seated"
 const EATING_ATTRIBUTE = "Eating"
 const CARRYING_ATTRIBUTE = "Carrying"
+-- rig attributes of the served hot dog's look (CustomerService CARRY_LOOK)
+const CARRY_TOPPINGS = "CarryToppings"
+const CARRY_SAUCE = "CarrySauce"
+const CARRY_ALTERED = "CarryAltered"
+const CARRY_DISH = "CarryDish"
 const TOOL_NAME = "hot_dog"
 const ARM = "Right Arm"
 const BITES = 3
@@ -53,6 +64,14 @@ export type Anim = {
 export type Hooks = {
 	Toppings: (rig: Model) -> { string }, -- topping keys of the order the rig carries ({} = plain)
 	TableTop: (index: number) -> CFrame?, -- table top centre (Y up), nil = table not bound
+}
+
+-- How the carried / eaten hot dog looks (TASK-387; owner 2026-10-19).
+type Look = {
+	Toppings: { string },
+	Sauce: string?, -- HotDogVisual.Sauce wire of the drawn lines
+	Altered: boolean,
+	Dish: boolean, -- under it the kit plate's dish (the Tool's Dish)
 }
 
 type Diner = {
@@ -153,9 +172,9 @@ local function drawnFood(): (Model, CFrame)
 	return model, CFrame.identity
 end
 
--- A hot dog model (kit or drawn) with `toppings` stacked by HotDogVisual (kit only: the drawn one has no anchor).
--- Parts anchored, not parented; returns the model and its Tool grip.
-function Meal.Food(self: Meal, toppings: { string }?): (Model, CFrame)
+-- A hot dog model (kit or drawn) looking like `look` (toppings and drawn sauce by HotDogVisual; kit only: the drawn one
+-- has no anchor). Parts anchored, not parented; returns the model and its Tool grip.
+function Meal.Food(self: Meal, look: Look?): (Model, CFrame)
 	local food, grip = self:KitFood()
 	if food == nil then
 		food, grip = drawnFood()
@@ -166,6 +185,11 @@ function Meal.Food(self: Meal, toppings: { string }?): (Model, CFrame)
 		if descendant:IsA("BasePart") then
 			descendant.Anchored = true
 		end
+	end
+	const toppings = if look then look.Toppings else nil
+	if look ~= nil then
+		model:SetAttribute(HotDogVisual.Sauce.Attribute, look.Sauce)
+		model:SetAttribute("Altered", if look.Altered then true else nil)
 	end
 	if toppings ~= nil and #toppings > 0 and handle:FindFirstChild(TOPPING_ANCHOR) ~= nil then
 		const ok, err = pcall(HotDogVisual.apply, model, toppings, nil)
@@ -191,12 +215,12 @@ local function weldAll(model: Model, root: BasePart)
 	end
 end
 
-function Meal.Give(self: Meal, rig: Model, toppings: { string }?): (Model?, WeldConstraint?)
+function Meal.Give(self: Meal, rig: Model, look: Look?): (Model?, WeldConstraint?)
 	const arm = rig:FindFirstChild(ARM)
 	if arm == nil or not arm:IsA("BasePart") then
 		return nil, nil
 	end
-	const model, grip = self:Food(toppings)
+	const model, grip = self:Food(look)
 	const handle = model.PrimaryPart :: BasePart
 	model:PivotTo(arm.CFrame * GRIP * grip:Inverse())
 	weldAll(model, handle)
@@ -240,6 +264,58 @@ function Meal.ToppingsOf(self: Meal, rig: Model): { string }
 	return if ok and type(keys) == "table" then keys else {}
 end
 
+-- The served hot dog's look (rig Carry* attributes), else the order's toppings on a plain hot dog.
+function Meal.LookOf(self: Meal, rig: Model): Look
+	const toppings = rig:GetAttribute(CARRY_TOPPINGS)
+	if type(toppings) ~= "string" then
+		return { Toppings = self:ToppingsOf(rig), Sauce = nil, Altered = false, Dish = false }
+	end
+	const sauce = rig:GetAttribute(CARRY_SAUCE)
+	return {
+		Toppings = HotDogVisual.parse(toppings),
+		Sauce = if type(sauce) == "string" then sauce else nil,
+		Altered = rig:GetAttribute(CARRY_ALTERED) == true,
+		Dish = rig:GetAttribute(CARRY_DISH) == true,
+	}
+end
+
+-- The kit plate's dish (Assets.Items.Tools.plate) under `handle`, as KitchenService attachDish puts it on the Tool: its top
+-- (kit Handle +Y) meets the bottom of the hot dog Handle. Anchored parts into `into`; returns the dish base (nil = no kit).
+local function dishUnder(handle: BasePart, into: Model): BasePart?
+	const assets = ReplicatedStorage:FindFirstChild("Assets")
+	const items = if assets then assets:FindFirstChild("Items") else nil
+	const tools = if items then items:FindFirstChild("Tools") else nil
+	const kit = if tools then tools:FindFirstChild(PlateTool.Plate) else nil
+	const kitHandle = if kit then kit:FindFirstChild("Handle") else nil
+	if kit == nil or kitHandle == nil or not kitHandle:IsA("BasePart") then
+		return nil
+	end
+	const base = handle.CFrame * CFrame.new(0, -handle.Size.Y / 2, 0)
+	const kitTop = kitHandle.CFrame * CFrame.new(0, kitHandle.Size.Y / 2, 0)
+	local dishBase: BasePart? = nil
+	for _, part in kit:GetDescendants() do
+		if part:IsA("BasePart") then
+			const copy = part:Clone()
+			for _, child in copy:GetChildren() do
+				if not child:IsA("DataModelMesh") and not child:IsA("SurfaceAppearance") and not child:IsA("Decal") then
+					child:Destroy()
+				end
+			end
+			copy.Name = if part == kitHandle then "DishBase" else part.Name
+			copy.Anchored = true
+			copy.CanCollide = false
+			copy.CanQuery = false
+			copy.CanTouch = false
+			copy.CFrame = base * kitTop:ToObjectSpace(part.CFrame)
+			copy.Parent = into
+			if part == kitHandle then
+				dishBase = copy
+			end
+		end
+	end
+	return dishBase
+end
+
 -- Handle frame that lays the hot dog on `top` (Y up): the stack's up axis (Att_Topping1) up, resting on its side.
 local function lay(handle: BasePart, top: CFrame): CFrame
 	const anchor = handle:FindFirstChild(TOPPING_ANCHOR)
@@ -250,18 +326,45 @@ local function lay(handle: BasePart, top: CFrame): CFrame
 	return top * CFrame.new(0, half, 0) * turn:Inverse()
 end
 
+-- `food` laid on what it is carried on: the Tool's dish (with `dish`, built under it), else the drawn plate (Tray.Plate).
+-- Pivot = centre of the bottom, Y up (Land puts it on the table). Returns the model and its base part.
+local function carried(food: Model, dish: boolean): (Model, BasePart)
+	const handle = food.PrimaryPart :: BasePart
+	if dish then
+		food:PivotTo(lay(handle, CFrame.identity))
+		const model = Instance.new("Model")
+		const dishBase = dishUnder(handle, model)
+		if dishBase ~= nil then
+			local bottom = math.huge
+			for _, part in model:GetChildren() do
+				if part:IsA("BasePart") then
+					bottom = math.min(bottom, part.Position.Y - part.Size.Y / 2)
+				end
+			end
+			const centre = dishBase.Position
+			model.PrimaryPart = dishBase
+			dishBase.PivotOffset = dishBase.CFrame:ToObjectSpace(CFrame.new(centre.X, bottom, centre.Z))
+			food.Parent = model
+			return model, dishBase
+		end
+		model:Destroy()
+	end
+	const plate, topHeight = Tray.Plate()
+	food:PivotTo(lay(handle, CFrame.new(0, topHeight, 0)))
+	food.Parent = plate
+	return plate, plate.PrimaryPart :: BasePart
+end
+
 -- Plate + hot dog in front of the torso (walking to the table, or takeaway).
 function Meal.Hold(self: Meal, rig: Model, carry: Carry)
 	const torso = rig:FindFirstChild("Torso") or rig:FindFirstChild("HumanoidRootPart")
 	if torso == nil or not torso:IsA("BasePart") then
 		return
 	end
-	const plate, topHeight = Tray.Plate()
+	const look = self:LookOf(rig)
+	const food = self:Food(look)
+	const plate, base = carried(food, look.Dish)
 	plate.Name = "Seating_Carry"
-	const base = plate.PrimaryPart :: BasePart
-	const food = self:Food(self:ToppingsOf(rig))
-	food:PivotTo(lay(food.PrimaryPart :: BasePart, CFrame.new(0, topHeight, 0)))
-	food.Parent = plate
 	-- level in torso space (the torso stays upright while it walks)
 	plate:PivotTo(torso.CFrame * CFrame.new(0, -torso.Size.Y * HOLD_DROP, -(torso.Size.Z / 2 + HOLD_AHEAD)))
 	weldAll(plate, base)
@@ -395,14 +498,14 @@ function Meal.Eat(self: Meal, rig: Model)
 			return
 		end
 		const carry = self.Carries[rig]
-		local toppings: { string }? = nil
+		local look: Look? = nil
 		if carry ~= nil then
-			-- carried plate (TASK-387): it lands on the table and the hot dog of the order goes to the hand
+			-- carried plate (TASK-387): it lands on the table and the hot dog handed over goes to the hand
 			self:Land(rig)
 			takeFood(carry)
-			toppings = self:ToppingsOf(rig)
+			look = self:LookOf(rig)
 		end
-		diner.Food, diner.Grip = self:Give(rig, toppings)
+		diner.Food, diner.Grip = self:Give(rig, look)
 		for count = 1, BITES do
 			task.wait(BITE_EVERY)
 			if self.Diners[rig] ~= diner then

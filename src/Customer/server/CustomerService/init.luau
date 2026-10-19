@@ -108,7 +108,9 @@
 --     Served (no Wrong/Left/Refused line): the rigs get the attribute Carrying = true (the client puts the plate in the
 --     hand); with Content.Seating.SitAt = "Served" the Seater is offered the party AT THE SALE (Seater.Offer before
 --     Leave(dining = true): SeatingService walks it from PU-n to the table, eats, Dismiss); no table (or SitAt "Order")
---     = takeaway: it walks out carrying the plate (Rules.TakeawayWhenNoTable).
+--     = takeaway: it walks out carrying the plate (Rules.TakeawayWhenNoTable). The plate is THE hot dog handed over (owner
+--     2026-10-19): SellLine keeps the Tool's Toppings, Sauce, Altered and Dish (KeepLook) and SetCarrying writes them as the
+--     rig attributes CarryToppings / CarrySauce / CarryAltered / CarryDish before Carrying.
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -169,6 +171,8 @@ export type Customer = {
 	Number: number?, -- #n of the order (pickup mode), nil = none
 	PausedAt: number?, -- PausePatience: server time the running clock was frozen; nil = running
 	CarryModel: Model?, -- rig carrying the attribute Carrying (served at the pickup; cleared when the record goes)
+	-- look of the hot dog it was handed (SellLine, before the Tool goes): the rig's Carry* attributes at SetCarrying
+	CarryLook: { Toppings: string?, Sauce: string?, Altered: boolean, Dish: boolean }?,
 }
 
 -- What SeatingService gets when a customer or pair takes its order (Seater.Offer). Leader = the customer with the ticket.
@@ -269,6 +273,8 @@ const TUTORIAL_PHASES: { [string]: boolean } = { Prep = true, Open = true }
 const PICKUP_SERVE = "pickup_serve" -- Content.Actions key (PICKUP Prompt_Serve)
 const PICKUP_FULL = "pickup_full" -- Content.Notices key
 const CARRYING = "Carrying" -- rig attribute: the customer carries its plate (Seating client, R1-J)
+-- rig attributes: the look of THE hot dog it was handed (owner 2026-10-19; Seating client Meal draws it on its dish)
+const CARRY_LOOK = { Toppings = "CarryToppings", Sauce = "CarrySauce", Altered = "CarryAltered", Dish = "CarryDish" }
 const TICKET = "Ticket" -- hot_dog Tool attribute written by PlateService (NpcId of the plate's order)
 -- hot_dog Tool attributes of a plate (shared/Plate/PlateTool): the sausage was flipped in the window; the plate's id
 const FLIPPED = "Flipped"
@@ -1003,6 +1009,7 @@ function CustomerService:Create(id: number, variant: Variant?, leader: number?, 
 		Number = nil,
 		PausedAt = nil,
 		CarryModel = nil,
+		CarryLook = nil,
 	}
 	if customer.Tutorial then
 		-- before the first replication of the record: the client knows it is the tutorial customer from the start
@@ -1283,6 +1290,9 @@ function CustomerService:Forget(id: number): boolean
 	if carried ~= nil then
 		-- the rig goes back to the pool empty-handed (TASK-380)
 		carried:SetAttribute(CARRYING, nil)
+		for _, attribute in CARRY_LOOK do
+			carried:SetAttribute(attribute, nil)
+		end
 		customer.CarryModel = nil
 	end
 	const wasPicking = Pickup.leave(self.PickupLine, id)
@@ -2058,6 +2068,7 @@ function CustomerService:SellLine(
 		const effect = Grade.SaleEffect(Content.Prep, band :: any)
 		-- Incomplete does not look at the grade (FEAT-045 rev. 3, DEC-072)
 		line.Mood = if effect ~= nil and verdict == "Complete" then effect.Mood else nil
+		self:KeepLook(customer, index, tool)
 		-- Wrong: $0; the hot dog stays in the server's hand (FEAT-011 "Errado devolvido")
 		items:Consume(player, tool)
 		amount += economy:AddSale(Orders.Pay(verdict, line.Price), "Sale")
@@ -2075,6 +2086,23 @@ function CustomerService:SellLine(
 		self.Acted:Fire(id, SERVE, player, result)
 	end
 	return result
+end
+
+-- The look of the served hot dog (owner 2026-10-19): kept on the line's owner, read before the Tool is consumed, so the rig
+-- carries THE hot dog the player made (toppings, drawn sauce, dish) and not a generic one.
+function CustomerService:KeepLook(customer: Customer, index: number, tool: Tool)
+	const owner = self.Customers[self:LineOwner(customer, index)]
+	if owner == nil then
+		return
+	end
+	const toppings = tool:GetAttribute("Toppings")
+	const sauce = tool:GetAttribute("Sauce")
+	owner.CarryLook = {
+		Toppings = if type(toppings) == "string" then toppings else "", -- "" = plain (the client still knows it was served)
+		Sauce = if type(sauce) == "string" then sauce else nil,
+		Altered = tool:GetAttribute("Altered") == true,
+		Dish = tool:FindFirstChild("Dish") ~= nil,
+	}
 end
 
 -- Band of a served hot dog (kitchen-world.md §4): a plate's hot dog (PlateId) by Grade.Assembly against the line, from the time
@@ -2162,10 +2190,16 @@ function CustomerService:LeaveServed(customer: Customer, mood: string?)
 	self:Leave(customer.Id, mood, "service", sits)
 end
 
--- Rig attribute Carrying = true (cleared when the record goes and the rig returns to the pool).
+-- Rig attribute Carrying = true, after the Carry* look of the hot dog it was handed (none = the client draws its order);
+-- all cleared when the record goes and the rig returns to the pool.
 function CustomerService:SetCarrying(customer: Customer)
 	const model = self.Dependencies.NpcService:GetModel(customer.Id)
 	if model ~= nil then
+		const look = customer.CarryLook
+		model:SetAttribute(CARRY_LOOK.Toppings, if look then look.Toppings else nil)
+		model:SetAttribute(CARRY_LOOK.Sauce, if look then look.Sauce else nil)
+		model:SetAttribute(CARRY_LOOK.Altered, if look and look.Altered then true else nil)
+		model:SetAttribute(CARRY_LOOK.Dish, if look and look.Dish then true else nil)
 		model:SetAttribute(CARRYING, true)
 		customer.CarryModel = model
 	end
