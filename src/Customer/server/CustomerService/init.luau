@@ -1290,7 +1290,7 @@ function CustomerService:Forget(id: number): boolean
 	if carried ~= nil then
 		-- the rig goes back to the pool empty-handed (TASK-380)
 		carried:SetAttribute(CARRYING, nil)
-		for _, attribute in CARRY_LOOK do
+		for _, attribute in { CARRY_LOOK.Toppings, CARRY_LOOK.Sauce, CARRY_LOOK.Altered, CARRY_LOOK.Dish } do
 			carried:SetAttribute(attribute, nil)
 		end
 		customer.CarryModel = nil
