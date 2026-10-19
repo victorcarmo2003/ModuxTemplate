@@ -24,10 +24,11 @@ PlateTool.Attr = table.freeze({
 	Altered = "Altered",
 	Item = "Item",
 	Toppings = "Toppings",
+	Scores = "Scores",
 })
 
 -- What the hot dog keeps of the plate it was (the rest is ItemService's: Toppings, Altered, Quality)
-PlateTool.Carried = table.freeze({ "PlateId", "Ticket", "TicketLine", "Since", "Flipped" })
+PlateTool.Carried = table.freeze({ "PlateId", "Ticket", "TicketLine", "Since", "Flipped", "Scores" })
 
 local function number(tool: Instance, name: string): number
 	const value = tool:GetAttribute(name)
@@ -64,6 +65,35 @@ function PlateTool.Parts(tool: Instance): (boolean, boolean)
 		return true, true
 	end
 	return tool:GetAttribute(PlateTool.Attr.Bun) == true, tool:GetAttribute(PlateTool.Attr.Sausage) == true
+end
+
+-- Gesture scores of the cooking focus (attribute Scores "cut=92,dog=80,flip=100,ketchup=70"; kitchen-focus.md §3)
+function PlateTool.Scores(tool: Instance): { [string]: number }
+	const out: { [string]: number } = {}
+	const raw = tool:GetAttribute(PlateTool.Attr.Scores)
+	if type(raw) ~= "string" then
+		return out
+	end
+	for key, value in string.gmatch(raw, "([%w_]+)=(%d+)") do
+		out[key] = tonumber(value) :: number
+	end
+	return out
+end
+
+-- Writes one score (0..100, whole) into the Scores attribute
+function PlateTool.SetScore(tool: Instance, key: string, value: number)
+	const scores = PlateTool.Scores(tool)
+	scores[key] = math.clamp(math.floor(if value == value then value else 0), 0, 100)
+	const keys: { string } = {}
+	for name in scores do
+		table.insert(keys, name)
+	end
+	table.sort(keys)
+	const parts: { string } = {}
+	for _, name in keys do
+		table.insert(parts, `{name}={scores[name]}`)
+	end
+	tool:SetAttribute(PlateTool.Attr.Scores, table.concat(parts, ","))
 end
 
 -- Toppings on it, in the order added ("" = none)

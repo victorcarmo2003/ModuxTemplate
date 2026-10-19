@@ -98,6 +98,9 @@ return Table.new({
 	{ Key = "tablet_busy", Text = "Someone's taking that order.", Audience = "Player", ValueFrom = "None", Wave = 3 },
 	-- World kitchen (kitchen-world.md §2; TASK-569). ticket_other: Value = the ticket #n
 	{ Key = "pile_empty", Text = "Nothing on that pile yet.", Audience = "Player", ValueFrom = "None", Wave = 3 },
+	{ Key = "plate_needs_bun", Text = "Bun on the plate first.", Audience = "Player", ValueFrom = "None", Wave = 3 },
+	{ Key = "need_plate", Text = "Grab a plate first.", Audience = "Player", ValueFrom = "None", Wave = 3 },
+	{ Key = "need_hot_dog", Text = "Bring the hot dog on its plate.", Audience = "Player", ValueFrom = "None", Wave = 3 },
 	{ Key = "ticket_other", Text = "#{value} isn't at the pickup yet", Audience = "Player", ValueFrom = "Number", Wave = 3 },
 	{ Key = "ticket_gone", Text = "They left. Throw it away.", Audience = "Player", ValueFrom = "None", Wave = 3 },
 	-- drive-thru car gave up (wave R3), to the party

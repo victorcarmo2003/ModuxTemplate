@@ -34,6 +34,9 @@ return Table.new({
 	-- both on it the plate becomes the hot_dog Tool (same ticket), which the condiments and the hand-over take
 	{ Key = "plate_add_bun", Text = "Add Bun", Hold = 0, Radius = 7, Requires = { Held = "plate" }, Night = "Any", Wave = 1 },
 	{ Key = "plate_add_sausage", Text = "Add Sausage", Hold = 0, Radius = 7, Requires = { Held = "plate" }, Night = "Any", Wave = 1 },
+	-- cooking focus (kitchen-focus.md; owner 2026-10-19): the prompt of the cutting board, the grill and the condiment table only
+	-- opens the focus (camera over the station, gestures); PromptText per station ("Cut Bun", "Grill", "Toppings")
+	{ Key = "cook_focus", Text = "Cook", Hold = 0, Radius = 7, Requires = {}, Night = "Any", Wave = 1 },
 	{
 		Key = "topping_add",
 		Text = "Add {item}",

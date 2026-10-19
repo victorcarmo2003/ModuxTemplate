@@ -8,8 +8,9 @@
 --   Tick 10 Hz    Working -> Ready at StartedAt + Duration, flipped or not. Never burns (DEC-298): a Ready sausage waits on the
 --                 grill for as long as it takes.
 --   grill_flip    (optional, tap "Flip") once, only while Working. Server clock minus the tap latency (<= 0.3 s): inside
---                 Restaurant.Grill.FlipFrom..FlipTo of the Duration it stamps the bonus (score 100), outside it is a flip without
---                 bonus (score 0). The cook schedule never moves. Stations.Flip = score + 1 (101 / 1). The bonus travels to the
+--                 Restaurant.Grill.FlipFrom..FlipTo of the Duration it stamps the bonus; the flip score is Grade.Score grill_flip
+--                 of the distance to the middle of that window (kitchen-focus.md §3). The cook schedule never moves.
+--                 Stations.Flip = score + 1. The bonus travels to the
 --                 rest rail (Rail Entry.Flip), to the plate (attribute Flipped) and lifts the grade one band (Grade.Assembly).
 --                 Anchor: PromptAction grill_flip inside the grill station, slot = attribute FlipSlot, else the Slot of its
 --                 parent, else its own Slot; on Bind each one moves onto its slot anchor (one pill per slot).
@@ -21,6 +22,7 @@
 -- grill_full; "Collect" with the rail full -> rail_full (the sausage waits on the grill). A wrong kind stays silent.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
+local Grade = require(ReplicatedStorage.shared.Prep.Grade)
 local StationApi = require(script.Parent.Parent.StationApi)
 local Rail = require(script.Parent.Rail)
 local Refusal = require(script.Parent.Parent.Refusal)
@@ -43,8 +45,12 @@ const TIME_STAT = "GrillTime"
 const DURATION_STEP = 0.1 -- Stations.Duration is quant(0, 120, 0.1): the server uses the value the wire carries
 const DURATION_MAX = 120
 const LATENCY_MAX = 0.3 -- s: the tap latency the server gives back to a flip
-const BONUS_SCORE = 100 -- flip score inside the window (Stations.Flip 101)
-const MISS_SCORE = 0 -- flip score outside the window (Stations.Flip 1)
+-- flip score (kitchen-focus.md §3): Grade.Score grill_flip of the distance to the middle of the window, % of the cook time
+local function flipScore(fraction: number): number
+	const window = Content.Restaurant.Grill
+	const middle = (window.FlipFrom + window.FlipTo) / 2
+	return Grade.Score(Content.Prep, "grill_flip", math.abs(fraction - middle) * 100)
+end
 
 -- Bound grill stations (one per vehicle expected). Stale entries (station removed/re-added) are skipped by alive().
 const grills: { Station } = {}
@@ -466,7 +472,7 @@ local function flipOn(ctx: Context, grill: Station, slot: number, latency: numbe
 	const window = Content.Restaurant.Grill
 	const fraction = if record.Duration > 0 then (seen - record.StartedAt) / record.Duration else -1
 	const bonus = fraction >= window.FlipFrom and fraction <= window.FlipTo
-	const score = if bonus then BONUS_SCORE else MISS_SCORE
+	const score = flipScore(fraction)
 	flippedOf(grill)[slot] = score
 	bonusOf(grill)[slot] = bonus
 	record.Flip = score + 1
@@ -505,6 +511,52 @@ const Grill = {
 }
 
 -- Public API (KitchenService) ------------------------------------------------------------------------------------------
+
+-- The grill of a vehicle with the lowest StationId, nil when it has none.
+function Grill.Find(vehicle: string): Station?
+	return grillsOf(vehicle)[1]
+end
+
+-- Cooking focus (kitchen-focus.md §1 #3): one sausage from `stock` (the sausage_stock station) onto `slot` of `grill` when that
+-- slot is active and free. (true, nil) or (false, notice?): out_of_stock / grill_full (the caller toasts), nil = silent.
+function Grill.PlaceAt(ctx: Context, grill: Station, stock: Station, player: Player, slot: number): (boolean, string?)
+	if grill.Kind ~= GRILL or stock.Kind ~= STOCK then
+		return false, nil
+	end
+	if table.find(activeSlots(ctx, grill), slot) == nil then
+		return false, nil
+	end
+	const record = grill.Records[slot]
+	if record ~= nil and record.State ~= "Empty" then
+		return false, "grill_full"
+	end
+	if ctx.GetStock(ingredientOf(stock)) < 1 then
+		return false, "out_of_stock"
+	end
+	const placed = placeSausage(ctx, stock, player, slot, grill)
+	return placed == slot, nil
+end
+
+-- Cooking focus: flips the sausage of `slot` (only while it cooks, once). Returns its flip score, nil = refused.
+function Grill.FlipAt(ctx: Context, grill: Station, slot: number, latency: number?): number?
+	const score = flipOn(ctx, grill, slot, latency)
+	return score
+end
+
+-- Cooking focus: takes the Ready sausage of `slot` off the grill (onto a plate). Returns (taken, flip score or nil = never flipped).
+function Grill.TakeReady(ctx: Context, grill: Station, slot: number): (boolean, number?)
+	const record = grill.Records[slot]
+	if record == nil or record.State ~= "Ready" then
+		return false, nil
+	end
+	const score = flippedOf(grill)[slot]
+	clearStamps(grill, slot)
+	grill.Records[slot] = StationApi.empty(GRILL)
+	sync(ctx, grill)
+	ctx.Publish(grill)
+	refreshCollect(ctx, grill)
+	return true, score
+end
 
 -- Sausages on the grills of the vehicle (any slot that is not Empty).
 function Grill.Busy(vehicle: string): number
