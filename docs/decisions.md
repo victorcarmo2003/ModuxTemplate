@@ -4050,3 +4050,11 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
 - Decidido pelo dono: **o modo trailer sai**. `Content.Restaurant.Rules.Enabled` deixa de ser chave de rollback; tudo que só existe para o trailer é removido em lotes (TASK-564/565): Mercado e Opal, entrega arrastando até a janela, mesas sujas, porta dos fundos do trailer, anomalias cortadas (002, 003, 007, 018), preparo focado do trailer (`PT_Hatch`, `PT_Bin`, `Station_1..4`) e o tutorial do Mercado.
 - Emendas (append-only): **DEC-280** e TASK-390 ("a chave única liga e desliga o restaurante; o trailer é o rollback"): não há mais rollback. A pasta `Trailer` do Studio é o restaurante (nome mantido pelo dono).
 - Fica para decidir: Gear Stand (Q-395), esteira (Q-390).
+
+### DEC-308 — 2026-10-19 — A esteira sai: a montagem é toda no mundo (Q-390 A); Gear Stand e Opal ficam (Q-395 A)
+
+- Origem: respostas do dono em chat (2026-10-19) às Q-390 e Q-395.
+- Decidido pelo dono:
+  - **Q-390 A:** o minigame da esteira (DEC-302) e o preparo focado saem. O hot dog é montado no mundo, como na DEC-306: salsichas fritas empilhadas no descanso, pães cortados empilhados na bandeja, prato na mão (pão + salsicha), condimentos na mesa de condimentos, servir. A nota continua no `Grade` e o ticket continua.
+  - **Q-395 A:** a **Gear Stand** (bancada de upgrades B1..B5) e a **Opal** ficam no restaurante; só as prateleiras do Mercado (`BUY-*`, `buy_package`) saem.
+- Emendas (append-only): **DEC-302**, **DEC-303** (passa e mesa central da esteira), **DEC-304** (o prato nasce na mesa central), **DEC-305** (dois prompts grelha/esteira) e **DEC-223** (preparo focado) deixam de valer no que conflita com a montagem no mundo. Contrato novo: TASK-566.
