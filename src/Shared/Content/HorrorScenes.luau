@@ -311,7 +311,7 @@ const roofWalker: Scene = {
 const crawler: Scene = {
 	Key = "anm_017_crawler",
 	Name = "The crawler",
-	Live = Restaurant.Rules.Enabled,
+	Live = true,
 	Steps = {
 		-- the warning (Signal, 10 s): something under the floor
 		{ At = 0, Phase = "Signal", Kind = "Sound", Target = "horror_sting", Value = 0.6 },
@@ -578,7 +578,7 @@ const hush: Scene = {
 	Steps = {
 		{ At = 0, Phase = "Active", Kind = "Sound", Target = "horror_sting", Value = 0.4 },
 		{ At = 0.5, Phase = "Active", Kind = "Cinema", Value = 0.09, Duration = 1.5 },
-		{ At = 1, Phase = "Active", Kind = "Whispers", Target = if Restaurant.Rules.Enabled then "hush_shop" else "hush", Value = 0.4, To = 2.2, Duration = 13 },
+		{ At = 1, Phase = "Active", Kind = "Whispers", Target = "hush_shop", Value = 0.4, To = 2.2, Duration = 13 },
 		{ At = 1, Phase = "Active", Kind = "Heartbeat", Value = 60, To = 130, Duration = 14 },
 		{ At = 1, Phase = "Active", Kind = "Vignette", Value = 0, To = 0.3, Duration = 14 },
 		-- the corner post: the street is gone; hold still in the dark
@@ -586,7 +586,7 @@ const hush: Scene = {
 		{ At = 15, Phase = "Active", Kind = "Shake", Target = "Step" },
 		{ At = 15.3, Phase = "Active", Kind = "Sound", Target = "breath_held" },
 		{ At = 15.3, Phase = "Active", Kind = "Heartbeat", Value = 120, To = 80, Duration = 18 },
-		{ At = 25, Phase = "Active", Kind = "Whispers", Target = if Restaurant.Rules.Enabled then "hush_shop_hold" else "hush_hold", Value = 0.2, To = 0.2, Duration = 6 },
+		{ At = 25, Phase = "Active", Kind = "Whispers", Target = "hush_shop_hold", Value = 0.2, To = 0.2, Duration = 6 },
 		{ At = 36, Phase = "Active", Kind = "Cinema", Value = 0, Duration = 1.5 },
 		{ At = 36, Phase = "Active", Kind = "Heartbeat", Value = 0, To = 0 },
 		{ At = 0, Phase = "Resolved", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
@@ -631,7 +631,7 @@ const hush: Scene = {
 const knock: Scene = {
 	Key = "anm_009_knock",
 	Name = "The knock",
-	Live = Restaurant.Rules.Enabled,
+	Live = true,
 	Steps = {
 		-- 0 s, first series far and soft: the room starts to hush, bars close in
 		{ At = 0, Phase = "Active", Kind = "Silence", Value = 1, To = 0.55, Duration = 2 },

@@ -800,10 +800,10 @@ const reasons = Table.new({
 } :: { Reason })
 
 const rules: Rules = {
-	Enabled = Restaurant.Switch.PrepEnabled, -- TASK-513 (DT-E1): true in both modes (trailer and restaurant conveyor)
-	Mode = Restaurant.Switch.PrepMode, -- "Conveyor" with the restaurant on, "Trailer" otherwise
+	Enabled = true, -- TASK-513 (DT-E1)
+	Mode = "Conveyor", -- the restaurant (DEC-307); the world kitchen of DEC-306 replaces it (Q-390)
 	-- DEC-223: the world prompts of the kitchen are hidden; false in both modes since TASK-513 (the F2 world kitchen is gone)
-	WorldKitchenPrompts = Restaurant.Switch.WorldKitchenPrompts,
+	WorldKitchenPrompts = false,
 	Delivery = DELIVERY,
 	DoneHold = 0.8,
 	ThreeD = true, -- prep-3d.md §11.3: flips Tabs / Steps to the 3D sets and arms World.Stages (the 2D mode runs while false). On since TASK-203 (the owner plays the 3D grill); Board, Toppings and Serve still use the 2D stages through TabAlias

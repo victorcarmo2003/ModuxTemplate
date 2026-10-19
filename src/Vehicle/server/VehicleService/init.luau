@@ -32,7 +32,6 @@ const SNAPSHOT = "Veh"
 const VEHICLE = Content.RunParams.StartVehicle
 -- MapPoint of the trailer pose at the Pad (MAP-01 §16.3: point = model pivot). Checked, never used to move it.
 const TRL_POINT = "TRL"
-const POSE_TOLERANCE = 1.5 -- studs between the model pivot and the TRL point before a warning
 -- Phases where the lever works (Content.Actions.shutter_toggle.Requires.Phase: Prep, Open, Closing, Night; TASK-284)
 const SHUTTER_PHASES: { string } = Content.Actions.ByKey.shutter_toggle.Requires.Phase or {}
 const PREP = "Prep"
@@ -109,32 +108,6 @@ function VehicleService:Models(): { Instance }
 		end
 	end
 	return out
-end
-
--- The trailer sits where the owner put it; the TRL point must say the same (anomaly zones, the trailer door and the
--- cutscene read it). A mismatch is warned once, never fixed here.
-function VehicleService:CheckPose()
-	-- the restaurant shell is the vehicle (Restaurant.Switch.VehicleIsRestaurant): it never drives, TRL is only a point
-	if not MapIndex.HasBinding() or Content.Restaurant.Switch.VehicleIsRestaurant then
-		return
-	end
-	const point = MapIndex.FindPoint(TRL_POINT)
-	if point == nil then
-		if not self.MissingPoints[TRL_POINT] then
-			self.MissingPoints[TRL_POINT] = true
-			warn(`[VehicleService] MapPoint {TRL_POINT} not found (MAP-01 §16)`)
-		end
-		return
-	end
-	for _, model in self:Models() do
-		if model:IsA("PVInstance") and (model:GetPivot().Position - point.Position).Magnitude > POSE_TOLERANCE then
-			const key = `pose:{model.Name}`
-			if not self.MissingPoints[key] then
-				self.MissingPoints[key] = true
-				warn(`[VehicleService] {model.Name} is not at MapPoint {TRL_POINT}: the point must follow the model (trailer_only_map.luau)`)
-			end
-		end
-	end
 end
 
 -- Service window (§19.14) -----------------------------------------------------------------------------------------
@@ -390,7 +363,6 @@ VehicleService:OnStart(function(self)
 		warn("[VehicleService] no Prompt_Shutter (PromptAction shutter_toggle) in the Workspace (MAP-01 §16.5)")
 	end
 	self:ApplyShutter()
-	self:CheckPose()
 end)
 
 return VehicleService

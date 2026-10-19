@@ -7,9 +7,8 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 
--- Restaurant tutorial (TASK-393; design/tutorial-restaurant.md, Provisional): on with Content.Restaurant.Rules.Enabled.
--- Off = every field below keeps its trailer value (the published tutorial is unchanged).
-const RESTAURANT = Content.Restaurant.Rules.Enabled
+-- Restaurant tutorial (TASK-393; design/tutorial-restaurant.md, Provisional): the only tutorial (DEC-307).
+const RESTAURANT = true
 
 return table.freeze({
 	-- fixed order of the tutorial customer (Content.Ingredients topping keys; Walt's lines name it, Steps.luau)

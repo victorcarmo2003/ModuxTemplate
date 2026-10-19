@@ -17,7 +17,6 @@ export type Public = {
 	Setup: (self: Public) -> (),
 	Current: (self: Public) -> string,
 	Models: (self: Public) -> { Instance },
-	CheckPose: (self: Public) -> (),
 	IsShutterClosed: (self: Public) -> boolean,
 	Interior: (self: Public) -> BasePart?,
 	IsInsidePoint: (self: Public, position: Vector3) -> boolean,

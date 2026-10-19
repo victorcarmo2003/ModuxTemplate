@@ -146,7 +146,7 @@ type RestaurantCall = {
 }
 
 local function nightCall(index: number, body: { Line }, short: { Line }, restaurantCall: RestaurantCall?): BossCall
-	const variant = if Restaurant.Switch.On then restaurantCall else nil
+	const variant = restaurantCall
 	return {
 		Key = `call_night_{index}`,
 		Lines = if variant then variant.Lines else body,
@@ -337,7 +337,7 @@ const base = Table.new({
 		Lines = lines(
 			"Shift's over, Rookie. Nice work.",
 			"Before tonight, get some gear.",
-			if Restaurant.Rules.Enabled then "Gear Stand, in the back." else "Gear Stand, at the Mart.",
+			"Gear Stand, in the back.",
 			"Get Storage. More buns, more sauce.",
 			"Short on cash? I've got you."
 		),

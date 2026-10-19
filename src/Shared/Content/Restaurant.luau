@@ -1,28 +1,16 @@
 --!strict
 -- Restaurant flow, single record (tech/restaurant-flow.md rev. 2 §4.1; design/restaurant-flow.md FEAT-043..FEAT-050;
 -- DEC-269..DEC-280). Owner: game-designer (numbers) + architect (binding names). Every number Provisional.
--- Rules.Enabled = false keeps the trailer flow (no pickup line, no plate gate, tablets ignored, the new map points not
--- required by MapIndex/Required). Rollback = Enabled false (+ the trailer back from ServerStorage.TRAILER_Backup_20261017).
--- TASK-513 (DEC-302..DEC-305, tech/prep-conveyor.md §1): Enabled = true in the repository (as in the owner's Studio).
---
--- THE SINGLE SWITCH (TASK-390, tech/restaurant-flow.md §6): Rules.Enabled is the only thing to flip to turn the
--- restaurant on. Every table that changes with it reads Switch below (derived here, never edited by hand there):
---   Prep.Rules.Enabled = true in both modes, Prep.Rules.Mode = "Conveyor" (restaurant) / "Trailer", and
---   Prep.Rules.WorldKitchenPrompts = false in both modes (DT-E1, prep-conveyor.md §1: the focused prep with the conveyor)
---   Seating.SitAt = "Served", Seating.DirtyTables = false                (DT-R11: sits after the sale, no tray)
---   Vehicles.trailer.HasBackDoor = false, Vehicles.trailer.Restaurant = true (DT-R1, DEC-280: no back door)
---   Anomalies: the CutAnomalies rows lose Family and Scripted (out of the agenda, design/anomalies-v3-restaurant.md §8)
---   Nights: NewAnomaly per night and debut night per row from NewAnomalies / DebutNights (the cut ones were premieres)
---   Supply.MartShelves = false (owner 2026-10-17: the Mart left the map, stock comes from the stock room bays; MapIndex
---     then requires no BUY-* shelf anchor, no OP-1 / MKT-DOOR point). Written below from Switch.MartShelves.
--- Off (default) = every field keeps the published trailer value.
+-- The restaurant is the only flow (DEC-307, 2026-10-18): the trailer mode and its rollback switch are gone. The
+-- tables that used to follow the switch (Prep, Seating, Vehicles, Supply) hold the restaurant values themselves.
+-- Switch keeps only the anomaly agenda changes of the restaurant (cut rows, premieres, debut nights) until the cut
+-- rows leave the catalog (TASK-564).
 -- "ByParty" lists have 4 entries: party of 1..4 active players at the start of the shift (Q-067).
 local Table = require(script.Parent.Table)
 
 export type ByParty = { number }
 
 export type Rules = {
-	Enabled: boolean, -- false = trailer flow (DEC-280 restaurant off); the published game stays the same
 	PlateSlots: number, -- physical PLATE-n on the assembly table (the map may bind fewer)
 	PlateSlotsMax: number, -- with UPG-024 Long Pass (+2 / +4)
 	ActivePlates: ByParty, -- plate slots active per party (FEAT-044); full = tablet "Kitchen full"
@@ -209,7 +197,6 @@ const restaurant: Restaurant = {
 		{ Min = Vector3.new(-48.3, -1, -11.2), Max = Vector3.new(-25.5, 12, -3.4) }, -- pantry / stock room
 	},
 	Rules = {
-		Enabled = true, -- TASK-513 (DEC-302, DT-E1): on in the repository; the trailer is the rollback (false)
 		PlateSlots = 8,
 		PlateSlotsMax = 12,
 		ActivePlates = { 4, 6, 8, 8 },
@@ -285,9 +272,9 @@ const restaurant: Restaurant = {
 		PetMax = 1,
 	},
 	Supply = {
-		Enabled = false, -- derived: overwritten from Rules.Enabled below (never edit by hand)
+		Enabled = true, -- the stock room is the only stock source (FEAT-050, DEC-307)
 		LowAt = 0.25,
-		MartShelves = true, -- derived: overwritten from Switch.MartShelves below (never edit by hand)
+		MartShelves = false, -- the Mart left the map (DEC-307)
 	},
 	-- Q-383 A (8 slots); Reach and PutRate Provisional (prep-conveyor.md §7.2, §11.1)
 	CenterTable = { Slots = 8, Reach = 12, PutRate = 4 },
@@ -345,24 +332,14 @@ local function pickupPoints(count: number?): { string }
 	return out
 end
 
--- What Rules.Enabled flips in the other Content tables (see the header). Pure data, read at require time.
+-- The anomaly agenda of the restaurant (DEC-279, DEC-294, DEC-307). Pure data, read at require time.
 export type Switch = {
-	On: boolean, -- = Rules.Enabled
-	PrepEnabled: boolean, -- Prep.Rules.Enabled (true in both modes since TASK-513)
-	PrepMode: "Trailer" | "Conveyor", -- Prep.Rules.Mode: abas/pan + board per seat, or the conveyor (prep-conveyor.md §1)
-	WorldKitchenPrompts: boolean, -- Prep.Rules.WorldKitchenPrompts (false in both modes since TASK-513)
-	SitAt: "Order" | "Served", -- Seating.SitAt
-	DirtyTables: boolean, -- Seating.DirtyTables
-	HasBackDoor: boolean, -- Vehicles.trailer.HasBackDoor
-	VehicleIsRestaurant: boolean, -- Vehicles.trailer.Restaurant
-	MartShelves: boolean, -- Supply.MartShelves (the Mart and its BUY-* shelves left the map with the restaurant)
 	-- Anomalies keys out of the agenda (Family nil, Scripted nil); the row, module and Journal page stay (dev can force them)
 	CutAnomalies: { string },
 	NewAnomalies: { [number]: string }, -- night index -> Nights[k].NewAnomaly override
 	DebutNights: { [string]: number }, -- Anomalies key -> Night override (a night whose premiere was cut needs a debut)
 }
 
-const on = restaurant.Rules.Enabled
 
 -- design/anomalies-v3-restaurant.md §8.1 (DEC-279, Provisional until wave R4 adapts them) + Q-331 ("hide" leaves):
 --   ANM-002 food (work channel) · ANM-003 bank clock + trailer switch · ANM-004 back door knock · ANM-007, 017, 018
@@ -378,33 +355,18 @@ const CUT_ANOMALIES = {
 }
 
 const switch: Switch = {
-	On = on,
-	PrepEnabled = true,
-	PrepMode = if on then "Conveyor" else "Trailer",
-	WorldKitchenPrompts = false,
-	SitAt = if on then "Served" else "Order",
-	DirtyTables = not on,
-	HasBackDoor = not on,
-	VehicleIsRestaurant = on,
-	MartShelves = not on,
-	CutAnomalies = if on then CUT_ANOMALIES else {},
+	CutAnomalies = CUT_ANOMALIES,
 	-- premieres of nights 6..8 were family B: the family A row debuting that night takes the call (Provisional; the
 	-- boss call texts of those nights still name the old monster until the narrative pass of wave R4)
-	NewAnomalies = if on
-		then {
-			[6] = "anm_014_big_head",
-			-- [7] crawler presents Night 7 again (TASK-483), the floater debuts beside it as in the trailer
-			[8] = "anm_008_long_car",
-		}
-		else {},
+	NewAnomalies = {
+		[6] = "anm_014_big_head",
+		-- [7] crawler presents Night 7 again (TASK-483), the floater debuts beside it as in the trailer
+		[8] = "anm_008_long_car",
+	},
 	-- TASK-484: ANM-019 is back in the restaurant ("don't look up", no HideZone) and presents Night 9 again; the starer
 	-- keeps its own debut (Night 8, silently, like before the cut)
 	DebutNights = {},
 }
-
-restaurant.Supply.MartShelves = switch.MartShelves
--- the stock room replaces the Mart (FEAT-050): on with the restaurant, else nothing would give a box (DEC-306 playtest)
-restaurant.Supply.Enabled = on
 
 export type Module = Restaurant & { PickupPoints: (count: number?) -> { string }, Switch: Switch }
 

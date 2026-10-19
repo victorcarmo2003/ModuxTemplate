@@ -35,7 +35,7 @@ return Table.new({
 		HasSwitch = true, -- "Lights" switch (DEC-189)
 		HasShutter = true, -- service window opens/closes from the button next to the switch (DEC-221)
 		-- TASK-390: derived from Content.Restaurant.Rules.Enabled (Restaurant.Switch); off = the trailer keeps its door
-		HasBackDoor = Restaurant.Switch.HasBackDoor,
-		Restaurant = Restaurant.Switch.VehicleIsRestaurant,
+		HasBackDoor = false,
+		Restaurant = true,
 	},
 } :: { Vehicle })

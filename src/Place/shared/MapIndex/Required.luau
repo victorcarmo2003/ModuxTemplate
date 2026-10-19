@@ -106,7 +106,7 @@ end
 -- The Mart (shelves BUY-*, checkout OP-1, door MKT-DOOR) left the map with the restaurant (owner 2026-10-17: it is kept in
 -- ServerStorage.Mart, the lot is a plaza; stock comes from the phone / bays, SupplyService). Off = no BUY-* anchor, no OP-1
 -- facing rule and the Mart points (MART_POINTS) not required. The Gear Stand (B1..B5, S1, shutters) stays required.
-const MART_ON = Content.Restaurant.Supply.MartShelves and not Content.Restaurant.Rules.Enabled
+const MART_ON = Content.Restaurant.Supply.MartShelves -- false since DEC-307
 const MART_POINTS = { "OP-1", "MKT-DOOR" }
 
 -- GEAR WALL: B1..B5 from Upgrades.BenchSpot (DEC-106), S1 = special spot (bench_buy_item).
@@ -438,26 +438,24 @@ wave3.Routes = wave2.Routes
 -- of each kind" rule of kitchen() does not fit it: only the coffee machine stays checked (KitchenService binds the rest by
 -- tag + StationKind). Change tools/assetplace/check_map01.luau together when this goes on.
 const restaurant = Content.Restaurant
-if restaurant.Rules.Enabled then
-	local pickups = 0
-	for _, count in restaurant.Rules.PickupSlots do
-		pickups = math.max(pickups, count)
-	end
-	const pickupIds = restaurant.PickupPoints(pickups)
-	wave3.Tags = union(wave3.Tags, { restaurant.Binding.TabletTag, restaurant.Binding.PickupTag })
-	wave3.Points = union(wave3.Points, pickupIds)
-	wave3.Nodes = union(wave3.Nodes, pickupIds)
-	wave3.Vehicles = {
-		trailer = {
-			Stations = { coffee_machine = { Actions = { brew_coffee = 1, restock = 1 } } },
-			Actions = { answer_phone = 1, switch_light = 1, shutter_toggle = 1 },
-		},
-	}
-	wave3.Routes = concat(wave2.Routes, {
-		{ From = "Q1", To = pickupIds[#pickupIds], Name = "ROUTE-PICKUP-IN" },
-		{ From = pickupIds[1], To = "EX-E", Name = "ROUTE-PICKUP-EXIT" },
-	})
+local pickups = 0
+for _, count in restaurant.Rules.PickupSlots do
+	pickups = math.max(pickups, count)
 end
+const pickupIds = restaurant.PickupPoints(pickups)
+wave3.Tags = union(wave3.Tags, { restaurant.Binding.TabletTag, restaurant.Binding.PickupTag })
+wave3.Points = union(wave3.Points, pickupIds)
+wave3.Nodes = union(wave3.Nodes, pickupIds)
+wave3.Vehicles = {
+	trailer = {
+		Stations = { coffee_machine = { Actions = { brew_coffee = 1, restock = 1 } } },
+		Actions = { answer_phone = 1, switch_light = 1, shutter_toggle = 1 },
+	},
+}
+wave3.Routes = concat(wave2.Routes, {
+	{ From = "Q1", To = pickupIds[#pickupIds], Name = "ROUTE-PICKUP-IN" },
+	{ From = pickupIds[1], To = "EX-E", Name = "ROUTE-PICKUP-EXIT" },
+})
 
 const BY_WAVE: { List } = { wave1, wave2, wave3 }
 

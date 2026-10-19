@@ -46,7 +46,6 @@ export type AnomalyScore = {
 	Active: StageKey?,
 	Failed: StageKey?, -- default Climax
 	Ramp: number, -- s of the Tension ramp (presentation only; the real windows live in AnomalyService/Rules)
-	RampTrailer: number?, -- Ramp with Content.Restaurant.Rules.Enabled false (nil = Ramp)
 	Caption: string?, -- key of Captions shown when the record turns Active (fresh only)
 }
 
@@ -55,7 +54,6 @@ export type Caption = {
 	Key: string,
 	Title: string,
 	Line: string,
-	LineTrailer: string?, -- Line with Content.Restaurant.Rules.Enabled false (nil = Line)
 	Duration: number, -- s on screen (fade in + hold, then fade out)
 }
 
@@ -188,7 +186,6 @@ const anomalies: { [string]: AnomalyScore } = {
 		Active = "Rise", -- owner 2026-10-18: notes loop + rising note, cut at the jumpscare
 		Failed = "Climax",
 		Ramp = 30, -- Rules/ANM-020 RestaurantWindow (the jumpscare second on the client, Effects/ANM-020)
-		RampTrailer = 30, -- Rules/ANM-020 Window
 		Caption = "power_out",
 	},
 }
@@ -198,7 +195,6 @@ const captions = Table.new({
 		Key = "power_out",
 		Title = "POWER OUT",
 		Line = "FIX THE BREAKER", -- DEC-292 (owner 2026-10-18): hiding no longer saves; was "HIDE IN THE BACK"
-		LineTrailer = "FIND THE BREAKER",
 		Duration = 2.6,
 	},
 } :: { Caption })

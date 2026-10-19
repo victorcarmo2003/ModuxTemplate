@@ -108,8 +108,8 @@ export type Seating = {
 
 const seating: Seating = {
 	-- TASK-390: both derived from Content.Restaurant.Rules.Enabled (Restaurant.Switch); off = "Order" / true (the trailer)
-	SitAt = Restaurant.Switch.SitAt,
-	DirtyTables = Restaurant.Switch.DirtyTables,
+	SitAt = "Served",
+	DirtyTables = false,
 	UnlockDay = 2,
 	Tables = 4,
 	Groups = {

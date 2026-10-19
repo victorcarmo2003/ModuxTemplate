@@ -592,10 +592,8 @@ function CustomerService:MeanInterval(): number?
 		local base = if row ~= nil then row.Customers.BaseInterval else flow.NightInterval
 		-- restaurant (owner 2026-10-18): its own, slower night cadence
 		const restaurant = Content.Restaurant
-		if restaurant.Rules.Enabled then
-			const list = restaurant.Flow.NightInterval
-			base = list[math.clamp(round:Info().Night, 1, #list)] or base
-		end
+		const list = restaurant.Flow.NightInterval
+		base = list[math.clamp(round:Info().Night, 1, #list)] or base
 		if base <= 0 or party <= 0 then
 			return nil
 		end
@@ -620,7 +618,7 @@ function CustomerService:NextInterval(): number?
 	local interval = mean * (1 + Content.Flow.Jitter * (2 * self.Rng:NextNumber() - 1))
 	-- restaurant nights: a quiet stretch after every LullEvery customers
 	const restaurant = Content.Restaurant
-	if restaurant.Rules.Enabled and self:IsNightShift() then
+	if self:IsNightShift() then
 		const every = restaurant.Flow.LullEvery
 		self.LullCount += 1
 		if every > 0 and self.LullCount >= every then

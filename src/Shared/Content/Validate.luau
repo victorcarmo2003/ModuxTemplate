@@ -2635,27 +2635,7 @@ local function checkRestaurant()
 	if Seating.SitAt ~= "Order" and Seating.SitAt ~= "Served" then
 		fail("Seating", nil, nil, `SitAt '{tostring(Seating.SitAt)}' must be Order or Served`)
 	end
-	-- TASK-390: the single switch. Every derived field follows Rules.Enabled (nobody hand-edits one of them)
 	const switch = Restaurant.Switch
-	const on = rules.Enabled
-	const trailer = Vehicles.ByKey.trailer
-	-- TASK-513 (DT-E1, prep-conveyor.md §1): the focused prep runs in both modes, with the conveyor in the restaurant, and
-	-- the world kitchen prompts are gone in both
-	if switch.On ~= on or not switch.PrepEnabled or switch.WorldKitchenPrompts then
-		fail(name, nil, nil, "Switch: PrepEnabled = true and WorldKitchenPrompts = false in both modes (TASK-513)")
-	end
-	if switch.PrepMode ~= (if on then "Conveyor" else "Trailer") then
-		fail(name, nil, nil, "Switch.PrepMode must be Conveyor with the restaurant on, Trailer otherwise (TASK-513)")
-	end
-	if Prep.Rules.Enabled ~= true or Prep.Rules.Mode ~= switch.PrepMode or Prep.Rules.WorldKitchenPrompts ~= false then
-		fail(name, nil, nil, "Prep.Rules.Enabled / Mode / WorldKitchenPrompts must follow Restaurant.Switch (TASK-513)")
-	end
-	if Seating.SitAt ~= (if on then "Served" else "Order") or Seating.DirtyTables == on then
-		fail("Seating", nil, nil, "SitAt / DirtyTables must follow Restaurant.Switch (TASK-390)")
-	end
-	if trailer == nil or trailer.HasBackDoor == on or trailer.Restaurant ~= on then
-		fail("Vehicles", nil, "trailer", "HasBackDoor / Restaurant must follow Restaurant.Switch (TASK-390)")
-	end
 	for _, key in switch.CutAnomalies do
 		const row = Anomalies.ByKey[key]
 		if row == nil then
