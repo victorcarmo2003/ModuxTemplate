@@ -33,10 +33,8 @@ local Content = require(ReplicatedStorage.shared.Content)
 local Modux = require(ServerScriptService.server.Modux)
 
 const TAG = "Interactable"
-const PACKAGE_ACTION = "buy_package"
 const UPGRADE_ACTION = "bench_buy_upgrade"
 const ITEM_ACTION = "bench_buy_item"
-const PACKAGE_GAP = Content.Actions.ByKey[PACKAGE_ACTION].Hold * 0.8
 const NOTICE_GAP = 2 -- seconds (FEAT-005 anti-spam; Provisional constant, TASK-080: no Content field yet)
 
 local function stringAttribute(anchor: Instance, name: string): string?
@@ -83,8 +81,6 @@ const MarketService = Modux.Service("MarketService", {
 })
 
 function MarketService:Setup()
-	-- os.clock() of the last accepted buy_package per player (PACKAGE_GAP)
-	self.LastBuy = {} :: { [Player]: number }
 	-- os.clock() of the last refusal toast per player and Notices key (NOTICE_GAP)
 	self.LastNotice = {} :: { [Player]: { [string]: number } }
 	-- identity of the last shift that got the "Closing time" hint (once per shift)
@@ -97,11 +93,6 @@ end
 -- Same answer as Stock.Blocked: KitchenService owns the rule.
 function MarketService:IsBlocked(ingredientKey: string): boolean
 	return self.Dependencies.KitchenService:IsBlocked(ingredientKey)
-end
-
-function MarketService:PackageOf(anchor: Instance): Content.Package?
-	const key = stringAttribute(anchor, "Package")
-	return if key then Content.Packages.ByKey[key] else nil
 end
 
 function MarketService:UpgradeOf(anchor: Instance): Content.Upgrade?
@@ -204,11 +195,7 @@ end
 function MarketService:Refresh(anchor: Instance)
 	const action = anchor:GetAttribute("PromptAction")
 	const interaction = self.Dependencies.InteractionService
-	if action == PACKAGE_ACTION then
-		const package = self:PackageOf(anchor)
-		-- Text left to the client (Prompt.luau fills {item}/{price} from Package): same table, no duplicate string.
-		interaction:SetPrompt(anchor, package ~= nil and not self:IsBlocked(package.Ingredient))
-	elseif action == UPGRADE_ACTION then
+	if action == UPGRADE_ACTION then
 		const upgrade = self:UpgradeOf(anchor)
 		if upgrade == nil or not self:IsKioskOpen() or not self:OnSale(upgrade) then
 			interaction:SetPrompt(anchor, false)
@@ -251,51 +238,6 @@ function MarketService:CanAct(player: Player): boolean
 	return self.Dependencies.RoundService:IsStarted() and self.Dependencies.RunStateService:IsActive(player)
 end
 
-function MarketService:ValidatePackage(player: Player, anchor: Instance): boolean
-	if not self:CanAct(player) then
-		return false
-	end
-	const package = self:PackageOf(anchor)
-	if package == nil then
-		return false
-	end
-	if self:IsBlocked(package.Ingredient) then
-		self:Refuse(player, "shelf_locked", Content.Ingredients.IndexOf[package.Ingredient] or 0)
-		return false
-	end
-	const last = self.LastBuy[player]
-	return last == nil or os.clock() - last >= PACKAGE_GAP
-end
-
--- Hotbar and package limit before the money (T036-07: refused without charging), then Spend and Give with no yield
--- in between, so the Tool always lands once the cash is gone.
-function MarketService:BuyPackage(player: Player, anchor: Instance)
-	const package = self:PackageOf(anchor)
-	if package == nil then
-		return
-	end
-	const items = self.Dependencies.ItemService
-	const ok, notice, value = items:CanGive(player, package.Item)
-	if not ok then
-		if notice then
-			self.Dependencies.RunStateService:Notify(player, notice, value)
-		end
-		return
-	end
-	if items:Template(package.Item) == nil then
-		warn(`[MarketService] no kit Tool for "{package.Item}" (Assets.Items.Tools): purchase refused`)
-		return
-	end
-	if player:FindFirstChildOfClass("Backpack") == nil then
-		return
-	end
-	if not self.Dependencies.EconomyService:Spend(package.Price, player, package.Key) then
-		return -- "not_enough_cash" already sent by Spend
-	end
-	self.LastBuy[player] = os.clock()
-	items:Give(player, package.Item, { Count = package.Amount })
-end
-
 function MarketService:ValidateUpgrade(player: Player, anchor: Instance): boolean
 	if not self:CanAct(player) then
 		return false
@@ -334,14 +276,6 @@ MarketService:OnInit(function(self)
 
 	-- InteractionService (730) built its handler table in its own OnInit, before this one (615).
 	const interaction = self.Dependencies.InteractionService
-	interaction:RegisterAction(PACKAGE_ACTION, {
-		Validate = function(player: Player, anchor: Instance, _id: number): boolean
-			return self:ValidatePackage(player, anchor)
-		end,
-		Run = function(player: Player, anchor: Instance, _id: number)
-			self:BuyPackage(player, anchor)
-		end,
-	})
 	interaction:RegisterAction(UPGRADE_ACTION, {
 		Validate = function(player: Player, anchor: Instance, _id: number): boolean
 			return self:ValidateUpgrade(player, anchor)
@@ -356,7 +290,6 @@ MarketService:OnInit(function(self)
 	end)
 
 	self.Dependencies.PlayerService.PlayerRemoving:Connect(function(player)
-		self.LastBuy[player] = nil
 		self.LastNotice[player] = nil
 	end)
 end)

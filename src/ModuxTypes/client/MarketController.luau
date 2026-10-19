@@ -61,8 +61,6 @@ export type Public = {
 	UpgradeAt: (self: Public, slot: string) -> Content.Upgrade?,
 	BenchView: (self: Public, upgrade: Content.Upgrade, vehicle: string, level: number, wait: number) -> View,
 	MiniTarget: (self: Public, upgrade: Content.Upgrade, vehicle: string, level: number, wait: number) -> Minis.Target,
-	SyncShelves: (self: Public) -> (),
-	MountShelf: (self: Public, anchor: Instance, packageKey: string) -> Mounted?,
 	PlatePart: (self: Public, slot: string) -> Part?,
 	SyncPlates: (self: Public) -> (),
 	MountBench: (self: Public, anchor: Instance, slot: string) -> Mounted?,

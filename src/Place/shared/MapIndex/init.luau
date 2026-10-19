@@ -563,9 +563,8 @@ function MapIndex.Validate(required: List): { string }
 		end
 	end
 
-	-- 2: anchors on the map (open sign, Mart shelves, bench)
+	-- 2: anchors on the map (open sign, bench)
 	const mapActions: { [string]: number } = {}
-	const shelves: { [string]: { Instance } } = {}
 	const benches: { [string]: { Instance } } = {}
 	for _, anchor in anchors do
 		const action = stringAttribute(anchor, "PromptAction")
@@ -576,15 +575,6 @@ function MapIndex.Validate(required: List): { string }
 			mapActions[action] = (mapActions[action] or 0) + 1
 			if ancestorWithTag(anchor, "Vehicle") ~= nil then
 				add(`2: {action} {nameOf(anchor)} is inside a Vehicle (it stays on the map)`)
-			end
-		elseif action == "buy_package" then
-			const package = stringAttribute(anchor, "Package")
-			if package == nil then
-				add(`2: buy_package {nameOf(anchor)} without Package`)
-			else
-				const list = shelves[package] or {}
-				shelves[package] = list
-				table.insert(list, anchor)
 			end
 		elseif action == "bench_buy_upgrade" or action == "bench_buy_item" then
 			const spot = stringAttribute(anchor, "BenchSlot")
@@ -604,12 +594,6 @@ function MapIndex.Validate(required: List): { string }
 	for action, count in required.MapActions do
 		if (mapActions[action] or 0) ~= count then
 			add(`2: {mapActions[action] or 0} {action} anchor(s) on the map, need {count}`)
-		end
-	end
-	for _, package in required.Packages do
-		const found = #(shelves[package] or {})
-		if found ~= 1 then
-			add(`2: buy_package {package} found {found} time(s), need 1`)
 		end
 	end
 	for spot in required.Bench do
@@ -636,7 +620,6 @@ function MapIndex.Validate(required: List): { string }
 			end
 		end
 	end
-	spread(shelves, required.ShelfGap, "Mart shelves")
 	spread(benches, required.BenchGap, "bench")
 	for _, vehicle in vehicleModels do
 		const inVehicle: { Instance } = {}

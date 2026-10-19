@@ -363,11 +363,6 @@ const base = Table.new({
 		"serve",
 		lines("Nice! Tips go in the jar.", "Low on stock? Grab a box in the pantry.")
 	),
-	hint(
-		"hint_buy_package",
-		"buy_package",
-		lines("Careful crossing. Get hit, drop it.", "Gear's on the back wall.", "Sometimes there's something special.")
-	),
 	hint("hint_restock", "restock", lines("That's how you restock. Easy.")),
 	hint("hint_discard", "discard", lines("Messed up? Toss it. No harm.")),
 	hint("hint_bench_buy_upgrade", "bench_buy_upgrade", lines("New gear's in the kitchen. Heh.")),
@@ -392,7 +387,6 @@ const rules: Rules = {
 			"serve",
 			"topping_add",
 			"discard",
-			"buy_package",
 			"restock",
 		},
 	},

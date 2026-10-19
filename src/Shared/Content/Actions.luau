@@ -56,7 +56,6 @@ return Table.new({
 	-- fills it to capacity (KitchenService, Stations/Toppings). Anchor Prompt_Unwrap_<Suf> (made at runtime when the map has none)
 	-- TASK-277: a real "hold E" (1 s, was 0.5) on the gift-wrapped bowl (black Highlight, white outline)
 	{ Key = "topping_unwrap", Text = "Open", Hold = 1, Radius = 7, Requires = {}, Night = "Any", Wave = 1 },
-	{ Key = "buy_package", Text = "Buy {item} — ${price}", Hold = 0.5, Radius = 7, Requires = {}, Night = "Any", Wave = 1 },
 	{
 		Key = "bench_buy_upgrade",
 		Text = "Buy {upgrade} — ${price}",

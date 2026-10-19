@@ -51,7 +51,6 @@ local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local GearTag = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.GearTag)
-local ShelfTag = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.ShelfTag)
 local Hint = require(script.Hint)
 local Kiosk = require(script.Kiosk)
 local Labels = require(script.Labels)
@@ -64,13 +63,8 @@ local Fx = require(StarterPlayer.StarterPlayerScripts.client.Kitchen.KitchenCont
 const TAG = "Interactable"
 const ECONOMY_ID = 1 -- single record (network.md §1 rule 5)
 const SPECIAL_SLOT = "S1"
--- Shelf tag sits under the prompt pill, which is drawn at the anchor itself (Provisional, MAP-01 §7.4).
-const SHELF_OFFSET = Vector3.new(0, -1.3, 0)
--- Chest freezers (TASK-319): the anchor floats over the rim, so the tag under the pill sank into the case and was cut
--- by its edge. When something solid sits under the tag's spot, the tag goes over the pill instead.
-const SHELF_LIFTED = Vector3.new(0, 1.3, 0)
-const SHELF_CLEARANCE = 0.6 -- studs: half the ShelfTag height (0.475) + a small margin under it
-const SHELF_DISTANCE = 30
+const BUN_BAY_TAG = "StockShelf" -- pantry bays (Supply/Shelves.luau)
+const BUN_PACKAGE = "pack_buns"
 const SETTLE = 0.5 -- s before an upgrade sound is decided (swap guard)
 const SWAP_GUARD = 2 -- s: level changes this close to a vehicle swap are the swap, not a purchase
 const CONFETTI = 14 -- AST-092 upgrade Emit(14)
@@ -363,66 +357,6 @@ function MarketController:MiniTarget(upgrade: Content.Upgrade, vehicle: string, 
 		return { State = "Sale", Part = nextRow.Part, Vehicle = vehicle, Badge = badge }
 	end
 	return { State = "Maxed", Part = if current then current.Part else "", Vehicle = vehicle, Badge = badge }
-end
-
--- Shelf tag offset: under the prompt pill, or over it when the spot under the pill is inside a case (TASK-319).
-local function shelfOffset(anchor: Instance): Vector3
-	const position = if anchor:IsA("Attachment") then anchor.WorldPosition elseif anchor:IsA("BasePart") then anchor.Position else nil
-	if position == nil then
-		return SHELF_OFFSET
-	end
-	const params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Exclude
-	params.FilterDescendantsInstances = { if anchor:IsA("Attachment") then anchor.Parent or anchor else anchor }
-	const hit = workspace:Raycast(position, Vector3.new(0, SHELF_OFFSET.Y - SHELF_CLEARANCE, 0), params)
-	return if hit then SHELF_LIFTED else SHELF_OFFSET
-end
-
--- Case parts stream in after the anchor: re-check where each shelf tag hangs.
-function MarketController:SyncShelves()
-	for anchor, mounted in self.Mounted do
-		if mounted.Slot == nil and anchor.Parent then
-			mounted.Gui.StudsOffset = shelfOffset(anchor)
-		end
-	end
-end
-
-function MarketController:MountShelf(anchor: Instance, packageKey: string): Mounted?
-	const package = Content.Packages.ByKey[packageKey]
-	const ingredient = if package then Content.Ingredients.ByKey[package.Ingredient] else nil
-	if package == nil or ingredient == nil then
-		warn(`[MarketController] shelf {anchor:GetFullName()}: unknown Package "{packageKey}"`)
-		return nil
-	end
-	const availability = self.Stock[ingredient.Key]
-	const price = package.Price
-
-	local function mode(): ShelfTag.Mode
-		if availability() == "Blocked" then
-			return "OutOfStock"
-		end
-		return if self:CanPay(price) then "Price" else "NoCash"
-	end
-
-	const unmount, gui = Vide.root(function()
-		return ShelfTag({
-			Name = "ShelfTag_" .. packageKey,
-			Adornee = anchor,
-			Visible = function()
-				return availability() ~= "Unknown"
-			end,
-			Mode = mode,
-			Text = function()
-				return if mode() == "OutOfStock" then Labels.OutOfStock else Labels.Price(price)
-			end,
-			SubText = function()
-				return Labels.UnlockDay(ingredient)
-			end,
-			StudsOffset = SHELF_OFFSET,
-			MaxDistance = SHELF_DISTANCE,
-		})
-	end)
-	return { Gui = gui, Unmount = unmount, Slot = nil }
 end
 
 -- Local invisible part of a slot's plate: over the miniature centre (Mart.Plate.Lift), nil while the miniature has no
@@ -782,8 +716,25 @@ function MarketController:HintTarget(): Instance?
 	return nil
 end
 
--- Low buns (Content.Mart.BunHint, owner decision 2026-10-17: the Mart lesson left Day 1): an arrow to the Mart door and
--- one toast per low spell, any day, while the tutorial is not running. Owns the screen over the gear-stand hint.
+-- The pantry bay of the buns (StockShelf, Package pack_buns): the part the low-bun arrow points at (nil = not streamed)
+local function bunBay(): BasePart?
+	for _, bay in CollectionService:GetTagged(BUN_BAY_TAG) do
+		if bay:GetAttribute("Package") == BUN_PACKAGE and bay:IsDescendantOf(workspace) then
+			if bay:IsA("BasePart") then
+				return bay
+			end
+			const part = if bay:IsA("Model") then bay.PrimaryPart or bay:FindFirstChildWhichIsA("BasePart", true) else nil
+			if part ~= nil then
+				return part
+			end
+		end
+	end
+	return nil
+end
+
+-- Low buns (Content.Mart.BunHint, owner decision 2026-10-17): an arrow to the buns bay of the pantry (DEC-307: the Mart
+-- left the map) and one toast per low spell, any day, while the tutorial is not running. Owns the screen over the
+-- gear-stand hint.
 function MarketController:StepBunHint()
 	const hint = self.BunHint
 	if hint == nil then
@@ -808,12 +759,12 @@ function MarketController:StepBunHint()
 		hint:Set(false)
 		return
 	end
-	const door = tutorial:MartDoor()
+	const door = bunBay()
 	const character = Players.LocalPlayer.Character
 	const root = if character then character:FindFirstChild("HumanoidRootPart") else nil
 	if door and door:IsA("BasePart") and root and root:IsA("BasePart") then
 		if (root.Position - door.Position).Magnitude <= rule.Reach then
-			self.BunDismissed = true -- at the Mart: done until the stock goes back up
+			self.BunDismissed = true -- at the pantry: done until the stock goes back up
 			self.BunShown = false
 			hint:Set(false)
 			return
@@ -824,7 +775,7 @@ function MarketController:StepBunHint()
 	self.BunShown = door ~= nil
 	if door ~= nil and not self.BunToasted then
 		self.BunToasted = true
-		self.Dependencies.HudController:PushText("Buns running low! Grab more at the Mart.", "Info")
+		self.Dependencies.HudController:PushText("Buns running low! Grab a box in the pantry.", "Info")
 	end
 end
 
@@ -899,7 +850,6 @@ function MarketController:Step()
 		self.LastRelocate = now
 		self.Minis:Relocate()
 		self:SyncPlates()
-		self:SyncShelves()
 	end
 	self:StepBunHint()
 	self:StepHint()
@@ -915,12 +865,9 @@ function MarketController:Add(anchor: Instance)
 	if gui == nil or self.Mounted[anchor] or not anchor:IsDescendantOf(workspace) then
 		return
 	end
-	const package = anchor:GetAttribute("Package")
 	const slot = anchor:GetAttribute("BenchSlot")
 	local mounted: Mounted? = nil
-	if typeof(package) == "string" and package ~= "" then
-		mounted = self:MountShelf(anchor, package)
-	elseif typeof(slot) == "string" and slot ~= "" then
+	if typeof(slot) == "string" and slot ~= "" then
 		-- the miniature falls back to the prompt anchor when the slot has no pedestal; bound first so the plate
 		-- finds its position
 		self.Minis:Bind(slot, self.Pedestals[slot], anchor)

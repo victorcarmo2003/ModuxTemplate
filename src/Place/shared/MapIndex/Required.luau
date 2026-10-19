@@ -64,12 +64,10 @@ export type List = {
 	Vehicles: { [string]: VehicleRule }, -- key of Content.Vehicles -> rule; exactly one Model of each
 	Toppings: { string }, -- ingredient keys of the toppings grid
 	MapActions: { [string]: number }, -- PromptAction outside any vehicle, exact count (open sign)
-	Packages: { string }, -- one buy_package anchor per key (Mart shelves); empty when the Mart is off the map (MART_ON)
 	Bench: { [string]: string }, -- BenchSlot -> PromptAction (GEAR WALL)
 	Tagged: { TaggedIds },
 	StationGap: number, -- min distance between anchors of different stations (§18.7 item 4)
 	ToppingGap: number, -- min distance between anchors of different ingredients in the grid
-	ShelfGap: number, -- min distance between Mart shelf anchors
 	BenchGap: number, -- min distance between bench anchors
 	MaxEdge: number, -- studs (§18.6)
 	MaxNodes: number, -- §12.3
@@ -218,12 +216,10 @@ local function base(wave: number): List
 		},
 		Toppings = Content.Ingredients.ToppingKeys,
 		MapActions = {}, -- the shop lever is the trailer service window (TASK-284)
-		Packages = if MART_ON then Content.Packages.Keys else {},
 		Bench = bench(),
 		Tagged = {},
 		StationGap = 2.5,
 		ToppingGap = 2.0,
-		ShelfGap = 2.5,
 		BenchGap = 2.5,
 		MaxEdge = 40,
 		MaxNodes = 80,
