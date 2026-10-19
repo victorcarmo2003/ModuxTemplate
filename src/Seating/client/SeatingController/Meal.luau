@@ -50,8 +50,12 @@ const BUN = Color3.fromHex("#E8B36B")
 const SAUSAGE = Color3.fromHex("#B5482E")
 const TOPPING_ANCHOR = "Att_Topping1" -- HotDogVisual: the up axis of the stack
 -- carried plate (Provisional, judged in Play): in torso space, a little under the chest and in front of it
-const HOLD_DROP = 0.3 -- share of the torso height under its centre
+const HOLD_DROP = 0.08 -- share of the torso height under its centre (the plate bottom at the raised hands)
 const HOLD_AHEAD = 0.55 -- studs in front of the torso face
+-- arms under the plate while it walks (R6 shoulders, rotation about the joint's Z: + right arm forward, - left)
+const HOLD_ARM_ANGLE = math.rad(65)
+const HOLD_ARM_IN = math.rad(20) -- the raised arms turned toward the middle, the hands under the rim
+const SHOULDERS: { [string]: number } = { ["Right Shoulder"] = 1, ["Left Shoulder"] = -1 }
 const REACH = 1.4 -- studs from the seated root towards the table centre where the plate lands (at most)
 const REACH_SHARE = 0.75 -- ... and at most this share of the way to the centre
 
@@ -86,6 +90,7 @@ type Carry = {
 	Model: Model?, -- plate (+ Food on it)
 	Food: Model?, -- hot dog on the plate
 	Hold: WeldConstraint?, -- torso -> plate while it walks
+	Arms: { [Motor6D]: { From: CFrame, To: CFrame } }?, -- shoulders raised to hold the plate (C0 before / set)
 	OnTable: boolean,
 	Seated: boolean, -- it sat with the plate: standing up again = done
 	Done: boolean, -- ate at a table: walks out empty-handed until `Carrying` goes
@@ -326,19 +331,29 @@ local function lay(handle: BasePart, top: CFrame): CFrame
 	return top * CFrame.new(0, half, 0) * turn:Inverse()
 end
 
+-- Puts the HANDLE of `food` on `at` (PivotTo moves the model pivot, which may be turned against the handle: the kit hot
+-- dog's is, and the carried plate stood on its edge)
+local function placeHandle(food: Model, handle: BasePart, at: CFrame)
+	food:PivotTo(at * handle.CFrame:ToObjectSpace(food:GetPivot()))
+end
+
 -- `food` laid on what it is carried on: the Tool's dish (with `dish`, built under it), else the drawn plate (Tray.Plate).
 -- Pivot = centre of the bottom, Y up (Land puts it on the table). Returns the model and its base part.
 local function carried(food: Model, dish: boolean): (Model, BasePart)
 	const handle = food.PrimaryPart :: BasePart
 	if dish then
-		food:PivotTo(lay(handle, CFrame.identity))
+		placeHandle(food, handle, lay(handle, CFrame.identity))
 		const model = Instance.new("Model")
 		const dishBase = dishUnder(handle, model)
 		if dishBase ~= nil then
+			-- lowest point of the turned parts (the rim is a cylinder lying flat: its Size.Y is its diameter, not its height)
 			local bottom = math.huge
 			for _, part in model:GetChildren() do
 				if part:IsA("BasePart") then
-					bottom = math.min(bottom, part.Position.Y - part.Size.Y / 2)
+					const frame, size = part.CFrame, part.Size
+					const halfY = 0.5
+						* (math.abs(frame.RightVector.Y) * size.X + math.abs(frame.UpVector.Y) * size.Y + math.abs(frame.LookVector.Y) * size.Z)
+					bottom = math.min(bottom, part.Position.Y - halfY)
 				end
 			end
 			const centre = dishBase.Position
@@ -350,9 +365,38 @@ local function carried(food: Model, dish: boolean): (Model, BasePart)
 		model:Destroy()
 	end
 	const plate, topHeight = Tray.Plate()
-	food:PivotTo(lay(handle, CFrame.new(0, topHeight, 0)))
+	placeHandle(food, handle, lay(handle, CFrame.new(0, topHeight, 0)))
 	food.Parent = plate
 	return plate, plate.PrimaryPart :: BasePart
+end
+
+-- Shoulders raised so both hands are under the plate (local C0; the walk clip still swings them a little on top)
+local function raiseArms(torso: BasePart): { [Motor6D]: { From: CFrame, To: CFrame } }
+	const arms = {}
+	for name, side in SHOULDERS do
+		const joint = torso:FindFirstChild(name)
+		if joint ~= nil and joint:IsA("Motor6D") then
+			const from = joint.C0
+			const to = from * CFrame.Angles(0, side * HOLD_ARM_IN, 0) * CFrame.Angles(0, 0, side * HOLD_ARM_ANGLE)
+			joint.C0 = to
+			arms[joint] = { From = from, To = to }
+		end
+	end
+	return arms
+end
+
+-- Back to the C0 they had, unless the server wrote its own meanwhile (the seated pose)
+local function lowerArms(carry: Carry)
+	const arms = carry.Arms
+	carry.Arms = nil
+	if arms == nil then
+		return
+	end
+	for joint, pose in arms do
+		if joint.Parent ~= nil and joint.C0 == pose.To then
+			joint.C0 = pose.From
+		end
+	end
 end
 
 -- Plate + hot dog in front of the torso (walking to the table, or takeaway).
@@ -377,6 +421,7 @@ function Meal.Hold(self: Meal, rig: Model, carry: Carry)
 	carry.Food = food
 	carry.Hold = hold
 	carry.OnTable = false
+	carry.Arms = raiseArms(torso)
 end
 
 -- Seated with the plate: it goes on the table, between the diner and the table centre. Idempotent.
@@ -402,6 +447,7 @@ function Meal.Land(self: Meal, rig: Model)
 		carry.Hold:Destroy()
 		carry.Hold = nil
 	end
+	lowerArms(carry)
 	const flat = if distance > 1e-3 then toward.Unit else top.LookVector
 	plate:PivotTo(CFrame.lookAt(at, at + flat))
 	for _, descendant in plate:GetDescendants() do
@@ -428,6 +474,7 @@ function Meal.ClearCarry(_self: Meal, carry: Carry)
 	carry.Food = nil
 	carry.Hold = nil
 	carry.OnTable = false
+	lowerArms(carry)
 end
 
 function Meal.DropCarry(self: Meal, rig: Model)
@@ -445,7 +492,7 @@ function Meal.RefreshCarry(self: Meal, rig: Model)
 	end
 	local carry = self.Carries[rig]
 	if carry == nil then
-		const created: Carry = { Model = nil, Food = nil, Hold = nil, OnTable = false, Seated = false, Done = false }
+		const created: Carry = { Model = nil, Food = nil, Hold = nil, Arms = nil, OnTable = false, Seated = false, Done = false }
 		self.Carries[rig] = created
 		carry = created
 	end

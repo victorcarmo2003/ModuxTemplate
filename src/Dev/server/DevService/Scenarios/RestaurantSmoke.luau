@@ -11,8 +11,9 @@
 --   cooking focus (kitchen-focus.md §1): the prompts open the focus; the gestures go through KitchenService.Cook.Act, the
 --   same path as the Cook packet (reach, rate, station locks), with a fixed score of 90
 --   plate        plate_take on the plate pile -> a plate Tool with Ticket = the customer
---   cut          cook_focus at the board, Cut -> Bun on the plate
---   grill        cook_focus at the grill, Place on slot 1 -> Flip in the window -> Ready -> Dog -> the hot_dog Tool, same Ticket
+--   cut          cook_focus at the board, Cut -> the cut-bun pile; plate_add_bun -> Bun on the plate (DEC-310)
+--   grill        cook_focus at the grill, Place -> Flip in the window -> Ready -> Collect (rest rail); plate_add_sausage ->
+--                the hot_dog Tool, same Ticket
 --   condiments   cook_focus at the table, Topping for every topping of the order
 --   pickup       pickup_serve on PICKUP -> the customer is no longer Waiting (cash delta reported)
 --   table        the customer sits (Dining) or takes it away (leaves) within 20 s
@@ -308,14 +309,17 @@ local function run(api: Api.Context, dev: Dev, caller: Player?): string
 		{
 			Name = "cut",
 			Run = function(): string?
-				equip(plateTool :: Tool)
+				-- DEC-310: the cut bun goes to the cut-bun pile, then "Add Bun" takes it onto the plate
 				act(cookAnchor("Board"), "cook_focus")
 				kitchen.Cook.Act(player, { Act = "Cut", Slot = 0, Score = 90 })
+				task.wait(0.3)
+				equip(plateTool :: Tool)
+				act(pick("plate_add_bun"), "plate_add_bun")
 				task.wait(0.2)
 				if (plateTool :: Tool):GetAttribute("Bun") ~= true then
-					error(`no Bun on the plate after Cut{why()}`, 0)
+					error(`no Bun on the plate after Cut + Add Bun{why()}`, 0)
 				end
-				return "bun cut onto the plate"
+				return "bun cut to the pile, then onto the plate"
 			end,
 		},
 		{
@@ -381,11 +385,15 @@ local function run(api: Api.Context, dev: Dev, caller: Player?): string
 				if not waitFor(isReady, 20) then
 					error(`place {used} not Ready{why()}`, 0)
 				end
-				kitchen.Cook.Act(player, { Act = "Dog", Slot = used, Score = 90 })
+				-- DEC-310: the ready sausage goes to the rest rail, then "Add Sausage" takes it onto the plate
+				kitchen.Cook.Act(player, { Act = "Collect", Slot = used, Score = 0 })
+				task.wait(0.3)
+				equip(plateTool :: Tool)
+				act(pick("plate_add_sausage"), "plate_add_sausage")
 				task.wait(0.3)
 				const tool = toolOf("hot_dog")
 				if tool == nil then
-					error(`no hot_dog after Dog{why()}`, 0)
+					error(`no hot_dog after Collect + Add Sausage{why()}`, 0)
 				end
 				if tool:GetAttribute("Ticket") ~= npc then
 					error(`hot_dog Ticket {tool:GetAttribute("Ticket")} (expected {npc})`, 0)

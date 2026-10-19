@@ -3,7 +3,7 @@
 
 -- One Cook packet (Net.Restaurant Cook)
 export type Send = {
-	Act: "Cut" | "Place" | "Flip" | "Dog" | "Topping",
+	Act: "Cut" | "Place" | "Flip" | "Collect" | "Topping",
 	Slot: number,
 	Score: number,
 	Key: string?,

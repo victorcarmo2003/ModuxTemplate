@@ -15,6 +15,7 @@
 -- 1, no stock). A plate that takes it carries Altered (the hot dog it becomes keeps the Tool attribute Altered = true).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
+local PlateTool = require(ReplicatedStorage.shared.Plate.PlateTool)
 local StationApi = require(script.Parent.Parent.StationApi)
 local Refusal = require(script.Parent.Parent.Refusal)
 
@@ -27,6 +28,17 @@ const BUN = "Bun"
 
 -- Bound boards (one per vehicle expected). Stale entries (station removed/re-added) are skipped by alive().
 const bound: { Station } = {}
+-- Cut score of the bun on each place (cooking focus, DEC-310), server only: "Add Bun" puts it on the plate as Scores.cut
+const cutScores: { [Station]: { [number]: number } } = setmetatable({}, { __mode = "k" }) :: any
+
+local function scoresOf(station: Station): { [number]: number }
+	local scores = cutScores[station]
+	if scores == nil then
+		scores = {}
+		cutScores[station] = scores
+	end
+	return scores
+end
 
 local function alive(station: Station): boolean
 	const instance = station.Instance
@@ -124,9 +136,15 @@ const add: StationApi.Action = {
 		end
 		const bun = station.Records[slot]
 		const altered = bun ~= nil and (bun.Altered or 0) > 0
+		-- the score first: FillPlate may turn the plate into the hot dog, which carries Scores over
+		const score = scoresOf(station)[slot]
+		if score ~= nil then
+			PlateTool.SetScore(plate, "cut", score)
+		end
 		if not ctx.FillPlate(player, plate, "Bun", { Altered = altered }) then
 			return
 		end
+		scoresOf(station)[slot] = nil
 		station.Records[slot] = StationApi.empty(KIND)
 		sync(station)
 		ctx.Publish(station)
@@ -185,8 +203,9 @@ function Board.Count(vehicle: string): number
 	return count
 end
 
--- Puts a whole bun on that slot, sliced in `duration` seconds. False when the slot is not free. Synchronous.
-function Board.Place(ctx: Context, vehicle: string, slot: number, duration: number): boolean
+-- Puts a whole bun on that slot, sliced in `duration` seconds; `score` = its cut score when cut in the focus (nil = sliced by
+-- the crate prompt, no score). False when the slot is not free. Synchronous.
+function Board.Place(ctx: Context, vehicle: string, slot: number, duration: number, score: number?): boolean
 	const station = Board.Find(vehicle)
 	if station == nil then
 		return false
@@ -202,6 +221,7 @@ function Board.Place(ctx: Context, vehicle: string, slot: number, duration: numb
 		Duration = duration,
 		Count = 0,
 	}
+	scoresOf(station)[slot] = score
 	sync(station)
 	ctx.Publish(station)
 	return true

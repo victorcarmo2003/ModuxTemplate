@@ -11,6 +11,7 @@
 	    props, a hint line and the grade pop, and sends its gestures as the Cook packet.
 	The server decides everything (stock, plate, grill, scores clamped); the props are local and go with the focus.
 ]]
+local CollectionService = game:GetService("CollectionService")
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -37,6 +38,16 @@ const SINK_ACTION = "CookFocusSink"
 const LEAVE_ACTION = "CookFocusLeave"
 const SINK_PRIORITY = 3000
 const FOV = 55
+-- Framing (DEC-310, owner 2026-10-19: "the grill is too close"): the camera looks down at PITCH and backs off until the framed
+-- box fits the screen with MARGIN around it, never closer than MIN_DISTANCE. Provisional, judged in Play.
+const PITCH: { [string]: number } = { Board = math.rad(58), Grill = math.rad(55), Toppings = math.rad(52) }
+const MARGIN = 1.35
+const MIN_DISTANCE = 4.5
+-- what else the camera frames with the station: the grill shows the rest rail its sausages go to, the board the two bun crates
+const ALSO: { [string]: { string } } = { Grill = { "rail" }, Board = { "bun_crate", "board" } }
+const NEAR = 9 -- studs: an ALSO station farther than this from the focused one is not framed
+const PLATE_INSET = 0.45 -- studs from the table's front edge to the hot dog (Toppings)
+const CEILING_GAP = 0.5 -- studs the camera keeps under a ceiling between it and the station
 const TRAVEL = 0.45
 const LEAVE_TRAVEL = 0.35
 const DONE_DELAY = 1.1 -- s the result stays on screen before the focus leaves by itself
@@ -131,6 +142,88 @@ end
 
 -- Camera pose ----------------------------------------------------------------------------------------------------------
 
+-- `flat` turned to the nearest horizontal side of the station (the counter's front), so the camera looks square at it and not
+-- along the line from wherever the player stood
+local function squared(target: Instance, flat: Vector3): Vector3
+	const frame = if target:IsA("Model") then target:GetPivot() elseif target:IsA("BasePart") then target.CFrame else CFrame.identity
+	local best, bestDot = flat, -math.huge
+	for _, axis in { frame.RightVector, -frame.RightVector, frame.LookVector, -frame.LookVector } do
+		const horizontal = Vector3.new(axis.X, 0, axis.Z)
+		if horizontal.Magnitude < 0.5 then
+			continue
+		end
+		const unit = horizontal.Unit
+		const dot = unit:Dot(flat)
+		if dot > bestDot then
+			best, bestDot = unit, dot
+		end
+	end
+	return best
+end
+
+-- The first solid surface on the way from `from` along `offset` (ignoring the own character and the focus props), nil = none
+local function castAlong(from: Vector3, offset: Vector3): RaycastResult?
+	const params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	const ignore: { Instance } = {}
+	const character = Players.LocalPlayer.Character
+	if character ~= nil then
+		table.insert(ignore, character)
+	end
+	if Workspace.CurrentCamera ~= nil then
+		table.insert(ignore, Workspace.CurrentCamera)
+	end
+	params.FilterDescendantsInstances = ignore
+	return Workspace:Raycast(from, offset, params)
+end
+
+-- Where the hot dog rests on the condiment table: the middle of its front edge, on the surface found there (the slab between the
+-- front pans), pulled back toward the middle while the ray finds no counter (an edge that overhangs the floor)
+local function restSpot(top: Vector3, size: Vector3, toward: Vector3): Vector3
+	const depth = math.abs(size.X * toward.X) + math.abs(size.Z * toward.Z)
+	local inset = math.max(depth / 2 - PLATE_INSET, 0)
+	for _ = 1, 10 do
+		const probe = top + toward * inset
+		const hit = castAlong(probe + Vector3.yAxis * 2, Vector3.yAxis * -(size.Y + 3.5))
+		if hit ~= nil and hit.Position.Y > top.Y - size.Y - 0.5 then
+			return Vector3.new(probe.X, hit.Position.Y, probe.Z)
+		end
+		inset = math.max(inset - 0.3, 0)
+	end
+	return top
+end
+
+-- What the camera frames: the station and its ALSO neighbours (by StationKind, within NEAR studs)
+local function framed(station: Station, target: Instance, top: Vector3): { Instance }
+	const list: { Instance } = { target }
+	const kinds = ALSO[station]
+	if kinds == nil then
+		return list
+	end
+	for _, other in CollectionService:GetTagged("Station") do
+		if other == target or not other:IsDescendantOf(Workspace) or table.find(kinds, other:GetAttribute("StationKind") :: any) == nil then
+			continue
+		end
+		const at = Kit.Bounds(other)
+		if (at - top).Magnitude <= NEAR then
+			table.insert(list, other)
+		end
+	end
+	return list
+end
+
+-- Distance from the look point that fits a box (half extents along screen right, toward the camera and up) in the view
+local function fitDistance(halfWide: number, halfDeep: number, halfTall: number, pitch: number): number
+	const camera = Workspace.CurrentCamera
+	const viewport = if camera then camera.ViewportSize else Vector2.new(1280, 720)
+	const aspect = math.max(viewport.X, 1) / math.max(viewport.Y, 1)
+	const tanV = math.tan(math.rad(FOV) / 2)
+	const tanH = tanV * aspect
+	const projected = halfDeep * math.sin(pitch) + halfTall * math.cos(pitch)
+	const distance = math.max(halfWide / tanH, projected / tanV) * MARGIN + halfDeep * math.cos(pitch)
+	return math.max(distance, MIN_DISTANCE)
+end
+
 -- Top centre and size of the station, its horizontal "toward the player" and screen right, and the eye of the camera
 function CookController:Pose(station: Station, target: Instance): (Vector3, Vector3, Vector3, Vector3, CFrame, Vector3)
 	local top, size = Kit.Bounds(target)
@@ -140,26 +233,32 @@ function CookController:Pose(station: Station, target: Instance): (Vector3, Vect
 	if root ~= nil and root:IsA("BasePart") then
 		const flat = Vector3.new(root.Position.X - top.X, 0, root.Position.Z - top.Z)
 		if flat.Magnitude > 0.05 then
-			toward = flat.Unit
+			toward = squared(target, flat.Unit)
 		end
-	end
-	if station == "Toppings" then
-		-- the hot dog sits at the front edge of the table (toward the player), on the table top
-		local tableTop: BasePart? = nil
-		for _, part in target:GetDescendants() do
-			if part:IsA("BasePart") and part.Name == "Board" then
-				tableTop = part
-				break
-			end
-		end
-		const depth = math.abs(size.X * toward.X) + math.abs(size.Z * toward.Z)
-		const y = if tableTop then tableTop.Position.Y + tableTop.Size.Y / 2 else top.Y
-		top = Vector3.new(top.X, y, top.Z) + toward * math.max(depth / 2 - 0.45, 0)
 	end
 	const right = (-toward):Cross(Vector3.yAxis).Unit
-	const radius = math.clamp(math.max(size.X, size.Z) / 2, 0.8, 2.6)
-	local eye = top + toward * (radius * 0.75 + 0.8) + Vector3.yAxis * (radius * 1.25 + 1.7)
-	local look = top - toward * 0.1
+	-- the framed box (station + neighbours) in screen axes
+	const boxTop, boxSize = Kit.BoundsOf(framed(station, target, top))
+	const halfWide = (math.abs(boxSize.X * right.X) + math.abs(boxSize.Z * right.Z)) / 2
+	const halfDeep = (math.abs(boxSize.X * toward.X) + math.abs(boxSize.Z * toward.Z)) / 2
+	if station == "Toppings" then
+		top = restSpot(top, size, toward)
+	end
+	const pitch = PITCH[station] or math.rad(55)
+	-- the middle of the box, a little under its top; Toppings leans toward the hot dog (the work)
+	local look = boxTop - Vector3.yAxis * (math.min(boxSize.Y, 1) * 0.5)
+	if station == "Toppings" then
+		look = look:Lerp(top, 0.4)
+	end
+	local distance = fitDistance(halfWide, halfDeep, math.min(boxSize.Y, 1.5) / 2, pitch)
+	const back = toward * math.cos(pitch) + Vector3.yAxis * math.sin(pitch)
+	-- a low ceiling (lamps, the roof) between the station and the eye: the camera stays under it (the ray starts a stud out, clear
+	-- of the station's own parts)
+	const roof = if distance > 1 then castAlong(look + back, back * (distance - 1)) else nil
+	if roof ~= nil then
+		distance = math.max(roof.Distance + 1 - CEILING_GAP, 1.5)
+	end
+	local eye = look + back * distance
 	const camAnchor = target:FindFirstChild("CamAnchor_Cook", true)
 	const focusAnchor = target:FindFirstChild("Focus_Cook", true)
 	if camAnchor ~= nil and camAnchor:IsA("Attachment") then

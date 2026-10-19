@@ -1,17 +1,21 @@
 --!strict
 -- Cooking focus, server side (docs/tech/kitchen-focus.md; owner 2026-10-19). Part of KitchenService (it owns the stations, the
 -- stock and the station locks); plain module: `kitchen` is the KitchenService instance.
+-- DEC-310 (pre-prep): the board and the grill need no plate. The cut bun goes to the cut-bun pile (Board), the ready sausage to
+-- the rest rail (Rail); the plate is built in the world (plate_add_bun / plate_add_sausage carry the cut and flip scores over),
+-- then the toppings in the focus.
 --   Focus stations (found on Start, no Studio binding needed): Grill = the grill of the vehicle; Toppings = the folder holding the
 --   toppings stations (PRODUCTION/Pan_*); Board = the Model with attribute CookStation = "Board", else the one named
 --   Content.Restaurant.Binding.CookBoard (TLR-CUTTING_BOARD). Each gets one Prompt_Cook anchor (PromptAction cook_focus,
 --   attribute Cook = the station, PromptText per station) unless the map authored one.
---   cook_focus  Validate: active player and what the station needs in hand (Board: a plate without a bun; Toppings: the hot dog
---               of a plate; Grill: nothing). Run: CookOpen to the player (the client moves the camera and takes the gestures).
+--   cook_focus  Validate: active player and what the station needs in hand (Toppings: the hot dog of a plate; Board and Grill:
+--               nothing). Run: CookOpen to the player (the client moves the camera and takes the gestures).
 --   Cook packet one gesture, committed here inside the right station lock:
---     Cut      plate in hand without a bun: 1 bun from the stock -> Bun on the plate, Scores.cut = Score
+--     Cut      1 bun from the stock -> lowest free place of the cut-bun pile, cut score kept with it (Board.Place);
+--              board_full / out_of_stock
 --     Place    a sausage from the stock onto the free grill slot `Slot`
 --     Flip     flips the sausage of `Slot` (the score comes from the server clock, Grill.FlipAt)
---     Dog      the Ready sausage of `Slot` -> the plate (needs its bun; plate_needs_bun), Scores.dog = Score, Scores.flip
+--     Collect  the Ready sausage of `Slot` -> the rest rail with its flip score (Grill.CollectAt); rail_full
 --     Topping  `Key` on the hot dog in hand (stock, repeat, MaxToppings, gift bowl, locked), Scores[Key] = Score, the drawn
 --              sauce `Points` into the Tool attribute Sauce (HotDogVisual.Sauce)
 -- Every gesture also needs the player within REACH studs of the focused station. Refusals = toasts (Refusal). The scores are the
@@ -26,6 +30,7 @@ local Sauce = require(ReplicatedStorage.shared.Item.HotDogVisual.Sauce)
 local StationApi = require(script.Parent.StationApi)
 local Refusal = require(script.Parent.Refusal)
 local Grill = require(script.Parent.Stations.Grill)
+local Board = require(script.Parent.Stations.Board)
 
 export type Station = "Board" | "Grill" | "Toppings"
 
@@ -49,9 +54,7 @@ const REACH = 16 -- studs from the focused station a gesture is accepted (the ca
 const RATE = 12 -- gestures per second per player
 const BUN = "bun"
 const PROMPT_TEXT: { [Station]: string } = { Board = "Cut Bun", Grill = "Grill", Toppings = "Toppings" }
-const PLATE = PlateTool.Plate
 const HOT_DOG = PlateTool.HotDog
-const ATTR = PlateTool.Attr
 
 type Bucket = { Tokens: number, At: number }
 
@@ -198,16 +201,7 @@ function Cook.new(kitchen: any): Cook
 
 	-- What the station needs in the hand before it opens (the toast says it)
 	local function canOpen(player: Player, station: Station): boolean
-		if station == "Board" then
-			const plate = held(player, PLATE)
-			if plate == nil then
-				notify(player, "need_plate")
-				return false
-			elseif plate:GetAttribute(ATTR.Bun) == true then
-				notify(player, "plate_full")
-				return false
-			end
-		elseif station == "Toppings" then
+		if station == "Toppings" then
 			const hotDog = held(player, HOT_DOG)
 			if hotDog == nil or PlateTool.Id(hotDog) <= 0 then
 				notify(player, "need_hot_dog")
@@ -220,22 +214,21 @@ function Cook.new(kitchen: any): Cook
 	-- Gestures -------------------------------------------------------------------------------------------------------
 
 	local function cut(player: Player, score: number)
-		const plate = held(player, PLATE)
-		if plate == nil then
-			notify(player, "need_plate")
-			return
-		elseif plate:GetAttribute(ATTR.Bun) == true then
-			notify(player, "plate_full")
-			return
-		end
+		const vehicle = kitchen:GetVehicle()
 		const crate = kitchen:CurrentStation("bun_crate")
 		const run = function()
+			const slot = Board.Free(vehicle)
+			if slot == nil then
+				notify(player, "board_full")
+				return
+			end
 			if kitchen:IsBlocked(BUN) or not kitchen:TakeStock(BUN, 1) then
 				notify(player, "out_of_stock", Refusal.ingredient(BUN))
 				return
 			end
-			if kitchen:FillPlate(player, plate, "Bun", {}) then
-				PlateTool.SetScore(plate, "cut", score)
+			-- cut in the focus already: Ready on the board's next tick
+			if not Board.Place(kitchen.Context, vehicle, slot, 0, score) then
+				warn(`[KitchenService] {player.Name}: a bun left the stock but cut-bun place {slot} refused it`)
 			end
 		end
 		if crate ~= nil then
@@ -245,7 +238,7 @@ function Cook.new(kitchen: any): Cook
 		end
 	end
 
-	local function grillCall(player: Player, act: string, slot: number, score: number)
+	local function grillCall(player: Player, act: string, slot: number)
 		const grill = Grill.Find(kitchen:GetVehicle())
 		if grill == nil then
 			return
@@ -265,35 +258,10 @@ function Cook.new(kitchen: any): Cook
 				end
 			elseif act == "Flip" then
 				Grill.FlipAt(ctx, grill, slot, player:GetNetworkPing())
-			elseif act == "Dog" then
-				const plate = held(player, PLATE)
-				if plate == nil then
-					notify(player, "need_plate")
-					return
-				elseif plate:GetAttribute(ATTR.Bun) ~= true then
-					notify(player, "plate_needs_bun")
-					return
-				elseif plate:GetAttribute(ATTR.Sausage) == true then
-					notify(player, "plate_full")
-					return
-				end
-				const record = grill.Records[slot]
-				if record == nil or record.State ~= "Ready" then
-					return
-				end
-				-- the scores first: FillPlate turns the plate into the hot dog, which carries Scores over
-				PlateTool.SetScore(plate, "dog", score)
-				PlateTool.SetScore(plate, "flip", Content.Prep.Grades.Unflipped)
-				const taken, flip = Grill.TakeReady(ctx, grill, slot)
-				if not taken then
-					return
-				end
-				if flip ~= nil then
-					PlateTool.SetScore(plate, "flip", flip)
-				end
-				const bonus = flip ~= nil and flip >= Content.Prep.Grades.Bands.Good
-				if not kitchen:FillPlate(player, plate, "Sausage", { Flipped = bonus }) then
-					warn(`[KitchenService] {player.Name}: a sausage left the grill but the plate refused it`)
+			elseif act == "Collect" then
+				const ok, reason = Grill.CollectAt(ctx, grill, slot)
+				if not ok and reason == "RailFull" then
+					notify(player, "rail_full")
 				end
 			end
 		end)
@@ -370,7 +338,7 @@ function Cook.new(kitchen: any): Cook
 				topping(player, data.Key, score, data.Points)
 			end
 		elseif data.Slot >= 1 then
-			grillCall(player, kind, data.Slot, score)
+			grillCall(player, kind, data.Slot)
 		end
 	end
 

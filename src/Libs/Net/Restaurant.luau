@@ -23,8 +23,8 @@ end
 -- Cooking focus (kitchen-focus.md §4): one gesture of the focused station, committed by the server
 local function restaurantCook()
 	return Lync.struct({
-		Act = Lync.enum({ "Cut", "Place", "Flip", "Dog", "Topping" }),
-		Slot = Lync.int(0, 8), -- grill slot (Place, Flip, Dog); 0 otherwise
+		Act = Lync.enum({ "Cut", "Place", "Flip", "Collect", "Topping" }),
+		Slot = Lync.int(0, 8), -- grill slot (Place, Flip, Collect); 0 otherwise
 		Score = Lync.int(0, 100), -- the gesture score the client measured (Grade.Score); Place / Flip ignore it
 		Key = Lync.optional(Lync.enum(Content.Ingredients.ToppingKeys)), -- Topping
 		Points = Lync.optional(Lync.array(Lync.int(0, 4095), 0, 24)), -- the drawn sauce (HotDogVisual.Sauce wire)

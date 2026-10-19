@@ -177,17 +177,20 @@ function Kit.Ball(parent: Instance, at: Vector3, color: Color3, size: number, tr
 	return part
 end
 
--- The top centre and the horizontal axes of the visible parts of an instance (a model, a folder): its bounding box on the floor plan
-function Kit.Bounds(target: Instance): (Vector3, Vector3)
+-- The top centre and the size of the visible parts of instances (models, folders): their bounding box on the floor plan
+function Kit.BoundsOf(targets: { Instance }): (Vector3, Vector3)
 	local low = Vector3.new(math.huge, math.huge, math.huge)
 	local high = -low
-	for _, part in target:GetDescendants() do
-		if part:IsA("BasePart") and part.Transparency < 1 then
-			const half = part.Size / 2
-			for _, corner in { Vector3.new(-1, -1, -1), Vector3.new(1, 1, 1), Vector3.new(-1, 1, 1), Vector3.new(1, -1, -1) } do
-				const point = (part.CFrame * CFrame.new(half * corner)).Position
-				low = low:Min(point)
-				high = high:Max(point)
+	const corners = { Vector3.new(-1, -1, -1), Vector3.new(1, 1, 1), Vector3.new(-1, 1, 1), Vector3.new(1, -1, -1) }
+	for _, target in targets do
+		for _, part in target:GetDescendants() do
+			if part:IsA("BasePart") and part.Transparency < 1 then
+				const half = part.Size / 2
+				for _, corner in corners do
+					const point = (part.CFrame * CFrame.new(half * corner)).Position
+					low = low:Min(point)
+					high = high:Max(point)
+				end
 			end
 		end
 	end
@@ -195,6 +198,11 @@ function Kit.Bounds(target: Instance): (Vector3, Vector3)
 		return Vector3.zero, Vector3.zero
 	end
 	return Vector3.new((low.X + high.X) / 2, high.Y, (low.Z + high.Z) / 2), high - low
+end
+
+-- Kit.BoundsOf of one instance
+function Kit.Bounds(target: Instance): (Vector3, Vector3)
+	return Kit.BoundsOf({ target })
 end
 
 return table.freeze(Kit)

@@ -543,19 +543,10 @@ function Grill.FlipAt(ctx: Context, grill: Station, slot: number, latency: numbe
 	return score
 end
 
--- Cooking focus: takes the Ready sausage of `slot` off the grill (onto a plate). Returns (taken, flip score or nil = never flipped).
-function Grill.TakeReady(ctx: Context, grill: Station, slot: number): (boolean, number?)
-	const record = grill.Records[slot]
-	if record == nil or record.State ~= "Ready" then
-		return false, nil
-	end
-	const score = flippedOf(grill)[slot]
-	clearStamps(grill, slot)
-	grill.Records[slot] = StationApi.empty(GRILL)
-	sync(ctx, grill)
-	ctx.Publish(grill)
-	refreshCollect(ctx, grill)
-	return true, score
+-- Cooking focus (DEC-310): the Ready sausage of `slot` goes to the rest rail with its flip stamps, as "Collect" does.
+-- Returns (ok, reason?) with reason "NotReady" | "RailFull".
+function Grill.CollectAt(ctx: Context, grill: Station, slot: number): (boolean, string?)
+	return collectSlot(ctx, grill, slot)
 end
 
 -- Sausages on the grills of the vehicle (any slot that is not Empty).

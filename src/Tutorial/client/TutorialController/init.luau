@@ -201,6 +201,8 @@ const DEV_PREFIX = "[TutorialDev]"
 const RESTAURANT = Content.Restaurant
 const TABLET_TAKE = "tablet_take"
 const PLATE_TAKE = "plate_take"
+const PLATE_ADD_BUN = "plate_add_bun"
+const PLATE_ADD_SAUSAGE = "plate_add_sausage"
 const COOK_ACTION = "cook_focus"
 const COOK_FOCUS = "CookStation" -- local Player attribute: the cooking focus station open now (CookController)
 const PLATE = "plate"
@@ -1003,32 +1005,45 @@ function TutorialController:DecideRestaurant(guestId: number, guest: GuestRecord
 		end
 		return "r_pickup", self:Anchor(PICKUP_SERVE, false) or self:Anchor("serve", false, onGuest) or rig, ""
 	end
-	-- cooking focus (kitchen-focus.md §1; owner 2026-10-19): plate -> cut the bun on it -> grill, flip, drag the sausage onto it ->
-	-- toppings. Outside the focus the arrow points at the station's Prompt_Cook; inside it the focus HUD and these hints guide.
+	-- pre-prep (DEC-310): cut a bun to the cut-bun pile, grill a sausage to the rest rail, then take a plate and pick both onto it
+	-- (world prompts), then the toppings. Outside a focus the arrow points at the station's Prompt_Cook; inside it the focus HUD
+	-- and these hints guide.
 	const plate = self:HeldPlate()
 	if plate == nil and crewHasHotDog() then
 		return "r_crew", self:Anchor(PICKUP_SERVE, false), ""
 	end
+	const kitchen = self:Kitchen()
+	const focus = Players.LocalPlayer:GetAttribute(COOK_FOCUS)
+	const buns = kitchen.BoardWorking or kitchen.BoardReady
+	if plate ~= nil and not plate.Bun and kitchen.BoardReady then
+		return "r_bun_plate", self:Anchor(PLATE_ADD_BUN, true) or self:Anchor(PLATE_ADD_BUN, false), ""
+	end
+	if plate ~= nil and plate.Bun and not plate.Sausage and kitchen.Rail > 0 then
+		return "r_dog_plate", self:Anchor(PLATE_ADD_SAUSAGE, true) or self:Anchor(PLATE_ADD_SAUSAGE, false), ""
+	end
+	if not buns and (plate == nil or not plate.Bun) then
+		return "r_cut", if focus == "Board" then nil else self:CookAnchor("Board"), ""
+	end
+	if kitchen.Rail == 0 and (plate == nil or not plate.Sausage) then
+		if focus ~= "Grill" then
+			return "r_grill", self:CookAnchor("Grill"), ""
+		end
+		-- inside the grill focus: what the sausages want
+		const grill = self:GrillState()
+		if grill.Ready then
+			return "r_collect", nil, ""
+		elseif grill.FlipNow then
+			return "r_flip", nil, ""
+		elseif grill.Working then
+			return "r_cooking", nil, ""
+		end
+		return "r_grill", nil, ""
+	end
 	if plate == nil then
 		return "r_take_plate", self:Anchor(PLATE_TAKE, false), ""
 	end
-	const focus = Players.LocalPlayer:GetAttribute(COOK_FOCUS)
-	if not plate.Bun then
-		return "r_cut", if focus == "Board" then nil else self:CookAnchor("Board"), ""
-	end
-	if focus ~= "Grill" then
-		return "r_grill", self:CookAnchor("Grill"), ""
-	end
-	-- inside the grill focus: what the sausages want
-	const grill = self:GrillState()
-	if grill.Ready then
-		return "r_dog_plate", nil, ""
-	elseif grill.FlipNow then
-		return "r_flip", nil, ""
-	elseif grill.Working then
-		return "r_cooking", nil, ""
-	end
-	return "r_grill", nil, ""
+	-- the bun is still being cut
+	return "r_bun_plate", self:Anchor(PLATE_ADD_BUN, false), ""
 end
 
 -- The Prompt_Cook of a cooking focus station ("Board" | "Grill" | "Toppings")

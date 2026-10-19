@@ -17,6 +17,7 @@
 -- as Flipped and lifts the grade one band (Grade.Assembly, kitchen-world.md §4).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
+local PlateTool = require(ReplicatedStorage.shared.Plate.PlateTool)
 local StationApi = require(script.Parent.Parent.StationApi)
 local Refusal = require(script.Parent.Parent.Refusal)
 
@@ -126,6 +127,8 @@ const add: StationApi.Action = {
 		if plate == nil or front == nil then
 			return
 		end
+		-- the flip score first (cooking focus, DEC-310): FillPlate may turn the plate into the hot dog, which carries Scores over
+		PlateTool.SetScore(plate, "flip", front.Score or Content.Prep.Grades.Unflipped)
 		if not ctx.FillPlate(player, plate, "Sausage", { Altered = front.Altered, Flipped = front.Flip }) then
 			return
 		end

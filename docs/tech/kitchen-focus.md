@@ -13,6 +13,13 @@ gestos nos objetos 3D (mouse, toque, controle). Respostas do dono (2026-10-19):
 | Nota | **precisão conta**: corte, salsicha no pão, virar e cada condimento dão nota por gesto |
 | Sair do foco | os dois: botão Voltar (B / Backspace) ou andar, **e** sai sozinho ao terminar o passo |
 
+> **DEC-310 (2026-10-19) vale sobre §1, §4 e §5:** tábua e grelha são **pré-preparo** (sem prato). O corte vai para a
+> pilha de pães cortados (`TLR_BUN_CUT`, cesta da direita) e a salsicha pronta, com um toque, vai para o descanso
+> (`TRL-SAUSAGE_RAIL`). Montar é pegar o que está pronto: **Add Bun** na cesta de cortados e **Add Sausage** no descanso
+> (prompts de mundo; levam a nota do corte e a do virar para o prato), depois os condimentos em foco com o prato **pousado
+> na laje da mesa** (raycast). Pacote `Cook`: `Dog` vira `Collect`. Câmera: encaixa a caixa da estação na tela (grelha +
+> descanso; tábua + as duas cestas), olhando de frente para a bancada e abaixo do teto.
+
 ## 1. Fluxo (ordem fixa: prato → pão → salsicha → condimentos)
 
 | # | Onde | Prompt | No foco | Servidor |

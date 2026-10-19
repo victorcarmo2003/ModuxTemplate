@@ -1,23 +1,22 @@
 --!strict
--- Grill of the cooking focus (kitchen-focus.md §1 #3). The camera is over the bars; the plate in hand sits beside the grill.
+-- Grill of the cooking focus (kitchen-focus.md §1 #3; DEC-310 pre-prep). The camera is over the bars; no plate here.
 --   tap an empty place          -> Cook Place (a sausage from the box onto that place)
 --   tap a cooking sausage       -> Cook Flip (once; the score is the server's: how close to the middle of the flip window)
---   drag a ready sausage        -> onto the bun of the plate: Cook Dog, scored by Gestures.Place -> Grade.Score sausage_place
+--   tap a ready sausage         -> Cook Collect (it goes to the rest rail with its flip score; "Add Sausage" there puts it
+--                                  on a plate)
 -- A marker over each sausage says what it wants: Mustard = flip now (inside Restaurant.Grill.FlipFrom..FlipTo), Green = ready.
--- The sausages themselves are the world's (KitchenController draws them from the Stations set). The step ends when the plate
--- becomes the hot dog.
+-- The sausages themselves are the world's (KitchenController draws them from the Stations set). The focus stays until the
+-- player leaves (Back, walking): the grill is a batch station.
+local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local Content = require(ReplicatedStorage.shared.Content)
-local Grade = require(ReplicatedStorage.shared.Prep.Grade)
-local Gestures = require(script.Parent.Gestures)
 local Kit = require(script.Parent.Kit)
 local Session = require(script.Parent.Session)
 
-const BUILD = Content.Prep.Build
 const WINDOW = Content.Restaurant.Grill
 const PICK = 0.4 -- studs from a place a tap still picks it
-const SLACK = 0.4 -- bun-space margin a drop still lands in
+const RAIL_KIND = "rail" -- StationKind of the rest rail
 const FLIP_COLOR = Color3.fromHex("#F6C12B")
 const READY_COLOR = Color3.fromHex("#5FA36A")
 const HOVER_COLOR = Color3.fromHex("#FFFFFF")
@@ -26,12 +25,22 @@ const SLOT_FACTOR = 100
 type Place = { Slot: number, At: Vector3 }
 
 const Grill = {}
+-- StationId of the rest rail of the world (nil when none bound)
+local function railId(): number?
+	for _, station in CollectionService:GetTagged("Station") do
+		const id = station:GetAttribute("StationId")
+		if station:GetAttribute("StationKind") == RAIL_KIND and type(id) == "number" then
+			return id
+		end
+	end
+	return nil
+end
 
 function Grill.Start(session: Session.Session): Session.Handler
 	const folder = session.Folder
 	const target = session.Target
 	const up = Vector3.yAxis
-	const right = session.Right
+	const rail = railId()
 
 	-- the places: Attachments with a Slot inside the grill (the level's one wins over an unlevelled one, as the server does)
 	const places: { [number]: Place } = {}
@@ -49,42 +58,11 @@ function Grill.Start(session: Session.Session): Session.Handler
 		break
 	end
 
-	-- the plate beside the grill (right side of the screen)
-	const extent = (math.abs(session.Size.X * right.X) + math.abs(session.Size.Z * right.Z)) / 2
-	const plateBase = CFrame.fromMatrix(Vector3.new(session.Top.X, height, session.Top.Z) + right * (extent + 0.9), right, up)
-	const plateFolder = Instance.new("Folder")
-	plateFolder.Name = "Plate"
-	plateFolder.Parent = folder
-	local bun: Kit.Bun? = nil
-	local shown = ""
-
-	local function drawPlate(hasBun: boolean)
-		plateFolder:ClearAllChildren()
-		const plate = Kit.Plate()
-		Kit.SitOn(plate, plateBase)
-		plate.Parent = plateFolder
-		const _, size = plate:GetBoundingBox()
-		const top = plateBase + up * size.Y
-		bun = nil
-		if hasBun then
-			const model = Kit.Food("BunOpen")
-			if model ~= nil then
-				Kit.SitOn(model, top)
-				model.Parent = plateFolder
-				const box, bunSize = model:GetBoundingBox()
-				bun = { Frame = CFrame.fromMatrix(box.Position + up * (bunSize.Y / 2), right, up), Length = bunSize.X, Width = bunSize.Z }
-			end
-		end
-	end
-
 	const marks = Instance.new("Folder")
 	marks.Name = "Marks"
 	marks.Parent = folder
 	const hover = Kit.Ball(folder, Vector3.zero, HOVER_COLOR, 0.3, 1)
-
-	local dragging: number? = nil
-	local ghost: Model? = nil
-	local finished = false
+	local shown = ""
 
 	local function stationId(): number?
 		const value = target:GetAttribute("StationId")
@@ -94,6 +72,15 @@ function Grill.Start(session: Session.Session): Session.Handler
 	local function record(slot: number): any?
 		const id = stationId()
 		return if id then session.Records()[id * SLOT_FACTOR + slot] else nil
+	end
+
+	-- sausages waiting on the rest rail
+	local function railCount(): number?
+		if rail == nil then
+			return nil
+		end
+		const value = session.Records()[rail * SLOT_FACTOR]
+		return if value ~= nil then value.Count or 0 else 0
 	end
 
 	local function nearest(position: Vector2): number?
@@ -116,31 +103,14 @@ function Grill.Start(session: Session.Session): Session.Handler
 		return best
 	end
 
-	local function dropGhost()
-		if ghost ~= nil then
-			ghost:Destroy()
-			ghost = nil
-		end
-		dragging = nil
-	end
-
 	local function hint()
-		const held = session.Held()
-		const item = if held then held:GetAttribute("Item") else nil
-		if item ~= "plate" then
-			session.Hint("Grill: tap a spot to cook a sausage. Bring a plate with a bun to serve it")
-		elseif held ~= nil and held:GetAttribute("Bun") ~= true then
-			session.Hint("Cut a bun on your plate first (the cutting board)")
-		else
-			session.Hint("Tap to grill, tap again to flip, drag a ready one onto the bun")
-		end
+		const count = railCount()
+		const tail = if count ~= nil then ` On the rest rail: {count}` else ""
+		session.Hint(`Tap a spot to grill, tap again to flip, tap a ready one to send it to the rest rail.{tail}`)
 	end
 
 	return {
 		Pointer = function(kind: string, position: Vector2)
-			if finished then
-				return
-			end
 			if kind == "Down" then
 				const slot = nearest(position)
 				if slot == nil then
@@ -152,75 +122,22 @@ function Grill.Start(session: Session.Session): Session.Handler
 				elseif state.State == "Working" and (state.Flip or 0) == 0 then
 					session.Send({ Act = "Flip", Slot = slot, Score = 0 })
 				elseif state.State == "Ready" then
-					dragging = slot
-					ghost = Kit.Food("SausageGrilled")
-					if ghost ~= nil then
-						ghost.Parent = folder
-					end
+					session.Send({ Act = "Collect", Slot = slot, Score = 0 })
 				end
 				return
 			end
-			const slot = dragging
-			if slot == nil then
-				-- the place under the pointer glows
-				const near = if kind == "Move" then nearest(position) else nil
-				const place = if near then places[near] else nil
-				hover.Transparency = if place then 0.55 else 1
-				if place ~= nil then
-					hover.Position = place.At + up * 0.12
-				end
-				return
+			-- the place under the pointer glows
+			const near = if kind == "Move" then nearest(position) else nil
+			const place = if near then places[near] else nil
+			hover.Transparency = if place then 0.55 else 1
+			if place ~= nil then
+				hover.Position = place.At + up * 0.12
 			end
-			const plane = Kit.OnPlane(position, plateBase.Position + up * 0.2, up)
-			if kind == "Move" then
-				const model = ghost
-				if model ~= nil and plane ~= nil then
-					model:PivotTo(CFrame.fromMatrix(plane + up * 0.15, right, up))
-				end
-				return
-			end
-			-- Up: the drop
-			const current = bun
-			dropGhost()
-			if plane == nil then
-				return
-			end
-			if current == nil then
-				session.Hint("Cut a bun on your plate first (the cutting board)")
-				return
-			end
-			const x, y = Kit.BunPoint(current, plane)
-			if x < -SLACK or x > 1 + SLACK or y < -1 - SLACK or y > 2 + SLACK then
-				session.Hint("Drop the sausage on the bun")
-				return
-			end
-			const score = Grade.Score(Content.Prep, "sausage_place", Gestures.Place(x, y, BUILD.Aspect, BUILD.Groove.X, BUILD.Groove.Y))
-			session.Graded(score)
-			session.Send({ Act = "Dog", Slot = slot, Score = score })
 		end,
 		Step = function(_dt: number)
-			if finished then
-				return
-			end
-			const held = session.Held()
-			const item = if held then held:GetAttribute("Item") else nil
-			if item == "hot_dog" and held ~= nil and (held:GetAttribute("PlateId") or 0) ~= 0 then
-				finished = true
-				plateFolder:ClearAllChildren()
-				marks:ClearAllChildren()
-				session.Hint("Hot dog on the plate! Now the toppings")
-				session.Done()
-				return
-			end
-			const signature = if item == "plate" then (if held and held:GetAttribute("Bun") == true then "bun" else "plate") else "none"
+			const signature = tostring(railCount())
 			if signature ~= shown then
 				shown = signature
-				if signature == "none" then
-					plateFolder:ClearAllChildren()
-					bun = nil
-				else
-					drawPlate(signature == "bun")
-				end
 				hint()
 			end
 			-- what each sausage wants
@@ -231,7 +148,7 @@ function Grill.Start(session: Session.Session): Session.Handler
 				if state == nil then
 					continue
 				end
-				if state.State == "Ready" and dragging ~= slot then
+				if state.State == "Ready" then
 					Kit.Ball(marks, place.At + up * 0.45, READY_COLOR, 0.16, 0)
 				elseif state.State == "Working" and (state.Flip or 0) == 0 and state.Duration > 0 then
 					const fraction = (now - state.StartedAt) / state.Duration
@@ -241,9 +158,7 @@ function Grill.Start(session: Session.Session): Session.Handler
 				end
 			end
 		end,
-		Stop = function()
-			dropGhost()
-		end,
+		Stop = function() end,
 	}
 end
 

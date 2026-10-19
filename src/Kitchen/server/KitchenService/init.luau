@@ -101,14 +101,13 @@ const COFFEE = "coffee"
 const PLATE = PlateTool.Plate
 const PLATE_ATTR = PlateTool.Attr
 -- Cooking focus (kitchen-focus.md §5; owner 2026-10-19): the focus does these; their world prompts stay off and a prompt request
--- for them is refused (the station modules keep the handlers; the focus calls the stations through Cook.luau)
+-- for them is refused (the station modules keep the handlers; the focus calls the stations through Cook.luau). DEC-310: picking
+-- the ready bun and sausage onto the plate (plate_add_bun, plate_add_sausage) is a world prompt again.
 const FOCUS_ONLY: { [string]: boolean } = {
 	grill_place = true,
 	grill_flip = true,
 	grill_collect = true,
 	bun_cut = true,
-	plate_add_bun = true,
-	plate_add_sausage = true,
 	topping_add = true,
 }
 -- StationKinds of the old flows still on the map (kitchen-world.md §5): skipped quietly, scenery until the binding removes them
