@@ -151,18 +151,15 @@ end
 -- The cards from the current records, oldest first.
 function OrderBoardController:Build(): { OrderBoard.Card }
 	const now = workspace:GetServerTimeNow()
-	const restaurant = Content.Restaurant.Rules.Enabled
 	const urgentAt = Content.Restaurant.Rules.UrgentAt
 
 	-- plates by ticket and line
 	const plates: { [number]: { [number]: Plate } } = {}
-	if restaurant then
-		for _, plate in self.Plates do
-			if plate.Npc ~= 0 then
-				const lines = plates[plate.Npc] or {}
-				lines[if plate.Line == 2 then 2 else 1] = plate
-				plates[plate.Npc] = lines
-			end
+	for _, plate in self.Plates do
+		if plate.Npc ~= 0 then
+			const lines = plates[plate.Npc] or {}
+			lines[if plate.Line == 2 then 2 else 1] = plate
+			plates[plate.Npc] = lines
 		end
 	end
 
@@ -202,23 +199,21 @@ function OrderBoardController:Build(): { OrderBoard.Card }
 		end
 
 		local state = QUEUED
-		if restaurant then
-			if lines then
-				-- a pair is as far as its slowest hot dog
-				local rank = RANK.Ready
-				if first then
-					rank = RANK[plateState(first, record.Order)]
-				end
-				if pair and second then
-					rank = math.min(rank, RANK[plateState(second, record.Order2)])
-				end
-				state = BY_RANK[rank]
-				self.LastState[id] = state
-			else
-				-- the plate left the pass: in a player's hands
-				const last = self.LastState[id]
-				state = if last == nil then QUEUED elseif last == READY then READY else PREPARING
+		if lines then
+			-- a pair is as far as its slowest hot dog
+			local rank = RANK.Ready
+			if first then
+				rank = RANK[plateState(first, record.Order)]
 			end
+			if pair and second then
+				rank = math.min(rank, RANK[plateState(second, record.Order2)])
+			end
+			state = BY_RANK[rank]
+			self.LastState[id] = state
+		else
+			-- the plate left the pass: in a player's hands
+			const last = self.LastState[id]
+			state = if last == nil then QUEUED elseif last == READY then READY else PREPARING
 		end
 
 		local patience = -1
@@ -240,21 +235,19 @@ function OrderBoardController:Build(): { OrderBoard.Card }
 	end
 
 	-- restaurant: an order still being told at a tablet (FEAT-043) is the newest card, "NEW", no bar yet
-	if restaurant then
-		for _, tablet in self.Tablets do
-			const record = self.Customers[tablet.Npc]
-			if tablet.State ~= "Talking" or tablet.Npc == 0 or (record ~= nil and record.State == "Waiting") then
-				continue
-			end
-			const rows = { rowOf(tablet.Order, nil, true) }
-			if tablet.Order2 ~= nil then
-				table.insert(rows, rowOf(tablet.Order2, nil, true))
-			end
-			table.insert(entries, {
-				Since = if tablet.StartedAt > 0 then tablet.StartedAt else now,
-				Card = { Id = tablet.Npc, Number = 0, Rows = rows, State = QUEUED, Patience = -1 },
-			})
+	for _, tablet in self.Tablets do
+		const record = self.Customers[tablet.Npc]
+		if tablet.State ~= "Talking" or tablet.Npc == 0 or (record ~= nil and record.State == "Waiting") then
+			continue
 		end
+		const rows = { rowOf(tablet.Order, nil, true) }
+		if tablet.Order2 ~= nil then
+			table.insert(rows, rowOf(tablet.Order2, nil, true))
+		end
+		table.insert(entries, {
+			Since = if tablet.StartedAt > 0 then tablet.StartedAt else now,
+			Card = { Id = tablet.Npc, Number = 0, Rows = rows, State = QUEUED, Patience = -1 },
+		})
 	end
 
 	table.sort(entries, function(a: Entry, b: Entry): boolean
@@ -267,9 +260,6 @@ function OrderBoardController:Build(): { OrderBoard.Card }
 	const cards: { OrderBoard.Card } = {}
 	for index, entry in entries do
 		-- trailer flow: the oldest order is the one being made
-		if not restaurant then
-			entry.Card.State = if index == 1 then PREPARING else QUEUED
-		end
 		table.insert(cards, entry.Card)
 	end
 	return cards

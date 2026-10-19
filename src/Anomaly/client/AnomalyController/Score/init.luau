@@ -141,9 +141,8 @@ local function showCaption(director: Director, key: string)
 		warnOnce(director, `caption:{key}`, `unknown caption "{key}" (Content.Score.Captions)`)
 		return
 	end
-	const restaurant = Content.Restaurant.Rules.Enabled
 	director.CaptionTitle(row.Title)
-	director.CaptionLine(if restaurant then row.Line else (row.LineTrailer or row.Line))
+	director.CaptionLine(row.Line)
 	director.CaptionShown(true)
 	director.CaptionToken += 1
 	const token = director.CaptionToken
@@ -397,7 +396,7 @@ end
 
 local function step(director: Director)
 	const seen = read(director)
-	local pick: Stage.Pick = Stage.Pick(seen, Content.Restaurant.Rules.Enabled)
+	local pick: Stage.Pick = Stage.Pick(seen)
 	if not open(director) then
 		const calm: Stage.Pick = { Stage = "Calm", Since = 0, Ramp = 0, Ref = nil }
 		pick = calm

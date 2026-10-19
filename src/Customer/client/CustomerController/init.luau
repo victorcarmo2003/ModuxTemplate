@@ -642,12 +642,9 @@ end
 -- Customer of the card: (restaurant: the Ticket in my hand,) the prompt target's rig when it is Waiting, else
 -- (restaurant: the front of the pickup line, else) the Q1 customer in Waiting. My talk is read by the card methods.
 function CustomerController:PickFocus(): number
-	const restaurant = RESTAURANT.Rules.Enabled
-	if restaurant then
-		const ticket = self:TicketFocus()
-		if ticket ~= 0 then
-			return ticket
-		end
+	const ticket = self:TicketFocus()
+	if ticket ~= 0 then
+		return ticket
 	end
 	const target = self.Dependencies.PromptController.Target
 	const rig = if target then target.Rig else nil
@@ -655,11 +652,9 @@ function CustomerController:PickFocus(): number
 	if typeof(value) == "number" and isWaiting(self.Entries[value]) then
 		return value
 	end
-	if restaurant then
-		const front = self:PickupFocus()
-		if front ~= 0 then
-			return front
-		end
+	const front = self:PickupFocus()
+	if front ~= 0 then
+		return front
 	end
 
 	const character = Players.LocalPlayer.Character
@@ -703,9 +698,6 @@ end
 
 -- Reactive: my talk at a tablet (restaurant), the top priority of the card; nil = none.
 function CustomerController:CardTalk(): Talk?
-	if not RESTAURANT.Rules.Enabled then
-		return nil
-	end
 	const talk = self.Dependencies.TabletController:MyTalk()
 	if talk == nil then
 		return nil

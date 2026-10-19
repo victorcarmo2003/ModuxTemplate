@@ -58,11 +58,11 @@ function TrailerFront.DriveThru(stop: CFrame, kitchen: CFrame, from: Vector3, gr
 	}
 end
 
--- The front for the current map: the drive-thru stop when `restaurant` and DT-STOP is bound (coming from the lane of
+-- The front for the current map: the drive-thru stop when DT-STOP is bound (coming from the lane of
 -- `lane`, abeam the stop), else the trailer front. Same call on the server (Anomalies/ANM-008) and the client.
-function TrailerFront.Pick(restaurant: boolean, trailer: CFrame, across: CFrame?, lane: CFrame?, driveStop: CFrame?): Front
+function TrailerFront.Pick(trailer: CFrame, across: CFrame?, lane: CFrame?, driveStop: CFrame?): Front
 	const ground = if lane ~= nil then lane.Position.Y else nil
-	if restaurant and driveStop ~= nil then
+	if driveStop ~= nil then
 		local from = driveStop.Position + Vector3.new(0, 0, 40)
 		if lane ~= nil then
 			const dir = flat(lane.LookVector)

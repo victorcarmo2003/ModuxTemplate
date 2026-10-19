@@ -345,7 +345,7 @@ end
 
 -- The one prompt a slot may show (R-3): FLIP in the pause (restaurant only), COLLECT when Ready, nil otherwise.
 local function slotPrompt(station: Station, slot: number, now: number): string?
-	if Content.Restaurant.Rules.Enabled and inPause(station, slot, now) then
+	if inPause(station, slot, now) then
 		return FLIP
 	end
 	const record = station.Records[slot]
@@ -380,9 +380,6 @@ end
 
 -- Restaurant on (R-3): each flip anchor sits on the slot anchor it flips, so Flip and Collect share one spot.
 local function alignFlipAnchors(station: Station)
-	if not Content.Restaurant.Rules.Enabled then
-		return
-	end
 	for _, anchor in station.Anchors do
 		if anchor:GetAttribute("PromptAction") ~= FLIP or not anchor:IsA("Attachment") then
 			continue
@@ -609,7 +606,7 @@ end
 -- Restaurant "Flip" on a slot of the touched grill, only in the pause (TASK-378).
 const flip: StationApi.Action = {
 	Validate = function(ctx: Context, station: Station, _player: Player, anchor: Instance): (boolean, string?)
-		if not Content.Restaurant.Rules.Enabled or station.Kind ~= GRILL then
+		if station.Kind ~= GRILL then
 			return false, nil
 		end
 		const slot = flipSlotOf(anchor)

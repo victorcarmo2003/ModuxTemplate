@@ -172,7 +172,6 @@ SupplyService:OnInit(function(self)
 	if
 		not self.Dependencies.PlaceService:Is("Run")
 		or not Content.Restaurant.Supply.Enabled
-		or not Content.Restaurant.Rules.Enabled
 	then
 		return
 	end

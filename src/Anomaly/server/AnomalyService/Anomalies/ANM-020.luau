@@ -59,7 +59,6 @@ type Stage = "Omen" | "Dark" | "Attacked"
 
 type State = {
 	Stage: Stage,
-	Restaurant: boolean, -- Content.Restaurant.Rules.Enabled at the start (TASK-444 timeline)
 	DarkAt: number, -- restaurant: the end of the omen
 	AttackAt: number,
 	RestoreAt: number, -- set at the attack
@@ -140,31 +139,7 @@ end
 
 -- 30 s in the dark: the shape attacks whoever is in the trailer zone.
 local function attack(ctx: Api.Context, occ: Api.Occurrence, state: State, now: number)
-	if state.Restaurant then
-		attackRestaurant(ctx, occ, state, now)
-		return
-	end
-	state.Stage = "Attacked"
-	state.RestoreAt = now + state.RestoreAfter
-	const victims: { Player } = {}
-	for _, player in ctx.Active() do
-		if ctx.Vehicle.IsInside(player) or ctx.InZone(player, state.Point, state.Radius) then
-			table.insert(victims, player)
-		end
-	end
-	ctx.Publish(occ, { Phase = "Failed" })
-	ctx.Cue(occ, SCARE_CUE, 0)
-	if #victims == 0 then
-		ctx.Log(occ, "the shape attacked an empty trailer: nobody fainted")
-		return
-	end
-	task.delay(state.FaintDelay, function()
-		for _, player in victims do
-			if player.Parent ~= nil then
-				Kit.Vital():Fall(player)
-			end
-		end
-	end)
+	attackRestaurant(ctx, occ, state, now)
 end
 
 const Blackout: Api.Module = {
@@ -176,24 +151,17 @@ const Blackout: Api.Module = {
 			return false -- another blackout is on: the agenda tries again later
 		end
 		const rule = ctx.Rule(REF)
-		const restaurant = Content.Restaurant.Rules.Enabled
-		const window = if restaurant
-			then param(rule, "RestaurantWindow", DEFAULT_RESTAURANT_WINDOW)
-			elseif rule ~= nil and rule.Window > 0 then rule.Window
-			else DEFAULT_WINDOW
-		const omen = if restaurant then param(rule, "OmenFor", DEFAULT_OMEN) else 0
+		const window = param(rule, "RestaurantWindow", DEFAULT_RESTAURANT_WINDOW)
+		const omen = param(rule, "OmenFor", DEFAULT_OMEN)
 		const state: State = {
 			Stage = if omen > 0 then "Omen" else "Dark",
-			Restaurant = restaurant,
 			DarkAt = occ.StartedAt + omen,
 			AttackAt = occ.StartedAt + omen + window,
 			RestoreAt = 0,
 			Point = text(rule, "Point", DEFAULT_POINT),
 			Radius = param(rule, "Radius", DEFAULT_RADIUS),
 			FaintDelay = param(rule, "FaintDelay", DEFAULT_FAINT),
-			RestoreAfter = if restaurant
-				then param(rule, "MaxDark", DEFAULT_MAX_DARK)
-				else param(rule, "RestoreAfter", DEFAULT_RESTORE),
+			RestoreAfter = param(rule, "MaxDark", DEFAULT_MAX_DARK),
 			Margin = param(rule, "Margin", DEFAULT_MARGIN),
 		}
 		occ.State = state
@@ -244,7 +212,7 @@ const Blackout: Api.Module = {
 			return
 		end
 		const state = occ.State :: State
-		if state.Stage == "Attacked" and state.Restaurant then
+		if state.Stage == "Attacked" then
 			-- TASK-444: after the attack the dark stays until somebody holds the breaker (the record stays Failed)
 			owner = nil
 			ctx.Cue(occ, RESTORE_CUE, 0)

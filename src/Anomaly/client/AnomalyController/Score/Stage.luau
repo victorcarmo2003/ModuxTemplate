@@ -2,7 +2,7 @@
 -- Pure stage pick of the horror score (TASK-443; Content.Score). No Roblox instance, no time source of its own: the
 -- director hands in what it saw of each anomaly record and the clock.
 --   Of(score, phase)       stage one record asks for (nil = that phase does not score)
---   Pick(seen, restaurant) the stage of the moment: highest Priority wins; between two records asking for the same stage
+--   Pick(seen) the stage of the moment: highest Priority wins; between two records asking for the same stage
 --                          the one seen first in that phase drives the ramp (it is the furthest along)
 --   Next(current, ...)     the director's step: up at once, down only after the current stage's Hold, and a fall from
 --                          Uneasy / Tension / Climax to Calm passes through Release first
@@ -53,7 +53,7 @@ function Stage.Of(score: Content.ScoreAnomaly, phase: string): StageKey?
 	return nil
 end
 
-function Stage.Pick(seen: { Seen }, restaurant: boolean): Pick
+function Stage.Pick(seen: { Seen }): Pick
 	local best: Pick = { Stage = "Calm", Since = 0, Ramp = 0, Ref = nil }
 	for _, entry in seen do
 		const score = ANOMALIES[entry.Ref]
@@ -67,7 +67,7 @@ function Stage.Pick(seen: { Seen }, restaurant: boolean): Pick
 		const priority = Stage.Priority(key)
 		const current = Stage.Priority(best.Stage)
 		if priority > current or (priority == current and key == best.Stage and entry.Since < best.Since) then
-			const ramp = if restaurant then score.Ramp else (score.RampTrailer or score.Ramp)
+			const ramp = score.Ramp
 			const picked: Pick = { Stage = key, Since = entry.Since, Ramp = ramp, Ref = entry.Ref }
 			best = picked
 		end

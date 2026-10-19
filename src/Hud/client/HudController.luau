@@ -735,11 +735,9 @@ function HudController:OrderCard(): Frame
 		end,
 		WarnAt = Content.Moods.Rules.AnnoyedAt,
 		-- talk reveal at the tablet (FEAT-043, TASK-384): items said so far, each new one pops in; restaurant only
-		Reveal = if Content.Restaurant.Rules.Enabled
-			then function()
-				return customer:CardReveal() or math.huge
-			end
-			else nil,
+		Reveal = function()
+			return customer:CardReveal() or math.huge
+		end,
 		Revealed = function()
 			return self:IsOpen("order_card")
 		end,

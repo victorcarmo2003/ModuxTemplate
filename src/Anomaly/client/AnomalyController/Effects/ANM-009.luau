@@ -58,20 +58,14 @@ const spring = Vide.spring
 const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }) -> Instance
 
 const SPEAKER = "???"
-const LINES = {
-	"Rookie? It's me. It's Walt. Open up.",
-	"It's cold out here, Rookie.",
-}
 const SUBTITLE_TIME = 3.5 -- seconds a line stays
 const SERIES_RESET = 20 -- seconds without a knock: the next one starts a new count (Entity 0 only)
 
-const KNOCKS = 3
 const KNOCK_GAP = 0.42
 const DOOR_NAMES = { "Door_Back", "Door_Glass" }
 const NAPKIN_ANCHOR = "VFX_Napkins"
 -- restaurant (owner 2026-10-18, Walt knocking on the back door): the pantry's exit door DOOR-B, from outside
-const RESTAURANT = Content.Restaurant.Rules.Enabled
-const DOOR_POINT = if RESTAURANT then "SCENE-DOOR-OUT" else "AN-05"
+const DOOR_POINT = "SCENE-DOOR-OUT"
 const DOOR_IN_POINT = "SCENE-DOOR" -- restaurant: the inside of DOOR-B (the blackout's door point)
 const OUTSIDE_RANGE = 40 -- studs: a local player outside this near DOOR-B sees the knocker
 
@@ -107,7 +101,6 @@ const WISP_COLOR = Color3.fromHex("#C7E6F5")
 const WISP_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
 
 -- The knocker outside (TASK-333)
-const KNOCKER_CAM = "CAM2" -- Content.Security.Cams key that sees the back door
 const KNOCKER_OUT = 3.2 -- studs out from the door glass
 const KNOCKER_DROP = 7.45 -- studs from the door glass (AN-05) down to the ground when no raycast hits (MAP-01)
 const KNOCKER_BODY = Color3.fromHex("#1E1A2B")
@@ -308,18 +301,7 @@ end
 
 local function knock(ctx: Effect.Context, cue: Effect.Cue)
 	const number = nextSeries(cue)
-	if RESTAURANT then
-		knockRestaurant(ctx, number)
-		return
-	end
-	say(LINES[math.min(number, #LINES)])
-	const at = doorPoint(ctx, vehicleModel(ctx))
-	for i = 1, KNOCKS do
-		ctx.Audio:Play("door_knock", at)
-		if i < KNOCKS then
-			task.wait(KNOCK_GAP)
-		end
-	end
+	knockRestaurant(ctx, number)
 end
 
 -- Door Ajar ---------------------------------------------------------------------------------------------------------
@@ -529,17 +511,15 @@ end
 
 local function doorCrack(ctx: Effect.Context, cue: Effect.Cue)
 	const duration = math.max(cue.Row.Duration, OPEN_TIME + CLOSE_TIME)
-	const vehicle = if RESTAURANT then nil else vehicleModel(ctx)
+	const vehicle = nil :: Instance?
 	local door = doorPoint(ctx, vehicle)
 	const swing = if vehicle then makeSwing(ctx, vehicle) else nil
 	local direction = windDirection(vehicle, door)
 	local origin = napkinOrigin(vehicle, door)
-	if RESTAURANT then
-		const gustAt, gustDirection = restaurantGust(ctx)
-		door = gustAt
-		origin = gustAt
-		direction = gustDirection or direction
-	end
+	const gustAt, gustDirection = restaurantGust(ctx)
+	door = gustAt
+	origin = gustAt
+	direction = gustDirection or direction
 	ctx.Audio:Play("door_creak", door)
 
 	const rng = cue.Rng
@@ -651,37 +631,19 @@ end
 
 -- Feet pose outside the back door, facing it (nil when the door is not known on this client)
 local function knockerPose(ctx: Effect.Context): CFrame?
-	if RESTAURANT then
-		-- SCENE-DOOR-OUT outside DOOR-B, facing SCENE-DOOR; feet on the ground under it
-		const outside = ctx.Point(DOOR_POINT)
-		const inside = ctx.Point(DOOR_IN_POINT)
-		if outside == nil or inside == nil then
-			return nil
-		end
-		const params = RaycastParams.new()
-		params.FilterType = Enum.RaycastFilterType.Exclude
-		params.FilterDescendantsInstances = { ctx.Folder() }
-		const hit = workspace:Raycast(outside.Position + Vector3.new(0, 3, 0), Vector3.new(0, -20, 0), params)
-		const feet = if hit then hit.Position else outside.Position
-		const look = Vector3.new(inside.X, feet.Y, inside.Z)
-		return if (look - feet).Magnitude > 1e-3 then CFrame.lookAt(feet, look) else CFrame.new(feet)
-	end
-	const vehicle = vehicleModel(ctx)
-	const door = doorPoint(ctx, vehicle)
-	if door == nil or vehicle == nil then
+	-- SCENE-DOOR-OUT outside DOOR-B, facing SCENE-DOOR; feet on the ground under it
+	const outside = ctx.Point(DOOR_POINT)
+	const inside = ctx.Point(DOOR_IN_POINT)
+	if outside == nil or inside == nil then
 		return nil
 	end
-	const centre = VehicleRoot.Pivot(vehicle).Position
-	local out = Vector3.new(door.X - centre.X, 0, door.Z - centre.Z)
-	out = if out.Magnitude > 1e-3 then out.Unit else Vector3.zAxis
-	const at = door + out * KNOCKER_OUT
 	const params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
-	params.FilterDescendantsInstances = { vehicle, ctx.Folder() }
-	const hit = workspace:Raycast(at + Vector3.new(0, 2, 0), Vector3.new(0, -20, 0), params)
-	const ground = if hit then hit.Position.Y else door.Y - KNOCKER_DROP
-	const feet = Vector3.new(at.X, ground, at.Z)
-	return CFrame.lookAt(feet, feet - out)
+	params.FilterDescendantsInstances = { ctx.Folder() }
+	const hit = workspace:Raycast(outside.Position + Vector3.new(0, 3, 0), Vector3.new(0, -20, 0), params)
+	const feet = if hit then hit.Position else outside.Position
+	const look = Vector3.new(inside.X, feet.Y, inside.Z)
+	return if (look - feet).Magnitude > 1e-3 then CFrame.lookAt(feet, look) else CFrame.new(feet)
 end
 
 -- Tall silhouette, pivot at the feet, facing -Z (the door)
@@ -713,13 +675,6 @@ local function outsideNear(ctx: Effect.Context): boolean
 	return from:Dot(out) > out:Dot(out) * 0.5 and (root.Position - outside.Position).Magnitude <= OUTSIDE_RANGE
 end
 
--- Watching camera 2 right now (TASK-285 attributes on the LocalPlayer)
-local function onCamera(): boolean
-	const player = Players.LocalPlayer
-	const view = player:GetAttribute("SecurityView")
-	return type(view) == "string" and view ~= "" and player:GetAttribute("SecurityCam") == KNOCKER_CAM
-end
-
 local function mountKnocker(ctx: Effect.Context, occ: Effect.Occurrence)
 	local model: Model? = nil
 	local pose: CFrame? = nil
@@ -741,7 +696,7 @@ local function mountKnocker(ctx: Effect.Context, occ: Effect.Occurrence)
 		if current == nil then
 			return
 		end
-		const visible = live and (if RESTAURANT then Watch.Watching() or outsideNear(ctx) else onCamera())
+		const visible = live and (Watch.Watching() or outsideNear(ctx))
 		if visible ~= shown then
 			shown = visible
 			for _, part in current:GetDescendants() do

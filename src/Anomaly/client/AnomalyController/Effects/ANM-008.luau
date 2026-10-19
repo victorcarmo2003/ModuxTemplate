@@ -163,7 +163,6 @@ local function route(ctx: Effect.Context): Route
 	-- the car drives at the lane's height (E-IN sits on the road), never at the TRL pivot (below the street, TASK-348)
 	-- TASK-490: in the restaurant it brakes at the drive-thru window (DT-STOP), the same pose as the server
 	const front = TrailerFront.Pick(
-		Content.Restaurant.Rules.Enabled,
 		ctx.Point("TRL") or FALLBACK_TRL,
 		ctx.Point("WALKER-10"),
 		eIn,

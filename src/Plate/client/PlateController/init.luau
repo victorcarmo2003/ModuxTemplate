@@ -55,7 +55,7 @@ const RESTAURANT = Content.Restaurant
 const BINDING = RESTAURANT.Binding
 const MAX_TOPPINGS = Content.OrderRules.MaxToppings
 -- the central table replaces the pass (prep-conveyor.md §7.4): Prep.Rules.Mode is the only selector
-const CONVEYOR = RESTAURANT.Rules.Enabled and Content.Prep.Rules.Mode == "Conveyor"
+const CONVEYOR = Content.Prep.Rules.Mode == "Conveyor"
 const SLOT_TAG = if CONVEYOR then BINDING.CenterTag else BINDING.PlateTag
 const SLOT_INDEX = if CONVEYOR then BINDING.CenterIndex else BINDING.PlateIndex
 const TICKET_ANCHOR = if CONVEYOR then BINDING.CenterTicket else BINDING.PlateTicket
@@ -168,7 +168,7 @@ function PlateController:Setup()
 end
 
 function PlateController:Enabled(): boolean
-	return RESTAURANT.Rules.Enabled
+	return true
 end
 
 -- Reactive read of a plate record (nil = no such plate). For other controllers and debugging.
@@ -955,7 +955,7 @@ end
 -- The ticket the HUD shows: the equipped plate (with a ticket or an orphan), else the plate of the own belt seat
 function PlateController:Current(): Current?
 	const hand = self.Hand
-	const held = if hand then hand.Held() else false
+	const held: TicketHud.HeldPlate | false = if hand then hand.Held() else false
 	if held ~= false and (held.Ticket ~= 0 or held.Orphan) then
 		return {
 			Ticket = held.Ticket,
@@ -1047,7 +1047,7 @@ function PlateController:HudCard(): TicketHud.CardProps
 		NoToppings = function()
 			const current = self:Current()
 			const order = if current then self:OrderOf(current.Ticket, current.Line) else nil
-			return order ~= nil and #order == 0
+			return order ~= nil and #(order :: { string }) == 0
 		end,
 		Grade = function(): string?
 			const current = self:Current()

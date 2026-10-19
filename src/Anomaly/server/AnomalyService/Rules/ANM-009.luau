@@ -10,13 +10,12 @@ local Content = require(ReplicatedStorage.shared.Content)
 local Api = require(script.Parent.Parent.Api)
 
 -- restaurant (owner 2026-10-18): longer, the scene builds over it (Content.HorrorScenes anm_009_knock)
-const restaurant = Content.Restaurant.Rules.Enabled
 
 const rule: Api.Rule = {
 	Anomaly = "anm_009_knock",
 	Verb = "refuse",
 	LikelyWrongVerb = "open_door",
-	Window = if restaurant then 20 else 12,
+	Window = 20,
 	IsCritical = false,
 	Params = {
 		-- s after the start of the second series of three knocks (the first one is at 0); it ends ~1 s later, at the
@@ -24,9 +23,9 @@ const rule: Api.Rule = {
 		SecondAt = 10.8,
 		-- restaurant (TASK-561): s of series 2, 3, 4 (far and soft at 0, closer, Walt's voice, the voice wrong); the
 		-- handle and the latch are the scene's (17..19.3 s). PROVISIONAL
-		Series2At = if restaurant then 4.5 else nil,
-		Series3At = if restaurant then 8.5 else nil,
-		Series4At = if restaurant then 12.5 else nil,
+		Series2At = 4.5,
+		Series3At = 8.5,
+		Series4At = 12.5,
 		-- s after the Window the door still bites (the figure is still outside); PROVISIONAL (TASK-333)
 		DoorGrace = 2,
 		-- s between the jumpscare and the faint

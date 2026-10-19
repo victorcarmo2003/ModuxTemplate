@@ -33,7 +33,7 @@ const CONVEYOR = "Conveyor"
 
 -- the F2 world kitchen: restaurant map on and the prep not in the conveyor (never true since TASK-513; TASK-506 cleans up)
 local function enabled(): boolean
-	return Content.Restaurant.Rules.Enabled and Content.Prep.Rules.Mode ~= CONVEYOR
+	return Content.Prep.Rules.Mode ~= CONVEYOR
 end
 
 local function ingredientOf(station: Station): string

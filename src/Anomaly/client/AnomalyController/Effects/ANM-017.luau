@@ -9,7 +9,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 local Hide = require(script.Parent.Kit.Hide)
 
-const restaurant = Content.Restaurant.Rules.Enabled
 
 return Hide.Effect({
 	Ref = "ANM-017",
@@ -19,7 +18,7 @@ return Hide.Effect({
 	Approach = 3,
 	Look = 3,
 	Leave = 3,
-	Path = if restaurant then { "REV-4", "REV-1" } else nil,
+	Path = { "REV-4", "REV-1" },
 	Extend = 7,
 	Face = "TRL",
 })

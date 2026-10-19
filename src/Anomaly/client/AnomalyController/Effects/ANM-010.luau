@@ -51,7 +51,6 @@ const RUN_TEXT = "RUN TO THE MART!"
 const STAY_TEXT = "Stay inside the Mart"
 const SAFE_POINT = "SS"
 -- TASK-490 (restaurant: no Mart): the answer is the shop light OFF, kept off; the arrow stands over the light switch
-const SHOP = Content.Restaurant.Rules.Enabled
 const SHOP_LINE = "The lamps outside are dying! Kill the lights in here, NOW!"
 const SHOP_RUN_TEXT = "TURN OFF THE LIGHTS!"
 const SHOP_STAY_TEXT = "Keep the lights off"
@@ -310,17 +309,7 @@ local function banner(): (ScreenGui, TextLabel, UIScale)
 end
 
 local function nearSafe(ctx: Effect.Context): boolean
-	if SHOP then
-		return not ctx.Light:GroupOn(SWITCH_GROUP)
-	end
-	const character = Players.LocalPlayer.Character
-	const root = if character then character:FindFirstChild("HumanoidRootPart") else nil
-	const point = ctx.Point(SAFE_POINT)
-	if root == nil or not root:IsA("BasePart") or point == nil then
-		return false
-	end
-	const offset = root.Position - point.Position
-	return Vector2.new(offset.X, offset.Z).Magnitude <= SAFE_RADIUS
+	return not ctx.Light:GroupOn(SWITCH_GROUP)
 end
 
 -- Banner + arrow while the record is Active; returns the stop function
@@ -328,7 +317,7 @@ local function runWarning(ctx: Effect.Context, occ: Effect.Occurrence): () -> ()
 	if occ.Elapsed() <= RUN_FRESH then
 		task.spawn(function()
 			Watch.Interrupt()
-			Radio.Say(ctx, if SHOP then SHOP_LINE else RUN_LINE, RUN_LINE_TIME)
+			Radio.Say(ctx, SHOP_LINE, RUN_LINE_TIME)
 		end)
 	end
 	const gui, label, scale = banner()
@@ -339,7 +328,7 @@ local function runWarning(ctx: Effect.Context, occ: Effect.Occurrence): () -> ()
 	const started = os.clock()
 	const connection = RunService.RenderStepped:Connect(function()
 		const safe = nearSafe(ctx)
-		label.Text = if SHOP then (if safe then SHOP_STAY_TEXT else SHOP_RUN_TEXT) elseif safe then STAY_TEXT else RUN_TEXT
+		label.Text = (if safe then SHOP_STAY_TEXT else SHOP_RUN_TEXT)
 		label.TextColor3 = if safe then BANNER_CREAM else BANNER_MUSTARD
 		if not reduced and not safe then
 			scale.Scale = 1 + 0.06 * math.abs(math.sin((os.clock() - started) * math.pi / PULSE))
@@ -347,18 +336,13 @@ local function runWarning(ctx: Effect.Context, occ: Effect.Occurrence): () -> ()
 			scale.Scale = 1
 		end
 		local aim: Vector3? = nil
-		if SHOP then
-			const anchor = ctx.Light:SwitchAnchor()
-			if anchor ~= nil and anchor:IsA("Attachment") then
-				aim = anchor.WorldPosition + Vector3.new(0, SWITCH_LIFT, 0)
-			elseif anchor ~= nil and anchor:IsA("BasePart") then
-				aim = anchor.Position + Vector3.new(0, SWITCH_LIFT, 0)
-			elseif anchor ~= nil and anchor:IsA("Model") then
-				aim = anchor:GetPivot().Position + Vector3.new(0, SWITCH_LIFT, 0)
-			end
-		else
-			const point = ctx.Point(SAFE_POINT)
-			aim = if point ~= nil then point.Position + Vector3.new(0, ARROW_LIFT, 0) else nil
+		const anchor = ctx.Light:SwitchAnchor()
+		if anchor ~= nil and anchor:IsA("Attachment") then
+			aim = anchor.WorldPosition + Vector3.new(0, SWITCH_LIFT, 0)
+		elseif anchor ~= nil and anchor:IsA("BasePart") then
+			aim = anchor.Position + Vector3.new(0, SWITCH_LIFT, 0)
+		elseif anchor ~= nil and anchor:IsA("Model") then
+			aim = anchor:GetPivot().Position + Vector3.new(0, SWITCH_LIFT, 0)
 		end
 		if aim ~= nil and not safe then
 			arrow.Show(ctx.Folder())

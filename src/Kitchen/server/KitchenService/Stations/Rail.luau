@@ -140,7 +140,7 @@ local function takeable(station: Station): number
 end
 
 local function refreshTake(ctx: Context, station: Station)
-	const on = Content.Restaurant.Rules.Enabled and not beltMode() and takeable(station) > 0
+	const on = not beltMode() and takeable(station) > 0
 	for _, anchor in station.Anchors do
 		if anchor:GetAttribute("PromptAction") == TAKE and anchor:GetAttribute("PromptEnabled") ~= on then
 			ctx.SetPrompt(anchor, on, nil)
@@ -150,7 +150,7 @@ end
 
 const take: StationApi.Action = {
 	Validate = function(ctx: Context, station: Station, player: Player, _anchor: Instance): (boolean, string?)
-		if not Content.Restaurant.Rules.Enabled or beltMode() or station.Kind ~= KIND or takeable(station) < 1 then
+		if beltMode() or station.Kind ~= KIND or takeable(station) < 1 then
 			return false, nil
 		end
 		const tool, count = heldStack(ctx, player)

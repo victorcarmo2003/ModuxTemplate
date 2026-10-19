@@ -75,7 +75,7 @@ const LIST: { Step } = {
 		Key = "wait_call",
 		Number = 1,
 		Text = "Wait for the call",
-		Hint = "Your boss is about to call. Stay near the trailer.",
+		Hint = "Your boss is about to call. Stay near the phone.",
 		Action = nil,
 	},
 	-- Owner request 2026-10-12: phone -> open the trailer -> the customer comes. TASK-284 (2026-10-14): the red switch is

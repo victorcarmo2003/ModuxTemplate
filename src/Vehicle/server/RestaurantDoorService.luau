@@ -197,7 +197,7 @@ end
 
 RestaurantDoorService:OnInit(function(self)
 	self:Setup()
-	if not self.Dependencies.PlaceService:Is("Run") or not Content.Restaurant.Rules.Enabled then
+	if not self.Dependencies.PlaceService:Is("Run") then
 		return
 	end
 	self.Enabled = true

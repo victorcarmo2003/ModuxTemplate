@@ -12,6 +12,6 @@ local Hide = require(script.Parent.Kit.Hide)
 return Hide.Module({
 	Ref = "ANM-017",
 	Test = function(): Hide.Test
-		return if Content.Restaurant.Rules.Enabled then "Floor" else "Zone"
+		return "Floor"
 	end,
 })

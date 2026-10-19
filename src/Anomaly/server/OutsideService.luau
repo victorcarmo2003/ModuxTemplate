@@ -149,9 +149,6 @@ function OutsideService:IsSafe(player: Player, root: BasePart): boolean
 	if self.Dependencies.VehicleService:IsInside(player) then
 		return true
 	end
-	if not Content.Restaurant.Rules.Enabled then
-		return false
-	end
 	const p = root.Position
 	for _, box in Content.Restaurant.SafeBoxes do
 		if p.X >= box.Min.X and p.X <= box.Max.X and p.Y >= box.Min.Y and p.Y <= box.Max.Y and p.Z >= box.Min.Z and p.Z <= box.Max.Z then

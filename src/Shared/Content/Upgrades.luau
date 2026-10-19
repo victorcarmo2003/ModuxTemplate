@@ -193,7 +193,7 @@ return Table.new({
 	{
 		Key = "trailer_lights",
 		Ref = "UPG-005",
-		Name = "Trailer Lights",
+		Name = "Patio Lights",
 		Vehicles = { "trailer" }, -- FEAT-015, DEC-055
 		StartLevel = 0,
 		Levels = { trailer = trailerLightsTrailer },
@@ -261,7 +261,7 @@ return Table.new({
 	{
 		Key = "trailer_tables",
 		Ref = "UPG-011",
-		Name = "Trailer Table",
+		Name = "Extra Table",
 		Vehicles = { "trailer" },
 		StartLevel = 0,
 		Levels = { trailer = trailerTablesTrailer },

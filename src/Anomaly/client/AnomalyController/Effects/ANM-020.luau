@@ -489,33 +489,29 @@ local function begin(ctx: Effect.Context, occ: Effect.Occurrence): Session
 		Ended = false,
 	}
 	darkenVehicle(session)
-	if Content.Restaurant.Rules.Enabled then
-		-- total blackout (owner 2026-10-17): the rest of the restaurant, never what LightController or the vehicle pass own
-		const skip = owned(ctx)
-		for _, saved in session.Saved do
-			const instance: Instance? = saved.Light or saved.Part
-			if instance ~= nil then
-				skip[instance] = true
-			end
+	-- total blackout (owner 2026-10-17): the rest of the restaurant, never what LightController or the vehicle pass own
+	const skip = owned(ctx)
+	for _, saved in session.Saved do
+		const instance: Instance? = saved.Light or saved.Part
+		if instance ~= nil then
+			skip[instance] = true
 		end
-		session.Map = Blackout.Darken(skip)
-		Blackout.Look(true)
 	end
+	session.Map = Blackout.Darken(skip)
+	Blackout.Look(true)
 	session.Connection = RunService.RenderStepped:Connect(function()
 		step(session)
 	end)
-	if Content.Restaurant.Rules.Enabled then
-		-- counted from the moment the dark began on this client (the record's StartedAt is the omen's, 2 s earlier), the same
-		-- reference the score uses for the rising note's cut (Play 2026-10-18: 27.98 s vs 30.10 s before this)
-		task.delay(SCARE_AT, function()
-			if session.Ended or current ~= session then
-				return
-			end
-			hideShape(session, false)
-			session.ScaredAt = os.clock()
-			Jumpscare.Show(ctx)
-		end)
-	end
+	-- counted from the moment the dark began on this client (the record's StartedAt is the omen's, 2 s earlier), the same
+	-- reference the score uses for the rising note's cut (Play 2026-10-18: 27.98 s vs 30.10 s before this)
+	task.delay(SCARE_AT, function()
+		if session.Ended or current ~= session then
+			return
+		end
+		hideShape(session, false)
+		session.ScaredAt = os.clock()
+		Jumpscare.Show(ctx)
+	end)
 	current = session
 	return session
 end

@@ -228,9 +228,7 @@ function Rules.Allows(target: Target, context: Context): boolean
 	const probe = plateProbe
 	const conveyor = probe ~= nil and probe.Conveyor == true
 	if RESTAURANT_ACTIONS[target.Action] then
-		if not Content.Restaurant.Rules.Enabled then
-			return false
-		elseif target.Action ~= "tablet_take" then
+		if target.Action ~= "tablet_take" then
 			if probe ~= nil and conveyor then
 				if not centerAllows(target.Action, target.Slot, probe) then
 					return false

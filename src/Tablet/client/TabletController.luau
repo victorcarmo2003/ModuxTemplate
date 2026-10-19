@@ -213,7 +213,7 @@ function TabletController:StepAt(record: Record, talk: Talk, now: number): numbe
 end
 
 function TabletController:Enabled(): boolean
-	return RESTAURANT.Rules.Enabled
+	return true
 end
 
 -- Reactive read of a tablet record (nil = no such tablet). For other controllers and debugging.

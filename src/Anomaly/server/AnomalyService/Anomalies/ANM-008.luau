@@ -163,7 +163,6 @@ const LongCar: Api.Module = {
 		const lane = MapIndex.FindPoint(LANE_POINT)
 		-- TASK-490: in the restaurant it brakes at the drive-thru window (DT-STOP)
 		const front = TrailerFront.Pick(
-			Content.Restaurant.Rules.Enabled,
 			trailer,
 			MapIndex.FindPoint(ACROSS_POINT),
 			lane,

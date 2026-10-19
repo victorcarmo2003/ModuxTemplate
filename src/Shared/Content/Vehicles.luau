@@ -27,7 +27,7 @@ return Table.new({
 	{
 		Key = "trailer",
 		Ref = "UPG-006", -- model AST-027
-		Name = "Open Late Trailer", -- upgrades.md UPG-006 / ui-text.md §3
+		Name = "Open Late", -- upgrades.md UPG-006 / ui-text.md §3 (restaurant name, DEC-307)
 		HasNight = true, -- the night shift is worked in the trailer too
 		RailSlots = 8, -- FEAT-006, UPG-006
 		BoardSlots = 4, -- DEC-215 (3), 4 for the four prep seats (DEC-223, TASK-172, Provisional): board slot n belongs to seat n

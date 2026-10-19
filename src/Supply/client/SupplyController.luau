@@ -47,7 +47,7 @@ const SupplyController = Modux.Controller("SupplyController", {
 })
 
 function SupplyController:Setup()
-	self.Live = (Content.Restaurant.Supply.Enabled and Content.Restaurant.Rules.Enabled) :: boolean
+	self.Live = (Content.Restaurant.Supply.Enabled) :: boolean
 	self.Stock = {} :: { [string]: StockRecord }
 	-- ingredient keys under LowAt now, and the ones already toasted this drop
 	self.LowKeys = Vide.source({}) :: Vide.Source<{ string }>

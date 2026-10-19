@@ -53,7 +53,6 @@ type State = {
 	ZonePoint: string,
 	ZoneRadius: number,
 	Second: boolean,
-	Restaurant: boolean,
 	Series: { number }, -- restaurant: absolute times of series 2.. (cue knock Entity = index + 1)
 	NextSeries: number,
 	Scared: { [number]: boolean },
@@ -94,10 +93,7 @@ local function text(rule: Api.Rule?, name: string, default: string): string
 end
 
 local function inZone(ctx: Api.Context, state: State, player: Player): boolean
-	if state.Restaurant then
-		return true
-	end
-	return ctx.Vehicle.IsInside(player) or ctx.InZone(player, state.ZonePoint, state.ZoneRadius)
+	return true
 end
 
 -- Restaurant series 2.. as absolute times; a time past the window or out of order is dropped
@@ -128,15 +124,7 @@ local function scare(ctx: Api.Context, occ: Api.Occurrence, state: State, player
 		ctx.Cue(occ, "door_crack", 0)
 	end
 	ctx.Cue(occ, SCARE_CUE, userId % ENTITY_MOD)
-	if state.Restaurant then
-		ctx.Fail(occ, { player }) -- DEC-277: -35, falls only at zero
-		return
-	end
-	task.delay(state.ScareFaint, function()
-		if player.Parent ~= nil then
-			Kit.Vital():Fall(player)
-		end
-	end)
+	ctx.Fail(occ, { player }) -- DEC-277: -35, falls only at zero
 end
 
 const Knock: Api.Module = {
@@ -145,7 +133,6 @@ const Knock: Api.Module = {
 	Start = function(ctx: Api.Context, occ: Api.Occurrence): boolean
 		const rule = ctx.Rule(REF)
 		const window = if rule ~= nil and rule.Window > 0 then rule.Window else DEFAULT_WINDOW
-		const restaurant = Content.Restaurant.Rules.Enabled
 		const state: State = {
 			SecondAt = occ.StartedAt + math.min(param(rule, "SecondAt", DEFAULT_SECOND_AT), window),
 			EndsAt = occ.StartedAt + window + param(rule, "DoorGrace", DEFAULT_GRACE),
@@ -153,21 +140,18 @@ const Knock: Api.Module = {
 			ZonePoint = text(rule, "ZonePoint", DEFAULT_ZONE_POINT),
 			ZoneRadius = param(rule, "ZoneRadius", DEFAULT_ZONE_RADIUS),
 			Second = false,
-			Restaurant = restaurant,
-			Series = if restaurant then seriesTimes(rule, occ.StartedAt, window) else {},
+			Series = seriesTimes(rule, occ.StartedAt, window),
 			NextSeries = 1,
 			Scared = {},
 			AnyFailed = false,
 		}
 		occ.State = state
-		if restaurant then
-			-- nobody knocks on an open door: the draught slams it shut first
-			const mapId = Content.Restaurant.ManualDoors[1]
-			const door = restaurantDoor()
-			if mapId ~= nil and door:IsOpen(mapId) then
-				door:SetOpen(mapId, false, nil)
-				ctx.Log(occ, `{mapId} was open: shut at the start`)
-			end
+		-- nobody knocks on an open door: the draught slams it shut first
+		const mapId = Content.Restaurant.ManualDoors[1]
+		const door = restaurantDoor()
+		if mapId ~= nil and door:IsOpen(mapId) then
+			door:SetOpen(mapId, false, nil)
+			ctx.Log(occ, `{mapId} was open: shut at the start`)
 		end
 		ctx.Publish(occ, { Phase = "Active", Step = 1, Anchor = 0 })
 		ctx.Cue(occ, "knock", 1)
@@ -182,17 +166,11 @@ const Knock: Api.Module = {
 
 	Tick = function(ctx: Api.Context, occ: Api.Occurrence, now: number)
 		const state = occ.State :: State
-		if state.Restaurant then
-			const at = state.Series[state.NextSeries]
-			if at ~= nil and now >= at then
-				state.NextSeries += 1
-				ctx.Publish(occ, { Step = state.NextSeries })
-				ctx.Cue(occ, "knock", state.NextSeries)
-			end
-		elseif not state.Second and now >= state.SecondAt then
-			state.Second = true
-			ctx.Publish(occ, { Step = 2 })
-			ctx.Cue(occ, "knock", 2)
+		const at = state.Series[state.NextSeries]
+		if at ~= nil and now >= at then
+			state.NextSeries += 1
+			ctx.Publish(occ, { Step = state.NextSeries })
+			ctx.Cue(occ, "knock", state.NextSeries)
 		end
 		if now < state.EndsAt then
 			return

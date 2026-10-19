@@ -361,7 +361,7 @@ const base = Table.new({
 	hint(
 		"hint_serve",
 		"serve",
-		lines("Nice! Cash goes in the drawer.", "Low on stock? Try the Mart.", "Look both ways.")
+		lines("Nice! Tips go in the jar.", "Low on stock? Grab a box in the pantry.")
 	),
 	hint(
 		"hint_buy_package",
@@ -370,7 +370,7 @@ const base = Table.new({
 	),
 	hint("hint_restock", "restock", lines("That's how you restock. Easy.")),
 	hint("hint_discard", "discard", lines("Messed up? Toss it. No harm.")),
-	hint("hint_bench_buy_upgrade", "bench_buy_upgrade", lines("New gear's on the trailer. Heh.")),
+	hint("hint_bench_buy_upgrade", "bench_buy_upgrade", lines("New gear's in the kitchen. Heh.")),
 } :: { BossCall })
 
 const rules: Rules = {

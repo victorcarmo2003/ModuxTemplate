@@ -9,11 +9,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 local Hide = require(script.Parent.Parent.Anomalies.Kit.Hide)
 
-const restaurant = Content.Restaurant.Rules.Enabled
 
 return Hide.Rule("ANM-017", {
 	-- fast: the shortest warning (DEC-255: 8-10 s); the restaurant gives 10 s to climb (HorrorScenes crawler scene)
-	WarnFor = if restaurant then 10 else 8,
+	WarnFor = 10,
 	PassFor = 9,
 	LookFrom = 3,
 	LookTo = 6,

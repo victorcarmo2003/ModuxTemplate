@@ -706,9 +706,6 @@ end
 -- Restaurant map (R-4): PendingStationKind (a known Content.Stations key) becomes the StationKind before the bind. Map
 -- binding only (CUT-1 is a "cut", never a second board); the kitchen flow is chosen by Prep.Rules.Mode.
 function KitchenService:ApplyPendingKind(instance: Instance)
-	if not Content.Restaurant.Rules.Enabled then
-		return
-	end
 	const pending = instance:GetAttribute(PENDING_KIND)
 	if type(pending) ~= "string" or Content.Stations.ByKey[pending] == nil then
 		return

@@ -657,17 +657,14 @@ function CustomerService:PickupPoints(): number
 	return count
 end
 
--- Pickup line on: Content.Restaurant.Rules.Enabled and PU-1 in the map. Off = the trailer flow (served at Q1).
+-- Pickup line on: PU-1 in the map. Off = the trailer flow (served at Q1).
 function CustomerService:IsPickupMode(): boolean
-	return Content.Restaurant.Rules.Enabled and self:PickupPoints() > 0
+	return self:PickupPoints() > 0
 end
 
--- Orders are taken at the tablet: Content.Restaurant.Rules.Enabled and TAB-1 (Model tagged Binding.TabletTag with
+-- Orders are taken at the tablet: TAB-1 (Model tagged Binding.TabletTag with
 -- Binding.TabletIndex = 1) in the Workspace. The rig's "Take Order" prompt is off then (TabletService calls TakeOrderFor).
 function CustomerService:IsTabletMode(): boolean
-	if not Content.Restaurant.Rules.Enabled then
-		return false
-	end
 	const binding = Content.Restaurant.Binding
 	for _, instance in CollectionService:GetTagged(binding.TabletTag) do
 		if instance:GetAttribute(binding.TabletIndex) == 1 and instance:IsDescendantOf(workspace) then
@@ -796,9 +793,6 @@ end
 
 -- PICKUP Prompt_Serve anchors (Model tagged Binding.PickupTag) on or off.
 function CustomerService:SetPickupPrompt(enabled: boolean)
-	if not Content.Restaurant.Rules.Enabled then
-		return
-	end
 	const binding = Content.Restaurant.Binding
 	for _, model in CollectionService:GetTagged(binding.PickupTag) do
 		if not model:IsDescendantOf(workspace) then
@@ -2564,7 +2558,7 @@ end
 function CustomerService:DevPickupState(): string
 	assert(self.Dependencies.PlaceService:IsDev(), "dev mode only")
 	const lines: { string } = {
-		`restaurant {if Content.Restaurant.Rules.Enabled then "on" else "off"} | pickup mode {self:IsPickupMode()} | tablet mode {self:IsTabletMode()}`,
+		`restaurant {"on"} | pickup mode {self:IsPickupMode()} | tablet mode {self:IsTabletMode()}`,
 		`PU points {self:PickupPoints()} | size {self:PickupSize()} | in line {#self.PickupLine.Order} | full {self:IsPickupFull()} | last #n {self.OrderNumber}`,
 	}
 	const t = now()

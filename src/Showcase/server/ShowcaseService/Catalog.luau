@@ -113,10 +113,6 @@ local function anomalyItems(): { Item }
 				table.insert(actions, act("dev", if step == 4 then "Step 4 (loses)" else `Step {step}`, `walker {step}`))
 			end
 		end
-		if (ref == "ANM-008" or ref == "ANM-009" or ref == "ANM-010") and not Content.Restaurant.Rules.Enabled then
-			table.insert(actions, act("sc", "Go to Mart", "tp:SS"))
-			table.insert(actions, act("sc", "Go to trailer", "tp:TRL"))
-		end
 		table.insert(actions, act("stop", "Reset"))
 		table.insert(out, {
 			Tab = "Anomalies",

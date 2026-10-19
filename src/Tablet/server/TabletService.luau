@@ -408,7 +408,7 @@ function TabletService:DevTablet(index: number?): Tablet
 		error("[TabletService] dev mode only", 3)
 	end
 	if not self.Enabled then
-		error("restaurant off (Content.Restaurant.Rules.Enabled)", 0)
+		error("tablet off (no TAB-1 bound)", 0)
 	end
 	const tablet = self.Tablets[index or HEAD_INDEX]
 	if tablet == nil then
@@ -462,7 +462,7 @@ end
 
 TabletService:OnInit(function(self)
 	self:Setup()
-	if not self.Dependencies.PlaceService:Is("Run") or not Content.Restaurant.Rules.Enabled then
+	if not self.Dependencies.PlaceService:Is("Run") then
 		return
 	end
 	self.Enabled = true
